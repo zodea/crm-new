@@ -12,6 +12,7 @@ import { encodePayrollAdjustmentWire, parsePayrollAdjustmentCommand } from '../.
 import { payrollCanonical } from '../../app/lib/payroll/central-command-shared'
 import { wireExact, wireId, wireObject } from '../../app/lib/payroll/central-payroll-wire'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
+import { createPayrollFeesReferenceCollector } from './payroll-fees-migration-references'
 
 export const PAYROLL_ADJUSTMENT_REFERENCE_TABLES = ['payroll_adjustments', 'payroll_actual_events', 'payroll_actual_allocations', 'payroll_adjustment_applications', 'payroll_a_adjustment_coverage'] as const
 const actions = ['save-adjustment-draft', 'confirm-adjustment', 'confirm-actual-payment', 'confirm-recording-reversal']
@@ -47,16 +48,19 @@ function collector() {
   }
   function original(value: PayrollOriginalWageRef) {
     subject(value)
+    if (value.book)
+      add('payroll_a_management_books', value.book.managementBookId)
     add('wage_statements', value.statementId)
     value.memberWorkerIds.forEach(id => add('workers', id))
     value.members.forEach(subject)
   }
   function coverage(value: PayrollAAdjustmentCoverage) {
+    const revisionTable = value.negativeLineId ? 'payroll_a_negative_lines' : value.feeComponentKey ? 'payroll_a_fee_revisions' : 'payroll_a_price_revisions'
     add('payroll_adjustments', value.adjustmentId)
     add('payroll_adjustments', value.rootAdjustmentId)
     add('wage_statements', value.originalStatementId)
-    add('payroll_a_price_revisions', value.originalPriceRevisionId)
-    add('payroll_a_price_revisions', value.currentPriceRevisionId)
+    add(revisionTable, value.originalPriceRevisionId)
+    add(revisionTable, value.currentPriceRevisionId)
   }
   function basis(value: PayrollAdjustmentBasisDraft | null) {
     if (!value)
@@ -79,6 +83,12 @@ function collector() {
       })
     }
     else {
+      const fees = createPayrollFeesReferenceCollector()
+      if (value.source.schemaVersion === 2)
+        fees.source(value.source)
+      if (value.fees)
+        fees.basis(value.fees)
+      for (const reference of fees.refs) refs.add(reference)
       subject(value.source.subject)
       value.source.subject.memberWorkerIds.forEach(id => add('workers', id))
       const fields = { completionId: 'unit_stage_completions', assignmentId: 'unit_assignments', stageId: 'construction_stages', stageItemId: 'construction_stage_items', unitId: 'units', floorId: 'floors', buildingId: 'buildings', templateId: 'house_type_templates', templateLineId: 'house_type_template_items', roomId: 'rooms', itemId: 'items' } as const

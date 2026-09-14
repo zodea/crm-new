@@ -6,6 +6,7 @@ import { PAYROLL_A_CONFIG_PATH, PAYROLL_SOURCE_KEYS, payrollSourceContext } from
 import { PAYROLL_C1_SOURCE_KEYS, payrollC1SourceContext } from '~/lib/payroll/c1-navigation'
 import { PAYROLL_C2_SOURCE_KEYS, payrollC2SourceContext } from '~/lib/payroll/c2-navigation'
 import { PAYROLL_READ_QUERY_KEYS, payrollViewScope } from '~/lib/payroll/central-navigation'
+import { isQuantitySourceIdentity } from '~/lib/quantity/migration-identity'
 import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { SCHEDULE_DRILL_QUERY_KEYS } from '~/lib/schedule/navigation'
 import { TARGET_COST_FILTER_KEYS, TARGET_COST_LIST_PATH, TARGET_COST_SOURCE_PATHS, TARGET_COST_SOURCE_QUERY_KEYS, targetCostSourceContext } from '~/lib/target-cost/navigation'
@@ -129,7 +130,12 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
           break
         }
       }
-      if (!detail || !isStableRouteIdentity(detail.id) || (detail.secondId != null && !isStableRouteIdentity(detail.secondId)))
+      if (!detail)
+        return null
+      const validDetailId = detail.family === 'crew-worker-fact' && detail.kind === 'assignment'
+        ? isQuantitySourceIdentity(detail.id, 'units')
+        : isStableRouteIdentity(detail.id)
+      if (!validDetailId || (detail.secondId != null && !isStableRouteIdentity(detail.secondId)))
         return null
     }
     const originValue = url.searchParams.get('origin')
@@ -172,8 +178,8 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
       PAYROLL_SOURCE_KEYS.forEach(key => allowed.add(key))
     }
     if (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment') {
-      for (const key of ['stageId', 'itemId', 'completionId']) {
-        if (url.searchParams.has(key) && (url.searchParams.getAll(key).length !== 1 || !isStableRouteIdentity(url.searchParams.get(key))))
+      for (const [key, table] of [['stageId', 'construction_stages'], ['itemId', 'items'], ['completionId', 'unit_stage_completions']] as const) {
+        if (url.searchParams.has(key) && (url.searchParams.getAll(key).length !== 1 || !isQuantitySourceIdentity(url.searchParams.get(key), table)))
           return null
         allowed.add(key)
       }

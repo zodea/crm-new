@@ -1,5 +1,6 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAQuantityFacts, PayrollAQuantityQuery } from '../../app/lib/payroll/central-a-contract'
+import type { PayrollAManagementScopeFacts, PayrollCrewFeeDefaults } from '../../app/lib/payroll/central-a-fees-contract'
 import type { PayrollAdjustmentCommand } from '../../app/lib/payroll/central-adjustment-contract'
 import type { PayrollAttendanceFacts, PayrollWorkerFact } from '../../app/lib/payroll/central-attendance-contract'
 import type { PayrollC2ConfigFacts, PayrollC2ConfigScope } from '../../app/lib/payroll/central-c2-contract'
@@ -8,6 +9,7 @@ import type { PayrollDayworkFacts, PayrollDayworkRecordFacts } from '../../app/l
 import type { PayrollReleaseAdjustmentPreview } from '../../app/lib/payroll/central-release-adjustment-contract'
 import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
+import { initializePayrollAFeesSchema } from '../../app/lib/payroll/central-a-fees-schema'
 import { assertPayrollActualCommand } from '../../app/lib/payroll/central-actual-validation'
 import { assertPayrollAdjustmentCommand } from '../../app/lib/payroll/central-adjustment-validation'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
@@ -15,6 +17,7 @@ import { loadPayrollHistory } from '../../app/lib/payroll/central-history'
 import { loadPayrollGraph, payrollEvidence, payrollListRows, payrollSources, readPayrollStatement } from '../../app/lib/payroll/central-read'
 import { assertPayrollReversalCommand } from '../../app/lib/payroll/central-reversal-validation'
 import { initializePayrollSchema, payrollRevision } from '../../app/lib/payroll/central-schema'
+import { resolvePayrollABook } from './payroll-a-book'
 import { createPayrollAService } from './payroll-a-service'
 import { createPayrollActualService } from './payroll-actual-service'
 import { createPayrollAdjustmentService } from './payroll-adjustment-service'
@@ -28,7 +31,7 @@ import { createPayrollReversalService } from './payroll-reversal-service'
 export interface PayrollIdentitySource {
   version: string
   projects: PayrollProjectOption[]
-  crews: { id: string, name: string, defaultPayRatio?: number | null, ratioExplicitlyConfigured?: boolean }[]
+  crews: { id: string, name: string, defaultPayRatio?: number | null, ratioExplicitlyConfigured?: boolean, feeDefaults?: PayrollCrewFeeDefaults }[]
   workers: ({ id: string, name: string, crewId: string | null } & Partial<Omit<PayrollWorkerFact, 'workerId' | 'crewId'>>)[]
 }
 export interface PayrollServiceOptions {
@@ -36,6 +39,7 @@ export interface PayrollServiceOptions {
   identities: (sessionId?: string | null) => PayrollIdentitySource | Promise<PayrollIdentitySource>
   transaction: <T>(work: (db: TransactionDb, context: BusinessSession) => Promise<T>, sessionId?: string | null) => Promise<T>
   quantityFacts?: (db: TransactionDb, query: PayrollAQuantityQuery) => Promise<PayrollAQuantityFacts>
+  managementScopeFacts?: (db: TransactionDb, query: { projectId: string }, context: PayrollContext) => Promise<PayrollAManagementScopeFacts>
   attendanceFacts?: (db: TransactionDb, query: { projectId: string, month: string }) => Promise<PayrollAttendanceFacts>
   dayworkFacts?: (db: TransactionDb, query: { projectId: string, month: string }) => Promise<PayrollDayworkFacts>
   dayworkRecord?: (db: TransactionDb, recordId: string) => Promise<PayrollDayworkRecordFacts>
@@ -79,6 +83,7 @@ export function createPayrollService(options: PayrollServiceOptions) {
       authorize(session, write)
       const source = structuredClone(await options.identities(sessionId))
       await initializePayrollSchema(db)
+      await initializePayrollAFeesSchema(db)
       await synchronizeIdentities(db, source)
       if (query.projectId && !source.projects.some(project => project.id === query.projectId)) {
         const recorded = await db.select<{ project_id: string }>(`SELECT project_id FROM wage_statements UNION SELECT project_id FROM payroll_subject_configs
@@ -138,13 +143,27 @@ export function createPayrollService(options: PayrollServiceOptions) {
         const graph = await loadPayrollGraph(db)
         const projectIds = new Set([...graph.statements, ...graph.configs, ...graph.attendance, ...graph.daywork].map(row => row.project_id))
         graph.evidence.forEach(e => projectIds.add(e.projectId))
-        return { context, rows: payrollListRows(graph, query), projects: source.projects.filter(project => projectIds.has(project.id)), diagnostics: graph.evidence.filter(e => !query.projectId || e.projectId === query.projectId).flatMap(e => e.diagnostics) }
+        const rows = payrollListRows(graph, query)
+        const explicitBooks = new Set((await db.select<{ statement_id: string }>('SELECT statement_id FROM payroll_a_statement_books')).map(b => b.statement_id))
+        for (const row of rows) {
+          if (!explicitBooks.has(row.id))
+            continue
+          const proof = await resolvePayrollABook(db, row.id)
+          if (proof.state === 'proven')
+            row.book = proof.book
+        }
+        return { context, rows, projects: source.projects.filter(project => projectIds.has(project.id)), diagnostics: graph.evidence.filter(e => !query.projectId || e.projectId === query.projectId).flatMap(e => e.diagnostics) }
       })
     },
     detail(query: PayrollQuery, id: string, sessionId?: string | null): Promise<PayrollDetailRead> {
       return run(query, sessionId, async (db, context) => {
         const graph = await loadPayrollGraph(db)
         const statement = await readPayrollStatement(db, id, graph)
+        if ((await db.select('SELECT statement_id FROM payroll_a_statement_books WHERE statement_id=?', [id])).length) {
+          const proof = await resolvePayrollABook(db, id)
+          if (proof.state === 'proven')
+            statement.book = proof.book
+        }
         if ((query.projectId && statement.projectId !== query.projectId) || (query.month && statement.month !== query.month) || (query.crewId && statement.crewId !== query.crewId))
           throw payrollProblem('relationship-mismatch', '工资单与指定项目、月份或班组范围不一致')
         return { context, statement, history: await loadPayrollHistory(db, graph, statement.projectId, statement.id), evidence: payrollEvidence(graph, statement.projectId) }

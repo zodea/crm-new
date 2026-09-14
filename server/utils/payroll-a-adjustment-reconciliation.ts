@@ -1,29 +1,23 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAAdjustmentCoverage, PayrollAAdjustmentDimension, PayrollAAdjustmentReconciliation } from '../../app/lib/payroll/central-a-adjustment-contract'
-import type { PayrollAQuantityFact } from '../../app/lib/payroll/central-a-contract'
 import type { PayrollAAdjustmentBasis } from '../../app/lib/payroll/central-adjustment-contract'
 import { payrollAAmount } from '../../app/lib/payroll/central-a-calculation'
-import { isPayrollAStatementSourceSnapshot } from '../../app/lib/payroll/central-a-codec'
+import { isPayrollAStatementSourceVersioned } from '../../app/lib/payroll/central-a-fees-validation'
 import { payrollCorrectionAmount } from '../../app/lib/payroll/central-adjustment-calculation'
 import { amountInCents } from '../../app/lib/payroll/statements'
+import { reconcilePayrollAFeeAdjustments } from './payroll-a-fee-reconciliation'
+import { payrollAAdjustmentDimension as dimension, payrollAAdjustmentOwnership as ownership } from './payroll-a-reconciliation-shared'
 import { loadPayrollActualFacts } from './payroll-actual-facts'
 import { payrollAdjustmentChainHeads } from './payroll-adjustment-chain'
 import { payrollAdjustmentHash as hash } from './payroll-adjustment-facts'
 import { loadPayrollAdjustmentRows, readPayrollAdjustmentRecord } from './payroll-adjustment-records'
 
-function ownership(fact: PayrollAQuantityFact) {
-  return [fact.ownershipKey, fact.completionId, fact.assignmentId, fact.stageId, fact.stageItemId, fact.unitId, fact.floorId, fact.buildingId, fact.templateId, fact.templateLineId, fact.roomId, fact.itemId, fact.completedAt, fact.workerId, fact.crewId, fact.assignmentScopeIds, fact.scopeKind, fact.scopeRows, fact.unit]
-}
-function dimension(dimension: PayrollAAdjustmentDimension['dimension'], before: number | null, after: number | null, current: number | null, related: boolean): PayrollAAdjustmentDimension {
-  const state = !related || current === null || after === null ? 'unproven' : current === after ? 'included-in-current-source' : current === before ? 'needs-independent-effect' : 'unproven'
-  return { dimension, before, after, current, effective: state === 'unproven' ? null : after, state }
-}
-
 /** 原始量价始终保留；每个更正只作用于可证明的责任及变动维度，不以总额相等代替沿革。 */
 export async function loadPayrollAAdjustmentReconciliation(tx: TransactionDb, rawBasis: PayrollAAdjustmentBasis, priorStatementIds: string[], statementId: string | null): Promise<PayrollAAdjustmentReconciliation | undefined> {
-  if (!isPayrollAStatementSourceSnapshot(rawBasis.source))
+  if (!isPayrollAStatementSourceVersioned(rawBasis.source))
     return undefined
-  const records = (await loadPayrollAdjustmentRows(tx)).map(readPayrollAdjustmentRecord).filter(r => r.status === 'confirmed' && r.originalStatementId !== statementId && r.projectId === rawBasis.source.subject.projectId && r.draft.basis?.formatFamily === 'A' && r.draft.basis.source.subject.leaderWorkerId === rawBasis.source.subject.leaderWorkerId)
+  const book = rawBasis.source.schemaVersion === 2 ? rawBasis.source.book : { bookPurpose: 'ordinary', managementBookId: null }
+  const records = (await loadPayrollAdjustmentRows(tx)).map(readPayrollAdjustmentRecord).filter(r => r.status === 'confirmed' && r.originalStatementId !== statementId && r.projectId === rawBasis.source.subject.projectId && r.draft.basis?.formatFamily === 'A' && r.draft.basis.source.subject.leaderWorkerId === rawBasis.source.subject.leaderWorkerId && r.draft.basis.source.subject.crewId === rawBasis.source.subject.crewId && hash(r.draft.basis.source.schemaVersion === 2 ? r.draft.basis.source.book : { bookPurpose: 'ordinary', managementBookId: null }) === hash(book))
   if (!records.length)
     return undefined
   const heads = payrollAdjustmentChainHeads(records)
@@ -61,7 +55,7 @@ export async function loadPayrollAAdjustmentReconciliation(tx: TransactionDb, ra
       if (!sameOwnership || !samePrice)
         localReasons.push(`责任 ${component.ownershipKey} 的原施工范围或采用价格沿革不能核实`)
       for (const d of dimensions) {
-        const key = `${component.ownershipKey}:${d.dimension}`
+        const key = d.dimension === 'pay-ratio' ? 'pay-ratio' : `${component.ownershipKey}:${d.dimension}`
         if (changed.has(key) && changed.get(key) !== head.rootAdjustmentId)
           localReasons.push(`责任 ${component.ownershipKey} 的同一维度涉及不同原单更正，需核实前后引用`)
         changed.set(key, head.rootAdjustmentId)
@@ -76,6 +70,9 @@ export async function loadPayrollAAdjustmentReconciliation(tx: TransactionDb, ra
       coverage.push({ adjustmentId: head.id, rootAdjustmentId: head.rootAdjustmentId, originalStatementId: head.originalStatementId, ownershipKey: component.ownershipKey, originalSourceFingerprint: oldFact?.sourceFingerprint ?? '', currentSourceFingerprint: currentFact?.sourceFingerprint ?? null, originalPriceRevisionId: original.priceRevisionId, currentPriceRevisionId: current?.priceRevisionId ?? null, dimensions, reasons: localReasons })
       reasons.push(...localReasons)
     }
+    const feeCoverage = reconcilePayrollAFeeAdjustments(rawBasis, effectiveBasis, before, after, head, changed)
+    coverage.push(...feeCoverage)
+    reasons.push(...feeCoverage.flatMap(c => c.reasons))
   }
   const actual = await loadPayrollActualFacts(tx, { projectId: rawBasis.source.subject.projectId, originalStatementIds: priorStatementIds })
   const rawCumulative = payrollCorrectionAmount(rawBasis)

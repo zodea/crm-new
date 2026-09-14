@@ -1,6 +1,7 @@
 import type { PayrollAdjustmentCommand, PayrollAdjustmentCommandResult, PayrollAdjustmentConfirmedSnapshot, PayrollOriginalWageRef } from './central-adjustment-contract'
+import { isPayrollABook } from './central-a-fees-validation'
 import { payrollCorrectionAmount } from './central-adjustment-calculation'
-import { assertPayrollAdjustmentDraft } from './central-adjustment-validation'
+import { assertPayrollAdjustmentDraft, payrollCorrectionReasons } from './central-adjustment-validation'
 import { payrollCanonical } from './central-command-shared'
 import { payrollProblem } from './central-contract'
 import { wireCent, wireDate, wireExact, wireId, wireMonth, wireObject, wireStrings, wireText } from './central-payroll-wire'
@@ -10,7 +11,9 @@ const uniqueIds = (value: unknown): value is string[] => Array.isArray(value) &&
 const knownAmount = (v: unknown) => wireObject(v) && typeof v.value === 'number' && wireCent(Math.abs(v.value)) && v.knownValue === v.value && v.state === 'known' && Array.isArray(v.reasons) && !v.reasons.length
 export function isPayrollOriginalWageRef(v: unknown): v is PayrollOriginalWageRef {
   try {
-    wireExact(v, ['statementId', 'formatFamily', 'projectId', 'projectName', 'crewId', 'leaderWorkerId', 'month', 'memberWorkerIds', 'members', 'originalSignatureAmount', 'originalGrossAmount', 'provenanceVersion'])
+    wireExact(v, ['statementId', 'formatFamily', 'projectId', 'projectName', 'crewId', 'leaderWorkerId', 'month', 'memberWorkerIds', 'members', 'originalSignatureAmount', 'originalGrossAmount', 'provenanceVersion', 'book'])
+    if (Object.hasOwn(v, 'book') && (v.formatFamily !== 'A' || !isPayrollABook(v.book)))
+      return false
     if (![v.statementId, v.projectId, v.leaderWorkerId].every(wireId) || !['A', 'C1', 'C2'].includes(String(v.formatFamily)) || !(v.projectName === null || wireText(v.projectName)) || !(v.crewId === null || wireId(v.crewId)) || !wireMonth(v.month) || !uniqueIds(v.memberWorkerIds) || !v.memberWorkerIds.includes(String(v.leaderWorkerId)) || !wireText(v.provenanceVersion) || !v.provenanceVersion || !knownAmount(v.originalSignatureAmount) || !knownAmount(v.originalGrossAmount) || !Array.isArray(v.members))
       return false
     for (const m of v.members) {
@@ -37,6 +40,12 @@ export function isPayrollAdjustmentConfirmedSnapshot(v: unknown): v is PayrollAd
     if (![p.beforeAmount, p.afterAmount, p.delta].every(knownAmount) || !wireStrings(p.reasons) || p.reasons.length || !Array.isArray(p.proofRefs) || p.proofRefs.length !== 1)
       return false
     const snapshot = v as unknown as PayrollAdjustmentConfirmedSnapshot
+    const before = snapshot.preview.before
+    const after = snapshot.preview.after
+    if (before?.formatFamily === 'A' && after?.formatFamily === 'A' && (before.source.schemaVersion === 2 || after.source.schemaVersion === 2)) {
+      if (before.source.schemaVersion !== 2 || after.source.schemaVersion !== 2 || payrollCanonical(snapshot.original.book) !== payrollCanonical(before.source.book) || payrollCorrectionReasons(after, before).length)
+        return false
+    }
     return payrollCorrectionAmount(snapshot.preview.before!).value === snapshot.preview.beforeAmount.value && payrollCorrectionAmount(snapshot.preview.after!).value === snapshot.preview.afterAmount.value && amountInCents(snapshot.preview.afterAmount.value!) - amountInCents(snapshot.preview.beforeAmount.value!) === amountInCents(snapshot.preview.delta.value!) && payrollCanonical(p.proofRefs) === payrollCanonical([{ kind: 'frozen-source', id: v.original.statementId, sourceFingerprint: v.original.provenanceVersion }])
   }
   catch { return false }

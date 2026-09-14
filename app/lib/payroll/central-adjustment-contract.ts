@@ -1,4 +1,5 @@
-import type { PayrollAPeriodKind, PayrollAStatementSourceSnapshot } from './central-a-contract'
+import type { PayrollAPeriodKind } from './central-a-contract'
+import type { PayrollABookRef, PayrollAFeeAdjustmentBasis, PayrollAStatementSourceVersioned } from './central-a-fees-contract'
 import type { PayrollActualFact, PayrollActualPaymentDraft, PayrollActualPaymentTarget, PayrollActualReversalDraft, PayrollActualReversalTarget, PayrollProofRef, PayrollSignedAmount } from './central-actual-contract'
 import type { PayrollQuery, PayrollWritableContext } from './central-contract'
 import type { PayrollReleaseAdjustmentPreview } from './central-release-adjustment-contract'
@@ -16,6 +17,8 @@ export interface PayrollOriginalWageRef {
   originalSignatureAmount: PayrollSignedAmount
   originalGrossAmount: PayrollSignedAmount
   provenanceVersion: string
+  /** 仅新 A V2 已证来源携带；旧原单引用保留原 JSON。 */
+  book?: PayrollABookRef
 }
 export interface PayrollC2AdjustmentBasis {
   formatFamily: 'C2'
@@ -31,9 +34,11 @@ export interface PayrollC1AdjustmentBasis {
 export interface PayrollAAdjustmentBasis {
   formatFamily: 'A'
   periodKind: PayrollAPeriodKind
-  source: PayrollAStatementSourceSnapshot
+  source: PayrollAStatementSourceVersioned
   payRatio: number | null
   components: Array<{ ownershipKey: string, priceRevisionId: string, quantity: number | null, unitPrice: number | null }>
+  /** source V2 必须有同簿费用依据；V1 不补写此字段。 */
+  fees?: PayrollAFeeAdjustmentBasis
 }
 export type PayrollAdjustmentBasisDraft = PayrollAAdjustmentBasis | PayrollC1AdjustmentBasis | PayrollC2AdjustmentBasis
 export interface PayrollAdjustmentDraft {

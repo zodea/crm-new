@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, reactive } from 'vue'
 import PayrollASourceReturn from '~/components/payroll/PayrollASourceReturn.vue'
+import { feeFormRead, feeManagementBook } from '../helpers/payroll-fees-ui-fixture'
 
 const route = reactive({ query: { origin: 'real', payrollReturnTo: '/subcontract/payroll/form/wage-a?origin=real', payrollSourceKind: 'quantity-unit', payrollSourceId: 'unit-a', payrollProject: 'project-a' } as Record<string, string> })
 const form = vi.fn()
@@ -17,6 +18,25 @@ beforeEach(() => {
   vi.stubGlobal('usePayrollStore', () => ({ loadAForm: form, loadRead: list }))
 })
 describe('工资来源页返回读取核验', () => {
+  it('独立管理簿可从已证管理责任返回未完工户，不能借无关户放行', async () => {
+    const read = feeFormRead()
+    read.statementId = 'wage-a'
+    read.draft.projectId = 'project-a'
+    read.facts = []
+    read.book = { bookPurpose: 'management', managementBookId: 'management-book' }
+    const book = feeManagementBook()
+    book.revision!.scope.assignments[0]!.cells[0]!.unitId = 'unit-a'
+    read.fees!.management = { book: book.book, revision: book.revision! }
+    form.mockResolvedValue(read)
+    const wrapper = mount(PayrollASourceReturn, { props: { kind: 'quantity-unit', sourceId: 'unit-a', projectId: 'project-a', origin: 'real' }, global })
+    await flushPromises()
+    expect(wrapper.get('a').attributes('href')).toContain('/form/wage-a')
+    route.query.payrollSourceId = 'other-unit'
+    await wrapper.setProps({ sourceId: 'other-unit' })
+    await flushPromises()
+    expect(wrapper.find('a').exists()).toBe(false)
+    wrapper.unmount()
+  })
   it('已存工资需真实同户来源，失效不回默认工资', async () => {
     const wrapper = mount(PayrollASourceReturn, { props: { kind: 'quantity-unit', sourceId: 'unit-a', projectId: 'project-a', origin: 'real' }, global })
     await flushPromises()

@@ -1,10 +1,12 @@
 import type { PayrollAFormRead } from '../../app/lib/payroll/central-a-contract'
+import type { PayrollAFeesFormRead } from '../../app/lib/payroll/central-a-fees-contract'
 import type { PayrollOriginalWageRef } from '../../app/lib/payroll/central-adjustment-contract'
 import type { PayrollC1FormRead } from '../../app/lib/payroll/central-c1-contract'
 import type { PayrollC2FormRead } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollWritableContext } from '../../app/lib/payroll/central-contract'
 import type { NavigationIntentDTO } from '../../app/types/read-model'
 import type { PayrollMigratedProof } from './payroll-migrated-proof'
+import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
 
 const known = (value: number) => ({ value, knownValue: value, state: 'known' as const, reasons: [] })
 const eligibility = () => ({ canSaveDraft: false, canCheck: false, canRelease: false, canOutput: true, reasons: ['已发工资只能阅读当时冻结事实'] })
@@ -30,7 +32,11 @@ export function payrollMigratedAForm(proof: PayrollMigratedProof, base: PayrollW
   const original = proof.originals.get(statementId)
   if (!document || original?.basis.formatFamily !== 'A')
     return null
-  return { ...frame(base, original.original, document.crewName, document.note), draft: { ...original.basis.source.subject, month: document.month, periodKind: document.periodKind, payRatio: document.payRatio, note: document.note }, facts: original.basis.source.facts, lines: document.lines, prices: original.basis.source.priceRevisions, ratioDefault: { value: null, source: 'missing', statementId: null, configId: null, sourceVersion: null }, totals: { workAmount: known(document.workAmount), cumulativeAmount: known(document.cumulativeAmount), previouslyPaid: known(document.previouslyPaid), grossAmount: known(document.grossAmount) }, paymentSourceVersion: original.original.provenanceVersion, ...(document.adjustmentReconciliation ? { adjustmentReconciliation: document.adjustmentReconciliation } : {}) }
+  const form: PayrollAFormRead = { ...frame(base, original.original, document.crewName, document.note), draft: { ...original.basis.source.subject, month: document.month, periodKind: document.periodKind, payRatio: document.payRatio, note: document.note }, facts: original.basis.source.facts, lines: document.lines, prices: original.basis.source.priceRevisions, ratioDefault: { value: null, source: 'missing', statementId: null, configId: null, sourceVersion: null }, totals: { workAmount: known(document.workAmount), cumulativeAmount: known(document.cumulativeAmount), previouslyPaid: known(document.previouslyPaid), grossAmount: known(document.grossAmount) }, paymentSourceVersion: original.original.provenanceVersion, ...(document.adjustmentReconciliation ? { adjustmentReconciliation: document.adjustmentReconciliation } : {}) }
+  if (!hasPayrollAFeesDocument(document))
+    return form
+  const feesForm: PayrollAFeesFormRead = { ...form, draft: { ...form.draft, book: document.book }, book: document.book, bookProof: { state: 'proven', book: document.book, sourceVersion: original.original.provenanceVersion }, bookEligibility: { canSave: false, canCheck: false, canRelease: false, reasons: ['已发工资保留原簿和冻结费用'] }, managementBooks: [], negativeLineDrafts: [], negativeLineRevisions: [...proof.negativeLineRevisions.values()].filter(row => row.statementId === statementId), previousBookPayments: document.previousBookPayments.map(payment => ({ statementId: payment.statementId, month: payment.month, book: payment.book, actualRefs: [{ kind: 'released-statement', statementId: payment.statementId }], amount: known(payment.amount), sourceVersion: original.original.provenanceVersion })), fees: document.fees, totals: document.fees.totals, blockers: [] }
+  return feesForm
 }
 export function payrollMigratedC1Form(proof: PayrollMigratedProof, base: PayrollWritableContext, statementId: string): PayrollC1FormRead | null {
   const document = proof.c1Documents.get(statementId)

@@ -1,8 +1,10 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollCentralMigrationGraph, PayrollCentralMigrationTable } from '../../app/lib/migration/payroll-central-source'
 import type { PayrollMigrationRow } from '../../app/lib/migration/payroll-source'
+import type { PayrollAFeesMigrationTable } from '../../app/lib/payroll/central-a-fees-schema'
 import type { PayrollIdentityMapping } from '../../app/lib/payroll/central-contract'
 import { PAYROLL_CENTRAL_MIGRATION_COLUMNS, PAYROLL_CENTRAL_MIGRATION_TABLES, payrollCentralPrimaryKey } from '../../app/lib/migration/payroll-central-source'
+import { PAYROLL_A_FEES_MIGRATION_TABLES, payrollAFeesPrimaryKey } from '../../app/lib/payroll/central-a-fees-schema'
 import { initializePayrollAdjustmentSchema } from '../../app/lib/payroll/central-adjustment-schema'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 
@@ -88,7 +90,7 @@ export function payrollIndependentReferenceReader(tx: TransactionDb, owned: Set<
     const table = /\bFROM\s+([a-z_]\w*)/i.exec(sql)?.[1]
     if (!table)
       return rows as T[]
-    const primary = PAYROLL_CENTRAL_MIGRATION_TABLES.includes(table as PayrollCentralMigrationTable) ? payrollCentralPrimaryKey(table as PayrollCentralMigrationTable) : 'id'
+    const primary = PAYROLL_CENTRAL_MIGRATION_TABLES.includes(table as PayrollCentralMigrationTable) ? payrollCentralPrimaryKey(table as PayrollCentralMigrationTable) : PAYROLL_A_FEES_MIGRATION_TABLES.includes(table as PayrollAFeesMigrationTable) ? payrollAFeesPrimaryKey(table as PayrollAFeesMigrationTable) : 'id'
     return rows.filter(row => !owned.has(key(table, row[primary]))) as T[]
   } }
 }

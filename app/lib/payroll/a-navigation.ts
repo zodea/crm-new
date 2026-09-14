@@ -1,11 +1,14 @@
 import type { DataOriginDTO } from '../../types/read-model'
+import type { PayrollAFeeConfigScope } from './central-a-fees-contract'
+import { isQuantitySourceIdentity } from '../quantity/migration-identity'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
+import { payrollAdjustmentReturn } from './adjustment-navigation'
 import { PAYROLL_READ_QUERY_KEYS, payrollReturnTo, payrollViewScope } from './central-navigation'
 
 export const PAYROLL_A_CONFIG_PATH = '/subcontract/payroll/config'
 export const PAYROLL_SOURCE_KEYS = ['payrollReturnTo', 'payrollSourceKind', 'payrollSourceId', 'payrollProject'] as const
 export type PayrollSourceKind = 'quantity-unit' | 'quantity-project' | 'worker' | 'crew'
-export interface PayrollSourceContext { returnTo: string, kind: PayrollSourceKind, id: string, projectId: string, statementId: string | null, draftKey: string | null }
+export interface PayrollSourceContext { returnTo: string, kind: PayrollSourceKind, id: string, projectId: string, statementId: string | null, draftKey: string | null, configScope?: PayrollAFeeConfigScope }
 
 export function payrollAEntryReturn(value: unknown, origin: DataOriginDTO | null, projectId?: string, depth = 0): string | null {
   if (typeof value !== 'string' || !origin || depth > 4)
@@ -52,7 +55,8 @@ export function payrollSourceQuery(query: Record<string, unknown>): Record<strin
 }
 
 export function payrollSourceContext(query: Record<string, unknown>, expected: { kind: PayrollSourceKind, id: string, origin: DataOriginDTO, projectId?: string }): PayrollSourceContext | null {
-  if (PAYROLL_SOURCE_KEYS.some(key => typeof query[key] !== 'string') || query.payrollSourceKind !== expected.kind || query.payrollSourceId !== expected.id || !isStableRouteIdentity(expected.id) || !isStableRouteIdentity(query.payrollProject))
+  const validSourceId = expected.kind === 'quantity-unit' ? isQuantitySourceIdentity(expected.id, 'units') : isStableRouteIdentity(expected.id)
+  if (PAYROLL_SOURCE_KEYS.some(key => typeof query[key] !== 'string') || query.payrollSourceKind !== expected.kind || query.payrollSourceId !== expected.id || !validSourceId || !isStableRouteIdentity(query.payrollProject))
     return null
   if (expected.projectId && query.payrollProject !== expected.projectId)
     return null
@@ -64,6 +68,12 @@ export function payrollSourceContext(query: Record<string, unknown>, expected: {
   const detail = /^\/subcontract\/payroll\/([^/]+)$/.exec(url.pathname)
   const statementId = edit ? decodeURIComponent(edit[1]!) : detail && !['new', 'config', 'sources'].includes(detail[1]!) ? decodeURIComponent(detail[1]!) : null
   const draftKey = url.pathname === '/subcontract/payroll/new' ? url.searchParams.get('draftKey') : null
+  if (url.pathname === PAYROLL_A_CONFIG_PATH) {
+    if (url.searchParams.get('project') !== query.payrollProject)
+      return null
+    const managementBookId = url.searchParams.get('managementBookId')
+    return { returnTo, kind: expected.kind, id: expected.id, projectId: String(query.payrollProject), statementId: null, draftKey: null, configScope: { projectId: String(query.payrollProject), month: url.searchParams.get('month')!, crewId: url.searchParams.get('crew') || null, leaderWorkerId: url.searchParams.get('leader') || null, book: managementBookId ? { bookPurpose: 'management', managementBookId } : { bookPurpose: 'ordinary', managementBookId: null } } }
+  }
   if (!statementId && !draftKey)
     return null
   return { returnTo, kind: expected.kind, id: expected.id, projectId: String(query.payrollProject), statementId, draftKey }
@@ -80,6 +90,23 @@ export function payrollAWorkspaceReturn(value: unknown, origin: DataOriginDTO | 
       return null
     if (readPath && url.pathname.startsWith('/subcontract/payroll'))
       return readPath
+    if (url.pathname === PAYROLL_A_CONFIG_PATH) {
+      const keys = ['origin', 'project', 'month', 'crew', 'leader', 'managementBookId', 'focus', 'returnTo']
+      if ([...url.searchParams.keys()].some(key => !keys.includes(key) || url.searchParams.getAll(key).length !== 1) || (url.searchParams.get('origin') ?? 'real') !== origin || !isStableRouteIdentity(url.searchParams.get('project')) || !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(url.searchParams.get('month') ?? ''))
+        return null
+      if (['crew', 'leader', 'managementBookId', 'focus'].some(key => url.searchParams.has(key) && url.searchParams.get(key) !== '' && (!isStableRouteIdentity(url.searchParams.get(key)) || /[\\/]/.test(url.searchParams.get(key)!))))
+        return null
+      const back = url.searchParams.get('returnTo')
+      // 配置只返回原工资工作页或其受限只读宿主，禁止配置嵌套自身。
+      if (back) {
+        const nested = new URL(back, 'https://payroll.invalid')
+        if (nested.pathname === PAYROLL_A_CONFIG_PATH || !payrollAWorkspaceReturn(back, origin))
+          return null
+      }
+      return `${url.pathname}?${url.searchParams}`
+    }
+    if (url.pathname.startsWith('/subcontract/payroll/') && payrollAdjustmentReturn(value, origin))
+      return payrollAdjustmentReturn(value, origin)
     const edit = /^\/subcontract\/payroll\/form\/([^/]+)$/.exec(url.pathname)
     if (url.pathname !== '/subcontract/payroll/new' && !edit)
       return null
@@ -94,7 +121,7 @@ export function payrollAWorkspaceReturn(value: unknown, origin: DataOriginDTO | 
     if (!edit && !isStableRouteIdentity(url.searchParams.get('draftKey')))
       return null
     const back = url.searchParams.get('returnTo')
-    if (back && !payrollAEntryReturn(back, origin))
+    if (back && !payrollAdjustmentReturn(back, origin))
       return null
     return `${url.pathname}?${url.searchParams}`
   }

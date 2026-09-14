@@ -2,12 +2,14 @@ import type { PayrollACommand, PayrollACommandResult, PayrollAConfigRead, Payrol
 import type { PayrollQuery } from './central-contract'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { isPayrollAAdjustmentReconciliation } from './central-a-adjustment-validation'
+import { isPayrollAFeesFormExtension } from './central-a-fees-read-validation'
+import { isPayrollABook, isPayrollAFeesFrozenDocument } from './central-a-fees-validation'
 import { payrollProblem } from './central-contract'
 import { isPayrollReleaseApplications, transformPayrollReleaseApplications } from './central-release-adjustment-wire'
 import { payrollObject as object } from './central-snapshot'
 import { amountInCents } from './statements'
 
-const moneyFields = new Set(['unitPrice', 'amount', 'actualAmount', 'workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount'])
+const moneyFields = new Set(['unitPrice', 'amount', 'actualAmount', 'workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount', 'listAmount'])
 const decimalFields = new Set(['payRatio', 'initialPayRatio', 'quantity', 'knownQuantity', 'fieldQty'])
 const text = (v: unknown): v is string => typeof v === 'string'
 const nullableText = (v: unknown) => v === null || text(v)
@@ -58,6 +60,7 @@ function transform(value: unknown, decode: boolean): unknown {
   }))
 }
 export const encodePayrollAWire = (value: unknown) => transform(value, false)
+export const decodePayrollAWire = (value: unknown) => transform(value, true)
 
 function scope(v: unknown) {
   if (!object(v) || !['project', 'cells'].includes(String(v.kind)))
@@ -107,7 +110,7 @@ function amount(v: unknown) {
 function draft(v: unknown, partial: boolean) {
   if (!object(v))
     return false
-  const checks: Record<string, (v: unknown) => boolean> = { projectId: isStableRouteIdentity, leaderWorkerId: isStableRouteIdentity, crewId: v => v === null || isStableRouteIdentity(v), memberWorkerIds: v => array(v, isStableRouteIdentity), month, periodKind: v => kinds.includes(String(v)), payRatio: nullableNumber, note: text }
+  const checks: Record<string, (v: unknown) => boolean> = { projectId: isStableRouteIdentity, leaderWorkerId: isStableRouteIdentity, crewId: v => v === null || isStableRouteIdentity(v), memberWorkerIds: v => array(v, isStableRouteIdentity), month, periodKind: v => kinds.includes(String(v)), payRatio: nullableNumber, note: text, book: v => v === undefined || isPayrollABook(v) }
   return Object.keys(v).every(key => key in checks) && Object.entries(checks).every(([key, check]) => {
     // 读取预览允许尚未选定/主动清空选择；持久保存继续执行完整身份与日期校验。
     if (partial && (!(key in v) || (v[key] === '' && ['projectId', 'leaderWorkerId', 'month'].includes(key))))
@@ -187,9 +190,12 @@ export function parsePayrollACommand(value: unknown): PayrollACommand {
   return next as unknown as PayrollACommand
 }
 export function isPayrollAFrozenDocument(v: unknown): v is PayrollAFrozenDocument {
+  const fees = object(v) && (Object.hasOwn(v, 'book') || Object.hasOwn(v, 'fees')) ? isPayrollAFeesFrozenDocument(v) ? v : false : null
+  if (fees === false)
+    return false
   if (!object(v) || !fields(v, ['id', 'projectId', 'projectName', 'leaderName', 'releasedAt', 'operatorName', 'note'], text) || !v.projectName || !v.leaderName || !v.operatorName || !nullableText(v.crewName) || !month(v.month) || !kinds.includes(String(v.periodKind)) || v.formatFamily !== 'A' || !fields(v, ['payRatio', 'workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount', 'actualAmount'], number))
     return false
-  if (!Array.isArray(v.lines) || !v.lines.length || !array(v.lines, l => line(l) && object(l) && number(l.quantity) && l.quantity >= 0 && fields(l, ['unitPrice', 'amount'], centAmount) && fields(l, ['workerName', 'itemName', 'unit'], x => text(x) && x.length > 0)) || !Array.isArray(v.members) || !v.members.length || !array(v.members, m => object(m) && text(m.workerId) && text(m.workerName) && !!m.workerName && typeof m.isLeader === 'boolean') || !array(v.allocations, a => object(a) && text(a.workerId) && text(a.workerName) && typeof a.isLeader === 'boolean' && centAmount(a.amount) && Number.isSafeInteger(a.allocatedAmountFen) && cents(a.amount) === a.allocatedAmountFen) || !array(v.previousPayments, p => object(p) && text(p.statementId) && month(p.month) && centAmount(p.amount)))
+  if (!Array.isArray(v.lines) || (!v.lines.length && fees?.book.bookPurpose !== 'management') || !array(v.lines, l => line(l) && object(l) && number(l.quantity) && l.quantity >= 0 && fields(l, ['unitPrice', 'amount'], centAmount) && fields(l, ['workerName', 'itemName', 'unit'], x => text(x) && x.length > 0)) || !Array.isArray(v.members) || !v.members.length || !array(v.members, m => object(m) && text(m.workerId) && text(m.workerName) && !!m.workerName && typeof m.isLeader === 'boolean') || !array(v.allocations, a => object(a) && text(a.workerId) && text(a.workerName) && typeof a.isLeader === 'boolean' && centAmount(a.amount) && Number.isSafeInteger(a.allocatedAmountFen) && cents(a.amount) === a.allocatedAmountFen) || !array(v.previousPayments, p => object(p) && text(p.statementId) && month(p.month) && centAmount(p.amount)))
     return false
   if (!fields(v, ['workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount', 'actualAmount'], centAmount) || Number(v.payRatio) < 0 || Number(v.payRatio) > 1 || (v.periodKind === 'retention' && v.payRatio !== 1) || Number(v.actualAmount) <= 0 || Number(v.actualAmount) > Number(v.grossAmount))
     return false
@@ -203,7 +209,7 @@ export function isPayrollAFrozenDocument(v: unknown): v is PayrollAFrozenDocumen
   const reconciliation = v.adjustmentReconciliation
   if (reconciliation !== undefined && (!isPayrollAAdjustmentReconciliation(reconciliation) || reconciliation.rawCumulative.value !== v.cumulativeAmount || reconciliation.availableAmount.value !== v.grossAmount || reconciliation.rawBasis.payRatio !== v.payRatio || reconciliation.reasons.length))
     return false
-  if (lines.reduce((sum, l) => sum + cents(l.amount!), 0) !== cents(Number(v.workAmount)) || cents(Number(v.workAmount) * Number(v.payRatio)) !== cents(Number(v.cumulativeAmount)) || payments.reduce((sum, p) => sum + cents(p.amount), 0) !== cents(Number(v.previouslyPaid)) || (reconciliation === undefined && Math.max(0, cents(Number(v.cumulativeAmount)) - cents(Number(v.previouslyPaid))) !== cents(Number(v.grossAmount))))
+  if (lines.reduce((sum, l) => sum + cents(l.amount!), 0) !== cents(Number(v.workAmount)) || cents(Number(fees ? fees.listAmount : v.workAmount) * Number(v.payRatio)) !== cents(Number(v.cumulativeAmount)) || payments.reduce((sum, p) => sum + cents(p.amount), 0) !== cents(Number(v.previouslyPaid)) || (reconciliation === undefined && Math.max(0, cents(Number(v.cumulativeAmount)) - cents(Number(v.previouslyPaid))) !== cents(Number(v.grossAmount))))
     return false
   return new Set(members.map(m => m.workerId)).size === members.length && members.filter(m => m.isLeader).length === 1 && allocations.length === members.length && new Set(allocations.map(a => a.workerId)).size === members.length && allocations.every(a => members.some(m => m.workerId === a.workerId)) && allocations.reduce((sum, a) => sum + a.allocatedAmountFen, 0) === cents(Number(v.actualAmount))
 }
@@ -219,6 +225,8 @@ export function decodePayrollARead<T extends PayrollAFormRead | PayrollAConfigRe
   if (kind !== 'output' && c.origin === 'real' && c.readonly !== !(c.capabilities as string[]).includes('payroll:write'))
     fail('工资读取权限与可写状态不一致')
   if (kind === 'form') {
+    if ((Object.hasOwn(value, 'fees') || Object.hasOwn(value, 'bookProof') || (object(value.draft) && Object.hasOwn(value.draft, 'book'))) && !isPayrollAFeesFormExtension(value))
+      fail('工资费用用途或读取依据不完整')
     if (!text(value.paymentSourceVersion))
       fail()
     if (!object(target) || value.statementId !== target.statementId || value.draftKey !== (target.statementId ? null : target.draftKey) || !['new', 'draft', 'checked', 'released'].includes(String(value.status)) || typeof value.needsRecheck !== 'boolean' || !draft(value.draft, true) || !options(value.options) || !array(value.members, member) || !array(value.facts, fact) || !array(value.lines, line) || !array(value.prices, price) || !array(value.blockers, blocker) || !object(value.totals) || !fields(value.totals, ['workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount'], amount) || !object(value.ratioDefault) || !nullableNumber(value.ratioDefault.value) || !['previous-statement', 'subject-config', 'crew-config', 'settlement-default', 'retention-fixed', 'missing'].includes(String(value.ratioDefault.source)) || !fields(value.ratioDefault, ['statementId', 'configId', 'sourceVersion'], nullableText) || !object(value.eligibility) || !fields(value.eligibility, ['canSaveDraft', 'canCheck', 'canRelease', 'canOutput'], v => typeof v === 'boolean') || !strings(value.eligibility.reasons))

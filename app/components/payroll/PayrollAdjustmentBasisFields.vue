@@ -2,6 +2,7 @@
 import type { PayrollAdjustmentBasisDraft, PayrollOriginalWageRef } from '~/lib/payroll/central-adjustment-contract'
 import { computed } from 'vue'
 import { c2InputNumber } from '~/lib/payroll/c2-presentation'
+import PayrollAFeeAdjustmentFields from './PayrollAFeeAdjustmentFields.vue'
 
 const props = defineProps<{ basis: PayrollAdjustmentBasisDraft | null, original: PayrollOriginalWageRef, disabled: boolean, sectionId?: string }>()
 const emit = defineEmits<{ change: [value: PayrollAdjustmentBasisDraft] }>()
@@ -31,7 +32,7 @@ function amount(event: Event) {
     </p>
     <template v-else-if="basis.formatFamily === 'A'">
       <label class="grid max-w-md gap-1 text-12px">本次更正采用比例（0 至 1）<input :value="basis.payRatio ?? ''" type="number" min="0" max="1" step="any" class="field-input" :disabled="disabled || basis.periodKind === 'retention'" @input="emit('change', { ...basis, payRatio: amount($event) })"></label>
-      <div tabindex="0" aria-label="A 原责任量价更正表" class="min-w-0 overflow-x-auto">
+      <div v-if="basis.components.length" tabindex="0" aria-label="A 原责任量价更正表" class="min-w-0 overflow-x-auto">
         <table class="w-full min-w-640px text-left text-12px">
           <thead>
             <tr class="border-b border-line">
@@ -60,6 +61,7 @@ function amount(event: Event) {
           </tbody>
         </table>
       </div>
+      <PayrollAFeeAdjustmentFields v-if="basis.source.schemaVersion === 2 && basis.fees" :basis="basis.fees" :source="basis.source.fees" :disabled="disabled" @change="emit('change', { ...basis, fees: $event })" />
     </template>
     <template v-else-if="basis.formatFamily === 'C1'">
       <div tabindex="0" aria-label="原成员更正标准" class="min-w-0 overflow-x-auto">

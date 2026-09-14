@@ -85,6 +85,7 @@ useTabTitle(computed(() => statement.value ? `${statement.value.month} · 工资
         <div>
           <span class="text-ink-faint">格式 / 工资状态</span><p class="mt-1">
             {{ statement.formatFamily }} · {{ payrollStatusLabel(statement.status) }}
+            <span v-if="statement.book" class="mt-1 block text-ink-soft">{{ statement.book.bookPurpose === 'management' ? '独立管理费簿' : '普通施工簿' }}</span>
           </p>
         </div><div>
           <span class="text-ink-faint">记录状态</span><p class="mt-1">
@@ -92,7 +93,7 @@ useTabTitle(computed(() => statement.value ? `${statement.value.month} · 工资
           </p>
         </div>
         <div>
-          <span class="text-ink-faint">核算应发</span><p class="mt-1 font-mono font-700">
+          <span class="text-ink-faint">{{ statement.status === 'released' ? '核算应发' : '已保存核算应发' }}</span><p class="mt-1 font-mono font-700">
             {{ payrollAmount(statement.grossAmount) }}
           </p>
         </div><div>

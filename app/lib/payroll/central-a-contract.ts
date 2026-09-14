@@ -1,6 +1,7 @@
 // 仅 P1 A 核算；取消是离开未保存页面，不是数据库删除/撤销/解除发放。
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollAAdjustmentReconciliation } from './central-a-adjustment-contract'
+import type { PayrollABookRef } from './central-a-fees-contract'
 import type { PayrollContext, PayrollDetailRead, PayrollHistoryEntry, PayrollProjectOption, PayrollQuery } from './central-contract'
 import type { PayrollReleaseAdjustmentApplication } from './central-release-adjustment-contract'
 
@@ -212,6 +213,7 @@ export interface PayrollALine {
 }
 
 export interface PayrollADraft extends PayrollASubjectScope {
+  book?: PayrollABookRef
   month: string
   periodKind: PayrollAPeriodKind
   payRatio: number | null

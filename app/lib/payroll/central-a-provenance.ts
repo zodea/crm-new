@@ -1,7 +1,12 @@
 import type { PayrollACommand, PayrollAFrozenDocument, PayrollALine } from './central-a-contract'
+import type { PayrollAFeeLine } from './central-a-fees-contract'
+import type { PayrollAFeesProjectionLoader } from './central-a-fees-provenance'
 import type { PayrollDb } from './statements'
 import { payrollACanonical, payrollALines } from './central-a-calculation'
-import { encodePayrollAWire, isPayrollAFrozenDocument, isPayrollAStatementSourceSnapshot, parsePayrollACommand } from './central-a-codec'
+import { encodePayrollAWire, isPayrollAFrozenDocument, parsePayrollACommand } from './central-a-codec'
+import { payrollAFeeLines } from './central-a-fees-calculation'
+import { payrollAFeesPhysicalProof } from './central-a-fees-provenance'
+import { isPayrollAStatementSourceVersioned } from './central-a-fees-validation'
 import { payrollObject } from './central-snapshot'
 import { amountInCents } from './statements'
 
@@ -34,9 +39,13 @@ const ids = (values: string[]) => [...values].sort()
 function calculation(lines: PayrollALine[]) {
   return lines.map(line => payrollACanonical({ workerId: line.workerId, itemId: line.itemId, unit: line.unit, quantity: line.quantity, knownQuantity: line.knownQuantity, unitPrice: line.unitPrice, amount: line.amount, priceRevisionIds: ids(line.priceRevisionIds), facts: line.facts.map(payrollACanonical).sort() })).sort()
 }
+function feeCalculation(lines: PayrollAFeeLine[]) {
+  // 导航由当前授权投影；金额证明比较原事实和费率，不依赖当时是否展示来源按钮。
+  return lines.map(line => ({ ...line, sources: [], blockers: [] }))
+}
 
 /** 来源、冻结与成功回执必须相互匹配；旧库仿同结构字段本身不能证明中央发放。 */
-export async function loadPayrollAReleasedDocuments(db: PayrollDb, statementId?: string): Promise<Map<string, PayrollAFrozenDocument>> {
+export async function loadPayrollAReleasedDocuments(db: PayrollDb, statementId?: string, feeProjection?: PayrollAFeesProjectionLoader): Promise<Map<string, PayrollAFrozenDocument>> {
   const documents = new Map<string, PayrollAFrozenDocument>()
   const tables = await db.select('SELECT name FROM sqlite_master WHERE type=\'table\' AND name IN (\'payroll_a_statement_sources\',\'payroll_command_receipts\')')
   if (tables.length !== 2 || !(await db.select<{ name: string }>('PRAGMA table_info(payroll_command_receipts)')).some(column => column.name === 'command_json'))
@@ -54,7 +63,7 @@ export async function loadPayrollAReleasedDocuments(db: PayrollDb, statementId?:
     const result = parsed(row.result_json)
     const document = snapshot?.aDocument
     const command = await originalCommand(row.command_json, row.fingerprint)
-    if (!snapshot || !isPayrollAFrozenDocument(document) || !isPayrollAStatementSourceSnapshot(source) || !result
+    if (!snapshot || !isPayrollAFrozenDocument(document) || !isPayrollAStatementSourceVersioned(source) || !result
       || document.id !== row.id || document.projectId !== row.project_id || row.source_project_id !== row.project_id || row.source_leader_id !== row.leader_worker_id
       || source.subject.projectId !== row.project_id || source.subject.leaderWorkerId !== row.leader_worker_id || source.subject.crewId !== row.crew_id
       || document.month !== row.month || document.grossAmount !== row.gross_amount || document.actualAmount !== row.actual_amount
@@ -69,13 +78,15 @@ export async function loadPayrollAReleasedDocuments(db: PayrollDb, statementId?:
     if (!same(snapshot.aSource, source) || !same(source.adjustmentReconciliation, document.adjustmentReconciliation) || !Object.entries(document).every(([key, value]) => same(snapshot[key], value))
       || !same(ids(source.subject.memberWorkerIds), ids(document.members.map(member => member.workerId)))
       || !document.members.some(member => member.isLeader && member.workerId === source.subject.leaderWorkerId)
-      || !same(source.facts.map(payrollACanonical).sort(), document.lines.flatMap(line => line.facts).map(payrollACanonical).sort())
+      || (!(source.schemaVersion === 2 && source.book.bookPurpose === 'management') && !same(source.facts.map(payrollACanonical).sort(), document.lines.flatMap(line => line.facts).map(payrollACanonical).sort()))
       || !same(ids(source.priceRevisions.map(price => price.id)), ids([...new Set(document.lines.flatMap(line => line.priceRevisionIds))]))
       || source.priceRevisions.some(price => price.projectId !== source.subject.projectId || price.crewId !== source.subject.crewId || price.leaderWorkerId !== source.subject.leaderWorkerId)
-      || !same(calculation(payrollALines(source.facts, source.priceRevisions, source.subject, document.month)), calculation(document.lines))
+      || !same(calculation(source.schemaVersion === 2 && source.book.bookPurpose === 'management' ? [] : payrollALines(source.facts, source.priceRevisions, source.subject, document.month)), calculation(document.lines))
       || !same(submittedAllocations, frozenAllocations)) {
       continue
     }
+    if (source.schemaVersion === 2 && (!same(feeCalculation(source.fees.lines), feeCalculation(payrollAFeeLines(source.facts, source.fees.feeRevisions, document.month))) || !same(source.fees, (document as unknown as Record<string, unknown>).fees) || !same(source.book, (document as unknown as Record<string, unknown>).book) || !await payrollAFeesPhysicalProof(db, document.id, source, await feeProjection?.(source.subject.projectId))))
+      continue
     documents.set(document.id, document)
   }
   return documents

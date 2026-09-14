@@ -1,5 +1,6 @@
 import type { PayrollAdjustmentBasisDraft } from './central-adjustment-contract'
 import { payrollAAmount } from './central-a-calculation'
+import { payrollAFeeCorrectionAmount } from './central-a-fee-adjustment'
 import { payrollCanonical } from './central-command-shared'
 import { rounded } from './statements'
 
@@ -16,7 +17,9 @@ export function payrollCorrectionAmount(basis: PayrollAdjustmentBasisDraft, reas
       groups.set(key, { quantity: component.quantity === null || old?.quantity === null ? null : component.quantity + (old?.quantity ?? 0), unitPrice: component.unitPrice })
     }
     const work = payrollAAmount([...groups.values()].map(g => g.quantity === null || g.unitPrice === null ? null : rounded(g.quantity * g.unitPrice)), reasons)
-    return work.value === null || basis.payRatio === null ? payrollAAmount([null], reasons) : payrollAAmount([rounded(work.value * basis.payRatio)], reasons)
+    const fees = payrollAFeeCorrectionAmount(basis, reasons)
+    const list = payrollAAmount([work.value, fees.value], [...reasons, ...fees.reasons])
+    return list.value === null || basis.payRatio === null ? payrollAAmount([null], list.reasons) : payrollAAmount([rounded(list.value * basis.payRatio)], list.reasons)
   }
   if (basis.formatFamily === 'C1') {
     return payrollAAmount(basis.rates.flatMap((rate) => {

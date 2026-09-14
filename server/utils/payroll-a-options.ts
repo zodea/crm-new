@@ -45,5 +45,5 @@ export async function loadPayrollAOptions(db: TransactionDb, source: PayrollIden
   const workerIds = new Set([...assignments.map(a => a.worker_id), ...facts.map(f => f.workerId)].filter(id => id !== null))
   const crewIds = new Set([...assignments.map(a => a.crew_id), ...facts.map(f => f.crewId), ...source.workers.filter(w => workerIds.has(w.id)).map(w => w.crewId)].filter(id => id !== null))
   const workers = source.workers.filter(w => workerIds.has(w.id) || (w.crewId !== null && crewIds.has(w.crewId)))
-  return { projects: source.projects, crews: source.crews.filter(c => crewIds.has(c.id)).map(c => ({ id: c.id, name: c.name, eligible: true, reasons: [] })), workers: workers.map(w => ({ ...w, eligible: true, reasons: [], source: payrollANavigation(context, projectId, 'worker', w.id, w.name) })) }
+  return { projects: source.projects.map(p => ({ id: p.id, name: p.name, code: p.code })), crews: source.crews.filter(c => crewIds.has(c.id)).map(c => ({ id: c.id, name: c.name, eligible: true, reasons: [] })), workers: workers.map(w => ({ id: w.id, name: w.name, crewId: w.crewId, eligible: true, reasons: [], source: payrollANavigation(context, projectId, 'worker', w.id, w.name) })) }
 }

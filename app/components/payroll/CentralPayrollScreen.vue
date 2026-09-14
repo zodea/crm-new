@@ -36,7 +36,7 @@ const columns: KitTableColumn[] = [
   { field: 'projectName', title: '项目', minWidth: 210 },
   { field: 'leaderName', title: '负责人', minWidth: 130, slot: 'leader' },
   { field: 'crewName', title: '班组', minWidth: 150, slot: 'crew' },
-  { field: 'formatFamily', title: '格式', width: 90 },
+  { field: 'formatFamily', title: '格式 / 请款簿', minWidth: 165, slot: 'format' },
   { field: 'status', title: '工资状态', width: 120, slot: 'status' },
   { field: 'grossAmount', title: '核算应发', width: 145, align: 'right', slot: 'gross' },
   { field: 'actualAmount', title: '实际发放', width: 145, align: 'right', slot: 'actual' },
@@ -113,6 +113,9 @@ useTabTitle('工资台账')
             <KitStatusTag :tone="payrollStatusTone(row.status)">
               {{ payrollStatusLabel(row.status) }}
             </KitStatusTag>
+          </template>
+          <template #format="{ row }">
+            {{ row.formatFamily }}<span v-if="row.book" class="block text-11px text-ink-soft">{{ row.book.bookPurpose === 'management' ? '独立管理费簿' : '普通施工簿' }}</span>
           </template>
           <template #gross="{ row }">
             {{ payrollAmount(row.grossAmount) }}

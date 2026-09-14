@@ -1,0 +1,265 @@
+{
+  "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+  "sourceVersion": "sqlite-v49",
+  "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+  "status": "dry-run",
+  "authority": "local",
+  "steps": [
+    {
+      "entityType": "customers",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "suppliers",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "supplier_credentials",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "crews",
+      "sourceCount": 1,
+      "importableCount": 1,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "projects",
+      "sourceCount": 2,
+      "importableCount": 2,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "construction_contracts",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "subcontract_contracts",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "auxiliary_contracts",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "other_settlements",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "other_settlement_sources",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "contract_supplements",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "receipt_registrations",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "delivery_records",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "owner_documents",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "workers",
+      "sourceCount": 4,
+      "importableCount": 4,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "project_suppliers",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "quantity_projects",
+      "sourceCount": 2,
+      "importableCount": 2,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "process_libraries",
+      "sourceCount": 1,
+      "importableCount": 1,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "wbs_projects",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "target_cost_versions",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "payroll_projects",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    }
+  ],
+  "mappings": [
+    {
+      "entityType": "crews",
+      "legacyId": "fee-crew",
+      "serverId": "core-crews-0d774cbff491ffb451ad6238"
+    },
+    {
+      "entityType": "projects",
+      "legacyId": "fee-management",
+      "serverId": "core-projects-5f9125935c67857497b06942"
+    },
+    {
+      "entityType": "projects",
+      "legacyId": "fee-ordinary",
+      "serverId": "core-projects-86ad20d8ae7fbf32f5d823b8"
+    },
+    {
+      "entityType": "workers",
+      "legacyId": "fee-management-leader",
+      "serverId": "core-workers-d070e21834fc6e2f31bdd8f3"
+    },
+    {
+      "entityType": "workers",
+      "legacyId": "fee-management-zero",
+      "serverId": "core-workers-3457c0277a82409488a838b1"
+    },
+    {
+      "entityType": "workers",
+      "legacyId": "fee-ordinary-leader",
+      "serverId": "core-workers-37061c4bcba90451c9784c9e"
+    },
+    {
+      "entityType": "workers",
+      "legacyId": "fee-ordinary-zero",
+      "serverId": "core-workers-39e9e9d1ebd1c1750011b12c"
+    },
+    {
+      "entityType": "quantity_projects",
+      "legacyId": "fee-management",
+      "serverId": "core-quantity_projects-51025b1c726ab0ae38da4513"
+    },
+    {
+      "entityType": "quantity_projects",
+      "legacyId": "fee-ordinary",
+      "serverId": "core-quantity_projects-2a0410c7fc44255e062c13f2"
+    },
+    {
+      "entityType": "process_libraries",
+      "legacyId": "schedule_process_library_decoration_v1",
+      "serverId": "core-process_libraries-c2e7d3fc5076aea4e9f5e1f3"
+    }
+  ],
+  "sourceRefs": [
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "crews",
+      "legacyId": "fee-crew",
+      "serverId": "core-crews-0d774cbff491ffb451ad6238"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "projects",
+      "legacyId": "fee-management",
+      "serverId": "core-projects-5f9125935c67857497b06942"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "projects",
+      "legacyId": "fee-ordinary",
+      "serverId": "core-projects-86ad20d8ae7fbf32f5d823b8"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "workers",
+      "legacyId": "fee-management-leader",
+      "serverId": "core-workers-d070e21834fc6e2f31bdd8f3"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "workers",
+      "legacyId": "fee-management-zero",
+      "serverId": "core-workers-3457c0277a82409488a838b1"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "workers",
+      "legacyId": "fee-ordinary-leader",
+      "serverId": "core-workers-37061c4bcba90451c9784c9e"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "workers",
+      "legacyId": "fee-ordinary-zero",
+      "serverId": "core-workers-39e9e9d1ebd1c1750011b12c"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "quantity_projects",
+      "legacyId": "fee-management",
+      "serverId": "core-quantity_projects-51025b1c726ab0ae38da4513"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "quantity_projects",
+      "legacyId": "fee-ordinary",
+      "serverId": "core-quantity_projects-2a0410c7fc44255e062c13f2"
+    },
+    {
+      "batchId": "core-batch-70c5cfe8b682efcbf0d28ace",
+      "sourceHash": "a9778257ac727ab741f1447709a8b0cb7a44d424eb03c025cc4993ab37f0127c",
+      "entityType": "process_libraries",
+      "legacyId": "schedule_process_library_decoration_v1",
+      "serverId": "core-process_libraries-c2e7d3fc5076aea4e9f5e1f3"
+    }
+  ],
+  "issues": [],
+  "createdAt": "2026-09-14T16:51:15.526Z",
+  "updatedAt": "2026-09-14T16:51:15.526Z",
+  "rollbackExpiresAt": null,
+  "confirmedAt": null,
+  "rolledBackAt": null
+}

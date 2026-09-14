@@ -1,12 +1,15 @@
 import type { PayrollAAdjustmentCoverage, PayrollAAdjustmentReconciliation } from '../../app/lib/payroll/central-a-adjustment-contract'
-import type { PayrollABlocker, PayrollAFrozenDocument, PayrollALine, PayrollAPriceRevision, PayrollAQuantityFact, PayrollAStatementSourceSnapshot } from '../../app/lib/payroll/central-a-contract'
+import type { PayrollABlocker, PayrollAFrozenDocument, PayrollALine, PayrollAPriceRevision, PayrollAQuantityFact } from '../../app/lib/payroll/central-a-contract'
+import type { PayrollAStatementSourceVersioned } from '../../app/lib/payroll/central-a-fees-contract'
 import type { PayrollActualFact, PayrollActualPaymentSnapshot, PayrollActualRef, PayrollActualReversalSnapshot, PayrollProofRef } from '../../app/lib/payroll/central-actual-contract'
 import type { PayrollAAdjustmentBasis, PayrollAdjustmentBasisDraft, PayrollAdjustmentConfirmedSnapshot, PayrollAdjustmentRecord, PayrollOriginalWageRef } from '../../app/lib/payroll/central-adjustment-contract'
 import type { PayrollC1FrozenDocument } from '../../app/lib/payroll/central-c1-contract'
 import type { PayrollC2FrozenDocument, PayrollC2OutputDocument, PayrollC2OutputIdentity } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollIdentityMapping, PayrollSourceDiagnostic } from '../../app/lib/payroll/central-contract'
 import type { NavigationIntentDTO } from '../../app/types/read-model'
+import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
+import { createPayrollMigratedFeesMapper } from './payroll-migrated-fees-mapping'
 
 const key = (table: string, id: string) => JSON.stringify([table, id])
 const ownershipTables = ['projects', 'units', 'unit_assignments', 'rooms', 'items'] as const
@@ -14,6 +17,7 @@ const ownershipTables = ['projects', 'units', 'unit_assignments', 'rooms', 'item
 /** 原正文先在来源身份空间证明；此处仅构造消费端 DTO，不改 JSON、hash 或源版本。 */
 export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[]) {
   const identities = new Map<string, string | null>()
+  const feeMapper = createPayrollMigratedFeesMapper({ mapping, id, nullableId, ownership, quantity, actualRef, navigation, blocker: aBlocker })
   function invalid(message: string): never {
     throw payrollProblem('unavailable', `迁入工资身份映射不可用：${message}`)
   }
@@ -69,6 +73,7 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[]) {
       leaderWorkerId: id('workers', value.leaderWorkerId),
       memberWorkerIds: value.memberWorkerIds.map(value => id('workers', value)),
       members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId), crewId: nullableId('crews', member.crewId) })),
+      ...(value.book ? { book: feeMapper.book(value.book) } : {}),
     }
   }
   function quantity(value: PayrollAQuantityFact): PayrollAQuantityFact {
@@ -112,30 +117,34 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[]) {
     }
   }
   function coverage(value: PayrollAAdjustmentCoverage): PayrollAAdjustmentCoverage {
+    const revisionTable = value.negativeLineId ? 'payroll_a_negative_lines' : value.feeComponentKey ? 'payroll_a_fee_revisions' : 'payroll_a_price_revisions'
     return {
       ...value,
       adjustmentId: id('payroll_adjustments', value.adjustmentId),
       rootAdjustmentId: id('payroll_adjustments', value.rootAdjustmentId),
       originalStatementId: id('wage_statements', value.originalStatementId),
-      ownershipKey: ownership(value.ownershipKey),
-      originalPriceRevisionId: id('payroll_a_price_revisions', value.originalPriceRevisionId),
-      currentPriceRevisionId: nullableId('payroll_a_price_revisions', value.currentPriceRevisionId),
+      ownershipKey: value.negativeLineId ? feeMapper.lineId(value.ownershipKey) : ownership(value.ownershipKey),
+      originalPriceRevisionId: id(revisionTable, value.originalPriceRevisionId),
+      currentPriceRevisionId: nullableId(revisionTable, value.currentPriceRevisionId),
+      ...(value.feeComponentKey ? { feeComponentKey: feeMapper.componentKey(value.feeComponentKey) } : {}),
+      ...(value.negativeLineId ? { negativeLineId: feeMapper.lineId(value.negativeLineId) } : {}),
     }
   }
   function reconciliation(value: PayrollAAdjustmentReconciliation): PayrollAAdjustmentReconciliation {
     return { ...value, rawBasis: aBasis(value.rawBasis), effectiveBasis: aBasis(value.effectiveBasis), actualIdentities: value.actualIdentities.map(actualIdentity), coverage: value.coverage.map(coverage) }
   }
-  function source(value: PayrollAStatementSourceSnapshot): PayrollAStatementSourceSnapshot {
+  function source(value: PayrollAStatementSourceVersioned): PayrollAStatementSourceVersioned {
     return {
       ...value,
       subject: { ...value.subject, projectId: id('projects', value.subject.projectId), crewId: nullableId('crews', value.subject.crewId), leaderWorkerId: id('workers', value.subject.leaderWorkerId), memberWorkerIds: value.subject.memberWorkerIds.map(value => id('workers', value)) },
       facts: value.facts.map(quantity),
       priceRevisions: value.priceRevisions.map(price),
       ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}),
+      ...(value.schemaVersion === 2 ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees) } : {}),
     }
   }
   function aBasis(value: PayrollAAdjustmentBasis): PayrollAAdjustmentBasis {
-    return { ...value, source: source(value.source), components: value.components.map(component => ({ ...component, ownershipKey: ownership(component.ownershipKey), priceRevisionId: id('payroll_a_price_revisions', component.priceRevisionId) })) }
+    return { ...value, source: source(value.source), components: value.components.map(component => ({ ...component, ownershipKey: ownership(component.ownershipKey), priceRevisionId: id('payroll_a_price_revisions', component.priceRevisionId) })), ...(value.fees ? { fees: feeMapper.basis(value.fees) } : {}) }
   }
   function basis(value: PayrollAdjustmentBasisDraft): PayrollAdjustmentBasisDraft {
     if (value.formatFamily === 'C1') {
@@ -235,7 +244,7 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[]) {
     return { ...value, id: lineId, workerId: id('workers', value.workerId), itemId: id('items', value.itemId), priceRevisionIds: value.priceRevisionIds.map(value => id('payroll_a_price_revisions', value)), facts: value.facts.map(quantity), sources: value.sources.map(navigation), blockers: value.blockers.map(aBlocker) }
   }
   function aDocument(value: PayrollAFrozenDocument): PayrollAFrozenDocument {
-    return { ...value, id: id('wage_statements', value.id), projectId: id('projects', value.projectId), lines: value.lines.map(aLine), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })), previousPayments: value.previousPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId) })), ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}) }
+    return { ...value, id: id('wage_statements', value.id), projectId: id('projects', value.projectId), lines: value.lines.map(aLine), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })), previousPayments: value.previousPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId) })), ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}), ...(hasPayrollAFeesDocument(value) ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees), previousBookPayments: value.previousBookPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId), book: feeMapper.book(payment.book) })) } : {}) }
   }
   function c1Document(value: PayrollC1FrozenDocument): PayrollC1FrozenDocument {
     return { ...value, id: id('wage_statements', value.id), projectId: id('projects', value.projectId), crewId: nullableId('crews', value.crewId), lines: value.lines.map(line => ({ ...line, id: `${id('workers', line.workerId)}:${line.kind}`, workerId: id('workers', line.workerId), attendanceIds: line.attendanceIds.map(value => id('attendance_records', value)) })), rates: value.rates.map(rate => ({ ...rate, workerId: id('workers', rate.workerId), configId: nullableId('payroll_c1_rate_revisions', rate.configId) })), attendance: value.attendance.map(fact => ({ ...fact, id: id('attendance_records', fact.id), projectId: id('projects', fact.projectId), crewId: nullableId('crews', fact.crewId), workerId: id('workers', fact.workerId) })), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })) }
@@ -251,5 +260,5 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[]) {
     const document = { ...value, id: take('wage_statements', value.id), projectId: take('projects', value.projectId), crewId: maybe('crews', value.crewId), lines: value.lines.map(line => ({ ...line, id: `${take('workers', line.workerId)}:daywork`, workerId: take('workers', line.workerId), dayworkIds: line.dayworkIds.map(value => take('signed_daywork_records', value)) })), daywork: value.daywork.map(fact => ({ ...fact, id: take('signed_daywork_records', fact.id), projectId: take('projects', fact.projectId), crewId: maybe('crews', fact.crewId), workerId: take('workers', fact.workerId) })), config: { ...value.config, id: take('payroll_subject_configs', value.config.id), projectId: take('projects', value.config.projectId), crewId: maybe('crews', value.config.crewId), leaderWorkerId: take('workers', value.config.leaderWorkerId) }, members: value.members.map(member => ({ ...member, workerId: take('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: take('workers', allocation.workerId) })) }
     return { ...document, identityMapping: [...selected.values()] }
   }
-  return { original, basis, record, fact, snapshot, aDocument, c1Document, c2Document }
+  return { original, basis, record, fact, snapshot, aDocument, c1Document, c2Document, aFeeRevision: feeMapper.revision, aNegativeLine: feeMapper.negative, aManagementOwnership: feeMapper.claim, aManagementBook: feeMapper.managementBook, aManagementRevision: feeMapper.managementRevision }
 }

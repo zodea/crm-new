@@ -1,4 +1,5 @@
 import type { PayrollAAdjustmentCoverage, PayrollAAdjustmentReconciliation } from './central-a-adjustment-contract'
+import { applyPayrollAAdjustmentDimension } from './central-a-adjustment-coverage'
 import { payrollCorrectionAmount } from './central-adjustment-calculation'
 import { assertPayrollAdjustmentDraft } from './central-adjustment-validation'
 import { payrollCanonical } from './central-command-shared'
@@ -11,12 +12,15 @@ function metric(value: unknown) {
 }
 export function isPayrollAAdjustmentCoverage(row: unknown): row is PayrollAAdjustmentCoverage {
   try {
-    wireExact(row, ['adjustmentId', 'rootAdjustmentId', 'originalStatementId', 'ownershipKey', 'originalSourceFingerprint', 'currentSourceFingerprint', 'originalPriceRevisionId', 'currentPriceRevisionId', 'dimensions', 'reasons'])
+    wireExact(row, ['adjustmentId', 'rootAdjustmentId', 'originalStatementId', 'ownershipKey', 'originalSourceFingerprint', 'currentSourceFingerprint', 'originalPriceRevisionId', 'currentPriceRevisionId', 'dimensions', 'reasons', 'feeComponentKey', 'negativeLineId'])
+    if ((Object.hasOwn(row, 'feeComponentKey') && (!wireText(row.feeComponentKey) || !row.feeComponentKey || Object.hasOwn(row, 'negativeLineId'))) || (Object.hasOwn(row, 'negativeLineId') && !wireId(row.negativeLineId)))
+      return false
     if (![row.adjustmentId, row.rootAdjustmentId, row.originalStatementId, row.originalPriceRevisionId].every(wireId) || !wireText(row.ownershipKey) || !wireText(row.originalSourceFingerprint) || !(row.currentSourceFingerprint === null || wireText(row.currentSourceFingerprint)) || !(row.currentPriceRevisionId === null || wireId(row.currentPriceRevisionId)) || !Array.isArray(row.dimensions) || !wireStrings(row.reasons))
       return false
     for (const d of row.dimensions) {
       wireExact(d, ['dimension', 'before', 'after', 'current', 'effective', 'state'])
-      if (!['quantity', 'unit-price', 'pay-ratio'].includes(String(d.dimension)) || ![d.before, d.after, d.current, d.effective].every(wireNullableNumber) || !['included-in-current-source', 'needs-independent-effect', 'unproven'].includes(String(d.state)))
+      const allowed = row.feeComponentKey !== undefined ? ['fee-quantity', 'fee-unit-price', 'pay-ratio'] : row.negativeLineId !== undefined ? ['negative-quantity', 'negative-unit-price', 'pay-ratio'] : ['quantity', 'unit-price', 'pay-ratio']
+      if (!allowed.includes(String(d.dimension)) || ![d.before, d.after, d.current, d.effective].every(wireNullableNumber) || !['included-in-current-source', 'needs-independent-effect', 'unproven'].includes(String(d.state)))
         return false
       if (d.state === 'unproven' ? d.effective !== null : d.after === null || d.effective !== d.after || (d.state === 'included-in-current-source' ? d.current !== d.after : d.current !== d.before))
         return false
@@ -44,17 +48,11 @@ export function isPayrollAAdjustmentReconciliation(value: unknown): value is Pay
     for (const row of read.coverage) {
       if (row.reasons.length)
         continue
-      const component = applied.components.find(c => c.ownershipKey === row.ownershipKey)
-      if (!component)
-        return false
       for (const d of row.dimensions) {
         if (d.state === 'unproven')
           continue
-        if (d.dimension === 'quantity')
-          component.quantity = d.effective
-        else if (d.dimension === 'unit-price')
-          component.unitPrice = d.effective
-        else applied.payRatio = d.effective
+        if (!applyPayrollAAdjustmentDimension(applied, row, d, d.effective))
+          return false
       }
     }
     if (!same(applied, read.effectiveBasis))

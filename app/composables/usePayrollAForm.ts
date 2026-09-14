@@ -1,9 +1,12 @@
 import type { PayrollADraft, PayrollAFormRead, PayrollAStatementCommandResult } from '~/lib/payroll/central-a-contract'
 import { computed, nextTick, onActivated, onDeactivated, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
+import { usePayrollANegativeLines } from '~/composables/usePayrollANegativeLines'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { payrollAEntryReturn } from '~/lib/payroll/a-navigation'
 import { payrollDraft } from '~/lib/payroll/a-presentation'
+import { payrollAdjustmentReturn } from '~/lib/payroll/adjustment-navigation'
+import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { payrollReadLocation, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 import { deriveKey } from '~/lib/tabs/tab-machine'
@@ -35,17 +38,19 @@ export function usePayrollAForm() {
   const original = shallowRef('')
   const ratioExplicit = shallowRef(false)
   const formElement = shallowRef<HTMLFormElement | null>(null)
+  const errorPanel = shallowRef<{ focus: () => void } | null>(null)
   const matchingRead = computed(() => read.value && read.value.context.origin === scope.value.origin && read.value.statementId === id.value && (id.value !== null || read.value.draftKey === draftKey.value) ? read.value : null)
   const pending = computed(() => matchingRead.value ? store.getAPending(matchingRead.value) : null)
-  const busy = computed(() => loading.value || saving.value)
+  const negative = usePayrollANegativeLines({ read: () => matchingRead.value, latest: () => latest.value, blocked: () => loading.value || saving.value || !!pending.value, active: () => active.value, saved: () => load(true) })
+  const busy = computed(() => loading.value || saving.value || negative.busy.value)
   const editable = computed(() => {
     const value = latest.value ?? matchingRead.value
-    return !!matchingRead.value && !!value && ['new', 'draft'].includes(value.status) && value.context.origin === 'real' && !value.context.readonly && value.context.capabilities.includes('payroll:write') && !readFailed.value && !pending.value && !busy.value
+    return !!matchingRead.value && !!value && (!hasPayrollAFeesForm(value) || (!!value.fees && value.bookProof.state === 'proven' && value.bookEligibility.canSave)) && ['new', 'draft'].includes(value.status) && value.context.origin === 'real' && !value.context.readonly && value.context.capabilities.includes('payroll:write') && !readFailed.value && !pending.value && !negative.pending.value && !busy.value
   })
-  const dirty = computed(() => !!matchingRead.value && original.value !== JSON.stringify(draft.value))
-  const returnTo = computed(() => payrollAEntryReturn(route.query.returnTo, scope.value.origin) || payrollReadLocation('/subcontract/payroll', scope.value))
+  const dirty = computed(() => (!!matchingRead.value && original.value !== JSON.stringify(draft.value)) || negative.dirty.value)
+  const returnTo = computed(() => (scope.value.origin && payrollAdjustmentReturn(route.query.returnTo, scope.value.origin)) || payrollAEntryReturn(route.query.returnTo, scope.value.origin) || payrollReadLocation('/subcontract/payroll', scope.value))
   const previewed = computed(() => !!matchingRead.value && sourceSelection(draft.value) === sourceSelection(payrollDraft(matchingRead.value.draft)))
-  const canSave = computed(() => editable.value && previewed.value && !!matchingRead.value?.eligibility.canSaveDraft)
+  const canSave = computed(() => editable.value && !negative.dirty.value && previewed.value && !!matchingRead.value?.eligibility.canSaveDraft)
   const cache = new Map<string, { read: PayrollAFormRead, draft: PayrollADraft, original: string, ratioExplicit: boolean }>()
   const key = (value: PayrollAFormRead) => JSON.stringify([value.context.workspaceId, value.context.actorId, value.context.origin, value.statementId ?? value.draftKey])
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
@@ -68,7 +73,7 @@ export function usePayrollAForm() {
     fieldErrors.value = Object.fromEntries(Object.entries(problem.fieldErrors ?? {}).map(([key, messages]) => [key.replace(/^draft\./, ''), messages.join('；')]))
   }
   async function load(preview = false) {
-    if (preview && pending.value)
+    if (preview && (pending.value || negative.pending.value))
       return
     if (!preview && matchingRead.value)
       remember()
@@ -151,19 +156,19 @@ export function usePayrollAForm() {
   async function mayLeave() {
     if (allowLeave)
       return true
-    if (saving.value || (read.value && store.getAPending(read.value))) {
+    if (saving.value || negative.busy.value || negative.pending.value || (read.value && store.getAPending(read.value))) {
       error.value = '请先核对原提交，不能放弃结果尚未确认的工资操作。'
       return false
     }
     if (!dirty.value)
       return true
-    const before = JSON.stringify(draft.value)
+    const before = JSON.stringify([draft.value, negative.snapshot.value])
     const accepted = await kit.confirm({ variant: 'simple', title: '放弃工资草稿修改', message: '当前输入尚未保存，确认放弃？', confirmLabel: '放弃修改' })
-    return accepted && before === JSON.stringify(draft.value) && !pending.value
+    return accepted && before === JSON.stringify([draft.value, negative.snapshot.value]) && !pending.value && !negative.pending.value
   }
   useTabCloseGuard(mayLeave)
   useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
-    if (dirty.value || pending.value) {
+    if (dirty.value || pending.value || negative.pending.value) {
       event.preventDefault()
       event.returnValue = ''
     }
@@ -180,6 +185,7 @@ export function usePayrollAForm() {
       return
     if (read.value)
       cache.delete(key(read.value))
+    negative.discard()
     allowLeave = true
     tabs.close(formKey)
     await router.push(returnTo.value)
@@ -225,7 +231,9 @@ export function usePayrollAForm() {
         if (isCurrent(requested, request)) {
           const field = Object.keys(fieldErrors.value)[0]
           const element = [...formElement.value?.querySelectorAll<HTMLElement>('[data-field]') ?? []].find(element => element.dataset.field === field)
-          element?.focus()
+          if (element)
+            element.focus()
+          else errorPanel.value?.focus()
         }
       }
     }
@@ -282,5 +290,5 @@ export function usePayrollAForm() {
     active.value = false
     sequence += 1
   })
-  return { id, draftKey, scope, read, matchingRead, latest, draft, loading, busy, error, fieldErrors, formElement, pending, editable, dirty, previewed, canSave, returnTo, change, load, save, recover, leave }
+  return { id, draftKey, scope, read, matchingRead, latest, draft, loading, busy, error, fieldErrors, formElement, errorPanel, negative, pending, editable, dirty, previewed, canSave, returnTo, change, load, save, recover, leave }
 }

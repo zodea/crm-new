@@ -8,6 +8,7 @@ import type {
   CoreMigrationSourceDTO,
   CoreMigrationSourceEntityDTO,
 } from '../../app/lib/migration/core-contract'
+import { crewPayrollFeeAttributes } from '../../app/lib/crew-worker/payroll-fee-defaults'
 import {
   CORE_MIGRATION_CAPABILITY,
   CORE_MIGRATION_TOPOLOGY,
@@ -27,7 +28,7 @@ const REFERENCE_KEYS = new Set<CoreMigrationReferenceField>([
 const ROW_KEYS = new Set(['legacyId', 'name', 'references', 'quantity', 'amount', 'attributes', 'deletedAt'])
 const ATTRIBUTE_KEYS = new Set(['no', 'content', 'invoiceType', 'contactName', 'contactPhone', 'taxRate', 'signDate', 'mainTerms', 'paymentTerms', 'warrantyTerms', 'retentionRatio', 'retentionAmount', 'retentionDays', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note', 'actualCompletionDate', 'createdAt', 'updatedAt', 'laborScope'])
 const ATTRIBUTE_KEYS_BY_ENTITY: Partial<Record<CoreMigrationEntityType, ReadonlySet<string>>> = {
-  crews: new Set([...ATTRIBUTE_KEYS, 'defaultPayRatio']),
+  crews: new Set([...ATTRIBUTE_KEYS, 'defaultPayRatio', 'rentSubsidyEnabled', 'rentSubsidyPrice', 'mgmtFeeEnabled', 'mgmtFeePrice']),
   workers: new Set([...ATTRIBUTE_KEYS, 'dailyWage']),
   supplier_credentials: new Set(['graphJson']),
   suppliers: new Set(['aliases', 'externalRef', 'uniqueCode', 'taxNo', 'businessType', 'supplierCategory', 'rating', 'legalRep', 'registeredCapital', 'registeredDate', 'address', 'taxpayerType', 'taxpayerVerificationStatus', 'taxpayerVerificationSource', 'taxpayerVerifiedAt', 'taxpayerVerificationNote', 'mainBusiness', 'laborScope', 'invoiceName', 'invoiceAddress', 'bank', 'bankAccount', 'phone', 'contact', 'contactPhone', 'contactTitle', 'note', 'approvalStatus', 'createdAt', 'updatedAt']),
@@ -161,6 +162,12 @@ function parseAttributes(value: unknown, label: string, entityType: CoreMigratio
   if (!isObject(value))
     invalid(`${label}必须是对象`)
   assertOnlyKeys(value, ATTRIBUTE_KEYS_BY_ENTITY[entityType] ?? ATTRIBUTE_KEYS, label)
+  if (entityType === 'crews') {
+    try {
+      crewPayrollFeeAttributes(value)
+    }
+    catch (cause) { invalid(cause instanceof Error ? cause.message : `${label} 班组费用默认无效`) }
+  }
   const result: Record<string, string | number | null> = {}
   for (const [key, entry] of Object.entries(value)) {
     if (entityType === 'crews' && key === 'defaultPayRatio' && entry !== null && (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0 || entry > 1))

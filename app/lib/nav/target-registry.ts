@@ -29,6 +29,7 @@ import {
   validateProjectSupplierReturnTo,
 } from '~/lib/project-supplier/return-context'
 import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
+import { isQuantitySourceIdentity } from '~/lib/quantity/migration-identity'
 import { validateReceiptReturnTo } from '~/lib/receipt/return-context'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
 import { validateSupplierDetailReturnTo, validateSupplierReturnTo } from '~/lib/supplier/return-context'
@@ -280,8 +281,8 @@ function quantityUnitPath(intent: EntityTargetIntent): string {
   )
   if (!hasCrewWorkerFactContext(intent) && isDataOriginDTO(intent.filters.dataOrigin)) {
     const query = new URLSearchParams({ origin: intent.filters.dataOrigin })
-    for (const key of ['stageId', 'itemId', 'completionId']) {
-      if (isStableRouteIdentity(intent.filters[key]))
+    for (const [key, table] of [['stageId', 'construction_stages'], ['itemId', 'items'], ['completionId', 'unit_stage_completions']] as const) {
+      if (isQuantitySourceIdentity(intent.filters[key], table))
         query.set(key, String(intent.filters[key]))
     }
     return `${target}?${query}`

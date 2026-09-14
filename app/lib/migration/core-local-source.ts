@@ -11,6 +11,7 @@ import type {
   CoreMigrationTotalExpectationDTO,
 } from './core-contract'
 import { isTauri } from '@tauri-apps/api/core'
+import { CREW_PAYROLL_FEE_FIELDS, crewPayrollFeeAttributes } from '../crew-worker/payroll-fee-defaults'
 import {
   activateBrowserCoreMigration,
   clearBrowserCoreMigration,
@@ -926,8 +927,13 @@ function sourceEntity(
   row: Record<string, unknown>,
 ): CoreMigrationSourceEntityDTO {
   const entity = baseEntity(row)
-  if (entityType === 'crews' && Object.hasOwn(row, 'default_pay_ratio'))
-    return { ...entity, attributes: { defaultPayRatio: nullableNumber(row.default_pay_ratio) } }
+  if (entityType === 'crews') {
+    try {
+      const fees = crewPayrollFeeAttributes(Object.fromEntries(CREW_PAYROLL_FEE_FIELDS.filter(field => Object.hasOwn(row, field.column)).map(field => [field.attribute, row[field.column]])))
+      return { ...entity, attributes: { ...(Object.hasOwn(row, 'default_pay_ratio') ? { defaultPayRatio: nullableNumber(row.default_pay_ratio) } : {}), ...fees } }
+    }
+    catch (cause) { throw problem('unidentifiable-source-row', cause instanceof Error ? cause.message : '班组费用默认来源无效') }
+  }
   if (entityType === 'suppliers')
     return { ...entity, attributes: { laborScope: text(row.labor_scope) } }
   if (entityType === 'projects') {
@@ -1254,7 +1260,12 @@ async function buildSource(
         deletedAt: quantityMigrationTimestamp(project.deleted_at, '工程量项目删除'),
       }))] as const
     }
-    const sql = ENTITY_SQL[entityType]
+    let sql = ENTITY_SQL[entityType]
+    if (entityType === 'crews') {
+      const columns = new Set((await selectSource<{ name: string }>('PRAGMA table_info(crews)')).map(row => row.name))
+      const fees = CREW_PAYROLL_FEE_FIELDS.filter(field => columns.has(field.column)).map(field => field.column)
+      sql = `SELECT ${['id', 'name', 'default_pay_ratio', 'deleted_at', ...fees].join(', ')} FROM crews ORDER BY id`
+    }
     const rows = await selectSource<Record<string, unknown>>(sql)
     if (entityType === 'delivery_records') {
       assertDeliverySourceDiagnostics(await selectSource(DELIVERY_SOURCE_DIAGNOSTICS_SQL))

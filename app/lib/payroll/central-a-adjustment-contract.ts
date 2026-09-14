@@ -2,7 +2,7 @@ import type { PayrollSignedAmount } from './central-actual-contract'
 import type { PayrollAAdjustmentBasis } from './central-adjustment-contract'
 
 export interface PayrollAAdjustmentDimension {
-  dimension: 'quantity' | 'unit-price' | 'pay-ratio'
+  dimension: 'quantity' | 'unit-price' | 'pay-ratio' | 'fee-quantity' | 'fee-unit-price' | 'negative-quantity' | 'negative-unit-price'
   before: number | null
   after: number | null
   current: number | null
@@ -18,6 +18,9 @@ export interface PayrollAAdjustmentCoverage {
   currentSourceFingerprint: string | null
   originalPriceRevisionId: string
   currentPriceRevisionId: string | null
+  /** P5 费用/负价专用定位；旧普通量价 coverage 原文不补字段。 */
+  feeComponentKey?: string
+  negativeLineId?: string
   dimensions: PayrollAAdjustmentDimension[]
   reasons: string[]
 }

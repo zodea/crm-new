@@ -34,8 +34,8 @@ export function createPayrollActualService(run: PayrollRun) {
     const originals = []
     for (const id of [...new Set(selected.map(r => r.originalStatementId))])
       originals.push((await loadPayrollAdjustmentOriginal(tx, id)).original)
-    if (new Set(originals.map(o => hash([o.projectId, o.crewId, o.leaderWorkerId, o.formatFamily]))).size !== 1)
-      throw payrollProblem('relationship-mismatch', '实际补退不能跨项目、跨主体代收或代退')
+    if (new Set(originals.map(o => hash([o.projectId, o.crewId, o.leaderWorkerId, o.formatFamily, o.formatFamily === 'A' ? o.book ?? { bookPurpose: 'ordinary', managementBookId: null } : null]))).size !== 1)
+      throw payrollProblem('relationship-mismatch', '实际补退不能跨项目、跨主体或跨管理簿代收代退')
     const balances = []
     for (const id of input.target.adjustmentIds)
       balances.push(await loadPayrollAdjustmentBalance(tx, id))

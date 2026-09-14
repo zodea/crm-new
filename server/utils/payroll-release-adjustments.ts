@@ -1,12 +1,14 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAAdjustmentReconciliation } from '../../app/lib/payroll/central-a-adjustment-contract'
 import type { PayrollReleaseAdjustmentApplication, PayrollReleaseAdjustmentCandidate } from '../../app/lib/payroll/central-release-adjustment-contract'
+import { applyPayrollAAdjustmentDimension } from '../../app/lib/payroll/central-a-adjustment-coverage'
 import { payrollCorrectionAmount } from '../../app/lib/payroll/central-adjustment-calculation'
 import { payrollCanonical, payrollWriteRow } from '../../app/lib/payroll/central-command-shared'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { isPayrollReleaseApplications } from '../../app/lib/payroll/central-release-adjustment-wire'
 import { amountInCents } from '../../app/lib/payroll/statements'
 import { generateId } from '../../app/lib/util/id'
+import { resolvePayrollABook, samePayrollABook } from './payroll-a-book'
 import { payrollAdjustmentChainHeads } from './payroll-adjustment-chain'
 import { payrollAdjustmentHash as hash, loadPayrollAdjustmentOriginal } from './payroll-adjustment-facts'
 import { loadPayrollAdjustmentBalance, loadPayrollAdjustmentRows, readPayrollAdjustmentRecord } from './payroll-adjustment-records'
@@ -18,14 +20,9 @@ function includedAmount(reconciliation: PayrollAAdjustmentReconciliation | undef
     return 0
   const without = structuredClone(reconciliation.effectiveBasis)
   for (const row of reconciliation.coverage.filter(c => c.rootAdjustmentId === rootAdjustmentId)) {
-    const component = without.components.find(c => c.ownershipKey === row.ownershipKey)
     for (const d of row.dimensions) {
-      if (component && d.dimension === 'quantity')
-        component.quantity = d.before
-      else if (component && d.dimension === 'unit-price')
-        component.unitPrice = d.before
-      else if (d.dimension === 'pay-ratio')
-        without.payRatio = d.before
+      if (!applyPayrollAAdjustmentDimension(without, row, d, d.before))
+        return 0
     }
   }
   const amount = payrollCorrectionAmount(without).value
@@ -41,10 +38,13 @@ export async function readPayrollReleaseAdjustments(tx: TransactionDb, statement
   const records = await loadPayrollAdjustmentRows(tx)
   const confirmed = records.filter(r => r.status === 'confirmed' && r.project_id === statement.project_id && r.original_statement_id !== statementId).map(readPayrollAdjustmentRecord)
   const heads = payrollAdjustmentChainHeads(confirmed)
+  const bookProof = statement.format_family === 'A' ? await resolvePayrollABook(tx, statementId) : null
   const candidates: PayrollReleaseAdjustmentCandidate[] = []
   for (const row of heads) {
     const { original } = await loadPayrollAdjustmentOriginal(tx, row.originalStatementId)
     if (original.leaderWorkerId !== statement.leader_worker_id || original.crewId !== statement.crew_id || original.month > statement.month)
+      continue
+    if (statement.format_family === 'A' && (original.formatFamily !== 'A' || bookProof?.state !== 'proven' || !samePayrollABook(bookProof.book, original.book ?? { bookPurpose: 'ordinary', managementBookId: null })))
       continue
     const balance = await loadPayrollAdjustmentBalance(tx, row.id)
     const remainingAmount = balance.remainingDelta.value

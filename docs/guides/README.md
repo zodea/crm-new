@@ -30,6 +30,7 @@
 - [材料单价分析使用说明](./material-price-analysis.md)
 - [工资与考勤工作台使用说明](./payroll-attendance.md)（中央历史接管、A/C1/C2 配置、核对、实际发放及冻结输出；C1 配对考勤，C2 配对人工签工；更正与费用分期另述）
 - [工资更正与实际收付](./payroll-adjustments.md)（P4 本地验收；核算差额、补退、后月处理与错记冲销分别留证）
+- [房补、其他补贴与独立管理费](./payroll-fees.md)（明确完成量范围、多条费用、独立管理簿及负价清单；当前验收进度见指南首部）
 - [OCR 设置使用说明](./ocr-settings.md)
 - [发票台账与 Excel 导入导出使用说明](./finance-invoice.md)
 - [开票因子与税额计算使用说明](./invoice-factor.md)
@@ -50,6 +51,6 @@
 
 指南以本目录 Markdown 为准。新增或改变流程时更新对应指南，检查链接、步骤及当前可用范围；流程图和必要的实际界面证据直接链接在 Markdown 中。
 
-2026-09-14 起按用户要求停止例行生成指南 PDF，原 `output/pdf/` 的 25 份可重建副本移入 Windows 回收站。旧验收记录中的 PDF 页数、摘要和路径只描述当时检查，当前阅读入口为本页的 Markdown 指南。清理明细见[指南副本清理记录](../research/guide-pdf-cleanup-2026-09-14.md)。
+2026-09-14 起按用户要求停止例行生成指南 PDF，原 `output/pdf/` 的 25 份可重建副本及 4 份旧工资打印样本移入 Windows 回收站。旧验收记录中的 PDF 页数、摘要和路径只描述当时检查，当前阅读使用 Markdown 指南与保留的逐页图片。清理明细见[PDF 清理记录](../research/guide-pdf-cleanup-2026-09-14.md)。
 
 需要纸质版或明确要求 PDF 时，可使用 `scripts/generate-project-guide-pdf.py` 从指定 Markdown 按需生成，并逐页核查；产品中的工资签名表、合同原件、打印与导出仍按相应业务规格验收。

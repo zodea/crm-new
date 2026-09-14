@@ -3,9 +3,11 @@ import type { PayrollQuery } from '~/lib/payroll/central-contract'
 import { defineStore } from 'pinia'
 import { payrollACanonical } from '~/lib/payroll/central-a-calculation'
 import { decodePayrollAResult, encodePayrollAWire, parsePayrollACommand } from '~/lib/payroll/central-a-codec'
+import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { payrollProblem } from '~/lib/payroll/central-contract'
 import { usePayrollPending } from '~/lib/payroll/central-pending'
 import { generateId } from '~/lib/util/id'
+import { usePayrollAFeesStore } from './payroll-a-fees'
 
 const storageKey = 'payroll-a-central-pending-v1'
 export const usePayrollAStore = defineStore('payroll-a-central', () => {
@@ -21,6 +23,12 @@ export const usePayrollAStore = defineStore('payroll-a-central', () => {
       throw payrollProblem('forbidden', '当前工资资料仅可阅读')
     if (getAPending(read))
       throw payrollProblem('conflict', '请先核对这份工资或配置的原提交结果')
+    if ('statementId' in read && hasPayrollAFeesForm(read)) {
+      if (usePayrollAFeesStore().getPending(read))
+        throw payrollProblem('conflict', '请先核对本管理清单的原提交结果')
+      if (!read.fees || read.bookProof.state !== 'proven')
+        throw payrollProblem('unavailable', '费用或请款簿依据尚未完整读取')
+    }
     const { workspaceId, actorId, origin, sourceVersion } = read.context
     const projectId = 'scope' in read ? read.scope.projectId : read.draft.projectId
     if (!projectId)
@@ -38,9 +46,10 @@ export const usePayrollAStore = defineStore('payroll-a-central', () => {
   }
   function acknowledgeA(original: { command: PayrollACommand }, refreshed: PayrollACommandRead, output?: PayrollAOutputRead) {
     const command = original.command
-    const sameContext = (read: PayrollACommandRead | PayrollAOutputRead) => read.context.workspaceId === command.workspaceId && read.context.actorId === command.actorId && read.context.origin === command.origin && !read.context.readonly && read.context.capabilities.includes('payroll:write')
+    const sameContext = (read: PayrollACommandRead | PayrollAOutputRead) => read.context.workspaceId === command.workspaceId && read.context.actorId === command.actorId && read.context.origin === command.origin && read.context.capabilities.includes('payroll:write')
     pending.acknowledge(original, output ? [refreshed, output] : [refreshed], (result) => {
-      if (!sameContext(refreshed))
+      // 冻结输出始终只读；原表单仍须确认当前经办写权限，不能因输出可读解除撤权后的原提交。
+      if (!sameContext(refreshed) || refreshed.context.readonly)
         return false
       if (command.configScope) {
         if (!('scope' in refreshed) || payrollACanonical(refreshed.scope) !== payrollACanonical(command.configScope))

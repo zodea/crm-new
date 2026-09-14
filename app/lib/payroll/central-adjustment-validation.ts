@@ -1,5 +1,6 @@
 import type { PayrollAAdjustmentBasis, PayrollAdjustmentBasisDraft, PayrollAdjustmentDraft, PayrollAdjustmentTarget, PayrollC1AdjustmentBasis, PayrollC2AdjustmentBasis, PayrollCorrectionCommand } from './central-adjustment-contract'
-import { isPayrollAStatementSourceSnapshot } from './central-a-codec'
+import { assertPayrollAFeeAdjustmentBasis, payrollAFeeCorrectionReasons } from './central-a-fee-adjustment'
+import { isPayrollAStatementSourceVersioned } from './central-a-fees-validation'
 import { payrollCanonical } from './central-command-shared'
 import { payrollProblem } from './central-contract'
 import { wireCent, wireDate, wireExact, wireId, wireNullableNumber, wireObject, wireText } from './central-payroll-wire'
@@ -21,9 +22,13 @@ export function assertPayrollAdjustmentDraft(value: unknown): asserts value is P
   if (value.basis === null)
     return
   if (wireObject(value.basis) && value.basis.formatFamily === 'A') {
-    wireExact(value.basis, ['formatFamily', 'periodKind', 'source', 'payRatio', 'components'])
-    if (!isPayrollAStatementSourceSnapshot(value.basis.source) || !['monthly', 'settlement', 'retention'].includes(String(value.basis.periodKind)) || !wireNullableNumber(value.basis.payRatio) || !Array.isArray(value.basis.components))
+    wireExact(value.basis, ['formatFamily', 'periodKind', 'source', 'payRatio', 'components', 'fees'])
+    if (!isPayrollAStatementSourceVersioned(value.basis.source) || !['monthly', 'settlement', 'retention'].includes(String(value.basis.periodKind)) || !wireNullableNumber(value.basis.payRatio) || !Array.isArray(value.basis.components))
       fail('A 更正须保留原完整施工责任、价格来源和发放档位')
+    if (value.basis.source.schemaVersion === 2)
+      assertPayrollAFeeAdjustmentBasis(value.basis.fees)
+    else if (Object.hasOwn(value.basis, 'fees'))
+      fail('旧 A 原来源不能补写费用更正字段')
     for (const component of value.basis.components) {
       wireExact(component, ['ownershipKey', 'priceRevisionId', 'quantity', 'unitPrice'])
       if (!wireText(component.ownershipKey) || !component.ownershipKey || !wireId(component.priceRevisionId) || !wireNullableNumber(component.quantity) || !wireNullableNumber(component.unitPrice))
@@ -110,7 +115,7 @@ function payrollC1CorrectionReasons(basis: PayrollC1AdjustmentBasis, original: P
   return [...new Set(reasons)]
 }
 function payrollACorrectionReasons(basis: PayrollAAdjustmentBasis, original: PayrollAAdjustmentBasis): string[] {
-  const reasons: string[] = []
+  const reasons: string[] = payrollAFeeCorrectionReasons(basis, original)
   if (basis.periodKind !== original.periodKind || payrollCanonical(basis.source) !== payrollCanonical(original.source))
     reasons.push('A 更正须保留原冻结施工责任及量价沿革，独立核对不能冒充修改原源表')
   if (basis.components.length !== original.components.length || new Set(basis.components.map(c => c.ownershipKey)).size !== original.components.length)

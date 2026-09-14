@@ -7,15 +7,22 @@ import { createHash } from 'node:crypto'
 import { payrollAAmount, payrollACanonical, payrollAFactInSubject, payrollALines, payrollAMoney } from '../../app/lib/payroll/central-a-calculation'
 import { decodePayrollAResult, encodePayrollAWire, parsePayrollACommand } from '../../app/lib/payroll/central-a-codec'
 import { payrollACalculationVersion, payrollACrossBookConflicts, payrollAWriteRow, persistPayrollACalculation, releasePayrollA } from '../../app/lib/payroll/central-a-command'
+import { payrollAManagementContains } from '../../app/lib/payroll/central-a-fees-calculation'
+import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
+import { isPayrollAStatementSourceSnapshotV2 } from '../../app/lib/payroll/central-a-fees-validation'
 import { loadPayrollAConfigHistory } from '../../app/lib/payroll/central-a-history'
 import { assertPayrollAMonth, assertPayrollARatio, loadPayrollAPrices, loadPayrollASubjectConfig, savePayrollAPrices } from '../../app/lib/payroll/central-a-prices'
-import { loadPayrollAReleasedDocuments } from '../../app/lib/payroll/central-a-provenance'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { advancePayrollRevision, payrollRevision } from '../../app/lib/payroll/central-schema'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { generateId } from '../../app/lib/util/id'
 import { loadPayrollAAdjustmentReconciliation } from './payroll-a-adjustment-reconciliation'
+import { loadPayrollABookPayments, resolvePayrollABook, samePayrollABook } from './payroll-a-book'
+import { extendPayrollAFeesForm, payrollAFeesSelection } from './payroll-a-fees-read'
+import { createPayrollAFeesService } from './payroll-a-fees-service'
+import { payrollAFeesFrozenForm } from './payroll-a-frozen-form'
 import { loadPayrollABlockerLocation, loadPayrollAOptions, payrollANavigation } from './payroll-a-options'
+import { loadPayrollAReleasedWithMigration } from './payroll-a-released-with-migration'
 import { payrollMigratedAForm } from './payroll-migrated-form'
 import { loadPayrollMigratedProof } from './payroll-migrated-proof'
 import { persistPayrollReleaseAdjustments, preparePayrollReleaseAdjustments } from './payroll-release-adjustments'
@@ -25,7 +32,8 @@ const hash = (value: unknown) => createHash('sha256').update(payrollACanonical(v
 const number = (value: unknown) => value == null ? null : typeof value === 'number' && Number.isFinite(value) ? value : null
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 function blocker(code: string, message: string, extra: Partial<PayrollABlocker> = {}): PayrollABlocker {
-  return { code, message, locationLabel: null, sourceUnavailableReason: null, field: null, completionId: null, assignmentId: null, unitId: null, roomId: null, itemId: null, workerId: null, statementId: null, source: null, ...extra }
+  // 来源诊断还含 affects/crewId 等内部筛选依据；公开阻断项只投影合同字段。
+  return { code, message, locationLabel: extra.locationLabel ?? null, sourceUnavailableReason: extra.sourceUnavailableReason ?? null, field: extra.field ?? null, completionId: extra.completionId ?? null, assignmentId: extra.assignmentId ?? null, unitId: extra.unitId ?? null, roomId: extra.roomId ?? null, itemId: extra.itemId ?? null, workerId: extra.workerId ?? null, statementId: extra.statementId ?? null, source: extra.source ?? null }
 }
 async function head(db: TransactionDb, id: string): Promise<Row> {
   const [row] = await db.select<Row>('SELECT * FROM wage_statements WHERE id = ?', [id])
@@ -35,11 +43,13 @@ async function head(db: TransactionDb, id: string): Promise<Row> {
 }
 async function savedDraft(db: TransactionDb, row: Row): Promise<PayrollADraft> {
   const members = await db.select<{ worker_id: string }>('SELECT worker_id FROM wage_statement_members WHERE statement_id = ? AND deleted_at IS NULL ORDER BY worker_id', [row.id])
-  return { projectId: text(row.project_id), crewId: row.crew_id == null ? null : text(row.crew_id), leaderWorkerId: text(row.leader_worker_id), memberWorkerIds: members.map(member => member.worker_id), month: text(row.month), periodKind: row.period_kind as PayrollADraft['periodKind'], payRatio: number(row.pay_ratio), note: text(row.note) }
+  const relation = await db.select('SELECT statement_id FROM payroll_a_statement_books WHERE statement_id=?', [row.id])
+  const proof = relation.length ? await resolvePayrollABook(db, text(row.id)) : null
+  return { projectId: text(row.project_id), crewId: row.crew_id == null ? null : text(row.crew_id), leaderWorkerId: text(row.leader_worker_id), memberWorkerIds: members.map(member => member.worker_id), month: text(row.month), periodKind: row.period_kind as PayrollADraft['periodKind'], payRatio: number(row.pay_ratio), note: text(row.note), ...(proof?.state === 'proven' ? { book: proof.book } : {}) }
 }
 async function priorPayments(db: TransactionDb, scope: PayrollASubjectScope, excluded: string | null) {
   // 已发事实包括后来软删的旧头；隐藏或删除不能把真实已付款解除成未付款。
-  return db.select<Row>('SELECT id,month,pay_ratio,actual_amount FROM wage_statements WHERE project_id=? AND leader_worker_id=? AND format_family=\'A\' AND status=\'released\' AND id<>? ORDER BY month,id', [scope.projectId, scope.leaderWorkerId, excluded ?? ''])
+  return loadPayrollABookPayments(db, { ...scope, book: 'book' in scope && scope.book ? scope.book as NonNullable<PayrollADraft['book']> : { bookPurpose: 'ordinary', managementBookId: null } }, excluded)
 }
 async function ratioDefault(db: TransactionDb, draft: Partial<PayrollADraft>, source: PayrollIdentitySource): Promise<PayrollARatioDefault> {
   const base = { statementId: null, configId: null, sourceVersion: null }
@@ -51,6 +61,13 @@ async function ratioDefault(db: TransactionDb, draft: Partial<PayrollADraft>, so
     const previousMonth = new Date(`${draft.month}-01T00:00:00Z`)
     previousMonth.setUTCMonth(previousMonth.getUTCMonth() - 1)
     const previousRows = await db.select<Row>('SELECT id,status,pay_ratio,snapshot_json,source_version FROM wage_statements WHERE project_id=? AND leader_worker_id=? AND format_family=\'A\' AND period_kind=\'monthly\' AND status IN (\'draft\',\'checked\',\'released\') AND deleted_at IS NULL AND month=? ORDER BY id', [draft.projectId, draft.leaderWorkerId, previousMonth.toISOString().slice(0, 7)])
+    for (let i = previousRows.length - 1; i >= 0; i--) {
+      if ((draft.book?.bookPurpose ?? 'ordinary') === 'ordinary' && !(await db.select('SELECT statement_id FROM payroll_a_statement_books WHERE statement_id=?', [previousRows[i]!.id])).length)
+        continue
+      const proof = await resolvePayrollABook(db, text(previousRows[i]!.id))
+      if (proof.state !== 'proven' || !samePayrollABook(proof.book, draft.book ?? { bookPurpose: 'ordinary', managementBookId: null }))
+        previousRows.splice(i, 1)
+    }
     const previous = previousRows[0]
     if (previous) {
       let value = number(previous.pay_ratio)
@@ -63,6 +80,10 @@ async function ratioDefault(db: TransactionDb, draft: Partial<PayrollADraft>, so
       }
       // 旧同月多头没有唯一依据时明确未知，不能任取一份作为建议。
       return { ...base, value: previousRows.length === 1 ? value : null, source: 'previous-statement', statementId: previousRows.length === 1 ? text(previous.id) : null, sourceVersion: hash(previousRows) }
+    }
+    if (draft.book?.bookPurpose === 'management') {
+      const management = await payrollAFeesSelection(db, draft.projectId, draft.month, draft.book)
+      return management ? { ...base, value: management.revision.initialPayRatio, source: 'subject-config', configId: management.book.id, sourceVersion: management.revision.id } : { ...base, value: null, source: 'missing' }
     }
     const config = await loadPayrollASubjectConfig(db, draft.projectId, draft.leaderWorkerId)
     if (config)
@@ -89,17 +110,39 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
       const migrated = payrollMigratedAForm(await loadPayrollMigratedProof(db, String(row.project_id)), base, String(row.id))
       if (migrated)
         return migrated
+      const [savedSource] = await db.select<{ source_json: string }>('SELECT source_json FROM payroll_a_statement_sources WHERE statement_id=?', [row.id])
+      let originalSource: unknown
+      try {
+        originalSource = savedSource ? JSON.parse(savedSource.source_json) : null
+      }
+      catch { throw payrollProblem('unavailable', '原工资来源正文无法核实') }
+      if (originalSource && typeof originalSource === 'object' && 'schemaVersion' in originalSource && originalSource.schemaVersion === 2) {
+        const document = (await loadPayrollAReleasedWithMigration(db, String(row.id))).get(String(row.id))
+        if (!document || !hasPayrollAFeesDocument(document) || !isPayrollAStatementSourceSnapshotV2(originalSource))
+          throw payrollProblem('unavailable', '原费用清单、用途或发放证明无法核实')
+        return payrollAFeesFrozenForm(base, document, originalSource)
+      }
     }
     const draft = row ? { ...await savedDraft(db, row), ...(row.status === 'draft' ? input.draft : {}) } : { ...input.draft }
+    if (!row && draft.projectId && draft.month)
+      draft.book ??= { bookPurpose: 'ordinary', managementBookId: null }
+    if (row && input.draft?.book) {
+      const proof = await resolvePayrollABook(db, text(row.id))
+      if (proof.state !== 'proven' || !samePayrollABook(proof.book, input.draft.book))
+        throw payrollProblem('relationship-mismatch', '已存工资不能切换请款簿用途')
+    }
     const all = await quantities(db, draft.projectId, draft.month)
-    const prices = draft.projectId ? await loadPayrollAPrices(db, draft.projectId) : []
+    const management = draft.book?.bookPurpose === 'management' && draft.projectId && draft.month ? await payrollAFeesSelection(db, draft.projectId, draft.month, draft.book) : null
+    const prices = draft.projectId && draft.book?.bookPurpose !== 'management' ? await loadPayrollAPrices(db, draft.projectId) : []
     const defaults = await ratioDefault(db, draft, source)
     if (draft.payRatio === undefined)
       draft.payRatio = defaults.value
     const scope: PayrollASubjectScope = { projectId: draft.projectId ?? '', leaderWorkerId: draft.leaderWorkerId ?? '', crewId: draft.crewId ?? null, memberWorkerIds: draft.memberWorkerIds ?? [] }
-    const facts = all.rows.filter(fact => payrollAFactInSubject(fact, scope))
+    const facts = all.rows.filter(fact => draft.book?.bookPurpose === 'management' ? management && payrollAManagementContains(management.revision.scope, fact) : payrollAFactInSubject(fact, scope))
     const memberOptions = await loadPayrollAOptions(db, source, base, scope.projectId, all.rows)
     const blocks: PayrollABlocker[] = []
+    if (row && draft.book?.bookPurpose === 'management' && (draft.crewId ?? null) !== (row.crew_id ?? null))
+      blocks.push(blocker('management-subject-changed', '管理草稿须保留原费用主体班组，不能切换后继续发放', { field: 'crewId' }))
     if (!source.projects.some(project => project.id === scope.projectId))
       blocks.push(blocker('project-unavailable', '请选择有效的工资项目', { field: 'projectId' }))
     if (!scope.leaderWorkerId || !scope.memberWorkerIds.includes(scope.leaderWorkerId) || new Set(scope.memberWorkerIds).size !== scope.memberWorkerIds.length)
@@ -122,7 +165,7 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
       if (fact.fieldQty === null || !fact.unit)
         blocks.push(blocker(fact.fieldQty === null ? 'field-quantity-missing' : 'unit-missing', fact.fieldQty === null ? '已完成施工的现场量尚未提供' : '施工来源的计量单位未提供', { completionId: fact.completionId, assignmentId: fact.assignmentId, unitId: fact.unitId, roomId: fact.roomId, itemId: fact.itemId }))
     }
-    const lines = payrollALines(facts, prices, scope, draft.month ?? '')
+    const lines = draft.book?.bookPurpose === 'management' ? [] : payrollALines(facts, prices, scope, draft.month ?? '')
     for (const line of lines) {
       line.workerName = source.workers.find(worker => worker.id === line.workerId)?.name ?? null
       line.sources = [...new Map(line.facts.map(fact => [fact.unitId, payrollANavigation(base, scope.projectId, 'quantity-unit', fact.unitId, fact.unitName ?? '施工户', { stageId: fact.stageId, itemId: fact.itemId, completionId: fact.completionId })])).values()].filter((intent): intent is NavigationIntentDTO => intent !== null)
@@ -134,11 +177,11 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
         blocks.push(missing)
       }
     }
-    const payments = await priorPayments(db, scope, input.statementId ?? null)
+    const payments = await priorPayments(db, { ...scope, ...(draft.book ? { book: draft.book } : {}) }, input.statementId ?? null)
     const previouslyPaid = payrollAAmount(payments.map(payment => number(payment.actual_amount)), payments.some(payment => payment.actual_amount == null) ? ['历史 A 工资实际发放金额未记录'] : [])
     const workAmount = payrollAAmount(lines.map(line => line.amount), lines.some(line => line.amount === null) ? ['施工量或工资单价未完整提供'] : [])
     const cumulativeAmount = workAmount.value !== null && draft.payRatio !== null && draft.payRatio !== undefined ? payrollAAmount([payrollAMoney(workAmount.value * draft.payRatio)]) : payrollAAmount([null], ['累计核算依据不完整'])
-    const adjustmentReconciliation = await loadPayrollAAdjustmentReconciliation(db, { formatFamily: 'A', periodKind: draft.periodKind ?? 'monthly', payRatio: draft.payRatio ?? null, source: { schemaVersion: 1, subject: scope, facts, priceRevisions: prices.filter(p => lines.some(l => l.priceRevisionIds.includes(p.id))) }, components: lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0] ?? '', quantity: fact.fieldQty, unitPrice: line.unitPrice }))) }, payments.map(p => String(p.id)), input.statementId)
+    const adjustmentReconciliation = draft.book ? undefined : await loadPayrollAAdjustmentReconciliation(db, { formatFamily: 'A', periodKind: draft.periodKind ?? 'monthly', payRatio: draft.payRatio ?? null, source: { schemaVersion: 1, subject: scope, facts, priceRevisions: prices.filter(p => lines.some(l => l.priceRevisionIds.includes(p.id))) }, components: lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0] ?? '', quantity: fact.fieldQty, unitPrice: line.unitPrice }))) }, payments.map(p => String(p.id)), input.statementId)
     const grossAmount = adjustmentReconciliation?.availableAmount ?? (cumulativeAmount.value !== null && previouslyPaid.value !== null ? payrollAAmount([Math.max(0, payrollAMoney(cumulativeAmount.value - previouslyPaid.value))]) : payrollAAmount([null], ['累计应付或此前实发未完整提供']))
     for (const reason of adjustmentReconciliation?.reasons ?? [])
       blocks.push(blocker('adjustment-source-unproven', reason))
@@ -156,7 +199,8 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
     const context: PayrollAContext = { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion: `${base.sourceVersion}+a:${hash({ scope, month: draft.month, periodKind: draft.periodKind, payRatio: draft.payRatio, all, prices, payments, ...(adjustmentReconciliation ? { adjustmentReconciliation } : {}) })}` }
     const status = row ? row.status as PayrollAFormRead['status'] : 'new'
     const writable = !context.readonly && blocks.length === 0
-    return { context, statementId: input.statementId, draftKey: input.statementId ? null : input.draftKey!, status, needsRecheck: !!row?.needs_recheck, draft, options: memberOptions, members: memberOptions.workers.filter(worker => scope.memberWorkerIds.includes(worker.id)), facts, lines, prices, ratioDefault: defaults, totals: { workAmount, cumulativeAmount, previouslyPaid, grossAmount }, paymentSourceVersion: hash(adjustmentReconciliation ? { payments, adjustmentReconciliation } : payments), ...(adjustmentReconciliation ? { adjustmentReconciliation } : {}), blockers: blocks, eligibility: { canSaveDraft: writable && ['new', 'draft'].includes(status), canCheck: writable && ['draft', 'checked'].includes(status), canRelease: writable && status === 'checked' && !row?.needs_recheck && grossAmount.value !== null && grossAmount.value > 0, canOutput: false, reasons: blocks.map(block => block.message) } }
+    const read: PayrollAFormRead = { context, statementId: input.statementId, draftKey: input.statementId ? null : input.draftKey!, status, needsRecheck: !!row?.needs_recheck, draft, options: memberOptions, members: memberOptions.workers.filter(worker => scope.memberWorkerIds.includes(worker.id)), facts, lines, prices, ratioDefault: defaults, totals: { workAmount, cumulativeAmount, previouslyPaid, grossAmount }, paymentSourceVersion: hash(adjustmentReconciliation ? { payments, adjustmentReconciliation } : payments), ...(adjustmentReconciliation ? { adjustmentReconciliation } : {}), blockers: blocks, eligibility: { canSaveDraft: writable && ['new', 'draft'].includes(status), canCheck: writable && ['draft', 'checked'].includes(status), canRelease: writable && status === 'checked' && !row?.needs_recheck && grossAmount.value !== null && grossAmount.value > 0, canOutput: false, reasons: blocks.map(block => block.message) } }
+    return draft.book ? extendPayrollAFeesForm(db, read, source, all, options) : read
   }
   async function config(db: TransactionDb, base: PayrollAContext, source: PayrollIdentitySource, scope: PayrollAConfigScope): Promise<PayrollAConfigRead> {
     assertPayrollAMonth(scope.month)
@@ -178,6 +222,7 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
     return { context: { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion: `${base.sourceVersion}+config:${hash({ scope, all, prices, subject })}` }, scope, options: memberOptions, subject, crewRatio: crew ? { crewId: crew.id, value: crew.ratioExplicitlyConfigured ? crew.defaultPayRatio ?? null : null, explicitlyConfigured: crew.ratioExplicitlyConfigured ?? false, sourceVersion: source.version } : null, prices, priceOptions: [...new Map(all.rows.map(fact => [`${fact.itemId}:${fact.unit}`, { itemId: fact.itemId, itemName: fact.itemName, unit: fact.unit, scopes: [{ kind: 'project' as const }] }])).values()], readonlyReasons, history: await loadPayrollAConfigHistory(db, scope.projectId, scope.leaderWorkerId) }
   }
   return {
+    ...createPayrollAFeesService(run, options, form),
     aFormInTransaction: form,
     aForm: (query: PayrollQuery, input: PayrollAFormInput, sessionId?: string | null) => run(query, sessionId, (db, context, source) => form(db, context, source, input)),
     aConfig: (query: PayrollQuery, scope: PayrollAConfigScope, sessionId?: string | null) => run(query, sessionId, (db, context, source) => config(db, context, source, scope)),
@@ -185,7 +230,7 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
       const row = await head(db, statementId)
       if (query.projectId && query.projectId !== row.project_id)
         throw payrollProblem('relationship-mismatch', '输出单据与指定项目不匹配')
-      const document = (await loadPayrollMigratedProof(db, String(row.project_id))).aDocuments.get(statementId) ?? (await loadPayrollAReleasedDocuments(db, statementId)).get(statementId)
+      const document = (await loadPayrollMigratedProof(db, String(row.project_id))).aDocuments.get(statementId) ?? (await loadPayrollAReleasedWithMigration(db, statementId)).get(statementId)
       if (!document)
         return { context, statementId, state: 'unavailable', document: null, reasons: ['当前历史记录没有可证明的新中央发放与来源记录，仍保留原快照阅读'] }
       return { context, statementId, state: 'available', document, reasons: [] }
@@ -272,15 +317,18 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
                   throw payrollProblem('validation-failed', read.blockers[0]?.message ?? '当前工资不能保存或核对')
                 if ((await payrollACrossBookConflicts(db, read)).length)
                   throw payrollProblem('conflict', '当前施工责任已有其他请款簿发放，不能重复计薪')
-                if ((await db.select('SELECT id FROM wage_statements WHERE project_id=? AND leader_worker_id=? AND month=? AND format_family=\'A\' AND period_kind=? AND id<>? AND (deleted_at IS NULL OR status=\'released\')', [read.draft.projectId, read.draft.leaderWorkerId, read.draft.month, read.draft.periodKind, command.statementId ?? ''])).length)
+                if ((await db.select(`SELECT w.id FROM wage_statements w LEFT JOIN payroll_a_statement_books b ON b.statement_id=w.id
+                  WHERE w.project_id=? AND w.leader_worker_id=? AND w.month=? AND w.format_family='A' AND w.period_kind=? AND w.id<>? AND (w.deleted_at IS NULL OR w.status='released')
+                  AND COALESCE(b.book_purpose,'ordinary')=? AND (?='ordinary' OR b.management_book_id=?)`, [read.draft.projectId, read.draft.leaderWorkerId, read.draft.month, read.draft.periodKind, command.statementId ?? '', read.draft.book?.bookPurpose ?? 'ordinary', read.draft.book?.bookPurpose ?? 'ordinary', read.draft.book?.managementBookId ?? null])).length) {
                   throw payrollProblem('conflict', '同一负责人、月份与档位已有工资单，请打开原单继续')
+                }
                 result.statementId = command.statementId ?? generateId('wage')
                 await persistPayrollACalculation(db, result.statementId, read, calculationVersion, action.kind === 'check-a' ? 'checked' : 'draft', context.actorId)
                 result.outcome = action.kind === 'check-a' ? 'checked' : 'saved'
               }
               else if (action.kind === 'release-a') {
                 const applications = await preparePayrollReleaseAdjustments(db, command.statementId!, action.release.actualAmount, action.release.adjustmentApplications, read.adjustmentReconciliation)
-                await releasePayrollA(db, read, action.release, calculationVersion, context.actorId)
+                await releasePayrollA(db, read, action.release, calculationVersion, context.actorId, command.commandId)
                 if (applications !== undefined)
                   result.adjustmentApplicationIds = await persistPayrollReleaseAdjustments(db, command.statementId!, command.commandId, applications, context.actorId)
                 if (read.adjustmentReconciliation) {

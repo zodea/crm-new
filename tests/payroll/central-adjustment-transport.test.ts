@@ -13,7 +13,7 @@ afterEach(async () => {
 it('真实 P4 SQLite 原图迁入完整中央工资表与回执审计，正文逐字保留且重复接管不覆盖', async () => {
   const f = await createPayrollAdjustmentMigrationFixture()
   const sourceGraph = JSON.parse(f.evidence.source_graph_json)
-  expect(sourceGraph.schemaVersion).toBe(2)
+  expect(sourceGraph.schemaVersion).toBe(3)
   expect(Object.keys(sourceGraph.central.tables).sort()).toEqual([...PAYROLL_CENTRAL_MIGRATION_TABLES].sort())
   const readAll = () => f.instance.withWorkspaceTransaction(async tx => Object.fromEntries(await Promise.all(PAYROLL_CENTRAL_MIGRATION_TABLES.map(async table => [table, await tx.select(`SELECT * FROM ${table} ORDER BY rowid`)]))))
   const before = await readAll()

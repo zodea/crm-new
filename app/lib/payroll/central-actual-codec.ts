@@ -74,6 +74,8 @@ export function isPayrollActualSnapshot(v: unknown): v is PayrollActualPaymentSn
     wireExact(v, reversal ? ['schemaVersion', 'kind', 'id', 'commandId', 'projectId', 'originalFact', 'originals', 'draft', 'applications', 'applicationIds', 'confirmedBy', 'confirmedAt'] : ['schemaVersion', 'id', 'commandId', 'projectId', 'originals', 'draft', 'applicationIds', 'confirmedBy', 'confirmedAt'])
     if (v.schemaVersion !== 1 || ![v.id, v.commandId, v.projectId, v.confirmedBy].every(wireId) || !wireText(v.confirmedAt) || !Array.isArray(v.originals) || !v.originals.length || !v.originals.every(isPayrollOriginalWageRef) || v.originals.some(o => o.projectId !== v.projectId) || !payrollUniqueIds(v.applicationIds))
       return false
+    if (v.originals.some(o => o.book !== undefined) && new Set(v.originals.map(o => JSON.stringify([o.crewId, o.leaderWorkerId, o.formatFamily, o.book?.bookPurpose ?? 'ordinary', o.book?.managementBookId ?? null]))).size !== 1)
+      return false
     if (reversal) {
       assertPayrollReversalDraft(v.draft)
       if (!v.draft.confirmedNotOccurred || !v.draft.evidenceNote.trim() || !isPayrollActualFact(v.originalFact) || v.originalFact.projectId !== v.projectId || !Array.isArray(v.applications) || v.applications.length !== v.applicationIds.length)

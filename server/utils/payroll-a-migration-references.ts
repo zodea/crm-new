@@ -7,6 +7,7 @@ import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/
 import { payrollAdjustmentReceiptReferences } from './payroll-adjustment-migration-references'
 import { payrollC1ReceiptReferences } from './payroll-c1-migration-references'
 import { payrollC2ReceiptReferences } from './payroll-c2-migration-references'
+import { createPayrollFeesReferenceCollector, payrollFeesReceiptReferences } from './payroll-fees-migration-references'
 
 export const PAYROLL_A_REFERENCE_TABLES = ['payroll_a_subject_configs', 'payroll_a_price_revisions', 'payroll_a_statement_sources', 'payroll_command_receipts'] as const
 const sqlFields = { project_id: 'projects', crew_id: 'crews', leader_worker_id: 'workers', worker_id: 'workers', item_id: 'items', statement_id: 'wage_statements' }
@@ -51,8 +52,14 @@ export async function payrollAMigrationReferences(db: TransactionDb): Promise<Se
     for (const cell of array(scope.cells)) fields(object(cell), sourceFields)
   }
   function source(source: Record<string, unknown>) {
-    if (source.schemaVersion !== 1)
+    if (source.schemaVersion === 2) {
+      const fees = createPayrollFeesReferenceCollector()
+      fees.source(source)
+      for (const reference of fees.refs) result.add(reference)
+    }
+    else if (source.schemaVersion !== 1) {
       invalid()
+    }
     const subject = object(source.subject)
     fields(subject, sourceFields)
     for (const member of array(subject.memberWorkerIds)) add('workers', member)
@@ -73,7 +80,7 @@ export async function payrollAMigrationReferences(db: TransactionDb): Promise<Se
     }
   }
   function receiptCommand(value: Record<string, unknown>) {
-    const specific = payrollAdjustmentReceiptReferences(value) ?? payrollC1ReceiptReferences(value) ?? payrollC2ReceiptReferences(value)
+    const specific = payrollAdjustmentReceiptReferences(value) ?? payrollC1ReceiptReferences(value) ?? payrollC2ReceiptReferences(value) ?? payrollFeesReceiptReferences(value)
     if (specific) {
       for (const reference of specific) result.add(reference)
       return
@@ -103,6 +110,8 @@ export async function payrollAMigrationReferences(db: TransactionDb): Promise<Se
     const action = command.action
     if (action.kind === 'save-a-draft') {
       fields({ ...action.draft }, sourceFields)
+      if (action.draft.book)
+        add('payroll_a_management_books', action.draft.book.managementBookId)
       for (const id of action.draft.memberWorkerIds) add('workers', id)
     }
     else if (action.kind === 'release-a') {

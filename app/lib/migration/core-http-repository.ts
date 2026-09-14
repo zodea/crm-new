@@ -11,6 +11,7 @@ import type {
   CoreMigrationSourceCommandDTO,
 } from './core-contract'
 import { isISODateTimeDTO, isProblemCodeDTO } from '../../types/read-model'
+import { crewPayrollFeeAttributes } from '../crew-worker/payroll-fee-defaults'
 
 import {
   CORE_MIGRATION_CAPABILITY,
@@ -232,6 +233,12 @@ function isAttributes(value: unknown): boolean {
 }
 
 function isServerEntity(value: unknown): value is CoreMigrationServerEntityDTO {
+  if (isObject(value) && value.entityType === 'crews' && isObject(value.attributes)) {
+    try {
+      crewPayrollFeeAttributes(value.attributes)
+    }
+    catch { return false }
+  }
   return isObject(value)
     && isEntityType(value.entityType)
     && isString(value.id)

@@ -17,7 +17,7 @@ export function payrollRatioLabel(value: PayrollARatioDefault): string {
 }
 
 export function payrollDraft(value: Partial<PayrollADraft>): PayrollADraft {
-  return { projectId: value.projectId ?? '', month: value.month ?? '', periodKind: value.periodKind ?? 'monthly', crewId: value.crewId ?? null, leaderWorkerId: value.leaderWorkerId ?? '', memberWorkerIds: [...value.memberWorkerIds ?? []], payRatio: value.payRatio ?? null, note: value.note ?? '' }
+  return { projectId: value.projectId ?? '', month: value.month ?? '', periodKind: value.periodKind ?? 'monthly', crewId: value.crewId ?? null, leaderWorkerId: value.leaderWorkerId ?? '', memberWorkerIds: [...value.memberWorkerIds ?? []], payRatio: value.payRatio ?? null, note: value.note ?? '', ...(value.book ? { book: { ...value.book } } : {}) }
 }
 
 export function payrollReleaseDefault(read: PayrollAFormRead): PayrollAReleaseDraft {

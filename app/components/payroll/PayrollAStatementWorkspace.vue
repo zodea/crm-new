@@ -4,6 +4,7 @@ import { computed, nextTick, shallowRef } from 'vue'
 import { usePayrollAStatement } from '~/composables/usePayrollAStatement'
 import { createPayrollAWorkbook } from '~/lib/payroll/a-export'
 import { payrollInputNumber, payrollRatioLabel } from '~/lib/payroll/a-presentation'
+import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { toErrorMessage } from '~/lib/util/error'
 
 const props = defineProps<{ statementId: string, origin: 'real' | 'demo', returnTo: string }>()
@@ -11,10 +12,11 @@ const emit = defineEmits<{ changed: [] }>()
 const adjustmentsReady = shallowRef(false)
 const kit = useKitUI()
 const ui = usePayrollAStatement({ id: () => props.statementId, origin: () => props.origin, changed: () => emit('changed') })
-const { matching, output, active, busy, error, writable, pending, ratio, releaseOpen, releaseRead, releaseDraft } = ui
+const { matching, output, active, busy, error, writable, pending, feesPending, ratio, releaseOpen, releaseRead, releaseDraft } = ui
 const selectedLine = shallowRef<PayrollALine | null>(null)
+const feeRead = computed(() => matching.value && hasPayrollAFeesForm(matching.value) ? matching.value : null)
 const edit = computed(() => ({ path: `/subcontract/payroll/form/${encodeURIComponent(props.statementId)}`, query: { origin: props.origin, returnTo: props.returnTo } }))
-const config = computed(() => ({ path: '/subcontract/payroll/config', query: { origin: props.origin, project: matching.value?.draft.projectId || '', month: matching.value?.draft.month || '', crew: matching.value?.draft.crewId || '', leader: matching.value?.draft.leaderWorkerId || '', returnTo: props.returnTo } }))
+const config = computed(() => ({ path: '/subcontract/payroll/config', query: { origin: props.origin, project: matching.value?.draft.projectId || '', month: matching.value?.draft.month || '', crew: matching.value?.draft.crewId || '', leader: matching.value?.draft.leaderWorkerId || '', managementBookId: feeRead.value?.book?.managementBookId || undefined, returnTo: props.returnTo } }))
 async function exportFile() {
   const value = output.value
   if (value?.state !== 'available' || !active.value || value.statementId !== props.statementId)
@@ -40,6 +42,11 @@ async function print() {
 <template>
   <section class="grid min-w-0 gap-4" aria-label="A工资核对与发放">
     <PayrollACommandState :pending="!!pending" :busy="busy" :error="error" @recover="ui.recover" @refresh="ui.load()" />
+    <section v-if="feesPending" class="panel grid gap-2 p-3 text-12px" role="status">
+      <p>管理清单原提交尚未核对，暂不能重新核对或发放工资。</p><NuxtLink :to="edit" class="cell--link">
+        返回负价清单核对原提交
+      </NuxtLink>
+    </section>
     <template v-if="matching">
       <section class="panel grid gap-3 p-4" aria-label="A工资处理">
         <SectionHeader title="核对与实际发放" />
@@ -52,6 +59,8 @@ async function print() {
         <div class="flex flex-wrap items-center gap-2">
           <NuxtLink v-if="matching.status === 'draft' && writable" :to="edit" class="btn-secondary">
             编辑工资草稿
+          </NuxtLink><NuxtLink v-else-if="feeRead?.book?.bookPurpose === 'management' && matching.status === 'checked' && writable" :to="edit" class="btn-secondary">
+            编辑管理清单负价行
           </NuxtLink><NuxtLink v-if="matching.status !== 'released'" :to="config" class="btn-secondary">
             工资配置
           </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck" @click="ui.execute('check')">
@@ -71,7 +80,8 @@ async function print() {
           {{ reason }}
         </p>
       </section>
-      <PayrollASourceReview v-if="matching.status !== 'released'" :read="matching" :return-to="returnTo" :editable="writable" @price="selectedLine = $event" />
+      <PayrollASourceReview v-if="matching.status !== 'released' && feeRead?.book?.bookPurpose !== 'management'" :read="matching" :return-to="returnTo" :editable="writable" @price="selectedLine = $event" />
+      <PayrollAFeesReview v-if="feeRead" :read="feeRead" :return-to="returnTo" />
     </template>
     <PayrollReleaseAdjustmentSelection v-if="matching && matching.status !== 'released'" :statement-id="statementId" :origin="origin" :source-version="matching.context.sourceVersion" :return-to="returnTo" :applications="releaseDraft?.adjustmentApplications" :disabled="!writable || releaseOpen" @change="ui.setReleaseApplications" @valid="adjustmentsReady = $event" />
     <section v-if="output" class="panel grid gap-3 p-4" aria-label="冻结工资输出">

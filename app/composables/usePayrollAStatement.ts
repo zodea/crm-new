@@ -2,7 +2,9 @@ import type { PayrollAFormRead, PayrollAOutputRead, PayrollAReleaseDraft, Payrol
 import type { PayrollReleaseAdjustmentApplication } from '~/lib/payroll/central-release-adjustment-contract'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { payrollReleaseDefault } from '~/lib/payroll/a-presentation'
+import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { toErrorMessage } from '~/lib/util/error'
+import { usePayrollAFeesStore } from '~/stores/payroll-a-fees'
 
 export function usePayrollAStatement(options: { id: () => string, origin: () => 'real' | 'demo', changed: () => void }) {
   const store = usePayrollStore()
@@ -22,10 +24,11 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
   const target = () => JSON.stringify([options.id(), options.origin()])
   const matching = computed(() => read.value?.statementId === options.id() && read.value.context.origin === options.origin() ? read.value : null)
   const pending = computed(() => matching.value ? store.getAPending(matching.value) : null)
+  const feesPending = computed(() => matching.value && hasPayrollAFeesForm(matching.value) ? usePayrollAFeesStore().getPending(matching.value) : null)
   const busy = computed(() => loading.value || working.value)
   const writable = computed(() => {
     const value = latest.value ?? matching.value
-    return !!matching.value && !!value && !value.context.readonly && value.status !== 'released' && value.context.capabilities.includes('payroll:write') && options.origin() === 'real' && !readFailed.value && !pending.value && !busy.value
+    return !!matching.value && !!value && (!hasPayrollAFeesForm(value) || (!!value.fees && value.bookProof.state === 'proven')) && !value.context.readonly && value.status !== 'released' && value.context.capabilities.includes('payroll:write') && options.origin() === 'real' && !readFailed.value && !pending.value && !feesPending.value && !busy.value
   })
   let sequence = 0
   let started = false
@@ -194,5 +197,5 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
     active.value = false
     sequence += 1
   })
-  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, ratio, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, setReleaseApplications, recover }
+  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, feesPending, ratio, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, setReleaseApplications, recover }
 }

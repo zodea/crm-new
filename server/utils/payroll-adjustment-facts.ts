@@ -1,12 +1,13 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAdjustmentBasisDraft, PayrollOriginalWageRef } from '../../app/lib/payroll/central-adjustment-contract'
 import { createHash } from 'node:crypto'
-import { isPayrollAStatementSourceSnapshot } from '../../app/lib/payroll/central-a-codec'
-import { loadPayrollAReleasedDocuments } from '../../app/lib/payroll/central-a-provenance'
+import { payrollAFeeAdjustmentBasis } from '../../app/lib/payroll/central-a-fee-adjustment'
+import { isPayrollAStatementSourceVersioned } from '../../app/lib/payroll/central-a-fees-validation'
 import { loadPayrollC1ReleasedDocuments } from '../../app/lib/payroll/central-c1-provenance'
 import { loadPayrollC2ReleasedDocuments } from '../../app/lib/payroll/central-c2-provenance'
 import { payrollCanonical } from '../../app/lib/payroll/central-command-shared'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
+import { loadPayrollAReleasedWithMigration } from './payroll-a-released-with-migration'
 import { loadPayrollMigratedProof } from './payroll-migrated-proof'
 
 export const payrollAdjustmentHash = (value: unknown) => createHash('sha256').update(payrollCanonical(value)).digest('hex')
@@ -27,19 +28,19 @@ export async function loadPayrollAdjustmentOriginal(tx: TransactionDb, statement
       throw payrollProblem('unavailable', '原工资头的主体、月份或金额与冻结不一致，须核对后再更正')
   }
   if (head.format_family === 'A') {
-    const document = (await loadPayrollAReleasedDocuments(tx, statementId)).get(statementId)
+    const document = (await loadPayrollAReleasedWithMigration(tx, statementId)).get(statementId)
     const [row] = await tx.select<{ source_json: string }>('SELECT source_json FROM payroll_a_statement_sources WHERE statement_id=?', [statementId])
     let source: unknown
     try {
       source = row ? JSON.parse(row.source_json) : null
     }
     catch { source = null }
-    if (!document || !isPayrollAStatementSourceSnapshot(source))
+    if (!document || !isPayrollAStatementSourceVersioned(source))
       throw payrollProblem('unavailable', '原 A 完成责任、量价来源与发放冻结证明不完整')
     checkHead(document, source.subject.crewId)
     return {
-      original: { statementId, formatFamily: 'A', projectId: document.projectId, projectName: document.projectName, crewId: source.subject.crewId, leaderWorkerId: head.leader_worker_id, month: document.month, memberWorkerIds: document.members.map(m => m.workerId), members: document.members.map(m => ({ workerId: m.workerId, workerName: m.workerName, crewId: head.crew_id })), originalSignatureAmount: payrollKnownAmount(document.actualAmount), originalGrossAmount: payrollKnownAmount(document.grossAmount), provenanceVersion: payrollAdjustmentHash({ document, source }) },
-      basis: { formatFamily: 'A', periodKind: document.periodKind, source, payRatio: document.payRatio, components: document.lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0]!, quantity: fact.fieldQty, unitPrice: line.unitPrice }))) },
+      original: { statementId, formatFamily: 'A', projectId: document.projectId, projectName: document.projectName, crewId: source.subject.crewId, leaderWorkerId: head.leader_worker_id, month: document.month, memberWorkerIds: document.members.map(m => m.workerId), members: document.members.map(m => ({ workerId: m.workerId, workerName: m.workerName, crewId: head.crew_id })), originalSignatureAmount: payrollKnownAmount(document.actualAmount), originalGrossAmount: payrollKnownAmount(document.grossAmount), provenanceVersion: payrollAdjustmentHash({ document, source }), ...(source.schemaVersion === 2 ? { book: source.book } : {}) },
+      basis: { formatFamily: 'A', periodKind: document.periodKind, source, payRatio: document.payRatio, components: document.lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0]!, quantity: fact.fieldQty, unitPrice: line.unitPrice }))), ...(source.schemaVersion === 2 ? { fees: payrollAFeeAdjustmentBasis(source) } : {}) },
     }
   }
   if (head.format_family === 'C1') {

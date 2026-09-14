@@ -27,7 +27,7 @@ describe('中央 A 配置、核对与冻结发放事务', () => {
     expect(detail.statement).toMatchObject({ actualAmount: 1200, status: 'released' })
     expect(detail.statement.allocations.map(row => row.amount)).toEqual([1200, 0])
     expect(detail.statement.snapshot).toMatchObject({ state: 'complete', issues: [] })
-    expect(detail.statement.snapshot.data?.aSource).toMatchObject({ schemaVersion: 1, subject: { projectId: 'p', memberWorkerIds: ['w', 'zero'] } })
+    expect(detail.statement.snapshot.data?.aSource).toMatchObject({ schemaVersion: 2, book: { bookPurpose: 'ordinary', managementBookId: null }, subject: { projectId: 'p', memberWorkerIds: ['w', 'zero'] } })
     expect(detail.statement.snapshot.data).not.toHaveProperty('dayworkRecords')
     expect(detail.statement.diagnostics.map(diagnostic => diagnostic.code)).not.toContain('source-unproven')
     const decoded = decodePayrollRead<PayrollDetailRead>(encodePayrollWire(detail), 'detail', { origin: 'real' }, saved.statementId!)

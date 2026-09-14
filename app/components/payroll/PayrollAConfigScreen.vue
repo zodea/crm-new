@@ -18,14 +18,14 @@ useTabTitle('A 工资配置')
 </script>
 
 <template>
-  <EntityFormShell title="A 工资配置" subtitle="工资配置独立于合同价；首月比例和单价分别保存，未保存输入保留各自的核对依据。" back-label="返回原工资" :sections="[{ key: 'scope', label: '配置范围' }, { key: 'subject', label: '首月比例' }, { key: 'prices', label: '工资单价' }]" @back="ui.leave">
+  <EntityFormShell title="A 工资配置" subtitle="项目主体的比例、工资单价与费用分别保存；管理费使用独立请款簿。" back-label="返回原工资" :sections="[{ key: 'scope', label: '配置范围' }, { key: 'subject', label: '首月比例' }, { key: 'prices', label: '工资单价' }, { key: 'fees', label: '补贴与费用' }, { key: 'management', label: '管理关系' }]" @back="ui.leave">
     <PayrollACommandState :pending="!!pending" :busy="busy" :error="error" @recover="ui.recover" @refresh="ui.load" />
     <section id="section-scope" class="panel my-4 min-w-0 scroll-mt-4 p-4" aria-label="工资配置范围">
       <SectionHeader title="配置范围" /><div class="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label class="grid min-w-0 gap-1 text-12px">项目<select :value="scope.projectId" class="field-input min-w-0 w-full" aria-label="配置项目" :disabled="busy || !!pending" @change="ui.changeScope({ projectId: ($event.target as HTMLSelectElement).value, crewId: null, leaderWorkerId: null })"><option value="">请选择项目</option><option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name || '项目名称未记录' }}</option></select></label>
-        <label class="grid min-w-0 gap-1 text-12px">核对月份<input :value="scope.month" type="month" class="field-input min-w-0 w-full" aria-label="配置核对月份" :disabled="busy || !!pending" @input="ui.changeScope({ month: ($event.target as HTMLInputElement).value })"></label>
-        <label class="grid min-w-0 gap-1 text-12px">班组<select :value="scope.crewId || ''" class="field-input min-w-0 w-full" aria-label="配置班组" :disabled="busy || !!pending" @change="ui.changeScope({ crewId: ($event.target as HTMLSelectElement).value || null, leaderWorkerId: null })"><option value="">未关联班组</option><option v-for="crew in matching?.options.crews || []" :key="crew.id" :value="crew.id" :disabled="!crew.eligible">{{ crew.name || '班组名称未记录' }}</option></select></label>
-        <label class="grid min-w-0 gap-1 text-12px">负责人<select :value="scope.leaderWorkerId || ''" class="field-input min-w-0 w-full" aria-label="配置负责人" :disabled="busy || !!pending" @change="ui.changeScope({ leaderWorkerId: ($event.target as HTMLSelectElement).value || null })"><option value="">请选择负责人</option><option v-for="worker in matching?.options.workers || []" :key="worker.id" :value="worker.id" :disabled="!worker.eligible">{{ worker.name || '姓名未记录' }}</option></select></label>
+        <label class="grid min-w-0 gap-1 text-12px">项目<select :value="scope.projectId" class="field-input min-w-0 w-full" aria-label="配置项目" :disabled="busy || !!pending || !!ui.fees.pending.value" @change="ui.changeScope({ projectId: ($event.target as HTMLSelectElement).value, crewId: null, leaderWorkerId: null })"><option value="">请选择项目</option><option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name || '项目名称未记录' }}</option></select></label>
+        <label class="grid min-w-0 gap-1 text-12px">核对月份<input :value="scope.month" type="month" class="field-input min-w-0 w-full" aria-label="配置核对月份" :disabled="busy || !!pending || !!ui.fees.pending.value" @input="ui.changeScope({ month: ($event.target as HTMLInputElement).value })"></label>
+        <label class="grid min-w-0 gap-1 text-12px">班组<select :value="scope.crewId || ''" class="field-input min-w-0 w-full" aria-label="配置班组" :disabled="busy || !!pending || !!ui.fees.pending.value" @change="ui.changeScope({ crewId: ($event.target as HTMLSelectElement).value || null, leaderWorkerId: null })"><option value="">未关联班组</option><option v-for="crew in matching?.options.crews || []" :key="crew.id" :value="crew.id" :disabled="!crew.eligible">{{ crew.name || '班组名称未记录' }}</option></select></label>
+        <label class="grid min-w-0 gap-1 text-12px">负责人<select :value="scope.leaderWorkerId || ''" class="field-input min-w-0 w-full" aria-label="配置负责人" :disabled="busy || !!pending || !!ui.fees.pending.value" @change="ui.changeScope({ leaderWorkerId: ($event.target as HTMLSelectElement).value || null })"><option value="">请选择负责人</option><option v-for="worker in matching?.options.workers || []" :key="worker.id" :value="worker.id" :disabled="!worker.eligible">{{ worker.name || '姓名未记录' }}</option></select></label>
       </div>
     </section>
     <p v-if="loading" role="status" class="text-12px">
@@ -37,7 +37,7 @@ useTabTitle('A 工资配置')
       <p v-for="reason in matching.readonlyReasons" :key="reason" class="mb-3 text-12px leading-5 text-warn">
         {{ reason }}
       </p>
-      <section id="section-subject" class="panel mb-4 grid min-w-0 grid-cols-1 scroll-mt-4 gap-3 p-4" aria-label="负责人首月比例">
+      <section v-if="ui.fees.book.value?.bookPurpose !== 'management'" id="section-subject" class="panel mb-4 grid min-w-0 grid-cols-1 scroll-mt-4 gap-3 p-4" aria-label="负责人首月比例">
         <SectionHeader title="负责人首月比例" subtitle="月度沿用上月有效月度单据保存的比例；无上月单据时使用明确首月配置，不追改已发记录。" />
         <label class="grid max-w-sm gap-1 text-12px">首月支付比例（%）<input :value="subject.initialPayRatio === null ? '' : subject.initialPayRatio * 100" type="number" min="0" max="100" step="0.01" class="field-input min-w-0" aria-label="首月支付比例" :disabled="!editable || !scope.leaderWorkerId" @input="subject.initialPayRatio = payrollInputNumber(($event.target as HTMLInputElement).value) === null ? null : Number(($event.target as HTMLInputElement).value) / 100"></label>
         <p v-if="matching.crewRatio?.explicitlyConfigured" class="text-12px text-ink-soft">
@@ -52,7 +52,7 @@ useTabTitle('A 工资配置')
           保存首月比例
         </KitButton>
       </section>
-      <section id="section-prices" class="panel grid min-w-0 grid-cols-1 scroll-mt-4 gap-3 p-4" aria-label="工资基准价与个人例外">
+      <section v-if="ui.fees.book.value?.bookPurpose !== 'management'" id="section-prices" class="panel grid min-w-0 grid-cols-1 scroll-mt-4 gap-3 p-4" aria-label="工资基准价与个人例外">
         <SectionHeader title="工资基准价与个人例外" subtitle="统一改对应当前负责人的分项基准；单独改保留该工人的独立调价记录。" />
         <KitTable :columns="[{ field: 'itemName', title: '分项', minWidth: 170 }, { field: 'unit', title: '单位', width: 85 }, { field: 'mode', title: '适用人员', minWidth: 170, slot: 'mode' }, { field: 'effectiveMonth', title: '生效月份', width: 115 }, { field: 'unitPrice', title: '工资单价', width: 140, slot: 'price' }, { field: 'revision', title: '修订', width: 90 }, { field: 'editable', title: '操作', minWidth: 180, slot: 'action' }]" :data="matching.prices" :min-rows="3" :row-height="52" :empty="{ title: '当前负责人尚未配置工资单价' }">
           <template #mode="{ row }">
@@ -81,8 +81,9 @@ useTabTitle('A 工资配置')
       </section>
       <PayrollReadHistory class="mt-4" :history="matching.history" />
     </template>
+    <PayrollAFeesConfigSection class="mt-4" :ui="ui.fees" :blocked="subjectDirty || priceDirty || !!pending" @book="ui.chooseBook" />
     <template #footer>
-      <KitButton variant="secondary" :disabled="busy || !!pending" @click="ui.leave">
+      <KitButton variant="secondary" :disabled="busy || !!pending || !!ui.fees.pending.value" @click="ui.leave">
         返回原工资
       </KitButton>
     </template>

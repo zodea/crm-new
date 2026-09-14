@@ -44,6 +44,20 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 describe('工资中央只读资料', () => {
+  it('同人同月两个A请款簿按已证用途分开展示，旧单没有凭空补普通簿', async () => {
+    const value = payrollListFixture()
+    const base = value.rows[0]!
+    value.rows = [{ ...base, id: 'ordinary', formatFamily: 'A', leaderName: '同一管理人', book: { bookPurpose: 'ordinary', managementBookId: null } }, { ...base, id: 'management', formatFamily: 'A', leaderName: '同一管理人', book: { bookPurpose: 'management', managementBookId: 'management-book' } }, { ...base, id: 'legacy', formatFamily: 'A', leaderName: '原历史人' }]
+    listRead.mockResolvedValue(value)
+    const wrapper = mount(CentralPayrollScreen, { global: { components, stubs } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('普通施工簿')
+    expect(wrapper.text()).toContain('独立管理费簿')
+    expect(wrapper.text().match(/普通施工簿/g)).toHaveLength(1)
+    expect(wrapper.findAll('a').some(link => link.attributes('href')?.includes('/ordinary?'))).toBe(true)
+    expect(wrapper.findAll('a').some(link => link.attributes('href')?.includes('/management?'))).toBe(true)
+    wrapper.unmount()
+  })
   it('null不是0，完整快照保扩展原文、零分配与分开的关系历史', async () => {
     const wrapper = mount(CentralPayrollDetailScreen, { global: { components, stubs } })
     await flushPromises()

@@ -7,6 +7,7 @@ import type { QuantityMigrationIdentity } from '../../app/lib/quantity/migration
 import { createHash } from 'node:crypto'
 import { PAYROLL_CENTRAL_MIGRATION_TABLES, payrollCentralPrimaryKey } from '../../app/lib/migration/payroll-central-source'
 import { parsePayrollProjectGraph, PAYROLL_MIGRATION_COLUMNS, PAYROLL_MIGRATION_PARTS, PAYROLL_MIGRATION_TABLES, payrollLogProject, payrollLogSnapshot } from '../../app/lib/migration/payroll-source'
+import { PAYROLL_A_FEES_MIGRATION_TABLES, payrollAFeesPrimaryKey } from '../../app/lib/payroll/central-a-fees-schema'
 import { loadPayrollGraph } from '../../app/lib/payroll/central-read'
 import { advancePayrollRevision, initializePayrollSchema } from '../../app/lib/payroll/central-schema'
 import { payrollDayworkOccupationsFromGraph, payrollSourceExclusionsFromGraph } from '../../app/lib/payroll/central-source-locks'
@@ -16,6 +17,8 @@ import { payrollAdjustmentMigrationReferences } from './payroll-adjustment-migra
 import { payrollC1MigrationReferences } from './payroll-c1-migration-references'
 import { payrollC2MigrationReferences } from './payroll-c2-migration-references'
 import { insertPayrollCentralMigrationGraph, mapPayrollCentralMigrationGraph, payrollCentralGraphFingerprint, payrollCentralGraphKeys, payrollIndependentReferenceReader, readPayrollCentralMigrationRows, removePayrollCentralMigrationGraph } from './payroll-central-migration'
+import { insertPayrollFeesMigrationGraph, mapPayrollFeesMigrationGraph, payrollFeesGraphFingerprint, payrollFeesGraphKeys, readPayrollFeesMigrationRows, removePayrollFeesMigrationGraph } from './payroll-fees-migration'
+import { payrollFeesMigrationReferences } from './payroll-fees-migration-references'
 import { withPayrollMigratedSource } from './payroll-migrated-proof'
 
 export interface ImportedPayrollProject {
@@ -112,13 +115,21 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
       daywork: ['project_id', 'worker_id', 'work_date', 'start_time', 'end_time'],
       statementDaywork: ['daywork_record_id'],
     }
+    function distinctABooks(row: PayrollMigrationRow, other: PayrollMigrationRow): boolean {
+      if (row.format_family !== 'A' || other.format_family !== 'A' || !source.fees)
+        return false
+      const book = (head: PayrollMigrationRow) => source.fees!.tables.payroll_a_statement_books.find(book => book.statement_id === head.id && book.project_id === head.project_id && book.leader_worker_id === head.leader_worker_id && book.month === head.month && book.period_kind === head.period_kind && ((book.book_purpose === 'ordinary' && book.management_book_id === null) || (book.book_purpose === 'management' && source.fees!.tables.payroll_a_management_books.some(management => management.id === book.management_book_id && management.project_id === head.project_id && management.manager_worker_id === head.leader_worker_id))))
+      const left = book(row)
+      const right = book(other)
+      return !!left && !!right && (left.book_purpose !== right.book_purpose || left.management_book_id !== right.management_book_id)
+    }
     for (const part of parts) {
       for (const row of source[part]) {
         const problem = rowProblem(part, row)
         if (problem)
           isolate(part, row, 'row-invalid', `${problem}；原行保留在隔离报告`)
         const fields = uniqueFields[part]
-        if (fields && row.deleted_at === null && source[part].some(other => other.id !== row.id && other.deleted_at === null && fields.every(field => other[field] === row[field])))
+        if (fields && row.deleted_at === null && source[part].some(other => other.id !== row.id && other.deleted_at === null && fields.every(field => other[field] === row[field]) && !(part === 'statements' && distinctABooks(row, other))))
           isolate(part, row, 'duplicate-identity', '原来源违反当前唯一性；全部重复行保留隔离，不能任选一行')
       }
     }
@@ -198,6 +209,10 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
       graph.schemaVersion = 2
       graph.central = mapPayrollCentralMigrationGraph(source.central, entity.id, mapping)
     }
+    if (source.fees) {
+      graph.schemaVersion = 3
+      graph.fees = mapPayrollFeesMigrationGraph(source.fees, entity.id, mapping)
+    }
     graph.logs = source.logs.map(row => ({ ...row, id: mapping.get(key('operation_logs', row.id))!.centralId!, record_id: mapping.get(key(String(row.table_name), row.record_id))?.centralId ?? `payroll-report-record:${entity.id}:${String(row.table_name)}:${encodeURIComponent(String(row.record_id))}` }))
     const mappings = [...mapping.values()]
     const fingerprint = createHash('sha256').update(JSON.stringify([source, mappings])).digest('hex')
@@ -213,7 +228,7 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
 }
 
 function graphFingerprint(graph: PayrollProjectGraph) {
-  return JSON.stringify([PAYROLL_MIGRATION_PARTS.map(part => graph[part].toSorted((a, b) => String(a.id).localeCompare(String(b.id))).map(row => PAYROLL_MIGRATION_COLUMNS[part].map(field => row[field]))), payrollCentralGraphFingerprint(graph.central)])
+  return JSON.stringify([PAYROLL_MIGRATION_PARTS.map(part => graph[part].toSorted((a, b) => String(a.id).localeCompare(String(b.id))).map(row => PAYROLL_MIGRATION_COLUMNS[part].map(field => row[field]))), payrollCentralGraphFingerprint(graph.central), payrollFeesGraphFingerprint(graph.fees)])
 }
 export interface PayrollRemovedIdentities { projects: ReadonlySet<string>, crews: ReadonlySet<string>, workers: ReadonlySet<string>, quantity: readonly QuantityMigrationIdentity[] }
 
@@ -222,7 +237,8 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
   await initializePayrollSchema(db)
   const all = Object.fromEntries(await Promise.all(PAYROLL_MIGRATION_PARTS.map(async part => [part, await db.select<PayrollMigrationRow>(`SELECT ${PAYROLL_MIGRATION_COLUMNS[part].join(',')} FROM ${PAYROLL_MIGRATION_TABLES[part]}`)]))) as Record<PayrollMigrationPart, PayrollMigrationRow[]>
   const central = await readPayrollCentralMigrationRows(db)
-  const owned = new Set(plan.removed.flatMap(previous => [...PAYROLL_MIGRATION_PARTS.flatMap(part => previous.graph[part].map(row => key(PAYROLL_MIGRATION_TABLES[part], row.id))), ...payrollCentralGraphKeys(previous.graph.central)]))
+  const fees = await readPayrollFeesMigrationRows(db)
+  const owned = new Set(plan.removed.flatMap(previous => [...PAYROLL_MIGRATION_PARTS.flatMap(part => previous.graph[part].map(row => key(PAYROLL_MIGRATION_TABLES[part], row.id))), ...payrollCentralGraphKeys(previous.graph.central), ...payrollFeesGraphKeys(previous.graph.fees)]))
   const removedKeys = new Set([...owned, ...['projects', 'crews', 'workers'].flatMap(table => [...removed[table as 'projects' | 'crews' | 'workers']].map(id => key(table, id))), ...removed.quantity.map(identity => key(identity.table, identity.id))])
   const nativeExcluded = new Set(owned)
   const migratedReferences = new Set<string>()
@@ -247,7 +263,17 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
             nativeExcluded.add(key(table, row[primary]))
         }
       }
-      const originalReferences = await withPayrollMigratedSource(previous.source, async source => [...await payrollAMigrationReferences(source), ...await payrollC1MigrationReferences(source), ...await payrollC2MigrationReferences(source), ...await payrollAdjustmentMigrationReferences(source)])
+      if (previous.graph.fees) {
+        for (const table of PAYROLL_A_FEES_MIGRATION_TABLES) {
+          const primary = payrollAFeesPrimaryKey(table)
+          for (const row of previous.graph.fees.tables[table]) {
+            const current = fees.tables[table].find(candidate => candidate[primary] === row[primary])
+            if (current && Object.entries(row).every(([field, value]) => current[field] === value))
+              nativeExcluded.add(key(table, row[primary]))
+          }
+        }
+      }
+      const originalReferences = await withPayrollMigratedSource(previous.source, async source => [...await payrollAMigrationReferences(source), ...await payrollC1MigrationReferences(source), ...await payrollC2MigrationReferences(source), ...await payrollAdjustmentMigrationReferences(source), ...await payrollFeesMigrationReferences(source)])
       for (const reference of originalReferences) {
         const [table, id] = JSON.parse(reference) as [string, string]
         const mapped = previous.mappings.find(m => m.tableName === table && m.legacyId === id)?.centralId
@@ -257,7 +283,7 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
     }
   }
   const independent = payrollIndependentReferenceReader(db, nativeExcluded)
-  const groups = removedKeys.size ? { A: await payrollAMigrationReferences(independent), C1: await payrollC1MigrationReferences(independent), C2: await payrollC2MigrationReferences(independent), P4: await payrollAdjustmentMigrationReferences(independent), migrated: migratedReferences } : {}
+  const groups = removedKeys.size ? { A: await payrollAMigrationReferences(independent), C1: await payrollC1MigrationReferences(independent), C2: await payrollC2MigrationReferences(independent), P4: await payrollAdjustmentMigrationReferences(independent), P5: await payrollFeesMigrationReferences(independent), migrated: migratedReferences } : {}
   const blockedReference = Object.entries(groups).flatMap(([domain, refs]) => [...refs].filter(reference => removedKeys.has(reference)).map(reference => `${domain}: ${reference}`))[0]
   if (blockedReference)
     invalid(`独立工资配置、来源、回执或历史仍引用待撤身份 ${blockedReference}，已在删除前整批拒绝`)
@@ -268,6 +294,10 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
     if (previous.graph.central) {
       actual.schemaVersion = 2
       actual.central = { schemaVersion: 1, tables: Object.fromEntries(PAYROLL_CENTRAL_MIGRATION_TABLES.map(table => [table, central.tables[table].filter(row => previous.graph.central!.tables[table].some(old => old[payrollCentralPrimaryKey(table)] === row[payrollCentralPrimaryKey(table)]))])) as typeof central.tables }
+    }
+    if (previous.graph.fees) {
+      actual.schemaVersion = 3
+      actual.fees = { schemaVersion: 1, tables: Object.fromEntries(PAYROLL_A_FEES_MIGRATION_TABLES.map(table => [table, fees.tables[table].filter(row => previous.graph.fees!.tables[table].some(old => old[payrollAFeesPrimaryKey(table)] === row[payrollAFeesPrimaryKey(table)]))])) as typeof fees.tables }
     }
     const evidence = await db.select<{ source_graph_json: string, mapping_json: string, diagnostics_json: string }>('SELECT * FROM payroll_migration_evidence WHERE entity_id = ?', [previous.entityId])
     if (graphFingerprint(actual) !== graphFingerprint(previous.graph) || evidence.length !== 1 || evidence[0]!.source_graph_json !== JSON.stringify(previous.source) || evidence[0]!.mapping_json !== JSON.stringify(previous.mappings) || evidence[0]!.diagnostics_json !== JSON.stringify(previous.diagnostics))
@@ -353,6 +383,7 @@ export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<
   // 只比较真正新进入的原图与现有独立事实；同批无变化不重新裁定旧历史。
   await assertIncomingSources(db, plan)
   for (const previous of plan.removed) {
+    await removePayrollFeesMigrationGraph(db, previous.graph.fees)
     await removePayrollCentralMigrationGraph(db, previous.graph.central)
     for (const part of [...PAYROLL_MIGRATION_PARTS].reverse()) {
       for (const row of previous.graph[part])
@@ -365,6 +396,8 @@ export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<
       for (const row of plan.references.filter(row => row.entityType === type))
         await db.execute(`INSERT INTO ${type}(id,name,deleted_at) VALUES (?,?,?) ON CONFLICT(id) DO NOTHING`, [row.id, row.name, row.deletedAt])
     }
+    // 簿身份先于 A 工资头，事务延迟外键；SQL 互斥据此辨明普通与管理用途。
+    await insertPayrollFeesMigrationGraph(db, next.graph.fees)
     // prepare 使用同一候选事务并延迟外键；正文顺序不产生额外队列。
     for (const part of PAYROLL_MIGRATION_PARTS) {
       const columns = PAYROLL_MIGRATION_COLUMNS[part]

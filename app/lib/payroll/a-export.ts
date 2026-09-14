@@ -1,6 +1,8 @@
 import type { ExportFileOptions } from '../kit/export'
 import type { PayrollAFrozenDocument } from './central-a-contract'
 import * as XLSX from 'xlsx'
+import { appendPayrollAFeesSheets } from './a-fees-export'
+import { hasPayrollAFeesDocument } from './central-a-fees-contract'
 
 /** 页面只传后端已核准的冻结输出，不查询当前来源补齐。 */
 export function createPayrollAWorkbook(document: PayrollAFrozenDocument): ExportFileOptions {
@@ -13,7 +15,10 @@ export function createPayrollAWorkbook(document: PayrollAFrozenDocument): Export
   ]
   for (const sheet of sheets)
     XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(sheet.rows), sheet.name)
+  if (hasPayrollAFeesDocument(document))
+    appendPayrollAFeesSheets(book, document)
   const data: ArrayBuffer = XLSX.write(book, { type: 'array', bookType: 'xlsx' })
-  const name = `${document.projectName}-${document.leaderName}-${document.month}-工资表`.replace(/[<>:"/\\|?*]/g, '-')
+  const label = hasPayrollAFeesDocument(document) && document.book.bookPurpose === 'management' ? '管理费进度款' : '工资表'
+  const name = `${document.projectName}-${document.leaderName}-${document.month}-${label}`.replace(/[<>:"/\\|?*]/g, '-')
   return { data, defaultName: `${name}.xlsx`, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
 }

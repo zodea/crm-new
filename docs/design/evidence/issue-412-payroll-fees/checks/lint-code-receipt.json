@@ -1,0 +1,9 @@
+{
+  "command": "node node_modules/eslint/bin/eslint.js -- <144 changed app/server/tests/e2e files>",
+  "exitCode": 0,
+  "output": "",
+  "count": 144,
+  "manifest": "checks/code-files.json",
+  "scope": "最终 P5 工作树源码与夹具，含三份新增组合测试",
+  "fixtureRepair": "捕获 JSON 只补末尾换行，JSON 内容与原响应一致"
+}

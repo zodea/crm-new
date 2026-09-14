@@ -2,6 +2,7 @@ import { once } from 'node:events'
 import { createServer } from 'node:http'
 import * as h3 from 'h3'
 import { afterEach, expect, it, vi } from 'vitest'
+import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { createPayrollRepository } from '~/lib/payroll/central-repository'
 import { createPayrollAServiceFixture } from '../helpers/payroll-a-service-fixture'
 
@@ -55,10 +56,26 @@ it('a HTTP/Repository往返保数量精度、明确零与固定目标，拒绝�
       expect(initial.blockers).toContainEqual(expect.objectContaining({ code: 'project-unavailable' }))
       await expect(repo.execute(f.command(initial, { kind: 'save-a-draft', draft: { ...f.draft, projectId: '', leaderWorkerId: '' } }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
     }
-    const invalidProject = await repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'invalid-project', draft: { projectId: 'unknown-project', month: '2026-08' } })
-    expect(invalidProject.draft.projectId).toBe('unknown-project')
-    expect(invalidProject.eligibility.canSaveDraft).toBe(false)
-    expect(invalidProject.blockers).toContainEqual(expect.objectContaining({ code: 'project-unavailable' }))
+    // 项目失效或清空选择时保留用途草稿，返回明确未知的费用依据，供页面继续修正选择。
+    for (const draft of [
+      { projectId: 'unknown-project', month: '2026-08' },
+      { projectId: 'unknown-project', month: '2026-08', book: { bookPurpose: 'ordinary' as const, managementBookId: null } },
+      { projectId: '', month: '', book: { bookPurpose: 'management' as const, managementBookId: 'selected-management' } },
+    ]) {
+      const invalidProject = await repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'invalid-project', draft })
+      expect(invalidProject.draft.projectId).toBe(draft.projectId)
+      expect(invalidProject.draft.book).toEqual(draft.book ?? { bookPurpose: 'ordinary', managementBookId: null })
+      expect(invalidProject.options.projects.map(project => project.id)).toEqual(['p'])
+      expect(invalidProject.eligibility).toMatchObject({ canSaveDraft: false, canCheck: false, canRelease: false, canOutput: false })
+      expect(invalidProject.blockers).toContainEqual(expect.objectContaining({ code: 'project-unavailable' }))
+      expect(hasPayrollAFeesForm(invalidProject)).toBe(true)
+      if (!hasPayrollAFeesForm(invalidProject))
+        throw new Error('费用草稿缺少明确的不可用读取状态')
+      expect(invalidProject.bookProof).toMatchObject({ state: 'unproven', book: null })
+      expect(invalidProject.fees).toBeNull()
+      expect(invalidProject.bookEligibility).toMatchObject({ canSave: false, canCheck: false, canRelease: false })
+      expect(Object.values(invalidProject.totals).every(amount => amount.state === 'unknown' && amount.value === null && amount.reasons.length > 0)).toBe(true)
+    }
     await expect(repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'invalid-identity', draft: { projectId: 'invalid project' } })).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
     expect(await f.db.select('SELECT * FROM wage_statements')).toEqual([])
     const scope = { projectId: 'p', month: '2026-08', crewId: 'crew', leaderWorkerId: 'w' }

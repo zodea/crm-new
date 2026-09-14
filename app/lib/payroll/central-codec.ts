@@ -1,6 +1,7 @@
 import type { PayrollDetailRead, PayrollListRead, PayrollQuery, PayrollSourcesRead } from './central-contract'
 import { isDataOriginDTO } from '../../types/read-model'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
+import { isPayrollABook } from './central-a-fees-validation'
 import { payrollProblem } from './central-contract'
 import { payrollFixedDecimal } from './central-payroll-wire'
 import { payrollObject as object } from './central-snapshot'
@@ -55,6 +56,8 @@ function snapshot(v: unknown) {
   return object(v) && ['not-released', 'complete', 'partial', 'missing', 'invalid'].includes(String(v.state)) && nullableText(v.raw) && nullableText(v.originalRaw) && (v.data === null || object(v.data)) && strings(v.issues)
 }
 function statement(v: unknown, query: PayrollQuery, id?: string) {
+  if (object(v) && Object.hasOwn(v, 'book') && (v.formatFamily !== 'A' || !isPayrollABook(v.book)))
+    return false
   return object(v) && text(v.id) && (!id || v.id === id) && ['central', 'isolated'].includes(String(v.recordKind)) && nullableText(v.legacyId) && text(v.projectId) && (!query.projectId || v.projectId === query.projectId) && (!query.month || v.month === query.month) && (!query.crewId || v.crewId === query.crewId)
     && ['month', 'formatFamily', 'periodKind', 'purpose', 'quantitySource', 'status', 'leaderWorkerId', 'sourceVersion'].every(key => text(v[key]))
     && ['projectName', 'crewId', 'crewName', 'leaderName', 'subjectConfigId', 'checkedAt', 'releasedAt', 'submittedAt', 'updatedAt', 'deletedAt', 'note'].every(key => nullableText(v[key]))

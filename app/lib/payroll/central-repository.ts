@@ -7,6 +7,7 @@ import type { PayrollDetailRead, PayrollListRead, PayrollQuery, PayrollRepositor
 import type { PayrollDayworkFormRead, PayrollDayworkListRead } from './central-daywork-contract'
 import { readProjectHttp } from '../project/http-repository'
 import { decodePayrollARead, decodePayrollAResult, encodePayrollAWire } from './central-a-codec'
+import { decodePayrollAFeeConfigRead, decodePayrollAFeesResult, encodePayrollAFeesWire } from './central-a-fees-codec'
 import { decodePayrollAdjustmentResult } from './central-adjustment-codec'
 import { decodePayrollAdjustmentRead } from './central-adjustment-read-codec'
 import { encodePayrollAdjustmentWire } from './central-adjustment-wire'
@@ -19,6 +20,8 @@ import { decodePayrollDayworkRead, decodePayrollDayworkResult, encodePayrollDayw
 export function createPayrollRepository(fetcher: ProjectHttpFetcher): PayrollRepository {
   const adjustmentRead = <T extends PayrollAdjustmentRead>(kind: PayrollAdjustmentReadKind, query: PayrollQuery, input: unknown, target = input): Promise<T> => readProjectHttp(() => fetcher(`/api/read/payroll/${kind}`, { method: 'POST', body: { query, input: encodePayrollAdjustmentWire(input) } }), value => decodePayrollAdjustmentRead<T>(value, kind, query, target))
   return {
+    aFeeConfig: (query, scope) => readProjectHttp(() => fetcher('/api/read/payroll/a-fee-config', { method: 'POST', body: { query, scope: encodePayrollAFeesWire(scope) } }), value => decodePayrollAFeeConfigRead(value, query, scope)),
+    executeFees: command => readProjectHttp(() => fetcher('/api/commands/payroll-a-fees', { method: 'POST', body: encodePayrollAFeesWire(command) as Record<string, unknown> }), value => decodePayrollAFeesResult(value, command)),
     adjustmentHistory: (q, id) => adjustmentRead('adjustment-history', q, { statementId: id }, id),
     adjustmentForm: (q, input) => adjustmentRead('adjustment-form', q, input),
     adjustmentDetail: (q, id) => adjustmentRead('adjustment-detail', q, { adjustmentId: id }, id),

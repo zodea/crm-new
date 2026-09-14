@@ -14,7 +14,7 @@ function transform(v: unknown, decode: boolean): unknown {
   if (!wireObject(v))
     return v
   const metric = 'knownValue' in v && 'state' in v
-  const dimension = 'dimension' in v && ['quantity', 'unit-price', 'pay-ratio'].includes(String(v.dimension))
+  const dimension = 'dimension' in v && ['quantity', 'unit-price', 'pay-ratio', 'fee-quantity', 'fee-unit-price', 'negative-quantity', 'negative-unit-price'].includes(String(v.dimension))
   return Object.fromEntries(Object.entries(v).filter(([, child]) => child !== undefined).map(([key, child]) => {
     const money = moneyKeys.has(key) || (metric && ['value', 'knownValue'].includes(key))
     const decimal = decimalKeys.has(key) || (dimension && ['before', 'after', 'current', 'effective'].includes(key))

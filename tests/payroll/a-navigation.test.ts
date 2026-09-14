@@ -4,6 +4,20 @@ import { payrollAEntryReturn, payrollAWorkspaceReturn, payrollSourceContext } fr
 import { inspectRestorableTabPath } from '~/lib/tabs/restore-target'
 
 describe('a工资原来源返回', () => {
+  it('费用配置来源保项目/月份/主体/管理簿及原分项焦点，只接受同项目稳定范围', () => {
+    const back = '/subcontract/payroll/config?origin=real&project=project-a&month=2026-09&leader=manager&managementBookId=book-a&focus=fee-a'
+    const query = { payrollReturnTo: back, payrollSourceKind: 'quantity-unit', payrollSourceId: 'unit-a', payrollProject: 'project-a' }
+    expect(payrollAWorkspaceReturn(back, 'real')).toBe(back)
+    expect(payrollSourceContext(query, { kind: 'quantity-unit', id: 'unit-a', projectId: 'project-a', origin: 'real' })?.configScope).toEqual({ projectId: 'project-a', month: '2026-09', leaderWorkerId: 'manager', crewId: null, book: { bookPurpose: 'management', managementBookId: 'book-a' } })
+    expect(payrollSourceContext({ ...query, payrollProject: 'other' }, { kind: 'quantity-unit', id: 'unit-a', origin: 'real' })).toBeNull()
+    for (const path of [back.replace('book-a', 'bad%2Fbook'), `${back}&managementBookId=other`, back.replace('2026-09', 'bad'), `${back}&commandId=cmd`]) expect(payrollAWorkspaceReturn(path, 'real')).toBeNull()
+    const path = `/subcontract/quantity/project-a/unit-a?${new URLSearchParams({ origin: 'real', ...query })}`
+    expect(new URL(inspectRestorableTabPath(path)!.fullPath, 'https://test.invalid').searchParams.get('payrollReturnTo')).toBe(back)
+    expect(inspectRestorableTabPath(back)).toBeNull()
+    const worker = '/base/worker/w?origin=real'
+    const wage = `/subcontract/payroll/wage?origin=real&returnTo=${encodeURIComponent(worker)}`
+    expect(payrollAWorkspaceReturn(`/subcontract/payroll/form/wage?origin=real&returnTo=${encodeURIComponent(wage)}`, 'real')).toContain(encodeURIComponent(wage))
+  })
   it('保存新建draftKey与独立编辑身份，不允许任意路径/另一来源/重复参数', () => {
     const draft = '/subcontract/payroll/new?origin=real&draftKey=draft-a&project=project-a'
     expect(payrollAWorkspaceReturn(draft, 'real')).toBe(draft)

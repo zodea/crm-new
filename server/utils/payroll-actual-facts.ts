@@ -1,10 +1,10 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollActualFact, PayrollActualFacts, PayrollActualScope } from '../../app/lib/payroll/central-actual-contract'
 import { payrollAAmount } from '../../app/lib/payroll/central-a-calculation'
-import { loadPayrollAReleasedDocuments } from '../../app/lib/payroll/central-a-provenance'
 import { loadPayrollC1ReleasedDocuments } from '../../app/lib/payroll/central-c1-provenance'
 import { loadPayrollC2ReleasedDocuments } from '../../app/lib/payroll/central-c2-provenance'
 import { loadPayrollGraph } from '../../app/lib/payroll/central-read'
+import { loadPayrollAReleasedWithMigration } from './payroll-a-released-with-migration'
 import { loadPayrollHistoricalActual } from './payroll-actual-history'
 import { loadPayrollConfirmedActualEvents } from './payroll-actual-provenance'
 import { payrollAdjustmentHash, payrollKnownAmount } from './payroll-adjustment-facts'
@@ -15,7 +15,7 @@ import { loadPayrollConfirmedReversals } from './payroll-reversal-provenance'
 export async function loadPayrollActualFacts(tx: TransactionDb, scope: PayrollActualScope): Promise<PayrollActualFacts> {
   const imported = await loadPayrollMigratedProof(tx, scope.projectId)
   const heads = await tx.select<{ id: string, project_id: string, crew_id: string | null, actual_amount: number | null }>('SELECT id,project_id,crew_id,actual_amount FROM wage_statements WHERE project_id=? AND status=\'released\' AND format_family IN (\'A\',\'C1\',\'C2\') ORDER BY id', [scope.projectId])
-  const documents = [...(await loadPayrollAReleasedDocuments(tx)).values(), ...(await loadPayrollC1ReleasedDocuments(tx)).values(), ...(await loadPayrollC2ReleasedDocuments(tx)).values()]
+  const documents = [...(await loadPayrollAReleasedWithMigration(tx)).values(), ...(await loadPayrollC1ReleasedDocuments(tx)).values(), ...(await loadPayrollC2ReleasedDocuments(tx)).values()]
   const rows: PayrollActualFact[] = []
   const reasons: string[] = []
   let historicalGraph: Awaited<ReturnType<typeof loadPayrollGraph>> | undefined

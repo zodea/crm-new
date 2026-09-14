@@ -16,6 +16,8 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (sql === 'PRAGMA table_info(crews)')
+    return ['id', 'name', 'default_pay_ratio', 'deleted_at'].map(name => ({ name }))
   // 本组旧库替身没有中央工资扩展表；其余未知查询仍应明确失败。
   if (sql === 'SELECT name FROM sqlite_master WHERE type=\'table\'')
     return []
