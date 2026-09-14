@@ -1,0 +1,554 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/payroll_c1_backend",
+  "date": "2026-09-14",
+  "round": "browser-visual-final",
+  "scope": "新签工失响应冷恢复及原签工成功后读失败后续合法更正，两条旅程9组×5宽=45张原图，全部实际逐张view_image original。",
+  "sourceReview": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c2-central/recovery-visual-review/review.json",
+  "sourceReviewPreserved": true,
+  "testReview": {
+    "path": "D:/crm本地项目开发/e2e/payroll-c2-recovery.spec.ts",
+    "sha256": "36EDFC685BE9DCD02C39782596050C35CFE6A182BA360D0A0DB5B77E88FC02CD",
+    "reviewedBeforeExecution": true,
+    "conclusion": "5组补图selector均对应实际组件，逐宽scrollIntoView，截图前断言根scrollWidth<=clientWidth；未知/后读失败/原结果已确认随后更新三个状态分别取证；原输入和可靠当前事实走公开接口，不伪造后读。",
+    "executionStatus": "Root报告browser-visual-final五场景5/5通过，本审查只读其两恢复case原图，不自行重跑。"
+  },
+  "totals": {
+    "images": 45,
+    "uniquePaths": 45,
+    "pass": 45,
+    "visibleDefects": 0,
+    "unclosedOriginalCoverageGaps": 0
+  },
+  "closure": [
+    {
+      "originalId": "V1",
+      "status": "closed",
+      "proofNames": [
+        "daywork-unknown-form-actions-390.png",
+        "daywork-success-read-failure-actions-390.png"
+      ],
+      "description": "两状态390底部三操作按钮完整，卡片下缘和屏底间有空隙；其余四宽也逐张可读。"
+    },
+    {
+      "originalId": "V2",
+      "status": "closed",
+      "proofNames": [
+        "daywork-original-ack-current-expanded-390.png",
+        "daywork-original-ack-retained-content-390.png"
+      ],
+      "description": "当前11/04、当前正文/状态/未记录证明完整展开；原11/03、原正文在独立下滚图清楚保留，文字明确区分当前事实与本次输入。其余四宽全部可读。"
+    },
+    {
+      "originalId": "V3",
+      "status": "closed",
+      "proofNames": [
+        "daywork-success-read-failure-status-390.png"
+      ],
+      "description": "成功后读取失败首屏提示及原命令恢复操作完整，明确提交已保存但等待读取原结果；其余四宽全部可读。"
+    }
+  ],
+  "limitations": [
+    "after-later-change与retained-content-390本身仍不显示ack后底部按钮；这不是原V1所指的unknown/read-failure状态，新补图已分别证明这两状态底部布局。ack后宽屏显示返回可用、两保存禁用，390不可冒称单张已显示。",
+    "全部原图无打开确认弹窗，不对其它主链弹窗/输出图作结论。",
+    "旧轮其它四条旅程与最终主链签工表右端不在本45图范围，须各自关联原独立审查。"
+  ],
+  "images": [
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-1024.png",
+      "name": "daywork-cold-original-pending-1024.png",
+      "sha256": "12FD883EAB6E582ED7677FF533719F5154211B0C20AE63F9193A8889590245C7",
+      "width": 1024,
+      "status": "pass",
+      "notes": "冷页原提交待核提示与两恢复按钮完整；项目、负责人、原组、2026/10/03、08:00–12:00、0.5半工和原长正文均可读，390单列无可见横溢。下部证明/操作不在本图完整覆盖，见本轮unknown-form-actions同宽。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-1280.png",
+      "name": "daywork-cold-original-pending-1280.png",
+      "sha256": "0890D3F570FAAF1F59BF58C02BC7004911656C213964F7BA4699C28C0683FE2A",
+      "width": 1280,
+      "status": "pass",
+      "notes": "冷页原提交待核提示与两恢复按钮完整；项目、负责人、原组、2026/10/03、08:00–12:00、0.5半工和原长正文均可读，390单列无可见横溢。下部证明/操作不在本图完整覆盖，见本轮unknown-form-actions同宽。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-1440.png",
+      "name": "daywork-cold-original-pending-1440.png",
+      "sha256": "596EA8F75272E7DC9F22FBB80D1322A5CA5CD17ADFF2E500B88880E4E70E898A",
+      "width": 1440,
+      "status": "pass",
+      "notes": "冷页原提交待核提示与两恢复按钮完整；项目、负责人、原组、2026/10/03、08:00–12:00、0.5半工和原长正文均可读，390单列无可见横溢。下部证明/操作不在本图完整覆盖，见本轮unknown-form-actions同宽。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-390.png",
+      "name": "daywork-cold-original-pending-390.png",
+      "sha256": "43A1FF3375F9172DA0EEA4B9D37C7DF562B7A18703F3462949F01090021827DB",
+      "width": 390,
+      "status": "pass",
+      "notes": "冷页原提交待核提示与两恢复按钮完整；项目、负责人、原组、2026/10/03、08:00–12:00、0.5半工和原长正文均可读，390单列无可见横溢。下部证明/操作不在本图完整覆盖，见本轮unknown-form-actions同宽。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-768.png",
+      "name": "daywork-cold-original-pending-768.png",
+      "sha256": "89DAC915A56C71295B8C6D5473AEF0E73221B49B432335694FA1A2C978B4FC77",
+      "width": 768,
+      "status": "pass",
+      "notes": "冷页原提交待核提示与两恢复按钮完整；项目、负责人、原组、2026/10/03、08:00–12:00、0.5半工和原长正文均可读，390单列无可见横溢。下部证明/操作不在本图完整覆盖，见本轮unknown-form-actions同宽。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-form-actions-1024.png",
+      "name": "daywork-unknown-form-actions-1024.png",
+      "sha256": "18D8A03D4039BB51144E6751BE8AFF850C0C18A35CDBDCEBC1EFD6910AA9918B",
+      "width": 1024,
+      "status": "pass",
+      "notes": "新增底部滚动图：原日期/时段/0.5工与长正文保留；证明、备注及返回/保存待确认/保存并确认完整入镜，三按钮禁用且390不裁边。闭合原V1新签工底部缺口；上部pending提示由cold-original同宽覆盖。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-form-actions-1280.png",
+      "name": "daywork-unknown-form-actions-1280.png",
+      "sha256": "4E7DAA2266D3E986670226E86F22303155A1F5E831AD1D5064DA5FE8C7AC0B9F",
+      "width": 1280,
+      "status": "pass",
+      "notes": "新增底部滚动图：原日期/时段/0.5工与长正文保留；证明、备注及返回/保存待确认/保存并确认完整入镜，三按钮禁用且390不裁边。闭合原V1新签工底部缺口；上部pending提示由cold-original同宽覆盖。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-form-actions-1440.png",
+      "name": "daywork-unknown-form-actions-1440.png",
+      "sha256": "6FB8EE19FD2BCCB60EEA69F847D8AAF31BAF8B5F789A8BE81EA537A1C827CE4F",
+      "width": 1440,
+      "status": "pass",
+      "notes": "新增底部滚动图：原日期/时段/0.5工与长正文保留；证明、备注及返回/保存待确认/保存并确认完整入镜，三按钮禁用且390不裁边。闭合原V1新签工底部缺口；上部pending提示由cold-original同宽覆盖。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-form-actions-390.png",
+      "name": "daywork-unknown-form-actions-390.png",
+      "sha256": "C3321B6A38622DCBB67C5D217829248978E19A5EA4CAD3650234E1C24480D6C8",
+      "width": 390,
+      "status": "pass",
+      "notes": "新增底部滚动图：原日期/时段/0.5工与长正文保留；证明、备注及返回/保存待确认/保存并确认完整入镜，三按钮禁用且390不裁边。闭合原V1新签工底部缺口；上部pending提示由cold-original同宽覆盖。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-form-actions-768.png",
+      "name": "daywork-unknown-form-actions-768.png",
+      "sha256": "36D006EFB0C798C241CBF7938927E63C5405B8267540107C5D438CD0A6D025E9",
+      "width": 768,
+      "status": "pass",
+      "notes": "新增底部滚动图：原日期/时段/0.5工与长正文保留；证明、备注及返回/保存待确认/保存并确认完整入镜，三按钮禁用且390不裁边。闭合原V1新签工底部缺口；上部pending提示由cold-original同宽覆盖。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1024.png",
+      "name": "daywork-unknown-keeps-input-1024.png",
+      "sha256": "18D8A03D4039BB51144E6751BE8AFF850C0C18A35CDBDCEBC1EFD6910AA9918B",
+      "width": 1024,
+      "status": "pass",
+      "notes": "失响应原正文/日期/时段/半工与空证明字段保留可读，表单无可见横溢；390底部仍折下但已由同轮unknown-form-actions-390实际覆盖，首屏提示由cold-original同宽覆盖，不以本图单独作全页通过。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1280.png",
+      "name": "daywork-unknown-keeps-input-1280.png",
+      "sha256": "4E7DAA2266D3E986670226E86F22303155A1F5E831AD1D5064DA5FE8C7AC0B9F",
+      "width": 1280,
+      "status": "pass",
+      "notes": "失响应原正文/日期/时段/半工与空证明字段保留可读，表单无可见横溢；390底部仍折下但已由同轮unknown-form-actions-390实际覆盖，首屏提示由cold-original同宽覆盖，不以本图单独作全页通过。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1440.png",
+      "name": "daywork-unknown-keeps-input-1440.png",
+      "sha256": "6FB8EE19FD2BCCB60EEA69F847D8AAF31BAF8B5F789A8BE81EA537A1C827CE4F",
+      "width": 1440,
+      "status": "pass",
+      "notes": "失响应原正文/日期/时段/半工与空证明字段保留可读，表单无可见横溢；390底部仍折下但已由同轮unknown-form-actions-390实际覆盖，首屏提示由cold-original同宽覆盖，不以本图单独作全页通过。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-390.png",
+      "name": "daywork-unknown-keeps-input-390.png",
+      "sha256": "E3370658F4B7BF233F3731C051A301CA71935720597A5B313FC66CD6B3664481",
+      "width": 390,
+      "status": "pass",
+      "notes": "失响应原正文/日期/时段/半工与空证明字段保留可读，表单无可见横溢；390底部仍折下但已由同轮unknown-form-actions-390实际覆盖，首屏提示由cold-original同宽覆盖，不以本图单独作全页通过。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-768.png",
+      "name": "daywork-unknown-keeps-input-768.png",
+      "sha256": "36D006EFB0C798C241CBF7938927E63C5405B8267540107C5D438CD0A6D025E9",
+      "width": 768,
+      "status": "pass",
+      "notes": "失响应原正文/日期/时段/半工与空证明字段保留可读，表单无可见横溢；390底部仍折下但已由同轮unknown-form-actions-390实际覆盖，首屏提示由cold-original同宽覆盖，不以本图单独作全页通过。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-1024.png",
+      "name": "daywork-original-ack-after-later-change-1024.png",
+      "sha256": "25CF2E503AC311B644F7337BC983BD8D26B48384341EE6A74F21EB27387EDAA4",
+      "width": 1024,
+      "status": "pass",
+      "notes": "原提交已完成但随后更新提示完整；当前摘要11/04与原输入11/03区分清楚，重新读取及查看当前原记录入口可读；390原正文折下由本轮retained-content覆盖，折叠详情由current-expanded覆盖。无提示/输入重叠或可见根横溢。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-1280.png",
+      "name": "daywork-original-ack-after-later-change-1280.png",
+      "sha256": "6FE686A6B31AEA8A94D1DFD45C5F66CB22732A70CCF308EDDD76E15CFE8FF31A",
+      "width": 1280,
+      "status": "pass",
+      "notes": "原提交已完成但随后更新提示完整；当前摘要11/04与原输入11/03区分清楚，重新读取及查看当前原记录入口可读；390原正文折下由本轮retained-content覆盖，折叠详情由current-expanded覆盖。无提示/输入重叠或可见根横溢。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-1440.png",
+      "name": "daywork-original-ack-after-later-change-1440.png",
+      "sha256": "BF01A0C698E2540F34DF553D28EC3F8C58204EB642B50A254C195A8BF8EACF7F",
+      "width": 1440,
+      "status": "pass",
+      "notes": "原提交已完成但随后更新提示完整；当前摘要11/04与原输入11/03区分清楚，重新读取及查看当前原记录入口可读；390原正文折下由本轮retained-content覆盖，折叠详情由current-expanded覆盖。无提示/输入重叠或可见根横溢。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-390.png",
+      "name": "daywork-original-ack-after-later-change-390.png",
+      "sha256": "80F6924128CD4328C466EEE2A1541749F7CC4F4174EC2F9DB98E95F7E742ECFC",
+      "width": 390,
+      "status": "pass",
+      "notes": "原提交已完成但随后更新提示完整；当前摘要11/04与原输入11/03区分清楚，重新读取及查看当前原记录入口可读；390原正文折下由本轮retained-content覆盖，折叠详情由current-expanded覆盖。无提示/输入重叠或可见根横溢。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-768.png",
+      "name": "daywork-original-ack-after-later-change-768.png",
+      "sha256": "C7C6B4EABA9754819F4DBB1B47B0225C5026D14301B71F3CA974EA137D50F54E",
+      "width": 768,
+      "status": "pass",
+      "notes": "原提交已完成但随后更新提示完整；当前摘要11/04与原输入11/03区分清楚，重新读取及查看当前原记录入口可读；390原正文折下由本轮retained-content覆盖，折叠详情由current-expanded覆盖。无提示/输入重叠或可见根横溢。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-current-expanded-1024.png",
+      "name": "daywork-original-ack-current-expanded-1024.png",
+      "sha256": "90D18457B0E1C5EB318BF3DE1A4F2ED1952420A0CD4433D3C5F6C2CD7AD7F307",
+      "width": 1024,
+      "status": "pass",
+      "notes": "展开当前原记录完整显示11/04、08:00–12:00、0.5工待确认、另一窗口后来核实的当前事实、证明人/确认日期未记录；解释“以上随后更新，下面保留本次原输入”清楚。390单列全部当前详情在卡片内完整入镜，其余宽两列正常；闭合原V2当前详情未展开缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-current-expanded-1280.png",
+      "name": "daywork-original-ack-current-expanded-1280.png",
+      "sha256": "1826DF8EE83D100C6B640EDA1F201BA171DD6EB0588F215FE7FBA8BA6D38E7BF",
+      "width": 1280,
+      "status": "pass",
+      "notes": "展开当前原记录完整显示11/04、08:00–12:00、0.5工待确认、另一窗口后来核实的当前事实、证明人/确认日期未记录；解释“以上随后更新，下面保留本次原输入”清楚。390单列全部当前详情在卡片内完整入镜，其余宽两列正常；闭合原V2当前详情未展开缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-current-expanded-1440.png",
+      "name": "daywork-original-ack-current-expanded-1440.png",
+      "sha256": "E3C7553D521BFFAB26382341FF4C9AEF53CF8A96FB8367951498E346654BFA26",
+      "width": 1440,
+      "status": "pass",
+      "notes": "展开当前原记录完整显示11/04、08:00–12:00、0.5工待确认、另一窗口后来核实的当前事实、证明人/确认日期未记录；解释“以上随后更新，下面保留本次原输入”清楚。390单列全部当前详情在卡片内完整入镜，其余宽两列正常；闭合原V2当前详情未展开缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-current-expanded-390.png",
+      "name": "daywork-original-ack-current-expanded-390.png",
+      "sha256": "60772CE501244AB5435FC241A2D38DDE0D653E309CD72E77896D38FFFBFC0AAE",
+      "width": 390,
+      "status": "pass",
+      "notes": "展开当前原记录完整显示11/04、08:00–12:00、0.5工待确认、另一窗口后来核实的当前事实、证明人/确认日期未记录；解释“以上随后更新，下面保留本次原输入”清楚。390单列全部当前详情在卡片内完整入镜，其余宽两列正常；闭合原V2当前详情未展开缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-current-expanded-768.png",
+      "name": "daywork-original-ack-current-expanded-768.png",
+      "sha256": "2C1ACE983134201EDD3751D05464C5D4BB21D204A06FEC86C3F5060AAC5A37EB",
+      "width": 768,
+      "status": "pass",
+      "notes": "展开当前原记录完整显示11/04、08:00–12:00、0.5工待确认、另一窗口后来核实的当前事实、证明人/确认日期未记录；解释“以上随后更新，下面保留本次原输入”清楚。390单列全部当前详情在卡片内完整入镜，其余宽两列正常；闭合原V2当前详情未展开缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-retained-content-1024.png",
+      "name": "daywork-original-ack-retained-content-1024.png",
+      "sha256": "42686963415CB824188D4D59CCB7039179DA558C83B06CBE60F0D5094FF5E7AD",
+      "width": 1024,
+      "status": "pass",
+      "notes": "原结果确认后仍显示原日期2026/11/03、08:00–12:00、0.5半工及“本窗口原提交的施工内容”，与展开当前的11/04及另一正文共同证明可读分区。390原正文全部在框内、证明区无横溢；底部此截图折下，前后底部图验证共用布局，不能以此图单独证明ack后按钮状态。宽屏可见返回恢复可用、两保存仍禁用。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-retained-content-1280.png",
+      "name": "daywork-original-ack-retained-content-1280.png",
+      "sha256": "90FF2D6A17EB12ADAA6B82A2282BACD33DFC844519C6E03E0F5055D4EE22C4D1",
+      "width": 1280,
+      "status": "pass",
+      "notes": "原结果确认后仍显示原日期2026/11/03、08:00–12:00、0.5半工及“本窗口原提交的施工内容”，与展开当前的11/04及另一正文共同证明可读分区。390原正文全部在框内、证明区无横溢；底部此截图折下，前后底部图验证共用布局，不能以此图单独证明ack后按钮状态。宽屏可见返回恢复可用、两保存仍禁用。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-retained-content-1440.png",
+      "name": "daywork-original-ack-retained-content-1440.png",
+      "sha256": "EF5DB05CE93D71CCA257E715BE06CE9DDCD29A7C00696B434314B397A1E26992",
+      "width": 1440,
+      "status": "pass",
+      "notes": "原结果确认后仍显示原日期2026/11/03、08:00–12:00、0.5半工及“本窗口原提交的施工内容”，与展开当前的11/04及另一正文共同证明可读分区。390原正文全部在框内、证明区无横溢；底部此截图折下，前后底部图验证共用布局，不能以此图单独证明ack后按钮状态。宽屏可见返回恢复可用、两保存仍禁用。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-retained-content-390.png",
+      "name": "daywork-original-ack-retained-content-390.png",
+      "sha256": "2C1A511A1B51722DB56E9216FCDAC59737CDFA80D81784CDD65583A26F825621",
+      "width": 390,
+      "status": "pass",
+      "notes": "原结果确认后仍显示原日期2026/11/03、08:00–12:00、0.5半工及“本窗口原提交的施工内容”，与展开当前的11/04及另一正文共同证明可读分区。390原正文全部在框内、证明区无横溢；底部此截图折下，前后底部图验证共用布局，不能以此图单独证明ack后按钮状态。宽屏可见返回恢复可用、两保存仍禁用。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-retained-content-768.png",
+      "name": "daywork-original-ack-retained-content-768.png",
+      "sha256": "AF307260E32F66F425EBA85650C8ACC30BC1BA8DECCF5B2AB9B9C01DA529E036",
+      "width": 768,
+      "status": "pass",
+      "notes": "原结果确认后仍显示原日期2026/11/03、08:00–12:00、0.5半工及“本窗口原提交的施工内容”，与展开当前的11/04及另一正文共同证明可读分区。390原正文全部在框内、证明区无横溢；底部此截图折下，前后底部图验证共用布局，不能以此图单独证明ack后按钮状态。宽屏可见返回恢复可用、两保存仍禁用。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-1024.png",
+      "name": "daywork-success-read-failure-1024.png",
+      "sha256": "D5487DA4B6AB2A877F19209CD49945120165C33FC87D9180C7E41700FBCDB152",
+      "width": 1024,
+      "status": "pass",
+      "notes": "后读失败原日期/时段/半工/原正文、空证明和备注保留，无可见输入裁切或横溢。截图位于中下部，390按钮上沿而顶部提示在折上；本轮独立status和actions图分别覆盖此状态上下两端。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-1280.png",
+      "name": "daywork-success-read-failure-1280.png",
+      "sha256": "A89B6D44B79F98D5135BD74B119CCA07B8BF05695651390F241C558D354A3632",
+      "width": 1280,
+      "status": "pass",
+      "notes": "后读失败原日期/时段/半工/原正文、空证明和备注保留，无可见输入裁切或横溢。截图位于中下部，390按钮上沿而顶部提示在折上；本轮独立status和actions图分别覆盖此状态上下两端。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-1440.png",
+      "name": "daywork-success-read-failure-1440.png",
+      "sha256": "2B8BC12BC66F72DDB0674F30D680C06C3D3BA3D1DCDC02EEA33D4856A10DC9C0",
+      "width": 1440,
+      "status": "pass",
+      "notes": "后读失败原日期/时段/半工/原正文、空证明和备注保留，无可见输入裁切或横溢。截图位于中下部，390按钮上沿而顶部提示在折上；本轮独立status和actions图分别覆盖此状态上下两端。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-390.png",
+      "name": "daywork-success-read-failure-390.png",
+      "sha256": "41B77C96AF69EDB567A0C4617E9EF47793D6CEAA2A958C78F69C82325380DF54",
+      "width": 390,
+      "status": "pass",
+      "notes": "后读失败原日期/时段/半工/原正文、空证明和备注保留，无可见输入裁切或横溢。截图位于中下部，390按钮上沿而顶部提示在折上；本轮独立status和actions图分别覆盖此状态上下两端。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-768.png",
+      "name": "daywork-success-read-failure-768.png",
+      "sha256": "4358404F57533AAD529FC4B83BA94419109104B248C47E144258C6557573EB3F",
+      "width": 768,
+      "status": "pass",
+      "notes": "后读失败原日期/时段/半工/原正文、空证明和备注保留，无可见输入裁切或横溢。截图位于中下部，390按钮上沿而顶部提示在折上；本轮独立status和actions图分别覆盖此状态上下两端。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-actions-1024.png",
+      "name": "daywork-success-read-failure-actions-1024.png",
+      "sha256": "D5487DA4B6AB2A877F19209CD49945120165C33FC87D9180C7E41700FBCDB152",
+      "width": 1024,
+      "status": "pass",
+      "notes": "新增后读失败底部图完整显示原正文、证明/备注、原记录诊断入口和返回/保存待确认/保存并确认三按钮，均禁用；390底部完整且与屏底有空隙，无裁切/横溢。闭合原V1后读失败底部缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-actions-1280.png",
+      "name": "daywork-success-read-failure-actions-1280.png",
+      "sha256": "A89B6D44B79F98D5135BD74B119CCA07B8BF05695651390F241C558D354A3632",
+      "width": 1280,
+      "status": "pass",
+      "notes": "新增后读失败底部图完整显示原正文、证明/备注、原记录诊断入口和返回/保存待确认/保存并确认三按钮，均禁用；390底部完整且与屏底有空隙，无裁切/横溢。闭合原V1后读失败底部缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-actions-1440.png",
+      "name": "daywork-success-read-failure-actions-1440.png",
+      "sha256": "2B8BC12BC66F72DDB0674F30D680C06C3D3BA3D1DCDC02EEA33D4856A10DC9C0",
+      "width": 1440,
+      "status": "pass",
+      "notes": "新增后读失败底部图完整显示原正文、证明/备注、原记录诊断入口和返回/保存待确认/保存并确认三按钮，均禁用；390底部完整且与屏底有空隙，无裁切/横溢。闭合原V1后读失败底部缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-actions-390.png",
+      "name": "daywork-success-read-failure-actions-390.png",
+      "sha256": "08B838A709AD37994D04A710D903743D0E523CB5B386FFBAAFAAFBD357412B67",
+      "width": 390,
+      "status": "pass",
+      "notes": "新增后读失败底部图完整显示原正文、证明/备注、原记录诊断入口和返回/保存待确认/保存并确认三按钮，均禁用；390底部完整且与屏底有空隙，无裁切/横溢。闭合原V1后读失败底部缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-actions-768.png",
+      "name": "daywork-success-read-failure-actions-768.png",
+      "sha256": "4358404F57533AAD529FC4B83BA94419109104B248C47E144258C6557573EB3F",
+      "width": 768,
+      "status": "pass",
+      "notes": "新增后读失败底部图完整显示原正文、证明/备注、原记录诊断入口和返回/保存待确认/保存并确认三按钮，均禁用；390底部完整且与屏底有空隙，无裁切/横溢。闭合原V1后读失败底部缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-status-1024.png",
+      "name": "daywork-success-read-failure-status-1024.png",
+      "sha256": "2AEE60F265ABB973DBA346C53C022E3FE1695D73274274A12F5A955662558193",
+      "width": 1024,
+      "status": "pass",
+      "notes": "新增失败状态首屏完整显示“项目读取服务暂时不可用，请重试”及“提交已保存，等待读取原结果。原输入与编号已保留，请核对原提交”，两恢复按钮完整且区别于原结果未知状态。390提示自然换行，与项目/原组/日期/半工/原正文互不遮挡；闭合原V3后读失败顶部状态缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1024：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-status-1280.png",
+      "name": "daywork-success-read-failure-status-1280.png",
+      "sha256": "3FDD853DC5F8FD20F937573FADF7B2B9C39BD0B3C02C7120BB482CDC6C24CECA",
+      "width": 1280,
+      "status": "pass",
+      "notes": "新增失败状态首屏完整显示“项目读取服务暂时不可用，请重试”及“提交已保存，等待读取原结果。原输入与编号已保留，请核对原提交”，两恢复按钮完整且区别于原结果未知状态。390提示自然换行，与项目/原组/日期/半工/原正文互不遮挡；闭合原V3后读失败顶部状态缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1280：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-status-1440.png",
+      "name": "daywork-success-read-failure-status-1440.png",
+      "sha256": "DA58F0E6579EEA892DE02DB2F862F58C67F42B9623EC8CBD831B8D2FE9028C58",
+      "width": 1440,
+      "status": "pass",
+      "notes": "新增失败状态首屏完整显示“项目读取服务暂时不可用，请重试”及“提交已保存，等待读取原结果。原输入与编号已保留，请核对原提交”，两恢复按钮完整且区别于原结果未知状态。390提示自然换行，与项目/原组/日期/半工/原正文互不遮挡；闭合原V3后读失败顶部状态缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "1440：展开侧栏，主表单/内容留在工作区内，卡片边界和文字无重叠。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-status-390.png",
+      "name": "daywork-success-read-failure-status-390.png",
+      "sha256": "DA57CFDC162A735954C448960CB2F451FFF5A52DCE1909E11E886FDADAC447ED",
+      "width": 390,
+      "status": "pass",
+      "notes": "新增失败状态首屏完整显示“项目读取服务暂时不可用，请重试”及“提交已保存，等待读取原结果。原输入与编号已保留，请核对原提交”，两恢复按钮完整且区别于原结果未知状态。390提示自然换行，与项目/原组/日期/半工/原正文互不遮挡；闭合原V3后读失败顶部状态缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "390：单列，正文及提示按容器换行，无可见页面根横向溢出。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-status-768.png",
+      "name": "daywork-success-read-failure-status-768.png",
+      "sha256": "AD36404404F397130EE134FBC32D5D8EE183084485F7518AB717C80DB4C8065D",
+      "width": 768,
+      "status": "pass",
+      "notes": "新增失败状态首屏完整显示“项目读取服务暂时不可用，请重试”及“提交已保存，等待读取原结果。原输入与编号已保留，请核对原提交”，两恢复按钮完整且区别于原结果未知状态。390提示自然换行，与项目/原组/日期/半工/原正文互不遮挡；闭合原V3后读失败顶部状态缺口。",
+      "inspection": "view_image original",
+      "limitations": "仅评价本图可见范围；同一状态的上下部按本轮配对图共同覆盖，静态图不替代原命令ID/请求顺序/权限/根scroll数值行为断言。",
+      "widthSpecific": "768：收起侧栏，两列表单/当前详情对齐，内容保持在卡片内。"
+    }
+  ],
+  "mutations": "只创建本审查JSON；未修改产品、E2E或原图，未启动浏览器/测试/服务。"
+}

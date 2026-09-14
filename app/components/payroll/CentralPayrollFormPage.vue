@@ -28,7 +28,7 @@ const format = computed(() => id.value ? current.value?.format : route.query.for
     正在核对工资格式…
   </p><section v-else-if="error" class="panel p-4 text-danger" role="alert">
     {{ error }}
-  </section><CentralC1DraftFormPage v-else-if="format === 'C1'" /><CentralPayrollDraftFormPage v-else-if="format === 'A'" /><section v-else class="panel p-4 text-warn" role="status">
+  </section><CentralC2DraftFormPage v-else-if="format === 'C2'" /><CentralC1DraftFormPage v-else-if="format === 'C1'" /><CentralPayrollDraftFormPage v-else-if="format === 'A'" /><section v-else class="panel p-4 text-warn" role="status">
     该工资格式目前只支持原资料查看，请从台账打开其历史详情。
   </section>
 </template>

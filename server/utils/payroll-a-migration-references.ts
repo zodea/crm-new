@@ -5,6 +5,7 @@ import { payrollACanonical } from '../../app/lib/payroll/central-a-calculation'
 import { encodePayrollAWire, parsePayrollACommand } from '../../app/lib/payroll/central-a-codec'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { payrollC1ReceiptReferences } from './payroll-c1-migration-references'
+import { payrollC2ReceiptReferences } from './payroll-c2-migration-references'
 
 export const PAYROLL_A_REFERENCE_TABLES = ['payroll_a_subject_configs', 'payroll_a_price_revisions', 'payroll_a_statement_sources', 'payroll_command_receipts'] as const
 const sqlFields = { project_id: 'projects', crew_id: 'crews', leader_worker_id: 'workers', worker_id: 'workers', item_id: 'items', statement_id: 'wage_statements' }
@@ -71,9 +72,9 @@ export async function payrollAMigrationReferences(db: TransactionDb): Promise<Se
     }
   }
   function receiptCommand(value: Record<string, unknown>) {
-    const c1 = payrollC1ReceiptReferences(value)
-    if (c1) {
-      for (const reference of c1) result.add(reference)
+    const specific = payrollC1ReceiptReferences(value) ?? payrollC2ReceiptReferences(value)
+    if (specific) {
+      for (const reference of specific) result.add(reference)
       return
     }
     // 旧 NULL 没有原正文证据；只保留已有 SQL 列引用，不反推或回填命令。

@@ -62,7 +62,7 @@ export const ADAPTERS = {
   },
   'payroll-browser-readonly': {
     read: '工资专用中央 Repository：台账、历史冻结资料、配置、考勤、签工与月份占用；正式和演示隔离读取',
-    write: '完整历史与原来源证据只读；A、C1 和中央考勤分别登记日常写入能力，签工新写仍待 P3',
+    write: '完整历史与原来源证据只读；A、C1、C2、中央考勤及签工分别登记已接通日常写入能力',
     storage: '中央工作区验证实例；原图与映射图分别保留，生产持久化仍待 #416',
     sources: [['app/components/payroll/PayrollScreen.vue', 'CentralPayrollScreen'], ['server/utils/payroll-service.ts', 'createPayrollService']],
   },
@@ -73,7 +73,7 @@ export const ADAPTERS = {
     sources: [['app/components/payroll/CentralPayrollDraftFormPage.vue', 'usePayrollAForm'], ['server/utils/payroll-a-service.ts', 'createPayrollAService']],
   },
   'payroll-workbench-browser': {
-    read: '中央共享工资台账和详情；A、C1 工作区按原单真实格式分流，旧历史保留只读证据',
+    read: '中央共享工资台账和详情；各格式工作区按原单真实格式分流，旧历史保留只读证据',
     write: '台账只读；具体格式的草稿、核对、发放与配置由各自中央适配承担',
     storage: '中央工作区验证实例；生产持久化仍待 #416',
     sources: [['app/components/payroll/CentralPayrollScreen.vue', '新建 C1 工资草稿'], ['app/components/payroll/CentralPayrollDetailScreen.vue', 'PayrollC1StatementWorkspace']],
@@ -89,6 +89,18 @@ export const ADAPTERS = {
     write: '固定项目/工人/日期的考勤命令及原键恢复；同月 C1/C2 互斥，已发全成员锁月；P2 已通过本地限定验收',
     storage: '中央工作区验证实例；浏览器不回写本地正式库，生产持久化仍待 #416',
     sources: [['app/components/payroll/AttendanceScreen.vue', 'CentralAttendanceScreen'], ['server/utils/payroll-attendance-service.ts', 'createPayrollAttendanceService']],
+  },
+  'payroll-c2-browser': {
+    read: '逐条签工、主体配置、C2 草稿与同次发放冻结的工资/签工配对输出；旧来源原文与当前可用性分别读取',
+    write: '固定目标与原提交的 C2 配置、保存、核对及实际发放；P3 已通过本地限定验收，独立更正及完整费用仍由后续承接',
+    storage: '与签工、考勤及其他工资共用中央工作区事务；独立来源及恢复保护，生产持久化仍待 #416',
+    sources: [['app/components/payroll/CentralC2DraftFormPage.vue', 'usePayrollC2Form'], ['server/utils/payroll-c2-service.ts', 'createPayrollC2Service']],
+  },
+  'daywork-central-browser': {
+    read: '独立中央签工台账与按稳定编号读取的原记录；日期、工数、证明信息、原归属、占用及诊断保留',
+    write: '独立整页登记/编辑与轻量人工确认，原命令恢复；P3 已通过本地限定验收，已发更正及生产保存仍由后续承接',
+    storage: '中央工作区验证实例；已发月份锁及逐条来源占用分别核对，生产持久化仍待 #416',
+    sources: [['app/components/payroll/CentralSignedDayworkScreen.vue', 'useCentralDaywork'], ['server/utils/payroll-daywork-service.ts', 'createPayrollDayworkService']],
   },
   'simulation': {
     read: '合成导入演示',
@@ -162,12 +174,16 @@ export function resolveAdapter(surface, host) {
     return 'schedule-binding-browser'
   if (route === '/project/target-cost' || route.startsWith('/project/target-cost/'))
     return host === 'browser' ? 'target-cost-browser' : 'desktop-sqlite'
-  if (['/subcontract/payroll/sources', '/subcontract/payroll/config', '/subcontract/payroll/form/:id'].includes(route) && host === 'tauri')
+  if (['/subcontract/payroll/sources', '/subcontract/payroll/config', '/subcontract/payroll/form/:id', '/subcontract/daywork/new', '/subcontract/daywork/form/:id'].includes(route) && host === 'tauri')
     return 'unsupported'
   if (variant !== 'central-source' && host === 'browser' && route === '/subcontract/attendance')
     return 'attendance-central-browser'
   if (variant !== 'central-source' && host === 'browser' && surface.path.startsWith('central/c1/'))
     return 'payroll-c1-browser'
+  if (variant !== 'central-source' && host === 'browser' && surface.path.startsWith('central/c2/'))
+    return 'payroll-c2-browser'
+  if (variant !== 'central-source' && host === 'browser' && (route === '/subcontract/daywork' || route.startsWith('/subcontract/daywork/')))
+    return 'daywork-central-browser'
   if (variant !== 'central-source' && host === 'browser' && ['/subcontract/payroll', '/subcontract/payroll/:id'].includes(route) && !surface.path.startsWith('central/a-'))
     return 'payroll-workbench-browser'
   if (variant !== 'central-source' && ['/subcontract/payroll', '/subcontract/payroll/:id', '/subcontract/payroll/new', '/subcontract/payroll/form/:id', '/subcontract/payroll/config'].includes(route) && host === 'browser')
@@ -423,7 +439,37 @@ export const SUBVIEWS = [
     view('central/diagnostics', 'aria-label="考勤资料核对"', 'detail', '转组/失效历史与隔离原因保留'),
     view('central/evidence', 'PayrollSourceEvidence', 'detail'),
   ], ['browser']),
-  group({ route: ['/subcontract/payroll/sources', '/subcontract/daywork'] }, 'app/components/payroll/CentralPayrollSourcesScreen.vue', [
+  group({ route: ['/subcontract/payroll/new', '/subcontract/payroll/form/:id'] }, 'app/components/payroll/CentralC2DraftFormPage.vue', [
+    view('central/c2/scope', 'PayrollC2FormFields', 'form-section', '显式 C2 新稿或按原工资实体识别；不要求工程量或合同'),
+    view('central/c2/source', 'PayrollC2SourceReview', 'review-panel', '逐条原签工、当前占用及本主体标准；待确认与无源分开'),
+    view('central/c2/config', 'C2 主体配置', 'source-return', '配置返回原 draftKey，当前范围与原单身份分开'),
+    view('central/c2/pending', 'PayrollACommandState', 'recovery-panel', '仅恢复 C2 原命令及目标'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/config' }, 'app/components/payroll/PayrollC2ConfigScreen.vue', [
+    view('central/c2/scope', 'id="section-scope"', 'form-section', '仅 format=C2；项目与负责人唯一范围'),
+    view('central/c2/config', 'id="section-config"', 'form-section', '正价、未配置、停用、空规则与未填规则分别核对'),
+    view('central/c2/pending', 'PayrollACommandState', 'recovery-panel', 'pending 保原价、规则及范围名称'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/PayrollC2StatementWorkspace.vue', [
+    view('central/c2/processing', 'aria-label="C2工资核对与发放"', 'form-section', '原 C2 三态及需重核分别核对'),
+    view('central/c2/source', 'PayrollC2SourceReview', 'review-panel', '原 stable 签工 ID 与工资往返，不按名称猜测'),
+    view('central/c2/release', 'PayrollC2ReleaseDialog', 'dialog', '实际金额与全员分配，零收款成员保留'),
+    view('central/c2/output', 'PayrollC2FrozenPrint', 'print', '真实已发工资与签工两表；历史缺损不能补造'),
+    view('central/c2/pending', 'PayrollACommandState', 'recovery-panel', '原提交结果和配对后读共同确认'),
+  ], ['browser']),
+  group({ route: '/subcontract/daywork' }, 'app/components/payroll/CentralSignedDayworkScreen.vue', [
+    view('central/scope', 'aria-label="签工筛选"', 'form-section', '项目、月份、班组及独立签工状态；不覆盖工资状态'),
+    view('central/records', 'PayrollDayworkTable', 'subtable', '原事实、确认、占用及坏来源逐条显示'),
+    view('central/confirm', 'PayrollDayworkConfirmDialog', 'dialog', '明确人工证明，取消与原提交恢复分别处理'),
+    view('central/source-return', 'PayrollC2SourceReturn', 'source-return', '稳定原记录返回原工资或新稿'),
+    view('central/evidence', 'PayrollSourceEvidence', 'detail', '缺损及隔离原文保留'),
+  ], ['browser']),
+  group({ route: ['/subcontract/daywork/new', '/subcontract/daywork/form/:id'] }, 'app/components/payroll/CentralDayworkFormPage.vue', [
+    view('central/record', 'PayrollDayworkFormFields', 'form-section', '独立整页录入日期、时段、工数与人工证明'),
+    view('central/pending', 'PayrollACommandState', 'recovery-panel', '原签工编号或 draftKey；失败不清正文与证明'),
+    view('central/later-change', '原提交后续更新', 'detail', '可靠原回执与同编号后读确认；后来合法变化与旧输入分开呈现'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/sources' }, 'app/components/payroll/CentralPayrollSourcesScreen.vue', [
     view('central/filters', 'PayrollReadFilters', 'form-section'),
     ...['configs', 'attendance', 'daywork', 'locks'].map(key => view(`central/tab/${key}`, `selectedTab === '${key}'`, 'tab')),
     view('central/history', 'PayrollReadHistory', 'subtable'),

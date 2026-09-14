@@ -1,0 +1,125 @@
+{
+  "baseline": "4738be98730955cd63832c8df04fc6f1d855caff",
+  "browser": {
+    "spec": "e2e/payroll-c2-central.spec.ts",
+    "state": "ready-not-run",
+    "serviceOwner": "root"
+  },
+  "ownedCount": 53,
+  "pendingChecks": [
+    "Root typecheck/build/full",
+    "真实五宽浏览器及PDF目检",
+    "独立双轴审查"
+  ],
+  "latestTargetCache": {
+    "files": 2,
+    "tests": 4,
+    "log": "target-cache-green.log"
+  },
+  "componentValidation": {
+    "result": "passed",
+    "files": 13,
+    "tests": 30,
+    "log": "tests-final.log"
+  },
+  "redCases": {
+    "confirmedSave": "daywork-save-red.log",
+    "navigation": "navigation-red.log"
+  },
+  "temporaryOwner": ".tmp/remaining-issues-20260910/payroll-c2-central/c",
+  "lint": {
+    "files": 51,
+    "exitCode": 0,
+    "log": "lint-final.log"
+  },
+  "reviewFixes": {
+    "result": "passed",
+    "files": 7,
+    "tests": 17,
+    "greenLog": "review-fixes-green.log",
+    "redLogs": [
+      "daywork-reload-red.log",
+      "confirmation-recheck-red.log"
+    ],
+    "lintFiles": 9,
+    "lintExitCode": 0,
+    "lintLog": "review-fixes-lint.log",
+    "independentTestsUnchanged": true
+  },
+  "browserFirstFollowup": {
+    "files": [
+      "e2e/payroll-c2-central.spec.ts",
+      "app/pages/subcontract/payroll/config.vue"
+    ],
+    "lintExitCode": 0,
+    "lintLog": "browser-recovery-lint.log",
+    "browserState": "awaiting-root",
+    "changes": [
+      "完整 pathname/解码后全部 searchParams/hash 校验",
+      "Aug 5 人工确认超过两天",
+      "取消回焦点",
+      "Tab/Home/End 表内真实键盘滚动",
+      "Native 配置通用名称"
+    ]
+  },
+  "centralBoundary": {
+    "files": 1,
+    "tests": 7,
+    "result": "passed",
+    "log": "central-boundary-green.log",
+    "redEvidence": "../root/npm-test-final.log",
+    "lintExitCode": 0,
+    "lintLog": "central-boundary-lint.log"
+  },
+  "keyboardFollowup": {
+    "files": [
+      "e2e/payroll-c2-central.spec.ts"
+    ],
+    "reason": "浏览器原生 Home/End 不保证水平定位，改验 ArrowLeft/ArrowRight 实际方向变化；Tab 焦点断言保留",
+    "lintExitCode": 0,
+    "lintLog": "keyboard-followup-lint.log",
+    "browserState": "root-owned",
+    "sha256": "988c50cad745288a4ef5ce674a1b94a6a88f379b08c04c8e1e12f9fdb74d3431"
+  },
+  "finalVisualFollowup": {
+    "ownedFileCount": 54,
+    "files": [
+      {
+        "path": "app/components/payroll/PayrollDayworkConfirmDialog.vue",
+        "state": "present",
+        "sha256": "e0cfd1c4c6dbe39f9a9c18651c3775ef9e59a85ab5f8b58e88895a0fbe30549f"
+      },
+      {
+        "path": "app/components/payroll/PayrollReadNotice.vue",
+        "state": "present",
+        "sha256": "a67615cc5ec086f459338654a921c57cd2fdd26195769608a6f6d3b9537fcf7c"
+      },
+      {
+        "path": "app/components/payroll/PayrollC2FrozenPrint.vue",
+        "state": "present",
+        "sha256": "01b972ed096f4f414d396eccc89efd6ef62633c87dd7fb711bf962e42bb255b1"
+      },
+      {
+        "path": "e2e/payroll-c2-central.spec.ts",
+        "state": "present",
+        "sha256": "988c50cad745288a4ef5ce674a1b94a6a88f379b08c04c8e1e12f9fdb74d3431"
+      }
+    ],
+    "changes": [
+      "ConfirmDialog 自有 20px 左右留白/分区间距、限制高度局部滚动、页脚按钮折行",
+      "Notice 说明 A/C1/C2 已开放并保 P4 后续",
+      "C2 打印宿主存在时 html 背景白色"
+    ],
+    "testFiles": 4,
+    "tests": 22,
+    "durationSeconds": 5.17,
+    "testsExitCode": 0,
+    "testLog": "final-visual-followup-green.log",
+    "lintFiles": 4,
+    "lintExitCode": 0,
+    "lintLog": "final-visual-followup-lint.log",
+    "browserAndPdf": "待 Root 本轮实际修后复验",
+    "noTestAssertionsChanged": true,
+    "copyFollowup": "移除内部P4编号，仅说明已发后的独立更正与实际补退暂未开放；无行为变更，未重复测试"
+  }
+}

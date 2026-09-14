@@ -3,6 +3,7 @@ import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { resolveBusinessSession } from './business-session'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { loadPayrollC2ConfigFacts, loadPayrollDayworkFacts, loadPayrollDayworkRecord } from './payroll-daywork-facts'
 import { loadPayrollAQuantityFacts } from './payroll-quantity-facts'
 import { createPayrollService } from './payroll-service'
 import { projectReadTestInstance } from './project-read-test-instance'
@@ -23,7 +24,7 @@ export function payrollIdentitySource(sessionId?: string | null) {
   const workers = crewWorkerCommandTestInstance.workerRows(sessionId).filter(row => row.dataOrigin === 'real' && (!row.crewId || crews.some(crew => crew.id === row.crewId))).map(row => ({ ...workerFacts.rows.find(fact => fact.workerId === row.id), id: row.id, name: row.name, crewId: row.crewId }))
   return { projects, crews, workers, version: createHash('sha256').update(JSON.stringify([projects, crews, workers, ratios, workerFacts])).digest('hex') }
 }
-export const payrollService = createPayrollService({ session: payrollSession, identities: payrollIdentitySource, quantityFacts: loadPayrollAQuantityFacts, async transaction(work, sessionId) {
+export const payrollService = createPayrollService({ session: payrollSession, identities: payrollIdentitySource, quantityFacts: loadPayrollAQuantityFacts, dayworkFacts: loadPayrollDayworkFacts, dayworkRecord: loadPayrollDayworkRecord, c2ConfigFacts: loadPayrollC2ConfigFacts, async transaction(work, sessionId) {
   try {
     return await quantityTestInstance.withWorkspaceTransaction(work, sessionId)
   }

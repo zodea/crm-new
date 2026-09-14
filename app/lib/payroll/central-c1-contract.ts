@@ -1,8 +1,8 @@
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollAttendanceFact, PayrollAttendanceWorker, PayrollC1Options } from './central-attendance-contract'
-import type { PayrollContext, PayrollHistoryEntry, PayrollQuery } from './central-contract'
+import type { PayrollHistoryEntry, PayrollQuery, PayrollWritableContext } from './central-contract'
 
-export interface PayrollC1Context extends Omit<PayrollContext, 'readonly'> { readonly: boolean }
+export type PayrollC1Context = PayrollWritableContext
 export interface PayrollC1Draft {
   projectId: string
   crewId: string | null

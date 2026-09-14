@@ -28,6 +28,7 @@ const sources = computed(() => payrollReadLocation('/subcontract/payroll/sources
 const canCreate = computed(() => scope.value.origin === 'real' && current.value?.context.capabilities.includes('payroll:write'))
 const createTo = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: undefined, returnTo: returnTo.value } }))
 const createC1To = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: 'C1', returnTo: returnTo.value } }))
+const createC2To = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: 'C2', returnTo: returnTo.value } }))
 const attendanceTo = computed(() => payrollReadLocation('/subcontract/attendance', scope.value))
 const configTo = computed(() => ({ path: '/subcontract/payroll/config', query: { origin: 'real', project: scope.value.projectId, month: scope.value.month, crew: scope.value.crewId, returnTo: returnTo.value } }))
 const columns: KitTableColumn[] = [
@@ -67,6 +68,8 @@ useTabTitle('工资台账')
         </NuxtLink>
         <NuxtLink v-if="canCreate" :to="createC1To" class="btn-primary">
           新建 C1 工资草稿
+        </NuxtLink><NuxtLink v-if="canCreate" :to="createC2To" class="btn-primary">
+          新建 C2 工资草稿
         </NuxtLink>
         <NuxtLink :to="attendanceTo" class="btn-secondary">
           考勤管理

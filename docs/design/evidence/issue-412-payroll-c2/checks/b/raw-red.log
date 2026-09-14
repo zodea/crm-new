@@ -1,0 +1,38 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/daywork-facts.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/daywork-facts.test.ts (2 tests | 1 failed) 1040ms
+   × 坏原值不转成可用数值，未知原列/零/NULL保留；空月拒绝，坏日期不因月筛选消失 482ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/daywork-facts.test.ts > 坏原值不转成可用数值，未知原列/零/NULL保留；空月拒绝，坏日期不因月筛选消失
+AssertionError: expected [] to deep equally contain ObjectContaining{…}
+
+- Expected:
+ObjectContaining {
+  "code": "daywork-date-invalid",
+  "recordId": "signed_daywork_mu0t4shq_4",
+}
+
++ Received:
+[]
+
+ ❯ tests/payroll/daywork-facts.test.ts:47:31
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  13:33:30
+   Duration  1.91s (transform 479ms, setup 0ms, import 661ms, tests 1.04s, environment 0ms)
+

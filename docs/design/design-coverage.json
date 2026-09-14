@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 148,
+    "trackedPageFiles": 150,
     "devPageFiles": 5,
-    "appPageFiles": 143,
+    "appPageFiles": 145,
     "appNavLeaves": 51,
     "covered": 135,
-    "designPending": 8,
+    "designPending": 10,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -719,6 +719,20 @@
       "status": "covered"
     },
     {
+      "appRoute": "/subcontract/daywork/form/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "中央签工固定记录的显式整页编辑，无直接对应设计路由；依据工资签工规则、DC 通用原语与 ADR 0014 独立实施验收，不继承台账覆盖结论。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/daywork/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "中央签工新增整页及人工证据信息，无直接对应设计路由；依据工资签工规则、DC 通用原语与 ADR 0014 独立实施验收，不继承台账覆盖结论。",
+      "issue": "#412"
+    },
+    {
       "appRoute": "/subcontract/payroll",
       "designRoute": "payroll",
       "status": "covered"
@@ -732,14 +746,14 @@
       "appRoute": "/subcontract/payroll/config",
       "designRoute": null,
       "status": "design-pending",
-      "reason": "A 工资主体比例和生效月工资价格的独立配置页，无直接对应设计路由；按工资页面、DC 工资蓝本及整页原语实施并单独验收。",
+      "reason": "A 主体比例/工资价格、C1 个人标准与 C2 主体单价/规则的独立配置页，无直接对应设计路由；按各格式工资规则、DC 工资蓝本及整页原语实施并单独验收。",
       "issue": "#412"
     },
     {
       "appRoute": "/subcontract/payroll/form/:id",
       "designRoute": null,
       "status": "design-pending",
-      "reason": "A 工资固定单据的整页编辑入口，无直接对应设计路由；按工资页面、DC 工资蓝本及整页原语实施并单独验收。",
+      "reason": "各格式工资固定单据的整页编辑入口，无直接对应设计路由；按工资页面、DC 工资蓝本及整页原语实施并单独验收。",
       "issue": "#412"
     },
     {

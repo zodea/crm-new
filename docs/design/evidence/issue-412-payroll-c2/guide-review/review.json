@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/payroll_c1_backend",
+  "reviewDate": "2026-09-14",
+  "scope": "两份最终指南只读逐页视觉QA，14页全部实际查看原尺寸渲染图；未修改PDF、Markdown来源或产品。",
+  "render": {
+    "tool": "Poppler pdftoppm",
+    "executable": "D:/UserData/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/poppler/Library/bin/pdftoppm.exe",
+    "args": "-r 120 -png",
+    "paper": "A4 595.276 x 841.89pt",
+    "dpi": 120,
+    "inspectionTool": "view_image",
+    "detail": "original",
+    "actualInspectedPages": 14,
+    "renderExitCodes": [
+      0,
+      0
+    ],
+    "warnings": [
+      "Poppler两次均输出 Syntax Error: No display font for 'Symbol'；渲染完成，14页实际目检未发现缺字、黑框、数学符号损坏或其它可见影响。"
+    ],
+    "textExtractionUsedForLayoutVerdict": false
+  },
+  "documents": [
+    {
+      "path": "D:\\crm本地项目开发\\output\\pdf\\瑞航CRM_工资与考勤工作台使用说明.pdf",
+      "sha256Before": "F36907F92CFC196DEF93C4876880618327703728710FDAAF0B5C0FCDA0073D67",
+      "sha256After": "F36907F92CFC196DEF93C4876880618327703728710FDAAF0B5C0FCDA0073D67",
+      "unchanged": true,
+      "version": "V2.3",
+      "physicalPages": 7,
+      "printedPageNumbering": "封面不编号；正文第1–6页连续",
+      "pages": [
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\payroll-1.png",
+          "name": "payroll-1.png",
+          "sha256": "0EF37F01EDB8E1FB630C01937F89599C8025ABFC396F7BC156DE521C71731298",
+          "physicalPage": 1,
+          "printedPage": null,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "封面标题与副标题完整；V2.3、2026-09-14及A/C1/C2浏览器验证版本性质表全部可读，表内自然换行无重叠；封面无正文页码，页脚完整。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\payroll-2.png",
+          "name": "payroll-2.png",
+          "sha256": "B9DFF4E03519B72E6EB00AABDD913361012BC1C7CF95696B87B00576BEDBC870",
+          "physicalPage": 2,
+          "printedPage": 1,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第1页：当前已开放A/C1/C2明确列举，B只读及生产保存边界清楚；接管与台账步骤衔接正常，底部全部班组/空状态说明完整，未压页脚。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\payroll-3.png",
+          "name": "payroll-3.png",
+          "sha256": "5D236CDCA2AB23E0F985906B15E9EC8D03B02311202DCF8137B9A01A29B43E97",
+          "physicalPage": 3,
+          "printedPage": 2,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第2页：历史缺口6行表无跨页断裂、文字越界；旧头100与冻结未记录示例完整。考勤/签工/月锁说明与A建稿步骤1–4完整，下一页从步骤5连续承接。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\payroll-4.png",
+          "name": "payroll-4.png",
+          "sha256": "2856B3DF4095D807BC71998BEC39F87DE02D560B80AE696A2DA63D8D50838974",
+          "physicalPage": 4,
+          "printedPage": 3,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第3页：开头承接A步骤5–6，配置/实发/异常三段顺序清楚；异常处理表完整；独立更正与实际补退标为后续范围，末尾冻结输出及完整工作簿边界完整，页脚分离。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\payroll-5.png",
+          "name": "payroll-5.png",
+          "sha256": "EEE2BED043723DE34A23635C3AF4F300C42C5B9EC09A20F0BFFDC1064171C8D9",
+          "physicalPage": 5,
+          "printedPage": 4,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第4页：C1完整逐日考勤和个人标准说明可读，7.51与60.125精度示例未断损；实际零/空值、转组原证据和C1/C2锁说明明确。步骤3的第5项到页末完整，下一页示例接续自然。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\payroll-6.png",
+          "name": "payroll-6.png",
+          "sha256": "37710B0931E79A2F280C84017CE85A98CD45CC9A37D9CA60A5E1A98EE58C653A",
+          "physicalPage": 6,
+          "printedPage": 5,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第5页：先续C1实发示例与配对输出，再以大标题进入C2当前已用路径；逐条签工/人工确认/后续更新保原稿语义完整。底部C2主体配置第一条完整，下一页从第二条续接，无孤立标题或裁切。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\payroll-7.png",
+          "name": "payroll-7.png",
+          "sha256": "80D6098EFF1A09745CB054CD054C910D0E6D75BD202A243E20D7E9236FD81337",
+          "physicalPage": 7,
+          "printedPage": 6,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第6页：续C2配置核对第2–4项；525核算/500实际及350+150+0分配示例完整，签工表配工资表及全成员月锁明确。第九节以仍在接续、尚未全部开放标示独立更正、实际补退、房补管理费、户级款项与扣款、批量资金建议及完整工作簿；C2当前开放回指第八节，工资预算成本接入仍待后续验收。末段及页脚完整。"
+        }
+      ]
+    },
+    {
+      "path": "D:\\crm本地项目开发\\output\\pdf\\瑞航CRM_本地核心身份数据迁移使用指南.pdf",
+      "sha256Before": "1B20BEBA43E850956A87804ABCC4CCB8FB7D2DEA1399F3D910E8E192A335C498",
+      "sha256After": "1B20BEBA43E850956A87804ABCC4CCB8FB7D2DEA1399F3D910E8E192A335C498",
+      "unchanged": true,
+      "version": "V2.9",
+      "physicalPages": 7,
+      "printedPageNumbering": "封面不编号；正文第1–6页连续",
+      "pages": [
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\migration-1.png",
+          "name": "migration-1.png",
+          "sha256": "4A6B475C07C2F8A6CD020B4A5156A738940AF04F967482591E35F26A87F5F528",
+          "physicalPage": 1,
+          "printedPage": null,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "封面标题两行自然排版，V2.9和2026-09-14清楚，说明为当前浏览器迁移/对账/回滚，不误称生产保存；封面表格与底部提示、页脚无重叠。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\migration-2.png",
+          "name": "migration-2.png",
+          "sha256": "A03255F55575C305E8C00A380C204A12812DA61325E39F2E1CAC7797AC630B5C",
+          "physicalPage": 2,
+          "printedPage": 1,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第1页：迁移边界及当前可重置验证实例说明完整；工资/考勤/签工段明确旧证据保真和A/C1/C2操作分开，真实0、缺数据、零成员锁及回滚保护可读。整页较密但末段不侵入页脚。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\migration-3.png",
+          "name": "migration-3.png",
+          "sha256": "C1FC37D60DBE5992F37FC2E491F39124B3DE170D2A167E4085E6F7300F4DE4F2",
+          "physicalPage": 3,
+          "printedPage": 2,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第2页：从C1恢复保护续到C2签工日期/工数/证明/确认规则及实际零保护，语义连续；工程量、工序库、WBS标题与正文均完整。末段在“刷新”之后跨页，下一页“仍须一致”可连续读，无缺字。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\migration-4.png",
+          "name": "migration-4.png",
+          "sha256": "A72D34BD3EFCB157873CFBE6A0F1F2904BB84630FDE96073E990119DDBDEDA4A",
+          "physicalPage": 4,
+          "printedPage": 3,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第3页：开头完整续接WBS刷新核对与恢复保护；目标成本、证照、开始前检查段可读，既有人工核验和资料不补造边界清楚。执行迁移标题及引导句同页出现，步骤从下一页开始，留白与页脚正常。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\migration-5.png",
+          "name": "migration-5.png",
+          "sha256": "3200398EE8900B888B9CB04446255A3967156DCB05786DCF6757D004F3152F10",
+          "physicalPage": 5,
+          "printedPage": 4,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第4页：执行迁移六步完整衔接前页引导，确认后核对五步与工程量/WBS核对正文齐全，长路由可读且未越界；最后指南链接距页脚有明确间隔。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\migration-6.png",
+          "name": "migration-6.png",
+          "sha256": "8DD206EAD9E3A57363572505279F2F319D253E034907F56B02435509B9831E68",
+          "physicalPage": 6,
+          "printedPage": 5,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第5页：延续确认后证照/预算抽查，再进入回滚四步和恢复中状态；说明保持独立记录、阻断破坏引用及不手改标记，段落衔接自然。下部留白为章节分页，不是内容裁切。"
+        },
+        {
+          "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\guide-review\\migration-7.png",
+          "name": "migration-7.png",
+          "sha256": "B240964F71695AB23EE98DA30FDD8865038B5A213DDD69B1B69961C3EA9FD9FC",
+          "physicalPage": 7,
+          "printedPage": 6,
+          "verdict": "pass",
+          "inspection": "实际view_image original",
+          "notes": "正文第6页：常见提示整张表头与16条记录完整，单元格长中文与production等英文自然换行，不越列/重叠；最后继续旧数据说明与底边留足空间，页脚第6页可读。"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "documents": 2,
+    "physicalPages": 14,
+    "pass": 14,
+    "visualDefects": 0,
+    "contentBoundaryIssues": 0,
+    "conclusion": "两份指南逐页无裁切/重叠/表格破损，封面与正文页码衔接一致。工资指南明确A/C1/C2当前浏览器路径已可用，独立更正和后续费用/资金工作簿仍待开发；迁移指南把历史接管与新写分清，不将迁入历史当新增发放资格。"
+  },
+  "retention": "本目录14张渲染图与本报告为Root最终归档证据候选；未删除源或其他临时文件，后续由Root按归档/回收流程处理。"
+}

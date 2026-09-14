@@ -1,0 +1,37 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/stores/daywork-central.test.ts tests/stores/payroll-c2-central.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/stores/payroll-c2-central.test.ts (3 tests | 1 failed) 1824ms
+   × 原命令已可靠返回需重核后，其他窗口再次核对仍可按原单确认成功而不永久卡住 582ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/stores/payroll-c2-central.test.ts > 原命令已可靠返回需重核后，其他窗口再次核对仍可按原单确认成功而不永久卡住
+ProjectRepositoryProblem: 原目标尚未完整读取确认，请保留原输入并重试核对
+ ❯ payrollProblem app/lib/payroll/central-contract.ts:106:10
+    104| }
+    105| export function payrollProblem(code: Parameters<typeof projectProblem>…
+    106|   return new ProjectRepositoryProblem({ ...projectProblem(code, messag…
+       |          ^
+    107| }
+    108|
+ ❯ Object.acknowledge app/lib/payroll/central-pending.ts:109:13
+ ❯ Proxy.acknowledgeC2 app/stores/payroll-c2.ts:35:13
+ ❯ Proxy.wrappedAction ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/pinia/dist/pinia.mjs:1400:26
+ ❯ tests/stores/payroll-c2-central.test.ts:77:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 4 passed (5)
+   Start at  14:23:55
+   Duration  4.11s (transform 882ms, setup 0ms, import 1.26s, tests 3.02s, environment 2.77s)
+

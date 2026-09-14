@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { isDesktopRuntime } from '~/lib/platform/runtime'
-import CentralPayrollSourcesScreen from './CentralPayrollSourcesScreen.vue'
+import CentralSignedDayworkScreen from './CentralSignedDayworkScreen.vue'
 import NativeSignedDayworkScreen from './NativeSignedDayworkScreen.vue'
 
 const native = isDesktopRuntime()
@@ -8,5 +8,5 @@ const native = isDesktopRuntime()
 
 <template>
   <NativeSignedDayworkScreen v-if="native" />
-  <CentralPayrollSourcesScreen v-else initial-tab="daywork" />
+  <CentralSignedDayworkScreen v-else />
 </template>

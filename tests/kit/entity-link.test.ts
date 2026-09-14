@@ -168,6 +168,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'contract:supplement',
       'crew:detail',
       'customer:detail',
+      'daywork:ledger',
       'delivery-record:detail',
       'invoice:detail',
       'owner-document:acceptance',

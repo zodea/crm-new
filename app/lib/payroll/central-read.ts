@@ -3,6 +3,7 @@ import type { PayrollDb } from './statements'
 import { selectVisibleSql } from '../db/soft-delete'
 import { loadPayrollAReleasedDocuments } from './central-a-provenance'
 import { loadPayrollC1ReleasedDocuments } from './central-c1-provenance'
+import { loadPayrollC2ReleasedDocuments } from './central-c2-provenance'
 import { payrollProblem } from './central-contract'
 import { payrollNumber as number, payrollObject as object, readPayrollSnapshot, payrollText as text } from './central-snapshot'
 
@@ -21,6 +22,7 @@ export interface PayrollReadGraph {
   visibleStatementIds: Set<string>
   provenAReleaseIds: Set<string>
   provenC1ReleaseIds: Set<string>
+  provenC2ReleaseIds: Set<string>
   workers: Map<string, string>
   projects: Map<string, string>
   crews: Map<string, string>
@@ -45,6 +47,7 @@ export async function loadPayrollGraph(db: PayrollDb): Promise<PayrollReadGraph>
   graph.visibleStatementIds = new Set((await db.select<{ id: string }>(selectVisibleSql('wage_statements'))).map(row => row.id))
   graph.provenAReleaseIds = new Set((await loadPayrollAReleasedDocuments(db)).keys())
   graph.provenC1ReleaseIds = new Set((await loadPayrollC1ReleasedDocuments(db)).keys())
+  graph.provenC2ReleaseIds = new Set((await loadPayrollC2ReleasedDocuments(db)).keys())
   for (const table of ['workers', 'projects', 'crews'] as const) {
     graph[table] = new Map((await db.select<{ id: string, name: string }>(selectVisibleSql(table))).map(row => [row.id, row.name]))
   }
@@ -84,6 +87,7 @@ export function payrollStatementRow(row: PayrollStoredRow, graph: PayrollReadGra
   const frozen = snapshot.data
   const provenARelease = graph.provenAReleaseIds.has(id)
   const provenC1Release = graph.provenC1ReleaseIds?.has(id) ?? false
+  const provenC2Release = graph.provenC2ReleaseIds?.has(id) ?? false
   if (released && row.format_family === 'A' && frozen && ('aSource' in frozen || 'aDocument' in frozen) && !provenARelease) {
     snapshot.state = 'partial'
     snapshot.issues.push('中央 A 发放的原来源、冻结内容或成功回执无法相互核实')
@@ -92,6 +96,10 @@ export function payrollStatementRow(row: PayrollStoredRow, graph: PayrollReadGra
     snapshot.state = 'partial'
     snapshot.issues.push('中央 C1 的原考勤、个人标准、冻结内容或成功回执无法相互核实')
   }
+  if (released && row.format_family === 'C2' && frozen && ('c2Source' in frozen || 'c2Document' in frozen) && !provenC2Release) {
+    snapshot.state = 'partial'
+    snapshot.issues.push('中央 C2 的原签工、主体配置、冻结内容或成功回执无法相互核实')
+  }
   const value = (key: string, column: string) => released ? frozen?.[key] : row[column]
   const diagnostics = [...(evidence?.diagnostics.filter(d => d.recordId === original.legacyId || d.recordId === id || d.recordId === null) ?? [])]
   diagnostics.push(...snapshot.issues.map(message => diagnostic(`snapshot-${snapshot.state}`, message, id, 'snapshot_json')))
@@ -99,6 +107,8 @@ export function payrollStatementRow(row: PayrollStoredRow, graph: PayrollReadGra
     diagnostics.push(diagnostic('retired-b', 'B 类已退役，仅保留历史，不参与新工资及成本', id, 'format_family'))
   if ((row.format_family === 'A' && !provenARelease) || (row.format_family === 'C1' && !provenC1Release))
     diagnostics.push(diagnostic('source-unproven', '旧汇总未保存完整施工责任或考勤行身份，不能据当前资料补造历史计薪资格', id, 'source_version'))
+  if (released && row.format_family === 'C2' && !provenC2Release)
+    diagnostics.push(diagnostic('source-unproven', '原签工、主体配置或完整发放证据尚未证实，不能据当前资料补造历史计薪资格', id, 'source_version'))
   if (!graph.visibleStatementIds.has(id))
     diagnostics.push(diagnostic('historical-scope', '工资单或其档案关系已隐藏，仅用于历史核对', id))
   const frozenFields = { month: 'month', formatFamily: 'format_family', quantitySource: 'quantity_source', sourceVersion: 'source_version', payRatio: 'pay_ratio', cumulativeAmount: 'cumulative_amount', previouslyPaid: 'previously_paid', grossAmount: 'gross_amount', actualAmount: 'actual_amount' }
@@ -214,7 +224,7 @@ export async function readPayrollStatement(db: PayrollDb, id: string, existingGr
   const released = statement.status === 'released'
   const frozen = statement.snapshot.data
   const frozenNames = new Map(records(frozen?.members).map(member => [member.workerId, text(member.workerName)]))
-  const frozenDaywork = records(frozen?.dayworkRecords).map(source => ({ id: mapFrozenId(evidence, 'signed_daywork_records', source.id) ?? String(source.id ?? ''), projectId: statement.projectId, crewId: mapFrozenId(evidence, 'crews', source.crewId), workerId: mapFrozenId(evidence, 'workers', source.workerId) ?? '', workerName: text(source.workerName), workDate: text(source.workDate) ?? '', workContent: text(source.workContent), startTime: text(source.startTime), endTime: text(source.endTime), laborUnits: number(source.laborUnits), witness: text(source.witness), confirmedOn: text(source.confirmedOn), status: text(source.status) ?? '', note: text(source.note), deletedAt: null }))
+  const frozenDaywork = records(frozen?.dayworkRecords).map(source => ({ id: mapFrozenId(evidence, 'signed_daywork_records', source.id) ?? String(source.id ?? ''), projectId: statement.projectId, crewId: mapFrozenId(evidence, 'crews', source.crewId), workerId: mapFrozenId(evidence, 'workers', source.workerId) ?? '', workerName: Object.hasOwn(source, 'workerName') ? text(source.workerName) : frozenNames.get(source.workerId) ?? null, workDate: text(source.workDate) ?? '', workContent: text(source.workContent), startTime: text(source.startTime), endTime: text(source.endTime), laborUnits: number(source.laborUnits), witness: text(source.witness), confirmedOn: text(source.confirmedOn), status: text(source.status) ?? '', note: text(source.note), deletedAt: null }))
   return { ...statement, lines: released ? records(frozen?.lines).map(line => mapLine({ ...line, workerName: text(line.workerName) ?? frozenNames.get(line.workerId) ?? null }, id, graph, true, evidence)) : savedLines.filter(line => line.deletedAt === null), members: released ? records(frozen?.members).map(member => mapMember(member, id, graph, true, evidence)) : savedMembers.filter(member => member.deletedAt === null), allocations: released ? records(frozen?.allocations).map(allocation => mapAllocation(allocation, id, graph, true, evidence)) : savedAllocations.filter(allocation => allocation.deletedAt === null), daywork: released ? frozenDaywork : graph.daywork.filter(source => savedLinks.some(link => link.deletedAt === null && link.dayworkRecordId === source.id)).map(source => payrollDaywork(source, graph)), dayworkLinks: savedLinks, stored: { head: row as PayrollJsonObject, lines: savedLines, members: savedMembers, allocations: savedAllocations, dayworkLinks: savedLinks }, locks: payrollSourceLocks(graph).filter(lock => lock.statementId === id) }
 }
 export function payrollSources(graph: PayrollReadGraph, query: PayrollQuery & { projectId: string }) {

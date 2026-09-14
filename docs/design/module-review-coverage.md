@@ -4,7 +4,7 @@
 
 本索引负责防遗漏，不定义业务规格，也不是完成率。路由来源为 [运行证据账本](./runtime-evidence-ledger.json)；子视图和宿主接线来自实际源码。父路由的 direct/historical 等级不自动赋给子视图。逐场景规则、差异和验收继续写入 [模块复核规程](../agents/module-review.md) 指定的当前 Issue。
 
-现有 143 条生产路由展开为 199 个路由变体、689 个页面/子视图、1147 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
+现有 145 条生产路由展开为 201 个路由变体、711 个页面/子视图、1171 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
 
 实际记录见 [可机读清单](./module-review-coverage.json)：surfaces 保存 route + kind + variant + mode + path，cases 再按 browser/tauri 展开，分别保存读写适配器、参考范围、验收结果和剩余缺口。规则已定、前台通过、跨域通过、生产可用独立记录。#422 只登记材料合同浏览器列表已覆盖切片，整页仍为 partial；中央 Map、IndexedDB 刷新读回都没有生产可用结论。
 
@@ -84,11 +84,13 @@
 | schedule-browser | 正式项目 WBS 经中央 Repository；首页同源只读，demo 经服务端授权后沿隔离只读适配 | 独立正式 WBS 经中央 command 建组、调期、依赖、楼层、基线与任务维护；首页和演示只读 | 与工程量共用中央验证候选和事务；生产持久化仍待 #416 |
 | schedule-binding-browser | 中央绑定预览与已绑定依据；冻结暂估、当前合同范围及历史缺口分别说明 | 独立 bind-contract 中央命令；固定来源版本与原提交恢复，不开放解绑或换绑 | 原中央 WBS 分组与冻结比较审计；生产持久化仍待 #416 |
 | target-cost-browser | 预算专用中央 Repository；版本头、科目、附件和实际来源完整度分别读取 | 固定读取依据的版本头、整份明细、基线切换及删除恢复命令；当前单元实施中，逐动作待验收 | 现有中央工作区 SQLite 验证实例与受控迁移；生产持久化仍待 #416 |
-| payroll-browser-readonly | 工资专用中央 Repository：台账、历史冻结资料、配置、考勤、签工与月份占用；正式和演示隔离读取 | 完整历史与原来源证据只读；A、C1 和中央考勤分别登记日常写入能力，签工新写仍待 P3 | 中央工作区验证实例；原图与映射图分别保留，生产持久化仍待 #416 |
+| payroll-browser-readonly | 工资专用中央 Repository：台账、历史冻结资料、配置、考勤、签工与月份占用；正式和演示隔离读取 | 完整历史与原来源证据只读；A、C1、C2、中央考勤及签工分别登记已接通日常写入能力 | 中央工作区验证实例；原图与映射图分别保留，生产持久化仍待 #416 |
 | payroll-a-browser | 中央工资台账/详情及 A 草稿、主体配置、工资价格和冻结输出；完整旧历史继续只读 | 正式 A 使用固定来源和目标的保存、改比例、核对、发放及配置命令；P1 限定范围已验证，其他工资格式独立验收 | 与工程量共用中央工作区事务及完整恢复保护；生产持久化仍待 #416 |
-| payroll-workbench-browser | 中央共享工资台账和详情；A、C1 工作区按原单真实格式分流，旧历史保留只读证据 | 台账只读；具体格式的草稿、核对、发放与配置由各自中央适配承担 | 中央工作区验证实例；生产持久化仍待 #416 |
+| payroll-workbench-browser | 中央共享工资台账和详情；各格式工作区按原单真实格式分流，旧历史保留只读证据 | 台账只读；具体格式的草稿、核对、发放与配置由各自中央适配承担 | 中央工作区验证实例；生产持久化仍待 #416 |
 | payroll-c1-browser | 逐日考勤、个人日薪与独立加班标准、C1 草稿和同次发放冻结的工资/考勤配对输出 | 固定范围与原提交的个人标准、C1 保存/核对/实际发放；P2 已通过本地限定验收 | 与考勤及 A 工资共用中央工作区事务；原来源与恢复保护独立验收，生产持久化仍待 #416 |
 | attendance-central-browser | 中央真实工人日期矩阵、原组历史、月份占用与来源诊断；空格与真实零分开 | 固定项目/工人/日期的考勤命令及原键恢复；同月 C1/C2 互斥，已发全成员锁月；P2 已通过本地限定验收 | 中央工作区验证实例；浏览器不回写本地正式库，生产持久化仍待 #416 |
+| payroll-c2-browser | 逐条签工、主体配置、C2 草稿与同次发放冻结的工资/签工配对输出；旧来源原文与当前可用性分别读取 | 固定目标与原提交的 C2 配置、保存、核对及实际发放；P3 已通过本地限定验收，独立更正及完整费用仍由后续承接 | 与签工、考勤及其他工资共用中央工作区事务；独立来源及恢复保护，生产持久化仍待 #416 |
+| daywork-central-browser | 独立中央签工台账与按稳定编号读取的原记录；日期、工数、证明信息、原归属、占用及诊断保留 | 独立整页登记/编辑与轻量人工确认，原命令恢复；P3 已通过本地限定验收，已发更正及生产保存仍由后续承接 | 中央工作区验证实例；已发月份锁及逐条来源占用分别核对，生产持久化仍待 #416 |
 | simulation | 合成导入演示 | 模拟成功/首次失败，无业务记录写入 | 无业务持久化 |
 | precheck-only | 本地来源预检 | 只预检，不写业务行 | 无导入写入 |
 | file-workflow | 导出任务上下文与选定数据集 | 生成真实文件；不是业务存储写入 | 瞬时文件工作流；完整数据集/正文/失败清理分别验收 |
@@ -715,14 +717,20 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/subcontract/attendance` view | subcontract.attendance / default | central/pending · pending | attendance-central-browser / 不适用 | [app/components/payroll/CentralAttendanceScreen.vue](../../app/components/payroll/CentralAttendanceScreen.vue) |
 | `/subcontract/attendance` view | subcontract.attendance / default | central/diagnostics · diagnostics | attendance-central-browser / 不适用 | [app/components/payroll/CentralAttendanceScreen.vue](../../app/components/payroll/CentralAttendanceScreen.vue) |
 | `/subcontract/attendance` view | subcontract.attendance / default | central/evidence · evidence | attendance-central-browser / 不适用 | [app/components/payroll/CentralAttendanceScreen.vue](../../app/components/payroll/CentralAttendanceScreen.vue) |
-| `/subcontract/daywork` view | subcontract.daywork / default | page · 工作台 | payroll-browser-readonly / desktop-sqlite | [app/pages/subcontract/daywork.vue](../../app/pages/subcontract/daywork.vue) |
-| `/subcontract/daywork` view | subcontract.daywork / default | central/filters · filters | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |
-| `/subcontract/daywork` view | subcontract.daywork / default | central/tab/configs · configs | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |
-| `/subcontract/daywork` view | subcontract.daywork / default | central/tab/attendance · attendance | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |
-| `/subcontract/daywork` view | subcontract.daywork / default | central/tab/daywork · daywork | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |
-| `/subcontract/daywork` view | subcontract.daywork / default | central/tab/locks · locks | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |
-| `/subcontract/daywork` view | subcontract.daywork / default | central/history · history | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |
-| `/subcontract/daywork` view | subcontract.daywork / default | central/evidence · evidence | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |
+| `/subcontract/daywork` view | subcontract.daywork / default | page · 工作台 | daywork-central-browser / desktop-sqlite | [app/pages/subcontract/daywork/index.vue](../../app/pages/subcontract/daywork/index.vue) |
+| `/subcontract/daywork` view | subcontract.daywork / default | central/scope · scope | daywork-central-browser / 不适用 | [app/components/payroll/CentralSignedDayworkScreen.vue](../../app/components/payroll/CentralSignedDayworkScreen.vue) |
+| `/subcontract/daywork` view | subcontract.daywork / default | central/records · records | daywork-central-browser / 不适用 | [app/components/payroll/CentralSignedDayworkScreen.vue](../../app/components/payroll/CentralSignedDayworkScreen.vue) |
+| `/subcontract/daywork` view | subcontract.daywork / default | central/confirm · confirm | daywork-central-browser / 不适用 | [app/components/payroll/CentralSignedDayworkScreen.vue](../../app/components/payroll/CentralSignedDayworkScreen.vue) |
+| `/subcontract/daywork` view | subcontract.daywork / default | central/source-return · source-return | daywork-central-browser / 不适用 | [app/components/payroll/CentralSignedDayworkScreen.vue](../../app/components/payroll/CentralSignedDayworkScreen.vue) |
+| `/subcontract/daywork` view | subcontract.daywork / default | central/evidence · evidence | daywork-central-browser / 不适用 | [app/components/payroll/CentralSignedDayworkScreen.vue](../../app/components/payroll/CentralSignedDayworkScreen.vue) |
+| `/subcontract/daywork/new` new | subcontract.daywork / default | page · 整页表单 | daywork-central-browser / unsupported | [app/pages/subcontract/daywork/new.vue](../../app/pages/subcontract/daywork/new.vue) |
+| `/subcontract/daywork/new` new | subcontract.daywork / default | central/record · record | daywork-central-browser / 不适用 | [app/components/payroll/CentralDayworkFormPage.vue](../../app/components/payroll/CentralDayworkFormPage.vue) |
+| `/subcontract/daywork/new` new | subcontract.daywork / default | central/pending · pending | daywork-central-browser / 不适用 | [app/components/payroll/CentralDayworkFormPage.vue](../../app/components/payroll/CentralDayworkFormPage.vue) |
+| `/subcontract/daywork/new` new | subcontract.daywork / default | central/later-change · later-change | daywork-central-browser / 不适用 | [app/components/payroll/CentralDayworkFormPage.vue](../../app/components/payroll/CentralDayworkFormPage.vue) |
+| `/subcontract/daywork/form/:id` edit | subcontract.daywork / default | page · 整页表单 | daywork-central-browser / unsupported | [app/pages/subcontract/daywork/form/[id].vue](../../app/pages/subcontract/daywork/form/[id].vue) |
+| `/subcontract/daywork/form/:id` edit | subcontract.daywork / default | central/record · record | daywork-central-browser / 不适用 | [app/components/payroll/CentralDayworkFormPage.vue](../../app/components/payroll/CentralDayworkFormPage.vue) |
+| `/subcontract/daywork/form/:id` edit | subcontract.daywork / default | central/pending · pending | daywork-central-browser / 不适用 | [app/components/payroll/CentralDayworkFormPage.vue](../../app/components/payroll/CentralDayworkFormPage.vue) |
+| `/subcontract/daywork/form/:id` edit | subcontract.daywork / default | central/later-change · later-change | daywork-central-browser / 不适用 | [app/components/payroll/CentralDayworkFormPage.vue](../../app/components/payroll/CentralDayworkFormPage.vue) |
 | `/subcontract/payroll/:id` view | subcontract.payroll / default | page · 详情 | payroll-workbench-browser / desktop-sqlite | [app/pages/subcontract/payroll/[id].vue](../../app/pages/subcontract/payroll/[id].vue) |
 | `/subcontract/payroll/:id` view | subcontract.payroll / default | table/PayrollStatementMembersTable · PayrollStatementMembersTable | 不适用 / desktop-sqlite | [app/components/payroll/NativePayrollStatementDetailScreen.vue](../../app/components/payroll/NativePayrollStatementDetailScreen.vue) |
 | `/subcontract/payroll/:id` view | subcontract.payroll / default | table/PayrollStatementLinesTable · PayrollStatementLinesTable | 不适用 / desktop-sqlite | [app/components/payroll/NativePayrollStatementDetailScreen.vue](../../app/components/payroll/NativePayrollStatementDetailScreen.vue) |
@@ -746,6 +754,11 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/subcontract/payroll/:id` view | subcontract.payroll / default | central/c1/release · release | payroll-c1-browser / 不适用 | [app/components/payroll/PayrollC1StatementWorkspace.vue](../../app/components/payroll/PayrollC1StatementWorkspace.vue) |
 | `/subcontract/payroll/:id` view | subcontract.payroll / default | central/c1/output · output | payroll-c1-browser / 不适用 | [app/components/payroll/PayrollC1StatementWorkspace.vue](../../app/components/payroll/PayrollC1StatementWorkspace.vue) |
 | `/subcontract/payroll/:id` view | subcontract.payroll / default | central/c1/pending · pending | payroll-c1-browser / 不适用 | [app/components/payroll/PayrollC1StatementWorkspace.vue](../../app/components/payroll/PayrollC1StatementWorkspace.vue) |
+| `/subcontract/payroll/:id` view | subcontract.payroll / default | central/c2/processing · processing | payroll-c2-browser / 不适用 | [app/components/payroll/PayrollC2StatementWorkspace.vue](../../app/components/payroll/PayrollC2StatementWorkspace.vue) |
+| `/subcontract/payroll/:id` view | subcontract.payroll / default | central/c2/source · source | payroll-c2-browser / 不适用 | [app/components/payroll/PayrollC2StatementWorkspace.vue](../../app/components/payroll/PayrollC2StatementWorkspace.vue) |
+| `/subcontract/payroll/:id` view | subcontract.payroll / default | central/c2/release · release | payroll-c2-browser / 不适用 | [app/components/payroll/PayrollC2StatementWorkspace.vue](../../app/components/payroll/PayrollC2StatementWorkspace.vue) |
+| `/subcontract/payroll/:id` view | subcontract.payroll / default | central/c2/output · output | payroll-c2-browser / 不适用 | [app/components/payroll/PayrollC2StatementWorkspace.vue](../../app/components/payroll/PayrollC2StatementWorkspace.vue) |
+| `/subcontract/payroll/:id` view | subcontract.payroll / default | central/c2/pending · pending | payroll-c2-browser / 不适用 | [app/components/payroll/PayrollC2StatementWorkspace.vue](../../app/components/payroll/PayrollC2StatementWorkspace.vue) |
 | `/subcontract/payroll/:id?ownerKind=crew&ownerId=:ownerId&origin=:origin` view | subcontract.payroll / central-source | page · 详情 | central-http / central-http | [app/pages/subcontract/payroll/[id].vue](../../app/pages/subcontract/payroll/[id].vue) |
 | `/subcontract/payroll/:id?ownerKind=worker&ownerId=:ownerId&origin=:origin` view | subcontract.payroll / central-source | page · 详情 | central-http / central-http | [app/pages/subcontract/payroll/[id].vue](../../app/pages/subcontract/payroll/[id].vue) |
 | `/subcontract/payroll` view | subcontract.payroll / default | page · 工作台 | payroll-workbench-browser / desktop-sqlite | [app/pages/subcontract/payroll/index.vue](../../app/pages/subcontract/payroll/index.vue) |
@@ -771,6 +784,10 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/subcontract/payroll/new` new | subcontract.payroll / default | central/c1/source · source | payroll-c1-browser / 不适用 | [app/components/payroll/CentralC1DraftFormPage.vue](../../app/components/payroll/CentralC1DraftFormPage.vue) |
 | `/subcontract/payroll/new` new | subcontract.payroll / default | central/c1/config · config | payroll-c1-browser / 不适用 | [app/components/payroll/CentralC1DraftFormPage.vue](../../app/components/payroll/CentralC1DraftFormPage.vue) |
 | `/subcontract/payroll/new` new | subcontract.payroll / default | central/c1/pending · pending | payroll-c1-browser / 不适用 | [app/components/payroll/CentralC1DraftFormPage.vue](../../app/components/payroll/CentralC1DraftFormPage.vue) |
+| `/subcontract/payroll/new` new | subcontract.payroll / default | central/c2/scope · scope | payroll-c2-browser / 不适用 | [app/components/payroll/CentralC2DraftFormPage.vue](../../app/components/payroll/CentralC2DraftFormPage.vue) |
+| `/subcontract/payroll/new` new | subcontract.payroll / default | central/c2/source · source | payroll-c2-browser / 不适用 | [app/components/payroll/CentralC2DraftFormPage.vue](../../app/components/payroll/CentralC2DraftFormPage.vue) |
+| `/subcontract/payroll/new` new | subcontract.payroll / default | central/c2/config · config | payroll-c2-browser / 不适用 | [app/components/payroll/CentralC2DraftFormPage.vue](../../app/components/payroll/CentralC2DraftFormPage.vue) |
+| `/subcontract/payroll/new` new | subcontract.payroll / default | central/c2/pending · pending | payroll-c2-browser / 不适用 | [app/components/payroll/CentralC2DraftFormPage.vue](../../app/components/payroll/CentralC2DraftFormPage.vue) |
 | `/subcontract/payroll/config` new | subcontract.payroll.config / default | page · 整页表单 | payroll-a-browser / unsupported | [app/pages/subcontract/payroll/config.vue](../../app/pages/subcontract/payroll/config.vue) |
 | `/subcontract/payroll/config` new | subcontract.payroll.config / default | central/section/scope · scope | payroll-a-browser / 不适用 | [app/components/payroll/PayrollAConfigScreen.vue](../../app/components/payroll/PayrollAConfigScreen.vue) |
 | `/subcontract/payroll/config` new | subcontract.payroll.config / default | central/section/subject · subject | payroll-a-browser / 不适用 | [app/components/payroll/PayrollAConfigScreen.vue](../../app/components/payroll/PayrollAConfigScreen.vue) |
@@ -781,6 +798,9 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/subcontract/payroll/config` new | subcontract.payroll.config / default | central/c1/scope · scope | payroll-c1-browser / 不适用 | [app/components/payroll/PayrollC1ConfigScreen.vue](../../app/components/payroll/PayrollC1ConfigScreen.vue) |
 | `/subcontract/payroll/config` new | subcontract.payroll.config / default | central/c1/rates · rates | payroll-c1-browser / 不适用 | [app/components/payroll/PayrollC1ConfigScreen.vue](../../app/components/payroll/PayrollC1ConfigScreen.vue) |
 | `/subcontract/payroll/config` new | subcontract.payroll.config / default | central/c1/pending · pending | payroll-c1-browser / 不适用 | [app/components/payroll/PayrollC1ConfigScreen.vue](../../app/components/payroll/PayrollC1ConfigScreen.vue) |
+| `/subcontract/payroll/config` new | subcontract.payroll.config / default | central/c2/scope · scope | payroll-c2-browser / 不适用 | [app/components/payroll/PayrollC2ConfigScreen.vue](../../app/components/payroll/PayrollC2ConfigScreen.vue) |
+| `/subcontract/payroll/config` new | subcontract.payroll.config / default | central/c2/config · config | payroll-c2-browser / 不适用 | [app/components/payroll/PayrollC2ConfigScreen.vue](../../app/components/payroll/PayrollC2ConfigScreen.vue) |
+| `/subcontract/payroll/config` new | subcontract.payroll.config / default | central/c2/pending · pending | payroll-c2-browser / 不适用 | [app/components/payroll/PayrollC2ConfigScreen.vue](../../app/components/payroll/PayrollC2ConfigScreen.vue) |
 | `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | page · 整页表单 | payroll-a-browser / unsupported | [app/pages/subcontract/payroll/form/[id].vue](../../app/pages/subcontract/payroll/form/[id].vue) |
 | `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/section/basic · basic | payroll-a-browser / 不适用 | [app/components/payroll/CentralPayrollDraftFormPage.vue](../../app/components/payroll/CentralPayrollDraftFormPage.vue) |
 | `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/section/source · source | payroll-a-browser / 不适用 | [app/components/payroll/CentralPayrollDraftFormPage.vue](../../app/components/payroll/CentralPayrollDraftFormPage.vue) |
@@ -791,6 +811,10 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/c1/source · source | payroll-c1-browser / 不适用 | [app/components/payroll/CentralC1DraftFormPage.vue](../../app/components/payroll/CentralC1DraftFormPage.vue) |
 | `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/c1/config · config | payroll-c1-browser / 不适用 | [app/components/payroll/CentralC1DraftFormPage.vue](../../app/components/payroll/CentralC1DraftFormPage.vue) |
 | `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/c1/pending · pending | payroll-c1-browser / 不适用 | [app/components/payroll/CentralC1DraftFormPage.vue](../../app/components/payroll/CentralC1DraftFormPage.vue) |
+| `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/c2/scope · scope | payroll-c2-browser / 不适用 | [app/components/payroll/CentralC2DraftFormPage.vue](../../app/components/payroll/CentralC2DraftFormPage.vue) |
+| `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/c2/source · source | payroll-c2-browser / 不适用 | [app/components/payroll/CentralC2DraftFormPage.vue](../../app/components/payroll/CentralC2DraftFormPage.vue) |
+| `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/c2/config · config | payroll-c2-browser / 不适用 | [app/components/payroll/CentralC2DraftFormPage.vue](../../app/components/payroll/CentralC2DraftFormPage.vue) |
+| `/subcontract/payroll/form/:id` edit | subcontract.payroll / default | central/c2/pending · pending | payroll-c2-browser / 不适用 | [app/components/payroll/CentralC2DraftFormPage.vue](../../app/components/payroll/CentralC2DraftFormPage.vue) |
 | `/subcontract/payroll/sources` view | subcontract.payroll.sources / default | page · 工作台 | payroll-browser-readonly / unsupported | [app/pages/subcontract/payroll/sources.vue](../../app/pages/subcontract/payroll/sources.vue) |
 | `/subcontract/payroll/sources` view | subcontract.payroll.sources / default | central/filters · filters | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |
 | `/subcontract/payroll/sources` view | subcontract.payroll.sources / default | central/tab/configs · configs | payroll-browser-readonly / 不适用 | [app/components/payroll/CentralPayrollSourcesScreen.vue](../../app/components/payroll/CentralPayrollSourcesScreen.vue) |

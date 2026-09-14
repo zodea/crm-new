@@ -1,7 +1,9 @@
-import type { DataOriginDTO } from '../../types/read-model'
+import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollARepository } from './central-a-contract'
 import type { PayrollAttendanceRepository } from './central-attendance-contract'
 import type { PayrollC1Repository } from './central-c1-contract'
+import type { PayrollC2Repository } from './central-c2-contract'
+import type { PayrollDayworkRepository } from './central-daywork-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../project/repository'
 
 export const PAYROLL_READ_CAPABILITY = 'payroll:read' as const
@@ -9,6 +11,11 @@ export type PayrollJson = null | boolean | number | string | PayrollJson[] | { [
 export interface PayrollJsonObject { [key: string]: PayrollJson }
 export interface PayrollQuery { origin: DataOriginDTO, includeDemo?: boolean, projectId?: string, month?: string, crewId?: string }
 export interface PayrollContext { workspaceId: string, actorId: string, origin: DataOriginDTO, sourceVersion: string, capabilities: readonly string[], readonly: true }
+export interface PayrollWritableContext extends Omit<PayrollContext, 'readonly'> { readonly: boolean }
+export interface PayrollParticipantOption { id: string, name: string | null, crewId: string | null, eligible: boolean, reasons: string[], historical: boolean, source: NavigationIntentDTO | null }
+export interface PayrollCrewOption { id: string, name: string | null, eligible: boolean, reasons: string[] }
+export interface PayrollParticipantOptions { projects: PayrollProjectOption[], crews: PayrollCrewOption[], workers: PayrollParticipantOption[] }
+export interface PayrollSourceDiagnostic { code: string, message: string, recordId: string | null, workerId: string | null, field: string | null, tableName: string | null, entityId: string | null, legacyRecordId: string | null }
 export interface PayrollDiagnostic { code: string, message: string, tableName: string | null, recordId: string | null, field: string | null }
 export interface PayrollProjectOption { id: string, name: string, code: string }
 export interface PayrollSnapshot {
@@ -90,7 +97,7 @@ export interface PayrollStatementDetail extends PayrollStatementRow {
 export interface PayrollListRead { context: PayrollContext, rows: PayrollStatementRow[], projects: PayrollProjectOption[], diagnostics: PayrollDiagnostic[] }
 export interface PayrollDetailRead { context: PayrollContext, statement: PayrollStatementDetail, history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
 export interface PayrollSourcesRead { context: PayrollContext, projectId: string, configs: PayrollConfig[], attendance: PayrollAttendance[], daywork: PayrollDaywork[], locks: PayrollSourceLock[], diagnostics: PayrollDiagnostic[], history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
-export interface PayrollRepository extends PayrollARepository, PayrollAttendanceRepository, PayrollC1Repository {
+export interface PayrollRepository extends PayrollARepository, PayrollAttendanceRepository, PayrollC1Repository, PayrollC2Repository, PayrollDayworkRepository {
   list: (query: PayrollQuery) => Promise<PayrollListRead>
   detail: (query: PayrollQuery, id: string) => Promise<PayrollDetailRead>
   sources: (query: PayrollQuery & { projectId: string }) => Promise<PayrollSourcesRead>

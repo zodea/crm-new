@@ -36,6 +36,9 @@ export async function initializePayrollSchema(tx: TransactionDb) {
   await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_c1_statement_sources (
     statement_id TEXT PRIMARY KEY REFERENCES wage_statements(id), project_id TEXT NOT NULL REFERENCES projects(id),
     leader_worker_id TEXT NOT NULL REFERENCES workers(id), source_json TEXT NOT NULL)`)
+  await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_c2_statement_sources (
+    statement_id TEXT PRIMARY KEY REFERENCES wage_statements(id), project_id TEXT NOT NULL REFERENCES projects(id),
+    leader_worker_id TEXT NOT NULL REFERENCES workers(id), source_json TEXT NOT NULL)`)
 }
 export async function payrollRevision(tx: TransactionDb): Promise<number> {
   const rows = await tx.select<{ revision: number }>('SELECT revision FROM payroll_revision WHERE singleton = 1')

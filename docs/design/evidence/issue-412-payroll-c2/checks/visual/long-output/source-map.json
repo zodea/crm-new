@@ -1,0 +1,96 @@
+{
+  "operation": "copy-exact-review-artifacts",
+  "archivedAt": "2026-09-14T07:34:57.4485115Z",
+  "reviewer": "/root/c2_b_independent",
+  "pdfSourcePath": ".tmp/remaining-issues-20260910/payroll-c2-central/browser-visual-final/payroll-c2-output-真实长签工发放后两表分页与下载回读，精确单价及明确空规则不被改写-chromium/c2-long-paired-output.pdf",
+  "pdfSourceSha256": "1894a4eaffd0c276b59d7595577d8b61ba3b09a8b417f0e5685bd1221fdc611c",
+  "originalRound1Preserved": true,
+  "originalRound2Preserved": true,
+  "reportContentsRewritten": false,
+  "files": [
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-01.png",
+      "sourceSha256": "e381d3b652e09207b1551b11889e7759c51d1a6491486cc6390cc19080564ab7",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-01.png",
+      "archiveSha256": "e381d3b652e09207b1551b11889e7759c51d1a6491486cc6390cc19080564ab7",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-02.png",
+      "sourceSha256": "91c1702c00bbd51a6baf9f1e9c1b7a5b699788659cd26fb660b97db3b5c7470e",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-02.png",
+      "archiveSha256": "91c1702c00bbd51a6baf9f1e9c1b7a5b699788659cd26fb660b97db3b5c7470e",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-03.png",
+      "sourceSha256": "13c9664e81e5cceba2f20f3ff20e8b0e1f18e32472bdf736c95de6a10d49c10c",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-03.png",
+      "archiveSha256": "13c9664e81e5cceba2f20f3ff20e8b0e1f18e32472bdf736c95de6a10d49c10c",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-04.png",
+      "sourceSha256": "83a28fe776ff937a930d204d80419edb282148772b76c5bffb63664077ef4323",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-04.png",
+      "archiveSha256": "83a28fe776ff937a930d204d80419edb282148772b76c5bffb63664077ef4323",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-05.png",
+      "sourceSha256": "4a825b49c619c7bae69ca18ed379d3f680e9ab1ec1e02df8d7e3fa6df6441ffa",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-05.png",
+      "archiveSha256": "4a825b49c619c7bae69ca18ed379d3f680e9ab1ec1e02df8d7e3fa6df6441ffa",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-06.png",
+      "sourceSha256": "199c398a79100364b6e7cb276449b2e9add951ae5aa62abb730c9cd5782f18e5",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-06.png",
+      "archiveSha256": "199c398a79100364b6e7cb276449b2e9add951ae5aa62abb730c9cd5782f18e5",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-07.png",
+      "sourceSha256": "d74f098d612c73d52c974abe704ce7e9aa822507c9439c87a6342ebea5b0e00b",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-07.png",
+      "archiveSha256": "d74f098d612c73d52c974abe704ce7e9aa822507c9439c87a6342ebea5b0e00b",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-08.png",
+      "sourceSha256": "cba78d4a8f639bd1a7714000e2d0d161d9a87f376a2317ff02dc90c3a691482d",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-08.png",
+      "archiveSha256": "cba78d4a8f639bd1a7714000e2d0d161d9a87f376a2317ff02dc90c3a691482d",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-09.png",
+      "sourceSha256": "b1906219f08e6f7dee4871f266743b30bec7f4e76970f26ad6808c1aba830459",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-09.png",
+      "archiveSha256": "b1906219f08e6f7dee4871f266743b30bec7f4e76970f26ad6808c1aba830459",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\page-10.png",
+      "sourceSha256": "2ce6a2c46a737001988c280ac6fd790a78235c200ed8de9467300b69dc8e0e8f",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\page-10.png",
+      "archiveSha256": "2ce6a2c46a737001988c280ac6fd790a78235c200ed8de9467300b69dc8e0e8f",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\review.md",
+      "sourceSha256": "0c30c1c8751a1b56170e16e06c4f157449f4a7254ae0d5f4129e604a8c5af540",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\review.md",
+      "archiveSha256": "0c30c1c8751a1b56170e16e06c4f157449f4a7254ae0d5f4129e604a8c5af540",
+      "byteIdentical": true
+    },
+    {
+      "sourcePath": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\long-output-review\\round2\\validation.json",
+      "sourceSha256": "bc678237f69516cafdae6c1be3296929904acdc17a9cc1f9e42226f2c950d69f",
+      "archivePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\checks\\visual\\long-output\\validation.json",
+      "archiveSha256": "bc678237f69516cafdae6c1be3296929904acdc17a9cc1f9e42226f2c950d69f",
+      "byteIdentical": true
+    }
+  ]
+}

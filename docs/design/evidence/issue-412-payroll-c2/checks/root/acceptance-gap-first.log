@@ -1,0 +1,63 @@
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/central-c2-invalid-migration.test.ts (2 tests | 1 failed) 2794ms
+   × 真实迁入null-rate主体配置保原值，已有confirmed签工仍不能建可发工资 1324ms
+ ❯ |unit| tests/payroll/central-c2-independent.test.ts (12 tests | 1 failed) 7446ms
+     × 前月实际发放500后次月新一工仍核算350，不扣前月实发或释放前月锁 762ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/central-c2-independent.test.ts > c2 独立公开服务反例：原关系、最后窗口与完整冻结 > 前月实际发放500后次月新一工仍核算350，不扣前月实发或释放前月锁
+AssertionError: expected { context: { …(6) }, …(4) } to deeply equal { context: { …(6) }, …(4) }
+
+- Expected
++ Received
+
+@@ -5,11 +5,11 @@
+        "payroll:read",
+        "payroll:write",
+      ],
+      "origin": "real",
+      "readonly": false,
+-     "sourceVersion": "payroll:6+identities:e9d53ca13540f5cbde01cba3838effdcf77dd26406053818de360b7301e34f3e",
++     "sourceVersion": "payroll:8+identities:e9d53ca13540f5cbde01cba3838effdcf77dd26406053818de360b7301e34f3e",
+      "workspaceId": "work",
+    },
+    "document": {
+      "actualAmount": 500,
+      "allocations": [
+
+ ❯ tests/payroll/central-c2-independent.test.ts:59:80
+     57|     const saved = await f.service.executeC2(f.c2Command(read, { kind: …
+     58|     expect((await f.service.c2Form({ origin: 'real' }, { statementId: …
+     59|     expect(await f.service.c2Output({ origin: 'real' }, previous.state…
+       |                                                                                ^
+     60|     await expect(f.daywork({ workerId: 'zero', workDate: '2026-08-31' …
+     61|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |unit| tests/payroll/central-c2-invalid-migration.test.ts > 真实迁入null-rate主体配置保原值，已有confirmed签工仍不能建可发工资
+AssertionError: expected null to match object { enabled: true, unitRate: null }
+
+- Expected:
+{
+  "enabled": true,
+  "unitRate": null,
+}
+
++ Received:
+null
+
+ ❯ tests/payroll/central-c2-invalid-migration.test.ts:29:27
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 12 passed (14)
+   Start at  15:29:30
+   Duration  8.43s (transform 2.80s, setup 0ms, import 3.40s, tests 10.24s, environment 0ms)
+

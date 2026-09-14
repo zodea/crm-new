@@ -17,7 +17,7 @@ const cases = [
   { component: PayrollStatementDetailScreen, central: 'CentralPayrollDetailScreen', native: 'NativePayrollStatementDetailScreen' },
   { component: PayrollDraftFormPage, central: 'CentralPayrollFormPage', native: 'NativePayrollDraftFormPage' },
   { component: AttendanceScreen, central: 'CentralAttendanceScreen', native: 'NativeAttendanceScreen' },
-  { component: SignedDayworkScreen, central: 'CentralPayrollSourcesScreen', native: 'NativeSignedDayworkScreen' },
+  { component: SignedDayworkScreen, central: 'CentralSignedDayworkScreen', native: 'NativeSignedDayworkScreen' },
 ]
 beforeEach(() => {
   runtime.native = false

@@ -1,0 +1,76 @@
+{
+  "date": "2026-09-14T15:49:11.8992547+08:00",
+  "localHead": "4738be98730955cd63832c8df04fc6f1d855caff",
+  "originMain": "4292291d2a99c94052a6eab743036b149bfa9634",
+  "aheadBehind": "169\t0",
+  "unmerged": [],
+  "remoteBranches": [
+    {
+      "ref": "origin/codex/issue-277-material-contract-zero-chain",
+      "sha": "b16facca6d0dc0e1ef060d150469938008aaf720",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-281-partner-identity-chain",
+      "sha": "9f10bf6d2a0d3f730d596f2fca634e1505ff27f7",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-315-supplier-central-facts",
+      "sha": "75e821bfb3bb54fe7170281a6fe6dae8619e6600",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-316-crew-worker-central-chain",
+      "sha": "6c702a282a6f2035d525cf5efb9feca1a0c87c4a",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-317-project-supplier-facts",
+      "sha": "48a47f70647f1796b0423e6379cd2ba87f786675",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-319-project-material-supplier-journey",
+      "sha": "e6e04bb3856ccf501a1d75a5f6d1efc012e8dc5c",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-321-subcontract-detail",
+      "sha": "2183c063c0653974c815e6115c35a8767df19f70",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-327-subcontract-change-readonly",
+      "sha": "648b91e4a7f6feb20fa247311f8bf65c16c2e57e",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-328-subcontract-settlement",
+      "sha": "a37cdf500746498a0ddbd7b1c5db2fc7981b41ff",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-329-project-penalty",
+      "sha": "bfdafb4a69c0176549ddc80513fc512bb6e0c794",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-330-auxiliary-contracts",
+      "sha": "a00074e6232bf1c4a0096d47b2047641c294f842",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/codex/issue-331-other-expense-settlement",
+      "sha": "dee82bf60288202ef63f3605a4d83a0548a88334",
+      "includedInLocalHead": true
+    },
+    {
+      "ref": "origin/main",
+      "sha": "4292291d2a99c94052a6eab743036b149bfa9634",
+      "includedInLocalHead": true
+    }
+  ],
+  "openPullRequests": [],
+  "note": "本次成功fetch后核实；远端13实际分支均已包含于本地，未推送或部署。"
+}

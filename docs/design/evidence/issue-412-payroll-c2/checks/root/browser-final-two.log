@@ -1,0 +1,9 @@
+
+Running 2 tests using 1 worker
+
+(node:34512) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › e2e\payroll-c2-central.spec.ts:61:1 › 独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出 (59.6s)
+  ok 2 [chromium] › e2e\payroll-c2-readonly.spec.ts:17:1 › 旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签工输出 (2.7s)
+
+  2 passed (1.1m)

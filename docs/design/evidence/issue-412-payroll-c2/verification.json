@@ -1,0 +1,120 @@
+{
+  "date": "2026-09-14",
+  "scope": "P3 本地中央签工/C2独立核算、实发、配对冻结、来源/迁入保护；不含P4–P7、生产保存或部署",
+  "baseline": "4738be98730955cd63832c8df04fc6f1d855caff",
+  "commitStatus": "产品及正式证据提交时记录；后置回执不得被视为此前已经提交",
+  "codeFiles": 112,
+  "deletedPath": "app/pages/subcontract/daywork.vue",
+  "codeManifest": "code-identities.json",
+  "codeManifestSha256": "3983958c5d8d9fd6db85d6408703f970af918a3480df121f0234dc7628ca3661",
+  "tests": {
+    "files": 682,
+    "cases": 3964,
+    "command": "npm test",
+    "finalDurationSeconds": 263.07,
+    "rounds": [
+      {
+        "path": "checks/delivery/npm-test-delivery-final.log",
+        "durationSeconds": 284.98,
+        "scope": "最后产品修正后的完整检查"
+      },
+      {
+        "path": "checks/delivery/npm-test-metadata-final.log",
+        "durationSeconds": 263.07,
+        "scope": "签工覆盖状态文字及测试标题修正后的最终完整检查"
+      }
+    ],
+    "afterFinalRunCodeChanges": 0
+  },
+  "typecheck": "passed",
+  "build": "passed",
+  "lint": {
+    "checkedFiles": 112,
+    "firstFindings": 1,
+    "kind": "测试标题大小写",
+    "fixedFile": "tests/payroll/central-c2-independent.test.ts",
+    "targetedRecheck": "passed",
+    "remaining": 0
+  },
+  "browser": {
+    "uniqueCases": 9,
+    "finalRound": {
+      "cases": 5,
+      "passed": 5
+    },
+    "priorUnaffectedCases": [
+      "拒绝C2读取仍保原范围",
+      "演示C2/签工禁止写入",
+      "配置原编号冷恢复",
+      "迟到旧读取不覆盖新月份"
+    ],
+    "repeatedCasesNotDoubleCounted": true
+  },
+  "visual": {
+    "validInteractionPng": 180,
+    "preservedSupersededPng": 1,
+    "actualOutputPdfPages": 12,
+    "guidePdfPages": 14,
+    "allImagesIndividuallyViewed": true,
+    "authorsAndLimits": "主链作者QA；恢复/只读/长PDF/指南由分工审查；Root独立查看关键确认、历史、最新说明与短PDF。可见范围/旧帧/最终替代分别登记"
+  },
+  "review": {
+    "spec": "checks/spec-final/review.md",
+    "specVisual": "checks/spec-final/visual-followup-review.md",
+    "specAcceptance": "checks/spec-final/acceptance-gap-review.md",
+    "standards": [
+      "checks/standards-final/cross-review.md",
+      "checks/standards-root-final.md"
+    ],
+    "unresolved": 0,
+    "specDeliveryIdentity": "checks/spec-final/delivery-identity-review.md"
+  },
+  "checks": [
+    {
+      "path": "checks/delivery/npm-test-delivery-final.log",
+      "sha256": "8242f78348876d52c608233db0845f7cd170be261a25654446c6e89021365adb"
+    },
+    {
+      "path": "checks/delivery/typecheck-delivery-final.log",
+      "sha256": "29aa230872b81c9be83929131e82e9487811170eb768324395f03ab1523ffa01"
+    },
+    {
+      "path": "checks/delivery/build-delivery-final.log",
+      "sha256": "0f2d73c354f9bfc5ee09de693ea3e663eb45363ecb50a7a625fb81f2169e9f4f"
+    },
+    {
+      "path": "checks/delivery/lint-delivery-final.log",
+      "sha256": "b35f11072bfb2427b95bcb2aa634623c630f7c5acbe2780e3f85d81553c2280c"
+    },
+    {
+      "path": "checks/delivery/lint-title-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "checks/delivery/browser-visual-final.log",
+      "sha256": "9d0e76e653ae0bc736b349e7f3917a77dca9c38488e41bc8eae89ed177a1345f"
+    },
+    {
+      "path": "checks/delivery/npm-test-metadata-final.log",
+      "sha256": "d8d18f30e472442cd4f97c05faa901b75f24a14c0dc726586ab62b04c5962958"
+    }
+  ],
+  "remoteSync": "branch-sync.json",
+  "newBusinessGrill": [],
+  "followup": [
+    "P4独立更正/补退/完整实际成本",
+    "P5房补管理费",
+    "P6空鼓",
+    "P7资金建议和整册",
+    "#416生产关口"
+  ],
+  "report": {
+    "path": "report/verification.json",
+    "issues": 46,
+    "issue412Steps": 16,
+    "nodes": 18,
+    "edges": 27,
+    "localLinksVerified": 83,
+    "visualReview": "report/visual-review.json"
+  }
+}

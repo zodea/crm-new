@@ -20,6 +20,7 @@ import {
 } from '~/lib/owner-document/return-context'
 import { payrollAWorkspaceReturn } from '~/lib/payroll/a-navigation'
 import { payrollC1WorkspaceReturn } from '~/lib/payroll/c1-navigation'
+import { payrollC2WorkspaceReturn } from '~/lib/payroll/c2-navigation'
 import { payrollReadLocation, payrollReturnTo, payrollViewScope } from '~/lib/payroll/central-navigation'
 import {
   appendProjectSupplierReturnContext,
@@ -366,6 +367,12 @@ const TARGET_REGISTRY = {
       throw new Error('invalid attendance source')
     return `/subcontract/attendance?${new URLSearchParams({ origin: dataOrigin, project: projectId, month, ...(typeof crewId === 'string' && crewId ? { crew: crewId } : {}), worker: workerId, workDate, record: intent.subject.id })}`
   },
+  'daywork:ledger': (intent: EntityTargetIntent) => {
+    const { projectId, dataOrigin, month, crewId, workerId, workDate } = intent.filters
+    if (!isStableRouteIdentity(projectId) || !isDataOriginDTO(dataOrigin) || !isStableRouteIdentity(workerId) || typeof month !== 'string' || !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(month) || typeof workDate !== 'string' || !workDate.startsWith(`${month}-`))
+      throw new Error('invalid daywork source')
+    return `/subcontract/daywork?${new URLSearchParams({ origin: dataOrigin, project: projectId, month, ...(typeof crewId === 'string' && crewId ? { crew: crewId } : {}), worker: workerId, workDate, record: intent.subject.id })}`
+  },
   'wage-statement:detail': (intent: EntityTargetIntent) => {
     const path = entityPath('/subcontract/payroll', intent)
     if (intent.filters.ownerKind != null || intent.filters.ownerId != null)
@@ -485,7 +492,8 @@ export function resolveNavigationTarget(
     const dataOrigin = intent.filters.dataOrigin
     const returnContext = validateProjectSupplierReturnTo(options.returnTo)
     const attendanceReturn = key === 'attendance:matrix' && isDataOriginDTO(dataOrigin) && payrollC1WorkspaceReturn(options.returnTo, dataOrigin)
-    if (!attendanceReturn && (!isDataOriginDTO(dataOrigin) || returnContext?.origin !== dataOrigin
+    const dayworkReturn = key === 'daywork:ledger' && isDataOriginDTO(dataOrigin) && payrollC2WorkspaceReturn(options.returnTo, dataOrigin)
+    if (!attendanceReturn && !dayworkReturn && (!isDataOriginDTO(dataOrigin) || returnContext?.origin !== dataOrigin
       || !isVerifiedProjectSupplierSourceTarget({
         dataOrigin,
         entity: intent.subject.entity,
@@ -577,7 +585,7 @@ export function resolveNavigationTarget(
       if (validated && !to.includes('returnTo='))
         to += `${to.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(validated)}`
     }
-    if (intent.kind === 'source-record' && key !== 'attendance:matrix' && options.returnTo)
+    if (intent.kind === 'source-record' && !['attendance:matrix', 'daywork:ledger'].includes(key) && options.returnTo)
       to = appendProjectSupplierReturnContext(to, options.returnTo)
     if (key === 'project:detail' && options.returnTo && options.returnContextId) {
       const returnTo = validateProjectReturnTo(options.returnTo)
@@ -666,6 +674,19 @@ export function resolveNavigationTarget(
         target.searchParams.set('payrollSourceKind', intent.subject.entity)
         target.searchParams.set('payrollSourceId', intent.subject.id)
         target.searchParams.set('payrollFormat', 'C1')
+        to = `${target.pathname}?${target.searchParams}`
+      }
+    }
+    if (options.returnTo && ['daywork:ledger', 'worker:detail', 'crew:detail'].includes(key) && isDataOriginDTO(intent.filters.dataOrigin) && isStableRouteIdentity(intent.filters.projectId)) {
+      const back = payrollC2WorkspaceReturn(options.returnTo, intent.filters.dataOrigin)
+      if (back) {
+        const target = new URL(to, 'https://payroll.invalid')
+        target.searchParams.delete('returnTo')
+        target.searchParams.set('payrollReturnTo', back)
+        target.searchParams.set('payrollProject', intent.filters.projectId)
+        target.searchParams.set('payrollSourceKind', intent.subject.entity)
+        target.searchParams.set('payrollSourceId', intent.subject.id)
+        target.searchParams.set('payrollFormat', 'C2')
         to = `${target.pathname}?${target.searchParams}`
       }
     }

@@ -115,6 +115,7 @@
 | `R-STAGE-PENDING` | 新增整页待验 | `/subcontract/quantity/stages`；阶段目录、分项关联与显式报量选择 | 待验证 390、768、1024、1280、1440px | #442 按 ADR 0010 与实体整页表单原语实施，当前未取得完整运行验收；相邻工程量页面的历史观察不提升本页证据等级。 |
 | `R-PAYROLL-SOURCES-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/sources` | 独立运行证据见工资接管记录，不继承旧空台账观察 | 按工资页面规格及 DC 通用原语呈现配置、考勤、签工和月锁；当前浏览器中央只读，Tauri 显式说明边界。[当前接管证据](./evidence/issue-412-payroll-history/README.md)与后续日常核算分别验收。 |
 | `R-PAYROLL-A-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/config`、`/subcontract/payroll/form/:id` | 新增整页按 390、768、1024、1280、1440px 独立验收；当前实施中 | 依据 #412 承接的 #117/#287 规则、工资页面及 DC 工资构图和整页原语。主体配置、工资价格、来源核对与固定单据编辑分别呈现；不继承旧空工资台账的运行结果，不称外部目标页已观察。 |
+| `R-PAYROLL-DAYWORK-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/daywork/new`、`/subcontract/daywork/form/:id` | 新增整页按 390、768、1024、1280、1440px 独立验收；P3 当前实施中 | 依据 #412 已定签工规则、工资页面、DC 原语和 ADR 0014；整页登记与编辑、轻量人工确认分别核对。未观察独立外部目标页，不继承旧签工台账的运行结果；待取得本轮真实交互证据。 |
 | `R-OCR-STUDIO-SOURCE` | 固定源码参考，非业务运行态 | [`andyhuo520/ppocrv6-studio@34bf6c3`](https://github.com/andyhuo520/ppocrv6-studio/tree/34bf6c3) 的单页设置工作台 | 源项目桌面布局；瑞航仍复核 390、768、1024、1280–1440px | 只复刻“单页纵向分组、紧凑控件密度、恢复默认/保存反馈”的信息架构，不复制其传统 PP-OCRv6 ONNX 引擎契约。`model_variant`、`det_thresh`、`box_thresh`、`unclip` 等传统检测参数不能伪装成 PaddleOCR-VL 1.6 云端参数；瑞航可编辑项必须确实进入现有 VL 调用链，Access Token 等私密运行参数继续仅由服务端持有。 |
 | `R-SHELL-LIVE` | 当前直接证据 | 已登录参考站全局外壳；活动业务页签保持在用户原先打开的页面 | 桌面窗口，`RootWebArea` 约 1568×1153，2026-07-27 | 仅通过 Windows 无障碍树读取和安全界面状态切换：侧栏主体约 215px、顶栏约 50px、路由页签约 28–32px、通知面板约 360px；参考站菜单搜索“分包”显示 5 个站内入口，其中“分包产值确认”“分包签证结算”是参考站独有能力，不构成给瑞航新增或改名路由的授权。瑞航只按自身叶子名称/提示过滤，因此本地同词结果保持“分包变洽签”“分包合同”“分包结算”3 项。分组收起后立即恢复，两个已打开页签切换后恢复原页，通知面板只打开读取并由同一入口关闭。未触发已读、删除、处理、提交、导入、导出或任何业务动作；未保存参考截图和业务值。 |
 | `R-PUBLIC-SURFACES-LIVE` | 当前直接证据 | 已登录参考站全局外壳；付款申请列表/详情、付款管理、支付记录、材料采购合同详情、分供方详情、项目详情、开票申请列表/详情 | Chrome 桌面视口，2026-08-13 | 浏览器只有 1 个页面，参考工作台恢复 25 个应用内业务页签并回到“支付记录”；进入付款详情后增至 26。付款详情完成异步能力判定约 3.5 秒后出现“业务洞察”，右侧 Sheet 分为统一检查、当前合同付款与结算/发票、跨项目/跨供应商报表三层；有合同和无合同两张付款单均挂载，当前层指标随记录更新。公共详情壳会以业务元数据、记录 ID 和 `detail/upsert` 位置请求分析，响应 `show` 决定是否挂载浮动入口；审批位置另带流程定义与活动节点。材料采购合同、分供方和项目详情使用相同公共详情壳但当前响应均未挂载入口，证明入口由后台能力/规则控制，不由页签数量、项目名称或“是否详情页”单独决定。页签内刷新收起 Sheet 但保留详情与入口；浏览器刷新丢弃刚打开的详情和 Sheet，恢复 25 个持久化工作台。刷新日志只证明外壳初始化持续通讯能力，未把某条 toast 绑定到私有传输帧。仅切换页签、执行列表搜索、进入蓝色只读详情、打开/关闭洞察和刷新页面；未点击通知、文件、评论、下载、打印、新建、导入、审批或任何写入口，未保存真实业务值。完整挂载、接口抽象、缓存、消息已读与页签恢复契约见 `docs/rewrite/PUBLIC-SURFACES.md`。 |
@@ -179,13 +180,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 148 / 5 / 143 |
+| 跟踪页面文件 / dev / 生产路由 | 150 / 5 / 145 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 143 / 143 |
-| 参考证据档案 / 被路由使用 | 44 / 38 |
-| 直接 / 邻近 / 本地权威 | 54 / 18 / 27 |
+| 证据行 / 唯一参考端点 | 145 / 145 |
+| 参考证据档案 / 被路由使用 | 45 / 39 |
+| 直接 / 邻近 / 本地权威 | 54 / 18 / 29 |
 | 历史证据 / 未验证目标 | 34 / 10 |
-| 设计已覆盖 / 待补设计 | 135 / 8 |
+| 设计已覆盖 / 待补设计 | 135 / 10 |
 
 | 页面域 | 路由数 | 当前复核承接 |
 | --- | ---: | --- |
@@ -205,7 +206,7 @@
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 13 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 工程量与工资 | 15 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
@@ -344,7 +345,9 @@
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-SUB-DOCUMENTS-LIVE | 参考分包变洽签与分包结算分别保留合同金额/申报审定链和奖罚/申请支付余额链；当前本地真实项目/合同/分供方来源正确但列表投影较窄 | 金额与余额只做真实聚合，不保存副本；空列表仍保留专属列，编号/名称先进入只读详情并恢复项目/合同/分供方及本地筛选 | C-DENSE |
 | `app/pages/subcontract/[kind]/new.vue` | `/subcontract/:kind/new` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 新建页按动态类型显示真实标题、来源、金额、备注和附件分区，不使用通用占位标题或虚构明细 | 项目、合同和分供方只选择真实关联记录；草稿、上报和确认沿用本地状态校验 | C-FORM |
 | `app/pages/subcontract/attendance.vue` | `/subcontract/attendance` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目/月/班组 query 可恢复真实名册，当前无考勤时仍展示 0 人日/0 工时和当月实际天数矩阵；390–1440px 根无横滚、矩阵局部横滚 | 返回工资和进入 C2 可保留项目/月/班组/工资状态；只写 `attendance_records`，C2 人员与 C1 已发月份锁定 | C-DENSE |
-| `app/pages/subcontract/daywork.vue` | `/subcontract/daywork` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | C2 逐日签工表单与真实空台账已可达，但当前忽略来自工资/考勤的 project/month/crew/status query，回考勤和工资也退回无筛选根路由 | 必须复用工资筛选上下文；签工与考勤同月互斥、已发月份冻结、只有已确认记录进入工资的规则不变 | C-DENSE |
+| `app/pages/subcontract/daywork/index.vue` | `/subcontract/daywork` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 保留原台账的历史观察；后续 #433 来源往返及 P3 中央接管分别以对应限定验收为准，路由文件改为目录入口不升级参考证据 | 必须复用工资筛选上下文；签工与考勤同月互斥、已发月份冻结、只有已确认记录进入工资的规则不变 | C-DENSE |
+| `app/pages/subcontract/daywork/new.vue` | `/subcontract/daywork/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-DAYWORK-LOCAL | 独立登记日期、时段、整工/半工与原施工内容；证明信息及明确确认另行呈现，P3 实施中 | 固定 draftKey，失败保原输入；待确认不计薪，人工确认不自动罚扣；Tauri 不挂载中央表单 | C-FORM |
+| `app/pages/subcontract/daywork/form/[id].vue` | `/subcontract/daywork/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-DAYWORK-LOCAL | 按稳定原记录读取及显式编辑；当前事实、旧稿和原提交后续更新分开，P3 实施中 | 旧新关系共同核验；已发不能移动原来源，后来合法修改不使可靠原提交永久无法确认，失败保稿 | C-FORM |
 | `app/pages/subcontract/payroll/[id].vue` | `/subcontract/payroll/:id` | 工程量与工资 | 详情 | #198 | R-ENGINEERING-FLOW-LOCAL | 不存在 ID 能显示真实 not-found；当前运行种子无工资单，released 冻结详情只能由既有测试证明 | 详情入口和返回需携项目/月/班组/状态；当前 `back-to` 固定工资根路由会丢筛选。只展示真实外键与 released 快照 | C-DENSE |
 | `app/pages/subcontract/payroll/index.vue` | `/subcontract/payroll` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目/月/班组/状态筛选、0 单据汇总、空表头和建单/考勤/C2 入口均由运行态确认；没有工资种子时不补成功单据 | 列表→建单→列表与列表↔考勤已保留 query；详情和 C2 仍需补齐。A/C1/C2 可用，B 因无合同责任外键继续禁用 | C-DENSE |
 | `app/pages/subcontract/payroll/new.vue` | `/subcontract/payroll/new` | 工程量与工资 | 整页表单 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目、月份、班组按来源 query 正确预填，负责人只取当前真实责任范围；B 在界面禁用 | 取消/成功按原筛选返回；不触发保存也能观察完整字段。页面、store 和服务继续多层阻止 B 类伪建单 | C-FORM |

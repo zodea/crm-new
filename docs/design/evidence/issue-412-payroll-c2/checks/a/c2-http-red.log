@@ -1,0 +1,33 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/central-c2-http.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/central-c2-http.test.ts (1 test | 1 failed) 557ms
+   × 真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发放及冻结，价保原精度而金额到分 556ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/central-c2-http.test.ts > 真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发放及冻结，价保原精度而金额到分
+Error: Cannot find module '/server/api/read/payroll/daywork.get' imported from D:/crm本地项目开发/tests/payroll/central-c2-http.test.ts
+ ❯ tests/payroll/central-c2-http.test.ts:17:44
+     15|   const app = h3.createApp()
+     16|   const router = h3.createRouter()
+     17|   router.get('/api/read/payroll/daywork', (await import('../../server/…
+       |                                            ^
+     18|   router.post('/api/read/payroll/daywork-form', (await import('../../s…
+     19|   router.post('/api/commands/payroll-daywork', (await import('../../se…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  14:09:21
+   Duration  1.43s (transform 514ms, setup 0ms, import 644ms, tests 557ms, environment 0ms)
+

@@ -1,0 +1,147 @@
+{
+  "date": "2026-09-14",
+  "reviewer": "Root；未编写C产品",
+  "mode": "view_image original逐张，不以截图生成成功代验",
+  "images": [
+    {
+      "path": "browser/main/manual-daywork-confirmation-390.png",
+      "note": "Root逐张实际查看；内边距、证明人、确认日期焦点和两个按钮均可见，背景层及五宽布局无裁切。",
+      "sha256": "220a5621d1662cca57d9d3f9ef4a80062755c540b468f2f717d1f4e2db55dd08",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-missing-snapshot-390.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "175c5a05f2a4e64434fabfbfa2004116fc949bbf8ef4e61f7956d37994a6d1a0",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-original-amount-390.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "2c0fb1e4e52eba866263e0e2e4e606d01db5896c8e40e26e4c551f6b1b2d9f22",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/main/manual-daywork-confirmation-768.png",
+      "note": "Root逐张实际查看；内边距、证明人、确认日期焦点和两个按钮均可见，背景层及五宽布局无裁切。",
+      "sha256": "14c1e831f4b9e803cdd0215fe101c4fe2c02248f00f276b6e94fdceb21f1b3e6",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-missing-snapshot-768.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "8654b3109918e20a263fedaefcca74e4872c778d5793050fb4b13a5c73fd347d",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-original-amount-768.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "2e883d0214432268b86996584b43c7ba2e49d52b77bcfde9ce910a116ada6ec0",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/main/manual-daywork-confirmation-1024.png",
+      "note": "Root逐张实际查看；内边距、证明人、确认日期焦点和两个按钮均可见，背景层及五宽布局无裁切。",
+      "sha256": "e63177ce0c9c7e57c30959cade8ae988fc4a6baa1a9736dec7fd84afb1614bf9",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-missing-snapshot-1024.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "d43d61298b40290238a1bc798077c752d513fc51775eb3e702a1547ca6db1aa9",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-original-amount-1024.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "283ade0cd9ca37d70bb2c4038935992a2e629a6b484827cf52e51e61cdd2348d",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/main/manual-daywork-confirmation-1280.png",
+      "note": "Root逐张实际查看；内边距、证明人、确认日期焦点和两个按钮均可见，背景层及五宽布局无裁切。",
+      "sha256": "db6846638e81b4e6f769bce2a4ecc9219aff642ef3d1433eca5c07f2aab5dd81",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-missing-snapshot-1280.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "a0f1f4ad274ef5c739fe8b7210915e863b789c3c00894d2a6b3c7a8c8a29b867",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-original-amount-1280.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "a013c10846079de8e3b5bbeb49f847172026ab4f0d19bf7e23e0ae93a2898d53",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/main/manual-daywork-confirmation-1440.png",
+      "note": "Root逐张实际查看；内边距、证明人、确认日期焦点和两个按钮均可见，背景层及五宽布局无裁切。",
+      "sha256": "ac03a2bc6a302ed127f6ccf40c5ac40182a4e833e4278a29bbb6030b888381ca",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-missing-snapshot-1440.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "e10d4131b2b113da7a97a21517de6513c379e5aa581754b735b31a3222aa2ed2",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-c2-original-amount-1440.png",
+      "note": "Root逐张实际查看；缺损只读理由与原表金额100分别可见，未知冻结不补零。目标区滚动截图不冒称整页；本轮说明旧P4字样由notice-final另补。",
+      "sha256": "1ecba58c263afc8015ba889a8be3298d72613ac840eb04ee693121418b029c33",
+      "status": "passed-visible-scope"
+    },
+    {
+      "path": "checks/visual/short-output/page-1.png",
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central/root/short-print-review/page-1.png",
+      "sha256": "1641736d17ead9f0cb11f80054982e00582b66ec986329013ca718f0a6665917",
+      "status": "passed",
+      "note": "工资整工/半工、525核算、500实发、350/150/0分配、签字按手印和四方签字位完整。"
+    },
+    {
+      "path": "checks/visual/short-output/page-2.png",
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central/root/short-print-review/page-2.png",
+      "sha256": "08dbdeb7fbbf83dd62884e680e79b4941bf63d6cdbedfbd72b1651cc1fda69ef",
+      "status": "passed",
+      "note": "原施工内容、证明人、8月5日人工确认、时段及半工、冻结规则脚注和四方签字位完整，末页白底。"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central/notice-final/payroll-scope-notice-390.png",
+      "sha256": "830a3afe50a26c43bac5bb03429a1d4f52c5d1d6eb6854aa936daa7d1b2e98c5",
+      "status": "passed",
+      "note": "Root逐张实际查看：A/C1/C2接管文字完整且末句仅提示更正/补退暂未开放，五宽未撑根。归档映射另见supplement。"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central/notice-final/payroll-scope-notice-768.png",
+      "sha256": "529d4b30115006460f7c2a0f3a0fb201b422db3dd14ef1fba3138f0ac2c74de6",
+      "status": "passed",
+      "note": "Root逐张实际查看：A/C1/C2接管文字完整且末句仅提示更正/补退暂未开放，五宽未撑根。归档映射另见supplement。"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central/notice-final/payroll-scope-notice-1024.png",
+      "sha256": "bbca50354c0b8938f9e883d0994e5d436d01c38fe2835804d2d5c54799f3ce21",
+      "status": "passed",
+      "note": "Root逐张实际查看：A/C1/C2接管文字完整且末句仅提示更正/补退暂未开放，五宽未撑根。归档映射另见supplement。"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central/notice-final/payroll-scope-notice-1280.png",
+      "sha256": "10f7fc75b6ecf3d17fb427dd87479010dc79987098be78ef887736244fe84ce9",
+      "status": "passed",
+      "note": "Root逐张实际查看：A/C1/C2接管文字完整且末句仅提示更正/补退暂未开放，五宽未撑根。归档映射另见supplement。"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central/notice-final/payroll-scope-notice-1440.png",
+      "sha256": "84e2dadb844f363019bc8b924b62f0f65103d2e7ff604a4bcd2128292fc9ce45",
+      "status": "passed",
+      "note": "Root逐张实际查看：A/C1/C2接管文字完整且末句仅提示更正/补退暂未开放，五宽未撑根。归档映射另见supplement。"
+    }
+  ],
+  "interactionImages": 20,
+  "printedPages": 2,
+  "limitations": [
+    "其余85主链作者审、旧只读与恢复由A独立审、长PDF10页由Spec独立审。",
+    "早期说明文字与最后notice补图分开，不覆盖旧图或旧哈希。"
+  ]
+}

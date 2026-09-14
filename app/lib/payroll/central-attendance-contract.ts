@@ -1,6 +1,6 @@
-import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { DataOriginDTO } from '../../types/read-model'
 import type { PayrollC1Context } from './central-c1-contract'
-import type { PayrollProjectOption, PayrollQuery, PayrollSourceEvidence } from './central-contract'
+import type { PayrollCrewOption, PayrollParticipantOption, PayrollParticipantOptions, PayrollQuery, PayrollSourceDiagnostic, PayrollSourceEvidence } from './central-contract'
 
 export interface PayrollWorkerFact {
   workerId: string
@@ -26,16 +26,7 @@ export interface PayrollAttendanceFact {
   updatedAt: string | null
   sourceFingerprint: string
 }
-export interface PayrollAttendanceDiagnostic {
-  code: string
-  message: string
-  recordId: string | null
-  workerId: string | null
-  field: string | null
-  tableName: string | null
-  entityId: string | null
-  legacyRecordId: string | null
-}
+export type PayrollAttendanceDiagnostic = PayrollSourceDiagnostic
 export interface PayrollAttendanceFacts {
   sourceVersion: string
   rows: PayrollAttendanceFact[]
@@ -54,17 +45,9 @@ export interface PayrollSourceExclusion {
   evidenceId: string | null
   legacyRecordId: string | null
 }
-export interface PayrollAttendanceWorker {
-  id: string
-  name: string | null
-  crewId: string | null
-  eligible: boolean
-  reasons: string[]
-  historical: boolean
-  source: NavigationIntentDTO | null
-}
-export interface PayrollC1CrewOption { id: string, name: string | null, eligible: boolean, reasons: string[] }
-export interface PayrollC1Options { projects: PayrollProjectOption[], crews: PayrollC1CrewOption[], workers: PayrollAttendanceWorker[] }
+export type PayrollAttendanceWorker = PayrollParticipantOption
+export type PayrollC1CrewOption = PayrollCrewOption
+export type PayrollC1Options = PayrollParticipantOptions
 export interface PayrollAttendanceMatrixRead {
   context: PayrollC1Context
   scope: PayrollAttendanceScope

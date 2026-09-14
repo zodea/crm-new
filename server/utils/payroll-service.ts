@@ -1,7 +1,9 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAQuantityFacts, PayrollAQuantityQuery } from '../../app/lib/payroll/central-a-contract'
 import type { PayrollAttendanceFacts, PayrollWorkerFact } from '../../app/lib/payroll/central-attendance-contract'
+import type { PayrollC2ConfigFacts, PayrollC2ConfigScope } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollContext, PayrollDetailRead, PayrollListRead, PayrollProjectOption, PayrollQuery, PayrollSourcesRead } from '../../app/lib/payroll/central-contract'
+import type { PayrollDayworkFacts, PayrollDayworkRecordFacts } from '../../app/lib/payroll/central-daywork-contract'
 import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
@@ -11,6 +13,8 @@ import { initializePayrollSchema, payrollRevision } from '../../app/lib/payroll/
 import { createPayrollAService } from './payroll-a-service'
 import { createPayrollAttendanceService } from './payroll-attendance-service'
 import { createPayrollC1Service } from './payroll-c1-service'
+import { createPayrollC2Service } from './payroll-c2-service'
+import { createPayrollDayworkService } from './payroll-daywork-service'
 
 export interface PayrollIdentitySource {
   version: string
@@ -24,6 +28,9 @@ export interface PayrollServiceOptions {
   transaction: <T>(work: (db: TransactionDb, context: BusinessSession) => Promise<T>, sessionId?: string | null) => Promise<T>
   quantityFacts?: (db: TransactionDb, query: PayrollAQuantityQuery) => Promise<PayrollAQuantityFacts>
   attendanceFacts?: (db: TransactionDb, query: { projectId: string, month: string }) => Promise<PayrollAttendanceFacts>
+  dayworkFacts?: (db: TransactionDb, query: { projectId: string, month: string }) => Promise<PayrollDayworkFacts>
+  dayworkRecord?: (db: TransactionDb, recordId: string) => Promise<PayrollDayworkRecordFacts>
+  c2ConfigFacts?: (db: TransactionDb, scope: PayrollC2ConfigScope) => Promise<PayrollC2ConfigFacts>
 }
 export type PayrollRun = <T>(query: PayrollQuery, sessionId: string | null | undefined, read: (db: TransactionDb, context: PayrollContext, source: PayrollIdentitySource) => Promise<T>, write?: boolean) => Promise<T>
 function hash(value: unknown) {
@@ -86,6 +93,8 @@ export function createPayrollService(options: PayrollServiceOptions) {
     ...createPayrollAService(run, options),
     ...createPayrollAttendanceService(run, options),
     ...createPayrollC1Service(run, options),
+    ...createPayrollC2Service(run, options),
+    ...createPayrollDayworkService(run, options),
     list(query: PayrollQuery, sessionId?: string | null): Promise<PayrollListRead> {
       return run(query, sessionId, async (db, context, source) => {
         const graph = await loadPayrollGraph(db)

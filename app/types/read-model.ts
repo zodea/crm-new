@@ -61,6 +61,7 @@ export const ENTITY_KINDS = [
   'warehouse',
   'wage-statement',
   'attendance',
+  'daywork',
   'schedule-group',
   'schedule-task',
   'process-library',

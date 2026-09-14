@@ -68,12 +68,14 @@
       "目标成本预算中央链已独立提交 b64d52240cb4d229dc5458b4009d5a16a982bc3c：完整检查 589 文件、3628 项通过，浏览器 10 项通过（51.1 秒）。版本头与七科目独立保存、唯一基线、附件与完整旧图接管、并开保稿、冲突及同键恢复、删除恢复和项目/来源往返均已实际操作；70 张交互图及三份指南 19 页已核对。",
       "工资 P0 完整资料接管与中央历史只读已完成本地验收：600 文件、3697 项测试及类型、构建通过；9 条实际浏览器流程、85 张五档图和两份指南共9页均已检查。坏快照、零成员锁、日志归属、旧备份兼容及多状态返回已修复；P0 范围仅为历史接管，日常 A 核算见本期 P1。",
       "工资 P1 A 中央核算与实际发放已完成本地验收：626 文件、3783 项测试通过，类型、109 个源码文件规范检查及构建通过；同一真实迁入实例的9项浏览器测试、85张五档图、实际300元发放PDF与Excel、两份指南12页均已检查。首张工资入口、配置及来源往返、整数分分配、旧结果恢复、重新核对、完整原回执和班组价格范围已闭合。 已独立提交 c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d，正常提交检查再次通过3783项（219.34秒），110个代码身份匹配。",
-      "工资 P2 C1 已接通真实逐日考勤、个人日薪与独立加班标准、独立草稿、来源重核、实际发放及工资/考勤配对输出；无工程量项目可直接开始。已修复原稿返回、成功后回读失败丢原键、批量关页丢稿、空月份入口、历史证据提示、恢复范围名称及详情费率精度。最终限定验收与实际文件见 P2 独立记录。"
+      "工资 P2 C1 已接通真实逐日考勤、个人日薪与独立加班标准、独立草稿、来源重核、实际发放及工资/考勤配对输出；无工程量项目可直接开始。已修复原稿返回、成功后回读失败丢原键、批量关页丢稿、空月份入口、历史证据提示、恢复范围名称及详情费率精度。最终限定验收与实际文件见 P2 独立记录。",
+      "工资 P3 C2 已通过本地限定验收，尚未提交：无工程量项目的逐日签工、人工确认、项目与负责人单价及规则、唯一来源领用、核对实发及工资/签工双表已接通。整批 682 文件、3964 项测试以及类型、构建通过；112 个代码文件规范检查仅测试标题大小写修正后复查通过。9 个真实场景分轮通过，180 张有效交互图、12 页实际输出与 14 页指南已检查，早期一张右列未完整入镜的图不计入 180 张。",
+      "P3 已修复原稿返回时沿用旧权限与旧依据、原提交恢复误判、C1 来源多出 A 返回、零签工成员月锁遗漏及长表末页灰底。当前权限控制可写性，明确重核才采用新依据；完整原回执与冻结互证，费率保原精度，C1/C2 月锁及迁入恢复保护均已验证。"
     ],
     "remaining": [
       "#442–#447 及预算中央接管已独立本地提交，尚未推送或部署；完整验证和范围见各自验收目录。",
       "中央 WBS 与新增暂估绑定分别见 #444/#445；预算维护已接通，完整工资、材料和财务成本来源继续实施。",
-      "工资 P0 接管与历史只读已独立提交 1de44da2；P1 A 核算、实际发放与冻结输出已本地验收。C2、防双计、独立更正与实际补退，以及房补、管理费、空鼓和批量工作簿继续逐条实施。",
+      "工资 P0 接管、P1 A 与 P2 C1 已本地验收并提交；P3 C2 已通过本地限定验收，尚未提交。防双计完整成本消费者、独立更正与实际补退，以及房补、管理费、空鼓和批量工作簿继续逐条实施。",
       "工程量—排程—A/C1/C2—目标成本的跨模块数量和金额勾稽尚未闭合；缺源保留未知，不产生假余额。"
     ],
     "flow": [
@@ -141,11 +143,6 @@
         "result": "持久提示需重核，保留已填75元及成员分配；明确重核后再确认，不重复计已付"
       },
       {
-        "title": "C1/C2 与后续更正（交互示意）",
-        "action": "由真实考勤或确认签工生成工资，已发后按独立更正处理",
-        "result": "后续切片继续实施；A 已通过不代表这两类及费用、整册输出已完成"
-      },
-      {
         "title": "C1 真实考勤与个人标准（已实际操作）",
         "action": "在没有工程量的项目登记7.51小时，核对每人档案日薪和独立加班价",
         "result": "空记录与真实零分开，原工时及60.125费率保精度；缺标准回配置后返回原草稿"
@@ -159,6 +156,26 @@
         "title": "C1 配对输出与缺损历史（已实际操作）",
         "action": "冷读同一发放并下载工资、考勤Excel及打印PDF；另查看缺原快照旧单",
         "result": "正常输出保原姓名、工时、费率与签字位；旧原金额100仍可追溯，但不补成未知的发放快照"
+      },
+      {
+        "title": "C2 签工登记与人工确认（已实际操作）",
+        "action": "无工程量项目也可登记整工或半工，填写真实施工内容，再补证明人与确认日期",
+        "result": "待确认可独立保存但不计薪；人工确认后才纳入工资，重叠、超日工数和错误关系会拒绝并保留输入"
+      },
+      {
+        "title": "C2 主体标准与工资核对（已实际操作）",
+        "action": "维护当前项目与负责人的 350 元工价和规则，回到同一工资草稿核对 1 工加半工",
+        "result": "核算 525 元；配置与逐条签工共同成为依据，待确认与已被占用来源分别提示，旧输入不被新读取静默替换"
+      },
+      {
+        "title": "C2 实际发放与原提交恢复（已实际操作）",
+        "action": "登记实发 500 元与 350/150/0 全员分配，遇响应或回读失败时核对同一个原提交",
+        "result": "差一分拒绝；未知结果保原稿和原编号。需重核回执不等于已发，按当前状态分别回到重核、实发输入或可证明的冻结"
+      },
+      {
+        "title": "C2 真实双表与全成员月锁（已实际操作）",
+        "action": "冷读真实发放并下载工资/签工 Excel 与打印 PDF，另核对 56 条长签工和后来改价后的原输出",
+        "result": "原价、空规则、长内容、重复表头及四方签字完整；无签工零收款成员也锁整月，已发原单不可改写"
       }
     ],
     "evidence": [
@@ -216,7 +233,35 @@
       "docs/design/evidence/issue-412-payroll-c1/browser/c1-config-cold-original-pending-390.png",
       "docs/design/evidence/issue-412-payroll-c1/browser/c1-paired-output.pdf",
       "docs/design/evidence/issue-412-payroll-c1/browser/c1-wage-and-attendance.xlsx",
-      "docs/design/evidence/issue-412-payroll-c1/browser/saved-personal-config-scope-390.png"
+      "docs/design/evidence/issue-412-payroll-c1/browser/saved-personal-config-scope-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/empty-daywork-ledger-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/draft-unconfirmed-record-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/manual-daywork-confirmation-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/confirmed-whole-half-records-1440.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/subject-unit-rate-config-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/subject-rule-config-tail-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/c2-draft-source-values-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/checked-signature-sources-1440.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/allocation-cent-error-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/unknown-original-allocation-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/released-paired-output-1440.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/released-daywork-readonly-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/main/zero-member-month-lock-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/config-recovery/c2-config-cold-original-pending-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/new-daywork-recovery/daywork-cold-original-pending-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/late-read-scope/daywork-late-read-current-month-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/legacy-readonly/legacy-c2-original-amount-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/interaction/main/c2-paired-output.pdf",
+      "docs/design/evidence/issue-412-payroll-c2/interaction/main/C2 无工程量验收 68768d79-f188-4cce-a4b8-cca7cc7ae1af-签工负责人-2026-08-C2工资与签工.xlsx",
+      "docs/design/evidence/issue-412-payroll-c2/interaction/long-output/c2-long-paired-output.pdf",
+      "docs/design/evidence/issue-412-payroll-c2/interaction/long-output/C2 无工程量验收 68768d79-f188-4cce-a4b8-cca7cc7ae1af-签工负责人-2027-03-C2工资与签工.xlsx",
+      "docs/design/evidence/issue-412-payroll-c2/checks/visual/long-output/review.md",
+      "docs/design/evidence/issue-412-payroll-c2/README.md",
+      "docs/design/evidence/issue-412-payroll-c2/checks/README.md",
+      "docs/design/evidence/issue-412-payroll-c2/browser/supplement/payroll-scope-notice-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/supplement/frozen-source-right-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/supplement/released-ledger-right-390.png",
+      "docs/design/evidence/issue-412-payroll-c2/browser/supplement/released-ledger-right-1024-final.png"
     ],
     "questions": [
       "P5 房补：除已确定的分项工程量基数，是否还需要按金额比例、每人或每月固定额？额外基数需给一个实际算例，确认单位、期间及叠加方式；已确定的分项补贴继续实施。",
@@ -229,7 +274,7 @@
     ],
     "graph": {
       "width": 1080,
-      "height": 1150,
+      "height": 1550,
       "nodes": [
         {
           "id": "start",
@@ -278,11 +323,11 @@
           "y": 155,
           "width": 320,
           "height": 142,
-          "title": "C2 · 签工来源（P3 待实施）",
+          "title": "C2 · 签工来源（已验证）",
           "lines": [
-            "待确认签工已占用人员月份",
-            "确认真实签工后才能参与核算",
-            "C1 与 C2 同人同月互斥"
+            "待确认已占月；人工确认后计薪",
+            "确认签工 × 主体工价，按月100%",
+            "唯一逐条领用；C1/C2同人月互斥"
           ],
           "warning": false
         },
@@ -318,11 +363,11 @@
           "y": 490,
           "width": 280,
           "height": 122,
-          "title": "来源变化 / 权限失效",
+          "title": "修正来源并重新核对",
           "lines": [
-            "阻止旧核对继续发放",
-            "保留输入，回源修正后重核",
-            "同一原工资继续处理"
+            "旧核对停用；原输入仍保留",
+            "当前撤权时保持只读",
+            "恢复权限并核对后再发放"
           ],
           "warning": true
         },
@@ -346,58 +391,104 @@
           "y": 350,
           "width": 280,
           "height": 100,
-          "title": "明确未应用：返回确认",
+          "title": "明确未应用：重新读取",
           "lines": [
             "后台明确证明原提交未应用",
-            "保留输入，重新确认发放"
+            "保留输入，明确重读后再核对"
           ],
           "warning": true
         },
         {
           "id": "recover-applied",
-          "x": 780,
+          "x": 330,
           "y": 650,
-          "width": 280,
-          "height": 78,
-          "title": "确认已应用：读取原冻结",
+          "width": 420,
+          "height": 122,
+          "title": "原回执已核：读取当前原单",
           "lines": [
-            "沿原编号读取，不再执行发放"
+            "原提交结果与当前状态分别说明",
+            "需重核回执不能当作已经发放",
+            "原输入与原提交编号继续保留"
+          ],
+          "warning": false
+        },
+        {
+          "id": "recover-needs-recheck",
+          "x": 20,
+          "y": 850,
+          "width": 280,
+          "height": 122,
+          "title": "当前仍需重核",
+          "lines": [
+            "原发放未执行，原输入保留",
+            "先核实来源，再重新核对",
+            "不能直接进入已发输出"
+          ],
+          "warning": true
+        },
+        {
+          "id": "recover-checked",
+          "x": 380,
+          "y": 850,
+          "width": 320,
+          "height": 122,
+          "title": "随后已核对但尚未发放",
+          "lines": [
+            "原提交未发放，已有后续合法重核",
+            "保留原实发与分配输入",
+            "核对当前资料后重新确认实发"
+          ],
+          "warning": false
+        },
+        {
+          "id": "recover-released",
+          "x": 780,
+          "y": 850,
+          "width": 280,
+          "height": 122,
+          "title": "当前已发且原冻结可证明",
+          "lines": [
+            "核对实际发放及完整原表",
+            "此时才能进入冻结输出",
+            "原需重核回执不冒充发放"
           ],
           "warning": false
         },
         {
           "id": "frozen",
           "x": 330,
-          "y": 650,
+          "y": 1040,
           "width": 420,
-          "height": 100,
-          "title": "同次实发冻结与全成员占用",
+          "height": 122,
+          "title": "同次实发冻结与全成员月锁",
           "lines": [
-            "发放金额只计一次，零收款成员保留",
-            "C1 冻结逐日原考勤，全员整月锁定"
+            "金额只计一次，零收款成员保留",
+            "C1冻结考勤；C2冻结签工与规则",
+            "全员整月锁定，软删不解除来源保护"
           ],
           "warning": false
         },
         {
           "id": "output",
           "x": 330,
-          "y": 790,
+          "y": 1200,
           "width": 420,
-          "height": 100,
+          "height": 122,
           "title": "冷读原单，打印及 Excel",
           "lines": [
-            "A 输出冻结工资；C1 工资与考勤成对",
-            "旧资料缺项保持未知，不用当前资料补造"
+            "A输出冻结工资；C1工资与考勤成对",
+            "C2工资与签工成对，保原价与空规则",
+            "旧缺项不补造，配对表不冒充完整整册"
           ],
           "warning": false
         },
         {
           "id": "correction",
           "x": 780,
-          "y": 790,
+          "y": 1200,
           "width": 280,
           "height": 100,
-          "title": "已发后更正（P4 待实施）",
+          "title": "已发后更正（待实施）",
           "lines": [
             "补差 / 退回 / 后月抵扣",
             "原工资与原现金事实保留"
@@ -407,26 +498,26 @@
         {
           "id": "budget",
           "x": 20,
-          "y": 790,
+          "y": 1200,
           "width": 280,
           "height": 100,
           "title": "预算版本 / 七科目 / 对比",
           "lines": [
             "独立维护与唯一基线已验证",
-            "工资实际来源仍待 P4 接齐"
+            "工资完整实际来源尚待接齐"
           ],
           "warning": false
         },
         {
           "id": "end",
           "x": 230,
-          "y": 960,
+          "y": 1390,
           "width": 620,
           "height": 122,
-          "title": "汇总与后续费用：仍按各自完成范围验收",
+          "title": "跨模块汇总与后续费用仍逐项验收",
           "lines": [
             "预算来源缺项显示未知，不造完整成本或余额",
-            "P5 房补管理费 / P6 空鼓 / P7 批量及整册继续实施",
+            "房补、管理费、空鼓、批量及完整工作簿继续实施",
             "生产保存、备份恢复和上线仍由 #416 单独验收"
           ],
           "warning": false
@@ -477,7 +568,7 @@
         {
           "from": "recheck",
           "to": "draft",
-          "path": "M160 490V398H327",
+          "path": "M160 490V400H327",
           "exception": true
         },
         {
@@ -494,20 +585,14 @@
         },
         {
           "from": "recover-not-applied",
-          "to": "release",
-          "path": "M780 400H765V515H753",
+          "to": "draft",
+          "path": "M780 400H753",
           "exception": true
         },
         {
           "from": "recover",
           "to": "recover-applied",
-          "path": "M920 612V647",
-          "exception": true
-        },
-        {
-          "from": "recover-applied",
-          "to": "frozen",
-          "path": "M780 689H753",
+          "path": "M920 612V712H753",
           "exception": true
         },
         {
@@ -518,39 +603,72 @@
         },
         {
           "from": "release",
-          "to": "frozen",
+          "to": "recover-applied",
           "path": "M540 590V647"
+        },
+        {
+          "from": "recover-applied",
+          "to": "recover-needs-recheck",
+          "path": "M540 772V810H160V847",
+          "exception": true
+        },
+        {
+          "from": "recover-applied",
+          "to": "recover-checked",
+          "path": "M540 772V847"
+        },
+        {
+          "from": "recover-applied",
+          "to": "recover-released",
+          "path": "M540 772V810H920V847"
+        },
+        {
+          "from": "recover-needs-recheck",
+          "to": "recheck",
+          "path": "M20 910H10V550H17",
+          "exception": true
+        },
+        {
+          "from": "recover-checked",
+          "to": "release",
+          "path": "M380 900H315V535H327",
+          "exception": true
+        },
+        {
+          "from": "recover-released",
+          "to": "frozen",
+          "path": "M920 972V1005H540V1037"
         },
         {
           "from": "frozen",
           "to": "output",
-          "path": "M540 750V787"
+          "path": "M540 1162V1197"
         },
         {
           "from": "frozen",
           "to": "budget",
-          "path": "M330 700H160V787"
+          "path": "M330 1100H160V1197"
         },
         {
           "from": "output",
           "to": "correction",
-          "path": "M750 835H777",
+          "path": "M750 1250H777",
           "exception": true
         },
         {
           "from": "output",
           "to": "end",
-          "path": "M540 890V957"
+          "path": "M540 1322V1387"
         },
         {
           "from": "budget",
           "to": "end",
-          "path": "M160 890V935H420V957"
+          "path": "M160 1300V1360H400V1387"
         },
         {
           "from": "correction",
           "to": "end",
-          "path": "M920 890V935H650V957",
+          "path": "M920 1300V1360H650V1387",
           "exception": true
         }
       ]

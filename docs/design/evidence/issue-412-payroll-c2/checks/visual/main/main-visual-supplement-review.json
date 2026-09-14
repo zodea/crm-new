@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/wbs_central_backend",
+  "authorship": "C界面作者视觉QA；不是独立审查",
+  "date": "2026-09-14",
+  "method": "16张逐张view_image original（原15张+1024最终补帧）；原图未修改；逐图哈希绑定",
+  "summary": {
+    "viewed": 16,
+    "pass": 15,
+    "coverageGap": 0,
+    "newProductDefects": 0,
+    "scope": "right-columns-final 原10 PNG + 独立1024-final补帧 + notice-final 5 PNG",
+    "sourceEvidence": "共享逐条来源表五宽最右列及焦点可达已证，当前是已发只读表单，不充作发放前新建草稿截图。",
+    "noticeEvidence": "最新Notice五宽已可读，关闭主QA旧P4文案补证项。",
+    "remaining": "0。1024台账右端缺口已由独立-final帧关闭；旧1024缺帧保留原名原SHA且不计有效成功证据。",
+    "journeyCounting": "这些是当前原记录只读补证，不新增业务旅程。",
+    "historicalIncompleteFrames": 1
+  },
+  "images": [
+    {
+      "name": "frozen-source-right-390.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-390.png",
+      "round": "right-columns-final",
+      "group": "frozen-source-right",
+      "width": 390,
+      "sha256": "fc7819a5bc817808daf1835b05456edd34050a63ec6e8d0c9aff576eb0ce82a3",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发C2工资的只读表单；两条签工均已采用，并明确已发签工不可修改、后续更正需引用原发放。",
+        "表格最右端查看原签工入口完整且首条具有可见焦点，证明/确认日期可读；证明共享来源表右列可达，不冒作发放前新稿截图。",
+        "窄屏已实际横滚到逐条签工表右端，左列离开视窗属于局部滚动；证明日期和入口自然换行，无控件重叠。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "frozen-source-right-768.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-768.png",
+      "round": "right-columns-final",
+      "group": "frozen-source-right",
+      "width": 768,
+      "sha256": "6c4bffc55d205c11395c1dda86783f29171fa2f14ef94c3f4020712fb22b6250",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发C2工资的只读表单；两条签工均已采用，并明确已发签工不可修改、后续更正需引用原发放。",
+        "表格最右端查看原签工入口完整且首条具有可见焦点，证明/确认日期可读；证明共享来源表右列可达，不冒作发放前新稿截图。",
+        "当前幅宽可同时查看原人员/工数与证明、采用状态、来源链接；核算525与350/175行金额一致，保存按钮保持禁用。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "frozen-source-right-1024.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-1024.png",
+      "round": "right-columns-final",
+      "group": "frozen-source-right",
+      "width": 1024,
+      "sha256": "362f6329b5a1fffc911d19d727a72248e002f1637c2471ed5a3b66a603fdafe2",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发C2工资的只读表单；两条签工均已采用，并明确已发签工不可修改、后续更正需引用原发放。",
+        "表格最右端查看原签工入口完整且首条具有可见焦点，证明/确认日期可读；证明共享来源表右列可达，不冒作发放前新稿截图。",
+        "当前幅宽可同时查看原人员/工数与证明、采用状态、来源链接；核算525与350/175行金额一致，保存按钮保持禁用。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "frozen-source-right-1280.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-1280.png",
+      "round": "right-columns-final",
+      "group": "frozen-source-right",
+      "width": 1280,
+      "sha256": "cee0d9fb2b520b7831bd4a08131154cf99da72f86b4c37364f35c94a008aaee5",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发C2工资的只读表单；两条签工均已采用，并明确已发签工不可修改、后续更正需引用原发放。",
+        "表格最右端查看原签工入口完整且首条具有可见焦点，证明/确认日期可读；证明共享来源表右列可达，不冒作发放前新稿截图。",
+        "当前幅宽可同时查看原人员/工数与证明、采用状态、来源链接；核算525与350/175行金额一致，保存按钮保持禁用。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "frozen-source-right-1440.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-1440.png",
+      "round": "right-columns-final",
+      "group": "frozen-source-right",
+      "width": 1440,
+      "sha256": "d01ac16ce2967ed43993f66cca6966dfeadf7521e48b67252d56712eed5addf8",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发C2工资的只读表单；两条签工均已采用，并明确已发签工不可修改、后续更正需引用原发放。",
+        "表格最右端查看原签工入口完整且首条具有可见焦点，证明/确认日期可读；证明共享来源表右列可达，不冒作发放前新稿截图。",
+        "当前幅宽可同时查看原人员/工数与证明、采用状态、来源链接；核算525与350/175行金额一致，保存按钮保持禁用。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "payroll-scope-notice-390.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-390.png",
+      "round": "notice-final",
+      "group": "payroll-scope-notice",
+      "width": 390,
+      "sha256": "830a3afe50a26c43bac5bb03429a1d4f52c5d1d6eb6854aa936daa7d1b2e98c5",
+      "inspection": "view_image original",
+      "notes": [
+        "最新说明完整写明A完成量/C1考勤/C2签工当前可用、C1与C2各自配对输出、旧资料缺项保原文；末句已为已发后的独立更正与实际补退暂未开放，没有内部P4编号。",
+        "窄屏文案自然换行且全部可见；525核算与500实发、零成员双表说明及输出按钮未挤压。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "payroll-scope-notice-768.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-768.png",
+      "round": "notice-final",
+      "group": "payroll-scope-notice",
+      "width": 768,
+      "sha256": "529d4b30115006460f7c2a0f3a0fb201b422db3dd14ef1fba3138f0ac2c74de6",
+      "inspection": "view_image original",
+      "notes": [
+        "最新说明完整写明A完成量/C1考勤/C2签工当前可用、C1与C2各自配对输出、旧资料缺项保原文；末句已为已发后的独立更正与实际补退暂未开放，没有内部P4编号。",
+        "Notice与摘要、冻结输出区无重叠；实际525/500与完整发放状态一致，文字全文可见。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "payroll-scope-notice-1024.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-1024.png",
+      "round": "notice-final",
+      "group": "payroll-scope-notice",
+      "width": 1024,
+      "sha256": "bbca50354c0b8938f9e883d0994e5d436d01c38fe2835804d2d5c54799f3ce21",
+      "inspection": "view_image original",
+      "notes": [
+        "最新说明完整写明A完成量/C1考勤/C2签工当前可用、C1与C2各自配对输出、旧资料缺项保原文；末句已为已发后的独立更正与实际补退暂未开放，没有内部P4编号。",
+        "Notice与摘要、冻结输出区无重叠；实际525/500与完整发放状态一致，文字全文可见。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "payroll-scope-notice-1280.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-1280.png",
+      "round": "notice-final",
+      "group": "payroll-scope-notice",
+      "width": 1280,
+      "sha256": "10f7fc75b6ecf3d17fb427dd87479010dc79987098be78ef887736244fe84ce9",
+      "inspection": "view_image original",
+      "notes": [
+        "最新说明完整写明A完成量/C1考勤/C2签工当前可用、C1与C2各自配对输出、旧资料缺项保原文；末句已为已发后的独立更正与实际补退暂未开放，没有内部P4编号。",
+        "Notice与摘要、冻结输出区无重叠；实际525/500与完整发放状态一致，文字全文可见。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "payroll-scope-notice-1440.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-1440.png",
+      "round": "notice-final",
+      "group": "payroll-scope-notice",
+      "width": 1440,
+      "sha256": "84e2dadb844f363019bc8b924b62f0f65103d2e7ff604a4bcd2128292fc9ce45",
+      "inspection": "view_image original",
+      "notes": [
+        "最新说明完整写明A完成量/C1考勤/C2签工当前可用、C1与C2各自配对输出、旧资料缺项保原文；末句已为已发后的独立更正与实际补退暂未开放，没有内部P4编号。",
+        "Notice与摘要、冻结输出区无重叠；实际525/500与完整发放状态一致，文字全文可见。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "released-ledger-right-390.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-390.png",
+      "round": "right-columns-final",
+      "group": "released-ledger-right",
+      "width": 390,
+      "sha256": "c42aa2d8c2e2a54a22a982a8620bb76b51f4eb6e2644cb3d80606cfab57a9a0b",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发签工台账；最右端原记录证据控件完整，首条summary有明确焦点，未显示编辑或人工确认写操作。",
+        "窄屏处于表格右端，左侧文字前缀因表内横滚离开视窗；原记录控件与已发不可修改原因尾部可读，未见根页面横溢。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "released-ledger-right-768.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-768.png",
+      "round": "right-columns-final",
+      "group": "released-ledger-right",
+      "width": 768,
+      "sha256": "76d95344172370ff998e6fe7cf3aa38d77454c1e41f95f78c58106c4f71e20d1",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发签工台账；最右端原记录证据控件完整，首条summary有明确焦点，未显示编辑或人工确认写操作。",
+        "证明、已确认与已发占用原因、原记录入口可读；成员月份占用包含零成员，未见重叠。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "released-ledger-right-1024.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-1024.png",
+      "round": "right-columns-final",
+      "group": "released-ledger-right",
+      "width": 1024,
+      "sha256": "68a59327da5cc8588995041926d64e2f96c8520b5ee9b378e7f8d323a8062799",
+      "inspection": "view_image original",
+      "notes": [
+        "实际画面仍以用工/日期、工数左端开始，右端操作列与原记录证据焦点未入镜；不以文件名或verification文字冒作最右端已验证。",
+        "已发两条来源状态及包含零成员的整月锁仍可读；这是本帧补证范围缺口，未证明产品最右端不可达。"
+      ],
+      "verdict": "coverage-gap",
+      "resolvedBy": "released-ledger-right-1024-final.png"
+    },
+    {
+      "name": "released-ledger-right-1280.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-1280.png",
+      "round": "right-columns-final",
+      "group": "released-ledger-right",
+      "width": 1280,
+      "sha256": "6881fbd562a8fc02dbe126714c81cc3a5cb320955c3e8a4954c45c1c2fbeb359",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发签工台账；最右端原记录证据控件完整，首条summary有明确焦点，未显示编辑或人工确认写操作。",
+        "证明、已确认与已发占用原因、原记录入口可读；成员月份占用包含零成员，未见重叠。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "released-ledger-right-1440.png",
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-1440.png",
+      "round": "right-columns-final",
+      "group": "released-ledger-right",
+      "width": 1440,
+      "sha256": "66e76476e4bbfa4670c36b58ba52e2f815804a95d76470b10c9096784745b4fd",
+      "inspection": "view_image original",
+      "notes": [
+        "当前是已发签工台账；最右端原记录证据控件完整，首条summary有明确焦点，未显示编辑或人工确认写操作。",
+        "证明、已确认与已发占用原因、原记录入口可读；成员月份占用包含零成员，未见重叠。"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "name": "released-ledger-right-1024-final.png",
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c2-central/right-columns-final/released-ledger-right-1024-final.png",
+      "round": "right-columns-final",
+      "group": "released-ledger-right",
+      "width": 1024,
+      "sha256": "48a6f393209c29d48c56173b207cd75d50cd767c3537b06841655a34f9e70656",
+      "inspection": "view_image original",
+      "notes": [
+        "独立补帧现已实际显示1024px台账右端：证明人/日期、已确认、已发不可修改及更正需引用原发放原因、原记录证据summary全部可读。",
+        "首条原记录证据具有清晰焦点，整条控件在表内视窗内；关闭上一1024帧右端未入镜缺口。当前仍是已发台账，未改来源或工资，不重复计业务旅程。"
+      ],
+      "verdict": "pass",
+      "supersedesForCoverage": "released-ledger-right-1024.png"
+    }
+  ]
+}

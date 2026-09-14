@@ -4,6 +4,7 @@ import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO } from '~/types/read-model'
 import { PAYROLL_A_CONFIG_PATH, PAYROLL_SOURCE_KEYS, payrollSourceContext } from '~/lib/payroll/a-navigation'
 import { PAYROLL_C1_SOURCE_KEYS, payrollC1SourceContext } from '~/lib/payroll/c1-navigation'
+import { PAYROLL_C2_SOURCE_KEYS, payrollC2SourceContext } from '~/lib/payroll/c2-navigation'
 import { PAYROLL_READ_QUERY_KEYS, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { SCHEDULE_DRILL_QUERY_KEYS } from '~/lib/schedule/navigation'
@@ -136,7 +137,13 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
-    if (url.searchParams.has('payrollFormat')) {
+    if (url.searchParams.get('payrollFormat') === 'C2') {
+      const source: { kind: 'worker' | 'crew' | 'daywork', id: string, projectId?: string } | null = detail?.family === 'worker' || detail?.family === 'crew' ? { kind: detail.family, id: detail.id } : url.pathname === '/subcontract/daywork' ? { kind: 'daywork', id: url.searchParams.get('record') || '', projectId: url.searchParams.get('project') || '' } : null
+      if (!origin || !source || PAYROLL_C2_SOURCE_KEYS.some(key => url.searchParams.getAll(key).length !== 1) || !payrollC2SourceContext(Object.fromEntries(url.searchParams), { ...source, origin }))
+        return null
+      PAYROLL_C2_SOURCE_KEYS.forEach(key => allowed.add(key))
+    }
+    else if (url.searchParams.has('payrollFormat')) {
       const source: { kind: 'worker' | 'crew' | 'attendance', id: string, projectId?: string } | null = detail?.family === 'worker' || detail?.family === 'crew' ? { kind: detail.family, id: detail.id } : url.pathname === '/subcontract/attendance' ? { kind: 'attendance', id: url.searchParams.get('record') || '', projectId: url.searchParams.get('project') || '' } : null
       if (!origin || !source || PAYROLL_C1_SOURCE_KEYS.some(key => url.searchParams.getAll(key).length !== 1) || !payrollC1SourceContext(Object.fromEntries(url.searchParams), { ...source, origin }))
         return null
@@ -171,7 +178,15 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
       else
         url.searchParams.delete('status')
       PAYROLL_READ_QUERY_KEYS.forEach(key => allowed.add(key))
-      if (url.pathname === '/subcontract/attendance') {
+      if (url.pathname === '/subcontract/daywork') {
+        if (url.searchParams.has('dayworkStatus')) {
+          const statuses: unknown = JSON.parse(url.searchParams.get('dayworkStatus') || '[]')
+          if (url.searchParams.getAll('dayworkStatus').length !== 1 || !Array.isArray(statuses) || statuses.some(status => status !== 'draft' && status !== 'confirmed'))
+            return null
+        }
+        allowed.add('dayworkStatus')
+      }
+      if (url.pathname === '/subcontract/attendance' || url.pathname === '/subcontract/daywork') {
         for (const key of ['record', 'worker']) {
           if (url.searchParams.has(key) && (url.searchParams.getAll(key).length !== 1 || !isStableRouteIdentity(url.searchParams.get(key))))
             return null

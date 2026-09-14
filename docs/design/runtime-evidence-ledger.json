@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 148,
+    "trackedPageFiles": 150,
     "devPageFiles": 5,
-    "productionRoutes": 143,
+    "productionRoutes": 145,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 143,
-    "referenceEndpoints": 143,
-    "referenceProfiles": 44,
-    "usedReferenceProfiles": 38,
+    "evidenceEndpointRecords": 145,
+    "referenceEndpoints": 145,
+    "referenceProfiles": 45,
+    "usedReferenceProfiles": 39,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 27,
+    "localAuthorityRoutes": 29,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 10,
     "designCoveredRoutes": 135,
-    "designPendingRoutes": 8
+    "designPendingRoutes": 10
   },
   "domains": [
     {
@@ -232,7 +232,7 @@
     {
       "code": "quantity-payroll",
       "domain": "工程量与工资",
-      "routeCount": 13,
+      "routeCount": 15,
       "implementationIssues": [
         412
       ],
@@ -4348,7 +4348,7 @@
     },
     {
       "evidenceRecordId": "E-F3C41F60CBA6",
-      "page": "app/pages/subcontract/daywork.vue",
+      "page": "app/pages/subcontract/daywork/index.vue",
       "localRoute": "/subcontract/daywork",
       "domainCode": "quantity-payroll",
       "template": "工作台",
@@ -4376,6 +4376,68 @@
         "routeKey": "/subcontract/daywork"
       },
       "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-8CC98402FA16",
+      "page": "app/pages/subcontract/daywork/new.vue",
+      "localRoute": "/subcontract/daywork/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-DAYWORK-LOCAL",
+      "referenceEndpointId": "local-8CC98402FA16",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/daywork/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/daywork/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/daywork/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-70E1FCC120C1",
+      "page": "app/pages/subcontract/daywork/form/[id].vue",
+      "localRoute": "/subcontract/daywork/form/:id",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-DAYWORK-LOCAL",
+      "referenceEndpointId": "local-70E1FCC120C1",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/daywork/form/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/daywork/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/daywork/form/:id"
+      },
+      "constraints": "C-FORM"
     },
     {
       "evidenceRecordId": "E-A0FBACD602EC",
