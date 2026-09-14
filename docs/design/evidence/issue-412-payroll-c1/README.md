@@ -63,9 +63,11 @@ flowchart TD
 
 正式证据包含 **125 张实际交互图**，覆盖 390/768/1024/1280/1440px：主流程 85、历史及权限只读 20、恢复 15、普通配置名称就绪补图 5。三位复核者逐张检查全部原图；主流程最早三张普通配置图仅证明标签读取过渡态，名称完整状态以补图为准。另有实际配对 PDF 2 页及两份使用指南 13 页逐页目检，分别计数，不冒充额外交互图。
 
-- [本次工资及考勤 PDF](./browser/c1-paired-output.pdf)与[实际下载的 Excel](./browser/c1-wage-and-attendance.xlsx)：两张工作表已重新读取，费率、原工时、实发及零分配核实。
+- [工资打印页](./browser/c1-paired-page-1.png)、[考勤打印页](./browser/c1-paired-page-2.png)与[实际下载的 Excel](./browser/c1-wage-and-attendance.xlsx)：两张工作表已重新读取，费率、原工时、实发及零分配核实。
 - [主流程记录](./browser/journey-verification.json)、[浏览器检查](./checks/browser.log)与[完整测试](./checks/npm-test.log)。
 - [独立 Spec 复核](./checks/spec/review.md)与[独立 Standards 复核](./checks/standards/review.md)：当前范围无未决阻断；保留真实失败到修复的记录。
+
+2026-09-14，旧配对打印 PDF 样本已按用户要求移入 Windows 回收站；当前阅读使用上述两张页图和 Markdown，原始清单中的路径及哈希保留为历史证据。恢复来源见[清理记录](../../../research/guide-pdf-cleanup-2026-09-14.md)。
 - [逐项验收证据索引](./checks/README.md)保留各作者及独立审查的实际范围，原临时路径可通过图片映射找到正式副本。
 - [最终证据摘要](./verification.json)及[逐文件指纹](./file-manifest.json)固定本期输入和正式产物。
 

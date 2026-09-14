@@ -9,4 +9,4 @@ Root 已逐页渲染并查看以下两份指南，共 12 页，正文、表格�
 
 [manifest.json](./manifest.json)记录最终 PDF 和每页 PNG 的 SHA-256、页次及人工检查结果。工资指南的签工完整性说明仅用于对应类型，A 不要求不适用的签工正文。
 
-此目录为使用指南证据，实际发放的工资表 PDF、Excel 和来源另见 [browser](../browser/)。组件夹具打印微验不能替代真实发放文件。
+此目录保留使用指南验收证据及[实际工资打印页图](./frozen-a-payroll-1.png)；实际发放的 [Excel](../browser/frozen-a-payroll.xlsx) 和来源另见 [browser](../browser/)。旧 PDF 样本已移入 Windows 回收站，原始清单不倒改，恢复来源见[清理记录](../../../../research/guide-pdf-cleanup-2026-09-14.md)。组件夹具打印微验不能替代真实发放文件。

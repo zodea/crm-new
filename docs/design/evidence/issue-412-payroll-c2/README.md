@@ -67,9 +67,11 @@ flowchart TD
 
 九个唯一浏览器场景分别完成：最后一轮5项全部通过；未受视觉修正影响的拒权、演示、配置原编号恢复及迟到读取4项沿用此前通过轮。不是一次新跑9项。有效交互证据共 **180 张**：主链85、旧缺损10、新签工及后来更新恢复45、另外4场景25、最终说明5、右端列10。另保留1张未覆盖预期右端的1024旧补图，不计入有效180张；最终替代图单独留名。每张原图都有目检范围与哈希，局部滚动截图只证明可见区域。
 
-- [两页工资与签工 PDF](./interaction/main/c2-paired-output.pdf)：包含原确认事实、半工、零收款成员及两套四方签字位。
-- [十页长签工 PDF](./interaction/long-output/c2-long-paired-output.pdf)：56条原签工、350.125精确单价、明确空规则、重复表头和签字位逐页检查。实际工资与签工 Excel 均已下载后重新读取，文件位于同一 interaction 目录；完整路径见[原始归档映射](./checks/visual/archive-map.json)。
+- [工资打印页](./checks/visual/short-output/page-1.png)与[签工打印页](./checks/visual/short-output/page-2.png)：包含原确认事实、半工、零收款成员及两套四方签字位。
+- [十页长签工逐页复验说明](./checks/visual/long-output/review.md)：56条原签工、350.125精确单价、明确空规则、重复表头和签字位逐页检查；页图为[第1页](./checks/visual/long-output/page-01.png)、[第2页](./checks/visual/long-output/page-02.png)、[第3页](./checks/visual/long-output/page-03.png)、[第4页](./checks/visual/long-output/page-04.png)、[第5页](./checks/visual/long-output/page-05.png)、[第6页](./checks/visual/long-output/page-06.png)、[第7页](./checks/visual/long-output/page-07.png)、[第8页](./checks/visual/long-output/page-08.png)、[第9页](./checks/visual/long-output/page-09.png)、[第10页](./checks/visual/long-output/page-10.png)。实际工资与签工 Excel 均已下载后重新读取，文件位于同一 interaction 目录；完整路径见[原始归档映射](./checks/visual/archive-map.json)。
 - [工资指南](../../../guides/payroll-attendance.md)及[迁移指南](../../../guides/local-data-migration.md)的两份最终 PDF 共14页已逐页渲染检查；页图及原 PDF 摘要在 guide-review 目录。
 - [独立 Spec 审查](./checks/spec-final/review.md)、[最后界面增量](./checks/spec-final/visual-followup-review.md)、[四项验收补证](./checks/spec-final/acceptance-gap-review.md)。Standards 按作者排除交叉审查，Root 审 C，C 审 A/B/Root；没有声称一个独立代理审完全部代码。
+
+2026-09-14，旧两页及十页打印 PDF 样本已按用户要求移入 Windows 回收站；当前阅读使用上述逐页说明及 12 张页图，原始清单中的路径及哈希保留为历史证据。恢复来源见[清理记录](../../../research/guide-pdf-cleanup-2026-09-14.md)。
 
 逐 Issue 和完整总图统一进入[交互审阅报告](../../../research/issue-review-2026-09-11/index.html#issue-412)。P4 更正与完整成本、P5–P7 费用和工作簿、#416 生产关口继续分别承接。C2 本期没有新增业务 `$grill`。
