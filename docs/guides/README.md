@@ -45,102 +45,10 @@
 
 项目、客户、分供方、班组、工人与三类核心合同的每个编辑页独立保留记录身份和版本。先打开 A，再打开 B，切回 A 保存时只更新 A；版本冲突仍需显式选择保留本地内容或使用服务器最新版。
 
-## PDF 生成与检查
+## 文档交付
 
-```powershell
-python scripts/generate-project-guide-pdf.py
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/target-cost.md `
-  --output output/pdf/瑞航CRM_目标成本预算使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/tabs-and-recovery.md `
-  --output output/pdf/瑞航CRM_页签与页面恢复使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/home-project-progress.md `
-  --output output/pdf/瑞航CRM_首页项目与施工进度使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/quantity-totals-and-export.md `
-  --output output/pdf/瑞航CRM_工程量合计与台账导出使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/quantity-central-workflow.md `
-  --output output/pdf/瑞航CRM_工程量中央流程使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/project-excel-import.md `
-  --output output/pdf/瑞航CRM_项目Excel导入使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/customer-records.md `
-  --output output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/supplier-records.md `
-  --output output/pdf/瑞航CRM_分供方档案与真实事实使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/crew-worker-records.md `
-  --output output/pdf/瑞航CRM_班组与工人档案使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/core-contract-and-boq.md `
-  --output output/pdf/瑞航CRM_核心合同与工程量清单使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/project-supplier-workbench.md `
-  --output output/pdf/瑞航CRM_项目分供方工作台与文件导入使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/supplier-credential-review.md `
-  --output output/pdf/瑞航CRM_分供方证照与资料核验使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/material-price-analysis.md `
-  --output output/pdf/瑞航CRM_材料单价分析使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/payroll-attendance.md `
-  --output output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/ocr-settings.md `
-  --output output/pdf/瑞航CRM_OCR设置使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/finance-invoice.md `
-  --output output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/invoice-factor.md `
-  --output output/pdf/瑞航CRM_开票因子与税额计算使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/finance-payment.md `
-  --output output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/receipt-registration.md `
-  --output output/pdf/瑞航CRM_收款登记使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/material-delivery.md `
-  --output output/pdf/瑞航CRM_送货单归档与原件包导出使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/local-data-migration.md `
-  --output output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf
-```
+指南以本目录 Markdown 为准。新增或改变流程时更新对应指南，检查链接、步骤及当前可用范围；流程图和必要的实际界面证据直接链接在 Markdown 中。
 
-生成文件：
+2026-09-14 起按用户要求停止例行生成指南 PDF，原 `output/pdf/` 的 25 份可重建副本移入 Windows 回收站。旧验收记录中的 PDF 页数、摘要和路径只描述当时检查，当前阅读入口为本页的 Markdown 指南。清理明细见[指南副本清理记录](../research/guide-pdf-cleanup-2026-09-14.md)。
 
-```text
-output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf
-output/pdf/瑞航CRM_目标成本预算使用指南.pdf
-output/pdf/瑞航CRM_页签与页面恢复使用指南.pdf
-output/pdf/瑞航CRM_首页项目与施工进度使用指南.pdf
-output/pdf/瑞航CRM_工程量合计与台账导出使用说明.pdf
-output/pdf/瑞航CRM_工程量中央流程使用指南.pdf
-output/pdf/瑞航CRM_项目Excel导入使用指南.pdf
-output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
-output/pdf/瑞航CRM_分供方档案与真实事实使用指南.pdf
-output/pdf/瑞航CRM_班组与工人档案使用指南.pdf
-output/pdf/瑞航CRM_核心合同与工程量清单使用指南.pdf
-output/pdf/瑞航CRM_项目分供方工作台与文件导入使用说明.pdf
-output/pdf/瑞航CRM_分供方证照与资料核验使用指南.pdf
-output/pdf/瑞航CRM_材料单价分析使用说明.pdf
-output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf
-output/pdf/瑞航CRM_OCR设置使用说明.pdf
-output/pdf/瑞航CRM_开票因子与税额计算使用说明.pdf
-output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf
-output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
-output/pdf/瑞航CRM_收款登记使用指南.pdf
-output/pdf/瑞航CRM_送货单归档与原件包导出使用说明.pdf
-output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf
-```
-
-每次改变最终用户可见流程时，先更新 Markdown，再重新生成并逐页渲染检查 PDF。指南必须明确区分“当前已可用”和“已定稿待开发”，不能把目标规格写成已经上线。
-
-公共列表指南生成方式：`python scripts/generate-project-guide-pdf.py --source docs/guides/list-search-and-filters.md --output output/pdf/瑞航CRM_列表搜索与筛选使用指南.pdf`。
+需要纸质版或明确要求 PDF 时，可使用 `scripts/generate-project-guide-pdf.py` 从指定 Markdown 按需生成，并逐页核查；产品中的工资签名表、合同原件、打印与导出仍按相应业务规格验收。

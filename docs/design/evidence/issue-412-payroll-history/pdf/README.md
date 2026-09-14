@@ -4,7 +4,7 @@
 
 | 文档 | 版本 | 页数 | PDF SHA-256 |
 | --- | --- | ---: | --- |
-| [瑞航CRM_工资与考勤工作台使用说明.pdf](../../../../../output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf) | V2.0 | 3 | `ee14973006614af584ddee3f865c98130d8ca5ea26dd736d2b88ccdb26848a67` |
-| [瑞航CRM_本地核心身份数据迁移使用指南.pdf](../../../../../output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf) | V2.6 | 6 | `bea3ca51510446f343b572246bc1e564fa32edb533adb322628eea857e7eb372` |
+| [瑞航CRM_工资与考勤工作台使用说明.pdf](../../../../guides/payroll-attendance.md) | V2.0 | 3 | `ee14973006614af584ddee3f865c98130d8ca5ea26dd736d2b88ccdb26848a67` |
+| [瑞航CRM_本地核心身份数据迁移使用指南.pdf](../../../../guides/local-data-migration.md) | V2.6 | 6 | `bea3ca51510446f343b572246bc1e564fa32edb533adb322628eea857e7eb372` |
 
 每页图像、字数与检查者见 [page-hashes.json](./page-hashes.json)。原图以 120 dpi 渲染，正式副本与临时原图逐项匹配。封面不计正文页码。

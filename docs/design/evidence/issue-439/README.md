@@ -4,7 +4,7 @@
 
 ## 规则和交付边界
 
-字段来源、输入意图、金额公式和历史操作兼容以 [DATABASE §10.2](../../../rewrite/DATABASE.md#102-支付记录及付款申请分摊) 为准；读侧完整度以 [READ-MODELS §2.4](../../../rewrite/READ-MODELS.md#24-可空值与聚合完整性) 为准。使用流程见[付款指南](../../../guides/finance-payment.md)及[四页 PDF](../../../../output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf)。
+字段来源、输入意图、金额公式和历史操作兼容以 [DATABASE §10.2](../../../rewrite/DATABASE.md#102-支付记录及付款申请分摊) 为准；读侧完整度以 [READ-MODELS §2.4](../../../rewrite/READ-MODELS.md#24-可空值与聚合完整性) 为准。使用流程见[付款指南](../../../guides/finance-payment.md)及[四页 Markdown 指南](../../../guides/finance-payment.md)。
 
 PAY-07 只保留旧金额并添加来源，不推测 v21/v22 压缩零的原意。历史未知记录的新支付确认政策仍是 [PAY-08 待裁定项](https://github.com/zodea/crm-new/issues/413#issuecomment-5616431545)，现有登记/确认兼容不代表批准申请全额。支付记录与分摊原事实保持；通用付款中央写命令、桌面实际账套迁移和生产持久化不由本证据宣告完成。
 

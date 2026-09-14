@@ -261,7 +261,7 @@
     "evidence": [
       "docs/design/evidence/issue-423/project-import-verification.md",
       "docs/guides/project-excel-import.md",
-      "output/pdf/瑞航CRM_项目Excel导入使用指南.pdf"
+      "docs/guides/project-excel-import.md"
     ],
     "questions": []
   },

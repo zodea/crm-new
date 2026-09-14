@@ -23,7 +23,7 @@
 - 定向兼容：`npm test -- tests/server/core-migration-preparation.test.ts tests/server/quantity-migration.test.ts tests/server/quantity-database.test.ts tests/server/quantity-test-instance.test.ts tests/quantity/controlled-migration.test.ts tests/quantity/migration-graph.test.ts tests/quantity/migration-core-source.test.ts tests/migration/core-local-source.test.ts tests/server/core-migration-test-instance.test.ts tests/receipt/migration.test.ts tests/delivery/controlled-migration.test.ts`：11 文件 / 62 项通过；随后补历史照片缺正文反例，`tests/quantity/controlled-migration.test.ts` 3 / 3 通过。
 - `pnpm typecheck`：通过。独占迁移源码、测试及 E2E 的精确 ESLint：通过。共享文件由集成提交统一检查，未整体格式化其他代理的改动。
 - 真实 HTTP：`e2e/quantity-migration.spec.ts`，Chromium 项目 1 worker，1 / 1 通过，业务 2.7 秒、整轮 15.3 秒。覆盖真实来源包、稳定身份、三量空零、原始照片字节、中央更正、独立新项目与回滚。该项是实际 HTTP 验证，不是页面视觉截图；[运行结果](./http-result.json)与[合成来源及真实 SQLite 摘要](./source.json)已归档。
-- [迁移指南](../../../../guides/local-data-migration.md) V2.0 的 [PDF](../../../../../output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf) 共 5 页，已逐页渲染核对，无截断或覆盖；预览保留在 [pdf-preview](./pdf-preview/)。
+- [迁移指南](../../../../guides/local-data-migration.md) V2.0 的 [Markdown 指南](../../../../guides/local-data-migration.md) 共 5 页，已逐页渲染核对，无截断或覆盖；预览保留在 [pdf-preview](./pdf-preview/)。
 
 ## 当前边界
 

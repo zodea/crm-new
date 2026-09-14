@@ -49,7 +49,7 @@ pnpm exec playwright test e2e/project-supplier-files.spec.ts --project=chromium 
 
 ## 使用指南与保留边界
 
-[使用指南](../../../guides/project-supplier-workbench.md) V1.4 与 [PDF](../../../../output/pdf/瑞航CRM_项目分供方工作台与文件导入使用说明.pdf) 已同步。PDF 共六页，逐页渲染检查标题、表格、操作步骤、页脚及当前可用/待业务裁定边界，无裁切、重叠或乱码。
+[使用指南](../../../guides/project-supplier-workbench.md) V1.4 与 [Markdown 指南](../../../guides/project-supplier-workbench.md) 已同步。PDF 共六页，逐页渲染检查标题、表格、操作步骤、页脚及当前可用/待业务裁定边界，无裁切、重叠或乱码。
 
 其他 owner 的合同、付款申请、发票、支付、支出结算正文仍未接入，继续由 #406/#408/#409/#410/#413 承接；缺正文不回退本地。合作终态确认 PDF 与终态规则仍归 #408 的业务裁定。本票不交付生产重启持久化、完整 RBAC、多 workspace、Tauri、OCR、附件替换/删除或全项目档案包，也不把测试会话当作生产认证。
 

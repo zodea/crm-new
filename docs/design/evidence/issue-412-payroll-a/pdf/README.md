@@ -4,8 +4,8 @@ Root 已逐页渲染并查看以下两份指南，共 12 页，正文、表格�
 
 | 指南 | 版本 | 页数 | 最终文件 |
 | --- | --- | ---: | --- |
-| 工资与考勤工作台 | V2.1 | 5 | [PDF](../../../../../output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf) |
-| 本地核心身份数据迁移 | V2.7 | 7 | [PDF](../../../../../output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf) |
+| 工资与考勤工作台 | V2.1 | 5 | [Markdown 指南](../../../../guides/payroll-attendance.md) |
+| 本地核心身份数据迁移 | V2.7 | 7 | [Markdown 指南](../../../../guides/local-data-migration.md) |
 
 [manifest.json](./manifest.json)记录最终 PDF 和每页 PNG 的 SHA-256、页次及人工检查结果。工资指南的签工完整性说明仅用于对应类型，A 不要求不适用的签工正文。
 

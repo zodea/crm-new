@@ -57,6 +57,6 @@
 
 ## 指南与保留边界
 
-[使用指南](../../../guides/receipt-registration.md)与[PDF](../../../../output/pdf/瑞航CRM_收款登记使用指南.pdf)同步。PDF 三页逐页渲染检查，标题、表格、正文与页脚无重叠、裁切或乱码。
+[使用指南](../../../guides/receipt-registration.md)与[Markdown 指南](../../../guides/receipt-registration.md)同步。PDF 三页逐页渲染检查，标题、表格、正文与页脚无重叠、裁切或乱码。
 
 原始数据没有独立收款分类/类型事实，当前展示未记录；保留金和现金实现额没有完整事实，明确未知。该判断已回写[原 Issue 评论](https://github.com/zodea/crm-new/issues/436#issuecomment-5624247094)，未从方式、状态或演示样例猜测填值。完整审批、确认撤回/退款/红冲、生产持久化 #416、#413 其他财务模块与 Tauri 正式交付保持各自范围，本票未运行远端 CI。

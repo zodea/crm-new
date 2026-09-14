@@ -18,7 +18,7 @@
 - [invalid-color.png](./invalid-color.png)：无效颜色在固定操作区提示。
 - [invoice-borders.xlsx](./invoice-borders.xlsx)：另一条完整保存/刷新/导出旅程下载的真实文件，使用不同线型与颜色。
 - [workbook-readback.json](./workbook-readback.json)：该文件 SHA-256、单元格样式索引、边框索引及四边原始 XML 值。
-- [使用指南](../../../guides/finance-invoice.md)及[四页 PDF](../../../../output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf)。
+- [使用指南](../../../guides/finance-invoice.md)及[四页 Markdown 指南](../../../guides/finance-invoice.md)。
 
 ## 验证记录
 
