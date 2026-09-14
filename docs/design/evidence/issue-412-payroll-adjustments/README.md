@@ -1,6 +1,6 @@
 # P4 工资更正与实际收付：集成验收记录
 
-P4 的浏览器完整旅程、定向业务回归、完整测试、类型、构建及独立复核已通过，正在进行独立提交。比较基线为 `c5caede8d55f117ededcff7354ce2b1af1872d90`；[实施票](../../../research/issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)列出精确范围。P3 已完成，不重复作为本期交付。
+P4 的浏览器完整旅程、定向业务回归、完整测试、类型、构建及独立复核已通过，已独立提交 `74f831f7da0dc37f7ec031279223649a6f32fbee`。比较基线为 `c5caede8d55f117ededcff7354ce2b1af1872d90`；[实施票](../../../research/issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)列出精确范围。P3 已完成，不重复作为本期交付。
 
 操作说明以 [Markdown 指南](../../../guides/payroll-adjustments.md)为准。按用户 2026-09-14 的要求，本期不另生成指南 PDF；产品自身 Excel / 打印仍使用真实页面与文件核对。
 
@@ -54,4 +54,8 @@ P4 的浏览器完整旅程、定向业务回归、完整测试、类型、构�
 
 实际下载的 [更正确认 Excel](./outputs/confirmed-adjustment.xlsx) 与 [退款确认 Excel](./outputs/actual-refund.xlsx)已重读核对数字单元格及依据。产品打印临时文件逐页渲染为[更正第 1 页](./outputs/correction-page-1.png)、[第 2 页](./outputs/correction-page-2.png)、[退款第 1 页](./outputs/refund-page-1.png)，长依据、表头、负号和签字区可读且末页为白底；临时 PDF 不作为本期文档交付。
 
-本期仅完成后才能更新 #412 / #413 对应切片；P5–P7、其他成本域与 #416 生产持久化不因工资分区有金额而完成。
+本期已按固定提交更新 #412 / #413 对应切片；P5–P7、其他成本域与 #416 生产持久化不因工资分区有金额而完成。
+
+正常产品提交的类型及完整测试再次通过 715 文件、4062 项（281.14 秒），见[提交检查](./checks/commit-product.log)。提交前后 196 个代码文件与[冻结摘要](./checks/code-manifest.json)一致。
+
+[清理记录](./cleanup.json)：579 个已归档临时文件、68,846,773 字节已移入 Windows 回收站，可恢复；其中包含本期临时打印 PDF，正式 Markdown、截图、Excel 及业务原件保留。

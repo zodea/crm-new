@@ -5,7 +5,7 @@ import { REVIEW_OBLIGATIONS, validateReviewObligations } from '../../scripts/mod
 import { buildRuntimeEvidenceLedger } from '../../scripts/runtime-evidence-ledger.mjs'
 
 describe('module review coverage', () => {
-  it('registers P4 independent pages and every cash host without promoting uncommitted acceptance', () => {
+  it('records committed P4 obligations without inheriting whole-page or production acceptance', () => {
     const { surfaces, cases, obligations } = buildModuleReviewCoverage()
     const routes = ['/subcontract/payroll/adjustments/:id', '/subcontract/payroll/adjustments/form/:id', '/subcontract/payroll/adjustments/new', '/subcontract/payroll/payments', '/subcontract/payroll/payments/:id', '/subcontract/payroll/payments/new', '/subcontract/payroll/payments/reversal/new']
     const roots = surfaces.filter(surface => routes.includes(surface.route) && surface.path === 'page')
@@ -20,8 +20,20 @@ describe('module review coverage', () => {
     expect(selected).toHaveLength(43)
     expect(selected.every(item => item.adapter === 'payroll-adjustment-central' && item.acceptance.frontend === 'not-verified' && item.acceptance.production === 'not-verified')).toBe(true)
     expect(selected.every(item => item.obligationIds.includes('WAGE-10'))).toBe(true)
-    expect(obligations.find(item => item.id === 'WAGE-09')?.status).toBe('partial')
-    expect(obligations.find(item => item.id === 'WAGE-10')).toMatchObject({ status: 'ready', evidence: [] })
+    const byId = (id: string) => obligations.find(item => item.id === id)!
+    for (const id of ['WAGE-09', 'WAGE-10', 'WAGE-11', 'WAGE-12']) {
+      expect(byId(id).evidence).toContainEqual(expect.objectContaining({
+        reference: 'docs/design/evidence/issue-412-payroll-adjustments/README.md',
+        commit: '74f831f7da0dc37f7ec031279223649a6f32fbee',
+        recency: 'current-run',
+      }))
+    }
+    for (const id of ['WAGE-10', 'WAGE-11'])
+      expect(byId(id).status).toBe('current-passed')
+    expect(byId('WAGE-09').status).toBe('partial')
+    expect(byId('WAGE-09').remaining).toContain('材料/报销')
+    expect(byId('WAGE-12').status).toBe('partial')
+    expect(byId('WAGE-12').remaining).toContain('P5–P7')
   })
 
   it('registers stage creation, editing and reporting as unverified central browser work', () => {
@@ -236,13 +248,14 @@ describe('module review coverage', () => {
     expect(byId('WAGE-01').status).toBe('current-passed')
     expect(byId('WAGE-02').status).toBe('current-passed')
     expect(byId('WAGE-02').evidence).toEqual([expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-history/README.md', commit: '1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3', recency: 'current-run' })])
-    expect(byId('WAGE-10').status).toBe('ready')
+    expect(byId('WAGE-10').status).toBe('current-passed')
+    expect(byId('WAGE-11').status).toBe('current-passed')
     const payrollAProof = expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-a/README.md', commit: 'c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d', recency: 'current-run' })
     for (const id of ['WAGE-03', 'WAGE-08']) {
       expect(byId(id).status).toBe('current-passed')
       expect(byId(id).evidence).toContainEqual(payrollAProof)
     }
-    for (const id of ['WAGE-09', 'WAGE-11', 'WAGE-12', 'WAGE-18']) {
+    for (const id of ['WAGE-09', 'WAGE-12', 'WAGE-18']) {
       expect(byId(id).status).toBe('partial')
       expect(byId(id).evidence).toContainEqual(payrollAProof)
     }
@@ -253,7 +266,7 @@ describe('module review coverage', () => {
     }
     for (const id of ['WAGE-09', 'WAGE-11', 'WAGE-12'])
       expect(byId(id).evidence).toContainEqual(payrollC2Proof)
-    for (const id of ['WAGE-06', 'WAGE-13'])
+    for (const id of ['WAGE-06', 'WAGE-11', 'WAGE-13'])
       expect(byId(id).evidence).toContainEqual(payrollAProof)
     for (const id of ['WAGE-14', 'WAGE-15', 'WAGE-16', 'WAGE-17']) {
       expect(byId(id).status).toBe('ready')

@@ -70,13 +70,17 @@
       "工资 P1 A 中央核算与实际发放已完成本地验收：626 文件、3783 项测试通过，类型、109 个源码文件规范检查及构建通过；同一真实迁入实例的9项浏览器测试、85张五档图、实际300元发放PDF与Excel、两份指南12页均已检查。首张工资入口、配置及来源往返、整数分分配、旧结果恢复、重新核对、完整原回执和班组价格范围已闭合。 已独立提交 c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d，正常提交检查再次通过3783项（219.34秒），110个代码身份匹配。",
       "工资 P2 C1 已接通真实逐日考勤、个人日薪与独立加班标准、独立草稿、来源重核、实际发放及工资/考勤配对输出；无工程量项目可直接开始。已修复原稿返回、成功后回读失败丢原键、批量关页丢稿、空月份入口、历史证据提示、恢复范围名称及详情费率精度。最终限定验收与实际文件见 P2 独立记录。",
       "工资 P3 C2 已通过本地限定验收，产品已独立提交 f39d8106579ea09cd1335119701ba6105cd22846：无工程量项目的逐日签工、人工确认、项目与负责人单价及规则、唯一来源领用、核对实发及工资/签工双表已接通。整批 682 文件、3964 项测试以及类型、构建通过；112 个代码文件规范检查仅测试标题大小写修正后复查通过。9 个真实场景分轮通过，180 张有效交互图、12 页实际输出与 14 页指南已检查，早期一张右列未完整入镜的图不计入 180 张。",
-      "P3 已修复原稿返回时沿用旧权限与旧依据、原提交恢复误判、C1 来源多出 A 返回、零签工成员月锁遗漏及长表末页灰底。当前权限控制可写性，明确重核才采用新依据；完整原回执与冻结互证，费率保原精度，C1/C2 月锁及迁入恢复保护均已验证。"
+      "P3 已修复原稿返回时沿用旧权限与旧依据、原提交恢复误判、C1 来源多出 A 返回、零签工成员月锁遗漏及长表末页灰底。当前权限控制可写性，明确重核才采用新依据；完整原回执与冻结互证，费率保原精度，C1/C2 月锁及迁入恢复保护均已验证。",
+      "P3 后置登记已独立提交 c5caede8d55f117ededcff7354ce2b1af1872d90，完整检查682文件3964项及正常提交再次通过；未重复实现P3。",
+      "工资 P4 已独立提交 74f831f7da0dc37f7ec031279223649a6f32fbee：独立更正、真实补退、后月处理、错记冲销及再纠错保原签收；真实迁入后仍能读取原格式输出和继续处理余额，原JSON保持不变。",
+      "P4 真实浏览器联合2项通过，1000核减100时实际仍1000、退款40后960、后月实发940并处理60后净1900且余额0；工人、班组、项目、预算及付款冷读同源。80张交互图和3页实际打印已复核，Excel负数金额实际下载回读；指南改为Markdown。",
+      "P4 最终完整npm test 715文件4062项通过，类型、构建、196个代码文件规范及独立双轴复核通过；正常产品提交再次通过4062项（281.14秒）。新增7条路由及宿主登记，不提升未观察外部参考或生产状态。"
     ],
     "remaining": [
       "#442–#447 及预算中央接管已独立本地提交，尚未推送或部署；完整验证和范围见各自验收目录。",
       "中央 WBS 与新增暂估绑定分别见 #444/#445；预算维护已接通，完整工资、材料和财务成本来源继续实施。",
-      "工资 P0 接管、P1 A 与 P2 C1 已本地验收并提交；P3 C2 已通过本地限定验收，产品已独立提交 f39d8106579ea09cd1335119701ba6105cd22846。防双计完整成本消费者、独立更正与实际补退，以及房补、管理费、空鼓和批量工作簿继续逐条实施。",
-      "工程量—排程—A/C1/C2—目标成本的跨模块数量和金额勾稽尚未闭合；缺源保留未知，不产生假余额。"
+      "工资 P0–P4 已完成各自本地限定验收并独立提交；分项多条房补、独立管理费、负价依据、空鼓和批量资金/完整工作簿继续按P5–P7实施。",
+      "工程量、排程与A/C1/C2工资已有来源与实际收付核对；完整费用、材料及其他财务成本仍未接齐。跨模块总数和项目余额保缺源未知，不从工资单项推成全项目完整。"
     ],
     "flow": [
       "选择项目，维护预算版本、七科目与对比基线",
@@ -261,7 +265,12 @@
       "docs/design/evidence/issue-412-payroll-c2/browser/supplement/payroll-scope-notice-390.png",
       "docs/design/evidence/issue-412-payroll-c2/browser/supplement/frozen-source-right-390.png",
       "docs/design/evidence/issue-412-payroll-c2/browser/supplement/released-ledger-right-390.png",
-      "docs/design/evidence/issue-412-payroll-c2/browser/supplement/released-ledger-right-1024-final.png"
+      "docs/design/evidence/issue-412-payroll-c2/browser/supplement/released-ledger-right-1024-final.png",
+      "docs/design/evidence/issue-412-payroll-adjustments/README.md",
+      "docs/guides/payroll-adjustments.md",
+      "docs/design/evidence/issue-412-payroll-adjustments/interaction/main/refund-unknown-keeps-original-390.png",
+      "docs/design/evidence/issue-412-payroll-adjustments/interaction/main/budget-same-actual-1440.png",
+      "docs/design/evidence/issue-412-payroll-adjustments/interaction/closeout/reversal-correction-label-final-390.png"
     ],
     "questions": [
       "P5 房补：除已确定的分项工程量基数，是否还需要按金额比例、每人或每月固定额？额外基数需给一个实际算例，确认单位、期间及叠加方式；已确定的分项补贴继续实施。",
@@ -488,12 +497,12 @@
           "y": 1200,
           "width": 280,
           "height": 100,
-          "title": "已发后更正（待实施）",
+          "title": "已发后独立更正（已验证）",
           "lines": [
-            "补差 / 退回 / 后月抵扣",
-            "原工资与原现金事实保留"
+            "核算差额与实际收付分别留证",
+            "退40＋后月60，净1900"
           ],
-          "warning": true
+          "warning": false
         },
         {
           "id": "budget",
@@ -504,7 +513,7 @@
           "title": "预算版本 / 七科目 / 对比",
           "lines": [
             "独立维护与唯一基线已验证",
-            "工资完整实际来源尚待接齐"
+            "工资实际已接；其余成本保缺口"
           ],
           "warning": false
         },
@@ -680,7 +689,8 @@
     "solved": [
       "#436 普通收款中央读写、附件、完整迁移与客户/项目/施工合同/最终结算投影已本地提交并完成限定验收。",
       "#439 已区分批复空值、明确零与历史含义待核验，修复付款详情缓存往返与失败撤旧。",
-      "#437 发票 Excel 边框、金额格式与本地日期文件名已验证；#432 因子工具限定范围已验证。"
+      "#437 发票 Excel 边框、金额格式与本地日期文件名已验证；#432 因子工具限定范围已验证。",
+      "P4 工资实际收付只读分区随74f831f7接通：独立项目选择冷恢复、工资/人员/预算同源净额和原来源往返已验证；不生成普通付款申请、银行流水或第二份工资账。"
     ],
     "remaining": [
       "开票申请、往来收付、付款申请/管理、支付记录、报销与发票各类型中央链仍须逐项闭合。",
@@ -725,7 +735,8 @@
       "docs/design/evidence/issue-436/receipt-detail-390.png",
       "docs/design/evidence/issue-439/README.md",
       "docs/design/evidence/issue-439/approval-form-390.png",
-      "docs/design/evidence/issue-437/README.md"
+      "docs/design/evidence/issue-437/README.md",
+      "docs/design/evidence/issue-412-payroll-adjustments/README.md"
     ],
     "questions": [
       "旧申请 100、无法解释的批复 0、真实银行支付 30：新增支付确认是否先核清批复，或允许带历史异常继续确认？建议允许保存真实回单草稿、核清后确认；若允许异常确认，还须明确可付上限和责任人。已有实付保持不变。"
