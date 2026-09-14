@@ -33,6 +33,8 @@ def bullets(items):
 
 
 def flow_svg(row):
+    if row.get('graph'):
+        return branch_flow_svg(row)
     # A vertical flow leaves room for a visible failure-and-return path on the right.
     nodes = row["flow"]
     height = len(nodes) * 84 + 30
@@ -57,15 +59,42 @@ def flow_svg(row):
     return ''.join(svg)
 
 
+def branch_flow_svg(row):
+    graph = row['graph']
+    marker = f'branch-arrow-{row["number"]}'
+    nodes = {node['id']: node for node in graph['nodes']}
+    assert len(nodes) == len(graph['nodes']), 'duplicate branch node'
+    svg = [f'<svg class="flow flow-branches" viewBox="0 0 {graph["width"]} {graph["height"]}" role="img" aria-label="Issue {row["number"]} 独立来源分支及异常返回">',
+           f'<defs><marker id="{marker}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#668077"/></marker></defs>']
+    for edge in graph['edges']:
+        assert edge['from'] in nodes and edge['to'] in nodes, 'missing branch target'
+        color = '#b47438' if edge.get('exception') else '#668077'
+        dashed = ' stroke-dasharray="6 4"' if edge.get('exception') else ''
+        svg.append(f'<path d="{esc(edge["path"])}" fill="none" stroke="{color}" stroke-width="2"{dashed} marker-end="url(#{marker})"/>')
+    for node in nodes.values():
+        x, y, width, height = node['x'], node['y'], node['width'], node['height']
+        assert x >= 0 and y >= 0 and x+width <= graph['width'] and y+height <= graph['height']
+        assert len(node['lines'])*22+53 <= height, 'branch text exceeds node height'
+        fill = '#fff3df' if node.get('warning') else '#fff'
+        svg.append(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="9" fill="{fill}" stroke="#aac0b8"/>')
+        svg.append(f'<text x="{x+16}" y="{y+25}" font-size="15" font-weight="600" fill="#203d34">{esc(node["title"])}</text>')
+        for i, line in enumerate(node['lines']):
+            assert len(line)*14 <= width-32, 'branch label would be clipped'
+            svg.append(f'<text x="{x+16}" y="{y+50+i*22}" font-size="14" fill="#52665d">{esc(line)}</text>')
+    svg.append('</svg>')
+    return ''.join(svg)
+
+
 def overview(rows):
     statuses = {str(row['number']): row['status'] for row in rows}
     lanes = [
         ("收入", [("甲方变更 / 报量 / 验收 / 结算", "410", "partial"), ("发票与普通收款", "413", "partial"), ("客户 / 项目 / 合同累计", "436", "local-done")]),
         ("材料", [("原件 → 人工核对 → 逻辑归档", "441", "in-progress"), ("有效到货 → 入仓 / 领用 / 调拨", "411", "partial"), ("材料结算 → 发票 → 付款", "409", "partial")]),
-        ("现场", [("区域 / 模板 / 责任 / 完成事实", "442", "in-progress"), ("排程 / 月报 / A·C1·C2 来源", "412", "partial"), ("工资核对 → 发放冻结 → 调整", "412", "partial")]),
+        ("现场", [("区域 / 模板 / 责任 / 完成事实", "442", "in-progress"), ("排程与月报，按原来源回读", "412", "partial"), ("真实施工完成 → A 工资来源", "412", "partial")]),
+        ("工资", [("按格式选择：A 完成 / C1 考勤 / C2 签工", "412", "partial"), ("个人或主体标准 → 草稿 → 核对", "412", "partial"), ("实际分配 → 发放冻结 → 独立更正", "412", "partial")]),
         ("分包及其他支出", [("分包合同 → 变更 → 确认结算", "410", "partial"), ("罚扣抵扣 / 报销 / 辅助结算", "413", "partial"), ("付款申请 → 批复 → 实际支付", "413", "partial")]),
     ]
-    top = '<div class="global-start"><a href="#issue-407">客户 / 分供方 / 班组 / 工人<br><small>#407 · 主档与身份</small></a><span>→</span><a href="#issue-408">项目与合作关系<br><small>#408 · 归属与来源</small></a><span>→</span><a href="#issue-409">合同与工程量清单<br><small>#409 · 业务依据</small></a></div><div class="branch-caption">↓ 按业务分支流转；各分支保留自己的数量、状态和金额事实 ↓</div><div class="lanes">'
+    top = '<div class="global-start"><a href="#issue-407">客户 / 分供方 / 班组 / 工人<br><small>#407 · 主档与身份</small></a><span>→</span><a href="#issue-408">项目与合作关系<br><small>#408 · 归属与来源</small></a><span>→</span><a href="#issue-409">按业务选择合同与清单依据<br><small>#409 · 适用时进入</small></a></div><div class="branch-caption">↓ 按业务分支流转；C1 可从已有项目归属的工人直接登记考勤，不依赖工程量或排程 ↓</div><div class="lanes">'
     for title, nodes in lanes:
         top += f'<div class="lane"><h3>{title}</h3>'
         for i, (label, number, status) in enumerate(nodes):
@@ -93,6 +122,9 @@ def overview_screens():
         (412, 'A 工资：分别保存主体比例与工资单价', 'docs/design/evidence/issue-412-payroll-a/browser/subject-price-configuration-390.png'),
         (412, 'A 工资：实发后冷读冻结工资及全部成员分配', 'docs/design/evidence/issue-412-payroll-a/browser/released-frozen-output-1440.png'),
         (412, 'A 工资：另一笔实发后，本单保留输入并重新核对', 'docs/design/evidence/issue-412-payroll-a/browser/rechecked-allocation-retained-390.png'),
+        (412, 'C1 考勤：原工时与月底合计保精度', 'docs/design/evidence/issue-412-payroll-c1/browser/month-normal-totals-390.png'),
+        (412, 'C1 工资：逐人标准与实际核算分别核对', 'docs/design/evidence/issue-412-payroll-c1/browser/c1-draft-source-values-390.png'),
+        (412, 'C1 发放：冷读同次工资与考勤配对输出', 'docs/design/evidence/issue-412-payroll-c1/browser/released-paired-output-1440.png'),
         (441, '材料分支：对照原件人工核对送货', 'docs/design/evidence/issue-441/delivery-form-1440.png'),
         (436, '收入分支：保存后回读普通收款', 'docs/design/evidence/issue-436/receipt-detail-1440.png'),
         (412, '回看预算与真实来源；来源未齐时余额保持未知', 'docs/design/evidence/issue-412-target-cost/browser/actual-source-completeness-1440.png'),
@@ -109,6 +141,14 @@ CSS = '''
 .results li{overflow-wrap:anywhere}
 .planned{background:#ecebf4;color:#61577e}.stats{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))!important}
 :root{font-family:"Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;color:#233a33;background:#f4f3ed;font-synthesis:none;line-height:1.65}*{box-sizing:border-box}body{margin:0}a{color:#21675a;text-decoration-thickness:1px;text-underline-offset:3px}button,input,select,textarea{font:inherit}button,a,input,select,textarea{outline-offset:4px}button{cursor:pointer;border:1px solid #bcc9c2;background:#fff;border-radius:6px;padding:7px 13px;color:#244c3d}button:hover{background:#e6eee8}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:255px minmax(0,1fr);gap:34px;padding:28px}aside{position:sticky;top:24px;align-self:start;height:calc(100vh - 50px);display:flex;flex-direction:column;gap:12px}.brand{font-size:13px;letter-spacing:.13em;color:#647c6b}.rail-title{font-size:22px;margin:0}aside input,aside select{min-width:0;width:100%;padding:9px;border:1px solid #c7d1ca;background:#fff;border-radius:5px}.issue-nav{overflow:auto;min-height:80px;flex:1}.issue-nav a{display:block;text-decoration:none;color:#476055;padding:9px 7px;border-bottom:1px solid #e0e3d9;font-size:12px}.issue-nav a:hover{background:#e4ebe3}.issue-nav b{display:inline-block;min-width:42px;color:#274d3c}.intro{padding:24px 0 28px;border-bottom:2px solid #254d3e}.kicker{text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:#7b674c}h1{font-size:clamp(27px,3vw,42px);line-height:1.25;font-weight:600;margin:10px 0 20px}h2{font-size:24px;line-height:1.4;font-weight:600}h3{font-size:16px;margin:0 0 12px}p{margin:8px 0 14px}.muted,small{color:#65786e}.intro p{max-width:850px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0}.stat{border-top:1px solid #aebdad;padding:12px 4px}.stat strong{font-size:30px;margin-right:10px}.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px}.badge{display:inline-block;border-radius:4px;padding:4px 8px;background:#ece8dd;color:#6d6246;font-size:12px}.local-done{background:#e8f1e7;color:#285b39}.partial{background:#f5ead9;color:#805b2c}.in-progress{background:#e3edf7;color:#2b5678}.decision{background:#f4e1df;color:#8b4842}.panel,.issue{background:#fdfcf8;border:1px solid #d9dfd1;padding:28px;margin:26px 0;border-radius:10px;scroll-margin-top:18px}.notice{border-left:3px solid #ab7843;padding:8px 14px;background:#fcf1df;color:#735335}.global-start{display:grid;grid-template-columns:1fr 26px 1fr 26px 1fr;align-items:center;text-align:center;gap:8px}.global-start a{background:#e5ece2;padding:17px 8px;border:1px solid #b8c8b1;border-radius:7px;text-decoration:none;font-weight:600}.global-start small{font-weight:400;font-size:11px}.branch-caption{text-align:center;padding:16px 0;color:#6b7d68;font-size:12px}.lanes{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.lane{padding:15px 10px;background:#f2f2e9;border-top:2px solid #93ab90}.lane h3{font-size:14px;text-align:center}.lane-node{display:block;text-align:center;padding:15px 8px;min-height:100px;text-decoration:none;border:1px solid #d8ded4;border-radius:5px;font-size:13px}.lane-node small{display:block;font-size:10px;margin-top:7px}.down{text-align:center;color:#8aa180}.crosslinks{margin:18px 0;font-size:12px;color:#66725d;border-top:1px dashed #a4b296;border-bottom:1px dashed #a4b296;padding:12px}.global-end{border:1px solid #9ead9a;text-align:center;background:#edf0e6;padding:17px}.global-end p{font-size:13px;margin:5px}.amber{color:#876137}.production{margin-top:15px;border:1px dashed #b57d6e;padding:13px;font-size:13px}.production span{display:block;color:#975846}.issue-head{display:flex;align-items:flex-start;gap:16px;justify-content:space-between}.issue-head h2{margin:3px 0 8px}.issue-id{font-size:13px;letter-spacing:.06em}.source-links{font-size:12px;margin-bottom:20px}.results{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:20px 0}.results section{padding:16px 20px;background:#f1f4eb}.results section:last-child{background:#f9f0e0}ul{margin:8px 0;padding-left:20px}li{margin:7px 0;font-size:13px}.diagram-layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(230px,.8fr);gap:22px;align-items:start}.flow{display:block;width:100%;height:auto;min-width:560px}.flow-scroll{overflow:auto;background:#f3f5ee;border-radius:8px;padding:10px}.flow-scroll:focus{outline:2px solid #467a59}.sim{background:#edf0e8;border:1px solid #c2cdbb;border-radius:8px;overflow:hidden}.sim-bar{background:#294b3b;color:#fff;padding:11px 16px;font-size:12px}.sim-content{padding:20px;min-height:210px}.sim-title{font-size:19px;font-weight:600;margin:0 0 18px}.sim-label{font-size:11px;color:#6d7c63;margin:12px 0 5px}.sim-action{background:#fff;border:1px solid #cbd5c2;padding:12px;border-radius:5px;font-size:13px}.sim-result{background:#e0ead9;border-left:3px solid #6c9960;padding:12px;font-size:13px;margin-top:14px}.sim-controls{display:flex;justify-content:space-between;padding:12px 16px;border-top:1px solid #cbd5c2;gap:8px}.sim-controls span{font-size:12px;align-self:center}.image-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.image-grid figure{margin:0;border:1px solid #dce2d4;padding:8px;background:#fff}.image-grid img{width:100%;height:230px;object-fit:contain;object-position:top;background:#eaf0e8}.image-grid figcaption{font-size:11px;overflow-wrap:anywhere;padding:8px 0}.links{font-size:12px;display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.notes{margin-top:25px;padding-top:18px;border-top:1px solid #dae0d0}.notes label{font-size:13px;display:block;margin-bottom:6px}.notes textarea{width:100%;resize:vertical;min-height:76px;padding:12px;border:1px solid #c6d2bd;background:#fffef9;border-radius:5px}.saved{font-size:11px;color:#788a6a}details{margin:15px 0}summary{cursor:pointer;font-size:14px;font-weight:600}.grill-item{padding:16px 0;border-bottom:1px solid #e0dfd4}.grill-item p{font-size:14px}.reading-guide{display:flex;gap:12px;flex-wrap:wrap;font-size:13px}.empty{padding:30px;text-align:center}.sticky-alert{font-size:11px;padding:10px;background:#e7eddf}footer{font-size:12px;color:#7b8770;padding:20px 0 50px}.off{display:none!important}@media(max-width:1080px){.shell{grid-template-columns:210px minmax(0,1fr);padding:20px;gap:20px}.diagram-layout{grid-template-columns:1fr}.lanes{grid-template-columns:repeat(2,1fr)}.panel,.issue{padding:22px}}@media(max-width:700px){.shell{display:block;padding:14px}aside{position:static;height:auto;display:grid;grid-template-columns:1fr 1fr}.brand,.rail-title,.issue-nav,.sticky-alert{display:none}aside>a,aside>button{font-size:12px}.intro{padding-top:20px}.stats{grid-template-columns:1fr 1fr}.panel,.issue{padding:16px}.results,.image-grid{grid-template-columns:1fr}.global-start{display:flex;flex-direction:column}.global-start a{width:100%}.global-start span{transform:rotate(90deg)}.lanes{grid-template-columns:1fr 1fr}.issue-head{display:block}.image-grid img{height:250px}}@media print{aside,.sim-controls,.notes,.reading-guide,.filter-count{display:none!important}.shell{display:block;padding:0}.issue,.panel{break-inside:avoid}.off{display:block!important}.flow{min-width:0}.image-grid img{height:190px}body{background:white}.lanes{grid-template-columns:repeat(4,1fr)}a{color:inherit}}
+'''
+
+CSS += '''
+.diagram-layout:has(.flow-branches){grid-template-columns:minmax(0,1fr)}
+.flow.flow-branches{min-width:1000px}
+@media(min-width:1081px){.lanes{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:1080px){.lanes .lane:last-child{grid-column:1 / -1}}
+@media print{.flow.flow-branches{min-width:0}.lanes{grid-template-columns:repeat(5,minmax(0,1fr))}.lanes .lane:last-child{grid-column:auto}}
 '''
 
 JS = '''

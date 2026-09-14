@@ -3,6 +3,7 @@ import type { PayrollSourceKind } from '~/lib/payroll/a-navigation'
 import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO } from '~/types/read-model'
 import { PAYROLL_A_CONFIG_PATH, PAYROLL_SOURCE_KEYS, payrollSourceContext } from '~/lib/payroll/a-navigation'
+import { PAYROLL_C1_SOURCE_KEYS, payrollC1SourceContext } from '~/lib/payroll/c1-navigation'
 import { PAYROLL_READ_QUERY_KEYS, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { SCHEDULE_DRILL_QUERY_KEYS } from '~/lib/schedule/navigation'
@@ -135,7 +136,13 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
-    if (PAYROLL_SOURCE_KEYS.some(key => url.searchParams.has(key))) {
+    if (url.searchParams.has('payrollFormat')) {
+      const source: { kind: 'worker' | 'crew' | 'attendance', id: string, projectId?: string } | null = detail?.family === 'worker' || detail?.family === 'crew' ? { kind: detail.family, id: detail.id } : url.pathname === '/subcontract/attendance' ? { kind: 'attendance', id: url.searchParams.get('record') || '', projectId: url.searchParams.get('project') || '' } : null
+      if (!origin || !source || PAYROLL_C1_SOURCE_KEYS.some(key => url.searchParams.getAll(key).length !== 1) || !payrollC1SourceContext(Object.fromEntries(url.searchParams), { ...source, origin }))
+        return null
+      PAYROLL_C1_SOURCE_KEYS.forEach(key => allowed.add(key))
+    }
+    else if (PAYROLL_SOURCE_KEYS.some(key => url.searchParams.has(key))) {
       const sourceQuery = Object.fromEntries(url.searchParams)
       const source: { kind: PayrollSourceKind, id: string, projectId?: string } | null = detail?.family === 'crew-worker-fact' && detail.kind === 'assignment'
         ? { kind: 'quantity-unit' as const, id: detail.id, projectId: detail.secondId }
@@ -164,6 +171,16 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
       else
         url.searchParams.delete('status')
       PAYROLL_READ_QUERY_KEYS.forEach(key => allowed.add(key))
+      if (url.pathname === '/subcontract/attendance') {
+        for (const key of ['record', 'worker']) {
+          if (url.searchParams.has(key) && (url.searchParams.getAll(key).length !== 1 || !isStableRouteIdentity(url.searchParams.get(key))))
+            return null
+          allowed.add(key)
+        }
+        if (url.searchParams.has('workDate') && (url.searchParams.getAll('workDate').length !== 1 || !/^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('workDate') || '')))
+          return null
+        allowed.add('workDate')
+      }
     }
     if (url.pathname === TARGET_COST_LIST_PATH)
       TARGET_COST_FILTER_KEYS.forEach(key => allowed.add(key))

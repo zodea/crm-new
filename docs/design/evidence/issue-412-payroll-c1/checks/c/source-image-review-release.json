@@ -1,0 +1,348 @@
+{
+  "reviewer": "/root/wbs_central_backend",
+  "directory": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/",
+  "batch": "browser-release",
+  "reviewedCount": 40,
+  "method": "对本轮每张PNG单独调用 view_image(detail=original)，完成目检后直接对该文件计算 SHA-256；未沿用旧轮哈希。",
+  "confirmedProductFindings": [],
+  "evidenceObservations": [
+    {
+      "id": "config-lookup-label-not-yet-visible",
+      "files": [
+        "independent-overtime-config-390.png",
+        "independent-overtime-config-768.png",
+        "independent-overtime-config-1024.png"
+      ],
+      "observation": "正常编辑的配置首屏项目/班组仅见占位；相同本轮1280/1440已有真实名称，tail768/1024也显示原班组。",
+      "classification": "Lookup 标签仍在读取的截图过渡态；Root 已结合后续同轮标签解析确认，不列为持续产品缺陷",
+      "requestedFollowUp": "保留这3张原图并标明标签尚在读取。Root 将同一实例新增 saved-personal-config-scope 五宽证据，明确等待原项目/班组和55；本报告不冒称其已完成。",
+      "status": "documented-transitional-state"
+    }
+  ],
+  "limits": [
+    "390px来源表左右区分由 lines/values 两状态联合目检；source-tail的原考勤表右侧链接未在该张出现，不宣称已经在该张验证。",
+    "旧C1缺证据详情、冷配置pending和已发通用工资明细由Root及其他reviewer分工，本报告只覆盖所列八组。"
+  ],
+  "images": [
+    {
+      "file": "c1-draft-source-390.png",
+      "width": 390,
+      "group": "c1-draft-source",
+      "sha256": "d30943280f3a7aebd336cad4ff6c8fd396de5998078af681442d8da09ce812e1",
+      "result": "pass-visible-region",
+      "reason": "真实新项目 8c46e276… 的 2026-08 草稿，负责人及两名成员已选、缺日薪工人未选；核算总额 ¥1,041.00。 单列字段和所有成员完整可读；表仅首行标题进入视口，后续独立滚动状态补齐。"
+    },
+    {
+      "file": "c1-draft-source-768.png",
+      "width": 768,
+      "group": "c1-draft-source",
+      "sha256": "19bd57a8a73e55c16ee4a183f9d84234fee707752fd129133753c4234a76908b",
+      "result": "pass-visible-region",
+      "reason": "真实新项目 8c46e276… 的 2026-08 草稿，负责人及两名成员已选、缺日薪工人未选；核算总额 ¥1,041.00。 两列字段/两列成员，明细主要列和原单价完整；末行在屏幕底部，由 lines 图补齐。"
+    },
+    {
+      "file": "c1-draft-source-1024.png",
+      "width": 1024,
+      "group": "c1-draft-source",
+      "sha256": "63cfdea160133f64231d1b38f86aa8627456b0ad3c65f5296c34fce0c8bd85f1",
+      "result": "pass-visible-region",
+      "reason": "真实新项目 8c46e276… 的 2026-08 草稿，负责人及两名成员已选、缺日薪工人未选；核算总额 ¥1,041.00。 侧栏与两列字段布局稳定，成员三列无重叠，明细列完整。"
+    },
+    {
+      "file": "c1-draft-source-1280.png",
+      "width": 1280,
+      "group": "c1-draft-source",
+      "sha256": "a730ec96d47bee475ea212fb58c703b55f0b894f3ba43dc0c66583931966e83b",
+      "result": "pass-visible-region",
+      "reason": "真实新项目 8c46e276… 的 2026-08 草稿，负责人及两名成员已选、缺日薪工人未选；核算总额 ¥1,041.00。 分节导航与正文分离，两列基础字段和明细未挤压。"
+    },
+    {
+      "file": "c1-draft-source-1440.png",
+      "width": 1440,
+      "group": "c1-draft-source",
+      "sha256": "61dacd715c674decf3f4f110a6e4060ccbae2ce96dfc3a60dc8f874addb52209",
+      "result": "pass-visible-region",
+      "reason": "真实新项目 8c46e276… 的 2026-08 草稿，负责人及两名成员已选、缺日薪工人未选；核算总额 ¥1,041.00。 宽屏表单受控宽度；项目长名全部可读，明细表尾由独立图补齐。"
+    },
+    {
+      "file": "c1-draft-source-lines-390.png",
+      "width": 390,
+      "group": "c1-draft-source-lines",
+      "sha256": "203c3474342e47d35089197643ffec485c5263c043934d5339d4ea37bc391055",
+      "result": "pass-visible-region",
+      "reason": "六行明细包含正常和加班两条零成员行。负责人 8×60.125=481、2×55=110，工人 7.5×60=450，其他三行 0；标准说明未混淆原档案与独立加班价。 姓名/核算项目完整纵向六行，右侧工时及金额处于表内横滚边界，由 values-390 补齐。"
+    },
+    {
+      "file": "c1-draft-source-lines-768.png",
+      "width": 768,
+      "group": "c1-draft-source-lines",
+      "sha256": "8e52ad7f0fc89aa25d20c51750d816a9c3ca6b56309835d25ad5cbcdaa355522",
+      "result": "pass-visible-region",
+      "reason": "六行明细包含正常和加班两条零成员行。负责人 8×60.125=481、2×55=110，工人 7.5×60=450，其他三行 0；标准说明未混淆原档案与独立加班价。 六行及最后零加班行完整，三名标准说明清楚。"
+    },
+    {
+      "file": "c1-draft-source-lines-1024.png",
+      "width": 1024,
+      "group": "c1-draft-source-lines",
+      "sha256": "2411d63da283ea61a907018ca7251ad87c63b3b1534d12e1787e43d4ff5d415f",
+      "result": "pass-visible-region",
+      "reason": "六行明细包含正常和加班两条零成员行。负责人 8×60.125=481、2×55=110，工人 7.5×60=450，其他三行 0；标准说明未混淆原档案与独立加班价。 六行与末行完整，说明及原考勤标题无遮挡。"
+    },
+    {
+      "file": "c1-draft-source-lines-1280.png",
+      "width": 1280,
+      "group": "c1-draft-source-lines",
+      "sha256": "158fc5847656c9568b60d5043781983d0fed5e1b010dc8a6a62f996c5aa73ca2",
+      "result": "pass-visible-region",
+      "reason": "六行明细包含正常和加班两条零成员行。负责人 8×60.125=481、2×55=110，工人 7.5×60=450，其他三行 0；标准说明未混淆原档案与独立加班价。 表格与分节导航无重叠，全部六行及说明可读。"
+    },
+    {
+      "file": "c1-draft-source-lines-1440.png",
+      "width": 1440,
+      "group": "c1-draft-source-lines",
+      "sha256": "90ee363076a77450facb3c0d576ee8f7e7eed3849a96b06b6ac283f07fa716b2",
+      "result": "pass-visible-region",
+      "reason": "六行明细包含正常和加班两条零成员行。负责人 8×60.125=481、2×55=110，工人 7.5×60=450，其他三行 0；标准说明未混淆原档案与独立加班价。 宽屏全部六行金额与源价并列，零行和后续标准说明完整。"
+    },
+    {
+      "file": "c1-draft-source-tail-390.png",
+      "width": 390,
+      "group": "c1-draft-source-tail",
+      "sha256": "35bf23ec36953ef0150e16e10617a312469326849e119b2ef64a6dc1ddf430fc",
+      "result": "pass-visible-region",
+      "reason": "来源表尾、三名成员说明与资料链接、两条实际考勤、备注及取消/保存工资草稿操作均在对应可见范围内清晰。 原考勤表左侧姓名日期/正常/加班可读，右侧施工内容与来源入口需其内部横滚，不能仅由本图宣称已目检右列；三个人员链接与备注、保存按钮完整。"
+    },
+    {
+      "file": "c1-draft-source-tail-768.png",
+      "width": 768,
+      "group": "c1-draft-source-tail",
+      "sha256": "e1ffcb46f517d0d04ec067693c29bc3e0224ce8508542556530492b3bb9d47de",
+      "result": "pass-visible-region",
+      "reason": "来源表尾、三名成员说明与资料链接、两条实际考勤、备注及取消/保存工资草稿操作均在对应可见范围内清晰。 两条原考勤的施工内容和查看原考勤入口完整，全部人员链接及页尾可读。"
+    },
+    {
+      "file": "c1-draft-source-tail-1024.png",
+      "width": 1024,
+      "group": "c1-draft-source-tail",
+      "sha256": "b9d45a02c9374eba36f5af60cf07f0b16b167d70ea535629efb41591d808d574",
+      "result": "pass-visible-region",
+      "reason": "来源表尾、三名成员说明与资料链接、两条实际考勤、备注及取消/保存工资草稿操作均在对应可见范围内清晰。 表尾零行、两条来源和页尾操作全部无遮挡。"
+    },
+    {
+      "file": "c1-draft-source-tail-1280.png",
+      "width": 1280,
+      "group": "c1-draft-source-tail",
+      "sha256": "1828905bb6ad1728b080d43b657b39a67c5918403cc1a3ae903c0306376b8254",
+      "result": "pass-visible-region",
+      "reason": "来源表尾、三名成员说明与资料链接、两条实际考勤、备注及取消/保存工资草稿操作均在对应可见范围内清晰。 原考勤、全部来源链接和保存区完整，侧边分节导航未遮挡。"
+    },
+    {
+      "file": "c1-draft-source-tail-1440.png",
+      "width": 1440,
+      "group": "c1-draft-source-tail",
+      "sha256": "318b45beddeb344812179f1cf563d92f7121cfd7e6cbff4a0455737b60f4b562",
+      "result": "pass-visible-region",
+      "reason": "来源表尾、三名成员说明与资料链接、两条实际考勤、备注及取消/保存工资草稿操作均在对应可见范围内清晰。 宽屏表尾和所有末端操作清楚，无浮层覆盖。"
+    },
+    {
+      "file": "c1-draft-source-values-390.png",
+      "width": 390,
+      "group": "c1-draft-source-values",
+      "sha256": "34e04182d3af0f4de4d3904b6eb86a85cef046077906767ec8d2dd2fd7ba235e",
+      "result": "pass-visible-region",
+      "reason": "工时、每小时标准及金额完整保留原精度：60.125、55、60；金额到分，零成员末行保留。 右移限于明细表，工时/标准/金额三列及六行完整；名称对应另由 lines 图证明。"
+    },
+    {
+      "file": "c1-draft-source-values-768.png",
+      "width": 768,
+      "group": "c1-draft-source-values",
+      "sha256": "8e52ad7f0fc89aa25d20c51750d816a9c3ca6b56309835d25ad5cbcdaa355522",
+      "result": "pass-visible-region",
+      "reason": "工时、每小时标准及金额完整保留原精度：60.125、55、60；金额到分，零成员末行保留。 宽度足够，全部列同时可见，无页面横向溢出。"
+    },
+    {
+      "file": "c1-draft-source-values-1024.png",
+      "width": 1024,
+      "group": "c1-draft-source-values",
+      "sha256": "2411d63da283ea61a907018ca7251ad87c63b3b1534d12e1787e43d4ff5d415f",
+      "result": "pass-visible-region",
+      "reason": "工时、每小时标准及金额完整保留原精度：60.125、55、60；金额到分，零成员末行保留。 侧栏外正文全列可读，原精度与金额没有裁切。"
+    },
+    {
+      "file": "c1-draft-source-values-1280.png",
+      "width": 1280,
+      "group": "c1-draft-source-values",
+      "sha256": "158fc5847656c9568b60d5043781983d0fed5e1b010dc8a6a62f996c5aa73ca2",
+      "result": "pass-visible-region",
+      "reason": "工时、每小时标准及金额完整保留原精度：60.125、55、60；金额到分，零成员末行保留。 完整列和末行清楚，金额对齐稳定。"
+    },
+    {
+      "file": "c1-draft-source-values-1440.png",
+      "width": 1440,
+      "group": "c1-draft-source-values",
+      "sha256": "90ee363076a77450facb3c0d576ee8f7e7eed3849a96b06b6ac283f07fa716b2",
+      "result": "pass-visible-region",
+      "reason": "工时、每小时标准及金额完整保留原精度：60.125、55、60；金额到分，零成员末行保留。 无需额外横移即可看全表，右侧金额未越界。"
+    },
+    {
+      "file": "independent-overtime-config-390.png",
+      "width": 390,
+      "group": "independent-overtime-config",
+      "sha256": "309a82068787bfe14ba8655a04e1d9cfb5acb40fcd99db4ca32937d627f57d33",
+      "result": "pass-layout-with-label-evidence-observation",
+      "reason": "负责人待保存加班输入 55 与当前按档案日薪 481÷8 的 60.125 分开说明；缺日薪保空，没有回填 0。 单列输入焦点正常；项目/班组此张仍为占位，未显示所选名称，已报告 Root 核实截图是否早于 Lookup 标签解析。"
+    },
+    {
+      "file": "independent-overtime-config-768.png",
+      "width": 768,
+      "group": "independent-overtime-config",
+      "sha256": "afc3cd0cacdd7ca87de8c7f9a8c12e977a579f3fe18c4418af449c1a6a2fbd51",
+      "result": "pass-layout-with-label-evidence-observation",
+      "reason": "负责人待保存加班输入 55 与当前按档案日薪 481÷8 的 60.125 分开说明；缺日薪保空，没有回填 0。 最多两列字段，已见前三人及第四人标题；项目/班组仍为占位，需补标签就绪证据。"
+    },
+    {
+      "file": "independent-overtime-config-1024.png",
+      "width": 1024,
+      "group": "independent-overtime-config",
+      "sha256": "440b20bb5207806ff5408b3331a77c3b8c8c240b13d518e8290f1095e131e859",
+      "result": "pass-layout-with-label-evidence-observation",
+      "reason": "负责人待保存加班输入 55 与当前按档案日薪 481÷8 的 60.125 分开说明；缺日薪保空，没有回填 0。 布局无裁切，但项目/班组此张仍为占位，不能宣称所选范围名称已呈现。"
+    },
+    {
+      "file": "independent-overtime-config-1280.png",
+      "width": 1280,
+      "group": "independent-overtime-config",
+      "sha256": "5a5f7fcd5766691fd3be9fef858162e8c48230236b5f94b312ed1ce9293096c2",
+      "result": "pass-visible-region",
+      "reason": "负责人待保存加班输入 55 与当前按档案日薪 481÷8 的 60.125 分开说明；缺日薪保空，没有回填 0。 本图项目完整名称及计时班组已显示，输入55及前三人原标准清楚。"
+    },
+    {
+      "file": "independent-overtime-config-1440.png",
+      "width": 1440,
+      "group": "independent-overtime-config",
+      "sha256": "c2f7afb3a9b476f53bd7412ddeccba143d13200f9c9172cfb2fc7551ffbd7052",
+      "result": "pass-visible-region",
+      "reason": "负责人待保存加班输入 55 与当前按档案日薪 481÷8 的 60.125 分开说明；缺日薪保空，没有回填 0。 项目完整名称及班组标签已显示，两列输入和原标准说明完整。"
+    },
+    {
+      "file": "independent-overtime-config-tail-390.png",
+      "width": 390,
+      "group": "independent-overtime-config-tail",
+      "sha256": "74b5f2498148b4729cd14f1aee44ed176e2eb7d07a2225e0518f39c773e752d9",
+      "result": "pass-visible-region",
+      "reason": "第四位无考勤零收款成员的档案日薪/有效日薪为真实 0，工资兜底与独立加班配置输入仍为空，默认加班 0；返回/保存个人标准完整。 第三人和第四人完整，第二人尾部作为滚动延续；零价与空值文字清楚，底部按钮无遮挡。"
+    },
+    {
+      "file": "independent-overtime-config-tail-768.png",
+      "width": 768,
+      "group": "independent-overtime-config-tail",
+      "sha256": "186c80c4c3773e073abf45cabcb9ff93f4e0b18d47f2aa1e408d903c6745861b",
+      "result": "pass-visible-region",
+      "reason": "第四位无考勤零收款成员的档案日薪/有效日薪为真实 0，工资兜底与独立加班配置输入仍为空，默认加班 0；返回/保存个人标准完整。 四人配置卡片均可核对，55稿保留，第四人和保存区完整。"
+    },
+    {
+      "file": "independent-overtime-config-tail-1024.png",
+      "width": 1024,
+      "group": "independent-overtime-config-tail",
+      "sha256": "cb374d07beac2f2a5ad6896e7a9136b6df2f0f2bb9724f1139ebaa9243346dc0",
+      "result": "pass-visible-region",
+      "reason": "第四位无考勤零收款成员的档案日薪/有效日薪为真实 0，工资兜底与独立加班配置输入仍为空，默认加班 0；返回/保存个人标准完整。 四人全部可见；当前班组名在顶端可见，空值/零值及保存操作没有挤压。"
+    },
+    {
+      "file": "independent-overtime-config-tail-1280.png",
+      "width": 1280,
+      "group": "independent-overtime-config-tail",
+      "sha256": "513130aec5c82657bb6663fce2b89a2aa46097afb8be91f4f7a8c2b4e76b2978",
+      "result": "pass-visible-region",
+      "reason": "第四位无考勤零收款成员的档案日薪/有效日薪为真实 0，工资兜底与独立加班配置输入仍为空，默认加班 0；返回/保存个人标准完整。 四人卡片与两列输入完整，原班组可见，页面尾部留有操作空间。"
+    },
+    {
+      "file": "independent-overtime-config-tail-1440.png",
+      "width": 1440,
+      "group": "independent-overtime-config-tail",
+      "sha256": "f8e1bf87271828fb30cf73450e1a3ef1cc53ec510aee0ea024d0d9bb7babf8ee",
+      "result": "pass-visible-region",
+      "reason": "第四位无考勤零收款成员的档案日薪/有效日薪为真实 0，工资兜底与独立加班配置输入仍为空，默认加班 0；返回/保存个人标准完整。 四人原标准、55草稿、空配置和零值均完整，保存按钮不被裁切。"
+    },
+    {
+      "file": "allocation-cent-error-390.png",
+      "width": 390,
+      "group": "allocation-cent-error",
+      "sha256": "b054b5354fb41c3f58d0be255a605acedafe45e437c6fc90288e1bdb6ae7bf64",
+      "result": "pass-visible-region",
+      "reason": "实发 900、三名成员 550/349.99/0，明确红字相差 0.01 元；焦点位于 349.99 输入，确认禁用、取消可见。 整张弹窗在窄屏内，说明换行与按钮完整，没有页面横溢。"
+    },
+    {
+      "file": "allocation-cent-error-768.png",
+      "width": 768,
+      "group": "allocation-cent-error",
+      "sha256": "c3f921457dc1f4598318b952b1fab353fb67c567ced4de2c18aeb8085afd3072",
+      "result": "pass-visible-region",
+      "reason": "实发 900、三名成员 550/349.99/0，明确红字相差 0.01 元；焦点位于 349.99 输入，确认禁用、取消可见。 居中弹窗全部成员、差额与按钮完整，遮罩层级清晰。"
+    },
+    {
+      "file": "allocation-cent-error-1024.png",
+      "width": 1024,
+      "group": "allocation-cent-error",
+      "sha256": "2355424df8c55a08abef952534f47690943ba9cb3a175387030cc043fe5b3ee5",
+      "result": "pass-visible-region",
+      "reason": "实发 900、三名成员 550/349.99/0，明确红字相差 0.01 元；焦点位于 349.99 输入，确认禁用、取消可见。 浮层覆盖背景但不遮自身内容，焦点环可读。"
+    },
+    {
+      "file": "allocation-cent-error-1280.png",
+      "width": 1280,
+      "group": "allocation-cent-error",
+      "sha256": "24b9c88b2db6f78238beca6b8512c9b9d3186294e910e75f0c225e6efabc6e87",
+      "result": "pass-visible-region",
+      "reason": "实发 900、三名成员 550/349.99/0，明确红字相差 0.01 元；焦点位于 349.99 输入，确认禁用、取消可见。 所有字段、错误与操作区完整，未出现上下裁切。"
+    },
+    {
+      "file": "allocation-cent-error-1440.png",
+      "width": 1440,
+      "group": "allocation-cent-error",
+      "sha256": "a1f3a866c0d5e0ea1ebd7ab133b4a175d2bf1b6dd156b088cc18a115a811b40d",
+      "result": "pass-visible-region",
+      "reason": "实发 900、三名成员 550/349.99/0，明确红字相差 0.01 元；焦点位于 349.99 输入，确认禁用、取消可见。 固定合理宽度，金额和一分差额清晰，禁用态明确。"
+    },
+    {
+      "file": "unknown-original-allocation-390.png",
+      "width": 390,
+      "group": "unknown-original-allocation",
+      "sha256": "3231248f0a7c2aa97d73fc1abbade47a8475898a0d28f34aeed61d99d1e3444f",
+      "result": "pass-visible-region",
+      "reason": "失响应保留实际 900 和原分配 550/350/0；读取服务错误与原提交结果未确认说明分开，取消禁用，核对原提交入口可见。 红/橙提示换行完整，原金额未丢，恢复按钮未被遮挡。"
+    },
+    {
+      "file": "unknown-original-allocation-768.png",
+      "width": 768,
+      "group": "unknown-original-allocation",
+      "sha256": "9fc6072cb79049cdff3a862f04f8f0a8d58f68624568a7e18cbba79200bb9b54",
+      "result": "pass-visible-region",
+      "reason": "失响应保留实际 900 和原分配 550/350/0；读取服务错误与原提交结果未确认说明分开，取消禁用，核对原提交入口可见。 所有成员与恢复说明完整，原窗口保留，未宣告已发成功。"
+    },
+    {
+      "file": "unknown-original-allocation-1024.png",
+      "width": 1024,
+      "group": "unknown-original-allocation",
+      "sha256": "2ad078b9fdd31cab0c619206c2e708039717ac3ad3086b8a6e7a8b86a117093f",
+      "result": "pass-visible-region",
+      "reason": "失响应保留实际 900 和原分配 550/350/0；读取服务错误与原提交结果未确认说明分开，取消禁用，核对原提交入口可见。 原分配三行和恢复入口完整；背景操作被遮罩清晰区分。"
+    },
+    {
+      "file": "unknown-original-allocation-1280.png",
+      "width": 1280,
+      "group": "unknown-original-allocation",
+      "sha256": "bf930eebf93d2701e2777f7b5488e5287aa392f38acde7c139604f8b3a7d7961",
+      "result": "pass-visible-region",
+      "reason": "失响应保留实际 900 和原分配 550/350/0；读取服务错误与原提交结果未确认说明分开，取消禁用，核对原提交入口可见。 错误/恢复两种信息清楚，底部操作未裁切。"
+    },
+    {
+      "file": "unknown-original-allocation-1440.png",
+      "width": 1440,
+      "group": "unknown-original-allocation",
+      "sha256": "2e6ffe9b601293a2c6f4d9b1cf6475ca2684da3a09e97f3d931f02c5a25df969",
+      "result": "pass-visible-region",
+      "reason": "失响应保留实际 900 和原分配 550/350/0；读取服务错误与原提交结果未确认说明分开，取消禁用，核对原提交入口可见。 原输入及零成员保留，浮层与背景区分，恢复入口完整可见。"
+    }
+  ]
+}

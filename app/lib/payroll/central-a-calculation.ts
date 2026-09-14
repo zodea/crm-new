@@ -1,13 +1,8 @@
 import type { PayrollAAmount, PayrollALine, PayrollAPriceRevision, PayrollAQuantityFact, PayrollASubjectScope } from './central-a-contract'
+import { payrollCanonical as payrollACanonical } from './central-command-shared'
 import { rounded } from './statements'
 
-export function payrollACanonical(value: unknown): string {
-  if (Array.isArray(value))
-    return `[${value.map(payrollACanonical).join(',')}]`
-  if (value && typeof value === 'object')
-    return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => `${JSON.stringify(key)}:${payrollACanonical(entry)}`).join(',')}}`
-  return JSON.stringify(value) ?? 'null'
-}
+export { payrollCanonical as payrollACanonical } from './central-command-shared'
 export const payrollAMoney = rounded
 export function payrollAAmount(values: Array<number | null>, reasons: string[] = []): PayrollAAmount {
   const known = values.filter((value): value is number => value !== null)

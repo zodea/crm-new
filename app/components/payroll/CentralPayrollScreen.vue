@@ -26,7 +26,9 @@ const crews = computed(() => [...new Map((current.value?.rows || []).flatMap(row
 const returnTo = computed(() => payrollReadLocation('/subcontract/payroll', scope.value))
 const sources = computed(() => payrollReadLocation('/subcontract/payroll/sources', scope.value))
 const canCreate = computed(() => scope.value.origin === 'real' && current.value?.context.capabilities.includes('payroll:write'))
-const createTo = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', returnTo: returnTo.value } }))
+const createTo = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: undefined, returnTo: returnTo.value } }))
+const createC1To = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: 'C1', returnTo: returnTo.value } }))
+const attendanceTo = computed(() => payrollReadLocation('/subcontract/attendance', scope.value))
 const configTo = computed(() => ({ path: '/subcontract/payroll/config', query: { origin: 'real', project: scope.value.projectId, month: scope.value.month, crew: scope.value.crewId, returnTo: returnTo.value } }))
 const columns: KitTableColumn[] = [
   { field: 'month', title: '月份 / 详情', minWidth: 142, fixed: 'left', slot: 'detail' },
@@ -62,6 +64,12 @@ useTabTitle('工资台账')
       <div class="flex flex-wrap gap-2">
         <NuxtLink v-if="canCreate" :to="createTo" class="btn-primary">
           新建 A 工资草稿
+        </NuxtLink>
+        <NuxtLink v-if="canCreate" :to="createC1To" class="btn-primary">
+          新建 C1 工资草稿
+        </NuxtLink>
+        <NuxtLink :to="attendanceTo" class="btn-secondary">
+          考勤管理
         </NuxtLink>
         <NuxtLink v-if="canCreate" :to="configTo" class="btn-secondary">
           工资配置

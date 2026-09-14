@@ -14,13 +14,14 @@ export function payrollSession(sessionId?: string | null) {
 }
 export function payrollIdentitySource(sessionId?: string | null) {
   const ratios = crewWorkerCommandTestInstance.payrollRatioFacts(sessionId)
+  const workerFacts = crewWorkerCommandTestInstance.payrollWorkerFacts(sessionId)
   const projects = projectReadTestInstance.identities(sessionId).rows.filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, name: row.name, code: row.code ?? '' }))
   const crews = crewWorkerCommandTestInstance.crewRows(sessionId).filter(row => row.dataOrigin === 'real').map((row) => {
     const ratio = ratios.rows.find(ratio => ratio.crewId === row.id)
     return { id: row.id, name: row.name, defaultPayRatio: ratio?.value ?? null, ratioExplicitlyConfigured: ratio?.explicitlyConfigured ?? false }
   })
-  const workers = crewWorkerCommandTestInstance.workerRows(sessionId).filter(row => row.dataOrigin === 'real' && (!row.crewId || crews.some(crew => crew.id === row.crewId))).map(row => ({ id: row.id, name: row.name, crewId: row.crewId }))
-  return { projects, crews, workers, version: createHash('sha256').update(JSON.stringify([projects, crews, workers, ratios])).digest('hex') }
+  const workers = crewWorkerCommandTestInstance.workerRows(sessionId).filter(row => row.dataOrigin === 'real' && (!row.crewId || crews.some(crew => crew.id === row.crewId))).map(row => ({ ...workerFacts.rows.find(fact => fact.workerId === row.id), id: row.id, name: row.name, crewId: row.crewId }))
+  return { projects, crews, workers, version: createHash('sha256').update(JSON.stringify([projects, crews, workers, ratios, workerFacts])).digest('hex') }
 }
 export const payrollService = createPayrollService({ session: payrollSession, identities: payrollIdentitySource, quantityFacts: loadPayrollAQuantityFacts, async transaction(work, sessionId) {
   try {

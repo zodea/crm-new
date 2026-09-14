@@ -1,0 +1,197 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run tests/components/PayrollC1DetailPrecision.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+stderr | tests/components/PayrollC1DetailPrecision.test.ts > c1 详情及保存的明细保留60.125原时薪，金额仍到分，未知价不补零
+[Vue warn]: Failed to resolve component: PayrollAStatementWorkspace
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+
+stderr | tests/components/PayrollC1DetailPrecision.test.ts > c1 详情及保存的明细保留60.125原时薪，金额仍到分，未知价不补零
+[Vue warn]: Failed to resolve component: PayrollAStatementWorkspace
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+[Vue warn]: Failed to resolve component: KitStatusTag
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <PayrollEvidenceTable title="工资明细" rows= [
+  {
+    id: 'line-a',
+    statementId: 'wage-a',
+    workerId: 'worker-a',
+    workerName: '快照原姓名',
+    itemId: null,
+    itemName: '正常工时',
+    unit: '小时',
+    quantity: 8,
+    unitPrice: 60.125,
+    amount: 481,
+    sortOrder: 0,
+    deletedAt: null
+  },
+  {
+    id: 'missing-price',
+    statementId: 'wage-a',
+    workerId: 'worker-a',
+    workerName: '快照原姓名',
+    itemId: null,
+    itemName: '正常工时',
+    unit: '小时',
+    quantity: 8,
+    unitPrice: null,
+    amount: null,
+    sortOrder: 0,
+    deletedAt: null
+  }
+] columns= [
+  { field: 'workerName', title: '姓名', width: 140 },
+  { field: 'itemName', title: '分项', width: 180 },
+  { field: 'unit', title: '单位', width: 90 },
+  { field: 'quantity', title: '数量' },
+  { field: 'unitPrice', title: '单价', money: true },
+  { field: 'amount', title: '金额', money: true },
+  { field: 'deletedAt', title: '记录状态' }
+] > 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+[Vue warn]: Failed to resolve component: KitStatusTag
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <PayrollEvidenceTable title="请款成员" rows= [
+  {
+    id: 'member-a',
+    statementId: 'wage-a',
+    workerId: 'worker-zero',
+    workerName: '零金额成员',
+    isLeader: false,
+    deletedAt: null
+  }
+] columns= [
+  { field: 'workerName', title: '成员姓名', width: 160 },
+  { field: 'isLeader', title: '角色' },
+  { field: 'deletedAt', title: '记录状态' }
+] > 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+[Vue warn]: Failed to resolve component: KitStatusTag
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <PayrollEvidenceTable title="收款分配" rows= [
+  {
+    id: 'allocation-a',
+    statementId: 'wage-a',
+    workerId: 'worker-zero',
+    workerName: '零金额成员',
+    isLeader: false,
+    amount: 0,
+    allocatedAmountFen: 0,
+    deletedAt: null
+  }
+] columns= [
+  { field: 'workerName', title: '收款成员', width: 160 },
+  { field: 'isLeader', title: '角色' },
+  { field: 'amount', title: '分配金额', money: true },
+  { field: 'deletedAt', title: '记录状态' }
+]  ... > 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+[Vue warn]: Failed to resolve component: KitStatusTag
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <PayrollEvidenceTable title="关联签工" rows= [] columns= [
+  { field: 'workerName', title: '姓名' },
+  { field: 'workDate', title: '签工日期' },
+  { field: 'workContent', title: '工作内容', width: 240 },
+  { field: 'laborUnits', title: '工数' },
+  { field: 'status', title: '签工确认状态' },
+  { field: 'deletedAt', title: '记录状态' }
+] > 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+[Vue warn]: Failed to resolve component: KitStatusTag
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <PayrollEvidenceTable title="保存的明细历史" rows= [
+  {
+    id: 'line-a',
+    statementId: 'wage-a',
+    workerId: 'worker-a',
+    workerName: '快照原姓名',
+    itemId: null,
+    itemName: '正常工时',
+    unit: '小时',
+    quantity: 8,
+    unitPrice: 60.125,
+    amount: 481,
+    sortOrder: 0,
+    deletedAt: null
+  }
+] columns= [
+  { field: 'workerName', title: '姓名', width: 140 },
+  { field: 'itemName', title: '分项', width: 180 },
+  { field: 'unit', title: '单位', width: 90 },
+  { field: 'quantity', title: '数量' },
+  { field: 'unitPrice', title: '单价', money: true },
+  { field: 'amount', title: '金额', money: true },
+  { field: 'deletedAt', title: '记录状态' }
+] > 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+[Vue warn]: Failed to resolve component: KitStatusTag
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <PayrollEvidenceTable title="保存的成员历史" rows= [] columns= [
+  { field: 'workerName', title: '成员姓名', width: 160 },
+  { field: 'isLeader', title: '角色' },
+  { field: 'deletedAt', title: '记录状态' }
+] > 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+[Vue warn]: Failed to resolve component: KitStatusTag
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <PayrollEvidenceTable title="保存的分配历史" rows= [] columns= [
+  { field: 'workerName', title: '收款成员', width: 160 },
+  { field: 'isLeader', title: '角色' },
+  { field: 'amount', title: '分配金额', money: true },
+  { field: 'deletedAt', title: '记录状态' }
+] > 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+[Vue warn]: Failed to resolve component: KitStatusTag
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <PayrollEvidenceTable title="保存的签工关联历史" rows= [] columns= [
+  { field: 'dayworkRecordId', title: '原签工身份', width: 260 },
+  { field: 'deletedAt', title: '记录状态' }
+] > 
+  at <CentralPayrollDetailScreen ref="VTU_COMPONENT" > 
+  at <VTUROOT>
+
+ ❯ |component| tests/components/PayrollC1DetailPrecision.test.ts (1 test | 1 failed) 73ms
+   × c1 详情及保存的明细保留60.125原时薪，金额仍到分，未知价不补零 71ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |component| tests/components/PayrollC1DetailPrecision.test.ts > c1 详情及保存的明细保留60.125原时薪，金额仍到分，未知价不补零
+AssertionError: expected '快照原姓名正常工时小时8¥60.13¥481.00保留中快照原姓名正常工时…' to contain '60.125'
+
+Expected: "60.125"
+Received: "快照原姓名正常工时小时8¥60.13¥481.00保留中快照原姓名正常工时小时8未记录未记录保留中"
+
+ ❯ tests/components/PayrollC1DetailPrecision.test.ts:33:26
+     31|   for (const label of ['工资明细', '保存的明细历史']) {
+     32|     const table = view.get(`[aria-label="${label}"] table`)
+     33|     expect(table.text()).toContain('60.125')
+       |                          ^
+     34|     expect(table.text()).not.toContain('60.13')
+     35|     expect(table.text()).toContain('¥481.00')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  12:10:04
+   Duration  2.34s (transform 188ms, setup 453ms, import 200ms, tests 73ms, environment 1.36s)
+

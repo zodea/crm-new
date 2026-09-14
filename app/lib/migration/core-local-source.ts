@@ -802,7 +802,7 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
     ORDER BY kind, id
   `,
   workers: `
-    SELECT id, name, crew_id, current_project_id, deleted_at
+    SELECT id, name, crew_id, current_project_id, daily_wage, deleted_at
     FROM workers
     ORDER BY id
   `,
@@ -942,8 +942,12 @@ function sourceEntity(
     }
   }
   if (entityType === 'workers') {
+    const dailyWage = row.daily_wage
+    if (dailyWage !== undefined && dailyWage !== null && (typeof dailyWage !== 'number' || !Number.isFinite(dailyWage) || dailyWage < 0))
+      throw problem('unidentifiable-source-row', '本地工人日薪不是可确认的非负数值，不能以缺价或零代替')
     return {
       ...entity,
+      ...(dailyWage !== undefined ? { attributes: { dailyWage } } : {}),
       references: {
         crewId: nullableText(row.crew_id),
         projectId: nullableText(row.current_project_id),

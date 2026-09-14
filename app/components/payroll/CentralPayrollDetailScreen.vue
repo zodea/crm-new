@@ -29,7 +29,7 @@ const sources = computed(() => {
     return null
   return { path: '/subcontract/payroll/sources', query: { ...payrollViewQuery({ ...scope.value, projectId: statement.value.projectId, month: statement.value.month, crewId: statement.value.crewId || '' }), returnTo: payrollReadLocation(`/subcontract/payroll/${encodeURIComponent(statement.value.id)}`, scope.value) } }
 })
-const lineColumns = [{ field: 'workerName', title: '姓名', width: 140 }, { field: 'itemName', title: '分项', width: 180 }, { field: 'unit', title: '单位', width: 90 }, { field: 'quantity', title: '数量' }, { field: 'unitPrice', title: '单价', money: true }, { field: 'amount', title: '金额', money: true }, { field: 'deletedAt', title: '记录状态' }]
+const lineColumns = computed(() => [{ field: 'workerName', title: '姓名', width: 140 }, { field: 'itemName', title: '分项', width: 180 }, { field: 'unit', title: '单位', width: 90 }, { field: 'quantity', title: '数量' }, { field: 'unitPrice', title: '单价', money: statement.value?.formatFamily !== 'C1' }, { field: 'amount', title: '金额', money: true }, { field: 'deletedAt', title: '记录状态' }])
 const memberColumns = [{ field: 'workerName', title: '成员姓名', width: 160 }, { field: 'isLeader', title: '角色' }, { field: 'deletedAt', title: '记录状态' }]
 const allocationColumns = [{ field: 'workerName', title: '收款成员', width: 160 }, { field: 'isLeader', title: '角色' }, { field: 'amount', title: '分配金额', money: true }, { field: 'deletedAt', title: '记录状态' }]
 const dayworkColumns = [{ field: 'workerName', title: '姓名' }, { field: 'workDate', title: '签工日期' }, { field: 'workContent', title: '工作内容', width: 240 }, { field: 'laborUnits', title: '工数' }, { field: 'status', title: '签工确认状态' }, { field: 'deletedAt', title: '记录状态' }]
@@ -115,6 +115,7 @@ useTabTitle(computed(() => statement.value ? `${statement.value.month} · 工资
       </section>
       <PayrollReadDiagnostics :issues="statement.diagnostics" />
       <PayrollAStatementWorkspace v-if="statement.formatFamily === 'A' && statement.recordKind === 'central' && !statement.deletedAt && current" :statement-id="statement.id" :origin="current.context.origin" :return-to="route.fullPath" @changed="load" />
+      <PayrollC1StatementWorkspace v-if="statement.formatFamily === 'C1' && statement.recordKind === 'central' && !statement.deletedAt && current" :statement-id="statement.id" :origin="current.context.origin" :return-to="route.fullPath" @changed="load" />
       <PayrollSnapshotEvidence :snapshot="statement.snapshot" />
       <PayrollEvidenceTable title="工资明细" :rows="statement.lines" :columns="lineColumns" />
       <PayrollEvidenceTable title="请款成员" :rows="statement.members" :columns="memberColumns" />

@@ -29,6 +29,13 @@ export async function initializePayrollSchema(tx: TransactionDb) {
   // 旧回执没有保存原提交正文时保留 NULL；不能根据当前单据猜造正文再升格为可验证来源。
   if (!(await tx.select<{ name: string }>('PRAGMA table_info(payroll_command_receipts)')).some(column => column.name === 'command_json'))
     await tx.execute('ALTER TABLE payroll_command_receipts ADD COLUMN command_json TEXT')
+  await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_c1_rate_revisions (
+    id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), worker_id TEXT NOT NULL REFERENCES workers(id),
+    effective_month TEXT NOT NULL, daily_wage REAL, overtime_rate REAL, revision INTEGER NOT NULL,
+    operator_id TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(project_id,worker_id,revision))`)
+  await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_c1_statement_sources (
+    statement_id TEXT PRIMARY KEY REFERENCES wage_statements(id), project_id TEXT NOT NULL REFERENCES projects(id),
+    leader_worker_id TEXT NOT NULL REFERENCES workers(id), source_json TEXT NOT NULL)`)
 }
 export async function payrollRevision(tx: TransactionDb): Promise<number> {
   const rows = await tx.select<{ revision: number }>('SELECT revision FROM payroll_revision WHERE singleton = 1')

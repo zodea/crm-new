@@ -19,6 +19,7 @@ import {
   validateOwnerDocumentJourneyReturnTo,
 } from '~/lib/owner-document/return-context'
 import { payrollAWorkspaceReturn } from '~/lib/payroll/a-navigation'
+import { payrollC1WorkspaceReturn } from '~/lib/payroll/c1-navigation'
 import { payrollReadLocation, payrollReturnTo, payrollViewScope } from '~/lib/payroll/central-navigation'
 import {
   appendProjectSupplierReturnContext,
@@ -359,6 +360,12 @@ const TARGET_REGISTRY = {
     return `${entityPath('/schedule/process-library', intent)}?origin=${origin}`
   },
   'quantity-unit:detail': quantityUnitPath,
+  'attendance:matrix': (intent: EntityTargetIntent) => {
+    const { projectId, dataOrigin, month, crewId, workerId, workDate, recordId } = intent.filters
+    if (!isStableRouteIdentity(projectId) || !isDataOriginDTO(dataOrigin) || !isStableRouteIdentity(workerId) || recordId !== intent.subject.id || typeof month !== 'string' || !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(month) || typeof workDate !== 'string' || !workDate.startsWith(`${month}-`))
+      throw new Error('invalid attendance source')
+    return `/subcontract/attendance?${new URLSearchParams({ origin: dataOrigin, project: projectId, month, ...(typeof crewId === 'string' && crewId ? { crew: crewId } : {}), worker: workerId, workDate, record: intent.subject.id })}`
+  },
   'wage-statement:detail': (intent: EntityTargetIntent) => {
     const path = entityPath('/subcontract/payroll', intent)
     if (intent.filters.ownerKind != null || intent.filters.ownerId != null)
@@ -477,12 +484,13 @@ export function resolveNavigationTarget(
   if (intent.kind === 'source-record') {
     const dataOrigin = intent.filters.dataOrigin
     const returnContext = validateProjectSupplierReturnTo(options.returnTo)
-    if (!isDataOriginDTO(dataOrigin) || returnContext?.origin !== dataOrigin
+    const attendanceReturn = key === 'attendance:matrix' && isDataOriginDTO(dataOrigin) && payrollC1WorkspaceReturn(options.returnTo, dataOrigin)
+    if (!attendanceReturn && (!isDataOriginDTO(dataOrigin) || returnContext?.origin !== dataOrigin
       || !isVerifiedProjectSupplierSourceTarget({
         dataOrigin,
         entity: intent.subject.entity,
         variant: intent.variant,
-      })) {
+      }))) {
       return unavailable('unverified-target', intent.subject.label)
     }
   }
@@ -569,7 +577,7 @@ export function resolveNavigationTarget(
       if (validated && !to.includes('returnTo='))
         to += `${to.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(validated)}`
     }
-    if (intent.kind === 'source-record' && options.returnTo)
+    if (intent.kind === 'source-record' && key !== 'attendance:matrix' && options.returnTo)
       to = appendProjectSupplierReturnContext(to, options.returnTo)
     if (key === 'project:detail' && options.returnTo && options.returnContextId) {
       const returnTo = validateProjectReturnTo(options.returnTo)
@@ -645,6 +653,19 @@ export function resolveNavigationTarget(
         target.searchParams.set('payrollProject', String(intent.filters.projectId))
         target.searchParams.set('payrollSourceKind', intent.subject.entity)
         target.searchParams.set('payrollSourceId', intent.subject.id)
+        to = `${target.pathname}?${target.searchParams}`
+      }
+    }
+    if (options.returnTo && ['attendance:matrix', 'worker:detail', 'crew:detail'].includes(key) && isDataOriginDTO(intent.filters.dataOrigin) && isStableRouteIdentity(intent.filters.projectId)) {
+      const back = payrollC1WorkspaceReturn(options.returnTo, intent.filters.dataOrigin)
+      if (back) {
+        const target = new URL(to, 'https://payroll.invalid')
+        target.searchParams.delete('returnTo')
+        target.searchParams.set('payrollReturnTo', back)
+        target.searchParams.set('payrollProject', intent.filters.projectId)
+        target.searchParams.set('payrollSourceKind', intent.subject.entity)
+        target.searchParams.set('payrollSourceId', intent.subject.id)
+        target.searchParams.set('payrollFormat', 'C1')
         to = `${target.pathname}?${target.searchParams}`
       }
     }

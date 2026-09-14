@@ -1,0 +1,53 @@
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |component| tests/components/PayrollC1Completion.test.ts (2 tests | 2 failed) 22ms
+     × 工作区与输出就绪后才通知父详情，不在旧核对状态发出 changed 17ms
+     × 成功后读取失败，保留实发原分配与原窗口，不宣告完成 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |component| tests/components/PayrollC1Completion.test.ts > C1 回执后的同目标状态读取 > 工作区与输出就绪后才通知父详情，不在旧核对状态发出 changed
+AssertionError: expected undefined to be 'available' // Object.is equality
+
+- Expected:
+"available"
+
++ Received:
+undefined
+
+ ❯ tests/components/PayrollC1Completion.test.ts:38:36
+     36|     await ui.recover()
+     37|     expect(changed).toHaveBeenCalledOnce()
+     38|     expect(ui.output.value?.state).toBe('available')
+       |                                    ^
+     39|     view.unmount()
+     40|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |component| tests/components/PayrollC1Completion.test.ts > C1 回执后的同目标状态读取 > 成功后读取失败，保留实发原分配与原窗口，不宣告完成
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/components/PayrollC1Completion.test.ts:47:34
+     45|     load.mockRejectedValue(new Error('回执成功但读取中断'))
+     46|     await ui.recover()
+     47|     expect(ui.releaseOpen.value).toBe(true)
+       |                                  ^
+     48|     expect(ui.releaseDraft.value?.allocations).toEqual([{ workerId: 'w…
+     49|     expect(changed).not.toHaveBeenCalled()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  11:31:38
+   Duration  2.22s (transform 111ms, setup 467ms, import 128ms, tests 22ms, environment 1.37s)
+

@@ -62,15 +62,33 @@ export const ADAPTERS = {
   },
   'payroll-browser-readonly': {
     read: '工资专用中央 Repository：台账、历史冻结资料、配置、考勤、签工与月份占用；正式和演示隔离读取',
-    write: '完整历史与独立考勤/签工来源只读；A 日常核算另走 payroll-a-browser，不由此适配开放来源修改',
+    write: '完整历史与原来源证据只读；A、C1 和中央考勤分别登记日常写入能力，签工新写仍待 P3',
     storage: '中央工作区验证实例；原图与映射图分别保留，生产持久化仍待 #416',
     sources: [['app/components/payroll/PayrollScreen.vue', 'CentralPayrollScreen'], ['server/utils/payroll-service.ts', 'createPayrollService']],
   },
   'payroll-a-browser': {
     read: '中央工资台账/详情及 A 草稿、主体配置、工资价格和冻结输出；完整旧历史继续只读',
-    write: '正式 A 使用固定来源和目标的保存、改比例、核对、发放及配置命令；当前切片实施中，逐动作待验收',
+    write: '正式 A 使用固定来源和目标的保存、改比例、核对、发放及配置命令；P1 限定范围已验证，其他工资格式独立验收',
     storage: '与工程量共用中央工作区事务及完整恢复保护；生产持久化仍待 #416',
     sources: [['app/components/payroll/CentralPayrollDraftFormPage.vue', 'usePayrollAForm'], ['server/utils/payroll-a-service.ts', 'createPayrollAService']],
+  },
+  'payroll-workbench-browser': {
+    read: '中央共享工资台账和详情；A、C1 工作区按原单真实格式分流，旧历史保留只读证据',
+    write: '台账只读；具体格式的草稿、核对、发放与配置由各自中央适配承担',
+    storage: '中央工作区验证实例；生产持久化仍待 #416',
+    sources: [['app/components/payroll/CentralPayrollScreen.vue', '新建 C1 工资草稿'], ['app/components/payroll/CentralPayrollDetailScreen.vue', 'PayrollC1StatementWorkspace']],
+  },
+  'payroll-c1-browser': {
+    read: '逐日考勤、个人日薪与独立加班标准、C1 草稿和同次发放冻结的工资/考勤配对输出',
+    write: '固定范围与原提交的个人标准、C1 保存/核对/实际发放；P2 整合验收中',
+    storage: '与考勤及 A 工资共用中央工作区事务；原来源与恢复保护独立验收，生产持久化仍待 #416',
+    sources: [['app/components/payroll/CentralC1DraftFormPage.vue', 'usePayrollC1Form'], ['server/utils/payroll-c1-service.ts', 'createPayrollC1Service']],
+  },
+  'attendance-central-browser': {
+    read: '中央真实工人日期矩阵、原组历史、月份占用与来源诊断；空格与真实零分开',
+    write: '固定项目/工人/日期的考勤命令及原键恢复；同月 C1/C2 互斥，已发全成员锁月；P2 整合验收中',
+    storage: '中央工作区验证实例；浏览器不回写本地正式库，生产持久化仍待 #416',
+    sources: [['app/components/payroll/AttendanceScreen.vue', 'CentralAttendanceScreen'], ['server/utils/payroll-attendance-service.ts', 'createPayrollAttendanceService']],
   },
   'simulation': {
     read: '合成导入演示',
@@ -146,6 +164,12 @@ export function resolveAdapter(surface, host) {
     return host === 'browser' ? 'target-cost-browser' : 'desktop-sqlite'
   if (['/subcontract/payroll/sources', '/subcontract/payroll/config', '/subcontract/payroll/form/:id'].includes(route) && host === 'tauri')
     return 'unsupported'
+  if (variant !== 'central-source' && host === 'browser' && route === '/subcontract/attendance')
+    return 'attendance-central-browser'
+  if (variant !== 'central-source' && host === 'browser' && surface.path.startsWith('central/c1/'))
+    return 'payroll-c1-browser'
+  if (variant !== 'central-source' && host === 'browser' && ['/subcontract/payroll', '/subcontract/payroll/:id'].includes(route) && !surface.path.startsWith('central/a-'))
+    return 'payroll-workbench-browser'
   if (variant !== 'central-source' && ['/subcontract/payroll', '/subcontract/payroll/:id', '/subcontract/payroll/new', '/subcontract/payroll/form/:id', '/subcontract/payroll/config'].includes(route) && host === 'browser')
     return 'payroll-a-browser'
   if (variant !== 'central-source' && (route === '/subcontract/payroll' || route.startsWith('/subcontract/payroll/') || ['/subcontract/attendance', '/subcontract/daywork'].includes(route)))
@@ -372,7 +396,34 @@ export const SUBVIEWS = [
     view('central/a-output', 'PayrollAFrozenPrint', 'print', '完整新 A 发放快照，真实打印与 XLSX 分别验收'),
     view('central/a-pending', 'PayrollACommandState', 'recovery-panel'),
   ], ['browser']),
-  group({ route: ['/subcontract/payroll/sources', '/subcontract/attendance', '/subcontract/daywork'] }, 'app/components/payroll/CentralPayrollSourcesScreen.vue', [
+  group({ route: ['/subcontract/payroll/new', '/subcontract/payroll/form/:id'] }, 'app/components/payroll/CentralC1DraftFormPage.vue', [
+    view('central/c1/scope', 'PayrollC1FormFields', 'form-section', '仅显式 C1 新稿或原 C1 实体；无工程量仍可选合法人员'),
+    view('central/c1/source', 'PayrollC1SourceReview', 'review-panel', '逐日原考勤与每人标准，范围/成员改变后明确重核'),
+    view('central/c1/config', '个人工资标准', 'source-return', '个人配置返回原稿，不以列表替换原草稿'),
+    view('central/c1/pending', 'PayrollACommandState', 'recovery-panel', '复用消息壳，恢复仍按 C1 固定目标与原命令'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/config' }, 'app/components/payroll/PayrollC1ConfigScreen.vue', [
+    view('central/c1/scope', 'id="section-scope"', 'form-section', '仅 format=C1'),
+    view('central/c1/rates', 'PayrollC1RateEditor', 'subtable', '原档案日薪、缺档兜底与独立加班标准分别呈现'),
+    view('central/c1/pending', 'PayrollACommandState', 'recovery-panel', '未知提交保留原范围与输入'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/PayrollC1StatementWorkspace.vue', [
+    view('central/c1/processing', 'aria-label="C1工资核对与发放"', 'form-section', '原 C1 草稿/已核对/需重核/已发分别验收'),
+    view('central/c1/source', 'PayrollC1SourceReview', 'review-panel', '原考勤 ID 与工资稳定身份往返'),
+    view('central/c1/release', 'PayrollC1ReleaseDialog', 'dialog', '全成员到分分配，保留零收款成员'),
+    view('central/c1/output', 'PayrollC1FrozenPrint', 'print', '同次已发原事实生成工资表与考勤表；历史缺项不补造'),
+    view('central/c1/pending', 'PayrollACommandState', 'recovery-panel', '仅恢复原 C1 提交'),
+  ], ['browser']),
+  group({ route: '/subcontract/attendance' }, 'app/components/payroll/CentralAttendanceScreen.vue', [
+    view('central/scope', 'aria-label="考勤项目"', 'form-section'),
+    view('central/matrix', 'CentralAttendanceGrid', 'matrix', '实际月天数、固定工人列与表内横滚'),
+    view('central/cell', 'PayrollAttendanceCellDialog', 'dialog', '固定原工人日期；保存失败保稿，锁定只读'),
+    view('central/source-return', 'PayrollC1SourceReturn', 'source-return', '原考勤关系复验，不猜其他工人或日期'),
+    view('central/pending', '打开原提交', 'recovery-panel', '按原单元格恢复，结果未知不换新键'),
+    view('central/diagnostics', 'aria-label="考勤资料核对"', 'detail', '转组/失效历史与隔离原因保留'),
+    view('central/evidence', 'PayrollSourceEvidence', 'detail'),
+  ], ['browser']),
+  group({ route: ['/subcontract/payroll/sources', '/subcontract/daywork'] }, 'app/components/payroll/CentralPayrollSourcesScreen.vue', [
     view('central/filters', 'PayrollReadFilters', 'form-section'),
     ...['configs', 'attendance', 'daywork', 'locks'].map(key => view(`central/tab/${key}`, `selectedTab === '${key}'`, 'tab')),
     view('central/history', 'PayrollReadHistory', 'subtable'),

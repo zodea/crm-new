@@ -154,7 +154,8 @@ interface NavigationOrigin {
 | 班组 | detail | `/base/crew/:id?origin=&returnTo=` | 已闭合；公共 `EntityLink` 已登记 |
 | 工人 | detail | `/base/worker/:id?origin=&returnTo=` | 已闭合；公共 `EntityLink` 已登记 |
 | 工程量责任单元 | detail | `/subcontract/quantity/:pid/:uid` | 已闭合；必须同时持有项目 ID 与单元 ID；班组—工人中央入口携来源主体进入只读事实详情 |
-| 工资单 | detail | `/subcontract/payroll/:id` | 已闭合；班组—工人中央入口携来源主体进入只读事实详情 |
+| 工资单 | detail | `/subcontract/payroll/:id` | P0 中央台账/详情与班组—工人来源返回已验证，P1 A 原单核对/发放与原来源返回已验证；C1/C2 新写态分别验收 |
+| 考勤原记录 | matrix | `/subcontract/attendance` | P2 实施中；原 record ID、项目、人员和日期成对核实，筛选和返回上下文不替代记录身份 |
 | 项目扣罚 | penalty-detail | `/project/penalty/:id` | 已闭合；班组—工人中央入口进入只读事实详情，不落入旧编辑表单 |
 | 合同 | detail | `/contract/:id` | 已闭合；施工/分包/材采按合同类型分组 |
 | 项目×分供方 | overview / six tabs | `/project/:pid/supplier/:sid` | 已闭合；目标模块尚未统一消费来源 query |
@@ -168,7 +169,6 @@ interface NavigationOrigin {
 | 发票 | review / detail | `/finance/invoice/:id` | 已有单票工作台；来源返回仍需统一 |
 | 送货归档 | detail | `/material/delivery/archive/:id` | 已闭合 |
 | 工程量户 | detail | `/subcontract/quantity/:pid/:uid` | 已闭合；六项筛选可恢复 |
-| 工资单 | detail | `/subcontract/payroll/:id` | 详情已存在；班组工人中央来源可安全返回，常规工资台账的全量筛选返回仍未闭合 |
 | 排程工序 | task subview | `/schedule` + `project/group/task` | 已闭合 |
 | 甲方单据 | change/report/acceptance/final-settlement/penalty | `/owner/:kind/:id` | 五类均为中央只读详情，编辑分流到 `/owner/:kind/form/:id`；验收/保修以 `variant=acceptance\|warranty` 共用同一 acceptance ID；罚扣使用独立 `penalty` 变体，不进入项目罚扣 |
 | 分包单据 | change/settlement | `/subcontract/:kind/:id` | 读写混用 |
@@ -227,8 +227,8 @@ interface NavigationOrigin {
 | `N-INVOICE` | `invoice` 收票/归档台账 | 发票号、项目、分供方、合同、付款申请 | 对应 ref resolved | `/finance/invoice/:id` 与项目/分供方/合同/付款详情 | 返回上传/校对/台账来源 | 部分；单表状态机正确，来源返回和关系 ID 仍需补齐 |
 | `N-SCHEDULE-QUANTITY` | `schedule-target-cost` 排程工序详情 | 工程量矩阵 | project/group/task/stage/item 稳定 ID | `/subcontract/quantity` + `project/group/buildings/task/stage/item`，名称与日期仅提示 | `/schedule?project=:pid&group=:gid&task=:tid` | 闭合 |
 | `N-QUANTITY-UNIT` | `quantity-payroll` 工程量矩阵 | 户施工详情 | project + unit ID resolved | `/subcontract/quantity/:pid/:uid`，带 `project/building/month/view/trade/assignee` | 原六项筛选 | 闭合 |
-| `N-PAYROLL-FLOW` | `quantity-payroll` 工资台账 | 新建草稿、考勤、工资详情 | 项目/月/班组及单据 ID resolved | `/subcontract/payroll/new`、`/subcontract/attendance`、`/subcontract/payroll/:id` | 返回 `project/month/crew/status` | 部分；建单/考勤闭合，详情固定退工资根路由 |
-| `N-DAYWORK-FLOW` | `quantity-payroll` 考勤/工资台账 | C2 零星签工 | 项目/月/班组上下文 | `/subcontract/daywork` | 返回考勤或工资原筛选 | 部分；当前忽略来源 query 且两侧都退根路由 |
+| `N-PAYROLL-FLOW` | `quantity-payroll` 工资台账 | 新建草稿、考勤、工资详情 | 项目/月/班组及单据 ID resolved | `/subcontract/payroll/new`、`/subcontract/attendance`、`/subcontract/payroll/:id` | 返回 `project/month/crew/status` | P0 中央只读及 P1 A 写态/原来源往返已验证；C1 新写态正在 P2 实施，C2 随 P3 |
+| `N-DAYWORK-FLOW` | `quantity-payroll` 考勤/工资台账 | C2 零星签工 | 项目/月/班组上下文 | `/subcontract/daywork` | 返回当前项目/月/班组与原工资状态；签工确认状态独立保存 | #433 本地往返及 P0 中央来源只读已验证；C2 日常签工/工资写态随 P3 验收 |
 | `N-TARGET-COST` | `schedule-target-cost` 目标成本列表/详情 | 名称、项目、已签合同额 | ref 或明确聚合目标 | `/project/target-cost/:id`、`/project/:id`；已签合同额进入当前版本合同聚合区 | 返回列表筛选/详情区块 | 部分；名称/项目闭合，金额聚合锚点待实现 |
 | `N-IMPORT-EXPORT` | `import-export` 映射/导出配置 | 返回来源、错误行源实体、生成结果 | 来源为站内 route key；文件 capability resolved | 返回调用页或受控文件预览 | 恢复调用页上下文 | 部分；不得把原始文件路径或私有 URL 当路由 |
 | `N-OCR-SETTINGS` | `ocr-settings` `/settings/ocr` | 无业务实体关系入口 | — | 仅侧栏导航 `/settings/ocr` | 返回原应用页签 | 非入口；Token/API 地址永不进入导航 DTO |

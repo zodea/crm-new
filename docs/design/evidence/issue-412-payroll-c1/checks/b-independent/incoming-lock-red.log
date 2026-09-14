@@ -1,0 +1,28 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run tests/payroll/c1-b-independent-review.test.ts
+
+failed to load config from D:\crm本地项目开发\vitest.config.ts
+
+⎯⎯⎯⎯⎯⎯⎯ Startup Error ⎯⎯⎯⎯⎯⎯⎯⎯
+Error: spawn EPERM
+    at ChildProcess.spawn (node:internal/child_process:421:11)
+    at Object.spawn (node:child_process:796:9)
+    at ensureServiceIsRunning (D:\crm本地项目开发\node_modules\.pnpm\esbuild@0.28.1\node_modules\esbuild\lib\main.js:2268:29)
+    at build (D:\crm本地项目开发\node_modules\.pnpm\esbuild@0.28.1\node_modules\esbuild\lib\main.js:2166:26)
+    at bundleConfigFile (file:///D:/crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:35895:23)
+    at bundleAndLoadConfigFile (file:///D:/crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:35882:24)
+    at loadConfigFromFile (file:///D:/crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:35851:179)
+    at resolveConfig (file:///D:/crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:35500:28)
+    at _createServer (file:///D:/crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:25441:73)
+    at createServer$2 (file:///D:/crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:25438:9) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'spawn'
+}
+
+
+

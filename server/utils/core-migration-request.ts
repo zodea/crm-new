@@ -28,6 +28,7 @@ const ROW_KEYS = new Set(['legacyId', 'name', 'references', 'quantity', 'amount'
 const ATTRIBUTE_KEYS = new Set(['no', 'content', 'invoiceType', 'contactName', 'contactPhone', 'taxRate', 'signDate', 'mainTerms', 'paymentTerms', 'warrantyTerms', 'retentionRatio', 'retentionAmount', 'retentionDays', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note', 'actualCompletionDate', 'createdAt', 'updatedAt', 'laborScope'])
 const ATTRIBUTE_KEYS_BY_ENTITY: Partial<Record<CoreMigrationEntityType, ReadonlySet<string>>> = {
   crews: new Set([...ATTRIBUTE_KEYS, 'defaultPayRatio']),
+  workers: new Set([...ATTRIBUTE_KEYS, 'dailyWage']),
   supplier_credentials: new Set(['graphJson']),
   suppliers: new Set(['aliases', 'externalRef', 'uniqueCode', 'taxNo', 'businessType', 'supplierCategory', 'rating', 'legalRep', 'registeredCapital', 'registeredDate', 'address', 'taxpayerType', 'taxpayerVerificationStatus', 'taxpayerVerificationSource', 'taxpayerVerifiedAt', 'taxpayerVerificationNote', 'mainBusiness', 'laborScope', 'invoiceName', 'invoiceAddress', 'bank', 'bankAccount', 'phone', 'contact', 'contactPhone', 'contactTitle', 'note', 'approvalStatus', 'createdAt', 'updatedAt']),
   process_libraries: new Set(['graphJson']),
@@ -164,6 +165,8 @@ function parseAttributes(value: unknown, label: string, entityType: CoreMigratio
   for (const [key, entry] of Object.entries(value)) {
     if (entityType === 'crews' && key === 'defaultPayRatio' && entry !== null && (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0 || entry > 1))
       invalid(`${label}.${key}必须是 0 至 1 的比例或 null`)
+    if (entityType === 'workers' && key === 'dailyWage' && entry !== null && (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0))
+      invalid(`${label}.${key}必须是非负日薪或 null`)
     if (entry !== null && typeof entry !== 'string' && (typeof entry !== 'number' || !Number.isFinite(entry)))
       invalid(`${label}.${key}必须是文本、有限数值或 null`)
     result[key] = entry as string | number | null

@@ -15,8 +15,8 @@ const legacy = vi.fn(() => {
 const cases = [
   { component: PayrollScreen, central: 'CentralPayrollScreen', native: 'NativePayrollScreen' },
   { component: PayrollStatementDetailScreen, central: 'CentralPayrollDetailScreen', native: 'NativePayrollStatementDetailScreen' },
-  { component: PayrollDraftFormPage, central: 'CentralPayrollDraftFormPage', native: 'NativePayrollDraftFormPage' },
-  { component: AttendanceScreen, central: 'CentralPayrollSourcesScreen', native: 'NativeAttendanceScreen' },
+  { component: PayrollDraftFormPage, central: 'CentralPayrollFormPage', native: 'NativePayrollDraftFormPage' },
+  { component: AttendanceScreen, central: 'CentralAttendanceScreen', native: 'NativeAttendanceScreen' },
   { component: SignedDayworkScreen, central: 'CentralPayrollSourcesScreen', native: 'NativeSignedDayworkScreen' },
 ]
 beforeEach(() => {

@@ -2,12 +2,16 @@ import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { PayrollMigrationPart, PayrollMigrationRow, PayrollProjectGraph } from '../../app/lib/migration/payroll-source'
 import type { PayrollDiagnostic, PayrollIdentityMapping } from '../../app/lib/payroll/central-contract'
+import type { PayrollExclusionGraph } from '../../app/lib/payroll/central-source-locks'
 import type { QuantityMigrationIdentity } from '../../app/lib/quantity/migration-mapping'
 import { createHash } from 'node:crypto'
 import { parsePayrollProjectGraph, PAYROLL_MIGRATION_COLUMNS, PAYROLL_MIGRATION_PARTS, PAYROLL_MIGRATION_TABLES, payrollLogProject, payrollLogSnapshot } from '../../app/lib/migration/payroll-source'
+import { loadPayrollGraph } from '../../app/lib/payroll/central-read'
 import { advancePayrollRevision, initializePayrollSchema } from '../../app/lib/payroll/central-schema'
+import { payrollSourceExclusionsFromGraph } from '../../app/lib/payroll/central-source-locks'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { payrollAMigrationReferences } from './payroll-a-migration-references'
+import { payrollC1MigrationReferences } from './payroll-c1-migration-references'
 
 export interface ImportedPayrollProject {
   entityId: string
@@ -210,8 +214,8 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
   const all = Object.fromEntries(await Promise.all(PAYROLL_MIGRATION_PARTS.map(async part => [part, await db.select<PayrollMigrationRow>(`SELECT ${PAYROLL_MIGRATION_COLUMNS[part].join(',')} FROM ${PAYROLL_MIGRATION_TABLES[part]}`)]))) as Record<PayrollMigrationPart, PayrollMigrationRow[]>
   const owned = new Set(plan.removed.flatMap(previous => PAYROLL_MIGRATION_PARTS.flatMap(part => previous.graph[part].map(row => key(PAYROLL_MIGRATION_TABLES[part], row.id)))))
   const removedKeys = new Set([...owned, ...['projects', 'crews', 'workers'].flatMap(table => [...removed[table as 'projects' | 'crews' | 'workers']].map(id => key(table, id))), ...removed.quantity.map(identity => key(identity.table, identity.id))])
-  if (removedKeys.size && [...await payrollAMigrationReferences(db)].some(reference => removedKeys.has(reference)))
-    invalid('独立 A 类配置、来源、回执或历史仍引用待撤身份，已在删除前整批拒绝')
+  if (removedKeys.size && [...await payrollAMigrationReferences(db), ...await payrollC1MigrationReferences(db)].some(reference => removedKeys.has(reference)))
+    invalid('独立工资配置、来源、回执或历史仍引用待撤身份，已在删除前整批拒绝')
   for (const previous of plan.removed) {
     const actual = { schemaVersion: 1, projectId: previous.projectId } as PayrollProjectGraph
     for (const part of PAYROLL_MIGRATION_PARTS)
@@ -241,7 +245,59 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
   }
 }
 
+function incomingExclusionGraph(incoming: ImportedPayrollProject): PayrollExclusionGraph {
+  const graph: PayrollExclusionGraph = {
+    statements: [...incoming.graph.statements],
+    members: [...incoming.graph.members],
+    statementDaywork: [...incoming.graph.statementDaywork],
+    daywork: incoming.graph.daywork,
+    attendance: incoming.graph.attendance,
+    evidence: [{ entityId: incoming.entityId, projectId: incoming.projectId, graph: incoming.source, mappings: incoming.mappings, diagnostics: incoming.diagnostics }],
+  }
+  // 与普通读取相同的只读隔离身份；只组装图，不自行重算成员、月份或占用规则。
+  for (const row of incoming.source.statements) {
+    if (incoming.mappings.some(mapping => mapping.tableName === 'wage_statements' && mapping.legacyId === row.id && mapping.centralId))
+      continue
+    const id = `payroll-report:${incoming.entityId}:${encodeURIComponent(String(row.id))}`
+    graph.statements.push({ ...row, id, project_id: incoming.projectId, _isolated: true, _legacyId: row.id, _evidenceId: incoming.entityId })
+    for (const part of ['members', 'statementDaywork'] as const)
+      graph[part].push(...incoming.source[part].filter(child => child.statement_id === row.id).map(child => ({ ...child, statement_id: id })))
+  }
+  return graph
+}
+
+async function assertIncomingSources(db: TransactionDb, plan: ReturnType<typeof planPayrollMigration>) {
+  if (!plan.incoming.length)
+    return
+  const current = await loadPayrollGraph(db)
+  const removed = new Set(plan.removed.flatMap(previous => PAYROLL_MIGRATION_PARTS.flatMap(part => previous.graph[part].map(row => key(PAYROLL_MIGRATION_TABLES[part], row.id)))))
+  const removedEvidence = new Set(plan.removed.map(row => row.entityId))
+  const scopes = new Map<string, { projectId: string, month: string, formatFamily: 'C1' | 'C2', workerIds: Set<string> }>()
+  for (const incoming of plan.incoming) {
+    const graph = incomingExclusionGraph(incoming)
+    for (const family of ['C1', 'C2'] as const) {
+      const occupied = payrollSourceExclusionsFromGraph(graph, { projectId: incoming.projectId, formatFamily: family, statementId: null })
+      for (const lock of occupied) {
+        const families = lock.kind === 'released-month' ? ['C1', 'C2'] as const : [lock.formatFamily]
+        for (const formatFamily of families) {
+          const scopeKey = JSON.stringify([lock.projectId, lock.month, formatFamily])
+          const scope = scopes.get(scopeKey) ?? { projectId: lock.projectId, month: lock.month, formatFamily, workerIds: new Set<string>() }
+          scope.workerIds.add(lock.workerId)
+          scopes.set(scopeKey, scope)
+        }
+      }
+    }
+  }
+  for (const scope of scopes.values()) {
+    const locks = payrollSourceExclusionsFromGraph(current, { ...scope, workerIds: [...scope.workerIds], statementId: null })
+    if (locks.some(lock => !removedEvidence.has(lock.evidenceId ?? '') && !removed.has(key('wage_statements', lock.statementId)) && !removed.has(key('attendance_records', lock.attendanceRecordId)) && !removed.has(key('signed_daywork_records', lock.dayworkRecordId))))
+      invalid('迁入来源与当前独立考勤、签工或已发月份冲突，已在删除前整批拒绝；原图内部旧冲突仍只读保留')
+  }
+}
+
 export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<typeof planPayrollMigration>) {
+  // 只比较真正新进入的原图与现有独立事实；同批无变化不重新裁定旧历史。
+  await assertIncomingSources(db, plan)
   for (const previous of plan.removed) {
     for (const part of [...PAYROLL_MIGRATION_PARTS].reverse()) {
       for (const row of previous.graph[part])

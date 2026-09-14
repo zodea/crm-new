@@ -1,0 +1,16 @@
+import type { PayrollAttendanceFact, PayrollAttendanceMatrixRead } from '../../app/lib/payroll/central-attendance-contract'
+import type { PayrollC1FormRead, PayrollC1FrozenDocument } from '../../app/lib/payroll/central-c1-contract'
+
+export function c1AttendanceFact(patch: Partial<PayrollAttendanceFact> = {}): PayrollAttendanceFact {
+  return { id: 'r', projectId: 'p', crewId: 'c', workerId: 'w', workDate: '2026-08-01', hours: 7.51, overtimeHours: 0, workContent: '原施工内容', note: '', deletedAt: null, createdAt: null, updatedAt: null, sourceFingerprint: 'r1', ...patch }
+}
+export function c1Matrix(): PayrollAttendanceMatrixRead {
+  return { context: { workspaceId: 'workspace', actorId: 'actor', origin: 'real', sourceVersion: 'v1', capabilities: ['payroll:read', 'payroll:write'], readonly: false }, scope: { projectId: 'p', month: '2026-08', crewId: 'c' }, options: { projects: [{ id: 'p', name: '真实项目', code: '' }], crews: [{ id: 'c', name: '原班组', eligible: true, reasons: [] }] }, workers: [{ id: 'w', name: '原工人', crewId: 'c', eligible: true, reasons: [], historical: false, source: null }], records: [c1AttendanceFact()], locks: [], diagnostics: [], evidence: [] }
+}
+export function c1Form(): PayrollC1FormRead {
+  const matrix = c1Matrix()
+  return { context: matrix.context, statementId: 'wage', draftKey: null, status: 'checked', needsRecheck: false, draft: { projectId: 'p', crewId: 'c', month: '2026-08', leaderWorkerId: 'w', memberWorkerIds: ['w', 'zero'], note: '' }, options: { ...matrix.options, workers: matrix.workers }, members: [...matrix.workers, { id: 'zero', name: '零成员', crewId: 'c', eligible: true, reasons: [], historical: false, source: null }], facts: matrix.records, sources: [], rates: [], lines: [], totals: { grossAmount: { value: 300, knownValue: 300, state: 'known', reasons: [] } }, blockers: [], eligibility: { canSaveDraft: false, canCheck: true, canRelease: true, canOutput: false, reasons: [] } }
+}
+export function c1Frozen(): PayrollC1FrozenDocument {
+  return { id: 'wage', projectId: 'p', projectName: '冻结项目', crewId: 'c', crewName: '原班组', leaderName: '原工人', month: '2026-08', formatFamily: 'C1', periodKind: 'monthly', payRatio: 1, grossAmount: 601.25, actualAmount: 300, releasedAt: '2026-08-31T10:00:00Z', operatorName: '经办甲', note: '原备注', rates: [{ workerId: 'w', workerName: '原工人', profileDailyWage: 481, configuredDailyWage: null, configuredOvertimeRate: null, dailyWage: 481, dailyWageSource: 'worker-profile', overtimeRate: 60.125, overtimeRateSource: 'daily-divided-eight', configId: null, revision: null, effectiveMonth: null, sourceVersion: 'rate1' }], lines: [{ id: 'normal', workerId: 'w', workerName: '原工人', kind: 'normal', itemName: '正常工时', quantity: 8, unit: '小时', unitPrice: 60.125, amount: 481, attendanceIds: ['r'] }, { id: 'ot', workerId: 'w', workerName: '原工人', kind: 'overtime', itemName: '加班工时', quantity: 2, unit: '小时', unitPrice: 60.125, amount: 120.25, attendanceIds: ['r'] }], attendance: [c1AttendanceFact({ hours: 8, overtimeHours: 2 })], members: [{ workerId: 'w', workerName: '原工人', isLeader: true }, { workerId: 'zero', workerName: '零成员', isLeader: false }], allocations: [{ workerId: 'w', workerName: '原工人', isLeader: true, amount: 300, allocatedAmountFen: 30000 }, { workerId: 'zero', workerName: '零成员', isLeader: false, amount: 0, allocatedAmountFen: 0 }] }
+}

@@ -7,32 +7,38 @@ import { payrollObject as object } from './central-snapshot'
 const amounts = new Set(['cumulativeAmount', 'previouslyPaid', 'grossAmount', 'actualAmount', 'unitPrice', 'amount', 'unitRate'])
 const decimals = new Set(['payRatio', 'quantity', 'hours', 'overtimeHours', 'laborUnits'])
 const evidenceKeys = new Set(['snapshot', 'head', 'beforeData', 'afterData', 'evidence'])
-function transform(value: unknown, decode: boolean): unknown {
+function c1Detail(value: unknown) {
+  return object(value) && object(value.statement) && value.statement.formatFamily === 'C1'
+}
+function transform(value: unknown, decode: boolean, c1 = false, path = ''): unknown {
   if (Array.isArray(value))
-    return value.map(entry => transform(entry, decode))
+    return value.map(entry => transform(entry, decode, c1, `${path}[]`))
   if (!object(value))
     return value
   return Object.fromEntries(Object.entries(value).map(([key, entry]) => {
     if (evidenceKeys.has(key))
       return [key, entry]
     if (amounts.has(key) || decimals.has(key)) {
+      // C1 每小时标准是原费率；仅详情的已发/原行单价保留精度，金额与 A 合同不变。
+      const c1Rate = c1 && key === 'unitPrice' && ['statement.lines[]', 'statement.stored.lines[]'].includes(path)
+      const money = amounts.has(key) && !c1Rate
       if (entry === null)
         return [key, null]
       if (decode) {
-        const pattern = amounts.has(key) ? /^-?(?:0|[1-9]\d*)\.\d{2}$/ : /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/
+        const pattern = money ? /^-?(?:0|[1-9]\d*)\.\d{2}$/ : c1Rate ? /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/i : /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/
         if (typeof entry !== 'string' || !pattern.test(entry) || !Number.isFinite(Number(entry)))
           throw payrollProblem('unavailable', '工资数值传输格式不完整')
         return [key, Number(entry)]
       }
       if (typeof entry !== 'number' || !Number.isFinite(entry))
         throw payrollProblem('unavailable', '工资数值不是已知金额或明确空值')
-      return [key, amounts.has(key) ? entry.toFixed(2) : String(entry)]
+      return [key, money ? entry.toFixed(2) : String(entry)]
     }
-    return [key, transform(entry, decode)]
+    return [key, transform(entry, decode, c1, path ? `${path}.${key}` : key)]
   }))
 }
 export function encodePayrollWire(value: unknown): unknown {
-  return transform(value, false)
+  return transform(value, false, c1Detail(value))
 }
 const text = (v: unknown): v is string => typeof v === 'string'
 const nullableText = (v: unknown) => v === null || text(v)
@@ -83,7 +89,7 @@ export function decodePayrollRead<T extends PayrollListRead | PayrollDetailRead 
   const c = input.context
   if (!['workspaceId', 'actorId', 'sourceVersion'].every(key => text(c[key]) && c[key]) || c.origin !== query.origin || c.readonly !== true || !strings(c.capabilities) || !(c.capabilities as string[]).includes('payroll:read') || (c.origin === 'demo' && !(c.capabilities as string[]).includes('demo:read')))
     return fail()
-  const value = transform(input, true) as Record<string, unknown>
+  const value = transform(input, true, kind === 'detail' && c1Detail(input)) as Record<string, unknown>
   if (kind === 'list') {
     if (!array(value.rows, row => statement(row, query)) || !array(value.projects, p => object(p) && text(p.id) && text(p.name) && text(p.code)) || !array(value.diagnostics, diagnostic))
       return fail()

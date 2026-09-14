@@ -530,7 +530,7 @@ CREATE TABLE project_aliases (
 | WageStatementMember | `wage_statement_members` | `id` | 请款簿成员归属；同一请款簿包含一名负责人和零至多名成员，负责人同时记入成员表 |
 | WageStatementAllocation | `wage_statement_allocations` | `id` | 已发工资单的组内实际收款分配；按整数分保存，成员集合必须与请款簿成员完全一致，零金额保留且分配合计必须严格等于实际发放金额 |
 | WageStatementLine | `wage_statement_lines` | `id` | 月度分项快照：工人、分项、单位、工程量、工资单价、金额；核对时按现场量/考勤替换，发放后只读 |
-| AttendanceRecord | `attendance_records` | `id` | 工人×日期唯一；正常工时、加班工时、施工内容，重复录入覆盖同一工作日；日期必须真实存在，正常+加班总工时不得超过 24 小时，C2 签工成员不得录考勤 |
+| AttendanceRecord | `attendance_records` | `id` | 项目×工人×日期唯一；正常工时、加班工时、施工内容，同日合法重存保留物理 ID 和原班组；日期必须真实存在，正常+加班总工时不得超过 24 小时，同项目同人同月的 C2 签工与考勤互斥 |
 | SignedDayworkRecord | `signed_daywork_records` | `id` | C2 逐日签工事实；项目、班组、人员、日期、施工内容、起止时间、整工/半工、证明人与确认日期；只有 `confirmed` 记录计薪；同人同日时段不重叠且合计不超过 1 工 |
 | WageStatementDayworkRecord | `wage_statement_daywork_records` | `id` | C2 工资单与本次核对签工记录的显式关联；每条有效签工只能归属一张有效工资单，发放时完整记录与主体费率/规则另入 `snapshot_json` |
 
@@ -550,7 +550,7 @@ CREATE TABLE project_aliases (
 
 ### A 工资中央来源、配置与发放（#412）
 
-A 日常核算仍写既有工资头、明细、全体成员和整数分分配；新增下列工资域事实，不把施工完成、合同价或班组表复制成第二套工资来源。实施与验收范围见[工资页面](./pages/subcontract-payroll.md)，当前 P1 切片的待验收状态不能外推到 C1/C2 或生产保存。
+A 日常核算仍写既有工资头、明细、全体成员和整数分分配；新增下列工资域事实，不把施工完成、合同价或班组表复制成第二套工资来源。P1 本地限定验收见[A 工资证据](../design/evidence/issue-412-payroll-a/README.md)，该范围不能外推到 C1/C2 或生产保存。
 
 | 表 | 身份与主要字段 | 约束 |
 | --- | --- | --- |
@@ -566,6 +566,27 @@ A 日常核算仍写既有工资头、明细、全体成员和整数分分配；
 本期发放按同主体 A 的真实此前已付核算，不叠加成员分配，不混入 B/C 类或另一负责人。已知实际少发使用实际值，历史实际未知令此前已付及本次应发保持未知；软删不能让已经发生的工资支付消失。发放事务重新校验量、价、身份、来源及此前已付，变化时保存需重核状态。成功冻结原事实 ID、显示名称、量与单位、价格修订、比例、累计/此前已付/本次应发与实发、全成员含零分配、操作者及时间；已发不提供普通编辑、删除或撤销。
 
 新中央 A 的来源资格由已采用来源、完整冻结内容和相同工资/项目的正式发放回执共同证明；来源主体、原事实、成员、实际使用价格、回执正文指纹及操作者必须一致。实际重算原命令正文的 SHA-256，并比对其中实发及全成员分配；仅指纹格式正确不能证明正文一致。冻结价格须按原完整主体、月份、数量、单位和范围复算出同一工资行；相同价格 ID 不代替内容核对。旧回执缺原文时保持未证，同键恢复原结果不能自动补造来源资格。历史区与冻结输出共用这项核验，不能仅凭 `format_family='A'` 或某个同名快照字段升级资格。签工正文是 C2 的适用完整性要求，A 不因缺少不适用的签工字段被误判；真实历史缺损继续按原格式保留。
+
+### C1 逐日考勤、个人费率与冻结来源（#412，P2）
+
+本节为 P2 已接通的中央合同；实际开放及限定验收见[工资页面](./pages/subcontract-payroll.md)。考勤复用 `attendance_records`，工资复用现有头、明细、成员和整数分分配；新增两类工资域事实：
+
+| 表 | 关键数据 | 约束 |
+| --- | --- | --- |
+| `payroll_c1_rate_revisions` | `id / project_id / worker_id / effective_month`，可空 `daily_wage / overtime_rate`，`revision / operator_id / created_at` | 项目、工人、生效月份的不可变修订；日薪为档案缺值时的明确兜底，加班价独立保存，null 和明确 0 分开 |
+| `payroll_c1_statement_sources` | `statement_id / project_id / leader_worker_id / source_json` | 每单采用的完整主体与成员、月份、逐日考勤和个人费率；与草稿或核对事实同事务写入 |
+
+人员 owner 提供真实日薪及其缺字段、NULL、明确值状态，连同当前项目、班组和内容版本用于资格与核算。受控迁入保留这些差别，重复迁入不覆盖后来改价；工资配置不反写工人档案。合法档案日薪优先；只有未配置独立加班价才用该人有效日薪÷8，不提前把 60.125 舍入为两位。最终工资金额按现有到分规则保存，原工时和费率保完整精度。
+
+逐日来源保存物理 ID、项目、工人、原班组、真实日期、正常/加班工时、施工内容、备注及原时间与删除信息；来源版本覆盖逐行内容，不能以合计或最大更新时间代替。当前资格与历史阅读分别判断，改名、转组或离场不抹除原记录。同项目、工人、日期已有原组记录时，新组请求不能改挂该行或另建第二条；原记录与不可写原因仍可见。
+
+一条真实全零考勤也属于来源；完全没有记录不能建 C1。全体成员各自保存正常和加班两行，含无工时和零分配成员。C1 固定当月、100%，不采用 A 累计、档位、取整或前月实付扣减。核算与状态动作见[工资页面](./pages/subcontract-payroll.md#工资核算)。
+
+互斥按同项目、人员和月份验证，不以当前班组筛选隐藏冲突。对侧有效工资主体的全部成员、C2 独立待确认/已确认签工及可证明的隔离证据均纳入；已发 C1/C2 软删头、成员或关联不解除整月锁。A 与 C1 可以同人同月并存。旧迁入图已存在冲突时保留双方与诊断，不能自动删除一方；日常写入及会破坏后来合法事实的恢复仍需事务内拒绝。
+
+新 C1 发放冻结当时的完整逐日考勤、每人费率及来源、人员名称、明细和全成员实分配。采用来源、冻结事实及正式原发放回执共同证明新输出资格；历史详情与工资/考勤配对输出使用同一完整性核验，旧 C1 缺逐行事实仍保留部分证据状态，不由当前矩阵补齐。
+
+考勤、C1 与 A 共用命令回执表，正文及结果按明确动作封闭解析。恢复引用必须包含回执里实际保存的考勤记录 ID、费率物理修订 ID 和已采用来源；坏正文或未知动作不能跳过，旧 SQL NULL 不补造。候选、复验、来源锁及回执与工作区其它领域共用一次事务，持锁后不再次进入同一队列。
 
 完整恢复保护扩展至上述四表及独立发放，包含软删配置、只在回执中引用的主体、来源中的原施工身份和零成员。仅解析已定义的关系字段，不递归猜测旧快照的未知扩展；任何危险引用在删除前拒绝整批恢复。更正、实际补退、费用与跨域成本由后续切片接续，不能通过重写原发放来实现。
 
@@ -1438,7 +1459,7 @@ penalty_settlement_deductions(
 | `wage_statement_members` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 请款簿负责人及成员归属 |
 | `wage_statement_allocations` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 发放时组内实际收款分配；数据库保存整数分，显示名、负责人标识和金额同时进入发放快照 |
 | `wage_statement_lines` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 工人工资行（快照） |
-| `attendance_records` | `project_id` / `worker_id` | `projects.id` / `workers.id` | N:1 | C1 日工/加班来源；工人×日期唯一 |
+| `attendance_records` | `project_id` / `worker_id` | `projects.id` / `workers.id` | N:1 | C1 日工/加班来源；项目×工人×日期唯一，原班组证据不随转组改写 |
 | `signed_daywork_records` | `project_id` / `crew_id` / `worker_id` | `projects.id` / `crews.id` / `workers.id` | N:1 | C2 逐日签工来源；整工 1 / 半工 0.5 |
 | `wage_statement_daywork_records` | `statement_id` / `daywork_record_id` | `wage_statements.id` / `signed_daywork_records.id` | N:1 | C2 核对来源关联；活跃 `daywork_record_id` 全局唯一，禁止重复计薪 |
 | `delivery_records` | `projectId` / `supplierId` | `projects.id` / `suppliers.id` | N:1 | 送货单（supplierId 可空=未区分分供方兜底） |

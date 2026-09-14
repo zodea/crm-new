@@ -1,0 +1,52 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run tests/payroll/c1-b-independent-review.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/c1-b-independent-review.test.ts (5 tests | 5 failed) 5008ms
+   × 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：frozen-lines 1114ms
+   × 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：frozen-leader 989ms
+   × 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：frozen-month 984ms
+   × 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：deleted-source-link 974ms
+   × 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：invalid-date-source 947ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：frozen-lines
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：frozen-leader
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：frozen-month
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：deleted-source-link
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：invalid-date-source
+AssertionError: expected undefined to match object { problem: { code: 'conflict' } }
+
+- Expected:
+{
+  "problem": {
+    "code": "conflict",
+  },
+}
+
++ Received:
+undefined
+
+ ❯ tests/payroll/c1-b-independent-review.test.ts:70:23
+     68|     expect(await readAll()).toEqual(before)
+     69|     expect(coreMigrationTestInstance.snapshot(session)).toEqual(author…
+     70|     expect(rejection).toMatchObject({ problem: { code: 'conflict' } })
+       |                       ^
+     71|   }
+     72|   finally { db.close() }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed (5)
+   Start at  11:04:49
+   Duration  7.47s (transform 1.84s, setup 0ms, import 2.23s, tests 5.01s, environment 0ms)
+

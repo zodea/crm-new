@@ -32,7 +32,13 @@ test.describe('工资中央来源、筛选与退役写入口', () => {
       await page.goto(`${path}?origin=real&project=missing-payroll-project&crew=missing-crew`)
       await expect(page.getByRole('alert')).toBeVisible({ timeout: 30_000 })
       expect(new URL(page.url()).searchParams.get('project')).toBe('missing-payroll-project')
-      await expect(page.getByRole('combobox', { name: '项目', exact: true })).toHaveValue('missing-payroll-project')
+      if (path === '/subcontract/attendance') {
+        await expect(page.getByRole('region', { name: '月度考勤矩阵', exact: true })).toHaveCount(0)
+        await expect(page.getByRole('button', { name: '保存考勤', exact: true })).toHaveCount(0)
+      }
+      else {
+        await expect(page.getByRole('combobox', { name: '项目', exact: true })).toHaveValue('missing-payroll-project')
+      }
     }
   })
 })

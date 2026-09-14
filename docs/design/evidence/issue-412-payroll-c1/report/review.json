@@ -1,0 +1,216 @@
+{
+  "reviewer": "/root/c1_standards_final",
+  "scope": "最后报告7张原图；仅流程分支、可读性与可视边界",
+  "method": "全部逐张 tools.view_image(detail=original) 直接目检",
+  "summary": {
+    "reviewedImages": 7,
+    "layoutAndReadabilityPass": 7,
+    "flowFindings": 0,
+    "historicalFlowFindingsResolved": 1,
+    "status": "pass"
+  },
+  "findings": [
+    {
+      "id": "REPORT-FLOW-01",
+      "priority": "P2",
+      "title": "未知结果恢复缺少应用/未应用/未知分支",
+      "evidence": [
+        "payroll-branches-1440.png",
+        "payroll-branches-right-390.png"
+      ],
+      "observation": "响应或回读异常框说明明确未应用后才重新确认，但唯一出口直接接同次实发冻结与全成员占用。",
+      "impact": "图上未应用结果与已应用结果汇入同一冻结状态；读者无法判断何时返回确认、何时继续核对原命令。",
+      "recommendation": "区分确认已应用→沿原回执读取冻结、明确未应用→返回实际总额与全成员确认、仍未知→保原编号继续核对；至少为分支加准确条件，不能把未应用直接连接冻结。",
+      "reportedToRoot": true,
+      "resolution": "Root 重生成后逐张 original 复验7图。1440完整图及右端390图确认：明确未应用回到确认、确认已应用读取原冻结、仍未知留原编号自环继续核对；无条件恢复到冻结的连接已移除。",
+      "status": "resolved"
+    }
+  ],
+  "images": [
+    {
+      "name": "payroll-branches-390.png",
+      "sha256": "f252c82d39a3ad9223956554f09d74073b30723c5d3b636bef36f1d9b88ac7d1",
+      "path": "payroll-branches-390.png",
+      "method": "view_image(detail=original)",
+      "viewed": true,
+      "readability": "pass",
+      "layout": "pass",
+      "flow": "pass",
+      "notes": "A 来源与来源变化回同稿、预算独立维护节点可读；宽图左侧视野边界未改变。"
+    },
+    {
+      "name": "payroll-branches-768.png",
+      "sha256": "a167abe06d5e804a8862f4c70916ac3356a8419e09e628684d7f313e1413f2c0",
+      "path": "payroll-branches-768.png",
+      "method": "view_image(detail=original)",
+      "viewed": true,
+      "readability": "pass",
+      "layout": "pass",
+      "flow": "pass",
+      "notes": "左部及主线内容可读，无节点或文字重叠；右部以独立右端图及1440全图复核。"
+    },
+    {
+      "name": "payroll-branches-1024.png",
+      "sha256": "82a657c0518c1c34c8ecb18d6c6d989bbbb2841c197a1dd0d9dcacd599d372ae",
+      "path": "payroll-branches-1024.png",
+      "method": "view_image(detail=original)",
+      "viewed": true,
+      "readability": "pass",
+      "layout": "pass",
+      "flow": "pass",
+      "notes": "A/C1 到草稿、确认、冻结与配对输出主线完整可辨，原资料缺项保持未知。"
+    },
+    {
+      "name": "payroll-branches-1280.png",
+      "sha256": "140f82ac3aff6c315a1948cb9b4d2f6c286ba4fb8455a344c7bcfef356be5a47",
+      "path": "payroll-branches-1280.png",
+      "method": "view_image(detail=original)",
+      "viewed": true,
+      "readability": "pass",
+      "layout": "pass",
+      "flow": "pass",
+      "notes": "可视恢复支路中未应用回确认、已应用回冻结方向清楚；截在可视区外的右部由另图覆盖。"
+    },
+    {
+      "name": "payroll-branches-1440.png",
+      "sha256": "790e0d94c8d9e8a53400b515992e126c7f944bd0064c03ee0b84c203ad6f2b84",
+      "path": "payroll-branches-1440.png",
+      "method": "view_image(detail=original)",
+      "viewed": true,
+      "readability": "pass",
+      "layout": "pass",
+      "flow": "pass",
+      "notes": "完整15节点22连接可读；明确未应用上行后返回实际分配确认，已应用下行读取原冻结，仍未知在异常框右侧自环。箭头不穿字或混入其它节点。"
+    },
+    {
+      "name": "payroll-branches-right-390.png",
+      "sha256": "33c2a9269d0fcb0af7721303886fe4f250f66e1ff874af05270d111f0a9f6ef0",
+      "path": "payroll-branches-right-390.png",
+      "method": "view_image(detail=original)",
+      "viewed": true,
+      "readability": "pass",
+      "layout": "pass",
+      "flow": "pass",
+      "notes": "右端三个恢复状态及未知自环完整清晰；未应用向左返回确认，已应用向左读取冻结，无原无条件冻结出口。"
+    },
+    {
+      "name": "overview-lanes-1440.png",
+      "sha256": "adf56a84ded4f343b93604d209055df00867e7c80ff340a95991a508af7cb772",
+      "path": "overview-lanes-1440.png",
+      "method": "view_image(detail=original)",
+      "viewed": true,
+      "readability": "pass",
+      "layout": "pass",
+      "flow": "pass",
+      "notes": "五泳道及每卡状态仍可读，无文字遮挡或跨列混线；本次恢复修复未改变总览。"
+    }
+  ],
+  "limits": [
+    "截图为报告中可横向滚动的宽流程图：窄视口分别查看左端与右端，不把局部视野误判为根页面横溢。",
+    "Root verification.json 记录五档根页面无横溢；本审查人不重复运行浏览器。",
+    "本报告验证流程说明与呈现，不替代业务应用或生产持久化验收。",
+    "审查人原先独立发现 REPORT-FLOW-01，之后经 Root 授权修正 #412.graph，并对 Root 新生成截图复验；未改产品。"
+  ],
+  "graphFix": {
+    "file": "docs/research/issue-review-2026-09-11/rows-business.json",
+    "scope": "#412.graph only",
+    "nonGraphSha256": "489759b973ceebf5f62965f9db1df86144d179c7a13f72668cbab9ac6299eec2",
+    "nodes": 15,
+    "edges": 22,
+    "newNodes": [
+      "recover-not-applied：后台明确未应用，保原输入返回确认",
+      "recover-applied：确认已应用，沿原编号读取原冻结"
+    ],
+    "requiredEdges": [
+      "recover → recover-not-applied → release",
+      "recover → recover-applied → frozen",
+      "recover → recover（仍未知：保留并继续核对）"
+    ],
+    "removedEdge": "recover → frozen 的无条件直连",
+    "validation": "JSON 可解析；节点、边目标、边界与文字容纳检查通过；除 #412.graph 外语义 SHA256 与修改前完全一致。未生成报告/截图。",
+    "followup": "已完成7图原尺寸视觉复验，REPORT-FLOW-01 消项。",
+    "sourceSha256AtFix": "f356c397d389164ab14b9cf4c4c4a125d4e521ae7246fc8cea1d3a1d6f49d942"
+  },
+  "history": {
+    "status": "before-fix-evidence",
+    "summary": {
+      "reviewedImages": 7,
+      "layoutAndReadabilityPass": 7,
+      "flowFindings": 1,
+      "status": "flow-code-fixed-awaiting-root-regeneration"
+    },
+    "observation": "响应或回读异常框说明明确未应用后才重新确认，但唯一出口直接接同次实发冻结与全成员占用。",
+    "images": [
+      {
+        "name": "payroll-branches-390.png",
+        "sha256": "f252c82d39a3ad9223956554f09d74073b30723c5d3b636bef36f1d9b88ac7d1",
+        "observation": "左侧 A 已验证、来源变化回原稿、预算独立维护节点文字可读；当前图为宽流程容器左端，右侧另图核对。"
+      },
+      {
+        "name": "payroll-branches-768.png",
+        "sha256": "a167abe06d5e804a8862f4c70916ac3356a8419e09e628684d7f313e1413f2c0",
+        "observation": "主流程左部和来源变化回环可读，无节点或文字重叠；右端位于宽流程的可视区域外。"
+      },
+      {
+        "name": "payroll-branches-1024.png",
+        "sha256": "ddc748c78f48dd7807cf3e97e3e305607f9b38f0ccfb847fea85c6b4a2abc111",
+        "observation": "A/C1 到草稿、分配、冻结及配对输出主线连续；C1 非工程量前提和原资料不补造说明可读。"
+      },
+      {
+        "name": "payroll-branches-1280.png",
+        "sha256": "eb5b5592721fe5b223eea4a54cb4384158007c3664b3743de79b9d1b9a178c9d",
+        "observation": "A/C1/C2 主分支及后续待实施节点可辨；异常分支唯一出口指向冻结，缺少结果分支条件。"
+      },
+      {
+        "name": "payroll-branches-1440.png",
+        "sha256": "2245777dfeae7cf76992e6c6e1427b3a51a2bf4bde99e9d55fe959e39c4ba668",
+        "observation": "完整工资分支图可读，A/C1 已验证与 C2/P4 待实施区分清楚；异常节点与冻结之间缺结果条件及未应用返回确认路径。"
+      },
+      {
+        "name": "payroll-branches-right-390.png",
+        "sha256": "7a817cd85cf076dd617b18c4531e28c3e8638eb970e2bd454a43fdce7a49831e",
+        "observation": "窄屏右侧 C2、异常处理与更正节点完整可读；配合整图确认异常框仅向冻结方向出线。"
+      },
+      {
+        "name": "overview-lanes-1440.png",
+        "sha256": "adf56a84ded4f343b93604d209055df00867e7c80ff340a95991a508af7cb772",
+        "observation": "收入、材料、现场、工资、分包及其他支出五泳道有序，卡片文本与 Issue 状态可读，未见遮挡或跨列混线。"
+      }
+    ],
+    "note": "记录原7图的修复前指纹和发现；原临时路径已由新图覆盖，历史指纹不指向本目录当前图片。"
+  },
+  "generatorInputs": [
+    {
+      "path": "docs/research/issue-review-2026-09-11/rows-business.json",
+      "sha256": "e48c5ad83251e06c0c465499350cffcf8a0e72cf8ae474c8e7e963d5c40019db"
+    },
+    {
+      "path": "docs/research/issue-review-2026-09-11/build_report.py",
+      "sha256": "0aa53da27f170827d78bd2b4fc3bd6c7a2fe56cc9268b0974b9116583cf6f280"
+    },
+    {
+      "path": "docs/research/issue-review-2026-09-11/index.html",
+      "sha256": "084f6c335d732151420cc1734d73997bc996eb72d06e623913ad885f9d452e94"
+    }
+  ],
+  "runtimeVerification": {
+    "file": "verification.json",
+    "sha256": "4d05f9b0a1722d818152f30482663d88f0ec3b5ae05821be5542679edc9caaf0",
+    "source": "Root browser capture; read by this reviewer",
+    "result": "5 viewport root width equals scroll width; 15 nodes / 22 edges each"
+  },
+  "archive": {
+    "directory": "docs/design/evidence/issue-412-payroll-c1/report",
+    "files": [
+      "payroll-branches-390.png",
+      "payroll-branches-768.png",
+      "payroll-branches-1024.png",
+      "payroll-branches-1280.png",
+      "payroll-branches-1440.png",
+      "payroll-branches-right-390.png",
+      "overview-lanes-1440.png",
+      "verification.json",
+      "review.json"
+    ]
+  }
+}

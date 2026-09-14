@@ -1,5 +1,6 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAQuantityFacts, PayrollAQuantityQuery } from '../../app/lib/payroll/central-a-contract'
+import type { PayrollAttendanceFacts, PayrollWorkerFact } from '../../app/lib/payroll/central-attendance-contract'
 import type { PayrollContext, PayrollDetailRead, PayrollListRead, PayrollProjectOption, PayrollQuery, PayrollSourcesRead } from '../../app/lib/payroll/central-contract'
 import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
@@ -8,18 +9,21 @@ import { loadPayrollHistory } from '../../app/lib/payroll/central-history'
 import { loadPayrollGraph, payrollEvidence, payrollListRows, payrollSources, readPayrollStatement } from '../../app/lib/payroll/central-read'
 import { initializePayrollSchema, payrollRevision } from '../../app/lib/payroll/central-schema'
 import { createPayrollAService } from './payroll-a-service'
+import { createPayrollAttendanceService } from './payroll-attendance-service'
+import { createPayrollC1Service } from './payroll-c1-service'
 
 export interface PayrollIdentitySource {
   version: string
   projects: PayrollProjectOption[]
   crews: { id: string, name: string, defaultPayRatio?: number | null, ratioExplicitlyConfigured?: boolean }[]
-  workers: { id: string, name: string, crewId: string | null }[]
+  workers: ({ id: string, name: string, crewId: string | null } & Partial<Omit<PayrollWorkerFact, 'workerId' | 'crewId'>>)[]
 }
 export interface PayrollServiceOptions {
   session: (sessionId?: string | null) => BusinessSession
   identities: (sessionId?: string | null) => PayrollIdentitySource | Promise<PayrollIdentitySource>
   transaction: <T>(work: (db: TransactionDb, context: BusinessSession) => Promise<T>, sessionId?: string | null) => Promise<T>
   quantityFacts?: (db: TransactionDb, query: PayrollAQuantityQuery) => Promise<PayrollAQuantityFacts>
+  attendanceFacts?: (db: TransactionDb, query: { projectId: string, month: string }) => Promise<PayrollAttendanceFacts>
 }
 export type PayrollRun = <T>(query: PayrollQuery, sessionId: string | null | undefined, read: (db: TransactionDb, context: PayrollContext, source: PayrollIdentitySource) => Promise<T>, write?: boolean) => Promise<T>
 function hash(value: unknown) {
@@ -43,8 +47,11 @@ async function synchronizeIdentities(db: TransactionDb, source: PayrollIdentityS
     await db.execute('INSERT INTO projects(id,name,code) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,code=excluded.code,deleted_at=NULL', [row.id, row.name, row.code])
   for (const row of source.crews)
     await db.execute('INSERT INTO crews(id,name,trade) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,deleted_at=NULL', [row.id, row.name, ''])
-  for (const row of source.workers)
+  for (const row of source.workers) {
     await db.execute('INSERT INTO workers(id,name,trade,crew_id) VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,crew_id=excluded.crew_id,deleted_at=NULL', [row.id, row.name, '', row.crewId])
+    if ('dailyWageState' in row || 'currentProjectId' in row)
+      await db.execute('UPDATE workers SET daily_wage=?,current_project_id=? WHERE id=?', [row.dailyWageState === 'value' ? row.dailyWage ?? null : null, source.projects.some(p => p.id === row.currentProjectId) ? row.currentProjectId : null, row.id])
+  }
 }
 /** P0 只读域：会话、中央身份、工资事实与迁移候选共用工作区串行事务。 */
 export function createPayrollService(options: PayrollServiceOptions) {
@@ -77,6 +84,8 @@ export function createPayrollService(options: PayrollServiceOptions) {
   }
   return {
     ...createPayrollAService(run, options),
+    ...createPayrollAttendanceService(run, options),
+    ...createPayrollC1Service(run, options),
     list(query: PayrollQuery, sessionId?: string | null): Promise<PayrollListRead> {
       return run(query, sessionId, async (db, context, source) => {
         const graph = await loadPayrollGraph(db)

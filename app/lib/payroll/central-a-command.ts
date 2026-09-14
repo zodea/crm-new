@@ -1,22 +1,15 @@
 import type { TransactionDb } from '../db/coordinator'
 import type { PayrollAFormRead, PayrollAFrozenDocument, PayrollAReleaseDraft, PayrollAStatementSourceSnapshot } from './central-a-contract'
-import { logOperation } from '../db/soft-delete'
 import { generateId } from '../util/id'
 import { payrollACanonical } from './central-a-calculation'
 import { isPayrollAFrozenDocument } from './central-a-codec'
+import { payrollWriteRow as payrollAWriteRow } from './central-command-shared'
 import { payrollProblem } from './central-contract'
 import { amountInCents, normalizeAllocations } from './statements'
 
+export { payrollWriteRow as payrollAWriteRow } from './central-command-shared'
+
 type Row = Record<string, unknown>
-export async function payrollAWriteRow(db: TransactionDb, table: string, id: string, after: Row, actor: string): Promise<string> {
-  const [before] = await db.select<Row>(`SELECT * FROM ${table} WHERE id=?`, [id])
-  const fields = Object.keys(after)
-  if (before)
-    await db.execute(`UPDATE ${table} SET ${fields.map(field => `${field}=?`).join(',')} WHERE id=?`, [...Object.values(after), id])
-  else
-    await db.execute(`INSERT INTO ${table}(id,${fields.join(',')}) VALUES (?,${fields.map(() => '?').join(',')})`, [id, ...Object.values(after)])
-  return logOperation(db, { table, recordId: id, action: before ? 'update' : 'create', before, after: { ...(before ?? {}), id, ...after }, operator: actor })
-}
 
 /** 成功发放的事实所有权保留，软删头/重建完成行不能绕过；同负责人累计不重复领用。 */
 export async function payrollACrossBookConflicts(db: TransactionDb, read: PayrollAFormRead): Promise<string[]> {

@@ -1,0 +1,50 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run tests/payroll/c1-b-independent-review.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/c1-b-independent-review.test.ts (4 tests | 4 failed) 4010ms
+   × 迟到迁入已发月锁复用全部原证据，不能越过后来真实考勤：frozen-lines 1123ms
+   × 迟到迁入已发月锁复用全部原证据，不能越过后来真实考勤：frozen-leader 979ms
+   × 迟到迁入已发月锁复用全部原证据，不能越过后来真实考勤：frozen-month 957ms
+   × 迟到迁入已发月锁复用全部原证据，不能越过后来真实考勤：deleted-source-link 950ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入已发月锁复用全部原证据，不能越过后来真实考勤：frozen-lines
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入已发月锁复用全部原证据，不能越过后来真实考勤：frozen-leader
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入已发月锁复用全部原证据，不能越过后来真实考勤：frozen-month
+ FAIL  |unit| tests/payroll/c1-b-independent-review.test.ts > 迟到迁入已发月锁复用全部原证据，不能越过后来真实考勤：deleted-source-link
+AssertionError: expected undefined to match object { problem: { code: 'conflict' } }
+
+- Expected:
+{
+  "problem": {
+    "code": "conflict",
+  },
+}
+
++ Received:
+undefined
+
+ ❯ tests/payroll/c1-b-independent-review.test.ts:67:23
+     65|     expect(await readAll()).toEqual(before)
+     66|     expect(coreMigrationTestInstance.snapshot(session)).toEqual(author…
+     67|     expect(rejection).toMatchObject({ problem: { code: 'conflict' } })
+       |                       ^
+     68|   }
+     69|   finally { db.close() }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed (4)
+   Start at  11:02:23
+   Duration  6.34s (transform 1.75s, setup 0ms, import 2.12s, tests 4.01s, environment 0ms)
+

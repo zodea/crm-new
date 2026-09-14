@@ -8,6 +8,7 @@ import type {
 import type { CrewSourceRow, WorkerSourceRow } from '../../app/lib/crew-worker/read-contract'
 import type { CrewFormDraft, WorkerFormDraft } from '../../app/lib/master-data/forms'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { PayrollWorkerFact } from '../../app/lib/payroll/central-attendance-contract'
 import type { BusinessSession } from './business-session'
 import { createHash, randomUUID } from 'node:crypto'
 import {
@@ -196,6 +197,8 @@ export function createCrewWorkerCommandTestInstance(options: Options = {}) {
     }
     else {
       const workerDraft = draft as WorkerFormDraft
+      if (workerDraft.dailyWage != null && (typeof workerDraft.dailyWage !== 'number' || !Number.isFinite(workerDraft.dailyWage) || workerDraft.dailyWage < 0))
+        throw fail('validation-failed', '参考日工资必须是非负数值或空值', { dailyWage: ['参考日工资必须是非负数值或空值'] })
       if (workerDraft.crewId && !state.crews.has(workerDraft.crewId))
         throw fail('validation-failed', '所属班组不存在或来源不匹配', { crewId: ['所属班组不存在或来源不匹配'] })
       workerDraft.status = lifecycle(input.request.action)
@@ -233,6 +236,23 @@ export function createCrewWorkerCommandTestInstance(options: Options = {}) {
         return { crewId: stored.id, value, explicitlyConfigured: value !== null, sourceVersion }
       })
       return { sourceVersion: `crew-payroll-ratio:${createHash('sha256').update(JSON.stringify(rows)).digest('hex')}`, rows }
+    },
+    /** 工资 owner 授权后读取；属性缺失、原 NULL 和明确零分别保留。 */
+    payrollWorkerFacts(sessionId?: string | null) {
+      const rows: PayrollWorkerFact[] = [...stateFor(sessionId).workers.values()].map((stored) => {
+        const raw = stored.draft.dailyWage
+        if (raw != null && (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0))
+          throw fail('validation-failed', '工人原日薪无法确认，不能按缺价或零读取')
+        const fact = {
+          workerId: stored.id,
+          crewId: text(stored.draft.crewId) || null,
+          currentProjectId: text(stored.draft.currentProjectId) || null,
+          dailyWage: raw ?? null,
+          dailyWageState: !Object.hasOwn(stored.draft, 'dailyWage') || raw === undefined ? 'missing' as const : raw === null ? 'null' as const : 'value' as const,
+        }
+        return { ...fact, sourceVersion: createHash('sha256').update(JSON.stringify(fact)).digest('hex') }
+      })
+      return { sourceVersion: `worker-payroll:${createHash('sha256').update(JSON.stringify(rows)).digest('hex')}`, rows }
     },
     workerRows(sessionId?: string | null): WorkerSourceRow[] {
       return [...stateFor(sessionId).workers.values()].map(workerRow)
