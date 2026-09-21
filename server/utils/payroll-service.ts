@@ -12,8 +12,10 @@ import type { QuantityHollowFacts, QuantityHollowFactsQuery } from '../../app/li
 import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
 import { initializePayrollAFeesSchema } from '../../app/lib/payroll/central-a-fees-schema'
+import { initializePayrollARoundingSchema } from '../../app/lib/payroll/central-a-rounding-schema'
 import { assertPayrollActualCommand } from '../../app/lib/payroll/central-actual-validation'
 import { assertPayrollAdjustmentCommand } from '../../app/lib/payroll/central-adjustment-validation'
+import { initializePayrollBatchSchema } from '../../app/lib/payroll/central-batch-schema'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { loadPayrollHistory } from '../../app/lib/payroll/central-history'
 import { initializePayrollHollowDeductionSchema } from '../../app/lib/payroll/central-hollow-deduction-schema'
@@ -21,10 +23,12 @@ import { loadPayrollGraph, payrollEvidence, payrollListRows, payrollSources, rea
 import { assertPayrollReversalCommand } from '../../app/lib/payroll/central-reversal-validation'
 import { initializePayrollSchema, payrollRevision } from '../../app/lib/payroll/central-schema'
 import { resolvePayrollABook } from './payroll-a-book'
+import { createPayrollARoundingService } from './payroll-a-rounding-service'
 import { createPayrollAService } from './payroll-a-service'
 import { createPayrollActualService } from './payroll-actual-service'
 import { createPayrollAdjustmentService } from './payroll-adjustment-service'
 import { createPayrollAttendanceService } from './payroll-attendance-service'
+import { createPayrollBatchService } from './payroll-batch-service'
 import { createPayrollC1Service } from './payroll-c1-service'
 import { createPayrollC2Service } from './payroll-c2-service'
 import { createPayrollDayworkService } from './payroll-daywork-service'
@@ -90,6 +94,8 @@ export function createPayrollService(options: PayrollServiceOptions) {
       const source = structuredClone(await options.identities(sessionId))
       await initializePayrollSchema(db)
       await initializePayrollAFeesSchema(db)
+      await initializePayrollARoundingSchema(db)
+      await initializePayrollBatchSchema(db)
       if (options.hollowFacts)
         await initializePayrollHollowDeductionSchema(db)
       await synchronizeIdentities(db, source)
@@ -117,8 +123,16 @@ export function createPayrollService(options: PayrollServiceOptions) {
   const { c2FormInTransaction, ...c2Service } = createPayrollC2Service(run, options)
   const { executeActual, ...actualReads } = createPayrollActualService(run)
   const { executeReversal, ...reversalReads } = createPayrollReversalService(run)
+  const { aRoundingInTransaction, ...aRoundingService } = createPayrollARoundingService(run)
+  const batchService = createPayrollBatchService(
+    run,
+    { A: aFormInTransaction, C1: c1FormInTransaction, C2: c2FormInTransaction, rounding: aRoundingInTransaction },
+    { A: aService.execute, C1: c1Service.executeC1, C2: c2Service.executeC2 },
+  )
   return {
     ...aService,
+    ...aRoundingService,
+    ...batchService,
     ...createPayrollHollowService(run, {
       A: async (db, context, source, statementId) => (await aFormInTransaction(db, context, source, { statementId })).hollow,
       C1: async (db, context, source, statementId) => (await c1FormInTransaction(db, context, source, { statementId })).hollow,

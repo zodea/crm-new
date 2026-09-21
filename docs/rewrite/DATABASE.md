@@ -684,6 +684,16 @@ P4 更正依据增加可选 `hollow`：原冻结采用集合与对应 `adoptionI
 
 操作步骤见[空鼓指南](../guides/payroll-hollow.md)，接口与读取分别见 [COMMANDS](./COMMANDS.md#户级空鼓和人工扣款命令412p6)、[READ-MODELS](./READ-MODELS.md#户级空鼓和工资扣款读取412p6)。
 
+### 批量工资计划与逐单协调（#412，P7）
+
+P7 的批量协调不建立第二套工资或现金账。`payroll_batch_plans` 保存经办人确认的项目、月份、用途、资金输入、逐项依据、人工金额和完整成员分配；计划正文及摘要不可变，`state / next_item_index / expected_payroll_revision / revision` 只表示协调进度。暂缓项不生成工资命令，也不形成零元发放。
+
+`payroll_batch_attempts` 在每项首次发送前保存完整 A/C1/C2 原命令正文、摘要、原命令 ID、准备/执行命令 ID、确认依据及发送前工资修订。同一计划至多一项处于 `prepared`。原工资是否成功只认既有 `payroll_command_receipts`；尝试表中的结果是协调引用，不能独立证明核对或现金。原事务已成功而协调响应丢失时，仍以相同原命令 ID 和正文恢复；已成功项不再换键发送。
+
+`payroll_batch_command_receipts` 保存 `confirm-batch / prepare-batch-item / execute-batch-original` 的同键同文结果，并绑定工作区、经办人、项目和计划。批次确认不推进工资修订；准备只保留资金与命令且不改工资；执行调用原格式服务后，必须读到匹配原命令的正式回执才推进下一项。只有原服务明确返回 `commandOutcome=not-applied` 才可结束本次尝试并回到重新准备；未知结果保持 `prepared`。本批前项带来的唯一预期修订可继续，其他修订、依据变化、错回执或异常版本增量均停止为 `needs-recheck`。
+
+`payroll_a_rounding_revisions` 按项目、负责人、普通/管理工资簿及生效月追加保存 A 的 `off` 或向下整百规则；未配置与明确关闭不同。C1/C2 不读取 A 取整。当前尚未裁定自动分配尾差，建议必须保留未分配额并由经办人明确修改；正式编号和名册归档也不得借本表提前定案。
+
 ### 工程量物理模型（#103）
 
 以下是 #103 的目标物理模型；列名统一为 snake_case。模板房间直接落 `rooms`，但它属于户型模板而非某一户；某户的房间实例由 `(unit_id, room_id)` 组合指认，不建立逐户房间副本。

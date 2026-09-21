@@ -1,9 +1,11 @@
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollARepository } from './central-a-contract'
 import type { PayrollABookRef, PayrollAFeesRepository } from './central-a-fees-contract'
+import type { PayrollARoundingRepository } from './central-a-rounding-contract'
 import type { PayrollActualRepository } from './central-actual-contract'
 import type { PayrollAdjustmentRepository } from './central-adjustment-contract'
 import type { PayrollAttendanceRepository } from './central-attendance-contract'
+import type { PayrollBatchRepository } from './central-batch-service-contract'
 import type { PayrollC1Repository } from './central-c1-contract'
 import type { PayrollC2Repository } from './central-c2-contract'
 import type { PayrollDayworkRepository } from './central-daywork-contract'
@@ -103,7 +105,7 @@ export interface PayrollStatementDetail extends PayrollStatementRow {
 export interface PayrollListRead { context: PayrollContext, rows: PayrollStatementRow[], projects: PayrollProjectOption[], diagnostics: PayrollDiagnostic[] }
 export interface PayrollDetailRead { context: PayrollContext, statement: PayrollStatementDetail, history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
 export interface PayrollSourcesRead { context: PayrollContext, projectId: string, configs: PayrollConfig[], attendance: PayrollAttendance[], daywork: PayrollDaywork[], locks: PayrollSourceLock[], diagnostics: PayrollDiagnostic[], history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
-export interface PayrollRepository extends PayrollARepository, PayrollAFeesRepository, PayrollAttendanceRepository, PayrollC1Repository, PayrollC2Repository, PayrollDayworkRepository, PayrollAdjustmentRepository, PayrollActualRepository, PayrollHollowRepository {
+export interface PayrollRepository extends PayrollARepository, PayrollARoundingRepository, PayrollAFeesRepository, PayrollAttendanceRepository, PayrollBatchRepository, PayrollC1Repository, PayrollC2Repository, PayrollDayworkRepository, PayrollAdjustmentRepository, PayrollActualRepository, PayrollHollowRepository {
   list: (query: PayrollQuery) => Promise<PayrollListRead>
   detail: (query: PayrollQuery, id: string) => Promise<PayrollDetailRead>
   sources: (query: PayrollQuery & { projectId: string }) => Promise<PayrollSourcesRead>

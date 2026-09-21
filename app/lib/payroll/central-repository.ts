@@ -1,5 +1,6 @@
 import type { ProjectHttpFetcher } from '../project/http-repository'
 import type { PayrollAConfigRead, PayrollAFormRead, PayrollAOutputRead } from './central-a-contract'
+import type { PayrollARoundingRead } from './central-a-rounding-contract'
 import type { PayrollAdjustmentRead, PayrollAdjustmentReadKind } from './central-adjustment-read-codec'
 import type { PayrollC1ConfigRead, PayrollC1FormRead, PayrollC1OutputRead } from './central-c1-contract'
 import type { PayrollC2ConfigRead, PayrollC2FormRead, PayrollC2OutputRead } from './central-c2-contract'
@@ -8,10 +9,12 @@ import type { PayrollDayworkFormRead, PayrollDayworkListRead } from './central-d
 import { readProjectHttp } from '../project/http-repository'
 import { decodePayrollARead, decodePayrollAResult, encodePayrollAWire } from './central-a-codec'
 import { decodePayrollAFeeConfigRead, decodePayrollAFeesResult, encodePayrollAFeesWire } from './central-a-fees-codec'
+import { decodePayrollARoundingRead, decodePayrollARoundingResult } from './central-a-rounding-codec'
 import { decodePayrollAdjustmentResult } from './central-adjustment-codec'
 import { decodePayrollAdjustmentRead } from './central-adjustment-read-codec'
 import { encodePayrollAdjustmentWire } from './central-adjustment-wire'
 import { decodePayrollAttendanceRead, decodePayrollAttendanceResult, encodePayrollAttendanceWire } from './central-attendance-codec'
+import { decodePayrollBatchPlan, decodePayrollBatchPreview } from './central-batch-codec'
 import { decodePayrollC1Read, decodePayrollC1Result, encodePayrollC1Wire } from './central-c1-codec'
 import { decodePayrollC2Read, decodePayrollC2Result, encodePayrollC2Wire } from './central-c2-codec'
 import { decodePayrollRead } from './central-codec'
@@ -21,6 +24,11 @@ import { decodePayrollHollowConfigRead, decodePayrollHollowResult, encodePayroll
 export function createPayrollRepository(fetcher: ProjectHttpFetcher): PayrollRepository {
   const adjustmentRead = <T extends PayrollAdjustmentRead>(kind: PayrollAdjustmentReadKind, query: PayrollQuery, input: unknown, target = input): Promise<T> => readProjectHttp(() => fetcher(`/api/read/payroll/${kind}`, { method: 'POST', body: { query, input: encodePayrollAdjustmentWire(input) } }), value => decodePayrollAdjustmentRead<T>(value, kind, query, target))
   return {
+    batchPreview: (query, input) => readProjectHttp(() => fetcher('/api/read/payroll/batch-preview', { method: 'POST', body: { query, input } }), value => decodePayrollBatchPreview(value, query, input)),
+    executeBatch: command => readProjectHttp(() => fetcher('/api/commands/payroll-batch', { method: 'POST', body: command as unknown as Record<string, unknown> }), value => decodePayrollBatchPlan(value, command.action.kind === 'confirm-batch' ? { origin: command.origin, projectId: command.action.input.projectId, month: command.action.input.month } : { origin: command.origin }, command.action.kind === 'confirm-batch' ? undefined : command.action.input.planId, command)),
+    batch: (query, planId) => readProjectHttp(() => fetcher('/api/read/payroll/batch', { query: { ...query, planId } }), value => decodePayrollBatchPlan(value, query, planId)),
+    aRounding: (query, scope) => readProjectHttp(() => fetcher('/api/read/payroll/a-rounding', { query: { ...query, scope: JSON.stringify(scope) } }), value => decodePayrollARoundingRead(value, query, scope) as PayrollARoundingRead),
+    executeARounding: command => readProjectHttp(() => fetcher('/api/commands/payroll-a-rounding', { method: 'POST', body: command as unknown as Record<string, unknown> }), value => decodePayrollARoundingResult(value, command)),
     hollowConfig: (query, config) => readProjectHttp(() => fetcher('/api/read/payroll/hollow-config', { method: 'POST', body: { query, config: encodePayrollHollowWire(config) } }), value => decodePayrollHollowConfigRead(value, query, config)),
     executeHollow: command => readProjectHttp(() => fetcher('/api/commands/payroll-hollow', { method: 'POST', body: encodePayrollHollowWire(command) as Record<string, unknown> }), value => decodePayrollHollowResult(value, command)),
     aFeeConfig: (query, scope) => readProjectHttp(() => fetcher('/api/read/payroll/a-fee-config', { method: 'POST', body: { query, scope: encodePayrollAFeesWire(scope) } }), value => decodePayrollAFeeConfigRead(value, query, scope)),
