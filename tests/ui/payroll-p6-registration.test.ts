@@ -26,7 +26,7 @@ interface ReportRow {
 }
 
 describe('p6 limited delivery registration', () => {
-  it('binds the fixed product evidence to the hollow obligation and keeps P7 and production open', () => {
+  it('preserves the fixed P6 evidence after the later P7 registration', () => {
     const coverage = buildModuleReviewCoverage()
     const byId = (id: string) => coverage.obligations.find(item => item.id === id)!
     expect(byId('WAGE-15')).toMatchObject({ status: 'current-passed' })
@@ -36,8 +36,8 @@ describe('p6 limited delivery registration', () => {
     expect(byId('WAGE-18').evidence).toContainEqual(expect.objectContaining({ reference: evidence, commit: productCommit }))
     expect(byId('WAGE-18').remaining).toContain('P7')
     for (const id of ['WAGE-16', 'WAGE-17']) {
-      expect(byId(id).status).toBe('ready')
-      expect(byId(id).evidence).toEqual([])
+      expect(byId(id).status).toBe('current-passed')
+      expect(byId(id).evidence).toContainEqual(expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-batch-workbooks/README.md' }))
     }
     expect(new Set(byId('WAGE-15').caseIds).size).toBe(byId('WAGE-15').caseIds.length)
     for (const caseId of hollowCases) {

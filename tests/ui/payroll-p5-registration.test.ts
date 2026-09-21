@@ -45,8 +45,8 @@ describe('p5 limited delivery registration', () => {
     expect(byId('WAGE-12').remaining).toContain('P7')
     expect(byId('WAGE-15').status).toBe('current-passed')
     for (const id of ['WAGE-16', 'WAGE-17']) {
-      expect(byId(id).status).toBe('ready')
-      expect(byId(id).evidence).toEqual([])
+      expect(byId(id).status).toBe('current-passed')
+      expect(byId(id).evidence).toContainEqual(expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-batch-workbooks/README.md' }))
     }
     for (const caseId of payrollACases) {
       const linked = coverage.cases.find(item => item.id === caseId)!

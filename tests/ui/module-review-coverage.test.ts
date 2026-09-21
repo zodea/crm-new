@@ -292,9 +292,9 @@ describe('module review coverage', () => {
       recency: 'current-run',
     }))
     for (const id of ['WAGE-16', 'WAGE-17']) {
-      expect(byId(id).status).toBe('ready')
+      expect(byId(id).status).toBe('current-passed')
       expect(byId(id).sources).toContain('https://github.com/zodea/crm-new/issues/117')
-      expect(byId(id).evidence).toEqual([])
+      expect(byId(id).evidence).toContainEqual(expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-batch-workbooks/README.md', commit: 'a2f117f52dffe3d7867f4ff82a1d62be372b0c2b' }))
     }
     expect(byId('PRG-01').status).toBe('current-passed')
     expect(byId('PRG-07').status).toBe('current-passed')

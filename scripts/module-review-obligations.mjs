@@ -106,6 +106,12 @@ const payrollP6Evidence = {
   recency: 'current-run',
   scope: '真实户/分项/原责任空鼓检查与追加整改、A/C1/C2列示及人工启动扣款、已发冻结与当前事实并列、施工楼层往返、P4更正/真实补退与迁入恢复保护。限本地中央实例及列明场景；一次启动跨后续单持续、部分新增处理仍留local grill，不代验P7完整工作簿、名册归档或#416生产交付',
 }
+const payrollP7Evidence = {
+  reference: 'docs/design/evidence/issue-412-payroll-batch-workbooks/README.md',
+  commit: 'a2f117f52dffe3d7867f4ff82a1d62be372b0c2b',
+  recency: 'current-run',
+  scope: '固定项目月的 A/C1/C2 批次资金建议、不可变计划、逐单原回执恢复，以及负责人全周期和项目按月 XLSX/ZIP；自动尾差、正式编号接续和完整名册原件仍留 grill，不含 #416 生产交付',
+}
 const homeScheduleEvidence = {
   reference: 'docs/design/evidence/issue-434/README.md',
   commit: '0dd6c91e096789d842cea417cd40a496363fe52e',
@@ -613,8 +619,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: [...new Set([...payrollCases, ...payrollC1Cases, ...payrollC2StatementCases, 'C-68C5D0C7AF86', 'C-EC73DDB08635', 'C-3CDEC6A17EDE', 'C-CF490A18E883', 'C-7C47CBA71307', 'C-9CD9C66FECE2', 'C-0D44B14FF6F4', 'C-60F79C79C1FD', 'C-374B51B5F091', 'C-6C1FAE8C5A88', ...payrollP5DetailCases])],
     status: 'current-passed',
-    evidence: [payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence, payrollC2Evidence, payrollP4Evidence, payrollP5Evidence],
-    remaining: 'P0–P3原责任/量价/全员分配、签收及各格式输出冻结已有证据；P4已验证原单更正集合、本次确认与整链余额、实际收付及处理历史分开呈现，原来源/宿主嵌套返回和并发幂等、原键后读均通过。迁入后原JSON/回执和冻结输出保真，实际确认Excel及三页打印已核对。P5追加普通/管理分簿原已领、费用与负价完整冻结、普通3815及管理520的两份实际XLSX和四页打印，原JSON/签名/回执迁入后仍保真；单张可组合输出不等于P7完整工作簿。P6/P7、未裁定费用扩展、其他成本与生产仍另验。',
+    evidence: [payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence, payrollC2Evidence, payrollP4Evidence, payrollP5Evidence, payrollP7Evidence],
+    remaining: 'P0–P3原责任/量价/全员分配、签收及各格式输出冻结已有证据；P4已验证原单更正集合、本次确认与整链余额、实际收付及处理历史分开呈现，原来源/宿主嵌套返回和并发幂等、原键后读均通过。迁入后原JSON/回执和冻结输出保真，实际确认Excel及三页打印已核对。P5追加普通/管理分簿原已领、费用与负价完整冻结。P7组合冻结原表、实际收付和缺口清单，完成全周期及按月工作簿的限定文件回读；正式编号、完整名册原件、未裁定费用扩展、其他成本与生产仍另验。',
   },
   {
     id: 'WAGE-12',
@@ -623,8 +629,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: [...new Set([...payrollCases, attendanceCase, ...payrollC1Cases, ...dayworkCentralCases, ...payrollC2Cases, ...payrollP5Cases])],
     status: 'partial',
-    evidence: [payrollEvidence, payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence, payrollC2Evidence, payrollP4Evidence, payrollP5Evidence, payrollP6Evidence],
-    remaining: 'P0–P6均具固定本地提交及独立复核；P3既有验收范围不变。P4和P5的更正、实际及费用边界按各自证据保留。P6产品提交正常钩子类型及完整npm test 782文件4312项通过（326.16秒），生产构建、完整浏览器旅程、真实Excel/打印回读及非作者双轴复核通过；指南按用户要求提供Markdown，临时PDF不归档。P7批量资金建议、完整工作簿和名册归档，以及未裁定局部规则、全模块后续交付与#416生产关口仍分别承接。',
+    evidence: [payrollEvidence, payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence, payrollC2Evidence, payrollP4Evidence, payrollP5Evidence, payrollP6Evidence, payrollP7Evidence],
+    remaining: 'P0–P7均具固定本地产品提交；P7最终产品提交补齐批次归属、逐项三态金额、危险恢复引用保护、缺口工作簿口径及取整脏态保护，提交钩子类型检查及完整npm test 793文件4339项通过，生产构建、XLSX/ZIP回读和五档空实例界面检查通过，指南按用户要求提供Markdown。P7自动尾差、正式编号和完整名册原件继续留grill；P5/P6局部规则、全模块跨域缺口与#416生产关口仍分别承接。',
   },
   {
     id: 'WAGE-13',
@@ -662,9 +668,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(117), `${issue(117)}#issuecomment-5018217081`],
     ownerIssue: 412,
     caseIds: payrollCases,
-    status: 'ready',
-    evidence: [],
-    remaining: 'P7 在项目/月多主体批量发放中按剩余应领权重分配资金建议，逐行可改、按簿取整并逐单登记真实发放；零权重、超可发、余数、部分成功和丢响应必须保留各自回执。建议金额不是实际已付。',
+    status: 'current-passed',
+    evidence: [payrollP7Evidence],
+    remaining: 'P7限定范围已验证：固定项目/月按当前合法可发余额建议，A使用明确取整配置，逐行可改并保存不可变计划；A/C1/C2沿原命令逐项执行，成功、明确未执行和未知结果保留原回执并冷恢复。三等权整百的尾差明确留未分配并允许手工调整；若要求自动用尽，合法档位与并列顺序继续留grill。#416生产另验。',
   },
   {
     id: 'WAGE-17',
@@ -672,9 +678,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(117), `${issue(117)}#issuecomment-5018392493`, 'docs/research/issue-review-2026-09-11/payroll-central-spec-draft.md'],
     ownerIssue: 412,
     caseIds: wageCases,
-    status: 'ready',
-    evidence: [],
-    remaining: 'P7 保留应付、实际支付和差额；亚运城按负责人一册完整周期含月度及结算，未来印按月一册/月目录。实际下载核对各页、明细、冻结来源与合计；单张 A 冻结导出不能替代。',
+    status: 'current-passed',
+    evidence: [payrollP7Evidence],
+    remaining: 'P7限定范围已验证：负责人/格式/请款簿稳定身份全周期一册，以及项目按月真实ZIP目录均由冻结原表和实际收付生成；A累计不重复相加，C1工资+考勤、C2工资+签工且无考勤。缺冻结原文时明确生成部分工作簿，公式合计和对账结论保持不可判定，实际账仍覆盖所选全部已发工资身份。正式编号当前明确标记待定，发号时点与旧号接续继续留grill；#416生产另验。',
   },
   {
     id: 'WAGE-18',
@@ -683,8 +689,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: [...payrollCases, ...quantityCases],
     status: 'partial',
-    evidence: [payrollAEvidence, payrollP6Evidence],
-    remaining: 'P1已验证A原施工楼层/责任来源及返回定位；P6追加验证往月/本月/未涉及分项、未整改点位、多楼栋同层稳定身份、离职仅提示及原户冷返回，C1/C2不显示虚构楼层。P7正式工作簿中的实名资料、证件照/银行卡照及归档时点仍待验；名册原事实归#407，#416生产另验。',
+    evidence: [payrollAEvidence, payrollP6Evidence, payrollP7Evidence],
+    remaining: 'P1/P6已验证A原施工楼层、责任与空鼓位置往返。P7工作簿保留冻结成员及零分配人员，但不会借工资读取权限导出完整实名目录；正式名册中的未脱敏字段、证件照/银行卡照、归档时点和最小授权仍待grill，名册原事实归#407，#416生产另验。',
   },
 ]
 
