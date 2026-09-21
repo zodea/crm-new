@@ -11,6 +11,7 @@ const payrollCases = ['C-9C98D806E9B1', 'C-D8B07FE3B973', 'C-A7B5F1FDD485']
 const payrollACases = [...payrollCases, 'C-D3A1780D1250', 'C-D5D665364A7D']
 const payrollP5DetailCases = ['C-7E706511E4DD', 'C-2E84963015A0', 'C-7DC8B7374ADB', 'C-C9CB7033103F', 'C-322BD11C58B3']
 const payrollP5Cases = [...payrollACases, ...payrollP5DetailCases, 'C-F8C579338CD4']
+const payrollP6Cases = [...new Set([...payrollCases, ...quantityCases, 'C-D6CAD39409A2', 'C-1785D3BD0ACB', 'C-646DC1829859'])]
 const payrollC1Cases = ['C-0E290F34471B', 'C-0691840A9820', 'C-47E400CBBB0A', 'C-E648A9E95DCF', 'C-35235DAEA64C', 'C-B1D7348A13D7', 'C-72AAED4C3E21', 'C-54E1EDEB0DBF', 'C-F0F7F41C11C4', 'C-95C49C34C8F0', 'C-10C2AA2AC212', 'C-8760F1D1B19E', 'C-99C11727D5D7', 'C-849CF779D9ED', 'C-CBC81AEE97F5', 'C-322F46461EF5']
 const attendanceCase = 'C-5751CF6E9985'
 const dayworkCase = 'C-7C09C38C854D'
@@ -98,6 +99,12 @@ const payrollP5Evidence = {
   commit: '61a6a10ddee611125d9d10b8dfd9dd81f99db467',
   recency: 'current-run',
   scope: 'A明确分项实际量的多条补贴、班组默认missing/null/0/false保真与明确采用、独立管理簿及公司代管无单、原责任负价清单、分簿已领和冻结输出；费用/负价原引用的P4更正及后月处理有公开服务/组件回归。外层v3/费用子图v1保原JSON、回执与冻结原件，旧图兼容、危险恢复、原键后读和真实浏览器来源保稿已验；实际只计一次的新增多宿主结论限公开服务与宿主投影。仅限本地中央实例及列明场景，不代验C1/C2平方米费用公式、P6/P7、其他成本域完整性或#416生产交付',
+}
+const payrollP6Evidence = {
+  reference: 'docs/design/evidence/issue-412-payroll-hollow/README.md',
+  commit: 'edc03faba20e0c5c665b7fc2011e2a4120d8428f',
+  recency: 'current-run',
+  scope: '真实户/分项/原责任空鼓检查与追加整改、A/C1/C2列示及人工启动扣款、已发冻结与当前事实并列、施工楼层往返、P4更正/真实补退与迁入恢复保护。限本地中央实例及列明场景；一次启动跨后续单持续、部分新增处理仍留local grill，不代验P7完整工作簿、名册归档或#416生产交付',
 }
 const homeScheduleEvidence = {
   reference: 'docs/design/evidence/issue-434/README.md',
@@ -616,8 +623,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: [...new Set([...payrollCases, attendanceCase, ...payrollC1Cases, ...dayworkCentralCases, ...payrollC2Cases, ...payrollP5Cases])],
     status: 'partial',
-    evidence: [payrollEvidence, payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence, payrollC2Evidence, payrollP4Evidence, payrollP5Evidence],
-    remaining: 'P0–P5均具固定本地提交及独立复核；P3既有验收范围不变。P4正常提交类型及完整npm test 715文件4062项通过，最终两项浏览器旅程、80张五档交互图、两份实际Excel及三页确认打印分别核验，迁入运输/危险恢复和旧库兼容有公开回归。P5产品正常提交完整npm test 740文件4190项通过（295.02秒）；费用图运输、旧图兼容及相关/无关原生引用危险恢复有公开回归，第二批入口和混批快照仍拒绝，不声称多批次并存。真实浏览器及四页产品打印按实际轮次复核，390金额列由第八轮独立场景补图关闭，不合并不同原单为同一事实链。指南按用户要求提供Markdown；P6/P7、未裁定费用扩展、全模块后续交付及#416生产关口仍分别承接。',
+    evidence: [payrollEvidence, payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence, payrollC2Evidence, payrollP4Evidence, payrollP5Evidence, payrollP6Evidence],
+    remaining: 'P0–P6均具固定本地提交及独立复核；P3既有验收范围不变。P4和P5的更正、实际及费用边界按各自证据保留。P6产品提交正常钩子类型及完整npm test 782文件4312项通过（326.16秒），生产构建、完整浏览器旅程、真实Excel/打印回读及非作者双轴复核通过；指南按用户要求提供Markdown，临时PDF不归档。P7批量资金建议、完整工作簿和名册归档，以及未裁定局部规则、全模块后续交付与#416生产关口仍分别承接。',
   },
   {
     id: 'WAGE-13',
@@ -644,10 +651,10 @@ export const REVIEW_OBLIGATIONS = [
     label: '#117 核对⑥ 户级空鼓销记与人工启动扣款',
     sources: [issue(117), `${issue(117)}#issuecomment-5015344952`],
     ownerIssue: 412,
-    caseIds: [...payrollCases, ...quantityCases],
-    status: 'ready',
-    evidence: [],
-    remaining: 'P6 从真实户/分项缺陷及整改记录聚合；进度月先列示，人工开始扣款时按仍未整改数和配置金额计算，置于请款合计后取整前。离职提示、并发销记和已发更正需联验，不恢复暂扣返还。',
+    caseIds: payrollP6Cases,
+    status: 'current-passed',
+    evidence: [payrollP6Evidence],
+    remaining: 'P6限定范围已验证：真实户/分项/原责任空鼓可追加整改，进度月只列示，具体工资单人工开始后按未整改处数×当时配置扣款，与请款、取整和实发顺序固定。已发冻结不被后来整改/改价改写，P4更正与真实补退保持守恒；迁入、危险恢复、原键恢复、楼层和户来源返回均有公开回归与真实浏览器证据。一次启动是否持续到后续单、已处理后新增处数及部分实际采用仍留local grill；P7整册及#416生产另验。',
   },
   {
     id: 'WAGE-16',
@@ -676,8 +683,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: [...payrollCases, ...quantityCases],
     status: 'partial',
-    evidence: [payrollAEvidence],
-    remaining: 'P1 已验证 A 原施工楼层/责任来源及返回定位；当月/往月完整展示、未整改点位、真实在班/离职人数和名册资料输出仍随 P6/P7。名册原事实归 #407，C1/C2 不显示虚构楼层。',
+    evidence: [payrollAEvidence, payrollP6Evidence],
+    remaining: 'P1已验证A原施工楼层/责任来源及返回定位；P6追加验证往月/本月/未涉及分项、未整改点位、多楼栋同层稳定身份、离职仅提示及原户冷返回，C1/C2不显示虚构楼层。P7正式工作簿中的实名资料、证件照/银行卡照及归档时点仍待验；名册原事实归#407，#416生产另验。',
   },
 ]
 

@@ -180,6 +180,7 @@ function buildSurfaces(ledger, registry) {
 function caseFor(surface, host) {
   const materialList = surface.route === '/contract/material' && surface.path === 'page' && host === 'browser'
   const projectImport = surface.route === '/import/mapping/:entity' && surface.kind === 'project' && host === 'browser'
+  const quantityHollow = surface.kind === 'subcontract.quantity.hollow' && host === 'browser'
   const customerProjects = host === 'browser' && (
     (surface.route === '/base/customer/:id' && ['page', 'tab/projects', 'tab/projects/table'].includes(surface.path))
     || (surface.route === '/project/:id' && surface.path === 'page')
@@ -192,18 +193,18 @@ function caseFor(surface, host) {
     applicability: host === 'tauri' ? 'existing-capabilities-only; formal-delivery-excluded' : 'in-scope',
     sourceState: surface.type === 'unlinked-placeholder' ? 'placeholder-not-implemented' : 'wired-needs-action-audit',
     reference: {
-      status: materialList ? 'scoped-observation' : 'not-observed',
+      status: materialList || quantityHollow ? 'scoped-observation' : 'not-observed',
       routeEvidenceId: surface.routeEvidenceId,
       note: '父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据',
     },
     acceptance: {
-      rules: materialList || projectImport || customerProjects ? 'scoped-defined' : 'needs-review',
-      frontend: projectImport ? 'passed' : materialList || customerProjects ? 'partial' : 'not-verified',
-      crossModule: projectImport || customerProjects ? 'passed' : materialList ? 'partial' : 'not-verified',
+      rules: materialList || projectImport || customerProjects || quantityHollow ? 'scoped-defined' : 'needs-review',
+      frontend: projectImport || quantityHollow ? 'passed' : materialList || customerProjects ? 'partial' : 'not-verified',
+      crossModule: projectImport || customerProjects || quantityHollow ? 'passed' : materialList ? 'partial' : 'not-verified',
       production: host === 'tauri' ? 'out-of-scope' : 'not-verified',
     },
-    reviewEvidence: customerProjects ? ['docs/design/evidence/issue-424/customer-project-verification.md'] : projectImport ? ['docs/design/evidence/issue-423/project-import-verification.md'] : materialList ? ['docs/design/evidence/issue-422/README.md'] : [],
-    remaining: customerProjects ? ['#424 仅验收中央项目→客户关联回读及往返；其他关联、逐列工具由 #407/#408/#404 继续复核，生产持久化归 #416'] : projectImport ? ['生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射'] : materialList ? ['逐列筛选、排序、设置和文件工具仍由 #404/#409 复核'] : ['逐动作及正常/边界/失败/重复/更正/跨域场景待核验'],
+    reviewEvidence: customerProjects ? ['docs/design/evidence/issue-424/customer-project-verification.md'] : projectImport ? ['docs/design/evidence/issue-423/project-import-verification.md'] : quantityHollow ? ['docs/design/evidence/issue-412-payroll-hollow/README.md'] : materialList ? ['docs/design/evidence/issue-422/README.md'] : [],
+    remaining: customerProjects ? ['#424 仅验收中央项目→客户关联回读及往返；其他关联、逐列工具由 #407/#408/#404 继续复核，生产持久化归 #416'] : projectImport ? ['生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射'] : quantityHollow ? ['P6限定业务与界面已验收；跨后续工资单持续规则保留local grill，完整工作簿归P7，生产持久化归#416'] : materialList ? ['逐列筛选、排序、设置和文件工具仍由 #404/#409 复核'] : ['逐动作及正常/边界/失败/重复/更正/跨域场景待核验'],
   }
 }
 

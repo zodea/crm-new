@@ -33,7 +33,7 @@ describe('module review coverage', () => {
     expect(byId('WAGE-09').status).toBe('partial')
     expect(byId('WAGE-09').remaining).toContain('材料/报销')
     expect(byId('WAGE-12').status).toBe('partial')
-    expect(byId('WAGE-12').remaining).toContain('P6/P7')
+    expect(byId('WAGE-12').remaining).toContain('P7')
   })
 
   it('registers stage creation, editing and reporting as unverified central browser work', () => {
@@ -284,7 +284,14 @@ describe('module review coverage', () => {
       expect(byId(id).evidence).toContainEqual(payrollAProof)
     expect(byId('WAGE-14').status).toBe('current-passed')
     expect(byId('WAGE-14').sources).toContain('https://github.com/zodea/crm-new/issues/117')
-    for (const id of ['WAGE-15', 'WAGE-16', 'WAGE-17']) {
+    expect(byId('WAGE-15').status).toBe('current-passed')
+    expect(byId('WAGE-15').sources).toContain('https://github.com/zodea/crm-new/issues/117')
+    expect(byId('WAGE-15').evidence).toContainEqual(expect.objectContaining({
+      reference: 'docs/design/evidence/issue-412-payroll-hollow/README.md',
+      commit: 'edc03faba20e0c5c665b7fc2011e2a4120d8428f',
+      recency: 'current-run',
+    }))
+    for (const id of ['WAGE-16', 'WAGE-17']) {
       expect(byId(id).status).toBe('ready')
       expect(byId(id).sources).toContain('https://github.com/zodea/crm-new/issues/117')
       expect(byId(id).evidence).toEqual([])
@@ -298,8 +305,9 @@ describe('module review coverage', () => {
       expect(obligation.status).not.toBe('needs-decision')
       for (const caseId of obligation.caseIds) {
         const linked = coverage.cases.find(item => item.id === caseId)!
-        expect(linked.acceptance.frontend).not.toBe('passed')
-        expect(linked.acceptance.crossModule).not.toBe('passed')
+        if (linked.acceptance.frontend === 'passed' || linked.acceptance.crossModule === 'passed')
+          expect(linked.reviewEvidence).toContain('docs/design/evidence/issue-412-payroll-hollow/README.md')
+        expect(linked.acceptance.production).toBe('not-verified')
       }
     }
   })

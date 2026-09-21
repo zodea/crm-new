@@ -1,6 +1,6 @@
 # P6 户级空鼓、整改与人工扣款
 
-本地产品验收已通过，基线为 P5 登记提交 `e344a5444cd52bf65e78b031912d5241666fc0`。本记录只覆盖 #412 的 P6；产品提交 SHA 将由后续登记提交补入，当前不能据此宣称 #412 全部完成或生产持久化已通过。
+本地产品验收已通过，基线为 P5 登记提交 `e344a5444cd52bfeb65e78b031912d5241666fc0`，P6 产品已独立提交 `edc03faba20e0c5c665b7fc2011e2a4120d8428f`。正常提交钩子类型检查及完整 `npm test` 782 文件 / 4312 项通过（326.16 秒）；240 个源码 Git 对象与冻结清单完全一致。本记录只覆盖 #412 的 P6，不能据此宣称 #412 全部完成或生产持久化已通过。
 
 规格见 [P6 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)，操作见 [Markdown 指南](../../../guides/payroll-hollow.md)。不另生成指南 PDF；产品打印仅用于验证实际工资输出，完成后保留必要页图。
 
@@ -48,7 +48,7 @@ flowchart TD
 | 原采用更正表暴露内部 JSON，且 V3 误隐藏费用更正 | 以冻结事实显示位置、分项、单位、原责任人和价格依据；版本门禁允许 V2/V3 并继续拒绝旧 V1。两组五档最终图和正式组件回归通过。 |
 | 已发单只显示冻结 15 处，后来全整改与新月份改价无法并列解释 | A/C1/C2 及迁入已发单新增只读当前来源伴随视图；冻结 19 / 4 / 15、单价 30 与当前 19 / 19 / 0、单价 45 分区显示，当前行严格绑定原冻结身份，且不重算原 450 扣款和 550 实发。 |
 
-作者自验与非作者复验分开登记，见 [A 复核](./checks/a/independent-review.md) 与 [B 复核](./checks/b/independent-review.md)。最终生产构建、E2E、输出回读和补正图范围见 [最终运行记录](./checks/final-runtime.md) 与 [Root 逐图记录](./checks/root/visual-review.md)；不能把组件测试或文件存在当作本轮实图。
+作者自验与非作者复验分开登记，见 [A 复核](./checks/a/independent-review.md) 与 [B 复核](./checks/b/independent-review.md)。最终生产构建、E2E、输出回读和补正图范围见 [最终运行记录](./checks/final-runtime.md)、[产品提交核验](./checks/product-verification.json.txt)、[登记保全核验](./checks/registration/registration-preservation.json.txt) 与 [Root 逐图记录](./checks/root/visual-review.md)；不能把组件测试或文件存在当作本轮实图。
 
 2026-09-15 04:18 的完整 `npm test` 为 780 文件 / 4308 项，其中 779 文件 / 4307 项通过；唯一失败为原费用迁入更正长链超出默认 5000ms。该项隔离原断言通过，仅为其设置 30000ms 上限后再次通过，未放宽全局超时或业务断言。该轮早于最后补正，最终全量结果以正常提交钩子为准。2026-09-21 的最终生产构建、类型检查和真实 E2E 已通过；239 个精确源码路径整体 lint 及最后 4 个补正路径 lint 均通过。
 

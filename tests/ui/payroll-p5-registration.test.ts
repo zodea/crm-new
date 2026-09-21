@@ -42,8 +42,9 @@ describe('p5 limited delivery registration', () => {
     expect(byId('WAGE-09').remaining).toContain('材料/报销')
     expect(byId('WAGE-10').remaining).toContain('公开服务/组件')
     expect(byId('WAGE-11').remaining).toContain('原JSON')
-    expect(byId('WAGE-12').remaining).toContain('P6/P7')
-    for (const id of ['WAGE-15', 'WAGE-16', 'WAGE-17']) {
+    expect(byId('WAGE-12').remaining).toContain('P7')
+    expect(byId('WAGE-15').status).toBe('current-passed')
+    for (const id of ['WAGE-16', 'WAGE-17']) {
       expect(byId(id).status).toBe('ready')
       expect(byId(id).evidence).toEqual([])
     }
@@ -77,7 +78,7 @@ describe('p5 limited delivery registration', () => {
       expect(row.solved.join('\n')).toContain(productCommit)
       expect(row.solved.join('\n')).toContain('740文件4190项')
       expect(row.solved.join('\n')).toContain('74f831f7da0dc37f7ec031279223649a6f32fbee')
-      expect(row.remaining.join('\n')).toContain('P6/P7')
+      expect(row.remaining.join('\n')).toContain('P7')
       expect(row.questions).toHaveLength(7)
       expect(row.questions[0]).toContain('每人或每月')
       expect(row.questions[1]).toContain('默认规则')
@@ -88,16 +89,16 @@ describe('p5 limited delivery registration', () => {
       expect(row.graph.nodes).toHaveLength(18)
       expect(row.graph.edges).toHaveLength(27)
       expect(row.graph.nodes.find(item => item.id === 'frozen')!.lines).toContain('A普通/管理分簿，软删不解锁')
-      expect(row.graph.nodes.find(item => item.id === 'end')!.lines).toContain('空鼓、批量资金及完整工作簿继续实施')
+      expect(row.graph.nodes.find(item => item.id === 'end')!.lines).toContain('批量资金、完整工作簿与名册继续实施')
       const article = document.querySelector('#issue-412')!
-      expect(article.querySelectorAll('[data-graph-node]')).toHaveLength(18)
-      expect(article.querySelectorAll('[data-graph-edge]')).toHaveLength(27)
+      expect(article.querySelectorAll('svg.flow-branches > rect')).toHaveLength(18)
+      expect(article.querySelectorAll('svg.flow-branches > path')).toHaveLength(27)
       expect([...article.querySelectorAll('.flow-scroll svg text')].map(item => item.textContent)).toEqual(row.graph.nodes.flatMap(item => [item.title, ...item.lines]))
       const readme = readFileSync(`${reportDirectory}/README.md`, 'utf8')
       const summaryRow = readme.split(/\r?\n/).find(line => line.startsWith('| [#412 '))!
       expect(summaryRow).toContain(productCommit)
       expect(summaryRow).toContain('部分完成')
-      expect(summaryRow).toContain('P6/P7')
+      expect(summaryRow).toContain('P7')
     }
     finally {
       dom.window.close()
