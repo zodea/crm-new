@@ -1,4 +1,6 @@
+import type { PayrollBatchPlanRead } from './central-batch-service-contract'
 import type { PayrollDiagnostic, PayrollHistoryEntry } from './central-contract'
+
 import { yuan } from '../util/money'
 
 const statusLabels: Record<string, string> = { draft: '草稿', checked: '已核对', released: '已发放', confirmed: '已确认' }
@@ -6,6 +8,8 @@ export const payrollStatusTone = (value: string) => value === 'released' ? 'ok' 
 export const dayworkStatusTone = (value: string) => value === 'confirmed' ? 'ok' : value === 'draft' ? 'warn' : 'neutral'
 export const dayworkStatusLabel = (value: string) => value === 'confirmed' ? '已确认' : value === 'draft' ? '待确认' : `历史确认状态：${value || '未记录'}`
 export const payrollStatusLabel = (value: string) => statusLabels[value] || `历史状态：${value || '未提供'}`
+const batchStateLabels: Record<PayrollBatchPlanRead['state'], string> = { 'ready': '待执行', 'prepared': '当前项待核实', 'needs-recheck': '需要重新核对', 'complete': '批次已完成', 'unavailable': '结果不可用' }
+export const payrollBatchStateLabel = (value: PayrollBatchPlanRead['state']) => batchStateLabels[value]
 export const payrollAmount = (value: number | null) => value === null ? '未记录' : yuan(value)
 export const payrollNumber = (value: number | null) => value === null ? '未记录' : String(value)
 const snapshotLabels: Record<string, string> = { 'complete': '发放记录完整', 'partial': '发放记录有缺项', 'missing': '未保留发放记录', 'invalid': '发放记录无法解析', 'not-released': '尚未发放' }

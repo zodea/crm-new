@@ -221,13 +221,17 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
     const outcomes: PayrollBatchPlanRead['outcomes'] = stored.items.map((item) => {
       const attempt = latest.get(item.target.itemId)
       const attemptState = attempt?.state ?? 'not-started'
-      const state = attemptState === 'checked' || attemptState === 'released'
-        ? 'succeeded'
-        : attemptState === 'prepared' || attemptState === 'needs-recheck' || attemptState === 'unavailable'
-          ? 'unknown'
-          : 'not-executed'
+      const state = item.decision.kind === 'defer'
+        ? 'deferred'
+        : attemptState === 'not-started'
+          ? 'pending'
+          : attemptState === 'checked' || attemptState === 'released'
+            ? 'succeeded'
+            : attemptState === 'prepared' || attemptState === 'needs-recheck' || attemptState === 'unavailable'
+              ? 'unknown'
+              : 'not-executed'
       const plannedAmountFen = item.decision.kind === 'release' ? item.decision.actualAmountFen : null
-      const actualAmountFen = plannedAmountFen === null || state === 'unknown' ? null : state === 'succeeded' ? plannedAmountFen : 0
+      const actualAmountFen = plannedAmountFen === null || state === 'unknown' || state === 'pending' ? null : state === 'succeeded' ? plannedAmountFen : 0
       return { itemId: item.target.itemId, state, attemptState, plannedAmountFen, actualAmountFen }
     })
     const planVersion = hash({ planHash: row.plan_hash, revision: row.revision, state: row.state, nextItemIndex: row.next_item_index, expectedPayrollRevision: row.expected_payroll_revision, preparedExecuteCommandId, outcomes })

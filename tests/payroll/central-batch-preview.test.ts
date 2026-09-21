@@ -55,8 +55,8 @@ describe('central payroll batch preview and immutable confirmation', () => {
     const plan = await f.service.executeBatch(command)
     expect(plan).toMatchObject({ schemaVersion: 1, commandId: 'confirm-batch', projectId: 'p', month: '2026-08', purpose: 'release', fundingAmountFen: 50_000, state: 'ready', nextItemIndex: 0, expectedPayrollRevision: before!.revision })
     expect(plan.outcomes).toEqual([
-      { itemId: left, state: 'not-executed', attemptState: 'not-started', plannedAmountFen: 30_000, actualAmountFen: 0 },
-      { itemId: right, state: 'not-executed', attemptState: 'not-started', plannedAmountFen: 20_000, actualAmountFen: 0 },
+      { itemId: left, state: 'pending', attemptState: 'not-started', plannedAmountFen: 30_000, actualAmountFen: null },
+      { itemId: right, state: 'pending', attemptState: 'not-started', plannedAmountFen: 20_000, actualAmountFen: null },
     ])
     expect(plan.items.map(item => item.decision)).toEqual(decisions.map(item => item.decision))
     expect(await f.service.executeBatch(command)).toEqual(plan)
@@ -82,7 +82,7 @@ describe('central payroll batch preview and immutable confirmation', () => {
     expect(afterFirst).toMatchObject({ state: 'ready', preparedExecuteCommandId: null, nextItemIndex: 1, expectedPayrollRevision: before!.revision + 1 })
     expect(afterFirst.outcomes).toEqual([
       { itemId: left, state: 'succeeded', attemptState: 'released', plannedAmountFen: 30_000, actualAmountFen: 30_000 },
-      { itemId: right, state: 'not-executed', attemptState: 'not-started', plannedAmountFen: 20_000, actualAmountFen: 0 },
+      { itemId: right, state: 'pending', attemptState: 'not-started', plannedAmountFen: 20_000, actualAmountFen: null },
     ])
     expect((await f.service.aForm({ origin: 'real' }, { statementId: left })).status).toBe('released')
     expect(await f.service.executeBatch(executeFirst)).toEqual(afterFirst)

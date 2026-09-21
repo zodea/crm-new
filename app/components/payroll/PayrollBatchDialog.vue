@@ -3,6 +3,7 @@ import type { PayrollBatchDecision, PayrollBatchPlanRead, PayrollBatchPreviewRea
 import type { PayrollContext, PayrollStatementRow } from '~/lib/payroll/central-contract'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '~/components/ui/dialog'
 import { parsePayrollBatchFundingFen } from '~/lib/payroll/central-batch-calculation'
+import { payrollBatchStateLabel, payrollStatusLabel } from '~/lib/payroll/read-presentation'
 
 const props = defineProps<{
   open: boolean
@@ -49,6 +50,10 @@ function outcomeLabel(itemId: string): string {
     return outcome.actualAmountFen === null ? '成功' : `成功 · 实际 ${fenInput(outcome.actualAmountFen)} 元`
   if (outcome.state === 'unknown')
     return outcome.plannedAmountFen === null ? '待核实' : `待核实 · 计划 ${fenInput(outcome.plannedAmountFen)} 元`
+  if (outcome.state === 'pending')
+    return outcome.plannedAmountFen === null ? '待执行' : `待执行 · 计划 ${fenInput(outcome.plannedAmountFen)} 元`
+  if (outcome.state === 'deferred')
+    return '暂缓'
   return outcome.plannedAmountFen === null ? '确定未执行' : `确定未执行 · 实际 0.00 元 / 计划 ${fenInput(outcome.plannedAmountFen)} 元`
 }
 function draftSnapshot() {
@@ -190,7 +195,7 @@ watch(() => props.open, async (open) => {
           </p>
           <article v-for="item in preview.items" :key="item.target.itemId" class="rounded-lg border border-line p-3">
             <div class="flex flex-wrap items-start justify-between gap-2">
-              <div><strong>{{ item.leaderName || '负责人未记录' }}</strong><span class="ml-2 text-12px text-ink-soft">{{ item.target.formatFamily }} · {{ item.status }}</span></div>
+              <div><strong>{{ item.leaderName || '负责人未记录' }}</strong><span class="ml-2 text-12px text-ink-soft">{{ item.target.formatFamily }} · {{ payrollStatusLabel(item.status) }}</span></div>
               <label class="flex items-center gap-2 text-12px"><input v-model="decisions[item.target.itemId]" type="radio" value="defer" @change="remember">暂缓</label>
               <label v-if="!item.reasons.length" class="flex items-center gap-2 text-12px"><input v-model="decisions[item.target.itemId]" type="radio" value="apply" @change="remember">{{ purpose === 'check' ? '核对' : '执行发放' }}</label>
             </div>
@@ -214,7 +219,7 @@ watch(() => props.open, async (open) => {
         <section v-if="plan" class="rounded-lg border border-line p-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <strong>批次状态：{{ plan.state }}</strong><p class="mt-1 text-12px text-ink-soft">
+              <strong>批次状态：{{ payrollBatchStateLabel(plan.state) }}</strong><p class="mt-1 text-12px text-ink-soft">
                 {{ planLabel }}
               </p>
             </div><KitButton v-if="plan.state === 'ready' || plan.state === 'prepared'" :disabled="busy" @click="advance">

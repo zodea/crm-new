@@ -88,7 +88,7 @@ export type PayrollBatchCommand = PayrollBatchConfirmCommand | PayrollBatchPrepa
 export interface PayrollBatchPlanItem extends PayrollBatchPreviewItem { decision: PayrollBatchDecision }
 export interface PayrollBatchItemOutcome {
   itemId: string
-  state: 'succeeded' | 'not-executed' | 'unknown'
+  state: 'succeeded' | 'not-executed' | 'unknown' | 'pending' | 'deferred'
   attemptState: 'not-started' | 'prepared' | 'checked' | 'released' | 'needs-recheck' | 'not-applied' | 'unavailable'
   plannedAmountFen: number | null
   actualAmountFen: number | null

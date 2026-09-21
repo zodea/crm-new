@@ -115,7 +115,7 @@ export function decodePayrollBatchPlan(value: unknown, query: PayrollQuery, plan
     || typeof value.planVersion !== 'string' || !value.planVersion || !Array.isArray(value.items)
     || !value.items.every(item => object(item) && decision(item.decision) && previewItem(item))
     || !Array.isArray(value.outcomes) || value.outcomes.length !== value.items.length || !value.outcomes.every(outcome => object(outcome)
-      && isStableRouteIdentity(outcome.itemId) && ['succeeded', 'not-executed', 'unknown'].includes(String(outcome.state))
+      && isStableRouteIdentity(outcome.itemId) && ['succeeded', 'not-executed', 'unknown', 'pending', 'deferred'].includes(String(outcome.state))
       && ['not-started', 'prepared', 'checked', 'released', 'needs-recheck', 'not-applied', 'unavailable'].includes(String(outcome.attemptState))
       && nullableFen(outcome.plannedAmountFen) && nullableFen(outcome.actualAmountFen))
     || !Array.isArray(value.reasons) || !value.reasons.every(reason => typeof reason === 'string')) {
