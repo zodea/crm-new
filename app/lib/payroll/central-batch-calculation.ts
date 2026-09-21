@@ -1,6 +1,9 @@
 import type { PayrollBatchFundingInput, PayrollBatchFundingItemInput, PayrollBatchFundingItemSuggestion, PayrollBatchFundingSuggestion } from './central-batch-contract'
 
 const MAX_SAFE_FEN = BigInt(Number.MAX_SAFE_INTEGER)
+const BIGINT_ZERO = BigInt(0)
+const BIGINT_TWO = BigInt(2)
+const BIGINT_HUNDRED = BigInt(100)
 
 function assertFen(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0)
@@ -8,7 +11,7 @@ function assertFen(value: number, label: string): void {
 }
 
 function safeFen(value: bigint, label: string): number {
-  if (value < 0n || value > MAX_SAFE_FEN)
+  if (value < BIGINT_ZERO || value > MAX_SAFE_FEN)
     throw new Error(`${label}超出安全金额范围`)
   return Number(value)
 }
@@ -39,14 +42,17 @@ function roundedShare(item: PayrollBatchFundingItemInput, distributable: bigint,
     const step = BigInt(item.rounding.rule.stepFen)
     return safeFen((numerator / (totalWeight * step)) * step, `工资 ${item.itemId} 的建议金额`)
   }
-  return safeFen((2n * numerator + totalWeight) / (2n * totalWeight), `工资 ${item.itemId} 的建议金额`)
+  return safeFen(
+    (BIGINT_TWO * numerator + totalWeight) / (BIGINT_TWO * totalWeight),
+    `工资 ${item.itemId} 的建议金额`,
+  )
 }
 
 export function parsePayrollBatchFundingFen(value: string): number {
   const match = /^(0|[1-9]\d{0,13})(?:\.(\d{1,2}))?$/.exec(value)
   if (!match)
     throw new Error('资金金额必须是非负且最多两位小数的明确金额')
-  const fen = BigInt(match[1]!) * 100n + BigInt((match[2] ?? '').padEnd(2, '0') || '0')
+  const fen = BigInt(match[1]!) * BIGINT_HUNDRED + BigInt((match[2] ?? '').padEnd(2, '0') || '0')
   if (fen > MAX_SAFE_FEN)
     throw new Error('资金金额超出安全范围')
   return Number(fen)
@@ -74,11 +80,11 @@ export function suggestPayrollBatchFunding(input: PayrollBatchFundingInput): Pay
     }
   }
 
-  const eligibleTotal = initial.reduce((total, row) => total + BigInt(row.item.eligibleAmountFen!), 0n)
+  const eligibleTotal = initial.reduce((total, row) => total + BigInt(row.item.eligibleAmountFen!), BIGINT_ZERO)
   const funding = BigInt(input.fundingAmountFen)
   const distributable = funding < eligibleTotal ? funding : eligibleTotal
   const items: PayrollBatchFundingItemSuggestion[] = initial.map(({ item }) => {
-    const calculated = eligibleTotal === 0n ? 0 : roundedShare(item, distributable, eligibleTotal)
+    const calculated = eligibleTotal === BIGINT_ZERO ? 0 : roundedShare(item, distributable, eligibleTotal)
     const blockers: string[] = []
     let suggestedAmountFen = calculated
     if (item.requiresFullAmount && calculated !== item.eligibleAmountFen) {
@@ -87,19 +93,19 @@ export function suggestPayrollBatchFunding(input: PayrollBatchFundingInput): Pay
     }
     return { ...item, exactSuggestedAmountFen: calculated, suggestedAmountFen, blockers }
   })
-  const suggestedTotal = items.reduce((total, item) => total + BigInt(item.suggestedAmountFen!), 0n)
-  const overAllocated = suggestedTotal > funding ? suggestedTotal - funding : 0n
-  const unallocated = overAllocated === 0n ? funding - suggestedTotal : null
+  const suggestedTotal = items.reduce((total, item) => total + BigInt(item.suggestedAmountFen!), BIGINT_ZERO)
+  const overAllocated = suggestedTotal > funding ? suggestedTotal - funding : BIGINT_ZERO
+  const unallocated = overAllocated === BIGINT_ZERO ? funding - suggestedTotal : null
   const diagnostics: string[] = []
-  if (overAllocated > 0n)
+  if (overAllocated > BIGINT_ZERO)
     diagnostics.push(`按分取整后的建议合计超过资金 ${overAllocated} 分，请经办人明确分配尾差`)
-  else if (unallocated! > 0n)
+  else if (unallocated! > BIGINT_ZERO)
     diagnostics.push(`仍有 ${unallocated} 分未自动分配，请经办人明确调整`)
-  if (eligibleTotal === 0n)
+  if (eligibleTotal === BIGINT_ZERO)
     diagnostics.push('所选工资当前均无可发余额，不生成支付')
 
   return {
-    state: overAllocated > 0n || items.some(item => item.blockers.length) ? 'blocked' : 'ready',
+    state: overAllocated > BIGINT_ZERO || items.some(item => item.blockers.length) ? 'blocked' : 'ready',
     fundingAmountFen: input.fundingAmountFen,
     eligibleTotalFen: safeFen(eligibleTotal, '可发余额合计'),
     distributableFen: safeFen(distributable, '可建议资金'),
