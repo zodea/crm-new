@@ -1,11 +1,13 @@
 import type { ProblemDTO } from '../../types/read-model'
-import type { QuantityBatchReadQuery, QuantityCommand, QuantityReadQuery, QuantityUnitReadQuery } from './central-contract'
+import type { QuantityBatchReadQuery, QuantityCommand, QuantityCommandResult, QuantityReadQuery, QuantityUnitReadQuery } from './central-contract'
+import type { QuantityHollowCommand, QuantityHollowCommandResult } from './central-hollow-contract'
 import type { QuantityPhotoIdentity } from './central-photo'
 import { isProblemCodeDTO } from '../../types/read-model'
 import { decodeQuantityBoq, decodeQuantityVariance } from './central-boq-decoder'
 import { decodeQuantityCommand } from './central-command-decoder'
 import { quantityProblem, QuantityRepositoryProblem } from './central-contract'
 import { decodeQuantityRegion, decodeQuantityStages, decodeQuantityTemplates, quantityObject, quantityStrings } from './central-decoder'
+import { decodeQuantityHollow } from './central-hollow-codec'
 import { decodeQuantityPhoto } from './central-photo-decoder'
 import { decodeQuantityAssignments, decodeQuantityBatchPlan, decodeQuantityCompletion, decodeQuantityWorkspace } from './central-workspace-decoder'
 
@@ -50,7 +52,17 @@ export function createQuantityRepository(fetcher: QuantityFetcher) {
       throw quantityProblemFromUnknown(cause)
     }
   }
+  function execute(command: QuantityHollowCommand): Promise<QuantityHollowCommandResult>
+  function execute(command: QuantityCommand): Promise<QuantityCommandResult>
+  function execute(command: QuantityCommand): Promise<QuantityCommandResult> {
+    const body = structuredClone(command)
+    return request('/api/commands/quantity', { method: 'POST', body }, value => decodeQuantityCommand(value, body))
+  }
   return {
+    hollow: (query: QuantityUnitReadQuery, options: { signal?: AbortSignal } = {}) => {
+      const scope = { ...query }
+      return request('/api/read/quantity/hollow', { query: scope, signal: options.signal }, value => decodeQuantityHollow(value, scope))
+    },
     variance: (query: QuantityReadQuery, options: { signal?: AbortSignal } = {}) => {
       const scope = { ...query }
       return request('/api/read/quantity/variance', { query: scope, signal: options.signal }, value => decodeQuantityVariance(value, scope))
@@ -91,10 +103,7 @@ export function createQuantityRepository(fetcher: QuantityFetcher) {
       const scope = { ...query }
       return request('/api/read/quantity/templates', { query: scope }, value => decodeQuantityTemplates(value, scope))
     },
-    execute: (command: QuantityCommand) => {
-      const body = structuredClone(command)
-      return request('/api/commands/quantity', { method: 'POST', body }, value => decodeQuantityCommand(value, body))
-    },
+    execute,
   }
 }
 

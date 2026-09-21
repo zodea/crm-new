@@ -3,6 +3,7 @@ import { computed, nextTick, shallowRef } from 'vue'
 import { usePayrollC2Statement } from '~/composables/usePayrollC2Statement'
 import { createPayrollC2Workbook } from '~/lib/payroll/c2-export'
 import { toErrorMessage } from '~/lib/util/error'
+import PayrollHollowReview from './PayrollHollowReview.vue'
 
 const props = defineProps<{
   statementId: string
@@ -14,6 +15,7 @@ const emit = defineEmits<{
   ]
 }>()
 const adjustmentsReady = shallowRef(false)
+const hollowLocked = shallowRef(false)
 const kit = useKitUI()
 const ui = usePayrollC2Statement({ id: () => props.statementId, origin: () => props.origin, changed: () => emit('changed') })
 const { matching, output, active, busy, error, writable, pending, releaseOpen, releaseRead, releaseDraft } = ui
@@ -54,6 +56,7 @@ async function print() {
   <section class="grid min-w-0 gap-4" aria-label="C2工资核对与发放">
     <PayrollACommandState :pending="!!pending" :awaiting-read="pending?.state === 'awaiting-read'" :busy="busy" :error="error" @recover="ui.recover" @refresh="ui.load()" />
     <template v-if="matching">
+      <PayrollHollowReview v-if="matching.hollow" :read="matching.hollow" :return-to="returnTo" :readonly="matching.status === 'released'" :blocked="busy || !!pending || releaseOpen" @changed="ui.load()" @locked="hollowLocked = $event" />
       <section class="panel grid gap-3 p-4">
         <SectionHeader title="核对签工与实际发放" /><p class="text-12px leading-5 text-ink-soft">
           {{ statusMessage }}
@@ -64,9 +67,9 @@ async function print() {
             编辑 C2 草稿
           </NuxtLink><NuxtLink v-if="matching.status !== 'released'" :to="config" class="btn-secondary">
             C2 主体配置
-          </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck" @click="ui.execute('check')">
+          </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck || hollowLocked" @click="ui.execute('check')">
             {{ matching.status === 'draft' ? '核对签工' : '重新核对签工' }}
-          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease || !adjustmentsReady" @click="ui.openRelease">
+          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease || !adjustmentsReady || hollowLocked" @click="ui.openRelease">
             确认实际发放
           </KitButton>
         </div><template v-if="matching.status !== 'released'">
@@ -76,7 +79,7 @@ async function print() {
         </template>
       </section><PayrollC2SourceReview v-if="matching.status !== 'released'" :read="matching" :return-to="returnTo" />
     </template>
-    <PayrollReleaseAdjustmentSelection v-if="matching && matching.status !== 'released'" :statement-id="statementId" :origin="origin" :source-version="matching.context.sourceVersion" :return-to="returnTo" :applications="releaseDraft?.adjustmentApplications" :disabled="!writable || releaseOpen" @change="ui.setReleaseApplications" @valid="adjustmentsReady = $event" />
+    <PayrollReleaseAdjustmentSelection v-if="matching && matching.status !== 'released'" :statement-id="statementId" :origin="origin" :source-version="matching.context.sourceVersion" :return-to="returnTo" :applications="releaseDraft?.adjustmentApplications" :disabled="!writable || releaseOpen || hollowLocked" @change="ui.setReleaseApplications" @valid="adjustmentsReady = $event" />
     <section v-if="output" class="panel grid gap-3 p-4" aria-label="冻结工资与签工输出">
       <SectionHeader title="冻结工资与签工表" /><template v-if="output.state === 'available'">
         <p class="text-12px">

@@ -3,8 +3,10 @@ import type { PayrollAdjustmentCommand, PayrollAdjustmentFormInput } from './cen
 import { assertPayrollActualCommand, assertPayrollActualDraft, assertPayrollActualTarget } from './central-actual-validation'
 import { assertPayrollAdjustmentCommand, assertPayrollAdjustmentDraft, assertPayrollAdjustmentTarget } from './central-adjustment-validation'
 import { payrollProblem } from './central-contract'
+import { transformPayrollHollowWire } from './central-hollow-deduction-wire'
 import { payrollFixedDecimal, wireCent, wireExact, wireId, wireObject, wireText } from './central-payroll-wire'
 import { assertPayrollReversalCommand, assertPayrollReversalDraft, assertPayrollReversalTarget } from './central-reversal-validation'
+import { isPayrollSourceIdentity } from './migration-identity'
 
 const moneyKeys = new Set(['amount', 'delta', 'remainingAmount', 'embeddedInCalculation', 'additionalWithholding'])
 const decimalKeys = new Set(['quantity', 'knownQuantity', 'fieldQty', 'unitPrice', 'unitRate', 'payRatio', 'dailyWage', 'overtimeRate', 'hours', 'overtimeHours', 'laborUnits'])
@@ -16,6 +18,8 @@ function transform(v: unknown, decode: boolean): unknown {
   const metric = 'knownValue' in v && 'state' in v
   const dimension = 'dimension' in v && ['quantity', 'unit-price', 'pay-ratio', 'fee-quantity', 'fee-unit-price', 'negative-quantity', 'negative-unit-price'].includes(String(v.dimension))
   return Object.fromEntries(Object.entries(v).filter(([, child]) => child !== undefined).map(([key, child]) => {
+    if (key === 'hollow')
+      return [key, transformPayrollHollowWire(child, decode)]
     const money = moneyKeys.has(key) || (metric && ['value', 'knownValue'].includes(key))
     const decimal = decimalKeys.has(key) || (dimension && ['before', 'after', 'current', 'effective'].includes(key))
     if ((!money && !decimal) || wireObject(child) || Array.isArray(child))
@@ -69,7 +73,7 @@ export function parsePayrollActualReversalFormInput(raw: unknown): PayrollActual
 }
 export function parsePayrollActualScope(v: unknown): PayrollActualScope {
   wireExact(v, ['projectId', 'originalStatementIds'])
-  if (!wireId(v.projectId) || (v.originalStatementIds !== undefined && (!Array.isArray(v.originalStatementIds) || !v.originalStatementIds.every(wireId) || new Set(v.originalStatementIds).size !== v.originalStatementIds.length)))
+  if (!wireId(v.projectId) || (v.originalStatementIds !== undefined && (!Array.isArray(v.originalStatementIds) || !v.originalStatementIds.every(id => isPayrollSourceIdentity(id, 'wage_statements')) || new Set(v.originalStatementIds).size !== v.originalStatementIds.length)))
     throw payrollProblem('invalid-query', '工资实际收付须指定项目和不重复的原工资范围')
   return v as unknown as PayrollActualScope
 }

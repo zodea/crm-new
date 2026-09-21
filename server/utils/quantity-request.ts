@@ -1,6 +1,7 @@
 import type { QuantityBatchReadQuery, QuantityCommand, QuantityReadQuery, QuantityUnitReadQuery } from '../../app/lib/quantity/central-contract'
 import type { QuantityPhotoIdentity } from '../../app/lib/quantity/central-photo'
 import { quantityProblem } from '../../app/lib/quantity/central-contract'
+import { isQuantityHollowActionKind, parseQuantityHollowCommand } from '../../app/lib/quantity/central-hollow-validation'
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -43,10 +44,18 @@ export function parseQuantityPhotoReadQuery(value: unknown): QuantityReadQuery &
 }
 
 export function parseQuantityCommand(value: unknown): QuantityCommand {
+  if (object(value) && object(value.action) && isQuantityHollowActionKind(value.action.kind))
+    return parseQuantityHollowCommand(value)
   if (!object(value) || !['workspaceId', 'actorId', 'commandId', 'projectId', 'baseVersion'].every(key => typeof value[key] === 'string' && String(value[key]).trim())
     || value.requiredCapability !== 'quantity:write' || value.origin !== 'real' || !object(value.action)) {
     throw quantityProblem('validation-failed', '工程量命令身份、版本或动作格式无效')
   }
   // 各动作的完整草稿及当前父关系由中央服务在同一事务边界内验证。
   return structuredClone(value) as unknown as QuantityCommand
+}
+
+export function parseQuantityHollowReadQuery(value: unknown): QuantityUnitReadQuery {
+  if (!object(value) || Object.keys(value).some(key => !['projectId', 'unitId', 'origin', 'includeDemo'].includes(key)))
+    throw quantityProblem('invalid-query', '空鼓查询包含不明确的来源字段')
+  return parseQuantityUnitReadQuery(value)
 }

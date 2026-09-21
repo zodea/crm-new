@@ -2,6 +2,7 @@ import type { ExportFileOptions } from '../kit/export'
 import type { PayrollC1FrozenDocument } from './central-c1-contract'
 import * as XLSX from 'xlsx'
 import { c1MonthDays, c1Number } from './c1-presentation'
+import { appendPayrollHollowSheets } from './hollow-export'
 
 export function c1FrozenAttendanceRows(document: PayrollC1FrozenDocument) {
   return document.members.map(member => ({ ...member, days: c1MonthDays(document.month).map((date) => {
@@ -18,6 +19,8 @@ export function createPayrollC1Workbook(document: PayrollC1FrozenDocument): Expo
     sheet['!cols'] = name === '工资表' ? [{ wch: 20 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 24 }] : [{ wch: 20 }, ...c1MonthDays(document.month).map(() => ({ wch: 12 }))]
     XLSX.utils.book_append_sheet(book, sheet, name)
   }
+  if (document.hollow)
+    appendPayrollHollowSheets(book, document.hollow)
   const data: ArrayBuffer = XLSX.write(book, { bookType: 'xlsx', type: 'array' })
   return { data, defaultName: `${document.projectName}-${document.leaderName}-${document.month}-C1工资与考勤.xlsx`.replace(/[<>:"/\\|?*]/g, '-'), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
 }

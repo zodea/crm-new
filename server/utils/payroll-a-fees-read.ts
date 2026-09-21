@@ -53,9 +53,14 @@ export async function payrollAFeesSelection(db: TransactionDb, projectId: string
 }
 
 export async function extendPayrollAFeesForm(db: TransactionDb, read: PayrollAFormRead, source: PayrollIdentitySource, all: PayrollAQuantityFacts, options: PayrollServiceOptions): Promise<PayrollAFeesFormRead> {
-  if (!source.projects.some(p => p.id === read.draft.projectId)) {
-    // 项目失效或选择被清空时仍保留费用用途草稿，不能退回缺少费用依据的旧版读取。
-    const reasons = [...new Set(['请选择有效的工资项目', ...read.blockers.map(b => b.message)])]
+  const incomplete = [
+    ...(!source.projects.some(p => p.id === read.draft.projectId) ? ['请选择有效的工资项目'] : []),
+    ...(!read.draft.leaderWorkerId ? ['请先选择工资负责人'] : []),
+    ...(!read.draft.month ? ['请先选择工资月份'] : []),
+  ]
+  if (incomplete.length) {
+    // 尚未选全主体或月份时保留原稿及未知费用依据，不把未选择身份送入 SQL 或原件核验。
+    const reasons = [...new Set([...incomplete, ...read.blockers.map(b => b.message)])]
     const unknown = () => payrollAAmount([null], reasons)
     return {
       ...read,

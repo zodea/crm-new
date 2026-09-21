@@ -3,6 +3,7 @@ import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollAAdjustmentReconciliation } from './central-a-adjustment-contract'
 import type { PayrollABookRef } from './central-a-fees-contract'
 import type { PayrollContext, PayrollDetailRead, PayrollHistoryEntry, PayrollProjectOption, PayrollQuery } from './central-contract'
+import type { PayrollHollowRead, PayrollHollowSnapshot } from './central-hollow-deduction-contract'
 import type { PayrollReleaseAdjustmentApplication } from './central-release-adjustment-contract'
 
 export const PAYROLL_WRITE_CAPABILITY = 'payroll:write' as const
@@ -234,6 +235,7 @@ export interface PayrollAEligibility {
   reasons: string[]
 }
 export interface PayrollAFormRead {
+  hollow?: PayrollHollowRead
   adjustmentReconciliation?: PayrollAAdjustmentReconciliation
   context: PayrollAContext
   statementId: string | null
@@ -331,6 +333,7 @@ export interface PayrollAStatementSourceSnapshot {
 
 /** 已发 A 输出仅从完整且可证明的新中央冻结事实构建；不使用当前量/价格/姓名补齐。 */
 export interface PayrollAFrozenDocument {
+  hollow?: PayrollHollowSnapshot
   adjustmentReconciliation?: PayrollAAdjustmentReconciliation
   id: string
   projectId: string

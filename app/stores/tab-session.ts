@@ -4,6 +4,7 @@ import type { TabSessionDiagnostic, TabSessionScope, TabSessionSnapshot } from '
 import { useStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { effectScope, onScopeDispose, shallowRef, watch } from 'vue'
+import { isQuantityHollowWorkPath } from '~/lib/quantity/hollow-navigation'
 import { TAB_TARGET_VERSION } from '~/lib/tabs/restoration-contract'
 import { createTabSessionRestorer } from '~/lib/tabs/restore-session'
 import { inspectRestorableTabPath } from '~/lib/tabs/restore-target'
@@ -179,6 +180,9 @@ export const useTabSessionStore = defineStore('tab-session', () => {
 
   async function startupPath(fullPath: string, browserReload: boolean): Promise<string | null> {
     if (!snapshot)
+      return fullPath
+    // 原键/字段由空鼓页面在当前身份下重读；这里只保留用户正在刷新的精确工作地址。
+    if (browserReload && isQuantityHollowWorkPath(fullPath))
       return fullPath
     if (fullPath === '/' || (browserReload && !inspectRestorableTabPath(fullPath)))
       return resolve(snapshot.activeKey)

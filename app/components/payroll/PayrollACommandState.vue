@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { shallowRef } from 'vue'
+import KitButton from '~/components/ui/KitButton.vue'
 
 defineProps<{ pending: boolean, busy: boolean, error: string, awaitingRead?: boolean, focusable?: boolean }>()
 defineEmits<{ recover: [], refresh: [] }>()

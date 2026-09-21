@@ -3,10 +3,11 @@ import type { PayrollADraft } from '~/lib/payroll/central-a-contract'
 import { computed } from 'vue'
 import { usePayrollAForm } from '~/composables/usePayrollAForm'
 import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
+import PayrollHollowReview from './PayrollHollowReview.vue'
 
 const route = useRoute()
 const ui = usePayrollAForm()
-const { id, matchingRead, draft, loading, busy, error, fieldErrors, pending, editable, latest, formElement, errorPanel, previewed, canSave } = ui
+const { id, matchingRead, draft, loading, busy, error, fieldErrors, pending, editable, latest, restoredInput, formElement, errorPanel, previewed, canSave } = ui
 const feeRead = computed(() => matchingRead.value && hasPayrollAFeesForm(matchingRead.value) ? matchingRead.value : null)
 const management = computed(() => feeRead.value?.book?.bookPurpose === 'management')
 const title = computed(() => management.value ? '编辑独立管理费草稿' : id.value ? '编辑 A 工资草稿' : '新建 A 工资草稿')
@@ -22,8 +23,8 @@ useTabTitle(title)
 <template>
   <EntityFormShell :title="title" subtitle="按明确请款簿与原施工责任核对组成；负价清单独立保存，再重新核对实际发放。" back-label="返回工资台账" :sections="[{ key: 'basic', label: '请款范围' }, { key: 'source', label: '完成与单价' }, { key: 'fees', label: '费用组成' }, ...(management ? [{ key: 'negative', label: '负价清单' }] : []), { key: 'note', label: '备注' }]" :state="!matchingRead ? loading ? 'loading' : 'error' : 'ready'" state-title="工资草稿未能读取" :state-description="error" state-action-label="重新读取" @back="ui.leave" @state-action="ui.load()">
     <PayrollACommandState ref="errorPanel" :pending="!!pending" :busy="busy" :error="error" focusable @recover="ui.recover" @refresh="ui.load()" />
-    <p v-if="latest" class="panel my-3 p-3 text-12px leading-5">
-      已重新读取资料，原草稿与保存依据仍保留。请点击“核对完成量与单价”明确采用本次读取结果。
+    <p v-if="latest || restoredInput" class="panel my-3 p-3 text-12px leading-5" role="status">
+      {{ restoredInput ? '已恢复未保存的原输入。请点击“核对完成量与单价”重新核对当前来源，再保存。' : '已重新读取资料，原草稿与保存依据仍保留。请点击“核对完成量与单价”明确采用本次读取结果。' }}
     </p>
     <form v-if="matchingRead" ref="formElement" class="grid min-w-0 gap-4" @submit.prevent="ui.save">
       <PayrollAFormFields :draft="draft" :options="matchingRead.options" :ratio-default="matchingRead.ratioDefault" :disabled="!editable || management" :field-errors="fieldErrors" @patch="change" />
@@ -38,6 +39,7 @@ useTabTitle(title)
         请先按当前请款范围重新核对来源，再保存草稿。
       </p>
       <PayrollASourceReview v-if="!management" :read="matchingRead" :return-to="route.fullPath" />
+      <PayrollHollowReview v-if="matchingRead.hollow" :read="matchingRead.hollow" :return-to="route.fullPath" readonly :blocked="busy || !!pending" @changed="ui.load()" />
       <PayrollAFeesReview v-if="feeRead" :read="feeRead" :return-to="route.fullPath" />
       <PayrollANegativeLinesSection v-if="management" :ui="ui.negative" />
       <section id="section-note" class="panel scroll-mt-4 p-4">

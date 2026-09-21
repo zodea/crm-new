@@ -1,6 +1,7 @@
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollHistoryEntry, PayrollJsonObject, PayrollParticipantOption, PayrollParticipantOptions, PayrollQuery, PayrollSourceDiagnostic, PayrollSourceEvidence, PayrollWritableContext } from './central-contract'
 import type { PayrollDayworkFact, PayrollDayworkRecordRead } from './central-daywork-contract'
+import type { PayrollHollowRead, PayrollHollowSnapshot } from './central-hollow-deduction-contract'
 import type { PayrollReleaseAdjustmentApplication } from './central-release-adjustment-contract'
 
 export interface PayrollC2ConfigScope { projectId: string, leaderWorkerId: string }
@@ -94,7 +95,13 @@ export interface PayrollC2StatementSourceSnapshot {
   members: PayrollC2MemberSnapshot[]
   qualificationVersion: string
 }
+export interface PayrollC2StatementSourceSnapshotV2 extends Omit<PayrollC2StatementSourceSnapshot, 'schemaVersion'> {
+  schemaVersion: 2
+  hollow: PayrollHollowSnapshot
+}
+export type PayrollC2StatementSourceVersioned = PayrollC2StatementSourceSnapshot | PayrollC2StatementSourceSnapshotV2
 export interface PayrollC2FormRead {
+  hollow?: PayrollHollowRead
   context: PayrollWritableContext
   statementId: string | null
   draftKey: string | null
@@ -107,7 +114,7 @@ export interface PayrollC2FormRead {
   adoptedRecordIds: string[]
   qualificationVersion: string
   config: PayrollC2ConfigFact | null
-  storedSource: PayrollC2StatementSourceSnapshot | null
+  storedSource: PayrollC2StatementSourceVersioned | null
   sources: NavigationIntentDTO[]
   lines: PayrollC2Line[]
   totals: { grossAmount: PayrollC2Amount }
@@ -122,6 +129,7 @@ export interface PayrollC2ReleaseDraft {
   adjustmentApplications?: PayrollReleaseAdjustmentApplication[]
 }
 export interface PayrollC2FrozenDocument {
+  hollow?: PayrollHollowSnapshot
   id: string
   projectId: string
   projectName: string
@@ -145,7 +153,7 @@ export interface PayrollC2FrozenDocument {
 }
 /** 仅用于迁入后的读取 DTO；原冻结正文与其中 original 字段仍使用原身份。 */
 export interface PayrollC2OutputIdentity {
-  tableName: 'wage_statements' | 'projects' | 'crews' | 'workers' | 'signed_daywork_records' | 'payroll_subject_configs'
+  tableName: 'wage_statements' | 'projects' | 'crews' | 'workers' | 'signed_daywork_records' | 'payroll_subject_configs' | typeof import('./central-hollow-deduction-mapping').PAYROLL_HOLLOW_OUTPUT_IDENTITY_TABLES[number]
   legacyId: string
   centralId: string
 }

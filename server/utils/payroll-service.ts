@@ -6,7 +6,9 @@ import type { PayrollAttendanceFacts, PayrollWorkerFact } from '../../app/lib/pa
 import type { PayrollC2ConfigFacts, PayrollC2ConfigScope } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollContext, PayrollDetailRead, PayrollListRead, PayrollProjectOption, PayrollQuery, PayrollSourcesRead } from '../../app/lib/payroll/central-contract'
 import type { PayrollDayworkFacts, PayrollDayworkRecordFacts } from '../../app/lib/payroll/central-daywork-contract'
+import type { PayrollHollowProjectionProvider } from '../../app/lib/payroll/central-hollow-deduction-projection'
 import type { PayrollReleaseAdjustmentPreview } from '../../app/lib/payroll/central-release-adjustment-contract'
+import type { QuantityHollowFacts, QuantityHollowFactsQuery } from '../../app/lib/quantity/central-hollow-contract'
 import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
 import { initializePayrollAFeesSchema } from '../../app/lib/payroll/central-a-fees-schema'
@@ -14,6 +16,7 @@ import { assertPayrollActualCommand } from '../../app/lib/payroll/central-actual
 import { assertPayrollAdjustmentCommand } from '../../app/lib/payroll/central-adjustment-validation'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { loadPayrollHistory } from '../../app/lib/payroll/central-history'
+import { initializePayrollHollowDeductionSchema } from '../../app/lib/payroll/central-hollow-deduction-schema'
 import { loadPayrollGraph, payrollEvidence, payrollListRows, payrollSources, readPayrollStatement } from '../../app/lib/payroll/central-read'
 import { assertPayrollReversalCommand } from '../../app/lib/payroll/central-reversal-validation'
 import { initializePayrollSchema, payrollRevision } from '../../app/lib/payroll/central-schema'
@@ -25,6 +28,7 @@ import { createPayrollAttendanceService } from './payroll-attendance-service'
 import { createPayrollC1Service } from './payroll-c1-service'
 import { createPayrollC2Service } from './payroll-c2-service'
 import { createPayrollDayworkService } from './payroll-daywork-service'
+import { createPayrollHollowService } from './payroll-hollow-service'
 import { readPayrollReleaseAdjustments } from './payroll-release-adjustments'
 import { createPayrollReversalService } from './payroll-reversal-service'
 
@@ -39,6 +43,8 @@ export interface PayrollServiceOptions {
   identities: (sessionId?: string | null) => PayrollIdentitySource | Promise<PayrollIdentitySource>
   transaction: <T>(work: (db: TransactionDb, context: BusinessSession) => Promise<T>, sessionId?: string | null) => Promise<T>
   quantityFacts?: (db: TransactionDb, query: PayrollAQuantityQuery) => Promise<PayrollAQuantityFacts>
+  hollowFacts?: (db: TransactionDb, query: QuantityHollowFactsQuery) => Promise<QuantityHollowFacts>
+  hollowProjection?: PayrollHollowProjectionProvider
   managementScopeFacts?: (db: TransactionDb, query: { projectId: string }, context: PayrollContext) => Promise<PayrollAManagementScopeFacts>
   attendanceFacts?: (db: TransactionDb, query: { projectId: string, month: string }) => Promise<PayrollAttendanceFacts>
   dayworkFacts?: (db: TransactionDb, query: { projectId: string, month: string }) => Promise<PayrollDayworkFacts>
@@ -84,6 +90,8 @@ export function createPayrollService(options: PayrollServiceOptions) {
       const source = structuredClone(await options.identities(sessionId))
       await initializePayrollSchema(db)
       await initializePayrollAFeesSchema(db)
+      if (options.hollowFacts)
+        await initializePayrollHollowDeductionSchema(db)
       await synchronizeIdentities(db, source)
       if (query.projectId && !source.projects.some(project => project.id === query.projectId)) {
         const recorded = await db.select<{ project_id: string }>(`SELECT project_id FROM wage_statements UNION SELECT project_id FROM payroll_subject_configs
@@ -105,10 +113,17 @@ export function createPayrollService(options: PayrollServiceOptions) {
   }
   const adjustments = createPayrollAdjustmentService(run)
   const { aFormInTransaction, ...aService } = createPayrollAService(run, options)
+  const { c1FormInTransaction, ...c1Service } = createPayrollC1Service(run, options)
+  const { c2FormInTransaction, ...c2Service } = createPayrollC2Service(run, options)
   const { executeActual, ...actualReads } = createPayrollActualService(run)
   const { executeReversal, ...reversalReads } = createPayrollReversalService(run)
   return {
     ...aService,
+    ...createPayrollHollowService(run, {
+      A: async (db, context, source, statementId) => (await aFormInTransaction(db, context, source, { statementId })).hollow,
+      C1: async (db, context, source, statementId) => (await c1FormInTransaction(db, context, source, { statementId })).hollow,
+      C2: async (db, context, source, statementId) => (await c2FormInTransaction(db, context, source, { statementId })).hollow,
+    }, options.hollowProjection),
     ...adjustments,
     ...actualReads,
     ...reversalReads,
@@ -116,7 +131,7 @@ export function createPayrollService(options: PayrollServiceOptions) {
       return run(query, sessionId, async (db, context, source) => {
         const [head] = await db.select<{ format_family: string }>('SELECT format_family FROM wage_statements WHERE id=?', [input.statementId])
         const a = head?.format_family === 'A' ? await aFormInTransaction(db, context, source, { statementId: input.statementId }) : null
-        const preview = await readPayrollReleaseAdjustments(db, input.statementId, a?.adjustmentReconciliation)
+        const preview = await readPayrollReleaseAdjustments(db, input.statementId, a?.adjustmentReconciliation, a?.hollow)
         if (query.projectId && query.projectId !== preview.statement.project_id)
           throw payrollProblem('relationship-mismatch', '后续工资不属于指定项目')
         return { context: { ...context, readonly: !context.capabilities.includes('payroll:write'), sourceVersion: `${context.sourceVersion}+release-adjustments:${hash(preview)}` }, statementId: input.statementId, candidates: preview.candidates, reasons: preview.reasons }
@@ -135,8 +150,8 @@ export function createPayrollService(options: PayrollServiceOptions) {
       return adjustments.executeAdjustment(command, sessionId)
     },
     ...createPayrollAttendanceService(run, options),
-    ...createPayrollC1Service(run, options),
-    ...createPayrollC2Service(run, options),
+    ...c1Service,
+    ...c2Service,
     ...createPayrollDayworkService(run, options),
     list(query: PayrollQuery, sessionId?: string | null): Promise<PayrollListRead> {
       return run(query, sessionId, async (db, context, source) => {

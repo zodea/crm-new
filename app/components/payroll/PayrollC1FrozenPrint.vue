@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { c1FrozenAttendanceRows } from '~/lib/payroll/c1-export'
 import { c1MonthDays, c1Number } from '~/lib/payroll/c1-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
+import PayrollHollowFrozenSection from './PayrollHollowFrozenSection.vue'
 
 const props = defineProps<{ document: PayrollC1FrozenDocument }>()
 const attendance = computed(() => c1FrozenAttendanceRows(props.document))
@@ -28,6 +29,7 @@ const days = computed(() => c1MonthDays(props.document.month))
             </tr>
           </tbody>
         </table>
+        <PayrollHollowFrozenSection v-if="document.hollow" :snapshot="document.hollow" />
         <section class="summary">
           <p>核算应发 <strong>{{ payrollAmount(document.grossAmount) }}</strong></p><p>实际发放 <strong>{{ payrollAmount(document.actualAmount) }}</strong></p>
         </section>

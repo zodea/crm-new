@@ -1,4 +1,5 @@
 import type { PayrollAAmount, PayrollADraft, PayrollAFormRead, PayrollARatioDefault, PayrollAReleaseDraft } from './central-a-contract'
+import { payrollHollowAllowsZeroRelease } from './central-hollow-deduction-release'
 import { payrollAmount } from './read-presentation'
 
 export function payrollInputNumber(value: string): number | null {
@@ -38,7 +39,8 @@ export function payrollReleaseError(read: PayrollAFormRead, draft: PayrollARelea
     return '请填写实际发放总额，空白不代表零。'
   const actual = fen(draft.actualAmount)
   const gross = fen(read.totals.grossAmount.value)
-  if (actual === null || actual <= 0)
+  const zeroAllowed = read.eligibility.canRelease && payrollHollowAllowsZeroRelease(read.hollow?.snapshot)
+  if (actual === null || (actual === 0 && !zeroAllowed))
     return '实际发放金额必须大于 0 且精确到分。'
   if (gross === null)
     return '核算应发尚未确定，请先补齐来源并重新核对。'

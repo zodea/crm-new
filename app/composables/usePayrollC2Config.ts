@@ -7,7 +7,7 @@ import { projectProblemFromUnknown } from '~/lib/project/repository'
 import { toErrorMessage } from '~/lib/util/error'
 import { usePayrollRead } from './usePayrollRead'
 
-export function usePayrollC2Config() {
+export function usePayrollC2Config(additionalGuard: () => boolean | Promise<boolean> = () => true) {
   const route = useRoute()
   const router = useRouter()
   const store = usePayrollC2Store()
@@ -98,6 +98,8 @@ export function usePayrollC2Config() {
   }
   const returnTo = computed(() => (view.value.origin && payrollC2WorkspaceReturn(route.query.returnTo, view.value.origin)) || payrollReturnTo(route.query.returnTo, view.value.origin) || payrollReadLocation('/subcontract/payroll', view.value))
   async function mayLeave() {
+    if (!await additionalGuard())
+      return false
     return !working.value && !pending.value && (!dirty.value || await kit.confirm({ variant: 'simple', title: '放弃主体配置修改', message: '当前单价或规则尚未保存，确认放弃？', confirmLabel: '放弃修改' }))
   }
   useTabCloseGuard(mayLeave)

@@ -1,6 +1,7 @@
 import type { PayrollADraft, PayrollAFormRead, PayrollAStatementCommandResult } from '~/lib/payroll/central-a-contract'
 import { computed, nextTick, onActivated, onDeactivated, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
+import { usePayrollADraftCache } from '~/composables/usePayrollADraftCache'
 import { usePayrollANegativeLines } from '~/composables/usePayrollANegativeLines'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { payrollAEntryReturn } from '~/lib/payroll/a-navigation'
@@ -37,6 +38,8 @@ export function usePayrollAForm() {
   const fieldErrors = shallowRef<Record<string, string>>({})
   const original = shallowRef('')
   const ratioExplicit = shallowRef(false)
+  const restoredInput = shallowRef(false)
+  const coldCache = usePayrollADraftCache()
   const formElement = shallowRef<HTMLFormElement | null>(null)
   const errorPanel = shallowRef<{ focus: () => void } | null>(null)
   const matchingRead = computed(() => read.value && read.value.context.origin === scope.value.origin && read.value.statementId === id.value && (id.value !== null || read.value.draftKey === draftKey.value) ? read.value : null)
@@ -45,12 +48,16 @@ export function usePayrollAForm() {
   const busy = computed(() => loading.value || saving.value || negative.busy.value)
   const editable = computed(() => {
     const value = latest.value ?? matchingRead.value
-    return !!matchingRead.value && !!value && (!hasPayrollAFeesForm(value) || (!!value.fees && value.bookProof.state === 'proven' && value.bookEligibility.canSave)) && ['new', 'draft'].includes(value.status) && value.context.origin === 'real' && !value.context.readonly && value.context.capabilities.includes('payroll:write') && !readFailed.value && !pending.value && !negative.pending.value && !busy.value
+    return !!matchingRead.value && !!value && ['new', 'draft'].includes(value.status) && value.context.origin === 'real' && !value.context.readonly && value.context.capabilities.includes('payroll:write') && !readFailed.value && !pending.value && !negative.pending.value && !busy.value
+  })
+  const feeBasisReady = computed(() => {
+    const value = latest.value ?? matchingRead.value
+    return !!value && (!hasPayrollAFeesForm(value) || (!!value.fees && value.bookProof.state === 'proven' && value.bookEligibility.canSave))
   })
   const dirty = computed(() => (!!matchingRead.value && original.value !== JSON.stringify(draft.value)) || negative.dirty.value)
   const returnTo = computed(() => (scope.value.origin && payrollAdjustmentReturn(route.query.returnTo, scope.value.origin)) || payrollAEntryReturn(route.query.returnTo, scope.value.origin) || payrollReadLocation('/subcontract/payroll', scope.value))
-  const previewed = computed(() => !!matchingRead.value && sourceSelection(draft.value) === sourceSelection(payrollDraft(matchingRead.value.draft)))
-  const canSave = computed(() => editable.value && !negative.dirty.value && previewed.value && !!matchingRead.value?.eligibility.canSaveDraft)
+  const previewed = computed(() => !restoredInput.value && !!matchingRead.value && sourceSelection(draft.value) === sourceSelection(payrollDraft(matchingRead.value.draft)))
+  const canSave = computed(() => editable.value && feeBasisReady.value && !negative.dirty.value && previewed.value && !!matchingRead.value?.eligibility.canSaveDraft)
   const cache = new Map<string, { read: PayrollAFormRead, draft: PayrollADraft, original: string, ratioExplicit: boolean }>()
   const key = (value: PayrollAFormRead) => JSON.stringify([value.context.workspaceId, value.context.actorId, value.context.origin, value.statementId ?? value.draftKey])
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
@@ -64,8 +71,10 @@ export function usePayrollAForm() {
   }
   const isCurrent = (requested: string, request: number) => active.value && requested === target() && request === sequence
   function remember() {
-    if (read.value)
+    if (read.value && !allowLeave) {
       cache.set(key(read.value), { read: read.value, draft: clone(draft.value), original: original.value, ratioExplicit: ratioExplicit.value })
+      coldCache.remember(read.value, { draft: clone(draft.value), original: original.value, ratioExplicit: ratioExplicit.value })
+    }
   }
   function capture(cause: unknown) {
     error.value = toErrorMessage(cause)
@@ -110,6 +119,8 @@ export function usePayrollAForm() {
         read.value = value
         latest.value = null
         draft.value = { ...payrollDraft(value.draft), note: draft.value.note }
+        restoredInput.value = false
+        remember()
       }
       else {
         const saved = cache.get(key(value))
@@ -121,16 +132,23 @@ export function usePayrollAForm() {
           latest.value = value
         }
         else {
+          const savedInput = coldCache.get(value)
           read.value = value
           latest.value = null
           draft.value = payrollDraft(value.draft)
           original.value = JSON.stringify(draft.value)
           ratioExplicit.value = id.value !== null
-          const operation = store.getAPending(value)
-          if (operation?.command.action.kind === 'save-a-draft') {
-            draft.value = clone(operation.command.action.draft)
-            ratioExplicit.value = true
+          restoredInput.value = !!savedInput
+          if (savedInput) {
+            draft.value = clone(savedInput.draft)
+            original.value = savedInput.original
+            ratioExplicit.value = savedInput.ratioExplicit
           }
+        }
+        const operation = store.getAPending(value)
+        if (operation?.command.action.kind === 'save-a-draft') {
+          draft.value = clone(operation.command.action.draft)
+          ratioExplicit.value = true
         }
       }
     }
@@ -152,6 +170,7 @@ export function usePayrollAForm() {
     if ('payRatio' in patch && !('periodKind' in patch))
       ratioExplicit.value = true
     fieldErrors.value = {}
+    remember()
   }
   async function mayLeave() {
     if (allowLeave)
@@ -183,8 +202,10 @@ export function usePayrollAForm() {
     const requested = target()
     if (!await mayLeave() || !active.value || requested !== target())
       return
-    if (read.value)
+    if (read.value) {
       cache.delete(key(read.value))
+      coldCache.discard(read.value)
+    }
     negative.discard()
     allowLeave = true
     tabs.close(formKey)
@@ -199,8 +220,10 @@ export function usePayrollAForm() {
     if (!operation)
       throw new Error('原工资提交未能核对，请保留草稿。')
     store.acknowledgeA(operation, refreshed)
-    if (read.value)
+    if (read.value) {
       cache.delete(key(read.value))
+      coldCache.discard(read.value)
+    }
     allowLeave = true
     tabs.close(formKey)
     const destination = `/subcontract/payroll/${encodeURIComponent(result.statementId)}`
@@ -287,8 +310,9 @@ export function usePayrollAForm() {
     void load()
   })
   onScopeDispose(() => {
+    remember()
     active.value = false
     sequence += 1
   })
-  return { id, draftKey, scope, read, matchingRead, latest, draft, loading, busy, error, fieldErrors, formElement, errorPanel, negative, pending, editable, dirty, previewed, canSave, returnTo, change, load, save, recover, leave }
+  return { id, draftKey, scope, read, matchingRead, latest, restoredInput, draft, loading, busy, error, fieldErrors, formElement, errorPanel, negative, pending, editable, dirty, previewed, canSave, returnTo, change, load, save, recover, leave }
 }

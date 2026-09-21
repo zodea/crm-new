@@ -11,6 +11,7 @@ import { payrollCanonical } from './central-command-shared'
 import { payrollProblem } from './central-contract'
 import { wireCent, wireContext, wireExact, wireId, wireObject, wireStrings, wireText } from './central-payroll-wire'
 import { assertPayrollReversalDraft, assertPayrollReversalTarget } from './central-reversal-validation'
+import { isPayrollSourceIdentity } from './migration-identity'
 import { amountInCents } from './statements'
 
 export type PayrollAdjustmentRead = PayrollAdjustmentFormRead | PayrollAdjustmentDetailRead | PayrollAdjustmentHistoryRead | PayrollActualLedgerRead | PayrollActualPaymentFormRead | PayrollActualPaymentDetailRead | PayrollActualReversalFormRead | PayrollReleaseAdjustmentPreview
@@ -22,7 +23,7 @@ function fail(): never {
 export function isPayrollAdjustmentBalance(v: unknown): v is PayrollAdjustmentBalance {
   try {
     wireExact(v, ['adjustmentId', 'rootAdjustmentId', 'confirmedDelta', 'appliedDelta', 'remainingDelta', 'balanceVersion', 'applicationIds'])
-    if (!wireId(v.adjustmentId) || !wireId(v.rootAdjustmentId) || ![v.confirmedDelta, v.appliedDelta, v.remainingDelta].every(isPayrollSignedAmount) || !wireText(v.balanceVersion) || !v.balanceVersion || !payrollUniqueIds(v.applicationIds))
+    if (![v.adjustmentId, v.rootAdjustmentId].every(id => isPayrollSourceIdentity(id, 'payroll_adjustments')) || ![v.confirmedDelta, v.appliedDelta, v.remainingDelta].every(isPayrollSignedAmount) || !wireText(v.balanceVersion) || !v.balanceVersion || !payrollUniqueIds(v.applicationIds, 'payroll_adjustment_applications'))
       return false
     const balance = v as unknown as PayrollAdjustmentBalance
     return balance.remainingDelta.value === null ? balance.confirmedDelta.value === null || balance.appliedDelta.value === null : balance.confirmedDelta.value !== null && balance.appliedDelta.value !== null && amountInCents(balance.confirmedDelta.value) - amountInCents(balance.appliedDelta.value) === amountInCents(balance.remainingDelta.value)
@@ -43,7 +44,7 @@ function preview(v: unknown): v is PayrollAdjustmentPreview {
 function record(v: unknown): v is PayrollAdjustmentRecord {
   try {
     wireExact(v, ['id', 'rootAdjustmentId', 'originalStatementId', 'projectId', 'status', 'draft', 'delta', 'snapshot'])
-    if (![v.id, v.rootAdjustmentId, v.originalStatementId, v.projectId].every(wireId) || !['draft', 'confirmed'].includes(String(v.status)))
+    if (![v.id, v.rootAdjustmentId].every(id => isPayrollSourceIdentity(id, 'payroll_adjustments')) || !isPayrollSourceIdentity(v.originalStatementId, 'wage_statements') || !wireId(v.projectId) || !['draft', 'confirmed'].includes(String(v.status)))
       return false
     assertPayrollAdjustmentDraft(v.draft)
     if (v.status === 'draft')
@@ -64,7 +65,7 @@ function applicationHistory(v: unknown, projectId: string, balances: PayrollAdju
   const ids = new Set<string>()
   for (const a of v) {
     wireExact(a, ['id', 'adjustmentId', 'rootAdjustmentId', 'kind', 'appliedDelta', 'fact', 'reversesApplicationId', 'reasons'])
-    if (!wireId(a.id) || !wireId(a.adjustmentId) || !wireId(a.rootAdjustmentId) || ids.has(a.id) || !['actual-payment', 'later-release', 'recording-reversal'].includes(String(a.kind)) || !isPayrollSignedAmount(a.appliedDelta) || !wireStrings(a.reasons) || !(a.reversesApplicationId === null || wireId(a.reversesApplicationId)))
+    if (!isPayrollSourceIdentity(a.id, 'payroll_adjustment_applications') || ![a.adjustmentId, a.rootAdjustmentId].every(id => isPayrollSourceIdentity(id, 'payroll_adjustments')) || ids.has(a.id) || !['actual-payment', 'later-release', 'recording-reversal'].includes(String(a.kind)) || !isPayrollSignedAmount(a.appliedDelta) || !wireStrings(a.reasons) || !(a.reversesApplicationId === null || isPayrollSourceIdentity(a.reversesApplicationId, 'payroll_adjustment_applications')))
       return false
     ids.add(a.id)
     const id = a.id
@@ -145,21 +146,21 @@ export function decodePayrollAdjustmentRead<T extends PayrollAdjustmentRead>(raw
     wireExact(v, ['context', 'target', 'originalFact', 'originals', 'draft', 'reversalAmount', 'applications', 'alreadyReversedBy', 'eligibility'])
     assertPayrollReversalTarget(v.target)
     assertPayrollReversalDraft(v.draft)
-    if (!wireObject(target) || !same(v.target, target.target) || !isPayrollActualFact(v.originalFact) || !same(v.target.original, v.originalFact.ref) || !Array.isArray(v.originals) || !v.originals.every(isPayrollOriginalWageRef) || !isPayrollSignedAmount(v.reversalAmount) || v.reversalAmount.value !== (v.originalFact.signedAmount.value === null ? null : -v.originalFact.signedAmount.value) || !Array.isArray(v.applications) || !payrollUniqueIds(v.alreadyReversedBy) || !eligibility(v.eligibility, ['canConfirmReversal'], readonly) || (query.projectId && v.originalFact.projectId !== query.projectId))
+    if (!wireObject(target) || !same(v.target, target.target) || !isPayrollActualFact(v.originalFact) || !same(v.target.original, v.originalFact.ref) || !Array.isArray(v.originals) || !v.originals.every(isPayrollOriginalWageRef) || !isPayrollSignedAmount(v.reversalAmount) || v.reversalAmount.value !== (v.originalFact.signedAmount.value === null ? null : -v.originalFact.signedAmount.value) || !Array.isArray(v.applications) || !payrollUniqueIds(v.alreadyReversedBy, 'payroll_actual_events') || !eligibility(v.eligibility, ['canConfirmReversal'], readonly) || (query.projectId && v.originalFact.projectId !== query.projectId))
       fail()
     for (const a of v.applications) {
       wireExact(a, ['originalApplicationId', 'adjustmentId', 'rootAdjustmentId', 'amount', 'balanceVersion'])
-      if (![a.originalApplicationId, a.adjustmentId, a.rootAdjustmentId].every(wireId) || typeof a.amount !== 'number' || !wireCent(Math.abs(a.amount)) || !wireText(a.balanceVersion))
+      if (!isPayrollSourceIdentity(a.originalApplicationId, 'payroll_adjustment_applications') || ![a.adjustmentId, a.rootAdjustmentId].every(id => isPayrollSourceIdentity(id, 'payroll_adjustments')) || typeof a.amount !== 'number' || !wireCent(Math.abs(a.amount)) || !wireText(a.balanceVersion))
         fail()
     }
   }
   else {
     wireExact(v, ['context', 'statementId', 'candidates', 'reasons'])
-    if (!wireObject(target) || v.statementId !== target.statementId || !wireId(v.statementId) || !Array.isArray(v.candidates) || !wireStrings(v.reasons))
+    if (!wireObject(target) || v.statementId !== target.statementId || !isPayrollSourceIdentity(v.statementId, 'wage_statements') || !Array.isArray(v.candidates) || !wireStrings(v.reasons))
       fail()
     for (const c of v.candidates) {
       wireExact(c, ['adjustmentId', 'rootAdjustmentId', 'originalStatementId', 'originalMonth', 'remainingAmount', 'embeddedInCalculation', 'additionalWithholding', 'balanceVersion', 'coverageVersion', 'eligible', 'reasons'])
-      if (![c.adjustmentId, c.rootAdjustmentId, c.originalStatementId].every(wireId) || ![c.originalMonth, c.balanceVersion, c.coverageVersion].every(wireText) || !(c.remainingAmount === null || (typeof c.remainingAmount === 'number' && wireCent(Math.abs(c.remainingAmount)))) || !wireCent(c.embeddedInCalculation) || !(c.additionalWithholding === null || wireCent(c.additionalWithholding)) || typeof c.eligible !== 'boolean' || !wireStrings(c.reasons) || (c.eligible && c.reasons.length))
+      if (![c.adjustmentId, c.rootAdjustmentId].every(id => isPayrollSourceIdentity(id, 'payroll_adjustments')) || !isPayrollSourceIdentity(c.originalStatementId, 'wage_statements') || ![c.originalMonth, c.balanceVersion, c.coverageVersion].every(wireText) || !(c.remainingAmount === null || (typeof c.remainingAmount === 'number' && wireCent(Math.abs(c.remainingAmount)))) || !wireCent(c.embeddedInCalculation) || !(c.additionalWithholding === null || wireCent(c.additionalWithholding)) || typeof c.eligible !== 'boolean' || !wireStrings(c.reasons) || (c.eligible && c.reasons.length))
         fail()
     }
     if (new Set(v.candidates.map(c => c.rootAdjustmentId)).size !== v.candidates.length)

@@ -2,6 +2,7 @@
 import type { PayrollC2Draft } from '~/lib/payroll/central-c2-contract'
 import { computed } from 'vue'
 import { usePayrollC2Form } from '~/composables/usePayrollC2Form'
+import PayrollHollowReview from './PayrollHollowReview.vue'
 
 const route = useRoute()
 const ui = usePayrollC2Form()
@@ -35,6 +36,7 @@ useTabTitle(title)
         范围或成员已改变，请按当前稿重新核对来源后保存。
       </p>
       <PayrollC2SourceReview :read="matchingRead" :return-to="route.fullPath" />
+      <PayrollHollowReview v-if="matchingRead.hollow" :read="matchingRead.hollow" :return-to="route.fullPath" readonly :blocked="busy || !!pending" />
       <section id="section-note" class="panel p-4">
         <SectionHeader title="备注" /><textarea :value="draft.note" class="field-input mt-3 w-full min-w-0" rows="3" aria-label="工资备注" :disabled="!editable" @input="ui.change({ note: ($event.target as HTMLTextAreaElement).value })" />
       </section>

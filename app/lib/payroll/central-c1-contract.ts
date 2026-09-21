@@ -1,6 +1,7 @@
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollAttendanceFact, PayrollAttendanceWorker, PayrollC1Options } from './central-attendance-contract'
 import type { PayrollHistoryEntry, PayrollQuery, PayrollWritableContext } from './central-contract'
+import type { PayrollHollowRead, PayrollHollowSnapshot } from './central-hollow-deduction-contract'
 import type { PayrollReleaseAdjustmentApplication } from './central-release-adjustment-contract'
 
 export type PayrollC1Context = PayrollWritableContext
@@ -54,6 +55,7 @@ export interface PayrollC1Blocker {
 export interface PayrollC1Amount { value: number | null, knownValue: number | null, state: 'known' | 'partial' | 'unknown', reasons: string[] }
 export interface PayrollC1Eligibility { canSaveDraft: boolean, canCheck: boolean, canRelease: boolean, canOutput: boolean, reasons: string[] }
 export interface PayrollC1FormRead {
+  hollow?: PayrollHollowRead
   context: PayrollC1Context
   statementId: string | null
   draftKey: string | null
@@ -116,7 +118,13 @@ export interface PayrollC1StatementSourceSnapshot {
   facts: PayrollAttendanceFact[]
   rates: PayrollC1Rate[]
 }
+export interface PayrollC1StatementSourceSnapshotV2 extends Omit<PayrollC1StatementSourceSnapshot, 'schemaVersion'> {
+  schemaVersion: 2
+  hollow: PayrollHollowSnapshot
+}
+export type PayrollC1StatementSourceVersioned = PayrollC1StatementSourceSnapshot | PayrollC1StatementSourceSnapshotV2
 export interface PayrollC1FrozenDocument {
+  hollow?: PayrollHollowSnapshot
   id: string
   projectId: string
   projectName: string

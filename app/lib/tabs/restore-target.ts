@@ -74,10 +74,12 @@ export interface RestoredDetailPath {
   family: string
   id: string
   secondId?: string
+  unitId?: string
   kind?: string
 }
 
 const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDetailPath]> = [
+  [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)\/hollow\/([^/]+)$/, m => ({ family: 'quantity-hollow', id: m[3]!, secondId: m[1]!, unitId: m[2]! })],
   [/^\/base\/supplier\/credential\/([^/]+)$/, m => ({ family: 'supplier-credential', id: m[1]! })],
   [/^\/schedule\/process-library\/([^/]+)$/, m => ({ family: 'process-library', id: m[1]! })],
   [/^\/project\/target-cost\/([^/]+)$/, m => ({ family: 'target-cost', id: m[1]! })],
@@ -127,6 +129,8 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
           detail.id = decodeURIComponent(detail.id)
           if (detail.secondId)
             detail.secondId = decodeURIComponent(detail.secondId)
+          if (detail.unitId)
+            detail.unitId = decodeURIComponent(detail.unitId)
           break
         }
       }
@@ -134,7 +138,9 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
         return null
       const validDetailId = detail.family === 'crew-worker-fact' && detail.kind === 'assignment'
         ? isQuantitySourceIdentity(detail.id, 'units')
-        : isStableRouteIdentity(detail.id)
+        : detail.family === 'quantity-hollow'
+          ? isQuantitySourceIdentity(detail.id, 'quantity_hollow_records') && isQuantitySourceIdentity(detail.unitId, 'units')
+          : isStableRouteIdentity(detail.id)
       if (!validDetailId || (detail.secondId != null && !isStableRouteIdentity(detail.secondId)))
         return null
     }
@@ -146,6 +152,13 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
+    if (detail?.family === 'quantity-hollow') {
+      if (origin !== 'real' || ['ownerKind', 'ownerId'].some(key => url.searchParams.has(key)))
+        return null
+      if (url.searchParams.has('revisionId') && (url.searchParams.getAll('revisionId').length !== 1 || !isQuantitySourceIdentity(url.searchParams.get('revisionId'), 'quantity_hollow_revisions')))
+        return null
+      allowed.add('revisionId')
+    }
     const paymentPayrollScope = url.pathname === '/finance/payment-management'
     if (paymentPayrollScope && url.searchParams.has('payrollProject')) {
       if (origin === 'demo' || url.searchParams.getAll('payrollProject').length !== 1 || !isStableRouteIdentity(url.searchParams.get('payrollProject')))
@@ -168,11 +181,13 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
       const sourceQuery = Object.fromEntries(url.searchParams)
       const source: { kind: PayrollSourceKind, id: string, projectId?: string } | null = detail?.family === 'crew-worker-fact' && detail.kind === 'assignment'
         ? { kind: 'quantity-unit' as const, id: detail.id, projectId: detail.secondId }
-        : detail?.family === 'worker' || detail?.family === 'crew'
-          ? { kind: detail.family, id: detail.id }
-          : url.pathname === '/subcontract/quantity'
-            ? { kind: 'quantity-project' as const, id: url.searchParams.get('project') || '', projectId: url.searchParams.get('project') || '' }
-            : null
+        : detail?.family === 'quantity-hollow'
+          ? { kind: 'quantity-unit' as const, id: detail.unitId!, projectId: detail.secondId }
+          : detail?.family === 'worker' || detail?.family === 'crew'
+            ? { kind: detail.family, id: detail.id }
+            : url.pathname === '/subcontract/quantity'
+              ? { kind: 'quantity-project' as const, id: url.searchParams.get('project') || '', projectId: url.searchParams.get('project') || '' }
+              : null
       if (!origin || !source || PAYROLL_SOURCE_KEYS.some(key => url.searchParams.getAll(key).length !== 1) || !payrollSourceContext(sourceQuery, { ...source, origin }))
         return null
       PAYROLL_SOURCE_KEYS.forEach(key => allowed.add(key))

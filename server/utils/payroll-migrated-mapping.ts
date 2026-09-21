@@ -6,18 +6,21 @@ import type { PayrollAAdjustmentBasis, PayrollAdjustmentBasisDraft, PayrollAdjus
 import type { PayrollC1FrozenDocument } from '../../app/lib/payroll/central-c1-contract'
 import type { PayrollC2FrozenDocument, PayrollC2OutputDocument, PayrollC2OutputIdentity } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollIdentityMapping, PayrollSourceDiagnostic } from '../../app/lib/payroll/central-contract'
+import type { QuantityHollowMigrationGraph } from '../../app/lib/quantity/hollow-migration-contract'
 import type { NavigationIntentDTO } from '../../app/types/read-model'
 import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { createPayrollMigratedFeesMapper } from './payroll-migrated-fees-mapping'
+import { createPayrollMigratedHollowMapper } from './payroll-migrated-hollow-mapping'
 
 const key = (table: string, id: string) => JSON.stringify([table, id])
 const ownershipTables = ['projects', 'units', 'unit_assignments', 'rooms', 'items'] as const
 
 /** 原正文先在来源身份空间证明；此处仅构造消费端 DTO，不改 JSON、hash 或源版本。 */
-export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[]) {
+export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[], hollowQuantity?: QuantityHollowMigrationGraph) {
   const identities = new Map<string, string | null>()
   const feeMapper = createPayrollMigratedFeesMapper({ mapping, id, nullableId, ownership, quantity, actualRef, navigation, blocker: aBlocker })
+  const hollowMapper = createPayrollMigratedHollowMapper({ id, nullableId, quantity: hollowQuantity })
   function invalid(message: string): never {
     throw payrollProblem('unavailable', `迁入工资身份映射不可用：${message}`)
   }
@@ -140,22 +143,24 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[]) {
       facts: value.facts.map(quantity),
       priceRevisions: value.priceRevisions.map(price),
       ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}),
-      ...(value.schemaVersion === 2 ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees) } : {}),
+      ...(value.schemaVersion !== 1 ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees) } : {}),
+      ...(value.schemaVersion === 3 ? { hollow: hollowMapper.snapshot(value.hollow) } : {}),
     }
   }
   function aBasis(value: PayrollAAdjustmentBasis): PayrollAAdjustmentBasis {
-    return { ...value, source: source(value.source), components: value.components.map(component => ({ ...component, ownershipKey: ownership(component.ownershipKey), priceRevisionId: id('payroll_a_price_revisions', component.priceRevisionId) })), ...(value.fees ? { fees: feeMapper.basis(value.fees) } : {}) }
+    return { ...value, source: source(value.source), components: value.components.map(component => ({ ...component, ownershipKey: ownership(component.ownershipKey), priceRevisionId: id('payroll_a_price_revisions', component.priceRevisionId) })), ...(value.fees ? { fees: feeMapper.basis(value.fees) } : {}), ...(value.hollow ? { hollow: hollowMapper.basis(value.hollow) } : {}) }
   }
   function basis(value: PayrollAdjustmentBasisDraft): PayrollAdjustmentBasisDraft {
     if (value.formatFamily === 'C1') {
       return {
         ...value,
+        ...(value.hollow ? { hollow: hollowMapper.basis(value.hollow) } : {}),
         rates: value.rates.map(rate => ({ ...rate, workerId: id('workers', rate.workerId), configId: nullableId('payroll_c1_rate_revisions', rate.configId) })),
         records: value.records.map(record => ({ ...record, recordId: id('attendance_records', record.recordId), workerId: id('workers', record.workerId) })),
       }
     }
     if (value.formatFamily === 'C2')
-      return { ...value, configId: id('payroll_subject_configs', value.configId), records: value.records.map(record => ({ ...record, recordId: id('signed_daywork_records', record.recordId), workerId: id('workers', record.workerId) })) }
+      return { ...value, ...(value.hollow ? { hollow: hollowMapper.basis(value.hollow) } : {}), configId: id('payroll_subject_configs', value.configId), records: value.records.map(record => ({ ...record, recordId: id('signed_daywork_records', record.recordId), workerId: id('workers', record.workerId) })) }
     return aBasis(value)
   }
   function confirmed(value: PayrollAdjustmentConfirmedSnapshot): PayrollAdjustmentConfirmedSnapshot {
@@ -244,21 +249,41 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[]) {
     return { ...value, id: lineId, workerId: id('workers', value.workerId), itemId: id('items', value.itemId), priceRevisionIds: value.priceRevisionIds.map(value => id('payroll_a_price_revisions', value)), facts: value.facts.map(quantity), sources: value.sources.map(navigation), blockers: value.blockers.map(aBlocker) }
   }
   function aDocument(value: PayrollAFrozenDocument): PayrollAFrozenDocument {
-    return { ...value, id: id('wage_statements', value.id), projectId: id('projects', value.projectId), lines: value.lines.map(aLine), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })), previousPayments: value.previousPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId) })), ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}), ...(hasPayrollAFeesDocument(value) ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees), previousBookPayments: value.previousBookPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId), book: feeMapper.book(payment.book) })) } : {}) }
+    return { ...value, ...(value.hollow ? { hollow: hollowMapper.snapshot(value.hollow) } : {}), id: id('wage_statements', value.id), projectId: id('projects', value.projectId), lines: value.lines.map(aLine), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })), previousPayments: value.previousPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId) })), ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}), ...(hasPayrollAFeesDocument(value) ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees), previousBookPayments: value.previousBookPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId), book: feeMapper.book(payment.book) })) } : {}) }
   }
   function c1Document(value: PayrollC1FrozenDocument): PayrollC1FrozenDocument {
-    return { ...value, id: id('wage_statements', value.id), projectId: id('projects', value.projectId), crewId: nullableId('crews', value.crewId), lines: value.lines.map(line => ({ ...line, id: `${id('workers', line.workerId)}:${line.kind}`, workerId: id('workers', line.workerId), attendanceIds: line.attendanceIds.map(value => id('attendance_records', value)) })), rates: value.rates.map(rate => ({ ...rate, workerId: id('workers', rate.workerId), configId: nullableId('payroll_c1_rate_revisions', rate.configId) })), attendance: value.attendance.map(fact => ({ ...fact, id: id('attendance_records', fact.id), projectId: id('projects', fact.projectId), crewId: nullableId('crews', fact.crewId), workerId: id('workers', fact.workerId) })), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })) }
+    return { ...value, ...(value.hollow ? { hollow: hollowMapper.snapshot(value.hollow) } : {}), id: id('wage_statements', value.id), projectId: id('projects', value.projectId), crewId: nullableId('crews', value.crewId), lines: value.lines.map(line => ({ ...line, id: `${id('workers', line.workerId)}:${line.kind}`, workerId: id('workers', line.workerId), attendanceIds: line.attendanceIds.map(value => id('attendance_records', value)) })), rates: value.rates.map(rate => ({ ...rate, workerId: id('workers', rate.workerId), configId: nullableId('payroll_c1_rate_revisions', rate.configId) })), attendance: value.attendance.map(fact => ({ ...fact, id: id('attendance_records', fact.id), projectId: id('projects', fact.projectId), crewId: nullableId('crews', fact.crewId), workerId: id('workers', fact.workerId) })), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })) }
   }
   function c2Document(value: PayrollC2FrozenDocument): PayrollC2OutputDocument {
     const selected = new Map<string, PayrollC2OutputIdentity>()
+    const previous = (value as PayrollC2OutputDocument).identityMapping
+    const originalIdentity = (table: PayrollC2OutputIdentity['tableName'], current: string) => {
+      if (!previous)
+        return current
+      return previous.find(row => row.tableName === table && row.centralId === current)?.legacyId ?? invalid('再次迁入输出丢失祖先身份映射')
+    }
     const take = (tableName: PayrollC2OutputIdentity['tableName'], legacyId: string): string => {
       const centralId = id(tableName, legacyId)
-      selected.set(key(tableName, legacyId), { tableName, legacyId, centralId })
+      const original = originalIdentity(tableName, legacyId)
+      selected.set(key(tableName, original), { tableName, legacyId: original, centralId })
       return centralId
     }
     const maybe = (tableName: PayrollC2OutputIdentity['tableName'], legacyId: string | null) => legacyId === null ? null : take(tableName, legacyId)
-    const document = { ...value, id: take('wage_statements', value.id), projectId: take('projects', value.projectId), crewId: maybe('crews', value.crewId), lines: value.lines.map(line => ({ ...line, id: `${take('workers', line.workerId)}:daywork`, workerId: take('workers', line.workerId), dayworkIds: line.dayworkIds.map(value => take('signed_daywork_records', value)) })), daywork: value.daywork.map(fact => ({ ...fact, id: take('signed_daywork_records', fact.id), projectId: take('projects', fact.projectId), crewId: maybe('crews', fact.crewId), workerId: take('workers', fact.workerId) })), config: { ...value.config, id: take('payroll_subject_configs', value.config.id), projectId: take('projects', value.config.projectId), crewId: maybe('crews', value.config.crewId), leaderWorkerId: take('workers', value.config.leaderWorkerId) }, members: value.members.map(member => ({ ...member, workerId: take('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: take('workers', allocation.workerId) })) }
+    const hollow = value.hollow
+      ? createPayrollMigratedHollowMapper({ id: (table, value) => take(table as PayrollC2OutputIdentity['tableName'], value), nullableId: (table, value) => maybe(table as PayrollC2OutputIdentity['tableName'], value), quantityCommand(logId, commandId) {
+          const log = hollowQuantity?.tables.quantity_hollow_logs.find(row => row.id === logId)
+          const receipt = hollowQuantity?.tables.quantity_hollow_command_receipts.find(row => row.id === log?.command_receipt_id && row.command_id === commandId)
+          if (!receipt)
+            return invalid('输出原检查命令缺少对应回执')
+          const mapped = id('quantity_hollow_commands', JSON.stringify([receipt.workspace_id, receipt.actor_id, commandId]))
+          const legacyId = originalIdentity('quantity_hollow_log_commands', encodeURIComponent(JSON.stringify([logId, commandId])))
+          const centralId = encodeURIComponent(JSON.stringify([take('quantity_hollow_logs', logId), mapped]))
+          selected.set(key('quantity_hollow_log_commands', legacyId), { tableName: 'quantity_hollow_log_commands', legacyId, centralId })
+          return mapped
+        } }).snapshot(value.hollow)
+      : undefined
+    const document = { ...value, ...(hollow ? { hollow } : {}), id: take('wage_statements', value.id), projectId: take('projects', value.projectId), crewId: maybe('crews', value.crewId), lines: value.lines.map(line => ({ ...line, id: `${take('workers', line.workerId)}:daywork`, workerId: take('workers', line.workerId), dayworkIds: line.dayworkIds.map(value => take('signed_daywork_records', value)) })), daywork: value.daywork.map(fact => ({ ...fact, id: take('signed_daywork_records', fact.id), projectId: take('projects', fact.projectId), crewId: maybe('crews', fact.crewId), workerId: take('workers', fact.workerId) })), config: { ...value.config, id: take('payroll_subject_configs', value.config.id), projectId: take('projects', value.config.projectId), crewId: maybe('crews', value.config.crewId), leaderWorkerId: take('workers', value.config.leaderWorkerId) }, members: value.members.map(member => ({ ...member, workerId: take('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: take('workers', allocation.workerId) })) }
     return { ...document, identityMapping: [...selected.values()] }
   }
-  return { original, basis, record, fact, snapshot, aDocument, c1Document, c2Document, aFeeRevision: feeMapper.revision, aNegativeLine: feeMapper.negative, aManagementOwnership: feeMapper.claim, aManagementBook: feeMapper.managementBook, aManagementRevision: feeMapper.managementRevision }
+  return { original, basis, record, fact, snapshot, aPriceRevision: price, aDocument, c1Document, c2Document, aFeeRevision: feeMapper.revision, aNegativeLine: feeMapper.negative, aManagementOwnership: feeMapper.claim, aManagementBook: feeMapper.managementBook, aManagementRevision: feeMapper.managementRevision, hollowPolicyRevision: hollowMapper.policyRevision, hollowStart: hollowMapper.start, hollowAdoption: hollowMapper.adoption, hollowSnapshot: hollowMapper.snapshot, hollowCommand: hollowMapper.command, hollowResult: hollowMapper.result }
 }

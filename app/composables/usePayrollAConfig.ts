@@ -10,7 +10,7 @@ import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 
-export function usePayrollAConfig() {
+export function usePayrollAConfig(additionalGuard: () => boolean | Promise<boolean> = () => true) {
   const route = useRoute()
   const router = useRouter()
   const store = usePayrollStore()
@@ -127,6 +127,8 @@ export function usePayrollAConfig() {
   async function mayLeave() {
     if (allowLeave)
       return true
+    if (!await additionalGuard())
+      return false
     if (saving.value || fees.busy.value || fees.pending.value || (current.value && store.getAPending(current.value))) {
       error.value = '请先核对配置原提交，再离开当前修改。'
       return false

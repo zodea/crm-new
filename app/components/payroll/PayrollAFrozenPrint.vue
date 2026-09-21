@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { hasPayrollAFeesDocument } from '~/lib/payroll/central-a-fees-contract'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollAFeesFrozenSection from './PayrollAFeesFrozenSection.vue'
+import PayrollHollowFrozenSection from './PayrollHollowFrozenSection.vue'
 
 const props = defineProps<{ document: PayrollAFrozenDocument }>()
 const feesDocument = computed(() => hasPayrollAFeesDocument(props.document) ? props.document : null)
@@ -31,6 +32,7 @@ const management = computed(() => feesDocument.value?.book.bookPurpose === 'mana
           </tbody>
         </table>
         <PayrollAFeesFrozenSection v-if="feesDocument" :document="feesDocument" />
+        <PayrollHollowFrozenSection v-if="document.hollow" :snapshot="document.hollow" />
         <section class="payroll-a-print-confirmation">
           <section class="payroll-a-print-summary">
             <p>累计应付<strong>{{ payrollAmount(document.cumulativeAmount) }}</strong></p><p>此前实际已发<strong>{{ payrollAmount(document.previouslyPaid) }}</strong></p><p>本次核算应发<strong>{{ payrollAmount(document.grossAmount) }}</strong></p><p>本次实际发放<strong>{{ payrollAmount(document.actualAmount) }}</strong></p>

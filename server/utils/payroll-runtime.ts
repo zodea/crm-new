@@ -5,9 +5,12 @@ import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instan
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { loadPayrollC2ConfigFacts, loadPayrollDayworkFacts, loadPayrollDayworkRecord } from './payroll-daywork-facts'
 import { loadPayrollAManagementScopeFacts } from './payroll-management-scope-facts'
+import { loadPayrollMigratedHollow } from './payroll-migrated-hollow'
 import { loadPayrollAQuantityFacts } from './payroll-quantity-facts'
 import { createPayrollService } from './payroll-service'
 import { projectReadTestInstance } from './project-read-test-instance'
+import { loadQuantityHollowFacts } from './quantity-hollow-facts'
+import { loadQuantityHollowMigratedProof } from './quantity-hollow-migrated-proof'
 import { quantityTestInstance } from './quantity-runtime'
 import { WorkspaceTransactionSessionChanged } from './quantity-test-instance'
 
@@ -26,7 +29,7 @@ export function payrollIdentitySource(sessionId?: string | null) {
   const workers = crewWorkerCommandTestInstance.workerRows(sessionId).filter(row => row.dataOrigin === 'real' && (!row.crewId || crews.some(crew => crew.id === row.crewId))).map(row => ({ ...workerFacts.rows.find(fact => fact.workerId === row.id), id: row.id, name: row.name, crewId: row.crewId }))
   return { projects, crews, workers, version: createHash('sha256').update(JSON.stringify([projects, crews, workers, ratios, workerFacts])).digest('hex') }
 }
-export const payrollService = createPayrollService({ session: payrollSession, identities: payrollIdentitySource, quantityFacts: loadPayrollAQuantityFacts, managementScopeFacts: loadPayrollAManagementScopeFacts, dayworkFacts: loadPayrollDayworkFacts, dayworkRecord: loadPayrollDayworkRecord, c2ConfigFacts: loadPayrollC2ConfigFacts, async transaction(work, sessionId) {
+export const payrollService = createPayrollService({ session: payrollSession, identities: payrollIdentitySource, quantityFacts: loadPayrollAQuantityFacts, hollowFacts: (db, query) => loadQuantityHollowFacts(db, query, { migratedProof: loadQuantityHollowMigratedProof }), hollowProjection: loadPayrollMigratedHollow, managementScopeFacts: loadPayrollAManagementScopeFacts, dayworkFacts: loadPayrollDayworkFacts, dayworkRecord: loadPayrollDayworkRecord, c2ConfigFacts: loadPayrollC2ConfigFacts, async transaction(work, sessionId) {
   try {
     return await quantityTestInstance.withWorkspaceTransaction(work, sessionId)
   }

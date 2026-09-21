@@ -1,9 +1,10 @@
+import type { QuantityHollowTable } from './central-hollow-schema'
 import type { QuantityMigrationTable } from './migration-graph'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 
 /** 与 mapQuantityMigrationGraph 的物理 ID 编码一致；只校验形状，归属仍由原图/关系证明。 */
-export function isQuantitySourceIdentity(value: unknown, table: QuantityMigrationTable): value is string {
-  if (isStableRouteIdentity(value))
+export function isQuantitySourceIdentity(value: unknown, table: QuantityMigrationTable | QuantityHollowTable): value is string {
+  if (isStableRouteIdentity(value) && !value.startsWith('core-quantity_projects-'))
     return true
   if (typeof value !== 'string' || value.length > 256)
     return false

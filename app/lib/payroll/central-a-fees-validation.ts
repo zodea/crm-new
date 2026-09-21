@@ -1,4 +1,5 @@
 import type { PayrollABookRef, PayrollAFeeBasis, PayrollAFeeDraft, PayrollAFeesFrozenDocument, PayrollAFeesSourceSnapshot, PayrollAManagementScope, PayrollAStatementSourceSnapshotV2, PayrollAStatementSourceVersioned } from './central-a-fees-contract'
+import type { PayrollAStatementSourceSnapshotV3 } from './central-a-hollow-contract'
 import { isQuantitySourceIdentity } from '../quantity/migration-identity'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { payrollAAmount, payrollACanonical, payrollAMoney } from './central-a-calculation'
@@ -6,6 +7,7 @@ import { isPayrollAStatementSourceSnapshot } from './central-a-codec'
 import { payrollAFeeTotal, payrollAManagementContains } from './central-a-fees-calculation'
 import { isPayrollAFeeBlocker, isPayrollAFeeCell, isPayrollAFeeNavigation, isPayrollAFeePriceScope, isPayrollAFeeQuantityFact } from './central-a-fees-read-primitives'
 import { payrollProblem } from './central-contract'
+import { isPayrollHollowSnapshot } from './central-hollow-deduction-snapshot'
 import { payrollObject } from './central-snapshot'
 
 export const feeObject = payrollObject
@@ -108,11 +110,22 @@ export function isPayrollAStatementSourceSnapshotV2(v: unknown): v is PayrollASt
   return source.fees.lines.every(l => l.components.every(c => source.facts.some(f => f.ownershipKey === c.ownershipKey && same(f, c.fact)) && c.quantity === c.fact.fieldQty && (source.book.bookPurpose === 'management' ? !!source.fees.management && payrollAManagementContains(source.fees.management.revision.scope, c.fact) && same(c.managementOwnership, { purpose: 'management-fee', projectId: source.subject.projectId, ownershipKey: c.ownershipKey }) : c.managementOwnership === null)))
 }
 export function isPayrollAStatementSourceVersioned(v: unknown): v is PayrollAStatementSourceVersioned {
-  return feeObject(v) && (v.schemaVersion === 1 ? isPayrollAStatementSourceSnapshot(v) : isPayrollAStatementSourceSnapshotV2(v))
+  return feeObject(v) && (v.schemaVersion === 1 ? isPayrollAStatementSourceSnapshot(v) : v.schemaVersion === 3 ? isPayrollAStatementSourceSnapshotV3(v) : isPayrollAStatementSourceSnapshotV2(v))
+}
+export function isPayrollAStatementSourceSnapshotV3(v: unknown): v is PayrollAStatementSourceSnapshotV3 {
+  if (!feeObject(v) || v.schemaVersion !== 3 || !isPayrollHollowSnapshot(v.hollow) || v.hollow.state !== 'available' || v.hollow.adoptions.length || v.hollow.scope.formatFamily !== 'A')
+    return false
+  const { hollow, ...previous } = v
+  return isPayrollAStatementSourceSnapshotV2({ ...previous, schemaVersion: 2 }) && feeObject(v.subject)
+    && hollow.scope.projectId === v.subject.projectId && hollow.scope.crewId === v.subject.crewId && hollow.scope.leaderWorkerId === v.subject.leaderWorkerId && same(hollow.scope.book, v.book)
 }
 export function isPayrollAFeesFrozenDocument(v: unknown): v is PayrollAFeesFrozenDocument {
   if (!feeObject(v) || !isPayrollABook(v.book) || !isPayrollAFeesSourceSnapshot(v.fees, v.book) || !feeNumber(v.listAmount) || !feeArray(v.previousBookPayments, p => feeObject(p) && keys(p, ['statementId', 'month', 'amount', 'book']) && feeId(p.statementId) && feeMonth(p.month) && feeNumber(p.amount) && isPayrollABook(p.book) && same(p.book, v.book)))
     return false
   const fees = v.fees
-  return Object.values(fees.totals).every(t => t.state === 'known') && fees.totals.listAmount.value === v.listAmount && ['workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount'].every(k => fees.totals[k as keyof typeof fees.totals].value === v[k])
+  const hollow = v.hollow === undefined ? null : isPayrollHollowSnapshot(v.hollow) ? v.hollow : false
+  if (hollow === false)
+    return false
+  return Object.values(fees.totals).every(t => t.state === 'known') && fees.totals.listAmount.value === v.listAmount && ['workAmount', 'cumulativeAmount', 'previouslyPaid'].every(k => fees.totals[k as keyof typeof fees.totals].value === v[k])
+    && fees.totals.grossAmount.value === (hollow ? hollow.totals.claimSubtotal.value : v.grossAmount)
 }

@@ -1,6 +1,8 @@
+import type { QuantityHollowMigrationGraph } from './hollow-migration-contract'
 import { isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
 import { quantityProblem } from './central-contract'
 import { validateQuantityPhoto } from './central-photo'
+import { parseQuantityHollowMigrationGraph } from './hollow-migration-graph'
 
 export type QuantityMigrationValue = string | number | null
 export type QuantityMigrationRow = Record<string, QuantityMigrationValue>
@@ -50,13 +52,13 @@ export interface QuantityMigrationBoqReference {
   contractId: string
   deletedAt: string | null
 }
-export interface QuantityMigrationGraph {
-  version: 1
+interface QuantityMigrationGraphBase {
   projectId: string
   archivedAt: string | null
   boqReferences: QuantityMigrationBoqReference[]
   tables: Record<QuantityMigrationTable, QuantityMigrationRow[]>
 }
+export type QuantityMigrationGraph = QuantityMigrationGraphBase & ({ version: 1 } | { version: 2, hollow: QuantityHollowMigrationGraph })
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -90,10 +92,10 @@ export function quantityMigrationTimestamp(value: unknown, label: string): strin
 
 /** 结构和物理祖先验证同时覆盖软删行；当前不可见不等于可丢弃。 */
 export function parseQuantityMigrationGraph(value: unknown, projectId?: string): QuantityMigrationGraph {
-  if (!object(value) || value.version !== 1 || !identifier(value.projectId) || (projectId && value.projectId !== projectId)
+  if (!object(value) || ![1, 2].includes(Number(value.version)) || (value.version !== 1 && value.version !== 2) || !identifier(value.projectId) || (projectId && value.projectId !== projectId)
     || !(value.archivedAt === null || isISODateTimeDTO(value.archivedAt)) || !object(value.tables)
     || !Array.isArray(value.boqReferences)
-    || Object.keys(value).some(key => !['version', 'projectId', 'archivedAt', 'tables', 'boqReferences'].includes(key))
+    || Object.keys(value).some(key => !['version', 'projectId', 'archivedAt', 'tables', 'boqReferences', ...(value.version === 2 ? ['hollow'] : [])].includes(key))
     || Object.keys(value.tables).some(key => !QUANTITY_MIGRATION_TABLES.includes(key as QuantityMigrationTable))) {
     invalid('项目、版本或表结构无效')
   }
@@ -138,7 +140,8 @@ export function parseQuantityMigrationGraph(value: unknown, projectId?: string):
       return { ...row }
     })
   }
-  const graph: QuantityMigrationGraph = { version: 1, projectId: value.projectId, archivedAt: value.archivedAt as string | null, boqReferences, tables }
+  const base = { projectId: value.projectId, archivedAt: value.archivedAt as string | null, boqReferences, tables }
+  const graph: QuantityMigrationGraph = value.version === 1 ? { version: 1, ...base } : { version: 2, ...base, hollow: parseQuantityHollowMigrationGraph(value.hollow) }
   validateQuantityMigrationRelations(graph)
   return graph
 }

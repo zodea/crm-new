@@ -368,7 +368,7 @@ export interface PayrollAStatementSourceSnapshotV2 extends Omit<PayrollAStatemen
   book: PayrollABookRef
   fees: PayrollAFeesSourceSnapshot
 }
-export type PayrollAStatementSourceVersioned = PayrollAStatementSourceSnapshot | PayrollAStatementSourceSnapshotV2
+export type PayrollAStatementSourceVersioned = PayrollAStatementSourceSnapshot | PayrollAStatementSourceSnapshotV2 | import('./central-a-hollow-contract').PayrollAStatementSourceSnapshotV3
 
 /** 明确受控投影，旧 frozen document 不反向注入缺省 book/fees。 */
 export interface PayrollAFeesFrozenDocument extends PayrollAFrozenDocument {

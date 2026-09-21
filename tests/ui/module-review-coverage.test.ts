@@ -47,6 +47,20 @@ describe('module review coverage', () => {
     expect(stageCases.every(item => item.adapter === 'central-http' && item.acceptance.frontend !== 'passed' && item.acceptance.production !== 'passed')).toBe(true)
   })
 
+  it('registers the three hollow source routes with central reads and an unsupported desktop boundary', () => {
+    const coverage = buildModuleReviewCoverage()
+    const routes = ['new', 'form/:id', ':id'].map(suffix => `/subcontract/quantity/:pid/:uid/hollow/${suffix}`)
+    const pages = coverage.surfaces.filter(surface => routes.includes(surface.route) && surface.path === 'page')
+    expect(pages).toHaveLength(3)
+    for (const page of pages) {
+      const cases = coverage.cases.filter(item => item.surfaceId === page.id)
+      expect(cases.find(item => item.host === 'browser')?.adapter).toBe('central-http')
+      expect(cases.find(item => item.host === 'tauri')?.adapter).toBe('unsupported')
+      expect(cases.find(item => item.host === 'browser')?.acceptance.production).toBe('not-verified')
+      expect(cases.find(item => item.host === 'tauri')?.acceptance.production).toBe('out-of-scope')
+    }
+  })
+
   it('covers every production route without treating route evidence as subview acceptance', () => {
     const coverage = buildModuleReviewCoverage()
     expect(new Set(coverage.surfaces.map(surface => surface.route))).toEqual(

@@ -3,6 +3,7 @@ import type { QuantityAssignmentBatchDraft, QuantityAssignmentWriteResult } from
 import type { QuantityBatchCompletionResult } from './batch-completion'
 import type { QuantityArchiveAction } from './central-archive'
 import type { QuantityCompletionAction } from './central-completion-action'
+import type { QuantityHollowAction, QuantityHollowWriteReceipt } from './central-hollow-contract'
 import type { QuantityStageAction } from './central-stages'
 import type { QuantityCompletionWriteResult } from './completion'
 import type { QuantityImportAction } from './import-contract'
@@ -59,7 +60,7 @@ export interface QuantityCommand {
   baseVersion: string
   origin: DataOriginDTO
   projectId: string
-  action: QuantityRegionAction | QuantityTemplateAction | QuantityAssignmentAction | QuantityCompletionAction | QuantityStageAction | QuantityArchiveAction | QuantityImportAction
+  action: QuantityRegionAction | QuantityTemplateAction | QuantityAssignmentAction | QuantityCompletionAction | QuantityStageAction | QuantityArchiveAction | QuantityImportAction | QuantityHollowAction
 }
 
 export interface QuantityCommandResult {
@@ -70,6 +71,7 @@ export interface QuantityCommandResult {
   assignments?: QuantityAssignmentWriteResult
   completion?: QuantityCompletionWriteResult
   batch?: QuantityBatchCompletionResult
+  hollow?: QuantityHollowWriteReceipt
 }
 
 export class QuantityRepositoryProblem extends Error {

@@ -7,6 +7,7 @@ import type { PayrollWritableContext } from '../../app/lib/payroll/central-contr
 import type { NavigationIntentDTO } from '../../app/types/read-model'
 import type { PayrollMigratedProof } from './payroll-migrated-proof'
 import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
+import { payrollHollowFrozenRead } from '../../app/lib/payroll/central-hollow-deduction-read'
 
 const known = (value: number) => ({ value, knownValue: value, state: 'known' as const, reasons: [] })
 const eligibility = () => ({ canSaveDraft: false, canCheck: false, canRelease: false, canOutput: true, reasons: ['已发工资只能阅读当时冻结事实'] })
@@ -33,9 +34,13 @@ export function payrollMigratedAForm(proof: PayrollMigratedProof, base: PayrollW
   if (!document || original?.basis.formatFamily !== 'A')
     return null
   const form: PayrollAFormRead = { ...frame(base, original.original, document.crewName, document.note), draft: { ...original.basis.source.subject, month: document.month, periodKind: document.periodKind, payRatio: document.payRatio, note: document.note }, facts: original.basis.source.facts, lines: document.lines, prices: original.basis.source.priceRevisions, ratioDefault: { value: null, source: 'missing', statementId: null, configId: null, sourceVersion: null }, totals: { workAmount: known(document.workAmount), cumulativeAmount: known(document.cumulativeAmount), previouslyPaid: known(document.previouslyPaid), grossAmount: known(document.grossAmount) }, paymentSourceVersion: original.original.provenanceVersion, ...(document.adjustmentReconciliation ? { adjustmentReconciliation: document.adjustmentReconciliation } : {}) }
+  if (document.hollow)
+    form.hollow = payrollHollowFrozenRead(form.context, statementId, document.hollow)
   if (!hasPayrollAFeesDocument(document))
     return form
   const feesForm: PayrollAFeesFormRead = { ...form, draft: { ...form.draft, book: document.book }, book: document.book, bookProof: { state: 'proven', book: document.book, sourceVersion: original.original.provenanceVersion }, bookEligibility: { canSave: false, canCheck: false, canRelease: false, reasons: ['已发工资保留原簿和冻结费用'] }, managementBooks: [], negativeLineDrafts: [], negativeLineRevisions: [...proof.negativeLineRevisions.values()].filter(row => row.statementId === statementId), previousBookPayments: document.previousBookPayments.map(payment => ({ statementId: payment.statementId, month: payment.month, book: payment.book, actualRefs: [{ kind: 'released-statement', statementId: payment.statementId }], amount: known(payment.amount), sourceVersion: original.original.provenanceVersion })), fees: document.fees, totals: document.fees.totals, blockers: [] }
+  if (document.hollow)
+    feesForm.totals = { ...feesForm.totals, grossAmount: known(document.grossAmount) }
   return feesForm
 }
 export function payrollMigratedC1Form(proof: PayrollMigratedProof, base: PayrollWritableContext, statementId: string): PayrollC1FormRead | null {
@@ -44,7 +49,8 @@ export function payrollMigratedC1Form(proof: PayrollMigratedProof, base: Payroll
   if (!document || !original)
     return null
   const sources: NavigationIntentDTO[] = document.attendance.map(fact => ({ kind: 'source-record', subject: { state: 'resolved', entity: 'attendance', id: fact.id, label: `${fact.workDate} 考勤`, no: null }, variant: 'matrix', view: null, filters: { projectId: fact.projectId, dataOrigin: base.origin, month: document.month, crewId: fact.crewId, workerId: fact.workerId, workDate: fact.workDate, recordId: fact.id } }))
-  return { ...frame(base, original.original, document.crewName, document.note), facts: document.attendance, sources, rates: document.rates, lines: document.lines, totals: { grossAmount: known(document.grossAmount) } }
+  const frameValue = frame(base, original.original, document.crewName, document.note)
+  return { ...frameValue, ...(document.hollow ? { hollow: payrollHollowFrozenRead(frameValue.context, statementId, document.hollow) } : {}), facts: document.attendance, sources, rates: document.rates, lines: document.lines, totals: { grossAmount: known(document.grossAmount) } }
 }
 export function payrollMigratedC2Form(proof: PayrollMigratedProof, base: PayrollWritableContext, statementId: string): PayrollC2FormRead | null {
   const document = proof.c2Documents.get(statementId)
@@ -52,5 +58,6 @@ export function payrollMigratedC2Form(proof: PayrollMigratedProof, base: Payroll
   if (!document || !original)
     return null
   const sources: NavigationIntentDTO[] = document.daywork.map(fact => ({ kind: 'source-record', subject: { state: 'resolved', entity: 'daywork', id: fact.id, label: `${fact.workDate} 签工`, no: null }, variant: 'ledger', view: null, filters: { dataOrigin: base.origin, projectId: fact.projectId, month: document.month, crewId: fact.crewId, workerId: fact.workerId, workDate: fact.workDate } }))
-  return { ...frame(base, original.original, document.crewName, document.note), facts: document.daywork.map((fact, index) => ({ ...fact, workerName: document.members.find(member => member.workerId === fact.workerId)?.workerName ?? null, crewName: document.crewName, source: sources[index]!, occupations: [], locks: [], diagnostics: [], eligibility: { canEdit: false, canConfirm: false, reasons: ['已发签工不可修改；后续更正需引用原发放'] }, availability: 'occupied' })), adoptedRecordIds: document.daywork.map(fact => fact.id), qualificationVersion: original.original.provenanceVersion, config: document.config, storedSource: null, sources, lines: document.lines, totals: { grossAmount: known(document.grossAmount) }, diagnostics: [], evidence: [] }
+  const frameValue = frame(base, original.original, document.crewName, document.note)
+  return { ...frameValue, ...(document.hollow ? { hollow: payrollHollowFrozenRead(frameValue.context, statementId, document.hollow) } : {}), facts: document.daywork.map((fact, index) => ({ ...fact, workerName: document.members.find(member => member.workerId === fact.workerId)?.workerName ?? null, crewName: document.crewName, source: sources[index]!, occupations: [], locks: [], diagnostics: [], eligibility: { canEdit: false, canConfirm: false, reasons: ['已发签工不可修改；后续更正需引用原发放'] }, availability: 'occupied' })), adoptedRecordIds: document.daywork.map(fact => fact.id), qualificationVersion: original.original.provenanceVersion, config: document.config, storedSource: null, sources, lines: document.lines, totals: { grossAmount: known(document.grossAmount) }, diagnostics: [], evidence: [] }
 }

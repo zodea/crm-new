@@ -99,10 +99,10 @@
     ]
   },
   "counts": {
-    "productionRoutes": 152,
-    "rootVariants": 208,
-    "surfaces": 754,
-    "environmentCases": 1221,
+    "productionRoutes": 155,
+    "rootVariants": 211,
+    "surfaces": 757,
+    "environmentCases": 1227,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -1504,7 +1504,7 @@
       "issues": [
         412
       ],
-      "surfaces": 211
+      "surfaces": 214
     },
     {
       "code": "schedule-target-cost",
@@ -23570,6 +23570,93 @@
         412
       ],
       "routeEvidenceId": "E-E86E0A7B7A61"
+    },
+    {
+      "id": "S-22CD12260836",
+      "route": "/subcontract/quantity/:pid/:uid/hollow/new",
+      "routePattern": "/subcontract/quantity/:pid/:uid/hollow/new",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.quantity.hollow",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "page",
+      "label": "整页表单",
+      "type": "page",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/new.vue",
+          "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-75A863A55891"
+    },
+    {
+      "id": "S-8E5E0B6D49AE",
+      "route": "/subcontract/quantity/:pid/:uid/hollow/form/:id",
+      "routePattern": "/subcontract/quantity/:pid/:uid/hollow/form/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.quantity.hollow",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "page",
+      "label": "整页表单",
+      "type": "page",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/form/[id].vue",
+          "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-6F8382C77961"
+    },
+    {
+      "id": "S-B7551B223630",
+      "route": "/subcontract/quantity/:pid/:uid/hollow/:id",
+      "routePattern": "/subcontract/quantity/:pid/:uid/hollow/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.quantity.hollow",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "page",
+      "label": "详情",
+      "type": "page",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/[id].vue",
+          "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-326974A20A57"
     },
     {
       "id": "S-75F8FF542466",
@@ -54726,6 +54813,150 @@
       "reference": {
         "status": "not-observed",
         "routeEvidenceId": "E-E86E0A7B7A61",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-D6CAD39409A2",
+      "surfaceId": "S-22CD12260836",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-75A863A55891",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-B7C58971F628",
+      "surfaceId": "S-22CD12260836",
+      "host": "tauri",
+      "adapter": "unsupported",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-75A863A55891",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-1785D3BD0ACB",
+      "surfaceId": "S-8E5E0B6D49AE",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-6F8382C77961",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-5A0426F1DB83",
+      "surfaceId": "S-8E5E0B6D49AE",
+      "host": "tauri",
+      "adapter": "unsupported",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-6F8382C77961",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-646DC1829859",
+      "surfaceId": "S-B7551B223630",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-326974A20A57",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-360E9A18A66F",
+      "surfaceId": "S-B7551B223630",
+      "host": "tauri",
+      "adapter": "unsupported",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-326974A20A57",
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {

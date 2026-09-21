@@ -5,8 +5,15 @@ import { generateId } from '../util/id'
 import { payrollACanonical, payrollAEffectivePrices } from './central-a-calculation'
 import { payrollProblem } from './central-contract'
 
-export async function loadPayrollAPrices(db: TransactionDb, projectId: string): Promise<PayrollAPriceRevision[]> {
-  return (await db.select<Record<string, unknown>>('SELECT * FROM payroll_a_price_revisions WHERE project_id = ? ORDER BY revision, id', [projectId])).map(row => ({ id: String(row.id), priceId: String(row.price_id), projectId: String(row.project_id), crewId: row.crew_id == null ? null : String(row.crew_id), leaderWorkerId: String(row.leader_worker_id), itemId: String(row.item_id), itemName: null, unit: row.unit == null ? null : String(row.unit), mode: row.mode as PayrollAPriceRevision['mode'], workerId: row.worker_id == null ? null : String(row.worker_id), workerName: null, effectiveMonth: String(row.effective_month), unitPrice: row.unit_price == null ? null : Number(row.unit_price), scope: JSON.parse(String(row.scope_json)) as PayrollAPriceRevision['scope'], revision: Number(row.revision), operatorId: String(row.operator_id), createdAt: String(row.created_at), editable: true, readonlyReasons: [] }))
+export type PayrollAPriceProjectionLoader = (db: TransactionDb, projectId: string) => Promise<ReadonlyMap<string, PayrollAPriceRevision>>
+
+export async function loadPayrollAPrices(db: TransactionDb, projectId: string, projection?: PayrollAPriceProjectionLoader): Promise<PayrollAPriceRevision[]> {
+  // 先核迁入物理原件，再读取 SQL；原 scope_json 只通过显式已证 DTO 映射消费。
+  const mapped = await projection?.(db, projectId)
+  return (await db.select<Record<string, unknown>>('SELECT * FROM payroll_a_price_revisions WHERE project_id = ? ORDER BY revision, id', [projectId])).map((row) => {
+    const projected = mapped?.get(String(row.id))
+    return projected ?? { id: String(row.id), priceId: String(row.price_id), projectId: String(row.project_id), crewId: row.crew_id == null ? null : String(row.crew_id), leaderWorkerId: String(row.leader_worker_id), itemId: String(row.item_id), itemName: null, unit: row.unit == null ? null : String(row.unit), mode: row.mode as PayrollAPriceRevision['mode'], workerId: row.worker_id == null ? null : String(row.worker_id), workerName: null, effectiveMonth: String(row.effective_month), unitPrice: row.unit_price == null ? null : Number(row.unit_price), scope: JSON.parse(String(row.scope_json)) as PayrollAPriceRevision['scope'], revision: Number(row.revision), operatorId: String(row.operator_id), createdAt: String(row.created_at), editable: true, readonlyReasons: [] }
+  })
 }
 export async function loadPayrollASubjectConfig(db: TransactionDb, projectId: string, leaderWorkerId: string): Promise<PayrollASubjectConfig | null> {
   // A 配置与现配置同一项目/班组/负责人祖先契约；中央专表不注册到 Native 物理迁移表集。
@@ -21,10 +28,10 @@ export function assertPayrollARatio(value: unknown): asserts value is number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)
     throw payrollProblem('validation-failed', '发放比例必须明确填写且在 0% 至 100% 之间', { payRatio: ['请填写有效发放比例'] })
 }
-export async function savePayrollAPrices(db: TransactionDb, scope: PayrollAConfigScope, drafts: PayrollAPriceDraft[], actor: string): Promise<string[]> {
+export async function savePayrollAPrices(db: TransactionDb, scope: PayrollAConfigScope, drafts: PayrollAPriceDraft[], actor: string, projection?: PayrollAPriceProjectionLoader): Promise<string[]> {
   if (!scope.leaderWorkerId || !drafts.length)
     throw payrollProblem('validation-failed', '请先选择请款主体及需要保存的工资配置')
-  const previous = await loadPayrollAPrices(db, scope.projectId)
+  const previous = await loadPayrollAPrices(db, scope.projectId, projection)
   const ids: string[] = []
   const seen = new Set<string>()
   for (const [index, draft] of drafts.entries()) {
@@ -56,7 +63,7 @@ export async function savePayrollAPrices(db: TransactionDb, scope: PayrollAConfi
     await logOperation(db, { table: 'payroll_a_price_revisions', recordId: id, action: 'create', after: row, operator: actor })
     ids.push(id)
   }
-  const next = await loadPayrollAPrices(db, scope.projectId)
+  const next = await loadPayrollAPrices(db, scope.projectId, projection)
   for (const month of new Set(next.map(price => price.effectiveMonth).filter(month => month >= scope.month))) {
     const effective = payrollAEffectivePrices(next, month).filter(price => price.crewId === scope.crewId && price.leaderWorkerId === scope.leaderWorkerId)
     for (const [index, left] of effective.entries()) {

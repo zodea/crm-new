@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 157,
+    "trackedPageFiles": 160,
     "devPageFiles": 5,
-    "appPageFiles": 152,
+    "appPageFiles": 155,
     "appNavLeaves": 51,
     "covered": 135,
-    "designPending": 17,
+    "designPending": 20,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -826,6 +826,27 @@
       "appRoute": "/subcontract/quantity/:pid/:uid",
       "designRoute": "quantityUnit",
       "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/quantity/:pid/:uid/hollow/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "户级空鼓检查新增、修订及整改详情无独立 DC 设计屏；按 #412、工程量和工资页面及通用整页原语独立验收，不继承原户详情覆盖结论。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/quantity/:pid/:uid/hollow/form/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "户级空鼓检查新增、修订及整改详情无独立 DC 设计屏；按 #412、工程量和工资页面及通用整页原语独立验收，不继承原户详情覆盖结论。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/quantity/:pid/:uid/hollow/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "户级空鼓检查新增、修订及整改详情无独立 DC 设计屏；按 #412、工程量和工资页面及通用整页原语独立验收，不继承原户详情覆盖结论。",
+      "issue": "#412"
     },
     {
       "appRoute": "/subcontract/quantity/region",

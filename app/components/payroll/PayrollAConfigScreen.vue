@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import type { PayrollAPriceRevision } from '~/lib/payroll/central-a-contract'
+import { computed, shallowRef } from 'vue'
 import { usePayrollAConfig } from '~/composables/usePayrollAConfig'
 import { payrollInputNumber } from '~/lib/payroll/a-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
+import PayrollHollowConfigSection from './PayrollHollowConfigSection.vue'
 
-const ui = usePayrollAConfig()
+const hollowSection = shallowRef<{ mayLeave: () => Promise<boolean> } | null>(null)
+const hollowLocked = shallowRef(false)
+const ui = usePayrollAConfig(() => hollowSection.value?.mayLeave() ?? true)
 const { scope, projects, matching, subject, prices, subjectRead, priceRead, busy, loading, error, pending, editable, subjectDirty, priceDirty } = ui
+const hollowConfig = computed(() => scope.value.leaderWorkerId && ui.fees.book.value ? { scope: { formatFamily: 'A' as const, projectId: scope.value.projectId, crewId: scope.value.crewId, leaderWorkerId: scope.value.leaderWorkerId, book: ui.fees.book.value }, month: scope.value.month } : null)
 function add() {
   if (editable.value)
     prices.value.push({ priceId: null, itemId: '', unit: null, mode: 'baseline', workerId: null, effectiveMonth: scope.value.month, unitPrice: null, scope: { kind: 'project' } })
@@ -18,14 +23,14 @@ useTabTitle('A 工资配置')
 </script>
 
 <template>
-  <EntityFormShell title="A 工资配置" subtitle="项目主体的比例、工资单价与费用分别保存；管理费使用独立请款簿。" back-label="返回原工资" :sections="[{ key: 'scope', label: '配置范围' }, { key: 'subject', label: '首月比例' }, { key: 'prices', label: '工资单价' }, { key: 'fees', label: '补贴与费用' }, { key: 'management', label: '管理关系' }]" @back="ui.leave">
+  <EntityFormShell title="A 工资配置" subtitle="项目主体的比例、工资单价与费用分别保存；管理费使用独立请款簿。" back-label="返回原工资" :sections="[{ key: 'scope', label: '配置范围' }, { key: 'subject', label: '首月比例' }, { key: 'prices', label: '工资单价' }, { key: 'fees', label: '补贴与费用' }, { key: 'management', label: '管理关系' }, { key: 'hollow-config', label: '空鼓扣款' }]" @back="ui.leave">
     <PayrollACommandState :pending="!!pending" :busy="busy" :error="error" @recover="ui.recover" @refresh="ui.load" />
     <section id="section-scope" class="panel my-4 min-w-0 scroll-mt-4 p-4" aria-label="工资配置范围">
       <SectionHeader title="配置范围" /><div class="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label class="grid min-w-0 gap-1 text-12px">项目<select :value="scope.projectId" class="field-input min-w-0 w-full" aria-label="配置项目" :disabled="busy || !!pending || !!ui.fees.pending.value" @change="ui.changeScope({ projectId: ($event.target as HTMLSelectElement).value, crewId: null, leaderWorkerId: null })"><option value="">请选择项目</option><option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name || '项目名称未记录' }}</option></select></label>
-        <label class="grid min-w-0 gap-1 text-12px">核对月份<input :value="scope.month" type="month" class="field-input min-w-0 w-full" aria-label="配置核对月份" :disabled="busy || !!pending || !!ui.fees.pending.value" @input="ui.changeScope({ month: ($event.target as HTMLInputElement).value })"></label>
-        <label class="grid min-w-0 gap-1 text-12px">班组<select :value="scope.crewId || ''" class="field-input min-w-0 w-full" aria-label="配置班组" :disabled="busy || !!pending || !!ui.fees.pending.value" @change="ui.changeScope({ crewId: ($event.target as HTMLSelectElement).value || null, leaderWorkerId: null })"><option value="">未关联班组</option><option v-for="crew in matching?.options.crews || []" :key="crew.id" :value="crew.id" :disabled="!crew.eligible">{{ crew.name || '班组名称未记录' }}</option></select></label>
-        <label class="grid min-w-0 gap-1 text-12px">负责人<select :value="scope.leaderWorkerId || ''" class="field-input min-w-0 w-full" aria-label="配置负责人" :disabled="busy || !!pending || !!ui.fees.pending.value" @change="ui.changeScope({ leaderWorkerId: ($event.target as HTMLSelectElement).value || null })"><option value="">请选择负责人</option><option v-for="worker in matching?.options.workers || []" :key="worker.id" :value="worker.id" :disabled="!worker.eligible">{{ worker.name || '姓名未记录' }}</option></select></label>
+        <label class="grid min-w-0 gap-1 text-12px">项目<select :value="scope.projectId" class="field-input min-w-0 w-full" aria-label="配置项目" :disabled="busy || !!pending || !!ui.fees.pending.value || hollowLocked" @change="ui.changeScope({ projectId: ($event.target as HTMLSelectElement).value, crewId: null, leaderWorkerId: null })"><option value="">请选择项目</option><option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name || '项目名称未记录' }}</option></select></label>
+        <label class="grid min-w-0 gap-1 text-12px">核对月份<input :value="scope.month" type="month" class="field-input min-w-0 w-full" aria-label="配置核对月份" :disabled="busy || !!pending || !!ui.fees.pending.value || hollowLocked" @input="ui.changeScope({ month: ($event.target as HTMLInputElement).value })"></label>
+        <label class="grid min-w-0 gap-1 text-12px">班组<select :value="scope.crewId || ''" class="field-input min-w-0 w-full" aria-label="配置班组" :disabled="busy || !!pending || !!ui.fees.pending.value || hollowLocked" @change="ui.changeScope({ crewId: ($event.target as HTMLSelectElement).value || null, leaderWorkerId: null })"><option value="">未关联班组</option><option v-for="crew in matching?.options.crews || []" :key="crew.id" :value="crew.id" :disabled="!crew.eligible || hollowLocked">{{ crew.name || '班组名称未记录' }}</option></select></label>
+        <label class="grid min-w-0 gap-1 text-12px">负责人<select :value="scope.leaderWorkerId || ''" class="field-input min-w-0 w-full" aria-label="配置负责人" :disabled="busy || !!pending || !!ui.fees.pending.value || hollowLocked" @change="ui.changeScope({ leaderWorkerId: ($event.target as HTMLSelectElement).value || null })"><option value="">请选择负责人</option><option v-for="worker in matching?.options.workers || []" :key="worker.id" :value="worker.id" :disabled="!worker.eligible || hollowLocked">{{ worker.name || '姓名未记录' }}</option></select></label>
       </div>
     </section>
     <p v-if="loading" role="status" class="text-12px">
@@ -39,16 +44,16 @@ useTabTitle('A 工资配置')
       </p>
       <section v-if="ui.fees.book.value?.bookPurpose !== 'management'" id="section-subject" class="panel mb-4 grid min-w-0 grid-cols-1 scroll-mt-4 gap-3 p-4" aria-label="负责人首月比例">
         <SectionHeader title="负责人首月比例" subtitle="月度沿用上月有效月度单据保存的比例；无上月单据时使用明确首月配置，不追改已发记录。" />
-        <label class="grid max-w-sm gap-1 text-12px">首月支付比例（%）<input :value="subject.initialPayRatio === null ? '' : subject.initialPayRatio * 100" type="number" min="0" max="100" step="0.01" class="field-input min-w-0" aria-label="首月支付比例" :disabled="!editable || !scope.leaderWorkerId" @input="subject.initialPayRatio = payrollInputNumber(($event.target as HTMLInputElement).value) === null ? null : Number(($event.target as HTMLInputElement).value) / 100"></label>
+        <label class="grid max-w-sm gap-1 text-12px">首月支付比例（%）<input :value="subject.initialPayRatio === null ? '' : subject.initialPayRatio * 100" type="number" min="0" max="100" step="0.01" class="field-input min-w-0" aria-label="首月支付比例" :disabled="!editable || !scope.leaderWorkerId || hollowLocked" @input="subject.initialPayRatio = payrollInputNumber(($event.target as HTMLInputElement).value) === null ? null : Number(($event.target as HTMLInputElement).value) / 100"></label>
         <p v-if="matching.crewRatio?.explicitlyConfigured" class="text-12px text-ink-soft">
           班组明确比例：{{ matching.crewRatio.value === null ? '尚未填写' : `${matching.crewRatio.value * 100}%` }}，不会代替当前未保存输入。
         </p>
         <div v-if="subjectRead && subjectRead.context.sourceVersion !== matching.context.sourceVersion && subjectDirty" class="text-12px text-warn">
-          <p>其他配置已变化，本区保留原依据；保存时将重新验证。</p><KitButton type="button" variant="secondary" :disabled="!editable" @click="ui.recheck('subject')">
+          <p>其他配置已变化，本区保留原依据；保存时将重新验证。</p><KitButton type="button" variant="secondary" :disabled="!editable || hollowLocked" @click="ui.recheck('subject')">
             按当前首月比例稿重新核对
           </KitButton>
         </div>
-        <KitButton class="justify-self-start" type="button" :disabled="!editable || !subjectDirty || !scope.leaderWorkerId" @click="ui.save('subject')">
+        <KitButton class="justify-self-start" type="button" :disabled="!editable || !subjectDirty || !scope.leaderWorkerId || hollowLocked" @click="ui.save('subject')">
           保存首月比例
         </KitButton>
       </section>
@@ -60,30 +65,31 @@ useTabTitle('A 工资配置')
           </template><template #price="{ row }">
             {{ payrollAmount(row.unitPrice) }}
           </template><template #action="{ row }">
-            <KitButton v-if="row.editable" size="sm" type="button" :disabled="!editable" @click="edit(row)">
+            <KitButton v-if="row.editable" size="sm" type="button" :disabled="!editable || hollowLocked" @click="edit(row)">
               修订单价
             </KitButton><span v-else class="text-11px text-ink-faint">{{ row.readonlyReasons.join('；') || '历史版本只读' }}</span>
           </template>
         </KitTable>
-        <PayrollAPriceEditor v-for="(price, index) in prices" :key="price.priceId || `new-${index}`" :draft="price" :read="priceRead || matching" :disabled="!editable" @patch="patch => prices[index] = { ...price, ...patch }" @remove="prices = prices.filter((_, itemIndex) => itemIndex !== index)" />
+        <PayrollAPriceEditor v-for="(price, index) in prices" :key="price.priceId || `new-${index}`" :draft="price" :read="priceRead || matching" :disabled="!editable || hollowLocked" @patch="patch => prices[index] = { ...price, ...patch }" @remove="prices = prices.filter((_, itemIndex) => itemIndex !== index)" />
         <div v-if="priceRead && priceRead.context.sourceVersion !== matching.context.sourceVersion && priceDirty" class="text-12px text-warn">
-          <p>首月配置已变化，本区保留原单价稿与依据；请重新核对后保存。</p><KitButton type="button" variant="secondary" :disabled="!editable" @click="ui.recheck('prices')">
+          <p>首月配置已变化，本区保留原单价稿与依据；请重新核对后保存。</p><KitButton type="button" variant="secondary" :disabled="!editable || hollowLocked" @click="ui.recheck('prices')">
             按当前单价稿重新核对
           </KitButton>
         </div>
         <div class="flex flex-wrap gap-2">
-          <KitButton type="button" variant="secondary" :disabled="!editable || !scope.leaderWorkerId" @click="add">
+          <KitButton type="button" variant="secondary" :disabled="!editable || !scope.leaderWorkerId || hollowLocked" @click="add">
             新增工资单价
-          </KitButton><KitButton type="button" :disabled="!editable || !priceDirty || !scope.leaderWorkerId" @click="ui.save('prices')">
+          </KitButton><KitButton type="button" :disabled="!editable || !priceDirty || !scope.leaderWorkerId || hollowLocked" @click="ui.save('prices')">
             保存工资单价
           </KitButton>
         </div>
       </section>
       <PayrollReadHistory class="mt-4" :history="matching.history" />
     </template>
-    <PayrollAFeesConfigSection class="mt-4" :ui="ui.fees" :blocked="subjectDirty || priceDirty || !!pending" @book="ui.chooseBook" />
+    <PayrollAFeesConfigSection class="mt-4" :ui="ui.fees" :blocked="subjectDirty || priceDirty || !!pending || hollowLocked" @book="ui.chooseBook" />
+    <PayrollHollowConfigSection v-if="matching && hollowConfig" ref="hollowSection" :config="hollowConfig" :origin="matching.context.origin" :blocked="busy || !!pending" @locked="hollowLocked = $event" />
     <template #footer>
-      <KitButton variant="secondary" :disabled="busy || !!pending || !!ui.fees.pending.value" @click="ui.leave">
+      <KitButton variant="secondary" :disabled="busy || !!pending || !!ui.fees.pending.value || hollowLocked" @click="ui.leave">
         返回原工资
       </KitButton>
     </template>

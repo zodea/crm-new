@@ -657,6 +657,33 @@ P4 新 V2 更正追加同簿费用依据，保留原费项、组件及负价行�
 
 命令与读取见 [COMMANDS](./COMMANDS.md#a-工资费用与独立管理簿命令412p5)、[READ-MODELS](./READ-MODELS.md#a-工资费用与独立管理簿读取412p5)；操作及实际验收进度见[费用指南](../guides/payroll-fees.md)。P6 扣款、P7 整册和 #416 生产保存继续单独验收。
 
+### 户级空鼓、整改与工资采用（#412，P6）
+
+P6 在既有工程量和工资中央事务中增加以下追加事实。五张来源表与三张工资表均不保存可编辑余额，也不使用 `deleted_at` 隐藏已处理的来源。当前实施与验收进度独立见 [P6 实施票](../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)，不代表 #416 生产部署完成。
+
+| 表 | 事实与字段 |
+| --- | --- |
+| `quantity_hollow_records` | 原检查稳定头：`id, project_id, unit_id, assignment_id, room_id, item_id, ownership_key`；检查时 `original_party_json, location_json, responsibility_proof_json, responsibility_fingerprint`；`created_at, created_by, command_receipt_id`。原责任和房间分项范围必须在创建时可证，不能借当前姓名重建。 |
+| `quantity_hollow_revisions` | 检查修订：`id, record_id, previous_revision_id, inspected_on, count, note, reason, created_at, created_by, command_receipt_id`。首条与后继各自唯一；数量为非负安全整数，修订有原因。 |
+| `quantity_hollow_rectifications` | 独立整改事件：`id, record_id, revision_id, rectified_on, count, note, created_at, created_by, command_receipt_id`。处数为正安全整数，不能超过当前未整改余量。 |
+| `quantity_hollow_logs` | 连续历史：`id, project_id, record_id, previous_log_id, kind, revision_id, rectification_id, payload_json, payload_fingerprint, created_at, actor_id, command_receipt_id`；首条与后继各自唯一，与具体动作及原回执互证。 |
+| `quantity_hollow_command_receipts` | 来源回执：`id, workspace_id, actor_id, command_id, project_id, unit_id, record_id, kind, request_json, request_fingerprint, result_json, result_fingerprint, created_at`；`workspace_id + actor_id + command_id` 唯一。 |
+| `payroll_hollow_policy_revisions` | 逐分项配置：`id, policy_id, project_id, crew_id, leader_worker_id, format_family, book_purpose, management_book_id, item_id, previous_revision_id, effective_month, enabled, unit_amount, command_id, revision_json, created_by, created_at`。同系列首条与后继唯一；A 区分普通/管理簿，C1/C2 无用途簿。开启、关闭、未填金额及明确 0 保留原含义。 |
+| `payroll_hollow_starts` | 具体工资上的人工开始：`id, project_id, statement_id, previous_start_id, command_id, start_json, created_by, created_at`。原单唯一首条，后继唯一；正文冻结当前原检查证明、余量、配置及合计。 |
+| `payroll_hollow_adoptions` | 实际发放采用：`id, project_id, statement_id, start_id, record_id, command_id, adoption_json, created_by, created_at`。`record_id` 唯一，绑定完整原检查采用行；当前不提供按金额猜测部分采用的入口。 |
+
+工资配置、开始、采用复用 `payroll_command_receipts` 与 `operation_logs`，与工资写入处于同一事务。`revision_json / start_json / adoption_json` 逐字段对应各自物理列和完整命令产生集合；缺同次命令的其他行、缺开始对工资的需重核日志、缺发放冻结日志或无回执的额外采用，均不能判为完整原件。
+
+当前未整改为最新可证检查数减累计整改事件，零与未知不同。工资来源按原责任及该工资成员匹配；A 管理簿还需明确原责任覆盖。后期转组、改名、换责任、整改不改原采用。A 累计式工资按同簿已处理扣款避免后月重新领取；C1/C2 逐期来源不将该累计金额再次相减。当前工资的此前处理依据只包含不晚于本单月份的采用，补录早月不能引用未来月份扣款；原记录是否已采用仍核全历史，以免早月补录后重复处理。
+
+发放前来源快照与发放后输出快照共同包含范围、月份、原检查、配置、人工开始、此前处理及金额完整度；输出在此基础上增加本次实际采用集合。A 源版本 V3 承接 P5 V2 费用，C1/C2 源版本 V2 承接各自 V1；原 V1/V2 文字保留，不补造新字段。完整扣款正好抵完可领额时，显式实发 0 可以冻结采用；不产生正数现金。超额及部分实际处理保持规则缺口。
+
+P4 更正依据增加可选 `hollow`：原冻结采用集合与对应 `adoptionId / recordId / count / unitAmount` 组件。只允许改量价与经办依据，不能替换原户、采用身份或工资簿。有效更正链产生当前已处理金额；冻结工资保留当时采用的链端及处理额。核算差额、真正补退和后月处理关系仍沿 P4 分离，原件不会因整改或确认更正自动改变实际现金。
+
+迁入保留所有原 JSON 和摘要，物理身份列与原证明的类型投影分开。工程量外层 V2 承接五表；工资外层 V4 承接三表及其原工程量证明闭包，旧中央十二表和费用六表合同不变。多次迁入的原图证明为最多 64 个节点的平面、可达且无环关系，不得嵌套证明包或携带整个运行库；重复接管保留日常追加。恢复在删除前检查原责任、整改、启动、采用、更正、回执和跨批次引用，软删与零余量不能解除引用，失败整批不变。最终迁移验证状态以本票证据为准。
+
+操作步骤见[空鼓指南](../guides/payroll-hollow.md)，接口与读取分别见 [COMMANDS](./COMMANDS.md#户级空鼓和人工扣款命令412p6)、[READ-MODELS](./READ-MODELS.md#户级空鼓和工资扣款读取412p6)。
+
 ### 工程量物理模型（#103）
 
 以下是 #103 的目标物理模型；列名统一为 snake_case。模板房间直接落 `rooms`，但它属于户型模板而非某一户；某户的房间实例由 `(unit_id, room_id)` 组合指认，不建立逐户房间副本。

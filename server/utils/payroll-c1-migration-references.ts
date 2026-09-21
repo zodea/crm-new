@@ -2,7 +2,7 @@ import type { TransactionDb } from '../../app/lib/db/coordinator'
 import { createHash } from 'node:crypto'
 import { payrollLogSnapshot } from '../../app/lib/migration/payroll-source'
 import { decodePayrollAttendanceResult, encodePayrollAttendanceWire, parsePayrollAttendanceCommand, payrollAttendanceCanonical } from '../../app/lib/payroll/central-attendance-codec'
-import { decodePayrollC1Result, encodePayrollC1Wire, isPayrollC1StatementSourceSnapshot, parsePayrollC1Command } from '../../app/lib/payroll/central-c1-codec'
+import { decodePayrollC1Result, encodePayrollC1Wire, isPayrollC1StatementSourceVersioned, parsePayrollC1Command } from '../../app/lib/payroll/central-c1-codec'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 
 export const PAYROLL_C1_REFERENCE_TABLES = ['payroll_c1_rate_revisions', 'payroll_c1_statement_sources'] as const
@@ -93,7 +93,7 @@ export function payrollC1ReceiptReferences(value: Record<string, unknown>): Set<
 export async function payrollC1MigrationReferences(tx: TransactionDb): Promise<Set<string>> {
   const { refs, add, subject } = collector()
   function source(value: unknown) {
-    if (!isPayrollC1StatementSourceSnapshot(value))
+    if (!isPayrollC1StatementSourceVersioned(value))
       invalid()
     subject(value.subject)
     for (const id of value.subject.memberWorkerIds) add('workers', id)

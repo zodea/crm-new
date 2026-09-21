@@ -1,6 +1,7 @@
 import type { ExportFileOptions } from '../kit/export'
 import type { PayrollC2FrozenDocument } from './central-c2-contract'
 import * as XLSX from 'xlsx'
+import { appendPayrollHollowSheets } from './hollow-export'
 
 export function createPayrollC2Workbook(document: PayrollC2FrozenDocument): ExportFileOptions {
   const book = XLSX.utils.book_new()
@@ -11,6 +12,8 @@ export function createPayrollC2Workbook(document: PayrollC2FrozenDocument): Expo
     sheet['!cols'] = name === '工资表' ? [{ wch: 20 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 24 }] : [{ wch: 20 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 40 }, { wch: 16 }, { wch: 14 }, { wch: 24 }]
     XLSX.utils.book_append_sheet(book, sheet, name)
   }
+  if (document.hollow)
+    appendPayrollHollowSheets(book, document.hollow)
   const data: ArrayBuffer = XLSX.write(book, { bookType: 'xlsx', type: 'array' })
   return { data, defaultName: `${document.projectName}-${document.leaderName}-${document.month}-C2工资与签工.xlsx`.replace(/[<>:"/\\|?*]/g, '-'), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
 }

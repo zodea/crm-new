@@ -14,6 +14,7 @@ import { createDbCoordinator } from '../../app/lib/db/coordinator'
 import { createQuantityService } from '../../app/lib/quantity/central-service'
 import { applyPayrollMigration, assertPayrollMigrationRemoval, planPayrollMigration } from './payroll-migration'
 import { createQuantityDatabase } from './quantity-database'
+import { assertQuantityHollowMigrationReferences } from './quantity-hollow-migration'
 import { applyQuantityMigration, planQuantityMigration } from './quantity-migration'
 import { applyBudgetMigration, planBudgetMigration } from './target-cost-migration'
 import { applyWbsMigration, planWbsMigration, removeWbsMigration } from './wbs-migration'
@@ -131,6 +132,21 @@ export function createQuantityTestInstance(options: Options) {
   }
 
   return {
+    /** 真实 SQLite 原件，沿同工作区队列读取；不得在事务回调内再次调用。 */
+    exportSnapshotBytes(sessionId?: string | null): Promise<Uint8Array> {
+      const scheduled = structuredClone(options.session(sessionId))
+      const state = stateFor(sessionId, scheduled)
+      const pending = state.pending.then(async () => {
+        sameWorkspaceSession(scheduled, options.session(sessionId))
+        const driver = await state.driver()
+        sameWorkspaceSession(scheduled, options.session(sessionId))
+        const bytes = driver.exportSnapshotBytes()
+        sameWorkspaceSession(scheduled, options.session(sessionId))
+        return bytes
+      })
+      state.pending = pending.then(() => undefined, () => undefined)
+      return pending
+    },
     /** 仅提供工作区互斥与 SQL 原子性。领域在回调内验证自身能力、来源和项目版本；不得嵌套调用同队列。 */
     withWorkspaceTransaction<T>(consume: (db: TransactionDb, context: QuantityContext) => Promise<T>, sessionId?: string | null): Promise<T> {
       const scheduled = structuredClone(options.session(sessionId))
@@ -178,6 +194,7 @@ export function createQuantityTestInstance(options: Options) {
         const prepared = affectedProjects.length || removedLibraryIds.size || budget.incoming.length || budget.removed.length || payroll.incoming.length || payroll.removed.length || removedProjectIds.size || removedPeople.crews.size || removedPeople.workers.size
           ? await (await state.driver()).prepare(async (candidate) => {
               await assertPayrollMigrationRemoval(candidate, payroll, { projects: removedProjectIds, ...removedPeople, quantity: plan.removed.flatMap(row => row.identities) })
+              await assertQuantityHollowMigrationReferences(candidate, { entityIds: plan.removed.map(row => row.entityId), projects: [...removedProjectIds], crews: [...removedPeople.crews], workers: [...removedPeople.workers], quantity: plan.removed.flatMap(row => row.identities) })
               await applyBudgetMigration(candidate, budget, removedProjectIds)
               await removeWbsMigration(candidate, wbs, plan.removed, removedLibraryIds)
               await applyQuantityMigration(candidate, plan)

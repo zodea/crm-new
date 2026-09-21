@@ -53,7 +53,10 @@ describe('p5 limited delivery registration', () => {
       expect(linked.obligationIds).toContain('WAGE-14')
       expect(linked.acceptance).toEqual({ rules: 'needs-review', frontend: 'not-verified', crossModule: 'not-verified', production: 'not-verified' })
     }
-    expect(coverage.counts).toMatchObject({ rootVariants: 208, surfaces: 754, environmentCases: 1221 })
+    // 后续交付可增补路由；P5 已登记身份和限定证据仍必须全部存在。
+    expect(coverage.counts.rootVariants).toBeGreaterThanOrEqual(208)
+    expect(coverage.counts.surfaces).toBeGreaterThanOrEqual(754)
+    expect(coverage.counts.environmentCases).toBeGreaterThanOrEqual(1221)
   })
 
   it('keeps the report partial, preserves the remaining decisions and renders the actual P5 evidence consistently', () => {

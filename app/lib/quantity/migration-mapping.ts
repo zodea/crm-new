@@ -1,5 +1,6 @@
 import type { QuantityMigrationGraph, QuantityMigrationRow, QuantityMigrationTable, QuantityMigrationValue } from './migration-graph'
 import { quantityProblem } from './central-contract'
+import { mapQuantityHollowMigrationGraph } from './hollow-migration-mapping'
 import { parseQuantityMigrationGraph, QUANTITY_MIGRATION_COLUMNS, QUANTITY_MIGRATION_TABLES, quantityMigrationRowId, quantityMigrationTimestamp } from './migration-graph'
 
 export interface QuantityMigrationBindings {
@@ -139,5 +140,17 @@ export function mapQuantityMigrationGraph(source: QuantityMigrationGraph, bindin
     projectId: bindings.projectId,
     contractId: external(bindings.contracts ?? new Map(), reference.contractId, '施工合同')!,
   }))
-  return { graph: parseQuantityMigrationGraph({ ...original, projectId: bindings.projectId, boqReferences, tables }), identities }
+  const hollow = original.version === 2
+    ? mapQuantityHollowMigrationGraph(original.hollow, bindings.namespace, (table, id) => {
+        if (table === 'projects') {
+          if (id !== original.projectId)
+            invalid('空鼓原项目映射跨项目')
+          return bindings.projectId
+        }
+        const current = table === 'workers' ? bindings.workers.get(id) : table === 'crews' ? bindings.crews.get(id) : maps[table as QuantityMigrationTable]?.get(id)
+        // 已证首次责任可保历史 scope 等身份；只作 proof 投影，不创建当前候选实体。
+        return current ?? `${bindings.namespace}:${table}:${encodeURIComponent(id)}`
+      })
+    : null
+  return { graph: parseQuantityMigrationGraph({ ...original, projectId: bindings.projectId, boqReferences, tables, ...(hollow ? { hollow } : {}) }), identities }
 }

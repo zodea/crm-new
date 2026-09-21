@@ -9,10 +9,11 @@ import { decodePayrollAResult, encodePayrollAWire, parsePayrollACommand } from '
 import { payrollACalculationVersion, payrollACrossBookConflicts, payrollAWriteRow, persistPayrollACalculation, releasePayrollA } from '../../app/lib/payroll/central-a-command'
 import { payrollAManagementContains } from '../../app/lib/payroll/central-a-fees-calculation'
 import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
-import { isPayrollAStatementSourceSnapshotV2 } from '../../app/lib/payroll/central-a-fees-validation'
+import { isPayrollAStatementSourceSnapshotV2, isPayrollAStatementSourceSnapshotV3 } from '../../app/lib/payroll/central-a-fees-validation'
 import { loadPayrollAConfigHistory } from '../../app/lib/payroll/central-a-history'
 import { assertPayrollAMonth, assertPayrollARatio, loadPayrollAPrices, loadPayrollASubjectConfig, savePayrollAPrices } from '../../app/lib/payroll/central-a-prices'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
+import { payrollHollowFrozenReadWithCurrent } from '../../app/lib/payroll/central-hollow-deduction-read'
 import { advancePayrollRevision, payrollRevision } from '../../app/lib/payroll/central-schema'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { generateId } from '../../app/lib/util/id'
@@ -21,9 +22,12 @@ import { loadPayrollABookPayments, resolvePayrollABook, samePayrollABook } from 
 import { extendPayrollAFeesForm, payrollAFeesSelection } from './payroll-a-fees-read'
 import { createPayrollAFeesService } from './payroll-a-fees-service'
 import { payrollAFeesFrozenForm } from './payroll-a-frozen-form'
+import { extendPayrollAHollowForm } from './payroll-a-hollow-read'
 import { loadPayrollABlockerLocation, loadPayrollAOptions, payrollANavigation } from './payroll-a-options'
 import { loadPayrollAReleasedWithMigration } from './payroll-a-released-with-migration'
+import { readPayrollHollowCurrentForSnapshot } from './payroll-hollow-read'
 import { payrollMigratedAForm } from './payroll-migrated-form'
+import { loadPayrollMigratedPrices } from './payroll-migrated-prices'
 import { loadPayrollMigratedProof } from './payroll-migrated-proof'
 import { persistPayrollReleaseAdjustments, preparePayrollReleaseAdjustments } from './payroll-release-adjustments'
 
@@ -108,19 +112,29 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
     const row = input.statementId ? await head(db, input.statementId) : null
     if (row?.status === 'released') {
       const migrated = payrollMigratedAForm(await loadPayrollMigratedProof(db, String(row.project_id)), base, String(row.id))
-      if (migrated)
+      if (migrated) {
+        if (migrated.hollow?.snapshot) {
+          const current = await readPayrollHollowCurrentForSnapshot(db, base, source, String(row.id), migrated.hollow.snapshot, migrated.draft.memberWorkerIds ?? [], options)
+          migrated.hollow = payrollHollowFrozenReadWithCurrent(base, String(row.id), migrated.hollow.snapshot, current)
+        }
         return migrated
+      }
       const [savedSource] = await db.select<{ source_json: string }>('SELECT source_json FROM payroll_a_statement_sources WHERE statement_id=?', [row.id])
       let originalSource: unknown
       try {
         originalSource = savedSource ? JSON.parse(savedSource.source_json) : null
       }
       catch { throw payrollProblem('unavailable', '原工资来源正文无法核实') }
-      if (originalSource && typeof originalSource === 'object' && 'schemaVersion' in originalSource && originalSource.schemaVersion === 2) {
+      if (originalSource && typeof originalSource === 'object' && 'schemaVersion' in originalSource && (originalSource.schemaVersion === 2 || originalSource.schemaVersion === 3)) {
         const document = (await loadPayrollAReleasedWithMigration(db, String(row.id))).get(String(row.id))
-        if (!document || !hasPayrollAFeesDocument(document) || !isPayrollAStatementSourceSnapshotV2(originalSource))
+        if (!document || !hasPayrollAFeesDocument(document) || (!isPayrollAStatementSourceSnapshotV2(originalSource) && !isPayrollAStatementSourceSnapshotV3(originalSource)))
           throw payrollProblem('unavailable', '原费用清单、用途或发放证明无法核实')
-        return payrollAFeesFrozenForm(base, document, originalSource)
+        const frozen = payrollAFeesFrozenForm(base, document, originalSource)
+        if (frozen.hollow?.snapshot) {
+          const current = await readPayrollHollowCurrentForSnapshot(db, base, source, String(row.id), frozen.hollow.snapshot, frozen.draft.memberWorkerIds ?? [], options)
+          frozen.hollow = payrollHollowFrozenReadWithCurrent(base, String(row.id), frozen.hollow.snapshot, current)
+        }
+        return frozen
       }
     }
     const draft = row ? { ...await savedDraft(db, row), ...(row.status === 'draft' ? input.draft : {}) } : { ...input.draft }
@@ -133,7 +147,7 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
     }
     const all = await quantities(db, draft.projectId, draft.month)
     const management = draft.book?.bookPurpose === 'management' && draft.projectId && draft.month ? await payrollAFeesSelection(db, draft.projectId, draft.month, draft.book) : null
-    const prices = draft.projectId && draft.book?.bookPurpose !== 'management' ? await loadPayrollAPrices(db, draft.projectId) : []
+    const prices = draft.projectId && draft.book?.bookPurpose !== 'management' ? await loadPayrollAPrices(db, draft.projectId, loadPayrollMigratedPrices) : []
     const defaults = await ratioDefault(db, draft, source)
     if (draft.payRatio === undefined)
       draft.payRatio = defaults.value
@@ -200,14 +214,15 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
     const status = row ? row.status as PayrollAFormRead['status'] : 'new'
     const writable = !context.readonly && blocks.length === 0
     const read: PayrollAFormRead = { context, statementId: input.statementId, draftKey: input.statementId ? null : input.draftKey!, status, needsRecheck: !!row?.needs_recheck, draft, options: memberOptions, members: memberOptions.workers.filter(worker => scope.memberWorkerIds.includes(worker.id)), facts, lines, prices, ratioDefault: defaults, totals: { workAmount, cumulativeAmount, previouslyPaid, grossAmount }, paymentSourceVersion: hash(adjustmentReconciliation ? { payments, adjustmentReconciliation } : payments), ...(adjustmentReconciliation ? { adjustmentReconciliation } : {}), blockers: blocks, eligibility: { canSaveDraft: writable && ['new', 'draft'].includes(status), canCheck: writable && ['draft', 'checked'].includes(status), canRelease: writable && status === 'checked' && !row?.needs_recheck && grossAmount.value !== null && grossAmount.value > 0, canOutput: false, reasons: blocks.map(block => block.message) } }
-    return draft.book ? extendPayrollAFeesForm(db, read, source, all, options) : read
+    const withFees = draft.book ? await extendPayrollAFeesForm(db, read, source, all, options) : read
+    return extendPayrollAHollowForm(db, withFees, source, options)
   }
   async function config(db: TransactionDb, base: PayrollAContext, source: PayrollIdentitySource, scope: PayrollAConfigScope): Promise<PayrollAConfigRead> {
     assertPayrollAMonth(scope.month)
     if (!source.projects.some(project => project.id === scope.projectId))
       throw payrollProblem('not-found', '工资配置项目不存在或不可用')
     const all = await quantities(db, scope.projectId, scope.month)
-    const prices = (await loadPayrollAPrices(db, scope.projectId)).filter(price => price.crewId === scope.crewId && price.leaderWorkerId === scope.leaderWorkerId)
+    const prices = (await loadPayrollAPrices(db, scope.projectId, loadPayrollMigratedPrices)).filter(price => price.crewId === scope.crewId && price.leaderWorkerId === scope.leaderWorkerId)
     const subject = scope.leaderWorkerId ? await loadPayrollASubjectConfig(db, scope.projectId, scope.leaderWorkerId) : null
     const crew = source.crews.find(crew => crew.id === scope.crewId)
     const locked = (await db.select('SELECT id FROM wage_statements WHERE project_id=? AND leader_worker_id=? AND month=? AND format_family=\'A\' AND status=\'released\'', [scope.projectId, scope.leaderWorkerId, scope.month])).length > 0
@@ -282,7 +297,7 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
                 if (price.scope.kind === 'cells' && price.scope.cells.some(cell => !all.rows.some(fact => fact.unitId === cell.unitId && fact.roomId === cell.roomId && fact.itemId === cell.itemId)))
                   throw payrollProblem('relationship-mismatch', '价格适用范围已变化')
               }
-              result.priceRevisionIds = await savePayrollAPrices(db, scope, action.prices, context.actorId)
+              result.priceRevisionIds = await savePayrollAPrices(db, scope, action.prices, context.actorId, loadPayrollMigratedPrices)
             }
           }
           else {
@@ -327,7 +342,7 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
                 result.outcome = action.kind === 'check-a' ? 'checked' : 'saved'
               }
               else if (action.kind === 'release-a') {
-                const applications = await preparePayrollReleaseAdjustments(db, command.statementId!, action.release.actualAmount, action.release.adjustmentApplications, read.adjustmentReconciliation)
+                const applications = await preparePayrollReleaseAdjustments(db, command.statementId!, action.release.actualAmount, action.release.adjustmentApplications, read.adjustmentReconciliation, read.hollow)
                 await releasePayrollA(db, read, action.release, calculationVersion, context.actorId, command.commandId)
                 if (applications !== undefined)
                   result.adjustmentApplicationIds = await persistPayrollReleaseAdjustments(db, command.statementId!, command.commandId, applications, context.actorId)

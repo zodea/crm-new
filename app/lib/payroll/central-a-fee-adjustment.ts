@@ -1,4 +1,5 @@
 import type { PayrollAFeeAdjustmentBasis, PayrollAStatementSourceSnapshotV2 } from './central-a-fees-contract'
+import type { PayrollAStatementSourceSnapshotV3 } from './central-a-hollow-contract'
 import type { PayrollAAdjustmentBasis } from './central-adjustment-contract'
 import { payrollAAmount } from './central-a-calculation'
 import { isPayrollABook, isPayrollANegativeValues } from './central-a-fees-validation'
@@ -8,7 +9,7 @@ import { wireCent, wireExact, wireId, wireNullableNumber, wireText } from './cen
 import { rounded } from './statements'
 
 /** 从已证原冻结取可改的量价，来源只保留在上层 source 一份。 */
-export function payrollAFeeAdjustmentBasis(source: PayrollAStatementSourceSnapshotV2): PayrollAFeeAdjustmentBasis {
+export function payrollAFeeAdjustmentBasis(source: PayrollAStatementSourceSnapshotV2 | PayrollAStatementSourceSnapshotV3): PayrollAFeeAdjustmentBasis {
   return { schemaVersion: 1, book: source.book, components: source.fees.lines.flatMap(line => line.components.map(c => ({ componentKey: c.componentKey, feeId: c.feeId, feeRevisionId: c.feeRevisionId, ownershipKey: c.ownershipKey, quantity: c.quantity, unitPrice: c.unitPrice }))), negativeLines: source.fees.negativeLines.filter(n => !n.removed).map(n => ({ lineId: n.lineId, originalNegativeRevisionId: n.id, label: n.label, quantity: n.quantity, unit: n.unit, unitPrice: n.unitPrice, scope: n.scope, reason: n.reason, evidenceNote: n.evidenceNote, actualRef: n.actualRef })) }
 }
 

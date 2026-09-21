@@ -2,6 +2,7 @@ import type { PayrollActualReversalDraft, PayrollActualReversalTarget } from './
 import type { PayrollActualReversalCommand } from './central-adjustment-contract'
 import { payrollProblem } from './central-contract'
 import { wireExact, wireId, wireObject, wireText } from './central-payroll-wire'
+import { isPayrollSourceIdentity } from './migration-identity'
 
 function fail(): never {
   throw payrollProblem('validation-failed', '错记冲销须引用具体原收付、固定草稿并明确填写核查依据')
@@ -11,7 +12,7 @@ export function assertPayrollReversalTarget(v: unknown): asserts v is PayrollAct
   if (v.kind !== 'recording-reversal' || !wireId(v.draftKey) || !wireObject(v.original))
     fail()
   wireExact(v.original, v.original.kind === 'released-statement' ? ['kind', 'statementId'] : ['kind', 'eventId'])
-  if (v.original.kind === 'released-statement' ? !wireId(v.original.statementId) : v.original.kind !== 'actual-event' || !wireId(v.original.eventId))
+  if (v.original.kind === 'released-statement' ? !isPayrollSourceIdentity(v.original.statementId, 'wage_statements') : v.original.kind !== 'actual-event' || !isPayrollSourceIdentity(v.original.eventId, 'payroll_actual_events'))
     fail()
 }
 export function assertPayrollReversalDraft(v: unknown): asserts v is PayrollActualReversalDraft {

@@ -1,5 +1,6 @@
 import type { PayrollAFormInput, PayrollAFormRead, PayrollAPending } from '~/lib/payroll/central-a-contract'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, reactive, shallowRef } from 'vue'
 import { usePayrollAForm } from '~/composables/usePayrollAForm'
@@ -25,6 +26,8 @@ const Harness = defineComponent({ setup() {
   return () => h('div', [h('input', { 'aria-label': '备注', 'value': ui.draft.value.note, 'onInput': (event: Event) => ui.change({ note: (event.target as HTMLInputElement).value }) }), h('button', { disabled: !ui.canSave.value, onClick: ui.save }, '保存'), h('button', { disabled: ui.busy.value, onClick: () => ui.load() }, '读取'), h('button', { disabled: ui.busy.value, onClick: ui.recover }, '核对原提交')])
 } })
 beforeEach(() => {
+  setActivePinia(createPinia())
+  sessionStorage.clear()
   vi.clearAllMocks()
   values.length = 0
   guards.clear()
@@ -50,6 +53,42 @@ beforeEach(() => {
   vi.stubGlobal('useEventListener', vi.fn())
 })
 describe('中央 A 独立草稿', () => {
+  it('原户核对后冷返回保全部工资输入，须重新预览才采用当前来源', async () => {
+    let wrapper = mount(Harness)
+    await flushPromises()
+    values[0]!.change({ memberWorkerIds: ['worker', 'worker-two'], payRatio: 0, note: '去原户排查前未保存的说明' })
+    wrapper.unmount()
+    load.mockImplementation(async (_query, input: PayrollAFormInput) => ({ ...read(input.statementId, 'v2', input.draftKey ?? null), ...(input.draft ? { draft: input.draft } : {}) }))
+    wrapper = mount(Harness)
+    await flushPromises()
+    const restored = values[1]!
+    expect(restored.draft.value).toMatchObject({ memberWorkerIds: ['worker', 'worker-two'], payRatio: 0, note: '去原户排查前未保存的说明' })
+    expect(restored.matchingRead.value?.context.sourceVersion).toBe('v2')
+    expect(restored.previewed.value).toBe(false)
+    expect(restored.canSave.value).toBe(false)
+    await restored.load(true)
+    expect(load.mock.calls.at(-1)?.[1].draft).toMatchObject({ payRatio: 0, memberWorkerIds: ['worker', 'worker-two'] })
+    expect(restored.canSave.value).toBe(true)
+    wrapper.unmount()
+  })
+  it('冷返回优先呈现完整原提交，另一身份不能取得前人草稿', async () => {
+    let wrapper = mount(Harness)
+    await flushPromises()
+    values[0]!.change({ note: '原草稿输入' })
+    wrapper.unmount()
+    pending.value = { state: 'unknown', command: { commandId: 'pending-original', workspaceId: 'workspace', actorId: 'actor', origin: 'real', sourceVersion: 'v1', requiredCapability: 'payroll:write', projectId: 'project', statementId: 'wage-a', draftKey: null, configScope: null, action: { kind: 'save-a-draft', draft: { ...read().draft, note: '实际原提交正文', payRatio: null } } } }
+    wrapper = mount(Harness)
+    await flushPromises()
+    expect(values[1]!.draft.value.note).toBe('实际原提交正文')
+    expect(values[1]!.canSave.value).toBe(false)
+    wrapper.unmount()
+    pending.value = null
+    load.mockResolvedValue({ ...read(), context: { ...read().context, actorId: 'another-actor' } })
+    wrapper = mount(Harness)
+    await flushPromises()
+    expect(values[2]!.draft.value.note).toBe('')
+    wrapper.unmount()
+  })
   it('新建未手填比例可采用明确建议，主动清空后核对仍保null', async () => {
     route.params.id = undefined
     route.path = '/subcontract/payroll/new'

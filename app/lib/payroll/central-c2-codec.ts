@@ -1,10 +1,14 @@
-import type { PayrollC2Command, PayrollC2CommandResult, PayrollC2ConfigFact, PayrollC2ConfigRead, PayrollC2ConfigScope, PayrollC2FormInput, PayrollC2FormRead, PayrollC2FrozenDocument, PayrollC2OutputRead, PayrollC2StatementSourceSnapshot } from './central-c2-contract'
+import type { PayrollC2Command, PayrollC2CommandResult, PayrollC2ConfigFact, PayrollC2ConfigRead, PayrollC2ConfigScope, PayrollC2FormInput, PayrollC2FormRead, PayrollC2FrozenDocument, PayrollC2OutputRead, PayrollC2StatementSourceSnapshot, PayrollC2StatementSourceSnapshotV2, PayrollC2StatementSourceVersioned } from './central-c2-contract'
 import type { PayrollQuery } from './central-contract'
 import { payrollC2Lines } from './central-c2-calculation'
 import { payrollC2OriginalOutput } from './central-c2-output-identity'
+import { isPayrollCHollowDocument, isPayrollCHollowSource } from './central-c-hollow'
 import { payrollCanonical } from './central-command-shared'
 import { payrollProblem } from './central-contract'
 import { isPayrollDayworkFact, isPayrollDayworkRecordRead, isPayrollParticipantOptions } from './central-daywork-codec'
+import { isPayrollHollowRead } from './central-hollow-deduction-read'
+import { payrollHollowAllowsZeroRelease } from './central-hollow-deduction-release'
+import { isPayrollHollowSnapshot } from './central-hollow-deduction-snapshot'
 import { wireArray as array, wireExact as exact, wireFields as fields, wireId as id, wireNullableText as nullableText, wireNullableNumber as number, wireObject as object, wireText as text, transformPayrollC2Wire, wireCent, wireContext, wireDate, wireIntent, wireMonth, wireStrings } from './central-payroll-wire'
 import { isPayrollReleaseApplications } from './central-release-adjustment-wire'
 import { amountInCents } from './statements'
@@ -114,21 +118,34 @@ export function isPayrollC2StatementSourceSnapshot(value: unknown): value is Pay
   }
   return true
 }
+export function isPayrollC2StatementSourceSnapshotV2(value: unknown): value is PayrollC2StatementSourceSnapshotV2 {
+  if (!object(value) || value.schemaVersion !== 2)
+    return false
+  const { hollow, ...original } = value
+  const legacy = { ...original, schemaVersion: 1 }
+  return isPayrollC2StatementSourceSnapshot(legacy) && isPayrollCHollowSource(hollow, 'C2', legacy.subject, legacy.month) && hollow.adoptions.length === 0
+}
+export function isPayrollC2StatementSourceVersioned(value: unknown): value is PayrollC2StatementSourceVersioned {
+  return isPayrollC2StatementSourceSnapshot(value) || isPayrollC2StatementSourceSnapshotV2(value)
+}
 export function isPayrollC2FrozenDocument(value: unknown): value is PayrollC2FrozenDocument {
-  if (!object(value) || !fields(value, ['id', 'projectId', 'projectName', 'leaderName', 'releasedAt', 'operatorName', 'note'], text) || !value.projectName || !value.leaderName || !value.operatorName || !nullableId(value.crewId) || !nullableText(value.crewName) || value.formatFamily !== 'C2' || value.periodKind !== 'monthly' || value.payRatio !== 1 || !wireMonth(value.month) || !wireCent(value.grossAmount) || !wireCent(value.actualAmount) || value.actualAmount <= 0 || value.actualAmount > value.grossAmount || !array(value.members, m => object(m) && id(m.workerId) && text(m.workerName) && !!m.workerName && typeof m.isLeader === 'boolean') || !array(value.allocations, a => object(a) && id(a.workerId) && text(a.workerName) && typeof a.isLeader === 'boolean' && wireCent(a.amount) && Number.isSafeInteger(a.allocatedAmountFen) && a.allocatedAmountFen === amountInCents(a.amount)) || !Array.isArray(value.lines))
+  const zeroRelease = object(value) && isPayrollHollowSnapshot(value.hollow) && payrollHollowAllowsZeroRelease(value.hollow)
+  if (!object(value) || !fields(value, ['id', 'projectId', 'projectName', 'leaderName', 'releasedAt', 'operatorName', 'note'], text) || !value.projectName || !value.leaderName || !value.operatorName || !nullableId(value.crewId) || !nullableText(value.crewName) || value.formatFamily !== 'C2' || value.periodKind !== 'monthly' || value.payRatio !== 1 || !wireMonth(value.month) || !wireCent(value.grossAmount) || !wireCent(value.actualAmount) || (value.actualAmount === 0 && !zeroRelease) || value.actualAmount > value.grossAmount || !array(value.members, m => object(m) && id(m.workerId) && text(m.workerName) && !!m.workerName && typeof m.isLeader === 'boolean') || !array(value.allocations, a => object(a) && id(a.workerId) && text(a.workerName) && typeof a.isLeader === 'boolean' && wireCent(a.amount) && Number.isSafeInteger(a.allocatedAmountFen) && a.allocatedAmountFen === amountInCents(a.amount)) || !Array.isArray(value.lines))
     return false
   const document = value as unknown as PayrollC2FrozenDocument
   const ids = document.members.map(m => m.workerId)
   if (document.members.filter(m => m.isLeader).length !== 1 || !isPayrollC2StatementSourceSnapshot({ schemaVersion: 1, subject: { projectId: document.projectId, crewId: document.crewId, leaderWorkerId: document.members.find(m => m.isLeader)?.workerId ?? '', memberWorkerIds: ids }, month: document.month, facts: document.daywork, config: document.config, members: document.members.map(m => ({ workerId: m.workerId, workerName: m.workerName, crewId: document.crewId })), qualificationVersion: 'frozen-qualification' }))
     return false
   const lines = payrollC2Lines(document.daywork, document.config, document.members)
-  return document.members.find(m => m.isLeader)?.workerName === document.leaderName && payrollCanonical(lines) === payrollCanonical(document.lines) && lines.every(l => l.amount !== null && wireCent(l.amount)) && lines.reduce((sum, l) => sum + amountInCents(l.amount!), 0) === amountInCents(document.grossAmount) && document.allocations.length === ids.length && new Set(document.allocations.map(a => a.workerId)).size === ids.length && document.allocations.every(a => document.members.some(m => m.workerId === a.workerId && m.workerName === a.workerName && m.isLeader === a.isLeader)) && document.allocations.reduce((sum, a) => sum + a.allocatedAmountFen, 0) === amountInCents(document.actualAmount)
+  return document.members.find(m => m.isLeader)?.workerName === document.leaderName && payrollCanonical(lines) === payrollCanonical(document.lines) && lines.every(l => l.amount !== null && wireCent(l.amount)) && isPayrollCHollowDocument(document, lines.reduce((sum, l) => sum + amountInCents(l.amount!), 0)) && document.allocations.length === ids.length && new Set(document.allocations.map(a => a.workerId)).size === ids.length && document.allocations.every(a => document.members.some(m => m.workerId === a.workerId && m.workerName === a.workerName && m.isLeader === a.isLeader)) && document.allocations.reduce((sum, a) => sum + a.allocatedAmountFen, 0) === amountInCents(document.actualAmount)
 }
 
 export function decodePayrollC2Read<T extends PayrollC2FormRead | PayrollC2ConfigRead | PayrollC2OutputRead>(raw: unknown, kind: 'form' | 'config' | 'output', query: PayrollQuery, target: PayrollC2FormInput | PayrollC2ConfigScope | string): T {
   const value = transformPayrollC2Wire(raw, true)
-  if (!object(value) || !wireContext(value.context, query.origin))
+  if (!object(value) || !object(value.context) || !wireContext(value.context, query.origin))
     fail()
+  if (kind === 'form' && value.hollow !== undefined && (!isPayrollHollowRead(value.hollow) || value.hollow.context.workspaceId !== value.context.workspaceId || value.hollow.context.actorId !== value.context.actorId || value.hollow.target.statementId !== value.statementId || value.hollow.target.draftKey !== value.draftKey))
+    fail('C2空鼓读取与原工资目标不一致')
   if (kind === 'output') {
     const document = object(value.document) && value.document.identityMapping !== undefined ? payrollC2OriginalOutput(value.document) : value.document
     if (value.statementId !== target || (value.state === 'available' ? !isPayrollC2FrozenDocument(document) || !object(value.document) || value.document.id !== target || !array(value.reasons, () => false) : value.state !== 'unavailable' || value.document !== null || !wireStrings(value.reasons)))
@@ -142,7 +159,7 @@ export function decodePayrollC2Read<T extends PayrollC2FormRead | PayrollC2Confi
       if (payrollCanonical(value.scope) !== payrollCanonical(target) || !(value.config === null || inScope(value.config)) || !array(value.configs, inScope) || !object(value.draft) || !nullableId(value.draft.crewId) || !number(value.draft.unitRate) || !nullableText(value.draft.ruleText) || !wireStrings(value.readonlyReasons) || !Array.isArray(value.history))
         fail()
     }
-    else if (!object(target) || value.statementId !== target.statementId || value.draftKey !== (target.statementId ? null : target.draftKey) || !['new', 'draft', 'checked', 'released'].includes(String(value.status)) || typeof value.needsRecheck !== 'boolean' || !draft(value.draft, true) || !array(value.members, m => object(m) && id(m.id) && nullableText(m.name) && nullableId(m.crewId) && typeof m.eligible === 'boolean' && typeof m.historical === 'boolean' && wireStrings(m.reasons) && wireIntent(m.source)) || !array(value.facts, isPayrollDayworkRecordRead) || !uniqueIds(value.adoptedRecordIds) || !text(value.qualificationVersion) || !array(value.sources, wireIntent) || !(value.config === null || isPayrollC2ConfigFact(value.config)) || !(value.storedSource === null || isPayrollC2StatementSourceSnapshot(value.storedSource)) || !array(value.lines, line => object(line) && fields(line, ['id', 'workerId', 'itemName'], text) && nullableText(line.workerName) && line.kind === 'daywork' && line.unit === '工' && number(line.quantity) && number(line.unitPrice) && (line.amount === null || wireCent(line.amount)) && uniqueIds(line.dayworkIds)) || !array(value.blockers, b => object(b) && fields(b, ['code', 'message'], text) && fields(b, ['field', 'workerId', 'recordId', 'statementId'], nullableText) && wireIntent(b.source)) || !object(value.totals) || !object(value.totals.grossAmount) || !fields(value.totals.grossAmount, ['value', 'knownValue'], v => v === null || wireCent(v)) || !['known', 'partial', 'unknown'].includes(String(value.totals.grossAmount.state)) || !wireStrings(value.totals.grossAmount.reasons) || !object(value.eligibility) || !fields(value.eligibility, ['canSaveDraft', 'canCheck', 'canRelease', 'canOutput'], v => typeof v === 'boolean') || !wireStrings(value.eligibility.reasons)) {
+    else if (!object(target) || value.statementId !== target.statementId || value.draftKey !== (target.statementId ? null : target.draftKey) || !['new', 'draft', 'checked', 'released'].includes(String(value.status)) || typeof value.needsRecheck !== 'boolean' || !draft(value.draft, true) || !array(value.members, m => object(m) && id(m.id) && nullableText(m.name) && nullableId(m.crewId) && typeof m.eligible === 'boolean' && typeof m.historical === 'boolean' && wireStrings(m.reasons) && wireIntent(m.source)) || !array(value.facts, isPayrollDayworkRecordRead) || !uniqueIds(value.adoptedRecordIds) || !text(value.qualificationVersion) || !array(value.sources, wireIntent) || !(value.config === null || isPayrollC2ConfigFact(value.config)) || !(value.storedSource === null || isPayrollC2StatementSourceVersioned(value.storedSource)) || !array(value.lines, line => object(line) && fields(line, ['id', 'workerId', 'itemName'], text) && nullableText(line.workerName) && line.kind === 'daywork' && line.unit === '工' && number(line.quantity) && number(line.unitPrice) && (line.amount === null || wireCent(line.amount)) && uniqueIds(line.dayworkIds)) || !array(value.blockers, b => object(b) && fields(b, ['code', 'message'], text) && fields(b, ['field', 'workerId', 'recordId', 'statementId'], nullableText) && wireIntent(b.source)) || !object(value.totals) || !object(value.totals.grossAmount) || !fields(value.totals.grossAmount, ['value', 'knownValue'], v => v === null || wireCent(v)) || !['known', 'partial', 'unknown'].includes(String(value.totals.grossAmount.state)) || !wireStrings(value.totals.grossAmount.reasons) || !object(value.eligibility) || !fields(value.eligibility, ['canSaveDraft', 'canCheck', 'canRelease', 'canOutput'], v => typeof v === 'boolean') || !wireStrings(value.eligibility.reasons)) {
       fail()
     }
   }

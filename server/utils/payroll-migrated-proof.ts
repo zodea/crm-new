@@ -7,29 +7,39 @@ import type { PayrollAdjustmentBasisDraft, PayrollAdjustmentRecord, PayrollOrigi
 import type { PayrollC1FrozenDocument } from '../../app/lib/payroll/central-c1-contract'
 import type { PayrollC2OutputDocument } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollIdentityMapping } from '../../app/lib/payroll/central-contract'
+import type { PayrollHollowSourceProof } from './payroll-hollow-migrated-source'
 import { createRequire } from 'node:module'
 import initSqlJs from 'sql.js'
 import { runMigrations } from '../../app/lib/db/migrations'
 import { PAYROLL_CENTRAL_MIGRATION_TABLES, payrollCentralPrimaryKey } from '../../app/lib/migration/payroll-central-source'
+import { payrollProofAncestorGraph, payrollProofReceiptLogIds, verifyPayrollProofPackage } from '../../app/lib/migration/payroll-proof-package'
 import { parsePayrollProjectGraph, PAYROLL_MIGRATION_COLUMNS, PAYROLL_MIGRATION_PARTS, PAYROLL_MIGRATION_TABLES } from '../../app/lib/migration/payroll-source'
 import { PAYROLL_A_FEES_MIGRATION_TABLES, payrollAFeesPrimaryKey } from '../../app/lib/payroll/central-a-fees-schema'
-import { loadPayrollAReleasedDocuments } from '../../app/lib/payroll/central-a-provenance'
-import { loadPayrollC1ReleasedDocuments } from '../../app/lib/payroll/central-c1-provenance'
-import { loadPayrollC2ReleasedDocuments } from '../../app/lib/payroll/central-c2-provenance'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
+import { PAYROLL_HOLLOW_DEDUCTION_TABLES } from '../../app/lib/payroll/central-hollow-deduction-schema'
 import { initializePayrollSchema } from '../../app/lib/payroll/central-schema'
+import { QUANTITY_HOLLOW_COLUMNS, QUANTITY_HOLLOW_TABLES } from '../../app/lib/quantity/central-hollow-schema'
+import { quantityHollowHash } from '../../app/lib/quantity/hollow-migration-graph'
+import { buildQuantityHollowMigrationGraphs, QUANTITY_HOLLOW_EVIDENCE_COLUMNS, QUANTITY_HOLLOW_EVIDENCE_TABLE } from '../../app/lib/quantity/hollow-migration-source'
+import { readQuantityHollowTables } from '../../app/lib/quantity/hollow-migration-tables'
 import { loadPayrollANegativeLines } from './payroll-a-fees-data'
+import { loadPayrollAReleasedWithMigration } from './payroll-a-released-with-migration'
 import { loadPayrollActualFacts } from './payroll-actual-facts'
 import { payrollAdjustmentHash as hash, loadPayrollAdjustmentOriginal } from './payroll-adjustment-facts'
 import { loadPayrollAdjustmentRows, readPayrollAdjustmentRecord } from './payroll-adjustment-records'
+import { loadPayrollC1ReleasedWithMigration, loadPayrollC2ReleasedWithMigration } from './payroll-c-released-with-migration'
 import { insertPayrollCentralMigrationGraph, mapPayrollCentralMigrationGraph } from './payroll-central-migration'
 import { insertPayrollFeesMigrationGraph, mapPayrollFeesMigrationGraph } from './payroll-fees-migration'
+import { emptyPayrollHollowSourceProof, provePayrollHollowMigrationSource } from './payroll-hollow-migrated-source'
+import { insertPayrollHollowMigrationRows, mapPayrollHollowMigrationGraph } from './payroll-hollow-migration'
 import { createPayrollMigratedMapper } from './payroll-migrated-mapping'
 import { loadPayrollReleasedApplicationIds } from './payroll-release-application-provenance'
+import { initializeQuantityHollowMigrationEvidence } from './quantity-hollow-migration'
 
 interface Evidence { entity_id: string, project_id: string, source_graph_json: string, mapping_json: string }
 interface Original { original: PayrollOriginalWageRef, basis: PayrollAdjustmentBasisDraft }
 export interface PayrollMigratedProof {
+  hollow: PayrollHollowSourceProof
   negativeLineRevisions: Map<string, PayrollANegativeLineRevision>
   aDocuments: Map<string, PayrollAFrozenDocument>
   c1Documents: Map<string, PayrollC1FrozenDocument>
@@ -41,7 +51,7 @@ export interface PayrollMigratedProof {
   snapshots: Map<string, PayrollActualPaymentSnapshot | PayrollActualReversalSnapshot>
   releasedApplications: Map<string, string[]>
 }
-const empty = (): PayrollMigratedProof => ({ negativeLineRevisions: new Map(), aDocuments: new Map(), c1Documents: new Map(), c2Documents: new Map(), originals: new Map(), records: new Map(), draftBases: new Map(), facts: new Map(), snapshots: new Map(), releasedApplications: new Map() })
+const empty = (): PayrollMigratedProof => ({ hollow: emptyPayrollHollowSourceProof(), negativeLineRevisions: new Map(), aDocuments: new Map(), c1Documents: new Map(), c2Documents: new Map(), originals: new Map(), records: new Map(), draftBases: new Map(), facts: new Map(), snapshots: new Map(), releasedApplications: new Map() })
 let runtime: ReturnType<typeof initSqlJs> | undefined
 const sourceProofs = new Map<string, Promise<PayrollMigratedProof>>()
 const key = (table: string, id: unknown) => JSON.stringify([table, id])
@@ -67,6 +77,18 @@ export async function withPayrollMigratedSource<T>(graph: PayrollProjectGraph, w
     await runMigrations(tx)
     await initializePayrollSchema(tx)
     await tx.execute('PRAGMA foreign_keys=OFF')
+    if (graph.deductions) {
+      // 仅装载所携带的真实原件闭包；这份内存容器不产生任何业务成功凭据。
+      await initializeQuantityHollowMigrationEvidence(tx)
+      const quantity = graph.deductions.quantity
+      for (const table of QUANTITY_HOLLOW_TABLES) {
+        const columns = QUANTITY_HOLLOW_COLUMNS[table]
+        for (const row of quantity.tables[table])
+          await tx.execute(`INSERT INTO ${table}(${columns.join(',')}) VALUES(${columns.map(() => '?').join(',')})`, columns.map(column => row[column]))
+      }
+      const raw = JSON.stringify(quantity)
+      await tx.execute(`INSERT INTO ${QUANTITY_HOLLOW_EVIDENCE_TABLE}(${QUANTITY_HOLLOW_EVIDENCE_COLUMNS.join(',')}) VALUES(?,?,?,?,?,?)`, ['source-proof', graph.projectId, 'source-proof', raw, await quantityHollowHash(raw), raw])
+    }
     await insertPayrollFeesMigrationGraph(tx, graph.fees)
     for (const part of PAYROLL_MIGRATION_PARTS) {
       const table = PAYROLL_MIGRATION_TABLES[part]
@@ -74,6 +96,17 @@ export async function withPayrollMigratedSource<T>(graph: PayrollProjectGraph, w
       for (const row of graph[part]) await tx.execute(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`, columns.map(c => row[c]))
     }
     await insertPayrollCentralMigrationGraph(tx, graph.central)
+    await insertPayrollHollowMigrationRows(tx, graph.deductions)
+    if (graph.deductions?.proof) {
+      const proof = await verifyPayrollProofPackage(graph.deductions.proof)
+      for (const binding of proof.bindings) {
+        const ancestor = parsePayrollProjectGraph(payrollProofAncestorGraph(proof, binding.originId))
+        const projectId = binding.mappings.find(row => row.tableName === 'projects' && row.legacyId === ancestor.projectId)?.centralId
+        if (!projectId || projectId !== graph.projectId)
+          throw payrollProblem('unavailable', '工资祖先原图的映射项目不一致')
+        await tx.execute('INSERT INTO payroll_migration_evidence(entity_id,project_id,batch_id,source_graph_json,diagnostics_json,mapping_json) VALUES(?,?,?,?,?,?)', [binding.entityId, projectId, 'source-proof-ancestor', JSON.stringify(ancestor), '[]', JSON.stringify(binding.mappings)])
+      }
+    }
     return await work(tx)
   }
   finally { db.close() }
@@ -81,7 +114,9 @@ export async function withPayrollMigratedSource<T>(graph: PayrollProjectGraph, w
 
 async function proveSource(graph: PayrollProjectGraph): Promise<PayrollMigratedProof> {
   return withPayrollMigratedSource(graph, async (tx) => {
-    const result = empty()
+    // 此内存库只有已验证 DAG 的直接祖先，没有当前节点自身，后缀不能给自己背书。
+    const result = await loadPayrollMigratedProof(tx, graph.projectId)
+    result.hollow = await provePayrollHollowMigrationSource(tx, graph)
     if (graph.fees) {
       for (const id of new Set(graph.fees.tables.payroll_a_negative_lines.map(row => String(row.statement_id)))) {
         for (const revision of await loadPayrollANegativeLines(tx, id)) result.negativeLineRevisions.set(revision.id, revision)
@@ -94,25 +129,39 @@ async function proveSource(graph: PayrollProjectGraph): Promise<PayrollMigratedP
       }
       catch { /* 无现代完整证明的历史头仍由 P0 逐项诊断；不能因此升格为可更正。 */ }
     }
-    for (const record of (await loadPayrollAdjustmentRows(tx)).map(readPayrollAdjustmentRecord)) result.records.set(record.id, record)
-    for (const [id, document] of await loadPayrollAReleasedDocuments(tx)) {
+    for (const record of (await loadPayrollAdjustmentRows(tx)).map(readPayrollAdjustmentRecord)) {
+      if (!result.records.has(record.id))
+        result.records.set(record.id, record)
+    }
+    for (const [id, document] of await loadPayrollAReleasedWithMigration(tx)) {
       if (result.originals.has(id))
         result.aDocuments.set(id, document)
     }
-    for (const [id, document] of await loadPayrollC1ReleasedDocuments(tx)) {
+    for (const [id, document] of await loadPayrollC1ReleasedWithMigration(tx)) {
       if (result.originals.has(id))
         result.c1Documents.set(id, document)
     }
-    for (const [id, document] of await loadPayrollC2ReleasedDocuments(tx)) {
+    for (const [id, document] of await loadPayrollC2ReleasedWithMigration(tx)) {
       if (result.originals.has(id))
         result.c2Documents.set(id, document)
+    }
+    // 版本别名只收集已通过格式/物理/P4前缀证明的冻结文档，不接受未经证明的 source_json。
+    for (const document of [...result.aDocuments.values(), ...result.c1Documents.values(), ...result.c2Documents.values()]) {
+      for (const row of document.hollow?.previousProcessed ?? []) {
+        const entries = result.hollow.processedVersions.get(row.sourceVersion) ?? []
+        const value = { adoptionId: row.adoption.id, adjustmentIds: row.adjustmentIds, effectiveAmount: row.effectiveAmount }
+        if (!entries.some(entry => hash(entry) === hash(value)))
+          entries.push(value)
+        result.hollow.processedVersions.set(row.sourceVersion, entries)
+      }
     }
     const actual = await loadPayrollActualFacts(tx, { projectId: graph.projectId })
     for (const fact of actual.rows.filter(f => f.qualification === 'proven')) result.facts.set(fact.identity, fact)
     for (const row of graph.central!.tables.payroll_actual_events) {
       if (!actual.rows.some(f => f.ref.kind === 'actual-event' && f.ref.eventId === row.id))
         throw payrollProblem('unavailable', '迁入工资存在无法证明的实际收付')
-      result.snapshots.set(String(row.id), JSON.parse(String(row.confirmed_snapshot_json)))
+      if (!result.snapshots.has(String(row.id)))
+        result.snapshots.set(String(row.id), JSON.parse(String(row.confirmed_snapshot_json)))
     }
     return result
   })
@@ -123,6 +172,10 @@ async function verifyPhysical(tx: TransactionDb, evidence: Evidence, graph: Payr
   const mapping = new Map(mappings.map(m => [key(m.tableName, m.legacyId), m]))
   const central = mapPayrollCentralMigrationGraph(graph.central, evidence.entity_id, mapping)!
   const fees = mapPayrollFeesMigrationGraph(graph.fees, evidence.entity_id, mapping)
+  const quantityId = graph.deductions?.quantity.tables.quantity_hollow_records[0]?.id
+  const mappedQuantityId = quantityId ? mapping.get(key('quantity_hollow_records', quantityId))?.centralId : null
+  const quantityNamespace = mappedQuantityId?.split(':quantity_hollow_records:')[0]
+  const deductions = mapPayrollHollowMigrationGraph(graph.deductions, evidence.entity_id, mapping, quantityNamespace && graph.deductions ? { namespace: quantityNamespace, original: graph.deductions.quantity } : undefined)
   if (hash([...mapping.values()]) !== hash(mappings))
     throw payrollProblem('unavailable', '迁入工资身份映射与原证据不一致')
   const check = async (table: string, primary: string, expected: Record<string, unknown>, ignored: string[] = []) => {
@@ -159,6 +212,38 @@ async function verifyPhysical(tx: TransactionDb, evidence: Evidence, graph: Payr
       }
     }
   }
+  if (deductions) {
+    for (const table of PAYROLL_HOLLOW_DEDUCTION_TABLES) {
+      for (const row of deductions.tables[table])
+        await check(table, 'id', row)
+      for (const commandId of new Set(deductions.tables[table].map(row => row.command_id)))
+        await checkChildren(table, 'command_id', String(commandId), deductions.tables[table].filter(row => row.command_id === commandId).map(row => row.id))
+    }
+    for (const statementId of new Set(deductions.tables.payroll_hollow_adoptions.map(row => row.statement_id)))
+      await checkChildren('payroll_hollow_adoptions', 'statement_id', String(statementId), deductions.tables.payroll_hollow_adoptions.filter(row => row.statement_id === statementId).map(row => row.id))
+    const commands = new Set(PAYROLL_HOLLOW_DEDUCTION_TABLES.flatMap(table => graph.deductions!.tables[table].map(row => row.command_id)))
+    const receiptLogs = new Set(graph.central!.tables.payroll_command_receipts.filter(row => commands.has(row.command_id)).flatMap(row => payrollProofReceiptLogIds(graph, String(row.command_id), String(row.result_json))))
+    for (const logId of receiptLogs) {
+      const log = graph.logs.find(row => row.id === logId)
+      if (!log)
+        throw payrollProblem('unavailable', '空鼓原回执缺少同事务日志原件')
+      const mappedId = mapping.get(key('operation_logs', log.id))?.centralId
+      const recordId = mapping.get(key(String(log.table_name), log.record_id))?.centralId
+      if (!mappedId || !recordId)
+        throw payrollProblem('unavailable', '空鼓原日志缺少明确身份映射')
+      await check('operation_logs', 'id', { ...log, id: mappedId, record_id: recordId })
+    }
+    const physical = await readQuantityHollowTables(tx)
+    if (!physical)
+      throw payrollProblem('unavailable', '迁入工资的原空鼓物理证据缺失')
+    for (const table of QUANTITY_HOLLOW_TABLES) {
+      for (const row of deductions.quantity.tables[table])
+        await check(table, 'id', row)
+    }
+    const projects = await tx.select<{ id: string }>('SELECT id FROM projects')
+    // 原件内存库只装载领域闭包，项目原身份由 evidence 与责任原件交叉证明。
+    await buildQuantityHollowMigrationGraphs(tx, physical, [...new Set([...projects.map(row => row.id), evidence.project_id])])
+  }
   const refs: Record<string, string> = { project_id: 'projects', crew_id: 'crews', leader_worker_id: 'workers', subject_config_id: 'payroll_subject_configs', statement_id: 'wage_statements', worker_id: 'workers', item_id: 'items', daywork_record_id: 'signed_daywork_records' }
   const released = new Set(graph.statements.filter(r => r.status === 'released' && mapping.get(key('wage_statements', r.id))?.centralId).map(r => r.id))
   for (const part of ['statements', 'lines', 'members', 'allocations', 'statementDaywork'] as const) {
@@ -176,6 +261,8 @@ async function verifyPhysical(tx: TransactionDb, evidence: Evidence, graph: Payr
   }
   for (const originalId of released) {
     const statementId = mapping.get(key('wage_statements', originalId))!.centralId!
+    if (deductions)
+      await checkChildren('payroll_hollow_adoptions', 'statement_id', statementId, deductions.tables.payroll_hollow_adoptions.filter(row => row.statement_id === statementId).map(row => row.id))
     if (fees) {
       for (const table of ['payroll_a_negative_lines', 'payroll_a_management_ownership'] as const) {
         const field = table === 'payroll_a_negative_lines' ? 'statement_id' : 'first_statement_id'
@@ -224,7 +311,32 @@ export async function loadPayrollMigratedProof(tx: TransactionDb, projectId?: st
       void source.catch(() => sourceProofs.delete(cacheKey))
     }
     const proven = await source
-    const mapper = createPayrollMigratedMapper(mappings)
+    const mapper = createPayrollMigratedMapper(mappings, graph.deductions?.quantity)
+    const mappedId = (table: string, id: string) => {
+      const mapped = mappings.find(row => row.tableName === table && row.legacyId === id)?.centralId
+      if (!mapped)
+        throw payrollProblem('unavailable', '已处理空鼓前缀缺少明确身份映射')
+      return mapped
+    }
+    for (const [version, rows] of proven.hollow.processedVersions)
+      result.hollow.processedVersions.set(version, rows.map(row => ({ ...row, adoptionId: mappedId('payroll_hollow_adoptions', row.adoptionId), adjustmentIds: row.adjustmentIds.map(id => mappedId('payroll_adjustments', id)) })))
+    for (const policy of proven.hollow.policyRevisions.values()) {
+      const mapped = mapper.hollowPolicyRevision(policy)
+      result.hollow.policyRevisions.set(mapped.id, mapped)
+      result.hollow.policyVersions.set(mapped.id, [...new Set([...(proven.hollow.policyVersions.get(policy.id) ?? []), hash(policy), hash(mapped)])])
+    }
+    for (const start of proven.hollow.starts.values()) {
+      const mapped = mapper.hollowStart(start)
+      result.hollow.starts.set(mapped.id, mapped)
+    }
+    for (const adoption of proven.hollow.adoptions.values()) {
+      const mapped = mapper.hollowAdoption(adoption)
+      result.hollow.adoptions.set(mapped.id, mapped)
+    }
+    for (const receipt of proven.hollow.receipts.values()) {
+      const command = mapper.hollowCommand(receipt.command)
+      result.hollow.receipts.set(command.commandId, { command, result: mapper.hollowResult(receipt.result) })
+    }
     for (const revision of proven.negativeLineRevisions.values()) {
       const mapped = mapper.aNegativeLine(revision)
       result.negativeLineRevisions.set(mapped.id, mapped)

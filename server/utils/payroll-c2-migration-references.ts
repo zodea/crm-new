@@ -1,7 +1,7 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import { createHash } from 'node:crypto'
 import { payrollLogSnapshot } from '../../app/lib/migration/payroll-source'
-import { decodePayrollC2Result, encodePayrollC2Wire, isPayrollC2FrozenDocument, isPayrollC2StatementSourceSnapshot, parsePayrollC2Command } from '../../app/lib/payroll/central-c2-codec'
+import { decodePayrollC2Result, encodePayrollC2Wire, isPayrollC2FrozenDocument, isPayrollC2StatementSourceVersioned, parsePayrollC2Command } from '../../app/lib/payroll/central-c2-codec'
 import { payrollCanonical } from '../../app/lib/payroll/central-command-shared'
 import { decodePayrollDayworkResult, encodePayrollDayworkWire, parsePayrollDayworkCommand } from '../../app/lib/payroll/central-daywork-codec'
 import { payrollObject } from '../../app/lib/payroll/central-snapshot'
@@ -110,7 +110,7 @@ export function payrollC2ReceiptReferences(value: Record<string, unknown>): Set<
 export async function payrollC2MigrationReferences(tx: TransactionDb): Promise<Set<string>> {
   const { refs, add, subject } = collector()
   function source(value: unknown) {
-    if (!isPayrollC2StatementSourceSnapshot(value))
+    if (!isPayrollC2StatementSourceVersioned(value))
       invalid()
     subject(value.subject)
     for (const id of value.subject.memberWorkerIds) add('workers', id)

@@ -6,6 +6,7 @@ import { computed, nextTick, onActivated, onDeactivated, onScopeDispose, shallow
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { payrollAmountSummary } from '~/lib/payroll/a-presentation'
 import { payrollAmount, payrollNumber } from '~/lib/payroll/read-presentation'
+import PayrollAFloorReview from './PayrollAFloorReview.vue'
 
 const props = defineProps<{ read: PayrollAFormRead, returnTo: string, editable?: boolean }>()
 const emit = defineEmits<{ price: [line: PayrollALine] }>()
@@ -13,6 +14,7 @@ const route = useRoute()
 const section = shallowRef<HTMLElement | null>(null)
 const active = shallowRef(true)
 const selectedFloor = shallowRef('')
+const selectedItemId = shallowRef('')
 const crewSource = computed<NavigationIntentDTO | null>(() => props.read.draft.crewId && props.read.context.capabilities.includes('crew:list:read') ? { kind: 'entity-detail', subject: { state: 'resolved', entity: 'crew', id: props.read.draft.crewId, label: props.read.options.crews.find(crew => crew.id === props.read.draft.crewId)?.name || '班组', no: null }, variant: 'detail', view: null, filters: { projectId: props.read.draft.projectId || '', dataOrigin: props.read.context.origin } } : null)
 const floors = computed(() => [...new Map(props.read.facts.map(fact => [fact.floorId, { id: fact.floorId, label: `${fact.buildingName || '楼栋未记录'} · ${fact.floorName || '楼层未记录'}`, count: props.read.facts.filter(value => value.floorId === fact.floorId).length }])).values()])
 const lines = computed(() => selectedFloor.value ? props.read.lines.filter(line => line.facts.some(fact => fact.floorId === selectedFloor.value)) : props.read.lines)
@@ -73,6 +75,7 @@ function name(line: PayrollALine) {
 <template>
   <section id="section-source" ref="section" class="panel grid grid-cols-1 min-w-0 scroll-mt-4 gap-4 overflow-hidden p-4" aria-label="A工资完成来源核对">
     <SectionHeader title="核对实际完成与现场量" :mb="0" />
+    <PayrollAFloorReview :facts="read.facts" :month="read.draft.month || ''" :hollow="read.hollow" :selected-item-id="selectedItemId" :return-to="returnTo" @floor="selectedFloor = $event" />
     <p data-payroll-source-description class="min-w-0 whitespace-normal break-words text-12px leading-5 text-ink-faint">
       数量只读；未记录的值不会补成零，姓名和合同价格不用于替换原责任与工资配置。
     </p>
@@ -129,9 +132,9 @@ function name(line: PayrollALine) {
     <div class="min-w-0 overflow-hidden">
       <KitTable :columns="columns" :data="lines" :row-height="64" :min-rows="3" :empty="{ title: '当前没有已证明的完成工资行', description: '请选择项目、负责人、月份与成员，再核对实际完成来源。' }">
         <template #item="{ row }">
-          <div tabindex="0" class="max-h-13 overflow-y-auto whitespace-normal break-words leading-5">
+          <button type="button" class="max-h-13 overflow-y-auto whitespace-normal break-words text-left leading-5" :aria-pressed="selectedItemId === row.itemId" @click="selectedItemId = row.itemId">
             {{ name(row) }}
-          </div>
+          </button>
         </template>
         <template #unit="{ row }">
           {{ row.unit || '未记录' }}

@@ -16,8 +16,8 @@ import { loadPayrollAdjustmentRows, readPayrollAdjustmentRecord } from './payrol
 export async function loadPayrollAAdjustmentReconciliation(tx: TransactionDb, rawBasis: PayrollAAdjustmentBasis, priorStatementIds: string[], statementId: string | null): Promise<PayrollAAdjustmentReconciliation | undefined> {
   if (!isPayrollAStatementSourceVersioned(rawBasis.source))
     return undefined
-  const book = rawBasis.source.schemaVersion === 2 ? rawBasis.source.book : { bookPurpose: 'ordinary', managementBookId: null }
-  const records = (await loadPayrollAdjustmentRows(tx)).map(readPayrollAdjustmentRecord).filter(r => r.status === 'confirmed' && r.originalStatementId !== statementId && r.projectId === rawBasis.source.subject.projectId && r.draft.basis?.formatFamily === 'A' && r.draft.basis.source.subject.leaderWorkerId === rawBasis.source.subject.leaderWorkerId && r.draft.basis.source.subject.crewId === rawBasis.source.subject.crewId && hash(r.draft.basis.source.schemaVersion === 2 ? r.draft.basis.source.book : { bookPurpose: 'ordinary', managementBookId: null }) === hash(book))
+  const book = rawBasis.source.schemaVersion !== 1 ? rawBasis.source.book : { bookPurpose: 'ordinary', managementBookId: null }
+  const records = (await loadPayrollAdjustmentRows(tx)).map(readPayrollAdjustmentRecord).filter(r => r.status === 'confirmed' && r.originalStatementId !== statementId && r.projectId === rawBasis.source.subject.projectId && r.draft.basis?.formatFamily === 'A' && r.draft.basis.source.subject.leaderWorkerId === rawBasis.source.subject.leaderWorkerId && r.draft.basis.source.subject.crewId === rawBasis.source.subject.crewId && hash(r.draft.basis.source.schemaVersion !== 1 ? r.draft.basis.source.book : { bookPurpose: 'ordinary', managementBookId: null }) === hash(book))
   if (!records.length)
     return undefined
   const heads = payrollAdjustmentChainHeads(records)

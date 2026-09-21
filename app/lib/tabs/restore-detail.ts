@@ -10,7 +10,7 @@ import { loadPayrollDetailRead } from '~/lib/payroll/platform-read'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { readRestoredCrewWorkerFact } from './restore-crew-worker'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
-import { readRestoredQuantityUnit } from './restore-quantity'
+import { readRestoredQuantityHollow, readRestoredQuantityUnit } from './restore-quantity'
 
 export interface RestoreDetailOptions {
   repositories: DomainRepositories
@@ -58,6 +58,8 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
     return readRestoredCrewWorkerFact({ ...options, detail: { ...detail, family: 'crew-worker-fact', kind: 'wage' } })
   if (family === 'crew-worker-fact' && detail.kind === 'assignment' && !url.searchParams.has('ownerKind') && !url.searchParams.has('ownerId'))
     return readRestoredQuantityUnit(options)
+  if (family === 'quantity-hollow')
+    return readRestoredQuantityHollow(options)
   if (family === 'crew-worker-fact' || (family === 'subcontract-document' && detail.kind === 'penalty' && (url.searchParams.has('ownerKind') || url.searchParams.has('ownerId'))))
     return readRestoredCrewWorkerFact(options)
   const contractKind = url.searchParams.get('contractKind')
@@ -223,9 +225,10 @@ export async function readRestoredDetail(options: RestoreDetailOptions): Promise
     return restoreProblem('forbidden')
   if (loaded.subject.state !== 'resolved')
     return restoreProblem('not-found')
-  if (loaded.subject.id !== options.detail.id || loaded.origin !== options.path.origin)
+  const subjectId = options.detail.family === 'quantity-hollow' ? options.detail.unitId : options.detail.id
+  if (loaded.subject.id !== subjectId || loaded.origin !== options.path.origin)
     return restoreProblem('mismatch')
-  const intent: NavigationIntentDTO = { kind: 'entity-detail', subject: loaded.subject, variant: loaded.variant, view: loaded.view ?? null, filters: { ...loaded.filters, dataOrigin: loaded.origin } }
+  const intent: NavigationIntentDTO = { kind: options.detail.family === 'quantity-hollow' ? 'entity-subview' : 'entity-detail', subject: loaded.subject, variant: loaded.variant, view: loaded.view ?? null, filters: { ...loaded.filters, dataOrigin: loaded.origin } }
   const target = resolveNavigationTarget(intent, {
     returnTo: options.url.searchParams.get('returnTo') ?? undefined,
     returnContextId: options.url.searchParams.get('returnContext') ?? undefined,

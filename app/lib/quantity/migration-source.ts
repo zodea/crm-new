@@ -1,6 +1,8 @@
 import type { SoftDb } from '../db/soft-delete'
 import type { QuantityMigrationGraph, QuantityMigrationRow, QuantityMigrationTable, QuantityMigrationValue } from './migration-graph'
 import { quantityProblem } from './central-contract'
+import { buildQuantityHollowMigrationGraphs } from './hollow-migration-source'
+import { readQuantityHollowTables } from './hollow-migration-tables'
 import { parseQuantityMigrationGraph, QUANTITY_MIGRATION_COLUMNS, QUANTITY_MIGRATION_PROJECT_PARENTS, QUANTITY_MIGRATION_TABLES, quantityMigrationRowId, quantityMigrationTimestamp } from './migration-graph'
 
 interface Project { id: string, name: string, matrix_archived_at: string | null, deleted_at: string | null }
@@ -19,6 +21,8 @@ function normalize(table: QuantityMigrationTable, row: QuantityMigrationRow): Qu
 /** 仅供受保护 SQLite 快照适配器使用；按物理身份读取，不因祖先软删丢历史。 */
 export async function readQuantityMigrationGraphs(db: Pick<SoftDb, 'select'>): Promise<QuantityMigrationProjectSource[]> {
   const projects = await db.select<Project>('SELECT id, name, matrix_archived_at, deleted_at FROM projects ORDER BY id')
+  const hollowTables = await readQuantityHollowTables(db)
+  const hollow = hollowTables ? await buildQuantityHollowMigrationGraphs(db, hollowTables, projects.map(project => project.id)) : null
   const rows = {} as Record<QuantityMigrationTable, QuantityMigrationRow[]>
   for (const table of QUANTITY_MIGRATION_TABLES) {
     const where = table === 'file_refs' ? ' WHERE owner_type = \'unit_stage_completion\'' : ''
@@ -89,6 +93,6 @@ export async function readQuantityMigrationGraphs(db: Pick<SoftDb, 'select'>): P
     }
   }
   return [...byProject.values()]
-    .filter(source => source.graph.archivedAt !== null || QUANTITY_MIGRATION_TABLES.some(table => source.graph.tables[table].length))
-    .map(source => ({ project: source.project, graph: parseQuantityMigrationGraph(source.graph, source.project.id) }))
+    .filter(source => source.graph.archivedAt !== null || QUANTITY_MIGRATION_TABLES.some(table => source.graph.tables[table].length) || hollow?.get(source.project.id)?.tables.quantity_hollow_records.length)
+    .map(source => ({ project: source.project, graph: parseQuantityMigrationGraph(hollow ? { ...source.graph, version: 2, hollow: hollow.get(source.project.id) } : source.graph, source.project.id) }))
 }

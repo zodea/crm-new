@@ -1,0 +1,42 @@
+{
+  "run": "sixteenth",
+  "scope": "最终生产构建验证：只归档并人工查看已发后当前来源五档图与真实流程断言；打印 PDF 仅用于临时逐页回读，不归档。",
+  "records": [
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\sixteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\released-current-zero-with-frozen-original-390.png",
+      "destination": "browser/sixteenth/released-current-zero-with-frozen-original-390.png",
+      "bytes": 88209,
+      "sha256": "33bcd8963c4e72d8215b79f9461329f5961c51d52fd3e2e5b4974b32d717360a"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\sixteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\released-current-zero-with-frozen-original-768.png",
+      "destination": "browser/sixteenth/released-current-zero-with-frozen-original-768.png",
+      "bytes": 119696,
+      "sha256": "f5658c5aae77a02589f3fc7dd8147d13ea952aeece05c2dfa61a035c8f22a4b3"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\sixteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\released-current-zero-with-frozen-original-1024.png",
+      "destination": "browser/sixteenth/released-current-zero-with-frozen-original-1024.png",
+      "bytes": 173484,
+      "sha256": "55540a05fdfbda9aff2ae175d6a4d9e1048390429ff804cba96bca1316fcb06b"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\sixteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\released-current-zero-with-frozen-original-1280.png",
+      "destination": "browser/sixteenth/released-current-zero-with-frozen-original-1280.png",
+      "bytes": 174771,
+      "sha256": "a2f880ee557eb268cc5fbba945e901e5636e17867d5758939b9bdcd9420e1fe1"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\sixteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\released-current-zero-with-frozen-original-1440.png",
+      "destination": "browser/sixteenth/released-current-zero-with-frozen-original-1440.png",
+      "bytes": 190684,
+      "sha256": "f71a1edc6787642b2bfb6939c0497a248dff7d1a332f136da4a404004d37da6c"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\sixteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\verification.json",
+      "destination": "browser/sixteenth/verification.json.txt",
+      "bytes": 826,
+      "sha256": "671be00decfb6ed3f03b0ae0b804b432de13f040fcf653d5ba9819490094b092"
+    }
+  ]
+}

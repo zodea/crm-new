@@ -1,5 +1,7 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAAdjustmentReconciliation } from '../../app/lib/payroll/central-a-adjustment-contract'
+import type { PayrollAdjustmentRecord } from '../../app/lib/payroll/central-adjustment-contract'
+import type { PayrollHollowRead } from '../../app/lib/payroll/central-hollow-deduction-contract'
 import type { PayrollReleaseAdjustmentApplication, PayrollReleaseAdjustmentCandidate } from '../../app/lib/payroll/central-release-adjustment-contract'
 import { applyPayrollAAdjustmentDimension } from '../../app/lib/payroll/central-a-adjustment-coverage'
 import { payrollCorrectionAmount } from '../../app/lib/payroll/central-adjustment-calculation'
@@ -15,8 +17,8 @@ import { loadPayrollAdjustmentBalance, loadPayrollAdjustmentRows, readPayrollAdj
 
 interface Statement { id: string, project_id: string, crew_id: string | null, leader_worker_id: string, month: string, format_family: string, status: string, gross_amount: number | null }
 export interface PayrollReleaseApplicationPlan extends PayrollReleaseAdjustmentApplication { rootAdjustmentId: string, originalStatementId: string }
-function includedAmount(reconciliation: PayrollAAdjustmentReconciliation | undefined, rootAdjustmentId: string, remainingAmount: number | null) {
-  if (!reconciliation || reconciliation.reasons.length || reconciliation.effectiveCumulative.value === null || remainingAmount === null)
+function includedRawEffect(reconciliation: PayrollAAdjustmentReconciliation | undefined, rootAdjustmentId: string) {
+  if (!reconciliation || reconciliation.reasons.length || reconciliation.effectiveCumulative.value === null)
     return 0
   const without = structuredClone(reconciliation.effectiveBasis)
   for (const row of reconciliation.coverage.filter(c => c.rootAdjustmentId === rootAdjustmentId)) {
@@ -28,10 +30,25 @@ function includedAmount(reconciliation: PayrollAAdjustmentReconciliation | undef
   const amount = payrollCorrectionAmount(without).value
   if (amount === null)
     return 0
-  const effect = (amountInCents(reconciliation.effectiveCumulative.value) - amountInCents(amount)) / 100
-  return effect * remainingAmount <= 0 ? 0 : Math.min(Math.abs(remainingAmount), Math.abs(effect))
+  return (amountInCents(reconciliation.effectiveCumulative.value) - amountInCents(amount)) / 100
 }
-export async function readPayrollReleaseAdjustments(tx: TransactionDb, statementId: string, reconciliation?: PayrollAAdjustmentReconciliation) {
+function includedHollowEffect(hollow: PayrollHollowRead | undefined, head: PayrollAdjustmentRecord, records: PayrollAdjustmentRecord[]) {
+  if (!hollow?.snapshot || hollow.state !== 'available' || hollow.scope?.formatFamily !== 'A')
+    return 0
+  const root = records.find(record => record.id === head.rootAdjustmentId)
+  const before = root?.snapshot?.preview.before?.hollow
+  if (!before)
+    return 0
+  let effectFen = 0
+  for (const component of before.components) {
+    const current = hollow.snapshot.previousProcessed.find(row => row.adoption.id === component.adoptionId && row.adoption.statementId === head.originalStatementId && row.adjustmentIds.includes(head.id))
+    if (!current || current.effectiveAmount.value === null || component.count === null || component.unitAmount === null)
+      return 0
+    effectFen += amountInCents(component.count * component.unitAmount) - amountInCents(current.effectiveAmount.value)
+  }
+  return effectFen / 100
+}
+export async function readPayrollReleaseAdjustments(tx: TransactionDb, statementId: string, reconciliation?: PayrollAAdjustmentReconciliation, hollow?: PayrollHollowRead) {
   const [statement] = await tx.select<Statement>('SELECT id,project_id,crew_id,leader_worker_id,month,format_family,status,gross_amount FROM wage_statements WHERE id=?', [statementId])
   if (!statement)
     throw payrollProblem('not-found', '后续工资不存在')
@@ -50,18 +67,19 @@ export async function readPayrollReleaseAdjustments(tx: TransactionDb, statement
     const remainingAmount = balance.remainingDelta.value
     if (remainingAmount === 0)
       continue
-    const embeddedInCalculation = includedAmount(reconciliation, row.rootAdjustmentId, remainingAmount)
+    const effect = includedRawEffect(reconciliation, row.rootAdjustmentId) + includedHollowEffect(hollow, row, confirmed)
+    const embeddedInCalculation = remainingAmount === null || effect * remainingAmount <= 0 ? 0 : Math.min(Math.abs(remainingAmount), Math.abs(effect))
     const reasons = [...(remainingAmount === null ? ['原更正剩余无法证明'] : remainingAmount > 0 && !embeddedInCalculation ? ['该核增需通过独立实际补发处理'] : []), ...(original.formatFamily !== statement.format_family ? ['后续处理不能借另一工资格式转移原余额'] : []), ...(statement.format_family === 'A' ? reconciliation?.reasons ?? ['A 类须完成逐来源更正包含核验'] : []), ...(!['draft', 'checked'].includes(statement.status) ? ['后续工资已发或状态不可用'] : [])]
-    candidates.push({ adjustmentId: row.id, rootAdjustmentId: row.rootAdjustmentId, originalStatementId: original.statementId, originalMonth: original.month, remainingAmount, embeddedInCalculation, additionalWithholding: remainingAmount === null ? null : remainingAmount < 0 ? Math.max(0, -remainingAmount - embeddedInCalculation) : 0, balanceVersion: balance.balanceVersion, coverageVersion: hash({ statement, original, balance, ...(reconciliation ? { reconciliation } : {}) }), eligible: reasons.length === 0, reasons })
+    candidates.push({ adjustmentId: row.id, rootAdjustmentId: row.rootAdjustmentId, originalStatementId: original.statementId, originalMonth: original.month, remainingAmount, embeddedInCalculation, additionalWithholding: remainingAmount === null ? null : remainingAmount < 0 ? Math.max(0, -remainingAmount - embeddedInCalculation) : 0, balanceVersion: balance.balanceVersion, coverageVersion: hash({ statement, original, balance, ...(reconciliation ? { reconciliation } : {}), ...(hollow ? { hollow: hollow.snapshot } : {}) }), eligible: reasons.length === 0, reasons })
   }
   return { statement, candidates, reasons: [] as string[] }
 }
-export async function preparePayrollReleaseAdjustments(tx: TransactionDb, statementId: string, actualAmount: number | null, applications?: PayrollReleaseAdjustmentApplication[], reconciliation?: PayrollAAdjustmentReconciliation): Promise<PayrollReleaseApplicationPlan[] | undefined> {
-  if (applications === undefined && !reconciliation)
+export async function preparePayrollReleaseAdjustments(tx: TransactionDb, statementId: string, actualAmount: number | null, applications?: PayrollReleaseAdjustmentApplication[], reconciliation?: PayrollAAdjustmentReconciliation, hollow?: PayrollHollowRead): Promise<PayrollReleaseApplicationPlan[] | undefined> {
+  if (applications === undefined && !reconciliation && !hollow)
     return undefined
   if (applications !== undefined && !isPayrollReleaseApplications(applications))
     throw payrollProblem('validation-failed', '后续工资处理引用无效')
-  const preview = await readPayrollReleaseAdjustments(tx, statementId, reconciliation)
+  const preview = await readPayrollReleaseAdjustments(tx, statementId, reconciliation, hollow)
   for (const candidate of preview.candidates.filter(c => c.eligible && c.embeddedInCalculation > 0)) {
     const application = applications?.find(a => a.adjustmentId === candidate.adjustmentId)
     const needed = candidate.remainingAmount! < 0 ? candidate.embeddedInCalculation : Math.min(candidate.embeddedInCalculation, Math.max(0, (actualAmount ?? 0) - Math.max(0, (preview.statement.gross_amount ?? 0) - candidate.embeddedInCalculation)))

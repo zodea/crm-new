@@ -14,7 +14,8 @@ export function isPayrollAFeesFormExtension(v: unknown): boolean {
     return feeKeys(v.bookProof, ['state', 'book', 'reasons']) && v.book === null && v.fees === null && v.bookProof.book === null && feeArray(v.bookProof.reasons, feeText) && !e.canSave && !e.canCheck && !e.canRelease
   if (v.bookProof.state !== 'proven' || !feeKeys(v.bookProof, ['state', 'book', 'sourceVersion']) || !feeText(v.bookProof.sourceVersion) || !isPayrollABook(v.book) || !same(v.bookProof.book, v.book) || !same(v.draft.book, v.book) || !isPayrollAFeesSourceSnapshot(v.fees, v.book, !e.canSave && !e.canCheck && !e.canRelease && e.reasons.length > 0))
     return false
-  if (!same(v.fees.totals, v.totals) || !v.previousBookPayments.every(p => feeObject(p) && same(p.book, v.book)))
+  const totals = feeObject(v.hollow) && feeObject(v.hollow.totals) ? { ...v.totals, grossAmount: v.hollow.totals.claimSubtotal } : v.totals
+  if (!same(v.fees.totals, totals) || !v.previousBookPayments.every(p => feeObject(p) && same(p.book, v.book)))
     return false
   return v.status !== 'released' || (v.negativeLineDrafts.length === 0 && !e.canSave && !e.canCheck && !e.canRelease)
 }

@@ -8,11 +8,11 @@ interface Reference { id: string, rootAdjustmentId: string, originalStatementId:
 
 /** 费用归属和负价沿革逐行证明；不能只凭总金额相等认为已含更正。 */
 export function reconcilePayrollAFeeAdjustments(raw: PayrollAAdjustmentBasis, effective: PayrollAAdjustmentBasis, before: PayrollAAdjustmentBasis, after: PayrollAAdjustmentBasis, head: Reference, changed: Map<string, string>): PayrollAAdjustmentCoverage[] {
-  if (before.source.schemaVersion !== 2 || after.source.schemaVersion !== 2 || !before.fees || !after.fees)
+  if (before.source.schemaVersion === 1 || after.source.schemaVersion === 1 || !before.fees || !after.fees)
     return []
-  const source = raw.source.schemaVersion === 2 ? raw.source.fees : null
+  const source = raw.source.schemaVersion !== 1 ? raw.source.fees : null
   const originalSource = before.source.fees
-  const sameBook = raw.source.schemaVersion === 2 && hash(raw.source.book) === hash(before.source.book)
+  const sameBook = raw.source.schemaVersion !== 1 && hash(raw.source.book) === hash(before.source.book)
   const coverage: PayrollAAdjustmentCoverage[] = []
   function push(row: PayrollAAdjustmentCoverage) {
     for (const d of row.dimensions) {

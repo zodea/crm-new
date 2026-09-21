@@ -3,7 +3,9 @@ import { assertPayrollAFeeAdjustmentBasis, payrollAFeeCorrectionReasons } from '
 import { isPayrollAStatementSourceVersioned } from './central-a-fees-validation'
 import { payrollCanonical } from './central-command-shared'
 import { payrollProblem } from './central-contract'
+import { assertPayrollHollowAdjustmentBasis, payrollHollowCorrectionReasons } from './central-hollow-deduction-adjustment'
 import { wireCent, wireDate, wireExact, wireId, wireNullableNumber, wireObject, wireText } from './central-payroll-wire'
+import { isPayrollSourceIdentity } from './migration-identity'
 
 function fail(message: string): never {
   throw payrollProblem('validation-failed', message)
@@ -12,53 +14,55 @@ export function assertPayrollAdjustmentTarget(value: unknown): asserts value is 
   if (!wireObject(value))
     fail('更正需要固定的原工资或草稿身份')
   wireExact(value, value.adjustmentId === null ? ['adjustmentId', 'draftKey', 'originalStatementId'] : ['adjustmentId'])
-  if (value.adjustmentId === null ? !wireId(value.draftKey) || !wireId(value.originalStatementId) : !wireId(value.adjustmentId))
+  if (value.adjustmentId === null ? !wireId(value.draftKey) || !isPayrollSourceIdentity(value.originalStatementId, 'wage_statements') : !isPayrollSourceIdentity(value.adjustmentId, 'payroll_adjustments'))
     fail('更正的原工资或草稿身份无效')
 }
 export function assertPayrollAdjustmentDraft(value: unknown): asserts value is PayrollAdjustmentDraft {
   wireExact(value, ['reason', 'evidenceNote', 'correctsAdjustmentId', 'basis'])
-  if (!wireText(value.reason) || !wireText(value.evidenceNote) || !(value.correctsAdjustmentId === null || wireId(value.correctsAdjustmentId)))
+  if (!wireText(value.reason) || !wireText(value.evidenceNote) || !(value.correctsAdjustmentId === null || isPayrollSourceIdentity(value.correctsAdjustmentId, 'payroll_adjustments')))
     fail('更正原因、核对依据或前序更正无效')
   if (value.basis === null)
     return
+  if (wireObject(value.basis) && Object.hasOwn(value.basis, 'hollow'))
+    assertPayrollHollowAdjustmentBasis(value.basis.hollow)
   if (wireObject(value.basis) && value.basis.formatFamily === 'A') {
-    wireExact(value.basis, ['formatFamily', 'periodKind', 'source', 'payRatio', 'components', 'fees'])
+    wireExact(value.basis, ['formatFamily', 'periodKind', 'source', 'payRatio', 'components', 'fees', 'hollow'])
     if (!isPayrollAStatementSourceVersioned(value.basis.source) || !['monthly', 'settlement', 'retention'].includes(String(value.basis.periodKind)) || !wireNullableNumber(value.basis.payRatio) || !Array.isArray(value.basis.components))
       fail('A 更正须保留原完整施工责任、价格来源和发放档位')
-    if (value.basis.source.schemaVersion === 2)
+    if (value.basis.source.schemaVersion !== 1)
       assertPayrollAFeeAdjustmentBasis(value.basis.fees)
     else if (Object.hasOwn(value.basis, 'fees'))
       fail('旧 A 原来源不能补写费用更正字段')
     for (const component of value.basis.components) {
       wireExact(component, ['ownershipKey', 'priceRevisionId', 'quantity', 'unitPrice'])
-      if (!wireText(component.ownershipKey) || !component.ownershipKey || !wireId(component.priceRevisionId) || !wireNullableNumber(component.quantity) || !wireNullableNumber(component.unitPrice))
+      if (!wireText(component.ownershipKey) || !component.ownershipKey || !isPayrollSourceIdentity(component.priceRevisionId, 'payroll_a_price_revisions') || !wireNullableNumber(component.quantity) || !wireNullableNumber(component.unitPrice))
         fail('A 更正须逐责任指向原量、价依据')
     }
     return
   }
   if (wireObject(value.basis) && value.basis.formatFamily === 'C1') {
-    wireExact(value.basis, ['formatFamily', 'rates', 'records'])
+    wireExact(value.basis, ['formatFamily', 'rates', 'records', 'hollow'])
     if (!Array.isArray(value.basis.rates) || !Array.isArray(value.basis.records))
       fail('C1 更正须保留逐人标准与逐日考勤集合')
     for (const row of value.basis.rates) {
       wireExact(row, ['workerId', 'configId', 'dailyWage', 'overtimeRate', 'overtimeRule'])
-      if (!wireId(row.workerId) || !(row.configId === null || wireId(row.configId)) || !wireNullableNumber(row.dailyWage) || !wireNullableNumber(row.overtimeRate) || !['daily-divided-eight', 'explicit'].includes(String(row.overtimeRule)))
+      if (!wireId(row.workerId) || !(row.configId === null || isPayrollSourceIdentity(row.configId, 'payroll_c1_rate_revisions')) || !wireNullableNumber(row.dailyWage) || !wireNullableNumber(row.overtimeRate) || !['daily-divided-eight', 'explicit'].includes(String(row.overtimeRule)))
         fail('C1 个人更正标准字段无效')
     }
     for (const row of value.basis.records) {
       wireExact(row, ['recordId', 'workerId', 'workDate', 'hours', 'overtimeHours', 'workContent'])
-      if (!wireId(row.recordId) || !wireId(row.workerId) || !wireDate(row.workDate) || !wireNullableNumber(row.hours) || !wireNullableNumber(row.overtimeHours) || !wireText(row.workContent))
+      if (!isPayrollSourceIdentity(row.recordId, 'attendance_records') || !wireId(row.workerId) || !wireDate(row.workDate) || !wireNullableNumber(row.hours) || !wireNullableNumber(row.overtimeHours) || !wireText(row.workContent))
         fail('C1 更正考勤字段无效')
     }
     return
   }
-  wireExact(value.basis, ['formatFamily', 'configId', 'unitRate', 'records'])
+  wireExact(value.basis, ['formatFamily', 'configId', 'unitRate', 'records', 'hollow'])
   const basis = value.basis
-  if (basis.formatFamily !== 'C2' || !wireId(basis.configId) || !wireNullableNumber(basis.unitRate) || !Array.isArray(basis.records))
+  if (basis.formatFamily !== 'C2' || !isPayrollSourceIdentity(basis.configId, 'payroll_subject_configs') || !wireNullableNumber(basis.unitRate) || !Array.isArray(basis.records))
     fail('更正必须保留原 C2 主体配置及逐条签工身份')
   for (const record of basis.records) {
     wireExact(record, ['recordId', 'workerId', 'workDate', 'laborUnits', 'startTime', 'endTime', 'workContent', 'witness', 'confirmedOn'])
-    if (!wireId(record.recordId) || !wireId(record.workerId) || !wireDate(record.workDate) || !wireNullableNumber(record.laborUnits) || !['startTime', 'endTime', 'workContent', 'witness', 'confirmedOn'].every(k => wireText(record[k])))
+    if (!isPayrollSourceIdentity(record.recordId, 'signed_daywork_records') || !wireId(record.workerId) || !wireDate(record.workDate) || !wireNullableNumber(record.laborUnits) || !['startTime', 'endTime', 'workContent', 'witness', 'confirmedOn'].every(k => wireText(record[k])))
       fail('独立更正的签工记录字段不完整')
   }
 }
@@ -132,11 +136,12 @@ function payrollACorrectionReasons(basis: PayrollAAdjustmentBasis, original: Pay
   return [...new Set(reasons)]
 }
 export function payrollCorrectionReasons(basis: PayrollAdjustmentBasisDraft, original: PayrollAdjustmentBasisDraft): string[] {
+  const hollow = payrollHollowCorrectionReasons(basis.hollow, original.hollow)
   if (basis.formatFamily === 'A' && original.formatFamily === 'A')
-    return payrollACorrectionReasons(basis, original)
+    return [...payrollACorrectionReasons(basis, original), ...hollow]
   if (basis.formatFamily === 'C1' && original.formatFamily === 'C1')
-    return payrollC1CorrectionReasons(basis, original)
+    return [...payrollC1CorrectionReasons(basis, original), ...hollow]
   if (basis.formatFamily === 'C2' && original.formatFamily === 'C2')
-    return payrollC2CorrectionReasons(basis, original)
+    return [...payrollC2CorrectionReasons(basis, original), ...hollow]
   return ['独立更正不能改变原工资格式']
 }

@@ -1,5 +1,7 @@
 import type { QuantityCommand, QuantityCommandResult } from './central-contract'
 import { invalidQuantityResponse, quantityObject, quantityStrings } from './central-decoder'
+import { decodeQuantityHollowCommand } from './central-hollow-codec'
+import { isQuantityHollowActionKind, parseQuantityHollowCommand } from './central-hollow-validation'
 
 function ids(value: unknown): value is string[] {
   return quantityStrings(value) && value.every(id => id.trim()) && new Set(value).size === value.length
@@ -11,6 +13,8 @@ function sameIds(left: unknown, right: readonly string[]) {
 
 /** 请求动作决定可采纳结果；响应不能把其他户的完成或附件混入当前操作。 */
 export function decodeQuantityCommand(value: unknown, command: QuantityCommand): QuantityCommandResult {
+  if (isQuantityHollowActionKind(command.action.kind))
+    return decodeQuantityHollowCommand(value, parseQuantityHollowCommand(command))
   if (!quantityObject(value) || value.commandId !== command.commandId || typeof value.id !== 'string' || !value.id.trim()
     || typeof value.sourceVersion !== 'string' || !value.sourceVersion.trim() || !ids(value.logIds)) {
     invalidQuantityResponse()

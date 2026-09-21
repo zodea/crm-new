@@ -172,6 +172,8 @@ export function resolveAdapter(surface, host) {
     return 'tool-local-storage'
   if (route === '/subcontract/quantity/stages')
     return host === 'browser' ? 'central-http' : 'unsupported'
+  if (route.startsWith('/subcontract/quantity/:pid/:uid/hollow/'))
+    return host === 'browser' ? 'central-http' : 'unsupported'
   if (route.startsWith('/subcontract/payroll/adjustments/') || route === '/subcontract/payroll/payments' || route.startsWith('/subcontract/payroll/payments/'))
     return host === 'tauri' && surface.template === '整页表单' ? 'unsupported' : 'payroll-adjustment-central'
   if (surface.path.startsWith('central/p4/'))

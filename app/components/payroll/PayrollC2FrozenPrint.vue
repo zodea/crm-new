@@ -2,6 +2,7 @@
 import type { PayrollC2FrozenDocument } from '~/lib/payroll/central-c2-contract'
 import { c2Number } from '~/lib/payroll/c2-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
+import PayrollHollowFrozenSection from './PayrollHollowFrozenSection.vue'
 
 defineProps<{ document: PayrollC2FrozenDocument }>()
 </script>
@@ -24,6 +25,7 @@ defineProps<{ document: PayrollC2FrozenDocument }>()
             </tr>
           </tbody>
         </table>
+        <PayrollHollowFrozenSection v-if="document.hollow" :snapshot="document.hollow" />
         <section class="summary">
           <p>核算应发 <strong>{{ payrollAmount(document.grossAmount) }}</strong></p><p>实际发放 <strong>{{ payrollAmount(document.actualAmount) }}</strong></p>
         </section><h2>实际收款分配</h2><table>

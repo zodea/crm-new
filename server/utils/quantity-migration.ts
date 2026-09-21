@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { quantityProblem } from '../../app/lib/quantity/central-contract'
 import { parseQuantityMigrationGraph, QUANTITY_MIGRATION_COLUMNS, QUANTITY_MIGRATION_PROJECT_PARENTS, QUANTITY_MIGRATION_TABLES, quantityMigrationRowId } from '../../app/lib/quantity/migration-graph'
 import { mapQuantityMigrationGraph } from '../../app/lib/quantity/migration-mapping'
+import { assertQuantityHollowMigrationReferences, insertQuantityHollowMigration, removeQuantityHollowMigration } from './quantity-hollow-migration'
 
 export interface ImportedQuantityProject {
   entityId: string
@@ -41,7 +42,7 @@ export function planQuantityMigration(snapshot: CoreMigrationSnapshotDTO, curren
     invalid('工程量逻辑项目身份重复')
   const removed = [...current.values()].filter(row => row.batchId !== batchId || !ids.has(row.entityId))
   const imports = new Map([...current].filter(([, row]) => !removed.includes(row)))
-  const incoming: { entity: CoreMigrationServerEntityDTO, project: CoreMigrationServerEntityDTO, graph: QuantityMigrationGraph, identities: QuantityMigrationIdentity[], fingerprint: string }[] = []
+  const incoming: { entity: CoreMigrationServerEntityDTO, project: CoreMigrationServerEntityDTO, source: QuantityMigrationGraph, graph: QuantityMigrationGraph, identities: QuantityMigrationIdentity[], fingerprint: string }[] = []
   const projects = new Set<string>()
   for (const entity of entities) {
     if (entity.batchId !== batchId || !entity.references.projectId || projects.has(entity.references.projectId))
@@ -72,7 +73,7 @@ export function planQuantityMigration(snapshot: CoreMigrationSnapshotDTO, curren
       contracts: bindings(contracts, 'construction_contracts'),
       boqLineIds: new Set(source.boqReferences.map(row => row.id)),
     })
-    incoming.push({ entity, project, ...mapped, fingerprint })
+    incoming.push({ entity, project, source, ...mapped, fingerprint })
   }
   return { incoming, removed, imports, references: snapshot.entities, affectedProjects: [...new Set([...removed.map(row => row.projectId), ...incoming.map(row => row.project.id)])] }
 }
@@ -105,7 +106,10 @@ async function assertRollbackIndependentRecords(db: TransactionDb, removed: read
 }
 
 export async function applyQuantityMigration(db: TransactionDb, plan: ReturnType<typeof planQuantityMigration>) {
+  const removedEntityIds = plan.removed.map(row => row.entityId)
+  await assertQuantityHollowMigrationReferences(db, { entityIds: removedEntityIds, projects: plan.removed.map(row => row.projectId), quantity: plan.removed.flatMap(row => row.identities) })
   await assertRollbackIndependentRecords(db, plan.removed)
+  await removeQuantityHollowMigration(db, removedEntityIds)
   // 整户行已由真实来源携带。候选事务内暂停新增模板的便捷触发器，避免造出第二条整户行。
   const [wholeUnitTrigger] = await db.select<{ sql: string }>('SELECT sql FROM sqlite_master WHERE type = \'trigger\' AND name = \'trg_house_type_templates_whole_unit\'')
   if (!wholeUnitTrigger?.sql)
@@ -151,6 +155,7 @@ export async function applyQuantityMigration(db: TransactionDb, plan: ReturnType
           invalid(`${table} 写后字段对账不一致`)
       }
     }
+    await insertQuantityHollowMigration(db, { entityId: next.entity.id, projectId: next.project.id, batchId: next.entity.batchId, source: next.source, mapped: next.graph })
     plan.imports.set(next.entity.id, { entityId: next.entity.id, projectId: next.project.id, batchId: next.entity.batchId, fingerprint: next.fingerprint, identities: next.identities, previousArchive: before?.matrix_archived_at ?? null, createdBoqIds })
   }
   await db.execute(wholeUnitTrigger.sql)

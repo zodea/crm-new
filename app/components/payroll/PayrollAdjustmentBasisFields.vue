@@ -2,13 +2,32 @@
 import type { PayrollAdjustmentBasisDraft, PayrollOriginalWageRef } from '~/lib/payroll/central-adjustment-contract'
 import { computed } from 'vue'
 import { c2InputNumber } from '~/lib/payroll/c2-presentation'
+import { isPayrollAStatementSourceVersioned } from '~/lib/payroll/central-a-fees-validation'
+import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollAFeeAdjustmentFields from './PayrollAFeeAdjustmentFields.vue'
+import PayrollHollowAdjustmentFields from './PayrollHollowAdjustmentFields.vue'
 
 const props = defineProps<{ basis: PayrollAdjustmentBasisDraft | null, original: PayrollOriginalWageRef, disabled: boolean, sectionId?: string }>()
 const emit = defineEmits<{ change: [value: PayrollAdjustmentBasisDraft] }>()
 const names = computed(() => new Map(props.original.members.map(member => [member.workerId, member.workerName || '姓名未记录'])))
+const aRows = computed(() => {
+  const basis = props.basis
+  if (basis?.formatFamily !== 'A')
+    return []
+  return basis.components.map((row) => {
+    const facts = basis.source.facts.filter(fact => fact.ownershipKey === row.ownershipKey)
+    const prices = basis.source.priceRevisions.filter(price => price.id === row.priceRevisionId)
+    const fact = facts.length === 1 ? facts[0]! : null
+    const price = prices.length === 1 ? prices[0]! : null
+    return { row, fact, price, sourceReady: !!fact && !!price, location: fact ? [fact.buildingName || '楼栋未记录', fact.floorName || '楼层未记录', fact.unitName || '户名未记录', fact.roomName || '房间未记录'].join(' / ') : facts.length ? '原责任位置依据不唯一' : '原责任位置依据缺失', priceReason: prices.length ? '原价格依据不唯一' : '原价格依据缺失' }
+  })
+})
+const feeSource = computed(() => {
+  const source = props.basis?.formatFamily === 'A' ? props.basis.source : null
+  return isPayrollAStatementSourceVersioned(source) && source.schemaVersion !== 1 ? source.fees : null
+})
 function update(group: 'records' | 'rates' | 'components', index: number, field: string, value: unknown) {
-  if (props.disabled || !props.basis)
+  if (props.disabled || !props.basis || (group === 'components' && !aRows.value[index]?.sourceReady))
     return
   const basis = JSON.parse(JSON.stringify(props.basis)) as PayrollAdjustmentBasisDraft
   if (group === 'components' && basis.formatFamily === 'A')
@@ -47,21 +66,28 @@ function amount(event: Event) {
               </th>
             </tr>
           </thead><tbody>
-            <tr v-for="(row, index) in basis.components" :key="row.ownershipKey" class="border-b border-line">
-              <td class="max-w-64 break-all p-2">
-                {{ row.ownershipKey }}
+            <tr v-for="({ row, fact, price, sourceReady, location, priceReason }, index) in aRows" :key="row.ownershipKey" class="border-b border-line">
+              <td class="min-w-48 max-w-64 break-words p-2 leading-5">
+                {{ location }}<template v-if="fact">
+                  <span class="block font-600">{{ fact.itemName || '分项未记录' }} · {{ fact.unit || '单位未记录' }}</span><span class="block text-ink-soft">原施工：{{ fact.workerName || fact.crewName || '责任名称未记录' }}</span>
+                </template>
               </td><td class="p-2">
-                <input :value="row.quantity ?? ''" :aria-label="`第${index + 1}项更正现场量`" type="number" min="0" step="any" class="field-input w-32" :disabled="disabled" @input="update('components', index, 'quantity', amount($event))">
+                <input :value="row.quantity ?? ''" :aria-label="`第${index + 1}项更正现场量`" type="number" min="0" step="any" class="field-input w-32" :disabled="disabled || !sourceReady" @input="update('components', index, 'quantity', amount($event))">
               </td><td class="p-2">
-                <input :value="row.unitPrice ?? ''" :aria-label="`第${index + 1}项更正单价`" type="number" step="0.01" class="field-input w-32" :disabled="disabled" @input="update('components', index, 'unitPrice', amount($event))">
-              </td><td class="max-w-48 break-all p-2">
-                {{ row.priceRevisionId }}
+                <input :value="row.unitPrice ?? ''" :aria-label="`第${index + 1}项更正单价`" type="number" step="0.01" class="field-input w-32" :disabled="disabled || !sourceReady" @input="update('components', index, 'unitPrice', amount($event))">
+              </td><td class="min-w-40 max-w-48 break-words p-2 leading-5">
+                <template v-if="price">
+                  <span class="block">{{ price.mode === 'baseline' ? '基准单价' : '个人例外单价' }} · 修订 {{ price.revision }}</span><span class="block whitespace-nowrap font-mono">{{ payrollAmount(price.unitPrice) }} / {{ price.unit || '单位未记录' }}</span><span class="block text-ink-soft">{{ price.effectiveMonth }} 起生效</span>
+                </template><span v-else class="text-warn">{{ priceReason }}</span>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <PayrollAFeeAdjustmentFields v-if="basis.source.schemaVersion === 2 && basis.fees" :basis="basis.fees" :source="basis.source.fees" :disabled="disabled" @change="emit('change', { ...basis, fees: $event })" />
+      <PayrollAFeeAdjustmentFields v-if="feeSource && basis.fees" :basis="basis.fees" :source="feeSource" :disabled="disabled" @change="emit('change', { ...basis, fees: $event })" />
+      <p v-else-if="basis.fees" class="text-12px text-warn">
+        原费用版本与完整来源未通过核对，不能补造费用更正。
+      </p>
     </template>
     <template v-else-if="basis.formatFamily === 'C1'">
       <div tabindex="0" aria-label="原成员更正标准" class="min-w-0 overflow-x-auto">
@@ -173,5 +199,6 @@ function amount(event: Event) {
         </table>
       </div>
     </template>
+    <PayrollHollowAdjustmentFields v-if="basis?.hollow" :basis="basis.hollow" :disabled="disabled" @change="emit('change', { ...basis, hollow: $event })" />
   </section>
 </template>

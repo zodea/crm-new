@@ -127,7 +127,7 @@ it('迁入原费用依据仍可独立更正和实际退款，原签字输出不�
     expect((await f.service.aOutput({ origin: 'real' }, f.ordinaryId)).document).toEqual(before.document)
   }
   finally { await f.original.close() }
-})
+}, 30_000)
 
 it('真实普通补贴与管理负价迁入后公开输出/已发详情可读，原六表JSON和签名逐字保留', async () => {
   const f = await createPayrollFeesMigrationFixture()

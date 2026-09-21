@@ -1,8 +1,9 @@
 import type { PayrollAAction, PayrollACommand, PayrollACommandRead, PayrollAConfigRead, PayrollAConfigScope, PayrollADraft, PayrollAFormInput, PayrollAFormRead, PayrollAOutputRead, PayrollAPriceDraft, PayrollAReleaseDraft, PayrollAStatementCommandResult, PayrollASubjectConfigDraft } from '~/lib/payroll/central-a-contract'
 import type { PayrollQuery } from '~/lib/payroll/central-contract'
+import { useSessionStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { payrollACanonical } from '~/lib/payroll/central-a-calculation'
-import { decodePayrollAResult, encodePayrollAWire, parsePayrollACommand } from '~/lib/payroll/central-a-codec'
+import { decodePayrollAResult, encodePayrollAWire, parsePayrollACommand, parsePayrollAFormInput } from '~/lib/payroll/central-a-codec'
 import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { payrollProblem } from '~/lib/payroll/central-contract'
 import { usePayrollPending } from '~/lib/payroll/central-pending'
@@ -10,14 +11,36 @@ import { generateId } from '~/lib/util/id'
 import { usePayrollAFeesStore } from './payroll-a-fees'
 
 const storageKey = 'payroll-a-central-pending-v1'
+interface PayrollACachedInput { draft: PayrollADraft, original: string, ratioExplicit: boolean }
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 export const usePayrollAStore = defineStore('payroll-a-central', () => {
   const repository = () => useNuxtApp().$repositories.payroll
+  const draftInputs = useSessionStorage<Record<string, PayrollACachedInput>>('payroll-a-draft-inputs-v1', {}, { flush: 'sync', writeDefaults: false, onError: () => {} })
   const keyFor = (c: Pick<PayrollACommand, 'workspaceId' | 'actorId' | 'origin' | 'statementId' | 'draftKey' | 'configScope'>) => payrollACanonical([c.workspaceId, c.actorId, c.origin, c.configScope ?? c.statementId ?? c.draftKey])
   const readKey = (read: PayrollACommandRead) => keyFor({ ...read.context, statementId: 'statementId' in read ? read.statementId : null, draftKey: 'draftKey' in read ? read.draftKey : null, configScope: 'scope' in read ? read.scope : null })
   const pending = usePayrollPending(storageKey, keyFor, (command: PayrollACommand) => {
     parsePayrollACommand(encodePayrollAWire(command))
   }, command => repository().execute(command), decodePayrollAResult)
   const getAPending = (read: PayrollACommandRead) => pending.get(readKey(read))
+  const draftInputKey = (read: PayrollAFormRead) => JSON.stringify([read.context.workspaceId, read.context.actorId, read.context.origin, read.statementId ?? read.draftKey])
+  function getADraftInput(read: PayrollAFormRead): PayrollACachedInput | null {
+    try {
+      const value = draftInputs.value?.[draftInputKey(read)]
+      if (!value || typeof value.original !== 'string' || typeof value.ratioExplicit !== 'boolean' || !['projectId', 'month', 'periodKind', 'crewId', 'leaderWorkerId', 'memberWorkerIds', 'payRatio', 'note'].every(field => field in value.draft))
+        return null
+      const input = parsePayrollAFormInput(encodePayrollAWire({ statementId: read.statementId, ...(read.statementId ? {} : { draftKey: read.draftKey }), draft: clone(value.draft) }))
+      return { draft: input.draft as PayrollADraft, original: value.original, ratioExplicit: value.ratioExplicit }
+    }
+    catch { return null }
+  }
+  function rememberADraftInput(read: PayrollAFormRead, value: PayrollACachedInput) {
+    draftInputs.value = { ...draftInputs.value, [draftInputKey(read)]: clone(value) }
+  }
+  function discardADraftInput(read: PayrollAFormRead) {
+    const next = { ...draftInputs.value }
+    delete next[draftInputKey(read)]
+    draftInputs.value = next
+  }
   function execute(read: PayrollACommandRead, action: PayrollAAction) {
     if (read.context.origin !== 'real' || read.context.readonly || !read.context.capabilities.includes('payroll:write'))
       throw payrollProblem('forbidden', '当前工资资料仅可阅读')
@@ -73,6 +96,9 @@ export const usePayrollAStore = defineStore('payroll-a-central', () => {
     saveASubjectConfig: (read: PayrollAConfigRead, config: PayrollASubjectConfigDraft) => execute(read, { kind: 'save-a-subject-config', config }),
     saveAPrices: (read: PayrollAConfigRead, prices: PayrollAPriceDraft[]) => execute(read, { kind: 'save-a-prices', prices }),
     getAPending,
+    getADraftInput,
+    rememberADraftInput,
+    discardADraftInput,
     recoverA: pending.recover,
     acknowledgeA,
   }

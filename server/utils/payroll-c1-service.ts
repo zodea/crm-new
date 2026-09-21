@@ -5,11 +5,12 @@ import type { NavigationIntentDTO } from '../../app/types/read-model'
 import type { PayrollIdentitySource, PayrollRun, PayrollServiceOptions } from './payroll-service'
 import { createHash } from 'node:crypto'
 import { payrollC1Amount, payrollC1Lines } from '../../app/lib/payroll/central-c1-calculation'
-import { decodePayrollC1Result, encodePayrollC1Wire, isPayrollC1Rate, isPayrollC1StatementSourceSnapshot, parsePayrollC1Command, parsePayrollC1ConfigScope, parsePayrollC1FormInput } from '../../app/lib/payroll/central-c1-codec'
+import { decodePayrollC1Result, encodePayrollC1Wire, isPayrollC1Rate, isPayrollC1StatementSourceVersioned, parsePayrollC1Command, parsePayrollC1ConfigScope, parsePayrollC1FormInput } from '../../app/lib/payroll/central-c1-codec'
 import { payrollC1Source, persistPayrollC1, releasePayrollC1 } from '../../app/lib/payroll/central-c1-command'
-import { loadPayrollC1ReleasedDocuments } from '../../app/lib/payroll/central-c1-provenance'
 import { payrollCanonical, payrollWriteRow } from '../../app/lib/payroll/central-command-shared'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
+import { payrollHollowFrozenReadWithCurrent } from '../../app/lib/payroll/central-hollow-deduction-read'
+import { payrollHollowAllowsZeroRelease } from '../../app/lib/payroll/central-hollow-deduction-release'
 import { wireMonth } from '../../app/lib/payroll/central-payroll-wire'
 import { advancePayrollRevision, payrollRevision } from '../../app/lib/payroll/central-schema'
 import { loadPayrollSourceExclusions } from '../../app/lib/payroll/central-source-locks'
@@ -18,6 +19,8 @@ import { generateId } from '../../app/lib/util/id'
 import { loadPayrollAttendanceFacts } from './payroll-attendance-facts'
 import { markPayrollC1Recheck } from './payroll-attendance-service'
 import { loadPayrollC1Options } from './payroll-c1-options'
+import { loadPayrollC1ReleasedWithMigration } from './payroll-c-released-with-migration'
+import { readPayrollHollowCurrentForSnapshot, readPayrollHollowInTransaction } from './payroll-hollow-read'
 import { payrollMigratedC1Form } from './payroll-migrated-form'
 import { loadPayrollMigratedProof } from './payroll-migrated-proof'
 import { persistPayrollReleaseAdjustments, preparePayrollReleaseAdjustments } from './payroll-release-adjustments'
@@ -51,19 +54,26 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
     const row = input.statementId ? await head(db, input.statementId) : null
     if (row?.status === 'released') {
       const migrated = payrollMigratedC1Form(await loadPayrollMigratedProof(db, String(row.project_id)), base, String(row.id))
-      if (migrated)
+      if (migrated) {
+        if (migrated.hollow?.snapshot) {
+          const current = await readPayrollHollowCurrentForSnapshot(db, base, source, String(row.id), migrated.hollow.snapshot, migrated.draft.memberWorkerIds ?? [], options)
+          migrated.hollow = payrollHollowFrozenReadWithCurrent(base, String(row.id), migrated.hollow.snapshot, current)
+        }
         return migrated
+      }
     }
     let stored: Partial<PayrollC1Draft> = {}
     let central = false
+    let storedHollow = false
     if (row) {
       const [saved] = await db.select<{ source_json: string }>('SELECT source_json FROM payroll_c1_statement_sources WHERE statement_id=?', [row.id])
       if (saved) {
         try {
           const original: unknown = JSON.parse(saved.source_json)
-          if (isPayrollC1StatementSourceSnapshot(original)) {
+          if (isPayrollC1StatementSourceVersioned(original)) {
             stored = { ...original.subject, month: original.month, note: String(row.note ?? '') }
             central = true
+            storedHollow = original.schemaVersion === 2
           }
         }
         catch { /* 原文保留为历史诊断，不补造可维护来源。 */ }
@@ -114,15 +124,38 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
     if (row && (!central || row.deleted_at !== null))
       blockers.push(block('historical-readonly', '旧 C1 没有完整中央逐考勤来源或已归档，只保留原文阅读'))
     const lines = payrollC1Lines(facts, effectiveRates)
-    const grossAmount = payrollC1Amount(lines, blockers.filter(b => !['source-occupied', 'historical-readonly'].includes(b.code)).map(b => b.message))
+    let grossAmount = payrollC1Amount(lines, blockers.filter(b => !['source-occupied', 'historical-readonly'].includes(b.code)).map(b => b.message))
     const sources: NavigationIntentDTO[] = facts.map(f => ({ kind: 'source-record', subject: { state: 'resolved', entity: 'attendance', id: f.id, label: `${f.workDate} 考勤`, no: null }, variant: 'matrix', view: null, filters: { projectId, dataOrigin: base.origin, month, crewId: f.crewId, workerId: f.workerId, workDate: f.workDate, recordId: f.id } }))
     const status = row ? row.status as PayrollC1FormRead['status'] : 'new'
     const preliminary: PayrollC1FormRead = { context: { ...base, readonly: !base.capabilities.includes('payroll:write') }, statementId: input.statementId, draftKey: input.statementId ? null : input.draftKey!, status, needsRecheck: !!row?.needs_recheck, draft, options: catalog, members, facts, sources, rates: effectiveRates, lines, totals: { grossAmount }, blockers, eligibility: { canSaveDraft: false, canCheck: false, canRelease: false, canOutput: false, reasons: blockers.map(b => b.message) } }
+    if (options.hollowFacts && (status !== 'released' || storedHollow)) {
+      preliminary.hollow = await readPayrollHollowInTransaction(db, base, source, { target: input.statementId ? { statementId: input.statementId, draftKey: null } : { statementId: null, draftKey: input.draftKey! }, scope: projectId && draft.leaderWorkerId ? { projectId, crewId: draft.crewId ?? null, leaderWorkerId: draft.leaderWorkerId, formatFamily: 'C1', book: null } : null, month: wireMonth(month) ? month : null, memberWorkerIds: memberIds, claimSubtotal: grossAmount, status }, options)
+      grossAmount = preliminary.hollow.totals.grossAmount
+      preliminary.totals.grossAmount = grossAmount
+      for (const reason of preliminary.hollow.reasons)
+        blockers.push(block('hollow-unavailable', reason))
+    }
     const version = hash({ source: payrollC1Source(preliminary), locks })
     preliminary.context.sourceVersion = `${base.sourceVersion}+c1:${hash(payrollC1Source(preliminary))}+locks:${hash(locks)}`
     preliminary.needsRecheck ||= status === 'checked' && row?.checked_source_version !== version
     const writable = !preliminary.context.readonly && blockers.length === 0
-    preliminary.eligibility = { canSaveDraft: writable && ['new', 'draft'].includes(status), canCheck: writable && ['draft', 'checked'].includes(status), canRelease: writable && status === 'checked' && !preliminary.needsRecheck && grossAmount.value !== null && grossAmount.value > 0, canOutput: false, reasons: blockers.map(b => b.message) }
+    preliminary.eligibility = { canSaveDraft: writable && ['new', 'draft'].includes(status), canCheck: writable && ['draft', 'checked'].includes(status), canRelease: writable && status === 'checked' && !preliminary.needsRecheck && grossAmount.value !== null && (grossAmount.value > 0 || payrollHollowAllowsZeroRelease(preliminary.hollow?.snapshot)), canOutput: false, reasons: blockers.map(b => b.message) }
+    if (status === 'released' && storedHollow) {
+      const document = (await loadPayrollC1ReleasedWithMigration(db, input.statementId!)).get(input.statementId!)
+      if (document) {
+        if (document.hollow) {
+          const current = preliminary.hollow ?? await readPayrollHollowCurrentForSnapshot(db, base, source, document.id, document.hollow, draft.memberWorkerIds ?? [], options)
+          preliminary.hollow = payrollHollowFrozenReadWithCurrent(base, document.id, document.hollow, current)
+        }
+        preliminary.facts = document.attendance
+        preliminary.rates = document.rates
+        preliminary.lines = document.lines
+        preliminary.members = document.members.map(member => ({ id: member.workerId, name: member.workerName, crewId: document.crewId, eligible: false, reasons: ['已发工资保留原成员事实'], historical: true, source: null }))
+        preliminary.totals.grossAmount = { value: document.grossAmount, knownValue: document.grossAmount, state: 'known', reasons: [] }
+        preliminary.blockers = []
+        preliminary.eligibility = { canSaveDraft: false, canCheck: false, canRelease: false, canOutput: true, reasons: ['已发工资只读当时冻结事实'] }
+      }
+    }
     return preliminary
   }
   async function config(db: TransactionDb, base: PayrollC1Context, source: PayrollIdentitySource, scope: PayrollC1ConfigScope): Promise<PayrollC1ConfigRead> {
@@ -151,6 +184,7 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
     return { context: { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion: `${base.sourceVersion}+c1-config:${hash({ scope, values, workers: catalog.workers, locks })}` }, scope, options: catalog, rates: values, readonlyReasons, history }
   }
   return {
+    c1FormInTransaction: form,
     c1Form: (query: PayrollQuery, input: PayrollC1FormInput, sessionId?: string | null) => run(query, sessionId, (db, context, source) => form(db, context, source, parsePayrollC1FormInput(encodePayrollC1Wire(input)))),
     c1Config: (query: PayrollQuery, scope: PayrollC1ConfigScope, sessionId?: string | null) => run(query, sessionId, (db, context, source) => config(db, context, source, scope)),
     c1Output: (query: PayrollQuery, statementId: string, sessionId?: string | null): Promise<PayrollC1OutputRead> => run(query, sessionId, async (db, base) => {
@@ -158,7 +192,7 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
       if (query.projectId && query.projectId !== row.project_id)
         throw payrollProblem('relationship-mismatch', 'C1 输出与原项目不一致')
       const context = { ...base, readonly: !base.capabilities.includes('payroll:write') }
-      const document = (await loadPayrollMigratedProof(db, String(row.project_id))).c1Documents.get(statementId) ?? (await loadPayrollC1ReleasedDocuments(db, statementId)).get(statementId)
+      const document = (await loadPayrollMigratedProof(db, String(row.project_id))).c1Documents.get(statementId) ?? (await loadPayrollC1ReleasedWithMigration(db, statementId)).get(statementId)
       return document ? { context, statementId, state: 'available', document, reasons: [] } : { context, statementId, state: 'unavailable', document: null, reasons: ['这份历史工资缺少可相互证明的逐日考勤、个人费率、冻结与原发放回执；继续保留原文阅读'] }
     }),
     async executeC1(input: PayrollC1Command, sessionId?: string | null): Promise<PayrollC1CommandResult> {
@@ -222,7 +256,7 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
               }
               else {
                 const applications = await preparePayrollReleaseAdjustments(db, command.statementId!, action.release.actualAmount, action.release.adjustmentApplications)
-                await releasePayrollC1(db, read, action.release, version, context.actorId)
+                await releasePayrollC1(db, read, action.release, version, context.actorId, command.commandId)
                 if (applications !== undefined)
                   result.adjustmentApplicationIds = await persistPayrollReleaseAdjustments(db, command.statementId!, command.commandId, applications, context.actorId)
                 result.outcome = 'released'

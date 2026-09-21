@@ -1,21 +1,24 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
-import type { PayrollC2Blocker, PayrollC2Command, PayrollC2CommandResult, PayrollC2ConfigRead, PayrollC2ConfigScope, PayrollC2Draft, PayrollC2FormInput, PayrollC2FormRead, PayrollC2OutputRead, PayrollC2StatementSourceSnapshot } from '../../app/lib/payroll/central-c2-contract'
+import type { PayrollC2Blocker, PayrollC2Command, PayrollC2CommandResult, PayrollC2ConfigRead, PayrollC2ConfigScope, PayrollC2Draft, PayrollC2FormInput, PayrollC2FormRead, PayrollC2OutputRead, PayrollC2StatementSourceVersioned } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollJson, PayrollQuery, PayrollWritableContext } from '../../app/lib/payroll/central-contract'
 import type { PayrollIdentitySource, PayrollRun, PayrollServiceOptions } from './payroll-service'
 import { createHash } from 'node:crypto'
 import { payrollC2Amount, payrollC2Lines } from '../../app/lib/payroll/central-c2-calculation'
-import { decodePayrollC2Result, encodePayrollC2Wire, isPayrollC2StatementSourceSnapshot, parsePayrollC2Command, parsePayrollC2ConfigScope, parsePayrollC2FormInput } from '../../app/lib/payroll/central-c2-codec'
+import { decodePayrollC2Result, encodePayrollC2Wire, isPayrollC2StatementSourceVersioned, parsePayrollC2Command, parsePayrollC2ConfigScope, parsePayrollC2FormInput } from '../../app/lib/payroll/central-c2-codec'
 import { payrollC2Source, persistPayrollC2, releasePayrollC2 } from '../../app/lib/payroll/central-c2-command'
-import { loadPayrollC2ReleasedDocuments } from '../../app/lib/payroll/central-c2-provenance'
 import { payrollCanonical, payrollWriteRow } from '../../app/lib/payroll/central-command-shared'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
+import { payrollHollowFrozenReadWithCurrent } from '../../app/lib/payroll/central-hollow-deduction-read'
+import { payrollHollowAllowsZeroRelease } from '../../app/lib/payroll/central-hollow-deduction-release'
 import { wireMonth } from '../../app/lib/payroll/central-payroll-wire'
 import { advancePayrollRevision, payrollRevision } from '../../app/lib/payroll/central-schema'
 import { loadPayrollSourceExclusions } from '../../app/lib/payroll/central-source-locks'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { generateId } from '../../app/lib/util/id'
+import { loadPayrollC2ReleasedWithMigration } from './payroll-c-released-with-migration'
 import { loadPayrollC2ConfigFacts, loadPayrollDayworkFacts } from './payroll-daywork-facts'
 import { markPayrollC2Recheck, projectPayrollDayworkRecords } from './payroll-daywork-service'
+import { readPayrollHollowCurrentForSnapshot, readPayrollHollowInTransaction } from './payroll-hollow-read'
 import { payrollMigratedC2Form } from './payroll-migrated-form'
 import { loadPayrollMigratedProof } from './payroll-migrated-proof'
 import { loadPayrollParticipantOptions } from './payroll-participant-options'
@@ -42,17 +45,22 @@ export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceO
     const row = input.statementId ? await head(db, input.statementId) : null
     if (row?.status === 'released') {
       const migrated = payrollMigratedC2Form(await loadPayrollMigratedProof(db, String(row.project_id)), base, String(row.id))
-      if (migrated)
+      if (migrated) {
+        if (migrated.hollow?.snapshot) {
+          const current = await readPayrollHollowCurrentForSnapshot(db, base, source, String(row.id), migrated.hollow.snapshot, migrated.draft.memberWorkerIds ?? [], options)
+          migrated.hollow = payrollHollowFrozenReadWithCurrent(base, String(row.id), migrated.hollow.snapshot, current)
+        }
         return migrated
+      }
     }
-    let storedSource: PayrollC2StatementSourceSnapshot | null = null
+    let storedSource: PayrollC2StatementSourceVersioned | null = null
     let stored: Partial<PayrollC2Draft> = {}
     if (row) {
       const [saved] = await db.select<{ source_json: string }>('SELECT source_json FROM payroll_c2_statement_sources WHERE statement_id=?', [row.id])
       if (saved) {
         try {
           const original: unknown = JSON.parse(saved.source_json)
-          if (isPayrollC2StatementSourceSnapshot(original))
+          if (isPayrollC2StatementSourceVersioned(original))
             storedSource = original
         }
         catch { /* 缺损源只保留原历史，不以当前配置重构。 */ }
@@ -97,21 +105,32 @@ export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceO
     if (row && (!storedSource || row.deleted_at !== null))
       blockers.push(block('historical-readonly', '旧 C2 缺少完整中央逐签工来源或已归档，只保留原文阅读'))
     const lines = payrollC2Lines(facts.filter(f => adoptedRecordIds.includes(f.id)), current, members.map(m => ({ workerId: m.id, workerName: m.name })))
-    const grossAmount = payrollC2Amount(lines, blockers.filter(b => !['source-occupied', 'historical-readonly'].includes(b.code)).map(b => b.message))
+    let grossAmount = payrollC2Amount(lines, blockers.filter(b => !['source-occupied', 'historical-readonly'].includes(b.code)).map(b => b.message))
     const assignments = projectId ? await db.select<Row>('SELECT a.* FROM unit_assignments a JOIN units u ON u.id=a.unit_id JOIN floors f ON f.id=u.floor_id JOIN buildings b ON b.id=f.building_id WHERE b.project_id=? ORDER BY a.id', [projectId]) : []
     const qualificationVersion = hash({ project: source.projects.find(p => p.id === projectId) ?? null, crews: source.crews.filter(c => c.id === draft.crewId), workers: source.workers.filter(w => ids.includes(w.id)), assignments: assignments.filter(a => ids.includes(String(a.worker_id)) || (a.crew_id !== null && a.crew_id === draft.crewId)), members })
     const status = row ? row.status : 'new'
     if (!['new', 'draft', 'checked', 'released'].includes(String(status)))
       throw payrollProblem('conflict', '旧 C2 状态无法确认，请在原历史详情阅读')
     const read: PayrollC2FormRead = { context: { ...base, readonly: !base.capabilities.includes('payroll:write') }, statementId: input.statementId, draftKey: input.statementId ? null : input.draftKey!, status: status as PayrollC2FormRead['status'], needsRecheck: false, draft, options: catalog, members, facts, adoptedRecordIds, qualificationVersion, config: current, storedSource, sources: facts.flatMap(f => f.source ? [f.source] : []), lines, totals: { grossAmount }, blockers, eligibility: { canSaveDraft: false, canCheck: false, canRelease: false, canOutput: false, reasons: [] }, diagnostics: [...all.diagnostics, ...configRead.diagnostics], evidence: [...all.evidence, ...configRead.evidence] }
+    if (options.hollowFacts && (read.status !== 'released' || storedSource?.schemaVersion === 2)) {
+      read.hollow = await readPayrollHollowInTransaction(db, base, source, { target: input.statementId ? { statementId: input.statementId, draftKey: null } : { statementId: null, draftKey: input.draftKey! }, scope: projectId && draft.leaderWorkerId ? { projectId, crewId: draft.crewId ?? null, leaderWorkerId: draft.leaderWorkerId, formatFamily: 'C2', book: null } : null, month: wireMonth(month) ? month : null, memberWorkerIds: ids, claimSubtotal: grossAmount, status: read.status }, options)
+      grossAmount = read.hollow.totals.grossAmount
+      read.totals.grossAmount = grossAmount
+      for (const reason of read.hollow.reasons)
+        blockers.push(block('hollow-unavailable', reason))
+    }
     const currentVersion = sourceVersion(read, locks)
     read.needsRecheck = read.status === 'checked' && (row?.needs_recheck === 1 || row?.checked_source_version !== currentVersion.version)
     read.context.sourceVersion = `${base.sourceVersion}+c2:${hash(currentVersion.source)}+locks:${hash(currentVersion.locks)}`
     const writable = base.capabilities.includes('payroll:write') && read.status !== 'released' && !blockers.length && grossAmount.value !== null
-    read.eligibility = { canSaveDraft: writable, canCheck: writable && read.statementId !== null, canRelease: writable && read.status === 'checked' && !read.needsRecheck && grossAmount.value! > 0, canOutput: false, reasons: blockers.map(b => b.message) }
+    read.eligibility = { canSaveDraft: writable, canCheck: writable && read.statementId !== null, canRelease: writable && read.status === 'checked' && !read.needsRecheck && (grossAmount.value! > 0 || payrollHollowAllowsZeroRelease(read.hollow?.snapshot)), canOutput: false, reasons: blockers.map(b => b.message) }
     if (read.status === 'released') {
-      const document = (await loadPayrollC2ReleasedDocuments(db, read.statementId!)).get(read.statementId!)
+      const document = (await loadPayrollC2ReleasedWithMigration(db, read.statementId!)).get(read.statementId!)
       if (document && storedSource) {
+        if (document.hollow) {
+          const currentHollow = read.hollow ?? await readPayrollHollowCurrentForSnapshot(db, base, source, document.id, document.hollow, draft.memberWorkerIds ?? [], options)
+          read.hollow = payrollHollowFrozenReadWithCurrent(base, document.id, document.hollow, currentHollow)
+        }
         read.members = document.members.map(m => ({ id: m.workerId, name: m.workerName, crewId: document.crewId, eligible: false, reasons: ['已发工资保留原成员事实'], historical: true, source: null }))
         read.facts = document.daywork.map(f => ({ ...f, workerName: document.members.find(m => m.workerId === f.workerId)?.workerName ?? null, crewName: document.crewName, source: { kind: 'source-record', subject: { state: 'resolved', entity: 'daywork', id: f.id, label: `${f.workDate} 签工`, no: null }, variant: 'ledger', view: null, filters: { dataOrigin: base.origin, projectId: f.projectId, month: document.month, crewId: f.crewId, workerId: f.workerId, workDate: f.workDate } }, occupations: [], locks: [], diagnostics: [], eligibility: { canEdit: false, canConfirm: false, reasons: ['已发签工不可修改；后续更正需引用原发放'] }, availability: 'occupied' }))
         read.sources = read.facts.flatMap(f => f.source ? [f.source] : [])
@@ -152,6 +171,7 @@ export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceO
     return { context: { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion: `${base.sourceVersion}+c2-config:${hash({ scope, facts, leader, readonlyReasons })}` }, scope, options: catalog, config: current, configs: facts.rows, draft: { crewId: current?.crewId ?? leader?.crewId ?? null, unitRate: current?.unitRate ?? null, ruleText: current ? current.ruleText : '' }, diagnostics: facts.diagnostics, evidence: facts.evidence, readonlyReasons, history }
   }
   return {
+    c2FormInTransaction: form,
     c2Form: (query: PayrollQuery, input: PayrollC2FormInput, sessionId?: string | null) => run(query, sessionId, (db, context, source) => form(db, context, source, parsePayrollC2FormInput(encodePayrollC2Wire(input)))),
     c2Config: (query: PayrollQuery, scope: PayrollC2ConfigScope, sessionId?: string | null) => run(query, sessionId, (db, context, source) => config(db, context, source, scope)),
     c2Output: (query: PayrollQuery, statementId: string, sessionId?: string | null): Promise<PayrollC2OutputRead> => run(query, sessionId, async (db, base) => {
@@ -159,7 +179,7 @@ export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceO
       if (query.projectId && query.projectId !== row.project_id)
         throw payrollProblem('relationship-mismatch', 'C2 输出与原项目不一致')
       const context = { ...base, readonly: !base.capabilities.includes('payroll:write') }
-      const document = (await loadPayrollMigratedProof(db, String(row.project_id))).c2Documents.get(statementId) ?? (await loadPayrollC2ReleasedDocuments(db, statementId)).get(statementId)
+      const document = (await loadPayrollMigratedProof(db, String(row.project_id))).c2Documents.get(statementId) ?? (await loadPayrollC2ReleasedWithMigration(db, statementId)).get(statementId)
       return document ? { context, statementId, state: 'available', document, reasons: [] } : { context, statementId, state: 'unavailable', document: null, reasons: ['这份工资缺少可相互核实的原签工、主体配置、冻结与原成功回执；保留原历史阅读'] }
     }),
     async executeC2(input: PayrollC2Command, sessionId?: string | null): Promise<PayrollC2CommandResult> {
@@ -228,7 +248,7 @@ export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceO
               else {
                 const locks = await loadPayrollSourceExclusions(db, { projectId: command.projectId, month: read.draft.month!, workerIds: read.draft.memberWorkerIds!, formatFamily: 'C2', statementId: command.statementId })
                 const applications = await preparePayrollReleaseAdjustments(db, command.statementId!, action.release.actualAmount, action.release.adjustmentApplications)
-                await releasePayrollC2(db, read, action.release, sourceVersion(read, locks).version, context.actorId)
+                await releasePayrollC2(db, read, action.release, sourceVersion(read, locks).version, context.actorId, command.commandId)
                 if (applications !== undefined)
                   result.adjustmentApplicationIds = await persistPayrollReleaseAdjustments(db, command.statementId!, command.commandId, applications, context.actorId)
                 result.outcome = 'released'

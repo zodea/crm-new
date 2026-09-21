@@ -2,6 +2,7 @@ import type { PayrollAPeriodKind } from './central-a-contract'
 import type { PayrollABookRef, PayrollAFeeAdjustmentBasis, PayrollAStatementSourceVersioned } from './central-a-fees-contract'
 import type { PayrollActualFact, PayrollActualPaymentDraft, PayrollActualPaymentTarget, PayrollActualReversalDraft, PayrollActualReversalTarget, PayrollProofRef, PayrollSignedAmount } from './central-actual-contract'
 import type { PayrollQuery, PayrollWritableContext } from './central-contract'
+import type { PayrollHollowAdjustmentBasis } from './central-hollow-deduction-contract'
 import type { PayrollReleaseAdjustmentPreview } from './central-release-adjustment-contract'
 
 export interface PayrollOriginalWageRef {
@@ -21,17 +22,20 @@ export interface PayrollOriginalWageRef {
   book?: PayrollABookRef
 }
 export interface PayrollC2AdjustmentBasis {
+  hollow?: PayrollHollowAdjustmentBasis
   formatFamily: 'C2'
   configId: string
   unitRate: number | null
   records: Array<{ recordId: string, workerId: string, workDate: string, laborUnits: number | null, startTime: string, endTime: string, workContent: string, witness: string, confirmedOn: string }>
 }
 export interface PayrollC1AdjustmentBasis {
+  hollow?: PayrollHollowAdjustmentBasis
   formatFamily: 'C1'
   rates: Array<{ workerId: string, configId: string | null, dailyWage: number | null, overtimeRate: number | null, overtimeRule: 'daily-divided-eight' | 'explicit' }>
   records: Array<{ recordId: string, workerId: string, workDate: string, hours: number | null, overtimeHours: number | null, workContent: string }>
 }
 export interface PayrollAAdjustmentBasis {
+  hollow?: PayrollHollowAdjustmentBasis
   formatFamily: 'A'
   periodKind: PayrollAPeriodKind
   source: PayrollAStatementSourceVersioned

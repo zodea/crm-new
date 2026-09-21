@@ -5,6 +5,11 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: process.env.NUXT_DEVTOOLS !== 'false' },
 
+  nitro: {
+    // sql.js 按运行时路径加载 WASM；显式携带现有依赖，构建后无需手工补文件。
+    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'] },
+  },
+
   runtimeConfig: {
     // PaddleOCR 官方 API 凭证仅存在 Nitro 服务端；禁止放入 public 或前端持久化。
     paddleOcrAccessToken: '',

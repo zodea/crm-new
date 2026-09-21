@@ -8,6 +8,7 @@ import { payrollAttendanceCanonical } from '../../app/lib/payroll/central-attend
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
+import { payrollC1MigrationReferences } from '../../server/utils/payroll-c1-migration-references'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
 import { createMemoryDb } from '../helpers/memory-db'
@@ -155,6 +156,8 @@ it.each(['source', 'frozen-source', 'frozen-audit'] as const)('真实 C1 配置/
   expect(output.state).toBe('available')
   expect(output.document?.allocations).toContainEqual(expect.objectContaining({ workerId: zero.id, allocatedAmountFen: 0 }))
   expect(output.document?.attendance).toContainEqual(expect.objectContaining({ id: sourceZero.id, hours: 0 }))
+  const references = await quantityTestInstance.withWorkspaceTransaction(tx => payrollC1MigrationReferences(tx))
+  expect(references.has(JSON.stringify(['attendance_records', sourceZero.id]))).toBe(true)
   matrix = await payrollService.attendanceMatrix({ origin: 'real' }, matrix.scope)
   expect(matrix.locks).toContainEqual(expect.objectContaining({ workerId: zero.id, statementId: saved.statementId, kind: 'released-month' }))
   if (kind !== 'source')

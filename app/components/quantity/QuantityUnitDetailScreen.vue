@@ -6,6 +6,7 @@ import QuantityTotalValue from '~/components/quantity/QuantityTotalValue.vue'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { payrollSourceContext, payrollSourceQuery } from '~/lib/payroll/a-navigation'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { formatQuantityValue } from '~/lib/quantity/format'
 import { sumQuantityLines } from '~/lib/quantity/totals'
 import { toErrorMessage } from '~/lib/util/error'
@@ -19,6 +20,7 @@ const props = defineProps<{
 }>()
 
 const store = useQuantityStore()
+const native = isDesktopRuntime()
 const detailElement = shallowRef<HTMLElement | null>(null)
 const payrollContext = computed(() => props.origin ? payrollSourceContext(props.payrollQuery ?? {}, { kind: 'quantity-unit', id: props.unitId, origin: props.origin, projectId: props.projectId }) : null)
 const payrollMatrix = computed(() => payrollContext.value ? { path: '/subcontract/quantity', query: { ...payrollSourceQuery(props.payrollQuery ?? {}), payrollSourceKind: 'quantity-project', payrollSourceId: props.projectId, project: props.projectId, origin: props.origin ?? 'real' } } : null)
@@ -407,6 +409,8 @@ onScopeDispose(closePhoto)
         </div>
       </section>
     </template>
+
+    <QuantityHollowSection v-if="!native && projectId && unitId && origin !== null" :project-id="projectId" :unit-id="unitId" :origin="origin ?? 'real'" />
 
     <QuantityCompletionDialog
       v-if="projectId && unitId"

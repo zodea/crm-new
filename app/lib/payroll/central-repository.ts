@@ -16,10 +16,13 @@ import { decodePayrollC1Read, decodePayrollC1Result, encodePayrollC1Wire } from 
 import { decodePayrollC2Read, decodePayrollC2Result, encodePayrollC2Wire } from './central-c2-codec'
 import { decodePayrollRead } from './central-codec'
 import { decodePayrollDayworkRead, decodePayrollDayworkResult, encodePayrollDayworkWire } from './central-daywork-codec'
+import { decodePayrollHollowConfigRead, decodePayrollHollowResult, encodePayrollHollowWire } from './central-hollow-deduction-codec'
 
 export function createPayrollRepository(fetcher: ProjectHttpFetcher): PayrollRepository {
   const adjustmentRead = <T extends PayrollAdjustmentRead>(kind: PayrollAdjustmentReadKind, query: PayrollQuery, input: unknown, target = input): Promise<T> => readProjectHttp(() => fetcher(`/api/read/payroll/${kind}`, { method: 'POST', body: { query, input: encodePayrollAdjustmentWire(input) } }), value => decodePayrollAdjustmentRead<T>(value, kind, query, target))
   return {
+    hollowConfig: (query, config) => readProjectHttp(() => fetcher('/api/read/payroll/hollow-config', { method: 'POST', body: { query, config: encodePayrollHollowWire(config) } }), value => decodePayrollHollowConfigRead(value, query, config)),
+    executeHollow: command => readProjectHttp(() => fetcher('/api/commands/payroll-hollow', { method: 'POST', body: encodePayrollHollowWire(command) as Record<string, unknown> }), value => decodePayrollHollowResult(value, command)),
     aFeeConfig: (query, scope) => readProjectHttp(() => fetcher('/api/read/payroll/a-fee-config', { method: 'POST', body: { query, scope: encodePayrollAFeesWire(scope) } }), value => decodePayrollAFeeConfigRead(value, query, scope)),
     executeFees: command => readProjectHttp(() => fetcher('/api/commands/payroll-a-fees', { method: 'POST', body: encodePayrollAFeesWire(command) as Record<string, unknown> }), value => decodePayrollAFeesResult(value, command)),
     adjustmentHistory: (q, id) => adjustmentRead('adjustment-history', q, { statementId: id }, id),

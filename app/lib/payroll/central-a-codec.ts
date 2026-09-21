@@ -1,12 +1,18 @@
 import type { PayrollACommand, PayrollACommandResult, PayrollAConfigRead, PayrollAConfigScope, PayrollAFormInput, PayrollAFormRead, PayrollAFrozenDocument, PayrollAOutputRead, PayrollAStatementSourceSnapshot } from './central-a-contract'
 import type { PayrollQuery } from './central-contract'
+import { isQuantitySourceIdentity } from '../quantity/migration-identity'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { isPayrollAAdjustmentReconciliation } from './central-a-adjustment-validation'
 import { isPayrollAFeesFormExtension } from './central-a-fees-read-validation'
 import { isPayrollABook, isPayrollAFeesFrozenDocument } from './central-a-fees-validation'
 import { payrollProblem } from './central-contract'
+import { isPayrollHollowRead } from './central-hollow-deduction-read'
+import { payrollHollowAllowsZeroRelease } from './central-hollow-deduction-release'
+import { isPayrollHollowSnapshot } from './central-hollow-deduction-snapshot'
+import { transformPayrollHollowWire } from './central-hollow-deduction-wire'
 import { isPayrollReleaseApplications, transformPayrollReleaseApplications } from './central-release-adjustment-wire'
 import { payrollObject as object } from './central-snapshot'
+import { isPayrollSourceIdentity } from './migration-identity'
 import { amountInCents } from './statements'
 
 const moneyFields = new Set(['unitPrice', 'amount', 'actualAmount', 'workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount', 'listAmount'])
@@ -18,6 +24,8 @@ const cents = amountInCents
 const centAmount = (v: unknown): v is number => number(v) && v >= 0 && Number.isSafeInteger(cents(v)) && Math.abs(v * 100 - cents(v)) < 1e-8
 const nullableNumber = (v: unknown) => v === null || number(v)
 const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every(text)
+const priceIdentity = (v: unknown) => isPayrollSourceIdentity(v, 'payroll-price')
+const priceRevisionIdentity = (v: unknown) => isPayrollSourceIdentity(v, 'payroll_a_price_revisions')
 const array = (v: unknown, check: (v: unknown) => boolean) => Array.isArray(v) && v.every(check)
 const fields = (v: Record<string, unknown>, names: string[], check: (v: unknown) => boolean) => names.every(name => check(v[name]))
 const month = (v: unknown) => text(v) && /^\d{4}-(?:0[1-9]|1[0-2])$/.test(v)
@@ -37,6 +45,8 @@ function transform(value: unknown, decode: boolean): unknown {
   const metric = 'knownValue' in value && 'state' in value
   const ratio = 'explicitlyConfigured' in value || ('statementId' in value && 'configId' in value && 'source' in value)
   return Object.fromEntries(Object.entries(value).filter(([, child]) => child !== undefined).map(([key, child]) => {
+    if (key === 'hollow')
+      return [key, transformPayrollHollowWire(child, decode)]
     if (['history', 'beforeData', 'afterData'].includes(key))
       return [key, child]
     if (key === 'adjustmentApplications')
@@ -65,7 +75,7 @@ export const decodePayrollAWire = (value: unknown) => transform(value, true)
 function scope(v: unknown) {
   if (!object(v) || !['project', 'cells'].includes(String(v.kind)))
     return false
-  return v.kind === 'project' || array(v.cells, cell => object(cell) && fields(cell, ['unitId', 'roomId', 'itemId'], isStableRouteIdentity))
+  return v.kind === 'project' || array(v.cells, cell => object(cell) && isQuantitySourceIdentity(cell.unitId, 'units') && isQuantitySourceIdentity(cell.roomId, 'rooms') && isQuantitySourceIdentity(cell.itemId, 'items'))
 }
 function fact(v: unknown) {
   return object(v) && fields(v, ['ownershipKey', 'completionId', 'assignmentId', 'stageId', 'stageItemId', 'unitId', 'floorId', 'buildingId', 'templateId', 'templateLineId', 'roomId', 'itemId', 'completedAt', 'sourceFingerprint'], text)
@@ -89,7 +99,7 @@ function history(v: unknown) {
   return object(v) && fields(v, ['id', 'tableName', 'recordId', 'operation'], text) && fields(v, ['operatedAt', 'operator', 'beforeRaw', 'afterRaw'], nullableText) && 'beforeData' in v && 'afterData' in v
 }
 function price(v: unknown) {
-  return object(v) && fields(v, ['id', 'priceId', 'projectId', 'leaderWorkerId', 'itemId'], text) && fields(v, ['crewId', 'itemName', 'unit', 'workerId', 'workerName', 'operatorId', 'createdAt'], nullableText) && ['baseline', 'worker-exception'].includes(String(v.mode)) && month(v.effectiveMonth) && nullableNumber(v.unitPrice) && Number.isInteger(v.revision) && scope(v.scope) && typeof v.editable === 'boolean' && strings(v.readonlyReasons)
+  return object(v) && priceRevisionIdentity(v.id) && priceIdentity(v.priceId) && fields(v, ['projectId', 'leaderWorkerId', 'itemId'], text) && fields(v, ['crewId', 'itemName', 'unit', 'workerId', 'workerName', 'operatorId', 'createdAt'], nullableText) && ['baseline', 'worker-exception'].includes(String(v.mode)) && month(v.effectiveMonth) && nullableNumber(v.unitPrice) && Number.isInteger(v.revision) && scope(v.scope) && typeof v.editable === 'boolean' && strings(v.readonlyReasons)
 }
 export function isPayrollAStatementSourceSnapshot(v: unknown): v is PayrollAStatementSourceSnapshot {
   if (object(v) && v.adjustmentReconciliation !== undefined && !isPayrollAAdjustmentReconciliation(v.adjustmentReconciliation))
@@ -102,7 +112,7 @@ export function isPayrollAStatementSourceSnapshot(v: unknown): v is PayrollAStat
   return true
 }
 function line(v: unknown) {
-  return object(v) && fields(v, ['id', 'workerId', 'itemId'], text) && fields(v, ['workerName', 'itemName', 'unit'], nullableText) && fields(v, ['quantity', 'knownQuantity', 'unitPrice', 'amount'], nullableNumber) && strings(v.priceRevisionIds) && array(v.facts, fact) && array(v.sources, intent) && array(v.blockers, blocker)
+  return object(v) && fields(v, ['id', 'workerId', 'itemId'], text) && fields(v, ['workerName', 'itemName', 'unit'], nullableText) && fields(v, ['quantity', 'knownQuantity', 'unitPrice', 'amount'], nullableNumber) && array(v.priceRevisionIds, priceRevisionIdentity) && array(v.facts, fact) && array(v.sources, intent) && array(v.blockers, blocker)
 }
 function amount(v: unknown) {
   return object(v) && nullableNumber(v.value) && nullableNumber(v.knownValue) && ['known', 'partial', 'unknown'].includes(String(v.state)) && strings(v.reasons) && (v.state === 'known' ? v.value !== null && v.value === v.knownValue : v.value === null) && (v.state !== 'unknown' || v.knownValue === null)
@@ -181,7 +191,7 @@ export function parsePayrollACommand(value: unknown): PayrollACommand {
       exact(row.scope, row.scope && object(row.scope) && row.scope.kind === 'project' ? ['kind'] : ['kind', 'cells'])
       if (row.scope.kind === 'cells' && Array.isArray(row.scope.cells))
         row.scope.cells.forEach(cell => exact(cell, ['unitId', 'roomId', 'itemId']))
-      return (row.priceId === null || isStableRouteIdentity(row.priceId)) && isStableRouteIdentity(row.itemId) && nullableText(row.unit) && ['baseline', 'worker-exception'].includes(String(row.mode)) && (row.workerId === null || isStableRouteIdentity(row.workerId)) && month(row.effectiveMonth) && nullableNumber(row.unitPrice) && scope(row.scope)
+      return (row.priceId === null || priceIdentity(row.priceId)) && isQuantitySourceIdentity(row.itemId, 'items') && nullableText(row.unit) && ['baseline', 'worker-exception'].includes(String(row.mode)) && (row.workerId === null || isStableRouteIdentity(row.workerId)) && month(row.effectiveMonth) && nullableNumber(row.unitPrice) && scope(row.scope)
     })) {
       fail('工资价格字段不完整')
     }
@@ -190,6 +200,9 @@ export function parsePayrollACommand(value: unknown): PayrollACommand {
   return next as unknown as PayrollACommand
 }
 export function isPayrollAFrozenDocument(v: unknown): v is PayrollAFrozenDocument {
+  const hollow = object(v) && v.hollow !== undefined ? isPayrollHollowSnapshot(v.hollow) ? v.hollow : false : null
+  if (hollow === false || (hollow && (hollow.state !== 'available' || hollow.scope.formatFamily !== 'A' || hollow.month !== (v as Record<string, unknown>).month || hollow.totals.grossAmount.value !== (v as Record<string, unknown>).grossAmount || (hollow.start && hollow.adoptions.length !== hollow.start.lines.length))))
+    return false
   const fees = object(v) && (Object.hasOwn(v, 'book') || Object.hasOwn(v, 'fees')) ? isPayrollAFeesFrozenDocument(v) ? v : false : null
   if (fees === false)
     return false
@@ -197,7 +210,7 @@ export function isPayrollAFrozenDocument(v: unknown): v is PayrollAFrozenDocumen
     return false
   if (!Array.isArray(v.lines) || (!v.lines.length && fees?.book.bookPurpose !== 'management') || !array(v.lines, l => line(l) && object(l) && number(l.quantity) && l.quantity >= 0 && fields(l, ['unitPrice', 'amount'], centAmount) && fields(l, ['workerName', 'itemName', 'unit'], x => text(x) && x.length > 0)) || !Array.isArray(v.members) || !v.members.length || !array(v.members, m => object(m) && text(m.workerId) && text(m.workerName) && !!m.workerName && typeof m.isLeader === 'boolean') || !array(v.allocations, a => object(a) && text(a.workerId) && text(a.workerName) && typeof a.isLeader === 'boolean' && centAmount(a.amount) && Number.isSafeInteger(a.allocatedAmountFen) && cents(a.amount) === a.allocatedAmountFen) || !array(v.previousPayments, p => object(p) && text(p.statementId) && month(p.month) && centAmount(p.amount)))
     return false
-  if (!fields(v, ['workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount', 'actualAmount'], centAmount) || Number(v.payRatio) < 0 || Number(v.payRatio) > 1 || (v.periodKind === 'retention' && v.payRatio !== 1) || Number(v.actualAmount) <= 0 || Number(v.actualAmount) > Number(v.grossAmount))
+  if (!fields(v, ['workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount', 'actualAmount'], centAmount) || Number(v.payRatio) < 0 || Number(v.payRatio) > 1 || (v.periodKind === 'retention' && v.payRatio !== 1) || Number(v.actualAmount) < 0 || (Number(v.actualAmount) === 0 && !payrollHollowAllowsZeroRelease(hollow || undefined)) || Number(v.actualAmount) > Number(v.grossAmount))
     return false
   const members = v.members as Array<{ workerId: string, workerName: string, isLeader: boolean }>
   const allocations = v.allocations as Array<{ workerId: string, allocatedAmountFen: number }>
@@ -207,9 +220,9 @@ export function isPayrollAFrozenDocument(v: unknown): v is PayrollAFrozenDocumen
   if (new Set(ownership).size !== ownership.length || lines.some(l => !l.facts.length || !l.priceRevisionIds.length || l.facts.some(f => f.fieldQty === null || f.unit !== l.unit) || !members.some(m => m.workerId === l.workerId && m.workerName === l.workerName) || Math.abs(l.facts.reduce((sum, f) => sum + (f.fieldQty ?? 0), 0) - l.quantity!) > 1e-8 || cents(l.quantity! * l.unitPrice!) !== cents(l.amount!)))
     return false
   const reconciliation = v.adjustmentReconciliation
-  if (reconciliation !== undefined && (!isPayrollAAdjustmentReconciliation(reconciliation) || reconciliation.rawCumulative.value !== v.cumulativeAmount || reconciliation.availableAmount.value !== v.grossAmount || reconciliation.rawBasis.payRatio !== v.payRatio || reconciliation.reasons.length))
+  if (reconciliation !== undefined && (!isPayrollAAdjustmentReconciliation(reconciliation) || reconciliation.rawCumulative.value !== v.cumulativeAmount || reconciliation.availableAmount.value !== (hollow ? hollow.totals.claimSubtotal.value : v.grossAmount) || reconciliation.rawBasis.payRatio !== v.payRatio || reconciliation.reasons.length))
     return false
-  if (lines.reduce((sum, l) => sum + cents(l.amount!), 0) !== cents(Number(v.workAmount)) || cents(Number(fees ? fees.listAmount : v.workAmount) * Number(v.payRatio)) !== cents(Number(v.cumulativeAmount)) || payments.reduce((sum, p) => sum + cents(p.amount), 0) !== cents(Number(v.previouslyPaid)) || (reconciliation === undefined && Math.max(0, cents(Number(v.cumulativeAmount)) - cents(Number(v.previouslyPaid))) !== cents(Number(v.grossAmount))))
+  if (lines.reduce((sum, l) => sum + cents(l.amount!), 0) !== cents(Number(v.workAmount)) || cents(Number(fees ? fees.listAmount : v.workAmount) * Number(v.payRatio)) !== cents(Number(v.cumulativeAmount)) || payments.reduce((sum, p) => sum + cents(p.amount), 0) !== cents(Number(v.previouslyPaid)) || (reconciliation === undefined && Math.max(0, cents(Number(v.cumulativeAmount)) - cents(Number(v.previouslyPaid))) !== cents(Number(hollow ? hollow.totals.claimSubtotal.value : v.grossAmount))))
     return false
   return new Set(members.map(m => m.workerId)).size === members.length && members.filter(m => m.isLeader).length === 1 && allocations.length === members.length && new Set(allocations.map(a => a.workerId)).size === members.length && allocations.every(a => members.some(m => m.workerId === a.workerId)) && allocations.reduce((sum, a) => sum + a.allocatedAmountFen, 0) === cents(Number(v.actualAmount))
 }
@@ -225,6 +238,8 @@ export function decodePayrollARead<T extends PayrollAFormRead | PayrollAConfigRe
   if (kind !== 'output' && c.origin === 'real' && c.readonly !== !(c.capabilities as string[]).includes('payroll:write'))
     fail('工资读取权限与可写状态不一致')
   if (kind === 'form') {
+    if (value.hollow !== undefined && (!isPayrollHollowRead(value.hollow) || !object(value.totals) || !object(value.draft) || value.hollow.target.statementId !== value.statementId || value.hollow.target.draftKey !== value.draftKey || (value.hollow.scope === null ? value.hollow.state !== 'unavailable' || value.hollow.eligibility.canStart || !!(value.draft.projectId && value.draft.leaderWorkerId && value.draft.book) : value.hollow.scope.formatFamily !== 'A' || value.hollow.scope.projectId !== value.draft.projectId) || value.hollow.totals.grossAmount.value !== (value.totals.grossAmount as Record<string, unknown>)?.value))
+      fail('A工资的空鼓读取、目标或净额不一致')
     if ((Object.hasOwn(value, 'fees') || Object.hasOwn(value, 'bookProof') || (object(value.draft) && Object.hasOwn(value.draft, 'book'))) && !isPayrollAFeesFormExtension(value))
       fail('工资费用用途或读取依据不完整')
     if (!text(value.paymentSourceVersion))
@@ -255,7 +270,7 @@ export function decodePayrollAResult(v: unknown, command: PayrollACommand): Payr
     if (v.adjustmentApplicationIds !== undefined && (command.action.kind !== 'release-a' || command.action.release.adjustmentApplications === undefined || (v.adjustmentApplicationIds as string[]).length !== command.action.release.adjustmentApplications.length))
       fail('A 工资更正应用回执与原提交不一致')
   }
-  if (!object(v) || v.commandId !== command.commandId || v.projectId !== command.projectId || (command.statementId !== null && v.statementId !== command.statementId) || !nullableText(v.statementId) || !nullableText(v.subjectConfigId) || !text(v.sourceVersion) || !strings(v.priceRevisionIds) || !strings(v.logIds) || !['saved', 'checked', 'released', 'needs-recheck'].includes(String(v.outcome)))
+  if (!object(v) || v.commandId !== command.commandId || v.projectId !== command.projectId || (command.statementId !== null && v.statementId !== command.statementId) || !nullableText(v.statementId) || !nullableText(v.subjectConfigId) || !text(v.sourceVersion) || !array(v.priceRevisionIds, priceRevisionIdentity) || !strings(v.logIds) || !['saved', 'checked', 'released', 'needs-recheck'].includes(String(v.outcome)))
     fail('工资提交回执与原目标不一致')
   if (!command.action.kind.startsWith('save-a-prices') && command.action.kind !== 'save-a-subject-config' && !v.statementId)
     fail('工资回执缺少单据身份')

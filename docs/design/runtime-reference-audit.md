@@ -106,6 +106,7 @@
 
 | 代码 | 证据级别 | 参考路径或视图 | 视口 | 只读证据与安全状态 |
 | --- | --- | --- | --- | --- |
+| `R-QUANTITY-HOLLOW-LOCAL` | 本地权威；无独立对应参考页 | 原户空鼓检查新增、修订与详情整页 | 390、768、1024、1280、1440px 独立验收；P6 正在收尾 | 依据 #412 空鼓检查与人工扣款规则、工程量和工资页面、DC 通用原语及 ADR 0014；检查原责任、修订与整改历史分别呈现，不继承相邻户详情或工资台账的参考证据等级。 |
 | `R-OTHER-SETTLEMENT-LIVE-331` | 直接证据，只读已核验 | 项目其他合同 → 其他支出结算列表及名称只读详情 | 2026-09-06；1293×1051 | 紧凑表格与专属金额列，详情摘要、页签及分区资料；未触发任何写入或文件动作，不保留真实值；本地四档视口合成证据见 `evidence/issue-331/README.md` |
 | `R-LIST-PRIOR` | 历史结构记录，未验证只读 | 业务列表；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | `docs/research/red-circle-ui-gap-2026-07-11.md` §2；仅作列表密度、筛选区、工具栏与分页的采集线索，必须按本轮协议重新观察 |
 | `R-FORM-PRIOR` | 历史结构记录，未验证只读 | 新增/编辑表单；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §1 与 ADR 0014；旧记录包含保存、取消关闭等行为结论，本轮不采信这些交互，也不再点击相关入口 |
@@ -181,13 +182,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 157 / 5 / 152 |
+| 跟踪页面文件 / dev / 生产路由 | 160 / 5 / 155 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 152 / 152 |
-| 参考证据档案 / 被路由使用 | 46 / 40 |
-| 直接 / 邻近 / 本地权威 | 54 / 18 / 36 |
+| 证据行 / 唯一参考端点 | 155 / 155 |
+| 参考证据档案 / 被路由使用 | 47 / 41 |
+| 直接 / 邻近 / 本地权威 | 54 / 18 / 39 |
 | 历史证据 / 未验证目标 | 34 / 10 |
-| 设计已覆盖 / 待补设计 | 135 / 17 |
+| 设计已覆盖 / 待补设计 | 135 / 20 |
 
 | 页面域 | 路由数 | 当前复核承接 |
 | --- | ---: | --- |
@@ -207,7 +208,7 @@
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 22 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 工程量与工资 | 25 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
@@ -363,6 +364,9 @@
 | `app/pages/subcontract/payroll/payments/[id].vue` | `/subcontract/payroll/payments/:id` | 工程量与工资 | 详情 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 本次实际事实、人员分配、核对依据、关联处理及原记录引用分别展示 | 原收付只读，错记冲销及冲销再纠错通过独立引用追加；确认记录输出不改原工资签名 | C-DENSE |
 | `app/pages/subcontract/payroll/payments/reversal/new.vue` | `/subcontract/payroll/payments/reversal/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 指定错记事实、核实日期和未真实发生的明确依据使用独立整页 | 冲销只抵销所指错记效果；再纠错保原引用，不假造真实退款，未知结果恢复原提交，桌面不允许写入 | C-FORM |
 | `app/pages/subcontract/quantity/[pid]/[uid].vue` | `/subcontract/quantity/:pid/:uid` | 工程量与工资 | 详情 | #198 | R-ENGINEERING-FLOW-LOCAL | 工种→阶段→三量的只读施工详情可达，六项筛选完整返回，错配 pid/uid 显式失败；当前明细 `null` 显示“—”，阶段/全户合计却按 0 相加 | 先修复可空合计，不能把缺现场量写成 0；责任、阶段完成和三量仍只读派生，不落第二表 | C-DENSE |
+| `app/pages/subcontract/quantity/[pid]/[uid]/hollow/new.vue` | `/subcontract/quantity/:pid/:uid/hollow/new` | 工程量与工资 | 整页表单 | #412 | R-QUANTITY-HOLLOW-LOCAL | 依据实际户、分项与原责任记录检查，未检查与明确零处区分；无独立外部对应页 | 固定草稿及原命令，未知结果原键恢复；保存检查不触发工资扣款，来源返回保留原单和位置 | C-FORM |
+| `app/pages/subcontract/quantity/[pid]/[uid]/hollow/form/[id].vue` | `/subcontract/quantity/:pid/:uid/hollow/form/:id` | 工程量与工资 | 整页表单 | #412 | R-QUANTITY-HOLLOW-LOCAL | 固定原检查身份修订，检查时责任与当前可编辑资格分区；历史修订继续保留 | 不替换原户、分项或负责人；来源变化需重新核对，失败保稿，工资已采用历史不能重写 | C-FORM |
+| `app/pages/subcontract/quantity/[pid]/[uid]/hollow/[id].vue` | `/subcontract/quantity/:pid/:uid/hollow/:id` | 工程量与工资 | 详情 | #412 | R-QUANTITY-HOLLOW-LOCAL | 原检查、修订、整改及现余量分区；明确显示零处和缺证明 | 整改是具名行级销记，累计不得超量；来源往返按稳定原记录校验，冻结工资不随后来整改改变 | C-DENSE |
 | `app/pages/subcontract/quantity/index.vue` | `/subcontract/quantity` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 合和新城真实 8 户矩阵可显示责任、完成与草稿；车陂商业大楼无区域时显示真实配置空态。四档根无横滚，矩阵只在 390px 局部滚动 | 排程任务下钻与返回已闭合；量差和矩阵继续读三量/阶段事实。分包合同与工资责任无显式外键，不从项目名称猜合同 | C-DENSE |
 | `app/pages/subcontract/quantity/region.vue` | `/subcontract/quantity/region` | 工程量与工资 | 整页表单 | #198 | R-ENGINEERING-FLOW-LOCAL | 楼栋→楼层→户真实区域、户型挂靠和排程来源返回已在只读运行态确认；空项目仍提供明确区域配置入口 | 本轮未执行新增；合同可选，归档矩阵禁止写入，排程恢复标记继续按项目真实 ID 传递 | C-FORM |
 | `app/pages/subcontract/quantity/stages.vue` | `/subcontract/quantity/stages` | 工程量与工资 | 整页表单 | #442 | R-STAGE-PENDING | 阶段字段、关联分项、逐项报量选择使用独立整页；当前只有领域和组件验证，首屏与五档运行验收待完成 | 新建/编辑与报量为独立命令；草稿保留、来源隔离、当前权限重试和归档取消均需实际运行验收，不代入历史页面结论 | C-FORM |

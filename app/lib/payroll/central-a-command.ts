@@ -8,6 +8,7 @@ import { isPayrollAFrozenDocument } from './central-a-codec'
 import { hasPayrollAFeesForm } from './central-a-fees-contract'
 import { payrollWriteRow as payrollAWriteRow } from './central-command-shared'
 import { payrollProblem } from './central-contract'
+import { adoptPayrollHollowOnRelease, payrollHollowAllowsZeroRelease } from './central-hollow-deduction-release'
 import { amountInCents, normalizeAllocations } from './statements'
 
 export { payrollWriteRow as payrollAWriteRow } from './central-command-shared'
@@ -27,7 +28,7 @@ export async function payrollACrossBookConflicts(db: TransactionDb, read: Payrol
     if (row.leader_worker_id === read.draft.leaderWorkerId)
       continue
     const snapshot = JSON.parse(row.source_json) as PayrollAStatementSourceVersioned
-    if (snapshot.schemaVersion === 2 && snapshot.book.bookPurpose === 'management')
+    if (snapshot.schemaVersion !== 1 && snapshot.book.bookPurpose === 'management')
       continue
     if (snapshot.facts.some(fact => owned.has(fact.ownershipKey)))
       conflicts.push(row.statement_id)
@@ -38,7 +39,7 @@ export async function payrollACrossBookConflicts(db: TransactionDb, read: Payrol
 export async function persistPayrollASource(db: TransactionDb, statementId: string, read: PayrollAFormRead): Promise<void> {
   const subject = { projectId: read.draft.projectId!, crewId: read.draft.crewId ?? null, leaderWorkerId: read.draft.leaderWorkerId!, memberWorkerIds: read.draft.memberWorkerIds! }
   const usedPrices = new Set(read.lines.flatMap(line => line.priceRevisionIds))
-  const snapshot: PayrollAStatementSourceVersioned = hasPayrollAFeesForm(read) && read.fees && read.book ? { schemaVersion: 2, book: read.book, fees: read.fees, subject, facts: read.facts, priceRevisions: read.prices.filter(price => usedPrices.has(price.id)) } : { schemaVersion: 1, subject, facts: read.facts, priceRevisions: read.prices.filter(price => usedPrices.has(price.id)) }
+  const snapshot: PayrollAStatementSourceVersioned = hasPayrollAFeesForm(read) && read.fees && read.book ? { ...(read.hollow?.snapshot ? { schemaVersion: 3 as const, hollow: read.hollow.snapshot } : { schemaVersion: 2 as const }), book: read.book, fees: read.fees, subject, facts: read.facts, priceRevisions: read.prices.filter(price => usedPrices.has(price.id)) } : { schemaVersion: 1, subject, facts: read.facts, priceRevisions: read.prices.filter(price => usedPrices.has(price.id)) }
   if (read.adjustmentReconciliation)
     snapshot.adjustmentReconciliation = read.adjustmentReconciliation
   await db.execute('INSERT INTO payroll_a_statement_sources(statement_id,project_id,leader_worker_id,source_json) VALUES(?,?,?,?) ON CONFLICT(statement_id) DO UPDATE SET project_id=excluded.project_id,leader_worker_id=excluded.leader_worker_id,source_json=excluded.source_json', [statementId, subject.projectId, subject.leaderWorkerId, JSON.stringify(snapshot)])
@@ -72,13 +73,13 @@ export async function persistPayrollACalculation(db: TransactionDb, id: string, 
 }
 
 export function payrollACalculationVersion(read: PayrollAFormRead, identityVersion: unknown): string {
-  return payrollACanonical({ draft: { ...read.draft, note: undefined }, facts: read.facts, prices: read.prices, paymentSourceVersion: read.paymentSourceVersion, identityVersion, ...(hasPayrollAFeesForm(read) ? { fees: read.fees } : {}) })
+  return payrollACanonical({ draft: { ...read.draft, note: undefined }, facts: read.facts, prices: read.prices, paymentSourceVersion: read.paymentSourceVersion, identityVersion, ...(hasPayrollAFeesForm(read) ? { fees: read.fees } : {}), ...(read.hollow ? { hollow: read.hollow.snapshot } : {}) })
 }
 
 export async function releasePayrollA(db: TransactionDb, read: PayrollAFormRead, release: PayrollAReleaseDraft, calculationVersion: string, actor: string, commandId?: string) {
   if (!read.statementId || !read.eligibility.canRelease)
     throw payrollProblem('validation-failed', '工资尚未核对完整或需要重新核对')
-  if (release.actualAmount === null || !Number.isFinite(release.actualAmount) || release.actualAmount <= 0 || Math.abs(release.actualAmount * 100 - Math.round(release.actualAmount * 100)) > 1e-8)
+  if (release.actualAmount === null || !Number.isFinite(release.actualAmount) || release.actualAmount < 0 || (release.actualAmount === 0 && !payrollHollowAllowsZeroRelease(read.hollow?.snapshot)) || Math.abs(release.actualAmount * 100 - Math.round(release.actualAmount * 100)) > 1e-8)
     throw payrollProblem('validation-failed', '实际发放须为正数并精确到分', { actualAmount: ['请明确填写实际发放金额'] })
   if (read.totals.grossAmount.value === null || release.actualAmount > read.totals.grossAmount.value)
     throw payrollProblem('validation-failed', '实际发放不能超过事务内重新核算的本次应发', { actualAmount: ['实际发放超过当前应付余额'] })
@@ -112,12 +113,17 @@ export async function releasePayrollA(db: TransactionDb, read: PayrollAFormRead,
   }
   const payments = hasPayrollAFeesForm(read) ? read.previousBookPayments.map(p => ({ id: p.statementId, month: p.month, actual_amount: p.amount.value! })) : await db.select<{ id: string, month: string, actual_amount: number }>('SELECT id,month,actual_amount FROM wage_statements WHERE project_id=? AND leader_worker_id=? AND format_family=\'A\' AND status=\'released\' AND id<>? ORDER BY month,id', [read.draft.projectId, read.draft.leaderWorkerId, read.statementId])
   const subject = { projectId: read.draft.projectId!, crewId: read.draft.crewId ?? null, leaderWorkerId: read.draft.leaderWorkerId!, memberWorkerIds: read.draft.memberWorkerIds! }
-  const source: PayrollAStatementSourceVersioned = hasPayrollAFeesForm(read) && read.fees && read.book ? { schemaVersion: 2, book: read.book, fees: read.fees, subject, facts: read.facts, priceRevisions: read.prices.filter(price => read.lines.some(line => line.priceRevisionIds.includes(price.id))) } : { schemaVersion: 1, subject, facts: read.facts, priceRevisions: read.prices.filter(price => read.lines.some(line => line.priceRevisionIds.includes(price.id))) }
+  const source: PayrollAStatementSourceVersioned = hasPayrollAFeesForm(read) && read.fees && read.book ? { ...(read.hollow?.snapshot ? { schemaVersion: 3 as const, hollow: read.hollow.snapshot } : { schemaVersion: 2 as const }), book: read.book, fees: read.fees, subject, facts: read.facts, priceRevisions: read.prices.filter(price => read.lines.some(line => line.priceRevisionIds.includes(price.id))) } : { schemaVersion: 1, subject, facts: read.facts, priceRevisions: read.prices.filter(price => read.lines.some(line => line.priceRevisionIds.includes(price.id))) }
   if (read.adjustmentReconciliation)
     source.adjustmentReconciliation = read.adjustmentReconciliation
   const document: PayrollAFrozenDocument = { id: read.statementId, projectId: read.draft.projectId!, projectName: project?.name ?? '', crewName: crew?.name ?? null, leaderName: members.find(member => member.isLeader)?.workerName ?? '', month: read.draft.month!, periodKind: read.draft.periodKind!, formatFamily: 'A', payRatio: read.draft.payRatio!, workAmount: read.totals.workAmount.value!, cumulativeAmount: read.totals.cumulativeAmount.value!, previouslyPaid: read.totals.previouslyPaid.value!, grossAmount: read.totals.grossAmount.value!, actualAmount: release.actualAmount, releasedAt: now, operatorName: actor, note: read.draft.note ?? '', lines: read.lines.map(line => ({ ...line, workerName: members.find(member => member.workerId === line.workerId)?.workerName ?? null })), members, allocations, previousPayments: payments.map(payment => ({ statementId: payment.id, month: payment.month, amount: payment.actual_amount })) }
   if (read.adjustmentReconciliation)
     document.adjustmentReconciliation = read.adjustmentReconciliation
+  if (read.hollow) {
+    if (!commandId)
+      throw payrollProblem('validation-failed', '空鼓采用缺少原发放命令身份')
+    document.hollow = await adoptPayrollHollowOnRelease(db, read.hollow, release.actualAmount, actor, commandId)
+  }
   if (hasPayrollAFeesForm(read) && read.fees && read.book)
     Object.assign(document, { book: read.book, fees: read.fees, listAmount: read.fees.totals.listAmount.value, previousBookPayments: payments.map(p => ({ statementId: p.id, month: p.month, amount: p.actual_amount, book: read.book })) })
   if (!isPayrollAFrozenDocument(document))

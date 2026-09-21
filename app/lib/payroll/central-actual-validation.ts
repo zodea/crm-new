@@ -2,13 +2,14 @@ import type { PayrollActualPaymentDraft, PayrollActualPaymentTarget } from './ce
 import type { PayrollActualPaymentCommand } from './central-adjustment-contract'
 import { payrollProblem } from './central-contract'
 import { wireExact, wireId, wireNullableNumber, wireObject, wireText } from './central-payroll-wire'
+import { isPayrollSourceIdentity } from './migration-identity'
 
 function fail(message: string): never {
   throw payrollProblem('validation-failed', message)
 }
 export function assertPayrollActualTarget(value: unknown): asserts value is PayrollActualPaymentTarget {
   wireExact(value, ['kind', 'draftKey', 'adjustmentIds'])
-  if (value.kind !== 'actual-payment' || !wireId(value.draftKey) || !Array.isArray(value.adjustmentIds) || !value.adjustmentIds.length || !value.adjustmentIds.every(wireId) || new Set(value.adjustmentIds).size !== value.adjustmentIds.length)
+  if (value.kind !== 'actual-payment' || !wireId(value.draftKey) || !Array.isArray(value.adjustmentIds) || !value.adjustmentIds.length || !value.adjustmentIds.every(id => isPayrollSourceIdentity(id, 'payroll_adjustments')) || new Set(value.adjustmentIds).size !== value.adjustmentIds.length)
     fail('实际补退须指定独立草稿及不重复的原更正')
 }
 export function assertPayrollActualDraft(value: unknown): asserts value is PayrollActualPaymentDraft {
@@ -22,7 +23,7 @@ export function assertPayrollActualDraft(value: unknown): asserts value is Payro
   }
   for (const row of value.applications) {
     wireExact(row, ['adjustmentId', 'amount', 'balanceVersion'])
-    if (!wireId(row.adjustmentId) || !wireNullableNumber(row.amount) || !wireText(row.balanceVersion))
+    if (!isPayrollSourceIdentity(row.adjustmentId, 'payroll_adjustments') || !wireNullableNumber(row.amount) || !wireText(row.balanceVersion))
       fail('更正处理关联或采用余额版本不完整')
   }
 }

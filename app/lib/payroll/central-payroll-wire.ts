@@ -1,5 +1,6 @@
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { payrollProblem } from './central-contract'
+import { transformPayrollHollowWire } from './central-hollow-deduction-wire'
 import { transformPayrollReleaseApplications } from './central-release-adjustment-wire'
 import { payrollObject } from './central-snapshot'
 import { amountInCents } from './statements'
@@ -55,6 +56,8 @@ export function transformPayrollC1Wire(value: unknown, decode: boolean): unknown
     return value
   const metric = 'knownValue' in value && 'state' in value
   return Object.fromEntries(Object.entries(value).filter(([, child]) => child !== undefined).map(([key, child]) => {
+    if (key === 'hollow')
+      return [key, transformPayrollHollowWire(child, decode)]
     if (['history', 'beforeData', 'afterData', 'evidence'].includes(key))
       return [key, child]
     if (key === 'adjustmentApplications')
@@ -89,6 +92,8 @@ export function transformPayrollC2Wire(value: unknown, decode: boolean): unknown
     return value
   const metric = 'knownValue' in value && 'state' in value
   return Object.fromEntries(Object.entries(value).filter(([, child]) => child !== undefined).map(([key, child]) => {
+    if (key === 'hollow')
+      return [key, transformPayrollHollowWire(child, decode)]
     if (['original', 'history', 'beforeData', 'afterData', 'evidence'].includes(key))
       return [key, child]
     if (key === 'adjustmentApplications')

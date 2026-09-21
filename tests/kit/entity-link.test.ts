@@ -182,6 +182,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'project:detail',
       'project:supplier-workbench',
       'quantity-unit:detail',
+      'quantity-unit:hollow-record',
       'receipt:detail',
       'settlement:other_settlement',
       'subcontract-document:change',

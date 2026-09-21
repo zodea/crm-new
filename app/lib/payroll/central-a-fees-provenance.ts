@@ -1,4 +1,5 @@
 import type { PayrollAFeeRevision, PayrollAManagementBook, PayrollAManagementBookRevision, PayrollAManagementOwnership, PayrollANegativeLineRevision, PayrollAStatementSourceSnapshotV2 } from './central-a-fees-contract'
+import type { PayrollAStatementSourceSnapshotV3 } from './central-a-hollow-contract'
 import type { PayrollDb } from './statements'
 import { payrollACanonical } from './central-a-calculation'
 import { encodePayrollAFeesWire, parsePayrollAFeesCommand } from './central-a-fees-codec'
@@ -18,7 +19,7 @@ export interface PayrollAFeesPhysicalProjection {
 export type PayrollAFeesProjectionLoader = (projectId: string) => Promise<PayrollAFeesPhysicalProjection>
 
 /** 自己的负价修订只能来自已成功的原命令；最新有效集合须与发放冻结一致。 */
-async function negativeCollectionProof(db: PayrollDb, statementId: string, source: PayrollAStatementSourceSnapshotV2): Promise<boolean> {
+async function negativeCollectionProof(db: PayrollDb, statementId: string, source: PayrollAStatementSourceSnapshotV2 | PayrollAStatementSourceSnapshotV3): Promise<boolean> {
   const rows = await db.select<Row>('SELECT id,line_id,revision,removed FROM payroll_a_negative_lines WHERE statement_id=? ORDER BY revision,id', [statementId])
   const receipts = await db.select<Row>('SELECT command_id,actor_id,project_id,fingerprint,command_json,result_json FROM payroll_command_receipts WHERE statement_id=? AND action=\'save-a-negative-lines\'', [statementId])
   const signedIds: string[] = []
@@ -44,7 +45,7 @@ async function negativeCollectionProof(db: PayrollDb, statementId: string, sourc
   return same([...current.values()].filter(r => r.removed === 0).map(r => String(r.id)).sort(), source.fees.negativeLines.filter(n => n.statementId === statementId).map(n => n.id).sort())
 }
 /** 原冻结指向的物理修订、用途和领取关系仍须存在；原文与关系分开核验。 */
-export async function payrollAFeesPhysicalProof(db: PayrollDb, statementId: string, source: PayrollAStatementSourceSnapshotV2, projection?: PayrollAFeesPhysicalProjection): Promise<boolean> {
+export async function payrollAFeesPhysicalProof(db: PayrollDb, statementId: string, source: PayrollAStatementSourceSnapshotV2 | PayrollAStatementSourceSnapshotV3, projection?: PayrollAFeesPhysicalProjection): Promise<boolean> {
   const [relation] = await db.select<Row>('SELECT * FROM payroll_a_statement_books WHERE statement_id=?', [statementId])
   if (!relation || relation.project_id !== source.subject.projectId || relation.leader_worker_id !== source.subject.leaderWorkerId || relation.book_purpose !== source.book.bookPurpose || relation.management_book_id !== source.book.managementBookId)
     return false

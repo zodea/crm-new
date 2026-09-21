@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import initSqlJs from 'sql.js'
 import { runMigrations } from '../../app/lib/db/migrations'
 import { initializeScheduleSchema } from '../../app/lib/schedule/central-schema'
+import { initializeQuantityHollowMigrationEvidence } from './quantity-hollow-migration'
 
 let runtime: ReturnType<typeof initSqlJs> | null = null
 
@@ -112,6 +113,7 @@ export async function createQuantityDatabase() {
     await runMigrations(driver)
     await initializeExternalBoqReferences(driver)
     await initializeScheduleReferences(driver)
+    await initializeQuantityHollowMigrationEvidence(driver)
   }
   catch (cause) {
     await driver.close()
@@ -119,6 +121,15 @@ export async function createQuantityDatabase() {
   }
   return {
     ...driver,
+    exportSnapshotBytes(): Uint8Array {
+      try {
+        return connection.export()
+      }
+      finally {
+        // sql.js 导出会重开连接；快照读取不能改变后续事务的外键约束。
+        connection.run('PRAGMA foreign_keys = ON')
+      }
+    },
     async prepare(work: (candidate: TransactionDb) => Promise<void>): Promise<PreparedCoreMigration> {
       const bytes = connection.export()
       // sql.js export 会重开原连接；重新恢复该连接的运行期外键约束。

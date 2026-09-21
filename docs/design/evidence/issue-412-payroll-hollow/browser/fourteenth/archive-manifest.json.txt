@@ -1,0 +1,654 @@
+{
+  "run": "fourteenth",
+  "scope": "完整行为通过；更正表和启动行文案发现问题，后续补图单独登记。PDF不作为交付文件，实际打印另存必要页图。",
+  "records": [
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-floor-axis-before-start-1024.png",
+      "destination": "browser/fourteenth/actual-floor-axis-before-start-1024.png",
+      "bytes": 135658,
+      "sha256": "607f2a56836a5819da9ccc87648da9a4c1980982664051bb9873ea5f0c4f04f2"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-floor-axis-before-start-1280.png",
+      "destination": "browser/fourteenth/actual-floor-axis-before-start-1280.png",
+      "bytes": 143380,
+      "sha256": "719fac21d607de8ad7f1e9e9fab9cdea330dc44e742b1332a40170a781d0b384"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-floor-axis-before-start-1440.png",
+      "destination": "browser/fourteenth/actual-floor-axis-before-start-1440.png",
+      "bytes": 144991,
+      "sha256": "b3d55b84594438a74d5f092f6776d783b1d3f3d80691f657ec0a91035df9a50f"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-floor-axis-before-start-390.png",
+      "destination": "browser/fourteenth/actual-floor-axis-before-start-390.png",
+      "bytes": 75565,
+      "sha256": "b45219add76072cd9ecf829181bfcb77dcad7afa2054a4be96a0eac38be82b3d"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-floor-axis-before-start-768.png",
+      "destination": "browser/fourteenth/actual-floor-axis-before-start-768.png",
+      "bytes": 95645,
+      "sha256": "7629b6a54370883d2ef1417ab82bae154d59646ec32670d1438edb209fd048e0"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-supplement-150-1024.png",
+      "destination": "browser/fourteenth/actual-supplement-150-1024.png",
+      "bytes": 94159,
+      "sha256": "5d8c8604cb35c776c3e87bbde29dd2d62f468e6baa2739538603c753ca784c55"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-supplement-150-1280.png",
+      "destination": "browser/fourteenth/actual-supplement-150-1280.png",
+      "bytes": 100700,
+      "sha256": "39b39cc14919b06f7ec8e3907e1c0d81b307b5fc2bb691d1d92c2063b2fe75be"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-supplement-150-1440.png",
+      "destination": "browser/fourteenth/actual-supplement-150-1440.png",
+      "bytes": 102255,
+      "sha256": "2c0254542b3fc4bd38b4ccd5443cd8f03c75421225d4464bb64fff91cd70c141"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-supplement-150-390.png",
+      "destination": "browser/fourteenth/actual-supplement-150-390.png",
+      "bytes": 47909,
+      "sha256": "d35d26228de3e76e52cfc1611c498cae580f116bf9ecdec27b329f8499afc5e0"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\actual-supplement-150-768.png",
+      "destination": "browser/fourteenth/actual-supplement-150-768.png",
+      "bytes": 62106,
+      "sha256": "a672d875127b4919a3731c206c6d1addc52bdb63ce1720f6360573985e76dabc"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\hollow-550-frozen.xlsx",
+      "destination": "browser/fourteenth/hollow-550-frozen.xlsx",
+      "bytes": 32865,
+      "sha256": "f20266409b4807a69fabfd40a0c57a229df65482a995b7b90c7b0181b795d5fb"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\hollow-base-source.json",
+      "destination": "browser/fourteenth/hollow-base-source.json.txt",
+      "bytes": 22850,
+      "sha256": "fb1d75d465188a70b4512b2ad20e12e0e638c133dc19e80ec4374e597ed07a97"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\hollow-migration-batch.json",
+      "destination": "browser/fourteenth/hollow-migration-batch.json.txt",
+      "bytes": 5790,
+      "sha256": "e12fae55a177ab914a788b2e31b5fc6ac1034dfbc8e9b95a727493b052f19511"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\hollow-print-verification.json",
+      "destination": "browser/fourteenth/hollow-print-verification.json.txt",
+      "bytes": 2247,
+      "sha256": "b5f530c2ad7be879b1beac6281aa2060178152abc5928e5a5a58deb6cf0278fb"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-unknown-original-input-1024.png",
+      "destination": "browser/fourteenth/inspection-unknown-original-input-1024.png",
+      "bytes": 106209,
+      "sha256": "50a1eab751397be8eaddc44ba1625953f333bc6c2766d6c0525f6a49d179fae0"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-unknown-original-input-1280.png",
+      "destination": "browser/fourteenth/inspection-unknown-original-input-1280.png",
+      "bytes": 111922,
+      "sha256": "0f6b32f25c99fcd94b4606bd60354d9cd9ad79432febe22a0de38a9b4ed9caa9"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-unknown-original-input-1440.png",
+      "destination": "browser/fourteenth/inspection-unknown-original-input-1440.png",
+      "bytes": 113533,
+      "sha256": "5f138e37c170449ccd44a4de9f2717bac06b6f9ec0f79b01af556f889befd74a"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-unknown-original-input-390.png",
+      "destination": "browser/fourteenth/inspection-unknown-original-input-390.png",
+      "bytes": 65903,
+      "sha256": "3d341e01edc5dff0751c02ac92c5d6caa193cd3306082efb53403f49739b8576"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-unknown-original-input-768.png",
+      "destination": "browser/fourteenth/inspection-unknown-original-input-768.png",
+      "bytes": 73978,
+      "sha256": "a49b4b0551011d8cecb4fab62ff296747bcf8ea9a51d1d30592dbe1f20acdafe"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-whole-page-19-1024.png",
+      "destination": "browser/fourteenth/inspection-whole-page-19-1024.png",
+      "bytes": 95187,
+      "sha256": "6095d076ae5b3147e14515b33cb2bb248f6d3dfa4a85704e00477b2effa2663c"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-whole-page-19-1280.png",
+      "destination": "browser/fourteenth/inspection-whole-page-19-1280.png",
+      "bytes": 100751,
+      "sha256": "88dfd413edb7ec814d7240856a5962880f619fa3edaa9c7cdd8457ce1d51e372"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-whole-page-19-1440.png",
+      "destination": "browser/fourteenth/inspection-whole-page-19-1440.png",
+      "bytes": 102102,
+      "sha256": "c9d0e4be0256cbab223956197fa08ff40fc0cf6c18bad5d63995ebf68bcafeb0"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-whole-page-19-390.png",
+      "destination": "browser/fourteenth/inspection-whole-page-19-390.png",
+      "bytes": 55476,
+      "sha256": "e8d5fa1e9730e161bcf793381085ac41e669220b6ed23907daa10cb68953ec0f"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\inspection-whole-page-19-768.png",
+      "destination": "browser/fourteenth/inspection-whole-page-19-768.png",
+      "bytes": 62825,
+      "sha256": "a73715441b7f46b0d0b0ac463559bea17f15bd6a7b2a59ac2fb5df66795cf1ce"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\later-all-rectified-original-retained-1024.png",
+      "destination": "browser/fourteenth/later-all-rectified-original-retained-1024.png",
+      "bytes": 128713,
+      "sha256": "94a72ed46e19e9d6335817bf37a96ce893a876f8558466742f900c931e1d7e49"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\later-all-rectified-original-retained-1280.png",
+      "destination": "browser/fourteenth/later-all-rectified-original-retained-1280.png",
+      "bytes": 130179,
+      "sha256": "525e0e1d4e8897ec5ed76093f73eb6c86bb5783e1790fa445397e1c96139fa6f"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\later-all-rectified-original-retained-1440.png",
+      "destination": "browser/fourteenth/later-all-rectified-original-retained-1440.png",
+      "bytes": 131200,
+      "sha256": "644be1e5c11787192affc1f932539391f3702ad9045d5a3ffa919bd8cff392fc"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\later-all-rectified-original-retained-390.png",
+      "destination": "browser/fourteenth/later-all-rectified-original-retained-390.png",
+      "bytes": 87938,
+      "sha256": "011a8b26650a83a140bc4488cd9afe880086acbcedf1fe30acb19204ceabda92"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\later-all-rectified-original-retained-768.png",
+      "destination": "browser/fourteenth/later-all-rectified-original-retained-768.png",
+      "bytes": 95659,
+      "sha256": "4da0dbdd113c1d2a02f348687a8eb1d7bb60364d37b4a57bd4d5688f42ad64d9"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-1024.png",
+      "destination": "browser/fourteenth/manual-450-gross-550-1024.png",
+      "bytes": 150867,
+      "sha256": "3af0475555dbfcbf88294f3a752eca7b208b17a7ecb4bb90b94036ec17ee91e4"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-1280.png",
+      "destination": "browser/fourteenth/manual-450-gross-550-1280.png",
+      "bytes": 154097,
+      "sha256": "a2862bc6c3524260a65dcc985a97373b5c7b84c17b2dd328bdd26c6eac87f698"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-1440.png",
+      "destination": "browser/fourteenth/manual-450-gross-550-1440.png",
+      "bytes": 155975,
+      "sha256": "d679ddbd3baca1c82e3987e9419a5b3041f3ccffb9d64465a3a424d87a7097e9"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-390.png",
+      "destination": "browser/fourteenth/manual-450-gross-550-390.png",
+      "bytes": 79468,
+      "sha256": "1b5f2deb135efe33687c18b3181bfcd0a733e2c5b34c6473a36da8c0d2ca8052"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-768.png",
+      "destination": "browser/fourteenth/manual-450-gross-550-768.png",
+      "bytes": 105905,
+      "sha256": "406d8f45135aa2bab42811d797711e87b97609b391f55f4dac9992fd0b2a50c7"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-start-confirmation-1024.png",
+      "destination": "browser/fourteenth/manual-start-confirmation-1024.png",
+      "bytes": 179646,
+      "sha256": "41ecdb28cc023754927894657dcc1c9028c9b39d85b5554b8a1cc4e20170385a"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-start-confirmation-1280.png",
+      "destination": "browser/fourteenth/manual-start-confirmation-1280.png",
+      "bytes": 194975,
+      "sha256": "fc703af64eb67df48827192336ad071c606676b5d0551aed900c629d0d63b9db"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-start-confirmation-1440.png",
+      "destination": "browser/fourteenth/manual-start-confirmation-1440.png",
+      "bytes": 199402,
+      "sha256": "e7c796d2fea50050cf6638fa7e0806aeefc43111dd258e0e31ab31b1da4eb2cf"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-start-confirmation-390.png",
+      "destination": "browser/fourteenth/manual-start-confirmation-390.png",
+      "bytes": 104778,
+      "sha256": "b367c009ed45e4c6ee61b15accaa88b1dec7456fd5659c167c54a2544bf3aca7"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-start-confirmation-768.png",
+      "destination": "browser/fourteenth/manual-start-confirmation-768.png",
+      "bytes": 150325,
+      "sha256": "2680a704478e77e6e33b49dfa73994ed90314b712ef181373ef0be18b169af33"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-1024.png",
+      "destination": "browser/fourteenth/original-adoption-correction-150-1024.png",
+      "bytes": 182021,
+      "sha256": "d4b469618194da1773975d5f9f6304baf9447537f7c2238a8986d13067849f1b"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-1280.png",
+      "destination": "browser/fourteenth/original-adoption-correction-150-1280.png",
+      "bytes": 187011,
+      "sha256": "10b5ad5f3dc2388f051c23211510306db221471a3d4886bce99e9739ec2c90f1"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-1440.png",
+      "destination": "browser/fourteenth/original-adoption-correction-150-1440.png",
+      "bytes": 191756,
+      "sha256": "a513099313488ae90e7abce1ae7184d7328fc9f7e81323734b6c76db453535bd"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-390.png",
+      "destination": "browser/fourteenth/original-adoption-correction-150-390.png",
+      "bytes": 115257,
+      "sha256": "0a19cd77c671c5a2edb6f7c2ae0b0f956e037f739e975cc6d267be37310e286d"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-768.png",
+      "destination": "browser/fourteenth/original-adoption-correction-150-768.png",
+      "bytes": 147006,
+      "sha256": "04ac96b62001fffb9bc14bd2f391349e2a700bd9a23bf835a0a5a6ac2cfcb25b"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-empty-is-unknown-1024.png",
+      "destination": "browser/fourteenth/policy-empty-is-unknown-1024.png",
+      "bytes": 112838,
+      "sha256": "1a96625af594a774706b879abf2b107a16e77daf1ffaaf19d1d9f53f6ab5e71f"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-empty-is-unknown-1280.png",
+      "destination": "browser/fourteenth/policy-empty-is-unknown-1280.png",
+      "bytes": 124345,
+      "sha256": "4f3df77be0ba75350858f023c4d6f29d236347aa7154c403639e9dd1a7aaa2bf"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-empty-is-unknown-1440.png",
+      "destination": "browser/fourteenth/policy-empty-is-unknown-1440.png",
+      "bytes": 126233,
+      "sha256": "300973d95f8f1778670a138bf0c8862557163b131853496b4a0ab472d31235e2"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-empty-is-unknown-390.png",
+      "destination": "browser/fourteenth/policy-empty-is-unknown-390.png",
+      "bytes": 56781,
+      "sha256": "ffbc4a62898dbbd79540ddc8f4f12ce61aad9ae0cd64105e827515156e256e06"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-empty-is-unknown-768.png",
+      "destination": "browser/fourteenth/policy-empty-is-unknown-768.png",
+      "bytes": 80877,
+      "sha256": "5b339e0f577c4a94df9c4355c7873818d30ab40982b7e1314647f93b5b2da533"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-explicit-zero-1024.png",
+      "destination": "browser/fourteenth/policy-explicit-zero-1024.png",
+      "bytes": 108239,
+      "sha256": "1c6fe2669d56ae85791326acf59a01aa173eb7366d0e4a75471eefb39797efe7"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-explicit-zero-1280.png",
+      "destination": "browser/fourteenth/policy-explicit-zero-1280.png",
+      "bytes": 118385,
+      "sha256": "319fb23fdf1c58f8bf21adf6cdae229b2252c24387dce491f8f5aca4ff23a7a7"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-explicit-zero-1440.png",
+      "destination": "browser/fourteenth/policy-explicit-zero-1440.png",
+      "bytes": 120242,
+      "sha256": "ee14b5e2ad4671a114060c68d075c44f74f9bf0ea543d1f5c0b08de197e1dd25"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-explicit-zero-390.png",
+      "destination": "browser/fourteenth/policy-explicit-zero-390.png",
+      "bytes": 52554,
+      "sha256": "da8507d2c10d37dd7bafefec7a139d07aa3a53e83543d552d392b9d9c148f5a4"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\policy-explicit-zero-768.png",
+      "destination": "browser/fourteenth/policy-explicit-zero-768.png",
+      "bytes": 76387,
+      "sha256": "3d0bf97b7405dc98ea2ed72a72ec14c3bcdaaf880af1a0a9b600b15d530ee1da"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\release-550-confirmation-1024.png",
+      "destination": "browser/fourteenth/release-550-confirmation-1024.png",
+      "bytes": 140301,
+      "sha256": "388ade3fcb4833d24c24cae35d039e6fe0fd73cfdf2b3438b8fb9b743647ac10"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\release-550-confirmation-1280.png",
+      "destination": "browser/fourteenth/release-550-confirmation-1280.png",
+      "bytes": 161529,
+      "sha256": "a2fbe8296543fd9175eabdf5a73e8a593c698f2d723b1013d4467ac60b456ed3"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\release-550-confirmation-1440.png",
+      "destination": "browser/fourteenth/release-550-confirmation-1440.png",
+      "bytes": 169127,
+      "sha256": "c580a9d071cda14211a2de4a15221d3459c0611c7be64688f6e336d32a3203b0"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\release-550-confirmation-390.png",
+      "destination": "browser/fourteenth/release-550-confirmation-390.png",
+      "bytes": 67761,
+      "sha256": "f37946b3de66252afddea38b0554ab844b33d137c2123863aa4b215fbe585a92"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\release-550-confirmation-768.png",
+      "destination": "browser/fourteenth/release-550-confirmation-768.png",
+      "bytes": 103186,
+      "sha256": "5ceb43cc7d5e6b08019da41c3b79fc87fc3e3b43acde48f1ca76b9932497fe42"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\second-unit-source-cold-return-1024.png",
+      "destination": "browser/fourteenth/second-unit-source-cold-return-1024.png",
+      "bytes": 144283,
+      "sha256": "6d73d3082587b239116d8f5c1bcf7f20fa4593dc6292f5a1cee6e78bcd0b93a4"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\second-unit-source-cold-return-1280.png",
+      "destination": "browser/fourteenth/second-unit-source-cold-return-1280.png",
+      "bytes": 145656,
+      "sha256": "3e11d530c3359a88e1ee29fb57e67f8e4a5daf2f8bff79215ac38a6246b4b05b"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\second-unit-source-cold-return-1440.png",
+      "destination": "browser/fourteenth/second-unit-source-cold-return-1440.png",
+      "bytes": 146850,
+      "sha256": "2e49ed3c9e851880f27004a24c8dbd2a75d992f63ba7c4f507d6287ba05ffb11"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\second-unit-source-cold-return-390.png",
+      "destination": "browser/fourteenth/second-unit-source-cold-return-390.png",
+      "bytes": 95205,
+      "sha256": "34733030dc04a3f1b1f154e03495d4473fc81615efc093d795f3316c87439c2c"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\second-unit-source-cold-return-768.png",
+      "destination": "browser/fourteenth/second-unit-source-cold-return-768.png",
+      "bytes": 110660,
+      "sha256": "1eb8b0536892becd871feb6d08131215f172c3132fec104eb37a4949cd5be321"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-19-4-15-history-1024.png",
+      "destination": "browser/fourteenth/source-19-4-15-history-1024.png",
+      "bytes": 126911,
+      "sha256": "494090cefbbc2430e36ec30d12905f6891aa4e093e8cdcb2d7531b1cf5c92033"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-19-4-15-history-1280.png",
+      "destination": "browser/fourteenth/source-19-4-15-history-1280.png",
+      "bytes": 128025,
+      "sha256": "fdad13fc655b744e646bdeaa0ec0a13966c7958a75fa31390931a262754ab616"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-19-4-15-history-1440.png",
+      "destination": "browser/fourteenth/source-19-4-15-history-1440.png",
+      "bytes": 129251,
+      "sha256": "2f980a9999af8cc10eaf81ccbf8e7f7f9a5e3dedd9db73f272722e1145719c50"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-19-4-15-history-390.png",
+      "destination": "browser/fourteenth/source-19-4-15-history-390.png",
+      "bytes": 84901,
+      "sha256": "54c9fba0cbc30d202426e249d5162b8ff49aeaf3ab96cff37a7ac026ea6a4380"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-19-4-15-history-768.png",
+      "destination": "browser/fourteenth/source-19-4-15-history-768.png",
+      "bytes": 94325,
+      "sha256": "405e36b3e3c0648fd73ce03cc57820fbb7ed4cff8c9c76fad1d74bf63a5fe46d"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-known-zero-1024.png",
+      "destination": "browser/fourteenth/source-known-zero-1024.png",
+      "bytes": 101276,
+      "sha256": "e8565054cfa0699aa13ba77ace7d55082ca15125275d00525122ce78b2ace7c7"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-known-zero-1280.png",
+      "destination": "browser/fourteenth/source-known-zero-1280.png",
+      "bytes": 102594,
+      "sha256": "19ac083794c82024c607d2c49aecb6fa60798c650a285829faeeaf84a320c7fe"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-known-zero-1440.png",
+      "destination": "browser/fourteenth/source-known-zero-1440.png",
+      "bytes": 103333,
+      "sha256": "772f4438d88967cec5d36ce279ce361fda1ae8a99f6921f02acb5dba19ed7e6c"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-known-zero-390.png",
+      "destination": "browser/fourteenth/source-known-zero-390.png",
+      "bytes": 62229,
+      "sha256": "fc492fe01da8890df051cf7def291c0fa38e69aae95dedc6089497d0a7d9443d"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-known-zero-768.png",
+      "destination": "browser/fourteenth/source-known-zero-768.png",
+      "bytes": 69205,
+      "sha256": "cc14e7ee2c53d8bd2c88c6b46c0079224e7ef0d120b7bf1e1782ac04012906f5"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-not-inspected-1024.png",
+      "destination": "browser/fourteenth/source-not-inspected-1024.png",
+      "bytes": 125638,
+      "sha256": "fb938ddad6e974ea3f51ce8410e6ba20b1dca07398a4ffa56d231c2d7d154f22"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-not-inspected-1280.png",
+      "destination": "browser/fourteenth/source-not-inspected-1280.png",
+      "bytes": 126770,
+      "sha256": "467d581449185ac8127508cdf90e47ccdb0ebe04d4549d1e47bbdeb83f778094"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-not-inspected-1440.png",
+      "destination": "browser/fourteenth/source-not-inspected-1440.png",
+      "bytes": 128402,
+      "sha256": "d2ecfd65e92039a4373a31d57ce951bebcf204d53b749751c23c657e846fcc62"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-not-inspected-390.png",
+      "destination": "browser/fourteenth/source-not-inspected-390.png",
+      "bytes": 69112,
+      "sha256": "22ebd120a967a05dc0f92c83bf907fe64deeb5a2785cde9603b0bf2f7df449cc"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\source-not-inspected-768.png",
+      "destination": "browser/fourteenth/source-not-inspected-768.png",
+      "bytes": 89757,
+      "sha256": "53c970607c3293bb7ed1ad1b3bc6df8a8f934633a1dd328066e2add7c3ccaff0"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\start-unknown-original-command-1024.png",
+      "destination": "browser/fourteenth/start-unknown-original-command-1024.png",
+      "bytes": 162011,
+      "sha256": "29b472f2ce0feff3ec46d6a01ab93eb05238293ac19fece8238ea10af3cacbe7"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\start-unknown-original-command-1280.png",
+      "destination": "browser/fourteenth/start-unknown-original-command-1280.png",
+      "bytes": 173007,
+      "sha256": "29fa6c2d7eb38aab18a7f245ea9a74f5b7c4f7db0b090e76949962e0d125e0a1"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\start-unknown-original-command-1440.png",
+      "destination": "browser/fourteenth/start-unknown-original-command-1440.png",
+      "bytes": 175280,
+      "sha256": "72b6be7014f481e6f067baf48769351efe5f60c62e65627d1244aaca52f0c6a2"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\start-unknown-original-command-390.png",
+      "destination": "browser/fourteenth/start-unknown-original-command-390.png",
+      "bytes": 83936,
+      "sha256": "623445a692b8d4eab6c49ba1d1de5f410c2cc16853c26ea249afac824bf35542"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\start-unknown-original-command-768.png",
+      "destination": "browser/fourteenth/start-unknown-original-command-768.png",
+      "bytes": 130246,
+      "sha256": "328e02b841bbd535937471137791991c72832a98c5bf8e9c991a1e615e29a542"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\verification.json",
+      "destination": "browser/fourteenth/verification.json.txt",
+      "bytes": 1011,
+      "sha256": "f09410cd5b457bef0051af08a7b4a6313261260f24a527610faa88e4b58b7d8e"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\wage-cold-draft-preserved-1024.png",
+      "destination": "browser/fourteenth/wage-cold-draft-preserved-1024.png",
+      "bytes": 108579,
+      "sha256": "bb0f31ebab537a8eb7fc4f0222c4e81d8a9a019254bc37ab6953edcbb5059e83"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\wage-cold-draft-preserved-1280.png",
+      "destination": "browser/fourteenth/wage-cold-draft-preserved-1280.png",
+      "bytes": 115559,
+      "sha256": "2a15f7588c336aaf1c59efaa96550c19764a1353e5e530b1b98ad647c22c9c07"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\wage-cold-draft-preserved-1440.png",
+      "destination": "browser/fourteenth/wage-cold-draft-preserved-1440.png",
+      "bytes": 117664,
+      "sha256": "ef92bdb1632b5a14a933c6494072c22e8187b77caef3e3b0991292afcd9bf995"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\wage-cold-draft-preserved-390.png",
+      "destination": "browser/fourteenth/wage-cold-draft-preserved-390.png",
+      "bytes": 65885,
+      "sha256": "b57f46b72267ae0c40849be430f5e487e73a2b3fa784682c5a9f4a5ae4400354"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\wage-cold-draft-preserved-768.png",
+      "destination": "browser/fourteenth/wage-cold-draft-preserved-768.png",
+      "bytes": 73658,
+      "sha256": "eff67fbac4a8c0746f54a71fc9f8273adc0c03e68f609abe8a653fbf9c67ec5e"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\a\\visual-review.md",
+      "destination": "checks/a/visual-review.md",
+      "bytes": 8110,
+      "sha256": "3b9254ed928010f8a5ba20f692e01e7566267608fcdde97044ec2fd630766197"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\root\\visual-review.md",
+      "destination": "checks/root/visual-review.md",
+      "bytes": 4102,
+      "sha256": "b0d0b6f28a3d8038fe11dc33e48204269b14a7ce9fd4dd7c795c60829c20682e"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\print-review-fourteenth\\hollow-550-page-1.png",
+      "destination": "print/fourteenth/hollow-550-page-1.png",
+      "bytes": 123447,
+      "sha256": "995f0c7cbe5233890b81dfb59045c31b6ade29150e68e9210b46d8fa1906464b"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\print-review-fourteenth\\hollow-550-page-2.png",
+      "destination": "print/fourteenth/hollow-550-page-2.png",
+      "bytes": 67265,
+      "sha256": "6711625eb0b8b3f868e781defcb5972ea05f01f05bf39cea331410eb66e21b45"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth-source\\PayrollAdjustmentBasisFields.vue",
+      "destination": "checks/c/fourteenth-source/PayrollAdjustmentBasisFields.vue.txt",
+      "bytes": 10490,
+      "sha256": "780465b57cd847e9bae28e46113c20def848135be667c6e929e7386d2322a2e4"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fourteenth-source\\PayrollHollowReview.vue",
+      "destination": "checks/c/fourteenth-source/PayrollHollowReview.vue.txt",
+      "bytes": 8420,
+      "sha256": "47d7529e5bd3e3d5d082ed19461e3741dee8e50130aa1341fdf99d27a17501d9"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-390.png",
+      "destination": "browser/fifteenth/manual-450-gross-550-390.png",
+      "bytes": 79825,
+      "sha256": "f92e8d478c78b1757ce51429fc720890196974f04578188687ddead770036e72"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-768.png",
+      "destination": "browser/fifteenth/manual-450-gross-550-768.png",
+      "bytes": 107974,
+      "sha256": "44f248a1c643f2d25bdd374d8628a3ce4688f13a4168e90188d617e0ccc5438f"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-1024.png",
+      "destination": "browser/fifteenth/manual-450-gross-550-1024.png",
+      "bytes": 152904,
+      "sha256": "1da8e3a7aa6c90fa038726ee3b7f857f740d528df995c8cd34d92278dc035eaf"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-1280.png",
+      "destination": "browser/fifteenth/manual-450-gross-550-1280.png",
+      "bytes": 155685,
+      "sha256": "4093aefaea70bb77e9740a67c1d24f4df531658ec0641299a5216eed8aeaa331"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\manual-450-gross-550-1440.png",
+      "destination": "browser/fifteenth/manual-450-gross-550-1440.png",
+      "bytes": 157637,
+      "sha256": "f9d0326eaee4b9d865943894ab67d1fd9cbdc90880beda61ef20754eff02fb2d"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-390.png",
+      "destination": "browser/fifteenth/original-adoption-correction-150-390.png",
+      "bytes": 89897,
+      "sha256": "b53442ab71618fcfc1f5ac07a534f10a981813e034dc53c8f61b3606c50745d4"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-768.png",
+      "destination": "browser/fifteenth/original-adoption-correction-150-768.png",
+      "bytes": 114518,
+      "sha256": "a913d9c7a84a06d0153724909c549a632978722d53ac033e9f0daf34c23b0ee6"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-1024.png",
+      "destination": "browser/fifteenth/original-adoption-correction-150-1024.png",
+      "bytes": 146377,
+      "sha256": "0c264eeab0b3cc49ae10edc610f9a732f26e6e603b4943bba57a071998a8aefc"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-1280.png",
+      "destination": "browser/fifteenth/original-adoption-correction-150-1280.png",
+      "bytes": 152797,
+      "sha256": "4c147088b82c26aa37c1ff676a49abc81faf3f513c73fef959365997786298c9"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\original-adoption-correction-150-1440.png",
+      "destination": "browser/fifteenth/original-adoption-correction-150-1440.png",
+      "bytes": 154252,
+      "sha256": "332d316d5add94c649db45967e9693c0b414bda1cb8a9d862aa43daa2bfa3faa"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\verification.json",
+      "destination": "browser/fifteenth/verification.json.txt",
+      "bytes": 1066,
+      "sha256": "34e9ad005d3aeaa8324ccf9f866ec2d3ad7a401d37a001c9d16e64b4c4e522cc"
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p6-central\\c\\browser\\fifteenth\\payroll-hollow-central-原户19减4、真实楼层冷返回、人工450扣款550发放及独立补款150-chromium\\hollow-550-frozen.xlsx",
+      "destination": "browser/fifteenth/hollow-550-frozen.xlsx",
+      "bytes": 32865,
+      "sha256": "13043fbff7840989eb5b63889acc0cfa67d21e81bed9b097b06f92facdf86fcb"
+    }
+  ]
+}

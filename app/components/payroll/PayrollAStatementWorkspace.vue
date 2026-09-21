@@ -6,10 +6,12 @@ import { createPayrollAWorkbook } from '~/lib/payroll/a-export'
 import { payrollInputNumber, payrollRatioLabel } from '~/lib/payroll/a-presentation'
 import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { toErrorMessage } from '~/lib/util/error'
+import PayrollHollowReview from './PayrollHollowReview.vue'
 
 const props = defineProps<{ statementId: string, origin: 'real' | 'demo', returnTo: string }>()
 const emit = defineEmits<{ changed: [] }>()
 const adjustmentsReady = shallowRef(false)
+const hollowLocked = shallowRef(false)
 const kit = useKitUI()
 const ui = usePayrollAStatement({ id: () => props.statementId, origin: () => props.origin, changed: () => emit('changed') })
 const { matching, output, active, busy, error, writable, pending, feesPending, ratio, releaseOpen, releaseRead, releaseDraft } = ui
@@ -48,6 +50,7 @@ async function print() {
       </NuxtLink>
     </section>
     <template v-if="matching">
+      <PayrollHollowReview v-if="matching.hollow" :read="matching.hollow" :return-to="returnTo" :readonly="matching.status === 'released'" :blocked="busy || !!pending || !!feesPending || releaseOpen" @changed="ui.load(true)" @locked="hollowLocked = $event" />
       <section class="panel grid gap-3 p-4" aria-label="A工资处理">
         <SectionHeader title="核对与实际发放" />
         <p class="text-12px leading-5 text-ink-soft">
@@ -63,16 +66,16 @@ async function print() {
             编辑管理清单负价行
           </NuxtLink><NuxtLink v-if="matching.status !== 'released'" :to="config" class="btn-secondary">
             工资配置
-          </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck" @click="ui.execute('check')">
+          </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck || hollowLocked" @click="ui.execute('check')">
             重新核对工资
-          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease || !adjustmentsReady" @click="ui.openRelease">
+          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease || !adjustmentsReady || hollowLocked" @click="ui.openRelease">
             确认实际发放
           </KitButton>
         </div>
         <div v-if="matching.status !== 'released'" class="grid max-w-lg gap-2">
-          <label class="grid gap-1 text-12px">本次支付比例（%）<input :value="ratio === null ? '' : ratio * 100" type="number" min="0" max="100" step="0.01" aria-label="核对单支付比例" class="field-input min-w-0" :disabled="!writable || matching.draft.periodKind === 'retention'" @input="ratio = payrollInputNumber(($event.target as HTMLInputElement).value) === null ? null : Number(($event.target as HTMLInputElement).value) / 100"></label><p class="text-12px text-ink-faint">
+          <label class="grid gap-1 text-12px">本次支付比例（%）<input :value="ratio === null ? '' : ratio * 100" type="number" min="0" max="100" step="0.01" aria-label="核对单支付比例" class="field-input min-w-0" :disabled="!writable || matching.draft.periodKind === 'retention' || hollowLocked" @input="ratio = payrollInputNumber(($event.target as HTMLInputElement).value) === null ? null : Number(($event.target as HTMLInputElement).value) / 100"></label><p class="text-12px text-ink-faint">
             {{ payrollRatioLabel(matching.ratioDefault) }}。已保存比例不会被建议值覆盖。
-          </p><KitButton class="justify-self-start" :disabled="!writable || matching.draft.periodKind === 'retention' || ratio === matching.draft.payRatio" @click="ui.execute('ratio')">
+          </p><KitButton class="justify-self-start" :disabled="!writable || matching.draft.periodKind === 'retention' || ratio === matching.draft.payRatio || hollowLocked" @click="ui.execute('ratio')">
             保存本次比例（需重新核对）
           </KitButton>
         </div>
@@ -83,7 +86,7 @@ async function print() {
       <PayrollASourceReview v-if="matching.status !== 'released' && feeRead?.book?.bookPurpose !== 'management'" :read="matching" :return-to="returnTo" :editable="writable" @price="selectedLine = $event" />
       <PayrollAFeesReview v-if="feeRead" :read="feeRead" :return-to="returnTo" />
     </template>
-    <PayrollReleaseAdjustmentSelection v-if="matching && matching.status !== 'released'" :statement-id="statementId" :origin="origin" :source-version="matching.context.sourceVersion" :return-to="returnTo" :applications="releaseDraft?.adjustmentApplications" :disabled="!writable || releaseOpen" @change="ui.setReleaseApplications" @valid="adjustmentsReady = $event" />
+    <PayrollReleaseAdjustmentSelection v-if="matching && matching.status !== 'released'" :statement-id="statementId" :origin="origin" :source-version="matching.context.sourceVersion" :return-to="returnTo" :applications="releaseDraft?.adjustmentApplications" :disabled="!writable || releaseOpen || hollowLocked" @change="ui.setReleaseApplications" @valid="adjustmentsReady = $event" />
     <section v-if="output" class="panel grid gap-3 p-4" aria-label="冻结工资输出">
       <SectionHeader title="冻结工资表" /><template v-if="output.state === 'available'">
         <p class="text-12px leading-5 text-ink-soft">

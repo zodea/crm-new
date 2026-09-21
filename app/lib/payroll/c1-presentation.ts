@@ -1,4 +1,5 @@
 import type { PayrollC1Draft, PayrollC1FormRead, PayrollC1ReleaseDraft } from './central-c1-contract'
+import { payrollHollowAllowsZeroRelease } from './central-hollow-deduction-release'
 import { amountInCents } from './statements'
 
 export interface PayrollAttendanceInput {
@@ -30,7 +31,8 @@ export function c1ReleaseDefault(read: PayrollC1FormRead): PayrollC1ReleaseDraft
 }
 export function c1ReleaseError(read: PayrollC1FormRead, draft: PayrollC1ReleaseDraft): string {
   const valid = (value: number | null): value is number => value !== null && Number.isFinite(value) && value >= 0 && Math.abs(value * 100 - amountInCents(value)) < 0.000001
-  if (!valid(draft.actualAmount) || draft.actualAmount <= 0)
+  const zeroAllowed = read.eligibility.canRelease && payrollHollowAllowsZeroRelease(read.hollow?.snapshot)
+  if (!valid(draft.actualAmount) || (draft.actualAmount === 0 && !zeroAllowed))
     return '请填写大于零、精确到分的实际发放金额。'
   if (read.members.length !== draft.allocations.length || new Set(draft.allocations.map(row => row.workerId)).size !== read.members.length || draft.allocations.some(row => !read.members.some(member => member.id === row.workerId)))
     return '请保留本次全部成员，包含零金额成员。'

@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 157,
+    "trackedPageFiles": 160,
     "devPageFiles": 5,
-    "productionRoutes": 152,
+    "productionRoutes": 155,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 152,
-    "referenceEndpoints": 152,
-    "referenceProfiles": 46,
-    "usedReferenceProfiles": 40,
+    "evidenceEndpointRecords": 155,
+    "referenceEndpoints": 155,
+    "referenceProfiles": 47,
+    "usedReferenceProfiles": 41,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 36,
+    "localAuthorityRoutes": 39,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 10,
     "designCoveredRoutes": 135,
-    "designPendingRoutes": 17
+    "designPendingRoutes": 20
   },
   "domains": [
     {
@@ -232,7 +232,7 @@
     {
       "code": "quantity-payroll",
       "domain": "工程量与工资",
-      "routeCount": 22,
+      "routeCount": 25,
       "implementationIssues": [
         412
       ],
@@ -4870,6 +4870,99 @@
       "stateAndNavigationConclusion": {
         "sourceDocument": "docs/design/runtime-reference-audit.md",
         "routeKey": "/subcontract/quantity/:pid/:uid"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-75A863A55891",
+      "page": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/new.vue",
+      "localRoute": "/subcontract/quantity/:pid/:uid/hollow/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-QUANTITY-HOLLOW-LOCAL",
+      "referenceEndpointId": "local-75A863A55891",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/quantity/:pid/:uid/hollow/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-6F8382C77961",
+      "page": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/form/[id].vue",
+      "localRoute": "/subcontract/quantity/:pid/:uid/hollow/form/:id",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-QUANTITY-HOLLOW-LOCAL",
+      "referenceEndpointId": "local-6F8382C77961",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/quantity/:pid/:uid/hollow/form/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-326974A20A57",
+      "page": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/[id].vue",
+      "localRoute": "/subcontract/quantity/:pid/:uid/hollow/:id",
+      "domainCode": "quantity-payroll",
+      "template": "详情",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-QUANTITY-HOLLOW-LOCAL",
+      "referenceEndpointId": "local-326974A20A57",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/quantity/:pid/:uid/hollow/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/:id"
       },
       "constraints": "C-DENSE"
     },

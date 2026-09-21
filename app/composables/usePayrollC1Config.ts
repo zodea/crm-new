@@ -7,7 +7,7 @@ import { payrollReadLocation, payrollViewScope } from '~/lib/payroll/central-nav
 import { toErrorMessage } from '~/lib/util/error'
 import { usePayrollRead } from './usePayrollRead'
 
-export function usePayrollC1Config() {
+export function usePayrollC1Config(additionalGuard: () => boolean | Promise<boolean> = () => true) {
   const route = useRoute()
   const router = useRouter()
   const store = usePayrollC1Store()
@@ -131,6 +131,8 @@ export function usePayrollC1Config() {
   }
   const returnTo = computed(() => (scope.value.origin ? payrollC1WorkspaceReturn(route.query.returnTo, scope.value.origin) : null) || payrollAEntryReturn(route.query.returnTo, scope.value.origin) || payrollReadLocation('/subcontract/payroll', scope.value))
   async function mayLeave() {
+    if (!await additionalGuard())
+      return false
     if (pending.value || working.value) {
       commandError.value = '请先核对原提交。'
       return false

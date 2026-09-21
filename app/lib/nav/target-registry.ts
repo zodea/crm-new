@@ -29,6 +29,7 @@ import {
   validateProjectSupplierReturnTo,
 } from '~/lib/project-supplier/return-context'
 import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
+import { quantityHollowPath } from '~/lib/quantity/hollow-navigation'
 import { isQuantitySourceIdentity } from '~/lib/quantity/migration-identity'
 import { validateReceiptReturnTo } from '~/lib/receipt/return-context'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
@@ -290,6 +291,18 @@ function quantityUnitPath(intent: EntityTargetIntent): string {
   return target
 }
 
+function quantityHollowRecordPath(intent: EntityTargetIntent): string {
+  const { projectId, dataOrigin, recordId, revisionId } = intent.filters
+  if (intent.kind !== 'entity-subview' || intent.view !== null || !isStableRouteIdentity(projectId) || dataOrigin !== 'real'
+    || !isQuantitySourceIdentity(intent.subject.id, 'units') || !isQuantitySourceIdentity(recordId, 'quantity_hollow_records')
+    || (revisionId !== undefined && !isQuantitySourceIdentity(revisionId, 'quantity_hollow_revisions'))
+    || Object.keys(intent.filters).some(key => !['projectId', 'dataOrigin', 'recordId', 'revisionId'].includes(key))) {
+    throw new Error('invalid quantity hollow source')
+  }
+  const query = new URLSearchParams({ origin: dataOrigin, ...(typeof revisionId === 'string' ? { revisionId } : {}) })
+  return `${quantityHollowPath({ projectId, unitId: intent.subject.id, origin: dataOrigin }, 'detail', recordId)}?${query}`
+}
+
 function withCrewWorkerFactContext(path: string, intent: EntityTargetIntent): string {
   const dataOrigin = intent.filters.dataOrigin
   const ownerKind = intent.filters.ownerKind
@@ -363,6 +376,7 @@ const TARGET_REGISTRY = {
     return `${entityPath('/schedule/process-library', intent)}?origin=${origin}`
   },
   'quantity-unit:detail': quantityUnitPath,
+  'quantity-unit:hollow-record': quantityHollowRecordPath,
   'attendance:matrix': (intent: EntityTargetIntent) => {
     const { projectId, dataOrigin, month, crewId, workerId, workDate, recordId } = intent.filters
     if (!isStableRouteIdentity(projectId) || !isDataOriginDTO(dataOrigin) || !isStableRouteIdentity(workerId) || recordId !== intent.subject.id || typeof month !== 'string' || !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(month) || typeof workDate !== 'string' || !workDate.startsWith(`${month}-`))
@@ -672,7 +686,7 @@ export function resolveNavigationTarget(
         to = `${to}${separator}returnTo=${encodeURIComponent(returnTo)}`
       }
     }
-    if (options.returnTo && ['quantity-unit:detail', 'worker:detail', 'crew:detail'].includes(key) && isDataOriginDTO(intent.filters.dataOrigin) && isStableRouteIdentity(intent.filters.projectId)) {
+    if (options.returnTo && ['quantity-unit:detail', 'quantity-unit:hollow-record', 'worker:detail', 'crew:detail'].includes(key) && isDataOriginDTO(intent.filters.dataOrigin) && isStableRouteIdentity(intent.filters.projectId)) {
       const back = payrollAWorkspaceReturn(options.returnTo, intent.filters.dataOrigin)
       if (back) {
         const target = new URL(to, 'https://payroll.invalid')

@@ -6,6 +6,7 @@ import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollSourceContext } from '~/lib/payroll/a-navigation'
 import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { usePayrollAFeesStore } from '~/stores/payroll-a-fees'
+import { usePayrollHollowStore } from '~/stores/payroll-hollow'
 
 const props = defineProps<{ kind: PayrollSourceKind, sourceId: string, origin: DataOriginDTO, projectId?: string }>()
 const route = useRoute()
@@ -25,6 +26,17 @@ const { current, error, loading } = usePayrollRead(() => JSON.stringify([context
     return { context: read.context, source: value }
   }
   if (value.statementId) {
+    if (props.kind === 'quantity-unit' && /\/hollow\//.test(route.path)) {
+      const detail = await useNuxtApp().$repositories.payroll.detail({ origin: props.origin }, value.statementId)
+      const format = detail.statement.formatFamily
+      if (detail.statement.id !== value.statementId || detail.statement.projectId !== value.projectId || !['A', 'C1', 'C2'].includes(format))
+        throw new Error('原工资与空鼓来源所属项目或格式未通过核对。')
+      const hollow = await usePayrollHollowStore().loadStatement({ origin: props.origin }, format as 'A' | 'C1' | 'C2', value.statementId)
+      const authorized = hollow.rows.some(row => row.fact.target.unitId === value.id && row.source && (row.source.kind === 'entity-detail' || row.source.kind === 'entity-subview') && row.source.subject.state === 'resolved' && row.source.subject.entity === 'quantity-unit' && row.source.subject.id === value.id && row.source.filters.projectId === value.projectId && row.source.filters.dataOrigin === props.origin)
+      if (hollow.scope?.projectId !== value.projectId || hollow.context.workspaceId !== detail.context.workspaceId || hollow.context.actorId !== detail.context.actorId || !authorized)
+        throw new Error('原工资与当前空鼓检查的授权关系尚未获证明。')
+      return { context: hollow.context, source: value }
+    }
     const read = await store.loadAForm({ origin: props.origin }, { statementId: value.statementId })
     const fees = hasPayrollAFeesForm(read) && read.bookProof.state === 'proven' ? read.fees : null
     const facts = [...read.facts, ...(fees?.lines.flatMap(line => line.components.map(component => component.fact)) ?? [])]
@@ -50,7 +62,7 @@ const { current, error, loading } = usePayrollRead(() => JSON.stringify([context
   <section v-if="present" class="panel flex min-w-0 flex-wrap items-center justify-between gap-3 border-brand/20 bg-brand-soft p-3 text-12px" aria-label="工资原来源返回">
     <div class="min-w-0 flex-1">
       <p class="font-700">
-        来自 A 工资的实际来源核对
+        来自原工资的实际来源核对
       </p><p v-if="loading" role="status">
         正在核对原工资与当前来源…
       </p><p v-else-if="error" role="alert" class="mt-1 break-words text-danger">
