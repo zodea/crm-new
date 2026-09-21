@@ -86,6 +86,13 @@ export interface PayrollBatchExecuteCommand extends PayrollBatchCommandBase {
 export type PayrollBatchCommand = PayrollBatchConfirmCommand | PayrollBatchPrepareCommand | PayrollBatchExecuteCommand
 
 export interface PayrollBatchPlanItem extends PayrollBatchPreviewItem { decision: PayrollBatchDecision }
+export interface PayrollBatchItemOutcome {
+  itemId: string
+  state: 'succeeded' | 'not-executed' | 'unknown'
+  attemptState: 'not-started' | 'prepared' | 'checked' | 'released' | 'needs-recheck' | 'not-applied' | 'unavailable'
+  plannedAmountFen: number | null
+  actualAmountFen: number | null
+}
 export interface PayrollBatchPlanRead {
   schemaVersion: 1
   context: PayrollContext
@@ -101,6 +108,7 @@ export interface PayrollBatchPlanRead {
   nextItemIndex: number
   expectedPayrollRevision: number
   items: PayrollBatchPlanItem[]
+  outcomes: PayrollBatchItemOutcome[]
   reasons: string[]
 }
 

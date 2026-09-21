@@ -54,15 +54,23 @@ describe('central payroll batch preview and immutable confirmation', () => {
     const [before] = await f.db.select<{ revision: number }>('SELECT revision FROM payroll_revision WHERE singleton=1')
     const plan = await f.service.executeBatch(command)
     expect(plan).toMatchObject({ schemaVersion: 1, commandId: 'confirm-batch', projectId: 'p', month: '2026-08', purpose: 'release', fundingAmountFen: 50_000, state: 'ready', nextItemIndex: 0, expectedPayrollRevision: before!.revision })
+    expect(plan.outcomes).toEqual([
+      { itemId: left, state: 'not-executed', attemptState: 'not-started', plannedAmountFen: 30_000, actualAmountFen: 0 },
+      { itemId: right, state: 'not-executed', attemptState: 'not-started', plannedAmountFen: 20_000, actualAmountFen: 0 },
+    ])
     expect(plan.items.map(item => item.decision)).toEqual(decisions.map(item => item.decision))
     expect(await f.service.executeBatch(command)).toEqual(plan)
     expect(await f.service.batch({ origin: 'real', projectId: 'p', month: '2026-08' }, plan.planId)).toEqual(plan)
+    await f.db.execute('UPDATE payroll_batch_plans SET actor_id=\'other-actor\' WHERE id=?', [plan.planId])
+    await expect(f.service.batch({ origin: 'real', projectId: 'p', month: '2026-08' }, plan.planId)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+    await f.db.execute('UPDATE payroll_batch_plans SET actor_id=? WHERE id=?', [plan.context.actorId, plan.planId])
     expect((await f.db.select<{ revision: number }>('SELECT revision FROM payroll_revision WHERE singleton=1'))[0]!.revision).toBe(before!.revision)
     expect(await f.db.select('SELECT * FROM wage_statements WHERE status=\'released\'')).toEqual([])
 
     const prepareFirst = { schemaVersion: 1 as const, commandId: 'prepare-first', workspaceId: plan.context.workspaceId, actorId: plan.context.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, action: { kind: 'prepare-batch-item' as const, input: { planId: plan.planId, planVersion: plan.planVersion, executeCommandId: 'execute-first' } } }
     const firstPrepared = await f.service.executeBatch(prepareFirst)
     expect(firstPrepared).toMatchObject({ state: 'prepared', preparedExecuteCommandId: 'execute-first', nextItemIndex: 0 })
+    expect(firstPrepared.outcomes[0]).toEqual({ itemId: left, state: 'unknown', attemptState: 'prepared', plannedAmountFen: 30_000, actualAmountFen: null })
     const [firstAttempt] = await f.db.select<Record<string, unknown>>('SELECT * FROM payroll_batch_attempts WHERE prepare_command_id=\'prepare-first\'')
     expect(firstAttempt).toMatchObject({ state: 'prepared', execute_command_id: 'execute-first', before_payroll_revision: before!.revision })
     expect(JSON.parse(String(firstAttempt!.command_json))).toMatchObject({ commandId: firstAttempt!.payroll_command_id, statementId: left, action: { kind: 'release-a', release: { actualAmount: 300 } } })
@@ -72,6 +80,10 @@ describe('central payroll batch preview and immutable confirmation', () => {
     const executeFirst = { schemaVersion: 1 as const, commandId: 'execute-first', workspaceId: plan.context.workspaceId, actorId: plan.context.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, action: { kind: 'execute-batch-original' as const, input: { planId: plan.planId, planVersion: firstPrepared.planVersion } } }
     const afterFirst = await f.service.executeBatch(executeFirst)
     expect(afterFirst).toMatchObject({ state: 'ready', preparedExecuteCommandId: null, nextItemIndex: 1, expectedPayrollRevision: before!.revision + 1 })
+    expect(afterFirst.outcomes).toEqual([
+      { itemId: left, state: 'succeeded', attemptState: 'released', plannedAmountFen: 30_000, actualAmountFen: 30_000 },
+      { itemId: right, state: 'not-executed', attemptState: 'not-started', plannedAmountFen: 20_000, actualAmountFen: 0 },
+    ])
     expect((await f.service.aForm({ origin: 'real' }, { statementId: left })).status).toBe('released')
     expect(await f.service.executeBatch(executeFirst)).toEqual(afterFirst)
 
@@ -80,6 +92,7 @@ describe('central payroll batch preview and immutable confirmation', () => {
     const executeSecond = { schemaVersion: 1 as const, commandId: 'execute-second', workspaceId: plan.context.workspaceId, actorId: plan.context.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, action: { kind: 'execute-batch-original' as const, input: { planId: plan.planId, planVersion: secondPrepared.planVersion } } }
     const complete = await f.service.executeBatch(executeSecond)
     expect(complete).toMatchObject({ state: 'complete', nextItemIndex: 2, expectedPayrollRevision: before!.revision + 2 })
+    expect(complete.outcomes.map(outcome => outcome.state)).toEqual(['succeeded', 'succeeded'])
     expect((await f.service.aForm({ origin: 'real' }, { statementId: right })).status).toBe('released')
     expect(await f.db.select('SELECT command_id FROM payroll_command_receipts WHERE action=\'release-a\'')).toHaveLength(2)
 

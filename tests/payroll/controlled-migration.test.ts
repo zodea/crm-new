@@ -2,6 +2,7 @@ import type { CoreMigrationSourceDTO } from '~/lib/migration/core-contract'
 import { createHash } from 'node:crypto'
 import { afterEach, expect, it } from 'vitest'
 import { CORE_MIGRATION_CAPABILITY, coreMigrationSourceHashInput } from '~/lib/migration/core-contract'
+import { initializePayrollBatchSchema } from '~/lib/payroll/central-batch-schema'
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
@@ -82,7 +83,7 @@ it.each(['missing', 'cross-project'] as const)('旧缺关系行与坏快照可�
   finally { db.close() }
 })
 
-it.each(['untouched', 'daily-change', 'deleted-independent', 'zero-member', 'unclaimed-daywork', 'independent-audit'] as const)('危险恢复在删除前保护工资完整关系并保持全域不变：%s', async (kind) => {
+it.each(['untouched', 'daily-change', 'deleted-independent', 'zero-member', 'unclaimed-daywork', 'independent-audit', 'batch-plan'] as const)('危险恢复在删除前保护工资完整关系并保持全域不变：%s', async (kind) => {
   const db = await createMemoryDb()
   try {
     const batch = await confirm(await seedPayrollMigrationSource(db))
@@ -105,6 +106,11 @@ it.each(['untouched', 'daily-change', 'deleted-independent', 'zero-member', 'unc
         await tx.execute('INSERT INTO signed_daywork_records(id,project_id,worker_id,work_date,labor_units) VALUES (\'new-day\',?,?,\'2026-09-01\',1)', [ids.statement.project_id, ids.statement.leader_worker_id])
       if (kind === 'independent-audit')
         await tx.execute('INSERT INTO operation_logs(id,table_name,record_id,action,before_data,after_data) VALUES (\'new-audit\',\'future_payroll_adjustments\',\'future-independent\',\'create\',NULL,?)', [JSON.stringify({ statement_id: ids.statement.id })])
+      if (kind === 'batch-plan') {
+        await initializePayrollBatchSchema(tx)
+        const plan = { schemaVersion: 1, commandId: 'batch-confirm', planId: 'batch-after-migration', projectId: ids.statement.project_id, month: '2026-08', purpose: 'release', fundingAmountFen: 30_000, state: 'ready', preparedExecuteCommandId: null, nextItemIndex: 0, expectedPayrollRevision: 1, items: [{ target: { itemId: ids.statement.id, statementId: ids.statement.id, formatFamily: 'A' }, leaderWorkerId: ids.statement.leader_worker_id, members: [{ workerId: ids.statement.leader_worker_id }], decision: { kind: 'release', actualAmountFen: 30_000, allocations: [{ workerId: ids.statement.leader_worker_id, amountFen: 30_000 }] } }], reasons: [] }
+        await tx.execute('INSERT INTO payroll_batch_plans(id,workspace_id,actor_id,origin,project_id,month,purpose,schema_version,plan_json,plan_hash,base_payroll_revision,expected_payroll_revision,next_item_index,revision,state,created_at,confirmed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', ['batch-after-migration', session.workspaceId, session.actorId, 'real', ids.statement.project_id, '2026-08', 'release', 1, JSON.stringify(plan), 'test-plan-hash', 1, 1, 0, 1, 'ready', '2026-09-21T00:00:00Z', '2026-09-21T00:00:00Z'])
+      }
     })
     const query = () => quantityTestInstance.withWorkspaceTransaction(async tx => ({
       statements: await tx.select('SELECT * FROM wage_statements'),

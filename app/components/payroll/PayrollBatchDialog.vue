@@ -41,6 +41,16 @@ const planLabel = computed(() => {
 function fenInput(value: number | null): string {
   return value === null ? '' : (value / 100).toFixed(2)
 }
+function outcomeLabel(itemId: string): string {
+  const outcome = plan.value?.outcomes.find(item => item.itemId === itemId)
+  if (!outcome)
+    return '结果不可用'
+  if (outcome.state === 'succeeded')
+    return outcome.actualAmountFen === null ? '成功' : `成功 · 实际 ${fenInput(outcome.actualAmountFen)} 元`
+  if (outcome.state === 'unknown')
+    return outcome.plannedAmountFen === null ? '待核实' : `待核实 · 计划 ${fenInput(outcome.plannedAmountFen)} 元`
+  return outcome.plannedAmountFen === null ? '确定未执行' : `确定未执行 · 实际 0.00 元 / 计划 ${fenInput(outcome.plannedAmountFen)} 元`
+}
 function draftSnapshot() {
   return { purpose: purpose.value, statementIds: selectedIds.value, fundingInput: fundingInput.value, amounts: { ...amounts.value }, allocations: structuredClone(allocations.value), ...(plan.value ? { planId: plan.value.planId } : {}) }
 }
@@ -212,8 +222,8 @@ watch(() => props.open, async (open) => {
             </KitButton>
           </div>
           <ol class="mt-4 space-y-2 text-12px">
-            <li v-for="(item, index) in plan.items" :key="item.target.itemId" class="flex justify-between gap-3 rounded bg-surface-soft px-3 py-2">
-              <span>{{ item.leaderName || item.target.statementId }} · {{ item.target.formatFamily }}</span><span>{{ item.decision.kind === 'defer' ? '暂缓' : index < plan.nextItemIndex ? '已完成' : index === plan.nextItemIndex ? plan.state === 'prepared' ? '待恢复' : '待执行' : '等待前项' }}</span>
+            <li v-for="item in plan.items" :key="item.target.itemId" class="flex justify-between gap-3 rounded bg-surface-soft px-3 py-2">
+              <span>{{ item.leaderName || item.target.statementId }} · {{ item.target.formatFamily }}</span><span>{{ outcomeLabel(item.target.itemId) }}</span>
             </li>
           </ol>
         </section>

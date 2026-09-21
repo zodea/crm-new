@@ -65,7 +65,7 @@ async function exportArchive() {
     if (!entries.length)
       throw new Error('所选范围没有可用的已冻结工资，未生成空工作簿')
     if (mode.value === 'leader-cycle') {
-      const ids = entries.map(entry => entry.document.id)
+      const ids = selectedRows.value.map(row => row.id)
       const actualLedger = await repository().actualLedger({ origin: props.context.origin, projectId: props.projectId }, { projectId: props.projectId, originalStatementIds: ids })
       const subject = subjects.value.find(item => item.key === subjectKey.value)
       await kit.exportFile(createPayrollCompleteWorkbook({ key: subjectKey.value, label: subject?.label ?? `${props.projectName}-负责人全周期`, entries, actualLedger }, gaps))
@@ -81,7 +81,7 @@ async function exportArchive() {
       key: month,
       label: `${props.projectName}-${month}`,
       entries: monthEntries,
-      actualLedger: await repository().actualLedger({ origin: props.context.origin, projectId: props.projectId, month }, { projectId: props.projectId, originalStatementIds: monthEntries.map(entry => entry.document.id) }),
+      actualLedger: await repository().actualLedger({ origin: props.context.origin, projectId: props.projectId, month }, { projectId: props.projectId, originalStatementIds: selectedRows.value.filter(row => row.month === month).map(row => row.id) }),
     })))
     await kit.exportFile(createPayrollMonthlyArchive(props.projectName, groups, gaps))
   }

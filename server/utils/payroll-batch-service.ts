@@ -37,7 +37,7 @@ interface BatchExecutors {
 }
 
 interface Head { id: string, project_id: string, month: string, format_family: string, status: string, needs_recheck: number, checked_source_version: string, leader_worker_id: string }
-type StoredPlan = Omit<PayrollBatchPlanRead, 'context' | 'planVersion'>
+type StoredPlan = Omit<PayrollBatchPlanRead, 'context' | 'planVersion' | 'outcomes'>
 
 function hash(value: unknown): string {
   return createHash('sha256').update(payrollCanonical(value)).digest('hex')
@@ -210,14 +210,34 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
 
   async function planFromRow(db: TransactionDb, context: PayrollContext, row: Record<string, unknown>): Promise<PayrollBatchPlanRead> {
     const stored = JSON.parse(String(row.plan_json)) as StoredPlan
-    const [prepared] = String(row.state) === 'prepared' ? await db.select<{ execute_command_id: string }>('SELECT execute_command_id FROM payroll_batch_attempts WHERE plan_id=? AND state=\'prepared\'', [row.id]) : []
+    const attempts = await db.select<{ item_id: string, attempt_no: number, execute_command_id: string, state: PayrollBatchPlanRead['outcomes'][number]['attemptState'] }>('SELECT item_id,attempt_no,execute_command_id,state FROM payroll_batch_attempts WHERE plan_id=? ORDER BY item_id,attempt_no DESC', [row.id])
+    const [prepared] = String(row.state) === 'prepared' ? attempts.filter(attempt => attempt.state === 'prepared') : []
     const preparedExecuteCommandId = prepared?.execute_command_id ?? null
-    const planVersion = hash({ planHash: row.plan_hash, revision: row.revision, state: row.state, nextItemIndex: row.next_item_index, expectedPayrollRevision: row.expected_payroll_revision, preparedExecuteCommandId })
-    return { ...stored, context, planVersion, state: String(row.state) as PayrollBatchPlanRead['state'], preparedExecuteCommandId, nextItemIndex: Number(row.next_item_index), expectedPayrollRevision: Number(row.expected_payroll_revision) }
+    const latest = new Map<string, typeof attempts[number]>()
+    for (const attempt of attempts) {
+      if (!latest.has(attempt.item_id))
+        latest.set(attempt.item_id, attempt)
+    }
+    const outcomes: PayrollBatchPlanRead['outcomes'] = stored.items.map((item) => {
+      const attempt = latest.get(item.target.itemId)
+      const attemptState = attempt?.state ?? 'not-started'
+      const state = attemptState === 'checked' || attemptState === 'released'
+        ? 'succeeded'
+        : attemptState === 'prepared' || attemptState === 'needs-recheck' || attemptState === 'unavailable'
+          ? 'unknown'
+          : 'not-executed'
+      const plannedAmountFen = item.decision.kind === 'release' ? item.decision.actualAmountFen : null
+      const actualAmountFen = plannedAmountFen === null || state === 'unknown' ? null : state === 'succeeded' ? plannedAmountFen : 0
+      return { itemId: item.target.itemId, state, attemptState, plannedAmountFen, actualAmountFen }
+    })
+    const planVersion = hash({ planHash: row.plan_hash, revision: row.revision, state: row.state, nextItemIndex: row.next_item_index, expectedPayrollRevision: row.expected_payroll_revision, preparedExecuteCommandId, outcomes })
+    return { ...stored, context, planVersion, state: String(row.state) as PayrollBatchPlanRead['state'], preparedExecuteCommandId, nextItemIndex: Number(row.next_item_index), expectedPayrollRevision: Number(row.expected_payroll_revision), outcomes }
   }
 
   async function currentPlan(db: TransactionDb, context: PayrollContext, planId: string): Promise<PayrollBatchPlanRead> {
-    return planFromRow(db, context, await loadPlanRow(db, planId))
+    const row = await loadPlanRow(db, planId)
+    assertPlanOwner(context, row)
+    return planFromRow(db, context, row)
   }
 
   async function existingCoordinationReceipt(db: TransactionDb, context: PayrollContext, command: PayrollBatchCommand): Promise<PayrollBatchPlanRead | null> {
@@ -350,6 +370,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
       const [row] = await db.select<Record<string, unknown>>('SELECT * FROM payroll_batch_plans WHERE id=?', [planId])
       if (!row)
         throw payrollProblem('not-found', '批量工资计划不存在')
+      assertPlanOwner(context, row)
       if ((query.projectId && query.projectId !== row.project_id) || (query.month && query.month !== row.month))
         throw payrollProblem('relationship-mismatch', '批量工资计划不属于当前项目或月份')
       return planFromRow(db, context, row)

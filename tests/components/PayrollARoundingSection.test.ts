@@ -25,7 +25,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('a 工资取整配置', () => {
   it('未配置时明确阻断，并保存用户选择的整百向下取整修订', async () => {
-    render(PayrollARoundingSection, {
+    const view = render(PayrollARoundingSection, {
       props: { scope, origin: 'real', blocked: false },
       global: {
         stubs: {
@@ -36,8 +36,25 @@ describe('a 工资取整配置', () => {
     })
     await screen.findByText('当前范围尚未明确取整规则，批量资金建议会阻断。')
     await fireEvent.click(screen.getByLabelText('向下取整到整百元（不足 100 元部分暂不发）'))
+    expect(screen.getByText('取整规则尚未保存；保存或撤销后才能切换配置范围。')).toBeTruthy()
+    expect(view.emitted().locked?.at(-1)).toEqual([true])
+    expect((screen.getByRole('button', { name: '保存取整修订' }) as HTMLButtonElement).disabled).toBe(false)
     await fireEvent.click(screen.getByRole('button', { name: '保存取整修订' }))
     await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ scope }), { kind: 'floor', stepFen: 10_000 }))
     expect(screen.getByText('当前为第 1 版，生效月份 2026-08。')).toBeTruthy()
+    expect(view.emitted().locked?.at(-1)).toEqual([false])
+  })
+
+  it('可撤销未保存取整选择并解除范围锁定', async () => {
+    const view = render(PayrollARoundingSection, {
+      props: { scope, origin: 'real', blocked: false },
+      global: { stubs: { SectionHeader: true, KitButton: { template: '<button><slot /></button>' } } },
+    })
+    await screen.findByText('当前范围尚未明确取整规则，批量资金建议会阻断。')
+    await fireEvent.click(screen.getByLabelText('向下取整到整百元（不足 100 元部分暂不发）'))
+    await fireEvent.click(screen.getByRole('button', { name: '撤销未保存修改' }))
+    expect(screen.queryByText('取整规则尚未保存；保存或撤销后才能切换配置范围。')).toBeNull()
+    expect((screen.getByLabelText('不取整，按核算金额参与资金建议') as HTMLInputElement).checked).toBe(true)
+    expect(view.emitted().locked?.at(-1)).toEqual([false])
   })
 })

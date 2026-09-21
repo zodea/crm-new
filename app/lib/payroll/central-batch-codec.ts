@@ -113,7 +113,12 @@ export function decodePayrollBatchPlan(value: unknown, query: PayrollQuery, plan
     || !(value.preparedExecuteCommandId === null || isStableRouteIdentity(value.preparedExecuteCommandId))
     || !Number.isSafeInteger(value.nextItemIndex) || Number(value.nextItemIndex) < 0 || !Number.isSafeInteger(value.expectedPayrollRevision) || Number(value.expectedPayrollRevision) < 0
     || typeof value.planVersion !== 'string' || !value.planVersion || !Array.isArray(value.items)
-    || !value.items.every(item => object(item) && decision(item.decision) && previewItem(item)) || !Array.isArray(value.reasons) || !value.reasons.every(reason => typeof reason === 'string')) {
+    || !value.items.every(item => object(item) && decision(item.decision) && previewItem(item))
+    || !Array.isArray(value.outcomes) || value.outcomes.length !== value.items.length || !value.outcomes.every(outcome => object(outcome)
+      && isStableRouteIdentity(outcome.itemId) && ['succeeded', 'not-executed', 'unknown'].includes(String(outcome.state))
+      && ['not-started', 'prepared', 'checked', 'released', 'needs-recheck', 'not-applied', 'unavailable'].includes(String(outcome.attemptState))
+      && nullableFen(outcome.plannedAmountFen) && nullableFen(outcome.actualAmountFen))
+    || !Array.isArray(value.reasons) || !value.reasons.every(reason => typeof reason === 'string')) {
     fail('批量工资计划回读不完整', 'unavailable')
   }
   return value as unknown as PayrollBatchPlanRead

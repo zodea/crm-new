@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto'
 import { PAYROLL_CENTRAL_MIGRATION_TABLES, payrollCentralPrimaryKey } from '../../app/lib/migration/payroll-central-source'
 import { parsePayrollProjectGraph, PAYROLL_MIGRATION_COLUMNS, PAYROLL_MIGRATION_PARTS, PAYROLL_MIGRATION_TABLES, payrollLogProject, payrollLogSnapshot } from '../../app/lib/migration/payroll-source'
 import { PAYROLL_A_FEES_MIGRATION_TABLES, payrollAFeesPrimaryKey } from '../../app/lib/payroll/central-a-fees-schema'
+import { initializePayrollBatchSchema } from '../../app/lib/payroll/central-batch-schema'
 import { PAYROLL_HOLLOW_DEDUCTION_TABLES } from '../../app/lib/payroll/central-hollow-deduction-schema'
 import { loadPayrollGraph } from '../../app/lib/payroll/central-read'
 import { advancePayrollRevision, initializePayrollSchema } from '../../app/lib/payroll/central-schema'
@@ -46,6 +47,13 @@ function invalid(message: string): never {
 }
 function key(table: string, id: unknown) {
   return JSON.stringify([table, id])
+}
+function containsRemovedIdentity(value: unknown, ids: ReadonlySet<string>): boolean {
+  if (typeof value === 'string')
+    return ids.has(value)
+  if (Array.isArray(value))
+    return value.some(item => containsRemovedIdentity(item, ids))
+  return !!value && typeof value === 'object' && Object.values(value).some(item => containsRemovedIdentity(item, ids))
 }
 function rowProblem(part: PayrollMigrationPart, row: PayrollMigrationRow): string | null {
   if (PAYROLL_MIGRATION_COLUMNS[part].some(field => row[field] === null ? !nullableFields.has(field) : numericFields.has(field) ? typeof row[field] !== 'number' : typeof row[field] !== 'string'))
@@ -246,12 +254,37 @@ export interface PayrollRemovedIdentities { projects: ReadonlySet<string>, crews
 /** 所有删除之前检查；历史软删、零成员及孤立来源仍构成独立引用。 */
 export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: ReturnType<typeof planPayrollMigration>, removed: PayrollRemovedIdentities) {
   await initializePayrollSchema(db)
+  await initializePayrollBatchSchema(db)
   const all = Object.fromEntries(await Promise.all(PAYROLL_MIGRATION_PARTS.map(async part => [part, await db.select<PayrollMigrationRow>(`SELECT ${PAYROLL_MIGRATION_COLUMNS[part].join(',')} FROM ${PAYROLL_MIGRATION_TABLES[part]}`)]))) as Record<PayrollMigrationPart, PayrollMigrationRow[]>
   const central = await readPayrollCentralMigrationRows(db)
   const fees = await readPayrollFeesMigrationRows(db)
   const deductions = await readPayrollHollowMigrationRows(db)
   const owned = new Set(plan.removed.flatMap(previous => [...PAYROLL_MIGRATION_PARTS.flatMap(part => previous.graph[part].map(row => key(PAYROLL_MIGRATION_TABLES[part], row.id))), ...payrollCentralGraphKeys(previous.graph.central), ...payrollFeesGraphKeys(previous.graph.fees), ...payrollHollowGraphKeys(previous.graph.deductions)]))
   const removedKeys = new Set([...owned, ...['projects', 'crews', 'workers'].flatMap(table => [...removed[table as 'projects' | 'crews' | 'workers']].map(id => key(table, id))), ...removed.quantity.map(identity => key(identity.table, identity.id))])
+  const removedIds = new Set([...removedKeys].map((value) => {
+    const parsed = JSON.parse(value) as [string, unknown]
+    return typeof parsed[1] === 'string' ? parsed[1] : String(parsed[1])
+  }))
+  if (removedIds.size) {
+    const plans = await db.select<{ id: string, project_id: string, plan_json: string }>('SELECT id,project_id,plan_json FROM payroll_batch_plans')
+    const attempts = await db.select<{ plan_id: string, command_json: string, result_json: string | null, problem_json: string | null }>('SELECT plan_id,command_json,result_json,problem_json FROM payroll_batch_attempts')
+    const receipts = await db.select<{ plan_id: string, project_id: string, command_json: string, result_json: string }>('SELECT plan_id,project_id,command_json,result_json FROM payroll_batch_command_receipts')
+    const parseProtected = (raw: string | null, label: string): unknown => {
+      if (raw === null)
+        return null
+      try {
+        return JSON.parse(raw)
+      }
+      catch {
+        invalid(`批次${label}正文损坏，不能确认危险恢复不会丢失引用`)
+      }
+    }
+    const blockedPlan = plans.find(row => removedIds.has(row.project_id) || containsRemovedIdentity(parseProtected(row.plan_json, '计划'), removedIds))
+    const blockedAttempt = attempts.find(row => [row.command_json, row.result_json, row.problem_json].some(raw => containsRemovedIdentity(parseProtected(raw, '尝试'), removedIds)))
+    const blockedReceipt = receipts.find(row => removedIds.has(row.project_id) || [row.command_json, row.result_json].some(raw => containsRemovedIdentity(parseProtected(raw, '回执'), removedIds)))
+    if (blockedPlan || blockedAttempt || blockedReceipt)
+      invalid(`批次计划、逐项尝试或协调回执仍引用待撤身份 ${blockedPlan?.id ?? blockedAttempt?.plan_id ?? blockedReceipt?.plan_id}，已在删除前整批拒绝`)
+  }
   const nativeExcluded = new Set(owned)
   const migratedReferences = new Set<string>()
   if (removedKeys.size) {

@@ -128,23 +128,26 @@ export function createPayrollCompleteWorkbook(group: PayrollWorkbookGroup, gaps:
       原表页签: sheetNames.join('、'),
     }
   })
-  const due = cycleFormulaDue(group.entries)
+  const complete = gaps.length === 0
+  const due = complete ? cycleFormulaDue(group.entries) : { value: null, basis: '所选范围存在冻结工资缺口，公式合计不可判定' }
   const actual = group.actualLedger.netAmount.state === 'known' ? group.actualLedger.netAmount.value : null
   book.Sheets['目录'] = XLSX.utils.json_to_sheet(directory)
   book.Sheets['周期对账'] = XLSX.utils.json_to_sheet([{
     输出范围: group.label,
+    输出完整性: complete ? '完整' : '部分（存在冻结工资缺口）',
     工资份数: group.entries.length,
     公式应付: due.value,
     公式口径: due.basis,
     净实际: actual,
     实际状态: group.actualLedger.netAmount.state,
     差额: due.value !== null && actual !== null ? due.value - actual : null,
+    对账结论: due.value !== null && actual !== null ? '可计算' : '不可判定',
     正式编号: numberStatus,
     实名名册及照片: rosterStatus,
     缺口数量: gaps.length,
   }])
   const data = XLSX.write(book, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
-  return { data, defaultName: `${safeSegment(group.label)}-完整工资工作簿-编号待定.xlsx`, mimeType: XLSX_MIME }
+  return { data, defaultName: `${safeSegment(group.label)}-${complete ? '完整' : '部分'}工资工作簿-编号待定.xlsx`, mimeType: XLSX_MIME }
 }
 
 function archiveReadme(projectName: string, groups: PayrollWorkbookGroup[], gaps: PayrollWorkbookGap[]): string {
@@ -155,7 +158,7 @@ function archiveReadme(projectName: string, groups: PayrollWorkbookGroup[], gaps
     `- 正式编号：${numberStatus}。当前文件名使用稳定工资身份消歧，不冒充官方编号。`,
     `- 实名名册及证件原件：${rosterStatus}。`,
     '- 工资原表来自发放时冻结正文；A、C1、C2 分别保留原有工资/考勤/签工页签。',
-    '- 未知金额保持未知；缺失输出不会生成零值替代表。',
+    '- 未知金额保持未知；缺失输出不会生成零值替代表。有冻结缺口的月份只生成“部分工资工作簿”，公式合计与对账结论保持不可判定。',
     '',
     '## 缺口',
     '',
@@ -173,7 +176,7 @@ export function createPayrollMonthlyArchive(projectName: string, groups: Payroll
     const output = createPayrollCompleteWorkbook(group, gaps.filter(gap => gap.month === group.key))
     if (typeof output.data === 'function' || typeof output.data === 'string')
       throw new TypeError('按月工作簿必须同步生成二进制正文')
-    files.push({ path: `${safeSegment(group.key)}/${safeSegment(group.label)}-完整工资工作簿-编号待定.xlsx`, data: bytes(output.data), mimeType: XLSX_MIME })
+    files.push({ path: `${safeSegment(group.key)}/${output.defaultName}`, data: bytes(output.data), mimeType: XLSX_MIME })
   }
   return { data: createZip(files), defaultName: `${safeSegment(projectName)}-按月工资归档-编号待定.zip`, mimeType: ZIP_MIME }
 }

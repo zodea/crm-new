@@ -8,10 +8,13 @@ const emit = defineEmits<{ locked: [boolean] }>()
 const store = usePayrollARoundingStore()
 const read = shallowRef<PayrollARoundingRead | null>(null)
 const selected = ref<'off' | 'floor'>('off')
+const baseline = ref<'off' | 'floor'>('off')
 const busy = ref(false)
 const error = ref('')
 const pending = computed(() => read.value ? store.getPending(read.value) : null)
-const locked = computed(() => busy.value || !!pending.value)
+const processing = computed(() => busy.value || !!pending.value)
+const dirty = computed(() => !!read.value && selected.value !== baseline.value)
+const locked = computed(() => processing.value || dirty.value)
 const editable = computed(() => !!read.value && !props.blocked && !read.value.context.readonly && read.value.context.capabilities.includes('payroll:write'))
 
 watch(locked, value => emit('locked', value), { immediate: true })
@@ -25,6 +28,7 @@ async function load() {
   try {
     read.value = await store.load({ origin: props.origin, projectId: props.scope.projectId, month: props.scope.month }, props.scope)
     selected.value = read.value.current?.rule.kind ?? 'off'
+    baseline.value = selected.value
   }
   catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause) }
   finally { busy.value = false }
@@ -37,6 +41,8 @@ async function save() {
   error.value = ''
   try {
     read.value = await store.save(read.value, selected.value === 'off' ? { kind: 'off' } : { kind: 'floor', stepFen: 10_000 })
+    selected.value = read.value.current?.rule.kind ?? 'off'
+    baseline.value = selected.value
   }
   catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause) }
   finally { busy.value = false }
@@ -49,9 +55,16 @@ async function recover() {
   error.value = ''
   try {
     read.value = await store.recover(read.value)
+    selected.value = read.value.current?.rule.kind ?? 'off'
+    baseline.value = selected.value
   }
   catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause) }
   finally { busy.value = false }
+}
+
+function discard() {
+  selected.value = baseline.value
+  error.value = ''
 }
 
 watch(() => [props.origin, props.scope] as const, load, { deep: true, immediate: true })
@@ -70,14 +83,20 @@ watch(() => [props.origin, props.scope] as const, load, { deep: true, immediate:
       <p v-if="!read.current" class="rounded-md bg-warning/10 px-3 py-2 text-12px text-warning-strong">
         当前范围尚未明确取整规则，批量资金建议会阻断。
       </p>
-      <label class="flex items-start gap-2 text-12px"><input v-model="selected" type="radio" value="off" :disabled="!editable || locked">不取整，按核算金额参与资金建议</label>
-      <label class="flex items-start gap-2 text-12px"><input v-model="selected" type="radio" value="floor" :disabled="!editable || locked">向下取整到整百元（不足 100 元部分暂不发）</label>
+      <label class="flex items-start gap-2 text-12px"><input v-model="selected" type="radio" value="off" :disabled="!editable || processing">不取整，按核算金额参与资金建议</label>
+      <label class="flex items-start gap-2 text-12px"><input v-model="selected" type="radio" value="floor" :disabled="!editable || processing">向下取整到整百元（不足 100 元部分暂不发）</label>
+      <p v-if="dirty" class="rounded-md bg-warning/10 px-3 py-2 text-12px text-warning-strong">
+        取整规则尚未保存；保存或撤销后才能切换配置范围。
+      </p>
       <p v-for="reason in read.readonlyReasons" :key="reason" class="text-12px text-warn">
         {{ reason }}
       </p>
       <div class="flex flex-wrap gap-2">
-        <KitButton :disabled="!editable || locked" @click="save">
+        <KitButton :disabled="!editable || processing || !dirty" @click="save">
           保存取整修订
+        </KitButton>
+        <KitButton v-if="dirty" variant="secondary" :disabled="processing" @click="discard">
+          撤销未保存修改
         </KitButton>
         <KitButton v-if="pending" variant="secondary" :disabled="busy" @click="recover">
           按原编号核对提交
