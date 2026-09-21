@@ -97,6 +97,7 @@ export interface PayrollBatchPlanRead {
   purpose: PayrollBatchPurpose
   fundingAmountFen: number | null
   state: 'ready' | 'prepared' | 'needs-recheck' | 'complete' | 'unavailable'
+  preparedExecuteCommandId: string | null
   nextItemIndex: number
   expectedPayrollRevision: number
   items: PayrollBatchPlanItem[]

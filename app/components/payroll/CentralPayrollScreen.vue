@@ -2,7 +2,7 @@
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { PayrollStatementRow } from '~/lib/payroll/central-contract'
 import type { PayrollViewScope } from '~/lib/payroll/central-navigation'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollReadLocation, payrollReadQuery, payrollStatusSelection, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { payrollStatementTarget } from '~/lib/payroll/central-target'
@@ -26,12 +26,27 @@ const crews = computed(() => [...new Map((current.value?.rows || []).flatMap(row
 const returnTo = computed(() => payrollReadLocation('/subcontract/payroll', scope.value))
 const sources = computed(() => payrollReadLocation('/subcontract/payroll/sources', scope.value))
 const canCreate = computed(() => scope.value.origin === 'real' && current.value?.context.capabilities.includes('payroll:write'))
+const selectedIds = ref<string[]>([])
+const batchOpen = ref(false)
+const batchEligibleRows = computed(() => rows.value.filter(row => row.recordKind === 'central'
+  && !row.deletedAt
+  && row.status !== 'released'
+  && !row.releasedAt
+  && ['A', 'C1', 'C2'].includes(row.formatFamily)
+  && row.projectId === scope.value.projectId
+  && row.month === scope.value.month))
+const selectedRows = computed(() => batchEligibleRows.value.filter(row => selectedIds.value.includes(row.id)))
+const canBatch = computed(() => !!scope.value.projectId
+  && !!scope.value.month
+  && scope.value.origin === 'real'
+  && !!current.value?.context.capabilities.includes('payroll:write'))
 const createTo = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: undefined, returnTo: returnTo.value } }))
 const createC1To = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: 'C1', returnTo: returnTo.value } }))
 const createC2To = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: 'C2', returnTo: returnTo.value } }))
 const attendanceTo = computed(() => payrollReadLocation('/subcontract/attendance', scope.value))
 const configTo = computed(() => ({ path: '/subcontract/payroll/config', query: { origin: 'real', project: scope.value.projectId, month: scope.value.month, crew: scope.value.crewId, returnTo: returnTo.value } }))
 const columns: KitTableColumn[] = [
+  { field: 'select', title: '选择', width: 68, fixed: 'left', slot: 'select' },
   { field: 'month', title: '月份 / 详情', minWidth: 142, fixed: 'left', slot: 'detail' },
   { field: 'projectName', title: '项目', minWidth: 210 },
   { field: 'leaderName', title: '负责人', minWidth: 130, slot: 'leader' },
@@ -49,6 +64,24 @@ function change(patch: Partial<PayrollViewScope>) {
 function detail(row: PayrollStatementRow) {
   return payrollStatementTarget(row, scope.value, returnTo.value)
 }
+function toggle(row: PayrollStatementRow, checked: boolean) {
+  selectedIds.value = checked
+    ? [...new Set([...selectedIds.value, row.id])]
+    : selectedIds.value.filter(id => id !== row.id)
+}
+function toggleAll() {
+  selectedIds.value = selectedRows.value.length === batchEligibleRows.value.length
+    ? []
+    : batchEligibleRows.value.map(row => row.id)
+}
+watch([() => scope.value.origin, () => scope.value.projectId, () => scope.value.month], () => {
+  selectedIds.value = []
+  batchOpen.value = false
+})
+watch(batchEligibleRows, (eligible) => {
+  const ids = new Set(eligible.map(row => row.id))
+  selectedIds.value = selectedIds.value.filter(id => ids.has(id))
+})
 useTabTitle('工资台账')
 </script>
 
@@ -63,6 +96,12 @@ useTabTitle('工资台账')
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
+        <KitButton v-if="canBatch" variant="secondary" :disabled="!batchEligibleRows.length" @click="toggleAll">
+          {{ selectedRows.length === batchEligibleRows.length ? '清空选择' : '选择本期可处理工资' }}
+        </KitButton>
+        <KitButton v-if="canBatch" :disabled="!selectedRows.length" @click="batchOpen = true">
+          批量核对 / 资金（{{ selectedRows.length }}）
+        </KitButton>
         <NuxtLink :to="{ path: '/subcontract/payroll/payments', query: { origin: scope.origin || 'real', project: scope.projectId, returnTo } }" class="btn-secondary">
           工资实际收付
         </NuxtLink>
@@ -99,6 +138,16 @@ useTabTitle('工资台账')
       <PayrollReadDiagnostics :issues="current?.diagnostics || []" />
       <section class="panel min-w-0 overflow-hidden" aria-label="工资只读台账">
         <KitTable :columns="columns" :data="rows" :loading="loading" :min-rows="6" :row-height="48" :empty="{ title: '当前筛选下没有工资记录', description: '没有工资单的项目也可在工资来源中查询配置、考勤和签工。' }">
+          <template #select="{ row }">
+            <input
+              v-if="batchEligibleRows.some(item => item.id === row.id)"
+              type="checkbox"
+              :checked="selectedIds.includes(row.id)"
+              :aria-label="`选择 ${row.leaderName || row.id} 的工资`"
+              @change="toggle(row, ($event.target as HTMLInputElement).checked)"
+            >
+            <span v-else class="text-ink-faint">—</span>
+          </template>
           <template #detail="{ row }">
             <NuxtLink v-if="detail(row)" :to="detail(row)!" class="cell--link">
               {{ row.month || '月份未记录' }}
@@ -134,5 +183,14 @@ useTabTitle('工资台账')
         当前 {{ rows.length }} 份记录 · {{ rows.filter(row => row.status === 'released').length }} 份已发放 · {{ rows.filter(row => row.recordKind === 'isolated').length }} 份隔离历史。未记录的金额保留为空。
       </p>
     </template>
+    <PayrollBatchDialog
+      v-if="current && canBatch"
+      v-model:open="batchOpen"
+      :context="current.context"
+      :project-id="scope.projectId"
+      :month="scope.month"
+      :rows="selectedRows"
+      @complete="load"
+    />
   </main>
 </template>

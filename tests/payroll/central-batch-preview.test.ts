@@ -62,7 +62,7 @@ describe('central payroll batch preview and immutable confirmation', () => {
 
     const prepareFirst = { schemaVersion: 1 as const, commandId: 'prepare-first', workspaceId: plan.context.workspaceId, actorId: plan.context.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, action: { kind: 'prepare-batch-item' as const, input: { planId: plan.planId, planVersion: plan.planVersion, executeCommandId: 'execute-first' } } }
     const firstPrepared = await f.service.executeBatch(prepareFirst)
-    expect(firstPrepared).toMatchObject({ state: 'prepared', nextItemIndex: 0 })
+    expect(firstPrepared).toMatchObject({ state: 'prepared', preparedExecuteCommandId: 'execute-first', nextItemIndex: 0 })
     const [firstAttempt] = await f.db.select<Record<string, unknown>>('SELECT * FROM payroll_batch_attempts WHERE prepare_command_id=\'prepare-first\'')
     expect(firstAttempt).toMatchObject({ state: 'prepared', execute_command_id: 'execute-first', before_payroll_revision: before!.revision })
     expect(JSON.parse(String(firstAttempt!.command_json))).toMatchObject({ commandId: firstAttempt!.payroll_command_id, statementId: left, action: { kind: 'release-a', release: { actualAmount: 300 } } })
@@ -71,7 +71,7 @@ describe('central payroll batch preview and immutable confirmation', () => {
 
     const executeFirst = { schemaVersion: 1 as const, commandId: 'execute-first', workspaceId: plan.context.workspaceId, actorId: plan.context.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, action: { kind: 'execute-batch-original' as const, input: { planId: plan.planId, planVersion: firstPrepared.planVersion } } }
     const afterFirst = await f.service.executeBatch(executeFirst)
-    expect(afterFirst).toMatchObject({ state: 'ready', nextItemIndex: 1, expectedPayrollRevision: before!.revision + 1 })
+    expect(afterFirst).toMatchObject({ state: 'ready', preparedExecuteCommandId: null, nextItemIndex: 1, expectedPayrollRevision: before!.revision + 1 })
     expect((await f.service.aForm({ origin: 'real' }, { statementId: left })).status).toBe('released')
     expect(await f.service.executeBatch(executeFirst)).toEqual(afterFirst)
 

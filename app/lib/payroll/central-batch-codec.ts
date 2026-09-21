@@ -110,6 +110,7 @@ export function decodePayrollBatchPlan(value: unknown, query: PayrollQuery, plan
     || (command && value.commandId !== command.commandId) || !isStableRouteIdentity(value.commandId) || !isStableRouteIdentity(value.projectId)
     || (query.projectId && value.projectId !== query.projectId) || !month(value.month) || (query.month && value.month !== query.month)
     || !['check', 'release'].includes(String(value.purpose)) || !nullableFen(value.fundingAmountFen) || !['ready', 'prepared', 'needs-recheck', 'complete', 'unavailable'].includes(String(value.state))
+    || !(value.preparedExecuteCommandId === null || isStableRouteIdentity(value.preparedExecuteCommandId))
     || !Number.isSafeInteger(value.nextItemIndex) || Number(value.nextItemIndex) < 0 || !Number.isSafeInteger(value.expectedPayrollRevision) || Number(value.expectedPayrollRevision) < 0
     || typeof value.planVersion !== 'string' || !value.planVersion || !Array.isArray(value.items)
     || !value.items.every(item => object(item) && decision(item.decision) && previewItem(item)) || !Array.isArray(value.reasons) || !value.reasons.every(reason => typeof reason === 'string')) {

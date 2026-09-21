@@ -208,14 +208,16 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
       throw payrollProblem('forbidden', '批量工资提交身份、工作区或能力不匹配')
   }
 
-  async function planFromRow(context: PayrollContext, row: Record<string, unknown>): Promise<PayrollBatchPlanRead> {
+  async function planFromRow(db: TransactionDb, context: PayrollContext, row: Record<string, unknown>): Promise<PayrollBatchPlanRead> {
     const stored = JSON.parse(String(row.plan_json)) as StoredPlan
-    const planVersion = hash({ planHash: row.plan_hash, revision: row.revision, state: row.state, nextItemIndex: row.next_item_index, expectedPayrollRevision: row.expected_payroll_revision })
-    return { ...stored, context, planVersion, state: String(row.state) as PayrollBatchPlanRead['state'], nextItemIndex: Number(row.next_item_index), expectedPayrollRevision: Number(row.expected_payroll_revision) }
+    const [prepared] = String(row.state) === 'prepared' ? await db.select<{ execute_command_id: string }>('SELECT execute_command_id FROM payroll_batch_attempts WHERE plan_id=? AND state=\'prepared\'', [row.id]) : []
+    const preparedExecuteCommandId = prepared?.execute_command_id ?? null
+    const planVersion = hash({ planHash: row.plan_hash, revision: row.revision, state: row.state, nextItemIndex: row.next_item_index, expectedPayrollRevision: row.expected_payroll_revision, preparedExecuteCommandId })
+    return { ...stored, context, planVersion, state: String(row.state) as PayrollBatchPlanRead['state'], preparedExecuteCommandId, nextItemIndex: Number(row.next_item_index), expectedPayrollRevision: Number(row.expected_payroll_revision) }
   }
 
   async function currentPlan(db: TransactionDb, context: PayrollContext, planId: string): Promise<PayrollBatchPlanRead> {
-    return planFromRow(context, await loadPlanRow(db, planId))
+    return planFromRow(db, context, await loadPlanRow(db, planId))
   }
 
   async function existingCoordinationReceipt(db: TransactionDb, context: PayrollContext, command: PayrollBatchCommand): Promise<PayrollBatchPlanRead | null> {
@@ -240,7 +242,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
         return replay
       const row = await loadPlanRow(db, command.action.input.planId)
       assertPlanOwner(context, row)
-      const plan = await planFromRow(context, row)
+      const plan = await planFromRow(db, context, row)
       if (plan.planVersion !== command.action.input.planVersion)
         throw payrollProblem('stale-source', '批量工资计划版本已变化，请重新读取')
       if (plan.state !== 'ready' || plan.nextItemIndex >= plan.items.length)
@@ -277,7 +279,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
         return { replay, original: null, formatFamily: null, projectId: replay.projectId }
       const row = await loadPlanRow(db, command.action.input.planId)
       assertPlanOwner(context, row)
-      const plan = await planFromRow(context, row)
+      const plan = await planFromRow(db, context, row)
       if (plan.planVersion !== command.action.input.planVersion || plan.state !== 'prepared')
         throw payrollProblem('stale-source', '批量工资准备状态或版本已变化，请重新读取')
       const [attempt] = await db.select<Record<string, unknown>>('SELECT * FROM payroll_batch_attempts WHERE plan_id=? AND execute_command_id=? AND state=\'prepared\'', [plan.planId, command.commandId])
@@ -317,7 +319,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
         return replay
       const row = await loadPlanRow(db, command.action.input.planId)
       assertPlanOwner(context, row)
-      const plan = await planFromRow(context, row)
+      const plan = await planFromRow(db, context, row)
       if (plan.state !== 'prepared')
         throw payrollProblem('stale-source', '批量工资执行后计划状态已变化，请重新读取')
       const [attempt] = await db.select<Record<string, unknown>>('SELECT * FROM payroll_batch_attempts WHERE plan_id=? AND execute_command_id=? AND state=\'prepared\'', [plan.planId, command.commandId])
@@ -350,7 +352,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
         throw payrollProblem('not-found', '批量工资计划不存在')
       if ((query.projectId && query.projectId !== row.project_id) || (query.month && query.month !== row.month))
         throw payrollProblem('relationship-mismatch', '批量工资计划不属于当前项目或月份')
-      return planFromRow(context, row)
+      return planFromRow(db, context, row)
     }),
     executeBatch: async (command: PayrollBatchCommand, sessionId?: string | null) => {
       if (command.action.kind === 'prepare-batch-item')
@@ -385,13 +387,13 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
         const planId = generateId('payroll-batch')
         const revision = await payrollRevision(db)
         const next = nextExecutable(planItems, 0)
-        const stored: StoredPlan = { schemaVersion: 1, commandId: command.commandId, planId, projectId: fixed.projectId, month: fixed.month, purpose: fixed.purpose, fundingAmountFen: fixed.fundingAmountFen, state: next >= planItems.length ? 'complete' : 'ready', nextItemIndex: next, expectedPayrollRevision: revision, items: planItems, reasons: [] }
+        const stored: StoredPlan = { schemaVersion: 1, commandId: command.commandId, planId, projectId: fixed.projectId, month: fixed.month, purpose: fixed.purpose, fundingAmountFen: fixed.fundingAmountFen, state: next >= planItems.length ? 'complete' : 'ready', preparedExecuteCommandId: null, nextItemIndex: next, expectedPayrollRevision: revision, items: planItems, reasons: [] }
         const planJson = payrollCanonical(stored)
         const planHash = hash(stored)
         const now = new Date().toISOString()
         await db.execute('INSERT INTO payroll_batch_plans(id,workspace_id,actor_id,origin,project_id,month,purpose,schema_version,plan_json,plan_hash,base_payroll_revision,expected_payroll_revision,next_item_index,revision,state,created_at,confirmed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [planId, context.workspaceId, context.actorId, 'real', fixed.projectId, fixed.month, fixed.purpose, 1, planJson, planHash, revision, revision, next, 1, stored.state, now, now])
         const [row] = await db.select<Record<string, unknown>>('SELECT * FROM payroll_batch_plans WHERE id=?', [planId])
-        const result = await planFromRow(context, row!)
+        const result = await planFromRow(db, context, row!)
         await saveCoordinationReceipt(db, context, command, fixed.projectId, result)
         return result
       }, true)

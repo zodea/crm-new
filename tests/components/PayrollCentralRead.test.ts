@@ -18,7 +18,7 @@ import { payrollDetailFixture, payrollListFixture, payrollSourcesFixture } from 
 const table = defineComponent({ props: ['columns', 'data', 'empty'], template: '<div role="table"><div v-for="row in data"><span v-for="column in columns"><slot v-if="column.slot" :name="column.slot" :row="row"/><template v-else>{{ row[column.field] }}</template></span></div></div>' })
 const link = defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: typeof props.to === 'string' ? props.to : `${props.to.path}?${new URLSearchParams(props.to.query)}` }, slots.default?.()) })
 const components = { PayrollReadNotice, PayrollReadDiagnostics, PayrollReadFilters, PayrollReadHistory, PayrollEvidenceTable, PayrollSnapshotEvidence, PayrollSourceEvidence, KitStatusTag }
-const stubs = { KitTable: table, SectionHeader: { props: ['title'], template: '<h2>{{title}}</h2>' }, KitButton: { template: '<button><slot /></button>' }, KitMultiSelectFilter: defineComponent({ props: ['label', 'modelValue'], setup: props => () => h('button', { 'aria-label': `${props.label}，已选 ${props.modelValue.length} 项` }, props.label) }), NuxtLink: link }
+const stubs = { KitTable: table, SectionHeader: { props: ['title'], template: '<h2>{{title}}</h2>' }, KitButton: { template: '<button><slot /></button>' }, KitMultiSelectFilter: defineComponent({ props: ['label', 'modelValue'], setup: props => () => h('button', { 'aria-label': `${props.label}，已选 ${props.modelValue.length} 项` }, props.label) }), PayrollBatchDialog: { props: ['open', 'rows', 'projectId', 'month'], template: '<div v-if="open" data-testid="batch-dialog">{{projectId}}/{{month}}/{{rows.length}}</div>' }, NuxtLink: link }
 let route: ReturnType<typeof makeRoute>
 const detailRead = vi.fn()
 const listRead = vi.fn()
@@ -44,6 +44,27 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 describe('工资中央只读资料', () => {
+  it('只允许同一固定项目月份的未发中央工资进入批次', async () => {
+    const value = payrollListFixture()
+    const base = value.rows[0]!
+    value.context = { ...value.context, capabilities: ['payroll:read', 'payroll:write'], readonly: false }
+    value.rows = [
+      { ...base, id: 'eligible', status: 'checked', releasedAt: null, formatFamily: 'C1' },
+      { ...base, id: 'released', status: 'released', releasedAt: '2026-09-01', formatFamily: 'C2' },
+      { ...base, id: 'isolated', status: 'checked', releasedAt: null, recordKind: 'isolated', formatFamily: 'A' },
+    ]
+    listRead.mockResolvedValue(value)
+    route.query = { origin: 'real', project: 'project-a', month: '2026-08' }
+    const wrapper = mount(CentralPayrollScreen, { global: { components, stubs } })
+    await flushPromises()
+    const checks = wrapper.findAll('input[type="checkbox"]')
+    expect(checks).toHaveLength(1)
+    await checks[0]!.setValue(true)
+    expect(wrapper.text()).toContain('批量核对 / 资金（1）')
+    await wrapper.findAll('button').find(button => button.text().includes('批量核对 / 资金'))!.trigger('click')
+    expect(wrapper.get('[data-testid="batch-dialog"]').text()).toBe('project-a/2026-08/1')
+    wrapper.unmount()
+  })
   it('同人同月两个A请款簿按已证用途分开展示，旧单没有凭空补普通簿', async () => {
     const value = payrollListFixture()
     const base = value.rows[0]!
