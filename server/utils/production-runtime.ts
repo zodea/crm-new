@@ -18,7 +18,7 @@ export function productionRuntime() {
     runtime = { key, storage: createProductionStorage(config) }
   return runtime
 }
-export const productionSession = (event: H3Event) => () => requireProductionBusinessSession(event)
+export const productionSession = (event: H3Event, options: { touch?: boolean } = {}) => () => requireProductionBusinessSession(event, options)
 export function throwProductionStorageError(cause: unknown) {
   if (cause instanceof ProductionStorageProblem)
     throw createError({ statusCode: 503, data: projectProblem('unavailable', cause.message) })

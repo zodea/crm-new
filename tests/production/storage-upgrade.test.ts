@@ -47,3 +47,17 @@ it('升级中途失败保持旧版本和完整旧参与者，未知参与者不�
   finally { inspected.close() }
   await expect(createProductionStorage(options).status()).rejects.toThrow('参与者清单')
 })
+
+it('参与者登记仍在但实际审计表缺失时，冷打开明确拒绝而非报告已就绪', async () => {
+  const base = resolve('.codex-tmp/issue-463-tests')
+  await mkdir(base, { recursive: true })
+  const directory = await mkdtemp(`${base}/missing-table-`)
+  const options = { directory, workspaceId: 'missing-table-workspace', ownerId: 'missing-table-owner', purpose: 'verification' as const }
+  const first = createProductionStorage(options)
+  await first.status()
+  await first.close()
+  const raw = new DatabaseSync(join(directory, 'ruihang.sqlite'))
+  raw.exec('DROP TABLE customer_audits')
+  raw.close()
+  await expect(createProductionStorage(options).status()).rejects.toThrow('业务表')
+})
