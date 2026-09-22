@@ -7,6 +7,7 @@
 | 工资台账与详情 | `/subcontract/payroll`、`/subcontract/payroll/:id` | 浏览器验证版本已开放历史只读、A/C1/C2 核对、实际发放及冻结输出，范围见[工资指南](./payroll-attendance.md) |
 | 考勤、签工与主体配置来源 | `/subcontract/payroll/sources`、`/subcontract/attendance`、`/subcontract/daywork` | 同项目真实来源及月锁查看；包含尚无工资头的独立来源 |
 | 工资新建与草稿编辑 | `/subcontract/payroll/new`、`/subcontract/payroll/form/:id` | A/C1/C2 独立整页在浏览器验证版本可用，既有单据按实际格式读取 |
+| 完整工资工作簿 | `/subcontract/payroll/workbooks` | 同项目已发工资、固定目录和独立实名版本；见[完整工作簿指南](./payroll-complete-workbook.md) |
 | 工资配置 | `/subcontract/payroll/config` | A 的负责人首月比例、分项基准价及个人例外，C1 的个人兜底与加班标准，C2 的项目×负责人主体价与确认规则分别核对 |
 | 独立工资更正 | `/subcontract/payroll/adjustments/new`、`/subcontract/payroll/adjustments/form/:id`、`/subcontract/payroll/adjustments/:id` | 原已发工资的独立核算更正；P4 已本地验收，见[更正指南](./payroll-adjustments.md) |
 | 工资补贴与独立管理费 | `/subcontract/payroll/config`、`/subcontract/payroll/form/:id`、`/subcontract/payroll/:id` | 配置明确费用与管理关系，管理草稿中编辑负价清单，再核对实发；见[费用指南](./payroll-fees.md) |

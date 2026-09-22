@@ -6,6 +6,12 @@ export const SOURCE_INSPECTED_AT = '2026-09-10'
 const REFERENCE_MENU_OBSERVED_AT = '2026-09-08'
 
 export const ADAPTERS = {
+  'payroll-workbook-browser': {
+    read: '中央不可变工资目录与保存时点收付；私密名册及原件独立重新授权读取',
+    write: '显式范围和名册版本保存目录、原键恢复；不发工资、不占号、不复制私密正文到公开目录',
+    storage: '中央验证实例与现代完整图受控迁入；生产持久化另由 #467 验收',
+    sources: [['app/lib/payroll/workbook-repository.ts', 'createPayrollWorkbookRepository'], ['server/utils/payroll-workbook-service.ts', 'createPayrollWorkbookService']],
+  },
   'payroll-numbering-browser': {
     read: '中央已证 A/C1/C2 原工资、项目序列与正式出具元数据',
     write: '项目起点登记与首次正式出具；原键恢复、同原单保持原号',
@@ -176,6 +182,8 @@ export const LOCAL_DOMAINS = new Set([
 export function resolveAdapter(surface, host) {
   const local = host === 'browser' ? 'browser-local' : 'desktop-sqlite'
   const { route, domain, mode, kind, variant } = surface
+  if (route === '/subcontract/payroll/workbooks')
+    return host === 'browser' ? 'payroll-workbook-browser' : 'unsupported'
   if (route === '/subcontract/payroll/issue/:id')
     return host === 'browser' ? 'payroll-numbering-browser' : 'unsupported'
   if (route === '/base/worker/private/:id' || route === '/subcontract/payroll/roster')

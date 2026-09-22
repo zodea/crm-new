@@ -9,7 +9,7 @@ import { payrollHollowJson, readPayrollHollowReceipt } from './payroll-hollow-da
 import { PAYROLL_HOLLOW_SQL_REFERENCES } from './payroll-hollow-migration'
 
 /** 显式 DTO 关系遍历，原检查计数为零、后来整改或退款均不解除原引用。 */
-export async function payrollHollowMigrationReferences(tx: TransactionDb): Promise<Set<string>> {
+export function createPayrollHollowReferenceCollector() {
   const refs = new Set<string>()
   const add = (table: string, id: unknown) => {
     if (typeof id === 'string' && id)
@@ -74,6 +74,11 @@ export async function payrollHollowMigrationReferences(tx: TransactionDb): Promi
       processed.adjustmentIds.forEach(id => add('payroll_adjustments', id))
     }
   }
+  return { refs, add, scope, fact, start, adoption, snapshot }
+}
+
+export async function payrollHollowMigrationReferences(tx: TransactionDb): Promise<Set<string>> {
+  const { refs, add, scope, start, adoption, snapshot } = createPayrollHollowReferenceCollector()
   const present = new Set((await tx.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')).map(row => row.name))
   for (const table of PAYROLL_HOLLOW_DEDUCTION_TABLES) {
     if (!present.has(table))

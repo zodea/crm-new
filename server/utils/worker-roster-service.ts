@@ -7,6 +7,7 @@ import { logOperation } from '../../app/lib/db/soft-delete'
 import { decodeRosterArchive } from '../../app/lib/worker-roster/codec'
 import { EMPTY_WORKER_PRIVATE, rosterProblem, WORKER_PRIVATE_READ } from '../../app/lib/worker-roster/contract'
 import { parseRosterCommand, parseRosterScope, rosterCanonical, rosterDate, rosterId } from '../../app/lib/worker-roster/validation'
+import { readMigratedWorkerRosterArchive } from './payroll-publication-migration'
 import { currentWorkerPrivate, initializeWorkerRosterSchema, insertWorkerPhoto, photoBytes, readWorkerAssetPayload, rosterHash, workerRosterAssets } from './worker-roster-storage'
 
 export interface WorkerRosterSource { workers: WorkerSourceRow[], projects: { id: string, name: string }[] }
@@ -121,6 +122,9 @@ export function createWorkerRosterService(options: WorkerRosterServiceOptions) {
   async function archive(db: TransactionDb, session: BusinessSession, source: WorkerRosterSource, projectId: string, id: string): Promise<WorkerRosterArchive> {
     if (!rosterId(id) || !rosterId(projectId) || !source.projects.some(p => p.id === projectId))
       return rosterProblem('not-found', '名册归档不存在或不可读取')
+    const migrated = await readMigratedWorkerRosterArchive(db, projectId, id)
+    if (migrated)
+      return { ...migrated, context: context(session) }
     const [stored] = await db.select<{ snapshot_json: string }>('SELECT snapshot_json FROM worker_roster_archives WHERE id=? AND project_id=?', [id, projectId])
     if (!stored)
       return rosterProblem('not-found', '名册归档不存在或不属于当前项目')
@@ -160,14 +164,12 @@ export function createWorkerRosterService(options: WorkerRosterServiceOptions) {
         if (!rosterId(projectId) || !source.projects.some(p => p.id === projectId))
           return rosterProblem('not-found', '名册项目不可读取')
         const rows = await db.select<{ id: string, snapshot_json: string }>('SELECT id,snapshot_json FROM worker_roster_archives WHERE project_id=? ORDER BY created_at DESC,version DESC,id', [projectId])
-        return rows.map(({ id, snapshot_json }) => {
-          let document: WorkerRosterArchive
-          try {
-            document = decodeRosterArchive(JSON.parse(snapshot_json), projectId, id)
-          }
-          catch { return rosterProblem('unavailable', '名册归档损坏，请核对原来源') }
-          return { id: document.id, version: document.version, projectId, registeredOn: document.scope.registeredOn, createdAt: document.createdAt, statementIds: document.scope.statementIds, memberCount: document.members.length, gapCount: document.members.reduce((sum, member) => sum + member.diagnostics.length, 0) }
-        })
+        const summaries: WorkerRosterArchiveSummary[] = []
+        for (const { id } of rows) {
+          const document = await archive(db, _session, source, projectId, id)
+          summaries.push({ id: document.id, version: document.version, projectId, registeredOn: document.scope.registeredOn, createdAt: document.createdAt, statementIds: document.scope.statementIds, memberCount: document.members.length, gapCount: document.members.reduce((sum, member) => sum + member.diagnostics.length, 0) })
+        }
+        return summaries
       })
     },
     file(input: { workerId: string, assetId: string, projectId?: string, archiveId?: string }, sessionId?: string | null) {

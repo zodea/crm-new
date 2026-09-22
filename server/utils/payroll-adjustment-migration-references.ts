@@ -13,6 +13,7 @@ import { payrollCanonical } from '../../app/lib/payroll/central-command-shared'
 import { wireExact, wireId, wireObject } from '../../app/lib/payroll/central-payroll-wire'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { createPayrollFeesReferenceCollector } from './payroll-fees-migration-references'
+import { createPayrollHollowReferenceCollector } from './payroll-hollow-migration-references'
 
 export const PAYROLL_ADJUSTMENT_REFERENCE_TABLES = ['payroll_adjustments', 'payroll_actual_events', 'payroll_actual_allocations', 'payroll_adjustment_applications', 'payroll_a_adjustment_coverage'] as const
 const actions = ['save-adjustment-draft', 'confirm-adjustment', 'confirm-actual-payment', 'confirm-recording-reversal']
@@ -28,7 +29,7 @@ function json(value: unknown): Record<string, unknown> {
   catch { /* 非空坏证据不能当作没有引用。 */ }
   return invalid()
 }
-function collector() {
+export function createPayrollAdjustmentReferenceCollector() {
   const refs = new Set<string>()
   function add(table: string, id: unknown) {
     if (id === null || id === undefined)
@@ -65,6 +66,15 @@ function collector() {
   function basis(value: PayrollAdjustmentBasisDraft | null) {
     if (!value)
       return
+    if (value.hollow) {
+      const hollow = createPayrollHollowReferenceCollector()
+      hollow.snapshot(value.hollow.source)
+      for (const component of value.hollow.components) {
+        hollow.add('payroll_hollow_adoptions', component.adoptionId)
+        hollow.add('quantity_hollow_records', component.recordId)
+      }
+      for (const reference of hollow.refs) refs.add(reference)
+    }
     if (value.formatFamily === 'C1') {
       value.rates.forEach((rate) => {
         subject(rate)
@@ -84,8 +94,15 @@ function collector() {
     }
     else {
       const fees = createPayrollFeesReferenceCollector()
-      if (value.source.schemaVersion === 2)
-        fees.source(value.source)
+      if (value.source.schemaVersion !== 1) {
+        fees.identity(value.source.book)
+        fees.feesSnapshot(value.source.fees)
+      }
+      if (value.source.schemaVersion === 3) {
+        const hollow = createPayrollHollowReferenceCollector()
+        hollow.snapshot(value.source.hollow)
+        for (const reference of hollow.refs) refs.add(reference)
+      }
       if (value.fees)
         fees.basis(value.fees)
       for (const reference of fees.refs) refs.add(reference)
@@ -144,7 +161,7 @@ function collector() {
 export function payrollAdjustmentReceiptReferences(value: Record<string, unknown>): Set<string> | null {
   if (!actions.includes(String(value.action)))
     return null
-  const c = collector()
+  const c = createPayrollAdjustmentReferenceCollector()
   try {
     const raw = json(value.command_json)
     if (payrollCanonical(raw) !== value.command_json || createHash('sha256').update(String(value.command_json)).digest('hex') !== value.fingerprint)
@@ -184,7 +201,7 @@ export function payrollAdjustmentReceiptReferences(value: Record<string, unknown
 /** 工资域五张独立表、原审计和冻结覆盖均是恢复保护来源，不通过当前姓名反推关系。 */
 export async function payrollAdjustmentMigrationReferences(tx: TransactionDb): Promise<Set<string>> {
   await initializePayrollAdjustmentSchema(tx)
-  const c = collector()
+  const c = createPayrollAdjustmentReferenceCollector()
   const fields = { project_id: 'projects', worker_id: 'workers', original_statement_id: 'wage_statements', statement_id: 'wage_statements', released_statement_id: 'wage_statements', root_adjustment_id: 'payroll_adjustments', corrects_adjustment_id: 'payroll_adjustments', adjustment_id: 'payroll_adjustments', event_id: 'payroll_actual_events', actual_event_id: 'payroll_actual_events' }
   function row(table: string, value: Record<string, unknown>) {
     for (const [field, target] of Object.entries(fields)) c.add(target, value[field])

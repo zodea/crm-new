@@ -1,3 +1,4 @@
+import type { WorkerRosterServiceOptions } from './worker-roster-service'
 import { readPayrollStatement } from '../../app/lib/payroll/central-read'
 import { initializePayrollSchema } from '../../app/lib/payroll/central-schema'
 import { rosterProblem } from '../../app/lib/worker-roster/contract'
@@ -10,7 +11,7 @@ import { WorkspaceTransactionSessionChanged } from './quantity-test-instance'
 import { createWorkerRosterService } from './worker-roster-service'
 import { rosterHash } from './worker-roster-storage'
 
-export const workerRosterService = createWorkerRosterService({
+export const workerRosterRuntimeOptions: WorkerRosterServiceOptions = {
   session: sessionId => ({ ...resolveBusinessSession(), capabilities: demoWorkspaceTestInstance.capabilities(sessionId) }),
   source: sessionId => ({
     workers: crewWorkerCommandTestInstance.workerRows(sessionId).filter(row => row.dataOrigin === 'real'),
@@ -37,4 +38,5 @@ export const workerRosterService = createWorkerRosterService({
       throw cause
     }
   },
-})
+}
+export const workerRosterService = createWorkerRosterService(workerRosterRuntimeOptions)
