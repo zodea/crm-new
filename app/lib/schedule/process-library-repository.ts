@@ -45,7 +45,7 @@ function summary(value: unknown, origin: DataOriginDTO): asserts value is Proces
     invalid()
   }
 }
-function detail(value: unknown, id: string, origin: DataOriginDTO): ProcessLibraryVersion {
+export function decodeProcessLibraryVersion(value: unknown, id: string, origin: DataOriginDTO): ProcessLibraryVersion {
   summary(value, origin)
   const result = value as ProcessLibraryVersion
   if (result.id !== id || !Array.isArray(result.tasks) || result.taskCount !== result.tasks.length)
@@ -111,7 +111,7 @@ export function createProcessLibraryRepository(fetcher: ProcessLibraryFetcher) {
   const query = (origin: DataOriginDTO) => origin === 'demo' ? { origin, includeDemo: true } : { origin }
   return {
     list: (origin: DataOriginDTO, options: { signal?: AbortSignal } = {}) => request('/api/read/process-libraries', { query: query(origin), signal: options.signal }, value => catalog(value, origin)),
-    detail: (id: string, origin: DataOriginDTO, options: { signal?: AbortSignal } = {}) => request(`/api/read/process-libraries/${encodeURIComponent(id)}`, { query: query(origin), signal: options.signal }, value => detail(value, id, origin)),
+    detail: (id: string, origin: DataOriginDTO, options: { signal?: AbortSignal } = {}) => request(`/api/read/process-libraries/${encodeURIComponent(id)}`, { query: query(origin), signal: options.signal }, value => decodeProcessLibraryVersion(value, id, origin)),
     execute: (input: ProcessLibraryCreateCommand) => {
       const command = structuredClone(input)
       return request('/api/commands/process-libraries', { method: 'POST', body: command }, value => result(value, command))

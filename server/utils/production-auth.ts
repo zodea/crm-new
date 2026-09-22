@@ -5,11 +5,12 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { createError, deleteCookie, getCookie, getHeader, setCookie } from 'h3'
 import { getProductionRuntimeConfig } from './production-config'
+import { PRODUCTION_PROCESS_LIBRARY_CAPABILITIES } from './production-process-library-access'
 
 const COOKIE = 'ruihang_owner_session'
 const ABSOLUTE_MS = 8 * 60 * 60 * 1000
 const IDLE_MS = 30 * 60 * 1000
-const OWNER_CAPABILITIES = Object.freeze(['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write'])
+const OWNER_CAPABILITIES = Object.freeze(['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', ...PRODUCTION_PROCESS_LIBRARY_CAPABILITIES])
 interface OwnerSession { configuration: string, created: number, used: number }
 // Authentication is intentionally revoked by a process restart; business receipts live on disk.
 const sessions = new Map<string, OwnerSession>()

@@ -4,7 +4,7 @@
 
 ## 版本与使用边界
 
-各指南的“当前已可用”指该指南注明版本和验证环境内的行为，不等同于本轮已经复验或正式上线。除明确登记的 [#450 本机客户切片](./local-customer-storage.md)外，中央端仍按 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 的可重置验证实例边界使用；其他持久化、备份恢复和部署由 [#416 承接图](../implementation/production-gate-work-breakdown.md)逐项验收。
+各指南的“当前已可用”指该指南注明版本和验证环境内的行为，不等同于本轮已经复验或正式上线。除明确登记的 [#450 本机客户切片](./local-customer-storage.md)与 [#463 本机工序库](./local-process-library-storage.md)外，中央端仍按 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 的可重置验证实例边界使用；其他持久化、备份恢复和部署由 [#416 承接图](../implementation/production-gate-work-breakdown.md)逐项验收。
 
 本轮按[全模块复核路线](https://github.com/zodea/crm-new/issues/402)逐份核实指南与实际界面。旧票号只用于解释版本来源；远程已合入、本地尚未整合与其他工作树进行中的能力分别登记，不能仅改文档就把它们写成当前版本可用。完整审批引擎、完整登录/RBAC 和 Tauri 正式交付继续是当前排除范围，不因旧指南列为“待开发”而自动纳入本轮。
 
@@ -17,6 +17,7 @@
 - [其他支出与公司支出合同使用指南](./auxiliary-contracts.md)
 - [客户档案与业务关系使用指南](./customer-records.md)
 - [本机客户保存与重新登录](./local-customer-storage.md)（#450 首条磁盘路径，正式写入等待备份与上线门禁）
+- [本机工序库保存与旧版本核对](./local-process-library-storage.md)（#463 完整不可变版本、原提交恢复与独立服务重启）
 - [分供方档案与真实事实使用指南](./supplier-records.md)
 - [班组与工人档案使用指南](./crew-worker-records.md)
 - [工人私密资料与工资实名名册](./worker-roster-archive.md)（独立权限、两类照片、带日期不可变名册与原件 ZIP）

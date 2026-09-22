@@ -2,7 +2,7 @@
 
 > 本文档是浏览器中央写命令的权威源。数据实体与迁移看 [`DATABASE.md`](./DATABASE.md)，读 DTO 看 [`READ-MODELS.md`](./READ-MODELS.md)，浏览器权威边界看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)。
 
-下文“正式”表示来源身份与命令边界；除本页明确的 PG-01 本机客户切片外，当前后端仍是可重置内存实例，不构成生产持久化证明。前台优先的复核顺序与后置生产验收见 [`ARCHITECTURE.md`](./ARCHITECTURE.md)；本契约不因顺序调整而允许本地正式双写，也不扩展完整审批或账号权限产品。
+下文“正式”表示来源身份与命令边界；除本页明确的 PG-01 本机客户与 #463 本机工序库切片外，当前后端仍是可重置验证实例，不构成生产持久化证明。前台优先的复核顺序与后置生产验收见 [`ARCHITECTURE.md`](./ARCHITECTURE.md)；本契约不因顺序调整而允许本地正式双写，也不扩展完整审批或账号权限产品。
 
 ## PG-01 本机客户命令（#450）
 
@@ -12,7 +12,13 @@
 
 `POST /api/commands/customer-resolve` 仅接受 `{commandId}`：同一磁盘事务返回已提交原回执；无回执则封存原键后返回 `not-applied`，阻止迟到请求继续写入。单纯 GET 查不到只表示当前没有回执，不能替代封存核对。浏览器只保留当前工作区/actor/页面目标下的原编号，不持久保存正文；权限、网络或读回失败保持未知。身份恢复后按原键核对，不自动新建。
 
-运行配置、访问保护及正式写入备份门禁见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)；持久参与者见 [DATABASE](./DATABASE.md#pg-01-本机客户持久参与者450)。其他正式 API 仍明确未就绪，不能回落开发实例。
+运行配置、访问保护及正式写入备份门禁见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)；持久参与者见 [DATABASE](./DATABASE.md#pg-01-本机客户持久参与者450)。未接管的正式 API 仍明确未就绪，不能回落开发实例。
+
+## 本机工序库命令（#463）
+
+配置后的本机模式复用 `POST /api/commands/process-libraries` 的既有 `create-version` 协议，可信维护人由访问码会话给出，需 `process-library:read` 和 `process-library:write`。完整版本图、系列修订、原命令正文与摘要、成功回执、审计在同一磁盘事务提交；提交前再次核对当前身份和权限。原命令重复返回原版本，不提高系列编号；同键不同正文、陈旧版本或错误来源拒绝。独立服务重启后同样有效。
+
+旧版只读，新版始终追加；恢复读取先核对版本、原命令和审计之间的关系，损坏明确停止，不跳过坏行或重新填演示库。此切片的真实保存已在隔离 `verification` 用途验收；正式用途写门禁仍等待 #451 备份与上线条件，不能由领域自行放开。完整存量迁入和项目 WBS 正式保存由各自后续票验收。数据及操作见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)、[本机工序库指南](../guides/local-process-library-storage.md)。
 
 ## 1. 当前落点
 

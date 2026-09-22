@@ -8,7 +8,7 @@ import { normalizeProcessLibraryDraft } from '../../app/lib/schedule/process-lib
 import { prepareProcessLibraryMigration } from './process-library-migration'
 import { parseProcessLibraryCommand } from './process-library-request'
 
-interface LibraryState {
+export interface ProcessLibraryState {
   versions: ProcessLibraryVersion[]
   commands: Map<string, { fingerprint: string, result: ProcessLibraryCommandResult }>
   revision: number
@@ -17,21 +17,25 @@ interface Options {
   createId?: () => string
   now?: () => string
   beforeCommit?: () => void
+  /** The disk owner supplies a fresh state inside its transaction; it is never retained between requests. */
+  state?: ProcessLibraryState
 }
 
-function canonical(value: unknown): string {
+export function processLibraryCanonical(value: unknown): string {
   return JSON.stringify(value, (_key, entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
     ? Object.fromEntries(Object.entries(entry).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0))
     : entry)
 }
 
-/** 当前中央验证实例；只发布完整版本，不承担生产持久化。 */
+/** One set of immutable-version rules; the runtime owner selects memory or a transaction-scoped disk state. */
 export function createProcessLibraryService(options: Options = {}) {
-  const states = new Map<string, LibraryState>()
+  const states = new Map<string, ProcessLibraryState>()
   const createId = options.createId ?? randomUUID
   const now = options.now ?? (() => new Date().toISOString())
   const keyFor = (session: BusinessSession, sessionId?: string | null) => JSON.stringify([session.workspaceId, sessionId || 'default'])
-  function stateFor(session: BusinessSession, sessionId?: string | null): LibraryState {
+  function stateFor(session: BusinessSession, sessionId?: string | null): ProcessLibraryState {
+    if (options.state)
+      return options.state
     const key = keyFor(session, sessionId)
     const state = states.get(key) ?? { versions: [], commands: new Map(), revision: 0 }
     states.set(key, state)
@@ -100,7 +104,7 @@ export function createProcessLibraryService(options: Options = {}) {
       if (command.workspaceId !== session.workspaceId || command.actorId !== session.actorId)
         throw processLibraryProblem('forbidden', '工序库保存会话身份已变化，请重新读取')
       const state = stateFor(session, sessionId)
-      const fingerprint = canonical(command)
+      const fingerprint = processLibraryCanonical(command)
       const prior = state.commands.get(command.commandId)
       if (prior) {
         if (prior.fingerprint !== fingerprint)
