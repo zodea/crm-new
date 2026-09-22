@@ -1,7 +1,29 @@
-export const PRODUCTION_STORAGE_VERSION = 1
-export const PRODUCTION_PARTICIPANTS = ['customer'] as const
+import { PRODUCTION_PROCESS_LIBRARY_SCHEMA, PRODUCTION_PROCESS_LIBRARY_TABLES } from './production-process-library-schema'
 
-/** PG-01 only. Further domains join through an explicit storage version upgrade. */
+export const PRODUCTION_STORAGE_VERSION = 2
+/** Append a new numbered upgrade when a domain lands; never rewrite an applied step. */
+export const PRODUCTION_STORAGE_UPGRADES = [
+  { from: 1, to: 2, sql: PRODUCTION_PROCESS_LIBRARY_SCHEMA, participants: { 'process-library': { schemaVersion: 1, tables: PRODUCTION_PROCESS_LIBRARY_TABLES } } },
+] as const
+
+export function productionStorageManifest(version = PRODUCTION_STORAGE_VERSION) {
+  if (!Number.isSafeInteger(version) || version < 1 || version > PRODUCTION_STORAGE_VERSION)
+    throw new Error('此发布物不能验证该正式存储版本的完整清单。')
+  const participants: Record<string, { schemaVersion: number, tables: readonly string[] }> = {
+    customer: { schemaVersion: 1, tables: ['customer_revision', 'customers', 'file_refs', 'file_payloads', 'customer_command_receipts', 'customer_command_resolutions', 'customer_audits'] },
+  }
+  for (const upgrade of PRODUCTION_STORAGE_UPGRADES) {
+    if (upgrade.to <= version)
+      Object.assign(participants, upgrade.participants)
+  }
+  return structuredClone({ schemaVersion: version, coreTables: ['production_metadata', 'production_participants'], participants })
+}
+export function productionParticipantVersions(version: number): Record<string, number> {
+  return Object.fromEntries(Object.entries(productionStorageManifest(version).participants).map(([domain, value]) => [domain, value.schemaVersion]))
+}
+export const PRODUCTION_PARTICIPANTS = Object.keys(productionParticipantVersions(PRODUCTION_STORAGE_VERSION))
+
+/** Frozen v1 bootstrap. Existing databases reach later domains through the numbered upgrades. */
 export const PRODUCTION_STORAGE_SCHEMA = `
 CREATE TABLE production_metadata (
   singleton INTEGER PRIMARY KEY CHECK(singleton=1), schema_version INTEGER NOT NULL,
