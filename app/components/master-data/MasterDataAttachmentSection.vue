@@ -11,6 +11,7 @@ export interface PendingMasterDataAttachment extends FormAttachmentDraft {
 defineProps<{
   title: string
   desktopPicker: boolean
+  storesOriginals?: boolean
   attachments: FormAttachment[]
   pendingAttachments: PendingMasterDataAttachment[]
   pendingRemoveIds: string[]
@@ -20,6 +21,7 @@ defineProps<{
 const emit = defineEmits<{
   pickNative: []
   files: [files: File[]]
+  download: [file: FormAttachment]
   toggleExisting: [id: string]
   removePending: [localId: string]
   updatePendingCategory: [localId: string, category: string]
@@ -55,7 +57,7 @@ function inputValue(event: Event) {
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
       <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径</span>
+      <span class="mt-0.5 text-11px text-ink-faint">{{ storesOriginals ? '原件随客户一同保存，重启后可下载；最多 9 份，单份不超过 10 MiB' : '浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径' }}</span>
       <input type="file" multiple class="sr-only" @change="handleFiles">
     </label>
 
@@ -74,6 +76,9 @@ function inputValue(event: Event) {
         <span class="min-w-0 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
         <span class="text-10px text-ink-faint">{{ file.category || '未分类' }}</span>
         <span v-if="file.deletedAt" class="text-10px text-danger">已删除</span>
+        <button v-if="storesOriginals && !file.deletedAt" type="button" class="text-11px text-brand" :aria-label="`下载原件 ${file.fileName}`" @click="emit('download', file)">
+          下载原件
+        </button>
         <button
           type="button"
           class="text-11px"

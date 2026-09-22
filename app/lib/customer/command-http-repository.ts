@@ -26,7 +26,7 @@ function context(value: unknown): CustomerCommandContextDTO {
   return value as unknown as CustomerCommandContextDTO
 }
 
-function result(value: unknown): CustomerCommandResultDTO {
+export function decodeCustomerCommandResult(value: unknown): CustomerCommandResultDTO {
   if (!object(value) || typeof value.id !== 'string' || typeof value.commandId !== 'string'
     || typeof value.version !== 'string' || !isISODateTimeDTO(value.updatedAt)
     || !Array.isArray(value.attachmentIds) || !value.attachmentIds.every(item => typeof item === 'string')) {
@@ -88,7 +88,7 @@ export function createHttpCustomerCommandRepository(options: { fetcher: Customer
         method: request.id ? 'PUT' : 'POST',
         body: { ...request },
       }),
-      result,
+      decodeCustomerCommandResult,
     ),
   }
 }

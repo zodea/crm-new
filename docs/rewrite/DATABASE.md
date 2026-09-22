@@ -1,5 +1,23 @@
 # 数据库设计 — 全局实体关系 + 外键索引 + 建表顺序
 
+## PG-01 本机客户持久参与者（#450）
+
+`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite` 和独立正式 schema 版本 1；不把旧浏览器/Tauri schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
+
+| 同库参与者 | 不可遗漏的事实 |
+| --- | --- |
+| `production_metadata` | schema 版本、固定工作区/维护人、用途及创建时间；重开必须相符 |
+| `production_participants` | 已接管领域与领域 schema 版本；本票仅 `customer:1` |
+| `customer_revision` / `customers` | 全域客户版本、稳定 ID、原字段、实体版本、创建/更新时间和软删除；税号唯一包含已删除客户 |
+| `file_refs` / `file_payloads` | 客户 owner、稳定文件 ID、文件描述/大小、服务端上传人、删除状态、原字节和 SHA-256；不保存客户端路径来冒充原件 |
+| `customer_command_receipts` | 原编号、工作区/操作者、客户、完整命令指纹、动作、原结果、提交时间 |
+| `customer_command_resolutions` | 明确未应用并封存的原编号、工作区/操作者及核对时间，迟到请求不得再提交 |
+| `customer_audits` | 客户、原命令、可信操作者、动作、前后事实与时间；不把原件正文写进审计 |
+
+客户、原件、审计、版本和成功回执同一 `BEGIN IMMEDIATE` 事务提交，单连接由既有 coordinator 排队；WAL、`synchronous=FULL`、外键及每次重开完整性/身份校验。版本不兼容、损坏、不可写明确拒绝，禁止创建内存替代。SQLite/设备故障保证仍按 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md) 分层验收，不以进程终止冒充物理断电。
+
+这份表是 PG-02 的首个完整备份参与者清单：一致备份必须覆盖全部上述表与原件字节，核对外键、owner、数量、摘要、版本及原回执；活动主文件单独复制不构成备份。后续领域只增补此单库的参与者与版本迁移，不新建平行正式权威。
+
 > 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 
 当前落地事实（#279、#294、#320、#321）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。Tauri 不消费浏览器演示偏好，仍只连接原有 `sqlite:crm.db`。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份与 canonical 施工/分包合同的一次性分类、ID 映射、导入、对账和回滚使用同一受控迁移；其余领域仍由后续迁移票完成。

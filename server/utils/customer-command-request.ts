@@ -43,7 +43,7 @@ function validDraft(value: Record<string, unknown>): boolean {
 function validAttachmentDraft(value: unknown): boolean {
   if (!object(value) || typeof value.fileName !== 'string' || !value.fileName.trim())
     return false
-  return ['filePath', 'mimeType', 'category', 'uploader'].every(key =>
+  return ['filePath', 'mimeType', 'category', 'uploader', 'contentBase64'].every(key =>
     value[key] === undefined || typeof value[key] === 'string',
   ) && (value.fileSize === undefined
     || (typeof value.fileSize === 'number' && Number.isFinite(value.fileSize) && value.fileSize >= 0))

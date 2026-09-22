@@ -25,9 +25,9 @@ describe.each([
 ] as const)('%s 多页签编辑', (kind, useStore, repositoryKey) => {
   it('打开两个主档后，保存前一个只更新自己的记录和版本', async () => {
     const repository = {
-      context: async () => ({ workspaceId: 'w', actorId: 'u' }),
+      context: async () => ({ workspaceId: 'w', actorId: 'u', capabilities: ['customer:write'] }),
       loadForm: async (id: string) => ({ draft: { id, name: id }, attachments: [], version: id === 'a' ? '2' : '9', updatedAt: '' }),
-      execute: vi.fn(async (request: { id: string }) => ({ id: request.id, version: '10', attachmentIds: [] })),
+      execute: vi.fn(async (request: { id: string, commandId: string }) => ({ id: request.id, commandId: request.commandId, version: '10', attachmentIds: [] })),
     }
     vi.stubGlobal('useNuxtApp', () => ({ $repositories: { [repositoryKey]: repository } }))
     const first = useStore()
