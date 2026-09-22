@@ -40,6 +40,7 @@ import { createHttpProjectSupplierCommandRepository } from '~/lib/project-suppli
 import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
+import { createProjectProductionRepository } from '~/lib/project/production-repository'
 import { createQuantityRepository } from '~/lib/quantity/central-repository'
 import { createReceiptRepository } from '~/lib/receipt/repository'
 import { createScheduleRepository } from '~/lib/schedule/central-repository'
@@ -55,6 +56,7 @@ import { createWorkerRosterRepository } from '~/lib/worker-roster/repository'
 export interface DomainRepositories {
   productionAccess: ReturnType<typeof createProductionAccessRepository>
   customerProduction: ReturnType<typeof createCustomerProductionRepository>
+  projectProduction: ReturnType<typeof createProjectProductionRepository>
   workerRoster: ReturnType<typeof createWorkerRosterRepository>
   payroll: ReturnType<typeof createPayrollRepository>
   targetCosts: ReturnType<typeof createTargetCostRepository>
@@ -92,6 +94,7 @@ export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
     productionAccess: createProductionAccessRepository((url, options) => $fetch<unknown>(url, { ...options, timeout: 10_000, retry: 0 })),
     customerProduction: createCustomerProductionRepository((url, options) => $fetch<unknown>(url, options), url => $fetch<Blob>(url, { responseType: 'blob' })),
+    projectProduction: createProjectProductionRepository((url, options) => $fetch<unknown>(url, options), url => $fetch<Blob>(url, { responseType: 'blob' })),
     workerRoster: createWorkerRosterRepository((url, options) => $fetch<unknown>(url, { ...options, body: options?.body as Record<string, unknown> | undefined })),
     payroll: createPayrollRepository((url, options) => $fetch<unknown>(url, options)),
     targetCosts: createTargetCostRepository((url, options) => $fetch<unknown>(url, options)),

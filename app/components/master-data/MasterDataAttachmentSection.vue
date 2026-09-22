@@ -12,6 +12,7 @@ defineProps<{
   title: string
   desktopPicker: boolean
   storesOriginals?: boolean
+  originalDescription?: string
   attachments: FormAttachment[]
   pendingAttachments: PendingMasterDataAttachment[]
   pendingRemoveIds: string[]
@@ -57,7 +58,7 @@ function inputValue(event: Event) {
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
       <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">{{ storesOriginals ? '原件随客户一同保存，重启后可下载；最多 9 份，单份不超过 10 MiB' : '浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径' }}</span>
+      <span class="mt-0.5 text-11px text-ink-faint">{{ storesOriginals ? originalDescription || '原件随客户一同保存，重启后可下载；最多 9 份，单份不超过 10 MiB' : '浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径' }}</span>
       <input type="file" multiple class="sr-only" @change="handleFiles">
     </label>
 

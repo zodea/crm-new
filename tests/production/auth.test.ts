@@ -105,7 +105,7 @@ describe('单人正式访问保护', () => {
     expect((await request('/api/auth/login', { method: 'POST', body: { accessCode: `${code}-wrong` } })).status).toBe(401)
     const first = await login()
     const session = await (await request('/api/read/business-session', { cookie: first, headers: { 'x-actor-id': 'forged' } })).json()
-    expect(session).toEqual({ workspaceId: process.env.CRM_WORKSPACE_ID, actorId: 'only-owner', capabilities: ['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write'] })
+    expect(session).toEqual({ workspaceId: process.env.CRM_WORKSPACE_ID, actorId: 'only-owner', capabilities: ['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', 'project:list:read', 'project:write', 'project:original:write', 'project:lifecycle:write'] })
     const second = await login()
     expect((await request('/api/read/customers', { cookie: first })).status).toBe(401)
     expect((await request('/api/auth/logout', { method: 'POST', cookie: second })).status).toBe(200)
