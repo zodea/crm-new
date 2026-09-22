@@ -66,6 +66,19 @@ function uniqueSheetName(raw: string, used: Set<string>): string {
   return name
 }
 
+function sumAmounts(values: readonly (number | null)[]): number | null {
+  let cents = 0
+  for (const value of values) {
+    if (value === null || !Number.isFinite(value))
+      return null
+    const next = Math.round(value * 100)
+    if (!Number.isSafeInteger(next) || !Number.isSafeInteger(cents + next))
+      return null
+    cents += next
+  }
+  return cents / 100
+}
+
 function cycleFormulaDue(entries: PayrollWorkbookEntry[]): { value: number | null, basis: string } {
   if (!entries.length)
     return { value: null, basis: '没有可用冻结工资' }
@@ -74,10 +87,10 @@ function cycleFormulaDue(entries: PayrollWorkbookEntry[]): { value: number | nul
     const latest = [...aEntries].sort((left, right) => `${left.document.month}:${left.document.releasedAt}`.localeCompare(`${right.document.month}:${right.document.releasedAt}`)).at(-1)!
     const reconciliation = latest.document.adjustmentReconciliation?.effectiveCumulative
     return reconciliation
-      ? { value: reconciliation.state === 'known' ? reconciliation.value : null, basis: `A 最新冻结累计口径；${reconciliation.state}` }
-      : { value: latest.document.cumulativeAmount, basis: 'A 最新冻结累计应付，不逐月重复相加' }
+      ? { value: reconciliation.state === 'known' ? sumAmounts([reconciliation.value]) : null, basis: `A 最新冻结累计口径；${reconciliation.state}` }
+      : { value: sumAmounts([latest.document.cumulativeAmount]), basis: 'A 最新冻结累计应付，不逐月重复相加' }
   }
-  return { value: entries.reduce((sum, entry) => sum + entry.document.grossAmount, 0), basis: 'C1/C2 各独立期间核算应发合计' }
+  return { value: sumAmounts(entries.map(entry => entry.document.grossAmount)), basis: 'C1/C2 各独立期间核算应发合计' }
 }
 
 function actualRows(ledger: PayrollActualLedgerRead) {
@@ -95,13 +108,14 @@ function actualRows(ledger: PayrollActualLedgerRead) {
   }))
 }
 
-export function createPayrollCompleteWorkbook(group: PayrollWorkbookGroup, gaps: PayrollWorkbookGap[] = []): ExportFileOptions {
+function createWorkbook(group: PayrollWorkbookGroup, gaps: PayrollWorkbookGap[], mode: 'cycle' | 'month'): ExportFileOptions {
   if (!group.entries.length)
     throw new RangeError('完整工资工作簿至少需要一份可用冻结工资')
   const book = XLSX.utils.book_new()
-  const used = new Set<string>(['目录', '周期对账', '实际收付', '缺口清单'])
+  const reconciliationSheet = mode === 'month' ? '月度对账' : '周期对账'
+  const used = new Set<string>(['目录', reconciliationSheet, '实际收付', '缺口清单'])
   XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([[]]), '目录')
-  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([[]]), '周期对账')
+  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([[]]), reconciliationSheet)
   XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(actualRows(group.actualLedger)), '实际收付')
   XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(gaps.map(gap => ({ 工资身份: gap.statementId, 月份: gap.month, 格式: gap.formatFamily, 缺口: gap.reason }))), '缺口清单')
 
@@ -124,30 +138,40 @@ export function createPayrollCompleteWorkbook(group: PayrollWorkbookGroup, gaps:
       档位: periodLabel(entry.document),
       本单核算应发: entry.document.grossAmount,
       冻结实际发放: entry.document.actualAmount,
-      本单差额: entry.document.grossAmount - entry.document.actualAmount,
+      本单差额: sumAmounts([entry.document.grossAmount, -entry.document.actualAmount]),
       原表页签: sheetNames.join('、'),
     }
   })
   const complete = gaps.length === 0
-  const due = complete ? cycleFormulaDue(group.entries) : { value: null, basis: '所选范围存在冻结工资缺口，公式合计不可判定' }
-  const actual = group.actualLedger.netAmount.state === 'known' ? group.actualLedger.netAmount.value : null
+  const due = !complete
+    ? { value: null, basis: '所选范围存在冻结工资缺口，公式合计不可判定' }
+    : mode === 'month'
+      ? { value: sumAmounts(group.entries.map(entry => entry.document.grossAmount)), basis: '本月各张原单本次核算合计；不代表周期新增债务' }
+      : cycleFormulaDue(group.entries)
+  const actual = group.actualLedger.netAmount.state === 'known' ? sumAmounts([group.actualLedger.netAmount.value]) : null
+  const difference = due.value !== null && actual !== null ? sumAmounts([due.value, -actual]) : null
   book.Sheets['目录'] = XLSX.utils.json_to_sheet(directory)
-  book.Sheets['周期对账'] = XLSX.utils.json_to_sheet([{
+  book.Sheets[reconciliationSheet] = XLSX.utils.json_to_sheet([{
     输出范围: group.label,
     输出完整性: complete ? '完整' : '部分（存在冻结工资缺口）',
     工资份数: group.entries.length,
     公式应付: due.value,
     公式口径: due.basis,
     净实际: actual,
+    实际口径: '本册原工资范围的已确认收付净额，含可追溯后续补退',
     实际状态: group.actualLedger.netAmount.state,
-    差额: due.value !== null && actual !== null ? due.value - actual : null,
-    对账结论: due.value !== null && actual !== null ? '可计算' : '不可判定',
+    差额: difference,
+    对账结论: difference !== null ? '可计算' : '不可判定',
     正式编号: numberStatus,
     实名名册及照片: rosterStatus,
     缺口数量: gaps.length,
   }])
   const data = XLSX.write(book, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
   return { data, defaultName: `${safeSegment(group.label)}-${complete ? '完整' : '部分'}工资工作簿-编号待定.xlsx`, mimeType: XLSX_MIME }
+}
+
+export function createPayrollCompleteWorkbook(group: PayrollWorkbookGroup, gaps: PayrollWorkbookGap[] = []): ExportFileOptions {
+  return createWorkbook(group, gaps, 'cycle')
 }
 
 function archiveReadme(projectName: string, groups: PayrollWorkbookGroup[], gaps: PayrollWorkbookGap[]): string {
@@ -158,6 +182,7 @@ function archiveReadme(projectName: string, groups: PayrollWorkbookGroup[], gaps
     `- 正式编号：${numberStatus}。当前文件名使用稳定工资身份消歧，不冒充官方编号。`,
     `- 实名名册及证件原件：${rosterStatus}。`,
     '- 工资原表来自发放时冻结正文；A、C1、C2 分别保留原有工资/考勤/签工页签。',
+    '- 月度对账合计各张原单本次核算，不代表周期新增债务；净实际只取这些原单范围的已确认收付，包含可追溯的后续补退。A 的跨月累计只在负责人全周期一册按最新冻结依据计算。',
     '- 未知金额保持未知；缺失输出不会生成零值替代表。有冻结缺口的月份只生成“部分工资工作簿”，公式合计与对账结论保持不可判定。',
     '',
     '## 缺口',
@@ -173,7 +198,7 @@ export function createPayrollMonthlyArchive(projectName: string, groups: Payroll
     throw new RangeError('按月工资归档至少需要一份可用冻结工资')
   const files: ProjectArchiveZipFile[] = [{ path: '00-归档说明.md', data: new TextEncoder().encode(archiveReadme(projectName, groups, gaps)), mimeType: 'text/markdown;charset=utf-8' }]
   for (const group of groups) {
-    const output = createPayrollCompleteWorkbook(group, gaps.filter(gap => gap.month === group.key))
+    const output = createWorkbook(group, gaps.filter(gap => gap.month === group.key), 'month')
     if (typeof output.data === 'function' || typeof output.data === 'string')
       throw new TypeError('按月工作簿必须同步生成二进制正文')
     files.push({ path: `${safeSegment(group.key)}/${output.defaultName}`, data: bytes(output.data), mimeType: XLSX_MIME })

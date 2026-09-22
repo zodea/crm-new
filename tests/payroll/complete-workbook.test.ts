@@ -73,6 +73,67 @@ function zipEntries(data: Uint8Array): { name: string, data: Uint8Array }[] {
 }
 
 describe('完整工资工作簿与按月归档', () => {
+  it('按月合计各张 A 单本次核算，不拿全月最后一张累计代替多名负责人与管理簿', () => {
+    const documents = [
+      { ...payrollUiDocument(), id: 'ordinary-one', leaderName: '同名负责人', cumulativeAmount: 1600, previouslyPaid: 800, grossAmount: 800, actualAmount: 700 },
+      { ...payrollUiDocument(), id: 'ordinary-two', leaderName: '同名负责人', cumulativeAmount: 900, previouslyPaid: 600, grossAmount: 300, actualAmount: 250 },
+      { ...payrollUiDocument(), id: 'management-one', leaderName: '同名负责人', cumulativeAmount: 550, previouslyPaid: 350, grossAmount: 200, actualAmount: 180 },
+    ]
+    const entries = documents.map((document, index) => ({ row: row(document, { leaderWorkerId: index === 1 ? 'leader-two' : 'leader-one', book: index === 2 ? { bookPurpose: 'management' as const, managementBookId: 'management-one' } : { bookPurpose: 'ordinary' as const, managementBookId: null } }), document }))
+    const output = createPayrollMonthlyArchive('真实项目', [{ key: '2026-09', label: '真实项目-2026-09', entries, actualLedger: ledger(documents.map(document => document.id), 1130) }], [])
+    const files = zipEntries(output.data as Uint8Array)
+    const book = XLSX.read(files[1]!.data, { type: 'array' })
+    expect(XLSX.utils.sheet_to_json((book.Sheets.月度对账 ?? book.Sheets.周期对账)!)).toEqual([expect.objectContaining({ 公式应付: 1300, 净实际: 1130, 差额: 170, 公式口径: expect.stringContaining('各张原单本次核算') })])
+    expect(XLSX.utils.sheet_to_json(book.Sheets.目录!).map(item => (item as { 稳定工资身份: string }).稳定工资身份)).toEqual(['ordinary-one', 'ordinary-two', 'management-one'])
+    expect(book.SheetNames.filter(name => name.includes('发放汇总'))).toHaveLength(3)
+    expect(book.SheetNames).not.toContain('周期对账')
+  })
+
+  it('同一 A 的月核算与周期累计分别对账，混入 C1/C2 不改变 A 的月口径', () => {
+    const first = { ...payrollUiDocument(), id: 'a-first', month: '2026-08', cumulativeAmount: 1000, grossAmount: 1000, actualAmount: 800 }
+    const second = { ...payrollUiDocument(), id: 'a-second', month: '2026-09', cumulativeAmount: 1600, previouslyPaid: 800, grossAmount: 800, actualAmount: 700 }
+    const c1 = { ...c1Frozen(), id: 'c1-mixed', month: '2026-09', grossAmount: 0.1, actualAmount: 0.1 }
+    const c2 = { ...c2Frozen(), id: 'c2-mixed', month: '2026-09', grossAmount: 0.2, actualAmount: 0.2 }
+    const documents = [second, c1, c2]
+    const output = createPayrollMonthlyArchive('真实项目', [
+      { key: '2026-08', label: '真实项目-2026-08', entries: [{ row: row(first), document: first }], actualLedger: ledger(['a-first'], 800) },
+      { key: '2026-09', label: '真实项目-2026-09', entries: documents.map(document => ({ row: row(document), document })), actualLedger: ledger(documents.map(document => document.id), 700.3) },
+    ], [])
+    const files = zipEntries(output.data as Uint8Array)
+    const august = XLSX.read(files[1]!.data, { type: 'array' })
+    const september = XLSX.read(files[2]!.data, { type: 'array' })
+    expect(XLSX.utils.sheet_to_json(august.Sheets.月度对账!)).toEqual([expect.objectContaining({ 公式应付: 1000, 净实际: 800, 差额: 200 })])
+    expect(XLSX.utils.sheet_to_json(september.Sheets.月度对账!)).toEqual([expect.objectContaining({ 公式应付: 800.3, 净实际: 700.3, 差额: 100 })])
+    expect(new TextDecoder().decode(files[0]!.data)).toContain('不代表周期新增债务')
+  })
+
+  it('已知小数金额按分相加和相减，未知实际保持空值而非零', () => {
+    const first = { ...c1Frozen(), id: 'c1-first', grossAmount: 0.1, actualAmount: 0.1 }
+    const second = { ...c1Frozen(), id: 'c1-second', grossAmount: 0.2, actualAmount: 0.1 }
+    const group = { key: 'leader-c1', label: '负责人-C1', entries: [first, second].map(document => ({ row: row(document), document })), actualLedger: ledger(['c1-first', 'c1-second'], 0.2) }
+    const book = XLSX.read(createPayrollCompleteWorkbook(group).data, { type: 'array' })
+    expect(XLSX.utils.sheet_to_json(book.Sheets.周期对账!)).toEqual([expect.objectContaining({ 公式应付: 0.3, 净实际: 0.2, 差额: 0.1 })])
+    group.actualLedger.netAmount = { state: 'partial', value: null, knownValue: 0.1, reasons: ['一笔原实际金额待核'] }
+    const unknown = XLSX.read(createPayrollCompleteWorkbook(group).data, { type: 'array' })
+    expect(XLSX.utils.sheet_to_json(unknown.Sheets.周期对账!, { defval: null })).toEqual([expect.objectContaining({ 公式应付: 0.3, 净实际: null, 差额: null, 对账结论: '不可判定' })])
+  })
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])('不把不可用的历史公式金额 %s 算成零或可计算结论', (grossAmount) => {
+    const document = { ...c1Frozen(), grossAmount }
+    const output = createPayrollMonthlyArchive('真实项目', [{ key: document.month, label: '历史缺损月份', entries: [{ row: row(document), document }], actualLedger: ledger([document.id], document.actualAmount) }], [])
+    const file = zipEntries(output.data as Uint8Array)[1]!
+    const book = XLSX.read(file.data, { type: 'array' })
+    expect(XLSX.utils.sheet_to_json(book.Sheets.月度对账!, { defval: null })).toEqual([expect.objectContaining({ 公式应付: null, 差额: null, 对账结论: '不可判定' })])
+  })
+
+  it('公式与实际各自可表示但差额超出安全分值时，不宣称可计算', () => {
+    const amount = 50_000_000_000_000
+    const document = { ...c1Frozen(), grossAmount: amount }
+    const output = createPayrollCompleteWorkbook({ key: 'overflow', label: '差额超过安全分值', entries: [{ row: row(document), document }], actualLedger: ledger([document.id], -amount) })
+    const book = XLSX.read(output.data, { type: 'array' })
+    expect(XLSX.utils.sheet_to_json(book.Sheets.周期对账!, { defval: null })).toEqual([expect.objectContaining({ 公式应付: amount, 净实际: -amount, 差额: null, 对账结论: '不可判定' })])
+  })
+
   it('a 全周期用最新累计应付对账，不把 1000 与 1600 重复相加', () => {
     const first = { ...payrollUiDocument(), id: 'a-first', month: '2026-08', cumulativeAmount: 1000, grossAmount: 1000, actualAmount: 800 }
     const second = { ...payrollUiDocument(), id: 'a-second', month: '2026-09', cumulativeAmount: 1600, previouslyPaid: 800, grossAmount: 800, actualAmount: 700 }
@@ -97,7 +158,7 @@ describe('完整工资工作簿与按月归档', () => {
     expect(august.SheetNames).toEqual(expect.arrayContaining(['01_C1_工资表', '01_C1_考勤表']))
     expect(september.SheetNames).toEqual(expect.arrayContaining(['01_C2_工资表', '01_C2_签工表']))
     expect(september.SheetNames.some(name => name.includes('考勤'))).toBe(false)
-    expect(XLSX.utils.sheet_to_json(september.Sheets.周期对账!)).toEqual([expect.objectContaining({ 输出完整性: '部分（存在冻结工资缺口）', 公式口径: '所选范围存在冻结工资缺口，公式合计不可判定', 对账结论: '不可判定' })])
+    expect(XLSX.utils.sheet_to_json(september.Sheets.月度对账!)).toEqual([expect.objectContaining({ 输出完整性: '部分（存在冻结工资缺口）', 公式口径: '所选范围存在冻结工资缺口，公式合计不可判定', 对账结论: '不可判定' })])
     expect(new TextDecoder().decode(files[0]!.data)).toContain('实名名册及证件原件')
   })
 })
