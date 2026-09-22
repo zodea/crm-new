@@ -75,21 +75,21 @@ describe('runtime reference audit contract', () => {
 
     expect(committed).toEqual(ledger)
     expect(ledger.counts).toMatchObject({
-      trackedPageFiles: 160,
+      trackedPageFiles: 162,
       devPageFiles: 5,
-      productionRoutes: 155,
+      productionRoutes: 157,
       pageDomains: 20,
-      evidenceEndpointRecords: 155,
-      referenceEndpoints: 155,
-      referenceProfiles: 47,
-      usedReferenceProfiles: 41,
+      evidenceEndpointRecords: 157,
+      referenceEndpoints: 157,
+      referenceProfiles: 48,
+      usedReferenceProfiles: 42,
       directEvidenceRoutes: 54,
       adjacentEvidenceRoutes: 18,
-      localAuthorityRoutes: 39,
+      localAuthorityRoutes: 41,
       historicalEvidenceRoutes: 34,
       unverifiedTargetRoutes: 10,
     })
-    expect(ledger.endpoints).toHaveLength(155)
+    expect(ledger.endpoints).toHaveLength(157)
     expect(ledger.domains).toHaveLength(20)
 
     for (const endpoint of ledger.endpoints) {
@@ -183,13 +183,17 @@ describe('runtime reference audit contract', () => {
     const designPending = coverage.screenParity.filter((entry: { status: string }) => entry.status === 'design-pending')
 
     expect(status).toContain('> 核对日期：2026-08-25')
-    expect(status).toContain('| 实现页面文件（含 dev） | 160 |')
+    expect(status).toContain('| 实现页面文件（含 dev） | 162 |')
     expect(status).toContain('| 开发预览路由 | 5 |')
-    expect(status).toContain('| 实现生产路由（排除 dev） | 155 |')
+    expect(status).toContain('| 实现生产路由（排除 dev） | 157 |')
     expect(status).toContain('`/finance/payment/:id/detail`')
     expect(status).not.toMatch(/\| 已闭环 \|/)
 
     expect(designPending).toEqual([
+      expect.objectContaining({
+        appRoute: '/base/worker/private/:id',
+        issue: '#449',
+      }),
       expect.objectContaining({
         appRoute: '/contract/boq/building-evidence',
         issue: '#445',
@@ -251,6 +255,10 @@ describe('runtime reference audit contract', () => {
         issue: '#412',
       }),
       expect.objectContaining({
+        appRoute: '/subcontract/payroll/roster',
+        issue: '#449',
+      }),
+      expect.objectContaining({
         appRoute: '/subcontract/payroll/sources',
         issue: '#412',
       }),
@@ -292,10 +300,10 @@ describe('runtime reference audit contract', () => {
     expect(existsSync(AUDIT_PATH)).toBe(true)
 
     const endpoints = buildRuntimeEvidenceLedger().endpoints
-    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(155)
-    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(155)
-    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(155)
-    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(155)
+    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(157)
+    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(157)
+    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(157)
+    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(157)
   })
 
   it('records classification, evidence, differences and constraints for each route', () => {

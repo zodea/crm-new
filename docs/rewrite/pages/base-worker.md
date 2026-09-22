@@ -1,12 +1,12 @@
 # 基础信息 / 工人信息
 
-> 路由：`/base/worker`、`/base/worker/:id`、`/base/worker/form/:id?`
+> 路由：`/base/worker`、`/base/worker/:id`、`/base/worker/form/:id?`、`/base/worker/private/:id`；工资名册工作区 `/subcontract/payroll/roster`
 >
 > 页面：`app/pages/base/worker/`
 >
 > 数据模型：[`DATABASE.md`](../DATABASE.md)
 >
-> 状态：浏览器中央列表—详情—显式编辑与班组/项目/责任/工资/扣罚链已闭合；Tauri 保留本地路径 · 2026-08-23（#316）
+> 状态：浏览器中央列表—详情—显式编辑与班组/项目/责任/工资/扣罚链已闭合（#316）；独立私密资料与工资名册归档接入中央测试实例（#449，2026-09-22）。Tauri 保留本地路径。
 
 ## 定位
 
@@ -26,6 +26,9 @@
 - 所属班组、当前项目、责任单元、工资单、扣罚单和关联人员一律使用稳定 ID；同名实体保持独立。
 - 列表进入详情时携搜索、工种、排序、页码和来源行的安全 `returnTo`；工人与班组互跳，以及项目、责任单元、工资单、扣罚单下钻，均可返回原详情。
 - 浏览器中央附件边界尚未接入时不回退本地证书附件。Tauri 继续使用现有 SQLite 和 `file_refs`。
+- #449 的私密整页通过 `WorkerRosterRepository` 维护劳动合同事实和明确用途的证件照、银行卡照，原件复用中央 `file_refs/file_payloads`。普通证书附件没有因此获得自动识别用途或任意路径读取能力。
+- 私密整页和已有工人完整编辑表单要求 `worker:sensitive:read`；维护还要求 `worker:write`。普通列表/详情继续脱敏，默认工资权限不隐含私密资料权限。无权限时整页说明原因，不返回完整字段。
+- 工资名册只按同项目已发 A/C1/C2 的原冻结成员创建有独立登记日期的不可变版本；姓名、资料、劳动合同和照片均固定，并保留缺口。补充版本不是原工资发放时的原件。操作见 [Markdown 指南](../../guides/worker-roster-archive.md)。
 
 ## 真实关系
 

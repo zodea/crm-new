@@ -127,6 +127,8 @@ useTabTitle('工资台账')
         </NuxtLink>
         <NuxtLink :to="sources" class="btn-secondary">
           查看工资来源
+        </NuxtLink><NuxtLink v-if="scope.origin === 'real' && current?.context.capabilities.includes('worker:sensitive:read')" :to="{ path: '/subcontract/payroll/roster', query: { origin: 'real', project: scope.projectId } }" class="btn-secondary">
+          实名名册归档
         </NuxtLink><KitButton :disabled="loading" @click="load">
           刷新
         </KitButton>

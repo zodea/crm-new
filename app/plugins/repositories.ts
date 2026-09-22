@@ -48,8 +48,10 @@ import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http
 import { createSupplierCredentialRepository } from '~/lib/supplier/credential-repository'
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 import { createTargetCostRepository } from '~/lib/target-cost/central-repository'
+import { createWorkerRosterRepository } from '~/lib/worker-roster/repository'
 
 export interface DomainRepositories {
+  workerRoster: ReturnType<typeof createWorkerRosterRepository>
   payroll: ReturnType<typeof createPayrollRepository>
   targetCosts: ReturnType<typeof createTargetCostRepository>
   boqBuilding: ReturnType<typeof createBoqBuildingRepository>
@@ -84,6 +86,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    workerRoster: createWorkerRosterRepository((url, options) => $fetch<unknown>(url, { ...options, body: options?.body as Record<string, unknown> | undefined })),
     payroll: createPayrollRepository((url, options) => $fetch<unknown>(url, options)),
     targetCosts: createTargetCostRepository((url, options) => $fetch<unknown>(url, options)),
     boqBuilding: createBoqBuildingRepository((url, options) => $fetch<unknown>(url, options)),

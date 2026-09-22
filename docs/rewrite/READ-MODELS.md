@@ -597,3 +597,11 @@ Repository 的 `batchPreview` 经 `POST /api/read/payroll/batch-preview` 读取�
 `batch(query, planId)` 经 `GET /api/read/payroll/batch` 冷读当前协调状态。计划正文保留原确认项；`planVersion / state / nextItemIndex / expectedPayrollRevision` 反映当前进度。`ready` 可准备下一原单，`prepared` 表示原命令已经持久化且资金不可挪用，`needs-recheck` 要求重新核对，`complete` 表示所有非暂缓项已有原回执。计划或回执不能替代原工资详情、冻结输出和实际收付读取。
 
 `aRounding` 经 `GET /api/read/payroll/a-rounding` 返回固定 A 工资簿范围的全部追加修订、目标月有效修订及不可写原因。缺失、明确关闭和整百规则分别表达；后月修订不回写前月。
+
+## 工人私密资料与名册读取（#449）
+
+`WorkerRosterRepository` 提供 `profile(workerId)`、`preview(scope)`、`archives(projectId)`、`archive(projectId,archiveId)` 和 `file(input)`；对应 `/api/read/worker-roster/profile|preview|archives|archive|file`。预览采用 POST 正文 `{projectId,statementIds,registeredOn}`，不接收手填成员范围。全部私密读取需要 `worker:sensitive:read`，预览和名册读取同时需要 `payroll:read`。响应为 private/no-store；普通工人列表和详情不因新增接口取消遮盖。
+
+预览从可信工资冻结读取映射稳定工人身份，保留零成员、原姓名、负责人和工资来源；当前工人资料缺失仍保留成员并记录缺口。当前项目与合法进退场事实不足时登记日期的在场状态为 unknown。归档是独立日期的资料补充，返回固定成员、字段、劳动合同、照片元数据/摘要、资料版本和缺口；后续主档修改不补写旧归档。
+
+照片读取核对工人 owner、归档成员与该版照片引用、正文编码/长度/SHA-256；无归档参数只服务当前工人专门私密页面，仍须独立私密权限。客户端不提供路径，不以文件名判断归属。所有读取在最后异步等待后再次核验会话和权限，Repository 验证响应身份与选择范围。

@@ -31,10 +31,10 @@ describe('p6 limited delivery registration', () => {
     const byId = (id: string) => coverage.obligations.find(item => item.id === id)!
     expect(byId('WAGE-15')).toMatchObject({ status: 'current-passed' })
     expect(byId('WAGE-15').evidence).toContainEqual(expect.objectContaining({ reference: evidence, commit: productCommit, recency: 'current-run' }))
-    expect(byId('WAGE-15').remaining).toContain('local grill')
+    expect(byId('WAGE-15').remaining).toContain('逐单人工')
     expect(byId('WAGE-18')).toMatchObject({ status: 'partial' })
     expect(byId('WAGE-18').evidence).toContainEqual(expect.objectContaining({ reference: evidence, commit: productCommit }))
-    expect(byId('WAGE-18').remaining).toContain('P7')
+    expect(byId('WAGE-18').remaining).toContain('#479')
     for (const id of ['WAGE-16', 'WAGE-17']) {
       expect(byId(id).status).toBe('current-passed')
       expect(byId(id).evidence).toContainEqual(expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-batch-workbooks/README.md' }))
@@ -46,7 +46,7 @@ describe('p6 limited delivery registration', () => {
       expect(current.reviewEvidence).toContain(evidence)
       expect(current.obligationIds).toContain('WAGE-15')
     }
-    expect(coverage.counts).toMatchObject({ productionRoutes: 155, rootVariants: 211, surfaces: 757, environmentCases: 1227 })
+    expect(coverage.counts).toMatchObject({ productionRoutes: 157, rootVariants: 213, surfaces: 759, environmentCases: 1231 })
   })
 
   it('keeps #412 partial, renders P6 evidence and preserves the seven real business questions', () => {

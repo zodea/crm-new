@@ -18,6 +18,7 @@ import { assertQuantityHollowMigrationReferences } from './quantity-hollow-migra
 import { applyQuantityMigration, planQuantityMigration } from './quantity-migration'
 import { applyBudgetMigration, planBudgetMigration } from './target-cost-migration'
 import { applyWbsMigration, planWbsMigration, removeWbsMigration } from './wbs-migration'
+import { applyWorkerRosterMigration } from './worker-roster-migration'
 
 interface QuantityProjectSource {
   id: string
@@ -191,8 +192,9 @@ export function createQuantityTestInstance(options: Options) {
         const migrationLibraryIds = new Set(scope.authority === 'central' ? scope.entities.filter(row => row.entityType === 'process_libraries').map(row => row.id) : [])
         const removedLibraryIds = new Set([...state.migrationLibraryIds].filter(id => !migrationLibraryIds.has(id)))
         const affectedProjects = [...new Set([...plan.affectedProjects, ...wbs.affectedProjects])]
-        const prepared = affectedProjects.length || removedLibraryIds.size || budget.incoming.length || budget.removed.length || payroll.incoming.length || payroll.removed.length || removedProjectIds.size || removedPeople.crews.size || removedPeople.workers.size
+        const prepared = affectedProjects.length || removedLibraryIds.size || budget.incoming.length || budget.removed.length || payroll.incoming.length || payroll.removed.length || removedProjectIds.size || removedPeople.crews.size || removedPeople.workers.size || migrationPeople.workers.size
           ? await (await state.driver()).prepare(async (candidate) => {
+              await applyWorkerRosterMigration(candidate, scope, { projects: removedProjectIds, workers: removedPeople.workers, statements: new Set(payroll.removed.flatMap(row => row.mappings.filter(mapping => mapping.tableName === 'wage_statements' && mapping.centralId).map(mapping => mapping.centralId!))) })
               await assertPayrollMigrationRemoval(candidate, payroll, { projects: removedProjectIds, ...removedPeople, quantity: plan.removed.flatMap(row => row.identities) })
               await assertQuantityHollowMigrationReferences(candidate, { entityIds: plan.removed.map(row => row.entityId), projects: [...removedProjectIds], crews: [...removedPeople.crews], workers: [...removedPeople.workers], quantity: plan.removed.flatMap(row => row.identities) })
               await applyBudgetMigration(candidate, budget, removedProjectIds)

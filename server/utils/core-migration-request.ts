@@ -14,6 +14,7 @@ import {
   CORE_MIGRATION_TOPOLOGY,
   isCoreMigrationMoney,
 } from '../../app/lib/migration/core-contract'
+import { WORKER_ROSTER_SOURCE_ATTRIBUTE_KEYS } from '../../app/lib/migration/worker-roster-source'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 
 const ENTITY_KEYS = new Set<string>(CORE_MIGRATION_TOPOLOGY)
@@ -29,7 +30,7 @@ const ROW_KEYS = new Set(['legacyId', 'name', 'references', 'quantity', 'amount'
 const ATTRIBUTE_KEYS = new Set(['no', 'content', 'invoiceType', 'contactName', 'contactPhone', 'taxRate', 'signDate', 'mainTerms', 'paymentTerms', 'warrantyTerms', 'retentionRatio', 'retentionAmount', 'retentionDays', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note', 'actualCompletionDate', 'createdAt', 'updatedAt', 'laborScope'])
 const ATTRIBUTE_KEYS_BY_ENTITY: Partial<Record<CoreMigrationEntityType, ReadonlySet<string>>> = {
   crews: new Set([...ATTRIBUTE_KEYS, 'defaultPayRatio', 'rentSubsidyEnabled', 'rentSubsidyPrice', 'mgmtFeeEnabled', 'mgmtFeePrice']),
-  workers: new Set([...ATTRIBUTE_KEYS, 'dailyWage']),
+  workers: new Set([...ATTRIBUTE_KEYS, 'dailyWage', ...WORKER_ROSTER_SOURCE_ATTRIBUTE_KEYS]),
   supplier_credentials: new Set(['graphJson']),
   suppliers: new Set(['aliases', 'externalRef', 'uniqueCode', 'taxNo', 'businessType', 'supplierCategory', 'rating', 'legalRep', 'registeredCapital', 'registeredDate', 'address', 'taxpayerType', 'taxpayerVerificationStatus', 'taxpayerVerificationSource', 'taxpayerVerifiedAt', 'taxpayerVerificationNote', 'mainBusiness', 'laborScope', 'invoiceName', 'invoiceAddress', 'bank', 'bankAccount', 'phone', 'contact', 'contactPhone', 'contactTitle', 'note', 'approvalStatus', 'createdAt', 'updatedAt']),
   process_libraries: new Set(['graphJson']),
