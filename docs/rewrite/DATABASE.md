@@ -692,7 +692,7 @@ P7 的批量协调不建立第二套工资或现金账。`payroll_batch_plans` �
 
 `payroll_batch_command_receipts` 保存 `confirm-batch / prepare-batch-item / execute-batch-original` 的同键同文结果，并绑定工作区、经办人、项目和计划。批次确认不推进工资修订；准备只保留资金与命令且不改工资；执行调用原格式服务后，必须读到匹配原命令的正式回执才推进下一项。只有原服务明确返回 `commandOutcome=not-applied` 才可结束本次尝试并回到重新准备；未知结果保持 `prepared`。本批前项带来的唯一预期修订可继续，其他修订、依据变化、错回执或异常版本增量均停止为 `needs-recheck`。
 
-`payroll_a_rounding_revisions` 按项目、负责人、普通/管理工资簿及生效月追加保存 A 的 `off` 或向下整百规则；未配置与明确关闭不同。C1/C2 不读取 A 取整。当前尚未裁定自动分配尾差，建议必须保留未分配额并由经办人明确修改；正式编号和名册归档也不得借本表提前定案。
+`payroll_a_rounding_revisions` 按项目、负责人、普通/管理工资簿及生效月追加保存 A 的 `off` 或向下整百规则；未配置与明确关闭不同。C1/C2 不读取 A 取整。本表保存初分配置，批次最终自动用尽资金可突破整百，规则见[工资页面](./pages/subcontract-payroll.md)；建议不生成现金。排序使用既有簿身份，不改已固定批次正文，不借本表分配正式编号或保存名册。
 
 ### 工程量物理模型（#103）
 
