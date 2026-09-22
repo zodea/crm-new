@@ -105,9 +105,19 @@ export function decodePayrollBatchPreview(value: unknown, query: PayrollQuery, i
   }
   return value as unknown as PayrollBatchPreviewRead
 }
+function matchesPlanCommand(value: Record<string, unknown>, command?: PayrollBatchCommand): boolean {
+  if (!command)
+    return true
+  if (!object(value.context) || value.context.workspaceId !== command.workspaceId || value.context.actorId !== command.actorId || value.context.origin !== command.origin)
+    return false
+  // 计划的 commandId 固定为首次确认编号；准备/执行另有自己的幂等编号。
+  return command.action.kind === 'confirm-batch'
+    ? value.commandId === command.commandId && value.projectId === command.action.input.projectId && value.month === command.action.input.month
+    : value.planId === command.action.input.planId
+}
 export function decodePayrollBatchPlan(value: unknown, query: PayrollQuery, planId?: string, command?: PayrollBatchCommand): PayrollBatchPlanRead {
   if (!object(value) || value.schemaVersion !== 1 || !context(value.context, query) || !isStableRouteIdentity(value.planId) || (planId && value.planId !== planId)
-    || (command && value.commandId !== command.commandId) || !isStableRouteIdentity(value.commandId) || !isStableRouteIdentity(value.projectId)
+    || !matchesPlanCommand(value, command) || !isStableRouteIdentity(value.commandId) || !isStableRouteIdentity(value.projectId)
     || (query.projectId && value.projectId !== query.projectId) || !month(value.month) || (query.month && value.month !== query.month)
     || !['check', 'release'].includes(String(value.purpose)) || !nullableFen(value.fundingAmountFen) || !['ready', 'prepared', 'needs-recheck', 'complete', 'unavailable'].includes(String(value.state))
     || !(value.preparedExecuteCommandId === null || isStableRouteIdentity(value.preparedExecuteCommandId))

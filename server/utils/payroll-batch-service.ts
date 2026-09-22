@@ -38,6 +38,7 @@ interface BatchExecutors {
 
 interface Head { id: string, project_id: string, month: string, format_family: string, status: string, needs_recheck: number, checked_source_version: string, leader_worker_id: string }
 type StoredPlan = Omit<PayrollBatchPlanRead, 'context' | 'planVersion' | 'outcomes'>
+interface FundingPreviewItem { item: PayrollBatchPreviewItem, bookKey: string }
 
 function hash(value: unknown): string {
   return createHash('sha256').update(payrollCanonical(value)).digest('hex')
@@ -55,13 +56,14 @@ function formReasons(read: { eligibility: { canCheck: boolean, canRelease: boole
 }
 
 export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders, executors: BatchExecutors) {
-  async function previewItem(db: TransactionDb, context: PayrollWritableContext, source: PayrollIdentitySource, input: PayrollBatchPreviewInput, statementId: string): Promise<PayrollBatchPreviewItem> {
+  async function previewItem(db: TransactionDb, context: PayrollWritableContext, source: PayrollIdentitySource, input: PayrollBatchPreviewInput, statementId: string): Promise<FundingPreviewItem> {
     const [head] = await db.select<Head>('SELECT id,project_id,month,format_family,status,needs_recheck,checked_source_version,leader_worker_id FROM wage_statements WHERE id=?', [statementId])
     if (!head)
       throw payrollProblem('not-found', '批量工资包含不存在的原工资单')
     if (head.project_id !== input.projectId || head.month !== input.month || !['A', 'C1', 'C2'].includes(head.format_family))
       throw payrollProblem('relationship-mismatch', '批量工资必须属于同一项目、月份及 A/C1/C2 格式')
     const target = { itemId: statementId, statementId, formatFamily: head.format_family as 'A' | 'C1' | 'C2' }
+    let bookKey = payrollCanonical([head.project_id, head.leader_worker_id, target.formatFamily])
     let read: PayrollAFormRead | PayrollC1FormRead | PayrollC2FormRead
     let evidence: PayrollJsonObject
     let checkedBasisChanged = false
@@ -69,6 +71,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
     if (target.formatFamily === 'A') {
       read = await readers.A(db, context, source, { statementId })
       const book = hasPayrollAFeesForm(read) ? read.book : { bookPurpose: 'ordinary' as const, managementBookId: null }
+      bookKey = payrollCanonical([head.project_id, head.leader_worker_id, target.formatFamily, book?.bookPurpose ?? 'unknown', book?.managementBookId ?? null])
       if (book) {
         const configured = await readers.rounding(db, context, source, { projectId: input.projectId, leaderWorkerId: head.leader_worker_id, book, month: input.month })
         rounding = configured.current ? { state: 'configured', rule: configured.current.rule, revisionId: configured.current.id, revision: configured.current.revision, effectiveMonth: configured.current.effectiveMonth, sourceVersion: configured.current.sourceVersion } : { state: 'missing' }
@@ -96,17 +99,20 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
     const members = read.members.map(member => ({ workerId: member.id, workerName: member.name }))
     const { readSourceVersion: _readSourceVersion, ...basisEvidence } = evidence
     return {
-      target,
-      leaderWorkerId: head.leader_worker_id,
-      leaderName: source.workers.find(worker => worker.id === head.leader_worker_id)?.name ?? null,
-      members,
-      status: read.status,
-      needsRecheck: read.needsRecheck,
-      eligibleAmountFen,
-      requiresFullAmount: !!read.hollow?.snapshot?.start,
-      rounding,
-      basis: { basisHash: hash(basisEvidence), checkedSourceVersion: head.checked_source_version, evidence },
-      reasons,
+      bookKey,
+      item: {
+        target,
+        leaderWorkerId: head.leader_worker_id,
+        leaderName: source.workers.find(worker => worker.id === head.leader_worker_id)?.name ?? null,
+        members,
+        status: read.status,
+        needsRecheck: read.needsRecheck,
+        eligibleAmountFen,
+        requiresFullAmount: !!read.hollow?.snapshot?.start,
+        rounding,
+        basis: { basisHash: hash(basisEvidence), checkedSourceVersion: head.checked_source_version, evidence },
+        reasons,
+      },
     }
   }
 
@@ -121,11 +127,12 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
     else if (input.fundingAmountFen !== null) {
       throw payrollProblem('validation-failed', '批量核对不能夹带发放资金')
     }
-    const items: PayrollBatchPreviewItem[] = []
+    const prepared: FundingPreviewItem[] = []
     for (const statementId of input.statementIds)
-      items.push(await previewItem(db, context, source, input, statementId))
-    const funding = input.purpose === 'release' ? suggestPayrollBatchFunding({ fundingAmountFen: input.fundingAmountFen!, items: items.map(item => ({ itemId: item.target.itemId, formatFamily: item.target.formatFamily, eligibleAmountFen: item.eligibleAmountFen, rounding: item.rounding, requiresFullAmount: item.requiresFullAmount })) }) : null
-    const reasons = [...new Set(items.flatMap(item => item.reasons).concat(funding?.state === 'incomplete' ? funding.diagnostics : []))]
+      prepared.push(await previewItem(db, context, source, input, statementId))
+    const items = prepared.map(row => row.item)
+    const funding = input.purpose === 'release' ? suggestPayrollBatchFunding({ fundingAmountFen: input.fundingAmountFen!, items: prepared.map(({ item, bookKey }) => ({ itemId: item.target.itemId, bookKey, formatFamily: item.target.formatFamily, eligibleAmountFen: item.eligibleAmountFen, rounding: item.rounding, requiresFullAmount: item.requiresFullAmount })) }) : null
+    const reasons = [...new Set(items.flatMap(item => item.reasons).concat(funding?.diagnostics ?? []))]
     const previewVersion = hash({ input, items: items.map(item => ({ target: item.target, basis: item.basis, eligibleAmountFen: item.eligibleAmountFen, requiresFullAmount: item.requiresFullAmount, rounding: item.rounding })), funding })
     return { schemaVersion: 1, context: { ...context, readonly: !context.capabilities.includes('payroll:write'), sourceVersion: `${context.sourceVersion}+batch-preview:${previewVersion}` }, input, previewVersion, items, funding, reasons }
   }
@@ -277,7 +284,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
       if (item.decision.kind === 'defer')
         throw payrollProblem('conflict', '批量工资暂缓项不执行原工资命令')
       const previewInput: PayrollBatchPreviewInput = { purpose: plan.purpose, projectId: plan.projectId, month: plan.month, statementIds: [item.target.statementId], fundingAmountFen: plan.purpose === 'release' ? plan.fundingAmountFen : null }
-      const latest = await previewItem(db, context, source, previewInput, item.target.statementId)
+      const { item: latest } = await previewItem(db, context, source, previewInput, item.target.statementId)
       if (latest.basis.basisHash !== item.basis.basisHash)
         throw payrollProblem('stale-source', '当前原工资依据与批量确认时不同，请重新核对')
       validateDecision(latest, item.decision, previewInput)
