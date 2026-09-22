@@ -5,6 +5,7 @@ import { once } from 'node:events'
 import { createServer } from 'node:http'
 import * as h3 from 'h3'
 import { afterEach, expect, it, vi } from 'vitest'
+import { decodePayrollBatchPlan } from '../../app/lib/payroll/central-batch-codec'
 import { createPayrollRepository } from '../../app/lib/payroll/central-repository'
 import { createPayrollAServiceFixture, payrollAFact } from '../helpers/payroll-a-service-fixture'
 
@@ -73,6 +74,18 @@ it('batch HTTP/Repository roundtrip binds preview, identity and immutable plan w
     await expect(repo.executeBatch(changed)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     const malformed = await fetch(`${base}/api/commands/payroll-batch`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...command, unknown: true }) })
     expect(malformed.status).toBe(422)
+    const common = { schemaVersion: 1 as const, workspaceId: plan.context.workspaceId, actorId: plan.context.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const }
+    const prepared = await repo.executeBatch({ ...common, commandId: 'http-prepare', action: { kind: 'prepare-batch-item', input: { planId: plan.planId, planVersion: plan.planVersion, executeCommandId: 'http-execute' } } })
+    expect(prepared).toMatchObject({ commandId: command.commandId, planId: plan.planId, state: 'prepared' })
+    const execute = { ...common, commandId: 'http-execute', action: { kind: 'execute-batch-original' as const, input: { planId: plan.planId, planVersion: prepared.planVersion } } }
+    const completed = await repo.executeBatch(execute)
+    expect(completed).toMatchObject({ commandId: command.commandId, planId: plan.planId, state: 'complete' })
+    expect(completed.outcomes).toMatchObject([{ state: 'succeeded', actualAmountFen: 60_000 }])
+    expect(await repo.executeBatch(execute)).toEqual(completed)
+    expect(await repo.batch(query, plan.planId)).toEqual(completed)
+    expect(() => decodePayrollBatchPlan({ ...completed, planId: 'unrelated-plan' }, query, undefined, execute)).toThrow('批量工资计划回读不完整')
+    for (const context of [{ ...completed.context, actorId: 'other-actor' }, { ...completed.context, workspaceId: 'other-workspace' }])
+      expect(() => decodePayrollBatchPlan({ ...completed, context }, query, undefined, execute)).toThrow('批量工资计划回读不完整')
   }
   finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))

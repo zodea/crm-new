@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 160,
+    "trackedPageFiles": 163,
     "devPageFiles": 5,
-    "productionRoutes": 155,
+    "productionRoutes": 158,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 155,
-    "referenceEndpoints": 155,
-    "referenceProfiles": 47,
-    "usedReferenceProfiles": 41,
+    "evidenceEndpointRecords": 158,
+    "referenceEndpoints": 158,
+    "referenceProfiles": 49,
+    "usedReferenceProfiles": 43,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 39,
+    "localAuthorityRoutes": 42,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 10,
     "designCoveredRoutes": 135,
-    "designPendingRoutes": 20
+    "designPendingRoutes": 23
   },
   "domains": [
     {
@@ -47,7 +47,7 @@
     {
       "code": "master-data",
       "domain": "基础主数据",
-      "routeCount": 9,
+      "routeCount": 10,
       "implementationIssues": [
         407
       ],
@@ -232,7 +232,7 @@
     {
       "code": "quantity-payroll",
       "domain": "工程量与工资",
-      "routeCount": 25,
+      "routeCount": 27,
       "implementationIssues": [
         412
       ],
@@ -682,6 +682,99 @@
         "routeKey": "/base/worker/:id"
       },
       "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-29B2FAA32371",
+      "page": "app/pages/base/worker/private/[id].vue",
+      "localRoute": "/base/worker/private/:id",
+      "domainCode": "master-data",
+      "template": "整页表单",
+      "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
+        281,
+        316,
+        289
+      ],
+      "referenceProfile": "R-WORKER-ROSTER-LOCAL",
+      "referenceEndpointId": "worker-private-profile-unobserved",
+      "referenceEndpointLabel": "工人私密资料独立整页；外部目标未观察",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/base/worker/private/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/base/worker/private/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-21018885146D",
+      "page": "app/pages/subcontract/payroll/roster.vue",
+      "localRoute": "/subcontract/payroll/roster",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-WORKER-ROSTER-LOCAL",
+      "referenceEndpointId": "worker-payroll-roster-unobserved",
+      "referenceEndpointLabel": "工资实名名册独立归档；外部目标未观察",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/roster"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/roster"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-E30DD8727CF1",
+      "page": "app/pages/subcontract/payroll/issue/[id].vue",
+      "localRoute": "/subcontract/payroll/issue/:id",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-NUMBERING-LOCAL",
+      "referenceEndpointId": "payroll-official-numbering-unobserved",
+      "referenceEndpointLabel": "工资单份正式编号与出具整页；外部目标未观察",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/issue/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/issue/:id"
+      },
+      "constraints": "C-FORM"
     },
     {
       "evidenceRecordId": "E-837731197FB3",

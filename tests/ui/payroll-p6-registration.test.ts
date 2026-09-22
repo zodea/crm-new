@@ -46,7 +46,7 @@ describe('p6 limited delivery registration', () => {
       expect(current.reviewEvidence).toContain(evidence)
       expect(current.obligationIds).toContain('WAGE-15')
     }
-    expect(coverage.counts).toMatchObject({ productionRoutes: 155, rootVariants: 211, surfaces: 757, environmentCases: 1227 })
+    expect(coverage.counts).toMatchObject({ productionRoutes: 157, rootVariants: 213, surfaces: 759, environmentCases: 1231 })
   })
 
   it('keeps #412 partial, renders P6 evidence and preserves the seven real business questions', () => {

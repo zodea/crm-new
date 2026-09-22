@@ -62,6 +62,11 @@ function draftSnapshot() {
 function remember() {
   store.rememberDraft(props.context, props.projectId, props.month, draftSnapshot())
 }
+function fundingChanged() {
+  amounts.value = {}
+  allocations.value = {}
+  remember()
+}
 function initialize(read: PayrollBatchPreviewRead) {
   const restored = store.getDraft(props.context, props.projectId, props.month, selectedIds.value)
   decisions.value = {}
@@ -70,13 +75,13 @@ function initialize(read: PayrollBatchPreviewRead) {
   for (const item of read.items) {
     const suggestion = read.funding?.items.find(row => row.itemId === item.target.itemId)?.suggestedAmountFen ?? null
     const amount = restored?.amounts[item.target.itemId] ?? fenInput(suggestion)
-    decisions.value[item.target.itemId] = item.reasons.length || suggestion === null ? 'defer' : 'apply'
     amounts.value[item.target.itemId] = amount
     let amountFen = 0
     try {
       amountFen = amount ? parsePayrollBatchFundingFen(amount) : 0
     }
     catch { /* 保留可编辑草稿；固定计划时再给出明确字段错误。 */ }
+    decisions.value[item.target.itemId] = item.reasons.length || (purpose.value === 'release' && (suggestion === null || amountFen === 0)) ? 'defer' : 'apply'
     allocations.value[item.target.itemId] = Object.fromEntries(item.members.map((member, index) => [member.workerId, restored?.allocations[item.target.itemId]?.[member.workerId] ?? fenInput(index === 0 ? amountFen : 0)]))
   }
 }
@@ -180,7 +185,7 @@ watch(() => props.open, async (open) => {
       <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
         <section v-if="!plan" class="grid gap-3 sm:grid-cols-[180px_1fr_auto] sm:items-end">
           <label class="grid gap-1 text-12px">用途<select v-model="purpose" class="field-input" :disabled="busy || !!preview"><option value="release">批量发放</option><option value="check">批量核对</option></select></label>
-          <label v-if="purpose === 'release'" class="grid gap-1 text-12px">本期资金总额（元）<input v-model="fundingInput" class="field-input" inputmode="decimal" placeholder="0.00" :disabled="busy || !!preview" @input="remember"></label>
+          <label v-if="purpose === 'release'" class="grid gap-1 text-12px">本期资金总额（元）<input v-model="fundingInput" class="field-input" inputmode="decimal" placeholder="0.00" :disabled="busy || !!preview" @input="fundingChanged"></label>
           <KitButton :disabled="busy || !rows.length" @click="readPreview">
             {{ preview ? '重新预览' : '生成预览' }}
           </KitButton>
@@ -190,6 +195,9 @@ watch(() => props.open, async (open) => {
           <div v-if="preview.funding" class="grid gap-2 rounded-lg border border-line bg-surface-soft p-3 text-12px sm:grid-cols-4">
             <span>可发余额：{{ fenInput(preview.funding.eligibleTotalFen) || '未知' }} 元</span><span>建议合计：{{ fenInput(preview.funding.suggestedTotalFen) || '未知' }} 元</span><span>未分配：{{ fenInput(preview.funding.unallocatedFen) || '未知' }} 元</span><span>超出：{{ fenInput(preview.funding.overAllocatedFen) }} 元</span>
           </div>
+          <p v-if="preview.funding" class="text-12px text-ink-soft">
+            先安排可整单发放的工资，其余资金按比例分配到分。为用尽资金，最终建议可突破整百；未分到金额的工资默认暂缓。
+          </p>
           <p v-for="reason in preview.reasons" :key="reason" class="rounded-md bg-warning/10 px-3 py-2 text-12px text-warning-strong">
             {{ reason }}
           </p>

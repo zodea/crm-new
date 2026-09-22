@@ -31,7 +31,7 @@ export function migratedIdentityRecords<T extends { id: string, migrationBatchId
 }
 
 export function migratedIdentityDraft<T>(kind: MasterDataOwnerType, entity: CoreMigrationServerEntityDTO): T {
-  const { createdAt: _createdAt, updatedAt: _updatedAt, ...fields } = entity.attributes
+  const { createdAt: _createdAt, updatedAt: _updatedAt, workerOriginalJson: _workerOriginalJson, workerFilesJson: _workerFilesJson, ...fields } = entity.attributes
   const draft: Record<string, unknown> = { ...formDefaults(kind), ...fields, id: entity.id, name: entity.name }
   for (const key of ['aliases', 'capabilityTrades', 'capabilityItems']) {
     if (!(key in draft))
@@ -52,6 +52,8 @@ export function migratedIdentityDraft<T>(kind: MasterDataOwnerType, entity: Core
   if (kind === 'worker') {
     draft.crewId = entity.references.crewId ?? null
     draft.currentProjectId = entity.references.projectId ?? null
+    if ('safetyEducation' in fields)
+      draft.safetyEducation = fields.safetyEducation === 1
   }
   return draft as T
 }

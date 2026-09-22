@@ -14,7 +14,7 @@ import { subcontractContractCommandTestInstance } from '../../server/utils/subco
 import { supplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
 import { supplierReadTestInstance } from '../../server/utils/supplier-read-test-instance'
 
-const session = resolveBusinessSession()
+const session = { ...resolveBusinessSession(), capabilities: [...resolveBusinessSession().capabilities, 'worker:sensitive:read'] }
 beforeEach(async () => {
   await coreMigrationTestInstance.reset()
   projectCommandTestInstance.reset()

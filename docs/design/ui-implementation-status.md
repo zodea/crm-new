@@ -12,6 +12,8 @@
 
 ## 1. 口径
 
+2026-09-22 #477 已接通项目旧纸号起点登记、A/C1/C2 单份正式出具、原键恢复与同号 Excel/打印。五档视口、真实文件回读和两页产品打印已验证，服务/迁移 21 项及 UI/输出/恢复 7 项定向检查通过，见 [正式编号验收](./evidence/issue-477-official-numbering/README.md)。编号不改变原冻结金额和发放时间，不为旧八表猜补纸号；全册与月归档组合仍由 #479 验收，生产保存仍沿 ADR 0021 的实施票。
+
 2026-09-21 #412 工资 P7 已接通项目月多工资批量资金建议、不可变计划、A/C1/C2 逐单执行与原回执恢复，以及负责人全周期 XLSX 和项目按月 ZIP 归档。完整测试 792 文件、4335 项，生产构建、文件回读及五档空实例界面检查通过，见 [P7 限定验收记录](./evidence/issue-412-payroll-batch-workbooks/README.md)。自动尾差、正式编号接续和完整名册原件仍留 `$grill`；#412 跨模块完整成本和 #416 生产关口不因此完成。
 
 2026-09-14 #412 工资 P4 已接通独立核算更正、真实补发／退款、记账冲销及其纠错，后续工资可逐笔处理原更正差额；工人、班组、项目、付款工作台及目标成本预算读取同一实际收付事实。原工资 1000 → 更正 -100 → 实退 40 → 后月实发 940 并处理剩余 -60 的浏览器链已通过，原签收仍冻结为 1000／940。五档视口、迁入证明与原件、旧库兼容及验证轮次见 [P4 验收记录](./evidence/issue-412-payroll-adjustments/README.md)。产品已独立提交，完整 715 文件、4062 项检查与正常提交检查均通过；P5–P7 费用与完整工作簿以及生产保存继续待完成，指南默认提供 Markdown。
@@ -87,12 +89,12 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 160 |
+| 实现页面文件（含 dev） | 163 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 155 |
+| 实现生产路由（排除 dev） | 158 |
 | 实现侧栏叶子 | 51 |
 | 已覆盖 | 135 |
-| 待补设计（实现有、设计稿没有） | 20 |
+| 待补设计（实现有、设计稿没有） | 23 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
@@ -126,7 +128,7 @@
 | --- | ---: | --- |
 | 首页 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
 | 项目 | 3 | [#408](https://github.com/zodea/crm-new/issues/408) |
-| 基础主数据 | 9 | [#407](https://github.com/zodea/crm-new/issues/407) |
+| 基础主数据 | 10 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 分供方 | 4 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 项目分供方 | 2 | [#408](https://github.com/zodea/crm-new/issues/408) |
 | 核心合同 | 13 | [#409](https://github.com/zodea/crm-new/issues/409) |
@@ -140,7 +142,7 @@
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 25 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 工程量与工资 | 27 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |

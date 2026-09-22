@@ -6,6 +6,18 @@ export const SOURCE_INSPECTED_AT = '2026-09-10'
 const REFERENCE_MENU_OBSERVED_AT = '2026-09-08'
 
 export const ADAPTERS = {
+  'payroll-numbering-browser': {
+    read: '中央已证 A/C1/C2 原工资、项目序列与正式出具元数据',
+    write: '项目起点登记与首次正式出具；原键恢复、同原单保持原号',
+    storage: '中央验证实例与完整编号原图迁入；生产持久化沿 ADR 0021 实施票验收',
+    sources: [['app/lib/payroll/central-repository.ts', 'executeNumbering'], ['server/utils/payroll-numbering-service.ts', 'createPayrollNumberingService']],
+  },
+  'worker-roster-browser': {
+    read: '独立私密权限下的工人 owner 与已发工资成员名册；原件按冻结身份读取',
+    write: '工人资料追加版本、两类照片与有日期不可变归档；回执核对不保存浏览器私密正文',
+    storage: '中央工作区验证实例与受控原件迁入；生产持久化仍待 #416',
+    sources: [['app/lib/worker-roster/repository.ts', 'createWorkerRosterRepository'], ['server/utils/worker-roster-service.ts', 'createWorkerRosterService']],
+  },
   'central-http': {
     read: 'HTTP Repository；测试服务实例',
     write: '中央 command（仅已暴露动作；逐动作原子性/幂等/版本待核验）',
@@ -164,6 +176,10 @@ export const LOCAL_DOMAINS = new Set([
 export function resolveAdapter(surface, host) {
   const local = host === 'browser' ? 'browser-local' : 'desktop-sqlite'
   const { route, domain, mode, kind, variant } = surface
+  if (route === '/subcontract/payroll/issue/:id')
+    return host === 'browser' ? 'payroll-numbering-browser' : 'unsupported'
+  if (route === '/base/worker/private/:id' || route === '/subcontract/payroll/roster')
+    return host === 'browser' ? 'worker-roster-browser' : 'unsupported'
   if (route === '/settings/data-migration')
     return host === 'browser' ? 'migration-browser' : 'unsupported'
   if (route === '/export/config/:jobId')

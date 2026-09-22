@@ -2,7 +2,7 @@ import type { PayrollBatchFundingInput, PayrollBatchFundingItemInput, PayrollBat
 
 const MAX_SAFE_FEN = BigInt(Number.MAX_SAFE_INTEGER)
 const BIGINT_ZERO = BigInt(0)
-const BIGINT_TWO = BigInt(2)
+const BIGINT_ONE = BigInt(1)
 const BIGINT_HUNDRED = BigInt(100)
 
 function assertFen(value: number, label: string): void {
@@ -17,6 +17,8 @@ function safeFen(value: bigint, label: string): number {
 }
 
 function inputBlockers(item: PayrollBatchFundingItemInput): string[] {
+  if (typeof item.bookKey !== 'string' || !item.bookKey.trim())
+    throw new Error(`工资 ${item.itemId} 缺少稳定簿身份`)
   if (item.eligibleAmountFen === null)
     return ['当前未付应领仍未知']
   assertFen(item.eligibleAmountFen, `工资 ${item.itemId} 的当前未付应领`)
@@ -35,17 +37,42 @@ function inputBlockers(item: PayrollBatchFundingItemInput): string[] {
   return []
 }
 
-function roundedShare(item: PayrollBatchFundingItemInput, distributable: bigint, totalWeight: bigint): number {
-  const weight = BigInt(item.eligibleAmountFen!)
-  const numerator = distributable * weight
+function initialShare(item: PayrollBatchFundingItemInput, numerator: bigint, totalWeight: bigint): number {
   if (item.rounding.state === 'configured' && item.rounding.rule.kind === 'floor') {
     const step = BigInt(item.rounding.rule.stepFen)
     return safeFen((numerator / (totalWeight * step)) * step, `工资 ${item.itemId} 的建议金额`)
   }
-  return safeFen(
-    (BIGINT_TWO * numerator + totalWeight) / (BIGINT_TWO * totalWeight),
-    `工资 ${item.itemId} 的建议金额`,
-  )
+  return safeFen(numerator / totalWeight, `工资 ${item.itemId} 的初分金额`)
+}
+
+function stableOrder(left: PayrollBatchFundingItemInput, right: PayrollBatchFundingItemInput): number {
+  for (const key of ['bookKey', 'itemId'] as const) {
+    if (left[key] !== right[key])
+      return left[key] < right[key] ? -1 : 1
+  }
+  return 0
+}
+
+function allocateFlexible(items: PayrollBatchFundingItemSuggestion[], funding: bigint): void {
+  const totalWeight = items.reduce((total, item) => total + BigInt(item.eligibleAmountFen!), BIGINT_ZERO)
+  if (totalWeight === BIGINT_ZERO)
+    return
+  const distributable = funding < totalWeight ? funding : totalWeight
+  const shares = items.map((item) => {
+    const numerator = distributable * BigInt(item.eligibleAmountFen!)
+    item.exactSuggestedAmountFen = initialShare(item, numerator, totalWeight)
+    // 先补回各行与精确比例间的整分差，再按小数余数分尾；不会把整百差全给某一行。
+    item.suggestedAmountFen = safeFen(numerator / totalWeight, `工资 ${item.itemId} 的建议金额`)
+    return { item, remainder: numerator % totalWeight }
+  })
+  let remainder = distributable - items.reduce((total, item) => total + BigInt(item.suggestedAmountFen!), BIGINT_ZERO)
+  shares.sort((left, right) => left.remainder === right.remainder ? stableOrder(left.item, right.item) : left.remainder > right.remainder ? -1 : 1)
+  for (const { item } of shares) {
+    if (remainder === BIGINT_ZERO)
+      break
+    item.suggestedAmountFen! += 1
+    remainder -= BIGINT_ONE
+  }
 }
 
 export function parsePayrollBatchFundingFen(value: string): number {
@@ -83,35 +110,38 @@ export function suggestPayrollBatchFunding(input: PayrollBatchFundingInput): Pay
   const eligibleTotal = initial.reduce((total, row) => total + BigInt(row.item.eligibleAmountFen!), BIGINT_ZERO)
   const funding = BigInt(input.fundingAmountFen)
   const distributable = funding < eligibleTotal ? funding : eligibleTotal
-  const items: PayrollBatchFundingItemSuggestion[] = initial.map(({ item }) => {
-    const calculated = eligibleTotal === BIGINT_ZERO ? 0 : roundedShare(item, distributable, eligibleTotal)
-    const blockers: string[] = []
-    let suggestedAmountFen = calculated
-    if (item.requiresFullAmount && calculated !== item.eligibleAmountFen) {
-      blockers.push(`本单已启动空鼓扣款，只能明确整单发放 ${item.eligibleAmountFen} 分或暂不支付`)
-      suggestedAmountFen = 0
+  const items: PayrollBatchFundingItemSuggestion[] = initial.map(({ item }) => ({ ...item, exactSuggestedAmountFen: 0, suggestedAmountFen: 0, blockers: [] }))
+  let remaining = funding
+  const deferred: PayrollBatchFundingItemSuggestion[] = []
+  for (const item of items.filter(item => item.requiresFullAmount).sort(stableOrder)) {
+    const amount = BigInt(item.eligibleAmountFen!)
+    if (amount > remaining) {
+      deferred.push(item)
+      continue
     }
-    return { ...item, exactSuggestedAmountFen: calculated, suggestedAmountFen, blockers }
-  })
+    item.exactSuggestedAmountFen = item.eligibleAmountFen
+    item.suggestedAmountFen = item.eligibleAmountFen
+    remaining -= amount
+  }
+  allocateFlexible(items.filter(item => !item.requiresFullAmount), remaining)
   const suggestedTotal = items.reduce((total, item) => total + BigInt(item.suggestedAmountFen!), BIGINT_ZERO)
-  const overAllocated = suggestedTotal > funding ? suggestedTotal - funding : BIGINT_ZERO
-  const unallocated = overAllocated === BIGINT_ZERO ? funding - suggestedTotal : null
+  const unallocated = funding - suggestedTotal
   const diagnostics: string[] = []
-  if (overAllocated > BIGINT_ZERO)
-    diagnostics.push(`按分取整后的建议合计超过资金 ${overAllocated} 分，请经办人明确分配尾差`)
-  else if (unallocated! > BIGINT_ZERO)
-    diagnostics.push(`仍有 ${unallocated} 分未自动分配，请经办人明确调整`)
+  if (deferred.length)
+    diagnostics.push(`${deferred.length} 份工资因资金不足整单金额而暂缓，未生成部分发放建议`)
+  if (unallocated > BIGINT_ZERO)
+    diagnostics.push(deferred.length ? `保留 ${unallocated} 分：普通工资已到可发上限，余额不足暂缓工资的整单金额` : `保留 ${unallocated} 分：资金超过所选工资的可发上限`)
   if (eligibleTotal === BIGINT_ZERO)
     diagnostics.push('所选工资当前均无可发余额，不生成支付')
 
   return {
-    state: overAllocated > BIGINT_ZERO || items.some(item => item.blockers.length) ? 'blocked' : 'ready',
+    state: 'ready',
     fundingAmountFen: input.fundingAmountFen,
     eligibleTotalFen: safeFen(eligibleTotal, '可发余额合计'),
     distributableFen: safeFen(distributable, '可建议资金'),
     suggestedTotalFen: safeFen(suggestedTotal, '建议金额合计'),
-    unallocatedFen: unallocated === null ? null : safeFen(unallocated, '未分配资金'),
-    overAllocatedFen: safeFen(overAllocated, '超出资金'),
+    unallocatedFen: safeFen(unallocated, '未分配资金'),
+    overAllocatedFen: 0,
     items,
     diagnostics,
   }

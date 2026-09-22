@@ -31,7 +31,7 @@ export interface PayrollActualFact {
   allocations: PayrollActualAllocation[]
   allocationState: 'complete' | 'partial' | 'unknown'
   historicalMembers: Array<{ workerId: string, crewId: string | null, name: string | null }>
-  qualification: 'proven' | 'historical-amount-proven' | 'unproven'
+  qualification: 'proven' | 'scoped-amount-proven' | 'historical-amount-proven' | 'unproven'
   sourceVersion: string
   diagnostics: PayrollSourceDiagnostic[]
 }

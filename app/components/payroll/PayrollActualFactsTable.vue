@@ -5,6 +5,7 @@ import { payrollAmount } from '~/lib/payroll/read-presentation'
 
 defineProps<{ rows: PayrollActualFact[], origin: 'real' | 'demo', returnTo: string, writable?: boolean }>()
 const labels = { 'initial-release': '原工资发放', 'supplement': '实际补发', 'refund': '实际退款', 'recording-reversal': '错记冲销' }
+const qualificationLabels: Record<PayrollActualFact['qualification'], string> = { 'proven': '依据完整', 'scoped-amount-proven': '按原工资范围计入', 'historical-amount-proven': '仅历史整单金额可证明', 'unproven': '待核实' }
 </script>
 
 <template>
@@ -44,10 +45,15 @@ const labels = { 'initial-release': '原工资发放', 'supplement': '实际补�
             <p v-for="allocation in row.allocations" :key="allocation.workerId" class="break-words">
               {{ allocation.workerName || '姓名未记录' }}：{{ payrollAmount(allocation.amount) }}
             </p><p v-if="row.allocationState !== 'complete'" class="text-warn">
-              原个人分配未完整记录
+              {{ row.qualification === 'scoped-amount-proven' ? '各原工资的个人分配未完整记录' : '原个人分配未完整记录' }}
             </p>
           </td><td class="max-w-56 break-words p-2">
-            {{ row.qualification === 'proven' ? '依据完整' : row.qualification === 'historical-amount-proven' ? '仅历史整单金额可证明' : '待核实' }}
+            {{ qualificationLabels[row.qualification] }}
+            <template v-if="row.qualification === 'scoped-amount-proven'">
+              <p v-for="diagnostic in row.diagnostics" :key="diagnostic.code" class="mt-1 text-ink-soft">
+                {{ diagnostic.message }}
+              </p>
+            </template>
           </td><td class="p-2">
             <NuxtLink v-if="writable && origin === 'real' && row.qualification === 'proven'" :to="{ path: '/subcontract/payroll/payments/reversal/new', query: { origin, ...payrollActualRefQuery(row.ref), returnTo } }" class="link-brand">
               {{ row.kind === 'recording-reversal' ? '纠正这次错记冲销' : '核实错记冲销' }}

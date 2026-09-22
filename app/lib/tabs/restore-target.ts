@@ -11,10 +11,12 @@ import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { SCHEDULE_DRILL_QUERY_KEYS } from '~/lib/schedule/navigation'
 import { TARGET_COST_FILTER_KEYS, TARGET_COST_LIST_PATH, TARGET_COST_SOURCE_PATHS, TARGET_COST_SOURCE_QUERY_KEYS, targetCostSourceContext } from '~/lib/target-cost/navigation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
+import { rosterId } from '~/lib/worker-roster/validation'
 import { TAB_TARGET_VERSION } from './restoration-contract'
 import { readRestoredDetail } from './restore-detail'
 import { readRestoredPayrollNumbering } from './restore-payroll-numbering'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
+import { readRestoredWorkerRoster } from './restore-worker-roster'
 
 // 明确登记可恢复的阅读入口；导航树有链接不代表页面没有写态。
 const LISTS: Record<string, [string, string?]> = {
@@ -42,6 +44,7 @@ const LISTS: Record<string, [string, string?]> = {
   '/subcontract/payroll': ['工资台账', 'payroll:read'],
   '/subcontract/payroll/sources': ['工资来源', 'payroll:read'],
   '/subcontract/payroll/payments': ['工资实际收付', 'payroll:read'],
+  '/subcontract/payroll/roster': ['工资实名名册归档', 'worker:sensitive:read'],
   '/subcontract/attendance': ['考勤管理', 'payroll:read'],
   '/subcontract/daywork': ['签工管理', 'payroll:read'],
   '/material/requisition': ['下料单'],
@@ -81,6 +84,7 @@ export interface RestoredDetailPath {
 
 const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDetailPath]> = [
   [/^\/subcontract\/payroll\/issue\/([^/]+)$/, m => ({ family: 'payroll-numbering', id: m[1]! })],
+  [/^\/base\/worker\/private\/([^/]+)$/, m => ({ family: 'worker-private', id: m[1]! })],
   [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)\/hollow\/([^/]+)$/, m => ({ family: 'quantity-hollow', id: m[3]!, secondId: m[1]!, unitId: m[2]! })],
   [/^\/base\/supplier\/credential\/([^/]+)$/, m => ({ family: 'supplier-credential', id: m[1]! })],
   [/^\/schedule\/process-library\/([^/]+)$/, m => ({ family: 'process-library', id: m[1]! })],
@@ -142,7 +146,7 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
         ? isQuantitySourceIdentity(detail.id, 'units')
         : detail.family === 'quantity-hollow'
           ? isQuantitySourceIdentity(detail.id, 'quantity_hollow_records') && isQuantitySourceIdentity(detail.unitId, 'units')
-          : isStableRouteIdentity(detail.id)
+          : detail.family === 'worker-private' ? rosterId(detail.id) : isStableRouteIdentity(detail.id)
       if (!validDetailId || (detail.secondId != null && !isStableRouteIdentity(detail.secondId)))
         return null
     }
@@ -158,6 +162,14 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
       if (originValue !== 'real' || url.searchParams.getAll('project').length !== 1 || !isStableRouteIdentity(url.searchParams.get('project')))
         return null
       allowed.add('project')
+    }
+    if (detail?.family === 'worker-private' || url.pathname === '/subcontract/payroll/roster') {
+      if (originValue !== 'real' || (url.searchParams.has('project') && (url.searchParams.getAll('project').length !== 1 || !rosterId(url.searchParams.get('project')))))
+        return null
+      allowed.clear()
+      allowed.add('origin')
+      if (!detail)
+        allowed.add('project')
     }
     if (detail?.family === 'quantity-hollow') {
       if (origin !== 'real' || ['ownerKind', 'ownerId'].some(key => url.searchParams.has(key)))
@@ -301,9 +313,11 @@ export function createTabRestoreValidator(options: { repositories: DomainReposit
         return restoreProblem('mismatch')
       parsed.detail = { family: 'schedule-project', id }
     }
-    if (parsed.detail?.family === 'payroll-numbering') {
+    if (parsed.detail?.family === 'payroll-numbering' || parsed.detail?.family === 'worker-private' || parsed.url.pathname === '/subcontract/payroll/roster') {
       try {
-        return await readRestoredPayrollNumbering(options.repositories, parsed.inspected.fullPath, parsed.url.searchParams.get('project')!, parsed.detail.id, signal)
+        if (parsed.detail?.family === 'payroll-numbering')
+          return await readRestoredPayrollNumbering(options.repositories, parsed.inspected.fullPath, parsed.url.searchParams.get('project')!, parsed.detail.id, signal)
+        return await readRestoredWorkerRoster(options.repositories, parsed.inspected.fullPath, parsed.detail?.id ?? null, parsed.url.searchParams.get('project'), signal)
       }
       catch (cause) {
         checkRestoreAbort(signal)

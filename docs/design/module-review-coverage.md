@@ -4,7 +4,7 @@
 
 本索引负责防遗漏，不定义业务规格，也不是完成率。路由来源为 [运行证据账本](./runtime-evidence-ledger.json)；子视图和宿主接线来自实际源码。父路由的 direct/historical 等级不自动赋给子视图。逐场景规则、差异和验收继续写入 [模块复核规程](../agents/module-review.md) 指定的当前 Issue。
 
-现有 155 条生产路由展开为 211 个路由变体、757 个页面/子视图、1227 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
+现有 158 条生产路由展开为 214 个路由变体、760 个页面/子视图、1233 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
 
 实际记录见 [可机读清单](./module-review-coverage.json)：surfaces 保存 route + kind + variant + mode + path，cases 再按 browser/tauri 展开，分别保存读写适配器、参考范围、验收结果和剩余缺口。规则已定、前台通过、跨域通过、生产可用独立记录。#422 只登记材料合同浏览器列表已覆盖切片，整页仍为 partial；中央 Map、IndexedDB 刷新读回都没有生产可用结论。
 
@@ -77,6 +77,8 @@
 
 | 标识 | 读取 | 写入边界 | 实际存储/限制 |
 | --- | --- | --- | --- |
+| payroll-numbering-browser | 中央已证 A/C1/C2 原工资、项目序列与正式出具元数据 | 项目起点登记与首次正式出具；原键恢复、同原单保持原号 | 中央验证实例与完整编号原图迁入；生产持久化沿 ADR 0021 实施票验收 |
+| worker-roster-browser | 独立私密权限下的工人 owner 与已发工资成员名册；原件按冻结身份读取 | 工人资料追加版本、两类照片与有日期不可变归档；回执核对不保存浏览器私密正文 | 中央工作区验证实例与受控原件迁入；生产持久化仍待 #416 |
 | central-http | HTTP Repository；测试服务实例 | 中央 command（仅已暴露动作；逐动作原子性/幂等/版本待核验） | 中央测试实例；不具备进程重启持久化证据 |
 | browser-local | 本地 DB adapter：sql.js / IndexedDB 快照 | 本地 DB 事务；尚未接管的业务边界，不能冒充中央正式写入 | IndexedDB crm-new-browser / database_snapshots；文件正文须另验 |
 | desktop-sqlite | Tauri 本地 DB adapter | 现有桌面 SQLite 分支；本轮只核对既有能力 | sqlite:crm.db；桌面正式交付不在本轮扩展范围 |
@@ -245,6 +247,7 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/base/worker/:id` view | worker / default | section/WorkerDetailLaborFacts · WorkerDetailLaborFacts | 不适用 / desktop-sqlite | [app/components/worker/WorkerDetailScreen.vue](../../app/components/worker/WorkerDetailScreen.vue) |
 | `/base/worker/:id` view | worker / default | section/WorkerDetailAside · WorkerDetailAside | 不适用 / desktop-sqlite | [app/components/worker/WorkerDetailScreen.vue](../../app/components/worker/WorkerDetailScreen.vue) |
 | `/base/worker/:id` view | worker / default | central/p4/host-actual · host-actual | payroll-adjustment-central / 不适用 | [app/components/crew-worker/CrewWorkerCentralDetailScreen.vue](../../app/components/crew-worker/CrewWorkerCentralDetailScreen.vue) |
+| `/base/worker/private/:id` edit | worker / default | page · 整页表单 | worker-roster-browser / unsupported | [app/pages/base/worker/private/[id].vue](../../app/pages/base/worker/private/[id].vue) |
 | `/base/worker/form` new | worker / default | page · 整页表单 | central-http / desktop-sqlite | [app/pages/base/worker/form/[[id]].vue](../../app/pages/base/worker/form/[[id]].vue) |
 | `/base/worker/form/:id` edit | worker / default | page · 整页表单 | central-http / desktop-sqlite | [app/pages/base/worker/form/[[id]].vue](../../app/pages/base/worker/form/[[id]].vue) |
 | `/base/worker` view | worker / default | page · 列表 | central-http / desktop-sqlite | [app/pages/base/worker/index.vue](../../app/pages/base/worker/index.vue) |
@@ -714,6 +717,8 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 
 | 路由变体 / mode | kind / variant | 子视图 | browser / tauri | 源码 |
 | --- | --- | --- | --- | --- |
+| `/subcontract/payroll/roster` new | subcontract.payroll.roster / default | page · 整页表单 | worker-roster-browser / unsupported | [app/pages/subcontract/payroll/roster.vue](../../app/pages/subcontract/payroll/roster.vue) |
+| `/subcontract/payroll/issue/:id` edit | subcontract.payroll.issue / default | page · 整页表单 | payroll-numbering-browser / unsupported | [app/pages/subcontract/payroll/issue/[id].vue](../../app/pages/subcontract/payroll/issue/[id].vue) |
 | `/subcontract/attendance` view | subcontract.attendance / default | page · 工作台 | attendance-central-browser / desktop-sqlite | [app/pages/subcontract/attendance.vue](../../app/pages/subcontract/attendance.vue) |
 | `/subcontract/attendance` view | subcontract.attendance / default | central/scope · scope | attendance-central-browser / 不适用 | [app/components/payroll/CentralAttendanceScreen.vue](../../app/components/payroll/CentralAttendanceScreen.vue) |
 | `/subcontract/attendance` view | subcontract.attendance / default | central/matrix · matrix | attendance-central-browser / 不适用 | [app/components/payroll/CentralAttendanceScreen.vue](../../app/components/payroll/CentralAttendanceScreen.vue) |
