@@ -1,9 +1,9 @@
-import { productionCustomerRuntime, productionCustomerSession, throwProductionStorageError } from '../../utils/production-customer-runtime'
+import { productionRuntime, productionSession, throwProductionStorageError } from '../../utils/production-runtime'
 
 export default defineEventHandler(async (event) => {
   try {
-    productionCustomerSession(event)()
-    const runtime = productionCustomerRuntime()
+    productionSession(event)()
+    const runtime = productionRuntime()
     if (!runtime)
       throw createError({ statusCode: 503, statusMessage: 'Production storage is not configured' })
     return await runtime.storage.status()
