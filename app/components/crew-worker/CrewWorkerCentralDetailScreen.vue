@@ -106,6 +106,9 @@ onActivated(() => void load())
       <span v-if="detail" class="chip">{{ detail.dataOrigin === 'demo' ? '测试数据' : '正式数据' }}</span>
     </template>
     <template #actions>
+      <NuxtLink v-if="workerDetail?.dataOrigin === 'real' && workerDetail.capabilities.includes('worker:sensitive:read')" :to="`/base/worker/private/${encodeURIComponent(id)}?origin=real`" class="btn-secondary">
+        私密资料与照片
+      </NuxtLink>
       <NuxtLink v-if="canEdit" :to="editTo" class="btn-primary">
         <span class="i-lucide-square-pen mr-1" aria-hidden="true" />编辑
       </NuxtLink>

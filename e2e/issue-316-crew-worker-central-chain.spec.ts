@@ -55,6 +55,8 @@ test.describe('Issue #316：班组—工人中央关系链', () => {
     const sessionId = testSession(testInfo)
     await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId })
     await reset(page.context().request, sessionId)
+    const privateGrant = await page.request.post('/api/testing/worker-roster/access', { headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': sessionId }, data: { allowed: true } })
+    expect(privateGrant.ok()).toBe(true)
   })
   test.afterEach(async ({ page }, testInfo) => {
     await reset(page.context().request, testSession(testInfo))

@@ -48,6 +48,7 @@ import { readProcessLibraryMigrationGraphs } from './process-library-source'
 import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes } from './supplier-credential-source'
 import { readBudgetVersionMigrationGraphs } from './target-cost-source'
 import { readWbsMigrationGraphs } from './wbs-source'
+import { WORKER_ROSTER_SOURCE_SQL, workerRosterSourceAttributes } from './worker-roster-source'
 
 export interface CoreMigrationLocalSourceDependencies {
   isNative: () => boolean
@@ -802,11 +803,7 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
     ) owner_document
     ORDER BY kind, id
   `,
-  workers: `
-    SELECT id, name, crew_id, current_project_id, daily_wage, deleted_at
-    FROM workers
-    ORDER BY id
-  `,
+  workers: WORKER_ROSTER_SOURCE_SQL,
   project_suppliers: `
     SELECT id, project_id, supplier_id, deleted_at
     FROM project_suppliers
@@ -953,7 +950,7 @@ function sourceEntity(
       throw problem('unidentifiable-source-row', '本地工人日薪不是可确认的非负数值，不能以缺价或零代替')
     return {
       ...entity,
-      ...(dailyWage !== undefined ? { attributes: { dailyWage } } : {}),
+      attributes: { ...workerRosterSourceAttributes(row), ...(dailyWage !== undefined ? { dailyWage } : {}) },
       references: {
         crewId: nullableText(row.crew_id),
         projectId: nullableText(row.current_project_id),

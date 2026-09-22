@@ -30,7 +30,8 @@ it('真实工人日薪经受控网络保 NULL/0/481，旧缺字段不补价且�
     expect(before.rows.map(row => [row.workerId, row.dailyWage, row.dailyWageState])).toEqual([['c1-null', null, 'null'], ['c1-worker', 481, 'value'], ['c1-zero', 0, 'value'], ['c1-missing', null, 'missing']])
     expect(before.rows.find(row => row.workerId === 'c1-worker')).toMatchObject({ currentProjectId: 'c1-project', crewId: 'c1-crew-current' })
     expect(owner.payrollWorkerFacts('another-session').rows).toEqual([])
-    const session = { workspaceId: request.workspaceId, actorId: request.actorId, capabilities: [WORKER_WRITE_CAPABILITY] }
+    const session = { workspaceId: request.workspaceId, actorId: request.actorId, capabilities: [WORKER_WRITE_CAPABILITY, 'worker:sensitive:read'] }
+    expect(() => owner.workerForm('c1-missing', { ...session, capabilities: [WORKER_WRITE_CAPABILITY] })).toThrow('私密')
     const form = owner.workerForm('c1-missing', session)
     await owner.executeWorker({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: WORKER_WRITE_CAPABILITY, commandId: 'set-worker-wage', id: 'c1-missing', baseVersion: form.version, action: 'draft', draft: { ...form.draft, dailyWage: 0 }, attachments: {} }, session)
     const changed = owner.payrollWorkerFacts()

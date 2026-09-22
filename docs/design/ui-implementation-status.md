@@ -87,12 +87,12 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 160 |
+| 实现页面文件（含 dev） | 162 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 155 |
+| 实现生产路由（排除 dev） | 157 |
 | 实现侧栏叶子 | 51 |
 | 已覆盖 | 135 |
-| 待补设计（实现有、设计稿没有） | 20 |
+| 待补设计（实现有、设计稿没有） | 22 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
@@ -126,7 +126,7 @@
 | --- | ---: | --- |
 | 首页 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
 | 项目 | 3 | [#408](https://github.com/zodea/crm-new/issues/408) |
-| 基础主数据 | 9 | [#407](https://github.com/zodea/crm-new/issues/407) |
+| 基础主数据 | 10 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 分供方 | 4 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 项目分供方 | 2 | [#408](https://github.com/zodea/crm-new/issues/408) |
 | 核心合同 | 13 | [#409](https://github.com/zodea/crm-new/issues/409) |
@@ -140,7 +140,7 @@
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 25 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 工程量与工资 | 26 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |

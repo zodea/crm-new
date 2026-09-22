@@ -37,6 +37,8 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
   { test: p => p.startsWith('/base/crew/form'), title: '班组表单', subtitle: '核算配置 · 合作协议' },
   { test: p => /^\/base\/crew\/[^/]+/.test(p), title: '班组详情', subtitle: '基本信息 · 工人配置 · 分项单价' },
   { test: p => p.startsWith('/base/crew'), title: '班组管理', subtitle: '全局核算单元 · 跨项目复用' },
+  { test: p => p.startsWith('/base/worker/private'), title: '工人私密资料', subtitle: '实名 · 劳动合同 · 照片原件' },
+  { test: p => p === '/subcontract/payroll/roster', title: '工资实名名册归档', subtitle: '原工资成员 · 资料登记日期 · 不可变版本' },
   { test: p => p.startsWith('/base/worker/form'), title: '工人表单', subtitle: '人员档案 · 项目分配 · 证书' },
   { test: p => /^\/base\/worker\/[^/]+/.test(p), title: '工人详情', subtitle: '档案 · 证书 · 亲属关联' },
   { test: p => p.startsWith('/base/worker'), title: '工人信息', subtitle: '人员管理' },
