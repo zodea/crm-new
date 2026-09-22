@@ -6,7 +6,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 import { backup, DatabaseSync } from 'node:sqlite'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
-import { PRODUCTION_PARTICIPANTS, PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES, PRODUCTION_STORAGE_VERSION, productionParticipantVersions } from './production-storage-schema'
+import { PRODUCTION_PARTICIPANTS, PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES, PRODUCTION_STORAGE_VERSION, productionParticipantVersions, productionStorageManifest } from './production-storage-schema'
 
 export interface ProductionStorageOptions {
   directory: string
@@ -40,6 +40,10 @@ function verifyParticipants(db: DatabaseSync, version: number) {
   const actual = db.prepare('SELECT domain,schema_version FROM production_participants').all()
   if (actual.length !== Object.keys(expected).length || actual.some(row => typeof row.domain !== 'string' || expected[row.domain] !== row.schema_version))
     invalid('正式数据库参与者清单或领域版本不兼容；不能把缺少的领域当作空库。')
+  const manifest = productionStorageManifest(version)
+  const tables = new Set(db.prepare('SELECT name FROM sqlite_schema WHERE type=\'table\'').all().map(row => row.name))
+  if ([...manifest.coreTables, ...Object.values(manifest.participants).flatMap(participant => participant.tables)].some(table => !tables.has(table)))
+    invalid('正式数据库缺少已登记领域的业务表；停止读取和升级。')
 }
 
 async function backupTo(db: DatabaseSync, source: string, destination: string): Promise<void> {
