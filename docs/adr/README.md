@@ -26,6 +26,7 @@ ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用�
 | [0018](./0018-versioned-schedule-process-library.md) | 标准工序库采用不可变版本与可恢复的前置关系 | 已采纳并已落地 |
 | [0019](./0019-delivery-export-source-preservation.md) | 送货单导出的原件保真与可选转换 | 已采纳；部分能力已落地，未完成项由当前文件流程复核承接 |
 | [0020](./0020-browser-authority-and-demo-workspace-boundary.md) | 浏览器中央权威与演示工作区隔离 | 已采纳；已有中央功能切片，生产持久化另经后置关口验收 |
+| [0021](./0021-single-operator-windows-production-storage.md) | 单人 Windows 正式存储与可验证备份 | 已采纳；实施和实际上线验收待完成 |
 
 ## 写作边界
 

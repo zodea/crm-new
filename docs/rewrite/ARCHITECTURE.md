@@ -4,6 +4,8 @@
 
 当前工作按[全模块复核路线](https://github.com/zodea/crm-new/issues/402)与[模块复核规程](../agents/module-review.md)逐模块推进，前台界面、交互和数据处理优先；可靠持久化、备份恢复与部署由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。顺序调整不撤销 ADR 0020，不开放本地正式写入旁路，也不把完整账号/RBAC、审批引擎或 Tauri 正式交付加入当前范围。
 
+首期单人本机的持久库、身份入口与备份恢复方案已由 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)裁定，具体执行见[生产子票入口](../implementation/production-gate-work-breakdown.md)。方案定稿与下述现有代码状态分别阅读；只有 [#471 最终上线验收](https://github.com/zodea/crm-new/issues/471)通过后才可宣称该范围正式可用。
+
 ## 1. 运行形态
 
 ```text
