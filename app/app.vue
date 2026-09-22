@@ -71,23 +71,26 @@ function pageKey(r: { fullPath: string }) {
 </script>
 
 <template>
-  <SidebarProvider>
-    <AppSidebar />
-    <SidebarInset class="h-svh overflow-hidden">
-      <AppTopbar />
-      <AppTabBar />
-      <TabRestoreStatus />
-      <!-- 主区滚动容器；密集表格在各自区域内横向滚动。 -->
-      <div
-        ref="scrollEl"
-        data-shell-workspace
-        class="shell-workspace min-h-0 flex-1 overflow-y-auto bg-[var(--shell-workspace-bg)]"
-      >
-        <NuxtPage :page-key="pageKey" :keepalive="keepAliveOptions" />
-      </div>
-    </SidebarInset>
-    <KitUIHost />
-  </SidebarProvider>
+  <ProductionAccessGate>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset class="h-svh overflow-hidden">
+        <AppTopbar />
+        <ProductionOwnerBar />
+        <AppTabBar />
+        <TabRestoreStatus />
+        <!-- 主区滚动容器；密集表格在各自区域内横向滚动。 -->
+        <div
+          ref="scrollEl"
+          data-shell-workspace
+          class="shell-workspace min-h-0 flex-1 overflow-y-auto bg-[var(--shell-workspace-bg)]"
+        >
+          <NuxtPage :page-key="pageKey" :keepalive="keepAliveOptions" />
+        </div>
+      </SidebarInset>
+      <KitUIHost />
+    </SidebarProvider>
+  </ProductionAccessGate>
 </template>
 
 <style scoped>

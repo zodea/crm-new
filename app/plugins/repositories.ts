@@ -22,8 +22,10 @@ import { createHttpConstructionContractCommandRepository } from '~/lib/construct
 import { createHttpConstructionContractReadRepository } from '~/lib/construction-contract/http-repository'
 import { createHttpCrewWorkerCommandRepository } from '~/lib/crew-worker/command-http-repository'
 import { createHttpCrewWorkerReadRepository } from '~/lib/crew-worker/http-repository'
+import { createProductionAccessRepository } from '~/lib/customer/access-repository'
 import { createHttpCustomerCommandRepository } from '~/lib/customer/command-http-repository'
 import { createHttpCustomerReadRepository } from '~/lib/customer/http-repository'
+import { createCustomerProductionRepository } from '~/lib/customer/production-repository'
 import { createDeliveryRepository } from '~/lib/delivery-record/repository'
 import { createHttpMaterialContractCommandRepository } from '~/lib/material-contract/command-http-repository'
 import { createHttpMaterialContractReadRepository } from '~/lib/material-contract/http-repository'
@@ -51,6 +53,8 @@ import { createTargetCostRepository } from '~/lib/target-cost/central-repository
 import { createWorkerRosterRepository } from '~/lib/worker-roster/repository'
 
 export interface DomainRepositories {
+  productionAccess: ReturnType<typeof createProductionAccessRepository>
+  customerProduction: ReturnType<typeof createCustomerProductionRepository>
   workerRoster: ReturnType<typeof createWorkerRosterRepository>
   payroll: ReturnType<typeof createPayrollRepository>
   targetCosts: ReturnType<typeof createTargetCostRepository>
@@ -86,6 +90,8 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    productionAccess: createProductionAccessRepository((url, options) => $fetch<unknown>(url, { ...options, timeout: 10_000, retry: 0 })),
+    customerProduction: createCustomerProductionRepository((url, options) => $fetch<unknown>(url, options), url => $fetch<Blob>(url, { responseType: 'blob' })),
     workerRoster: createWorkerRosterRepository((url, options) => $fetch<unknown>(url, { ...options, body: options?.body as Record<string, unknown> | undefined })),
     payroll: createPayrollRepository((url, options) => $fetch<unknown>(url, options)),
     targetCosts: createTargetCostRepository((url, options) => $fetch<unknown>(url, options)),
