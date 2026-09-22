@@ -3,6 +3,7 @@
 // subtitle 口径对齐 DC 设计稿 app.dc.html PAGE 词条（顶栏第二行）。
 
 const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[] = [
+  { test: p => /^\/subcontract\/payroll\/issue\/[^/]+/.test(p), title: '正式工资出具', subtitle: '冻结预览 · 正式编号 · 原件输出' },
   {
     test: p => /^\/export\/config\/[^/]+\/?$/.test(p),
     title: '导出配置',

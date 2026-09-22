@@ -13,6 +13,7 @@ import { TARGET_COST_FILTER_KEYS, TARGET_COST_LIST_PATH, TARGET_COST_SOURCE_PATH
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { TAB_TARGET_VERSION } from './restoration-contract'
 import { readRestoredDetail } from './restore-detail'
+import { readRestoredPayrollNumbering } from './restore-payroll-numbering'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
 
 // 明确登记可恢复的阅读入口；导航树有链接不代表页面没有写态。
@@ -79,6 +80,7 @@ export interface RestoredDetailPath {
 }
 
 const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDetailPath]> = [
+  [/^\/subcontract\/payroll\/issue\/([^/]+)$/, m => ({ family: 'payroll-numbering', id: m[1]! })],
   [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)\/hollow\/([^/]+)$/, m => ({ family: 'quantity-hollow', id: m[3]!, secondId: m[1]!, unitId: m[2]! })],
   [/^\/base\/supplier\/credential\/([^/]+)$/, m => ({ family: 'supplier-credential', id: m[1]! })],
   [/^\/schedule\/process-library\/([^/]+)$/, m => ({ family: 'process-library', id: m[1]! })],
@@ -152,6 +154,11 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
+    if (detail?.family === 'payroll-numbering') {
+      if (originValue !== 'real' || url.searchParams.getAll('project').length !== 1 || !isStableRouteIdentity(url.searchParams.get('project')))
+        return null
+      allowed.add('project')
+    }
     if (detail?.family === 'quantity-hollow') {
       if (origin !== 'real' || ['ownerKind', 'ownerId'].some(key => url.searchParams.has(key)))
         return null
@@ -293,6 +300,16 @@ export function createTabRestoreValidator(options: { repositories: DomainReposit
       if (!isStableRouteIdentity(id) || parsed.url.searchParams.getAll('project').length !== 1)
         return restoreProblem('mismatch')
       parsed.detail = { family: 'schedule-project', id }
+    }
+    if (parsed.detail?.family === 'payroll-numbering') {
+      try {
+        return await readRestoredPayrollNumbering(options.repositories, parsed.inspected.fullPath, parsed.url.searchParams.get('project')!, parsed.detail.id, signal)
+      }
+      catch (cause) {
+        checkRestoreAbort(signal)
+        const code = (cause as { problem?: { code?: string } })?.problem?.code
+        return restoreProblem(code === 'forbidden' ? 'forbidden' : code === 'not-found' ? 'not-found' : 'error')
+      }
     }
     if (!parsed.detail) {
       const [title, capability] = LISTS[parsed.url.pathname]!

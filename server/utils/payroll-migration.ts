@@ -2,6 +2,7 @@ import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { PayrollMigrationPart, PayrollMigrationRow, PayrollProjectGraph } from '../../app/lib/migration/payroll-source'
 import type { PayrollDiagnostic, PayrollIdentityMapping } from '../../app/lib/payroll/central-contract'
+import type { PayrollNumberingDocument } from '../../app/lib/payroll/central-numbering-contract'
 import type { PayrollExclusionGraph } from '../../app/lib/payroll/central-source-locks'
 import type { QuantityMigrationIdentity } from '../../app/lib/quantity/migration-mapping'
 import { createHash } from 'node:crypto'
@@ -10,22 +11,27 @@ import { parsePayrollProjectGraph, PAYROLL_MIGRATION_COLUMNS, PAYROLL_MIGRATION_
 import { PAYROLL_A_FEES_MIGRATION_TABLES, payrollAFeesPrimaryKey } from '../../app/lib/payroll/central-a-fees-schema'
 import { initializePayrollBatchSchema } from '../../app/lib/payroll/central-batch-schema'
 import { PAYROLL_HOLLOW_DEDUCTION_TABLES } from '../../app/lib/payroll/central-hollow-deduction-schema'
+import { PAYROLL_NUMBERING_TABLES } from '../../app/lib/payroll/central-numbering-schema'
 import { loadPayrollGraph } from '../../app/lib/payroll/central-read'
 import { advancePayrollRevision, initializePayrollSchema } from '../../app/lib/payroll/central-schema'
 import { payrollDayworkOccupationsFromGraph, payrollSourceExclusionsFromGraph } from '../../app/lib/payroll/central-source-locks'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { parseQuantityMigrationGraph } from '../../app/lib/quantity/migration-graph'
 import { payrollAMigrationReferences } from './payroll-a-migration-references'
+import { loadPayrollAReleasedWithMigration } from './payroll-a-released-with-migration'
 import { payrollAdjustmentMigrationReferences } from './payroll-adjustment-migration-references'
 import { payrollC1MigrationReferences } from './payroll-c1-migration-references'
 import { payrollC2MigrationReferences } from './payroll-c2-migration-references'
+import { loadPayrollC1ReleasedWithMigration, loadPayrollC2ReleasedWithMigration } from './payroll-c-released-with-migration'
 import { insertPayrollCentralMigrationGraph, mapPayrollCentralMigrationGraph, payrollCentralGraphFingerprint, payrollCentralGraphKeys, payrollIndependentReferenceReader, readPayrollCentralMigrationRows, removePayrollCentralMigrationGraph } from './payroll-central-migration'
 import { insertPayrollFeesMigrationGraph, mapPayrollFeesMigrationGraph, payrollFeesGraphFingerprint, payrollFeesGraphKeys, readPayrollFeesMigrationRows, removePayrollFeesMigrationGraph } from './payroll-fees-migration'
 import { payrollFeesMigrationReferences } from './payroll-fees-migration-references'
 import { provePayrollHollowMigrationSource } from './payroll-hollow-migrated-source'
 import { insertPayrollHollowMigrationRows, mapPayrollHollowMigrationGraph, payrollHollowGraphFingerprint, payrollHollowGraphKeys, readPayrollHollowMigrationRows, removePayrollHollowMigrationRows } from './payroll-hollow-migration'
 import { payrollHollowMigrationReferences } from './payroll-hollow-migration-references'
-import { withPayrollMigratedSource } from './payroll-migrated-proof'
+import { loadPayrollMigratedProof, withPayrollMigratedSource } from './payroll-migrated-proof'
+import { provePayrollNumberingState } from './payroll-numbering-facts'
+import { insertPayrollNumberingMigrationRows, mapPayrollNumberingMigrationGraph, payrollNumberingGraphFingerprint, payrollNumberingGraphKeys, payrollNumberingMigrationReferences, readPayrollNumberingMigrationRows, removePayrollNumberingMigrationRows } from './payroll-numbering-migration'
 
 export interface ImportedPayrollProject {
   entityId: string
@@ -232,6 +238,10 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
       graph.schemaVersion = 4
       graph.deductions = mapPayrollHollowMigrationGraph(source.deductions, entity.id, mapping, quantityEntity && quantitySource?.version === 2 ? { namespace: quantityEntity.id, original: quantitySource.hollow } : undefined)
     }
+    if (source.numbering) {
+      graph.schemaVersion = 5
+      graph.numbering = mapPayrollNumberingMigrationGraph(source.numbering, entity.id, mapping)
+    }
     graph.logs = source.logs.map(row => ({ ...row, id: mapping.get(key('operation_logs', row.id))!.centralId!, record_id: mapping.get(key(String(row.table_name), row.record_id))?.centralId ?? `payroll-report-record:${entity.id}:${String(row.table_name)}:${encodeURIComponent(String(row.record_id))}` }))
     const mappings = [...mapping.values()]
     const fingerprint = createHash('sha256').update(JSON.stringify([source, mappings])).digest('hex')
@@ -247,7 +257,7 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
 }
 
 function graphFingerprint(graph: PayrollProjectGraph) {
-  return JSON.stringify([PAYROLL_MIGRATION_PARTS.map(part => graph[part].toSorted((a, b) => String(a.id).localeCompare(String(b.id))).map(row => PAYROLL_MIGRATION_COLUMNS[part].map(field => row[field]))), payrollCentralGraphFingerprint(graph.central), payrollFeesGraphFingerprint(graph.fees), payrollHollowGraphFingerprint(graph.deductions)])
+  return JSON.stringify([PAYROLL_MIGRATION_PARTS.map(part => graph[part].toSorted((a, b) => String(a.id).localeCompare(String(b.id))).map(row => PAYROLL_MIGRATION_COLUMNS[part].map(field => row[field]))), payrollCentralGraphFingerprint(graph.central), payrollFeesGraphFingerprint(graph.fees), payrollHollowGraphFingerprint(graph.deductions), payrollNumberingGraphFingerprint(graph.numbering)])
 }
 export interface PayrollRemovedIdentities { projects: ReadonlySet<string>, crews: ReadonlySet<string>, workers: ReadonlySet<string>, quantity: readonly QuantityMigrationIdentity[] }
 
@@ -259,7 +269,8 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
   const central = await readPayrollCentralMigrationRows(db)
   const fees = await readPayrollFeesMigrationRows(db)
   const deductions = await readPayrollHollowMigrationRows(db)
-  const owned = new Set(plan.removed.flatMap(previous => [...PAYROLL_MIGRATION_PARTS.flatMap(part => previous.graph[part].map(row => key(PAYROLL_MIGRATION_TABLES[part], row.id))), ...payrollCentralGraphKeys(previous.graph.central), ...payrollFeesGraphKeys(previous.graph.fees), ...payrollHollowGraphKeys(previous.graph.deductions)]))
+  const numbering = await readPayrollNumberingMigrationRows(db)
+  const owned = new Set(plan.removed.flatMap(previous => [...PAYROLL_MIGRATION_PARTS.flatMap(part => previous.graph[part].map(row => key(PAYROLL_MIGRATION_TABLES[part], row.id))), ...payrollCentralGraphKeys(previous.graph.central), ...payrollFeesGraphKeys(previous.graph.fees), ...payrollHollowGraphKeys(previous.graph.deductions), ...payrollNumberingGraphKeys(previous.graph.numbering)]))
   const removedKeys = new Set([...owned, ...['projects', 'crews', 'workers'].flatMap(table => [...removed[table as 'projects' | 'crews' | 'workers']].map(id => key(table, id))), ...removed.quantity.map(identity => key(identity.table, identity.id))])
   const removedIds = new Set([...removedKeys].map((value) => {
     const parsed = JSON.parse(value) as [string, unknown]
@@ -327,7 +338,22 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
           }
         }
       }
-      const originalReferences = await withPayrollMigratedSource(previous.source, async source => [...await payrollAMigrationReferences(source), ...await payrollC1MigrationReferences(source), ...await payrollC2MigrationReferences(source), ...await payrollAdjustmentMigrationReferences(source), ...await payrollFeesMigrationReferences(source), ...await payrollHollowMigrationReferences(source)])
+      if (previous.graph.numbering) {
+        for (const table of PAYROLL_NUMBERING_TABLES) {
+          for (const row of previous.graph.numbering.tables[table]) {
+            const current = numbering.tables[table].find(candidate => candidate.id === row.id)
+            if (current && Object.entries(row).every(([field, value]) => current[field] === value))
+              nativeExcluded.add(key(table, row.id))
+          }
+        }
+      }
+      const originalReferences = await withPayrollMigratedSource(previous.source, async (source) => {
+        const inherited = previous.source.numbering ? await loadPayrollMigratedProof(source, previous.source.projectId) : null
+        // 已证祖先编号回执保留原 JSON；通用分派不能将映射 SQL 当成本代命令再解析，类型引用仍由编号 owner 收集。
+        const inheritedNumbering = new Set([...(inherited?.numbering.receipts ?? [])].map(id => key('payroll_command_receipts', id)))
+        const nativeNumberingReader = payrollIndependentReferenceReader(source, inheritedNumbering)
+        return [...await payrollAMigrationReferences(nativeNumberingReader), ...await payrollC1MigrationReferences(source), ...await payrollC2MigrationReferences(source), ...await payrollAdjustmentMigrationReferences(source), ...await payrollFeesMigrationReferences(source), ...await payrollHollowMigrationReferences(source), ...await payrollNumberingMigrationReferences(source, inherited?.numbering.receipts)]
+      })
       for (const reference of originalReferences) {
         const [table, id] = JSON.parse(reference) as [string, string]
         const mapped = previous.mappings.find(m => m.tableName === table && m.legacyId === id)?.centralId
@@ -337,7 +363,7 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
     }
   }
   const independent = payrollIndependentReferenceReader(db, nativeExcluded)
-  const groups = removedKeys.size ? { A: await payrollAMigrationReferences(independent), C1: await payrollC1MigrationReferences(independent), C2: await payrollC2MigrationReferences(independent), P4: await payrollAdjustmentMigrationReferences(independent), P5: await payrollFeesMigrationReferences(independent), P6: await payrollHollowMigrationReferences(independent), migrated: migratedReferences } : {}
+  const groups = removedKeys.size ? { A: await payrollAMigrationReferences(independent), C1: await payrollC1MigrationReferences(independent), C2: await payrollC2MigrationReferences(independent), P4: await payrollAdjustmentMigrationReferences(independent), P5: await payrollFeesMigrationReferences(independent), P6: await payrollHollowMigrationReferences(independent), numbering: await payrollNumberingMigrationReferences(independent), migrated: migratedReferences } : {}
   const blockedReference = Object.entries(groups).flatMap(([domain, refs]) => [...refs].filter(reference => removedKeys.has(reference)).map(reference => `${domain}: ${reference}`))[0]
   if (blockedReference)
     invalid(`独立工资配置、来源、回执或历史仍引用待撤身份 ${blockedReference}，已在删除前整批拒绝`)
@@ -357,6 +383,10 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
       actual.schemaVersion = 4
       actual.deductions = { schemaVersion: 1, quantity: previous.graph.deductions.quantity, tables: Object.fromEntries(PAYROLL_HOLLOW_DEDUCTION_TABLES.map(table => [table, deductions[table].filter(row => previous.graph.deductions!.tables[table].some(old => old.id === row.id))])) as typeof deductions }
     }
+    if (previous.graph.numbering) {
+      actual.schemaVersion = 5
+      actual.numbering = { schemaVersion: 1, tables: Object.fromEntries(PAYROLL_NUMBERING_TABLES.map(table => [table, numbering.tables[table].filter(row => previous.graph.numbering!.tables[table].some(old => old.id === row.id))])) as typeof numbering.tables }
+    }
     const evidence = await db.select<{ source_graph_json: string, mapping_json: string, diagnostics_json: string }>('SELECT * FROM payroll_migration_evidence WHERE entity_id = ?', [previous.entityId])
     if (graphFingerprint(actual) !== graphFingerprint(previous.graph) || evidence.length !== 1 || evidence[0]!.source_graph_json !== JSON.stringify(previous.source) || evidence[0]!.mapping_json !== JSON.stringify(previous.mappings) || evidence[0]!.diagnostics_json !== JSON.stringify(previous.diagnostics))
       invalid('迁入后工资或来源已有日常变更；恢复会丢失当前事实，已整批拒绝')
@@ -371,7 +401,7 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
   }
   const logs = await db.select<PayrollMigrationRow>('SELECT * FROM operation_logs')
   for (const log of logs.filter(row => !owned.has(key('operation_logs', row.id)))) {
-    const payrollTable = parts.some(part => PAYROLL_MIGRATION_TABLES[part] === log.table_name)
+    const payrollTable = parts.some(part => PAYROLL_MIGRATION_TABLES[part] === log.table_name) || (PAYROLL_NUMBERING_TABLES as readonly string[]).includes(String(log.table_name))
     if (payrollTable && removedKeys.has(key(String(log.table_name), log.record_id)))
       invalid('独立审计仍引用待撤工资或来源身份')
     for (const data of [log.before_data, log.after_data].map(payrollLogSnapshot)) {
@@ -441,10 +471,18 @@ export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<
   for (const incoming of plan.incoming) {
     if (incoming.source.deductions)
       await withPayrollMigratedSource(incoming.source, source => provePayrollHollowMigrationSource(source, incoming.source))
+    if (incoming.source.numbering) {
+      await withPayrollMigratedSource(incoming.source, async (source) => {
+        const inherited = await loadPayrollMigratedProof(source, incoming.source.projectId)
+        const documents = new Map<string, PayrollNumberingDocument>([...inherited.aDocuments, ...inherited.c1Documents, ...inherited.c2Documents, ...await loadPayrollAReleasedWithMigration(source), ...await loadPayrollC1ReleasedWithMigration(source), ...await loadPayrollC2ReleasedWithMigration(source)])
+        await provePayrollNumberingState(source, incoming.source.projectId, documents, inherited.numbering)
+      })
+    }
   }
   // 只比较真正新进入的原图与现有独立事实；同批无变化不重新裁定旧历史。
   await assertIncomingSources(db, plan)
   for (const previous of plan.removed) {
+    await removePayrollNumberingMigrationRows(db, previous.graph.numbering)
     await removePayrollHollowMigrationRows(db, previous.graph.deductions)
     await removePayrollFeesMigrationGraph(db, previous.graph.fees)
     await removePayrollCentralMigrationGraph(db, previous.graph.central)
@@ -470,6 +508,7 @@ export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<
     await db.execute('INSERT INTO payroll_migration_evidence(entity_id,project_id,batch_id,source_graph_json,diagnostics_json,mapping_json) VALUES (?,?,?,?,?,?)', [next.entityId, next.projectId, next.batchId, JSON.stringify(next.source), JSON.stringify(next.diagnostics), JSON.stringify(next.mappings)])
     await insertPayrollCentralMigrationGraph(db, next.graph.central)
     await insertPayrollHollowMigrationRows(db, next.graph.deductions)
+    await insertPayrollNumberingMigrationRows(db, next.graph.numbering)
     plan.imports.set(next.entityId, next)
   }
   if (plan.incoming.length || plan.removed.length)

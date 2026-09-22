@@ -3,6 +3,7 @@ import type { PayrollIdentityMapping, PayrollJsonObject } from '../payroll/centr
 import type { PayrollProjectGraph } from './payroll-source'
 import { PAYROLL_A_FEES_MIGRATION_TABLES } from '../payroll/central-a-fees-schema'
 import { PAYROLL_HOLLOW_DEDUCTION_TABLES } from '../payroll/central-hollow-deduction-schema'
+import { PAYROLL_NUMBERING_TABLES } from '../payroll/central-numbering-schema'
 import { QUANTITY_HOLLOW_TABLES } from '../quantity/central-hollow-schema'
 import { hollowExact, quantityHollowHash } from '../quantity/hollow-migration-graph'
 import { QUANTITY_MIGRATION_TABLES } from '../quantity/migration-graph'
@@ -31,7 +32,7 @@ function bindings(value: unknown): PayrollProofBinding[] {
   if (!Array.isArray(value))
     invalid()
   const ids = new Set<string>()
-  const tables = new Set<string>(['projects', 'crews', 'workers', ...QUANTITY_MIGRATION_TABLES, ...QUANTITY_HOLLOW_TABLES, ...Object.values(PAYROLL_MIGRATION_TABLES), ...PAYROLL_CENTRAL_MIGRATION_TABLES, ...PAYROLL_A_FEES_MIGRATION_TABLES, ...PAYROLL_HOLLOW_DEDUCTION_TABLES, 'payroll_hollow_policies', 'quantity_hollow_commands'])
+  const tables = new Set<string>(['projects', 'crews', 'workers', ...QUANTITY_MIGRATION_TABLES, ...QUANTITY_HOLLOW_TABLES, ...Object.values(PAYROLL_MIGRATION_TABLES), ...PAYROLL_CENTRAL_MIGRATION_TABLES, ...PAYROLL_A_FEES_MIGRATION_TABLES, ...PAYROLL_HOLLOW_DEDUCTION_TABLES, ...PAYROLL_NUMBERING_TABLES, 'payroll_hollow_policies', 'quantity_hollow_commands'])
   return value.map((row) => {
     if (!hollowExact(row, ['originId', 'entityId', 'mappings']) || typeof row.originId !== 'string' || !/^[a-f0-9]{64}$/.test(row.originId) || typeof row.entityId !== 'string' || !row.entityId || ids.has(row.entityId) || !Array.isArray(row.mappings))
       invalid()

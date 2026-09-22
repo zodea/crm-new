@@ -595,3 +595,11 @@ Repository 的 `batchPreview` 经 `POST /api/read/payroll/batch-preview` 读取�
 `batch(query, planId)` 经 `GET /api/read/payroll/batch` 冷读当前协调状态。计划正文保留原确认项；`planVersion / state / nextItemIndex / expectedPayrollRevision` 反映当前进度。`ready` 可准备下一原单，`prepared` 表示原命令已经持久化且资金不可挪用，`needs-recheck` 要求重新核对，`complete` 表示所有非暂缓项已有原回执。计划或回执不能替代原工资详情、冻结输出和实际收付读取。
 
 `aRounding` 经 `GET /api/read/payroll/a-rounding` 返回固定 A 工资簿范围的全部追加修订、目标月有效修订及不可写原因。缺失、明确关闭和整百规则分别表达；后月修订不回写前月。
+
+## 工资正式编号与原件读取（#477）
+
+Repository 的 `numbering(query, { projectId, statementId })` 经 `POST /api/read/payroll/numbering` 读取固定项目、可空原工资、项目序列、已出具元数据、可证明冻结文档及分动作资格。`statementId=null` 仅用于项目起点登记；它不能自动选择工资。正式编号 `issue.number` 始终为原字符串，`firstNumber / nextNumber` 仅是内部安全整数计数。编号缺失与已出具区分，预览不占号；未知旧号不从文件名、月份或当前行序推导。
+
+`document` 复用完整 A/C1/C2 冻结 DTO，数量、费率与金额继续使用各格式既有十进制传输，不因附加编号重算工资。已出具必须同时证明原回执、序列和原件摘要才能 `canDownload`；只读工资身份可读取已证编号和单份原件，但不能登记或新增出具。没有写权限、缺起点、删除未出具原单、未发、历史 B、缺冻存证据分别返回不可操作原因；跨项目和坏响应在服务及 Repository 边界拒绝。
+
+迁入 DTO 只投影经原图和显式映射证明的当前身份；`issue.documentHash` 保留出具时原摘要，映射后的文档另在服务端核对，不改写原摘要来伪装一致。完整工资工作簿与月归档之后通过 [#479](https://github.com/zodea/crm-new/issues/479) 消费该接口，不凭工资权限扩读私密名册。页面流程见[正式出具指南](../guides/payroll-official-numbering.md)。

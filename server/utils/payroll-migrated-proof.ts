@@ -7,7 +7,9 @@ import type { PayrollAdjustmentBasisDraft, PayrollAdjustmentRecord, PayrollOrigi
 import type { PayrollC1FrozenDocument } from '../../app/lib/payroll/central-c1-contract'
 import type { PayrollC2OutputDocument } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollIdentityMapping } from '../../app/lib/payroll/central-contract'
+import type { PayrollNumberingDocument } from '../../app/lib/payroll/central-numbering-contract'
 import type { PayrollHollowSourceProof } from './payroll-hollow-migrated-source'
+import type { PayrollNumberingProof } from './payroll-numbering-facts'
 import { createRequire } from 'node:module'
 import initSqlJs from 'sql.js'
 import { runMigrations } from '../../app/lib/db/migrations'
@@ -17,6 +19,7 @@ import { parsePayrollProjectGraph, PAYROLL_MIGRATION_COLUMNS, PAYROLL_MIGRATION_
 import { PAYROLL_A_FEES_MIGRATION_TABLES, payrollAFeesPrimaryKey } from '../../app/lib/payroll/central-a-fees-schema'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { PAYROLL_HOLLOW_DEDUCTION_TABLES } from '../../app/lib/payroll/central-hollow-deduction-schema'
+import { PAYROLL_NUMBERING_TABLES } from '../../app/lib/payroll/central-numbering-schema'
 import { initializePayrollSchema } from '../../app/lib/payroll/central-schema'
 import { QUANTITY_HOLLOW_COLUMNS, QUANTITY_HOLLOW_TABLES } from '../../app/lib/quantity/central-hollow-schema'
 import { quantityHollowHash } from '../../app/lib/quantity/hollow-migration-graph'
@@ -33,12 +36,15 @@ import { insertPayrollFeesMigrationGraph, mapPayrollFeesMigrationGraph } from '.
 import { emptyPayrollHollowSourceProof, provePayrollHollowMigrationSource } from './payroll-hollow-migrated-source'
 import { insertPayrollHollowMigrationRows, mapPayrollHollowMigrationGraph } from './payroll-hollow-migration'
 import { createPayrollMigratedMapper } from './payroll-migrated-mapping'
+import { emptyPayrollNumberingProof, provePayrollNumberingState } from './payroll-numbering-facts'
+import { insertPayrollNumberingMigrationRows, mapPayrollNumberingMigrationGraph } from './payroll-numbering-migration'
 import { loadPayrollReleasedApplicationIds } from './payroll-release-application-provenance'
 import { initializeQuantityHollowMigrationEvidence } from './quantity-hollow-migration'
 
 interface Evidence { entity_id: string, project_id: string, source_graph_json: string, mapping_json: string }
 interface Original { original: PayrollOriginalWageRef, basis: PayrollAdjustmentBasisDraft }
 export interface PayrollMigratedProof {
+  numbering: PayrollNumberingProof
   hollow: PayrollHollowSourceProof
   negativeLineRevisions: Map<string, PayrollANegativeLineRevision>
   aDocuments: Map<string, PayrollAFrozenDocument>
@@ -51,7 +57,7 @@ export interface PayrollMigratedProof {
   snapshots: Map<string, PayrollActualPaymentSnapshot | PayrollActualReversalSnapshot>
   releasedApplications: Map<string, string[]>
 }
-const empty = (): PayrollMigratedProof => ({ hollow: emptyPayrollHollowSourceProof(), negativeLineRevisions: new Map(), aDocuments: new Map(), c1Documents: new Map(), c2Documents: new Map(), originals: new Map(), records: new Map(), draftBases: new Map(), facts: new Map(), snapshots: new Map(), releasedApplications: new Map() })
+const empty = (): PayrollMigratedProof => ({ numbering: emptyPayrollNumberingProof(), hollow: emptyPayrollHollowSourceProof(), negativeLineRevisions: new Map(), aDocuments: new Map(), c1Documents: new Map(), c2Documents: new Map(), originals: new Map(), records: new Map(), draftBases: new Map(), facts: new Map(), snapshots: new Map(), releasedApplications: new Map() })
 let runtime: ReturnType<typeof initSqlJs> | undefined
 const sourceProofs = new Map<string, Promise<PayrollMigratedProof>>()
 const key = (table: string, id: unknown) => JSON.stringify([table, id])
@@ -97,6 +103,7 @@ export async function withPayrollMigratedSource<T>(graph: PayrollProjectGraph, w
     }
     await insertPayrollCentralMigrationGraph(tx, graph.central)
     await insertPayrollHollowMigrationRows(tx, graph.deductions)
+    await insertPayrollNumberingMigrationRows(tx, graph.numbering)
     if (graph.deductions?.proof) {
       const proof = await verifyPayrollProofPackage(graph.deductions.proof)
       for (const binding of proof.bindings) {
@@ -145,6 +152,7 @@ async function proveSource(graph: PayrollProjectGraph): Promise<PayrollMigratedP
       if (result.originals.has(id))
         result.c2Documents.set(id, document)
     }
+    result.numbering = await provePayrollNumberingState(tx, graph.projectId, new Map<string, PayrollNumberingDocument>([...result.aDocuments, ...result.c1Documents, ...result.c2Documents]), result.numbering)
     // 版本别名只收集已通过格式/物理/P4前缀证明的冻结文档，不接受未经证明的 source_json。
     for (const document of [...result.aDocuments.values(), ...result.c1Documents.values(), ...result.c2Documents.values()]) {
       for (const row of document.hollow?.previousProcessed ?? []) {
@@ -176,6 +184,7 @@ async function verifyPhysical(tx: TransactionDb, evidence: Evidence, graph: Payr
   const mappedQuantityId = quantityId ? mapping.get(key('quantity_hollow_records', quantityId))?.centralId : null
   const quantityNamespace = mappedQuantityId?.split(':quantity_hollow_records:')[0]
   const deductions = mapPayrollHollowMigrationGraph(graph.deductions, evidence.entity_id, mapping, quantityNamespace && graph.deductions ? { namespace: quantityNamespace, original: graph.deductions.quantity } : undefined)
+  const numbering = mapPayrollNumberingMigrationGraph(graph.numbering, evidence.entity_id, mapping)
   if (hash([...mapping.values()]) !== hash(mappings))
     throw payrollProblem('unavailable', '迁入工资身份映射与原证据不一致')
   const check = async (table: string, primary: string, expected: Record<string, unknown>, ignored: string[] = []) => {
@@ -187,6 +196,11 @@ async function verifyPhysical(tx: TransactionDb, evidence: Evidence, graph: Payr
     const rows = await tx.select<{ id: string }>(`SELECT id FROM ${table} WHERE ${foreignKey}=?`, [ownerId])
     if (hash(rows.map(r => r.id).sort()) !== hash([...expectedIds].sort()))
       throw payrollProblem('unavailable', `迁入工资 ${table} 的原成员、分配或处理集合已变化，不能沿用原证明`)
+  }
+  if (numbering) {
+    for (const table of PAYROLL_NUMBERING_TABLES) {
+      for (const row of numbering.tables[table]) await check(table, 'id', row, table === 'payroll_numbering_settings' ? ['next_number'] : [])
+    }
   }
   for (const table of PAYROLL_CENTRAL_MIGRATION_TABLES) {
     if (['payroll_a_subject_configs'].includes(table))
@@ -353,6 +367,18 @@ export async function loadPayrollMigratedProof(tx: TransactionDb, projectId?: st
       const mapped = mapper.c2Document(document)
       result.c2Documents.set(mapped.id, mapped)
     }
+    for (const setting of proven.numbering.settings.values()) {
+      const mapped = { ...setting, id: mappedId('payroll_numbering_settings', setting.id), projectId: mappedId('projects', setting.projectId) }
+      result.numbering.settings.set(mapped.projectId, mapped)
+    }
+    for (const entry of proven.numbering.issues.values()) {
+      const issue = { ...entry.issue, id: mappedId('payroll_official_issues', entry.issue.id), projectId: mappedId('projects', entry.issue.projectId), statementId: mappedId('wage_statements', entry.issue.statementId), commandId: mappedId('payroll_command_receipts', entry.issue.commandId) }
+      const document = result.aDocuments.get(issue.statementId) ?? result.c1Documents.get(issue.statementId) ?? result.c2Documents.get(issue.statementId)
+      if (!document)
+        throw payrollProblem('unavailable', '迁入正式编号缺少已证冻结原工资')
+      result.numbering.issues.set(issue.statementId, { issue, documentHash: hash(document) })
+    }
+    for (const id of proven.numbering.receipts) result.numbering.receipts.add(mappedId('payroll_command_receipts', id))
     for (const original of proven.originals.values()) {
       const mapped = { original: mapper.original(original.original), basis: mapper.basis(original.basis) }
       if (mapped.original.projectId !== evidence.project_id)
