@@ -39,7 +39,7 @@ export function isPayrollSourceDiagnostics(v: unknown) {
 export function isPayrollActualFact(v: unknown): v is PayrollActualFact {
   try {
     wireExact(v, ['identity', 'ref', 'kind', 'projectId', 'originalStatementIds', 'adjustmentIds', 'applicationIds', 'reverses', 'occurredOn', 'recordedAt', 'signedAmount', 'allocations', 'allocationState', 'historicalMembers', 'qualification', 'sourceVersion', 'diagnostics'])
-    if (!isPayrollActualRef(v.ref) || !wireId(v.projectId) || !payrollUniqueIds(v.originalStatementIds, 'wage_statements') || !v.originalStatementIds.length || !payrollUniqueIds(v.adjustmentIds, 'payroll_adjustments') || !payrollUniqueIds(v.applicationIds, 'payroll_adjustment_applications') || !(v.reverses === null || isPayrollActualRef(v.reverses)) || ![v.occurredOn, v.recordedAt].every(t => t === null || wireText(t)) || !isPayrollSignedAmount(v.signedAmount) || !Array.isArray(v.allocations) || !Array.isArray(v.historicalMembers) || !['complete', 'partial', 'unknown'].includes(String(v.allocationState)) || !['proven', 'historical-amount-proven', 'unproven'].includes(String(v.qualification)) || !wireText(v.sourceVersion) || !v.sourceVersion || !isPayrollSourceDiagnostics(v.diagnostics))
+    if (!isPayrollActualRef(v.ref) || !wireId(v.projectId) || !payrollUniqueIds(v.originalStatementIds, 'wage_statements') || !v.originalStatementIds.length || !payrollUniqueIds(v.adjustmentIds, 'payroll_adjustments') || !payrollUniqueIds(v.applicationIds, 'payroll_adjustment_applications') || !(v.reverses === null || isPayrollActualRef(v.reverses)) || ![v.occurredOn, v.recordedAt].every(t => t === null || wireText(t)) || !isPayrollSignedAmount(v.signedAmount) || !Array.isArray(v.allocations) || !Array.isArray(v.historicalMembers) || !['complete', 'partial', 'unknown'].includes(String(v.allocationState)) || !['proven', 'scoped-amount-proven', 'historical-amount-proven', 'unproven'].includes(String(v.qualification)) || !wireText(v.sourceVersion) || !v.sourceVersion || !isPayrollSourceDiagnostics(v.diagnostics))
       return false
     if (v.ref.kind === 'released-statement' ? v.identity !== `real:payroll:released:${v.ref.statementId}` || v.kind !== 'initial-release' || v.reverses !== null || v.originalStatementIds.length !== 1 || v.originalStatementIds[0] !== v.ref.statementId : v.identity !== `real:payroll:actual:${v.ref.eventId}` || !['supplement', 'refund', 'recording-reversal'].includes(String(v.kind)))
       return false
@@ -63,6 +63,8 @@ export function isPayrollActualFact(v: unknown): v is PayrollActualFact {
     if (new Set(fact.allocations.map(a => a.workerId)).size !== fact.allocations.length)
       return false
     if (fact.qualification === 'proven' && (fact.signedAmount.value === null || fact.allocationState !== 'complete'))
+      return false
+    if (fact.qualification === 'scoped-amount-proven' && (fact.ref.kind !== 'actual-event' || fact.signedAmount.value === null || !fact.applicationIds.length))
       return false
     return fact.allocationState !== 'complete' || (fact.signedAmount.value !== null && fact.allocations.every(a => a.amount !== null) && fact.allocations.reduce((sum, a) => sum + amountInCents(a.amount!), 0) === amountInCents(fact.signedAmount.value))
   }

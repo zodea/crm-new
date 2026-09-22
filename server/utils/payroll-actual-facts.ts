@@ -5,6 +5,7 @@ import { loadPayrollGraph } from '../../app/lib/payroll/central-read'
 import { loadPayrollAReleasedWithMigration } from './payroll-a-released-with-migration'
 import { loadPayrollHistoricalActual } from './payroll-actual-history'
 import { loadPayrollConfirmedActualEvents } from './payroll-actual-provenance'
+import { scopePayrollActualFacts } from './payroll-actual-scope'
 import { payrollAdjustmentHash, payrollKnownAmount } from './payroll-adjustment-facts'
 import { loadPayrollC1ReleasedWithMigration, loadPayrollC2ReleasedWithMigration } from './payroll-c-released-with-migration'
 import { loadPayrollMigratedProof } from './payroll-migrated-proof'
@@ -44,5 +45,7 @@ export async function loadPayrollActualFacts(tx: TransactionDb, scope: PayrollAc
   const reversals = await loadPayrollConfirmedReversals(tx, scope, rows)
   rows.push(...reversals.rows)
   reasons.push(...reversals.reasons)
-  return { sourceVersion: payrollAdjustmentHash({ heads, rows, reasons }), status: reasons.length || rows.some(r => r.allocationState !== 'complete') ? 'partial' : 'complete', rows, netAmount: payrollAAmount(rows.map(r => r.signedAmount.value), reasons), diagnostics: rows.flatMap(r => r.diagnostics) }
+  const scoped = await scopePayrollActualFacts(tx, scope, rows)
+  reasons.push(...scoped.reasons)
+  return { sourceVersion: payrollAdjustmentHash({ heads, rows: scoped.rows, reasons }), status: reasons.length || scoped.rows.some(r => r.allocationState !== 'complete') ? 'partial' : 'complete', rows: scoped.rows, netAmount: payrollAAmount(scoped.rows.map(r => r.signedAmount.value), reasons), diagnostics: scoped.rows.flatMap(r => r.diagnostics) }
 }

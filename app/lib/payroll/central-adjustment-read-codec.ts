@@ -127,7 +127,7 @@ export function decodePayrollAdjustmentRead<T extends PayrollAdjustmentRead>(raw
     const scope = parsePayrollActualScope(v.scope)
     if (!same(scope, target) || !wireText(v.sourceVersion) || !['complete', 'partial', 'forbidden', 'unavailable'].includes(String(v.status)) || !Array.isArray(v.rows) || !v.rows.every(isPayrollActualFact) || !isPayrollSignedAmount(v.netAmount) || !isPayrollSourceDiagnostics(v.diagnostics))
       fail()
-    if (new Set(v.rows.map(r => r.identity)).size !== v.rows.length || v.rows.some(r => r.projectId !== scope.projectId || (scope.originalStatementIds && !r.originalStatementIds.some(id => scope.originalStatementIds!.includes(id)))) || (v.netAmount.value !== null && (v.rows.some(r => r.signedAmount.value === null) || v.rows.reduce((sum, r) => sum + amountInCents(r.signedAmount.value!), 0) !== amountInCents(v.netAmount.value))))
+    if (new Set(v.rows.map(r => r.identity)).size !== v.rows.length || v.rows.some(r => r.projectId !== scope.projectId || (scope.originalStatementIds && r.originalStatementIds.some(id => !scope.originalStatementIds!.includes(id))) || (r.qualification === 'scoped-amount-proven' && !scope.originalStatementIds)) || (v.netAmount.value !== null && (v.rows.some(r => r.signedAmount.value === null) || v.rows.reduce((sum, r) => sum + amountInCents(r.signedAmount.value!), 0) !== amountInCents(v.netAmount.value))))
       fail()
   }
   else if (kind === 'actual-payment-form') {
