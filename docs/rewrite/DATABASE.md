@@ -2486,3 +2486,15 @@ CREATE TABLE reconciliation_issues (
 - 附件仍归 `file_refs(owner_type='expenditure_settlement')`；中央只保存元数据，不公开本地路径。保存使用服务端 ID、版本与 commandId，重试幂等，旧版本拒绝覆盖；确认后锁定。未知事实或已有下游事实的结算禁止改挂关系，历史空审计在编辑后仍为空。
 
 专属页面与当前源单下钻边界见[页面蓝本](./pages/contract-forms.md#ax05-当前浏览器实现331)，环境边界见 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md#ax05-其他支出结算接管)。材料到货分摊、冲销和虚构结算明细均未引入。
+
+### 工人私密资料与工资名册（#449）
+
+实名和银行字段继续归工人主档，不形成工资私有人事主档。劳动合同事实和照片用途由 `worker_roster_profile_versions` 按 `(worker_id,revision)` 追加：`values_json` 保存签订三态、签订日期、证件照与银行卡照原件身份，另记操作者、实际时间及可选迁入批次。
+
+`worker_roster_assets` 记录独立原件身份、工人 owner、`file_ref_id`、SHA-256、形成时间、旧分类、迁入批次与旧软删除事实。元数据/正文复用 `file_refs/file_payloads`；上传追加身份，当前用途放在工人资料版本中，不能覆盖原件字节。缺正文的旧附件保留为缺口。
+
+`worker_roster_archives` 固定项目、规范工资范围摘要、同范围递增版本和完整 `snapshot_json`；正文记录登记日期、实际归档时间、原工资稳定成员与原姓名、登记时实名字段、资料版本、照片身份/摘要和缺口。历史正文不回写。`worker_roster_receipts` 的工作区/操作者/命令编号唯一，保存请求摘要与回执；核对确认未应用的编号保存取消墓碑，拒绝迟到应用。资料、原件、归档和回执共用工作区 SQL 事务。
+
+`worker_roster_migration_evidence` 以工人稳定身份保存批次、来源指纹和完整来源 JSON。它用于重复确认与受控恢复证明，不是日常可编辑主档。原表没有劳动合同事实时保持未记录，只有明确且唯一有效的照片分类才关联用途；文件路径只保留为原证据，不作为文件读取入口。
+
+归档需要独立 `worker:sensitive:read`；工资读写不自动授予。当前 SQL 由中央测试实例承载，生产持久化不是此表结构的验收结论。迁入和回滚沿受控映射保留原字段与原件，未知用途不猜，日常版本及归档引用不能被重复迁入或回滚覆盖。

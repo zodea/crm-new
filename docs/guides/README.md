@@ -18,6 +18,7 @@
 - [客户档案与业务关系使用指南](./customer-records.md)
 - [分供方档案与真实事实使用指南](./supplier-records.md)
 - [班组与工人档案使用指南](./crew-worker-records.md)
+- [工人私密资料与工资实名名册](./worker-roster-archive.md)（独立权限、两类照片、带日期不可变名册与原件 ZIP）
 - [新项目启动与施工排程使用指南](./project-start-and-schedule.md)（中央 WBS、来源返回与受控接管见 [#444](../design/evidence/issue-444/README.md)，暂估后补合同与楼栋证据更正见 [#445](../design/evidence/issue-445/README.md)）
 - [目标成本预算使用指南](./target-cost.md)（版本头、七类科目、基线、原件及完整迁移；来源缺口单独说明）
 - [首页项目与施工进度使用指南](./home-project-progress.md)（首页只读入口与独立维护入口分别说明）

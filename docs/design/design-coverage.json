@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 160,
+    "trackedPageFiles": 162,
     "devPageFiles": 5,
-    "appPageFiles": 155,
+    "appPageFiles": 157,
     "appNavLeaves": 51,
     "covered": 135,
-    "designPending": 20,
+    "designPending": 22,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -85,6 +85,13 @@
       "appRoute": "/base/worker/form/:id?",
       "designRoute": "workerForm",
       "status": "covered"
+    },
+    {
+      "appRoute": "/base/worker/private/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "独立私密工人资料与照片整页，无直接对应设计路由；沿 DC 工人表单与整页原语单独验收。",
+      "issue": "#449"
     },
     {
       "appRoute": "/contract/:id",
@@ -809,6 +816,13 @@
       "status": "design-pending",
       "reason": "明确原引用的错记冲销与再纠错；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
       "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/roster",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "独立有日期的工资实名名册归档整页，无直接对应设计路由；沿 DC 工资表格与整页原语单独验收。",
+      "issue": "#449"
     },
     {
       "appRoute": "/subcontract/payroll/sources",

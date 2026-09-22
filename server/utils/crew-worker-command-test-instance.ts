@@ -296,6 +296,8 @@ export function createCrewWorkerCommandTestInstance(options: Options = {}) {
     workerForm(id: string, session: BusinessSession, sessionId?: string | null): WorkerFormReadDTO {
       if (!session.capabilities.includes(WORKER_WRITE_CAPABILITY))
         throw fail('forbidden', '无工人写入权限')
+      if (!session.capabilities.includes('worker:sensitive:read'))
+        throw fail('forbidden', '工人完整编辑表单包含身份证和银行资料，需要工人私密资料读取权限')
       const stored = stateFor(sessionId).workers.get(id)
       if (!stored)
         throw fail('not-found', '正式工人不存在')
