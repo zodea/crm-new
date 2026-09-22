@@ -89,6 +89,7 @@ async function print() {
     <PayrollReleaseAdjustmentSelection v-if="matching && matching.status !== 'released'" :statement-id="statementId" :origin="origin" :source-version="matching.context.sourceVersion" :return-to="returnTo" :applications="releaseDraft?.adjustmentApplications" :disabled="!writable || releaseOpen || hollowLocked" @change="ui.setReleaseApplications" @valid="adjustmentsReady = $event" />
     <section v-if="output" class="panel grid gap-3 p-4" aria-label="冻结工资输出">
       <SectionHeader title="冻结工资表" /><template v-if="output.state === 'available'">
+        <PayrollAFrozenLocationSection :document="output.document" />
         <p class="text-12px leading-5 text-ink-soft">
           只使用本次发放时完整保存的工资与成员分配，包含零金额成员。
         </p><div class="flex flex-wrap gap-2">

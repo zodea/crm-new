@@ -25,14 +25,17 @@ describe('p7 limited delivery registration', () => {
     for (const id of ['WAGE-16', 'WAGE-17']) {
       expect(byId(id).status).toBe('current-passed')
       expect(byId(id).evidence).toContainEqual(expect.objectContaining({ reference: evidence, commit: productCommit, recency: 'current-run' }))
-      expect(byId(id).remaining).toContain('grill')
+      expect(byId(id).remaining).toContain('#467')
     }
     expect(byId('WAGE-18').status).toBe('partial')
     expect(byId('WAGE-18').evidence).toContainEqual(expect.objectContaining({ reference: evidence, commit: productCommit }))
-    expect(byId('WAGE-18').remaining).toContain('最小授权')
+    expect(byId('WAGE-16').remaining).toContain('PR483')
+    expect(byId('WAGE-17').remaining).toContain('#477')
+    expect(byId('WAGE-18').remaining).toContain('独立私密权限')
+    expect(byId('WAGE-18').remaining).toContain('#479')
     expect(byId('WAGE-12').status).toBe('partial')
     expect(byId('WAGE-12').evidence).toContainEqual(expect.objectContaining({ reference: evidence, commit: productCommit }))
-    expect(byId('WAGE-12').remaining).toContain('#416')
+    expect(byId('WAGE-12').remaining).toContain('#467')
   })
 
   it('keeps #412 partial and records P7 results without dropping the seven business questions', () => {

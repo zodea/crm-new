@@ -56,6 +56,8 @@ useTabTitle(computed(() => statement.value ? `${statement.value.month} · 工资
           返回工资台账
         </NuxtLink><NuxtLink v-if="sources" :to="sources" class="btn-secondary">
           查看本月来源
+        </NuxtLink><NuxtLink v-if="statement?.status === 'released' && statement.recordKind === 'central' && !statement.deletedAt && ['A', 'C1', 'C2'].includes(statement.formatFamily) && current?.context.origin === 'real'" :to="{ path: `/subcontract/payroll/issue/${encodeURIComponent(statement.id)}`, query: { origin: 'real', project: statement.projectId, returnTo: route.fullPath } }" class="btn-secondary">
+          预览 / 正式出具
         </NuxtLink><KitButton :disabled="loading" @click="load">
           刷新
         </KitButton>

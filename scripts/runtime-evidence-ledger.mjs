@@ -89,6 +89,7 @@ const HISTORICAL_PROFILES = new Set([
 ])
 const UNVERIFIED_PROFILES = new Set(['R-TOOL-PENDING', 'R-STAGE-PENDING'])
 const LOCAL_AUTHORITY_PROFILES = new Set([
+  'R-PAYROLL-NUMBERING-LOCAL',
   'R-WORKER-ROSTER-LOCAL',
   'R-OCR-STUDIO-SOURCE',
   'R-TARGET-COST-LOCAL',
@@ -140,6 +141,7 @@ const RESTRICTED_TARGET_ROUTES = new Set(['/base/customer', '/project'])
 // 路由级参考视图是端点身份与证据等级覆盖的单一维护点；
 // 被多个本地路由复用的外部运行证据必须拆到具体目标视图。
 const REFERENCE_VIEW_BY_ROUTE = new Map([
+  ['/subcontract/payroll/issue/:id', { id: 'payroll-official-numbering-unobserved', label: '工资单份正式编号与出具整页；外部目标未观察' }],
   ['/base/worker/private/:id', { id: 'worker-private-profile-unobserved', label: '工人私密资料独立整页；外部目标未观察' }],
   ['/subcontract/payroll/roster', { id: 'worker-payroll-roster-unobserved', label: '工资实名名册独立归档；外部目标未观察' }],
   ['/settings/data-migration', { id: 'core-data-migration-unobserved', label: '本地核心身份数据迁移；外部目标页未观察' }],

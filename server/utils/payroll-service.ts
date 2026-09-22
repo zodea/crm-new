@@ -33,6 +33,7 @@ import { createPayrollC1Service } from './payroll-c1-service'
 import { createPayrollC2Service } from './payroll-c2-service'
 import { createPayrollDayworkService } from './payroll-daywork-service'
 import { createPayrollHollowService } from './payroll-hollow-service'
+import { createPayrollNumberingService } from './payroll-numbering-service'
 import { readPayrollReleaseAdjustments } from './payroll-release-adjustments'
 import { createPayrollReversalService } from './payroll-reversal-service'
 
@@ -130,6 +131,7 @@ export function createPayrollService(options: PayrollServiceOptions) {
     { A: aService.execute, C1: c1Service.executeC1, C2: c2Service.executeC2 },
   )
   return {
+    ...createPayrollNumberingService(run),
     ...aService,
     ...aRoundingService,
     ...batchService,

@@ -20,10 +20,13 @@ import { decodePayrollC2Read, decodePayrollC2Result, encodePayrollC2Wire } from 
 import { decodePayrollRead } from './central-codec'
 import { decodePayrollDayworkRead, decodePayrollDayworkResult, encodePayrollDayworkWire } from './central-daywork-codec'
 import { decodePayrollHollowConfigRead, decodePayrollHollowResult, encodePayrollHollowWire } from './central-hollow-deduction-codec'
+import { decodePayrollNumberingRead, decodePayrollNumberingResult } from './central-numbering-codec'
 
 export function createPayrollRepository(fetcher: ProjectHttpFetcher): PayrollRepository {
   const adjustmentRead = <T extends PayrollAdjustmentRead>(kind: PayrollAdjustmentReadKind, query: PayrollQuery, input: unknown, target = input): Promise<T> => readProjectHttp(() => fetcher(`/api/read/payroll/${kind}`, { method: 'POST', body: { query, input: encodePayrollAdjustmentWire(input) } }), value => decodePayrollAdjustmentRead<T>(value, kind, query, target))
   return {
+    numbering: (query, input) => readProjectHttp(() => fetcher('/api/read/payroll/numbering', { method: 'POST', body: { query, input } }), value => decodePayrollNumberingRead(value, query, input)),
+    executeNumbering: command => readProjectHttp(() => fetcher('/api/commands/payroll-numbering', { method: 'POST', body: command as unknown as Record<string, unknown> }), value => decodePayrollNumberingResult(value, command)),
     batchPreview: (query, input) => readProjectHttp(() => fetcher('/api/read/payroll/batch-preview', { method: 'POST', body: { query, input } }), value => decodePayrollBatchPreview(value, query, input)),
     executeBatch: command => readProjectHttp(() => fetcher('/api/commands/payroll-batch', { method: 'POST', body: command as unknown as Record<string, unknown> }), value => decodePayrollBatchPlan(value, command.action.kind === 'confirm-batch' ? { origin: command.origin, projectId: command.action.input.projectId, month: command.action.input.month } : { origin: command.origin }, command.action.kind === 'confirm-batch' ? undefined : command.action.input.planId, command)),
     batch: (query, planId) => readProjectHttp(() => fetcher('/api/read/payroll/batch', { query: { ...query, planId } }), value => decodePayrollBatchPlan(value, query, planId)),

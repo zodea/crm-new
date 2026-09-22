@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { PayrollAFrozenDocument } from '~/lib/payroll/central-a-contract'
+import type { PayrollOfficialIssue } from '~/lib/payroll/central-numbering-contract'
 import { computed } from 'vue'
 import { hasPayrollAFeesDocument } from '~/lib/payroll/central-a-fees-contract'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollAFeesFrozenSection from './PayrollAFeesFrozenSection.vue'
+import PayrollAFrozenLocationSection from './PayrollAFrozenLocationSection.vue'
 import PayrollHollowFrozenSection from './PayrollHollowFrozenSection.vue'
 
-const props = defineProps<{ document: PayrollAFrozenDocument }>()
+const props = defineProps<{ document: PayrollAFrozenDocument, officialIssue?: PayrollOfficialIssue }>()
 const feesDocument = computed(() => hasPayrollAFeesDocument(props.document) ? props.document : null)
 const management = computed(() => feesDocument.value?.book.bookPurpose === 'management')
 </script>
@@ -17,6 +19,7 @@ const management = computed(() => feesDocument.value?.book.bookPurpose === 'mana
       <article class="payroll-a-print-page" data-payroll-print-page>
         <header class="payroll-a-print-title">
           <h1>{{ document.projectName }}{{ management ? '管理费进度款单' : '工资表' }}</h1><p>{{ document.month }} · {{ document.crewName || '未关联班组' }} · {{ management ? '管理人' : '负责人' }}：{{ document.leaderName }} · {{ { monthly: '月度请款', settlement: '工程结算', retention: '尾款' }[document.periodKind] }}</p><p>按实际完成现场量核算 · 支付比例 {{ document.payRatio * 100 }}%</p>
+          <PayrollOfficialIdentity v-if="officialIssue" :issue="officialIssue" />
         </header>
         <table v-if="!management">
           <thead>
@@ -59,6 +62,7 @@ const management = computed(() => feesDocument.value?.book.bookPurpose === 'mana
             <span>{{ management ? '管理人' : '班组长' }}：</span><span>施工员：</span><span>安全员：</span><span>现场负责人：</span>
           </footer>
         </section>
+        <PayrollAFrozenLocationSection :document="document" />
       </article>
     </div>
   </Teleport>

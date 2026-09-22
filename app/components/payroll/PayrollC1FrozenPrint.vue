@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { PayrollC1FrozenDocument } from '~/lib/payroll/central-c1-contract'
+import type { PayrollOfficialIssue } from '~/lib/payroll/central-numbering-contract'
 import { computed } from 'vue'
 import { c1FrozenAttendanceRows } from '~/lib/payroll/c1-export'
 import { c1MonthDays, c1Number } from '~/lib/payroll/c1-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollHollowFrozenSection from './PayrollHollowFrozenSection.vue'
 
-const props = defineProps<{ document: PayrollC1FrozenDocument }>()
+const props = defineProps<{ document: PayrollC1FrozenDocument, officialIssue?: PayrollOfficialIssue }>()
 const attendance = computed(() => c1FrozenAttendanceRows(props.document))
 const days = computed(() => c1MonthDays(props.document.month))
 </script>
@@ -15,7 +16,7 @@ const days = computed(() => c1MonthDays(props.document.month))
   <Teleport to="body">
     <div class="payroll-c1-print" aria-hidden="true">
       <article class="c1-paper" data-payroll-print-page>
-        <header><h1>{{ document.projectName }} C1 工资表</h1><p>{{ document.month }} · {{ document.crewName || '未关联班组' }} · 负责人：{{ document.leaderName }}</p><p>本月正常工时与加班工资 · 月度 100%</p></header>
+        <header><h1>{{ document.projectName }} C1 工资表</h1><p>{{ document.month }} · {{ document.crewName || '未关联班组' }} · 负责人：{{ document.leaderName }}</p><p>本月正常工时与加班工资 · 月度 100%</p><PayrollOfficialIdentity v-if="officialIssue" :issue="officialIssue" /></header>
         <table>
           <thead>
             <tr>
@@ -49,7 +50,7 @@ const days = computed(() => c1MonthDays(props.document.month))
         <p>{{ document.note }}</p><p>发放：{{ document.releasedAt }} · 经办：{{ document.operatorName }}</p><footer><span>班组长：</span><span>施工员：</span><span>安全员：</span><span>现场负责人：</span></footer>
       </article>
       <article class="c1-paper attendance-paper" data-payroll-print-page>
-        <header><h1>{{ document.projectName }} 月度考勤表</h1><p>{{ document.month }} · 负责人：{{ document.leaderName }}</p><p>正常 / 加班工时，空白为未登记；本表与工资表来自同一次发放冻结。</p></header>
+        <header><h1>{{ document.projectName }} 月度考勤表</h1><p>{{ document.month }} · 负责人：{{ document.leaderName }}</p><p>正常 / 加班工时，空白为未登记；本表与工资表来自同一次发放冻结。</p><PayrollOfficialIdentity v-if="officialIssue" :issue="officialIssue" /></header>
         <table class="month-grid">
           <thead>
             <tr>
@@ -80,6 +81,7 @@ const days = computed(() => c1MonthDays(props.document.month))
 <style scoped>
 .payroll-c1-print { display:none; }
 @media print {
+  :global(html:has(body > .payroll-c1-print)) { background:white !important; }
   :global(body:has(> .payroll-c1-print) > :not(.payroll-c1-print)) { display:none !important; }
   :global(body:has(> .payroll-c1-print)) { height:auto !important; overflow:visible !important; background:white !important; }
   .payroll-c1-print { display:block !important; width:100%; color:#111; background:white; }
