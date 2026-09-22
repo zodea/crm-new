@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 162,
+    "trackedPageFiles": 163,
     "devPageFiles": 5,
-    "appPageFiles": 157,
+    "appPageFiles": 158,
     "appNavLeaves": 51,
     "covered": 135,
-    "designPending": 22,
+    "designPending": 23,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -783,6 +783,13 @@
       "status": "design-pending",
       "reason": "各格式工资固定单据的整页编辑入口，无直接对应设计路由；按工资页面、DC 工资蓝本及整页原语实施并单独验收。",
       "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/issue/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "单份冻结工资预览、旧纸号起点与正式出具整页，无直接对应设计路由；沿 DC 工资/整页原语独立验收，不继承外部台账证据。",
+      "issue": "#477"
     },
     {
       "appRoute": "/subcontract/payroll/new",

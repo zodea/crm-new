@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import type { PayrollC2FrozenDocument } from '~/lib/payroll/central-c2-contract'
+import type { PayrollOfficialIssue } from '~/lib/payroll/central-numbering-contract'
 import { c2Number } from '~/lib/payroll/c2-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollHollowFrozenSection from './PayrollHollowFrozenSection.vue'
 
-defineProps<{ document: PayrollC2FrozenDocument }>()
+defineProps<{ document: PayrollC2FrozenDocument, officialIssue?: PayrollOfficialIssue }>()
 </script>
 
 <template>
   <Teleport to="body">
     <div class="payroll-c2-print" aria-hidden="true">
       <article class="c2-paper" data-payroll-print-page>
-        <header><h1>{{ document.projectName }} C2 工资表</h1><p>{{ document.month }} · {{ document.crewName || '未关联班组' }} · 负责人：{{ document.leaderName }}</p><p>本月已确认签工工资 · 月度 100%</p></header>
+        <header><h1>{{ document.projectName }} C2 工资表</h1><p>{{ document.month }} · {{ document.crewName || '未关联班组' }} · 负责人：{{ document.leaderName }}</p><p>本月已确认签工工资 · 月度 100%</p><PayrollOfficialIdentity v-if="officialIssue" :issue="officialIssue" /></header>
         <table>
           <thead>
             <tr>
@@ -43,7 +44,7 @@ defineProps<{ document: PayrollC2FrozenDocument }>()
         </table><p>{{ document.note }}</p><p>发放：{{ document.releasedAt }} · 经办：{{ document.operatorName }}</p><footer><span>班组长：</span><span>施工员：</span><span>安全员：</span><span>现场负责人：</span></footer>
       </article>
       <article class="c2-paper" data-payroll-print-page>
-        <header><h1>{{ document.projectName }} 零星签工表</h1><p>{{ document.month }} · 负责人：{{ document.leaderName }}</p><p>本表与工资表来自同一次发放冻结。</p></header><p>每工标准：{{ c2Number(document.config.unitRate) }} 元</p><p class="rule">
+        <header><h1>{{ document.projectName }} 零星签工表</h1><p>{{ document.month }} · 负责人：{{ document.leaderName }}</p><p>本表与工资表来自同一次发放冻结。</p><PayrollOfficialIdentity v-if="officialIssue" :issue="officialIssue" /></header><p>每工标准：{{ c2Number(document.config.unitRate) }} 元</p><p class="rule">
           计算规则：{{ document.config.ruleText == null ? '未记录' : document.config.ruleText === '' ? '已明确保存为空规则' : document.config.ruleText }}
         </p><table>
           <thead><tr><th>姓名 / 日期</th><th>施工内容</th><th>时段 / 工</th><th>证明人 / 确认日</th><th>签字</th></tr></thead><tbody>

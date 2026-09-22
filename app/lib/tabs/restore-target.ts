@@ -14,6 +14,7 @@ import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { rosterId } from '~/lib/worker-roster/validation'
 import { TAB_TARGET_VERSION } from './restoration-contract'
 import { readRestoredDetail } from './restore-detail'
+import { readRestoredPayrollNumbering } from './restore-payroll-numbering'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
 import { readRestoredWorkerRoster } from './restore-worker-roster'
 
@@ -82,6 +83,7 @@ export interface RestoredDetailPath {
 }
 
 const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDetailPath]> = [
+  [/^\/subcontract\/payroll\/issue\/([^/]+)$/, m => ({ family: 'payroll-numbering', id: m[1]! })],
   [/^\/base\/worker\/private\/([^/]+)$/, m => ({ family: 'worker-private', id: m[1]! })],
   [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)\/hollow\/([^/]+)$/, m => ({ family: 'quantity-hollow', id: m[3]!, secondId: m[1]!, unitId: m[2]! })],
   [/^\/base\/supplier\/credential\/([^/]+)$/, m => ({ family: 'supplier-credential', id: m[1]! })],
@@ -156,6 +158,11 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
+    if (detail?.family === 'payroll-numbering') {
+      if (originValue !== 'real' || url.searchParams.getAll('project').length !== 1 || !isStableRouteIdentity(url.searchParams.get('project')))
+        return null
+      allowed.add('project')
+    }
     if (detail?.family === 'worker-private' || url.pathname === '/subcontract/payroll/roster') {
       if (originValue !== 'real' || (url.searchParams.has('project') && (url.searchParams.getAll('project').length !== 1 || !rosterId(url.searchParams.get('project')))))
         return null
@@ -306,8 +313,10 @@ export function createTabRestoreValidator(options: { repositories: DomainReposit
         return restoreProblem('mismatch')
       parsed.detail = { family: 'schedule-project', id }
     }
-    if (parsed.detail?.family === 'worker-private' || parsed.url.pathname === '/subcontract/payroll/roster') {
+    if (parsed.detail?.family === 'payroll-numbering' || parsed.detail?.family === 'worker-private' || parsed.url.pathname === '/subcontract/payroll/roster') {
       try {
+        if (parsed.detail?.family === 'payroll-numbering')
+          return await readRestoredPayrollNumbering(options.repositories, parsed.inspected.fullPath, parsed.url.searchParams.get('project')!, parsed.detail.id, signal)
         return await readRestoredWorkerRoster(options.repositories, parsed.inspected.fullPath, parsed.detail?.id ?? null, parsed.url.searchParams.get('project'), signal)
       }
       catch (cause) {
