@@ -9,7 +9,7 @@ export const ADAPTERS = {
   'worker-roster-browser': {
     read: '独立私密权限下的工人 owner 与已发工资成员名册；原件按冻结身份读取',
     write: '工人资料追加版本、两类照片与有日期不可变归档；回执核对不保存浏览器私密正文',
-    storage: '中央工作区验证实例与受控原件迁入；生产持久化仍待 #416',
+    storage: '中央工作区验证实例与受控原件迁入；#449 已验证，生产 owner / 工资由 #454 / #467 承接',
     sources: [['app/lib/worker-roster/repository.ts', 'createWorkerRosterRepository'], ['server/utils/worker-roster-service.ts', 'createWorkerRosterService']],
   },
   'central-http': {

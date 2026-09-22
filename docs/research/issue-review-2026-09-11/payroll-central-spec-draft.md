@@ -1,5 +1,7 @@
 # 工资中央链实施规格草稿：来源、发放冻结与独立更正
 
+> 历史准备记录，保留初次调查时态，不表示当前仍未实施或待发布。P0–P7 限定链已随 PR448 合并；2026-09-22 的最终决定、28 项义务及后续子票以[调查收尾](../../design/evidence/issue-412-decision-closeout.md)和当前工资页面为准，勿重做旧反例或重复提出已答问题。
+
 > 非权威源，未发布、未创建实施票；2026-09-12 本地准备稿。当前承接为开放 [#412](https://github.com/zodea/crm-new/issues/412)。调查基线为 `ab056768ebf17dd3a2713bb6bc0df37dbb118ba6`，#445 同期独立验收，本稿不混入其完成结论。本次只读核对代码、文档与 Issue，没有运行工资浏览器、写业务数据或执行测试。
 >
 > 事实入口：[实施前事实核对](payroll-central-facts.md)。有效决定以 [#287 最终决议](https://github.com/zodea/crm-new/issues/287#issuecomment-5294862416)、#412 明确继承的 [#301](https://github.com/zodea/crm-new/issues/301)、[#350](https://github.com/zodea/crm-new/issues/350)、[#351](https://github.com/zodea/crm-new/issues/351)、[#352](https://github.com/zodea/crm-new/issues/352)、[#353](https://github.com/zodea/crm-new/issues/353)、[#354](https://github.com/zodea/crm-new/issues/354)及未被取代的 [#117 最终评论](https://github.com/zodea/crm-new/issues/117)为准。现行权威入口为[工资页面](../../rewrite/pages/subcontract-payroll.md)、[DATABASE](../../rewrite/DATABASE.md)、[术语](../../../CONTEXT.md)、[ADR 0010](../../adr/0010-quantity-matrix-and-construction-record-model.md)和[ADR 0020](../../adr/0020-browser-authority-and-demo-workspace-boundary.md)。本稿记录已可直接作出的实施判断，不重新询问上述已定决定。
