@@ -1,12 +1,12 @@
 <script setup lang="ts">
+import type { LocationQueryRaw } from 'vue-router'
 import type { QuantityMatrixCell, QuantityMatrixViewMode, QuantityOption } from '~/lib/quantity/matrix'
 import type { QuantityProjectSnapshot } from '~/lib/quantity/read-model'
-import { db } from '~/lib/db/client'
-import {
-  loadQuantityConstructionRecords,
-  loadQuantityMonthlyOutput,
-  loadQuantityStageProgress,
-} from '~/lib/quantity/derived'
+import type { DataOriginDTO } from '~/types/read-model'
+import { onActivated, onDeactivated } from 'vue'
+import KitButton from '~/components/ui/KitButton.vue'
+import { payrollSourceQuery } from '~/lib/payroll/a-navigation'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { createQuantityCategoryExport, createQuantityLedgerExport } from '~/lib/quantity/export'
 import {
   ALL_QUANTITY_FILTER,
@@ -15,19 +15,30 @@ import {
   quantityMonthOptions,
   quantityTradeOptions,
 } from '~/lib/quantity/matrix'
-import {
-  buildQuantityFilterQuery,
-  readQuantityFilterQuery,
-} from '~/lib/quantity/navigation'
-import { buildScheduleReturnLocation, parseScheduleDrillContext } from '~/lib/schedule/navigation'
+import { buildQuantityFilterQuery, quantityMatrixReturnPath, readQuantityFilterQuery, readQuantityOrigin } from '~/lib/quantity/navigation'
+
+import { buildScheduleReturnLocation, parseScheduleDrillContext, scheduleSourceQuery, validateScheduleDrillContext } from '~/lib/schedule/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 
 const store = useQuantityStore()
+const scheduleStore = useScheduleStore()
 const route = useRoute()
 const router = useRouter()
 const { confirm, error: toastError, exportFile, formModal, openImportTab, success, warning } = useKitUI()
 
 const projectId = shallowRef('')
+const origin = shallowRef<DataOriginDTO>('real')
+const sourceError = shallowRef('')
+const projectSelection = computed({
+  get: () => JSON.stringify([origin.value, projectId.value]),
+  set: (key: string) => {
+    const project = store.catalog.find(row => JSON.stringify([row.dataOrigin, row.id]) === key)
+    if (project) {
+      origin.value = project.dataOrigin
+      projectId.value = project.id
+    }
+  },
+})
 const buildingId = shallowRef('')
 const month = shallowRef(ALL_QUANTITY_FILTER)
 const viewMode = shallowRef<QuantityMatrixViewMode>('trade')
@@ -47,7 +58,7 @@ const fromBoq = computed(() => Boolean(boqLineId.value))
 
 const scheduleContext = computed(() => parseScheduleDrillContext(route.query))
 const scheduleReturnTo = computed(() => scheduleContext.value
-  ? buildScheduleReturnLocation(scheduleContext.value)
+  ? buildScheduleReturnLocation({ ...scheduleContext.value, filters: quantityFilterQuery() })
   : '/schedule')
 const scheduleSourceLabel = computed(() => scheduleContext.value?.source === 'home'
   ? '来自首页施工进度'
@@ -57,11 +68,11 @@ const scheduleReturnLabel = computed(() => scheduleContext.value?.source === 'ho
   : '返回该工序')
 
 const projectOptions = computed<QuantityOption[]>(() => store.catalog.map(project => ({
-  key: project.id,
-  label: project.code ? `${project.name} · ${project.code}` : project.name,
+  key: JSON.stringify([project.dataOrigin, project.id]),
+  label: `${project.name}${project.code ? ` · ${project.code}` : ''}${project.dataOrigin === 'demo' ? ' · 演示' : ''}`,
 })))
 
-const snapshot = computed(() => store.snapshot)
+const snapshot = computed(() => !sourceError.value && store.snapshot?.projectId === projectId.value && store.dataOrigin === origin.value ? store.snapshot : null)
 const buildingOptions = computed<QuantityOption[]>(() => (snapshot.value?.buildings ?? []).map(building => ({
   key: building.id,
   label: building.name,
@@ -121,38 +132,84 @@ function normalizeFilters(next: QuantityProjectSnapshot, reset = false, restoreS
 
 async function loadSelectedProject(reset = false, restoreScheduleContext = false) {
   const requestedProject = projectId.value
-  await store.loadProject(requestedProject)
-  if (store.snapshot?.projectId === requestedProject)
+  const requestedOrigin = origin.value
+  await store.loadProject(requestedProject, requestedOrigin)
+  if (requestedProject === projectId.value && requestedOrigin === origin.value && store.snapshot?.projectId === requestedProject)
     normalizeFilters(store.snapshot, reset, restoreScheduleContext)
 }
 
+let initializeSequence = 0
+let active = true
+let activated = false
 async function initialize() {
+  const sequence = ++initializeSequence
   initialized.value = false
+  sourceError.value = ''
+  if ((route.query.from === 'schedule' || route.query.from === 'home') && !scheduleContext.value) {
+    sourceError.value = '排程来源参数无效，请从原工序重新打开'
+    initialized.value = true
+    return
+  }
+  const requestedOrigin = readQuantityOrigin(route.query)
+  if (!requestedOrigin) {
+    sourceError.value = '工程量来源无效，请从项目列表重新打开'
+    initialized.value = true
+    return
+  }
   await store.loadCatalog()
+  if (sequence !== initializeSequence || !active)
+    return
   const requestedProjectId = scheduleContext.value?.projectId ?? String(route.query.project ?? '')
-  const preferred = store.catalog.find(project => project.id === requestedProjectId)
-    ?? store.catalog.find(project => project.hasQuantityData)
-    ?? store.catalog[0]
+  const choices = store.catalog.filter(project => project.dataOrigin === requestedOrigin)
+  const preferred = requestedProjectId ? choices.find(project => project.id === requestedProjectId) : choices[0]
+  origin.value = requestedOrigin
   projectId.value = preferred?.id ?? ''
+  if (requestedProjectId && !preferred && !store.error)
+    sourceError.value = '当前来源的项目不可用、已删除或无权读取，请重新选择项目'
   if (projectId.value)
     await loadSelectedProject(true, Boolean(scheduleContext.value))
-  if (!scheduleContext.value && store.snapshot)
+  if (sequence !== initializeSequence || !active)
+    return
+  if (scheduleContext.value && projectId.value && store.snapshot) {
+    try {
+      await scheduleStore.loadProject(projectId.value, undefined, requestedOrigin)
+      if (sequence !== initializeSequence || !active)
+        return
+      sourceError.value = validateScheduleDrillContext(scheduleContext.value, scheduleStore.snapshot, store.snapshot)
+    }
+    catch (cause) {
+      if (sequence === initializeSequence && active)
+        sourceError.value = `排程来源无法核对：${toErrorMessage(cause)}`
+    }
+  }
+  if (store.snapshot)
     restoreRouteFilters(store.snapshot)
   initialized.value = true
   if (fromBoq.value)
     await openTemplates()
 }
 
-watch(projectId, async (next, previous) => {
-  if (!initialized.value || next === previous)
+watch([projectId, origin], async () => {
+  if (!initialized.value || !active)
     return
+  sourceError.value = ''
+  assignmentDialogOpen.value = false
+  completionDialogOpen.value = false
+  batchCompletionDialogOpen.value = false
+  varianceDialogOpen.value = false
+  if (scheduleContext.value && (scheduleContext.value.projectId !== projectId.value || scheduleContext.value.origin !== origin.value)) {
+    const query: LocationQueryRaw = { ...route.query, project: projectId.value, origin: origin.value }
+    for (const key of ['from', 'group', 'task', 'stage', 'item', 'buildings', 'groupName', 'taskName', 'itemName', 'planStart', 'planFinish'])
+      delete query[key]
+    await router.replace({ query })
+  }
   await loadSelectedProject(true)
 })
 
 watch(
-  [projectId, buildingId, month, viewMode, trade, assigneeKey],
+  [projectId, origin, buildingId, month, viewMode, trade, assigneeKey],
   () => {
-    if (!initialized.value || scheduleContext.value)
+    if (!initialized.value || !active || sourceError.value)
       return
     void router.replace({
       query: {
@@ -165,13 +222,15 @@ watch(
 )
 
 async function retry() {
-  if (!store.catalog.length)
+  if (!store.catalog.length || sourceError.value)
     await initialize()
   else
     await loadSelectedProject(false)
 }
 
 function openAssignments(unitId = '', preferredTrade = trade.value) {
+  if (!store.canWrite)
+    return
   assignmentInitialUnitId.value = unitId
   assignmentInitialTrade.value = preferredTrade
   assignmentDialogOpen.value = true
@@ -185,20 +244,23 @@ function configureCell(cell: QuantityMatrixCell): void {
 }
 
 function completeCell(cell: QuantityMatrixCell): void {
+  if (!store.canWrite)
+    return
   completionUnitId.value = cell.unitId
   completionInitialStageId.value = cell.summary?.stageId ?? ''
   completionDialogOpen.value = true
 }
 
 function quantityFilterQuery() {
-  return buildQuantityFilterQuery({
+  return { ...payrollSourceQuery(route.query), ...scheduleSourceQuery(route.query), ...buildQuantityFilterQuery({
     project: projectId.value,
     building: buildingId.value,
     month: month.value,
     view: viewMode.value,
     trade: trade.value,
     assignee: assigneeKey.value,
-  })
+    origin: origin.value,
+  }) }
 }
 
 function restoreRouteFilters(next: QuantityProjectSnapshot) {
@@ -241,8 +303,12 @@ async function openRegions() {
     return
   await router.push({
     path: '/subcontract/quantity/region',
-    query: { project: projectId.value },
+    query: { project: projectId.value, origin: origin.value },
   })
+}
+
+function openStages() {
+  return router.push({ path: '/subcontract/quantity/stages', query: quantityFilterQuery() })
 }
 
 async function openUnitDetail(cell: QuantityMatrixCell) {
@@ -252,7 +318,7 @@ async function openUnitDetail(cell: QuantityMatrixCell) {
   })
 }
 
-// 导入走 ADR 0005 映射页签：三类目标 + 旧合一行迁移预检（蓝本§六）。
+// 日常三类映射使用当前来源；旧合一行预检只保留在显式桌面适配。
 const IMPORT_TARGETS = [
   { label: '户型模板量', entity: 'quantity-template' },
   { label: '责任配置', entity: 'quantity-assignment' },
@@ -261,22 +327,27 @@ const IMPORT_TARGETS = [
 ] as const
 
 async function importData() {
+  if (!store.canImport) {
+    warning('请先读取具有写入权限的正式工程量项目，再开始导入。')
+    return
+  }
+  const targets = isDesktopRuntime() ? IMPORT_TARGETS : IMPORT_TARGETS.filter(target => target.entity !== 'quantity-legacy-precheck')
   const values = await formModal({
     title: '工程量导入',
-    subtitle: '选择导入目标后进入映射页签；旧合一行只做迁移预检，不会写入。',
+    subtitle: isDesktopRuntime() ? '选择导入目标后进入映射页签；旧合一行只做迁移预检，不会写入。' : '按文件中的项目编码核对正式项目；责任须唯一匹配。缺少验收照片的记录请明确填 draft，稍后到户详情补齐。',
     saveText: '进入映射',
     fields: [{
       key: 'target',
       label: '导入目标',
       type: 'select',
-      options: IMPORT_TARGETS.map(target => target.label),
-      value: IMPORT_TARGETS[0].label,
+      options: targets.map(target => target.label),
+      value: targets[0]!.label,
       required: true,
     }],
   })
   if (!values)
     return
-  const target = IMPORT_TARGETS.find(candidate => candidate.label === values.target)
+  const target = targets.find(candidate => candidate.label === values.target)
   if (target)
     openImportTab({ entity: target.entity })
 }
@@ -285,18 +356,26 @@ async function importData() {
 async function exportLedger() {
   if (!projectId.value)
     return
+  const requestedProject = projectId.value
+  const requestedOrigin = origin.value
+  const requestedSequence = initializeSequence
+  const projectName = store.catalog.find(project => project.id === requestedProject && project.dataOrigin === requestedOrigin)?.name ?? ''
+  const requireCurrentSource = () => {
+    if (!active || requestedProject !== projectId.value || requestedOrigin !== origin.value || requestedSequence !== initializeSequence)
+      throw new Error('工程量来源已切换，请从当前矩阵重新导出')
+  }
   try {
-    const [records, progress, monthly] = await Promise.all([
-      loadQuantityConstructionRecords(db, projectId.value),
-      loadQuantityStageProgress(db, projectId.value),
-      loadQuantityMonthlyOutput(db, projectId.value),
-    ])
-    if (!records.length && !progress.length) {
-      warning('当前项目还没有可导出的工程量数据')
-      return
-    }
-    const projectName = store.catalog.find(project => project.id === projectId.value)?.name ?? ''
-    await exportFile(createQuantityLedgerExport({ projectName, records, progress, monthly }))
+    await exportFile(createQuantityLedgerExport({
+      projectName,
+      loadData: async () => {
+        requireCurrentSource()
+        const { records, stageProgress: progress, monthly } = await store.readExportWorkspace(requestedProject, requestedOrigin)
+        requireCurrentSource()
+        if (!records.length && !progress.length)
+          throw new Error('当前项目还没有可导出的工程量数据')
+        return { records, progress, monthly }
+      },
+    }))
   }
   catch (cause) {
     toastError(`工程量导出失败：${toErrorMessage(cause)}`)
@@ -306,8 +385,13 @@ async function exportLedger() {
 async function exportByCategory() {
   if (!projectId.value)
     return
+  const requestedProject = projectId.value
+  const requestedOrigin = origin.value
+  const requestedSequence = initializeSequence
   try {
-    const records = await loadQuantityConstructionRecords(db, projectId.value)
+    const { records } = await store.readExportWorkspace(requestedProject, requestedOrigin)
+    if (!active || requestedProject !== projectId.value || requestedOrigin !== origin.value || requestedSequence !== initializeSequence)
+      return
     if (!records.length) {
       warning('当前项目还没有施工记录可分类导出')
       return
@@ -321,9 +405,13 @@ async function exportByCategory() {
 
 // 归档锁定/解除都要二次确认并落 projects 操作日志（蓝本§六）。
 async function toggleArchive() {
-  if (!projectId.value || !snapshot.value)
+  if (!projectId.value || !snapshot.value || !store.canWrite)
     return
-  const archived = Boolean(snapshot.value.matrixArchivedAt)
+  const confirmedProjectId = projectId.value
+  const confirmedOrigin = origin.value
+  const confirmedSnapshot = snapshot.value
+  const confirmedSequence = initializeSequence
+  const archived = Boolean(confirmedSnapshot.matrixArchivedAt)
   const approved = await confirm({
     variant: 'simple',
     title: archived ? '解除矩阵归档' : '归档工程量矩阵',
@@ -332,12 +420,14 @@ async function toggleArchive() {
       : '归档后修改户型模板、责任指派或完成事实都需要二次确认，操作日志全程保留。确认归档当前项目矩阵？',
     confirmLabel: archived ? '解除归档' : '确认归档',
   })
-  if (!approved)
+  if (!approved || !active || !store.canWrite || projectId.value !== confirmedProjectId
+    || origin.value !== confirmedOrigin || snapshot.value !== confirmedSnapshot || initializeSequence !== confirmedSequence) {
     return
+  }
   try {
     const logId = archived
-      ? await store.unarchiveMatrix(projectId.value)
-      : await store.archiveMatrix(projectId.value)
+      ? await store.unarchiveMatrix(confirmedProjectId)
+      : await store.archiveMatrix(confirmedProjectId)
     if (logId)
       success(archived ? '已解除矩阵归档' : '矩阵已归档锁定')
   }
@@ -347,13 +437,30 @@ async function toggleArchive() {
 }
 
 onMounted(initialize)
+onActivated(() => {
+  active = true
+  if (activated)
+    void initialize()
+  activated = true
+})
+onDeactivated(() => {
+  active = false
+  initializeSequence++
+  store.cancelProject()
+})
+watch(() => [route.query.project, route.query.origin, route.query.from, route.query.group, route.query.task, route.query.stage, route.query.item, route.query.buildings], (next, previous) => {
+  if (active && initialized.value && route.path === '/subcontract/quantity'
+    && (route.query.project !== projectId.value || readQuantityOrigin(route.query) !== origin.value || next.slice(2).some((value, index) => value !== previous?.[index + 2]))) {
+    void initialize()
+  }
+})
 </script>
 
 <template>
   <div class="quantity-screen flex min-w-0 flex-col gap-4">
     <QuantityToolbar
       v-if="store.catalog.length"
-      v-model:project-id="projectId"
+      v-model:project-id="projectSelection"
       v-model:building-id="buildingId"
       v-model:month="month"
       v-model:view-mode="viewMode"
@@ -365,6 +472,8 @@ onMounted(initialize)
       :trade-options="tradeOptions"
       :assignee-options="assigneeOptions"
       :loading="store.loading"
+      :can-write="store.canWrite && !sourceError"
+      :can-import="store.canImport"
       :active-units="matrix.activeUnits"
       :total-units="matrix.totalUnits"
       :matrix-archived-at="snapshot?.matrixArchivedAt ?? null"
@@ -376,10 +485,17 @@ onMounted(initialize)
       @toggle-archive="toggleArchive"
       @manage-regions="openRegions"
       @manage-templates="openTemplates"
+      @manage-stages="openStages"
       @view-variance="varianceDialogOpen = true"
       @manage-assignments="openAssignments()"
       @refresh="retry"
     />
+
+    <PayrollASourceReturn v-if="snapshot && route.query.payrollReturnTo" kind="quantity-project" :source-id="projectId" :project-id="projectId" :origin="origin" />
+    <PayrollACreateFromQuantity v-if="snapshot && !isDesktopRuntime() && !route.query.payrollReturnTo" :project-id="projectId" :origin="origin" :month="month" :return-to="quantityMatrixReturnPath(buildQuantityFilterQuery({ project: projectId, building: buildingId, month, view: viewMode, trade, assignee: assigneeKey, origin }))" />
+    <p v-if="origin === 'demo'" class="panel px-4 py-3 text-12px text-ink-soft" role="status">
+      演示工程量只读。切换正式项目后可按权限配置模板、阶段和施工记录。
+    </p>
 
     <section v-if="scheduleContext" class="panel flex flex-wrap items-center gap-3 border-brand/30 bg-brand-soft/35 px-4 py-3">
       <span class="grid h-8 w-8 flex-none place-items-center rounded-lg bg-brand-soft text-brand">
@@ -395,7 +511,7 @@ onMounted(initialize)
           <span v-if="scheduleContext.planStart" class="ml-1 font-mono">计划 {{ scheduleContext.planStart }} — {{ scheduleContext.planFinish }}</span>
         </div>
       </div>
-      <NuxtLink :to="scheduleReturnTo" class="btn-primary">
+      <NuxtLink :to="scheduleReturnTo" class="btn-primary ">
         <span class="i-lucide-arrow-left mr-1" /> {{ scheduleReturnLabel }}
       </NuxtLink>
     </section>
@@ -412,7 +528,7 @@ onMounted(initialize)
           若该 BOQ 行已唯一命中户型模板，系统会直接定位；可在“三量明细”中维护现场复核算式。
         </div>
       </div>
-      <NuxtLink :to="{ path: '/contract/boq', query: { project: projectId } }" class="btn-primary">
+      <NuxtLink :to="{ path: '/contract/boq', query: { project: projectId } }" class="btn-primary ">
         <span class="i-lucide-arrow-left mr-1" /> 返回合同清单
       </NuxtLink>
     </section>
@@ -430,7 +546,7 @@ onMounted(initialize)
     </section>
 
     <section
-      v-else-if="store.error"
+      v-else-if="sourceError || store.error"
       class="panel flex min-h-64 flex-col items-center justify-center gap-3 border-danger/35 px-6 text-center"
       role="alert"
     >
@@ -439,11 +555,11 @@ onMounted(initialize)
         工程量数据暂时无法读取
       </div>
       <p class="max-w-xl text-12px text-ink-soft">
-        {{ store.error }}
+        {{ sourceError || store.error }}
       </p>
-      <button type="button" class="btn-primary" @click="retry">
+      <KitButton type="button" variant="primary" class="" @click="retry">
         重新加载
-      </button>
+      </KitButton>
     </section>
 
     <section
@@ -457,7 +573,7 @@ onMounted(initialize)
       <p class="text-12px text-ink-soft">
         请先建立项目，再配置楼栋、楼层、户与户型模板。
       </p>
-      <NuxtLink to="/project" class="btn-primary mt-1">
+      <NuxtLink to="/project" class="btn-primary  mt-1">
         前往项目列表
       </NuxtLink>
     </section>
@@ -473,9 +589,9 @@ onMounted(initialize)
       <p class="text-12px text-ink-soft">
         这里只展示真实区域数据。先建立楼栋、楼层和户，再继续责任配置或排程。
       </p>
-      <button type="button" class="btn-primary mt-1" @click="openRegions">
+      <KitButton type="button" variant="primary" class=" mt-1" @click="openRegions">
         配置项目区域
-      </button>
+      </KitButton>
     </section>
 
     <section
@@ -489,15 +605,16 @@ onMounted(initialize)
       <p class="text-12px text-ink-soft">
         切换其他楼栋，或补齐当前楼栋下的楼层和户。
       </p>
-      <button type="button" class="btn-primary mt-1" @click="openRegions">
+      <KitButton type="button" variant="primary" class=" mt-1" @click="openRegions">
         配置楼层与户
-      </button>
+      </KitButton>
     </section>
 
     <template v-else-if="snapshot">
       <QuantityProgressCards :progress="store.stageProgress" />
       <QuantityWorkspace
         :matrix="matrix"
+        :readonly="!store.canWrite"
         @configure="configureCell"
         @complete="completeCell"
         @detail="openUnitDetail"
@@ -508,6 +625,7 @@ onMounted(initialize)
       v-if="projectId"
       v-model:open="assignmentDialogOpen"
       :project-id="projectId"
+      :origin="origin"
       :initial-building-id="buildingId"
       :initial-trade="assignmentInitialTrade"
       :initial-unit-id="assignmentInitialUnitId"
@@ -517,6 +635,7 @@ onMounted(initialize)
       v-if="projectId && completionUnitId"
       v-model:open="completionDialogOpen"
       :project-id="projectId"
+      :origin="origin"
       :unit-id="completionUnitId"
       :initial-stage-id="completionInitialStageId"
     />
@@ -525,6 +644,7 @@ onMounted(initialize)
       v-if="projectId"
       v-model:open="batchCompletionDialogOpen"
       :project-id="projectId"
+      :origin="origin"
       :initial-building-id="buildingId"
       :initial-trade="trade"
     />
@@ -533,6 +653,7 @@ onMounted(initialize)
       v-if="projectId"
       v-model:open="varianceDialogOpen"
       :project-id="projectId"
+      :origin="origin"
       :initial-building-id="buildingId"
     />
   </div>

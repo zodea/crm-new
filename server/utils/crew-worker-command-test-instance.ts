@@ -5,17 +5,25 @@ import type {
   WorkerCommandRequestDTO,
   WorkerFormReadDTO,
 } from '../../app/lib/crew-worker/command-contract'
+import type { CrewPayrollFeeValues } from '../../app/lib/crew-worker/payroll-fee-defaults'
 import type { CrewSourceRow, WorkerSourceRow } from '../../app/lib/crew-worker/read-contract'
 import type { CrewFormDraft, WorkerFormDraft } from '../../app/lib/master-data/forms'
+import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { PayrollCrewFeeDefaults } from '../../app/lib/payroll/central-a-fees-contract'
+import type { PayrollWorkerFact } from '../../app/lib/payroll/central-attendance-contract'
 import type { BusinessSession } from './business-session'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   CREW_WRITE_CAPABILITY,
   WORKER_WRITE_CAPABILITY,
 } from '../../app/lib/crew-worker/command-contract'
+import { CREW_PAYROLL_FEE_FIELDS, crewPayrollFeeValues, updatedCrewPayrollFeeValues } from '../../app/lib/crew-worker/payroll-fee-defaults'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from '../../app/lib/crew-worker/read-contract'
+import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 
 interface Stored<TDraft> {
+  payrollFeeDefaults?: CrewPayrollFeeValues
+  migrationBatchId?: string | null
   id: string
   draft: TDraft
   version: number
@@ -36,6 +44,10 @@ interface Options {
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function explicitRatio(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : null
 }
 
 function fail(code: 'forbidden' | 'validation-failed' | 'not-found' | 'conflict', message: string, fieldErrors: Record<string, string[]> = {}): CrewWorkerRepositoryProblem {
@@ -189,13 +201,21 @@ export function createCrewWorkerCommandTestInstance(options: Options = {}) {
     }
     else {
       const workerDraft = draft as WorkerFormDraft
+      if (workerDraft.dailyWage != null && (typeof workerDraft.dailyWage !== 'number' || !Number.isFinite(workerDraft.dailyWage) || workerDraft.dailyWage < 0))
+        throw fail('validation-failed', '参考日工资必须是非负数值或空值', { dailyWage: ['参考日工资必须是非负数值或空值'] })
       if (workerDraft.crewId && !state.crews.has(workerDraft.crewId))
         throw fail('validation-failed', '所属班组不存在或来源不匹配', { crewId: ['所属班组不存在或来源不匹配'] })
       workerDraft.status = lifecycle(input.request.action)
     }
     const id = existing?.id ?? createId(input.kind)
     const timestamp = now()
-    const stored: Stored<TDraft> = { id, draft: { ...draft, id }, version: (existing?.version ?? 0) + 1, updatedAt: timestamp }
+    const stored: Stored<TDraft> = { id, draft: { ...draft, id }, version: (existing?.version ?? 0) + 1, updatedAt: timestamp, migrationBatchId: existing?.migrationBatchId ?? null }
+    if (input.kind === 'crew') {
+      try {
+        stored.payrollFeeDefaults = updatedCrewPayrollFeeValues(draft, existing ? { draft: existing.draft, values: existing.payrollFeeDefaults ?? updatedCrewPayrollFeeValues(existing.draft) } : undefined)
+      }
+      catch (cause) { throw fail('validation-failed', cause instanceof Error ? cause.message : '班组费用默认无效') }
+    }
     records.set(id, stored)
     state.sourceVersion += 1
     const result = { id, commandId: input.request.commandId, version: String(stored.version), updatedAt: timestamp, attachmentIds: [] }
@@ -204,11 +224,60 @@ export function createCrewWorkerCommandTestInstance(options: Options = {}) {
   }
 
   return {
+    prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
+      const current = stateFor(sessionId)
+      const crews = migratedIdentityRecords(current.crews, snapshot, 'crews', (entity) => {
+        const payrollFeeDefaults = crewPayrollFeeValues(entity.attributes)
+        const displayed = Object.fromEntries(CREW_PAYROLL_FEE_FIELDS.map((field) => {
+          const fact = payrollFeeDefaults[field.fact]
+          return [field.attribute, fact.state === 'value' ? fact.value : field.kind === 'boolean' ? false : null]
+        }))
+        return { id: entity.id, draft: { ...migratedIdentityDraft<CrewFormDraft>('crew', entity), ...displayed, defaultPayRatio: explicitRatio(entity.attributes.defaultPayRatio) }, payrollFeeDefaults, version: 1, updatedAt: migratedIdentityTimestamp(entity) }
+      })
+      const workers = migratedIdentityRecords(current.workers, snapshot, 'workers', entity => ({ id: entity.id, draft: migratedIdentityDraft<WorkerFormDraft>('worker', entity), version: 1, updatedAt: migratedIdentityTimestamp(entity) }))
+      const candidate = { ...current, crews, workers, sourceVersion: current.sourceVersion + (crews === current.crews && workers === current.workers ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => crews.has(result.id) || workers.has(result.id))) }
+      return () => states.set(keyFor(sessionId), candidate)
+    },
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },
     crewRows(sessionId?: string | null): CrewSourceRow[] {
       return [...stateFor(sessionId).crews.values()].map(crewRow)
+    },
+    /** 由工资 owner 授权后消费的原比例证据；缺省表单值不具备迁入来源资格。 */
+    payrollRatioFacts(sessionId?: string | null) {
+      const state = stateFor(sessionId)
+      const rows = [...state.crews.values()].map((stored) => {
+        const value = explicitRatio(stored.draft.defaultPayRatio)
+        const sourceVersion = createHash('sha256').update(JSON.stringify([stored.id, stored.version, stored.updatedAt, value])).digest('hex')
+        return { crewId: stored.id, value, explicitlyConfigured: value !== null, sourceVersion }
+      })
+      return { sourceVersion: `crew-payroll-ratio:${createHash('sha256').update(JSON.stringify(rows)).digest('hex')}`, rows }
+    },
+    /** 工资 owner 授权后消费，版本只绑定费用事实；改名不等于采用旧显示默认。 */
+    payrollCrewFeeDefaults(sessionId?: string | null) {
+      const rows: PayrollCrewFeeDefaults[] = [...stateFor(sessionId).crews.values()].map((stored) => {
+        const values = stored.payrollFeeDefaults ?? updatedCrewPayrollFeeValues(stored.draft)
+        return { crewId: stored.id, ...values, sourceVersion: createHash('sha256').update(JSON.stringify([stored.id, values])).digest('hex') }
+      })
+      return { sourceVersion: `crew-payroll-fees:${createHash('sha256').update(JSON.stringify(rows)).digest('hex')}`, rows }
+    },
+    /** 工资 owner 授权后读取；属性缺失、原 NULL 和明确零分别保留。 */
+    payrollWorkerFacts(sessionId?: string | null) {
+      const rows: PayrollWorkerFact[] = [...stateFor(sessionId).workers.values()].map((stored) => {
+        const raw = stored.draft.dailyWage
+        if (raw != null && (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0))
+          throw fail('validation-failed', '工人原日薪无法确认，不能按缺价或零读取')
+        const fact = {
+          workerId: stored.id,
+          crewId: text(stored.draft.crewId) || null,
+          currentProjectId: text(stored.draft.currentProjectId) || null,
+          dailyWage: raw ?? null,
+          dailyWageState: !Object.hasOwn(stored.draft, 'dailyWage') || raw === undefined ? 'missing' as const : raw === null ? 'null' as const : 'value' as const,
+        }
+        return { ...fact, sourceVersion: createHash('sha256').update(JSON.stringify(fact)).digest('hex') }
+      })
+      return { sourceVersion: `worker-payroll:${createHash('sha256').update(JSON.stringify(rows)).digest('hex')}`, rows }
     },
     workerRows(sessionId?: string | null): WorkerSourceRow[] {
       return [...stateFor(sessionId).workers.values()].map(workerRow)

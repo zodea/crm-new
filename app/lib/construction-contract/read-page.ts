@@ -1,4 +1,4 @@
-import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ProblemDTO } from '../../types/read-model'
 import type {
   ConstructionContractDetailFocusDTO,
   ConstructionContractDetailFocusScope,
@@ -14,6 +14,7 @@ import type {
   ConstructionContractPageSize,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
@@ -25,6 +26,7 @@ import {
 } from './read-contract'
 
 interface BuildConstructionContractListPageInput {
+  receiptsProblem?: ProblemDTO
   contracts: readonly ConstructionContractDetailSource[]
   facts: ConstructionContractFactSources
   query: ConstructionContractListQueryDTO
@@ -34,6 +36,7 @@ interface BuildConstructionContractListPageInput {
 }
 
 interface BuildConstructionContractDetailInput {
+  receiptsProblem?: ProblemDTO
   contracts: readonly ConstructionContractDetailSource[]
   facts: ConstructionContractFactSources
   query: ConstructionContractDetailQueryDTO
@@ -73,7 +76,7 @@ export function parseConstructionContractListQuery(
     search: typeof input?.search === 'string' ? input.search.trim() : '',
     projectId: optional(input?.projectId),
     customerId: optional(input?.customerId),
-    status: optional(input?.status),
+    status: parseContractListFilter(input?.status, () => new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '合同筛选参数无效'))),
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as ConstructionContractPageSize,
   }
@@ -162,7 +165,7 @@ function contractNavigation(source: ConstructionContractDetailSource): Navigatio
 }
 
 function activeSupplement(row: ConstructionContractFactSource): boolean {
-  return !['草稿', '无效', '作废', 'cancelled'].includes(row.status)
+  return !['draft', '草稿', '无效', '作废', 'cancelled'].includes(row.status)
 }
 
 function approvedChange(row: ConstructionContractFactSource): boolean {
@@ -176,10 +179,14 @@ function sameContract<T extends { dataOrigin: string, contractId: string | null 
   return rows.filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)
 }
 
-function changedAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number {
-  const supplements = sameContract(facts.supplements, source)
+export function constructionContractSupplementAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number {
+  return round2(sameContract(facts.supplements, source)
     .filter(activeSupplement)
-    .reduce((sum, row) => sum + (row.amount ?? 0), 0)
+    .reduce((sum, row) => sum + (row.amount ?? 0), 0))
+}
+
+function changedAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number {
+  const supplements = constructionContractSupplementAmount(source, facts)
   const changes = sameContract(facts.changes, source)
     .filter(approvedChange)
     .reduce((sum, row) => sum + (row.amount ?? 0), 0)
@@ -192,9 +199,9 @@ function amounts(source: ConstructionContractDetailSource, facts: ConstructionCo
     changed: money(changedAmount(source, facts)),
     settled: money(source.settledAmount),
     invoiced: money(source.invoicedAmount),
-    received: money(source.receivedAmount),
-    bySettlementReceivable: money(source.settledAmount - source.receivedAmount),
-    invoicedUnreceived: money(source.invoicedAmount - source.receivedAmount),
+    received: source.receivedAmount === null ? null : money(source.receivedAmount),
+    bySettlementReceivable: source.receivedAmount === null ? null : money(source.settledAmount - source.receivedAmount),
+    invoicedUnreceived: source.receivedAmount === null ? null : money(source.invoicedAmount - source.receivedAmount),
   }
 }
 
@@ -211,7 +218,7 @@ export function buildConstructionContractListPage(
         return false
       if (input.query.customerId && row.customerId !== input.query.customerId)
         return false
-      if (input.query.status && row.status !== input.query.status)
+      if (!matchesContractListFilter(row.status, input.query.status))
         return false
       return !search || [row.name, row.no].some(value => value.toLocaleLowerCase('zh-CN').includes(search))
     })
@@ -244,7 +251,7 @@ export function buildConstructionContractListPage(
       contractCount: rows.length,
       changedAmount: money(rows.reduce((sum, row) => sum + changedAmount(row, input.facts), 0)),
       invoicedAmount: money(rows.reduce((sum, row) => sum + row.invoicedAmount, 0)),
-      receivedAmount: money(rows.reduce((sum, row) => sum + row.receivedAmount, 0)),
+      receivedAmount: (dataOrigin === 'real' && input.receiptsProblem) || rows.some(row => row.receivedAmount === null) ? null : money(rows.reduce((sum, row) => sum + row.receivedAmount!, 0)),
     }
   }
   const options = (id: (row: ConstructionContractDetailSource) => string | null, label: (row: ConstructionContractDetailSource) => string) =>
@@ -256,6 +263,7 @@ export function buildConstructionContractListPage(
     .map(value => ({ value, count: filtered.filter(row => row.status === value).length }))
   return {
     items,
+    ...(input.query.origin !== 'demo' && input.receiptsProblem ? { receiptsProblem: input.receiptsProblem } : {}),
     pagination: { page: input.query.page, pageSize: input.query.pageSize, total: filtered.length },
     summary: {
       projects: options(row => row.projectId, row => row.projectName),
@@ -425,6 +433,7 @@ export function buildConstructionContractDetail(
   const canReadSensitive = input.capabilities.includes('construction-contract:sensitive:read')
   return {
     dataOrigin: source.dataOrigin,
+    ...(source.dataOrigin === 'real' && input.receiptsProblem ? { receiptsProblem: input.receiptsProblem } : {}),
     contract: {
       dataOrigin: source.dataOrigin,
       id: source.id,

@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSupplierDetailRead,
   buildSupplierListPage,
+  decodeSupplierDetailRead,
+  decodeSupplierListPage,
   parseSupplierDetailQuery,
   parseSupplierListQuery,
+  serializeSupplierListQuery,
 } from '~/lib/supplier/repository'
 
 const AS_OF = '2026-08-23T00:00:00.000Z'
@@ -47,6 +50,164 @@ function supplier(
 }
 
 describe('分供方中央 Repository contract', () => {
+  it('分供方请款读回不把历史零和未填解释成零元批复', () => {
+    for (const [amount, origin, state, expected] of [[null, 'user-entry', 'not-entered', null], [0, 'legacy', 'legacy-unknown', null], [0, 'user-entry', 'known', '0.00']] as const) {
+      const result = buildSupplierDetailRead({ suppliers: [supplier('s', '分供方')], projects: [], projectSuppliers: [], contracts: [], settlements: [], invoices: [], paymentRecords: [], paymentAllocations: [], paymentApplications: [{ dataOrigin: 'real', id: 'a', supplierId: 's', projectId: null, contractId: null, no: '', name: '请款', applyAmount: 100, approvedAmount: amount, approvedAmountOrigin: origin, status: 'approved', applyDate: null }], query: parseSupplierDetailQuery('s', {}), asOf: AS_OF, sourceVersion: 'approval', capabilities: [] })
+      expect(result.payments[0]).toMatchObject({ approvedAmount: expected, approvedAmountState: state, actualPaidAmount: '0.00' })
+      expect(decodeSupplierDetailRead(result)).toEqual(result)
+    }
+  })
+  it('固定枚举多选同字段取并集、跨字段取交集，分页汇总与自身排除 facet 同步', () => {
+    const suppliers = Array.from({ length: 30 }, (_, index) => supplier(`multi-${index}`, `多选 ${index}`, {
+      supplierCategory: ['材料供应商', '劳务分包商', '设备供应商'][index % 3]!,
+      credentialStatus: index < 20 ? 'qualified' : 'reviewing',
+      taxpayerType: index % 2 ? '小规模纳税人' : '一般纳税人',
+    }))
+    const input = { suppliers, projectSuppliers: [], contracts: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], asOf: AS_OF, sourceVersion: 'multi-enum', capabilities: [] }
+    const query = parseSupplierListQuery({ category: ['材料供应商', '劳务分包商'], credentialStatus: ['qualified', 'reviewing'], columnFilters: { taxpayerType: ['一般纳税人', '小规模纳税人'] }, pageSize: 10, page: 2 })
+    expect(parseSupplierListQuery(serializeSupplierListQuery(query))).toEqual(query)
+    const result = buildSupplierListPage({ ...input, query })
+    expect(result.pagination).toEqual({ page: 2, pageSize: 10, total: 20 })
+    expect(result.summary.origins.real.supplierCount).toBe(20)
+    expect(result.summary.categories).toEqual(expect.arrayContaining([{ value: '设备供应商', label: '设备供应商', count: 10 }]))
+    const narrowed = buildSupplierListPage({ ...input, query: { ...query, credentialStatus: ['qualified'], columnFilters: { taxpayerType: ['一般纳税人'] } } })
+    expect(narrowed.pagination).toEqual({ page: 1, pageSize: 10, total: 7 })
+    expect(narrowed.items.every(item => ['材料供应商', '劳务分包商'].includes(item.supplierCategory) && item.credentialStatus === 'qualified' && item.taxpayerType === '一般纳税人')).toBe(true)
+    expect(narrowed.summary.taxpayerTypes).toEqual(expect.arrayContaining([{ value: '小规模纳税人', label: '小规模纳税人', count: 7 }]))
+    expect(buildSupplierListPage({ ...input, query: { ...query, category: [], credentialStatus: [], columnFilters: { taxpayerType: [] } } }).pagination.total).toBe(30)
+  })
+
+  it('多选编码兼容旧单值和重复参数，去重空白并拒绝非字符串选项', () => {
+    const single = parseSupplierListQuery({ category: '材料供应商', credentialStatus: 'qualified', columnFilters: { taxpayerType: '一般纳税人' } })
+    expect(single).toMatchObject({ category: ['材料供应商'], credentialStatus: ['qualified'], columnFilters: { taxpayerType: ['一般纳税人'] } })
+    expect(serializeSupplierListQuery(single)).toMatchObject({ category: '材料供应商', credentialStatus: 'qualified' })
+    const repeated = parseSupplierListQuery({ category: [' 材料供应商 ', '劳务分包商', '材料供应商', ''], credentialStatus: '["qualified","reviewing","qualified"]' })
+    expect(repeated.category).toEqual(expect.arrayContaining(['材料供应商', '劳务分包商']))
+    expect(repeated.category).toHaveLength(2)
+    expect(repeated.credentialStatus).toHaveLength(2)
+    expect(parseSupplierListQuery(serializeSupplierListQuery(repeated))).toEqual(repeated)
+    for (const value of [[12], ['qualified', null], {}, '[broken']) {
+      expect(() => parseSupplierListQuery({ credentialStatus: value })).toThrow()
+      expect(() => parseSupplierListQuery({ columnFilters: { taxpayerType: value } })).toThrow()
+    }
+    expect(parseSupplierListQuery({ category: 'all', credentialStatus: '[]' })).toMatchObject({ category: null, credentialStatus: null })
+    expect(parseSupplierListQuery({ credentialStatus: ['legacy-state'] }).credentialStatus).toEqual(['legacy-state'])
+  })
+
+  it.each([false, true])('短敏感值在列表、详情和复制后查询保持一致（敏感权限：%s）', (canReadSensitive) => {
+    const raw = { uniqueCode: 'SUP-001', taxNo: 'TAX-01', bankAccount: '1234567', contactPhone: '12345' }
+    const visible = canReadSensitive ? raw : { uniqueCode: 'SUP- **** 01', taxNo: 'TAX- **** 1', bankAccount: '1234 **** 67', contactPhone: '123 **** 5' }
+    const input = {
+      suppliers: [supplier('supplier-1', '短编码验证', raw)],
+      projects: [],
+      projectSuppliers: [],
+      contracts: [],
+      settlements: [],
+      invoices: [],
+      paymentApplications: [],
+      paymentRecords: [],
+      paymentAllocations: [],
+      asOf: AS_OF,
+      sourceVersion: 'single-mask',
+      capabilities: canReadSensitive ? ['supplier:sensitive:read'] : [],
+    }
+    const page = buildSupplierListPage({ ...input, query: parseSupplierListQuery({}) })
+    const detail = buildSupplierDetailRead({ ...input, query: parseSupplierDetailQuery('supplier-1', {}) })
+    expect(page.items[0]).toMatchObject(visible)
+    expect(page.items[0]?.supplier.no).toBe(visible.uniqueCode)
+    expect(detail.supplier).toMatchObject(visible)
+    for (const field of ['uniqueCode', 'taxNo'] as const) {
+      const search = page.items[0]![field]
+      expect(buildSupplierListPage({ ...input, query: parseSupplierListQuery({ search }) }).items).toHaveLength(1)
+    }
+    for (const field of ['uniqueCode', 'taxNo', 'bankAccount', 'contactPhone'] as const) {
+      const contains = { [field]: page.items[0]![field] }
+      expect(buildSupplierListPage({ ...input, query: parseSupplierListQuery({ columnFilters: { contains } }) }).items).toHaveLength(1)
+    }
+    expect(buildSupplierListPage({ ...input, query: parseSupplierListQuery({ search: raw.uniqueCode }) }).items).toHaveLength(canReadSensitive ? 1 : 0)
+    expect(input.suppliers[0]).toMatchObject(raw)
+  })
+
+  it('列表和详情使用同一有效合同与确认结算口径，缺金额保留 partial 与 null', () => {
+    const contract = { dataOrigin: 'real' as const, id: 'contract', supplierId: 'supplier', projectId: null, no: '', name: '', kind: '分包', amount: 100, supplementAmount: 20, signDate: null, status: '生效' }
+    const settlement = { dataOrigin: 'real' as const, id: 'settlement', supplierId: 'supplier', projectId: null, contractId: contract.id, no: '', name: '', settlementType: 'progress', totalAmount: 30, settlementDate: null, status: 'confirmed' }
+    const input = { suppliers: [supplier('supplier', '统计验证')], projects: [], projectSuppliers: [], contracts: [contract, { ...contract, id: 'draft', amount: 999, status: '草稿' }, { ...contract, id: 'cancelled', amount: 888, status: 'cancelled' }], settlements: [settlement, { ...settlement, id: 'approval-is-not-confirmation', totalAmount: 777, status: 'approved' }], invoices: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], asOf: AS_OF, sourceVersion: 'facts', capabilities: [] }
+    const list = buildSupplierListPage({ ...input, query: parseSupplierListQuery({}) })
+    const detail = buildSupplierDetailRead({ ...input, query: parseSupplierDetailQuery('supplier', {}) })
+    expect(list.items[0]).toMatchObject({ cumulativeContractAmount: '120.00', contractAmount: '120.00', settlementAmount: '30.00' })
+    expect(detail.summary.contractAmount.value).toBe('120.00')
+    expect(detail.summary.settlementAmount.value).toBe('30.00')
+    const unknown = { ...input, contracts: [{ ...contract, supplementAmount: null }], settlements: [{ ...settlement, totalAmount: null }] }
+    const unknownList = decodeSupplierListPage(buildSupplierListPage({ ...unknown, query: parseSupplierListQuery({}) }))
+    const unknownDetail = decodeSupplierDetailRead(buildSupplierDetailRead({ ...unknown, query: parseSupplierDetailQuery('supplier', {}) }))
+    expect(unknownList.items[0]).toMatchObject({ cumulativeContractAmount: null, contractAmount: null, settlementAmount: null })
+    expect(unknownList.summary.origins.real.contractAmount).toBeNull()
+    expect(unknownDetail.contracts[0]?.effectiveAmount).toBeNull()
+    expect(unknownDetail.settlements[0]?.totalAmount).toBeNull()
+    expect(unknownDetail.summary.contractAmount).toMatchObject({ value: null, status: 'partial', missingSources: ['contract'] })
+    expect(unknownDetail.summary.settlementAmount).toMatchObject({ value: null, status: 'partial', missingSources: ['settlement'] })
+    expect(unknownDetail.summary.payableAmount.value).toBeNull()
+    expect(buildSupplierListPage({ ...unknown, query: parseSupplierListQuery({ columnFilters: { ranges: { contractAmount: { min: 0 } } } }) }).items).toEqual([])
+  })
+
+  it('表头条件先筛完整集合，数值排序分页，facet不被自身选中值锁死', () => {
+    const suppliers = Array.from({ length: 25 }, (_, index) => supplier(`supplier-${index}`, `列表 ${index}`, {
+      laborScope: index < 22 ? '石材安装' : '电梯安装',
+      taxpayerType: index % 2 ? '小规模纳税人' : '一般纳税人',
+    }))
+    const input = {
+      suppliers,
+      projectSuppliers: [],
+      contracts: [],
+      paymentApplications: [],
+      paymentRecords: [],
+      paymentAllocations: [],
+      asOf: AS_OF,
+      sourceVersion: 'query-test',
+      capabilities: [],
+    }
+    const query = parseSupplierListQuery({ page: 2, pageSize: 10, sort: 'projectCount-desc', columnFilters: JSON.stringify({ contains: { laborScope: ' 石材 ' }, ranges: { projectCount: { min: 0, max: 0 } } }) })
+    expect(parseSupplierListQuery(serializeSupplierListQuery(query))).toEqual(query)
+    const page = buildSupplierListPage({ ...input, query })
+    expect(page.pagination).toEqual({ page: 2, pageSize: 10, total: 22 })
+    expect(page.items).toHaveLength(10)
+    const clamped = buildSupplierListPage({ ...input, query: { ...query, page: 999 } })
+    expect(clamped.pagination).toEqual({ page: 3, pageSize: 10, total: 22 })
+    expect(clamped.items).toHaveLength(2)
+    expect(page.summary.origins.real.supplierCount).toBe(22)
+    const selected = buildSupplierListPage({ ...input, query: parseSupplierListQuery({ columnFilters: { taxpayerType: '一般纳税人' } }) })
+    expect(selected.summary.taxpayerTypes).toEqual(expect.arrayContaining([
+      { value: '一般纳税人', label: '一般纳税人', count: 13 },
+      { value: '小规模纳税人', label: '小规模纳税人', count: 12 },
+    ]))
+  })
+
+  it('敏感查询只匹配可见值；真实零结算与未接入分开，草稿不计入累计', () => {
+    const input = {
+      suppliers: [supplier('supplier-1', '来源验证')],
+      projectSuppliers: [],
+      contracts: [],
+      paymentApplications: [],
+      paymentRecords: [],
+      paymentAllocations: [],
+      asOf: AS_OF,
+      sourceVersion: 'fact-test',
+      capabilities: [],
+    }
+    expect(buildSupplierListPage({ ...input, query: parseSupplierListQuery({ search: '6217850012345678' }) }).items).toEqual([])
+    expect(buildSupplierListPage({ ...input, query: parseSupplierListQuery({ columnFilters: { contains: { bankAccount: '6217850012345678' } } }) }).items).toEqual([])
+    const noSource = buildSupplierListPage({ ...input, query: parseSupplierListQuery({}) })
+    expect(noSource.items[0]).toMatchObject({ settlementAmount: null, laborScope: '', businessLicense: { state: 'unavailable', fileCount: null, fileIds: [] } })
+    const confirmed = { dataOrigin: 'real' as const, id: 's-1', supplierId: 'supplier-1', projectId: null, contractId: null, no: 'S1', name: '真实结算', settlementType: 'final', totalAmount: 18, settlementDate: null, status: 'confirmed' }
+    const page = buildSupplierListPage({ ...input, settlements: [confirmed, { ...confirmed, id: 's-2', totalAmount: 90, status: 'draft' }], query: parseSupplierListQuery({ columnFilters: { ranges: { settlementAmount: { min: 18, max: 18 } } } }) })
+    expect(page.items[0]?.settlementAmount).toBe('18.00')
+    const oldPayload = structuredClone(noSource) as unknown as { items: Record<string, unknown>[] }
+    delete oldPayload.items[0]!.laborScope
+    expect(decodeSupplierListPage(oldPayload).items[0]?.laborScope).toBe('')
+    for (const columnFilters of [{ contains: { unsupported: 'x' } }, { ranges: { contractAmount: { min: 2, max: 1 } } }, '{broken'])
+      expect(() => parseSupplierListQuery({ columnFilters })).toThrow()
+  })
+
   it('列表在中央侧筛选分页并只返回语义详情目标', () => {
     const page = buildSupplierListPage({
       suppliers: [

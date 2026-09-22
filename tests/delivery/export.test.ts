@@ -76,6 +76,25 @@ function base64Bytes(value: string): Uint8Array {
 }
 
 describe('送货单 Excel 导出', () => {
+  it('中央 ZIP 的长文件名与重名原件在实际路径和台账中保持一致，不截断扩展名或 emoji', async () => {
+    const fileName = `${'材料'.repeat(58)}📄📄.pdf`
+    const bytes = new TextEncoder().encode('%PDF-1.7\noriginal\n%%EOF')
+    const records = ['a', 'b'].map(id => record({ id, orderNo: id, dataOrigin: 'real', assetId: id, hasSourceFile: true, fileName }))
+    const result = await createDeliveryArchiveZip(records, { projectName: () => '项目', supplierName: () => '供应商' }, {
+      convertImagesToPdf: false,
+      loadSource: async () => ({ fileName, mimeType: 'application/pdf', fileSize: bytes.length, bytes }),
+    })
+    const entries = zipEntries(result.data)
+    const originals = entries.filter(entry => entry.name.startsWith('原件/'))
+    expect(new Set(originals.map(entry => entry.name)).size).toBe(2)
+    expect(originals.every(entry => entry.name.endsWith('.pdf') && !entry.name.includes('\uFFFD'))).toBe(true)
+    expect(originals.every(entry => [...entry.data].join() === [...bytes].join())).toBe(true)
+    const workbook = XLSX.read(entries.find(entry => entry.name === '送货单明细.xlsx')!.data, { type: 'array' })
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets['送货单明细']!, { header: 1 }).slice(2)
+    expect(rows.map(row => row[10])).toEqual(result.rows.map(row => row.sourceFile))
+    expect(new Set(rows.map(row => String(row[10]).replace(' / —', '')))).toEqual(new Set(originals.map(entry => entry.name)))
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -214,6 +233,30 @@ describe('送货单 Excel 导出', () => {
     expect(entries.map(entry => entry.name)).not.toContain('图片原件合并.pdf')
     const explanation = entries.find(entry => entry.name === '导出说明.txt')
     expect(new TextDecoder().decode(explanation?.data)).toContain('PDF 原件未重建或合并')
+  })
+
+  it('中央共用资产逐条重验 owner，任何逻辑单据越权都阻止整包导出', async () => {
+    const records = ['a', 'b'].map(id => record({ id, assetId: 'shared-asset', dataOrigin: 'real', hasSourceFile: true, printBatchId: 'shared', orderNo: id }))
+    const loadSource = vi.fn(async (current: DeliveryRecord) => {
+      if (current.id === 'b')
+        throw new Error('第二张逻辑单据的分供方权限已撤销')
+      return { fileName: '完整.pdf', mimeType: 'application/pdf', fileSize: 3, bytes: new Uint8Array([1, 2, 3]) }
+    })
+    await expect(createDeliveryArchiveZip(records, { projectName: () => '项目', supplierName: () => '分供方' }, { convertImagesToPdf: false, loadSource })).rejects.toThrow('权限已撤销')
+    expect(loadSource.mock.calls.map(call => call[0].id)).toEqual(['a', 'b'])
+  })
+
+  it('中央同一旧打印批次的缺原件记录不借其他逻辑单据原件，不同资产分别保留', async () => {
+    const records = [record({ id: 'one', dataOrigin: 'real', assetId: 'asset-one', hasSourceFile: true }), record({ id: 'two', dataOrigin: 'real', assetId: 'asset-two', hasSourceFile: true }), record({ id: 'missing', dataOrigin: 'real', assetId: null, hasSourceFile: false })]
+    const result = await createDeliveryArchiveZip(records, { projectName: () => '项目', supplierName: () => '分供方' }, { convertImagesToPdf: false, loadSource: async current => ({ fileName: `${current.id}.pdf`, mimeType: 'application/pdf', fileSize: 1, bytes: new Uint8Array([current.id === 'one' ? 1 : 2]) }) })
+    expect(result.sources).toHaveLength(2)
+    expect(result.missingRecordIds).toEqual(['missing'])
+    expect(result.rows.find(row => row.exception.includes('缺少原件'))?.sourceFile).toBe('—')
+  })
+
+  it('中央同一资产回读出不同字节时明确失败，不取第一份掩盖冲突', async () => {
+    const records = ['a', 'b'].map(id => record({ id, dataOrigin: 'real', assetId: 'asset', hasSourceFile: true, orderNo: id }))
+    await expect(createDeliveryArchiveZip(records, { projectName: () => '项目', supplierName: () => '分供方' }, { convertImagesToPdf: false, loadSource: async current => ({ fileName: '原件.pdf', mimeType: 'application/pdf', fileSize: 1, bytes: new Uint8Array([current.id === 'a' ? 1 : 2]) }) })).rejects.toThrow('原件')
   })
 
   it('用浏览器 API 边界替身覆盖 PNG/JPG 到图片 PDF 的生产编排且不栅格化 PDF 原件', async () => {

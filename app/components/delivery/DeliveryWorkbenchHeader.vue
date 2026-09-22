@@ -32,7 +32,7 @@ const emit = defineEmits<{
           送货单识别工作台
         </div>
         <div class="mt-0.5 text-11px text-ink-faint">
-          PaddleOCR-VL 1.6 · 自动裁边扶正 · 表格提取 · 归档即入库 · 打印单独回执
+          PaddleOCR-VL 1.6 · 自动裁边扶正 · 表格提取 · 人工核对归档 · 打印单独回执
         </div>
       </div>
       <button type="button" class="btn-secondary" :disabled="!pendingCount" @click="emit('recognizeAll')">

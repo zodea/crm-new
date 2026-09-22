@@ -1,0 +1,38 @@
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/c1-spec-independent.test.ts (6 tests | 1 failed) 92ms
+   × 批量关闭在其他页签取消时，考勤已确认但尚未卸载的原稿仍须保留 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/c1-spec-independent.test.ts > 批量关闭在其他页签取消时，考勤已确认但尚未卸载的原稿仍须保留
+AssertionError: expected undefined to deeply equal { Object (hours, overtimeHours, ...) }
+
+- Expected:
+{
+  "hours": 7.51,
+  "note": "",
+  "overtimeHours": 0,
+  "workContent": "关闭整批取消后仍须保留",
+}
+
++ Received:
+undefined
+
+ ❯ tests/payroll/c1-spec-independent.test.ts:153:32
+    151|     expect(confirm).toHaveBeenCalledOnce()
+    152|     expect(tabs.tabs.some(tab => tab.key === key)).toBe(true)
+    153|     expect(ui.cellDraft.value).toEqual(input)
+       |                                ^
+    154|   }
+    155|   finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  11:52:00
+   Duration  7.68s (transform 844ms, setup 0ms, import 1.28s, tests 92ms, environment 5.47s)
+

@@ -2,13 +2,16 @@
 import type { F2SaveAction, ProjectContractFormDraft } from '~/lib/contract/forms'
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useContractFormNavigation } from '~/composables/useContractFormNavigation'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { F2_FORM_META, f2FormDefaults } from '~/lib/contract/page'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/repository'
 import { MaterialContractCommandConflictError, useMaterialContractCommandStore } from '~/stores/material-contract-command'
 
 const route = useRoute()
 const store = useMaterialContractCommandStore()
+const commandSession = store.createSession()
+const { closeCurrent, openNew } = useContractFormNavigation('material')
 const { confirm, success, warning, error } = useKitUI()
 const {
   attachments,
@@ -39,7 +42,6 @@ const closeAfterSave = ref(true)
 const savedSnapshot = shallowRef('')
 const context = shallowRef<Awaited<ReturnType<typeof store.hydrate>>['context'] | null>(null)
 const lineItemsEditor = useTemplateRef<{ validate: () => { row: number, key: string }[] }>('lineItemsEditor')
-let allowLeave = false
 
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value || attachmentDirty.value)
 const pageState = computed(() => loading.value ? 'loading' : loadError.value ? 'error' : 'ready')
@@ -64,7 +66,7 @@ async function initialize(targetId = routeId.value) {
   fieldErrors.value = {}
   resetAttachments()
   try {
-    const hydrated = await store.hydrate(targetId)
+    const hydrated = await store.hydrate(commandSession, targetId)
     if (request !== initializeRequest)
       return
     context.value = hydrated.context
@@ -128,24 +130,28 @@ async function save(action: FormFooterAction) {
   }
   loadingAction.value = action
   try {
-    const result = await store.saveForm(draft.value, saveAction, attachmentChanges())
+    const result = await store.saveForm(commandSession, draft.value, saveAction, attachmentChanges())
     clearPendingAttachments()
-    success(saveAction === 'draft' ? '草稿已保存到中央后台' : '材料采购合同已保存到中央后台')
+    success(saveAction === 'draft' ? '草稿已保存' : '材料采购合同已保存')
+    savedSnapshot.value = JSON.stringify(draft.value)
+    if (action === 'saveNew') {
+      await openNew(() => initialize(null))
+      return
+    }
     if (closeAfterSave.value) {
-      allowLeave = true
+      closeCurrent()
       await navigateTo({
         path: `/contract/${encodeURIComponent(result.id)}`,
         query: { origin: 'real', contractKind: 'material', returnTo: returnTo.value },
       })
       return
     }
-    allowLeave = true
+    closeCurrent()
     await navigateTo({
       path: `/contract/material/form/${encodeURIComponent(result.id)}`,
       query: { origin: 'real', returnTo: returnTo.value },
     }, { replace: true })
     await initialize(result.id)
-    allowLeave = false
   }
   catch (cause) {
     if (cause instanceof MaterialContractCommandConflictError) {
@@ -156,7 +162,7 @@ async function save(action: FormFooterAction) {
         confirmLabel: '载入最新版',
         cancelLabel: '保留我的内容',
       })
-      store.adoptConflictVersion(cause.latest)
+      store.adoptConflictVersion(commandSession, cause.latest)
       if (reload) {
         draft.value = cause.latest.draft
         resetAttachments(cause.latest.attachments)
@@ -180,17 +186,17 @@ async function save(action: FormFooterAction) {
 async function leave() {
   if (dirty.value && !await confirm({ variant: 'simple', title: '放弃修改', message: '当前表单还有未保存内容，确认离开？', confirmLabel: '放弃修改' }))
     return
-  allowLeave = true
+  closeCurrent()
   await navigateTo(returnTo.value)
 }
 
-onBeforeRouteLeave(async () => allowLeave || !dirty.value || await confirm({ variant: 'simple', title: '放弃修改', message: '当前表单还有未保存内容，确认离开？', confirmLabel: '放弃修改' }))
+useTabCloseGuard(async () => !dirty.value || await confirm({ variant: 'simple', title: '放弃修改', message: '当前表单还有未保存内容，确认离开？', confirmLabel: '放弃修改' }))
 watch(routeId, id => void initialize(id), { immediate: true })
 useTabTitle(title)
 </script>
 
 <template>
-  <EntityFormShell :title="title" subtitle="正式材料采购合同统一写入中央命令服务；演示数据不可编辑。" back-label="返回材料采购合同" :sections="F2_FORM_META.material.sections" :state="pageState" :state-title="loadError || '正在载入中央表单'" state-action-label="重新载入" @back="leave" @state-action="initialize">
+  <EntityFormShell :title="title" back-label="返回材料采购合同" :sections="F2_FORM_META.material.sections" :state="pageState" :state-title="loadError || '正在载入表单'" state-action-label="重新载入" @back="leave" @state-action="initialize">
     <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
       <ContractFormFields kind="material" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="emptyLookup" :fetch-suppliers="fetchSuppliers" :fetch-original-contracts="emptyLookup" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError" />
       <ContractLineItemsEditor ref="lineItemsEditor" :lines="draft.lineItems ?? []" @update="patchDraft({ lineItems: $event })" />

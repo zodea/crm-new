@@ -1,6 +1,6 @@
 # 数据库设计 — 全局实体关系 + 外键索引 + 建表顺序
 
-> 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；后台物理库结构待迁移切片落地，不能把本文件中的本地 seed 策略解释为正式工作区初始化。
+> 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 
 当前落地事实（#279、#294、#320、#321）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。Tauri 不消费浏览器演示偏好，仍只连接原有 `sqlite:crm.db`。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份与 canonical 施工/分包合同的一次性分类、ID 映射、导入、对账和回滚使用同一受控迁移；其余领域仍由后续迁移票完成。
 
@@ -129,13 +129,20 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 
 | 字段 | 权威语义 | 必填/状态规则 |
 |---|---|---|
+| `unique_code` | 分供方内部唯一识别码；中央字段 `uniqueCode` | 与税号独立维护，非空时按 [COMMANDS.md](./COMMANDS.md) 的身份校验分别判重 |
+| `tax_no` | 统一社会信用代码/纳税人识别号；中央字段 `taxNo` | 与内部编码独立维护，不以旧 OCR 或导出标签推断二者等义 |
+| `external_ref` | 外部旧 ID / 匹配标识 | 迁移、二次导入与对账身份，唯一性沿本节上方既有规则，不替代内部编码或税号 |
+| `business_type` | 经营类型，分供方业务描述的可选自由文本 | 保留原值，不推导成第二套类别；分供方类别仍使用 CONTEXT.md 的权威七类 |
+| `labor_scope` | 劳务承包范围；中央字段 `laborScope`，词义见 [CONTEXT.md](../../CONTEXT.md#业务) | 可选自由文本，默认空字符串；独立于 `main_business`，不按类别强制必填，也不从既有主营业务自动回填；修改不改变资料齐全度或既有人工作出的核验结论 |
 | `address` | 营业执照登记的住所/注册地址 | 工商信息；不得与经营地址或开票地址混用 |
 | `invoice_address` | 分供方确认使用的开票资料地址 | 选填；可从注册地址一次性复制，但保存后独立维护、不永久联动 |
 | `phone` | 公司电话/开票资料电话 | 选填；与联系人手机 `contact_phone` 分开，不影响资料齐全度 |
 | `taxpayer_type` | 纳税人类型 | 选填，默认“未核验”；经官方查询或人工资料确认后填写，“未查到”不得自动推导为“小规模纳税人” |
 | `credential_status` | 资料齐全度与人工核验结论 | `incomplete` 缺失/过期；`reviewing` 齐全待核验；`qualified` 人工合格；`rejected` 人工退回 |
 
-`credential_reviewed_at TEXT NULL` 与 `credential_review_note TEXT DEFAULT ''` 是供应商级人工核验凭证：人工通过记录时间和可选备注，人工退回时备注必填；操作人字段待账号体系落地后补充。系统只可按资料规则自动写入 `incomplete/reviewing`，不得自动写入 `qualified/rejected`。迁移 v36 会把没有该级凭证的旧 `qualified` / `rejected` 按真实文件重新计算，不用单份证照的 `verified_at` 冒充整户审核。
+2026-09-08 已将 `labor_scope` 接入本地迁移 v48、中央源模型/读写 DTO/解码及表单映射。存量留空，读取旧载荷缺字段时按空值兼容。显式清空保存为空字符串，更新载荷未提供该字段则保留原值；不制造工种枚举或独立关联实体。状态、审计和写入权限沿现有分供方主档契约；审计只记字段名等既定元信息。当前存在旧编码标签混写时保留原始值，按来源核对后更正，不按长度自动将内部编码迁为税号。
+
+`credential_reviewed_at TEXT NULL` 与 `credential_review_note TEXT DEFAULT ''` 是旧 SQLite 的供应商级人工核验凭证：人工通过记录时间和可选备注，人工退回时备注必填；该历史物理 schema 没有操作人字段。#446 中央凭证另外使用当前服务端会话的 `actorId`，历史没有操作者时保持 `null`，不补成迁入人。系统只可按资料规则自动写入 `incomplete/reviewing`，不得自动写入 `qualified/rejected`。迁移 v36 会把没有该级凭证的旧 `qualified` / `rejected` 按真实文件重新计算，不用单份证照的 `verified_at` 冒充整户审核。
 
 广东省内分供方可从应用打开[广东省电子税务局一般纳税人资格查询](https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx)辅助核验。应用只负责复制税号、打开官网及记录人工确认结果；验证码由用户在官网完成，不爬取页面、不绕过验证码，也不把该页面当作稳定 API。
 
@@ -146,6 +153,20 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 有效期的“已过期 / 30 天内临期”统一按 `Asia/Shanghai` 业务日期判断，避免 UTC 日界线造成提前或延后一天。证照新增、OCR 核对、独立有效期编辑、删除和撤回写入 `supplier_credential_audits`：该表只保存动作、分类变化、变更字段名、有效期前后值与置信度，不保存 OCR 原文或人工确认正文；删除/撤回按明确的证照 ID 与 `deleted_at` 在同一事务恢复。上述动作不得使用通用 `operation_logs` 对 `supplier_credentials` 或 `suppliers` 做整行前后快照，避免复制 OCR 原文、税号和银行账号。
 
 供应商新增、编辑、导入、删除/撤回、人工资料核验与纳税人核验统一写 `supplier_audits`。该表只保存 `action`、规范化 `outcome`、`source_category`、变更字段名、备注是否存在和时间，不保存税号、银行账号、核验备注正文或外部来源原文。供应商与证照即使误走通用日志，快照也必须先按安全字段白名单脱敏；迁移 v36 会逐行清洗历史 `operation_logs` 中 `suppliers` / `supplier_credentials` 的敏感快照，坏 JSON 安全置空而不阻断升级。
+
+### 分供方证照中央事实（#446）
+
+浏览器证照以中央 `(dataOrigin, supplierId)` 为唯一所有者，主档、列表与证照页共用当前资料状态和原件投影。证照专用领域保存稳定证照身份、文件关系与正文、类别要求、有效期、整体人工凭证、原始及已确认 OCR 事实和专用审计；普通主档附件集合仍为空。#447 在 #446 保全历史的基础上接通日常 OCR 识别与人工回填，上传和迁移均不自动重新识别。Tauri 历史 schema 与本地适配不被中央接管改写。
+
+资料状态从当前有效必需原件、类别要求及上海业务日期派生；人工结论只在整体凭证仍有效时保留。中央主档关键字段真实变化和影响必需资料的命令与凭证失效原子协调，字段范围及可见行为只见[分供方蓝本](./pages/base-supplier.md#credentialstatus-流转)。无关可选资料、无变化的要求值或普通非关键字段不误撤销结论；普通表单与导入不能伪造人工态。
+
+受控迁移读取 `suppliers`、`supplier_credentials`、`supplier_credential_requirements`、所属 `file_refs` 及 `file_payloads`、`supplier_credential_audits` 和 `supplier_audits` 的完整关联图，保留软删除、旧 ID 映射、原始与人工确认 OCR、整体核验凭证及审计原义。文件引用必须属于对应证照；缺关系或歧义阻断，不按名称合并。只有路径而无正文时保留线索，不能据路径读取文件或计入齐全度。历史没有整体人工凭证的合格/退回按当前资料重算，内部码与税号保持原义，敏感原文不进入动作审计。
+
+#447 的识别快照关联当前原件 ID、正文摘要、识别时间、原始服务结果与已解析候选；候选有稳定身份，同一目标字段的矛盾值不得合并成一个隐式结果。新识别的信用代码/纳税人识别号指向 `taxNo`，不写内部码 `uniqueCode`。人工确认单独保存所依据的识别身份、逐字段决定、实际确认值、类别、有效期及确认时间，也保存类别和长期有效各自的采用方式；再次识别仅更新待核对事实，保留上次人工确认。可解释的历史候选沿原字段含义受控投影为续核对来源，读取不改写旧事实；不可识别格式保留历史并提示重新识别。
+
+人工税务核验沿主档既有五字段保存结果及来源，服务端生成时间，专用审计只含元信息。普通主档保存、导入和 OCR 回填不能采用来稿中的核验凭证：当前税号与纳税人类型均未变时保留已有凭证，实际变化时清除不再适用的凭证。专用核验和 OCR 确认复用主档与证照的同步事务，主档重复校验失败时不发布部分确认。
+
+迁移候选在统一协调器中准备、核对后原子发布；二次确认不覆盖已接管后的日常更正。回滚仅撤回未发生日常更正的本批证照图，独立中央记录保留；若本批证照已有日常更正，或独立记录仍依赖待撤回的主档或图，先整体拒绝，任何参与领域都不提前撤回。操作入口与失败恢复见[迁移指南](../guides/local-data-migration.md#分供方证照迁移范围)，当前实例的部署边界仍按 ADR 0020。
 
 迁移 v36 创建严格限定关键列的 `AFTER UPDATE OF name, unique_code, tax_no, legal_rep, address, bank, bank_account` 触发器。只有这些字段的 `OLD/NEW` 实际不同且旧状态为人工 `qualified/rejected` 时，才清除人工凭证并按真实原件、逐类别要求和上海业务日回算 `incomplete/reviewing`；纳税人核验、备注和 `updated_at` 更新不得误触发。列表每次加载前还会按当前上海业务日批量检查人工结论，只让已经缺失/过期或无有效凭证的历史人工态失效，仍有效的人工结论保持不变。除 `reviewCredentials` 外，表单、store 和导入入口均不得写入 `qualified/rejected` 或伪造审核时间/备注。
 
@@ -291,7 +312,7 @@ Issue #323—#327 的核心迁移拓扑使用逻辑实体名 `owner_documents`�
 - `owner_final_settlements`：作为甲方最终结算唯一头事实；报审/审定金额分字段读取，审定事实缺失保持 `null`。
 - `owner_penalties`：作为甲方罚扣唯一头事实；保留联系单号、罚扣金额/日期/事由、申诉说明、状态与备注，不拆成项目罚扣或分包抵扣记录。
 - `subcontract_change_orders`：作为分包变洽签唯一头事实；保留项目、分供方、分包合同、审批金额、变更面积、实际审定价、日期、事由、状态与备注，不拆成分包结算或项目罚扣记录。
-- `receipt_registrations`：在 `owner_documents` 之前作为一等迁移实体，按稳定项目/合同/客户外键归属，供最终结算查询时聚合与收款详情下钻。
+- `receipt_registrations`：在 `owner_documents` 之前作为一等迁移实体，按稳定项目、主客户及可选施工合同外键归属。#436 携带该表全部已存字段、审计时间及 `file_refs` / `file_payloads` 的元数据与正文；缺字段、缺正文不猜测补齐。确认后接管到普通收款同一命令事实源，客户、合同、项目和最终结算查询聚合；同批再次同步保留中央更正，回滚仅撤销该批记录及附件，独立新建记录不串批次。字段和关联仍以下方表定义为准，当前测试实例不代表生产持久化完成。
 - canonical 施工合同迁移嵌套快照：同步完整、未软删除的 `boq_lines` 目录，以及按期次与稳定 BOQ 行派生的 field 完成量事实。它们不另建业务表，但不得只从旧变洽签/旧月报量明细反推，否则从未成单的 BOQ 行和新期次事实会在切换后消失。历史单据行是冻结时点证据：同一稳定 BOQ ID 已在完整目录中时只校验项目—合同归属，不用历史名称、数量或单价覆盖当前 canonical 目录；只有目录缺行时才以历史行兜底。
 - `file_refs`：按真实 `owner_type + owner_id` 取有效文件引用，不复制文件正文。
 
@@ -386,7 +407,8 @@ CREATE TABLE payment_applications (
   pay_content     TEXT,
   prepay_deduct   REAL,
   prepay_note     TEXT,
-  approved_amount REAL,
+  approved_amount REAL DEFAULT NULL CHECK (approved_amount IS NULL OR approved_amount >= 0),
+  approved_amount_origin TEXT NOT NULL DEFAULT 'legacy' CHECK (approved_amount_origin IN ('legacy', 'user-entry')),
   paid_amount     REAL,                -- 兼容旧列，只读；新值由已确认支付记录分摊派生（§10.2）
   external_ref    TEXT DEFAULT '',      -- 外部业务键；导入时用于幂等和来源关联
   status          TEXT DEFAULT 'draft',
@@ -417,6 +439,8 @@ CREATE TABLE payment_application_invoice_allocations (
 
 ### 2.5 物资管理类
 
+本节 SQLite 表仍是现有来源结构。[材料到货与送货归档基数决定](https://github.com/zodea/crm-new/issues/284)、[甲供材供货身份与计划决定](https://github.com/zodea/crm-new/issues/285)及[已确认材料结算冲销决定](https://github.com/zodea/crm-new/issues/291)已经采纳；不能因为下文尚保留旧表而重新讨论单一明细、Party/计划行或整张冲销。目标结构、旧表退役和迁移的实际完成度按[物资模块复核](https://github.com/zodea/crm-new/issues/411)与[合同及材料结算复核](https://github.com/zodea/crm-new/issues/409)逐项核验，不由本段宣告完成。缺价格可保留归档到货事实，价格分析排除缺价格行；归档标记本身不证明有效到货、库存与结算门禁全部满足。
+
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
 | MaterialRequisition | `material_requisitions` | `id` | `material-management.md`（乙供材下料） |
@@ -445,7 +469,7 @@ CREATE TABLE delivery_records (
   orderNo TEXT, deliveryDate TEXT,   -- 去重自然键 = projectId+supplierId+orderNo（全 ID 化，见 §6 唯一索引）
   fileName TEXT, filePath TEXT,
   ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
-  archived  INTEGER DEFAULT 0,       -- 归属齐全并由用户触发归档后置 1；送货单 archived=1 即已入库/可供单价分析
+  archived  INTEGER DEFAULT 0,       -- 已人工核对、归属齐全并触发归档后置 1；有效到货与价格分析另按本节现行门禁判断
   stored    INTEGER DEFAULT 0,       -- v25 起只作存量兼容镜像，归档记录统一回填 1；禁止作为独立业务资格判断
   printBatchId TEXT DEFAULT '',      -- v32：同一上传原件拆出的多张送货单共享；跨刷新按批次恢复一个打印任务
   printDisposition TEXT DEFAULT 'excluded', -- pending | printed | excluded；新归档由 store 显式写 pending
@@ -502,15 +526,175 @@ CREATE TABLE project_aliases (
 | UnitStageCompletion | `unit_stage_completions` | `id` | **ADR 0010**：户 × 工序阶段完成事实（状态/日期/照片软卡） |
 | ~~Quantity~~ | ~~`quantities`~~ | — | **已废弃**：原“分项 × 房间 × 工人 × 完成月份”合一表拆为户型模板量、户 × 工种责任和户 × 工序阶段完成；禁用旧表和 `completedMonth` |
 | PayrollSubjectConfig | `payroll_subject_configs` | `id` | C2 请款主体×项目配置；保存负责人、班组、默认大工单价和可编辑签工确认规则，活跃自然键为项目×负责人×格式族 |
-| WageStatement | `wage_statements` | `id` | 负责人请款簿（请款主体×月×格式族×档位）；`format_family=A/B/C1/C2`（当前开放 A/C1/C2，B 待真实合同清单），`period_kind=monthly/settlement/retention`，`purpose=advance/final`，`quantity_source=provisional/field`，`status=draft/checked/released`；C2 通过 `subject_config_id` 关联主体配置；保存累计应付、此前已发、来源版本/时间与操作者；`released` 冻结 `snapshot_json` 和实际发放金额 |
+| WageStatement | `wage_statements` | `id` | 负责人请款簿（请款主体×月×格式族×档位）；现有来源 schema 的 `format_family=A/B/C1/C2` 保留历史 B 编码，现行业务只允许 A/C1/C2，B 类合同/BOQ 清单直报工资已退役，其遗留入口与数据须隔离而非等待清单补齐后启用；`period_kind=monthly/settlement/retention`，`purpose=advance/final`，`quantity_source=provisional/field`，`status=draft/checked/released`；C2 通过 `subject_config_id` 关联主体配置；保存累计应付、此前已发、来源版本/时间与操作者；`released` 冻结 `snapshot_json` 和实际发放金额 |
 | WageStatementMember | `wage_statement_members` | `id` | 请款簿成员归属；同一请款簿包含一名负责人和零至多名成员，负责人同时记入成员表 |
 | WageStatementAllocation | `wage_statement_allocations` | `id` | 已发工资单的组内实际收款分配；按整数分保存，成员集合必须与请款簿成员完全一致，零金额保留且分配合计必须严格等于实际发放金额 |
 | WageStatementLine | `wage_statement_lines` | `id` | 月度分项快照：工人、分项、单位、工程量、工资单价、金额；核对时按现场量/考勤替换，发放后只读 |
-| AttendanceRecord | `attendance_records` | `id` | 工人×日期唯一；正常工时、加班工时、施工内容，重复录入覆盖同一工作日；日期必须真实存在，正常+加班总工时不得超过 24 小时，C2 签工成员不得录考勤 |
+| AttendanceRecord | `attendance_records` | `id` | 项目×工人×日期唯一；正常工时、加班工时、施工内容，同日合法重存保留物理 ID 和原班组；日期必须真实存在，正常+加班总工时不得超过 24 小时，同项目同人同月的 C2 签工与考勤互斥 |
 | SignedDayworkRecord | `signed_daywork_records` | `id` | C2 逐日签工事实；项目、班组、人员、日期、施工内容、起止时间、整工/半工、证明人与确认日期；只有 `confirmed` 记录计薪；同人同日时段不重叠且合计不超过 1 工 |
 | WageStatementDayworkRecord | `wage_statement_daywork_records` | `id` | C2 工资单与本次核对签工记录的显式关联；每条有效签工只能归属一张有效工资单，发放时完整记录与主体费率/规则另入 `snapshot_json` |
 
 > ~~PayrollRecord `payroll_records`~~ **已细化拆分**为上述工资与考勤表（禁用旧名）。工资单不是纯计算视图：草稿可活算，核对强制刷新现场复核量，发放时冻结量、价、比例、明细及实际发放金额。合同量禁止进入应付取数。
+
+### 工资完整资料中央接管（#412）
+
+工资接管按真实项目组织，包含上表八类工资/来源实体和可证明归属的操作历史。项目即使没有工资头，其主体配置、考勤和待确认/已确认签工也属于完整图；禁止仅从工资头向下取关联。四类来源根的 `project_id` 必须映射到真实项目，不能使用预算的空项目草稿规则。缺项目身份阻断接管；其他缺关系保留明确隔离原因，不凭名称或相同金额猜接。
+
+同一工作区 SQL 保留映射后的关系和 `payroll_migration_evidence` 中不可变的原图、原始快照、映射及诊断；`payroll_revision` 提供中央读取版本。`snapshot_json` 全文与未知扩展字段保留，不能经过旧输出 DTO 重建。已发呈现只使用原冻结资料；原表和原快照金额分别可追溯，缺实际金额、缺分配、坏快照和真实零不合并为同一种情况。冻结行缺显示名时，只能在同一快照中按明确成员 ID 解释，不能回填当前工人档案。
+
+旧 A 汇总没有保存完整施工责任/完成 ID，旧 C1 也没有逐考勤行外键；保存原值不证明它们具有新的计薪资格，`source_version` 不能反解成关系。B 类历史保原格式、状态和金额，持续隔离，不进入新工资或成本。未知附件归属不生成工资文件；班组/工人原件仍由其原身份领域管理。
+
+不存在可由金额反推的独立月锁表。C1/C2 已发月份锁使用原工资状态、负责人及全部相关成员，包括零分配、无工资行和无工时成员；C2 另有明确签工关联占用。软删历史及快照不一致不能让锁无声消失，原关系应保留供恢复复验。
+
+迁移准备与实际确认复用同一候选和稳定映射，与工程量、WBS、预算共用工作区事务；持锁时不再调用普通入队读取。重复确认保留后来更正。任何后来独立工资、配置、考勤、签工、关联或可识别历史占用，必须在删除前使危险恢复整批失败，其他领域也不部分回退。本阶段只读不赋予旧单新的发放、更正或输出资格。
+
+### A 工资中央来源、配置与发放（#412）
+
+A 日常核算仍写既有工资头、明细、全体成员和整数分分配；新增下列工资域事实，不把施工完成、合同价或班组表复制成第二套工资来源。P1 本地限定验收见[A 工资证据](../design/evidence/issue-412-payroll-a/README.md)，该范围不能外推到 C1/C2 或生产保存。
+
+| 表 | 身份与主要字段 | 约束 |
+| --- | --- | --- |
+| `payroll_a_subject_configs` | `id`，`project_id / crew_id / leader_worker_id`，可空 `initial_pay_ratio`，`revision / updated_at / deleted_at` | 项目与负责人唯一；班组是显式归属。未配置为 null，明确 0 为真实配置 |
+| `payroll_a_price_revisions` | `id / price_id`，项目、班组、负责人、分项、单位，`mode / worker_id / effective_month / unit_price / scope_json`，修订号、操作者和时间 | `price_id + revision` 唯一；基准与个人例外分开。范围为明确全项目或稳定户×房间×分项集合；空集合不作通配 |
+| `payroll_a_statement_sources` | `statement_id`，项目、负责人，`source_json` | 每单一份已采用来源；封闭结构包含完整主体成员、原完成责任事实和价格修订。与头、行、成员及核对结果同事务保存 |
+| `payroll_command_receipts` | `command_id`，操作者、项目、工资单或配置作用域，动作、正文指纹、原结果及 `command_json` 原命令规范化正文 | 同键同文重放原结果，同键异文拒绝；回执不能与工资事实部分提交。旧表新增正文列保留 null，不反推补造；无配置作用域时保存 SQL NULL |
+
+工程量按原物理完成记录、原责任及其细分范围、报量阶段与模板现场量读取。同一工作区事务内加载，不再次进入队列。来源缺链、缺单位、缺现场量分别保留诊断；真实零保行，不跨单位相加。责任换人、工人转组、相同名称或重建完成记录不能把旧施工量转成另一请款主体的新可领额度。原责任领取身份由项目、户、原 assignment、房间及分项组成，不以可重建的完成 ID 或工资月作为新身份。
+
+工资价格独立于合同价和 E 类维修单价库。每个稳定价格先选目标月份适用的最新修订，再判范围；缩小范围后不能使旧修订复活。不同价格身份在同主体、分项、单位、模式及生效条件重叠时须明确拒绝，不按数组顺序猜价。原班组比例只有真实录入或迁入来源可证明时才作为默认依据；界面初始化产生的 0.95 不能伪装已配置事实。月份比例沿用规则只见[工资页面](./pages/subcontract-payroll.md#工资核算)。
+
+本期发放按同主体 A 的真实此前已付核算，不叠加成员分配，不混入 B/C 类或另一负责人。已知实际少发使用实际值，历史实际未知令此前已付及本次应发保持未知；软删不能让已经发生的工资支付消失。发放事务重新校验量、价、身份、来源及此前已付，变化时保存需重核状态。成功冻结原事实 ID、显示名称、量与单位、价格修订、比例、累计/此前已付/本次应发与实发、全成员含零分配、操作者及时间；已发不提供普通编辑、删除或撤销。
+
+新中央 A 的来源资格由已采用来源、完整冻结内容和相同工资/项目的正式发放回执共同证明；来源主体、原事实、成员、实际使用价格、回执正文指纹及操作者必须一致。实际重算原命令正文的 SHA-256，并比对其中实发及全成员分配；仅指纹格式正确不能证明正文一致。冻结价格须按原完整主体、月份、数量、单位和范围复算出同一工资行；相同价格 ID 不代替内容核对。旧回执缺原文时保持未证，同键恢复原结果不能自动补造来源资格。历史区与冻结输出共用这项核验，不能仅凭 `format_family='A'` 或某个同名快照字段升级资格。签工正文是 C2 的适用完整性要求，A 不因缺少不适用的签工字段被误判；真实历史缺损继续按原格式保留。
+
+### C1 逐日考勤、个人费率与冻结来源（#412，P2）
+
+本节为 P2 已接通的中央合同；实际开放及限定验收见[工资页面](./pages/subcontract-payroll.md)。考勤复用 `attendance_records`，工资复用现有头、明细、成员和整数分分配；新增两类工资域事实：
+
+| 表 | 关键数据 | 约束 |
+| --- | --- | --- |
+| `payroll_c1_rate_revisions` | `id / project_id / worker_id / effective_month`，可空 `daily_wage / overtime_rate`，`revision / operator_id / created_at` | 项目、工人、生效月份的不可变修订；日薪为档案缺值时的明确兜底，加班价独立保存，null 和明确 0 分开 |
+| `payroll_c1_statement_sources` | `statement_id / project_id / leader_worker_id / source_json` | 每单采用的完整主体与成员、月份、逐日考勤和个人费率；与草稿或核对事实同事务写入 |
+
+人员 owner 提供真实日薪及其缺字段、NULL、明确值状态，连同当前项目、班组和内容版本用于资格与核算。受控迁入保留这些差别，重复迁入不覆盖后来改价；工资配置不反写工人档案。合法档案日薪优先；只有未配置独立加班价才用该人有效日薪÷8，不提前把 60.125 舍入为两位。最终工资金额按现有到分规则保存，原工时和费率保完整精度。
+
+逐日来源保存物理 ID、项目、工人、原班组、真实日期、正常/加班工时、施工内容、备注及原时间与删除信息；来源版本覆盖逐行内容，不能以合计或最大更新时间代替。当前资格与历史阅读分别判断，改名、转组或离场不抹除原记录。同项目、工人、日期已有原组记录时，新组请求不能改挂该行或另建第二条；原记录与不可写原因仍可见。
+
+一条真实全零考勤也属于来源；完全没有记录不能建 C1。全体成员各自保存正常和加班两行，含无工时和零分配成员。C1 固定当月、100%，不采用 A 累计、档位、取整或前月实付扣减。核算与状态动作见[工资页面](./pages/subcontract-payroll.md#工资核算)。
+
+互斥按同项目、人员和月份验证，不以当前班组筛选隐藏冲突。对侧有效工资主体的全部成员、C2 独立待确认/已确认签工及可证明的隔离证据均纳入；已发 C1/C2 软删头、成员或关联不解除整月锁。A 与 C1 可以同人同月并存。旧迁入图已存在冲突时保留双方与诊断，不能自动删除一方；日常写入及会破坏后来合法事实的恢复仍需事务内拒绝。
+
+新 C1 发放冻结当时的完整逐日考勤、每人费率及来源、人员名称、明细和全成员实分配。采用来源、冻结事实及正式原发放回执共同证明新输出资格；历史详情与工资/考勤配对输出使用同一完整性核验，旧 C1 缺逐行事实仍保留部分证据状态，不由当前矩阵补齐。
+
+考勤、C1 与 A 共用命令回执表，正文及结果按明确动作封闭解析。恢复引用必须包含回执里实际保存的考勤记录 ID、费率物理修订 ID 和已采用来源；坏正文或未知动作不能跳过，旧 SQL NULL 不补造。候选、复验、来源锁及回执与工作区其它领域共用一次事务，持锁后不再次进入同一队列。
+
+完整恢复保护扩展至上述四表及独立发放，包含软删配置、只在回执中引用的主体、来源中的原施工身份和零成员。仅解析已定义的关系字段，不递归猜测旧快照的未知扩展；任何危险引用在删除前拒绝整批恢复。更正、实际补退与跨域工资实际由下文 P4 接续，费用由 P5 接续，均不能通过重写原发放实现。
+
+### C2 签工、主体配置与冻结来源（#412，P3）
+
+本节为已接通的 P3 中央合同；本期实际开放与限定验收见[工资页面](./pages/subcontract-payroll.md)。C2 复用 `payroll_subject_configs`、`signed_daywork_records`、工资头/明细/全成员/分配及 `wage_statement_daywork_records`；不建立第二套主体价、签工或工资业务表。
+
+新增 `payroll_c2_statement_sources` 保存每单采用的来源：`statement_id` 为指向工资头的主键，`project_id / leader_worker_id` 分别关联项目和工人，`source_json` 为完整主体与成员、月份、实际采用的逐条签工、主体配置及资格版本。来源与草稿/核对同事务保存；新发放在原 `snapshot_json` 中保存专属 `c2Source / c2Document` 和同源通用字段，不从裁剪后的通用详情反推完整来源。
+
+主体配置固定项目×负责人，保存实际班组、有限正数大工单价及规则原文；不增加按月生效政策。历史缺价、明确 0、停用、软删、空规则和 NULL 分别保留，非法原文不会变成合法可用配置。重核采用当前有效配置，冻结输出保发放时采用的配置，不解析规则脚注触发自动处罚。
+
+签工保存原稳定 ID、项目/人员/班组、日期与时段、整工/半工、施工内容、证明人、确认日期、状态、备注及原时间/删除信息。正规字段服务合法性判断，完整可表达的数据库原行另保原文；未知状态或坏字段只读诊断，不自动转成待确认。逐行来源版本包含正文和关系，不能以合计工数或最大更新时间代替。
+
+逐条领用与人员月锁分别判断：有效工资的原签工关联不可被另一工资抢走；已发头/关联即使软删，以及可证明的原冻结或专属来源独存，仍保护原领用。待确认签工不计薪但参与日内冲突和 C1/C2 月互斥；未发原签工可以合法修正，受影响旧核对必须失效。已发负责人及全部成员整月锁定，包括无签工、无工资行或零分配成员；A 与 C2 可以同人同月并存。
+
+日常保存、核对、发放与迁入恢复共享同一工作区事务。恢复引用显式解析原配置、原记录、原/新作用域、实际回执中的记录和关联 ID、来源/冻结及对应审计；不遍历未知 `original` 或备注猜 ID。混合 A/C1/考勤/C2/签工回执按动作闭集分派，坏非空正文不能静默跳过，历史 SQL NULL 继续保真。危险恢复在删除前整批拒绝，不因不相关项目存在工资而笼统阻断。
+
+新输出需同时核实采用来源、专属冻结及原发放回执，保完整签工和配置、明细、实发及全员到分分配；旧缺损 C2 不从当前名册或单价补全。真实工资与零星用工记录表配对，不生成考勤表，不代替 P4 更正和 P5–P7 完整费用工作簿。
+
+### 工资更正、实际补退与后月处理（#412，P4）
+
+原已发 `wage_statements`、全员分配和 `snapshot_json` 始终不可变。更正与实际收付使用同一工资工作区事务、版本、审计及命令回执，新增以下五张工资域表；具体列约束由 `app/lib/payroll/central-adjustment-schema.ts` 落地。
+
+| 表 | 身份与归属 | 保存内容 |
+| --- | --- | --- |
+| `payroll_adjustments` | 原工资、项目、格式族；根更正及可选前次更正 ID | 草稿/已确认、新旧核算依据、原因、证据说明、有符号整数分差额、不可变确认快照、经办人与时间 |
+| `payroll_actual_events` | 项目、稳定事件 ID；错记冲销指向原工资发放或原事件 | 补发/退款/错记冲销、发生日、有符号整数分实额、证据、确认快照与经办人；同一原事实只允许一个直接冲销 |
+| `payroll_actual_allocations` | 实际事件×稳定工人唯一 | 有符号整数分收付额及当时人员关系依据；全员分配合计等于本次实额，真实零保留 |
+| `payroll_adjustment_applications` | 更正及其根，关联独立实际事件或后续已发工资，两者互斥 | 本次处理的整数分差额、当时余额版本、处理种类与证据；错记冲销另引用被冲销的处理关系 |
+| `payroll_a_adjustment_coverage` | A 工资×更正×稳定计薪组件唯一 | 原施工责任/范围、量、价、比例与真实修订沿革，记录本次累计已经包含的差额及确认命令 |
+
+更正的确认差额、成功处理差额和剩余差额分别派生。草稿、预览及未发工资上的处理选择没有结清效力。补发/退款精确到分、方向一致且不得超过同根剩余余额；核对、余额、人员分配、引用、审计、版本和同键回执一次提交。后续发放失败或来源需重核时不写入处理关系。
+
+工资实际 facts 的初始身份为 `real:payroll:released:<statementId>`，独立事件身份为 `real:payroll:actual:<eventId>`；原发放不复制成事件行。核算更正与后月处理关系不进入现金集合。原 1000 核减 100 后实际仍 1000；退 40 后实际 960、待处理 -60；后月核算 1000、实际发 940 并处理 -60 后，实际合计 1900、待处理 0，原两张签名仍为 1000 和 940。
+
+A 的有效累计依据与实际净额分开：后台逐责任、数量、单价、比例及修订历史证明更正是否已包含，不按月份、总额或整图 hash 猜测。已包含差额不再扣一次；实际退款不直接减少原 `previouslyPaid` 而重新形成同额可领。核增在后续正常发放中得到处理时也关联该唯一发放，不能再生成待补余额。缺组件或沿革证据时保持不可继续核算的具体原因。
+
+错记冲销只用于有明确核对依据证明原记账未实际发生，保留原记录与操作者。错误退款被冲销后，对应处理关系反向恢复原余额；它不是工人再次付款。继续纠错仍追加有原引用的记录，不删除或编辑已确认事实。
+
+工资动态成本与工资已付读取同一有效实际事实集合，两个指标不可相加；工人只取已证个人分配，班组与项目不再把个人行叠加到整单。整单金额可证但缺个人分配时，整单与个人分别声明完整度。转组、停用或工资软删不抹去真实已发生，历史 B 或缺来源资格持续隔离。合同劳务仍取合格合同结算，不按姓名或项目猜 worker 与 supplier 映射。
+
+预算在已有事务中调用纯工资 facts loader；人员与项目在各自受控读面加载同一事实，`facts()/identities()` 的同步上游接口不二次入队。目的页面和工资来源权限均须满足，最后异步等待后再次核对身份与权限。工资完整不提升材料、报销等未接来源，项目总预算剩余仍须全部来源完整。
+
+受控迁入、重复确认和恢复必须保留这五表、原快照、审计、回执及可证明引用。恢复前检查完整图、日常新增与软删历史，任何会移除实际事实或其依据的操作整批拒绝；无关项目不因存在合法 P4 记录而一律阻断。实施及验收范围见[工资页面](./pages/subcontract-payroll.md)，P4 不替代 P5–P7 或生产保存验收。
+
+### A 工资费用、独立管理簿与负价清单（#412，P5）
+
+P5 沿原 A 工资、P4 实际事实、命令回执和工作区事务扩展，不新增工资格式族。物理白名单及约束由 `app/lib/payroll/central-a-fees-schema.ts` 实现。
+
+| 表 | 稳定身份与关系 | 保存内容与约束 |
+| --- | --- | --- |
+| `payroll_a_management_books` | 项目×独立管理簿 ID，真实管理人 ID | 创建人、创建时间与软删；管理人不替代原施工执行人 |
+| `payroll_a_management_book_revisions` | 管理簿×递增修订唯一 | 生效月、班组管理/公司代管、原责任及细格范围、明确首月比例、确认依据与来源版本；追加修订，不改旧正文 |
+| `payroll_a_fee_revisions` | 稳定费项 ID×递增修订唯一，固定项目、负责人、班组和用途簿 | 类别、名称、启用状态、非负单价、单位、明确基数、生效月、明确采用的默认依据及移除标记；禁用、移除和真实零分别保留 |
+| `payroll_a_statement_books` | 原工资 ID 唯一，归属项目/负责人/用途/月份/档位 | 普通簿按项目×负责人×期间唯一，管理簿按管理簿×期间唯一；同人同月两种用途可并存，已发或软删占用不重新释放 |
+| `payroll_a_negative_lines` | 稳定负价行 ID×递增修订唯一，固定原工资与管理簿 | 名称、非负数量、单位、严格负单价、有符号整数分金额、原管理修订与责任范围、事由、经办依据、可选已证实际引用及移除标记 |
+| `payroll_a_management_ownership` | 项目×原施工责任用途身份唯一 | 首次发放工资、管理簿及完整原责任证明；不因管理人、费项、月份、完成记录重建、退款或软删生成第二次领取资格 |
+
+管理范围保留原 `assignmentId / workerId / crewId / scopeIds` 与明确细格；细格使用原户、房间、分项及单位身份，不能将下标或显示名作为关系。尚未完成的原责任可用于管理关系及负价说明，但不进入正向已完成费用量。公司代管不生成管理费工资。普通簿只能含房补/其他补贴，管理簿只能含管理费和有依据的负价；负价实际引用只作同项目已证事实参考，不形成另一笔收付。
+
+同一费项按楼栋、分项、单位、修订及价格分组后到分；不同费用不合并，组成行的分金额仅供追溯，不把逐格舍入结果再相加。清单合计先含正负费用，再乘本簿比例、扣本簿此前已证实际。管理费 1500、负价 -600、比例 80%、此前已领 200 得 520；同人普通工资 1000 不参与相减。同簿历史实付或来源不可证明时保留未知并阻止核算，不能当成 0。
+
+新 A 单在 `payroll_a_statement_sources.source_json` 保存来源 V2，冻结用途、费用各修订、原量组成、管理关系、负价与此前本簿实付。旧 V1 原字符串、指纹和快照不补 `book/fees`；只对可证明原关系作受控读取投影。已发 V2 原头、全部适用负价、冻结来源与原发放回执必须一致；冻结后不能通过在旧头下追加或替换行改变后月累计。
+
+P4 新 V2 更正追加同簿费用依据，保留原费项、组件及负价行身份。逐量、价、比例与真实修订证明后月是否已包含更正；核算更正、真实补退和后月处理仍分别记账。普通簿与管理簿不合并补退，退款不重开原领取。旧 P4 无费用字段正文保持原字节和解析语义。
+
+迁移外层图 V3 承接 `fees: { schemaVersion: 1, tables }` 六表扩展；旧外层 V1/V2 及原中央十二表合同保持兼容，无费用表的旧图不伪造空扩展。所有原 JSON 文本及摘要逐字保留，SQL 身份列单独映射；映射后的类型投影须与原物理证据一致，无法证明即不可用。重复确认保留日常更正；恢复同时检查费用、管理关系、负价、领取归属、P4 引用、审计与回执，含零、软删、跨批次与独立新增，在删除前整批拒绝危险恢复。班组旧默认按物理列存在性区分未记录、空值与零，不能从旧表单默认回填。
+
+命令与读取见 [COMMANDS](./COMMANDS.md#a-工资费用与独立管理簿命令412p5)、[READ-MODELS](./READ-MODELS.md#a-工资费用与独立管理簿读取412p5)；操作及实际验收进度见[费用指南](../guides/payroll-fees.md)。P6 扣款、P7 整册和 #416 生产保存继续单独验收。
+
+### 户级空鼓、整改与工资采用（#412，P6）
+
+P6 在既有工程量和工资中央事务中增加以下追加事实。五张来源表与三张工资表均不保存可编辑余额，也不使用 `deleted_at` 隐藏已处理的来源。当前实施与验收进度独立见 [P6 实施票](../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)，不代表 #416 生产部署完成。
+
+| 表 | 事实与字段 |
+| --- | --- |
+| `quantity_hollow_records` | 原检查稳定头：`id, project_id, unit_id, assignment_id, room_id, item_id, ownership_key`；检查时 `original_party_json, location_json, responsibility_proof_json, responsibility_fingerprint`；`created_at, created_by, command_receipt_id`。原责任和房间分项范围必须在创建时可证，不能借当前姓名重建。 |
+| `quantity_hollow_revisions` | 检查修订：`id, record_id, previous_revision_id, inspected_on, count, note, reason, created_at, created_by, command_receipt_id`。首条与后继各自唯一；数量为非负安全整数，修订有原因。 |
+| `quantity_hollow_rectifications` | 独立整改事件：`id, record_id, revision_id, rectified_on, count, note, created_at, created_by, command_receipt_id`。处数为正安全整数，不能超过当前未整改余量。 |
+| `quantity_hollow_logs` | 连续历史：`id, project_id, record_id, previous_log_id, kind, revision_id, rectification_id, payload_json, payload_fingerprint, created_at, actor_id, command_receipt_id`；首条与后继各自唯一，与具体动作及原回执互证。 |
+| `quantity_hollow_command_receipts` | 来源回执：`id, workspace_id, actor_id, command_id, project_id, unit_id, record_id, kind, request_json, request_fingerprint, result_json, result_fingerprint, created_at`；`workspace_id + actor_id + command_id` 唯一。 |
+| `payroll_hollow_policy_revisions` | 逐分项配置：`id, policy_id, project_id, crew_id, leader_worker_id, format_family, book_purpose, management_book_id, item_id, previous_revision_id, effective_month, enabled, unit_amount, command_id, revision_json, created_by, created_at`。同系列首条与后继唯一；A 区分普通/管理簿，C1/C2 无用途簿。开启、关闭、未填金额及明确 0 保留原含义。 |
+| `payroll_hollow_starts` | 具体工资上的人工开始：`id, project_id, statement_id, previous_start_id, command_id, start_json, created_by, created_at`。原单唯一首条，后继唯一；正文冻结当前原检查证明、余量、配置及合计。 |
+| `payroll_hollow_adoptions` | 实际发放采用：`id, project_id, statement_id, start_id, record_id, command_id, adoption_json, created_by, created_at`。`record_id` 唯一，绑定完整原检查采用行；当前不提供按金额猜测部分采用的入口。 |
+
+工资配置、开始、采用复用 `payroll_command_receipts` 与 `operation_logs`，与工资写入处于同一事务。`revision_json / start_json / adoption_json` 逐字段对应各自物理列和完整命令产生集合；缺同次命令的其他行、缺开始对工资的需重核日志、缺发放冻结日志或无回执的额外采用，均不能判为完整原件。
+
+当前未整改为最新可证检查数减累计整改事件，零与未知不同。工资来源按原责任及该工资成员匹配；A 管理簿还需明确原责任覆盖。后期转组、改名、换责任、整改不改原采用。A 累计式工资按同簿已处理扣款避免后月重新领取；C1/C2 逐期来源不将该累计金额再次相减。当前工资的此前处理依据只包含不晚于本单月份的采用，补录早月不能引用未来月份扣款；原记录是否已采用仍核全历史，以免早月补录后重复处理。
+
+发放前来源快照与发放后输出快照共同包含范围、月份、原检查、配置、人工开始、此前处理及金额完整度；输出在此基础上增加本次实际采用集合。A 源版本 V3 承接 P5 V2 费用，C1/C2 源版本 V2 承接各自 V1；原 V1/V2 文字保留，不补造新字段。完整扣款正好抵完可领额时，显式实发 0 可以冻结采用；不产生正数现金。超额及部分实际处理保持规则缺口。
+
+P4 更正依据增加可选 `hollow`：原冻结采用集合与对应 `adoptionId / recordId / count / unitAmount` 组件。只允许改量价与经办依据，不能替换原户、采用身份或工资簿。有效更正链产生当前已处理金额；冻结工资保留当时采用的链端及处理额。核算差额、真正补退和后月处理关系仍沿 P4 分离，原件不会因整改或确认更正自动改变实际现金。
+
+迁入保留所有原 JSON 和摘要，物理身份列与原证明的类型投影分开。工程量外层 V2 承接五表；工资外层 V4 承接三表及其原工程量证明闭包，旧中央十二表和费用六表合同不变。多次迁入的原图证明为最多 64 个节点的平面、可达且无环关系，不得嵌套证明包或携带整个运行库；重复接管保留日常追加。恢复在删除前检查原责任、整改、启动、采用、更正、回执和跨批次引用，软删与零余量不能解除引用，失败整批不变。最终迁移验证状态以本票证据为准。
+
+操作步骤见[空鼓指南](../guides/payroll-hollow.md)，接口与读取分别见 [COMMANDS](./COMMANDS.md#户级空鼓和人工扣款命令412p6)、[READ-MODELS](./READ-MODELS.md#户级空鼓和工资扣款读取412p6)。
+
+### 批量工资计划与逐单协调（#412，P7）
+
+P7 的批量协调不建立第二套工资或现金账。`payroll_batch_plans` 保存经办人确认的项目、月份、用途、资金输入、逐项依据、人工金额和完整成员分配；计划正文及摘要不可变，`state / next_item_index / expected_payroll_revision / revision` 只表示协调进度。暂缓项不生成工资命令，也不形成零元发放。
+
+`payroll_batch_attempts` 在每项首次发送前保存完整 A/C1/C2 原命令正文、摘要、原命令 ID、准备/执行命令 ID、确认依据及发送前工资修订。同一计划至多一项处于 `prepared`。原工资是否成功只认既有 `payroll_command_receipts`；尝试表中的结果是协调引用，不能独立证明核对或现金。原事务已成功而协调响应丢失时，仍以相同原命令 ID 和正文恢复；已成功项不再换键发送。
+
+`payroll_batch_command_receipts` 保存 `confirm-batch / prepare-batch-item / execute-batch-original` 的同键同文结果，并绑定工作区、经办人、项目和计划。批次确认不推进工资修订；准备只保留资金与命令且不改工资；执行调用原格式服务后，必须读到匹配原命令的正式回执才推进下一项。只有原服务明确返回 `commandOutcome=not-applied` 才可结束本次尝试并回到重新准备；未知结果保持 `prepared`。本批前项带来的唯一预期修订可继续，其他修订、依据变化、错回执或异常版本增量均停止为 `needs-recheck`。
+
+`payroll_a_rounding_revisions` 按项目、负责人、普通/管理工资簿及生效月追加保存 A 的 `off` 或向下整百规则；未配置与明确关闭不同。C1/C2 不读取 A 取整。当前尚未裁定自动分配尾差，建议必须保留未分配额并由经办人明确修改；正式编号和名册归档也不得借本表提前定案。
+
+### 工程量物理模型（#103）
 
 以下是 #103 的目标物理模型；列名统一为 snake_case。模板房间直接落 `rooms`，但它属于户型模板而非某一户；某户的房间实例由 `(unit_id, room_id)` 组合指认，不建立逐户房间副本。
 
@@ -701,6 +885,8 @@ END;
 
 可见性父链刻意排除两项审计引用：`house_type_templates.copied_from_template_id` 只是一次性复制来源，删除来源不隐藏复制件；`unit_stage_completions.assignment_id` 只是完成时责任，软删旧责任不隐藏完成事实。
 
+#442 浏览器中央工程量适配中的 `quantity_boq_references` 仅存 `id + project_id + contract_id` 外部身份索引，模板行的 BOQ 外键指向此索引；量价与已签证增减仍读取中央施工合同/变洽签。该索引不是第二份 BOQ 业务表，也不改变显式桌面 SQLite 的物理 schema。迁移使用完整数据库候选准备，在外键、祖先及跨域对账通过后原子切换；月报自动完成量与有效 BOQ 来源在同一串行窗口重验后固化，具体读写契约见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442) 与 [COMMANDS](./COMMANDS.md#工程量中央命令与迁移接管442)。
+
 ### 2.7 施工进度类（工期 × 工程量主线）
 
 | 实体 | 表名 | PK | 设计文档 |
@@ -724,21 +910,51 @@ END;
 > 标准工序库按 [ADR 0018](../adr/0018-versioned-schedule-process-library.md) 保存全局不可变版本。基于旧版只能沿用相同 `code` 新建下一版本；`schedule_process_library_tasks.predecessor_task_key` 保存前置身份，`predecessor_disabled=1` 表示因顺序冲突已置灰但未删除。建组时 `schedule_groups` 冻结库名/版本，`schedule_tasks` 同时保存来源工序 ID、来源版本和 `template_snapshot_json`；任务名称、工种、颜色、应用工期、阶段码、分项码及前置状态均以创建时快照为准。禁用关系仍创建 `task_dependencies` 后按 `schedule:conflict-reschedule` 软删除，之后全局库变化不会追溯改写既有项目 WBS。迁移历史冻结为：v34 只增加并回填 `predecessor_task_key`，v35 再通过 `addColumnIfMissing` 增加 `predecessor_disabled` 并把空值或非法值回填为 `0`，以覆盖已经登记 v34 的存量数据库。
 > `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
 > `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
-> `schedule_task_floor_plans` 由排程域拥有，并以 `source_basis` 区分来源。合同清单行保存 `item_id + boq_line_id`，唯一范围为 `task_id + floor_id + boq_line_id`；内部暂估行保存 `item_id + provisional_qty`、`boq_line_id=NULL`，唯一范围为 `task_id + floor_id + item_id`。两种来源均从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。v38 只从真实 `boq_lines.item_id` 回填存量合同计划；缺少可验证分项的旧行会阻断迁移，不伪造 BOQ。`boq_line_id` 是来源追溯引用，不是该排程行的可见性祖先：BOQ 行后续软删除不能隐藏已冻结的楼层计划。内部暂估后补合同时仅改变分组依据，预览与写入统一聚合分组内有效 `provisional_qty` 快照；既有暂估计划行继续保持 `source_basis='provisional'`，不被户型模板后续修改或合同量覆盖。
+> `schedule_task_floor_plans` 由排程域拥有，并以 `source_basis` 区分来源。合同清单行保存 `item_id + boq_line_id`，唯一范围为 `task_id + floor_id + boq_line_id`；内部暂估行保存 `item_id + provisional_qty`、`boq_line_id=NULL`，唯一范围为 `task_id + floor_id + item_id`。两种来源均从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。v38 只从真实 `boq_lines.item_id` 回填存量合同计划；缺少可验证分项的旧行会阻断迁移，不伪造 BOQ。`item_id` 与 `boq_line_id` 是冻结来源追溯引用，不是该排程行的可见性祖先：分项或 BOQ 行后续软删除不能隐藏排程自己保存的楼层计划；工序、楼层及其语义祖先仍决定当前可见性。稳定来源身份、物理外键与迁移/恢复引用保护仍须保留，当前模板适用范围不因此扩大。内部暂估后补合同时仅改变分组依据，预览与写入统一聚合分组内有效 `provisional_qty` 快照；既有暂估计划行继续保持 `source_basis='provisional'`，不被户型模板后续修改或合同量覆盖。
+
+#### 标准工序库中央版本（#443）
+
+工序库头与其工序作为完整版本进入同一中央事实源。稳定版本 ID 区分同编码的每一版；复制来源记录为版本引用，下一版编号按同编码全部既有版本计算，包含已删除版本，禁止回收编号。任何可见旧版均可作为同编码新版的来源，原版和旧项目创建时的快照保持不变。目录单独返回授权范围内的系列最高编号基准，删除版本的正文不因此可见。
+
+`stageCode` / `itemCodes` 是可复用模板定义，不是某项目的外键；全局工序库本身不持有项目、楼栋或完成事实。项目建组时才按当前项目解析成稳定阶段和分项身份并冻结。版本使用项目及数量由当前中央 WBS 投影，不另存本地关联副本；读取不可用时为 `null`（未知），不得把未获取的关联事实计成零。
+
+受控迁移追加库头与工序图，保留旧稳定 ID、版本、工序 key、前置 key/禁用状态、映射、排序、创建/更新时间及软删除边界。重复版本、断裂前置、自依赖、循环和无可解释身份阻断预检；不得按名称补造或清空关系。源 v27/v34/v35 等已应用迁移保持不变。准备、确认、对账和恢复沿既有核心协调器执行，一次确认原子接管完整图，回滚保留独立中央新版本并核验下游依赖。旧 WBS 图及既有合同绑定身份由 #444 接管，新绑定动作由 #445 接通；本票不迁出第二份项目排程。
+
+#### 中央 WBS 事实与整图接管（#444）
+
+浏览器正式 WBS 复用本节六类排程表，并与中央工程量处于同一候选数据库和串行事务；不把旧浏览器整库作为正式读写的第二源。中央验证实例另保存项目修订、命令回执和楼层冻结数量的完整性说明，分别用于陈旧来源检查、原命令恢复及历史缺口展示。项目、合同/清单和全局工序库保持原领域权威，只消费稳定身份及来源版本，不另建可独立改写的合同量价或库版本。
+
+新建暂估快照保留有效分项及逐户来源、计量单位、已知数量和缺失情况。真实 `0` 与 `null` 分开，单位不同不混算，不能以全组正数掩盖某栋缺少有效范围。当前模板后来变化不改写冻结快照。自动进度读取当前阶段的适用应做户与完成户交集，责任配置和其他阶段不进入分子；具体显示计算以[排程页面](./pages/schedule-progress.md)为准。
+
+受控迁移追加每项目一个 `wbs_projects` 完整图节点，位于工程量和工序库之后。包含六表的物理记录、可识别操作日志、软删除边界、无分组旧任务、计划日期、基线、进度方式、库快照、禁用依赖、楼层人工标记和已有合同绑定关系。项目、合同、楼栋、楼层、户、分项、阶段、库版本及快照内明确身份逐项映射；日志只按已知身份字段改映射，不按名字匹配，也不对原 JSON 全文替换 ID。
+
+旧分组已绑定合同、其楼层计划仍保存暂估来源属于合法历史，两者一起保留；新绑定仍由 #445 实施。旧冻结来源没有记录单位或逐户完整性时，保留实际值与原始快照并登记历史缺口，不从当前模板反推旧值、不用合同量填补。缺失或歧义身份、非法关系、日期或依赖阻断试跑。
+
+完整候选准备、对账、确认和恢复复用现有核心迁移协调器；对账检查关系和事实，不只比较行数。重复确认保留接管后的日常更正，不回放历史通知。恢复只处理本批所属图；独立中央 WBS 仍引用待撤的项目、合同、区域、阶段、分项或库版本时，整批拒绝恢复，各领域保持当前状态，不删除独立 WBS 来强行满足回滚，也不旁路修改工程量完成。实际验证及当前实例边界见 [#444 证据](../design/evidence/issue-444/README.md) 和 ADR 0020。
+
+#### 中央暂估绑定与楼栋证据（#445）
+
+暂估绑定复用原 `schedule_groups`、楼层冻结来源和操作日志，不另建平行 WBS 图。新命令在原组保存合同依据及绑定时间，操作日志同时冻结所选合同、楼栋覆盖、按稳定分项与单位组织的数量比较、来源版本和操作身份。原任务、依赖、楼层计划、基线和完成事实不变；原暂估楼层行继续保留暂估来源。旧记录没有完整比较时显示明确缺口，不能从当前模板或合同反推历史。
+
+完整冻结快照的逐户来源与单位负责数量完整性：同一户及模板行被多个阶段引用时不重复相加；来源缺失保持未知，真实零保留，异单位分别比较。原 `provisional_qty` 只保留旧数值，缺少单位或逐户证据时不能单独用来制造完整差异。
+
+合同楼栋证据更正仍由原施工合同清单中央来源拥有。受控来源保全导入文件、签证新增来源、确认状态及可用的原表追溯；只有可证明属于已确认导入基准的行允许更正。保存只更新原行楼栋并追加不可变审计，原项目、合同、分项、行 ID、量价及签证事实保留。签证新增结果和资格未知的历史行不提供独立改写入口，不另建覆盖表代替原行证据。
+
+迁移与日常命令遵守同一互斥边界。重复确认保留接管后新增的绑定与楼栋更正；移除或替换已有更正的来源须整体拒绝。WBS 恢复在删除日志前，对比受控接管时保存的原分组合同关系与当前关系；迁入后新增绑定即使审计或回执缺失，也不能被旧批次恢复吞掉。原本已绑定的迁入历史与迁入后新增动作分别判断，不能把显示用操作人字符串作为唯一保护依据。读取和写入契约分别见 [READ-MODELS](./READ-MODELS.md#中央暂估绑定与楼栋证据读取445)、[COMMANDS](./COMMANDS.md#中央暂估绑定与合同楼栋证据更正445)，运行范围见 [#445 证据](../design/evidence/issue-445/README.md)。
 
 ### 2.8 目标成本类（成本控制基线）
 
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
 | TargetCost | `target_costs` | `id` | `target-cost.md`（项目目标成本，`is_baseline` 版本化） |
-| TargetCostItem | `target_cost_items` | `id` | `schedule-progress.md` §六（科目行：专业分包/合同劳务/材料/机械/工人工资/费用报销/其他，可细到分项） |
+| TargetCostItem | `target_cost_items` | `id` | `target-cost.md`（科目行：专业分包/合同劳务/材料/机械/工人工资/费用报销/其他，可细到分项） |
 
 ```sql
 CREATE TABLE target_costs (
   id                  TEXT PRIMARY KEY,
-  project_id          TEXT,                 -- → projects.id；仅 draft 可空，提交时应用层强制必填
+  project_id          TEXT REFERENCES projects(id), -- 仅 draft 可空，提交时应用层强制必填
   name                TEXT NOT NULL,        -- 版本名（“投标预算”/“开工基线”）
-  is_baseline         INTEGER DEFAULT 0,    -- 1=当前对比基线；部分唯一索引保证一项目一条
+  is_baseline         INTEGER NOT NULL DEFAULT 0 CHECK (is_baseline IN (0, 1)), -- 部分唯一索引保证一项目一条
   contract_revenue    REAL DEFAULT 0 CHECK (contract_revenue >= 0),
   planned_profit      REAL DEFAULT 0 CHECK (planned_profit >= 0),
   signed_contract_sum REAL DEFAULT 0 CHECK (signed_contract_sum >= 0),
@@ -746,25 +962,41 @@ CREATE TABLE target_costs (
   tax_exclusive_total REAL DEFAULT 0 CHECK (tax_exclusive_total >= 0),
   tax_amount          REAL DEFAULT 0 CHECK (tax_amount >= 0),
   status TEXT NOT NULL DEFAULT 'draft',     -- draft | submitted
-  note TEXT DEFAULT '',
-  created_at TEXT, updated_at TEXT, deleted_at TEXT
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
 );
 
 CREATE TABLE target_cost_items (
   id           TEXT PRIMARY KEY,
-  target_cost_id TEXT NOT NULL,     -- → target_costs.id
-  cost_category TEXT NOT NULL,      -- '专业分包' | '合同劳务' | '材料' | '机械' | '工人工资' | '费用报销' | '其他'
+  target_cost_id TEXT NOT NULL REFERENCES target_costs(id),
+  cost_category TEXT NOT NULL CHECK (cost_category IN ('专业分包', '合同劳务', '材料', '机械', '工人工资', '费用报销', '其他')),
   item_name     TEXT,               -- 可选：细到分项（墙砖/地砖…），NULL=科目级
-  unit TEXT, qty REAL, unit_price REAL,
-  amount       REAL NOT NULL,
-  note TEXT, sort_order INTEGER DEFAULT 0,
-  created_at TEXT, updated_at TEXT, deleted_at TEXT
+  unit TEXT DEFAULT '',
+  qty REAL CHECK (qty IS NULL OR qty >= 0),
+  unit_price REAL CHECK (unit_price IS NULL OR unit_price >= 0),
+  amount REAL NOT NULL CHECK (amount >= 0),
+  note TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
 );
 ```
 
 > 迁移 v20 `target-cost-incomplete-drafts` 将已落过 v19 的存量库安全重建为 `project_id` 草稿可空，并原样保留目标成本头、科目明细、软删除状态和索引；非草稿保存仍必须校验真实项目 ID。
 
 > **costCategory 全局归集约定（2026-07-23 修订）**：合同成本按专业分包、合同劳务、材料、机械、其他五类；直接工人工资和费用报销分别作为独立成本来源。**合同劳务与工人工资不得合并为“人工”**。动态成本以已确认支出结算、已发放工资和已确认费用报销归集；付款申请、支付记录和送货单分别代表审批、现金流和收货事实，不与结算重复计入成本。红圈参照：目标成本 + 目标成本清单明细。
+
+#### 目标成本中央版本与完整接管（#412）
+
+预算头、科目明细和文件仍使用上述业务表；中央读写不创建另一套预算金额或成本快照。`target_cost_revision(singleton, revision)` 保存工作区预算版本，`target_cost_command_receipts(command_id, actor_id, target_cost_id, action, fingerprint, result_json)` 记录已提交命令及原回执；工作区隔离沿共享中央实例。预算与当前项目来源共同决定保存依据，版本头、基线旧新变更、附件与审计在同一工作区事务核对。命令和读面见 [COMMANDS](./COMMANDS.md#目标成本中央命令412)及 [READ-MODELS](./READ-MODELS.md#目标成本中央读取412)，实际验收状态见 [#412 预算证据](../design/evidence/issue-412-target-cost/README.md)。
+
+受控迁移节点为 `target_cost_versions`，每个版本携带完整 `budgetGraphJson`：版本头、科目、`file_refs` 中 `owner_type='target_cost'` 的附件、按文件稳定 ID 取得的真实 `file_payloads` 及可识别的 `operation_logs`。项目只按显式迁入映射归属；项目没有工程量不阻止预算接管，无项目草稿原样保留。迁入图金额、空值、真实零、排序、删除时间、旧空分项名和合法空附件元数据均按原表约束核对，不套新建表单必填规则改写历史。完整图所用头与明细非空约束以上述现行 v20 schema 为准。
+
+文件正文缺失保留缺件；存在正文时验证编码及已知长度，不从旧路径补读。日志原实体已不存在，但前后快照明确指向该预算时仍保留并可追溯；不得按同名对象补接。确认前先在候选实例逐列对账再整体发布，重复确认不覆盖日常变化。恢复依据可信迁入基准、命令回执和实际引用阻断预算日常变更、独立版本及当前/历史项目引用的丢失，软删除不解除这种保护。
+
+实际成本为当前真实来源投影，预算头的手录已签金额不替代正式合同。同一支付在不同读面出现时只计一次，独立分摊按稳定支付/分摊身份核对；归属或金额冲突保留未知。合法已知部分、真实零、无权、缺源和不可用不混淆；来源未齐时不生成完整余额或偏差。此扩展仍为 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 的可重置中央验证实例，完整工资、材料、财务来源及 #416 生产关口不因预算接管而完成。
 
 ### 2.9 导入与对账审计类
 
@@ -1331,7 +1563,7 @@ penalty_settlement_deductions(
 | `wage_statement_members` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 请款簿负责人及成员归属 |
 | `wage_statement_allocations` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 发放时组内实际收款分配；数据库保存整数分，显示名、负责人标识和金额同时进入发放快照 |
 | `wage_statement_lines` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 工人工资行（快照） |
-| `attendance_records` | `project_id` / `worker_id` | `projects.id` / `workers.id` | N:1 | C1 日工/加班来源；工人×日期唯一 |
+| `attendance_records` | `project_id` / `worker_id` | `projects.id` / `workers.id` | N:1 | C1 日工/加班来源；项目×工人×日期唯一，原班组证据不随转组改写 |
 | `signed_daywork_records` | `project_id` / `crew_id` / `worker_id` | `projects.id` / `crews.id` / `workers.id` | N:1 | C2 逐日签工来源；整工 1 / 半工 0.5 |
 | `wage_statement_daywork_records` | `statement_id` / `daywork_record_id` | `wage_statements.id` / `signed_daywork_records.id` | N:1 | C2 核对来源关联；活跃 `daywork_record_id` 全局唯一，禁止重复计薪 |
 | `delivery_records` | `projectId` / `supplierId` | `projects.id` / `suppliers.id` | N:1 | 送货单（supplierId 可空=未区分分供方兜底） |
@@ -1425,10 +1657,15 @@ interface FilePayload {
 
 #### 送货单原件持久化约束
 
-- 新归档送货单的结构化单头、明细行和 `file_refs(category=source)` 在同一归档动作中写入本地 SQLite；原件不上传云端。
-- `file_refs` 保持轻量元数据，文件正文单独存于 `file_payloads`。归档列表不查询、不 JOIN 正文；仅详情页和编辑页按 `ownerId` 单份懒加载。
-- 业务字段编辑不得清空或覆盖原件引用；补传/替换原件走独立 action，不把文件正文复制进 `operation_logs`。
-- 早期归档或手工建立的记录若没有原件字节，界面显示“历史记录未保存原件”并提供补传，不从 OCR 文本伪造扫描件。
+- #441 的浏览器送货头、材料行、打印状态、修订和原件由同一中央领域保存；Repository/HTTP/command 是当前浏览器入口，失败不回落旧 SQLite。当前服务是可重置中央验证实例，尚不声明生产重启持久化或云端上线；部署边界见 ADR 0020。
+- 旧 `delivery_records` / `delivery_lines` / `file_refs(category=source)` / `file_payloads` 保留为受控迁移输入及显式 Tauri 适配。它们的旧本地归档行为不再是已接管浏览器的日常正式写源。
+- 上传批次与不可变资产分别保留稳定 ID。资产保存文件名、MIME、真实长度、完整字节、SHA-256、建立者和时间；同一明确批次且字节一致才复用资产。逻辑送货保存稳定 ID、当前项目/分供方、资产引用、结构化版本和唯一材料行事实。一份资产可供多条逻辑送货显式引用。
+- 新归档和人工修订必须选择当前有效项目、分供方并人工填写日期；缺失分供方、日期的历史记录保持原缺失与待核验，不能匹配同名主档或补当天日期。历史核对标记只有在当前必需事实完整时才有效；缺价格经人工确认可归档并标记价格待补录。
+- 结构化修订保存版本、原因、服务端操作者/时间和前后变化；业务字段编辑不改变原件字节。补传/替换建立新资产与修订引用，旧资产保留。列表和结构化审计不含正文，当前及历史正文均按需重验当前权限、逻辑 owner、来源和可证实祖先。
+- 缺原件保持明确缺失，不从 OCR 文本或同名本机文件补齐；价格分析不因价格有效而忽略缺原件。资产长度、MIME、摘要或 owner 错配阻断读取/保存，不静默合并。
+- 受控迁移保留稳定头/行映射、原件、打印处置及可解析历史；孤儿和批次/字节冲突阻断。可证明逻辑 owner 的软删除原件按字节与摘要保全；未能证明其历史版本/祖先时只作受保护历史事实，不进入公共原件集合。缺正文及无法解析审计明确登记，不伪造版本。
+- 旧 `project_aliases` 尚未迁入。当前项目建议仅从已人工确认送货的 `rawSiteText + projectId` 派生，仍需人工选定；完整旧别名迁移继续由 #411 承接，不能计为已迁。打印按当前资产关系分组，同一上传批次后续产生不同资产或缺失引用时分别处置，不能借相邻资产打印。
+- 本切片不建立有效到货头、库存或材料结算资格，也不退役旧到货明细；这些后续关系继续由 #411/#409 承接。
 
 ### 3.6 施工进度关联
 
@@ -1846,9 +2083,11 @@ CREATE INDEX idx_att_worker ON attendance_records(workerId);
 
 ## § 7 数据迁移策略
 
+本节的 localStorage → SQLite 内容是旧本地版本的来源映射，不是当前浏览器中央切换流程或自动启动命令。当前中央迁移的预检、不可变备份、拓扑导入、对账、确认与回滚以 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 和 [`COMMANDS.md`](./COMMANDS.md) 为准；未迁移领域仍保持其明确现有边界，不新增静默迁移或正式数据 seed。
+
 ### 7.1 旧数据迁移（localStorage → SQLite）
 
-首次启动检测 localStorage 中的旧数据 key：
+旧本地版本曾使用的 localStorage 数据 key 与目标映射如下，是否存在与是否已迁移须先核对实际来源，不能在当前浏览器启动时自动执行：
 
 | 旧 key | 目标表 | 说明 |
 |---|---|---|
@@ -1863,14 +2102,14 @@ CREATE INDEX idx_att_worker ON attendance_records(workerId);
 2. 旧数据保留不删除（用户可手动清理）
 3. 旧 `Supplier.attachments[]` 内嵌数组 → 拆为 `supplier_credentials` 多行
 4. 旧 `Supplier.purchases[]` / `payments[]` → 保留在 `suppliers` 表的 JSON 字段中（兼容），新数据走独立表
-5. 区域树/工程量/施工进度/目标成本等新表**无 localStorage 旧数据来源**，不参与迁移（首启建空表 + seed；工序标准库 22 道随 seed 内置）
+5. 区域树/工程量/施工进度/目标成本等表**无上述 localStorage 旧数据来源**，不参与这条旧 key 映射；这不等于它们不参与后续 SQLite → 中央迁移。浏览器正式 `production` 不 seed，确定性工程量、排程和工序样本只允许在授权演示来源使用。
 6. 旧 `credential_status` 按新必需资料和有效期重新计算：缺失/过期 → `incomplete`；齐全 → `reviewing`。没有人工核验时间/备注凭证的旧自动 `qualified` 不得迁为人工合格，也应进入 `reviewing`；旧 `rejected` 仅在有明确退回凭证时保留，否则同样重算。迁移不得伪造 `credential_reviewed_at` 或核验备注。
 
 ---
 
 ## § 8 撤回机制（V1 已落地，#52）
 
-> 所有新增/编辑/删除操作需支持撤回。V1 用软删除 + 操作日志（已由 #52 实现），后续可扩展为后台管理回退面板。
+> 本节记录 #52 的本地软删除与操作日志基础，不表示每个实体当前都开放删除或任意撤回。可用命令、受保护状态和更正方式分别以 [`COMMANDS.md`](./COMMANDS.md) 及页面领域契约为准；已确认材料结算、已发工资等必须沿用各自冲销/调整规则，不能用通用撤回覆盖历史事实。后台管理回退面板不因此进入本轮范围。
 
 ### 8.1 软删除
 
@@ -1912,7 +2151,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 1. **删除撤回**：从操作日志中恢复 `before_data`，或直接清除 `deleted_at`
 2. **编辑撤回**：从操作日志中恢复 `before_data` 的字段值
 3. **新增撤回**：标记软删除
-4. **撤回时效**：V1 不限制，V2 可按天数限制（如 30 天内可撤回）
+4. **撤回时效**：通用日志基础能力不代表页面允许无限期撤回；用户可见的单条/批量删除撤回按 ADR 0003 的 10 秒窗口，级联采用提交前取消，各实体的受保护状态和更正方式仍优先。
 5. **级联撤回**：见 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) 第 5 条——级联只标父级、撤回只恢复父级、下游按「祖先是否已删」自动重现（读取过滤本体见 §8.1）。
 
 ### 8.4 实施计划
@@ -2046,7 +2285,15 @@ CREATE INDEX idx_praa_application
 4. OCR 置信度不替代人工确认；
 5. 未确认支付不进入已付、合同付款或现金流汇总。
 
-付款申请派生字段：
+付款申请批复来源（[#439 / PAY-07](https://github.com/zodea/crm-new/issues/439)）：
+
+- `approved_amount = NULL` 表示未填写，明确录入 `0` 表示批复零元；只有未填写时才回退申请金额作为可付上限。新申请默认保存 `NULL`，不得经过 `|| 0` 或默认值压成零。
+- `approved_amount_origin` 由保存域维护：新建及明确编辑批复后为 `user-entry`，迁移前存量为 `legacy`。修改批复必须携带与金额一致的明确输入意图；仅改备注、整单保存或客户端声称来源已确认，不会升级存量来源。金额、来源、分摊和附件沿用同一保存事务，取消或保存失败不留下来源变更。
+- v21/v22 曾把空值、缺列和非法负值压成零，无法从零值、状态、备注或时间戳恢复当时批复事实。v49 仅改为可空列并给旧记录添加来源标记，原始金额、银行记录、三类分摊、索引及约束保持；不批量猜测旧零的含义。
+- `legacy + 0` 读为“历史批复待核验”，批复金额、依赖它的余额及完整合计为未知；原存储零仍保留。旧非零批复仍按已有金额读取，已确认银行实付独立显示，不为对平批复而修改。
+- 历史未知批复的新支付确认政策仍由 [PAY-08 待裁定项](https://github.com/zodea/crm-new/issues/413#issuecomment-5616431545) 决定。PAY-07 保留既有登记与确认操作的申请额兼容上限，并在读侧显示未知；该技术兼容不构成批准申请全额的业务裁定。明确重填后使用新金额语义。
+
+付款申请派生字段（批复来源已明确，或批复为未填写时）：
 
 ```text
 paid_amount =
@@ -2057,6 +2304,8 @@ actual_payment = paid_amount
 unpaid_amount = max(COALESCE(approved_amount, apply_amount) - paid_amount, 0)
 ```
 
+历史待核验批复的 `unpaid_amount` 为 `NULL`，不能使用上式回退申请额并将结果冒充已知余额；登记动作的兼容回填与读侧金额事实分开。当前实现覆盖本地付款表单、详情、付款管理、分供方/项目分供方读投影及其他支出结算关联源单，不代表通用付款中央写命令或生产持久化已经接管。
+
 `payment_applications.paid_amount/actual_payment` 旧列在兼容期只读；迁移完成后移除。分摊金额写入、支付确认、撤回及操作日志必须在同一事务内。
 
 ### 10.3 工人工资与费用报销
@@ -2064,8 +2313,7 @@ unpaid_amount = max(COALESCE(approved_amount, apply_amount) - paid_amount, 0)
 工人工资按 #117 的负责人请款簿管理。工资单通过“确认发放”动作进入“已发放”状态时，同时确认成本和已支付事实，不生成逐工人支付记录或合同付款申请：
 
 ```text
-工资动态成本 = Σ wage_statements.actual_amount
-WHERE status = 'released'
+工资动态成本 = Σ 工资有效实际事实的有符号金额（稳定身份去重）
 
 工资资金流出 = 同一集合
 ```
@@ -2081,7 +2329,7 @@ F3 迁移将旧 `expense_reimbursements.amount > 0` 的记录转换为一条 `ex
 ```text
 动态成本 =
   Σ已确认支出结算.total_amount（按合同 cost_category 五类）
-  + Σ已发放工资.actual_amount
+  + Σ工资有效实际事实.有符号金额（原发放、真实补退及有效错记冲销）
   + Σ费用报销明细.amount（仅头 status='confirmed' 且头/明细均未软删）
 
 动态效益 = 客户已确认收入 - 动态成本
@@ -2145,6 +2393,10 @@ interface OperatingMetric {
 首个样本的迁移前显示值只在[睿璟验收清单](../migration/ruijing-acceptance.md)维护。系统按实体重新派生；差异进入对账，不反写静态值。
 
 ### 10.7 导入追溯与差异表
+
+#423 项目 Excel 切片在同一中央项目事实内保存 `importSource` 回执，命令和表单回读共享它；不向浏览器 SQLite 写正式项目，也不新增平行业务表。当前为可重置内存实例中的映射：`fileName → source_file`、`fileDigest → source_hash`（原文件字节 SHA-256）、`sheetName → source_sheet`、`rowNumber → source_row`（原 Sheet 的 1 起始行号）、`externalRef → source_key`、`rawSnapshot → raw_snapshot`（包含未映射源列的解析值）。项目 ID 为中央分配的稳定 ID；客户关系使用中央正式客户 ID。
+
+原 Excel 文件字节仅在当前浏览器解析，不作为中央附件上传；文件名、摘要、Sheet、行号和源行快照随成功行保留。下载的拒绝清单携来源定位与原因，未成功行不冒充正式项目。当前回执仅对本 Excel 链路已保存行去重，不解释既有受控迁移的 `legacyId → serverId` 映射；处理历史整库身份必须沿既有迁移边界。防重与冲突契约见 [COMMANDS 项目 Excel 导入](./COMMANDS.md#项目-excel-导入423)。下列持久化表的实际部署、唯一约束、重启与备份恢复仍由 #416 验收，本切片没有执行迁移。
 
 ```sql
 CREATE TABLE import_batches (

@@ -9,6 +9,7 @@ export interface RuntimeEvidenceEndpoint {
   domainCode: string
   template: string
   implementationIssues: number[]
+  historicalImplementationIssues: number[]
   referenceProfile: string
   referenceEndpointId: string
   referenceEndpointLabel: string
@@ -30,6 +31,7 @@ export interface RuntimeEvidenceLedger {
     domain: string
     routeCount: number
     implementationIssues: number[]
+    historicalImplementationIssues: number[]
   }[]
   endpoints: RuntimeEvidenceEndpoint[]
 }

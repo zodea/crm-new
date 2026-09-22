@@ -1,7 +1,7 @@
 import type { MaterialContractListPageDTO } from '~/lib/material-contract/repository'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, defineComponent, h, nextTick, onActivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineComponent, h, nextTick, onActivated, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import MaterialContractListScreen from '~/components/contract/MaterialContractListScreen.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -115,6 +115,7 @@ describe('材料采购合同列表返回上下文', () => {
     vi.stubGlobal('onActivated', onActivated)
     vi.stubGlobal('onMounted', onMounted)
     vi.stubGlobal('ref', ref)
+    vi.stubGlobal('shallowRef', shallowRef)
     vi.stubGlobal('watch', watch)
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0)

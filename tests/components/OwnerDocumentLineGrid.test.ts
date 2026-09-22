@@ -64,6 +64,23 @@ const boqLines = [{
 }]
 
 describe('ownerDocumentLineGrid behavior', () => {
+  it('缺量不预填申报零，未知单价和金额保留未记录，已知零仍能显示零', async () => {
+    const missing = [{ ...boqLines[0]!, unitPrice: null, autoQty: 0, missingQtyCount: 1 }]
+    const wrapper = mount(OwnerDocumentLineGrid, {
+      props: { kind: 'owner_report', lines: [{ boqLineId: '', reportedQty: null }], boqLines: missing },
+      global,
+    })
+    await wrapper.get('[aria-label="合同清单项"]').setValue('boq-real-id')
+    const next = wrapper.emitted('update')!.at(-1)![0] as Array<Record<string, unknown>>
+    expect(next[0]!.reportedQty).toBeNull()
+    await wrapper.setProps({ lines: next })
+    expect(wrapper.text()).toContain('申报 待核对')
+    expect(wrapper.text()).toContain('未记录')
+    expect(wrapper.text()).not.toContain('申报 ¥0.00')
+    await wrapper.setProps({ lines: [{ ...next[0], reportedQty: 0, unitPrice: 20 }] })
+    expect(wrapper.text()).toContain('申报 ¥0.00')
+  })
+
   it('fills a report line from the selected real BOQ id and derives its amount', async () => {
     const lines = [{
       boqLineId: '',

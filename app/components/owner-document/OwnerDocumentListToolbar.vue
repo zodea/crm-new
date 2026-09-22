@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { Button } from '~/components/ui/button'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+import { enumSelectionFromQuery } from '~/lib/util/enum-selection'
 
 interface FilterOption {
   key: string
@@ -30,8 +33,8 @@ const emit = defineEmits<{
 
 const search = defineModel<string>('search', { required: true })
 const project = defineModel<string>('project', { required: true })
-const type = defineModel<string>('type', { required: true })
-const view = defineModel<string>('view', { required: true })
+const type = defineModel<string | string[]>('type', { required: true })
+const view = defineModel<string | string[]>('view', { required: true })
 </script>
 
 <template>
@@ -41,13 +44,11 @@ const view = defineModel<string>('view', { required: true })
     class="owner-document-toolbar panel min-w-0 p-3.5"
   >
     <div class="owner-document-toolbar__top grid min-w-0 items-center gap-3">
-      <div class="min-w-0">
+      <div class="min-w-0 flex items-center gap-1.5">
         <h1 class="m-0 truncate text-15px font-800 text-ink" :title="title">
           {{ title }}
         </h1>
-        <p class="m-0 mt-0.5 truncate text-11px text-ink-faint" :title="subtitle">
-          {{ subtitle }}
-        </p>
+        <ContextHelp v-if="subtitle" :label="title" :text="subtitle" />
       </div>
 
       <div class="owner-document-toolbar__filters flex min-w-0 flex-wrap items-center gap-2.5">
@@ -57,18 +58,20 @@ const view = defineModel<string>('view', { required: true })
           :options="projectOptions"
           :min-width="156"
         />
-        <SelectFilter
+        <KitMultiSelectFilter
           v-if="showType"
-          v-model="type"
+          :model-value="enumSelectionFromQuery(type)"
           :label="typeLabel"
           :options="typeOptions"
           :min-width="132"
+          @update:model-value="type = $event"
         />
-        <SelectFilter
-          v-model="view"
+        <KitMultiSelectFilter
+          :model-value="enumSelectionFromQuery(view)"
           label="状态"
           :options="views"
           :min-width="120"
+          @update:model-value="view = $event"
         />
         <SearchInput v-model="search" :placeholder="searchPlaceholder" :width="246" />
         <Button

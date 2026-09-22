@@ -1,14 +1,68 @@
 # 运行态参考差异矩阵
 
-> 当前实施票：[#276](https://github.com/zodea/crm-new/issues/276)
+> 本轮总图：[#402](https://github.com/zodea/crm-new/issues/402)；可信基线：[#403](https://github.com/zodea/crm-new/issues/403)
 >
-> 父规格：[#292](https://github.com/zodea/crm-new/issues/292)
+> 历史账本实施：[#276](https://github.com/zodea/crm-new/issues/276)；历史总规格：[#292](https://github.com/zodea/crm-new/issues/292)
 >
 > 历史来源：[#181](https://github.com/zodea/crm-new/issues/181)、[#182](https://github.com/zodea/crm-new/issues/182)
 >
 > 核对日期：2026-08-25
 
 本文是全部生产 Nuxt 路由的运行态参考证据登记册，不是第二份页面规格。字段、业务规则和数据关系仍以 `docs/rewrite/pages/`、`DATABASE.md`、`CONTEXT.md` 为准；实际实现状态仍看 `ui-implementation-status.md`。
+
+> 2026-09-08 起，本轮任务转入[全模块复核与红圈对齐路线](https://github.com/zodea/crm-new/issues/402)。本登记册及生成账本的既有票号保留历史来源含义；当前承接者由旧票顶部指针与新图的原生子票确定。选定 SHA 后的计数和机器账本校正由[可信复核基线](https://github.com/zodea/crm-new/issues/403)负责；证据等级不因任务替换而升级。
+
+2026-09-08 分供方列表/详情的新增只读观察，以及 #418 本地层次和排版验证见[本批证据](./evidence/issue-418/README.md)。此次只为明确覆盖的界面补充证据，不提升整份历史账本的核验日期或其他路由的完成等级。
+
+同日列内容与操作补查见 [#404 红框反馈](https://github.com/zodea/crm-new/issues/404#issuecomment-5582280040)：参考分供方列表确认名称蓝链、各业务列表头漏斗、审批状态浅底短标签及刷新/筛选/设置/导入/新建入口；刷新与筛选之间图标的准确作用尚未核实。此次在用户既有桌面窗口只读读取，没有测量新的视口尺寸或打开工具菜单，也没有保存或发布参考截图和业务值；用户所附图仅提供标注区域，不充当工具内部行为证据。该次本地搜索样本只证明当时的搜索、分页/汇总及清空恢复；后续实现验收另按下述入口登记。各列准确含义、能力缺口及当前实现归[分供方页面蓝本](../rewrite/pages/base-supplier.md)，其余界面仍按[逐页对应表](../agents/module-review.md#列表详情子表与工作台的逐页对应)采证。
+
+2026-09-08 的 #419 / #421 本地运行态实现、实际覆盖路由、视口和交互结果统一见[本批验收入口](./evidence/issue-419/README.md)。该证据记录瑞航本地合成样本或隔离中央测试会话，不提升外部参考证据等级；未观察的参考工具内部行为继续为未知。营业执照读面未接通、正式材料结算 feed 尚无记录等真实边界仍按领域契约保留，不因列表可展示而视为全部数据能力完成。
+
+2026-09-11 #438 仅为项目合作档案补齐中央原件读取、预览、下载和 ZIP。真实多页 PDF、当前祖先/来源/owner/测试会话隔离、慢响应保存及五档视口见[本地验收记录](./evidence/issue-438/project-supplier-files-verification.md)。下表 #317 的“文件正文未接入”保留历史观察含义，当前限定实现以该记录和页面蓝本为准；其他业务 owner 正文与合作终态写入继续未接入，不更新外部参考观察日期或证据等级。
+
+### 2026-09-08 复核基线与展开边界
+
+2026-09-09 #423 项目 Excel 导入仅使用隔离合成文件与中央测试会话，实际入口、选 Sheet、映射预览、结果、五档视口和失败反馈见[验收记录](./evidence/issue-423/project-import-verification.md)。本次没有触碰外部参考站的上传或写入口；导入内部流程仍保持 `R-TOOL-PENDING` 的参考证据等级，采用本地 `ImportMappingScreen.jsx` 与 ADR 0005 蓝本。
+
+本轮固定源码为 `ec392bd602200c8da343b626b5a21c8215b4884d`，工作分支 `codex/ui-reference-layout`；远端 main 与本地 origin/main 均为 `4292291d2a99c94052a6eab743036b149bfa9634`。版本、原生依赖和领取状态的核验见 [#403 开工记录](https://github.com/zodea/crm-new/issues/403#issuecomment-5586540379)。
+
+- #328–#331 经 PR #399/#400/#401/#417 合入，当前源码包含其成果；#418–#421 及多选、刷新修复仅在当前分支本地完成，复用各自实际验收入口。
+- 此次基线核对时，#398 的 `82dd2debbbcc020a68070182fcbfe0f002926faf` 尚未整合。2026-09-10 按用户后续授权，将该分支与含 #425 的本地 main 整合；历史审计保留为非权威证据，冲突裁定及本次重新验证见[本地整合记录](../research/local-branch-integration-2026-09-10.md)。远程分支未更新，中央内存验证不代表 #416 完成。
+- 现有三个 `.worktrees/issue-329`、`issue-330`、`issue-331` 保留。工作树存在不等于任务进行中，以对应 PR、提交和当前改动分别核对。
+- 机器账本保留路由级历史证据编号及等级。`implementationIssues` 现指当前复核责任，`historicalImplementationIssues` 单独保留历史来源；导入/导出归 #406，迁移页归 #414，材料结算归 #409，不能按相邻菜单误归物资模块。
+
+下表是已核对源码的展开规则，尚不构成全部子表或运行环境已验收的清单。各项继续由对应模块逐场景采证；父路由的直接证据不自动赋给未观察的子视图。
+
+这些规则现已落实为 [全模块复核覆盖索引](./module-review-coverage.md)及同名 JSON：动态注册、当前挂载子视图和宿主适配器分别展开；逐场景状态及动作仍由模块票继续细化。项目旧 `ProjectSubTables` 根组件当前未挂载，不计入可达界面；当前项目详情为资料分组、九项甲方/分包单据入口及材料合同/合作关系区。索引里的待核验状态不覆盖本登记册原有证据等级。
+
+| 路由或入口 | 已核实展开事实 | 源码入口 / 承接 |
+| --- | --- | --- |
+| `/owner/:kind` 的列表、详情、新建、编辑 | 5 个 kind：change、report、acceptance、final-settlement、penalty；验收与保修为同一 acceptance 的 variant 视图 | `app/lib/owner-document/page.ts`、`app/pages/owner/`；#410 |
+| `/subcontract/:kind` 的列表、详情、新建、编辑 | change、settlement 两个 kind；与上述 8 个动态页面文件合计 28 个路由＋kind，视图及环境继续展开 | `app/lib/owner-document/page.ts`；#410 |
+| `/contract/:id` | construction / subcontract / material 与有效 origin 共同选择中央详情；缺省分支仍走旧适配，不能合记一次通过 | `app/pages/contract/[id].vue`；#409 |
+| `/import/mapping/:entity` | invoice、project、supplier、demo-supplier、quantity-template、quantity-assignment、quantity-completion、quantity-legacy-precheck；分别有上传、映射、预览及失败恢复，demo-supplier 是演示桩 | `app/lib/kit/import-entities.ts`；#406 联同 #407/#408/#412/#413 |
+| 客户 / 分供方 / 项目合作详情 | 客户 3 个事实页签；分供方 6 个页签；项目合作 6 个页签及常驻文件面板 | `CustomerDetailScreen.vue`、`SupplierDetailScreen.vue`、`ProjectSupplierWorkbench.vue`；#407/#408 |
+| 三类中央合同 / 辅助合同 / 其他结算详情 | 三类核心合同各 7 个页签；公司支出 3 个、其他支出 5 个、其他结算 4 个，页签内子表另行登记 | `app/components/contract/`、`app/components/other-settlement/`；#409 |
+| 工程量、BOQ、排程、OCR 工作台 | 工种/班组矩阵，BOQ 五格式导入及三页签，甘特与依赖编辑，发票复核/打印及窄屏面板、送货重复复核分别登记 | `app/components/boq/`、`quantity/`、`schedule/`、`invoice/`、`delivery/`；#406/#409/#411/#412/#413 |
+
+尚未完成：全量调用位置级子表/浮层清单、每个环境分支的运行验证、红圈全部安全可达目标的双向映射、旧任务逐条验收义务迁移及生产持久化验收。当前重算的路由数量只证明登记集合一致；`design-coverage` 的 covered 只表示有设计落点。
+
+本次已通过登录会话只读展开全部工程项目管理菜单，实测内容视口 1293×1051；下表只证明入口名称可见，不证明子页面、保存或私有接口行为。未保存参考截图或真实业务值。
+
+| 红圈可见入口组 | 瑞航映射与边界 |
+| --- | --- |
+| 项目信息、目标成本 | #408 项目与 #412 目标成本 |
+| 主合同：施工合同、甲方报量、甲方罚扣单、甲方变洽签、竣工验收、最终结算、保修到期确认单 | #409 合同；#410 五类单据及验收/保修视图 |
+| 分包及人工：分包合同、项目罚扣、分包结算、分包变洽签 | #409 分包合同；#410 对应单据 |
+| 乙供材：仓库档案、材料采购合同、下料单、材料到货、材料领用、乙供材直入直出、批量调拨、材料采购结算、库存盘点 | #409 合同/结算；#411 其余物资能力。仓库、乙供材直入直出和批量调拨无同名独立生产路由，须按已定领域范围核验实际入口，不能直接判排除 |
+| 甲供材：总控量、下料单、到货、领用、直入直出 | #411 五类明确列表入口 |
+| 资金：开票申请、收款登记、收票登记、付款申请、费用报销、往来收款/付款、付款管理、支付记录 | #413 对应资金与发票能力；往来收付按实际方向展开，收票台账不能冒充 OCR 工作台直接证据 |
+| 资金：保证金申请/退还、备用金申请/退还 | 无同名独立生产路由；#413 核验是否已被往来业务覆盖，尚不声明独立功能已实现 |
+| 项目其他合同：项目其他收入合同、其他支出合同、其他支出结算、公司支出合同 | #409 辅助合同/结算；其他收入无同名入口，须按既定范围核验映射 |
+| 基础信息：客户、分供方、往来单位 | #407 主档与 #413 往来身份协作；不能以往来单位代替瑞航班组/工人独有能力 |
+| 统计分析：分析、公告、审批；物品管理：档案、领用、移交、归还、销毁；协同办公：日程、文件、任务 | 仅菜单观察；独立统计门户、办公/物品管理及完整审批按 #402 排除。瑞航现有通知、文件和 capability 仍按自身契约复核，不因同名而复制外部模块 |
+
+红圈当前材料采购合同列表的列与汇总差异已登记 [#409](https://github.com/zodea/crm-new/issues/409#issuecomment-5586649120)，当前可确定切片不等待菜单对应中的其他业务映射裁定。
 
 ## 1. 裁定边界
 
@@ -52,12 +106,18 @@
 
 | 代码 | 证据级别 | 参考路径或视图 | 视口 | 只读证据与安全状态 |
 | --- | --- | --- | --- | --- |
+| `R-QUANTITY-HOLLOW-LOCAL` | 本地权威；无独立对应参考页 | 原户空鼓检查新增、修订与详情整页 | 390、768、1024、1280、1440px 独立验收；P6 正在收尾 | 依据 #412 空鼓检查与人工扣款规则、工程量和工资页面、DC 通用原语及 ADR 0014；检查原责任、修订与整改历史分别呈现，不继承相邻户详情或工资台账的参考证据等级。 |
 | `R-OTHER-SETTLEMENT-LIVE-331` | 直接证据，只读已核验 | 项目其他合同 → 其他支出结算列表及名称只读详情 | 2026-09-06；1293×1051 | 紧凑表格与专属金额列，详情摘要、页签及分区资料；未触发任何写入或文件动作，不保留真实值；本地四档视口合成证据见 `evidence/issue-331/README.md` |
 | `R-LIST-PRIOR` | 历史结构记录，未验证只读 | 业务列表；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | `docs/research/red-circle-ui-gap-2026-07-11.md` §2；仅作列表密度、筛选区、工具栏与分页的采集线索，必须按本轮协议重新观察 |
 | `R-FORM-PRIOR` | 历史结构记录，未验证只读 | 新增/编辑表单；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §1 与 ADR 0014；旧记录包含保存、取消关闭等行为结论，本轮不采信这些交互，也不再点击相关入口 |
 | `R-DETAIL-PRIOR` | 历史结构记录，未验证只读 | 业务详情；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §3；仅作结构线索，字段、动作和进入路径都必须通过明确只读入口重新确认 |
 | `R-WORKBENCH-PRIOR` | 历史结构记录，未验证只读 | 数据工作台/矩阵；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §2–§3；仅作密度、分栏和局部滚动线索，业务操作保持本地契约并等待重新观察 |
 | `R-TOOL-PENDING` | 待补采 | 导入、导出、OCR、换算或价格工具；具体参考路径未知 | 首次安全观察目标 1440×900；实现仍复核四档视口 | 没有可安全确认的目标页证据；不得点击上传、下载、导出或任何可能立即生效的控件，先保留本地行为 |
+| `R-STAGE-PENDING` | 新增整页待验 | `/subcontract/quantity/stages`；阶段目录、分项关联与显式报量选择 | 待验证 390、768、1024、1280、1440px | #442 按 ADR 0010 与实体整页表单原语实施，当前未取得完整运行验收；相邻工程量页面的历史观察不提升本页证据等级。 |
+| `R-PAYROLL-SOURCES-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/sources` | 独立运行证据见工资接管记录，不继承旧空台账观察 | 按工资页面规格及 DC 通用原语呈现配置、考勤、签工和月锁；当前浏览器中央只读，Tauri 显式说明边界。[当前接管证据](./evidence/issue-412-payroll-history/README.md)与后续日常核算分别验收。 |
+| `R-PAYROLL-A-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/config`、`/subcontract/payroll/form/:id` | 新增整页按 390、768、1024、1280、1440px 独立验收；当前实施中 | 依据 #412 承接的 #117/#287 规则、工资页面及 DC 工资构图和整页原语。主体配置、工资价格、来源核对与固定单据编辑分别呈现；不继承旧空工资台账的运行结果，不称外部目标页已观察。 |
+| `R-PAYROLL-ADJUSTMENTS-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/adjustments` 下更正整页与详情、`/subcontract/payroll/payments` 下实际台账、收付详情及补退/冲销整页 | 新增界面按 390、768、1024、1280、1440px 单独验收；本期提交后固定证据 | 依据 #412 P4、工资页面及 DC 通用整页/详情/表格原语；原签名、核算更正、实际补退与错记冲销分别呈现。不继承旧空工资台账或参考站工资之外页面的观察结果；本地验收不提升外部参考等级。 |
+| `R-PAYROLL-DAYWORK-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/daywork/new`、`/subcontract/daywork/form/:id` | 新增整页按 390、768、1024、1280、1440px 独立验收；P3 当前实施中 | 依据 #412 已定签工规则、工资页面、DC 原语和 ADR 0014；整页登记与编辑、轻量人工确认分别核对。未观察独立外部目标页，不继承旧签工台账的运行结果；待取得本轮真实交互证据。 |
 | `R-OCR-STUDIO-SOURCE` | 固定源码参考，非业务运行态 | [`andyhuo520/ppocrv6-studio@34bf6c3`](https://github.com/andyhuo520/ppocrv6-studio/tree/34bf6c3) 的单页设置工作台 | 源项目桌面布局；瑞航仍复核 390、768、1024、1280–1440px | 只复刻“单页纵向分组、紧凑控件密度、恢复默认/保存反馈”的信息架构，不复制其传统 PP-OCRv6 ONNX 引擎契约。`model_variant`、`det_thresh`、`box_thresh`、`unclip` 等传统检测参数不能伪装成 PaddleOCR-VL 1.6 云端参数；瑞航可编辑项必须确实进入现有 VL 调用链，Access Token 等私密运行参数继续仅由服务端持有。 |
 | `R-SHELL-LIVE` | 当前直接证据 | 已登录参考站全局外壳；活动业务页签保持在用户原先打开的页面 | 桌面窗口，`RootWebArea` 约 1568×1153，2026-07-27 | 仅通过 Windows 无障碍树读取和安全界面状态切换：侧栏主体约 215px、顶栏约 50px、路由页签约 28–32px、通知面板约 360px；参考站菜单搜索“分包”显示 5 个站内入口，其中“分包产值确认”“分包签证结算”是参考站独有能力，不构成给瑞航新增或改名路由的授权。瑞航只按自身叶子名称/提示过滤，因此本地同词结果保持“分包变洽签”“分包合同”“分包结算”3 项。分组收起后立即恢复，两个已打开页签切换后恢复原页，通知面板只打开读取并由同一入口关闭。未触发已读、删除、处理、提交、导入、导出或任何业务动作；未保存参考截图和业务值。 |
 | `R-PUBLIC-SURFACES-LIVE` | 当前直接证据 | 已登录参考站全局外壳；付款申请列表/详情、付款管理、支付记录、材料采购合同详情、分供方详情、项目详情、开票申请列表/详情 | Chrome 桌面视口，2026-08-13 | 浏览器只有 1 个页面，参考工作台恢复 25 个应用内业务页签并回到“支付记录”；进入付款详情后增至 26。付款详情完成异步能力判定约 3.5 秒后出现“业务洞察”，右侧 Sheet 分为统一检查、当前合同付款与结算/发票、跨项目/跨供应商报表三层；有合同和无合同两张付款单均挂载，当前层指标随记录更新。公共详情壳会以业务元数据、记录 ID 和 `detail/upsert` 位置请求分析，响应 `show` 决定是否挂载浮动入口；审批位置另带流程定义与活动节点。材料采购合同、分供方和项目详情使用相同公共详情壳但当前响应均未挂载入口，证明入口由后台能力/规则控制，不由页签数量、项目名称或“是否详情页”单独决定。页签内刷新收起 Sheet 但保留详情与入口；浏览器刷新丢弃刚打开的详情和 Sheet，恢复 25 个持久化工作台。刷新日志只证明外壳初始化持续通讯能力，未把某条 toast 绑定到私有传输帧。仅切换页签、执行列表搜索、进入蓝色只读详情、打开/关闭洞察和刷新页面；未点击通知、文件、评论、下载、打印、新建、导入、审批或任何写入口，未保存真实业务值。完整挂载、接口抽象、缓存、消息已读与页签恢复契约见 `docs/rewrite/PUBLIC-SURFACES.md`。 |
@@ -80,7 +140,7 @@
 | `R-OWNER-DOCUMENTS-LIVE` | 当前直接证据 | `默认首页 > 主合同管理 > 甲方报量 / 甲方罚扣单 / 甲方变洽签 / 竣工验收 / 最终结算 / 保修到期确认单`；甲方报量编号进入只读详情 | Chrome 内容视口约 1280×1024，2026-08-13 | 六类列表均保留专属分类、列、汇总/分页和空态，不能压成一套通用表；甲方报量有真实行，编号进入“详情-收入结算”，详情采用顶部摘要、审批轨迹、详细资料/合同清单/变洽签清单/扣款与奖励/结算转扣记录页签。项目、施工合同和甲方均为蓝色关系入口，附件为独立集合。仅点击菜单、报量编号与只读页签；未点击导入、新建、下载、文件、评论、审批或任何写动作。其余五类详情未因列表为空而外推。 |
 | `R-SUB-DOCUMENTS-LIVE` | 当前直接证据 | `默认首页 > 分包及人工 > 分包变洽签 / 分包结算 / 项目罚扣`；分包合同详情的对应只读页签 | Chrome 内容视口约 1280×1024，2026-08-13 | 三类独立列表分别展示变更合同金额链、结算付款余额链和罚扣转扣关系列；当前列表样本均为空，但完整分类、表头、分页与空态仍存在。分包合同详情中的项目罚扣页签进一步按已通过、审批中、未提交/已驳回/已撤销、补充协议四组保留同一专属表头。只切换菜单和既有只读页签，未触发导入、新建、导出、编辑、审批或行级动作。 |
 | `R-AUX-DOCUMENTS-LIVE` | 当前直接证据 | `默认首页 > 项目其他合同 > 项目其他收入合同 / 其他支出合同 / 其他支出结算 / 公司支出合同` | Chrome 内容视口约 1280×1024，2026-08-13 | 四类入口都保持自己的分类和专属表头；当前样本为空仍显示分页/空态。项目其他收入含项目、甲方、税率、期限和两类合同附件；其他支出含项目/乙方及结算、收票、支付、应付与结清链；其他支出结算含项目/合同/分供方、奖罚及申请/支付余额；公司支出不含项目，改为甲乙方、税额、附件、票款与经办审计列。只切换菜单，未触发导入、新建、导出或任何业务动作。项目其他收入当前无本地生产路由，只作为相邻范围证据。 |
-| `R-MATERIAL-SETTLEMENT-LIVE` | 当前直接证据 | `默认首页 > 乙供材管理 > 材料采购结算 > 结算名称 > 详情-支出结算` | Chrome 内容视口约 1280×1024，2026-08-13 | 列表保留业务类型分类、付款状态、项目/采购合同/分供方、含税金额/奖罚/本次结算、申请与支付四档余额、审批状态、全量汇总和分页。结算名称进入只读详情，详情为顶部摘要、审批轨迹与详细资料；资料分基础、前期、结算、累计、应付、质保金和系统信息，并有附件集合及可空的采购结算明细表（关联到货单/送货单/到货日/金额）。仅点击结算名称，未点击附件、批量下载、审批、评论、新建、导入或行级动作；该明细的本地 canonical 关系尚未裁定，不能据此补 Mock 表格。 |
+| `R-MATERIAL-SETTLEMENT-LIVE` | 当前直接证据 | `默认首页 > 乙供材管理 > 材料采购结算 > 结算名称 > 详情-支出结算` | Chrome 内容视口约 1280×1024，2026-08-13 | 列表保留业务类型分类、付款状态、项目/采购合同/分供方、含税金额/奖罚/本次结算、申请与支付四档余额、审批状态、全量汇总和分页。结算名称进入只读详情，详情为顶部摘要、审批轨迹与详细资料；资料分基础、前期、结算、累计、应付、质保金和系统信息，并有附件集合及可空的采购结算明细表（关联到货单/送货单/到货日/金额）。仅点击结算名称，未点击附件、批量下载、审批、评论、新建、导入或行级动作；本次观察只证明参考详情结构；本地 canonical 基数和确认后更正已分别由 #284/#291 裁定，执行以 DATABASE 和现行领域规格为准，不能据空明细补 Mock 表格。 |
 | `R-MATERIAL-FLOW-LIVE` | 当前直接证据 | `默认首页 > 乙供材管理 > 仓库档案 / 下料单 / 材料到货 / 材料领用 / 乙供材直入直出 / 批量调拨 / 库存盘点`；`材料采购合同 > 合同名称 > 物资管理` | Chrome 内容视口约 1280×1024，2026-08-13 | 七类列表均使用有业务意义的单层分类、单行工具栏、专属紧凑宽表和底部空态/分页；当前样本均为 0 条，但表头明确覆盖仓库与项目、源单据、合同、分供方、送货单、入出库、班组合同、调拨两端、结算和付款状态。材采合同“物资管理”进一步拆成新/历史入库、直入直出、新/历史出库五组专属空表。只切换菜单、既有合同详情和只读页签；未点击新建、编辑、删除、上传、下载、导入、导出、审批、打印、评论、文件或行级动作，也未进入任何表单。 |
 | `R-OWNER-MATERIAL-LIVE` | 当前直接证据 | `默认首页 > 甲供材管理 > 甲供材总控量 / 甲供材下料单 / 甲供材到货 / 甲供材领用 / 甲供材直入直出`；`项目信息 > 车陂商业大楼项目 > 物资管理` | Chrome 桌面视口，2026-08-13 | 五类全局列表当前均为 0 条，但各自保留专属分类、单行工具栏、紧凑宽表、真实空态和 20 条/页分页：总控量覆盖计划/盖章/说明/附件，下料覆盖审批/金额/到货情况，到货覆盖源单/分供方/送货单/仓库/结算付款链，领用覆盖负责人/部门/班组合同，直入直出覆盖仓库/分供方/送货照片与编号。主样本项目“物资管理”另保留物资总计划、物资需用计划、入库单三组专属空表；阶段任务、成员与文件位于独立区域。只切换菜单、项目名称和只读页签；未点击导入、新建、上传、下载、文件、评论、操作列或任何写入口。空表无法证明未知详情/明细字段，供货单位和单据头/行身份不得据此猜定。 |
 | `R-FINANCE-FLOW-LIVE` | 当前直接证据 | `默认首页 > 资金管理`下 13 个工作台；`项目信息 > 车陂商业大楼项目 > 票税管理 / 资金管理 / 往来款 / 支付明细` | Chrome 桌面视口，2026-08-13 | 13 个工作台均使用单行搜索/图标工具栏、专属紧凑宽表、表内横向滚动和底部汇总/分页，不能继续压成同一套“名称/编号/项目/关联方/金额/日期/状态”通用列。开票申请有 9 条主样本数据，左侧按未开/部分/全部/终止开票分类，名称进入只读详情；详情平铺项目、收票/开票单位、合同、票种、含税/无税/税额、内容、购方快照、开票记录、系统信息和附件。收款登记有 9 条，编号进入只读详情并展示合同原额/变更额、累计收款、支付/质保/变现字段和凭证。往来收款 14 条且编号进入只读详情；往来付款 5 条，列表明确审批/生效/支付与实付余额，但本轮未从编号形成可靠详情。收票、付款申请、报销、保证金申请/退还、备用金申请/退还、付款管理和支付记录当前均为明确的 `共0条/暂无数据`，仍保留完整分类与专属表头；这属于“当前无记录”，不是权限不可见或参考后台未接。付款管理默认按待支付/已支付/无需支付/全部分段，并保留来源单据与业务类型；支付记录保留账户/开户行/账号和审计字段。项目详情同步聚合开票申请/开票登记/收票登记、收款/付款申请/集中付款/费用报销、往来收付与支付明细；最后一组当前为空。只点击菜单、项目页签和明确蓝色只读名称/编号；未点击导入、新建、打印、下载、文件、评论、支付、审批、操作列或任何写入口。参考站无一一对应的 OCR 校对/排版工作台，瑞航发票识别、打印和因子工具仍由本地 DC、ADR 与 #251 裁定；收票登记只作为台账字段和项目/合同/分供方关系的相邻证据。 |
@@ -122,36 +182,36 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 142 / 5 / 137 |
+| 跟踪页面文件 / dev / 生产路由 | 160 / 5 / 155 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 137 / 137 |
-| 参考证据档案 / 被路由使用 | 41 / 35 |
-| 直接 / 邻近 / 本地权威 | 54 / 18 / 22 |
-| 历史证据 / 未验证目标 | 34 / 9 |
-| 设计已覆盖 / 待补设计 | 135 / 2 |
+| 证据行 / 唯一参考端点 | 155 / 155 |
+| 参考证据档案 / 被路由使用 | 47 / 41 |
+| 直接 / 邻近 / 本地权威 | 54 / 18 / 39 |
+| 历史证据 / 未验证目标 | 34 / 10 |
+| 设计已覆盖 / 待补设计 | 135 / 20 |
 
-| 页面域 | 路由数 | 当前实施票 |
+| 页面域 | 路由数 | 当前复核承接 |
 | --- | ---: | --- |
-| 首页 | 1 | [#278](https://github.com/zodea/crm-new/issues/278) |
-| 项目 | 3 | [#288](https://github.com/zodea/crm-new/issues/288)、[#293](https://github.com/zodea/crm-new/issues/293)、[#294](https://github.com/zodea/crm-new/issues/294)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#316](https://github.com/zodea/crm-new/issues/316)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 分供方 | 4 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289)、[#317](https://github.com/zodea/crm-new/issues/317) |
-| 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 辅助合同与结算 | 15 | [#295](https://github.com/zodea/crm-new/issues/295)、[#330](https://github.com/zodea/crm-new/issues/330)、[#331](https://github.com/zodea/crm-new/issues/331)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#324](https://github.com/zodea/crm-new/issues/324)、[#325](https://github.com/zodea/crm-new/issues/325)、[#326](https://github.com/zodea/crm-new/issues/326)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 分包单据 | 8 | [#295](https://github.com/zodea/crm-new/issues/295)、[#327](https://github.com/zodea/crm-new/issues/327)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 送货单闭环 | 4 | [#296](https://github.com/zodea/crm-new/issues/296)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 材料价格 | 1 | [#296](https://github.com/zodea/crm-new/issues/296)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 收入财务 | 10 | [#302](https://github.com/zodea/crm-new/issues/302)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 支出财务 | 11 | [#303](https://github.com/zodea/crm-new/issues/303)、[#305](https://github.com/zodea/crm-new/issues/305)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 发票台账 | 4 | [#304](https://github.com/zodea/crm-new/issues/304)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 工程量与工资 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#301](https://github.com/zodea/crm-new/issues/301)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 项目进度成本 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 导入导出 | 3 | [#278](https://github.com/zodea/crm-new/issues/278)、[#294](https://github.com/zodea/crm-new/issues/294) |
-| 系统设置 | 1 | [#204](https://github.com/zodea/crm-new/issues/204) |
+| 首页 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
+| 项目 | 3 | [#408](https://github.com/zodea/crm-new/issues/408) |
+| 基础主数据 | 9 | [#407](https://github.com/zodea/crm-new/issues/407) |
+| 分供方 | 4 | [#407](https://github.com/zodea/crm-new/issues/407) |
+| 项目分供方 | 2 | [#408](https://github.com/zodea/crm-new/issues/408) |
+| 核心合同 | 13 | [#409](https://github.com/zodea/crm-new/issues/409) |
+| 辅助合同与结算 | 15 | [#409](https://github.com/zodea/crm-new/issues/409) |
+| 甲方单据 | 4 | [#410](https://github.com/zodea/crm-new/issues/410) |
+| 分包单据 | 8 | [#410](https://github.com/zodea/crm-new/issues/410) |
+| 自购材 | 12 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 甲供材 | 15 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 送货单闭环 | 4 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 材料价格 | 1 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
+| 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
+| 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
+| 工程量与工资 | 25 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
+| 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
 <!-- runtime-evidence-summary:end -->
 
 | Page | Route | 业务域 | 模板 | 历史基础票 | 参考证据 | 布局差异 | 状态与跳转结论 | 业务约束 |
@@ -165,13 +225,14 @@
 | `app/pages/base/customer/form/[[id]].vue` | `/base/customer/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页表单返回详情、联系人输入语义及统一社会信用代码冲突反馈 | 保存仍走客户领域 action；敏感字段只在编辑流程维护 | C-FORM |
 | `app/pages/base/customer/index.vue` | `/base/customer` | 基础主数据 | 列表 | #194 | R-CUSTOMER-LIST-LIVE | 参考已确认无空左树、单行工具栏、紧凑宽表和分页；当前账号无可见客户，字段仍按本地真实模型收敛为名称/简称/税号/联系人/状态，不复制参考私有列 | 名称进入本地真实详情；税号与电话脱敏；参考详情受权限限制，不能据此更改本地外键、删除或表单契约 | C-DENSE |
 | `app/pages/base/supplier/[id].vue` | `/base/supplier/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #193 已按统一详情壳完成长名称、脱敏摘要、6 页签、可追溯汇总、分类文件区与四档布局回归；#319 再按直接证据闭合材采合同到合同/结算/收票/付款事实页签及原合同返回 | 蓝色聚合值按真实外键进入对应事实；目标无记录显示真实空态，灰色值不伪装入口。材采来源只接受稳定分供方 ID、同来源与安全合同返回地址；参考审批、评论、供应商层级和写动作仍不推断 | C-BASE |
-| `app/pages/base/supplier/credential/[id].vue` | `/base/supplier/credential/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #315 将既有证照文件、OCR、有效期、资料要求和人工核验从中央事实页签拆为无路由冲突的独立整页入口；复用参考详情文件管理区的构图证据，不外推参考站写动作 | 只接既有证照专用文件/审计边界；未接入时明确不可用，不写入第二套正式分供方；返回同一中央详情和来源 | C-BASE |
+| `app/pages/base/supplier/credential/[id].vue` | `/base/supplier/credential/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #315 拆出独立证照整页，#446 接入中央原件、资料要求及人工核验，#447 接入候选人工核对；继续复用参考详情文件区的构图证据及已有 OCR 组件，不外推参考站上传或审核动作 | 正式身份消费专用中央原件和审计，测试身份经授权只读；稍后核对和冷刷新保留当前身份及来源，陈旧确认保留选择，返回原详情和列表；Tauri 保留既有适配 | C-BASE |
 | `app/pages/base/supplier/form/[[id]].vue` | `/base/supplier/form/:id?` | 分供方 | 整页表单 | #193 | R-FORM-LIVE | #193 已确认短表单无空左栏、两列字段网格、内容滚动、固定底部操作和统一七类选择；主数据保存后进入真实证照流程 | 普通附件不伪装证照；`approvalStatus` 不展示，证照原件、OCR 与人工核验统一在详情维护 | C-FORM |
 | `app/pages/base/supplier/index.vue` | `/base/supplier` | 分供方 | 列表 | #193 | R-SUPPLIER-LIST-LIVE | #193 已完成无空左树、单行工具栏、真实项目/欠款/资料筛选、聚合列、固定操作列、局部横滚和列表汇总回归 | 行级关联写入真实 ProjectSupplier；税号与电话脱敏；上级供应商和参考站未授权业务动作不引入 | C-DENSE |
 | `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #316 | R-ENGINEERING-FLOW-LOCAL | #316 已以本地中央测试接缝复核班组/项目/责任单元/工资单/扣罚与关联人员稳定 ID 链、隐私、未知工资分配和四档回归 | 身份/联系/银行信息脱敏；正式/测试来源隔离；工资分配缺失显示“历史未记录”，不反推金额 | C-DENSE |
 | `app/pages/base/worker/form/[[id]].vue` | `/base/worker/form/:id?` | 基础主数据 | 整页表单 | #316 | R-FORM-PRIOR | #316 已完成浏览器中央表单预载、中央班组/项目选择、幂等命令、乐观锁和返回详情 | 班组与当前项目只保存同来源稳定 ID；中央附件未接入时不回退本地 | C-FORM |
 | `app/pages/base/worker/index.vue` | `/base/worker` | 基础主数据 | 列表 | #316 | R-LIST-PRIOR | #316 已完成中央来源隔离、班组/项目/档案/在场/安全教育展示、筛选、安全回程与四档局部横滚回归 | 电话和身份证脱敏；浏览器无本地删除/快捷编辑；键盘链接按稳定 ID 进入详情 | C-DENSE |
 | `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-CONTRACT-DETAIL-LIVE | #318 闭合材采中央七页签；#320/#321 闭合施工/分包专属七分区；#322 以真实浏览器证明两类补充协议 canonical 聚焦、键盘焦点、目标不存在/父子错配和列表来源恢复，并复核 390/768/1024/1440px 无页面级横滚 | 只有 `dataOrigin` 加对应 `contractKind` 进入各类中央读模型；补充协议还必须用稳定 `focusId` 命中当前主合同；正式来源显式编辑，演示只读；未核验事实目标保持文本 | C-BASE |
+| `app/pages/contract/boq/building-evidence.vue` | `/contract/boq/building-evidence` | 核心合同 | 整页表单 | #445 | R-SCHEDULE-LOCAL | 无直接对应外部参考页；采用瑞航排程绑定与合同清单来源、DC 表单及现有原语，按 ADR 0014 独立整页维护；实际五档验收单独记录于 #445 | 只对已确认导入基准行更正楼栋；签证新增和来源不明只读，返回原分组重新预览，绑定后可按冻结身份进入楼层再返回，不重建历史 | C-FORM |
 | `app/pages/contract/boq/import.vue` | `/contract/boq/import` | 核心合同 | 特殊工具 | #195 | R-TOOL-PENDING | #195 已按本地清单拆表蓝本完成三步导入、逐 sheet 映射、持久缺失字段错误与四档无整页横滚回归；无红圈安全直接证据，不宣称同屏复刻 | 未对参考站触发上传或导入；A–E 格式与人工确认口径以 `docs/rewrite/pages/boq-import.md` 为准 | C-TOOL |
 | `app/pages/contract/boq/index.vue` | `/contract/boq` | 核心合同 | 工作台 | #195 | R-WORKBENCH-PRIOR | #195 已完成目录/密集表格/变更/月度报量三页签、完整合同编号、直接业务入口、金额完整显示、键盘与四档局部横滚回归；无红圈安全直接证据 | 原始金额不做 MoneyLink；清单手调/导出不推进甲方报量状态；布局权威见 `docs/rewrite/pages/boq-import.md` | C-DENSE |
 | `app/pages/contract/company-expense/form/[id].vue` | `/contract/company-expense/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-AUX-CONTRACT-DC | 按 `companyExpForm` 直接源码呈现基本信息、金额、合同条款、附件与备注；外部运行态只佐证短表单两列字段、内容滚动和固定底栏 | 编辑只回填并保存独立公司合同中央事实，不补项目、项目结算或分供方外键 | C-FORM |
@@ -209,10 +270,10 @@
 | `app/pages/finance/payment/index.vue` | `/finance/payment` | 支出财务 | 列表 | #203 | R-FINANCE-FLOW-LIVE | 参考专属列覆盖申请编号/名称、项目/收款单位/合同、申请/批复/实付、成本、业务类型、支付/审批/生效/回票、结算与审批人；当前通用列表只显示基础 7 列 | 名称先进入只读详情；合同、结算、发票、项目、分供方与支付记录全部按真实外键下钻，来源 query 和列表筛选需可恢复 | C-DENSE |
 | `app/pages/finance/payment/new.vue` | `/finance/payment/new` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/payment-management/index.vue` | `/finance/payment-management` | 支出财务 | 工作台 | #203 | R-FINANCE-FLOW-LIVE | 本地已是独立工作台且运行有 2 条已批复申请；参考默认按支付状态分段，并额外展示合同、付款内容、来源单据/业务类型、所属部门和剩余待支付 | 只读核对批复与已确认支付；申请/项目/分供方/合同/来源单据可下钻，登记支付仍跳整页支付记录，来源字段无 canonical ID 时保持“未接”而非猜文本路由 | C-DENSE |
-| `app/pages/finance/receipt/[id].vue` | `/finance/receipt/:id` | 收入财务 | 详情 | #314 | R-FINANCE-FLOW-LIVE | 客户收款关系按稳定 ID 进入中央只读详情；详情展示收款、客户、项目与合同并返回客户收款页签 | 收款查看不得复用表单壳，来源错配/缺失/无权限分别呈现 | C-DENSE |
-| `app/pages/finance/receipt/form/[id].vue` | `/finance/receipt/form/:id` | 收入财务 | 整页表单 | #202 | R-FORM-PRIOR | 原编辑表单迁至显式 form 路由，保持既有字段与保存契约 | 只从收款列表显式编辑动作进入 | C-FORM |
-| `app/pages/finance/receipt/index.vue` | `/finance/receipt` | 收入财务 | 列表 | #202 | R-FINANCE-FLOW-LIVE | 参考专属列覆盖收款编号/分类、项目/付款单位/合同、收款日期/金额/方式/类型与累计合同收款，编号进入只读详情；当前本地只有 1 条并缺分类、累计列与中央来源身份 | 详情由有效收款聚合累计值，不回写合同静态金额；只有读模型明确返回来源与稳定 ID 时才下钻，旧本地行降级普通文本，编辑保持显式独立动作 | C-DENSE |
-| `app/pages/finance/receipt/new.vue` | `/finance/receipt/new` | 收入财务 | 整页表单 | #202 | R-FORM-PRIOR | 待 #202 同屏测量 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/finance/receipt/[id].vue` | `/finance/receipt/:id` | 收入财务 | 详情 | #436 | R-FINANCE-FLOW-LIVE | 浏览器按收款自身 ID 与当前来源读取；客户、合同、项目、最终结算保持各自返回位置；附件支持正文预览与下载 | [本切片证据](./evidence/issue-436/README.md)；来源错配/缺失/无权限分别呈现，生产持久化仍属 #416 | C-DENSE |
+| `app/pages/finance/receipt/form/[id].vue` | `/finance/receipt/form/:id` | 收入财务 | 整页表单 | #436 | R-FORM-PRIOR | 浏览器显式整页编辑接入中央命令与附件正文，失败保留输入；五档及来源恢复见本切片证据 | 保存动作与已知缺项只按[页面契约](../rewrite/pages/finance-receipt.md)，不推断参考系统写行为 | C-FORM |
+| `app/pages/finance/receipt/index.vue` | `/finance/receipt` | 收入财务 | 列表 | #436 | R-FINANCE-FLOW-LIVE | 浏览器已接专属中央列表、来源分别累计及关系下钻；无原始事实的分类/类型显示未记录 | [本切片证据](./evidence/issue-436/README.md)；宽表仅区域横滚，Tauri 原适配边界保持 ADR 0020 | C-DENSE |
+| `app/pages/finance/receipt/new.vue` | `/finance/receipt/new` | 收入财务 | 整页表单 | #436 | R-FORM-PRIOR | 浏览器整页新建、空草稿、提交、附件及首错焦点已接入；使用既有表单参考与 Kit 原语 | 写入生命周期只按[页面契约](../rewrite/pages/finance-receipt.md)，真实验证见本切片证据 | C-FORM |
 | `app/pages/finance/records/[id].vue` | `/finance/records/:id` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/records/index.vue` | `/finance/records` | 支出财务 | 列表 | #203 | R-FINANCE-FLOW-LIVE | 参考空表仍明确支付编号/日期/金额/方式、收款账户/开户行/账号和创建审计；当前本地有 3 条已确认支付但继续使用通用列表，未展示银行凭证身份 | 编号先进入只读详情，付款申请分摊和收款方下钻按真实 ID；银行流水唯一性、人工确认和 OCR 来源继续以 ADR 0015 为准 | C-DENSE |
 | `app/pages/finance/records/new.vue` | `/finance/records/new` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
@@ -232,7 +293,7 @@
 | `app/pages/material/requisition/[id].vue` | `/material/requisition/:id` | 自购材 | 整页表单 | #199 | R-FORM-PRIOR | 待 #199 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/material/requisition/index.vue` | `/material/requisition` | 自购材 | 列表 | #199 | R-MATERIAL-FLOW-LIVE | 参考下料单专属列覆盖业务/审批状态、项目、供应商、到货情况、明细及完成/部分/未完成入库计数；当前通用列表只显示材料/对象、编号、项目、数量、日期、状态 | 蓝色名称应先进入只读详情，项目、材采合同和关联到货按真实 ID 下钻；到货进度只从 `requisition_id` 聚合，当前直接进入编辑态且缺供应与进度读模型 | C-DENSE |
 | `app/pages/material/requisition/new.vue` | `/material/requisition/new` | 自购材 | 整页表单 | #199 | R-FORM-PRIOR | 待 #199 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/material/settlement/form/[id].vue` | `/material/settlement/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-MATERIAL-SETTLEMENT-LIVE | 参考名称先进入只读详情，采用摘要、审批轨迹、分段资料、附件与采购结算明细；当前本地同一路由直接承载编辑表单，尚未复刻查看态 | 编辑仍走本地整页表单和真实合同外键；新增独立查看态前先裁定结算—到货分摊实体，不能用采购合同物资行或 Mock 明细冒充；返回必须恢复列表上下文 | C-FORM |
+| `app/pages/material/settlement/form/[id].vue` | `/material/settlement/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-MATERIAL-SETTLEMENT-LIVE | 参考名称先进入只读详情，采用摘要、审批轨迹、分段资料、附件与采购结算明细；当前本地同一路由直接承载编辑表单，尚未复刻查看态 | 编辑仍走本地整页表单和真实合同外键；按 #409 已继承的结算—有效到货关系核验迁移与只读投影，不重新裁定实体基数，不能用采购合同物资行或 Mock 明细冒充；返回必须恢复列表上下文 | C-FORM |
 | `app/pages/material/settlement/form/index.vue` | `/material/settlement/form` | 辅助合同与结算 | 整页表单 | #196 | R-AUX-SETTLEMENT-DC | `matSettleForm` 直接源码提供项目、采购合同、金额、期间、扣款、合同情况和附件分区；税额、税率等由本地持久化模型裁定 | 先选项目和真实材料采购合同，分供方从合同派生；只保存结算头和附件，材料采购合同明细仍归 `contract_line_items` | C-FORM |
 | `app/pages/material/settlement/index.vue` | `/material/settlement` | 辅助合同与结算 | 列表 | #196 | R-MATERIAL-SETTLEMENT-LIVE | 参考确认付款状态、奖罚、本次结算、申请/支付余额链、全量汇总和分页；当前本地只投影项目/分供方/采购合同、金额、日期与状态 | 补充字段只从真实支出结算、付款申请、支付与抵扣关系聚合；明确当前筛选/全量汇总口径，名称进入只读详情且返回恢复筛选 | C-DENSE |
 | `app/pages/material/stock-check/[id].vue` | `/material/stock-check/:id` | 自购材 | 整页表单 | #199 | R-FORM-PRIOR | 待 #199 同屏测量 | 写入路径保持现有契约 | C-FORM |
@@ -248,9 +309,9 @@
 | `app/pages/owner-material/arrival/[id].vue` | `/owner-material/arrival/:id` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 参考列表 0 条，未能安全观察详情；当前 `/:id` 直接进入编辑表单 | 增加独立只读详情，源单/项目/分供方/送货单/仓库只按真实 ID 下钻；编辑仍由明确动作进入现有整页表单 | C-FORM |
 | `app/pages/owner-material/arrival/index.vue` | `/owner-material/arrival` | 甲供材 | 列表 | #200 | R-OWNER-MATERIAL-LIVE | 参考为 22 列到货专属宽表及三类分类/未完全出库视图；当前只有“材料/对象、编号、项目、数量、日期、状态” | 按可空 DTO 补源单、分供方、送货单、仓库、采购类型、入出库、结算和付款状态；金额无事实时保持未知 | C-DENSE |
 | `app/pages/owner-material/arrival/new.vue` | `/owner-material/arrival/new` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 本轮只登记参考新建入口，未点击，不能外推表单字段；本地已有项目/材料/质检/入库表单 | 写入路径保持本地总控校验与整页表单；新增关系字段须先有 canonical ID，不复制参考审批动作 | C-FORM |
-| `app/pages/owner-material/control/[id].vue` | `/owner-material/control/:id` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 参考列表 0 条，仅确认二级展开位，未知明细与详情不可外推；当前 `/:id` 直接进入编辑表单 | 增加只读详情并保留未知明细空态；总控头/材料行身份裁定前不拆错实体，编辑由明确动作进入现有表单 | C-FORM |
+| `app/pages/owner-material/control/[id].vue` | `/owner-material/control/:id` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 参考列表 0 条，仅确认二级展开位，未知明细与详情不可外推；当前 `/:id` 直接进入编辑表单 | 增加只读详情并保留未知明细空态；按 #411 已继承的总计划头/计划行身份核验迁移，不按材料文本另造身份，编辑由明确动作进入现有表单 | C-FORM |
 | `app/pages/owner-material/control/index.vue` | `/owner-material/control` | 甲供材 | 列表 | #200 | R-OWNER-MATERIAL-LIVE | 参考专属列为单据编号、项目、计划日期、备注、盖章、说明、附件；当前为通用材料列表 | 使用总计划头读模型和真实空态；当前材料维度三量可在详情/展开中展示，但不能替代单据头字段 | C-DENSE |
-| `app/pages/owner-material/control/new.vue` | `/owner-material/control/new` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 本轮未点击参考新建；本地已有项目/甲方客户/材料/总控量和派生量表单 | 继续本地事务与项目甲方校验；计划头/行与附件写入待 canonical 裁定后再扩展 | C-FORM |
+| `app/pages/owner-material/control/new.vue` | `/owner-material/control/new` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 本轮未点击参考新建；本地已有项目/甲方客户/材料/总控量和派生量表单 | 按既定 Party 供货角色、总计划头/行和真实项目关系核验 canonical 迁移与写入；项目甲方不自动成为供货方，附件须有真实所属关系 | C-FORM |
 | `app/pages/owner-material/direct/[id].vue` | `/owner-material/direct/:id` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 参考列表 0 条，详情不可观察；当前 `/:id` 直接进入编辑表单 | 增加只读详情，项目/仓库/分供方/送货单按真实 ID 下钻并恢复来源；确认写入仍保持双计且不入仓 | C-FORM |
 | `app/pages/owner-material/direct/index.vue` | `/owner-material/direct` | 甲供材 | 列表 | #200 | R-OWNER-MATERIAL-LIVE | 参考专属列覆盖业务类型、负责人、项目、仓库、日期、采购类型、分供方、送货照片/编号；当前为通用材料列表 | 专属列和附件计数来自可空 DTO；客户 ID 不得冒充分供方，照片未授权时只显示状态/数量 | C-DENSE |
 | `app/pages/owner-material/direct/new.vue` | `/owner-material/direct/new` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 本轮未点击参考新建；本地已有项目/甲方客户/材料/用途/部位表单 | 保持本地不入仓双计事务；仓库、供货单位和送货单字段先完成身份/关系裁定再写入 | C-FORM |
@@ -268,7 +329,7 @@
 | `app/pages/project/penalty/[id].vue` | `/project/penalty/:id` | 分包单据 | 详情 | #329 | R-SUB-DOC-DC | 项目罚扣使用独立标题、项目/分供方/合同/班组来源、罚扣与整改分区及真实状态动作 | 抵扣必须引用真实已确认分包结算；附件归当前罚扣，错误定位首个无效字段 | C-FORM |
 | `app/pages/project/penalty/form/[id].vue` | `/project/penalty/form/:id` | 分包单据 | 整页表单 | #329 | R-SUB-DOC-DC | 正式草稿编辑独立路由，罚扣与整改字段分区 | 保存经中央 command，提交后不普通修改金额；返回只读详情 | C-FORM |
 | `app/pages/project/penalty/index.vue` | `/project/penalty` | 分包单据 | 列表 | #197 | R-PROJECT-PENALTY-LIVE-329 | 参考专属列覆盖审批、罚扣类型、转扣合同/乙方、罚扣与签认金额、附件及甲方结算转扣记录；分包合同详情再按四组审批状态保留相同表头 | 不展示参考内部“是否删除”列；签认和转扣只读真实抵扣关系，编号先进入只读详情，来源 query 和列表状态往返可恢复 | C-DENSE |
-| `app/pages/project/penalty/new.vue` | `/project/penalty/new` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 新建页使用项目罚扣专属字段和附件区，项目、合同、分供方或班组只选择真实关联记录 | 草稿不伪造抵扣结果；状态推进和结算抵扣保持本地事务契约 | C-FORM |
+| `app/pages/project/penalty/new.vue` | `/project/penalty/new` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 新建页使用项目罚扣专属字段和附件区，项目、合同、分供方或班组只选择真实关联记录 | 草稿不伪造抵扣结果；保存、提交、整改与结算抵扣只经中央命令，校验真实来源与状态；结算抵扣另验双方版本，不回退本地正式写入 | C-FORM |
 | `app/pages/project/target-cost/[id].vue` | `/project/target-cost/:id` | 项目进度成本 | 详情 | #191 | R-TARGET-COST-LIVE | 参考详情已确认独立页签、白底平铺资料、明确关闭返回和预算/已签/实际/申请四轨摘要；本地继续保留版本摘要、科目清单与正式成本对比，不复制参考审批栏或示例值 | 科目明细只写当前版本；成本对比只读正式源单并穿透现有路由，不从名称或录入汇总值反推 | C-DENSE |
 | `app/pages/project/target-cost/form/[[id]].vue` | `/project/target-cost/form/:id?` | 项目进度成本 | 整页表单 | #191 | R-TARGET-COST-LOCAL | DC 有目标成本版本头整页表单源码；现有参考运行证据只支持邻近短表单的两列字段网格、纵向滚动和固定底部动作，不把材料合同或分供方字段外推到目标成本 | 版本头与科目明细分开保存；草稿、提交、项目 lookup 和基线切换继续按本地事务契约 | C-FORM |
 | `app/pages/project/target-cost/index.vue` | `/project/target-cost` | 项目进度成本 | 列表 | #191 | R-TARGET-COST-LIVE | 参考已确认单行工具栏、紧凑宽表、右下分页、名称详情入口和已签合同额到清单明细的嵌套下钻；本地保留项目/基线/状态筛选与真实版本状态，不复制导入导出或参考审批写入 | 金额只展示 `target_costs` 版本头事实；项目、状态和基线筛选不改写数据，名称进入专用详情；金额下钻由后续跨域链接票按本地真实关系统一裁定 | C-DENSE |
@@ -278,6 +339,7 @@
 | `app/pages/schedule/new.vue` | `/schedule/new` | 项目进度成本 | 整页表单 | #191 | R-SCHEDULE-LOCAL | DC 有新建排程源码但形态早于当前三步向导；业务字段只取其本地蓝本，生产结构按“范围 → 工序 → 确认”与 ADR 0017 / 0018 裁定，不声称红圈有目标页 | 无项目区域时直达区域配置；内部暂估只读手工暂估量；第三步集中汇总范围、依据、周期、依赖与阻断项，失败保留草稿并可重试 | C-FORM |
 | `app/pages/schedule/process-library/form.vue` | `/schedule/process-library/form` | 项目进度成本 | 整页表单 | #191 | R-SCHEDULE-LOCAL | 红圈无直接目标页；采用 #244 已补齐的 `forms/ScheduleForms.jsx`、ADR 0014 与本地甘特/精确表格双视图 | 进入页面只读来源版本；只有“保存为新版本”才新增库与工序定义，绝不回写来源版本 | C-FORM |
 | `app/pages/schedule/process-library/index.vue` | `/schedule/process-library` | 项目进度成本 | 列表 | #191 | R-SCHEDULE-LOCAL | 红圈无直接目标页；采用 #244 已补齐的 `ScheduleProcessLibraryScreen.jsx`、本地紧凑列表模板与局部横向滚动 | 只读展示版本、工序数及引用数；编辑动作统一转入新版本整页表单 | C-DENSE |
+| `app/pages/schedule/process-library/[id].vue` | `/schedule/process-library/:id` | 项目进度成本 | 详情 | #443 | R-SCHEDULE-LOCAL | 红圈无直接目标页；当前 DC 无一一对应详情，采用已有工序库列表/表单与 Table 原语，依 ADR 0018 核对不可变版本及本地五档视口 | 只读当前授权版本；基于此版调整进入整页新建，旧版不改；#444 从当前中央 WBS 读取使用数量及项目，来源不可读仍为未知，实际验收见对应切片证据 | C-DENSE |
 | `app/pages/settings/ocr.vue` | `/settings/ocr` | 系统设置 | 工作台 | #204 | R-OCR-STUDIO-SOURCE | 采用参考项目的单页纵向区块、紧凑密度和底部恢复/保存反馈；字段与能力只按 ADR 0006 的 PaddleOCR-VL 单模型契约实现，不照搬传统 PP-OCRv6 参数 | 当前路由已可达；7 项 VL 文档能力和有界请求/轮询超时保存到本机 SQLite，并真实进入发票、送货单识别请求。Token、API 地址和模型仍由服务端私有配置持有，不提供假保存 | C-TOOL |
 | `app/pages/settings/data-migration.vue` | `/settings/data-migration` | 导入导出 | 工作台 | #294 | R-TOOL-PENDING | 按本地迁移契约使用纵向步骤、预检/备份/对账/切换分区和表内横向滚动；外部参考站没有可安全观察的一一对应迁移页 | 仅浏览器正式工作区可执行；后台权威校验拓扑、整库摘要、映射、实际写入对账和回滚窗口，Tauri 明确不可用；备份字节不上传 | C-TOOL |
 | `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 详情 | #328 | R-SUB-SETTLEMENT-LIVE-328 | #327 按 DC 分包变洽签字段与本地只读详情蓝本交付 change 专属详情；#328 settlement 现为专属只读详情，编辑使用独立 form 路由 | 分包变洽签及分包结算分别展示专属金额、真实项目/分供方/合同、状态与附件，列表/项目/合同来源可恢复；缺失、无权、错配与重试分态，不补造审批流 | C-FORM |
@@ -285,13 +347,29 @@
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-SUB-DOCUMENTS-LIVE | 参考分包变洽签与分包结算分别保留合同金额/申报审定链和奖罚/申请支付余额链；当前本地真实项目/合同/分供方来源正确但列表投影较窄 | 金额与余额只做真实聚合，不保存副本；空列表仍保留专属列，编号/名称先进入只读详情并恢复项目/合同/分供方及本地筛选 | C-DENSE |
 | `app/pages/subcontract/[kind]/new.vue` | `/subcontract/:kind/new` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 新建页按动态类型显示真实标题、来源、金额、备注和附件分区，不使用通用占位标题或虚构明细 | 项目、合同和分供方只选择真实关联记录；草稿、上报和确认沿用本地状态校验 | C-FORM |
 | `app/pages/subcontract/attendance.vue` | `/subcontract/attendance` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目/月/班组 query 可恢复真实名册，当前无考勤时仍展示 0 人日/0 工时和当月实际天数矩阵；390–1440px 根无横滚、矩阵局部横滚 | 返回工资和进入 C2 可保留项目/月/班组/工资状态；只写 `attendance_records`，C2 人员与 C1 已发月份锁定 | C-DENSE |
-| `app/pages/subcontract/daywork.vue` | `/subcontract/daywork` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | C2 逐日签工表单与真实空台账已可达，但当前忽略来自工资/考勤的 project/month/crew/status query，回考勤和工资也退回无筛选根路由 | 必须复用工资筛选上下文；签工与考勤同月互斥、已发月份冻结、只有已确认记录进入工资的规则不变 | C-DENSE |
+| `app/pages/subcontract/daywork/index.vue` | `/subcontract/daywork` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 保留原台账的历史观察；后续 #433 来源往返及 P3 中央接管分别以对应限定验收为准，路由文件改为目录入口不升级参考证据 | 必须复用工资筛选上下文；签工与考勤同月互斥、已发月份冻结、只有已确认记录进入工资的规则不变 | C-DENSE |
+| `app/pages/subcontract/daywork/new.vue` | `/subcontract/daywork/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-DAYWORK-LOCAL | 独立登记日期、时段、整工/半工与原施工内容；证明信息及明确确认另行呈现，P3 实施中 | 固定 draftKey，失败保原输入；待确认不计薪，人工确认不自动罚扣；Tauri 不挂载中央表单 | C-FORM |
+| `app/pages/subcontract/daywork/form/[id].vue` | `/subcontract/daywork/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-DAYWORK-LOCAL | 按稳定原记录读取及显式编辑；当前事实、旧稿和原提交后续更新分开，P3 实施中 | 旧新关系共同核验；已发不能移动原来源，后来合法修改不使可靠原提交永久无法确认，失败保稿 | C-FORM |
 | `app/pages/subcontract/payroll/[id].vue` | `/subcontract/payroll/:id` | 工程量与工资 | 详情 | #198 | R-ENGINEERING-FLOW-LOCAL | 不存在 ID 能显示真实 not-found；当前运行种子无工资单，released 冻结详情只能由既有测试证明 | 详情入口和返回需携项目/月/班组/状态；当前 `back-to` 固定工资根路由会丢筛选。只展示真实外键与 released 快照 | C-DENSE |
 | `app/pages/subcontract/payroll/index.vue` | `/subcontract/payroll` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目/月/班组/状态筛选、0 单据汇总、空表头和建单/考勤/C2 入口均由运行态确认；没有工资种子时不补成功单据 | 列表→建单→列表与列表↔考勤已保留 query；详情和 C2 仍需补齐。A/C1/C2 可用，B 因无合同责任外键继续禁用 | C-DENSE |
 | `app/pages/subcontract/payroll/new.vue` | `/subcontract/payroll/new` | 工程量与工资 | 整页表单 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目、月份、班组按来源 query 正确预填，负责人只取当前真实责任范围；B 在界面禁用 | 取消/成功按原筛选返回；不触发保存也能观察完整字段。页面、store 和服务继续多层阻止 B 类伪建单 | C-FORM |
+| `app/pages/subcontract/payroll/config.vue` | `/subcontract/payroll/config` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-A-LOCAL | 工资主体首月比例、按生效月的基准价和个人例外使用独立整页；无独立外部目标页，当前正在实施 | 主体身份与价格范围明确，空值不默认零；保存后回原草稿复验来源，Tauri 显式说明边界，实际运行另行验收 | C-FORM |
+| `app/pages/subcontract/payroll/form/[id].vue` | `/subcontract/payroll/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-A-LOCAL | 固定 A 单据的资料、现场完成来源与单价、备注分区，按 DC 工资蓝本及整页表单原语实施 | 编辑身份来自路径，来源 query 只恢复上下文；已发不可编辑，未保存离开及来源变化保留输入并明确重核，实际运行另行验收 | C-FORM |
+| `app/pages/subcontract/payroll/sources.vue` | `/subcontract/payroll/sources` | 工程量与工资 | 工作台 | #412 | R-PAYROLL-SOURCES-LOCAL | 新增中央来源只读页；配置、考勤、签工和月锁四视图，逐屏验收见接管证据，不继承旧空台账观察 | 项目/月/班组与来源返回显式保留；无工资头仍可读取独立来源，Tauri 不挂中央来源组件 | C-DENSE |
+| `app/pages/subcontract/payroll/adjustments/new.vue` | `/subcontract/payroll/adjustments/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 原已发单、新旧核算依据、原因与具名核对依据使用独立整页；无对应外部参考页 | 固定原单与 draftKey，保存更正不产生现金；失败保稿，桌面不允许更正写入，原来源返回受控 | C-FORM |
+| `app/pages/subcontract/payroll/adjustments/form/[id].vue` | `/subcontract/payroll/adjustments/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 固定更正编号的编辑与确认整页；原签名实发、当前核算差额分区 | 前序变化重核，未知结果恢复原提交；已确认只追加引用纠错，不覆盖旧确认，桌面不允许写入 | C-FORM |
+| `app/pages/subcontract/payroll/adjustments/[id].vue` | `/subcontract/payroll/adjustments/:id` | 工程量与工资 | 详情 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 本次确认差额、确认者、新旧依据、前序引用与原链当前余额分区；独立确认记录输出 | 原单、原更正、实际补退及以后工资处理按稳定身份下钻；原签名金额保持原文，缺证明不重算 | C-DENSE |
+| `app/pages/subcontract/payroll/payments/index.vue` | `/subcontract/payroll/payments` | 工程量与工资 | 工作台 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 工资独立实际台账；初始发放、实际补退、有效错记冲销及分配完整度分别显示 | 净额只聚合有效实际事实；项目和原单范围、预算版本及人员/付款来源返回分别校验，无本地正式写入回退 | C-DENSE |
+| `app/pages/subcontract/payroll/payments/new.vue` | `/subcontract/payroll/payments/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 真实发生日期、有符号实额、成员分配和本次处理关系使用独立整页 | 按剩余额度与稳定原单确认真实补退；未知提交保原键，桌面不允许写入，不生成付款申请或银行流水 | C-FORM |
+| `app/pages/subcontract/payroll/payments/[id].vue` | `/subcontract/payroll/payments/:id` | 工程量与工资 | 详情 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 本次实际事实、人员分配、核对依据、关联处理及原记录引用分别展示 | 原收付只读，错记冲销及冲销再纠错通过独立引用追加；确认记录输出不改原工资签名 | C-DENSE |
+| `app/pages/subcontract/payroll/payments/reversal/new.vue` | `/subcontract/payroll/payments/reversal/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 指定错记事实、核实日期和未真实发生的明确依据使用独立整页 | 冲销只抵销所指错记效果；再纠错保原引用，不假造真实退款，未知结果恢复原提交，桌面不允许写入 | C-FORM |
 | `app/pages/subcontract/quantity/[pid]/[uid].vue` | `/subcontract/quantity/:pid/:uid` | 工程量与工资 | 详情 | #198 | R-ENGINEERING-FLOW-LOCAL | 工种→阶段→三量的只读施工详情可达，六项筛选完整返回，错配 pid/uid 显式失败；当前明细 `null` 显示“—”，阶段/全户合计却按 0 相加 | 先修复可空合计，不能把缺现场量写成 0；责任、阶段完成和三量仍只读派生，不落第二表 | C-DENSE |
+| `app/pages/subcontract/quantity/[pid]/[uid]/hollow/new.vue` | `/subcontract/quantity/:pid/:uid/hollow/new` | 工程量与工资 | 整页表单 | #412 | R-QUANTITY-HOLLOW-LOCAL | 依据实际户、分项与原责任记录检查，未检查与明确零处区分；无独立外部对应页 | 固定草稿及原命令，未知结果原键恢复；保存检查不触发工资扣款，来源返回保留原单和位置 | C-FORM |
+| `app/pages/subcontract/quantity/[pid]/[uid]/hollow/form/[id].vue` | `/subcontract/quantity/:pid/:uid/hollow/form/:id` | 工程量与工资 | 整页表单 | #412 | R-QUANTITY-HOLLOW-LOCAL | 固定原检查身份修订，检查时责任与当前可编辑资格分区；历史修订继续保留 | 不替换原户、分项或负责人；来源变化需重新核对，失败保稿，工资已采用历史不能重写 | C-FORM |
+| `app/pages/subcontract/quantity/[pid]/[uid]/hollow/[id].vue` | `/subcontract/quantity/:pid/:uid/hollow/:id` | 工程量与工资 | 详情 | #412 | R-QUANTITY-HOLLOW-LOCAL | 原检查、修订、整改及现余量分区；明确显示零处和缺证明 | 整改是具名行级销记，累计不得超量；来源往返按稳定原记录校验，冻结工资不随后来整改改变 | C-DENSE |
 | `app/pages/subcontract/quantity/index.vue` | `/subcontract/quantity` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 合和新城真实 8 户矩阵可显示责任、完成与草稿；车陂商业大楼无区域时显示真实配置空态。四档根无横滚，矩阵只在 390px 局部滚动 | 排程任务下钻与返回已闭合；量差和矩阵继续读三量/阶段事实。分包合同与工资责任无显式外键，不从项目名称猜合同 | C-DENSE |
 | `app/pages/subcontract/quantity/region.vue` | `/subcontract/quantity/region` | 工程量与工资 | 整页表单 | #198 | R-ENGINEERING-FLOW-LOCAL | 楼栋→楼层→户真实区域、户型挂靠和排程来源返回已在只读运行态确认；空项目仍提供明确区域配置入口 | 本轮未执行新增；合同可选，归档矩阵禁止写入，排程恢复标记继续按项目真实 ID 传递 | C-FORM |
+| `app/pages/subcontract/quantity/stages.vue` | `/subcontract/quantity/stages` | 工程量与工资 | 整页表单 | #442 | R-STAGE-PENDING | 阶段字段、关联分项、逐项报量选择使用独立整页；当前只有领域和组件验证，首屏与五档运行验收待完成 | 新建/编辑与报量为独立命令；草稿保留、来源隔离、当前权限重试和归档取消均需实际运行验收，不代入历史页面结论 | C-FORM |
 | `app/pages/subcontract/quantity/template.vue` | `/subcontract/quantity/template` | 工程量与工资 | 整页表单 | #198 | R-ENGINEERING-FLOW-LOCAL | 正式模板、稳定房间、活链接户数和合同/暂估/现场三量并排显示已确认；未触发编辑或保存 | 三量分别保存；现场量保持 number 或 null，未保存离开需确认，详情合计不得把 null 降格为 0 | C-FORM |
 
 ## 6. 维护规则
@@ -301,3 +379,9 @@
 3. 同一类参考证据可以复用档案代码，但目标页没有直接证据时必须继续标为邻近或待补采。
 4. 若发现会改变业务规则、权限、状态机、字段含义或写入副作用的差异，停止实现并按固定模板建立独立 `needs-info` Issue。
 5. 实施票关闭前同时更新本矩阵、受影响的页面蓝本/ADR、`ui-implementation-status.md` 和 Issue 验收证据。
+
+<!-- issue-441:begin -->
+## #441 本地送货中央链运行证据
+
+2026-09-12 的本地 Chromium 已验证送货识别核对、归档库、整页修订、当前及历史原件和显式冲突核对，并完成真实 SQLite HTTP 迁移、补传与打印处置旅程。限定来源、五档视口与截图说明见 [#441 验收记录](./evidence/issue-441/README.md)。这批证据属于本地实现实测，不提升外部参考站的 `R-TOOL-PENDING` 等级，不宣称整个 #411 或生产持久化已完成；提交与最终集成结果由验收记录承接。
+<!-- issue-441:end -->

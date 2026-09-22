@@ -1,7 +1,8 @@
 import type { ExportData } from '~/lib/kit/export'
 import type { DeliveryRecord, DeliveryRecordSourceFile } from '~/stores/delivery-record'
 import * as XLSX from 'xlsx'
-import { appendCollisionSuffix, exportDataToBytes } from '~/lib/kit/export'
+import { assertDeliveryExportActive, loadCentralDeliveryExportSources } from '~/lib/delivery-record/export-sources'
+import { exportDataToBytes } from '~/lib/kit/export'
 import { createZip, sanitizeSegment } from '~/lib/project/archive'
 
 export const DELIVERY_XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -46,6 +47,7 @@ export interface DeliveryExportSourceInfo {
   fileName: string
   shared: boolean
   available?: boolean
+  sourceKey?: string
 }
 
 export interface DeliveryArchiveSource extends DeliveryRecordSourceFile {
@@ -57,6 +59,7 @@ export interface DeliveryArchiveSource extends DeliveryRecordSourceFile {
 export interface DeliveryArchiveExportOptions {
   convertImagesToPdf: boolean
   loadSource: (record: DeliveryRecord) => Promise<DeliveryRecordSourceFile | null>
+  signal?: AbortSignal
 }
 
 export interface DeliveryArchiveExportResult {
@@ -318,16 +321,25 @@ function sourceKey(record: DeliveryRecord): string {
 function sourcePath(source: DeliveryArchiveSource, usedPaths: Set<string>): string {
   const extension = /\.(pdf|png|jpe?g)$/i.exec(source.fileName)?.[1]?.toLowerCase() || 'bin'
   const folder = isPdf(source) ? '原件/PDF' : '原件/图片'
-  const originalName = sanitizeSegment(source.fileName, `${source.recordId}.${extension}`)
-  const dot = originalName.lastIndexOf('.')
-  const stem = dot > 0 ? originalName.slice(0, dot) : originalName
-  const extensionSuffix = dot > 0 ? originalName.slice(dot) : ''
+  const stem = sanitizeSegment(source.fileName.replace(/\.(pdf|png|jpe?g)$/i, ''), '原件').replace(/[\uD800-\uDBFF]$/, '')
+  const extensionSuffix = `.${extension}`
+  const nameFor = (sequence: number) => {
+    const suffix = sequence > 1 ? ` (${sequence})` : ''
+    const budget = 120 - extensionSuffix.length - suffix.length
+    let shortened = ''
+    for (const character of stem) {
+      if (shortened.length + character.length > budget)
+        break
+      shortened += character
+    }
+    return `${shortened}${suffix}${extensionSuffix}`
+  }
   let sequence = 1
-  let name = originalName
+  let name = nameFor(sequence)
   let path = `${folder}/${name}`
   while (usedPaths.has(path.toLowerCase())) {
     sequence += 1
-    name = appendCollisionSuffix(`${stem}${extensionSuffix}`, sequence)
+    name = nameFor(sequence)
     path = `${folder}/${name}`
   }
   usedPaths.add(path.toLowerCase())
@@ -407,14 +419,32 @@ export async function createDeliveryArchiveZip(
   resolvers: DeliveryExportResolvers,
   options: DeliveryArchiveExportOptions,
 ): Promise<DeliveryArchiveExportResult> {
-  const { sources, sourceByRecord, missingRecordIds } = await loadUniqueSources(records, options.loadSource)
+  assertDeliveryExportActive(options.signal)
+  const central = records.some(record => record.dataOrigin !== undefined)
+  if (central && records.some(record => record.dataOrigin === undefined))
+    throw new Error('送货导出来源不一致，请重新读取')
+  const { sources, sourceByRecord, missingRecordIds } = central
+    ? await loadCentralDeliveryExportSources(records, options.loadSource, options.signal)
+    : await loadUniqueSources(records, options.loadSource)
+  assertDeliveryExportActive(options.signal)
+  const usedSourcePaths = new Set<string>()
+  const sourceFiles = sources.map(source => ({ path: sourcePath(source, usedSourcePaths), data: source.bytes, sourceKey: source.sourceKey }))
+  if (central) {
+    const paths = new Map(sourceFiles.map(file => [file.sourceKey, file.path]))
+    for (const info of sourceByRecord.values()) {
+      if (info.sourceKey && paths.has(info.sourceKey))
+        info.fileName = paths.get(info.sourceKey)!
+    }
+  }
   const rows = deliveryLedgerRows(records, resolvers, sourceByRecord)
   const imageSources = options.convertImagesToPdf ? sources.filter(isImage) : []
   const imagePages: PdfPageImage[] = []
-  for (const source of imageSources)
+  for (const source of imageSources) {
+    assertDeliveryExportActive(options.signal)
     imagePages.push(await imageToJpeg(source))
+  }
+  assertDeliveryExportActive(options.signal)
   const imagePdfFileName = imagePages.length ? '图片原件合并.pdf' : null
-  const usedSourcePaths = new Set<string>()
   const zipFiles = [
     { path: '送货单明细.xlsx', data: exportDataToBytes(createDeliveryLedgerXlsx(rows)) },
     {
@@ -428,7 +458,7 @@ export async function createDeliveryArchiveZip(
       ),
     },
     ...(imagePdfFileName ? [{ path: imagePdfFileName, data: createImagePdf(imagePages) }] : []),
-    ...sources.map(source => ({ path: sourcePath(source, usedSourcePaths), data: source.bytes })),
+    ...sourceFiles,
   ]
   return {
     data: createZip(zipFiles),

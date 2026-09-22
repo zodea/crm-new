@@ -55,10 +55,10 @@ test.describe('Issue #319：项目—材采合同—分供方旅程', () => {
     await page.getByRole('link', { name: '查看分供方收票事实' }).click()
 
     await expect(page).toHaveURL(/\/base\/supplier\/sup_demo_007\?.*tab=invoices.*returnTo=/)
-    await expect(page.getByRole('tab', { name: /收票事实/ })).toHaveAttribute('aria-selected', 'true')
-    await page.getByRole('tab', { name: /付款事实/ }).click()
+    await expect(page.getByRole('tab', { name: /收票登记/ })).toHaveAttribute('aria-selected', 'true')
+    await page.getByRole('tab', { name: /付款管理/ }).click()
     await page.reload()
-    await expect(page.getByRole('tab', { name: /付款事实/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: /付款管理/ })).toHaveAttribute('aria-selected', 'true')
 
     await page.getByRole('link', { name: '返回材料采购合同' }).click()
     await expect(page.getByRole('tab', { name: /发票登记/ })).toHaveAttribute('aria-selected', 'true')
@@ -111,7 +111,7 @@ test.describe('Issue #319：项目—材采合同—分供方旅程', () => {
       await page.getByRole('link', { name: '瓷砖采购合同', exact: true }).click()
       await expectNoPageOverflow(page, `#319 材采详情 @ ${width}px`)
       await page.getByRole('link', { name: '查看分供方合同事实' }).click()
-      await expect(page.getByRole('tab', { name: /合同事实/ })).toBeVisible()
+      await expect(page.getByRole('tab', { name: /支出合同/ })).toBeVisible()
       await expectNoPageOverflow(page, `#319 分供方事实 @ ${width}px`)
     })
   }

@@ -21,6 +21,9 @@ export interface ImportColumnMatch {
  */
 export const IMPORT_SOURCE_META_KEY = '__importSource'
 
+/** 写入前已经确定的业务拒绝，允许导入执行器继续处理其余行。 */
+export class ImportRowRejected extends Error {}
+
 /** 模板字段 key → 源列匹配；未匹配字段不出现。 */
 export type ImportMapping = Readonly<Record<string, ImportColumnMatch>>
 

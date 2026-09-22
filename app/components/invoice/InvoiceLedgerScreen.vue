@@ -12,6 +12,7 @@ import type { Invoice } from '~/stores/invoice'
 import { createInvoiceLedgerXlsxFromRows, INVOICE_XLSX_MIME, invoiceLedgerRows } from '~/lib/invoice/excel'
 import { ledgerNodeFromQuery, projectGroupKeyFromNode, projectTreeNodeKey } from '~/lib/invoice/ledger-nodes'
 import { toErrorMessage } from '~/lib/util/error'
+import { toLocalDateInputValue } from '~/lib/util/local-date'
 import { yuan } from '~/lib/util/money'
 
 const store = useInvoiceStore()
@@ -145,7 +146,7 @@ function openExportPreview() {
     return
   }
   exportPreviewRows.value = invoiceLedgerRows(tableFilteredRows.value)
-  exportPreviewFileName.value = `发票台账_${new Date().toISOString().slice(0, 10)}.xlsx`
+  exportPreviewFileName.value = `发票台账_${toLocalDateInputValue()}.xlsx`
   exportPreviewOpen.value = true
 }
 

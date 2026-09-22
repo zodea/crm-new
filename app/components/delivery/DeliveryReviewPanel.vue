@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import type { DeepReadonly } from 'vue'
-import type { SupplierMatch } from '~/lib/delivery/match'
+import type { ProjectMatchCandidate, SupplierMatch, SupplierMatchCandidate } from '~/lib/delivery/match'
 import type { DeliveryAmountSummary, DeliveryReviewIssue } from '~/lib/delivery/review'
 import type { DeliveryDoc, DeliveryFile, DeliveryItem, DeliveryReviewInput } from '~/stores/delivery'
-import type { Project } from '~/stores/project'
-import type { Supplier } from '~/stores/supplier'
 
 type DraftPatch = Partial<Omit<DeliveryReviewInput, 'items'>>
 type ItemTextPatch = Partial<Pick<DeliveryItem, 'name' | 'spec' | 'unit' | 'note'>>
@@ -14,8 +12,8 @@ const props = defineProps<{
   file?: DeliveryFile
   document?: DeliveryDoc
   documents: readonly DeliveryDoc[]
-  projects: readonly DeepReadonly<Project>[]
-  suppliers: readonly DeepReadonly<Supplier>[]
+  projects: readonly ProjectMatchCandidate[]
+  suppliers: readonly SupplierMatchCandidate[]
   supplierSuggestion: SupplierMatch | null
   amountSummary: DeliveryAmountSummary
   reviewProgress: { passed: number, total: number }
@@ -199,7 +197,7 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
     <div v-else-if="file?.printDisposition === 'pending'" class="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <span class="i-lucide-printer mb-2 text-26px text-brand" />
       <p class="text-13px font-800 text-ink">
-        已归档并入库，等待打印
+        已归档，等待打印
       </p>
       <p class="mt-1 max-w-96 text-10px leading-5 text-ink-faint">
         “打开打印”只打开原件，不改变状态；打印机实际输出后再单独登记。取消或打印失败时不用操作，文件会继续保留。

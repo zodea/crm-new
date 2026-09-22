@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { CustomerListPageDTO, CustomerListQueryDTO } from '~/lib/customer/repository'
-import type { MasterDataListFilterField, MasterDataListSort } from '~/lib/master-data/list'
+import type { MasterDataFilterValue, MasterDataListFilterField, MasterDataListSort } from '~/lib/master-data/list'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, onActivated, onMounted, shallowRef, watch } from 'vue'
 import { MASTER_DATA_LIST_PROFILES, masterDataStatusLabel } from '~/lib/master-data/list'
+import { normalizeEnumSelection } from '~/lib/util/enum-selection'
 import { maskIdentifier, maskPhone } from '~/lib/util/privacy'
 import { useCustomerCommandStore } from '~/stores/customer-command'
 import { useCustomerReadStore } from '~/stores/customer-read'
@@ -14,7 +15,7 @@ const visibility = useDataVisibilityStore()
 const { error } = useKitUI()
 const search = shallowRef('')
 const sort = shallowRef<MasterDataListSort>('updated-desc')
-const filters = shallowRef<Partial<Record<MasterDataListFilterField, string>>>({ status: 'all' })
+const filters = shallowRef<Partial<Record<MasterDataListFilterField, MasterDataFilterValue>>>({ status: [] })
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 const profile = MASTER_DATA_LIST_PROFILES.customer
@@ -46,22 +47,22 @@ const problem = computed(() => ['forbidden', 'not-found', 'mismatch', 'error'].i
   : null)
 const statusOptions = computed(() => ({
   status: [
-    { key: 'all', label: '全部档案状态' },
-    ...(readPage.value?.summary.statuses ?? []).map(item => ({ key: item.value, label: `${item.label}（${item.count}）` })),
+    ...(readPage.value?.summary.statuses ?? []).map(item => ({ key: item.value, label: `${masterDataStatusLabel(item.value)}（${item.count}）` })),
   ],
 }))
 const summary = computed(() => ({
   正式客户: readPage.value?.summary.origins.real.customerCount ?? 0,
   ...(visibility.includeDemo ? { 测试客户: readPage.value?.summary.origins.demo.customerCount ?? 0 } : {}),
 }))
-const empty = computed(() => search.value || filters.value.status !== 'all'
+const hasFilters = computed(() => Boolean(search.value || normalizeEnumSelection(filters.value.status).length))
+const empty = computed(() => hasFilters.value
   ? { title: '没有符合条件的客户', description: '可清除搜索或档案状态后查看全部客户。', actionLabel: '清除筛选' }
   : { title: '还没有客户档案', description: '正式工作区暂无客户；测试数据默认隐藏。', actionLabel: '新建客户' })
 
 const returnContext = useCustomerListReturnContext({
   readState: () => ({
     search: search.value,
-    status: filters.value.status ?? 'all',
+    status: filters.value.status ?? [],
     sort: sort.value,
     page: page.value,
     pageSize: pageSize.value as 10 | 20 | 50 | 100,
@@ -80,7 +81,7 @@ function currentQuery(): CustomerListQueryDTO {
   return {
     includeDemo: visibility.includeDemo,
     search: search.value,
-    status: filters.value.status === 'all' ? null : filters.value.status ?? null,
+    status: normalizeEnumSelection(filters.value.status),
     sort: sort.value,
     page: page.value,
     pageSize: pageSize.value as CustomerListQueryDTO['pageSize'],
@@ -89,6 +90,8 @@ function currentQuery(): CustomerListQueryDTO {
 
 async function load() {
   await readStore.loadList(currentQuery())
+  if (readPage.value)
+    page.value = readPage.value.pagination.page
   await returnContext.restore()
 }
 
@@ -111,12 +114,11 @@ function createCustomer() {
 }
 
 function emptyAction() {
-  if (search.value || filters.value.status !== 'all') {
+  if (hasFilters.value) {
     search.value = ''
-    filters.value = { status: 'all' }
+    filters.value = { status: [] }
     sort.value = 'updated-desc'
     page.value = 1
-    void load()
   }
   else {
     createCustomer()
@@ -170,11 +172,11 @@ onActivated(() => void load())
         />
       </template>
       <template #table>
-        <div data-ui="customer-list-table" class="min-w-0 max-w-full">
+        <div data-ui="customer-list-table" class="min-w-0 max-w-full" :aria-busy="loading">
           <KitTable
             :columns="profile.columns"
             :data="rows"
-            :loading="loading"
+            :loading="loading && !readPage"
             :page="{ page, pageSize, total: readPage?.pagination.total ?? 0 }"
             :page-size-options="[10, 20, 50, 100]"
             :empty="empty"

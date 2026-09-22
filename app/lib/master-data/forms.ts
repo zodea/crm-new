@@ -88,6 +88,7 @@ export interface SupplierFormDraft extends FormIdentity {
   taxpayerVerifiedAt?: string | null
   taxpayerVerificationNote?: string
   mainBusiness?: string
+  laborScope?: string
   invoiceName?: string
   invoiceAddress?: string
   bank?: string
@@ -436,6 +437,7 @@ export async function saveSupplierForm(
     address: text(draft.address),
     taxpayer_type: text(draft.taxpayerType),
     main_business: rawText(draft.mainBusiness),
+    ...(draft.laborScope !== undefined ? { labor_scope: rawText(draft.laborScope) } : {}),
     invoice_name: text(draft.invoiceName),
     invoice_address: text(draft.invoiceAddress),
     bank: text(draft.bank),
@@ -858,6 +860,7 @@ function supplierFromRow(row: Record<string, unknown>): SupplierFormDraft & { id
     taxpayerVerifiedAt: row.taxpayer_verified_at == null ? null : rawText(row.taxpayer_verified_at),
     taxpayerVerificationNote: rawText(row.taxpayer_verification_note),
     mainBusiness: rawText(row.main_business),
+    laborScope: rawText(row.labor_scope),
     invoiceName: rawText(row.invoice_name),
     invoiceAddress: rawText(row.invoice_address),
     bank: rawText(row.bank),

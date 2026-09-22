@@ -86,6 +86,8 @@
 
 本期批复金额和审批备注按 ADR 0015 持久化。已付金额、实际支付金额和支付状态均为只读派生值；关系、公式、存量字段兼容和确认约束只在 [ADR 0015 决策 6](../../adr/0015-form-persistence-and-payment-reconciliation.md) 与 [`DATABASE.md §10.2`](../DATABASE.md) 维护。本页负责显示支付记录、分摊明细、未付提示和源单下钻。
 
+[#439](https://github.com/zodea/crm-new/issues/439) 已接本期批复的输入语义：新建留空、填写零元和清空后保存均按真实输入往返；表单明确提示空与零的区别，临时非法输入保留可编辑状态并由保存域拒绝。详情与付款管理用“未填写”或“历史批复待核验”解释空金额，已确认实付照常显示。历史待核验记录的完整批复/余额合计显示不完整，不能冒充零元或已付清。仅改备注或放弃修改不会确认历史来源；历史新支付确认政策仍见 DATABASE 链接的 PAY-08 待裁定项。
+
 ---
 
 ## 三、保存与提交
@@ -122,7 +124,7 @@
 
 ## 五、与工资进度款边界
 
-本页不处理工人工资，也不提供工资付款申请或支付记录入口。工资的领域边界见 [`CONTEXT.md`](../../../CONTEXT.md)，状态和成本/支付事实见 [`DATABASE.md §10.3`](../DATABASE.md) 与 #117。
+本页不处理工人工资，也不提供工资付款申请或支付记录入口。工资的领域边界见 [`CONTEXT.md`](../../../CONTEXT.md)，状态和成本/支付事实见 [`DATABASE.md §10.3`](../DATABASE.md) 与 [#412](https://github.com/zodea/crm-new/issues/412)。
 
 ---
 
@@ -160,14 +162,16 @@
 - `paidAmount` 只取已确认 `payment_record_application_allocations`；
 - `settlementAllocatedAmount` 只取有效结算分摊；
 - `invoiceAllocatedAmount/pendingInvoiceAmount` 只取有效发票分摊；
-- `project/supplier/contract` 返回 `{ id, name }`，名称链接分别落项目、分供方和合同详情；
+- `project/supplier/contract` 使用 [READ-MODELS.md](../READ-MODELS.md) 的来源感知实体引用，目标注册成功后才成为详情链接；
 - 名称主链接进入 `/finance/payment/:id/detail`，编辑保持独立动作，来源 query、筛选、页码和滚动位置可恢复。
 
 ### 2. 付款管理
 
-参考工作台按待支付、已支付、无需支付和全部分段，列为申请编号、项目、收款单位、合同、付款内容、申请日期/金额、剩余待支付、来源单据/业务类型、所属部门和支付状态。本地已有独立付款管理工作台与 2 条已批复演示记录，批复、已支付、应付余额、回票和支付状态均由真实分摊派生；需补合同、付款内容、来源与部门列，并把申请/项目/分供方/合同/来源单据接到真实详情。
+参考工作台按待支付、已支付、无需支付和全部分段，列为申请编号、项目、收款单位、合同、付款内容、申请日期/金额、剩余待支付、来源单据/业务类型、所属部门和支付状态。2026-08-13 已观察到本地独立工作台和小规模演示样本；[#413](https://github.com/zodea/crm-new/issues/413) 按当前提交核实专属列、真实分摊、各来源详情与回读，不能把当时的样本或缺口当本轮状态。
 
-`sourceDocument` 的接口形态使用 `{ entityType, entityId, no, name, route? }`。缺 canonical `entityId` 或实体类型不在允许映射表时返回 `route: null` 并显示“来源未接”，不得按单号/名称猜路由。
+`sourceDocument` 遵循现行 `EntityRefDTO` / `NavigationIntentDTO` 与 Target Registry 契约；缺稳定 ID、来源不一致或目标未注册时显示具体不可达原因，不由 DTO 拼可选路由，也不按单号/名称猜路由。
+
+工资实际收付在付款管理中作为独立只读分区，来源为工资 Repository 的项目台账。该分区按稳定原工资/收付身份下钻，保留返回入口；金额不并入 `payment_applications`、`payment_records` 或往来指标。P4 的跨域限定状态见[工资实施票](../../research/issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)，操作说明见[工资更正指南](../../guides/payroll-adjustments.md)。
 
 ### 3. 当前不扩张的相邻页面
 

@@ -1,0 +1,32 @@
+{
+  "projectId": "core-projects-cafddf889d4c46e8a6a89f7d",
+  "statementId": "wage_mub1zl9b_m",
+  "adjustmentId": "payroll-adjustment_mub206bf_1u",
+  "sourceCommand": "quantity-hollow-command_mub1za8f_1",
+  "startCommand": "payroll-hollow-command_mub1zpxb_4",
+  "before": 1000,
+  "inspected": 19,
+  "rectified": 4,
+  "adopted": 15,
+  "unitAmount": 30,
+  "deduction": 450,
+  "actual": 550,
+  "correctedDeduction": 300,
+  "supplement": 150,
+  "cash": 700,
+  "later": 0,
+  "widths": [
+    390,
+    768,
+    1024,
+    1280,
+    1440
+  ],
+  "errors": [
+    "POST /api/commands/quantity: net::ERR_FAILED",
+    "GET /api/read/quantity/hollow: net::ERR_ABORTED",
+    "GET /api/read/quantity/hollow: net::ERR_ABORTED",
+    "POST /api/commands/payroll-hollow: net::ERR_FAILED",
+    "GET /api/read/quantity/hollow: net::ERR_ABORTED"
+  ]
+}

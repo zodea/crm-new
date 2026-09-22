@@ -1,3 +1,6 @@
+import type { QuantityAssignmentBatchDraft } from './assignment'
+import type { QuantityCompletionDraft } from './completion'
+import type { QuantityTemplateDraft } from './template'
 // 工程量导入（ADR 0005 / #103 切片 6B）：模板量、责任配置、阶段完成三类目标 +
 // 旧合一行迁移预检。逐行写入全部复用领域唯一写路径（persistQuantityXxx），
 // 不建导入专用副本；旧合一行只校验报告，不落库。
@@ -126,6 +129,10 @@ async function findUnitId(
  */
 export async function importQuantityTemplateRow(db: SoftDb, row: Record<string, unknown>): Promise<void> {
   const projectId = await findProjectId(db, str(row, 'projectCode'))
+  await persistQuantityTemplate(db, await buildQuantityTemplateImportDraft(db, projectId, row))
+}
+
+export async function buildQuantityTemplateImportDraft(db: SoftDb, projectId: string, row: Record<string, unknown>): Promise<QuantityTemplateDraft> {
   const templateCode = str(row, 'templateCode')
   const roomCode = str(row, 'roomCode')
   const itemCode = str(row, 'itemCode')
@@ -230,7 +237,7 @@ export async function importQuantityTemplateRow(db: SoftDb, row: Record<string, 
     })
   }
 
-  await persistQuantityTemplate(db, draft)
+  return draft
 }
 
 /** 责任配置逐行导入：单户 draft 走 persistQuantityAssignments，导入文件视为权威、允许替换。 */
@@ -243,6 +250,10 @@ export async function importQuantityAssignmentRow(db: SoftDb, row: Record<string
     str(row, 'floorCode'),
     str(row, 'unitCode'),
   )
+  await persistQuantityAssignments(db, await buildQuantityAssignmentImportDraft(db, projectId, unitId, row))
+}
+
+export async function buildQuantityAssignmentImportDraft(db: SoftDb, projectId: string, unitId: string, row: Record<string, unknown>, identity?: { kind: 'crew' | 'worker', id: string }): Promise<QuantityAssignmentBatchDraft> {
   const trade = str(row, 'trade')
   const crewName = str(row, 'crewName')
   const workerName = str(row, 'workerName')
@@ -255,6 +266,7 @@ export async function importQuantityAssignmentRow(db: SoftDb, row: Record<string
   const assignee = workspace.assignees.find(candidate => (
     candidate.kind === (crewName ? 'crew' : 'worker')
     && candidate.name === (crewName || workerName)
+    && (!identity || (candidate.kind === identity.kind && candidate.id === identity.id))
   ))
   if (!assignee)
     throw new Error(`${crewName ? '班组' : '工人'}「${crewName || workerName}」不存在`)
@@ -277,7 +289,7 @@ export async function importQuantityAssignmentRow(db: SoftDb, row: Record<string
     ? current.scopes.map(scope => ({ unitId, roomId: scope.roomId, itemId: scope.itemId }))
     : []
 
-  await persistQuantityAssignments(db, {
+  return {
     projectId,
     trade,
     assigneeKind: assignee.kind,
@@ -292,7 +304,7 @@ export async function importQuantityAssignmentRow(db: SoftDb, row: Record<string
     note: str(row, 'note') || undefined,
     allowReplacement: Boolean(isSameAssignee) || replaceExisting,
     allowArchivedEdit: false,
-  })
+  }
 }
 
 /** 阶段完成逐行导入：历史回填走 allowMissingPhotos 迁移通道，仍按唯一写路径落事实。 */
@@ -305,6 +317,10 @@ export async function importQuantityCompletionRow(db: SoftDb, row: Record<string
     str(row, 'floorCode'),
     str(row, 'unitCode'),
   )
+  await persistQuantityStageCompletion(db, { ...await buildQuantityCompletionImportDraft(db, projectId, unitId, row), allowMissingPhotos: true })
+}
+
+export async function buildQuantityCompletionImportDraft(db: SoftDb, projectId: string, unitId: string, row: Record<string, unknown>): Promise<Omit<QuantityCompletionDraft, 'allowMissingPhotos'>> {
   const stageCode = str(row, 'stageCode')
   if (!stageCode)
     throw new Error('缺少阶段编码')
@@ -325,7 +341,7 @@ export async function importQuantityCompletionRow(db: SoftDb, row: Record<string
   if (!stage)
     throw new Error(`工序阶段「${stageCode}」不存在或不支持按户完成`)
 
-  await persistQuantityStageCompletion(db, {
+  return {
     projectId,
     unitId,
     stageId: stage.id,
@@ -337,8 +353,7 @@ export async function importQuantityCompletionRow(db: SoftDb, row: Record<string
     expectedAssignmentId: stage.currentAssignment?.id ?? null,
     photos: [],
     allowArchivedEdit: false,
-    allowMissingPhotos: true,
-  })
+  }
 }
 
 /**

@@ -1,0 +1,173 @@
+{
+  "owner": "/root/payroll_c1_backend",
+  "baseline": "579d9383357fffd2bd87e727dbc21b903a7cb69c",
+  "functionalDependency": "c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d",
+  "status": "frozen-after-C1-detail-wire-precision-awaiting-root-integration",
+  "ownedManifest": "owned-files.json",
+  "ownedFileCount": 40,
+  "hashManifest": "code-hashes.json",
+  "verification": [
+    {
+      "kind": "red",
+      "log": "service-red.log",
+      "files": 1,
+      "tests": 2,
+      "failed": 2,
+      "reason": "公开 service 未接 attendanceMatrix/c1Form"
+    },
+    {
+      "kind": "initial-integration",
+      "log": "service-first.log",
+      "files": 2,
+      "tests": 4,
+      "failed": 1,
+      "reason": "公共 canonical 提取后原 A 内部缺显式 import，已修"
+    },
+    {
+      "kind": "first-green",
+      "log": "service-green.log",
+      "files": 2,
+      "tests": 4,
+      "failed": 0
+    },
+    {
+      "kind": "core-http-store-proof",
+      "log": "c1-first-complete.log",
+      "files": 8,
+      "tests": 13,
+      "failed": 0
+    },
+    {
+      "kind": "final-exact-regression",
+      "log": "regression-final.log",
+      "files": 17,
+      "tests": 55,
+      "failed": 0,
+      "durationSeconds": 24.9
+    },
+    {
+      "kind": "eslint",
+      "log": "lint-final.log",
+      "files": 39,
+      "exitCode": 0
+    },
+    {
+      "kind": "projection-eslint",
+      "log": "lint-projection.log",
+      "files": 1,
+      "exitCode": 0,
+      "note": "最后只为 B 共用原图占用投影开放可省略 month/workerIds；日常 load wrapper 签名与行为不变。该新增投影由 B 的危险迁入红例接续验证。"
+    },
+    {
+      "kind": "typecheck-first",
+      "log": "typecheck-first.log",
+      "exitCode": 2,
+      "note": "当时 A JSON workerId 类型缩窄与 C 路由类型各一类；A 已用逐项 object guard 修复，最终类型由 Root 统一运行。"
+    },
+    {
+      "kind": "S1-red",
+      "log": "pending-ack-red.log",
+      "files": 3,
+      "tests": 10,
+      "failed": 9,
+      "note": "独立两例与扩展同目标确认协议真红，唯一旧明确未应用路径仍绿"
+    },
+    {
+      "kind": "S1-first-green",
+      "log": "pending-ack-first.log",
+      "files": 3,
+      "tests": 10,
+      "failed": 0
+    },
+    {
+      "kind": "S1-exact-pending-race-store-regression",
+      "log": "pending-ack-regression.log",
+      "files": 6,
+      "tests": 21,
+      "failed": 0,
+      "durationSeconds": 2.42,
+      "note": "包含不可修改独立2例、C1/考勤store、原A store、旧工资store/race；随后仅将测试两行throw格式分行，不改变行为"
+    },
+    {
+      "kind": "S1-eslint",
+      "log": "pending-ack-lint-final.log",
+      "files": 7,
+      "exitCode": 0
+    },
+    {
+      "kind": "attendance-empty-entry-red",
+      "log": "attendance-empty-red.log",
+      "files": 2,
+      "tests": 5,
+      "failed": 2,
+      "note": "实际HTTP与公开service同因空month范围校验失败"
+    },
+    {
+      "kind": "attendance-empty-entry-green",
+      "log": "attendance-empty-green.log",
+      "files": 7,
+      "tests": 29,
+      "failed": 0,
+      "durationSeconds": 5.6
+    },
+    {
+      "kind": "attendance-empty-entry-eslint",
+      "log": "attendance-empty-lint.log",
+      "files": 6,
+      "exitCode": 0
+    },
+    {
+      "kind": "C1-detail-wire-red",
+      "log": "detail-wire-precision-red.log",
+      "files": 1,
+      "tests": 1,
+      "failed": 1,
+      "note": "真实HTTP Repository草稿detail两套lines原60.125被round成60.13；沙箱最初spawn失败不算业务红例"
+    },
+    {
+      "kind": "C1-detail-wire-first-green",
+      "log": "detail-wire-precision-green.log",
+      "files": 1,
+      "tests": 1,
+      "failed": 0
+    },
+    {
+      "kind": "C1-detail-wire-precision-regression",
+      "log": "detail-wire-precision-regression.log",
+      "files": 6,
+      "tests": 20,
+      "failed": 0,
+      "durationSeconds": 5.26,
+      "note": "包含真实草稿/已发HTTP detail双lines精度、金额三位拒绝、A原单价合同拒绝、原A HTTP/commands/service/history和C1codec"
+    },
+    {
+      "kind": "C1-detail-wire-eslint",
+      "log": "detail-wire-precision-lint.log",
+      "files": 2,
+      "exitCode": 0
+    }
+  ],
+  "completed": [
+    "工资权限下读取无工程量项目的真实人员与原逐日考勤，个人标准保 missing/null/0 和 60.125 精度",
+    "同库考勤 upsert 保稳定 ID、真实原组与审计、同日转组拒绝、异常格原记录诊断",
+    "C1 独立个人标准修订、原配置与有效值分离、严格完整同组主体、草稿/核对/当月实发",
+    "C1/C2 原图互斥和已发整月全成员锁，含旧软删头/来源/link、冻结零成员/lines/双方月份",
+    "当前源变化持久需重核、全成员到分分配、原键幂等与同键异文拒绝，已发只读",
+    "完整原考勤/个人标准/冻结/原成功回执及 SHA 相互证明的配对输出 DTO；不补当前来源",
+    "真实 HTTP/Repository 六接口，C1 与考勤独立 store 保原命令、未知恢复、撤权与存储失败",
+    "原 A execute/codec/核算行为保持，仅纯 canonical 与审计 writeRow 最小共用提取",
+    "S1：原命令与可靠成功回执原子保存到同目标冷读确认，unknown/awaiting-read区别；只接受成功回执后开始且真实未改的读取，原身份与权限、原范围/新草稿真实ID/考勤物理ID和已发输出匹配；旧预览/旧请求/其他scope/撤权/存储失败均保原操作",
+    "考勤未选项目或月份入口原空scope返回候选与空矩阵，不读取整年事实、不默认月份和首项目；非法非空月和写command严格月份继续拒绝，C1配置月校验保持",
+    "C1通用detail由真实格式限定statement.lines与stored.lines单价原精度编码/解码60.125；保原A两位单价和所有金额两位，snapshot/head/evidence原文不改"
+  ],
+  "remainingOwnedByRootOrPeers": [
+    "B 用纯图 export 统一危险迁入与当前占用提取，并完成对应 5 红例复验",
+    "C 真实五档界面、输出文件和来源往返 E2E",
+    "非作者 Standards/Spec、最终全量/type/build、权威文档与指南/PDF、精准提交"
+  ],
+  "temporaryRoot": ".tmp/remaining-issues-20260910/payroll-c1-central/a",
+  "servicesStarted": [],
+  "committed": false,
+  "published": false,
+  "productionDependenciesAdded": false
+}

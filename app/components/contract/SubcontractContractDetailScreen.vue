@@ -119,7 +119,7 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
           <SegTab v-model="activeTab" :tabs="tabs" />
         </div>
         <section v-if="activeTab === 'info'" class="panel p-4">
-          <SectionHeader title="详细资料" subtitle="分包合同头、稳定关系与独立状态事实" />
+          <SectionHeader title="详细资料" />
           <div class="mt-3 grid gap-x-7 [grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))]">
             <div class="flex min-w-0 gap-3 border-b border-dashed border-line py-2.5 text-13px">
               <span class="w-28 flex-none text-ink-soft">所属项目</span><NuxtLink v-if="target(detail.projectNavigation)" :to="target(detail.projectNavigation)!" class="min-w-0 [overflow-wrap:anywhere] text-brand hover:underline">
@@ -158,7 +158,7 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
             <li v-for="file in detail.sections.files" :key="file.id" class="flex flex-wrap justify-between gap-2 p-3 text-12px">
               <span>{{ file.fileName }}</span><span class="text-ink-soft">{{ file.category }} · {{ file.fileSize }} B</span>
             </li>
-          </ul><StatePanel v-else class="mt-2" kind="empty" title="暂无合同文件" description="中央详情尚未关联合同文件。" compact />
+          </ul><StatePanel v-else class="mt-2" kind="empty" title="暂无合同文件" compact />
         </section>
         <section v-else-if="activeTab === 'changes'" class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">
@@ -188,7 +188,7 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
           <SectionHeader title="项目罚扣" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.penalties" empty-label="暂无项目罚扣" />
         </section>
         <section v-else class="space-y-3" data-testid="subcontract-material-uses">
-          <StatePanel kind="empty" title="暂无可归属的材料使用记录" description="现有库房与历史材料使用数据均缺少合同或分供方稳定外键，因此不做名称推断。" />
+          <StatePanel kind="empty" title="暂无材料使用记录" description="材料使用记录尚未关联到此合同。" />
         </section>
       </div>
     </EntityDetailShell>

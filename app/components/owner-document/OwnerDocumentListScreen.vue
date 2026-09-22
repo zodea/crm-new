@@ -31,6 +31,7 @@ import {
   validateOwnerDocumentListReturnTo,
 } from '~/lib/owner-document/return-context'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
+import { enumSelectionFromQuery, serializeEnumSelection } from '~/lib/util/enum-selection'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
@@ -54,7 +55,6 @@ const config = computed(() => {
       }
     : base
 })
-const rows = computed(() => store.recordsFor(props.kind))
 const loading = computed(() => store.listLoadingFor(props.kind))
 const loadError = computed(() => store.listError(props.kind))
 const centralReadOnly = computed(() => !isDesktopRuntime()
@@ -62,18 +62,22 @@ const centralReadOnly = computed(() => !isDesktopRuntime()
     || props.kind === 'acceptance' || props.kind === 'final_settlement' || props.kind === 'owner_penalty'
     || props.kind === 'sub_change' || props.kind === 'sub_settlement' || props.kind === 'project_penalty'))
 const centralKind = computed(() => props.kind as OwnerCommercialDocumentKind)
+const hasSnapshot = computed(() => store.hasListSnapshot(props.kind, centralReadOnly.value && props.kind === 'acceptance' ? acceptanceVariant.value : null))
+const rows = computed(() => hasSnapshot.value ? store.recordsFor(props.kind) : [])
 const initialNavigation = ownerDocumentListNavigationStateFromQuery(route.query, centralKind.value)
 
 const search = shallowRef(centralReadOnly.value ? initialNavigation.search : '')
 const projectFilter = shallowRef(centralReadOnly.value ? initialNavigation.projectId ?? 'all' : 'all')
-const typeFilter = shallowRef(centralReadOnly.value ? initialNavigation.documentType ?? 'all' : 'all')
-const statusView = shallowRef(centralReadOnly.value
-  && initialNavigation.status
-  && config.value.views.some(view => view.key === initialNavigation.status)
-  ? initialNavigation.status
-  : config.value.defaultView)
+const typeFilter = shallowRef<string | string[]>(centralReadOnly.value ? enumSelectionFromQuery(initialNavigation.documentType) : [])
+const initialStatuses = enumSelectionFromQuery(initialNavigation.status).filter(value => config.value.views.some(view => view.key === value))
+const statusView = shallowRef<string | string[]>(centralReadOnly.value && initialNavigation.status !== null ? initialStatuses : config.value.defaultView)
 const page = shallowRef(centralReadOnly.value ? initialNavigation.page : 1)
 const pageSize = shallowRef(centralReadOnly.value ? initialNavigation.pageSize : 10)
+
+function selectedQuery(value: string | string[]): string | string[] | null {
+  const values = enumSelectionFromQuery(value)
+  return values.length > 1 ? values : values[0] ?? null
+}
 
 function queryText(key: 'project' | 'contract' | 'supplier'): string {
   const value = route.query[key]
@@ -101,20 +105,21 @@ const filtered = computed(() => centralReadOnly.value
       routeContract: routeContract.value,
       routeSupplier: routeSupplier.value,
     }))
+const centralPage = computed(() => hasSnapshot.value ? store.centralPageFor(centralKind.value) : { page: page.value, pageSize: pageSize.value, total: 0 })
 const currentPage = computed(() =>
-  centralReadOnly.value ? store.centralPageFor(centralKind.value).page : clampPage(page.value, filtered.value.length, pageSize.value),
+  centralReadOnly.value ? centralPage.value.page : clampPage(page.value, filtered.value.length, pageSize.value),
 )
 const pageRows = computed(() =>
   centralReadOnly.value ? filtered.value : paginate(filtered.value, currentPage.value, pageSize.value),
 )
 const totalRows = computed(() => centralReadOnly.value
-  ? store.centralPageFor(centralKind.value).total
+  ? centralPage.value.total
   : filtered.value.length)
-const centralSummary = computed(() => centralReadOnly.value ? store.centralSummaryFor(centralKind.value) : null)
+const centralSummary = computed(() => centralReadOnly.value && hasSnapshot.value ? store.centralSummaryFor(centralKind.value) : null)
 const canCreate = computed(() => !centralReadOnly.value
-  || store.centralCapabilitiesFor(centralKind.value).includes(
+  || (hasSnapshot.value && store.centralCapabilitiesFor(centralKind.value).includes(
     (props.kind === 'sub_change' || props.kind === 'sub_settlement' || props.kind === 'project_penalty') ? 'subcontract-document:write' : 'owner-document:write',
-  ))
+  )))
 const journeyReturnTo = computed(() => centralReadOnly.value
   ? validateOwnerDocumentJourneyReturnTo(route.query.returnTo, centralKind.value, 'real')
   : null)
@@ -193,8 +198,8 @@ const contextFilters = computed(() => {
 const hasLocalFilters = computed(() =>
   Boolean(search.value)
   || projectFilter.value !== 'all'
-  || typeFilter.value !== 'all'
-  || statusView.value !== config.value.defaultView,
+  || enumSelectionFromQuery(typeFilter.value).length > 0
+  || serializeEnumSelection(statusView.value) !== serializeEnumSelection(config.value.defaultView),
 )
 const emptyIsFilterMiss = computed(() => centralReadOnly.value
   ? store.centralEmptyReasonFor(centralKind.value) === 'no-filter-match'
@@ -285,8 +290,8 @@ async function load() {
           projectId: projectFilter.value === 'all' ? null : projectFilter.value,
           contractId: routeContract.value || null,
           supplierId: routeSupplier.value || null,
-          status: statusView.value === 'all' ? null : statusView.value,
-          documentType: typeFilter.value === 'all' ? null : typeFilter.value,
+          status: selectedQuery(statusView.value),
+          documentType: selectedQuery(typeFilter.value),
           variant: props.kind === 'acceptance' ? acceptanceVariant.value : null,
           page: page.value,
           pageSize: pageSize.value as 10 | 20 | 50 | 100,
@@ -322,8 +327,8 @@ async function openEdit(row: OwnerDocumentListRecord) {
       projectId: projectFilter.value === 'all' ? null : projectFilter.value,
       contractId: routeContract.value || null,
       supplierId: routeSupplier.value || null,
-      status: statusView.value === config.value.defaultView ? null : statusView.value,
-      documentType: typeFilter.value === 'all' ? null : typeFilter.value,
+      status: enumSelectionFromQuery(statusView.value),
+      documentType: enumSelectionFromQuery(typeFilter.value),
       origin: 'real',
       page: currentPage.value,
       pageSize: pageSize.value as 10 | 20 | 50 | 100,
@@ -442,18 +447,10 @@ async function handleDelete(row: OwnerDocumentListRecord) {
 
 watch([search, projectFilter, typeFilter, statusView, routeProject, routeContract, routeSupplier], () => {
   page.value = 1
-  if (centralReadOnly.value)
-    void load()
 })
 watch(acceptanceVariant, () => {
   page.value = 1
   statusView.value = 'all'
-  if (centralReadOnly.value)
-    void load()
-})
-watch([page, pageSize], () => {
-  if (centralReadOnly.value)
-    void load()
 })
 watch(
   () => props.kind,
@@ -462,9 +459,16 @@ watch(
     projectFilter.value = 'all'
     typeFilter.value = 'all'
     statusView.value = config.value.defaultView
-    void load()
+    page.value = 1
+    if (!centralReadOnly.value)
+      void load()
   },
 )
+// 筛选与重置页码在同一轮更新完成后，只请求最终查询一次。
+watch([() => props.kind, search, projectFilter, typeFilter, statusView, routeContract, routeSupplier, acceptanceVariant, page, pageSize], () => {
+  if (centralReadOnly.value)
+    void load()
+}, { flush: 'post' })
 
 let hasActivated = false
 let restoredRoute = ''
@@ -480,12 +484,12 @@ watch([search, projectFilter, typeFilter, statusView, page, pageSize], () => {
     query.projectId = projectFilter.value
   else
     delete query.projectId
-  if (statusView.value !== config.value.defaultView)
-    query.status = statusView.value
+  if (serializeEnumSelection(statusView.value) !== serializeEnumSelection(config.value.defaultView))
+    query.status = serializeEnumSelection(statusView.value) || 'all'
   else
     delete query.status
-  if (typeFilter.value !== 'all')
-    query.documentType = typeFilter.value
+  if (enumSelectionFromQuery(typeFilter.value).length)
+    query.documentType = serializeEnumSelection(typeFilter.value)
   else
     delete query.documentType
   if (currentPage.value !== 1)
@@ -545,6 +549,7 @@ onActivated(async () => {
 
 <template>
   <div class="flex min-w-0 flex-col gap-3">
+    <TargetCostSourceReturn v-if="kind === 'sub_settlement' && centralReadOnly" />
     <div v-if="journeyReturnTo" class="flex">
       <NuxtLink :to="journeyReturnTo" class="btn-ghost text-12px">
         <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />返回来源详情
@@ -606,14 +611,16 @@ onActivated(async () => {
       v-if="loadError && !loading"
       kind="error"
       :title="`${meta.label}载入失败`"
-      :description="loadError"
+      :description="hasSnapshot ? `${loadError}；当前保留上一次成功读取的列表。` : loadError"
+      :compact="hasSnapshot"
       action-label="重新载入"
       @action="load"
     />
 
-    <div v-else class="min-w-0">
+    <div v-if="!loadError || loading || hasSnapshot" class="min-w-0">
       <div
         data-ui="owner-document-table"
+        :aria-busy="loading"
         role="region"
         :aria-label="`${meta.label}列表，可横向滚动查看完整列`"
         tabindex="0"
@@ -622,7 +629,7 @@ onActivated(async () => {
         <KitTable
           :columns="config.columns"
           :data="pageRows"
-          :loading="loading"
+          :loading="loading && !hasSnapshot"
           :page="{ page: currentPage, pageSize, total: totalRows }"
           :empty="emptyState"
           :style="{ minWidth: kind === 'sub_settlement' && !pageRows.length ? '100%' : `${tableMinWidth}px`, maxWidth: 'none' }"

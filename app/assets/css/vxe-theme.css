@@ -69,10 +69,27 @@
   text-decoration: underline;
 }
 
-/* 状态纯文字（列表页不用 chip） */
+/* 名称返回定位与键盘聚焦共用轻量提示，不显示浏览器默认的黑色矩形。 */
+.vxe-table a[href]:focus {
+  outline: none;
+}
+.vxe-table a[href]:focus-visible {
+  background: var(--brand-soft);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* 兼容未迁移的纯文字状态；新列表业务状态使用 KitStatusTag。 */
 .vxe-table .cell--status-ok { color: var(--ok); font-weight: 600; }
 .vxe-table .cell--status-warn { color: var(--warn); font-weight: 600; }
 .vxe-table .cell--status-danger { color: var(--danger); font-weight: 600; }
+
+/* 紧凑列表工具：图标始终可见，真实能力由调用方提供。 */
+.list-tool-button { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); color: var(--ink-soft); cursor: pointer; }
+.list-tool-button:hover { color: var(--brand); background: var(--surface-2); }
+.list-tool-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.list-tool-button:disabled { opacity: .45; cursor: not-allowed; }
 
 /* 底部汇总栏 */
 .vxe-table .vxe-table--footer {

@@ -5,7 +5,7 @@
 > 表单蓝本: `projectForm`（ADR 0014）
 > 参考: `docs/红圈系统/项目详情页/` 25张红圈CRM截图  
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5  
-> 状态: 项目列表、来源感知基础详情、唯一 Target Registry、完整列表返回上下文、正式新增/编辑命令、中央项目分供方反向关系及项目—材料采购合同—分供方事实旅程已接中央 HTTP；全局开关隔离本地 production/demo 快照；核心身份迁移可确认切换，项目导入/删除、其他正式详情扩展模块及物资管理三组项目读模型待补 · 2026-08-27
+> 状态: 项目列表、来源感知基础详情、唯一 Target Registry、完整列表返回上下文、正式新增/编辑命令、项目 Excel 导入、中央项目分供方反向关系及项目—材料采购合同—分供方事实旅程已接中央 HTTP；全局开关隔离本地 production/demo 快照；核心身份迁移可确认切换；删除、其他正式详情扩展模块及物资管理三组项目读模型待补。中央内存验证通过不等于生产持久化完成 · 2026-09-09
 
 ---
 
@@ -21,7 +21,7 @@
 
 ```
 ┌─ 业务流程阶段 ─┬─ 单行工具栏 ────────────────────────────────────┐
-│ 全部项目       │ 搜索 刷新 排序 筛选 密度 导出；导入/新增暂禁用   │
+│ 全部项目       │ 搜索 刷新 排序 筛选 密度 导入 导出 新增         │
 │ 筹备中         ├─ 紧凑 vxe-table（自身横向滚动）────────────────┤
 │ 施工中 / 停工  │ 项目名称│数据来源│业务阶段│收入│预算│竣工日期│经理│客户│操作│
 │ 已竣工         ├─ sticky 汇总 + 右下分页 ───────────────────────┤
@@ -50,7 +50,13 @@
 
 左树采用运行参考的业务阶段筛选结构，但叶子值只使用本地权威状态机（筹备中、施工中、停工、已竣工、已结算），不得把参考站阶段写入或映射成本地状态。外部导入遗留的未知值只读收纳到“待归一阶段”。搜索覆盖项目、客户、项目经理、执行经理和施工员。列表页的横向滚动只发生在工具栏和表格内部，390px 至 1440px 视口不得带动整个页面横滚。
 
-> 当前实现（#288、#279、#293、#289、#312、#313）：列表经 `ProjectListRepository` 从中央 HTTP 读实例取得 `PageDTO`，页面和 store 不接触 HTTP URL 或 SQL。每行由 Repository 输出项目 `EntityRefDTO` 与语义 `NavigationIntentDTO`，decoder 校验身份、variant 和 `dataOrigin`，再由唯一 Target Registry 生成详情链接；未登记、缺身份、无权限或解析失败不会回退到列表根路由。加载、真实空表、筛选无结果、整页无权限、关系无权限、错误保留上一版数据与重试均使用共享 `ReadState`；金额的未知值 `null` 与真实 `0.00` 分开显示。搜索、阶段和表头筛选在分页前由 Repository 统一应用，导出会继续读取全部分页而不截断为当前页。列表进入详情时保存搜索、阶段、排序、列筛选、页码、每页条数、应用页签、滚动与行焦点；合法来源在详情刷新及各读状态中持续可用，过期、伪造和直接深链降级到规范列表。正式来源默认为空且不自动 seed；应用顶栏“包含测试数据”默认关闭并持久化为当前工作区呈现偏好。开启时后台先校验全局 `demo:read`，再返回逐行 `dataOrigin` 与 `summary.origins.real/demo`；行、详情、导出和汇总持续标识来源，数量与金额不产生混合业务总计。关闭后重新查询正式来源并保留真实 `no-records`。正式新增/编辑已迁移为中央命令；导入与删除仍禁用。演示行只能进入来源感知的只读详情，正式编辑、审批、付款、归档和删除入口不会作用于演示记录。
+> 当前实现（#288、#279、#293、#289、#312、#313）：列表经 `ProjectListRepository` 从中央 HTTP 读实例取得 `PageDTO`，页面和 store 不接触 HTTP URL 或 SQL。每行由 Repository 输出项目 `EntityRefDTO` 与语义 `NavigationIntentDTO`，decoder 校验身份、variant 和 `dataOrigin`，再由唯一 Target Registry 生成详情链接；未登记、缺身份、无权限或解析失败不会回退到列表根路由。加载、真实空表、筛选无结果、整页无权限、关系无权限、错误保留上一版数据与重试均使用共享 `ReadState`；金额的未知值 `null` 与真实 `0.00` 分开显示。搜索、阶段和表头筛选在分页前由 Repository 统一应用，导出会继续读取全部分页而不截断为当前页。列表进入详情时保存搜索、阶段、排序、列筛选、页码、每页条数、应用页签、滚动与行焦点；合法来源在详情刷新及各读状态中持续可用，过期、伪造和直接深链降级到规范列表。正式来源默认为空且不自动 seed；应用顶栏“包含测试数据”默认关闭并持久化为当前工作区呈现偏好。开启时后台先校验全局 `demo:read`，再返回逐行 `dataOrigin` 与 `summary.origins.real/demo`；行、详情、导出和汇总持续标识来源，数量与金额不产生混合业务总计。关闭后重新查询正式来源并保留真实 `no-records`。正式新增/编辑与 #423 项目 Excel 导入已迁移为中央命令；删除仍禁用。演示行只能进入来源感知的只读详情，正式编辑、审批、付款、归档和删除入口不会作用于演示记录。
+
+### 项目 Excel 导入
+
+#423 在列表恢复有权限时可用的“导入项目”，进入独立 `/import/mapping/project` 页签；历史深链复用同一边界。使用现有三步界面（上传并选择 Sheet → 映射 → 人工预览与确认），来源行、真实客户 ID、归一阶段和拒绝原因可核对。导入期间不能修改映射；成功项目提供详情或返回列表；部分成功、响应丢失、回读失败与取消都有明确结果，成功行重试不重复创建。表格只能自身横滚，步骤切换焦点到标题，来源切换继续使用全局确认浮层。
+
+字段、关系、状态、权限、防重与错误语义见 [中央命令契约](../COMMANDS.md#项目-excel-导入423)，来源保留范围见 [DATABASE §10.7](../DATABASE.md#107-导入追溯与差异表)，操作见[使用指南](../../guides/project-excel-import.md)，实际验证见[证据](../../design/evidence/issue-423/project-import-verification.md)。没有直接对应参考导入页的运行证据，继续使用本地 `ImportMappingScreen.jsx` 与 ADR 0005 三步蓝本，不宣称复刻参考站导入内部流程。
 
 ### 新增/编辑项目
 
@@ -78,7 +84,9 @@
 
 ## 二、项目详情 `/project/:id`
 
-### 已定稿待开发的完整结构（从上到下）
+#424 的客户关联项目切片使正式保存/Excel 导入项目进入客户反向回读。项目事实快照与项目主读共用，客户匹配口径见[客户页面](./base-customer.md#详情)，项目刷新、失败状态及返回来源校验见[导航契约](../NAVIGATION.md#客户关联项目返回)。本切片不扩展合同、收款等其他关联写源，也不表示 #416 生产持久化完成。
+
+### 详情结构与逐分区复核契约（从上到下）
 
 ```
 ┌─ 顶栏：项目名 + 元数据行 ──────────────────────────────────────────┐
@@ -119,7 +127,7 @@
 
 > 当前实现（#281）：项目详情 DTO 按同一项目稳定 ID 和来源返回 `projectSuppliers` 状态块，右栏区分可读关系、真实空态、无权限与服务异常。反向身份单独要求服务端 `project-supplier:read`；只有项目读取权限时返回 `forbidden + []`，不泄露分供方稳定 ID 或名称。每条可读关系通过唯一 Target Registry 携项目 ID、分供方 ID 和 `dataOrigin` 进入工作台；文件导入成功后重读该 DTO，不从本地 store 拼出临时关系。
 
-顶部操作区的“导出档案包”打开项目范围选择器。选择器按真实 owner 关系组织项目基本资料、六个阶段、甲供材、乙供材、班组与工人目录；不根据文件名猜测归属。核心原件默认勾选，`99_待归类` 保留为历史杂项资料目录，名称自定义能力后续再配置；证照在目录中可查看，但当前 ZIP 不包含证照原件，导出下载权限另行配置。甲供材当前没有独立真实供货单位实体，不使用 `developer` 或客户关系推断，暂放在 `02_分供方/01_甲供材/甲供材供货单位待配置`，后续接入真实供货单位或自定义名称。ZIP 同时写入固定目录、项目档案目录、文件清单和原件缺失留痕。
+顶部操作区的“导出档案包”打开项目范围选择器。选择器按真实 owner 关系组织项目基本资料、六个阶段、甲供材、乙供材、班组与工人目录；不根据文件名猜测归属。核心原件默认勾选，`99_待归类` 保留为历史杂项资料目录，名称自定义能力后续再配置；证照在目录中可查看，但当前 ZIP 不包含证照原件，导出下载权限另行配置。甲供材供货身份已定为 Party 的甲方指定供货方，不能用 `developer`、客户或自定义名称替代。未迁移记录暂放在 `02_分供方/01_甲供材/甲供材供货单位待配置`；#408 / #411 联验接入后的稳定身份与目录。ZIP 同时写入固定目录、项目档案目录、文件清单和原件缺失留痕。
 
 ---
 
@@ -204,7 +212,7 @@ interface FileRef {
 - 通过项目关系可证明的分供方证照（当前仅进入目录清单供查看，不进入 ZIP 原件导出）；
 - 通过项目当前关系、工资/考勤/签工或户分配可证明的班组与工人资料。
 
-ZIP 目录固定为 `00_档案说明与清单`、`01_项目信息与工程档案`、`02_分供方/01_甲供材`、`02_分供方/02_乙供材`、`03_班组与工人` 和 `99_待归类`；阶段目录按六阶段稳定编号。甲供材当前使用 `甲供材供货单位待配置` 作为临时目录名，不冒用 `developer` 或客户作为供货单位；后续可接入真实供货单位或配置自定义名称。核心资料默认勾选；证照与工人个人资料在目录中可查看，但当前不参与原件导出，导出下载权限后续单独配置。`99_待归类` 暂时保留，名称自定义能力后续再配置。原件正文缺失的 `file_refs` 只进入文件清单并标明原因，不生成空白替代文件；同名文件、非法路径和重复导出均使用稳定可解释的归一化规则。
+ZIP 目录固定为 `00_档案说明与清单`、`01_项目信息与工程档案`、`02_分供方/01_甲供材`、`02_分供方/02_乙供材`、`03_班组与工人` 和 `99_待归类`；阶段目录按六阶段稳定编号。甲供材已定接入 Party 供货方；缺少真实关系的存量记录继续使用 `甲供材供货单位待配置`，不冒用 `developer`、客户或自定义名称；#408 / #411 验证真实关系接入。核心资料默认勾选；证照与工人个人资料在目录中可查看，但当前不参与原件导出，导出下载权限后续单独配置。`99_待归类` 暂时保留，名称自定义能力后续再配置。原件正文缺失的 `file_refs` 只进入文件清单并标明原因，不生成空白替代文件；同名文件、非法路径和重复导出均使用稳定可解释的归一化规则。
 
 ---
 
@@ -325,7 +333,7 @@ ZIP 目录固定为 `00_档案说明与清单`、`01_项目信息与工程档案
 
 **物资需用计划(N)：** 单据名称、审批状态、计划日期、要求到货日期、负责人、创建时间、操作。甲供/乙供来源使用显式来源引用区分，不按名称合并。
 
-**入库单(N)：** 单据编号、类型、分供方、入库日期、入库仓库、材料采购合同、生效状态、操作。甲供到货、乙供到货和送货归档在 canonical 关系闭合前不得合并为同一事实。
+**入库单(N)：** 单据编号、类型、分供方、入库日期、入库仓库、材料采购合同、生效状态、操作。按已定有效态逻辑送货单与到货头 1:1 关系去重；缺原件或偏差未闭合时不冒充有效入库，甲供/乙供来源保持可辨。
 
 **项目到货归档(N)：** 继续只读 `delivery_records.archived=1` 和有效 `delivery_lines`，现场聚合数量与金额；OCR 处理中或仅核对但未归档的记录不展示。原件仍引用 `file_refs(owner_type='delivery_record', category='source')`，详情页不复制正文。该表是瑞航独有来源视图，不冒充参考“入库单”。
 
@@ -343,191 +351,9 @@ ZIP 目录固定为 `00_档案说明与清单`、`01_项目信息与工程档案
 
 ---
 
-## 六、旧字段快照（已废弃）
+## 六、数据与接口权威
 
-> ⛔ 本节只保留早期项目详情聚合类型作历史对照，不是 schema 来源。现行项目客户外键、表单字段、合同/资金子实体及迁移批次统一见 [`DATABASE.md` §2.10](../DATABASE.md)；`developer` / `developer2` 名称文本、`TicketRegistration` 和拆分的 `CurrentReceipt` / `CurrentPayment` 均不得用于新写路径。
-
-### 6.1 Project（扩展）
-
-```ts
-interface Project {
-  // ... 原有字段保持
-  id: string
-  name: string
-  contractName: string        // 新增: 项目合同名称
-  code: string
-  address: string
-  region: string              // 新增: 工程地域
-  type: string
-  area: number | null
-  contractAmount: number | null
-  overview: string            // 新增: 工程概况
-  operationType: string       // 新增: 经营类型(自营/联营)
-
-  startDate: string
-  plannedEnd: string
-  actualEnd: string
-  plannedDuration: number | null  // 新增: 计划工期(天)
-  status: string
-
-  developer: string           // 客户(甲方)
-  developer2: string          // 新增: 客户2
-  supervisor: string
-  designer: string
-  contractor: string          // 承包单位
-
-  manager: string
-  managerPhone: string
-  siteLeader: string
-  siteLeaderPhone: string
-
-  riskLevel: string           // 新增: 项目风险级别
-  approvalStatus: string      // 新增: 审批状态
-  acceptanceDate: string      // 新增: F-验收日期
-  filingDate: string          // 新增: 上传立项文件时间
-
-  note: string
-  description: string         // 新增: 说明(阶段转换规则等)
-  source: 'manual' | 'import'
-  createdBy: string           // 新增
-  createdAt: string
-  updatedBy: string           // 新增
-  updatedAt: string
-
-  // 阶段任务
-  phaseTasks: PhaseTask[]
-
-  // 以下为 computed，不存储
-  // 经营数据、票据信息从关联子表实时聚合
-}
-```
-
-### 6.2 子表数据模型
-
-```ts
-// 施工合同
-interface ConstructionContract {
-  id: string
-  projectId: string
-  name: string
-  contractNo: string
-  amount: number              // 含税合同金额
-  status: string              // 合同状态
-  signDate: string
-  category: string            // 合同分类
-  signedAmount: number        // 含税已签金额
-  taxRate: number
-}
-
-// 补充协议
-interface SupplementAgreement {
-  id: string
-  contractId: string          // 关联施工合同
-  name: string
-  amount: number
-  signDate: string
-}
-
-// 甲方变洽签
-interface OwnerChangeOrder {
-  id: string
-  projectId: string
-  changeNo: string
-  contractName: string
-  taxIncAmount: number        // 含税审定金额
-  taxExcAmount: number        // 无税审定金额
-  appliedAmount: number       // 无税申报金额
-  approvalDate: string
-}
-
-// 支出合同
-interface ExpenditureContract {
-  id: string
-  projectId: string
-  name: string
-  approvalStatus: string
-  taxIncTotal: number         // 含税合价
-  contractor: string          // 乙方
-  effectiveDate: string
-  accumulatedSettlement: number
-  signedAmount: number
-}
-
-// 开票申请
-interface InvoiceApplication {
-  id: string
-  projectId: string
-  name: string
-  amount: number              // 开票金额
-  taxAmount: number           // 税额
-  status: string
-  invoiceDate: string
-}
-
-// 收票登记
-interface TicketRegistration {
-  id: string
-  projectId: string
-  invoiceNo: string
-  amountType: string
-  contractName: string
-  amount: number              // 发票金额
-  taxAmount: number           // 税额
-  invoiceType: string
-  invoiceDate: string
-  supplier: string
-}
-
-// 收款登记
-interface ReceiptRegistration {
-  id: string
-  projectId: string
-  receiptNo: string
-  receiptDate: string
-  amount: number
-  paymentMethod: string
-  payerUnit: string
-  cumulativeReceivable: number
-}
-
-// 付款申请
-interface PaymentApplication {
-  id: string
-  projectId: string
-  applicationNo: string
-  approvalStatus: string
-  applicant: string
-  amount: number              // 申请金额
-  paidAmount: number          // 已付金额
-  paymentMethod: string
-  actualPayment: number       // 实际支付金额
-  acceptor: string            // 承兑人
-}
-
-// 往来收款
-interface CurrentReceipt {
-  id: string
-  projectId: string
-  receiptNo: string
-  receiptDate: string
-  amount: number
-  payer: string
-}
-
-// 往来付款
-interface CurrentPayment {
-  id: string
-  projectId: string
-  paymentNo: string
-  approvalStatus: string
-  paymentDate: string
-  payee: string
-  amount: number
-  paymentMethod: string
-}
-```
-
----
+项目字段、子实体和关系只在 [DATABASE.md](../DATABASE.md) 维护；跨域投影与来源可达性见 [READ-MODELS.md](../READ-MODELS.md)，写入与回读见 [COMMANDS.md](../COMMANDS.md)。本页不保留废弃类型快照；[#408](https://github.com/zodea/crm-new/issues/408) 按这些契约逐分区复核。
 
 ## 七、交互规范
 
@@ -547,12 +373,12 @@ interface CurrentPayment {
 - 上传支持多文件，Tauri 文件对话框
 - 已上传的文件显示文件名、大小、上传人、上传时间
 - 文件可预览（图片/PDF）和删除
-- 浏览器开发态把正文放入既有文件正文表，并将 sql.js 快照写入 IndexedDB，刷新后仍可预览/下载；Tauri 保留本机路径
+- 浏览器正式文件经中央文件能力读取与保存；只有元数据或未授予正文能力时明确提示，不能从路径推断可下载，更不能回退 sql.js / IndexedDB 当作正式正文。Tauri 本机路径属于后置交付范围。
 - 项目文件柜按任务聚合同一批文件，不复制文件事实
 
 ### 底部 Tab
 
-> 当前阶段（#180）：10 个详情 Tab 均已接真实 SQLite，不再保留“待建设”占位卡。项目详情只展示可见记录并保持只读；草稿可供核对但不进入正式金额合计，新增、编辑、审批、确认、归档等写操作继续进入各自源单流程。顶部指标与筛选结果合计使用同一正式事实口径，源单状态变化或软删后刷新即可重新聚合。
+> 详情各分区经所属领域 Repository 读取；已接管浏览器领域遵守 ADR 0020 中央唯一来源，不回退 SQLite。#180 是历史接线记录，#408 须逐分区复核当前来源、空态、关系和回读；未接目标明确不可用。项目详情保持只读，写操作进入各自源单流程；草稿可供核对但不进入正式金额合计，源单变更或软删后重读同一事实源。
 
 - 每个 Tab 内包含 1-6 个子表
 - 每个真实子表有独立的搜索、列筛选、分页和筛选结果合计
@@ -575,10 +401,10 @@ interface CurrentPayment {
 - 3 个汇总面板（经营数据 + 往来款 + 票据信息）
 - 1 个阶段时间线 + 文件管理
 - 10 个 Tab × 平均 3 个子表 ≈ **25+ 个独立数据表**
-- 每个子表有 CRUD + 搜索 + 筛选 + 导出 + 汇总
+- 子表只读查看、搜索、筛选、汇总及按能力导出；新增、编辑、删除与既定状态动作进入源模块
 - 顶部面板的 15+ 个字段需要实时聚合计算
 
-建议实施策略：先做框架（顶部+阶段+Tab 切换），子表按优先级逐步填充。
+复核顺序按 #408 逐分区确认显示、来源、下钻与返回，再与源模块联验变更后的回读；不以已有框架或子表数量判定闭合。
 
 ---
 

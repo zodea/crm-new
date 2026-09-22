@@ -173,7 +173,7 @@ export function f3FormDefaults(kind: F3FormKind): F3FormDraft {
         applyDate: today(),
         invoiceState: '先款后票',
         prepayDeduct: 0,
-        approvedAmount: 0,
+        approvedAmount: null,
         status: 'draft',
         settlementAllocations: [],
         invoiceAllocations: [],

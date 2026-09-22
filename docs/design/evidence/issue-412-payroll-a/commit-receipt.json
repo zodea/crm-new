@@ -1,0 +1,21 @@
+{
+  "commit": "c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d",
+  "committedAt": "2026-09-13T10:32:09.878230+08:00",
+  "normalHook": {
+    "status": "passed",
+    "files": 626,
+    "tests": 3783,
+    "durationSeconds": 219.34,
+    "checks": [
+      "lint-staged eslint --fix",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "log": "verification/commit-hook.log",
+    "sha256": "6ed93792f5d110efe65a389be89d0523846dc68e50027faebb0fc9eba8f09904"
+  },
+  "codeBlobsMatched": 110,
+  "workingCodeBytesMatched": 110,
+  "pushed": false,
+  "deployed": false
+}

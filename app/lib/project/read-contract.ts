@@ -11,6 +11,7 @@ import type {
   PageDTO,
   ProblemDTO,
 } from '../../types/read-model'
+import type { PayrollHostSection } from '../crew-worker/payroll-read'
 
 export const PROJECT_PAGE_SIZES = [10, 20, 50, 100] as const
 export const IMPORTED_PROJECT_STATUS = '__unrecognized__'
@@ -68,6 +69,7 @@ export interface ProjectListSourceRow {
   riskLevel: string
   address: string
   income: number | null
+  incomeMissingSource?: string
   budget: number | null
   updatedAt: string
 }
@@ -148,6 +150,7 @@ export interface ProjectListSummaryDTO {
 export type ProjectListPageDTO = PageDTO<ProjectListItemDTO, ProjectListSummaryDTO>
 
 export interface ProjectDetailReadDTO {
+  payrollActual?: PayrollHostSection
   item: ProjectListItemDTO
   materialContracts: {
     count: MetricDTO

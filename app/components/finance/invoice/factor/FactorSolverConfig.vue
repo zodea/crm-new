@@ -43,32 +43,29 @@ function updateDecimal(id: number, event: Event) {
 </script>
 
 <template>
-  <section class="min-w-0 p-4 xl:min-h-0 xl:overflow-y-auto xl:border-r xl:border-line xl:overscroll-contain" style="background-color: var(--panel)">
-    <div class="mb-3 flex items-start justify-between gap-3">
+  <section data-testid="factor-config-panel" class="min-w-0 self-start overflow-hidden rounded-[var(--radius-card)] border border-line bg-panel lg:max-h-full lg:overflow-y-auto lg:overscroll-contain">
+    <div class="flex items-center justify-between gap-3 px-3 py-2.5">
       <div>
         <h2 class="text-13px font-800 text-ink">
-          因子配置
+          开票因子（单价）
         </h2>
-        <p class="mt-0.5 text-10px leading-4 text-ink-faint">
-          小数数量仅生成单价乘数量恰为整分的组合
-        </p>
       </div>
-      <button type="button" class="btn-secondary shrink-0" @click="addFactor">
+      <KitButton type="button" class="shrink-0" @click="addFactor">
         <span class="i-lucide-plus mr-1 text-12px" />添加因子
-      </button>
+      </KitButton>
     </div>
 
-    <div class="overflow-hidden rounded-[var(--radius-btn)] border border-line">
-      <div class="grid grid-cols-[minmax(86px,1fr)_106px_46px_28px] items-center gap-1.5 bg-surface-2 px-2.5 py-2 text-10px font-700 text-ink-faint">
+    <div class="border-y border-line">
+      <div class="grid grid-cols-[minmax(0,1fr)_76px_40px_26px] items-center gap-1.5 bg-surface-2 px-2.5 py-2 text-10px font-700 text-ink-faint">
         <span>因子值</span>
-        <span class="text-right">最大次数/数量</span>
+        <span class="text-right">最大数量</span>
         <span class="text-center">小数</span>
         <span />
       </div>
       <div
         v-for="factor in props.factors"
         :key="factor.id"
-        class="grid grid-cols-[minmax(86px,1fr)_106px_46px_28px] items-center gap-1.5 border-t border-line px-2.5 py-2"
+        class="grid grid-cols-[minmax(0,1fr)_76px_40px_26px] items-center gap-1.5 border-t border-line px-2.5 py-2"
       >
         <input
           :value="factor.value ?? ''"
@@ -91,8 +88,7 @@ function updateDecimal(id: number, event: Event) {
           @input="updateNumber(factor.id, 'maxQuantity', $event)"
         >
         <label class="flex cursor-pointer items-center justify-center gap-1 text-11px text-ink-soft">
-          <input :checked="factor.allowDecimal" type="checkbox" class="accent-brand" @change="updateDecimal(factor.id, $event)">
-          <span>是</span>
+          <input :checked="factor.allowDecimal" :aria-label="`因子 ${factor.id} 允许小数数量`" type="checkbox" class="accent-brand" @change="updateDecimal(factor.id, $event)">
         </label>
         <button
           type="button"
@@ -106,6 +102,9 @@ function updateDecimal(id: number, event: Event) {
       <div v-if="props.factors.length === 0" class="px-3 py-8 text-center text-12px text-ink-faint">
         暂无因子，点击“添加因子”开始配置
       </div>
+    </div>
+    <div class="p-3">
+      <slot name="controls" />
     </div>
   </section>
 </template>

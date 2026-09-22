@@ -9,6 +9,7 @@ import {
   isISODateDTO,
   isISODateTimeDTO,
 } from '../../types/read-model'
+import { isApprovalReadState } from '../finance/approval-amount'
 import {
   projectSupplierProblem,
   ProjectSupplierRepositoryProblem,
@@ -102,8 +103,9 @@ function contract(value: unknown, origin: string): boolean {
 
 function claim(value: unknown, origin: string): boolean {
   return factBase(value, 'payment-application', ['detail'], origin)
-    && stringFields(value, ['status', 'applyAmount', 'approvedAmount', 'invoiceState'])
-    && money(value.applyAmount) && money(value.approvedAmount) && nullableDate(value.applyDate)
+    && stringFields(value, ['status', 'applyAmount', 'invoiceState'])
+    && money(value.applyAmount) && (value.approvedAmount === null || money(value.approvedAmount)) && nullableDate(value.applyDate)
+    && isApprovalReadState(value.approvedAmount, value.approvedAmountState)
     && Number.isSafeInteger(value.attachmentCount) && Number(value.attachmentCount) >= 0
 }
 
@@ -148,6 +150,9 @@ function file(value: unknown, origin: string): boolean {
     && fileNavigation(value.navigation, origin)
     && Number.isSafeInteger(value.fileSize) && Number(value.fileSize) >= 0
     && isISODateTimeDTO(value.uploadedAt)
+    && (value.content === undefined || (object(value.content)
+      && ['available', 'missing', 'not-connected'].includes(String(value.content.state))
+      && (value.content.sha256 === null || (typeof value.content.sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.content.sha256)))))
 }
 
 function invalid(message: string): never {
@@ -167,7 +172,8 @@ export function decodeProjectSupplierWorkbenchRead(value: unknown): ProjectSuppl
     || !Array.isArray(value.payments) || !value.payments.every(row => payment(row, value.dataOrigin as string))
     || !Array.isArray(value.settlements) || !value.settlements.every(row => settlement(row, value.dataOrigin as string))
     || !Array.isArray(value.files) || !value.files.every(row => file(row, value.dataOrigin as string))
-    || !moneyFields(value.summary, ['contractTotal', 'claimedTotal', 'invoiceTotal', 'taxTotal', 'paidTotal', 'settlementTotal', 'balance'])
+    || !moneyFields(value.summary, ['contractTotal', 'invoiceTotal', 'taxTotal', 'paidTotal', 'settlementTotal', 'balance'])
+    || !(value.summary.claimedTotal === null || money(value.summary.claimedTotal))
     || !countFields(value.counts, ['contracts', 'claims', 'invoices', 'payments', 'settlements', 'files'])
     || value.counts.contracts !== value.contracts.length || value.counts.claims !== value.claims.length
     || value.counts.invoices !== value.invoices.length || value.counts.payments !== value.payments.length

@@ -1,14 +1,22 @@
 import type { ReadState } from '~/types/read-model'
 import { auxiliaryProblemFromUnknown } from '~/lib/auxiliary-contract/repository'
 
-export function useAuxiliaryContractRead<T>(read: () => Promise<T>, classify: (data: T) => ReadState<T> = data => ({ kind: 'ready', data })) {
+export function useAuxiliaryContractRead<T>(
+  read: () => Promise<T>,
+  classify: (data: T) => ReadState<T> = data => ({ kind: 'ready', data }),
+  options?: { snapshotKey: () => string },
+) {
   const state = shallowRef<ReadState<T>>({ kind: 'idle' })
   const data = shallowRef<T | null>(null)
   let generation = 0
+  let previousKey: string | undefined
   async function load() {
     const current = ++generation
-    state.value = { kind: 'loading', previous: null }
-    data.value = null
+    const key = options?.snapshotKey()
+    const previous = key !== undefined && key === previousKey ? data.value : null
+    previousKey = key
+    state.value = { kind: 'loading', previous }
+    data.value = previous
     try {
       const value = await read()
       if (current !== generation)
@@ -20,13 +28,15 @@ export function useAuxiliaryContractRead<T>(read: () => Promise<T>, classify: (d
       if (current !== generation)
         return
       const problem = auxiliaryProblemFromUnknown(cause).problem
+      const unavailableSource = ['forbidden', 'not-found', 'relationship-mismatch'].includes(problem.code)
+      data.value = unavailableSource ? null : previous
       state.value = problem.code === 'forbidden'
         ? { kind: 'forbidden', problem }
         : problem.code === 'not-found'
           ? { kind: 'not-found', problem }
           : problem.code === 'relationship-mismatch'
             ? { kind: 'mismatch', problem }
-            : { kind: 'error', problem, previous: null }
+            : { kind: 'error', problem, previous }
     }
   }
   const problem = computed(() => 'problem' in state.value ? state.value.problem : null)

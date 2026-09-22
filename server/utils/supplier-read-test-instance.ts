@@ -7,6 +7,7 @@ import type {
   SupplierPaymentRecordSourceRow,
   SupplierProjectRelationSourceRow,
   SupplierProjectSourceRow,
+  SupplierSettlementSourceRow,
 } from '../../app/lib/supplier/repository'
 import supplementsSeed from '../../app/lib/db/seed/contract_supplements.json'
 import contractsSeed from '../../app/lib/db/seed/contracts.json'
@@ -17,6 +18,7 @@ import paymentRecordsSeed from '../../app/lib/db/seed/payment_records.json'
 import projectSuppliersSeed from '../../app/lib/db/seed/project_suppliers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import suppliersSeed from '../../app/lib/db/seed/suppliers.json'
+import { currentCredentialStatus } from '../../app/lib/supplier/credential-domain'
 import {
   buildSupplierDetailRead,
   buildSupplierListPage,
@@ -26,44 +28,16 @@ import {
   SupplierRepositoryProblem,
 } from '../../app/lib/supplier/repository'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
-import { materialContractCommandTestInstance } from './material-contract-command-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { projectSupplierCommandTestInstance } from './project-supplier-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
+import { supplierCredentialDemoScope } from './supplier-credential-demo'
+import { supplierFactSource } from './supplier-fact-source'
 
 export type SupplierReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
 const FIXED_AS_OF = '2026-08-23T00:00:00.000Z'
 const SOURCE_VERSION = 'supplier-read-fixture-v1'
-const linkedSubcontractSupplier: SupplierListSourceRow = {
-  dataOrigin: 'real',
-  id: 'supplier-real-327',
-  name: '中央正式劳务分供方',
-  aliases: [],
-  externalRef: '',
-  uniqueCode: 'SUP-REAL-327',
-  taxNo: '',
-  businessType: '劳务分包',
-  supplierCategory: '劳务分包商',
-  rating: '',
-  legalRep: '',
-  registeredCapital: null,
-  registeredDate: null,
-  address: '',
-  taxpayerType: '',
-  mainBusiness: '中央正式分包合同与变洽签关联分供方',
-  invoiceName: '中央正式劳务分供方',
-  invoiceAddress: '',
-  bank: '',
-  bankAccount: '',
-  phone: '',
-  contact: '项目商务联系人',
-  contactPhone: '',
-  contactTitle: '',
-  credentialStatus: 'incomplete',
-  note: '',
-  updatedAt: '2026-08-26T00:00:00.000Z',
-}
 
 function jsonArray(value: unknown): string[] {
   if (Array.isArray(value))
@@ -170,7 +144,8 @@ const demoPaymentApplications: SupplierPaymentApplicationSourceRow[] = paymentAp
   no: row.no,
   name: row.name,
   applyAmount: Number(row.apply_amount ?? 0),
-  approvedAmount: Number(row.approved_amount ?? 0),
+  approvedAmount: row.approved_amount == null ? null : Number(row.approved_amount),
+  approvedAmountOrigin: 'legacy',
   applyDate: row.apply_date || null,
   status: row.status,
 }))
@@ -217,6 +192,10 @@ export function createSupplierReadTestInstance(
     rows: readonly SupplierProjectSourceRow[]
     sourceVersion: string
   } = () => ({ rows: [], sourceVersion: 'project-command-0' }),
+  resolveSettlementSource?: (sessionId?: string | null) => {
+    rows: readonly SupplierSettlementSourceRow[]
+    sourceVersion: string
+  },
 ) {
   const scenarios = new Map<string, SupplierReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -234,18 +213,20 @@ export function createSupplierReadTestInstance(
     const imported = resolveImportedRelations(sessionId)
     const formalContracts = resolveFormalContractSource(sessionId)
     const formalProjects = resolveFormalProjectSource(sessionId)
+    const settlementSource = resolveSettlementSource?.(sessionId)
     return {
       capabilities,
-      suppliers: ready ? [...resolveFormalRows(sessionId), ...demoSuppliers] : [],
+      suppliers: ready ? [...resolveFormalRows(sessionId), ...demoSuppliers.map(row => ({ ...row, credentialStatus: currentCredentialStatus(supplierCredentialDemoScope(row.id).aggregate, new Date()), businessLicense: { state: 'missing' as const, fileCount: 0, fileIds: [] } }))] : [],
       projects: ready ? [...formalProjects.rows, ...imported.projects, ...demoProjects] : [],
       projectSuppliers: ready ? [...imported.relations, ...demoProjectSuppliers] : [],
       contracts: ready ? [...formalContracts.rows, ...demoContracts] : [],
-      settlements: [],
+      settlements: ready ? settlementSource?.rows ?? [] : [],
+      settlementSourceConnected: settlementSource !== undefined,
       invoices: ready ? demoInvoices : [],
       paymentApplications: ready ? demoPaymentApplications : [],
       paymentRecords: ready ? demoPaymentRecords : [],
       paymentAllocations: ready ? demoPaymentAllocations : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${formalContracts.sourceVersion}:${formalProjects.sourceVersion}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
+      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${formalContracts.sourceVersion}:${formalProjects.sourceVersion}:${settlementSource?.sourceVersion ?? 'settlements-not-connected'}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
     }
   }
 
@@ -264,7 +245,7 @@ export function createSupplierReadTestInstance(
       const query = parseSupplierListQuery(input)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
-      return buildSupplierListPage({ ...data, query, asOf: FIXED_AS_OF })
+      return buildSupplierListPage({ ...data, settlements: data.settlementSourceConnected ? data.settlements : undefined, query, asOf: FIXED_AS_OF })
     },
     async detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
@@ -278,27 +259,13 @@ export function createSupplierReadTestInstance(
 
 export const supplierReadTestInstance = createSupplierReadTestInstance(
   id => demoWorkspaceTestInstance.capabilities(id),
-  id => [linkedSubcontractSupplier, ...supplierCommandTestInstance.rows(id)],
-  id => `${supplierCommandTestInstance.sourceVersion(id)}+linked-subcontract-supplier-327`,
+  id => supplierCommandTestInstance.rows(id),
+  id => `${supplierCommandTestInstance.sourceVersion(id)}`,
   id => projectSupplierCommandTestInstance.supplierProjectRows(id),
-  id => ({
-    rows: materialContractCommandTestInstance.rows(id)
-      .filter(row => row.supplierId)
-      .map(row => ({
-        dataOrigin: 'real' as const,
-        id: row.id,
-        supplierId: row.supplierId!,
-        projectId: row.projectId,
-        no: row.no,
-        name: row.name,
-        kind: row.kind,
-        amount: row.amount,
-        supplementAmount: row.supplementAmount,
-        signDate: row.signDate,
-        status: row.status,
-      })),
-    sourceVersion: materialContractCommandTestInstance.sourceVersion(id),
-  }),
+  (id) => {
+    const source = supplierFactSource(id)
+    return { rows: source.contracts, sourceVersion: source.sourceVersion }
+  },
   id => ({
     rows: projectCommandTestInstance.rows(id).map(row => ({
       dataOrigin: 'real' as const,
@@ -309,4 +276,8 @@ export const supplierReadTestInstance = createSupplierReadTestInstance(
     })),
     sourceVersion: projectCommandTestInstance.sourceVersion(id),
   }),
+  (id) => {
+    const source = supplierFactSource(id)
+    return { rows: source.settlements, sourceVersion: source.sourceVersion }
+  },
 )

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  MasterDataFilterValue,
   MasterDataListFilterField,
   MasterDataListSort,
   MasterDataRegistryKind,
@@ -13,6 +14,7 @@ import {
   initialMasterDataFilterValues,
   MASTER_DATA_LIST_PROFILES,
   masterDataFilterOptions,
+  masterDataSelectedValues,
   masterDataStatusLabel,
 } from '~/lib/master-data/list'
 import { FORM_META } from '~/lib/master-data/page'
@@ -42,7 +44,7 @@ const stores = {
 const search = shallowRef('')
 const sort = shallowRef<MasterDataListSort>('updated-desc')
 const profile = computed(() => MASTER_DATA_LIST_PROFILES[props.kind])
-const filterValues = shallowRef<Partial<Record<MasterDataListFilterField, string>>>(
+const filterValues = shallowRef<Partial<Record<MasterDataListFilterField, MasterDataFilterValue>>>(
   initialMasterDataFilterValues(profile.value),
 )
 const page = shallowRef(1)
@@ -89,7 +91,7 @@ const pageRows = computed(() =>
 )
 const hasFilters = computed(() =>
   Boolean(search.value.trim())
-  || Object.values(filterValues.value).some(value => value !== 'all'),
+  || Object.values(filterValues.value).some(value => masterDataSelectedValues(value).length > 0),
 )
 const emptyState = computed(() => hasFilters.value
   ? {
@@ -272,11 +274,11 @@ onActivated(() => {
       </template>
 
       <template #table>
-        <div data-ui="master-data-list-table" class="min-w-0 max-w-full">
+        <div data-ui="master-data-list-table" class="min-w-0 max-w-full" :aria-busy="loading">
           <KitTable
             :columns="profile.columns"
             :data="pageRows"
-            :loading="loading"
+            :loading="loading && !readStore.loadedByKind?.[kind]"
             :page="{ page: currentPage, pageSize, total: visibleRows.length }"
             :empty="emptyState"
             @empty-action="handleEmptyAction"

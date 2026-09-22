@@ -35,6 +35,10 @@ describe('matchSupplierName', () => {
 })
 
 describe('matchProjectText', () => {
+  it('同名项目或同长命中不能按数组顺序误选稳定身份', () => {
+    expect(matchProjectText(['中央项目送货'], [{ id: 'a', name: '中央项目' }, { id: 'b', name: '中央项目' }])).toBeNull()
+    expect(matchProjectText(['北门东区'], [{ id: 'a', name: '项目甲', aliases: ['北门'] }, { id: 'b', name: '项目乙', aliases: ['东区'] }])).toBeNull()
+  })
   it('从工地原文或文件名中预选项目，多个命中时取更具体的长名称', () => {
     const projects = [
       { id: 'p1', name: '合和新城' },

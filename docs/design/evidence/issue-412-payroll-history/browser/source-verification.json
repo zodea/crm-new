@@ -1,0 +1,22 @@
+{
+  "runId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+  "batchId": "core-batch-aabe1eb5146d0411889ec8c8",
+  "sourceHash": "c93ad526460a7cd027a2032f890da6d2c27311fa9efea0e68481b995c58a0078",
+  "statementId": "core-payroll_projects-5d4c1d55d72fbfe8766b4c67:wage_statements:wage_statement_mtysfvwl_2",
+  "snapshotUnchanged": true,
+  "newWrites": 0,
+  "resets": 0,
+  "scope": "真实SQLite预检、演练、迁入、确认后的一次完整只读浏览器旅程",
+  "widths": [
+    390,
+    768,
+    1024,
+    1280,
+    1440
+  ],
+  "snapshotSha256": "db2f04cf90db90f8d72209f0380f15f2b8e4b548d64dde56a5edb67ee5f909d9",
+  "byteLength": 2285568,
+  "sourceKind": "真实 SQLite 完整图，由公开预检、演练、迁入、确认形成中央只读资料",
+  "interruptedAttemptsIncluded": false,
+  "rawSourceArchived": false
+}

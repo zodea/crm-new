@@ -1,3 +1,4 @@
+import type { ApprovedAmountState } from '../finance/approval-amount'
 import { round2 } from '~/lib/util/number'
 
 export {
@@ -48,7 +49,8 @@ export interface SupplierPaymentSummary {
   projectId: string
   projectName: string
   amount: number
-  approvedAmount: number
+  approvedAmount: number | null
+  approvedAmountState?: ApprovedAmountState
   paidAmount: number
   actualPayment: number
   approvalStatus: string
@@ -84,7 +86,7 @@ export interface SupplierReadonlySummary {
   contractCount: number
   contractTotal: number
   settledTotal: number
-  claimedTotal: number
+  claimedTotal: number | null
   invoiceTotal: number
   invoiceTaxTotal: number
   paidTotal: number
@@ -154,7 +156,7 @@ export function buildSupplierReadonlySummary(
     contractCount: contracts.length,
     contractTotal,
     settledTotal,
-    claimedTotal: round2(payments.reduce((sum, row) => sum + row.approvedAmount, 0)),
+    claimedTotal: payments.some(row => row.approvedAmount === null) ? null : round2(payments.reduce((sum, row) => sum + (row.approvedAmount ?? 0), 0)),
     invoiceTotal: round2(invoices.reduce((sum, row) => sum + row.totalAmount, 0)),
     invoiceTaxTotal: round2(invoices.reduce((sum, row) => sum + row.taxAmount, 0)),
     paidTotal,

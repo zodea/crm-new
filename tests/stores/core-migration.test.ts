@@ -280,6 +280,17 @@ describe('core migration store', () => {
     expect(store.activeMigration).toEqual(marker())
     expect(store.batch).toMatchObject({ status: 'rolled-back', authority: 'local' })
 
+    const recoveryBatch = store.batch
+    const protectedBackup = store.backup
+    const eventCount = events.length
+    for (const action of [store.preflight, store.createBackup, store.dryRun, store.importBatch]) {
+      await expect(action()).rejects.toThrow('不能重新发起迁移')
+      expect(store.phase).toBe('rollback-pending')
+      expect(store.batch).toBe(recoveryBatch)
+      expect(store.backup).toBe(protectedBackup)
+    }
+    expect(events).toHaveLength(eventCount)
+
     await store.rollback()
 
     expect(repository.rollback).toHaveBeenCalledTimes(2)
@@ -444,5 +455,35 @@ describe('core migration store', () => {
 
     expect(localSource.abortSwitch).not.toHaveBeenCalled()
     expect(store.phase).toBe('cutover-pending')
+    for (const action of [store.preflight, store.createBackup, store.dryRun, store.importBatch]) {
+      await expect(action()).rejects.toThrow('不能重新发起迁移')
+      expect(store.phase).toBe('cutover-pending')
+    }
+  })
+
+  it('刷新重放中央确认后本机落地失败，持续保护待切换标记并可再次恢复', async () => {
+    const pending = {
+      batchId: 'batch-1',
+      backupId: backup().backupId,
+      sourceHash: SOURCE.sourceHash,
+      snapshotSha256: backup().snapshotSha256,
+      commandId: 'persisted-confirm',
+    }
+    localSource.loadPendingMigration.mockResolvedValue(pending)
+    repository.snapshot.mockResolvedValue({ authority: 'central', activeBatchId: 'batch-1', entities: [] })
+    localSource.confirmSwitch.mockRejectedValueOnce(new Error('本机切换标记暂时写入失败'))
+    const store = useStore()
+    await expect(store.hydrate()).rejects.toThrow('本机切换标记暂时写入失败')
+    expect(store.preparationBlocked).toBe(true)
+    for (const action of [store.preflight, store.createBackup, store.dryRun, store.importBatch]) {
+      await expect(action()).rejects.toThrow('不能重新发起迁移')
+      expect(store.phase).toBe('cutover-pending')
+    }
+    expect(localSource.readSource).not.toHaveBeenCalled()
+    expect(localSource.abortSwitch).not.toHaveBeenCalled()
+    await store.hydrate()
+    expect(store.phase).toBe('confirmed')
+    expect(store.activeMigration).toMatchObject({ batchId: pending.batchId })
+    expect(repository.confirm.mock.calls.every(([command]) => command.commandId === pending.commandId)).toBe(true)
   })
 })

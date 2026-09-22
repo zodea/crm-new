@@ -1,0 +1,41 @@
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+x·
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/target-cost/payroll-actual.test.ts > 预算在工资同一队列事务内读取真实1000→退40→后月940，只计1900且保留其他科目缺口
+AssertionError: expected null to match object { kind: 'entity-list', …(3) }
+
+- Expected:
+{
+  "entity": "wage-statement",
+  "filters": {
+    "costCategory": "工人工资",
+    "dataOrigin": "real",
+    "projectId": "p",
+  },
+  "kind": "entity-list",
+  "variant": "actual-ledger",
+}
+
++ Received:
+null
+
+ ❯ tests/target-cost/payroll-actual.test.ts:41:27
+     39|     const decoded = decodeTargetCostRead<typeof detail>(encodeTargetCo…
+     40|     const paymentSource = decoded.view.categories.find(c => c.category…
+     41|     expect(paymentSource).toMatchObject({ kind: 'entity-list', entity:…
+       |                           ^
+     42|     const budgetReturn = `/project/target-cost/${saved.id}?origin=real…
+     43|     const destination = resolveNavigationTarget(paymentSource!, { retu…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  20:02:47
+   Duration  3.20s (transform 1.21s, setup 0ms, import 1.51s, tests 1.46s, environment 0ms)
+

@@ -15,8 +15,9 @@ import type {
 } from '~/lib/master-data/page'
 import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
 import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
-import { onActivated } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onActivated, onDeactivated, onScopeDispose } from 'vue'
+import SupplierTaxpayerDialog from '~/components/supplier/SupplierTaxpayerDialog.vue'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import {
   listFormAttachments,
@@ -35,6 +36,8 @@ import {
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
+import { createTaxpayerEditorState } from '~/lib/supplier/taxpayer-editor-state'
+import { mergeTaxpayerVerification } from '~/lib/supplier/taxpayer-verification'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 import { CrewWorkerCommandConflictError, useCrewWorkerCommandStore } from '~/stores/crew-worker-command'
@@ -64,6 +67,10 @@ const projectCommandStore = useProjectCommandStore()
 const customerCommandStore = () => useCustomerCommandStore()
 const supplierCommandStore = () => useSupplierCommandStore()
 const crewWorkerCommandStore = () => useCrewWorkerCommandStore()
+const projectSession = projectCommandStore.createSession()
+const customerSession = props.kind === 'customer' ? customerCommandStore().createSession() : null
+const supplierSession = props.kind === 'supplier' ? supplierCommandStore().createSession() : null
+const crewWorkerSession = props.kind === 'crew' || props.kind === 'worker' ? crewWorkerCommandStore().createSession() : null
 const targetCostStore = useTargetCostStore()
 const readStore = useMasterDataReadStore()
 const tabsStore = useTabsStore()
@@ -170,6 +177,52 @@ const dirty = computed(() => hydrated.value && (
   || pendingRestoreIds.value.length > 0
 ))
 
+const taxpayerEditor = createTaxpayerEditorState({
+  target: () => ({ supplierId: supplierSession?.targetSupplierId ?? null, origin: route.query.origin && route.query.origin !== 'real' ? 'demo' : 'real', version: supplierSession?.baseVersion ?? null, draft: draft.value, saved: savedSnapshot.value ? JSON.parse(savedSnapshot.value) : {}, enabled: props.kind === 'supplier' && !isDesktopRuntime() && hydrated.value && !loadingAction.value }),
+  pending: () => supplierSession?.pendingTaxpayerCommand ?? null,
+  execute: (input, current) => supplierCommandStore().recordTaxpayerVerification(supplierSession!, input, current),
+  read: id => useNuxtApp().$repositories.supplierCommands.loadForm(id),
+  apply: (result, verifiedTaxNo) => {
+    const saved = savedSnapshot.value ? JSON.parse(savedSnapshot.value) : {}
+    const merged = mergeTaxpayerVerification(draft.value, saved, result.verification)
+    // 重新核对见到的新税号只有在本页税号未被编辑时才同步；其他草稿保持原样。
+    if ((draft.value.taxNo ?? '').trim() === (saved.taxNo ?? '').trim()) {
+      merged.draft.taxNo = verifiedTaxNo
+      merged.saved.taxNo = verifiedTaxNo
+    }
+    draft.value = merged.draft as MasterDataPageDraft
+    savedSnapshot.value = JSON.stringify(merged.saved)
+    success('纳税人核验记录已保存；主档其他输入仍保留')
+  },
+})
+
+// 浏览器预算有独立中央表单；不启动此页的本地记录、附件或保存流程。
+const centralTargetCost = props.kind === 'target_cost' && !isDesktopRuntime()
+let taxpayerTrigger: HTMLElement | null = null
+async function openTaxpayerEditor() {
+  taxpayerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  const message = taxpayerEditor.begin()
+  if (message)
+    warning(message)
+}
+async function closeTaxpayerEditor() {
+  if (taxpayerEditor.busy.value || taxpayerEditor.locked.value)
+    return
+  if (taxpayerEditor.dirty.value && !await confirm({ variant: 'simple', title: '放弃未保存的核验输入？', message: '仅放弃本次核验输入，主档其他输入继续保留。', confirmLabel: '放弃核验输入' }))
+    return
+  taxpayerEditor.close()
+  await nextTick()
+  if (taxpayerEditor.active.value && taxpayerTrigger?.isConnected)
+    taxpayerTrigger.focus()
+}
+async function submitTaxpayerEditor() {
+  if (await taxpayerEditor.save()) {
+    await nextTick()
+    if (taxpayerEditor.active.value && taxpayerTrigger?.isConnected)
+      taxpayerTrigger.focus()
+  }
+}
+
 const sections = computed(() => meta.value.sections)
 const usesSupplierCredentialFlow = computed(() =>
   meta.value.attachmentMode === 'supplierCredential',
@@ -265,12 +318,12 @@ async function initialize() {
   try {
     if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier' || props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime()) {
       const central = props.kind === 'project'
-        ? await projectCommandStore.hydrate(routeId.value ?? null)
+        ? await projectCommandStore.hydrate(projectSession, routeId.value ?? null)
         : props.kind === 'customer'
-          ? await customerCommandStore().hydrate(routeId.value ?? null)
+          ? await customerCommandStore().hydrate(customerSession!, routeId.value ?? null)
           : props.kind === 'supplier'
-            ? await supplierCommandStore().hydrate(routeId.value ?? null)
-            : await crewWorkerCommandStore().hydrate(props.kind, routeId.value ?? null)
+            ? await supplierCommandStore().hydrate(supplierSession!, routeId.value ?? null)
+            : await crewWorkerCommandStore().hydrate(crewWorkerSession!, props.kind, routeId.value ?? null)
       draft.value = {
         ...formDefaults(props.kind),
         ...(central.draft ?? createDefaultDraft()),
@@ -399,29 +452,33 @@ async function saveThroughStore(action: MasterDataSaveAction) {
     case 'supplier':
       return isDesktopRuntime()
         ? supplierStore.saveForm(draft.value, action, attachmentChanges())
-        : supplierCommandStore().saveForm(draft.value, action, attachmentChanges())
+        : supplierCommandStore().saveForm(supplierSession!, draft.value, action, attachmentChanges())
     case 'customer':
       return isDesktopRuntime()
         ? customerStore.save(draft.value, action, attachmentChanges())
-        : customerCommandStore().saveForm(draft.value, action, attachmentChanges())
+        : customerCommandStore().saveForm(customerSession!, draft.value, action, attachmentChanges())
     case 'crew':
       return isDesktopRuntime()
         ? crewStore.save(draft.value, action, attachmentChanges())
-        : crewWorkerCommandStore().saveCrew(draft.value, action, attachmentChanges())
+        : crewWorkerCommandStore().saveCrew(crewWorkerSession!, draft.value, action, attachmentChanges())
     case 'worker':
       return isDesktopRuntime()
         ? workerStore.save(draft.value, action, attachmentChanges())
-        : crewWorkerCommandStore().saveWorker(draft.value, action, attachmentChanges())
+        : crewWorkerCommandStore().saveWorker(crewWorkerSession!, draft.value, action, attachmentChanges())
     case 'project':
       return isDesktopRuntime()
         ? projectStore.saveForm(draft.value, action, attachmentChanges())
-        : projectCommandStore.saveForm(draft.value, action, attachmentChanges())
+        : projectCommandStore.saveForm(projectSession, draft.value, action, attachmentChanges())
     case 'target_cost':
       return targetCostStore.save(draft.value, action, attachmentChanges())
   }
 }
 
 async function handleFooterAction(action: FormFooterAction) {
+  if (taxpayerEditor.open.value) {
+    warning('请先完成或取消当前税务核验')
+    return
+  }
   if (action === 'cancel') {
     await leaveForm()
     return
@@ -449,13 +506,13 @@ async function handleFooterAction(action: FormFooterAction) {
 
     if (action === 'saveNew') {
       if (props.kind === 'project' && !isDesktopRuntime())
-        projectCommandStore.startNewProject()
+        projectCommandStore.startNewProject(projectSession)
       if (props.kind === 'customer' && !isDesktopRuntime())
-        customerCommandStore().startNewCustomer()
+        customerCommandStore().startNewCustomer(customerSession!)
       if (props.kind === 'supplier' && !isDesktopRuntime())
-        supplierCommandStore().startNewSupplier()
+        supplierCommandStore().startNewSupplier(supplierSession!)
       if ((props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime())
-        crewWorkerCommandStore().startNew(props.kind)
+        crewWorkerCommandStore().startNew(crewWorkerSession!, props.kind)
       allowLeave = true
       if (route.path === meta.value.newPath) {
         draft.value = createDefaultDraft()
@@ -541,13 +598,13 @@ function keepLocalAgainstLatest() {
   if (!conflictLatest.value)
     return
   if (props.kind === 'customer')
-    customerCommandStore().rebase(conflictLatest.value.version)
+    customerCommandStore().rebase(customerSession!, conflictLatest.value.version)
   else if (props.kind === 'supplier')
-    supplierCommandStore().rebase(conflictLatest.value.version)
+    supplierCommandStore().rebase(supplierSession!, conflictLatest.value.version)
   else if (props.kind === 'crew' || props.kind === 'worker')
-    crewWorkerCommandStore().rebase(props.kind, conflictLatest.value.version)
+    crewWorkerCommandStore().rebase(crewWorkerSession!, props.kind, conflictLatest.value.version)
   else
-    projectCommandStore.rebase(conflictLatest.value.version)
+    projectCommandStore.rebase(projectSession, conflictLatest.value.version)
   conflictLatest.value = null
   localDraftNotice.value = '已保留你的内容并基于服务器最新版本；请再次保存以提交。'
 }
@@ -557,13 +614,13 @@ async function useLatestServerVersion() {
   if (!latest)
     return
   if (props.kind === 'customer')
-    customerCommandStore().acceptLatest(latest as CustomerFormReadDTO)
+    customerCommandStore().acceptLatest(customerSession!, latest as CustomerFormReadDTO)
   else if (props.kind === 'supplier')
-    supplierCommandStore().acceptLatest(latest as SupplierFormReadDTO)
+    supplierCommandStore().acceptLatest(supplierSession!, latest as SupplierFormReadDTO)
   else if (props.kind === 'crew' || props.kind === 'worker')
-    crewWorkerCommandStore().acceptLatest(props.kind, latest as CrewFormReadDTO | WorkerFormReadDTO)
+    crewWorkerCommandStore().acceptLatest(crewWorkerSession!, props.kind, latest as CrewFormReadDTO | WorkerFormReadDTO)
   else
-    projectCommandStore.acceptLatest(latest as ProjectFormReadDTO)
+    projectCommandStore.acceptLatest(projectSession, latest as ProjectFormReadDTO)
   draft.value = {
     ...formDefaults(props.kind),
     ...latest.draft,
@@ -657,7 +714,9 @@ function toggleExistingAttachment(id: string) {
 }
 
 async function leaveForm() {
-  if (dirty.value) {
+  if (taxpayerEditor.busy.value)
+    return
+  if (dirty.value || taxpayerEditor.dirty.value) {
     const leave = await confirm({
       variant: 'simple',
       title: '放弃修改',
@@ -672,35 +731,40 @@ async function leaveForm() {
   await navigateTo(returnPath.value)
 }
 
-onBeforeRouteLeave(async () => {
-  if (allowLeave || !dirty.value)
-    return true
+if (!centralTargetCost) {
+  useTabCloseGuard(async () => {
+    if (taxpayerEditor.busy.value)
+      return false
+    if (allowLeave || (!dirty.value && !taxpayerEditor.dirty.value))
+      return true
 
-  // 普通页签切换保留 KeepAlive 草稿；只有当前表单页签已被关闭时才拦截。
-  if (tabsStore.tabs.some(tab => tab.key === pageKey.value))
-    return true
-
-  const leave = await confirm({
-    variant: 'simple',
-    title: '放弃修改',
-    message: '当前表单还有未保存内容，确认离开？',
-    confirmLabel: '放弃修改',
+    const leave = await confirm({
+      variant: 'simple',
+      title: '放弃修改',
+      message: '当前表单还有未保存内容，确认离开？',
+      confirmLabel: '放弃修改',
+    })
+    return leave
   })
-  if (!leave)
-    tabsStore.open({ fullPath: pageFullPath.value, title: title.value })
-  return leave
-})
+}
 
 onMounted(() => {
+  if (centralTargetCost)
+    return
   desktopAttachmentPicker.value = isDesktopRuntime()
   void initialize()
 })
 
 onActivated(() => {
+  if (centralTargetCost)
+    return
+  taxpayerEditor.activate()
   const target = `${props.kind}:${routeId.value ?? 'new'}`
   if (lastInitializedTarget && target !== lastInitializedTarget)
     void initialize()
 })
+onDeactivated(taxpayerEditor.deactivate)
+onScopeDispose(taxpayerEditor.deactivate)
 
 watch(routeSupplierCategory, () => {
   if (props.kind === 'supplier' && !isEditing.value)
@@ -709,9 +773,11 @@ watch(routeSupplierCategory, () => {
 </script>
 
 <template>
+  <CentralTargetCostFormScreen v-if="centralTargetCost" />
   <EntityFormShell
+    v-else
     :title="title"
-    subtitle="草稿可暂存不完整内容；提交时校验必填、关联和金额规则。"
+    :subtitle="kind === 'supplier' ? undefined : '草稿可暂存不完整内容；提交时校验必填、关联和金额规则。'"
     :back-label="backLabel"
     :sections="shellSections"
     :state="shellState"
@@ -777,6 +843,7 @@ watch(routeSupplierCategory, () => {
         :fetch-projects="fetchProjects"
         :fetch-crews="fetchCrews"
         @clear-error="clearFieldError"
+        @verify-taxpayer="openTaxpayerEditor"
       />
 
       <MasterDataAttachmentSection
@@ -800,15 +867,8 @@ watch(routeSupplierCategory, () => {
         data-ui="supplier-credential-guidance"
         class="panel scroll-mt-4 p-4"
       >
-        <SectionHeader
-          title="证照资料"
-          subtitle="证照原件、OCR 核对、有效期和人工审核统一在分供方详情维护。"
-        />
-        <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3 border border-brand/20 bg-brand-soft/35 p-3 text-12px text-ink-soft">
-          <span class="i-lucide-shield-check shrink-0 text-18px text-brand" aria-hidden="true" />
-          <p class="min-w-52 flex-1 leading-5">
-            此处只保存主数据，不会把普通附件伪装成证照。保存后进入“证照附件”，按真实文件、资料要求和人工核验规则完成准入。
-          </p>
+        <SectionHeader title="证照资料" />
+        <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3 text-12px text-ink-soft">
           <NuxtLink
             v-if="isEditing && routeId"
             :to="supplierCredentialPath(routeId)"
@@ -816,6 +876,7 @@ watch(routeSupplierCategory, () => {
           >
             前往证照附件
           </NuxtLink>
+          <span v-else>保存分供方后可维护证照资料。</span>
         </div>
       </section>
 
@@ -848,6 +909,7 @@ watch(routeSupplierCategory, () => {
       />
     </template>
   </EntityFormShell>
+  <SupplierTaxpayerDialog v-if="taxpayerEditor.open.value && taxpayerEditor.active.value" :value="taxpayerEditor.form" :tax-no="taxpayerEditor.taxNo.value" :busy="taxpayerEditor.busy.value" :locked="taxpayerEditor.locked.value" :conflict="taxpayerEditor.conflict.value" :error="taxpayerEditor.error.value" :summary="taxpayerEditor.summary.value" @patch="patch => { if (!taxpayerEditor.busy.value && !taxpayerEditor.locked.value && !taxpayerEditor.conflict.value) Object.assign(taxpayerEditor.form, patch) }" @submit="submitTaxpayerEditor" @cancel="closeTaxpayerEditor" @recheck="taxpayerEditor.recheck" />
 </template>
 
 <style scoped>

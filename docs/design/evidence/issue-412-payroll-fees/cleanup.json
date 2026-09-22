@@ -1,0 +1,78 @@
+{
+  "date": "2026-09-15T01:39:58.9934790+08:00",
+  "action": "Windows Recycle Bin",
+  "recoverable": true,
+  "permanentlyDeleted": false,
+  "productCommit": "61a6a10ddee611125d9d10b8dfd9dd81f99db467",
+  "files": 507.0,
+  "bytes": 51258682.0,
+  "temporaryPdfs": 7.0,
+  "targets": [
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\root\\browser-first",
+      "files": 6,
+      "bytes": 1092153.0,
+      "pdfFiles": 0
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\root\\browser-second",
+      "files": 7,
+      "bytes": 372449.0,
+      "pdfFiles": 0
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\root\\browser-third",
+      "files": 7,
+      "bytes": 349277.0,
+      "pdfFiles": 0
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\root\\browser-fourth",
+      "files": 22,
+      "bytes": 2760521.0,
+      "pdfFiles": 0
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\root\\browser-fifth",
+      "files": 42,
+      "bytes": 6610364.0,
+      "pdfFiles": 1
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\root\\browser-sixth",
+      "files": 121,
+      "bytes": 10021976.0,
+      "pdfFiles": 2
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\root\\browser-seventh",
+      "files": 145,
+      "bytes": 14615291.0,
+      "pdfFiles": 2
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\root\\browser-eighth",
+      "files": 146,
+      "bytes": 14678467.0,
+      "pdfFiles": 2
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\c\\layout",
+      "files": 3,
+      "bytes": 185987.0,
+      "pdfFiles": 0
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-p5-central\\c\\print-review",
+      "files": 8,
+      "bytes": 572197.0,
+      "pdfFiles": 0
+    }
+  ],
+  "reparsePoints": 0,
+  "trackedFiles": 0,
+  "databases": 0,
+  "activeProcessReferences": 0,
+  "scope": "仅P5已归档的八轮浏览器临时输出、失败视频及C的布局/打印页图；149份正式证据已核Git原字节；源码、数据库、其他工作树和P6准备资料未处理",
+  "remaining": "登记仍在使用的临时脚本与日志待其工作结束后回收"
+}

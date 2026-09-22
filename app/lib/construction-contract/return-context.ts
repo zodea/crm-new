@@ -1,12 +1,15 @@
+import type { ContractListFilter } from '../contract/list-filters'
 import type { DataOriginDTO } from '~/types/read-model'
+import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
+import { parseContractListFilter, serializeContractListFilter } from '../contract/list-filters'
 
 export interface ConstructionContractListNavigationState {
   search: string
   projectId: string | null
   customerId: string | null
-  status: string | null
+  status: ContractListFilter
   origin: DataOriginDTO | null
   page: number
   pageSize: 10 | 20 | 50 | 100
@@ -61,7 +64,7 @@ export function constructionContractListNavigationStateFromQuery(
     search: optionalText(query.search, 120) ?? '',
     projectId: optionalText(query.projectId, 240),
     customerId: optionalText(query.customerId, 240),
-    status: optionalText(query.status, 80),
+    status: parseContractListFilter(query.status),
     origin: isDataOriginDTO(origin) ? origin : null,
     page: positiveInteger(query.page, 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 10,
@@ -77,7 +80,7 @@ function searchParams(state: ConstructionContractListNavigationState, contextId:
   if (state.customerId)
     query.set('customerId', state.customerId)
   if (state.status)
-    query.set('status', state.status)
+    query.set('status', serializeContractListFilter(state.status))
   if (state.origin)
     query.set('origin', state.origin)
   if (state.page !== 1)
@@ -133,10 +136,13 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
     if (focusView && (tab !== 'acceptance' || !focus || (focusView !== 'acceptance' && focusView !== 'warranty')))
       return null
     const anchorId = decodeURIComponent(url.hash.slice(1))
-    if (anchorId && (!focus || !focusView || anchorId !== `construction-contract-fact-${focusView}-${focus}`))
+    const receiptAnchor = tab === 'receipts' && anchorId.startsWith('construction-contract-receipt-') && isStableRouteIdentity(anchorId.slice('construction-contract-receipt-'.length))
+    if (anchorId && !receiptAnchor && (!focus || !focusView || anchorId !== `construction-contract-fact-${focusView}-${focus}`))
       return null
     const returnTo = url.searchParams.get('returnTo')
-    const validatedListReturnTo = returnTo ? validateConstructionContractReturnTo(returnTo) : null
+    const validatedListReturnTo = returnTo
+      ? validateConstructionContractReturnTo(returnTo, origin) ?? validateCustomerDetailReturnTo(returnTo, origin)
+      : null
     if (returnTo && !validatedListReturnTo)
       return null
     if (validatedListReturnTo) {

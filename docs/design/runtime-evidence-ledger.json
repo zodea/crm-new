@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 142,
+    "trackedPageFiles": 160,
     "devPageFiles": 5,
-    "productionRoutes": 137,
+    "productionRoutes": 155,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 137,
-    "referenceEndpoints": 137,
-    "referenceProfiles": 41,
-    "usedReferenceProfiles": 35,
+    "evidenceEndpointRecords": 155,
+    "referenceEndpoints": 155,
+    "referenceProfiles": 47,
+    "usedReferenceProfiles": 41,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 22,
+    "localAuthorityRoutes": 39,
     "historicalEvidenceRoutes": 34,
-    "unverifiedTargetRoutes": 9,
+    "unverifiedTargetRoutes": 10,
     "designCoveredRoutes": 135,
-    "designPendingRoutes": 2
+    "designPendingRoutes": 20
   },
   "domains": [
     {
@@ -24,6 +24,9 @@
       "domain": "首页",
       "routeCount": 1,
       "implementationIssues": [
+        414
+      ],
+      "historicalImplementationIssues": [
         278
       ]
     },
@@ -32,6 +35,9 @@
       "domain": "项目",
       "routeCount": 3,
       "implementationIssues": [
+        408
+      ],
+      "historicalImplementationIssues": [
         288,
         293,
         294,
@@ -43,6 +49,9 @@
       "domain": "基础主数据",
       "routeCount": 9,
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -53,6 +62,9 @@
       "domain": "分供方",
       "routeCount": 4,
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         289
       ]
@@ -62,6 +74,9 @@
       "domain": "项目分供方",
       "routeCount": 2,
       "implementationIssues": [
+        408
+      ],
+      "historicalImplementationIssues": [
         281,
         289,
         317
@@ -70,8 +85,11 @@
     {
       "code": "core-contract",
       "domain": "核心合同",
-      "routeCount": 12,
+      "routeCount": 13,
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -82,6 +100,9 @@
       "domain": "辅助合同与结算",
       "routeCount": 15,
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -94,6 +115,9 @@
       "domain": "甲方单据",
       "routeCount": 4,
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         283,
         323,
         324,
@@ -107,6 +131,9 @@
       "domain": "分包单据",
       "routeCount": 8,
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -117,6 +144,9 @@
       "domain": "自购材",
       "routeCount": 12,
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -128,6 +158,9 @@
       "domain": "甲供材",
       "routeCount": 15,
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ]
@@ -137,6 +170,9 @@
       "domain": "送货单闭环",
       "routeCount": 4,
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         289
       ]
@@ -146,6 +182,9 @@
       "domain": "材料价格",
       "routeCount": 1,
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         298,
         289
@@ -156,6 +195,9 @@
       "domain": "收入财务",
       "routeCount": 10,
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ]
@@ -165,6 +207,10 @@
       "domain": "支出财务",
       "routeCount": 11,
       "implementationIssues": [
+        404,
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -175,6 +221,10 @@
       "domain": "发票台账",
       "routeCount": 4,
       "implementationIssues": [
+        413,
+        414
+      ],
+      "historicalImplementationIssues": [
         304,
         289
       ]
@@ -182,8 +232,11 @@
     {
       "code": "quantity-payroll",
       "domain": "工程量与工资",
-      "routeCount": 9,
+      "routeCount": 25,
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -192,8 +245,11 @@
     {
       "code": "schedule-target-cost",
       "domain": "项目进度成本",
-      "routeCount": 9,
+      "routeCount": 10,
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ]
@@ -203,6 +259,10 @@
       "domain": "导入导出",
       "routeCount": 3,
       "implementationIssues": [
+        406,
+        414
+      ],
+      "historicalImplementationIssues": [
         278,
         294
       ]
@@ -212,6 +272,9 @@
       "domain": "系统设置",
       "routeCount": 1,
       "implementationIssues": [
+        414
+      ],
+      "historicalImplementationIssues": [
         204
       ]
     }
@@ -224,6 +287,9 @@
       "domainCode": "aux-contract",
       "template": "详情",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -254,6 +320,9 @@
       "domainCode": "aux-contract",
       "template": "详情",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -284,6 +353,9 @@
       "domainCode": "master-data",
       "template": "详情",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -312,6 +384,9 @@
       "domainCode": "master-data",
       "template": "整页表单",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -340,6 +415,9 @@
       "domainCode": "master-data",
       "template": "列表",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -368,6 +446,9 @@
       "domainCode": "master-data",
       "template": "详情",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -396,6 +477,9 @@
       "domainCode": "master-data",
       "template": "整页表单",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -424,6 +508,9 @@
       "domainCode": "master-data",
       "template": "列表",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -452,6 +539,9 @@
       "domainCode": "supplier",
       "template": "详情",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         289
       ],
@@ -479,6 +569,9 @@
       "domainCode": "supplier",
       "template": "详情",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         289
       ],
@@ -506,6 +599,9 @@
       "domainCode": "supplier",
       "template": "整页表单",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         289
       ],
@@ -533,6 +629,9 @@
       "domainCode": "supplier",
       "template": "列表",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         289
       ],
@@ -560,6 +659,9 @@
       "domainCode": "master-data",
       "template": "详情",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -588,6 +690,9 @@
       "domainCode": "master-data",
       "template": "整页表单",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -616,6 +721,9 @@
       "domainCode": "master-data",
       "template": "列表",
       "implementationIssues": [
+        407
+      ],
+      "historicalImplementationIssues": [
         281,
         316,
         289
@@ -644,6 +752,9 @@
       "domainCode": "core-contract",
       "template": "详情",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -666,12 +777,46 @@
       "constraints": "C-BASE"
     },
     {
+      "evidenceRecordId": "E-15375394D923",
+      "page": "app/pages/contract/boq/building-evidence.vue",
+      "localRoute": "/contract/boq/building-evidence",
+      "domainCode": "core-contract",
+      "template": "整页表单",
+      "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
+        277,
+        282,
+        289
+      ],
+      "referenceProfile": "R-SCHEDULE-LOCAL",
+      "referenceEndpointId": "local-15375394D923",
+      "referenceEndpointLabel": "本地权威端点：/contract/boq/building-evidence",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/boq/building-evidence"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/boq/building-evidence"
+      },
+      "constraints": "C-FORM"
+    },
+    {
       "evidenceRecordId": "E-0CDB640E8346",
       "page": "app/pages/contract/boq/import.vue",
       "localRoute": "/contract/boq/import",
       "domainCode": "core-contract",
       "template": "特殊工具",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -700,6 +845,9 @@
       "domainCode": "core-contract",
       "template": "工作台",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -728,6 +876,9 @@
       "domainCode": "aux-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -758,6 +909,9 @@
       "domainCode": "aux-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -788,6 +942,9 @@
       "domainCode": "aux-contract",
       "template": "列表",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -818,6 +975,9 @@
       "domainCode": "core-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -846,6 +1006,9 @@
       "domainCode": "core-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -874,6 +1037,9 @@
       "domainCode": "core-contract",
       "template": "列表",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -902,6 +1068,9 @@
       "domainCode": "core-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -930,6 +1099,9 @@
       "domainCode": "core-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -958,6 +1130,9 @@
       "domainCode": "core-contract",
       "template": "列表",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -986,6 +1161,9 @@
       "domainCode": "aux-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -1016,6 +1194,9 @@
       "domainCode": "aux-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -1046,6 +1227,9 @@
       "domainCode": "aux-contract",
       "template": "列表",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -1076,6 +1260,9 @@
       "domainCode": "aux-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -1106,6 +1293,9 @@
       "domainCode": "aux-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -1136,6 +1326,9 @@
       "domainCode": "aux-contract",
       "template": "详情",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -1166,6 +1359,9 @@
       "domainCode": "aux-contract",
       "template": "列表",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -1196,6 +1392,9 @@
       "domainCode": "core-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -1224,6 +1423,9 @@
       "domainCode": "core-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -1252,6 +1454,9 @@
       "domainCode": "core-contract",
       "template": "列表",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         277,
         282,
         289
@@ -1280,6 +1485,9 @@
       "domainCode": "import-export",
       "template": "特殊工具",
       "implementationIssues": [
+        406
+      ],
+      "historicalImplementationIssues": [
         278,
         294
       ],
@@ -1307,6 +1515,9 @@
       "domainCode": "finance-income",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1334,6 +1545,9 @@
       "domainCode": "finance-income",
       "template": "列表",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1361,6 +1575,9 @@
       "domainCode": "finance-income",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1388,6 +1605,9 @@
       "domainCode": "finance-income",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1415,6 +1635,9 @@
       "domainCode": "finance-income",
       "template": "列表",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1442,6 +1665,9 @@
       "domainCode": "finance-income",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1469,6 +1695,9 @@
       "domainCode": "invoice",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         304,
         289
       ],
@@ -1496,6 +1725,10 @@
       "domainCode": "invoice",
       "template": "特殊工具",
       "implementationIssues": [
+        413,
+        414
+      ],
+      "historicalImplementationIssues": [
         304,
         289
       ],
@@ -1523,6 +1756,9 @@
       "domainCode": "invoice",
       "template": "工作台",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         304,
         289
       ],
@@ -1550,6 +1786,9 @@
       "domainCode": "invoice",
       "template": "工作台",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         304,
         289
       ],
@@ -1577,6 +1816,9 @@
       "domainCode": "finance-expense",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1605,6 +1847,10 @@
       "domainCode": "finance-expense",
       "template": "详情",
       "implementationIssues": [
+        413,
+        404
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1633,6 +1879,9 @@
       "domainCode": "finance-expense",
       "template": "列表",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1661,6 +1910,9 @@
       "domainCode": "finance-expense",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1689,6 +1941,9 @@
       "domainCode": "finance-expense",
       "template": "工作台",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1717,6 +1972,9 @@
       "domainCode": "finance-income",
       "template": "详情",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1744,6 +2002,9 @@
       "domainCode": "finance-income",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1771,6 +2032,9 @@
       "domainCode": "finance-income",
       "template": "列表",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1798,6 +2062,9 @@
       "domainCode": "finance-income",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         302,
         289
       ],
@@ -1825,6 +2092,9 @@
       "domainCode": "finance-expense",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1853,6 +2123,9 @@
       "domainCode": "finance-expense",
       "template": "列表",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1881,6 +2154,9 @@
       "domainCode": "finance-expense",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1909,6 +2185,9 @@
       "domainCode": "finance-expense",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1937,6 +2216,9 @@
       "domainCode": "finance-expense",
       "template": "列表",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1965,6 +2247,9 @@
       "domainCode": "finance-expense",
       "template": "整页表单",
       "implementationIssues": [
+        413
+      ],
+      "historicalImplementationIssues": [
         303,
         305,
         289
@@ -1993,6 +2278,9 @@
       "domainCode": "import-export",
       "template": "特殊工具",
       "implementationIssues": [
+        406
+      ],
+      "historicalImplementationIssues": [
         278,
         294
       ],
@@ -2020,6 +2308,9 @@
       "domainCode": "home",
       "template": "工作台",
       "implementationIssues": [
+        414
+      ],
+      "historicalImplementationIssues": [
         278
       ],
       "referenceProfile": "R-HOME-LIVE",
@@ -2046,6 +2337,9 @@
       "domainCode": "material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2075,6 +2369,9 @@
       "domainCode": "material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2104,6 +2401,9 @@
       "domainCode": "material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2133,6 +2433,9 @@
       "domainCode": "delivery",
       "template": "详情",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         289
       ],
@@ -2160,6 +2463,9 @@
       "domainCode": "delivery",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         289
       ],
@@ -2187,6 +2493,9 @@
       "domainCode": "delivery",
       "template": "工作台",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         289
       ],
@@ -2214,6 +2523,9 @@
       "domainCode": "delivery",
       "template": "工作台",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         289
       ],
@@ -2241,6 +2553,9 @@
       "domainCode": "material-price",
       "template": "特殊工具",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         298,
         289
@@ -2269,6 +2584,9 @@
       "domainCode": "material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2298,6 +2616,9 @@
       "domainCode": "material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2327,6 +2648,9 @@
       "domainCode": "material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2356,6 +2680,9 @@
       "domainCode": "aux-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -2386,6 +2713,9 @@
       "domainCode": "aux-contract",
       "template": "整页表单",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -2416,6 +2746,9 @@
       "domainCode": "aux-contract",
       "template": "列表",
       "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
         295,
         330,
         331,
@@ -2446,6 +2779,9 @@
       "domainCode": "material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2475,6 +2811,9 @@
       "domainCode": "material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2504,6 +2843,9 @@
       "domainCode": "material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2533,6 +2875,9 @@
       "domainCode": "material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2562,6 +2907,9 @@
       "domainCode": "material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2591,6 +2939,9 @@
       "domainCode": "material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         296,
         297,
         298,
@@ -2620,6 +2971,9 @@
       "domainCode": "owner-document",
       "template": "详情",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         283,
         323,
         324,
@@ -2651,6 +3005,9 @@
       "domainCode": "owner-document",
       "template": "整页表单",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         283,
         323,
         324,
@@ -2682,6 +3039,9 @@
       "domainCode": "owner-document",
       "template": "列表",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         283,
         323,
         324,
@@ -2713,6 +3073,9 @@
       "domainCode": "owner-document",
       "template": "整页表单",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         283,
         323,
         324,
@@ -2744,6 +3107,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2771,6 +3137,9 @@
       "domainCode": "owner-material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2798,6 +3167,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2825,6 +3197,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2852,6 +3227,9 @@
       "domainCode": "owner-material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2879,6 +3257,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2906,6 +3287,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2933,6 +3317,9 @@
       "domainCode": "owner-material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2960,6 +3347,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -2987,6 +3377,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -3014,6 +3407,9 @@
       "domainCode": "owner-material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -3041,6 +3437,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -3068,6 +3467,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -3095,6 +3497,9 @@
       "domainCode": "owner-material",
       "template": "列表",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -3122,6 +3527,9 @@
       "domainCode": "owner-material",
       "template": "整页表单",
       "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [
         299,
         289
       ],
@@ -3149,6 +3557,9 @@
       "domainCode": "project",
       "template": "详情",
       "implementationIssues": [
+        408
+      ],
+      "historicalImplementationIssues": [
         288,
         293,
         294,
@@ -3178,6 +3589,9 @@
       "domainCode": "project-supplier",
       "template": "详情",
       "implementationIssues": [
+        408
+      ],
+      "historicalImplementationIssues": [
         281,
         289,
         317
@@ -3206,6 +3620,9 @@
       "domainCode": "project-supplier",
       "template": "特殊工具",
       "implementationIssues": [
+        408
+      ],
+      "historicalImplementationIssues": [
         281,
         289,
         317
@@ -3234,6 +3651,9 @@
       "domainCode": "project",
       "template": "整页表单",
       "implementationIssues": [
+        408
+      ],
+      "historicalImplementationIssues": [
         288,
         293,
         294,
@@ -3263,6 +3683,9 @@
       "domainCode": "project",
       "template": "列表",
       "implementationIssues": [
+        408
+      ],
+      "historicalImplementationIssues": [
         288,
         293,
         294,
@@ -3292,6 +3715,9 @@
       "domainCode": "subcontract-document",
       "template": "详情",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -3320,6 +3746,9 @@
       "domainCode": "subcontract-document",
       "template": "整页表单",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -3348,6 +3777,9 @@
       "domainCode": "subcontract-document",
       "template": "列表",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -3376,6 +3808,9 @@
       "domainCode": "subcontract-document",
       "template": "整页表单",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -3404,6 +3839,9 @@
       "domainCode": "schedule-target-cost",
       "template": "详情",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3431,6 +3869,9 @@
       "domainCode": "schedule-target-cost",
       "template": "整页表单",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3458,6 +3899,9 @@
       "domainCode": "schedule-target-cost",
       "template": "列表",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3485,6 +3929,9 @@
       "domainCode": "schedule-target-cost",
       "template": "工作台",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3512,6 +3959,9 @@
       "domainCode": "schedule-target-cost",
       "template": "整页表单",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3539,6 +3989,9 @@
       "domainCode": "schedule-target-cost",
       "template": "工作台",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3566,6 +4019,9 @@
       "domainCode": "schedule-target-cost",
       "template": "整页表单",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3593,6 +4049,9 @@
       "domainCode": "schedule-target-cost",
       "template": "整页表单",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3620,6 +4079,9 @@
       "domainCode": "schedule-target-cost",
       "template": "列表",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         289
       ],
@@ -3641,12 +4103,45 @@
       "constraints": "C-DENSE"
     },
     {
+      "evidenceRecordId": "E-722913A7E296",
+      "page": "app/pages/schedule/process-library/[id].vue",
+      "localRoute": "/schedule/process-library/:id",
+      "domainCode": "schedule-target-cost",
+      "template": "详情",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        289
+      ],
+      "referenceProfile": "R-SCHEDULE-LOCAL",
+      "referenceEndpointId": "local-722913A7E296",
+      "referenceEndpointLabel": "本地权威端点：/schedule/process-library/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/schedule/process-library/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/schedule/process-library/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
       "evidenceRecordId": "E-D904DDBF1CAC",
       "page": "app/pages/settings/ocr.vue",
       "localRoute": "/settings/ocr",
       "domainCode": "ocr-settings",
       "template": "工作台",
       "implementationIssues": [
+        414
+      ],
+      "historicalImplementationIssues": [
         204
       ],
       "referenceProfile": "R-OCR-STUDIO-SOURCE",
@@ -3673,6 +4168,9 @@
       "domainCode": "import-export",
       "template": "工作台",
       "implementationIssues": [
+        414
+      ],
+      "historicalImplementationIssues": [
         278,
         294
       ],
@@ -3700,6 +4198,9 @@
       "domainCode": "subcontract-document",
       "template": "详情",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -3728,6 +4229,9 @@
       "domainCode": "subcontract-document",
       "template": "整页表单",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -3756,6 +4260,9 @@
       "domainCode": "subcontract-document",
       "template": "列表",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -3784,6 +4291,9 @@
       "domainCode": "subcontract-document",
       "template": "整页表单",
       "implementationIssues": [
+        410
+      ],
+      "historicalImplementationIssues": [
         295,
         327,
         289
@@ -3812,6 +4322,9 @@
       "domainCode": "quantity-payroll",
       "template": "工作台",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -3835,11 +4348,14 @@
     },
     {
       "evidenceRecordId": "E-F3C41F60CBA6",
-      "page": "app/pages/subcontract/daywork.vue",
+      "page": "app/pages/subcontract/daywork/index.vue",
       "localRoute": "/subcontract/daywork",
       "domainCode": "quantity-payroll",
       "template": "工作台",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -3862,12 +4378,77 @@
       "constraints": "C-DENSE"
     },
     {
+      "evidenceRecordId": "E-8CC98402FA16",
+      "page": "app/pages/subcontract/daywork/new.vue",
+      "localRoute": "/subcontract/daywork/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-DAYWORK-LOCAL",
+      "referenceEndpointId": "local-8CC98402FA16",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/daywork/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/daywork/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/daywork/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-70E1FCC120C1",
+      "page": "app/pages/subcontract/daywork/form/[id].vue",
+      "localRoute": "/subcontract/daywork/form/:id",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-DAYWORK-LOCAL",
+      "referenceEndpointId": "local-70E1FCC120C1",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/daywork/form/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/daywork/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/daywork/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
       "evidenceRecordId": "E-A0FBACD602EC",
       "page": "app/pages/subcontract/payroll/[id].vue",
       "localRoute": "/subcontract/payroll/:id",
       "domainCode": "quantity-payroll",
       "template": "详情",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -3896,6 +4477,9 @@
       "domainCode": "quantity-payroll",
       "template": "工作台",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -3924,6 +4508,9 @@
       "domainCode": "quantity-payroll",
       "template": "整页表单",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -3946,12 +4533,325 @@
       "constraints": "C-FORM"
     },
     {
+      "evidenceRecordId": "E-A6A57BA1B6F6",
+      "page": "app/pages/subcontract/payroll/config.vue",
+      "localRoute": "/subcontract/payroll/config",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-A-LOCAL",
+      "referenceEndpointId": "local-A6A57BA1B6F6",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/config",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/config"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/config"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-C0ED476A7DD8",
+      "page": "app/pages/subcontract/payroll/form/[id].vue",
+      "localRoute": "/subcontract/payroll/form/:id",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-A-LOCAL",
+      "referenceEndpointId": "local-C0ED476A7DD8",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/form/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-3C1576C18107",
+      "page": "app/pages/subcontract/payroll/sources.vue",
+      "localRoute": "/subcontract/payroll/sources",
+      "domainCode": "quantity-payroll",
+      "template": "工作台",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-SOURCES-LOCAL",
+      "referenceEndpointId": "local-3C1576C18107",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/sources",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/sources"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/sources"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-34F3A23AC6C4",
+      "page": "app/pages/subcontract/payroll/adjustments/new.vue",
+      "localRoute": "/subcontract/payroll/adjustments/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-34F3A23AC6C4",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/adjustments/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-70A241B634AB",
+      "page": "app/pages/subcontract/payroll/adjustments/form/[id].vue",
+      "localRoute": "/subcontract/payroll/adjustments/form/:id",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-70A241B634AB",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/adjustments/form/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-D76D2351E280",
+      "page": "app/pages/subcontract/payroll/adjustments/[id].vue",
+      "localRoute": "/subcontract/payroll/adjustments/:id",
+      "domainCode": "quantity-payroll",
+      "template": "详情",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-D76D2351E280",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/adjustments/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-9199ABAD01C0",
+      "page": "app/pages/subcontract/payroll/payments/index.vue",
+      "localRoute": "/subcontract/payroll/payments",
+      "domainCode": "quantity-payroll",
+      "template": "工作台",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-9199ABAD01C0",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/payments",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-2D144233027A",
+      "page": "app/pages/subcontract/payroll/payments/new.vue",
+      "localRoute": "/subcontract/payroll/payments/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-2D144233027A",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/payments/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-CF84668FF087",
+      "page": "app/pages/subcontract/payroll/payments/[id].vue",
+      "localRoute": "/subcontract/payroll/payments/:id",
+      "domainCode": "quantity-payroll",
+      "template": "详情",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-CF84668FF087",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/payments/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-410AA14B4D8D",
+      "page": "app/pages/subcontract/payroll/payments/reversal/new.vue",
+      "localRoute": "/subcontract/payroll/payments/reversal/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-410AA14B4D8D",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/payments/reversal/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/reversal/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/reversal/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
       "evidenceRecordId": "E-E86E0A7B7A61",
       "page": "app/pages/subcontract/quantity/[pid]/[uid].vue",
       "localRoute": "/subcontract/quantity/:pid/:uid",
       "domainCode": "quantity-payroll",
       "template": "详情",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -3974,12 +4874,108 @@
       "constraints": "C-DENSE"
     },
     {
+      "evidenceRecordId": "E-75A863A55891",
+      "page": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/new.vue",
+      "localRoute": "/subcontract/quantity/:pid/:uid/hollow/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-QUANTITY-HOLLOW-LOCAL",
+      "referenceEndpointId": "local-75A863A55891",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/quantity/:pid/:uid/hollow/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-6F8382C77961",
+      "page": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/form/[id].vue",
+      "localRoute": "/subcontract/quantity/:pid/:uid/hollow/form/:id",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-QUANTITY-HOLLOW-LOCAL",
+      "referenceEndpointId": "local-6F8382C77961",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/quantity/:pid/:uid/hollow/form/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-326974A20A57",
+      "page": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/[id].vue",
+      "localRoute": "/subcontract/quantity/:pid/:uid/hollow/:id",
+      "domainCode": "quantity-payroll",
+      "template": "详情",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-QUANTITY-HOLLOW-LOCAL",
+      "referenceEndpointId": "local-326974A20A57",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/quantity/:pid/:uid/hollow/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/:pid/:uid/hollow/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
       "evidenceRecordId": "E-015E1904AFBB",
       "page": "app/pages/subcontract/quantity/index.vue",
       "localRoute": "/subcontract/quantity",
       "domainCode": "quantity-payroll",
       "template": "工作台",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -4008,6 +5004,9 @@
       "domainCode": "quantity-payroll",
       "template": "整页表单",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289
@@ -4030,12 +5029,46 @@
       "constraints": "C-FORM"
     },
     {
+      "evidenceRecordId": "E-B8F4C3A6444A",
+      "page": "app/pages/subcontract/quantity/stages.vue",
+      "localRoute": "/subcontract/quantity/stages",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-STAGE-PENDING",
+      "referenceEndpointId": "unverified-B8F4C3A6444A",
+      "referenceEndpointLabel": "目标端点未验证：/subcontract/quantity/stages",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/stages"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/stages"
+      },
+      "constraints": "C-FORM"
+    },
+    {
       "evidenceRecordId": "E-74BBF6F5E748",
       "page": "app/pages/subcontract/quantity/template.vue",
       "localRoute": "/subcontract/quantity/template",
       "domainCode": "quantity-payroll",
       "template": "整页表单",
       "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
         300,
         301,
         289

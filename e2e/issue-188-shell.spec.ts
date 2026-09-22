@@ -9,6 +9,8 @@ const ROUTES_FOR_OVERFLOW = [
   '材料采购合同',
   '发票台账',
   '分供方',
+  '费用报销',
+  '库存盘点',
 ] as const
 
 async function openSidebarRoute(page: Page, label: string) {
@@ -76,12 +78,12 @@ test('Issue #188：导航搜索与页签溢出均可由键盘可达控件操作'
   const sidebarFrame = page.locator('[data-sidebar="sidebar"]').first().locator('..')
   await page.getByRole('button', { name: '收起侧栏' }).click()
   await page.mouse.move(800, 700)
-  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(68)
+  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(48)
   await expect(previous).toHaveCount(0)
   await expect(next).toHaveCount(0)
 
   await page.getByRole('button', { name: '固定侧栏' }).click()
-  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(248)
+  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(208)
   await expect(previous).toBeVisible()
   await expect(next).toBeVisible()
 })

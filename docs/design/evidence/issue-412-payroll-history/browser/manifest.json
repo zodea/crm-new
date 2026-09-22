@@ -1,0 +1,1379 @@
+{
+  "baseline": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
+  "evidence": "一次完整浏览器旅程；五档截图逐张审查另列状态",
+  "total": 85,
+  "provenanceFile": "source-verification.json",
+  "entries": [
+    {
+      "file": "filtered-payroll-list-390.png",
+      "group": "filtered-payroll-list",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "同项目、月份、班组、工资状态和格式的只读台账",
+      "sha256": "c5238fb3f569a4e32c8d225e1574c763f9e41b4e9a7a3ceafbbdaf1bc7f2b6c5",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "filtered-payroll-list-768.png",
+      "group": "filtered-payroll-list",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "同项目、月份、班组、工资状态和格式的只读台账",
+      "sha256": "febed9541b12808c3d8849702bacb936a044f1fc88df2c4fa90821efbd23d67c",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "filtered-payroll-list-1024.png",
+      "group": "filtered-payroll-list",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "同项目、月份、班组、工资状态和格式的只读台账",
+      "sha256": "72adcdffe5cd553e1f1ae724df637d57472831cb4a21cc9bd23f378d24d09e81",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "filtered-payroll-list-1280.png",
+      "group": "filtered-payroll-list",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "同项目、月份、班组、工资状态和格式的只读台账",
+      "sha256": "2fe9dc2b79646ebafcf09f0084ab07c67d3a1be9dd65f89dcb1dffdba89d8ae0",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "filtered-payroll-list-1440.png",
+      "group": "filtered-payroll-list",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "同项目、月份、班组、工资状态和格式的只读台账",
+      "sha256": "1dcf6a39c377b9683dd87b0d354a00e87e8d4f5d53b7f4926fd2ee1b93f7a28c",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "healthy-frozen-detail-390.png",
+      "group": "healthy-frozen-detail",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "完整已发记录：历史姓名与实际金额保持冻结",
+      "sha256": "695deae0ed9b71016bc6452faa19578e3388c0ac9c721338e8647d4ec03e31b7",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "healthy-frozen-detail-768.png",
+      "group": "healthy-frozen-detail",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "完整已发记录：历史姓名与实际金额保持冻结",
+      "sha256": "d2fae900297ea40b202035127d5e28b6f9fc1ffda6ff36bac740f808c10636e1",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "healthy-frozen-detail-1024.png",
+      "group": "healthy-frozen-detail",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "完整已发记录：历史姓名与实际金额保持冻结",
+      "sha256": "cd5b624b5210338e44c9f303d10495b37655cd227e40242303b04f922fc8ebdc",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "healthy-frozen-detail-1280.png",
+      "group": "healthy-frozen-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "完整已发记录：历史姓名与实际金额保持冻结",
+      "sha256": "bddec251f9441d8ca4c86c061e011050da7125a37b38f2092c5006f9e353033f",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "healthy-frozen-detail-1440.png",
+      "group": "healthy-frozen-detail",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "完整已发记录：历史姓名与实际金额保持冻结",
+      "sha256": "4e6d7745ed557c6486bfa232155923e2b13826889280004f3e0fa69d5e3b3c1b",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "complete-snapshot-evidence-390.png",
+      "group": "complete-snapshot-evidence",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "完整发放内容和人工确认规则原文",
+      "sha256": "18e061b2278ef2357d329bd59d5777d756ef4976eaa2d7385189a298349b8ced",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "complete-snapshot-evidence-768.png",
+      "group": "complete-snapshot-evidence",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "完整发放内容和人工确认规则原文",
+      "sha256": "9b20c1b45e1664a78573ab0c41dcbdaeee91f666e7cf6a221e61f17813340ba9",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "complete-snapshot-evidence-1024.png",
+      "group": "complete-snapshot-evidence",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "完整发放内容和人工确认规则原文",
+      "sha256": "0a22f6fdce6cd1285b98f6d2d7720d9cd248e453a24571c5d2d489c399fd771a",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "complete-snapshot-evidence-1280.png",
+      "group": "complete-snapshot-evidence",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "完整发放内容和人工确认规则原文",
+      "sha256": "ec3efdc8ec4474885e2156a64e12e069463e5d20416e043199080233e5c32ac2",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "complete-snapshot-evidence-1440.png",
+      "group": "complete-snapshot-evidence",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "完整发放内容和人工确认规则原文",
+      "sha256": "aca47e15a64a22e571e521f4344161c892cb5198a9bfb74a3fadd1222d075453",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "zero-member-allocation-390.png",
+      "group": "zero-member-allocation",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "真实发放 300 与 0，零金额成员分配保留",
+      "sha256": "7e14d891e052bdb4fa45075d407cebdd6867c0193c795fdeb620c07c608c2c73",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "zero-member-allocation-768.png",
+      "group": "zero-member-allocation",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "真实发放 300 与 0，零金额成员分配保留",
+      "sha256": "0875f0d7226fc0f80f17f47948e96d85a735c3fe093c8b7fb12cec5ad0380041",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "zero-member-allocation-1024.png",
+      "group": "zero-member-allocation",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "真实发放 300 与 0，零金额成员分配保留",
+      "sha256": "9dd91dfcb4dd0a16525336dbc7f3e9618b667fcf18108d16d009bdaa97814cba",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "zero-member-allocation-1280.png",
+      "group": "zero-member-allocation",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "真实发放 300 与 0，零金额成员分配保留",
+      "sha256": "f72a6893852305bac2e5904b23f9354acec2ce3f1722a6bbae05fad5ef05e0ba",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "zero-member-allocation-1440.png",
+      "group": "zero-member-allocation",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "真实发放 300 与 0，零金额成员分配保留",
+      "sha256": "77c6c4b387aaf2f558b185bece3dd9f57e46116ab951c58346e7c954964d2e46",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "frozen-month-occupation-390.png",
+      "group": "frozen-month-occupation",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "月份与签工占用，真实表内向右滚动查看稳定关联",
+      "sha256": "99cf2965fcf3edc27fb8b25bb2f63f33f1443500a2d071f3b9164e782132def0",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "frozen-month-occupation-768.png",
+      "group": "frozen-month-occupation",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "月份与签工占用，真实表内向右滚动查看稳定关联",
+      "sha256": "eca593a69e8f9461e407af5683924776144dc78ea163837feb26bc78c7cca599",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "frozen-month-occupation-1024.png",
+      "group": "frozen-month-occupation",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "月份与签工占用，真实表内向右滚动查看稳定关联",
+      "sha256": "c893f804baa513513f6a7c41e1552dede2ac5800e7e91b3348114a7fb9b221e2",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "frozen-month-occupation-1280.png",
+      "group": "frozen-month-occupation",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "月份与签工占用，真实表内向右滚动查看稳定关联",
+      "sha256": "a2612c82dbb0ec46369cdd240f6b0685d46fac84d49bdea7c77de9c62dd08420",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "frozen-month-occupation-1440.png",
+      "group": "frozen-month-occupation",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "月份与签工占用，真实表内向右滚动查看稳定关联",
+      "sha256": "8bc278fce7653295a003d27ec2075fb8cf363f8a7f44cdb58fae6347f494ec4a",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "independent-source-configuration-390.png",
+      "group": "independent-source-configuration",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "没有工资单的项目仍可查询工资配置",
+      "sha256": "ac0eb62ec15c0bb757187ba1c229749c40a949593232ffd7ed76d416f9ae0064",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "independent-source-configuration-768.png",
+      "group": "independent-source-configuration",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "没有工资单的项目仍可查询工资配置",
+      "sha256": "130d4c4af88f354b76e7a533fe303c98e661c50d058f8ce289b0a59e66c36198",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "independent-source-configuration-1024.png",
+      "group": "independent-source-configuration",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "没有工资单的项目仍可查询工资配置",
+      "sha256": "fd92259e3a8a404ec68442a8dfac98f1844a208ce9906305f92718b24b2510d2",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "independent-source-configuration-1280.png",
+      "group": "independent-source-configuration",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "没有工资单的项目仍可查询工资配置",
+      "sha256": "646ab9e91cac3e3c96dfd9e56377311c97d1d085bc235eec56ebe6e68b5fe34e",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "independent-source-configuration-1440.png",
+      "group": "independent-source-configuration",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "没有工资单的项目仍可查询工资配置",
+      "sha256": "f1896686670540ab67d52a2134852b18d8201b2f4b3aa10a1aadf548a7f7ca98",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "backend",
+        "status": "passed",
+        "method": "A逐张 view_image 检查原图；5组25张0发现"
+      }
+    },
+    {
+      "file": "independent-attendance-zero-390.png",
+      "group": "independent-attendance-zero",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "独立考勤记录保留真实零工时",
+      "sha256": "24c38a4e8cc3aac40c19f2286c8103c921982afb835cf3e961b11a1d57d07018",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-attendance-zero-768.png",
+      "group": "independent-attendance-zero",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "独立考勤记录保留真实零工时",
+      "sha256": "d81063efd729af7713940f24bdcb80234e1757899ff5903a56963e1978000331",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-attendance-zero-1024.png",
+      "group": "independent-attendance-zero",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "独立考勤记录保留真实零工时",
+      "sha256": "c85f8fdf5587cfa54837a0ce86770eab643fa64e8918f53f9d43e2cf184f868c",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-attendance-zero-1280.png",
+      "group": "independent-attendance-zero",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "独立考勤记录保留真实零工时",
+      "sha256": "13610c4468a6de55ccbbe623852c632021e39de0ba49c8ec9acdcf2b1ef0c54a",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-attendance-zero-1440.png",
+      "group": "independent-attendance-zero",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "独立考勤记录保留真实零工时",
+      "sha256": "499fc8e6236859b3c6eae89b7768a2406f7c1f336470ad1163d680039fa5d531",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-daywork-draft-390.png",
+      "group": "independent-daywork-draft",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "未领用签工与独立确认状态，真实表内右滚",
+      "sha256": "439be9c9317ad41e0558eb3deecb8a963eaeecb871337c595fdb040391e6f5c2",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-daywork-draft-768.png",
+      "group": "independent-daywork-draft",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "未领用签工与独立确认状态，真实表内右滚",
+      "sha256": "8cf91d64acdf13746eec27b6c5d3b90bd160edf09ea547eeee3a55ff52223241",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-daywork-draft-1024.png",
+      "group": "independent-daywork-draft",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "未领用签工与独立确认状态，真实表内右滚",
+      "sha256": "dfa7273dcd821b96815e8edec14fa86605e8fe7f9a5764ee95a9194568d11f1d",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-daywork-draft-1280.png",
+      "group": "independent-daywork-draft",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "未领用签工与独立确认状态，真实表内右滚",
+      "sha256": "74c305827f18bf160fbb789d9203b0ff84d37617bb0a7895990172d9a1103449",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "independent-daywork-draft-1440.png",
+      "group": "independent-daywork-draft",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "未领用签工与独立确认状态，真实表内右滚",
+      "sha256": "072746b054d80203970cc874492a8d3e6e8eaf842dab12177bcf76e04e088f62",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "partial-snapshot-390.png",
+      "group": "partial-snapshot",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "部分历史快照保留缺项并说明来源不足",
+      "sha256": "3db9fb579297b96a12024be23765b0b45481f05881def0ad25c177be27e24773",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "partial-snapshot-768.png",
+      "group": "partial-snapshot",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "部分历史快照保留缺项并说明来源不足",
+      "sha256": "8ce1b1032eb2d9ca2db278fd494f2af114ff0a017b736ca5d97158bcc8aa3024",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "partial-snapshot-1024.png",
+      "group": "partial-snapshot",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "部分历史快照保留缺项并说明来源不足",
+      "sha256": "59364afe32f7b187e1ac5150897b31fcf3643a6cf678252b08a3a407dd56620e",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "partial-snapshot-1280.png",
+      "group": "partial-snapshot",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "部分历史快照保留缺项并说明来源不足",
+      "sha256": "6d38e6785959905cec0e03fd280901b60efb6781adfd70a2342ee9b6a0e4b688",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "partial-snapshot-1440.png",
+      "group": "partial-snapshot",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "部分历史快照保留缺项并说明来源不足",
+      "sha256": "f28abbfa1ed7d23beb58d73e2109336fb56173f4ed38a5f45d564509c9ba3bc5",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "retired-b-history-390.png",
+      "group": "retired-b-history",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "退役 B 已发历史只读，原值不产生新发放结果",
+      "sha256": "222308ca16cd272b3208d22cfc9ffc0ef0d2173a61a4fa9d7447379e3788ba71",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "retired-b-history-768.png",
+      "group": "retired-b-history",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "退役 B 已发历史只读，原值不产生新发放结果",
+      "sha256": "85b2d9aa4e24076f441d734388a374c80874b56301253474925f24baa7620a9b",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "retired-b-history-1024.png",
+      "group": "retired-b-history",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "退役 B 已发历史只读，原值不产生新发放结果",
+      "sha256": "3e3a3f3c99f1dc2695a20867448d036927fef0c5d9853e389492ad1aace7c998",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "retired-b-history-1280.png",
+      "group": "retired-b-history",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "退役 B 已发历史只读，原值不产生新发放结果",
+      "sha256": "78776235bd55174866af75b442846d823c5090d63cf3124960b49043ef0bbad9",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "retired-b-history-1440.png",
+      "group": "retired-b-history",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "退役 B 已发历史只读，原值不产生新发放结果",
+      "sha256": "27b3cdd7ff1f05d914f388e1bf24f51d22a1c8a5fac7d27f1247203731b3c3d5",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "invalid-snapshot-390.png",
+      "group": "invalid-snapshot",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "损坏发放原文明确显示，缺失金额不填零",
+      "sha256": "48baa40a3acc4f9b19e065816a0c8118da83007066afc089a3bb8f8eb4347a7f",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "invalid-snapshot-768.png",
+      "group": "invalid-snapshot",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "损坏发放原文明确显示，缺失金额不填零",
+      "sha256": "3d20308365a6fc50f9db4998b7e42bc360c653acedcf63bd32a5bed5f830fd89",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "invalid-snapshot-1024.png",
+      "group": "invalid-snapshot",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "损坏发放原文明确显示，缺失金额不填零",
+      "sha256": "97c378cb66b1b3d91021dac44c21f41beb057f79f526ce7ab55193ed84a0db04",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "invalid-snapshot-1280.png",
+      "group": "invalid-snapshot",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "损坏发放原文明确显示，缺失金额不填零",
+      "sha256": "ffef08aad30e06b2304ce00a5f1bf7cd28eff96b64a317ac9c8ded19fcf1d4f9",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "invalid-snapshot-1440.png",
+      "group": "invalid-snapshot",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "损坏发放原文明确显示，缺失金额不填零",
+      "sha256": "596c63b18e79980e508af77b154145b02291e6d820dd15fb8ec6826d8ca3d58e",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "standards",
+        "status": "passed",
+        "method": "B逐张 view_image 检查原图；5组25张0发现，折叠原文仅核其入口可达"
+      }
+    },
+    {
+      "file": "missing-snapshot-390.png",
+      "group": "missing-snapshot",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "缺少发放原文时实际发放保持未记录",
+      "sha256": "1b5c26374f72f04c6bc518d3bfbc09249a11d41e1f97a7a80dcc4916e9802696",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-768.png",
+      "group": "missing-snapshot",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "缺少发放原文时实际发放保持未记录",
+      "sha256": "916b0ce50b60c33cf110c0d95c3eb7068c5c6d0ba487d006b3b3443a7976233a",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-1024.png",
+      "group": "missing-snapshot",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "缺少发放原文时实际发放保持未记录",
+      "sha256": "c7e2bfaa559eb51822909d46866f66571104391799932e341d1767ef1feb9b13",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-1280.png",
+      "group": "missing-snapshot",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "缺少发放原文时实际发放保持未记录",
+      "sha256": "1891de52786132328b2a3669bacdcbc6982e4a8e699ad61d2868bcc73e4ff999",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-1440.png",
+      "group": "missing-snapshot",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "缺少发放原文时实际发放保持未记录",
+      "sha256": "ad18dceb9113009060406a3799efbec598f62c5e752eb56e9cf8422d1ccbb1b4",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-original-head-390.png",
+      "group": "missing-snapshot-original-head",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "原表中文金额与历史原文可核对，原表 100 不补作冻结实发",
+      "sha256": "48d384f45fe04af1fcc81436f280d10538c3d2bc8b0705efb511b0686b2a8e68",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-original-head-768.png",
+      "group": "missing-snapshot-original-head",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "原表中文金额与历史原文可核对，原表 100 不补作冻结实发",
+      "sha256": "9b5ffb37270753c708ffe95ecf94365a7e3c8c854481168cfc1c7e71b945c8aa",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-original-head-1024.png",
+      "group": "missing-snapshot-original-head",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "原表中文金额与历史原文可核对，原表 100 不补作冻结实发",
+      "sha256": "7e1c18ffbe929e2bb393763c2d7de38fadd2d6c13a4bd2b9e413eb0cb5ed6ffc",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-original-head-1280.png",
+      "group": "missing-snapshot-original-head",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "原表中文金额与历史原文可核对，原表 100 不补作冻结实发",
+      "sha256": "90a199bc76503e7236550c44dc3f3099cdff6c68144329f601541092ff225a67",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-snapshot-original-head-1440.png",
+      "group": "missing-snapshot-original-head",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "原表中文金额与历史原文可核对，原表 100 不补作冻结实发",
+      "sha256": "14260e51ca21d114273d1379a236755cc3d97d239b904cb1dd79652fcde79642",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "isolated-original-records-390.png",
+      "group": "isolated-original-records",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "迁入原始记录按工资头及原身份查看",
+      "sha256": "ad71826f9c1adae1db43145e335792ec18d2cd01fba0dcb79bd04f43d17651a1",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "isolated-original-records-768.png",
+      "group": "isolated-original-records",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "迁入原始记录按工资头及原身份查看",
+      "sha256": "1e426bebb1b8498982cb4f1b175ef104b013a0fdc78dfc447fb1e6178cb296ee",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "isolated-original-records-1024.png",
+      "group": "isolated-original-records",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "迁入原始记录按工资头及原身份查看",
+      "sha256": "0f563b167b6e855f90749583da101df95e2c5a9f409058c38e13af6ad1321585",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "isolated-original-records-1280.png",
+      "group": "isolated-original-records",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "迁入原始记录按工资头及原身份查看",
+      "sha256": "d40e0fef1687a359d143c80eb52e30f97e13be2f3f6c942e2a18e8052b599e91",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "isolated-original-records-1440.png",
+      "group": "isolated-original-records",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "迁入原始记录按工资头及原身份查看",
+      "sha256": "250e1cbda15147289041dfa3890c55a7c6a313bc01acbc2d629a07a1ec4948e4",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "missing-record-no-fallback-390.png",
+      "group": "missing-record-no-fallback",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "失效工资身份明确失败，不改读另一条记录",
+      "sha256": "4bd98477d558160d1f847a324ee33e9ca43b97e0e84942e5b0e3f9d0135306f6",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "missing-record-no-fallback-768.png",
+      "group": "missing-record-no-fallback",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "失效工资身份明确失败，不改读另一条记录",
+      "sha256": "c19f56fd7e96cc9800072040a4544254f3164427c1be8e4da20fa4443341b6e6",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "missing-record-no-fallback-1024.png",
+      "group": "missing-record-no-fallback",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "失效工资身份明确失败，不改读另一条记录",
+      "sha256": "eeeedeea0b35a46df2e67194d3e743289e445e2eafcdd215d73f1d6a1c97aefa",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "missing-record-no-fallback-1280.png",
+      "group": "missing-record-no-fallback",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "失效工资身份明确失败，不改读另一条记录",
+      "sha256": "ab94eb2210e614b649ed19bf2070b0bc869d85241e783b2f88657796bd63f8da",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "missing-record-no-fallback-1440.png",
+      "group": "missing-record-no-fallback",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "失效工资身份明确失败，不改读另一条记录",
+      "sha256": "a92b7d583490acd51804231ffc9da53eaf916d136ae5f766eddbeff04da3ed7a",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "demo-origin-rejected-390.png",
+      "group": "demo-origin-rejected",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "演示来源授权或身份不匹配明确拒绝",
+      "sha256": "68b1ee99fc992854419183bcfc369501fb00c392adc02d4ba1e532188eaff8da",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "demo-origin-rejected-768.png",
+      "group": "demo-origin-rejected",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "演示来源授权或身份不匹配明确拒绝",
+      "sha256": "71943c6937ef282de5f3025a980498e10b423a08aaa9df828fbd75b3eeef9045",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "demo-origin-rejected-1024.png",
+      "group": "demo-origin-rejected",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "演示来源授权或身份不匹配明确拒绝",
+      "sha256": "f7b60f270b28c7a3d2a6cf383d8d4c65b2b70467abccf5592e96caf8f889a956",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "demo-origin-rejected-1280.png",
+      "group": "demo-origin-rejected",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "演示来源授权或身份不匹配明确拒绝",
+      "sha256": "34da13d603f53c4f99e5af6790b8651ee5cece76376dc90d7ef6c4cdb13f5f89",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "demo-origin-rejected-1440.png",
+      "group": "demo-origin-rejected",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "演示来源授权或身份不匹配明确拒绝",
+      "sha256": "1dc90366f6e5fcf39023e3f932363015c58b3d3723c3bb91233979d84e1544ed",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "ui",
+        "status": "passed",
+        "method": "逐张 view_image 检查原图"
+      }
+    },
+    {
+      "file": "new-route-readonly-guard-390.png",
+      "group": "new-route-readonly-guard",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "caption": "新建深链整页说明未开放，无本地写表单",
+      "sha256": "034819ffde96cc9b1428834a23bdcdaf4cd64e2f44991bf86a0e97ede7933f42",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "new-route-readonly-guard-768.png",
+      "group": "new-route-readonly-guard",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "caption": "新建深链整页说明未开放，无本地写表单",
+      "sha256": "b3edfe60872e9fb7a1278364654a8f3e20990e4f8841ff3fd07312daeed9b82b",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "new-route-readonly-guard-1024.png",
+      "group": "new-route-readonly-guard",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "caption": "新建深链整页说明未开放，无本地写表单",
+      "sha256": "c685485358a523fd38287f55f41a97905535560e9fad5b0caf78f10b66f2e50e",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "new-route-readonly-guard-1280.png",
+      "group": "new-route-readonly-guard",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "caption": "新建深链整页说明未开放，无本地写表单",
+      "sha256": "14b4c46036a23766d04366325ecb0850bbed692f707db399ccaf7403d86b0aa1",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    },
+    {
+      "file": "new-route-readonly-guard-1440.png",
+      "group": "new-route-readonly-guard",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "caption": "新建深链整页说明未开放，无本地写表单",
+      "sha256": "0b9430885fc2e56b4f570fe1156e2fc0f18fb1b6d0609535aec667bf10d74456",
+      "sourceRunId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+      "review": {
+        "reviewer": "root",
+        "status": "passed",
+        "method": "Root逐张 view_image 检查原图；3组15张0发现"
+      }
+    }
+  ],
+  "visualReview": {
+    "status": "passed",
+    "total": 85,
+    "findings": 0,
+    "root": 15,
+    "backend": 25,
+    "standards": 25,
+    "ui": 20,
+    "method": "逐张查看正式PNG原图，非拼图/缩略图替代",
+    "hashesRechecked": true
+  }
+}

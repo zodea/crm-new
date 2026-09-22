@@ -1,0 +1,406 @@
+{
+  "context": {
+    "workspaceId": "workspace-default",
+    "actorId": "actor-default",
+    "capabilities": [
+      "payroll:read",
+      "payroll:write",
+      "target-cost:read",
+      "target-cost:write",
+      "schedule:read",
+      "schedule:write",
+      "process-library:read",
+      "process-library:write",
+      "quantity:read",
+      "quantity:write",
+      "delivery:read",
+      "delivery:write",
+      "receipt:read",
+      "receipt:write",
+      "other-settlement:read",
+      "other-settlement:write",
+      "auxiliary-contract:read",
+      "auxiliary-contract:write",
+      "project:list:read",
+      "project:write",
+      "customer:list:read",
+      "customer:write",
+      "supplier:list:read",
+      "supplier:write",
+      "supplier-credential:read",
+      "supplier-credential:write",
+      "subcontract-contract:read",
+      "subcontract-contract:write",
+      "construction-contract:read",
+      "construction-contract:write",
+      "owner-document:read",
+      "owner-document:write",
+      "subcontract-document:read",
+      "subcontract-document:write",
+      "material-contract:read",
+      "material-contract:write",
+      "project-supplier:read",
+      "project-supplier:write",
+      "crew:list:read",
+      "crew:write",
+      "worker:list:read",
+      "worker:write",
+      "demo:read",
+      "core:migration:write"
+    ],
+    "readonly": false,
+    "origin": "real",
+    "sourceVersion": "payroll:1+identities:be8f39e21f7167b26e2ad804637c73c098ce0fbe16b7efd8f2175475d7bc8a4d+fees:eada2a822b08139073733caf794b9594fcd672e00530a716dc431145c36e9393"
+  },
+  "scope": {
+    "projectId": "core-projects-148635c5b48a67db3e23f515",
+    "month": "2026-07",
+    "crewId": "core-crews-d5cc6c63a29716ceb701fcd0",
+    "leaderWorkerId": "core-workers-088caa0e12cae44cb51fb866",
+    "book": {
+      "bookPurpose": "ordinary",
+      "managementBookId": null
+    }
+  },
+  "baseVersion": "payroll:1+identities:be8f39e21f7167b26e2ad804637c73c098ce0fbe16b7efd8f2175475d7bc8a4d+fees:eada2a822b08139073733caf794b9594fcd672e00530a716dc431145c36e9393",
+  "options": {
+    "projects": [
+      {
+        "id": "core-projects-db3c8f8503200958e1d5608a",
+        "name": "P5 独立管理工程 1b575624-4126-471c-bea1-7babfd99fec6",
+        "code": ""
+      },
+      {
+        "id": "core-projects-148635c5b48a67db3e23f515",
+        "name": "P5 补贴核对工程 1b575624-4126-471c-bea1-7babfd99fec6",
+        "code": ""
+      }
+    ],
+    "crews": [
+      {
+        "id": "core-crews-d5cc6c63a29716ceb701fcd0",
+        "name": "费用核对班组",
+        "eligible": true,
+        "reasons": []
+      }
+    ],
+    "workers": [
+      {
+        "id": "core-workers-d64b89ebc42511c05bae9a31",
+        "name": "同人普通工资与管理人",
+        "crewId": "core-crews-d5cc6c63a29716ceb701fcd0",
+        "eligible": true,
+        "reasons": [],
+        "source": {
+          "kind": "entity-detail",
+          "subject": {
+            "state": "resolved",
+            "entity": "worker",
+            "id": "core-workers-d64b89ebc42511c05bae9a31",
+            "label": "同人普通工资与管理人",
+            "no": null
+          },
+          "variant": "detail",
+          "view": null,
+          "filters": {
+            "projectId": "core-projects-148635c5b48a67db3e23f515",
+            "dataOrigin": "real"
+          }
+        }
+      },
+      {
+        "id": "core-workers-679fe4aaed0a91ca1a003882",
+        "name": "零收款成员",
+        "crewId": "core-crews-d5cc6c63a29716ceb701fcd0",
+        "eligible": true,
+        "reasons": [],
+        "source": {
+          "kind": "entity-detail",
+          "subject": {
+            "state": "resolved",
+            "entity": "worker",
+            "id": "core-workers-679fe4aaed0a91ca1a003882",
+            "label": "零收款成员",
+            "no": null
+          },
+          "variant": "detail",
+          "view": null,
+          "filters": {
+            "projectId": "core-projects-148635c5b48a67db3e23f515",
+            "dataOrigin": "real"
+          }
+        }
+      },
+      {
+        "id": "core-workers-088caa0e12cae44cb51fb866",
+        "name": "同人普通工资与管理人",
+        "crewId": "core-crews-d5cc6c63a29716ceb701fcd0",
+        "eligible": true,
+        "reasons": [],
+        "source": {
+          "kind": "entity-detail",
+          "subject": {
+            "state": "resolved",
+            "entity": "worker",
+            "id": "core-workers-088caa0e12cae44cb51fb866",
+            "label": "同人普通工资与管理人",
+            "no": null
+          },
+          "variant": "detail",
+          "view": null,
+          "filters": {
+            "projectId": "core-projects-148635c5b48a67db3e23f515",
+            "dataOrigin": "real"
+          }
+        }
+      },
+      {
+        "id": "core-workers-aa9d71e1580ac1e676e2c569",
+        "name": "零收款成员",
+        "crewId": "core-crews-d5cc6c63a29716ceb701fcd0",
+        "eligible": true,
+        "reasons": [],
+        "source": {
+          "kind": "entity-detail",
+          "subject": {
+            "state": "resolved",
+            "entity": "worker",
+            "id": "core-workers-aa9d71e1580ac1e676e2c569",
+            "label": "零收款成员",
+            "no": null
+          },
+          "variant": "detail",
+          "view": null,
+          "filters": {
+            "projectId": "core-projects-148635c5b48a67db3e23f515",
+            "dataOrigin": "real"
+          }
+        }
+      }
+    ]
+  },
+  "crewDefaults": {
+    "crewId": "core-crews-d5cc6c63a29716ceb701fcd0",
+    "rentEnabled": {
+      "state": "value",
+      "value": false
+    },
+    "rentUnitPrice": {
+      "state": "value",
+      "value": 0
+    },
+    "managementEnabled": {
+      "state": "value",
+      "value": false
+    },
+    "managementUnitPrice": {
+      "state": "null",
+      "value": null
+    },
+    "sourceVersion": "3b5b03403f45d3c3eee33a8ee208e57cfdafd14d367796df989f647392aa81a7"
+  },
+  "fees": [],
+  "managementBooks": [],
+  "cellOptions": [
+    {
+      "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+      "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room",
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-floor",
+      "locationLabel": "一栋 / 一层 / 101 / 客厅及浴室 / 地砖"
+    },
+    {
+      "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+      "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room-%E4%B8%89",
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall",
+      "locationLabel": "一栋 / 一层 / 101 / 墙砖部位三 / 墙砖"
+    },
+    {
+      "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+      "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room-%E4%BA%8C",
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall",
+      "locationLabel": "一栋 / 一层 / 101 / 墙砖部位二 / 墙砖"
+    },
+    {
+      "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+      "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room-%E5%9B%9B",
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall",
+      "locationLabel": "一栋 / 一层 / 101 / 墙砖部位四 / 墙砖"
+    },
+    {
+      "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+      "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room",
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-shower",
+      "locationLabel": "一栋 / 一层 / 101 / 客厅及浴室 / 淋浴板"
+    },
+    {
+      "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+      "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room",
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall",
+      "locationLabel": "一栋 / 一层 / 101 / 客厅及浴室 / 墙砖"
+    },
+    {
+      "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+      "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room",
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-zero",
+      "locationLabel": "一栋 / 一层 / 101 / 客厅及浴室 / 真实零量墙砖"
+    }
+  ],
+  "items": [
+    {
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-floor",
+      "itemName": "地砖",
+      "unit": "㎡",
+      "housingClassification": {
+        "state": "missing"
+      },
+      "sourceVersion": "payroll-management-scope:99d3896e105554957338ad73b0d52158cabe0c660699668aedad80d5e0c45263",
+      "scopes": [
+        {
+          "kind": "project"
+        }
+      ]
+    },
+    {
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-shower",
+      "itemName": "淋浴板",
+      "unit": "套",
+      "housingClassification": {
+        "state": "missing"
+      },
+      "sourceVersion": "payroll-management-scope:99d3896e105554957338ad73b0d52158cabe0c660699668aedad80d5e0c45263",
+      "scopes": [
+        {
+          "kind": "project"
+        }
+      ]
+    },
+    {
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall",
+      "itemName": "墙砖",
+      "unit": "㎡",
+      "housingClassification": {
+        "state": "missing"
+      },
+      "sourceVersion": "payroll-management-scope:99d3896e105554957338ad73b0d52158cabe0c660699668aedad80d5e0c45263",
+      "scopes": [
+        {
+          "kind": "project"
+        }
+      ]
+    },
+    {
+      "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-zero",
+      "itemName": "真实零量墙砖",
+      "unit": "㎡",
+      "housingClassification": {
+        "state": "missing"
+      },
+      "sourceVersion": "payroll-management-scope:99d3896e105554957338ad73b0d52158cabe0c660699668aedad80d5e0c45263",
+      "scopes": [
+        {
+          "kind": "project"
+        }
+      ]
+    }
+  ],
+  "responsibilityOptions": [
+    {
+      "assignmentId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:unit_assignments:fee-ordinary-assignment",
+      "workerId": "core-workers-088caa0e12cae44cb51fb866",
+      "crewId": null,
+      "scopeIds": [
+        "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:unit_assignment_scopes:fee-ordinary-floor-scope",
+        "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:unit_assignment_scopes:fee-ordinary-room-%E4%B8%89-scope",
+        "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:unit_assignment_scopes:fee-ordinary-room-%E4%BA%8C-scope",
+        "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:unit_assignment_scopes:fee-ordinary-room-%E5%9B%9B-scope",
+        "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:unit_assignment_scopes:fee-ordinary-shower-scope",
+        "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:unit_assignment_scopes:fee-ordinary-wall-scope",
+        "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:unit_assignment_scopes:fee-ordinary-zero-scope"
+      ],
+      "cells": [
+        {
+          "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+          "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room",
+          "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-floor"
+        },
+        {
+          "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+          "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room-%E4%B8%89",
+          "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall"
+        },
+        {
+          "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+          "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room-%E4%BA%8C",
+          "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall"
+        },
+        {
+          "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+          "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room-%E5%9B%9B",
+          "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall"
+        },
+        {
+          "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+          "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room",
+          "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-shower"
+        },
+        {
+          "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+          "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room",
+          "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-wall"
+        },
+        {
+          "unitId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+          "roomId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:fee-ordinary-room",
+          "itemId": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:fee-ordinary-zero"
+        }
+      ],
+      "label": "一栋 / 一层 / 101 / 同人普通工资与管理人",
+      "eligible": true,
+      "reasons": [],
+      "sources": [
+        {
+          "kind": "entity-detail",
+          "subject": {
+            "state": "resolved",
+            "entity": "quantity-unit",
+            "id": "core-quantity_projects-f0ee60ca6ba460c3cc78ad09:units:fee-ordinary-unit",
+            "label": "一栋 / 一层 / 101 / 同人普通工资与管理人",
+            "no": null
+          },
+          "variant": "detail",
+          "view": null,
+          "filters": {
+            "projectId": "core-projects-148635c5b48a67db3e23f515",
+            "dataOrigin": "real"
+          }
+        },
+        {
+          "kind": "entity-detail",
+          "subject": {
+            "state": "resolved",
+            "entity": "worker",
+            "id": "core-workers-088caa0e12cae44cb51fb866",
+            "label": "同人普通工资与管理人",
+            "no": null
+          },
+          "variant": "detail",
+          "view": null,
+          "filters": {
+            "projectId": "core-projects-148635c5b48a67db3e23f515",
+            "dataOrigin": "real"
+          }
+        }
+      ]
+    }
+  ],
+  "blockers": [],
+  "readonlyReasons": [],
+  "eligibility": {
+    "canSaveFees": true,
+    "canSaveManagementBook": true,
+    "canStartManagementDraft": true,
+    "feeReasons": [],
+    "managementReasons": []
+  },
+  "history": []
+}

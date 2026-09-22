@@ -67,9 +67,10 @@ const global = {
 }
 
 describe('list shell', () => {
-  it('把分类树和视图作为受控值向页面回传，并保留工具栏与表格插槽', async () => {
+  it.each([false, true])('连续工作面=%s 时保留分类、视图、工具栏和表格交互', async (continuous) => {
     const { emitted } = render(ListShell, {
       props: {
+        continuous,
         tree: [
           { key: 'all', label: '全部合同' },
           { key: 'active', label: '履约中' },
@@ -96,6 +97,27 @@ describe('list shell', () => {
 
     expect(emitted()['update:treeKey']).toEqual([['active']])
     expect(emitted()['update:viewKey']).toEqual([['mine']])
+  })
+
+  it('连续工作面承接紧凑标题、操作、次行筛选和独立业务汇总', () => {
+    const { container } = render(ListShell, {
+      props: { continuous: true },
+      slots: {
+        heading: '<h1>施工合同</h1>',
+        actions: '<button type="button">新建施工合同</button>',
+        filters: '<input aria-label="筛选项目" />',
+        table: '<div role="table" aria-label="合同列表">表格</div>',
+        summary: '<span>筛选后金额合计 ¥100.00</span>',
+      },
+      global,
+    })
+
+    const toolbar = container.querySelector('[data-list-shell-toolbar]')!
+    expect(toolbar.contains(screen.getByRole('heading', { name: '施工合同' }))).toBe(true)
+    expect(toolbar.contains(screen.getByRole('button', { name: '新建施工合同' }))).toBe(true)
+    expect(container.querySelector('[data-list-shell-filters]')?.contains(screen.getByRole('textbox', { name: '筛选项目' }))).toBe(true)
+    expect(screen.getByRole('status', { name: '列表汇总' }).textContent).toContain('¥100.00')
+    expect(screen.getByRole('table', { name: '合同列表' })).toBeTruthy()
   })
 
   it('按红圈句式格式化汇总值，并允许自定义汇总覆盖默认呈现', () => {

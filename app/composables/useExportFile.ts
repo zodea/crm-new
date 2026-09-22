@@ -36,7 +36,7 @@ export function useExportFile(
       pickDirectory: pickExportDirectory,
       feedback: {
         async during(task) {
-          const id = toast.loading('正在写入导出文件…')
+          const id = toast.loading(typeof fileOptions.data === 'function' ? '正在准备并保存文件…' : '正在写入导出文件…')
           try {
             const result = await task()
             toast.dismiss(id)

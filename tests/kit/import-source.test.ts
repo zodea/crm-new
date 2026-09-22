@@ -134,7 +134,41 @@ describe('导入源解析：原始表头 + 行', () => {
     expect(sheet.rows).toEqual([{ 名称: '华东建材', 类别: '材料' }])
   })
 
+  it('csv 保留原始日期、前导零编码和精度，不自动转成本地显示格式', async () => {
+    const csv = new TextEncoder().encode('完成日期,户编码,数量\n2026-09-11,00101,0.0000001\n')
+    const sheet = await parseSheetForMapping(csv.buffer as ArrayBuffer)
+    expect(sheet.rows).toEqual([{ 完成日期: '2026-09-11', 户编码: '00101', 数量: '0.0000001' }])
+  })
+
+  it('gbk 回退也保留日期字面值，XLSX 仍采用真实单元格格式', async () => {
+    const prefix = new Uint8Array([0xC3, 0xFB, 0xB3, 0xC6, 0x2C]) // 「名称,」
+    const suffix = new TextEncoder().encode('date\nA,2026-09-11\n')
+    const bytes = new Uint8Array(prefix.length + suffix.length)
+    bytes.set(prefix)
+    bytes.set(suffix, prefix.length)
+    expect((await parseSheetForMapping(bytes.buffer)).rows).toEqual([{ 名称: 'A', date: '2026-09-11' }])
+    const workbook = XLSX.utils.book_new()
+    const worksheet = XLSX.utils.aoa_to_sheet([['日期', '编码'], [new Date(Date.UTC(2026, 8, 11)), 101]])
+    worksheet.A2!.z = 'yyyy-mm-dd'
+    worksheet.B2!.z = '00000'
+    XLSX.utils.book_append_sheet(workbook, worksheet, '数据')
+    const sheet = await parseSheetForMapping(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer)
+    expect(sheet.rows).toEqual([{ 日期: '2026-09-11', 编码: '00101' }])
+  })
+
   it('没有表头的空表报可读错误', async () => {
     await expect(parseSheetForMapping(workbookBuffer([]))).rejects.toThrow('表头')
+  })
+
+  it('工作簿允许空白辅助 Sheet，所选数据表保留文件摘要与原始空行后的行号', async () => {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([]), '空白预留')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([[], ['项目名称', '客户', '项目经理'], [], ['项目423', '客户423', '经理423']]), '项目')
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+    const parsed = await parseWorkbookForMapping(buffer)
+    expect(parsed.sheets[0]?.columns).toEqual([])
+    expect(parsed.sheets[1]).toMatchObject({ headerRow: 1, rowNumbers: [4], rows: [{ 项目名称: '项目423', 客户: '客户423', 项目经理: '经理423' }] })
+    expect(parsed.sheets[1]?.sourceHash).toMatch(/^[a-f0-9]{64}$/)
+    expect((await parseWorkbookForMapping(buffer)).sheets[1]?.sourceHash).toBe(parsed.sheets[1]?.sourceHash)
   })
 })

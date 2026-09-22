@@ -85,9 +85,12 @@ export type ExportStepperEvent
     | { type: 'retry' }
 
 export interface ExportFileOptions {
-  data: ExportData
+  /** 惰性正文在用户选定保存位置后读取，保留浏览器目录选择需要的用户激活。 */
+  data: ExportData | (() => Promise<ExportData>)
   defaultName: string
   mimeType?: string
+  /** Stops stale source exports before disk writing begins; it cannot undo an in-flight native write. */
+  signal?: AbortSignal
 }
 
 export interface ExportDirectoryTarget {
@@ -350,22 +353,43 @@ export async function exportFile(
   options: ExportFileOptions,
   environment: ExportEnvironment,
 ): Promise<ExportFileResult> {
+  if (options.signal?.aborted)
+    return { status: 'cancelled' }
   let target: ExportDirectoryTarget | null
   try {
     target = await environment.pickDirectory()
   }
   catch (error) {
+    if (options.signal?.aborted)
+      return { status: 'cancelled' }
     environment.feedback.failure(error)
     throw error
   }
 
-  if (!target)
+  if (!target || options.signal?.aborted)
     return { status: 'cancelled' }
 
-  await environment.feedback.during(
-    () => target.writeFile(options.defaultName, exportDataToBytes(options.data), options.mimeType),
-  )
-  environment.feedback.success(`已导出到 ${target.displayPath} 文件夹`)
+  const written = await environment.feedback.during(async () => {
+    if (options.signal?.aborted)
+      return false
+    let data: ExportData
+    try {
+      data = typeof options.data === 'function' ? await options.data() : options.data
+    }
+    catch (error) {
+      if (options.signal?.aborted)
+        return false
+      throw error
+    }
+    if (options.signal?.aborted)
+      return false
+    await target.writeFile(options.defaultName, exportDataToBytes(data), options.mimeType)
+    return true
+  })
+  if (!written)
+    return { status: 'cancelled' }
+  if (!options.signal?.aborted)
+    environment.feedback.success(`已导出到 ${target.displayPath} 文件夹`)
 
   return { status: 'exported', displayPath: target.displayPath }
 }

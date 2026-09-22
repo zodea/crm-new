@@ -3,6 +3,7 @@ import type {
   ConstructionContractFactSource,
   ConstructionContractFactSources,
 } from '../../app/lib/construction-contract/repository'
+import type { ProblemDTO } from '../../app/types/read-model'
 import {
   buildConstructionContractDetail,
   buildConstructionContractListPage,
@@ -18,9 +19,11 @@ import {
   ownerFinalSettlementReceiptIsActive,
   ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
+import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { receiptReadTestInstance } from './receipt-read-test-instance'
 
 export type ConstructionContractReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -123,6 +126,7 @@ export function createConstructionContractReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[] = id => demoWorkspaceTestInstance.capabilities(id),
   commandInstance = constructionContractCommandTestInstance,
   ownerDocumentCommandInstance: OwnerDocumentReadSource = ownerCommercialDocumentCommandTestInstance,
+  receiptSource?: typeof receiptReadTestInstance.facts,
 ) {
   const scenarios = new Map<string, ConstructionContractReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -136,7 +140,7 @@ export function createConstructionContractReadTestInstance(
     const capabilities = [...resolveCapabilities(sessionId)]
     if (!capabilities.includes('construction-contract:read'))
       throw problem('forbidden', '无施工合同查看权限')
-    const formalRows = commandInstance.rows(sessionId)
+    let formalRows = commandInstance.rows(sessionId)
     const formalFacts = commandInstance.facts(sessionId)
     const ownerDocuments = ownerDocumentCommandInstance.rows(sessionId)
     const ownerChanges = ownerDocuments
@@ -206,7 +210,7 @@ export function createConstructionContractReadTestInstance(
           date: source.date,
           status: source.status,
         })))
-    const ownerSettlementReceipts = ownerDocuments
+    let ownerSettlementReceipts: ConstructionContractFactSource[] = ownerDocuments
       .filter(row => row.kind === 'final_settlement' && row.contractId)
       .flatMap(row => (row.finalSettlementEvidence?.receipts ?? [])
         .filter(source => ownerFinalSettlementReceiptIsActive(source.status))
@@ -221,6 +225,39 @@ export function createConstructionContractReadTestInstance(
           date: source.date,
           status: source.status,
         })))
+    let receiptsProblem: ProblemDTO | undefined
+    let receiptSourceVersion = ''
+    if (receiptSource) {
+      try {
+        const source = receiptSource(sessionId)
+        receiptSourceVersion = source.sourceVersion
+        if (!source.capabilities.includes('construction-contract:read'))
+          throw new ReceiptRepositoryProblem({ code: 'forbidden', message: '无权读取收款与合同的关联', retryable: false, fieldErrors: {}, traceId: null })
+        ownerSettlementReceipts = source.rows.filter(row => row.draft.contractId).map(({ id, dataOrigin, draft }) => ({
+          id,
+          dataOrigin,
+          contractId: draft.contractId,
+          customerId: source.capabilities.includes('customer:list:read') ? draft.customerId : null,
+          no: draft.no,
+          name: draft.no || '收款登记',
+          amount: draft.amount === null ? null : Number(draft.amount),
+          date: draft.receiptDate || null,
+          status: draft.status,
+        }))
+        formalRows = formalRows.map((row) => {
+          const active = ownerSettlementReceipts.filter(receipt => receipt.dataOrigin === row.dataOrigin && receipt.contractId === row.id && ownerFinalSettlementReceiptIsActive(receipt.status))
+          return { ...row, receivedAmount: active.some(receipt => receipt.amount === null) ? null : active.reduce((sum, receipt) => sum + receipt.amount!, 0) }
+        })
+      }
+      catch (cause) {
+        if (!(cause instanceof ReceiptRepositoryProblem) || !['forbidden', 'unavailable'].includes(cause.problem.code))
+          throw cause
+        receiptsProblem = cause.problem
+        receiptSourceVersion = `receipt-${cause.problem.code}`
+        ownerSettlementReceipts = []
+        formalRows = formalRows.map(row => ({ ...row, receivedAmount: null }))
+      }
+    }
     const mergeFacts = <T extends { id: string }>(left: readonly T[], right: readonly T[]): T[] =>
       [...new Map([...left, ...right].map(row => [row.id, row])).values()]
     const ownerAcceptances = ownerDocuments
@@ -256,7 +293,7 @@ export function createConstructionContractReadTestInstance(
       finalSettlements: mergeFacts(formalFacts.finalSettlements, ownerFinalSettlements),
       penalties: mergeFacts(formalFacts.penalties, ownerPenalties),
       supplements: mergeFacts(formalFacts.supplements, ownerSettlementSupplements),
-      receipts: mergeFacts(formalFacts.receipts, ownerSettlementReceipts),
+      receipts: receiptSource ? ownerSettlementReceipts : mergeFacts(formalFacts.receipts, ownerSettlementReceipts),
       acceptances: [...formalFacts.acceptances, ...ownerAcceptances],
       warranties: [...formalFacts.warranties, ...ownerWarranties],
     }
@@ -278,11 +315,15 @@ export function createConstructionContractReadTestInstance(
             files: [...formalFacts.files, ...demoFacts.files],
           },
       capabilities,
-      sourceVersion: `${commandInstance.sourceVersion(sessionId)}+${ownerDocumentCommandInstance.sourceVersion(sessionId)}`,
+      receiptsProblem,
+      sourceVersion: `${commandInstance.sourceVersion(sessionId)}+${ownerDocumentCommandInstance.sourceVersion(sessionId)}${receiptSourceVersion ? `+${receiptSourceVersion}` : ''}`,
     }
   }
 
   return {
+    facts(sessionId?: string | null) {
+      return { ...context(sessionId), asOf: FIXED_AS_OF }
+    },
     reset(scenario: ConstructionContractReadTestScenario, sessionId?: string | null) {
       if (scenario === 'ready')
         scenarios.delete(keyFor(sessionId))
@@ -310,4 +351,4 @@ export function createConstructionContractReadTestInstance(
   }
 }
 
-export const constructionContractReadTestInstance = createConstructionContractReadTestInstance()
+export const constructionContractReadTestInstance = createConstructionContractReadTestInstance(undefined, undefined, undefined, sessionId => receiptReadTestInstance.facts(sessionId))

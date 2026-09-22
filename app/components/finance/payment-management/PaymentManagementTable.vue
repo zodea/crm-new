@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { PaymentManagementRow } from '~/stores/payment-management'
+import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { yuan } from '~/lib/util/money'
 
 defineProps<{
@@ -29,7 +30,7 @@ const columns: KitTableColumn[] = [
   { field: 'projectName', title: '项目', minWidth: 160, slot: 'project' },
   { field: 'supplierName', title: '收款单位', minWidth: 190, slot: 'supplier' },
   { field: 'bizType', title: '业务类型', width: 150 },
-  { field: 'approvedAmount', title: '批复金额', type: 'money', width: 136 },
+  { field: 'approvedAmount', title: '批复金额', width: 150, slot: 'approved', align: 'right' },
   { field: 'paidAmount', title: '已支付', type: 'money', width: 136 },
   { field: 'dueAmount', title: '应付余额', width: 136, align: 'right', slot: 'due' },
   { field: 'invoiceStatus', title: '回票状态', width: 104, slot: 'invoiceStatus' },
@@ -83,14 +84,14 @@ function handleAction(action: string, row: PaymentManagementRow) {
       @page-change="emit('pageChange', $event)"
     >
       <template #application="{ row }">
-        <button
-          type="button"
-          class="cell--link border-0 bg-transparent p-0 text-left"
+        <KitButton
+          variant="ghost"
+          class="cell--link h-auto flex-col items-start justify-start gap-0 border-0 p-0 text-left"
           @click="emit('openApplication', row)"
         >
           <span class="block font-700">{{ row.name || '未命名申请' }}</span>
           <span class="mt-0.5 block font-mono text-11px text-ink-faint">{{ row.no || '未编号' }}</span>
-        </button>
+        </KitButton>
       </template>
 
       <template #project="{ row }">
@@ -110,10 +111,15 @@ function handleAction(action: string, row: PaymentManagementRow) {
       <template #due="{ row }">
         <span
           class="font-mono font-700 tabular-nums"
-          :class="row.dueAmount > 0 ? 'text-danger-ink' : 'text-ink'"
+          :class="(row.dueAmount ?? 0) > 0 ? 'text-danger-ink' : 'text-ink'"
         >
-          {{ yuan(row.dueAmount) }}
+          {{ row.dueAmount === null ? '—' : yuan(row.dueAmount) }}
         </span>
+      </template>
+
+      <template #approved="{ row }">
+        <span class="block font-mono tabular-nums">{{ row.approvedAmount === null ? '—' : yuan(row.approvedAmount) }}</span>
+        <span v-if="row.approvedAmount === null" class="text-10px text-ink-faint">{{ approvalAmountLabel(row.approvedAmountState) }}</span>
       </template>
 
       <template #invoiceStatus="{ row }">

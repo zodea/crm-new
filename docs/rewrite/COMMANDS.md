@@ -2,9 +2,11 @@
 
 > 本文档是浏览器中央写命令的权威源。数据实体与迁移看 [`DATABASE.md`](./DATABASE.md)，读 DTO 看 [`READ-MODELS.md`](./READ-MODELS.md)，浏览器权威边界看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)。
 
+下文“正式”表示来源身份与命令边界；当前后端仍是可重置内存实例，不构成生产持久化证明。前台优先的复核顺序与后置生产验收见 [`ARCHITECTURE.md`](./ARCHITECTURE.md)；本契约不因顺序调整而允许本地正式双写，也不扩展完整审批或账号权限产品。
+
 ## 1. 当前落点
 
-Issue #281、#293、#314、#315、#316、#318、#320、#321、#323、#324、#325、#326 与 #327 已完成正式项目、正式客户、正式分供方、班组、工人、项目分供方导入、三类核心合同、五类甲方单据和分包变洽签的中央写链。浏览器不再直接将这些正式事实写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
+Issue #281、#293、#314—#316、#318、#320—#331 已完成正式项目、客户、分供方、班组、工人、项目分供方导入、三类核心合同、五类甲方单据、分包变洽签、分包结算、项目罚扣、两类辅助合同与其他支出结算的中央命令接缝。浏览器不再直接将这些正式事实写入本地 SQLite；写入统一通过领域 CommandStore action、CommandRepository 和 HTTP adapter 调用。#329—#331 已包含在本次整合基线，不再按远端待接入描述；#421 补充分供方表格映射导入的同源写入与回读，逐行导入由 SupplierCommandStore action 承接。
 
 - `GET /api/read/business-session`：取得当前服务端会话的 `workspaceId`、`actorId` 和 capability。
 - `GET /api/read/projects/:id/form`：返回可编辑 draft、附件元数据、`version` 和服务端更新时间。
@@ -16,6 +18,7 @@ Issue #281、#293、#314、#315、#316、#318、#320、#321、#323、#324、#325
 - `GET /api/read/suppliers/:id/form`：返回正式分供方可编辑主档、`version` 和服务端更新时间；普通附件恒为空，证照仍走证照专用边界。
 - `POST /api/commands/suppliers`：新建正式分供方。
 - `PUT /api/commands/suppliers/:id`：用当前 `baseVersion` 编辑正式分供方。
+- `POST /api/commands/suppliers/import`：#421 接通分供方表格映射的逐行中央导入；按外部旧 ID 精确新建或更新主档，成功后由同一中央表单接口回读。
 - `GET /api/read/project-suppliers/:projectId/import-context`：返回当前正式项目、可选正式分供方、已有合作关系和 `version`；路径项目 ID 与中央身份不一致时拒绝。
 - `POST /api/commands/project-suppliers/import`：确认后原子新建或复用正式分供方与 ProjectSupplier，并写入该关系的文件元数据与正文；不创建合同、请款、发票、支付或结算单。
 - `GET /api/read/crews/:id/form`、`GET /api/read/workers/:id/form`：返回正式班组/工人可编辑主档、`version` 和服务端更新时间；中央附件边界未接入时附件恒为空。
@@ -24,16 +27,27 @@ Issue #281、#293、#314、#315、#316、#318、#320、#321、#323、#324、#325
 - `GET /api/read/material-contracts/form-context`、`GET /api/read/material-contracts/:id/form`：返回中央正式项目/分供方选项，或正式材料采购合同的可编辑 draft、附件元数据、`version` 与更新时间。
 - `POST /api/commands/material-contracts`、`PUT /api/commands/material-contracts/:id`：新建或按 `baseVersion` 编辑正式材料采购合同；合同与明细 ID 均由服务端分配，项目和分供方只接受中央正式稳定 ID。
 - `GET /api/read/construction-contracts/form-context`、`GET /api/read/construction-contracts/:id/form`：返回中央正式项目/甲方客户选项，或正式施工合同 draft、附件元数据、`version` 与更新时间。
+- 施工合同每次进入表单重取当前会话可读的完整正式项目和客户候选，包含刚保存的记录；命令端按稳定 ID 重新验证候选存在、可读且项目当前主客户一致。历史合同归属及客户回读规则见[客户详情](./pages/base-customer.md)，不按项目后续变更自动改写已存合同甲方。
 - `POST /api/commands/construction-contracts`、`PUT /api/commands/construction-contracts/:id`：新建或按 `baseVersion` 编辑正式施工合同；服务端重验项目—客户关系，施工合同不接受采购明细或分供方关系。
 - `GET /api/read/subcontract-contracts/form-context`、`GET /api/read/subcontract-contracts/:id/form`：返回正式项目/分供方选项，或正式分包合同 draft、附件、`version` 与更新时间。
 - `POST /api/commands/subcontract-contracts`、`PUT /api/commands/subcontract-contracts/:id`：新建或按 `baseVersion` 编辑正式分包合同；服务端重验项目、分供方、劳务/专业类别，并拒绝客户关系与采购明细。
-- `GET /api/commands/owner-documents/context`、`GET /api/commands/owner-documents/boq-lines`：按 kind 返回中央正式项目、施工合同，或项目、分供方、分包合同选项；关系不匹配时拒绝。BOQ 明细只服务甲方量价单据。
-- `GET /api/commands/owner-documents/:kind/:id/form`：对 `owner_change` / `owner_report` / `acceptance` / `final_settlement` / `owner_penalty` / `sub_change` 返回受控 draft、附件、`version` 与服务端更新时间；响应顶层 `kind + id`、draft ID 和每个附件的 `ownerType + ownerId` 必须与请求目标完全一致，HTTP adapter 拒绝身份错配或非法日期。
-- `POST /api/commands/owner-documents`：新建或按每个表单页实例持有的 `baseVersion` 更新五类正式甲方 canonical 单据与分包变洽签，并承载各自草稿、提交、流转、删除与附件变更 action。`sub_change` 使用独立 `subcontract-document:write` capability，只接受同一正式来源中项目、分供方和分包合同的稳定 ID，附件 owner 类型固定为 `subcontract_change_order`；提交校验正数审批金额、合法日期和事由，状态只开放 `draft → submitted`，不补造审批 action，也不借分包结算或项目罚扣写链。甲方罚扣同样不创建申诉审批 action。附件 action 不把已提交单据伪装成可编辑草稿；服务端重验稳定关系、状态和版本，不信任客户端合计。
+- `GET /api/commands/owner-documents/context`、`GET /api/commands/owner-documents/boq-lines`：按 kind 返回中央正式项目、施工合同，或项目、分供方、分包合同、班组与已确认结算选项；关系不匹配时拒绝。结算候选携版本与剩余可抵扣金额，BOQ 明细只服务甲方量价单据。
+- `GET /api/commands/owner-documents/:kind/:id/form`：对 `owner_change` / `owner_report` / `acceptance` / `final_settlement` / `owner_penalty` / `sub_change` / `sub_settlement` / `project_penalty` 八类 kind 返回受控 draft、附件、`version` 与服务端更新时间；响应顶层 `kind + id`、draft ID 和每个附件的 `ownerType + ownerId` 必须与请求目标完全一致，HTTP adapter 拒绝身份错配或非法日期。
+- `POST /api/commands/owner-documents`：新建或按每个表单页实例持有的 `baseVersion` 更新五类正式甲方 canonical 单据、分包变洽签、分包结算与项目罚扣，并承载各自草稿、提交、流转、删除与附件变更 action。`sub_change` 使用独立 `subcontract-document:write` capability，只接受同一正式来源中项目、分供方和分包合同的稳定 ID，附件 owner 类型固定为 `subcontract_change_order`；提交校验正数审批金额、合法日期和事由，状态只开放 `draft → submitted`，不补造审批 action，也不借分包结算或项目罚扣写链。甲方罚扣同样不创建申诉审批 action。附件 action 不把已提交单据伪装成可编辑草稿；服务端重验稳定关系、状态和版本，不信任客户端合计。
 
 甲方变洽签调量/调价命令使用 BOQ canonical 计算规则：调减可为负，但有效量不得为负；调价按签证时间稳定排序后的有效量价计算，缺失的新单价不按零价处理。签证 action 只写签证日期，不覆盖申报日期；日期必须是真实存在的日历日，且新签证不得早于同合同既有签证时序尾；同日签证再按签证 action 写入的不可变、单调执行时间排序，不使用通用 `updatedAt` 或无业务含义的单据 ID 打破并列，后续附件维护不得改变签证顺序。月度报量命令按 `periodNo` 取精确快照，只在申报时固化取数基准、来源版本/更新时间、经办人和系统提交时间，草稿不充当审计事实；受控迁移随施工合同同步完整 BOQ 目录和尚未成单的月度完成量事实，历史单据量价只在目录确实缺行时兜底，不得覆盖同稳定 ID 的当前 canonical 名称、数量或单价；无对应期次快照时拒绝借用其他月份的数量。
 
-项目/客户/分供方/班组/工人/核心合同删除、通用离线 outbox、自动合并、完整登录/RBAC 和其他实体的日常写命令不在当前落点。甲方变洽签与甲方报量的删除只是同一中央领域 action，必须服从受保护状态，不是列表快捷删除。已有正式记录只通过 #294 受控核心迁移进入中央，不另建平行导入源。Tauri 继续使用既有本地写路径，不消费浏览器中央命令。浏览器中央列表不提供并行本地删除或快捷编辑；正式编辑必须从中央只读详情显式进入。
+项目/客户/分供方/班组/工人/核心合同删除、通用离线 outbox、自动合并、完整登录/RBAC 和其他实体的日常写命令不在当前落点。甲方变洽签与甲方报量的删除只是同一中央领域 action，必须服从受保护状态，不是列表快捷删除。历史核心身份迁移仍走 #294 受控迁移；#421 的分供方表格映射写入同一中央主档，不另建本地或平行导入源。Tauri 继续使用既有本地写路径，不消费浏览器中央命令。浏览器中央列表不提供并行本地删除或快捷编辑；正式编辑必须从中央只读详情显式进入。
+
+### 项目 Excel 导入（#423）
+
+项目列表入口与历史 `/import/mapping/project` 使用同一 `ProjectCommandStore` 逐行 action，复用 `POST /api/commands/projects` 和 `GET /api/read/projects/:id/form`；不调用旧 `useProjectStore().add` 或本地 SQL 客户解析。行导入拥有独立请求缓存，不 hydrate 编辑表单、不改变编辑目标、草稿、版本或命令会话；成功通知只触发中央查询失效与重读。
+
+文件解析后选择一个 Sheet，映射现行项目模板字段，人工预览后才提交。项目名称、客户和项目经理必填，日期沿现行表单 decoder；阶段沿现行导入归一规则，预览同时展示原值和采用值。客户/次客户从完整分页的中央正式候选解析：精确稳定 ID 优先，其次唯一名称/别名；缺失、歧义、明确 `inactive=停用`、失效或越权逐行拒绝，不创建临时客户。准备后的请求固定关系 ID，提交时服务端重验正式关系与权限，客户改名不能改接别的身份。列表/详情同样按稳定 ID 解析最新客户名称；无权时不泄露身份。
+
+导入请求只允许无 `id`、`baseVersion=null`、`action=save`，附合法 `importSource`，成功后表单回读同一来源元数据。来源字段含义仅在 [DATABASE §10.7](./DATABASE.md#107-导入追溯与差异表) 维护。每个工作区内，同一文件摘要 + Sheet + 原始行，或本 Excel 链路已经保存的非空外部旧 ID，命中已保存回执时：相同规范内容返回原项目 ID；不同内容明确冲突，不能覆盖，修改须显式进入项目编辑。并发提交与响应丢失重试保持同一命令/回执。该外部旧 ID 规则不查询受控整库迁移 `legacyId → serverId` 映射，也不按名称自动合并；原文件变化且无外部旧 ID 视为新的来源。
+
+业务拒绝保留原始行号并继续其他行；网络异常或写后回读失败停在当前行，重试复用原命令；已成功行不再创建。部分成功可下载来源定位和原因清单、进入成功项目详情或仅重试未导入行。导入前取消无写入；导入中停止等待当前行结束后返回列表，其余行停止；重新上传原文件可安全续导。来源切换沿全局确认后刷新契约，清空未保存的文件/映射/预览，中央已保存行仍可回读。原文件不作为附件上传。中央内存实例验证不表示 #416 的生产持久化、实际数据库迁移或备份恢复已经完成。
 
 ## 2. 命令信封
 
@@ -48,6 +62,7 @@ interface ProjectCommandRequestDTO {
   action: 'draft' | 'save' | 'submit'
   draft: ProjectFormDraft
   attachments: FormAttachmentChanges
+  importSource?: ProjectImportSource // 项目 Excel 新建来源；契约见下节和 DATABASE §10.7
 }
 
 interface CustomerCommandRequestDTO {
@@ -72,6 +87,14 @@ interface SupplierCommandRequestDTO {
   action: 'draft' | 'save' | 'submit'
   draft: SupplierFormDraft
   attachments: FormAttachmentChanges // 当前主档命令只接受空变更
+}
+
+interface SupplierImportCommandRequestDTO {
+  workspaceId: string
+  actorId: string
+  requiredCapability: 'supplier:write'
+  commandId: string              // 同一映射行的失败重试保持不变
+  draft: SupplierImportDraft     // 仅主数据映射字段；不接受 id、审批或人工核验结论
 }
 
 interface ProjectSupplierImportCommandRequestDTO {
@@ -144,26 +167,37 @@ interface ConstructionContractCommandRequestDTO {
 
 interface OwnerCommercialDocumentCommandRequestDTO {
   id?: string
-  kind: 'owner_change' | 'owner_report' | 'acceptance'
+  kind: 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change' | 'sub_settlement' | 'project_penalty'
   workspaceId: string
   actorId: string
-  requiredCapability: 'owner-document:write'
+  requiredCapability: 'owner-document:write' | 'subcontract-document:write'
   commandId: string
   baseVersion: string | null
-  action: 'save' | 'submit' | 'approve' | 'audit' | 'transition-acceptance' | 'attachments' | 'delete'
+  action: 'save' | 'submit' | 'approve' | 'audit' | 'transition-acceptance' | 'attachments' | 'delete' | 'deduct-penalty' | 'rectify-penalty'
   draft?: OwnerDocumentDraft
   attachments?: FormAttachmentChanges
   approvedAt?: string
   audit?: { lines: Array<{ boqLineId: string, auditedQty: number, auditedAmount: number }> }
   target?: 'accepted' | 'warranty' | 'expired'
   facts?: AcceptanceLifecycleFacts
+  settlementId?: string          // deduct-penalty：真实已确认分包结算
+  settlementVersion?: string     // deduct-penalty：同时校验结算版本
+  amount?: number                // deduct-penalty：正数，最多两位小数
+  deadline?: string | null        // rectify-penalty：整改期限
+  note?: string                  // 两类项目罚扣 action 的说明
 }
 ```
 
-- 服务端重新解析会话并校验工作区、操作人及对应的 `project:write` / `customer:write` / `supplier:write` / `project-supplier:write` / `crew:write` / `worker:write` / `material-contract:write` / `construction-contract:write` / `owner-document:write`；客户端字段不是授权证据。项目分供方文件的上传人固定取本次服务端会话 `actorId`，命令体不接受客户端自报上传人。
+上方信封是公共字段概览；实际请求按 `action` 使用可辨识联合，不能任意组合 kind、action 和可选字段。`deduct-penalty` 与 `rectify-penalty` 只接受 `kind='project_penalty'`；精确类型见 `app/lib/owner-document/central-command-contract.ts`。
+
+- 服务端重新解析会话并校验工作区、操作人及对应的 `project:write` / `customer:write` / `supplier:write` / `project-supplier:write` / `crew:write` / `worker:write` / `material-contract:write` / `construction-contract:write` / `subcontract-contract:write` / `owner-document:write` / `subcontract-document:write` / `auxiliary-contract:write` / `other-settlement:write`；客户端字段不是授权证据。项目分供方文件的上传人固定取本次服务端会话 `actorId`，命令体不接受客户端自报上传人。
 - 新建 ID 由服务端分配不透明值；页面不使用时间戳、名称或本地 `draftId` 作正式主键。
 - `version`、最终更新时间和命令结果由服务端生成。
 - `draft` 允许缺少业务必填项；`save` / `submit` 同时经页面和服务端执行领域必填校验。客户统一社会信用代码在正式客户间重复时返回字段错误；分供方公司全称、类别、主要联系人必填，统一社会信用代码和内部编码分别唯一。
+- 分供方表格导入沿 [ADR 0005](../adr/0005-import-mapping-model.md) 的上传、映射、预览确认、逐行执行与失败续导。每行公司全称必填；首次建档沿既有最小导入默认值，未映射类别为“其他”、纳税人类型为“未核验”、资料状态为 `incomplete`，不伪造人工核验。完整字段含义与默认展示顺序仍以[分供方页面蓝本](./pages/base-supplier.md)和数据模型为准。
+- 导入的 `externalRef` 是外部旧 ID / 匹配标识。服务端在同一正式集合中精确匹配：为空或未命中时新建，唯一命中时只覆盖明确映射字段；未映射字段保留，显式空值可清空选填字段，`laborScope` 与 `mainBusiness` 独立。多记录命中时拒绝，不扫描当前分页或按名称猜测身份。`uniqueCode` 是唯一识别码 / 内部编码，`taxNo` 是统一社会信用代码；二者独立映射并分别查重，不互相回填。
+- 导入请求不携带主档 ID、`baseVersion`、附件、审批及人工核验结论；服务端在同一执行段中查找现有版本、合并映射字段并复用中央保存检查。已有 `qualified/rejected` 是否失效仍服从关键工商 / 银行字段变化规则，单独维护劳务范围不改变人工结论。每行保存与回读成功后才计入完成；响应丢失或回读失败沿用该行 `commandId` 重试，不重复新建。同一导入标识改换内容会被拒绝；命令权限与身份由服务端重新验证。
+- 表格导入是一行一个提交单元，并非整批原子事务。可预期的空名称在行级拒绝清单中显示，其余业务或请求失败停在当前行，保留页签从该行续导；已经完成的行不重写。`SupplierCommandStore.importRow` 仅在中央回读成功后更新 `latestWrite` 通知缓存页面，不改变当前编辑目标、`baseVersion` 或待重试保存命令。完成后关闭导入页签，返回列表重新读取当前查询。当前不承诺刷新 / 关页后恢复内存中的重试状态、离线重放或生产持久化；浏览器实现仍服从本文第 5 节的非生产实例边界。
 
 ## 3. 幂等、冲突与读回
 
@@ -178,6 +212,8 @@ interface OwnerCommercialDocumentCommandRequestDTO {
 
 ## 4. 网络失败与本地草稿
 
+项目、客户、分供方、班组、工人与三类核心合同的中央表单命令按页面实例持有目标 ID、版本与失败重试意图。切换其他编辑页或执行 Excel 导入不覆盖该实例的保存目标、`baseVersion` 或待重试命令；成功后才发布共享写入版本以刷新读面。
+
 - 用户点击保存时，浏览器先以 `project-draft-<uuid>` 暂存该次意图，再调用中央命令；成功后立即清除这份暂存。
 - 会话或命令请求不可达时，正式读模型不改变，页面必须提示“仅保留本地草稿，未正式保存”。
 - 本地草稿按新建/目标项目分区，保留原 `commandId` 和 `baseVersion`；重载表单可恢复。它不是正式项目、不进入列表/汇总，也不能被其他实体当作外键。
@@ -191,14 +227,216 @@ interface OwnerCommercialDocumentCommandRequestDTO {
 
 施工合同命令由 #320 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—客户关系校验、附件读回和浏览器交互。`actualCompletionDate` 不是日常表单可写字段；受控迁移没有 canonical 事实时保持 `null`。
 
-甲方变洽签与甲方报量命令由 #323 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—施工合同关系、附件读回、受保护状态和量价重算。甲方变洽签的量价变更合计与审定含税金额分字段存储；纯金额签证提交可由审定含税或不含税任一正金额成立。提交只保留当时预览；签证命令必须基于当前已签证时序链再次校验并重算有效量价，防止并行待签单据将合同量降为负数或锁定过期金额。“新增”操作物化为稳定 BOQ 行，后续变更与报量均使用该结果；纯金额签证不改写 BOQ 或月度工程量快照版本。系统锁定台账与手录纯金额签证仍是同一 canonical 读面。甲方报量直接消费 `monthly_statements` 的自动/申报/审定事实，审定命令要求每行显式给出审定量（包括显式的 `0`）。验收—保修命令由 #324 在同一 `acceptance` ID 上证明单向状态链、追加审计和终态锁定。最终结算命令由 #325 在同一中央契约中证明草稿保存、提交、附件 owner 身份、关系重验与迁移读回；已提交记录的业务字段锁定。审定金额/日期只能来自已有持久化事实，当前未新增审定 action。甲方罚扣、分包变更、分包结算、项目罚扣与开票申请尚无中央只读目标时只展示事实文本，不借现有编辑表单冒充详情。
+甲方变洽签与甲方报量命令由 #323 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—施工合同关系、附件读回、受保护状态和量价重算。甲方变洽签的量价变更合计与审定含税金额分字段存储；纯金额签证提交可由审定含税或不含税任一正金额成立。提交只保留当时预览；签证命令必须基于当前已签证时序链再次校验并重算有效量价，防止并行待签单据将合同量降为负数或锁定过期金额。“新增”操作物化为稳定 BOQ 行，后续变更与报量均使用该结果；纯金额签证不改写 BOQ 或月度工程量快照版本。系统锁定台账与手录纯金额签证仍是同一 canonical 读面。甲方报量直接消费 `monthly_statements` 的自动/申报/审定事实，审定命令要求每行显式给出审定量（包括显式的 `0`）。验收—保修命令由 #324 在同一 `acceptance` ID 上证明单向状态链、追加审计和终态锁定。最终结算命令由 #325 在同一中央契约中证明草稿保存、提交、附件 owner 身份、关系重验与迁移读回；已提交记录的业务字段锁定。审定金额/日期只能来自已有持久化事实，当前未新增审定 action。甲方罚扣、分包变洽签、分包结算与项目罚扣已分别由 #326—#329 接入专属中央只读目标；#330/#331 的辅助合同与其他支出结算命令同样已进入当前基线。开票申请等尚未接入的目标仍按实际能力展示事实文本，不借编辑表单冒充详情。
 
 当前中央项目、客户、分供方、班组、工人和项目分供方导入命令由可重置的非生产后台实例证明信封、权限、幂等、乐观锁、读回和浏览器交互。项目分供方命令还证明完整正式候选集、服务端上传人、正文实际字节长度和跨分供方主档/合作关系的原子提交；文件、版本或中央接管无效时不留分供方、关系、文件或版本半成品，重放同一 `commandId` 不重复写入。#294 在相同的 HTTP/Repository 边界补充核心身份迁移命令：`POST /api/migrations/core/preflight`、`POST /api/migrations/core/dry-run`、`POST /api/migrations/core/:batchId/import|confirm|rollback`，并以 `GET /api/migrations/core/snapshot` 读取中央权威快照。迁移命令要求 `core:migration:write`、稳定 `commandId`、服务端会话身份和批次状态机；后台会重算 canonical 来源哈希、校验备份证明结构与确定性 ID、按实际写入结果重新对账，并在确认时再次拒绝阻塞差异。本地适配器负责从不上传中央的 IndexedDB 备份字节重算摘要和来源，创建与恢复两端都拒绝篡改。它们只服务于显式迁移，不是客户、项目、分供方、班组或工人的日常保存接口。迁移端同样是可重置测试实例，不能把它或 `/api/testing/core-migration/reset` 描述为生产持久化业务库或业务命令。
 
+### 核心迁移身份接管（#398）
+
+确认批次时，项目、客户、分供方、班组和工人一起接入既有中央命令事实源，列表与普通编辑读写同一稳定 ID；迁移快照不作为第二份日常读源。同批再次同步保留已经编辑的主档；回滚撤回本批接管身份及其后续修改，不撤销其他独立创建的主档。迁入分供方缺少资料核验事实时保持“资料不全”，不得推断核验通过。新正式会话不预置测试身份，只有显式测试 reset 可注入合成样例。这些行为仍属于可重置内存实例，不构成 #416 的持久化验收。
+
+### 工程量中央命令与迁移接管（#442）
+
+`POST /api/commands/quantity` 的领域动作由当前会话、`projectId + origin`、`quantity:write`、稳定 `commandId` 和 `baseVersion` 约束。区域、模板、阶段映射、责任、完成和照片在同一事务中重验当前项目与祖先关系并追加审计；失败不发布部分写入。归档后编辑须显式确认，授权意图参与幂等指纹；取消不发送授权重试。模板复制来源只是审计引用，删除原模板不影响复制件编辑。
+
+甲方月报的提交继续走既有 owner-document 命令，工程量服务提供串行读取窗口，并在持久化月报前重验中央 BOQ 版本。缺量或缺价不能由 `0` 补齐成完整申报；草稿不提前冻结提交人、提交时间或假来源版本。三量读取与快照规则见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442)。
+
+受控迁移先异步准备不可见的数据库候选及各域候选，全部成功后才同步切换工程量、其他领域与主档权威来源；任一准备失败均中止候选，保留原活动实例。外部 BOQ 只迁身份关系，不造本地施工合同或复制量价。回滚若会撤去独立新业务正在引用的祖先，必须返回明确冲突并阻止整批回滚；其他独立新建主档不得一并撤销。该机制仍只证明可重置后台实例，不构成生产数据库迁移或持久化上线验收。
+
 ### AX02 分包结算
 
-`POST /api/commands/owner-documents` 接受 `kind=sub_settlement`，使用 `subcontract-document:write`、commandId、baseVersion；save 保存草稿，submit 确认同一支出结算并锁定。服务器重验项目/分供方/分包合同 ID、正金额、名称及日期，附件 owner 固定为 expenditure_settlement。候选只包含正式已确认结算，并按项目/分供方/合同过滤。边界与未接入的付款/抵扣读状态见[页面蓝本](./pages/owner-documents.md#issue-328-分包结算中央只读链)。
+`POST /api/commands/owner-documents` 接受 `kind=sub_settlement`，使用 `subcontract-document:write`、commandId、baseVersion；save 保存草稿，submit 确认同一支出结算并锁定。服务器重验项目/分供方/分包合同 ID、正金额、名称及日期，附件 owner 固定为 expenditure_settlement。候选只包含正式已确认结算，并按项目/分供方/合同过滤。#329 的独立抵扣事实已进入结算净额；未接入或无法精确归属的付款事实仍保持未知，见[页面蓝本](./pages/owner-documents.md#issue-328-分包结算中央只读链)。
+
+## AX03 项目罚扣命令
+
+#329 通过同一 `POST /api/commands/owner-documents` 和 `subcontract-document:write` 接入 `project_penalty` 的草稿保存、提交、附件，以及 `deduct-penalty` / `rectify-penalty`。普通编辑仅用于草稿；提交后的金额不经编辑表单修改。抵扣命令携罚扣 `baseVersion`、真实已确认分包结算的 `settlementId + settlementVersion`，服务端校验双方关系和剩余余额，追加独立抵扣记录并更新双方版本；重复请求不重复入账。整改命令追加期限、说明及操作者/时间，不伪造签认或审批事实。具体资格、金额和审计只见 [DATABASE](./DATABASE.md#ax03-中央项目罚扣与独立抵扣事实) 与 [页面蓝本](./pages/owner-documents.md#issue-329-项目罚扣中央执行链)。
 
 ## AX04 辅助合同命令
 
-#330 浏览器正式写入经辅助合同 command store 与 HTTP，执行会话身份、能力、幂等命令及基版本检查。两类合同共享原子头资料与附件元数据写入，保留专属关系边界；读面与命令同源。业务字段、状态和聚合不在此复制，见 [DATABASE](./DATABASE.md#ax04-辅助合同中央事实) 与 [页面蓝本](./pages/contract-forms.md#ax04-当前浏览器实现330)。旧浏览器本地写入口拒绝两类合同写入，Tauri 原路径保留。
+#330 浏览器正式写入经 `POST /api/commands/auxiliary-contracts`，使用 `auxiliary-contract:write`、commandId 与 baseVersion，接收 `other_expense` / `company_expense` 两类草稿的 `draft` / `save` / `submit`。表单上下文及回填从 `GET /api/read/auxiliary-contracts/context` 和 `GET /api/read/auxiliary-contracts/:id` 取得。两类合同共享原子头资料与附件元数据写入，保留专属关系边界；读面与命令同源。业务字段、状态和聚合不在此复制，见 [DATABASE](./DATABASE.md#ax04-辅助合同中央事实) 与 [页面蓝本](./pages/contract-forms.md#ax04-当前浏览器实现330)。旧浏览器本地写入口拒绝两类合同写入，Tauri 原路径保留。
+
+## AX05 其他支出结算命令
+
+#331 浏览器正式写入经 `POST /api/commands/other-settlements`，使用 `other-settlement:write`、commandId 与 baseVersion。`draft` 允许未完成业务字段；`save` 校验并保留当前状态，`submit` 进入待确认；仅待确认记录接受 `confirm`，确认后锁定。服务端重验同项目、同分供方、非草稿的真实其他支出合同并原子维护结算头和附件元数据；不写第二套结算明细或本地正式副本。表单上下文及回填使用 `GET /api/read/other-settlements/context` 和 `GET /api/read/other-settlements/:id`。
+
+奖罚、申请、支付通过 `GET /api/read/other-settlements/:id/source` 独立读取中央源单；这不扩展为通用付款申请或支付记录写命令。#331 的受控迁移接管既有其他支出结算抵扣事实，不把 #329 当前只接受已确认分包结算的新增抵扣命令扩展到其他结算类型。金额、准确归属与迁移规则只见 [DATABASE](./DATABASE.md#ax05-其他支出结算中央事实) 和 [页面蓝本](./pages/contract-forms.md#ax05-当前浏览器实现331)。中央仍为可重置测试实例，附件正文服务与生产持久化不由这些命令入口宣告完成。
+
+PAY-07 的付款批复来源由现有本地付款保存域验证，中央关联源单只投影该事实；本切片不新增通用付款写命令。后续接管必须继续遵守 [DATABASE §10.2](./DATABASE.md#102-支付记录及付款申请分摊) 的明确输入、事务回滚与历史未知兼容边界，不能凭读 DTO 的来源标签确认历史批复。
+
+## 普通收款登记命令（#436）
+
+浏览器正式收款使用 `POST /api/commands/receipts`，要求服务端会话、`receipt:write`、工作区/操作人、稳定 `commandId`、来源 `real` 和编辑时的 `baseVersion`；`GET /api/read/receipts/context` 与 `GET /api/read/receipts/:id/record` 提供候选和完整回填。动作仅 `draft` / `save` / `submit`，业务校验和状态结果见[收款页面契约](./pages/finance-receipt.md)。旧浏览器本地保存入口拒绝收款写入，Tauri 原适配保留。
+
+命令先重验现有与请求中的项目、主客户、可选施工合同的读权及真实归属，再校验全部字段、非空流水号唯一性和文件正文。附件新增、删除、恢复与收款头、审计和版本构成原子提交；文件归属不能由客户端跨记录指定。相同命令 ID 必须携相同完整请求，正文或动作变化也不能借重放覆盖第一次结果；旧版本返回冲突，不自动覆盖。保存失败保留当前页实例的输入、附件和待重试意图，成功后从同一实体读回；不承诺刷新后恢复未保存草稿或自动离线重放。
+
+重新激活缓存编辑页时重新验证权限和来源，保留未保存内容及原版本；读取失败时禁写，恢复后再核对保存。详情/列表重新读取不沿用旧金额作成功结果。附件读取使用 `GET /api/read/receipts/:id/files/:fileId`，复验当前来源、收款与附件归属，并校验正文大小/哈希；保存位置选择先于异步正文读取。
+
+受控迁移在既有核心迁移 prepare/commit 边界接管全部原字段、附件元数据和已存正文；相同迁移同步保留中央更正，回滚仅撤销所属批次，独立新建记录保留。数据定义见 [DATABASE](./DATABASE.md)，本节不扩展为生产持久化或新的收款审批流程。
+
+## 标准工序库版本命令（#443）
+
+`POST /api/commands/process-libraries` 只接受 `create-version`：新编码建立首版，基于任意可见旧版时沿同一编码创建下一版。命令携当前服务端会话、`process-library:write`、正式来源、稳定命令 ID、同编码系列基准和复制来源版本；后台再次验证字段、工序身份及前置关系。编号包含历史删除版本，不能回收旧编号，也不能仅由前台可见行计算保存基准。一次保存原子发布完整版本和工序；来源版本与既有项目快照不被改写。
+
+重复提交须使用相同完整输入，返回原结果；同键不同内容明确拒绝。版本冲突保留草稿，显式重读核对后再保存；传输结果不确定时保留原提交身份核对结果。切换库、页面或来源后，迟到读取和确认不能覆盖当前目标；已经成功的版本仍能从原来源重新读取。列表重新加载不得静默抬高另一个编辑页的保存基准。
+
+阶段码与分项码是全局工序定义，保存工序库不要求某项目已有区域或工程量；中央 WBS 建组时再解析到该项目的稳定阶段和分项。工序库候选及保存前复核同源，不向旧浏览器数据库写入镜像。完整 WBS 写入见[中央 WBS 命令](#中央-wbs-命令444)。迁移和数据定义见 [DATABASE](./DATABASE.md#标准工序库中央版本443)，实现验证不替代 #416 生产持久化。
+
+## 中央 WBS 命令（#444）
+
+`POST /api/commands/schedule` 接受建组、任务和楼层计划调整、同组依赖维护、冲突调期、基线、任务增删及受限撤销。请求包含稳定 `commandId`、当前 `workspaceId / actorId`、来源 `real`、`schedule:write`、项目 ID 和 `sourceVersion`；后台依据当前服务端会话复验能力及作用域。首页及演示入口只读，正式失败不改写旧浏览器 SQLite。
+
+建组时重新验证同项目施工合同的显式楼栋覆盖，或逐栋区域、模板、分项及工序映射的有效性；所选全局库版本解析为当前项目的稳定阶段/分项身份，再冻结库定义与计划来源。真实零量、缺失值和不同单位保持各自含义，不按跨单位合计决定范围有效。新增合同绑定使用下述独立 `bind-contract` 动作；已迁入绑定结果可完整读回。
+
+完整用户动作在工程量与 WBS 共用的中央串行事务中执行，计划、受影响依赖、楼层人工标记、审计、版本与命令回执共同提交。外部项目、合同/清单及不可变工序库来源也纳入版本核对，来源变化则整次拒绝；不留下半组任务或半次调期。依赖冲突取消不写，确认仅软禁用明确列出的关系，恢复时重验同组、日期、循环和唯一活跃前置。
+
+工序详情保存中的 `dependency: null` 表示本次未编辑依赖，保留现有关系；非空对象才提交关系调整。主动移除前置使用单独的 `remove-dependency` 确认动作，不因只改进度或楼层日期而隐式删除。既有同日开工关系按当前日期和 Lag 核验，合法的同日关系不能阻断普通字段保存。
+
+同键同内容返回原回执，同键不同内容拒绝。陈旧来源保留输入，显式重读核对后才能形成新提交；传输结果不确定时保留原命令、原来源基准及完整正文，用原提交查询结果，不能先换新键。只有后台查验原回执并能证明本次未应用时，才返回与原 `commandId` 匹配的 `commandOutcome='not-applied'`；通用陈旧来源、不存在或无权错误不能作为丢弃原提交的依据。页面、项目或来源变化后的迟到结果不作用于新目标，权限不足时不沿旧快照继续保存。
+
+整图接管复用受控迁移的准备、确认、对账与恢复互斥，重复确认不回放覆盖日常更正。范围、历史保全与危险恢复约束统一见 [DATABASE](./DATABASE.md#中央-wbs-事实与整图接管444)，读取及运行日约定见 [READ-MODELS](./READ-MODELS.md#中央-wbs-读取444)。本节实施验证以 [#444 证据](../design/evidence/issue-444/README.md) 的实际记录为准，不能替代 #416 生产关口。
+
+## 中央暂估绑定与合同楼栋证据更正（#445）
+
+`POST /api/commands/schedule` 的 `bind-contract` 动作固定预览时的项目、分组、合同、来源版本和当前操作身份，沿既有 `schedule:write` 与幂等协议提交。其他页面重新读取不能抬高该预览的保存基准。后台在工程量与 WBS 共用的串行事务内，重新核验分组未绑定、同项目施工合同、显式楼栋覆盖、稳定分项映射和全部来源版本。缺覆盖或映射阻断；合同额外楼栋仅提示，不自动纳入；数量差异和缺失本身不成为新增的绑定门槛。
+
+成功只改变原分组的合同依据，保存绑定时比较及必要审计，并与命令回执一起提交。取消不写；陈旧预览保留选择、显式重读后再确认；结果不确定先用原键和原正文核对结果，不能另起一次绑定。另一操作者先绑定后，读取既有事实，不开放解绑或换绑。原计划、冻结来源、基线、完成事实和既有下游单据保持不变。
+
+`POST /api/commands/boq-building` 在原施工合同清单中央来源内更正一条已确认导入基准行的显式楼栋；需要当前 `owner-document:write`、固定项目/合同/行身份、楼栋 ID、原因、来源版本及稳定命令 ID。来源资格由后台已有导入文件与确认事实决定，请求不能自报资格。签证新增结果及来源不明行只读；该命令不改量价、分项、稳定行身份或签证时序。
+
+更正与前后楼栋、原因、操作人、时间、原始来源和命令审计共同发布，并遵守工程量及迁移互斥；失败不留下半次来源更新。更正使旧绑定预览失效，返回同一分组重新核对。重复同步保留日常更正，恢复保护见 [DATABASE](./DATABASE.md#中央暂估绑定与楼栋证据445)。实际完成范围与运行验证统一见 [#445 证据](../design/evidence/issue-445/README.md)。
+
+## 送货归档、修订与原件命令（#441）
+
+浏览器送货使用 `POST /api/commands/deliveries`，要求当前服务端会话、`delivery:write`、工作区/操作人、来源 `real`、稳定 `commandId` 及适用的 `baseVersion`。动作分别为人工归档 `archive`、结构化修订 `revise`、原件补传/替换 `source`、打印处置 `print`、删除/恢复和受控撤回。各动作重验当前记录与请求归属的项目、分供方、来源和读取能力；演示只读，文件名和旧父对象均不授予权限。
+
+归档保存前必须人工核对必需事实；缺价格可在明确确认后保留待补录，异常金额须有复核原因。修订需原因，保存产生当前版本及历史变化。逻辑记录、材料行、原件及修订在同一事务式变更中提交；任何校验或提交故障不留下半成品。原件替换建立新资产，不能在原资产 ID 上修改正文。字段、保全及迁移规则以 [DATABASE](./DATABASE.md#送货单原件持久化约束) 为准。
+
+重复请求须携带同一命令与完整输入；重放返回原结果，不重复建立逻辑记录或修订。响应丢失时保留原命令重试，版本冲突不得以新版本自动覆盖。保存与归档失败保留当前人工稿；来源变化、离页或取消后不应用迟到结果。刷新不恢复未保存识别/编辑草稿，已归档的打印队列重新读取中央事实。
+
+“打开打印”不写打印结果；人工确认实际输出后才写已打印，排除只写已排除。批量打印处置逐逻辑 owner 重验权限及版本，不能借共用原件只验证第一条。预览和导出同样重验每条 owner，正文按需取得并校验长度、MIME 和摘要，取消后的迟到正文不得写出。
+
+归档成功后的分供方别名记忆是独立主数据命令，失败单独提示并保留逐笔重试，不把它和归档宣称为原子成功。项目建议只消费当前已人工确认送货的原文与稳定项目关系，旧项目别名正式迁移由 #411 继续承接。当前接管不创建有效到货、库存或材料结算资格，不宣称生产持久化已完成。
+
+## 分供方证照与人工核验命令（#446）
+
+`POST /api/commands/supplier-credentials` 接受 `upload / edit / requirement / review / delete / restore`，分别负责原件上传、行级类别与有效期、逐类别要求、整体人工核验及证照删除/撤回。请求固定 `supplierId + origin`、`commandId`、当前会话 `workspaceId / actorId`、`supplier-credential:write`、`baseSupplierVersion` 与 `baseCredentialVersion`；后台重验当前主档、来源及能力，演示来源拒绝写入。客户端声明不能代替服务端会话，普通主档命令也不能写入人工合格或退回。
+
+原件接受 PDF/PNG/JPG/JPEG，后台复验 MIME、扩展名、字节签名、真实长度和 20 MB 上限。一次上传在同一原子边界发布证照、正文、所有权关系与适用审计；`edit` 只维护该证照的类别和有效期，不在原件 ID 上静默替换正文。需要纠正错误文件时使用新上传与合法删除动作。资料要求沿既定固定必需和条件资料原因规则，不能从直接命令绕过页面限制。
+
+`review` 只允许当前自动齐全、尚待人工核验的资料通过或退回，退回原因必填。提交同时重验主档和证照事实版本，写入整体人工凭证并同步主档状态。主档普通编辑、逐行导入与专用证照命令共享事务接缝；关键主档真实变化或影响必需原件的变化会使旧人工凭证失效，无关可选资料和非关键修改不误失效。具体字段和状态仅在[分供方蓝本](./pages/base-supplier.md#credentialstatus-流转)维护。
+
+同命令同内容重放返回原结果，同键不同内容拒绝；陈旧主档或证照版本保留输入，重读后由用户重新核对。响应丢失时保留原请求身份与正文核验结果，不自动生成新命令。A/B、来源、页面与页签切换后不应用旧请求结果。主档逐行导入和编辑同样禁止同键不同正文被当作成功重试。
+
+`restore` 必须携同一证照、删除审计 ID 与对应 `deletionToken`，后台核对当前证照与原件的准确删除边界；旧撤回不能恢复后一次删除。缺正文旧线索可保留，不能借撤回补造原件。专用动作审计只记录既定元信息，OCR、税号、银行账号及核验备注正文不复制进动作审计。
+
+受控旧图迁移复用统一准备、确认、实际对账与回滚；完整身份和保全规则见 [DATABASE](./DATABASE.md#分供方证照中央事实446)。上传和迁移不自动发起 OCR；#447 的显式识别、确认和税务命令见下。当前中央验证实例及生产关口继续按 ADR 0020。
+
+### OCR 人工确认与税务核验（#447）
+
+证照命令增加 `ocr-recognize` 与 `ocr-confirm`。识别只携当前证照身份和允许的 OCR 运行选项，后台从授权原件取字节，不接受客户端伪造的原件正文或识别结果。先读取主档、证照及原件边界，再在事务之外等待现有 OCR 服务；返回后重验当前会话、双版本和同一原件，才原子保存待核对快照。未配置、缺原件、无权及服务失败分别反馈，不删除已经上传的原件。
+
+确认携 `recognitionId`、逐字段 `keep-current / use-recognized / manual` 决定、类别及长期有效选择，另携 `draft.decisions.category / longTerm` 记录这两项采用方式。采用识别值时必须指定同目标字段的稳定候选 ID；类别冲突默认保留当前，矛盾税号不得静默取第一项或最后一项。除证照读写能力外，确认还要求 `supplier:write`。后台重验主档、候选、原件、版本及各项决定与最终值的一致性，复用主档规范化及重复校验，一同提交确认事实、选定主档字段、资料结论失效和脱敏审计；任何校验失败均不发布部分结果。
+
+人工纳税人核验使用 `POST /api/commands/suppliers/:id/taxpayer-verification`，要求已保存正式身份、`supplier:write`、稳定命令 ID、主档版本及 `expectedTaxNo`。后台核对当前已保存税号，接受既定人工结果和备注，按来源规则记录核验凭证并生成服务端时间。普通表单不接受来稿凭证；税号或纳税人类型实际变化时撤去旧凭证，未变化时保留当前凭证。官网查询和验证码由用户完成，不作为自动命令的一部分。
+
+识别、确认与税务结果均按同命令恢复；同键不同内容拒绝。页面为每个主体、来源及表单会话保留独立的待恢复命令和草稿；冲突不清除人工选择，结果不确定先恢复原提交。税务成功只合并已保存的五个核验字段及对应保存基准，保留其他尚未保存的表单内容。切换主体、页签或来源后的迟到结果不能应用到新目标。
+
+OCR 结果不确定期间不销毁核对窗口或丢弃原命令；恢复时暂时撤权也不代表原提交未应用，须保留原标识等待恢复。此时“重新核对当前资料”可以刷新身份、权限和当前事实，但不替换原命令、原版本基准或人工选择；权限恢复后继续核对原提交，不开放新的确认。只有后台可证明本命令尚未写入时，才返回绑定该命令 ID 的 `commandOutcome=not-applied`：外部识别失败且尚未进入候选事务，或同身份查收据未命中后被写前条件拒绝。客户端严格核对标识后才释放待恢复状态，保留人工选择供重新核对；通用网络、权限或读回错误不能自行推断未应用。
+
+## 目标成本中央命令（#412）
+
+`POST /api/commands/target-costs` 接受 `save-header / save-items / delete / restore`。请求固定预算 `targetCostId`（新建为空且带独立 `draftKey`）、`origin`、`commandId`、`workspaceId / actorId`、`target-cost:write` 与打开当前草稿时的 `sourceVersion`。后台还要求预算读取能力，来源只能为正式；普通刷新不能提高已打开草稿的保存依据。
+
+版本头和整份科目分别保存。头保存核对当前项目、金额与基线，并与附件正文/元数据及旧新基线审计一起提交；科目保存核对每行归属、字段及顺序，失败定位到行格。删除保留历史，不自动替换当前基线；恢复重新核对项目及唯一基线，不抢占后来基线。字段和迁移约束只见 [DATABASE](./DATABASE.md#目标成本中央版本与完整接管412)及[页面蓝本](./pages/target-cost.md)。
+
+预算命令与工程量、WBS 及迁移候选共用工作区互斥事务，但不要求工程量查看权限，也不以工程量项目作为预算项目目录。每次等待后、提交前重新核对会话和项目来源；失败不发布部分头、科目、附件、审计或回执。同命令同正文返回原结果，同键异文拒绝；已提交回执恢复失败不能伪称未应用。仅后台同身份确认原回执不存在且本次未提交时，才能返回绑定该命令的 `commandOutcome=not-applied`。
+
+页面保留原命令、附件字节及输入直到结果确定；暂时撤权、断网或回读失败不创建新预算。A/B 页面各持自己的身份和保存依据，旧页停用或来源变化后的迟到结果不修改新页。本单元的实际验收状态见 [#412 预算证据](../design/evidence/issue-412-target-cost/README.md)，中央验证实例不替代 #416 生产保存与部署。
+
+## 工资资料接管阶段的写入边界（#412）
+
+P0 通过既有受控迁移命令接管工资完整图；历史读取不新设核算或发放动作。浏览器 store 和直接建单入口始终拒绝原本地写入，不能用隐藏按钮代替写入门禁。A 的日常中央命令由下节 P1 接续；C1/C2 的来源修改及发放仍按各自切片完成来源校验、冻结、回执和实际界面验收后开放。
+
+迁移使用真实项目映射及完整来源候选，与工程量、WBS、预算共用工作区事务；重复确认保现值，危险恢复在任何删除前复验独立工资/来源/历史占用，失败全域保持原值。原图、映射与诊断归属见 [DATABASE](./DATABASE.md#工资完整资料中央接管412)，不可将只读迁入原值作为新发放授权。桌面本地适配和后置生产关口继续遵守 ADR 0020。
+
+## A 工资中央命令（#412，P1）
+
+`POST /api/commands/payroll-a` 接受 `save-a-draft / check-a / set-a-pay-ratio / release-a / save-a-subject-config / save-a-prices`。封套固定 `commandId / workspaceId / actorId / origin / sourceVersion / projectId` 和 `payroll:write`；工资动作绑定已存 `statementId` 或新建 `draftKey`，配置动作绑定读取时的完整 `configScope`。客户端不能提交已付合计、核算明细、来源资格或冻结结果来代替后台核验。
+
+新建与草稿可以保存范围、成员、月份、比例和备注；已核对单只允许改比例、重核或发放，改比例持久标记需重核。结算与尾款规则见[工资页面](./pages/subcontract-payroll.md#工资核算)，已发始终只读。取消只放弃页面未保存输入，不发送删除、撤销或恢复命令。
+
+核对与发放在同一工作区事务内重新读取原施工责任、现场量、适用工资价格、完整成员和此前真实已付。与上次核对不一致时保存需重核结果，原实际金额及分配输入仍可供用户重新核对；不能抛错回滚这一状态后继续显示已核对。实际总额和成员分配精确到分，全成员含零与总额一致，唯一发放、完整快照、审计和回执一起提交。数据来源和价格修订约束只见 [DATABASE](./DATABASE.md#a-工资中央来源配置与发放412)。
+
+正式失败不回落浏览器旧库，演示只读。每次异步等待后、发布结果前复验当前身份、能力和来源；同键同文返回原结果，同键异文拒绝。结果不确定保留原命令、原版本和输入，换页、普通刷新或暂时撤权不能新键重发。只有后台证明原提交未应用且返回绑定原命令的 `commandOutcome=not-applied` 时才能解除待恢复状态；通用错误不能自行推断未应用。
+
+上述命令的 P1 本地限定验收见[A 工资证据](../design/evidence/issue-412-payroll-a/README.md)；C1/C2、更正/实际补退、完整成本链和生产保存仍各自验收。
+
+## 考勤与 C1 工资中央命令（#412，P2）
+
+本节为已接通的 P2 合同，限定验证见 [C1 验收记录](../design/evidence/issue-412-payroll-c1/README.md)。`POST /api/commands/payroll-attendance` 仅接受 `upsert-attendance`；`POST /api/commands/payroll-c1` 接受 `save-c1-draft / check-c1 / release-c1 / save-c1-rates`。均固定原 `commandId / workspaceId / actorId / origin / sourceVersion / projectId` 和 `payroll:write`，正文不接受客户端核算行或冻结结果。
+
+考勤目标固定项目、工人和日期，范围包含读取时项目、月份和班组；不接受任意记录 ID 或借班组输入改写历史归属。后台在同一事务核实真实日期、有限非负工时及正常加班合计不超过 24、当前人员项目资格、原班组、C1/C2 互斥和已发月锁。同日合法重存保原 ID，失败保留单元格输入。考勤矩阵可读取空项目或空月份预览；考勤命令及 C1 配置命令仍要求有效项目和月份，不能提交空范围。C1 配置读取仍要求有效月份，项目未选时可读取候选。
+
+C1 工资动作绑定已存 `statementId` 或独立 `draftKey`；费率动作只绑定完整 `configScope`，工资身份为空。草稿只保存项目、班组、负责人、全部成员、月份和备注，固定当月 100%，无 A 比例或档位输入；个人费率保存明确的兜底日薪和独立加班价，不能把展示的档案价或默认推导价当作用户输入。
+
+核对、发放重新读取原逐日事实、人员、采用费率、全成员及占用。改考勤或费率时，受影响已核 C1 持久标记需重核；外部档案变化在读取时提示，发放时再次复验并保存需重核结果。最后一次外部 owner 等待后仍验证会话、来源和权限，失败不留下部分工资、分配或回执。实发和全成员分配严格到分相等，真实零成员不能漏；0 应发不可发放。发放、快照、整月锁依据、审计和回执同提交。
+
+未知结果沿用原命令恢复协议，考勤 pending 按工作区、身份、来源、项目、工人、日期隔离，C1 按格式、工资实体/草稿或配置范围隔离。换单元格、query、页签或暂时撤权均不能新键重发；只有绑定原命令的明确未应用结果才能解除待恢复状态。共享回执恢复按动作核对原正文与结果引用，规则见 [DATABASE](./DATABASE.md#c1-逐日考勤个人费率与冻结来源412p2)。
+
+## 签工与 C2 工资中央命令（#412，P3）
+
+本节为已接通的 P3 合同，限定验收见 [C2 证据](../design/evidence/issue-412-payroll-c2/README.md)。`POST /api/commands/payroll-daywork` 仅接受 `save-daywork / confirm-daywork`；`POST /api/commands/payroll-c2` 仅接受 `save-c2-draft / check-c2 / release-c2 / save-c2-config`。各自使用独立正文、结果及恢复解析，均固定原命令、工作区、操作者、正式来源、读取版本与 `payroll:write`；不向 A/C1 专属算法强制转换。
+
+签工新增绑定独立 `draftKey`，原 `recordId / originalScope` 为空；编辑与确认绑定原 `recordId` 及读回的原项目/班组/人员/日期。编辑后的范围在正文内单独表达，不替换命令外层原目标。确认仅补证明人和确认日期；明确保存并确认可在一次保存中表达，仍完整验证日期、时段、1/0.5 工数、同日重叠/上限、原与新范围互斥及月锁。晚于两天的合法人工确认不会自动免费或处罚。
+
+C2 配置绑定项目×负责人及原配置 ID，不使用页面月份或“全部班组”作为配置身份。工资绑定原 `statementId` 或新稿 `draftKey`，正文只含主体、全成员、月份和备注；来源 ID 集合、合计、价格和冻结结果由服务读取生成，客户端不能指定任意来源行冒充核对。已确认且可用的原签工逐条唯一领用，待确认/他单占用/坏来源分别说明；完全无可用来源不能建空 C2。
+
+合法未发签工或配置修改持久使受影响工资需重核，保旧关联及审计；核对、发放重新读取来源正文、原配置、全部成员及当前占用，最终 owner 等待后再次复验身份、权限和来源。核算按当月实际工数×主体价、100% 月度，不扣上月实付。实际总额和全部成员分配到分一致，0 应发、超额、漏成员或差一分拒绝；唯一实发、冻结、关联、月锁、审计及原回执同事务完成。
+
+签工待恢复按原记录 ID/新稿，配置按项目×负责人，工资按原工资 ID/新稿分桶。可靠成功后仍保原命令至同身份、同实体的真实后读完成；任意复制 DTO、旧请求或另一个目标的成功读取不得解除。未发签工在原提交后被另一窗口合法修改时，以可靠原回执和同记录真实后读确认原提交，同时显示后来的事实变化，不要求可变日期/人员/状态永远等于旧结果，也不将旧输入覆盖当前记录。暂时撤权或读取失败仍保留原稿与原编号。C2 发放还须读取同次完整可用输出后才完成确认；仍未知继续核对原键，明确未应用才回到重新确认。
+
+来源及物理引用见 [DATABASE](./DATABASE.md#c2-签工主体配置与冻结来源412p3)，当前界面状态见[工资页面](./pages/subcontract-payroll.md)。
+
+## 工资更正与实际收付命令（#412，P4）
+
+`POST /api/commands/payroll-adjustment` 只接受封闭的 `save-adjustment-draft / confirm-adjustment / confirm-actual-payment / confirm-recording-reversal`。封套固定工作区、经办人、来源、项目、原目标、来源版本和 `payroll:write`；新更正、实际补退及错记冲销分别有独立草稿身份，不能互换原提交编号。更正及实际金额规则见 [DATABASE](./DATABASE.md#工资更正实际补退与后月处理412p4)。
+
+核算更正必须引用原已发工资和具名核对的新旧依据，确认之后只能追加引用前序的纠错。真实补退保存实际发生日、有符号金额、原成员分配及更正处理额，原确认与所有关系同事务写入；0 元不生成事件。错记冲销明确引用被误记且未实际发生的事实，不冒充工人退款。
+
+A/C1/C2 的 `release` 可选携带 `adjustmentApplications`，每项绑定原更正、整数分处理额、余额版本和来源包含版本。字段缺省时保持旧正文、指纹和冻结输出兼容；存在时严格校验。选择、草稿及核对不提前结清，只有成功实发同事务形成处理关系。A 已包含的更正不再重复扣减；核增实际由正常工资承担时也绑定唯一发放。
+
+所有写入仍在最后外部来源等待后复验身份、权限及来源。重复同键同文返回原结果，同键异文拒绝。可靠回执后必须同目标真实后读，读取失败、断网或撤权继续保留原稿与 pending；只有绑定原命令的可信未应用结果允许释放重试。
+
+## A 工资费用与独立管理簿命令（#412，P5）
+
+`POST /api/commands/payroll-a-fees` 只接受 `save-a-fees / save-a-management-book / start-a-management-draft / save-a-negative-lines`。沿原工资封套绑定工作区、经办人、项目、来源版本、原草稿/配置范围及 `payroll:write`，另明确用途簿与读取所得 `baseVersion`。不接受客户端合计、领取资格或冻结结果；费用动作与工资动作的原命令编号不可互换。
+
+保存费用逐项核对真实分项、单位、明确完成量范围和费率，房补默认采用保留对应语义确认及经办依据。新增、修订、关闭与移除区分处理；移除追加保留原正文的修订，不要求先把已经失效的旧单位或范围改成当前新事实。已发月份原簿不能倒改配置，未来修订只从明确生效月适用。管理关系保存核实原责任及细格、管理人和模式；公司代管不生成单据。新建管理草稿重查同簿期间唯一性，重复发起定位已有合法草稿。
+
+负价保存固定当前未发管理工资和原行，必须有数量、单位、负单价、原责任范围、事由和依据。引用已有实际记录时须证明同项目及事实资格，关联不生成另一笔现金。移除只追加原行修订；已发后更正沿 P4 的独立流程。
+
+A 原 `save/check/release` 读取费用、管理关系、全部适用负价、原完成及本簿此前实付，按同一版本核算；管理归属首次领用、唯一发放、来源 V2、费用冻结、原分配、审计与回执一次提交。费用或历史依据不可证时不能回退无费用核算。P4 费用更正按原费项/负价身份与真实修订证明包含关系，普通簿与管理簿禁止合并补退。
+
+最后一次外部来源等待后仍重查权限、来源和版本。费用配置与工资表单沿各自原目标保稿，可靠回执后同目标真实后读才能解除待确认；成功后读取失败、断网及暂时撤权保留原命令，重试沿原键。同簿和不同簿动作资格分别给出，已发普通工资不阻止合法建立同月独立管理簿。实体与恢复合同见 [DATABASE](./DATABASE.md#a-工资费用独立管理簿与负价清单412p5)。
+
+## 户级空鼓和人工扣款命令（#412，P6）
+
+来源沿 `POST /api/commands/quantity` 处理 `create-hollow-inspection / revise-hollow-inspection / rectify-hollow-inspection`。封套复用工程量工作区、当前身份、项目、户、来源版本、稳定命令及 `quantity:write`；写入前重验当前范围、原责任与可见祖先。新增固定真实房间和分项，修订与整改固定 `recordId + expectedRevisionId`，修订必须有原因。检查可明确为零，整改必须为正安全整数且不超当前余量；日期与修订关系重验，坏输入不能半写。
+
+来源头、修订或整改、连续历史与回执在同一事务提交。回执键为当前工作区×经办人×原命令编号；同键同文恢复原结果，同键异文拒绝。页面不以本地减数当成保存成功，可靠回执及同记录真实后读共同解除待确认。即使冷打开同户的另一记录或另一动作，也必须显示原提交所属动作并先沿原键核对，不把旧输入套入新动作。
+
+工资沿 `POST /api/commands/payroll-hollow` 处理 `save-hollow-policies / start-hollow-deduction`。封套绑定工作区、经办人、项目、`payroll:write`、来源版本及配置范围或原已存工资身份，两种目标互斥。配置逐项携原系列和原修订、生效月、开关及非负单处金额，严格保留空值与零；保存当前月份修订，不倒改已有后月发放依据。
+
+开始动作只表达经办人的明确确认，不接受客户端自报处数、金额、领取资格或冻结内容。后台在工程量与工资共享事务内取得原记录、完整整改、分项配置、已处理关系及金额，选择原责任下本单合法未处理来源。启动写入原单需重核状态；原检查或配置变化后，旧核对不能继续发放，重新开始保留前次启动。
+
+A/C1/C2 的原核对、发放命令共同核验空鼓快照与原金额组成。发放时采用关系、工资冻结、审计与回执同事务发布；本单启动后只接受完整核算净额，超额或部分实际处理保持规则缺口。完整正数扣款恰好抵完可领额时可明确实发 0，其他既有零额发放限制不变。已处理原记录不因后月、整改、退款或改名再次开放。
+
+P4 的原独立更正命令可核对原空鼓采用组件并修正量价，原采用身份和来源不变。有效更正影响后月已处理金额，真实补退及后月明确关联仍沿既有独立动作；确认更正不产生现金。所有异步来源等待后再次核对当前权限，撤权不能借已有原命令重放获得写资格。数据及迁入保护见 [DATABASE](./DATABASE.md#户级空鼓整改与工资采用412p6)。
+
+## 批量工资协调命令（#412，P7）
+
+`POST /api/commands/payroll-a-rounding` 只接受 `save-a-rounding`，固定项目、负责人、普通/管理工资簿、生效月和读取版本，追加保存明确关闭或向下整百规则。已发月份只读；缺配置不会自动保存默认规则。
+
+`POST /api/commands/payroll-batch` 接受三种封闭动作。`confirm-batch` 固定同项目同月 A/C1/C2 预览、资金输入、逐项人工决定和全成员整数分分配，只创建不可变计划，不核对或发放原工资。`prepare-batch-item` 绑定最新计划版本及下一次执行命令 ID，在复验当前工资修订和本项依据后先持久化完整原格式命令；暂缓项不准备。`execute-batch-original` 只允许与当前 prepared 尝试预留的执行 ID 相同，调用所存原命令并核对原工资回执后推进计划。
+
+三个动作都固定工作区、经办人、正式来源、`payroll:write`、稳定命令 ID 和计划版本；同键异文、换 actor/workspace、串计划或过期版本拒绝。原工资确定未应用时保留人工决定并允许后续重新准备；响应未知、进程中断或原事务已成功但协调未落结果时保持原键原正文恢复。批次不绕过 A/C1/C2 的来源、金额、空鼓、更正、分配或权限校验。

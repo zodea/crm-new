@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { OtherSettlementDTO } from '~/lib/other-settlement/contract'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
+import { enumFilterValues } from '~/lib/kit/enum-filter'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { OTHER_SETTLEMENT_AMOUNT_LABELS, OTHER_SETTLEMENT_PATH, OTHER_SETTLEMENT_STATUS_LABELS } from '~/lib/other-settlement/contract'
 
@@ -10,9 +12,13 @@ const route = useRoute()
 const root = useTemplateRef<HTMLElement>('root')
 const navigation = useOtherSettlementNavigation(root)
 const repository = useNuxtApp().$repositories.otherSettlements
-const { data: page, shellState, problem, load } = useAuxiliaryContractRead(() => repository.list({ ...route.query }))
+const { data: page, shellState, problem, load } = useAuxiliaryContractRead(
+  () => repository.list({ ...route.query }),
+  undefined,
+  { snapshotKey: () => JSON.stringify([route.query.origin ?? 'real']) },
+)
 const search = shallowRef(String(route.query.search ?? ''))
-const status = computed({ get: () => String(route.query.status ?? 'all'), set: value => void filter({ status: value === 'all' ? undefined : value }) })
+const status = computed({ get: () => enumFilterValues(route.query.status), set: (value: string[]) => void filter({ status: value.length ? value : undefined }) })
 const project = computed({ get: () => String(route.query.projectId ?? ''), set: value => void filter({ projectId: value || undefined }) })
 const statuses = Object.entries(OTHER_SETTLEMENT_STATUS_LABELS).map(([key, label]) => ({ key, label }))
 const columns: KitTableColumn[] = [
@@ -32,9 +38,9 @@ const columns: KitTableColumn[] = [
 ]
 const rows = computed(() => page.value?.items.map(row => ({ id: row.id, source: row, name: row.draft.name || '未命名结算', no: row.draft.no || '未记录', date: row.draft.settlementDate || '未记录', type: row.draft.settlementType || '未记录', project: row.project.label || '关系不可用', contractName: row.contract.label || '关系不可用', supplier: row.supplier.label || '关系不可用', ...Object.fromEntries(Object.entries(row.amounts).map(([key, value]) => [key, auxiliaryMoney(value)])), status: statuses.find(s => s.key === row.draft.status)?.label || '未记录', business: '其他支出结算', attachmentCount: row.attachmentCount, ...Object.fromEntries(Object.entries(row.audit).map(([key, value]) => [key, value || '未记录'])) })) ?? [])
 const canWrite = computed(() => page.value?.capabilities.includes('other-settlement:write'))
-const hasFilters = computed(() => ['search', 'status', 'projectId', 'contractId', 'supplierId'].some(key => route.query[key]))
+const hasFilters = computed(() => ['search', 'projectId', 'contractId', 'supplierId'].some(key => route.query[key]) || status.value.length > 0)
 const fetchProjects = async (keyword: string) => page.value?.projectOptions.filter(p => p.label.includes(keyword)) ?? []
-async function filter(patch: Record<string, string | undefined>) {
+async function filter(patch: Record<string, string | string[] | undefined>) {
   await navigateTo({ path: route.path, query: { ...route.query, ...patch, page: undefined } }, { replace: true })
 }
 function clear() {
@@ -61,11 +67,12 @@ useTabTitle(() => '其他支出结算')
 
 <template>
   <div ref="root" class="flex min-w-0 flex-col gap-3" data-testid="other-settlement-list">
+    <TargetCostSourceReturn />
     <header class="panel flex min-w-0 flex-wrap items-center gap-2 p-3">
       <h1 class="m-0 mr-auto text-15px font-800">
         其他支出结算
       </h1>
-      <SelectFilter v-model="status" :options="[{ key: 'all', label: '全部状态' }, ...statuses]" label="状态" />
+      <KitMultiSelectFilter v-model="status" :options="statuses" label="状态" />
       <LookupSelect v-model="project" :fetch="fetchProjects" placeholder="筛选项目" class="w-44 max-w-full" />
       <form class="flex min-w-0 max-w-full flex-wrap gap-2" @submit.prevent="filter({ search: search || undefined })">
         <input v-model="search" class="field-input min-w-0 max-w-full" type="search" placeholder="搜索结算名称 / 单号 / 合同" aria-label="搜索结算名称 / 单号 / 合同">
@@ -86,8 +93,14 @@ useTabTitle(() => '其他支出结算')
     <KitButton v-if="hasFilters" class="self-start" @click="clear">
       清除筛选
     </KitButton>
-    <StatePanel v-if="problem" :kind="shellState === 'forbidden' ? 'forbidden' : 'error'" :title="problem.message" :action-label="problem.retryable ? '重新加载' : ''" @action="refresh" />
-    <div v-else class="grid min-w-0 gap-3 lg:grid-cols-[150px_minmax(0,1fr)]">
+    <p v-if="problem && page" role="alert" class="m-0 rounded-sm bg-danger-soft p-3 text-12px text-danger">
+      {{ problem.message }}；当前保留上一次成功读取的列表。
+      <button v-if="problem.retryable" type="button" class="ml-2 underline" @click="refresh">
+        重试
+      </button>
+    </p>
+    <StatePanel v-if="problem && !page" :kind="shellState === 'forbidden' ? 'forbidden' : 'error'" :title="problem.message" :action-label="problem.retryable ? '重新加载' : ''" @action="refresh" />
+    <div v-else class="grid min-w-0 gap-3 lg:grid-cols-[150px_minmax(0,1fr)]" :aria-busy="shellState === 'loading'">
       <aside class="panel hidden p-3 text-13px lg:block">
         <p class="text-ink-soft">
           业务类型
@@ -95,8 +108,9 @@ useTabTitle(() => '其他支出结算')
           其他支出结算
         </p>
       </aside>
-      <div class="min-w-0">
-        <KitTable :columns="columns" :data="rows" :loading="shellState === 'loading'" :page="page?.pagination ?? { page: 1, pageSize: 20, total: 0 }" :empty="{ title: hasFilters ? '没有符合条件的结算' : '暂无其他支出结算', description: hasFilters ? '请调整筛选范围。' : '从真实其他支出合同建立结算。', actionLabel: hasFilters ? '清除筛选' : '' }" @empty-action="clear" @page-change="navigateTo({ path: route.path, query: { ...route.query, page: $event.page, pageSize: $event.pageSize } }, { replace: true })">
+      <div class="relative min-w-0">
+        <span v-if="shellState === 'loading' && page" role="status" class="pointer-events-none absolute right-3 top-1 z-1 rounded-sm bg-panel px-2 py-1 text-12px text-ink-soft">正在更新列表…</span>
+        <KitTable :columns="columns" :data="rows" :loading="shellState === 'loading' && !page" :page="page?.pagination ?? { page: 1, pageSize: 20, total: 0 }" :empty="{ title: hasFilters ? '没有符合条件的结算' : '暂无其他支出结算', description: hasFilters ? '请调整筛选范围。' : '从真实其他支出合同建立结算。', actionLabel: hasFilters ? '清除筛选' : '' }" @empty-action="clear" @page-change="navigateTo({ path: route.path, query: { ...route.query, page: $event.page, pageSize: $event.pageSize } }, { replace: true })">
           <template #name="{ row }">
             <NuxtLink :id="`other-settlement-${row.id}`" :to="target(row.source)" class="cell--link" @click="navigation.remember(`other-settlement-${row.id}`)">
               {{ row.name }}

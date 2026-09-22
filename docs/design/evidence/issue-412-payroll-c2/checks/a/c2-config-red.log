@@ -1,0 +1,29 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/central-c2-service.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/central-c2-service.test.ts (1 test | 1 failed) 561ms
+   × C2主体按项目与负责人保存正价和明确空规则，不要求月份或工程量，原配置可冷读 561ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/central-c2-service.test.ts > C2主体按项目与负责人保存正价和明确空规则，不要求月份或工程量，原配置可冷读
+TypeError: f.service.c2Config is not a function
+ ❯ Object.c2Config tests/helpers/payroll-c2-service-fixture.ts:16:36
+
+ ❯ tests/payroll/central-c2-service.test.ts:7:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  13:47:17
+   Duration  1.37s (transform 498ms, setup 0ms, import 584ms, tests 561ms, environment 0ms)
+

@@ -144,6 +144,16 @@ afterEach(() => {
 })
 
 describe('supplier detail store', () => {
+  it('分供方本地快照区分未填、明确零与历史未知，保留确认银行实付', async () => {
+    const store = useSupplierDetailStore()
+    for (const [amount, origin, state, claimed] of [[null, 'user-entry', 'not-entered', null], [0, 'user-entry', 'known', 0], [0, 'legacy', 'legacy-unknown', null]] as const) {
+      await mem.execute('UPDATE payment_applications SET approved_amount = ?, approved_amount_origin = ? WHERE id = ?', [amount, origin, 'pay1'])
+      await store.loadReadonlySnapshot('s1')
+      const snapshot = store.bySupplier('s1')
+      expect(snapshot.payments[0]).toMatchObject({ approvedAmount: state === 'known' ? 0 : null, approvedAmountState: state, paidAmount: 200 })
+      expect(snapshot.summary.claimedTotal).toBe(claimed)
+    }
+  })
   it('只读快照只执行查询，不启动状态同步事务或改写测试分供方', async () => {
     await mem.execute(`UPDATE suppliers SET credential_status = 'reviewing' WHERE id = 's1'`)
     const store = useSupplierDetailStore()

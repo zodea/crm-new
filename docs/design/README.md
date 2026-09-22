@@ -35,11 +35,21 @@ DC重构设计源码/
 
 ## 当前待补设计
 
-**当前为 2 条。** `/finance/payment/:id/detail` 与 `/settings/data-migration` 已有生产路由，但还没有一一对应的 DC 页面；它们在 [`design-coverage.json`](./design-coverage.json) 中保持 `design-pending`，分别由 [#305](https://github.com/zodea/crm-new/issues/305) 与 [#294](https://github.com/zodea/crm-new/issues/294) 承接。迁移页在设计补齐前以运行契约、四档实际视口和表内局部滚动证据验收。此前的施工进度「前后置依赖设置」已由 [#244](https://github.com/zodea/crm-new/issues/244) 合入设计源码，其 brief 仅保留历史说明，不再作为待办。
+当前缺一一对应 DC 页面的路由统一登记在 [`design-coverage.json`](./design-coverage.json)，数量见[实现状态生成表](./ui-implementation-status.md#2-当前总数)。付款详情由 [#404](https://github.com/zodea/crm-new/issues/404) 联同 [#413](https://github.com/zodea/crm-new/issues/413) 复核；数据迁移由 [#414](https://github.com/zodea/crm-new/issues/414) 承接；阶段配置整页已在 [#442](https://github.com/zodea/crm-new/issues/442) 完成本地运行验收，仍缺一一对应的 DC 页面。工序库独立只读详情由 [#443](https://github.com/zodea/crm-new/issues/443) 新增，采用已有工序库与 Table 原语验证，明确保留缺直接设计页的边界。旧 #305/#294 仅作历史来源。迁移页在设计补齐前以运行契约、实际视口和表内局部滚动证据验收。此前施工进度「前后置依赖设置」已由 #244 合入设计源码，[补图 brief](../research/schedule-dependency-editor-brief.md) 保留为历史研究。
 
-当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据、差异状态和对应实施票看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。当前实施权威是父规格 [#292](https://github.com/zodea/crm-new/issues/292) 与账本票 [#276](https://github.com/zodea/crm-new/issues/276)；#181 / #182 / #183 只保留历史证据，不再代表当前 Issue 状态。
+当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据和差异看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。本轮任务统一进入[瑞航 CRM 全模块复核与红圈对齐路线：前台交互和数据处理优先](https://github.com/zodea/crm-new/issues/402)，复核与详细规格按 [`module-review.md`](../agents/module-review.md) 执行。旧总规格、地图及账本中的票号保留历史证据含义；被替代的旧票通过正文指向当前承接者，不再充当当前实施入口。选定代码基线后的路由与机器账本校正由[建立全模块功能清单与可信复核基线](https://github.com/zodea/crm-new/issues/403)负责。
+
+历史溯源继续保留：旧生产链总规格 [#292](https://github.com/zodea/crm-new/issues/292) 与证据账本重建 [#276](https://github.com/zodea/crm-new/issues/276)。这些链接用于核对已有决定和验收来源，当前工作仍跟随新总图与承接任务。
+
+动态单据、导入阶段、当前挂载的页签/子表和 browser/Tauri 读写差异，进入 [全模块复核覆盖索引](./module-review-coverage.md)；其 [JSON](./module-review-coverage.json) 为派生清单。它与路由证据账本分别记录“需要核验哪些面”和“已有何种参考证据”，不以生成行数宣告功能完成。
 
 运行态视觉与公共交互回归的覆盖矩阵、更新方式和数据脱敏边界见 [`runtime-visual-regression.md`](./runtime-visual-regression.md)。页面切片完成时必须同时更新对应模板样本与真实页面基线。
+
+分供方证照中央链的流程、实际交互与文档验收分别见 [#446 原件与人工核验](./evidence/issue-446/README.md) 和 [#447 OCR 人工确认与税务核验](./evidence/issue-447/README.md)；结果与未验范围以对应页为准，不以某条子流程接通推定整个证照或主档模块完成。
+
+排程中央链分别查 [#443 工序库版本](./evidence/issue-443/README.md) 与 [#444 WBS、阶段往返及旧图接管](./evidence/issue-444/README.md) 的流程图、实际交互和验收记录。新增暂估绑定由 #445 接通；各切片不代替成本、工资或生产部署验收。
+
+工资完整接管及中央历史只读的流程、实际交互与指南见 [#412 工资接管记录](./evidence/issue-412-payroll-history/README.md)。新增独立工资来源页保留 `design-pending`，其依据为工资页面规格及 DC 通用原语；只读切片与后续 A/C1/C2 核算、发放和完整工作簿分别验收。
 
 ## 文档放置规则
 
@@ -59,3 +69,9 @@ DC重构设计源码/
 4. 打开 `app.dc.html` 核对品牌、DC 独有能力和无直接参考页的当前方案。
 5. 检查 ADR 0013 的响应式要求；不得按固定长宽实现。
 6. 若运行态参考、设计稿、Issue、Nuxt 现状互相冲突，在 Issue 中记录后再修改，并同轮消除旧文档冲突。
+
+<!-- issue-441:begin -->
+## #441 送货中央归档切片
+
+送货归档、完整原件、结构化修订和受控迁移已完成本地真实浏览器切片验收；三条旅程、五档界面、冲突核对、文件字节及指南 PDF 证据统一见 [#441 验收记录](./evidence/issue-441/README.md)。最终整合测试、类型检查与构建通过；物资父票 #411 的有效到货、库存及结算范围不因此标记完成。
+<!-- issue-441:end -->

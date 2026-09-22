@@ -22,6 +22,7 @@ export interface DeliveryPriceLineInput {
 }
 
 export interface DeliveryPriceRecordInput {
+  dataOrigin?: 'real' | 'demo'
   id: string
   projectId: string
   supplierId: string | null
@@ -33,6 +34,7 @@ export interface DeliveryPriceRecordInput {
   ocrStatus: string
   naturalKeyDuplicate: boolean
   currentValuesConfirmed: boolean
+  hasSourceFile: boolean
 }
 
 export interface PricePartyInput {
@@ -41,6 +43,7 @@ export interface PricePartyInput {
 }
 
 export interface MaterialPriceFact {
+  dataOrigin?: 'real' | 'demo'
   id: string
   deliveryRecordId: string
   deliveryOrderNo: string
@@ -97,6 +100,7 @@ export interface MaterialPriceAnalysis {
 }
 
 export interface MaterialContractInput {
+  dataOrigin?: 'real' | 'demo'
   id: string
   kind: string
   supplierId: string | null
@@ -108,6 +112,7 @@ export interface MaterialContractInput {
 }
 
 export interface SupplierContractDetail {
+  dataOrigin?: 'real' | 'demo'
   id: string
   name: string
   no: string
@@ -203,6 +208,7 @@ export function buildMaterialPriceCatalog(
       || (record.ocrStatus !== 'done' && record.ocrStatus !== 'reviewed')
       || record.naturalKeyDuplicate
       || !record.currentValuesConfirmed
+      || !record.hasSourceFile
     ) {
       continue
     }
@@ -255,6 +261,7 @@ export function buildMaterialPriceCatalog(
       item.facts.push({
         id: `${record.id}:${line.id}`,
         deliveryRecordId: record.id,
+        dataOrigin: record.dataOrigin,
         deliveryOrderNo: record.orderNo || record.id,
         date: record.deliveryDate,
         projectId: record.projectId,
@@ -377,7 +384,7 @@ export function buildSupplierContractRows(
       continue
     }
 
-    const key = `${contract.supplierId}:${contract.projectId}`
+    const key = JSON.stringify([contract.dataOrigin ?? 'native', contract.supplierId, contract.projectId])
     const row = rows.get(key) ?? {
       key,
       supplierId: contract.supplierId,
@@ -392,6 +399,7 @@ export function buildSupplierContractRows(
     row.totalAmount += Number.isFinite(contract.amount) ? contract.amount : 0
     row.contracts.push({
       id: contract.id,
+      dataOrigin: contract.dataOrigin,
       name: contract.name,
       no: contract.no,
       amount: contract.amount,

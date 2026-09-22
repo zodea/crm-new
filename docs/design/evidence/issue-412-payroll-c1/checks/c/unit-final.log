@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+
+ Test Files  2 passed (2)
+      Tests  3 passed (3)
+   Start at  11:43:38
+   Duration  583ms (transform 300ms, setup 0ms, import 519ms, tests 30ms, environment 0ms)
+

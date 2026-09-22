@@ -3,16 +3,17 @@ import type {
   QuantityBatchCompletionItem,
   QuantityBatchCompletionResult,
 } from '~/lib/quantity/batch-completion'
+import type { DataOriginDTO } from '~/types/read-model'
 import { useEventListener } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
-import { db } from '~/lib/db/client'
-import { loadQuantityBatchCompletionPlan } from '~/lib/quantity/batch-completion'
+import KitButton from '~/components/ui/KitButton.vue'
 import { ALL_QUANTITY_FILTER } from '~/lib/quantity/matrix'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 const props = withDefaults(defineProps<{
   projectId: string
+  origin?: DataOriginDTO
   initialBuildingId?: string
   initialTrade?: string
 }>(), {
@@ -41,6 +42,7 @@ const sections = [
 ]
 
 const workspace = computed(() => store.assignmentWorkspace?.projectId === props.projectId
+  && store.assignmentOrigin === (props.origin ?? 'real')
   ? store.assignmentWorkspace
   : null)
 
@@ -79,7 +81,7 @@ const dirty = computed(() => (
 
 async function initialize(sequence: number, projectId: string) {
   try {
-    await store.loadAssignments(projectId)
+    await store.loadAssignments(projectId, props.origin ?? 'real')
     if (sequence !== initializeSequence || !open.value || props.projectId !== projectId || !workspace.value)
       return
     selectedTrade.value = (
@@ -117,7 +119,7 @@ function requestInitialize(isOpen: boolean, projectId: string) {
 }
 
 watch(
-  [open, () => props.projectId, () => props.initialBuildingId, () => props.initialTrade],
+  [open, () => props.projectId, () => props.initialBuildingId, () => props.initialTrade, () => props.origin],
   ([isOpen, projectId]) => requestInitialize(isOpen, projectId),
   { immediate: true },
 )
@@ -141,11 +143,11 @@ async function expandPlan() {
     return
   }
   planLoading.value = true
+  const scope = JSON.stringify([props.projectId, props.origin, selectedTrade.value, selectedUnitIds.value])
   try {
-    const plan = await loadQuantityBatchCompletionPlan(db, props.projectId, {
-      trade: selectedTrade.value,
-      unitIds: [...selectedUnitIds.value],
-    })
+    const plan = await store.loadBatchPlan(props.projectId, selectedTrade.value, selectedUnitIds.value, props.origin ?? 'real')
+    if (!open.value || !plan || scope !== JSON.stringify([props.projectId, props.origin, selectedTrade.value, selectedUnitIds.value]))
+      return
     planItems.value = plan.items
     excludedKeys.value = plan.items
       .filter(item => item.currentStatus === 'completed')
@@ -198,7 +200,7 @@ async function confirmArchivedEdit(): Promise<boolean> {
 }
 
 async function save() {
-  if (store.completionSaving || planLoading.value || initializing.value)
+  if (!store.batchCanWrite || store.completionSaving || planLoading.value || initializing.value)
     return
   const items = includedItems.value
   if (!planItems.value) {
@@ -299,6 +301,7 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
     save-label="提交批量登记"
     width="min(1080px, calc(100dvw - var(--space-6, 24px)))"
     :busy="store.completionSaving"
+    :save-disabled="!store.batchCanWrite || !planItems || planLoading || initializing"
     @save="save"
     @cancel="requestClose"
   >
@@ -319,9 +322,9 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
       <p class="max-w-xl text-12px text-ink-soft">
         {{ store.assignmentError }}
       </p>
-      <button type="button" class="btn-primary" @click="retry">
+      <KitButton variant="primary" @click="retry">
         重新加载
-      </button>
+      </KitButton>
     </section>
 
     <fieldset
@@ -329,7 +332,7 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
       data-testid="quantity-batch-completion-fields"
       class="m-0 min-w-0 border-0 p-0"
       :class="store.completionSaving ? 'pointer-events-none opacity-70' : ''"
-      :disabled="store.completionSaving || initializing"
+      :disabled="!store.assignmentCanWrite || store.completionSaving || initializing"
     >
       <div class="grid gap-7">
         <section id="form-section-scope" class="scroll-mt-4 grid gap-4">

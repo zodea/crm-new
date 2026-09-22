@@ -118,6 +118,8 @@ def inline_markup(text: str) -> str:
 
 def make_styles() -> dict[str, ParagraphStyle]:
     samples = getSampleStyleSheet()
+    # 使用中文断行禁则，避免句号等闭合标点单独落到下一行。
+    samples["BodyText"].wordWrap = "CJK"
     return {
         "body": ParagraphStyle(
             "Body",
@@ -192,6 +194,7 @@ def make_styles() -> dict[str, ParagraphStyle]:
             leading=12.5,
             textColor=INK,
             alignment=TA_LEFT,
+            wordWrap=None,
         ),
         "table_cell": ParagraphStyle(
             "TableCell",
@@ -201,6 +204,7 @@ def make_styles() -> dict[str, ParagraphStyle]:
             leading=12.5,
             textColor=INK,
             alignment=TA_LEFT,
+            wordWrap=None,
         ),
         "code": ParagraphStyle(
             "Code",
@@ -214,10 +218,11 @@ def make_styles() -> dict[str, ParagraphStyle]:
 
 
 class FlowDiagram(Flowable):
-    def __init__(self, steps: list[FlowStep], styles: dict[str, ParagraphStyle]):
+    def __init__(self, steps: list[FlowStep], styles: dict[str, ParagraphStyle], start_number: int = 1):
         super().__init__()
         self.steps = steps
         self.styles = styles
+        self.start_number = start_number
         self.step_height = 49
         self.width = 0
         self.height = len(steps) * self.step_height + 4
@@ -226,11 +231,22 @@ class FlowDiagram(Flowable):
         self.width = available_width
         return available_width, self.height
 
+    def split(self, available_width: float, available_height: float) -> list[Flowable]:
+        count = min(len(self.steps), int((available_height - 4) // self.step_height))
+        if count <= 0:
+            return []
+        if count == len(self.steps):
+            return [self]
+        return [
+            FlowDiagram(self.steps[:count], self.styles, self.start_number),
+            FlowDiagram(self.steps[count:], self.styles, self.start_number + count),
+        ]
+
     @staticmethod
     def tone(status: str) -> tuple[colors.Color, colors.Color]:
         if "当前已可用" in status:
             return SUCCESS, SUCCESS_SOFT
-        if "待开发" in status or "未闭环" in status:
+        if "待开发" in status or "未闭环" in status or "待中央接通" in status:
             return WARNING, WARNING_SOFT
         if status.startswith("步骤"):
             return BRAND, BRAND_SOFT
@@ -256,7 +272,7 @@ class FlowDiagram(Flowable):
             canvas.circle(circle_x, center_y, 11, stroke=0, fill=1)
             canvas.setFont("RuihangSansBold", 8.3)
             canvas.setFillColor(colors.white)
-            canvas.drawCentredString(circle_x, center_y - 3, str(index + 1))
+            canvas.drawCentredString(circle_x, center_y - 3, str(index + self.start_number))
 
             canvas.setFillColor(soft)
             canvas.setStrokeColor(LINE)

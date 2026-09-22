@@ -69,6 +69,28 @@ const facts: SubcontractContractFactSources = {
 }
 
 describe('分包合同中央 Repository 契约', () => {
+  it('状态和类别各自 OR、字段之间 AND，分页和汇总共用筛选结果', () => {
+    const contracts = [
+      ...Array.from({ length: 12 }, (_, index) => ({ ...contract, id: `match-${index}`, status: index % 2 ? '草稿' : '履约中', subKind: index % 2 ? '劳务' : '专业' })),
+      { ...contract, id: 'excluded-status', status: '已结清' },
+      { ...contract, id: 'excluded-kind', subKind: '其他' },
+    ]
+    const input = { contracts, facts, asOf: '2026-08-25T00:00:00.000Z', sourceVersion: 'multi-filter', capabilities: [] }
+    const page = buildSubcontractContractListPage({
+      ...input,
+      query: parseSubcontractContractListQuery({ status: '["草稿","履约中"]', subKind: '["劳务","专业"]' }),
+    })
+    expect(page.items).toHaveLength(10)
+    expect(page.pagination.total).toBe(12)
+    expect(page.summary.origins.real).toMatchObject({ contractCount: 12, changedAmount: '12000.00' })
+    const labor = buildSubcontractContractListPage({
+      ...input,
+      query: parseSubcontractContractListQuery({ status: '["草稿","履约中"]', subKind: '["劳务"]' }),
+    })
+    expect(labor.pagination.total).toBe(6)
+    expect(labor.items.every(row => row.subKind === '劳务')).toBe(true)
+  })
+
   it('只从真实合同外键事实派生分包专属金额，且不从余额猜结清状态', () => {
     const page = buildSubcontractContractListPage({
       contracts: [contract],

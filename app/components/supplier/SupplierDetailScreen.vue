@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { SupplierFactTab } from './SupplierFactTable.vue'
 import type { DataOriginDTO, MetricDTO } from '~/types/read-model'
-import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
+import { computed, nextTick, onActivated, shallowRef, useTemplateRef, watch } from 'vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { validateAuxiliaryDetailReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { validateMaterialContractDetailJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
@@ -15,6 +16,8 @@ import {
   validateSupplierDetailReturnTo,
   validateSupplierReturnTo,
 } from '~/lib/supplier/return-context'
+import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE } from '~/lib/supplier/status'
+import { formatShanghaiDateTime } from '~/lib/util/datetime'
 import { yuan } from '~/lib/util/money'
 import { useSupplierReadStore } from '~/stores/supplier-read'
 
@@ -27,9 +30,11 @@ const props = defineProps<{
 }>()
 const route = useRoute()
 const router = useRouter()
+const supplierNavigation = useTemplateRef<HTMLElement>('supplierNavigation')
 const store = useSupplierReadStore()
-const factTabs = new Set<SupplierFactTab>(['projects', 'contracts', 'settlements', 'invoices', 'payments'])
-const activeTab = shallowRef<SupplierFactTab>(validTab(route.query.tab))
+type SupplierDetailTab = 'overview' | SupplierFactTab
+const factTabs = new Set<SupplierDetailTab>(['overview', 'projects', 'contracts', 'settlements', 'invoices', 'payments'])
+const activeTab = shallowRef<SupplierDetailTab>(validTab(route.query.tab))
 const subcontractChangeContextId = shallowRef(newSupplierDetailJourneyReturnContextId())
 const subcontractChangeAnchorId = 'supplier-subcontract-change-link'
 
@@ -42,6 +47,11 @@ const detail = computed(() => {
   return null
 })
 const supplier = computed(() => detail.value?.supplier ?? null)
+const credentialLabel = computed(() => {
+  const status = supplier.value?.credentialStatus
+  return status ? CREDENTIAL_STATUS_LABEL[status] ?? '未知状态' : '未记录'
+})
+const credentialTone = computed(() => CREDENTIAL_STATUS_TONE[supplier.value?.credentialStatus ?? ''] ?? 'neutral')
 const materialContractReturnTo = computed(() => validateMaterialContractDetailJourneyReturnTo(props.returnTo, props.origin))
 const subcontractChangeReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'sub_change'))
 const subcontractSettlementReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'sub_settlement'))
@@ -124,12 +134,30 @@ const subcontractChangesTo = computed(() => {
   return `/subcontract/change?${query.toString()}`
 })
 const tabs = computed(() => [
+  { key: 'overview', label: '详细资料' },
   { key: 'projects', label: '合作项目', count: detail.value?.projects.length ?? 0 },
-  { key: 'contracts', label: '合同事实', count: detail.value?.contracts.length ?? 0 },
-  { key: 'settlements', label: '结算事实', count: detail.value?.settlements.length ?? 0 },
-  { key: 'invoices', label: '收票事实', count: detail.value?.invoices.length ?? 0 },
-  { key: 'payments', label: '付款事实', count: detail.value?.payments.length ?? 0 },
+  { key: 'contracts', label: '支出合同', count: detail.value?.contracts.length ?? 0 },
+  { key: 'settlements', label: '支出结算', count: detail.value?.settlements.length ?? 0 },
+  { key: 'invoices', label: '收票登记', count: detail.value?.invoices.length ?? 0 },
+  { key: 'payments', label: '付款管理', count: detail.value?.payments.length ?? 0 },
 ])
+const overviewMetadata = computed(() => supplier.value
+  ? [
+      { label: '分供方类别', value: supplier.value.supplierCategory },
+      { label: '评价等级', value: supplier.value.rating },
+      { label: '主要联系人', value: supplier.value.contact },
+      { label: '联系电话', value: supplier.value.contactPhone },
+      { label: '详细地址', value: supplier.value.address },
+    ]
+  : [])
+const recordFields = computed(() => supplier.value
+  ? [
+      { label: '唯一识别码', value: supplier.value.uniqueCode },
+      { label: '经营类型', value: supplier.value.businessType },
+      { label: '资料状态', value: credentialLabel.value },
+      { label: '更新时间', value: formatShanghaiDateTime(supplier.value.updatedAt) },
+    ]
+  : [])
 const summaryRows = computed(() => detail.value
   ? [
       { label: '合作项目', value: `${detail.value.summary.projectCount} 个`, tab: 'projects' as const, metric: null },
@@ -143,16 +171,16 @@ const summaryRows = computed(() => detail.value
 
 useTabTitle(() => supplier.value?.name)
 
-function validTab(value: unknown): SupplierFactTab {
+function validTab(value: unknown): SupplierDetailTab {
   const candidate = Array.isArray(value) ? value[0] : value
-  return typeof candidate === 'string' && factTabs.has(candidate as SupplierFactTab) ? candidate as SupplierFactTab : 'projects'
+  return typeof candidate === 'string' && factTabs.has(candidate as SupplierDetailTab) ? candidate as SupplierDetailTab : 'overview'
 }
 
 function selectTab(value: string | undefined) {
   const next = validTab(value)
   activeTab.value = next
   const query = { ...route.query }
-  if (next === 'projects')
+  if (next === 'overview')
     delete query.tab
   else
     query.tab = next
@@ -161,6 +189,15 @@ function selectTab(value: string | undefined) {
 
 function summaryClickable(row: { tab: SupplierFactTab | null, metric: MetricDTO | null }) {
   return Boolean(row.tab && (row.metric === null || row.metric.drilldown))
+}
+
+async function selectSummaryTab(tab: SupplierFactTab | null) {
+  if (!tab)
+    return
+  selectTab(tab)
+  await nextTick()
+  supplierNavigation.value?.scrollIntoView?.({ block: 'start', inline: 'nearest' })
+  supplierNavigation.value?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true })
 }
 
 function workspaceScrollTop(): number {
@@ -236,8 +273,8 @@ onActivated(() => void load())
 
 <template>
   <EntityDetailShell
+    compact
     :title="supplier?.name ?? '分供方详情'"
-    :subtitle="supplier ? [supplier.supplierCategory, supplier.taxNo, supplier.contact].filter(Boolean).join(' · ') : ''"
     :back-to="backTo"
     :back-label="backLabel"
     :state="shellState"
@@ -247,13 +284,17 @@ onActivated(() => void load())
     @state-action="load"
   >
     <template #mark>
-      <div v-if="supplier" class="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-soft text-18px font-800 text-brand">
-        {{ supplier.name.slice(0, 1) }}
+      <div v-if="supplier" class="grid h-8 w-8 place-items-center rounded-[var(--radius-card)] bg-brand-soft text-18px text-brand">
+        <span class="i-lucide-building-2" />
       </div>
     </template>
     <template #status>
-      <span v-if="supplier" :class="supplier.credentialStatus === 'complete' ? 'chip chip-ok' : 'chip chip-warn'">{{ supplier.credentialStatus === 'complete' ? '资料完整' : '资料待完善' }}</span>
-      <span v-if="detail" class="chip">{{ detail.dataOrigin === 'demo' ? '测试数据' : '正式数据' }}</span>
+      <KitStatusTag v-if="supplier" :tone="credentialTone">
+        {{ credentialLabel }}
+      </KitStatusTag>
+      <KitStatusTag v-if="detail?.dataOrigin === 'demo'" tone="neutral">
+        测试数据
+      </KitStatusTag>
     </template>
     <template #actions>
       <NuxtLink
@@ -275,34 +316,61 @@ onActivated(() => void load())
       <span v-else-if="detail?.dataOrigin === 'demo'" class="text-11px text-ink-faint">测试分供方只读</span>
     </template>
     <template #summary>
-      <MetricGrid v-if="detail" :cols="6" data-testid="supplier-summary">
-        <template v-for="row in summaryRows" :key="row.label">
-          <button v-if="summaryClickable(row)" type="button" class="min-w-0 border-0 bg-transparent p-0 text-left hover:bg-surface-2 focus-visible:outline-brand" :aria-label="`查看${row.label}明细`" @click="selectTab(row.tab ?? undefined)">
-            <Metric :label="row.label" :value="row.value" tone="brand" />
-          </button>
-          <div v-else class="min-w-0">
-            <Metric :label="row.label" :value="row.value" />
-          </div>
-        </template>
-      </MetricGrid>
+      <dl class="supplier-metadata">
+        <div v-for="item in overviewMetadata" :key="item.label" class="min-w-0">
+          <dt class="m-0 mb-1 text-12px text-ink-soft">
+            {{ item.label }}
+          </dt>
+          <dd class="m-0 whitespace-pre-wrap break-words text-14px leading-5 text-ink">
+            {{ item.value || '—' }}
+          </dd>
+        </div>
+      </dl>
     </template>
-    <div v-if="supplier && detail" class="flex min-w-0 flex-col gap-4">
+    <template #navigation>
+      <nav ref="supplierNavigation" aria-label="分供方业务事实">
+        <SegTab :model-value="activeTab" :tabs="tabs" @update:model-value="selectTab" />
+      </nav>
+    </template>
+    <div v-if="supplier && detail" class="grid min-w-0 gap-2">
       <StatePanel v-if="store.detailState.kind === 'error'" kind="error" title="刷新分供方详情失败" :description="store.detailState.problem.message" :action-label="store.detailState.problem.retryable ? '重新加载' : ''" compact @action="load" />
-      <SupplierDetailOverview :supplier="supplier" />
-      <AuxiliaryContractJourney v-if="detail.dataOrigin === 'real'" :supplier-id="supplierId" />
-      <section class="panel min-w-0 overflow-hidden" aria-labelledby="supplier-facts-heading">
-        <div class="flex min-w-0 flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-          <h3 id="supplier-facts-heading" class="m-0 mr-auto text-14px font-800 text-ink">
-            真实业务事实
-          </h3>
-          <nav class="min-w-0 max-w-full overflow-x-auto" aria-label="分供方业务事实">
-            <SegTab :model-value="activeTab" :tabs="tabs" @update:model-value="selectTab" />
-          </nav>
-        </div>
-        <div class="min-w-0 p-3">
-          <SupplierFactTable :tab="activeTab" :projects="detail.projects" :contracts="detail.contracts" :settlements="detail.settlements" :invoices="detail.invoices" :payments="detail.payments" />
-        </div>
+      <SupplierDetailOverview v-if="activeTab === 'overview'" :supplier="supplier" />
+      <section v-else class="min-w-0 bg-panel p-3" :aria-label="tabs.find(tab => tab.key === activeTab)?.label">
+        <SupplierFactTable :tab="activeTab" :projects="detail.projects" :contracts="detail.contracts" :settlements="detail.settlements" :invoices="detail.invoices" :payments="detail.payments" />
       </section>
     </div>
+    <template v-if="supplier && detail" #aside>
+      <div class="grid min-w-0 gap-2">
+        <section class="min-w-0 bg-panel" aria-labelledby="supplier-cooperation-heading">
+          <h3 id="supplier-cooperation-heading" class="m-0 border-b border-line px-4 py-3 text-14px font-700 text-ink">
+            往期合作情况
+          </h3>
+          <dl class="m-0 grid min-w-0 gap-4 p-4" data-testid="supplier-summary">
+            <div v-for="row in summaryRows" :key="row.label" class="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <dt class="text-12px text-ink-soft">
+                {{ row.label }}
+              </dt>
+              <dd class="m-0 min-w-0">
+                <button v-if="summaryClickable(row)" type="button" class="border-0 bg-transparent p-0 text-left text-14px font-600 tabular-nums text-brand hover:underline focus-visible:outline-brand" :aria-label="`查看${row.label}明细`" @click="selectSummaryTab(row.tab)">
+                  {{ row.value }}
+                </button>
+                <span v-else class="text-14px font-600 tabular-nums text-ink">{{ row.value }}</span>
+              </dd>
+            </div>
+          </dl>
+        </section>
+        <ReadOnlySection title="档案信息" :fields="recordFields" />
+        <AuxiliaryContractJourney v-if="detail.dataOrigin === 'real'" :supplier-id="supplierId" />
+      </div>
+    </template>
   </EntityDetailShell>
 </template>
+
+<style scoped>
+.supplier-metadata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 16px 24px;
+  margin: 0;
+}
+</style>

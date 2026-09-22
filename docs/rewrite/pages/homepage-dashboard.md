@@ -2,7 +2,7 @@
 
 > 路由：`/` · 页面：`app/pages/index.vue`
 >
-> 现行版本：2026-07-28，落实 [#189](https://github.com/zodea/crm-new/issues/189)
+> 既有实现来源：[#189](https://github.com/zodea/crm-new/issues/189)；当前复核由 [#414](https://github.com/zodea/crm-new/issues/414) 承接，排程来源与 #412 联验。
 >
 > 关联权威：[施工进度 §7.1](schedule-progress.md)、[ProjectSwitcher 契约](../../design/kit-ui-component-specs.md)、[ADR 0013](../../adr/0013-align-all-ui-to-online-design.md)
 
@@ -33,13 +33,17 @@
 
 ## 3. 数据与状态
 
-所有生产内容来自 `useScheduleStore` 的项目目录和 `ScheduleProjectView`，不得在页面内构造业务指标或模拟事实。
+页面消费 `useHomeDashboardStore` / `createHomeProjectSource` 提供的项目目录与排程可用性，不在页面构造业务指标或模拟事实。浏览器项目目录使用中央 Project Repository 完整分页；项目身份为 `(origin, id)`，选择后再次通过详情 Repository 核对名称与权限。禁止因复用旧 store 回退本地正式项目。
+
+[#434](https://github.com/zodea/crm-new/issues/434) 先接通中央项目目录并用 `not-connected` 标明当时缺排程来源；[#444](https://github.com/zodea/crm-new/issues/444) 继续把正式排程接到同一中央 Repository，独立工作区修改后首页重新读取当前计划与阶段进度。真实空计划与未知/失败分别表示，不把读取失败构造成空 `ScheduleProjectView` 或零进度。只有测试数据开关与中央权限均通过的测试项目，才能按稳定 ID 读取隔离只读演示排程。桌面 SQLite 的既有路径仍保留，浏览器中央验证不等于生产部署完成。
 
 | 状态 | 页面反馈 | 可恢复路径 |
 | --- | --- | --- |
 | `loading` | 施工进度骨架屏 | 等待同一请求完成 |
 | `catalog-empty` | 尚无可查看项目 | 前往整页项目表单 |
-| `schedule-empty` | 当前项目没有施工排程 | 新建楼栋分组或打开施工进度 |
+| `schedule-empty` | 已读取对应排程，确实没有分组 | 首页来源入口只读；独立施工进度工作区可新建分组 |
+| `not-connected` | 项目资料已读取，排程来源尚未接入；计划与实际进度未知 | 查看施工进度来源并返回同一首页项目 |
+| `forbidden` | 当前无权查看项目施工进度 | 重新加载；不得展示之前已失权的事实 |
 | `partial-data` | 保留已有进度，同时显示缺失分组/适用单元提示 | 前往施工进度补齐配置；缺失值不按 0 推断 |
 | `error` | 明确错误说明 | 重新加载 |
 | `ready` | 项目进度甘特 | 项目切换、分组展开、工序下钻 |
@@ -51,7 +55,7 @@
 ### 项目切换
 
 - 项目选择器在 1、3、12 个项目时使用同一触发器和搜索面板契约。
-- 只有目标项目读取成功后才确认选择并同步 `?project=`。
+- 只有目标项目读取成功后才确认选择并同步 `?project=&origin=`；桌面旧路径不附中央来源。没有来源的历史项目链接只有在目录内身份唯一时才可归一化，找不到或来源不匹配时显示问题，不回落首个项目。
 - 切换失败时恢复上一个已确认项目、上一个可用快照和 URL；页面内显示可重试错误，系统泳道同时提示结果。
 - 并发切换只接受最后一次请求结果，较早响应不得覆盖当前选择。
 - 路由查询变化和页签重新激活都重新核对项目事实，不能只依赖首次挂载。
@@ -59,9 +63,9 @@
 ### 甘特
 
 - 楼栋分组可展开/收起；高亮分组或工序时自动保证对应分组展开。
-- 工程量联动工序跳转到工程量工作台并携带项目、分组和工序筛选。
-- 手动填报工序不伪造下钻，提示用户前往施工进度页维护。
-- 首页本身只读；新增分组、编辑计划和进度写入均在施工进度路由完成。
+- 工程量联动工序跳转到工程量工作台并携带项目、来源、分组和工序筛选，返回时保留这些身份。
+- 手动填报工序不伪造下钻，提示当前入口仅提供只读查看。
+- 首页的 `/schedule?project=&origin=&from=home` 是同源只读查看，由 `HomeScheduleSourceScreen` 消费同一读取入口，不能进入旧 store 后回落本地首个项目；返回首页保留项目、来源及已有工序定位。独立排程以明确调用来源区分，不能仅因携带 `origin` 就变成首页只读页；新增分组、编辑计划和进度写入只在独立工作区开放。
 
 ## 5. 响应式与可达性
 
@@ -75,7 +79,10 @@
 
 - 纯规则：`tests/home/dashboard.test.ts`
 - 状态面：`tests/components/HomeDashboardSurface.test.ts`
+- 中央项目来源与跨页回读：`tests/home/project-source.test.ts`、`tests/components/HomeProjectSourceNavigation.test.ts`
+- 中央新建到首页与来源返回：`e2e/issue-434-home-project-source.spec.ts`
 - 首页流程：`e2e/issue-189-home-dashboard.spec.ts`
 - 原施工进度闭环：`e2e/home-schedule.spec.ts`
 - 五种状态四档视觉：`e2e/runtime-visual-matrix.spec.ts`
 - 稳定状态预览（仅开发验证，不计生产路由）：`/dev/home-dashboard?state=loading|schedule-empty|partial|error`
+- 用户操作：[首页项目与施工进度使用指南](../../guides/home-project-progress.md)

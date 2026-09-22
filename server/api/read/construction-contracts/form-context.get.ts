@@ -1,16 +1,18 @@
 import { resolveBusinessSession } from '../../../utils/business-session'
-import {
-  CONSTRUCTION_CONTRACT_FORM_CUSTOMERS,
-  CONSTRUCTION_CONTRACT_FORM_PROJECTS,
-} from '../../../utils/construction-contract-command-test-instance'
+import { constructionContractReferences } from '../../../utils/construction-contract-references'
+import { throwProjectReadError } from '../../../utils/project-read-error'
 
-export default defineEventHandler(() => {
+export default defineEventHandler((event) => {
   const session = resolveBusinessSession()
-  return {
-    workspaceId: session.workspaceId,
-    actorId: session.actorId,
-    capabilities: [...session.capabilities],
-    projects: CONSTRUCTION_CONTRACT_FORM_PROJECTS.map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
-    customers: CONSTRUCTION_CONTRACT_FORM_CUSTOMERS.map(row => ({ id: row.id, label: row.name })),
+  try {
+    return {
+      workspaceId: session.workspaceId,
+      actorId: session.actorId,
+      capabilities: [...session.capabilities],
+      ...constructionContractReferences(getHeader(event, 'x-ruihang-test-session')),
+    }
+  }
+  catch (cause) {
+    throwProjectReadError(cause)
   }
 })

@@ -1,5 +1,7 @@
 import type { QuantityConstructionRecord } from '~/lib/quantity/derived'
+import type { QuantityMeasureTotal } from '~/lib/quantity/totals'
 import { describe, expect, it } from 'vitest'
+import * as XLSX from 'xlsx'
 import {
   createQuantityCategoryExport,
   createQuantityLedgerExport,
@@ -7,6 +9,10 @@ import {
   quantityProgressRows,
   quantityRecordRows,
 } from '~/lib/quantity/export'
+
+function total(value: number): QuantityMeasureTotal {
+  return { value, knownValue: value, missingCount: 0, sourceCount: 1, unitMissing: false, completeness: 'complete' }
+}
 
 function record(overrides: Partial<QuantityConstructionRecord> = {}): QuantityConstructionRecord {
   return {
@@ -78,11 +84,27 @@ describe('quantity export：派生查询到 ADR 0004 两路导出', () => {
       stageName: '墙砖铺贴',
       stageSortOrder: 20,
       completedUnits: 1,
-      contractQty: 21,
-      provisionalQty: 22,
-      fieldQty: 20,
+      unit: '㎡',
+      contractQty: total(21),
+      provisionalQty: total(22),
+      fieldQty: total(20),
     }])).toEqual([
-      { 月份: '2026-07', 工种: '泥水工', 工序阶段: '墙砖铺贴', 完成户数: 1, 合同量: 21, 暂定量: 22, 现场量: 20 },
+      {
+        月份: '2026-07',
+        工种: '泥水工',
+        工序阶段: '墙砖铺贴',
+        单位: '㎡',
+        完成户数: 1,
+        合同量: 21,
+        合同量完整度: '完整',
+        合同量已知部分: '',
+        暂估量: 22,
+        暂估量完整度: '完整',
+        暂估量已知部分: '',
+        现场量: 20,
+        现场量完整度: '完整',
+        现场量已知部分: '',
+      },
     ])
   })
 
@@ -95,6 +117,44 @@ describe('quantity export：派生查询到 ADR 0004 两路导出', () => {
     }, new Date(2026, 6, 20))
     expect(options.defaultName).toBe('合和新城_工程量台账_2026-07-20.xlsx')
     expect(options.data.byteLength).toBeGreaterThan(0)
+  })
+
+  it('真实 XLSX 保留缺失数值为空、明确零为数字，并带出单位和已知部分', () => {
+    const file = createQuantityLedgerExport({
+      projectName: '空值核验',
+      records: [],
+      progress: [],
+      monthly: [{
+        month: '2026-09',
+        trade: '泥水工',
+        stageId: 'stage-null',
+        stageName: '含缺量阶段',
+        stageSortOrder: 1,
+        unit: '㎡',
+        completedUnits: 1,
+        contractQty: total(0),
+        provisionalQty: total(30),
+        fieldQty: { value: null, knownValue: 12, missingCount: 1, sourceCount: 2, unitMissing: false, completeness: 'partial' },
+      }],
+    })
+    const book = XLSX.read(file.data, { type: 'array' })
+    const rows = XLSX.utils.sheet_to_json(book.Sheets['月度完成量']!, { defval: '' })
+    expect(rows).toEqual([{
+      月份: '2026-09',
+      工种: '泥水工',
+      工序阶段: '含缺量阶段',
+      单位: '㎡',
+      完成户数: 1,
+      合同量: 0,
+      合同量完整度: '完整',
+      合同量已知部分: '',
+      暂估量: 30,
+      暂估量完整度: '完整',
+      暂估量已知部分: '',
+      现场量: '',
+      现场量完整度: '缺 1 项',
+      现场量已知部分: 12,
+    }])
   })
 
   it('分类导出按楼栋→工种目录、户×工种一文件分组', () => {

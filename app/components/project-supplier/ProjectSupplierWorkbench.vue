@@ -2,6 +2,7 @@
 import type { ProjectSupplierWorkbenchReadDTO } from '~/lib/project-supplier/repository'
 import type { ProjectSupplierWorkbenchTab } from '~/lib/project-supplier/workbench'
 import { computed, shallowRef, watch } from 'vue'
+import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { projectSupplierWorkbenchTab } from '~/lib/project-supplier/workbench'
 import { yuan } from '~/lib/util/money'
 import { isDataOriginDTO } from '~/types/read-model'
@@ -22,6 +23,15 @@ const data = computed<ProjectSupplierWorkbenchReadDTO | null>(() => {
   return null
 })
 const refreshing = computed(() => readStore.state.kind === 'loading')
+const fileContext = computed(() => {
+  const current = data.value
+  if (!current || refreshing.value || current.project.id !== props.projectId || current.supplier.id !== props.supplierId
+    || current.dataOrigin !== origin.value || (current.dataOrigin === 'demo' && !visibility.includeDemo)
+    || !current.capabilities.includes('project-supplier:read')) {
+    return null
+  }
+  return { projectId: props.projectId, supplierId: props.supplierId, relationId: current.relation.id, origin: current.dataOrigin, includeDemo: visibility.includeDemo }
+})
 const returnTo = computed(() => `/project/${encodeURIComponent(props.projectId)}/supplier/${encodeURIComponent(props.supplierId)}${origin.value === 'demo' ? '?origin=demo&' : '?'}tab=${activeTab.value}`)
 
 useTabTitle(() => data.value?.supplier.label)
@@ -49,7 +59,7 @@ const claimRows = computed(() => (data.value?.claims ?? []).map(row => ({ id: ro
   { text: row.application.no || '—', tone: 'muted' as const },
   { text: row.application.label },
   { text: yuan(row.applyAmount), tone: 'money' as const },
-  { text: yuan(row.approvedAmount), tone: 'money' as const },
+  { text: row.approvedAmount === null ? approvalAmountLabel(row.approvedAmountState) : yuan(row.approvedAmount), tone: 'money' as const },
   { text: date(row.applyDate), tone: 'muted' as const },
   { text: row.invoiceState },
   { text: `${row.attachmentCount} 份`, tone: 'muted' as const },
@@ -129,7 +139,7 @@ watch(() => [props.projectId, props.supplierId, origin.value, route.query.tab, v
         <ProjectSupplierFactTable v-else-if="activeTab === 'payment'" :columns="['支付编号', '支付日期', '本关系分摊金额', '方式', '凭证号', '请款单', '附件', '确认状态']" :rows="paymentRows" empty="暂无付款事实" :return-to="returnTo" />
         <ProjectSupplierFactTable v-else :columns="['结算编号', '结算名称', '类型', '结算金额', '结算日期', '附件', '状态']" :rows="settlementRows" empty="暂无结算事实" :return-to="returnTo" />
       </section>
-      <ProjectSupplierFilePanel :files="data.files" :return-to="returnTo" />
+      <ProjectSupplierFileAccess :files="data.files" :return-to="returnTo" :context="fileContext" />
       <p class="m-0 text-right text-10px text-ink-faint">
         数据时间 {{ data.asOf.replace('T', ' ').replace('Z', '') }} · {{ data.sourceVersion || '中央版本未标注' }}
       </p>

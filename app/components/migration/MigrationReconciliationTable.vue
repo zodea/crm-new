@@ -5,6 +5,7 @@ export type MigrationReconciliationType
     | 'amount-mismatch'
     | 'reference-mismatch'
     | 'soft-delete-info'
+    | 'source-info'
     | 'soft-delete-mismatch'
     | 'orphan'
     | 'duplicate-source'
@@ -36,6 +37,7 @@ const typeLabels: Record<MigrationReconciliationType, string> = {
   'amount-mismatch': '金额不一致',
   'reference-mismatch': '引用不一致',
   'soft-delete-info': '已保留软删除',
+  'source-info': '来源缺失或历史留痕',
   'soft-delete-mismatch': '软删除不一致',
   'orphan': '孤儿记录',
   'duplicate-source': '来源重复',
@@ -48,6 +50,7 @@ const typeClasses: Record<MigrationReconciliationType, string> = {
   'amount-mismatch': 'chip-warn',
   'reference-mismatch': 'chip-danger',
   'soft-delete-info': 'chip-ok',
+  'source-info': 'chip-warn',
   'soft-delete-mismatch': 'chip-warn',
   'orphan': 'chip-danger',
   'duplicate-source': 'chip-danger',
@@ -62,6 +65,18 @@ const typeClasses: Record<MigrationReconciliationType, string> = {
         迁移对账
       </h2>
       <span class="text-12px text-ink-soft">{{ rows.length }} 条对账记录</span>
+    </div>
+
+    <div v-if="state === 'rollback-pending'" class="flex min-h-28 items-center justify-center px-4 py-6 text-center" role="status">
+      <div>
+        <span class="i-lucide-rotate-ccw text-22px text-warn" aria-hidden="true" />
+        <p class="m-0 mt-2 text-13px font-700 text-ink">
+          中央已回滚，等待恢复本地快照
+        </p>
+        <p class="m-0 mt-1 text-12px text-ink-soft">
+          历史对账已经完成；请重试回滚以恢复受保护备份。
+        </p>
+      </div>
     </div>
 
     <div v-if="rows.length" class="max-w-full overflow-x-auto" data-testid="migration-reconciliation-scroll">
@@ -164,18 +179,7 @@ const typeClasses: Record<MigrationReconciliationType, string> = {
         </p>
       </div>
     </div>
-    <div v-else-if="state === 'rollback-pending'" class="flex min-h-28 items-center justify-center px-4 py-6 text-center" role="status">
-      <div>
-        <span class="i-lucide-rotate-ccw text-22px text-warn" aria-hidden="true" />
-        <p class="m-0 mt-2 text-13px font-700 text-ink">
-          中央已回滚，等待恢复本地快照
-        </p>
-        <p class="m-0 mt-1 text-12px text-ink-soft">
-          历史对账已经完成；请重试回滚以恢复受保护备份。
-        </p>
-      </div>
-    </div>
-    <div v-else class="flex min-h-28 items-center justify-center px-4 py-6 text-center" role="status">
+    <div v-else-if="state === 'unchecked'" class="flex min-h-28 items-center justify-center px-4 py-6 text-center" role="status">
       <div>
         <span class="i-lucide-clock-3 text-22px text-ink-muted" aria-hidden="true" />
         <p class="m-0 mt-2 text-13px font-700 text-ink">

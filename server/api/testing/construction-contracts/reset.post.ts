@@ -1,5 +1,6 @@
 import type { ConstructionContractReadTestScenario } from '../../../utils/construction-contract-read-test-instance'
 import process from 'node:process'
+import { prepareConstructionContractChainIdentityFixtures } from '../../../utils/construction-contract-chain-test-fixture'
 import {
   CONSTRUCTION_CONTRACT_EXISTING_RECORD,
   constructionContractCommandTestInstance,
@@ -19,6 +20,8 @@ export default defineEventHandler(async (event) => {
   if (!body?.scenario || !scenarios.has(body.scenario))
     throw createError({ statusCode: 400, statusMessage: 'Unknown construction contract test scenario' })
   const sessionId = getHeader(event, 'x-ruihang-test-session')
+  if (body.scenario === 'ready')
+    prepareConstructionContractChainIdentityFixtures(sessionId)
   constructionContractCommandTestInstance.reset(sessionId)
   if (body.scenario === 'ready')
     constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], sessionId)

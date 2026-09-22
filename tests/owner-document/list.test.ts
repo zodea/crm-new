@@ -55,6 +55,12 @@ const rows: OwnerDocumentListRecord[] = [
 ]
 
 describe('owner document list configuration', () => {
+  it('类型和状态多选遵循同字段并集、跨字段交集', () => {
+    const query = { search: '', project: 'all', type: ['site_visa', 'change_negotiation'], statusView: ['approved', 'submitted'] }
+    expect(filterOwnerDocumentRows('owner_change', rows, query)).toHaveLength(2)
+    expect(filterOwnerDocumentRows('owner_change', rows, { ...query, type: ['site_visa'] }).map(row => row.id)).toEqual(['change-1'])
+    expect(filterOwnerDocumentRows('owner_change', rows, { ...query, type: [], statusView: [] })).toHaveLength(2)
+  })
   it('分包付款余额只出现在分包结算列表，甲方最终结算保持原业务列', () => {
     const paymentFields = ['deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid']
     expect(OWNER_DOCUMENT_LIST_CONFIG.sub_settlement.columns.map(column => column.field))

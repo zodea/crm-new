@@ -1,0 +1,31 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/central-host-read.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/central-host-read.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/central-host-read.test.ts [ tests/payroll/central-host-read.test.ts ]
+Error: Cannot find module '~/lib/crew-worker/payroll-read' imported from D:/crm本地项目开发/tests/payroll/central-host-read.test.ts
+ ❯ tests/payroll/central-host-read.test.ts:2:1
+      1| import { expect, it } from 'vitest'
+      2| import { buildPayrollHostSection, decodePayrollHostSection, encodePayr…
+       | ^
+      3| import { loadPayrollHostSection } from '../../server/utils/crew-worker…
+      4| import { createPayrollAdjustmentFixture } from '../helpers/payroll-adj…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  19:59:14
+   Duration  400ms (transform 35ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

@@ -4,7 +4,9 @@
 // ③ 分页条(页码 + 每页条数,受控:父组件持有 page/pageSize,本组件只 emit)。
 // 列配置驱动,纯逻辑在 ~/lib/kit/table.ts;金额列 ¥#,##0.00 走 lib/util/money 的 yuan()。
 import type { KitFilterOption, KitTableColumn, NormalizedKitColumn } from '~/lib/kit/table'
+import { provide } from 'vue'
 import { deriveFilterOptions, formatCell, normalizeKitColumn } from '~/lib/kit/table'
+import { KIT_TABLE_VIEW_KEY } from '~/lib/kit/table-view'
 
 interface KitTableEmptyState {
   title: string
@@ -34,6 +36,7 @@ const {
   resizable = true,
   rowHeight = 36,
   resizeConfig: resizeConfigInput,
+  restoreScrollLeft,
 } = defineProps<{
   columns: KitTableColumn[]
   data: T[]
@@ -55,6 +58,8 @@ const {
   rowHeight?: number
   /** 领域表格可覆盖拖拽边界，或关闭双击自适配。 */
   resizeConfig?: KitTableResizeConfig
+  /** 来源返回时，在 vxe 数据与列布局完成后恢复横向位置。 */
+  restoreScrollLeft?: number
 }>()
 
 const emit = defineEmits<{
@@ -63,9 +68,12 @@ const emit = defineEmits<{
   /** 勾选变化(含表头全选),携带当前全部选中行。 */
   checkboxChange: [rows: T[]]
   emptyAction: []
+  viewRestored: []
 }>()
 
-defineSlots<Record<string, (props: { row: T, rowIndex: number }) => unknown>>()
+defineSlots<Record<string, (props: { row: T, rowIndex: number }) => unknown> & {
+  columnHeader: (props: { column: NormalizedKitColumn }) => unknown
+}>()
 
 // 列 props 一次性算好并缓存:v-bind 若每次渲染都产出新对象/新闭包,
 // 会反复触发 vxe 内部列注册/布局,把主线程拖死。
@@ -176,7 +184,14 @@ const tableRef = useTemplateRef<{
   clearCheckboxRow: () => void
   clearFilter?: () => Promise<void> | void
   setFilter?: (field: string, options: KitFilterOption[]) => Promise<void> | void
+  recalculate?: (full?: boolean) => Promise<void>
+  scrollTo?: (left: number) => Promise<void>
+  getScroll?: () => { scrollLeft: number }
 }>('tableRef')
+
+provide(KIT_TABLE_VIEW_KEY, {
+  scrollLeft: () => tableRef.value?.getScroll?.().scrollLeft ?? 0,
+})
 
 // vxe-column 只在注册时读取 filters；远程快照到达或 facet 更新后，
 // 必须通过表格 API 同步选项，否则表头虽出现漏斗，面板仍保留旧的空列表。
@@ -190,6 +205,24 @@ async function syncFilterOptions(entries = normalized.value) {
 
 onMounted(syncFilterOptions)
 watch(normalized, syncFilterOptions, { flush: 'post' })
+
+let viewRestoreGeneration = 0
+async function restoreHorizontalScroll() {
+  const generation = ++viewRestoreGeneration
+  const left = restoreScrollLeft
+  if (left == null || !Number.isFinite(left) || left < 0)
+    return
+  await nextTick()
+  const table = tableRef.value
+  await table?.recalculate?.(true)
+  if (generation !== viewRestoreGeneration || !table || table !== tableRef.value)
+    return
+  await table.scrollTo?.(left)
+  if (generation === viewRestoreGeneration && table === tableRef.value)
+    emit('viewRestored')
+}
+
+watch(() => restoreScrollLeft, restoreHorizontalScroll, { flush: 'post' })
 
 const checkboxConfig = computed(() =>
   checkMethod ? { checkMethod: ({ row }: { row: T }) => checkMethod(row) } : {},
@@ -231,6 +264,8 @@ defineExpose({ clearCheckbox, clearFilter })
       :filter-config="{ remote: remoteFilter }"
       :seq-config="seqConfig"
       :checkbox-config="checkboxConfig"
+      @init-rendered="restoreHorizontalScroll"
+      @data-rendered="restoreHorizontalScroll"
       @filter-change="onFilterChange"
       @checkbox-change="onCheckboxChange"
       @checkbox-all="onCheckboxChange"
@@ -296,6 +331,9 @@ defineExpose({ clearCheckbox, clearFilter })
           :resizable="col.resizable"
         />
         <vxe-column v-else v-bind="vxeProps">
+          <template v-if="col.customHeader" #header>
+            <slot name="columnHeader" :column="col" />
+          </template>
           <template v-if="slot" #default="{ row, rowIndex }">
             <slot :name="slot" :row="row" :row-index="rowIndex" />
           </template>

@@ -1,0 +1,7 @@
+
+D:\crm本地项目开发\tests\payroll\central-c2-independent.test.ts
+  68:6  error  `it`s should begin with lowercase  test/prefer-lowercase-title
+
+✖ 1 problem (1 error, 0 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+

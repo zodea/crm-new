@@ -1,9 +1,10 @@
 import type { DataOriginDTO } from '~/types/read-model'
+import { enumSelectionFromQuery, serializeEnumSelection } from '~/lib/util/enum-selection'
 import { isDataOriginDTO } from '~/types/read-model'
 
 export interface CustomerListNavigationState {
   search: string
-  status: string
+  status: string | string[]
   sort: 'updated-desc' | 'name-asc' | 'name-desc'
   page: number
   pageSize: 10 | 20 | 50 | 100
@@ -20,7 +21,7 @@ export interface CustomerReturnOrigin {
 
 const ROUTE = '/base/customer'
 const DETAIL_ROUTE = /^\/base\/customer\/([^/]+)$/
-const DETAIL_QUERY = new Set(['origin', 'tab', 'returnTo', 'returnContext'])
+const DETAIL_QUERY = new Set(['origin', 'tab', 'returnTo', 'returnContext', 'relationContext'])
 const DETAIL_TABS = new Set(['projects', 'contracts', 'receipts'])
 const ID = /^[\w-]{8,64}$/
 const ANCHOR = /^customer-row-[\w%.~-]+$/
@@ -53,6 +54,7 @@ export function createCustomerDetailReturnTo(options: {
   tab: 'projects' | 'contracts' | 'receipts'
   returnTo?: string
   returnContext?: string
+  relationContext?: string
 }): string {
   const customerId = decodeDetailIdentity(encodeURIComponent(options.customerId))
   if (!customerId || !isDataOriginDTO(options.origin) || !DETAIL_TABS.has(options.tab))
@@ -60,6 +62,11 @@ export function createCustomerDetailReturnTo(options: {
   const query = new URLSearchParams({ origin: options.origin })
   if (options.tab !== 'projects')
     query.set('tab', options.tab)
+  if (options.relationContext != null) {
+    if (!isCustomerReturnContextId(options.relationContext))
+      throw new Error('invalid customer project return context')
+    query.set('relationContext', options.relationContext)
+  }
   if (options.returnTo != null || options.returnContext != null) {
     const returnTo = validateCustomerReturnTo(options.returnTo)
     if (!returnTo || !isCustomerReturnContextId(options.returnContext))
@@ -105,11 +112,70 @@ export function validateCustomerDetailReturnTo(
       tab: tab as 'projects' | 'contracts' | 'receipts',
       returnTo: url.searchParams.get('returnTo') ?? undefined,
       returnContext: url.searchParams.get('returnContext') ?? undefined,
+      relationContext: url.searchParams.get('relationContext') ?? undefined,
     })
   }
   catch {
     return null
   }
+}
+
+export interface CustomerRelationReturnOrigin {
+  returnTo: string
+  targetEntity: 'project' | 'contract' | 'receipt'
+  targetId: string
+  anchorId: string | null
+  scrollTop: number
+  scrollLeft: number
+  expiresAt: number
+}
+
+const PROJECT_RETURN_PREFIX = 'ruihang:customer-relation-return:'
+
+export function customerRelationReturnTo(returnTo: unknown, contextId: string): string | null {
+  const canonical = validateCustomerDetailReturnTo(returnTo)
+  if (!canonical || !isCustomerReturnContextId(contextId))
+    return null
+  const url = new URL(canonical, 'https://ruihang.invalid')
+  url.searchParams.set('relationContext', contextId)
+  return validateCustomerDetailReturnTo(`${url.pathname}${url.search}`)
+}
+
+export function saveCustomerRelationReturnOrigin(origin: CustomerRelationReturnOrigin, storage: Storage = sessionStorage) {
+  const canonical = validateCustomerDetailReturnTo(origin.returnTo)
+  const id = canonical && new URL(canonical, 'https://ruihang.invalid').searchParams.get('relationContext')
+  if (!id)
+    return
+  try {
+    storage.setItem(`${PROJECT_RETURN_PREFIX}${id}`, JSON.stringify(origin))
+  }
+  catch { /* 浏览器禁用存储时使用规范返回，不影响导航。 */ }
+}
+
+export function resolveCustomerRelationReturnOrigin(
+  returnTo: unknown,
+  expected: { targetEntity?: 'project' | 'contract' | 'receipt', targetId?: string, origin?: DataOriginDTO },
+  now = Date.now(),
+  storage: Storage = sessionStorage,
+): CustomerRelationReturnOrigin | null {
+  const canonical = validateCustomerDetailReturnTo(returnTo, expected.origin)
+  const id = canonical && new URL(canonical, 'https://ruihang.invalid').searchParams.get('relationContext')
+  if (!id)
+    return null
+  try {
+    const value = JSON.parse(storage.getItem(`${PROJECT_RETURN_PREFIX}${id}`) ?? 'null') as CustomerRelationReturnOrigin | null
+    return value && value.returnTo === canonical && typeof value.targetId === 'string' && value.targetId.length > 0
+      && (value.targetEntity === 'project' || value.targetEntity === 'contract' || value.targetEntity === 'receipt')
+      && (!expected.targetEntity || value.targetEntity === expected.targetEntity)
+      && (value.anchorId === null || (typeof value.anchorId === 'string' && value.anchorId.length <= 512 && /^(?:project|contract|receipt):[\w%.~-]+$/.test(value.anchorId)))
+      && (!expected.targetId || value.targetId === expected.targetId)
+      && Number.isFinite(value.expiresAt) && value.expiresAt > now
+      && Number.isFinite(value.scrollTop) && value.scrollTop >= 0
+      && Number.isFinite(value.scrollLeft) && value.scrollLeft >= 0
+      ? value
+      : null
+  }
+  catch { return null }
 }
 
 export function createCustomerReturnOrigin(options: {
@@ -124,8 +190,9 @@ export function createCustomerReturnOrigin(options: {
   const query = new URLSearchParams()
   if (options.state.search)
     query.set('search', options.state.search)
-  if (options.state.status !== 'all')
-    query.set('status', options.state.status)
+  const status = serializeEnumSelection(options.state.status)
+  if (status)
+    query.set('status', status)
   if (options.state.sort !== 'updated-desc')
     query.set('sort', options.state.sort)
   if (options.state.page !== 1)
@@ -172,12 +239,13 @@ export function validateCustomerReturnTo(value: unknown): string | null {
     return null
   const query = new URLSearchParams()
   const search = url.searchParams.get('search')
-  const status = url.searchParams.get('status')
+  const statuses = url.searchParams.getAll('status')
+  const status = serializeEnumSelection(enumSelectionFromQuery(statuses.length > 1 ? statuses : statuses[0]).filter(item => item.length <= 48))
   const sort = url.searchParams.get('sort')
   const nav = url.searchParams.get('nav')
   if (search && search.length <= 120)
     query.set('search', search)
-  if (status && status.length <= 48)
+  if (status)
     query.set('status', status)
   if (sort === 'name-asc' || sort === 'name-desc' || sort === 'updated-desc')
     query.set('sort', sort)
@@ -244,7 +312,7 @@ export function customerListNavigationStateFromQuery(query: Record<string, unkno
   const sort = value(query.sort)
   return {
     search: value(query.search)?.slice(0, 120) ?? '',
-    status: value(query.status)?.slice(0, 48) || 'all',
+    status: enumSelectionFromQuery(query.status).filter(item => item.length <= 48),
     sort: sort === 'name-asc' || sort === 'name-desc' ? sort : 'updated-desc',
     page: Math.max(1, Number(value(query.page)) || 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 10,

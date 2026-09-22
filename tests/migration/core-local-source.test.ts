@@ -10,11 +10,33 @@ import {
   CORE_MIGRATION_TOPOLOGY,
 } from '~/lib/migration/core-contract'
 import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-source'
+import { PAYROLL_CENTRAL_MIGRATION_TABLES } from '~/lib/migration/payroll-central-source'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (sql === 'PRAGMA table_info(crews)')
+    return ['id', 'name', 'default_pay_ratio', 'deleted_at'].map(name => ({ name }))
+  // 本组旧库替身没有中央工资扩展表；其余未知查询仍应明确失败。
+  if (sql === 'SELECT name FROM sqlite_master WHERE type=\'table\'')
+    return []
+  if (/FROM (?:payroll_subject_configs|wage_statements|wage_statement_lines|wage_statement_members|wage_statement_allocations|attendance_records|signed_daywork_records|wage_statement_daywork_records) ORDER BY id/.test(sql))
+    return []
+  if (/FROM supplier_(?:credentials|credential_requirements|credential_audits|audits)(?: ORDER BY|$)/.test(sql))
+    return []
+  if (/FROM schedule_process_librar(?:ies|y_tasks)/.test(sql))
+    return []
+  if (/FROM (?:schedule_groups|schedule_group_buildings|schedule_tasks|task_item_map|task_dependencies|schedule_task_floor_plans) ORDER BY id/.test(sql))
+    return []
+  if (sql === 'SELECT id, project_id, contract_id, deleted_at FROM boq_lines ORDER BY id')
+    return []
+  if (/^SELECT .+ FROM (?:buildings|house_type_templates|items|construction_stages|floors|rooms|units|house_type_template_items|construction_stage_items|unit_assignments|unit_assignment_scopes|unit_stage_completions|file_refs|file_payloads|operation_logs|target_costs|target_cost_items)(?: WHERE | ORDER BY )/.test(sql))
+    return []
+  if (sql.includes('AS orphan_lines'))
+    return [{ orphan_lines: 0, orphan_sources: 0, orphan_audit: 0 }]
+  if (sql.includes('FROM delivery_records d ORDER BY d.id'))
+    return []
   if (sql.includes('FROM payment_applications p WHERE p.id IN') || sql.includes('FROM payment_records p WHERE EXISTS'))
     return []
   if (sql.includes('FROM expenditure_settlements s WHERE s.biz_type'))
@@ -29,8 +51,47 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       { id: 'customer_demo_001', name: '随包测试客户' },
     ]
   }
-  if (sql.includes('FROM suppliers'))
-    return [{ id: 'supplier-local-1', name: '本地分供方', deleted_at: null }]
+  if (sql.includes('FROM suppliers')) {
+    return [{
+      id: 'supplier-local-1',
+      name: '本地分供方',
+      external_ref: '',
+      aliases: '[]',
+      unique_code: '',
+      tax_no: '',
+      business_type: '',
+      supplier_category: '',
+      rating: '',
+      legal_rep: '',
+      registered_capital: null,
+      registered_date: '',
+      address: '',
+      taxpayer_type: '',
+      main_business: '',
+      labor_scope: '独立劳务范围',
+      invoice_name: '',
+      invoice_address: '',
+      bank: '',
+      bank_account: '',
+      phone: '',
+      contact: '',
+      contact_phone: '',
+      contact_title: '',
+      credential_status: 'incomplete',
+      credential_reviewed_at: null,
+      credential_review_note: '',
+      approval_status: 'draft',
+      source: 'manual',
+      note: '',
+      taxpayer_verification_status: 'not_checked',
+      taxpayer_verification_source: '',
+      taxpayer_verified_at: null,
+      taxpayer_verification_note: '',
+      created_at: '2026-09-12T08:00:00.000Z',
+      updated_at: '2026-09-12T08:00:00.000Z',
+      deleted_at: null,
+    }]
+  }
   if (sql.includes('FROM crews'))
     return [{ id: 'crew-local-1', name: '本地班组', deleted_at: null }]
   if (sql.includes('FROM projects')) {
@@ -41,6 +102,7 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       secondary_customer_id: null,
       area: 12.5,
       contract_amount: 100,
+      matrix_archived_at: null,
       deleted_at: null,
     }]
   }
@@ -273,6 +335,7 @@ describe('core migration local source', () => {
     const second = await source.readSource()
 
     expect(first).toEqual(second)
+    expect(first.entities.suppliers).toContainEqual(expect.objectContaining({ legacyId: 'supplier-local-1', attributes: expect.objectContaining({ laborScope: '独立劳务范围' }) }))
     expect(first).toMatchObject({
       contractVersion: CORE_MIGRATION_CONTRACT_VERSION,
       mode: CORE_MIGRATION_SOURCE_MODE,
@@ -482,6 +545,27 @@ describe('core migration local source', () => {
     finally {
       db.close()
     }
+  })
+
+  it('旧 SQLite 未建中央工资表时省略扩展，仍完整导出原工资金额与原文', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      const tables = await db.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')
+      const centralTables = new Set<string>(PAYROLL_CENTRAL_MIGRATION_TABLES)
+      expect(tables.filter(table => centralTables.has(table.name))).toEqual([])
+      await db.execute('INSERT INTO projects(id,name) VALUES(\'legacy-payroll-project\',\'旧工资项目\')')
+      await db.execute('INSERT INTO workers(id,name,trade) VALUES(\'legacy-payroll-worker\',\'原工资负责人\',\'泥工\')')
+      const original = JSON.stringify({ note: '仅保留旧工资原文，不补造中央确认依据' })
+      await db.execute('INSERT INTO wage_statements(id,project_id,leader_worker_id,month,quantity_source,status,gross_amount,actual_amount,snapshot_json) VALUES(?,?,?,?,?,?,?,?,?)', ['legacy-payroll-statement', 'legacy-payroll-project', 'legacy-payroll-worker', '2026-08', 'field', 'released', 1000, 1000, original])
+
+      const result = await createCoreMigrationLocalSource(dependencies({ select: sql => db.select(sql) })).readSource()
+      expect(result.entities.payroll_projects).toHaveLength(1)
+      const graph = JSON.parse(String(result.entities.payroll_projects[0]!.attributes!.payrollGraphJson))
+      expect(graph).toMatchObject({ schemaVersion: 1, projectId: 'legacy-payroll-project', statements: [expect.objectContaining({ id: 'legacy-payroll-statement', gross_amount: 1000, actual_amount: 1000, snapshot_json: original })] })
+      expect(graph).not.toHaveProperty('central')
+    }
+    finally { db.close() }
   })
 
   it('sqlite 本地写入时间经 ISO 规范化后可完成甲方单据受控迁移', async () => {
@@ -915,6 +999,7 @@ describe('core migration local source', () => {
     expect(Object.keys(result.entities)).toEqual([
       'customers',
       'suppliers',
+      'supplier_credentials',
       'crews',
       'projects',
       'construction_contracts',
@@ -924,9 +1009,15 @@ describe('core migration local source', () => {
       'other_settlement_sources',
       'contract_supplements',
       'receipt_registrations',
+      'delivery_records',
       'owner_documents',
       'workers',
       'project_suppliers',
+      'quantity_projects',
+      'process_libraries',
+      'wbs_projects',
+      'target_cost_versions',
+      'payroll_projects',
     ])
   })
 })

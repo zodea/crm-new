@@ -1,5 +1,5 @@
 import type { ProjectSupplierWorkbenchReadDTO } from '~/lib/project-supplier/repository'
-import { render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
 import ProjectSupplierOverview from '~/components/project-supplier/ProjectSupplierOverview.vue'
@@ -19,7 +19,7 @@ const data = {
 } as ProjectSupplierWorkbenchReadDTO
 
 describe('项目分供方身份概览', () => {
-  it('项目和分供方身份链接共享当前工作台受限返回地址', () => {
+  it('项目和分供方身份链接共享当前工作台受限返回地址，说明按需展开且不污染标题', async () => {
     const returnTo = '/project/project-1/supplier/supplier-1?origin=demo&tab=overview'
     render(ProjectSupplierOverview, {
       props: { data, returnTo },
@@ -28,5 +28,10 @@ describe('项目分供方身份概览', () => {
 
     expect(screen.getByRole('link', { name: '中央项目' }).getAttribute('data-return-to')).toBe(returnTo)
     expect(screen.getByRole('link', { name: '中央分供方' }).getAttribute('data-return-to')).toBe(returnTo)
+    expect(screen.getByRole('heading', { name: '项目身份', exact: true })).not.toBeNull()
+    expect(screen.queryByText(/最终结算登记暂不可用/)).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: '查看工作台数据说明' }))
+    expect(screen.getByText(/最终结算登记暂不可用/)).not.toBeNull()
+    expect(screen.queryByText(/Repository/)).toBeNull()
   })
 })

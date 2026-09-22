@@ -13,6 +13,7 @@ import {
 } from '~/lib/db/soft-delete'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { generateId } from '~/lib/util/id'
+import { CONFIRMED_SETTLEMENT_SQL_VALUES } from './effective-status'
 
 export type F2FormKind
   = | 'construction'
@@ -1088,7 +1089,7 @@ export async function listExpenditureSettlementOptions(
     contractId?: string | null
   } = {},
 ): Promise<LookupOption[]> {
-  const conditions = [`settlement.status NOT IN ('draft', '草稿')`]
+  const conditions = [`settlement.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})`]
   const params: unknown[] = []
   for (const [column, value] of [
     ['project_id', filters.projectId],

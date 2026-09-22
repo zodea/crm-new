@@ -19,7 +19,7 @@ const readStore = useProjectListStore()
 const commandStore = useProjectCommandStore()
 const dataVisibilityStore = useDataVisibilityStore()
 const includeDemo = computed(() => dataVisibilityStore.includeDemo)
-const { error, exportFile } = useKitUI()
+const { error, exportFile, openImportTab } = useKitUI()
 
 const searchText = shallowRef('')
 const selectedPhase = shallowRef('all')
@@ -32,7 +32,6 @@ const columnFilters = shallowRef<{ field: string, values: unknown[] }[]>([])
 const tableRef = useTemplateRef<{ clearFilter: () => Promise<void> }>('tableRef')
 
 const IMPORTED_PHASES_KEY = 'imported-phases'
-const IMPORT_DISABLED_REASON = '项目导入尚未接入中央后台'
 const DELETE_DISABLED_REASON = '项目删除不在当前实施范围'
 const listViews = [
   { key: 'updated-desc', label: '最近更新' },
@@ -502,6 +501,7 @@ onDeactivated(() => {
       v-if="readPage"
       v-model:tree-key="selectedPhase"
       v-model:view-key="sortMode"
+      continuous
       :tree="filtersVisible ? phaseTree : []"
       :views="listViews"
       :summary="listSummary"
@@ -512,14 +512,16 @@ onDeactivated(() => {
           v-model:sort-mode="sortMode"
           v-model:filters-visible="filtersVisible"
           v-model:density="density"
+          class="project-list-toolbar"
           :real-total="realSummary?.projectCount ?? 0"
           :demo-total="demoSummary?.projectCount ?? 0"
           :include-demo="includeDemo"
           :visible="visibleTotal"
           :loading="loading"
-          :import-disabled-reason="IMPORT_DISABLED_REASON"
+          :import-disabled-reason="createDisabledReason"
           :create-disabled-reason="createDisabledReason"
           @create="createProject"
+          @import="openImportTab({ entity: 'project' })"
           @refresh="refresh"
           @export-ledger="exportLedger"
           @export-by-category="exportByCategory"
@@ -531,7 +533,8 @@ onDeactivated(() => {
           ref="tableRef"
           :columns="columns"
           :data="tableRows"
-          :loading="loading"
+          :loading="loading && !readPage"
+          :aria-busy="loading"
           :row-height="tableRowHeight"
           row-key="rowIdentity"
           :page="{ page: readPage.pagination.page, pageSize: readPage.pagination.pageSize, total: readPage.pagination.total }"
@@ -662,3 +665,26 @@ onDeactivated(() => {
     </ListShell>
   </div>
 </template>
+
+<style scoped>
+:deep(.project-list-toolbar) {
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:deep(.project-list-toolbar > div) {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+:deep(.project-list-toolbar > div > div) {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+</style>

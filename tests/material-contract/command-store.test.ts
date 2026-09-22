@@ -54,10 +54,11 @@ describe('材料采购合同冲突恢复', () => {
     vi.stubGlobal('crypto', { randomUUID: vi.fn().mockReturnValueOnce('stale-command').mockReturnValueOnce('retry-command') })
 
     const store = useMaterialContractCommandStore()
-    await store.hydrate('contract-1')
+    const session = store.createSession()
+    await store.hydrate(session, 'contract-1')
     let conflict: MaterialContractCommandConflictError | null = null
     try {
-      await store.saveForm(draft, 'save')
+      await store.saveForm(session, draft, 'save')
     }
     catch (cause) {
       if (cause instanceof MaterialContractCommandConflictError)
@@ -66,8 +67,8 @@ describe('材料采购合同冲突恢复', () => {
         throw cause
     }
     expect(conflict?.latest.version).toBe('2')
-    store.adoptConflictVersion(conflict!.latest)
-    await store.saveForm(draft, 'save')
+    store.adoptConflictVersion(session, conflict!.latest)
+    await store.saveForm(session, draft, 'save')
 
     expect(repository.execute).toHaveBeenLastCalledWith(expect.objectContaining({
       id: 'contract-1',

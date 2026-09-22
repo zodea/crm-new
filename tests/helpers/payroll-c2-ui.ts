@@ -1,0 +1,21 @@
+import type { PayrollC2ConfigRead, PayrollC2FormRead, PayrollC2FrozenDocument } from '../../app/lib/payroll/central-c2-contract'
+import type { PayrollDayworkFormRead, PayrollDayworkRecordRead } from '../../app/lib/payroll/central-daywork-contract'
+
+export function c2Fact(patch: Partial<PayrollDayworkRecordRead> = {}): PayrollDayworkRecordRead {
+  return { id: 'r', projectId: 'p', crewId: 'c', workerId: 'w', workerName: '原工人', crewName: '原班组', workDate: '2026-08-01', workContent: '原零星施工内容', startTime: '08:00', endTime: '17:00', laborUnits: 1, witness: '证明甲', confirmedOn: '2026-08-02', status: 'confirmed', note: '', createdAt: null, updatedAt: null, deletedAt: null, sourceFingerprint: 'f1', original: {}, source: null, occupations: [], locks: [], diagnostics: [], eligibility: { canEdit: true, canConfirm: false, reasons: [] }, availability: 'available', ...patch }
+}
+export function c2Config(): PayrollC2ConfigRead {
+  return { context: { workspaceId: 'workspace', actorId: 'actor', origin: 'real', sourceVersion: 'v1', capabilities: ['payroll:read', 'payroll:write'], readonly: false }, scope: { projectId: 'p', leaderWorkerId: 'w' }, options: { projects: [{ id: 'p', name: '真实项目', code: '' }], crews: [{ id: 'c', name: '原班组', eligible: true, reasons: [] }], workers: ['w', 'member', 'zero'].map((id, i) => ({ id, name: ['原工人', '原成员', '零成员'][i]!, crewId: 'c', eligible: true, reasons: [], historical: false, source: null })) }, config: { id: 'config', projectId: 'p', crewId: 'c', leaderWorkerId: 'w', formatFamily: 'C2', unitRate: 350, ruleText: '', enabled: true, createdAt: null, updatedAt: null, deletedAt: null, sourceFingerprint: 'config1', original: {} }, configs: [], draft: { crewId: 'c', unitRate: 350, ruleText: '' }, diagnostics: [], evidence: [], readonlyReasons: [], history: [] }
+}
+export function c2Form(): PayrollC2FormRead {
+  const config = c2Config()
+  return { context: config.context, qualificationVersion: 'qual1', statementId: 'wage', draftKey: null, status: 'checked', needsRecheck: false, draft: { projectId: 'p', crewId: 'c', leaderWorkerId: 'w', memberWorkerIds: ['w', 'member', 'zero'], month: '2026-08', note: '' }, options: config.options, members: config.options.workers, facts: [c2Fact(), c2Fact({ id: 'half', workerId: 'member', workerName: '原成员', laborUnits: 0.5 })], adoptedRecordIds: ['r', 'half'], config: config.config, storedSource: null, sources: [], lines: [{ id: 'line', workerId: 'w', workerName: '原工人', kind: 'daywork', itemName: '零星签工', quantity: 1, unit: '工', unitPrice: 350, amount: 350, dayworkIds: ['r'] }, { id: 'line-half', workerId: 'member', workerName: '原成员', kind: 'daywork', itemName: '零星签工', quantity: 0.5, unit: '工', unitPrice: 350, amount: 175, dayworkIds: ['half'] }], totals: { grossAmount: { value: 525, knownValue: 525, state: 'known', reasons: [] } }, blockers: [], eligibility: { canSaveDraft: false, canCheck: true, canRelease: true, canOutput: false, reasons: [] }, diagnostics: [], evidence: [] }
+}
+export function c2Frozen(): PayrollC2FrozenDocument {
+  const form = c2Form()
+  return { id: 'wage', projectId: 'p', projectName: '冻结项目', crewId: 'c', crewName: '原班组', leaderName: '原工人', month: '2026-08', formatFamily: 'C2', periodKind: 'monthly', payRatio: 1, grossAmount: 525, actualAmount: 500, releasedAt: '2026-08-31T10:00:00Z', operatorName: '经办甲', note: '原备注', lines: form.lines, daywork: form.facts, config: form.config!, members: form.members.map(member => ({ workerId: member.id, workerName: member.name!, isLeader: member.id === 'w' })), allocations: form.members.map((member, i) => ({ workerId: member.id, workerName: member.name!, isLeader: member.id === 'w', amount: [350, 150, 0][i]!, allocatedAmountFen: [35000, 15000, 0][i]! })) }
+}
+export function dayworkForm(): PayrollDayworkFormRead {
+  const { context, options } = c2Config()
+  return { context, recordId: 'r', draftKey: null, record: c2Fact(), draft: { projectId: 'p', crewId: 'c', workerId: 'w', workDate: '2026-08-01', workContent: '原零星施工内容', startTime: '08:00', endTime: '17:00', laborUnits: 1, witness: '证明甲', confirmedOn: '2026-08-02', status: 'confirmed', note: '' }, options, eligibility: { canEdit: true, canConfirm: false, reasons: [] }, diagnostics: [], evidence: [] }
+}

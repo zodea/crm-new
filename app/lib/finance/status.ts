@@ -1,3 +1,20 @@
+import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
+
+const FINANCE_STATUS_TONES: Readonly<Record<string, KitStatusTone>> = {
+  draft: 'neutral',
+  submitted: 'brand',
+  approved: 'ok',
+  rejected: 'danger',
+  paid: 'ok',
+  confirmed: 'ok',
+  needs_review: 'warn',
+  cancelled: 'neutral',
+}
+
+export function financeStatusTone(status: string): KitStatusTone {
+  return FINANCE_STATUS_TONES[status] ?? 'neutral'
+}
+
 const FINANCE_STATUS_LABELS: Readonly<Record<string, string>> = {
   draft: '草稿',
   submitted: '已提交',
@@ -7,6 +24,8 @@ const FINANCE_STATUS_LABELS: Readonly<Record<string, string>> = {
   confirmed: '已确认',
   needs_review: '待核对',
   cancelled: '已取消',
+  void: '已作废',
+  作废: '已作废',
 }
 
 /** 财务列表只在展示层翻译状态，数据库仍保存原始状态值。 */

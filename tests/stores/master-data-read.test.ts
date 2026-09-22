@@ -58,6 +58,19 @@ afterEach(() => {
 })
 
 describe('master data read store', () => {
+  it('记录各资料库成功读取的空快照，刷新不再视为首次读取', async () => {
+    const store = useMasterDataReadStore()
+    expect(store.loadedByKind.customer).toBeUndefined()
+    await mem.execute('UPDATE customers SET deleted_at = \'2026-09-08T00:00:00Z\'')
+    await store.load('customer')
+    expect(store.rowsByKind.customer).toEqual([])
+    expect(store.loadedByKind.customer).toBe(true)
+    expect(store.loadedByKind.crew).toBeUndefined()
+    const refresh = store.load('customer')
+    expect(store.loadingByKind.customer).toBe(true)
+    expect(store.loadedByKind.customer).toBe(true)
+    await refresh
+  })
   it('按领域保存独立列表切片并解析跨表名称', async () => {
     const store = useMasterDataReadStore()
 

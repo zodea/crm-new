@@ -30,6 +30,14 @@ describe('初始态', () => {
 })
 
 describe('deriveKey', () => {
+  it('页内锚点不增加页签身份，首页仍是固定首页', () => {
+    expect(deriveKey('/project#summary')).toBe('/project')
+    expect(deriveKey('/#progress')).toBe(HOME_KEY)
+    const first = openTab(initialTabsState(), { fullPath: '/project', title: '项目' }).state
+    const next = openTab(first, { fullPath: '/project#summary', title: '项目' }).state
+    expect(next.tabs).toHaveLength(2)
+    expect(next.tabs[1]?.fullPath).toBe('/project#summary')
+  })
   it('首页归一 HOME_KEY，其余用路径', () => {
     expect(deriveKey('/')).toBe(HOME_KEY)
     expect(deriveKey('')).toBe(HOME_KEY)

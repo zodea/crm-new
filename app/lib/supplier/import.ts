@@ -74,7 +74,7 @@ export function inferProjectSupplierName(fileName: string, projectName = ''): st
 
 /**
  * 仅使用本地文件名与现有分供方名称/别名做确定性匹配；不读取文件内容，也不伪装成 OCR。
- * 多个名称同时命中时取最长命中项，降低简称抢占全称的概率。
+ * 先匹配公司全称，未命中全称时才匹配别名；同层多个命中项取最长。
  */
 export function classifyProjectSupplierImportFile(
   fileName: string,
@@ -88,7 +88,8 @@ export function classifyProjectSupplierImportFile(
   ])
     .map(match => ({ ...match, normalizedLabel: comparable(match.label) }))
     .filter(match => match.normalizedLabel.length >= 2 && normalizedFileName.includes(match.normalizedLabel))
-    .sort((left, right) => right.normalizedLabel.length - left.normalizedLabel.length)
+    .sort((left, right) => Number(right.source === 'name') - Number(left.source === 'name')
+      || right.normalizedLabel.length - left.normalizedLabel.length)
 
   const best = matches[0]
   return {
@@ -143,6 +144,7 @@ export function normalizeSupplierImportRow(row: Record<string, unknown>): Partia
   assignIfPresent(data, row, 'registeredDate', text)
   assignIfPresent(data, row, 'address', text)
   assignIfPresent(data, row, 'mainBusiness', text)
+  assignIfPresent(data, row, 'laborScope', text)
   assignIfPresent(data, row, 'businessType', text)
   assignIfPresent(data, row, 'invoiceName', text)
   assignIfPresent(data, row, 'taxpayerType', text)

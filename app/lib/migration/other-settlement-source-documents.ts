@@ -22,6 +22,6 @@ export function otherSettlementDocumentSource(row: Record<string, unknown>, kind
     deletedAt: string('deleted_at'),
     amount: row[kind === 'application' ? 'apply_amount' : 'amount'] == null ? null : Number(row[kind === 'application' ? 'apply_amount' : 'amount']).toFixed(2),
     references: { projectId: string('project_id'), supplierId: string('supplier_id'), ...(kind === 'application' ? { contractId: row.contract_id == null ? null : `other_expense:${row.contract_id}` } : {}) },
-    attributes: { kind, no: string('no'), status: string(kind === 'application' ? 'status' : 'confirmation_status'), approvedAmount: kind === 'application' && row.approved_amount != null ? Number(row.approved_amount).toFixed(2) : null, allocationsJson: string('allocations_json') || '[]', filesJson: string('files_json') || '[]', ...Object.fromEntries(fields.map(key => [key, string(key)])) },
+    attributes: { kind, no: string('no'), status: string(kind === 'application' ? 'status' : 'confirmation_status'), approvedAmount: kind === 'application' && row.approved_amount != null ? Number(row.approved_amount).toFixed(2) : null, ...(kind === 'application' ? { approvedAmountOrigin: row.approved_amount_origin === 'user-entry' ? 'user-entry' : 'legacy' } : {}), allocationsJson: string('allocations_json') || '[]', filesJson: string('files_json') || '[]', ...Object.fromEntries(fields.map(key => [key, string(key)])) },
   }
 }

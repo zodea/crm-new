@@ -3,6 +3,7 @@ import type {
   MasterDataSaveAction,
   SupplierFormDraft,
 } from '../master-data/forms'
+import type { SupplierTaxpayerCommand, SupplierTaxpayerResult } from './taxpayer-verification'
 
 export const SUPPLIER_WRITE_CAPABILITY = 'supplier:write' as const
 
@@ -32,6 +33,16 @@ export interface SupplierCommandResultDTO {
   attachmentIds: string[]
 }
 
+export type SupplierImportDraft = Omit<SupplierFormDraft, 'id' | 'approvalStatus' | 'taxpayerVerificationStatus' | 'taxpayerVerificationSource' | 'taxpayerVerifiedAt' | 'taxpayerVerificationNote'>
+
+export interface SupplierImportCommandRequestDTO {
+  workspaceId: string
+  actorId: string
+  requiredCapability: typeof SUPPLIER_WRITE_CAPABILITY
+  commandId: string
+  draft: SupplierImportDraft
+}
+
 export interface SupplierFormReadDTO {
   draft: SupplierFormDraft & { id: string }
   attachments: []
@@ -43,4 +54,6 @@ export interface SupplierCommandRepository {
   context: () => Promise<SupplierCommandContextDTO>
   loadForm: (id: string) => Promise<SupplierFormReadDTO>
   execute: (request: SupplierCommandRequestDTO) => Promise<SupplierCommandResultDTO>
+  importRow: (request: SupplierImportCommandRequestDTO) => Promise<SupplierCommandResultDTO>
+  recordTaxpayerVerification: (request: SupplierTaxpayerCommand) => Promise<SupplierTaxpayerResult>
 }

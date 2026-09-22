@@ -2,6 +2,7 @@
 import type { FileRefRecord } from '~/lib/forms/file-refs'
 import type { OcrRecognitionResult } from '~/lib/recognize/engine'
 import type {
+  CredentialOcrFieldChoice,
   CredentialOcrFieldKey,
   CredentialOcrReviewField,
   ParsedCredentialOcr,
@@ -186,7 +187,7 @@ function supplierOcrValues(
 ): Partial<Record<CredentialOcrFieldKey, string>> {
   return {
     name: currentSupplier?.name ?? '',
-    uniqueCode: currentSupplier?.uniqueCode || currentSupplier?.taxNo || '',
+    uniqueCode: currentSupplier?.uniqueCode ?? '',
     taxNo: currentSupplier?.taxNo ?? '',
     legalRep: currentSupplier?.legalRep ?? '',
     address: currentSupplier?.address ?? '',
@@ -342,6 +343,7 @@ async function saveOcrReview(payload: {
   category: SupplierCredentialCategory
   fields: Partial<Record<CredentialOcrFieldKey, string>>
   decisions: Record<string, string>
+  choices?: CredentialOcrFieldChoice[]
   longTerm: boolean
 }) {
   const review = activeOcrReview.value
@@ -372,6 +374,7 @@ async function saveOcrReview(payload: {
       confirmedFields: {
         ...payload.fields,
         decisions: payload.decisions,
+        choices: payload.choices,
         candidates: review.parsed.fields,
         sourceFile: review.fileName,
       },

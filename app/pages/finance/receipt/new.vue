@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { isDesktopRuntime } from '~/lib/platform/runtime'
+
+const desktop = isDesktopRuntime()
 definePageMeta({ name: 'receiptForm' })
 </script>
 
 <template>
-  <FinanceFormPage kind="receipt" />
+  <FinanceFormPage v-if="desktop" kind="receipt" />
+  <ReceiptFormScreen v-else />
 </template>

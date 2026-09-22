@@ -43,7 +43,7 @@ export interface SignedDayworkFilter {
   projectId: string
   month: string
   crewId?: string
-  status?: SignedDayworkStatus | ''
+  status?: SignedDayworkStatus | '' | SignedDayworkStatus[]
 }
 
 export interface C2SubjectConfigInput {
@@ -435,9 +435,10 @@ export async function listSignedDayworkRecords(
     clauses.push('record.crew_id = ?')
     params.push(filter.crewId)
   }
-  if (filter.status) {
-    clauses.push('record.status = ?')
-    params.push(filter.status)
+  const statuses = Array.isArray(filter.status) ? [...new Set(filter.status)] : filter.status ? [filter.status] : []
+  if (statuses.length) {
+    clauses.push(`record.status IN (${statuses.map(() => '?').join(', ')})`)
+    params.push(...statuses)
   }
   const rows = await db.select<DayworkRow>(`
     ${DAYWORK_SELECT}

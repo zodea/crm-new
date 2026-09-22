@@ -1,0 +1,107 @@
+{
+  "owner": "P2 B",
+  "baseline": "579d9383357fffd2bd87e727dbc21b903a7cb69c",
+  "status": "repair-frozen-awaiting-independent-review",
+  "redGreen": [
+    {
+      "scenario": "真实工人日薪导出缺失",
+      "red": "worker-red.log",
+      "green": "worker-green.log",
+      "redObservation": "NULL/0/481 均误为 undefined",
+      "greenTests": 2
+    },
+    {
+      "scenario": "逐日及隔离证据新读取入口",
+      "red": "attendance-red.log",
+      "green": "attendance-green.log",
+      "redObservation": "新增公共 loader 尚不存在，属于接缝缺失红例；未冒充执行后的业务断言失败",
+      "greenTests": 3
+    },
+    {
+      "scenario": "C1 费率独立引用",
+      "red": "restore-rate-red.log",
+      "green": "final-targeted.log",
+      "redObservation": "真实引用迁入工人的新费率仍允许 rollback；无关费率对照通过"
+    },
+    {
+      "scenario": "迟到迁入与独立待确认签工互斥",
+      "red": "incoming-lock-red.log",
+      "green": "final-targeted.log",
+      "redObservation": "候选意外成功，先 abort 释放再断言缺少 conflict；最终红例不含悬挂队列"
+    },
+    {
+      "scenario": "真实 C1 发放冻结的逐考勤来源",
+      "red": "c1-release-first.log",
+      "green": "c1-release-green.log",
+      "redObservation": "source 表缺失后原发放快照仍有完整来源，但恢复遗漏引用",
+      "greenTests": 10
+    }
+  ],
+  "finalChecks": [
+    {
+      "log": "final-targeted.log",
+      "command": "npm test -- tests/payroll/c1-worker-facts.test.ts tests/payroll/attendance-facts.test.ts tests/payroll/c1-migration-protection.test.ts tests/payroll/subject-facts.test.ts tests/payroll/a-receipt-migration.test.ts tests/payroll/a-migration-protection.test.ts tests/payroll/controlled-migration.test.ts tests/server/core-migration-test-instance.test.ts",
+      "files": 8,
+      "tests": 66,
+      "passed": 66,
+      "durationSeconds": 22.45
+    },
+    {
+      "log": "frozen-audit-green.log",
+      "command": "npm test -- tests/payroll/c1-migration-protection.test.ts",
+      "files": 1,
+      "tests": 11,
+      "passed": 11,
+      "durationSeconds": 14.85,
+      "note": "上一轮后只新增 frozen-audit 用例，复跑完整该文件；累计唯一用例 67，不声称一次运行 67 例"
+    },
+    {
+      "log": "lint-final.log",
+      "command": "node_modules/.bin/eslint.cmd <owned-files.json 所列 11 文件>",
+      "files": 11,
+      "errors": 0,
+      "warnings": 0
+    }
+  ],
+  "boundaries": [
+    "worker missing/NULL/0/481 与非法原列保真，日常更正不被 repeat 覆盖",
+    "逐日物理 ID/原组/小数/零/软删/坏未来日期；隔离来源只 evidence+diagnostic",
+    "混合 A/C1/attendance 回执封闭分派；canonical/SHA/结果真实 recordId；旧 NULL 不升格",
+    "C1 原 source、原发放 c1Source 与原审计均保护逐日引用；不递归旧任意 JSON",
+    "完整候选删除前检查，独立占用阻断且整批不变；原内部历史冲突/repeat 保留",
+    "真实公开考勤→配置→C1 save/check/release→输出/零成员月锁→恢复"
+  ],
+  "executionNotes": [
+    "初次 sandbox 运行 esbuild spawn EPERM，获本地定向执行许可后记录真实红/绿。",
+    "restore-rate-green.log、incoming-lock-green.log 中 P1 套件曾因 A 并行尚未落 payroll-c1-service 导入失败，不能当完整绿；最终 targeted 已重新覆盖通过。",
+    "首次 pnpm exec eslint 未找到命令，改调用仓库现有 eslint.cmd；最终 11 文件 lint 0。",
+    "未运行全量、typecheck、build 或浏览器；未提交/推送/外发。",
+    "仅指定 B 临时目录的日志、合同响应、owned manifest 与本验证文件留作本工作单元交接证据；由 Root 统一归档/清理，无本任务外部临时输出。"
+  ],
+  "reviewRepair": {
+    "date": "2026-09-14",
+    "finding": "P1 independent review: incoming source occupancy omitted frozen lines/leader/month, soft-deleted daywork links and invalid-day recognizable month",
+    "sourceReport": "../b-independent/review.md",
+    "redLog": "../b-independent/incoming-lock-final-red.log",
+    "redTests": 5,
+    "modifiedProductFiles": [
+      "server/utils/payroll-migration.ts"
+    ],
+    "approach": "Incoming mapped graph and current graph both consume payrollSourceExclusionsFromGraph; no separate member/month/date occupancy algorithm remains in migration. Only real incoming graphs are checked; legal removed evidence and unchanged repeat retain prior behavior.",
+    "sharedProjectionPath": "app/lib/payroll/central-source-locks.ts",
+    "sharedProjectionOwner": "A",
+    "sharedProjectionSha256": "2f40819f508332d5b92fb9e9ee61662b753ced49e86220008ad408eaf6f6f7b2",
+    "unchangedIndependentTest": "tests/payroll/c1-b-independent-review.test.ts",
+    "unchangedIndependentTestSha256": "da12d489911b9899a441277be39469f4428c7c8fed41009d50370cb8e37cbdde",
+    "greenLog": "shared-exclusion-green.log",
+    "command": "npm test -- tests/payroll/c1-b-independent-review.test.ts tests/payroll/c1-migration-protection.test.ts tests/payroll/controlled-migration.test.ts tests/payroll/attendance-facts.test.ts tests/payroll/c1-worker-facts.test.ts",
+    "files": 5,
+    "tests": 36,
+    "passed": 36,
+    "durationSeconds": 18.21,
+    "lintLog": "shared-exclusion-lint.log",
+    "lintErrors": 0,
+    "lintWarnings": 0,
+    "note": "No independent test assertions or A-owned source were changed. No full test, typecheck, build, browser instance, commit or publication."
+  }
+}

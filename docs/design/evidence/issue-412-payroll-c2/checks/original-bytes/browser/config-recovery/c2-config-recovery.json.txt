@@ -1,0 +1,29 @@
+{
+  "original": {
+    "commandId": "payroll-c2-command_mu0w3jft_0",
+    "workspaceId": "workspace-default",
+    "actorId": "actor-default",
+    "origin": "real",
+    "sourceVersion": "payroll:69+identities:dfd308e14c803ec812ef2721e504165752f94b109260d2d5f7efbbc9c1c94290+c2-config:e6194ff8c3079a9201ee764118dfbd4ccabce23803dbb16c36ed575799d6e55d",
+    "requiredCapability": "payroll:write",
+    "projectId": "core-projects-2766ed7defa5caf34481858b",
+    "statementId": null,
+    "draftKey": null,
+    "configScope": {
+      "projectId": "core-projects-2766ed7defa5caf34481858b",
+      "leaderWorkerId": "core-workers-6c72fbba1653d9f820bc6d51"
+    },
+    "configId": "payroll-c2-config_mu0w2ws5_5",
+    "action": {
+      "kind": "save-c2-config",
+      "config": {
+        "crewId": "core-crews-fdc020be63cec349f3492102",
+        "unitRate": "360",
+        "ruleText": ""
+      }
+    }
+  },
+  "configId": "payroll-c2-config_mu0w2ws5_5",
+  "price": 360,
+  "ruleText": ""
+}

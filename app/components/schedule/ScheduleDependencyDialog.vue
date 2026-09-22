@@ -4,6 +4,7 @@ import type {
   ScheduleDisabledDependencyView,
   ScheduleTaskView,
 } from '~/lib/schedule/read-model'
+import ScheduleCommandRecovery from '~/components/schedule/ScheduleCommandRecovery.vue'
 import {
   dependencyConflictPreview,
   dependencyWouldCycle,
@@ -18,6 +19,9 @@ const props = defineProps<{
   dependency: ScheduleDependencyInput | null
   disabledDependencies: readonly ScheduleDisabledDependencyView[]
   busy?: boolean
+  readonly?: boolean
+  pending?: boolean
+  readError?: string
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +29,8 @@ const emit = defineEmits<{
   remove: [dependencyId: string]
   restore: [dependencyId: string]
   requestClose: [dirty: boolean]
+  recover: []
+  recheck: []
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -97,7 +103,8 @@ const canSave = computed(() =>
   Boolean(props.task && predecessor.value)
   && !lagError.value
   && !cycleError.value
-  && !props.busy,
+  && !props.busy
+  && !props.pending && !props.readonly,
 )
 const isDirty = computed(() =>
   predecessorId.value !== initialPredecessorId.value
@@ -107,7 +114,7 @@ const disabledForTask = computed(() => props.task
   ? props.disabledDependencies.filter(dependency => dependency.succId === props.task!.id)
   : [])
 
-watch([open, () => props.task, () => props.dependency], ([isOpen]) => {
+watch([open, () => props.task?.id], ([isOpen]) => {
   if (!isOpen)
     return
   predecessorId.value = props.dependency?.predId ?? candidates.value.at(-1)?.id ?? ''
@@ -119,7 +126,7 @@ watch([open, () => props.task, () => props.dependency], ([isOpen]) => {
 
 function requestClose(event?: Event) {
   event?.preventDefault()
-  if (props.busy || closeRequestQueued)
+  if (props.busy || props.pending || closeRequestQueued)
     return
   closeRequestQueued = true
   queueMicrotask(() => {
@@ -160,12 +167,19 @@ function taskName(taskId: string): string {
             楼栋分组：{{ groupName }}
           </p>
         </div>
-        <button type="button" class="icon-btn flex-none" aria-label="关闭" :disabled="busy" @click="requestClose()">
+        <button type="button" class="icon-btn flex-none" aria-label="关闭" :disabled="busy || pending" @click="requestClose()">
           <span class="i-lucide-x text-14px" />
         </button>
       </header>
 
       <div class="min-h-0 flex-1 overflow-y-auto p-5">
+        <ScheduleCommandRecovery v-if="pending" :busy="busy" @recover="emit('recover')" @recheck="emit('recheck')" />
+        <div v-if="readError && !pending" class="rounded bg-warning/8 p-3 text-12px" role="alert">
+          <p>{{ readError }}；依赖输入仍保留。</p>
+          <Button variant="outline" size="sm" :disabled="busy" @click="emit('recheck')">
+            重新核对权限与资料
+          </Button>
+        </div>
         <div v-if="task" class="grid gap-4">
           <div class="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2 text-11px">
             <span class="text-ink-faint">关系类型</span>
@@ -179,7 +193,7 @@ function taskName(taskId: string): string {
                 v-model="predecessorId"
                 aria-label="前置工序"
                 :options="predecessorOptions"
-                :disabled="!predecessorOptions.length"
+                :disabled="busy || pending || readonly || !predecessorOptions.length"
                 :min-width="220"
                 full-width
                 :placeholder="predecessorOptions.length ? '请选择前置工序' : '没有符合日期条件的工序'"
@@ -189,6 +203,7 @@ function taskName(taskId: string): string {
               <span class="field-label block">Lag（天）</span>
               <input
                 v-model.number="lagDays"
+                :disabled="busy || pending || readonly"
                 aria-label="Lag 天数"
                 type="number"
                 min="-365"
@@ -255,7 +270,7 @@ function taskName(taskId: string): string {
                   {{ taskName(disabled.predId) }} → {{ taskName(disabled.succId) }}
                   · FS{{ disabled.lagDays >= 0 ? '+' : '' }}{{ disabled.lagDays }}
                 </span>
-                <Button variant="outline" size="sm" :disabled="busy" @click="emit('restore', disabled.id)">
+                <Button variant="outline" size="sm" :disabled="busy || pending || readonly" @click="emit('restore', disabled.id)">
                   恢复关系
                 </Button>
                 <span class="w-full text-10px no-underline">
@@ -272,13 +287,13 @@ function taskName(taskId: string): string {
         <Button
           v-if="dependency"
           variant="destructive"
-          :disabled="busy"
+          :disabled="busy || pending || readonly"
           @click="emit('remove', dependency.id)"
         >
           移除依赖
         </Button>
         <span class="min-w-0 flex-1" />
-        <Button variant="outline" :disabled="busy" @click="requestClose()">
+        <Button variant="outline" :disabled="busy || pending" @click="requestClose()">
           取消
         </Button>
         <Button variant="accent" :disabled="!canSave" @click="save">

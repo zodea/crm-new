@@ -2,6 +2,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePayrollStore } from '~/stores/payroll'
 
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
+
 interface Deferred<T> {
   promise: Promise<T>
   resolve: (value: T) => void
@@ -25,7 +27,8 @@ vi.mock('~/lib/db/connection', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('~/lib/payroll/statements', () => ({
+vi.mock('~/lib/payroll/statements', async importOriginal => ({
+  ...await importOriginal<typeof import('~/lib/payroll/statements')>(),
   buildWageDraftSource: vi.fn(),
   checkWageStatement: vi.fn(),
   createWageStatementDraft: vi.fn(),
@@ -58,6 +61,49 @@ beforeEach(() => {
 })
 
 describe('payroll store latest-wins', () => {
+  it('下一次路由同步尚未开始读取时，旧响应也不得覆盖刚改的月份', async () => {
+    mocks.loadOptions.mockImplementation((_: unknown, projectId: string) => Promise.resolve(options(projectId)))
+    const old = deferred<Array<{ id: string }>>()
+    mocks.listStatements.mockReturnValueOnce(old.promise)
+    const store = usePayrollStore()
+    Object.assign(store.filters, { projectId: 'project-a', month: '2025-11' })
+    const pending = store.load()
+    await vi.waitFor(() => expect(mocks.listStatements).toHaveBeenCalledOnce())
+    store.filters.month = '2025-12'
+    old.resolve([{ id: 'november' }])
+    await pending
+    expect(store.filters.month).toBe('2025-12')
+    expect(store.statements).toEqual([])
+  })
+
+  it('同范围刷新保留列表快照含空结果，跨项目先清空', async () => {
+    mocks.loadOptions.mockImplementation((_: unknown, projectId: string) => Promise.resolve(options(projectId)))
+    mocks.listStatements.mockResolvedValueOnce([{ id: 'statement-a' }])
+    const store = usePayrollStore()
+    store.filters.projectId = 'project-a'
+    await store.load()
+    const refresh = deferred<Array<{ id: string }>>()
+    mocks.listStatements.mockReturnValueOnce(refresh.promise)
+    store.filters.status = ['checked']
+    const sameScope = store.load()
+    expect(store.statements.map(row => row.id)).toEqual(['statement-a'])
+    expect(store.hasSnapshot).toBe(true)
+    expect(store.selected).toBeNull()
+    refresh.resolve([])
+    await sameScope
+    expect(store.statements).toEqual([])
+    expect(store.hasSnapshot).toBe(true)
+    mocks.listStatements.mockResolvedValueOnce([])
+    const emptyRefresh = store.load()
+    expect(store.hasSnapshot).toBe(true)
+    await emptyRefresh
+    store.filters.projectId = 'project-b'
+    const otherScope = store.load()
+    expect(store.hasSnapshot).toBe(false)
+    expect(store.statements).toEqual([])
+    await otherScope
+  })
+
   it('旧项目选项请求后完成时不得覆盖最新项目', async () => {
     const projectA = deferred<ReturnType<typeof options>>()
     const projectB = deferred<ReturnType<typeof options>>()

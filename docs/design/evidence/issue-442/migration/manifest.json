@@ -1,0 +1,93 @@
+{
+  "issue": 442,
+  "status": "slice-verified",
+  "scope": "工程量受控迁移",
+  "exclusiveFiles": [
+    "app/lib/quantity/migration-graph.ts",
+    "app/lib/quantity/migration-source.ts",
+    "app/lib/quantity/migration-mapping.ts",
+    "server/utils/quantity-database.ts",
+    "server/utils/quantity-migration.ts",
+    "server/utils/quantity-test-instance.ts",
+    "server/utils/core-migration-preparation.ts",
+    "tests/helpers/quantity-migration-source.ts",
+    "tests/quantity/controlled-migration.test.ts",
+    "tests/quantity/migration-core-source.test.ts",
+    "tests/quantity/migration-graph.test.ts",
+    "tests/server/quantity-database.test.ts",
+    "tests/server/quantity-migration.test.ts",
+    "tests/server/core-migration-preparation.test.ts",
+    "e2e/quantity-migration.spec.ts",
+    "e2e/helpers/quantity-migration-source.ts"
+  ],
+  "sharedHunks": [
+    {
+      "file": "app/lib/quantity/central-service.ts",
+      "scope": "invalidateProjects 方法，命令重放缓存的 projectId 字段和写入；其余 BOQ/variance/monthly 为 root。"
+    },
+    {
+      "file": "tests/quantity/central-service.test.ts",
+      "scope": "首个迁移失效版本与其他项目重放保留回归；其余 root。"
+    },
+    {
+      "file": "app/lib/migration/core-contract.ts",
+      "scope": "quantity_projects 拓扑与可选 SourceEntities 类型、missing-original 指标及非阻断规则；delivery 节点与 legacy-audit 留 #441。"
+    },
+    {
+      "file": "app/lib/migration/core-http-repository.ts",
+      "scope": "仅 missing-original 可读指标；legacy-audit 留 #441。"
+    },
+    {
+      "file": "app/components/migration/MigrationReconciliationTable.vue",
+      "scope": "通用 source-info 类型、标签与样式，工程量缺历史照片正文需要该展示。"
+    },
+    {
+      "file": "app/lib/migration/core-local-source.ts",
+      "scope": "quantity imports、ENTITY_SQL 排除 quantity 类型、quantity 专属 buildSource 分支；施工合同 BOQ JSON 的 building/updatedAt/null保留与时间规范化。delivery imports/诊断/分支归 #441。"
+    },
+    {
+      "file": "server/utils/core-migration-request.ts",
+      "scope": "quantity_projects 专属 graphJson allowlist 与可选节点。delivery 专属 allowlist 不归本切片。"
+    },
+    {
+      "file": "server/utils/core-migration-test-instance.ts",
+      "scope": "异步 prepareTransition、同工作区命令队列、原子 confirm/rollback/reset、quantity 专属关系规则与 dry-run 校验、异步 quantity source 注册；delivery imports/rules/notices/commandSources 项归 #441。"
+    },
+    {
+      "file": "app/components/migration/CoreIdentityMigrationScreen.vue",
+      "scope": "quantity_projects 标签及 missing-original 到 source-info 映射；delivery标签/范围提示/legacy-audit 映射留 #441。"
+    },
+    {
+      "file": "server/api/testing/core-migration/reset.post.ts",
+      "scope": "handler 改 async 并 await reset。"
+    },
+    {
+      "file": "tests/migration/core-local-source.test.ts",
+      "scope": "quantity SQL mock/项目 matrix_archived_at/quantity topology 预期；delivery fixture 差异归 #441。"
+    },
+    {
+      "file": "tests/receipt/migration.test.ts",
+      "scope": "afterEach async 与 await core reset 两行兼容。"
+    }
+  ],
+  "documents": [
+    "docs/guides/local-data-migration.md",
+    "output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf"
+  ],
+  "evidenceDirectory": "docs/design/evidence/issue-442/migration",
+  "validation": {
+    "typecheck": "passed",
+    "exclusiveEslint": "passed",
+    "compatibility": "11 files / 62 tests passed; then controlled-migration 3/3 including added missing-body case",
+    "http": "1/1 passed; 2.7s case / 15.3s total",
+    "pdf": "5 pages individually rendered and inspected"
+  },
+  "notIncluded": [
+    "#441 送货切片",
+    "root 工程量 BOQ/variance/monthly 领域实现",
+    "Lagrange 工程量 store/UI/stage/模板修正",
+    "完整 #442 集成验收与生产持久化"
+  ],
+  "submissionNote": "#442 先于 #441；tests/delivery/controlled-migration.test.ts 虽有本代理补充的 await reset 兼容，整文件仍留给 #441 提交，不能混入 #442。",
+  "temporaryDirectory": ".tmp/remaining-issues-20260910/quantity-migration"
+}

@@ -2,6 +2,8 @@
 
 ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用下一个四位编号；被替代的 ADR 保留正文并在标题下明确指向新决策，不删除历史。
 
+当前任务组织看[全模块复核路线](https://github.com/zodea/crm-new/issues/402)与[模块复核规程](../agents/module-review.md)。旧任务被替代不撤销已采纳决定；“已采纳”“历史切片已实现”和“当前模块已通过/生产可用”分别判断，实际完成状态只看[界面实现状态](../design/ui-implementation-status.md)及当前验收证据。
+
 | ADR | 主题 | 当前状态 |
 | --- | --- | --- |
 | [0001](./0001-invoice-single-table.md) | 发票单表即台账 | 已采纳 |
@@ -17,13 +19,13 @@ ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用�
 | [0011](./0011-redesign-application-shell.md) | 应用外壳行为 | 视觉条款被 0013 取代；行为有效 |
 | [0012](./0012-exact-factor-combination-solver.md) | 开票因子精确组合求解 | 已采纳 |
 | [0013](./0013-align-all-ui-to-online-design.md) | 全站视觉统一到线上设计稿 | 已采纳 |
-| [0014](./0014-full-page-entity-forms.md) | 业务实体使用整页表单 | 已采纳并已落地 |
-| [0015](./0015-form-persistence-and-payment-reconciliation.md) | 表单持久化与付款勾稽 | 已采纳并已落地 |
+| [0014](./0014-full-page-entity-forms.md) | 业务实体使用整页表单 | 已采纳；整页表单基线已落地，业务闭环逐模块复核 |
+| [0015](./0015-form-persistence-and-payment-reconciliation.md) | 表单持久化与付款勾稽 | 已采纳；当前写入范围见 COMMANDS，不能等同全域生产持久化 |
 | [0016](./0016-overlay-composition-contract.md) | 浮层组合采用单交互平面与模态栈契约 | 已采纳，迁移中 |
 | [0017](./0017-provisional-schedule-before-contract.md) | 内部暂估排程允许先建计划、后绑定合同 | 已采纳并已落地 |
 | [0018](./0018-versioned-schedule-process-library.md) | 标准工序库采用不可变版本与可恢复的前置关系 | 已采纳并已落地 |
-| [0019](./0019-delivery-export-source-preservation.md) | 送货单导出的原件保真与可选转换 | 已采纳；#23 部分落地，多 PDF 对象级合并待实现 |
-| [0020](./0020-browser-authority-and-demo-workspace-boundary.md) | 浏览器中央权威与演示工作区隔离 | 已采纳并已落地首个切片 |
+| [0019](./0019-delivery-export-source-preservation.md) | 送货单导出的原件保真与可选转换 | 已采纳；部分能力已落地，未完成项由当前文件流程复核承接 |
+| [0020](./0020-browser-authority-and-demo-workspace-boundary.md) | 浏览器中央权威与演示工作区隔离 | 已采纳；已有中央功能切片，生产持久化另经后置关口验收 |
 
 ## 写作边界
 

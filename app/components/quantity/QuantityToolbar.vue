@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { QuantityMatrixViewMode, QuantityOption } from '~/lib/quantity/matrix'
+import KitButton from '~/components/ui/KitButton.vue'
 
 withDefaults(defineProps<{
   projectOptions: QuantityOption[]
@@ -12,12 +13,16 @@ withDefaults(defineProps<{
   totalUnits?: number
   matrixArchivedAt?: string | null
   scheduleScopeLabel?: string
+  canWrite?: boolean
+  canImport?: boolean
 }>(), {
   loading: false,
   activeUnits: 0,
   totalUnits: 0,
   matrixArchivedAt: null,
   scheduleScopeLabel: '',
+  canWrite: false,
+  canImport: false,
 })
 
 const emit = defineEmits<{
@@ -29,6 +34,7 @@ const emit = defineEmits<{
   manageAssignments: []
   manageRegions: []
   manageTemplates: []
+  manageStages: []
   toggleArchive: []
   refresh: []
 }>()
@@ -95,46 +101,50 @@ const viewTabs = [
         <span class="text-12px text-ink-soft" aria-live="polite">
           有责任或进度 <b class="font-mono text-ink">{{ activeUnits }}</b> / {{ totalUnits }} 户
         </span>
-        <button type="button" class="btn-primary" @click="emit('batchComplete')">
+        <KitButton v-if="canWrite" type="button" variant="primary" class="" @click="emit('batchComplete')">
           <span class="i-lucide-list-checks mr-1 text-13px" aria-hidden="true" />
           批量完成
-        </button>
-        <button type="button" class="btn-secondary" @click="emit('manageAssignments')">
+        </KitButton>
+        <KitButton v-if="canWrite" type="button" variant="secondary" class="" @click="emit('manageAssignments')">
           <span class="i-lucide-users-round mr-1 text-13px" aria-hidden="true" />
           责任配置
-        </button>
-        <button type="button" class="btn-secondary" @click="emit('manageRegions')">
+        </KitButton>
+        <KitButton type="button" variant="secondary" class="" @click="emit('manageRegions')">
           <span class="i-lucide-building-2 mr-1 text-13px" aria-hidden="true" />
           项目区域
-        </button>
-        <button type="button" class="btn-secondary" @click="emit('manageTemplates')">
+        </KitButton>
+        <KitButton type="button" variant="secondary" class="" @click="emit('manageTemplates')">
           <span class="i-lucide-layout-template mr-1 text-13px" aria-hidden="true" />
           户型模板
-        </button>
-        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('viewVariance')">
+        </KitButton>
+        <KitButton type="button" variant="secondary" class="" :disabled="loading" @click="emit('manageStages')">
+          <span class="i-lucide-list-ordered mr-1 text-13px" aria-hidden="true" />
+          阶段配置
+        </KitButton>
+        <KitButton type="button" variant="secondary" class="" :disabled="loading" @click="emit('viewVariance')">
           <span class="i-lucide-chart-no-axes-combined mr-1 text-13px" aria-hidden="true" />
           量差总表
-        </button>
-        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('importData')">
+        </KitButton>
+        <KitButton v-if="canWrite && canImport" type="button" variant="secondary" class="" :disabled="loading" @click="emit('importData')">
           <span class="i-lucide-file-up mr-1 text-13px" aria-hidden="true" />
           导入
-        </button>
-        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('exportLedger')">
+        </KitButton>
+        <KitButton type="button" variant="secondary" class="" :disabled="loading" @click="emit('exportLedger')">
           <span class="i-lucide-file-down mr-1 text-13px" aria-hidden="true" />
           导出台账
-        </button>
-        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('exportByCategory')">
+        </KitButton>
+        <KitButton type="button" variant="secondary" class="" :disabled="loading" @click="emit('exportByCategory')">
           <span class="i-lucide-folder-tree mr-1 text-13px" aria-hidden="true" />
           分类导出
-        </button>
-        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('toggleArchive')">
+        </KitButton>
+        <KitButton v-if="canWrite" type="button" variant="secondary" class="" :disabled="loading" @click="emit('toggleArchive')">
           <span :class="matrixArchivedAt ? 'i-lucide-archive-restore' : 'i-lucide-archive'" class="mr-1 text-13px" aria-hidden="true" />
           {{ matrixArchivedAt ? '解除归档' : '归档矩阵' }}
-        </button>
-        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('refresh')">
+        </KitButton>
+        <KitButton type="button" variant="secondary" class="" :disabled="loading" @click="emit('refresh')">
           <span class="i-lucide-refresh-cw mr-1 text-13px" aria-hidden="true" />
           刷新
-        </button>
+        </KitButton>
       </div>
     </div>
 

@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import { deleteQuantityTemplate, persistQuantityTemplate } from '~/lib/quantity/template'
-import { useQuantityStore } from '~/stores/quantity'
+import { useNativeQuantityStore as useQuantityStore } from '~/stores/quantity-native'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb

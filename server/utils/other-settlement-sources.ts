@@ -2,6 +2,7 @@ import type { CoreMigrationServerEntityDTO } from '../../app/lib/migration/core-
 import type { OtherSettlementSourceDocument } from '../../app/lib/other-settlement/contract'
 import type { OwnerCommercialDocumentSource } from '../../app/lib/owner-document/central-repository'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
+import { approvalAmountLabel, readApprovalAmount } from '../../app/lib/finance/approval-amount'
 import { isCoreMigrationMoney } from '../../app/lib/migration/core-contract'
 
 function money(value: unknown): string | null {
@@ -17,13 +18,15 @@ export function migratedSettlementSource(entity: CoreMigrationServerEntityDTO, e
   if (kind !== 'application' && kind !== 'payment')
     throw auxiliaryProblem('validation-failed', '付款源单类型无效')
   const a = entity.attributes
+  const approvalValue = money(a.approvedAmount)
+  const approval = readApprovalAmount(approvalValue === null ? null : Number(approvalValue), a.approvedAmountOrigin === 'user-entry' ? 'user-entry' : 'legacy')
   if (kind === 'application' && entity.references.contractId) {
     const contract = entities.find(e => e.entityType === 'auxiliary_contracts' && !e.deletedAt && e.id === entity.references.contractId && e.attributes.kind === 'other_expense')
     if (!contract || contract.references.projectId !== entity.references.projectId || contract.references.supplierId !== entity.references.supplierId)
       throw auxiliaryProblem('relationship-mismatch', '付款申请的合同、项目或分供方不一致')
   }
   const fields = kind === 'application'
-    ? { biz_type: '付款业务类型', applicant: '申请人', invoice_state: '发票状态', pay_content: '付款内容', approvedAmount: '批复金额', prepay_note: '预付款扣回说明', approval_note: '批复说明', external_ref: '外部编号', note: '备注', created_at: '创建时间', updated_at: '更新时间' }
+    ? { biz_type: '付款业务类型', applicant: '申请人', invoice_state: '发票状态', pay_content: '付款内容', approvedAmount: '批复金额', approvedAmountStatus: '批复金额说明', prepay_note: '预付款扣回说明', approval_note: '批复说明', external_ref: '外部编号', note: '备注', created_at: '创建时间', updated_at: '更新时间' }
     : { payee_name: '收款人', payment_method: '支付方式', purpose: '用途', voucher_no: '凭证号', bank_serial_no: '银行流水号', handler: '经办人', confirmed_by: '确认人', confirmed_at: '确认时间', note: '备注', created_at: '创建时间', updated_at: '更新时间' }
   const allocations: unknown = JSON.parse(String(a.allocationsJson ?? '[]'))
   if (!Array.isArray(allocations))
@@ -43,7 +46,7 @@ export function migratedSettlementSource(entity: CoreMigrationServerEntityDTO, e
     projectId: entity.references.projectId ?? null,
     contractId: entity.references.contractId ?? null,
     supplierId: entity.references.supplierId ?? null,
-    fields: Object.entries(fields).map(([key, label]) => ({ label: label!, value: a[key] == null ? null : String(a[key]) })),
+    fields: Object.entries(fields).map(([key, label]) => ({ label: label!, value: key === 'approvedAmount' ? money(approval.amount) : key === 'approvedAmountStatus' ? approvalAmountLabel(approval.state) : a[key] == null ? null : String(a[key]) })),
     allocations: allocations.map((raw) => {
       if (!raw || typeof raw.id !== 'string' || !raw.id || seen.has(raw.id) || typeof raw.targetId !== 'string')
         throw auxiliaryProblem('validation-failed', '源单分配身份无效或重复')

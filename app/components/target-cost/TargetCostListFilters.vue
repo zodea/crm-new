@@ -1,14 +1,18 @@
 <script setup lang="ts">
+import ContextHelp from '~/components/ui/ContextHelp.vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+
 interface FilterOption {
   key: string
   label: string
 }
 
-defineProps<{
+withDefaults(defineProps<{
   loading: boolean
   projectOptions: readonly FilterOption[]
   statusOptions: readonly FilterOption[]
-}>()
+  canCreate?: boolean
+}>(), { canCreate: true })
 
 const emit = defineEmits<{
   refresh: []
@@ -17,26 +21,24 @@ const emit = defineEmits<{
 
 const search = defineModel<string>('search', { required: true })
 const project = defineModel<string>('project', { required: true })
-const baseline = defineModel<'all' | 'baseline' | 'history'>('baseline', { required: true })
-const status = defineModel<string>('status', { required: true })
+const baseline = defineModel<string[]>('baseline', { required: true })
+const status = defineModel<string[]>('status', { required: true })
 </script>
 
 <template>
   <header class="panel flex min-w-0 flex-col gap-3 px-4 py-3">
     <div class="flex min-w-0 flex-wrap items-center gap-3">
-      <div class="mr-auto min-w-0">
+      <div class="mr-auto min-w-0 flex items-center gap-1">
         <h1 class="text-17px font-800 text-ink">
           目标成本列表
         </h1>
-        <p class="mt-0.5 text-11px text-ink-faint">
-          按项目管理预算版本，当前基线用于项目成本动态对比。
-        </p>
+        <ContextHelp label="目标成本基线" text="当前基线用于项目成本动态对比；可按基线范围筛选预算版本。" />
       </div>
       <KitButton type="button" variant="secondary" :loading="loading" @click="emit('refresh')">
         <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />
         刷新
       </KitButton>
-      <KitButton type="button" variant="primary" @click="emit('create')">
+      <KitButton type="button" variant="primary" :disabled="!canCreate" @click="emit('create')">
         <span class="i-lucide-plus mr-1" aria-hidden="true" />
         新建目标成本
       </KitButton>
@@ -58,32 +60,8 @@ const status = defineModel<string>('status', { required: true })
           {{ option.label }}
         </option>
       </select>
-      <label class="sr-only" for="target-cost-baseline-filter">基线范围</label>
-      <select
-        id="target-cost-baseline-filter"
-        v-model="baseline"
-        class="field-input h-8 min-w-0 text-12px"
-      >
-        <option value="all">
-          全部版本
-        </option>
-        <option value="baseline">
-          当前基线
-        </option>
-        <option value="history">
-          历史/非基线
-        </option>
-      </select>
-      <label class="sr-only" for="target-cost-status-filter">状态</label>
-      <select
-        id="target-cost-status-filter"
-        v-model="status"
-        class="field-input h-8 min-w-0 text-12px"
-      >
-        <option v-for="option in statusOptions" :key="option.key" :value="option.key">
-          {{ option.label }}
-        </option>
-      </select>
+      <KitMultiSelectFilter v-model="baseline" label="基线范围" :options="[{ key: 'baseline', label: '当前基线' }, { key: 'history', label: '历史/非基线' }]" full-width />
+      <KitMultiSelectFilter v-model="status" label="状态" :options="statusOptions" full-width />
     </div>
   </header>
 </template>

@@ -3,6 +3,7 @@ import type {
   FileRefDraft,
   FileRefRecord,
 } from '~/lib/forms/file-refs'
+import KitButton from '~/components/ui/KitButton.vue'
 
 export interface PendingFileRef extends FileRefDraft {
   localId: string
@@ -19,6 +20,7 @@ defineProps<{
   noteReadonly?: boolean
   categoryReadonly?: boolean
   readonly?: boolean
+  pickerDescription?: string
 }>()
 
 const emit = defineEmits<{
@@ -61,7 +63,7 @@ function inputValue(event: Event): string {
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
       <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">浏览器保存文件元数据；桌面应用保存真实路径</span>
+      <span class="mt-0.5 text-11px text-ink-faint">{{ pickerDescription ?? '浏览器保存文件元数据；桌面应用保存真实路径' }}</span>
       <input
         type="file"
         multiple
@@ -86,17 +88,17 @@ function inputValue(event: Event): string {
         <span class="min-w-0 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
         <span class="text-10px text-ink-faint">{{ file.category || '未分类' }}</span>
         <span v-if="file.deletedAt" class="text-10px text-danger">已删除</span>
-        <button
+        <KitButton
           v-if="!readonly"
-          type="button"
-          class="text-11px"
+          variant="ghost"
+          class="h-7 shrink-0 px-2 text-11px"
           :class="file.deletedAt ? 'text-brand' : 'text-danger'"
           @click="emit('toggleExisting', file.id)"
         >
           {{ file.deletedAt
             ? pendingRestoreIds.includes(file.id) ? '取消恢复' : '恢复'
             : pendingRemoveIds.includes(file.id) ? '撤销删除' : '删除' }}
-        </button>
+        </KitButton>
       </div>
 
       <div
@@ -114,14 +116,14 @@ function inputValue(event: Event): string {
           aria-label="附件分类"
           @input="emit('patchPending', file.localId, { category: inputValue($event) })"
         >
-        <button
+        <KitButton
           v-if="!readonly"
-          type="button"
-          class="text-11px text-danger"
+          variant="ghost"
+          class="h-7 shrink-0 px-2 text-11px text-danger"
           @click="emit('removePending', file.localId)"
         >
           移除
-        </button>
+        </KitButton>
       </div>
     </div>
 

@@ -39,7 +39,7 @@ describe('signed daywork components', () => {
   })
 
   it('renders long records inside a local horizontal-scroll table', async () => {
-    const { container, emitted } = render(SignedDayworkTable, {
+    const { container, emitted, rerender } = render(SignedDayworkTable, {
       props: {
         loading: false,
         records: [{
@@ -68,6 +68,14 @@ describe('signed daywork components', () => {
     expect(container.querySelector('.daywork-table > table')).not.toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '编辑签工记录' }))
     expect(emitted().edit?.[0]?.[0]).toMatchObject({ id: 'record-a' })
+    await rerender({ loading: true, hasSnapshot: true })
+    expect(container.querySelector('.daywork-table > table')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '编辑签工记录' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByText('正在读取签工记录')).toBeNull()
+    await rerender({ records: [], loading: true, hasSnapshot: true })
+    expect(screen.getByText('当前范围没有签工记录')).not.toBeNull()
+    await rerender({ records: [], loading: true, hasSnapshot: false })
+    expect(screen.getByText('正在读取签工记录')).not.toBeNull()
   })
 
   it('edits a pending record and preserves its id when confirming', async () => {

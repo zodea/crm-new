@@ -11,9 +11,9 @@ const KitButton = defineComponent({
 })
 
 const KitEditGrid = defineComponent({
-  props: ['modelValue', 'columns', 'rowOps', 'summary'],
+  props: ['modelValue', 'columns', 'rowOps', 'summary', 'readonly'],
   emits: ['update:modelValue'],
-  setup(props, { emit, expose }) {
+  setup(props, { emit, expose, slots }) {
     const errors = shallowRef<{ row: number, key: string, message?: string }[]>([])
     const focused = shallowRef(false)
     expose({
@@ -29,6 +29,7 @@ const KitEditGrid = defineComponent({
       h('span', `${props.columns.length} 列`),
       h('output', { 'data-testid': 'grid-errors' }, JSON.stringify(errors.value)),
       focused.value ? h('span', { 'data-testid': 'grid-focused' }) : null,
+      ...props.modelValue.map((row: unknown, rowIndex: number) => slots['cell-order']?.({ row, rowIndex })),
       h('button', {
         type: 'button',
         onClick: () => emit('update:modelValue', [
@@ -63,6 +64,7 @@ describe('target cost item editor', () => {
       'unitPrice',
       'amount',
       'note',
+      'order',
     ])
     expect(await (wrapper.vm as unknown as { validate: () => Promise<unknown[]> }).validate())
       .toEqual([])
@@ -71,6 +73,18 @@ describe('target cost item editor', () => {
     expect(wrapper.emitted('update:modelValue')?.[0]?.[0]).toEqual([
       { category: '材料', itemName: '新增行', amount: 10 },
     ])
+  })
+
+  it('preserves row identity and nullable values when moving rows, then applies server cell errors', async () => {
+    const rows = [{ id: 'a', category: '材料', itemName: '空数量', qty: null, unitPrice: null, amount: 0 }, { id: 'b', category: '机械', itemName: '真实零', qty: 0, unitPrice: 0, amount: 100 }]
+    const wrapper = mount(TargetCostItemEditor, { props: { modelValue: rows, saving: false }, global: { components: { KitButton, KitEditGrid } } })
+    await wrapper.get('button[aria-label="第 2 行上移"]').trigger('click')
+    expect(wrapper.emitted('update:modelValue')?.[0]?.[0]).toEqual([rows[1], rows[0]])
+    await (wrapper.vm as unknown as { setServerErrors: (value: Record<string, string>) => Promise<void> }).setServerErrors({ 'items.1.amount': '该行金额无效' })
+    expect(JSON.parse(wrapper.get('[data-testid="grid-errors"]').text())).toEqual([{ row: 1, key: 'amount', message: '该行金额无效' }])
+    expect(wrapper.find('[data-testid="grid-focused"]').exists()).toBe(true)
+    await wrapper.setProps({ saving: true })
+    expect(wrapper.findComponent(KitEditGrid).props('readonly')).toBe(true)
   })
 
   it('emits explicit save and cancel actions', async () => {

@@ -8,6 +8,7 @@ import type {
   CoreMigrationSourceDTO,
   CoreMigrationSourceEntityDTO,
 } from '../../app/lib/migration/core-contract'
+import { crewPayrollFeeAttributes } from '../../app/lib/crew-worker/payroll-fee-defaults'
 import {
   CORE_MIGRATION_CAPABILITY,
   CORE_MIGRATION_TOPOLOGY,
@@ -20,11 +21,26 @@ const REFERENCE_KEYS = new Set<CoreMigrationReferenceField>([
   'customerId',
   'secondaryCustomerId',
   'projectId',
+  'contractId',
   'supplierId',
   'crewId',
 ])
 const ROW_KEYS = new Set(['legacyId', 'name', 'references', 'quantity', 'amount', 'attributes', 'deletedAt'])
-const ATTRIBUTE_KEYS = new Set(['no', 'content', 'invoiceType', 'contactName', 'contactPhone', 'taxRate', 'signDate', 'mainTerms', 'paymentTerms', 'warrantyTerms', 'retentionRatio', 'retentionAmount', 'retentionDays', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note', 'actualCompletionDate', 'createdAt', 'updatedAt'])
+const ATTRIBUTE_KEYS = new Set(['no', 'content', 'invoiceType', 'contactName', 'contactPhone', 'taxRate', 'signDate', 'mainTerms', 'paymentTerms', 'warrantyTerms', 'retentionRatio', 'retentionAmount', 'retentionDays', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note', 'actualCompletionDate', 'createdAt', 'updatedAt', 'laborScope'])
+const ATTRIBUTE_KEYS_BY_ENTITY: Partial<Record<CoreMigrationEntityType, ReadonlySet<string>>> = {
+  crews: new Set([...ATTRIBUTE_KEYS, 'defaultPayRatio', 'rentSubsidyEnabled', 'rentSubsidyPrice', 'mgmtFeeEnabled', 'mgmtFeePrice']),
+  workers: new Set([...ATTRIBUTE_KEYS, 'dailyWage']),
+  supplier_credentials: new Set(['graphJson']),
+  suppliers: new Set(['aliases', 'externalRef', 'uniqueCode', 'taxNo', 'businessType', 'supplierCategory', 'rating', 'legalRep', 'registeredCapital', 'registeredDate', 'address', 'taxpayerType', 'taxpayerVerificationStatus', 'taxpayerVerificationSource', 'taxpayerVerifiedAt', 'taxpayerVerificationNote', 'mainBusiness', 'laborScope', 'invoiceName', 'invoiceAddress', 'bank', 'bankAccount', 'phone', 'contact', 'contactPhone', 'contactTitle', 'note', 'approvalStatus', 'createdAt', 'updatedAt']),
+  process_libraries: new Set(['graphJson']),
+  quantity_projects: new Set(['graphJson']),
+  wbs_projects: new Set(['graphJson']),
+  target_cost_versions: new Set(['budgetGraphJson']),
+  payroll_projects: new Set(['payrollGraphJson']),
+  construction_contracts: new Set([...ATTRIBUTE_KEYS, 'boqCatalogJson', 'monthlyQuantityFactsJson']),
+  receipt_registrations: new Set(['no', 'receiptDate', 'payerAccount', 'paymentMethod', 'acceptanceBillNo', 'billDueDate', 'periodNo', 'bankSerialNo', 'handler', 'reviewStatus', 'status', 'note', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'attachmentsJson']),
+  delivery_records: new Set(['orderNo', 'deliveryDate', 'rawSiteText', 'fileName', 'ocrStatus', 'archived', 'printBatchId', 'printDisposition', 'printedAt', 'printExcludedAt', 'reviewFlag', 'note', 'createdAt', 'updatedAt', 'sourceState', 'sourceProblem', 'assetJson', 'allLinesJson', 'auditJson', 'legacyOriginalsJson']),
+}
 const SOURCE_KEYS = new Set([
   'contractVersion',
   'mode',
@@ -140,14 +156,24 @@ function parseReferences(value: unknown, label: string): CoreMigrationSourceEnti
   return result
 }
 
-function parseAttributes(value: unknown, label: string): CoreMigrationSourceEntityDTO['attributes'] {
+function parseAttributes(value: unknown, label: string, entityType: CoreMigrationEntityType): CoreMigrationSourceEntityDTO['attributes'] {
   if (value === undefined)
     return undefined
   if (!isObject(value))
     invalid(`${label}必须是对象`)
-  assertOnlyKeys(value, ATTRIBUTE_KEYS, label)
+  assertOnlyKeys(value, ATTRIBUTE_KEYS_BY_ENTITY[entityType] ?? ATTRIBUTE_KEYS, label)
+  if (entityType === 'crews') {
+    try {
+      crewPayrollFeeAttributes(value)
+    }
+    catch (cause) { invalid(cause instanceof Error ? cause.message : `${label} 班组费用默认无效`) }
+  }
   const result: Record<string, string | number | null> = {}
   for (const [key, entry] of Object.entries(value)) {
+    if (entityType === 'crews' && key === 'defaultPayRatio' && entry !== null && (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0 || entry > 1))
+      invalid(`${label}.${key}必须是 0 至 1 的比例或 null`)
+    if (entityType === 'workers' && key === 'dailyWage' && entry !== null && (typeof entry !== 'number' || !Number.isFinite(entry) || entry < 0))
+      invalid(`${label}.${key}必须是非负日薪或 null`)
     if (entry !== null && typeof entry !== 'string' && (typeof entry !== 'number' || !Number.isFinite(entry)))
       invalid(`${label}.${key}必须是文本、有限数值或 null`)
     result[key] = entry as string | number | null
@@ -168,7 +194,7 @@ function parseEntity(value: unknown, entityType: CoreMigrationEntityType, index:
       : {}),
     ...(value.quantity !== undefined ? { quantity: optionalFinite(value.quantity, `${label}.quantity`) } : {}),
     ...(value.amount !== undefined ? { amount: optionalMoney(value.amount, `${label}.amount`) } : {}),
-    ...(value.attributes !== undefined ? { attributes: parseAttributes(value.attributes, `${label}.attributes`) } : {}),
+    ...(value.attributes !== undefined ? { attributes: parseAttributes(value.attributes, `${label}.attributes`, entityType) } : {}),
     ...(value.deletedAt !== undefined ? { deletedAt: optionalIso(value.deletedAt, `${label}.deletedAt`) } : {}),
   }
 }
@@ -252,7 +278,7 @@ export function parseCoreMigrationSourceCommand(value: unknown): CoreMigrationSo
     invalid('source.entities 必须是对象')
   assertOnlyKeys(entityGroups, ENTITY_KEYS, 'source.entities')
 
-  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['auxiliary_contracts', 'other_settlements', 'other_settlement_sources'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
+  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['auxiliary_contracts', 'other_settlements', 'other_settlement_sources', 'delivery_records', 'quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects', 'target_cost_versions', 'payroll_projects'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
     const rows = entityGroups[entityType]
     if (!Array.isArray(rows))
       invalid(`source.entities.${entityType}必须是数组`)

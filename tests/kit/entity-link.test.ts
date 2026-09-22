@@ -61,14 +61,14 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       variant: 'detail',
       view: null,
       filters: { projectId: 'p1', dataOrigin: 'real' },
-    })).toEqual({ state: 'resolved', to: '/subcontract/quantity/p1/u1', label: '201户' })
+    })).toEqual({ state: 'resolved', to: '/subcontract/quantity/p1/u1?origin=real', label: '201户' })
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
       subject: { state: 'resolved', entity: 'wage-statement', id: 'ws1', label: '7月工资单', no: null },
       variant: 'detail',
       view: null,
       filters: { dataOrigin: 'real' },
-    })).toEqual({ state: 'resolved', to: '/subcontract/payroll/ws1', label: '7月工资单' })
+    })).toEqual({ state: 'resolved', to: '/subcontract/payroll/ws1?origin=real', label: '7月工资单' })
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
       subject: { state: 'resolved', entity: 'subcontract-document', id: 'f1', label: 'FK-1', no: null },
@@ -158,6 +158,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
 
   it('映射表只登记已实装详情页', () => {
     expect(registeredTargetKeys()).toEqual([
+      'attendance:matrix',
       'contract:boq',
       'contract:company_expense',
       'contract:detail',
@@ -167,6 +168,8 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'contract:supplement',
       'crew:detail',
       'customer:detail',
+      'daywork:ledger',
+      'delivery-record:detail',
       'invoice:detail',
       'owner-document:acceptance',
       'owner-document:change',
@@ -175,16 +178,22 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'owner-document:report',
       'owner-document:warranty',
       'payment-application:detail',
+      'process-library:detail',
       'project:detail',
       'project:supplier-workbench',
       'quantity-unit:detail',
+      'quantity-unit:hollow-record',
       'receipt:detail',
       'settlement:other_settlement',
       'subcontract-document:change',
       'subcontract-document:penalty',
       'subcontract-document:penalty-detail',
       'subcontract-document:settlement',
+      'supplier:credentials',
       'supplier:detail',
+      'target-cost:detail',
+      'wage-actual:detail',
+      'wage-adjustment:detail',
       'wage-statement:detail',
       'worker:detail',
     ])

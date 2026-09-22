@@ -1,9 +1,11 @@
 import type { OwnerCommercialDocumentReadTestScenario } from '../../../utils/owner-commercial-document-read-test-instance'
 import process from 'node:process'
+import { prepareConstructionContractChainIdentityFixtures } from '../../../utils/construction-contract-chain-test-fixture'
 import { demoWorkspaceTestInstance } from '../../../utils/demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from '../../../utils/owner-commercial-document-command-test-instance'
 import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from '../../../utils/owner-commercial-document-fixtures'
 import { ownerCommercialDocumentReadTestInstance } from '../../../utils/owner-commercial-document-read-test-instance'
+import { prepareLegacyReceiptTestFixtures } from '../../../utils/receipt-test-fixtures'
 
 type Scenario = OwnerCommercialDocumentReadTestScenario | 'demo-forbidden'
 const scenarios = new Set<Scenario>(['ready', 'empty', 'forbidden', 'unavailable', 'demo-forbidden'])
@@ -17,9 +19,13 @@ export default defineEventHandler(async (event) => {
   if (!body?.scenario || !scenarios.has(body.scenario))
     throw createError({ statusCode: 400, statusMessage: 'Unknown owner document test scenario' })
   const sessionId = getHeader(event, 'x-ruihang-test-session')
-  ownerCommercialDocumentCommandTestInstance.reset(sessionId)
   if (body.scenario === 'ready')
+    prepareConstructionContractChainIdentityFixtures(sessionId)
+  ownerCommercialDocumentCommandTestInstance.reset(sessionId)
+  if (body.scenario === 'ready') {
+    prepareLegacyReceiptTestFixtures(sessionId)
     ownerCommercialDocumentCommandTestInstance.importExisting(OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS, sessionId)
+  }
   if (body.scenario === 'demo-forbidden') {
     ownerCommercialDocumentReadTestInstance.reset('ready', sessionId)
     demoWorkspaceTestInstance.reset('forbidden', sessionId)

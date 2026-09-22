@@ -4,6 +4,7 @@ import type {
   OwnerDocumentKind,
   OwnerDocumentListRecord,
 } from '~/lib/owner-document/forms'
+import { normalizeEnumSelection } from '~/lib/util/enum-selection'
 
 export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocumentListItemDTO): OwnerDocumentListRecord {
   const settlementAmounts = item.amounts.kind === 'sub_settlement' ? item.amounts : null
@@ -105,8 +106,8 @@ export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocument
 export interface OwnerDocumentListFilters {
   search: string
   project: string
-  type: string
-  statusView: string
+  type: string | string[]
+  statusView: string | string[]
   routeProject?: string
   routeContract?: string
   routeSupplier?: string
@@ -484,11 +485,13 @@ export function filterOwnerDocumentRows(
   return rows.filter((row) => {
     if (filters.project !== 'all' && row.projectId !== filters.project)
       return false
-    if (filters.type !== 'all' && row.type !== filters.type)
+    const types = normalizeEnumSelection(filters.type)
+    const statuses = normalizeEnumSelection(filters.statusView)
+    if (types.length && !types.includes(row.type))
       return false
     if (
-      filters.statusView !== 'all'
-      && ownerDocumentStatusViewKey(kind, row.status) !== filters.statusView
+      statuses.length
+      && !statuses.includes(ownerDocumentStatusViewKey(kind, row.status))
     ) {
       return false
     }

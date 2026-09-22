@@ -10,7 +10,9 @@ const props = defineProps<{
   returnTo?: string | null
   anchorScope?: 'acceptance' | 'warranty'
   returnFocusView?: 'acceptance' | 'warranty'
+  restoreScrollLeft?: number
 }>()
+defineEmits<{ viewRestored: [] }>()
 
 const anchorPrefix = computed(() => props.anchorScope
   ? `construction-contract-fact-${props.anchorScope}`
@@ -26,5 +28,7 @@ const anchorPrefix = computed(() => props.anchorScope
     :return-to="returnTo"
     :return-focus-view="returnFocusView"
     :anchor-prefix="anchorPrefix"
+    :restore-scroll-left="restoreScrollLeft"
+    @view-restored="$emit('viewRestored')"
   />
 </template>

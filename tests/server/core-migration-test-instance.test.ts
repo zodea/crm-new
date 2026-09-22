@@ -27,6 +27,14 @@ const SESSION: BusinessSession = {
   capabilities: [CORE_MIGRATION_CAPABILITY],
 }
 
+it.each(['sqlite-v47', 'sqlite-v48', 'sqlite-v49'])('批复来源迁移后仍接受 %s 受保护来源，并重验来源哈希', async (sourceVersion) => {
+  const instance = createCoreMigrationTestInstance()
+  const input = source({ sourceVersion })
+  const envelope = { workspaceId: SESSION.workspaceId, actorId: SESSION.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, source: input, backup: null }
+  await expect(instance.preflight({ ...envelope, commandId: `approval-${sourceVersion}` }, SESSION)).resolves.toBeDefined()
+  await expect(instance.preflight({ ...envelope, commandId: `tampered-${sourceVersion}`, source: { ...input, sourceHash: '0'.repeat(64) } }, SESSION)).rejects.toThrow('sourceHash')
+})
+
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex')
 }
@@ -179,6 +187,27 @@ function batchCommand(commandId: string, batchId: string): CoreMigrationBatchCom
 }
 
 describe('core migration test instance', () => {
+  it.each(['sqlite-v47', 'sqlite-v48'])('兼容已定版本 %s 的合法快照', async (sourceVersion) => {
+    const instance = createCoreMigrationTestInstance()
+    await expect(instance.preflight(sourceCommand(`version-${sourceVersion}`, cleanSource({ sourceVersion })), SESSION)).resolves.toBeDefined()
+  })
+
+  it.each(['缺省', '显式空数组'])('网络命令保留%s工资图并保持来源哈希', async (mode) => {
+    const baseline = source()
+    const migrationSource = mode === '缺省'
+      ? baseline
+      : source({ entities: { ...baseline.entities, payroll_projects: [] } })
+    const command = sourceCommand(`payroll-optional-${mode}`, migrationSource)
+    const parsed = parseCoreMigrationSourceCommand(JSON.parse(JSON.stringify(command)))
+
+    expect(parsed).toEqual(command)
+    expect(Object.hasOwn(parsed.source.entities, 'payroll_projects')).toBe(mode === '显式空数组')
+    expect(coreMigrationSourceHashInput(parsed.source)).toBe(coreMigrationSourceHashInput(migrationSource))
+    await expect(createCoreMigrationTestInstance().preflight(parsed, SESSION))
+      .resolves
+      .toMatchObject({ sourceHash: migrationSource.sourceHash })
+  })
+
   it('解析网络命令后保持来源哈希与字段顺序无关', async () => {
     const baseline = source()
     const migrationSource = source({
@@ -204,6 +233,24 @@ describe('core migration test instance', () => {
     await expect(createCoreMigrationTestInstance().preflight(parsed, SESSION))
       .resolves
       .toMatchObject({ sourceHash: migrationSource.sourceHash })
+  })
+
+  it.each(['独立劳务范围', null])('分供方迁移 HTTP 保留 laborScope=%s 并继续拒绝未知字段', async (laborScope) => {
+    const baseline = cleanSource()
+    const migrationSource = source({
+      ...baseline,
+      entities: {
+        ...baseline.entities,
+        suppliers: baseline.entities.suppliers.map(row => ({ ...row, attributes: { laborScope } })),
+      },
+    })
+    const command = sourceCommand('supplier-scope-http', migrationSource)
+    const parsed = parseCoreMigrationSourceCommand(JSON.parse(JSON.stringify(command)))
+    expect(parsed.source.entities.suppliers[0]?.attributes).toEqual({ laborScope })
+    await expect(createCoreMigrationTestInstance().preflight(parsed, SESSION)).resolves.toMatchObject({ sourceHash: migrationSource.sourceHash })
+    const unknown = structuredClone(command)
+    unknown.source.entities.suppliers[0]!.attributes!.unknownField = '拒绝'
+    expect(() => parseCoreMigrationSourceCommand(unknown)).toThrow('包含未知字段')
   })
 
   it('服务端重算来源哈希，预检仅接受未备份命令且 dry-run 必须先有同一来源预检', async () => {

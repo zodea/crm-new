@@ -8,7 +8,7 @@ import type {
   OwnerDocumentSaveAction,
 } from '~/lib/owner-document/forms'
 import { useDebounceFn } from '@vueuse/core'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { OwnerCommercialDocumentRepositoryProblem } from '~/lib/owner-document/central-repository'
 import {
   ownerDocumentFormCanRebase,
@@ -23,7 +23,7 @@ import {
   OWNER_DOCUMENT_META,
   ownerDocumentDefaults,
   ownerDocumentFormPath,
-  ownerDocumentLineAmount,
+  ownerDocumentTotalAmount,
   validateOwnerDocumentForm,
 } from '~/lib/owner-document/page'
 import {
@@ -31,6 +31,7 @@ import {
   validateOwnerDocumentJourneyReturnTo,
 } from '~/lib/owner-document/return-context'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
+import { isQuantityBasis } from '~/lib/quantity/basis'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -271,32 +272,43 @@ async function refreshContractAvailability() {
   }
 }
 
+let boqSequence = 0
+let pageActive = true
+const boqIdentity = () => JSON.stringify([route.fullPath, props.kind, draft.value.projectId, draft.value.contractId, draft.value.periodNo, draft.value.quantityBasis])
 const refreshBoqLines = useDebounceFn(async () => {
+  if (!pageActive || route.fullPath !== pageFullPath)
+    return
+  const sequence = ++boqSequence
+  const identity = boqIdentity()
   const projectId = typeof draft.value.projectId === 'string' ? draft.value.projectId : ''
   const contractId = typeof draft.value.contractId === 'string' ? draft.value.contractId : ''
-  if (!projectId || !contractId || !['owner_change', 'owner_report'].includes(props.kind)) {
+  if (!projectId || !contractId || !['owner_change', 'owner_report'].includes(props.kind)
+    || (props.kind === 'owner_report' && !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(String(draft.value.periodNo ?? '')))) {
     boqLines.value = []
     return
   }
   try {
-    boqLines.value = await store.loadBoqLines(
+    const rows = await store.loadBoqLines(
       projectId,
       contractId,
       props.kind === 'owner_report' ? String(draft.value.periodNo ?? '') : '',
+      props.kind === 'owner_report' && !isDesktopRuntime() && isQuantityBasis(draft.value.quantityBasis) ? draft.value.quantityBasis : undefined,
     )
+    if (!pageActive || sequence !== boqSequence || identity !== boqIdentity() || route.fullPath !== pageFullPath)
+      return
+    boqLines.value = rows
     if (editable.value) {
       const current = draft.value.lines ?? []
       const byId = new Map(boqLines.value.map(line => [line.id, line]))
       const lines = props.kind === 'owner_report' && !current.length
         ? boqLines.value
-            // 缺量行自动量为 0，仍要带入并在网格标注，否则缺数会被悄悄漏报。
-            .filter(line => line.autoQty > 0 || line.missingQtyCount > 0)
+            // 当前期次事实中的明确零和缺量行都保留，缺量不预填为已确认申报量。
             .map(line => ({
               boqLineId: line.id,
               itemName: line.itemName,
               unit: line.unit,
               autoQty: line.autoQty,
-              reportedQty: line.autoQty,
+              reportedQty: line.missingQtyCount > 0 ? null : line.autoQty,
               auditedQty: null,
               qty: line.qty,
               unitPrice: line.unitPrice,
@@ -322,6 +334,8 @@ const refreshBoqLines = useDebounceFn(async () => {
     }
   }
   catch (cause) {
+    if (!pageActive || sequence !== boqSequence || identity !== boqIdentity() || route.fullPath !== pageFullPath)
+      return
     boqLines.value = []
     error(`载入合同清单失败：${toErrorMessage(cause)}`)
   }
@@ -429,8 +443,26 @@ async function initialize() {
   }
 }
 
-function patchDraft(patch: Partial<OwnerDocumentDraft>) {
-  const next = { ...draft.value, ...patch }
+async function patchDraft(patch: Partial<OwnerDocumentDraft>) {
+  if (props.kind === 'owner_report' && !editable.value)
+    return
+  const previous = draft.value
+  const basisChanged = props.kind === 'owner_report'
+    && 'quantityBasis' in patch && patch.quantityBasis !== previous.quantityBasis
+  if (basisChanged && (previous.lines?.length ?? 0) > 0) {
+    const accepted = await confirm({
+      variant: 'simple',
+      title: '更换报量基准',
+      message: '更换基准将重新生成全部报量明细，并清除已有手工申报量。请核对后确认。',
+      confirmLabel: '确认重算',
+      cancelLabel: '保留原稿',
+    })
+    if (!accepted || draft.value !== previous || !editable.value || route.fullPath !== pageFullPath)
+      return
+  }
+  const next = { ...previous, ...patch }
+  if (basisChanged)
+    next.lines = []
   if ('projectId' in patch) {
     next.contractId = null
     if (!next.projectId)
@@ -439,8 +471,13 @@ function patchDraft(patch: Partial<OwnerDocumentDraft>) {
   if ('supplierId' in patch)
     next.contractId = null
   draft.value = next
-  if ('projectId' in patch || 'contractId' in patch || 'periodNo' in patch)
+  if (basisChanged)
+    updateDerivedAmounts()
+  if ('projectId' in patch || 'contractId' in patch || 'periodNo' in patch || 'quantityBasis' in patch) {
+    boqSequence += 1
+    boqLines.value = []
     void refreshBoqLines()
+  }
   if ('projectId' in patch || 'supplierId' in patch)
     void refreshContractAvailability()
   if (
@@ -461,14 +498,11 @@ function patchLines(lines: Array<Record<string, unknown>>) {
 
 function updateDerivedAmounts() {
   const lines = draft.value.lines ?? []
-  const amount = lines.reduce(
-    (sum, line) => sum + ownerDocumentLineAmount(props.kind, line),
-    0,
-  )
+  const amount = ownerDocumentTotalAmount(props.kind, lines)
   if (props.kind === 'owner_change')
-    draft.value = { ...draft.value, totalAmount: Math.round(amount * 100) / 100 }
+    draft.value = { ...draft.value, totalAmount: amount }
   if (props.kind === 'owner_report')
-    draft.value = { ...draft.value, reportedAmount: Math.round(amount * 100) / 100 }
+    draft.value = { ...draft.value, reportedAmount: amount }
 }
 
 function clearFieldError(field: string) {
@@ -619,10 +653,8 @@ async function leaveToList() {
   await navigateTo(returnTarget.value)
 }
 
-onBeforeRouteLeave(async () => {
+useTabCloseGuard(async () => {
   if (allowLeave || !dirty.value)
-    return true
-  if (tabsStore.tabs.some(tab => tab.key === pageKey))
     return true
   const leave = await confirm({
     variant: 'simple',
@@ -630,12 +662,21 @@ onBeforeRouteLeave(async () => {
     message: '当前表单还有未保存内容，确认离开？',
     confirmLabel: '放弃修改',
   })
-  if (!leave)
-    tabsStore.open({ fullPath: pageFullPath, title: title.value })
   return leave
 })
 
 onMounted(() => void initialize())
+onDeactivated(() => {
+  pageActive = false
+  boqSequence += 1
+  boqLines.value = []
+})
+onActivated(() => {
+  const returning = !pageActive
+  pageActive = true
+  if (returning)
+    void refreshBoqLines()
+})
 </script>
 
 <template>
@@ -699,6 +740,7 @@ onMounted(() => void initialize())
         :field-errors="fieldErrors"
         :eligible-contract-count="eligibleContractCount"
         :readonly="!editable"
+        :quantity-basis-editable="!isDesktopRuntime() && kind === 'owner_report'"
         :fetch-projects="fetchProjects"
         :fetch-suppliers="fetchSuppliers"
         :fetch-contracts="fetchContracts"
@@ -769,6 +811,7 @@ onMounted(() => void initialize())
         :pending-remove-ids="pendingRemoveIds"
         :pending-restore-ids="pendingRestoreIds"
         :desktop-picker="desktopAttachmentPicker"
+        picker-description="附件随当前单据保存，保存成功后可在详情中查看和下载"
         :note="String(draft.note ?? '')"
         :note-readonly="!editable"
         :category-readonly="kind === 'acceptance'"

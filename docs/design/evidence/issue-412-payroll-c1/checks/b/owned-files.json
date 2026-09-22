@@ -1,0 +1,53 @@
+{
+  "owner": "P2 B",
+  "baseline": "579d9383357fffd2bd87e727dbc21b903a7cb69c",
+  "status": "repair-frozen-awaiting-independent-review",
+  "files": [
+    {
+      "path": "app/lib/migration/core-local-source.ts",
+      "sha256": "89afaf0ad61bc5d59a4b63fb5e86d505c1057fc5bf11f55aaddc878689ec2d17"
+    },
+    {
+      "path": "server/utils/core-migration-request.ts",
+      "sha256": "21a47cd67d422df51503e4f9d4d287b1c5165ee0e8daa08f42de97360bee1c52"
+    },
+    {
+      "path": "server/utils/crew-worker-command-test-instance.ts",
+      "sha256": "fdca2ae3a52c9e6c0b3f90ea75248bbc62fa2c6f58d13b8217a6ffa24ff03786"
+    },
+    {
+      "path": "server/utils/payroll-attendance-facts.ts",
+      "sha256": "1d7413c2f807f5b198f4615a8c8c3688079655abf4a2879fb45631164e0c594e"
+    },
+    {
+      "path": "server/utils/payroll-c1-migration-references.ts",
+      "sha256": "8b44fd49096bea7b209016b3f9dbac15ae3692c477149b4ee87beb333dd40c76"
+    },
+    {
+      "path": "server/utils/payroll-a-migration-references.ts",
+      "sha256": "3d759e2c56064c53045381ddd7f70428fd6a046063b31bf073847c34a9851004"
+    },
+    {
+      "path": "server/utils/payroll-migration.ts",
+      "sha256": "3b856bb1133434a3084619b3fec4b24c76564d82be6e2177dde8abfa3ef1c688"
+    },
+    {
+      "path": "tests/helpers/payroll-c1-source.ts",
+      "sha256": "da4a4b0dc5ad68647b1f2da01ecab153cbb8448b2d584460263587383a055072"
+    },
+    {
+      "path": "tests/payroll/c1-worker-facts.test.ts",
+      "sha256": "7aceb13476b6f9f968a5d8e3ba59d4ae78ce617bf08813e8a7e564f9c3b6624f"
+    },
+    {
+      "path": "tests/payroll/attendance-facts.test.ts",
+      "sha256": "cb534b5fb9ec65600ccf6451715822bb86f50e72ffad09710747bc34c8932969"
+    },
+    {
+      "path": "tests/payroll/c1-migration-protection.test.ts",
+      "sha256": "71f6b3d0cba6bb74bcc03d00e9b89153ba3058a3aeb25e18c637b55d0e9c8ca1"
+    }
+  ],
+  "tempRoot": ".tmp/remaining-issues-20260910/payroll-c1-central/b",
+  "note": "Only these eleven product/test files are B-owned. No commit, browser service, full test, typecheck or build was run by B."
+}

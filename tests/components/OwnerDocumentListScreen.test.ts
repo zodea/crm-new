@@ -72,17 +72,19 @@ const ToolbarStub = defineComponent({
 
 const KitTableStub = defineComponent({
   inheritAttrs: false,
-  props: ['columns', 'data', 'empty', 'page'],
-  emits: ['emptyAction'],
+  props: ['columns', 'data', 'empty', 'page', 'loading'],
+  emits: ['emptyAction', 'pageChange'],
   setup(props, { attrs, emit, slots }) {
     return () => h('section', {
       ...attrs,
       'aria-label': '业务单据宽表',
+      'data-loading': String(Boolean(props.loading)),
       'data-min-width': (props.columns as any[]).reduce(
         (sum, column) => sum + (column.width ?? column.minWidth ?? 0),
         0,
       ),
     }, [
+      h('button', { onClick: () => emit('pageChange', { page: props.page.page + 1, pageSize: props.page.pageSize }) }, '下一页'),
       h('div', { role: 'row' }, (props.columns as any[]).map(column =>
         h('span', { role: 'columnheader' }, column.title))),
       ...(props.data as any[]).map(row => h('div', { role: 'row' }, [
@@ -149,6 +151,7 @@ describe('owner document list screen', () => {
       error: vi.fn(),
     }))
     vi.stubGlobal('useOwnerDocumentStore', () => ({
+      hasListSnapshot: () => true,
       recordsFor: () => activeRows,
       listLoadingFor: () => false,
       listError: () => '',
@@ -219,6 +222,53 @@ describe('owner document list screen', () => {
     expect(screen.getByRole('status', { name: '甲方变洽签列表汇总' }).textContent).toContain('变更单数：25')
     expect(screen.getByRole('link', { name: '合和新城施工合同' }).getAttribute('href'))
       .toBe('/contract/contract-1?origin=real&contractKind=construction')
+  })
+
+  it('中央第二页改筛选只请求一次，等待结果时保留旧页行且不显示加载遮罩', async () => {
+    runtime.desktop = false
+    route.query = {}
+    const snapshot = shallowRef(listRows)
+    const pending = shallowRef(false)
+    const pagination = shallowRef({ page: 1, pageSize: 20, total: 40 })
+    const fetchPage = vi.fn(async (_kind: string, query: { page: number, pageSize: number }) => {
+      pagination.value = { ...pagination.value, page: query.page, pageSize: query.pageSize }
+      return snapshot.value
+    })
+    vi.stubGlobal('useOwnerDocumentStore', () => ({
+      hasListSnapshot: () => true,
+      recordsFor: () => snapshot.value,
+      listLoadingFor: () => pending.value,
+      listError: () => '',
+      loadKind: fetchPage,
+      centralPageFor: () => pagination.value,
+      centralSummaryFor: () => null,
+      centralCapabilitiesFor: () => [],
+      centralEmptyReasonFor: () => null,
+    }))
+    render(OwnerDocumentListScreen, { props: { kind: 'owner_change' }, global })
+    await vi.waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(1))
+    await fireEvent.click(screen.getByRole('button', { name: '下一页' }))
+    await vi.waitFor(() => expect(fetchPage).toHaveBeenLastCalledWith('owner_change', expect.objectContaining({ page: 2 })))
+    fetchPage.mockClear()
+    let complete!: () => void
+    fetchPage.mockImplementation(async (_kind, query) => {
+      pending.value = true
+      await new Promise<void>(resolve => complete = resolve)
+      snapshot.value = [{ ...listRows[0]!, id: 'filtered', no: 'BQ-002', name: '筛选后签证', status: 'submitted' }]
+      pagination.value = { page: query.page, pageSize: query.pageSize, total: 1 }
+      pending.value = false
+      return snapshot.value
+    })
+    await fireEvent.update(screen.getByRole('combobox', { name: '状态' }), 'submitted')
+    await vi.waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(1))
+    expect(fetchPage).toHaveBeenLastCalledWith('owner_change', expect.objectContaining({ page: 1, status: 'submitted' }))
+    expect(document.querySelector('[data-ui="owner-document-table"]')?.getAttribute('aria-busy')).toBe('true')
+    expect(screen.getByRole('region', { name: '业务单据宽表' }).getAttribute('data-loading')).toBe('false')
+    expect(screen.getByRole('link', { name: 'BQ-001' })).not.toBeNull()
+    complete()
+    await vi.waitFor(() => expect(screen.getByRole('link', { name: 'BQ-002' })).not.toBeNull())
+    expect(screen.queryByRole('link', { name: 'BQ-001' })).toBeNull()
+    expect(fetchPage).toHaveBeenCalledTimes(1)
   })
 
   it('中央列表的全部状态计数来自状态分面总和，而非当前状态筛选结果数', () => {

@@ -50,6 +50,35 @@ async function confirmDaywork(workerId: string, workDate: string, units: 0.5 | 1
 }
 
 describe('c2 signed daywork source', () => {
+  it('filters multiple statuses with OR while retaining month and crew scope, and supports single or cleared selection', async () => {
+    const confirmedId = await confirmDaywork('worker-c2-a', '2026-07-10', 1)
+    const draftId = await saveSignedDayworkRecord(db, {
+      projectId: 'project-c2',
+      crewId: 'crew-c2',
+      workerId: 'worker-c2-b',
+      workDate: '2026-07-11',
+      workContent: '待证明签工',
+      startTime: '08:00',
+      endTime: '18:00',
+      laborUnits: 1,
+      status: 'draft',
+    })
+    await confirmDaywork('worker-c2-a', '2026-08-10', 1)
+    const filter = { projectId: 'project-c2', crewId: 'crew-c2', month: '2026-07' }
+    const expectedIds = [confirmedId, draftId].sort()
+
+    const multiple = await listSignedDayworkRecords(db, { ...filter, status: ['draft', 'confirmed', 'draft'] })
+    expect(multiple.map(record => record.id).sort()).toEqual(expectedIds)
+    const single = await listSignedDayworkRecords(db, { ...filter, status: ['draft'] })
+    expect(single.map(record => record.id)).toEqual([draftId])
+    const legacySingle = await listSignedDayworkRecords(db, { ...filter, status: 'confirmed' })
+    expect(legacySingle.map(record => record.id)).toEqual([confirmedId])
+    const cleared = await listSignedDayworkRecords(db, { ...filter, status: [] })
+    expect(cleared.map(record => record.id).sort()).toEqual(expectedIds)
+    const legacyCleared = await listSignedDayworkRecords(db, { ...filter, status: '' })
+    expect(legacyCleared.map(record => record.id).sort()).toEqual(expectedIds)
+  })
+
   it('v30 creates the signed record and statement-link tables', async () => {
     expect(migrations.some(migration => migration.version === 30)).toBe(true)
     expect(await listTables(db)).toEqual(expect.arrayContaining([

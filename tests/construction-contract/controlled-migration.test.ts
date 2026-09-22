@@ -157,7 +157,7 @@ describe('施工合同受控中央迁移', () => {
       actualCompletionDate: null,
     })
 
-    core.reset(session.workspaceId)
+    await core.reset(session.workspaceId)
     expect(() => commands.form(id, session)).toThrow('正式施工合同不存在')
     expect(() => read.detail(id, { origin: 'real' })).toThrow('施工合同不存在')
   })

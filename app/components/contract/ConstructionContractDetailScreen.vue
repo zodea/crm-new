@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
+import { useTimeoutFn } from '@vueuse/core'
+import { useReceiptSourceReturn } from '~/composables/useReceiptSourceReturn'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
+import { resolveCustomerRelationReturnOrigin } from '~/lib/customer/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { loadReceiptSourceOrigin } from '~/lib/receipt/return-context'
 import { yuan } from '~/lib/util/money'
 import { useConstructionContractReadStore } from '~/stores/construction-contract-read'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 const props = defineProps<{ contractId: string, origin: DataOriginDTO }>()
 const route = useRoute()
+const restoreReceiptSource = useReceiptSourceReturn()
+const receiptReturnOrigin = computed(() => loadReceiptSourceOrigin(route.fullPath))
 const router = useRouter()
 const store = useConstructionContractReadStore()
 const visibilityStore = useDataVisibilityStore()
@@ -71,10 +77,23 @@ const focus = computed<ConstructionContractDetailFocusDTO | null>(() => {
   return { id: focusId.value, scope: focusScope.value }
 })
 const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin))
-const returnTo = computed(() => ownerDocumentReturnTo.value
+const returnCheckTime = shallowRef(Date.now())
+const customerReturnOrigin = computed(() => resolveCustomerRelationReturnOrigin(route.query.returnTo, {
+  targetEntity: 'contract',
+  targetId: props.contractId,
+  origin: props.origin,
+}, Math.max(returnCheckTime.value, Date.now())))
+const { start: startReturnExpiry, stop: stopReturnExpiry } = useTimeoutFn(
+  () => returnCheckTime.value = Date.now(),
+  () => Math.max(0, (customerReturnOrigin.value?.expiresAt ?? 0) - Date.now() + 1),
+  { immediate: false },
+)
+watch(customerReturnOrigin, origin => origin ? startReturnExpiry() : stopReturnExpiry(), { immediate: true })
+const customerReturnTo = computed(() => customerReturnOrigin.value?.returnTo ?? null)
+const returnTo = computed(() => customerReturnTo.value ?? ownerDocumentReturnTo.value
   ?? validateConstructionContractReturnTo(route.query.returnTo, props.origin)
   ?? '/contract/construction')
-const backLabel = computed(() => ownerDocumentReturnTo.value ? '返回来源详情' : '返回施工合同列表')
+const backLabel = computed(() => customerReturnTo.value ? '返回客户详情' : ownerDocumentReturnTo.value ? '返回来源详情' : '返回施工合同列表')
 const canEdit = computed(() => detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('construction-contract:write'))
 const boqTo = computed(() => {
   const current = detail.value
@@ -113,7 +132,7 @@ const metrics = computed(() => {
   const amounts = detail.value?.contract.amounts
   if (!amounts)
     return []
-  const rows: Array<[string, string]> = [
+  const rows: Array<[string, string | null]> = [
     ['合同金额', amounts.contract],
     ['变更后金额', amounts.changed],
     ['累计结算', amounts.settled],
@@ -121,16 +140,18 @@ const metrics = computed(() => {
     ['累计收款', amounts.received],
     ['按结算应收', amounts.bySettlementReceivable],
   ]
-  return rows.map(([label, value]) => ({ label, value: yuan(Number(value)) }))
+  return rows.map(([label, value]) => ({ label, value: yuan(value) }))
 })
 
-function load() {
-  return store.loadDetail({
+async function load() {
+  await store.loadDetail({
     id: props.contractId,
     origin: props.origin,
     includeDemo: props.origin === 'demo' && visibilityStore.includeDemo,
     focus: focus.value,
   })
+  if (store.detailState.kind === 'ready')
+    await restoreReceiptSource(route.fullPath)
 }
 
 function edit() {
@@ -183,7 +204,7 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
         </div>
 
         <section v-if="activeTab === 'info'" class="panel p-4">
-          <SectionHeader title="详细资料" subtitle="施工合同头、真实关系与可空竣工事实" />
+          <SectionHeader title="详细资料" />
           <div class="construction-contract-grid mt-3">
             <div class="detail-row">
               <span>所属项目</span><NuxtLink v-if="target(detail.projectNavigation)" :to="target(detail.projectNavigation)!" class="text-brand hover:underline">
@@ -223,9 +244,7 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
           <div class="mt-4 rounded border border-line bg-surface-2 p-3">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <strong class="text-13px">工程量清单（BOQ）</strong><p class="mt-1 text-12px text-ink-soft">
-                  按当前项目与施工合同稳定 ID 打开专属清单。
-                </p>
+                <strong class="text-13px">工程量清单（BOQ）</strong>
               </div>
               <NuxtLink v-if="boqTo" :to="boqTo" class="btn-secondary" data-testid="construction-contract-boq">
                 查看 BOQ
@@ -238,11 +257,11 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
             <li v-for="file in detail.sections.files" :key="file.id" class="flex flex-wrap items-center justify-between gap-2 p-3 text-12px">
               <span>{{ file.fileName }}</span><span class="text-ink-soft">{{ file.category }} · {{ file.fileSize }} B</span>
             </li>
-          </ul><StatePanel v-else class="mt-2" kind="empty" title="暂无合同文件" description="中央详情尚未关联合同文件。" compact />
+          </ul><StatePanel v-else class="mt-2" kind="empty" title="暂无合同文件" compact />
         </section>
 
         <section v-else-if="activeTab === 'supplements'" class="panel min-w-0 overflow-hidden p-4">
-          <SectionHeader title="补充合同" subtitle="深链聚焦真实补充协议，不保留无目标蓝字" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.supplements" empty-label="暂无补充合同" :focus-id="focusId" :return-to="returnTo" />
+          <SectionHeader title="补充合同" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.supplements" empty-label="暂无补充合同" :focus-id="focusId" :return-to="returnTo" />
         </section>
         <section v-else-if="activeTab === 'changes'" class="panel min-w-0 overflow-hidden p-4">
           <SectionHeader title="甲方变洽签" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.changes" empty-label="暂无甲方变洽签" :focus-id="focusId" :return-to="route.fullPath" />
@@ -263,11 +282,13 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
             <SectionHeader title="开票申请" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.invoices.applications" empty-label="暂无开票申请" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="销项开票登记" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.invoices.registrations" empty-label="暂无销项开票登记；开票申请状态不冒充已开票事实" />
+            <SectionHeader title="销项开票登记" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.invoices.registrations" empty-label="暂无销项开票登记" />
           </div>
         </section>
         <section v-else-if="activeTab === 'receipts'" class="panel min-w-0 overflow-hidden p-4">
-          <SectionHeader title="收款登记" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.receipts" empty-label="暂无收款登记" />
+          <SectionHeader title="收款登记" />
+          <StatePanel v-if="detail.receiptsProblem" class="mt-3" :kind="detail.receiptsProblem.code === 'forbidden' ? 'forbidden' : 'error'" title="收款金额暂不可用" :description="detail.receiptsProblem.message" :action-label="detail.receiptsProblem.retryable ? '重新读取收款' : ''" compact @action="load" />
+          <ConstructionContractFactTable v-else class="mt-3" :rows="detail.sections.receipts" empty-label="暂无收款登记" :return-to="route.fullPath" :restore-scroll-left="receiptReturnOrigin?.scrollLeft" @view-restored="restoreReceiptSource(route.fullPath)" />
         </section>
         <section v-else class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">

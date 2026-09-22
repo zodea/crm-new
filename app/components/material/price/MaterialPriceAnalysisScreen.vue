@@ -26,6 +26,7 @@ const props = withDefaults(defineProps<{
   projects: readonly PricePartyInput[]
   contracts: readonly MaterialContractInput[]
   loading?: boolean
+  origin?: 'real' | 'demo'
 }>(), {
   loading: false,
 })
@@ -128,7 +129,7 @@ function money(value: number | null): string {
       <p class="mx-auto mt-2 max-w-110 text-12px leading-5 text-ink-soft">
         单价对比只读取已归档送货单明细；分供方未明确、单价为空及运费类费用行不会进入分析。
       </p>
-      <NuxtLink to="/material/delivery/archive" class="btn-primary mt-4">
+      <NuxtLink :to="`/material/delivery/archive${origin ? `?origin=${origin}` : ''}`" class="btn-primary mt-4">
         查看送货单归档库
       </NuxtLink>
     </div>
@@ -162,7 +163,7 @@ function money(value: number | null): string {
                 <span class="chip-brand">
                   {{ showsTrend ? (officialSeries ? '官方与市场趋势' : '价格趋势') : '厂家最新价对比' }}
                 </span>
-                <NuxtLink to="/material/delivery/archive" class="btn-secondary">
+                <NuxtLink :to="`/material/delivery/archive${origin ? `?origin=${origin}` : ''}`" class="btn-secondary">
                   数据来源：已归档送货单
                 </NuxtLink>
               </div>
@@ -229,7 +230,7 @@ function money(value: number | null): string {
                 <NuxtLink
                   v-for="fact in sourceFacts"
                   :key="fact.id"
-                  :to="`/material/delivery/archive/${fact.deliveryRecordId}`"
+                  :to="`/material/delivery/archive/${encodeURIComponent(fact.deliveryRecordId)}${fact.dataOrigin ? `?origin=${fact.dataOrigin}` : ''}`"
                   class="flex min-w-0 items-center justify-between gap-2 border border-line bg-panel px-2.5 py-2 text-11px hover:border-brand"
                 >
                   <span class="truncate">{{ fact.supplierName }} · {{ fact.projectName }}</span>

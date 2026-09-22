@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
-const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
-
 async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
   const widths = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
@@ -11,27 +9,21 @@ async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
 }
 
-async function useDemoWorkspace(page: import('@playwright/test').Page) {
-  await page.addInitScript((storageKey) => {
-    localStorage.setItem(storageKey, 'true')
-  }, DATA_VISIBILITY_STORAGE_KEY)
-}
-
 test.describe('Issue #103 Slice 6A：户施工详情', () => {
   test('矩阵时间线进入详情页，工种→阶段→日期与三量合计贯通', async ({ page }) => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
-    await useDemoWorkspace(page)
+    await installQuantityProductionFixture(page, { detailedStages: true })
 
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
 
     const cells = page.getByTestId('quantity-matrix-cell')
     await cells.nth(2).focus()
     await cells.nth(2).press('Enter')
     await page.getByRole('button', { name: '详情 101户' }).click()
 
-    await expect(page).toHaveURL(/\/subcontract\/quantity\/[^/]+\/[^/]+$/)
+    await expect(page).toHaveURL(/\/subcontract\/quantity\/[^/?]+\/[^/?]+\?/)
+    expect(new URL(page.url()).searchParams.get('origin')).toBe('real')
     await expect(page.getByRole('heading', { name: /1栋 1层 101户/ })).toBeVisible()
 
     // 工种 → 工序阶段 → 完成日期；墙砖/地砖、防水一遍/二遍分别成行。
@@ -54,14 +46,16 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
   })
 
   test('下钻带走矩阵筛选，返回后按原筛选恢复', async ({ page }) => {
-    await useDemoWorkspace(page)
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await installQuantityProductionFixture(page, { detailedStages: true })
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
 
     // 先把矩阵切到非默认筛选，返回时才能证明恢复的是用户的选择而不是默认值。
     await page.getByRole('tab', { name: '班组矩阵' }).click()
     await expect(page).toHaveURL(/view=crew/)
     const matrixUrl = new URL(page.url())
+    await page.reload()
+    await expect(page.getByRole('tab', { name: '班组矩阵' })).toHaveAttribute('data-state', 'active')
+    await expect(page).toHaveURL(/view=crew/)
 
     const cells = page.getByTestId('quantity-matrix-cell')
     await cells.nth(2).focus()
@@ -69,6 +63,9 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
     await page.getByRole('button', { name: /详情/ }).first().click()
     await expect(page).toHaveURL(/\/subcontract\/quantity\/[^/]+\/[^/]+/)
     // 下钻地址必须带上筛选，否则返回时无从恢复。
+    await expect(page).toHaveURL(/view=crew/)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: /1栋 1层 101户/ })).toBeVisible()
     await expect(page).toHaveURL(/view=crew/)
 
     await page.getByRole('link', { name: '返回工程量矩阵' }).click()
@@ -79,9 +76,8 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
   })
 
   test('390px 页面无横滚，量明细仅自身局部横滚', async ({ page }) => {
-    await useDemoWorkspace(page)
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await installQuantityProductionFixture(page, { detailedStages: true })
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
     const cells = page.getByTestId('quantity-matrix-cell')
     await cells.nth(2).focus()
     await cells.nth(2).press('Enter')
@@ -102,8 +98,7 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
   test('缺照片软卡取消时保留输入，确认后按原日期和备注保存草稿', async ({ page }) => {
     test.setTimeout(60_000)
     await installQuantityProductionFixture(page)
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
     const cells = page.getByTestId('quantity-matrix-cell')
     await cells.nth(2).focus()
     await cells.nth(2).press('Enter')
@@ -128,8 +123,8 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
   })
 
   test('直接访问不存在的户显示错误态', async ({ page }) => {
-    await useDemoWorkspace(page)
-    await page.goto('/subcontract/quantity/proj_demo_001/not-a-unit')
+    await installQuantityProductionFixture(page, { detailedStages: true })
+    await page.goto('/subcontract/quantity/missing-project/not-a-unit?origin=real')
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('alert')).toContainText(/不属于当前项目|不存在/)
   })

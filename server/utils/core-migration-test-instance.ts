@@ -16,12 +16,13 @@ import type {
   CoreMigrationSourceRefDTO,
 } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
+import type { PreparedCoreMigration } from './core-migration-preparation'
 import { createHash } from 'node:crypto'
 import {
   CORE_MIGRATION_CAPABILITY,
   CORE_MIGRATION_CONTRACT_VERSION,
   CORE_MIGRATION_SOURCE_MODE,
-  CORE_MIGRATION_SOURCE_VERSION,
+  CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS,
   CORE_MIGRATION_TOPOLOGY,
   coreMigrationCentsToMoney,
   coreMigrationMoneyToCents,
@@ -31,11 +32,26 @@ import {
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { auxiliaryContractInstance } from './auxiliary-contract-runtime'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
+import { prepareCoreMigrationCommandSources } from './core-migration-preparation'
+import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
+import { customerCommandTestInstance } from './customer-command-test-instance'
+import { deliveryCommandTestInstance } from './delivery-runtime'
 import { migratedOtherSettlement } from './other-settlement-migration'
 import { otherSettlementInstance } from './other-settlement-runtime'
 import { migratedSettlementSource } from './other-settlement-sources'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { planPayrollMigration } from './payroll-migration'
+import { prepareProcessLibraryMigration } from './process-library-migration'
+import { processLibraryService, processLibrarySession } from './process-library-runtime'
+import { projectCommandTestInstance } from './project-command-test-instance'
+import { planQuantityMigration } from './quantity-migration'
+import { quantityTestInstance } from './quantity-runtime'
+import { receiptCommandTestInstance } from './receipt-command-service'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
+import { supplierCommandTestInstance } from './supplier-command-test-instance'
+import { prepareSupplierCredentialMigration } from './supplier-credential-migration'
+import { planBudgetMigration } from './target-cost-migration'
+import { planWbsMigration } from './wbs-migration'
 
 const DEFAULT_ROLLBACK_WINDOW_MS = 24 * 60 * 60 * 1000
 
@@ -79,7 +95,8 @@ export interface CoreMigrationTestInstanceOptions {
   afterApply?: (entities: CoreMigrationServerEntityDTO[], batchId: string) => void | Promise<void>
   afterConfirm?: (snapshot: CoreMigrationSnapshotDTO, batchId: string) => void | Promise<void>
   afterRollback?: (snapshot: CoreMigrationSnapshotDTO, batchId: string) => void | Promise<void>
-  afterReset?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => void
+  afterReset?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => void | Promise<void>
+  prepareTransition?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => Promise<PreparedCoreMigration>
 }
 
 interface ReferenceRule {
@@ -90,6 +107,25 @@ interface ReferenceRule {
 }
 
 const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly ReferenceRule[]>> = {
+  payroll_projects: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
+  target_cost_versions: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true },
+  ],
+  supplier_credentials: [
+    { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
+  quantity_projects: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
+  wbs_projects: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
+  delivery_records: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+    { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
+  ],
   other_settlements: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
     { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
@@ -249,6 +285,34 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
   const now = options.now ?? (() => new Date().toISOString())
   const createServerId = options.createServerId ?? stableDefaultId
   const rollbackWindowMs = options.rollbackWindowMs ?? DEFAULT_ROLLBACK_WINDOW_MS
+  const queues = new Map<string, Promise<void>>()
+  let resetting: Promise<void> = Promise.resolve()
+
+  function enqueue<T>(workspaceId: string, work: () => Promise<T>): Promise<T> {
+    const pending = Promise.all([resetting, queues.get(workspaceId)]).then(work)
+    queues.set(workspaceId, pending.then(() => undefined, () => undefined))
+    return pending
+  }
+
+  function commandQueue<T, Request extends CoreMigrationSourceCommandDTO | CoreMigrationBatchCommandDTO>(request: Request, session: BusinessSession, operation: (command: Request, session: BusinessSession) => Promise<T>): Promise<T> {
+    const command = clone(request)
+    const actor = clone(session)
+    return enqueue(actor.workspaceId, () => operation(command, actor))
+  }
+
+  async function commitTransition(snapshot: CoreMigrationSnapshotDTO, workspaceId: string | undefined, beforeCommit: () => void | Promise<void>, commitAuthority: () => void) {
+    let prepared: PreparedCoreMigration | undefined
+    try {
+      prepared = await options.prepareTransition?.(snapshot, workspaceId)
+      await beforeCommit()
+      prepared?.commit()
+      commitAuthority()
+    }
+    catch (cause) {
+      await prepared?.abort()
+      throw cause
+    }
+  }
 
   function workspace(workspaceId: string): WorkspaceState {
     let state = workspaces.get(workspaceId)
@@ -299,7 +363,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       throw invalid(`不支持的迁移契约版本：${source.contractVersion}`)
     if (source.mode !== CORE_MIGRATION_SOURCE_MODE)
       throw invalid(`不支持的迁移来源模式：${source.mode}`)
-    if (source.sourceVersion !== CORE_MIGRATION_SOURCE_VERSION)
+    if (!CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS.includes(source.sourceVersion as typeof CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS[number]))
       throw invalid(`不支持的本地数据版本：${source.sourceVersion}`)
   }
 
@@ -509,6 +573,22 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
           }
         }
 
+        if (entityType === 'delivery_records' && row.attributes?.sourceProblem) {
+          skipped = true
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType,
+            legacyId: row.legacyId,
+            serverId: null,
+            field: 'original',
+            metricKey: 'apply-failed',
+            sourceValue: '',
+            expectedValue: null,
+            actualValue: null,
+            difference: null,
+            attribution: 'source',
+            reason: String(row.attributes.sourceProblem),
+          }))
+        }
         if (skipped) {
           sourceRefs.push({
             batchId,
@@ -548,6 +628,30 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
           batchId,
         })
         imported += 1
+
+        if (entityType === 'delivery_records') {
+          const legacyOriginals = JSON.parse(String(row.attributes?.legacyOriginalsJson || '[]')) as unknown[]
+          const notices = [
+            ...(row.attributes?.sourceState === 'missing' ? [{ metricKey: 'missing-original' as const, reason: '原件正文缺失，保留缺失状态；不代表到货、库存或结算资格' }] : []),
+            ...(row.attributes?.auditJson && row.attributes.auditJson !== '[]' ? [{ metricKey: 'legacy-audit' as const, reason: '旧审计原样留痕；无法重建的历史版本不得冒称完整修订历史' }] : []),
+            ...(legacyOriginals.length ? [{ metricKey: 'legacy-audit' as const, reason: `${legacyOriginals.length} 份历史原件已有逻辑 owner，按原字节与摘要保全；历史祖先及对应修订未核实，暂不开放正文。缺正文仍保留缺失，原库与不可变备份保留。` }] : []),
+          ]
+          for (const notice of notices) {
+            issues.push(issue(batchId, command.commandId, issueSequence++, {
+              entityType,
+              legacyId: row.legacyId,
+              serverId,
+              field: 'provenance',
+              metricKey: notice.metricKey,
+              sourceValue: '',
+              expectedValue: null,
+              actualValue: null,
+              difference: null,
+              attribution: 'source',
+              reason: notice.reason,
+            }))
+          }
+        }
 
         if (row.deletedAt) {
           issues.push(issue(batchId, command.commandId, issueSequence++, {
@@ -594,6 +698,217 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
           difference: null,
           attribution: 'missing-source',
           reason: cause instanceof Error ? cause.message : '结算迁移校验失败',
+        }))
+      }
+    }
+
+    try {
+      prepareSupplierCredentialMigration([], { authority: 'central', activeBatchId: batchId, entities: plannedEntities })
+    }
+    catch (cause) {
+      const entity = plannedEntities.find(row => row.entityType === 'supplier_credentials')
+      if (entity) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'supplier_credentials',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'graphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '证照完整来源图校验失败',
+        }))
+      }
+    }
+    try {
+      prepareProcessLibraryMigration([], { authority: 'central', activeBatchId: batchId, entities: plannedEntities })
+    }
+    catch (cause) {
+      const entity = plannedEntities.find(row => row.entityType === 'process_libraries')
+      if (entity) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'process_libraries',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'graphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '工序库完整来源图校验失败',
+        }))
+      }
+    }
+
+    for (const entity of plannedEntities.filter(row => row.entityType === 'quantity_projects')) {
+      try {
+        const plan = planQuantityMigration({ authority: 'central', activeBatchId: batchId, entities: plannedEntities.filter(row => row.entityType !== 'quantity_projects' || row.id === entity.id) }, new Map())
+        const graph = plan.incoming[0]!.graph
+        const payloads = new Set(graph.tables.file_payloads.map(row => row.file_ref_id))
+        const missing = graph.tables.file_refs.filter(row => !payloads.has(row.id)).length
+        if (missing) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'quantity_projects',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'graphJson',
+            metricKey: 'missing-original',
+            sourceValue: String(missing),
+            expectedValue: null,
+            actualValue: missing,
+            difference: null,
+            attribution: 'source',
+            reason: `${missing} 份历史工程量照片缺少正文，保留原元数据和明确缺失状态，不借其他照片补齐。`,
+          }))
+        }
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'quantity_projects',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'graphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '工程量完整来源图校验失败',
+        }))
+      }
+    }
+
+    for (const entity of plannedEntities.filter(row => row.entityType === 'wbs_projects')) {
+      try {
+        const plan = planWbsMigration({ authority: 'central', activeBatchId: batchId, entities: plannedEntities.filter(row => row.entityType !== 'wbs_projects' || row.id === entity.id) }, new Map())
+        const legacy = plan.incoming[0]!.graph.tables.schedule_task_floor_plans.filter(row => row.source_basis === 'provisional').length
+        if (legacy) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'wbs_projects',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'graphJson',
+            metricKey: 'legacy-audit',
+            sourceValue: String(legacy),
+            expectedValue: null,
+            actualValue: legacy,
+            difference: null,
+            attribution: 'missing-source',
+            reason: `${legacy} 条旧暂估楼层保留原冻结数值及原快照，但旧库没有完整冻结单位、逐户来源与缺量信息；明确登记历史不足，不用当前模板或合同量补造。`,
+          }))
+        }
+        const missingSnapshots = plan.incoming[0]!.graph.tables.schedule_tasks.filter(row => row.template_snapshot_json === null).length
+        if (missingSnapshots) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'wbs_projects',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'template_snapshot_json',
+            metricKey: 'legacy-audit',
+            sourceValue: String(missingSnapshots),
+            expectedValue: null,
+            actualValue: missingSnapshots,
+            difference: null,
+            attribution: 'missing-source',
+            reason: `${missingSnapshots} 条旧任务缺少原冻结工序快照，保留原计划和空值，不以当前工序库补造历史。`,
+          }))
+        }
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'wbs_projects',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'graphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : 'WBS 完整来源图校验失败',
+        }))
+      }
+    }
+
+    for (const entity of plannedEntities.filter(row => row.entityType === 'payroll_projects')) {
+      try {
+        const snapshot = { authority: 'central' as const, activeBatchId: batchId, entities: plannedEntities }
+        const quantity = planQuantityMigration(snapshot, new Map())
+        const plan = planPayrollMigration(snapshot, new Map(), quantity.incoming.flatMap(row => row.identities.map(identity => ({ ...identity, projectId: row.project.id }))))
+        for (const diagnostic of plan.incoming.find(row => row.entityId === entity.id)!.diagnostics) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'payroll_projects',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'payrollGraphJson',
+            metricKey: 'legacy-audit',
+            sourceValue: diagnostic.recordId ?? entity.legacyId,
+            expectedValue: null,
+            actualValue: null,
+            difference: null,
+            attribution: 'missing-source',
+            reason: `${diagnostic.code}：${diagnostic.message}`,
+          }))
+        }
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'payroll_projects',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'payrollGraphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '工资完整项目图校验失败',
+        }))
+      }
+    }
+    for (const entity of plannedEntities.filter(row => row.entityType === 'target_cost_versions')) {
+      try {
+        // 整批验证同一项目的当前版本唯一性，不能将每版单独通过后交给 SQL 报错。
+        const plan = planBudgetMigration({ authority: 'central', activeBatchId: batchId, entities: plannedEntities }, new Map())
+        const graph = plan.incoming.find(row => row.entityId === entity.id)!.graph
+        const missing = graph.files.filter(file => !graph.payloads.some(payload => payload.file_ref_id === file.id)).length
+        if (missing) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'target_cost_versions',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'budgetGraphJson',
+            metricKey: 'legacy-audit',
+            sourceValue: String(missing),
+            expectedValue: null,
+            actualValue: missing,
+            difference: null,
+            attribution: 'missing-source',
+            reason: `${missing} 份历史预算附件缺少原件正文；保留原元数据和缺件状态，不读取旧本地路径或伪造文件。`,
+          }))
+        }
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'target_cost_versions',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'budgetGraphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '预算完整来源图校验失败',
         }))
       }
     }
@@ -915,8 +1230,12 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     }
     if (batch.dto.status !== 'dry-run' && batch.dto.status !== 'failed')
       throw conflict(`状态 ${batch.dto.status} 不允许导入`)
-    if (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))
+    if (batch.dto.issues.some(item => ['quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects'].includes(item.entityType) && item.field === 'graphJson' && item.metricKey === 'apply-failed')
+      || batch.dto.issues.some(item => item.entityType === 'target_cost_versions' && item.field === 'budgetGraphJson' && item.metricKey === 'apply-failed')
+      || batch.dto.issues.some(item => item.entityType === 'payroll_projects' && item.field === 'payrollGraphJson' && item.metricKey === 'apply-failed')
+      || (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))) {
       throw conflict('dry-run 存在阻断问题，不能导入')
+    }
     if (state.activeBatchId && state.activeBatchId !== command.batchId)
       throw conflict('已有另一迁移批次等待确认或回滚')
 
@@ -1012,15 +1331,17 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       confirmedAt,
       rollbackExpiresAt: new Date(Date.parse(confirmedAt) + rollbackWindowMs).toISOString(),
     }
-    await options.afterConfirm?.({
+    const nextSnapshot: CoreMigrationSnapshotDTO = {
       authority: 'central',
       activeBatchId: command.batchId,
       entities: clone(state.entities),
-    }, command.batchId)
-    state.authority = 'central'
-    state.activeBatchId = command.batchId
-    batch.dto = confirmedBatch
-    remember(state, command.commandId, 'confirm', batch.dto)
+    }
+    await commitTransition(nextSnapshot, session.workspaceId, () => options.afterConfirm?.(nextSnapshot, command.batchId), () => {
+      state.authority = 'central'
+      state.activeBatchId = command.batchId
+      batch.dto = confirmedBatch
+      remember(state, command.commandId, 'confirm', batch.dto)
+    })
     return clone(batch.dto)
   }
 
@@ -1045,22 +1366,18 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
         || Date.parse(rolledBackAt) > Date.parse(batch.dto.rollbackExpiresAt))) {
       throw conflict('迁移回滚窗口已关闭')
     }
-    await options.afterRollback?.({
+    const nextSnapshot: CoreMigrationSnapshotDTO = {
       authority: batch.backup.authority,
       activeBatchId: batch.backup.activeBatchId,
       entities: clone(batch.backup.entities),
-    }, command.batchId)
-    state.authority = batch.backup.authority
-    state.activeBatchId = batch.backup.activeBatchId
-    state.entities = clone(batch.backup.entities)
-    batch.dto = {
-      ...batch.dto,
-      status: 'rolled-back',
-      authority: state.authority,
-      updatedAt: rolledBackAt,
-      rolledBackAt,
     }
-    remember(state, command.commandId, 'rollback', batch.dto)
+    await commitTransition(nextSnapshot, session.workspaceId, () => options.afterRollback?.(nextSnapshot, command.batchId), () => {
+      state.authority = nextSnapshot.authority
+      state.activeBatchId = nextSnapshot.activeBatchId
+      state.entities = clone(nextSnapshot.entities)
+      batch.dto = { ...batch.dto, status: 'rolled-back', authority: state.authority, updatedAt: rolledBackAt, rolledBackAt }
+      remember(state, command.commandId, 'rollback', batch.dto)
+    })
     return clone(batch.dto)
   }
 
@@ -1075,22 +1392,30 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     })
   }
 
-  function reset(workspaceId?: string): void {
-    if (workspaceId)
-      workspaces.delete(workspaceId)
-    else
-      workspaces.clear()
-    options.afterReset?.({ authority: 'local', activeBatchId: null, entities: [] }, workspaceId)
+  async function reset(workspaceId?: string): Promise<void> {
+    const empty: CoreMigrationSnapshotDTO = { authority: 'local', activeBatchId: null, entities: [] }
+    await commitTransition(empty, workspaceId, () => options.afterReset?.(empty, workspaceId), () => {
+      if (workspaceId)
+        workspaces.delete(workspaceId)
+      else
+        workspaces.clear()
+    })
   }
 
   return {
-    preflight,
-    dryRun,
-    importBatch,
-    confirm,
-    rollback,
+    preflight: (command: CoreMigrationSourceCommandDTO, session: BusinessSession) => commandQueue(command, session, preflight),
+    dryRun: (command: CoreMigrationSourceCommandDTO, session: BusinessSession) => commandQueue(command, session, dryRun),
+    importBatch: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, importBatch),
+    confirm: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, confirm),
+    rollback: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, rollback),
     snapshot,
-    reset,
+    reset(workspaceId?: string): Promise<void> {
+      if (workspaceId)
+        return enqueue(workspaceId, () => reset(workspaceId))
+      const pending = Promise.all([resetting, ...queues.values()]).then(() => reset())
+      resetting = pending.then(() => undefined, () => undefined)
+      return pending
+    },
   }
 }
 
@@ -1108,15 +1433,20 @@ export function synchronizeCoreMigrationCommandSources(
 }
 
 const commandSources = [
+  { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => processLibraryService.prepareMigrationSnapshot(snapshot, processLibrarySession()) },
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => auxiliaryContractInstance().prepareMigrationSnapshot(snapshot) },
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => otherSettlementInstance().prepareMigrationSnapshot(snapshot) },
+  projectCommandTestInstance,
+  customerCommandTestInstance,
+  supplierCommandTestInstance,
+  crewWorkerCommandTestInstance,
   constructionContractCommandTestInstance,
   subcontractContractCommandTestInstance,
+  receiptCommandTestInstance,
+  deliveryCommandTestInstance,
   ownerCommercialDocumentCommandTestInstance,
 ] as const
 
 export const coreMigrationTestInstance = createCoreMigrationTestInstance({
-  afterConfirm: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
-  afterRollback: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
-  afterReset: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
+  prepareTransition: snapshot => prepareCoreMigrationCommandSources(snapshot, commandSources, [quantityTestInstance]),
 })

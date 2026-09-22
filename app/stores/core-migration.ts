@@ -14,7 +14,7 @@ import type {
 import type { CoreMigrationRepository } from '~/lib/migration/core-http-repository'
 import type { CoreMigrationLocalSource } from '~/lib/migration/core-local-source'
 import { defineStore } from 'pinia'
-import { readonly, shallowRef } from 'vue'
+import { computed, readonly, shallowRef } from 'vue'
 import { CORE_MIGRATION_CAPABILITY } from '~/lib/migration/core-contract'
 import { coreMigrationEnvelope } from '~/lib/migration/core-http-repository'
 import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-source'
@@ -91,6 +91,17 @@ export function createCoreMigrationStoreDefinition(
     const activeMigration = shallowRef<BrowserCoreMigrationMarker | null>(null)
     const lastError = shallowRef<Error | null>(null)
     const commandIds = new Map<string, string>()
+    const preparationBlocked = computed(() => activeMigration.value !== null
+      || ['confirmed', 'cutover-pending', 'rollback-pending'].includes(phase.value))
+
+    function assertCanPrepareMigration() {
+      if (preparationBlocked.value) {
+        throw new CoreMigrationFlowError(
+          'invalid-step',
+          '当前迁移已切换或正在恢复，不能重新发起迁移',
+        )
+      }
+    }
 
     function commandIdFor(step: string): string {
       let id = commandIds.get(step)
@@ -201,6 +212,7 @@ export function createCoreMigrationStoreDefinition(
         activeMigration.value = marker
 
         if (!marker && pendingMarker) {
+          phase.value = 'cutover-pending'
           if (snapshot.activeBatchId === pendingMarker.batchId) {
             if (snapshot.authority === 'local') {
               await dependencies.localSource.assertCurrentSource(
@@ -232,7 +244,6 @@ export function createCoreMigrationStoreDefinition(
             phase.value = 'idle'
             return snapshot
           }
-          phase.value = 'cutover-pending'
           throw new CoreMigrationFlowError('source-mismatch', '待切换标记与中央迁移状态不一致')
         }
 
@@ -263,6 +274,7 @@ export function createCoreMigrationStoreDefinition(
     }
 
     async function preflight(): Promise<CoreMigrationPreflightDTO> {
+      assertCanPrepareMigration()
       return run(async () => {
         const nextSource = await dependencies.localSource.readSource()
         if (source.value?.sourceHash !== nextSource.sourceHash) {
@@ -282,6 +294,7 @@ export function createCoreMigrationStoreDefinition(
     }
 
     async function createBackup(): Promise<BrowserDatabaseBackupMetadata> {
+      assertCanPrepareMigration()
       return run(async () => {
         const currentSource = assertStep(source.value, '请先完成版本与来源预检')
         const checked = assertStep(preflightResult.value, '请先完成版本与来源预检')
@@ -294,6 +307,7 @@ export function createCoreMigrationStoreDefinition(
     }
 
     async function dryRun(): Promise<CoreMigrationBatchDTO> {
+      assertCanPrepareMigration()
       return run(async () => {
         const currentSource = assertStep(source.value, '请先完成版本与来源预检')
         const protectedBackup = assertStep(
@@ -314,6 +328,7 @@ export function createCoreMigrationStoreDefinition(
     }
 
     async function importBatch(): Promise<CoreMigrationBatchDTO> {
+      assertCanPrepareMigration()
       return run(async () => {
         const currentBatch = assertStep(batch.value, '请先完成 dry-run')
         if (currentBatch.status !== 'dry-run' && currentBatch.status !== 'failed') {
@@ -486,6 +501,7 @@ export function createCoreMigrationStoreDefinition(
 
     return {
       phase: readonly(phase),
+      preparationBlocked,
       busy: readonly(busy),
       source: readonly(source),
       preflightResult: readonly(preflightResult),

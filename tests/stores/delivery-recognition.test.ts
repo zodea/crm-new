@@ -9,6 +9,7 @@ import { useDeliveryRecordStore } from '~/stores/delivery-record'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),

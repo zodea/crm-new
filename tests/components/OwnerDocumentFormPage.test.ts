@@ -6,7 +6,10 @@ import {
   computed,
   defineComponent,
   h,
+  KeepAlive,
   nextTick,
+  onActivated,
+  onDeactivated,
   onMounted,
   ref,
   shallowRef,
@@ -34,6 +37,8 @@ const route = {
 const loadOne = vi.fn()
 const loadAttachments = vi.fn()
 const loadContractOptions = vi.fn()
+const loadBoqLines = vi.fn()
+const confirm = vi.fn()
 const saveForm = vi.fn()
 const saveAttachments = vi.fn()
 
@@ -75,7 +80,8 @@ const OwnerDocumentFormFieldsStub = defineComponent({
     fieldErrors: { type: Object, required: true },
     readonly: { type: Boolean, default: false },
   },
-  setup(props) {
+  emits: ['patch'],
+  setup(props, { emit }) {
     return () => h('section', [
       h('input', {
         'aria-label': '变更名称',
@@ -84,6 +90,19 @@ const OwnerDocumentFormFieldsStub = defineComponent({
         'readonly': props.readonly,
         'value': String(props.draft.name ?? ''),
       }),
+      props.draft.status === 'accepted'
+        ? h('div', [
+            h('output', { 'data-testid': 'acceptance-draft' }, JSON.stringify(props.draft)),
+            h('button', { type: 'button', onClick: () => emit('patch', { warrantyStartDate: '2026-09-11' }) }, '填写保修日期'),
+          ])
+        : null,
+      props.draft.quantityBasis
+        ? h('div', [
+            h('output', { 'data-testid': 'report-draft' }, JSON.stringify(props.draft)),
+            h('button', { type: 'button', onClick: () => emit('patch', { quantityBasis: 'contract' }) }, '切换合同量'),
+            h('button', { type: 'button', onClick: () => emit('patch', { name: '等待期间编辑' }) }, '修改报量名称'),
+          ])
+        : null,
     ])
   },
 })
@@ -145,6 +164,8 @@ describe('甲方与分包单据整页表单状态', () => {
     loadOne.mockReset()
     loadAttachments.mockReset()
     loadContractOptions.mockReset()
+    loadBoqLines.mockReset().mockResolvedValue([])
+    confirm.mockReset().mockResolvedValue(true)
     saveForm.mockReset()
     saveAttachments.mockReset()
     loadOne.mockResolvedValue(null)
@@ -155,28 +176,26 @@ describe('甲方与分包单据整页表单状态', () => {
     vi.stubGlobal('computed', computed)
     vi.stubGlobal('nextTick', nextTick)
     vi.stubGlobal('onMounted', onMounted)
+    vi.stubGlobal('onActivated', onActivated)
+    vi.stubGlobal('onDeactivated', onDeactivated)
     vi.stubGlobal('ref', ref)
     vi.stubGlobal('shallowRef', shallowRef)
     vi.stubGlobal('useRoute', () => route)
     vi.stubGlobal('navigateTo', vi.fn())
     vi.stubGlobal('useTabTitle', vi.fn())
-    vi.stubGlobal('useTabsStore', () => ({
-      tabs: [],
-      close: vi.fn(),
-      open: vi.fn(),
-    }))
+    vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, tabs: [], close: vi.fn(), open: vi.fn() }))
     vi.stubGlobal('useOwnerDocumentStore', () => ({
       loadOne,
       loadAttachments,
       loadBasicOptions: vi.fn().mockResolvedValue([]),
       loadContractOptions,
-      loadBoqLines: vi.fn().mockResolvedValue([]),
+      loadBoqLines,
       loadContractSummary: vi.fn().mockResolvedValue(null),
       saveForm,
       saveAttachments,
     }))
     vi.stubGlobal('useKitUI', () => ({
-      confirm: vi.fn().mockResolvedValue(true),
+      confirm,
       success: vi.fn(),
       warning: vi.fn(),
       error: vi.fn(),
@@ -216,6 +235,103 @@ describe('甲方与分包单据整页表单状态', () => {
     }))
   })
 
+  function prepareReport(status = 'draft') {
+    route.fullPath = '/owner/report/form/monthly-current'
+    route.params = { id: 'monthly-current' }
+    loadOne.mockResolvedValue({
+      id: 'monthly-current',
+      status,
+      name: '九月报量',
+      projectId: 'project-current',
+      contractId: 'contract-current',
+      periodNo: '2026-09',
+      quantityBasis: 'field',
+      lines: [{ id: 'old-line', boqLineId: 'boq-current', reportedQty: 17, unitPrice: 20 }],
+    })
+    loadBoqLines.mockImplementation(async (_project, _contract, _period, basis) => [{
+      id: 'boq-current',
+      itemName: '墙面',
+      unit: '㎡',
+      qty: 100,
+      unitPrice: 20,
+      autoQty: basis === 'contract' ? 0 : 9,
+      missingQtyCount: 0,
+    }])
+  }
+
+  it('月报离开缓存页再返回后拒绝旧取数响应，重新读取当前基准且保留手工稿', async () => {
+    prepareReport()
+    const visible = ref(true)
+    render(defineComponent({
+      setup: () => () => h(KeepAlive, () => visible.value ? h(OwnerDocumentFormPage, { kind: 'owner_report' }) : null),
+    }), { global: { components: globalComponents } })
+    await flushPromises()
+    let completeOld!: (rows: unknown[]) => void
+    loadBoqLines.mockImplementationOnce(() => new Promise((resolve) => {
+      completeOld = resolve
+    }))
+    await fireEvent.click(screen.getByRole('button', { name: '切换合同量' }))
+    await flushPromises()
+    visible.value = false
+    route.fullPath = '/owner/report'
+    await nextTick()
+    route.fullPath = '/owner/report/form/monthly-current'
+    visible.value = true
+    await flushPromises()
+    completeOld([{ id: 'boq-current', itemName: '过期读数', unit: '㎡', qty: 100, unitPrice: 20, autoQty: 99, missingQtyCount: 0 }])
+    await flushPromises()
+    const current = JSON.parse(screen.getByTestId('report-draft').textContent!)
+    expect(current.quantityBasis).toBe('contract')
+    expect(current.lines[0].autoQty).toBe(0)
+    expect(current.lines[0].reportedQty).toBe(0)
+    expect(loadOne).toHaveBeenCalledTimes(1)
+  })
+
+  it('更换报量基准取消保留手工稿，确认后重新生成全部明细并保留明确零', async () => {
+    prepareReport()
+    render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global: { components: globalComponents } })
+    await flushPromises()
+    confirm.mockResolvedValueOnce(false)
+    await fireEvent.click(screen.getByRole('button', { name: '切换合同量' }))
+    await flushPromises()
+    let current = JSON.parse(screen.getByTestId('report-draft').textContent!)
+    expect(current.quantityBasis).toBe('field')
+    expect(current.lines[0].reportedQty).toBe(17)
+    expect(loadBoqLines).toHaveBeenCalledTimes(1)
+    await fireEvent.click(screen.getByRole('button', { name: '切换合同量' }))
+    await flushPromises()
+    current = JSON.parse(screen.getByTestId('report-draft').textContent!)
+    expect(current.quantityBasis).toBe('contract')
+    expect(current.lines[0]).toMatchObject({ autoQty: 0, reportedQty: 0 })
+    expect(current.lines[0].id).toBeUndefined()
+    expect(current.reportedAmount).toBe(0)
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('手工申报量') }))
+  })
+
+  it('基准确认等待期间草稿已变化时不覆盖新编辑，已生效单据拒绝更换', async () => {
+    prepareReport()
+    const view = render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global: { components: globalComponents } })
+    await flushPromises()
+    let release!: (value: boolean) => void
+    confirm.mockReturnValueOnce(new Promise<boolean>((resolve) => {
+      release = resolve
+    }))
+    await fireEvent.click(screen.getByRole('button', { name: '切换合同量' }))
+    await fireEvent.click(screen.getByRole('button', { name: '修改报量名称' }))
+    release(true)
+    await flushPromises()
+    expect(JSON.parse(screen.getByTestId('report-draft').textContent!)).toMatchObject({ name: '等待期间编辑', quantityBasis: 'field' })
+    view.unmount()
+    prepareReport('reported')
+    confirm.mockClear()
+    render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global: { components: globalComponents } })
+    await flushPromises()
+    await fireEvent.click(screen.getByRole('button', { name: '切换合同量' }))
+    await flushPromises()
+    expect(JSON.parse(screen.getByTestId('report-draft').textContent!).quantityBasis).toBe('field')
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
   it('uses the dynamic title, return label and sections from the document kind', async () => {
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_change' },
@@ -227,6 +343,16 @@ describe('甲方与分包单据整页表单状态', () => {
     expect(screen.getByRole('button', { name: '返回甲方变洽签' })).not.toBeNull()
     expect(screen.getByTestId('sections').textContent)
       .toBe('基本信息|变更明细|附件与备注')
+  })
+
+  it('月报只读保护不阻止验收单当前生命周期允许填写的保修字段', async () => {
+    route.fullPath = '/owner/acceptance/form/current'
+    route.params = { id: 'current' }
+    loadOne.mockResolvedValue({ id: 'current', name: '验收', status: 'accepted', warrantyStartDate: null })
+    render(OwnerDocumentFormPage, { props: { kind: 'acceptance' }, global: { components: globalComponents } })
+    await flushPromises()
+    await fireEvent.click(screen.getByRole('button', { name: '填写保修日期' }))
+    expect(JSON.parse(screen.getByTestId('acceptance-draft').textContent!).warrantyStartDate).toBe('2026-09-11')
   })
 
   it('hides the writable form after a load failure and retries in place', async () => {

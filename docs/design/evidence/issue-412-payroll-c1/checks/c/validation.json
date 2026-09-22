@@ -1,0 +1,159 @@
+{
+  "baseline": "579d9383357fffd2bd87e727dbc21b903a7cb69c",
+  "owner": "C UI / navigation / paired output / browser scenarios",
+  "ownedManifest": "owned-files.json",
+  "ownedFiles": 51,
+  "componentVerification": {
+    "files": 10,
+    "tests": 26,
+    "state": "passed",
+    "log": "components-recovery.log",
+    "durationSeconds": 6.89
+  },
+  "unitVerification": {
+    "files": 2,
+    "tests": 3,
+    "state": "passed",
+    "log": "unit-final.log"
+  },
+  "lint": {
+    "state": "passed",
+    "groups": [
+      "46 existing owned files: lint-recovery.log",
+      "2 new recovery browser files: lint-recovery-e2e.log"
+    ]
+  },
+  "redGreen": [
+    {
+      "case": "7.51 must not become 7.5",
+      "red": "matrix-red.log",
+      "green": "components-first.log"
+    },
+    {
+      "case": "draftKey + status OR + nested attendance return",
+      "red": "return-status-red.log",
+      "green": "return-status-green.log"
+    },
+    {
+      "case": "unsaved attendance close requires confirmed discard; new draft source return uses authorized original record",
+      "red": "close-return-red.log",
+      "green": "close-return-green.log"
+    },
+    {
+      "case": "read actual statement and available paired output before parent changed or closing release input",
+      "red": "completion-red.log",
+      "green": "completion-green.log"
+    }
+  ],
+  "additionalBehavior": [
+    "same cell input survives KeepAlive visibility and month switch, including null hours",
+    "confirmed source record save does not automatically reopen the dialog",
+    "C1 options use shared searchable LookupSelect and config form uses two columns",
+    "all four command interfaces acknowledge only after successful same-target reads",
+    "awaiting-read displays saved-but-awaiting-result rather than unknown"
+  ],
+  "browser": {
+    "owner": "Root centralized 3188 window",
+    "first": "failed after 33.7s at configuration return; precise navigation red-green fixed",
+    "second": "failed after 34.2s after actual 900 release and original key recovery; parent detail released while workspace checked; completion sequencing fixed",
+    "final": "Root fresh main passed 41.8s; config recovery failed because write-form reload correctly falls back. E2E now explicitly reopens original URL after cold reload, pending final fresh run.",
+    "files": [
+      "e2e/payroll-c1-central.spec.ts",
+      "e2e/payroll-c1-recovery.spec.ts"
+    ],
+    "independentRootFiles": [
+      "e2e/payroll-c1-readonly.spec.ts",
+      "e2e/payroll-attendance.spec.ts",
+      "e2e/payroll-context-retirement.spec.ts"
+    ]
+  },
+  "fullSuiteTypeBuild": "Root owns integrated execution; C did not start full suite, typecheck, build or a service",
+  "remaining": [
+    "Root fresh main browser and recovery journeys",
+    "five-width independent visual review and actual paired PDF review",
+    "independent review and integrated final checks"
+  ],
+  "latestComponentIncrement": {
+    "red": "config-read-failed-red.log",
+    "addedTests": 1,
+    "lint": "lint-config-read-failed.log",
+    "file": "tests/components/PayrollC1Config.test.ts",
+    "tests": 3,
+    "state": "passed",
+    "currentTotalComponentTests": 27,
+    "green": "config-read-failed-green.log"
+  },
+  "independentTabGuard": {
+    "relatedComponents": "tab-and-config-green.log (2 files 6 tests)",
+    "log": "tab-batch-green.log",
+    "lint": "lint-tab-batch.log",
+    "source": "tests/payroll/c1-spec-independent.test.ts (Root owned unchanged)",
+    "state": "passed",
+    "scope": "same dirty map protects application tab close/refresh including KeepAlive; guard has no draft-clearing side effect before all tab decisions succeed",
+    "tests": 6,
+    "batchCloseRed": "tab-batch-red.log"
+  },
+  "finalIncrement": {
+    "tests": 30,
+    "files": 7,
+    "durationSeconds": 4.72,
+    "log": "detail-rate-and-recovery-green.log",
+    "precisionRed": "detail-rate-precision-red.log",
+    "lint": "lint-final-increment.log",
+    "lintFiles": 6,
+    "lintExit": 0,
+    "productionChanges": [
+      "CentralPayrollDetailScreen: C1 unitPrice retains original precision; amount remains currency to cents"
+    ],
+    "testOnlyCorrections": [
+      "registeredTargetKeys adds attendance:matrix",
+      "cold config explicitly reopens original write URL after safe reload fallback",
+      "real config composable + new Pinia instance preserves original command and 54/null, clears pending only after exact read acknowledgement"
+    ],
+    "addedScreenshotStates": [
+      "independent-overtime-config-tail",
+      "c1-draft-source-lines",
+      "c1-draft-source-values",
+      "c1-draft-source-tail",
+      "month-normal-totals"
+    ],
+    "browserRerun": "Root owns fresh integrated window; no service or E2E was started by C"
+  },
+  "visualFinalStateIncrement": {
+    "files": [
+      {
+        "file": "app/components/payroll/PayrollC1StatementWorkspace.vue",
+        "sha256": "24c458918a520d57b4e135fa66cd99c8ae357dc9d71f476cc2ee7d9b46710a8a"
+      },
+      {
+        "file": "app/components/payroll/PayrollC1ConfigScreen.vue",
+        "sha256": "d0e2144f5f4e3a9bd411b7ad51cac3deb7881cdcc6321d4f803b4d3819ec297d"
+      },
+      {
+        "file": "tests/components/PayrollC1ReleasedEvidence.test.ts",
+        "sha256": "8feee815beea76857537c1fb012a37cc876c82cd142a6083568b6406cee2f5db"
+      },
+      {
+        "file": "tests/components/PayrollC1ConfigRecovery.test.ts",
+        "sha256": "4cf7d6ec79fbc2dc1ecf9d02f7caf65a1dd0fc4a73bded2d12e0fdb15c36b950"
+      }
+    ],
+    "tests": {
+      "green": "visual-final-state-green.log",
+      "seconds": 3.93,
+      "tests": 8,
+      "files": 4,
+      "red": "visual-final-state-red.log"
+    },
+    "lint": {
+      "log": "visual-final-state-lint.log",
+      "files": 4,
+      "exitCode": 0
+    },
+    "productScope": [
+      "配对输出available才显示完整冻结；released不显示建单或重核指令；无输出尚未核实不推定缺损",
+      "配置pending及busy保留该次公开scope项目与班组名称，不改变恢复身份"
+    ],
+    "precision": "wire单价精度由A单独修复；C本轮未改EvidenceTable或codec"
+  }
+}

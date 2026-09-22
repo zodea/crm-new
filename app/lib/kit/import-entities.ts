@@ -1,9 +1,7 @@
 import type { ImportTemplateField } from './import-mapping'
 import type { Invoice } from '~/stores/invoice'
-import type { Project } from '~/stores/project'
-import { selectVisibleSql } from '~/lib/db/soft-delete'
 import { getInvoiceImportSourceMeta, invoiceNaturalKey } from '~/lib/invoice/excel'
-import { normalizeProjectStatus } from '~/lib/project/status'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import {
   QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
   QUANTITY_COMPLETION_IMPORT_FIELDS,
@@ -11,8 +9,8 @@ import {
   QUANTITY_TEMPLATE_IMPORT_FIELDS,
 } from '~/lib/quantity/import'
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
-import { parseJsonColumn } from '~/lib/util/json'
 import { round2 } from '~/lib/util/number'
+import { useBrowserQuantityStore } from '~/stores/quantity-browser'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
 // 工程量三类目标（#103 切片 6B）：逐行复用领域唯一写路径，行内自带项目编码定位归属；
@@ -21,6 +19,11 @@ async function runQuantityImport(
   row: Record<string, unknown>,
   handler: 'importQuantityTemplateRow' | 'importQuantityAssignmentRow' | 'importQuantityCompletionRow',
 ): Promise<void> {
+  if (!isDesktopRuntime()) {
+    const targets = { importQuantityTemplateRow: 'template', importQuantityAssignmentRow: 'assignment', importQuantityCompletionRow: 'completion' } as const
+    await useBrowserQuantityStore().importRow(targets[handler], row)
+    return
+  }
   const [{ withTransaction }, quantityImport] = await Promise.all([
     import('~/lib/db/connection'),
     import('~/lib/quantity/import'),
@@ -30,10 +33,7 @@ async function runQuantityImport(
 
 // 导入实体注册表（ADR 0005「实体触发、模板隐含」）：
 // 实体键即 /import/mapping/:entity 路由参数，静态登记保证刷新后仍可解析。
-// demo-supplier 为演示 stub；project 为第一个真实实体（#58 从项目列表页 openImportTab
-// 触发，模板字段取 #73 项目分析，逐行经 store.add 真实入库并落 create 日志）。
-// importRow 内的 useProjectStore 是 Nuxt 自动导入的运行时值：仅浏览器内导入 runner 调用，
-// node 单测不触发（故本文件仍可在纯 node 环境解析——Project 为 type-only import，运行时擦除）。
+// 项目与分供方走中央命令；其他实体仍按各自现行接管边界处理。
 
 export interface ImportEntityDef {
   key: string
@@ -57,43 +57,6 @@ const DEMO_SUPPLIER_FIELDS: readonly ImportTemplateField[] = [
 // 用于跑通「失败保留页签 → 从失败行续导」旅程。
 const demoFailedOnce = new Set<string>()
 
-interface ProjectImportCustomer {
-  id: string
-  name: string
-  aliases: string
-}
-
-function normalizedReference(value: unknown): string {
-  return String(value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN')
-}
-
-async function resolveProjectCustomerId(
-  reference: unknown,
-  label: string,
-  required = false,
-): Promise<string | null> {
-  const normalized = normalizedReference(reference)
-  if (!normalized) {
-    if (required)
-      throw new Error(`${label}不能为空`)
-    return null
-  }
-
-  const { select } = await import('~/lib/db/connection')
-  const customers = await select<ProjectImportCustomer>(selectVisibleSql('customers'))
-  const matches = customers.filter((customer) => {
-    const aliases = parseJsonColumn<string[]>(customer.aliases, [])
-    return [
-      customer.id,
-      customer.name,
-      ...aliases,
-    ].some(value => normalizedReference(value) === normalized)
-  })
-  if (matches.length !== 1)
-    throw new Error(`${label}“${String(reference).trim()}”未唯一匹配到有效客户`)
-  return matches[0]!.id
-}
-
 // 项目导入客户字段先唯一解析为真实 ID，拒绝继续写已停用的 developer/developer2 文本列。
 const PROJECT_FIELDS: readonly ImportTemplateField[] = [
   { key: 'name', label: '项目名称', required: true, aliases: ['项目', '工程名称'] },
@@ -104,7 +67,7 @@ const PROJECT_FIELDS: readonly ImportTemplateField[] = [
   { key: 'status', label: '业务流程阶段', aliases: ['项目状态', '阶段', '状态'] },
   { key: 'region', label: '工程地域', aliases: ['地域', '所在地区'] },
   { key: 'address', label: '工程详细地址', aliases: ['项目地址', '地址', '详细地址'] },
-  { key: 'manager', label: '项目经理', aliases: ['负责人'] },
+  { key: 'manager', label: '项目经理', required: true, aliases: ['负责人'] },
   { key: 'execManager', label: '执行经理' },
   { key: 'builder', label: '施工员' },
   { key: 'startDate', label: '计划开工', aliases: ['开工日期', '计划开工日期'] },
@@ -117,14 +80,15 @@ const SUPPLIER_FIELDS: readonly ImportTemplateField[] = [
   { key: 'name', label: '公司全称', required: true, aliases: ['分供方名称', '供应商名称', '名称'] },
   { key: 'supplierCategory', label: '分供方类别', aliases: ['类别', '合作类别'] },
   { key: 'aliases', label: '简称/别名', aliases: ['简称', '别名'] },
-  { key: 'uniqueCode', label: '统一社会信用代码', aliases: ['信用代码'] },
-  { key: 'taxNo', label: '税号', aliases: ['纳税人识别号'] },
+  { key: 'uniqueCode', label: '唯一识别码', aliases: ['分供方内部编码', '内部编码'] },
+  { key: 'taxNo', label: '统一社会信用代码', aliases: ['税号', '纳税人识别号', '信用代码'] },
   { key: 'legalRep', label: '法定代表人', aliases: ['法人'] },
   { key: 'registeredCapital', label: '注册资金（万元）', aliases: ['注册资金', '注册资本'] },
   { key: 'registeredDate', label: '注册日期', aliases: ['成立日期'] },
   { key: 'address', label: '注册地址', aliases: ['地址'] },
   { key: 'mainBusiness', label: '主营业务' },
-  { key: 'businessType', label: '业务类型' },
+  { key: 'laborScope', label: '劳务承包范围' },
+  { key: 'businessType', label: '经营类型' },
   { key: 'invoiceName', label: '开票名称' },
   { key: 'taxpayerType', label: '纳税人类型' },
   { key: 'bank', label: '开户行' },
@@ -305,30 +269,26 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
     key: 'project',
     label: '施工项目',
     fields: PROJECT_FIELDS,
-    // 逐行入库：客户名称必须唯一解析为 customerId；缺失或歧义会让该行失败并留在导入重试清单。
-    // store.add 内部走 INSERT + logCreate + load，导入完成后新行经共享 store 出现在列表页。
-    // externalRef 等未登记列由 projectToBindings 忽略（只写 PROJECT_COLUMN_KEYS）。
-    // status 经 normalizeProjectStatus 归一：Excel 任意文本不得写进非法阶段值。
+    validateRow: row => useProjectCommandStore().validateImportRow(row),
     async importRow(row) {
-      const {
-        customerName,
-        secondaryCustomerName,
-        ...project
-      } = row
-      await useProjectStore().add({
-        ...project,
-        customerId: await resolveProjectCustomerId(customerName, '客户', true),
-        secondaryCustomerId: await resolveProjectCustomerId(secondaryCustomerName, '次客户'),
-        status: normalizeProjectStatus(row.status),
-      } as Partial<Project>)
+      await useProjectCommandStore().importRow(row)
     },
   },
   'supplier': {
     key: 'supplier',
     label: '分供方',
     fields: SUPPLIER_FIELDS,
+    async validateRow(row) {
+      try {
+        normalizeSupplierImportRow(row)
+        return null
+      }
+      catch (cause) {
+        return cause instanceof Error ? cause.message : '分供方导入内容无效'
+      }
+    },
     async importRow(row) {
-      await useSupplierStore().upsertImported(normalizeSupplierImportRow(row))
+      await useSupplierCommandStore().importRow(row)
     },
   },
   'demo-supplier': {

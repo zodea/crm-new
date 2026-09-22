@@ -1,8 +1,10 @@
+import type { ApprovedAmountEdit, ApprovedAmountOrigin } from './approval-amount'
 import type { TransactionDb } from '~/lib/db/coordinator'
 import type {
   FileRefChanges,
   FileRefRecord,
 } from '~/lib/forms/file-refs'
+import { isConfirmedExpenditureSettlement } from '~/lib/contract/effective-status'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
   logCreate,
@@ -13,7 +15,9 @@ import {
   applyFileRefChanges,
   listFileRefs,
 } from '~/lib/forms/file-refs'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { generateId } from '~/lib/util/id'
+import { approvalAmountForSave, paymentConfirmationCap } from './approval-amount'
 
 export type F3FormKind
   = | 'receipt'
@@ -140,6 +144,8 @@ export interface PaymentApplicationFormDraft {
   prepayDeduct?: number | null
   prepayNote?: string
   approvedAmount?: number | null
+  approvedAmountOrigin?: ApprovedAmountOrigin
+  approvedAmountEdit?: ApprovedAmountEdit
   approvalNote?: string
   status?: string
   note?: string
@@ -806,7 +812,10 @@ async function validatePaymentApplicationAllocations(
     const settlement = await assertReference<{
       project_id: string
       contract_id: string
+      status: string
     }>(tx, 'expenditure_settlements', settlementId, '关联结算')
+    if (!isConfirmedExpenditureSettlement(settlement.status))
+      throw new Error('关联结算尚未确认，不能用于付款申请')
     if (draft.projectId && settlement.project_id !== draft.projectId)
       throw new Error('关联结算不属于所选项目')
     if (draft.contractId && settlement.contract_id !== draft.contractId)
@@ -868,13 +877,15 @@ async function savePaymentApplication(
   action: F3SaveAction,
 ): Promise<{ id: string, logId: string | null }> {
   const amount = nonNegativeMoney('申请金额', draft.applyAmount)
-  const approvedAmount = nonNegativeMoney('批复金额', draft.approvedAmount)
   const prepayDeduct = nonNegativeMoney('扣除预付款金额', draft.prepayDeduct)
   const id = draft.id ?? generateId('payment_application')
   const existing = await activeRow<{
     biz_type: string
     invoice_state: string
+    approved_amount: number | null
+    approved_amount_origin: ApprovedAmountOrigin
   }>(tx, 'payment_applications', id)
+  const approval = approvalAmountForSave(draft.approvedAmount, draft.approvedAmountEdit, existing)
   if (existing && (
     existing.biz_type !== text(draft.bizType)
     || existing.invoice_state !== (draft.invoiceState ?? '先款后票')
@@ -948,7 +959,8 @@ async function savePaymentApplication(
     text(draft.payContent),
     prepayDeduct,
     text(draft.prepayNote),
-    approvedAmount,
+    approval.approved_amount,
+    approval.approved_amount_origin,
     text(draft.approvalNote),
     lifecycleStatus(action, draft.status),
     text(draft.note),
@@ -961,7 +973,7 @@ async function savePaymentApplication(
         SET no = ?, name = ?, biz_type = ?, project_id = ?, supplier_id = ?,
             contract_id = ?, cost_name = ?, apply_amount = ?, apply_date = ?,
             applicant = ?, invoice_state = ?, pay_content = ?, prepay_deduct = ?,
-            prepay_note = ?, approved_amount = ?, approval_note = ?, status = ?,
+            prepay_note = ?, approved_amount = ?, approved_amount_origin = ?, approval_note = ?, status = ?,
             note = ?, external_ref = ?, updated_at = ?
         WHERE id = ?
       `, [...values, id]))
@@ -970,10 +982,10 @@ async function savePaymentApplication(
           INSERT INTO payment_applications (
             id, no, name, biz_type, project_id, supplier_id, contract_id,
             cost_name, apply_amount, apply_date, applicant, invoice_state,
-            pay_content, prepay_deduct, prepay_note, approved_amount,
+            pay_content, prepay_deduct, prepay_note, approved_amount, approved_amount_origin,
             approval_note, status, note, external_ref, created_at, updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [id, ...values.slice(0, -1), now, now])
         return logCreate(tx, 'payment_applications', id)
       })()
@@ -1054,7 +1066,8 @@ async function validatePaymentRecord(
       project_id: string | null
       supplier_id: string | null
       apply_amount: number
-      approved_amount: number
+      approved_amount: number | null
+      approved_amount_origin: ApprovedAmountOrigin
     }>(tx, 'payment_applications', applicationId, '付款申请')
     if (nullableId(draft.projectId) !== application.project_id)
       throw new Error('付款申请与支付记录的项目归属不一致')
@@ -1072,9 +1085,7 @@ async function validatePaymentRecord(
           AND payment.deleted_at IS NULL
           AND payment.confirmation_status = 'confirmed'
       `, [applicationId, id])
-      const cap = application.approved_amount > 0
-        ? application.approved_amount
-        : application.apply_amount
+      const cap = paymentConfirmationCap(application.apply_amount, application.approved_amount, application.approved_amount_origin)
       const thisAmount = positiveMoney('分摊金额', line.allocatedAmount)
       if ((alreadyPaid?.amount ?? 0) + thisAmount > cap + 0.0001)
         throw new Error('支付分摊超过付款申请可付金额')
@@ -1220,6 +1231,8 @@ export async function saveFinanceForm(
   action: F3SaveAction,
   attachments: FileRefChanges = {},
 ): Promise<F3SaveResult> {
+  if (kind === 'receipt' && 'window' in globalThis && !isDesktopRuntime())
+    throw new Error('浏览器收款请通过中央收款表单保存')
   if (action === 'confirm' && kind !== 'payment_record')
     throw new Error('只有支付记录支持确认动作')
   return withTransaction(async (tx) => {
@@ -1477,7 +1490,8 @@ async function loadPaymentApplication(
     payContent: String(row.pay_content ?? ''),
     prepayDeduct: Number(row.prepay_deduct) || 0,
     prepayNote: String(row.prepay_note ?? ''),
-    approvedAmount: Number(row.approved_amount) || 0,
+    approvedAmount: row.approved_amount === null ? null : Number(row.approved_amount),
+    approvedAmountOrigin: row.approved_amount_origin as ApprovedAmountOrigin,
     approvalNote: String(row.approval_note ?? ''),
     externalRef: String(row.external_ref ?? ''),
     settlementAllocations: settlements.map(line => ({

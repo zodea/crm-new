@@ -28,7 +28,6 @@ const columns: KitTableColumn[] = [
     <SectionHeader
       id="contract-lines-title"
       title="采购合同明细"
-      subtitle="仅材料采购合同展示持久化明细；施工和分包合同不补造明细"
     />
     <div v-if="rows.length" data-testid="contract-lines-scroll" class="mt-3 min-w-0">
       <KitTable :columns="columns" :data="tableRows" :min-rows="5">

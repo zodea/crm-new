@@ -1,0 +1,61 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/stores/daywork-central.test.ts tests/stores/payroll-c2-central.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/stores/payroll-c2-central.test.ts (0 test)
+ ❯ |unit| tests/stores/daywork-central.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/stores/daywork-central.test.ts [ tests/stores/daywork-central.test.ts ]
+Error: Failed to resolve import "~/stores/daywork-central" from "tests/stores/daywork-central.test.ts". Does the file exist?
+  Plugin: vite:import-analysis
+  File: D:/crm本地项目开发/tests/stores/daywork-central.test.ts:5:39
+  2  |  import { createPinia, setActivePinia } from "pinia";
+  3  |  import { afterEach, beforeEach, expect, it, vi } from "vitest";
+  4  |  import { useDayworkCentralStore } from "~/stores/daywork-central";
+     |                                          ^
+  5  |  import { createPayrollC2ServiceFixture } from "../helpers/payroll-c2-service-fixture";
+  6  |  beforeEach(() => {
+ ❯ TransformPluginContext._formatLog ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:29079:43
+ ❯ TransformPluginContext.error ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:29076:14
+ ❯ normalizeUrl ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:27199:18
+ ❯ ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:27257:32
+ ❯ TransformPluginContext.transform ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:27225:4
+ ❯ EnvironmentPluginContainer.transform ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:28877:14
+ ❯ loadAndTransform ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:22746:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |unit| tests/stores/payroll-c2-central.test.ts [ tests/stores/payroll-c2-central.test.ts ]
+Error: Failed to resolve import "~/stores/payroll-c2" from "tests/stores/payroll-c2-central.test.ts". Does the file exist?
+  Plugin: vite:import-analysis
+  File: D:/crm本地项目开发/tests/stores/payroll-c2-central.test.ts:5:34
+  2  |  import { createPinia, setActivePinia } from "pinia";
+  3  |  import { afterEach, beforeEach, expect, it, vi } from "vitest";
+  4  |  import { usePayrollC2Store } from "~/stores/payroll-c2";
+     |                                     ^
+  5  |  import { createCheckedPayrollC2, createPayrollC2ServiceFixture } from "../helpers/payroll-c2-service-fixture";
+  6  |  beforeEach(() => {
+ ❯ TransformPluginContext._formatLog ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:29079:43
+ ❯ TransformPluginContext.error ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:29076:14
+ ❯ normalizeUrl ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:27199:18
+ ❯ ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:27257:32
+ ❯ TransformPluginContext.transform ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:27225:4
+ ❯ EnvironmentPluginContainer.transform ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:28877:14
+ ❯ loadAndTransform ../crm%E6%9C%AC%E5%9C%B0%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/node_modules/.pnpm/vite@7.3.6_@types+node@26.1_e7229ca7609198494b007733993abb34/node_modules/vite/dist/node/chunks/config.js:22746:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  no tests
+   Start at  14:13:24
+   Duration  1.71s (transform 0ms, setup 0ms, import 0ms, tests 0ms, environment 2.74s)
+

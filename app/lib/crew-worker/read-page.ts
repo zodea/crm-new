@@ -17,6 +17,7 @@ import type {
   WorkerProjectSourceLabel,
   WorkerSourceRow,
 } from './read-contract'
+import { normalizeEnumSelection } from '../util/enum-selection'
 import { maskIdentifier, maskPhone } from '../util/privacy'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from './read-contract'
 
@@ -150,18 +151,28 @@ function parseCommonListQuery(input: Record<string, unknown> | undefined) {
 export function parseCrewListQuery(input: Record<string, unknown> | undefined): CrewListQueryDTO {
   return {
     ...parseCommonListQuery(input),
-    trade: typeof input?.trade === 'string' && input.trade.trim() ? input.trade.trim() : null,
-    status: typeof input?.status === 'string' && input.status.trim() ? input.status.trim() : null,
+    trade: enumSelection(input?.trade),
+    status: enumSelection(input?.status),
   }
 }
 
 export function parseWorkerListQuery(input: Record<string, unknown> | undefined): WorkerListQueryDTO {
   return {
     ...parseCommonListQuery(input),
-    trade: typeof input?.trade === 'string' && input.trade.trim() ? input.trade.trim() : null,
+    trade: enumSelection(input?.trade),
     crewId: typeof input?.crewId === 'string' && input.crewId.trim() ? input.crewId.trim() : null,
-    projectStatus: typeof input?.projectStatus === 'string' && input.projectStatus.trim() ? input.projectStatus.trim() : null,
-    status: typeof input?.status === 'string' && input.status.trim() ? input.status.trim() : null,
+    projectStatus: enumSelection(input?.projectStatus),
+    status: enumSelection(input?.status),
+  }
+}
+
+function enumSelection(value: unknown): string[] | null {
+  try {
+    const values = normalizeEnumSelection(value)
+    return values.length ? values : null
+  }
+  catch {
+    throw new CrewWorkerRepositoryProblem(crewWorkerProblem('invalid-query', '班组或工人列表选项筛选无效'))
   }
 }
 
@@ -186,18 +197,21 @@ export function buildCrewListPage(input: BuildCrewListPageInput): CrewListPageDT
     ? new Set(['real', 'demo'])
     : new Set(['real'])
   const search = input.query.search.toLocaleLowerCase('zh-CN')
-  const filtered = input.crews.filter((crew) => {
+  const trades = enumSelection(input.query.trade) ?? []
+  const statuses = enumSelection(input.query.status) ?? []
+  function matches(crew: CrewSourceRow, except?: 'trade' | 'status') {
     if (!allowedOrigins.has(crew.dataOrigin))
       return false
-    if (input.query.trade && crew.trade !== input.query.trade)
+    if (except !== 'trade' && trades.length && !trades.includes(crew.trade))
       return false
-    if (input.query.status && crew.status !== input.query.status)
+    if (except !== 'status' && statuses.length && !statuses.includes(crew.status))
       return false
     if (!search)
       return true
     return [crew.name, crew.trade, crew.contactName]
       .some(value => value.toLocaleLowerCase('zh-CN').includes(search))
-  })
+  }
+  const filtered = input.crews.filter(crew => matches(crew))
   const sorted = [...filtered].sort((left, right) => {
     if (input.query.sort === 'name-asc')
       return left.name.localeCompare(right.name, 'zh-CN') || left.id.localeCompare(right.id)
@@ -227,7 +241,8 @@ export function buildCrewListPage(input: BuildCrewListPageInput): CrewListPageDT
       projectCount: projectIds.size,
     }
   }
-  const start = (input.query.page - 1) * input.query.pageSize
+  const page = Math.min(input.query.page, Math.max(1, Math.ceil(filtered.length / input.query.pageSize)))
+  const start = (page - 1) * input.query.pageSize
   const items = sorted.slice(start, start + input.query.pageSize).map((source) => {
     const crew = crewRef(source)
     return {
@@ -248,10 +263,10 @@ export function buildCrewListPage(input: BuildCrewListPageInput): CrewListPageDT
       updatedAt: source.updatedAt,
     }
   })
-  const countBy = (field: 'trade' | 'status') => [...new Set(filtered.map(row => row[field]))]
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right, 'zh-CN'))
-    .map(value => ({ value, label: value, count: filtered.filter(row => row[field] === value).length }))
+  const countBy = (field: 'trade' | 'status') => {
+    const candidates = input.crews.filter(row => matches(row, field))
+    return [...new Set(candidates.map(row => row[field]))].filter(Boolean).sort((left, right) => left.localeCompare(right, 'zh-CN')).map(value => ({ value, label: value, count: candidates.filter(row => row[field] === value).length }))
+  }
   const origins = (['real', 'demo'] as const).reduce<CrewListPageDTO['summary']['origins']>((result, origin) => {
     const crews = filtered.filter(row => row.dataOrigin === origin)
     const crewIds = new Set(crews.map(row => row.id))
@@ -263,7 +278,7 @@ export function buildCrewListPage(input: BuildCrewListPageInput): CrewListPageDT
   }, { real: { crewCount: 0, workerCount: 0 }, demo: { crewCount: 0, workerCount: 0 } })
   return {
     items,
-    pagination: { page: input.query.page, pageSize: input.query.pageSize, total: filtered.length },
+    pagination: { page, pageSize: input.query.pageSize, total: filtered.length },
     summary: {
       trades: countBy('trade'),
       statuses: countBy('status'),
@@ -282,16 +297,19 @@ export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerList
   const allowedOrigins = input.query.includeDemo ? new Set(['real', 'demo']) : new Set(['real'])
   const search = input.query.search.toLocaleLowerCase('zh-CN')
   const canReadSensitive = input.capabilities.includes('worker:sensitive:read')
-  const filtered = input.workers.filter((worker) => {
+  const trades = enumSelection(input.query.trade) ?? []
+  const statuses = enumSelection(input.query.status) ?? []
+  const projectStatuses = enumSelection(input.query.projectStatus) ?? []
+  function matches(worker: WorkerSourceRow, except?: 'trade' | 'projectStatus') {
     if (!allowedOrigins.has(worker.dataOrigin))
       return false
-    if (input.query.trade && worker.trade !== input.query.trade)
+    if (except !== 'trade' && trades.length && !trades.includes(worker.trade))
       return false
     if (input.query.crewId && worker.crewId !== input.query.crewId)
       return false
-    if (input.query.projectStatus && worker.projectStatus !== input.query.projectStatus)
+    if (except !== 'projectStatus' && projectStatuses.length && !projectStatuses.includes(worker.projectStatus))
       return false
-    if (input.query.status && worker.status !== input.query.status)
+    if (statuses.length && !statuses.includes(worker.status))
       return false
     if (!search)
       return true
@@ -301,7 +319,8 @@ export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerList
     const searchableIdCard = canReadSensitive ? worker.idCard : maskIdentifier(worker.idCard)
     return [worker.name, worker.trade, searchablePhone, searchableIdCard, crew.state === 'resolved' ? crew.label : '', project.state === 'resolved' ? project.label : '']
       .some(value => value.toLocaleLowerCase('zh-CN').includes(search))
-  })
+  }
+  const filtered = input.workers.filter(worker => matches(worker))
   const sorted = [...filtered].sort((left, right) => {
     if (input.query.sort === 'name-asc')
       return left.name.localeCompare(right.name, 'zh-CN') || left.id.localeCompare(right.id)
@@ -309,7 +328,8 @@ export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerList
       return right.name.localeCompare(left.name, 'zh-CN') || left.id.localeCompare(right.id)
     return right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)
   })
-  const start = (input.query.page - 1) * input.query.pageSize
+  const page = Math.min(input.query.page, Math.max(1, Math.ceil(filtered.length / input.query.pageSize)))
+  const start = (page - 1) * input.query.pageSize
   const items = sorted.slice(start, start + input.query.pageSize).map((source) => {
     const worker = resolvedRef('worker', source.id, source.name)
     const crew = crewReference(source.crewId, input.crews, source.dataOrigin)
@@ -339,10 +359,10 @@ export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerList
       updatedAt: source.updatedAt,
     }
   })
-  const countBy = (field: 'trade' | 'projectStatus') => [...new Set(filtered.map(row => row[field]))]
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right, 'zh-CN'))
-    .map(value => ({ value, label: value, count: filtered.filter(row => row[field] === value).length }))
+  const countBy = (field: 'trade' | 'projectStatus') => {
+    const candidates = input.workers.filter(row => matches(row, field))
+    return [...new Set(candidates.map(row => row[field]))].filter(Boolean).sort((left, right) => left.localeCompare(right, 'zh-CN')).map(value => ({ value, label: value, count: candidates.filter(row => row[field] === value).length }))
+  }
   const origins = (['real', 'demo'] as const).reduce<WorkerListPageDTO['summary']['origins']>((result, origin) => {
     const rows = filtered.filter(row => row.dataOrigin === origin)
     result[origin] = {
@@ -353,7 +373,7 @@ export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerList
   }, { real: { workerCount: 0, activeWorkerCount: 0 }, demo: { workerCount: 0, activeWorkerCount: 0 } })
   return {
     items,
-    pagination: { page: input.query.page, pageSize: input.query.pageSize, total: filtered.length },
+    pagination: { page, pageSize: input.query.pageSize, total: filtered.length },
     summary: { trades: countBy('trade'), projectStatuses: countBy('projectStatus'), origins },
     empty: filtered.length === 0
       ? { reason: input.workers.some(row => allowedOrigins.has(row.dataOrigin)) ? 'no-filter-match' : 'no-records', missingRelations: [] }

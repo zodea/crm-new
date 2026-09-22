@@ -1,0 +1,185 @@
+{
+  "source": "Chromium 台账真实下载文件；全部业务行是隔离合成数据",
+  "file": "invoice-borders.xlsx",
+  "downloadFilename": "发票台账_2026-09-11.xlsx",
+  "browserLocalTime": "2026-09-11T00:30:00+08:00",
+  "sha256": "aee670419c81ee2ed4591ec4bc140394c7cfa16a6700ebefc1de79759529841f",
+  "cells": {
+    "A1": {
+      "cellStyleId": 3,
+      "borderId": 1,
+      "border": {
+        "top": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "bottom": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "left": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "right": {
+          "style": "thin",
+          "color": "FF112233"
+        }
+      }
+    },
+    "A2": {
+      "cellStyleId": 4,
+      "borderId": 2,
+      "border": {
+        "top": {
+          "style": "medium",
+          "color": "FF123456"
+        },
+        "bottom": {
+          "style": "dashed",
+          "color": "FF234567"
+        },
+        "left": {
+          "style": "dotted",
+          "color": "FF345678"
+        },
+        "right": {
+          "style": "thin",
+          "color": "FF456789"
+        }
+      }
+    },
+    "E2": {
+      "cellStyleId": 4,
+      "borderId": 2,
+      "border": {
+        "top": {
+          "style": "medium",
+          "color": "FF123456"
+        },
+        "bottom": {
+          "style": "dashed",
+          "color": "FF234567"
+        },
+        "left": {
+          "style": "dotted",
+          "color": "FF345678"
+        },
+        "right": {
+          "style": "thin",
+          "color": "FF456789"
+        }
+      }
+    },
+    "A3": {
+      "cellStyleId": 6,
+      "borderId": 3,
+      "border": {
+        "top": {
+          "style": "dotted",
+          "color": "FF56789A"
+        },
+        "bottom": {
+          "style": "thin",
+          "color": "FF6789AB"
+        },
+        "left": {
+          "style": "medium",
+          "color": "FF789ABC"
+        },
+        "right": {
+          "style": "none",
+          "color": "FF89ABCD"
+        }
+      }
+    },
+    "D3": {
+      "cellStyleId": 5,
+      "borderId": 3,
+      "border": {
+        "top": {
+          "style": "dotted",
+          "color": "FF56789A"
+        },
+        "bottom": {
+          "style": "thin",
+          "color": "FF6789AB"
+        },
+        "left": {
+          "style": "medium",
+          "color": "FF789ABC"
+        },
+        "right": {
+          "style": "none",
+          "color": "FF89ABCD"
+        }
+      }
+    },
+    "E3": {
+      "cellStyleId": 8,
+      "borderId": 3,
+      "border": {
+        "top": {
+          "style": "dotted",
+          "color": "FF56789A"
+        },
+        "bottom": {
+          "style": "thin",
+          "color": "FF6789AB"
+        },
+        "left": {
+          "style": "medium",
+          "color": "FF789ABC"
+        },
+        "right": {
+          "style": "none",
+          "color": "FF89ABCD"
+        }
+      }
+    },
+    "A4": {
+      "cellStyleId": 9,
+      "borderId": 4,
+      "border": {
+        "top": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "bottom": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "left": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "right": {
+          "style": "thin",
+          "color": "FF112233"
+        }
+      }
+    },
+    "E4": {
+      "cellStyleId": 10,
+      "borderId": 4,
+      "border": {
+        "top": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "bottom": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "left": {
+          "style": "thin",
+          "color": "FF112233"
+        },
+        "right": {
+          "style": "thin",
+          "color": "FF112233"
+        }
+      }
+    }
+  }
+}

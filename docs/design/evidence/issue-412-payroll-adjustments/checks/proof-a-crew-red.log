@@ -1,0 +1,33 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --config .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.vitest.config.ts -t A 原头班组
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.test.ts (4 tests | 1 failed | 3 skipped) 598ms
+   × A 原头班组与冻结主体不一致时不得把改后班组认作原工资事实 597ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.test.ts > A 原头班组与冻结主体不一致时不得把改后班组认作原工资事实
+AssertionError: expected 'complete' not to be 'complete' // Object.is equality
+ ❯ .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.test.ts:25:28
+     23|   let value
+     24|   try{value=await f.service.actualLedger({origin:'real'},{projectId:'p…
+     25|   expect(value.status).not.toBe('complete')
+       |                            ^
+     26|  } finally {await f.close()}
+     27| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  20:35:07
+   Duration  3.30s (transform 2.07s, setup 0ms, import 2.49s, tests 598ms, environment 0ms)
+

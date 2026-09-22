@@ -1,0 +1,51 @@
+{
+  "owner": "P3 A",
+  "state": "frozen",
+  "base": "4738be98730955cd63832c8df04fc6f1d855caff",
+  "files": [
+    "app/lib/payroll/central-daywork-contract.ts",
+    "app/lib/payroll/central-daywork-codec.ts",
+    "app/lib/payroll/central-c2-contract.ts",
+    "app/lib/payroll/central-c2-codec.ts",
+    "app/lib/payroll/central-c2-calculation.ts",
+    "app/lib/payroll/central-c2-command.ts",
+    "app/lib/payroll/central-c2-provenance.ts",
+    "server/utils/payroll-daywork-service.ts",
+    "server/utils/payroll-c2-service.ts",
+    "server/utils/payroll-participant-options.ts",
+    "app/stores/daywork-central.ts",
+    "app/stores/payroll-c2.ts",
+    "server/api/read/payroll/daywork.get.ts",
+    "server/api/read/payroll/daywork-form.post.ts",
+    "server/api/read/payroll/c2-form.post.ts",
+    "server/api/read/payroll/c2-config.get.ts",
+    "server/api/read/payroll/c2-output.get.ts",
+    "server/api/commands/payroll-daywork.post.ts",
+    "server/api/commands/payroll-c2.post.ts",
+    "app/lib/payroll/central-contract.ts",
+    "app/lib/payroll/central-attendance-contract.ts",
+    "app/lib/payroll/central-c1-contract.ts",
+    "server/utils/payroll-c1-options.ts",
+    "app/lib/payroll/central-repository.ts",
+    "app/lib/payroll/central-schema.ts",
+    "app/lib/payroll/central-payroll-wire.ts",
+    "server/utils/payroll-service.ts",
+    "server/utils/payroll-runtime.ts",
+    "tests/helpers/payroll-c2-service-fixture.ts",
+    "tests/payroll/central-daywork-service.test.ts",
+    "tests/payroll/central-c2-service.test.ts",
+    "tests/payroll/central-c2-commands.test.ts",
+    "tests/payroll/central-c2-codec.test.ts",
+    "tests/payroll/central-c2-http.test.ts",
+    "tests/stores/daywork-central.test.ts",
+    "tests/stores/payroll-c2-central.test.ts"
+  ],
+  "excludedRootTransfers": [
+    "app/lib/payroll/central-read.ts",
+    "app/lib/payroll/central-codec.ts"
+  ],
+  "unchangedShared": [
+    "app/lib/payroll/central-command-shared.ts",
+    "app/lib/payroll/central-pending.ts"
+  ]
+}

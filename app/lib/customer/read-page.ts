@@ -1,4 +1,4 @@
-import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ProblemDTO } from '../../types/read-model'
 import type {
   CustomerContractDTO,
   CustomerContractSourceRow,
@@ -17,6 +17,8 @@ import type {
   CustomerReceiptSourceRow,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { ownerFinalSettlementReceiptIsActive } from '../owner-document/central-repository'
+import { normalizeEnumSelection } from '../util/enum-selection'
 import { CUSTOMER_PAGE_SIZES, customerProblem, CustomerRepositoryProblem } from './read-contract'
 
 interface BuildCustomerListPageOptions {
@@ -28,6 +30,9 @@ interface BuildCustomerListPageOptions {
 }
 
 interface BuildCustomerDetailReadOptions {
+  receiptsProblem?: ProblemDTO
+  contractsProblem?: ProblemDTO
+  projectsProblem?: ProblemDTO
   customers: readonly CustomerListSourceRow[]
   projects: readonly CustomerProjectSourceRow[]
   contracts: readonly CustomerContractSourceRow[]
@@ -76,12 +81,24 @@ export function parseCustomerListQuery(
   return {
     includeDemo: includeDemo === 'true',
     search: one(input?.search)?.trim().slice(0, 120) ?? '',
-    status: one(input?.status)?.trim().slice(0, 48) || null,
+    status: customerStatuses(input?.status),
     sort: allowedSorts.has(sort as CustomerListSort)
       ? sort as CustomerListSort
       : 'updated-desc',
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as CustomerPageSize,
+  }
+}
+
+function customerStatuses(value: unknown): string[] | null {
+  try {
+    const values = normalizeEnumSelection(value)
+    if (values.some(item => item.length > 48))
+      throw new Error('status is too long')
+    return values.length ? values : null
+  }
+  catch {
+    throw new CustomerRepositoryProblem(customerProblem('invalid-query', '客户列表状态筛选无效'))
   }
 }
 
@@ -154,15 +171,17 @@ export function buildCustomerListPage(
     row.dataOrigin === 'real' || options.query.includeDemo,
   )
   const needle = options.query.search.toLocaleLowerCase('zh-CN')
-  const filtered = visibleByOrigin.filter((row) => {
+  const statuses = customerStatuses(options.query.status) ?? []
+  const candidates = visibleByOrigin.filter((row) => {
     const matchesSearch = !needle || [
       row.name,
       ...row.aliases,
       row.taxNo,
       row.contact,
     ].some(value => value.toLocaleLowerCase('zh-CN').includes(needle))
-    return matchesSearch && (!options.query.status || row.status === options.query.status)
+    return matchesSearch
   })
+  const filtered = candidates.filter(row => !statuses.length || statuses.includes(row.status))
   const sorted = [...filtered].sort((left, right) => {
     if (options.query.sort === 'name-asc')
       return left.name.localeCompare(right.name, 'zh-CN') || left.id.localeCompare(right.id)
@@ -170,9 +189,10 @@ export function buildCustomerListPage(
       return right.name.localeCompare(left.name, 'zh-CN') || left.id.localeCompare(right.id)
     return right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)
   })
-  const start = (options.query.page - 1) * options.query.pageSize
+  const page = Math.min(options.query.page, Math.max(1, Math.ceil(filtered.length / options.query.pageSize)))
+  const start = (page - 1) * options.query.pageSize
   const statusCounts = new Map<string, number>()
-  for (const row of filtered)
+  for (const row of candidates)
     statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1)
   const countOrigin = (origin: CustomerListSourceRow['dataOrigin']) =>
     filtered.filter(row => row.dataOrigin === origin).length
@@ -180,7 +200,7 @@ export function buildCustomerListPage(
   return {
     items: sorted.slice(start, start + options.query.pageSize).map(toListItem),
     pagination: {
-      page: options.query.page,
+      page,
       pageSize: options.query.pageSize,
       total: sorted.length,
     },
@@ -228,9 +248,8 @@ function missingRef(entity: EntityKindDTO): Extract<EntityRefDTO, { state: 'miss
 
 function forbiddenRef(
   entity: EntityKindDTO,
-  id: string,
 ): Extract<EntityRefDTO, { state: 'forbidden' }> {
-  return { state: 'forbidden', entity, id, label: null, reason: 'permission-denied' }
+  return { state: 'forbidden', entity, id: null, label: null, reason: 'permission-denied' }
 }
 
 function unavailable(reason: 'missing-id' | 'forbidden'): NavigationIntentDTO {
@@ -262,7 +281,7 @@ function refAndNavigation(
   if (!id)
     return { ref: missingRef(entity), navigation: unavailable('missing-id') }
   if (forbiddenIds.has(id))
-    return { ref: forbiddenRef(entity, id), navigation: unavailable('forbidden') }
+    return { ref: forbiddenRef(entity), navigation: unavailable('forbidden') }
   const label = labels.get(id)
   if (!label)
     return { ref: missingRef(entity), navigation: unavailable('missing-id') }
@@ -293,24 +312,29 @@ export function buildCustomerDetailRead(
     ))
   }
 
-  const originProjects = options.projects.filter(row => row.dataOrigin === customer.dataOrigin)
+  const originProjects = options.projectsProblem ? [] : options.projects.filter(row => row.dataOrigin === customer.dataOrigin)
   const projectRows = originProjects.filter(row =>
-    row.customerId === customer.id || row.secondaryCustomerId === customer.id,
+    row.permission !== 'forbidden'
+    && (row.customerId === customer.id || row.secondaryCustomerId === customer.id),
   )
-  const contractRows = options.contracts.filter(row =>
-    row.dataOrigin === customer.dataOrigin
-    && row.customerId === customer.id,
-  )
-  const receiptRows = options.receipts.filter(row =>
-    row.dataOrigin === customer.dataOrigin
-    && row.customerId === customer.id,
-  )
+  const contractRows = options.contractsProblem
+    ? []
+    : options.contracts.filter(row =>
+        row.dataOrigin === customer.dataOrigin
+        && row.customerId === customer.id,
+      )
+  const receiptRows = options.receiptsProblem
+    ? []
+    : options.receipts.filter(row =>
+        row.dataOrigin === customer.dataOrigin
+        && row.customerId === customer.id,
+      )
   const projectLabels = new Map(originProjects.map(row => [row.id, row.name]))
   const forbiddenProjects = new Set(
     originProjects.filter(row => row.permission === 'forbidden').map(row => row.id),
   )
   const contractLabels = new Map(
-    options.contracts
+    (options.contractsProblem ? [] : options.contracts)
       .filter(row => row.dataOrigin === customer.dataOrigin)
       .map(row => [row.id, row.name]),
   )
@@ -324,61 +348,58 @@ export function buildCustomerDetailRead(
       fact.amount += row.amount + row.supplementAmount
     contractsByProject.set(row.projectId, fact)
   }
-  const receiptsByProject = new Map<string, { count: number, amount: number }>()
+  const receiptsByProject = new Map<string, { count: number, amount: number | null }>()
   for (const row of receiptRows) {
     if (!row.projectId)
       continue
     const fact = receiptsByProject.get(row.projectId) ?? { count: 0, amount: 0 }
     fact.count += 1
-    if (!isDraft(row.status))
-      fact.amount += row.amount
+    if (ownerFinalSettlementReceiptIsActive(row.status))
+      fact.amount = fact.amount === null || row.amount === null ? null : fact.amount + row.amount
     receiptsByProject.set(row.projectId, fact)
   }
 
   const projects: CustomerProjectDTO[] = projectRows.map((row) => {
     const contractFact = contractsByProject.get(row.id) ?? { count: 0, amount: 0 }
     const receiptFact = receiptsByProject.get(row.id) ?? { count: 0, amount: 0 }
-    const target = row.permission === 'forbidden'
-      ? { ref: forbiddenRef('project', row.id), navigation: unavailable('forbidden') }
-      : (() => {
-          const ref = resolvedRef('project', row.id, row.name, row.code || null)
-          return { ref, navigation: detailIntent(ref, row.dataOrigin, { customerId: customer.id }) }
-        })()
+    const ref = resolvedRef('project', row.id, row.name, row.code || null)
     return {
-      project: target.ref as CustomerProjectDTO['project'],
-      navigation: target.navigation,
-      code: row.permission === 'forbidden' ? '' : row.code,
+      project: ref as CustomerProjectDTO['project'],
+      navigation: detailIntent(ref, row.dataOrigin, { customerId: customer.id }),
+      code: row.code,
       relationRole: row.customerId === customer.id ? '主客户' : '次客户',
-      status: row.permission === 'forbidden' ? '' : row.status,
-      startDate: row.permission === 'forbidden' ? null : row.startDate,
-      plannedEnd: row.permission === 'forbidden' ? null : row.plannedEnd,
-      manager: row.permission === 'forbidden' ? '' : row.manager,
-      contractCount: row.permission === 'forbidden' ? 0 : contractFact.count,
-      effectiveContractAmount: money(row.permission === 'forbidden' ? 0 : contractFact.amount),
-      receiptCount: row.permission === 'forbidden' ? 0 : receiptFact.count,
-      effectiveReceiptAmount: money(row.permission === 'forbidden' ? 0 : receiptFact.amount),
+      status: row.status,
+      startDate: row.startDate,
+      plannedEnd: row.plannedEnd,
+      manager: row.manager,
+      contractCount: options.contractsProblem ? null : contractFact.count,
+      effectiveContractAmount: options.contractsProblem ? null : money(contractFact.amount),
+      receiptCount: options.receiptsProblem ? null : receiptFact.count,
+      effectiveReceiptAmount: options.receiptsProblem || receiptFact.amount === null ? null : money(receiptFact.amount),
     }
   })
 
   const contracts: CustomerContractDTO[] = contractRows.map((row) => {
-    const project = refAndNavigation(
-      'project',
-      row.projectId,
-      projectLabels,
-      forbiddenProjects,
-      row.dataOrigin,
-      { customerId: customer.id },
-    )
+    const project = row.projectPermission === 'forbidden'
+      ? { ref: forbiddenRef('project'), navigation: unavailable('forbidden') }
+      : refAndNavigation(
+          'project',
+          row.projectId,
+          projectLabels,
+          forbiddenProjects,
+          row.dataOrigin,
+          { customerId: customer.id },
+        )
     const contractRef = resolvedRef('contract', row.id, row.name, row.no || null)
     const effectiveAmount = isDraft(row.status) ? 0 : row.amount + row.supplementAmount
     return {
       contract: contractRef as CustomerContractDTO['contract'],
-      navigation: detailIntent(contractRef),
+      navigation: detailIntent(contractRef, row.dataOrigin, { contractKind: '施工', customerId: customer.id }),
       project: project.ref as CustomerContractDTO['project'],
       projectNavigation: project.navigation,
       effectiveAmount: money(effectiveAmount),
-      receiptAmount: money(row.receiptAmount),
-      outstandingAmount: money(effectiveAmount - row.receiptAmount),
+      receiptAmount: options.receiptsProblem || row.receiptAmount === null ? null : money(row.receiptAmount),
+      outstandingAmount: options.receiptsProblem || row.receiptAmount === null ? null : money(effectiveAmount - row.receiptAmount),
       signDate: row.signDate,
       status: row.status,
       isDraft: isDraft(row.status),
@@ -386,21 +407,25 @@ export function buildCustomerDetailRead(
   })
 
   const receipts: CustomerReceiptDTO[] = receiptRows.map((row) => {
-    const project = refAndNavigation(
-      'project',
-      row.projectId,
-      projectLabels,
-      forbiddenProjects,
-      row.dataOrigin,
-      { customerId: customer.id },
-    )
-    const contract = refAndNavigation(
-      'contract',
-      row.contractId,
-      contractLabels,
-      new Set(),
-      row.dataOrigin,
-    )
+    const project = row.projectPermission === 'forbidden'
+      ? { ref: forbiddenRef('project'), navigation: unavailable('forbidden') }
+      : refAndNavigation(
+          'project',
+          row.projectId,
+          projectLabels,
+          forbiddenProjects,
+          row.dataOrigin,
+          { customerId: customer.id },
+        )
+    const contract = row.contractPermission === 'forbidden'
+      ? { ref: forbiddenRef('contract'), navigation: unavailable('forbidden') }
+      : refAndNavigation(
+          'contract',
+          row.contractId,
+          contractLabels,
+          new Set(),
+          row.dataOrigin,
+        )
     const receiptRef = resolvedRef('receipt', row.id, row.no || row.id, row.no || null)
     return {
       receipt: receiptRef as CustomerReceiptDTO['receipt'],
@@ -414,8 +439,8 @@ export function buildCustomerDetailRead(
       contractNavigation: contract.navigation,
       receiptDate: row.receiptDate,
       payerAccount: row.payerAccount,
-      amount: money(row.amount),
-      effectiveAmount: money(isDraft(row.status) ? 0 : row.amount),
+      amount: row.amount === null ? null : money(row.amount),
+      effectiveAmount: !ownerFinalSettlementReceiptIsActive(row.status) ? '0.00' : row.amount === null ? null : money(row.amount),
       paymentMethod: row.paymentMethod,
       status: row.status,
       isDraft: isDraft(row.status),
@@ -425,24 +450,29 @@ export function buildCustomerDetailRead(
     (sum, row) => sum + Number(row.effectiveAmount),
     0,
   )
-  const effectiveReceiptAmount = receipts.reduce(
-    (sum, row) => sum + Number(row.effectiveAmount),
-    0,
-  )
+  const effectiveReceiptAmount = receipts.some(row => row.effectiveAmount === null)
+    ? null
+    : receipts.reduce(
+        (sum, row) => sum + Number(row.effectiveAmount),
+        0,
+      )
   return {
     dataOrigin: customer.dataOrigin,
     customer: { ...customer, aliases: [...customer.aliases] },
+    ...(options.projectsProblem ? { projectsProblem: options.projectsProblem } : {}),
+    ...(options.contractsProblem ? { contractsProblem: options.contractsProblem } : {}),
+    ...(options.receiptsProblem ? { receiptsProblem: options.receiptsProblem } : {}),
     projects,
     contracts,
     receipts,
     summary: {
-      projectCount: projects.length,
-      contractCount: contracts.length,
-      effectiveContractAmount: money(effectiveContractAmount),
-      receiptCount: receipts.length,
-      effectiveReceiptAmount: money(effectiveReceiptAmount),
-      outstandingAmount: money(effectiveContractAmount - effectiveReceiptAmount),
-      draftReceiptCount: receipts.filter(row => row.isDraft).length,
+      projectCount: options.projectsProblem ? null : projects.length,
+      contractCount: options.contractsProblem ? null : contracts.length,
+      effectiveContractAmount: options.contractsProblem ? null : money(effectiveContractAmount),
+      receiptCount: options.receiptsProblem ? null : receipts.length,
+      effectiveReceiptAmount: options.receiptsProblem || effectiveReceiptAmount === null ? null : money(effectiveReceiptAmount),
+      outstandingAmount: options.contractsProblem || options.receiptsProblem || effectiveReceiptAmount === null ? null : money(effectiveContractAmount - effectiveReceiptAmount),
+      draftReceiptCount: options.receiptsProblem ? null : receipts.filter(row => row.isDraft).length,
     },
     asOf: options.asOf,
     sourceVersion: options.sourceVersion,

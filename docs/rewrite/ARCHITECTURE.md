@@ -2,6 +2,8 @@
 
 本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，浏览器中央权威与演示隔离决策看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)，中央写入语义看 [`COMMANDS.md`](./COMMANDS.md)，跨域入口与返回语义看 [`NAVIGATION.md`](./NAVIGATION.md)。
 
+当前工作按[全模块复核路线](https://github.com/zodea/crm-new/issues/402)与[模块复核规程](../agents/module-review.md)逐模块推进，前台界面、交互和数据处理优先；可靠持久化、备份恢复与部署由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。顺序调整不撤销 ADR 0020，不开放本地正式写入旁路，也不把完整账号/RBAC、审批引擎或 Tauri 正式交付加入当前范围。
+
 ## 1. 运行形态
 
 ```text
@@ -20,7 +22,7 @@ Nuxt 4 SPA
 
 - `nuxt.config.ts` 设置 `ssr: false`；当前生产目标、中央权威与桌面范围由 ADR 0020 裁定。
 - OCR 凭证只存在 Nitro runtime config，不进入 public config 或前端持久化。桌面静态构建不能假定 Nitro 永远可用，最终本地自托管/云端边界遵守 ADR 0006。
-- 项目列表与来源感知基础详情的 Nitro 实例已经实现默认 workspace/actor 会话、正式空来源、独立演示来源与 capability 校验；#294 的核心身份迁移会让已确认导入的项目进入正式项目读链。当前中央端仍是可重置测试实例，完整登录/RBAC 与生产持久化业务库尚未接入。
+- 项目列表与来源感知基础详情的 Nitro 实例已经实现默认 workspace/actor 会话、正式空来源、独立演示来源与 capability 校验；#294 的核心身份迁移会让已确认导入的项目进入正式项目读链。当前中央端仍是可重置测试实例，领域命令与迁移批次使用服务进程内的 Map 保存；完整登录/RBAC 与生产持久化业务库尚未接入。`dataOrigin='real'` 表示正式来源身份，不表示已经具备服务重启后的持久性；浏览器刷新读回只能证明当前服务实例内的命令与查询链。
 - 平台差异经 `app/lib/platform/`、`app/lib/io/` 和数据库连接层收口，页面不直接散写 Tauri/浏览器判断。
 
 ## 2. 技术栈
@@ -30,7 +32,8 @@ Nuxt 4 SPA
 | 框架 | Nuxt 4、Vue 3.5、TypeScript、Vue Router |
 | 桌面 | Tauri 2 |
 | 状态 | Pinia |
-| 持久化 | SQLite：tauri-plugin-sql；开发 fallback：sql.js |
+| 本地存储 | Tauri 使用 SQLite/tauri-plugin-sql；浏览器未迁移领域、迁移来源和演示快照使用 sql.js/IndexedDB，受 ADR 0020 约束 |
+| 中央服务 | 已接入领域经 HTTP/Repository/command；当前使用可重置内存实例，生产持久化后置验收 |
 | 样式 | UnoCSS，运行时令牌在 `app/assets/css/tokens.css` |
 | 交互 | reka-ui / shadcn-vue 结构、vue-sonner、VueUse |
 | 数据网格 | vxe-table，经项目组件封装 |
@@ -62,7 +65,7 @@ app/
 ├─ types/           # 跨模块共享类型
 └─ workers/         # 重计算或文件处理 worker
 
-server/             # 仅服务端可见的 OCR 代理、业务读 API、会话与 capability 边界
+server/             # OCR 代理、业务读写/迁移 API、会话与 capability 边界
 src-tauri/          # Tauri 壳、权限与打包
 tests/              # Vitest 单元/组件测试
 e2e/                # Playwright 用户旅程
@@ -109,11 +112,12 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
 
 - 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
 - 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
-- 项目列表、来源感知详情与正式项目表单已接中央 HTTP。新增/编辑由 `project:write`、`commandId` 和 `baseVersion` 保护；项目导入与删除仍禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
+- 项目列表、来源感知详情与正式项目表单已接中央 HTTP。新增/编辑由 `project:write`、`commandId` 和 `baseVersion` 保护；#423 项目 Excel 导入复用中央项目命令与同源回读，独立于编辑草稿会话，入口和来源防重边界见 [COMMANDS](./COMMANDS.md#项目-excel-导入423)；删除仍禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
 - Issue #318、#320 与 #321 的材料采购、施工、分包合同浏览器链只经各自领域 Repository/Store 与中央 HTTP：列表和七分区详情按 `(dataOrigin,id,kind)` 校验，演示来源还要同时通过用户可见性开关与服务端 `demo:read`。正式表单以各自 write capability、`commandId`、`baseVersion` 和服务端关系校验保护，成功后回到同一中央详情重读；#294 受控迁移携带 canonical 施工/分包合同并在确认后进入同一中央命令源。没有稳定外键的事实保持空集合，实际竣工、分包结算与清账未知时保持 `null`。
 - Issue #294 的核心身份迁移是另一条显式中央命令链：`preflight → immutable backup → dry-run → import → post-write reconciliation → confirm → rollback`。#320 与 #321 将 canonical 施工/分包合同纳入同一受控拓扑，导入顺序固定为客户、分供方、班组、项目、施工合同、分包合同、工人、项目分供方；只接受稳定旧 ID 映射，不按名称、编号或金额猜关系。本地迁移适配器从快照字节重算摘要、来源哈希和版本并在恢复前再次核对；服务端重算 canonical 来源哈希、验证证明结构并将首份证明不可替换地绑定批次，但不上传或读取浏览器整库备份。服务端在实际写入后重新核对计数、金额、数量、关系、软删除与孤儿，客户端按钮状态不能替代后台门禁。确认后浏览器保存持久迁移标记并禁止六类身份与施工/分包合同走旧 production 的普通读写，重载时必须校验标记和中央活动批次。迁移适配器可以读取不可变备份用于恢复，不能以此重新开放普通旧库查询。
 - Issue #322 在施工合同、分包合同之后把 canonical 补充协议加入同一受控拓扑；父合同旧 ID 必须唯一映射到其中一类主合同。确认后两类合同详情从同一中央命令事实源消费补充协议，并按 `(dataOrigin, contractId, kind, focusId)` 校验存在性与父子归属；不存在和关系错配使用不同问题语义。
 - Issue #323 将甲方变洽签与月度报量接入同一中央 owner-document Repository/HTTP/command 边界；Issue #324—#326 依次增加验收—保修、最终结算和甲方罚扣。Issue #327 在同一基础设施上以独立 `sub_change` kind 和 `subcontract-document` capability 接入分包变洽签；项目、分供方、分包合同、三档金额与签证单附件只从 canonical `subcontract_change_orders` 投影，并回流分包合同的变洽签事实区。共享基础设施不合并甲方与分包领域权限、状态或金额语义；受控迁移不信任客户端状态或关系元组。
+- Issue #328 继续以 `sub_settlement` kind 接入分包结算列表、只读详情、显式编辑/确认、结算单附件与受控迁移；复用 `expenditure_settlements`，累计已确认结算从同一事实源派生。付款与抵扣来源尚未接入的部分保持明确缺口，不因详情已闭合而声称全生命周期完成。
 - 当前项目与施工/分包合同正式读链会消费已确认迁移的对应实体。客户、分供方、班组、工人和项目分供方的普通页面 Repository/中央接线已由 #281 完成，迁移页不复制这些页面功能。项目详情直接消费中央 ProjectSupplier 反向关系；文件导入的本地 adapter 只负责选择、分类与读取文件，最终确认经 `ProjectSupplierCommandStore → CommandRepository → /api/commands/project-suppliers/import` 原子写入中央分供方、合作关系和文件事实，不在浏览器 SQLite 建立平行正式身份。
 - `/api/testing/projects/reset` 仅在非生产环境接受带测试标头的确定性场景切换，用来证明 ready、empty、forbidden、demo-forbidden、unavailable 与 retry，不是业务 API。
 - `server/utils/business-session.ts` 是单公司、单操作人首版的服务端身份注入边界；客户端查询不能覆盖 `workspaceId` 或 `actorId`。正式登录接入时替换该边界，不改变领域 DTO。

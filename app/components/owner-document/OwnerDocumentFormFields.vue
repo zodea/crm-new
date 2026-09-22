@@ -3,6 +3,7 @@ import type { LookupOption } from '~/lib/kit/lookup'
 import type { OwnerDocumentDraft, OwnerDocumentKind } from '~/lib/owner-document/forms'
 import { computed } from 'vue'
 import { OWNER_DOCUMENT_META } from '~/lib/owner-document/page'
+import { QUANTITY_BASIS_OPTIONS } from '~/lib/quantity/basis'
 
 type FieldType = 'text' | 'date' | 'month' | 'number' | 'lookup' | 'select' | 'readonly' | 'textarea'
 type LookupKey = 'projectId' | 'supplierId' | 'contractId' | 'crewId'
@@ -24,6 +25,7 @@ const props = defineProps<{
   fieldErrors: Record<string, string>
   eligibleContractCount?: number | null
   readonly?: boolean
+  quantityBasisEditable?: boolean
   fetchProjects: (keyword: string) => Promise<LookupOption[]>
   fetchSuppliers: (keyword: string) => Promise<LookupOption[]>
   fetchContracts: (keyword: string) => Promise<LookupOption[]>
@@ -78,6 +80,7 @@ const FIELDS: Record<OwnerDocumentKind, FieldDef[]> = {
     { key: 'projectId', label: '项目', type: 'lookup', required: true },
     { key: 'contractId', label: '施工合同', type: 'lookup', required: true },
     { key: 'periodNo', label: '报量期次', type: 'month', required: true },
+    { key: 'quantityBasis', label: '取数基准', type: 'select', options: QUANTITY_BASIS_OPTIONS.map(option => ({ key: option.value, label: option.label })), hint: '按所选三量取数；提交后保存当时的量和基准' },
     { key: 'applicationDate', label: '申报日期', type: 'date', required: true },
     { key: 'operatorName', label: '报量经办人', placeholder: '用于申报快照审计' },
     { key: 'reportedAmount', label: '申报金额', type: 'readonly' },
@@ -196,7 +199,7 @@ const FIELDS: Record<OwnerDocumentKind, FieldDef[]> = {
   ],
 }
 
-const fields = computed(() => FIELDS[props.kind])
+const fields = computed(() => FIELDS[props.kind].filter(field => field.key !== 'quantityBasis' || props.quantityBasisEditable))
 const meta = computed(() => OWNER_DOCUMENT_META[props.kind])
 const basicSectionLabel = computed(() =>
   meta.value.sections.find(section => section.key === 'basic')?.label ?? '基本信息',

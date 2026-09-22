@@ -1,5 +1,5 @@
 // shadcn-vue Sidebar（ADR 0008）—— 移植自官方 registry new-york/ui/sidebar/utils.ts。
-// 差异：宽度常量接项目布局令牌（--sidebar-w 248px / --sidebar-w-collapsed 68px），其余照抄。
+// 差异：宽度常量接项目布局令牌（--sidebar-w / --sidebar-w-collapsed），其余照抄。
 import type { ComputedRef, Ref } from 'vue'
 import { createContext } from 'reka-ui'
 

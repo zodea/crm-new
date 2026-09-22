@@ -3,6 +3,7 @@ import type {
   PaymentApplicationDetail,
 } from '~/lib/finance/payment-detail'
 import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
+import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { loadPaymentApplicationDetail } from '~/lib/finance/payment-detail'
 import { financeStatusLabel } from '~/lib/finance/status'
 import { toErrorMessage } from '~/lib/util/error'
@@ -13,6 +14,7 @@ const detail = shallowRef<PaymentApplicationDetail | null>(null)
 const errorMessage = shallowRef('')
 const settledId = shallowRef('')
 let requestVersion = 0
+let active = true
 
 const applicationId = computed(() => String(route.params.id ?? ''))
 const projectSupplierReturn = useProjectSupplierReturnContext(
@@ -53,6 +55,7 @@ async function load() {
   if (!id)
     return
   const currentRequest = ++requestVersion
+  detail.value = null
   errorMessage.value = ''
   settledId.value = ''
   try {
@@ -82,7 +85,7 @@ function createPayment() {
     return
   const query: Record<string, string> = {
     paymentApplicationId: current.id,
-    amount: String(current.unpaidAmount),
+    amount: String(current.registrationAmount),
   }
   if (current.projectId)
     query.projectId = current.projectId
@@ -91,7 +94,20 @@ function createPayment() {
   void navigateTo({ path: '/finance/records/new', query })
 }
 
-watch(applicationId, () => void load(), { immediate: true })
+watch(applicationId, () => {
+  if (active)
+    void load()
+}, { immediate: true })
+onDeactivated(() => {
+  active = false
+  requestVersion += 1
+})
+onActivated(() => {
+  if (!active) {
+    active = true
+    void load()
+  }
+})
 </script>
 
 <template>
@@ -127,7 +143,7 @@ watch(applicationId, () => void load(), { immediate: true })
       <KitButton v-if="detail?.projectId" variant="secondary" @click="navigateTo(`/project/${detail.projectId}`)">
         <span class="i-lucide-building-2 mr-1" aria-hidden="true" />查看项目
       </KitButton>
-      <KitButton v-if="detail && detail.unpaidAmount > 0" variant="secondary" data-testid="payment-application-create-payment" @click="createPayment">
+      <KitButton v-if="detail && detail.registrationAmount > 0" variant="secondary" data-testid="payment-application-create-payment" @click="createPayment">
         <span class="i-lucide-banknote-arrow-up mr-1" aria-hidden="true" />登记支付
       </KitButton>
       <KitButton variant="primary" data-testid="payment-application-edit" @click="openEdit">
@@ -138,9 +154,9 @@ watch(applicationId, () => void load(), { immediate: true })
     <template #summary>
       <MetricGrid v-if="detail" :cols="6">
         <Metric label="申请金额" :value="detail.applyAmount" :money="true" />
-        <Metric label="本期批复金额" :value="detail.approvedAmount || detail.applyAmount" :money="true" />
+        <Metric label="本期批复金额" :value="detail.approvedAmount ?? '—'" :money="true" :status="approvalAmountLabel(detail.approvedAmountState)" />
         <Metric label="已确认支付" :value="detail.paidAmount" :money="true" tone="ok" />
-        <Metric label="待支付" :value="detail.unpaidAmount" :money="true" :tone="detail.unpaidAmount ? 'danger' : 'ok'" />
+        <Metric label="待支付" :value="detail.unpaidAmount ?? '—'" :money="true" :status="detail.unpaidAmount === null ? '历史批复待核验' : ''" :tone="detail.unpaidAmount === null ? undefined : detail.unpaidAmount ? 'danger' : 'ok'" />
         <Metric label="已关联发票" :value="detail.invoiceAllocated" :money="true" />
         <Metric label="待回票" :value="detail.pendingInvoiceAmount" :money="true" :tone="detail.pendingInvoiceAmount ? 'danger' : 'ok'" />
       </MetricGrid>

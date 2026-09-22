@@ -80,8 +80,8 @@ describe('project list toolbar', () => {
     expect(view.emitted().exportByCategory).toHaveLength(1)
   })
 
-  it('新增接入中央命令后保持可用，未迁移的导入仍明确禁用', () => {
-    const reason = '项目导入尚未接入中央后台'
+  it('导入权限不足时展示具体禁用原因，不改变独立的新增权限', () => {
+    const reason = '无项目导入权限'
     render(ProjectListToolbar, {
       props: { ...props, importDisabledReason: reason },
       global,

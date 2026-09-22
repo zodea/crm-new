@@ -10,13 +10,13 @@ import type {
   SubcontractContractFactSources,
 } from '../../app/lib/subcontract-contract/repository'
 import type { BusinessSession } from './business-session'
-import projectsSeed from '../../app/lib/db/seed/projects.json'
-import suppliersSeed from '../../app/lib/db/seed/suppliers.json'
 import { SUBCONTRACT_CONTRACT_WRITE_CAPABILITY } from '../../app/lib/subcontract-contract/command-contract'
 import {
   subcontractContractProblem,
   SubcontractContractRepositoryProblem,
 } from '../../app/lib/subcontract-contract/repository'
+import { projectCommandTestInstance } from './project-command-test-instance'
+import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
 interface Option { id: string, name: string }
 
@@ -37,6 +37,8 @@ interface Options {
   now?: () => string
   projects?: readonly Option[]
   suppliers?: readonly Option[]
+  resolveProjects?: (sessionId?: string | null) => readonly Option[]
+  resolveSuppliers?: (sessionId?: string | null) => readonly Option[]
 }
 
 function failure(code: 'forbidden' | 'validation-failed' | 'not-found' | 'conflict', message: string, fieldErrors: Record<string, string[]> = {}) {
@@ -55,8 +57,10 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
   const createId = options.createId ?? (() => crypto.randomUUID())
   const createAttachmentId = options.createAttachmentId ?? (() => crypto.randomUUID())
   const now = options.now ?? (() => new Date().toISOString())
-  const projects = new Map((options.projects ?? []).map(row => [row.id, row]))
-  const suppliers = new Map((options.suppliers ?? []).map(row => [row.id, row]))
+  const references = (sessionId?: string | null) => ({
+    projects: new Map([...(options.resolveProjects?.(sessionId) ?? options.projects ?? [])].map(row => [row.id, row])),
+    suppliers: new Map([...(options.resolveSuppliers?.(sessionId) ?? options.suppliers ?? [])].map(row => [row.id, row])),
+  })
   let contracts = new Map<string, StoredContract>()
   const replay = new Map<string, SubcontractContractCommandResultDTO>()
   let migratedProjects = new Map<string, Option>()
@@ -69,7 +73,8 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       throw failure('forbidden', '无分包合同写入权限')
   }
 
-  function validate(draft: ProjectContractFormDraft, action: SubcontractContractCommandRequestDTO['action']) {
+  function validate(draft: ProjectContractFormDraft, action: SubcontractContractCommandRequestDTO['action'], sessionId?: string | null) {
+    const { projects, suppliers } = references(sessionId)
     if (draft.lineItems?.length)
       throw failure('validation-failed', '分包合同不接受采购明细')
     if (draft.customerId)
@@ -116,7 +121,8 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
     }
   }
 
-  function toRow(stored: StoredContract): SubcontractContractDetailSource {
+  function toRow(stored: StoredContract, refs = references()): SubcontractContractDetailSource {
+    const { projects, suppliers } = refs
     const draft = stored.draft
     return {
       dataOrigin: 'real',
@@ -202,18 +208,30 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       migratedSupplements = []
       sourceVersion += 1
     },
-    context(session: BusinessSession) {
+    context(session: BusinessSession, sessionId?: string | null) {
       authorize(session)
+      const { projects, suppliers } = references(sessionId)
       return {
         workspaceId: session.workspaceId,
         actorId: session.actorId,
         capabilities: [...session.capabilities],
-        projects: [...new Map([...projects, ...migratedProjects]).values()].map(row => ({ id: row.id, label: row.name })),
-        suppliers: [...new Map([...suppliers, ...migratedSuppliers]).values()].map(row => ({ id: row.id, label: row.name })),
+        projects: [...new Map([...migratedProjects, ...projects]).values()].map(row => ({ id: row.id, label: row.name })),
+        suppliers: [...new Map([...migratedSuppliers, ...suppliers]).values()].map(row => ({ id: row.id, label: row.name })),
       }
     },
-    rows() {
-      return [...contracts.values()].map(toRow)
+    rows(sessionId?: string | null) {
+      const refs = references(sessionId)
+      return [...contracts.values()].map(record => toRow(record, refs))
+    },
+    /** 预算对比保留原金额与真实关联资格，调用方须先取得分包读取授权。 */
+    budgetRows(sessionId?: string | null) {
+      const refs = references(sessionId)
+      return [...contracts.values()].map(record => ({
+        ...toRow(record, refs),
+        amount: record.draft.amount ?? null,
+        projectResolved: Boolean(record.draft.projectId && (refs.projects.has(record.draft.projectId) || migratedProjects.has(record.draft.projectId))),
+        supplierResolved: Boolean(record.draft.supplierId && (refs.suppliers.has(record.draft.supplierId) || migratedSuppliers.has(record.draft.supplierId))),
+      }))
     },
     facts(): SubcontractContractFactSources {
       return {
@@ -329,7 +347,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
         updatedAt: stored.updatedAt,
       }
     },
-    async execute(request: SubcontractContractCommandRequestDTO, session: BusinessSession): Promise<SubcontractContractCommandResultDTO> {
+    async execute(request: SubcontractContractCommandRequestDTO, session: BusinessSession, sessionId?: string | null): Promise<SubcontractContractCommandResultDTO> {
       authorize(session)
       if (request.workspaceId !== session.workspaceId || request.actorId !== session.actorId
         || request.requiredCapability !== SUBCONTRACT_CONTRACT_WRITE_CAPABILITY) {
@@ -345,7 +363,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
         throw failure('conflict', '分包合同已有更新版本')
       if (!existing && request.baseVersion !== null)
         throw failure('conflict', '新建分包合同不能携带旧版本')
-      validate(request.draft, request.action)
+      validate(request.draft, request.action, sessionId)
       const id = existing?.draft.id ?? createId()
       const timestamp = now()
       const version = (existing?.version ?? 0) + 1
@@ -390,16 +408,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
   return instance
 }
 
-export const SUBCONTRACT_CONTRACT_FORM_PROJECTS = [
-  { id: 'project-real-320', name: '中央正式施工项目' },
-  ...projectsSeed.map(row => ({ id: row.id, name: row.name })),
-]
-export const SUBCONTRACT_CONTRACT_FORM_SUPPLIERS = [
-  { id: 'supplier-real-327', name: '中央正式劳务分供方' },
-  ...suppliersSeed.map(row => ({ id: row.id, name: row.name })),
-]
-
 export const subcontractContractCommandTestInstance = createSubcontractContractCommandTestInstance({
-  projects: SUBCONTRACT_CONTRACT_FORM_PROJECTS,
-  suppliers: SUBCONTRACT_CONTRACT_FORM_SUPPLIERS,
+  resolveProjects: sessionId => projectCommandTestInstance.rows(sessionId),
+  resolveSuppliers: sessionId => supplierCommandTestInstance.rows(sessionId),
 })

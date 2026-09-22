@@ -11,6 +11,8 @@ import type {
   WorkerListQueryDTO,
 } from './read-contract'
 import { isDataOriginDTO, isISODateTimeDTO } from '../../types/read-model'
+import { serializeEnumSelection } from '../util/enum-selection'
+import { decodePayrollHostSection } from './payroll-read'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from './read-contract'
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -145,7 +147,10 @@ function detailEnvelope(value: unknown, entity: 'crew' | 'worker'): boolean {
 export function decodeCrewDetailRead(value: unknown): CrewDetailReadDTO {
   if (!detailEnvelope(value, 'crew') || !Array.isArray((value as Record<string, unknown>).members))
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '中央后台返回的班组详情无效'))
-  return value as CrewDetailReadDTO
+  const detail = value as CrewDetailReadDTO
+  if (detail.payrollActual !== undefined && (detail.dataOrigin !== 'real' || (!detail.capabilities.includes('payroll:read') && detail.payrollActual.status !== 'forbidden')))
+    throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '工资收付分区与来源授权不一致'))
+  return detail.payrollActual === undefined ? detail : { ...detail, payrollActual: decodePayrollHostSection(detail.payrollActual, { kind: 'crew', id: detail.crew.id }) }
 }
 
 export function decodeWorkerDetailRead(value: unknown): WorkerDetailReadDTO {
@@ -156,7 +161,10 @@ export function decodeWorkerDetailRead(value: unknown): WorkerDetailReadDTO {
     || !Array.isArray(detail.wageStatements) || !Array.isArray(detail.attendance) || !Array.isArray(detail.daywork)) {
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '中央后台返回的工人关系详情无效'))
   }
-  return value as WorkerDetailReadDTO
+  const result = value as WorkerDetailReadDTO
+  if (result.payrollActual !== undefined && (result.dataOrigin !== 'real' || (!result.capabilities.includes('payroll:read') && result.payrollActual.status !== 'forbidden')))
+    throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '工资收付分区与来源授权不一致'))
+  return result.payrollActual === undefined ? result : { ...result, payrollActual: decodePayrollHostSection(result.payrollActual, { kind: 'worker', id: result.worker.id }) }
 }
 
 export function decodeCrewWorkerRelationFactIdentity(value: unknown): CrewWorkerRelationFactIdentityDTO {
@@ -174,8 +182,8 @@ export function serializeCrewListQuery(query: CrewListQueryDTO): Record<string, 
   return {
     includeDemo: String(query.includeDemo),
     search: query.search,
-    trade: query.trade ?? '',
-    status: query.status ?? '',
+    trade: serializeEnumSelection(query.trade),
+    status: serializeEnumSelection(query.status),
     sort: query.sort,
     page: String(query.page),
     pageSize: String(query.pageSize),
@@ -186,10 +194,10 @@ export function serializeWorkerListQuery(query: WorkerListQueryDTO): Record<stri
   return {
     includeDemo: String(query.includeDemo),
     search: query.search,
-    trade: query.trade ?? '',
+    trade: serializeEnumSelection(query.trade),
     crewId: query.crewId ?? '',
-    projectStatus: query.projectStatus ?? '',
-    status: query.status ?? '',
+    projectStatus: serializeEnumSelection(query.projectStatus),
+    status: serializeEnumSelection(query.status),
     sort: query.sort,
     page: String(query.page),
     pageSize: String(query.pageSize),

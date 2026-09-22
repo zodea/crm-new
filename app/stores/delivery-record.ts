@@ -1,6 +1,9 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
+import type { DeliveryContext, DeliveryRevision } from '~/lib/delivery-record/contract'
 import type { DeliveryAmountSource } from '~/lib/delivery/review'
-import { defineStore } from 'pinia'
+import type { DataOriginDTO } from '~/types/read-model'
+import { isTauri } from '@tauri-apps/api/core'
+import { defineStore, storeToRefs } from 'pinia'
 import { computed, readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { select, withTransaction } from '~/lib/db/connection'
@@ -13,10 +16,13 @@ import {
   undoOperation,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
+import { createDeliveryRecordState } from '~/lib/delivery-record/state'
 import { deliveryNaturalKey, hasDeliveryPricePending, normalizeDeliveryOrderNo } from '~/lib/delivery/review'
 import { generateId } from '~/lib/util/id'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 export interface DeliveryLineDraft {
+  id?: string
   materialName: string
   spec: string
   unit: string
@@ -40,6 +46,12 @@ export type DeliveryPrintDisposition = 'pending' | 'printed' | 'excluded'
 
 export interface DeliveryRecord {
   id: string
+  dataOrigin?: DataOriginDTO
+  version?: string
+  assetId?: string | null
+  projectName?: string
+  supplierName?: string
+  legacyAudit?: string | null
   projectId: string
   supplierId: string | null
   rawSiteText: string
@@ -84,6 +96,7 @@ export interface DeliveryRecordInput {
 export interface DeliveryRecordConfirmations {
   noOrderNoConfirmed?: boolean
   pricePendingConfirmed?: boolean
+  amountReviewed?: boolean
 }
 
 export interface DeliveryRecordSourceFile {
@@ -454,7 +467,8 @@ async function persistSourceFile(
   )
 }
 
-export const useDeliveryRecordStore = defineStore('delivery-record', () => {
+/** ADR 0020 保留的桌面 SQLite 适配；浏览器不会调用此路径。 */
+const useLocalDeliveryRecordStore = defineStore('delivery-record-native-source', () => {
   const list = shallowRef<DeliveryRecord[]>([])
   const loading = shallowRef(false)
 
@@ -793,3 +807,53 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     undo,
   }
 })
+
+const useCentralDeliveryRecordStore = defineStore('delivery-record-central', () => {
+  const repositories = useNuxtApp().$repositories
+  const visibility = useDataVisibilityStore()
+  return createDeliveryRecordState(repositories.deliveries, () => visibility.includeDemo ? 'demo' : 'real')
+})
+
+const useNativeDeliveryRecordAdapter = defineStore('delivery-record-native', () => {
+  const local = useLocalDeliveryRecordStore()
+  const visibility = useDataVisibilityStore()
+  return {
+    ...storeToRefs(local),
+    mode: 'native' as const,
+    origin: computed(() => visibility.includeDemo ? 'demo' as const : 'real' as const),
+    context: shallowRef<DeliveryContext | null>(null),
+    canWrite: computed(() => true),
+    sourceVersion: shallowRef(''),
+    error: shallowRef(''),
+    saving: shallowRef(false),
+    load: local.load,
+    byId: local.byId,
+    add: local.add,
+    update: (id: string, input: DeliveryRecordInput, _reason = '', _baseVersion?: string) => local.update(id, input),
+    remove: local.remove,
+    restore: (id: string, _baseVersion?: string) => local.restore(id),
+    undo: local.undo,
+    excludeFromPrint: local.excludeFromPrint,
+    excludeManyFromPrint: local.excludeManyFromPrint,
+    confirmPrintReceipt: local.confirmPrintReceipt,
+    confirmManyPrintReceipts: local.confirmManyPrintReceipts,
+    async loadSourceFile(id: string, options?: { signal?: AbortSignal, assetId?: string | null }) {
+      if (options?.assetId === null)
+        return null
+      if (options?.assetId)
+        throw new Error('桌面旧适配尚未接入历史原件读取')
+      const file = await local.loadSourceFile(id)
+      if (options?.signal?.aborted)
+        throw new DOMException('原件读取已取消', 'AbortError')
+      return file
+    },
+    saveSourceFile: (id: string, file: File, _reason = '', _baseVersion?: string) => local.saveSourceFile(id, file),
+    async history(_id: string, _options?: { signal?: AbortSignal }): Promise<DeliveryRevision[]> {
+      throw new Error('桌面旧适配尚未接入中央修订历史')
+    },
+  }
+})
+
+export function useDeliveryRecordStore() {
+  return isTauri() ? useNativeDeliveryRecordAdapter() : useCentralDeliveryRecordStore()
+}

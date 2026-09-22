@@ -1,6 +1,9 @@
+import type { ApprovedAmountOrigin, ApprovedAmountState } from './approval-amount'
 import type { InvoiceState } from './forms'
+import { CONFIRMED_SETTLEMENT_SQL_VALUES } from '~/lib/contract/effective-status'
 import { select } from '~/lib/db/connection'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
+import { approvalPaymentCap, paymentConfirmationCap, readApprovalAmount } from './approval-amount'
 
 const EPSILON = 0.0001
 
@@ -11,7 +14,8 @@ export interface PaymentApplicationInsightInput {
   bizType: string
   invoiceState: InvoiceState | string
   applyAmount: number
-  approvedAmount: number
+  approvedAmount: number | null
+  approvedAmountOrigin?: ApprovedAmountOrigin
   settlementAllocated: number
   invoiceAllocated: number
   paidAmount: number
@@ -84,7 +88,8 @@ export interface PaymentApplicationDetail {
   payContent: string
   prepayDeduct: number
   prepayNote: string
-  approvedAmount: number
+  approvedAmount: number | null
+  approvedAmountState: ApprovedAmountState
   approvalNote: string
   status: string
   note: string
@@ -97,7 +102,8 @@ export interface PaymentApplicationDetail {
   invoiceDifference: number
   pendingInvoiceAmount: number
   paidAmount: number
-  unpaidAmount: number
+  unpaidAmount: number | null
+  registrationAmount: number
   supplierOtherProjectCount: number
   supplierOtherProjectPaidAmount: number
   settlements: PaymentApplicationSettlementDetail[]
@@ -131,14 +137,13 @@ export function buildPaymentApplicationInsight(
   input: PaymentApplicationInsightInput,
 ): PaymentApplicationInsight {
   const applyAmount = Math.max(amount(input.applyAmount), 0)
-  const approvedAmount = Math.max(amount(input.approvedAmount), 0)
   const settlementAllocated = Math.max(amount(input.settlementAllocated), 0)
   const invoiceAllocated = Math.max(amount(input.invoiceAllocated), 0)
   const paidAmount = Math.max(amount(input.paidAmount), 0)
   const settlementDifference = Math.max(applyAmount - settlementAllocated, 0)
   const pendingInvoiceAmount = Math.max(applyAmount - invoiceAllocated, 0)
-  const paymentCap = approvedAmount > EPSILON ? approvedAmount : applyAmount
-  const unpaidAmount = Math.max(paymentCap - paidAmount, 0)
+  const paymentCap = approvalPaymentCap(applyAmount, input.approvedAmount, input.approvedAmountOrigin)
+  const unpaidAmount = paymentCap === null ? null : Math.max(paymentCap - paidAmount, 0)
 
   const checks: PaymentApplicationInsightCheck[] = [
     {
@@ -182,21 +187,29 @@ export function buildPaymentApplicationInsight(
           ? `已关联 ${displayAmount(invoiceAllocated)} 发票金额。`
           : `当前回票类型允许后补发票，仍有 ${displayAmount(pendingInvoiceAmount)} 未关联。`,
     },
-    {
-      key: 'payment',
-      title: '支付结果',
-      level: paidAmount > paymentCap + EPSILON
-        ? 'danger'
-        : unpaidAmount > EPSILON ? 'info' : 'ok',
-      summary: paidAmount > paymentCap + EPSILON
-        ? '已付超出可付金额'
-        : unpaidAmount > EPSILON ? `待支付 ${displayAmount(unpaidAmount)}` : '已付清',
-      detail: paidAmount > paymentCap + EPSILON
-        ? `已确认支付 ${displayAmount(paidAmount)}，超过当前可付上限 ${displayAmount(paymentCap)}。`
-        : unpaidAmount > EPSILON
-          ? `已确认支付 ${displayAmount(paidAmount)}，当前可付上限为 ${displayAmount(paymentCap)}。`
-          : `已确认支付 ${displayAmount(paidAmount)}，当前申请已完成支付。`,
-    },
+    paymentCap === null
+      ? {
+          key: 'payment',
+          title: '支付结果',
+          level: 'warn',
+          summary: '历史批复待核验',
+          detail: `已确认支付 ${displayAmount(paidAmount)}。历史批复金额的含义尚不明确，暂不能据此判断余额或是否付清。`,
+        }
+      : {
+          key: 'payment',
+          title: '支付结果',
+          level: paidAmount > paymentCap + EPSILON
+            ? 'danger'
+            : (unpaidAmount ?? 0) > EPSILON ? 'info' : 'ok',
+          summary: paidAmount > paymentCap + EPSILON
+            ? '已付超出可付金额'
+            : (unpaidAmount ?? 0) > EPSILON ? `待支付 ${displayAmount(unpaidAmount ?? 0)}` : '已付清',
+          detail: paidAmount > paymentCap + EPSILON
+            ? `已确认支付 ${displayAmount(paidAmount)}，超过当前可付上限 ${displayAmount(paymentCap)}。`
+            : (unpaidAmount ?? 0) > EPSILON
+                ? `已确认支付 ${displayAmount(paidAmount)}，当前可付上限为 ${displayAmount(paymentCap)}。`
+                : `已确认支付 ${displayAmount(paidAmount)}，当前申请已完成支付。`,
+        },
   ]
 
   return {
@@ -228,7 +241,8 @@ interface PaymentApplicationHeaderRow extends Record<string, unknown> {
   pay_content: string
   prepay_deduct: number
   prepay_note: string
-  approved_amount: number
+  approved_amount: number | null
+  approved_amount_origin: ApprovedAmountOrigin
   approval_note: string
   status: string
   note: string
@@ -278,7 +292,7 @@ export async function loadPaymentApplicationDetail(
         FROM expenditure_settlements AS settlement
         WHERE settlement.contract_id = application.contract_id
           AND ${visibleCond('expenditure_settlements', 'settlement')}
-          AND settlement.status NOT IN ('草稿', 'draft')
+          AND settlement.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})
       ), 0) AS contract_settled_amount,
       COALESCE((
         SELECT SUM(recordAllocation.allocated_amount)
@@ -298,6 +312,7 @@ export async function loadPaymentApplicationDetail(
       application.prepay_deduct,
       application.prepay_note,
       application.approved_amount,
+      application.approved_amount_origin,
       application.approval_note,
       application.status,
       application.note,
@@ -415,7 +430,7 @@ export async function loadPaymentApplicationDetail(
   ])
 
   const applyAmount = amount(header.apply_amount)
-  const approvedAmount = amount(header.approved_amount)
+  const approval = readApprovalAmount(header.approved_amount, header.approved_amount_origin)
   const settlementAllocated = amount(header.settlement_allocated)
   const invoiceAllocated = amount(header.invoice_allocated)
   const paidAmount = amount(header.paid_amount)
@@ -424,14 +439,15 @@ export async function loadPaymentApplicationDetail(
   const pendingInvoiceAmount = header.invoice_state === '无需发票'
     ? 0
     : invoiceDifference
-  const paymentCap = approvedAmount > EPSILON ? approvedAmount : applyAmount
-  const unpaidAmount = roundMoney(Math.max(paymentCap - paidAmount, 0))
+  const paymentCap = approvalPaymentCap(applyAmount, header.approved_amount, header.approved_amount_origin)
+  const unpaidAmount = paymentCap === null ? null : roundMoney(Math.max(paymentCap - paidAmount, 0))
   const insight = buildPaymentApplicationInsight({
     status: String(header.status ?? ''),
     bizType: String(header.biz_type ?? ''),
     invoiceState: String(header.invoice_state ?? ''),
     applyAmount,
-    approvedAmount,
+    approvedAmount: header.approved_amount,
+    approvedAmountOrigin: header.approved_amount_origin,
     settlementAllocated,
     invoiceAllocated,
     paidAmount,
@@ -460,7 +476,8 @@ export async function loadPaymentApplicationDetail(
     payContent: String(header.pay_content ?? ''),
     prepayDeduct: amount(header.prepay_deduct),
     prepayNote: String(header.prepay_note ?? ''),
-    approvedAmount,
+    approvedAmount: approval.amount,
+    approvedAmountState: approval.state,
     approvalNote: String(header.approval_note ?? ''),
     status: String(header.status ?? ''),
     note: String(header.note ?? ''),
@@ -474,6 +491,7 @@ export async function loadPaymentApplicationDetail(
     pendingInvoiceAmount,
     paidAmount,
     unpaidAmount,
+    registrationAmount: roundMoney(Math.max(paymentConfirmationCap(applyAmount, header.approved_amount, header.approved_amount_origin) - paidAmount, 0)),
     supplierOtherProjectCount: amount(header.supplier_other_project_count),
     supplierOtherProjectPaidAmount: amount(header.supplier_other_project_paid_amount),
     settlements: settlements.map(row => ({

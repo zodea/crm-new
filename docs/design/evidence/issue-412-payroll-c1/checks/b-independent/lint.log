@@ -1,0 +1,8 @@
+
+D:\crm本地项目开发\tests\payroll\c1-b-independent-review.test.ts
+  33:22  error  Expected newline between test and consequent of ternary expression  style/multiline-ternary
+  34:9   error  Expected newline between test and consequent of ternary expression  style/multiline-ternary
+
+✖ 2 problems (2 errors, 0 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+

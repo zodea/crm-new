@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { SupplierDetailSnapshot } from '~/stores/supplier-detail'
+import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { yuan } from '~/lib/util/money'
 
 type SummaryTab = 'projects' | 'contracts' | 'payments' | 'invoices'
@@ -41,7 +42,7 @@ const paymentColumns: KitTableColumn[] = [
   { field: 'name', title: '请款名称', minWidth: 180 },
   { field: 'projectName', title: '项目', minWidth: 160, slot: 'project' },
   { field: 'amount', title: '申请金额', type: 'money', width: 130 },
-  { field: 'approvedAmount', title: '审批金额', type: 'money', width: 130 },
+  { field: 'approvedAmount', title: '审批金额', width: 150, align: 'right', slot: 'approval' },
   { field: 'actualPayment', title: '实际付款', type: 'money', width: 130 },
   { field: 'createdAt', title: '申请时间', width: 120, slot: 'date' },
   { field: 'paymentStatus', title: '状态', width: 95, slot: 'status' },
@@ -72,7 +73,7 @@ const visibleContracts = computed(() => {
 })
 const visiblePayments = computed(() => [...props.snapshot.payments].sort((a, b) =>
   paymentOrder.value === 'amount'
-    ? b.approvedAmount - a.approvedAmount
+    ? a.approvedAmount === null ? b.approvedAmount === null ? 0 : 1 : b.approvedAmount === null ? -1 : b.approvedAmount - a.approvedAmount
     : b.createdAt.localeCompare(a.createdAt),
 ))
 const visibleInvoices = computed(() => {
@@ -181,6 +182,10 @@ function date(value: string): string {
         </select>
       </div>
       <KitTable :columns="paymentColumns" :data="visiblePayments" empty="暂无请款/付款记录">
+        <template #approval="{ row }">
+          <span class="block font-mono tabular-nums">{{ yuan(row.approvedAmount) }}</span>
+          <span v-if="row.approvedAmount === null" class="text-10px text-ink-faint">{{ approvalAmountLabel(row.approvedAmountState ?? 'legacy-unknown') }}</span>
+        </template>
         <template #payment="{ row }">
           <NuxtLink :to="`/finance/payment/${row.id}/detail`" class="cell--link font-mono">
             {{ row.applicationNo || row.id }}

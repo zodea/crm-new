@@ -36,5 +36,5 @@
 - `docs/design/kit-ui-component-specs.md` 等规格文档的"照着手写"承载改述为"基于 shadcn-vue + reka-ui 的桥接实现"；结构锚点、变体、令牌、行为规则仍有效（那是设计语言，与实现无关）。
 - `CONTEXT.md` / `CLAUDE.md` 中 `window.KitUI` 表述需更新为 shadcn 底座 + `useKitUI` 薄封装。
 - `/dev/kit-ui` 改为 shadcn 组件验证台。
-- 迁移映射见 `docs/design/kitui-to-shadcn-migration.md`。
+- 当时的迁移映射见[历史映射材料](../research/kitui-to-shadcn-migration.md)，仅作非权威参考；当前 API 与实现边界以 [KitUI 组件规格](../design/kit-ui-component-specs.md)为准。
 - 桥接已离线验证：UnoCSS 生成器对语义色、圆角阶梯、`data-[state]` 动画变体均产出正确 CSS，无 Tailwind 引擎。

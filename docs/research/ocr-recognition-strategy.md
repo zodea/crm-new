@@ -1,5 +1,7 @@
 ﻿# OCR 识别策略：能用哪些 · 省钱 · 是否必联网 · 是否泄漏
 
+> **非权威历史调研。** 下文保留 2026-07-05 的设备、费用和模型判断，不作为当前能力或价格保证。Windows 为主、Mac 兼容、单一 PaddleOCR-VL、显式官方 API 评估及服务端凭证边界均以 [ADR 0006](../adr/0006-ocr-paddleocr-vl-single-model.md) 为准；本地自托管是否可用按实际运行验收，不能沿用本文“默认全离线”的旧结论。当前 OCR 功能复核由 [#406](https://github.com/zodea/crm-new/issues/406) 承接。
+
 > 调研+定案日期：2026-07-05（2026-07-05 依"用 PaddleOCR-VL 解决"修订为单模型方案）
 > 关联：移植方案 `invoice-recognition-app-port-plan.md`、UX 基准 `ocr-ux-benchmark.md`、决策 `docs/adr/0006-ocr-paddleocr-vl-single-model.md`
 > 背景：用户成本敏感 + 隐私敏感（真实发票/送货单含税号/金额/公司名）+ 要打磨质量；环境 macOS Apple Silicon。

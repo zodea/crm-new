@@ -1,0 +1,38 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/c2-migration-protection.test.ts -t 真实 C2 配置回执|只余一种稳定来源
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/c2-migration-protection.test.ts (15 tests | 6 failed | 8 skipped) 6688ms
+   × 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：source-table 958ms
+   × 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：source-audit-before 925ms
+   × 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：source-audit-after 926ms
+   × 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：frozen-source 932ms
+   × 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：frozen-audit 916ms
+   × 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：frozen-document 917ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/c2-migration-protection.test.ts > 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：source-table
+ FAIL  |unit| tests/payroll/c2-migration-protection.test.ts > 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：source-audit-before
+ FAIL  |unit| tests/payroll/c2-migration-protection.test.ts > 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：source-audit-after
+ FAIL  |unit| tests/payroll/c2-migration-protection.test.ts > 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：frozen-source
+ FAIL  |unit| tests/payroll/c2-migration-protection.test.ts > 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：frozen-audit
+ FAIL  |unit| tests/payroll/c2-migration-protection.test.ts > 真实 C2 核对和实发后只余一种稳定来源仍挡恢复：frozen-document
+TypeError: payrollService.c2Form is not a function
+ ❯ tests/payroll/c2-migration-protection.test.ts:51:37
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 1 passed | 8 skipped (15)
+   Start at  13:58:44
+   Duration  9.13s (transform 1.83s, setup 0ms, import 2.22s, tests 6.69s, environment 0ms)
+

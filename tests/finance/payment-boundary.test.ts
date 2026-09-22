@@ -65,7 +65,7 @@ beforeEach(async () => {
     VALUES (
       'settlement-payment-material', 'SET-PAY', '材料结算', '材采',
       'project-payment-boundary', 'supplier-payment-boundary',
-      'contract-payment-material', 100, '2026-08-10', '已审批'
+      'contract-payment-material', 100, '2026-08-10', '已确认'
     )
   `)
 })

@@ -249,7 +249,9 @@ export async function loadQuantityBatchCompletionPlan(
         continue
       const completion = completionByKey.get(`${unit.id} ${stage.id}`) ?? null
       const photoIds = completion ? photoIdsByCompletion.get(completion.id) ?? [] : []
-      const projectedReason: QuantityBatchDraftReason | null = !assignment
+      const hasExecutionAssignment = completion?.status === 'completed' && !!completion.assignment_id
+      const hasCurrentAssignment = !!assignment && (assignment.crew_name !== null || assignment.worker_name !== null)
+      const projectedReason: QuantityBatchDraftReason | null = !hasExecutionAssignment && !hasCurrentAssignment
         ? 'missing-assignment'
         : photoIds.length ? null : 'missing-photo'
       items.push({

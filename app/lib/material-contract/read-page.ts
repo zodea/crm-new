@@ -9,6 +9,7 @@ import type {
   MaterialContractPageSize,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import {
@@ -70,7 +71,7 @@ export function parseMaterialContractListQuery(
     search: typeof input?.search === 'string' ? input.search.trim() : '',
     projectId: optional(input?.projectId),
     supplierId: optional(input?.supplierId),
-    status: optional(input?.status),
+    status: parseContractListFilter(input?.status, () => new MaterialContractRepositoryProblem(materialContractProblem('invalid-query', '合同筛选参数无效'))),
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as MaterialContractPageSize,
   }
@@ -183,7 +184,7 @@ export function buildMaterialContractListPage(
         return false
       if (input.query.supplierId && row.supplierId !== input.query.supplierId)
         return false
-      if (input.query.status && row.status !== input.query.status)
+      if (!matchesContractListFilter(row.status, input.query.status))
         return false
       return !search || [row.name, row.no].some(value => value.toLocaleLowerCase('zh-CN').includes(search))
     })

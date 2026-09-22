@@ -1,0 +1,919 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/payroll_c1_backend",
+  "reviewDate": "2026-09-14",
+  "sourceDirectory": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium",
+  "sourceRun": "browser-release",
+  "sourceRunVisibleProject": "C1 无工程量验收 8c46e276-5d92-4e52-a25f-9d76844b2d94",
+  "scope": "修复后 browser-release 主链八组各五宽，共40张；本轮逐张原图重新目检，不以browser-final或integrated代替。",
+  "method": {
+    "tool": "view_image",
+    "detail": "original",
+    "imageCount": 40,
+    "groupCount": 8,
+    "widths": [
+      390,
+      768,
+      1024,
+      1280,
+      1440
+    ],
+    "height": 960,
+    "reviewedGroups": [
+      "released-paired-output",
+      "month-normal-totals",
+      "empty-no-quantity-matrix",
+      "empty-project-form",
+      "saved-precision-matrix",
+      "month-last-day-scroll",
+      "month-totals-scroll",
+      "checked-attendance"
+    ],
+    "priorBatchSubstitution": false,
+    "sourceHashAlgorithm": "SHA256"
+  },
+  "constraints": {
+    "onlyReviewJsonWritten": true,
+    "productModified": false,
+    "testsRun": false,
+    "browserUsed": false,
+    "wholePageAcceptanceClaimed": false
+  },
+  "findings": [],
+  "resolvedPriorFindings": [
+    {
+      "id": "FINAL-V1",
+      "status": "visually-closed-in-release",
+      "title": "已发明细单价原精度恢复",
+      "evidence": [
+        {
+          "released": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-768.png",
+          "checked": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-768.png"
+        },
+        {
+          "released": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-1024.png",
+          "checked": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1024.png"
+        },
+        {
+          "released": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-1280.png",
+          "checked": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1280.png"
+        },
+        {
+          "released": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-1440.png",
+          "checked": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1440.png"
+        }
+      ],
+      "observed": "本轮四宽已发工资明细单价实际完整为60.125，与同轮核对页一致；1280/1440第一行金额481.00完整。旧final四图60.13只作为历史发现。",
+      "limitation": "390px已发工资明细在首屏以下，本张不用于确认费率字段；未把折下当缺陷。"
+    },
+    {
+      "id": "integrated-V2",
+      "status": "visually-closed-and-reconfirmed-in-release",
+      "title": "390正常工时合计可读",
+      "evidence": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-390.png",
+      "observed": "本轮390px正常工时表头以及8 / 0 / 7.51 / 0全部完整可读。"
+    }
+  ],
+  "coverageByAdjacentStates": [
+    {
+      "width": 390,
+      "covered": [
+        "31日完整及第三行焦点框",
+        "正常工时7.51完整",
+        "加班工时2完整"
+      ],
+      "files": [
+        "month-last-day-scroll-390.png",
+        "month-normal-totals-390.png",
+        "month-totals-scroll-390.png"
+      ]
+    },
+    {
+      "width": 1024,
+      "limitation": "本轮month-totals-scroll-1024仍在23–31日的较左水平位置，右边31日及焦点部分出视口，合计未显示；不能声称此张合计完整。",
+      "coveredBy": [
+        "month-normal-totals-1024.png",
+        "month-last-day-scroll-1024.png"
+      ]
+    },
+    {
+      "scope": "首屏以下",
+      "limitation": "空项目表单的备注/保存与390详情的大部分明细不在本轮对应首屏，未作整页已覆盖的结论；由Root其他滚动状态及行为验收负责。"
+    },
+    {
+      "scope": "实际输出文件",
+      "limitation": "本轮仅看冻结说明、配对打印下载入口和可见明细，不用截图代替PDF/XLSX内部验收。"
+    }
+  ],
+  "summary": "40/40本轮原图逐张核对。已发单价60.125与390正常合计7.51在可见证据范围内闭环；空矩阵、空项目表单、已存考勤、月末和合计滚动、核对与冻结输出入口未见新增可见缺陷。旧final精度发现原记录保留，本轮单独记录消项。",
+  "entries": [
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-no-quantity-matrix-390.png",
+      "group": "empty-no-quantity-matrix",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "项目、月份、班组筛选纵排，标题、按钮和固定姓名列完整。",
+        "四名工人和前2日未登记横线可见；空格与已登记零工时的说明可读。",
+        "长项目名在选择控件内部截断，控件及页面未见横溢。"
+      ],
+      "imageBoundary": "这是已选项目、月份及班组后的未填考勤空矩阵；日期超过表格可视宽度，由同批横向滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-390.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "22984bfadcdbe187baa1886a83d4cd1726c5c843bdd218ecd76b23f1213cfa0d"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-no-quantity-matrix-768.png",
+      "group": "empty-no-quantity-matrix",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "横排筛选、标题、按钮及固定姓名列完整。",
+        "四名工人和前9日未登记横线可见；空格与已登记零工时的说明可读。",
+        "长项目名在选择控件内部截断，控件及页面未见横溢。"
+      ],
+      "imageBoundary": "这是已选项目、月份及班组后的未填考勤空矩阵；日期超过表格可视宽度，由同批横向滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-768.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "c047d49ba38f2e8e6f5e87d54b799438c528146bf61866a2a6f8f6a2db8b1e77"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-no-quantity-matrix-1024.png",
+      "group": "empty-no-quantity-matrix",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "侧栏和横排筛选、标题、按钮及固定姓名列完整。",
+        "四名工人和前10日未登记横线可见；空格与已登记零工时的说明可读。",
+        "长项目名在选择控件内部截断，控件及页面未见横溢。"
+      ],
+      "imageBoundary": "这是已选项目、月份及班组后的未填考勤空矩阵；日期超过表格可视宽度，由同批横向滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1024.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "a6e9b71c4d0348a3d5f95d044f6737e09c6c92846314870639e804135cfc6085"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-no-quantity-matrix-1280.png",
+      "group": "empty-no-quantity-matrix",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "侧栏和横排筛选、标题、按钮及固定姓名列完整。",
+        "四名工人和前14日未登记横线可见；空格与已登记零工时的说明可读。",
+        "长项目名在选择控件内部截断，控件及页面未见横溢。"
+      ],
+      "imageBoundary": "这是已选项目、月份及班组后的未填考勤空矩阵；日期超过表格可视宽度，由同批横向滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1280.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "6b3d1834d96c36785eb28cced6478417443aacdd7c10f0e244b0abbb384423fb"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-no-quantity-matrix-1440.png",
+      "group": "empty-no-quantity-matrix",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "侧栏和横排筛选、标题、按钮及固定姓名列完整。",
+        "四名工人和前16日未登记横线可见；空格与已登记零工时的说明可读。",
+        "长项目名在选择控件内部截断，控件及页面未见横溢。"
+      ],
+      "imageBoundary": "这是已选项目、月份及班组后的未填考勤空矩阵；日期超过表格可视宽度，由同批横向滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1440.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "ddaead8596a8f2b75b06cdee978e9b69ee3b87bd93a99b21b192daca6438d613"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-project-form-390.png",
+      "group": "empty-project-form",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "项目为“工资项目”占位，班组和负责人未代选；月份显示2026年08月。图本身不能证明月份取值来源。",
+        "单列表单、空成员说明、核对按钮、应发“未记录”和阻断提示清楚。",
+        "正常工资说明顶部进入画面。",
+        "所属班组下方“选择负责人后确定班组”提示清楚，未选负责人时保留班组占位。"
+      ],
+      "imageBoundary": "逐日来源、备注及保存/取消在首屏以下，本图未覆盖。",
+      "pairedEvidence": [],
+      "assessment": "可见区域无布局缺陷；首屏以下不在本图验收范围",
+      "sourceSha256": "610d7db442dd0ca950cd537ed01ef691c24dd2cf10250a41076d8a46d3e4d278"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-project-form-768.png",
+      "group": "empty-project-form",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "项目为“工资项目”占位，班组和负责人未代选；月份显示2026年08月。图本身不能证明月份取值来源。",
+        "双列表单布局完整，未见重叠或页面横溢。",
+        "“逐日原考勤（0条）”及无记录提示可见，黄色诊断列表顶部进入画面。",
+        "所属班组下方“选择负责人后确定班组”提示清楚，未选负责人时保留班组占位。"
+      ],
+      "imageBoundary": "完整诊断、备注及保存/取消在首屏以下，本图未覆盖。",
+      "pairedEvidence": [],
+      "assessment": "可见区域无布局缺陷；首屏以下不在本图验收范围",
+      "sourceSha256": "dd5781eff570f90510cea823b2f1b9f13caafaefbcfd06444cbb5136eea96e9d"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-project-form-1024.png",
+      "group": "empty-project-form",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "项目为“工资项目”占位，班组和负责人未代选；月份显示2026年08月。图本身不能证明月份取值来源。",
+        "双列表单布局完整，未见重叠或页面横溢。",
+        "“逐日原考勤（0条）”及无记录提示可见，黄色诊断列表顶部进入画面。",
+        "所属班组下方“选择负责人后确定班组”提示清楚，未选负责人时保留班组占位。"
+      ],
+      "imageBoundary": "完整诊断、备注及保存/取消在首屏以下，本图未覆盖。",
+      "pairedEvidence": [],
+      "assessment": "可见区域无布局缺陷；首屏以下不在本图验收范围",
+      "sourceSha256": "e9f3355566cf904c810afabcb58cf675acc66f381ae235c341f123ee75a36590"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-project-form-1280.png",
+      "group": "empty-project-form",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "项目为“工资项目”占位，班组和负责人未代选；月份显示2026年08月。图本身不能证明月份取值来源。",
+        "有段落锚点侧栏；双列表单布局完整，未见重叠或页面横溢。",
+        "“逐日原考勤（0条）”及无记录提示可见，黄色诊断列表顶部进入画面。",
+        "所属班组下方“选择负责人后确定班组”提示清楚，未选负责人时保留班组占位。"
+      ],
+      "imageBoundary": "完整诊断、备注及保存/取消在首屏以下，本图未覆盖。",
+      "pairedEvidence": [],
+      "assessment": "可见区域无布局缺陷；首屏以下不在本图验收范围",
+      "sourceSha256": "1cbaba308e7fc3b65cc889b59bd5182f80aca58e93d03a6e2f36d35c75830324"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/empty-project-form-1440.png",
+      "group": "empty-project-form",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "项目为“工资项目”占位，班组和负责人未代选；月份显示2026年08月。图本身不能证明月份取值来源。",
+        "有段落锚点侧栏；双列表单布局完整，未见重叠或页面横溢。",
+        "“逐日原考勤（0条）”及无记录提示可见，黄色诊断列表顶部进入画面。",
+        "所属班组下方“选择负责人后确定班组”提示清楚，未选负责人时保留班组占位。"
+      ],
+      "imageBoundary": "完整诊断、备注及保存/取消在首屏以下，本图未覆盖。",
+      "pairedEvidence": [],
+      "assessment": "可见区域无布局缺陷；首屏以下不在本图验收范围",
+      "sourceSha256": "09ad809e30cec2fd9dcf3a5bbc6d4dbebf4dc2e5b8a2e1072f13f9a93bee2852"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/saved-precision-matrix-390.png",
+      "group": "saved-precision-matrix",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "已录绿色日格与未录灰色横线区分清楚，姓名固定列和日格边界完整，未见页面横溢。",
+        "1日“8 + 2”完整可读，2日已录绿格只在右缘露出部分；此图未直接显示7.51文字。"
+      ],
+      "imageBoundary": "表格仅展示当前水平位置；余下日期及合计由同批滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-390.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-390.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "62da715e7ec841461c1b977a51f7339d0a583837b79fb267c31f5086296b404d"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/saved-precision-matrix-768.png",
+      "group": "saved-precision-matrix",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "已录绿色日格与未录灰色横线区分清楚，姓名固定列和日格边界完整，未见页面横溢。",
+        "1日“8 + 2”和第三行2日“7.51”均完整可读。"
+      ],
+      "imageBoundary": "表格仅展示当前水平位置；余下日期及合计由同批滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-768.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-768.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "6ba4862d431e48f274ec311e02b814edfaac980f0055ef4737010eab7acbbe90"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/saved-precision-matrix-1024.png",
+      "group": "saved-precision-matrix",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "已录绿色日格与未录灰色横线区分清楚，姓名固定列和日格边界完整，未见页面横溢。",
+        "1日“8 + 2”和第三行2日“7.51”均完整可读。"
+      ],
+      "imageBoundary": "表格仅展示当前水平位置；余下日期及合计由同批滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1024.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1024.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "a9375e5793434a67ae82c2fbd52a2639a8be813abf51956bdd4adc3282ccd158"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/saved-precision-matrix-1280.png",
+      "group": "saved-precision-matrix",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "已录绿色日格与未录灰色横线区分清楚，姓名固定列和日格边界完整，未见页面横溢。",
+        "1日“8 + 2”和第三行2日“7.51”均完整可读。"
+      ],
+      "imageBoundary": "表格仅展示当前水平位置；余下日期及合计由同批滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1280.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1280.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "17071f9e09a31a8aff07a52fd70257ba86721d0c7614baa7ad86037f06ecdf64"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/saved-precision-matrix-1440.png",
+      "group": "saved-precision-matrix",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "已录绿色日格与未录灰色横线区分清楚，姓名固定列和日格边界完整，未见页面横溢。",
+        "1日“8 + 2”和第三行2日“7.51”均完整可读。"
+      ],
+      "imageBoundary": "表格仅展示当前水平位置；余下日期及合计由同批滚动状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1440.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1440.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "0cbff7ed94d42b28702504eb2682a88a884db531e0d63db74b8364585dcee3b9"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-390.png",
+      "group": "month-last-day-scroll",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "固定姓名列及31日可见，第三行31日蓝色焦点框完整，没有被父容器裁断。",
+        "合计未完全进入当前水平视口。",
+        "最左残留前一日部分属于表格内部滚动位置，未见整页横溢。"
+      ],
+      "imageBoundary": "本图只确认月末日期及焦点；两类合计由同批各自滚动状态共同覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-390.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-390.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "30c64911a2ae1d07131a52d2485a4145a3ffdb98e0a27e27f12fb325412a9e91"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-768.png",
+      "group": "month-last-day-scroll",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "固定姓名列及27–31日可见，第三行31日蓝色焦点框完整，没有被父容器裁断。",
+        "正常工时合计8 / 0 / 7.51 / 0，加班工时合计2 / 0 / 0 / 0清楚可读。",
+        "最左残留前一日部分属于表格内部滚动位置，未见整页横溢。"
+      ],
+      "imageBoundary": "当前月份末日与两类合计在图中可读。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-768.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-768.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "8f2ca8a1dc690222221b3b653451844e55d4ace1849ef8687ec4d4a01e5d85f7"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1024.png",
+      "group": "month-last-day-scroll",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "固定姓名列及26–31日可见，第三行31日蓝色焦点框完整，没有被父容器裁断。",
+        "正常工时合计8 / 0 / 7.51 / 0，加班工时合计2 / 0 / 0 / 0清楚可读。",
+        "最左残留前一日部分属于表格内部滚动位置，未见整页横溢。"
+      ],
+      "imageBoundary": "当前月份末日与两类合计在图中可读。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1024.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1024.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "803607932afea8c6ae32f859791f74876e0e71920c087107a0bb28bc71ecd011"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1280.png",
+      "group": "month-last-day-scroll",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "固定姓名列及22–31日可见，第三行31日蓝色焦点框完整，没有被父容器裁断。",
+        "正常工时合计8 / 0 / 7.51 / 0，加班工时合计2 / 0 / 0 / 0清楚可读。",
+        "最左残留前一日部分属于表格内部滚动位置，未见整页横溢。"
+      ],
+      "imageBoundary": "当前月份末日与两类合计在图中可读。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1280.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1280.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "918b28f56a0c92bda6bde5d0564f0b3e67c90437dd66096999f8cf78b0dffadf"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1440.png",
+      "group": "month-last-day-scroll",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "固定姓名列及20–31日可见，第三行31日蓝色焦点框完整，没有被父容器裁断。",
+        "正常工时合计8 / 0 / 7.51 / 0，加班工时合计2 / 0 / 0 / 0清楚可读。",
+        "最左残留前一日部分属于表格内部滚动位置，未见整页横溢。"
+      ],
+      "imageBoundary": "当前月份末日与两类合计在图中可读。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1440.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1440.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "65bd0b176bd66cad00fdda78a66e5963664448d28f81e4229017cc97a1749ad3"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-390.png",
+      "group": "month-normal-totals",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "固定姓名列后“正常工时”表头完整，四行合计8 / 0 / 7.51 / 0在列中心完整可读。",
+        "31日焦点部分残留在左缘是当前水平位置，不是日期不可达。",
+        "未见页面横溢，滚动限定在矩阵内部。"
+      ],
+      "imageBoundary": "本图重点完整覆盖正常合计；加班合计和31日由相邻状态覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-390.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-390.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "b26041d4a4d7521fa8384a29a078efe2abf91aad3301719eed6d2df4fd855d9b"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-768.png",
+      "group": "month-normal-totals",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "31日与正常、加班两类合计完整可读；正常工时7.51保留原精度。",
+        "正常合计8 / 0 / 7.51 / 0，加班合计2 / 0 / 0 / 0。",
+        "未见页面横溢，滚动限定在矩阵内部。"
+      ],
+      "imageBoundary": "末日及两类合计同图覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-768.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-768.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "8f2ca8a1dc690222221b3b653451844e55d4ace1849ef8687ec4d4a01e5d85f7"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1024.png",
+      "group": "month-normal-totals",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "31日与正常、加班两类合计完整可读；正常工时7.51保留原精度。",
+        "正常合计8 / 0 / 7.51 / 0，加班合计2 / 0 / 0 / 0。",
+        "未见页面横溢，滚动限定在矩阵内部。"
+      ],
+      "imageBoundary": "末日及两类合计同图覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1024.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1024.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "803607932afea8c6ae32f859791f74876e0e71920c087107a0bb28bc71ecd011"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1280.png",
+      "group": "month-normal-totals",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "31日与正常、加班两类合计完整可读；正常工时7.51保留原精度。",
+        "正常合计8 / 0 / 7.51 / 0，加班合计2 / 0 / 0 / 0。",
+        "未见页面横溢，滚动限定在矩阵内部。"
+      ],
+      "imageBoundary": "末日及两类合计同图覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1280.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1280.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "918b28f56a0c92bda6bde5d0564f0b3e67c90437dd66096999f8cf78b0dffadf"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1440.png",
+      "group": "month-normal-totals",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "31日与正常、加班两类合计完整可读；正常工时7.51保留原精度。",
+        "正常合计8 / 0 / 7.51 / 0，加班合计2 / 0 / 0 / 0。",
+        "未见页面横溢，滚动限定在矩阵内部。"
+      ],
+      "imageBoundary": "末日及两类合计同图覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1440.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1440.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "65bd0b176bd66cad00fdda78a66e5963664448d28f81e4229017cc97a1749ad3"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-390.png",
+      "group": "month-totals-scroll",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "最右“加班工时”表头和2 / 0 / 0 / 0完整可读；正常列只露出表头尾字，未在本图完整显示。",
+        "固定姓名列清楚，未见整页横溢，横向滚动位于表格区域。"
+      ],
+      "imageBoundary": "正常合计未完整露出，由同批month-normal-totals-390实际覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-390.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-390.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "ebd6193ec06b55e6c8fd4d64f1ef75ba6ce59dd597614cba0c51aac7169f7e1b"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-768.png",
+      "group": "month-totals-scroll",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "27–31日与正常合计8 / 0 / 7.51 / 0和加班合计2 / 0 / 0 / 0清楚可读。",
+        "固定姓名列清楚，未见整页横溢，横向滚动位于表格区域。"
+      ],
+      "imageBoundary": "正常及加班合计在本图完整覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-768.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-768.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "8f2ca8a1dc690222221b3b653451844e55d4ace1849ef8687ec4d4a01e5d85f7"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1024.png",
+      "group": "month-totals-scroll",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "当前实际滚动位置为23–31日，31日及焦点框右侧部分在视口之外；正常与加班合计均未进入此图。",
+        "固定姓名列清楚，未见整页横溢，横向滚动位于表格区域。"
+      ],
+      "imageBoundary": "不能凭此张声称看见合计；同批正常合计与末日图已明确覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1024.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1024.png"
+      ],
+      "assessment": "本张证据范围有限；相邻状态共同覆盖末日与合计，未据此判产品缺陷",
+      "sourceSha256": "05b5116a7d00cfa4187600f1ee597f49d0d96a67bda161791308f372a046b2ac"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1280.png",
+      "group": "month-totals-scroll",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "正常合计8 / 0 / 7.51 / 0和加班合计2 / 0 / 0 / 0清楚可读。",
+        "固定姓名列清楚，未见整页横溢，横向滚动位于表格区域。"
+      ],
+      "imageBoundary": "正常及加班合计在本图完整覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1280.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1280.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "918b28f56a0c92bda6bde5d0564f0b3e67c90437dd66096999f8cf78b0dffadf"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-totals-scroll-1440.png",
+      "group": "month-totals-scroll",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "正常合计8 / 0 / 7.51 / 0和加班合计2 / 0 / 0 / 0清楚可读。",
+        "固定姓名列清楚，未见整页横溢，横向滚动位于表格区域。"
+      ],
+      "imageBoundary": "正常及加班合计在本图完整覆盖。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-normal-totals-1440.png",
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/month-last-day-scroll-1440.png"
+      ],
+      "assessment": "未见可见布局缺陷",
+      "sourceSha256": "65bd0b176bd66cad00fdda78a66e5963664448d28f81e4229017cc97a1749ad3"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-390.png",
+      "group": "checked-attendance",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已核对”、核算应发¥1,041.00、实际发放“未记录”、负责人及计时班组清楚可读。",
+        "“重新核对考勤”“确认实际发放”及个人工资标准入口完整；黄色“有1项资料需要核对”提示完整。",
+        "两列摘要卡片完整；本月考勤表仅顶部及第一行部分进入首屏。",
+        "表格右侧列在本图视口外，未据此确认费率。"
+      ],
+      "imageBoundary": "核算表大部分行在首屏以下，费率列在表格水平视口外；本图只确认摘要及核对动作。",
+      "pairedEvidence": [],
+      "assessment": "可见摘要与核对动作布局清楚；费率列未进入本张视口",
+      "sourceSha256": "38381232056d9bc87113e7284edeeab2721d47e49b92a429def15ba33c4a4ed2"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-768.png",
+      "group": "checked-attendance",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已核对”、核算应发¥1,041.00、实际发放“未记录”、负责人及计时班组清楚可读。",
+        "“重新核对考勤”“确认实际发放”及个人工资标准入口完整；黄色“有1项资料需要核对”提示完整。",
+        "本月考勤表六行可读；第一行正常工时8、每小时标准60.125、金额¥481.00完整，零收款成员两行0仍在。",
+        "第三名成员当前核对工时为7.5、标准60、金额450.00；此状态与此前7.51保存状态不同，图本身不证明为何变更。"
+      ],
+      "imageBoundary": "核算表首组六行完整；更下方内容不在此图范围。",
+      "pairedEvidence": [],
+      "assessment": "可见区域布局清楚，核对态费率60.125在768px及以上实际可读",
+      "sourceSha256": "a2f6bc0565daee343d77b48223c3d5e81e5063713dbceb56a5f84df248a65bc9"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1024.png",
+      "group": "checked-attendance",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已核对”、核算应发¥1,041.00、实际发放“未记录”、负责人及计时班组清楚可读。",
+        "“重新核对考勤”“确认实际发放”及个人工资标准入口完整；黄色“有1项资料需要核对”提示完整。",
+        "本月考勤表六行可读；第一行正常工时8、每小时标准60.125、金额¥481.00完整，零收款成员两行0仍在。",
+        "第三名成员当前核对工时为7.5、标准60、金额450.00；此状态与此前7.51保存状态不同，图本身不证明为何变更。"
+      ],
+      "imageBoundary": "核算表首组六行完整；更下方内容不在此图范围。",
+      "pairedEvidence": [],
+      "assessment": "可见区域布局清楚，核对态费率60.125在768px及以上实际可读",
+      "sourceSha256": "f8e17bf6bdccf79729d8447e6c45f66d7f1b90f25df5057f56712cafa473ba25"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1280.png",
+      "group": "checked-attendance",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已核对”、核算应发¥1,041.00、实际发放“未记录”、负责人及计时班组清楚可读。",
+        "“重新核对考勤”“确认实际发放”及个人工资标准入口完整；黄色“有1项资料需要核对”提示完整。",
+        "本月考勤表六行可读；第一行正常工时8、每小时标准60.125、金额¥481.00完整，零收款成员两行0仍在。",
+        "第三名成员当前核对工时为7.5、标准60、金额450.00；此状态与此前7.51保存状态不同，图本身不证明为何变更。"
+      ],
+      "imageBoundary": "核算表首组六行完整；更下方内容不在此图范围。",
+      "pairedEvidence": [],
+      "assessment": "可见区域布局清楚，核对态费率60.125在768px及以上实际可读",
+      "sourceSha256": "a950cfccb68f635bb90b319e62c1b740d65a5bef576807164ae2e2b7b335bc6a"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1440.png",
+      "group": "checked-attendance",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已核对”、核算应发¥1,041.00、实际发放“未记录”、负责人及计时班组清楚可读。",
+        "“重新核对考勤”“确认实际发放”及个人工资标准入口完整；黄色“有1项资料需要核对”提示完整。",
+        "本月考勤表六行可读；第一行正常工时8、每小时标准60.125、金额¥481.00完整，零收款成员两行0仍在。",
+        "第三名成员当前核对工时为7.5、标准60、金额450.00；此状态与此前7.51保存状态不同，图本身不证明为何变更。"
+      ],
+      "imageBoundary": "核算表首组六行完整；更下方内容不在此图范围。",
+      "pairedEvidence": [],
+      "assessment": "可见区域布局清楚，核对态费率60.125在768px及以上实际可读",
+      "sourceSha256": "2f7a3cf2e03c17bbaf1c6050607df040e797ed63af14ab9d796f0bec93c06ec1"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-390.png",
+      "group": "released-paired-output",
+      "viewport": {
+        "width": 390,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已发放”、核算应发¥1,041.00、实际发放¥900.00及负责人、计时班组清楚可读。",
+        "“本次工资与考勤已冻结，原全成员整月锁定”完整；“打印工资与考勤表”“下载工资与考勤表”入口完整。",
+        "配对输出说明包含零收款成员与原逐日考勤；发放记录完整提示明确缺项不会用今天姓名、配置或分配补齐。",
+        "工资明细尚在首屏以下，本图不能判断单价显示。",
+        "两个配对输出按钮在390px首屏完整显示，无重叠。"
+      ],
+      "imageBoundary": "工资明细在首屏以下；本图不用于核实60.125修复。",
+      "pairedEvidence": [],
+      "assessment": "摘要、冻结及输出入口无可见布局缺陷；明细精度未覆盖",
+      "sourceSha256": "2e54345f32f380c98cb2c9c9aba13e9562988fd3b2fd6cae1f3ecc4fcb3fc4f2"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-768.png",
+      "group": "released-paired-output",
+      "viewport": {
+        "width": 768,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已发放”、核算应发¥1,041.00、实际发放¥900.00及负责人、计时班组清楚可读。",
+        "“本次工资与考勤已冻结，原全成员整月锁定”完整；“打印工资与考勤表”“下载工资与考勤表”入口完整。",
+        "配对输出说明包含零收款成员与原逐日考勤；发放记录完整提示明确缺项不会用今天姓名、配置或分配补齐。",
+        "下方工资明细第一行单价完整显示60.125，与本轮同宽核对页每小时标准一致，旧60.13显示缺口已关闭。",
+        "工资明细金额列在表格水平视口外。"
+      ],
+      "imageBoundary": "工资明细仅前两行进入首屏；本图只核实际可见字段。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-768.png"
+      ],
+      "assessment": "已发单价60.125精度问题在本轮原图关闭；可见区域未见新增布局缺陷",
+      "sourceSha256": "e61ad2e7ce77abe146ec41efe8947ad9e8457f89c7751a366bc03e08efb990c0"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-1024.png",
+      "group": "released-paired-output",
+      "viewport": {
+        "width": 1024,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已发放”、核算应发¥1,041.00、实际发放¥900.00及负责人、计时班组清楚可读。",
+        "“本次工资与考勤已冻结，原全成员整月锁定”完整；“打印工资与考勤表”“下载工资与考勤表”入口完整。",
+        "配对输出说明包含零收款成员与原逐日考勤；发放记录完整提示明确缺项不会用今天姓名、配置或分配补齐。",
+        "下方工资明细第一行单价完整显示60.125，与本轮同宽核对页每小时标准一致，旧60.13显示缺口已关闭。",
+        "工资明细金额列在右缘部分截断；不能凭此图读取完整金额。"
+      ],
+      "imageBoundary": "工资明细仅前两行进入首屏；本图只核实际可见字段。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1024.png"
+      ],
+      "assessment": "已发单价60.125精度问题在本轮原图关闭；可见区域未见新增布局缺陷",
+      "sourceSha256": "34db123dc133d4597a39274aa80dafd3ff8d4ac3cd1ee164225a62dc1238e973"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-1280.png",
+      "group": "released-paired-output",
+      "viewport": {
+        "width": 1280,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已发放”、核算应发¥1,041.00、实际发放¥900.00及负责人、计时班组清楚可读。",
+        "“本次工资与考勤已冻结，原全成员整月锁定”完整；“打印工资与考勤表”“下载工资与考勤表”入口完整。",
+        "配对输出说明包含零收款成员与原逐日考勤；发放记录完整提示明确缺项不会用今天姓名、配置或分配补齐。",
+        "下方工资明细第一行单价完整显示60.125，与本轮同宽核对页每小时标准一致，旧60.13显示缺口已关闭。",
+        "工资明细第一行金额¥481.00完整；金额未随显示单价改成481.04。"
+      ],
+      "imageBoundary": "工资明细仅前两行进入首屏；本图只核实际可见字段。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1280.png"
+      ],
+      "assessment": "已发单价60.125精度问题在本轮原图关闭；可见区域未见新增布局缺陷",
+      "sourceSha256": "7045b54fd1bad70e98a2977f84cdff4abaca23e50a22f8a1f062df6b0a5f598b"
+    },
+    {
+      "file": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/released-paired-output-1440.png",
+      "group": "released-paired-output",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewedOriginal": true,
+      "visibleObservations": [
+        "C1“已发放”、核算应发¥1,041.00、实际发放¥900.00及负责人、计时班组清楚可读。",
+        "“本次工资与考勤已冻结，原全成员整月锁定”完整；“打印工资与考勤表”“下载工资与考勤表”入口完整。",
+        "配对输出说明包含零收款成员与原逐日考勤；发放记录完整提示明确缺项不会用今天姓名、配置或分配补齐。",
+        "下方工资明细第一行单价完整显示60.125，与本轮同宽核对页每小时标准一致，旧60.13显示缺口已关闭。",
+        "工资明细第一行金额¥481.00完整；金额未随显示单价改成481.04。"
+      ],
+      "imageBoundary": "工资明细仅前两行进入首屏；本图只核实际可见字段。",
+      "pairedEvidence": [
+        "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-release/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/checked-attendance-1440.png"
+      ],
+      "assessment": "已发单价60.125精度问题在本轮原图关闭；可见区域未见新增布局缺陷",
+      "sourceSha256": "45eadb473f5cd0ae76f7332eb5eaa140a91ffabc119e7826c0002e875de758f3"
+    }
+  ]
+}

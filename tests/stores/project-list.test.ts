@@ -47,6 +47,17 @@ describe('project list read state', () => {
     }))
   })
 
+  it('收起测试数据后等待与失败态均不保留上次范围快照', async () => {
+    list.mockResolvedValueOnce(PAGE)
+    const store = useProjectListStore()
+    await store.load({ ...QUERY, includeDemo: true })
+    list.mockRejectedValueOnce(new Error('network failed'))
+    const next = store.load(QUERY)
+    expect(store.state).toMatchObject({ kind: 'loading', previous: null })
+    await next
+    expect(store.state).toMatchObject({ kind: 'error', previous: null })
+  })
+
   it('moves loading to a real empty state', async () => {
     let resolve!: (page: typeof PAGE) => void
     list.mockImplementationOnce(() => new Promise((done) => {

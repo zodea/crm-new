@@ -1,0 +1,256 @@
+[STARTED] Backing up original state...
+[COMPLETED] Backed up original state in git stash (6e5a42d1)
+[STARTED] Running tasks for staged files...
+[STARTED] .lintstagedrc — 53 files (chunk 1/5)...
+[STARTED] .lintstagedrc — 53 files (chunk 2/5)...
+[STARTED] .lintstagedrc — 53 files (chunk 3/5)...
+[STARTED] .lintstagedrc — 53 files (chunk 4/5)...
+[STARTED] .lintstagedrc — 52 files (chunk 5/5)...
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 52 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 3 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 3 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 18 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 52 files
+[STARTED] eslint --fix
+[STARTED] eslint --fix
+[STARTED] eslint --fix
+[STARTED] eslint --fix
+[STARTED] eslint --fix
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 3 files
+[COMPLETED] .lintstagedrc — 53 files (chunk 3/5)...
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 3 files
+[COMPLETED] .lintstagedrc — 53 files (chunk 2/5)...
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 52 files
+[COMPLETED] .lintstagedrc — 52 files (chunk 5/5)...
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 18 files
+[COMPLETED] .lintstagedrc — 53 files (chunk 4/5)...
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 52 files
+[COMPLETED] .lintstagedrc — 53 files (chunk 1/5)...
+[COMPLETED] Running tasks for staged files...
+[STARTED] Staging changes from tasks...
+[COMPLETED] Staging changes from tasks...
+[STARTED] Cleaning up temporary files...
+[COMPLETED] Cleaning up temporary files...
+
+> crm-new@ typecheck D:\crm本地项目开发
+> nuxt typecheck
+
+
+> crm-new@ test D:\crm本地项目开发
+> vitest run
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+
+ Test Files  626 passed (626)
+      Tests  3783 passed (3783)
+   Start at  10:26:55
+   Duration  219.34s (transform 77.57s, setup 177.87s, import 377.91s, tests 1019.03s, environment 554.42s)
+
+[main c4c5b9f2] feat(payroll): 接通A工资中央核对实发与冻结输出
+ 264 files changed, 14075 insertions(+), 293 deletions(-)
+ create mode 100644 app/components/payroll/CentralPayrollDraftFormPage.vue
+ create mode 100644 app/components/payroll/PayrollACommandState.vue
+ create mode 100644 app/components/payroll/PayrollAConfigScreen.vue
+ create mode 100644 app/components/payroll/PayrollACreateFromQuantity.vue
+ create mode 100644 app/components/payroll/PayrollAFormFields.vue
+ create mode 100644 app/components/payroll/PayrollAFrozenPrint.vue
+ create mode 100644 app/components/payroll/PayrollAPriceDialog.vue
+ create mode 100644 app/components/payroll/PayrollAPriceEditor.vue
+ create mode 100644 app/components/payroll/PayrollAReleaseDialog.vue
+ create mode 100644 app/components/payroll/PayrollASourceReturn.vue
+ create mode 100644 app/components/payroll/PayrollASourceReview.vue
+ create mode 100644 app/components/payroll/PayrollAStatementWorkspace.vue
+ create mode 100644 app/composables/usePayrollAConfig.ts
+ create mode 100644 app/composables/usePayrollAForm.ts
+ create mode 100644 app/composables/usePayrollAStatement.ts
+ create mode 100644 app/lib/payroll/a-export.ts
+ create mode 100644 app/lib/payroll/a-navigation.ts
+ create mode 100644 app/lib/payroll/a-presentation.ts
+ create mode 100644 app/lib/payroll/central-a-calculation.ts
+ create mode 100644 app/lib/payroll/central-a-codec.ts
+ create mode 100644 app/lib/payroll/central-a-command.ts
+ create mode 100644 app/lib/payroll/central-a-contract.ts
+ create mode 100644 app/lib/payroll/central-a-history.ts
+ create mode 100644 app/lib/payroll/central-a-prices.ts
+ create mode 100644 app/lib/payroll/central-a-provenance.ts
+ create mode 100644 app/pages/subcontract/payroll/config.vue
+ create mode 100644 app/pages/subcontract/payroll/form/[id].vue
+ create mode 100644 app/stores/payroll-a.ts
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/README.md
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/browser-run.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/crew-source-return-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/crew-source-return-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/crew-source-return-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/crew-source-return-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/crew-source-return-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-before-config-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-before-config-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-before-config-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-before-config-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-before-config-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-config-return-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-config-return-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-config-return-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-config-return-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/draft-config-return-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/first-payroll-from-quantity-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/first-payroll-from-quantity-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/first-payroll-from-quantity-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/first-payroll-from-quantity-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/first-payroll-from-quantity-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/frozen-a-payroll.pdf
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/frozen-a-payroll.xlsx
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/frozen-document.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/manifest.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/original-quantity-sources-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/original-quantity-sources-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/original-quantity-sources-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/original-quantity-sources-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/original-quantity-sources-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/print-validation.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-matrix-source-return-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-matrix-source-return-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-matrix-source-return-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-matrix-source-return-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-matrix-source-return-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-missing-zero-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-missing-zero-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-missing-zero-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-missing-zero-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-missing-zero-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-unit-source-return-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-unit-source-return-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-unit-source-return-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-unit-source-return-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/quantity-unit-source-return-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/rechecked-allocation-retained-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/rechecked-allocation-retained-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/rechecked-allocation-retained-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/rechecked-allocation-retained-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/rechecked-allocation-retained-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/release-cent-mismatch-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/release-cent-mismatch-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/release-cent-mismatch-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/release-cent-mismatch-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/release-cent-mismatch-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/released-frozen-output-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/released-frozen-output-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/released-frozen-output-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/released-frozen-output-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/released-frozen-output-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-floor-source-focus-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-floor-source-focus-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-floor-source-focus-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-floor-source-focus-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-floor-source-focus-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-statement-needs-recheck-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-statement-needs-recheck-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-statement-needs-recheck-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-statement-needs-recheck-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/second-statement-needs-recheck-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/source-verification.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/stale-release-retained-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/stale-release-retained-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/stale-release-retained-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/stale-release-retained-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/stale-release-retained-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/subject-price-configuration-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/subject-price-configuration-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/subject-price-configuration-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/subject-price-configuration-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/subject-price-configuration-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/unknown-release-retained-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/unknown-release-retained-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/unknown-release-retained-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/unknown-release-retained-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/unknown-release-retained-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/worker-source-return-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/worker-source-return-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/worker-source-return-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/worker-source-return-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/browser/worker-source-return-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/code-hashes.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/README.md
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/frozen-a-payroll-1.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/manifest.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/migration-1.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/migration-2.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/migration-3.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/migration-4.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/migration-5.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/migration-6.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/migration-7.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/payroll-1.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/payroll-2.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/payroll-3.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/payroll-4.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/pdf/payroll-5.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review.md
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/README.md
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/final-integration-review.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/npm-test-final.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/provenance-standards-review.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/receipt-closure-cases-green.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/receipt-closure-cases.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/receipt-closure-migration-print.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/receipt-closure-prices-final.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/receipt-closure-regression.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/receipt-closure-review.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/root-image-review-final.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/source-image-review-final.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/spec-followup-final.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/review/standards-followup-final.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/verification.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/verification/build-release.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/verification/lint-release.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/verification/npm-test-release.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-a/verification/typecheck-release.log
+ create mode 100644 docs/research/issue-review-2026-09-11/payroll-tickets/01-central-a-payroll.md
+ create mode 100644 e2e/helpers/payroll-a-migration-source.ts
+ create mode 100644 e2e/payroll-a-central.spec.ts
+ create mode 100644 server/api/commands/payroll-a.post.ts
+ create mode 100644 server/api/read/payroll/a-config.get.ts
+ create mode 100644 server/api/read/payroll/a-form.post.ts
+ create mode 100644 server/api/read/payroll/a-output.get.ts
+ create mode 100644 server/utils/payroll-a-migration-references.ts
+ create mode 100644 server/utils/payroll-a-options.ts
+ create mode 100644 server/utils/payroll-a-service.ts
+ create mode 100644 server/utils/payroll-quantity-facts.ts
+ create mode 100644 tests/components/PayrollAConfigState.test.ts
+ create mode 100644 tests/components/PayrollACreateFromQuantity.test.ts
+ create mode 100644 tests/components/PayrollAFormState.test.ts
+ create mode 100644 tests/components/PayrollAFrozenPrint.test.ts
+ create mode 100644 tests/components/PayrollAPriceDialog.test.ts
+ create mode 100644 tests/components/PayrollAReleaseDialog.test.ts
+ create mode 100644 tests/components/PayrollASourceReturn.test.ts
+ create mode 100644 tests/components/PayrollASourceReview.test.ts
+ create mode 100644 tests/components/PayrollAStatementState.test.ts
+ create mode 100644 tests/helpers/payroll-a-quantity-source.ts
+ create mode 100644 tests/helpers/payroll-a-service-fixture.ts
+ create mode 100644 tests/helpers/payroll-a-ui-fixture.ts
+ create mode 100644 tests/payroll/a-export.test.ts
+ create mode 100644 tests/payroll/a-migration-protection.test.ts
+ create mode 100644 tests/payroll/a-navigation.test.ts
+ create mode 100644 tests/payroll/a-receipt-migration.test.ts
+ create mode 100644 tests/payroll/central-a-amount-integrity.test.ts
+ create mode 100644 tests/payroll/central-a-codec.test.ts
+ create mode 100644 tests/payroll/central-a-commands.test.ts
+ create mode 100644 tests/payroll/central-a-diagnostic-location.test.ts
+ create mode 100644 tests/payroll/central-a-http.test.ts
+ create mode 100644 tests/payroll/central-a-prices.test.ts
+ create mode 100644 tests/payroll/central-a-provenance.test.ts
+ create mode 100644 tests/payroll/central-a-service.test.ts
+ create mode 100644 tests/payroll/central-a-transactions.test.ts
+ create mode 100644 tests/payroll/quantity-facts-date-integrity.test.ts
+ create mode 100644 tests/payroll/quantity-facts.test.ts
+ create mode 100644 tests/payroll/subject-facts.test.ts
+ create mode 100644 tests/stores/payroll-a-central.test.ts

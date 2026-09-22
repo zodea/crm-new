@@ -8,7 +8,7 @@ import type {
   ProjectContractFormDraft,
 } from '~/lib/contract/forms'
 import type { FormFooterAction } from '~/lib/master-data/page'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import {
   listContractFormAttachments,
   loadContractSupplementForm,
@@ -372,10 +372,8 @@ async function leaveToList() {
   await navigateTo(meta.value.listPath)
 }
 
-onBeforeRouteLeave(async () => {
+useTabCloseGuard(async () => {
   if (allowLeave || !dirty.value)
-    return true
-  if (tabsStore.tabs.some(tab => tab.key === pageKey))
     return true
   const leave = await confirm({
     variant: 'simple',
@@ -383,8 +381,6 @@ onBeforeRouteLeave(async () => {
     message: '当前表单还有未保存内容，确认离开？',
     confirmLabel: '放弃修改',
   })
-  if (!leave)
-    tabsStore.open({ fullPath: pageFullPath, title: title.value })
   return leave
 })
 
@@ -394,7 +390,6 @@ onMounted(() => void initialize())
 <template>
   <EntityFormShell
     :title="title"
-    :subtitle="`${meta.subtitle}；草稿允许缺项，提交时校验真实关联与金额勾稽。`"
     :back-label="`返回${meta.listLabel}`"
     :sections="sections"
     :state="pageState"

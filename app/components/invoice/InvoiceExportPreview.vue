@@ -1,21 +1,27 @@
 <script setup lang="ts">
 import type {
-  InvoiceBorderSide,
   InvoiceBorderStyle,
   InvoiceFontStyle,
   InvoiceLedgerExportRow,
   InvoiceXlsxStyleConfig,
+  InvoiceResolvedStyleConfig as StyleDraft,
 } from '~/lib/invoice/excel'
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
+import InvoiceBorderSettings from '~/components/invoice/InvoiceBorderSettings.vue'
+import InvoiceExportTable from '~/components/invoice/InvoiceExportTable.vue'
+import { Button } from '~/components/ui/button'
 import {
+  INVOICE_LEDGER_EXPORT_COLUMNS as columnDefinitions,
   createDefaultInvoiceXlsxStyleConfig,
   DATE_FORMAT,
   MONEY_FORMAT,
+  normalizeInvoiceXlsxStyleConfig,
 } from '~/lib/invoice/excel'
+import { resolveInvoiceBorder } from '~/lib/invoice/xlsx-border'
 import { yuan } from '~/lib/util/money'
 import { useInvoiceStore } from '~/stores/invoice'
 
-const props = defineProps<{
+defineProps<{
   rows: readonly InvoiceLedgerExportRow[]
   totalAmount: number
   fileName: string
@@ -28,48 +34,13 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 const invoiceStore = useInvoiceStore()
-const PREVIEW_LIMIT = 200
-const visibleRows = computed(() => props.rows.slice(0, PREVIEW_LIMIT))
-const hiddenCount = computed(() => Math.max(0, props.rows.length - PREVIEW_LIMIT))
-
 type FontKey = 'titleFont' | 'headerFont' | 'dataFont' | 'totalFont'
 type ColumnKey = keyof InvoiceLedgerExportRow
-type BorderKey = keyof InvoiceBorderStyle
-
-interface StyleDraft {
-  freezeRows: number
-  titleRowHeight: number
-  headerRowHeight: number
-  dataRowHeight: number
-  totalRowHeight: number
-  columnWidths: Record<ColumnKey, number>
-  dateFormat: string
-  moneyFormat: string
-  textFormat: string
-  mergeTitle: boolean
-  mergeRepeatedValues: boolean
-  titleFont: InvoiceFontStyle
-  headerFont: InvoiceFontStyle
-  dataFont: InvoiceFontStyle
-  totalFont: InvoiceFontStyle
-  border: InvoiceBorderStyle
-}
 
 const styleSaved = ref(false)
 const styleLoading = ref(false)
 const styleSaving = ref(false)
 const styleSaveError = ref('')
-
-const columnDefinitions: readonly { key: ColumnKey, label: string }[] = [
-  { key: 'invoiceDate', label: '发票日期' },
-  { key: 'invoiceNumber', label: '发票号码' },
-  { key: 'seller', label: '供应商' },
-  { key: 'invoiceType', label: '票据类型' },
-  { key: 'totalAmount', label: '价税合计' },
-  { key: 'projectName', label: '归属项目' },
-  { key: 'source', label: '来源' },
-  { key: 'remark', label: '备注' },
-]
 
 const fontDefinitions: readonly { key: FontKey, label: string }[] = [
   { key: 'titleFont', label: '标题带' },
@@ -78,23 +49,15 @@ const fontDefinitions: readonly { key: FontKey, label: string }[] = [
   { key: 'totalFont', label: '合计行' },
 ]
 
-const borderDefinitions: readonly { key: BorderKey, label: string }[] = [
-  { key: 'top', label: '上边框' },
-  { key: 'bottom', label: '下边框' },
-  { key: 'left', label: '左边框' },
-  { key: 'right', label: '右边框' },
-]
-
-const borderStyles = [
-  { value: 'thin', label: '细线' },
-  { value: 'medium', label: '中线' },
-  { value: 'dashed', label: '虚线' },
-  { value: 'dotted', label: '点线' },
-  { value: 'none', label: '无' },
+const moneyFormats = [
+  { value: MONEY_FORMAT, label: '1234.56（负数红色括号）' },
+  { value: '#,##0.00', label: '1,234.56' },
+  { value: '0.00', label: '1234.56' },
 ]
 
 function toDraft(config: InvoiceXlsxStyleConfig): StyleDraft {
   const defaults = createDefaultInvoiceXlsxStyleConfig()
+  const border = resolveInvoiceBorder(config.border, defaults.border as InvoiceBorderStyle)
   return {
     freezeRows: config.freezeRows ?? defaults.freezeRows!,
     titleRowHeight: config.titleRowHeight ?? defaults.titleRowHeight!,
@@ -114,17 +77,14 @@ function toDraft(config: InvoiceXlsxStyleConfig): StyleDraft {
     headerFont: { ...defaults.headerFont, ...config.headerFont } as InvoiceFontStyle,
     dataFont: { ...defaults.dataFont, ...config.dataFont } as InvoiceFontStyle,
     totalFont: { ...defaults.totalFont, ...config.totalFont } as InvoiceFontStyle,
-    border: {
-      top: { ...defaults.border?.top, ...config.border?.top },
-      bottom: { ...defaults.border?.bottom, ...config.border?.bottom },
-      left: { ...defaults.border?.left, ...config.border?.left },
-      right: { ...defaults.border?.right, ...config.border?.right },
-    } as InvoiceBorderStyle,
+    border,
+    headerBorder: resolveInvoiceBorder(config.headerBorder, border),
+    dataBorder: resolveInvoiceBorder(config.dataBorder, border),
   }
 }
 
 function toConfig(draft: StyleDraft): InvoiceXlsxStyleConfig {
-  return {
+  return normalizeInvoiceXlsxStyleConfig({
     freezeRows: Math.max(0, Math.trunc(draft.freezeRows || 0)),
     titleRowHeight: Math.max(1, draft.titleRowHeight || 1),
     headerRowHeight: Math.max(1, draft.headerRowHeight || 1),
@@ -148,10 +108,15 @@ function toConfig(draft: StyleDraft): InvoiceXlsxStyleConfig {
       left: { ...draft.border.left },
       right: { ...draft.border.right },
     },
-  }
+    headerBorder: draft.headerBorder,
+    dataBorder: draft.dataBorder,
+  })
 }
 
 const draft = ref<StyleDraft>(toDraft(invoiceStore.invoiceExportStyle))
+watch(draft, () => {
+  styleSaved.value = false
+}, { deep: true })
 let styleLoadAttempt = 0
 
 watch(open, async (isOpen) => {
@@ -179,15 +144,14 @@ watch(open, async (isOpen) => {
   }
 }, { immediate: true })
 
-function display(value: string | number): string {
-  return value === '' ? '—' : String(value)
-}
-
 async function saveDefaultStyle() {
+  const config = validatedConfig()
+  if (!config)
+    return
   styleSaving.value = true
   styleSaveError.value = ''
   try {
-    await invoiceStore.saveInvoiceExportStyle(toConfig(draft.value))
+    await invoiceStore.saveInvoiceExportStyle(config)
     styleSaved.value = true
   }
   catch {
@@ -202,35 +166,35 @@ async function saveDefaultStyle() {
 function restoreDefaultStyle() {
   draft.value = toDraft(createDefaultInvoiceXlsxStyleConfig())
   styleSaved.value = false
+  styleSaveError.value = ''
 }
 
-function confirmExport() {
-  emit('confirm', toConfig(draft.value))
-}
-
-function fontStyle(key: FontKey) {
-  const font = draft.value[key]
-  return {
-    fontFamily: font.name,
-    fontSize: `${Math.max(8, font.sz)}px`,
-    fontWeight: font.bold ? '700' : '400',
-    fontStyle: font.italic ? 'italic' : 'normal',
-    color: font.color ? `#${font.color.replace(/^#/, '').slice(-6)}` : undefined,
+function validatedConfig() {
+  styleSaveError.value = ''
+  try {
+    return toConfig(draft.value)
+  }
+  catch (cause) {
+    styleSaveError.value = cause instanceof Error ? cause.message : '请检查边框线型与颜色。'
+    return null
   }
 }
 
-function borderStyle(side: InvoiceBorderSide) {
-  return side.style === 'none' ? 'none' : `${side.style} ${side.color ? `#${side.color.replace(/^#/, '').slice(-6)}` : 'var(--line)'}`
-}
-
-function previewColumnStyle(key: ColumnKey) {
-  return { minWidth: `${Math.max(4, draft.value.columnWidths[key]) * 8}px` }
+function confirmExport() {
+  const config = validatedConfig()
+  if (config)
+    emit('confirm', config)
 }
 </script>
 
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="w-[min(1380px,calc(100vw-24px))] p-0" :show-close="!saving">
+    <DialogContent
+      class="w-[min(1380px,calc(100vw-24px))] p-0"
+      :show-close="!saving && !styleSaving"
+      @escape-key-down="(saving || styleSaving) && $event.preventDefault()"
+      @interact-outside="(saving || styleSaving) && $event.preventDefault()"
+    >
       <div class="flex max-h-[min(900px,calc(100dvh-32px))] flex-col">
         <DialogHeader class="shrink-0 border-b border-line px-5 py-4">
           <DialogTitle>导出 Excel 预览与样式设置</DialogTitle>
@@ -246,81 +210,7 @@ function previewColumnStyle(key: ColumnKey) {
 
         <div class="min-h-0 flex-1 overflow-auto p-4 md:p-5">
           <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_370px]">
-            <section class="min-w-0" aria-label="Excel 数据预览">
-              <div class="mb-2 flex flex-wrap items-center justify-between gap-2 text-11px text-ink-faint">
-                <span>数据预览（实际导出包含全部记录）</span>
-                <span>冻结前 {{ draft.freezeRows }} 行 · {{ draft.mergeTitle ? '标题合并' : '标题不合并' }}</span>
-              </div>
-              <div class="overflow-x-auto border border-line rounded-[var(--radius-card)] bg-panel">
-                <table class="min-w-[980px] w-full border-collapse text-12px" data-testid="invoice-export-preview-table">
-                  <thead class="sticky top-0 z-1 bg-surface-2">
-                    <tr class="border-b border-line text-left text-11px text-ink-soft" :style="{ height: `${draft.headerRowHeight}px` }">
-                      <th class="whitespace-nowrap px-3 py-2 font-700">
-                        #
-                      </th>
-                      <th v-for="column in columnDefinitions" :key="column.key" class="whitespace-nowrap px-3 py-2 font-700" :style="previewColumnStyle(column.key)">
-                        {{ column.label }}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(row, index) in visibleRows"
-                      :key="`${row.invoiceNumber}-${index}`"
-                      class="border-b last:border-b-0"
-                      :style="{ ...fontStyle('dataFont'), height: `${draft.dataRowHeight}px`, borderBottom: borderStyle(draft.border.bottom) }"
-                    >
-                      <td class="px-3 py-2 text-ink-faint font-mono tabular-nums">
-                        {{ index + 1 }}
-                      </td>
-                      <td class="whitespace-nowrap px-3 py-2 text-ink" :style="previewColumnStyle('invoiceDate')">
-                        {{ display(row.invoiceDate) }}
-                      </td>
-                      <td class="whitespace-nowrap px-3 py-2 text-ink font-mono" :style="previewColumnStyle('invoiceNumber')">
-                        {{ display(row.invoiceNumber) }}
-                      </td>
-                      <td class="max-w-[240px] truncate px-3 py-2 text-ink" :title="row.seller" :style="previewColumnStyle('seller')">
-                        {{ display(row.seller) }}
-                      </td>
-                      <td class="whitespace-nowrap px-3 py-2 text-right text-ink font-mono tabular-nums" :style="previewColumnStyle('totalAmount')">
-                        {{ yuan(row.totalAmount) }}
-                      </td>
-                      <td class="whitespace-nowrap px-3 py-2 text-ink-soft" :style="previewColumnStyle('invoiceType')">
-                        {{ display(row.invoiceType) }}
-                      </td>
-                      <td class="max-w-[220px] truncate px-3 py-2 text-ink" :title="row.projectName" :style="previewColumnStyle('projectName')">
-                        {{ display(row.projectName) }}
-                      </td>
-                      <td class="whitespace-nowrap px-3 py-2 text-ink-soft" :style="previewColumnStyle('source')">
-                        {{ display(row.source) }}
-                      </td>
-                      <td class="max-w-[220px] truncate px-3 py-2 text-ink-soft" :title="row.remark" :style="previewColumnStyle('remark')">
-                        {{ display(row.remark) }}
-                      </td>
-                    </tr>
-                    <tr v-if="!rows.length">
-                      <td colspan="9" class="px-3 py-8 text-center text-ink-faint">
-                        没有可导出的记录。
-                      </td>
-                    </tr>
-                  </tbody>
-                  <tfoot>
-                    <tr class="bg-surface-2" :style="{ ...fontStyle('totalFont'), height: `${draft.totalRowHeight}px` }">
-                      <td colspan="4" class="px-3 py-2 text-ink">
-                        合计
-                      </td>
-                      <td class="whitespace-nowrap px-3 py-2 text-right text-ink font-mono tabular-nums">
-                        {{ yuan(totalAmount) }}
-                      </td>
-                      <td colspan="4" />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-              <p v-if="hiddenCount" class="mt-2 text-11px text-ink-faint">
-                预览显示前 {{ PREVIEW_LIMIT }} 条，实际导出仍包含全部 {{ hiddenCount }} 条其余记录。
-              </p>
-            </section>
+            <InvoiceExportTable :rows="rows" :total-amount="totalAmount" :style-config="draft" />
 
             <aside class="min-w-0 border border-line rounded-[var(--radius-card)] bg-panel" data-testid="invoice-export-style-settings" aria-label="Excel 样式设置">
               <div class="flex items-start justify-between gap-3 border-b border-line bg-surface-2 px-4 py-3">
@@ -339,8 +229,8 @@ function previewColumnStyle(key: ColumnKey) {
                 正在载入默认样式…
               </p>
               <fieldset
-                :disabled="styleLoading"
-                :aria-busy="styleLoading"
+                :disabled="styleLoading || styleSaving"
+                :aria-busy="styleLoading || styleSaving"
                 class="m-0 max-h-[620px] min-w-0 overflow-y-auto border-0 p-4"
               >
                 <section class="border-b border-line pb-4">
@@ -385,13 +275,11 @@ function previewColumnStyle(key: ColumnKey) {
                 </section>
 
                 <section class="border-b border-line py-4">
-                  <h3 class="mb-2 text-11px font-800 text-ink">
-                    边框
-                  </h3>
-                  <div class="grid grid-cols-2 gap-2">
-                    <label v-for="borderDefinition in borderDefinitions" :key="borderDefinition.key" class="text-10px text-ink-soft">{{ borderDefinition.label }}<select v-model="draft.border[borderDefinition.key].style" class="field-input mt-1 w-full text-11px"><option v-for="option in borderStyles" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
-                  </div>
-                  <label class="mt-2 block text-10px text-ink-soft">边框颜色<input v-model="draft.border.bottom.color" class="field-input mt-1 w-full text-11px" placeholder="如 FF000000"></label>
+                  <InvoiceBorderSettings v-model="draft.headerBorder" label="表头" />
+                  <InvoiceBorderSettings v-model="draft.dataBorder" label="数据行" class="mt-4" />
+                  <p class="mt-2 text-10px leading-4 text-ink-faint">
+                    每边可单独填写颜色，如 #336699 或 FF336699；留空使用黑色。标题和合计沿用原边框。
+                  </p>
                 </section>
 
                 <section class="border-b border-line py-4">
@@ -400,7 +288,7 @@ function previewColumnStyle(key: ColumnKey) {
                   </h3>
                   <div class="grid gap-2">
                     <label class="text-10px text-ink-soft">日期格式<select v-model="draft.dateFormat" class="field-input mt-1 w-full text-11px"><option value="yyyy&quot;年&quot;m&quot;月&quot;d&quot;日&quot;;@">2026年8月11日</option><option value="yyyy-mm-dd">2026-08-11</option><option value="yyyy/mm/dd">2026/08/11</option></select></label>
-                    <label class="text-10px text-ink-soft">金额格式<select v-model="draft.moneyFormat" class="field-input mt-1 w-full text-11px"><option value="0.00_);[Red]\\(0.00\\)">1,234.56（负数红色）</option><option value="#,##0.00">1,234.56</option><option value="0.00">1234.56</option></select></label>
+                    <label class="text-10px text-ink-soft">金额格式<select v-model="draft.moneyFormat" class="field-input mt-1 w-full text-11px"><option v-if="!moneyFormats.some(option => option.value === draft.moneyFormat)" :value="draft.moneyFormat">自定义（{{ draft.moneyFormat }}）</option><option v-for="option in moneyFormats" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
                     <label class="text-10px text-ink-soft">文本格式<input v-model="draft.textFormat" class="field-input mt-1 w-full text-11px" placeholder="如 @ 或 @ &quot;文本&quot;"></label>
                     <label class="inline-flex items-center gap-2 text-11px text-ink-soft"><input v-model="draft.mergeTitle" type="checkbox" class="accent-brand">合并标题行</label>
                     <label class="inline-flex items-center gap-2 text-11px text-ink-soft"><input v-model="draft.mergeRepeatedValues" type="checkbox" class="accent-brand">合并连续相同的供应商和归属项目</label>
@@ -408,33 +296,33 @@ function previewColumnStyle(key: ColumnKey) {
                 </section>
 
                 <div class="mt-4 flex flex-wrap items-center gap-2">
-                  <button type="button" class="btn-secondary text-11px" @click="restoreDefaultStyle">
+                  <Button type="button" size="sm" :disabled="styleSaving" @click="restoreDefaultStyle">
                     恢复默认
-                  </button>
-                  <button type="button" class="btn-secondary text-11px" :disabled="styleSaving" @click="saveDefaultStyle">
+                  </Button>
+                  <Button type="button" size="sm" :disabled="styleSaving" @click="saveDefaultStyle">
                     {{ styleSaving ? '正在保存…' : '保存为台账默认样式' }}
-                  </button>
+                  </Button>
                 </div>
-                <p v-if="styleSaveError" class="mt-2 text-11px text-danger" role="alert">
-                  {{ styleSaveError }}
-                </p>
               </fieldset>
             </aside>
           </div>
         </div>
 
         <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
+          <p v-if="styleSaveError" class="w-full text-11px text-danger" role="alert">
+            {{ styleSaveError }}
+          </p>
           <p class="text-11px text-ink-faint">
             导出文件会包含当前设置、标题带、格式、合并单元格和合计行。
           </p>
           <div class="flex items-center gap-2">
-            <button type="button" class="btn-ghost" :disabled="saving" @click="open = false">
+            <Button type="button" variant="ghost" :disabled="saving || styleSaving" @click="open = false">
               取消
-            </button>
-            <button type="button" class="btn-primary" :disabled="saving || styleLoading || !rows.length" @click="confirmExport">
+            </Button>
+            <Button type="button" variant="primary" :disabled="saving || styleLoading || styleSaving || !rows.length" @click="confirmExport">
               <span v-if="saving" class="i-lucide-loader-circle mr-1 animate-spin" aria-hidden="true" />
               {{ saving ? '正在保存…' : '确认导出' }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

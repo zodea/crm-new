@@ -1,3 +1,4 @@
+import type { BoqBuildingAudit, BoqBuildingCommand, BoqBuildingContext, BoqBuildingEvidence, BoqBuildingQuery, BoqBuildingResult, BoqLineSource } from '../../app/lib/boq/central-building-contract'
 import type { BoqChangeOperation } from '../../app/lib/boq/read-model'
 import type { FileRefChanges, FileRefRecord } from '../../app/lib/forms/file-refs'
 import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
@@ -17,8 +18,15 @@ import type {
   OwnerDocumentDraft,
 } from '../../app/lib/owner-document/forms'
 import type { PenaltyDeductionSource, PenaltyRectificationEvent } from '../../app/lib/owner-document/project-penalty'
+import type { QuantityBasis } from '../../app/lib/quantity/basis'
+import type { QuantityBoqLine, QuantityBoqWorkspace } from '../../app/lib/quantity/central-boq'
+import type { QuantityMonthlyBoqFact } from '../../app/lib/quantity/central-monthly'
+import type { ReceiptRecord } from '../../app/lib/receipt/contract'
 import type { SubcontractContractDetailSource } from '../../app/lib/subcontract-contract/repository'
+import type { ProblemDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
+import { createHash } from 'node:crypto'
+import { parseBoqBuildingCommand } from '../../app/lib/boq/central-building-request'
 import { calculateBoqChangeLine } from '../../app/lib/boq/change-calculation'
 import {
   OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY,
@@ -31,8 +39,14 @@ import {
   ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
 import { matchesPenaltySettlement } from '../../app/lib/owner-document/project-penalty'
+import { isQuantityBasis } from '../../app/lib/quantity/basis'
+import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
 import { isISODateDTO, isISODateTimeDTO } from '../../app/types/read-model'
+import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
+import { customerCommandTestInstance } from './customer-command-test-instance'
+import { projectCommandTestInstance } from './project-command-test-instance'
+import { receiptReadTestInstance } from './receipt-read-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 
 interface ProjectSeed {
@@ -72,6 +86,7 @@ interface SubcontractSeed {
 interface BoqLineSeed extends OwnerDocumentBoqLine {
   projectId: string
   contractId: string
+  source?: BoqLineSource
 }
 
 interface MonthlyQuantityFactSeed {
@@ -116,15 +131,20 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   crews?: readonly SupplierSeed[]
   crewSource?: Pick<typeof crewWorkerCommandTestInstance, 'crewRows'>
   projects?: readonly ProjectSeed[]
+  projectSource?: Pick<typeof projectCommandTestInstance, 'rows'>
   customers?: readonly CustomerSeed[]
+  customerSource?: Pick<typeof customerCommandTestInstance, 'rows'>
   suppliers?: readonly SupplierSeed[]
   contracts?: readonly ContractSeed[]
+  constructionContractSource?: Pick<typeof constructionContractCommandTestInstance, 'rows' | 'facts'>
   subcontractContracts?: readonly SubcontractSeed[]
   subcontractContractSource?: Pick<typeof subcontractContractCommandTestInstance, 'rows'>
   boqLines?: readonly BoqLineSeed[]
   monthlyQuantityFacts?: readonly MonthlyQuantityFactSeed[]
+  withMonthlyQuantity?: <T>(projectId: string, sessionId: string | null | undefined, consume: (facts: readonly QuantityMonthlyBoqFact[]) => T, basis: QuantityBasis) => Promise<T>
   finalSettlementSupplements?: readonly FinalSettlementSupplementSeed[]
   finalSettlementReceipts?: readonly FinalSettlementReceiptSeed[]
+  receiptSource?: typeof receiptReadTestInstance.facts
   documents?: readonly OwnerCommercialDocumentSource[]
 }
 
@@ -133,6 +153,7 @@ interface WorkspaceState {
   crews: Map<string, SupplierSeed>
   penaltyDeductions: Map<string, PenaltyDeductionSource>
   penaltyRectifications: Map<string, PenaltyRectificationEvent & { penaltyId: string }>
+  sessionId?: string | null
   documents: Map<string, OwnerCommercialDocumentSource>
   commands: Map<string, OwnerCommercialDocumentCommandResultDTO>
   migrationKeys: Set<string>
@@ -142,6 +163,9 @@ interface WorkspaceState {
   contracts: Map<string, ContractSeed>
   subcontractContracts: Map<string, SubcontractSeed>
   boqLines: Map<string, BoqLineSeed>
+  boqBuildingOriginals: Map<string, BoqLineSeed>
+  boqBuildingAudit: BoqBuildingAudit[]
+  boqBuildingCommands: Map<string, { fingerprint: string, result: BoqBuildingResult }>
   monthlyQuantityFacts: MonthlyQuantityFactSeed[]
   finalSettlementSupplements: Map<string, FinalSettlementSupplementSeed>
   finalSettlementReceipts: Map<string, FinalSettlementReceiptSeed>
@@ -172,6 +196,17 @@ function nullableNumber(value: unknown): number | null {
     return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function migrationBoqLineSource(value: unknown): BoqLineSource | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.confirmed !== 'boolean' || !['boqFileId', 'changeOrderId', 'traceKey', 'sourceSheet'].every(key => row[key] === null || typeof row[key] === 'string')
+    || !(row.sourceRow === null || (Number.isSafeInteger(row.sourceRow) && Number(row.sourceRow) >= 0))) {
+    return undefined
+  }
+  return { boqFileId: text(row.boqFileId) || null, changeOrderId: text(row.changeOrderId) || null, traceKey: text(row.traceKey) || null, sourceSheet: text(row.sourceSheet) || null, sourceRow: row.sourceRow as number | null, confirmed: row.confirmed }
 }
 
 function round(value: number): number {
@@ -562,6 +597,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       contracts: new Map(baseContracts.map(row => [row.id, clone(row)])),
       subcontractContracts: new Map(baseSubcontractContracts.map(row => [row.id, clone(row)])),
       boqLines: new Map(baseBoqLines.map(row => [row.id, clone(row)])),
+      boqBuildingOriginals: new Map(),
+      boqBuildingAudit: [],
+      boqBuildingCommands: new Map(),
       monthlyQuantityFacts: baseMonthlyQuantityFacts.map(clone),
       finalSettlementSupplements: new Map(baseFinalSettlementSupplements.map(row => [row.id, clone(row)])),
       finalSettlementReceipts: new Map(baseFinalSettlementReceipts.map(row => [row.id, clone(row)])),
@@ -590,16 +628,89 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         state.linkedCrewIds.add(crew.id)
       }
     }
+    state.sessionId = sessionId
     return state
   }
 
-  function linkedSubcontractRows(): SubcontractContractDetailSource[] {
-    return linkedSubcontractContractSource?.rows().map(clone) ?? []
+  function buildBoqBuildingContext(state: WorkspaceState, query: BoqBuildingQuery, session: BusinessSession, evidence: BoqBuildingEvidence): BoqBuildingContext {
+    if (!session.workspaceId || !session.actorId || query.origin !== 'real'
+      || !['project:list:read', 'construction-contract:read', 'owner-document:read', 'quantity:read'].every(capability => session.capabilities.includes(capability))) {
+      throw failure('forbidden', '当前身份无权读取正式施工合同清单')
+    }
+    const contract = effectiveConstructionContracts(state).get(query.contractId)
+    if (!effectiveProjects(state).has(query.projectId) || !contract)
+      throw failure('not-found', '项目或施工合同已失效，请返回重新读取')
+    if (contract.projectId !== query.projectId)
+      throw failure('relationship-mismatch', '施工合同不属于当前项目')
+    const sourceLines = [...state.boqLines.values()].filter(row => row.projectId === query.projectId && row.contractId === query.contractId).sort((a, b) => a.id.localeCompare(b.id))
+    const effectiveLines = effectiveBoqState(state, { projectId: query.projectId, contractId: query.contractId })
+    const lines = sourceLines.map((line) => {
+      const sourceKind = line.source?.changeOrderId ? 'change-addition' as const : line.source?.boqFileId && line.source.confirmed ? 'confirmed-import' as const : 'unknown' as const
+      const effective = effectiveLines.get(line.id)!
+      return { id: line.id, itemName: line.itemName, unit: line.unit, qty: line.qty, unitPrice: line.unitPrice, effectiveQty: effective.effectiveQty, effectiveUnitPrice: effective.effectiveUnitPrice, building: line.building ?? null, sourceKind, readOnlyReason: sourceKind === 'change-addition' ? '已签证变更新增行不可直接更正，请沿原变洽签业务处理' : sourceKind === 'unknown' ? '缺少已确认导入原始行证据，不可直接更正' : !session.capabilities.includes('owner-document:write') ? '当前身份无权更正清单' : null }
+    })
+    const sourceVersion = `boq-building:${createHash('sha256').update(JSON.stringify([session.workspaceId, query, contract, sourceLines, lines, evidence, state.sourceVersion])).digest('hex')}`
+    return clone({ ...query, workspaceId: session.workspaceId, actorId: session.actorId, contractName: contract.name, sourceVersion, capabilities: [...session.capabilities], buildings: evidence.buildings, lines, audit: state.boqBuildingAudit.filter(row => row.projectId === query.projectId && row.contractId === query.contractId) })
+  }
+
+  function boqBuildingContext(query: BoqBuildingQuery, session: BusinessSession, evidence: BoqBuildingEvidence, sessionId?: string | null): BoqBuildingContext {
+    return buildBoqBuildingContext(stateFor(sessionId), query, session, evidence)
+  }
+
+  /** 只能在量域串行窗口的 SQL 读取成功后同步调用；全部校验和结果生成先于发布。 */
+  function correctBoqBuilding(input: BoqBuildingCommand, session: BusinessSession, evidence: BoqBuildingEvidence, sessionId?: string | null): BoqBuildingResult {
+    const command = parseBoqBuildingCommand(input)
+    if (command.workspaceId !== session.workspaceId || command.actorId !== session.actorId || !session.capabilities.includes(command.requiredCapability))
+      throw failure('forbidden', '当前身份无权更正施工合同清单')
+    const query: BoqBuildingQuery = { projectId: command.projectId, contractId: command.contractId, origin: command.origin }
+    const state = stateFor(sessionId)
+    const context = buildBoqBuildingContext(state, query, session, evidence)
+    const fingerprint = JSON.stringify(command)
+    const duplicate = state.boqBuildingCommands.get(command.commandId)
+    if (duplicate) {
+      if (duplicate.fingerprint !== fingerprint)
+        throw failure('conflict', '同一提交编号不能更换更正内容')
+      return clone(duplicate.result)
+    }
+    if (command.sourceVersion !== context.sourceVersion)
+      throw new OwnerCommercialDocumentRepositoryProblem(ownerCommercialDocumentProblem('stale-source', '清单、合同或楼栋来源已变化，请重新读取后更正'))
+    const line = context.lines.find(row => row.id === command.lineId)
+    if (!line)
+      throw failure('not-found', '所选清单行已失效或不属于当前合同')
+    if (line.readOnlyReason)
+      throw failure('forbidden', line.readOnlyReason)
+    const building = context.buildings.find(row => row.id === command.buildingId)
+    if (!building)
+      throw failure('relationship-mismatch', '所选楼栋已失效或不属于当前项目')
+    const code = building.code.trim()
+    const matches = context.buildings.filter(row => row.code === code || row.name === code)
+    if (!code || matches.length !== 1 || matches[0]!.id !== building.id)
+      throw failure('validation-failed', '楼栋编码不能唯一识别当前楼栋，请先修正项目区域')
+    if (line.building === code)
+      throw failure('validation-failed', '该行已有相同楼栋证据，无需更正')
+    const candidate = clone(state)
+    const original = candidate.boqLines.get(command.lineId)!
+    if (!candidate.boqBuildingOriginals.has(original.id))
+      candidate.boqBuildingOriginals.set(original.id, clone(original))
+    const occurredAt = now()
+    const audit: BoqBuildingAudit = { id: `boq-building:${command.commandId}`, tableName: 'boq_lines', lineId: line.id, projectId: query.projectId, contractId: query.contractId, commandId: command.commandId, actorId: session.actorId, occurredAt, reason: command.reason, beforeBuilding: line.building, building: code, buildingId: building.id, sourceVersion: context.sourceVersion, source: clone(original.source!) }
+    candidate.boqLines.set(original.id, { ...original, building: code, updatedAt: occurredAt })
+    candidate.boqBuildingAudit.push(audit)
+    candidate.sourceVersion += 1
+    const result: BoqBuildingResult = { commandId: command.commandId, projectId: query.projectId, contractId: query.contractId, lineId: original.id, buildingId: building.id, building: code, sourceVersion: buildBoqBuildingContext(candidate, query, session, evidence).sourceVersion, auditId: audit.id }
+    candidate.boqBuildingCommands.set(command.commandId, { fingerprint, result })
+    const response = clone(result)
+    workspaces.set(workspaceKey(sessionId), candidate)
+    return response
+  }
+
+  function linkedSubcontractRows(state: WorkspaceState): SubcontractContractDetailSource[] {
+    return linkedSubcontractContractSource?.rows(state.sessionId).map(clone) ?? []
   }
 
   function effectiveSubcontractContracts(state: WorkspaceState): Map<string, SubcontractSeed> {
     return new Map([
-      ...linkedSubcontractRows().map(row => [row.id, {
+      ...linkedSubcontractRows(state).map(row => [row.id, {
         id: row.id,
         no: row.no,
         name: row.name,
@@ -612,43 +723,94 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 
   function effectiveProjects(state: WorkspaceState): Map<string, ProjectSeed> {
+    if (options.projectSource)
+      return new Map(options.projectSource.rows(state.sessionId).map(row => [row.id, { id: row.id, name: row.name, customerId: row.customerId }]))
     return new Map([
-      ...linkedSubcontractRows()
+      ...linkedSubcontractRows(state)
         .filter(row => row.projectId)
         .map(row => [row.projectId!, { id: row.projectId!, name: row.projectName, customerId: null }] as const),
       ...state.projects.entries(),
     ])
   }
 
+  function effectiveCustomers(state: WorkspaceState): Map<string, CustomerSeed> {
+    return options.customerSource
+      ? new Map(options.customerSource.rows(state.sessionId).map(row => [row.id, { id: row.id, name: row.name }]))
+      : state.customers
+  }
+
+  function effectiveConstructionContracts(state: WorkspaceState): Map<string, ContractSeed> {
+    return options.constructionContractSource
+      ? new Map(options.constructionContractSource.rows(state.sessionId).map(row => [row.id, { id: row.id, no: row.no, name: row.name, projectId: row.projectId ?? '', customerId: row.customerId, amount: row.amount }]))
+      : state.contracts
+  }
+
+  function finalSettlementSupplements(state: WorkspaceState, contractId: string) {
+    const known = options.constructionContractSource !== undefined || state.finalSettlementSupplementsKnownContractIds.has(contractId)
+    if (!known)
+      return null
+    const sources = new Map([...state.finalSettlementSupplements.values()].filter(row => row.contractId === contractId).map(row => [row.id, row]))
+    for (const row of options.constructionContractSource?.facts(state.sessionId).supplements ?? []) {
+      if (row.dataOrigin !== 'real' || row.contractId !== contractId)
+        continue
+      if (row.amount === null)
+        return null
+      sources.set(row.id, { contractId, id: row.id, no: row.no, name: row.name, status: row.status, amount: row.amount, date: row.date })
+    }
+    return [...sources.values()].map(({ contractId: _contractId, ...row }) => clone(row))
+  }
+
   function effectiveSuppliers(state: WorkspaceState): Map<string, SupplierSeed> {
     return new Map([
-      ...linkedSubcontractRows()
+      ...linkedSubcontractRows(state)
         .filter(row => row.supplierId)
         .map(row => [row.supplierId!, { id: row.supplierId!, name: row.supplierName }] as const),
       ...state.suppliers.entries(),
     ])
   }
 
+  function currentReceiptFacts(state: WorkspaceState): { rows: ReceiptRecord[] | null, sourceVersion: string, problem?: ProblemDTO } | undefined {
+    if (!options.receiptSource)
+      return undefined
+    try {
+      const source = options.receiptSource(state.sessionId)
+      if (source.rows.some(row => ownerFinalSettlementReceiptIsActive(row.draft.status) && row.draft.amount === null))
+        throw new ReceiptRepositoryProblem({ code: 'unavailable', message: '有效收款金额尚未记录，当前无法计算', retryable: false, fieldErrors: {}, traceId: null })
+      if (!['project:list:read', 'customer:list:read', 'construction-contract:read'].every(capability => source.capabilities.includes(capability)))
+        throw new ReceiptRepositoryProblem({ code: 'forbidden', message: '无权读取收款与结算的关联', retryable: false, fieldErrors: {}, traceId: null })
+      return source
+    }
+    catch (cause) {
+      if (!(cause instanceof ReceiptRepositoryProblem) || !['forbidden', 'unavailable'].includes(cause.problem.code))
+        throw cause
+      return { rows: null, sourceVersion: `receipt-${cause.problem.code}`, problem: cause.problem }
+    }
+  }
+
   function finalSettlementEvidenceForContract(state: WorkspaceState, contractId: string | null) {
-    const contract = contractId ? state.contracts.get(contractId) ?? null : null
+    const contract = contractId ? effectiveConstructionContracts(state).get(contractId) ?? null : null
     if (!contract)
       return undefined
-    const project = state.projects.get(contract.projectId) ?? null
+    const project = effectiveProjects(state).get(contract.projectId) ?? null
     const customerId = contract.customerId ?? project?.customerId ?? null
+    const receiptSource = currentReceiptFacts(state)
     return {
+      ...(receiptSource?.problem ? { receiptsProblem: receiptSource.problem } : {}),
       originalContractAmount: contract.amount ?? null,
-      supplements: state.finalSettlementSupplementsKnownContractIds.has(contract.id)
-        ? [...state.finalSettlementSupplements.values()]
-            .filter(source => source.contractId === contract.id)
-            .map(({ contractId: _contractId, ...source }) => clone(source))
-        : null,
-      receipts: state.finalSettlementReceiptsKnownContractIds.has(contract.id)
-        ? [...state.finalSettlementReceipts.values()]
-            .filter(source => source.contractId === contract.id
-              && source.projectId === contract.projectId
-              && source.customerId === customerId)
-            .map(({ contractId: _contractId, projectId: _projectId, customerId: _customerId, ...source }) => clone(source))
-        : null,
+      supplements: finalSettlementSupplements(state, contract.id),
+      receipts: receiptSource
+        ? receiptSource.rows === null
+          ? null
+          : receiptSource.rows
+              .filter(row => row.dataOrigin === 'real' && row.draft.contractId === contract.id && row.draft.projectId === contract.projectId && row.draft.customerId === customerId && ownerFinalSettlementReceiptIsActive(row.draft.status))
+              .map(({ id, draft }) => ({ id, no: draft.no, name: draft.no || '收款登记', status: draft.status, amount: Number(draft.amount), date: draft.receiptDate || null }))
+        : state.finalSettlementReceiptsKnownContractIds.has(contract.id)
+          ? [...state.finalSettlementReceipts.values()]
+              .filter(source => source.contractId === contract.id
+                && source.projectId === contract.projectId
+                && source.customerId === customerId)
+              .map(({ contractId: _contractId, projectId: _projectId, customerId: _customerId, ...source }) => clone(source))
+          : null,
     }
   }
 
@@ -765,14 +927,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const contractId = complete ? required(draft.contractId, '施工合同') : text(draft.contractId)
     if (contractId && !projectId)
       throw failure('relationship-mismatch', '选择施工合同前必须先选择项目')
-    const project = projectId ? state.projects.get(projectId) ?? null : null
-    const contract = contractId ? state.contracts.get(contractId) ?? null : null
+    const project = projectId ? effectiveProjects(state).get(projectId) ?? null : null
+    const contract = contractId ? effectiveConstructionContracts(state).get(contractId) ?? null : null
     if (projectId && !project)
       throw failure('relationship-mismatch', '项目不存在或已删除')
     if (contractId && (!contract || contract.projectId !== projectId))
       throw failure('relationship-mismatch', '施工合同不存在、已删除或不属于所选项目')
     const customerId = contract?.customerId ?? project?.customerId ?? null
-    const customer = customerId ? state.customers.get(customerId) ?? null : null
+    const customer = customerId ? effectiveCustomers(state).get(customerId) ?? null : null
     return { project, contract, subcontract: null, customerId, customer, supplierId: null, supplier: null }
   }
 
@@ -792,7 +954,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const effective = new Map(
       [...state.boqLines.values()]
         .filter(line => line.projectId === text(draft.projectId) && line.contractId === text(draft.contractId))
-        .map(line => [line.id, { effectiveQty: line.qty, effectiveUnitPrice: line.unitPrice }]),
+        .map(line => [line.id, { effectiveQty: line.qty, effectiveUnitPrice: line.unitPrice, approvedDeltaQty: 0, updatedAt: line.updatedAt ?? null }]),
     )
     const approvedChanges = [...state.documents.values()]
       .filter(source => source.kind === 'owner_change' && source.status === 'approved'
@@ -807,10 +969,15 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         const target = effective.get(line.boqLineId)
         if (!target)
           continue
-        if (line.operation === 'qty')
-          target.effectiveQty += line.deltaQty ?? 0
+        if (line.operation === 'qty') {
+          target.approvedDeltaQty += line.deltaQty ?? 0
+          if (target.effectiveQty !== null)
+            target.effectiveQty += line.deltaQty ?? 0
+        }
         if (line.operation === 'price' && line.newUnitPrice != null)
           target.effectiveUnitPrice = line.newUnitPrice
+        if (!target.updatedAt || source.updatedAt > target.updatedAt)
+          target.updatedAt = source.updatedAt
       }
     }
     return effective
@@ -830,7 +997,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       try {
         calculation = calculateBoqChangeLine(
           operation as BoqChangeOperation,
-          catalog ? effective.get(catalog.id) ?? null : null,
+          priorEffective,
           deltaQty,
           newUnitPrice,
         )
@@ -842,7 +1009,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const unit = operation === 'add' ? text(raw.unit) : catalog!.unit
       if (catalog) {
         const target = effective.get(catalog.id)!
-        if (operation === 'qty')
+        if (operation === 'qty' && target.effectiveQty !== null)
           target.effectiveQty += calculation.deltaQty ?? 0
         if (operation === 'price' && calculation.newUnitPrice != null)
           target.effectiveUnitPrice = calculation.newUnitPrice
@@ -890,7 +1057,11 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const effectiveLine = effective.get(catalog.id)
       if (!effectiveLine)
         throw failure('relationship-mismatch', 'BOQ 行不属于当前施工合同有效量价台账')
+      if (effectiveLine.effectiveUnitPrice === null)
+        throw failure('validation-failed', '当前清单单价未知，请补齐清单后再申报')
       const reportedQty = nullableNumber(raw.reportedQty) ?? fact.autoQty
+      if (nullableNumber(raw.reportedQty) === null && fact.missingQtyCount > 0)
+        throw failure('validation-failed', '当前自动完成量存在缺量，请核实后明确填写申报量')
       if (reportedQty < 0)
         throw failure('validation-failed', '申报量不能为负数')
       return {
@@ -1363,7 +1534,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       report = request.kind === 'owner_report' ? reportSnapshot(request.draft, state) : null
       lines = request.kind === 'owner_change' ? changeLines(request.draft, state) : report!.lines
     }
-    else if (canResolveDraft(request.kind, request.draft, state)) {
+    else if (!(request.kind === 'owner_report' && options.withMonthlyQuantity) && canResolveDraft(request.kind, request.draft, state)) {
       report = request.kind === 'owner_report' ? reportSnapshot(request.draft, state) : null
       lines = request.kind === 'owner_change' ? changeLines(request.draft, state) : report!.lines
     }
@@ -1421,7 +1592,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       applicationDate: applicationDate || null,
       approvalDate: current?.approvalDate ?? null,
       approvalSequenceAt: current?.approvalSequenceAt ?? null,
-      quantityBasis: report?.evidence.basis ?? null,
+      quantityBasis: report?.evidence.basis ?? (request.kind === 'owner_report' && isQuantityBasis(request.draft.quantityBasis) ? request.draft.quantityBasis : null),
       quantitySourceVersion: report?.evidence.sourceVersion ?? null,
       quantitySourceUpdatedAt: report?.evidence.sourceUpdatedAt ?? null,
       operatorName: request.kind === 'owner_report' && isSubmit ? text(request.draft.operatorName) : '',
@@ -1638,6 +1809,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         unit: line.unit,
         qty: quantity,
         unitPrice,
+        source: { boqFileId: null, changeOrderId: current.id, traceKey: null, sourceSheet: null, sourceRow: null, confirmed: false },
         autoQty: 0,
         missingQtyCount: 0,
       }
@@ -1811,6 +1983,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     sessionId?: string | null,
   ): () => void {
     const state = clone(stateFor(sessionId))
+    const previousBoqLines = new Map(state.boqLines)
     for (const migratedKey of state.migrationKeys)
       state.documents.delete(migratedKey)
     const previousMigrationKeys = new Set(state.migrationKeys)
@@ -1909,7 +2082,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
             date: entityAttribute(entity, 'signDate') || null,
           })
         }
-        if (entity.entityType === 'receipt_registrations') {
+        if (entity.entityType === 'receipt_registrations' && !options.receiptSource) {
           const contractId = entity.references.contractId ?? ''
           const projectId = entity.references.projectId ?? ''
           const customerId = entity.references.customerId ?? ''
@@ -1952,8 +2125,13 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           contractId: required(contract?.id, '合同'),
           itemName: required(raw.itemName, 'BOQ 名称'),
           unit: text(raw.unit),
-          qty: number(raw.qty),
-          unitPrice: number(raw.unitPrice),
+          qty: nullableNumber(raw.qty),
+          unitPrice: nullableNumber(raw.unitPrice),
+          building: text(raw.building) || null,
+          unitType: text(raw.unitType) || null,
+          floorZone: text(raw.floorZone) || null,
+          updatedAt: text(raw.updatedAt) || null,
+          source: migrationBoqLineSource(raw.source),
           autoQty: 0,
           missingQtyCount: 0,
         }
@@ -2354,6 +2532,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           throw failure('validation-failed', '迁移抵扣超出结算金额')
       }
     }
+    for (const [id, original] of state.boqBuildingOriginals) {
+      const incoming = state.boqLines.get(id)
+      if (!state.projects.has(original.projectId) || !state.contracts.has(original.contractId) || !incoming || JSON.stringify(incoming) !== JSON.stringify(original))
+        throw failure('conflict', '该清单已有中央日常更正，迁入或恢复不能删除、替换其原始来源')
+      state.boqLines.set(id, clone(previousBoqLines.get(id)!))
+    }
     state.sourceVersion += 1
     return () => workspaces.set(workspaceKey(sessionId), state)
   }
@@ -2366,6 +2550,11 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 
   return {
+    boqBuildingContext,
+    correctBoqBuilding,
+    hasBoqBuildingCommand(commandId: string, sessionId?: string | null) {
+      return stateFor(sessionId).boqBuildingCommands.has(commandId)
+    },
     reset(sessionId?: string | null) {
       if (sessionId)
         workspaces.delete(sessionId)
@@ -2377,7 +2566,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       return [...state.documents.values()].map(source => withFinalSettlementEvidence(state, source))
     },
     sourceVersion(sessionId?: string | null) {
-      return `owner-document-command-${stateFor(sessionId).sourceVersion}`
+      const state = stateFor(sessionId)
+      const receipts = currentReceiptFacts(state)
+      return `owner-document-command-${state.sourceVersion}${receipts ? `+${receipts.sourceVersion}` : ''}`
     },
     importExisting(
       records: readonly OwnerCommercialDocumentSource[],
@@ -2418,11 +2609,11 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         crews: includeSubcontract ? [...state.crews.values()].map(row => ({ id: row.id, label: row.name })) : [],
         settlements: includeSubcontract ? [...state.documents.values()].filter(row => row.kind === 'sub_settlement' && row.status === 'confirmed').map(row => ({ id: row.id, label: row.name || row.no, projectId: row.projectId, supplierId: row.supplierId ?? null, contractId: row.contractId, amount: row.amount, version: String(row.version), remainingAmount: round(row.amount - [...state.penaltyDeductions.values()].filter(d => d.settlementId === row.id).reduce((sum, d) => sum + d.amount, 0)) })) : [],
         projects: [...effectiveProjects(state).values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
-        customers: includeOwner ? [...state.customers.values()].map(row => ({ id: row.id, label: row.name })) : [],
+        customers: includeOwner ? [...effectiveCustomers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
         suppliers: includeSubcontract ? [...effectiveSuppliers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
         contracts: [
           ...(includeOwner
-            ? [...state.contracts.values()].map(row => ({
+            ? [...effectiveConstructionContracts(state).values()].map(row => ({
                 id: row.id,
                 label: row.name,
                 hint: row.no,
@@ -2449,11 +2640,49 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         ],
       }
     },
-    boqLinesFor(projectId: string, contractId: string, periodNo = '', sessionId?: string | null): OwnerDocumentBoqLine[] {
+    quantityBoqFacts(projectId: string, sessionId?: string | null): QuantityBoqWorkspace & { sourceVersion: string } {
       const state = stateFor(sessionId)
+      const contracts = effectiveConstructionContracts(state)
+      const lines: QuantityBoqLine[] = []
+      if (effectiveProjects(state).has(projectId)) {
+        for (const contract of contracts.values()) {
+          if (contract.projectId !== projectId)
+            continue
+          const effective = effectiveBoqState(state, { projectId, contractId: contract.id })
+          for (const line of state.boqLines.values()) {
+            if (line.projectId !== projectId || line.contractId !== contract.id)
+              continue
+            const current = effective.get(line.id)!
+            lines.push({
+              id: line.id,
+              contractId: contract.id,
+              contractName: contract.name,
+              contractNo: contract.no,
+              itemName: line.itemName,
+              unit: line.unit,
+              qty: line.qty,
+              unitPrice: line.unitPrice,
+              approvedDeltaQty: current.approvedDeltaQty,
+              effectiveUnitPrice: current.effectiveUnitPrice,
+              building: line.building ?? null,
+              unitType: line.unitType ?? null,
+              floorZone: line.floorZone ?? null,
+              updatedAt: current.updatedAt,
+            })
+          }
+        }
+      }
+      lines.sort((left, right) => left.contractId.localeCompare(right.contractId) || left.id.localeCompare(right.id))
+      const sourceVersion = `quantity-boq:${createHash('sha256').update(JSON.stringify([projectId, lines])).digest('hex')}`
+      return { projectId, lines: clone(lines), sourceVersion }
+    },
+    boqLinesFor(projectId: string, contractId: string, periodNo = '', sessionId?: string | null, monthlyFacts?: readonly QuantityMonthlyBoqFact[]): OwnerDocumentBoqLine[] {
+      const state = stateFor(sessionId)
+      if (!effectiveProjects(state).has(projectId) || effectiveConstructionContracts(state).get(contractId)?.projectId !== projectId)
+        return []
       const effective = effectiveBoqState(state, { projectId, contractId })
       const facts = periodNo
-        ? state.monthlyQuantityFacts.filter(fact => fact.projectId === projectId
+        ? (monthlyFacts ?? state.monthlyQuantityFacts).filter(fact => fact.projectId === projectId
           && fact.contractId === contractId && fact.periodNo === periodNo)
         : []
       const factByLine = new Map(facts.map(fact => [fact.boqLineId, fact]))
@@ -2462,7 +2691,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       return [...state.boqLines.values()]
         .filter(line => line.projectId === projectId && line.contractId === contractId)
         .filter(line => !periodNo || factByLine.has(line.id))
-        .map(({ projectId: _projectId, contractId: _contractId, ...line }) => {
+        .map(({ projectId: _projectId, contractId: _contractId, source: _source, ...line }) => {
           const fact = factByLine.get(line.id)
           const effectiveLine = effective.get(line.id)
           return clone({
@@ -2496,50 +2725,81 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       }
     },
     async execute(
-      request: OwnerCommercialDocumentCommandRequestDTO,
+      input: OwnerCommercialDocumentCommandRequestDTO,
       session: BusinessSession,
       sessionId?: string | null,
     ): Promise<OwnerCommercialDocumentCommandResultDTO> {
+      const request = clone(input)
       authorizeCommand(request, session)
       const state = stateFor(sessionId)
       const duplicate = state.commands.get(request.commandId)
       if (duplicate)
         return clone(duplicate)
-      let source: OwnerCommercialDocumentSource
-      switch (request.action) {
-        case 'save':
-        case 'submit':
-          source = save(request, state)
-          break
-        case 'deduct-penalty':
-        case 'rectify-penalty':
-          source = penaltyAction(request, state)
-          break
-        case 'approve':
-          source = approve(request, state)
-          break
-        case 'audit':
-          source = audit(request, state)
-          break
-        case 'transition-acceptance':
-          source = transitionAcceptance(request, state)
-          break
-        case 'attachments':
-          source = updateAttachments(request, state)
-          break
-        case 'delete':
-          source = remove(request, state)
-          break
+      const run = (monthlyFacts?: readonly QuantityMonthlyBoqFact[]) => {
+        const state = stateFor(sessionId)
+        const duplicate = state.commands.get(request.commandId)
+        if (duplicate)
+          return clone(duplicate)
+        const previousMonthlyFacts = state.monthlyQuantityFacts
+        if (monthlyFacts)
+          state.monthlyQuantityFacts = monthlyFacts.map(clone)
+        try {
+          let source: OwnerCommercialDocumentSource
+          switch (request.action) {
+            case 'save':
+            case 'submit':
+              source = save(request, state)
+              break
+            case 'deduct-penalty':
+            case 'rectify-penalty':
+              source = penaltyAction(request, state)
+              break
+            case 'approve':
+              source = approve(request, state)
+              break
+            case 'audit':
+              source = audit(request, state)
+              break
+            case 'transition-acceptance':
+              source = transitionAcceptance(request, state)
+              break
+            case 'attachments':
+              source = updateAttachments(request, state)
+              break
+            case 'delete':
+              source = remove(request, state)
+              break
+          }
+          const commandResult = result(request, source)
+          state.commands.set(request.commandId, commandResult)
+          return clone(commandResult)
+        }
+        finally {
+          state.monthlyQuantityFacts = previousMonthlyFacts
+        }
       }
-      const commandResult = result(request, source)
-      state.commands.set(request.commandId, commandResult)
-      return clone(commandResult)
+      if (options.withMonthlyQuantity && request.kind === 'owner_report' && (request.action === 'save' || request.action === 'submit') && request.draft.projectId) {
+        const basis = request.draft.quantityBasis ?? 'field'
+        if (!isQuantityBasis(basis))
+          throw failure('validation-failed', '取数基准只能是合同量、暂估量或现场复核量')
+        if (request.action === 'submit')
+          return options.withMonthlyQuantity(String(request.draft.projectId), sessionId, run, basis)
+      }
+      return run()
     },
   }
 }
 
 export const ownerCommercialDocumentCommandTestInstance
   = createOwnerCommercialDocumentCommandTestInstance({
+    withMonthlyQuantity: async (projectId, sessionId, consume, basis) => {
+      const { quantityTestInstance } = await import('./quantity-runtime')
+      return quantityTestInstance.withMonthly({ projectId, origin: 'real', includeDemo: false, basis }, consume, sessionId)
+    },
+    receiptSource: sessionId => receiptReadTestInstance.facts(sessionId),
+    projectSource: projectCommandTestInstance,
+    customerSource: customerCommandTestInstance,
+    constructionContractSource: constructionContractCommandTestInstance,
     subcontractContractSource: subcontractContractCommandTestInstance,
     crewSource: crewWorkerCommandTestInstance,
     projects: [{ id: 'project-real-320', name: '中央正式施工项目', customerId: 'customer-real-320' }],

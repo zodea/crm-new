@@ -104,9 +104,9 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const id = session(testInfo)
     await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': id })
+    await reset(page.context().request, id, 'projects')
     await reset(page.context().request, id, 'subcontract-contracts')
     await reset(page.context().request, id, 'owner-documents')
-    await reset(page.context().request, id, 'projects')
   })
 
   test('中央命令保存后从全局、项目和分包合同进入同一专属详情并精确返回', async ({ page }, testInfo) => {

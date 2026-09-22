@@ -56,6 +56,38 @@ function invoice(overrides: Partial<Invoice> = {}): Invoice {
 }
 
 describe('发票台账 Excel 导出', () => {
+  it('表头与数据的四边线型和颜色分别写入真实 XLSX，标题合计保留旧边框', async () => {
+    const border = {
+      top: { style: 'thin', color: 'FF102030' },
+      bottom: { style: 'thin', color: 'FF203040' },
+      left: { style: 'thin', color: 'FF304050' },
+      right: { style: 'thin', color: 'FF405060' },
+    }
+    const headerBorder = {
+      top: { style: 'medium', color: 'FF112233' },
+      bottom: { style: 'dashed', color: 'FF223344' },
+      left: { style: 'dotted', color: 'FF334455' },
+      right: { style: 'thin', color: 'FF445566' },
+    }
+    const dataBorder = {
+      top: { style: 'dotted', color: 'FF556677' },
+      bottom: { style: 'thin', color: 'FF667788' },
+      left: { style: 'medium', color: 'FF778899' },
+      right: { style: 'none', color: 'FF8899AA' },
+    }
+    const style = { border, headerBorder, dataBorder, mergeRepeatedValues: false }
+    const bytes = createInvoiceLedgerXlsx([invoice(), invoice({ id: 'second' })], style)
+    const readback = await readInvoiceWorkbookStyleReadback(bytes)
+    const cells = readback.sheets[0]!.cells
+    expect(readback.issues).toEqual([])
+    expect(cells.A2?.border).toEqual(headerBorder)
+    expect(cells.B2?.border).toEqual(headerBorder)
+    expect(cells.A3?.border).toEqual(dataBorder)
+    expect(cells.B4?.border).toEqual(dataBorder)
+    expect(cells.A1?.border).toEqual(border)
+    expect(cells.A5?.border).toEqual(border)
+  })
+
   it('生成可下载的发票导入模板和填写说明', () => {
     const workbook = XLSX.read(createInvoiceImportTemplateXlsx(), { type: 'array' })
     const worksheet = workbook.Sheets['发票导入']!

@@ -11,6 +11,7 @@ import type {
   CoreMigrationTotalExpectationDTO,
 } from './core-contract'
 import { isTauri } from '@tauri-apps/api/core'
+import { CREW_PAYROLL_FEE_FIELDS, crewPayrollFeeAttributes } from '../crew-worker/payroll-fee-defaults'
 import {
   activateBrowserCoreMigration,
   clearBrowserCoreMigration,
@@ -25,6 +26,8 @@ import {
 import { closeDb, getDb } from '../db/connection'
 import { getCurrentVersion } from '../db/migrations'
 import { openBrowserSqlite } from '../db/sqljs'
+import { quantityMigrationTimestamp } from '../quantity/migration-graph'
+import { readQuantityMigrationGraphs } from '../quantity/migration-source'
 import { AUXILIARY_CONTRACT_SOURCE_SQL, auxiliaryContractSourceEntity, COMPANY_CONTRACT_SOURCE_SQL } from './auxiliary-contract-source'
 import {
   compareCanonicalText,
@@ -36,8 +39,15 @@ import {
   coreMigrationSourceHashInput,
   isCoreMigrationMoney,
 } from './core-contract'
+import { DELIVERY_RECORD_SOURCE_SQL, deliveryRecordSourceEntities } from './delivery-record-source'
+import { assertDeliverySourceDiagnostics, DELIVERY_SOURCE_DIAGNOSTICS_SQL } from './delivery-source-diagnostics'
 import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './other-settlement-source'
 import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
+import { readPayrollProjectMigrationGraphs } from './payroll-source'
+import { readProcessLibraryMigrationGraphs } from './process-library-source'
+import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes } from './supplier-credential-source'
+import { readBudgetVersionMigrationGraphs } from './target-cost-source'
+import { readWbsMigrationGraphs } from './wbs-source'
 
 export interface CoreMigrationLocalSourceDependencies {
   isNative: () => boolean
@@ -68,7 +78,8 @@ export interface CoreMigrationLocalSourceProblem extends Error {
     | 'unidentifiable-source-row'
 }
 
-const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
+const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects' | 'target_cost_versions' | 'payroll_projects'>, string> = {
+  delivery_records: DELIVERY_RECORD_SOURCE_SQL,
   customers: `
     SELECT id, name, deleted_at
     FROM customers
@@ -80,7 +91,7 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     ORDER BY id
   `,
   crews: `
-    SELECT id, name, deleted_at
+    SELECT id, name, default_pay_ratio, deleted_at
     FROM crews
     ORDER BY id
   `,
@@ -106,15 +117,37 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
           'itemName', boq_catalog.item_name,
           'unit', boq_catalog.unit,
           'qty', boq_catalog.qty,
-          'unitPrice', boq_catalog.unit_price
+          'unitPrice', boq_catalog.unit_price,
+          'building', boq_catalog.building,
+          'unitType', boq_catalog.unit_type,
+          'floorZone', boq_catalog.floor_zone,
+          'source', json_object(
+            'boqFileId', boq_catalog.boq_file_id,
+            'changeOrderId', boq_catalog.change_order_id,
+            'traceKey', boq_catalog.trace_key,
+            'sourceSheet', boq_catalog.source_sheet,
+            'sourceRow', boq_catalog.source_row,
+            'confirmed', json(CASE WHEN boq_catalog.confirmed = 1 THEN 'true' ELSE 'false' END)
+          ),
+          'updatedAt', boq_catalog.updated_at
         ))
         FROM (
           SELECT boq_line.id,
                  boq_line.item_name,
                  boq_line.unit,
-                 COALESCE(boq_line.recognized_qty, boq_line.qty, 0) AS qty,
-                 COALESCE(boq_line.recognized_unit_price, boq_line.unit_price, 0) AS unit_price
+                 COALESCE(boq_line.recognized_qty, boq_line.qty) AS qty,
+                 COALESCE(boq_line.recognized_unit_price, boq_line.unit_price) AS unit_price,
+                 boq_line.building,
+                 boq_line.unit_type,
+                 boq_line.floor_zone,
+                 boq_line.boq_file_id, boq_line.change_order_id,
+                 boq_line.trace_key, boq_line.source_sheet, boq_line.source_row,
+                 CASE WHEN boq_line.change_order_id IS NULL AND boq_file.id IS NOT NULL
+                   AND boq_file.contract_id = c.id AND boq_file.deleted_at IS NULL
+                   AND boq_file.parse_status = 'parsed' THEN 1 ELSE 0 END AS confirmed,
+                 boq_line.updated_at
           FROM boq_lines boq_line
+          LEFT JOIN boq_files boq_file ON boq_file.id = boq_line.boq_file_id
           WHERE boq_line.contract_id = c.id
             AND boq_line.project_id = c.project_id
             AND boq_line.deleted_at IS NULL
@@ -200,8 +233,20 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
   receipt_registrations: `
     SELECT
       id, no, receipt_date, project_id, contract_id, customer_id,
-      payer_account, amount, payment_method, review_status, status, note,
-      created_at, updated_at, deleted_at
+      payer_account, amount, payment_method, acceptance_bill_no, bill_due_date,
+      period_no, bank_serial_no, handler, review_status, status, note,
+      created_at, updated_at, deleted_at,
+      (SELECT COALESCE(json_group_array(json_object(
+        'id', f.id, 'ownerType', f.owner_type, 'ownerId', f.owner_id,
+        'fileName', f.file_name, 'filePath', f.file_path, 'fileSize', f.file_size,
+        'mimeType', f.mime_type, 'category', f.category, 'uploader', f.uploader,
+        'uploadedAt', f.uploaded_at, 'deletedAt', f.deleted_at,
+        'payloadEncoding', payload.encoding, 'payloadBase64', CASE WHEN payload.encoding = 'base64' THEN payload.content ELSE NULL END
+      )), '[]') FROM (
+        SELECT * FROM file_refs
+        WHERE owner_type = 'receipt_registration' AND owner_id = receipt_registrations.id
+        ORDER BY id
+      ) f LEFT JOIN file_payloads payload ON payload.file_ref_id = f.id) AS attachments_json
     FROM receipt_registrations
     ORDER BY id
   `,
@@ -758,7 +803,7 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     ORDER BY kind, id
   `,
   workers: `
-    SELECT id, name, crew_id, current_project_id, deleted_at
+    SELECT id, name, crew_id, current_project_id, daily_wage, deleted_at
     FROM workers
     ORDER BY id
   `,
@@ -837,6 +882,21 @@ function normalizeMonthlyQuantityFactsJson(value: unknown): string {
   }
 }
 
+function normalizeBoqCatalogJson(value: unknown): string {
+  const serialized = text(value) || '[]'
+  try {
+    const parsed: unknown = JSON.parse(serialized)
+    if (!Array.isArray(parsed))
+      return serialized
+    return JSON.stringify(parsed.map((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !Object.hasOwn(entry, 'updatedAt'))
+        return entry
+      return { ...entry, updatedAt: isoDateTimeText(entry.updatedAt) }
+    }))
+  }
+  catch { return serialized }
+}
+
 function nullableNumber(value: unknown): number | null {
   if (value == null || value === '')
     return null
@@ -867,6 +927,15 @@ function sourceEntity(
   row: Record<string, unknown>,
 ): CoreMigrationSourceEntityDTO {
   const entity = baseEntity(row)
+  if (entityType === 'crews') {
+    try {
+      const fees = crewPayrollFeeAttributes(Object.fromEntries(CREW_PAYROLL_FEE_FIELDS.filter(field => Object.hasOwn(row, field.column)).map(field => [field.attribute, row[field.column]])))
+      return { ...entity, attributes: { ...(Object.hasOwn(row, 'default_pay_ratio') ? { defaultPayRatio: nullableNumber(row.default_pay_ratio) } : {}), ...fees } }
+    }
+    catch (cause) { throw problem('unidentifiable-source-row', cause instanceof Error ? cause.message : '班组费用默认来源无效') }
+  }
+  if (entityType === 'suppliers')
+    return { ...entity, attributes: { laborScope: text(row.labor_scope) } }
   if (entityType === 'projects') {
     return {
       ...entity,
@@ -879,8 +948,12 @@ function sourceEntity(
     }
   }
   if (entityType === 'workers') {
+    const dailyWage = row.daily_wage
+    if (dailyWage !== undefined && dailyWage !== null && (typeof dailyWage !== 'number' || !Number.isFinite(dailyWage) || dailyWage < 0))
+      throw problem('unidentifiable-source-row', '本地工人日薪不是可确认的非负数值，不能以缺价或零代替')
     return {
       ...entity,
+      ...(dailyWage !== undefined ? { attributes: { dailyWage } } : {}),
       references: {
         crewId: nullableText(row.crew_id),
         projectId: nullableText(row.current_project_id),
@@ -917,7 +990,7 @@ function sourceEntity(
         status: text(row.status),
         note: text(row.note),
         actualCompletionDate: nullableText(row.actual_completion_date),
-        boqCatalogJson: text(row.boq_catalog_json) || '[]',
+        boqCatalogJson: normalizeBoqCatalogJson(row.boq_catalog_json),
         monthlyQuantityFactsJson: normalizeMonthlyQuantityFactsJson(row.monthly_quantity_facts_json),
         createdAt: text(row.created_at),
         updatedAt: text(row.updated_at),
@@ -995,11 +1068,17 @@ function sourceEntity(
         receiptDate: nullableText(row.receipt_date),
         payerAccount: text(row.payer_account),
         paymentMethod: text(row.payment_method),
+        acceptanceBillNo: text(row.acceptance_bill_no),
+        billDueDate: text(row.bill_due_date),
+        periodNo: text(row.period_no),
+        bankSerialNo: text(row.bank_serial_no),
+        handler: text(row.handler),
         reviewStatus: text(row.review_status),
         status: text(row.status),
         note: text(row.note),
         createdAt: isoDateTimeText(row.created_at) ?? '',
         updatedAt: isoDateTimeText(row.updated_at) ?? '',
+        attachmentsJson: text(row.attachments_json) || '[]',
       },
     }
   }
@@ -1157,8 +1236,41 @@ async function buildSource(
   schemaVersion: number,
   selectSource: SourceSelect,
 ): Promise<CoreMigrationSourceDTO> {
+  const credentialGraphs = await readSupplierCredentialMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> }, schemaVersion)
   const entries = await Promise.all(CORE_MIGRATION_TOPOLOGY.map(async (entityType) => {
-    const rows = await selectSource<Record<string, unknown>>(ENTITY_SQL[entityType])
+    if (entityType === 'supplier_credentials')
+      return [entityType, credentialGraphs] as const
+    if (entityType === 'suppliers')
+      return [entityType, credentialGraphs.map(entity => ({ legacyId: entity.legacyId, name: entity.name, deletedAt: entity.deletedAt, attributes: supplierCredentialMasterAttributes(JSON.parse(String(entity.attributes?.graphJson)).supplier) }))] as const
+    if (entityType === 'process_libraries')
+      return [entityType, await readProcessLibraryMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
+    if (entityType === 'wbs_projects')
+      return [entityType, await readWbsMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
+    if (entityType === 'payroll_projects')
+      return [entityType, await readPayrollProjectMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
+    if (entityType === 'target_cost_versions')
+      return [entityType, await readBudgetVersionMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
+    if (entityType === 'quantity_projects') {
+      const projects = await readQuantityMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })
+      return [entityType, projects.map(({ project, graph }): CoreMigrationSourceEntityDTO => ({
+        legacyId: project.id,
+        name: project.name,
+        references: { projectId: project.id },
+        attributes: { graphJson: JSON.stringify(graph) },
+        deletedAt: quantityMigrationTimestamp(project.deleted_at, '工程量项目删除'),
+      }))] as const
+    }
+    let sql = ENTITY_SQL[entityType]
+    if (entityType === 'crews') {
+      const columns = new Set((await selectSource<{ name: string }>('PRAGMA table_info(crews)')).map(row => row.name))
+      const fees = CREW_PAYROLL_FEE_FIELDS.filter(field => columns.has(field.column)).map(field => field.column)
+      sql = `SELECT ${['id', 'name', 'default_pay_ratio', 'deleted_at', ...fees].join(', ')} FROM crews ORDER BY id`
+    }
+    const rows = await selectSource<Record<string, unknown>>(sql)
+    if (entityType === 'delivery_records') {
+      assertDeliverySourceDiagnostics(await selectSource(DELIVERY_SOURCE_DIAGNOSTICS_SQL))
+      return [entityType, await deliveryRecordSourceEntities(rows)] as const
+    }
     if (entityType === 'other_settlement_sources') {
       const payments = await selectSource<Record<string, unknown>>(OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL)
       return [entityType, [...rows.map(row => otherSettlementDocumentSource(row, 'application')), ...payments.map(row => otherSettlementDocumentSource(row, 'payment'))].sort((a, b) => compareCanonicalText(a.legacyId, b.legacyId))] as const

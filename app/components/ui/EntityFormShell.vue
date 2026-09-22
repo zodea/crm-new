@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef, watch } from 'vue'
+import { computed, shallowRef, useTemplateRef, watch } from 'vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
 
 type EntityFormState = 'ready' | 'loading' | 'error'
@@ -34,6 +34,7 @@ defineEmits<{
 }>()
 
 const activeSection = shallowRef('')
+const formContent = useTemplateRef<HTMLElement>('formContent')
 
 watch(
   () => props.sections,
@@ -64,16 +65,16 @@ const showSectionNav = computed(() =>
 
 function navigateToSection(key: string) {
   activeSection.value = key
-  document
-    .getElementById(`section-${key}`)
-    ?.scrollIntoView?.({ block: 'start', inline: 'nearest', behavior: 'auto' })
+  const target = Array.from(formContent.value?.querySelectorAll<HTMLElement>('[id]') ?? [])
+    .find(element => element.id === `section-${key}`)
+  target?.scrollIntoView?.({ block: 'start', inline: 'nearest', behavior: 'auto' })
 }
 </script>
 
 <template>
   <div
     data-ui="entity-form-shell"
-    class="entity-form-shell mx-auto w-full max-w-1340px pb-6"
+    class="entity-form-shell mx-auto w-full max-w-1240px pb-6"
   >
     <div
       data-ui="entity-form-layout"
@@ -150,7 +151,7 @@ function navigateToSection(key: string) {
         />
 
         <template v-else>
-          <div data-ui="entity-form-content" class="min-w-0">
+          <div ref="formContent" data-ui="entity-form-content" class="min-w-0">
             <slot />
           </div>
           <slot name="footer" />
@@ -166,10 +167,15 @@ function navigateToSection(key: string) {
 }
 
 .entity-form-shell__layout {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1080px);
+  justify-content: center;
 }
 
-@container entity-form-shell (min-width: 48rem) {
+.entity-form-shell :deep(.form-fields-grid) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(280px, calc((100% - 1rem) / 2))), 1fr));
+}
+
+@container entity-form-shell (min-width: 56.25rem) {
   .entity-form-shell__layout[data-has-sections="true"] {
     grid-template-columns: 9rem minmax(0, 1fr);
   }

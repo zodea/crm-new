@@ -44,6 +44,13 @@ const rows: ContractAuxRow[] = [
 ]
 
 describe('contract aux list configuration', () => {
+  it('supports OR within each selection and AND across fields while preserving route context', () => {
+    const filters = { search: '', project: [], category: ['房租', '材料'], status: ['履约中', '待确认'] }
+    expect(filterContractAuxRows('material_settlement', rows, filters)).toEqual(rows)
+    expect(filterContractAuxRows('material_settlement', rows, { ...filters, status: ['待确认'] })).toEqual([rows[1]])
+    expect(filterContractAuxRows('material_settlement', rows, { ...filters, routeProject: 'project-1' })).toEqual([rows[1]])
+    expect(filterContractAuxRows('material_settlement', rows, { ...filters, category: [] })).toEqual(rows)
+  })
   it('keeps company expenses project-free and preserves settlement relations', () => {
     const companyFields = CONTRACT_AUX_LIST_CONFIG.company_expense.columns.map(column => column.field)
     expect(companyFields).not.toContain('projectName')

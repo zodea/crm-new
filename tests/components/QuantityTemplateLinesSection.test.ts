@@ -32,16 +32,16 @@ describe('quantity template lines section', () => {
     }],
   }
 
-  it('工资预付预览只提供暂估量和现场复核量，并实时切换总量', async () => {
+  it('工程量比较保留两量切换，不把暂估量声明为可发工资', async () => {
     render(QuantityTemplateLinesSection, { props })
 
-    const source = screen.getByRole<HTMLSelectElement>('combobox', { name: '工资预付取数' })
+    const source = screen.getByRole<HTMLSelectElement>('combobox', { name: '工程量比较口径' })
     expect(Array.from(source.options).map(option => option.textContent))
       .toEqual(['暂估量', '现场复核量'])
     expect(Array.from(source.options).some(option => option.value === 'contract')).toBe(false)
     expect(screen.getByTestId('wage-preview-total').textContent?.replace(/\s+/g, ' ').trim())
       .toBe('预览合计 8')
-    expect(screen.getByText('最终结算固定取现场复核量')).not.toBeNull()
+    expect(screen.getByText('这里只比较工程量；A 工资须核对实际完成责任与现场量')).not.toBeNull()
 
     await fireEvent.update(source, 'field')
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PaymentApplicationDetail } from '~/lib/finance/payment-detail'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { yuan } from '~/lib/util/money'
 
 defineProps<{
@@ -13,9 +14,12 @@ defineProps<{
   <section class="panel overflow-hidden" aria-label="智能业务洞察" data-testid="payment-application-insight">
     <header class="border-b border-line bg-brand-soft px-4 py-3">
       <div class="flex items-center justify-between gap-2">
-        <h3 class="text-14px font-800 text-ink">
-          智能业务洞察
-        </h3>
+        <div class="flex items-center gap-1.5">
+          <h3 class="text-14px font-800 text-ink">
+            智能业务洞察
+          </h3>
+          <ContextHelp label="业务洞察" text="根据当前付款申请及关联单据计算金额与风险提示。" />
+        </div>
         <span class="i-lucide-sparkles text-16px text-brand" aria-hidden="true" />
       </div>
       <p class="mt-1 text-11px" :class="statusClass">
@@ -70,10 +74,6 @@ defineProps<{
           <span class="i-lucide-arrow-up-right ml-1" aria-hidden="true" />
         </NuxtLink>
       </section>
-
-      <p class="border-t border-line pt-3 text-10px leading-4 text-ink-faint">
-        洞察只读取当前申请及其真实关联源单，金额和状态均为实时派生；审批人、评论和审批时间未接入时不会由前端补造。
-      </p>
     </div>
   </section>
 </template>

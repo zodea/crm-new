@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
+import CustomerDetailRelations from '~/components/master-data/CustomerDetailRelations.vue'
 import CustomerDetailScreen from '~/components/master-data/CustomerDetailScreen.vue'
+import StatePanel from '~/components/ui/StatePanel.vue'
 
 const customerStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'idle' } as any,
@@ -88,11 +90,144 @@ vi.stubGlobal('useRouter', () => ({ replace: routerReplace }))
 vi.stubGlobal('useTabTitle', () => {})
 
 describe('客户详情业务页签', () => {
+  it('其他客户刷新共享状态时，不把其姓名写入当前详情或页签', () => {
+    customerStoreMock.detailState = { kind: 'ready', data: { ...detail, customer: { ...detail.customer, id: 'customer-2', name: '另一客户' } } }
+    const titles: Array<() => string | undefined> = []
+    vi.stubGlobal('useTabTitle', (title: () => string | undefined) => titles.push(title))
+    const view = render(CustomerDetailScreen, {
+      props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
+      global: { components: { EntityDetailShell: EntityDetailShellStub, SegTab: SegTabStub }, stubs: ['CustomerDetailOverview', 'CustomerDetailRelations', 'MetricGrid', 'Metric', 'NuxtLink'] },
+    })
+    expect(view.queryByRole('heading', { name: '另一客户' })).toBeNull()
+    expect(titles[0]?.()).toBeUndefined()
+    vi.stubGlobal('useTabTitle', () => {})
+  })
+
   beforeEach(() => {
     route.query = {}
     routerReplace.mockReset()
     customerStoreMock.detailState = { kind: 'ready', data: detail }
     customerStoreMock.loadDetail.mockClear()
+  })
+
+  it.each(['forbidden', 'unavailable'] as const)('项目源 %s 时数量未知、不渲染假空列表，仅失败可重试', async (code) => {
+    customerStoreMock.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        projects: [],
+        projectsProblem: { code, message: '项目源暂不可读', retryable: code === 'unavailable', fieldErrors: {}, traceId: null },
+        summary: { ...detail.summary, projectCount: null },
+      },
+    }
+    render(CustomerDetailScreen, {
+      props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
+      global: {
+        components: {
+          EntityDetailShell: EntityDetailShellStub,
+          SegTab: SegTabStub,
+          StatePanel,
+          CustomerDetailRelations,
+          CustomerDetailOverview: defineComponent({ template: '<section />' }),
+          KitTable: defineComponent({ template: '<section data-testid="project-table">暂无名下项目</section>' }),
+          MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
+          Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
+          NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
+        },
+      },
+    })
+    expect(screen.getByRole('tab', { name: '名下项目' })).not.toBeNull()
+    expect(screen.getByText('名下项目：—')).not.toBeNull()
+    expect(screen.queryByTestId('project-table')).toBeNull()
+    expect(screen.getByRole(code === 'forbidden' ? 'status' : 'alert', { name: code === 'forbidden' ? '无权查看关联项目' : '关联项目加载失败' })).not.toBeNull()
+    if (code === 'unavailable') {
+      customerStoreMock.loadDetail.mockClear()
+      await fireEvent.click(screen.getByRole('button', { name: '重新加载关联项目' }))
+      expect(customerStoreMock.loadDetail).toHaveBeenCalledWith({ id: 'customer-1', origin: 'real', includeDemo: false })
+    }
+    else {
+      expect(screen.queryByRole('button', { name: '重新加载关联项目' })).toBeNull()
+    }
+  })
+
+  it.each(['forbidden', 'unavailable'] as const)('合同源 %s 时派生金额未知，禁止假空态且只在允许时重试', async (code) => {
+    route.query = { tab: 'contracts' }
+    customerStoreMock.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        contracts: [],
+        contractsProblem: { code, message: '合同源暂不可读', retryable: code === 'unavailable', fieldErrors: {}, traceId: null },
+        summary: { ...detail.summary, contractCount: null, effectiveContractAmount: null, outstandingAmount: null },
+      },
+    }
+    render(CustomerDetailScreen, {
+      props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
+      global: { components: {
+        EntityDetailShell: EntityDetailShellStub,
+        SegTab: SegTabStub,
+        StatePanel,
+        CustomerDetailRelations,
+        CustomerDetailOverview: defineComponent({ template: '<section />' }),
+        KitTable: defineComponent({ template: '<section data-testid="contract-table">暂无施工合同</section>' }),
+        MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
+        Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
+        NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
+      } },
+    })
+    expect(screen.getByRole('tab', { name: '施工合同' })).not.toBeNull()
+    for (const label of ['施工合同', '有效合同额', '待收差额'])
+      expect(screen.getByText(`${label}：—`)).not.toBeNull()
+    expect(screen.queryByTestId('contract-table')).toBeNull()
+    expect(screen.getByRole(code === 'forbidden' ? 'status' : 'alert', { name: code === 'forbidden' ? '无权查看施工合同' : '施工合同加载失败' })).not.toBeNull()
+    if (code === 'unavailable') {
+      customerStoreMock.loadDetail.mockClear()
+      await fireEvent.click(screen.getByRole('button', { name: '重新加载施工合同' }))
+      expect(customerStoreMock.loadDetail).toHaveBeenCalledWith({ id: 'customer-1', origin: 'real', includeDemo: false })
+    }
+    else {
+      expect(screen.queryByRole('button', { name: '重新加载施工合同' })).toBeNull()
+    }
+  })
+
+  it.each(['forbidden', 'unavailable'] as const)('收款源 %s 显示未知与独立反馈，重试继续读取同一客户', async (code) => {
+    route.query = { tab: 'receipts' }
+    customerStoreMock.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        receipts: [],
+        receiptsProblem: { code, message: '收款来源不可读', retryable: code === 'unavailable', fieldErrors: {}, traceId: null },
+        summary: { ...detail.summary, receiptCount: null, effectiveReceiptAmount: null, outstandingAmount: null, draftReceiptCount: null },
+      },
+    }
+    render(CustomerDetailScreen, {
+      props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
+      global: { components: {
+        EntityDetailShell: EntityDetailShellStub,
+        SegTab: SegTabStub,
+        StatePanel,
+        CustomerDetailRelations,
+        CustomerDetailOverview: defineComponent({ template: '<section />' }),
+        KitTable: defineComponent({ template: '<section data-testid="receipt-table">暂无收款记录</section>' }),
+        MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
+        Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
+        NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
+      } },
+    })
+    expect(screen.getByRole('tab', { name: '收款明细' })).not.toBeNull()
+    expect(screen.getByText('有效收款：—')).not.toBeNull()
+    expect(screen.getByText('待收差额：—')).not.toBeNull()
+    expect(screen.queryByTestId('receipt-table')).toBeNull()
+    expect(screen.getByRole(code === 'forbidden' ? 'status' : 'alert', { name: code === 'forbidden' ? '无权查看收款明细' : '收款明细加载失败' })).not.toBeNull()
+    if (code === 'unavailable') {
+      customerStoreMock.loadDetail.mockClear()
+      await fireEvent.click(screen.getByRole('button', { name: '重新加载收款明细' }))
+      expect(customerStoreMock.loadDetail).toHaveBeenCalledWith({ id: 'customer-1', origin: 'real', includeDemo: false })
+    }
+    else {
+      expect(screen.queryByRole('button', { name: '重新加载收款明细' })).toBeNull()
+    }
   })
 
   it('从 query 恢复页签，展示真实数量并在切换时保留其他 query', async () => {

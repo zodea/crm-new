@@ -35,7 +35,7 @@ function statusOf(file: DeepReadonly<DeliveryFile>, statusByFile: Readonly<Recor
   if (statusByFile[file.id])
     return statusByFile[file.id]!
   if (file.printDisposition === 'pending')
-    return { label: '已入库 · 待打印', cls: 'chip-warn' }
+    return { label: '已归档 · 待打印', cls: 'chip-warn' }
   return STATUS[file.ocrStatus]
 }
 </script>

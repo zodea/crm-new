@@ -12,7 +12,7 @@ import type { SupplierListSourceRow, SupplierProjectRelationSourceRow, SupplierP
 import type { BusinessSession } from './business-session'
 import type { SupplierImportAdoptionTransaction } from './supplier-command-test-instance'
 import { Buffer } from 'node:buffer'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { PROJECT_SUPPLIER_FILE_CATEGORIES, PROJECT_SUPPLIER_WRITE_CAPABILITY } from '../../app/lib/project-supplier/command-contract'
 import { projectSupplierProblem, ProjectSupplierRepositoryProblem } from '../../app/lib/project-supplier/repository'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
@@ -118,6 +118,17 @@ export function createProjectSupplierCommandTestInstance(options: Options = {}) 
       return String(stateFor(sessionId).version)
     },
     rows,
+    /** Internal central byte source. HTTP readers must validate current ancestors and owner first. */
+    filePayload(fileId: string, origin: string, sessionId?: string | null) {
+      if (origin !== 'real')
+        return null
+      const state = stateFor(sessionId)
+      const file = state.files.get(fileId)
+      const payloadBase64 = state.payloads.get(fileId)
+      if (!file || payloadBase64 === undefined)
+        return null
+      return { payloadBase64, sha256: file.sha256 ?? null }
+    },
     supplierProjectRows(sessionId?: string | null): {
       projects: SupplierProjectSourceRow[]
       relations: SupplierProjectRelationSourceRow[]
@@ -282,6 +293,8 @@ export function createProjectSupplierCommandTestInstance(options: Options = {}) 
             category: text(file.category),
             uploader: session.actorId,
             uploadedAt: timestamp,
+            hasPayload: true,
+            sha256: createHash('sha256').update(Buffer.from(file.payloadBase64, 'base64')).digest('hex'),
           })
           nextPayloads.set(fileId, file.payloadBase64)
           fileCount += 1

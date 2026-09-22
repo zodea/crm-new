@@ -43,7 +43,7 @@ export const useSupplierReadStore = defineStore('supplier-read', () => {
 
   async function loadList(query: SupplierListQueryDTO) {
     const request = ++latestList
-    const prior = previous(listState.value)
+    const prior = listQuery.value?.includeDemo === query.includeDemo ? previous(listState.value) : null
     listQuery.value = { ...query }
     listState.value = { kind: 'loading', previous: prior }
     try {

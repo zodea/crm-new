@@ -43,7 +43,9 @@ export const useMaterialContractReadStore = defineStore('material-contract-read'
 
   async function loadList(query: MaterialContractListQueryDTO) {
     const request = ++latestList
-    const prior = previous(listState.value)
+    const prior = listQuery.value?.origin === query.origin && listQuery.value.includeDemo === query.includeDemo
+      ? previous(listState.value)
+      : null
     listQuery.value = { ...query }
     listState.value = { kind: 'loading', previous: prior }
     try {

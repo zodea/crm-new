@@ -157,6 +157,7 @@ const KitTableStub = defineComponent({
     },
     rowHeight: Number,
     rowKey: String,
+    loading: Boolean,
   },
   emits: ['filter-change'],
   setup(props, { emit, expose, slots }) {
@@ -165,6 +166,7 @@ const KitTableStub = defineComponent({
       'aria-label': '项目宽表',
       'data-row-height': props.rowHeight,
       'data-row-key': props.rowKey,
+      'data-loading': String(props.loading),
     }, [
       h('div', { role: 'row' }, (props.columns as any[]).map(column =>
         h('span', {
@@ -360,6 +362,19 @@ describe('project list screen', () => {
 
     expect(within(tree).queryByRole('button', { name: /项目立项/ })).toBeNull()
     expect(within(tree).queryByRole('button', { name: /保修结束/ })).toBeNull()
+  })
+
+  it('同范围刷新保留已有表格，首次或新范围等待仍显示加载态', async () => {
+    render(ProjectListScreen, { global })
+    await nextTick()
+    const previous = projectPage()
+    projectReadStore.state = { kind: 'loading', previous }
+    await nextTick()
+    expect(screen.getByRole('region', { name: '项目宽表' }).getAttribute('data-loading')).toBe('false')
+    expect(screen.getByRole('link', { name: '合和新城' })).not.toBeNull()
+    projectReadStore.state = { kind: 'loading', previous: null }
+    await nextTick()
+    expect(screen.queryByRole('region', { name: '项目宽表' })).toBeNull()
   })
 
   it('从列表新增正式项目，并为正式行提供来源明确的编辑入口', async () => {

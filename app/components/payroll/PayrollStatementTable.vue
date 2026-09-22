@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
-import type { WageStatement } from '~/lib/payroll/statements'
+import type { WageStatement, WageStatementFilter } from '~/lib/payroll/statements'
+import { payrollFilterQuery } from '~/lib/payroll/navigation'
+import { wageSourceLabel } from '~/lib/payroll/presentation'
 
 defineProps<{
   statements: WageStatement[]
   selectedId: string
   loading?: boolean
+  hasSnapshot?: boolean
+  filters?: WageStatementFilter
 }>()
 
 const emit = defineEmits<{ select: [id: string] }>()
@@ -32,17 +36,17 @@ const statusLabel = {
 </script>
 
 <template>
-  <section class="panel overflow-hidden" aria-label="工资单列表">
-    <SectionHeader title="负责人请款簿" subtitle="负责人 × 月份；已发放单据保留当月现场量与金额快照" />
+  <section class="panel overflow-hidden" aria-label="工资单列表" :aria-busy="loading">
+    <SectionHeader title="负责人请款簿" subtitle="负责人 × 月份；已发放单据保留当月来源与金额快照" />
     <KitTable
       :columns="columns"
       :data="statements"
-      :loading="loading"
+      :loading="loading && !(hasSnapshot ?? statements.length > 0)"
       :min-rows="8"
       :empty="{ title: '当前范围暂无工资单', description: '可从上方选择负责人和取数口径生成月度草稿。' }"
     >
       <template #source="{ row }">
-        {{ row.quantitySource === 'field' ? '现场复核量' : '暂估量' }}
+        {{ wageSourceLabel(row) }}
       </template>
       <template #period="{ row }">
         {{ row.periodKind === 'retention' ? '尾款100%' : row.periodKind === 'settlement' ? '结算95%' : '月度' }}
@@ -57,10 +61,10 @@ const statusLabel = {
       </template>
       <template #action="{ row }">
         <div class="flex items-center gap-3 whitespace-nowrap">
-          <button type="button" class="text-12px font-700 text-brand" @click="emit('select', row.id)">
+          <button type="button" class="text-12px font-700 text-brand" :disabled="loading" @click="emit('select', row.id)">
             {{ selectedId === row.id ? '查看中' : '查看' }}
           </button>
-          <NuxtLink :to="`/subcontract/payroll/${row.id}`" class="text-12px font-700 text-brand">
+          <NuxtLink :to="{ path: `/subcontract/payroll/${row.id}`, query: payrollFilterQuery(filters ?? {}) }" class="text-12px font-700 text-brand">
             详情
           </NuxtLink>
         </div>

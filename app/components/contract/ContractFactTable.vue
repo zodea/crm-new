@@ -3,6 +3,7 @@ import type { Directive } from 'vue'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { NavigationIntentDTO } from '~/types/read-model'
 import { computed, nextTick } from 'vue'
+import ReceiptSourceLink from '~/components/receipt/ReceiptSourceLink.vue'
 import KitTable from '~/components/ui/KitTable.vue'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { yuan } from '~/lib/util/money'
@@ -26,7 +27,9 @@ const props = defineProps<{
   anchorPrefix?: string
   returnTo?: string | null
   returnFocusView?: 'acceptance' | 'warranty'
+  restoreScrollLeft?: number
 }>()
+defineEmits<{ viewRestored: [] }>()
 
 const columns = computed<KitTableColumn[]>(() => [
   { field: 'no', title: '单号', width: 150, slot: 'no' },
@@ -89,14 +92,17 @@ const vFocusTarget: Directive<HTMLElement, boolean> = {
     :data="[...rows]"
     :min-rows="5"
     row-key="id"
-    :empty="{ title: emptyLabel, description: '仅展示通过稳定合同外键关联的真实事实。' }"
+    :empty="{ title: emptyLabel }"
+    :restore-scroll-left="restoreScrollLeft"
+    @view-restored="$emit('viewRestored')"
   >
     <template #no="{ row }">
       <span class="font-mono">{{ row.no || '—' }}</span>
     </template>
     <template #name="{ row }">
+      <ReceiptSourceLink v-if="'subject' in row.navigation && row.navigation.subject.entity === 'receipt' && returnTo" :intent="row.navigation" :return-to="returnTo" :anchor-id="`construction-contract-receipt-${row.id}`" :label="row.name || row.no || '查看收款'" />
       <NuxtLink
-        v-if="target(row)"
+        v-else-if="target(row)"
         :id="anchorId(row)"
         v-focus-target="focusId === row.id"
         :to="target(row)!"

@@ -1,0 +1,69 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/central-c2-codec.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/central-c2-codec.test.ts (5 tests | 2 failed) 1714ms
+   × 签工C2有限数精确展开十进制定点，null与零保真，科学计数传输不能进入读取或命令 10ms
+   × 同一规范适用于已共享的C1有限费率，原缺值与到分金额不放宽 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/central-c2-codec.test.ts > 签工C2有限数精确展开十进制定点，null与零保真，科学计数传输不能进入读取或命令
+AssertionError: expected { unitRate: '1e-7' } to deeply equal { unitRate: StringMatching{…} }
+
+- Expected
++ Received
+
+  {
+-   "unitRate": StringMatching /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/,
++   "unitRate": "1e-7",
+  }
+
+ ❯ tests/payroll/central-c2-codec.test.ts:10:18
+      8|   for (const unitRate of [null, 0, 350.125, 0.0000001, 1e21, Number.MI…
+      9|     const wire = encodePayrollC2Wire({ unitRate })
+     10|     expect(wire).toEqual({ unitRate: unitRate === null ? null : expect…
+       |                  ^
+     11|     expect(transformPayrollC2Wire(wire, true)).toEqual({ unitRate })
+     12|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |unit| tests/payroll/central-c2-codec.test.ts > 同一规范适用于已共享的C1有限费率，原缺值与到分金额不放宽
+AssertionError: expected { overtimeRate: '1e-7', …(4) } to deeply equal { overtimeRate: '0.0000001', …(4) }
+
+- Expected
++ Received
+
+  {
+    "amount": "350.13",
+    "configuredDailyWage": null,
+-   "dailyWage": "1000000000000000000000",
++   "dailyWage": "1e+21",
+    "hours": "7.51",
+-   "overtimeRate": "0.0000001",
++   "overtimeRate": "1e-7",
+  }
+
+ ❯ tests/payroll/central-c2-codec.test.ts:20:49
+     18|   const expected = { overtimeRate: '0.0000001', dailyWage: '1000000000…
+     19|   const source = { overtimeRate: 0.0000001, dailyWage: 1e21, hours: 7.…
+     20|   expect(transformPayrollC1Wire(source, false)).toEqual(expected)
+       |                                                 ^
+     21|   expect(transformPayrollC1Wire(expected, true)).toEqual(source)
+     22|   expect(() => transformPayrollC1Wire({ overtimeRate: '1e-7' }, true))…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  14:43:46
+   Duration  2.73s (transform 618ms, setup 0ms, import 736ms, tests 1.71s, environment 0ms)
+

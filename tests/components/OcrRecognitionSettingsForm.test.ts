@@ -8,6 +8,7 @@ describe('ocr 识别设置表单', () => {
     const view = render(OcrRecognitionSettingsForm, {
       props: {
         modelValue: createDefaultOcrRecognitionSettings(),
+        loaded: true,
         dirty: false,
         saving: false,
       },
@@ -27,6 +28,7 @@ describe('ocr 识别设置表单', () => {
     render(OcrRecognitionSettingsForm, {
       props: {
         modelValue: createDefaultOcrRecognitionSettings(),
+        loaded: true,
         dirty: true,
         saving: false,
       },
@@ -42,6 +44,7 @@ describe('ocr 识别设置表单', () => {
     render(OcrRecognitionSettingsForm, {
       props: {
         modelValue: createDefaultOcrRecognitionSettings(),
+        loaded: true,
         dirty: true,
         saving: true,
       },
@@ -61,6 +64,7 @@ describe('ocr 识别设置表单', () => {
     render(OcrRecognitionSettingsForm, {
       props: {
         modelValue: createDefaultOcrRecognitionSettings(),
+        loaded: true,
         dirty: true,
         saving: false,
       },

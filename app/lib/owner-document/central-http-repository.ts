@@ -19,6 +19,7 @@ import {
   isISODateTimeDTO,
   isProblemCodeDTO,
 } from '../../types/read-model'
+import { serializeEnumSelection } from '../util/enum-selection'
 import {
   ownerCommercialDocumentProblem,
   OwnerCommercialDocumentRepositoryProblem,
@@ -298,7 +299,7 @@ function fileRecord(value: unknown, ownerType?: string, ownerId?: string): boole
 
 function boqLine(value: unknown): boolean {
   return object(value) && typeof value.id === 'string' && typeof value.itemName === 'string'
-    && typeof value.unit === 'string' && finite(value.qty) && finite(value.unitPrice)
+    && typeof value.unit === 'string' && (value.qty === null || finite(value.qty)) && (value.unitPrice === null || finite(value.unitPrice))
     && finite(value.autoQty) && finite(value.missingQtyCount)
 }
 
@@ -556,7 +557,7 @@ export function createHttpOwnerCommercialDocumentReadRepository(
 ): OwnerCommercialDocumentReadRepository {
   return {
     list: query => read(
-      () => options.fetcher(`/api/read/owner-documents/${encodeURIComponent(query.kind)}`, { query: { ...query } }),
+      () => options.fetcher(`/api/read/owner-documents/${encodeURIComponent(query.kind)}`, { query: { ...query, status: serializeEnumSelection(query.status) || null, documentType: serializeEnumSelection(query.documentType) || null } }),
       value => decodeList(value, query),
     ),
     get: query => read(
@@ -578,8 +579,8 @@ export function createHttpOwnerCommercialDocumentCommandRepository(
       () => options.fetcher(`/api/commands/owner-documents/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/form`),
       value => decodeForm(value, kind, id),
     ),
-    boqLines: (projectId, contractId, periodNo = '') => read(
-      () => options.fetcher('/api/commands/owner-documents/boq-lines', { query: { projectId, contractId, periodNo } }),
+    boqLines: (projectId, contractId, periodNo = '', quantityBasis) => read(
+      () => options.fetcher('/api/commands/owner-documents/boq-lines', { query: { projectId, contractId, periodNo, ...(quantityBasis ? { quantityBasis } : {}) } }),
       decodeBoqLines,
     ),
     execute: (request: OwnerCommercialDocumentCommandRequestDTO) => read(

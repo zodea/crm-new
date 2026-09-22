@@ -11,12 +11,16 @@ const centralContext = computed(() => {
   return origin && ownerKind && ownerId ? { origin, ownerKind, ownerId } : null
 })
 const statementId = computed(() => String(route.params.id ?? ''))
+const invalidOwnerContext = computed(() => (route.query.ownerKind != null || route.query.ownerId != null) && !centralContext.value)
 const returnTo = computed(() => validateCrewWorkerReturnTo(route.query.returnTo) ?? '/base/worker')
 </script>
 
 <template>
+  <section v-if="invalidOwnerContext" role="alert" class="panel p-4 text-danger">
+    工资来源身份不完整，请从原工人或工资台账重新打开。不会改用其他记录。
+  </section>
   <CrewWorkerRelationFactDetailScreen
-    v-if="centralContext"
+    v-else-if="centralContext"
     fact-kind="wage"
     :fact-id="statementId"
     :owner-kind="centralContext.ownerKind"

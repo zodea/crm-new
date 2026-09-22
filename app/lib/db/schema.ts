@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
   address             TEXT DEFAULT '',
   taxpayer_type       TEXT DEFAULT '',
   main_business       TEXT DEFAULT '',
+  labor_scope         TEXT NOT NULL DEFAULT '',
 
   invoice_name        TEXT DEFAULT '',
   invoice_address     TEXT DEFAULT '',

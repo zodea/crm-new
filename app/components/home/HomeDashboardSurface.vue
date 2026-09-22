@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { HomeDashboardViewState } from '~/lib/home/dashboard'
 import type { ScheduleProjectView, ScheduleTaskView } from '~/lib/schedule/read-model'
+import type { DataOriginDTO } from '~/types/read-model'
+import { Button } from '~/components/ui/button'
 
 withDefaults(defineProps<{
   state: HomeDashboardViewState
@@ -8,6 +10,8 @@ withDefaults(defineProps<{
   snapshot?: ScheduleProjectView | null
   selectedProjectId?: string
   selectedProjectName?: string
+  selectedOrigin?: DataOriginDTO
+  sourceDescription?: string
   errorDescription?: string
   recoverableError?: string
   recoverableTitle?: string
@@ -15,12 +19,14 @@ withDefaults(defineProps<{
   recoverableLoading?: boolean
   coverageTitle?: string
   coverageDescription?: string
+  returnContext?: Record<string, string>
   highlightedGroupId?: string
   highlightedTaskId?: string
 }>(), {
   snapshot: null,
   selectedProjectId: '',
   selectedProjectName: '',
+  sourceDescription: '',
   errorDescription: '',
   recoverableError: '',
   recoverableTitle: '项目切换失败，已恢复原项目',
@@ -47,9 +53,9 @@ defineEmits<{
   />
 
   <StatePanel
-    v-else-if="state === 'error'"
+    v-else-if="state === 'error' || state === 'forbidden'"
     kind="error"
-    title="首页施工进度加载失败"
+    :title="state === 'forbidden' ? '当前无权查看项目施工进度' : '首页施工进度加载失败'"
     :description="errorDescription"
     action-label="重新加载"
     @action="$emit('retry')"
@@ -62,9 +68,26 @@ defineEmits<{
     description="先建立一个项目，首页才会显示对应的施工排程。"
   >
     <template #action>
-      <NuxtLink to="/project/form" class="btn-primary">
-        新建项目
-      </NuxtLink>
+      <Button class="border-solid no-underline" as-child variant="primary">
+        <NuxtLink to="/project/form">
+          新建项目
+        </NuxtLink>
+      </Button>
+    </template>
+  </StatePanel>
+
+  <StatePanel
+    v-else-if="state === 'not-connected'"
+    kind="empty"
+    :title="`${selectedProjectName || '当前项目'}的排程来源尚未接入`"
+    :description="sourceDescription"
+  >
+    <template #action>
+      <Button class="border-solid no-underline" as-child>
+        <NuxtLink :to="{ path: '/schedule', query: { project: selectedProjectId, origin: selectedOrigin, from: 'home' } }">
+          查看施工进度来源
+        </NuxtLink>
+      </Button>
     </template>
   </StatePanel>
 
@@ -72,22 +95,20 @@ defineEmits<{
     v-else-if="state === 'schedule-empty'"
     kind="empty"
     :title="`${selectedProjectName || '当前项目'}还没有施工排程`"
-    description="在施工进度页新建楼栋分组后，首页会实时显示同一份计划与实际进度。"
+    :description="selectedOrigin ? '已读取对应项目排程，当前没有楼栋分组。此入口仅提供只读查看。' : '在施工进度页新建楼栋分组后，首页会实时显示同一份计划与实际进度。'"
   >
     <template #action>
       <div class="flex flex-wrap justify-center gap-2">
-        <NuxtLink
-          :to="{ path: '/schedule/new', query: { project: selectedProjectId } }"
-          class="btn-accent"
-        >
-          新建楼栋分组
-        </NuxtLink>
-        <NuxtLink
-          :to="{ path: '/schedule', query: { project: selectedProjectId } }"
-          class="btn-secondary"
-        >
-          打开施工进度
-        </NuxtLink>
+        <Button v-if="!selectedOrigin" class="border-solid no-underline" as-child variant="accent">
+          <NuxtLink :to="{ path: '/schedule/new', query: { project: selectedProjectId } }">
+            新建楼栋分组
+          </NuxtLink>
+        </Button>
+        <Button class="border-solid no-underline" as-child>
+          <NuxtLink :to="{ path: '/schedule', query: { project: selectedProjectId, origin: selectedOrigin, from: 'home' } }">
+            打开施工进度
+          </NuxtLink>
+        </Button>
       </div>
     </template>
   </StatePanel>
@@ -131,6 +152,8 @@ defineEmits<{
     <HomeScheduleOverview
       :snapshot="snapshot"
       :today="today"
+      :origin="selectedOrigin"
+      :return-context="returnContext"
       :highlighted-group-id="highlightedGroupId"
       :highlighted-task-id="highlightedTaskId"
       @select-task="$emit('selectTask', $event)"

@@ -1,6 +1,7 @@
 import type { FileRefChanges } from '~/lib/forms/file-refs'
 import type { OwnerCommercialDocumentCommandRequestDTO } from '~/lib/owner-document/central-command-contract'
 import type {
+  OwnerAcceptanceViewVariant,
   OwnerCommercialDocumentKind,
   OwnerCommercialDocumentListQueryDTO,
   OwnerCommercialDocumentListSummaryDTO,
@@ -13,10 +14,12 @@ import type {
   OwnerDocumentSaveAction,
   OwnerReportAuditDraft,
 } from '~/lib/owner-document/forms'
+import type { QuantityBasis } from '~/lib/quantity/basis'
 import { isTauri } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { SUBCONTRACT_CHANGE_WRITE_CAPABILITY } from '~/lib/owner-document/central-command-contract'
+import { ownerCommercialDocumentProblemFromUnknown } from '~/lib/owner-document/central-repository'
 import {
   completeOwnerDocumentCommandIntent,
   ownerDocumentCommandId,
@@ -98,11 +101,30 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const listLoading = shallowRef<Partial<Record<OwnerDocumentKind, boolean>>>({})
   const listErrors = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
   const listLoadSequence: Partial<Record<OwnerDocumentKind, number>> = {}
+  const listSources = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
   const centralPagination = shallowRef<Partial<Record<OwnerCommercialDocumentKind, { page: number, pageSize: number, total: number }>>>({})
   const centralSummaries = shallowRef<Partial<Record<OwnerCommercialDocumentKind, OwnerCommercialDocumentListSummaryDTO>>>({})
   const centralCapabilities = shallowRef<Partial<Record<OwnerCommercialDocumentKind, string[]>>>({})
   const centralEmptyReasons = shallowRef<Partial<Record<OwnerCommercialDocumentKind, 'no-records' | 'no-filter-match' | 'missing-relation' | null>>>({})
   const loading = shallowRef(false)
+
+  function listSource(kind: OwnerDocumentKind, variant?: OwnerAcceptanceViewVariant | null) {
+    return `${kind}:${kind === 'acceptance' ? variant ?? 'acceptance' : ''}`
+  }
+
+  function clearListSnapshot(kind: OwnerDocumentKind) {
+    records.value = { ...records.value, [kind]: undefined }
+    if (isCentralKind(kind)) {
+      centralPagination.value = { ...centralPagination.value, [kind]: undefined }
+      centralSummaries.value = { ...centralSummaries.value, [kind]: undefined }
+      centralCapabilities.value = { ...centralCapabilities.value, [kind]: [] }
+      centralEmptyReasons.value = { ...centralEmptyReasons.value, [kind]: undefined }
+    }
+  }
+
+  function hasListSnapshot(kind: OwnerDocumentKind, variant?: OwnerAcceptanceViewVariant | null) {
+    return records.value[kind] !== undefined && listSources.value[kind] === listSource(kind, variant)
+  }
 
   async function loadKind(
     kind: OwnerDocumentKind,
@@ -110,6 +132,10 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   ) {
     const sequence = (listLoadSequence[kind] ?? 0) + 1
     listLoadSequence[kind] = sequence
+    const source = listSource(kind, centralQuery?.variant)
+    if (listSources.value[kind] !== source)
+      clearListSnapshot(kind)
+    listSources.value = { ...listSources.value, [kind]: source }
     listLoading.value = { ...listLoading.value, [kind]: true }
     listErrors.value = { ...listErrors.value, [kind]: '' }
     try {
@@ -144,6 +170,9 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     }
     catch (cause) {
       if (listLoadSequence[kind] === sequence) {
+        const problem = ownerCommercialDocumentProblemFromUnknown(cause).problem
+        if (['forbidden', 'not-found', 'relationship-mismatch'].includes(problem.code))
+          clearListSnapshot(kind)
         listErrors.value = {
           ...listErrors.value,
           [kind]: cause instanceof Error ? cause.message : '列表载入失败',
@@ -214,9 +243,10 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     projectId: string,
     contractId: string,
     periodNo = '',
+    quantityBasis?: QuantityBasis,
   ) {
     if (usesCentralBrowser)
-      return centralRepositories().ownerCommercialDocumentCommands.boqLines(projectId, contractId, periodNo)
+      return centralRepositories().ownerCommercialDocumentCommands.boqLines(projectId, contractId, periodNo, quantityBasis)
     return listOwnerDocumentBoqLines(projectId, contractId, periodNo)
   }
 
@@ -531,6 +561,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     listErrors: readonly(listErrors),
     loading: readonly(loading),
     loadKind,
+    hasListSnapshot,
     recordsFor,
     listLoadingFor,
     listError,

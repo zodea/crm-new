@@ -5,6 +5,7 @@ import CoreIdentityMigrationScreen from '~/components/migration/CoreIdentityMigr
 const migrationStore = vi.hoisted(() => ({
   phase: 'idle',
   busy: false,
+  preparationBlocked: false,
   source: null as any,
   preflightResult: null as any,
   backup: null as any,
@@ -42,6 +43,7 @@ describe('核心身份迁移整页流程', () => {
     Object.assign(migrationStore, {
       phase: 'idle',
       busy: false,
+      preparationBlocked: false,
       source: null,
       preflightResult: null,
       backup: null,
@@ -69,6 +71,7 @@ describe('核心身份迁移整页流程', () => {
     render(CoreIdentityMigrationScreen)
 
     expect(await screen.findByRole('heading', { name: '本地数据迁移' })).not.toBeNull()
+    expect(screen.getByText(/旧项目别名尚未迁移/)).toBeTruthy()
     await waitFor(() => expect(migrationStore.hydrate).toHaveBeenCalledOnce())
     expect(migrationStore.preflight).not.toHaveBeenCalled()
 
@@ -214,5 +217,38 @@ describe('核心身份迁移整页流程', () => {
 
     expect(await screen.findByText('中央切换前已完成对账')).not.toBeNull()
     expect(screen.queryByText('尚未执行迁移对账')).toBeNull()
+  })
+
+  it.each([false, true])('本地恢复失败优先显示待恢复状态并锁定新迁移，保留历史行=%s', async (withRows) => {
+    Object.assign(migrationStore, {
+      phase: 'rollback-pending',
+      preparationBlocked: true,
+      preflightResult: { eligible: true, sourceVersion: 'sqlite-v40', sourceHash: 'source-hash' },
+      backup: { backupId: 'backup-1' },
+      batch: batch({
+        status: 'rolled-back',
+        issues: withRows
+          ? [{
+              id: 'preserved-delete',
+              entityType: 'suppliers',
+              legacyId: 'supplier-1',
+              metricKey: 'soft-delete',
+              reason: '历史软删除已保留',
+            }]
+          : [],
+      }),
+      activeMigration: { rollbackExpiresAt: '2026-09-17T08:00:00.000Z' },
+    })
+    render(CoreIdentityMigrationScreen)
+    expect(await screen.findByText('中央已回滚，等待恢复本地快照')).not.toBeNull()
+    expect(screen.queryByText('对账通过，未发现迁移差异')).toBeNull()
+    expect(screen.queryByText('对账未通过')).toBeNull()
+    expect(screen.getByText('历史对账已完成')).not.toBeNull()
+    for (const name of ['运行预检', '创建不可变备份', '执行 dry-run', '导入可导入记录', '确认切换中央后台'])
+      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true)
+    if (withRows)
+      expect(screen.getByText('历史软删除已保留')).not.toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: '回滚到本地快照' }))
+    expect(migrationStore.rollback).toHaveBeenCalledOnce()
   })
 })

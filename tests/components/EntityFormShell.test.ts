@@ -1,8 +1,25 @@
-import { fireEvent, render, screen } from '@testing-library/vue'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/vue'
+import { describe, expect, it, vi } from 'vitest'
 import EntityFormShell from '~/components/ui/EntityFormShell.vue'
 
 describe('entityFormShell', () => {
+  it('keeps a short form free of an empty section rail', () => {
+    render(EntityFormShell, {
+      props: {
+        title: '新建 · 简单资料',
+        sections: [{ key: 'basic', label: '基础信息' }, { key: 'attachments', label: '附件' }],
+      },
+      slots: {
+        default: '<input aria-label="资料名称">',
+        footer: '<button type="button">保存</button>',
+      },
+    })
+
+    expect(screen.queryByRole('navigation', { name: '表单分区' })).toBeNull()
+    expect(screen.getByRole('textbox', { name: '资料名称' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '保存' })).not.toBeNull()
+  })
+
   it('lays out the header, section navigation, caller content and sticky action slot', async () => {
     const view = render(EntityFormShell, {
       props: {
@@ -64,5 +81,44 @@ describe('entityFormShell', () => {
     expect(screen.getByRole('alert', { name: '分供方表单载入失败' })).not.toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '重新加载' }))
     expect(view.emitted().stateAction).toHaveLength(1)
+  })
+
+  it('scrolls only the current form when another instance has the same section IDs', async () => {
+    const sections = [
+      { key: 'basic', label: '基础信息' },
+      { key: 'contact', label: '联系人信息' },
+      { key: 'attachments', label: '附件' },
+    ]
+    const first = render(EntityFormShell, {
+      props: { title: '甲表单', sections },
+      slots: { default: '<section id="section-contact">甲联系人字段</section>' },
+    })
+    const second = render(EntityFormShell, {
+      props: { title: '乙表单', sections },
+      slots: { default: '<section id="section-contact">乙联系人字段</section>' },
+    })
+    const firstScroll = vi.fn()
+    const secondScroll = vi.fn()
+    within(first.container).getByText('甲联系人字段').scrollIntoView = firstScroll
+    within(second.container).getByText('乙联系人字段').scrollIntoView = secondScroll
+    const firstContact = within(first.container).getByRole('link', { name: '联系人信息' })
+    const secondContact = within(second.container).getByRole('link', { name: '联系人信息' })
+    const originalUrl = window.location.href
+
+    secondContact.focus()
+    await fireEvent.click(secondContact)
+    expect(secondScroll).toHaveBeenCalledExactlyOnceWith({ block: 'start', inline: 'nearest', behavior: 'auto' })
+    expect(firstScroll).not.toHaveBeenCalled()
+    expect(secondContact.getAttribute('aria-current')).toBe('location')
+    expect(firstContact.getAttribute('aria-current')).toBeNull()
+    expect(document.activeElement).toBe(secondContact)
+    expect(window.location.href).toBe(originalUrl)
+
+    firstContact.focus()
+    await fireEvent.click(firstContact)
+    expect(firstScroll).toHaveBeenCalledExactlyOnceWith({ block: 'start', inline: 'nearest', behavior: 'auto' })
+    expect(secondScroll).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(firstContact)
+    expect(window.location.href).toBe(originalUrl)
   })
 })

@@ -7,7 +7,7 @@ import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
-import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
+import { resolveCustomerRelationReturnOrigin, validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
   createMaterialContractJourneyReturnOrigin,
   isProjectOwnerDocumentCardAnchor,
@@ -26,6 +26,7 @@ import {
 } from '~/lib/owner-document/return-context'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
+import { loadReceiptSourceOrigin, saveReceiptSourceOrigin } from '~/lib/receipt/return-context'
 import { yuan } from '~/lib/util/money'
 
 const props = withDefaults(defineProps<{
@@ -73,9 +74,15 @@ const ownerJourneys = shallowRef<OwnerJourneyPages | null>(null)
 const ownerJourneysError = shallowRef('')
 
 const item = computed(() => detail.value?.item ?? null)
+const customerReturnOrigin = computed(() => resolveCustomerRelationReturnOrigin(props.customerReturnTo, { targetEntity: 'project', targetId: props.projectId, origin: props.originHint }))
 const verifiedCustomerReturnTo = computed(() => {
-  if (!item.value || !props.customerReturnTo)
+  if (!props.customerReturnTo)
     return null
+  const hasContext = new URL(props.customerReturnTo, 'https://ruihang.invalid').searchParams.has('relationContext')
+  if (hasContext && !customerReturnOrigin.value)
+    return null
+  if (!item.value)
+    return customerReturnOrigin.value?.returnTo ?? null
   const customerIds = [item.value.customer, item.value.secondaryCustomer]
     .filter(reference => reference.state === 'resolved')
     .map(reference => reference.id)
@@ -85,7 +92,7 @@ const verifiedCustomerReturnTo = computed(() => {
 })
 const effectiveReturnTo = computed(() => verifiedCustomerReturnTo.value ?? props.returnTo)
 const effectiveReturnLabel = computed(() => verifiedCustomerReturnTo.value ? '返回客户详情' : props.returnLabel)
-const effectiveReturnExpiresAt = computed(() => verifiedCustomerReturnTo.value ? undefined : props.returnExpiresAt)
+const effectiveReturnExpiresAt = computed(() => verifiedCustomerReturnTo.value ? customerReturnOrigin.value?.expiresAt : props.returnExpiresAt)
 const project = computed(() => item.value ? projectFromRead(item.value) : null)
 const isDemo = computed(() => item.value?.dataOrigin === 'demo')
 const journeyReturnTo = computed(() => props.currentRoute
@@ -97,6 +104,21 @@ const materialJourneyReturnTo = computed(() => {
   return validateProjectJourneyReturnTo(`${url.pathname}${url.search}${url.hash}`, props.originHint)
     ?? `/project/${encodeURIComponent(props.projectId)}?origin=${props.originHint}`
 })
+const receiptReturnTo = computed(() => {
+  const url = new URL(journeyReturnTo.value, 'https://ruihang.invalid')
+  url.searchParams.delete('materialJourney')
+  url.searchParams.delete('ownerJourney')
+  url.hash = 'project-receipt-link'
+  return validateProjectJourneyReturnTo(`${url.pathname}${url.search}${url.hash}`, props.originHint) ?? journeyReturnTo.value
+})
+const receiptListTo = computed(() => `/finance/receipt?${new URLSearchParams({ origin: props.originHint, projectId: props.projectId, returnTo: receiptReturnTo.value })}`)
+const receiptIncomeReason = computed(() => {
+  const source = item.value?.income.missingSources.join(' ') ?? ''
+  return source.includes('forbidden') ? '当前无权读取收款事实' : source.includes('unavailable') ? '收款来源暂时不可用，请重新读取' : '收款金额尚未完整记录'
+})
+function captureReceiptOrigin() {
+  saveReceiptSourceOrigin({ returnTo: receiptReturnTo.value, scrollTop: workspaceScrollTop(), scrollLeft: 0 })
+}
 const ownerJourneyCards = computed(() => {
   const current = ownerJourneys.value
   if (!current)
@@ -210,7 +232,8 @@ async function restoreProjectAnchorContext(): Promise<boolean> {
   const anchor = decodeURIComponent(url.hash.slice(1))
   const ownerJourneyAnchor = isProjectOwnerDocumentCardAnchor(anchor)
   const materialJourneyAnchor = anchor === 'project-material-contract-link'
-  if (anchor !== 'project-detail-title' && !ownerJourneyAnchor && !materialJourneyAnchor)
+  const receiptJourneyAnchor = anchor === 'project-receipt-link'
+  if (anchor !== 'project-detail-title' && !ownerJourneyAnchor && !materialJourneyAnchor && !receiptJourneyAnchor)
     return false
   if (ownerJourneyAnchor && !ownerJourneys.value)
     return false
@@ -234,7 +257,7 @@ async function restoreProjectAnchorContext(): Promise<boolean> {
           now: Date.now(),
           load: id => loadOwnerDocumentReturnOrigin(id),
         })
-      : null
+      : receiptJourneyAnchor ? loadReceiptSourceOrigin(validatedRoute) : null
   const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
   if (origin && workspace)
     workspace.scrollTop = origin.scrollTop
@@ -537,6 +560,20 @@ onActivated(() => {
     />
 
     <AuxiliaryContractJourney v-if="item.dataOrigin === 'real'" :project-id="projectId" />
+
+    <PayrollHostSection v-if="detail.payrollActual" :section="detail.payrollActual" :return-to="journeyReturnTo" @retry="loadProject" />
+
+    <section class="panel flex min-w-0 flex-wrap items-center justify-between gap-3 p-4" aria-label="项目收款">
+      <div class="min-w-0">
+        <SectionHeader title="项目收款" /><p class="mb-0 mt-2 text-12px text-ink-soft">
+          {{ item.income.value === null ? receiptIncomeReason : `有效收款 ${yuan(item.income.value)}` }}
+        </p>
+      </div>
+      <NuxtLink v-if="detail.capabilities.includes('receipt:read')" id="project-receipt-link" :to="receiptListTo" class="btn-secondary h-8 px-4 text-12px" @click="captureReceiptOrigin">
+        查看收款登记
+      </NuxtLink>
+      <span v-else class="text-12px text-ink-faint">无收款查看权限</span>
+    </section>
 
     <section class="panel min-w-0 overflow-hidden p-3" aria-labelledby="project-owner-document-title">
       <SectionHeader id="project-owner-document-title" title="项目商务单据" subtitle="按当前项目稳定 ID 进入收入侧单据与分包变洽签中央正式链，返回时保留项目上下文" />

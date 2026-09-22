@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildConstructionContractDetail,
   buildConstructionContractListPage,
+  constructionContractSupplementAmount,
   parseConstructionContractDetailQuery,
   parseConstructionContractListQuery,
 } from '~/lib/construction-contract/repository'
@@ -74,6 +75,36 @@ function emptyFacts(): ConstructionContractFactSources {
 }
 
 describe('施工合同中央 Repository contract', () => {
+  it('有效补充金额与变更后金额分开，排除草稿/作废及其他来源或合同', () => {
+    const contract = source()
+    const row = { dataOrigin: 'real' as const, id: 's', contractId: contract.id, no: '', name: '', amount: 100, date: null, status: '有效' }
+    const facts = {
+      ...emptyFacts(),
+      supplements: [row, ...['draft', '草稿', '无效', '作废', 'cancelled'].map(status => ({ ...row, status, amount: 999 })), { ...row, dataOrigin: 'demo' as const }, { ...row, contractId: 'another' }],
+      changes: [{ ...row, id: 'change', amount: 250, status: 'approved' }],
+    }
+    expect(constructionContractSupplementAmount(contract, facts)).toBe(100)
+    const read = buildConstructionContractDetail({ contracts: [contract], facts, query: parseConstructionContractDetailQuery(contract.id, { origin: 'real' }), asOf: AS_OF, sourceVersion: '1', capabilities: [] })
+    expect(read.contract.amounts.changed).toBe('1350.00')
+  })
+  it('状态多选在分页前按 OR 匹配并汇总全量结果', () => {
+    const page = buildConstructionContractListPage({
+      contracts: [
+        ...Array.from({ length: 12 }, (_, index) => source({ id: `match-${index}`, status: index % 2 ? '草稿' : '履约中' })),
+        source({ id: 'excluded', status: '已结清' }),
+      ],
+      facts: emptyFacts(),
+      query: parseConstructionContractListQuery({ status: '["草稿","履约中"]' }),
+      asOf: AS_OF,
+      sourceVersion: 'multi-filter',
+      capabilities: [],
+    })
+    expect(page.items).toHaveLength(10)
+    expect(page.pagination.total).toBe(12)
+    expect(page.summary.origins.real).toMatchObject({ contractCount: 12, changedAmount: '12000.00' })
+    expect(page.items.every(row => ['草稿', '履约中'].includes(row.status))).toBe(true)
+  })
+
   it('列表保留施工专属列，实际竣工无 canonical 事实时保持 null', () => {
     const page = buildConstructionContractListPage({
       contracts: [

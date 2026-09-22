@@ -550,6 +550,11 @@ describe('f2 合同与支出结算领域 action', () => {
     expect(await listExpenditureSettlementOptions({
       projectId: 'project-contract',
       contractId: other.id,
+    })).toEqual([])
+    await mem.execute('UPDATE expenditure_settlements SET status = ? WHERE id = ?', ['confirmed', settlement.id])
+    expect(await listExpenditureSettlementOptions({
+      projectId: 'project-contract',
+      contractId: other.id,
     })).toEqual([{
       id: settlement.id,
       label: '可选结算',

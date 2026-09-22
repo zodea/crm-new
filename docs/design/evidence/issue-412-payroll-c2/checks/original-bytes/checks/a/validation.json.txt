@@ -1,0 +1,44 @@
+{
+  "owner": "P3 A",
+  "state": "frozen-pending-root-integration",
+  "baseline": "4738be98730955cd63832c8df04fc6f1d855caff",
+  "ownedFiles": 36,
+  "productFiles": 28,
+  "testFilesIncludingFixture": 8,
+  "implementation": [
+    "独立签工整页与台账的空范围读取、真实原ID、保存/人工确认、原行指纹、证明与日上限、时段重叠、原新范围互斥和关联工资持久重核",
+    "C2项目负责人主体正单价和明确空规则、逐条confirmed可用签工、唯一物理领用、完整成员含无源零成员、独立月核算和100%比例",
+    "C2核对/实际分配/冻结与专属来源及严格原命令成功回执互证，原价、原文、证明、人员、班组、配置、关联ID与全成员分配完整性",
+    "签工与C2独立HTTP/Repository/codec，费率350.125精确而金额到分，金额不全域放宽，A/C1原合同保持",
+    "三类稳定pending，可靠成功后必须同目标可信后读才ack，断线和未知结果保原键；合法后续签工变化返回changedSinceCommand，合法后续重核不使原needs-recheck回执永久卡住"
+  ],
+  "tests": {
+    "finalCommand": "npm test -- --project unit tests/payroll/central-daywork-service.test.ts tests/payroll/central-c2-service.test.ts tests/payroll/central-c2-commands.test.ts tests/payroll/central-c2-codec.test.ts tests/payroll/central-c2-http.test.ts tests/stores/daywork-central.test.ts tests/stores/payroll-c2-central.test.ts tests/payroll/central-service.test.ts tests/payroll/central-http.test.ts tests/payroll/central-c1-service.test.ts tests/payroll/central-c1-http.test.ts tests/payroll/central-attendance-service.test.ts tests/stores/payroll-c1-central.test.ts tests/stores/attendance-central.test.ts",
+    "log": "final-targeted.log",
+    "filesPassed": 14,
+    "testsPassed": 42,
+    "durationSeconds": 7.88,
+    "newASuites": 7,
+    "newATests": 20,
+    "lint": {"files": 36, "errors": 0, "warnings": 0, "log": "owned-lint-second.log", "method": "node node_modules/eslint/bin/eslint.js <exact owned files> --fix", "environmentNote": "pnpm exec eslint shim unavailable in sandbox; used installed local eslint entry, no install"},
+    "monthLockSupplement": {"filesPassed": 5, "testsPassed": 12, "durationSeconds": 3.95, "log": "month-lock-green.log", "lintFiles": 4, "lintErrors": 0, "lintLog": "month-lock-lint.log", "change": "daywork list.locks以原工资全部成员按项目/月独立投影，状态筛空和没有签工/失效当前名册不抹去原锁；不跨项目月份或空范围，不造签工。新增A范围测试1，前述42是补项前结果。", "independentRed": "../spec-final/zero-member-lock-reproduction.log", "independentGreen": "../spec-final/zero-member-lock-green.log", "finalLocalLog": "month-lock-final.log", "spec": "docs/rewrite/READ-MODELS.md:501；P3票已发全部成员整月锁"},
+    "fixedDecimalSupplement": {"filesPassed": 5, "testsPassed": 9, "durationSeconds": 4.17, "redLogs": ["fixed-decimal-red.log", "fixed-decimal-c1-red.log"], "greenLog": "fixed-decimal-green.log", "lintFiles": 3, "lintErrors": 0, "lintLog": "fixed-decimal-lint.log", "change": "新增payrollFixedDecimal有限数指数展开，C2/签工及同文件C1小数wire固定十进制、decoder拒e；原值无舍入，原JSON旁路、A金额与到分规则不变。Root负责通用detail复用。", "coverage": "真实HTTP配置0.0000001、1e21、350.125保存/回读和原e请求422；codec null/0/MIN_VALUE/MAX_VALUE/负极小有限值精确往返，C1同步反例与原A/C1 HTTP回归。", "spec": "docs/rewrite/READ-MODELS.md:28，Root明确裁定同文件C1冲突一并修复"}
+  },
+  "redGreenEvidence": [
+    {"scope": "签工空态", "red": "daywork-empty-red.log", "green": "daywork-empty-green.log"},
+    {"scope": "签工保存确认", "red": "daywork-save-red.log", "green": "daywork-save-green.log"},
+    {"scope": "C2配置", "red": "c2-config-red.log", "green": "c2-config-green.log"},
+    {"scope": "C2草稿核对", "red": "c2-draft-red.log", "green": "c2-draft-green.log"},
+    {"scope": "C2释放冻结", "red": "c2-release-red.log", "green": "c2-release-green.log"},
+    {"scope": "HTTP真实wire精度", "red": "c2-http-first.log", "green": "negative-green.log", "note": "通用detail精度修复由Root独占central-read/central-codec完成；A专属wire原价已正确"},
+    {"scope": "两个store真实恢复", "red": "stores-red.log", "green": "stores-first.log"},
+    {"scope": "原scope异常读取", "red": "negative-first.log", "green": "negative-green.log"},
+    {"scope": "needs-recheck后续合法核对恢复", "red": "stores-target-red.log", "green": "stores-target-green.log"}
+  ],
+  "rootFeedback": {
+    "typecheck": "Root首轮及第二轮反馈已修：声明式never fail保实际guards收窄、捕获验证后时段string；scope在访问项目负责人前用in guard、状态明确draft/confirmed后includes；等Root统一复验",
+    "independent": "Root独立公开服务9/9通过是独立证据，未冒充A红绿或计入42",
+    "rootOwnedTransfers": ["app/lib/payroll/central-read.ts", "app/lib/payroll/central-codec.ts"]
+  },
+  "limits": ["未自行全量测试、typecheck、build、浏览器、启动服务或提交；Root统一完成", "临时日志与计划均留在有界a目录等Root归档回收；没有自行删除或清理其他作者产物"]
+}

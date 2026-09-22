@@ -1,0 +1,16 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/c2-migration-protection.test.ts -t frozen-links
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 16 skipped (17)
+   Start at  14:08:53
+   Duration  4.20s (transform 2.23s, setup 0ms, import 2.69s, tests 1.27s, environment 0ms)
+

@@ -364,7 +364,7 @@ export function buildProjectListItem(
     region: row.region,
     riskLevel: row.riskLevel,
     address: row.address,
-    income: projectMetric(row.income, row.id, row.dataOrigin, 'receipt-registrations', 'receipt', asOf),
+    income: projectMetric(row.income, row.id, row.dataOrigin, row.incomeMissingSource ?? 'receipt-registrations', 'receipt', asOf),
     budget: projectMetric(row.budget, row.id, row.dataOrigin, 'target-cost-baseline', 'target-cost', asOf),
     updatedAt: row.updatedAt,
   }

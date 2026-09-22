@@ -1,8 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import {
-  resolveHomeProjectSwitch,
-  summarizeHomeScheduleCoverage,
-} from '~/lib/home/dashboard'
+import { describe, expect, it } from 'vitest'
+import { summarizeHomeScheduleCoverage } from '~/lib/home/dashboard'
 
 describe('首页驾驶舱状态规则', () => {
   it('只把真实缺失事实标为 partial-data，不用 0 冒充完整数据', () => {
@@ -38,35 +35,6 @@ describe('首页驾驶舱状态规则', () => {
       isPartial: false,
       title: '',
       description: '',
-    })
-  })
-
-  it('项目加载成功才确认切换，失败回到原项目', async () => {
-    const loaded = { id: 'project-new' }
-    const loadSuccess = vi.fn(async () => loaded)
-    await expect(resolveHomeProjectSwitch({
-      requestedId: 'project-new',
-      confirmedId: 'project-old',
-      load: loadSuccess,
-    })).resolves.toEqual({
-      ok: true,
-      selectedId: 'project-new',
-      value: loaded,
-    })
-
-    const failure = new Error('database unavailable')
-    const loadFailure = vi.fn(async () => {
-      throw failure
-    })
-    await expect(resolveHomeProjectSwitch({
-      requestedId: 'project-new',
-      confirmedId: 'project-old',
-      load: loadFailure,
-    })).resolves.toEqual({
-      ok: false,
-      selectedId: 'project-old',
-      failedId: 'project-new',
-      error: failure,
     })
   })
 })

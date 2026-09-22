@@ -1,5 +1,5 @@
 import type { FormAttachmentChanges, SupplierFormDraft } from '../../app/lib/master-data/forms'
-import type { SupplierCommandRequestDTO } from '../../app/lib/supplier/command-contract'
+import type { SupplierCommandRequestDTO, SupplierImportCommandRequestDTO } from '../../app/lib/supplier/command-contract'
 import { SUPPLIER_WRITE_CAPABILITY } from '../../app/lib/supplier/command-contract'
 import { supplierProblem, SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
 
@@ -21,6 +21,7 @@ const TEXT_FIELDS = new Set([
   'taxpayerVerificationSource',
   'taxpayerVerificationNote',
   'mainBusiness',
+  'laborScope',
   'invoiceName',
   'invoiceAddress',
   'bank',
@@ -88,5 +89,24 @@ export function parseSupplierCommandRequest(value: unknown, routeId?: string): S
     action: value.action as SupplierCommandRequestDTO['action'],
     draft: value.draft as SupplierFormDraft,
     attachments: value.attachments as FormAttachmentChanges,
+  }
+}
+
+/** 导入只接受主数据映射字段，不接收主档 ID、审核或核验结论。 */
+export function parseSupplierImportCommandRequest(value: unknown): SupplierImportCommandRequestDTO {
+  if (!object(value) || !object(value.draft)
+    || Object.keys(value).some(key => !['workspaceId', 'actorId', 'requiredCapability', 'commandId', 'draft'].includes(key))
+    || Object.keys(value.draft).some(key => ['id', 'approvalStatus', 'taxpayerVerificationStatus', 'taxpayerVerificationSource', 'taxpayerVerifiedAt', 'taxpayerVerificationNote'].includes(key))) {
+    return fail('分供方导入内容无效；导入不能指定主档 ID 或核验结论')
+  }
+  const parsed = parseSupplierCommandRequest({ ...value, baseVersion: null, action: 'draft', attachments: {} })
+  if (!parsed.draft.name?.trim())
+    return fail('公司全称不能为空')
+  return {
+    workspaceId: parsed.workspaceId,
+    actorId: parsed.actorId,
+    requiredCapability: SUPPLIER_WRITE_CAPABILITY,
+    commandId: parsed.commandId,
+    draft: parsed.draft,
   }
 }

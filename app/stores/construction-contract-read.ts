@@ -55,7 +55,9 @@ export const useConstructionContractReadStore = defineStore('construction-contra
 
   async function loadList(query: ConstructionContractListQueryDTO) {
     const request = ++latestList
-    const prior = previous(listState.value)
+    const prior = listQuery.value?.origin === query.origin && listQuery.value.includeDemo === query.includeDemo
+      ? previous(listState.value)
+      : null
     listQuery.value = { ...query }
     listState.value = { kind: 'loading', previous: prior }
     try {

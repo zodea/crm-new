@@ -1,11 +1,12 @@
 import type { QuantityVarianceFact } from '~/lib/quantity/variance'
-import { render, screen, waitFor } from '@testing-library/vue'
+import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import QuantityVarianceDialog from '~/components/quantity/QuantityVarianceDialog.vue'
 
 const loadQuantityVarianceFacts = vi.hoisted(() => vi.fn())
+beforeEach(() => vi.stubGlobal('useQuantityStore', () => ({ loadVariance: loadQuantityVarianceFacts })))
 
 vi.mock('~/lib/quantity/variance', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/lib/quantity/variance')>()
@@ -68,6 +69,37 @@ const factA: QuantityVarianceFact = {
 }
 
 describe('quantity variance dialog', () => {
+  it('分部与工种各自多选取并集、跨字段取交集，候选不因筛选缩水且清空恢复', async () => {
+    loadQuantityVarianceFacts.mockResolvedValueOnce([
+      factA,
+      { ...factA, id: 'b', itemId: 'b', itemName: '电气布线', section: '机电安装', trade: '电工' },
+      { ...factA, id: 'c', itemId: 'c', itemName: '装饰接线', section: '装饰装修', trade: '电工' },
+    ])
+    const view = render(QuantityVarianceDialog, {
+      props: { open: false, projectId: 'project-a' },
+      global: { components: { KitTable: KitTableStub, SelectFilter: SelectFilterStub } },
+    })
+    await view.rerender({ open: true })
+    await flushPromises()
+    await fireEvent.click(screen.getByRole('button', { name: '分部，已选 0 项' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '装饰装修' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '机电安装' }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(screen.getByTestId('variance-table').textContent).toContain('电气布线')
+    await fireEvent.click(screen.getByRole('button', { name: '工种，已选 0 项' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '泥水工' }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(screen.getByTestId('variance-table').textContent).toBe('项目 A 墙砖')
+    await fireEvent.click(screen.getByRole('button', { name: '分部，已选 2 项' }))
+    expect((screen.getByRole('checkbox', { name: '机电安装' }) as HTMLInputElement).checked).toBe(true)
+    await fireEvent.click(screen.getByRole('button', { name: '清除' }))
+    expect(screen.getByTestId('variance-table').textContent).toBe('项目 A 墙砖')
+    await fireEvent.click(screen.getByRole('button', { name: '工种，已选 1 项' }))
+    await fireEvent.click(screen.getByRole('button', { name: '清除' }))
+    expect(screen.getByTestId('variance-table').textContent).toContain('电气布线')
+    expect((screen.getByRole('combobox', { name: '对比口径' }) as HTMLSelectElement).value).toBe('field')
+  })
+
   it('clears prior-project facts before a failed reload and keeps mobile content vertically reachable', async () => {
     loadQuantityVarianceFacts
       .mockResolvedValueOnce([factA])

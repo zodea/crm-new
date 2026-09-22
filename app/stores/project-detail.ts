@@ -122,6 +122,7 @@ function number(value: unknown): number {
 
 export const useProjectDetailStore = defineStore('project-detail', () => {
   const invoiceStore = useInvoiceStore()
+  const deliveryStore = useDeliveryRecordStore()
   const constructionContracts = shallowRef<ConstructionContractRow[]>([])
   const supplementAgreements = shallowRef<SupplementAgreementRow[]>([])
   const ownerChangeOrders = shallowRef<OwnerChangeOrderRow[]>([])
@@ -221,7 +222,14 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         loadProjectCostControl(db),
         loadProjectExpenditureRelations(db),
         loadProjectFinanceFacts(db),
-        loadProjectDeliveryArchive(db),
+        loadProjectDeliveryArchive(deliveryStore.mode === 'central'
+          ? {
+              load: async () => {
+                await deliveryStore.load()
+                return { origin: deliveryStore.origin, records: deliveryStore.list }
+              },
+            }
+          : db),
         loadProjectAcceptanceLifecycle(db),
       ])
 

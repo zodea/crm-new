@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 const LIST_ROUTES = [
   { path: '/owner/change', typeFilter: true },
   { path: '/owner/report', typeFilter: false },
-  { path: '/owner/acceptance', typeFilter: true },
+  { path: '/owner/acceptance', typeFilter: false },
   { path: '/owner/final-settlement', typeFilter: false },
   { path: '/owner/penalty', typeFilter: false },
   { path: '/subcontract/change', typeFilter: true },
@@ -22,10 +22,11 @@ for (const width of [390, 768, 1024, 1440]) {
           timeout: 60_000,
         })
         await expect(page.getByRole('combobox', { name: '项目' })).toBeVisible()
-        await expect(page.getByRole('combobox', { name: '状态' })).toBeVisible()
+        await expect(page.getByRole('button', { name: /^状态，已选/ })).toBeVisible()
         if (item.typeFilter)
-          await expect(page.getByRole('combobox', { name: /类型/ })).toBeVisible()
+          await expect(page.getByRole('button', { name: /类型，已选/ })).toBeVisible()
         await expect(page.locator('[data-ui="owner-document-table"]')).toBeVisible()
+        await expect(page.locator('[data-ui="owner-document-table"]')).toHaveAttribute('aria-busy', 'false')
 
         const overflow = await page.evaluate(() => ({
           body: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -36,12 +37,22 @@ for (const width of [390, 768, 1024, 1440]) {
         }))
         expect(overflow.body).toBeLessThanOrEqual(1)
         if (width === 390) {
-          expect(overflow.table).toBeGreaterThan(0)
           const table = page.locator('[data-ui="owner-document-table"]')
-          await table.focus()
-          await page.keyboard.press('ArrowRight')
-          await expect.poll(() => table.evaluate(element => element.scrollLeft))
-            .toBeGreaterThan(0)
+          if (overflow.table > 0) {
+            await table.focus()
+            await page.keyboard.press('ArrowRight')
+            await expect.poll(() => table.evaluate(element => element.scrollLeft))
+              .toBeGreaterThan(0)
+          }
+          else {
+            // vxe 布局完成后可由内部主体接管横滚，仍必须局限在表格中。
+            await expect.poll(() => table.locator('.vxe-table--scroll-x-handle').evaluateAll(elements =>
+              elements.some(element => element.scrollWidth > element.clientWidth),
+            )).toBe(true)
+            const scrollbar = table.locator('.vxe-table--scroll-x-handle')
+            await scrollbar.evaluate(element => element.scrollLeft = 120)
+            await expect.poll(() => scrollbar.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+          }
         }
       })
     }

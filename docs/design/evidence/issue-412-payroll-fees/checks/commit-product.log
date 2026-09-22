@@ -1,0 +1,325 @@
+[STARTED] Backing up original state...
+[COMPLETED] Backed up original state in git stash (aeed6233)
+[STARTED] Running tasks for staged files...
+[STARTED] .lintstagedrc — 49 files (chunk 1/7)...
+[STARTED] .lintstagedrc — 49 files (chunk 2/7)...
+[STARTED] .lintstagedrc — 49 files (chunk 3/7)...
+[STARTED] .lintstagedrc — 49 files (chunk 4/7)...
+[STARTED] .lintstagedrc — 48 files (chunk 5/7)...
+[STARTED] .lintstagedrc — 48 files (chunk 6/7)...
+[STARTED] .lintstagedrc — 48 files (chunk 7/7)...
+[SKIPPED] .lintstagedrc — no tasks to run
+[SKIPPED] .lintstagedrc — no tasks to run
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 47 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 20 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 3 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 30 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 48 files
+[STARTED] eslint --fix
+[STARTED] eslint --fix
+[STARTED] eslint --fix
+[STARTED] eslint --fix
+[STARTED] eslint --fix
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 3 files
+[COMPLETED] .lintstagedrc — 48 files (chunk 5/7)...
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 20 files
+[COMPLETED] .lintstagedrc — 49 files (chunk 2/7)...
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 30 files
+[COMPLETED] .lintstagedrc — 48 files (chunk 6/7)...
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 48 files
+[COMPLETED] .lintstagedrc — 48 files (chunk 7/7)...
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 47 files
+[COMPLETED] .lintstagedrc — 49 files (chunk 1/7)...
+[COMPLETED] Running tasks for staged files...
+[STARTED] Staging changes from tasks...
+[COMPLETED] Staging changes from tasks...
+[STARTED] Cleaning up temporary files...
+[COMPLETED] Cleaning up temporary files...
+
+> crm-new@ typecheck D:\crm本地项目开发
+> nuxt typecheck
+
+
+> crm-new@ test D:\crm本地项目开发
+> vitest run
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+
+ Test Files  740 passed (740)
+      Tests  4190 passed (4190)
+   Start at  01:26:27
+   Duration  295.02s (transform 84.37s, setup 233.33s, import 473.55s, tests 1448.65s, environment 738.98s)
+
+[main 61a6a10d] feat(payroll): 接通多条补贴与独立管理费清单
+ 340 files changed, 10220 insertions(+), 261 deletions(-)
+ create mode 100644 app/components/payroll/PayrollAFeeAdjustmentFields.vue
+ create mode 100644 app/components/payroll/PayrollAFeeBasisEditor.vue
+ create mode 100644 app/components/payroll/PayrollAFeeEditor.vue
+ create mode 100644 app/components/payroll/PayrollAFeeLinesTable.vue
+ create mode 100644 app/components/payroll/PayrollAFeesConfigSection.vue
+ create mode 100644 app/components/payroll/PayrollAFeesFrozenSection.vue
+ create mode 100644 app/components/payroll/PayrollAFeesReview.vue
+ create mode 100644 app/components/payroll/PayrollAManagementBookEditor.vue
+ create mode 100644 app/components/payroll/PayrollAManagementScopeEditor.vue
+ create mode 100644 app/components/payroll/PayrollANegativeLineEditor.vue
+ create mode 100644 app/components/payroll/PayrollANegativeLinesSection.vue
+ create mode 100644 app/components/payroll/PayrollANegativeLinesTable.vue
+ create mode 100644 app/components/payroll/PayrollActualReferencePicker.vue
+ create mode 100644 app/composables/usePayrollAFeesConfig.ts
+ create mode 100644 app/composables/usePayrollANegativeLines.ts
+ create mode 100644 app/lib/crew-worker/payroll-fee-defaults.ts
+ create mode 100644 app/lib/migration/payroll-fees-source.ts
+ create mode 100644 app/lib/payroll/a-fees-export.ts
+ create mode 100644 app/lib/payroll/central-a-adjustment-coverage.ts
+ create mode 100644 app/lib/payroll/central-a-fee-adjustment.ts
+ create mode 100644 app/lib/payroll/central-a-fees-calculation.ts
+ create mode 100644 app/lib/payroll/central-a-fees-codec.ts
+ create mode 100644 app/lib/payroll/central-a-fees-contract.ts
+ create mode 100644 app/lib/payroll/central-a-fees-provenance.ts
+ create mode 100644 app/lib/payroll/central-a-fees-read-primitives.ts
+ create mode 100644 app/lib/payroll/central-a-fees-read-validation.ts
+ create mode 100644 app/lib/payroll/central-a-fees-schema.ts
+ create mode 100644 app/lib/payroll/central-a-fees-validation.ts
+ create mode 100644 app/lib/quantity/migration-identity.ts
+ create mode 100644 app/stores/payroll-a-fees.ts
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/README.md
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/artifact-manifest.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-evidence-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-table-0-right-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-table-0-right-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-table-0-right-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-table-0-right-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-no-statement-table-0-right-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-original-scope-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-original-scope-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-original-scope-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-original-scope-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-original-scope-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/company-managed-save-control-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-null-not-adopted-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-null-not-adopted-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-null-not-adopted-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-null-not-adopted-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-null-not-adopted-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-zero-not-adopted-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-zero-not-adopted-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-zero-not-adopted-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-zero-not-adopted-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/crew-default-zero-not-adopted-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-http.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-table-0-right-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-table-0-right-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-table-0-right-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-table-0-right-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-preserves-input-table-0-right-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-source-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-source-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-source-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-source-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fee-config-quantity-return-source-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fees-migration-batch.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fees-source.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fees-unknown-preserves-command-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fees-unknown-preserves-command-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fees-unknown-preserves-command-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fees-unknown-preserves-command-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/fees-unknown-preserves-command-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-520-calculation-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-520-calculation-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-520-calculation-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-520-calculation-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-520-calculation-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-520-print-check.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-520.xlsx
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-frozen-520-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-frozen-520-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-frozen-520-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-frozen-520-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-frozen-520-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-original-responsibility-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-original-responsibility-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-original-responsibility-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-original-responsibility-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-original-responsibility-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-quantity-return-source-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-quantity-return-source-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-quantity-return-source-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-quantity-return-source-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-quantity-return-source-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-evidence-tail-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-evidence-tail-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-evidence-tail-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-evidence-tail-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-evidence-tail-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-preserves-input-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-preserves-input-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-preserves-input-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-preserves-input-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-preserves-input-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-ratio-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-ratio-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-ratio-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-ratio-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/management-scope-return-ratio-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-evidence-tail-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-evidence-tail-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-evidence-tail-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-evidence-tail-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-evidence-tail-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-left-focus-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-left-focus-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-left-focus-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-left-focus-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-left-focus-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-measurements.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-reason-tail-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-reason-tail-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-reason-tail-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-reason-tail-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-reason-tail-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-right-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-right-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-right-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-right-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-readable-right-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-uncompleted-source-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-uncompleted-source-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-uncompleted-source-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-uncompleted-source-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/negative-uncompleted-source-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/ordinary-3815-print-check.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/ordinary-3815.xlsx
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/ordinary-work-and-215-fees-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/ordinary-work-and-215-fees-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/ordinary-work-and-215-fees-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/ordinary-work-and-215-fees-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/ordinary-work-and-215-fees-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-list-readable-measurements.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-actual-two-rows-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-actual-two-rows-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-actual-two-rows-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-actual-two-rows-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-actual-two-rows-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-left-two-rows-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-left-two-rows-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-left-two-rows-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-left-two-rows-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-readable-left-two-rows-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-two-books-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-two-books-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-two-books-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-two-books-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/same-person-two-books-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/supplement-390/browser-eighth.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/supplement-390/negative-readable-amount-columns-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/supplement-390/verification.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/two-fees-explicit-scope-1024.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/two-fees-explicit-scope-1280.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/two-fees-explicit-scope-1440.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/two-fees-explicit-scope-390.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/two-fees-explicit-scope-768.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/browser/verification.json.txt
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/browser-fifth.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/browser-first.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/browser-fourth.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/browser-second.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/browser-seventh.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/browser-sixth.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/browser-third.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/build-final.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/captured-fixture-proof.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/code-files.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/commit-pdf-cleanup-final.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/history-gaps-green.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/history-gaps-red.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/integration-first-failed.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/lint-code-receipt.json
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/migration-batch-boundaries.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/migration-runtime-followup.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/negative-display-check.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/print-and-negative-check.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/saved-calculation-label.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-crew-defaults-green.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-crew-defaults-red.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-fees-graph-green.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-fees-graph-red.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-management-scope-red.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-removal-future-green.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-removal-future-plan-red.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-spec-management-ratio-recheck.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-spec-recheck-integrity.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/checks/source-targeted-final.log
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/print/management-520-page-1.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/print/management-520-page-2.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/print/ordinary-3815-page-1.png
+ create mode 100644 docs/design/evidence/issue-412-payroll-fees/print/ordinary-3815-page-2.png
+ create mode 100644 docs/guides/payroll-fees.md
+ create mode 100644 e2e/helpers/payroll-fees-boundaries.ts
+ create mode 100644 e2e/helpers/payroll-fees-migration-source.ts
+ create mode 100644 e2e/helpers/payroll-fees-workspace.ts
+ create mode 100644 e2e/payroll-fees-central.spec.ts
+ create mode 100644 server/api/commands/payroll-a-fees.post.ts
+ create mode 100644 server/api/read/payroll/a-fee-config.post.ts
+ create mode 100644 server/utils/payroll-a-book.ts
+ create mode 100644 server/utils/payroll-a-fee-reconciliation.ts
+ create mode 100644 server/utils/payroll-a-fees-data.ts
+ create mode 100644 server/utils/payroll-a-fees-policy.ts
+ create mode 100644 server/utils/payroll-a-fees-read.ts
+ create mode 100644 server/utils/payroll-a-fees-service.ts
+ create mode 100644 server/utils/payroll-a-frozen-form.ts
+ create mode 100644 server/utils/payroll-a-reconciliation-shared.ts
+ create mode 100644 server/utils/payroll-a-released-with-migration.ts
+ create mode 100644 server/utils/payroll-fees-migration-references.ts
+ create mode 100644 server/utils/payroll-fees-migration.ts
+ create mode 100644 server/utils/payroll-management-scope-facts.ts
+ create mode 100644 server/utils/payroll-migrated-fees-mapping.ts
+ create mode 100644 server/utils/payroll-migrated-fees.ts
+ create mode 100644 tests/components/PayrollAFeeAdjustmentFields.test.ts
+ create mode 100644 tests/components/PayrollAFeesReview.test.ts
+ create mode 100644 tests/components/PayrollANegativeLinesState.test.ts
+ create mode 100644 tests/components/PayrollActualReferencePicker.test.ts
+ create mode 100644 tests/components/PayrollFeeEditors.test.ts
+ create mode 100644 tests/fixtures/payroll/fees-config-captured.json
+ create mode 100644 tests/helpers/payroll-a-fee-adjustment-fixture.ts
+ create mode 100644 tests/helpers/payroll-a-fees-fixture.ts
+ create mode 100644 tests/helpers/payroll-fees-migration-fixture.ts
+ create mode 100644 tests/helpers/payroll-fees-ui-fixture.ts
+ create mode 100644 tests/payroll/a-fees-output.test.ts
+ create mode 100644 tests/payroll/a-quantity-migration-navigation.test.ts
+ create mode 100644 tests/payroll/central-a-book-history-gaps.test.ts
+ create mode 100644 tests/payroll/central-a-fee-adjustment-calculation.test.ts
+ create mode 100644 tests/payroll/central-a-fee-adjustments.test.ts
+ create mode 100644 tests/payroll/central-a-fees-codec.test.ts
+ create mode 100644 tests/payroll/central-a-fees-host-cost.test.ts
+ create mode 100644 tests/payroll/central-a-fees-integrity.test.ts
+ create mode 100644 tests/payroll/central-a-fees-removal.test.ts
+ create mode 100644 tests/payroll/central-a-fees-runtime-options.test.ts
+ create mode 100644 tests/payroll/central-a-fees.test.ts
+ create mode 100644 tests/payroll/central-a-management-ownership.test.ts
+ create mode 100644 tests/payroll/central-a-management-ratio.test.ts
+ create mode 100644 tests/payroll/crew-fee-default-facts.test.ts
+ create mode 100644 tests/payroll/fees-migration-batch-boundaries.test.ts
+ create mode 100644 tests/payroll/fees-migration-graph.test.ts
+ create mode 100644 tests/payroll/fees-migration-runtime.test.ts
+ create mode 100644 tests/payroll/management-scope-facts.test.ts
+ create mode 100644 tests/stores/payroll-a-fees-pending.test.ts
+ create mode 100644 tests/stores/payroll-a-release-read.test.ts

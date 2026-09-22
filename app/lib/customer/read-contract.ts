@@ -17,7 +17,7 @@ export type CustomerListSort = 'updated-desc' | 'name-asc' | 'name-desc'
 export interface CustomerListQueryDTO {
   includeDemo: boolean
   search: string
-  status: string | null
+  status: string | string[] | null
   sort: CustomerListSort
   page: number
   pageSize: CustomerPageSize
@@ -97,6 +97,7 @@ export interface CustomerProjectSourceRow {
 }
 
 export interface CustomerContractSourceRow {
+  projectPermission?: 'allowed' | 'forbidden'
   dataOrigin: DataOriginDTO
   id: string
   no: string
@@ -105,12 +106,14 @@ export interface CustomerContractSourceRow {
   customerId: string | null
   amount: number
   supplementAmount: number
-  receiptAmount: number
+  receiptAmount: number | null
   signDate: ISODateDTO | null
   status: string
 }
 
 export interface CustomerReceiptSourceRow {
+  projectPermission?: 'allowed' | 'forbidden'
+  contractPermission?: 'allowed' | 'forbidden'
   dataOrigin: DataOriginDTO
   id: string
   no: string
@@ -118,14 +121,14 @@ export interface CustomerReceiptSourceRow {
   projectId: string | null
   contractId: string | null
   payerAccount: string
-  amount: number
+  amount: number | null
   paymentMethod: string
   receiptDate: ISODateDTO | null
   status: string
 }
 
 export interface CustomerProjectDTO {
-  project: EntityRefDTO & { entity: 'project' }
+  project: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'project' }
   navigation: NavigationIntentDTO
   code: string
   relationRole: '主客户' | '次客户'
@@ -133,10 +136,10 @@ export interface CustomerProjectDTO {
   startDate: ISODateDTO | null
   plannedEnd: ISODateDTO | null
   manager: string
-  contractCount: number
-  effectiveContractAmount: MoneyDTO
-  receiptCount: number
-  effectiveReceiptAmount: MoneyDTO
+  contractCount: number | null
+  effectiveContractAmount: MoneyDTO | null
+  receiptCount: number | null
+  effectiveReceiptAmount: MoneyDTO | null
 }
 
 export interface CustomerContractDTO {
@@ -145,8 +148,8 @@ export interface CustomerContractDTO {
   project: EntityRefDTO & { entity: 'project' }
   projectNavigation: NavigationIntentDTO
   effectiveAmount: MoneyDTO
-  receiptAmount: MoneyDTO
-  outstandingAmount: MoneyDTO
+  receiptAmount: MoneyDTO | null
+  outstandingAmount: MoneyDTO | null
   signDate: ISODateDTO | null
   status: string
   isDraft: boolean
@@ -161,8 +164,8 @@ export interface CustomerReceiptDTO {
   contractNavigation: NavigationIntentDTO
   receiptDate: ISODateDTO | null
   payerAccount: string
-  amount: MoneyDTO
-  effectiveAmount: MoneyDTO
+  amount: MoneyDTO | null
+  effectiveAmount: MoneyDTO | null
   paymentMethod: string
   status: string
   isDraft: boolean
@@ -179,16 +182,19 @@ export interface CustomerReceiptDetailReadDTO {
 }
 
 export interface CustomerDetailSummaryDTO {
-  projectCount: number
-  contractCount: number
-  effectiveContractAmount: MoneyDTO
-  receiptCount: number
-  effectiveReceiptAmount: MoneyDTO
-  outstandingAmount: MoneyDTO
-  draftReceiptCount: number
+  projectCount: number | null
+  contractCount: number | null
+  effectiveContractAmount: MoneyDTO | null
+  receiptCount: number | null
+  effectiveReceiptAmount: MoneyDTO | null
+  outstandingAmount: MoneyDTO | null
+  draftReceiptCount: number | null
 }
 
 export interface CustomerDetailReadDTO {
+  receiptsProblem?: ProblemDTO
+  contractsProblem?: ProblemDTO
+  projectsProblem?: ProblemDTO
   dataOrigin: DataOriginDTO
   customer: CustomerListSourceRow
   projects: CustomerProjectDTO[]

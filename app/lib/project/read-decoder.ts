@@ -8,6 +8,7 @@ import type {
   ProjectPageSize,
 } from './read-contract'
 import { isDataOriginDTO, isEntityKindDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { decodePayrollHostSection } from '../crew-worker/payroll-read'
 import {
   PROJECT_PAGE_SIZES,
   projectProblem,
@@ -290,7 +291,10 @@ export function decodeProjectDetailRead(value: unknown): ProjectDetailReadDTO {
       '中央后台返回的项目详情读模型无效',
     ))
   }
-  return value as unknown as ProjectDetailReadDTO
+  const detail = value as unknown as ProjectDetailReadDTO
+  if (detail.payrollActual !== undefined && (detail.item.dataOrigin !== 'real' || (!detail.capabilities.includes('payroll:read') && detail.payrollActual.status !== 'forbidden')))
+    throw new ProjectRepositoryProblem(projectProblem('internal-error', '工资收付分区与来源授权不一致'))
+  return detail.payrollActual === undefined ? detail : { ...detail, payrollActual: decodePayrollHostSection(detail.payrollActual, { kind: 'project', id: detail.item.project.id }) }
 }
 
 export function projectProblemFromUnknown(cause: unknown): ProjectRepositoryProblem {
