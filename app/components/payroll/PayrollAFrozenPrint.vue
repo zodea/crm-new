@@ -5,6 +5,7 @@ import { computed } from 'vue'
 import { hasPayrollAFeesDocument } from '~/lib/payroll/central-a-fees-contract'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollAFeesFrozenSection from './PayrollAFeesFrozenSection.vue'
+import PayrollAFrozenLocationSection from './PayrollAFrozenLocationSection.vue'
 import PayrollHollowFrozenSection from './PayrollHollowFrozenSection.vue'
 
 const props = defineProps<{ document: PayrollAFrozenDocument, officialIssue?: PayrollOfficialIssue }>()
@@ -61,6 +62,7 @@ const management = computed(() => feesDocument.value?.book.bookPurpose === 'mana
             <span>{{ management ? '管理人' : '班组长' }}：</span><span>施工员：</span><span>安全员：</span><span>现场负责人：</span>
           </footer>
         </section>
+        <PayrollAFrozenLocationSection :document="document" />
       </article>
     </div>
   </Teleport>

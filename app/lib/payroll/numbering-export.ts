@@ -2,6 +2,7 @@ import type { ExportFileOptions } from '../kit/export'
 import type { PayrollNumberingRead } from './central-numbering-contract'
 import * as XLSX from 'xlsx'
 import { createPayrollAWorkbook } from './a-export'
+import { payrollAFrozenFileName } from './a-location-output'
 import { createPayrollC1Workbook } from './c1-export'
 import { createPayrollC2Workbook } from './c2-export'
 import { payrollProblem } from './central-contract'
@@ -19,6 +20,8 @@ export function payrollOfficialDocument(read: PayrollNumberingRead) {
 
 export function payrollOfficialFilename(read: PayrollNumberingRead): string {
   const { issue, document } = payrollOfficialDocument(read)
+  if (document.formatFamily === 'A')
+    return `${payrollAFrozenFileName(document).slice(0, -5)}-正式${issue.number}-${issue.documentHash}.xlsx`
   const label = [...`${document.projectName.slice(0, 36)}-${document.leaderName.slice(0, 16)}-${document.month}-${document.formatFamily}-正式${issue.number}`].map(char => char.charCodeAt(0) < 32 ? '-' : char).join('').replace(/[<>:"/\\|?*]/g, '-')
   // Keep the complete frozen-document digest: shortened display names cannot overwrite another original.
   return `${label}-${issue.documentHash}.xlsx`

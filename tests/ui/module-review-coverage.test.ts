@@ -5,6 +5,33 @@ import { REVIEW_OBLIGATIONS, validateReviewObligations } from '../../scripts/mod
 import { buildRuntimeEvidenceLedger } from '../../scripts/runtime-evidence-ledger.mjs'
 
 describe('module review coverage', () => {
+  it('retains all 28 obligations while assigning decided work and genuine questions to their current owners', () => {
+    const coverage = buildModuleReviewCoverage()
+    const inherited = coverage.obligations.filter(item => /^(?:PRG|WAGE)-/.test(item.id))
+    expect(inherited.map(item => item.id)).toEqual([
+      ...Array.from({ length: 10 }, (_, i) => `PRG-${String(i + 1).padStart(2, '0')}`),
+      ...Array.from({ length: 18 }, (_, i) => `WAGE-${String(i + 1).padStart(2, '0')}`),
+    ])
+    const at = (id: string) => inherited.find(item => item.id === id)!
+    for (const number of [472, 473, 474, 475])
+      expect(at('WAGE-14').remaining).toContain(`#${number}`)
+    expect(at('WAGE-15').remaining).toContain('逐单人工')
+    expect(at('WAGE-16').remaining).toContain('整单优先')
+    expect(at('WAGE-17').remaining).toContain('#477')
+    expect(at('WAGE-18').remaining).toContain('#478')
+    for (const id of ['WAGE-15', 'WAGE-16', 'WAGE-17', 'WAGE-18'])
+      expect(at(id).remaining).not.toMatch(/local grill|仍待grill|继续留grill/)
+    for (const id of ['PRG-08', 'PRG-09', 'PRG-10', 'WAGE-09', 'WAGE-12', 'WAGE-18'])
+      expect(at(id).status).toBe('partial')
+    expect(at('WAGE-18').evidence).toContainEqual(expect.objectContaining({ reference: 'docs/design/evidence/issue-449/README.md', commit: '28d66492f80e62db988cfbfb77b615dbb1c2f243' }))
+    const privateCases = coverage.cases.filter(item => item.adapter === 'worker-roster-browser')
+    expect(privateCases).toHaveLength(2)
+    for (const item of privateCases) {
+      expect(item.acceptance).toMatchObject({ frontend: 'passed', production: 'not-verified' })
+      expect(item.remaining.join(' ')).toContain('#479')
+    }
+  })
+
   it('records committed P4 obligations without inheriting whole-page or production acceptance', () => {
     const { surfaces, cases, obligations } = buildModuleReviewCoverage()
     const routes = ['/subcontract/payroll/adjustments/:id', '/subcontract/payroll/adjustments/form/:id', '/subcontract/payroll/adjustments/new', '/subcontract/payroll/payments', '/subcontract/payroll/payments/:id', '/subcontract/payroll/payments/new', '/subcontract/payroll/payments/reversal/new']
@@ -306,7 +333,7 @@ describe('module review coverage', () => {
       for (const caseId of obligation.caseIds) {
         const linked = coverage.cases.find(item => item.id === caseId)!
         if (linked.acceptance.frontend === 'passed' || linked.acceptance.crossModule === 'passed')
-          expect(linked.reviewEvidence).toContain('docs/design/evidence/issue-412-payroll-hollow/README.md')
+          expect(linked.reviewEvidence).toContain(linked.adapter === 'worker-roster-browser' ? 'docs/design/evidence/issue-449/README.md' : 'docs/design/evidence/issue-412-payroll-hollow/README.md')
         expect(linked.acceptance.production).toBe('not-verified')
       }
     }
