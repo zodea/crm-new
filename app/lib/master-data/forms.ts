@@ -32,6 +32,8 @@ export type MasterDataOwnerType
 
 export interface FormAttachmentDraft {
   fileName: string
+  /** Central original bytes; only owners that explicitly support this field may accept it. */
+  contentBase64?: string
   filePath?: string
   fileSize?: number
   mimeType?: string

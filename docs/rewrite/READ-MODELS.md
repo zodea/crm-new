@@ -1,5 +1,13 @@
 # 前后端读模型与 DTO 语义基线
 
+## PG-01 本机客户读取（#450）
+
+本机模式客户列表、详情和表单沿既有中央 DTO 回读磁盘权威；开发模式仍为验证实例。`/api/read/customers/:id/lifecycle` 返回稳定身份、名称、版本及删除时间；`/api/read/customers-deleted` 列出可恢复客户；`/api/read/customers/:id/audit` 仅返回审计身份、动作、命令和时间。`/api/read/customer-commands/:commandId` 返回本工作区/actor 的原结果或当前不存在，不能凭不存在自行宣告迟到写入已阻断，封存动作见 [COMMANDS](./COMMANDS.md#pg-01-本机客户命令450)。
+
+`/api/read/customers/:id/files/:fileId` 验证所属客户、删除状态、正文长度和 SHA-256 后以附件下载，禁缓存、禁止 MIME 嗅探，不接受任意磁盘路径。正式详情的项目/合同/收款源尚未接管时返回各领域 `unavailable`，计数/金额为未知，客户本身仍可读；不能返回假零或取开发/演示源补全。
+
+`/api/auth/status` 只报告运行模式、是否认证以及已登录时的 owner/到期时间，不续期；受保护业务读取才刷新空闲时间。`/api/production/status` 需认证，触发实际打开及写探测并返回 schema、用途和持久参与者。无配置、无法打开或未接管 API 都明确失败。后台白名单只覆盖本票已实现的客户与认证入口，拒绝演示及代理/测试头。运行权威见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。
+
 本文是浏览器业务页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 [`NAVIGATION.md`](./NAVIGATION.md) 裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
 
 当前实现已有九类中央主链：项目、客户、分供方、班组、工人、项目分供方、材料采购合同、施工合同与分包合同均经 Repository、HTTP adapter 和对应 `/api/read/*` operation 读取。合同 canonical 导航意图使用 `filters.contractKind`，Target Registry 映射为 `contractKind=material|construction|subcontract`；缺失 marker 的深链不会改道中央详情。演示夹具只有在 `includeDemo=true` 且会话拥有 `demo:read` 时可读，三类合同都按稳定来源、ID 和类型返回专属七组详情。#281 已联合验收客户、分供方、班组、工人、项目与项目分供方的中央身份往返；#317、#318、#320 与 #321 已分别闭合工作台、材采、施工与分包的 HTTP/Repository/受限返回链。旧 production SQLite 不再作为这些浏览器普通读 adapter。当前中央端为可重置测试实例，不是生产持久化库。

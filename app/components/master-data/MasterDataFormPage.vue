@@ -19,6 +19,7 @@ import { onActivated, onDeactivated, onScopeDispose } from 'vue'
 import SupplierTaxpayerDialog from '~/components/supplier/SupplierTaxpayerDialog.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
+import { customerOriginal } from '~/lib/customer/original'
 import {
   listFormAttachments,
   loadCrewForm,
@@ -69,6 +70,8 @@ const supplierCommandStore = () => useSupplierCommandStore()
 const crewWorkerCommandStore = () => useCrewWorkerCommandStore()
 const projectSession = projectCommandStore.createSession()
 const customerSession = props.kind === 'customer' ? customerCommandStore().createSession() : null
+const customerStoresOriginals = shallowRef(false)
+const preparingOriginals = shallowRef(0)
 const supplierSession = props.kind === 'supplier' ? supplierCommandStore().createSession() : null
 const crewWorkerSession = props.kind === 'crew' || props.kind === 'worker' ? crewWorkerCommandStore().createSession() : null
 const targetCostStore = useTargetCostStore()
@@ -166,6 +169,7 @@ const hydrated = shallowRef(false)
 const desktopAttachmentPicker = shallowRef(false)
 const localDraftNotice = shallowRef('')
 const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | SupplierFormReadDTO | CrewFormReadDTO | WorkerFormReadDTO | null>(null)
+const customerAlreadyApplied = shallowRef(false)
 const formElement = useTemplateRef<HTMLFormElement>('formElement')
 let allowLeave = false
 let lastInitializedTarget = ''
@@ -314,6 +318,7 @@ async function initialize() {
   pendingRestoreIds.value = []
   localDraftNotice.value = ''
   conflictLatest.value = null
+  customerAlreadyApplied.value = false
   let shouldFocus = false
   try {
     if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier' || props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime()) {
@@ -335,6 +340,9 @@ async function initialize() {
       }))
       pendingRemoveIds.value = central.pendingRemoveIds
       pendingRestoreIds.value = central.pendingRestoreIds
+      customerStoresOriginals.value = customerSession?.storesOriginals ?? false
+      if ('productionNotice' in central && central.productionNotice)
+        localDraftNotice.value = central.productionNotice
       if (props.kind === 'project' && central.restoredLocalDraft) {
         localDraftNotice.value = '已恢复上次仅保留在本地的草稿；它尚未写入正式项目。'
       }
@@ -475,6 +483,14 @@ async function saveThroughStore(action: MasterDataSaveAction) {
 }
 
 async function handleFooterAction(action: FormFooterAction) {
+  if (action !== 'cancel' && customerAlreadyApplied.value) {
+    warning('上次提交已经保存，请先使用已保存内容，再继续更正；不要重复添加原件。')
+    return
+  }
+  if (preparingOriginals.value) {
+    warning('附件原件正在读取，请完成后再保存。')
+    return
+  }
   if (taxpayerEditor.open.value) {
     warning('请先完成或取消当前税务核验')
     return
@@ -571,6 +587,7 @@ async function handleFooterAction(action: FormFooterAction) {
     }
     else if (cause instanceof CustomerCommandConflictError) {
       conflictLatest.value = cause.latest
+      customerAlreadyApplied.value = cause.alreadyApplied
       warning(cause.message)
     }
     else if (cause instanceof SupplierCommandConflictError) {
@@ -613,14 +630,25 @@ async function useLatestServerVersion() {
   const latest = conflictLatest.value
   if (!latest)
     return
-  if (props.kind === 'customer')
-    customerCommandStore().acceptLatest(customerSession!, latest as CustomerFormReadDTO)
-  else if (props.kind === 'supplier')
+  if (props.kind === 'customer') {
+    try {
+      customerCommandStore().acceptLatest(customerSession!, latest as CustomerFormReadDTO)
+    }
+    catch (cause) {
+      error(toErrorMessage(cause))
+      return
+    }
+  }
+  else if (props.kind === 'supplier') {
     supplierCommandStore().acceptLatest(supplierSession!, latest as SupplierFormReadDTO)
-  else if (props.kind === 'crew' || props.kind === 'worker')
+  }
+  else if (props.kind === 'crew' || props.kind === 'worker') {
     crewWorkerCommandStore().acceptLatest(crewWorkerSession!, props.kind, latest as CrewFormReadDTO | WorkerFormReadDTO)
-  else
+  }
+  else {
     projectCommandStore.acceptLatest(projectSession, latest as ProjectFormReadDTO)
+  }
+  customerAlreadyApplied.value = false
   draft.value = {
     ...formDefaults(props.kind),
     ...latest.draft,
@@ -657,12 +685,28 @@ function appendPendingAttachments(files: FormAttachmentDraft[]) {
   ]
 }
 
-function handleFiles(files: File[]) {
-  appendPendingAttachments(files.map(file => ({
-    fileName: file.name,
-    fileSize: file.size,
-    mimeType: file.type,
-  })))
+async function handleFiles(files: File[]) {
+  preparingOriginals.value++
+  try {
+    appendPendingAttachments(customerStoresOriginals.value
+      ? await Promise.all(files.map(customerOriginal))
+      : files.map(file => ({ fileName: file.name, fileSize: file.size, mimeType: file.type })))
+  }
+  catch (cause) { error(toErrorMessage(cause)) }
+  finally { preparingOriginals.value-- }
+}
+
+async function downloadCustomerOriginal(file: FormAttachment) {
+  try {
+    const blob = await customerCommandStore().downloadOriginal(file.ownerId, file.id)
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = file.fileName
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+  catch (cause) { error(toErrorMessage(cause)) }
 }
 
 async function pickNativeFiles() {
@@ -801,7 +845,7 @@ watch(routeSupplierCategory, () => {
       class="border border-warn/35 bg-warn/8 px-3 py-2 text-12px leading-5 text-ink-soft"
       role="status"
     >
-      <b class="text-warn">本地草稿</b>
+      <b class="text-warn">{{ customerStoresOriginals ? '提交核对' : '本地草稿' }}</b>
       · {{ localDraftNotice }}
     </section>
 
@@ -812,17 +856,17 @@ watch(routeSupplierCategory, () => {
       role="alert"
     >
       <h2 class="text-13px font-800 text-danger">
-        {{ meta.label }}已被其他操作更新
+        {{ customerAlreadyApplied ? '上次客户提交已保存' : `${meta.label}已被其他操作更新` }}
       </h2>
       <p class="mt-1 text-12px leading-5 text-ink-soft">
-        服务器最新版本为 {{ conflictLatest.version }}。请选择保留当前内容后重试，或改用服务器版本。
+        {{ customerAlreadyApplied ? '已核对原客户和附件。当前输入仍保留在页面，采用已保存内容后再作新的更正，避免重复添加原件。' : `服务器最新版本为 ${conflictLatest.version}。请选择保留当前内容后重试，或改用服务器版本。` }}
       </p>
       <div class="mt-2 flex flex-wrap gap-2">
-        <button type="button" class="btn-primary" @click="keepLocalAgainstLatest">
+        <button v-if="!customerAlreadyApplied" type="button" class="btn-primary" @click="keepLocalAgainstLatest">
           保留我的内容
         </button>
         <button type="button" class="btn-secondary" @click="useLatestServerVersion">
-          改用服务器最新版
+          {{ customerAlreadyApplied ? '使用已保存内容' : '改用服务器最新版' }}
         </button>
       </div>
     </section>
@@ -850,12 +894,14 @@ watch(routeSupplierCategory, () => {
         v-if="!usesSupplierCredentialFlow && !usesCentralCrewWorkerFlow"
         :title="attachmentTitle"
         :desktop-picker="desktopAttachmentPicker"
+        :stores-originals="customerStoresOriginals"
         :attachments="attachments"
         :pending-attachments="pendingAttachments"
         :pending-remove-ids="pendingRemoveIds"
         :pending-restore-ids="pendingRestoreIds"
         @pick-native="pickNativeFiles"
         @files="handleFiles"
+        @download="downloadCustomerOriginal"
         @toggle-existing="toggleExistingAttachment"
         @remove-pending="removePending"
         @update-pending-category="updatePendingCategory"

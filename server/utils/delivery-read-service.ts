@@ -21,7 +21,7 @@ function queryOrigin(query: Record<string, unknown>, session: BusinessSession, f
 }
 
 /** URL 仅表达读取意图，当前会话、祖先关系及正文归属仍由服务端重验。 */
-export function createDeliveryReadService(commands: Commands, sessionFor: (sessionId?: string | null) => BusinessSession = resolveBusinessSession) {
+export function createDeliveryReadService(commands: Commands, sessionFor: (sessionId?: string | null) => BusinessSession = () => resolveBusinessSession()) {
   function detail(id: string, query: Record<string, unknown>, sessionId?: string | null) {
     const session = sessionFor(sessionId)
     const origin = queryOrigin(query, session)

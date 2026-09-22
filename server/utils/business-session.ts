@@ -1,3 +1,8 @@
+import type { H3Event } from 'h3'
+import { createError } from 'h3'
+import { requireProductionBusinessSession } from './production-auth'
+import { getProductionRuntimeConfig } from './production-config'
+
 export interface BusinessSession {
   workspaceId: string
   actorId: string
@@ -57,8 +62,13 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
 
 /**
  * 单公司、单操作人首版由服务端注入会话；客户端请求不能覆盖这些身份。
- * 正式登录接入后只替换此解析边界，不改变领域 DTO 或 Repository。
+ * 正式模式必须由当前已认证的请求注入，开发适配保持原契约。
  */
-export function resolveBusinessSession(): BusinessSession {
+export function resolveBusinessSession(event?: H3Event): BusinessSession {
+  if (getProductionRuntimeConfig()) {
+    if (!event)
+      throw createError({ statusCode: 401, message: '正式业务必须使用已认证的请求会话。' })
+    return requireProductionBusinessSession(event)
+  }
   return DEFAULT_BUSINESS_SESSION
 }

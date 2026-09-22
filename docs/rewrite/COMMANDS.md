@@ -2,7 +2,17 @@
 
 > 本文档是浏览器中央写命令的权威源。数据实体与迁移看 [`DATABASE.md`](./DATABASE.md)，读 DTO 看 [`READ-MODELS.md`](./READ-MODELS.md)，浏览器权威边界看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)。
 
-下文“正式”表示来源身份与命令边界；当前后端仍是可重置内存实例，不构成生产持久化证明。前台优先的复核顺序与后置生产验收见 [`ARCHITECTURE.md`](./ARCHITECTURE.md)；本契约不因顺序调整而允许本地正式双写，也不扩展完整审批或账号权限产品。
+下文“正式”表示来源身份与命令边界；除本页明确的 PG-01 本机客户切片外，当前后端仍是可重置内存实例，不构成生产持久化证明。前台优先的复核顺序与后置生产验收见 [`ARCHITECTURE.md`](./ARCHITECTURE.md)；本契约不因顺序调整而允许本地正式双写，也不扩展完整审批或账号权限产品。
+
+## PG-01 本机客户命令（#450）
+
+配置后的本机模式沿 `POST /api/commands/customers`、`PUT /api/commands/customers/:id` 保存同一客户协议；先封闭校验原请求再解码，禁止客户端来源覆盖、未知字段和不可回查的命令编号。原编号为 3–80 位字母/数字/下划线/连字符，首位字母或数字；正文、身份或动作改变不能复用。客户与附件归属、原件大小/字节及版本由后台核对，可信 actor 来自本机访问码会话，写前和提交前再次检查。
+
+`POST /api/commands/customers/:id/lifecycle` 接受精确 `delete / restore`，绑定原客户、命令、工作区/actor、`customer:write` 及实体版本；父客户软删除不改子原件的单独删除事实。成功回执和审计与事实同事务，保存成功只在 COMMIT 后返回。
+
+`POST /api/commands/customer-resolve` 仅接受 `{commandId}`：同一磁盘事务返回已提交原回执；无回执则封存原键后返回 `not-applied`，阻止迟到请求继续写入。单纯 GET 查不到只表示当前没有回执，不能替代封存核对。浏览器只保留当前工作区/actor/页面目标下的原编号，不持久保存正文；权限、网络或读回失败保持未知。身份恢复后按原键核对，不自动新建。
+
+运行配置、访问保护及正式写入备份门禁见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)；持久参与者见 [DATABASE](./DATABASE.md#pg-01-本机客户持久参与者450)。其他正式 API 仍明确未就绪，不能回落开发实例。
 
 ## 1. 当前落点
 

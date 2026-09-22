@@ -73,8 +73,10 @@ const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-f
   return 'error'
 })
 const problem = computed(() => 'problem' in store.detailState ? store.detailState.problem : null)
+const deleted = shallowRef<boolean | null>(null)
+const hasLifecycle = computed(() => detail.value?.capabilities.includes('customer:lifecycle:write') === true)
 const canEdit = computed(() => detail.value?.dataOrigin === 'real'
-  && detail.value.capabilities.includes('customer:write'))
+  && detail.value.capabilities.includes('customer:write') && (!hasLifecycle.value || deleted.value === false))
 const editTo = computed(() => {
   const query = new URLSearchParams({ origin: 'real' })
   if (props.returnTo && props.returnContext) {
@@ -163,6 +165,7 @@ onActivated(() => void load())
       </MetricGrid>
     </template>
     <div v-if="customer && detail" class="flex min-w-0 flex-col gap-4">
+      <CustomerStorageActions v-if="hasLifecycle" :customer-id="customerId" @state="deleted = $event" @changed="load" />
       <StatePanel
         v-if="store.detailState.kind === 'error'"
         kind="error"

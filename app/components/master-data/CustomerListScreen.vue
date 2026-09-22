@@ -137,6 +137,7 @@ onActivated(() => void load())
 
 <template>
   <div class="grid min-w-0 gap-3">
+    <CustomerPendingRecovery v-if="readPage?.capabilities.includes('customer:original:write')" />
     <StatePanel
       v-if="problem"
       :kind="problem.code === 'forbidden' ? 'forbidden' : 'error'"
@@ -218,5 +219,6 @@ onActivated(() => void load())
         </div>
       </template>
     </ListShell>
+    <CustomerDeletedList v-if="readPage?.capabilities.includes('customer:lifecycle:write')" />
   </div>
 </template>
