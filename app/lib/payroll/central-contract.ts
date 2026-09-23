@@ -11,6 +11,7 @@ import type { PayrollC2Repository } from './central-c2-contract'
 import type { PayrollDayworkRepository } from './central-daywork-contract'
 import type { PayrollHollowRepository } from './central-hollow-deduction-contract'
 import type { PayrollNumberingRepository } from './central-numbering-contract'
+import type { PayrollWorkbookRepository } from './central-workbook-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../project/repository'
 
 export const PAYROLL_READ_CAPABILITY = 'payroll:read' as const
@@ -106,7 +107,7 @@ export interface PayrollStatementDetail extends PayrollStatementRow {
 export interface PayrollListRead { context: PayrollContext, rows: PayrollStatementRow[], projects: PayrollProjectOption[], diagnostics: PayrollDiagnostic[] }
 export interface PayrollDetailRead { context: PayrollContext, statement: PayrollStatementDetail, history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
 export interface PayrollSourcesRead { context: PayrollContext, projectId: string, configs: PayrollConfig[], attendance: PayrollAttendance[], daywork: PayrollDaywork[], locks: PayrollSourceLock[], diagnostics: PayrollDiagnostic[], history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
-export interface PayrollRepository extends PayrollARepository, PayrollARoundingRepository, PayrollAFeesRepository, PayrollAttendanceRepository, PayrollBatchRepository, PayrollC1Repository, PayrollC2Repository, PayrollDayworkRepository, PayrollAdjustmentRepository, PayrollActualRepository, PayrollHollowRepository, PayrollNumberingRepository {
+export interface PayrollRepository extends PayrollARepository, PayrollARoundingRepository, PayrollAFeesRepository, PayrollAttendanceRepository, PayrollBatchRepository, PayrollC1Repository, PayrollC2Repository, PayrollDayworkRepository, PayrollAdjustmentRepository, PayrollActualRepository, PayrollHollowRepository, PayrollNumberingRepository, PayrollWorkbookRepository {
   list: (query: PayrollQuery) => Promise<PayrollListRead>
   detail: (query: PayrollQuery, id: string) => Promise<PayrollDetailRead>
   sources: (query: PayrollQuery & { projectId: string }) => Promise<PayrollSourcesRead>

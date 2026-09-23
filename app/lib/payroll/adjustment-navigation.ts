@@ -5,6 +5,7 @@ import { validateProjectJourneyReturnTo } from '~/lib/material-contract/return-c
 import { TARGET_COST_SOURCE_QUERY_KEYS, targetCostReturnTo, targetCostSourceContext } from '~/lib/target-cost/navigation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { payrollAEntryReturn } from './a-navigation'
+import { payrollWorkbookReturn } from './workbook-navigation'
 
 export function payrollAdjustmentReturn(value: unknown, origin: DataOriginDTO, depth = 0): string | null {
   if (depth > 4 || typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.includes('\\') || [...value].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))
@@ -13,6 +14,8 @@ export function payrollAdjustmentReturn(value: unknown, origin: DataOriginDTO, d
     const url = new URL(value, 'https://payroll.invalid')
     if (url.origin !== 'https://payroll.invalid' || url.searchParams.getAll('origin').length > 1 || (url.searchParams.get('origin') ?? 'real') !== origin)
       return null
+    if (origin === 'real' && url.pathname === '/subcontract/payroll/workbooks')
+      return payrollWorkbookReturn(value)
     const originalProjectReturn = validateProjectJourneyReturnTo(value, origin)
     if (originalProjectReturn)
       return originalProjectReturn

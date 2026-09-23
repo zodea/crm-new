@@ -4,6 +4,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { SupplierListColumnFilters, SupplierListNumericField, SupplierListPageDTO, SupplierListQueryDTO, SupplierListSort, SupplierListTextField } from '~/lib/supplier/repository'
 import { useDebounceFn, useMediaQuery, useStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onMounted, shallowRef, watch } from 'vue'
+import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_NUMERIC_SOURCE } from '~/lib/supplier/read-contract'
 import { normalizeSupplierEnumSelection } from '~/lib/supplier/read-query'
 import { createSupplierReturnTo, supplierListNavigationStateFromQuery } from '~/lib/supplier/return-context'
 import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE, CREDENTIAL_STATUSES, SUPPLIER_CATEGORIES, SUPPLIER_TAXPAYER_TYPES } from '~/lib/supplier/status'
@@ -114,12 +115,23 @@ const allColumns: KitTableColumn[] = [
   { field: 'settlementAmount', title: '累计结算金额', type: 'money', width: 145, slot: 'settlementAmount' },
   { field: 'cumulativeContractAmount', title: '累计合同金额', type: 'money', width: 145, slot: 'cumulativeContractAmount' },
   { field: 'contractAmount', title: '有效合同额', type: 'money', width: 140, slot: 'contractAmount' },
-  { field: 'paymentAmount', title: '确认实付', type: 'money', width: 130 },
-  { field: 'projectCount', title: '合作项目数', width: 110, align: 'right' },
+  { field: 'paymentAmount', title: '确认实付', type: 'money', width: 130, slot: 'paymentAmount' },
+  { field: 'projectCount', title: '合作项目数', width: 110, align: 'right', slot: 'projectCount' },
   { field: 'businessLicense', title: '营业执照', width: 110, slot: 'businessLicense' },
   { title: '操作', type: 'action', width: 55 },
 ]
-const numericFields = new Set(['settlementAmount', 'cumulativeContractAmount', 'contractAmount', 'paymentAmount', 'projectCount'])
+const numericFields = new Set<string>(SUPPLIER_LIST_NUMERIC_FIELDS)
+const disabledNumericFields = computed<SupplierListNumericField[]>(() => {
+  const sources = readPage.value?.unavailableSources ?? []
+  return SUPPLIER_LIST_NUMERIC_FIELDS.filter(field => sources.includes(SUPPLIER_NUMERIC_SOURCE[field]))
+})
+const hasNumericQuery = computed(() => Object.values(columnFilters.value.ranges ?? {}).some(range => range?.min !== undefined || range?.max !== undefined)
+  || [...numericFields].some(field => sort.value.startsWith(`${field}-`)))
+function clearNumericQuery() {
+  columnFilters.value = { ...columnFilters.value, ranges: {} }
+  if ([...numericFields].some(field => sort.value.startsWith(`${field}-`)))
+    sort.value = 'updated-desc'
+}
 const enumFields = new Set(['supplierCategory', 'credentialStatus', 'taxpayerType', 'businessLicense'])
 const columns = computed(() => allColumns
   .filter(col => !col.field || col.field === 'name' || !hiddenColumns.value.includes(col.field))
@@ -295,7 +307,14 @@ onActivated(() => {
 
 <template>
   <div class="grid min-w-0 gap-3">
+    <SupplierPendingRecovery v-if="readPage?.capabilities.includes('supplier:persistent:write')" />
+    <p v-if="readPage?.unavailableSources?.length" class="m-0 border border-line bg-panel p-3 text-12px text-ink-muted" role="status">
+      关联项目、合同、结算、发票与付款尚未接入，相关数量和金额显示为未知；分供方主档与证照可正常维护。
+    </p>
     <StatePanel v-if="problem" :kind="problem.code === 'forbidden' ? 'forbidden' : 'error'" title="分供方列表加载失败" :description="problem.message" :action-label="problem.retryable ? '重新加载' : ''" :compact="Boolean(readPage)" @action="load" />
+    <button v-if="problem && hasNumericQuery" type="button" class="btn-secondary justify-self-start" @click="clearNumericQuery">
+      清除数值条件并重试
+    </button>
     <ListShell v-if="!problem || readPage" continuous class="supplier-reference-list">
       <template #toolbar>
         <SupplierListControls
@@ -303,6 +322,7 @@ onActivated(() => {
           v-model:taxpayer-type="taxpayerType"
           v-model:sort="sort" v-model:hidden-columns="hiddenColumns" v-model:comfortable="comfortable"
           :columns="allColumns" :loading="loading" :category-options="categoryOptions" :credential-options="credentialOptions" :taxpayer-options="taxpayerOptions"
+          :disabled-numeric-fields="disabledNumericFields"
           :has-filters="hasFilters" :can-write="Boolean(readPage?.capabilities.includes('supplier:write'))"
           @refresh="load" @create="createSupplier" @import="navigateTo('/import/mapping/supplier')" @clear="clearFilters" @reset-view="resetView"
         />
@@ -322,7 +342,11 @@ onActivated(() => {
             @page-change="({ page: nextPage, pageSize: nextSize }) => { page = nextPage; pageSize = nextSize as 10 | 20 | 50 | 100; load() }"
           >
             <template #columnHeader="{ column }">
+              <span v-if="disabledNumericFields.includes(column.field as SupplierListNumericField)" role="columnheader" :title="`${column.title}尚未接入，暂不支持筛选或排序`">
+                {{ column.title }}<span class="sr-only">：尚未接入，暂不支持筛选或排序</span>
+              </span>
               <KitColumnHeader
+                v-else
                 :title="column.title" :kind="numericFields.has(column.field!) ? 'number' : enumFields.has(column.field!) ? 'multi-enum' : 'text'"
                 :value="columnValue(column.field!)" :options="columnOptions(column.field!)"
                 :sort="sort" :sort-options="columnSortOptions(column.field!)"
@@ -352,6 +376,12 @@ onActivated(() => {
             </template>
             <template #contractAmount="{ row }">
               <span :title="row.contractAmount === null ? '合同金额记录不完整' : undefined">{{ row.contractAmount === null ? '—' : yuan(row.contractAmount) }}</span>
+            </template>
+            <template #paymentAmount="{ row }">
+              <span :title="row.paymentAmount === null ? '付款尚未接入或当前不可读取' : undefined">{{ row.paymentAmount === null ? '—' : yuan(row.paymentAmount) }}</span>
+            </template>
+            <template #projectCount="{ row }">
+              <span :title="row.projectCount === null ? '合作项目尚未接入或当前不可读取' : undefined">{{ row.projectCount ?? '—' }}</span>
             </template>
             <template #businessLicense="{ row }">
               <span v-if="row.businessLicense?.state === 'unavailable'" title="当前无读取权限或原件来源未接通">不可用</span>

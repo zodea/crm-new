@@ -37,11 +37,13 @@ function decodeContext(value: unknown): ProjectCommandContextDTO {
   return value as unknown as ProjectCommandContextDTO
 }
 
-function decodeCommandResult(value: unknown): ProjectCommandResultDTO {
+export function decodeProjectCommandResult(value: unknown): ProjectCommandResultDTO {
   if (!isObject(value)
     || typeof value.id !== 'string'
+    || !value.id
     || typeof value.commandId !== 'string'
     || typeof value.version !== 'string'
+    || !/^[1-9]\d*$/.test(value.version) || !Number.isSafeInteger(Number(value.version))
     || !isISODateTimeDTO(value.updatedAt)
     || !Array.isArray(value.attachmentIds)
     || !value.attachmentIds.every(id => typeof id === 'string')) {
@@ -68,7 +70,7 @@ function decodeAttachment(value: unknown): boolean {
 function decodeForm(value: unknown, expectedId: string): ProjectFormReadDTO {
   if (!isObject(value)
     || !Array.isArray(value.attachments)
-    || !value.attachments.every(decodeAttachment)
+    || !value.attachments.every(file => decodeAttachment(file) && (file as { ownerId: string }).ownerId === expectedId)
     || typeof value.version !== 'string'
     || !isISODateTimeDTO(value.updatedAt)) {
     return invalidResponse('中央后台返回的项目表单无效')
@@ -114,7 +116,7 @@ export function createHttpProjectCommandRepository(
           body: { ...request },
         },
       ),
-      decodeCommandResult,
+      decodeProjectCommandResult,
     ),
   }
 }

@@ -95,7 +95,7 @@ it('已归档工资名册阻止删除所引用工人和原件，候选失败不�
     const savedArchive = await workerRosterService.execute({ commandId: 'roster-archive-confirm', workspaceId: preview.context.workspaceId, actorId: preview.context.actorId, origin: 'real', sourceVersion: preview.sourceVersion, action: 'archive', scope })
     const archive = await workerRosterService.archive(projectId, savedArchive.archiveId!)
     const before = coreMigrationTestInstance.snapshot(f.imported.session)
-    await expect(coreMigrationTestInstance.rollback({ ...f.imported.envelope('archived-roster-rollback'), batchId: f.imported.batch.batchId }, f.imported.session)).rejects.toMatchObject({ problem: { code: 'conflict', message: expect.stringContaining('固定名册引用') } })
+    await expect(coreMigrationTestInstance.rollback({ ...f.imported.envelope('archived-roster-rollback'), batchId: f.imported.batch.batchId }, f.imported.session)).rejects.toMatchObject({ problem: { code: 'conflict', message: expect.stringContaining('固定目录、名册或原件已有独立引用') } })
     expect(coreMigrationTestInstance.snapshot(f.imported.session)).toEqual(before)
     expect(await workerRosterService.archive(projectId, savedArchive.archiveId!)).toEqual(archive)
     const photo = archive.members.find(member => member.workerId === workerId)!.photos.find(asset => asset.purpose === 'portrait')!

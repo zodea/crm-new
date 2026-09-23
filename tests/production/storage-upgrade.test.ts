@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { PRODUCTION_STORAGE_SCHEMA } from '../../server/utils/production-storage-schema'
 
-it('既有客户v1库经同事务升级加入工序库，客户参与者和原事实不被替换', async () => {
+it('既有客户v1库经同事务升级加入工序库与分供方，客户参与者和原事实不被替换', async () => {
   const base = resolve('.codex-tmp/issue-463-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/upgrade-`)
@@ -17,9 +17,9 @@ it('既有客户v1库经同事务升级加入工序库，客户参与者和原�
   raw.close()
   const storage = createProductionStorage({ directory, workspaceId: 'upgrade-workspace', ownerId: 'upgrade-owner', purpose: 'verification' })
   try {
-    expect(await storage.status()).toMatchObject({ schemaVersion: 2, participants: ['customer', 'process-library'] })
+    expect(await storage.status()).toMatchObject({ schemaVersion: 4, participants: ['customer', 'process-library', 'project', 'supplier'] })
     expect(await storage.select('SELECT * FROM preserved_specimen')).toEqual([{ id: 'existing-fact', value: '客户库既有事实' }])
-    expect(await storage.select('SELECT * FROM production_participants ORDER BY domain')).toEqual([{ domain: 'customer', schema_version: 1 }, { domain: 'process-library', schema_version: 1 }])
+    expect(await storage.select('SELECT * FROM production_participants ORDER BY domain')).toEqual([{ domain: 'customer', schema_version: 1 }, { domain: 'process-library', schema_version: 1 }, { domain: 'project', schema_version: 1 }, { domain: 'supplier', schema_version: 1 }])
   }
   finally { await storage.close() }
 })
