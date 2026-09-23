@@ -456,6 +456,8 @@ onDeactivated(() => {
 
 <template>
   <div class="flex min-w-0 flex-col gap-4">
+    <ProjectPendingRecovery v-if="readPage?.capabilities.includes('project:original:write')" />
+    <ProjectDeletedList v-if="readPage?.capabilities.includes('project:lifecycle:write')" />
     <StatePanel
       v-if="readStore.state.kind === 'loading' && !readPage"
       kind="loading"

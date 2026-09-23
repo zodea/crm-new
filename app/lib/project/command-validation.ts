@@ -47,6 +47,7 @@ const PROJECT_NULLABLE_NUMBER_FIELDS = new Set<keyof ProjectFormDraft>([
 ])
 const ATTACHMENT_FIELDS = new Set<keyof FormAttachmentDraft>([
   'fileName',
+  'contentBase64',
   'filePath',
   'fileSize',
   'mimeType',
@@ -54,6 +55,7 @@ const ATTACHMENT_FIELDS = new Set<keyof FormAttachmentDraft>([
   'uploader',
 ])
 const OPTIONAL_ATTACHMENT_TEXT_FIELDS = new Set<keyof FormAttachmentDraft>([
+  'contentBase64',
   'filePath',
   'mimeType',
   'category',

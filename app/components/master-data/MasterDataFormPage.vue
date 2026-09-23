@@ -35,6 +35,7 @@ import {
   formRequiredFields,
 } from '~/lib/master-data/page'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
+import { projectOriginal } from '~/lib/project/original'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { createTaxpayerEditorState } from '~/lib/supplier/taxpayer-editor-state'
@@ -47,6 +48,7 @@ import {
   ProjectCommandConflictError,
   ProjectLocalDraftOnlyError,
 } from '~/stores/project-command'
+import { ProjectPersistentConflictError } from '~/stores/project-persistent-command'
 import { SupplierCommandConflictError, useSupplierCommandStore } from '~/stores/supplier-command'
 
 const props = withDefaults(defineProps<{
@@ -71,6 +73,8 @@ const crewWorkerCommandStore = () => useCrewWorkerCommandStore()
 const projectSession = projectCommandStore.createSession()
 const customerSession = props.kind === 'customer' ? customerCommandStore().createSession() : null
 const customerStoresOriginals = shallowRef(false)
+const projectStoresOriginals = shallowRef(false)
+const storesOriginals = computed(() => customerStoresOriginals.value || projectStoresOriginals.value)
 const preparingOriginals = shallowRef(0)
 const supplierSession = props.kind === 'supplier' ? supplierCommandStore().createSession() : null
 const crewWorkerSession = props.kind === 'crew' || props.kind === 'worker' ? crewWorkerCommandStore().createSession() : null
@@ -254,7 +258,12 @@ const shellStateTitle = computed(() =>
     : `${meta.value.label}表单载入失败`,
 )
 
-const fetchCustomers = readStore.searchCustomers
+async function fetchCustomers(keyword: string) {
+  if (isDesktopRuntime() || props.kind !== 'project')
+    return readStore.searchCustomers(keyword)
+  const page = await useNuxtApp().$repositories.customerRead.list({ includeDemo: false, search: keyword, status: null, sort: 'name-asc', page: 1, pageSize: 50 })
+  return page.items.filter(item => item.dataOrigin === 'real' && item.status !== 'inactive').map(item => ({ id: item.customer.id, label: item.customer.label }))
+}
 async function fetchProjects(keyword: string) {
   if (isDesktopRuntime() || props.kind !== 'worker')
     return readStore.searchProjects(keyword)
@@ -341,6 +350,7 @@ async function initialize() {
       pendingRemoveIds.value = central.pendingRemoveIds
       pendingRestoreIds.value = central.pendingRestoreIds
       customerStoresOriginals.value = customerSession?.storesOriginals ?? false
+      projectStoresOriginals.value = props.kind === 'project' && projectSession.storesOriginals
       if ('productionNotice' in central && central.productionNotice)
         localDraftNotice.value = central.productionNotice
       if (props.kind === 'project' && central.restoredLocalDraft) {
@@ -580,7 +590,12 @@ async function handleFooterAction(action: FormFooterAction) {
     await initialize()
   }
   catch (cause) {
-    if (cause instanceof ProjectCommandConflictError) {
+    if (cause instanceof ProjectPersistentConflictError) {
+      conflictLatest.value = cause.latest
+      customerAlreadyApplied.value = cause.alreadyApplied
+      warning(cause.message)
+    }
+    else if (cause instanceof ProjectCommandConflictError) {
       conflictLatest.value = cause.latest
       localDraftNotice.value = '当前内容仍只保留在本地，未覆盖服务器最新版本。'
       warning(cause.message)
@@ -688,8 +703,8 @@ function appendPendingAttachments(files: FormAttachmentDraft[]) {
 async function handleFiles(files: File[]) {
   preparingOriginals.value++
   try {
-    appendPendingAttachments(customerStoresOriginals.value
-      ? await Promise.all(files.map(customerOriginal))
+    appendPendingAttachments(storesOriginals.value
+      ? await Promise.all(files.map(props.kind === 'project' ? projectOriginal : customerOriginal))
       : files.map(file => ({ fileName: file.name, fileSize: file.size, mimeType: file.type })))
   }
   catch (cause) { error(toErrorMessage(cause)) }
@@ -698,7 +713,9 @@ async function handleFiles(files: File[]) {
 
 async function downloadCustomerOriginal(file: FormAttachment) {
   try {
-    const blob = await customerCommandStore().downloadOriginal(file.ownerId, file.id)
+    const blob = props.kind === 'project'
+      ? await projectCommandStore.downloadOriginal(file.ownerId, file.id)
+      : await customerCommandStore().downloadOriginal(file.ownerId, file.id)
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -845,7 +862,7 @@ watch(routeSupplierCategory, () => {
       class="border border-warn/35 bg-warn/8 px-3 py-2 text-12px leading-5 text-ink-soft"
       role="status"
     >
-      <b class="text-warn">{{ customerStoresOriginals ? '提交核对' : '本地草稿' }}</b>
+      <b class="text-warn">{{ storesOriginals ? '提交核对' : '本地草稿' }}</b>
       · {{ localDraftNotice }}
     </section>
 
@@ -856,10 +873,10 @@ watch(routeSupplierCategory, () => {
       role="alert"
     >
       <h2 class="text-13px font-800 text-danger">
-        {{ customerAlreadyApplied ? '上次客户提交已保存' : `${meta.label}已被其他操作更新` }}
+        {{ customerAlreadyApplied ? `上次${meta.label}提交已保存` : `${meta.label}已被其他操作更新` }}
       </h2>
       <p class="mt-1 text-12px leading-5 text-ink-soft">
-        {{ customerAlreadyApplied ? '已核对原客户和附件。当前输入仍保留在页面，采用已保存内容后再作新的更正，避免重复添加原件。' : `服务器最新版本为 ${conflictLatest.version}。请选择保留当前内容后重试，或改用服务器版本。` }}
+        {{ customerAlreadyApplied ? `已核对原${meta.label}和附件。当前输入仍保留在页面，采用已保存内容后再作新的更正，避免重复添加原件。` : `服务器最新版本为 ${conflictLatest.version}。请选择保留当前内容后重试，或改用服务器版本。` }}
       </p>
       <div class="mt-2 flex flex-wrap gap-2">
         <button v-if="!customerAlreadyApplied" type="button" class="btn-primary" @click="keepLocalAgainstLatest">
@@ -894,7 +911,8 @@ watch(routeSupplierCategory, () => {
         v-if="!usesSupplierCredentialFlow && !usesCentralCrewWorkerFlow"
         :title="attachmentTitle"
         :desktop-picker="desktopAttachmentPicker"
-        :stores-originals="customerStoresOriginals"
+        :stores-originals="storesOriginals"
+        :original-description="kind === 'project' ? '原件随项目一同保存，重启后可下载；单份不超过 10 MiB' : undefined"
         :attachments="attachments"
         :pending-attachments="pendingAttachments"
         :pending-remove-ids="pendingRemoveIds"

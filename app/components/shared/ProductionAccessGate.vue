@@ -38,10 +38,10 @@ useIntervalFn(() => {
         瑞航 CRM · 本机工作区
       </p>
       <h1 id="owner-access-title" class="text-20px font-800">
-        {{ checking ? '正在核对访问状态' : retainWorkspace ? '连接暂不可用' : '进入客户资料' }}
+        {{ checking ? '正在核对访问状态' : retainWorkspace ? '连接暂不可用' : '进入本机工作区' }}
       </h1>
       <p v-if="retainWorkspace" class="mt-2 text-12px leading-6 text-ink-muted">
-        客户输入和已选原件仍保留在当前页面，连接恢复后可继续。
+        当前输入和已选原件仍保留在当前页面，连接恢复后可继续。
       </p>
       <p class="mt-2 text-12px leading-6 text-ink-muted">
         {{ store.status?.mode === 'production' && store.status.purpose === 'verification' ? '当前是隔离验证工作区，请只使用验证资料。' : '请使用维护人设置的本机访问码。' }}
@@ -59,7 +59,7 @@ useIntervalFn(() => {
         重新核对
       </button>
       <p class="mt-5 text-11px leading-5 text-ink-faint">
-        服务重启或登录过期后需要重新输入访问码。客户记录和已保存原件不受影响。
+        服务重启或登录过期后需要重新输入访问码。已保存记录和原件不受影响。
       </p>
     </section>
   </main>

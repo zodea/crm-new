@@ -18,9 +18,26 @@
 
 这份表是 PG-02 的首个完整备份参与者清单：一致备份必须覆盖全部上述表与原件字节，核对外键、owner、数量、摘要、版本及原回执；活动主文件单独复制不构成备份。后续领域只增补此单库的参与者与版本迁移，不新建平行正式权威。
 
+## PG-03 本机项目持久参与者（#452）
+
+项目加入既有 `ruihang.sqlite` 和同一 coordinator，单独领域版本为 `project:1`，不使用原可重置项目实例或浏览器草稿充当正式事实。当前本分支显式 v2→v3 追加项目域；后续领域按实际合入顺序连续追加，不能重写已经使用的升级步。
+
+| 表 | 权威内容与关系 |
+| --- | --- |
+| `projects` | 稳定系统 ID、名称/业务编号、主次客户外键、封闭项目字段 `draft_json`、版本及创建/更正/软删时间。索引列必须与封闭正文一致，读取发现不一致拒绝 |
+| `project_revision` | 项目事实变化的全域修订；只在事务成功时递增 |
+| `project_command_receipts` | 每次命令的工作区、可信操作者、完整请求指纹、项目、动作、结果与时间；同键异文冲突 |
+| `project_command_resolutions` | 未应用原键的封存事实，阻止迟到请求再写入 |
+| `project_import_receipts` | 每项目原导入命令、文件摘要/Sheet/原行唯一键、非空外部旧 ID 唯一键、来源 JSON、规范 draft 指纹；外部旧 ID 是保真字符串，不是系统主键 |
+| `project_audits` | 项目、原命令、操作者、动作和前后字段/附件元数据，不复制原件正文 |
+| 共享 `file_refs` / `file_payloads` | 固定 `owner_type=project` 与稳定项目 ID；正文 BLOB、大小、SHA-256、服务端上传人和独立软删除状态 |
+
+正式项目保存核对主/次客户存在、可读、未停用/删除；读取按稳定 ID 解析当前客户名，客户不可读时不泄露名称。项目软删除保留全部回执和原件，恢复不改写独立删除附件或客户状态。实体、附件、版本、审计及导入回执在同事务内提交，提交前再次验证会话。备份清单通过 `productionStorageManifest` 包含项目全部表和共享原件表；缺表、坏正文或不兼容清单均不能降级为空项目。
+
 ## 共享正式存储版本与参与者（#463）
 
-schema v1 引导定义不可回写；当前 v2 通过同事务的 v1→v2 升级加入 `process-library:1`，保留 `customer:1`。新域的 SQL 定义独立存放，按实际合入顺序追加连续升级；事务内先核旧清单，再执行新表、参与者与版本更新。缺域、未知域或领域版本不符明确停止，不能重新插入空参与者掩盖问题。`productionStorageManifest(version)` 是备份代码消费的同一登记表，列出公共元数据表与逐域完整表名；维护它时必须同步本节。
+
+schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`，v2→v3 加入 `project:1`，各自保留既有参与者。新域的 SQL 定义独立存放，按实际合入顺序追加连续升级；事务内先核旧清单，再执行新表、参与者与版本更新。缺域、未知域或领域版本不符明确停止，不能重新插入空参与者掩盖问题。`productionStorageManifest(version)` 是备份代码消费的同一登记表，列出公共元数据表与逐域完整表名；维护它时必须同步本节。
 
 | 工序库参与表 | 不可遗漏的事实 |
 | --- | --- |
@@ -29,7 +46,7 @@ schema v1 引导定义不可回写；当前 v2 通过同事务的 v1→v2 升级
 | `process_library_command_receipts` | 原命令ID、工作区/操作者、版本ID、完整命令JSON/指纹和原结果 |
 | `process_library_audits` | 原版本、原命令、操作者、创建动作、完整版本事实和时间 |
 
-所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态由 #451 接续，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。
+所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态由 #451 接续，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力。
 
 工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 的使用投影尚未接通，引用数量为未知。存量中央迁入与 WBS 生产接管不由此切片证明。验证见 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)。
 

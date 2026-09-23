@@ -18,6 +18,16 @@
 
 当前实现已有九类中央主链：项目、客户、分供方、班组、工人、项目分供方、材料采购合同、施工合同与分包合同均经 Repository、HTTP adapter 和对应 `/api/read/*` operation 读取。合同 canonical 导航意图使用 `filters.contractKind`，Target Registry 映射为 `contractKind=material|construction|subcontract`；缺失 marker 的深链不会改道中央详情。演示夹具只有在 `includeDemo=true` 且会话拥有 `demo:read` 时可读，三类合同都按稳定来源、ID 和类型返回专属七组详情。#281 已联合验收客户、分供方、班组、工人、项目与项目分供方的中央身份往返；#317、#318、#320 与 #321 已分别闭合工作台、材采、施工与分包的 HTTP/Repository/受限返回链。旧 production SQLite 不再作为这些浏览器普通读 adapter。当前中央端为可重置测试实例，不是生产持久化库。
 
+## PG-03 本机项目读取（#452）
+
+本机模式 `/api/read/projects`、`/api/read/projects/:id`、`/api/read/projects/:id/form` 复用既有 DTO，由正式磁盘项目和客户投影。客户详情的项目分区在 `project:1` 参与者已就绪且有项目读取能力时，沿真实主/次客户外键回读；删除项目不出现在正常关系集合。未接管合同、收款、预算、工资和项目分供方时保持未知或不可用，不能填零、读取开发实例或借名称猜关系。
+
+双向关系在同一只读事务取得；项目详情来源版本同时包含客户修订，客户详情包含项目修订，关联改名、删除或恢复不能保留旧的来源版本。`asOf` 是本次一致读取时间，不能拿主实体上次修改时间充当关联事实的读取时点。
+
+`/api/read/projects/:id/lifecycle` 返回名称、版本、删除时间；`/api/read/projects-deleted` 是恢复入口；`/api/read/projects/:id/audit` 返回审计身份、原键、可信操作者、动作与时间。已删除项目详情可核对基础身份并恢复，但表单和原件下载拒绝；原件 `/api/read/projects/:id/files/:fileId` 重验 owner、删除状态、实际字节数与 SHA-256，按附件下载且禁缓存。客户恢复不隐式恢复项目，项目恢复也不改变独立附件删除事实。
+
+原键核对使用 [PG-03 命令](./COMMANDS.md#pg-03-本机项目命令452)，网络与权限失败不解释为未保存。完整参与者与一致备份清单见 [DATABASE](./DATABASE.md#pg-03-本机项目持久参与者452)。
+
 ## 1. 边界与分级
 
 每个页面族按以下分级标记：

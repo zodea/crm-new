@@ -1,9 +1,11 @@
 import { PRODUCTION_PROCESS_LIBRARY_SCHEMA, PRODUCTION_PROCESS_LIBRARY_TABLES } from './production-process-library-schema'
+import { PRODUCTION_PROJECT_SCHEMA, PRODUCTION_PROJECT_TABLES } from './production-project-schema'
 
-export const PRODUCTION_STORAGE_VERSION = 2
+export const PRODUCTION_STORAGE_VERSION = 3
 /** Append a new numbered upgrade when a domain lands; never rewrite an applied step. */
 export const PRODUCTION_STORAGE_UPGRADES = [
   { from: 1, to: 2, sql: PRODUCTION_PROCESS_LIBRARY_SCHEMA, participants: { 'process-library': { schemaVersion: 1, tables: PRODUCTION_PROCESS_LIBRARY_TABLES } } },
+  { from: 2, to: 3, sql: PRODUCTION_PROJECT_SCHEMA, participants: { project: { schemaVersion: 1, tables: PRODUCTION_PROJECT_TABLES } } },
 ] as const
 
 export function productionStorageManifest(version = PRODUCTION_STORAGE_VERSION) {
