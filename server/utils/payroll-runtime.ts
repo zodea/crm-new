@@ -1,3 +1,4 @@
+import type { PayrollServiceOptions } from './payroll-service'
 import { createHash } from 'node:crypto'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { resolveBusinessSession } from './business-session'
@@ -29,7 +30,7 @@ export function payrollIdentitySource(sessionId?: string | null) {
   const workers = crewWorkerCommandTestInstance.workerRows(sessionId).filter(row => row.dataOrigin === 'real' && (!row.crewId || crews.some(crew => crew.id === row.crewId))).map(row => ({ ...workerFacts.rows.find(fact => fact.workerId === row.id), id: row.id, name: row.name, crewId: row.crewId }))
   return { projects, crews, workers, version: createHash('sha256').update(JSON.stringify([projects, crews, workers, ratios, workerFacts])).digest('hex') }
 }
-export const payrollService = createPayrollService({ session: payrollSession, identities: payrollIdentitySource, quantityFacts: loadPayrollAQuantityFacts, hollowFacts: (db, query) => loadQuantityHollowFacts(db, query, { migratedProof: loadQuantityHollowMigratedProof }), hollowProjection: loadPayrollMigratedHollow, managementScopeFacts: loadPayrollAManagementScopeFacts, dayworkFacts: loadPayrollDayworkFacts, dayworkRecord: loadPayrollDayworkRecord, c2ConfigFacts: loadPayrollC2ConfigFacts, async transaction(work, sessionId) {
+export const payrollRuntimeOptions: PayrollServiceOptions = { session: payrollSession, identities: payrollIdentitySource, quantityFacts: loadPayrollAQuantityFacts, hollowFacts: (db, query) => loadQuantityHollowFacts(db, query, { migratedProof: loadQuantityHollowMigratedProof }), hollowProjection: loadPayrollMigratedHollow, managementScopeFacts: loadPayrollAManagementScopeFacts, dayworkFacts: loadPayrollDayworkFacts, dayworkRecord: loadPayrollDayworkRecord, c2ConfigFacts: loadPayrollC2ConfigFacts, async transaction(work, sessionId) {
   try {
     return await quantityTestInstance.withWorkspaceTransaction(work, sessionId)
   }
@@ -38,7 +39,8 @@ export const payrollService = createPayrollService({ session: payrollSession, id
       throw payrollProblem('forbidden', '读取期间工资工作区或身份已变化')
     throw cause
   }
-} })
+} }
+export const payrollService = createPayrollService(payrollRuntimeOptions)
 export function payrollDemoContext(includeDemo: boolean, sessionId?: string | null) {
   const session = payrollSession(sessionId)
   if (!includeDemo || !session.capabilities.includes('demo:read') || !session.capabilities.includes('payroll:read'))

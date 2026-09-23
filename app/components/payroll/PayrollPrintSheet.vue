@@ -147,7 +147,7 @@ function money(value: number | null) {
 .payroll-print-output { display: none; }
 
 @media print {
-  :global(body *) { visibility: hidden !important; }
+  :global(body:has(.payroll-print-output) *) { visibility: hidden !important; }
   .payroll-print-output,
   .payroll-print-output * { visibility: visible !important; }
   .payroll-print-output {

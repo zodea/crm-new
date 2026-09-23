@@ -6,7 +6,13 @@
 
 `/api/read/customers/:id/files/:fileId` 验证所属客户、删除状态、正文长度和 SHA-256 后以附件下载，禁缓存、禁止 MIME 嗅探，不接受任意磁盘路径。正式详情的项目/合同/收款源尚未接管时返回各领域 `unavailable`，计数/金额为未知，客户本身仍可读；不能返回假零或取开发/演示源补全。
 
-`/api/auth/status` 只报告运行模式、是否认证以及已登录时的 owner/到期时间，不续期；受保护业务读取才刷新空闲时间。`/api/production/status` 需认证，触发实际打开及写探测并返回 schema、用途和持久参与者。无配置、无法打开或未接管 API 都明确失败。后台白名单只覆盖本票已实现的客户与认证入口，拒绝演示及代理/测试头。运行权威见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。
+`/api/auth/status` 只报告运行模式、是否认证以及已登录时的 owner/到期时间，不续期；受保护业务读取才刷新空闲时间。`/api/production/status` 需认证，触发实际打开及写探测并返回 schema、用途和持久参与者。无配置、无法打开或未接管 API 都明确失败。后台白名单按已实现领域精确开放，拒绝演示及代理/测试头。运行权威见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。
+
+## 本机工序库读取（#463）
+
+本机模式 `GET /api/read/process-libraries` 与 `GET /api/read/process-libraries/:id` 沿既有 Repository/DTO 回读磁盘，需 `process-library:read`；只接 `real` 来源。空库返回空目录，不能填入演示模板。每个版本保留稳定 ID、完整工序顺序、阶段/分项定义、前置 key 与禁用状态，以及创建人和时间；后续版本不会修改旧版。目录修订和系列最高编号来自同一已核对状态。
+
+正式项目 WBS 尚未接管时 `usageCount=null`，页面明确“引用数量未知”，不得算作零。读取会核对版本、原命令和审计的完整关系，损坏、无权限和暂不可达分别拒绝，不能返回部分有效行或开发内存替代。持久参与者及升级见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)，已验收范围见 [#463 记录](../design/evidence/issue-463-production-process-library/README.md)。
 
 本文是浏览器业务页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 [`NAVIGATION.md`](./NAVIGATION.md) 裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
 
@@ -631,3 +637,15 @@ Repository 的 `numbering(query, { projectId, statementId })` 经 `POST /api/rea
 预览从可信工资冻结读取映射稳定工人身份，保留零成员、原姓名、负责人和工资来源；当前工人资料缺失仍保留成员并记录缺口。当前项目与合法进退场事实不足时登记日期的在场状态为 unknown。归档是独立日期的资料补充，返回固定成员、字段、劳动合同、照片元数据/摘要、资料版本和缺口；后续主档修改不补写旧归档。
 
 照片读取核对工人 owner、归档成员与该版照片引用、正文编码/长度/SHA-256；无归档参数只服务当前工人专门私密页面，仍须独立私密权限。客户端不提供路径，不以文件名判断归属。所有读取在最后异步等待后再次核验会话和权限，Repository 验证响应身份与选择范围。
+
+## 工资完整工作簿与保存目录读取（#479）
+
+`PayrollRepository` 的 `workbookPreview(query,input)`、`workbookArchives(query,{projectId})`、`workbookArchive(query,{projectId,archiveId})` 对应 `POST /api/read/payroll/workbook-preview|workbook-archives|workbook-archive`。输入固定正式来源、项目、模式、唯一原工资集合及可空名册版本，不能靠当前分页或姓名隐式补选。负责人全周期只允许同一稳定请款簿；按月模式将所选原工资按月份分组。
+
+预览同事务组合已发 A/C1/C2 原冻结文档、正式出具及原工资范围的实际收付。原工资正文缺口 `gaps` 与编号、名册、实际账交付缺口 `deliveryGaps` 分开；缺照片不能抹掉已证明的工资金额。未正式出具保持明确缺口，预览或保存不自动发号；不可用的来源不补零、不伪造已发正文。名册“独立登记日补充版本”是证据性质说明，不是资料缺口。
+
+所有目录读取要求 `payroll:read`。预览选择了名册时，额外从工人 owner 核验 `worker:sensitive:read`、完全一致的原工资范围、固定版本、照片归属和正文摘要；公开预览仅返回名册摘要，公开保存目录只返回固定引用。工资权限可阅读及下载工资部分，完整实名附件需重新单独授权。无权限、未选择、缺照片和坏版本分别说明，不把权限失败降格为“资料齐全”。
+
+HTTP 复用各工资格式与实际台账的十进制传输协议。Repository 验证金额、组内原单身份、模式分组、实际账范围、版本与当前身份；历史目录的实际账以保存时点为准，外层 context 为本次真实读取身份。输出器在完整附件生成后重新读取同一目录和名册，校验权限、范围和摘要，任何失败均不返回完整下载文件。
+
+经过服务端完整原图及映射证明的迁入目录/名册 DTO 可以附带 `migration: { originalId, originalContentHash }`。目录中的该摘要必须等于保留的原 `manifestHash`；名册的该摘要标识不含 context 的原归档正文。它说明原件与本代身份投影的关系，不是本代改写 JSON 的摘要，也不接受来源 JSON 自带的同名声明。私密下载仍核对本代项目、精确工资集合、名册版本/日期/来源版本及当前身份权限；目录固定的原名册摘要可以与经过证明的 `originalContentHash` 核对，不能因此绕开范围或撤权检查。

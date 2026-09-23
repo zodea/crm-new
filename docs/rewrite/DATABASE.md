@@ -36,7 +36,8 @@
 
 ## 共享正式存储版本与参与者（#463）
 
-schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`，当前 v2→v3 加入 `project:1`，保留既有参与者。新域的 SQL 定义独立存放，按实际合入顺序追加连续升级；事务内先核旧清单，再执行新表、参与者与版本更新。缺域、未知域或领域版本不符明确停止，不能重新插入空参与者掩盖问题。`productionStorageManifest(version)` 是备份代码消费的同一登记表，列出公共元数据表与逐域完整表名；维护它时必须同步本节。
+
+schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`，v2→v3 加入 `project:1`，各自保留既有参与者。新域的 SQL 定义独立存放，按实际合入顺序追加连续升级；事务内先核旧清单，再执行新表、参与者与版本更新。缺域、未知域或领域版本不符明确停止，不能重新插入空参与者掩盖问题。`productionStorageManifest(version)` 是备份代码消费的同一登记表，列出公共元数据表与逐域完整表名；维护它时必须同步本节。
 
 | 工序库参与表 | 不可遗漏的事实 |
 | --- | --- |
@@ -45,7 +46,9 @@ schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`
 | `process_library_command_receipts` | 原命令ID、工作区/操作者、版本ID、完整命令JSON/指纹和原结果 |
 | `process_library_audits` | 原版本、原命令、操作者、创建动作、完整版本事实和时间 |
 
-所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态由 #451 接续，正式业务写入门禁仍未放开。[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力，工序库公开流程随 #463 的完整记录验收。
+所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态由 #451 接续，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力。
+
+工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 的使用投影尚未接通，引用数量为未知。存量中央迁入与 WBS 生产接管不由此切片证明。验证见 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)。
 
 > 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 
@@ -2557,3 +2560,21 @@ CREATE TABLE reconciliation_issues (
 `worker_roster_migration_evidence` 以工人稳定身份保存批次、来源指纹和完整来源 JSON。它用于重复确认与受控恢复证明，不是日常可编辑主档。原表没有劳动合同事实时保持未记录，只有明确且唯一有效的照片分类才关联用途；文件路径只保留为原证据，不作为文件读取入口。
 
 归档需要独立 `worker:sensitive:read`；工资读写不自动授予。当前 SQL 由中央测试实例承载，生产持久化不是此表结构的验收结论。迁入和回滚沿受控映射保留原字段与原件，未知用途不猜，日常版本及归档引用不能被重复迁入或回滚覆盖。
+
+### 工资完整工作簿保存目录（#479）
+
+`payroll_workbook_archives` 保存不可变的输出目录，而不是另一份可编辑工资：`id / project_id / scope_key / version` 固定项目、模式和原工资集合，同范围版本递增；`snapshot_json / snapshot_hash` 固定原工资正文、原正式编号、保存时实际收付、工资正文缺口、文件交付缺口和可空名册引用；`created_at / created_by` 记录真实保存时间与可信经办人，`migration_batch_id` 仅用于来源归属。同范围可选择后补名册再保存新版本，旧版本不回写。
+
+目录只保名册身份、版本、登记日、来源版本与正文 SHA-256，不保存身份证、银行卡或照片正文。名册原归档及照片仍由工人 owner 提供；所选名册必须与目录项目、原工资集合完全相同。原工资零额成员、已离场成员及历史姓名均不从当前主档删掉。
+
+`payroll_workbook_receipts` 以工作区×操作者×原命令身份唯一，绑定规范命令正文、指纹、项目、目录身份、版本及摘要；确认未应用使用取消墓碑，阻止迟到写入。`payroll_workbook_references` 按目录×原表×稳定身份去重，保存明确原工资、成员、来源、正式出具、实际收付及名册原件关系，用于受控恢复保护；不扫描姓名或正文文本猜 ID。目录、引用、审计和回执共用同一个工作区事务。
+
+目录摘要不含当前会话 context；读取重新验证物理行、规范正文、原预览指纹及唯一提交回执。实际台账冻结于保存时点：之后真实补退只进入新目录版本，原单冻结实发及旧目录均不重写。保存成功不证明 XLSX/ZIP 已下载，文件生成失败不撤销已保存目录。
+
+当前目录仍由中央测试实例承载，生产落盘由 #467 承接；浏览器冷打开及原目录重读不能作为进程重启耐久验收。读取与命令分别见 [READ-MODELS](./READ-MODELS.md#工资完整工作簿与保存目录读取479)、[COMMANDS](./COMMANDS.md#工资完整工作簿目录命令479)。
+
+完整工资项目迁移图 V6 同时运输目录、名册、各自回执与明确引用；工人来源属性 `workerRosterGraphJson` 运输全部私密资料版本、原件身份、工人资料回执与实名审计，照片元数据和字节仍由同 owner 的原件清单运输。不能只迁名册 JSON 而丢工人版本或照片正文。迁入前交叉证明冻结工资、实际收付原事实、名册成员及版本、照片字节，以及目录对名册的原正文摘要；真实后续收付允许追加，不改变旧目录的原事实前缀。
+
+`payroll_publication_migration_proofs` 按原表与本代归档身份保存不可变原行、原回执、原数量闭包及显式映射证明。读取必须再次与 `payroll_migration_evidence` 的完整来源及映射核对，不能由该证明表自报摘要取得信任。原 `snapshot_json`、原目录摘要和来源版本逐代保持不变，本代项目、工资、工人、原件及归档身份只用于读取投影。`worker_roster_migration_receipts` 只登记由工人原证据运输的回执归属，不给日常回执贴迁入标记。
+
+危险恢复在候选 SQL 中先核对并移除本批仍完全相同的目录、名册和回执，再交给原工资与工人 owner 检查。独立新目录、资料、回执或审计仍引用原工资、零额成员、软删除历史、费用责任或空鼓原检查时整批拒绝；修改过的原件正文、资料版本或证明也拒绝。无关工人的独立资料不阻止本批安全恢复。SQL、缓存 authority、revision 及回执仍一起提交或一起放弃。

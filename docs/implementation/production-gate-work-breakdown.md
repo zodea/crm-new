@@ -16,6 +16,8 @@
 
 #450 已为客户接入首条本机单库路径、访问保护与原件/回执同事务；限定实现及验收见 [PG-01 证据](../design/evidence/issue-450-production-customer/README.md)。以下调查表保留其他领域的原基线，客户在显式本机模式的状态以该证据及 [DATABASE 参与者清单](../rewrite/DATABASE.md#pg-01-本机客户持久参与者450)为准。PG-02 和最终上线验收未完成前不开放真实业务写入。
 
+[#463](https://github.com/zodea/crm-new/issues/463) 已沿同一 storage 接入全局工序库完整版本、系列修订、原命令回执与审计；公开页面和独立进程冷重开证据见 [PG-14 验收](../design/evidence/issue-463-production-process-library/README.md)。工序库下行的 `Map` 是调查基线和开发验证实例，不再描述已配置本机模式的权威。该域纳入同一参与者清单，正式业务写入门禁仍保留。
+
 下表描述当前代码；“内存”包含 JavaScript 对象和进程内 SQLite，两者均没有由现有接缝自动变成磁盘持久化。
 
 | 事实及接缝 | 当前证据 | 生产实施必须保留的内容 |

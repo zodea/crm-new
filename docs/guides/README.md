@@ -4,7 +4,7 @@
 
 ## 版本与使用边界
 
-各指南的“当前已可用”指该指南注明版本和验证环境内的行为，不等同于本轮已经复验或正式上线。除明确登记的 [#450 客户](./local-customer-storage.md)与 [#452 项目](./local-project-storage.md)本机切片外，中央端仍按 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 的可重置验证实例边界使用；其他持久化、备份恢复和部署由 [#416 承接图](../implementation/production-gate-work-breakdown.md)逐项验收。
+各指南的“当前已可用”指该指南注明版本和验证环境内的行为，不等同于本轮已经复验或正式上线。除明确登记的 [#450 本机客户切片](./local-customer-storage.md)、[#452 项目](./local-project-storage.md)与 [#463 工序库](./local-process-library-storage.md)本机切片外，中央端仍按 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 的可重置验证实例边界使用；其他持久化、备份恢复和部署由 [#416 承接图](../implementation/production-gate-work-breakdown.md)逐项验收。
 
 本轮按[全模块复核路线](https://github.com/zodea/crm-new/issues/402)逐份核实指南与实际界面。旧票号只用于解释版本来源；远程已合入、本地尚未整合与其他工作树进行中的能力分别登记，不能仅改文档就把它们写成当前版本可用。完整审批引擎、完整登录/RBAC 和 Tauri 正式交付继续是当前排除范围，不因旧指南列为“待开发”而自动纳入本轮。
 
@@ -18,6 +18,7 @@
 - [客户档案与业务关系使用指南](./customer-records.md)
 - [本机客户保存与重新登录](./local-customer-storage.md)（#450 首条磁盘路径，正式写入等待备份与上线门禁）
 - [本机项目保存、原件与 Excel 导入](./local-project-storage.md)（#452 项目及客户关系同库保存，正式写入门禁保持）
+- [本机工序库保存与旧版本核对](./local-process-library-storage.md)（#463 完整不可变版本、原提交恢复与独立服务重启）
 - [分供方档案与真实事实使用指南](./supplier-records.md)
 - [班组与工人档案使用指南](./crew-worker-records.md)
 - [工人私密资料与工资实名名册](./worker-roster-archive.md)（独立权限、两类照片、带日期不可变名册与原件 ZIP）
@@ -32,6 +33,7 @@
 - [分供方证照与资料核验使用指南](./supplier-credential-review.md)（中央原件及人工核验见 [#446](../design/evidence/issue-446/README.md)，OCR 人工确认与税务核验见 [#447](../design/evidence/issue-447/README.md)）
 - [材料单价分析使用说明](./material-price-analysis.md)
 - [工资与考勤工作台使用说明](./payroll-attendance.md)（中央历史接管、A/C1/C2 配置、核对、实际发放及冻结输出；C1 配对考勤，C2 配对人工签工；更正与费用分期另述）
+- [完整工资工作簿与按月归档](./payroll-complete-workbook.md)（固定目录、正式编号、独立名册与照片、原时点重下）
 - [正式工资编号与单份出具](./payroll-official-numbering.md)（人工核对项目起点、原子正式编号、原提交恢复及冻结Excel/打印）
 - [工资更正与实际收付](./payroll-adjustments.md)（P4 本地验收；核算差额、补退、后月处理与错记冲销分别留证）
 - [房补、其他补贴与独立管理费](./payroll-fees.md)（明确完成量范围、多条费用、独立管理簿及负价清单；当前验收进度见指南首部）

@@ -28,7 +28,6 @@ const sources = computed(() => payrollReadLocation('/subcontract/payroll/sources
 const canCreate = computed(() => scope.value.origin === 'real' && current.value?.context.capabilities.includes('payroll:write'))
 const selectedIds = ref<string[]>([])
 const batchOpen = ref(false)
-const archiveOpen = ref(false)
 const batchEligibleRows = computed(() => rows.value.filter(row => row.recordKind === 'central'
   && !row.deletedAt
   && row.status !== 'released'
@@ -42,7 +41,6 @@ const canBatch = computed(() => !!scope.value.projectId
   && scope.value.origin === 'real'
   && !!current.value?.context.capabilities.includes('payroll:write'))
 const canArchive = computed(() => !!scope.value.projectId && scope.value.origin === 'real' && !!current.value?.context.capabilities.includes('payroll:read'))
-const archiveProjectName = computed(() => current.value?.projects.find(project => project.id === scope.value.projectId)?.name || rows.value.find(row => row.projectId === scope.value.projectId)?.projectName || scope.value.projectId)
 const createTo = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: undefined, returnTo: returnTo.value } }))
 const createC1To = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: 'C1', returnTo: returnTo.value } }))
 const createC2To = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', format: 'C2', returnTo: returnTo.value } }))
@@ -105,9 +103,9 @@ useTabTitle('工资台账')
         <KitButton v-if="canBatch" :disabled="!selectedRows.length" @click="batchOpen = true">
           批量核对 / 资金（{{ selectedRows.length }}）
         </KitButton>
-        <KitButton v-if="canArchive" variant="secondary" @click="archiveOpen = true">
+        <NuxtLink v-if="canArchive" :to="{ path: '/subcontract/payroll/workbooks', query: { origin: 'real', project: scope.projectId } }" class="btn-secondary">
           完整工作簿
-        </KitButton>
+        </NuxtLink>
         <NuxtLink :to="{ path: '/subcontract/payroll/payments', query: { origin: scope.origin || 'real', project: scope.projectId, returnTo } }" class="btn-secondary">
           工资实际收付
         </NuxtLink>
@@ -199,13 +197,6 @@ useTabTitle('工资台账')
       :month="scope.month"
       :rows="selectedRows"
       @complete="load"
-    />
-    <PayrollWorkbookArchiveDialog
-      v-if="current && canArchive"
-      v-model:open="archiveOpen"
-      :context="current.context"
-      :project-id="scope.projectId"
-      :project-name="archiveProjectName"
     />
   </main>
 </template>

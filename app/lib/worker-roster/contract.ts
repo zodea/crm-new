@@ -40,6 +40,8 @@ export interface WorkerRosterPreview {
   counts: { present: number, left: number, notEntered: number, unknown: number }
 }
 export interface WorkerRosterArchive extends WorkerRosterPreview {
+  /** 服务端逐行核对原图和显式映射后附加；不保存回原 snapshot_json。 */
+  migration?: { originalId: string, originalContentHash: string }
   id: string
   version: number
   createdAt: string

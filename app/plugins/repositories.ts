@@ -90,79 +90,84 @@ export interface DomainRepositories {
   ownerCommercialDocumentCommands: OwnerCommercialDocumentCommandRepository
 }
 
+// Keep the generic Nuxt fetch type at this adapter boundary; repository contracts
+// already constrain each endpoint's options and response decoder.
+const repositoryFetch = $fetch as unknown as (url: string, options?: object) => Promise<unknown>
+const repositoryFileFetch = $fetch as unknown as (url: string, options: { responseType: 'blob' }) => Promise<Blob>
+
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
-    productionAccess: createProductionAccessRepository((url, options) => $fetch<unknown>(url, { ...options, timeout: 10_000, retry: 0 })),
-    customerProduction: createCustomerProductionRepository((url, options) => $fetch<unknown>(url, options), url => $fetch<Blob>(url, { responseType: 'blob' })),
-    projectProduction: createProjectProductionRepository((url, options) => $fetch<unknown>(url, options), url => $fetch<Blob>(url, { responseType: 'blob' })),
-    workerRoster: createWorkerRosterRepository((url, options) => $fetch<unknown>(url, { ...options, body: options?.body as Record<string, unknown> | undefined })),
-    payroll: createPayrollRepository((url, options) => $fetch<unknown>(url, options)),
-    targetCosts: createTargetCostRepository((url, options) => $fetch<unknown>(url, options)),
-    boqBuilding: createBoqBuildingRepository((url, options) => $fetch<unknown>(url, options)),
-    schedule: createScheduleRepository((url, options) => $fetch<unknown>(url, options)),
-    supplierCredentials: createSupplierCredentialRepository((url, options) => $fetch<unknown>(url, options)),
-    processLibraries: createProcessLibraryRepository((url, options) => $fetch<unknown>(url, options)),
-    quantity: createQuantityRepository((url, options) => $fetch<unknown>(url, options)),
-    deliveries: createDeliveryRepository((url, options) => $fetch<unknown>(url, options)),
-    receipts: createReceiptRepository((url, options) => $fetch<unknown>(url, options)),
-    otherSettlements: createOtherSettlementRepository((url, options) => $fetch<unknown>(url, options)),
-    auxiliaryContracts: createAuxiliaryContractRepository((url, options) => $fetch<unknown>(url, options)),
+    productionAccess: createProductionAccessRepository((url, options) => repositoryFetch(url, { ...options, timeout: 10_000, retry: 0 })),
+    customerProduction: createCustomerProductionRepository((url, options) => repositoryFetch(url, options), url => repositoryFileFetch(url, { responseType: 'blob' })),
+    projectProduction: createProjectProductionRepository((url, options) => repositoryFetch(url, options), url => repositoryFileFetch(url, { responseType: 'blob' })),
+    workerRoster: createWorkerRosterRepository((url, options) => repositoryFetch(url, { ...options, body: options?.body as Record<string, unknown> | undefined })),
+    payroll: createPayrollRepository((url, options) => repositoryFetch(url, options)),
+    targetCosts: createTargetCostRepository((url, options) => repositoryFetch(url, options)),
+    boqBuilding: createBoqBuildingRepository((url, options) => repositoryFetch(url, options)),
+    schedule: createScheduleRepository((url, options) => repositoryFetch(url, options)),
+    supplierCredentials: createSupplierCredentialRepository((url, options) => repositoryFetch(url, options)),
+    processLibraries: createProcessLibraryRepository((url, options) => repositoryFetch(url, options)),
+    quantity: createQuantityRepository((url, options) => repositoryFetch(url, options)),
+    deliveries: createDeliveryRepository((url, options) => repositoryFetch(url, options)),
+    receipts: createReceiptRepository((url, options) => repositoryFetch(url, options)),
+    otherSettlements: createOtherSettlementRepository((url, options) => repositoryFetch(url, options)),
+    auxiliaryContracts: createAuxiliaryContractRepository((url, options) => repositoryFetch(url, options)),
     customerRead: createHttpCustomerReadRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     customerCommands: createHttpCustomerCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     constructionContractRead: createHttpConstructionContractReadRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     constructionContractCommands: createHttpConstructionContractCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     subcontractContractRead: createHttpSubcontractContractReadRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     subcontractContractCommands: createHttpSubcontractContractCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     crewWorkerRead: createHttpCrewWorkerReadRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     crewWorkerCommands: createHttpCrewWorkerCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     supplierRead: createHttpSupplierReadRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     supplierCommands: createHttpSupplierCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     projectList: createHttpProjectListRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     projectSupplierRead: createHttpProjectSupplierReadRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     projectSupplierCommands: createHttpProjectSupplierCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     projectCommands: createHttpProjectCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     coreMigration: createHttpCoreMigrationRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     materialContractRead: createHttpMaterialContractReadRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     materialContractCommands: createHttpMaterialContractCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     ownerCommercialDocumentRead: createHttpOwnerCommercialDocumentReadRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
     ownerCommercialDocumentCommands: createHttpOwnerCommercialDocumentCommandRepository({
-      fetcher: (url, options) => $fetch<unknown>(url, options),
+      fetcher: (url, options) => repositoryFetch(url, options),
     }),
   }
   return { provide: { repositories } }
