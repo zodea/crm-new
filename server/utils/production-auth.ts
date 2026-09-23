@@ -5,11 +5,12 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { createError, deleteCookie, getCookie, getHeader, setCookie } from 'h3'
 import { getProductionRuntimeConfig } from './production-config'
+import { PRODUCTION_PROCESS_LIBRARY_CAPABILITIES } from './production-process-library-access'
 
 const COOKIE = 'ruihang_owner_session'
 const ABSOLUTE_MS = 8 * 60 * 60 * 1000
 const IDLE_MS = 30 * 60 * 1000
-const OWNER_CAPABILITIES = Object.freeze(['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write'])
+const OWNER_CAPABILITIES = Object.freeze(['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', ...PRODUCTION_PROCESS_LIBRARY_CAPABILITIES])
 interface OwnerSession { configuration: string, created: number, used: number }
 // Authentication is intentionally revoked by a process restart; business receipts live on disk.
 const sessions = new Map<string, OwnerSession>()
@@ -57,12 +58,12 @@ export function productionAuthStatus(event: H3Event) {
   return { mode: 'production' as const, authenticated: Boolean(session), purpose: config.purpose, ...(session ? { ownerId: config.ownerId, expiresAt: new Date(session.created + ABSOLUTE_MS).toISOString() } : {}) }
 }
 
-export function requireProductionBusinessSession(event: H3Event): BusinessSession {
+export function requireProductionBusinessSession(event: H3Event, options: { touch?: boolean } = {}): BusinessSession {
   const config = getProductionRuntimeConfig()
   if (!config)
     return denied(503, '正式会话只能用于正式运行模式。')
   assertProductionRequest(event, config)
-  if (!currentSession(event, config, true))
+  if (!currentSession(event, config, options.touch !== false))
     denied(401, '请先输入本机访问码；登录可能已过期。')
   return { workspaceId: config.workspaceId, actorId: config.ownerId, capabilities: OWNER_CAPABILITIES }
 }

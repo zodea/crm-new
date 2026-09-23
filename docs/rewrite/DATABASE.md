@@ -2,12 +2,12 @@
 
 ## PG-01 本机客户持久参与者（#450）
 
-`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite` 和独立正式 schema 版本 1；不把旧浏览器/Tauri schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
+`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite`，由独立正式 schema 版本 1 引导；当前版本及逐域升级见下方共享存储清单。不把旧浏览器/Tauri schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
 
 | 同库参与者 | 不可遗漏的事实 |
 | --- | --- |
 | `production_metadata` | schema 版本、固定工作区/维护人、用途及创建时间；重开必须相符 |
-| `production_participants` | 已接管领域与领域 schema 版本；本票仅 `customer:1` |
+| `production_participants` | 已接管领域与领域 schema 版本；PG-01 引导为 `customer:1`，后续按显式升级追加 |
 | `customer_revision` / `customers` | 全域客户版本、稳定 ID、原字段、实体版本、创建/更新时间和软删除；税号唯一包含已删除客户 |
 | `file_refs` / `file_payloads` | 客户 owner、稳定文件 ID、文件描述/大小、服务端上传人、删除状态、原字节和 SHA-256；不保存客户端路径来冒充原件 |
 | `customer_command_receipts` | 原编号、工作区/操作者、客户、完整命令指纹、动作、原结果、提交时间 |
@@ -17,6 +17,21 @@
 客户、原件、审计、版本和成功回执同一 `BEGIN IMMEDIATE` 事务提交，单连接由既有 coordinator 排队；WAL、`synchronous=FULL`、外键及每次重开完整性/身份校验。版本不兼容、损坏、不可写明确拒绝，禁止创建内存替代。SQLite/设备故障保证仍按 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md) 分层验收，不以进程终止冒充物理断电。
 
 这份表是 PG-02 的首个完整备份参与者清单：一致备份必须覆盖全部上述表与原件字节，核对外键、owner、数量、摘要、版本及原回执；活动主文件单独复制不构成备份。后续领域只增补此单库的参与者与版本迁移，不新建平行正式权威。
+
+## 共享正式存储版本与参与者（#463）
+
+schema v1 引导定义不可回写；当前 v2 通过同事务的 v1→v2 升级加入 `process-library:1`，保留 `customer:1`。新域的 SQL 定义独立存放，按实际合入顺序追加连续升级；事务内先核旧清单，再执行新表、参与者与版本更新。缺域、未知域或领域版本不符明确停止，不能重新插入空参与者掩盖问题。`productionStorageManifest(version)` 是备份代码消费的同一登记表，列出公共元数据表与逐域完整表名；维护它时必须同步本节。
+
+| 工序库参与表 | 不可遗漏的事实 |
+| --- | --- |
+| `process_library_revision` | 目录修订计数，与本次成功版本共同提交 |
+| `process_library_versions` | 稳定版本ID、编码与版本唯一关系、来源旧版ID、完整不可变工序图JSON、可信创建人和时间、原命令ID |
+| `process_library_command_receipts` | 原命令ID、工作区/操作者、版本ID、完整命令JSON/指纹和原结果 |
+| `process_library_audits` | 原版本、原命令、操作者、创建动作、完整版本事实和时间 |
+
+所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态由 #451 接续，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。
+
+工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 的使用投影尚未接通，引用数量为未知。存量中央迁入与 WBS 生产接管不由此切片证明。验证见 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)。
 
 > 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 

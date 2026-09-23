@@ -30,7 +30,7 @@ beforeEach(async () => {
       return loginHandler(event)
     if (path === '/api/auth/logout')
       return logoutProductionOwner(event)
-    const session = requireProductionBusinessSession(event)
+    const session = requireProductionBusinessSession(event, { touch: path !== '/api/production/backup/status' })
     if (event.method !== 'GET')
       await readBody(event)
     return session
@@ -78,6 +78,15 @@ async function login() {
 }
 
 describe('单人正式访问保护', () => {
+  it('后台备份状态轮询不续期，空闲过期后业务读取仍要求重新登录', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const cookie = await login()
+    vi.setSystemTime(Date.now() + 29 * 60_000)
+    expect((await request('/api/production/backup/status', { cookie })).status).toBe(200)
+    vi.setSystemTime(Date.now() + 2 * 60_000)
+    expect((await request('/api/read/customers', { cookie })).status).toBe(401)
+  })
+
   it('配置缺失或非回环入口停止处理；不会退回默认操作者', async () => {
     expect(() => resolveBusinessSession()).toThrow('正式业务必须')
     for (const [name, value] of [['CRM_PUBLIC_ORIGIN', 'http://localhost:3100'], ['NITRO_HOST', '0.0.0.0'], ['CRM_ACCESS_CODE_HASH', ''], ['CRM_RUN_MODE', 'productoin']]) {
@@ -96,7 +105,7 @@ describe('单人正式访问保护', () => {
     expect((await request('/api/auth/login', { method: 'POST', body: { accessCode: `${code}-wrong` } })).status).toBe(401)
     const first = await login()
     const session = await (await request('/api/read/business-session', { cookie: first, headers: { 'x-actor-id': 'forged' } })).json()
-    expect(session).toEqual({ workspaceId: process.env.CRM_WORKSPACE_ID, actorId: 'only-owner', capabilities: ['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write'] })
+    expect(session).toEqual({ workspaceId: process.env.CRM_WORKSPACE_ID, actorId: 'only-owner', capabilities: ['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', 'process-library:read', 'process-library:write'] })
     const second = await login()
     expect((await request('/api/read/customers', { cookie: first })).status).toBe(401)
     expect((await request('/api/auth/logout', { method: 'POST', cookie: second })).status).toBe(200)

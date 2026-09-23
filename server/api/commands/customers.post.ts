@@ -1,7 +1,8 @@
 import { resolveBusinessSession } from '../../utils/business-session'
 import { parseCustomerCommandRequest } from '../../utils/customer-command-request'
 import { customerCommandTestInstance } from '../../utils/customer-command-test-instance'
-import { productionCustomerRuntime, productionCustomerSession, throwProductionStorageError } from '../../utils/production-customer-runtime'
+import { productionCustomerRuntime, productionCustomerSession } from '../../utils/production-customer-runtime'
+import { throwProductionStorageError } from '../../utils/production-runtime'
 import { throwProjectReadError } from '../../utils/project-read-error'
 
 export default defineEventHandler(async (event) => {

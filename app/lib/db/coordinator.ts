@@ -6,6 +6,8 @@ export interface DbDriver {
    * Native SQLite persists by itself; the browser sql.js driver implements this hook.
    */
   persist?: () => Promise<void>
+  /** Optional consistent disk snapshot; never exposes the native connection to callers. */
+  backupTo?: (destination: string) => Promise<void>
   close: () => Promise<void>
 }
 
@@ -72,6 +74,15 @@ export function createDbCoordinator(load: () => Promise<DbDriver>) {
     })
   }
 
+  async function backupTo(destination: string): Promise<void> {
+    return runExclusive(async () => {
+      const raw = await rawDriver()
+      if (!raw.backupTo)
+        throw new Error('当前数据库驱动不支持一致磁盘备份。')
+      await raw.backupTo(destination)
+    })
+  }
+
   const facade: DbDriver = { execute, select, close }
 
   async function getDb(): Promise<DbDriver> {
@@ -106,5 +117,5 @@ export function createDbCoordinator(load: () => Promise<DbDriver>) {
     })
   }
 
-  return { getDb, execute, select, close, withTransaction }
+  return { getDb, execute, select, close, withTransaction, backupTo }
 }

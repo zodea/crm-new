@@ -6,7 +6,13 @@
 
 `/api/read/customers/:id/files/:fileId` 验证所属客户、删除状态、正文长度和 SHA-256 后以附件下载，禁缓存、禁止 MIME 嗅探，不接受任意磁盘路径。正式详情的项目/合同/收款源尚未接管时返回各领域 `unavailable`，计数/金额为未知，客户本身仍可读；不能返回假零或取开发/演示源补全。
 
-`/api/auth/status` 只报告运行模式、是否认证以及已登录时的 owner/到期时间，不续期；受保护业务读取才刷新空闲时间。`/api/production/status` 需认证，触发实际打开及写探测并返回 schema、用途和持久参与者。无配置、无法打开或未接管 API 都明确失败。后台白名单只覆盖本票已实现的客户与认证入口，拒绝演示及代理/测试头。运行权威见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。
+`/api/auth/status` 只报告运行模式、是否认证以及已登录时的 owner/到期时间，不续期；受保护业务读取才刷新空闲时间。`/api/production/status` 需认证，触发实际打开及写探测并返回 schema、用途和持久参与者。无配置、无法打开或未接管 API 都明确失败。后台白名单按已实现领域精确开放，拒绝演示及代理/测试头。运行权威见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。
+
+## 本机工序库读取（#463）
+
+本机模式 `GET /api/read/process-libraries` 与 `GET /api/read/process-libraries/:id` 沿既有 Repository/DTO 回读磁盘，需 `process-library:read`；只接 `real` 来源。空库返回空目录，不能填入演示模板。每个版本保留稳定 ID、完整工序顺序、阶段/分项定义、前置 key 与禁用状态，以及创建人和时间；后续版本不会修改旧版。目录修订和系列最高编号来自同一已核对状态。
+
+正式项目 WBS 尚未接管时 `usageCount=null`，页面明确“引用数量未知”，不得算作零。读取会核对版本、原命令和审计的完整关系，损坏、无权限和暂不可达分别拒绝，不能返回部分有效行或开发内存替代。持久参与者及升级见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)，已验收范围见 [#463 记录](../design/evidence/issue-463-production-process-library/README.md)。
 
 本文是浏览器业务页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 [`NAVIGATION.md`](./NAVIGATION.md) 裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
 
