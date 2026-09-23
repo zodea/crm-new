@@ -19,6 +19,7 @@
 - [本机客户保存与重新登录](./local-customer-storage.md)（#450 首条磁盘路径，正式写入等待备份与上线门禁）
 - [本机项目保存、原件与 Excel 导入](./local-project-storage.md)（#452 项目及客户关系同库保存，正式写入门禁保持）
 - [本机工序库保存与旧版本核对](./local-process-library-storage.md)（#463 完整不可变版本、原提交恢复与独立服务重启）
+- [本机备份与隔离恢复](./local-backup-and-restore.md)（#451 主备份、离线复制与隔离恢复证明，实际介质和上线另验）
 - [分供方档案与真实事实使用指南](./supplier-records.md)
 - [本机分供方保存与原提交核对](./local-supplier-storage.md)（主档、证照与人工核验的磁盘保存、重启和原键恢复）
 - [班组与工人档案使用指南](./crew-worker-records.md)

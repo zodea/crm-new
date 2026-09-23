@@ -77,6 +77,7 @@ function pageKey(r: { fullPath: string }) {
       <SidebarInset class="h-svh overflow-hidden">
         <AppTopbar />
         <ProductionOwnerBar />
+        <ProductionBackupBar />
         <AppTabBar />
         <TabRestoreStatus />
         <!-- 主区滚动容器；密集表格在各自区域内横向滚动。 -->

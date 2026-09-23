@@ -29,7 +29,7 @@ export default defineEventHandler((event) => {
   const ready = (event.method === 'GET' && (readyReads.test(path) || ['/api/production/status', '/api/production/backup/status'].includes(path)))
     || isProductionProjectRoute(event.method, path)
     || isProductionProcessLibraryRequest(event.method, path)
-    || (event.method === 'POST' && (['/api/commands/customers', '/api/commands/customer-resolve'].includes(path) || (readyWrites.test(path) && path.endsWith('/lifecycle'))))
+    || (event.method === 'POST' && (['/api/commands/customers', '/api/commands/customer-resolve', '/api/commands/production-backups'].includes(path) || (readyWrites.test(path) && path.endsWith('/lifecycle'))))
     || (event.method === 'PUT' && readyWrites.test(path) && !path.endsWith('/lifecycle'))
   if (!ready && !isProductionSupplierRoute(event.method, path))
     throw createError({ statusCode: 503, message: '此功能的正式保存尚未就绪，请返回已开放的资料页面；不会使用测试实例替代。' })

@@ -36,6 +36,7 @@ import {
   createHttpOwnerCommercialDocumentReadRepository,
 } from '~/lib/owner-document/central-http-repository'
 import { createPayrollRepository } from '~/lib/payroll/central-repository'
+import { createProductionBackupRepository } from '~/lib/production/backup-repository'
 import { createHttpProjectSupplierCommandRepository } from '~/lib/project-supplier/command-http-repository'
 import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
@@ -55,6 +56,7 @@ import { createTargetCostRepository } from '~/lib/target-cost/central-repository
 import { createWorkerRosterRepository } from '~/lib/worker-roster/repository'
 
 export interface DomainRepositories {
+  productionBackup: ReturnType<typeof createProductionBackupRepository>
   productionAccess: ReturnType<typeof createProductionAccessRepository>
   customerProduction: ReturnType<typeof createCustomerProductionRepository>
   projectProduction: ReturnType<typeof createProjectProductionRepository>
@@ -99,6 +101,7 @@ const repositoryFileFetch = $fetch as unknown as (url: string, options: { respon
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    productionBackup: createProductionBackupRepository((url, options) => repositoryFetch(url, { ...options, timeout: options ? 120_000 : 10_000, retry: 0 })),
     productionAccess: createProductionAccessRepository((url, options) => repositoryFetch(url, { ...options, timeout: 10_000, retry: 0 })),
     customerProduction: createCustomerProductionRepository((url, options) => repositoryFetch(url, options), url => repositoryFileFetch(url, { responseType: 'blob' })),
     projectProduction: createProjectProductionRepository((url, options) => repositoryFetch(url, options), url => repositoryFileFetch(url, { responseType: 'blob' })),

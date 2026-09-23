@@ -1,13 +1,15 @@
+import { PRODUCTION_BACKUP_SCHEMA, PRODUCTION_BACKUP_TABLES } from './production-backup-schema'
 import { PRODUCTION_PROCESS_LIBRARY_SCHEMA, PRODUCTION_PROCESS_LIBRARY_TABLES } from './production-process-library-schema'
 import { PRODUCTION_PROJECT_SCHEMA, PRODUCTION_PROJECT_TABLES } from './production-project-schema'
 import { PRODUCTION_SUPPLIER_SCHEMA, PRODUCTION_SUPPLIER_TABLES } from './production-supplier-schema'
 
-export const PRODUCTION_STORAGE_VERSION = 4
+export const PRODUCTION_STORAGE_VERSION = 5
 /** Append a new numbered upgrade when a domain lands; never rewrite an applied step. */
 export const PRODUCTION_STORAGE_UPGRADES = [
   { from: 1, to: 2, sql: PRODUCTION_PROCESS_LIBRARY_SCHEMA, participants: { 'process-library': { schemaVersion: 1, tables: PRODUCTION_PROCESS_LIBRARY_TABLES } } },
   { from: 2, to: 3, sql: PRODUCTION_PROJECT_SCHEMA, participants: { project: { schemaVersion: 1, tables: PRODUCTION_PROJECT_TABLES } } },
   { from: 3, to: 4, sql: PRODUCTION_SUPPLIER_SCHEMA, participants: { supplier: { schemaVersion: 1, tables: PRODUCTION_SUPPLIER_TABLES } } },
+  { from: 4, to: 5, sql: PRODUCTION_BACKUP_SCHEMA, participants: { backup: { schemaVersion: 1, tables: PRODUCTION_BACKUP_TABLES } } },
 ] as const
 
 export function productionStorageManifest(version = PRODUCTION_STORAGE_VERSION) {
