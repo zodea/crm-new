@@ -103,7 +103,7 @@ describe('分供方中央 stores', () => {
       .mockResolvedValueOnce({ draft: { id: 'imported-supplier', name: '另一家导入供方' }, attachments: [], version: '2', updatedAt: '2026-09-08T01:00:00.000Z' })
     repositories.supplierCommands.execute
       .mockRejectedValueOnce(new SupplierRepositoryProblem(supplierProblem('unavailable', '保存响应丢失', true)))
-      .mockResolvedValueOnce({ id: 'editing-supplier', version: '4', updatedAt: '2026-09-08T02:00:00.000Z', attachmentIds: [] })
+      .mockImplementationOnce(async request => ({ id: 'editing-supplier', commandId: request.commandId, version: '4', updatedAt: '2026-09-08T02:00:00.000Z', attachmentIds: [] }))
     repositories.supplierCommands.importRow.mockResolvedValue({ id: 'imported-supplier', version: '2', updatedAt: '2026-09-08T01:00:00.000Z', attachmentIds: [] })
     const store = useSupplierCommandStore()
     const session = store.createSession()
