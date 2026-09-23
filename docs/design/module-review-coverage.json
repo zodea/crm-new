@@ -99,10 +99,10 @@
     ]
   },
   "counts": {
-    "productionRoutes": 158,
-    "rootVariants": 214,
-    "surfaces": 760,
-    "environmentCases": 1233,
+    "productionRoutes": 159,
+    "rootVariants": 215,
+    "surfaces": 761,
+    "environmentCases": 1235,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -113,6 +113,21 @@
     "app/pages/dev/kit-ui.vue"
   ],
   "adapterProfiles": {
+    "payroll-workbook-browser": {
+      "read": "中央不可变工资目录与保存时点收付；私密名册及原件独立重新授权读取",
+      "write": "显式范围和名册版本保存目录、原键恢复；不发工资、不占号、不复制私密正文到公开目录",
+      "storage": "中央验证实例与现代完整图受控迁入；生产持久化另由 #467 验收",
+      "sources": [
+        {
+          "path": "app/lib/payroll/workbook-repository.ts",
+          "anchor": "createPayrollWorkbookRepository"
+        },
+        {
+          "path": "server/utils/payroll-workbook-service.ts",
+          "anchor": "createPayrollWorkbookService"
+        }
+      ]
+    },
     "payroll-numbering-browser": {
       "read": "中央已证 A/C1/C2 原工资、项目序列与正式出具元数据",
       "write": "项目起点登记与首次正式出具；原键恢复、同原单保持原号",
@@ -1534,7 +1549,7 @@
       "issues": [
         412
       ],
-      "surfaces": 216
+      "surfaces": 217
     },
     {
       "code": "schedule-target-cost",
@@ -4317,6 +4332,35 @@
         412
       ],
       "routeEvidenceId": "E-21018885146D"
+    },
+    {
+      "id": "S-A1F817112D68",
+      "route": "/subcontract/payroll/workbooks",
+      "routePattern": "/subcontract/payroll/workbooks",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.workbooks",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "page",
+      "label": "整页表单",
+      "type": "page",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/workbooks.vue",
+          "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-9591391B9C98"
     },
     {
       "id": "S-3B2FC2B7D052",
@@ -30753,6 +30797,54 @@
       "reference": {
         "status": "not-observed",
         "routeEvidenceId": "E-21018885146D",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-2653E72B6589",
+      "surfaceId": "S-A1F817112D68",
+      "host": "browser",
+      "adapter": "payroll-workbook-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-9591391B9C98",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-ACD01659545B",
+      "surfaceId": "S-A1F817112D68",
+      "host": "tauri",
+      "adapter": "unsupported",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-9591391B9C98",
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {

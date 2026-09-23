@@ -6,6 +6,7 @@ import { PAYROLL_A_CONFIG_PATH, PAYROLL_SOURCE_KEYS, payrollSourceContext } from
 import { PAYROLL_C1_SOURCE_KEYS, payrollC1SourceContext } from '~/lib/payroll/c1-navigation'
 import { PAYROLL_C2_SOURCE_KEYS, payrollC2SourceContext } from '~/lib/payroll/c2-navigation'
 import { PAYROLL_READ_QUERY_KEYS, payrollViewScope } from '~/lib/payroll/central-navigation'
+import { payrollWorkbookReturn } from '~/lib/payroll/workbook-navigation'
 import { isQuantitySourceIdentity } from '~/lib/quantity/migration-identity'
 import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { SCHEDULE_DRILL_QUERY_KEYS } from '~/lib/schedule/navigation'
@@ -15,6 +16,7 @@ import { rosterId } from '~/lib/worker-roster/validation'
 import { TAB_TARGET_VERSION } from './restoration-contract'
 import { readRestoredDetail } from './restore-detail'
 import { readRestoredPayrollNumbering } from './restore-payroll-numbering'
+import { readRestoredPayrollWorkbook } from './restore-payroll-workbook'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
 import { readRestoredWorkerRoster } from './restore-worker-roster'
 
@@ -44,6 +46,7 @@ const LISTS: Record<string, [string, string?]> = {
   '/subcontract/payroll': ['工资台账', 'payroll:read'],
   '/subcontract/payroll/sources': ['工资来源', 'payroll:read'],
   '/subcontract/payroll/payments': ['工资实际收付', 'payroll:read'],
+  '/subcontract/payroll/workbooks': ['完整工资工作簿', 'payroll:read'],
   '/subcontract/payroll/roster': ['工资实名名册归档', 'worker:sensitive:read'],
   '/subcontract/attendance': ['考勤管理', 'payroll:read'],
   '/subcontract/daywork': ['签工管理', 'payroll:read'],
@@ -168,8 +171,21 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
         return null
       allowed.clear()
       allowed.add('origin')
-      if (!detail)
+      if (!detail) {
         allowed.add('project')
+        allowed.add('returnTo')
+        const statements = url.searchParams.getAll('statement')
+        if (statements.length > 1000 || !statements.every(rosterId))
+          return null
+        allowed.add('statement')
+      }
+    }
+    if (url.pathname === '/subcontract/payroll/workbooks') {
+      if (!payrollWorkbookReturn(`${url.pathname}${url.search}`))
+        return null
+      allowed.clear()
+      for (const key of ['origin', 'project', 'mode', 'subject', 'roster', 'archive'])
+        allowed.add(key)
     }
     if (detail?.family === 'quantity-hollow') {
       if (origin !== 'real' || ['ownerKind', 'ownerId'].some(key => url.searchParams.has(key)))
@@ -312,6 +328,16 @@ export function createTabRestoreValidator(options: { repositories: DomainReposit
       if (!isStableRouteIdentity(id) || parsed.url.searchParams.getAll('project').length !== 1)
         return restoreProblem('mismatch')
       parsed.detail = { family: 'schedule-project', id }
+    }
+    if (parsed.url.pathname === '/subcontract/payroll/workbooks') {
+      try {
+        return await readRestoredPayrollWorkbook(options.repositories, parsed.inspected.fullPath, parsed.url.searchParams.get('project'), parsed.url.searchParams.get('archive'), signal)
+      }
+      catch (cause) {
+        checkRestoreAbort(signal)
+        const code = (cause as { problem?: { code?: string } })?.problem?.code
+        return restoreProblem(code === 'forbidden' ? 'forbidden' : code === 'not-found' ? 'not-found' : 'error')
+      }
     }
     if (parsed.detail?.family === 'payroll-numbering' || parsed.detail?.family === 'worker-private' || parsed.url.pathname === '/subcontract/payroll/roster') {
       try {

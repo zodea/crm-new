@@ -1,4 +1,5 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
+import type { PayrollAFeesSourceSnapshot } from '../../app/lib/payroll/central-a-fees-contract'
 import { createHash } from 'node:crypto'
 import { payrollACanonical } from '../../app/lib/payroll/central-a-calculation'
 import { encodePayrollAFeesWire, parsePayrollAFeesCommand } from '../../app/lib/payroll/central-a-fees-codec'
@@ -122,7 +123,9 @@ export function createPayrollFeesReferenceCollector() {
     if (!isPayrollAStatementSourceSnapshotV2(value))
       invalid()
     identity(value.book)
-    const fees = value.fees
+    feesSnapshot(value.fees)
+  }
+  function feesSnapshot(fees: PayrollAFeesSourceSnapshot) {
     if (fees.crewDefaults)
       identity(fees.crewDefaults)
     fees.feeRevisions.forEach(fee)
@@ -175,7 +178,7 @@ export function createPayrollFeesReferenceCollector() {
     if (table === 'payroll_a_management_ownership')
       proof(json(value.proof_json))
   }
-  return { refs, add, identity, scope, fee, negative, source, basis, row }
+  return { refs, add, identity, scope, fee, negative, source, feesSnapshot, basis, row }
 }
 
 export function payrollFeesReceiptReferences(value: Record<string, unknown>): Set<string> | null {

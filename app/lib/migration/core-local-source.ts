@@ -48,6 +48,7 @@ import { readProcessLibraryMigrationGraphs } from './process-library-source'
 import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes } from './supplier-credential-source'
 import { readBudgetVersionMigrationGraphs } from './target-cost-source'
 import { readWbsMigrationGraphs } from './wbs-source'
+import { readWorkerModernGraphs } from './worker-roster-modern-source'
 import { WORKER_ROSTER_SOURCE_SQL, workerRosterSourceAttributes } from './worker-roster-source'
 
 export interface CoreMigrationLocalSourceDependencies {
@@ -1264,6 +1265,15 @@ async function buildSource(
       sql = `SELECT ${['id', 'name', 'default_pay_ratio', 'deleted_at', ...fees].join(', ')} FROM crews ORDER BY id`
     }
     const rows = await selectSource<Record<string, unknown>>(sql)
+    if (entityType === 'workers') {
+      const modern = await readWorkerModernGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })
+      if ([...modern.keys()].some(id => !rows.some(row => row.id === id)))
+        throw new Error('工人现代实名图缺少所属原主档，不能静默丢失')
+      for (const row of rows) {
+        if (modern.has(String(row.id)))
+          row.worker_roster_graph_json = JSON.stringify(modern.get(String(row.id)))
+      }
+    }
     if (entityType === 'delivery_records') {
       assertDeliverySourceDiagnostics(await selectSource(DELIVERY_SOURCE_DIAGNOSTICS_SQL))
       return [entityType, await deliveryRecordSourceEntities(rows)] as const

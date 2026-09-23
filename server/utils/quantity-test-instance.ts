@@ -13,6 +13,7 @@ import type { ImportedWbsProject } from './wbs-migration'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
 import { createQuantityService } from '../../app/lib/quantity/central-service'
 import { applyPayrollMigration, assertPayrollMigrationRemoval, planPayrollMigration } from './payroll-migration'
+import { preparePayrollPublicationRemoval } from './payroll-publication-removal'
 import { createQuantityDatabase } from './quantity-database'
 import { assertQuantityHollowMigrationReferences } from './quantity-hollow-migration'
 import { applyQuantityMigration, planQuantityMigration } from './quantity-migration'
@@ -194,6 +195,7 @@ export function createQuantityTestInstance(options: Options) {
         const affectedProjects = [...new Set([...plan.affectedProjects, ...wbs.affectedProjects])]
         const prepared = affectedProjects.length || removedLibraryIds.size || budget.incoming.length || budget.removed.length || payroll.incoming.length || payroll.removed.length || removedProjectIds.size || removedPeople.crews.size || removedPeople.workers.size || migrationPeople.workers.size
           ? await (await state.driver()).prepare(async (candidate) => {
+              await preparePayrollPublicationRemoval(candidate, payroll, { projects: removedProjectIds, ...removedPeople, quantity: plan.removed.flatMap(row => row.identities) })
               await applyWorkerRosterMigration(candidate, scope, { projects: removedProjectIds, workers: removedPeople.workers, statements: new Set(payroll.removed.flatMap(row => row.mappings.filter(mapping => mapping.tableName === 'wage_statements' && mapping.centralId).map(mapping => mapping.centralId!))) })
               await assertPayrollMigrationRemoval(candidate, payroll, { projects: removedProjectIds, ...removedPeople, quantity: plan.removed.flatMap(row => row.identities) })
               await assertQuantityHollowMigrationReferences(candidate, { entityIds: plan.removed.map(row => row.entityId), projects: [...removedProjectIds], crews: [...removedPeople.crews], workers: [...removedPeople.workers], quantity: plan.removed.flatMap(row => row.identities) })
