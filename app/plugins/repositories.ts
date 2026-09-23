@@ -50,6 +50,7 @@ import { createHttpSubcontractContractReadRepository } from '~/lib/subcontract-c
 import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http-repository'
 import { createSupplierCredentialRepository } from '~/lib/supplier/credential-repository'
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
+import { createSupplierProductionRepository } from '~/lib/supplier/production-repository'
 import { createTargetCostRepository } from '~/lib/target-cost/central-repository'
 import { createWorkerRosterRepository } from '~/lib/worker-roster/repository'
 
@@ -63,6 +64,7 @@ export interface DomainRepositories {
   boqBuilding: ReturnType<typeof createBoqBuildingRepository>
   schedule: ReturnType<typeof createScheduleRepository>
   supplierCredentials: ReturnType<typeof createSupplierCredentialRepository>
+  supplierProduction: ReturnType<typeof createSupplierProductionRepository>
   processLibraries: ReturnType<typeof createProcessLibraryRepository>
   quantity: ReturnType<typeof createQuantityRepository>
   deliveries: ReturnType<typeof createDeliveryRepository>
@@ -112,6 +114,7 @@ export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
     receipts: createReceiptRepository((url, options) => repositoryFetch(url, options)),
     otherSettlements: createOtherSettlementRepository((url, options) => repositoryFetch(url, options)),
     auxiliaryContracts: createAuxiliaryContractRepository((url, options) => repositoryFetch(url, options)),
+    supplierProduction: createSupplierProductionRepository((url, options) => repositoryFetch(url, options)),
     customerRead: createHttpCustomerReadRepository({
       fetcher: (url, options) => repositoryFetch(url, options),
     }),

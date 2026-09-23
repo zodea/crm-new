@@ -607,6 +607,7 @@ async function handleFooterAction(action: FormFooterAction) {
     }
     else if (cause instanceof SupplierCommandConflictError) {
       conflictLatest.value = cause.latest
+      customerAlreadyApplied.value = cause.alreadyApplied
       warning(cause.message)
     }
     else if (cause instanceof CrewWorkerCommandConflictError) {
@@ -862,7 +863,7 @@ watch(routeSupplierCategory, () => {
       class="border border-warn/35 bg-warn/8 px-3 py-2 text-12px leading-5 text-ink-soft"
       role="status"
     >
-      <b class="text-warn">{{ storesOriginals ? '提交核对' : '本地草稿' }}</b>
+      <b class="text-warn">{{ customerStoresOriginals || supplierSession?.persistent ? '提交核对' : '本地草稿' }}</b>
       · {{ localDraftNotice }}
     </section>
 

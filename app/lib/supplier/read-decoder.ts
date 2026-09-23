@@ -28,6 +28,10 @@ function strings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(item => typeof item === 'string')
 }
 
+function unavailableSources(value: unknown): boolean {
+  return value === undefined || (strings(value) && new Set(value).size === value.length && value.every(source => ['projects', 'contracts', 'settlements', 'invoices', 'payments'].includes(source)))
+}
+
 function money(value: unknown): value is string {
   return typeof value === 'string' && /^-?(?:0|[1-9]\d*)\.\d{2}$/.test(value)
 }
@@ -126,11 +130,11 @@ function listItem(value: unknown): boolean {
   }
   return navigation(value.navigation, value.supplier, { filters: { dataOrigin: value.dataOrigin } })
     && strings(value.aliases)
-    && ['taxNo', 'uniqueCode', 'supplierCategory', 'credentialStatus', 'contact', 'contactPhone', 'paymentAmount', 'updatedAt']
+    && ['taxNo', 'uniqueCode', 'supplierCategory', 'credentialStatus', 'contact', 'contactPhone', 'updatedAt']
       .every(field => typeof value[field] === 'string')
-      && nullableMoney(value.contractAmount) && money(value.paymentAmount)
+      && nullableMoney(value.contractAmount) && nullableMoney(value.paymentAmount)
       && isISODateTimeDTO(value.updatedAt)
-      && Number.isSafeInteger(value.projectCount) && Number(value.projectCount) >= 0
+      && (value.projectCount === null || (Number.isSafeInteger(value.projectCount) && Number(value.projectCount) >= 0))
       && ['address', 'taxpayerType', 'mainBusiness', 'laborScope', 'bank', 'bankAccount', 'businessType'].every(field => value[field] === undefined || typeof value[field] === 'string')
       && (value.cumulativeContractAmount === undefined || nullableMoney(value.cumulativeContractAmount))
       && (value.settlementAmount === undefined || value.settlementAmount === null || money(value.settlementAmount))
@@ -153,7 +157,7 @@ function summaryCount(value: unknown): boolean {
 
 function originSummary(value: unknown): boolean {
   return object(value) && Number.isSafeInteger(value.supplierCount) && Number(value.supplierCount) >= 0
-    && nullableMoney(value.contractAmount) && money(value.paymentAmount)
+    && nullableMoney(value.contractAmount) && nullableMoney(value.paymentAmount)
 }
 
 function invalid(message: string): never {
@@ -161,7 +165,7 @@ function invalid(message: string): never {
 }
 
 export function decodeSupplierListPage(value: unknown): SupplierListPageDTO {
-  if (!pageBase(value) || !Array.isArray(value.items) || !value.items.every(listItem)
+  if (!pageBase(value) || !unavailableSources(value.unavailableSources) || !Array.isArray(value.items) || !value.items.every(listItem)
     || !object(value.summary)
     || !Array.isArray(value.summary.categories) || !value.summary.categories.every(summaryCount)
     || !Array.isArray(value.summary.credentialStatuses) || !value.summary.credentialStatuses.every(summaryCount)
@@ -277,14 +281,14 @@ function payment(value: unknown, origin: unknown): boolean {
 export function decodeSupplierDetailRead(value: unknown): SupplierDetailReadDTO {
   const supplierId = object(value) && object(value.supplier) && typeof value.supplier.id === 'string' ? value.supplier.id : null
   const summary = object(value) && object(value.summary) ? value.summary : null
-  if (!object(value) || !supplierId || !isDataOriginDTO(value.dataOrigin) || !supplier(value.supplier, value.dataOrigin)
+  if (!object(value) || !unavailableSources(value.unavailableSources) || !supplierId || !isDataOriginDTO(value.dataOrigin) || !supplier(value.supplier, value.dataOrigin)
     || !Array.isArray(value.projects) || !value.projects.every(item => project(item, value.dataOrigin, supplierId))
     || !Array.isArray(value.contracts) || !value.contracts.every(item => contract(item, value.dataOrigin))
     || !Array.isArray(value.settlements) || !value.settlements.every(item => settlement(item, value.dataOrigin))
     || !Array.isArray(value.invoices) || !value.invoices.every(item => invoice(item, value.dataOrigin))
     || !Array.isArray(value.payments) || !value.payments.every(item => payment(item, value.dataOrigin))
     || !summary || !['projectCount', 'contractCount', 'settlementCount', 'invoiceCount', 'paymentCount']
-    .every(field => Number.isSafeInteger(summary[field]) && Number(summary[field]) >= 0)
+    .every(field => summary[field] === null || (Number.isSafeInteger(summary[field]) && Number(summary[field]) >= 0))
     || !['contractAmount', 'settlementAmount', 'invoiceAmount', 'paymentAmount', 'payableAmount']
       .every(field => metric(summary[field], supplierId))
       || !isISODateTimeDTO(value.asOf) || (value.sourceVersion !== null && typeof value.sourceVersion !== 'string')

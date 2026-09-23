@@ -10,7 +10,7 @@ import type {
 } from '../../app/lib/project-supplier/repository'
 import type { SupplierListSourceRow, SupplierProjectRelationSourceRow, SupplierProjectSourceRow } from '../../app/lib/supplier/repository'
 import type { BusinessSession } from './business-session'
-import type { SupplierImportAdoptionTransaction } from './supplier-command-test-instance'
+import type { SupplierImportAdoptionTransaction } from './supplier-command-service'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { PROJECT_SUPPLIER_FILE_CATEGORIES, PROJECT_SUPPLIER_WRITE_CAPABILITY } from '../../app/lib/project-supplier/command-contract'

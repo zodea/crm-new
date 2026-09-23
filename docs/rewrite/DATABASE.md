@@ -36,8 +36,7 @@
 
 ## 共享正式存储版本与参与者（#463）
 
-
-schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`，v2→v3 加入 `project:1`，各自保留既有参与者。新域的 SQL 定义独立存放，按实际合入顺序追加连续升级；事务内先核旧清单，再执行新表、参与者与版本更新。缺域、未知域或领域版本不符明确停止，不能重新插入空参与者掩盖问题。`productionStorageManifest(version)` 是备份代码消费的同一登记表，列出公共元数据表与逐域完整表名；维护它时必须同步本节。
+schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`，v2→v3 加入 `project:1`，v3→v4 加入 `supplier:1`，各自保留既有参与者。新域的 SQL 定义独立存放，按实际合入顺序追加连续升级；事务内先核旧清单，再执行新表、参与者与版本更新。缺域、未知域或领域版本不符明确停止，不能重新插入空参与者掩盖问题。`productionStorageManifest(version)` 是备份代码消费的同一登记表，列出公共元数据表与逐域完整表名；维护它时必须同步本节。
 
 | 工序库参与表 | 不可遗漏的事实 |
 | --- | --- |
@@ -49,6 +48,21 @@ schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`
 所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态由 #451 接续，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力。
 
 工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 的使用投影尚未接通，引用数量为未知。存量中央迁入与 WBS 生产接管不由此切片证明。验证见 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)。
+
+## PG-04 本机分供方持久参与者（#453）
+
+`supplier:1` 加入上述同一磁盘库和事务协调器；领域规则从开发实例抽出为事务内纯状态服务，`Map` 只承载本次从磁盘加载的候选，不能成为另一个正式数据源。
+
+| 参与表 | 不可遗漏的事实 |
+| --- | --- |
+| `supplier_revision` / `suppliers` | 稳定 ID、主档原字段及税务核验、证照状态、实体和来源版本、更新时间、迁移批次及是否由表格导入；非空税号和内部编码唯一 |
+| `supplier_credential_scopes` | 证照版本、完整迁移元数据及可空人工审核凭证；字段缺损或凭证无效拒绝，不能补空代替历史 |
+| `supplier_credentials` | 稳定证照 ID、分供方及原文件引用、有效期/删除历史、OCR 原始候选和人工确认分别保存 |
+| `supplier_credential_files` + `file_refs` / `file_payloads` | 分供方→证照→文件的稳定归属、迁移线索、字节与 SHA-256；文件元数据另保留原摘要，正文丢失不能变成合法缺件。公用原件 owner 为 `supplier_credential`，owner ID 为证照 ID |
+| `supplier_credential_requirements` / `supplier_credential_audits` / `supplier_audits` | 要求原因、资料更正/删除/撤回历史、主档及人工核验审计，保留可信操作者 |
+| `supplier_command_receipts` / `supplier_command_resolutions` | 原键、工作区/操作者、主档或证照动作类别、普通命令与导入各自指纹、原结果，以及明确未应用的封存键 |
+
+以上十张领域表与共享原件表构成完整备份参与者。原件正文只有一份，不能用元数据或旧路径冒充；读取核验字节长度、摘要及完整 owner 链。命令、事实、原件、审计、版本和原回执同事务提交。过期审核的自动撤销也属于持久变化，受同一业务写入门禁约束；门禁关闭时需要变更的读取明确失败并保持原记录。普通无变化读取不写业务表。
 
 > 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 
