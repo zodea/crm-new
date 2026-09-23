@@ -10,6 +10,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { buildCustomerDetailRead, buildCustomerListPage, customerProblem, parseCustomerDetailQuery, parseCustomerListQuery } from '../../app/lib/customer/repository'
 import { CUSTOMER_FIELDS, customerAttachment, customerDraft, customerListRow, customerFailure as fail, normalizedCustomer } from './production-customer-record'
 import { parseProductionCustomerRequest, productionCustomerId } from './production-customer-request'
+import { productionCustomerProjects } from './production-project-relations'
 
 export type ProductionSession = () => BusinessSession
 export const CUSTOMER_ORIGINAL_MAX_BYTES = 10 * 1024 * 1024
@@ -224,7 +225,10 @@ export function createProductionCustomerService(storage: ProductionStorage) {
           fail('forbidden', '正式磁盘客户不接受测试来源。')
         const row = await stored(tx, id)
         const notReady = customerProblem('unavailable', '关联领域尚未接入正式持久化，不能把未读取显示为零。')
-        return buildCustomerDetailRead({ customers: [customerListRow(row)], projects: [], contracts: [], receipts: [], query, projectsProblem: notReady, contractsProblem: notReady, receiptsProblem: notReady, asOf: row.updated_at, sourceVersion: `production-customer:${row.version}`, capabilities: [...actor.capabilities] })
+        const projects = actor.capabilities.includes('project:list:read') ? await productionCustomerProjects(tx) : null
+        const projectsProblem = projects === null ? actor.capabilities.includes('project:list:read') ? notReady : customerProblem('forbidden', '当前会话没有项目读取权限。') : undefined
+        const projectRevision = projects === null ? null : (await tx.select<{ revision: number }>('SELECT revision FROM project_revision'))[0]!.revision
+        return buildCustomerDetailRead({ customers: [customerListRow(row)], projects: projects ?? [], contracts: [], receipts: [], query, ...(projectsProblem ? { projectsProblem } : {}), contractsProblem: notReady, receiptsProblem: notReady, asOf: new Date().toISOString(), sourceVersion: `production-customer:${row.version}:project:${projectRevision ?? 'unavailable'}`, capabilities: [...actor.capabilities] })
       })
     },
     file(customerId: string, fileId: string, session: ProductionSession) {

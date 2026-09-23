@@ -16,6 +16,8 @@ import {
   saveProjectLocalDraft,
 } from '~/lib/project/local-draft'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
+import { useProductionAccessStore } from '~/stores/production-access'
+import { useProjectPersistentCommandStore } from '~/stores/project-persistent-command'
 
 export interface HydratedProjectCommandForm {
   draft: ProjectFormDraft | null
@@ -24,6 +26,7 @@ export interface HydratedProjectCommandForm {
   pendingRemoveIds: string[]
   pendingRestoreIds: string[]
   restoredLocalDraft: ProjectLocalDraft | null
+  productionNotice?: string
 }
 
 export class ProjectCommandConflictError extends Error {
@@ -44,8 +47,10 @@ export class ProjectLocalDraftOnlyError extends Error {
 }
 
 export const useProjectCommandStore = defineStore('project-command', () => {
+  const persistent = useProjectPersistentCommandStore()
+  const access = useProductionAccessStore()
   function createSession() {
-    return { targetProjectId: null as string | null, baseVersion: null as string | null, activeLocalDraft: null as ProjectLocalDraft | null }
+    return { targetProjectId: null as string | null, baseVersion: null as string | null, activeLocalDraft: null as ProjectLocalDraft | null, storesOriginals: false, persistent: persistent.createSession() }
   }
   type CommandSession = ReturnType<typeof createSession>
 
@@ -72,6 +77,9 @@ export const useProjectCommandStore = defineStore('project-command', () => {
   }
 
   async function hydrate(session: CommandSession, id: string | null): Promise<HydratedProjectCommandForm> {
+    session.storesOriginals = access.status?.mode === 'production'
+    if (session.storesOriginals)
+      return persistent.hydrate(session.persistent, id)
     session.targetProjectId = id
     const local = loadProjectLocalDraft(id)
     session.activeLocalDraft = local
@@ -107,6 +115,10 @@ export const useProjectCommandStore = defineStore('project-command', () => {
   }
 
   function startNewProject(session: CommandSession): void {
+    if (session.storesOriginals) {
+      persistent.startNewProject(session.persistent)
+      return
+    }
     if (session.activeLocalDraft)
       clearProjectLocalDraft(session.activeLocalDraft.draftId)
     session.targetProjectId = null
@@ -115,6 +127,10 @@ export const useProjectCommandStore = defineStore('project-command', () => {
   }
 
   function rebase(session: CommandSession, version: string): void {
+    if (session.storesOriginals) {
+      persistent.rebase(session.persistent, version)
+      return
+    }
     session.baseVersion = version
     if (session.activeLocalDraft) {
       session.activeLocalDraft = saveProjectLocalDraft({
@@ -126,6 +142,10 @@ export const useProjectCommandStore = defineStore('project-command', () => {
   }
 
   function acceptLatest(session: CommandSession, latest: ProjectFormReadDTO): void {
+    if (session.storesOriginals) {
+      persistent.acceptLatest(session.persistent, latest)
+      return
+    }
     if (session.activeLocalDraft)
       clearProjectLocalDraft(session.activeLocalDraft.draftId)
     session.activeLocalDraft = null
@@ -133,6 +153,13 @@ export const useProjectCommandStore = defineStore('project-command', () => {
   }
 
   async function saveForm(session: CommandSession, draft: ProjectFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
+    if (access.status?.mode === 'production' && !session.storesOriginals)
+      throw new Error('请先重新读取正式项目表单，再保存资料。')
+    if (session.storesOriginals) {
+      const result = await persistent.saveForm(session.persistent, draft, action, attachments)
+      latestWrite.value = { id: result.id, version: session.persistent.baseVersion! }
+      return result
+    }
     const id = session.targetProjectId ?? draft.id ?? null
     const local = saveProjectLocalDraft({
       targetProjectId: id,
@@ -180,6 +207,11 @@ export const useProjectCommandStore = defineStore('project-command', () => {
   }
 
   return {
+    recordLifecycleWrite(current: { id: string, version: string }) {
+      latestWrite.value = { id: current.id, version: current.version }
+    },
+    pendingForms: persistent.pendingForms,
+    downloadOriginal: persistent.downloadOriginal,
     prepareImportRow,
     validateImportRow,
     importRow,

@@ -139,7 +139,7 @@ describe('完整工资工作簿与按月归档', () => {
     const second = { ...payrollUiDocument(), id: 'a-second', month: '2026-09', cumulativeAmount: 1600, previouslyPaid: 800, grossAmount: 800, actualAmount: 700 }
     const output = createPayrollCompleteWorkbook({ key: 'leader', label: '项目-负责人-A普通簿', entries: [{ row: row(first, { book: { bookPurpose: 'ordinary', managementBookId: null } }), document: first }, { row: row(second, { book: { bookPurpose: 'ordinary', managementBookId: null } }), document: second }], actualLedger: ledger(['a-first', 'a-second'], 1500) })
     const book = XLSX.read(output.data, { type: 'array' })
-    expect(XLSX.utils.sheet_to_json(book.Sheets.周期对账!)).toEqual([expect.objectContaining({ 公式应付: 1600, 净实际: 1500, 差额: 100, 正式编号: expect.stringContaining('待业务裁定') })])
+    expect(XLSX.utils.sheet_to_json(book.Sheets.周期对账!)).toEqual([expect.objectContaining({ 公式应付: 1600, 净实际: 1500, 差额: 100, 正式编号: expect.stringContaining('未正式出具') })])
     expect(XLSX.utils.sheet_to_json(book.Sheets.目录!)).toHaveLength(2)
     expect(book.SheetNames.filter(name => name.includes('发放汇总'))).toHaveLength(2)
   })
@@ -152,7 +152,7 @@ describe('完整工资工作簿与按月归档', () => {
       { key: '2026-09', label: '真实项目-2026-09', entries: [{ row: row(c2), document: c2 }], actualLedger: ledger(['c2'], c2.actualAmount) },
     ], [{ statementId: 'missing', month: '2026-09', formatFamily: 'A', reason: '旧工资缺冻结正文' }])
     const files = zipEntries(output.data as Uint8Array)
-    expect(files.map(file => file.name)).toEqual(['00-归档说明.md', '2026-08/真实项目-2026-08-完整工资工作簿-编号待定.xlsx', '2026-09/真实项目-2026-09-部分工资工作簿-编号待定.xlsx'])
+    expect(files.map(file => file.name)).toEqual(['00-归档说明.md', '2026-08/真实项目-2026-08-完整工资工作簿-未正式出具.xlsx', '2026-09/真实项目-2026-09-部分工资工作簿-未正式出具.xlsx'])
     const august = XLSX.read(files[1]!.data, { type: 'array' })
     const september = XLSX.read(files[2]!.data, { type: 'array' })
     expect(august.SheetNames).toEqual(expect.arrayContaining(['01_C1_工资表', '01_C1_考勤表']))
@@ -161,4 +161,24 @@ describe('完整工资工作簿与按月归档', () => {
     expect(XLSX.utils.sheet_to_json(september.Sheets.月度对账!)).toEqual([expect.objectContaining({ 输出完整性: '部分（存在冻结工资缺口）', 公式口径: '所选范围存在冻结工资缺口，公式合计不可判定', 对账结论: '不可判定' })])
     expect(new TextDecoder().decode(files[0]!.data)).toContain('实名名册及证件原件')
   })
+})
+
+it('正式目录沿原单编号与固定名册引用输出，照片缺口不抹去已知工资公式', () => {
+  const document = { ...payrollUiDocument(), id: 'issued-a', cumulativeAmount: 1600, grossAmount: 800, actualAmount: 700 }
+  const group = { key: 'leader', label: '真实项目-负责人', entries: [{ row: row(document), document }], actualLedger: ledger([document.id], 1500) }
+  const publication = {
+    id: 'workbook-archive-1',
+    version: 1,
+    createdAt: '2026-09-22T12:00:00Z',
+    manifestHash: 'a'.repeat(64),
+    issues: [{ id: 'official-1', projectId: document.projectId, statementId: document.id, formatFamily: 'A' as const, number: '1001', documentHash: 'b'.repeat(64), issuedAt: '2026-09-22T11:00:00Z', operatorId: 'actor', commandId: 'issue-command' }],
+    rosterRef: { id: 'roster-1', version: 2, registeredOn: '2026-09-22', sourceVersion: 'roster-v2', contentHash: 'c'.repeat(64) },
+    deliveryGaps: [{ kind: 'roster' as const, statementId: null, reason: '一位工人缺少银行卡照片' }],
+  }
+  const output = createPayrollCompleteWorkbook(group, [], publication)
+  const book = XLSX.read(output.data, { type: 'array' })
+  expect(XLSX.utils.sheet_to_json(book.Sheets.目录!)).toEqual([expect.objectContaining({ 稳定工资身份: 'issued-a', 正式编号: '1001', 名册归档身份: 'roster-1', 名册版本: 2, 原件摘要: 'b'.repeat(64) })])
+  expect(XLSX.utils.sheet_to_json(book.Sheets.周期对账!)).toEqual([expect.objectContaining({ 公式应付: 1600, 净实际: 1500, 差额: 100, 输出完整性: '部分（存在交付缺口）', 保存时点: publication.createdAt })])
+  expect(XLSX.utils.sheet_to_json(book.Sheets.交付缺口!)).toEqual([expect.objectContaining({ 缺口: '一位工人缺少银行卡照片' })])
+  expect(output.defaultName).not.toMatch(/编号待定|待业务裁定/)
 })

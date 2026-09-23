@@ -1,0 +1,64 @@
+{
+  "projectId": "core-projects-d38336a3c8d2ac4453df6387",
+  "snapshotSha256": "83a06716aaff4e3fb45ebf9d23bf9e7aa23378841dbbbff0c554f6b60facd437",
+  "byteLength": 3186688,
+  "batchId": "core-batch-6a4823f0bd449b63ee8975c7",
+  "proof": [
+    {
+      "mode": "leader-cycle",
+      "originalId": "payroll-workbook-58209054-dffc-4021-97c3-abf1d76bab08",
+      "mappedId": "publication-import-f0f86626a255c3a786149d41882895640ff27343c5b88194750647fdd525e81f",
+      "manifestHash": "b009709209bcf36fc66a958de3f694c2065f5cce29af86e800feac26ef71b533",
+      "rosterRef": {
+        "contentHash": "136d3408cbc7af6a8e374b92cca999e1abb4f1aa471933dd71a4d3eedb456ae8",
+        "id": "publication-import-52f3736c91edc3329aa7afee51f189dcd8dff5cef4a9389cd5b5bf658dbaba5b",
+        "registeredOn": "2026-09-22",
+        "sourceVersion": "9166023385cb99aa53b266c72716a4bff41a03a450ebfd691aff6d61f36767b7",
+        "version": 1
+      },
+      "formalNumbers": [
+        "128",
+        "129"
+      ],
+      "zipSha256": "6fc581f148fd9ae9e5615e0864bc9cd003702574a6ee77dc99437322f60b0f6a",
+      "files": [
+        "00-保存目录.json",
+        "01-名册归档说明.md",
+        "01-实名名册.xlsx",
+        "01-私密附件目录.json",
+        "C1 无工程量验收 c9d911c4-4dc9-404c-84a7-67d5a23e-部分工资工作簿-b009709209bcf36fc66a958de3f694c2065f5cce29af86e800feac26ef71b533.xlsx",
+        "photos/member-1/photo-1.png",
+        "photos/member-1/photo-2.png"
+      ]
+    },
+    {
+      "mode": "project-month",
+      "originalId": "payroll-workbook-f360c1a9-8e8a-41fa-bc42-50c1a1e57065",
+      "mappedId": "publication-import-fa3785aeaa2a018d518abc8af95498c9a7e099a4d45b9ed49847aac0101b565a",
+      "manifestHash": "6037d132b57ce03a0fa7c7d5bb0790a1e89d97669efcd58bbfb376d4459ce293",
+      "rosterRef": {
+        "contentHash": "136d3408cbc7af6a8e374b92cca999e1abb4f1aa471933dd71a4d3eedb456ae8",
+        "id": "publication-import-52f3736c91edc3329aa7afee51f189dcd8dff5cef4a9389cd5b5bf658dbaba5b",
+        "registeredOn": "2026-09-22",
+        "sourceVersion": "9166023385cb99aa53b266c72716a4bff41a03a450ebfd691aff6d61f36767b7",
+        "version": 1
+      },
+      "formalNumbers": [
+        "128",
+        "129"
+      ],
+      "zipSha256": "ad04b445870cc3feb34b5d4a6696d4c26ab8ada7a86f20383a357b6105cf0c10",
+      "files": [
+        "00-保存目录.json",
+        "00-归档说明.md",
+        "01-名册归档说明.md",
+        "01-实名名册.xlsx",
+        "01-私密附件目录.json",
+        "2026-08/2026-08-部分工资工作簿-6037d132b57ce03a0fa7c7d5bb0790a1e89d97669efcd58bbfb376d4459ce293.xlsx",
+        "2026-09/2026-09-部分工资工作簿-6037d132b57ce03a0fa7c7d5bb0790a1e89d97669efcd58bbfb376d4459ce293.xlsx",
+        "photos/member-1/photo-1.png",
+        "photos/member-1/photo-2.png"
+      ]
+    }
+  ]
+}

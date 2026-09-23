@@ -7,6 +7,7 @@ import type { PayrollCentralMigrationGraph, PayrollCentralMigrationTable } from 
 import type { PayrollFeesMigrationGraph } from './payroll-fees-source'
 import type { PayrollHollowMigrationGraph } from './payroll-hollow-source'
 import type { PayrollNumberingMigrationGraph } from './payroll-numbering-source'
+import type { PayrollPublicationGraph } from './payroll-publication-source'
 import { PAYROLL_A_FEES_MIGRATION_TABLES, payrollAFeesPrimaryKey } from '../payroll/central-a-fees-schema'
 import { PAYROLL_HOLLOW_DEDUCTION_TABLES } from '../payroll/central-hollow-deduction-schema'
 import { PAYROLL_NUMBERING_TABLES } from '../payroll/central-numbering-schema'
@@ -18,6 +19,7 @@ import { parsePayrollFeesMigrationGraph, readPayrollFeesMigrationGraph } from '.
 import { parsePayrollHollowMigrationGraph, readPayrollHollowDeductionTables } from './payroll-hollow-source'
 import { parsePayrollNumberingMigrationGraph, readPayrollNumberingMigrationGraph } from './payroll-numbering-source'
 import { readPayrollProofPackages } from './payroll-proof-package'
+import { parsePayrollPublicationGraph, PAYROLL_PUBLICATION_TABLES, publicationRowProject, readPayrollPublicationGraph } from './payroll-publication-source'
 
 const identity = ['id', 'created_at', 'updated_at', 'deleted_at'] as const
 export const PAYROLL_MIGRATION_COLUMNS = {
@@ -34,7 +36,7 @@ export const PAYROLL_MIGRATION_COLUMNS = {
 export const PAYROLL_MIGRATION_TABLES = { configs: 'payroll_subject_configs', statements: 'wage_statements', lines: 'wage_statement_lines', members: 'wage_statement_members', allocations: 'wage_statement_allocations', attendance: 'attendance_records', daywork: 'signed_daywork_records', statementDaywork: 'wage_statement_daywork_records', logs: 'operation_logs' } as const
 export type PayrollMigrationPart = keyof typeof PAYROLL_MIGRATION_TABLES
 export type PayrollMigrationRow = Record<string, string | number | null>
-export type PayrollProjectGraph = { schemaVersion: 1 | 2 | 3 | 4 | 5, projectId: string, central?: PayrollCentralMigrationGraph, fees?: PayrollFeesMigrationGraph, deductions?: PayrollHollowMigrationGraph, numbering?: PayrollNumberingMigrationGraph } & Record<PayrollMigrationPart, PayrollMigrationRow[]>
+export type PayrollProjectGraph = { schemaVersion: 1 | 2 | 3 | 4 | 5 | 6, projectId: string, central?: PayrollCentralMigrationGraph, fees?: PayrollFeesMigrationGraph, deductions?: PayrollHollowMigrationGraph, numbering?: PayrollNumberingMigrationGraph, publication?: PayrollPublicationGraph } & Record<PayrollMigrationPart, PayrollMigrationRow[]>
 export const PAYROLL_MIGRATION_PARTS = Object.keys(PAYROLL_MIGRATION_TABLES) as PayrollMigrationPart[]
 const roots = ['configs', 'statements', 'attendance', 'daywork'] as const
 const children = ['lines', 'members', 'allocations', 'statementDaywork'] as const
@@ -54,11 +56,11 @@ export function payrollLogSnapshot(value: unknown): Record<string, unknown> | nu
 
 /** 仅校验可传输原图，不修正日期、空值、坏快照或不可证明历史。资格另作诊断。 */
 export function parsePayrollProjectGraph(value: unknown, legacyProjectId?: string): PayrollProjectGraph {
-  if (!object(value) || ![1, 2, 3, 4, 5].includes(Number(value.schemaVersion)) || typeof value.schemaVersion !== 'number' || typeof value.projectId !== 'string' || !value.projectId.trim()
-    || (legacyProjectId && value.projectId !== legacyProjectId) || Object.keys(value).some(key => !['schemaVersion', 'projectId', ...(Number(value.schemaVersion) >= 2 ? ['central'] : []), ...(Number(value.schemaVersion) >= 3 ? ['fees'] : []), ...(Number(value.schemaVersion) >= 4 ? ['deductions'] : []), ...(value.schemaVersion === 5 ? ['numbering'] : []), ...PAYROLL_MIGRATION_PARTS].includes(key))) {
+  if (!object(value) || ![1, 2, 3, 4, 5, 6].includes(Number(value.schemaVersion)) || typeof value.schemaVersion !== 'number' || typeof value.projectId !== 'string' || !value.projectId.trim()
+    || (legacyProjectId && value.projectId !== legacyProjectId) || Object.keys(value).some(key => !['schemaVersion', 'projectId', ...(Number(value.schemaVersion) >= 2 ? ['central'] : []), ...(Number(value.schemaVersion) >= 3 ? ['fees'] : []), ...(Number(value.schemaVersion) >= 4 ? ['deductions'] : []), ...(Number(value.schemaVersion) >= 5 ? ['numbering'] : []), ...(value.schemaVersion === 6 ? ['publication'] : []), ...PAYROLL_MIGRATION_PARTS].includes(key))) {
     invalid('完整项目图身份或结构无效')
   }
-  const graph = { schemaVersion: value.schemaVersion, projectId: value.projectId, ...(value.schemaVersion >= 2 ? { central: parsePayrollCentralMigrationGraph(value.central) } : {}), ...(value.schemaVersion >= 3 ? { fees: parsePayrollFeesMigrationGraph(value.fees) } : {}), ...(value.schemaVersion === 4 || (value.schemaVersion === 5 && Object.hasOwn(value, 'deductions')) ? { deductions: parsePayrollHollowMigrationGraph(value.deductions) } : {}), ...(value.schemaVersion === 5 ? { numbering: parsePayrollNumberingMigrationGraph(value.numbering) } : {}) } as PayrollProjectGraph
+  const graph = { schemaVersion: value.schemaVersion, projectId: value.projectId, ...(value.schemaVersion >= 2 ? { central: parsePayrollCentralMigrationGraph(value.central) } : {}), ...(value.schemaVersion >= 3 ? { fees: parsePayrollFeesMigrationGraph(value.fees) } : {}), ...(value.schemaVersion === 4 || (value.schemaVersion >= 5 && Object.hasOwn(value, 'deductions')) ? { deductions: parsePayrollHollowMigrationGraph(value.deductions) } : {}), ...(value.schemaVersion === 5 || (value.schemaVersion === 6 && Object.hasOwn(value, 'numbering')) ? { numbering: parsePayrollNumberingMigrationGraph(value.numbering) } : {}), ...(value.schemaVersion === 6 ? { publication: parsePayrollPublicationGraph(value.publication) } : {}) } as PayrollProjectGraph
   for (const part of PAYROLL_MIGRATION_PARTS) {
     const columns: readonly string[] = PAYROLL_MIGRATION_COLUMNS[part]
     const entries = value[part]
@@ -85,11 +87,18 @@ export function parsePayrollProjectGraph(value: unknown, legacyProjectId?: strin
     invalid('扣款原图或数量原件混入其他项目')
   if (graph.numbering && PAYROLL_NUMBERING_TABLES.some(table => graph.numbering!.tables[table].some(row => row.project_id !== graph.projectId)))
     invalid('编号原图混入其他项目')
+  if (graph.publication && PAYROLL_PUBLICATION_TABLES.some(table => graph.publication!.tables[table].some(row => publicationRowProject(table, row, graph.publication!) !== graph.projectId)))
+    invalid('目录名册原图缺少父关系或混入其他项目')
   return graph
 }
 
 /** 原行存在时以其归属为准；缺失行按最后可证明的快照归属，每个事件只接管一次。 */
 export function payrollLogProject(log: PayrollMigrationRow, graphs: readonly PayrollProjectGraph[]): string | null {
+  if (log.table_name === 'worker_roster_archives' || log.table_name === 'payroll_workbook_archives') {
+    const table = log.table_name
+    const owners = graphs.filter(graph => graph.publication?.tables[table].some(row => row.id === log.record_id))
+    return owners.length === 1 ? owners[0]!.projectId : null
+  }
   if (PAYROLL_NUMBERING_TABLES.includes(log.table_name as PayrollNumberingTable)) {
     const owners = graphs.filter(graph => graph.numbering?.tables[log.table_name as PayrollNumberingTable].some(row => row.id === log.record_id))
     if (owners.length)
@@ -162,6 +171,7 @@ export async function readPayrollProjectMigrationGraphs(db: Pick<SoftDb, 'select
   const central = await readPayrollCentralMigrationGraph(db)
   const fees = await readPayrollFeesMigrationGraph(db)
   const numbering = await readPayrollNumberingMigrationGraph(db)
+  const publication = await readPayrollPublicationGraph(db)
   const deductions = await readPayrollHollowDeductionTables(db)
   const proofPackages = deductions ? await readPayrollProofPackages(db) : new Map()
   if (deductions && (!fees || !central))
@@ -173,6 +183,11 @@ export async function readPayrollProjectMigrationGraphs(db: Pick<SoftDb, 'select
   if (numbering && PAYROLL_NUMBERING_TABLES.some(table => numbering.tables[table].length) && (!central || !fees))
     invalid('编号扩展缺少完整中央及费用原图')
   const projectIds = new Set(roots.flatMap(part => tables[part].map(row => String(row.project_id))))
+  if (publication) {
+    for (const table of ['worker_roster_archives', 'payroll_workbook_archives'] as const) {
+      for (const row of publication.tables[table]) projectIds.add(String(row.project_id))
+    }
+  }
   if (numbering) {
     for (const table of PAYROLL_NUMBERING_TABLES) {
       for (const row of numbering.tables[table]) projectIds.add(String(row.project_id))
@@ -216,6 +231,10 @@ export async function readPayrollProjectMigrationGraphs(db: Pick<SoftDb, 'select
     const projectDeductions = deductions ? parsePayrollHollowMigrationGraph({ schemaVersion: 1, tables: Object.fromEntries(PAYROLL_HOLLOW_DEDUCTION_TABLES.map(table => [table, deductions[table].filter(row => row.project_id === projectId)])), quantity: hollowGraphs?.get(projectId) ?? emptyQuantityHollowMigrationGraph(), ...(proofPackages.has(projectId) ? { proof: proofPackages.get(projectId) } : {}) }) : undefined
     const projectNumbering = numbering && PAYROLL_NUMBERING_TABLES.some(table => numbering.tables[table].some(row => row.project_id === projectId)) ? parsePayrollNumberingMigrationGraph({ schemaVersion: 1, tables: Object.fromEntries(PAYROLL_NUMBERING_TABLES.map(table => [table, numbering.tables[table].filter(row => row.project_id === projectId)])) }) : undefined
     const graph = { schemaVersion: projectNumbering ? 5 : projectDeductions ? 4 : projectFees ? 3 : projectCentral ? 2 : 1, projectId, logs: [], ...(projectCentral ? { central: projectCentral } : {}), ...(projectFees ? { fees: projectFees } : {}), ...(projectDeductions ? { deductions: projectDeductions } : {}), ...(projectNumbering ? { numbering: projectNumbering } : {}) } as unknown as PayrollProjectGraph
+    if (publication && PAYROLL_PUBLICATION_TABLES.some(table => publication.tables[table].some(row => publicationRowProject(table, row, publication) === projectId))) {
+      graph.schemaVersion = 6
+      graph.publication = parsePayrollPublicationGraph({ schemaVersion: 1, tables: Object.fromEntries(PAYROLL_PUBLICATION_TABLES.map(table => [table, publication.tables[table].filter(row => publicationRowProject(table, row, publication) === projectId)])), origins: publication.origins.filter(origin => publication.tables[origin.tableName].some(row => row.id === origin.recordId && row.project_id === projectId)) })
+    }
     for (const part of roots)
       graph[part] = tables[part].filter(row => row.project_id === projectId)
     for (const part of children)
@@ -224,7 +243,7 @@ export async function readPayrollProjectMigrationGraphs(db: Pick<SoftDb, 'select
   })
   for (const graph of graphs)
     graph.logs = tables.logs.filter(log => payrollLogProject(log, graphs) === graph.projectId)
-  const payrollLogs = tables.logs.filter(log => PAYROLL_MIGRATION_PARTS.some(part => part !== 'logs' && PAYROLL_MIGRATION_TABLES[part] === log.table_name) || PAYROLL_CENTRAL_MIGRATION_TABLES.includes(log.table_name as PayrollCentralMigrationTable) || PAYROLL_A_FEES_MIGRATION_TABLES.includes(log.table_name as PayrollAFeesMigrationTable) || PAYROLL_HOLLOW_DEDUCTION_TABLES.includes(log.table_name as PayrollHollowDeductionTable) || PAYROLL_NUMBERING_TABLES.includes(log.table_name as PayrollNumberingTable))
+  const payrollLogs = tables.logs.filter(log => ['worker_roster_archives', 'payroll_workbook_archives'].includes(String(log.table_name)) || PAYROLL_MIGRATION_PARTS.some(part => part !== 'logs' && PAYROLL_MIGRATION_TABLES[part] === log.table_name) || PAYROLL_CENTRAL_MIGRATION_TABLES.includes(log.table_name as PayrollCentralMigrationTable) || PAYROLL_A_FEES_MIGRATION_TABLES.includes(log.table_name as PayrollAFeesMigrationTable) || PAYROLL_HOLLOW_DEDUCTION_TABLES.includes(log.table_name as PayrollHollowDeductionTable) || PAYROLL_NUMBERING_TABLES.includes(log.table_name as PayrollNumberingTable))
   if (payrollLogs.some(log => !graphs.some(graph => graph.logs.some(row => row.id === log.id))))
     invalid('历史审计缺少可证明项目归属，已阻断读取，不能静默丢失')
   return graphs.map(graph => ({ legacyId: graph.projectId, name: projects.find(row => row.id === graph.projectId)!.name, references: { projectId: graph.projectId }, attributes: { payrollGraphJson: JSON.stringify(graph) } }))

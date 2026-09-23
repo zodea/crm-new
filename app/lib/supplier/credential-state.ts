@@ -1,7 +1,9 @@
 import type { DataOriginDTO } from '../../types/read-model'
 import type { SupplierCredentialAction, SupplierCredentialCommand, SupplierCredentialRepository, SupplierCredentialSnapshot } from './credential-contract'
+import type { SupplierProductionRepository } from './production-repository'
 import { computed, shallowReadonly, shallowRef } from 'vue'
 import { credentialProblem, SUPPLIER_CREDENTIAL_WRITE_CAPABILITY, SupplierCredentialNotAppliedProblem } from './credential-contract'
+import { clearSupplierPending, readSupplierPending, rememberSupplierPending, SUPPLIER_PERSISTENT_CAPABILITY, supplierPendingKey } from './pending'
 import { SupplierRepositoryProblem } from './read-contract'
 
 export interface SupplierCredentialTarget { supplierId: string, origin: DataOriginDTO, enabled: boolean }
@@ -16,7 +18,7 @@ export interface SupplierCredentialBaseline {
 }
 
 /** 每个 KeepAlive 页面独占请求序列和待恢复命令，避免同名分供方或页签间串档。 */
-export function createSupplierCredentialState(repository: SupplierCredentialRepository, targetFor: () => SupplierCredentialTarget, createId: () => string = () => crypto.randomUUID()) {
+export function createSupplierCredentialState(repository: SupplierCredentialRepository, targetFor: () => SupplierCredentialTarget, createId: () => string = () => crypto.randomUUID(), production?: SupplierProductionRepository) {
   const snapshot = shallowRef<SupplierCredentialSnapshot | null>(null)
   const loading = shallowRef(false)
   const saving = shallowRef(false)
@@ -24,6 +26,7 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
   const errorCode = shallowRef('')
   const conflict = shallowRef(false)
   const ready = shallowRef(false)
+  const recoveryNotice = shallowRef('')
   let generation = 0
   let controller: AbortController | null = null
   let lastTarget = ''
@@ -76,11 +79,35 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
     controller = request
     loading.value = true
     try {
-      const result = await repository.read(target.supplierId, target.origin, { signal: request.signal })
+      let result = await repository.read(target.supplierId, target.origin, { signal: request.signal })
       if (sequence !== generation || !matches(target) || request.signal.aborted)
         throw new DOMException('证照读取目标已变化', 'AbortError')
       if (result.supplierId !== target.supplierId || result.dataOrigin !== target.origin)
         throw credentialProblem('relationship-mismatch', '证照归属与当前分供方不匹配')
+      recoveryNotice.value = ''
+      if (result.dataOrigin === 'real' && result.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY)) {
+        const key = supplierPendingKey(result, `credential:${result.supplierId}`)
+        const commandId = readSupplierPending(key)
+        if (commandId) {
+          if (!production)
+            throw credentialProblem('unavailable', '原证照提交核对服务不可用，请保留编号。')
+          const resolved = await production.resolve(commandId)
+          if (resolved.result && (!('supplierId' in resolved.result) || 'verification' in resolved.result || resolved.result.supplierId !== result.supplierId))
+            throw credentialProblem('relationship-mismatch', '原证照回执与当前分供方不一致。')
+          const fresh = await repository.read(target.supplierId, target.origin, { signal: request.signal })
+          if (sequence !== generation || !matches(target) || request.signal.aborted)
+            throw new DOMException('证照恢复目标已变化', 'AbortError')
+          if (fresh.supplierId !== result.supplierId || fresh.dataOrigin !== 'real' || fresh.workspaceId !== result.workspaceId || fresh.actorId !== result.actorId || !fresh.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY))
+            throw credentialProblem('forbidden', '证照恢复期间身份或权限变化，请重新核对。')
+          clearSupplierPending(key, commandId)
+          for (const [pendingKey, command] of pending) {
+            if (command.commandId === commandId)
+              pending.delete(pendingKey)
+          }
+          result = fresh
+          recoveryNotice.value = resolved.outcome === 'applied' ? '已核对原证照提交：保存成功，现已重新读取原件与资料。' : '原证照提交没有保存，迟到请求已封存。请核对资料后重新操作。'
+        }
+      }
       snapshot.value = result
       ready.value = true
       return result
@@ -135,14 +162,39 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
         throw new DOMException('证照操作目标已变化，请返回原分供方查看结果', 'AbortError')
     }
     let acknowledged = false
+    const persistedKey = data.value.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY) ? supplierPendingKey(base, `credential:${base.supplierId}`) : ''
     try {
-      const result = await repository.execute(command)
+      const original = persistedKey ? readSupplierPending(persistedKey) : null
+      let result
+      if (original) {
+        if (!production)
+          throw credentialProblem('unavailable', '原证照提交核对服务不可用，请保留编号。')
+        const resolved = await production.resolve(original)
+        assertCurrent()
+        if (!resolved.result) {
+          clearSupplierPending(persistedKey, original)
+          throw new SupplierCredentialNotAppliedProblem(command.commandId, '原提交没有保存且已封存，请重新核对当前资料后操作。', 'conflict')
+        }
+        if (!('supplierId' in resolved.result) || 'verification' in resolved.result || resolved.result.supplierId !== target.supplierId || original !== command.commandId)
+          throw credentialProblem('conflict', '另一笔原证照提交待核对，请重新读取当前资料。')
+        result = resolved.result
+      }
+      else {
+        if (persistedKey)
+          rememberSupplierPending(persistedKey, command.commandId)
+        result = await repository.execute(command)
+      }
       acknowledged = true
       assertCurrent()
       const latest = await repository.read(target.supplierId, target.origin)
       assertCurrent()
       if (latest.supplierId !== target.supplierId || latest.dataOrigin !== target.origin)
         throw credentialProblem('relationship-mismatch', '证照回读归属不匹配')
+      if (persistedKey) {
+        if (latest.workspaceId !== base.workspaceId || latest.actorId !== base.actorId || !latest.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY))
+          throw credentialProblem('forbidden', '证照回读时身份或权限变化，请保留原提交编号。')
+        clearSupplierPending(persistedKey, command.commandId)
+      }
       snapshot.value = latest
       pending.delete(key)
       conflict.value = false
@@ -186,5 +238,5 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
       throw new DOMException('原件读取目标已变化', 'AbortError')
     return result
   }
-  return { data, loading: shallowReadonly(loading), saving: shallowReadonly(saving), error: shallowReadonly(error), errorCode: shallowReadonly(errorCode), conflict: shallowReadonly(conflict), canWrite, baseline, load, execute, recheck, file, cancelRead, hasPending }
+  return { data, loading: shallowReadonly(loading), saving: shallowReadonly(saving), error: shallowReadonly(error), errorCode: shallowReadonly(errorCode), conflict: shallowReadonly(conflict), recoveryNotice: shallowReadonly(recoveryNotice), canWrite, baseline, load, execute, recheck, file, cancelRead, hasPending }
 }

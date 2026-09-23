@@ -24,7 +24,7 @@ Nuxt 4 SPA
 
 - `nuxt.config.ts` 设置 `ssr: false`；当前生产目标、中央权威与桌面范围由 ADR 0020 裁定。
 - OCR 凭证只存在 Nitro runtime config，不进入 public config 或前端持久化。桌面静态构建不能假定 Nitro 永远可用，最终本地自托管/云端边界遵守 ADR 0006。
-- 项目列表与来源感知基础详情的 Nitro 实例已经实现默认 workspace/actor 会话、正式空来源、独立演示来源与 capability 校验；#294 的核心身份迁移会让已确认导入的项目进入正式项目读链。当前中央端仍是可重置测试实例，领域命令与迁移批次使用服务进程内的 Map 保存；完整登录/RBAC 与生产持久化业务库尚未接入。`dataOrigin='real'` 表示正式来源身份，不表示已经具备服务重启后的持久性；浏览器刷新读回只能证明当前服务实例内的命令与查询链。
+- 开发中央实例保留正式空来源、独立演示来源、默认 workspace/actor 和可重置验证数据；#294 核心身份迁移仍属于这条开发验证链。`dataOrigin='real'` 表示来源身份，不自动证明持久性。本机正式模式沿 ADR 0021 使用可信单人会话和同一磁盘 SQLite，客户及 #452 项目参与者已验证原件/回执随独立进程重启保留；尚未接管的 API 明确不可用，不回落开发实例。正式资料写入仍受备份和上线门禁保护，完整账号/RBAC 未纳入本期。
 - 平台差异经 `app/lib/platform/`、`app/lib/io/` 和数据库连接层收口，页面不直接散写 Tauri/浏览器判断。
 
 ## 2. 技术栈
@@ -35,7 +35,7 @@ Nuxt 4 SPA
 | 桌面 | Tauri 2 |
 | 状态 | Pinia |
 | 本地存储 | Tauri 使用 SQLite/tauri-plugin-sql；浏览器未迁移领域、迁移来源和演示快照使用 sql.js/IndexedDB，受 ADR 0020 约束 |
-| 中央服务 | 已接入领域经 HTTP/Repository/command；当前使用可重置内存实例，生产持久化后置验收 |
+| 中央服务 | 统一 HTTP/Repository/command；开发使用可重置实例，本机正式模式按已登记磁盘参与者提供服务并拒绝未就绪 API，实际范围见 DATABASE 与 ADR 0021 |
 | 样式 | UnoCSS，运行时令牌在 `app/assets/css/tokens.css` |
 | 交互 | reka-ui / shadcn-vue 结构、vue-sonner、VueUse |
 | 数据网格 | vxe-table，经项目组件封装 |

@@ -22,9 +22,12 @@ import { decodePayrollDayworkRead, decodePayrollDayworkResult, encodePayrollDayw
 import { decodePayrollHollowConfigRead, decodePayrollHollowResult, encodePayrollHollowWire } from './central-hollow-deduction-codec'
 import { decodePayrollNumberingRead, decodePayrollNumberingResult } from './central-numbering-codec'
 
+import { createPayrollWorkbookRepository } from './workbook-repository'
+
 export function createPayrollRepository(fetcher: ProjectHttpFetcher): PayrollRepository {
   const adjustmentRead = <T extends PayrollAdjustmentRead>(kind: PayrollAdjustmentReadKind, query: PayrollQuery, input: unknown, target = input): Promise<T> => readProjectHttp(() => fetcher(`/api/read/payroll/${kind}`, { method: 'POST', body: { query, input: encodePayrollAdjustmentWire(input) } }), value => decodePayrollAdjustmentRead<T>(value, kind, query, target))
   return {
+    ...createPayrollWorkbookRepository(fetcher),
     numbering: (query, input) => readProjectHttp(() => fetcher('/api/read/payroll/numbering', { method: 'POST', body: { query, input } }), value => decodePayrollNumberingRead(value, query, input)),
     executeNumbering: command => readProjectHttp(() => fetcher('/api/commands/payroll-numbering', { method: 'POST', body: command as unknown as Record<string, unknown> }), value => decodePayrollNumberingResult(value, command)),
     batchPreview: (query, input) => readProjectHttp(() => fetcher('/api/read/payroll/batch-preview', { method: 'POST', body: { query, input } }), value => decodePayrollBatchPreview(value, query, input)),
