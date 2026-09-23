@@ -7,7 +7,8 @@
 1. 运行 `git status --short --branch`，保护其他会话或用户尚未提交的改动。
 2. 用 `gh issue list --state open` 搜本次工作的关键词，再用 `gh issue view <number> --comments` 核实现时状态。已有 open Issue 的定稿规格优先；关闭 Issue 不自动成为新工作的规格。
 3. 读与任务相关的权威源：术语看 `CONTEXT.md`，决策看 `docs/adr/`，数据看 `docs/rewrite/DATABASE.md`，页面看 `docs/rewrite/pages/`，视觉看 `docs/design/README.md`。
-4. 规格与代码、设计稿互相冲突时，先在 Issue 留证，再在同一工作单元消除冲突；不要静默选一边。
+4. 实现需求前，先调研市场上是否有成熟、可用的库或工具，核对官方文档、维护状态、许可证、现有技术栈兼容性与接入成本；优先复用合适的成品，不重复实现已有通用能力。无法确定是否采用或替换、替换范围或关键取舍时，暂停该需求的实施，说明候选方案与差异，直到用户明确答复后再继续；沉默、超时或默认偏好不视为同意。
+5. 规格与代码、设计稿互相冲突时，先在 Issue 留证，再在同一工作单元消除冲突；不要静默选一边。
 
 Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) 和 [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md)。
 
@@ -89,4 +90,5 @@ GitHub Actions 只手动按需调用；没有后置依赖的叶子 PR 可单独�
 - 每个独立工作单元完成并验证后立即提交，不把多个 Issue 攒成一个 commit。
 - 只 `git add` 本任务明确文件；禁止 `git add .` 和 `git add -A`。
 - 提交信息使用 conventional commits + 中文描述，例如 `docs(repo): 重建开发指引`。
+- 本地提交/推送检查与失败处理见 [`docs/agents/git-workflow.md`](docs/agents/git-workflow.md)；合并任务的收尾必须按该文档核对并清理对应本地、远端工作分支，关联工作树先完成保全检查。
 - 结束前再次检查 `git status`；不得把其他会话的改动混入提交。

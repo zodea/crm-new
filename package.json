@@ -51,6 +51,8 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.1.0",
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
     "@nuxt/eslint": "^1.16.0",
     "@playwright/test": "^1.61.1",
     "@tauri-apps/cli": "^2.11.4",
