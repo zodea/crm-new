@@ -33,14 +33,16 @@ const FIELDS = {
   updatedAt: 'updated_at',
 } as const
 
-export const WORKER_ROSTER_SOURCE_ATTRIBUTE_KEYS = [...Object.keys(FIELDS), 'safetyEducation', 'workerOriginalJson', 'workerFilesJson']
+export const WORKER_ROSTER_SOURCE_ATTRIBUTE_KEYS = [...Object.keys(FIELDS), 'safetyEducation', 'workerOriginalJson', 'workerFilesJson', 'workerRosterGraphJson']
 
 export function workerRosterSourceAttributes(row: Record<string, unknown>): Record<string, string | number | null> {
-  const { worker_files_json: files, ...original } = row
+  const { worker_files_json: files, worker_roster_graph_json: modern, ...original } = row
   const attributes: Record<string, string | number | null> = {
     workerOriginalJson: JSON.stringify(original),
     workerFilesJson: typeof files === 'string' ? files : '[]',
   }
+  if (typeof modern === 'string')
+    attributes.workerRosterGraphJson = modern
   for (const [field, column] of Object.entries(FIELDS)) {
     if (row[column] !== undefined) {
       if (row[column] !== null && typeof row[column] !== 'string')

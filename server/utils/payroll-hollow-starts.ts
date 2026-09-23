@@ -125,6 +125,12 @@ export async function loadPayrollHollowAdoptions(tx: TransactionDb, projectId: s
     result.push(adoption)
   }
   for (const head of heads) {
+    if (head.snapshot_json === null) {
+      if (result.some(adoption => adoption.statementId === head.id) || imported?.documents.has(String(head.id)))
+        payrollHollowUnproven('已有空鼓采用的原工资冻结正文缺失')
+      // Old released heads without any hollow adoption remain historical gaps, never a zero deduction proof.
+      continue
+    }
     const raw = payrollHollowJson(head.snapshot_json) as Record<string, unknown> | null
     const document = raw?.[`${String(head.format_family).toLowerCase()}Document`] as Record<string, unknown> | null
     const hollow = imported?.documents.get(String(head.id)) ?? document?.hollow
