@@ -23,10 +23,10 @@ export async function createPayrollAFeesFixture() {
   await f.db.execute('INSERT INTO unit_stage_completions(id,unit_id,stage_id,assignment_id,status,completed_at) VALUES(\'fee-completion\',\'fee-unit\',\'fee-stage\',\'fee-assignment\',\'completed\',\'2026-08-05\')')
   const ordinary: PayrollABookRef = { bookPurpose: 'ordinary', managementBookId: null }
   let sequence = 0
-  const feeConfig = (book = ordinary, month = '2026-08') => f.service.aFeeConfig({ origin: 'real' }, { projectId: 'p', crewId: 'crew', leaderWorkerId: 'w', month, book })
+  const feeConfig = (book: PayrollABookRef = ordinary, month = '2026-08') => f.service.aFeeConfig({ origin: 'real' }, { projectId: 'p', crewId: 'crew', leaderWorkerId: 'w', month, book })
   const feeCommand = (read: PayrollAFeeConfigRead | PayrollAFeesFormRead, action: PayrollAFeesAction): PayrollAFeesCommand => ({ commandId: `fee-command-${++sequence}`, workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: 'real', requiredCapability: 'payroll:write', sourceVersion: read.context.sourceVersion, projectId: 'p', statementId: 'statementId' in read ? read.statementId : null, draftKey: 'draftKey' in read ? read.draftKey : null, configScope: 'scope' in read ? read.scope : null, book: 'scope' in read ? read.scope.book : read.book!, action })
   const fee = (overrides: Partial<PayrollAFeeDraft> = {}): PayrollAFeeDraft => ({ ...ordinary, kind: 'housing', feeId: null, baseRevisionId: null, name: '房补', enabled: true, unitPrice: 1.3, unit: '㎡', basis: { kind: 'completed-field-quantity', itemIds: ['wall'], scope: { kind: 'project' } }, effectiveMonth: '2026-08', adoptedDefault: null, ...overrides } as PayrollAFeeDraft)
-  const saveFees = async (fees: PayrollAFeeDraft[], book = ordinary, month = '2026-08') => {
+  const saveFees = async (fees: PayrollAFeeDraft[], book: PayrollABookRef = ordinary, month = '2026-08') => {
     const read = await feeConfig(book, month)
     return f.service.executeFees(feeCommand(read, { kind: 'save-a-fees', baseVersion: read.baseVersion, fees, remove: [] }))
   }
