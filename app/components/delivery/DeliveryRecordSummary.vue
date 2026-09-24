@@ -17,10 +17,10 @@ const printLabel = computed(() => ({
 })[props.printDisposition])
 const lifecycleDescription = computed(() => {
   if (props.printDisposition === 'pending')
-    return '归档即视为已入库，材料明细可用于单价分析；当前尚未收到打印成功回执，文件继续保留在待打印范围。'
+    return '原件与材料明细已归档；到货闭合与库存状态另行确认。当前尚未收到打印成功回执，文件继续保留在待打印范围。'
   if (props.printDisposition === 'printed')
-    return '归档即视为已入库；该文件已由用户确认实际打印成功。'
-  return '归档即视为已入库；该文件已明确排除打印范围，但没有记录为已打印。'
+    return '原件与材料明细已归档；到货闭合与库存状态另行确认。该文件已由用户确认实际打印成功。'
+  return '原件与材料明细已归档；到货闭合与库存状态另行确认。该文件已明确排除打印范围，但没有记录为已打印。'
 })
 </script>
 
@@ -30,7 +30,7 @@ const lifecycleDescription = computed(() => {
       <Metric label="送货日期" :value="deliveryDate || '—'" />
       <Metric label="材料项数" :value="lineCount" />
       <Metric label="金额合计" :value="yuan(totalAmount)" tone="brand" big />
-      <Metric label="入库状态" value="已入库" tone="ok" />
+      <Metric label="归档状态" value="已归档" tone="ok" />
       <Metric label="打印状态" :value="printLabel" :tone="printDisposition === 'printed' ? 'ok' : undefined" />
     </MetricGrid>
 

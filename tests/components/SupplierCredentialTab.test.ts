@@ -28,6 +28,7 @@ function snapshot(credentials: SupplierCredential[] = []): SupplierDetailSnapsho
       projectCount: 0,
       contractCount: 0,
       contractTotal: 0,
+      settledTotal: 0,
       claimedTotal: 0,
       invoiceTotal: 0,
       invoiceTaxTotal: 0,
@@ -202,7 +203,7 @@ describe('supplier credential tab', () => {
     })
     await fireEvent.change(input, { target: { files: [disguised] } })
     await waitFor(() => expect(messages.error).toHaveBeenCalledWith(
-      expect.stringContaining('文件内容与扩展名不匹配'),
+      expect.stringContaining('文件内容签名与扩展名不一致'),
     ))
 
     const oversized = pdfFile('超大证照.pdf')
@@ -310,15 +311,15 @@ describe('supplier credential tab', () => {
       category: '营业执照',
       confirmedFields: expect.objectContaining({
         name: '当前公司',
-        uniqueCode: '91440000TEST123456',
+        taxNo: '91440000TEST123456',
         decisions: expect.objectContaining({
           name: 'keep-current',
-          uniqueCode: 'use-recognized',
+          taxNo: 'use-recognized',
         }),
         sourceFile: '合成营业执照.pdf',
       }),
       supplierFields: {
-        uniqueCode: '91440000TEST123456',
+        taxNo: '91440000TEST123456',
         legalRep: '张某',
       },
     })

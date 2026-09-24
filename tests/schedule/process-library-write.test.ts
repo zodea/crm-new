@@ -144,4 +144,24 @@ describe('标准工序库版本维护', () => {
       ],
     })).rejects.toThrow('前置工序必须排在当前工序之前')
   })
+
+  it('即使标记置灰也拒绝以自身作为前置工序', async () => {
+    await expect(createScheduleProcessLibraryVersion(db, {
+      sourceLibraryId: null,
+      code: 'self-predecessor',
+      name: '自依赖反例',
+      description: '',
+      tasks: [{
+        key: 'self',
+        name: '自身工序',
+        trade: '',
+        color: '#64748b',
+        durationDays: 2,
+        stageCode: '',
+        itemCodes: [],
+        predecessorKey: 'self',
+        predecessorDisabled: true,
+      }],
+    })).rejects.toThrow('不能以前置关系引用自身')
+  })
 })

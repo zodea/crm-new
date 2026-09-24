@@ -1,0 +1,180 @@
+{
+  "reviewer": "/root/c2_b_independent",
+  "round": 2,
+  "reviewedAt": "2026-09-14T07:29:03.3219342Z",
+  "method": "Poppler pdftoppm 120 DPI PNG；view_image原尺寸重新逐页目检新PDF10页",
+  "pageCount": 10,
+  "renderedPageCount": 10,
+  "visuallyInspectedPageCount": 10,
+  "sourceFiles": [
+    {
+      "path": ".tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-output-真实长签工发放后两表分页与下载回读，精确单价及明确空规则不被改写-chromium\\c2-long-paired-output.pdf",
+      "sha256": "1894a4eaffd0c276b59d7595577d8b61ba3b09a8b417f0e5685bd1221fdc611c",
+      "bytes": 237805
+    },
+    {
+      "path": ".tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-output-真实长签工发放后两表分页与下载回读，精确单价及明确空规则不被改写-chromium\\long-output-verification.json",
+      "sha256": "0604abb7e2dace14f5ed989fff417079472ff7c4111d4255f65967a702becbf1",
+      "bytes": 39156
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-visual-final\\payroll-c2-output-真实长签工发放后两表分页与下载回读，精确单价及明确空规则不被改写-chromium\\C2 无工程量验收 68768d79-f188-4cce-a4b8-cca7cc7ae1af-签工负责人-2027-03-C2工资与签工.xlsx",
+      "sha256": "6f0c4a51afb5cb15f0d0dd7cfe7bfebc35f942c5bb2f8759eb28b6bc2b473023",
+      "bytes": 51759
+    }
+  ],
+  "pages": [
+    {
+      "page": 1,
+      "image": "page-01.png",
+      "sha256": "e381d3b652e09207b1551b11889e7759c51d1a6491486cc6390cc19080564ab7",
+      "reviewed": true,
+      "content": "工资表，2核算行及3全员分配行",
+      "repeatedDayworkHeader": false,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 2,
+      "image": "page-02.png",
+      "sha256": "91c1702c00bbd51a6baf9f1e9c1b7a5b699788659cd26fb660b97db3b5c7470e",
+      "reviewed": true,
+      "content": "01甲至03甲，5条",
+      "repeatedDayworkHeader": false,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 3,
+      "image": "page-03.png",
+      "sha256": "13c9664e81e5cceba2f20f3ff20e8b0e1f18e32472bdf736c95de6a10d49c10c",
+      "reviewed": true,
+      "content": "03乙至06乙，7条",
+      "repeatedDayworkHeader": true,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 4,
+      "image": "page-04.png",
+      "sha256": "83a28fe776ff937a930d204d80419edb282148772b76c5bffb63664077ef4323",
+      "reviewed": true,
+      "content": "07甲至10甲，7条",
+      "repeatedDayworkHeader": true,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 5,
+      "image": "page-05.png",
+      "sha256": "4a825b49c619c7bae69ca18ed379d3f680e9ab1ec1e02df8d7e3fa6df6441ffa",
+      "reviewed": true,
+      "content": "10乙至13乙，7条",
+      "repeatedDayworkHeader": true,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 6,
+      "image": "page-06.png",
+      "sha256": "199c398a79100364b6e7cb276449b2e9add951ae5aa62abb730c9cd5782f18e5",
+      "reviewed": true,
+      "content": "14甲至17甲，7条",
+      "repeatedDayworkHeader": true,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 7,
+      "image": "page-07.png",
+      "sha256": "d74f098d612c73d52c974abe704ce7e9aa822507c9439c87a6342ebea5b0e00b",
+      "reviewed": true,
+      "content": "17乙至20乙，7条",
+      "repeatedDayworkHeader": true,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 8,
+      "image": "page-08.png",
+      "sha256": "cba78d4a8f639bd1a7714000e2d0d161d9a87f376a2317ff02dc90c3a691482d",
+      "reviewed": true,
+      "content": "21甲至24甲，7条",
+      "repeatedDayworkHeader": true,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 9,
+      "image": "page-09.png",
+      "sha256": "b1906219f08e6f7dee4871f266743b30bec7f4e76970f26ad6808c1aba830459",
+      "reviewed": true,
+      "content": "24乙至27乙，7条",
+      "repeatedDayworkHeader": true,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    },
+    {
+      "page": 10,
+      "image": "page-10.png",
+      "sha256": "2ce6a2c46a737001988c280ac6fd790a78235c200ed8de9467300b69dc8e0e8f",
+      "reviewed": true,
+      "content": "28甲、28乙，2条及四方签字，底部全白",
+      "repeatedDayworkHeader": true,
+      "noContentClipping": true,
+      "noOverlappingText": true,
+      "wholeRowsPreserved": true,
+      "status": "pass"
+    }
+  ],
+  "dayworkRowDistribution": [
+    5,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    2
+  ],
+  "resolvedFindings": [
+    {
+      "id": "VIS-01",
+      "page": 10,
+      "originalPdfSha256": "8b50ebf28445d294b637870ad863e8499a4d8f0fb756d0ad0303925f8894639b",
+      "newPdfSha256": "1894a4eaffd0c276b59d7595577d8b61ba3b09a8b417f0e5685bd1221fdc611c",
+      "observation": "新PDF第10页四方签字以下全白，浅灰背景已消失",
+      "status": "resolved-visually-verified"
+    }
+  ],
+  "openFindings": [],
+  "conclusion": "10页逐页视觉通过，VIS-01已关闭，无新增视觉缺陷",
+  "originalRoundPreserved": true,
+  "pdfUnchanged": true,
+  "browserRerunByReviewer": false,
+  "productModified": false,
+  "scopeLimits": [
+    "仅这份实际PDF逐页视觉结论",
+    "XLSX仅绑定hash，不重新执行下载或字段验收",
+    "不替代其他旅程、视口、指南PDF或实体打印机验收"
+  ]
+}

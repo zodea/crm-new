@@ -1,16 +1,8 @@
 import type { OcrRecognitionResult } from '~/lib/recognize/engine'
 import type { SupplierCredentialCategory } from '~/lib/supplier/detail'
 
-export type CredentialOcrFieldKey
-  = | 'name'
-    | 'uniqueCode'
-    | 'taxNo'
-    | 'legalRep'
-    | 'address'
-    | 'bank'
-    | 'bankAccount'
-    | 'validFrom'
-    | 'expiresAt'
+export const CREDENTIAL_OCR_FIELD_KEYS = ['name', 'uniqueCode', 'taxNo', 'legalRep', 'address', 'bank', 'bankAccount', 'validFrom', 'expiresAt'] as const
+export type CredentialOcrFieldKey = typeof CREDENTIAL_OCR_FIELD_KEYS[number]
 
 export type CredentialOcrDecision = 'keep-current' | 'use-recognized' | 'manual'
 
@@ -21,8 +13,11 @@ export interface CredentialCategorySuggestion {
 }
 
 export interface CredentialOcrCandidate {
+  /** 旧候选可无 ID；新解析结果始终提供与同份识别结果绑定的稳定 ID。 */
+  id?: string
   key: CredentialOcrFieldKey
   label: string
+  sourceLabel?: string
   value: string
   confidence: number
 }
@@ -34,6 +29,30 @@ export interface CredentialOcrReviewField extends CredentialOcrCandidate {
   conflict: boolean
 }
 
+export interface CredentialOcrReviewGroup {
+  key: CredentialOcrFieldKey
+  label: string
+  currentValue: string
+  candidates: CredentialOcrCandidate[]
+  conflict: boolean
+  decision: CredentialOcrDecision
+  candidateId: string
+  manualValue: string
+}
+
+export type CredentialOcrFieldChoice
+  = | { key: CredentialOcrFieldKey, decision: 'keep-current' }
+    | { key: CredentialOcrFieldKey, decision: 'use-recognized', candidateId: string }
+    | { key: CredentialOcrFieldKey, decision: 'manual', manualValue: string }
+
+export interface CredentialOcrReviewDraft {
+  choices: CredentialOcrFieldChoice[]
+  categoryDecision: CredentialOcrDecision
+  manualCategory: SupplierCredentialCategory
+  longTermDecision: CredentialOcrDecision
+  manualLongTerm: boolean
+}
+
 export interface ParsedCredentialOcr {
   rawText: string
   category: CredentialCategorySuggestion
@@ -41,10 +60,10 @@ export interface ParsedCredentialOcr {
   longTerm: boolean
 }
 
-const FIELD_LABEL: Record<CredentialOcrFieldKey, string> = {
+export const CREDENTIAL_OCR_FIELD_LABELS: Record<CredentialOcrFieldKey, string> = {
   name: '公司名称',
-  uniqueCode: '统一社会信用代码',
-  taxNo: '纳税人识别号',
+  uniqueCode: '内部唯一识别码',
+  taxNo: '统一社会信用代码 / 税号',
   legalRep: '法定代表人',
   address: '注册地址',
   bank: '开户行',
@@ -52,6 +71,7 @@ const FIELD_LABEL: Record<CredentialOcrFieldKey, string> = {
   validFrom: '生效日期',
   expiresAt: '到期日期',
 }
+const FIELD_LABEL = CREDENTIAL_OCR_FIELD_LABELS
 
 const CATEGORY_RULES: Array<{
   category: SupplierCredentialCategory
@@ -84,7 +104,7 @@ const FIELD_RULES: Array<{
   patterns: RegExp[]
 }> = [
   {
-    key: 'uniqueCode',
+    key: 'taxNo',
     patterns: [
       /统一社会信用代码(?:\/注册号)?[ \t]*[:：][ \t]*([0-9A-Z]{18})/,
       /统一社会信用代码(?:\/注册号)?[ \t]+([0-9A-Z]{18})/,
@@ -207,17 +227,19 @@ export function parseCredentialOcr(
 ): ParsedCredentialOcr {
   const rawText = normalizeText(result.markdownPages.join('\n'))
   const category = suggestCredentialCategory(rawText, fileName)
-  const fields = FIELD_RULES.flatMap(({ key, patterns }) => {
-    const match = patterns.map(pattern => rawText.match(pattern)).find(Boolean)
-    if (!match?.[1])
-      return []
-    return [{
-      key,
-      label: FIELD_LABEL[key],
-      value: normalizeFieldValue(key, match[1]),
-      confidence: 0.9,
-    }]
-  })
+  const fields: CredentialOcrCandidate[] = []
+  for (const { key, patterns } of FIELD_RULES) {
+    for (const pattern of patterns) {
+      for (const match of rawText.matchAll(new RegExp(pattern.source, 'g'))) {
+        if (!match[1])
+          continue
+        const value = normalizeFieldValue(key, match[1])
+        const sourceLabel = match[0].slice(0, match[0].lastIndexOf(match[1])).trim().replace(/[：:]$/, '').trim()
+        if (!fields.some(field => field.key === key && field.value === value && field.sourceLabel === sourceLabel))
+          fields.push({ key, label: FIELD_LABEL[key], sourceLabel, value, confidence: 0.9 })
+      }
+    }
+  }
   if (category.category === '法人身份证' && !fields.some(field => field.key === 'legalRep')) {
     const name = rawText.match(/(?:^|\n)[ \t]*姓名[ \t]*[:：][ \t]*([^\s|，,]{2,20})/)
       ?? rawText.match(/(?:^|\n)[ \t]*姓名[ \t]+([^\s|，,]{2,20})/)
@@ -256,7 +278,7 @@ export function parseCredentialOcr(
   return {
     rawText,
     category,
-    fields,
+    fields: fields.map((field, index) => ({ ...field, id: `ocr-${field.key}-${index}`, sourceLabel: field.sourceLabel ?? field.label })),
     longTerm: validityRange?.[2] === '长期'
       || (/长期|无固定期限/.test(rawText)
         && /有效期|营业期限/.test(rawText)),
@@ -267,14 +289,19 @@ export function buildCredentialOcrReview(
   candidates: readonly CredentialOcrCandidate[],
   currentValues: Partial<Record<CredentialOcrFieldKey, string | null | undefined>>,
 ): CredentialOcrReviewField[] {
-  return candidates.map((candidate) => {
+  return candidates.map((candidate, index) => {
     const currentValue = String(currentValues[candidate.key] ?? '').trim()
-    const conflict = currentValue !== '' && currentValue !== candidate.value
+    const conflict = candidate.key === 'uniqueCode'
+      || (currentValue !== '' && currentValue !== candidate.value)
+      || new Set(candidates.filter(field => field.key === candidate.key).map(field => field.value)).size > 1
     return {
       ...candidate,
+      id: candidate.id ?? `legacy-${candidate.key}-${index}`,
+      sourceLabel: candidate.sourceLabel ?? candidate.label,
+      label: FIELD_LABEL[candidate.key],
       currentValue,
       conflict,
-      decision: conflict ? 'keep-current' : 'use-recognized',
+      decision: conflict || candidates.findIndex(field => field.key === candidate.key) !== index ? 'keep-current' : 'use-recognized',
       manualValue: '',
     }
   })
@@ -283,15 +310,55 @@ export function buildCredentialOcrReview(
 export function resolveCredentialOcrReview(
   fields: readonly CredentialOcrReviewField[],
 ): Partial<Record<CredentialOcrFieldKey, string>> {
-  const resolved: Partial<Record<CredentialOcrFieldKey, string>> = {}
-  for (const field of fields) {
-    const value = field.decision === 'keep-current'
-      ? field.currentValue
+  const candidates = fields.map((field, index) => ({ ...field, id: field.id ?? `legacy-${field.key}-${index}` }))
+  const choices: CredentialOcrFieldChoice[] = [...new Set(fields.map(field => field.key))].map((key) => {
+    const selected = candidates.filter(field => field.key === key && field.decision !== 'keep-current')
+    if (selected.length > 1)
+      throw new Error(`${FIELD_LABEL[key]}只能确认一个候选或一项人工值`)
+    const field = selected[0]
+    return !field
+      ? { key, decision: 'keep-current' }
       : field.decision === 'manual'
-        ? field.manualValue.trim()
-        : field.value
-    if (value)
-      resolved[field.key] = value
+        ? { key, decision: 'manual', manualValue: field.manualValue }
+        : { key, decision: 'use-recognized', candidateId: field.id }
+  })
+  return resolveCredentialOcrChoices(candidates, Object.fromEntries(fields.map(field => [field.key, field.currentValue])), choices)
+}
+
+/** 只由候选身份与明确决定解析值；不接受客户端另传的“最终识别值”。 */
+export function resolveCredentialOcrChoices(
+  candidates: readonly CredentialOcrCandidate[],
+  currentValues: Partial<Record<CredentialOcrFieldKey, string | null | undefined>>,
+  choices: readonly CredentialOcrFieldChoice[],
+): Partial<Record<CredentialOcrFieldKey, string>> {
+  const ids = candidates.map(field => field.id)
+  if (ids.some(id => !id) || new Set(ids).size !== ids.length)
+    throw new Error('识别候选身份缺失或重复，请重新识别后核对')
+  const keys = new Set(choices.map(choice => choice.key))
+  if (keys.size !== choices.length || candidates.some(candidate => !keys.has(candidate.key)))
+    throw new Error('每个字段必须提供且只提供一项人工决定')
+  const resolved: Partial<Record<CredentialOcrFieldKey, string>> = {}
+  for (const choice of choices) {
+    if (!Object.hasOwn(FIELD_LABEL, choice.key))
+      throw new Error('人工核对字段无效')
+    let value: string
+    if (choice.decision === 'keep-current') {
+      value = String(currentValues[choice.key] ?? '').trim()
+    }
+    else if (choice.decision === 'manual') {
+      value = choice.manualValue.trim()
+      if (!value && choice.key !== 'validFrom' && choice.key !== 'expiresAt')
+        throw new Error(`请填写${FIELD_LABEL[choice.key]}手工确认值`)
+    }
+    else if (choice.decision === 'use-recognized') {
+      const candidate = candidates.find(candidate => candidate.id === choice.candidateId && candidate.key === choice.key)
+      if (!candidate || !candidate.value || choice.key === 'uniqueCode')
+        throw new Error('候选与确认字段不一致，历史内部编码候选不能直接采用，请重新识别或人工核对')
+      value = candidate.value
+    }
+    else { throw new Error('人工核对决定无效') }
+    if (value || choice.decision === 'manual')
+      resolved[choice.key] = value
   }
   return resolved
 }

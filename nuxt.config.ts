@@ -5,6 +5,11 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: process.env.NUXT_DEVTOOLS !== 'false' },
 
+  nitro: {
+    // sql.js 按运行时路径加载 WASM；显式携带现有依赖，构建后无需手工补文件。
+    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'] },
+  },
+
   runtimeConfig: {
     // PaddleOCR 官方 API 凭证仅存在 Nitro 服务端；禁止放入 public 或前端持久化。
     paddleOcrAccessToken: '',
@@ -43,6 +48,10 @@ export default defineNuxtConfig({
   ],
 
   vite: {
+    resolve: {
+      // pnpm 的隔离/提升链接都必须让应用与 @pinia/nuxt 共享同一运行时实例。
+      dedupe: ['vue', 'pinia'],
+    },
     optimizeDeps: {
       // 预打包应用壳、交互原语、桌面桥接与按需导入依赖，避免 dev
       // 首次进入表单/导入路由时 Vite 发现新依赖并触发整页 reload。

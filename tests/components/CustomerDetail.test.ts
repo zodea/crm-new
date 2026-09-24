@@ -29,6 +29,7 @@ const NuxtLink = defineComponent({
 })
 
 const customer = {
+  dataOrigin: 'real' as const,
   id: 'customer_1',
   name: '合和地产集团',
   aliases: ['合和地产'],
@@ -42,7 +43,7 @@ const customer = {
   contactPhone: '13800000001',
   status: 'active',
   note: '重点客户',
-  updatedAt: '2026-07-29',
+  updatedAt: '2026-07-29T00:00:00.000Z',
 }
 
 describe('客户详情展示', () => {
@@ -54,11 +55,22 @@ describe('客户详情展示', () => {
     expect(wrapper.text()).toContain('重点客户')
   })
 
-  it('项目、合同、收款都提供已有详情路由下钻', () => {
+  it('项目、合同和收款都下钻各自只读详情', () => {
+    const relationshipReturnTo = '/base/customer/customer_1?origin=real&tab=receipts'
+    const expectProjectLink = (href: string) => {
+      const target = new URL(href, 'https://ruihang.invalid')
+      expect(target.pathname).toBe('/project/project_1')
+      expect(target.searchParams.get('origin')).toBe('real')
+      const source = new URL(target.searchParams.get('returnTo')!, target.origin)
+      expect(source.searchParams.get('relationContext')).toMatch(/^origin_[\w-]+$/)
+      source.searchParams.delete('relationContext')
+      expect(`${source.pathname}${source.search}`).toBe(relationshipReturnTo)
+    }
     const baseProps = {
+      relationshipReturnTo,
       projects: [{
-        id: 'project_1',
-        name: '合和新城',
+        project: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: 'HHXC-01' },
+        navigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: 'HHXC-01' }, variant: 'detail', view: null, filters: { dataOrigin: 'real', customerId: 'customer_1' } },
         code: 'HHXC-01',
         relationRole: '主客户' as const,
         status: '施工中',
@@ -66,55 +78,52 @@ describe('客户详情展示', () => {
         plannedEnd: '2026-12-31',
         manager: '张经理',
         contractCount: 1,
-        effectiveContractAmount: 1000000,
+        effectiveContractAmount: '1000000.00',
         receiptCount: 1,
-        effectiveReceiptAmount: 320000,
+        effectiveReceiptAmount: '320000.00',
       }],
       contracts: [{
-        id: 'contract_1',
-        no: 'SG-001',
-        name: '施工合同',
-        projectId: 'project_1',
-        projectName: '合和新城',
-        amount: 1000000,
-        changed: 0,
-        effectiveAmount: 1000000,
-        receiptAmount: 320000,
-        outstandingAmount: 680000,
+        contract: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract_1', label: '施工合同', no: 'SG-001' },
+        navigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract_1', label: '施工合同', no: 'SG-001' }, variant: 'detail', view: null, filters: {} },
+        project: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null },
+        projectNavigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null }, variant: 'detail', view: null, filters: { dataOrigin: 'real', customerId: 'customer_1' } },
+        effectiveAmount: '1000000.00',
+        receiptAmount: '320000.00',
+        outstandingAmount: '680000.00',
         signDate: '2026-01-02',
         status: '履约中',
         isDraft: false,
       }],
       receipts: [{
-        id: 'receipt_1',
-        no: 'SK-001',
+        receipt: { state: 'resolved' as const, entity: 'receipt' as const, id: 'receipt_1', label: 'SK-001', no: 'SK-001' },
+        navigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'receipt' as const, id: 'receipt_1', label: 'SK-001', no: 'SK-001' }, variant: 'detail', view: null, filters: { dataOrigin: 'real', customerId: 'customer_1' } },
         receiptDate: '2026-05-01',
-        projectId: 'project_1',
-        projectName: '合和新城',
-        contractId: 'contract_1',
-        contractName: '施工合同',
+        project: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null },
+        projectNavigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null }, variant: 'detail', view: null, filters: { dataOrigin: 'real', customerId: 'customer_1' } },
+        contract: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract_1', label: '施工合同', no: 'SG-001' },
+        contractNavigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract_1', label: '施工合同', no: 'SG-001' }, variant: 'detail', view: null, filters: {} },
         payerAccount: '合和地产集团',
-        amount: 320000,
-        effectiveAmount: 320000,
+        amount: '320000.00',
+        effectiveAmount: '320000.00',
         paymentMethod: '银行转账',
         status: 'submitted',
         isDraft: false,
       }],
     }
-    const global = { components: { KitTable, NuxtLink } }
+    const global = { components: { KitTable, NuxtLink }, stubs: { StatePanel: true, KitStatusTag: true } }
 
     const projectView = mount(CustomerDetailRelations, {
       props: { ...baseProps, tab: 'projects' },
       global,
     })
-    expect(projectView.get('a').attributes('href')).toBe('/project/project_1')
+    expectProjectLink(projectView.get('a').attributes('href'))
 
     const contractView = mount(CustomerDetailRelations, {
       props: { ...baseProps, tab: 'contracts' },
       global,
     })
-    expect(contractView.findAll('a').map(link => link.attributes('href'))).toEqual([
-      '/project/project_1',
+    expectProjectLink(contractView.get('a').attributes('href'))
+    expect(contractView.findAll('a').slice(1).map(link => link.attributes('href'))).toEqual([
       '/contract/contract_1',
     ])
 
@@ -122,11 +131,17 @@ describe('客户详情展示', () => {
       props: { ...baseProps, tab: 'receipts' },
       global,
     })
-    expect(receiptView.findAll('a').map(link => link.attributes('href'))).toEqual([
-      '/project/project_1',
-      '/contract/contract_1',
-      '/finance/receipt/receipt_1',
-    ])
+    expectProjectLink(receiptView.get('a').attributes('href'))
+    const receiptLinks = receiptView.findAll('a').slice(1)
+    expect(receiptLinks[0]!.attributes('href')).toBe('/contract/contract_1')
+    const receiptTarget = new URL(receiptLinks[1]!.attributes('href'), 'https://ruihang.invalid')
+    expect(receiptTarget.pathname).toBe('/finance/receipt/receipt_1')
+    expect(receiptTarget.searchParams.get('origin')).toBe('real')
+    expect(receiptTarget.searchParams.get('customerId')).toBe('customer_1')
+    const receiptSource = new URL(receiptTarget.searchParams.get('returnTo')!, receiptTarget.origin)
+    expect(receiptSource.searchParams.get('relationContext')).toMatch(/^origin_[\w-]+$/)
+    receiptSource.searchParams.delete('relationContext')
+    expect(`${receiptSource.pathname}${receiptSource.search}`).toBe(relationshipReturnTo)
   })
 
   it('没有业务关系时展示领域空状态，不生成静态成功数据', () => {

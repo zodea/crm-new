@@ -1,0 +1,12 @@
+
+Running 5 tests using 1 worker
+
+(node:33208) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › e2e\payroll-c2-central.spec.ts:61:1 › 独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出 (59.3s)
+  ok 2 [chromium] › e2e\payroll-c2-output.spec.ts:13:1 › 真实长签工发放后两表分页与下载回读，精确单价及明确空规则不被改写 (4.5s)
+  ok 3 [chromium] › e2e\payroll-c2-readonly.spec.ts:17:1 › 旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签工输出 (2.8s)
+  ok 4 [chromium] › e2e\payroll-c2-recovery.spec.ts:34:1 › 新签工失响应后冷页按原编号保存一次，日期和正文不丢失 (3.9s)
+  ok 5 [chromium] › e2e\payroll-c2-recovery.spec.ts:77:1 › 原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入 (4.0s)
+
+  5 passed (1.3m)

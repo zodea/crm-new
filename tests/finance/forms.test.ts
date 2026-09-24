@@ -83,7 +83,7 @@ beforeEach(async () => {
     )
     VALUES (
       'settlement-finance', 'JS-F3', '材料结算', '材采', 'project-finance',
-      'supplier-finance', 'contract-expense', 100, '2026-07-01', '已审批'
+      'supplier-finance', 'contract-expense', 100, '2026-07-01', '已确认'
     )
   `)
   await mem.execute(`
@@ -104,6 +104,22 @@ afterEach(() => {
 })
 
 describe('f3 六条资金表单领域 action', () => {
+  it.each(['draft', '待确认', 'pending', 'approved', '已审批'])('拒绝引用 %s 结算且不留下付款头或分摊', async (status) => {
+    await mem.execute('UPDATE expenditure_settlements SET status = ? WHERE id = ?', [status, 'settlement-finance'])
+    await expect(useFinanceStore().saveForm('payment_application', {
+      name: '无效结算关联',
+      bizType: '有合同-材料',
+      projectId: 'project-finance',
+      supplierId: 'supplier-finance',
+      contractId: 'contract-expense',
+      applyAmount: 100,
+      invoiceState: '先款后票',
+      settlementAllocations: [{ settlementId: 'settlement-finance', allocatedAmount: 100 }],
+    }, 'draft')).rejects.toThrow('关联结算尚未确认')
+    expect(await mem.select('SELECT id FROM payment_applications')).toEqual([])
+    expect(await mem.select('SELECT id FROM payment_application_settlement_allocations')).toEqual([])
+  })
+
   it('通过同一 Pinia store 保存六种真实实体、明细、分摊和附件', async () => {
     const store = useFinanceStore()
     const receipt = await store.saveForm('receipt', {
@@ -273,6 +289,54 @@ describe('f3 六条资金表单领域 action', () => {
     expect(await mem.select(`
       SELECT id FROM expense_reimbursement_lines
     `)).toEqual([])
+  })
+})
+
+describe('收款登记业务边界', () => {
+  it('付款方必须是真实客户 ID，施工合同可选且金额保持收入正向事实', async () => {
+    const store = useFinanceStore()
+
+    await mem.execute(`
+      INSERT INTO customers (id, name, tax_no, status)
+      VALUES ('customer-other-project', '其他项目客户', '91440100OTHER', 'submitted')
+    `)
+
+    await expect(store.saveForm('receipt', {
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      customerId: 'customer-missing',
+      amount: 88,
+    }, 'submit')).rejects.toThrow('付款方客户不存在或已删除')
+
+    await expect(store.saveForm('receipt', {
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      customerId: 'customer-other-project',
+      amount: 88,
+    }, 'submit')).rejects.toThrow('付款方客户必须是所选项目的主客户')
+
+    const receipt = await store.saveForm('receipt', {
+      no: 'SK-OPTIONAL-CONTRACT',
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      contractId: null,
+      customerId: 'customer-finance',
+      amount: 88,
+    }, 'submit')
+    expect(await loadFinanceForm('receipt', receipt.id)).toMatchObject({
+      projectId: 'project-finance',
+      contractId: null,
+      customerId: 'customer-finance',
+      amount: 88,
+      status: 'submitted',
+    })
+
+    await expect(store.saveForm('receipt', {
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      customerId: 'customer-finance',
+      amount: -1,
+    }, 'draft')).rejects.toThrow('收款金额不能为负数')
   })
 })
 

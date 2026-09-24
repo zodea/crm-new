@@ -4,8 +4,10 @@ import type {
   QuantityAssignmentWorkspace,
 } from '~/lib/quantity/assignment'
 import type { QuantityAssigneeKind } from '~/lib/quantity/read-model'
+import type { DataOriginDTO } from '~/types/read-model'
 import { useEventListener } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
+import KitButton from '~/components/ui/KitButton.vue'
 import {
   parseQuantityAssignmentScopeKey,
   previewQuantityAssignmentConflicts,
@@ -18,6 +20,7 @@ import { toErrorMessage } from '~/lib/util/error'
 
 const props = withDefaults(defineProps<{
   projectId: string
+  origin?: DataOriginDTO
   initialBuildingId?: string
   initialTrade?: string
   initialUnitId?: string
@@ -58,6 +61,7 @@ const assigneeTabs = [
 ]
 
 const workspace = computed(() => store.assignmentWorkspace?.projectId === props.projectId
+  && store.assignmentOrigin === (props.origin ?? 'real')
   ? store.assignmentWorkspace
   : null)
 
@@ -216,7 +220,7 @@ function hydrateDraft(source: QuantityAssignmentWorkspace) {
 
 async function initialize(sequence: number, projectId: string) {
   try {
-    await store.loadAssignments(projectId)
+    await store.loadAssignments(projectId, props.origin ?? 'real')
     if (sequence !== initializeSequence || !open.value || props.projectId !== projectId || !workspace.value)
       return
     hydrateDraft(workspace.value)
@@ -245,7 +249,7 @@ function requestInitialize(isOpen: boolean, projectId: string) {
 }
 
 watch(
-  [open, () => props.projectId, () => props.initialBuildingId, () => props.initialTrade, () => props.initialUnitId],
+  [open, () => props.projectId, () => props.initialBuildingId, () => props.initialTrade, () => props.initialUnitId, () => props.origin],
   ([isOpen, projectId]) => requestInitialize(isOpen, projectId),
   { immediate: true },
 )
@@ -376,7 +380,7 @@ async function persistDraft(draft: QuantityAssignmentBatchDraft) {
 }
 
 async function save() {
-  if (store.assignmentSaving || store.assignmentLoading || initializing.value)
+  if (!store.assignmentCanWrite || store.assignmentSaving || store.assignmentLoading || initializing.value)
     return
   const source = workspace.value
   const draft = buildDraft()
@@ -477,6 +481,7 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
     save-label="保存责任"
     width="min(1080px, calc(100dvw - var(--space-6, 24px)))"
     :busy="store.assignmentSaving"
+    :save-disabled="!store.assignmentCanWrite || store.assignmentLoading || initializing"
     @save="save"
     @cancel="requestClose"
   >
@@ -497,9 +502,9 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
       <p class="max-w-xl text-12px text-ink-soft">
         {{ store.assignmentError }}
       </p>
-      <button type="button" class="btn-primary" @click="retry">
+      <KitButton variant="primary" @click="retry">
         重新加载
-      </button>
+      </KitButton>
     </section>
 
     <fieldset
@@ -507,7 +512,7 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
       data-testid="quantity-assignment-fields"
       class="m-0 min-w-0 border-0 p-0"
       :class="store.assignmentSaving ? 'pointer-events-none opacity-70' : ''"
-      :disabled="store.assignmentSaving || store.assignmentLoading || initializing"
+      :disabled="!store.assignmentCanWrite || store.assignmentSaving || store.assignmentLoading || initializing"
     >
       <div class="grid gap-7">
         <section id="form-section-target" class="scroll-mt-4 grid gap-4">

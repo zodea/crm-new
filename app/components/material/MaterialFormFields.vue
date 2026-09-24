@@ -66,7 +66,7 @@ const FIELDS: Record<MaterialFormKind, FieldDef[]> = {
     { key: 'no', label: '到货单号', section: 'basic', placeholder: '留空自动生成' },
     { key: 'projectId', label: '项目', section: 'basic', type: 'lookup', required: true },
     { key: 'supplierId', label: '分供方', section: 'basic', type: 'lookup', required: true },
-    { key: 'contractId', label: '采购合同', section: 'basic', type: 'lookup' },
+    { key: 'contractId', label: '材料采购合同', section: 'basic', type: 'lookup' },
     { key: 'requisitionId', label: '关联下料单', section: 'basic', type: 'lookup' },
     { key: 'warehouse', label: '到货仓库', section: 'basic', type: 'select', options: WAREHOUSES, required: true },
     { key: 'arrivalDate', label: '到货日期', section: 'basic', type: 'date', required: true },
@@ -189,6 +189,8 @@ function lookupFor(key: string): (keyword: string) => Promise<LookupOption[]> {
 function disabledReason(key: string): string | undefined {
   if (props.readonly)
     return '已生效单据不可修改'
+  if (key === 'supplierId' && props.kind === 'mat_arrival' && !props.draft.projectId)
+    return '请先选择项目'
   if (key === 'contractId' || key === 'requisitionId')
     return props.draft.projectId ? undefined : '请先选择项目'
   return undefined

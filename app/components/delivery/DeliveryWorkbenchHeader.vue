@@ -3,12 +3,19 @@ defineProps<{
   stats: {
     total: number
     pending: number
+    pendingIntake: number
     processing: number
     done: number
     failed: number
     awaitingPrint: number
   }
   pendingCount: number
+  statusCounts?: {
+    archive: number
+    review: number
+    triage: number
+    duplicate: number
+  }
 }>()
 
 const emit = defineEmits<{
@@ -25,7 +32,7 @@ const emit = defineEmits<{
           送货单识别工作台
         </div>
         <div class="mt-0.5 text-11px text-ink-faint">
-          PaddleOCR-VL 1.6 · 自动裁边扶正 · 表格提取 · 归档即入库 · 打印单独回执
+          PaddleOCR-VL 1.6 · 自动裁边扶正 · 表格提取 · 人工核对归档 · 打印单独回执
         </div>
       </div>
       <button type="button" class="btn-secondary" :disabled="!pendingCount" @click="emit('recognizeAll')">
@@ -49,9 +56,10 @@ const emit = defineEmits<{
     </button>
 
     <div class="delivery-workbench-stats grid gap-3">
-      <StatCard label="队列文件" :value="stats.total" icon="i-lucide-files" color="brand" />
-      <StatCard label="待识别" :value="stats.pending + stats.processing" icon="i-lucide-clock" color="warn" />
-      <StatCard label="待核对 / 打印" :value="stats.done + stats.awaitingPrint" icon="i-lucide-file-check" color="ok" />
+      <StatCard label="待人工归档" :value="statusCounts?.archive ?? stats.done" icon="i-lucide-file-check" color="ok" />
+      <StatCard label="待复核" :value="statusCounts?.review ?? 0" icon="i-lucide-triangle-alert" color="warn" />
+      <StatCard label="人工分流" :value="statusCounts?.triage ?? stats.pendingIntake" icon="i-lucide-file-warning" color="danger" />
+      <StatCard label="重复待核查" :value="statusCounts?.duplicate ?? 0" icon="i-lucide-copy-check" color="brand" />
       <StatCard label="识别失败" :value="stats.failed" icon="i-lucide-circle-x" color="danger" />
     </div>
   </div>

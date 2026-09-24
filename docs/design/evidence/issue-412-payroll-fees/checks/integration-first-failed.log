@@ -1,0 +1,95 @@
+[STARTED] Backing up original state...
+[COMPLETED] Backed up original state in git stash (44990326)
+[STARTED] Running tasks for staged files...
+[STARTED] .lintstagedrc — 7 files
+[STARTED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 1 file
+[STARTED] eslint --fix
+[COMPLETED] eslint --fix
+[COMPLETED] *.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,json,jsonc} — 1 file
+[COMPLETED] .lintstagedrc — 7 files
+[COMPLETED] Running tasks for staged files...
+[STARTED] Staging changes from tasks...
+[COMPLETED] Staging changes from tasks...
+[STARTED] Cleaning up temporary files...
+[COMPLETED] Cleaning up temporary files...
+
+> crm-new@ typecheck D:\crm本地项目开发
+> nuxt typecheck
+
+
+> crm-new@ test D:\crm本地项目开发
+> vitest run
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+ ❯ |unit| tests/payroll/fees-migration-runtime.test.ts (12 tests | 1 failed) 37489ms
+   × 迁入后管理配置只用映射原责任，后月延续负价与已领，重复迁入保留新发放 6200ms
+ ❯ |unit| tests/payroll/central-a-diagnostic-location.test.ts (5 tests | 1 failed) 5420ms
+     × 原细分行已缺失仍按原审计精确呈现房间分项，HTTP形状往返保留定位 1161ms
+stderr | tests/payroll/central-a-http.test.ts > a HTTP/Repository往返保数量精度、明确零与固定目标，拒绝客户端伪造来源和未知动作
+[h3] Please prefer using `message` for longer error messages instead of `statusMessage`. In the future, `statusMessage` will be sanitized by default.
+
+stderr | tests/payroll/central-a-http.test.ts > a HTTP/Repository往返保数量精度、明确零与固定目标，拒绝客户端伪造来源和未知动作
+[h3] Please prefer using `message` for longer error messages instead of `statusMessage`. In the future, `statusMessage` will be sanitized by default.
+
+ ❯ |unit| tests/payroll/central-a-http.test.ts (1 test | 1 failed) 1626ms
+   × a HTTP/Repository往返保数量精度、明确零与固定目标，拒绝客户端伪造来源和未知动作 1625ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/central-a-diagnostic-location.test.ts > 中央工资损坏来源的原位置读取 > 原细分行已缺失仍按原审计精确呈现房间分项，HTTP形状往返保留定位
+ProjectRepositoryProblem: 工资费用用途或读取依据不完整
+ ❯ payrollProblem app/lib/payroll/central-contract.ts:111:10
+    109| }
+    110| export function payrollProblem(code: Parameters<typeof projectProblem>…
+    111|   return new ProjectRepositoryProblem({ ...projectProblem(code, messag…
+       |          ^
+    112| }
+    113|
+ ❯ fail app/lib/payroll/central-a-codec.ts:26:9
+ ❯ decodePayrollARead app/lib/payroll/central-a-codec.ts:229:7
+ ❯ tests/payroll/central-a-diagnostic-location.test.ts:58:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |unit| tests/payroll/central-a-http.test.ts > a HTTP/Repository往返保数量精度、明确零与固定目标，拒绝客户端伪造来源和未知动作
+ProjectRepositoryProblem: 工资费用用途或读取依据不完整
+ ❯ payrollProblem app/lib/payroll/central-contract.ts:111:10
+    109| }
+    110| export function payrollProblem(code: Parameters<typeof projectProblem>…
+    111|   return new ProjectRepositoryProblem({ ...projectProblem(code, messag…
+       |          ^
+    112| }
+    113|
+ ❯ fail app/lib/payroll/central-a-codec.ts:26:9
+ ❯ decodePayrollARead app/lib/payroll/central-a-codec.ts:229:7
+ ❯ app/lib/payroll/central-repository.ts:47:169
+ ❯ readProjectHttp app/lib/project/http-repository.ts:68:12
+ ❯ tests/payroll/central-a-http.test.ts:58:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |unit| tests/payroll/fees-migration-runtime.test.ts > 迁入后管理配置只用映射原责任，后月延续负价与已领，重复迁入保留新发放
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/payroll/fees-migration-runtime.test.ts:68:1
+     66| })
+     67|
+     68| it('迁入后管理配置只用映射原责任，后月延续负价与已领，重复迁入保留新发放', async () => {
+       | ^
+     69|   const f = await createPayrollFeesMigrationFixture()
+     70|   try {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  3 failed | 734 passed (737)
+      Tests  3 failed | 4179 passed (4182)
+   Start at  00:35:21
+   Duration  303.84s (transform 91.66s, setup 241.44s, import 485.00s, tests 1476.81s, environment 776.84s)
+
+ ELIFECYCLE  Test failed. See above for more details.
+husky - pre-commit script failed (code 1)

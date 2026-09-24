@@ -20,6 +20,19 @@ beforeEach(async () => {
 afterEach(() => db.close())
 
 describe('工程量量差总表', () => {
+  it('中央模式仅使用当前清单价和签证，旧 SQLite 清单与审批不补齐缺值', async () => {
+    const linked = await db.select<{ id: string }>(`SELECT DISTINCT boq_line_id AS id FROM house_type_template_items WHERE boq_line_id IS NOT NULL`)
+    const lines = linked.map(row => ({ id: row.id, contractId: 'contract', contractNo: 'HT', contractName: '当前合同', itemName: '清单', unit: '㎡', qty: null, unitPrice: null, approvedDeltaQty: 7, effectiveUnitPrice: 99, building: null, updatedAt: '2026-09-11T00:00:00.000Z' }))
+    const facts = await loadQuantityVarianceFacts(db, 'proj_demo_001', lines)
+    const changes = facts.filter(row => row.id.startsWith('approved-change:'))
+    expect(changes.length).toBeGreaterThan(0)
+    expect(changes.every(row => row.contractQty === 7 && row.effectiveUnitPrice === 99 && row.fieldQty === null)).toBe(true)
+    expect(new Set(changes.map(row => row.id)).size).toBe(changes.length)
+    const unavailable = await loadQuantityVarianceFacts(db, 'proj_demo_001', [])
+    expect(unavailable.some(row => row.id.startsWith('approved-change:'))).toBe(false)
+    expect(unavailable.every(row => row.effectiveUnitPrice === null)).toBe(true)
+  })
+
   it('按楼栋与分项聚合户型三量，跨楼栋签证只形成一条待分摊项目事实', async () => {
     const facts = await loadQuantityVarianceFacts(db, 'proj_demo_001')
     const rows = buildQuantityVarianceRows(facts, 'provisional')

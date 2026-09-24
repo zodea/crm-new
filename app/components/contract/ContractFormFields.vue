@@ -668,7 +668,6 @@ function inputChecked(event: Event): boolean {
 <style scoped>
 .form-fields-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 0.75rem 1rem;
   margin-top: 0.75rem;
 }

@@ -1,0 +1,79 @@
+{
+  "reviewer": "/root/c2_b_independent",
+  "baseline": "4738be98730955cd63832c8df04fc6f1d855caff",
+  "productFindings": [],
+  "reviewedInputs": [
+    {
+      "path": "app/lib/payroll/central-source-locks.ts",
+      "sha256": "51fd7ad857ad53f51db3eef9033756f22edcf253c33b028827fcf73b5745bfe9",
+      "matchedAuthorFreeze": true
+    },
+    {
+      "path": "server/utils/payroll-daywork-facts.ts",
+      "sha256": "f8db42347e467542fa096162eed13679d2c8f85ba1addc14ff573abf4d56f608",
+      "matchedAuthorFreeze": true
+    },
+    {
+      "path": "server/utils/payroll-c2-migration-references.ts",
+      "sha256": "19b8cbbe61ce3f4b425ee50cb0a22cd95692941da7e196810039c4aae79880db",
+      "matchedAuthorFreeze": true
+    },
+    {
+      "path": "server/utils/payroll-migration.ts",
+      "sha256": "a43d1e3aec581dee7ef45d28f3c7210cdcadd7d665164b2251f6d79fc7f54231",
+      "matchedAuthorFreeze": true
+    },
+    {
+      "path": "server/utils/payroll-a-migration-references.ts",
+      "sha256": "cc6f8de36aab1b90d52f2875bb98529fd5d0ac8c10bafa375d4f5a445e6eade6",
+      "matchedAuthorFreeze": true
+    },
+    {
+      "path": "tests/helpers/payroll-c2-migration-source.ts",
+      "sha256": "2343e339c7318d31db5043c597a63dd57a0e7d273e80d600575462d913e39938",
+      "matchedAuthorFreeze": true
+    },
+    {
+      "path": "tests/payroll/daywork-facts.test.ts",
+      "sha256": "97538fd6bf8883f0472ef55291b6d4ae0c0d20c236d7e86c73661bec1a801fee",
+      "matchedAuthorFreeze": true
+    },
+    {
+      "path": "tests/payroll/c2-source-locks.test.ts",
+      "sha256": "b19e846ca77aefa0fbfe97281112a997f558815e75352737774063c860e39da8",
+      "matchedAuthorFreeze": true
+    },
+    {
+      "path": "tests/payroll/c2-migration-protection.test.ts",
+      "sha256": "cd96ca751cd650a8da1733c3d56cfa51227f99e9b6cb308000ef2e324e67a98a",
+      "matchedAuthorFreeze": true
+    }
+  ],
+  "independentTestCount": 1,
+  "scopedTestCount": 27,
+  "scopedFileCount": 4,
+  "scopedDurationSeconds": 20.61,
+  "scopedExitCode": 0,
+  "artifacts": [
+    {
+      "path": "tests/payroll/c2-b-independent.test.ts",
+      "sha256": "e72de56c9fd92f9cca43b3ed31a1f15ac58162ccbaba302d0b871b43f307afd2"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b-independent/independent-test.log",
+      "sha256": "8b574bb7f3896c9f9809a7ebc2a792a692b84a681ee2d5a98fe3aa4f6ae07335"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b-independent/independent-test-final.log",
+      "sha256": "1ab2d7947ff2fdecaca692549f6a5004df2ff9651e2f2fa68a3c6769ec168d79"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b-independent/scoped-validation.log",
+      "sha256": "a7d68798cad31ca7e22fbadc82aa1b91632db9d832e87f06934d0b462b58c5a8"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b-independent/review.md",
+      "sha256": "fbc7ba3725df8d9c77849dc16a41af29583ecb67f9ea13d591115540db2d2a44"
+    }
+  ]
+}

@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import LookupSelect from '~/components/ui/LookupSelect.vue'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 const { warning } = vi.hoisted(() => ({
   warning: vi.fn(() => 'toast-warning'),
@@ -13,6 +15,10 @@ vi.mock('vue-sonner', () => ({
     warning,
   }),
 }))
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
 
 afterEach(() => {
   localStorage.clear()
@@ -64,7 +70,7 @@ describe('lookupSelect public behavior', () => {
 
   it('keeps dependency-disabled fields closed and reports the reason', async () => {
     const reason = '该字段依赖“项目名称”的值，请补全后操作'
-    localStorage.setItem('kit-lookup:disabled-projects:recent', JSON.stringify([
+    localStorage.setItem('kit-lookup:workspace-default:real:disabled-projects:recent', JSON.stringify([
       { id: 'project-1', label: '车陂项目' },
     ]))
     render(LookupSelect, {
@@ -131,7 +137,7 @@ describe('lookupSelect public behavior', () => {
   })
 
   it('restores the selected label from recent storage for an id-only model', () => {
-    localStorage.setItem('kit-lookup:projects:recent', JSON.stringify([
+    localStorage.setItem('kit-lookup:workspace-default:real:projects:recent', JSON.stringify([
       { id: 'project-1', label: '车陂项目' },
     ]))
 
@@ -146,6 +152,31 @@ describe('lookupSelect public behavior', () => {
 
     expect(screen.getByRole<HTMLInputElement>('combobox', { name: '选择项目' }).value)
       .toBe('车陂项目')
+  })
+
+  it('最近选择使用 Pinia 已授权的工作区而不重读原始偏好', async () => {
+    localStorage.setItem('ruihang:workspace-default:include-demo', 'true')
+    const visibility = useDataVisibilityStore()
+    await visibility.initialize(vi.fn().mockResolvedValue(true))
+    localStorage.setItem('ruihang:workspace-default:include-demo', 'false')
+    localStorage.setItem('kit-lookup:workspace-default:demo:projects:recent', JSON.stringify([
+      { id: 'project-1', label: '演示工作区项目' },
+    ]))
+    localStorage.setItem('kit-lookup:workspace-default:real:projects:recent', JSON.stringify([
+      { id: 'project-1', label: '正式工作区项目' },
+    ]))
+
+    render(LookupSelect, {
+      props: {
+        fetch: vi.fn(async () => []),
+        modelValue: 'project-1',
+        recentKey: 'projects',
+        placeholder: '选择项目',
+      },
+    })
+
+    expect(screen.getByRole<HTMLInputElement>('combobox', { name: '选择项目' }).value)
+      .toBe('演示工作区项目')
   })
 
   it('resolves an id-only model through the public fetch contract', async () => {

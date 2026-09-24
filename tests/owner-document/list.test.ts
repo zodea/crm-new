@@ -55,6 +55,22 @@ const rows: OwnerDocumentListRecord[] = [
 ]
 
 describe('owner document list configuration', () => {
+  it('类型和状态多选遵循同字段并集、跨字段交集', () => {
+    const query = { search: '', project: 'all', type: ['site_visa', 'change_negotiation'], statusView: ['approved', 'submitted'] }
+    expect(filterOwnerDocumentRows('owner_change', rows, query)).toHaveLength(2)
+    expect(filterOwnerDocumentRows('owner_change', rows, { ...query, type: ['site_visa'] }).map(row => row.id)).toEqual(['change-1'])
+    expect(filterOwnerDocumentRows('owner_change', rows, { ...query, type: [], statusView: [] })).toHaveLength(2)
+  })
+  it('分包付款余额只出现在分包结算列表，甲方最终结算保持原业务列', () => {
+    const paymentFields = ['deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid']
+    expect(OWNER_DOCUMENT_LIST_CONFIG.sub_settlement.columns.map(column => column.field))
+      .toEqual(expect.arrayContaining(paymentFields))
+    expect(OWNER_DOCUMENT_LIST_CONFIG.final_settlement.columns.filter(column => paymentFields.includes(column.field ?? '')))
+      .toEqual([])
+    expect(OWNER_DOCUMENT_LIST_CONFIG.final_settlement.columns.find(column => column.field === 'amount')?.title)
+      .toBe('结算金额')
+  })
+
   it('八类列表保留各自真实业务列与金额汇总口径', () => {
     expect(Object.keys(OWNER_DOCUMENT_LIST_CONFIG)).toHaveLength(8)
     expect(OWNER_DOCUMENT_LIST_CONFIG.owner_change.columns.map(column => column.title))
@@ -69,6 +85,10 @@ describe('owner document list configuration', () => {
       .toEqual(expect.arrayContaining(['乙方（分供方）', '变更面积', '实际审定价']))
     expect(OWNER_DOCUMENT_LIST_CONFIG.sub_settlement.columns.map(column => column.title))
       .toContain('结算类型')
+    expect(OWNER_DOCUMENT_LIST_CONFIG.acceptance.amountSummaries)
+      .toEqual([{ field: 'amount', label: '合同估算金额总和' }])
+    expect(OWNER_DOCUMENT_LIST_CONFIG.acceptance.columns.map(column => column.title))
+      .toEqual(expect.arrayContaining(['合同估算', '验收结论', '附件']))
   })
 
   it('按搜索、项目、类型、状态与来源 query 共同收窄真实 ID', () => {
@@ -93,7 +113,13 @@ describe('owner document list configuration', () => {
   it('按单据类型解释本地状态与类型，而不把英文存储值暴露给用户', () => {
     expect(ownerDocumentStatusViewKey('owner_report', 'adjusted')).toBe('reported')
     expect(ownerDocumentStatusLabelForList('owner_change', 'submitted')).toBe('已上报')
-    expect(ownerDocumentStatusLabelForList('owner_penalty', 'submitted')).toBe('申诉中')
+    expect(OWNER_DOCUMENT_LIST_CONFIG.owner_penalty.views).toEqual([
+      { key: 'all', label: '全部' },
+      { key: 'draft', label: '草稿' },
+      { key: 'submitted', label: '已提交' },
+    ])
+    expect(ownerDocumentStatusViewKey('owner_penalty', 'submitted')).toBe('submitted')
+    expect(ownerDocumentStatusLabelForList('owner_penalty', 'submitted')).toBe('已提交')
     expect(ownerDocumentStatusLabelForList('acceptance', 'expired')).toBe('已到期')
     expect(ownerDocumentStatusViewKey('project_penalty', 'draft')).toBe('draft')
     expect(ownerDocumentStatusLabelForList('project_penalty', 'draft')).toBe('草稿')
@@ -101,6 +127,26 @@ describe('owner document list configuration', () => {
     expect(ownerDocumentStatusLabelForList('project_penalty', 'repaired_self')).toBe('自行整改')
     expect(ownerDocumentStatusClass('sub_change', 'rejected')).toBe('chip-danger')
     expect(ownerDocumentTypeLabel('owner_change', 'site_visa')).toBe('现场签证')
+  })
+
+  it('验收列表按 canonical 状态区分已验收与已到期', () => {
+    const accepted = { ...rows[0], id: 'acceptance-accepted', status: 'accepted' }
+    const expired = { ...rows[0], id: 'acceptance-expired', status: 'expired' }
+
+    expect(ownerDocumentStatusViewKey('acceptance', accepted.status)).toBe('accepted')
+    expect(ownerDocumentStatusViewKey('acceptance', expired.status)).toBe('expired')
+    expect(filterOwnerDocumentRows('acceptance', [accepted, expired], {
+      search: '',
+      project: 'all',
+      type: 'all',
+      statusView: 'accepted',
+    })).toEqual([accepted])
+    expect(filterOwnerDocumentRows('acceptance', [accepted, expired], {
+      search: '',
+      project: 'all',
+      type: 'all',
+      statusView: 'expired',
+    })).toEqual([expired])
   })
 
   it('甲方罚扣可按联系单编号搜索', () => {

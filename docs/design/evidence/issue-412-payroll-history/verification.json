@@ -1,0 +1,110 @@
+{
+  "baseline": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
+  "status": "slice-verified",
+  "scope": "工资P0完整资料接管、中央历史与独立来源只读；P1–P7及生产不在此通过范围",
+  "commitState": "已完成本地独立提交；89个验收代码Git内容身份全部匹配。未推送或部署。",
+  "checks": [
+    {
+      "name": "npm test",
+      "files": 600,
+      "tests": 3697,
+      "seconds": 249.45,
+      "startedAt": "2026-09-13 03:24:35 +08:00",
+      "exitCode": 0
+    },
+    {
+      "name": "pnpm typecheck",
+      "exitCode": 0
+    },
+    {
+      "name": "pnpm build",
+      "exitCode": 0
+    },
+    {
+      "name": "本单元代码 ESLint",
+      "files": 89,
+      "exitCode": 0,
+      "note": "浏览器末次选择器与取景修改另经5文件ESLint通过"
+    },
+    {
+      "name": "Root 独立历史完整性",
+      "files": 1,
+      "tests": 9,
+      "seconds": 5.71,
+      "exitCode": 0
+    },
+    {
+      "name": "覆盖、设计及运行证据契约",
+      "files": 3,
+      "tests": 32,
+      "exitCode": 0
+    },
+    {
+      "name": "最终实际浏览器整批",
+      "files": 4,
+      "tests": 9,
+      "seconds": 50.6,
+      "exitCode": 0,
+      "mainJourneySeconds": 22.4
+    }
+  ],
+  "browser": {
+    "manifest": "browser/manifest.json",
+    "source": "browser/source-verification.json",
+    "images": 85,
+    "reviewed": 85,
+    "widths": [
+      390,
+      768,
+      1024,
+      1280,
+      1440
+    ],
+    "runId": "984d1446-bc1e-46d0-9f09-e636b5d57443",
+    "interruptedAttemptsIncluded": false
+  },
+  "guides": {
+    "manifest": "pdf/page-hashes.json",
+    "documents": 2,
+    "pages": 9,
+    "reviewedPages": 9
+  },
+  "review": {
+    "record": "review.md",
+    "specUnresolved": 0,
+    "standardsUnresolved": 0,
+    "visualUnresolved": 0
+  },
+  "regressionsFixed": [
+    "坏快照条目误标完整",
+    "零成员及班组月份锁范围",
+    "原表头与冻结金额差异",
+    "同批历史日志归属",
+    "旧备份可省略工资图兼容",
+    "工资多状态及来源返回"
+  ],
+  "notClaimed": [
+    "日常中央工资建单、核对和发放",
+    "独立更正及实际补退",
+    "房补管理费、空鼓扣款和完整工作簿",
+    "生产持久化与部署",
+    "远端推送或云CI"
+  ],
+  "commit": "1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3",
+  "commitChecks": {
+    "files": 600,
+    "tests": 3697,
+    "seconds": 229.72,
+    "startedAt": "2026-09-13 04:00:16 +08:00",
+    "codeBlobsMatched": 89,
+    "normalHooks": true,
+    "firstAttempt": "旧页签startup-order用例5000ms超时；同一原断言独跑830ms通过，未改代码后正常全套通过"
+  },
+  "cleanup": {
+    "files": 341,
+    "bytes": 22474402,
+    "recovery": "Windows Recycle Bin",
+    "at": "2026-09-13T04:05:40+08:00",
+    "retained": "85张正式交互图、9页正式PDF图及两份指南PDF"
+  }
+}

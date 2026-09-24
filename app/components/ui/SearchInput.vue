@@ -4,6 +4,7 @@
 withDefaults(defineProps<{
   placeholder?: string
   width?: number
+  maxlength?: number
 }>(), { placeholder: '搜索…', width: 210 })
 
 const model = defineModel<string>()
@@ -19,6 +20,7 @@ const model = defineModel<string>()
       type="search"
       :placeholder="placeholder"
       :aria-label="placeholder"
+      :maxlength="maxlength"
       class="h-8 min-w-0 w-full box-border border border-line-strong rounded-[var(--radius-btn)] bg-panel pl-[32px] pr-[14px] text-[13px] text-ink outline-none placeholder:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
     >
   </div>

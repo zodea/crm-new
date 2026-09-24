@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { F2FormKind } from '~/lib/contract/forms'
 import type { StatusTone } from '~/lib/project/status'
+import type { DataOriginDTO } from '~/types/read-model'
+import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
 import { contractStages } from '~/lib/contract/detail'
 import { formPath } from '~/lib/contract/page'
 import {
@@ -8,10 +10,22 @@ import {
   contractBalance,
   kindLabels,
 } from '~/lib/contract/status'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { yuan } from '~/lib/util/money'
 import { maskPhone } from '~/lib/util/privacy'
+import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()
+const desktop = isDesktopRuntime()
+const materialOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'material' && isDataOriginDTO(route.query.origin)
+  ? route.query.origin
+  : null)
+const constructionOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'construction' && isDataOriginDTO(route.query.origin)
+  ? route.query.origin
+  : null)
+const subcontractOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'subcontract' && isDataOriginDTO(route.query.origin)
+  ? route.query.origin
+  : null)
 const contractStore = useContractStore()
 const detailStore = useContractDetailStore()
 
@@ -20,6 +34,10 @@ const contractId = computed(() => {
   return Array.isArray(value) ? value[0] ?? '' : String(value ?? '')
 })
 const contract = computed(() => contractStore.byId(contractId.value))
+const projectSupplierReturn = useProjectSupplierReturnContext(
+  () => contract.value?.projectId,
+  () => contract.value?.supplierId,
+)
 const detail = computed(() => detailStore.byContract(contractId.value))
 const initializing = shallowRef(true)
 const loadError = shallowRef('')
@@ -43,12 +61,15 @@ const kindLabel = computed(() => {
 })
 
 const backTo = computed(() => {
+  if (projectSupplierReturn.value)
+    return projectSupplierReturn.value.to
   switch (contract.value?.kind) {
     case '分包': return '/contract/subcontract'
     case '材采': return '/contract/material'
     default: return '/contract/construction'
   }
 })
+const backLabel = computed(() => projectSupplierReturn.value ? '返回项目分供方工作台' : `返回${kindLabel.value}列表`)
 
 const TONE_CHIP: Record<StatusTone, string> = {
   warn: 'chip-warn',
@@ -131,6 +152,8 @@ function openEdit() {
 let loadRequest = 0
 
 async function load() {
+  if (materialOrigin.value || constructionOrigin.value || subcontractOrigin.value)
+    return
   const request = ++loadRequest
   const requestedId = contractId.value
   initializing.value = true
@@ -162,13 +185,28 @@ watch(contractId, () => {
 </script>
 
 <template>
+  <MaterialContractDetailScreen
+    v-if="materialOrigin"
+    :contract-id="contractId"
+    :origin="materialOrigin"
+  />
+  <ConstructionContractDetailScreen
+    v-else-if="constructionOrigin"
+    :contract-id="contractId"
+    :origin="constructionOrigin"
+  />
+  <SubcontractContractDetailScreen
+    v-else-if="subcontractOrigin"
+    :contract-id="contractId"
+    :origin="subcontractOrigin"
+  />
   <div
-    v-if="contract && !initializing && !contractStore.loading && !loadError"
+    v-else-if="contract && !initializing && !contractStore.loading && !loadError"
     class="contract-detail-screen min-w-0 space-y-3"
   >
     <header class="panel px-4 py-3" data-ui="contract-detail-header">
       <div class="flex min-w-0 flex-wrap items-center gap-3">
-        <NuxtLink :to="backTo" class="icon-btn" :aria-label="`返回${kindLabel}列表`" title="返回列表">
+        <NuxtLink :to="backTo" class="icon-btn" :aria-label="backLabel" :title="backLabel">
           <span class="i-lucide-arrow-left h-3.5 w-3.5" aria-hidden="true" />
         </NuxtLink>
         <div class="min-w-0 flex-[1_1_24rem]">

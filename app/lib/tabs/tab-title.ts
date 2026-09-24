@@ -3,6 +3,8 @@
 // subtitle 口径对齐 DC 设计稿 app.dc.html PAGE 词条（顶栏第二行）。
 
 const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[] = [
+  { test: p => p === '/subcontract/payroll/workbooks', title: '完整工资工作簿', subtitle: '固定目录 · 正式编号 · 名册原件' },
+  { test: p => /^\/subcontract\/payroll\/issue\/[^/]+/.test(p), title: '正式工资出具', subtitle: '冻结预览 · 正式编号 · 原件输出' },
   {
     test: p => /^\/export\/config\/[^/]+\/?$/.test(p),
     title: '导出配置',
@@ -14,6 +16,7 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
     subtitle: '上传 · 映射 · 预览导入',
   },
   { test: p => p === '/', title: '首页', subtitle: '在建工程总览' },
+  { test: p => p.startsWith('/settings/data-migration'), title: '本地数据迁移', subtitle: '预检 · 备份 · 对账 · 切换' },
   { test: p => p.startsWith('/settings/ocr'), title: 'OCR 设置', subtitle: '引擎状态 · 单据接入 · 参数边界' },
   { test: p => p === '/schedule/process-library/form', title: '标准工序库表单', subtitle: '工序 · 工种 · 工期 · 前置关系' },
   { test: p => p.startsWith('/schedule/process-library'), title: '标准工序库', subtitle: '版本维护 · 甘特预览 · 项目复用' },
@@ -36,6 +39,8 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
   { test: p => p.startsWith('/base/crew/form'), title: '班组表单', subtitle: '核算配置 · 合作协议' },
   { test: p => /^\/base\/crew\/[^/]+/.test(p), title: '班组详情', subtitle: '基本信息 · 工人配置 · 分项单价' },
   { test: p => p.startsWith('/base/crew'), title: '班组管理', subtitle: '全局核算单元 · 跨项目复用' },
+  { test: p => p.startsWith('/base/worker/private'), title: '工人私密资料', subtitle: '实名 · 劳动合同 · 照片原件' },
+  { test: p => p === '/subcontract/payroll/roster', title: '工资实名名册归档', subtitle: '原工资成员 · 资料登记日期 · 不可变版本' },
   { test: p => p.startsWith('/base/worker/form'), title: '工人表单', subtitle: '人员档案 · 项目分配 · 证书' },
   { test: p => /^\/base\/worker\/[^/]+/.test(p), title: '工人详情', subtitle: '档案 · 证书 · 亲属关联' },
   { test: p => p.startsWith('/base/worker'), title: '工人信息', subtitle: '人员管理' },
@@ -48,6 +53,7 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
   { test: p => p.startsWith('/finance/current'), title: '往来收付', subtitle: '非合同往来 · 收付台账' },
   { test: p => p.startsWith('/finance/reimbursement'), title: '费用报销', subtitle: '费用明细 · 票据与经办' },
   { test: p => p.startsWith('/finance/payment-management'), title: '付款管理', subtitle: '待支付工作台 · 批复金额与银行实际支付' },
+  { test: p => /^\/finance\/payment\/[^/]+\/detail/.test(p), title: '付款申请详情', subtitle: '合同 · 结算 · 发票 · 支付洞察' },
   { test: p => p.startsWith('/finance/payment'), title: '付款申请', subtitle: '关联结算 · 发票勾稽 · 审批支付' },
   { test: p => p.startsWith('/finance/records'), title: '支付记录', subtitle: '银行支付 · 付款申请分摊' },
   { test: p => p.startsWith('/finance'), title: '资金管理' },
@@ -69,6 +75,7 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
   { test: p => p.startsWith('/subcontract/change'), title: '分包变洽签', subtitle: '分包增项 · 签证 · 审批金额' },
   { test: p => p.startsWith('/subcontract/settlement'), title: '分包结算', subtitle: '过程结算 · 完工结算 · 抵扣' },
   { test: p => p === '/subcontract/quantity/template', title: '户型模板', subtitle: '房间 × 分项 × 三量' },
+  { test: p => p === '/subcontract/quantity/stages', title: '施工阶段配置', subtitle: '项目阶段 · 分项关系 · 月度报量选择' },
   { test: p => p === '/subcontract/quantity/region', title: '项目区域配置', subtitle: '楼栋 → 楼层 → 户' },
   { test: p => /^\/subcontract\/quantity\/[^/]+\/[^/]+/.test(p), title: '户施工详情', subtitle: '工种 → 工序阶段 → 完成日期 · 三量与验收照片' },
   { test: p => p.startsWith('/subcontract/quantity'), title: '工程量管理', subtitle: '户型模板 · 责任指派 · 阶段完成' },

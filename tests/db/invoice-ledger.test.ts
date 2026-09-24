@@ -3,7 +3,7 @@
 // account_status='archived'）+ ADR-0001 归属铁律（无归属禁止归档）。
 import { describe, expect, it } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
-import { checkArchiveOwnership, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
+import { checkArchiveOwnership, checkInvoiceArchiveReady, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
 import { createMemoryDb } from '../helpers/memory-db'
 
 describe('checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.4「核对完成是归档唯一前置」)', () => {
@@ -51,6 +51,58 @@ describe('checkArchiveOwnership:归档归属校验(纯逻辑)', () => {
   it('归属为个人开支(personal)不挂项目也放行', () => {
     expect(checkArchiveOwnership('personal', null)).toEqual({ ok: true })
     expect(checkArchiveOwnership('personal', undefined)).toEqual({ ok: true })
+  })
+
+  it('个人开支不能同时携带项目归属', () => {
+    expect(checkArchiveOwnership('personal', 'proj1').ok).toBe(false)
+  })
+})
+
+describe('#257 票据归档终态门禁与数据守恒', () => {
+  const candidate = () => ({
+    ocrStatus: 'done',
+    reviewStatus: 'reviewed',
+    dupStatus: 'normal',
+    ownerKind: 'project',
+    projectId: 'proj1',
+    invoiceNumber: 'INV-001',
+    invoiceDate: '2026-06-01',
+    seller: '甲供应商',
+    totalAmount: 113,
+    provenance: {
+      sourceKind: 'manual' as const,
+      sourceId: 'manual-INV-001',
+      sourceInfo: { entry: 'manual' },
+      originalOcr: null,
+      revisions: [],
+    },
+  })
+
+  it('只允许人工确认后的当前值进入归档，原始 OCR/修订/来源留痕不改变台账值', () => {
+    expect(checkInvoiceArchiveReady({
+      ...candidate(),
+      provenance: {
+        sourceKind: 'ocr',
+        sourceId: 'source-1',
+        sourceInfo: { fileName: 'source-1.pdf' },
+        originalOcr: { totalAmount: 110 },
+        revisions: [{ field: 'totalAmount', from: 110, to: 113, reason: '票面人工复核', at: '2026-06-02T08:00:00Z' }],
+      },
+    })).toEqual({ ok: true })
+  })
+
+  it.each([
+    ['ocrStatus', { ocrStatus: 'failed' }, '识别尚未完成'],
+    ['reviewStatus', { reviewStatus: 'unreviewed' }, '需先完成校对'],
+    ['duplicate status', { dupStatus: 'duplicate' }, '重复发票'],
+    ['natural key duplicate', { naturalKeyDuplicate: true }, '自然键重复'],
+    ['missing owner', { ownerKind: null }, '缺少归属'],
+    ['missing number', { invoiceNumber: '' }, '缺少发票号码'],
+    ['invalid amount', { totalAmount: 0 }, '金额异常'],
+  ])('%s 不得静默进入终态', (_label, patch, reason) => {
+    const result = checkInvoiceArchiveReady({ ...candidate(), ...patch })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toContain(reason)
   })
 })
 

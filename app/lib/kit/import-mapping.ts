@@ -15,6 +15,15 @@ export interface ImportColumnMatch {
   confidence: ImportMatchConfidence
 }
 
+/**
+ * 领域导入可以把来源证据挂在投影行上，而不把来源字段混进用户可映射的模板字段。
+ * 该键使用不可枚举属性传递，导出拒绝清单时仍只输出业务列，来源证据由领域专用链路读取。
+ */
+export const IMPORT_SOURCE_META_KEY = '__importSource'
+
+/** 写入前已经确定的业务拒绝，允许导入执行器继续处理其余行。 */
+export class ImportRowRejected extends Error {}
+
 /** 模板字段 key → 源列匹配；未匹配字段不出现。 */
 export type ImportMapping = Readonly<Record<string, ImportColumnMatch>>
 
@@ -113,6 +122,15 @@ export function buildImportRows(
       // hasOwn 而非 in：列名恰为原型键（toString/__proto__）时不得投影继承值。
       if (Object.hasOwn(row, match.column))
         mapped[key] = row[match.column]
+    }
+    const sourceMeta = row[IMPORT_SOURCE_META_KEY]
+    if (sourceMeta !== undefined) {
+      Object.defineProperty(mapped, IMPORT_SOURCE_META_KEY, {
+        configurable: true,
+        enumerable: false,
+        value: sourceMeta,
+        writable: false,
+      })
     }
     return mapped
   })

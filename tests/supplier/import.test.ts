@@ -97,7 +97,7 @@ describe('项目分供方文件分类', () => {
     { id: 'sup-short', name: '华建', aliases: [] },
   ]
 
-  it('按文件名中的最长公司名称或别名匹配现有分供方', () => {
+  it('先匹配公司全称，没有全称时才匹配别名', () => {
     expect(classifyProjectSupplierImportFile(
       '瑞航中心-华东建设工程有限公司-施工合同.pdf',
       suppliers,
@@ -117,6 +117,20 @@ describe('项目分供方文件分类', () => {
       matchSource: 'alias',
       category: '付款',
     })
+  })
+
+  it('全称命中优先于更长别名，同层仍取最长匹配', () => {
+    const candidates = [
+      { id: 'alias', name: '另一家公司', aliases: ['华建合同', '华东', '华东建设'] },
+      { id: 'short-name', name: '华建', aliases: [] },
+      { id: 'long-name', name: '华建集团', aliases: [] },
+    ]
+    expect(classifyProjectSupplierImportFile('华建合同.pdf', candidates)).toMatchObject({ supplierId: 'short-name', matchSource: 'name' })
+    expect(classifyProjectSupplierImportFile('华建集团-华建合同.pdf', candidates)).toMatchObject({ supplierId: 'long-name', matchSource: 'name' })
+    expect(classifyProjectSupplierImportFile('华东建设付款.pdf', [
+      { id: 'short-alias', name: '其他企业', aliases: ['华东'] },
+      candidates[0],
+    ])).toMatchObject({ supplierId: 'alias', matchSource: 'alias' })
   })
 
   it('未匹配时只从文件名推导待确认名称，不宣称读取文件内容', () => {

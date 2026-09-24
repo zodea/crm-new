@@ -16,6 +16,7 @@ import { defineStore } from 'pinia'
 import { shallowRef } from 'vue'
 import { select, withTransaction } from '~/lib/db/connection'
 import { hiddenCtes, hiddenCtesFor, logCreate, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
+import { approvalPaymentCap, readApprovalAmount } from '~/lib/finance/approval-amount'
 import { applyFileRefChanges } from '~/lib/forms/file-refs'
 import {
   taxpayerAuditSourceCategory,
@@ -135,6 +136,7 @@ const EMPTY_SUMMARY: SupplierReadonlySummary = {
   projectCount: 0,
   contractCount: 0,
   contractTotal: 0,
+  settledTotal: 0,
   claimedTotal: 0,
   invoiceTotal: 0,
   invoiceTaxTotal: 0,
@@ -234,6 +236,10 @@ function rowToContract(row: Record<string, unknown>): SupplierContractSummary {
 
 function rowToPayment(row: Record<string, unknown>): SupplierPaymentSummary {
   const paidAmount = Number(row.derived_paid_amount ?? 0)
+  const approvedAmount = row.approved_amount === null ? null : Number(row.approved_amount)
+  const origin = row.approved_amount_origin === 'user-entry' ? 'user-entry' : 'legacy'
+  const approval = readApprovalAmount(approvedAmount, origin)
+  const cap = approvalPaymentCap(Number(row.apply_amount ?? 0), approvedAmount, origin)
   return {
     id: row.id as string,
     applicationNo: (row.no ?? '') as string,
@@ -241,15 +247,20 @@ function rowToPayment(row: Record<string, unknown>): SupplierPaymentSummary {
     projectId: (row.project_id ?? '') as string,
     projectName: (row.project_name ?? '') as string,
     amount: Number(row.apply_amount ?? 0),
-    approvedAmount: Number(row.approved_amount ?? 0),
+    approvedAmount: approval.amount,
+    approvedAmountState: approval.state,
     paidAmount,
     actualPayment: paidAmount,
     approvalStatus: (row.status ?? '') as string,
-    paymentStatus: paidAmount <= 0
-      ? '未付款'
-      : paidAmount >= Number(row.apply_amount ?? 0)
-        ? '已付款'
-        : '部分付款',
+    paymentStatus: cap === null
+      ? '历史批复待核验'
+      : paidAmount > cap
+        ? '超额支付'
+        : paidAmount <= 0
+          ? '未付款'
+          : paidAmount >= cap
+            ? '已付款'
+            : '部分付款',
     createdAt: (row.created_at ?? '') as string,
   }
 }
@@ -563,6 +574,16 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
     finally {
       if (inFlightLoads.get(supplierId) === task)
         inFlightLoads.delete(supplierId)
+    }
+  }
+
+  async function loadReadonlySnapshot(supplierId: string) {
+    setLoading(supplierId, true)
+    try {
+      await loadSnapshot(supplierId)
+    }
+    finally {
+      setLoading(supplierId, false)
     }
   }
 
@@ -1250,6 +1271,7 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
     hasSnapshot,
     isLoading,
     load,
+    loadReadonlySnapshot,
     addCredential,
     addCredentials,
     recordCredentialOcrRecognition,

@@ -33,6 +33,7 @@ export const useMasterDataReadStore = defineStore('master-data-read', () => {
   const rowsByKind = shallowRef<Record<MasterDataListKind, MasterDataListRow[]>>({
     ...EMPTY_ROWS,
   })
+  const loadedByKind = shallowRef<Partial<Record<MasterDataListKind, boolean>>>({})
   const loadingByKind = shallowRef<Record<MasterDataListKind, boolean>>({
     customer: false,
     crew: false,
@@ -45,6 +46,7 @@ export const useMasterDataReadStore = defineStore('master-data-read', () => {
       ...rowsByKind.value,
       [kind]: rows,
     }
+    loadedByKind.value = { ...loadedByKind.value, [kind]: true }
   }
 
   function setLoading(kind: MasterDataListKind, loading: boolean) {
@@ -235,6 +237,7 @@ export const useMasterDataReadStore = defineStore('master-data-read', () => {
 
   return {
     rowsByKind: readonly(rowsByKind),
+    loadedByKind: readonly(loadedByKind),
     loadingByKind: readonly(loadingByKind),
     load,
     searchCustomers,

@@ -2,6 +2,7 @@
 import type { FinancePageDraft } from '~/lib/finance/page'
 import type { LookupOption } from '~/lib/kit/lookup'
 import { computed } from 'vue'
+import { approvalAmountLabel, readApprovalAmount } from '~/lib/finance/approval-amount'
 import FinanceLineGrid from './FinanceLineGrid.vue'
 
 const props = defineProps<{
@@ -74,6 +75,20 @@ const paymentAllocationTotal = computed(() =>
 )
 const applyAmount = computed(() => Number(props.draft.applyAmount) || 0)
 const paymentAmount = computed(() => Number(props.draft.amount) || 0)
+const approvalHint = computed(() => {
+  const amount = props.draft.approvedAmount ?? null
+  if (amount !== null && (!Number.isFinite(amount) || amount < 0))
+    return '请输入非负有效金额'
+  return approvalAmountLabel(readApprovalAmount(amount, props.draft.approvedAmountEdit ? 'user-entry' : props.draft.approvedAmountOrigin).state)
+})
+
+function inputApproval(event: Event) {
+  const input = event.target as HTMLInputElement
+  const value = input.value.trim()
+  const amount = input.validity.badInput ? Number.NaN : value === '' ? null : Number(value)
+  emit('patch', { approvedAmount: amount, approvedAmountEdit: { value: amount } })
+  emit('clearError', 'approvedAmount')
+}
 
 function patch(field: keyof FinancePageDraft, value: unknown) {
   const next = { [field]: value } as Partial<FinancePageDraft>
@@ -143,9 +158,10 @@ function fieldClass(field: string) {
           <span v-if="fieldErrors?.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
         </div>
         <div class="field-block" :class="fieldClass('supplierId')">
-          <span class="field-label">收款单位</span>
+          <span class="field-label">实际收款单位</span>
           <LookupSelect :model-value="draft.supplierId" :fetch="fetchSuppliers" recent-key="finance-payment-supplier" placeholder="检索分供方" @update:model-value="patch('supplierId', $event)" />
           <span v-if="fieldErrors?.supplierId" class="field-error">{{ fieldErrors.supplierId }}</span>
+          <span class="field-hint">有合同类型必须由真实支出合同证明；甲方、开发商和沟通联系人不属于此字段。</span>
         </div>
         <div v-if="showsContract" class="field-block" :class="fieldClass('contractId')">
           <span class="field-label">关联合同 *</span>
@@ -223,10 +239,11 @@ function fieldClass(field: string) {
           <span class="field-label">扣除说明</span>
           <input :value="draft.prepayNote" class="field-input w-full" @input="patch('prepayNote', inputValue($event))">
         </label>
-        <label class="field-block">
-          <span class="field-label">本期批复金额</span>
-          <input :value="draft.approvedAmount" type="number" min="0" step="0.01" class="field-input w-full font-mono" @input="patch('approvedAmount', inputNumber($event))">
-        </label>
+        <div class="field-block">
+          <label for="approval-amount" class="field-label">本期批复金额</label>
+          <input id="approval-amount" :value="draft.approvedAmount" type="number" min="0" step="0.01" class="field-input w-full font-mono" aria-describedby="approval-amount-help" @input="inputApproval">
+          <span id="approval-amount-help" class="text-11px text-ink-faint">{{ approvalHint }}。留空表示未填写；填写 0 表示明确零元。历史金额请按原始凭据核对后填写。</span>
+        </div>
         <label class="field-block form-span-full">
           <span class="field-label">审批备注</span>
           <textarea :value="draft.approvalNote" rows="2" class="field-input w-full" @input="patch('approvalNote', inputValue($event))" />
@@ -238,6 +255,9 @@ function fieldClass(field: string) {
   <template v-else>
     <section id="section-basic" class="panel scroll-mt-4 p-4">
       <SectionHeader>基本信息</SectionHeader>
+      <p class="mt-2 rounded-[var(--radius-control)] bg-warning-soft px-3 py-2 text-12px text-warning-deep">
+        收款方以银行支付凭据为准；关联分供方仅用于连接真实对象，不会把甲方、开发商或沟通联系人自动登记为付款方。
+      </p>
       <div class="form-fields-grid mt-3">
         <label class="field-block">
           <span class="field-label">支付编号</span>
@@ -248,11 +268,11 @@ function fieldClass(field: string) {
           <LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" recent-key="finance-record-project" placeholder="检索项目" @update:model-value="patch('projectId', $event)" />
         </div>
         <div class="field-block">
-          <span class="field-label">收款分供方</span>
+          <span class="field-label">关联分供方（可选）</span>
           <LookupSelect :model-value="draft.supplierId" :fetch="fetchSuppliers" recent-key="finance-record-supplier" placeholder="检索分供方" @update:model-value="patch('supplierId', $event)" />
         </div>
         <label class="field-block">
-          <span class="field-label">收款方名称 *</span>
+          <span class="field-label">实际收款方名称 *</span>
           <input :value="draft.payeeName" class="field-input w-full" :class="[fieldClass('payeeName')]" data-testid="finance-name" @input="patch('payeeName', inputValue($event))">
           <span v-if="fieldErrors?.payeeName" class="field-error">{{ fieldErrors.payeeName }}</span>
         </label>

@@ -11,7 +11,9 @@ import {
   visibleCond,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { generateId } from '~/lib/util/id'
+import { CONFIRMED_SETTLEMENT_SQL_VALUES } from './effective-status'
 
 export type F2FormKind
   = | 'construction'
@@ -867,6 +869,8 @@ export async function saveF2Form(
   action: F2SaveAction,
   attachments: ContractFormAttachmentChanges = {},
 ): Promise<F2FormSaveResult> {
+  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis && !isDesktopRuntime())
+    throw new Error('浏览器辅助合同请通过中央合同表单保存')
   return withTransaction(async (tx) => {
     if (PROJECT_FORM_KINDS.has(kind)) {
       return saveProjectContract(
@@ -1085,7 +1089,7 @@ export async function listExpenditureSettlementOptions(
     contractId?: string | null
   } = {},
 ): Promise<LookupOption[]> {
-  const conditions = [`settlement.status NOT IN ('draft', '草稿')`]
+  const conditions = [`settlement.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})`]
   const params: unknown[] = []
   for (const [column, value] of [
     ['project_id', filters.projectId],
@@ -1202,6 +1206,8 @@ export async function deleteF2Form(
   kind: F2FormKind,
   id: string,
 ): Promise<string | null> {
+  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis && !isDesktopRuntime())
+    throw new Error('浏览器辅助合同不允许从旧本地源删除')
   return withTransaction(async (tx) => {
     if (PROJECT_FORM_KINDS.has(kind)) {
       await assertContractCanDelete(tx, id)

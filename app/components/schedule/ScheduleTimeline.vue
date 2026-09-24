@@ -4,6 +4,8 @@ import type { ScheduleGroupView, ScheduleProjectView, ScheduleTaskView } from '~
 import { useNow } from '@vueuse/core'
 import { TreeItem, TreeRoot } from 'reka-ui'
 import { computed, shallowRef, watch } from 'vue'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
+import { buildScheduleBindingLocation } from '~/lib/schedule/binding-navigation'
 import {
   calendarDays,
   rescheduledTaskWindow,
@@ -57,6 +59,9 @@ const props = withDefaults(defineProps<{
   mode?: TimelineMode
   highlightedGroupId?: string
   highlightedTaskId?: string
+  readonly?: boolean
+  origin?: 'real' | 'demo'
+  returnContext?: Record<string, unknown>
 }>(), {
   mode: 'workspace',
   highlightedGroupId: '',
@@ -76,19 +81,21 @@ const emit = defineEmits<{
 const ROW_HEIGHT = 34
 
 const scheduleStore = useScheduleStore()
+const desktop = isDesktopRuntime()
+const memoryKey = computed(() => `${props.origin ?? 'real'}:${props.snapshot.id}`)
 const mobileView = shallowRef<MobileView>('wbs')
 const systemNow = useNow({ interval: 60_000 })
 const systemToday = computed(() => toLocalDateInputValue(systemNow.value))
 const expandedGroupIds = computed<string[]>({
   get() {
     const validIds = new Set(props.snapshot.groups.map(group => group.id))
-    const stored = scheduleStore.expandedGroupIdsByProject[props.snapshot.id]
+    const stored = scheduleStore.expandedGroupIdsByProject[memoryKey.value]
     if (stored)
       return stored.filter(groupId => validIds.has(groupId))
     return props.snapshot.groups[0] ? [props.snapshot.groups[0].id] : []
   },
   set(groupIds) {
-    scheduleStore.setExpandedGroupIds(props.snapshot.id, groupIds)
+    scheduleStore.setExpandedGroupIds(memoryKey.value, groupIds)
   },
 })
 const drag = shallowRef<{
@@ -186,7 +193,7 @@ const monthTicks = computed(() => {
 })
 
 const dependencyPaths = computed(() => {
-  if (props.mode !== 'workspace')
+  if (props.mode !== 'workspace' || props.readonly)
     return []
   const taskById = new Map(props.snapshot.groups.flatMap(group => group.tasks).map(task => [task.id, task]))
   const rowIndexById = new Map(rows.value.map((row, index) => [row.id, index]))
@@ -389,7 +396,7 @@ function applyDragPreview() {
 }
 
 function startDrag(event: PointerEvent, task: ScheduleTaskView, mode: 'move' | 'resize-finish') {
-  if (props.mode !== 'workspace')
+  if (props.mode !== 'workspace' || props.readonly)
     return
   const target = event.currentTarget as HTMLElement
   const chart = target.closest('.chart-cell')
@@ -463,7 +470,7 @@ function openTaskFromBar(task: ScheduleTaskView) {
 }
 
 function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', deltaDays: number) {
-  if (props.mode !== 'workspace')
+  if (props.mode !== 'workspace' || props.readonly)
     return
   emit('rescheduleTask', {
     task,
@@ -633,8 +640,8 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                 <template v-if="item.value.kind === 'group' && item.value.group.scopeBasis === 'provisional'">
                   <span class="pending-contract-chip">待绑定合同</span>
                   <NuxtLink
-                    v-if="mode === 'workspace'"
-                    :to="`/schedule/${item.value.group.projectId}/bind/${item.value.group.id}`"
+                    v-if="mode === 'workspace' && !readonly && (desktop || origin !== 'demo')"
+                    :to="desktop ? `/schedule/${item.value.group.projectId}/bind/${item.value.group.id}` : buildScheduleBindingLocation(item.value.group.projectId, item.value.group.id, origin ?? 'real', returnContext)"
                     class="binding-entry"
                     aria-label="绑定施工合同"
                     @click.stop
@@ -643,6 +650,14 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                     <span>绑定</span>
                   </NuxtLink>
                 </template>
+                <NuxtLink
+                  v-if="mode === 'workspace' && !desktop && origin !== 'demo' && item.value.kind === 'group' && item.value.group.contractId"
+                  :to="buildScheduleBindingLocation(item.value.group.projectId, item.value.group.id, origin ?? 'real', returnContext)"
+                  class="binding-entry"
+                  aria-label="查看合同依据"
+                >
+                  合同依据
+                </NuxtLink>
                 <span v-if="mode === 'overview' && item.value.kind === 'group'" class="status-label">
                   {{ groupStatusLabel(item.value.group) }}
                 </span>
@@ -650,7 +665,7 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                   {{ taskStatusLabel(item.value.task) }}
                 </span>
                 <button
-                  v-if="mode === 'workspace' && item.value.kind === 'group'"
+                  v-if="mode === 'workspace' && !readonly && item.value.kind === 'group'"
                   type="button"
                   class="add-task-button"
                   :aria-label="`向${item.value.label}追加工序`"
@@ -703,7 +718,7 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                 <span v-if="item.value.kind === 'task' && item.value.task.baselineStart" class="baseline-mark" />
               </button>
               <button
-                v-if="mode === 'workspace' && item.value.kind === 'task'"
+                v-if="mode === 'workspace' && !readonly && item.value.kind === 'task'"
                 type="button"
                 class="duration-handle"
                 :style="{ left: `calc(${position(barFinish(item.value))}% - 5px)` }"

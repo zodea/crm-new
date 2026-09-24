@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 async function openCellConfigure(
   page: import('@playwright/test').Page,
@@ -12,12 +13,16 @@ async function openCellConfigure(
 }
 
 test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
+  test.beforeEach(async ({ page }) => {
+    test.setTimeout(60_000)
+    await installQuantityProductionFixture(page)
+  })
+
   test('冲突取消保留选择，确认替换只更新当前责任并保留完成时责任', async ({ page }) => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
 
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
 
     const cell = await openCellConfigure(page, 0)
     const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
@@ -43,7 +48,12 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     replacement = page.getByRole('dialog').filter({ hasText: '替换现有责任' }).last()
     await replacement.getByRole('button', { name: '确认替换', exact: true }).click()
 
-    await expect(editor).toBeHidden()
+    // 先等二次确认浮层真正退出；否则底层编辑器因 aria-hidden 会让
+    // toBeHidden 在保存尚未开始时产生假阳性。
+    await expect(replacement).toBeHidden()
+    // 保存包含责任工作区与矩阵读模型的完整刷新，在 CI/sql.js 下可能超过
+    // Playwright 默认 5 秒；仍以用户看到弹窗关闭作为完成信号。
+    await expect(editor).toBeHidden({ timeout: 15_000 })
     await expect(page.getByText('已更新 1 户的 泥水工 责任')).toBeVisible()
     await expect(cell).toHaveAccessibleName(/当前责任：.*泥水工 泥水B班/)
     await expect(cell).toHaveAccessibleName(/执行责任 泥水A班/)
@@ -54,8 +64,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
 
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
     await page.getByRole('button', { name: '责任配置', exact: true }).click()
 
     let editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
@@ -70,7 +79,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     await scope.check()
     await editor.getByRole('button', { name: '保存责任' }).click()
 
-    await expect(editor).toBeHidden()
+    await expect(editor).toBeHidden({ timeout: 15_000 })
     await expect(page.getByText('已更新 1 户的 水暖工 责任')).toBeVisible()
 
     const tradeFilter = page.getByRole('combobox', { name: '工种' })
@@ -88,10 +97,27 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     expect(pageErrors).toEqual([])
   })
 
+  test('责任编辑器 Esc 关闭后焦点回到触发按钮并解除背景滚动锁', async ({ page }) => {
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
+
+    const trigger = page.getByRole('button', { name: '责任配置', exact: true })
+    await trigger.click()
+    const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
+    await expect(editor).toBeVisible()
+    // 浮层打开期间锁住背景滚动是既有契约的一部分。
+    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden')
+
+    await page.keyboard.press('Escape')
+    await expect(editor).toBeHidden()
+    await expect(trigger).toBeFocused()
+    // 关闭后必须解锁：残留 overflow/pointer-events 会让整页失去滚动与点击。
+    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+    await expect(page.locator('body')).not.toHaveCSS('pointer-events', 'none')
+  })
+
   test('390px 责任编辑器不撑宽页面，楼层批选可用键盘操作', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
     await page.getByRole('button', { name: '责任配置', exact: true }).click()
 
     const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })

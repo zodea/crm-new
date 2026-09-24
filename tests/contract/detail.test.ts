@@ -110,7 +110,7 @@ describe('contract detail read model', () => {
       ['甲方变洽签', 'BG-001', '/owner/change/boq-change-a'],
       ['甲方报量', 'BL-001', '/owner/report/report-a'],
       ['开票申请', 'KP-001', '/finance/billing/billing-a'],
-      ['收款登记', 'SK-001', '/finance/receipt/receipt-a'],
+      ['收款登记', 'SK-001', ''],
     ])
     expect(detail.lineItems).toEqual([])
     expect(detail.files).toEqual([

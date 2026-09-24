@@ -1,67 +1,48 @@
-// ReimburseScreen — 费用报销列表（资金域批B）：EntityListScreen meta 一份生成整页。
-// 口径：projectId=null 即「公司/个人开支」（灰字非链），项目筛选下拉专设 none 项承接；「已付款总和」只累计 status==="已付款" 的行。
-// fromParams：params.project → projectId 预筛（项目详情金额穿透落点），label 解析为项目中文名。
+// ReimburseScreen — 费用报销（按实现端 app/components/finance/FinanceListScreen.vue kind=reimbursement 校准）
+// 标准单表列表：# / 名称对象(link) / 编号 / 项目 / 关联方类型 / 金额 / 日期 / 状态 / 操作(编辑)；底部金额合计。
+// 口径（stores/finance.ts loadList reimbursement）：名称=报销人 applicant；关联方=费用类别 category；
+// 项目空=「公司开支」（SQL COALESCE(project.name, '公司开支')）；金额=Σ费用明细（演示数据取头字段 amount）。
 (function () {
   if (window.ReimburseScreen) return;
 
   function ReimburseScreen({ params, navigate }) {
-    const KA = window.KitAtoms || {};
-    const ELS = window.EntityListScreen;
     const A = window.APP;
-    if (!ELS || !KA.EntityLink || !A) return null;
-    const { StatusChip } = window.DesignSystem_e3d871 || {};
-    const projects = A.rows("projects");
-    const statusTone = { "审批中": "neutral", "已审批": "brand", "已付款": "ok" };
+    const Std = window.StdListScreen;
+    if (!A || !Std) return null;
+    A.use();
+    const nav = navigate || (window.DC && window.DC.navigate);
+    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : (id || ""); };
 
-    const meta = {
-      entity: "reimburse",
-      title: "费用报销",
-      coll: "reimburses",
-      formRoute: "reimburseForm",   // 整页表单（grill 决议 2026-07-18）
-      statusKey: "status",
-      columns: [
-        { key: "no", label: "报销单号", width: 140, mono: true },
-        { key: "applicant", label: "报销人", width: 100 },
-        { key: "projectId", label: "归属", width: 150,
-          render: (v) => (v ? <KA.EntityLink type="project" id={v} /> : <span style={{ color: "var(--ink-faint)" }}>公司/个人开支</span>),
-          form: { type: "select", options: projects.map((p) => p.name),
-            toLabel: (id) => { const p = A.get("projects", id); return p ? p.name : id; },
-            toValue: (name) => { const p = projects.find((x) => x.name === name); return p ? p.id : name; } } },
-        { key: "category", label: "费用类别", width: 110,
-          form: { type: "select", options: ["差旅费", "办公费", "招待费", "交通费", "水电费", "零星材料"] } },
-        { key: "amount", label: "报销金额", width: 120, money: true, align: "right" },
-        { key: "date", label: "报销日期", width: 110, mono: true, form: { type: "date" } },
-        { key: "status", label: "状态", width: 96,
-          render: (v) => (StatusChip ? <StatusChip tone={statusTone[v] || "neutral"}>{v}</StatusChip> : v),
-          form: { type: "select", options: ["审批中", "已审批", "已付款"] } },
-        { key: "note", label: "备注", width: 160 },
-      ],
-      views: [
-        { key: "pending", label: "审批中", filter: (r) => r.status === "审批中" },
-        { key: "approved", label: "已审批", filter: (r) => r.status === "已审批" },
-        { key: "paid", label: "已付款", filter: (r) => r.status === "已付款" },
-        { key: "all", label: "全部" },
-      ],
-      defaultView: "pending",
-      filters: [
-        { key: "proj", label: "项目",
-          options: [{ key: "all", label: "全部项目" }, { key: "none", label: "公司/个人" }, ...projects.map((p) => ({ key: p.id, label: p.name }))],
-          match: (r, val) => (val === "none" ? !r.projectId : r.projectId === val) },
-      ],
-      searchKeys: ["no", "applicant", "note"],
-      summary: (rows) => [
-        { label: "报销金额总和", value: Math.round(rows.reduce((s, r) => s + (r.amount || 0), 0) * 100) / 100 },
-        { label: "已付款总和", value: Math.round(rows.reduce((s, r) => s + (r.status === "已付款" ? (r.amount || 0) : 0), 0) * 100) / 100 },
-      ],
-      fromParams: (p) => {
-        if (!p.project) return null;
-        const proj = A.get("projects", p.project);
-        return { label: "项目：" + (proj ? proj.name : p.project), filter: (r) => r.projectId === p.project };
-      },
-      newDefaults: () => ({ status: "审批中" }),
-      tableMinWidth: 1240,
-    };
-    return <ELS meta={meta} params={params} navigate={navigate} />;
+    const rows = A.rows("reimburses").map((r) => ({
+      id: r.id,
+      name: r.applicant || "",                                              // 名称=报销人
+      no: r.no || "",
+      projectName: r.projectId ? projName(r.projectId) : "公司开支",        // SQL COALESCE(project.name, '公司开支')
+      partyName: r.category || "",                                          // 关联方=费用类别
+      amount: Number(r.amount) || 0,                                        // 金额=报销总额（明细 Σ金额 回写）
+      date: r.date || "",
+      status: r.status || "草稿",
+    }));
+
+    return (
+      <Std
+        title="费用报销" subtitle="报销头 + 费用明细 · 公司开支允许空项目"
+        searchPlaceholder="搜索名称、编号、项目或关联方" searchKeys={["no", "name", "projectName", "partyName", "status"]}
+        createLabel="新建费用报销" onCreate={() => nav && nav("reimburseForm", {})}
+        onRowOpen={(r) => nav && nav("reimburseForm", { id: r.id })}
+        columns={[
+          { key: "name", label: "名称/对象", minWidth: 220, link: true },
+          { key: "no", label: "编号", width: 170, mono: true },
+          { key: "projectName", label: "项目", minWidth: 160 },
+          { key: "partyName", label: "关联方/类型", minWidth: 180 },
+          { key: "amount", label: "金额", width: 140, align: "right", money: true },
+          { key: "date", label: "日期", width: 128, mono: true },
+          { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
+        ]}
+        rows={rows} filters={[{key:"projectName",label:"项目"}, {key:"name",label:"报销人"}, {key:"status",label:"状态"}]} tableMinWidth={1200}
+        footerSummary={(list) => ({ label: "金额合计", value: "¥" + list.reduce((s, r) => s + r.amount, 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
+      />
+    );
   }
 
   window.ReimburseScreen = ReimburseScreen;

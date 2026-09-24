@@ -1,0 +1,889 @@
+{
+  "reviewer": "/root/c1_standards_final",
+  "reviewKind": "原始尺寸逐张视觉目检",
+  "scope": "八组各五档，独立检查全部40张；未重跑测试，未修改产品",
+  "imageRoot": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/",
+  "method": "每张均使用 view_image detail=original 直接读取；没有缩略图或拼图代替原图",
+  "reviewedImageCount": 40,
+  "widths": [
+    390,
+    768,
+    1024,
+    1280,
+    1440
+  ],
+  "summary": {
+    "passedImages": 30,
+    "imagesWithFinding": 10,
+    "uniqueFindings": 3,
+    "visibleLayoutObstructionFindings": 0,
+    "status": "code-fixed-awaiting-new-images",
+    "directlyObservedFindings": 2,
+    "rootReportedOutsideAssignedImages": 1
+  },
+  "findings": [
+    {
+      "id": "VIS-C1-01",
+      "priority": "P2",
+      "group": "legacy-c1-missing-snapshot",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "title": "旧缺快照历史错误宣称配对冻结完成",
+      "observation": "同一画面显示实际发放/核算应发未记录、旧C1缺完整来源和未保留发放记录，却仍显示本次工资与考勤已冻结、原全成员整月锁定。还出现请选择负责人与无当月考勤的新建阻断文案。",
+      "impact": "用户可能把历史头的已发状态误解为已验证的新C1工资/考勤冻结。",
+      "recommendation": "冻结成功说明仅用于证据完整的新C1；旧缺快照改为只读与缺证据说明，并避免新建动作指导。",
+      "reportedToRoot": true,
+      "resolution": "代码增量独立复核未发现未决；仍待修后原图复验，旧图保留原发现"
+    },
+    {
+      "id": "VIS-C1-02",
+      "priority": "P2",
+      "group": "c1-config-cold-original-pending",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "title": "原提交恢复缺项目与班组名称",
+      "observation": "待恢复配置的两个禁用选择器只有配置项目/配置班组占位文字，实际原项目和班组名称均未显示。2026年11月、加班54及空兜底日薪可见。",
+      "impact": "核对原提交前无法从画面确认原配置属于哪个项目和班组。",
+      "recommendation": "禁用或pending时从原options和稳定ID带出可读名称，保持原恢复键及54/null不变。",
+      "reportedToRoot": true,
+      "resolution": "代码增量独立复核未发现未决；仍待修后原图复验，旧图保留原发现"
+    },
+    {
+      "id": "VIS-C1-03",
+      "priority": "P2",
+      "group": "Root 已发输出组（本次40张以外）",
+      "title": "真实已发明细将60.125显示成60.13",
+      "observation": "Root 另组原图确认：checked 仍显示60.125，最终已发明细却显示60.13，仅去掉货币符号仍未保留原费率精度。",
+      "provenance": "Root 独立视觉目检反馈；本审查员未将其冒充为本次40张直接观察。",
+      "impact": "已发实际界面不能准确核对原冻结费率；此前列定义与替身表格测试不证明该真实渲染路径。",
+      "recommendation": "在真实已发组件与冻结数据路径建立失败复现，检查checked/released均完整显示60.125，金额仍到分，A及null行为不变；修后重新目检已发输出对应视口。",
+      "requiredValidation": [
+        "使用真实业务渲染组件，不用仅回显row字段的KitTable替身证明精度。",
+        "使用实际冻结数据穿过真实格式化链，红转绿证明60.125不再变60.13。",
+        "保留金额到分、A原行为与null未记录的回归。",
+        "以修后真实浏览器已发截图复验，不复用旧图。"
+      ],
+      "reportedToRoot": true,
+      "resolution": "代码增量独立复核未发现未决；仍待修后原图复验，旧图保留原发现"
+    }
+  ],
+  "groupChecks": {
+    "legacy-c1-missing-snapshot": {
+      "status": "issue",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "observed": [
+        "核算应发/实际发放均为未记录，缺快照与缺逐日来源提示可见，无新输出按钮",
+        "各宽度文字布局可读，无可见遮挡"
+      ],
+      "findings": [
+        "历史缺快照页仍宣称本次工资与考勤已冻结，和缺证据说明冲突；同时出现面向新建的负责人/考勤阻断文案"
+      ]
+    },
+    "legacy-c1-original-amount": {
+      "status": "pass",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "observed": [
+        "原关系历史明确说明不用于补齐上方缺失发放结果",
+        "原记录实际金额 ¥100.00、原应发 ¥0.00、原状态已发放和月份 2026-07 均清楚",
+        "390 两列与其余四列阅读正常，空明细保持缺记录"
+      ],
+      "findings": []
+    },
+    "c1-demo-write-unavailable": {
+      "status": "pass",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "observed": [
+        "新建 C1 页面清楚显示工资草稿未能读取及正式来源说明",
+        "只显示返回/重新读取入口，无正式空草稿字段或保存按钮",
+        "五档无遮挡、文案与按钮完整"
+      ],
+      "findings": []
+    },
+    "c1-denied-read-retains-scope": {
+      "status": "pass",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "observed": [
+        "当前身份没有工资读取权限与重新读取按钮完整可见",
+        "旧读态字段和保存按钮不在画面中，五档布局清楚"
+      ],
+      "limitations": [
+        "截图停在拒权态，原范围保留本身须由对应浏览器行为断言证明，不能仅由画面确认"
+      ],
+      "findings": []
+    },
+    "attendance-failed-original-input": {
+      "status": "pass",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "observed": [
+        "原目标日薪481负责人·2026-10-03 明确",
+        "正常工时 7.51、加班 0 和施工内容冷页恢复仍是原日期原输入完整保留",
+        "服务不可用/本格输入已保留/提交结果尚未确认提示与核对原提交按钮可见",
+        "390 单列、其余双列工时；弹窗和按钮无遮挡"
+      ],
+      "findings": []
+    },
+    "attendance-late-read-current-month": {
+      "status": "pass",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "observed": [
+        "月份筛选为 2026 年 12 月，矩阵说明也为 2026-12；未出现 11 月标题或旧月残影",
+        "原项目/计时班组保持显示，四名工人行可辨，空格不是已登记零",
+        "390 筛选单列、固定工人列可读，日期延伸限制在表格区"
+      ],
+      "limitations": [
+        "截图证明最终可见月份，网络迟到顺序由对应 E2E 断言证明"
+      ],
+      "findings": []
+    },
+    "c1-config-cold-original-pending": {
+      "status": "issue",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "observed": [
+        "上次提交结果尚未确认、原输入已保留、核对原提交按钮可辨",
+        "2026 年 11 月、日薪481负责人、个人加班价 54、空兜底日薪与空白/零价说明完整",
+        "五档布局不遮挡"
+      ],
+      "findings": [
+        "禁用项目和班组 LookupSelect 只显示配置项目/配置班组占位文字，原范围名称不可辨，核对原提交前缺目标范围的视觉确认"
+      ],
+      "limitations": [
+        "原 commandId 不作为产品文本显示，其一致性由 E2E/组件测试核实"
+      ]
+    },
+    "zero-member-month-lock": {
+      "status": "pass",
+      "widths": [
+        390,
+        768,
+        1024,
+        1280,
+        1440
+      ],
+      "observed": [
+        "无考勤零收款成员·2026-08-31 原目标清楚",
+        "当月已有签工链或已发工资/不能修改考勤提示可辨；仅关闭按钮，无保存入口",
+        "新格默认 8 小时尚未保存说明可见，背景原格为空，与已登记 8 小时区别明确",
+        "五档弹窗和关闭按钮完整，无遮挡"
+      ],
+      "findings": []
+    }
+  },
+  "images": [
+    {
+      "group": "legacy-c1-missing-snapshot",
+      "width": 390,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-missing-snapshot-390.png",
+      "sha256": "6369cd9852c4a1149cdfb4209beebb480e6c9421dac1ce9da0cd896296c04c87",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "核算应发/实际发放均为未记录，缺快照与缺逐日来源提示可见，无新输出按钮",
+        "各宽度文字布局可读，无可见遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-01"
+      ],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-missing-snapshot",
+      "width": 768,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-missing-snapshot-768.png",
+      "sha256": "9dd9ffcb8d9c97d7909b0f7b8a2d88b4f8c267a362e48dd8969d8d8546054c58",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "核算应发/实际发放均为未记录，缺快照与缺逐日来源提示可见，无新输出按钮",
+        "各宽度文字布局可读，无可见遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-01"
+      ],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-missing-snapshot",
+      "width": 1024,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-missing-snapshot-1024.png",
+      "sha256": "93102a671cb860cc3520d516f187d7f7b4b8f73f0b41c05ef2c2f8bf66cc6204",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "核算应发/实际发放均为未记录，缺快照与缺逐日来源提示可见，无新输出按钮",
+        "各宽度文字布局可读，无可见遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-01"
+      ],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-missing-snapshot",
+      "width": 1280,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-missing-snapshot-1280.png",
+      "sha256": "d29d238210b7810f61aa049deb29002730dedb19a211a1039aee9f556c3c5f31",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "核算应发/实际发放均为未记录，缺快照与缺逐日来源提示可见，无新输出按钮",
+        "各宽度文字布局可读，无可见遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-01"
+      ],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-missing-snapshot",
+      "width": 1440,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-missing-snapshot-1440.png",
+      "sha256": "8476b3dffd2a8b3ca9dcf1dd1674f1615c8738b4c449b1ae802e0a442f98175c",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "核算应发/实际发放均为未记录，缺快照与缺逐日来源提示可见，无新输出按钮",
+        "各宽度文字布局可读，无可见遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-01"
+      ],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-original-amount",
+      "width": 390,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-original-amount-390.png",
+      "sha256": "2ca02025a2dc173d1e91ab1c9ba1b032db3ed1e000f077e136135910a5de6405",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原关系历史明确说明不用于补齐上方缺失发放结果",
+        "原记录实际金额 ¥100.00、原应发 ¥0.00、原状态已发放和月份 2026-07 均清楚",
+        "390 两列与其余四列阅读正常，空明细保持缺记录"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-original-amount",
+      "width": 768,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-original-amount-768.png",
+      "sha256": "0b3f310620b2412d365bb6012ad3467445465042e9fe17b660cac97b8a8c91a9",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原关系历史明确说明不用于补齐上方缺失发放结果",
+        "原记录实际金额 ¥100.00、原应发 ¥0.00、原状态已发放和月份 2026-07 均清楚",
+        "390 两列与其余四列阅读正常，空明细保持缺记录"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-original-amount",
+      "width": 1024,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-original-amount-1024.png",
+      "sha256": "d3db55dcaead8a90310e3fcc409e70b447e8e8b6d3480ed480802e084fffe56c",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原关系历史明确说明不用于补齐上方缺失发放结果",
+        "原记录实际金额 ¥100.00、原应发 ¥0.00、原状态已发放和月份 2026-07 均清楚",
+        "390 两列与其余四列阅读正常，空明细保持缺记录"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-original-amount",
+      "width": 1280,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-original-amount-1280.png",
+      "sha256": "2ba03dbd280db0f55b79e67bcf8fc4ec30be603c9adfb455e88bbf905835f114",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原关系历史明确说明不用于补齐上方缺失发放结果",
+        "原记录实际金额 ¥100.00、原应发 ¥0.00、原状态已发放和月份 2026-07 均清楚",
+        "390 两列与其余四列阅读正常，空明细保持缺记录"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "legacy-c1-original-amount",
+      "width": 1440,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出-chromium/legacy-c1-original-amount-1440.png",
+      "sha256": "b0feeb97b2846a012f59886e7fd5a3719f86b289a5a7577e321da6887bea7fef",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原关系历史明确说明不用于补齐上方缺失发放结果",
+        "原记录实际金额 ¥100.00、原应发 ¥0.00、原状态已发放和月份 2026-07 均清楚",
+        "390 两列与其余四列阅读正常，空明细保持缺记录"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "c1-demo-write-unavailable",
+      "width": 390,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-显式演示C1新建保持不可写，不替换成正式空草稿-chromium/c1-demo-write-unavailable-390.png",
+      "sha256": "3f2c59691f8e6e8adbb2756ec875a49faad96f82a2e84d6ef7a5969bcaa0e1ab",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "新建 C1 页面清楚显示工资草稿未能读取及正式来源说明",
+        "只显示返回/重新读取入口，无正式空草稿字段或保存按钮",
+        "五档无遮挡、文案与按钮完整"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "c1-demo-write-unavailable",
+      "width": 768,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-显式演示C1新建保持不可写，不替换成正式空草稿-chromium/c1-demo-write-unavailable-768.png",
+      "sha256": "e619b0e1f582dae429015e72fc1fdbfb72787dc269cf859a139a3a2f6496ce55",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "新建 C1 页面清楚显示工资草稿未能读取及正式来源说明",
+        "只显示返回/重新读取入口，无正式空草稿字段或保存按钮",
+        "五档无遮挡、文案与按钮完整"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "c1-demo-write-unavailable",
+      "width": 1024,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-显式演示C1新建保持不可写，不替换成正式空草稿-chromium/c1-demo-write-unavailable-1024.png",
+      "sha256": "ea9970db160f0b89784a7d2d724170cb6f27b2af2625bcc691a046e559f758c8",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "新建 C1 页面清楚显示工资草稿未能读取及正式来源说明",
+        "只显示返回/重新读取入口，无正式空草稿字段或保存按钮",
+        "五档无遮挡、文案与按钮完整"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "c1-demo-write-unavailable",
+      "width": 1280,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-显式演示C1新建保持不可写，不替换成正式空草稿-chromium/c1-demo-write-unavailable-1280.png",
+      "sha256": "acbbda62c26103f15255ef60effcc7fd37b61fcd8c2f254cb56d1a9dfda79260",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "新建 C1 页面清楚显示工资草稿未能读取及正式来源说明",
+        "只显示返回/重新读取入口，无正式空草稿字段或保存按钮",
+        "五档无遮挡、文案与按钮完整"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "c1-demo-write-unavailable",
+      "width": 1440,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-显式演示C1新建保持不可写，不替换成正式空草稿-chromium/c1-demo-write-unavailable-1440.png",
+      "sha256": "897613cf062e1ec10988076e6e8962f8b4303078c77f32a8c27d39158e1e7592",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "新建 C1 页面清楚显示工资草稿未能读取及正式来源说明",
+        "只显示返回/重新读取入口，无正式空草稿字段或保存按钮",
+        "五档无遮挡、文案与按钮完整"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "c1-denied-read-retains-scope",
+      "width": 390,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-C1来源拒权时不沿旧读取开放保存，恢复读取仍保原范围-chromium/c1-denied-read-retains-scope-390.png",
+      "sha256": "ee5091379a177953a9df819a77d9942b75c5ce6b02085b96273b0bcd437cd4fb",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "当前身份没有工资读取权限与重新读取按钮完整可见",
+        "旧读态字段和保存按钮不在画面中，五档布局清楚"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图停在拒权态，原范围保留本身须由对应浏览器行为断言证明，不能仅由画面确认"
+      ]
+    },
+    {
+      "group": "c1-denied-read-retains-scope",
+      "width": 768,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-C1来源拒权时不沿旧读取开放保存，恢复读取仍保原范围-chromium/c1-denied-read-retains-scope-768.png",
+      "sha256": "518da0a9c4de7895b695acc9430f436bee3ca691155f76cd049442671666b9b8",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "当前身份没有工资读取权限与重新读取按钮完整可见",
+        "旧读态字段和保存按钮不在画面中，五档布局清楚"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图停在拒权态，原范围保留本身须由对应浏览器行为断言证明，不能仅由画面确认"
+      ]
+    },
+    {
+      "group": "c1-denied-read-retains-scope",
+      "width": 1024,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-C1来源拒权时不沿旧读取开放保存，恢复读取仍保原范围-chromium/c1-denied-read-retains-scope-1024.png",
+      "sha256": "e1af674816a9c28741d556c50248e70aa65313fe8eef5cf9a11f738ca1cabbbd",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "当前身份没有工资读取权限与重新读取按钮完整可见",
+        "旧读态字段和保存按钮不在画面中，五档布局清楚"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图停在拒权态，原范围保留本身须由对应浏览器行为断言证明，不能仅由画面确认"
+      ]
+    },
+    {
+      "group": "c1-denied-read-retains-scope",
+      "width": 1280,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-C1来源拒权时不沿旧读取开放保存，恢复读取仍保原范围-chromium/c1-denied-read-retains-scope-1280.png",
+      "sha256": "f919148eb33809b2a5857fa5c2cecff3ad309e3ed5214e5da3fab68df7951815",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "当前身份没有工资读取权限与重新读取按钮完整可见",
+        "旧读态字段和保存按钮不在画面中，五档布局清楚"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图停在拒权态，原范围保留本身须由对应浏览器行为断言证明，不能仅由画面确认"
+      ]
+    },
+    {
+      "group": "c1-denied-read-retains-scope",
+      "width": 1440,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-readonly-C1来源拒权时不沿旧读取开放保存，恢复读取仍保原范围-chromium/c1-denied-read-retains-scope-1440.png",
+      "sha256": "05be20eff51c90b6888179ab67b11fd3e319d5cda3718d2c7a0336247ec7f365",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "当前身份没有工资读取权限与重新读取按钮完整可见",
+        "旧读态字段和保存按钮不在画面中，五档布局清楚"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图停在拒权态，原范围保留本身须由对应浏览器行为断言证明，不能仅由画面确认"
+      ]
+    },
+    {
+      "group": "attendance-failed-original-input",
+      "width": 390,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-failed-original-input-390.png",
+      "sha256": "59ff8d5ce14aa23f18ce2ce9e598b87b9b6e0a4fb9f5edeb55eb034bf9890ebf",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原目标日薪481负责人·2026-10-03 明确",
+        "正常工时 7.51、加班 0 和施工内容冷页恢复仍是原日期原输入完整保留",
+        "服务不可用/本格输入已保留/提交结果尚未确认提示与核对原提交按钮可见",
+        "390 单列、其余双列工时；弹窗和按钮无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "attendance-failed-original-input",
+      "width": 768,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-failed-original-input-768.png",
+      "sha256": "a3c68b0ad0a0bfb4c7eb9bb2828a160204a67573af67305dd784bd9f62a1ddb9",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原目标日薪481负责人·2026-10-03 明确",
+        "正常工时 7.51、加班 0 和施工内容冷页恢复仍是原日期原输入完整保留",
+        "服务不可用/本格输入已保留/提交结果尚未确认提示与核对原提交按钮可见",
+        "390 单列、其余双列工时；弹窗和按钮无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "attendance-failed-original-input",
+      "width": 1024,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-failed-original-input-1024.png",
+      "sha256": "3c3209b1d4721aa533adfe585c0a5979cc6171fa0665bc121b2d87087222a1dc",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原目标日薪481负责人·2026-10-03 明确",
+        "正常工时 7.51、加班 0 和施工内容冷页恢复仍是原日期原输入完整保留",
+        "服务不可用/本格输入已保留/提交结果尚未确认提示与核对原提交按钮可见",
+        "390 单列、其余双列工时；弹窗和按钮无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "attendance-failed-original-input",
+      "width": 1280,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-failed-original-input-1280.png",
+      "sha256": "a0c43bf4644bc961285d5d759259a3cc26ea7702cda1cc0dbc5fadfb2cb3c1b6",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原目标日薪481负责人·2026-10-03 明确",
+        "正常工时 7.51、加班 0 和施工内容冷页恢复仍是原日期原输入完整保留",
+        "服务不可用/本格输入已保留/提交结果尚未确认提示与核对原提交按钮可见",
+        "390 单列、其余双列工时；弹窗和按钮无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "attendance-failed-original-input",
+      "width": 1440,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-failed-original-input-1440.png",
+      "sha256": "3bf0488da7226c300ea03cf9eae02cb3c4a79bdead3bc69ea887fdad1584821f",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "原目标日薪481负责人·2026-10-03 明确",
+        "正常工时 7.51、加班 0 和施工内容冷页恢复仍是原日期原输入完整保留",
+        "服务不可用/本格输入已保留/提交结果尚未确认提示与核对原提交按钮可见",
+        "390 单列、其余双列工时；弹窗和按钮无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "attendance-late-read-current-month",
+      "width": 390,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-late-read-current-month-390.png",
+      "sha256": "c840430a8e93751fccac68dc94a4fa7c6560eeb518bc55fdd4daaf2c0f7922f7",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "月份筛选为 2026 年 12 月，矩阵说明也为 2026-12；未出现 11 月标题或旧月残影",
+        "原项目/计时班组保持显示，四名工人行可辨，空格不是已登记零",
+        "390 筛选单列、固定工人列可读，日期延伸限制在表格区"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图证明最终可见月份，网络迟到顺序由对应 E2E 断言证明"
+      ]
+    },
+    {
+      "group": "attendance-late-read-current-month",
+      "width": 768,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-late-read-current-month-768.png",
+      "sha256": "03e55d04f4d8665fac5971769043f344621ac7dca0e4e663e335bec10130d804",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "月份筛选为 2026 年 12 月，矩阵说明也为 2026-12；未出现 11 月标题或旧月残影",
+        "原项目/计时班组保持显示，四名工人行可辨，空格不是已登记零",
+        "390 筛选单列、固定工人列可读，日期延伸限制在表格区"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图证明最终可见月份，网络迟到顺序由对应 E2E 断言证明"
+      ]
+    },
+    {
+      "group": "attendance-late-read-current-month",
+      "width": 1024,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-late-read-current-month-1024.png",
+      "sha256": "98092e94327d30e1ac722aca65ccdd964f2bdfd0b3558e2f185719cbb7727bf8",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "月份筛选为 2026 年 12 月，矩阵说明也为 2026-12；未出现 11 月标题或旧月残影",
+        "原项目/计时班组保持显示，四名工人行可辨，空格不是已登记零",
+        "390 筛选单列、固定工人列可读，日期延伸限制在表格区"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图证明最终可见月份，网络迟到顺序由对应 E2E 断言证明"
+      ]
+    },
+    {
+      "group": "attendance-late-read-current-month",
+      "width": 1280,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-late-read-current-month-1280.png",
+      "sha256": "ac72f9ce607ceb59e133068ee37bee0d2efee325621c990f928f4e642e2898c7",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "月份筛选为 2026 年 12 月，矩阵说明也为 2026-12；未出现 11 月标题或旧月残影",
+        "原项目/计时班组保持显示，四名工人行可辨，空格不是已登记零",
+        "390 筛选单列、固定工人列可读，日期延伸限制在表格区"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图证明最终可见月份，网络迟到顺序由对应 E2E 断言证明"
+      ]
+    },
+    {
+      "group": "attendance-late-read-current-month",
+      "width": 1440,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取-chromium/attendance-late-read-current-month-1440.png",
+      "sha256": "8100fea77690e8737b086b45da2a188dcf6b367e9cf89c93ba67bb2e55513911",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "月份筛选为 2026 年 12 月，矩阵说明也为 2026-12；未出现 11 月标题或旧月残影",
+        "原项目/计时班组保持显示，四名工人行可辨，空格不是已登记零",
+        "390 筛选单列、固定工人列可读，日期延伸限制在表格区"
+      ],
+      "findingIds": [],
+      "limitations": [
+        "截图证明最终可见月份，网络迟到顺序由对应 E2E 断言证明"
+      ]
+    },
+    {
+      "group": "c1-config-cold-original-pending",
+      "width": 390,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-个人标准保存失响应后冷页仍按原编号确认，不覆盖原配置空值-chromium/c1-config-cold-original-pending-390.png",
+      "sha256": "185389ffdbdd0f00d9a161b8f039e8a18de6c3bfc3c0ec42b7b770d49bdb2ddd",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "上次提交结果尚未确认、原输入已保留、核对原提交按钮可辨",
+        "2026 年 11 月、日薪481负责人、个人加班价 54、空兜底日薪与空白/零价说明完整",
+        "五档布局不遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-02"
+      ],
+      "limitations": [
+        "原 commandId 不作为产品文本显示，其一致性由 E2E/组件测试核实"
+      ]
+    },
+    {
+      "group": "c1-config-cold-original-pending",
+      "width": 768,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-个人标准保存失响应后冷页仍按原编号确认，不覆盖原配置空值-chromium/c1-config-cold-original-pending-768.png",
+      "sha256": "984a5b138f958f5d176664d7f38750a5767817a0231cfc11f7dc254e46ad4e2d",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "上次提交结果尚未确认、原输入已保留、核对原提交按钮可辨",
+        "2026 年 11 月、日薪481负责人、个人加班价 54、空兜底日薪与空白/零价说明完整",
+        "五档布局不遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-02"
+      ],
+      "limitations": [
+        "原 commandId 不作为产品文本显示，其一致性由 E2E/组件测试核实"
+      ]
+    },
+    {
+      "group": "c1-config-cold-original-pending",
+      "width": 1024,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-个人标准保存失响应后冷页仍按原编号确认，不覆盖原配置空值-chromium/c1-config-cold-original-pending-1024.png",
+      "sha256": "e8931607f1da35b17c9973f92482e0fdf44be6a10f7c4116c78b2731f14916a0",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "上次提交结果尚未确认、原输入已保留、核对原提交按钮可辨",
+        "2026 年 11 月、日薪481负责人、个人加班价 54、空兜底日薪与空白/零价说明完整",
+        "五档布局不遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-02"
+      ],
+      "limitations": [
+        "原 commandId 不作为产品文本显示，其一致性由 E2E/组件测试核实"
+      ]
+    },
+    {
+      "group": "c1-config-cold-original-pending",
+      "width": 1280,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-个人标准保存失响应后冷页仍按原编号确认，不覆盖原配置空值-chromium/c1-config-cold-original-pending-1280.png",
+      "sha256": "57f47e50d1f85924e16e8c8845196c5293345a32126d0bc50218b83da8202db5",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "上次提交结果尚未确认、原输入已保留、核对原提交按钮可辨",
+        "2026 年 11 月、日薪481负责人、个人加班价 54、空兜底日薪与空白/零价说明完整",
+        "五档布局不遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-02"
+      ],
+      "limitations": [
+        "原 commandId 不作为产品文本显示，其一致性由 E2E/组件测试核实"
+      ]
+    },
+    {
+      "group": "c1-config-cold-original-pending",
+      "width": 1440,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-recovery-个人标准保存失响应后冷页仍按原编号确认，不覆盖原配置空值-chromium/c1-config-cold-original-pending-1440.png",
+      "sha256": "4b64032ab84b80c85f712216de6a57ee48a8f2479bc316facbf8d1cdaef8d764",
+      "viewedWith": "view_image(original)",
+      "verdict": "issue",
+      "observed": [
+        "上次提交结果尚未确认、原输入已保留、核对原提交按钮可辨",
+        "2026 年 11 月、日薪481负责人、个人加班价 54、空兜底日薪与空白/零价说明完整",
+        "五档布局不遮挡"
+      ],
+      "findingIds": [
+        "VIS-C1-02"
+      ],
+      "limitations": [
+        "原 commandId 不作为产品文本显示，其一致性由 E2E/组件测试核实"
+      ]
+    },
+    {
+      "group": "zero-member-month-lock",
+      "width": 390,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/zero-member-month-lock-390.png",
+      "sha256": "594763bdb973737134be9cdb0f8c2cbbe9c64daea652d3a501ed43074b8cefeb",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "无考勤零收款成员·2026-08-31 原目标清楚",
+        "当月已有签工链或已发工资/不能修改考勤提示可辨；仅关闭按钮，无保存入口",
+        "新格默认 8 小时尚未保存说明可见，背景原格为空，与已登记 8 小时区别明确",
+        "五档弹窗和关闭按钮完整，无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "zero-member-month-lock",
+      "width": 768,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/zero-member-month-lock-768.png",
+      "sha256": "86b2f299da02d557ad69b42f7694ade8ede57f4f6e600ce8e2632f409a26c97d",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "无考勤零收款成员·2026-08-31 原目标清楚",
+        "当月已有签工链或已发工资/不能修改考勤提示可辨；仅关闭按钮，无保存入口",
+        "新格默认 8 小时尚未保存说明可见，背景原格为空，与已登记 8 小时区别明确",
+        "五档弹窗和关闭按钮完整，无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "zero-member-month-lock",
+      "width": 1024,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/zero-member-month-lock-1024.png",
+      "sha256": "dcb5f6330d5fd6053021ce07060026326130bd9e22d64f741b01b7ece5f7882e",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "无考勤零收款成员·2026-08-31 原目标清楚",
+        "当月已有签工链或已发工资/不能修改考勤提示可辨；仅关闭按钮，无保存入口",
+        "新格默认 8 小时尚未保存说明可见，背景原格为空，与已登记 8 小时区别明确",
+        "五档弹窗和关闭按钮完整，无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "zero-member-month-lock",
+      "width": 1280,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/zero-member-month-lock-1280.png",
+      "sha256": "d4c6cd15114adf634f760ad6caaf82e37834930f837a59a71a508c3162086bbb",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "无考勤零收款成员·2026-08-31 原目标清楚",
+        "当月已有签工链或已发工资/不能修改考勤提示可辨；仅关闭按钮，无保存入口",
+        "新格默认 8 小时尚未保存说明可见，背景原格为空，与已登记 8 小时区别明确",
+        "五档弹窗和关闭按钮完整，无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    },
+    {
+      "group": "zero-member-month-lock",
+      "width": 1440,
+      "path": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c1-central/c/browser-final/payroll-c1-central-无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出-chromium/zero-member-month-lock-1440.png",
+      "sha256": "aa1ff0a7c95df7495bbd47b14b9d9ad7ae98c2e4e6911846dcd46fdfdb585919",
+      "viewedWith": "view_image(original)",
+      "verdict": "pass",
+      "observed": [
+        "无考勤零收款成员·2026-08-31 原目标清楚",
+        "当月已有签工链或已发工资/不能修改考勤提示可辨；仅关闭按钮，无保存入口",
+        "新格默认 8 小时尚未保存说明可见，背景原格为空，与已登记 8 小时区别明确",
+        "五档弹窗和关闭按钮完整，无遮挡"
+      ],
+      "findingIds": [],
+      "limitations": []
+    }
+  ],
+  "limits": [
+    "画面仅证明截图中的可见状态；原commandId、恢复身份、权限恢复、迟到请求顺序仍以已运行的行为断言为准。",
+    "表内可横滚区域可只显示部分日期/列，不据此判定页面横向溢出。",
+    "本记录针对所列原图SHA；后续修图需重新目检，不将旧结果自动套用。"
+  ],
+  "precisionReviewCorrection": "此前Standards/Spec精度判断仅基于列配置及替身表格，不能证明实际已发组件；实际显示精度结论现为待修复复验。",
+  "repairCodeReview": {
+    "report": "review.md",
+    "inputManifest": "final-inputs.json",
+    "standardsHard": 0,
+    "specCodeDelta": 0,
+    "newImageReviewComplete": false,
+    "previousImagesRemainOriginalEvidence": true
+  }
+}

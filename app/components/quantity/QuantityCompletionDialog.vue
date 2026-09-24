@@ -5,14 +5,17 @@ import type {
   QuantityCompletionWorkspace,
 } from '~/lib/quantity/completion'
 import type { QuantityCompletionStatus } from '~/lib/quantity/read-model'
+import type { DataOriginDTO } from '~/types/read-model'
 import { useBase64, useEventListener, useFileDialog } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
+import KitButton from '~/components/ui/KitButton.vue'
 import { formatQuantityValue } from '~/lib/quantity/format'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 const props = withDefaults(defineProps<{
   projectId: string
+  origin?: DataOriginDTO
   unitId: string
   initialStageId?: string
 }>(), {
@@ -38,6 +41,7 @@ const newPhotos = ref<DraftPhoto[]>([])
 const baseline = shallowRef('')
 const initializing = shallowRef(false)
 let initializeSequence = 0
+let photoGeneration = 0
 
 const sections = [
   { key: 'stage', label: '工序阶段' },
@@ -51,6 +55,7 @@ const statusTabs = [
 
 const workspace = computed<QuantityCompletionWorkspace | null>(() => (
   store.completionWorkspace?.projectId === props.projectId
+  && store.completionOrigin === (props.origin ?? 'real')
   && store.completionWorkspace.unit.id === props.unitId
     ? store.completionWorkspace
     : null
@@ -73,6 +78,7 @@ function draftSignature(): string {
 const dirty = computed(() => baseline.value !== '' && draftSignature() !== baseline.value)
 
 function hydrateStage(stage: QuantityCompletionStageView | null) {
+  photoGeneration++
   status.value = stage?.completion?.status ?? 'completed'
   completedAt.value = stage?.completion?.completedAt?.slice(0, 10) ?? toLocalDateInputValue()
   note.value = stage?.completion?.note ?? ''
@@ -82,7 +88,7 @@ function hydrateStage(stage: QuantityCompletionStageView | null) {
 
 async function initialize(sequence: number, projectId: string, unitId: string) {
   try {
-    await store.loadCompletion(projectId, unitId)
+    await store.loadCompletion(projectId, unitId, props.origin ?? 'real')
     if (sequence !== initializeSequence || !open.value || props.projectId !== projectId || !workspace.value)
       return
     const stages = workspace.value.stages
@@ -101,6 +107,7 @@ async function initialize(sequence: number, projectId: string, unitId: string) {
 }
 
 function requestInitialize(isOpen: boolean, projectId: string, unitId: string) {
+  photoGeneration++
   const sequence = ++initializeSequence
   baseline.value = ''
   selectedStageId.value = ''
@@ -114,7 +121,7 @@ function requestInitialize(isOpen: boolean, projectId: string, unitId: string) {
 }
 
 watch(
-  [open, () => props.projectId, () => props.unitId, () => props.initialStageId],
+  [open, () => props.projectId, () => props.unitId, () => props.initialStageId, () => props.origin],
   ([isOpen, projectId, unitId]) => requestInitialize(isOpen, projectId, unitId),
   { immediate: true },
 )
@@ -151,9 +158,15 @@ const { open: openPhotoPicker, onChange: onPhotoPicked, reset: resetPhotoPicker 
 onPhotoPicked(async (files) => {
   if (!files?.length)
     return
+  const selectedFiles = Array.from(files)
+  const generation = photoGeneration
+  const isCurrent = () => generation === photoGeneration && open.value
+  resetPhotoPicker()
   try {
-    for (const file of Array.from(files)) {
+    for (const file of selectedFiles) {
       const dataUrl = await useBase64(file).promise.value
+      if (!isCurrent())
+        return
       newPhotos.value.push({
         fileName: file.name,
         mimeType: file.type || 'image/jpeg',
@@ -163,10 +176,8 @@ onPhotoPicked(async (files) => {
     }
   }
   catch (cause) {
-    error(`验收照片读取失败：${toErrorMessage(cause)}`)
-  }
-  finally {
-    resetPhotoPicker()
+    if (isCurrent())
+      error(`验收照片读取失败：${toErrorMessage(cause)}`)
   }
 })
 
@@ -198,7 +209,7 @@ async function confirmArchivedEdit(): Promise<boolean> {
 }
 
 async function save() {
-  if (store.completionSaving || store.completionLoading || initializing.value)
+  if (!store.completionCanWrite || store.completionSaving || store.completionLoading || initializing.value)
     return
   const source = workspace.value
   const stage = selectedStage.value
@@ -212,7 +223,7 @@ async function save() {
     warning('请填写完成日期')
     return
   }
-  if (effectiveStatus === 'completed' && !stage.currentAssignment) {
+  if (effectiveStatus === 'completed' && !stage.currentAssignment?.available) {
     warning('该户当前工种还没有责任人，请先在责任配置中指派')
     return
   }
@@ -300,6 +311,7 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
     :save-label="status === 'draft' ? '保存草稿' : '登记完成'"
     width="min(960px, calc(100dvw - var(--space-6, 24px)))"
     :busy="store.completionSaving"
+    :save-disabled="!store.completionCanWrite || store.completionLoading || initializing"
     @save="save"
     @cancel="requestClose"
   >
@@ -320,9 +332,9 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
       <p class="max-w-xl text-12px text-ink-soft">
         {{ store.completionError }}
       </p>
-      <button type="button" class="btn-primary" @click="retry">
+      <KitButton variant="primary" @click="retry">
         重新加载
-      </button>
+      </KitButton>
     </section>
 
     <fieldset
@@ -330,7 +342,7 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
       data-testid="quantity-completion-fields"
       class="m-0 min-w-0 border-0 p-0"
       :class="store.completionSaving ? 'pointer-events-none opacity-70' : ''"
-      :disabled="store.completionSaving || store.completionLoading || initializing"
+      :disabled="!store.completionCanWrite || store.completionSaving || store.completionLoading || initializing"
     >
       <div class="grid gap-7">
         <section id="form-section-stage" class="scroll-mt-4 grid gap-3">

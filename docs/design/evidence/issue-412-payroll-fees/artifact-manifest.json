@@ -1,0 +1,1114 @@
+{
+  "schemaVersion": 1,
+  "run": "browser-seventh",
+  "productCommit": "61a6a10ddee611125d9d10b8dfd9dd81f99db467",
+  "scope": "第七轮主旅程与打印；第八轮仅归档390金额列补图、其独立事实记录与通过日志；不代表生产保存",
+  "sourceCopiesRetained": true,
+  "pdfRetained": false,
+  "counts": {
+    "browserPng": 132,
+    "xlsx": 2,
+    "originalJson": 8,
+    "printPng": 4,
+    "total": 149,
+    "supplementPng": 1,
+    "supplementJson": 1,
+    "supplementLog": 1
+  },
+  "artifacts": [
+    {
+      "path": "browser/company-managed-evidence-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-evidence-390.png",
+      "bytes": 56266,
+      "sha256": "e4b130ff0baa0eb9b8e534df490a03bc5b14f79b564d04fb67fa45cbd4265ce2",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-1024.png",
+      "bytes": 114632,
+      "sha256": "31880dd78d6f5b293f1bf819279543f07fb1d7fc622db15991fda2c25689b18b",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-1280.png",
+      "bytes": 123000,
+      "sha256": "63e4e4df2619c106377f768436b3562455b7cf713ab987ee3b93c5b81cc87026",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-1440.png",
+      "bytes": 125617,
+      "sha256": "c3dc4571a890e89afbe1d6619de22a376b083cc4a1a7ba738586ce435af2316e",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-390.png",
+      "bytes": 67499,
+      "sha256": "1c335b983ae1e654611b1b5f66a307989bcc304d92fa34a0fab0591812244c9f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-768.png",
+      "bytes": 82620,
+      "sha256": "0c85aabeb9f61da0dcc3da0d940167e0d1f6368492265a281904dda70c335002",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-table-0-right-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-table-0-right-1024.png",
+      "bytes": 12371,
+      "sha256": "b2cedf50b0091d79ae2d80eed6f9e53e78297e4d69e410325d20459d98be3f3b",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-table-0-right-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-table-0-right-1280.png",
+      "bytes": 13011,
+      "sha256": "523c2a0f8282495d0b0906c15c737291463f445b4468c39b8fcf953776a11e68",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-table-0-right-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-table-0-right-1440.png",
+      "bytes": 13608,
+      "sha256": "9a458756c54a6e80a0c202f6eae537c10bbfd7d22f9337102d1ea1ed0399a4c1",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-table-0-right-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-table-0-right-390.png",
+      "bytes": 9305,
+      "sha256": "c60472f45678ac7222b816e8f5a2769b4a1db922f595b43a4d43f0f3bc6e6688",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-no-statement-table-0-right-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-no-statement-table-0-right-768.png",
+      "bytes": 11613,
+      "sha256": "65742cbd827f863ff611ec8bea8da79b944705a563a27c5db0a846bc37bc2272",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-original-scope-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-original-scope-1024.png",
+      "bytes": 116934,
+      "sha256": "147d9d10b5ce819dac29c971788b5885ae22caf26b6e6dccf7c4f530c1c81c32",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-original-scope-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-original-scope-1280.png",
+      "bytes": 130742,
+      "sha256": "4f145657b0117b854b1a88ad55018ba404361230ffea555a4699f12131eafe81",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-original-scope-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-original-scope-1440.png",
+      "bytes": 134168,
+      "sha256": "694931f830482f0ecbc1887524affcda05bf9e8eb380261322c9669a653f17c2",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-original-scope-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-original-scope-390.png",
+      "bytes": 60683,
+      "sha256": "77d4c94c70b63986346b065f028d32273933db92d9c0d9a96b2818e09d704eb0",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-original-scope-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-original-scope-768.png",
+      "bytes": 88678,
+      "sha256": "7ee5fd5707aa207e276ee46aee0fd2f445891a57df151a2a9c1787448aa8f9d6",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/company-managed-save-control-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/company-managed-save-control-390.png",
+      "bytes": 55696,
+      "sha256": "b6d7d1ad978e7749d3c79699603afa1086e6a116eed1043c6a5a33dde6f8d2a8",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-null-not-adopted-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-null-not-adopted-1024.png",
+      "bytes": 116042,
+      "sha256": "cd8261f91400078fc51da54fc9911dbf09e163d2b1017fdba4befd59a86b34f5",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-null-not-adopted-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-null-not-adopted-1280.png",
+      "bytes": 121969,
+      "sha256": "6d950ca368883b9db508d0927f777ba137a42837e47b8490e7cb83edbce60a8e",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-null-not-adopted-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-null-not-adopted-1440.png",
+      "bytes": 123825,
+      "sha256": "46e8b9b4c0197f879e68b19328dfaea936237d1a382f981c144171aaffb406f9",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-null-not-adopted-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-null-not-adopted-390.png",
+      "bytes": 61453,
+      "sha256": "11dfd9a5750bc1e08defce0e716bd8130fa39a7dd5513d995433a092c415060c",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-null-not-adopted-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-null-not-adopted-768.png",
+      "bytes": 77750,
+      "sha256": "c9668265547b4814ff85493b5c6f736c1f818f62d9f829c684302fc35b57d434",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-zero-not-adopted-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-zero-not-adopted-1024.png",
+      "bytes": 109512,
+      "sha256": "25db3de8e43f90b223496a50677ff0462bf7d45efbde14d3fb99bc1f4275620f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-zero-not-adopted-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-zero-not-adopted-1280.png",
+      "bytes": 115529,
+      "sha256": "d2d4eca624e97a86fdaf7fa14b6dfc103b6124aa8434de61e4af7951af17b1d7",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-zero-not-adopted-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-zero-not-adopted-1440.png",
+      "bytes": 117395,
+      "sha256": "74f97c6ff95f56a6acb3ddd5ff8c55d32f841c8ea6385fae152bbd8bd1cb17ed",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-zero-not-adopted-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-zero-not-adopted-390.png",
+      "bytes": 57444,
+      "sha256": "5df439b42fd586a11ccf70cd260999a938cb96892410671ef565577ba7150774",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/crew-default-zero-not-adopted-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/crew-default-zero-not-adopted-768.png",
+      "bytes": 71207,
+      "sha256": "0f3c020f50f25dd9c74f2dd2705198538ef61195198ee65dbc72025acbc62d76",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-http.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-http.json",
+      "bytes": 14897,
+      "sha256": "ff459afa00517e19f159d218c5288c451f9eb28f4bcc4088705e3f45de59a4ec",
+      "encoding": "original-bytes",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-1024.png",
+      "bytes": 128722,
+      "sha256": "7ab7d05c2a8fad659449061ebeb8b8f703da10606c41a70f68654a5c2bffe277",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-1280.png",
+      "bytes": 134778,
+      "sha256": "e266fa6d2b80efeb0bd8bd1865e50bc559d0d6789ef53ddaf85c26d509d8bc1f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-1440.png",
+      "bytes": 138156,
+      "sha256": "8bfd35d75aa74f5e8e4fa6178f82688e4d5f7578e3bac2ee393b25343658def8",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-390.png",
+      "bytes": 59381,
+      "sha256": "6ee7064638fbbfe44d9202d052edae66c3b3fb8e84ba30abc2de9a3e37c2cf05",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-768.png",
+      "bytes": 89738,
+      "sha256": "e1c05df18bbb2ef25c564d50575d09608e6ac2dd080750cce90c4ec8361a298c",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-table-0-right-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-table-0-right-1024.png",
+      "bytes": 8575,
+      "sha256": "9df3fedf5289a7af89950894a5166ee47abd720a9208be289e200e62b4bf5fcc",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-table-0-right-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-table-0-right-1280.png",
+      "bytes": 10567,
+      "sha256": "cd022c7152e11545152be92ef65b21c763bd20d1b1ee12c106e6d3f71eed19f1",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-table-0-right-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-table-0-right-1440.png",
+      "bytes": 10858,
+      "sha256": "b442c1c165a0c43314d75aa9863f1538818f2a3d4f5ec366f753ff00f0557a4e",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-table-0-right-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-table-0-right-390.png",
+      "bytes": 3971,
+      "sha256": "9357fc5e31e6ff4e00e7180058dbccc224f0ed699e8886d5fd0d6360c9494c03",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-preserves-input-table-0-right-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-preserves-input-table-0-right-768.png",
+      "bytes": 7764,
+      "sha256": "c1d1b82bd76d2a0c93eba9f6f34d1892dc0f61ed0d63e12a4a6326bcd0ff3ede",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-source-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-source-1024.png",
+      "bytes": 144946,
+      "sha256": "fb609789586a5cfbf27d21bd472f87a0fe2be264ec46efef4794f5f8ef22e5f5",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-source-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-source-1280.png",
+      "bytes": 151478,
+      "sha256": "0f09a28021a7a0b3fc246fc19b31005a61995f46c3d469ecc9b9af2a57c71376",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-source-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-source-1440.png",
+      "bytes": 154374,
+      "sha256": "d661819c6c0ba4d06145626f02b5dea07035aeea9f52ffa95b40bdb3c51fafbc",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-source-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-source-390.png",
+      "bytes": 69721,
+      "sha256": "64e223109d1ffce0ded7d400091b00970c4edcc8ed1a1a9a831939aac4d0dc3a",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fee-config-quantity-return-source-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-quantity-return-source-768.png",
+      "bytes": 107166,
+      "sha256": "e1588b2ac3774e436a13da2f4319f05102e5cd1ef09196b6102a411da2ac139f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fees-migration-batch.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fees-migration-batch.json",
+      "bytes": 7548,
+      "sha256": "f7abd6c0565ffca7464359df2443122dbbcd085bf8853b752034f57aa651f9ac",
+      "encoding": "original-bytes",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "browser/fees-source.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fees-source.json",
+      "bytes": 38532,
+      "sha256": "239f572754aec0b435b4f3d513c66e379d78e333fd032bc88feaf45a65ad37a9",
+      "encoding": "original-bytes",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "browser/fees-unknown-preserves-command-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fees-unknown-preserves-command-1024.png",
+      "bytes": 110856,
+      "sha256": "2ad52e952d0f2944b0220aac2e08221ea96d61b5408c96fe12cf703308a9bae9",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fees-unknown-preserves-command-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fees-unknown-preserves-command-1280.png",
+      "bytes": 122442,
+      "sha256": "59cb21e86e8dc63f5b860968d4bb48f68b189bf488ed9544bd885e38477dae58",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fees-unknown-preserves-command-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fees-unknown-preserves-command-1440.png",
+      "bytes": 124797,
+      "sha256": "8eb19c340d9178ec9728e6279f9d6d524ddc68584728221a83cc8b4921a0e343",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fees-unknown-preserves-command-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fees-unknown-preserves-command-390.png",
+      "bytes": 54590,
+      "sha256": "2dd6560df61c174eda8ba2bbe6763fc6aa9ea9ebe425ea32453ae9db84a98e25",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/fees-unknown-preserves-command-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fees-unknown-preserves-command-768.png",
+      "bytes": 78576,
+      "sha256": "295fb3d5c18cdcc0e7bcb8cf8359d82039f0487dfdf3b508f4fd5b41c2edeb5f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-520-calculation-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-520-calculation-1024.png",
+      "bytes": 157859,
+      "sha256": "aa698be329a44a6fb3bf264055bd28d5e9b60f608ea47c8f06435d5bab80a9ae",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-520-calculation-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-520-calculation-1280.png",
+      "bytes": 154661,
+      "sha256": "04c5114d403847d6f2c5c93ef63be90f2febe2a7e361f1981632fdd6cdd20b47",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-520-calculation-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-520-calculation-1440.png",
+      "bytes": 157010,
+      "sha256": "a51325c9e6e4fbf578fac3ef30ce23871338cbc13b8f51788f635ee217413e7c",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-520-calculation-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-520-calculation-390.png",
+      "bytes": 76063,
+      "sha256": "86f8cf09d45c6d48ece46e6b0d7cea6fdaf33f06f03aedbd2a8028806dab3316",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-520-calculation-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-520-calculation-768.png",
+      "bytes": 114484,
+      "sha256": "773c7b520cb691b362ca33c39ba92cf2c5727958541ffae3fba866d13169fe0d",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-520-print-check.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-520-print-check.json",
+      "bytes": 1816,
+      "sha256": "b21a1fdaa71b4c86c25ebfdebc71fcfea7781d1304a32469cf079c950e3ce87d",
+      "encoding": "original-bytes",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "browser/management-520.xlsx",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-520.xlsx",
+      "bytes": 39361,
+      "sha256": "66b024fded4bdbe2fc13e615b3ac52b95a5a648c11376c71583e52bd95cd63cb",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-frozen-520-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-frozen-520-1024.png",
+      "bytes": 130246,
+      "sha256": "9cd52b483dc1005c79c93bc2b4b22aa1be0f6ce50c9d0f396be7540b1b97ce62",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-frozen-520-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-frozen-520-1280.png",
+      "bytes": 142060,
+      "sha256": "d757c0c09f33be32b54a50f27f1fcb4f2e7ee0ac0d0f7b79ec9b75f2bb4aa6da",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-frozen-520-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-frozen-520-1440.png",
+      "bytes": 142535,
+      "sha256": "aaf0230a07763ef4dd22b407605be1457435a28e79bee5deb091294d00cd210a",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-frozen-520-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-frozen-520-390.png",
+      "bytes": 56619,
+      "sha256": "7bdee2544ca529b80ab9fc586fd527c9b1d1e46b120532a69d517186c2f1a7cb",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-frozen-520-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-frozen-520-768.png",
+      "bytes": 93137,
+      "sha256": "3e9bdb4ba2e914afeb6f2f9c8b73dbb40eb6d936d0f8e8da984dc9879f1a91a3",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-original-responsibility-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-original-responsibility-1024.png",
+      "bytes": 114016,
+      "sha256": "e74307d670a958f61706f2cfa79b16e4106a57814eb03df0446d4535a2461993",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-original-responsibility-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-original-responsibility-1280.png",
+      "bytes": 127340,
+      "sha256": "51c57f0051126188db79681a4c0be1d0cc49b4d2a7d3b22dface17e04ce0feea",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-original-responsibility-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-original-responsibility-1440.png",
+      "bytes": 129208,
+      "sha256": "2fb4d6b5f42f872d2161d4ac4e497a486fe0e6a62346d8301a4093ac8faca8a7",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-original-responsibility-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-original-responsibility-390.png",
+      "bytes": 61152,
+      "sha256": "82d51af6b6a1e73502d0fa855e99c6d332f81c620a18be69ea08d9b23aa9a1c4",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-original-responsibility-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-original-responsibility-768.png",
+      "bytes": 86513,
+      "sha256": "c5417aed47feb4381736b0645bd6499ed380be9779526079e78d463ad059b4b7",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-quantity-return-source-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-quantity-return-source-1024.png",
+      "bytes": 144946,
+      "sha256": "fb609789586a5cfbf27d21bd472f87a0fe2be264ec46efef4794f5f8ef22e5f5",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-quantity-return-source-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-quantity-return-source-1280.png",
+      "bytes": 151478,
+      "sha256": "0f09a28021a7a0b3fc246fc19b31005a61995f46c3d469ecc9b9af2a57c71376",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-quantity-return-source-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-quantity-return-source-1440.png",
+      "bytes": 154374,
+      "sha256": "d661819c6c0ba4d06145626f02b5dea07035aeea9f52ffa95b40bdb3c51fafbc",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-quantity-return-source-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-quantity-return-source-390.png",
+      "bytes": 69721,
+      "sha256": "64e223109d1ffce0ded7d400091b00970c4edcc8ed1a1a9a831939aac4d0dc3a",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-quantity-return-source-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-quantity-return-source-768.png",
+      "bytes": 107166,
+      "sha256": "e1588b2ac3774e436a13da2f4319f05102e5cd1ef09196b6102a411da2ac139f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-evidence-tail-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-evidence-tail-1024.png",
+      "bytes": 124488,
+      "sha256": "8c57c68b1ccc1368c745f35fa4848cd662e09ecb2228a181bd3a0c24589c62ab",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-evidence-tail-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-evidence-tail-1280.png",
+      "bytes": 137060,
+      "sha256": "eeadf698921b46b38a572882480433fd184ea4eb1b7ec2b4919d92f5e6369b5a",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-evidence-tail-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-evidence-tail-1440.png",
+      "bytes": 138827,
+      "sha256": "047ad00190bf58aa238908ae9491ed98bffcba10eaf74b2a7683e24c415c5c99",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-evidence-tail-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-evidence-tail-390.png",
+      "bytes": 61004,
+      "sha256": "21e399e744e4e0012f611dfa14e157b6e847273c987d0d838ebdd9123aaf0e02",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-evidence-tail-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-evidence-tail-768.png",
+      "bytes": 96943,
+      "sha256": "14b6a9db58e88a7bb4f7d3cea903e4feb75fe7a6a3ec011b849e1e54ec399823",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-preserves-input-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-preserves-input-1024.png",
+      "bytes": 125358,
+      "sha256": "7eb829eaadc767e1999a4d0680c1e8737599668d0d16e876e2759a6f7833bb18",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-preserves-input-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-preserves-input-1280.png",
+      "bytes": 138499,
+      "sha256": "c9022800417e9b80fe9fdc1a7892cf6656af929800187930423e8168c2cc4c69",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-preserves-input-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-preserves-input-1440.png",
+      "bytes": 140391,
+      "sha256": "29c4ba725712be91fe763c8a4f444bb6f73e51aea1f793686139756c44fcf179",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-preserves-input-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-preserves-input-390.png",
+      "bytes": 62409,
+      "sha256": "b1ba307fc47c7b083a2f1c8986005d54236dde5e5177e9a8092ffe340b25d4b1",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-preserves-input-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-preserves-input-768.png",
+      "bytes": 97778,
+      "sha256": "b889bbcafc3de605a455d51668e6a36897857f900fa2515bb4b5343f36c92c4e",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-ratio-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-ratio-1024.png",
+      "bytes": 132935,
+      "sha256": "3e4c6196a6a932a3654820b1bf0951616b91b29791f11e7cf8f6e6066842298e",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-ratio-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-ratio-1280.png",
+      "bytes": 146109,
+      "sha256": "f24ae34d683550f9250f53a6f2d047810408dad433aa88f1f7b5964454a96076",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-ratio-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-ratio-1440.png",
+      "bytes": 147772,
+      "sha256": "e08708390d0b73503dda96b64d672b0610b65da62d8041ea3b01d57903a3847e",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-ratio-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-ratio-390.png",
+      "bytes": 65324,
+      "sha256": "ae8077cc37cbb237660900c4f47d0ecd3991c901515d6990d4e419fa2e0d59a1",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/management-scope-return-ratio-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-scope-return-ratio-768.png",
+      "bytes": 105039,
+      "sha256": "a4ab66046885cbc49a3292a5c5343e9a86418c8c9e46557d3d7510d1506ca34a",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-evidence-tail-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-evidence-tail-1024.png",
+      "bytes": 146209,
+      "sha256": "013bd4fb6c236034dd458659ae2b4a08fdd1a3504a53a3f02ea56b3d6eb171bb",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-evidence-tail-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-evidence-tail-1280.png",
+      "bytes": 154871,
+      "sha256": "84d7982e143a9de41bb28c45327439d30c11815e17428c176aac7f7d2d468a2b",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-evidence-tail-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-evidence-tail-1440.png",
+      "bytes": 155076,
+      "sha256": "e752d1f23419c4f29028e5affbf5cbfad14b9ef97610b93c6e456d3ca73a9e53",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-evidence-tail-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-evidence-tail-390.png",
+      "bytes": 76946,
+      "sha256": "0124f20ba3c2131a532f1ec3bdf62750285f28f1c0a2a10521395820d056ea89",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-evidence-tail-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-evidence-tail-768.png",
+      "bytes": 107803,
+      "sha256": "bc0e62f0d3211fb602c4d972870a11a1cadd74c9d64bef54c45a91e15bb7c3fd",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-left-focus-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-left-focus-1024.png",
+      "bytes": 142585,
+      "sha256": "31b42755b834a4fba110cf6c605f375009dd1d0e6d12d839d2572ae5d2252c50",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-left-focus-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-left-focus-1280.png",
+      "bytes": 154892,
+      "sha256": "bdd2fa5f72f31bdad5392218c462a9a660d5fc2e389bc7108abf72fe9cccc6ba",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-left-focus-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-left-focus-1440.png",
+      "bytes": 155134,
+      "sha256": "086bae7fdd17c9d7fb293b1e085b5dfc497c327b27b8d26be444cf2625e1e7c5",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-left-focus-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-left-focus-390.png",
+      "bytes": 57160,
+      "sha256": "a001f4d97c58b9210b8f1c6fef69ab0a85ce21e60cf1faecb236e8d8136a522c",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-left-focus-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-left-focus-768.png",
+      "bytes": 101066,
+      "sha256": "3b56299db56df65150153535d62ffabbefb58afbfbe35bfc928e7e82ec05c174",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-measurements.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-measurements.json",
+      "bytes": 5628,
+      "sha256": "f9ca4c8871640168f127d47df868a13d4d1bad6e558ee3cebfbceca1885c3f85",
+      "encoding": "original-bytes",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "browser/negative-readable-reason-tail-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-reason-tail-1024.png",
+      "bytes": 147777,
+      "sha256": "f8f533c16733504e3cf7ca4e9403017c85a86f60a97cc32d34f8c5cb22ca6dd6",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-reason-tail-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-reason-tail-1280.png",
+      "bytes": 154871,
+      "sha256": "84d7982e143a9de41bb28c45327439d30c11815e17428c176aac7f7d2d468a2b",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-reason-tail-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-reason-tail-1440.png",
+      "bytes": 155076,
+      "sha256": "e752d1f23419c4f29028e5affbf5cbfad14b9ef97610b93c6e456d3ca73a9e53",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-reason-tail-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-reason-tail-390.png",
+      "bytes": 78358,
+      "sha256": "c94aad06ef3647800f6c748245b5f42f22d339ef1cb7735d84e732e7a62f7163",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-reason-tail-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-reason-tail-768.png",
+      "bytes": 109253,
+      "sha256": "1a2c9a7ed48bf235400b39e5a14585947910069dde4b7e759a2e6a607ec26cca",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-right-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-right-1024.png",
+      "bytes": 147759,
+      "sha256": "ce7e404d89092cfeefb9f0d95c54e9cb5166689470b585df8c0a6eabac1e0996",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-right-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-right-1280.png",
+      "bytes": 154892,
+      "sha256": "bdd2fa5f72f31bdad5392218c462a9a660d5fc2e389bc7108abf72fe9cccc6ba",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-right-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-right-1440.png",
+      "bytes": 155134,
+      "sha256": "086bae7fdd17c9d7fb293b1e085b5dfc497c327b27b8d26be444cf2625e1e7c5",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-right-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-right-390.png",
+      "bytes": 78391,
+      "sha256": "7d32a226a429290693fee2612cddd4758bdbcded4fdafea38936fd1bdadee1b7",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-readable-right-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-right-768.png",
+      "bytes": 109194,
+      "sha256": "3433aa8d74439a1b5f8b94b8d6f73e7c3678ec1836b4aba984f3c0592028da12",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-uncompleted-source-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-uncompleted-source-1024.png",
+      "bytes": 133481,
+      "sha256": "6e2832872c782a3cf487cc4ceb234ddf5eeeb640e78e23ba3b0b8bd7ee6d3251",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-uncompleted-source-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-uncompleted-source-1280.png",
+      "bytes": 147265,
+      "sha256": "f2376f518d64cb0a862aec88a598c0c2c8d48bac9335e76253d7ffc102f1676f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-uncompleted-source-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-uncompleted-source-1440.png",
+      "bytes": 148992,
+      "sha256": "a871bd0b7a802134ee79a3d216d44aa26e6be36ba3917a96adaf6419597a5f3f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-uncompleted-source-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-uncompleted-source-390.png",
+      "bytes": 64156,
+      "sha256": "09b94fdd161e146d06c8d7364163009d6483094898e8897c658fac5afd290edf",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/negative-uncompleted-source-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-uncompleted-source-768.png",
+      "bytes": 104840,
+      "sha256": "8f88d0a9421ace887304da982bbd3d2fe748623dc0edcac38a964c81f816cabf",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/ordinary-3815-print-check.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/ordinary-3815-print-check.json",
+      "bytes": 1525,
+      "sha256": "1b140caba8c15e990c4381b5b93900fba4b605ca105cac1ed210016f6aed0db5",
+      "encoding": "original-bytes",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "browser/ordinary-3815.xlsx",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/ordinary-3815.xlsx",
+      "bytes": 43770,
+      "sha256": "937b5d00acf5d8c05cbbef6e5bad728679f2bfb325ca9e11da9e75d1e763c37f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/ordinary-work-and-215-fees-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/ordinary-work-and-215-fees-1024.png",
+      "bytes": 147502,
+      "sha256": "999454aa279a7c8ff47249eb56b4bd3260252a5ff7ef4a2df91458bc263891b6",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/ordinary-work-and-215-fees-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/ordinary-work-and-215-fees-1280.png",
+      "bytes": 152904,
+      "sha256": "53bc12a6349eb73c48a5b6bd1378e06425ef200b2b956e7d18bd75102637ec81",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/ordinary-work-and-215-fees-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/ordinary-work-and-215-fees-1440.png",
+      "bytes": 155201,
+      "sha256": "8917e893ee19e508a4acdaa0f45c9785b68ea29fdcda503d5c142be2fcef6707",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/ordinary-work-and-215-fees-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/ordinary-work-and-215-fees-390.png",
+      "bytes": 71598,
+      "sha256": "337ac126229ae2271cb1e600d1ebc7f3532b7e535d575aec109575d2505f53c5",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/ordinary-work-and-215-fees-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/ordinary-work-and-215-fees-768.png",
+      "bytes": 110002,
+      "sha256": "f21ae26b293b649a04da30e296633e295c89367991e9f3565d5461909452d41b",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-list-readable-measurements.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-list-readable-measurements.json",
+      "bytes": 6332,
+      "sha256": "e4b19d3ea1aaf22317e9065276a4fff11fa3cb4db2ff34438efa8b41a4195ef3",
+      "encoding": "original-bytes",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "browser/same-person-readable-actual-two-rows-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-actual-two-rows-1024.png",
+      "bytes": 126706,
+      "sha256": "3d069fc40fb1b3441d0ea24d00fa71b282e1f09f1f4fec4519175810dd7641e5",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-actual-two-rows-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-actual-two-rows-1280.png",
+      "bytes": 136009,
+      "sha256": "bdd89d43cc5aba8f176e03144064f7187df0d4dfe4c3a6ab2805b9d5c9699724",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-actual-two-rows-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-actual-two-rows-1440.png",
+      "bytes": 143235,
+      "sha256": "c9d74f6dc8a11768ce8aca5ca1c34d4ed3b9a7b88f6c85d8c2d01d0ab466a91b",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-actual-two-rows-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-actual-two-rows-390.png",
+      "bytes": 41920,
+      "sha256": "806c0da9fc1133388b2082735b23bc6f28f3933cd56dc8b229ca58ca58cbd454",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-actual-two-rows-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-actual-two-rows-768.png",
+      "bytes": 92496,
+      "sha256": "b745395b63eb91dbbb5f6173df72a3487d22d8e947213e93d5b6dd3d9fe5845d",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-left-two-rows-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-left-two-rows-1024.png",
+      "bytes": 130880,
+      "sha256": "051ee6829a12e24a1242fc3d76f5844fbd7a156571672ea0403169a20b810b97",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-left-two-rows-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-left-two-rows-1280.png",
+      "bytes": 140982,
+      "sha256": "371998c353b4dd840389876372d993768a3e4e5f994b8697b02a5a0aabc88c84",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-left-two-rows-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-left-two-rows-1440.png",
+      "bytes": 145399,
+      "sha256": "77eeea59fdcd821d5f654a224422ecf9ee59a6b94d1f1b3e8c91b64eabd67085",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-left-two-rows-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-left-two-rows-390.png",
+      "bytes": 41977,
+      "sha256": "1b7840248888a6465d0175e000f3e18af5e7654f5715b41b480b1658afd5eb02",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-readable-left-two-rows-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-readable-left-two-rows-768.png",
+      "bytes": 98385,
+      "sha256": "37d19f14d771419837b1328a5c23e4559e2c021acd5aa298fd63920ef2eec684",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-two-books-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-two-books-1024.png",
+      "bytes": 131418,
+      "sha256": "fbaf426f25cceb426870369011f30ca0a6feec5a9f8fa4ac7fcb179726eae852",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-two-books-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-two-books-1280.png",
+      "bytes": 140982,
+      "sha256": "371998c353b4dd840389876372d993768a3e4e5f994b8697b02a5a0aabc88c84",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-two-books-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-two-books-1440.png",
+      "bytes": 146810,
+      "sha256": "f707f6c59f62b07629da552011cda63a8739ea7aa326fb3dd81abfe6619c5a54",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-two-books-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-two-books-390.png",
+      "bytes": 73301,
+      "sha256": "d4f914a39b52694e7abc556d299fcff2dadb641bd8ab69ed4eddd287db656950",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/same-person-two-books-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/same-person-two-books-768.png",
+      "bytes": 98857,
+      "sha256": "a078558feed1db20f8dfdc7acfa0b7c676e6cb49f7295f3a18c554745eb5c62f",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/two-fees-explicit-scope-1024.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/two-fees-explicit-scope-1024.png",
+      "bytes": 120453,
+      "sha256": "80a5b0dde6bff5e390d0dd8db757e9616947cbece31d836e9e983cb6ea567b74",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/two-fees-explicit-scope-1280.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/two-fees-explicit-scope-1280.png",
+      "bytes": 122148,
+      "sha256": "2ad48fb4e75292d685a0450814a254b5ab19291f573aad949a56044f532512c7",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/two-fees-explicit-scope-1440.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/two-fees-explicit-scope-1440.png",
+      "bytes": 124352,
+      "sha256": "6277d528e56292db878c7ad8cc3aceeb3df016da343daa6a19c972586e48df37",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/two-fees-explicit-scope-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/two-fees-explicit-scope-390.png",
+      "bytes": 55862,
+      "sha256": "38f459069278c955c4487e0d9e983fb0871cc8e13b9039e5480c9aa2d6ae18d2",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/two-fees-explicit-scope-768.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/two-fees-explicit-scope-768.png",
+      "bytes": 73800,
+      "sha256": "acb8ee78e7e1341c3877336e0dea31c16ba35ccf952c8a05646245ffaf968837",
+      "encoding": "original-bytes"
+    },
+    {
+      "path": "browser/verification.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/verification.json",
+      "bytes": 21565,
+      "sha256": "6b2028dace4d16bf89e2b27b7adc2995eb75964791c3f38ad2cce1b983830790",
+      "encoding": "original-bytes",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "print/ordinary-3815-page-1.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/c/print-review/ordinary-3815-seventh-1.png",
+      "bytes": 93076,
+      "sha256": "e87f0ee8ee0abc599507021ed28c704351c90e62a930aff770a2d08e45ae0c17",
+      "encoding": "original-png-bytes",
+      "renderedFrom": "browser-seventh/ordinary-3815.pdf",
+      "rendering": "pdftoppm -r 120 -png",
+      "page": 1
+    },
+    {
+      "path": "print/ordinary-3815-page-2.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/c/print-review/ordinary-3815-seventh-2.png",
+      "bytes": 39303,
+      "sha256": "fe22b8b9d7d2e7b540df4566c2a6227a0486f3a66a6231757593163f7bac9280",
+      "encoding": "original-png-bytes",
+      "renderedFrom": "browser-seventh/ordinary-3815.pdf",
+      "rendering": "pdftoppm -r 120 -png",
+      "page": 2
+    },
+    {
+      "path": "print/management-520-page-1.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/c/print-review/management-520-seventh-1.png",
+      "bytes": 121597,
+      "sha256": "4c276e6c7e97915af820a04e61349be5b1d68124b099c0e98d4cbdd70d62c545",
+      "encoding": "original-png-bytes",
+      "renderedFrom": "browser-seventh/management-520.pdf",
+      "rendering": "pdftoppm -r 120 -png",
+      "page": 1
+    },
+    {
+      "path": "print/management-520-page-2.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/c/print-review/management-520-seventh-2.png",
+      "bytes": 31690,
+      "sha256": "e20471e180f3c24b7b5a06c6da5653b7d3c9e8d6b409b02b72c87eecc468a4de",
+      "encoding": "original-png-bytes",
+      "renderedFrom": "browser-seventh/management-520.pdf",
+      "rendering": "pdftoppm -r 120 -png",
+      "page": 2
+    },
+    {
+      "path": "browser/supplement-390/negative-readable-amount-columns-390.png",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-eighth/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/negative-readable-amount-columns-390.png",
+      "bytes": 60692,
+      "sha256": "6cac05b2c87b6d2cda4806070f0a81990287ec61806551e733db13a38987aff0",
+      "encoding": "original-bytes",
+      "run": "browser-eighth"
+    },
+    {
+      "path": "browser/supplement-390/verification.json.txt",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-eighth/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/verification.json",
+      "bytes": 21510,
+      "sha256": "4f3270f5069c79a9522c7291095362bc71c899e6605ba8518ef1bce4a33614bc",
+      "encoding": "original-bytes",
+      "run": "browser-eighth",
+      "contentType": "application/json; preserved as .json.txt"
+    },
+    {
+      "path": "browser/supplement-390/browser-eighth.log",
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-eighth.log",
+      "bytes": 393,
+      "sha256": "e983aefe9355e2838740a760533a6c8aa40a8f45f28c73bc29dbcbb99bfcf2c0",
+      "encoding": "original-bytes",
+      "run": "browser-eighth"
+    }
+  ],
+  "totalBytes": 14504144,
+  "pdfRenderSources": [
+    {
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/ordinary-3815.pdf",
+      "bytes": 218515,
+      "sha256": "54ddf22e6b8ebdfe25b8480d9ffc4dbc5ab6473bd2cb3f03c87902f485df621e",
+      "retainedInEvidence": false,
+      "pages": 2,
+      "renderedAtDpi": 120
+    },
+    {
+      "source": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-seventh/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/management-520.pdf",
+      "bytes": 260848,
+      "sha256": "7c067075e139d06e7b923c24af8a3ffa607098a66ac6ae57d77a4b8e724bf49e",
+      "retainedInEvidence": false,
+      "pages": 2,
+      "renderedAtDpi": 120
+    }
+  ],
+  "supplement": {
+    "run": "browser-eighth",
+    "scope": "390金额列完整单行入镜",
+    "independentScenario": true,
+    "originalSeventhArtifactsRetained": true
+  },
+  "sourceCopyRetentionScope": "仅第八轮运行日志临时副本仍被本次登记使用；主浏览器与渲染页图副本已回收，见cleanup.json",
+  "browserAndRenderCopiesRecycled": true
+}

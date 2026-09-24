@@ -5,6 +5,7 @@ import StatePanel from '~/components/ui/StatePanel.vue'
 defineProps<{
   records: SignedDayworkRecord[]
   loading: boolean
+  hasSnapshot?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -13,7 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="panel min-w-0 overflow-hidden" aria-label="逐日签工记录">
+  <section class="panel min-w-0 overflow-hidden" aria-label="逐日签工记录" :aria-busy="loading">
     <header class="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
       <div>
         <h2 class="text-14px font-800 text-ink">
@@ -26,7 +27,7 @@ const emit = defineEmits<{
       <span class="text-11px text-ink-faint">表格仅在本区域横向滚动</span>
     </header>
     <StatePanel
-      v-if="loading"
+      v-if="loading && !(hasSnapshot ?? records.length > 0)"
       kind="loading"
       title="正在读取签工记录"
       description="请稍候。"
@@ -81,6 +82,7 @@ const emit = defineEmits<{
                 type="button"
                 class="btn-ghost"
                 aria-label="编辑签工记录"
+                :disabled="loading"
                 @click="emit('edit', record)"
               >
                 编辑

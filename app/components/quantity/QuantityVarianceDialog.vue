@@ -5,6 +5,7 @@ import type {
   QuantityVarianceFact,
   QuantityVarianceRow,
 } from '~/lib/quantity/variance'
+import type { DataOriginDTO } from '~/types/read-model'
 import { computed, ref, watch } from 'vue'
 import {
   Dialog,
@@ -13,12 +14,11 @@ import {
   DialogFooter,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { db } from '~/lib/db/client'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { formatQuantityValue } from '~/lib/quantity/format'
 import {
   buildQuantityVarianceRows,
   filterQuantityVarianceRows,
-  loadQuantityVarianceFacts,
 } from '~/lib/quantity/variance'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
@@ -26,6 +26,7 @@ import { yuan } from '~/lib/util/money'
 const props = defineProps<{
   open: boolean
   projectId: string
+  origin?: DataOriginDTO
   initialBuildingId?: string
 }>()
 
@@ -34,10 +35,11 @@ const emit = defineEmits<{
 }>()
 
 const ALL = '__all__'
+const store = useQuantityStore()
 const basis = ref<QuantityVarianceBasis>('field')
 const buildingId = ref(ALL)
-const section = ref(ALL)
-const trade = ref(ALL)
+const section = ref<string[]>([])
+const trade = ref<string[]>([])
 const itemKeyword = ref('')
 const facts = ref<QuantityVarianceFact[]>([])
 const loading = ref(false)
@@ -74,18 +76,12 @@ const buildingOptions = computed(() => [
   { key: ALL, label: '全部楼栋' },
   ...uniqueOptions(allRows.value, 'buildingId', 'buildingName'),
 ])
-const sectionOptions = computed(() => [
-  { key: ALL, label: '全部分部' },
-  ...uniqueOptions(allRows.value, 'section', 'section'),
-])
-const tradeOptions = computed(() => [
-  { key: ALL, label: '全部工种' },
-  ...uniqueOptions(allRows.value, 'trade', 'trade'),
-])
+const sectionOptions = computed(() => uniqueOptions(allRows.value, 'section', 'section'))
+const tradeOptions = computed(() => uniqueOptions(allRows.value, 'trade', 'trade'))
 const visibleRows = computed(() => filterQuantityVarianceRows(allRows.value, {
   buildingId: buildingId.value === ALL ? undefined : buildingId.value,
-  section: section.value === ALL ? undefined : section.value,
-  trade: trade.value === ALL ? undefined : trade.value,
+  section: section.value,
+  trade: trade.value,
   itemKeyword: itemKeyword.value,
 }))
 const columns = computed<KitTableColumn[]>(() => [
@@ -118,8 +114,8 @@ function resetFilters() {
     && allRows.value.some(row => row.buildingId === props.initialBuildingId)
     ? props.initialBuildingId
     : ALL
-  section.value = ALL
-  trade.value = ALL
+  section.value = []
+  trade.value = []
   itemKeyword.value = ''
 }
 
@@ -134,7 +130,7 @@ async function load() {
   }
   loading.value = true
   try {
-    const next = await loadQuantityVarianceFacts(db, props.projectId)
+    const next = await store.loadVariance(props.projectId, props.origin ?? 'real')
     if (sequence !== loadSequence)
       return
     facts.value = next
@@ -151,10 +147,16 @@ async function load() {
 }
 
 watch(
-  () => [props.open, props.projectId] as const,
+  () => [props.open, props.projectId, props.origin] as const,
   ([open]) => {
-    if (open)
+    if (open) {
       void load()
+    }
+    else {
+      loadSequence++
+      facts.value = []
+      loading.value = false
+    }
   },
 )
 
@@ -196,8 +198,8 @@ function priceCell(row: QuantityVarianceRow): string {
         <div class="flex flex-none flex-wrap items-end gap-3" aria-label="量差筛选">
           <SelectFilter v-model="basis" label="对比口径" :options="basisOptions" :min-width="112" />
           <SelectFilter v-model="buildingId" label="楼栋" :options="buildingOptions" :min-width="116" />
-          <SelectFilter v-model="section" label="分部" :options="sectionOptions" :min-width="128" />
-          <SelectFilter v-model="trade" label="工种" :options="tradeOptions" :min-width="116" />
+          <KitMultiSelectFilter v-model="section" label="分部" :options="sectionOptions" :min-width="128" />
+          <KitMultiSelectFilter v-model="trade" label="工种" :options="tradeOptions" :min-width="116" />
           <label class="grid min-w-[180px] flex-1 gap-1 text-12px font-700 text-ink-soft">
             <span>分项</span>
             <input

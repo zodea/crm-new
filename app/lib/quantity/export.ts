@@ -7,6 +7,7 @@ import type {
   QuantityStageProgress,
 } from '~/lib/quantity/derived'
 import * as XLSX from 'xlsx'
+import { formatQuantityTotalCompleteness } from './format'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -69,10 +70,17 @@ export function quantityMonthlyRows(
     月份: row.month,
     工种: row.trade,
     工序阶段: row.stageName,
+    单位: row.unit,
     完成户数: row.completedUnits,
-    合同量: row.contractQty,
-    暂定量: row.provisionalQty,
-    现场量: row.fieldQty,
+    合同量: row.contractQty.value ?? '',
+    合同量完整度: formatQuantityTotalCompleteness(row.contractQty),
+    合同量已知部分: row.contractQty.completeness === 'partial' ? row.contractQty.knownValue ?? '' : '',
+    暂估量: row.provisionalQty.value ?? '',
+    暂估量完整度: formatQuantityTotalCompleteness(row.provisionalQty),
+    暂估量已知部分: row.provisionalQty.completeness === 'partial' ? row.provisionalQty.knownValue ?? '' : '',
+    现场量: row.fieldQty.value ?? '',
+    现场量完整度: formatQuantityTotalCompleteness(row.fieldQty),
+    现场量已知部分: row.fieldQty.completeness === 'partial' ? row.fieldQty.knownValue ?? '' : '',
   }))
 }
 
@@ -98,17 +106,25 @@ export interface QuantityLedgerExportInput {
   monthly: readonly QuantityMonthlyOutput[]
 }
 
+export interface QuantityLazyLedgerExportInput {
+  projectName: string
+  loadData: () => Promise<Omit<QuantityLedgerExportInput, 'projectName'>>
+}
+
 /** ADR 0004 路一：施工记录 + 阶段进度 + 月度完成量三 sheet 单文件直接保存。 */
+export function createQuantityLedgerExport(input: QuantityLedgerExportInput, now?: Date): ExportFileOptions & { data: ArrayBuffer }
+export function createQuantityLedgerExport(input: QuantityLazyLedgerExportInput, now?: Date): ExportFileOptions & { data: () => Promise<ArrayBuffer> }
 export function createQuantityLedgerExport(
-  input: QuantityLedgerExportInput,
+  input: QuantityLedgerExportInput | QuantityLazyLedgerExportInput,
   now = new Date(),
 ): ExportFileOptions {
+  const encode = (data: Omit<QuantityLedgerExportInput, 'projectName'>) => sheetsToXlsx([
+    { name: '施工记录', rows: quantityRecordRows(data.records) },
+    { name: '阶段进度', rows: quantityProgressRows(data.progress) },
+    { name: '月度完成量', rows: quantityMonthlyRows(data.monthly) },
+  ])
   return {
-    data: sheetsToXlsx([
-      { name: '施工记录', rows: quantityRecordRows(input.records) },
-      { name: '阶段进度', rows: quantityProgressRows(input.progress) },
-      { name: '月度完成量', rows: quantityMonthlyRows(input.monthly) },
-    ]),
+    data: 'loadData' in input ? async () => encode(await input.loadData()) : encode(input),
     defaultName: `${input.projectName || '工程量'}_工程量台账_${localDateStamp(now)}.xlsx`,
     mimeType: XLSX_MIME,
   }

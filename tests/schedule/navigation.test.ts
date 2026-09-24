@@ -4,7 +4,13 @@ import {
   buildQuantityDrillLocation,
   buildScheduleReturnLocation,
   parseScheduleDrillContext,
+  scheduleReturnContextQuery,
 } from '~/lib/schedule/navigation'
+
+it('首页总览与来源返回只保明确工序和五种筛选，不透传其他字段', () => {
+  const context = { group: 'g', task: 't', stage: 's', item: 'i', buildings: 'b', building: 'b', month: '2026-08', view: 'crew', trade: '泥水工', assignee: 'crew:c' }
+  expect(scheduleReturnContextQuery({ ...context, project: 'p', origin: 'real', unsafe: 'external' })).toEqual(context)
+})
 
 const task = {
   id: 'task-1',
@@ -25,6 +31,22 @@ const group = {
 } as ScheduleGroupView
 
 describe('排程下钻导航', () => {
+  it('按原工序往返时保留用户筛选，日期只作说明且不更换阶段身份', () => {
+    const location = buildQuantityDrillLocation('schedule', group, task, 'real', { building: 'building-2', month: '2026-09', view: 'crew', trade: '防水工', assignee: 'crew:1' }) as { query: Record<string, string> }
+    const context = parseScheduleDrillContext(location.query)!
+    expect(buildScheduleReturnLocation(context)).toMatchObject({ query: { building: 'building-2', month: '2026-09', view: 'crew', trade: '防水工', assignee: 'crew:1', stage: 'stage-1' } })
+    expect(parseScheduleDrillContext({ ...location.query, task: ['task-1', 'task-2'] })).toBeNull()
+    expect(parseScheduleDrillContext({ ...location.query, origin: 'invalid' })).toBeNull()
+  })
+  it('来源感知的排程下钻及返回保留正式或测试身份', () => {
+    for (const origin of ['real', 'demo'] as const) {
+      const location = buildQuantityDrillLocation('home', group, task, origin) as { query: Record<string, string> }
+      expect(location.query.origin).toBe(origin)
+      const context = parseScheduleDrillContext(location.query)!
+      expect(buildScheduleReturnLocation(context)).toMatchObject({ path: '/', query: { project: task.projectId, origin } })
+      expect(buildScheduleReturnLocation({ ...context, source: 'schedule' })).toMatchObject({ path: '/schedule', query: { origin } })
+    }
+  })
   it('首页和施工进度页共用完整工程量筛选参数', () => {
     const location = buildQuantityDrillLocation('home', group, task)
 
@@ -66,7 +88,7 @@ describe('排程下钻导航', () => {
     expect(homeContext?.buildingIds).toEqual(['building-1', 'building-2'])
     expect(buildScheduleReturnLocation(homeContext!)).toEqual({
       path: '/',
-      query: { project: 'project-1', group: 'group-1', task: 'task-1' },
+      query: { project: 'project-1', group: 'group-1', task: 'task-1', buildings: 'building-1,building-2' },
     })
     expect(buildScheduleReturnLocation(scheduleContext!)).toEqual({
       path: '/schedule',

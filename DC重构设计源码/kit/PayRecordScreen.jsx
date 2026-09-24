@@ -1,81 +1,53 @@
-// PayRecordScreen — 支付记录列表（资金域，实付流水终点）：EntityListScreen meta 一份生成整页。
-// 口径：列样=P1 项目详情⑧；payApplyId 只显示付款申请 no 的 mono 文本（付款申请无详情页，不做蓝链）；
-// fromParams 穿透优先级 payApply > contract(经付款申请 contractId 间接匹配) > supplier；「本年」视图按 date 前缀 2026。
+// PayRecordScreen — 支付记录（按实现端 app/components/finance/FinanceListScreen.vue kind=payment_record 校准）
+// 标准单表列表：# / 名称对象(link) / 编号 / 项目 / 关联方类型 / 金额 / 日期 / 状态 / 操作(编辑)；底部金额合计。
+// 口径（stores/finance.ts loadList payment_record）：名称=收款方 payee_name（演示数据取 account 收款账户名）；
+// 关联方=用途 purpose（演示数据演绎为关联付款申请名）；项目空=「公司付款」；
+// 状态=确认状态（已确认/待核对/草稿）——演示数据全为已完成支付、无 status 字段，兜底显示「已确认」。
 (function () {
   if (window.PayRecordScreen) return;
 
   function PayRecordScreen({ params, navigate }) {
-    const KA = window.KitAtoms || {};
-    const ELS = window.EntityListScreen;
     const A = window.APP;
-    if (!ELS || !KA.EntityLink || !A) return null;
-    const projects = A.rows("projects");
-    const suppliers = A.rows("suppliers");
-    const METHODS = ["银行转账", "银行承兑", "对公转账", "现金"];
+    const Std = window.StdListScreen;
+    if (!A || !Std) return null;
+    A.use();
+    const nav = navigate || (window.DC && window.DC.navigate);
+    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : (id || ""); };
 
-    const meta = {
-      entity: "payRecord",
-      title: "支付记录",
-      coll: "payRecords",
-      formRoute: "payRecordForm",   // 整页表单（grill 决议 2026-07-18）
-      columns: [
-        { key: "no", label: "支付编号", width: 140, mono: true },
-        { key: "date", label: "支付日期", width: 110, mono: true, form: { type: "date" } },
-        { key: "amount", label: "支付金额", width: 130, money: true, align: "right" },
-        { key: "method", label: "支付方式", width: 110, form: { type: "select", options: METHODS } },
-        { key: "account", label: "收款账户", width: 200 },
-        { key: "bank", label: "开户行", width: 190 },
-        { key: "bankNo", label: "银行账号", width: 170, mono: true },
-        { key: "projectId", label: "项目", width: 150, render: (v) => <KA.EntityLink type="project" id={v} />,
-          form: { type: "select", options: projects.map((p) => p.name),
-            toLabel: (id) => { const p = A.get("projects", id); return p ? p.name : id; },
-            toValue: (name) => { const p = projects.find((x) => x.name === name); return p ? p.id : name; } } },
-        { key: "supplierId", label: "分供方", width: 170, render: (v) => <KA.EntityLink type="supplier" id={v} />,
-          form: { type: "select", options: suppliers.map((s) => s.name),
-            toLabel: (id) => { const s = A.get("suppliers", id); return s ? s.name : id; },
-            toValue: (name) => { const s = suppliers.find((x) => x.name === name); return s ? s.id : name; } } },
-        { key: "payApplyId", label: "关联付款申请", width: 150, noForm: true, form: false,
-          render: (v) => { const pa = v && A.get("payApplies", v); return pa
-            ? <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{pa.no}</span>
-            : <span style={{ color: "var(--ink-faint)" }}>—</span>; } },
-      ],
-      views: [
-        { key: "all", label: "全部" },
-        { key: "year", label: "本年", filter: (r) => !!(r.date && r.date.startsWith("2026")) },
-      ],
-      defaultView: "all",
-      filters: [
-        { key: "proj", label: "项目",
-          options: [{ key: "all", label: "全部项目" }, ...projects.map((p) => ({ key: p.id, label: p.name }))],
-          match: (r, val) => r.projectId === val },
-        { key: "method", label: "方式",
-          options: [{ key: "all", label: "全部方式" }, ...METHODS.map((m) => ({ key: m, label: m }))],
-          match: (r, val) => r.method === val },
-      ],
-      searchKeys: ["no", "account"],
-      summary: (rows) => [
-        { label: "支付金额总和", value: Math.round(rows.reduce((s, r) => s + (r.amount || 0), 0) * 100) / 100 },
-      ],
-      fromParams: (p) => {
-        if (p.payApply) {
-          const pa = A.get("payApplies", p.payApply);
-          return { label: "付款申请：" + (pa ? pa.no : p.payApply), filter: (r) => r.payApplyId === p.payApply };
-        }
-        if (p.contract) {
-          const c = A.get("contracts", p.contract);
-          return { label: "合同：" + (c ? c.name : p.contract),
-            filter: (r) => { const pa = A.get("payApplies", r.payApplyId); return !!pa && pa.contractId === p.contract; } };
-        }
-        if (p.supplier) {
-          const s = A.get("suppliers", p.supplier);
-          return { label: "分供方：" + (s ? ((s.aliases && s.aliases[0]) || s.name) : p.supplier), filter: (r) => r.supplierId === p.supplier };
-        }
-        return null;
-      },
-      newDefaults: () => ({ method: "银行转账" }),
-      tableMinWidth: 1700,
-    };
-    return <ELS meta={meta} params={params} navigate={navigate} />;
+    const rows = A.rows("payRecords").map((r) => ({
+      id: r.id,
+      projectId: r.projectId || null,
+      supplierId: r.supplierId || null,
+      name: r.payeeName || r.account || "",                                 // 名称=收款方（实现端 payee_name AS display_name；旧演示行兜底账户名）
+      no: r.no || "",
+      projectName: r.projectId ? projName(r.projectId) : "公司付款",        // SQL COALESCE(project.name, '公司付款')
+      partyName: (A.get("payApplies", r.payApplyId) || {}).name || "—",     // 关联方=用途（关联付款申请名）
+      amount: Number(r.amount) || 0,
+      date: r.date || "",
+      status: r.status || "已确认",                                         // 确认状态兜底「已确认」
+    }));
+    const scopedRows = rows.filter((r) => (!(params && params.project) || r.projectId === params.project)
+      && (!(params && params.supplier) || r.supplierId === params.supplier));
+
+    return (
+      <Std
+        title="支付记录" subtitle="银行实际支付 · 多付款申请分摊 · 人工确认"
+        searchPlaceholder="搜索名称、编号、项目或关联方" searchKeys={["no", "name", "projectName", "partyName", "status"]}
+        createLabel="新建支付记录" onCreate={() => nav && nav("payRecordForm", {})}
+        onRowOpen={(r) => nav && nav("payRecordForm", { id: r.id })}
+        columns={[
+          { key: "name", label: "名称/对象", minWidth: 220, link: true },
+          { key: "no", label: "编号", width: 170, mono: true },
+          { key: "projectName", label: "项目", minWidth: 160 },
+          { key: "partyName", label: "关联方/类型", minWidth: 180 },
+          { key: "amount", label: "金额", width: 140, align: "right", money: true },
+          { key: "date", label: "日期", width: 128, mono: true },
+          { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
+        ]}
+        rows={scopedRows} filters={[{key:"projectName",label:"项目"}, {key:"status",label:"状态"}]} tableMinWidth={1200}
+        footerSummary={(list) => ({ label: "金额合计", value: "¥" + list.reduce((s, r) => s + r.amount, 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
+      />
+    );
   }
 
   window.PayRecordScreen = PayRecordScreen;

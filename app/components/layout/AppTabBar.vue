@@ -4,9 +4,11 @@ import { useOverlayStack, useOwnedOverlayLayerStyle } from '~/composables/useOve
 import { HOME_KEY, MAX_TABS } from '~/lib/tabs/tab-machine'
 import { routeTitle } from '~/lib/tabs/tab-title'
 
-const route = useRoute()
 const router = useRouter()
+// 外壳跟随已确认的导航。Nuxt useRoute 要等页面挂载才同步，启动恢复时仍可能是旧写态地址。
+const route = computed(() => router.currentRoute.value)
 const tabsStore = useTabsStore()
+const { openStoredTab } = useTabNavigation()
 const kit = useKitUI()
 const { hasActiveModal } = useOverlayStack()
 const ownedLayerStyle = useOwnedOverlayLayerStyle()
@@ -31,6 +33,14 @@ function syncScrollControls() {
   canScrollForward.value = element.scrollLeft < maxScrollLeft - 1
 }
 
+function scrollActiveTabIntoView() {
+  tabEls.value?.find(element => element.dataset.tabKey === tabsStore.activeKey)?.scrollIntoView({
+    block: 'nearest',
+    inline: 'nearest',
+  })
+  syncScrollControls()
+}
+
 function pageTabs(direction: -1 | 1) {
   const element = tabListEl.value
   if (!element)
@@ -42,13 +52,13 @@ function pageTabs(direction: -1 | 1) {
 }
 
 watch(
-  () => route.fullPath,
+  () => route.value.fullPath,
   (fullPath) => {
-    const blocked = tabsStore.open({ fullPath, title: routeTitle(route.path) || '未命名' })
+    const blocked = tabsStore.open({ fullPath, title: routeTitle(route.value.path) || '未命名' })
     if (blocked) {
       kit.warning(`页签已达上限 ${MAX_TABS} 个`, '请先关闭不需要的页签')
       if (tabsStore.activeFullPath !== fullPath)
-        router.replace(tabsStore.activeFullPath)
+        void openStoredTab(tabsStore.activeFullPath, { replace: true })
     }
   },
   { immediate: true },
@@ -56,30 +66,27 @@ watch(
 
 watch(
   () => tabsStore.activeKey,
-  async (key) => {
+  async () => {
     await nextTick()
-    tabEls.value?.find(element => element.dataset.tabKey === key)?.scrollIntoView({
-      block: 'nearest',
-      inline: 'nearest',
-    })
-    syncScrollControls()
+    scrollActiveTabIntoView()
   },
-  { flush: 'post' },
+  { flush: 'post', immediate: true },
 )
 
 function goTab(fullPath: string, key: string) {
   if (key !== tabsStore.activeKey)
-    router.push(fullPath)
+    void openStoredTab(fullPath)
 }
 
-function closeAndFollow(key: string) {
-  tabsStore.close(key)
-  if (tabsStore.activeFullPath !== route.fullPath)
-    router.push(tabsStore.activeFullPath)
+async function closeAndFollow(key: string) {
+  if (!await tabsStore.requestClose(key))
+    return
+  if (tabsStore.activeFullPath !== route.value.fullPath)
+    void openStoredTab(tabsStore.activeFullPath)
 }
 
 function refreshCurrent() {
-  tabsStore.refreshActive()
+  void tabsStore.requestRefresh()
 }
 
 useEventListener(tabListEl, 'wheel', (event) => {
@@ -92,7 +99,7 @@ useEventListener(tabListEl, 'wheel', (event) => {
 useEventListener(tabListEl, 'scroll', syncScrollControls, { passive: true })
 useResizeObserver(
   () => [tabListEl.value, tabTrackEl.value],
-  syncScrollControls,
+  scrollActiveTabIntoView,
 )
 
 watch(
@@ -116,7 +123,7 @@ async function showMenu(key: string, x: number, y: number) {
     key,
   }
   await nextTick()
-  menuEl.value?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+  menuEl.value?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus({ preventScroll: true })
 }
 
 function openMenu(event: MouseEvent, key: string) {
@@ -140,7 +147,7 @@ function closeMenu(restoreFocus = false) {
     nextTick(() => tabEls.value
       ?.find(element => element.dataset.tabKey === key)
       ?.querySelector<HTMLButtonElement>('[data-tab-trigger]')
-      ?.focus())
+      ?.focus({ preventScroll: true }))
   }
 }
 
@@ -180,15 +187,27 @@ const menuIndex = computed(() => tabsStore.tabs.findIndex(tab => tab.key === men
 const hasRight = computed(() => tabsStore.tabs.slice(menuIndex.value + 1).some(tab => tab.key !== HOME_KEY))
 const hasOthers = computed(() => tabsStore.tabs.some(tab => tab.key !== HOME_KEY && tab.key !== menu.value.key))
 
-function act(action: () => void) {
-  action()
+async function act(action: () => Promise<boolean>) {
+  const pending = action()
   closeMenu()
-  if (tabsStore.activeFullPath !== route.fullPath)
-    router.push(tabsStore.activeFullPath)
+  if (!await pending)
+    return
+  if (tabsStore.activeFullPath !== route.value.fullPath)
+    void openStoredTab(tabsStore.activeFullPath)
 }
 
 useEventListener('click', () => closeMenu())
-useEventListener('scroll', () => closeMenu(), true)
+useEventListener('scroll', (event) => {
+  if (menu.value.open && event.target === tabListEl.value) {
+    // 恢复活动页、键盘聚焦和视口变化会异步滚动页签栏；菜单随所属页签定位，不能刚打开就被关闭。
+    const anchor = tabEls.value?.find(element => element.dataset.tabKey === menu.value.key)
+    const rect = anchor?.getBoundingClientRect()
+    if (rect)
+      menu.value = { ...menu.value, x: Math.max(0, Math.min(rect.left, window.innerWidth - 148)), y: Math.min(rect.bottom, window.innerHeight - 166) }
+    return
+  }
+  closeMenu(!!menuEl.value?.contains(document.activeElement))
+}, true)
 onKeyStroke('Escape', () => closeMenu(true))
 </script>
 
@@ -200,7 +219,7 @@ onKeyStroke('Escape', () => closeMenu(true))
     <nav
       id="shell-route-tabs"
       ref="tabListEl"
-      class="tabbar-scroll min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-[16px]"
+      class="tabbar-scroll min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-2"
       aria-label="已打开页面"
     >
       <div
@@ -214,10 +233,10 @@ onKeyStroke('Escape', () => closeMenu(true))
           :data-tab-key="tab.key"
           data-shell-tab
           :data-active="tab.key === tabsStore.activeKey"
-          class="browser-tab group/tab relative inline-flex max-w-[200px] shrink-0 select-none items-center gap-[6px] whitespace-nowrap px-[12px] text-13px transition-[color,background-color,box-shadow] duration-[var(--dur-fast)]"
+          class="browser-tab group/tab relative inline-flex max-w-[180px] shrink-0 select-none items-center gap-1 whitespace-nowrap px-2 text-12px transition-[color,background-color,box-shadow] duration-[var(--dur-fast)]"
           :class="tab.key === tabsStore.activeKey
-            ? 'browser-tab--active font-800 text-brand'
-            : 'font-600 text-ink-soft hover:bg-[rgb(17_24_39/5%)] hover:text-ink'"
+            ? 'browser-tab--active font-500 text-brand'
+            : 'font-400 text-ink-soft hover:bg-[rgb(17_24_39/5%)] hover:text-ink'"
           @contextmenu.prevent="openMenu($event, tab.key)"
         >
           <button
@@ -267,8 +286,8 @@ onKeyStroke('Escape', () => closeMenu(true))
       >
         <span class="i-lucide-chevron-right h-3.5 w-3.5" aria-hidden="true" />
       </button>
-      <span class="px-1 text-12px text-ink-faint" title="当前页签数量">
-        <span class="font-mono tabular-nums">{{ tabsStore.tabs.length }}</span> 个页签
+      <span class="px-1 text-11px text-ink-faint" :title="`${tabsStore.tabs.length} 个页签`" :aria-label="`${tabsStore.tabs.length} 个页签`">
+        <span class="font-mono tabular-nums">{{ tabsStore.tabs.length }}</span>
       </span>
       <button
         type="button"
@@ -299,7 +318,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         tabindex="-1"
         class="tab-menu-item"
         :disabled="!menuTab?.closable"
-        @click="act(() => tabsStore.close(menu.key))"
+        @click="act(() => tabsStore.requestClose(menu.key))"
       >
         关闭当前
       </button>
@@ -309,7 +328,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         tabindex="-1"
         class="tab-menu-item"
         :disabled="!hasOthers"
-        @click="act(() => tabsStore.closeOther(menu.key))"
+        @click="act(() => tabsStore.requestCloseOther(menu.key))"
       >
         关闭其他
       </button>
@@ -319,7 +338,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         tabindex="-1"
         class="tab-menu-item"
         :disabled="!hasRight"
-        @click="act(() => tabsStore.closeToRight(menu.key))"
+        @click="act(() => tabsStore.requestCloseToRight(menu.key))"
       >
         关闭右侧
       </button>
@@ -330,7 +349,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         tabindex="-1"
         class="tab-menu-item"
         :disabled="!hasOthers"
-        @click="act(() => tabsStore.closeEvery())"
+        @click="act(() => tabsStore.requestCloseEvery())"
       >
         关闭全部
       </button>
@@ -350,7 +369,7 @@ onKeyStroke('Escape', () => closeMenu(true))
 
 .browser-tab {
   height: var(--tabbar-h);
-  border-radius: 6px 6px 0 0;
+  border-radius: 2px 2px 0 0;
 }
 
 .browser-tab--active {

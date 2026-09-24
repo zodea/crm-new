@@ -1,0 +1,17 @@
+{
+  "baseline": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
+  "reason": "浏览器工资资料已接管中央只读；旧浏览器本地写入验收不再代表正式行为。保留桌面领域/组件覆盖，中央写阶段另行验收。",
+  "entries": [
+    { "from": "payroll-attendance: 三态和取数边界、建单不提供合同量", "now": "payroll-attendance: 多状态台账及建单整页只读保护", "later": "P1–P3 开启中央核算时验证 A/C1/C2 对应真实来源，无合同量回退" },
+    { "from": "payroll-attendance: C2 独立签工、不复用考勤矩阵", "now": "payroll-central: 独立来源四表及未领用签工；payroll-attendance: 两入口只读", "native": "tests/payroll/signed-daywork.test.ts、tests/components/PayrollNavigation.test.ts" },
+    { "from": "payroll-attendance: 草稿→核对→发放持久化、重复期间与次月差额", "now": "payroll-central: 真实原 SQLite 执行核对/发放后受控迁入，冻结 300/0 与冷读完整性", "native": "tests/payroll/workbench.test.ts、release-safety.test.ts、allocations.test.ts", "later": "P1–P3 中央同业务动作与持久化/互斥验收；P0 不声称可新写" },
+    { "from": "payroll-attendance: 保存考勤冷读及四档矩阵滚动", "now": "payroll-central: 独立原考勤真零和五档表格；payroll-attendance: 五档入口不撑破页面", "native": "tests/components/AttendanceWorkbench.test.ts、tests/payroll/attendance-safety.test.ts", "later": "C1 中央考勤写入口接续时重验逐格保存与真实矩阵操作" },
+    { "from": "payroll-statement-detail: 核算金额与正式已发、四档布局、删除或缺失记录", "now": "payroll-central: 健康发放原快照、300/0 分配、原表100与冻结未知、五档原表/历史/表内滚动；payroll-statement-detail: 缺失实体错误及来源不完整拒绝", "native": "tests/payroll/detail.test.ts、tests/components/PayrollNavigation.test.ts" },
+    { "from": "payroll-context-retirement: 工资→考勤签工→返回原筛选、键盘和五档滚动", "now": "payroll-central: 真实健康单→月锁来源→同工资→同筛选台账；payroll-context-retirement: 多状态浮层键盘和独立确认状态返回" },
+    { "from": "payroll-context-retirement: B 三态只读、新建 A/C1/C2", "now": "payroll-central: 真实 SQLite B draft/checked/released 原状态只读；payroll-attendance: 全部中央新建被明确停用", "native": "tests/payroll/retired-format.test.ts", "later": "P1–P3 对应中央建单类型重新验收；不恢复 B 新建" },
+    { "from": "payroll-context-retirement: KeepAlive 同范围签工草稿、新来源范围、全部班组与空状态", "now": "tests/components/PayrollCentralRead.test.ts 与 payroll-context-retirement: 只读新范围、多状态和空项目返回", "native": "tests/components/PayrollNavigation.test.ts 保留真实 KeepAlive 未保存签工草稿例", "later": "中央签工编辑开放时增加草稿保留/关闭与换范围真实浏览器例" },
+    { "from": "payroll-context-retirement: 未知项目班组自动回首个有效选项", "now": "payroll-context-retirement: 中央未知稳定身份明确错误且不改变 URL；符合 ADR0020 不能回退", "native": "原本地归一化组件回归保留，不将其行为冒充中央身份规则" }
+  ],
+  "skippedBrowserTests": 0,
+  "browserPretendingNative": false
+}

@@ -1,3 +1,4 @@
+import type { ApprovedAmountState } from '../finance/approval-amount'
 import { round2 } from '~/lib/util/number'
 
 export {
@@ -48,7 +49,8 @@ export interface SupplierPaymentSummary {
   projectId: string
   projectName: string
   amount: number
-  approvedAmount: number
+  approvedAmount: number | null
+  approvedAmountState?: ApprovedAmountState
   paidAmount: number
   actualPayment: number
   approvalStatus: string
@@ -83,7 +85,8 @@ export interface SupplierReadonlySummary {
   projectCount: number
   contractCount: number
   contractTotal: number
-  claimedTotal: number
+  settledTotal: number
+  claimedTotal: number | null
   invoiceTotal: number
   invoiceTaxTotal: number
   paidTotal: number
@@ -146,12 +149,14 @@ export function buildSupplierReadonlySummary(
   invoices: readonly SupplierInvoiceSummary[],
 ): SupplierReadonlySummary {
   const contractTotal = round2(contracts.reduce((sum, row) => sum + row.amount, 0))
+  const settledTotal = round2(contracts.reduce((sum, row) => sum + row.settled, 0))
   const paidTotal = round2(payments.reduce((sum, row) => sum + row.actualPayment, 0))
   return {
     projectCount: projects.length,
     contractCount: contracts.length,
     contractTotal,
-    claimedTotal: round2(payments.reduce((sum, row) => sum + row.approvedAmount, 0)),
+    settledTotal,
+    claimedTotal: payments.some(row => row.approvedAmount === null) ? null : round2(payments.reduce((sum, row) => sum + (row.approvedAmount ?? 0), 0)),
     invoiceTotal: round2(invoices.reduce((sum, row) => sum + row.totalAmount, 0)),
     invoiceTaxTotal: round2(invoices.reduce((sum, row) => sum + row.taxAmount, 0)),
     paidTotal,

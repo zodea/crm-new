@@ -2,9 +2,13 @@
 import { Button } from '~/components/ui/button'
 
 defineProps<{
-  total: number
+  realTotal: number
+  demoTotal: number
+  includeDemo: boolean
   visible: number
   loading: boolean
+  importDisabledReason?: string
+  createDisabledReason?: string
 }>()
 
 const emit = defineEmits<{
@@ -40,17 +44,18 @@ function toggleDensity() {
       aria-label="项目列表工具栏"
     >
       <div class="mr-1 flex min-w-max flex-none items-baseline gap-2 px-1">
-        <h2 class="text-14px font-800 text-ink">
+        <h2 data-project-list-return-fallback tabindex="-1" class="text-14px font-800 text-ink outline-none">
           施工项目
         </h2>
-        <span class="text-12px text-ink-soft">
-          共 <b class="font-mono text-ink">{{ total }}</b> 个
-          <template v-if="visible !== total">· 当前 {{ visible }} 个</template>
+        <span class="text-12px text-ink-soft" aria-label="项目来源数量">
+          正式 <b class="font-mono text-ink">{{ realTotal }}</b> 个
+          <template v-if="includeDemo">· 测试 <b class="font-mono text-warn">{{ demoTotal }}</b> 个</template>
+          <template v-if="visible !== realTotal + (includeDemo ? demoTotal : 0)">· 当前筛选 {{ visible }} 个</template>
         </span>
       </div>
 
       <div class="ml-auto flex min-w-max items-center gap-2">
-        <SearchInput v-model="search" placeholder="搜索项目、客户、经理…" :width="220" />
+        <SearchInput v-model="search" placeholder="搜索项目、客户、经理…" :width="220" :maxlength="120" />
         <Button
           variant="outline"
           size="icon"
@@ -93,7 +98,13 @@ function toggleDensity() {
         >
           <span class="i-lucide-settings-2 h-3.5 w-3.5" aria-hidden="true" />
         </Button>
-        <Button variant="outline" aria-label="导入项目" title="导入项目（映射页签）" @click="emit('import')">
+        <Button
+          variant="outline"
+          aria-label="导入项目"
+          :title="importDisabledReason || '导入项目（映射页签）'"
+          :disabled="Boolean(importDisabledReason)"
+          @click="emit('import')"
+        >
           <span class="i-lucide-upload h-3.5 w-3.5" aria-hidden="true" />
           导入
         </Button>
@@ -105,7 +116,13 @@ function toggleDensity() {
           <span class="i-lucide-folder-tree h-3.5 w-3.5" aria-hidden="true" />
           分类导出
         </Button>
-        <Button variant="accent" aria-label="新增项目" @click="emit('create')">
+        <Button
+          variant="accent"
+          aria-label="新增项目"
+          :title="createDisabledReason || '新增正式项目'"
+          :disabled="Boolean(createDisabledReason)"
+          @click="emit('create')"
+        >
           <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
           新增项目
         </Button>

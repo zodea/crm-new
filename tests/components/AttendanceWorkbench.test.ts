@@ -3,8 +3,8 @@ import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, reactive } from 'vue'
 import AttendanceGrid from '~/components/payroll/AttendanceGrid.vue'
-import AttendanceScreen from '~/components/payroll/AttendanceScreen.vue'
 import AttendanceSummary from '~/components/payroll/AttendanceSummary.vue'
+import AttendanceScreen from '~/components/payroll/NativeAttendanceScreen.vue'
 
 const workers = [
   { id: 'worker-a', name: '张师傅', crewId: 'crew-a' },
@@ -259,7 +259,7 @@ describe('attendance screen truth-first states', () => {
     const store = createScreenStore()
     vi.stubGlobal('useAttendanceStore', () => store)
     vi.stubGlobal('useKitUI', () => ({ success: vi.fn(), error: vi.fn() }))
-    vi.stubGlobal('useRoute', () => ({ query: {} }))
+    vi.stubGlobal('useRoute', () => ({ path: '/subcontract/attendance', fullPath: '/subcontract/attendance', query: {} }))
 
     render(AttendanceScreen, {
       global: { components: screenComponents },
@@ -270,13 +270,13 @@ describe('attendance screen truth-first states', () => {
     expect(store.load).toHaveBeenCalledWith({ clearFacts: true })
   })
 
-  it('shows the scoped no-worker state and explains that roster ownership is not fabricated', async () => {
+  it('shows the scoped no-worker state and keeps low-frequency guidance in nearby help', async () => {
     const store = createScreenStore({
       projects: [{ id: 'project-a', name: '项目甲', crewId: null }],
     })
     vi.stubGlobal('useAttendanceStore', () => store)
     vi.stubGlobal('useKitUI', () => ({ success: vi.fn(), error: vi.fn() }))
-    vi.stubGlobal('useRoute', () => ({ query: {} }))
+    vi.stubGlobal('useRoute', () => ({ path: '/subcontract/attendance', fullPath: '/subcontract/attendance', query: {} }))
 
     render(AttendanceScreen, {
       global: { components: screenComponents },
@@ -285,8 +285,13 @@ describe('attendance screen truth-first states', () => {
     expect(await screen.findByRole('heading', {
       name: '当前范围没有可录考勤的工人',
     })).not.toBeNull()
-    expect(screen.getByText(/本页不会临时创建名册关系/)).not.toBeNull()
+    expect(screen.getByText(/请先在工人名册中检查当前项目、班组及工程量责任范围/)).not.toBeNull()
     expect(screen.getByRole('link', { name: '查看工人名册' })).not.toBeNull()
+    expect(screen.getByRole('heading', { name: '考勤管理', exact: true })).not.toBeNull()
+    expect(screen.queryByText(/批量导入、批量填充/)).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: '查看考勤登记说明' }))
+    expect(screen.getByText(/批量导入、批量填充及已发放工资的调整单暂不可用/)).not.toBeNull()
+    expect(screen.queryByText(/attendance_records|伪装入口/)).toBeNull()
   })
 
   it('initializes from payroll query, clears facts on scope change, and preserves return status', async () => {
@@ -300,14 +305,17 @@ describe('attendance screen truth-first states', () => {
     })
     vi.stubGlobal('useAttendanceStore', () => store)
     vi.stubGlobal('useKitUI', () => ({ success: vi.fn(), error: vi.fn() }))
-    vi.stubGlobal('useRoute', () => ({
+    const route = reactive({
+      path: '/subcontract/attendance',
+      fullPath: '/subcontract/attendance?project=project-a&month=2026-05&crew=crew-a&status=released',
       query: {
         project: 'project-a',
         month: '2026-05',
         crew: 'crew-a',
         status: 'released',
       },
-    }))
+    })
+    vi.stubGlobal('useRoute', () => route)
 
     render(AttendanceScreen, {
       global: { components: screenComponents },
@@ -328,6 +336,18 @@ describe('attendance screen truth-first states', () => {
     expect(store.load).toHaveBeenLastCalledWith({ clearFacts: true })
     expect(screen.getByRole('link', { name: '工资核算' }).getAttribute('href')).toBe(
       '/subcontract/payroll?project=project-a&month=2026-06&crew=crew-a&status=released',
+    )
+    route.path = '/subcontract/payroll'
+    route.fullPath = '/subcontract/payroll?project=project-b&month=2026-08&crew=crew-a&status=checked'
+    route.query = { project: 'project-b', month: '2026-08', crew: 'crew-a', status: 'checked' }
+    await nextTick()
+    expect(store.filters.month).toBe('2026-06')
+    route.path = '/subcontract/attendance'
+    route.fullPath = '/subcontract/attendance?project=project-b&month=2026-08&crew=crew-a&status=checked'
+    await nextTick()
+    expect(store.filters).toEqual({ projectId: 'project-b', month: '2026-08', crewId: 'crew-a' })
+    expect(screen.getByRole('link', { name: '工资核算' }).getAttribute('href')).toBe(
+      '/subcontract/payroll?project=project-b&month=2026-08&crew=crew-a&status=checked',
     )
   })
 })

@@ -3,6 +3,7 @@ import type {
   FileRefDraft,
   FileRefRecord,
 } from '~/lib/forms/file-refs'
+import KitButton from '~/components/ui/KitButton.vue'
 
 export interface PendingFileRef extends FileRefDraft {
   localId: string
@@ -17,6 +18,9 @@ defineProps<{
   title?: string
   note: string
   noteReadonly?: boolean
+  categoryReadonly?: boolean
+  readonly?: boolean
+  pickerDescription?: string
 }>()
 
 const emit = defineEmits<{
@@ -43,7 +47,7 @@ function inputValue(event: Event): string {
   <section id="section-attachments" class="panel scroll-mt-4 p-4">
     <SectionHeader :title="title ?? '附件与备注'" />
     <button
-      v-if="desktopPicker"
+      v-if="!readonly && desktopPicker"
       type="button"
       class="mt-3 flex min-h-24 w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
       data-testid="finance-attachment-picker"
@@ -54,12 +58,12 @@ function inputValue(event: Event): string {
       <span class="mt-0.5 text-11px text-ink-faint">桌面端保存可重新打开的本机路径</span>
     </button>
     <label
-      v-else
+      v-else-if="!readonly"
       class="mt-3 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
       <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">浏览器保存文件元数据；桌面应用保存真实路径</span>
+      <span class="mt-0.5 text-11px text-ink-faint">{{ pickerDescription ?? '浏览器保存文件元数据；桌面应用保存真实路径' }}</span>
       <input
         type="file"
         multiple
@@ -84,16 +88,17 @@ function inputValue(event: Event): string {
         <span class="min-w-0 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
         <span class="text-10px text-ink-faint">{{ file.category || '未分类' }}</span>
         <span v-if="file.deletedAt" class="text-10px text-danger">已删除</span>
-        <button
-          type="button"
-          class="text-11px"
+        <KitButton
+          v-if="!readonly"
+          variant="ghost"
+          class="h-7 shrink-0 px-2 text-11px"
           :class="file.deletedAt ? 'text-brand' : 'text-danger'"
           @click="emit('toggleExisting', file.id)"
         >
           {{ file.deletedAt
             ? pendingRestoreIds.includes(file.id) ? '取消恢复' : '恢复'
             : pendingRemoveIds.includes(file.id) ? '撤销删除' : '删除' }}
-        </button>
+        </KitButton>
       </div>
 
       <div
@@ -105,17 +110,20 @@ function inputValue(event: Event): string {
         <span class="min-w-36 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
         <input
           :value="file.category"
+          :disabled="readonly"
+          :readonly="categoryReadonly"
           class="field-input h-7 w-36 text-11px"
           aria-label="附件分类"
           @input="emit('patchPending', file.localId, { category: inputValue($event) })"
         >
-        <button
-          type="button"
-          class="text-11px text-danger"
+        <KitButton
+          v-if="!readonly"
+          variant="ghost"
+          class="h-7 shrink-0 px-2 text-11px text-danger"
           @click="emit('removePending', file.localId)"
         >
           移除
-        </button>
+        </KitButton>
       </div>
     </div>
 
@@ -124,7 +132,7 @@ function inputValue(event: Event): string {
       <textarea
         :value="note"
         rows="4"
-        :disabled="noteReadonly"
+        :disabled="readonly || noteReadonly"
         class="field-input w-full"
         placeholder="补充说明"
         @input="emit('updateNote', inputValue($event))"

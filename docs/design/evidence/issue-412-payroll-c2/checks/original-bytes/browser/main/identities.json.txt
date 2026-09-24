@@ -1,0 +1,9 @@
+{
+  "project": "core-projects-873cfe0b2e0c266305a44407",
+  "crew": "core-crews-7c5300e238cb36fd4716f0e9",
+  "leader": "core-workers-c5b9644e8990dad27db7dd8b",
+  "worker": "core-workers-c4b5cafd99af4a22880e9842",
+  "zero": "core-workers-5dcae398a338699f823d27a6",
+  "historicalProject": "core-projects-5635e3d5296b4f3a06645074",
+  "batchId": "core-batch-d579852e71957178c1468234"
+}

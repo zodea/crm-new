@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "axis": "Standards",
+  "scope": "P1 A release provenance delta and final print/config CSS delta",
+  "fixedBase": "1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3",
+  "reviewedAt": "2026-09-13T05:52:36.0155604+08:00",
+  "reviewMethod": "Read-only static control-flow and authority review; relevant source hunks and related tests read; no service or tests executed; no source edits",
+  "findingCount": 1,
+  "findings": [
+    {
+      "priority": "P2",
+      "file": "app/lib/payroll/central-a-provenance.ts",
+      "line": 38,
+      "title": "回执指纹仅校验格式，未验证正文一致性",
+      "standardSource": "docs/rewrite/DATABASE.md:566",
+      "standard": "新中央 A 的来源资格要求回执正文指纹及操作者必须一致",
+      "trigger": "真实发放后，只把正式 release receipt.fingerprint 替换为另一个合法的 64 位十六进制字符串；其他字段保持原值",
+      "observedByStaticFlow": "正则仍通过，后续分支不再读取 fingerprint；详情仍去除 source-unproven，aOutput 仍 available",
+      "impact": "损坏的正文指纹会继续作为可证明新中央发放的一部分，超出文档宣称的完整性核验",
+      "suggestedResolution": "建立可验证的原正文/冻结关联，或准确收窄权威文档对指纹内容验证的承诺。"
+    }
+  ],
+  "nonFindings": [
+    "仅 A 格式或仿同结构字段不会自动获得资格：还必须有相同工资/项目、released outcome 的正式 release-a 回执、匹配 source 与冻结内容。",
+    "来源、冻结与 actor 的现有比较及未证明时保留原始 snapshot 的路径未发现新增读取权限绕过。",
+    "纯 db loader 接入已授权工作区事务，不调用服务入队；新依赖链未见运行时循环导入。",
+    "A 移除不适用的签工数组要求，C2 仍保留缺签工、费率规则及确认来源检查。",
+    "最终打印 CSS 受 body 直子 A 宿主限制，A 工作区停用后不挂打印宿主；配置/价格编辑器显式单列及 min-width 约束未见新标准问题。"
+  ],
+  "observationsNotRaised": [
+    "source 价格修订和冻结 lines 当前比较修订 ID，未完整复算价格适用与单位价格。只有同时更改来源表和 snapshot.aSource 才能构造通过现有比较的源价差异，未发现普通操作可达路径，因此未另列独立 finding。"
+  ],
+  "runtimeEvidenceLimit": "未将正在进行的 E2E/PDF/完整测试列为缺失，也未复述为本人运行结果。",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "absolutePath": "D:\\crm本地项目开发\\AGENTS.md",
+      "sha256": "1b1b81717a9f056f5f9aa6462142ab2624d93f4670cb78a8d0f3004e9bee8340",
+      "bytes": 7133
+    },
+    {
+      "path": "docs/rewrite/DATABASE.md",
+      "absolutePath": "D:\\crm本地项目开发\\docs\\rewrite\\DATABASE.md",
+      "sha256": "b8333cf2840c4105e1c6d729ec9158c5dcd0c37c0441190e94efd7a560b790ba",
+      "bytes": 198224
+    },
+    {
+      "path": "docs/adr/0020-browser-authority-and-demo-workspace-boundary.md",
+      "absolutePath": "D:\\crm本地项目开发\\docs\\adr\\0020-browser-authority-and-demo-workspace-boundary.md",
+      "sha256": "0642535195493184930d041c2ada8daf57ce3c05389dcf57c8a6bbf5804384b8",
+      "bytes": 18666
+    },
+    {
+      "path": "docs/research/issue-review-2026-09-11/payroll-tickets/01-central-a-payroll.md",
+      "absolutePath": "D:\\crm本地项目开发\\docs\\research\\issue-review-2026-09-11\\payroll-tickets\\01-central-a-payroll.md",
+      "sha256": "5ff7e3485554a8bcd60cb87636fe3e8c4aabd2015781bc027911df583b691898",
+      "bytes": 6990
+    },
+    {
+      "path": "docs/design/evidence/issue-412-payroll-a/review.md",
+      "absolutePath": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-a\\review.md",
+      "sha256": "e75d826197a9181283ad9ae1829793af1d702337e5498d89e49dcb67e9f118e9",
+      "bytes": 4313
+    },
+    {
+      "path": "app/lib/payroll/central-a-provenance.ts",
+      "absolutePath": "D:\\crm本地项目开发\\app\\lib\\payroll\\central-a-provenance.ts",
+      "sha256": "36877508ff8f512e48be20b8f5b47c62eb7c7e603e7c3dbf997f9d07089b17e4",
+      "bytes": 3570
+    },
+    {
+      "path": "app/lib/payroll/central-read.ts",
+      "absolutePath": "D:\\crm本地项目开发\\app\\lib\\payroll\\central-read.ts",
+      "sha256": "c5f3a099df5d80af833abc0ff49c87ed0ec0261344718b32feaff1a788cf920c",
+      "bytes": 19350
+    },
+    {
+      "path": "app/lib/payroll/central-snapshot.ts",
+      "absolutePath": "D:\\crm本地项目开发\\app\\lib\\payroll\\central-snapshot.ts",
+      "sha256": "63ca0c3aa620d8365d0df472dd816a614ef3e0f847f522c2e4e4bc0386bff58a",
+      "bytes": 6349
+    },
+    {
+      "path": "app/lib/payroll/central-a-codec.ts",
+      "absolutePath": "D:\\crm本地项目开发\\app\\lib\\payroll\\central-a-codec.ts",
+      "sha256": "d53021e42406e7c30dff2cc77a4845bdfd3397ceb01193c9451903e55642a822",
+      "bytes": 20509
+    },
+    {
+      "path": "app/lib/payroll/central-a-command.ts",
+      "absolutePath": "D:\\crm本地项目开发\\app\\lib\\payroll\\central-a-command.ts",
+      "sha256": "d4eaff6f0018e732068384d0ef26d9b686104ab782df35a7fcf9c3b37b74dac7",
+      "bytes": 10384
+    },
+    {
+      "path": "app/lib/payroll/central-a-calculation.ts",
+      "absolutePath": "D:\\crm本地项目开发\\app\\lib\\payroll\\central-a-calculation.ts",
+      "sha256": "6370de62d991db406cc211eeaf509706adcc5a7e754fbf626fba2653cf729f8a",
+      "bytes": 4369
+    },
+    {
+      "path": "app/lib/payroll/central-schema.ts",
+      "absolutePath": "D:\\crm本地项目开发\\app\\lib\\payroll\\central-schema.ts",
+      "sha256": "35a5340feced5bf6a9059bccbf6e6b72e47090c784ba4357384237ee20610c10",
+      "bytes": 2648
+    },
+    {
+      "path": "app/lib/payroll/statements.ts",
+      "absolutePath": "D:\\crm本地项目开发\\app\\lib\\payroll\\statements.ts",
+      "sha256": "5c6bbea6303d3b5fa2bd5d2fc3c71729aa82738bcf4405356426d9a29fabee50",
+      "bytes": 58093
+    },
+    {
+      "path": "server/utils/payroll-service.ts",
+      "absolutePath": "D:\\crm本地项目开发\\server\\utils\\payroll-service.ts",
+      "sha256": "0d38a746b6be8d51f04073fa69bb82ce1503336e9864964032e390de2712372d",
+      "bytes": 7626
+    },
+    {
+      "path": "server/utils/payroll-runtime.ts",
+      "absolutePath": "D:\\crm本地项目开发\\server\\utils\\payroll-runtime.ts",
+      "sha256": "c2bd8f003b996aab339ce6f4133fe9b1db9f56408642526f507eed4133847b66",
+      "bytes": 2861
+    },
+    {
+      "path": "server/utils/payroll-a-service.ts",
+      "absolutePath": "D:\\crm本地项目开发\\server\\utils\\payroll-a-service.ts",
+      "sha256": "d34aad8a6397ff3f43ec9c77049c496b134e2d46ff4bce058f81f7eeb5f6bcbb",
+      "bytes": 27902
+    },
+    {
+      "path": "server/api/read/payroll/a-output.get.ts",
+      "absolutePath": "D:\\crm本地项目开发\\server\\api\\read\\payroll\\a-output.get.ts",
+      "sha256": "25b1833b7fbc4e10c7641e08abe0a64b348b0770c6be9c3213f5128570f96e3e",
+      "bytes": 890
+    },
+    {
+      "path": "tests/payroll/central-a-service.test.ts",
+      "absolutePath": "D:\\crm本地项目开发\\tests\\payroll\\central-a-service.test.ts",
+      "sha256": "4432a90b28a9718397ee1c2840ef3966501635bbc9aa8664b8e94304f0c37021",
+      "bytes": 2329
+    },
+    {
+      "path": "tests/payroll/central-a-http.test.ts",
+      "absolutePath": "D:\\crm本地项目开发\\tests\\payroll\\central-a-http.test.ts",
+      "sha256": "b574c91db1ea744d772182d3e813ae5236fb18902b73bc8898b1b15d500c4663",
+      "bytes": 6410
+    },
+    {
+      "path": "tests/payroll/central-a-commands.test.ts",
+      "absolutePath": "D:\\crm本地项目开发\\tests\\payroll\\central-a-commands.test.ts",
+      "sha256": "e1d26265a2c9a773f8d1671b14fbb58dc0825971f25a402b8af8d76563fce4c9",
+      "bytes": 4709
+    },
+    {
+      "path": "app/components/payroll/PayrollAFrozenPrint.vue",
+      "absolutePath": "D:\\crm本地项目开发\\app\\components\\payroll\\PayrollAFrozenPrint.vue",
+      "sha256": "e3fd33ebc630e724abd01a5566374b30efd09ddc0d0a3011a47001744a719695",
+      "bytes": 4532
+    },
+    {
+      "path": "app/components/payroll/PayrollAConfigScreen.vue",
+      "absolutePath": "D:\\crm本地项目开发\\app\\components\\payroll\\PayrollAConfigScreen.vue",
+      "sha256": "b0015f278004ece8b53bae9b0671af063f47cfb0adaf0828a8a38b6a5a6a8186",
+      "bytes": 8784
+    },
+    {
+      "path": "app/components/payroll/PayrollAPriceEditor.vue",
+      "absolutePath": "D:\\crm本地项目开发\\app\\components\\payroll\\PayrollAPriceEditor.vue",
+      "sha256": "d532f745853a4593eece8eec2aeff26eeca45ced1025bf857781f53420cdc549",
+      "bytes": 4844
+    },
+    {
+      "path": "app/components/payroll/PayrollAStatementWorkspace.vue",
+      "absolutePath": "D:\\crm本地项目开发\\app\\components\\payroll\\PayrollAStatementWorkspace.vue",
+      "sha256": "9e6cacc7ef315a977f5917b8f308400a09f48a4b020cb585e0b377166869ab11",
+      "bytes": 6408
+    },
+    {
+      "path": "tests/components/PayrollAFrozenPrint.test.ts",
+      "absolutePath": "D:\\crm本地项目开发\\tests\\components\\PayrollAFrozenPrint.test.ts",
+      "sha256": "f71da9c65ff160b0bd170b45e2e6bfceca845b4a177b8fef126410cbc35c8ccb",
+      "bytes": 825
+    }
+  ]
+}

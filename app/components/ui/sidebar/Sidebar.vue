@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 移植自官方 registry new-york/ui/sidebar/Sidebar.vue（gap + fixed 双层结构）。
-// 差异：移动端用 reka-ui Dialog 实现 Sheet；桌面端支持 68px 轨道上的 248px 临时悬浮面板；
-// ADR 0013 固定为白底实色侧栏，不使用 shadcn 默认毛玻璃。
+// 差异：移动端用 reka-ui Dialog 实现 Sheet；桌面端支持折叠轨道上的临时悬浮面板；
+// 尺寸和实色背景由 ADR 0013 对应的外壳令牌提供。
 // theme(spacing.4) → 1rem，w-(--x) → w-[var(--x)]（UnoCSS 语法）。
 import type { SidebarProps } from '.'
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'

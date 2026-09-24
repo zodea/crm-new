@@ -1,19 +1,18 @@
 <script setup lang="ts">
-import type { ProjectSupplierFileFact } from '~/lib/project-supplier/workbench'
+import type { ProjectSupplierFileDTO } from '~/lib/project-supplier/repository'
 import { computed, shallowRef } from 'vue'
 import { formatFileSize } from '~/lib/util/file'
 
 const props = defineProps<{
-  files: readonly ProjectSupplierFileFact[]
+  files: readonly ProjectSupplierFileDTO[]
+  returnTo: string
 }>()
 
 const expanded = shallowRef(true)
-const { preview, download } = useFileRefAccess()
-
 const groups = computed(() => {
-  const result = new Map<string, ProjectSupplierFileFact[]>()
+  const result = new Map<string, ProjectSupplierFileDTO[]>()
   for (const file of props.files) {
-    const key = `${file.ownerType}:${file.ownerId || file.sourcePath || file.id}`
+    const key = `${file.ownerType}:${file.ownerId || file.file.id}`
     const current = result.get(key) ?? []
     current.push(file)
     result.set(key, current)
@@ -21,7 +20,7 @@ const groups = computed(() => {
   return [...result.entries()].map(([key, files]) => ({
     key,
     label: files[0]?.sourceLabel || '未标注来源',
-    sourcePath: files[0]?.sourcePath || '',
+    navigation: files[0]?.navigation,
     files,
   }))
 })
@@ -51,6 +50,7 @@ function dateTime(value: string): string {
     </button>
 
     <div v-if="expanded" id="supplier-workbench-file-content">
+      <slot name="toolbar" />
       <div v-if="groups.length === 0" class="bg-surface-2 px-4 py-7 text-center text-12px text-ink-faint">
         暂无来自合同、付款申请、支付或结算的附件
       </div>
@@ -58,25 +58,20 @@ function dateTime(value: string): string {
         <section v-for="group in groups" :key="group.key">
           <div class="flex items-center gap-2 bg-surface-2 px-3 py-1.5">
             <span class="text-11px font-700 text-ink">{{ group.label }}</span>
-            <NuxtLink
-              v-if="group.sourcePath"
-              :to="group.sourcePath"
-              class="ml-auto cell--link text-10px"
-            >
-              查看来源
-            </NuxtLink>
+            <ProjectSupplierSourceLink v-if="group.navigation" label="查看来源" :intent="group.navigation" :return-to="returnTo" class="ml-auto text-10px" />
           </div>
           <div class="divide-y divide-line">
             <div
               v-for="file in group.files"
-              :key="file.id"
+              :key="file.file.id"
               class="supplier-file-row grid min-w-0 gap-2 px-3 py-2.5"
             >
               <div class="min-w-0">
                 <div class="flex items-center gap-1.5">
+                  <slot name="selection" :file="file" />
                   <span class="i-lucide-file-text flex-none text-13px text-ink-faint" aria-hidden="true" />
-                  <span class="truncate text-12px font-700 text-ink" :title="file.fileName">
-                    {{ file.fileName || '未命名附件' }}
+                  <span class="truncate text-12px font-700 text-ink" :title="file.file.label">
+                    {{ file.file.label || '未命名附件' }}
                   </span>
                 </div>
                 <p class="mt-0.5 pl-5 text-10px text-ink-faint">
@@ -84,13 +79,10 @@ function dateTime(value: string): string {
                   {{ file.uploader || '未记录上传人' }} · {{ dateTime(file.uploadedAt) }}
                 </p>
               </div>
-              <div class="flex items-center justify-end gap-2">
-                <button type="button" class="cell--link text-11px" @click="preview(file)">
-                  预览
-                </button>
-                <button type="button" class="cell--link text-11px" @click="download(file)">
-                  下载
-                </button>
+              <div class="flex items-center justify-end text-10px text-ink-faint">
+                <slot name="actions" :file="file">
+                  中央只读元数据
+                </slot>
               </div>
             </div>
           </div>

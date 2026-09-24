@@ -1,8 +1,16 @@
 <script setup lang="ts">
+import type { ColumnFilterValue } from '~/components/ui/KitColumnHeader.vue'
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { FinanceListRow } from '~/stores/finance'
-import { F3_FORM_META, financeFormPath } from '~/lib/finance/page'
+import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
+import KitEnumFilterOptions from '~/components/ui/KitEnumFilterOptions.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import KitToolbarPopover from '~/components/ui/KitToolbarPopover.vue'
+import ListShell from '~/components/ui/ListShell.vue'
+import { F3_FORM_META, financeDetailPath, financeFormPath, receiptDetailPath } from '~/lib/finance/page'
+import { financeStatusLabel, financeStatusTone } from '~/lib/finance/status'
+import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
@@ -16,28 +24,108 @@ const rows = computed<FinanceListRow[]>(() => [
   ...(listRows.value[props.kind] ?? []),
 ])
 const search = shallowRef('')
+const projectFilter = shallowRef<string[]>([])
+const partyFilter = shallowRef<string[]>([])
+const statusFilter = shallowRef<string[]>([])
+const page = shallowRef(1)
+const pageSize = shallowRef(10)
+const filtersOpen = shallowRef(false)
+const hasFilters = computed(() => projectFilter.value.length > 0 || partyFilter.value.length > 0 || statusFilter.value.length > 0)
+
+const displayRows = computed(() => rows.value.map(row => ({
+  ...row,
+  statusLabel: financeStatusLabel(row.status),
+})))
 
 const filtered = computed(() => {
   const keyword = search.value.trim().toLowerCase()
-  if (!keyword)
-    return rows.value
-  return rows.value.filter(row =>
-    [row.no, row.name, row.projectName, row.partyName, row.status]
-      .some(value => value.toLowerCase().includes(keyword)),
-  )
+  return displayRows.value.filter((row) => {
+    if (projectFilter.value.length && !projectFilter.value.includes(row.projectName))
+      return false
+    if (partyFilter.value.length && !partyFilter.value.includes(row.partyName))
+      return false
+    if (statusFilter.value.length && !statusFilter.value.includes(row.status))
+      return false
+    if (!keyword)
+      return true
+    return [row.no, row.name, row.projectName, row.partyName, row.statusLabel]
+      .some(value => value.toLowerCase().includes(keyword))
+  })
 })
 
-const columns: KitTableColumn[] = [
+const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
+const pageRows = computed(() => paginate(filtered.value, currentPage.value, pageSize.value))
+const filterDefinitions = computed(() => [
+  {
+    key: 'project',
+    label: '项目',
+    value: projectFilter.value,
+    options: deriveFilterOptions(displayRows.value, 'projectName')
+      .map(option => ({ label: option.label, key: String(option.value) })),
+  },
+  {
+    key: 'party',
+    label: '关联方',
+    value: partyFilter.value,
+    options: deriveFilterOptions(displayRows.value, 'partyName')
+      .map(option => ({ label: option.label, key: String(option.value) })),
+  },
+  {
+    key: 'status',
+    label: '状态',
+    value: statusFilter.value,
+    options: deriveFilterOptions(displayRows.value, 'status')
+      .map(option => ({ label: financeStatusLabel(String(option.value)), key: String(option.value) })),
+  },
+])
+
+const isReceipt = computed(() => props.kind === 'receipt')
+const amountSummaryLabel = computed(() => isReceipt.value ? '筛选后收款合计' : '筛选后金额合计')
+
+watch([search, projectFilter, partyFilter, statusFilter, pageSize], () => {
+  page.value = 1
+})
+
+function onFilterChange(key: string, value: ColumnFilterValue) {
+  if (!Array.isArray(value))
+    return
+  if (key === 'project')
+    projectFilter.value = value
+  else if (key === 'party')
+    partyFilter.value = value
+  else if (key === 'status')
+    statusFilter.value = value
+}
+
+function clearFilters() {
+  projectFilter.value = []
+  partyFilter.value = []
+  statusFilter.value = []
+  filtersOpen.value = false
+}
+
+function columnFilter(field?: string) {
+  const key = field === 'projectName' ? 'project' : field === 'partyName' ? 'party' : 'status'
+  return filterDefinitions.value.find(filter => filter.key === key)
+}
+
+function onPageChange(event: { page: number, pageSize: number }) {
+  page.value = event.page
+  pageSize.value = event.pageSize
+}
+
+const columns = computed<KitTableColumn[]>(() => [
   { title: '#', type: 'seq', width: 54 },
-  { field: 'name', title: '名称/对象', minWidth: 220, fixed: 'left', slot: 'name' },
-  { field: 'no', title: '编号', width: 170 },
-  { field: 'projectName', title: '项目', minWidth: 160 },
-  { field: 'partyName', title: '关联方/类型', minWidth: 180 },
-  { field: 'amount', title: '金额', type: 'money', width: 140 },
-  { field: 'date', title: '日期', type: 'date', width: 128 },
-  { field: 'status', title: '状态', width: 110, slot: 'status' },
+  { field: 'name', title: isReceipt.value ? '付款方（甲方客户）' : '名称/对象', minWidth: 220, fixed: 'left', slot: 'name' },
+  { field: 'no', title: isReceipt.value ? '收款编号' : '编号', width: 170 },
+  { field: 'projectName', title: '项目', minWidth: 160, customHeader: true },
+  { field: 'partyName', title: isReceipt.value ? '施工合同（可选）' : '关联方/类型', minWidth: 180, customHeader: true },
+  ...(isReceipt.value ? [{ title: '收款方', field: 'receiptPayee', minWidth: 140, slot: 'receiptPayee' } satisfies KitTableColumn] : []),
+  { field: 'amount', title: isReceipt.value ? '收款金额' : '金额', type: 'money', width: 140 },
+  { field: 'date', title: isReceipt.value ? '收款日期' : '日期', type: 'date', width: 128 },
+  { field: 'statusLabel', title: '状态', width: 110, slot: 'status', customHeader: true },
   { title: '操作', type: 'action', width: 72 },
-]
+])
 
 async function load() {
   await financeStore.loadList(props.kind)
@@ -51,6 +139,20 @@ function openEdit(row: FinanceListRow) {
   void navigateTo(financeFormPath(props.kind, row.id))
 }
 
+function openDetail(row: FinanceListRow) {
+  if (props.kind === 'receipt') {
+    if (!row.dataOrigin || !row.customerId)
+      return
+    void navigateTo(receiptDetailPath(row.id, { origin: row.dataOrigin, customerId: row.customerId }))
+    return
+  }
+  void navigateTo(financeDetailPath(props.kind, row.id))
+}
+
+function canOpenDetail(row: FinanceListRow) {
+  return props.kind !== 'receipt' || Boolean(row.dataOrigin && row.customerId)
+}
+
 onMounted(() => {
   void load()
 })
@@ -60,38 +162,61 @@ onActivated(() => {
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col gap-4">
-    <header class="panel flex flex-wrap items-center gap-3 px-4 py-3">
-      <div>
-        <h1 class="text-17px font-800 text-ink">
+  <ListShell continuous class="document-reference-list">
+    <template #toolbar>
+      <div class="flex min-w-0 flex-wrap items-center gap-1.5" aria-label="单据列表工具栏">
+        <h1 class="mr-auto truncate text-12px font-500 text-ink">
           {{ meta.label }}
         </h1>
-        <p class="mt-0.5 text-11px text-ink-faint">
-          {{ meta.subtitle }}
-        </p>
+        <SearchInput v-model="search" placeholder="搜索…" :width="210" class="document-list-search" />
+        <button type="button" class="list-tool-button" title="刷新" aria-label="刷新" :disabled="loading" @click="load">
+          <span class="i-lucide-refresh-cw h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />
+        </button>
+        <KitToolbarPopover v-model:open="filtersOpen" label="列表筛选" icon="i-lucide-filter" :active="hasFilters">
+          <div class="grid gap-3">
+            <div v-for="filter in filterDefinitions" :key="filter.key" class="grid gap-1">
+              <span>{{ filter.label }}</span>
+              <KitEnumFilterOptions :model-value="filter.value" :label="filter.label" :options="filter.options" @update:model-value="onFilterChange(filter.key, $event)" />
+            </div>
+            <button type="button" class="btn-secondary h-7 text-12px" @click="clearFilters">
+              清除筛选
+            </button>
+          </div>
+        </KitToolbarPopover>
+        <button type="button" class="btn-primary h-7 px-3 text-12px" data-testid="create-finance-form" :aria-label="`新建${meta.label}`" @click="openCreate">
+          新建
+        </button>
       </div>
-      <div class="ml-auto flex flex-wrap items-center gap-2">
-        <SearchInput v-model="search" placeholder="搜索名称、编号、项目或关联方" :width="272" />
-        <KitButton variant="secondary" :loading="loading" @click="load">
-          <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />刷新
-        </KitButton>
-        <KitButton data-testid="create-finance-form" @click="openCreate">
-          <span class="i-lucide-plus mr-1" aria-hidden="true" />新建{{ meta.label }}
-        </KitButton>
-      </div>
-    </header>
+    </template>
 
-    <div class="panel overflow-hidden">
-      <KitTable :columns="columns" :data="filtered" :loading="loading">
+    <template #table>
+      <KitTable
+        :columns="columns"
+        :data="pageRows"
+        :loading="loading && listRows[kind] === undefined"
+        :aria-busy="loading"
+        :row-height="32"
+        :page="{ page: currentPage, pageSize, total: filtered.length }"
+        @page-change="onPageChange"
+      >
+        <template #columnHeader="{ column }">
+          <KitColumnHeader :title="column.title" kind="multi-enum" :value="columnFilter(column.field)?.value" :options="columnFilter(column.field)?.options" @apply="onFilterChange(columnFilter(column.field)?.key ?? '', $event)" />
+        </template>
         <template #name="{ row }">
-          <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openEdit(row)">
-            {{ row.name || '未命名记录' }}
+          <button v-if="canOpenDetail(row)" class="cell--link border-0 bg-transparent p-0 text-left" @click="openDetail(row)">
+            {{ row.name || (isReceipt ? '待补充甲方客户' : '未命名记录') }}
           </button>
+          <span v-else data-testid="non-central-receipt-name" class="text-ink">
+            {{ row.name || '待补充甲方客户' }}
+          </span>
         </template>
         <template #status="{ row }">
-          <span class="chip" :class="row.status === '已确认' || row.status === 'approved' ? 'chip-ok' : 'chip-brand'">
-            {{ row.status || '草稿' }}
-          </span>
+          <KitStatusTag :tone="financeStatusTone(row.status)">
+            {{ row.statusLabel }}
+          </KitStatusTag>
+        </template>
+        <template #receiptPayee>
+          <span class="text-ink-soft">我方乙方</span>
         </template>
         <template #action="{ row }">
           <button class="icon-btn" title="编辑" @click="openEdit(row)">
@@ -99,12 +224,25 @@ onActivated(() => {
           </button>
         </template>
       </KitTable>
-      <div class="border-t border-line bg-surface-2 px-4 py-2 text-right text-12px text-ink-soft">
-        共 {{ filtered.length }} 条 · 金额合计
+    </template>
+    <template #summary>
+      <span class="ml-auto">
+        当前页 {{ pageRows.length }} 条 · {{ amountSummaryLabel }}
         <strong class="ml-1 font-mono text-ink">
           {{ yuan(filtered.reduce((total, row) => total + row.amount, 0)) }}
         </strong>
-      </div>
-    </div>
-  </div>
+      </span>
+    </template>
+  </ListShell>
 </template>
+
+<style scoped>
+.document-reference-list { border: 0; border-radius: 0; }
+.document-reference-list :deep([data-list-shell-toolbar]) { padding: 10px 10px 6px; }
+.document-reference-list :deep(.document-list-search) { flex: 1 1 100px; max-width: 210px; }
+.document-reference-list :deep(.document-list-search input) { height: 28px; font-size: 12px; border-radius: 2px; }
+.document-reference-list :deep(.vxe-body--column) { border-right-color: transparent; font-size: 12px; }
+.document-reference-list :deep(.vxe-header--column) { font-size: 12px; font-weight: 600; }
+.document-reference-list :deep(.cell--link) { text-decoration: none; }
+.document-reference-list :deep(.cell--link:hover) { text-decoration: underline; }
+</style>

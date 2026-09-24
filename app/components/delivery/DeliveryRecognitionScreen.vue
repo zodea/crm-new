@@ -11,8 +11,14 @@ const paneLabels: Readonly<Record<WorkbenchPane, string>> = {
 
 const {
   store,
-  projectStore,
-  supplierStore,
+  projects,
+  suppliers,
+  referenceError,
+  referenceLoading,
+  reloadReferences,
+  aliasRetry,
+  aliasSaving,
+  retrySupplierAlias,
   selectedFileId,
   selectedFile,
   selectedDocument,
@@ -21,6 +27,14 @@ const {
   supplierSuggestion,
   amountSummary,
   reviewProgress,
+  reviewIssues,
+  canArchive,
+  queueStatusCounts,
+  queueStatuses,
+  duplicates,
+  duplicateSelectedId,
+  duplicatePreview,
+  duplicateLoading,
   saving,
   isOverDropZone,
   openFilePicker,
@@ -29,6 +43,11 @@ const {
   recognizeOne,
   recognizeAll,
   removeFile,
+  classifySelected,
+  openSupplierForm,
+  confirmNoOrderNo,
+  selectDuplicate,
+  reviewDuplicate,
   patchDraft,
   patchItem,
   editItemAmount,
@@ -59,9 +78,32 @@ const {
     <DeliveryWorkbenchHeader
       :stats="store.stats"
       :pending-count="store.pendingFiles.length"
+      :status-counts="queueStatusCounts"
       @upload="openFilePicker()"
       @recognize-all="recognizeAll"
     />
+
+    <DeliveryDuplicateReviewPanel
+      :duplicates="duplicates"
+      :selected-id="duplicateSelectedId"
+      :preview="duplicatePreview"
+      :loading="duplicateLoading"
+      @select="selectDuplicate"
+      @confirm="reviewDuplicate"
+    />
+
+    <div v-if="referenceError" role="alert" class="panel flex flex-wrap items-center gap-3 p-3 text-13px text-danger">
+      <span class="min-w-0 flex-1">{{ referenceError }}</span>
+      <KitButton :loading="referenceLoading" @click="reloadReferences">
+        重新读取项目与分供方
+      </KitButton>
+    </div>
+    <div v-if="aliasRetry" role="status" class="panel flex flex-wrap items-center gap-3 p-3 text-13px text-warn-ink">
+      <span class="min-w-0 flex-1">分供方别名“{{ aliasRetry.raw }}”尚未保存；送货归档与别名分别处理。</span>
+      <KitButton :loading="aliasSaving" @click="retrySupplierAlias">
+        重试保存别名
+      </KitButton>
+    </div>
 
     <AdaptiveWorkbench
       v-model="activePane"
@@ -73,6 +115,7 @@ const {
           :files="store.files"
           :selected-id="selectedFileId"
           :progress="store.recognitionProgress"
+          :status-by-file="queueStatuses"
           @select="selectFile"
           @upload="openFilePicker()"
           @recognize="recognizeOne"
@@ -91,11 +134,14 @@ const {
           :file="selectedFile"
           :document="selectedDocument"
           :documents="selectedFile?.docs ?? []"
-          :projects="projectStore.list"
-          :suppliers="supplierStore.list"
+          :projects="projects"
+          :suppliers="suppliers"
           :supplier-suggestion="supplierSuggestion"
           :amount-summary="amountSummary"
           :review-progress="reviewProgress"
+          :review-issues="reviewIssues"
+          :can-archive="canArchive"
+          :queue-status="queueStatuses[selectedFile?.id ?? ''] ?? { label: '待选择', cls: 'chip' }"
           :saving="saving"
           @select-document="selectDocument"
           @recognize="recognizeOne()"
@@ -105,6 +151,9 @@ const {
           @add-item="addItem"
           @remove-item="removeItem"
           @apply-supplier-suggestion="applySupplierSuggestion"
+          @open-supplier-form="openSupplierForm"
+          @confirm-no-order-no="confirmNoOrderNo"
+          @classify="classifySelected"
           @archive="archiveSelected"
           @open-print="openPrint"
           @confirm-print="confirmPrint"

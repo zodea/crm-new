@@ -1,7 +1,9 @@
+import type { ApprovedAmountOrigin, ApprovedAmountState } from '~/lib/finance/approval-amount'
 import { defineStore } from 'pinia'
 import { computed, readonly, shallowRef } from 'vue'
 import { select } from '~/lib/db/connection'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
+import { approvalPaymentCap, readApprovalAmount } from '~/lib/finance/approval-amount'
 
 export type PaymentExecutionStatus
   = '待支付'
@@ -9,6 +11,7 @@ export type PaymentExecutionStatus
     | '已付清'
     | '超额支付'
     | '批复为 0'
+    | '历史批复待核验'
 
 export type PaymentInvoiceStatus
   = '待回票'
@@ -25,9 +28,10 @@ export interface PaymentManagementRow {
   projectName: string
   supplierId: string | null
   supplierName: string
-  approvedAmount: number
+  approvedAmount: number | null
+  approvedAmountState: ApprovedAmountState
   paidAmount: number
-  dueAmount: number
+  dueAmount: number | null
   paymentStatus: PaymentExecutionStatus
   invoiceState: string
   invoiceStatus: PaymentInvoiceStatus
@@ -37,10 +41,10 @@ export interface PaymentManagementRow {
 
 export interface PaymentManagementSummary {
   applicationCount: number
-  approvedAmount: number
+  approvedAmount: number | null
   paidAmount: number
-  dueAmount: number
-  dueCount: number
+  dueAmount: number | null
+  dueCount: number | null
 }
 
 interface PaymentManagementDbRow {
@@ -53,7 +57,8 @@ interface PaymentManagementDbRow {
   supplier_id: string | null
   supplier_name: string | null
   apply_amount: number
-  approved_amount: number
+  approved_amount: number | null
+  approved_amount_origin: ApprovedAmountOrigin
   paid_amount: number
   invoice_state: string
   invoice_allocated_amount: number
@@ -68,14 +73,14 @@ function executionStatus(
   approvedAmount: number,
   paidAmount: number,
 ): PaymentExecutionStatus {
+  if (paidAmount > approvedAmount)
+    return '超额支付'
   if (approvedAmount <= 0)
     return '批复为 0'
   if (paidAmount <= 0)
     return '待支付'
   if (paidAmount < approvedAmount)
     return '部分支付'
-  if (paidAmount > approvedAmount)
-    return '超额支付'
   return '已付清'
 }
 
@@ -95,7 +100,8 @@ function invoiceStatus(
 
 function mapRow(row: PaymentManagementDbRow): PaymentManagementRow {
   const applyAmount = money(row.apply_amount)
-  const approvedAmount = money(row.approved_amount)
+  const approval = readApprovalAmount(row.approved_amount, row.approved_amount_origin)
+  const cap = approvalPaymentCap(applyAmount, row.approved_amount, row.approved_amount_origin)
   const paidAmount = money(row.paid_amount)
   const invoiceAllocatedAmount = money(row.invoice_allocated_amount)
 
@@ -108,10 +114,11 @@ function mapRow(row: PaymentManagementDbRow): PaymentManagementRow {
     projectName: row.project_name || '公司付款',
     supplierId: row.supplier_id,
     supplierName: row.supplier_name || '未指定收款单位',
-    approvedAmount,
+    approvedAmount: approval.amount,
+    approvedAmountState: approval.state,
     paidAmount,
-    dueAmount: money(Math.max(approvedAmount - paidAmount, 0)),
-    paymentStatus: executionStatus(approvedAmount, paidAmount),
+    dueAmount: cap === null ? null : money(Math.max(cap - paidAmount, 0)),
+    paymentStatus: cap === null ? '历史批复待核验' : executionStatus(cap, paidAmount),
     invoiceState: row.invoice_state,
     invoiceStatus: invoiceStatus(
       row.invoice_state,
@@ -125,13 +132,13 @@ function mapRow(row: PaymentManagementDbRow): PaymentManagementRow {
   }
 }
 
-function summarize(rows: readonly PaymentManagementRow[]): PaymentManagementSummary {
+export function summarizePayments(rows: readonly PaymentManagementRow[]): PaymentManagementSummary {
   return rows.reduce<PaymentManagementSummary>((summary, row) => ({
     applicationCount: summary.applicationCount + 1,
-    approvedAmount: money(summary.approvedAmount + row.approvedAmount),
+    approvedAmount: summary.approvedAmount === null || row.approvedAmount === null ? null : money(summary.approvedAmount + row.approvedAmount),
     paidAmount: money(summary.paidAmount + row.paidAmount),
-    dueAmount: money(summary.dueAmount + row.dueAmount),
-    dueCount: summary.dueCount + Number(row.dueAmount > 0),
+    dueAmount: summary.dueAmount === null || row.dueAmount === null ? null : money(summary.dueAmount + row.dueAmount),
+    dueCount: summary.dueCount === null || row.dueAmount === null ? null : summary.dueCount + Number(row.dueAmount > 0),
   }), {
     applicationCount: 0,
     approvedAmount: 0,
@@ -144,6 +151,7 @@ function summarize(rows: readonly PaymentManagementRow[]): PaymentManagementSumm
 export const usePaymentManagementStore = defineStore('payment-management', () => {
   const rows = shallowRef<PaymentManagementRow[]>([])
   const loading = shallowRef(false)
+  const hasSnapshot = shallowRef(false)
   let activeLoad: Promise<PaymentManagementRow[]> | null = null
 
   const projectOptions = computed(() => {
@@ -159,7 +167,7 @@ export const usePaymentManagementStore = defineStore('payment-management', () =>
         .map(([key, label]) => ({ key, label })),
     ]
   })
-  const summary = computed(() => summarize(rows.value))
+  const summary = computed(() => summarizePayments(rows.value))
 
   async function load(): Promise<PaymentManagementRow[]> {
     if (activeLoad)
@@ -183,6 +191,7 @@ export const usePaymentManagementStore = defineStore('payment-management', () =>
              supplier.name AS supplier_name,
              application.apply_amount,
              application.approved_amount,
+             application.approved_amount_origin,
              application.invoice_state,
              application.apply_date,
              COALESCE((
@@ -213,6 +222,7 @@ export const usePaymentManagementStore = defineStore('payment-management', () =>
       ORDER BY application.apply_date DESC, application.created_at DESC
     `).then((source) => {
       rows.value = source.map(mapRow)
+      hasSnapshot.value = true
       return rows.value
     }).finally(() => {
       loading.value = false
@@ -225,6 +235,7 @@ export const usePaymentManagementStore = defineStore('payment-management', () =>
   return {
     rows: readonly(rows),
     loading: readonly(loading),
+    hasSnapshot: readonly(hasSnapshot),
     projectOptions,
     summary,
     load,

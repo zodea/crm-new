@@ -1,16 +1,24 @@
-// HomeScreenNew — 首页：项目Tab + 统一施工进度甘特（计划vs实际同轴 + today线），界面专项只做进度总览。
+// HomeScreenNew — 首页：项目切换 + 统一施工进度甘特（计划vs实际同轴 + today线）。
 // 反馈轮4：原「开工→完工总进度」里程碑卡 + 「工程量进度」楼层甘特两张割裂卡 → 合并为一张统一甘特。
 // 反馈轮8：删除底部「项目级成本对比」条（口径不透明、首页用处不大，成本对比归工程量清单看毛利）；
 //          删除指标卡 / 月度收支 / 支出分类模块（在项目详情页查看），首页只留 项目Tab + 甘特 + 图例。
-// 数据源：kit/ScheduleData.jsx 注册的 window.SCHEDULE；工序点击 → navigate("quantity", {...}) 下钻。
+// 数据源：kit/ScheduleData.jsx 注册的 window.SCHEDULE；项目目录来自 window.APP；工序点击 → navigate("quantity", {...}) 下钻。
 (function () {
   const { Button, Panel, StatusChip, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {} };
 
-  const PROJECTS = ["合和新城", "锦绣华庭", "翠湖花园"];
+  const fallbackProjects = [{ id: "p1", name: "合和新城" }, { id: "p2", name: "锦绣华庭" }, { id: "p3", name: "翠湖花园" }];
+
+  function projectOptions() {
+    const A = window.APP;
+    const S = window.SCHEDULE;
+    const rows = A && A.rows ? A.rows("projects") : [];
+    const projects = rows.length ? rows : fallbackProjects;
+    return projects.map((row) => ({ id: row.id, name: row.name, hasSchedule: !!(S && S.byProjectId && S.byProjectId[row.id]) }));
+  }
 
   // ── 统一施工进度甘特 ──────────────────────────────────────
-  function ScheduleGantt({ project, navigate }) {
+  function ScheduleGantt({ projectId, navigate }) {
     const [, force] = React.useReducer(x => x + 1, 0);
     React.useEffect(() => {
       if (!window.SCHEDULE) {
@@ -21,9 +29,21 @@
     }, []);
     const S = window.SCHEDULE;
     const [open, setOpen] = React.useState({});
-    if (!S) return <Panel padding={18}><div style={{ fontSize: 12, color: "var(--ink-soft)" }}>加载排程数据…</div></Panel>;
+    if (!S) return <Panel padding={18}><div style={{ fontSize: 13, color: "var(--ink-soft)" }}>施工进度加载中…</div></Panel>;
 
-    const p = S.state[project];
+    const p = S.byProjectId && S.byProjectId[projectId];
+    if (!p) return (
+      <Panel padding={22}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ width: 34, height: 34, display: "grid", placeItems: "center", borderRadius: 9, background: "var(--surface-2)" }}><Icon name="calendar-x" size={18} color="var(--ink-soft)" /></span>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ fontSize: 14, fontWeight: 800 }}>当前项目暂无施工排程</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: "var(--ink-soft)" }}>可先建立楼栋分组，再开始维护工序计划。</div>
+          </div>
+          <Button size="sm" variant="secondary" icon="external-link" onClick={() => navigate("projectDetail", { id: projectId })}>打开项目详情</Button>
+        </div>
+      </Panel>
+    );
     const allTasks = p.groups.flatMap(g => g.tasks);
     // 时间轴：项目开工月首 → 计划完工月末
     const axisStart = p.start.slice(0, 8) + "01";
@@ -51,7 +71,7 @@
     };
 
     const clickTask = (g, t) => {
-      if (t.hasQty) navigate("quantity", { group: g.name, trade: t.trade, item: t.item, task: t.name, ps: t.ps, pf: t.pf, from: "home" });
+      if (t.hasQty) navigate("quantity", { projectId, group: g.name, trade: t.trade, item: t.item, task: t.name, ps: t.ps, pf: t.pf, from: "home" });
       else UI().toast("「" + t.name + "」为手动填报工序，请在施工进度页更新进度");
     };
 
@@ -84,8 +104,8 @@
             <span style={{ margin: "0 6px", color: "var(--ink-faint)" }}>→</span>
             计划完工 <b style={{ fontFamily: "var(--font-mono)", color: "var(--ink)" }}>{fmt(p.plannedEnd)}</b>
           </span>
-          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-faint)" }}>点工序下钻工程量 · 计划编辑在施工进度页</span>
-          <Button size="sm" variant="secondary" icon="calendar-range" onClick={() => navigate("schedule")}>打开施工进度</Button>
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-faint)" }}>{allTasks.length} 道工序</span>
+          <Button size="sm" variant="secondary" icon="calendar-range" onClick={() => navigate("schedule", { projectId })}>打开施工进度</Button>
         </div>
 
         {/* 月刻度 */}
@@ -158,29 +178,27 @@
 
   // ── Main Component ──────────────────────────────────────
   function HomeScreenNew({ data, navigate }) {
-    const [tab, setTab] = React.useState(0);
-    const project = PROJECTS[tab];
+    const options = projectOptions();
+    const [selected, setSelected] = React.useState(() => options.find((x) => x.hasSchedule) || options[0]);
+    const current = options.find((x) => x.id === selected?.id) || options[0];
+    const projectId = current ? current.id : fallbackProjects[0].id;
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* Project tabs */}
-        <div style={{ display: "flex", borderBottom: "1px solid var(--line)", alignItems: "flex-end" }}>
-          {PROJECTS.map((p, i) => (
-            <button key={p} type="button" onClick={() => setTab(i)}
-              style={{ padding: "10px 18px 8px", border: 0, background: "transparent", cursor: "pointer",
-                borderBottom: `2px solid ${tab === i ? "var(--brand)" : "transparent"}`,
-                marginBottom: -1, fontSize: 13, fontWeight: tab === i ? 700 : 500,
-                color: tab === i ? "var(--brand-deep)" : "var(--ink-soft)", transition: "all 0.15s" }}>
-              {p}
-            </button>
-          ))}
-          <button type="button" onClick={() => navigate("project")} style={{ marginLeft: "auto", padding: "10px 16px 8px", border: 0, background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--brand)", fontWeight: 600, borderBottom: "2px solid transparent", marginBottom: -1 }}>
-            全部项目 →
+        {/* 项目切换：项目目录与实际工程数量保持一致，排程缺失时进入可恢复空态 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 10, borderBottom: "1px solid var(--line)", flexWrap: "wrap" }}>
+          <select value={current?.id || ""} onChange={(e) => setSelected(options.find((x) => String(x.id) === e.target.value) || options[0])}
+            aria-label="选择项目" style={{ minWidth: 220, maxWidth: "100%", padding: "8px 34px 8px 12px", border: "1px solid var(--line-strong)", borderRadius: 8, background: "#fff", color: "var(--ink)", fontSize: 13, fontWeight: 700 }}>
+            {options.map((x) => <option key={x.id} value={x.id}>{x.name}{x.hasSchedule ? "" : " · 暂无排程"}</option>)}
+          </select>
+          <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>{options.length} 个项目</span>
+          <button type="button" onClick={() => navigate("project")} style={{ marginLeft: "auto", padding: "8px 4px", border: 0, background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--brand)", fontWeight: 700 }}>
+            查看项目列表 →
           </button>
         </div>
 
         {/* 统一施工进度甘特（计划 vs 实际 + today）——首页唯一主体（反馈轮8：经营指标/收支/支出分类看项目详情） */}
-        <ScheduleGantt project={project} navigate={navigate} />
+        <ScheduleGantt projectId={projectId} navigate={navigate} />
       </div>
     );
   }

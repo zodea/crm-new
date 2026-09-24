@@ -1,0 +1,57 @@
+import { describe, expect, it } from 'vitest'
+import { resolveBusinessSession } from '../../server/utils/business-session'
+
+describe('default business session boundary', () => {
+  it('injects stable workspace, actor and capabilities on the server', () => {
+    expect(resolveBusinessSession()).toEqual({
+      workspaceId: 'workspace-default',
+      actorId: 'actor-default',
+      capabilities: [
+        'payroll:read',
+        'payroll:write',
+        'target-cost:read',
+        'target-cost:write',
+        'schedule:read',
+        'schedule:write',
+        'process-library:read',
+        'process-library:write',
+        'quantity:read',
+        'quantity:write',
+        'delivery:read',
+        'delivery:write',
+        'receipt:read',
+        'receipt:write',
+        'other-settlement:read',
+        'other-settlement:write',
+        'auxiliary-contract:read',
+        'auxiliary-contract:write',
+        'project:list:read',
+        'project:write',
+        'customer:list:read',
+        'customer:write',
+        'supplier:list:read',
+        'supplier:write',
+        'supplier-credential:read',
+        'supplier-credential:write',
+        'subcontract-contract:read',
+        'subcontract-contract:write',
+        'construction-contract:read',
+        'construction-contract:write',
+        'owner-document:read',
+        'owner-document:write',
+        'subcontract-document:read',
+        'subcontract-document:write',
+        'material-contract:read',
+        'material-contract:write',
+        'project-supplier:read',
+        'project-supplier:write',
+        'crew:list:read',
+        'crew:write',
+        'worker:list:read',
+        'worker:write',
+        'demo:read',
+        'core:migration:write',
+      ],
+    })
+  })
+})

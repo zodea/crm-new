@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import { useLocalStorage } from '@vueuse/core'
+import type { DataOriginDTO } from '~/types/read-model'
 import { computed } from 'vue'
 
 export interface LookupOption {
@@ -51,17 +51,15 @@ export function highlightMatch(label: string, keyword: string): HighlightSegment
     : [{ text: label, highlighted: false }]
 }
 
-export function lookupRecentStorageKey(key: string) {
-  return `kit-lookup:${key}:recent`
+export function lookupRecentStorageKey(
+  key: string,
+  workspaceId: string,
+  dataOrigin: DataOriginDTO,
+) {
+  return `kit-lookup:${workspaceId}:${dataOrigin}:${key}:recent`
 }
 
-export function recentStore(
-  key: string,
-  state: Ref<LookupOption[]> = useLocalStorage<LookupOption[]>(
-    lookupRecentStorageKey(key),
-    [],
-  ),
-) {
+export function recentStore(state: Ref<LookupOption[]>) {
   const items = computed(() => state.value)
 
   function getAll() {

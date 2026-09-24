@@ -11,11 +11,13 @@
 
 Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) 和 [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md)。
 
+逐模块复核、补全规格或承接旧 Issue 时，先按 [`docs/agents/module-review.md`](docs/agents/module-review.md) 调查事实、记录可直接作出的判断、补齐场景与验收，再对确有业务取舍的缺口使用 `grill-with-docs`。
+
 ## 2. 当前工程基线
 
 - Nuxt 4、Vue 3.5、TypeScript，SPA（`ssr: false`）；桌面壳为 Tauri 2。
 - 包管理固定为 pnpm；以 `package.json` 的 `packageManager` 和 scripts 为准。
-- 状态使用 Pinia；持久化统一经 `app/lib/db/` 接入 SQLite（浏览器开发态使用 sql.js fallback）。
+- 状态使用 Pinia；已接管浏览器实体读写统一走中央 Repository/HTTP/command，尚未接管的本地适配和桌面 SQLite 边界见 ADR 0020。浏览器测试实例不代表生产持久化已完成。
 - 样式使用 UnoCSS；交互底座为 reka-ui / shadcn-vue 结构与 vue-sonner；数据网格底座为 vxe-table。
 - 代码目录采用 Nuxt 4 的 `app/` 布局。架构入口见 [`docs/rewrite/ARCHITECTURE.md`](docs/rewrite/ARCHITECTURE.md)。
 
@@ -72,14 +74,14 @@ Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-trac
 
 修 bug 时先建立能失败的复现；界面修改除行为断言外还要验证实际视口、滚动边界、键盘焦点与浮层层次。不要用静态源码检查替代运行态验收。
 
-GitHub Actions 只手动按需调用；单个 PR 不运行 E2E/Visual，一批 PR 合并完成后才按批次手动运行一次。调用前必须先估算 runner-minutes、说明所选套件并等待用户确认。选择规则与费用基线见 [`docs/agents/ci-usage.md`](docs/agents/ci-usage.md)。
+GitHub Actions 只手动按需调用；没有后置依赖的叶子 PR 可单独验证，有后置依赖的 PR 等依赖链末端提交范围冻结后只做一次集成验证；单个 PR 不运行 E2E/Visual，一批 PR 合并完成后才按批次手动运行一次。CI 绑定提交 SHA，不锁定 PR；CI 后产生新提交时旧结果失效，按新提交按需重跑。调用前必须先估算 runner-minutes、说明所选套件并等待用户确认。选择规则与费用基线见 [`docs/agents/ci-usage.md`](docs/agents/ci-usage.md)。
 
 ## 5. 文档纪律
 
 - 单一权威源：词义 → `CONTEXT.md`；架构决策 → `docs/adr/`；数据模型 → `docs/rewrite/DATABASE.md`；当前界面对标权威链 → ADR 0013 与 `docs/design/README.md`。
 - 二次文档只链接，不复制字段表、色值或状态快照。
 - 决策或实现状态变化时，同一提交更新权威源和受影响入口；暂不能重写的历史材料移入 `docs/research/` 并标明“非权威源”。
-- 新增或改变最终用户可见业务流程时，同一工作单元更新 `docs/guides/` 的 Markdown 使用指南，并在 `output/pdf/` 重新生成 PDF；交付前逐页渲染检查，且明确区分“当前已可用”与“已定稿待开发”。
+- 新增或改变最终用户可见业务流程时，同一工作单元更新 `docs/guides/` 的 Markdown 使用指南，明确区分“当前已可用”与“已定稿待开发”。指南以 Markdown 交付；仅在用户明确需要 PDF 时按需生成并逐页检查。产品本身的打印、原件和导出功能仍按对应 Issue 验收。
 - 完成的临时计划、反馈轮、TODO 和交接副本应删除；Git 历史就是参考档案。
 
 ## 6. 提交纪律

@@ -1,34 +1,35 @@
-import type { ProjectSupplierFileFact } from '~/lib/project-supplier/workbench'
+import type { ProjectSupplierFileDTO } from '~/lib/project-supplier/repository'
 import { render, screen } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
 import ProjectSupplierFilePanel from '~/components/project-supplier/ProjectSupplierFilePanel.vue'
 
-vi.stubGlobal('useFileRefAccess', () => ({
-  preview: vi.fn(),
-  download: vi.fn(),
-}))
-
-const NuxtLinkStub = defineComponent({
-  props: { to: { type: String, required: true } },
-  setup: (props, { slots }) => () => h('a', { href: props.to }, slots.default?.()),
+const EntityLinkStub = defineComponent({
+  props: { label: String, intent: Object, returnTo: String },
+  setup: props => () => h('a', {
+    'href': `/contract/${String((props.intent as ProjectSupplierFileDTO['navigation']).subject && 'id' in (props.intent as ProjectSupplierFileDTO['navigation']).subject ? (props.intent as ProjectSupplierFileDTO['navigation']).subject.id : '')}`,
+    'data-return-to': props.returnTo,
+  }, props.label),
 })
 
-function file(overrides: Partial<ProjectSupplierFileFact>): ProjectSupplierFileFact {
+function file(overrides: Partial<ProjectSupplierFileDTO>): ProjectSupplierFileDTO {
   return {
-    id: 'file-1',
+    file: { state: 'resolved', entity: 'file', id: 'file-1', label: '合同.pdf', no: null },
     ownerType: 'contract',
     ownerId: 'contract-1',
     sourceLabel: 'CG-001',
-    sourcePath: '/contract/contract-1',
-    fileName: '合同.pdf',
-    filePath: '',
+    navigation: {
+      kind: 'source-record',
+      subject: { state: 'resolved', entity: 'contract', id: 'contract-1', label: 'CG-001', no: 'CG-001' },
+      variant: 'detail',
+      view: null,
+      filters: {},
+    },
     fileSize: 100,
     mimeType: 'application/pdf',
     category: '合同附件',
     uploader: '',
     uploadedAt: '2026-07-30T10:00:00',
-    deletedAt: null,
     ...overrides,
   }
 }
@@ -38,13 +39,24 @@ describe('项目分供方合作文件', () => {
     render(ProjectSupplierFilePanel, {
       props: {
         files: [
-          file({ id: 'file-1', ownerId: 'contract-1', sourcePath: '/contract/contract-1' }),
-          file({ id: 'file-2', ownerId: 'contract-2', sourcePath: '/contract/contract-2' }),
+          file({ ownerId: 'contract-1' }),
+          file({
+            file: { state: 'resolved', entity: 'file', id: 'file-2', label: '合同.pdf', no: null },
+            ownerId: 'contract-2',
+            navigation: {
+              kind: 'source-record',
+              subject: { state: 'resolved', entity: 'contract', id: 'contract-2', label: 'CG-001', no: 'CG-001' },
+              variant: 'detail',
+              view: null,
+              filters: {},
+            },
+          }),
         ],
+        returnTo: '/project/project-1/supplier/supplier-1?tab=contract',
       },
       global: {
         components: {
-          NuxtLink: NuxtLinkStub,
+          ProjectSupplierSourceLink: EntityLinkStub,
         },
       },
     })

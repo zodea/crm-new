@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "owner": "/root/wbs_central_backend",
+  "date": "2026-09-14",
+  "scope": "C main visual supplements only; preserves A archive map",
+  "summary": {
+    "files": 18,
+    "png": 16,
+    "verificationJson": 2,
+    "validPng": 15,
+    "incompletePng": 1,
+    "hashMismatches": 0
+  },
+  "records": [
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-390.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\frozen-source-right-390.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "fc7819a5bc817808daf1835b05456edd34050a63ec6e8d0c9aff576eb0ce82a3",
+      "reviewVerdict": "pass",
+      "sha256": "fc7819a5bc817808daf1835b05456edd34050a63ec6e8d0c9aff576eb0ce82a3",
+      "destinationSha256": "fc7819a5bc817808daf1835b05456edd34050a63ec6e8d0c9aff576eb0ce82a3",
+      "bytes": 62521
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-768.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\frozen-source-right-768.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "6c4bffc55d205c11395c1dda86783f29171fa2f14ef94c3f4020712fb22b6250",
+      "reviewVerdict": "pass",
+      "sha256": "6c4bffc55d205c11395c1dda86783f29171fa2f14ef94c3f4020712fb22b6250",
+      "destinationSha256": "6c4bffc55d205c11395c1dda86783f29171fa2f14ef94c3f4020712fb22b6250",
+      "bytes": 87238
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-1024.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\frozen-source-right-1024.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "362f6329b5a1fffc911d19d727a72248e002f1637c2471ed5a3b66a603fdafe2",
+      "reviewVerdict": "pass",
+      "sha256": "362f6329b5a1fffc911d19d727a72248e002f1637c2471ed5a3b66a603fdafe2",
+      "destinationSha256": "362f6329b5a1fffc911d19d727a72248e002f1637c2471ed5a3b66a603fdafe2",
+      "bytes": 121974
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-1280.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\frozen-source-right-1280.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "cee0d9fb2b520b7831bd4a08131154cf99da72f86b4c37364f35c94a008aaee5",
+      "reviewVerdict": "pass",
+      "sha256": "cee0d9fb2b520b7831bd4a08131154cf99da72f86b4c37364f35c94a008aaee5",
+      "destinationSha256": "cee0d9fb2b520b7831bd4a08131154cf99da72f86b4c37364f35c94a008aaee5",
+      "bytes": 126711
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\frozen-source-right-1440.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\frozen-source-right-1440.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "d01ac16ce2967ed43993f66cca6966dfeadf7521e48b67252d56712eed5addf8",
+      "reviewVerdict": "pass",
+      "sha256": "d01ac16ce2967ed43993f66cca6966dfeadf7521e48b67252d56712eed5addf8",
+      "destinationSha256": "d01ac16ce2967ed43993f66cca6966dfeadf7521e48b67252d56712eed5addf8",
+      "bytes": 126167
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-390.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\payroll-scope-notice-390.png",
+      "category": "browser",
+      "round": "notice-final",
+      "expected": "830a3afe50a26c43bac5bb03429a1d4f52c5d1d6eb6854aa936daa7d1b2e98c5",
+      "reviewVerdict": "pass",
+      "sha256": "830a3afe50a26c43bac5bb03429a1d4f52c5d1d6eb6854aa936daa7d1b2e98c5",
+      "destinationSha256": "830a3afe50a26c43bac5bb03429a1d4f52c5d1d6eb6854aa936daa7d1b2e98c5",
+      "bytes": 85270
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-768.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\payroll-scope-notice-768.png",
+      "category": "browser",
+      "round": "notice-final",
+      "expected": "529d4b30115006460f7c2a0f3a0fb201b422db3dd14ef1fba3138f0ac2c74de6",
+      "reviewVerdict": "pass",
+      "sha256": "529d4b30115006460f7c2a0f3a0fb201b422db3dd14ef1fba3138f0ac2c74de6",
+      "destinationSha256": "529d4b30115006460f7c2a0f3a0fb201b422db3dd14ef1fba3138f0ac2c74de6",
+      "bytes": 105864
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-1024.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\payroll-scope-notice-1024.png",
+      "category": "browser",
+      "round": "notice-final",
+      "expected": "bbca50354c0b8938f9e883d0994e5d436d01c38fe2835804d2d5c54799f3ce21",
+      "reviewVerdict": "pass",
+      "sha256": "bbca50354c0b8938f9e883d0994e5d436d01c38fe2835804d2d5c54799f3ce21",
+      "destinationSha256": "bbca50354c0b8938f9e883d0994e5d436d01c38fe2835804d2d5c54799f3ce21",
+      "bytes": 138408
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-1280.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\payroll-scope-notice-1280.png",
+      "category": "browser",
+      "round": "notice-final",
+      "expected": "10f7fc75b6ecf3d17fb427dd87479010dc79987098be78ef887736244fe84ce9",
+      "reviewVerdict": "pass",
+      "sha256": "10f7fc75b6ecf3d17fb427dd87479010dc79987098be78ef887736244fe84ce9",
+      "destinationSha256": "10f7fc75b6ecf3d17fb427dd87479010dc79987098be78ef887736244fe84ce9",
+      "bytes": 141233
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\payroll-scope-notice-1440.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\payroll-scope-notice-1440.png",
+      "category": "browser",
+      "round": "notice-final",
+      "expected": "84e2dadb844f363019bc8b924b62f0f65103d2e7ff604a4bcd2128292fc9ce45",
+      "reviewVerdict": "pass",
+      "sha256": "84e2dadb844f363019bc8b924b62f0f65103d2e7ff604a4bcd2128292fc9ce45",
+      "destinationSha256": "84e2dadb844f363019bc8b924b62f0f65103d2e7ff604a4bcd2128292fc9ce45",
+      "bytes": 142139
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-390.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\released-ledger-right-390.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "c42aa2d8c2e2a54a22a982a8620bb76b51f4eb6e2644cb3d80606cfab57a9a0b",
+      "reviewVerdict": "pass",
+      "sha256": "c42aa2d8c2e2a54a22a982a8620bb76b51f4eb6e2644cb3d80606cfab57a9a0b",
+      "destinationSha256": "c42aa2d8c2e2a54a22a982a8620bb76b51f4eb6e2644cb3d80606cfab57a9a0b",
+      "bytes": 68165
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-768.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\released-ledger-right-768.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "76d95344172370ff998e6fe7cf3aa38d77454c1e41f95f78c58106c4f71e20d1",
+      "reviewVerdict": "pass",
+      "sha256": "76d95344172370ff998e6fe7cf3aa38d77454c1e41f95f78c58106c4f71e20d1",
+      "destinationSha256": "76d95344172370ff998e6fe7cf3aa38d77454c1e41f95f78c58106c4f71e20d1",
+      "bytes": 104758
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-1024.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\released-ledger-right-1024.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "68a59327da5cc8588995041926d64e2f96c8520b5ee9b378e7f8d323a8062799",
+      "reviewVerdict": "coverage-gap",
+      "sha256": "68a59327da5cc8588995041926d64e2f96c8520b5ee9b378e7f8d323a8062799",
+      "destinationSha256": "68a59327da5cc8588995041926d64e2f96c8520b5ee9b378e7f8d323a8062799",
+      "bytes": 141712
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-1280.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\released-ledger-right-1280.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "6881fbd562a8fc02dbe126714c81cc3a5cb320955c3e8a4954c45c1c2fbeb359",
+      "reviewVerdict": "pass",
+      "sha256": "6881fbd562a8fc02dbe126714c81cc3a5cb320955c3e8a4954c45c1c2fbeb359",
+      "destinationSha256": "6881fbd562a8fc02dbe126714c81cc3a5cb320955c3e8a4954c45c1c2fbeb359",
+      "bytes": 150063
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\released-ledger-right-1440.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\released-ledger-right-1440.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "66e76476e4bbfa4670c36b58ba52e2f815804a95d76470b10c9096784745b4fd",
+      "reviewVerdict": "pass",
+      "sha256": "66e76476e4bbfa4670c36b58ba52e2f815804a95d76470b10c9096784745b4fd",
+      "destinationSha256": "66e76476e4bbfa4670c36b58ba52e2f815804a95d76470b10c9096784745b4fd",
+      "bytes": 152002
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\right-columns-final\\verification.json",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\interaction\\supplement\\right-columns-final-verification.json",
+      "category": "interaction-verification",
+      "round": "right-columns-final",
+      "sha256": "d9bf03f478549d7271775d3af1571406b64b26697059c6665e30ea469ad4076a",
+      "destinationSha256": "d9bf03f478549d7271775d3af1571406b64b26697059c6665e30ea469ad4076a",
+      "bytes": 269
+    },
+    {
+      "source": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\notice-final\\verification.json",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\interaction\\supplement\\notice-final-verification.json",
+      "category": "interaction-verification",
+      "round": "notice-final",
+      "sha256": "aca9970b99999ff21bdbdefcabbe0d9db4e1452d2f59a3aaa268e49081722e01",
+      "destinationSha256": "aca9970b99999ff21bdbdefcabbe0d9db4e1452d2f59a3aaa268e49081722e01",
+      "bytes": 637
+    },
+    {
+      "source": "D:/crm本地项目开发/.tmp/remaining-issues-20260910/payroll-c2-central/right-columns-final/released-ledger-right-1024-final.png",
+      "destination": "D:\\crm本地项目开发\\docs\\design\\evidence\\issue-412-payroll-c2\\browser\\supplement\\released-ledger-right-1024-final.png",
+      "category": "browser",
+      "round": "right-columns-final",
+      "expected": "48a6f393209c29d48c56173b207cd75d50cd767c3537b06841655a34f9e70656",
+      "reviewVerdict": "pass",
+      "sha256": "48a6f393209c29d48c56173b207cd75d50cd767c3537b06841655a34f9e70656",
+      "destinationSha256": "48a6f393209c29d48c56173b207cd75d50cd767c3537b06841655a34f9e70656",
+      "bytes": 138845
+    }
+  ],
+  "resolution": {
+    "incompleteFrame": "released-ledger-right-1024.png",
+    "finalEvidence": "released-ledger-right-1024-final.png",
+    "note": "旧帧仍原样保留，不计有效成功证据；新帧关闭台账右端覆盖缺口。"
+  }
+}

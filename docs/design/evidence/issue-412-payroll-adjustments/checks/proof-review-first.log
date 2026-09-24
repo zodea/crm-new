@@ -1,0 +1,54 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --config .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.vitest.config.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.test.ts (3 tests | 2 failed) 4489ms
+   × 原实际事件新增矛盾分配后，缓存不得继续给完整净额 1762ms
+   × 同原图隔离旧B头不阻断合格现代工资和退款 1055ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.test.ts > 原实际事件新增矛盾分配后，缓存不得继续给完整净额
+AssertionError: expected 'complete' not to be 'complete' // Object.is equality
+ ❯ .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.test.ts:24:27
+     22|  let value
+     23|  try { value = await f.service.actualLedger(query,{projectId:f.project…
+     24|  expect(value.status).not.toBe('complete')
+       |                           ^
+     25| })
+     26|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  .tmp/remaining-issues-20260910/payroll-p4-central/b/proof-review.test.ts > 同原图隔离旧B头不阻断合格现代工资和退款
+ProjectRepositoryProblem: 迁入工资 wage_statements/null 的原行或证据已缺损，不能继续计算剩余
+ ❯ payrollProblem app/lib/payroll/central-contract.ts:108:10
+    106| }
+    107| export function payrollProblem(code: Parameters<typeof projectProblem>…
+    108|   return new ProjectRepositoryProblem({ ...projectProblem(code, messag…
+       |          ^
+    109| }
+    110|
+ ❯ check server/utils/payroll-migrated-proof.ts:97:13
+ ❯ verifyPhysical server/utils/payroll-migrated-proof.ts:118:7
+ ❯ loadPayrollMigratedProof server/utils/payroll-migrated-proof.ts:133:5
+ ❯ loadPayrollActualFacts server/utils/payroll-actual-facts.ts:16:20
+ ❯ server/utils/payroll-adjustment-service.ts:77:110
+ ❯ server/utils/payroll-service.ts:90:22
+ ❯ server/utils/quantity-test-instance.ts:142:26
+ ❯ app/lib/db/coordinator.ts:92:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  20:33:32
+   Duration  7.35s (transform 2.23s, setup 0ms, import 2.65s, tests 4.49s, environment 0ms)
+

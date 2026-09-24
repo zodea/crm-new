@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import type { InvoicePrintRequest } from '~/lib/invoice/print-layout'
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import { isAllGreen, resolveAttribution } from '~/lib/invoice/batch-pass'
 import { confidenceTier, isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
 import { invoiceDocStatus } from '~/lib/invoice/status'
-import { yuan } from '~/lib/util/money'
 
 const store = useInvoiceStore()
 const projectStore = useProjectStore()
@@ -11,16 +11,23 @@ const { success, warning, info, undoToast, confirm, promise } = useKitUI()
 
 // #60：单一校对工作台，上传、识别状态与字段校对在同一上下文完成。
 const searchText = shallowRef('')
-const workspaceFilter = shallowRef<'all' | 'recognizing' | 'suggested' | 'warning' | 'danger'>('all')
+const workspaceFilter = shallowRef<string[]>([])
 const selectedId = shallowRef<string | null>(null)
 // 子模式的 tab 定义随工具栏走（内联在工具栏那一条里，不再独占一行）
 const workspaceMode = shallowRef<'review' | 'print'>('review')
 const activePane = shallowRef<'queue' | 'source' | 'review'>('queue')
+const pendingPrint = shallowRef<InvoicePrintRequest | null>(null)
 const paneLabels = computed(() => ({
   queue: '队列',
   source: workspaceMode.value === 'print' ? '排版' : '原件',
   review: '校对',
 }))
+
+// 窄屏切到打印排版时直接展示排版面板，避免用户在“字段校对 → 打印排版”后再次追着切面板。
+watch(workspaceMode, (mode) => {
+  if (mode === 'print')
+    activePane.value = 'source'
+})
 
 /** 按项目名称查具体项目（归档写入用规范名，而非发票原始 OCR/自由文本，避免 project_id/project_name 各指不同项目）。 */
 function findProjectByName(name: string) {
@@ -259,11 +266,11 @@ const workspaceRows = computed(() =>
 const visibleWorkspaceRows = computed(() => {
   const keyword = searchText.value.trim().toLowerCase()
   return workspaceRows.value.filter(({ inv, status, suggested, confidence }) => {
-    const matchesFilter = workspaceFilter.value === 'all'
-      || (workspaceFilter.value === 'recognizing' && status === 'recognizing')
-      || (workspaceFilter.value === 'suggested' && suggested)
-      || (workspaceFilter.value === 'warning' && !suggested && status === 'unreviewed' && confidence === 'warn')
-      || (workspaceFilter.value === 'danger' && !suggested && status === 'unreviewed' && confidence === 'danger')
+    const matchesFilter = !workspaceFilter.value.length
+      || (workspaceFilter.value.includes('recognizing') && status === 'recognizing')
+      || (workspaceFilter.value.includes('suggested') && suggested)
+      || (workspaceFilter.value.includes('warning') && !suggested && status === 'unreviewed' && confidence === 'warn')
+      || (workspaceFilter.value.includes('danger') && !suggested && status === 'unreviewed' && confidence === 'danger')
     if (!matchesFilter)
       return false
     if (!keyword)
@@ -275,23 +282,29 @@ const visibleWorkspaceRows = computed(() => {
 
 const printableInvoices = computed(() => visibleWorkspaceRows.value.map(row => row.inv))
 
-async function handlePrint(payload: {
-  ids: string[]
-  rotations: Record<string, number>
-  pageCount: number
-  totalAmount: number
-}) {
-  await nextTick()
-  window.print()
-  const printed = await confirm({
-    title: '确认打印结果',
-    message: `系统打印窗口已关闭。是否已完成打印？\n\n${payload.ids.length} 张发票 · ${payload.pageCount} 页 A4 · 金额合计 ${yuan(payload.totalAmount)}`,
-    confirmLabel: '已打印',
-    cancelLabel: '取消',
-  })
-  if (!printed)
+async function handlePrint(payload: InvoicePrintRequest) {
+  if (pendingPrint.value)
     return
+  pendingPrint.value = payload
+  await nextTick()
+  try {
+    window.print()
+  }
+  catch {
+    pendingPrint.value = null
+    warning('系统打印窗口打开失败，请检查打印权限后重试')
+  }
+}
 
+function cancelPrint() {
+  pendingPrint.value = null
+}
+
+async function confirmPrint() {
+  const payload = pendingPrint.value
+  if (!payload)
+    return
+  pendingPrint.value = null
   try {
     const updated = await store.recordPrinted(payload.ids, payload.rotations)
     success(`已记录 ${updated} 张发票的打印次数`)
@@ -371,7 +384,10 @@ onMounted(() => {
           v-else
           v-model:selected-id="selectedId"
           :invoices="printableInvoices"
+          :print-confirmation="pendingPrint"
           @print="handlePrint"
+          @confirm-print="confirmPrint"
+          @cancel-print="cancelPrint"
         />
       </template>
 

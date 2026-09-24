@@ -1,0 +1,247 @@
+[
+  {
+    "width": 390,
+    "visibleRows": [
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+        "top": 605.5,
+        "bottom": 653.5,
+        "withinWorkspace": true
+      },
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+        "top": 653.5,
+        "bottom": 701.5,
+        "withinWorkspace": true
+      }
+    ],
+    "amounts": [
+      {
+        "text": "¥1,000.00",
+        "rects": [
+          {
+            "left": 261.8125,
+            "right": 324,
+            "top": 619.5,
+            "bottom": 639.5
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      },
+      {
+        "text": "¥200.00",
+        "rects": [
+          {
+            "left": 273.484375,
+            "right": 324,
+            "top": 667.5,
+            "bottom": 687.5
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      }
+    ],
+    "horizontal": {
+      "left": 884,
+      "maximum": 1183
+    }
+  },
+  {
+    "width": 768,
+    "visibleRows": [
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+        "top": 624,
+        "bottom": 672,
+        "withinWorkspace": true
+      },
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+        "top": 672,
+        "bottom": 720,
+        "withinWorkspace": true
+      }
+    ],
+    "amounts": [
+      {
+        "text": "¥1,000.00",
+        "rects": [
+          {
+            "left": 450.8125,
+            "right": 513,
+            "top": 638,
+            "bottom": 658
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      },
+      {
+        "text": "¥200.00",
+        "rects": [
+          {
+            "left": 462.484375,
+            "right": 513,
+            "top": 686,
+            "bottom": 706
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      }
+    ],
+    "horizontal": {
+      "left": 695,
+      "maximum": 805
+    }
+  },
+  {
+    "width": 1024,
+    "visibleRows": [
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+        "top": 623.734375,
+        "bottom": 671.734375,
+        "withinWorkspace": true
+      },
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+        "top": 671.734375,
+        "bottom": 719.734375,
+        "withinWorkspace": true
+      }
+    ],
+    "amounts": [
+      {
+        "text": "¥1,000.00",
+        "rects": [
+          {
+            "left": 683.046875,
+            "right": 745.234375,
+            "top": 637.734375,
+            "bottom": 657.734375
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      },
+      {
+        "text": "¥200.00",
+        "rects": [
+          {
+            "left": 694.71875,
+            "right": 745.234375,
+            "top": 685.734375,
+            "bottom": 705.734375
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      }
+    ],
+    "horizontal": {
+      "left": 673,
+      "maximum": 761
+    }
+  },
+  {
+    "width": 1280,
+    "visibleRows": [
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+        "top": 523,
+        "bottom": 571,
+        "withinWorkspace": true
+      },
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+        "top": 571,
+        "bottom": 619,
+        "withinWorkspace": true
+      }
+    ],
+    "amounts": [
+      {
+        "text": "¥1,000.00",
+        "rects": [
+          {
+            "left": 848.8125,
+            "right": 911,
+            "top": 537,
+            "bottom": 557
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      },
+      {
+        "text": "¥200.00",
+        "rects": [
+          {
+            "left": 860.484375,
+            "right": 911,
+            "top": 585,
+            "bottom": 605
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      }
+    ],
+    "horizontal": {
+      "left": 509,
+      "maximum": 509
+    }
+  },
+  {
+    "width": 1440,
+    "visibleRows": [
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+        "top": 479,
+        "bottom": 527,
+        "withinWorkspace": true
+      },
+      {
+        "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+        "top": 527,
+        "bottom": 575,
+        "withinWorkspace": true
+      }
+    ],
+    "amounts": [
+      {
+        "text": "¥1,000.00",
+        "rects": [
+          {
+            "left": 1008.8125,
+            "right": 1071,
+            "top": 493,
+            "bottom": 513
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      },
+      {
+        "text": "¥200.00",
+        "rects": [
+          {
+            "left": 1020.484375,
+            "right": 1071,
+            "top": 541,
+            "bottom": 561
+          }
+        ],
+        "lineCount": 1,
+        "insideCell": true
+      }
+    ],
+    "horizontal": {
+      "left": 349,
+      "maximum": 349
+    }
+  }
+]

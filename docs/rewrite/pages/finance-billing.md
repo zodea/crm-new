@@ -23,3 +23,11 @@
 1. 合同 lookup 按项目过滤且保存真实合同 ID。
 2. 金额、税率、税额修改后价税合计即时更新。
 3. 已提交记录刷新后字段、状态与附件保持。
+
+## 运行态对标与列表契约（2026-08-13）
+
+直接证据见 `runtime-reference-audit.md` 的 `R-FINANCE-FLOW-LIVE`。开票申请列表不是通用财务列表：桌面端使用“左侧开票状态树 + 单行搜索/工具栏 + 专属宽表 + 页尾金额汇总”。专属列至少包含开票申请名称、开票状态、开票分类、项目、收票单位、合同、申请日期、票种、款项类别、含税金额、税率、无税金额、税额和审批状态。
+
+列表读模型至少返回 `id/name/status/classification/project/customer/contract/applicationDate/invoiceType/paymentCategory/amount/taxRate/netAmount/taxAmount/approvalStatus`；关联对象遵循 [READ-MODELS.md](../READ-MODELS.md) 的来源感知引用与目标注册契约，不得只返回名称后由前端猜路由。`netAmount` 与 `taxAmount` 可由金额口径派生，但响应必须明确哪一项是含税金额，不能继续用通用 `amount` 列掩盖语义。
+
+名称主链接进入只读详情；详情按基础信息、申请信息、购方快照、开票记录、系统信息和附件平铺，编辑作为独立动作进入 `/finance/billing/:id`。2026-08-13 走查时发现通用列和名称进入编辑的差异；现由 [#413](https://github.com/zodea/crm-new/issues/413) 核实当前专属列、只读目标及返回上下文，不把历史样本数量当本轮验收。

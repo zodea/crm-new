@@ -11,6 +11,18 @@ describe('导入实体注册表', () => {
     expect(entity?.fields).toContainEqual(EXTERNAL_REF_FIELD)
   })
 
+  it('发票实体已登记：票号和价税合计必填，支持真实票据列名', () => {
+    const entity = getImportEntity('invoice')
+
+    expect(entity?.label).toBe('发票台账')
+    expect(entity?.fields.filter(field => field.required).map(field => field.key)).toEqual([
+      'invoiceNumber',
+      'totalAmount',
+    ])
+    expect(entity?.fields.find(field => field.key === 'projectName')?.aliases).toEqual(expect.arrayContaining(['使用工地']))
+    expect(entity?.fields).toContainEqual(expect.objectContaining({ key: 'externalRef', label: '外部旧ID / 匹配标识' }))
+  })
+
   it('项目实体已登记：项目名称必填、含外部旧ID 对账列', () => {
     const entity = getImportEntity('project')
 

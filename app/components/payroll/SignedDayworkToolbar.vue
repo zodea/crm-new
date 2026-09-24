@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import type { SignedDayworkFilter } from '~/lib/payroll/daywork'
+import type { SignedDayworkFilter, SignedDayworkStatus } from '~/lib/payroll/daywork'
 import type { PayrollWorkbenchOptions } from '~/lib/payroll/statements'
+import { computed } from 'vue'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 
 const props = defineProps<{
   filters: SignedDayworkFilter
@@ -13,6 +16,10 @@ const emit = defineEmits<{
 
 function patch(key: keyof SignedDayworkFilter, value: string) {
   emit('change', { ...props.filters, [key]: value })
+}
+const statuses = computed(() => Array.isArray(props.filters.status) ? props.filters.status : props.filters.status ? [props.filters.status] : [])
+function setStatuses(values: string[]) {
+  emit('change', { ...props.filters, status: values.filter((value): value is SignedDayworkStatus => ['draft', 'confirmed'].includes(value)) })
 }
 </script>
 
@@ -49,20 +56,8 @@ function patch(key: keyof SignedDayworkFilter, value: string) {
         </option>
       </select>
     </label>
-    <label class="field">
-      <span>确认状态</span>
-      <select
-        :value="filters.status"
-        @change="patch('status', ($event.target as HTMLSelectElement).value)"
-      >
-        <option value="">全部</option>
-        <option value="draft">待确认</option>
-        <option value="confirmed">已确认</option>
-      </select>
-    </label>
-    <p class="ml-auto max-w-96 text-right text-11px leading-5 text-ink-faint">
-      C2 只读取已确认记录；待确认记录不会进入工资草稿。
-    </p>
+    <KitMultiSelectFilter :model-value="statuses" label="确认状态" :options="[{ key: 'draft', label: '待确认' }, { key: 'confirmed', label: '已确认' }]" @update:model-value="setStatuses" />
+    <ContextHelp label="签工计入工资" text="仅已确认签工可计入工资草稿。" />
   </section>
 </template>
 

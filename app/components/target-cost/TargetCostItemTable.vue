@@ -16,7 +16,7 @@ const emit = defineEmits<{
 const columns: KitTableColumn[] = [
   { type: 'seq', title: '#', width: 52 },
   { field: 'category', title: '成本科目', width: 112, filterable: true },
-  { field: 'itemName', title: '分项名称', minWidth: 220 },
+  { field: 'itemName', title: '分项名称', minWidth: 220, slot: 'itemName' },
   { field: 'unit', title: '单位', width: 76 },
   { field: 'qty', title: '数量', width: 110, align: 'right' },
   { field: 'unitPrice', title: '单价', type: 'money', width: 132 },
@@ -55,6 +55,10 @@ const columns: KitTableColumn[] = [
         title: '当前版本尚无科目明细',
         description: '点击“编辑科目明细”，按成本科目补充预算行。',
       }"
-    />
+    >
+      <template #itemName="{ row }">
+        <span v-if="row.itemName">{{ row.itemName }}</span><span v-else class="text-ink-faint">未填写分项名称（历史记录）</span>
+      </template>
+    </KitTable>
   </section>
 </template>

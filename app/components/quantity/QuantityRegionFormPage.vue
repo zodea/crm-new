@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { onBeforeRouteLeave } from 'vue-router'
+import type { DataOriginDTO } from '~/types/read-model'
+import { onActivated, onDeactivated } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
+import KitButton from '~/components/ui/KitButton.vue'
 import { confirmQuantityRegionLeave } from '~/lib/quantity/region'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -7,6 +10,7 @@ const props = defineProps<{
   projectId: string
   returnSource?: 'quantity' | 'schedule'
   resumeSchedule?: boolean
+  origin?: DataOriginDTO | null
 }>()
 
 const store = useQuantityStore()
@@ -19,8 +23,10 @@ const buildingDraft = reactive({ code: '', name: '' })
 const floorDraft = reactive({ code: '', name: '' })
 const unitDraft = reactive({ code: '', name: '', templateId: '' })
 const savingKind = shallowRef<'building' | 'floor' | 'unit' | null>(null)
+const resumeFailed = shallowRef(false)
+let active = true
 
-const workspace = computed(() => store.regionWorkspace?.projectId === props.projectId
+const workspace = computed(() => props.origin !== null && store.regionOrigin === (props.origin ?? 'real') && store.regionWorkspace?.projectId === props.projectId
   ? store.regionWorkspace
   : null)
 const buildings = computed(() => workspace.value?.buildings ?? [])
@@ -35,13 +41,14 @@ const selectedFloor = computed(() =>
   floors.value.find(floor => floor.id === selectedFloorId.value) ?? null)
 const matrixPath = computed(() => ({
   path: '/subcontract/quantity',
-  query: { project: props.projectId },
+  query: { project: props.projectId, origin: props.origin ?? 'real' },
 }))
 const schedulePath = computed(() => ({
   path: '/schedule/new',
   query: {
     project: props.projectId,
     resume: props.resumeSchedule ? 'region' : undefined,
+    origin: props.origin ?? 'real',
   },
 }))
 const backPath = computed(() => props.returnSource === 'schedule'
@@ -52,7 +59,8 @@ const templatePath = computed(() => ({
   query: {
     project: props.projectId,
     return: 'region',
-    origin: props.returnSource === 'schedule' ? 'schedule' : undefined,
+    origin: props.origin ?? 'real',
+    from: props.returnSource === 'schedule' ? 'schedule' : undefined,
     resume: props.resumeSchedule ? 'region' : undefined,
   },
 }))
@@ -65,7 +73,7 @@ const hasDraft = computed(() => [
   unitDraft.name,
 ].some(value => value.trim()))
 const shellState = computed(() => {
-  if (!props.projectId)
+  if (!props.projectId || props.origin === null)
     return 'error'
   if (store.regionLoading && !workspace.value)
     return 'loading'
@@ -73,10 +81,12 @@ const shellState = computed(() => {
     return 'error'
   return 'ready'
 })
-const shellDescription = computed(() => props.projectId
-  ? store.regionError
-  : '请从工程量管理选择项目后再配置区域。')
-const locked = computed(() => Boolean(workspace.value?.matrixArchivedAt))
+const shellDescription = computed(() => props.origin === null
+  ? '工程量来源无效，请从项目列表重新打开。'
+  : props.projectId
+    ? store.regionError
+    : '请从工程量管理选择项目后再配置区域。')
+const locked = computed(() => !store.regionCanWrite || Boolean(workspace.value?.matrixArchivedAt))
 
 function normalizeSelection() {
   if (!buildings.value.some(building => building.id === selectedBuildingId.value))
@@ -88,10 +98,11 @@ function normalizeSelection() {
 }
 
 async function initialize() {
-  if (!props.projectId)
+  resumeFailed.value = false
+  if (!props.projectId || props.origin === null)
     return
   try {
-    await store.loadRegion(props.projectId)
+    await store.loadRegion(props.projectId, props.origin ?? 'real')
     normalizeSelection()
   }
   catch (cause) {
@@ -99,7 +110,10 @@ async function initialize() {
   }
 }
 
-watch(() => props.projectId, () => void initialize(), { immediate: true })
+watch(() => [props.projectId, props.origin], () => {
+  if (active)
+    void initialize()
+}, { immediate: true })
 watch([buildings, floors, templates], normalizeSelection)
 watch(selectedBuildingId, () => {
   selectedFloorId.value = floors.value[0]?.id ?? ''
@@ -168,12 +182,51 @@ async function createUnit() {
   }
 }
 
-onBeforeRouteLeave(() => confirmQuantityRegionLeave(hasDraft.value, () => confirm({
-  variant: 'simple',
-  title: '放弃未提交的区域输入',
-  message: '当前楼栋、楼层或户还有尚未提交的内容，确认离开？',
-  confirmLabel: '放弃输入',
-})))
+async function beforeLeave() {
+  if (store.regionSaving)
+    return false
+  const approved = await confirmQuantityRegionLeave(hasDraft.value, () => confirm({
+    variant: 'simple',
+    title: '放弃未提交的区域输入',
+    message: '当前楼栋、楼层或户还有尚未提交的内容，确认离开？',
+    confirmLabel: '放弃输入',
+  }))
+  if (approved) {
+    buildingDraft.code = ''
+    buildingDraft.name = ''
+    floorDraft.code = ''
+    floorDraft.name = ''
+    unitDraft.code = ''
+    unitDraft.name = ''
+  }
+  return approved
+}
+onBeforeRouteLeave(beforeLeave)
+onBeforeRouteUpdate(beforeLeave)
+let activated = false
+async function resumePermissions() {
+  try {
+    if (await store.revalidateRegion())
+      resumeFailed.value = false
+  }
+  catch {
+    resumeFailed.value = true
+  }
+}
+onActivated(async () => {
+  active = true
+  if (activated) {
+    if (hasDraft.value)
+      await resumePermissions()
+    else
+      await initialize()
+  }
+  activated = true
+})
+onDeactivated(() => {
+  active = false
+  store.cancelRegion()
+})
 
 useTabTitle(() => workspace.value
   ? `${workspace.value.projectName} · 区域配置`
@@ -202,22 +255,30 @@ useTabTitle(() => workspace.value
       <span v-if="workspace" class="chip-brand">
         {{ workspace.projectName }}<template v-if="workspace.projectCode"> · {{ workspace.projectCode }}</template>
       </span>
-      <span v-if="locked" class="status-warn">矩阵已归档</span>
+      <span v-if="workspace?.matrixArchivedAt" class="status-warn">矩阵已归档</span>
+      <span v-else-if="origin === 'demo'" class="status-warn">演示数据只读</span>
+      <span v-else-if="workspace && !store.regionCanWrite" class="status-warn">当前只读权限</span>
     </template>
 
     <template #actions>
-      <NuxtLink :to="matrixPath" class="btn-secondary">
+      <NuxtLink :to="matrixPath" class="btn-secondary ">
         打开工程量矩阵
       </NuxtLink>
       <NuxtLink
         v-if="workspace?.units.length"
         :to="schedulePath"
-        class="btn-primary"
+        class="btn-primary "
       >
         新建楼栋分组
       </NuxtLink>
     </template>
 
+    <div v-if="resumeFailed" class="panel flex flex-wrap items-center gap-2 p-4 text-12px text-danger" role="alert">
+      <span>{{ store.regionError || '当前权限暂时无法读取，输入已保留。' }}</span>
+      <KitButton variant="secondary" @click="resumePermissions">
+        重新核验权限
+      </KitButton>
+    </div>
     <div v-if="workspace" class="grid min-w-0 gap-4 lg:grid-cols-3">
       <section id="section-building" class="panel min-w-0 p-4">
         <header class="mb-3 flex items-center justify-between gap-2">
@@ -233,7 +294,7 @@ useTabTitle(() => workspace.value
         </header>
 
         <div class="mb-4 grid max-h-52 gap-2 overflow-y-auto" aria-label="楼栋列表">
-          <button
+          <KitButton
             v-for="building in buildings"
             :key="building.id"
             type="button"
@@ -246,7 +307,7 @@ useTabTitle(() => workspace.value
               <span class="block truncate font-mono text-10px text-ink-faint">{{ building.code }}</span>
             </span>
             <span v-if="building.id === selectedBuildingId" class="i-lucide-check text-brand" aria-hidden="true" />
-          </button>
+          </KitButton>
           <p v-if="!buildings.length" class="m-0 rounded bg-canvas px-3 py-4 text-center text-11px text-ink-faint">
             先新增第一栋楼
           </p>
@@ -261,9 +322,9 @@ useTabTitle(() => workspace.value
             显示名称
             <input v-model.trim="buildingDraft.name" class="field-input w-full" placeholder="如 1栋">
           </label>
-          <button type="submit" class="btn-primary justify-center" :disabled="locked || store.regionSaving">
+          <KitButton type="submit" variant="primary" class=" justify-center" :disabled="locked || store.regionSaving">
             {{ savingKind === 'building' ? '正在新增…' : '新增楼栋' }}
-          </button>
+          </KitButton>
         </form>
       </section>
 
@@ -281,7 +342,7 @@ useTabTitle(() => workspace.value
         </header>
 
         <div class="mb-4 grid max-h-52 gap-2 overflow-y-auto" aria-label="楼层列表">
-          <button
+          <KitButton
             v-for="floor in floors"
             :key="floor.id"
             type="button"
@@ -294,7 +355,7 @@ useTabTitle(() => workspace.value
               <span class="block truncate font-mono text-10px text-ink-faint">{{ floor.code }}</span>
             </span>
             <span v-if="floor.id === selectedFloorId" class="i-lucide-check text-brand" aria-hidden="true" />
-          </button>
+          </KitButton>
           <p v-if="!floors.length" class="m-0 rounded bg-canvas px-3 py-4 text-center text-11px text-ink-faint">
             {{ selectedBuilding ? '在当前楼栋新增楼层' : '先新增或选择楼栋' }}
           </p>
@@ -309,13 +370,13 @@ useTabTitle(() => workspace.value
             显示名称
             <input v-model.trim="floorDraft.name" class="field-input w-full" placeholder="如 1层">
           </label>
-          <button
+          <KitButton
             type="submit"
-            class="btn-primary justify-center"
+            variant="primary" class=" justify-center"
             :disabled="locked || !selectedBuildingId || store.regionSaving"
           >
             {{ savingKind === 'floor' ? '正在新增…' : '新增楼层' }}
-          </button>
+          </KitButton>
         </form>
       </section>
 
@@ -378,13 +439,13 @@ useTabTitle(() => workspace.value
               </option>
             </select>
           </label>
-          <button
+          <KitButton
             type="submit"
-            class="btn-primary justify-center"
+            variant="primary" class=" justify-center"
             :disabled="locked || !selectedFloorId || !unitDraft.templateId || store.regionSaving"
           >
             {{ savingKind === 'unit' ? '正在新增…' : '新增户' }}
-          </button>
+          </KitButton>
         </form>
       </section>
     </div>

@@ -1,0 +1,219 @@
+[
+  {
+    "number": 443,
+    "status": "local-done",
+    "solved": [
+      "中央版本列表、独立只读详情、整页新建和保存回读，以及建组中的工序库候选已接到同一中央来源。",
+      "任意可见旧版均可创建同编码下一版；已删除版本仍占编号，旧版本与既有排程快照保持不变。真实迁入样本已验证从 v1 生成 v3。",
+      "调序先逐条列出受影响前置关系，取消保稿，确认只置灰并保留原键；版本冲突需显式重新核对，响应丢失重试原命令。",
+      "建组第 2 步往返工序库后保留分组名、所选旧版和人工工期；切换页签不误询问放弃。列表同源刷新、失败与重试保留原表格及横滚。",
+      "完整旧库版本图受控迁入、原子确认与危险回滚拒绝已验证；权限、来源、并发、幂等和迟到结果保护均有回归。",
+      "源码冻结后同一批 3 条真实浏览器流程全部通过（54.6 秒），43 张交互图已逐张或按已审原图哈希核验；两份指南共 13 页已逐页检查。",
+      "最终完整 npm test 530 个文件、3227 项通过（185.41 秒）；类型、构建、64 个修改文件规范检查及 Standards/Spec 两轴复核均通过。新增详情的账本分类与精确数量断言已同步。",
+      "已独立提交 a0c06a527e3049188d75f162098cbf294d600dce；正常提交检查再次通过 530 个文件、3227 项测试（192.93 秒）。"
+    ],
+    "remaining": [
+      "本地切片已验收并独立提交，等待远端交付；尚未推送或部署。",
+      "中央 WBS 写入和当前可见库引用量已由 #444 完成本地验收；新增暂估绑定及来源更正由 #445 接通并验收。",
+      "独立工序库详情尚无一一对应的 DC 设计页，仍保留 design-pending；生产持久化和部署继续由 #416 验收。"
+    ],
+    "flow": [
+      "读取当前中央工序库",
+      "查看旧版或新建空白库",
+      "整页调整工序与工期",
+      "核对前置冲突并选择取消或置灰",
+      "保存同编码下一版本",
+      "冷刷新读取新版本",
+      "核实旧版本与原有快照保持不变"
+    ],
+    "exception": {
+      "at": 4,
+      "label": "保存失败或版本陈旧：保留草稿，核对原提交结果后重试",
+      "returnTo": 2
+    },
+    "screens": [
+      {
+        "title": "不可变版本列表与详情（已实际操作）",
+        "action": "从任意旧版本打开详情并选择基于此版本新建",
+        "result": "原版本保持只读；编号按同编码最高版本递增，删除编号不重用"
+      },
+      {
+        "title": "调序关系确认（已实际操作）",
+        "action": "查看前置与后置工序名称、编码，先取消，再确认置灰",
+        "result": "取消保持原稿；确认保留前置身份并置灰，不删除关系"
+      },
+      {
+        "title": "版本冲突与保存恢复（已实际操作）",
+        "action": "并发冲突后显式核对当前系列；响应丢失则重试原提交",
+        "result": "草稿保留，同一命令只产生一份新版本，冷刷新仍可读取"
+      },
+      {
+        "title": "建组与工序库往返（已实际操作）",
+        "action": "从第 2 步维护工序库，再返回新建楼栋分组",
+        "result": "分组名、所选 v1 与人工工期 13 天仍在，候选列表可见新 v2"
+      },
+      {
+        "title": "列表刷新与重试（已实际操作）",
+        "action": "切回已横滚的版本列表，等待失败后点重试刷新",
+        "result": "原表格和横滚位置保留，刷新期间及失败后禁写，成功重读才恢复"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-443/README.md",
+      "docs/design/evidence/issue-443/01-library-list-1440.png",
+      "docs/design/evidence/issue-443/04-reorder-conflict-390.png",
+      "docs/design/evidence/issue-443/05-saved-version-cold-refresh-1440.png",
+      "docs/design/evidence/issue-443/06-version-conflict-review-390.png",
+      "docs/design/evidence/issue-443/08-caller-draft-returned-1440.png",
+      "docs/design/evidence/issue-443/10-same-origin-refresh-failed-390.png",
+      "docs/design/evidence/issue-443/pdf/README.md",
+      "e2e/process-library-central.spec.ts"
+    ],
+    "questions": []
+  },
+  {
+    "number": 444,
+    "status": "local-done",
+    "solved": [
+      "中央 WBS 读写、合同与暂估建组、完整旧图迁入及首页同源进度已完成本地验收，并独立提交 ab056768ebf17dd3a2713bb6bc0df37dbb118ba6。",
+      "暂估 8/null 保留缺失，真实零及不同单位分开核对；冻结楼层不被当前模板或已隐藏分项回填、抹除。",
+      "调期取消、依赖置灰/恢复/独立移除、楼层人工微调、基线及任务增删已实际操作，普通保存不误删前置。",
+      "首页、排程、矩阵、户详情及合同清单来源往返保留同一项目、工序、阶段、楼栋、月份和视图，冷刷新仍可回到原位置。",
+      "独立 Spec 七项缺陷与 Standards 可见性、首次读取和窄屏问题均已修复；合同来源、父任务或阶段隐藏后，统计和当前依赖使用同一可见范围。",
+      "最终完整浏览器批次4项通过（49.4秒）；弹窗截图等待修正后暂估旅程另通过（27.1秒）。66张五档交互图逐张检查，三份指南18页PDF逐页检查。",
+      "最终完整 npm test 559 个文件、3476 项通过（179.98 秒）；类型、构建、100 个代码文件规范及独立 Standards/Spec 通过，旧组件适配边界回归已补齐。",
+      "正常提交检查再次通过559文件3476项（177.06秒）。本票586个临时文件共57,411,887字节已送入回收站，可恢复；66张正式截图和18页PDF证据保留在仓库。"
+    ],
+    "remaining": [
+      "本地切片已验收，远端交付尚待完成；未推送或部署。",
+      "新增暂估绑定已由 #445 完成本地验收；目标成本和工资仍归 #412，生产持久化及部署归 #416。"
+    ],
+    "flow": [
+      "选择当前授权项目",
+      "选择合同清单或内部暂估依据",
+      "核验每栋区域与分项，缺源先配置",
+      "选定工序库版本并调整计划",
+      "三步确认后保存中央分组",
+      "调整日期、依赖、楼层计划和基线",
+      "读取当前阶段进度并下钻工程量",
+      "返回同一工序与原筛选"
+    ],
+    "exception": {
+      "at": 4,
+      "label": "来源变化或保存失败：保留确认步骤与输入，重读后重新核对",
+      "returnTo": 3
+    },
+    "screens": [
+      {
+        "title": "选择计划依据（已实际操作）",
+        "action": "选择合同清单或内部暂估，核验逐栋范围；缺区域先配置后返回",
+        "result": "原建组输入保留，未知数量不填零，单位分别核对"
+      },
+      {
+        "title": "调期与依赖（已实际操作）",
+        "action": "取消一次冲突调期，再确认置灰，修复后恢复同一关系",
+        "result": "取消不写入，置灰保留身份；只改进度不误删前置"
+      },
+      {
+        "title": "进度下钻与返回（已实际操作）",
+        "action": "由首页同源进度打开工序、矩阵及户详情，再冷刷新返回",
+        "result": "保留同一项目、工序、阶段和筛选；不同阶段完成率不串用"
+      },
+      {
+        "title": "失响应恢复（已实际操作）",
+        "action": "确认页保留输入，核对原提交结果",
+        "result": "恢复相同提交编号，只生成一个分组，成功后可冷读"
+      }
+    ],
+    "evidence": [
+      "docs/research/issue-review-2026-09-11/schedule-tickets/02-central-wbs.md",
+      "docs/design/evidence/issue-444/README.md",
+      "docs/design/evidence/issue-444/contract/contract-step3-768.png",
+      "docs/design/evidence/issue-444/contract/dependency-recovery-390.png",
+      "docs/design/evidence/issue-444/contract/central-wbs-1440.png",
+      "docs/design/evidence/issue-444/contract/boq-floor-source-390.png",
+      "docs/design/evidence/issue-444/provisional/pending-command-768.png",
+      "docs/design/evidence/issue-444/provisional/home-central-readonly-390.png",
+      "docs/design/evidence/issue-444/provisional/home-source-readonly-1440.png",
+      "docs/design/evidence/issue-444/provisional/task-quantity-frozen-390.png",
+      "docs/design/evidence/issue-444/region/provisional-zero-missing-preview-768.png",
+      "docs/design/evidence/issue-444/pdf/README.md",
+      "e2e/schedule-central.spec.ts",
+      "e2e/wbs-migration.spec.ts"
+    ],
+    "questions": []
+  },
+  {
+    "number": 445,
+    "status": "local-done",
+    "solved": [
+      "已接通同项目合同选择、显式楼栋覆盖阻断、按稳定分项及单位核对差异、固定预览版本确认和绑定后冷刷新回读。",
+      "原冻结暂估 8/null 保留已知部分与缺项，真实零和不同单位分别核对；合同独有分项不会消失，差异不确定时不显示虚假零。",
+      "原中央合同清单的已确认导入行可沿整页更正楼栋证据，保存原因及审计后返回同一绑定；签证新增和资格不明的历史来源保持只读。",
+      "取消保留合同选择并恢复键盘焦点；陈旧预览需重新核对，失响应恢复同一提交编号及正文。缓存页签、来源路由与下拉选行的草稿身份已分别验证。",
+      "绑定仅改变原分组合同依据；原任务、依赖、人工计划、基线、冻结来源和完成事实保持不变。清单来源可回到原楼层计划，冷刷新仍保留上下文。",
+      "重复迁入保留绑定及楼栋更正，危险恢复由可信迁入基线保护；旧绑定历史缺少可信差异时明确标缺口，不以当前来源补造。",
+      "五档交互截图、实际浏览器分段验收、独立 Standards/Spec 复核和指南 PDF 15 页已归档；具体轮次、边界与多来源补验见独立验收记录。",
+      "最终完整 npm test 569 个文件、3543 项通过（191.30 秒）；类型、构建和本票规范检查通过。"
+    ],
+    "remaining": [
+      "本地限定切片已验收并独立提交 59d5c735；未推送或部署。",
+      "目标成本、工资及完整跨模块成本消费继续归 #412；中央测试边界不代表 #416 生产持久化已完成。",
+      "未新增解绑、换绑或拆分分组；该范围沿当前已定规格。"
+    ],
+    "flow": [
+      "打开未绑定的内部暂估分组",
+      "选择同项目施工合同",
+      "读取冻结暂估与当前显式覆盖",
+      "核对分项、单位和可计算差异",
+      "显式确认绑定",
+      "后台复验当前版本与关系",
+      "冷刷新回读合同依据",
+      "核实计划、暂估快照和完成事实不变"
+    ],
+    "exception": {
+      "at": 2,
+      "label": "合同缺覆盖：禁止确认并定位缺项，修正来源后返回重新预览",
+      "returnTo": 1
+    },
+    "screens": [
+      {
+        "title": "缺覆盖与来源更正（已实际操作）",
+        "action": "选择缺少显式楼栋的合同，进入原清单楼栋更正后返回",
+        "result": "明确阻止绑定，保留选择；只更正有确认导入依据的原行"
+      },
+      {
+        "title": "冻结数量与来源（已实际操作）",
+        "action": "横向核对冻结量、合同量、可比差异与稳定来源",
+        "result": "8/null、真实零和不同单位可辨；模板改量不重算已冻历史"
+      },
+      {
+        "title": "取消与异常恢复（已实际操作）",
+        "action": "键盘取消确认，再模拟来源陈旧及失响应",
+        "result": "取消保选择并回焦点；先重新核对，未决则恢复原提交，不重复绑定"
+      },
+      {
+        "title": "绑定冷读与楼层返回（已实际操作）",
+        "action": "刷新绑定依据，沿合同清单来源返回原楼层计划",
+        "result": "原任务、计划和完成事实保持不变，同一楼层及筛选仍可定位"
+      }
+    ],
+    "evidence": [
+      "docs/research/issue-review-2026-09-11/schedule-tickets/03-central-provisional-binding.md",
+      "docs/design/evidence/issue-445/README.md",
+      "docs/design/evidence/issue-445/browser/coverage-blocked-frozen-390.png",
+      "docs/design/evidence/issue-445/browser/building-evidence-draft-768.png",
+      "docs/design/evidence/issue-445/browser/comparison-lower-and-confirm-1440.png",
+      "docs/design/evidence/issue-445/browser/comparison-horizontal-sources-390.png",
+      "docs/design/evidence/issue-445/browser/stale-preview-retained-390.png",
+      "docs/design/evidence/issue-445/browser/unknown-command-retained-768.png",
+      "docs/design/evidence/issue-445/browser/bound-cold-read-1440.png",
+      "docs/design/evidence/issue-445/browser/original-floor-readonly-390.png",
+      "docs/design/evidence/issue-445/browser/signed-addition-readonly-768.png",
+      "docs/design/evidence/issue-445/browser/legacy-bound-readonly-390.png",
+      "docs/design/evidence/issue-445/pdf/README.md",
+      "e2e/schedule-binding-central.spec.ts"
+    ],
+    "questions": []
+  }
+]

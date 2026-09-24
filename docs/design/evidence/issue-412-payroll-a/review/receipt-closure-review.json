@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/payroll_a_receipt_closure",
+  "completedAt": "2026-09-13T06:13:35.9070736+08:00",
+  "fixedBase": "1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3",
+  "comparison": "Fixed-base WIP increment; base...HEAD contains no newer commits; tracked diff uses git diff base and new untracked P1 files were read directly.",
+  "scope": [
+    "Non-author closure of canonical command receipt / released A provenance",
+    "Central receipt column upgrade and replay preserving unknown originals",
+    "Frozen calculation price contents / complete crew scope",
+    "Receipt-only migration references and atomic dangerous restore rejection",
+    "A print host CSS isolation and component output"
+  ],
+  "standards": {
+    "unresolvedCount": 0,
+    "findings": [],
+    "note": "Earlier two-axis independent full reviews remain separate; this is the last bounded increment. No new documented-standard violation or material smell remains."
+  },
+  "spec": {
+    "unresolvedCount": 0,
+    "findings": [],
+    "note": "Confirmed crew-scope P2 was fixed by Root and independently rechecked; previous fingerprint / simultaneous source-price defects are closed in this reviewed increment."
+  },
+  "resolvedFindings": [
+    {
+      "locations": [
+        "app/lib/payroll/central-a-prices.ts:53",
+        "app/lib/payroll/central-a-prices.ts:61",
+        "server/utils/payroll-a-service.ts:152"
+      ],
+      "priority": 2,
+      "specSource": "DATABASE A prices: project/crew/leader/item/unit identity and overlap only within same subject; READ-MODELS A config binds full project/month/crew/leader scope.",
+      "title": "转组后旧班组价格误挡新价格，旧价格身份和读取范围未完整限定班组",
+      "redLog": "receipt-closure-cases.log",
+      "resolution": "Current configuration reads, overlap detection and prior priceId ownership all include crewId. Existing old crew rows remain unchanged; actual same-subject overlaps still reject.",
+      "evidence": "Independent public config/save then crew transfer then new independent price 210 failed against old crew price 200; original exact reproducer now green. Root added old priceId cross-crew denial and current-config scope assertions.",
+      "greenLogs": [
+        "receipt-closure-cases-green.log",
+        "receipt-closure-prices-final.log"
+      ]
+    }
+  ],
+  "testsRunByReviewer": [
+    {
+      "coverage": "original body fingerprint, missing-body replay, price-content damage, codec, public release/detail/output, existing price cases",
+      "log": "receipt-closure-regression.log",
+      "durationSeconds": 4.99,
+      "files": 4,
+      "passed": 15
+    },
+    {
+      "coverage": "6 canonical receipt restore cases + 7 existing migration protections + 1 print component",
+      "log": "receipt-closure-migration-print.log",
+      "durationSeconds": 10.78,
+      "files": 3,
+      "passed": 14
+    },
+    {
+      "coverage": "same unchanged independent public new-crew price reproducer, previously failed",
+      "log": "receipt-closure-cases-green.log",
+      "durationSeconds": 1.23,
+      "files": 1,
+      "passed": 1
+    },
+    {
+      "coverage": "final complete crew-scope read/write/identity assertions and same-subject overlap regression",
+      "log": "receipt-closure-prices-final.log",
+      "durationSeconds": 3.74,
+      "files": 1,
+      "passed": 6
+    }
+  ],
+  "boundaries": [
+    "No production files edited by reviewer; only bounded temporary reproduction/config and this review evidence were written.",
+    "No service reset or write, no browser E2E, no full npm test/typecheck/build, no git commit/push or cloud CI.",
+    "Print review checked final CSS host selector and component behavior. Browser/PDF visual evidence belongs to C/Root, not claimed as reviewer-run.",
+    "Hashes identify whole file bytes, not a claim that every unrelated line was reviewed. Related support portions: central-read first125, statements first240, payroll-migration restore guard, print E2E region, existing CSS print/background matches and relevant authority sections.",
+    "Full P1 acceptance remains Root final integration/E2E/typecheck/full-test/build/documentation responsibility."
+  ],
+  "issueRead": {
+    "method": "Fresh read-only gh after sandbox proxy refused; no publication.",
+    "state": "OPEN",
+    "updatedAt": "2026-09-12T08:01:45Z",
+    "comments": 4,
+    "number": 412
+  },
+  "files": [
+    {
+      "sha256": "ffdf17b04e6f494cfb09317915d70510bdc50c9ef7f516bd7e1bd46d90509576",
+      "path": "CONTEXT.md"
+    },
+    {
+      "sha256": "752dd05bac451d520488278be73478c93887a44b6ecb54dd598babeb2aa91354",
+      "path": "docs/agents/issue-tracker.md"
+    },
+    {
+      "sha256": "5ff7e3485554a8bcd60cb87636fe3e8c4aabd2015781bc027911df583b691898",
+      "path": "docs/research/issue-review-2026-09-11/payroll-tickets/01-central-a-payroll.md"
+    },
+    {
+      "sha256": "229e192eee64251bc08f6c9b455e0b326bc2b30b353bccbadd25a792f748f32c",
+      "path": "docs/rewrite/DATABASE.md"
+    },
+    {
+      "sha256": "3ef37e16b22f6f7568dc02a7cc115decca5a539bb6b2e6dd773db3d33f9e71f6",
+      "path": "docs/rewrite/COMMANDS.md"
+    },
+    {
+      "sha256": "9494aad1b9434dbdb4f184dc294a9cb601bd734806834ec4f48a4b9b6e5283d9",
+      "path": "docs/rewrite/READ-MODELS.md"
+    },
+    {
+      "sha256": "576653b68a3ac654de358c8647fea4619bebb6f8cf05cfc4a043ae693e3e689c",
+      "path": "app/lib/payroll/central-a-provenance.ts"
+    },
+    {
+      "sha256": "d4eaff6f0018e732068384d0ef26d9b686104ab782df35a7fcf9c3b37b74dac7",
+      "path": "app/lib/payroll/central-a-command.ts"
+    },
+    {
+      "sha256": "e12892675928cee4a5f4caa6e536df49a748928c3cc3b8f599aaf0849acab0ec",
+      "path": "app/lib/payroll/central-a-prices.ts"
+    },
+    {
+      "sha256": "bbe536a9668581de5a976eb08117e59f85851f36e6caf52f1178154d5af16dfe",
+      "path": "app/lib/payroll/central-a-calculation.ts"
+    },
+    {
+      "sha256": "d53021e42406e7c30dff2cc77a4845bdfd3397ceb01193c9451903e55642a822",
+      "path": "app/lib/payroll/central-a-codec.ts"
+    },
+    {
+      "sha256": "4511fc80f6b125b7d51d4341cb3f3babe83d82c5f8e34c59c0c1469ccbf8911e",
+      "path": "app/lib/payroll/central-a-contract.ts"
+    },
+    {
+      "sha256": "7219f47c71595d77c0e2291ed18b23df006ea485be9177cf8951a1c9baa3b576",
+      "path": "app/lib/payroll/central-schema.ts"
+    },
+    {
+      "sha256": "c5f3a099df5d80af833abc0ff49c87ed0ec0261344718b32feaff1a788cf920c",
+      "path": "app/lib/payroll/central-read.ts"
+    },
+    {
+      "sha256": "63ca0c3aa620d8365d0df472dd816a614ef3e0f847f522c2e4e4bc0386bff58a",
+      "path": "app/lib/payroll/central-snapshot.ts"
+    },
+    {
+      "sha256": "9190c7f6f8aad6879498b30ebc87b18ba06db9bdeed347d2909f33a2da675993",
+      "path": "app/lib/payroll/central-contract.ts"
+    },
+    {
+      "sha256": "5c6bbea6303d3b5fa2bd5d2fc3c71729aa82738bcf4405356426d9a29fabee50",
+      "path": "app/lib/payroll/statements.ts"
+    },
+    {
+      "sha256": "fa3d10df9792035cccb917e88006b86b82d4846bdb605ef959e86dec0a4458b5",
+      "path": "server/utils/payroll-a-service.ts"
+    },
+    {
+      "sha256": "0d38a746b6be8d51f04073fa69bb82ce1503336e9864964032e390de2712372d",
+      "path": "server/utils/payroll-service.ts"
+    },
+    {
+      "sha256": "2454e6d3a2ea451306256ddb12323490ef636254142ed50aa9ec46270624df76",
+      "path": "server/utils/payroll-migration.ts"
+    },
+    {
+      "sha256": "c99e5dd410ef27857a24e6f5c1824725268e057355038c51caf915967ad580dc",
+      "path": "server/utils/payroll-a-migration-references.ts"
+    },
+    {
+      "sha256": "7a4383269bb60bd45b0593597c1d6f8616e604c94320c1fbb88f7c178776b7c4",
+      "path": "app/components/payroll/PayrollAFrozenPrint.vue"
+    },
+    {
+      "sha256": "a815ad54f2ee9b1244ef4427e0f580939a8a1dd7c0002e175501f883a15ed01a",
+      "path": "app/components/payroll/PayrollPrintSheet.vue"
+    },
+    {
+      "sha256": "4fefe976e4a22f45c71031daa60d71ecb895373a44dea40742144f7e529ff9c8",
+      "path": "app/assets/css/tokens.css"
+    },
+    {
+      "sha256": "0fcc8fe6fc9ebedc6f6aaad72fe018bbc56439a78839f9110ed26b3db1a0de37",
+      "path": "app/assets/css/vxe-theme.css"
+    },
+    {
+      "sha256": "bc6b96161d27a5021fe723ab8e4d6e17f3b768769a9d44384e15f10da303488f",
+      "path": "e2e/payroll-a-central.spec.ts"
+    },
+    {
+      "sha256": "9cee4a0bb05c209e82cbd529d6f3edc44211a551aefddd10631e4a60c8a29456",
+      "path": "vitest.config.ts"
+    },
+    {
+      "sha256": "dbc3ebdfec68418f9e45248fb88fe35ae20087dce6fc9968fb024677583bb194",
+      "path": "tests/helpers/payroll-a-service-fixture.ts"
+    },
+    {
+      "sha256": "c69a6ce29b4d01a39af90704ba3a7a705ddb16ec801e67e3ae9af159ed8898e3",
+      "path": "tests/payroll/central-a-provenance.test.ts"
+    },
+    {
+      "sha256": "ec22b22be4dffc243ace1396da389386e1c1abada99601b815a59aa8d144e6a7",
+      "path": "tests/payroll/central-a-codec.test.ts"
+    },
+    {
+      "sha256": "e1d26265a2c9a773f8d1671b14fbb58dc0825971f25a402b8af8d76563fce4c9",
+      "path": "tests/payroll/central-a-commands.test.ts"
+    },
+    {
+      "sha256": "24f57d1ee36dc0df7b603cb5dd6df5d23daea80ad09f443857346cbf09760f93",
+      "path": "tests/payroll/central-a-prices.test.ts"
+    },
+    {
+      "sha256": "b574c91db1ea744d772182d3e813ae5236fb18902b73bc8898b1b15d500c4663",
+      "path": "tests/payroll/central-a-http.test.ts"
+    },
+    {
+      "sha256": "4432a90b28a9718397ee1c2840ef3966501635bbc9aa8664b8e94304f0c37021",
+      "path": "tests/payroll/central-a-service.test.ts"
+    },
+    {
+      "sha256": "6e3d3daee745cc1ef9f5483f9d4249bae7ac39be192a8672bd85670030cb75a7",
+      "path": "tests/payroll/central-a-transactions.test.ts"
+    },
+    {
+      "sha256": "94736ee6d4a001fdb007b6284758ee81bc85cf9afe9ca4658d1bed9c2c9a48dd",
+      "path": "tests/payroll/a-migration-protection.test.ts"
+    },
+    {
+      "sha256": "f48e1d9361fa107943f2a36461d669fa611a06a08a37d7c426f9f9fc51cf129c",
+      "path": "tests/payroll/a-receipt-migration.test.ts"
+    },
+    {
+      "sha256": "f71da9c65ff160b0bd170b45e2e6bfceca845b4a177b8fef126410cbc35c8ccb",
+      "path": "tests/components/PayrollAFrozenPrint.test.ts"
+    },
+    {
+      "path": "app/components/payroll/PayrollASourceReturn.vue",
+      "sha256": "c2a1161b0f7f3fc5027e6e5174cc85e80fcc91b72d14b829d86f953d2765c788"
+    },
+    {
+      "path": "app/components/payroll/PayrollASourceReview.vue",
+      "sha256": "feeca72af54797963a0a13d55625bd3b6097f2c28561aab388dfff53c19f0855"
+    },
+    {
+      "path": "tests/components/PayrollASourceReturn.test.ts",
+      "sha256": "e090d1c2740836cb62975ec9c7a5f9b34e5bbe88f9d2f65b09048ea762818045"
+    },
+    {
+      "path": "tests/components/PayrollASourceReview.test.ts",
+      "sha256": "3c180ef2ba78a1241cdbaec34643578f667caa4427551427feabc27d9b3503ea"
+    },
+    {
+      "path": "app/types/read-model.ts",
+      "sha256": "0f61ba22d40cc1b98c12d977fa155e8acc12207731b662df3e2587b1dbe0f81e"
+    },
+    {
+      "path": "app/lib/payroll/a-navigation.ts",
+      "sha256": "1d725e20deb7d0d5e67c2006b236cc932cfa3bf501b06cd8ce48ca212a29f257"
+    }
+  ],
+  "supportingFiles": [
+    {
+      "sha256": "4726716d50ff5e4fabe888eb89d991257410560c0edda6ec6a1ece6b2f0601b5",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/a/owned-files.json"
+    },
+    {
+      "sha256": "b14f38e3e8a4ab3065c7a4ac921ad31d0972655726e8428dbebfb31989b62eb0",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/b/validation.json"
+    },
+    {
+      "sha256": "945538d8b632d9244da2a02bc9e6f0d821c5a875f1e9ceda0fff993f242415aa",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/root/receipt-closure-cases.test.ts"
+    },
+    {
+      "sha256": "9514eeb04d44f4f8bb31a1895b7befea9ed35d9d827cb07fa875b82fdedec98a",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/root/receipt-closure-vitest.config.ts"
+    },
+    {
+      "sha256": "bfd3544ae772c9b1af58309cae35d4f09a4badf53675d49d8d5ee315462ccbf9",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/root/receipt-closure-cases.log"
+    },
+    {
+      "sha256": "653d7d935d8d83355e9f28040d9ed618d83d87d3b2cb8c6423f55c539532e294",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/root/receipt-closure-cases-green.log"
+    },
+    {
+      "sha256": "aabe878db7e1f0c7686b76a454040985db6e3273103a76ad09fb75e024ad1cd5",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/root/receipt-closure-regression.log"
+    },
+    {
+      "sha256": "e5d045d363c27844ba4fadbdc5a32d8b271ed213dc1977c27aa6584345557e64",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/root/receipt-closure-migration-print.log"
+    },
+    {
+      "sha256": "b6177ea7e9b7ad8572bbe7632f742d5aaa26f168017bad9ae0ee9f895123137b",
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/root/receipt-closure-prices-final.log"
+    },
+    {
+      "sha256": "1b992e1c027dde38e7958644f4d24226178191adfb352dadf0ff0f996cbd34fd",
+      "path": "C:/Users/Administrator/.agents/skills/code-review-matt/SKILL.md"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/ui/source-kind-final.log",
+      "sha256": "1adb50a05d1e66e6082dab84e582b2470606ddf8e9e744cca73ffc723f307875"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-a-central/ui/source-kind-final-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "navigationClosure": {
+    "result": "No new finding. Both source guards now explicitly permit entity-detail/entity-subview/source-record before reading subject and filters. unavailable, entity-list, same-route-overlay fall through without accessing absent properties.",
+    "preserved": [
+      "resolved quantity-unit subject",
+      "current stable unit ID",
+      "project and data origin match for diagnostic return",
+      "original statement/draft target",
+      "per-source stage and completion identity for focus",
+      "existing load/permission failure state"
+    ],
+    "authorValidationReadByReviewer": {
+      "log": "ui/source-kind-final.log",
+      "files": 2,
+      "durationSeconds": 3.3,
+      "rerunByReviewer": false,
+      "tests": 5,
+      "lint": "ui/source-kind-final-lint.log exit0 for 2 files"
+    },
+    "coverage": "Reviewed both source components and adjacent NavigationIntentDTO/return-context contracts. This addendum does not claim whole navigation registry review."
+  }
+}

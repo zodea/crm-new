@@ -1,14 +1,113 @@
 import type { KitTableColumn } from '~/lib/kit/table'
+import type { OwnerCommercialDocumentListItemDTO } from '~/lib/owner-document/central-repository'
 import type {
   OwnerDocumentKind,
   OwnerDocumentListRecord,
 } from '~/lib/owner-document/forms'
+import { normalizeEnumSelection } from '~/lib/util/enum-selection'
+
+export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocumentListItemDTO): OwnerDocumentListRecord {
+  const settlementAmounts = item.amounts.kind === 'sub_settlement' ? item.amounts : null
+  const itemAmounts = item.amounts.kind === 'sub_settlement'
+    ? { amount: Number(item.amounts.total), secondaryAmount: 0, tertiaryAmount: 0 }
+    : item.amounts.kind === 'owner_change'
+      ? {
+          amount: Number(item.amounts.taxInclusive),
+          secondaryAmount: Number(item.amounts.taxExclusive),
+          tertiaryAmount: Number(item.amounts.appliedTaxExclusive),
+        }
+      : item.amounts.kind === 'sub_change'
+        ? {
+            amount: Number(item.amounts.approved),
+            secondaryAmount: item.amounts.actualApproved === null ? null : Number(item.amounts.actualApproved),
+            tertiaryAmount: 0,
+          }
+        : item.amounts.kind === 'owner_report'
+          ? {
+              amount: Number(item.amounts.reported),
+              secondaryAmount: Number(item.amounts.audited ?? 0),
+              tertiaryAmount: Number(item.amounts.difference ?? 0),
+            }
+          : item.amounts.kind === 'final_settlement'
+            ? {
+                amount: Number(item.amounts.declared),
+                secondaryAmount: Number(item.amounts.audited ?? 0),
+                tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
+              }
+            : (item.amounts.kind === 'owner_penalty' || item.amounts.kind === 'project_penalty')
+                ? {
+                    amount: Number(item.amounts.amount),
+                    secondaryAmount: 0,
+                    tertiaryAmount: 0,
+                  }
+                : {
+                    amount: Number(item.amounts.contractEstimate),
+                    secondaryAmount: 0,
+                    tertiaryAmount: 0,
+                  }
+  const acceptanceFields = item.acceptanceView?.variant === 'acceptance'
+    ? {
+        viewVariant: 'acceptance' as const,
+        acceptanceOrganization: item.acceptanceView.organization,
+        acceptancePerson: item.acceptanceView.person,
+        acceptanceConclusion: item.acceptanceView.conclusion,
+      }
+    : item.acceptanceView?.variant === 'warranty'
+      ? {
+          viewVariant: 'warranty' as const,
+          warrantyOwner: item.acceptanceView.owner,
+          warrantyStartDate: item.acceptanceView.startDate ?? '',
+          warrantyEndDate: item.acceptanceView.endDate ?? '',
+          warrantyConfirmationOrganization: item.acceptanceView.confirmationOrganization ?? '',
+          warrantyConfirmationDate: item.acceptanceView.confirmationDate ?? '',
+          warrantyConfirmationNote: item.acceptanceView.confirmationNote,
+        }
+      : {}
+  return {
+    id: item.id,
+    no: item.no,
+    name: item.name,
+    noticeNo: item.ownerPenaltyFacts?.noticeNo,
+    projectId: item.project.state === 'resolved' ? item.project.id : null,
+    projectName: item.project.state === 'resolved' ? item.project.label : '',
+    contractId: item.contract.state === 'resolved' ? item.contract.id : null,
+    contractName: item.contract.state === 'resolved' ? item.contract.label : '',
+    supplierId: item.supplier.state === 'resolved' ? item.supplier.id : null,
+    supplierName: item.supplier.state === 'resolved' ? item.supplier.label : '',
+    crewId: item.crew?.state === 'resolved' ? item.crew.id : null,
+    crewName: item.crew?.state === 'resolved' ? item.crew.label : '',
+    type: item.documentType,
+    period: item.periodNo,
+    ...itemAmounts,
+    ...(item.amounts.kind === 'project_penalty' ? { secondaryAmount: Number(item.amounts.deducted), tertiaryAmount: Number(item.amounts.remaining) } : {}),
+    ...(settlementAmounts
+      ? Object.fromEntries((['deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid'] as const).map((key) => {
+          const value = settlementAmounts[key]
+          return [key, value == null ? null : Number(value)]
+        }))
+      : {}),
+    projectNavigation: item.projectNavigation,
+    contractNavigation: item.contractNavigation,
+    supplierNavigation: item.supplierNavigation,
+    quantity: item.amounts.kind === 'sub_change' && item.amounts.changedArea != null
+      ? Number(item.amounts.changedArea)
+      : null,
+    date: item.acceptanceView?.variant === 'acceptance'
+      ? item.acceptanceView.date ?? ''
+      : item.acceptanceView?.variant === 'warranty'
+        ? item.acceptanceView.confirmationDate ?? item.acceptanceView.endDate ?? item.acceptanceView.startDate ?? ''
+        : item.applicationDate ?? '',
+    status: item.status,
+    attachmentCount: item.attachmentCount ?? 0,
+    ...acceptanceFields,
+  }
+}
 
 export interface OwnerDocumentListFilters {
   search: string
   project: string
-  type: string
-  statusView: string
+  type: string | string[]
+  statusView: string | string[]
   routeProject?: string
   routeContract?: string
   routeSupplier?: string
@@ -66,6 +165,56 @@ const STATUS_COLUMN: KitTableColumn = {
   slot: 'status',
 }
 
+export const OWNER_ACCEPTANCE_LIST_COLUMNS: Record<'acceptance' | 'warranty', KitTableColumn[]> = {
+  acceptance: [
+    SEQ_COLUMN,
+    { field: 'no', title: '验收编号', width: 150, fixed: 'left', slot: 'document' },
+    { field: 'name', title: '验收项目', minWidth: 210 },
+    PROJECT_COLUMN,
+    { ...CONTRACT_COLUMN, title: '施工合同' },
+    { field: 'acceptanceOrganization', title: '验收单位', minWidth: 200 },
+    { field: 'acceptancePerson', title: '验收人', width: 120 },
+    { field: 'date', title: '验收日期', type: 'date', width: 116 },
+    { field: 'amount', title: '合同估算', type: 'money', width: 142 },
+    { field: 'acceptanceConclusion', title: '验收结论', minWidth: 180 },
+    { field: 'attachmentCount', title: '附件', width: 82, align: 'right' },
+    STATUS_COLUMN,
+    ACTION_COLUMN,
+  ],
+  warranty: [
+    SEQ_COLUMN,
+    { field: 'no', title: '验收编号', width: 150, fixed: 'left', slot: 'document' },
+    { field: 'name', title: '保修项目', minWidth: 210 },
+    PROJECT_COLUMN,
+    { ...CONTRACT_COLUMN, title: '施工合同' },
+    { field: 'warrantyOwner', title: '保修责任单位', minWidth: 190 },
+    { field: 'warrantyStartDate', title: '保修开始', type: 'date', width: 116 },
+    { field: 'warrantyEndDate', title: '保修结束', type: 'date', width: 116 },
+    { field: 'warrantyConfirmationOrganization', title: '到期验收单位', minWidth: 180 },
+    { field: 'warrantyConfirmationDate', title: '确认日期', type: 'date', width: 116 },
+    { field: 'amount', title: '合同估算', type: 'money', width: 142 },
+    { field: 'warrantyConfirmationNote', title: '到期确认说明', minWidth: 190 },
+    { field: 'attachmentCount', title: '附件', width: 82, align: 'right' },
+    STATUS_COLUMN,
+    ACTION_COLUMN,
+  ],
+}
+
+export const OWNER_ACCEPTANCE_LIST_VIEWS: Record<'acceptance' | 'warranty', OwnerDocumentListView[]> = {
+  acceptance: [
+    { key: 'all', label: '全部' },
+    { key: 'checking', label: '验收中' },
+    { key: 'accepted', label: '已验收' },
+    { key: 'warranty', label: '保修中' },
+    { key: 'expired', label: '已到期' },
+  ],
+  warranty: [
+    { key: 'all', label: '全部' },
+    { key: 'warranty', label: '保修中' },
+    { key: 'expired', label: '已到期' },
+  ],
+}
+
 export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocumentListConfig> = {
   owner_change: {
     columns: [
@@ -82,7 +231,7 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
       STATUS_COLUMN,
       ACTION_COLUMN,
     ],
-    searchFields: ['no', 'name', 'projectName', 'contractName'],
+    searchFields: ['no', 'name', 'projectName', 'contractName', 'acceptanceConclusion', 'warrantyConfirmationNote'],
     searchPlaceholder: '搜索变更编号 / 名称 / 施工合同',
     typeLabel: '类型',
     showTypeFilter: true,
@@ -131,31 +280,15 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
     ],
   },
   acceptance: {
-    columns: [
-      SEQ_COLUMN,
-      { field: 'no', title: '单据编号', width: 150, fixed: 'left', slot: 'document' },
-      { field: 'type', title: '类型', width: 116, slot: 'type' },
-      { field: 'name', title: '名称', minWidth: 220 },
-      PROJECT_COLUMN,
-      { ...CONTRACT_COLUMN, title: '施工合同' },
-      { field: 'date', title: '日期', type: 'date', width: 116 },
-      STATUS_COLUMN,
-      { field: 'amount', title: '涉及金额', type: 'money', width: 142 },
-      ACTION_COLUMN,
-    ],
+    columns: OWNER_ACCEPTANCE_LIST_COLUMNS.acceptance,
     searchFields: ['no', 'name', 'projectName', 'contractName'],
     searchPlaceholder: '搜索单据编号 / 名称 / 项目',
     typeLabel: '类型',
-    showTypeFilter: true,
-    views: [
-      { key: 'all', label: '全部' },
-      { key: 'checking', label: '验收中' },
-      { key: 'warranty', label: '保修中' },
-      { key: 'done', label: '已验收' },
-    ],
-    defaultView: 'checking',
-    countLabel: '验收单数',
-    amountSummaries: [{ field: 'amount', label: '涉及金额总和' }],
+    showTypeFilter: false,
+    views: OWNER_ACCEPTANCE_LIST_VIEWS.acceptance,
+    defaultView: 'all',
+    countLabel: '生命周期记录数',
+    amountSummaries: [{ field: 'amount', label: '合同估算金额总和' }],
   },
   final_settlement: {
     columns: [
@@ -200,10 +333,10 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
     showTypeFilter: false,
     views: [
       { key: 'all', label: '全部' },
-      { key: 'appealing', label: '申诉中' },
-      { key: 'confirmed', label: '已确认' },
+      { key: 'draft', label: '草稿' },
+      { key: 'submitted', label: '已提交' },
     ],
-    defaultView: 'appealing',
+    defaultView: 'all',
     countLabel: '罚扣单数',
     amountSummaries: [{ field: 'amount', label: '罚扣金额总和' }],
   },
@@ -228,12 +361,12 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
     showTypeFilter: true,
     views: [
       { key: 'all', label: '全部' },
-      { key: 'approved', label: '已签证' },
-      { key: 'submitted', label: '已上报' },
+      { key: 'approved', label: '已审批' },
+      { key: 'submitted', label: '已提交' },
       { key: 'draft', label: '草稿' },
-      { key: 'rejected', label: '已打回' },
+      { key: 'rejected', label: '已退回' },
     ],
-    defaultView: 'approved',
+    defaultView: 'all',
     countLabel: '变更单数',
     amountSummaries: [
       { field: 'amount', label: '审批金额总和' },
@@ -249,7 +382,13 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
       CONTRACT_COLUMN,
       { field: 'supplierName', title: '乙方（分供方）', minWidth: 180, slot: 'supplier' },
       { field: 'type', title: '结算类型', width: 112, slot: 'type' },
-      { field: 'amount', title: '结算金额', type: 'money', width: 142 },
+      { field: 'amount', title: '含税结算额', type: 'money', width: 142 },
+      { field: 'deductions', title: '奖罚抵扣', type: 'money', width: 142 },
+      { field: 'netSettlement', title: '本次结算净额', type: 'money', width: 142 },
+      { field: 'cumulativeApplied', title: '累计申请付款', type: 'money', width: 142 },
+      { field: 'remainingApplicable', title: '剩余可申请', type: 'money', width: 142 },
+      { field: 'cumulativePaid', title: '累计已付', type: 'money', width: 142 },
+      { field: 'remainingUnpaid', title: '剩余未付', type: 'money', width: 142 },
       { field: 'date', title: '结算日期', type: 'date', width: 116 },
       STATUS_COLUMN,
       ACTION_COLUMN,
@@ -276,6 +415,9 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
       CONTRACT_COLUMN,
       { field: 'supplierName', title: '乙方', minWidth: 180, slot: 'supplier' },
       { field: 'amount', title: '罚扣金额', type: 'money', width: 142 },
+      { field: 'secondaryAmount', title: '累计已抵扣', type: 'money', width: 142 },
+      { field: 'tertiaryAmount', title: '剩余可抵扣', type: 'money', width: 142 },
+      { field: 'type', title: '抵扣方式', width: 120 },
       { field: 'date', title: '日期', type: 'date', width: 116 },
       STATUS_COLUMN,
       ACTION_COLUMN,
@@ -314,19 +456,11 @@ export function ownerDocumentStatusViewKey(
   if (kind === 'acceptance') {
     if (value === 'submitted')
       return 'checking'
-    if (value === 'warranty')
-      return 'warranty'
-    if (['accepted', 'expired'].includes(value))
-      return 'done'
+    if (['accepted', 'warranty', 'expired'].includes(value))
+      return value
   }
   if (kind === 'final_settlement')
     return ['audited', 'approved', 'confirmed'].includes(value) ? 'done' : 'doing'
-  if (kind === 'owner_penalty') {
-    if (value === 'confirmed')
-      return 'confirmed'
-    if (['submitted', 'rejected'].includes(value))
-      return 'appealing'
-  }
   if (kind === 'sub_settlement') {
     if (['confirmed', '已确认'].includes(value))
       return 'confirmed'
@@ -351,11 +485,13 @@ export function filterOwnerDocumentRows(
   return rows.filter((row) => {
     if (filters.project !== 'all' && row.projectId !== filters.project)
       return false
-    if (filters.type !== 'all' && row.type !== filters.type)
+    const types = normalizeEnumSelection(filters.type)
+    const statuses = normalizeEnumSelection(filters.statusView)
+    if (types.length && !types.includes(row.type))
       return false
     if (
-      filters.statusView !== 'all'
-      && ownerDocumentStatusViewKey(kind, row.status) !== filters.statusView
+      statuses.length
+      && !statuses.includes(ownerDocumentStatusViewKey(kind, row.status))
     ) {
       return false
     }
@@ -387,8 +523,9 @@ export function ownerDocumentStatusLabelForList(
     acceptance: {
       draft: '草稿',
       checking: '验收中',
-      done: normalized(status) === 'expired' ? '已到期' : '已验收',
+      accepted: '已验收',
       warranty: '保修中',
+      expired: '已到期',
     },
     final_settlement: {
       doing: normalized(status) === 'draft' ? '编制中' : '已报审',
@@ -396,14 +533,13 @@ export function ownerDocumentStatusLabelForList(
     },
     owner_penalty: {
       draft: '草稿',
-      appealing: '申诉中',
-      confirmed: '已确认',
+      submitted: '已提交',
     },
     sub_change: {
       draft: '草稿',
-      submitted: '已上报',
-      rejected: '已打回',
-      approved: '已签证',
+      submitted: '已提交',
+      rejected: '已退回',
+      approved: '已审批',
     },
     sub_settlement: {
       pending: ['draft', '草稿'].includes(normalized(status)) ? '草稿' : '待确认',
@@ -431,7 +567,7 @@ export function ownerDocumentStatusClass(
     return 'chip-danger'
   if (['submitted', 'reported', 'checking', 'appealing', 'pending'].includes(view))
     return 'chip-warn'
-  if (['approved', 'audited', 'done', 'confirmed'].includes(view))
+  if (['approved', 'audited', 'done', 'confirmed', 'accepted', 'expired'].includes(view))
     return 'chip-ok'
   if (view === 'warranty')
     return 'chip-brand'

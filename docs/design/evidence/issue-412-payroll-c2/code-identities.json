@@ -1,0 +1,562 @@
+[
+  {
+    "path": "app/components/crew-worker/CrewWorkerCentralDetailScreen.vue",
+    "sha256": "839f62154cc4d7d46121f6cf75eb3ffb8585e34ad4ed59c1fa3229e17b03e709",
+    "gitTextSha256": "5ab118ae427004b74ef728688361fd017eb85138f095ee8653b287f518073d48"
+  },
+  {
+    "path": "app/components/payroll/CentralC2DraftFormPage.vue",
+    "sha256": "71eb7220b6bb0d1c2afbe0b1d2c2b5782c57d791fd28e834e5d8a423fe805500",
+    "gitTextSha256": "71eb7220b6bb0d1c2afbe0b1d2c2b5782c57d791fd28e834e5d8a423fe805500"
+  },
+  {
+    "path": "app/components/payroll/CentralDayworkFormPage.vue",
+    "sha256": "08fc755a3f2ea74910dac7c0d7b0ccd3081ea91b99d840f19ba1f9f89e2bcf8a",
+    "gitTextSha256": "08fc755a3f2ea74910dac7c0d7b0ccd3081ea91b99d840f19ba1f9f89e2bcf8a"
+  },
+  {
+    "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+    "sha256": "5c4b922c083b4e45f8e97d8be4290d3ad42f3c97f8c59dc5c8c2f7908ace847d",
+    "gitTextSha256": "5c4b922c083b4e45f8e97d8be4290d3ad42f3c97f8c59dc5c8c2f7908ace847d"
+  },
+  {
+    "path": "app/components/payroll/CentralPayrollFormPage.vue",
+    "sha256": "a752edbca00eca5d6f30f5f296d121d8b9e95e425bea45f7065b04eb6a7a85be",
+    "gitTextSha256": "a752edbca00eca5d6f30f5f296d121d8b9e95e425bea45f7065b04eb6a7a85be"
+  },
+  {
+    "path": "app/components/payroll/CentralPayrollScreen.vue",
+    "sha256": "c4c6c990b7af1796e78fc3a06b9a0d6dfc3f408b505aed1ffb601e1d4d791b94",
+    "gitTextSha256": "c4c6c990b7af1796e78fc3a06b9a0d6dfc3f408b505aed1ffb601e1d4d791b94"
+  },
+  {
+    "path": "app/components/payroll/CentralSignedDayworkScreen.vue",
+    "sha256": "5ba5978b932e87bab91c811ed1453651c6ae4420b1ef5df416affddddfcd4140",
+    "gitTextSha256": "5ba5978b932e87bab91c811ed1453651c6ae4420b1ef5df416affddddfcd4140"
+  },
+  {
+    "path": "app/components/payroll/PayrollC2ConfigScreen.vue",
+    "sha256": "b8069abdd3b40f27d372bdcb89a7470ec317b2d8eaa0cf36441518543a89fcaf",
+    "gitTextSha256": "b8069abdd3b40f27d372bdcb89a7470ec317b2d8eaa0cf36441518543a89fcaf"
+  },
+  {
+    "path": "app/components/payroll/PayrollC2FormFields.vue",
+    "sha256": "c9c7fdee2c58a6df419236b80f0a4a86555d27c9ed70ee69ec24931179611100",
+    "gitTextSha256": "c9c7fdee2c58a6df419236b80f0a4a86555d27c9ed70ee69ec24931179611100"
+  },
+  {
+    "path": "app/components/payroll/PayrollC2FrozenPrint.vue",
+    "sha256": "01b972ed096f4f414d396eccc89efd6ef62633c87dd7fb711bf962e42bb255b1",
+    "gitTextSha256": "01b972ed096f4f414d396eccc89efd6ef62633c87dd7fb711bf962e42bb255b1"
+  },
+  {
+    "path": "app/components/payroll/PayrollC2ReleaseDialog.vue",
+    "sha256": "8d47ef8dbbc51a67b2259ba06c391e06f30da9bdf82b5139f394f1a1b9104fbd",
+    "gitTextSha256": "8d47ef8dbbc51a67b2259ba06c391e06f30da9bdf82b5139f394f1a1b9104fbd"
+  },
+  {
+    "path": "app/components/payroll/PayrollC2SourceReturn.vue",
+    "sha256": "34b2096ebf03b4b95e3a6317fcdbed75d37ab920a25ff42743ff3e46df8a8b9d",
+    "gitTextSha256": "34b2096ebf03b4b95e3a6317fcdbed75d37ab920a25ff42743ff3e46df8a8b9d"
+  },
+  {
+    "path": "app/components/payroll/PayrollC2SourceReview.vue",
+    "sha256": "3f76396028e868e4acac8c7c908e249b254a3703b001bbe9c73240c6b21844e3",
+    "gitTextSha256": "3f76396028e868e4acac8c7c908e249b254a3703b001bbe9c73240c6b21844e3"
+  },
+  {
+    "path": "app/components/payroll/PayrollC2StatementWorkspace.vue",
+    "sha256": "6a79ccf4708960dfa61d1df16f11c700f353e06280400ba6476cb112c6220a2c",
+    "gitTextSha256": "6a79ccf4708960dfa61d1df16f11c700f353e06280400ba6476cb112c6220a2c"
+  },
+  {
+    "path": "app/components/payroll/PayrollDayworkConfirmDialog.vue",
+    "sha256": "e0cfd1c4c6dbe39f9a9c18651c3775ef9e59a85ab5f8b58e88895a0fbe30549f",
+    "gitTextSha256": "e0cfd1c4c6dbe39f9a9c18651c3775ef9e59a85ab5f8b58e88895a0fbe30549f"
+  },
+  {
+    "path": "app/components/payroll/PayrollDayworkFormFields.vue",
+    "sha256": "127415e1543d65dac75e174e8ea6b297a20f4922e2e480ff22b54354c3ef323c",
+    "gitTextSha256": "127415e1543d65dac75e174e8ea6b297a20f4922e2e480ff22b54354c3ef323c"
+  },
+  {
+    "path": "app/components/payroll/PayrollDayworkLocks.vue",
+    "sha256": "9c0cbeb2af53ecd403604725c759f14a87816505e3ec6611540e5b55dac73bce",
+    "gitTextSha256": "9c0cbeb2af53ecd403604725c759f14a87816505e3ec6611540e5b55dac73bce"
+  },
+  {
+    "path": "app/components/payroll/PayrollDayworkTable.vue",
+    "sha256": "f561c3ee2938e1d9b1fffe703586f50e3d1e90de4ba3292b7cbae96c420e0520",
+    "gitTextSha256": "f561c3ee2938e1d9b1fffe703586f50e3d1e90de4ba3292b7cbae96c420e0520"
+  },
+  {
+    "path": "app/components/payroll/PayrollReadNotice.vue",
+    "sha256": "a67615cc5ec086f459338654a921c57cd2fdd26195769608a6f6d3b9537fcf7c",
+    "gitTextSha256": "a67615cc5ec086f459338654a921c57cd2fdd26195769608a6f6d3b9537fcf7c"
+  },
+  {
+    "path": "app/components/payroll/SignedDayworkScreen.vue",
+    "sha256": "5117af36003767f3ed87ad406dab2607b8ff092d29b042eca980bfb06c2f76fa",
+    "gitTextSha256": "5117af36003767f3ed87ad406dab2607b8ff092d29b042eca980bfb06c2f76fa"
+  },
+  {
+    "path": "app/composables/useCentralDaywork.ts",
+    "sha256": "281aa84addcde0d115b20868812bf68dbda0b0c1384b71dbafd98107fff0e81f",
+    "gitTextSha256": "281aa84addcde0d115b20868812bf68dbda0b0c1384b71dbafd98107fff0e81f"
+  },
+  {
+    "path": "app/composables/usePayrollC2Config.ts",
+    "sha256": "886fb6681d0890166132fc35dcfc7ad10f5f751e9c71e09baddf7ef978d493c6",
+    "gitTextSha256": "886fb6681d0890166132fc35dcfc7ad10f5f751e9c71e09baddf7ef978d493c6"
+  },
+  {
+    "path": "app/composables/usePayrollC2Form.ts",
+    "sha256": "0525660cb778acfd40ea0e7306f4ada74f33ae4b34e3baf11e3c9ed22b5ced10",
+    "gitTextSha256": "0525660cb778acfd40ea0e7306f4ada74f33ae4b34e3baf11e3c9ed22b5ced10"
+  },
+  {
+    "path": "app/composables/usePayrollC2Statement.ts",
+    "sha256": "f15cfcd3e8db5ba949ef051b1dfae5ac67aee494eace1914793bba336b675cf1",
+    "gitTextSha256": "f15cfcd3e8db5ba949ef051b1dfae5ac67aee494eace1914793bba336b675cf1"
+  },
+  {
+    "path": "app/composables/usePayrollDayworkForm.ts",
+    "sha256": "c2438cae6afc9d6d3325d9bf0d1f5aabf85f63af1f107bb4f6236111135c1f00",
+    "gitTextSha256": "c2438cae6afc9d6d3325d9bf0d1f5aabf85f63af1f107bb4f6236111135c1f00"
+  },
+  {
+    "path": "app/lib/nav/target-registry.ts",
+    "sha256": "de25908ca98d81f16c4e7519ad558f6b882344be6ff72144bebed6cbaf9e1fdc",
+    "gitTextSha256": "6670cd84074fc66ace4cccc33a6ae8337867d742173d18c7309d80441f5eb14b"
+  },
+  {
+    "path": "app/lib/payroll/c2-export.ts",
+    "sha256": "dc4418a67bffe990c2ad59f3e9a3779c5e9cf1d26c810f6f29e849d130b537a5",
+    "gitTextSha256": "dc4418a67bffe990c2ad59f3e9a3779c5e9cf1d26c810f6f29e849d130b537a5"
+  },
+  {
+    "path": "app/lib/payroll/c2-navigation.ts",
+    "sha256": "53f36f7596de4673bb7a16857ce4edc6671a8a1cb7d4c9bb294295163e9d3e43",
+    "gitTextSha256": "53f36f7596de4673bb7a16857ce4edc6671a8a1cb7d4c9bb294295163e9d3e43"
+  },
+  {
+    "path": "app/lib/payroll/c2-presentation.ts",
+    "sha256": "0b1c9448109588f7b4f28fa1438e4a8f67523373ee4fcb400f408f158bcf3009",
+    "gitTextSha256": "0b1c9448109588f7b4f28fa1438e4a8f67523373ee4fcb400f408f158bcf3009"
+  },
+  {
+    "path": "app/lib/payroll/central-attendance-contract.ts",
+    "sha256": "ddba5e69368d0860c0523b004d4a031aa5f55008e2dd2099a06a32c25d589556",
+    "gitTextSha256": "ddba5e69368d0860c0523b004d4a031aa5f55008e2dd2099a06a32c25d589556"
+  },
+  {
+    "path": "app/lib/payroll/central-c1-contract.ts",
+    "sha256": "b61f5dfdc4409518b87aa238838cf3d314f1f46f87e7a8511ab5aab0d8b6c241",
+    "gitTextSha256": "b61f5dfdc4409518b87aa238838cf3d314f1f46f87e7a8511ab5aab0d8b6c241"
+  },
+  {
+    "path": "app/lib/payroll/central-c2-calculation.ts",
+    "sha256": "bb911b0331954ee75555973b07eedb2fa53f4d28a8906949b5cda5f9d1fa63a5",
+    "gitTextSha256": "bb911b0331954ee75555973b07eedb2fa53f4d28a8906949b5cda5f9d1fa63a5"
+  },
+  {
+    "path": "app/lib/payroll/central-c2-codec.ts",
+    "sha256": "715d8e2d12d2b14e87f11e6e235a405d9444fe2241c4003e077d73a0a7600461",
+    "gitTextSha256": "715d8e2d12d2b14e87f11e6e235a405d9444fe2241c4003e077d73a0a7600461"
+  },
+  {
+    "path": "app/lib/payroll/central-c2-command.ts",
+    "sha256": "e977b5638ac68f00abf85baccf147daba96a31e7bf30dbf65cc4626afd05f7c7",
+    "gitTextSha256": "e977b5638ac68f00abf85baccf147daba96a31e7bf30dbf65cc4626afd05f7c7"
+  },
+  {
+    "path": "app/lib/payroll/central-c2-contract.ts",
+    "sha256": "26e96dbe3697aa5fc8c0f4fc1d2979bacdf1e28718dc7fa24d9958c86c5514f3",
+    "gitTextSha256": "26e96dbe3697aa5fc8c0f4fc1d2979bacdf1e28718dc7fa24d9958c86c5514f3"
+  },
+  {
+    "path": "app/lib/payroll/central-c2-provenance.ts",
+    "sha256": "633d5cb6bb6ea0cf0a8f1eef1affd7f81f2ab58a5bd641acde58afd5ae55dd4b",
+    "gitTextSha256": "633d5cb6bb6ea0cf0a8f1eef1affd7f81f2ab58a5bd641acde58afd5ae55dd4b"
+  },
+  {
+    "path": "app/lib/payroll/central-codec.ts",
+    "sha256": "a8cdf99edeadafce0d7d4b9388c489a7f4f70b309081a4501e0edf97526c1500",
+    "gitTextSha256": "a8cdf99edeadafce0d7d4b9388c489a7f4f70b309081a4501e0edf97526c1500"
+  },
+  {
+    "path": "app/lib/payroll/central-contract.ts",
+    "sha256": "a40e64a19c343a1f8c232dcf1cd1aea099eaacee1d39c946d6513c08d1fe0e7d",
+    "gitTextSha256": "a40e64a19c343a1f8c232dcf1cd1aea099eaacee1d39c946d6513c08d1fe0e7d"
+  },
+  {
+    "path": "app/lib/payroll/central-daywork-codec.ts",
+    "sha256": "2309e2d915c72281a96b31acfda101c619af27cc915bbc6f79a43a18e0ce832c",
+    "gitTextSha256": "2309e2d915c72281a96b31acfda101c619af27cc915bbc6f79a43a18e0ce832c"
+  },
+  {
+    "path": "app/lib/payroll/central-daywork-contract.ts",
+    "sha256": "abc8e3662abe60b49ab8a31fbc039c0f7330b0d092c6eaa84e7611ac337f31a8",
+    "gitTextSha256": "abc8e3662abe60b49ab8a31fbc039c0f7330b0d092c6eaa84e7611ac337f31a8"
+  },
+  {
+    "path": "app/lib/payroll/central-payroll-wire.ts",
+    "sha256": "8810aa060b3d9502027d2efb2632d149e6688fc547d4392c7ef980dc245833f0",
+    "gitTextSha256": "8810aa060b3d9502027d2efb2632d149e6688fc547d4392c7ef980dc245833f0"
+  },
+  {
+    "path": "app/lib/payroll/central-read.ts",
+    "sha256": "64ff381369eaff865721facded55df370d526060a5132cf5aece0506d720efcf",
+    "gitTextSha256": "64ff381369eaff865721facded55df370d526060a5132cf5aece0506d720efcf"
+  },
+  {
+    "path": "app/lib/payroll/central-repository.ts",
+    "sha256": "acc6559926bfb09baf469186157470c024ec8b82e79d1d42022d6b1c25039ef1",
+    "gitTextSha256": "acc6559926bfb09baf469186157470c024ec8b82e79d1d42022d6b1c25039ef1"
+  },
+  {
+    "path": "app/lib/payroll/central-schema.ts",
+    "sha256": "4f3b5ffd7dac154cc4207407cae90d16ae236784fc73037cf74f917fe56c5073",
+    "gitTextSha256": "4f3b5ffd7dac154cc4207407cae90d16ae236784fc73037cf74f917fe56c5073"
+  },
+  {
+    "path": "app/lib/payroll/central-source-locks.ts",
+    "sha256": "9cab428c16248488f62c65ad9d8847522e3ff3aae3c821f89dc51b060752d281",
+    "gitTextSha256": "9cab428c16248488f62c65ad9d8847522e3ff3aae3c821f89dc51b060752d281"
+  },
+  {
+    "path": "app/lib/tabs/restore-target.ts",
+    "sha256": "ea5065059840bc4ef5238fada2339b0ac4759d219bf78b10528f8434db07f567",
+    "gitTextSha256": "c836e12e54344bcca93527535e0bce126e170720dd6e4161f0f5f3770751ce16"
+  },
+  {
+    "path": "app/pages/subcontract/daywork/form/[id].vue",
+    "sha256": "9c3cdc8dee59b92052bffdab35db8dd6adf6a659b6d7f14dad819e144f479d26",
+    "gitTextSha256": "9c3cdc8dee59b92052bffdab35db8dd6adf6a659b6d7f14dad819e144f479d26"
+  },
+  {
+    "path": "app/pages/subcontract/daywork/index.vue",
+    "sha256": "90586d26b3c293f1cae4108440d3e39892fe91c4bb6240aa8bd7d31fc0b79598",
+    "gitTextSha256": "90586d26b3c293f1cae4108440d3e39892fe91c4bb6240aa8bd7d31fc0b79598"
+  },
+  {
+    "path": "app/pages/subcontract/daywork/new.vue",
+    "sha256": "8ea6cb74e1d9a8bfd2a5b33d092286b13d8afa76cf2b18d600c237939c3ffbf4",
+    "gitTextSha256": "8ea6cb74e1d9a8bfd2a5b33d092286b13d8afa76cf2b18d600c237939c3ffbf4"
+  },
+  {
+    "path": "app/pages/subcontract/payroll/config.vue",
+    "sha256": "2b7767300073889fe4380b575f674b4e6ba6000181beb6cba4544caf57cf5fc6",
+    "gitTextSha256": "2b7767300073889fe4380b575f674b4e6ba6000181beb6cba4544caf57cf5fc6"
+  },
+  {
+    "path": "app/stores/daywork-central.ts",
+    "sha256": "d8878ad62bec6f78df96531cb9e168ec3f26c9733b6f41fca8bc0f02cf8e522a",
+    "gitTextSha256": "d8878ad62bec6f78df96531cb9e168ec3f26c9733b6f41fca8bc0f02cf8e522a"
+  },
+  {
+    "path": "app/stores/payroll-c2.ts",
+    "sha256": "5b25a5775d0c0dadc7f0e0c6bde376e094efbdf98d6ba7d9c8bf57721bf352d5",
+    "gitTextSha256": "5b25a5775d0c0dadc7f0e0c6bde376e094efbdf98d6ba7d9c8bf57721bf352d5"
+  },
+  {
+    "path": "app/types/read-model.ts",
+    "sha256": "d20452bd20d39a45350bb87f6122645e73c561566372a25cb7fb4106986f5bfe",
+    "gitTextSha256": "29d808cea729ef430a14e5e5b987ee9af2191e5221ca1a38cc9d24e0446b8a9e"
+  },
+  {
+    "path": "e2e/helpers/payroll-c2-migration-source.ts",
+    "sha256": "5af5f247ae9b0723e19a07a7972c1c88e5d4ed5c48fee28a1b93f76a20b23818",
+    "gitTextSha256": "5af5f247ae9b0723e19a07a7972c1c88e5d4ed5c48fee28a1b93f76a20b23818"
+  },
+  {
+    "path": "e2e/helpers/payroll-c2-workspace.ts",
+    "sha256": "1593b2929cabbea785f7301bd3e53bf61d8feaa84dafbd92941dea0fa64a0165",
+    "gitTextSha256": "1593b2929cabbea785f7301bd3e53bf61d8feaa84dafbd92941dea0fa64a0165"
+  },
+  {
+    "path": "e2e/payroll-c2-central.spec.ts",
+    "sha256": "988c50cad745288a4ef5ce674a1b94a6a88f379b08c04c8e1e12f9fdb74d3431",
+    "gitTextSha256": "988c50cad745288a4ef5ce674a1b94a6a88f379b08c04c8e1e12f9fdb74d3431"
+  },
+  {
+    "path": "e2e/payroll-c2-output.spec.ts",
+    "sha256": "2f0bdde8f7ef754a2a47612ab0b7ff1697cc11646719f2b8920fec92d0cda823",
+    "gitTextSha256": "2f0bdde8f7ef754a2a47612ab0b7ff1697cc11646719f2b8920fec92d0cda823"
+  },
+  {
+    "path": "e2e/payroll-c2-readonly.spec.ts",
+    "sha256": "b87df4e6481436824c7a36de80c5c59066e50e9c45c577c4bbd45d4c0c417ca8",
+    "gitTextSha256": "b87df4e6481436824c7a36de80c5c59066e50e9c45c577c4bbd45d4c0c417ca8"
+  },
+  {
+    "path": "e2e/payroll-c2-recovery.spec.ts",
+    "sha256": "36edfc685be9dcd02c39782596050c35cfe6a182ba360d0a0db5b77e88fc02cd",
+    "gitTextSha256": "36edfc685be9dcd02c39782596050c35cfe6a182ba360d0a0db5b77e88fc02cd"
+  },
+  {
+    "path": "scripts/module-review-inventory.mjs",
+    "sha256": "da436eca51c27dd830ef7cd3312138a7b642927e67de7dd34977c2f4d063a2da",
+    "gitTextSha256": "617e94524ca743b460a9057fc67d48f5cca4466e200e54a1ff4dd6a0f49d751b"
+  },
+  {
+    "path": "scripts/runtime-evidence-ledger.mjs",
+    "sha256": "3793385706505efccc4914b05f00257ab5a73e1ca6d26b16ec1e0100eda43011",
+    "gitTextSha256": "558a6674d9a0ec951dcf16780e8c3e1f41467374a90ab8a4dad5a6cddd222af5"
+  },
+  {
+    "path": "server/api/commands/payroll-c2.post.ts",
+    "sha256": "8e3d2d957d9ebfd6b9a2f253cf65d1b267f62d1dbf50e65354eaa17ddbd1d98b",
+    "gitTextSha256": "8e3d2d957d9ebfd6b9a2f253cf65d1b267f62d1dbf50e65354eaa17ddbd1d98b"
+  },
+  {
+    "path": "server/api/commands/payroll-daywork.post.ts",
+    "sha256": "650bfe4c2c0db3d3c5ae3fb16b6342d553dae9573d54b0b61327f9b5b728199a",
+    "gitTextSha256": "650bfe4c2c0db3d3c5ae3fb16b6342d553dae9573d54b0b61327f9b5b728199a"
+  },
+  {
+    "path": "server/api/read/payroll/c2-config.get.ts",
+    "sha256": "45902141427a8cb42e88ef3a5ab66178fca0f79e6d8e5822492a2f26777a7571",
+    "gitTextSha256": "45902141427a8cb42e88ef3a5ab66178fca0f79e6d8e5822492a2f26777a7571"
+  },
+  {
+    "path": "server/api/read/payroll/c2-form.post.ts",
+    "sha256": "2d04dc4ef2e0d766f8205d19151fb0fc0ddf9aa55571232c4202ced3907057d1",
+    "gitTextSha256": "2d04dc4ef2e0d766f8205d19151fb0fc0ddf9aa55571232c4202ced3907057d1"
+  },
+  {
+    "path": "server/api/read/payroll/c2-output.get.ts",
+    "sha256": "07602b5a48e200d97a3de09ac2de76a2edb7b2121be9e7ecec5d2ae1ed87324b",
+    "gitTextSha256": "07602b5a48e200d97a3de09ac2de76a2edb7b2121be9e7ecec5d2ae1ed87324b"
+  },
+  {
+    "path": "server/api/read/payroll/daywork-form.post.ts",
+    "sha256": "db49f5d67025b44dfa03d89125dfa7da3756786d73ef0961f72f4068696c4728",
+    "gitTextSha256": "db49f5d67025b44dfa03d89125dfa7da3756786d73ef0961f72f4068696c4728"
+  },
+  {
+    "path": "server/api/read/payroll/daywork.get.ts",
+    "sha256": "5893d97f073a2b5ece0e7a7f1a162095c77399d9cb072a1c5973006d3c5f3a85",
+    "gitTextSha256": "5893d97f073a2b5ece0e7a7f1a162095c77399d9cb072a1c5973006d3c5f3a85"
+  },
+  {
+    "path": "server/utils/payroll-a-migration-references.ts",
+    "sha256": "cc6f8de36aab1b90d52f2875bb98529fd5d0ac8c10bafa375d4f5a445e6eade6",
+    "gitTextSha256": "cc6f8de36aab1b90d52f2875bb98529fd5d0ac8c10bafa375d4f5a445e6eade6"
+  },
+  {
+    "path": "server/utils/payroll-c1-options.ts",
+    "sha256": "98127fa01d6abe194704385d6c39a88a9db5a77f0abb6497baa05c75573fc703",
+    "gitTextSha256": "98127fa01d6abe194704385d6c39a88a9db5a77f0abb6497baa05c75573fc703"
+  },
+  {
+    "path": "server/utils/payroll-c2-migration-references.ts",
+    "sha256": "19b8cbbe61ce3f4b425ee50cb0a22cd95692941da7e196810039c4aae79880db",
+    "gitTextSha256": "19b8cbbe61ce3f4b425ee50cb0a22cd95692941da7e196810039c4aae79880db"
+  },
+  {
+    "path": "server/utils/payroll-c2-service.ts",
+    "sha256": "67aa66002b7e7a34635774e4dd4b1b03541b63d7fc1689d0ec07041054063bd8",
+    "gitTextSha256": "67aa66002b7e7a34635774e4dd4b1b03541b63d7fc1689d0ec07041054063bd8"
+  },
+  {
+    "path": "server/utils/payroll-daywork-facts.ts",
+    "sha256": "f8db42347e467542fa096162eed13679d2c8f85ba1addc14ff573abf4d56f608",
+    "gitTextSha256": "f8db42347e467542fa096162eed13679d2c8f85ba1addc14ff573abf4d56f608"
+  },
+  {
+    "path": "server/utils/payroll-daywork-service.ts",
+    "sha256": "e1d506c09b395381da65b592db963018c8aec2696fbcd9ecac74fa764febb425",
+    "gitTextSha256": "e1d506c09b395381da65b592db963018c8aec2696fbcd9ecac74fa764febb425"
+  },
+  {
+    "path": "server/utils/payroll-migration.ts",
+    "sha256": "a43d1e3aec581dee7ef45d28f3c7210cdcadd7d665164b2251f6d79fc7f54231",
+    "gitTextSha256": "a43d1e3aec581dee7ef45d28f3c7210cdcadd7d665164b2251f6d79fc7f54231"
+  },
+  {
+    "path": "server/utils/payroll-participant-options.ts",
+    "sha256": "3616dbb8b4cfe3f89facfc318908bcd9540845f684cd6faecf257858c1bf76f0",
+    "gitTextSha256": "3616dbb8b4cfe3f89facfc318908bcd9540845f684cd6faecf257858c1bf76f0"
+  },
+  {
+    "path": "server/utils/payroll-runtime.ts",
+    "sha256": "2e2dc47a0f5caf7510e33a90d46cfc7e1d9d7df98871298c91d0f450ddde5a03",
+    "gitTextSha256": "2e2dc47a0f5caf7510e33a90d46cfc7e1d9d7df98871298c91d0f450ddde5a03"
+  },
+  {
+    "path": "server/utils/payroll-service.ts",
+    "sha256": "0309bf72314be0a742c8b678d218f174fc3d9155b1b0adff94b6a2ef961df542",
+    "gitTextSha256": "0309bf72314be0a742c8b678d218f174fc3d9155b1b0adff94b6a2ef961df542"
+  },
+  {
+    "path": "tests/components/PayrollC2Completion.test.ts",
+    "sha256": "5def4c9da61fcc1c1ef07a771b98d996dfd39ebf5dc0074c6eead9cb33d3cf5a",
+    "gitTextSha256": "5def4c9da61fcc1c1ef07a771b98d996dfd39ebf5dc0074c6eead9cb33d3cf5a"
+  },
+  {
+    "path": "tests/components/PayrollC2Config.test.ts",
+    "sha256": "cd88eb375d00fb66a2f7aff67bcf7dbb724f561e48cfeae06c942e06ebca761d",
+    "gitTextSha256": "cd88eb375d00fb66a2f7aff67bcf7dbb724f561e48cfeae06c942e06ebca761d"
+  },
+  {
+    "path": "tests/components/PayrollC2DetailPrecision.test.ts",
+    "sha256": "f835683780f16305c8b480ea0375369cd590da1ba388d5a037e9e305f25b8e57",
+    "gitTextSha256": "f835683780f16305c8b480ea0375369cd590da1ba388d5a037e9e305f25b8e57"
+  },
+  {
+    "path": "tests/components/PayrollC2Form.test.ts",
+    "sha256": "02725b9a52ba8afaeb8381979f11c49edaa42f4d813249d791124c6da7bed508",
+    "gitTextSha256": "02725b9a52ba8afaeb8381979f11c49edaa42f4d813249d791124c6da7bed508"
+  },
+  {
+    "path": "tests/components/PayrollC2FrozenPrint.test.ts",
+    "sha256": "487eb604fff7d8b50b9046858af2c0aea61bb96642db35825e8326673b71b960",
+    "gitTextSha256": "487eb604fff7d8b50b9046858af2c0aea61bb96642db35825e8326673b71b960"
+  },
+  {
+    "path": "tests/components/PayrollC2Release.test.ts",
+    "sha256": "225265e3e6f5c03bbe133f0bee0401b5aab21625823b76054166b25cd0dae671",
+    "gitTextSha256": "225265e3e6f5c03bbe133f0bee0401b5aab21625823b76054166b25cd0dae671"
+  },
+  {
+    "path": "tests/components/PayrollC2ReleasedEvidence.test.ts",
+    "sha256": "35a883ed089cb61fa70ea1d062ec1c7593c099332f1e282da78b6034b31e6beb",
+    "gitTextSha256": "35a883ed089cb61fa70ea1d062ec1c7593c099332f1e282da78b6034b31e6beb"
+  },
+  {
+    "path": "tests/components/PayrollC2SourceReturn.test.ts",
+    "sha256": "2c64ec6b2fda76a3fa2fa4bf8fa8084964ee2675d396e1d4f7527336e8d4bb3f",
+    "gitTextSha256": "2c64ec6b2fda76a3fa2fa4bf8fa8084964ee2675d396e1d4f7527336e8d4bb3f"
+  },
+  {
+    "path": "tests/components/PayrollC2SourceReview.test.ts",
+    "sha256": "d1490f896daa1e1b55802ed6e5bea0ed41ac21ebc16817238cf8bbf539b08f81",
+    "gitTextSha256": "d1490f896daa1e1b55802ed6e5bea0ed41ac21ebc16817238cf8bbf539b08f81"
+  },
+  {
+    "path": "tests/components/PayrollC2SpecIndependent.test.ts",
+    "sha256": "3f13e07eae860e942bd17df83469f9e0573f8738033859962c79a0b3bec40fc1",
+    "gitTextSha256": "3f13e07eae860e942bd17df83469f9e0573f8738033859962c79a0b3bec40fc1"
+  },
+  {
+    "path": "tests/components/PayrollCentralBoundary.test.ts",
+    "sha256": "5948b2e78625ad60e4848daadba30e1aedbe2d923c424448231185bb8e0047d4",
+    "gitTextSha256": "5948b2e78625ad60e4848daadba30e1aedbe2d923c424448231185bb8e0047d4"
+  },
+  {
+    "path": "tests/components/PayrollDayworkConfirmation.test.ts",
+    "sha256": "892a307e370cef91caf1c814c040d753d312911fe95472ea8f0b9cc8e0d46b3e",
+    "gitTextSha256": "892a307e370cef91caf1c814c040d753d312911fe95472ea8f0b9cc8e0d46b3e"
+  },
+  {
+    "path": "tests/components/PayrollDayworkForm.test.ts",
+    "sha256": "0fba23fd2844dfc51e2cabc09e48c721b83908b3977187f11636dcdc87fd7afb",
+    "gitTextSha256": "0fba23fd2844dfc51e2cabc09e48c721b83908b3977187f11636dcdc87fd7afb"
+  },
+  {
+    "path": "tests/helpers/payroll-c2-migration-source.ts",
+    "sha256": "2343e339c7318d31db5043c597a63dd57a0e7d273e80d600575462d913e39938",
+    "gitTextSha256": "2343e339c7318d31db5043c597a63dd57a0e7d273e80d600575462d913e39938"
+  },
+  {
+    "path": "tests/helpers/payroll-c2-service-fixture.ts",
+    "sha256": "5212f64b2be291f19054eb471c977ca7fc941eff0def92aa7b6161b7a49a2846",
+    "gitTextSha256": "5212f64b2be291f19054eb471c977ca7fc941eff0def92aa7b6161b7a49a2846"
+  },
+  {
+    "path": "tests/helpers/payroll-c2-ui.ts",
+    "sha256": "6df5405de11dafe42157a9d02b9c59109c4e780e5e45e96014c95573d280aa34",
+    "gitTextSha256": "6df5405de11dafe42157a9d02b9c59109c4e780e5e45e96014c95573d280aa34"
+  },
+  {
+    "path": "tests/kit/entity-link.test.ts",
+    "sha256": "bb267db35552e97c9cb8d145f96043d4c8bee97bc12fe1c42862c28b5e9a4e65",
+    "gitTextSha256": "43f3e5741c630ac02c128b628f3c57f7e4fa96f79b590b6fb5f4e22aabae49e4"
+  },
+  {
+    "path": "tests/payroll/c2-b-independent.test.ts",
+    "sha256": "e72de56c9fd92f9cca43b3ed31a1f15ac58162ccbaba302d0b871b43f307afd2",
+    "gitTextSha256": "e72de56c9fd92f9cca43b3ed31a1f15ac58162ccbaba302d0b871b43f307afd2"
+  },
+  {
+    "path": "tests/payroll/c2-migration-protection.test.ts",
+    "sha256": "cd96ca751cd650a8da1733c3d56cfa51227f99e9b6cb308000ef2e324e67a98a",
+    "gitTextSha256": "cd96ca751cd650a8da1733c3d56cfa51227f99e9b6cb308000ef2e324e67a98a"
+  },
+  {
+    "path": "tests/payroll/c2-navigation.test.ts",
+    "sha256": "1702facbdfcec154a0d5f92dca51bcb23bfc40650fc757274dfcee5cff5a8351",
+    "gitTextSha256": "1702facbdfcec154a0d5f92dca51bcb23bfc40650fc757274dfcee5cff5a8351"
+  },
+  {
+    "path": "tests/payroll/c2-source-locks.test.ts",
+    "sha256": "b19e846ca77aefa0fbfe97281112a997f558815e75352737774063c860e39da8",
+    "gitTextSha256": "b19e846ca77aefa0fbfe97281112a997f558815e75352737774063c860e39da8"
+  },
+  {
+    "path": "tests/payroll/c2-spec-independent.test.ts",
+    "sha256": "b42dbebbf1926ada2f4dcbbd3d43babc03e528cc14acfd792bd4abdec3ee2daf",
+    "gitTextSha256": "b42dbebbf1926ada2f4dcbbd3d43babc03e528cc14acfd792bd4abdec3ee2daf"
+  },
+  {
+    "path": "tests/payroll/central-c2-codec.test.ts",
+    "sha256": "0ccffb8e760c630941e2f82875d2cc94d46e889126c6fcadf7a7929316f917ef",
+    "gitTextSha256": "0ccffb8e760c630941e2f82875d2cc94d46e889126c6fcadf7a7929316f917ef"
+  },
+  {
+    "path": "tests/payroll/central-c2-commands.test.ts",
+    "sha256": "a13e77df61e28240b969895c9eb08a3989974d654fcbfcd6680f2d9c46962d24",
+    "gitTextSha256": "a13e77df61e28240b969895c9eb08a3989974d654fcbfcd6680f2d9c46962d24"
+  },
+  {
+    "path": "tests/payroll/central-c2-detail.test.ts",
+    "sha256": "ddb00e4ee771a0b1da42d37a793fdce73aec36ca19f09876d97ba423710d8d1a",
+    "gitTextSha256": "ddb00e4ee771a0b1da42d37a793fdce73aec36ca19f09876d97ba423710d8d1a"
+  },
+  {
+    "path": "tests/payroll/central-c2-http.test.ts",
+    "sha256": "836b43a067d8a2c0fc7fd70bbbfe3bef96a743cf194c7826a0920e41e4797872",
+    "gitTextSha256": "836b43a067d8a2c0fc7fd70bbbfe3bef96a743cf194c7826a0920e41e4797872"
+  },
+  {
+    "path": "tests/payroll/central-c2-independent.test.ts",
+    "sha256": "e0d8e6c3ac96e9cc2ce5ad4e54ba3224bfcc87fa11c6aabd86c544e342cf754f",
+    "gitTextSha256": "e0d8e6c3ac96e9cc2ce5ad4e54ba3224bfcc87fa11c6aabd86c544e342cf754f"
+  },
+  {
+    "path": "tests/payroll/central-c2-invalid-migration.test.ts",
+    "sha256": "db50f711a0fa1d287d8390a97873c31cdc91d4a403f9ff0d2e719b6ac22341a5",
+    "gitTextSha256": "db50f711a0fa1d287d8390a97873c31cdc91d4a403f9ff0d2e719b6ac22341a5"
+  },
+  {
+    "path": "tests/payroll/central-c2-service.test.ts",
+    "sha256": "2e001031263b27209f6481af14cc7f4d80f536ea7919a8d3660dc47a793c0b09",
+    "gitTextSha256": "2e001031263b27209f6481af14cc7f4d80f536ea7919a8d3660dc47a793c0b09"
+  },
+  {
+    "path": "tests/payroll/central-daywork-service.test.ts",
+    "sha256": "ecdaa7755942f11b59fe1480161c8a7482a0692f4e40831de8b6db06db6f57fe",
+    "gitTextSha256": "ecdaa7755942f11b59fe1480161c8a7482a0692f4e40831de8b6db06db6f57fe"
+  },
+  {
+    "path": "tests/payroll/daywork-facts.test.ts",
+    "sha256": "97538fd6bf8883f0472ef55291b6d4ae0c0d20c236d7e86c73661bec1a801fee",
+    "gitTextSha256": "97538fd6bf8883f0472ef55291b6d4ae0c0d20c236d7e86c73661bec1a801fee"
+  },
+  {
+    "path": "tests/stores/daywork-central.test.ts",
+    "sha256": "28c109ca529d4b8441cb1fe72ebe0c8d881667e2b79de2f9d72aeb175c36cf73",
+    "gitTextSha256": "28c109ca529d4b8441cb1fe72ebe0c8d881667e2b79de2f9d72aeb175c36cf73"
+  },
+  {
+    "path": "tests/stores/payroll-c2-central.test.ts",
+    "sha256": "800a982119071e4da2926d3477c7eb2158ff7c4425747211969f13bed9b81272",
+    "gitTextSha256": "800a982119071e4da2926d3477c7eb2158ff7c4425747211969f13bed9b81272"
+  },
+  {
+    "path": "tests/ui/runtime-reference-audit.test.ts",
+    "sha256": "17f55129ff6c721c50eda19d71963cfbaf7a2074328c45d9abd6bd36592e100d",
+    "gitTextSha256": "ace44d07bb5bb59336d2ffa08bce6a3ee12895d12dcc9933503148f11eb664b2"
+  }
+]

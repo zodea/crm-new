@@ -1,0 +1,86 @@
+
+Running 9 tests using 1 worker
+
+(node:26076) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [chromium] › e2e\payroll-c2-central.spec.ts:61:1 › 独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出 (31.0s)
+(node:31708) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 2 [chromium] › e2e\payroll-c2-output.spec.ts:13:1 › 真实长签工发放后两表分页与下载回读，精确单价及明确空规则不被改写 (6.5s)
+  x  3 [chromium] › e2e\payroll-c2-readonly.spec.ts:17:1 › 旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签工输出 (7.5s)
+(node:26012) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 4 [chromium] › e2e\payroll-c2-readonly.spec.ts:51:1 › C2 来源拒权不能沿旧读保存，重读后仍保原项目及草稿编号 (2.8s)
+  ok 5 [chromium] › e2e\payroll-c2-readonly.spec.ts:72:1 › 显式演示 C2 新稿及签工新稿保持不可写，不切到正式来源 (2.6s)
+  ok 6 [chromium] › e2e\payroll-c2-recovery.spec.ts:32:1 › 新签工失响应后冷页按原编号保存一次，日期和正文不丢失 (4.9s)
+  ok 7 [chromium] › e2e\payroll-c2-recovery.spec.ts:74:1 › 原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入 (3.0s)
+  ok 8 [chromium] › e2e\payroll-c2-recovery.spec.ts:120:1 › C2 主体配置保存失响应后冷页仍按原键核对，明确空规则保持为空 (2.9s)
+  ok 9 [chromium] › e2e\payroll-c2-recovery.spec.ts:160:1 › 签工切换月份后迟到的旧读取不覆盖当前记录或两类状态筛选 (1.7s)
+
+
+  1) [chromium] › e2e\payroll-c2-central.spec.ts:61:1 › 独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出 ─────────────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 0
+    Received: 601
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      94 |   await expect(scrollRegion).toBeFocused()
+      95 |   await page.keyboard.press('Home')
+    > 96 |   await expect.poll(() => scrollRegion.evaluate(node => node.scrollLeft)).toBe(0)
+         |                                                                           ^
+      97 |   await page.keyboard.press('End')
+      98 |   await expect.poll(() => scrollRegion.evaluate(node => node.scrollWidth > node.clientWidth && node.scrollLeft >= node.scrollWidth - node.clientWidth - 1)).toBe(true)
+      99 |   await page.keyboard.press('Tab')
+        at D:\crm本地项目开发\e2e\payroll-c2-central.spec.ts:96:75
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .tmp\remaining-issues-20260910\payroll-c2-central\browser-final\payroll-c2-central-独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    .tmp\remaining-issues-20260910\payroll-c2-central\browser-final\payroll-c2-central-独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .tmp\remaining-issues-20260910\payroll-c2-central\browser-final\payroll-c2-central-独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出-chromium\error-context.md
+
+  2) [chromium] › e2e\payroll-c2-readonly.spec.ts:17:1 › 旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签工输出 ────────────
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByRole('region', { name: '原工资头业务记录', exact: true })
+    Expected substring: "100.00"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByRole('region', { name: '原工资头业务记录', exact: true })
+
+
+      40 |   await capture(page, info, 'legacy-c2-missing-snapshot', '[aria-label="发放快照证据"]')
+      41 |   await page.getByText('查看原表与关系历史', { exact: true }).click()
+    > 42 |   await expect(page.getByRole('region', { name: '原工资头业务记录', exact: true })).toContainText('100.00')
+         |                                                                             ^
+      43 |   await capture(page, info, 'legacy-c2-original-amount', '[aria-label="原工资头业务记录"]')
+      44 |   const output = await repository.c2Output({ origin: 'real' }, legacy!.id)
+      45 |   expect(output.state).toBe('unavailable')
+        at D:\crm本地项目开发\e2e\payroll-c2-readonly.spec.ts:42:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .tmp\remaining-issues-20260910\payroll-c2-central\browser-final\payroll-c2-readonly-旧-C2-缺原快照保留原金额与资料，禁止伪完整工资及签工输出-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    .tmp\remaining-issues-20260910\payroll-c2-central\browser-final\payroll-c2-readonly-旧-C2-缺原快照保留原金额与资料，禁止伪完整工资及签工输出-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .tmp\remaining-issues-20260910\payroll-c2-central\browser-final\payroll-c2-readonly-旧-C2-缺原快照保留原金额与资料，禁止伪完整工资及签工输出-chromium\error-context.md
+
+  2 failed
+    [chromium] › e2e\payroll-c2-central.spec.ts:61:1 › 独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出 ──────────────
+    [chromium] › e2e\payroll-c2-readonly.spec.ts:17:1 › 旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签工输出 ─────────────
+  7 passed (1.1m)

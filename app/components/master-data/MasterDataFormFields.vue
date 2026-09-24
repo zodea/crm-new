@@ -13,6 +13,7 @@ defineProps<{
 
 const emit = defineEmits<{
   clearError: [field: keyof MasterDataPageDraft]
+  verifyTaxpayer: []
 }>()
 
 const draft = defineModel<MasterDataPageDraft>({ required: true })
@@ -24,6 +25,7 @@ const draft = defineModel<MasterDataPageDraft>({ required: true })
     v-model="draft"
     :field-errors="fieldErrors"
     @clear-error="emit('clearError', $event)"
+    @verify-taxpayer="emit('verifyTaxpayer')"
   />
   <CustomerFormFields
     v-else-if="kind === 'customer'"

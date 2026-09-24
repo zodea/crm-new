@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { PendingMasterDataAttachment } from './MasterDataAttachmentSection.vue'
+import type { CrewFormReadDTO, WorkerFormReadDTO } from '~/lib/crew-worker/command-contract'
+import type { CustomerFormReadDTO } from '~/lib/customer/command-contract'
 import type {
   FormAttachment,
   FormAttachmentChanges,
@@ -11,8 +13,13 @@ import type {
   FormFooterAction,
   MasterDataPageDraft,
 } from '~/lib/master-data/page'
-import { isTauri } from '@tauri-apps/api/core'
-import { onBeforeRouteLeave } from 'vue-router'
+import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
+import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
+import { onActivated, onDeactivated, onScopeDispose } from 'vue'
+import SupplierTaxpayerDialog from '~/components/supplier/SupplierTaxpayerDialog.vue'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
+import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
+import { customerOriginal } from '~/lib/customer/original'
 import {
   listFormAttachments,
   loadCrewForm,
@@ -27,9 +34,22 @@ import {
   formDefaults,
   formRequiredFields,
 } from '~/lib/master-data/page'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
+import { projectOriginal } from '~/lib/project/original'
+import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
+import { createTaxpayerEditorState } from '~/lib/supplier/taxpayer-editor-state'
+import { mergeTaxpayerVerification } from '~/lib/supplier/taxpayer-verification'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
+import { CrewWorkerCommandConflictError, useCrewWorkerCommandStore } from '~/stores/crew-worker-command'
+import { CustomerCommandConflictError, useCustomerCommandStore } from '~/stores/customer-command'
+import {
+  ProjectCommandConflictError,
+  ProjectLocalDraftOnlyError,
+} from '~/stores/project-command'
+import { ProjectPersistentConflictError } from '~/stores/project-persistent-command'
+import { SupplierCommandConflictError, useSupplierCommandStore } from '~/stores/supplier-command'
 
 const props = withDefaults(defineProps<{
   kind: MasterDataOwnerType
@@ -46,19 +66,31 @@ const customerStore = useCustomerStore()
 const crewStore = useCrewStore()
 const workerStore = useWorkerStore()
 const projectStore = useProjectStore()
+const projectCommandStore = useProjectCommandStore()
+const customerCommandStore = () => useCustomerCommandStore()
+const supplierCommandStore = () => useSupplierCommandStore()
+const crewWorkerCommandStore = () => useCrewWorkerCommandStore()
+const projectSession = projectCommandStore.createSession()
+const customerSession = props.kind === 'customer' ? customerCommandStore().createSession() : null
+const customerStoresOriginals = shallowRef(false)
+const projectStoresOriginals = shallowRef(false)
+const storesOriginals = computed(() => customerStoresOriginals.value || projectStoresOriginals.value)
+const preparingOriginals = shallowRef(0)
+const supplierSession = props.kind === 'supplier' ? supplierCommandStore().createSession() : null
+const crewWorkerSession = props.kind === 'crew' || props.kind === 'worker' ? crewWorkerCommandStore().createSession() : null
 const targetCostStore = useTargetCostStore()
 const readStore = useMasterDataReadStore()
 const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
 
 const meta = computed(() => FORM_META[props.kind])
-const pageFullPath = route.fullPath
-const pageKey = deriveKey(pageFullPath)
-const routeId = (() => {
+const pageFullPath = computed(() => route.fullPath)
+const pageKey = computed(() => deriveKey(pageFullPath.value))
+const routeId = computed(() => {
   const value = route.params.id
   return Array.isArray(value) ? value[0] : value
-})()
-const isEditing = Boolean(routeId)
+})
+const isEditing = computed(() => Boolean(routeId.value))
 const routeSupplierCategory = computed(() => {
   const value = route.query.category
   const category = Array.isArray(value) ? value[0] : value
@@ -66,14 +98,59 @@ const routeSupplierCategory = computed(() => {
     ? category
     : ''
 })
-const title = computed(() => `${isEditing ? '编辑' : '新建'} · ${meta.value.label}`)
+const routeSupplierName = computed(() => {
+  const value = route.query.name
+  const name = Array.isArray(value) ? value[0] : value
+  return typeof name === 'string' ? name.trim() : ''
+})
+const title = computed(() => `${isEditing.value ? '编辑' : '新建'} · ${meta.value.label}`)
+function routeQueryText(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : Array.isArray(value) && typeof value[0] === 'string' ? value[0] : undefined
+}
+function customerDetailPath(id: string): string {
+  const query = new URLSearchParams({ origin: 'real' })
+  const returnTo = routeQueryText(route.query.returnTo)
+  const returnContext = routeQueryText(route.query.returnContext)
+  if (returnTo && returnContext) {
+    query.set('returnTo', returnTo)
+    query.set('returnContext', returnContext)
+  }
+  return `/base/customer/${encodeURIComponent(id)}?${query.toString()}`
+}
+function supplierDetailPath(id: string): string {
+  const query = new URLSearchParams({ origin: 'real' })
+  const returnTo = validateSupplierReturnTo(routeQueryText(route.query.returnTo))
+  if (returnTo)
+    query.set('returnTo', returnTo)
+  return `/base/supplier/${encodeURIComponent(id)}?${query.toString()}`
+}
+function supplierCredentialPath(id: string): string {
+  const query = new URLSearchParams({ origin: 'real' })
+  const returnTo = validateSupplierReturnTo(routeQueryText(route.query.returnTo))
+  if (returnTo)
+    query.set('returnTo', returnTo)
+  return `/base/supplier/credential/${encodeURIComponent(id)}?${query.toString()}`
+}
+function crewWorkerDetailPath(kind: 'crew' | 'worker', id: string): string {
+  const query = new URLSearchParams({ origin: 'real' })
+  const returnTo = validateCrewWorkerReturnTo(routeQueryText(route.query.returnTo))
+  if (returnTo)
+    query.set('returnTo', returnTo)
+  return `/base/${kind}/${encodeURIComponent(id)}?${query.toString()}`
+}
 const returnPath = computed(() =>
-  props.returnToDetail && isEditing && meta.value.detailPath
-    ? `${meta.value.detailPath}/${routeId}`
+  props.returnToDetail && isEditing.value && meta.value.detailPath
+    ? props.kind === 'customer'
+      ? customerDetailPath(routeId.value ?? '')
+      : props.kind === 'supplier'
+        ? supplierDetailPath(routeId.value ?? '')
+        : props.kind === 'crew' || props.kind === 'worker'
+          ? crewWorkerDetailPath(props.kind, routeId.value ?? '')
+          : `${meta.value.detailPath}/${routeId.value}${props.kind === 'project' ? '?origin=real' : ''}`
     : meta.value.listPath,
 )
 const backLabel = computed(() =>
-  props.returnToDetail && isEditing
+  props.returnToDetail && isEditing.value
     ? `返回${meta.value.label}详情`
     : `返回${meta.value.listLabel}`,
 )
@@ -94,8 +171,12 @@ const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
 const hydrated = shallowRef(false)
 const desktopAttachmentPicker = shallowRef(false)
+const localDraftNotice = shallowRef('')
+const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | SupplierFormReadDTO | CrewFormReadDTO | WorkerFormReadDTO | null>(null)
+const customerAlreadyApplied = shallowRef(false)
 const formElement = useTemplateRef<HTMLFormElement>('formElement')
 let allowLeave = false
+let lastInitializedTarget = ''
 
 const dirty = computed(() => hydrated.value && (
   JSON.stringify(draft.value) !== savedSnapshot.value
@@ -104,9 +185,58 @@ const dirty = computed(() => hydrated.value && (
   || pendingRestoreIds.value.length > 0
 ))
 
+const taxpayerEditor = createTaxpayerEditorState({
+  target: () => ({ supplierId: supplierSession?.targetSupplierId ?? null, origin: route.query.origin && route.query.origin !== 'real' ? 'demo' : 'real', version: supplierSession?.baseVersion ?? null, draft: draft.value, saved: savedSnapshot.value ? JSON.parse(savedSnapshot.value) : {}, enabled: props.kind === 'supplier' && !isDesktopRuntime() && hydrated.value && !loadingAction.value }),
+  pending: () => supplierSession?.pendingTaxpayerCommand ?? null,
+  execute: (input, current) => supplierCommandStore().recordTaxpayerVerification(supplierSession!, input, current),
+  read: id => useNuxtApp().$repositories.supplierCommands.loadForm(id),
+  apply: (result, verifiedTaxNo) => {
+    const saved = savedSnapshot.value ? JSON.parse(savedSnapshot.value) : {}
+    const merged = mergeTaxpayerVerification(draft.value, saved, result.verification)
+    // 重新核对见到的新税号只有在本页税号未被编辑时才同步；其他草稿保持原样。
+    if ((draft.value.taxNo ?? '').trim() === (saved.taxNo ?? '').trim()) {
+      merged.draft.taxNo = verifiedTaxNo
+      merged.saved.taxNo = verifiedTaxNo
+    }
+    draft.value = merged.draft as MasterDataPageDraft
+    savedSnapshot.value = JSON.stringify(merged.saved)
+    success('纳税人核验记录已保存；主档其他输入仍保留')
+  },
+})
+
+// 浏览器预算有独立中央表单；不启动此页的本地记录、附件或保存流程。
+const centralTargetCost = props.kind === 'target_cost' && !isDesktopRuntime()
+let taxpayerTrigger: HTMLElement | null = null
+async function openTaxpayerEditor() {
+  taxpayerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  const message = taxpayerEditor.begin()
+  if (message)
+    warning(message)
+}
+async function closeTaxpayerEditor() {
+  if (taxpayerEditor.busy.value || taxpayerEditor.locked.value)
+    return
+  if (taxpayerEditor.dirty.value && !await confirm({ variant: 'simple', title: '放弃未保存的核验输入？', message: '仅放弃本次核验输入，主档其他输入继续保留。', confirmLabel: '放弃核验输入' }))
+    return
+  taxpayerEditor.close()
+  await nextTick()
+  if (taxpayerEditor.active.value && taxpayerTrigger?.isConnected)
+    taxpayerTrigger.focus()
+}
+async function submitTaxpayerEditor() {
+  if (await taxpayerEditor.save()) {
+    await nextTick()
+    if (taxpayerEditor.active.value && taxpayerTrigger?.isConnected)
+      taxpayerTrigger.focus()
+  }
+}
+
 const sections = computed(() => meta.value.sections)
 const usesSupplierCredentialFlow = computed(() =>
   meta.value.attachmentMode === 'supplierCredential',
+)
+const usesCentralCrewWorkerFlow = computed(() =>
+  !isDesktopRuntime() && (props.kind === 'crew' || props.kind === 'worker'),
 )
 const shellSections = computed(() =>
   props.hideSections || meta.value.hideSectionNav ? [] : sections.value,
@@ -128,9 +258,40 @@ const shellStateTitle = computed(() =>
     : `${meta.value.label}表单载入失败`,
 )
 
-const fetchCustomers = readStore.searchCustomers
-const fetchProjects = readStore.searchProjects
-const fetchCrews = readStore.searchCrews
+async function fetchCustomers(keyword: string) {
+  if (isDesktopRuntime() || props.kind !== 'project')
+    return readStore.searchCustomers(keyword)
+  const page = await useNuxtApp().$repositories.customerRead.list({ includeDemo: false, search: keyword, status: null, sort: 'name-asc', page: 1, pageSize: 50 })
+  return page.items.filter(item => item.dataOrigin === 'real' && item.status !== 'inactive').map(item => ({ id: item.customer.id, label: item.customer.label }))
+}
+async function fetchProjects(keyword: string) {
+  if (isDesktopRuntime() || props.kind !== 'worker')
+    return readStore.searchProjects(keyword)
+  const page = await useNuxtApp().$repositories.projectList.list({
+    includeDemo: false,
+    search: keyword,
+    status: null,
+    filters: { statuses: [], plannedEnds: [], managers: [], customerIds: [] },
+    sort: 'name-asc',
+    page: 1,
+    pageSize: 20,
+  })
+  return page.items.map(item => ({ id: item.project.id, label: item.project.label, hint: item.code }))
+}
+async function fetchCrews(keyword: string) {
+  if (isDesktopRuntime() || props.kind !== 'worker')
+    return readStore.searchCrews(keyword)
+  const page = await useNuxtApp().$repositories.crewWorkerRead.listCrews({
+    includeDemo: false,
+    search: keyword,
+    trade: null,
+    status: null,
+    sort: 'name-asc',
+    page: 1,
+    pageSize: 20,
+  })
+  return page.items.map(item => ({ id: item.crew.id, label: item.crew.label, hint: item.trade }))
+}
 
 async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
   switch (props.kind) {
@@ -145,16 +306,18 @@ async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
 
 function createDefaultDraft(): MasterDataPageDraft {
   const defaults = formDefaults(props.kind) as MasterDataPageDraft
-  if (props.kind !== 'supplier' || isEditing || !routeSupplierCategory.value)
+  if (props.kind !== 'supplier' || isEditing.value)
     return defaults
 
   return {
     ...defaults,
-    supplierCategory: routeSupplierCategory.value,
+    ...(routeSupplierCategory.value ? { supplierCategory: routeSupplierCategory.value } : {}),
+    ...(routeSupplierName.value ? { name: routeSupplierName.value } : {}),
   }
 }
 
 async function initialize() {
+  lastInitializedTarget = `${props.kind}:${routeId.value ?? 'new'}`
   hydrated.value = false
   loading.value = true
   loadError.value = ''
@@ -162,18 +325,48 @@ async function initialize() {
   pendingAttachments.value = []
   pendingRemoveIds.value = []
   pendingRestoreIds.value = []
+  localDraftNotice.value = ''
+  conflictLatest.value = null
+  customerAlreadyApplied.value = false
   let shouldFocus = false
   try {
-    if (!routeId) {
+    if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier' || props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime()) {
+      const central = props.kind === 'project'
+        ? await projectCommandStore.hydrate(projectSession, routeId.value ?? null)
+        : props.kind === 'customer'
+          ? await customerCommandStore().hydrate(customerSession!, routeId.value ?? null)
+          : props.kind === 'supplier'
+            ? await supplierCommandStore().hydrate(supplierSession!, routeId.value ?? null)
+            : await crewWorkerCommandStore().hydrate(crewWorkerSession!, props.kind, routeId.value ?? null)
+      draft.value = {
+        ...formDefaults(props.kind),
+        ...(central.draft ?? createDefaultDraft()),
+      } as MasterDataPageDraft
+      attachments.value = central.attachments
+      pendingAttachments.value = central.pendingAttachments.map((file, index) => ({
+        ...file,
+        localId: `restored-${index}-${file.fileName}`,
+      }))
+      pendingRemoveIds.value = central.pendingRemoveIds
+      pendingRestoreIds.value = central.pendingRestoreIds
+      customerStoresOriginals.value = customerSession?.storesOriginals ?? false
+      projectStoresOriginals.value = props.kind === 'project' && projectSession.storesOriginals
+      if ('productionNotice' in central && central.productionNotice)
+        localDraftNotice.value = central.productionNotice
+      if (props.kind === 'project' && central.restoredLocalDraft) {
+        localDraftNotice.value = '已恢复上次仅保留在本地的草稿；它尚未写入正式项目。'
+      }
+    }
+    else if (!routeId.value) {
       draft.value = createDefaultDraft()
       attachments.value = []
     }
     else {
       const [record, files] = await Promise.all([
-        loadRecord(routeId),
+        loadRecord(routeId.value),
         usesSupplierCredentialFlow.value
           ? Promise.resolve([])
-          : listFormAttachments(props.kind, routeId, true),
+          : listFormAttachments(props.kind, routeId.value, true),
       ])
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
@@ -275,21 +468,43 @@ function attachmentChanges(): FormAttachmentChanges {
 async function saveThroughStore(action: MasterDataSaveAction) {
   switch (props.kind) {
     case 'supplier':
-      return supplierStore.saveForm(draft.value, action, attachmentChanges())
+      return isDesktopRuntime()
+        ? supplierStore.saveForm(draft.value, action, attachmentChanges())
+        : supplierCommandStore().saveForm(supplierSession!, draft.value, action, attachmentChanges())
     case 'customer':
-      return customerStore.save(draft.value, action, attachmentChanges())
+      return isDesktopRuntime()
+        ? customerStore.save(draft.value, action, attachmentChanges())
+        : customerCommandStore().saveForm(customerSession!, draft.value, action, attachmentChanges())
     case 'crew':
-      return crewStore.save(draft.value, action, attachmentChanges())
+      return isDesktopRuntime()
+        ? crewStore.save(draft.value, action, attachmentChanges())
+        : crewWorkerCommandStore().saveCrew(crewWorkerSession!, draft.value, action, attachmentChanges())
     case 'worker':
-      return workerStore.save(draft.value, action, attachmentChanges())
+      return isDesktopRuntime()
+        ? workerStore.save(draft.value, action, attachmentChanges())
+        : crewWorkerCommandStore().saveWorker(crewWorkerSession!, draft.value, action, attachmentChanges())
     case 'project':
-      return projectStore.saveForm(draft.value, action, attachmentChanges())
+      return isDesktopRuntime()
+        ? projectStore.saveForm(draft.value, action, attachmentChanges())
+        : projectCommandStore.saveForm(projectSession, draft.value, action, attachmentChanges())
     case 'target_cost':
       return targetCostStore.save(draft.value, action, attachmentChanges())
   }
 }
 
 async function handleFooterAction(action: FormFooterAction) {
+  if (action !== 'cancel' && customerAlreadyApplied.value) {
+    warning('上次提交已经保存，请先使用已保存内容，再继续更正；不要重复添加原件。')
+    return
+  }
+  if (preparingOriginals.value) {
+    warning('附件原件正在读取，请完成后再保存。')
+    return
+  }
+  if (taxpayerEditor.open.value) {
+    warning('请先完成或取消当前税务核验')
+    return
+  }
   if (action === 'cancel') {
     await leaveForm()
     return
@@ -316,6 +531,14 @@ async function handleFooterAction(action: FormFooterAction) {
     fieldErrors.value = {}
 
     if (action === 'saveNew') {
+      if (props.kind === 'project' && !isDesktopRuntime())
+        projectCommandStore.startNewProject(projectSession)
+      if (props.kind === 'customer' && !isDesktopRuntime())
+        customerCommandStore().startNewCustomer(customerSession!)
+      if (props.kind === 'supplier' && !isDesktopRuntime())
+        supplierCommandStore().startNewSupplier(supplierSession!)
+      if ((props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime())
+        crewWorkerCommandStore().startNew(crewWorkerSession!, props.kind)
       allowLeave = true
       if (route.path === meta.value.newPath) {
         draft.value = createDefaultDraft()
@@ -324,7 +547,7 @@ async function handleFooterAction(action: FormFooterAction) {
         allowLeave = false
       }
       else {
-        tabsStore.close(pageKey)
+        tabsStore.close(pageKey.value)
         await navigateTo(meta.value.newPath)
       }
       return
@@ -335,34 +558,125 @@ async function handleFooterAction(action: FormFooterAction) {
       const detailSuffix = meta.value.postSaveDetailTab
         ? `?tab=${encodeURIComponent(meta.value.postSaveDetailTab)}`
         : ''
-      const closePath = (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
-        ? `${meta.value.detailPath}/${routeId ?? result.id}${detailSuffix}`
-        : meta.value.listPath
+      const originSuffix = props.kind === 'project' || props.kind === 'crew' || props.kind === 'worker'
+        ? `${detailSuffix ? '&' : '?'}origin=real`
+        : ''
+      const closePath = props.kind === 'customer' && props.returnToDetail
+        ? customerDetailPath(routeId.value ?? result.id)
+        : props.kind === 'supplier' && props.returnToDetail
+          ? supplierDetailPath(routeId.value ?? result.id)
+          : (props.kind === 'crew' || props.kind === 'worker') && props.returnToDetail
+              ? crewWorkerDetailPath(props.kind, routeId.value ?? result.id)
+              : (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
+                  ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
+                  : meta.value.listPath
       if (meta.value.postSaveDetailTab) {
         await navigateTo(closePath)
-        tabsStore.close(pageKey)
+        tabsStore.close(pageKey.value)
       }
       else {
-        tabsStore.close(pageKey)
+        tabsStore.close(pageKey.value)
         await navigateTo(closePath)
       }
       return
     }
 
-    if (!isEditing) {
+    if (!isEditing.value) {
       allowLeave = true
-      tabsStore.close(pageKey)
+      tabsStore.close(pageKey.value)
       await navigateTo(`${meta.value.newPath}/${result.id}`)
       return
     }
     await initialize()
   }
   catch (cause) {
-    error(`保存失败：${toErrorMessage(cause)}`)
+    if (cause instanceof ProjectPersistentConflictError) {
+      conflictLatest.value = cause.latest
+      customerAlreadyApplied.value = cause.alreadyApplied
+      warning(cause.message)
+    }
+    else if (cause instanceof ProjectCommandConflictError) {
+      conflictLatest.value = cause.latest
+      localDraftNotice.value = '当前内容仍只保留在本地，未覆盖服务器最新版本。'
+      warning(cause.message)
+    }
+    else if (cause instanceof CustomerCommandConflictError) {
+      conflictLatest.value = cause.latest
+      customerAlreadyApplied.value = cause.alreadyApplied
+      warning(cause.message)
+    }
+    else if (cause instanceof SupplierCommandConflictError) {
+      conflictLatest.value = cause.latest
+      customerAlreadyApplied.value = cause.alreadyApplied
+      warning(cause.message)
+    }
+    else if (cause instanceof CrewWorkerCommandConflictError) {
+      conflictLatest.value = cause.latest
+      warning(cause.message)
+    }
+    else if (cause instanceof ProjectLocalDraftOnlyError) {
+      localDraftNotice.value = cause.message
+      error(cause.message)
+    }
+    else {
+      error(`保存失败：${toErrorMessage(cause)}`)
+    }
   }
   finally {
     loadingAction.value = null
   }
+}
+
+function keepLocalAgainstLatest() {
+  if (!conflictLatest.value)
+    return
+  if (props.kind === 'customer')
+    customerCommandStore().rebase(customerSession!, conflictLatest.value.version)
+  else if (props.kind === 'supplier')
+    supplierCommandStore().rebase(supplierSession!, conflictLatest.value.version)
+  else if (props.kind === 'crew' || props.kind === 'worker')
+    crewWorkerCommandStore().rebase(crewWorkerSession!, props.kind, conflictLatest.value.version)
+  else
+    projectCommandStore.rebase(projectSession, conflictLatest.value.version)
+  conflictLatest.value = null
+  localDraftNotice.value = '已保留你的内容并基于服务器最新版本；请再次保存以提交。'
+}
+
+async function useLatestServerVersion() {
+  const latest = conflictLatest.value
+  if (!latest)
+    return
+  if (props.kind === 'customer') {
+    try {
+      customerCommandStore().acceptLatest(customerSession!, latest as CustomerFormReadDTO)
+    }
+    catch (cause) {
+      error(toErrorMessage(cause))
+      return
+    }
+  }
+  else if (props.kind === 'supplier') {
+    supplierCommandStore().acceptLatest(supplierSession!, latest as SupplierFormReadDTO)
+  }
+  else if (props.kind === 'crew' || props.kind === 'worker') {
+    crewWorkerCommandStore().acceptLatest(crewWorkerSession!, props.kind, latest as CrewFormReadDTO | WorkerFormReadDTO)
+  }
+  else {
+    projectCommandStore.acceptLatest(projectSession, latest as ProjectFormReadDTO)
+  }
+  customerAlreadyApplied.value = false
+  draft.value = {
+    ...formDefaults(props.kind),
+    ...latest.draft,
+  } as MasterDataPageDraft
+  attachments.value = latest.attachments
+  pendingAttachments.value = []
+  pendingRemoveIds.value = []
+  pendingRestoreIds.value = []
+  conflictLatest.value = null
+  localDraftNotice.value = ''
+  await nextTick()
+  savedSnapshot.value = JSON.stringify(draft.value)
 }
 
 function appendPendingAttachments(files: FormAttachmentDraft[]) {
@@ -387,12 +701,30 @@ function appendPendingAttachments(files: FormAttachmentDraft[]) {
   ]
 }
 
-function handleFiles(files: File[]) {
-  appendPendingAttachments(files.map(file => ({
-    fileName: file.name,
-    fileSize: file.size,
-    mimeType: file.type,
-  })))
+async function handleFiles(files: File[]) {
+  preparingOriginals.value++
+  try {
+    appendPendingAttachments(storesOriginals.value
+      ? await Promise.all(files.map(props.kind === 'project' ? projectOriginal : customerOriginal))
+      : files.map(file => ({ fileName: file.name, fileSize: file.size, mimeType: file.type })))
+  }
+  catch (cause) { error(toErrorMessage(cause)) }
+  finally { preparingOriginals.value-- }
+}
+
+async function downloadCustomerOriginal(file: FormAttachment) {
+  try {
+    const blob = props.kind === 'project'
+      ? await projectCommandStore.downloadOriginal(file.ownerId, file.id)
+      : await customerCommandStore().downloadOriginal(file.ownerId, file.id)
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = file.fileName
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+  catch (cause) { error(toErrorMessage(cause)) }
 }
 
 async function pickNativeFiles() {
@@ -444,55 +776,70 @@ function toggleExistingAttachment(id: string) {
 }
 
 async function leaveForm() {
-  if (dirty.value) {
+  if (taxpayerEditor.busy.value)
+    return
+  if (dirty.value || taxpayerEditor.dirty.value) {
     const leave = await confirm({
       variant: 'simple',
       title: '放弃修改',
-      message: `当前表单还有未保存内容，确认放弃并${isEditing && props.returnToDetail ? '返回详情' : '返回列表'}？`,
+      message: `当前表单还有未保存内容，确认放弃并${isEditing.value && props.returnToDetail ? '返回详情' : '返回列表'}？`,
       confirmLabel: '放弃修改',
     })
     if (!leave)
       return
   }
   allowLeave = true
-  tabsStore.close(pageKey)
+  tabsStore.close(pageKey.value)
   await navigateTo(returnPath.value)
 }
 
-onBeforeRouteLeave(async () => {
-  if (allowLeave || !dirty.value)
-    return true
+if (!centralTargetCost) {
+  useTabCloseGuard(async () => {
+    if (taxpayerEditor.busy.value)
+      return false
+    if (allowLeave || (!dirty.value && !taxpayerEditor.dirty.value))
+      return true
 
-  // 普通页签切换保留 KeepAlive 草稿；只有当前表单页签已被关闭时才拦截。
-  if (tabsStore.tabs.some(tab => tab.key === pageKey))
-    return true
-
-  const leave = await confirm({
-    variant: 'simple',
-    title: '放弃修改',
-    message: '当前表单还有未保存内容，确认离开？',
-    confirmLabel: '放弃修改',
+    const leave = await confirm({
+      variant: 'simple',
+      title: '放弃修改',
+      message: '当前表单还有未保存内容，确认离开？',
+      confirmLabel: '放弃修改',
+    })
+    return leave
   })
-  if (!leave)
-    tabsStore.open({ fullPath: pageFullPath, title: title.value })
-  return leave
-})
+}
 
 onMounted(() => {
-  desktopAttachmentPicker.value = isTauri()
+  if (centralTargetCost)
+    return
+  desktopAttachmentPicker.value = isDesktopRuntime()
   void initialize()
 })
 
+onActivated(() => {
+  if (centralTargetCost)
+    return
+  taxpayerEditor.activate()
+  const target = `${props.kind}:${routeId.value ?? 'new'}`
+  if (lastInitializedTarget && target !== lastInitializedTarget)
+    void initialize()
+})
+onDeactivated(taxpayerEditor.deactivate)
+onScopeDispose(taxpayerEditor.deactivate)
+
 watch(routeSupplierCategory, () => {
-  if (props.kind === 'supplier' && !isEditing)
+  if (props.kind === 'supplier' && !isEditing.value)
     void initialize()
 })
 </script>
 
 <template>
+  <CentralTargetCostFormScreen v-if="centralTargetCost" />
   <EntityFormShell
+    v-else
     :title="title"
-    subtitle="草稿可暂存不完整内容；提交时校验必填、关联和金额规则。"
+    :subtitle="kind === 'supplier' ? undefined : '草稿可暂存不完整内容；提交时校验必填、关联和金额规则。'"
     :back-label="backLabel"
     :sections="shellSections"
     :state="shellState"
@@ -510,6 +857,38 @@ watch(routeSupplierCategory, () => {
       </template>
     </template>
 
+    <section
+      v-if="localDraftNotice"
+      data-ui="project-local-draft-notice"
+      class="border border-warn/35 bg-warn/8 px-3 py-2 text-12px leading-5 text-ink-soft"
+      role="status"
+    >
+      <b class="text-warn">{{ customerStoresOriginals || supplierSession?.persistent ? '提交核对' : '本地草稿' }}</b>
+      · {{ localDraftNotice }}
+    </section>
+
+    <section
+      v-if="conflictLatest"
+      data-ui="project-version-conflict"
+      class="border border-danger/30 bg-danger/6 p-3"
+      role="alert"
+    >
+      <h2 class="text-13px font-800 text-danger">
+        {{ customerAlreadyApplied ? `上次${meta.label}提交已保存` : `${meta.label}已被其他操作更新` }}
+      </h2>
+      <p class="mt-1 text-12px leading-5 text-ink-soft">
+        {{ customerAlreadyApplied ? `已核对原${meta.label}和附件。当前输入仍保留在页面，采用已保存内容后再作新的更正，避免重复添加原件。` : `服务器最新版本为 ${conflictLatest.version}。请选择保留当前内容后重试，或改用服务器版本。` }}
+      </p>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <button v-if="!customerAlreadyApplied" type="button" class="btn-primary" @click="keepLocalAgainstLatest">
+          保留我的内容
+        </button>
+        <button type="button" class="btn-secondary" @click="useLatestServerVersion">
+          {{ customerAlreadyApplied ? '使用已保存内容' : '改用服务器最新版' }}
+        </button>
+      </div>
+    </section>
+
     <form
       ref="formElement"
       :data-ui="kind === 'supplier' ? 'supplier-form-scroll' : undefined"
@@ -526,46 +905,56 @@ watch(routeSupplierCategory, () => {
         :fetch-projects="fetchProjects"
         :fetch-crews="fetchCrews"
         @clear-error="clearFieldError"
+        @verify-taxpayer="openTaxpayerEditor"
       />
 
       <MasterDataAttachmentSection
-        v-if="!usesSupplierCredentialFlow"
+        v-if="!usesSupplierCredentialFlow && !usesCentralCrewWorkerFlow"
         :title="attachmentTitle"
         :desktop-picker="desktopAttachmentPicker"
+        :stores-originals="storesOriginals"
+        :original-description="kind === 'project' ? '原件随项目一同保存，重启后可下载；单份不超过 10 MiB' : undefined"
         :attachments="attachments"
         :pending-attachments="pendingAttachments"
         :pending-remove-ids="pendingRemoveIds"
         :pending-restore-ids="pendingRestoreIds"
         @pick-native="pickNativeFiles"
         @files="handleFiles"
+        @download="downloadCustomerOriginal"
         @toggle-existing="toggleExistingAttachment"
         @remove-pending="removePending"
         @update-pending-category="updatePendingCategory"
       />
 
       <section
-        v-else
+        v-else-if="usesSupplierCredentialFlow"
         id="section-attachments"
         data-ui="supplier-credential-guidance"
         class="panel scroll-mt-4 p-4"
       >
-        <SectionHeader
-          title="证照资料"
-          subtitle="证照原件、OCR 核对、有效期和人工审核统一在分供方详情维护。"
-        />
-        <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3 border border-brand/20 bg-brand-soft/35 p-3 text-12px text-ink-soft">
-          <span class="i-lucide-shield-check shrink-0 text-18px text-brand" aria-hidden="true" />
-          <p class="min-w-52 flex-1 leading-5">
-            此处只保存主数据，不会把普通附件伪装成证照。保存后进入“证照附件”，按真实文件、资料要求和人工核验规则完成准入。
-          </p>
+        <SectionHeader title="证照资料" />
+        <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3 text-12px text-ink-soft">
           <NuxtLink
             v-if="isEditing && routeId"
-            :to="`/base/supplier/${routeId}?tab=credential`"
+            :to="supplierCredentialPath(routeId)"
             class="btn-secondary shrink-0"
           >
             前往证照附件
           </NuxtLink>
+          <span v-else>保存分供方后可维护证照资料。</span>
         </div>
+      </section>
+
+      <section
+        v-else
+        id="section-attachments"
+        data-ui="crew-worker-central-attachment-guidance"
+        class="panel scroll-mt-4 p-4"
+      >
+        <SectionHeader title="附件" subtitle="班组与工人正式主数据只通过中央命令保存。" />
+        <p class="mt-3 border border-line bg-surface-2 p-3 text-12px leading-5 text-ink-soft">
+          中央附件边界尚未接入；当前表单不会回退到本地附件，也不会生成并行正式来源。
+        </p>
       </section>
 
       <section id="section-note" class="panel scroll-mt-4 p-4">
@@ -585,6 +974,7 @@ watch(routeSupplierCategory, () => {
       />
     </template>
   </EntityFormShell>
+  <SupplierTaxpayerDialog v-if="taxpayerEditor.open.value && taxpayerEditor.active.value" :value="taxpayerEditor.form" :tax-no="taxpayerEditor.taxNo.value" :busy="taxpayerEditor.busy.value" :locked="taxpayerEditor.locked.value" :conflict="taxpayerEditor.conflict.value" :error="taxpayerEditor.error.value" :summary="taxpayerEditor.summary.value" @patch="patch => { if (!taxpayerEditor.busy.value && !taxpayerEditor.locked.value && !taxpayerEditor.conflict.value) Object.assign(taxpayerEditor.form, patch) }" @submit="submitTaxpayerEditor" @cancel="closeTaxpayerEditor" @recheck="taxpayerEditor.recheck" />
 </template>
 
 <style scoped>

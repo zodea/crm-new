@@ -127,6 +127,6 @@ describe('工资已发放快照导出', () => {
     expect(() => createPayrollWorkbookExport(statement({ status: 'checked' })))
       .toThrow('完成实际发放后')
     expect(() => createPayrollWorkbookExport(statement({ formatFamily: 'B' })))
-      .toThrow('B 类合同清单工资尚未实现')
+      .toThrow('B 类工资已退役')
   })
 })

@@ -1,6 +1,9 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
+import type { DeliveryContext, DeliveryRevision } from '~/lib/delivery-record/contract'
 import type { DeliveryAmountSource } from '~/lib/delivery/review'
-import { defineStore } from 'pinia'
+import type { DataOriginDTO } from '~/types/read-model'
+import { isTauri } from '@tauri-apps/api/core'
+import { defineStore, storeToRefs } from 'pinia'
 import { computed, readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { select, withTransaction } from '~/lib/db/connection'
@@ -13,9 +16,13 @@ import {
   undoOperation,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
+import { createDeliveryRecordState } from '~/lib/delivery-record/state'
+import { deliveryNaturalKey, hasDeliveryPricePending, normalizeDeliveryOrderNo } from '~/lib/delivery/review'
 import { generateId } from '~/lib/util/id'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 export interface DeliveryLineDraft {
+  id?: string
   materialName: string
   spec: string
   unit: string
@@ -31,6 +38,7 @@ export interface DeliveryLine extends Omit<DeliveryLineDraft, 'amount' | 'amount
   deliveryRecordId: string
   amount: number | null
   amountSource: DeliveryAmountSource
+  currentValueConfirmed: boolean
   sortOrder: number
 }
 
@@ -38,6 +46,12 @@ export type DeliveryPrintDisposition = 'pending' | 'printed' | 'excluded'
 
 export interface DeliveryRecord {
   id: string
+  dataOrigin?: DataOriginDTO
+  version?: string
+  assetId?: string | null
+  projectName?: string
+  supplierName?: string
+  legacyAudit?: string | null
   projectId: string
   supplierId: string | null
   rawSiteText: string
@@ -46,6 +60,9 @@ export interface DeliveryRecord {
   fileName: string
   filePath: string
   ocrStatus: string
+  reviewStatus: 'reviewed' | 'unreviewed'
+  naturalKeyDuplicate: boolean
+  currentValuesConfirmed: boolean
   archived: boolean
   stored: boolean
   printBatchId: string
@@ -67,11 +84,19 @@ export interface DeliveryRecordInput {
   orderNo: string
   deliveryDate: string
   note: string
+  reviewFlag?: string
   rawSiteText?: string
   fileName?: string
   filePath?: string
   printBatchId?: string
+  confirmations?: DeliveryRecordConfirmations
   lines: DeliveryLineDraft[]
+}
+
+export interface DeliveryRecordConfirmations {
+  noOrderNoConfirmed?: boolean
+  pricePendingConfirmed?: boolean
+  amountReviewed?: boolean
 }
 
 export interface DeliveryRecordSourceFile {
@@ -233,7 +258,36 @@ function validateInput(input: DeliveryRecordInput): NormalizedDeliveryLineDraft[
   return lines
 }
 
-function rowToLine(row: Record<string, unknown>): DeliveryLine {
+const MANAGED_REVIEW_FLAGS = new Set(['原件无单号', '价格待补录'])
+
+function reviewFlagTokens(values: readonly (string | undefined)[]): string[] {
+  return values.flatMap(value => (value ?? '').split(/[；;]/))
+    .map(value => value.trim())
+    .filter(Boolean)
+}
+
+function deriveReviewFlag(
+  orderNo: string,
+  lines: readonly NormalizedDeliveryLineDraft[],
+  confirmations: DeliveryRecordConfirmations | undefined,
+  ...existingFlags: (string | undefined)[]
+): string {
+  const tokens = reviewFlagTokens(existingFlags)
+    .filter(token => !MANAGED_REVIEW_FLAGS.has(token))
+  if (!orderNo) {
+    if (confirmations?.noOrderNoConfirmed !== true)
+      throw new Error('缺少送货单号，请先确认原件确实无单号')
+    tokens.push('原件无单号')
+  }
+  if (hasDeliveryPricePending(lines)) {
+    if (confirmations?.pricePendingConfirmed !== true)
+      throw new Error('缺少单价或金额，请先确认按“价格待补录”归档')
+    tokens.push('价格待补录')
+  }
+  return [...new Set(tokens)].join('；')
+}
+
+function rowToLine(row: Record<string, unknown>, currentValueConfirmed: boolean): DeliveryLine {
   return {
     id: row.id as string,
     deliveryRecordId: row.delivery_record_id as string,
@@ -244,16 +298,25 @@ function rowToLine(row: Record<string, unknown>): DeliveryLine {
     unitPrice: toNullableNumber(row.unit_price),
     amount: toNullableNumber(row.amount),
     amountSource: amountSourceOf(row.amount_source, 'manual'),
+    currentValueConfirmed,
     note: (row.note ?? '') as string,
     sortOrder: toNumber(row.sort_order),
   }
+}
+
+type DeliveryRecordWithoutDuplicateFlag = Omit<DeliveryRecord, 'naturalKeyDuplicate'>
+
+function currentValuesConfirmedFromRow(row: Record<string, unknown>): boolean {
+  return Boolean(row.archived) && row.ocr_status === 'reviewed'
 }
 
 function rowToRecord(
   row: Record<string, unknown>,
   lines: DeliveryLine[],
   hasSourceFile: boolean,
-): DeliveryRecord {
+): DeliveryRecordWithoutDuplicateFlag {
+  const ocrStatus = (row.ocr_status ?? 'pending') as string
+  const currentValuesConfirmed = currentValuesConfirmedFromRow(row)
   return {
     id: row.id as string,
     projectId: row.project_id as string,
@@ -263,7 +326,9 @@ function rowToRecord(
     deliveryDate: (row.delivery_date ?? '') as string,
     fileName: (row.file_name ?? '') as string,
     filePath: (row.file_path ?? '') as string,
-    ocrStatus: (row.ocr_status ?? 'reviewed') as string,
+    ocrStatus,
+    reviewStatus: currentValuesConfirmed ? 'reviewed' : 'unreviewed',
+    currentValuesConfirmed,
     archived: Boolean(row.archived),
     // v25 起归档即视为已入库；stored 只保留作存量兼容镜像。
     stored: Boolean(row.archived),
@@ -285,6 +350,50 @@ function rowToRecord(
     lines,
     totalAmount: roundMoney(lines.reduce((sum, line) => sum + (line.amount ?? 0), 0)),
   }
+}
+
+function withNaturalKeyDuplicateFlags(
+  records: readonly DeliveryRecordWithoutDuplicateFlag[],
+): DeliveryRecord[] {
+  const counts = new Map<string, number>()
+  for (const record of records) {
+    const key = deliveryNaturalKey(record)
+    if (key)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return records.map((record) => {
+    const key = deliveryNaturalKey(record)
+    return {
+      ...record,
+      naturalKeyDuplicate: key != null && (counts.get(key) ?? 0) > 1,
+    }
+  })
+}
+
+async function assertDeliveryNaturalKeyAvailable(
+  tx: SoftDb,
+  input: Pick<DeliveryRecordInput, 'projectId' | 'supplierId' | 'orderNo'>,
+  excludeId?: string,
+): Promise<void> {
+  const orderNo = normalizeDeliveryOrderNo(input.orderNo)
+  if (!input.projectId.trim() || !input.supplierId?.trim() || !orderNo)
+    return
+
+  const params: unknown[] = [input.projectId, input.supplierId]
+  const excludeSql = excludeId ? 'AND id <> ?' : ''
+  if (excludeId)
+    params.push(excludeId)
+  const rows = await tx.select<{ order_no: string | null }>(
+    `SELECT order_no
+     FROM delivery_records
+     WHERE project_id = ?
+       AND supplier_id = ?
+       AND deleted_at IS NULL
+       ${excludeSql}`,
+    params,
+  )
+  if (rows.some(row => normalizeDeliveryOrderNo(row.order_no ?? '') === orderNo))
+    throw new Error('送货单自然键重复，不能重复归档')
 }
 
 async function insertLines(tx: SoftDb, recordId: string, lines: NormalizedDeliveryLineDraft[], now: string): Promise<void> {
@@ -358,7 +467,8 @@ async function persistSourceFile(
   )
 }
 
-export const useDeliveryRecordStore = defineStore('delivery-record', () => {
+/** ADR 0020 保留的桌面 SQLite 适配；浏览器不会调用此路径。 */
+const useLocalDeliveryRecordStore = defineStore('delivery-record-native-source', () => {
   const list = shallowRef<DeliveryRecord[]>([])
   const loading = shallowRef(false)
 
@@ -377,19 +487,24 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
              AND source.deleted_at IS NULL`,
         ),
       ])
+      const currentValuesConfirmedByRecord = new Map(recordRows.map(row => [
+        row.id as string,
+        currentValuesConfirmedFromRow(row),
+      ]))
       const linesByRecord = new Map<string, DeliveryLine[]>()
       for (const row of lineRows) {
-        const line = rowToLine(row)
+        const recordId = row.delivery_record_id as string
+        const line = rowToLine(row, currentValuesConfirmedByRecord.get(recordId) === true)
         const lines = linesByRecord.get(line.deliveryRecordId) ?? []
         lines.push(line)
         linesByRecord.set(line.deliveryRecordId, lines)
       }
       const sourceRecordIds = new Set(sourceRows.map(row => row.owner_id))
-      list.value = recordRows.map(row => rowToRecord(
+      list.value = withNaturalKeyDuplicateFlags(recordRows.map(row => rowToRecord(
         row,
         linesByRecord.get(row.id as string) ?? [],
         sourceRecordIds.has(row.id as string),
-      ))
+      )))
     }
     finally {
       loading.value = false
@@ -406,24 +521,28 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     const source = sourceFile ? await prepareSourceFile(sourceFile) : null
     const id = generateId('del')
     const printBatchId = input.printBatchId?.trim() || id
+    const orderNo = normalizeDeliveryOrderNo(input.orderNo)
     const now = new Date().toISOString()
     await withTransaction(async (tx) => {
+      const reviewFlag = deriveReviewFlag(orderNo, lines, input.confirmations, input.reviewFlag)
+      await assertDeliveryNaturalKeyAvailable(tx, input)
       await tx.execute(
         `INSERT INTO delivery_records
           (id, project_id, supplier_id, raw_site_text, order_no, delivery_date, file_name, file_path,
            ocr_status, archived, stored, print_batch_id, print_disposition, printed_at, print_excluded_at,
            review_flag, note, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reviewed', 1, 1, ?, 'pending', NULL, NULL, '', ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reviewed', 1, 1, ?, 'pending', NULL, NULL, ?, ?, ?, ?)`,
         [
           id,
           input.projectId,
           input.supplierId || null,
           input.rawSiteText?.trim() ?? '',
-          input.orderNo.trim(),
+          orderNo || null,
           input.deliveryDate,
           input.fileName?.trim() || source?.fileName || '',
           input.filePath?.trim() ?? '',
           printBatchId,
+          reviewFlag,
           input.note.trim(),
           now,
           now,
@@ -514,17 +633,35 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
 
   async function update(id: string, input: DeliveryRecordInput): Promise<string | null> {
     const lines = validateInput(input)
+    const orderNo = normalizeDeliveryOrderNo(input.orderNo)
     const now = new Date().toISOString()
     const logId = await withTransaction(async (tx) => {
+      const [existing] = await tx.select<{ review_flag: string | null }>(
+        `SELECT review_flag
+         FROM delivery_records
+         WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      )
+      if (!existing)
+        return null
+      const reviewFlag = deriveReviewFlag(
+        orderNo,
+        lines,
+        input.confirmations,
+        existing.review_flag ?? '',
+        input.reviewFlag,
+      )
+      await assertDeliveryNaturalKeyAvailable(tx, input, id)
       const updateLogId = await withUpdateLog(tx, 'delivery_records', id, () => tx.execute(
         `UPDATE delivery_records
-         SET project_id=?, supplier_id=?, order_no=?, delivery_date=?, note=?, updated_at=?
+         SET project_id=?, supplier_id=?, order_no=?, delivery_date=?, review_flag=?, note=?, updated_at=?
          WHERE id=?`,
         [
           input.projectId,
           input.supplierId || null,
-          input.orderNo.trim(),
+          orderNo || null,
           input.deliveryDate,
+          reviewFlag,
           input.note.trim(),
           now,
           id,
@@ -670,3 +807,53 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     undo,
   }
 })
+
+const useCentralDeliveryRecordStore = defineStore('delivery-record-central', () => {
+  const repositories = useNuxtApp().$repositories
+  const visibility = useDataVisibilityStore()
+  return createDeliveryRecordState(repositories.deliveries, () => visibility.includeDemo ? 'demo' : 'real')
+})
+
+const useNativeDeliveryRecordAdapter = defineStore('delivery-record-native', () => {
+  const local = useLocalDeliveryRecordStore()
+  const visibility = useDataVisibilityStore()
+  return {
+    ...storeToRefs(local),
+    mode: 'native' as const,
+    origin: computed(() => visibility.includeDemo ? 'demo' as const : 'real' as const),
+    context: shallowRef<DeliveryContext | null>(null),
+    canWrite: computed(() => true),
+    sourceVersion: shallowRef(''),
+    error: shallowRef(''),
+    saving: shallowRef(false),
+    load: local.load,
+    byId: local.byId,
+    add: local.add,
+    update: (id: string, input: DeliveryRecordInput, _reason = '', _baseVersion?: string) => local.update(id, input),
+    remove: local.remove,
+    restore: (id: string, _baseVersion?: string) => local.restore(id),
+    undo: local.undo,
+    excludeFromPrint: local.excludeFromPrint,
+    excludeManyFromPrint: local.excludeManyFromPrint,
+    confirmPrintReceipt: local.confirmPrintReceipt,
+    confirmManyPrintReceipts: local.confirmManyPrintReceipts,
+    async loadSourceFile(id: string, options?: { signal?: AbortSignal, assetId?: string | null }) {
+      if (options?.assetId === null)
+        return null
+      if (options?.assetId)
+        throw new Error('桌面旧适配尚未接入历史原件读取')
+      const file = await local.loadSourceFile(id)
+      if (options?.signal?.aborted)
+        throw new DOMException('原件读取已取消', 'AbortError')
+      return file
+    },
+    saveSourceFile: (id: string, file: File, _reason = '', _baseVersion?: string) => local.saveSourceFile(id, file),
+    async history(_id: string, _options?: { signal?: AbortSignal }): Promise<DeliveryRevision[]> {
+      throw new Error('桌面旧适配尚未接入中央修订历史')
+    },
+  }
+})
+
+export function useDeliveryRecordStore() {
+  return isTauri() ? useNativeDeliveryRecordAdapter() : useCentralDeliveryRecordStore()
+}

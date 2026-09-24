@@ -1,31 +1,61 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
+import type { MaterialContractInput } from '~/lib/material/price-analysis'
 import type { DeliveryRecord } from '~/stores/delivery-record'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, watch } from 'vue'
+import { readDeliveryMaterialContracts } from '~/lib/delivery-record/material-contracts'
+import { createDeliveryArchiveZip, DELIVERY_ZIP_MIME } from '~/lib/delivery/export'
 import { clampPage, paginate } from '~/lib/kit/table'
+import { toLocalDateInputValue } from '~/lib/util/local-date'
 import { yuan } from '~/lib/util/money'
 
 const store = useDeliveryRecordStore()
-const projectStore = useProjectStore()
-const supplierStore = useSupplierStore()
-const contractStore = useContractStore()
-const { confirm, undoToast, error } = useKitUI()
+const central = store.mode === 'central'
+const projectStore = central ? null : useProjectStore()
+const supplierStore = central ? null : useSupplierStore()
+const contractStore = central ? null : useContractStore()
+const contractRepository = central ? useNuxtApp().$repositories.materialContractRead : null
+const contractFacts = shallowRef<readonly MaterialContractInput[]>([])
+const contractReadError = shallowRef('')
+let contractReadController: AbortController | null = null
+const { confirm, error, exportFile, warning, undoToast } = useKitUI()
+const ready = shallowRef(!central)
+const readError = shallowRef('')
+const reading = shallowRef(false)
+const deleting = shallowRef('')
+let generation = 0
+let active = true
+let exportController: AbortController | null = null
+const records = computed(() => ready.value && active ? store.list : [])
+const projects = computed(() => ready.value ? central ? store.context?.projects ?? [] : projectStore?.list ?? [] : [])
+const canWrite = computed(() => ready.value && active && (!central || store.canWrite))
 
 const search = shallowRef('')
+const dateFrom = shallowRef('')
+const dateTo = shallowRef('')
 const selectedNode = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
+const convertImagesToPdf = shallowRef(false)
+const exportingArchive = shallowRef(false)
 
 function projectName(id: string): string {
-  return projectStore.byId(id)?.name ?? '未知项目'
+  return central ? store.context?.projects.find(row => row.id === id)?.name ?? records.value.find(row => row.projectId === id)?.projectName ?? '未知项目' : projectStore?.byId(id)?.name ?? '未知项目'
 }
 
 function supplierName(id: string | null): string {
-  return id ? supplierStore.byId(id)?.name ?? '未知分供方' : '未区分分供方'
+  if (!id)
+    return '未区分分供方'
+  return central ? store.context?.suppliers.find(row => row.id === id)?.name ?? records.value.find(row => row.supplierId === id)?.supplierName ?? '未知分供方' : supplierStore?.byId(id)?.name ?? '未知分供方'
+}
+
+function entityPath(prefix: string, id = '') {
+  return `${prefix}${id ? `/${encodeURIComponent(id)}` : ''}${central ? `?origin=${store.origin}` : ''}`
 }
 
 function supplierContractDate(projectId: string, supplierId: string): string {
-  return contractStore.list
+  return (central ? contractFacts.value : contractStore?.list ?? [])
     .filter(contract => contract.kind === '材采'
       && contract.projectId === projectId
       && contract.supplierId === supplierId
@@ -35,11 +65,11 @@ function supplierContractDate(projectId: string, supplierId: string): string {
 }
 
 const treeItems = computed<TreeNode[]>(() => [
-  { key: 'all', label: '全部送货单', icon: 'i-lucide-archive', count: store.list.length },
-  ...projectStore.list
+  { key: 'all', label: '全部送货单', icon: 'i-lucide-archive', count: records.value.length },
+  ...projects.value
     .map((project) => {
-      const records = store.list.filter(record => record.projectId === project.id)
-      const supplierIds = [...new Set(records.map(record => record.supplierId))]
+      const projectRecords = records.value.filter(record => record.projectId === project.id)
+      const supplierIds = [...new Set(projectRecords.map(record => record.supplierId))]
       const children = supplierIds
         .sort((a, b) => {
           if (a == null)
@@ -50,17 +80,17 @@ const treeItems = computed<TreeNode[]>(() => [
             || supplierName(a).localeCompare(supplierName(b), 'zh-CN')
         })
         .map(supplierId => ({
-          key: `supplier:${project.id}:${supplierId ?? 'un'}`,
+          key: JSON.stringify(['supplier', project.id, supplierId]),
           label: supplierName(supplierId),
           icon: supplierId ? 'i-lucide-factory' : 'i-lucide-triangle-alert',
           tone: supplierId ? undefined : 'warn' as const,
-          count: records.filter(record => record.supplierId === supplierId).length,
+          count: projectRecords.filter(record => record.supplierId === supplierId).length,
         }))
       return {
-        key: `project:${project.id}`,
+        key: JSON.stringify(['project', project.id]),
         label: project.name,
         icon: 'i-lucide-building-2',
-        count: records.length,
+        count: projectRecords.length,
         children,
       }
     })
@@ -69,38 +99,98 @@ const treeItems = computed<TreeNode[]>(() => [
 
 const nodeFiltered = computed(() => {
   if (selectedNode.value === 'all')
-    return store.list
-  if (selectedNode.value.startsWith('project:')) {
-    const projectId = selectedNode.value.slice('project:'.length)
-    return store.list.filter(record => record.projectId === projectId)
+    return records.value
+  try {
+    const scope: unknown = JSON.parse(selectedNode.value)
+    if (!Array.isArray(scope) || typeof scope[1] !== 'string')
+      return []
+    if (scope[0] === 'project' && scope.length === 2)
+      return records.value.filter(record => record.projectId === scope[1])
+    if (scope[0] === 'supplier' && scope.length === 3 && (scope[2] === null || typeof scope[2] === 'string'))
+      return records.value.filter(record => record.projectId === scope[1] && record.supplierId === scope[2])
   }
-  const [, projectId, supplierId] = selectedNode.value.split(':')
-  return store.list.filter(record =>
-    record.projectId === projectId
-    && (supplierId === 'un' ? record.supplierId == null : record.supplierId === supplierId),
-  )
+  catch {}
+  return []
 })
 
 const filtered = computed(() => {
   const keyword = search.value.trim().toLocaleLowerCase('zh-CN')
-  if (!keyword)
-    return nodeFiltered.value
   return nodeFiltered.value.filter(record => [
     record.orderNo,
+    record.fileName,
     record.note,
     projectName(record.projectId),
     supplierName(record.supplierId),
     ...record.lines.map(line => `${line.materialName} ${line.spec}`),
-  ].some(value => value.toLocaleLowerCase('zh-CN').includes(keyword)))
+  ].some(value => (!keyword || value.toLocaleLowerCase('zh-CN').includes(keyword))
+    && (!dateFrom.value || record.deliveryDate >= dateFrom.value)
+    && (!dateTo.value || record.deliveryDate <= dateTo.value)))
 })
 
 const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
 const pageRows = computed(() => paginate([...filtered.value], currentPage.value, pageSize.value))
 const totalAmount = computed(() => filtered.value.reduce((sum, record) => sum + record.totalAmount, 0))
 
-watch([search, selectedNode], () => {
+watch([search, dateFrom, dateTo, selectedNode], () => {
   page.value = 1
 })
+
+async function exportArchive() {
+  if (exportingArchive.value || !ready.value || !active)
+    return
+  if (!filtered.value.length) {
+    error('当前筛选下没有可导出的送货单')
+    return
+  }
+  exportingArchive.value = true
+  const controller = new AbortController()
+  exportController = controller
+  const owner = generation
+  const selected = filtered.value.map(record => ({ ...record, lines: record.lines.map(line => ({ ...line })) }))
+  const projectNames = new Map(selected.map(record => [record.projectId, projectName(record.projectId)]))
+  const supplierNames = new Map(selected.map(record => [record.supplierId, supplierName(record.supplierId)]))
+  const convertImages = convertImagesToPdf.value
+  const ensureActive = () => {
+    if (controller.signal.aborted || owner !== generation || !active)
+      throw new DOMException('原件包导出已取消', 'AbortError')
+  }
+  let missingCount = 0
+  try {
+    const exportResult = await exportFile({
+      data: async () => {
+        ensureActive()
+        const result = await createDeliveryArchiveZip(selected, {
+          projectName: id => projectNames.get(id) ?? '未知项目',
+          supplierName: id => supplierNames.get(id) ?? '未区分分供方',
+        }, {
+          convertImagesToPdf: convertImages,
+          signal: controller.signal,
+          loadSource: record => store.loadSourceFile(record.id, { signal: controller.signal, ...(central ? { assetId: record.assetId ?? null } : {}) }),
+        })
+        ensureActive()
+        missingCount = result.missingRecordIds.length
+        return result.data
+      },
+      defaultName: `送货单原件包_${toLocalDateInputValue()}.zip`,
+      mimeType: DELIVERY_ZIP_MIME,
+      signal: controller.signal,
+    })
+    if (exportResult.status === 'cancelled' || controller.signal.aborted || owner !== generation)
+      return
+    if (missingCount)
+      warning(`${missingCount} 份送货单缺少原件，异常已写入 Excel`)
+  }
+  catch (cause) {
+    if (!controller.signal.aborted && owner === generation && !(cause instanceof Error && cause.name === 'AbortError'))
+      error(cause instanceof Error ? `导出失败：${cause.message}` : '导出失败')
+  }
+  finally {
+    if (exportController === controller) {
+      exportController = null
+      exportingArchive.value = false
+    }
+  }
+}
 
 const columns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
@@ -123,21 +213,36 @@ function materialSummary(record: DeliveryRecord): string {
 }
 
 async function handleDelete(record: DeliveryRecord) {
+  if (!canWrite.value || deleting.value)
+    return
+  const owner = generation
+  deleting.value = record.id
   const label = record.orderNo || record.id
-  const ok = await confirm({
-    variant: 'simple',
-    title: '删除送货单',
-    message: `确认删除送货单「${label}」？材料明细会随送货单一同隐藏，10 秒内可撤回。`,
-    confirmLabel: '删除',
-  })
-  if (!ok)
-    return
-  const logId = await store.remove(record.id)
-  if (!logId) {
-    error('删除失败：送货单不存在或已删除')
-    return
+  try {
+    const ok = await confirm({
+      variant: 'simple',
+      title: '删除送货单',
+      message: `确认删除送货单「${label}」？材料明细会随送货单一同隐藏，10 秒内可撤回。`,
+      confirmLabel: '删除',
+    })
+    if (!ok || owner !== generation || !canWrite.value)
+      return
+    const logId = await store.remove(record.id)
+    if (owner !== generation || !active)
+      return
+    if (!logId) {
+      error('删除失败：送货单不存在或已删除')
+      return
+    }
+    undoToast(`已删除送货单「${label}」`, () => owner === generation && canWrite.value ? store.undo(logId) : Promise.resolve(false))
   }
-  undoToast(`已删除送货单「${label}」`, () => store.undo(logId))
+  catch (cause) {
+    if (owner === generation && active)
+      error(cause instanceof Error ? cause.message : '删除失败，请重试')
+  }
+  finally {
+    deleting.value = ''
+  }
 }
 
 function onPageChange(event: { page: number, pageSize: number }) {
@@ -146,10 +251,70 @@ function onPageChange(event: { page: number, pageSize: number }) {
 }
 
 async function refresh() {
-  await Promise.all([store.load(), projectStore.load(), supplierStore.load(), contractStore.load()])
+  cancelExport()
+  contractReadController?.abort()
+  const controller = new AbortController()
+  contractReadController = controller
+  const owner = ++generation
+  reading.value = true
+  ready.value = false
+  readError.value = ''
+  contractFacts.value = []
+  contractReadError.value = ''
+  try {
+    const contractTask = contractRepository
+      ? readDeliveryMaterialContracts(contractRepository, store.origin, controller.signal).then((facts) => {
+          if (owner === generation && active)
+            contractFacts.value = facts
+        }).catch((cause) => {
+          if (owner === generation && active && !controller.signal.aborted)
+            contractReadError.value = cause instanceof Error ? cause.message : '合同日期暂不可读取'
+        })
+      : Promise.resolve()
+    await Promise.all([store.load(), projectStore?.load(), supplierStore?.load(), contractStore?.load(), contractTask])
+    if (owner === generation && active)
+      ready.value = true
+  }
+  catch (cause) {
+    if (owner === generation && active)
+      readError.value = cause instanceof Error ? cause.message : '送货归档读取失败'
+  }
+  finally {
+    if (owner === generation)
+      reading.value = false
+  }
+}
+
+function cancelExport() {
+  exportController?.abort()
+}
+function deactivate() {
+  active = false
+  generation += 1
+  ready.value = false
+  reading.value = false
+  cancelExport()
+  contractReadController?.abort()
+  contractFacts.value = []
 }
 
 onMounted(refresh)
+onActivated(() => {
+  if (!active) {
+    active = true
+    void refresh()
+  }
+})
+onDeactivated(deactivate)
+onBeforeUnmount(deactivate)
+watch(() => store.origin, () => {
+  generation += 1
+  ready.value = false
+  selectedNode.value = 'all'
+  cancelExport()
+  if (active)
+    void refresh()
+}, { flush: 'sync' })
 </script>
 
 <template>
@@ -170,13 +335,44 @@ onMounted(refresh)
           placeholder="搜索单号、项目、分供方、材料"
           :width="288"
         />
-        <button class="btn-secondary" :disabled="store.loading" @click="refresh">
+        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft">
+          <span>从</span>
+          <input v-model="dateFrom" type="date" class="field-input h-8 text-11px" aria-label="开始日期">
+        </label>
+        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft">
+          <span>至</span>
+          <input v-model="dateTo" type="date" class="field-input h-8 text-11px" aria-label="结束日期">
+        </label>
+        <button class="btn-secondary" :disabled="reading || store.loading" @click="refresh">
           <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
         </button>
-        <NuxtLink to="/material/delivery/archive/form" class="btn-accent">
+        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft" title="勾选后另行生成仅含图片原件的 PDF；PDF 原件始终整份原样保留，不参与当前图片合并">
+          <input v-model="convertImagesToPdf" type="checkbox">
+          <span>图片另生成 PDF</span>
+        </label>
+        <button class="btn-secondary" :disabled="!ready || store.loading || exportingArchive || !filtered.length" @click="exportArchive">
+          <span class="i-lucide-file-archive mr-1 text-13px" /> {{ exportingArchive ? '正在生成…' : '导出原件包' }}
+        </button>
+        <KitButton v-if="exportingArchive" variant="secondary" @click="cancelExport">
+          取消导出
+        </KitButton>
+        <NuxtLink v-if="canWrite" :to="entityPath('/material/delivery/archive/form')" class="btn-accent">
           <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单
         </NuxtLink>
       </div>
+    </div>
+
+    <div v-if="readError" role="alert" class="panel flex flex-wrap items-center gap-3 p-4 text-danger">
+      <span>{{ readError }}</span>
+      <KitButton variant="secondary" @click="refresh">
+        重新读取
+      </KitButton>
+    </div>
+    <div v-if="ready && contractReadError" role="status" class="panel flex flex-wrap items-center gap-3 p-4 text-warn">
+      <span>{{ contractReadError }}。分供方暂按名称排序。</span>
+      <KitButton variant="secondary" @click="refresh">
+        重新读取合同日期
+      </KitButton>
     </div>
 
     <div class="delivery-archive__layout flex items-start gap-3">
@@ -191,23 +387,23 @@ onMounted(refresh)
           data-testid="delivery-archive-table"
           :columns="columns"
           :data="pageRows"
-          :loading="store.loading"
+          :loading="reading || store.loading"
           :page="{ page: currentPage, pageSize, total: filtered.length }"
           empty="当前节点暂无送货单"
           @page-change="onPageChange"
         >
           <template #orderNo="{ row }">
-            <NuxtLink :to="`/material/delivery/archive/${row.id}`" class="cell--link font-mono">
+            <NuxtLink :to="entityPath('/material/delivery/archive', row.id)" class="cell--link font-mono">
               {{ row.orderNo || '未编号送货单' }}
             </NuxtLink>
           </template>
           <template #project="{ row }">
-            <NuxtLink :to="`/project/${row.projectId}`" class="cell--link">
+            <NuxtLink :to="entityPath('/project', row.projectId)" class="cell--link">
               {{ projectName(row.projectId) }}
             </NuxtLink>
           </template>
           <template #supplier="{ row }">
-            <NuxtLink v-if="row.supplierId" :to="`/base/supplier/${row.supplierId}`" class="cell--link">
+            <NuxtLink v-if="row.supplierId" :to="entityPath('/base/supplier', row.supplierId)" class="cell--link">
               {{ supplierName(row.supplierId) }}
             </NuxtLink>
             <span v-else class="chip-warn">未区分分供方</span>
@@ -224,7 +420,7 @@ onMounted(refresh)
           <template #action="{ row }">
             <div class="flex items-center gap-1">
               <NuxtLink
-                :to="`/material/delivery/archive/${row.id}`"
+                :to="entityPath('/material/delivery/archive', row.id)"
                 class="icon-btn"
                 title="详情"
                 :aria-label="`查看送货单 ${row.orderNo || row.id}`"
@@ -232,7 +428,8 @@ onMounted(refresh)
                 <span class="i-lucide-file-text text-14px" />
               </NuxtLink>
               <NuxtLink
-                :to="`/material/delivery/archive/form/${row.id}`"
+                v-if="canWrite"
+                :to="entityPath('/material/delivery/archive/form', row.id)"
                 class="icon-btn"
                 title="编辑"
                 :aria-label="`编辑送货单 ${row.orderNo || row.id}`"
@@ -240,6 +437,8 @@ onMounted(refresh)
                 <span class="i-lucide-square-pen text-14px" />
               </NuxtLink>
               <button
+                v-if="canWrite"
+                :disabled="!!deleting"
                 class="icon-btn-danger"
                 title="删除"
                 :aria-label="`删除送货单 ${row.orderNo || row.id}`"

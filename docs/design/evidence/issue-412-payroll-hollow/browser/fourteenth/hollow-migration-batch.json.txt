@@ -1,0 +1,217 @@
+{
+  "batchId": "core-batch-927184d54ab753d7aaaf8166",
+  "sourceVersion": "sqlite-v49",
+  "sourceHash": "379b3142cfcbf8eb6bb63f9d91fd51f366761eaf5459eb1d30e422957d4fd935",
+  "status": "dry-run",
+  "authority": "local",
+  "steps": [
+    {
+      "entityType": "customers",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "suppliers",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "supplier_credentials",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "crews",
+      "sourceCount": 1,
+      "importableCount": 1,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "projects",
+      "sourceCount": 1,
+      "importableCount": 1,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "construction_contracts",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "subcontract_contracts",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "auxiliary_contracts",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "other_settlements",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "other_settlement_sources",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "contract_supplements",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "receipt_registrations",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "delivery_records",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "owner_documents",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "workers",
+      "sourceCount": 2,
+      "importableCount": 2,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "project_suppliers",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "quantity_projects",
+      "sourceCount": 1,
+      "importableCount": 1,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "process_libraries",
+      "sourceCount": 1,
+      "importableCount": 1,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "wbs_projects",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "target_cost_versions",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    },
+    {
+      "entityType": "payroll_projects",
+      "sourceCount": 0,
+      "importableCount": 0,
+      "skippedCount": 0
+    }
+  ],
+  "mappings": [
+    {
+      "entityType": "crews",
+      "legacyId": "hollow-crew",
+      "serverId": "core-crews-421793e956d7203b434f01ab"
+    },
+    {
+      "entityType": "projects",
+      "legacyId": "hollow-browser",
+      "serverId": "core-projects-1771aae918902b2801d79386"
+    },
+    {
+      "entityType": "workers",
+      "legacyId": "hollow-leader",
+      "serverId": "core-workers-3b7470991b2526eafba7791a"
+    },
+    {
+      "entityType": "workers",
+      "legacyId": "hollow-zero",
+      "serverId": "core-workers-e191b029c3b2744f4c530309"
+    },
+    {
+      "entityType": "quantity_projects",
+      "legacyId": "hollow-browser",
+      "serverId": "core-quantity_projects-c7c65ef86f00f07d6b80f77b"
+    },
+    {
+      "entityType": "process_libraries",
+      "legacyId": "schedule_process_library_decoration_v1",
+      "serverId": "core-process_libraries-a64f49550708c7d80b7dff05"
+    }
+  ],
+  "sourceRefs": [
+    {
+      "batchId": "core-batch-927184d54ab753d7aaaf8166",
+      "sourceHash": "379b3142cfcbf8eb6bb63f9d91fd51f366761eaf5459eb1d30e422957d4fd935",
+      "entityType": "crews",
+      "legacyId": "hollow-crew",
+      "serverId": "core-crews-421793e956d7203b434f01ab"
+    },
+    {
+      "batchId": "core-batch-927184d54ab753d7aaaf8166",
+      "sourceHash": "379b3142cfcbf8eb6bb63f9d91fd51f366761eaf5459eb1d30e422957d4fd935",
+      "entityType": "projects",
+      "legacyId": "hollow-browser",
+      "serverId": "core-projects-1771aae918902b2801d79386"
+    },
+    {
+      "batchId": "core-batch-927184d54ab753d7aaaf8166",
+      "sourceHash": "379b3142cfcbf8eb6bb63f9d91fd51f366761eaf5459eb1d30e422957d4fd935",
+      "entityType": "workers",
+      "legacyId": "hollow-leader",
+      "serverId": "core-workers-3b7470991b2526eafba7791a"
+    },
+    {
+      "batchId": "core-batch-927184d54ab753d7aaaf8166",
+      "sourceHash": "379b3142cfcbf8eb6bb63f9d91fd51f366761eaf5459eb1d30e422957d4fd935",
+      "entityType": "workers",
+      "legacyId": "hollow-zero",
+      "serverId": "core-workers-e191b029c3b2744f4c530309"
+    },
+    {
+      "batchId": "core-batch-927184d54ab753d7aaaf8166",
+      "sourceHash": "379b3142cfcbf8eb6bb63f9d91fd51f366761eaf5459eb1d30e422957d4fd935",
+      "entityType": "quantity_projects",
+      "legacyId": "hollow-browser",
+      "serverId": "core-quantity_projects-c7c65ef86f00f07d6b80f77b"
+    },
+    {
+      "batchId": "core-batch-927184d54ab753d7aaaf8166",
+      "sourceHash": "379b3142cfcbf8eb6bb63f9d91fd51f366761eaf5459eb1d30e422957d4fd935",
+      "entityType": "process_libraries",
+      "legacyId": "schedule_process_library_decoration_v1",
+      "serverId": "core-process_libraries-a64f49550708c7d80b7dff05"
+    }
+  ],
+  "issues": [],
+  "createdAt": "2026-09-14T20:45:16.124Z",
+  "updatedAt": "2026-09-14T20:45:16.124Z",
+  "rollbackExpiresAt": null,
+  "confirmedAt": null,
+  "rolledBackAt": null
+}

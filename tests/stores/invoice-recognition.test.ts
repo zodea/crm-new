@@ -12,6 +12,18 @@ let mem: TestDb
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),
   select: async (sql: string, params?: unknown[]) => mem.select(sql, params),
+  withTransaction: async (work: (tx: TestDb) => Promise<unknown>) => {
+    await mem.execute('BEGIN')
+    try {
+      const result = await work(mem)
+      await mem.execute('COMMIT')
+      return result
+    }
+    catch (error) {
+      await mem.execute('ROLLBACK')
+      throw error
+    }
+  },
 }))
 
 function ocrResponse(markdown: string, status = 200): Response {
@@ -55,15 +67,39 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   mem.close()
 })
 
 describe('invoice store 真实识别管线', () => {
+  it('删除撤回窗口保留原文件，窗口结束释放文件且恢复记录不伪装仍有原件', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => ocrResponse(MARKDOWN))
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useInvoiceStore()
+    const [first, second] = await store.uploadInvoices([
+      new File(['first'], '撤回窗口.pdf'),
+      new File(['second'], '超过窗口.pdf'),
+    ])
+    const logId = await store.remove(first!)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(await store.undo(logId!)).toBe(true)
+    expect(await store.startRecognition(first!)).toBe(true)
+
+    await store.remove(second!)
+    await vi.advanceTimersByTimeAsync(10_000)
+    await store.restore(second!)
+    expect(await store.startRecognition(second!)).toBe(false)
+    expect(store.recognitionError(second!)).toContain('原文件')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('上传保留实际 File，识别完成后把解析字段一次性写入数据库', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(MARKDOWN))
     vi.stubGlobal('fetch', fetchMock)
     const file = new File([new Uint8Array([1, 2, 3])], '一季度发票.pdf', { type: 'application/pdf' })
+    await useOcrSettingsStore().load(mem)
     await useOcrSettingsStore().save({
       ...createDefaultOcrRecognitionSettings(),
       useDocUnwarping: false,
@@ -123,5 +159,28 @@ describe('invoice store 真实识别管线', () => {
 
     expect(await reloadedStore.startRecognition(id!)).toBe(false)
     expect(reloadedStore.recognitionError(id!)).toContain('原文件')
+  })
+
+  it('二次机器识别覆盖原始 OCR 基线，归档只把最后识别后的人工修改记为修订', async () => {
+    const secondRecognition = MARKDOWN.replace('¥678.04', '¥800.00')
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(ocrResponse(MARKDOWN))
+      .mockResolvedValueOnce(ocrResponse(secondRecognition)))
+    const store = useInvoiceStore()
+    const [id] = await store.uploadInvoices([new File(['x'], '重识别票据.pdf')])
+
+    expect(await store.startRecognition(id!)).toBe(true)
+    await store.correctField(id!, 'totalAmount', 700)
+    expect(await store.startRecognition(id!)).toBe(true)
+    expect(store.byId(id!)?.totalAmount).toBe(800)
+    await store.correctField(id!, 'totalAmount', 810)
+    await store.confirmInvoice(id!)
+    await expect(store.archiveInvoice(id!, 'personal')).resolves.toEqual({ ok: true })
+
+    const audit = await store.loadInvoiceArchiveAudit(id!)
+    expect(audit?.provenance.originalOcr).toMatchObject({ totalAmount: 800 })
+    expect(audit?.provenance.revisions.filter(item => item.field === 'totalAmount')).toEqual([
+      expect.objectContaining({ from: 800, to: 810, reason: '人工校对' }),
+    ])
   })
 })

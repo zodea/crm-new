@@ -1,0 +1,1447 @@
+{
+  "capturedAt": "2026-09-21T09:46:28.958Z",
+  "baseline": "e344a5444cd52bfeb65e78b031912d5241666fc0",
+  "scope": "P6 修改和新增源码。构建前冻结；原字节 SHA256 与 Git 内容对象分开，以容纳仓库既有换行规则。最终提交后须逐项核对 Git 对象，不以工作区字节等同提交字节。",
+  "records": [
+    {
+      "path": "app/components/payroll/CentralC1DraftFormPage.vue",
+      "bytes": 3572,
+      "sha256": "c081a1d969c5be79a2491438539534d63c57cff7fc2d69d74b578d81308a7695",
+      "gitBlob": "828c9ea1b193626592e6ca1d15574385b44c8909"
+    },
+    {
+      "path": "app/components/payroll/CentralC2DraftFormPage.vue",
+      "bytes": 3578,
+      "sha256": "6c8fabb151aaee1fa02dc558af999267253c3e55c1c686c852f2f04d754a992e",
+      "gitBlob": "acd4004a8707f7d77e444b642face8cd6784d147"
+    },
+    {
+      "path": "app/components/payroll/CentralPayrollDraftFormPage.vue",
+      "bytes": 4586,
+      "sha256": "206e645e0e493c15137b3989d482f9b12014911bf502feb1c17d4046a94cded6",
+      "gitBlob": "cf3735ca19698f289fe9f4f6a204c85ff6e7b0c5"
+    },
+    {
+      "path": "app/components/payroll/PayrollACommandState.vue",
+      "bytes": 1349,
+      "sha256": "852d97dffeb7c256c8f3d25c4e3b01b5977f89798e9989261aa5bcafb0ee6a39",
+      "gitBlob": "862d25abdb29be693ea749b3e06f7d2141ee319e"
+    },
+    {
+      "path": "app/components/payroll/PayrollAConfigScreen.vue",
+      "bytes": 10323,
+      "sha256": "85043b2690a8faac06ea650a2d7f4dc0dc6723f40a3179df420af3bc8aacc465",
+      "gitBlob": "293f967fa0c427148ddc486a9a3284d150433574"
+    },
+    {
+      "path": "app/components/payroll/PayrollAFloorReview.vue",
+      "bytes": 5428,
+      "sha256": "26ca01b3ffe0bb009e9ece5d6e35eb48ea6b4a61f61020dc402673581066ad6e",
+      "gitBlob": "2ff0be475d7c68930239d72984257538309a328c"
+    },
+    {
+      "path": "app/components/payroll/PayrollAFrozenPrint.vue",
+      "bytes": 5730,
+      "sha256": "11649dcefd38390bf62b7211074a7384a1eb008dec97b1a3fb88044b1f60c33c",
+      "gitBlob": "2d14d2acfb215e8752856ec02888c62c736c1308"
+    },
+    {
+      "path": "app/components/payroll/PayrollASourceReturn.vue",
+      "bytes": 6648,
+      "sha256": "3935b001b8ba0b99ce5431f664b31d1f8286e9b350b7e41c489b56965a5f3674",
+      "gitBlob": "1e3c5d9b8a43aed598dc692acfc02bd9af922469"
+    },
+    {
+      "path": "app/components/payroll/PayrollASourceReview.vue",
+      "bytes": 11335,
+      "sha256": "9658331b2b782d62e94b0831e39e5839d0c9da78a51824fee80465dddfc957d6",
+      "gitBlob": "c6e7b150a78d0ce9fa620e56d06d55f0b08e7610"
+    },
+    {
+      "path": "app/components/payroll/PayrollAStatementWorkspace.vue",
+      "bytes": 8195,
+      "sha256": "28706ae9cc8d7a58e468f95d0c7423666850cd4ada3dbadb1157bf26b4f53112",
+      "gitBlob": "99d5b661314b53eb303774e1802a12dc01a4bf13"
+    },
+    {
+      "path": "app/components/payroll/PayrollAdjustmentBasisFields.vue",
+      "bytes": 12772,
+      "sha256": "6ea37b8308f5437132c1b70e7cae41411bc0dc6140e6559dbb30bf335e02da07",
+      "gitBlob": "3c7e9bb6349543d71b891da2ecf854bd01608687"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1ConfigScreen.vue",
+      "bytes": 6177,
+      "sha256": "4e3ba65fc506ab2c8b95db1601d48fbd094cde49a2f87fcf7af3defbb1a9175b",
+      "gitBlob": "3794b491e8335c759da70f28276599d1af7dfa2f"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1FrozenPrint.vue",
+      "bytes": 5615,
+      "sha256": "71738e4562014c4040e030ecd52ca47105f48550282c38531d6e374a6f490e8a",
+      "gitBlob": "8e1e51ba332895353da3a626da7af511be1041fb"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1StatementWorkspace.vue",
+      "bytes": 6262,
+      "sha256": "3932e1ab0ec4d2875642eb93f988b8ba42e34ce428a30ca1011d1b025a2cb157",
+      "gitBlob": "a3a81d420c3494c2bec8cf86173b25973e5b97cc"
+    },
+    {
+      "path": "app/components/payroll/PayrollC2ConfigScreen.vue",
+      "bytes": 6944,
+      "sha256": "7bb426b5c3e97c09b24e1e9deba88d40c0d724a788cca077ded0c9c22aa30ff2",
+      "gitBlob": "1f7d68efeb3f530abf3d03e38776f14dd775a044"
+    },
+    {
+      "path": "app/components/payroll/PayrollC2FrozenPrint.vue",
+      "bytes": 4937,
+      "sha256": "e90759f5b4e4c9265772221cac4eb9f55fcb199da3dea36afbe0e0fd43c3a2ca",
+      "gitBlob": "e96d0d1fcc7a32d18471941023c079e8f2197b49"
+    },
+    {
+      "path": "app/components/payroll/PayrollC2StatementWorkspace.vue",
+      "bytes": 6259,
+      "sha256": "d5195ba92cedbfb7781d3cd450929d4286c55375c81881f933c834454f9537f7",
+      "gitBlob": "9ea8e75515bd4170ec1067e39fb2fdd9c05576d9"
+    },
+    {
+      "path": "app/components/payroll/PayrollHollowAdjustmentFields.vue",
+      "bytes": 2996,
+      "sha256": "ec6c95d35bc770e2d2784738fe9a11a03217d82a67d58ededd5bf8722dfbcd5c",
+      "gitBlob": "34041a6a7a0000abb756cb678f6b4fc870c0de67"
+    },
+    {
+      "path": "app/components/payroll/PayrollHollowConfigSection.vue",
+      "bytes": 12400,
+      "sha256": "497d63e756b5c32513e5aec5ed3a481d0a8b0dd17663028f508ad61f8907e87e",
+      "gitBlob": "8d5852853c3b57e015df54b04c3459ded9155fb7"
+    },
+    {
+      "path": "app/components/payroll/PayrollHollowFrozenSection.vue",
+      "bytes": 2826,
+      "sha256": "73cb38036c9e042152fa4c6fa57ab92fe9ba14f2f238a56b9c41e892f41adeb1",
+      "gitBlob": "3e6eb951d703176137da5f0a8a140bd80fd835ad"
+    },
+    {
+      "path": "app/components/payroll/PayrollHollowReview.vue",
+      "bytes": 13391,
+      "sha256": "8c2a79fd76df92030a14d89138190316fa7c5ae91e32ae4ef13854f12feed9a4",
+      "gitBlob": "d393fad8747c44ec82225e21afbc6e23b97cff2d"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowCommandState.vue",
+      "bytes": 1265,
+      "sha256": "9a31064d8983bb26bf2711b4e649efef1be27038a53bdc55fcd867d108a7cf84",
+      "gitBlob": "78d141c407594ff38efcfb3dfda23fca643b2d08"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowDetailScreen.vue",
+      "bytes": 4775,
+      "sha256": "dd7db77c3965a40bffccc2710ba4dd2918bcfc0f836fc20f2212d8f065a9317d",
+      "gitBlob": "4d9e77f023b7d043082561c1b507f6d97750cf7c"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowFormPage.vue",
+      "bytes": 4821,
+      "sha256": "adc5ae75303ffe8c88f7fbb4d11fffe95051dd973b7d0f14ffd4c23cbb0204d0",
+      "gitBlob": "7f725a4b38d32b035a5916a875a9e021c972e26c"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowHistory.vue",
+      "bytes": 2072,
+      "sha256": "b4c3457aea93d8efb40db2da6be3976cbb39921790e2e188221d2a0ec95e5222",
+      "gitBlob": "c34af88de07fb3f6ea13e29050127cff7d47a4a9"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowInspectionFields.vue",
+      "bytes": 5004,
+      "sha256": "cd720d2032db3414c12741aa810c478cf1d2c14d9305407092d7de35b1059b44",
+      "gitBlob": "f0d0ea3f43b64bd28ba55974f3710e1551de452e"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowPendingSummary.vue",
+      "bytes": 1770,
+      "sha256": "08d2435516332fe743b9b755878f0af0c55f614d335af88d86ef4ef786b5eb64",
+      "gitBlob": "8b9a7fb2d6f8f75f4d4011e278b2772c146577c9"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowRecordSummary.vue",
+      "bytes": 1579,
+      "sha256": "860da40d73fc52dd47ef126250dbe87251acf207cf8715530acfce46e48d5f3b",
+      "gitBlob": "334113e95b6331224a2ab62fb5a5aedcb221d2ef"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowRectification.vue",
+      "bytes": 2343,
+      "sha256": "4bdb7c44fdd5855b6fb059bde0abd30499f8c43e0e9a9eaf0c68510012dacd4a",
+      "gitBlob": "2f107c475d38ca6a0d8ab59e26691dbab8a78f8c"
+    },
+    {
+      "path": "app/components/quantity/QuantityHollowSection.vue",
+      "bytes": 4015,
+      "sha256": "2a316b7b82aceb43b8158ef4c1b886450b90db71a086bcb16be3621ea6e34e86",
+      "gitBlob": "16d7aaee52092d33d83b55d051fe15036562a6f2"
+    },
+    {
+      "path": "app/components/quantity/QuantityUnitDetailScreen.vue",
+      "bytes": 19158,
+      "sha256": "15b6361abb514009aa57d7b5a6c477c7902c475c6b8a58f5d4d3b1d4fc371704",
+      "gitBlob": "91a3209218f7599d16541b4eaeb45a484b98a69e"
+    },
+    {
+      "path": "app/composables/usePayrollAConfig.ts",
+      "bytes": 13885,
+      "sha256": "82c96c5528177e044504249b1856a59883f64c7acd2fb268b66acab4449dedeb",
+      "gitBlob": "70f03a372284b91f1d585a3f5a0f38e594f40a23"
+    },
+    {
+      "path": "app/composables/usePayrollADraftCache.ts",
+      "bytes": 794,
+      "sha256": "23e8e02874139d9842a4681a20225a3e7f34319f1faf34fb016f681a9308429f",
+      "gitBlob": "f08fb0805d2f31bafa9773820d5fe55abb820c4b"
+    },
+    {
+      "path": "app/composables/usePayrollAForm.ts",
+      "bytes": 14918,
+      "sha256": "ec9341e225c1c4e24ac263c424526098ab34452be5fd033c0656f3f4bcf8e472",
+      "gitBlob": "afbca30b963de28706bdcb5d4096c3d739753980"
+    },
+    {
+      "path": "app/composables/usePayrollC1Config.ts",
+      "bytes": 7789,
+      "sha256": "b9d1f1c6d5a00af119819ddede5ea11a0d7f90338c4b4bbda672ae82aa6c7b98",
+      "gitBlob": "827b797bc0b16a715ae805e9de384467596be439"
+    },
+    {
+      "path": "app/composables/usePayrollC2Config.ts",
+      "bytes": 6489,
+      "sha256": "3d02f6a795224ede1c45033418497857fe68d011183e424767e1b366026957bb",
+      "gitBlob": "8fefd4900b01aeda5a8645410b1581ecdf954fee"
+    },
+    {
+      "path": "app/composables/useQuantityHollowForm.ts",
+      "bytes": 12931,
+      "sha256": "fa9d172d7399011e0f5c331661ac85dc0be1fa4a87f336dfd8087fcb878bfb1e",
+      "gitBlob": "5ba7bfa86a08b0d6df20952d80398e5a50870650"
+    },
+    {
+      "path": "app/composables/useQuantityHollowRead.ts",
+      "bytes": 2160,
+      "sha256": "474228188ef2064d4100ced141105575a931562ba0b47e34b0b1efc98365b566",
+      "gitBlob": "f789b74e42a31736662a265aae710168612b50df"
+    },
+    {
+      "path": "app/lib/migration/payroll-hollow-source.ts",
+      "bytes": 3978,
+      "sha256": "20cab264fc9f4ee31510bcb83ddb61ece360b9f6f27c11314c918f4d0c4da2a2",
+      "gitBlob": "6ace1f435f89c031bbdb912499b732b754d18c7a"
+    },
+    {
+      "path": "app/lib/migration/payroll-proof-package.ts",
+      "bytes": 8771,
+      "sha256": "640e2f6359671a51d1f4ddbb5b1edc0fea38879354eef79e9835aeae35e4a939",
+      "gitBlob": "b612f208a5e048ae9c0ecc49635e5cbf988eae82"
+    },
+    {
+      "path": "app/lib/migration/payroll-source.ts",
+      "bytes": 16373,
+      "sha256": "17b47c74eba1a654f6f0b0480776467d1430fa5ee2110c726996aa0962a5c426",
+      "gitBlob": "2c72952a68b46343ad43f896176b9f613442cf77"
+    },
+    {
+      "path": "app/lib/nav/target-registry.ts",
+      "bytes": 37760,
+      "sha256": "a16ed4b0b5cdba98253743d7fc1c1dc0bc7c7f345af328d2ceb67e171c02bc94",
+      "gitBlob": "9f4cd1c32060dda55a278c527d0933c91ec89b12"
+    },
+    {
+      "path": "app/lib/payroll/a-export.ts",
+      "bytes": 2610,
+      "sha256": "56b7bf9fc11863083ecca12b46d9d5ad8f8d9bb6ea1913a64f7cd6a2aad6ad54",
+      "gitBlob": "3378d26d8f5a0811719af24a1b55d51cbe8cf698"
+    },
+    {
+      "path": "app/lib/payroll/a-presentation.ts",
+      "bytes": 3677,
+      "sha256": "60511aeec38f393694a30272088e8ff08dc1bb0141cc4648c6e63ad86aecc2b3",
+      "gitBlob": "0d0d070a8252aee1956cf8fd6de53cebc50605ca"
+    },
+    {
+      "path": "app/lib/payroll/c1-export.ts",
+      "bytes": 3230,
+      "sha256": "3d5d19737235520c3c1a04359847a6d160632f02300181ed27803dff30a575b4",
+      "gitBlob": "96a4003f9c2e1ac9defdcdfcbb01dbd7adf7c5e8"
+    },
+    {
+      "path": "app/lib/payroll/c1-presentation.ts",
+      "bytes": 2755,
+      "sha256": "e9afce85f68b64dae145105ac36c151162b1e03eab46393054456f422f312924",
+      "gitBlob": "cf96808b9e9ee5b4ea38408b5e22dc7819eab401"
+    },
+    {
+      "path": "app/lib/payroll/c2-export.ts",
+      "bytes": 2683,
+      "sha256": "c01a0f3354f5c07276bf4a1edab306b02a498386e4ab508c190e24056650a9f7",
+      "gitBlob": "f7e74b9db73a2d8f90f145735f81436fefac30c2"
+    },
+    {
+      "path": "app/lib/payroll/c2-presentation.ts",
+      "bytes": 3402,
+      "sha256": "03bcee6c796a22ca50efc6471a6f3d84ba24c270350f19431a7b8cda232f6ad6",
+      "gitBlob": "e7e8ce5f4e3e8c36da84647590b1520764c57395"
+    },
+    {
+      "path": "app/lib/payroll/central-a-codec.ts",
+      "bytes": 25551,
+      "sha256": "8b3b4a53a3e02b1fd41b513348c0b75c7c387e6e9a5f0eb00fd6d8eb646b29b2",
+      "gitBlob": "4e31c63cd2b6436b4539a6333495b539d7d1d0d0"
+    },
+    {
+      "path": "app/lib/payroll/central-a-command.ts",
+      "bytes": 14945,
+      "sha256": "0ae351ddb214ea88e1e79f5e646de0c34d21f6a7e32cf35cd6870034950bb735",
+      "gitBlob": "6c937471c1fccf5f9d14882ac96610dc0cc22a0b"
+    },
+    {
+      "path": "app/lib/payroll/central-a-contract.ts",
+      "bytes": 13583,
+      "sha256": "959e5c690d7a09b0d7eeb7e1eae67d4bbb6cbcec7d36baa49e89baa649a4e6b6",
+      "gitBlob": "c2ea26d41e2a366c0674197763d222da5dd7446a"
+    },
+    {
+      "path": "app/lib/payroll/central-a-fee-adjustment.ts",
+      "bytes": 6907,
+      "sha256": "eebbe175feaac14b9045254904557d4bba89835e8bc11f36571083907171be70",
+      "gitBlob": "446d5b1d6cb157c43923362b4449897cf681c6dd"
+    },
+    {
+      "path": "app/lib/payroll/central-a-fees-contract.ts",
+      "bytes": 16348,
+      "sha256": "86af4e8305d4b1a1f7c3ea7346f40f24e5e15eb8f986abf56cf95c53f894fa01",
+      "gitBlob": "0a816d66695c54071553076ade4440ffc6020736"
+    },
+    {
+      "path": "app/lib/payroll/central-a-fees-provenance.ts",
+      "bytes": 9257,
+      "sha256": "bc1a11862859575afd7061fb3540cd114080799ecefed2fb1598d8e5d9d08af6",
+      "gitBlob": "37f9f4ac74a75273ae35c12a6d28a9dcba7a9eb1"
+    },
+    {
+      "path": "app/lib/payroll/central-a-fees-read-validation.ts",
+      "bytes": 6756,
+      "sha256": "40de559ff6bb13533d88bf04234eca67de915553c475d6a55936d1eb83db9715",
+      "gitBlob": "4652b1d6b0ee15a55a9a35901e185db59ecc9517"
+    },
+    {
+      "path": "app/lib/payroll/central-a-fees-validation.ts",
+      "bytes": 17259,
+      "sha256": "ede5f6dd494f91ea6a849527a2492e72543765674d58b41c66073f69264acdde",
+      "gitBlob": "139268e716d0b090ec5c152580cd4400df36675e"
+    },
+    {
+      "path": "app/lib/payroll/central-a-hollow-contract.ts",
+      "bytes": 428,
+      "sha256": "d16537637a2018450a2beb4bbdc65d3b3faa55e280630e98cbee6b360144dd9f",
+      "gitBlob": "b779af591da97d231d8331885d745bc95b8b1b19"
+    },
+    {
+      "path": "app/lib/payroll/central-a-prices.ts",
+      "bytes": 7638,
+      "sha256": "b6bc8168f8ed91589f8ba5e2e18cb711084f45f0960142c4b1ca3761badf19df",
+      "gitBlob": "117e6d770abc4b88a097bc90c9853722f21fc95b"
+    },
+    {
+      "path": "app/lib/payroll/central-a-provenance.ts",
+      "bytes": 7954,
+      "sha256": "c316b98429eb6ad7034672a0fe372a8e2adb085b09d7843c774329e61a337020",
+      "gitBlob": "51c781e92ec1850f2e11f26bc4e44983d7543fc1"
+    },
+    {
+      "path": "app/lib/payroll/central-actual-codec.ts",
+      "bytes": 8890,
+      "sha256": "d6d87e96c754470f87f9cbc3f6d2cefd8ea00340e404fcf51eac92f76b5652bc",
+      "gitBlob": "ff19d619efe1753786abc0b19a0af0d9287d2d3b"
+    },
+    {
+      "path": "app/lib/payroll/central-actual-validation.ts",
+      "bytes": 2834,
+      "sha256": "72e855f2a6263ed21e1cae0588b8f170c62c12ea569d136e6ba1b6e7d18cf09c",
+      "gitBlob": "d21ed3a39b95c8a98c28eaf75a410adf99ef7b24"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-calculation.ts",
+      "bytes": 3054,
+      "sha256": "3728fbd3cd995818e196873b9767509545f8201d8ad9b2c585f91d72251244fc",
+      "gitBlob": "196edf8827683ca27e1c34f54924dcf087ea4d75"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-codec.ts",
+      "bytes": 7256,
+      "sha256": "56af918272074d600ec04af053eee52777b36aa859734b68f7494c7c0c1a337f",
+      "gitBlob": "011ed4e8a7b050c61b6a2f2e5d3d8747fa34e524"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-contract.ts",
+      "bytes": 7351,
+      "sha256": "dcef3ce30d0707e9b9984ede786ca4b2c8c4824822abc2f8bf9e1e2d7ba693d3",
+      "gitBlob": "dce82cd87a35c55862cea71c390a2fe1aafee43d"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-read-codec.ts",
+      "bytes": 15100,
+      "sha256": "2245c360e7e65b2ff2a67439eaaf585a0ba186dd8c8260f5302f272ef8b81bc6",
+      "gitBlob": "1f9362a0af38c31f1963d1eb13569ad4440d738e"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-validation.ts",
+      "bytes": 11663,
+      "sha256": "1958f94171d96eabcca9ecab45768899a1696d4a74fa09bcbe3934fe4e3a17ed",
+      "gitBlob": "aafa83e16d29772733b5f76680a35e8a1dba653c"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-wire.ts",
+      "bytes": 5045,
+      "sha256": "3be602c75803c5fb7ff9f8f2a8ab0f5a816dc2608a2768c3ba48732d40802fce",
+      "gitBlob": "c92296589d3b9f8ac9f0492f0bc47dd5b1b3d669"
+    },
+    {
+      "path": "app/lib/payroll/central-c-hollow.ts",
+      "bytes": 2937,
+      "sha256": "3b61002292a85ca7e666a75e73216e2b4bd08ded792aa05e4012691678915a5f",
+      "gitBlob": "0cdfa2a2bd0b8714070a3b1375e39cff7e1ae7c3"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-codec.ts",
+      "bytes": 15820,
+      "sha256": "99cc6d1bde38bfb9f85a702f028495570cec9bc9c86807ba9e856ffdbffd34ab",
+      "gitBlob": "a374602364b77e60d40a4ba37285b364664173de"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-command.ts",
+      "bytes": 7115,
+      "sha256": "2a1a1434f7c9ea9425d97d41579bbe5dd6520e1b5a0250a8f47d77e45f026b6a",
+      "gitBlob": "87f01ff5c986108f6f96e4fa3b9d4448d17c1a48"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-contract.ts",
+      "bytes": 6239,
+      "sha256": "5da05c7a3532e1280f7ccc635c265a6fe9592b7a3ff3964ae29087df701dfb69",
+      "gitBlob": "ed5176059042ebe6a8550f67c29a9a3ae41ec38a"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-provenance.ts",
+      "bytes": 4949,
+      "sha256": "6b7d3dd98dca466ab906bddcb991e59e2e0437bfa66faa71e34a945084780d88",
+      "gitBlob": "ea55dda3afa5a8683d7f74f690882f2630563ca3"
+    },
+    {
+      "path": "app/lib/payroll/central-c2-codec.ts",
+      "bytes": 18699,
+      "sha256": "15401330a8f61b05477837ad678d571fe079a10c0de674fec80717d01882bd88",
+      "gitBlob": "6912cd545feab3de98e0f4ac36f6787f03f41ca9"
+    },
+    {
+      "path": "app/lib/payroll/central-c2-command.ts",
+      "bytes": 9419,
+      "sha256": "7dcba8ffd182af49596548ae8adc5757dff2a6df27f8c9eec453f20426ae2b27",
+      "gitBlob": "c99219896397022f96c266b504fdad7b5c7e8641"
+    },
+    {
+      "path": "app/lib/payroll/central-c2-contract.ts",
+      "bytes": 7504,
+      "sha256": "547447375769f16df0978258721abc7f7b5b84a137b5363f4f8127523cf67a41",
+      "gitBlob": "31d91f2c47f8bc856fef00f321aeeadd30651edf"
+    },
+    {
+      "path": "app/lib/payroll/central-c2-output-identity.ts",
+      "bytes": 5739,
+      "sha256": "db43a41639d6776818a870f08695fe806fb55922608afea41736890713ce4946",
+      "gitBlob": "cc0b343a0687899f5a9a86d909a94b614b270389"
+    },
+    {
+      "path": "app/lib/payroll/central-c2-provenance.ts",
+      "bytes": 6028,
+      "sha256": "9c0124eaf8a5c5c569e1b0c05dc3df70bf9fb53ac6924a8893cf5ea79d3cf249",
+      "gitBlob": "b14b4d9022cadeb1200ba2b22498ca88a40fcf9d"
+    },
+    {
+      "path": "app/lib/payroll/central-contract.ts",
+      "bytes": 7906,
+      "sha256": "34580c2ff508607d825f84b26b310acc549471c49356e31f1cd011c81cfbf50b",
+      "gitBlob": "391bac1eb6b346a9a1097585e231246b63d1c918"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-adjustment.ts",
+      "bytes": 4034,
+      "sha256": "d4d7974658b49e36abb3b6f093465561cbbf0ff537f4e36af3b7235b979ba9ed",
+      "gitBlob": "1709c18ad6ff9223f9b2dfdeb8a27d3a120e2d5d"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-calculation.ts",
+      "bytes": 2722,
+      "sha256": "f08e72ac4b4dcaf30a7573c8185d5f7164a48ec2541fd04fef0db36634916792",
+      "gitBlob": "fe203beaec9773033ee4d469eefe37d4921ba669"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-codec.ts",
+      "bytes": 3002,
+      "sha256": "ada7bbb391293aa715a67e34d9fcc27d4eccf53820f56079d90ea0b858aec8fa",
+      "gitBlob": "ea53b1970a281e20e90e8b436f00fd05e0832302"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-contract.ts",
+      "bytes": 6330,
+      "sha256": "902731d89f53f30a0f50fe762c98beeb0bbeb831f8b76b4582d8d31a9d1c8df1",
+      "gitBlob": "5f57f7c2bf4c1d608a9b55eed75658dc972ef440"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-mapping.ts",
+      "bytes": 6920,
+      "sha256": "78d75b9a357d5e129dc1e555fcb1efa411898c2ec6de6d81d668bd4a70713f70",
+      "gitBlob": "7d62a86185850b58924defb80ca3b8d5ad2edbfd"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-projection.ts",
+      "bytes": 1893,
+      "sha256": "e184a5067a08ffcc9a39ba59d8cd643d2660775b76f122969b840c22d0461117",
+      "gitBlob": "95040a606dcd18e2d189d208e95efc3d1bdf8771"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-provenance.ts",
+      "bytes": 14727,
+      "sha256": "4a1e4cad348d84e1504129ef849decc4d0d154f954d3e3a4ecd0d8a8571f818b",
+      "gitBlob": "909c72ae6d281bdf15e4b2fabcce77e1beb01eaf"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-read.ts",
+      "bytes": 7345,
+      "sha256": "857e5204206d863ebee706afc310b1be2c5d7359d9dd42eeea0e452d04a2de2c",
+      "gitBlob": "1fbbe56484be7b89f605bbae4bd5ee122268455f"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-release.ts",
+      "bytes": 2765,
+      "sha256": "0be848c70a1dd9b5b610adafbf790389f3dfa9e96e2bed017667510c07d91b95",
+      "gitBlob": "e862bfca175b3f86b875dc448dd3c249c1868578"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-schema.ts",
+      "bytes": 4321,
+      "sha256": "e1ba36591b07f7fa285057c49d93242d92733d7a694f8fb7010e0a49326aa68e",
+      "gitBlob": "87bc86d73d90d560a5fcc708969ff96412db1152"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-snapshot.ts",
+      "bytes": 8069,
+      "sha256": "ccf13f2f15b6ac22dd249ce3a2a69b436bad02aa14d0698dc56b563a9c71cfb9",
+      "gitBlob": "633ddf85f9a4563e1e866f95900ad115e3f928b3"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-validation.ts",
+      "bytes": 5984,
+      "sha256": "b76b64bbc489dc1c9fe7f804f89ce2491ef3cbb6306327e1c508c532b13e75f2",
+      "gitBlob": "dca0dde651411863b763318e9996737e531097c1"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-deduction-wire.ts",
+      "bytes": 2013,
+      "sha256": "691b5bdb45eb13fc6b939b58210a052ba13b8608b34fb70180e59f11fd5c069c",
+      "gitBlob": "4b0260c7d7ef14608014e8f85131453dd906bc65"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-processed-original.ts",
+      "bytes": 8493,
+      "sha256": "23b8d141eb86a8100fec15ef199a956af40152da5d666a9270972e59b8701a9c",
+      "gitBlob": "a4dc7a5ecdbe8ad61c8ca36a154517910fcaef3c"
+    },
+    {
+      "path": "app/lib/payroll/central-hollow-processed-proof.ts",
+      "bytes": 10582,
+      "sha256": "9d1b80b5e9bd4d66f6b7cdd32603fd4253fa27b1f052cf3c8e478b2f5ed590ed",
+      "gitBlob": "f2b5154a5de8b76c182d8c241cc963fb4b8b945b"
+    },
+    {
+      "path": "app/lib/payroll/central-payroll-wire.ts",
+      "bytes": 7142,
+      "sha256": "3a083c9a1a3ff1c6916428615e0941a81220d17b4199e346a43dd38d35cd3ee5",
+      "gitBlob": "b07b9229576ab042ce225c739f2a122931030474"
+    },
+    {
+      "path": "app/lib/payroll/central-repository.ts",
+      "bytes": 8692,
+      "sha256": "834e5f5b951f92e94e6cfc3ff4dc3325888ee316a513dc36d8d4c385511db2a8",
+      "gitBlob": "321fd7c62faa2f895437b26d9d1270e697ad39bb"
+    },
+    {
+      "path": "app/lib/payroll/central-reversal-validation.ts",
+      "bytes": 2099,
+      "sha256": "cf4813a8b5ed18c266190ec8774ce1b1a6c70f5bd93f00894f1cede08322328f",
+      "gitBlob": "8f9019a26da3b044fb258d8481e4ee56d770ef7b"
+    },
+    {
+      "path": "app/lib/payroll/hollow-export.ts",
+      "bytes": 2171,
+      "sha256": "2e4bdbb5d989fe06454e0481769a6e1577182f86dac1574d18513404a878427b",
+      "gitBlob": "aaa1686b892d3c2ea9819d170e37b0fb868cdf33"
+    },
+    {
+      "path": "app/lib/payroll/migration-identity.ts",
+      "bytes": 1494,
+      "sha256": "d917e325e166ffa96bfee28556be27ee66a0cafd666f66c278b460cf40f19cce",
+      "gitBlob": "13757d3d0de6335cd380c0817d3756308643a80a"
+    },
+    {
+      "path": "app/lib/quantity/central-command-decoder.ts",
+      "bytes": 4453,
+      "sha256": "fd52f1863f3017b6b6dbe2ca0b5c545249be63bac1acb0cc3c0d3779bc8342dc",
+      "gitBlob": "dec8211e95a285c5193149bdec1da7021a3dbc42"
+    },
+    {
+      "path": "app/lib/quantity/central-contract.ts",
+      "bytes": 3270,
+      "sha256": "0662cf58336f4cf48770f156fc7291def8c3815d8a766d8b1d4317256a48fe69",
+      "gitBlob": "f5d3214d3944dc1ed2fce62ce8ff3af694a3d2ae"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-codec.ts",
+      "bytes": 11004,
+      "sha256": "cd3c0f34e23ed50ffa43da397e5a914b716eb179aa03ea802fb433fa156f116c",
+      "gitBlob": "e7ccf4b1df5400f9d7760ede8db76be8b88aeed2"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-contract.ts",
+      "bytes": 4430,
+      "sha256": "9790ca56fe9d96b376f79de0eca95d4bb5b4fa9f4a75b96b8495989caabee125",
+      "gitBlob": "5b753a213ccb2e7379e36290bee05177520c3090"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-primitives.ts",
+      "bytes": 1994,
+      "sha256": "066f45548b7f7dc21ee4f808be59d5f8306fcac62fe11a55820b684d28d3919f",
+      "gitBlob": "5559dbcf71dfaaa966ed35b9f46657484effef73"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-proof-contract.ts",
+      "bytes": 2154,
+      "sha256": "49397d162e59932d02fff6d4697692eed6ca79f68aa107fbfccbcce24cdd1e98",
+      "gitBlob": "4a621d16c538fbd453a3cce21aeb0dcfa8bcf572"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-proof.ts",
+      "bytes": 14608,
+      "sha256": "1935b5b6b1964d566e0542aea7e19a3b965750073cd2e2bc6586d6c7858ca569",
+      "gitBlob": "dc0edd88f4123654c5435f30ee4492a7ffe20638"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-responsibility.ts",
+      "bytes": 8280,
+      "sha256": "c83d6d0ad4e263515ec9ecc217b8d20244fa9ca05085448bdc42d334fba8832a",
+      "gitBlob": "45b4621a27baa26539217b1ab55ee4dceac2ece9"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-result.ts",
+      "bytes": 2573,
+      "sha256": "7a3bd2b2d3fa38afabf8144c8a6839cc75ace87f70f1f232230c1ef89be09662",
+      "gitBlob": "e2065283f5d21122e00aa28e85a8c25b932e0342"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-schema.ts",
+      "bytes": 6645,
+      "sha256": "08bc67b223d6e75d96cede9277a338a1e97d05c21c79842b7b3dfc3a50c434a0",
+      "gitBlob": "2614ebb9e99678e9176a4616d133852f515bda34"
+    },
+    {
+      "path": "app/lib/quantity/central-hollow-validation.ts",
+      "bytes": 2851,
+      "sha256": "12211a91f24691e9eeaf154cf1d1f62d746f7351a0806501080da00358e47002",
+      "gitBlob": "4c8621412589147478e594313059cea0278f1b2c"
+    },
+    {
+      "path": "app/lib/quantity/central-repository.ts",
+      "bytes": 6089,
+      "sha256": "2fd195ef10f9dbeef90152e83eadc4cc1a9e4c59f577ed2454f4ebe9d700bdef",
+      "gitBlob": "6125c46de63c71ec720f1555e776e323b5e15bc9"
+    },
+    {
+      "path": "app/lib/quantity/hollow-migration-contract.ts",
+      "bytes": 1543,
+      "sha256": "a0059aff9d1ec590e807cbe1d6477bf02aacaf134c2b33970371a03b0597fa93",
+      "gitBlob": "0bcdd717c18b20c8ad7793a0c52aa45528338d5a"
+    },
+    {
+      "path": "app/lib/quantity/hollow-migration-graph.ts",
+      "bytes": 11215,
+      "sha256": "56f288599363b84da273006e830b3c3aab5e81dbcf7910fea32aec9979551710",
+      "gitBlob": "360961c1a417cde504348aa324d21595d66f9375"
+    },
+    {
+      "path": "app/lib/quantity/hollow-migration-mapping.ts",
+      "bytes": 13210,
+      "sha256": "c2b4ffb544c2b3d98bdceb25669862292e3bb674c4bb0a02dee0d768ac654a5e",
+      "gitBlob": "675390076d0f7c21544627d934d8ae1c14671bb0"
+    },
+    {
+      "path": "app/lib/quantity/hollow-migration-proof.ts",
+      "bytes": 5567,
+      "sha256": "2dc2cfd0146c3f950840a7560cf9fffc05c5f0e09b23a0862aa5ff977f68cd2f",
+      "gitBlob": "54dc1003d64eafe0f3278e3cf53d02c08f1819bd"
+    },
+    {
+      "path": "app/lib/quantity/hollow-migration-source.ts",
+      "bytes": 6343,
+      "sha256": "6eabbe1aa666401cedb40e383f18f97fcf00b4dafe5fd056944b41670abe71be",
+      "gitBlob": "c2793425aeb81d01bb4a29a5d50ef2a558715249"
+    },
+    {
+      "path": "app/lib/quantity/hollow-migration-tables.ts",
+      "bytes": 1893,
+      "sha256": "d66e7f668e708fae0cfb46126f38f2bf81cab0eb81da5948e6d9c6b64cf06c4d",
+      "gitBlob": "49df646fa1245524d47a76fe02a48ab4bc34d8f0"
+    },
+    {
+      "path": "app/lib/quantity/hollow-navigation.ts",
+      "bytes": 3729,
+      "sha256": "30819cde67d3328e6593b6b0f11f44ed7ef50ca16659dc09983458a56ab95892",
+      "gitBlob": "a8972b55f4cdcb2c18600e0e80ef51c2b0e57763"
+    },
+    {
+      "path": "app/lib/quantity/migration-graph.ts",
+      "bytes": 13575,
+      "sha256": "3ae89ecc67afd225d1c7c8ce916b83dbfeec7a155c5b4816528562e7628dedf4",
+      "gitBlob": "e4e742bf2ec63f2d889d333be4a3f49aa9b4f8a1"
+    },
+    {
+      "path": "app/lib/quantity/migration-identity.ts",
+      "bytes": 940,
+      "sha256": "f8997f9a2d795e2b32b62dc11253a33462e6f208c2879ebdc203f740c8568354",
+      "gitBlob": "cfb138c06cf1b557464bdc0fc4f1486ab6363a83"
+    },
+    {
+      "path": "app/lib/quantity/migration-mapping.ts",
+      "bytes": 7958,
+      "sha256": "cc50afa2d6a91e0fab905532edf7026fa194c1af0ae9f015947df26afa60a137",
+      "gitBlob": "b218902ae19f3772b35a1fe37db833bbee59c60d"
+    },
+    {
+      "path": "app/lib/quantity/migration-source.ts",
+      "bytes": 6644,
+      "sha256": "aa4e1e648ce8cc4d911bc1e0d0528fa46d12c0610f5ca756ce9645177513e2ac",
+      "gitBlob": "4bffd9913624f25e72eb4b3f8ee1b83b9bbddd20"
+    },
+    {
+      "path": "app/lib/tabs/restore-detail.ts",
+      "bytes": 16155,
+      "sha256": "905dcfb124c440e514bb18210d26bfc0d4beda94aeb05bd84b64d7fae10d106b",
+      "gitBlob": "9b029085076ebe3cc382790496c97b0a91b389d8"
+    },
+    {
+      "path": "app/lib/tabs/restore-quantity.ts",
+      "bytes": 2829,
+      "sha256": "622cc6a8000a5b8913a245951b8c2f670ecb34af8652a611f7c4cb8df8dae00d",
+      "gitBlob": "018323993fd897fefb76e78994199564290ef44e"
+    },
+    {
+      "path": "app/lib/tabs/restore-target.ts",
+      "bytes": 20195,
+      "sha256": "132ccfd39756dd4f0243c059a0153fee7128ec1bf96d238b05cbb89cbe3df4d5",
+      "gitBlob": "36867703e199ce300ddc248443b7004bf6f5388d"
+    },
+    {
+      "path": "app/pages/subcontract/quantity/[pid]/[uid].vue",
+      "bytes": 2238,
+      "sha256": "9d815afc5c6dc185cd81b2da8704741f4b2ff26e4f67e9603b987c2f042432ce",
+      "gitBlob": "4829437ce85cc32697269cb3e5a16b704a4c96c5"
+    },
+    {
+      "path": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/[id].vue",
+      "bytes": 247,
+      "sha256": "47de545ba696f148124ae519424fb768f515a81dd09138b1bc67bf36f095ede3",
+      "gitBlob": "321e64c45d84153228a3d755665e207da490730e"
+    },
+    {
+      "path": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/form/[id].vue",
+      "bytes": 243,
+      "sha256": "9e3e04088cce917a931e2483c7a5acf2fcaf9418684cddf646c2354ae88dcdb2",
+      "gitBlob": "13d17b120baa5a1bf04c2682c5907b7dd42daf98"
+    },
+    {
+      "path": "app/pages/subcontract/quantity/[pid]/[uid]/hollow/new.vue",
+      "bytes": 200,
+      "sha256": "4f932815fd92eeedfd6e83c30e191178f4bdf98677432af9c90445bc21418f47",
+      "gitBlob": "c06277dc2f145ae0038c06832d51a2036ff05077"
+    },
+    {
+      "path": "app/stores/payroll-a.ts",
+      "bytes": 8410,
+      "sha256": "2f8944952a3e64939deed281f49d91aa2c5ecb350d499dc372baaabb00c8cd74",
+      "gitBlob": "66770428745c467a9b565973899dbe54182221ff"
+    },
+    {
+      "path": "app/stores/payroll-hollow.ts",
+      "bytes": 5983,
+      "sha256": "67428b3b0aacc3668a37d277fda4e6ce9df18cccc96a1281b6210755b84245d3",
+      "gitBlob": "d4ec49e710ff69e632b915f07090afce03a2938b"
+    },
+    {
+      "path": "app/stores/quantity-hollow.ts",
+      "bytes": 10622,
+      "sha256": "1b09af9d9424cfb7e6d32d0858392d81498c7f3853c1eeaa592b6fd5d75124ad",
+      "gitBlob": "cb0981ed0ebda8c9529c2d355a8e6a7c22cf7c5c"
+    },
+    {
+      "path": "app/stores/tab-session.ts",
+      "bytes": 8769,
+      "sha256": "5590792c769872f62532cf1260a27f2f4dc9c5fef748d863c385f2b5177a032b",
+      "gitBlob": "357c364ae3ceafe1353db8699518417ec9b4fe0a"
+    },
+    {
+      "path": "e2e/helpers/payroll-hollow-migration-source.ts",
+      "bytes": 6605,
+      "sha256": "d98cd6a6eb13507d3de3e396420e9cccb0b78b327e358ab0fa779cc0ac970c55",
+      "gitBlob": "f9b2a4351a70bff9b910b3694aba680966b3a0d0"
+    },
+    {
+      "path": "e2e/helpers/payroll-hollow-workspace.ts",
+      "bytes": 5272,
+      "sha256": "9653f887a5782b5c7bbe6b84d78d243e8d7f09d3e3837025d35bf082bf4be13d",
+      "gitBlob": "c2900b663f8f159b2dc02b9e9ca9f784758ea62d"
+    },
+    {
+      "path": "e2e/payroll-hollow-central.spec.ts",
+      "bytes": 21197,
+      "sha256": "71eecbc50e4c675429376f2ffd7aa78e8b2ca6e1bec49344c7972b2b456d8b16",
+      "gitBlob": "cc41c88054a614ad199d91cd1a9d5961fd4fc023"
+    },
+    {
+      "path": "nuxt.config.ts",
+      "bytes": 2663,
+      "sha256": "a949441c38a89e59be5f027f90eea11f4c9c818cfabdbec063c89806d993474a",
+      "gitBlob": "e381e3828eed0dd757251c112d23ec8afda5f4e9"
+    },
+    {
+      "path": "scripts/module-review-inventory.mjs",
+      "bytes": 57602,
+      "sha256": "3fc06396e86b9808f3252836614236eedbbf1cf6579837e709081fd608051d64",
+      "gitBlob": "5b8f6e92c8be8406319662aab252160023e96322"
+    },
+    {
+      "path": "scripts/runtime-evidence-ledger.mjs",
+      "bytes": 26542,
+      "sha256": "f7e1ad0d72dad85e51882c558bd97e8afd8eb72c72cdc1251ecaff41d27b0a2f",
+      "gitBlob": "b6b48fdf0d6c1ce382ff7868678761c3e6a55645"
+    },
+    {
+      "path": "server/api/commands/payroll-hollow.post.ts",
+      "bytes": 486,
+      "sha256": "f1440b2f17a32df87bfa8f83223eeadc507b14f962efaf0eca5503257f20739a",
+      "gitBlob": "b9162a880f519f65faea91d6d464c5e2baaa5fc4"
+    },
+    {
+      "path": "server/api/commands/quantity.post.ts",
+      "bytes": 828,
+      "sha256": "86b4e580e6e7b37c5d1812f41e41bf00baa22cce9b60846e06670e25c27b7725",
+      "gitBlob": "dd5056174ec0185605c4ee2e38d73ffe1e625273"
+    },
+    {
+      "path": "server/api/read/payroll/hollow-config.post.ts",
+      "bytes": 1329,
+      "sha256": "b88e9a96abfbecab3b39eb45c1ca70607124fcebbf20fbb1529dd0f8a89c2528",
+      "gitBlob": "93ab891c6ea5ee43d9405fcc886f530120e35f90"
+    },
+    {
+      "path": "server/api/read/quantity/hollow.get.ts",
+      "bytes": 480,
+      "sha256": "811c5bea4b2fdc4907ac490d1a72c8c11e081fc74567b600c63dc93946f25ead",
+      "gitBlob": "483d796935d0920010e2205f326f0bcefaaf9aa0"
+    },
+    {
+      "path": "server/utils/payroll-a-adjustment-reconciliation.ts",
+      "bytes": 7628,
+      "sha256": "ccc1350e809a8c60d9f5706daaefa216ecfe5a77bb46df11ea7e48ae38b972d7",
+      "gitBlob": "724bf6888da77cf45830a8605ad2509a2536ef49"
+    },
+    {
+      "path": "server/utils/payroll-a-fee-reconciliation.ts",
+      "bytes": 7171,
+      "sha256": "08680e0699b9f77e4d9d14c88c4a923d12f84a1356c5f021fa6cecb5a0363372",
+      "gitBlob": "f45c6a85f4130d0ef80a1d707a3b8e11565d10b7"
+    },
+    {
+      "path": "server/utils/payroll-a-fees-read.ts",
+      "bytes": 17258,
+      "sha256": "efde7ce835d890332da5f8ebcf7257b5093acafc3af8e53fda5102a05ae3ff3e",
+      "gitBlob": "8c49121ec3d60143dd57aed284a81a65c130f901"
+    },
+    {
+      "path": "server/utils/payroll-a-frozen-form.ts",
+      "bytes": 2938,
+      "sha256": "420a464e97cc583811a30bcdf7a47c05a12b06d57a59c0d16513c3fe17583d0a",
+      "gitBlob": "224fd1dca8fd2671ecdd6f5db9770180a94cc575"
+    },
+    {
+      "path": "server/utils/payroll-a-hollow-read.ts",
+      "bytes": 2458,
+      "sha256": "df37cf3eca4379cbfa58557862ee99d6ad3537ac8daac811b78497feb7362247",
+      "gitBlob": "cd4574837c940c4b8002c8cc471fea057a221d5a"
+    },
+    {
+      "path": "server/utils/payroll-a-released-with-migration.ts",
+      "bytes": 630,
+      "sha256": "7e7b6a72f75612179b2310988b0a6fbf2f4fca01a31baf99d8c5315c3019f830",
+      "gitBlob": "d3323a18a087bb9548fc972539819d4fa044bce6"
+    },
+    {
+      "path": "server/utils/payroll-a-service.ts",
+      "bytes": 36890,
+      "sha256": "f6cb2f5a69cae307bd2280595631d96e82c3e1829a75b00b9e8a7fee11e148cc",
+      "gitBlob": "8ea9428ef785fa8a8786ef8c29934cf751410b85"
+    },
+    {
+      "path": "server/utils/payroll-actual-facts.ts",
+      "bytes": 4066,
+      "sha256": "a5eddcec026a87f30741abd645fb41d8694de81bfad037b2dc4c14e9f955bd0f",
+      "gitBlob": "799fa476a848ea53e16a6722901467eca57554de"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-facts.ts",
+      "bytes": 7235,
+      "sha256": "2ac94261aeb4d876f6df852a261aca32d4ccc34d4bdeae42885fa5abe8eb990d",
+      "gitBlob": "ecf29b374f3aef08d6fbabff35b51f3682c526c2"
+    },
+    {
+      "path": "server/utils/payroll-c-released-with-migration.ts",
+      "bytes": 773,
+      "sha256": "571e1c2f8e4c91332c9a17a858ee0e474e16b21ec4f263c239af2db10b31c1d5",
+      "gitBlob": "9c31091c6271a589d6fd0c50f3ff6b3d975254d2"
+    },
+    {
+      "path": "server/utils/payroll-c1-migration-references.ts",
+      "bytes": 6856,
+      "sha256": "e6decb4a4ee9319d8c05d65c7a70cdc44adc7636a3ad0b6d6be55fd41b85dbaa",
+      "gitBlob": "a23e473d84e8934ddd3eec7650eb4e8d7bb2bbe7"
+    },
+    {
+      "path": "server/utils/payroll-c1-service.ts",
+      "bytes": 26066,
+      "sha256": "a6b977ac380e861315f63778e9dc056a69215a0db58ecf9c79499dda6a704d60",
+      "gitBlob": "45ae5ecc1cd7120e8e56e8aad3dc78228774825b"
+    },
+    {
+      "path": "server/utils/payroll-c2-migration-references.ts",
+      "bytes": 8558,
+      "sha256": "b81d8fb95add5642936616210aab600a66e1ef9b65e417116ac40a949af9c8af",
+      "gitBlob": "fef7182cb40bfa9c6f38de81a39ce1cf1d551143"
+    },
+    {
+      "path": "server/utils/payroll-c2-service.ts",
+      "bytes": 28065,
+      "sha256": "58b2bae2e452c7d45a8941cea92b979994a4c066e53a31af376600da5827f666",
+      "gitBlob": "03e8c2a7d554157986797398845ba9b644992f14"
+    },
+    {
+      "path": "server/utils/payroll-hollow-config.ts",
+      "bytes": 4047,
+      "sha256": "2c33d526eef535c3e2d3b59849a6e7507792ebe0f9c95a9966c7e1daff30fa97",
+      "gitBlob": "de1e4f831e8091d6ff45f6dc1da6db9c5dc9fdad"
+    },
+    {
+      "path": "server/utils/payroll-hollow-data.ts",
+      "bytes": 10524,
+      "sha256": "e4d8d2138566077ffd9941a0d52d7660351f140966c84a4b4f13a29bf5e6ee48",
+      "gitBlob": "3e30dadea8942e95db9afbe14b897a3ce016d8cd"
+    },
+    {
+      "path": "server/utils/payroll-hollow-migrated-source.ts",
+      "bytes": 5603,
+      "sha256": "d582fbd6ed9affb9d57b4dd18c2ffb85e1f6241eab10e0e53471b21b769d890a",
+      "gitBlob": "9171b2f9a0886a4533ed55d07f927bd66578bbe6"
+    },
+    {
+      "path": "server/utils/payroll-hollow-migration-references.ts",
+      "bytes": 7073,
+      "sha256": "f6027547669fb0d794adf9a837132687451920b63aed12c20521242f1cc56559",
+      "gitBlob": "1a51ac7286ea26fa768cdb75c8775965d826466d"
+    },
+    {
+      "path": "server/utils/payroll-hollow-migration.ts",
+      "bytes": 7165,
+      "sha256": "0f3a5ee24f8340d689dc467fa418c10c0bb642785a7b07a4c8beb0d264a33be5",
+      "gitBlob": "92ed385c7716e4832f354293aa9f45c7976de7eb"
+    },
+    {
+      "path": "server/utils/payroll-hollow-processed.ts",
+      "bytes": 2547,
+      "sha256": "e9c5971689c12699629a64d4eabae6e887c29220dced37f7d01ba247b70d908f",
+      "gitBlob": "dea8532ece42be5b8c39ec8a98f0ca52ad1639bf"
+    },
+    {
+      "path": "server/utils/payroll-hollow-read.ts",
+      "bytes": 10649,
+      "sha256": "f24f5e0a161dbd9ec4bbcc3f259287b58c3d6c397dd35f2864854b6acda052b8",
+      "gitBlob": "d6bb565d87e168ef8455d76920baf5d883e019c5"
+    },
+    {
+      "path": "server/utils/payroll-hollow-service.ts",
+      "bytes": 10015,
+      "sha256": "7513130a7918259d863fbe8ef06d15dfd4ff7aeecaf1258f05a5ae1269cb396b",
+      "gitBlob": "33846da562f3b65d0f6ee4a5e1b424659fe4d576"
+    },
+    {
+      "path": "server/utils/payroll-hollow-starts.ts",
+      "bytes": 11293,
+      "sha256": "02ecac58045715d1a1c4b197c81bfefacb63be5a028ebd6f06ded9e6886c0400",
+      "gitBlob": "0414282a13b741510ea1eca0516fd28400e95186"
+    },
+    {
+      "path": "server/utils/payroll-migrated-form.ts",
+      "bytes": 7386,
+      "sha256": "65075c5ff846bdc5c9a8cb850c6f7e00c39da79fb5a349c457825d52c4dfe6a5",
+      "gitBlob": "04d2a7b4256adfd7a39d71ec3170cecdb3a4894e"
+    },
+    {
+      "path": "server/utils/payroll-migrated-hollow-mapping.ts",
+      "bytes": 108,
+      "sha256": "02cfd73023e9dfb2da0c74acc9c2f043dd9230d67210512c4621f50e822e28e0",
+      "gitBlob": "e5f19a8d00ff824a97d6934efaf9eb5e81d4fad9"
+    },
+    {
+      "path": "server/utils/payroll-migrated-hollow.ts",
+      "bytes": 989,
+      "sha256": "93a3227f4d4194d2fd7a2504ce42cb1fe026dcc6ffcdb0c26672a42efc1ee378",
+      "gitBlob": "4de2612e2910fadefdde5e05609b530fabf7f246"
+    },
+    {
+      "path": "server/utils/payroll-migrated-mapping.ts",
+      "bytes": 24397,
+      "sha256": "b6c801eb0194a523bdac1809d87b3c64dbfb43f1a90a0d972cd7ed84461d0821",
+      "gitBlob": "38444a5f329cae97833b79087339dd4a3de27211"
+    },
+    {
+      "path": "server/utils/payroll-migrated-prices.ts",
+      "bytes": 2740,
+      "sha256": "b089a34a353d5d68d813122df6a1ebad8e3c8e5f80ee6f1e77346a2fbc34d83a",
+      "gitBlob": "95da60cfef15c7168502bf7655cbaed16e14909c"
+    },
+    {
+      "path": "server/utils/payroll-migrated-proof.ts",
+      "bytes": 25867,
+      "sha256": "989b01c50484772d24169156d3a18af2f90e1c51ac84a07c1d496ffdd86f74ab",
+      "gitBlob": "1a78e1104fe151c75820a155889692b3032f3abc"
+    },
+    {
+      "path": "server/utils/payroll-migration.ts",
+      "bytes": 34724,
+      "sha256": "46cd80a20d87ae380753a927a07b13ad5b962c9a47577d44cef051e2f0b0384f",
+      "gitBlob": "2afb56fc28dfbc8f6f11511f09a928ae9716aa01"
+    },
+    {
+      "path": "server/utils/payroll-release-adjustments.ts",
+      "bytes": 10389,
+      "sha256": "bda39efa3cfcfc9f4b1a3fa07941e31b97f1b72ac6afc11275b0325be4e71aa2",
+      "gitBlob": "01f99f9649306b5f2709d5b8b6ea76928c1845a1"
+    },
+    {
+      "path": "server/utils/payroll-runtime.ts",
+      "bytes": 3929,
+      "sha256": "e292299aed6fecbeca4d71ba2eaf369bb27afcc5df8010ca1bfafea7d2337f45",
+      "gitBlob": "5e9fcab746ab61e88cdb4a1f942e5b173e650a04"
+    },
+    {
+      "path": "server/utils/payroll-service.ts",
+      "bytes": 14410,
+      "sha256": "ab070977f0d56d47b8fe0e647fb54f0e2f5acc3479272be8ac0dbae1f58fa841",
+      "gitBlob": "294c812eb77eb568b85fc6a7f97d35347dc80da4"
+    },
+    {
+      "path": "server/utils/quantity-database.ts",
+      "bytes": 8061,
+      "sha256": "25cf77cb74d646141fe5618a159b4c6bd44750c46c09cbaabb26b38620a6b746",
+      "gitBlob": "3c6fcb020a128099a632dd0626093b7675e99b92"
+    },
+    {
+      "path": "server/utils/quantity-hollow-facts.ts",
+      "bytes": 6265,
+      "sha256": "826ab9f68d8e8a709ce7e442377451776b52e77a0505fd620dd46d50c54b9630",
+      "gitBlob": "992f13ac9375aeb9c0460c1e94133f6b65cd4bbb"
+    },
+    {
+      "path": "server/utils/quantity-hollow-migrated-proof.ts",
+      "bytes": 2237,
+      "sha256": "e6f4605e14600770bef24931522d4210f1d6ba9065bd1f411bfade8afbf4c130",
+      "gitBlob": "4e1e19957459a29128e12843fae231d9c75db7a5"
+    },
+    {
+      "path": "server/utils/quantity-hollow-migration.ts",
+      "bytes": 6904,
+      "sha256": "7ce609cd844650535a001dff16b3adfc0f21fdb4f4950ca0ac97704164649283",
+      "gitBlob": "93ea406c2495e637c36ae5d68dc87d23c9c56d02"
+    },
+    {
+      "path": "server/utils/quantity-hollow-read.ts",
+      "bytes": 3788,
+      "sha256": "04a95f69390a4c75e56f0f2dca7f293ac168784c05f25a9a6c9b01ef0054bc61",
+      "gitBlob": "783599c4afab7ac67e724983645f9746741b1f99"
+    },
+    {
+      "path": "server/utils/quantity-hollow-service.ts",
+      "bytes": 14708,
+      "sha256": "8a8af34d835c52d34fb23b1aca8040a76ab5e0c8633453f95abec3cfe25c9c05",
+      "gitBlob": "0bfc6e4e354361c410c30b257f802428b4e94321"
+    },
+    {
+      "path": "server/utils/quantity-hollow-targets.ts",
+      "bytes": 6278,
+      "sha256": "ea2e9582118f154a0562872531301b493b4caba30f8d8b2b2da89833c8575808",
+      "gitBlob": "1619f54e86eedcdf686c1ac0b1b4dba4b233f5c8"
+    },
+    {
+      "path": "server/utils/quantity-migration.ts",
+      "bytes": 10409,
+      "sha256": "b1ac0497ca74e4889278f01a095945a735edb52966959de03f69f3191a3a5cd5",
+      "gitBlob": "ffb34483be7fbfcbe5c6ccdd27b03a4c8018a8bd"
+    },
+    {
+      "path": "server/utils/quantity-request.ts",
+      "bytes": 3539,
+      "sha256": "08690574e5c66b3e56d51a6925c9c1d72f98d2dc9b62bd4a1acdf8aac0c2f63a",
+      "gitBlob": "d232dae830e738ddcbdffd8696a971ae39be6ce9"
+    },
+    {
+      "path": "server/utils/quantity-runtime.ts",
+      "bytes": 2789,
+      "sha256": "f1848e709c3610add08bec71b23c9753d8a38e87117ad0e1a49fb0c400cbc109",
+      "gitBlob": "849983ffb40b21701346c8740e384ea3bf0af6cb"
+    },
+    {
+      "path": "server/utils/quantity-test-instance.ts",
+      "bytes": 16145,
+      "sha256": "4a2a092b3fa084b36dd1d5b3cc4fa9224fb604afc52e4180cffa4f4107c6690b",
+      "gitBlob": "b942f02dec96ccea2d8d2d706449e86c30f7cbe0"
+    },
+    {
+      "path": "tests/components/PayrollAFloorReview.test.ts",
+      "bytes": 1934,
+      "sha256": "0b1571a599916c79401b2b6ddaa0cf758e9944c67731cce8ffcd4a9dfe09fddf",
+      "gitBlob": "5d18d7c5163c76ad08529b5e1e8db5ed4094d7e7"
+    },
+    {
+      "path": "tests/components/PayrollAFloorSourceFocus.test.ts",
+      "bytes": 3942,
+      "sha256": "0805b9b30e7e0664857e8907688f977cd1c2c130bd2b0414c85d1d29880e15bb",
+      "gitBlob": "43185a6db2f2a50428f6d662be6078cce14e1ee0"
+    },
+    {
+      "path": "tests/components/PayrollAFormState.test.ts",
+      "bytes": 11775,
+      "sha256": "3b1ad9bd0c8a07f5af14d80a5b968ce70efb1f5a1fc6914ef00d672df1010efd",
+      "gitBlob": "8e822a71c7255f3d9c5fce33fb14ab56edf3981d"
+    },
+    {
+      "path": "tests/components/PayrollAIncompleteForm.test.ts",
+      "bytes": 4817,
+      "sha256": "bbf5cad68f07e20eb723caa2829cde19c03f1040323d0a76cd671a4ac7150688",
+      "gitBlob": "c2bf9f14039d4558e572bb0ad7f0f88da9e0092d"
+    },
+    {
+      "path": "tests/components/PayrollHollowAdjustmentFields.test.ts",
+      "bytes": 7787,
+      "sha256": "8b43f95357d08297961ad3570444e84e790ed4ec5484a186f2541ffba0ca8983",
+      "gitBlob": "466fa16eeca23e567f05b5ead9089b1af051b0f3"
+    },
+    {
+      "path": "tests/components/PayrollHollowConfig.test.ts",
+      "bytes": 5267,
+      "sha256": "7dead62d70bcb5f89fbfd1f6d83cee7531bd463e660756a5254e6efe252e72d9",
+      "gitBlob": "61653b6a003fdc0858e279706db09ceb1893f8bf"
+    },
+    {
+      "path": "tests/components/PayrollHollowFrozenOutput.test.ts",
+      "bytes": 3200,
+      "sha256": "60674bb78168abaaf88749b3bd55fbc907532baaa72e5659fcf189d748517df5",
+      "gitBlob": "5fd20f65b98bde149b83633c7ed3c5c755e03ba7"
+    },
+    {
+      "path": "tests/components/PayrollHollowSourceReturn.test.ts",
+      "bytes": 3094,
+      "sha256": "ef71b3b2f283ad8c95bdb052cde61f97e63a210316377fd785cbd886f986e3f5",
+      "gitBlob": "f310985a24473e63ea440fc8c5cf9aaf01f456fb"
+    },
+    {
+      "path": "tests/components/PayrollHollowStart.test.ts",
+      "bytes": 5576,
+      "sha256": "cdad73976be171572d00e67ae86a1a04d6d77dea7597dbe37f43043e5469de69",
+      "gitBlob": "33b8a7d9f9289c9763039521d94750df732ee794"
+    },
+    {
+      "path": "tests/components/PayrollHollowZeroRelease.test.ts",
+      "bytes": 2344,
+      "sha256": "8c79089e919ebb8a79bbf5faa745ebd68a3382c4793ee010fbb62c342ab301db",
+      "gitBlob": "44248a990705f9cfeff3938df9bc0b67348da19b"
+    },
+    {
+      "path": "tests/components/QuantityHollowFormState.test.ts",
+      "bytes": 7688,
+      "sha256": "c788f145d3d86d99fb3ecfbfb8d5b1aabd21975fc996cbfaf5e15cb0bb6f9d58",
+      "gitBlob": "bcdc62fcd374d07cde257cd75cf742596eb03eb9"
+    },
+    {
+      "path": "tests/components/QuantityHollowHistory.test.ts",
+      "bytes": 2419,
+      "sha256": "70c796672f5fe94dcdbe0310e067a8a72be8eda1a70d80ca9b93aa5d943017e6",
+      "gitBlob": "ddd014795f0c848a46e070ba20778503c1dce6aa"
+    },
+    {
+      "path": "tests/components/QuantityHollowRectification.test.ts",
+      "bytes": 4983,
+      "sha256": "8202c439f2e37aa8ed1abc60900f8f96ed6d777d43796b74b55dfc0825485c81",
+      "gitBlob": "d4591db7e94605908b75aec5720a6e35d1b2aef2"
+    },
+    {
+      "path": "tests/components/QuantityHollowRuntime.test.ts",
+      "bytes": 1588,
+      "sha256": "90ff7b4345a17bb693aa65530e13ec96c3d626765714514e615efe23b02f0db0",
+      "gitBlob": "d80d60e5845f8b27155617565bc17507079e4ab8"
+    },
+    {
+      "path": "tests/helpers/payroll-c-hollow-fixture.ts",
+      "bytes": 3837,
+      "sha256": "55b6953e9d3527d686851e3361c54fbe0bda6b1e944c1f0924b200ddc6d9312e",
+      "gitBlob": "cbd6c8f34fd98cf8db09f48673479abb7e58aa5d"
+    },
+    {
+      "path": "tests/helpers/payroll-hollow-fixture.ts",
+      "bytes": 6099,
+      "sha256": "fbd863d4351e6b700ed55bf22375a5b88a94299ab6371879dfe43bd24c8a50bb",
+      "gitBlob": "7abc07d1715fe107aea913b2dfebd34275ef7c81"
+    },
+    {
+      "path": "tests/helpers/payroll-hollow-migration-fixture.ts",
+      "bytes": 5109,
+      "sha256": "37c9d1d8b53c23c3bf43866828505f67d189579a9570ae253f0e964dc344c1c6",
+      "gitBlob": "dfcf241602d83c1a4d6f3c541edc69f18d910e00"
+    },
+    {
+      "path": "tests/helpers/quantity-hollow-fixture.ts",
+      "bytes": 4558,
+      "sha256": "34ae5f24abea078d918614e1fecd1123d4f9b7d46271d5bea20a915d053ba65c",
+      "gitBlob": "86ea1290becd0df6adade29e6039d352ad53d730"
+    },
+    {
+      "path": "tests/helpers/quantity-hollow-migration-fixture.ts",
+      "bytes": 8833,
+      "sha256": "f99dac69f46b4d109a77da0b325438db6974e63e1aa904dcfdbc87365323bce0",
+      "gitBlob": "f44ac2f65d721149103bc7f1ee6924510278f7f0"
+    },
+    {
+      "path": "tests/helpers/quantity-hollow-ui-fixture.ts",
+      "bytes": 3048,
+      "sha256": "c50d08b30cf2e34a3c8bcb613c8e503482afbabb82a2e1d7af00eed7471f6f2b",
+      "gitBlob": "ecb90055a4262b7beb05f287a9e6e532959b265b"
+    },
+    {
+      "path": "tests/kit/entity-link.test.ts",
+      "bytes": 9380,
+      "sha256": "db3b7ee6e69de74def5536a016c68cab8d90625c87b736f59e1d485f7f2312d1",
+      "gitBlob": "19433a960027ccd06274c59e48c934cb9b43d6cf"
+    },
+    {
+      "path": "tests/payroll/c1-migration-protection.test.ts",
+      "bytes": 14472,
+      "sha256": "2dfeada7341023b601774f3e4c5c2bb3dbc002237340df09e006d138dfbc81d0",
+      "gitBlob": "88ac0a0557ad3ffe258a0fcb1a8b5ffe9aa66574"
+    },
+    {
+      "path": "tests/payroll/central-a-hollow-incomplete-form.test.ts",
+      "bytes": 4382,
+      "sha256": "636b764215fbbc798ff536094684a6f618069ac6728ddf9e66a204fab49bc23a",
+      "gitBlob": "fbb3c7d2acda1d33d12a1d0e044ed88d1f6a2f25"
+    },
+    {
+      "path": "tests/payroll/central-a-prices-migration.test.ts",
+      "bytes": 10250,
+      "sha256": "7a894effbf88608d1e9b6d405a8a4cc2a180e4c34f7641a29338f995bed87b57",
+      "gitBlob": "e3fe2d612d9e48c065891cf37e9a5118d763461e"
+    },
+    {
+      "path": "tests/payroll/central-c-hollow-zero.test.ts",
+      "bytes": 5559,
+      "sha256": "5f657908dd15fc6bd3bc42a747a1d86a8640863aa2eae0b1bc7d62fd5b66cb23",
+      "gitBlob": "034ed986ea428595c2c48fb0fc189b5030839503"
+    },
+    {
+      "path": "tests/payroll/central-c-hollow.test.ts",
+      "bytes": 8736,
+      "sha256": "07e34ea528375414fe2a89cc26e8e4a6961e54e08f729ef8fc9f9f10593747ae",
+      "gitBlob": "17a1cec5f557ae04c24039d0715dcc93b95d597f"
+    },
+    {
+      "path": "tests/payroll/central-hollow-adjustments.test.ts",
+      "bytes": 8595,
+      "sha256": "609de2831f590e789bad1095a0cd7e5478aa10fe8afc7d852a0b6009de7020bc",
+      "gitBlob": "63e0dc0adacd7b0e7bd327f4a4feaf7c71e29af5"
+    },
+    {
+      "path": "tests/payroll/central-hollow-deduction.test.ts",
+      "bytes": 9568,
+      "sha256": "c79229bce17379e6cc33d709e8eae188e78a9af26fdb6b9fdc6c49610f5ebbf2",
+      "gitBlob": "70ea0ad93a25344a96d772ac196394419b8aced0"
+    },
+    {
+      "path": "tests/payroll/central-hollow-http.test.ts",
+      "bytes": 6117,
+      "sha256": "da2065e63a43d0fde0805ef67bcdd3de0e406ce20dcc14f8a196566fcd0fec69",
+      "gitBlob": "64d72bb7bf2dfca644e83c0ebb9086c1a6cdd7b8"
+    },
+    {
+      "path": "tests/payroll/central-hollow-month-order-review.test.ts",
+      "bytes": 7258,
+      "sha256": "f627338eb91db2b63c3ced8ae158347d9cc97a96e2f182ca8b9069e234d056bd",
+      "gitBlob": "071812d1376caa6a4f6e1492058436126f82ea84"
+    },
+    {
+      "path": "tests/payroll/central-hollow-processed-proof.test.ts",
+      "bytes": 7242,
+      "sha256": "c417450ed11a4c2bad455f2e2b3e654824990544cd7e4ac22523464eaa769c82",
+      "gitBlob": "212c2b716576e4d8418d67bff7e80a409f291196"
+    },
+    {
+      "path": "tests/payroll/central-hollow-proof-review.test.ts",
+      "bytes": 7042,
+      "sha256": "243288fa3a1330de06106f642cedc3827ce76a40ba8fbb8af4bc5229fb027fb3",
+      "gitBlob": "57e1408df0bede6e5fe6f7e0feebaf34cba2976c"
+    },
+    {
+      "path": "tests/payroll/fees-migration-runtime.test.ts",
+      "bytes": 15294,
+      "sha256": "c9b0765a525c2a5a5062f295b05f6e9a745200271ea878b46a392fd4c9dd4480",
+      "gitBlob": "37a53b5263fb0ff5fed291360de4602a9b4a8cd1"
+    },
+    {
+      "path": "tests/payroll/hollow-deduction-calculation.test.ts",
+      "bytes": 2997,
+      "sha256": "4c532f1aa228fa69859bd20bd8a1e680f09a20ad949aa8c5dc957b0f27b52b63",
+      "gitBlob": "5cfa7e1251ba5c61b7dca632b18b43c4bcecfb31"
+    },
+    {
+      "path": "tests/payroll/hollow-deduction-command.test.ts",
+      "bytes": 4822,
+      "sha256": "1f38c7764d3ec44904ae2b434bd52db23ca88ba0fc344543a31d0f4360080dcb",
+      "gitBlob": "be892a81f8feabface904a933606d675bd370435"
+    },
+    {
+      "path": "tests/payroll/hollow-export.test.ts",
+      "bytes": 3486,
+      "sha256": "8ec75e5026e5218b5817414c0fc611df44b903b922c1fcf3a85f162a3e6b74e7",
+      "gitBlob": "7f9522805aec5e133a0e338ae690f053d4e8de26"
+    },
+    {
+      "path": "tests/payroll/hollow-migration-adjustments.test.ts",
+      "bytes": 10743,
+      "sha256": "226403f70440dda9d38057aa72fa404ad3dbd50b3bb49b73aaf8f167ce9769ea",
+      "gitBlob": "46dfb3e1f72490bcc5f4a6547fd0af87bc7a27f9"
+    },
+    {
+      "path": "tests/payroll/hollow-migration-graph.test.ts",
+      "bytes": 2462,
+      "sha256": "b5e51c7a7642d6afd1660127aba4886ef8df9abbf8674e9a248fef41fab68741",
+      "gitBlob": "8779a2d41840a3ddd3fea1068f67ef3c858c4f8e"
+    },
+    {
+      "path": "tests/payroll/hollow-migration-integrity.test.ts",
+      "bytes": 5552,
+      "sha256": "00e07b4366d682383e29d209b10a4b0041b45f205960aec58f7e24208e982210",
+      "gitBlob": "97b5ae0c7b109ea64ff695a97b1d0abb86c003bb"
+    },
+    {
+      "path": "tests/payroll/hollow-migration-proof-package.test.ts",
+      "bytes": 2510,
+      "sha256": "7f2df173c74a045e1d0eed3a9ed6527a2eb7839aa394ab7240ff1b1a64d5c418",
+      "gitBlob": "4a14fbef45980ad73f96f6bf7d9a82d818c7b1fc"
+    },
+    {
+      "path": "tests/payroll/hollow-migration-runtime.test.ts",
+      "bytes": 12121,
+      "sha256": "3d59a278fdf1096f2adf49a7091911a6695fd72cfff7dbfcc24c03a77f37b2b9",
+      "gitBlob": "56882ea03fd06bb2d8050f4fc92bf5af8fc5f40d"
+    },
+    {
+      "path": "tests/quantity/central-hollow-http.test.ts",
+      "bytes": 4041,
+      "sha256": "c9790a9fbad06865b627e318ead80407a1dfa0455df0e77f2db95ee8c8b647d6",
+      "gitBlob": "8038a49cf69f9c161b6b8256773e664894af899c"
+    },
+    {
+      "path": "tests/quantity/central-hollow-integrity.test.ts",
+      "bytes": 11615,
+      "sha256": "2d646307158fb03cab76dc3ef871644be77d8d5e208db11e4adf6c9f8c7c5639",
+      "gitBlob": "60f23ef7bc2df6c6eb7c2cef4d917ef0e2984a51"
+    },
+    {
+      "path": "tests/quantity/central-hollow.test.ts",
+      "bytes": 1677,
+      "sha256": "e26afb4714dc6744a48ee05bb27f0d117fdd21640c7a6a246c5854b395381582",
+      "gitBlob": "da2424e7ad555af01c048df742fac39677498d24"
+    },
+    {
+      "path": "tests/quantity/hollow-migration.test.ts",
+      "bytes": 5659,
+      "sha256": "91fb9b163bd81effb9c328f5eaa3af9c5a3f5cb0927c7fd8532d4bcb75ab3bb4",
+      "gitBlob": "be64eb423cb00f6f085b07ee3371a3754f9403de"
+    },
+    {
+      "path": "tests/quantity/hollow-navigation.test.ts",
+      "bytes": 4715,
+      "sha256": "4587992044336ff1c14bf8be119467693cffb3bea7cce37ff36b2b24aa92d47a",
+      "gitBlob": "2d935272016676fc2e663b255600d4b0384d59b9"
+    },
+    {
+      "path": "tests/server/quantity-hollow-migration.test.ts",
+      "bytes": 9248,
+      "sha256": "d5fb6e1edc5cfef69a08e5c0f7878405dcddbe4c45a35c5da92da8b25b3f290c",
+      "gitBlob": "b41aeba22af454eae3e8798672705bc6f0bcef87"
+    },
+    {
+      "path": "tests/stores/payroll-hollow-pending.test.ts",
+      "bytes": 4986,
+      "sha256": "9d13e5229765b0116e399f3bfc90bead5580304057208cd4f58b24b11630c356",
+      "gitBlob": "bf75c51c50b638dabb1a69a4fefda7f9af453c51"
+    },
+    {
+      "path": "tests/stores/quantity-hollow-pending.test.ts",
+      "bytes": 6156,
+      "sha256": "a7617bff01416775efe78746621e97991629abd5f84a38ca0f7b6c6ce61b8422",
+      "gitBlob": "c66cfe532f8e39cf00ef8a179c0aeeb9ef2bde25"
+    },
+    {
+      "path": "tests/stores/quantity-hollow-startup.test.ts",
+      "bytes": 2026,
+      "sha256": "ba0cebeaf0cd4ca8e10e7f024c9fe8bdba8d71534f90358dea75acf36512e483",
+      "gitBlob": "e2bfd8fc03e2e9ae09e3f5dffca2fbe8c5258848"
+    },
+    {
+      "path": "tests/tabs/quantity-hollow-restore.test.ts",
+      "bytes": 2852,
+      "sha256": "865af945d6d180cf753b56621cded764dd0558643712cad8f7ca4597e019396f",
+      "gitBlob": "a70d1e48981abe018c61926d1aa8c7cc36cc9c62"
+    },
+    {
+      "path": "tests/ui/module-review-coverage.test.ts",
+      "bytes": 21878,
+      "sha256": "53a147d5880346ca2c1e70543840ae85a87a9300ada1f86c407d78b657d83dbc",
+      "gitBlob": "0cf8863fa348ad164a0cd185619190ade298dcad"
+    },
+    {
+      "path": "tests/ui/payroll-p5-registration.test.ts",
+      "bytes": 6125,
+      "sha256": "4a7e0ef0a2564096cfe3a45ce0fb7b0f089442f53959c408559fbfd09e9768b8",
+      "gitBlob": "9ecfe9d3c93f0368fe06f5f09f557d153ad2b11f"
+    },
+    {
+      "path": "tests/ui/runtime-reference-audit.test.ts",
+      "bytes": 15377,
+      "sha256": "0f0ac5fefd045fd64519d32f2f5ad155541bd346cabfed8927132671da1c7baf",
+      "gitBlob": "52397f91351bf287759c5618c8bae8a37da74138"
+    }
+  ]
+}

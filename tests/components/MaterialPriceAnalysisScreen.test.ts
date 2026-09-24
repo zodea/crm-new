@@ -1,3 +1,4 @@
+import type { DeliveryPriceRecordInput } from '~/lib/material/price-analysis'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
@@ -23,7 +24,7 @@ const global = {
   },
 }
 
-const records = [
+const records: DeliveryPriceRecordInput[] = [
   {
     id: 'delivery-1',
     projectId: 'project-a',
@@ -31,9 +32,14 @@ const records = [
     orderNo: 'XS-001',
     deliveryDate: '2026-04-01',
     archived: true,
+    reviewStatus: 'reviewed',
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
+    hasSourceFile: true,
     lines: [
-      { id: 'line-1', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.5 },
-      { id: 'line-2', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 410 },
+      { id: 'line-1', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.5, amount: 25, currentValueConfirmed: true },
+      { id: 'line-2', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 410, amount: 410, currentValueConfirmed: true },
     ],
   },
   {
@@ -43,8 +49,13 @@ const records = [
     orderNo: 'XS-002',
     deliveryDate: '2026-05-01',
     archived: true,
+    reviewStatus: 'reviewed',
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
+    hasSourceFile: true,
     lines: [
-      { id: 'line-3', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.8 },
+      { id: 'line-3', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.8, amount: 28, currentValueConfirmed: true },
     ],
   },
   {
@@ -54,8 +65,13 @@ const records = [
     orderNo: 'XS-003',
     deliveryDate: '2026-05-02',
     archived: true,
+    reviewStatus: 'reviewed',
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
+    hasSourceFile: true,
     lines: [
-      { id: 'line-4', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 430 },
+      { id: 'line-4', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 430, amount: 430, currentValueConfirmed: true },
     ],
   },
 ]
@@ -187,16 +203,27 @@ describe('materialPriceAnalysisScreen', () => {
       global,
     })
 
-    const category = screen.getByRole('combobox', { name: '按官方材料大类筛选' })
-    await fireEvent.update(category, 'wire-cable')
+    await fireEvent.click(screen.getByRole('button', { name: '按官方材料大类筛选，已选 0 项' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: /电线电缆/ }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
 
     const catalog = screen.getByRole('listbox', { name: '可分析材料' })
     expect(within(catalog).getAllByRole('option')).toHaveLength(1)
     expect(within(catalog).getByText('电线电缆')).not.toBeNull()
 
-    await fireEvent.update(category, 'cement-sand-products')
+    await fireEvent.click(screen.getByRole('button', { name: '按官方材料大类筛选，已选 1 项' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: /水泥、砂石及混凝土制品/ }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(within(catalog).getAllByRole('option')).toHaveLength(2)
+    expect(within(catalog).getAllByRole('option', { selected: true })).toHaveLength(1)
+    await fireEvent.update(screen.getByRole('searchbox'), '水泥')
     expect(within(catalog).getAllByRole('option')).toHaveLength(1)
     expect(within(catalog).getByText('水泥、砂石及混凝土制品')).not.toBeNull()
     expect(screen.getByRole('heading', { name: '水泥 · P.O 42.5' })).not.toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: '按官方材料大类筛选，已选 2 项' }))
+    expect(screen.getByRole('checkbox', { name: /电线电缆/ })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: '清除' }))
+    await fireEvent.update(screen.getByRole('searchbox'), '')
+    expect(within(catalog).getAllByRole('option')).toHaveLength(2)
   })
 })

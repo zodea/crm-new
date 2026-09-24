@@ -1,277 +1,200 @@
 <script setup lang="ts">
 import type { HomeDashboardViewState } from '~/lib/home/dashboard'
-import type { ScheduleProjectView, ScheduleTaskView } from '~/lib/schedule/read-model'
-import {
-  resolveHomeProjectSwitch,
-  summarizeHomeScheduleCoverage,
-} from '~/lib/home/dashboard'
-import { buildQuantityDrillLocation } from '~/lib/schedule/navigation'
-import { toErrorMessage } from '~/lib/util/error'
+import type { HomeProjectReference, HomeProjectScheduleRead } from '~/lib/home/project-source'
+import type { ScheduleTaskView } from '~/lib/schedule/read-model'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, watch } from 'vue'
+import { summarizeHomeScheduleCoverage } from '~/lib/home/dashboard'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
+import { projectProblemFromUnknown } from '~/lib/project/repository'
+import { buildQuantityDrillLocation, scheduleFilterQuery, scheduleReturnContextQuery } from '~/lib/schedule/navigation'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
+import { useHomeDashboardStore } from '~/stores/home-dashboard'
 
 const route = useRoute()
 const router = useRouter()
-const store = useScheduleStore()
+const store = useHomeDashboardStore()
+const visibility = useDataVisibilityStore()
 const { error: toastError, warning } = useKitUI()
-
+const desktop = isDesktopRuntime()
 const today = toLocalDateInputValue()
-const selectedProjectId = shallowRef('')
-const confirmedProjectId = shallowRef('')
-const lastReadySnapshot = shallowRef<ScheduleProjectView | null>(null)
+const current = shallowRef<HomeProjectScheduleRead | null>(null)
 const initialized = shallowRef(false)
-const initializationError = shallowRef('')
-const recoverableSwitchError = shallowRef('')
-const failedProjectId = shallowRef('')
-const recoverableIntent = shallowRef<'switch' | 'refresh'>('switch')
-const retryingRecoverable = shallowRef(false)
-let latestSelectionRequest = 0
+const pending = shallowRef(false)
+const error = shallowRef('')
+const forbidden = shallowRef(false)
+const failedProject = shallowRef<HomeProjectReference | null>(null)
+let latestRequest = 0
 let wasDeactivated = false
 
-const selectedSnapshot = computed(() => lastReadySnapshot.value?.id === selectedProjectId.value
-  ? lastReadySnapshot.value
-  : null)
-
-const selectedProject = computed(() => store.catalog.find(project => project.id === selectedProjectId.value) ?? null)
+const includeDemo = computed(() => !desktop && visibility.includeDemo)
 const projectOptions = computed(() => store.catalog.map(project => ({
-  id: project.id,
+  id: project.key,
   name: project.name,
   code: project.code,
-  status: project.status,
+  status: `${project.status}${project.origin === 'demo' ? ' · 测试数据' : ''}`,
 })))
 const projectSelection = computed({
-  get: () => selectedProjectId.value,
-  set: projectId => void selectProject(projectId),
+  get: () => current.value?.project.key ?? '',
+  set: (key: string) => {
+    const project = store.catalog.find(row => row.key === key)
+    if (project)
+      void selectProject(project)
+  },
 })
-const coverage = computed(() => selectedSnapshot.value
-  ? summarizeHomeScheduleCoverage(selectedSnapshot.value)
-  : { isPartial: false, title: '', description: '' })
-const recoverableTitle = computed(() => recoverableIntent.value === 'refresh'
-  ? '首页刷新失败，已保留当前项目'
-  : '项目切换失败，已恢复原项目')
-const recoverableActionLabel = computed(() => recoverableIntent.value === 'refresh'
-  ? '重新刷新'
-  : '重试切换')
+const snapshot = computed(() => current.value?.snapshot ?? null)
+const coverage = computed(() => snapshot.value
+  ? summarizeHomeScheduleCoverage(snapshot.value)
+  : { title: '', description: '' })
 const viewState = computed<HomeDashboardViewState>(() => {
-  if (!initialized.value)
+  if (!initialized.value || (pending.value && !current.value))
     return 'loading'
-  if (initializationError.value)
-    return 'error'
+  if (error.value && !current.value)
+    return forbidden.value ? 'forbidden' : 'error'
   if (!store.catalog.length)
     return 'catalog-empty'
-  if (store.loading && !selectedSnapshot.value)
-    return 'loading'
-  if (!selectedSnapshot.value)
-    return store.error ? 'error' : 'loading'
-  if (!selectedSnapshot.value.groups.length)
+  if (current.value?.availability === 'not-connected')
+    return 'not-connected'
+  if (current.value?.availability === 'empty')
     return 'schedule-empty'
-  return 'ready'
+  return snapshot.value ? 'ready' : 'loading'
 })
 
-function routeProjectId(): string {
-  const value = Array.isArray(route.query.project) ? route.query.project[0] : route.query.project
-  return value == null ? '' : String(value)
+function queryText(value: unknown): string {
+  return String((Array.isArray(value) ? value[0] : value) ?? '')
 }
 
-async function replaceRouteProject(projectId: string) {
-  await router.replace({
-    query: {
-      ...route.query,
-      project: projectId || undefined,
-      group: undefined,
-      task: undefined,
-    },
-  })
+function routeProject() {
+  const id = queryText(route.query.project)
+  const origin = queryText(route.query.origin)
+  const matches = store.catalog.filter(row => row.id === id && (!origin || row.origin === origin))
+  return matches.length === 1 ? matches[0] : undefined
 }
 
-async function selectProject(
-  projectId: string,
-  options: {
-    syncRoute?: boolean
-    force?: boolean
-    intent?: 'switch' | 'refresh'
-  } = {},
-) {
-  if (!projectId)
+async function syncRoute(project: HomeProjectReference) {
+  const origin = desktop ? '' : project.origin
+  if (queryText(route.query.project) === project.id && queryText(route.query.origin) === origin)
     return
-  const { syncRoute = true, force = false, intent = 'switch' } = options
-  if (
-    !force
-    && projectId === confirmedProjectId.value
-    && lastReadySnapshot.value?.id === projectId
-  ) {
-    selectedProjectId.value = projectId
-    if (syncRoute && routeProjectId() !== projectId)
-      await replaceRouteProject(projectId)
-    return
+  await router.replace({ query: { ...route.query, project: project.id, origin: origin || undefined, group: undefined, task: undefined } })
+}
+
+async function selectProject(project: HomeProjectReference) {
+  const request = ++latestRequest
+  pending.value = true
+  error.value = ''
+  forbidden.value = false
+  failedProject.value = null
+  try {
+    const result = await store.readProject({ id: project.id, origin: project.origin, includeDemo: includeDemo.value }, today)
+    if (request !== latestRequest)
+      return
+    current.value = result
+    await syncRoute(result.project)
   }
-
-  const request = ++latestSelectionRequest
-  const previousProjectId = confirmedProjectId.value
-  recoverableSwitchError.value = ''
-  failedProjectId.value = ''
-
-  const result = await resolveHomeProjectSwitch({
-    requestedId: projectId,
-    confirmedId: previousProjectId,
-    load: async (requestedId) => {
-      await store.loadProject(requestedId, today)
-      if (!store.snapshot || store.snapshot.id !== requestedId)
-        throw new Error('目标项目不存在或已被删除')
-      return store.snapshot
-    },
-  })
-  if (request !== latestSelectionRequest)
-    return
-
-  if (result.ok) {
-    selectedProjectId.value = result.selectedId
-    confirmedProjectId.value = result.selectedId
-    lastReadySnapshot.value = result.value
-    if (syncRoute && routeProjectId() !== result.selectedId)
-      await replaceRouteProject(result.selectedId)
-    return
+  catch (cause) {
+    if (request !== latestRequest)
+      return
+    const { problem } = projectProblemFromUnknown(cause)
+    error.value = problem.message
+    forbidden.value = problem.code === 'forbidden'
+    failedProject.value = project
+    if (current.value?.project.key === project.key && ['forbidden', 'not-found', 'relationship-mismatch'].includes(problem.code))
+      current.value = null
+    if (current.value) {
+      await syncRoute(current.value.project)
+      toastError('项目读取失败，已保留当前项目', problem.message)
+    }
   }
-
-  selectedProjectId.value = result.selectedId
-  failedProjectId.value = result.failedId
-  recoverableIntent.value = intent
-  const message = toErrorMessage(result.error)
-  if (result.selectedId && lastReadySnapshot.value?.id === result.selectedId) {
-    recoverableSwitchError.value = message
-    toastError(recoverableTitle.value, message)
+  finally {
+    if (request === latestRequest)
+      pending.value = false
   }
-  if (routeProjectId() !== result.selectedId)
-    await replaceRouteProject(result.selectedId)
 }
 
 async function initialize() {
-  initialized.value = false
-  initializationError.value = ''
+  const request = ++latestRequest
+  pending.value = true
+  error.value = ''
+  forbidden.value = false
+  failedProject.value = null
   try {
-    await store.loadCatalog()
-    const requested = store.catalog.find(project => project.id === routeProjectId())
-    const preferred = requested
-      ?? store.catalog.find(project => project.groupCount > 0)
-      ?? store.catalog[0]
+    await store.loadCatalog(includeDemo.value)
+    if (request !== latestRequest)
+      return
     initialized.value = true
-    if (preferred)
-      await selectProject(preferred.id)
+    if (!store.catalog.length) {
+      current.value = null
+      if (queryText(route.query.project))
+        error.value = '指定项目不存在或当前不可查看，请从全部项目重新选择。'
+      return
+    }
+    const requested = queryText(route.query.project)
+    const preferred = routeProject() ?? (!requested && !queryText(route.query.origin) ? store.catalog[0] : undefined)
+    if (!preferred) {
+      current.value = null
+      error.value = '指定项目不存在、来源不匹配或当前不可查看，请重新选择项目。'
+      return
+    }
+    await selectProject(preferred)
   }
   catch (cause) {
-    initializationError.value = `首页项目加载失败：${toErrorMessage(cause)}`
-    initialized.value = true
-  }
-}
-
-watch(
-  () => route.query.project,
-  () => {
-    if (!initialized.value)
+    if (request !== latestRequest)
       return
-    const requestedId = routeProjectId()
-    const requested = store.catalog.find(project => project.id === requestedId)
-    if (requested && requested.id !== selectedProjectId.value)
-      void selectProject(requested.id, { syncRoute: false })
-    else if (requestedId && confirmedProjectId.value && requestedId !== confirmedProjectId.value)
-      void replaceRouteProject(confirmedProjectId.value)
-  },
-)
-
-function retry() {
-  if (initializationError.value) {
-    void initialize()
-    return
-  }
-  const projectId = failedProjectId.value || selectedProjectId.value
-  if (projectId)
-    void selectProject(projectId, { force: true })
-}
-
-async function retryRecoverable() {
-  if (retryingRecoverable.value)
-    return
-
-  retryingRecoverable.value = true
-  recoverableSwitchError.value = ''
-  try {
-    if (recoverableIntent.value === 'refresh')
-      await refreshActivatedProject()
-    else if (failedProjectId.value)
-      await selectProject(failedProjectId.value, { force: true })
+    const { problem } = projectProblemFromUnknown(cause)
+    error.value = problem.message
+    forbidden.value = problem.code === 'forbidden'
+    if (forbidden.value)
+      current.value = null
   }
   finally {
-    retryingRecoverable.value = false
+    initialized.value = true
+    if (request === latestRequest)
+      pending.value = false
   }
+}
+
+function retry() {
+  if (failedProject.value)
+    void selectProject(failedProject.value)
+  else
+    void initialize()
 }
 
 function selectTask(task: ScheduleTaskView) {
-  const group = selectedSnapshot.value?.groups.find(candidate => candidate.id === task.groupId)
+  const group = snapshot.value?.groups.find(candidate => candidate.id === task.groupId)
   if (!group)
     return
   if (!task.hasQty) {
-    warning(`「${task.name}」为手动填报工序，请在施工进度页更新进度`)
+    warning(`「${task.name}」为手动填报工序，首页仅提供只读查看`)
     return
   }
-  router.push(buildQuantityDrillLocation('home', group, task))
+  void router.push(buildQuantityDrillLocation('home', group, task, desktop ? undefined : current.value?.project.origin, scheduleFilterQuery(route.query)))
 }
 
+watch(() => [route.query.project, route.query.origin], () => {
+  if (!wasDeactivated && route.path === '/' && initialized.value && routeProject()?.key !== current.value?.project.key)
+    void initialize()
+})
+watch(includeDemo, () => {
+  current.value = null
+  if (!wasDeactivated && route.path === '/')
+    void initialize()
+})
 onMounted(initialize)
 onDeactivated(() => {
   wasDeactivated = true
+  latestRequest++
+  pending.value = false
+})
+onBeforeUnmount(() => {
+  latestRequest++
 })
 onActivated(() => {
-  if (!wasDeactivated || !selectedProjectId.value)
-    return
-  wasDeactivated = false
-  void refreshActivatedProject()
+  if (wasDeactivated) {
+    wasDeactivated = false
+    void initialize()
+  }
 })
-
-async function refreshActivatedProject() {
-  recoverableSwitchError.value = ''
-  initializationError.value = ''
-  try {
-    await store.loadCatalog()
-  }
-  catch (cause) {
-    const message = toErrorMessage(cause)
-    if (lastReadySnapshot.value) {
-      recoverableIntent.value = 'refresh'
-      failedProjectId.value = selectedProjectId.value
-      recoverableSwitchError.value = message
-      toastError(recoverableTitle.value, message)
-    }
-    else {
-      initializationError.value = `首页项目加载失败：${message}`
-    }
-    return
-  }
-
-  if (!store.catalog.length) {
-    selectedProjectId.value = ''
-    confirmedProjectId.value = ''
-    lastReadySnapshot.value = null
-    await replaceRouteProject('')
-    return
-  }
-
-  const current = store.catalog.find(project => project.id === selectedProjectId.value)
-  if (!current) {
-    const fallback = store.catalog.find(project => project.groupCount > 0) ?? store.catalog[0]
-    if (!fallback)
-      return
-    selectedProjectId.value = ''
-    confirmedProjectId.value = ''
-    lastReadySnapshot.value = null
-    await selectProject(fallback.id, { force: true, intent: 'refresh' })
-    return
-  }
-
-  await selectProject(current.id, {
-    syncRoute: false,
-    force: true,
-    intent: 'refresh',
-  })
-}
 </script>
 
 <template>
@@ -281,8 +204,8 @@ async function refreshActivatedProject() {
         v-model="projectSelection"
         class="w-[min(100%,320px)]"
         :projects="projectOptions"
-        :loading="!initialized || store.loading"
-        :error="initializationError"
+        :loading="!initialized || store.loading || pending"
+        :error="error"
         :disabled="initialized && !projectOptions.length"
         aria-label="选择首页项目"
       />
@@ -290,25 +213,31 @@ async function refreshActivatedProject() {
         全部项目 <span aria-hidden="true">→</span>
       </NuxtLink>
     </nav>
-
+    <StatePanel
+      v-if="current && error"
+      kind="error"
+      title="项目读取失败，已保留当前项目"
+      :description="error"
+      action-label="重新加载"
+      compact
+      @action="retry"
+    />
     <HomeDashboardSurface
       :state="viewState"
-      :snapshot="selectedSnapshot"
+      :snapshot="snapshot"
       :today="today"
-      :selected-project-id="selectedProjectId"
-      :selected-project-name="selectedProject?.name"
-      :error-description="initializationError || store.error"
-      :recoverable-error="recoverableSwitchError"
-      :recoverable-title="recoverableTitle"
-      :recoverable-action-label="recoverableActionLabel"
-      :recoverable-loading="retryingRecoverable"
+      :selected-project-id="current?.project.id"
+      :selected-project-name="current?.project.name"
+      :selected-origin="desktop ? undefined : current?.project.origin"
+      :source-description="current?.reason"
+      :error-description="error"
       :coverage-title="coverage.title"
       :coverage-description="coverage.description"
-      :highlighted-group-id="String(route.query.group ?? '')"
-      :highlighted-task-id="String(route.query.task ?? '')"
+      :return-context="scheduleReturnContextQuery(route.query)"
+      :highlighted-group-id="queryText(route.query.group)"
+      :highlighted-task-id="queryText(route.query.task)"
       @select-task="selectTask"
       @retry="retry"
-      @retry-recoverable="retryRecoverable"
     />
   </div>
 </template>

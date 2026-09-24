@@ -149,6 +149,7 @@ describe('分供方详情纯聚合', () => {
       projectCount: 1,
       contractCount: 2,
       contractTotal: 1500,
+      settledTotal: 500,
       claimedTotal: 350.55,
       invoiceTotal: 678.04,
       invoiceTaxTotal: 55.98,

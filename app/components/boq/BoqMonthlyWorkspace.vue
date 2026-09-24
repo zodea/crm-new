@@ -3,6 +3,7 @@ import type { MonthlyStatementLineView, MonthlyStatementView } from '~/lib/boq/m
 import type { BoqWorkspace } from '~/lib/boq/read-model'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { QuantityBasis } from '~/lib/quantity/basis'
+import { nextTick, watch } from 'vue'
 import { DEFAULT_PROGRESS_QUANTITY_BASIS } from '~/lib/boq/monthly'
 import { BOQ_MONTHLY_STATUS_LABEL } from '~/lib/boq/presentation'
 import {
@@ -11,10 +12,11 @@ import {
 } from '~/lib/quantity/basis'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
-defineProps<{
+const props = defineProps<{
   workspace: BoqWorkspace
   statement: MonthlyStatementView | null
   busy?: boolean
+  focusId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +27,13 @@ const emit = defineEmits<{
   adjust: [payload: { lineId: string, adjustedQty: number, note: string }]
   export: [statement: MonthlyStatementView]
 }>()
+
+watch(() => props.focusId, async (focusId) => {
+  if (!focusId)
+    return
+  await nextTick()
+  document.getElementById(`boq-monthly-focus-${focusId}`)?.focus({ preventScroll: false })
+}, { immediate: true })
 
 const { formModal } = useKitUI()
 const statusClass: Record<MonthlyStatementView['status'], string> = {
@@ -149,6 +158,7 @@ async function adjust(line: MonthlyStatementLineView) {
       <div class="space-y-1 p-2">
         <button
           v-for="item in workspace.monthlyStatements"
+          :id="`boq-monthly-focus-${item.id}`"
           :key="item.id"
           type="button"
           class="w-full rounded-[var(--radius-btn)] px-2.5 py-2 text-left transition-colors"

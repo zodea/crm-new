@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { MaterialPriceCatalogItem } from '~/lib/material/price-analysis'
 import { computed, shallowRef, watch } from 'vue'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import SearchInput from '~/components/ui/SearchInput.vue'
 import { normalizeMaterialIdentityText } from '~/lib/material/price-analysis'
 
@@ -10,7 +12,7 @@ const props = defineProps<{
 
 const selectedKey = defineModel<string>({ required: true })
 const query = shallowRef('')
-const selectedCategoryId = shallowRef('all')
+const selectedCategoryIds = shallowRef<string[]>([])
 
 const categories = computed(() => {
   const byId = new Map(
@@ -20,12 +22,16 @@ const categories = computed(() => {
     a.order - b.order || a.name.localeCompare(b.name, 'zh-CN'),
   )
 })
+const categoryOptions = computed(() => categories.value.map(category => ({
+  key: category.id,
+  label: category.order === 99 ? category.name : `${category.order}. ${category.name}`,
+})))
 
 const filteredMaterials = computed(() => {
   const needle = normalizeMaterialIdentityText(query.value)
   return props.materials.filter((material) => {
-    const categoryMatched = selectedCategoryId.value === 'all'
-      || material.category.id === selectedCategoryId.value
+    const categoryMatched = !selectedCategoryIds.value.length
+      || selectedCategoryIds.value.includes(material.category.id)
     const searchMatched = !needle
       || material.searchText.includes(needle)
       || normalizeMaterialIdentityText(material.category.name).includes(needle)
@@ -42,13 +48,11 @@ watch(filteredMaterials, (materials) => {
 <template>
   <aside class="material-picker panel" aria-label="材料选择">
     <header class="material-picker__header">
-      <div>
+      <div class="flex items-center gap-1.5">
         <h2 class="text-14px font-800 text-ink">
           选择材料
         </h2>
-        <p class="mt-0.5 text-11px text-ink-soft">
-          名称、规格与单位共同确定同一种材料
-        </p>
+        <ContextHelp label="材料识别" text="名称、规格与单位共同确定同一种材料。" />
       </div>
       <span class="chip-brand">{{ materials.length }} 种</span>
     </header>
@@ -60,22 +64,14 @@ watch(filteredMaterials, (materials) => {
         :width="256"
         class="max-w-full [&_input]:max-w-full"
       />
-      <select
-        v-model="selectedCategoryId"
+      <KitMultiSelectFilter
+        v-model="selectedCategoryIds"
+        label="大类"
         aria-label="按官方材料大类筛选"
-        class="field-input min-w-0 w-full text-12px"
-      >
-        <option value="all">
-          全部材料大类
-        </option>
-        <option
-          v-for="category in categories"
-          :key="category.id"
-          :value="category.id"
-        >
-          {{ category.order === 99 ? category.name : `${category.order}. ${category.name}` }}
-        </option>
-      </select>
+        :options="categoryOptions"
+        full-width
+        :min-width="100"
+      />
     </div>
 
     <div

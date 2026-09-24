@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
   address             TEXT DEFAULT '',
   taxpayer_type       TEXT DEFAULT '',
   main_business       TEXT DEFAULT '',
+  labor_scope         TEXT NOT NULL DEFAULT '',
 
   invoice_name        TEXT DEFAULT '',
   invoice_address     TEXT DEFAULT '',
@@ -589,6 +590,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_daywork_record
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_allocation_worker
   ON wage_statement_allocations(statement_id, worker_id)
   WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS invoice_export_settings (
+  id            TEXT PRIMARY KEY CHECK (id = 'default'),
+  settings_json TEXT NOT NULL,
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE IF NOT EXISTS ocr_settings (
   id            TEXT PRIMARY KEY CHECK (id = 'default'),

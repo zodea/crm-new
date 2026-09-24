@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadScheduleProcessLibraryTasks } from '~/lib/schedule/process-library'
 import { useScheduleStore } from '~/stores/schedule'
 
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
+
 vi.mock('~/lib/schedule/process-library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/lib/schedule/process-library')>()
   return {

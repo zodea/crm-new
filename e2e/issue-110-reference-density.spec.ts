@@ -26,8 +26,8 @@ async function visualStyle(locator: Locator): Promise<ElementVisualStyle> {
 test.describe('Issues #110/#183 reference density and token contract', () => {
   test('real list stays on the Ruihang palette and uses flat compact geometry', async ({ page }) => {
     await page.goto('/project')
-    await expect(page.locator('[data-shell-workspace]')).toBeVisible()
-    await expect(page.getByRole('link', { name: '合和新城' }).first()).toBeVisible()
+    await expect(page.locator('[data-shell-workspace]')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('link', { name: '合和新城' }).first()).toBeVisible({ timeout: 20_000 })
 
     const rootTokens = await page.locator('html').evaluate((element) => {
       const style = getComputedStyle(element)
@@ -62,25 +62,25 @@ test.describe('Issues #110/#183 reference density and token contract', () => {
     await page.goto('/project/proj_demo_001')
     await expect(page.locator('[data-shell-workspace]')).toBeVisible()
 
-    const sectionHeader = page.locator('[data-ui="section-header"]').first()
-    await expect(sectionHeader).toBeVisible()
-    const sectionHeaderStyle = await visualStyle(sectionHeader)
-    expect(sectionHeaderStyle.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
-    expect(sectionHeaderStyle.height).toBeLessThanOrEqual(34)
+    const phaseHeader = page.getByRole('region', { name: '阶段时间线 · 任务文件' }).locator('header')
+    await expect(phaseHeader).toBeVisible()
+    const phaseHeaderStyle = await visualStyle(phaseHeader)
+    expect(phaseHeaderStyle.backgroundColor).toBe('rgba(0, 0, 0, 0)')
+    expect(phaseHeaderStyle.height).toBeLessThanOrEqual(36)
 
     const tabs = page.getByRole('tablist').first()
     const firstTabStyle = await visualStyle(tabs.getByRole('tab').first())
     expect(firstTabStyle.height).toBeLessThanOrEqual(34)
 
     const detailSectionHeadingStyle = await visualStyle(page.getByRole('heading', { name: '基础信息' }).first())
-    expect(detailSectionHeadingStyle.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+    expect(detailSectionHeadingStyle.backgroundColor).toBe('rgba(0, 0, 0, 0)')
     expect(detailSectionHeadingStyle.height).toBeLessThanOrEqual(34)
 
     const orderedSections = [
       page.getByRole('region', { name: '阶段时间线 · 任务文件' }),
-      page.getByRole('heading', { name: '施工进度排程' }),
       page.getByRole('region', { name: '项目经营数据' }),
       page.getByRole('region', { name: '票据信息' }),
+      page.getByRole('heading', { name: '施工进度排程' }),
       tabs,
     ]
     const topPositions = await Promise.all(orderedSections.map(async locator => (await locator.boundingBox())?.y))

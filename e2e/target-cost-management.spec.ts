@@ -1,13 +1,5 @@
-import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
-
-async function selectProject(page: Page, name: string) {
-  const lookup = page.getByRole('combobox', { name: '检索项目' })
-  await lookup.fill(name)
-  await expect(page.getByRole('option', { name: new RegExp(name) })).toBeVisible()
-  await page.getByRole('option', { name: new RegExp(name) }).click()
-}
 
 test.describe('Issue #191：目标成本列表与科目维护', () => {
   for (const width of RESPONSIVE_WIDTHS) {
@@ -23,8 +15,8 @@ test.describe('Issue #191：目标成本列表与科目维护', () => {
       const filters = page.getByRole('search', { name: '目标成本筛选' })
       await expect(filters.getByPlaceholder('搜索版本名或项目')).toBeVisible()
       await expect(filters.getByLabel('项目', { exact: true })).toBeVisible()
-      await expect(filters.getByLabel('基线范围')).toBeVisible()
-      await expect(filters.getByLabel('状态')).toBeVisible()
+      await expect(filters.getByRole('button', { name: /^基线范围，已选/ })).toBeVisible()
+      await expect(filters.getByRole('button', { name: /^状态，已选/ })).toBeVisible()
       await expect(page.getByRole('status', { name: '目标成本列表汇总' })).toBeVisible()
       await expectNoPageOverflow(page, `目标成本专用列表 @ ${width}px`)
     })
@@ -33,14 +25,13 @@ test.describe('Issue #191：目标成本列表与科目维护', () => {
   test('新建版本后可新增、编辑并刷新回显科目明细', async ({ page }) => {
     const versionName = `E2E目标成本-${Date.now()}`
 
-    await page.goto('/project/target-cost/form')
+    await page.goto('/project/target-cost/form?origin=real')
     await page.getByLabel('版本名 *').fill(versionName)
-    await selectProject(page, '合和新城')
     await page.getByRole('group', { name: '表单操作' })
-      .getByRole('button', { name: '保存', exact: true })
+      .getByRole('button', { name: '保存草稿', exact: true })
       .click()
 
-    await expect(page).toHaveURL('/project/target-cost')
+    await expect(page).toHaveURL(/\/project\/target-cost\?origin=real/)
     await page.getByPlaceholder('搜索版本名或项目').fill(versionName)
     await page.getByRole('link', { name: versionName }).click()
     await expect(page.getByRole('heading', { name: versionName })).toBeVisible()
@@ -55,7 +46,7 @@ test.describe('Issue #191：目标成本列表与科目维护', () => {
     await page.getByRole('spinbutton', { name: '目标金额，第 1 行' }).fill('250')
     await page.getByRole('button', { name: '保存科目明细' }).click()
 
-    await expect(page.getByText('科目明细已保存', { exact: true })).toBeVisible()
+    await expect(page.getByText('科目明细已保存，版本头状态保持不变', { exact: true })).toBeVisible()
     await expect(page.getByRole('row').filter({ hasText: 'E2E电线' })).toBeVisible()
     await page.reload()
     await expect(page.getByRole('row').filter({ hasText: 'E2E电线' }))

@@ -4,6 +4,12 @@ defineProps<{
   visible: number
 }>()
 
+const emit = defineEmits<{
+  import: []
+  export: []
+  print: []
+}>()
+
 const search = defineModel<string>('search', { required: true })
 const view = defineModel<'table' | 'card'>('view', { required: true })
 </script>
@@ -21,6 +27,18 @@ const view = defineModel<'table' | 'card'>('view', { required: true })
     </div>
 
     <div class="ml-auto flex flex-wrap items-center gap-2.5">
+      <button type="button" class="btn-secondary" @click="emit('import')">
+        <span class="i-lucide-file-input mr-1 text-13px" aria-hidden="true" />
+        导入 Excel
+      </button>
+      <button type="button" class="btn-secondary" @click="emit('print')">
+        <span class="i-lucide-printer mr-1 text-13px" aria-hidden="true" />
+        打印 PDF
+      </button>
+      <button type="button" class="btn-primary" @click="emit('export')">
+        <span class="i-lucide-file-spreadsheet mr-1 text-13px" aria-hidden="true" />
+        导出 Excel
+      </button>
       <SearchInput v-model="search" placeholder="搜索编号、供应商、归属…" :width="230" />
       <div class="inline-flex overflow-hidden border border-line-strong rounded-[var(--radius-btn)] bg-panel">
         <button

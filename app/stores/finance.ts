@@ -6,6 +6,7 @@ import type {
 } from '~/lib/finance/forms'
 import type { FileRefChanges } from '~/lib/forms/file-refs'
 import type { LookupOption } from '~/lib/kit/lookup'
+import type { DataOriginDTO } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { select } from '~/lib/db/connection'
@@ -31,6 +32,8 @@ export interface FinanceListRow {
   amount: number
   date: string
   status: string
+  customerId: string | null
+  dataOrigin: DataOriginDTO | null
 }
 
 type FinanceLookupTable = 'projects' | 'customers' | 'suppliers'
@@ -45,6 +48,8 @@ function mapListRows(source: Array<Record<string, unknown>>): FinanceListRow[] {
     amount: Number(row.display_amount) || 0,
     date: String(row.display_date ?? ''),
     status: String(row.display_status ?? ''),
+    customerId: row.customer_id == null ? null : String(row.customer_id),
+    dataOrigin: row.data_origin === 'real' || row.data_origin === 'demo' ? row.data_origin : null,
   }))
 }
 
@@ -96,6 +101,8 @@ export const useFinanceStore = defineStore('finance', () => {
     try {
       const result = await saveFinanceForm(kind, draft, action, attachments)
       await loadOne(kind, result.id)
+      if (kind === 'receipt' && listRows.value.receipt)
+        await loadList('receipt')
       return result
     }
     finally {
@@ -122,8 +129,8 @@ export const useFinanceStore = defineStore('finance', () => {
         case 'receipt':
           result = await select(`
             ${hiddenCtesFor('receipt_registrations')}
-            SELECT receipt.id, receipt.no,
-                   COALESCE(customer.name, receipt.payer_account, '') AS display_name,
+            SELECT receipt.id, receipt.no, receipt.customer_id,
+                   COALESCE(customer.name, '待补充甲方客户') AS display_name,
                    COALESCE(project.name, '') AS project_name,
                    COALESCE(contract.name, '') AS party_name,
                    receipt.amount AS display_amount,

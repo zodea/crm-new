@@ -1,0 +1,121 @@
+{
+  "id": "wage_mtyypxd5_5",
+  "projectId": "core-projects-e8c4599b8aeed9b628556ee0",
+  "projectName": "工资验收工程 8a1b9aed-bdf5-4eca-af94-67422e0ce565",
+  "crewName": "当前班组",
+  "leaderName": "独立另一主体",
+  "month": "2026-08",
+  "periodKind": "monthly",
+  "formatFamily": "A",
+  "payRatio": 0.8,
+  "workAmount": 400,
+  "cumulativeAmount": 320,
+  "previouslyPaid": 0,
+  "grossAmount": 320,
+  "actualAmount": 300,
+  "releasedAt": "2026-09-12T22:34:32.839Z",
+  "operatorName": "actor-default",
+  "note": "配置往返保留备注",
+  "lines": [
+    {
+      "id": "[\"core-workers-54cf631b55eae109444e33f9\",\"core-quantity_projects-a0cbd60c1e44630a8189d55a:buildings:pa-building\",\"core-quantity_projects-a0cbd60c1e44630a8189d55a:house_type_templates:pa-template-other\",\"core-quantity_projects-a0cbd60c1e44630a8189d55a:items:pa-item\",\"㎡\",\"payroll_price_revision_mtyypqra_2\"]",
+      "workerId": "core-workers-54cf631b55eae109444e33f9",
+      "workerName": "独立另一主体",
+      "itemId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:items:pa-item",
+      "itemName": "一栋 · 独立主体户型 · 腻子",
+      "unit": "㎡",
+      "quantity": 4,
+      "knownQuantity": 4,
+      "unitPrice": 100,
+      "amount": 400,
+      "priceRevisionIds": [
+        "payroll_price_revision_mtyypqra_2"
+      ],
+      "facts": [
+        {
+          "ownershipKey": "[\"core-projects-e8c4599b8aeed9b628556ee0\",\"core-quantity_projects-a0cbd60c1e44630a8189d55a:units:pa-unit-other\",\"core-quantity_projects-a0cbd60c1e44630a8189d55a:unit_assignments:pa-asg-other\",\"core-quantity_projects-a0cbd60c1e44630a8189d55a:rooms:pa-room-other\",\"core-quantity_projects-a0cbd60c1e44630a8189d55a:items:pa-item\"]",
+          "completionId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:unit_stage_completions:pa-done-other",
+          "assignmentId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:unit_assignments:pa-asg-other",
+          "stageId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:construction_stages:pa-stage",
+          "stageItemId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:construction_stage_items:pa-stage-item",
+          "unitId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:units:pa-unit-other",
+          "floorId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:floors:pa-floor",
+          "buildingId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:buildings:pa-building",
+          "templateId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:house_type_templates:pa-template-other",
+          "templateLineId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:house_type_template_items:pa-line-other",
+          "roomId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:rooms:pa-room-other",
+          "itemId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:items:pa-item",
+          "completedAt": "2026-08-10",
+          "workerId": "core-workers-54cf631b55eae109444e33f9",
+          "crewId": null,
+          "assignmentScopeIds": [],
+          "scopeKind": "whole-trade",
+          "scopeRows": [],
+          "unit": "㎡",
+          "fieldQty": 4,
+          "fieldFormula": "2*2",
+          "buildingName": "一栋",
+          "floorName": "一层",
+          "unitName": "102",
+          "templateName": "独立主体户型",
+          "roomName": "独立房间",
+          "itemName": "腻子",
+          "workerName": "独立另一主体",
+          "crewName": null,
+          "sourceFingerprint": "bf80cbbc2e3e598e3e2ff690441cb3c4635ed443e3e9402493fa22f45ee6fad1"
+        }
+      ],
+      "sources": [
+        {
+          "kind": "entity-detail",
+          "subject": {
+            "state": "resolved",
+            "entity": "quantity-unit",
+            "id": "core-quantity_projects-a0cbd60c1e44630a8189d55a:units:pa-unit-other",
+            "label": "102",
+            "no": null
+          },
+          "variant": "detail",
+          "view": null,
+          "filters": {
+            "projectId": "core-projects-e8c4599b8aeed9b628556ee0",
+            "dataOrigin": "real",
+            "stageId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:construction_stages:pa-stage",
+            "itemId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:items:pa-item",
+            "completionId": "core-quantity_projects-a0cbd60c1e44630a8189d55a:unit_stage_completions:pa-done-other"
+          }
+        }
+      ],
+      "blockers": []
+    }
+  ],
+  "members": [
+    {
+      "workerId": "core-workers-54cf631b55eae109444e33f9",
+      "workerName": "独立另一主体",
+      "isLeader": true
+    },
+    {
+      "workerId": "core-workers-9487dc01b356baf8fad8f663",
+      "workerName": "零收款成员",
+      "isLeader": false
+    }
+  ],
+  "allocations": [
+    {
+      "workerId": "core-workers-54cf631b55eae109444e33f9",
+      "workerName": "独立另一主体",
+      "isLeader": true,
+      "allocatedAmountFen": 30000,
+      "amount": 300
+    },
+    {
+      "workerId": "core-workers-9487dc01b356baf8fad8f663",
+      "workerName": "零收款成员",
+      "isLeader": false,
+      "allocatedAmountFen": 0,
+      "amount": 0
+    }
+  ],
+  "previousPayments": []
+}

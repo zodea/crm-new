@@ -1,5 +1,7 @@
+import type { QuantityBoqLine } from './central-boq'
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
+import { matchesEnumFilter } from '~/lib/kit/enum-filter'
 
 export type QuantityVarianceBasis = 'contract' | 'provisional' | 'field'
 export type QuantityVarianceCompleteness = 'complete' | 'missing'
@@ -51,8 +53,8 @@ export interface QuantityVarianceRow {
 
 export interface QuantityVarianceFilter {
   buildingId?: string
-  section?: string
-  trade?: string
+  section?: string | string[]
+  trade?: string | string[]
   itemKeyword?: string
 }
 
@@ -156,8 +158,9 @@ function buildEffectiveBoqAdjustments(
 export async function loadQuantityVarianceFacts(
   db: SoftDb,
   projectId: string,
+  centralBoq?: readonly QuantityBoqLine[],
 ): Promise<QuantityVarianceFact[]> {
-  const facts = await db.select<QuantityVarianceFactRow>(
+  let facts = await db.select<QuantityVarianceFactRow>(
     `${hiddenCtesFor(
       'units',
       'house_type_template_items',
@@ -179,7 +182,7 @@ export async function loadQuantityVarianceFacts(
             hti.contract_qty,
             hti.provisional_qty,
             hti.field_qty,
-            boq.id AS boq_line_id,
+            ${centralBoq ? 'hti.boq_line_id' : 'boq.id'} AS boq_line_id,
             boq.building AS boq_building,
             boq.unit_price AS base_unit_price,
             hti.updated_at AS template_item_updated_at,
@@ -204,11 +207,19 @@ export async function loadQuantityVarianceFacts(
     [projectId, projectId, projectId, projectId],
   )
 
+  if (centralBoq) {
+    const byId = new Map(centralBoq.map(line => [line.id, line]))
+    facts = facts.map((row) => {
+      const line = row.boq_line_id ? byId.get(row.boq_line_id) : undefined
+      return { ...row, boq_line_id: line?.id ?? null, boq_building: line?.building ?? null, base_unit_price: line?.unitPrice ?? null, boq_line_updated_at: line?.updatedAt ?? null }
+    })
+  }
+
   const linkedBoqLineIds = [...new Set(
     facts.map(row => row.boq_line_id).filter((id): id is string => Boolean(id)),
   )]
   let changes: ApprovedChangeRow[] = []
-  if (linkedBoqLineIds.length) {
+  if (linkedBoqLineIds.length && !centralBoq) {
     const placeholders = linkedBoqLineIds.map(() => '?').join(', ')
     changes = await db.select<ApprovedChangeRow>(
       `${hiddenCtesFor('boq_change_lines')}
@@ -234,6 +245,16 @@ export async function loadQuantityVarianceFacts(
     )
   }
   const adjustments = buildEffectiveBoqAdjustments(facts, changes)
+  if (centralBoq) {
+    for (const line of centralBoq) {
+      const adjustment = adjustments.get(line.id)
+      if (adjustment) {
+        adjustment.approvedDeltaQty = line.approvedDeltaQty
+        adjustment.effectiveUnitPrice = line.effectiveUnitPrice
+        adjustment.updatedAt = line.updatedAt ?? adjustment.updatedAt
+      }
+    }
+  }
 
   const quantityFacts = facts.map<QuantityVarianceFact>((row) => {
     const adjustment = row.boq_line_id ? adjustments.get(row.boq_line_id) : undefined
@@ -412,8 +433,8 @@ export function filterQuantityVarianceRows(
   const keyword = filter.itemKeyword?.trim().toLocaleLowerCase('zh-CN') ?? ''
   return rows.filter(row => (
     (!filter.buildingId || row.buildingId === filter.buildingId)
-    && (!filter.section || row.section === filter.section)
-    && (!filter.trade || row.trade === filter.trade)
+    && matchesEnumFilter(row.section, filter.section)
+    && matchesEnumFilter(row.trade, filter.trade)
     && (!keyword || `${row.itemName} ${row.itemId}`.toLocaleLowerCase('zh-CN').includes(keyword))
   ))
 }

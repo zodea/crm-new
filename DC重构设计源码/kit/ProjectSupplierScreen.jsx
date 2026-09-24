@@ -118,12 +118,11 @@
     );
   }
 
-  // 只读列表 Tab（[+ 新建] 与行点击都跳转源模块，携带 项目+分供方 筛选）
+  // 聚合列表：当前页只负责查看，新增/编辑/审批回到源模块。
   function ListTab({ title, moduleName, columns, rows, sum, onJump }) {
     const toolbar = (
       <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 14, fontWeight: 700 }}>{title} <span style={{ color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>({rows.length})</span></span>
-        <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>只读 · 新增/编辑/审批在「{moduleName}」完成</span>
         <div style={{ marginLeft: "auto" }}>
           <Button size="sm" variant="primary" icon="external-link" onClick={() => onJump("new")}>去{moduleName}新建</Button>
         </div>
@@ -132,7 +131,7 @@
     if (!window.KitTable) return <Panel padding={16} style={{ color: "var(--ink-soft)" }}>表格组件加载中…</Panel>;
     return <window.KitTable toolbar={toolbar} columns={columns.map((c) => ({ width: 120, ...c }))} rows={rows}
       pageSize={10} minRows={5} sum={sum} tableMinWidth={Math.max(640, columns.length * 130)}
-      onRowClick={(r) => onJump("row", r)} footerLeft={"共 " + rows.length + " 条 · 点击行查看源单据"} empty="暂无数据" />;
+      onRowClick={(r) => onJump("row", r)} footerLeft={"共 " + rows.length + " 条"} empty="暂无数据" />;
   }
 
   function ProjectSupplierScreen({ params, navigate }) {
@@ -140,10 +139,9 @@
     const projectName = p.project || "合和新城";
     const supplierName = p.supplier || "大板东建材";
     const pid = p.pid || "p1";
-    const sid = p.sid || supplierName;
-    // 顶部蓝链 id 解析：params 的 pid/sid 可能缺省或存的是名称——先按 id 直查，查不到按名称反查；都查不到保持原文本
-    const projectId = window.APP && window.APP.get("projects", p.pid) ? p.pid : findId.project(projectName);
-    const supplierId = window.APP && window.APP.get("suppliers", sid) ? sid : (findId.supplier(sid) || findId.supplier(supplierName));
+    // 合作关系必须由真实外键定位；名称只用于显示，不反查、不猜测关联。
+    const projectId = window.APP && window.APP.get("projects", p.pid) ? p.pid : null;
+    const supplierId = window.APP && window.APP.get("suppliers", p.sid) ? p.sid : null;
 
     const M = React.useMemo(() => mockFor(supplierName), [supplierName]);
     const { contracts, claims, invoices, payments, files } = M;
@@ -170,8 +168,15 @@
     const [settleNote, setSettleNote] = React.useState("");
 
     const locked = status === "settled";
-    const jump = (module) => (kind, row) =>
-      UI().toast("跳转「" + module + "」模块（带 " + projectName + " + " + supplierName + " 筛选" + (kind === "row" ? "，定位该单据" : "，新建") + "）（演示）");
+    const nav = navigate || (window.DC && window.DC.navigate);
+    const jump = (module) => (kind, row) => {
+      if (module === "收票登记") { UI().toast("收票台账尚未支持真实 ID 预筛，已停止名称猜测跳转", "warn"); return; }
+      if (module === "采购合同") { UI().toast("采购合同尚未支持项目×分供方复合 ID 预筛，本次不做宽范围跳转", "warn"); return; }
+      const route = kind === "row" ? "payRecord" : "payApply";
+      if (!projectId || !supplierId) { UI().toast("缺少项目或分供方真实 ID，无法按合作关系跳转", "danger"); return; }
+      if (!nav) return;
+      nav(route, { project: projectId, supplier: supplierId, projectName, supplierName, sourceNo: row && row.no, from: "projectSupplier" });
+    };
 
     // #246：负尾差与零结算都是真实业务，不阻断；但必须填原因，并在二次确认里陈述未付请款。
     const settleAmtNum = Number(String(settleAmt).replace(/[^\d.\-]/g, "")) || 0;

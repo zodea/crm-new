@@ -67,10 +67,24 @@ describe('finance read store', () => {
         amount: 50000,
         date: '2026-07-26',
         status: 'submitted',
+        customerId: 'customer-1',
+        dataOrigin: null,
       },
     ])
     expect(store.listRows.receipt).toHaveLength(1)
     expect(store.loading).toBe(false)
+  })
+
+  it('正式本地工作区不把未接入中央仓库的收款伪装成 demo', async () => {
+    const store = useFinanceStore()
+
+    await expect(store.loadList('receipt')).resolves.toEqual([
+      expect.objectContaining({
+        id: 'receipt-1',
+        customerId: 'customer-1',
+        dataOrigin: null,
+      }),
+    ])
   })
 
   it('lookup 由 store 统一限定项目、合同类型并隐藏软删记录', async () => {

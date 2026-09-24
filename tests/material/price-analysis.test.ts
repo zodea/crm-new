@@ -35,6 +35,8 @@ function delivery(
     spec: string
     unit: string
     unitPrice: number | null
+    amount?: number | null
+    currentValueConfirmed?: boolean
   }>,
 ) {
   return {
@@ -44,11 +46,27 @@ function delivery(
     orderNo: id.toUpperCase(),
     deliveryDate,
     archived: true,
-    lines,
+    reviewStatus: 'reviewed' as const,
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
+    hasSourceFile: true,
+    lines: lines.map(line => ({
+      ...line,
+      amount: line.amount === undefined
+        ? (line.unitPrice == null ? null : 1)
+        : line.amount,
+      currentValueConfirmed: line.currentValueConfirmed ?? true,
+    })),
   }
 }
 
 describe('材料单价分析', () => {
+  it('缺原件的已核对中央记录保持归档，但不借有效价格进入分析', () => {
+    const source = delivery('missing-original', 'supplier-a', '2026-09-11', [{ id: 'line', materialName: '水泥', spec: '', unit: '吨', unitPrice: 20, amount: 20 }])
+    expect(buildMaterialPriceCatalog([{ ...source, dataOrigin: 'real', hasSourceFile: false }], suppliers, projects)).toEqual([])
+    expect(buildMaterialPriceCatalog([{ ...source, dataOrigin: 'real', hasSourceFile: true }], suppliers, projects)[0]?.facts[0]?.price).toBe(20)
+  })
   it('把 BV 全称、简称及常见单芯截面写法解析为同一稳定身份', () => {
     expect([
       parseWireMaterialIdentity({
@@ -424,6 +442,120 @@ describe('材料单价分析', () => {
     expect(catalog[0]?.facts).toHaveLength(2)
     expect(catalog[0]?.officialPriceLookupKey).toBe('wire::BV::1x2.5mm2::m')
     expect(catalog[0]?.facts.map(fact => fact.deliveryRecordId)).toEqual(['archived-1', 'archived-2'])
+  })
+
+  it('价格待补录的已归档明细不进入价格分析', () => {
+    const catalog = buildMaterialPriceCatalog([
+      delivery('price-pending', 'supplier-a', '2026-05-07', [{
+        id: 'line-price-pending',
+        materialName: 'BV 电线',
+        spec: '2.5 mm²',
+        unit: '米',
+        unitPrice: null,
+      }]),
+    ], suppliers, projects)
+
+    expect(catalog).toEqual([])
+  })
+
+  it('已有有效单价但金额待补录的明细仍不进入价格分析', () => {
+    const catalog = buildMaterialPriceCatalog([
+      delivery('amount-pending', 'supplier-a', '2026-05-08', [{
+        id: 'line-amount-pending',
+        materialName: 'BV 电线',
+        spec: '2.5 mm²',
+        unit: '米',
+        unitPrice: 2.8,
+        amount: null,
+      }]),
+    ], suppliers, projects)
+
+    expect(catalog).toEqual([])
+  })
+
+  it('无单号但金额、单价和人工确认态完整的归档明细可进入价格目录', () => {
+    const catalog = buildMaterialPriceCatalog([{
+      ...delivery('no-order-number', 'supplier-a', '2026-05-09', [{
+        id: 'line-no-order-number',
+        materialName: 'BV 电线',
+        spec: '2.5 mm²',
+        unit: '米',
+        unitPrice: 2.8,
+        amount: 28,
+      }]),
+      orderNo: '',
+    }], suppliers, projects)
+
+    expect(catalog).toHaveLength(1)
+    expect(catalog[0]?.facts).toEqual([
+      expect.objectContaining({
+        deliveryRecordId: 'no-order-number',
+        deliveryOrderNo: 'no-order-number',
+        price: 2.8,
+      }),
+    ])
+  })
+
+  it('#257 价格分析只读取人工确认后的当前单价，并保留原始/修订来源留痕', () => {
+    const catalog = buildMaterialPriceCatalog([
+      {
+        ...delivery('confirmed', 'supplier-a', '2026-05-01', [{
+          id: 'line-confirmed',
+          materialName: 'BV 电线',
+          spec: '2.5',
+          unit: 'm',
+          unitPrice: 2.8,
+          currentValueConfirmed: true,
+          originalOcrUnitPrice: 2.6,
+          revisionReason: '人工核对票面单价',
+        }]),
+        reviewStatus: 'reviewed',
+        ocrStatus: 'done',
+      },
+      {
+        ...delivery('unreviewed', 'supplier-a', '2026-05-02', [{
+          id: 'line-unreviewed',
+          materialName: 'BV 电线',
+          spec: '2.5',
+          unit: 'm',
+          unitPrice: 99,
+        }]),
+        reviewStatus: 'unreviewed',
+      },
+      {
+        ...delivery('duplicate', 'supplier-a', '2026-05-03', [{
+          id: 'line-duplicate',
+          materialName: 'BV 电线',
+          spec: '2.5',
+          unit: 'm',
+          unitPrice: 100,
+        }]),
+        naturalKeyDuplicate: true,
+      },
+      {
+        ...delivery('line-unconfirmed', 'supplier-a', '2026-05-04', [{
+          id: 'line-unconfirmed',
+          materialName: 'BV 电线',
+          spec: '2.5',
+          unit: 'm',
+          unitPrice: 101,
+          currentValueConfirmed: false,
+        }]),
+        currentValuesConfirmed: false,
+      },
+    ], suppliers, projects)
+
+    expect(catalog).toHaveLength(1)
+    expect(catalog[0]?.facts).toMatchObject([{
+      price: 2.8,
+      provenance: {
+        sourceKind: 'delivery',
+        sourceRecordId: 'confirmed',
+        sourceLineId: 'line-confirmed',
+        originalOcrUnitPrice: 2.6,
+        revisionReason: '人工核对票面单价',
+      },
+    }])
   })
 
   it('同一厂家存在多个日期价格点时切换为趋势，并限制最多四条厂家线', () => {

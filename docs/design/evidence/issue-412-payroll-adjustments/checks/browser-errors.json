@@ -1,0 +1,11 @@
+{
+  "page": "http://127.0.0.1:3188/project/target-cost/target_cost_mu19pjua_2d?origin=real&tab=comparison&returnTo=%2Fproject%2Ftarget-cost%3Forigin%3Dreal",
+  "errors": [
+    "POST /api/commands/payroll-adjustment: net::ERR_FAILED",
+    "POST /api/read/payroll/actual-ledger: net::ERR_ABORTED",
+    "POST /api/read/payroll/adjustment-history: net::ERR_ABORTED",
+    "GET /api/read/payroll: net::ERR_ABORTED",
+    "GET /api/read/target-costs/target_cost_mu19pjua_2d: net::ERR_ABORTED",
+    "POST /api/read/payroll/actual-ledger: net::ERR_ABORTED"
+  ]
+}

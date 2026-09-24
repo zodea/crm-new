@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { CustomerDetailMaster } from '~/lib/customer/detail'
+import type { CustomerListSourceRow } from '~/lib/customer/repository'
 
 defineProps<{
-  customer: CustomerDetailMaster
+  customer: CustomerListSourceRow
 }>()
 </script>
 

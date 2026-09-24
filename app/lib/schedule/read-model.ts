@@ -1,7 +1,9 @@
+import type { QuantityMeasureTotal } from '../quantity/totals'
 import type { ScheduleDependencyInput, ScheduleDependencyType } from './planning'
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 import { loadQuantityStageProgress } from '~/lib/quantity/derived'
+import { resolveScheduleBuildingReference } from './building-reference'
 import {
   SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR,
   scheduleDeviationDays,
@@ -37,6 +39,8 @@ export interface ScheduleContractOption {
 }
 
 export interface ScheduleFloorPlanView {
+  quantitySnapshot?: (QuantityMeasureTotal & { unit: string, sources: { unitId: string, templateItemId: string, quantity: number | null, unit: string }[] }) | null
+  legacyQuantityDetailMissing?: boolean
   id: string
   taskId: string
   floorId: string
@@ -212,7 +216,7 @@ function maxDate(values: readonly string[]): string | null {
   return values.length ? [...values].sort().at(-1)! : null
 }
 
-export async function loadScheduleCatalog(db: SoftDb): Promise<ScheduleCatalogProject[]> {
+export async function loadScheduleCatalog(db: Pick<SoftDb, 'select'>): Promise<ScheduleCatalogProject[]> {
   const rows = await db.select<ProjectRow>(selectVisibleSql('projects', 'ORDER BY created_at DESC, id'))
   const counts = await db.select<{ project_id: string, n: number }>(
     `${hiddenCtesFor('schedule_groups')}
@@ -232,7 +236,7 @@ export async function loadScheduleCatalog(db: SoftDb): Promise<ScheduleCatalogPr
 }
 
 export async function loadScheduleBuildings(
-  db: SoftDb,
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   contractId = '',
 ): Promise<ScheduleBuildingOption[]> {
@@ -270,7 +274,7 @@ export async function loadScheduleBuildings(
 }
 
 export async function loadScheduleBuildingCoverage(
-  db: SoftDb,
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   contractId: string,
 ): Promise<ScheduleBuildingCoverage[]> {
@@ -288,27 +292,7 @@ export async function loadScheduleBuildingCoverage(
       scheduled: false,
     }))
   }
-  const contractRows = await db.select<{ id: string }>(
-    `${hiddenCtesFor('buildings', 'boq_lines')}
-     SELECT building.id
-     FROM buildings building
-     WHERE ${visibleCond('buildings', 'building')}
-       AND building.project_id = ?
-       AND EXISTS (
-         SELECT 1
-         FROM boq_lines boq_line
-         WHERE ${visibleCond('boq_lines', 'boq_line')}
-            AND boq_line.project_id = ?
-            AND boq_line.contract_id = ?
-            AND trim(boq_line.building) <> ''
-            AND (
-              boq_line.building = building.code
-              OR boq_line.building = building.name
-            )
-        )
-     ORDER BY building.sort_order, building.code, building.id`,
-    [projectId, projectId, contractId],
-  )
+  const contractRows = await db.select<{ building: string | null }>(selectVisibleSql('boq_lines', 'AND project_id = ? AND contract_id = ?'), [projectId, contractId])
   const scheduledRows = await db.select<{ building_id: string }>(
     `${hiddenCtesFor('schedule_group_buildings')}
      SELECT DISTINCT group_building.building_id
@@ -319,7 +303,7 @@ export async function loadScheduleBuildingCoverage(
        AND group_row.contract_id = ?`,
     [projectId, contractId],
   )
-  const contractIds = new Set(contractRows.map(row => row.id))
+  const contractIds = new Set(contractRows.map(row => resolveScheduleBuildingReference(allRows, row.building)?.id).filter(Boolean))
   const scheduledIds = new Set(scheduledRows.map(row => row.building_id))
   return allRows.map(row => ({
     id: row.id,
@@ -331,7 +315,7 @@ export async function loadScheduleBuildingCoverage(
   }))
 }
 
-export async function loadScheduleContracts(db: SoftDb, projectId: string): Promise<ScheduleContractOption[]> {
+export async function loadScheduleContracts(db: Pick<SoftDb, 'select'>, projectId: string): Promise<ScheduleContractOption[]> {
   const rows = await db.select<{
     id: string
     project_id: string
@@ -348,7 +332,7 @@ export async function loadScheduleContracts(db: SoftDb, projectId: string): Prom
     LEFT JOIN boq_lines boq_line
       ON boq_line.contract_id = contract.id
      AND ${visibleCond('boq_lines', 'boq_line')}
-    WHERE contract.deleted_at IS NULL
+    WHERE ${visibleCond('contracts', 'contract')}
       AND contract.project_id = ?
       AND contract.kind = '施工'
     GROUP BY contract.id
@@ -364,7 +348,7 @@ export async function loadScheduleContracts(db: SoftDb, projectId: string): Prom
 }
 
 export async function loadScheduleProject(
-  db: SoftDb,
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   today: string,
 ): Promise<ScheduleProjectView | null> {
@@ -533,6 +517,7 @@ export async function loadScheduleProject(
     let actualFinish: string | null = null
     if (task.has_qty && task.stage_id) {
       const [progress] = await loadQuantityStageProgress(db, projectId, {
+        currentApplicabilityOnly: true,
         stageIds: [task.stage_id],
         buildingIds,
         itemIds: mappedItems.map(item => item.item_id),

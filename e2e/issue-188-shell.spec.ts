@@ -9,22 +9,30 @@ const ROUTES_FOR_OVERFLOW = [
   '材料采购合同',
   '发票台账',
   '分供方',
+  '费用报销',
+  '库存盘点',
 ] as const
 
-async function openOverflowingTabs(page: Page) {
+async function openSidebarRoute(page: Page, label: string) {
   const sidebar = page.locator('[data-sidebar="sidebar"]').first()
-  for (const label of ROUTES_FOR_OVERFLOW) {
-    await sidebar.getByRole('link', { name: label, exact: true }).click()
-    await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
-  }
+  const navSearch = sidebar.getByRole('searchbox', { name: '搜索菜单' })
+  // 分组导航按当前路由保持单组展开；跨组操作应走共享搜索，而不是依赖
+  // 某个非当前分组恰好保持展开。这样验收的是真实用户可达路径。
+  await navSearch.fill(label)
+  const link = sidebar.getByRole('link', { name: label, exact: true })
+  await expect(link).toBeVisible()
+  await link.click()
+  await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
+}
+
+async function openOverflowingTabs(page: Page) {
+  for (const label of ROUTES_FOR_OVERFLOW)
+    await openSidebarRoute(page, label)
 }
 
 async function openTabs(page: Page, labels: readonly string[]) {
-  const sidebar = page.locator('[data-sidebar="sidebar"]').first()
-  for (const label of labels) {
-    await sidebar.getByRole('link', { name: label, exact: true }).click()
-    await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
-  }
+  for (const label of labels)
+    await openSidebarRoute(page, label)
 }
 
 test.beforeEach(async ({ page }) => {
@@ -70,12 +78,12 @@ test('Issue #188：导航搜索与页签溢出均可由键盘可达控件操作'
   const sidebarFrame = page.locator('[data-sidebar="sidebar"]').first().locator('..')
   await page.getByRole('button', { name: '收起侧栏' }).click()
   await page.mouse.move(800, 700)
-  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(68)
+  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(48)
   await expect(previous).toHaveCount(0)
   await expect(next).toHaveCount(0)
 
   await page.getByRole('button', { name: '固定侧栏' }).click()
-  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(248)
+  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(208)
   await expect(previous).toBeVisible()
   await expect(next).toBeVisible()
 })

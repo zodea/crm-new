@@ -9,6 +9,8 @@ export type KitColumnType = 'seq' | 'checkbox' | 'text' | 'money' | 'date' | 'ac
 export interface KitFilterOption {
   label: string
   value: unknown
+  /** 受控远程筛选时由调用方回填当前选中态。 */
+  checked?: boolean
 }
 
 export interface KitTableColumn {
@@ -31,6 +33,8 @@ export interface KitTableColumn {
   filterable?: boolean | KitFilterOption[]
   /** 自定义单元格插槽名;action 列缺省用 'action' 插槽。 */
   slot?: string
+  /** 自定义可操作表头；调用方提供真实筛选/排序能力。 */
+  customHeader?: boolean
 }
 
 export interface NormalizedKitColumn extends KitTableColumn {

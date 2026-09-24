@@ -11,6 +11,8 @@ import {
 } from './helpers/responsive'
 import { VISUAL_BASE_URL, VISUAL_DATA_PROFILE } from './helpers/visual-environment'
 
+const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
+const VISUAL_NOW = new Date('2026-08-12T12:00:00+08:00')
 const VIEWPORT_HEIGHTS: Record<(typeof RESPONSIVE_WIDTHS)[number], number> = {
   390: 844,
   768: 900,
@@ -117,19 +119,23 @@ async function expectVisualEnvironment(page: Page) {
     mode: VISUAL_DATA_PROFILE,
     origin: new URL(VISUAL_BASE_URL).origin,
   })
+  await expect(page.getByRole('button', { name: '关闭测试数据' }))
+    .toHaveAttribute('aria-pressed', 'true')
 }
 
 async function navigateFromSidebar(page: Page, width: number, label: string) {
+  let sidebar: Locator
   if (width < 1024) {
     await page.getByRole('button', { name: '切换侧边栏' }).click()
-    const sheet = page.getByRole('dialog', { name: '导航菜单' })
-    await expect(sheet).toBeVisible()
-    await sheet.getByRole('link', { name: label, exact: true }).click()
+    sidebar = page.getByRole('dialog', { name: '导航菜单' })
+    await expect(sidebar).toBeVisible()
   }
   else {
-    const sidebar = page.locator('[data-sidebar="sidebar"]').first()
-    await sidebar.getByRole('link', { name: label, exact: true }).click()
+    sidebar = page.locator('[data-sidebar="sidebar"]').first()
   }
+
+  await sidebar.getByRole('searchbox', { name: '搜索菜单' }).fill(label)
+  await sidebar.getByRole('link', { name: label, exact: true }).click()
   await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
 }
 
@@ -195,7 +201,7 @@ const SAMPLES: VisualSample[] = [
     path: '/',
     prepare: async (page, width) => {
       await navigateFromSidebar(page, width, '项目列表')
-      const detailLink = page.getByRole('link', { name: '查看项目详情' }).first()
+      const detailLink = page.getByRole('link', { name: '合和新城', exact: true }).first()
       await expect(detailLink).toBeVisible()
       await detailLink.click()
       await expect(page).toHaveURL(/\/project\/[^/]+$/)
@@ -213,6 +219,9 @@ const SAMPLES: VisualSample[] = [
         '分供方',
       ])
         await navigateFromSidebar(page, width, label)
+
+      await expect(page.locator('[data-ui="supplier-list-table"] .vxe-body--row').first())
+        .toBeVisible()
 
       const tabList = page.getByRole('navigation', { name: '已打开页面' })
       await expect(page.getByRole('button', { name: '向前翻动页签' })).toBeVisible()
@@ -274,9 +283,10 @@ const SAMPLES: VisualSample[] = [
   },
   {
     key: 'detail',
-    path: '/project/proj_demo_001',
+    path: '/project/proj_demo_001?origin=demo',
     prepare: async (page) => {
-      await expect(page.getByRole('tablist').first()).toBeVisible()
+      await expect(page.locator('[data-ui="project-detail-screen"]')).toBeVisible()
+      await expect(page.getByRole('status', { name: '测试数据只读详情' })).toBeVisible()
     },
     sensitive: page => [
       ...stableSensitive(page),
@@ -297,6 +307,9 @@ const SAMPLES: VisualSample[] = [
       page.locator('[data-shell-workspace] #project-file-list-title + .chip'),
       page.locator('[data-shell-workspace] .chip-brand'),
       page.locator('[data-shell-workspace] a.cell--link'),
+      page.locator('[data-ui="project-detail-screen"] header p'),
+      page.locator('[data-ui="project-detail-screen"] header dd'),
+      page.locator('[data-ui="project-info-section"] dd'),
     ],
   },
   {
@@ -355,10 +368,12 @@ const SAMPLES: VisualSample[] = [
 ]
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
+  await page.clock.install({ time: VISUAL_NOW })
+  await page.addInitScript((dataVisibilityStorageKey) => {
     localStorage.removeItem('ruihang-sidebar-pinned')
     localStorage.removeItem('ruihang-sidebar-groups')
     localStorage.removeItem('ruihang-shell-theme')
+    localStorage.setItem(dataVisibilityStorageKey, 'true')
 
     const removeNuxtDevtools = () => {
       document.querySelectorAll('nuxt-devtools-frame').forEach(frame => frame.remove())
@@ -373,7 +388,7 @@ test.beforeEach(async ({ page }) => {
       document.addEventListener('DOMContentLoaded', observeNuxtDevtools, { once: true })
     else
       observeNuxtDevtools()
-  })
+  }, DATA_VISIBILITY_STORAGE_KEY)
 })
 
 test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
@@ -387,6 +402,19 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
         await expectVisualEnvironment(page)
         await page.addStyleTag({
           content: `
+            :root {
+              --font-sans: "Microsoft YaHei", sans-serif !important;
+              --font-mono: Consolas, "Courier New", monospace !important;
+            }
+            [data-shell-topbar] [class*="bg-danger"] {
+              width: 16px !important;
+              min-width: 16px !important;
+              padding: 0 !important;
+              font-size: 0 !important;
+            }
+            input[type="date"][data-visual-empty-date]::-webkit-datetime-edit {
+              color: transparent !important;
+            }
             *, *::before, *::after {
               caret-color: transparent !important;
               transition-duration: 0s !important;
@@ -432,6 +460,10 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
           `,
         })
         await sample.prepare(page, width)
+        await page.locator('input[type="date"]').evaluateAll(inputs => inputs.forEach((input) => {
+          if (input instanceof HTMLInputElement && !input.value)
+            input.dataset.visualEmptyDate = ''
+        }))
         await redactSensitiveText(sample.sensitive?.(page, width) ?? stableSensitive(page))
         if (sample.key === 'detail') {
           await page.getByTestId('project-schedule-progress-value')

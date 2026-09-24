@@ -1,0 +1,51 @@
+
+Running 1 test using 1 worker
+
+(node:26496) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [chromium] › e2e\payroll-fees-central.spec.ts:80:1 › 多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出 (55.2s)
+
+
+  1) [chromium] › e2e\payroll-fees-central.spec.ts:80:1 › 多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出 ──────
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: '重新核对工资', exact: true })
+        - locator resolved to <button disabled data-state="default" class="inline-flex items-center justify-center gap-2 whitespace-nowrap border rounded-md font-600 cursor-pointer transition-[color,background-color,border-color,opacity,transform] duration-[var(--dur-fast)] active:scale-97 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 btn-look-secon…>…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+        27 × waiting for element to be visible, enabled and stable
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+
+
+      35 | async function release(page: Page, statementId: string, amount: number) {
+      36 |   await page.goto(`/subcontract/payroll/${encodeURIComponent(statementId)}?origin=real`)
+    > 37 |   await page.getByRole('button', { name: '重新核对工资', exact: true }).click()
+         |                                                                   ^
+      38 |   await page.getByRole('button', { name: '确认实际发放', exact: true }).click()
+      39 |   const dialog = page.getByRole('dialog')
+      40 |   await dialog.getByLabel('实际发放总额', { exact: true }).fill(String(amount))
+        at release (D:\crm本地项目开发\e2e\payroll-fees-central.spec.ts:37:67)
+        at D:\crm本地项目开发\e2e\payroll-fees-central.spec.ts:172:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .tmp\remaining-issues-20260910\payroll-p5-central\root\browser-fifth\payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    .tmp\remaining-issues-20260910\payroll-p5-central\root\browser-fifth\payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .tmp\remaining-issues-20260910\payroll-p5-central\root\browser-fifth\payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium\error-context.md
+
+  1 failed
+    [chromium] › e2e\payroll-fees-central.spec.ts:80:1 › 多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出 ───────

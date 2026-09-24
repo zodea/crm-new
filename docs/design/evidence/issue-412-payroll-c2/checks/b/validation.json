@@ -1,0 +1,62 @@
+{
+  "baselineCommit": "4738be98730955cd63832c8df04fc6f1d855caff",
+  "ownedManifestSha256": "0880bad3f434acab2cbfad7e1f1ecf143a4c0ace16356c62ce149e49b464079e",
+  "tests": {
+    "command": "npm test -- --project unit tests/payroll/daywork-facts.test.ts tests/payroll/c2-source-locks.test.ts tests/payroll/c2-migration-protection.test.ts tests/payroll/c1-migration-protection.test.ts tests/payroll/a-receipt-migration.test.ts tests/payroll/a-migration-protection.test.ts tests/payroll/controlled-migration.test.ts tests/payroll/signed-daywork.test.ts",
+    "exitCode": 0,
+    "files": 8,
+    "tests": 73,
+    "durationSeconds": 23.63
+  },
+  "lint": {
+    "command": "node node_modules/eslint/bin/eslint.js app/lib/payroll/central-source-locks.ts server/utils/payroll-daywork-facts.ts server/utils/payroll-c2-migration-references.ts server/utils/payroll-migration.ts server/utils/payroll-a-migration-references.ts tests/helpers/payroll-c2-migration-source.ts tests/payroll/daywork-facts.test.ts tests/payroll/c2-source-locks.test.ts tests/payroll/c2-migration-protection.test.ts --fix",
+    "exitCode": 0,
+    "fileCount": 9
+  },
+  "diffCheck": {
+    "baseline": "4738be98730955cd63832c8df04fc6f1d855caff",
+    "exitCode": 0
+  },
+  "logs": [
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b/final-validation.log",
+      "sha256": "6776b33cecf4283e05135d4ca71140f4ddf457644c37e4bb73efd638c125f344"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b/lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b/raw-red.log",
+      "sha256": "f949eadc252438605a8ac2d31fae0c4ada68e9850a787fc7524a5e83bdcc9c8c"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b/evidence-red.log",
+      "sha256": "42aee795ac831731b3c6f5cf1689119f36dd9cb5497114661ba060fa6b35335b"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b/source-month-red.log",
+      "sha256": "aab46b4cfbeea76e41708e9751e1293a42ce91ffdf0bab13b3595781a8122b3b"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b/document-lock-red.log",
+      "sha256": "d3cb55d9f35e285e2f58082e7b62bad2690e0b12ac6aa1b7010bb09fee29f4e7"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b/frozen-links-red.log",
+      "sha256": "29aa93e753f68fad529dc2079497c811591de4a59d7e0f5e9590758c13256e62"
+    },
+    {
+      "path": ".tmp/remaining-issues-20260910/payroll-c2-central/b/frozen-links-month-red.log",
+      "sha256": "ae54db7509546084f8284b516c2f061ecead4fb13ae566197b5d35dd9909efaf"
+    }
+  ],
+  "rootIntegrationPending": [
+    "final typecheck",
+    "full suite",
+    "build",
+    "independent reviews",
+    "browser evidence",
+    "commit"
+  ]
+}

@@ -8,7 +8,7 @@ import {
   borrowedQuantityTemplateDraft,
   editableQuantityTemplateDraft,
 } from '~/lib/quantity/template'
-import { useQuantityStore } from '~/stores/quantity'
+import { useNativeQuantityStore as useQuantityStore } from '~/stores/quantity-native'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb

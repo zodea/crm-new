@@ -1,0 +1,41 @@
+{
+  "issue": 412,
+  "slice": "P6 户级空鼓、整改与人工扣款",
+  "baselineCommit": "e344a5444cd52bfeb65e78b031912d5241666fc0",
+  "productCommit": "edc03faba20e0c5c665b7fc2011e2a4120d8428f",
+  "commit": {
+    "files": 386,
+    "insertions": 15073,
+    "deletions": 383,
+    "normalHook": {
+      "typecheck": "passed",
+      "npmTest": {
+        "status": "passed",
+        "files": 782,
+        "tests": 4312,
+        "seconds": 326.16
+      }
+    }
+  },
+  "frozenSourceMap": {
+    "records": 240,
+    "gitObjectMismatches": 0
+  },
+  "productionBuild": "passed",
+  "productionE2E": {
+    "file": "e2e/payroll-hollow-central.spec.ts",
+    "tests": 1,
+    "status": "passed",
+    "testSeconds": 58.2,
+    "commandSeconds": 59.4
+  },
+  "sqlWasm": {
+    "bytes": 659730,
+    "sha256": "438C88F666DC054CE4E9395F80FE9DB4218B1A3C379960454880F048A7898AED"
+  },
+  "review": {
+    "standards": "passed",
+    "spec": "passed"
+  },
+  "verifiedAt": "2026-09-21"
+}

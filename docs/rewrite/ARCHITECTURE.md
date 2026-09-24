@@ -1,22 +1,30 @@
 # 当前技术架构
 
-本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)。
+本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，浏览器中央权威与演示隔离决策看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)，中央写入语义看 [`COMMANDS.md`](./COMMANDS.md)，跨域入口与返回语义看 [`NAVIGATION.md`](./NAVIGATION.md)。
+
+当前工作按[全模块复核路线](https://github.com/zodea/crm-new/issues/402)与[模块复核规程](../agents/module-review.md)逐模块推进，前台界面、交互和数据处理优先；可靠持久化、备份恢复与部署由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。顺序调整不撤销 ADR 0020，不开放本地正式写入旁路，也不把完整账号/RBAC、审批引擎或 Tauri 正式交付加入当前范围。
+
+首期单人本机的持久库、身份入口与备份恢复方案已由 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)裁定，具体执行见[生产子票入口](../implementation/production-gate-work-breakdown.md)。方案定稿与下述现有代码状态分别阅读；只有 [#471 最终上线验收](https://github.com/zodea/crm-new/issues/471)通过后才可宣称该范围正式可用。
 
 ## 1. 运行形态
 
 ```text
 Nuxt 4 SPA
-├─ 浏览器开发态
-│  ├─ sql.js SQLite fallback
-│  └─ Nitro /server/api/ocr 代理官方 OCR API
+├─ 浏览器当前生产目标
+│  ├─ 领域 Repository → 中央 HTTP 服务
+│  ├─ sql.js/IndexedDB 分为无 seed 的 production 快照与只读 demo 快照
+│  ├─ 核心身份迁移经 HTTP/Repository 切换；确认后旧 production 普通读写阻断，保留不可变备份供回滚
+│  ├─ Nitro /server/api/ocr 代理官方 OCR API
+│  └─ Nitro /api/read/projects 提供项目列表与详情的正式/演示隔离读链，并消费已确认迁移的项目身份
 └─ Tauri 2 桌面态
    ├─ tauri-plugin-sql SQLite
    ├─ tauri-plugin-fs / dialog
    └─ Nuxt 静态前端
 ```
 
-- `nuxt.config.ts` 设置 `ssr: false`；生产产品以 Tauri 桌面应用为目标。
+- `nuxt.config.ts` 设置 `ssr: false`；当前生产目标、中央权威与桌面范围由 ADR 0020 裁定。
 - OCR 凭证只存在 Nitro runtime config，不进入 public config 或前端持久化。桌面静态构建不能假定 Nitro 永远可用，最终本地自托管/云端边界遵守 ADR 0006。
+- 开发中央实例保留正式空来源、独立演示来源、默认 workspace/actor 和可重置验证数据；#294 核心身份迁移仍属于这条开发验证链。`dataOrigin='real'` 表示来源身份，不自动证明持久性。本机正式模式沿 ADR 0021 使用可信单人会话和同一磁盘 SQLite，客户及 #452 项目参与者已验证原件/回执随独立进程重启保留；尚未接管的 API 明确不可用，不回落开发实例。正式资料写入仍受备份和上线门禁保护，完整账号/RBAC 未纳入本期。
 - 平台差异经 `app/lib/platform/`、`app/lib/io/` 和数据库连接层收口，页面不直接散写 Tauri/浏览器判断。
 
 ## 2. 技术栈
@@ -26,7 +34,8 @@ Nuxt 4 SPA
 | 框架 | Nuxt 4、Vue 3.5、TypeScript、Vue Router |
 | 桌面 | Tauri 2 |
 | 状态 | Pinia |
-| 持久化 | SQLite：tauri-plugin-sql；开发 fallback：sql.js |
+| 本地存储 | Tauri 使用 SQLite/tauri-plugin-sql；浏览器未迁移领域、迁移来源和演示快照使用 sql.js/IndexedDB，受 ADR 0020 约束 |
+| 中央服务 | 统一 HTTP/Repository/command；开发使用可重置实例，本机正式模式按已登记磁盘参与者提供服务并拒绝未就绪 API，实际范围见 DATABASE 与 ADR 0021 |
 | 样式 | UnoCSS，运行时令牌在 `app/assets/css/tokens.css` |
 | 交互 | reka-ui / shadcn-vue 结构、vue-sonner、VueUse |
 | 数据网格 | vxe-table，经项目组件封装 |
@@ -50,6 +59,7 @@ app/
 │  ├─ forms/        # 整页表单契约与共享逻辑
 │  ├─ kit/          # KitUI 纯逻辑
 │  ├─ nav/          # 导航树与路由归属
+│  ├─ migration/    # 核心身份来源快照、映射契约与 HTTP Repository
 │  └─ <domain>/     # 领域纯逻辑、适配器与读写服务
 ├─ pages/           # Nuxt 文件路由；页面负责组合，不承担全部领域逻辑
 ├─ plugins/         # 数据库、组件库等运行时接入
@@ -57,7 +67,7 @@ app/
 ├─ types/           # 跨模块共享类型
 └─ workers/         # 重计算或文件处理 worker
 
-server/             # 仅服务端可见的 OCR 代理与凭证边界
+server/             # OCR 代理、业务读写/迁移 API、会话与 capability 边界
 src-tauri/          # Tauri 壳、权限与打包
 tests/              # Vitest 单元/组件测试
 e2e/                # Playwright 用户旅程
@@ -67,27 +77,61 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
 ## 4. 数据与状态流
 
 ```text
-Page / Domain component
-        │ 读取状态、调用 action
+项目列表、详情与表单
+  AppTopbar / DataVisibilityStore
+        │ includeDemo 默认关闭并按工作区偏好持久化
         ▼
-     Pinia store
-        │ 调用领域服务 / DB coordinator
-        ▼
-    app/lib/<domain> + app/lib/db
-        │
-        ▼
- SQLite（Tauri）或 sql.js（浏览器开发态）
+  ProjectListScreen ──► ProjectListStore ──┐
+  ProjectDetailScreen ─────────────────────┤ 只依赖 ProjectListRepository port
+                                          ▼
+  HTTP adapter ──► Nitro /api/read/projects[/:id] ──► 默认业务会话 + 可重置中央测试实例
+                                                    ├─ real：正式来源，默认空且不 seed
+                                                    └─ demo：独立夹具，capability 允许时只读叠加
+
+  ProjectForm ──► ProjectCommandStore ──► ProjectCommandRepository
+       │ 本地草稿只保留失败意图                  │
+       └──► HTTP adapter ──► /api/commands/projects[/:id]
+                                  ├─ server session/capability 重验
+                                  ├─ commandId 幂等 + baseVersion 乐观锁
+                                  └─ 成功后失效详情并从中央读模型读回
+
+尚未切换的页面域
+  includeDemo=false ──► production 本地快照（未迁移域的过渡投影/写入暂存；不 seed）
+  includeDemo=true  ──► demo 本地快照（确定性 seed，驱动只读）
+  开关变化          ──► 确认未保存内容 → 服务端授权 → 原子重载应用
+                       └─ 统一清空旧 Pinia 投影、Lookup 最近选择域与连接
+
+核心身份迁移（#294）
+  设置 → 数据迁移页 ──► CoreMigrationStore ──► CoreMigrationRepository ──► /api/migrations/core/*
+        │                         │                         │
+        │                         │                         └─ 可重置中央测试实例：预检、dry-run、导入、确认、回滚
+        │                         ▼
+        └─ production 快照 ──► 不可变 IndexedDB 备份 ──► 拓扑映射/对账 ──► 用户确认
+                                                                            │
+                                                                            ├─ 已接管身份、合同与甲方商务单据只走中央
+                                                                            └─ 回滚窗口内仅可由迁移适配器恢复备份
 ```
 
 - 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
 - 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
+- 项目列表、来源感知详情与正式项目表单已接中央 HTTP。新增/编辑由 `project:write`、`commandId` 和 `baseVersion` 保护；#423 项目 Excel 导入复用中央项目命令与同源回读，独立于编辑草稿会话，入口和来源防重边界见 [COMMANDS](./COMMANDS.md#项目-excel-导入423)；删除仍禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
+- Issue #318、#320 与 #321 的材料采购、施工、分包合同浏览器链只经各自领域 Repository/Store 与中央 HTTP：列表和七分区详情按 `(dataOrigin,id,kind)` 校验，演示来源还要同时通过用户可见性开关与服务端 `demo:read`。正式表单以各自 write capability、`commandId`、`baseVersion` 和服务端关系校验保护，成功后回到同一中央详情重读；#294 受控迁移携带 canonical 施工/分包合同并在确认后进入同一中央命令源。没有稳定外键的事实保持空集合，实际竣工、分包结算与清账未知时保持 `null`。
+- Issue #294 的核心身份迁移是另一条显式中央命令链：`preflight → immutable backup → dry-run → import → post-write reconciliation → confirm → rollback`。#320 与 #321 将 canonical 施工/分包合同纳入同一受控拓扑，导入顺序固定为客户、分供方、班组、项目、施工合同、分包合同、工人、项目分供方；只接受稳定旧 ID 映射，不按名称、编号或金额猜关系。本地迁移适配器从快照字节重算摘要、来源哈希和版本并在恢复前再次核对；服务端重算 canonical 来源哈希、验证证明结构并将首份证明不可替换地绑定批次，但不上传或读取浏览器整库备份。服务端在实际写入后重新核对计数、金额、数量、关系、软删除与孤儿，客户端按钮状态不能替代后台门禁。确认后浏览器保存持久迁移标记并禁止六类身份与施工/分包合同走旧 production 的普通读写，重载时必须校验标记和中央活动批次。迁移适配器可以读取不可变备份用于恢复，不能以此重新开放普通旧库查询。
+- Issue #322 在施工合同、分包合同之后把 canonical 补充协议加入同一受控拓扑；父合同旧 ID 必须唯一映射到其中一类主合同。确认后两类合同详情从同一中央命令事实源消费补充协议，并按 `(dataOrigin, contractId, kind, focusId)` 校验存在性与父子归属；不存在和关系错配使用不同问题语义。
+- Issue #323 将甲方变洽签与月度报量接入同一中央 owner-document Repository/HTTP/command 边界；Issue #324—#326 依次增加验收—保修、最终结算和甲方罚扣。Issue #327 在同一基础设施上以独立 `sub_change` kind 和 `subcontract-document` capability 接入分包变洽签；项目、分供方、分包合同、三档金额与签证单附件只从 canonical `subcontract_change_orders` 投影，并回流分包合同的变洽签事实区。共享基础设施不合并甲方与分包领域权限、状态或金额语义；受控迁移不信任客户端状态或关系元组。
+- Issue #328 继续以 `sub_settlement` kind 接入分包结算列表、只读详情、显式编辑/确认、结算单附件与受控迁移；复用 `expenditure_settlements`，累计已确认结算从同一事实源派生。付款与抵扣来源尚未接入的部分保持明确缺口，不因详情已闭合而声称全生命周期完成。
+- 当前项目与施工/分包合同正式读链会消费已确认迁移的对应实体。客户、分供方、班组、工人和项目分供方的普通页面 Repository/中央接线已由 #281 完成，迁移页不复制这些页面功能。项目详情直接消费中央 ProjectSupplier 反向关系；文件导入的本地 adapter 只负责选择、分类与读取文件，最终确认经 `ProjectSupplierCommandStore → CommandRepository → /api/commands/project-suppliers/import` 原子写入中央分供方、合作关系和文件事实，不在浏览器 SQLite 建立平行正式身份。
+- `/api/testing/projects/reset` 仅在非生产环境接受带测试标头的确定性场景切换，用来证明 ready、empty、forbidden、demo-forbidden、unavailable 与 retry，不是业务 API。
+- `server/utils/business-session.ts` 是单公司、单操作人首版的服务端身份注入边界；客户端查询不能覆盖 `workspaceId` 或 `actorId`。正式登录接入时替换该边界，不改变领域 DTO。
 - 用户可编辑的实体字段和关系以 `DATABASE.md` 为契约；不要从表格列或 mock 对象反推 schema。
+- 列表、详情、工作台和未来 HTTP adapter 的读语义以 `READ-MODELS.md` 为契约；Pinia 不直接拼私有 URL，本地 SQLite adapter 与 HTTP adapter 不得各造一套空值、金额或权限含义。
 - 删除遵循软删除与撤回语义；具体约束见 `DATABASE.md` 和 ADR 0003。
 
 ## 5. 导航、页面与表单
 
 - 侧栏信息架构的代码权威源是 `app/lib/nav/nav-tree.ts`；`to` 缺省表示入口尚未实现。
-- 页面路由由 `app/pages/` 生成。列表、详情、表单之间的 active nav 和应用页签归属由 `app/lib/nav/`、`app/lib/tabs/` 统一处理。
+- 页面路由由 `app/pages/` 生成。列表、详情、表单之间的 active nav 和应用页签归属由 `app/lib/nav/`、`app/lib/tabs/` 统一处理；页签上限、可恢复 descriptor、活动页刷新和后台页暂停语义统一遵守 [`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)。
+- 蓝色名称、编号、金额、消息目标和跨域来源返回必须遵守 [`NAVIGATION.md`](./NAVIGATION.md)；后台返回语义目标与稳定 ID，前端唯一 target registry 解析站内路径，多态单据不得用名称或编号猜 variant。
 - 业务实体新增/编辑采用整页表单路由；共享字段、保存动作、脏数据拦截和持久化能力位于 `app/components/forms/`、`app/lib/forms/` 及相关 store，见 ADR 0014 / 0015。
 - 行级小对象、确认和轻量选择器才使用 Dialog；不得把大型业务实体重新塞回通用 formModal。
 
@@ -99,6 +143,7 @@ Page / Domain component
 - `app/components/shared/`：AppShell、KitUIHost、整页表单壳等跨领域组合。
 - `app/components/<domain>/`：只在某一业务语义成立的复杂组件，例如 WBS、甘特、工程量矩阵和票款分摊。
 - `useKitUI()` 是 toast / confirm / formModal 的稳定入口；页面不直接创建第二套全局浮层宿主。
+- 智能洞察可用性、右侧 Sheet、全局事件 inbox、toast/角标/消息抽屉扇出及单例实时通道属于应用壳公共能力；领域页只提供稳定 `metadataKey`、`subject` 和读模型 adapter，不自行建立第二套消息或洞察框架，见 [`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)。
 
 视觉权威、组件层次和响应式规则见 [`docs/design/README.md`](../design/README.md) 与 [`DESIGN-SYSTEM.md`](./DESIGN-SYSTEM.md)。
 

@@ -101,7 +101,7 @@ function nullableNumber(value: unknown): number | null {
 function mapDocuments(
   rows: readonly Record<string, unknown>[],
   group: ContractDocumentGroup,
-  path: (id: string) => string,
+  path: (id: string, row: Record<string, unknown>) => string,
 ): ContractRelatedDocument[] {
   return rows.map(row => ({
     id: stringValue(row.id),
@@ -111,7 +111,7 @@ function mapDocuments(
     amount: nullableNumber(row.amount),
     date: stringValue(row.date),
     status: stringValue(row.status),
-    to: path(stringValue(row.id)),
+    to: path(stringValue(row.id), row),
   }))
 }
 
@@ -324,9 +324,10 @@ async function loadPayments(
         amount: row.amount,
         date: row.receipt_date,
         status: row.status,
+        customerId: row.customer_id,
       })),
       '收款登记',
-      id => `/finance/receipt/${id}`,
+      () => '',
     )
   }
   const rows = await select<Record<string, unknown>>(`
@@ -364,7 +365,7 @@ async function loadPayments(
       application.status
     ORDER BY application.apply_date DESC, application.created_at DESC
   `, [contractId])
-  return mapDocuments(rows, '付款申请', id => `/finance/payment/${id}`)
+  return mapDocuments(rows, '付款申请', id => `/finance/payment/${id}/detail`)
 }
 
 async function loadMaterialDocuments(

@@ -3,7 +3,7 @@
 // 超限阻断（不新增、不改激活，由调用方弹临时 toast）。UI/store 只做状态搬运与副作用。
 
 export interface Tab {
-  /** 唯一键：同 fullPath 复用（首页固定 HOME_KEY）。 */
+  /** 唯一键：同路径复用，筛选与锚点不参与（首页固定 HOME_KEY）。 */
   key: string
   title: string
   /** 完整路径（含 query），用于导航。 */
@@ -30,12 +30,12 @@ export function initialTabsState(): TabsState {
 }
 
 /**
- * 由 fullPath 推 key：首页归一到 HOME_KEY，其余取路径（剥离 query——
+ * 由 fullPath 推 key：首页归一到 HOME_KEY，其余取路径（剥离 query 与 hash——
  * 穿透预筛不进页签身份，同路径复用页签并刷新 fullPath 即「应用新预筛」，
  * 见 CONTEXT.md「页签导航」词条 / kit-ui-component-specs §07）。
  */
 export function deriveKey(fullPath: string): string {
-  const path = fullPath.split('?')[0] ?? ''
+  const path = fullPath.split(/[?#]/)[0] ?? ''
   if (path === '/' || path === '')
     return HOME_KEY
   return path

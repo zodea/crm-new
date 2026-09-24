@@ -1,0 +1,36 @@
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/c2-spec-independent.test.ts (1 test | 1 failed) 666ms
+   × 独立规格反例：真实发放的全员月锁在签工台账可见，零签工成员与状态筛空均不能丢锁 665ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/c2-spec-independent.test.ts > 独立规格反例：真实发放的全员月锁在签工台账可见，零签工成员与状态筛空均不能丢锁
+AssertionError: expected [ 'member', 'w' ] to deeply equal [ 'member', 'w', 'zero' ]
+
+- Expected
++ Received
+
+  [
+    "member",
+    "w",
+-   "zero",
+  ]
+
+ ❯ tests/payroll/c2-spec-independent.test.ts:14:35
+     12|     expect(ledger.records.map(row => row.workerId).sort()).toEqual(['m…
+     13|     const lockedWorkers = (read: typeof ledger) => [...new Set(read.lo…
+     14|     expect(lockedWorkers(ledger)).toEqual(['member', 'w', 'zero'])
+       |                                   ^
+     15|     const filtered = await f.service.dayworkList({ origin: 'real' }, {…
+     16|     expect(filtered.records).toEqual([])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  14:32:27
+   Duration  1.47s (transform 505ms, setup 0ms, import 593ms, tests 666ms, environment 0ms)
+

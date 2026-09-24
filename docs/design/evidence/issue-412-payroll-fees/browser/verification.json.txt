@@ -1,0 +1,827 @@
+{
+  "ordinaryId": "wage_mu1hcnzu_f",
+  "workerWage": "wage_mu1hct5t_1m",
+  "firstManagement": "wage_mu1hcw9i_2r",
+  "secondManagement": "wage_mu1hcywm_3d",
+  "bookId": "management-book_mu1hcvwz_2k",
+  "originalCommand": "payroll-fees-command_mu1hcnih_2",
+  "ordinaryActual": 3815,
+  "managementProjectActual": 1720,
+  "managementPreviouslyPaid": 200,
+  "managementCurrent": 520,
+  "boundaries": {
+    "month": "2026-09",
+    "companyBookId": "management-book_mu1hdhdp_3t",
+    "originalBookId": "management-book_mu1hcvwz_2k",
+    "originalStatementsUnchanged": true,
+    "defaultsNotAdopted": true,
+    "unsavedInputsPreserved": true,
+    "captures": [
+      {
+        "name": "crew-default-zero-not-adopted",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "crew-default-zero-not-adopted",
+        "width": 768,
+        "localScrollers": 0
+      },
+      {
+        "name": "crew-default-zero-not-adopted",
+        "width": 1024,
+        "localScrollers": 0
+      },
+      {
+        "name": "crew-default-zero-not-adopted",
+        "width": 1280,
+        "localScrollers": 0
+      },
+      {
+        "name": "crew-default-zero-not-adopted",
+        "width": 1440,
+        "localScrollers": 0
+      },
+      {
+        "name": "company-managed-original-scope",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "company-managed-original-scope",
+        "width": 768,
+        "localScrollers": 0
+      },
+      {
+        "name": "company-managed-original-scope",
+        "width": 1024,
+        "localScrollers": 0
+      },
+      {
+        "name": "company-managed-original-scope",
+        "width": 1280,
+        "localScrollers": 0
+      },
+      {
+        "name": "company-managed-original-scope",
+        "width": 1440,
+        "localScrollers": 0
+      },
+      {
+        "name": "company-managed-evidence",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "company-managed-save-control",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "company-managed-no-statement",
+        "width": 390,
+        "localScrollers": 3
+      },
+      {
+        "name": "company-managed-no-statement",
+        "width": 768,
+        "localScrollers": 3
+      },
+      {
+        "name": "company-managed-no-statement",
+        "width": 1024,
+        "localScrollers": 3
+      },
+      {
+        "name": "company-managed-no-statement",
+        "width": 1280,
+        "localScrollers": 3
+      },
+      {
+        "name": "company-managed-no-statement",
+        "width": 1440,
+        "localScrollers": 2
+      },
+      {
+        "name": "crew-default-null-not-adopted",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "crew-default-null-not-adopted",
+        "width": 768,
+        "localScrollers": 0
+      },
+      {
+        "name": "crew-default-null-not-adopted",
+        "width": 1024,
+        "localScrollers": 0
+      },
+      {
+        "name": "crew-default-null-not-adopted",
+        "width": 1280,
+        "localScrollers": 0
+      },
+      {
+        "name": "crew-default-null-not-adopted",
+        "width": 1440,
+        "localScrollers": 0
+      },
+      {
+        "name": "fee-config-quantity-return-source",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "fee-config-quantity-return-source",
+        "width": 768,
+        "localScrollers": 0
+      },
+      {
+        "name": "fee-config-quantity-return-source",
+        "width": 1024,
+        "localScrollers": 0
+      },
+      {
+        "name": "fee-config-quantity-return-source",
+        "width": 1280,
+        "localScrollers": 0
+      },
+      {
+        "name": "fee-config-quantity-return-source",
+        "width": 1440,
+        "localScrollers": 0
+      },
+      {
+        "name": "fee-config-quantity-return-preserves-input",
+        "width": 390,
+        "localScrollers": 2
+      },
+      {
+        "name": "fee-config-quantity-return-preserves-input",
+        "width": 768,
+        "localScrollers": 3
+      },
+      {
+        "name": "fee-config-quantity-return-preserves-input",
+        "width": 1024,
+        "localScrollers": 3
+      },
+      {
+        "name": "fee-config-quantity-return-preserves-input",
+        "width": 1280,
+        "localScrollers": 3
+      },
+      {
+        "name": "fee-config-quantity-return-preserves-input",
+        "width": 1440,
+        "localScrollers": 2
+      },
+      {
+        "name": "management-scope-quantity-return-source",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-quantity-return-source",
+        "width": 768,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-quantity-return-source",
+        "width": 1024,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-quantity-return-source",
+        "width": 1280,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-quantity-return-source",
+        "width": 1440,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-preserves-input",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-preserves-input",
+        "width": 768,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-preserves-input",
+        "width": 1024,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-preserves-input",
+        "width": 1280,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-preserves-input",
+        "width": 1440,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-ratio",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-ratio",
+        "width": 768,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-ratio",
+        "width": 1024,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-ratio",
+        "width": 1280,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-ratio",
+        "width": 1440,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-evidence-tail",
+        "width": 390,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-evidence-tail",
+        "width": 768,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-evidence-tail",
+        "width": 1024,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-evidence-tail",
+        "width": 1280,
+        "localScrollers": 0
+      },
+      {
+        "name": "management-scope-return-evidence-tail",
+        "width": 1440,
+        "localScrollers": 0
+      }
+    ]
+  },
+  "negativeDisplay": {
+    "kind": "negative",
+    "screenshotScope": "current-shell-viewport",
+    "measurements": [
+      {
+        "width": 390,
+        "amountLines": [
+          {
+            "text": "¥-20.00",
+            "rects": [
+              {
+                "left": 298.578125,
+                "right": 339.390625,
+                "top": 482.5,
+                "bottom": 499.5
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥-600.00",
+            "rects": [
+              {
+                "left": 401.765625,
+                "right": 449.234375,
+                "top": 482.5,
+                "bottom": 499.5
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "maximum": 529,
+        "keyboardLeft": 34,
+        "reasonMaximum": 18,
+        "keyboardTop": 17,
+        "reasonTail": {
+          "text": "末行须完整显示。",
+          "top": 517.5,
+          "bottom": 534.5,
+          "left": 205.765625,
+          "right": 301.765625,
+          "visible": true,
+          "scrollTop": 0,
+          "maximum": 18
+        },
+        "evidenceTail": {
+          "text": "0，得到520。",
+          "top": 562,
+          "bottom": 579,
+          "left": 15.078125,
+          "right": 89.734375,
+          "visible": true,
+          "scrollTop": 8,
+          "maximum": 18
+        }
+      },
+      {
+        "width": 768,
+        "amountLines": [
+          {
+            "text": "¥-20.00",
+            "rects": [
+              {
+                "left": 298.578125,
+                "right": 339.390625,
+                "top": 482,
+                "bottom": 499
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥-600.00",
+            "rects": [
+              {
+                "left": 401.765625,
+                "right": 449.234375,
+                "top": 482,
+                "bottom": 499
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "maximum": 151,
+        "keyboardLeft": 35,
+        "reasonMaximum": 18,
+        "keyboardTop": 17,
+        "reasonTail": {
+          "text": "末行须完整显示。",
+          "top": 517,
+          "bottom": 534,
+          "left": 583.765625,
+          "right": 679.765625,
+          "visible": true,
+          "scrollTop": 0,
+          "maximum": 18
+        },
+        "evidenceTail": {
+          "text": "0，得到520。",
+          "top": 561.5,
+          "bottom": 578.5,
+          "left": 393.078125,
+          "right": 467.734375,
+          "visible": true,
+          "scrollTop": 8,
+          "maximum": 18
+        }
+      },
+      {
+        "width": 1024,
+        "amountLines": [
+          {
+            "text": "¥-20.00",
+            "rects": [
+              {
+                "left": 508.8125,
+                "right": 549.625,
+                "top": 482.234375,
+                "bottom": 499.234375
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥-600.00",
+            "rects": [
+              {
+                "left": 612,
+                "right": 659.46875,
+                "top": 482.234375,
+                "bottom": 499.234375
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "maximum": 107,
+        "keyboardLeft": 36,
+        "reasonMaximum": 18,
+        "keyboardTop": 15,
+        "reasonTail": {
+          "text": "末行须完整显示。",
+          "top": 517.234375,
+          "bottom": 534.234375,
+          "left": 838,
+          "right": 934,
+          "visible": true,
+          "scrollTop": 0,
+          "maximum": 18
+        },
+        "evidenceTail": {
+          "text": "0，得到520。",
+          "top": 561.734375,
+          "bottom": 578.734375,
+          "left": 647.3125,
+          "right": 721.96875,
+          "visible": true,
+          "scrollTop": 8,
+          "maximum": 18
+        }
+      },
+      {
+        "width": 1280,
+        "amountLines": [
+          {
+            "text": "¥-20.00",
+            "rects": [
+              {
+                "left": 555.53125,
+                "right": 596.34375,
+                "top": 482,
+                "bottom": 499
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥-600.00",
+            "rects": [
+              {
+                "left": 676.125,
+                "right": 723.59375,
+                "top": 482,
+                "bottom": 499
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "maximum": 0,
+        "keyboardLeft": 0,
+        "reasonMaximum": 0,
+        "keyboardTop": 0,
+        "reasonTail": {
+          "text": "末行须完整显示。",
+          "top": 517,
+          "bottom": 534,
+          "left": 898.875,
+          "right": 994.875,
+          "visible": true,
+          "scrollTop": 0,
+          "maximum": 0
+        },
+        "evidenceTail": {
+          "text": "0，得到520。",
+          "top": 552,
+          "bottom": 569,
+          "left": 1116.5625,
+          "right": 1191.21875,
+          "visible": true,
+          "scrollTop": 0,
+          "maximum": 0
+        }
+      },
+      {
+        "width": 1440,
+        "amountLines": [
+          {
+            "text": "¥-20.00",
+            "rects": [
+              {
+                "left": 605.125,
+                "right": 645.9375,
+                "top": 482,
+                "bottom": 499
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥-600.00",
+            "rects": [
+              {
+                "left": 744.921875,
+                "right": 792.390625,
+                "top": 482,
+                "bottom": 499
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "maximum": 0,
+        "keyboardLeft": 0,
+        "reasonMaximum": 0,
+        "keyboardTop": 0,
+        "reasonTail": {
+          "text": "末行须完整显示。",
+          "top": 499.5,
+          "bottom": 534,
+          "left": 919.671875,
+          "right": 1387.671875,
+          "visible": true,
+          "scrollTop": 0,
+          "maximum": 0
+        },
+        "evidenceTail": {
+          "text": "0，得到520。",
+          "top": 552,
+          "bottom": 569,
+          "left": 1137.359375,
+          "right": 1212.015625,
+          "visible": true,
+          "scrollTop": 0,
+          "maximum": 0
+        }
+      }
+    ]
+  },
+  "booksDisplay": {
+    "kind": "same-person-list",
+    "screenshotScope": "current-shell-viewport",
+    "measurements": [
+      {
+        "width": 390,
+        "visibleRows": [
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+            "top": 605.5,
+            "bottom": 653.5,
+            "withinWorkspace": true
+          },
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+            "top": 653.5,
+            "bottom": 701.5,
+            "withinWorkspace": true
+          }
+        ],
+        "amounts": [
+          {
+            "text": "¥1,000.00",
+            "rects": [
+              {
+                "left": 261.8125,
+                "right": 324,
+                "top": 619.5,
+                "bottom": 639.5
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥200.00",
+            "rects": [
+              {
+                "left": 273.484375,
+                "right": 324,
+                "top": 667.5,
+                "bottom": 687.5
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "horizontal": {
+          "left": 884,
+          "maximum": 1183
+        }
+      },
+      {
+        "width": 768,
+        "visibleRows": [
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+            "top": 624,
+            "bottom": 672,
+            "withinWorkspace": true
+          },
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+            "top": 672,
+            "bottom": 720,
+            "withinWorkspace": true
+          }
+        ],
+        "amounts": [
+          {
+            "text": "¥1,000.00",
+            "rects": [
+              {
+                "left": 450.8125,
+                "right": 513,
+                "top": 638,
+                "bottom": 658
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥200.00",
+            "rects": [
+              {
+                "left": 462.484375,
+                "right": 513,
+                "top": 686,
+                "bottom": 706
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "horizontal": {
+          "left": 695,
+          "maximum": 805
+        }
+      },
+      {
+        "width": 1024,
+        "visibleRows": [
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+            "top": 623.734375,
+            "bottom": 671.734375,
+            "withinWorkspace": true
+          },
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+            "top": 671.734375,
+            "bottom": 719.734375,
+            "withinWorkspace": true
+          }
+        ],
+        "amounts": [
+          {
+            "text": "¥1,000.00",
+            "rects": [
+              {
+                "left": 683.046875,
+                "right": 745.234375,
+                "top": 637.734375,
+                "bottom": 657.734375
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥200.00",
+            "rects": [
+              {
+                "left": 694.71875,
+                "right": 745.234375,
+                "top": 685.734375,
+                "bottom": 705.734375
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "horizontal": {
+          "left": 673,
+          "maximum": 761
+        }
+      },
+      {
+        "width": 1280,
+        "visibleRows": [
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+            "top": 523,
+            "bottom": 571,
+            "withinWorkspace": true
+          },
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+            "top": 571,
+            "bottom": 619,
+            "withinWorkspace": true
+          }
+        ],
+        "amounts": [
+          {
+            "text": "¥1,000.00",
+            "rects": [
+              {
+                "left": 848.8125,
+                "right": 911,
+                "top": 537,
+                "bottom": 557
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥200.00",
+            "rects": [
+              {
+                "left": 860.484375,
+                "right": 911,
+                "top": 585,
+                "bottom": 605
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "horizontal": {
+          "left": 509,
+          "maximum": 509
+        }
+      },
+      {
+        "width": 1440,
+        "visibleRows": [
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A普通施工簿已发放¥14,400.00¥1,000.00发放记录完整当前记录",
+            "top": 479,
+            "bottom": 527,
+            "withinWorkspace": true
+          },
+          {
+            "text": "P5 独立管理工程 80442eff-cff5-4cee-b702-44e4e15c7411同人普通工资与管理人费用核对班组A独立管理费簿已发放¥1,200.00¥200.00发放记录完整当前记录",
+            "top": 527,
+            "bottom": 575,
+            "withinWorkspace": true
+          }
+        ],
+        "amounts": [
+          {
+            "text": "¥1,000.00",
+            "rects": [
+              {
+                "left": 1008.8125,
+                "right": 1071,
+                "top": 493,
+                "bottom": 513
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          },
+          {
+            "text": "¥200.00",
+            "rects": [
+              {
+                "left": 1020.484375,
+                "right": 1071,
+                "top": 541,
+                "bottom": 561
+              }
+            ],
+            "lineCount": 1,
+            "insideCell": true
+          }
+        ],
+        "horizontal": {
+          "left": 349,
+          "maximum": 349
+        }
+      }
+    ]
+  },
+  "errors": [
+    "POST /api/commands/payroll-a-fees: net::ERR_FAILED",
+    "GET /api/read/payroll/wage_mu1hcnzu_f: net::ERR_ABORTED",
+    "POST /api/read/payroll/a-form: net::ERR_ABORTED",
+    "GET /api/read/payroll/wage_mu1hcw9i_2r: net::ERR_ABORTED"
+  ],
+  "widths": [
+    390,
+    768,
+    1024,
+    1280,
+    1440
+  ]
+}

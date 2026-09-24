@@ -1,0 +1,15 @@
+
+> crm-new@ typecheck D:\crm本地项目开发
+> nuxt typecheck
+
+app/lib/payroll/central-source-locks.ts(36,70): error TS18047: 'm' is possibly 'null'.
+app/lib/payroll/central-source-locks.ts(36,72): error TS2339: Property 'workerId' does not exist on type 'string | number | boolean | PayrollJson[] | { [key: string]: PayrollJson; }'.
+  Property 'workerId' does not exist on type 'string'.
+app/lib/tabs/restore-target.ts(141,176): error TS2345: Argument of type '{ origin: "real" | "demo"; kind: string; id: string; projectId?: undefined; } | { origin: "real" | "demo"; kind: "attendance"; id: string; projectId: string; }' is not assignable to parameter of type '{ kind: "crew" | "worker" | "attendance"; id: string; origin: "real" | "demo"; projectId?: string | undefined; }'.
+  Type '{ origin: "real" | "demo"; kind: string; id: string; projectId?: undefined; }' is not assignable to type '{ kind: "crew" | "worker" | "attendance"; id: string; origin: "real" | "demo"; projectId?: string | undefined; }'.
+    Types of property 'kind' are incompatible.
+      Type 'string' is not assignable to type '"crew" | "worker" | "attendance"'.
+app/lib/payroll/central-source-locks.ts(36,70): error TS18047: 'm' is possibly 'null'.
+app/lib/payroll/central-source-locks.ts(36,72): error TS2339: Property 'workerId' does not exist on type 'string | number | boolean | PayrollJson[] | { [key: string]: PayrollJson; }'.
+  Property 'workerId' does not exist on type 'string'.
+ ELIFECYCLE  Command failed with exit code 2.

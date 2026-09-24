@@ -152,11 +152,11 @@ const paymentRecordColumns: KitTableColumn[] = [
 const deliveryColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
   { field: 'orderNo', title: '送货单号', minWidth: 180, slot: 'link' },
-  { field: 'deliveryDate', title: '到货日期', type: 'date' },
+  { field: 'deliveryDate', title: '送货日期', type: 'date' },
   { field: 'supplier', title: '分供方', minWidth: 180, filterable: true },
   { field: 'lineCount', title: '有效材料行', width: 110, align: 'right' },
-  { field: 'totalQty', title: '到货数量', width: 120, align: 'right' },
-  { field: 'totalAmount', title: '到货金额', type: 'money', width: 145 },
+  { field: 'totalQty', title: '送货数量', width: 120, align: 'right' },
+  { field: 'totalAmount', title: '归档金额', type: 'money', width: 145 },
   { field: 'fileName', title: '归档原件', minWidth: 210 },
   { field: 'sourceStatus', title: '原件状态', width: 110, filterable: true },
   { field: 'ocrStatus', title: '识别状态', width: 110, filterable: true },
@@ -351,16 +351,16 @@ const acceptanceColumns: KitTableColumn[] = [
 
   <ProjectSubTableSection
     v-else-if="tab === 'material'"
-    title="项目到货归档"
+    title="项目送货归档"
     :columns="deliveryColumns"
     :rows="deliveries"
     :loading="detailStore.loading"
-    :summary-fields="[{ field: 'totalAmount', label: '到货金额合计' }]"
+    :summary-fields="[{ field: 'totalAmount', label: '归档金额合计' }]"
     empty="当前项目尚无已归档送货单"
   >
     <template #link="{ row }">
       <NuxtLink :to="row.sourcePath" class="cell--link">
-        {{ row.orderNo || '查看到货归档' }}
+        {{ row.orderNo || '查看送货归档' }}
       </NuxtLink>
     </template>
   </ProjectSubTableSection>

@@ -25,3 +25,5 @@
 `ui`、`documentation`、`infra`、`feat` 等是主题标签，可按需附加，但不能替代 `bug` / `enhancement` 类别角色。`P1` / `P2` / `P3` 是优先级，也不参与类别或状态计数。
 
 `question` 只表示普通提问，不参与 triage 状态机。
+
+`superseded` 表示旧工单已由正文指向的新任务承接；这类票以 `not_planned` 关闭并使用 `wontfix` 状态表示停止旧安排，不表示承接的功能取消或完成。历史决定与全部未满足验收义务仍须读取，具体替换规则见 [`issue-tracker.md`](./issue-tracker.md)。

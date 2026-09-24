@@ -9,6 +9,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { StatusTone } from '~/lib/project/status'
 import type { Contract } from '~/stores/contract'
+import KitEnumFilterOptions from '~/components/ui/KitEnumFilterOptions.vue'
 import { formPath } from '~/lib/contract/page'
 import { CONTRACT_STATUS_TONE, CONTRACT_STATUSES, CONTRACT_SUB_KINDS, contractBalance, kindLabels, sumField } from '~/lib/contract/status'
 import { clampPage, paginate } from '~/lib/kit/table'
@@ -30,10 +31,10 @@ const kindRows = computed(() => store.byKind(kind))
 
 // ── 筛选状态：搜索 / 项目 / 业务态视图（默认履约中）/ 分包左分类 ──
 const searchText = shallowRef('')
-const projFilter = shallowRef('all') // reka Select 不接受空串值，'all' 哨兵
-const partyFilter = shallowRef('all')
-const view = shallowRef('履约中') // 默认业务态视图 = 履约中（设计稿 defaultView: 'active'）
-const subCat = shallowRef('all') // 分包左分类：all | 劳务 | 专业
+const projFilter = shallowRef<string[]>([])
+const partyFilter = shallowRef<string[]>([])
+const view = shallowRef<string[]>(['履约中']) // 保留既有默认业务视图，真实选中条件在筛选器中明确显示。
+const subCat = shallowRef<string[]>([])
 
 const projOptions = computed(() => [
   { key: 'all', label: '全部项目' },
@@ -60,10 +61,10 @@ const searched = computed(() => {
   const q = searchText.value.trim().toLowerCase()
   const proj = projFilter.value
   return kindRows.value.filter((c) => {
-    if (proj !== 'all' && c.projectId !== proj)
+    if (proj.length && !proj.includes(c.projectId))
       return false
     const partyId = kind === '施工' ? c.customerId : c.supplierId
-    if (partyFilter.value !== 'all' && partyId !== partyFilter.value)
+    if (partyFilter.value.length && (!partyId || !partyFilter.value.includes(partyId)))
       return false
     if (!q)
       return true
@@ -72,8 +73,8 @@ const searched = computed(() => {
 })
 
 const catRows = computed(() =>
-  kind === '分包' && subCat.value !== 'all'
-    ? searched.value.filter(c => c.subKind === subCat.value)
+  kind === '分包' && subCat.value.length
+    ? searched.value.filter(c => subCat.value.includes(c.subKind ?? ''))
     : searched.value,
 )
 
@@ -93,13 +94,13 @@ const viewOptions = computed(() =>
 )
 
 const filtered = computed(() =>
-  view.value === 'all' ? catRows.value : catRows.value.filter(c => c.status === view.value),
+  view.value.length === 0 ? catRows.value : catRows.value.filter(c => view.value.includes(c.status)),
 )
 
 // 分包左分类（计数口径：项目/搜索/视图已生效、分类本身除外）
 const catItems = computed<TreeNode[]>(() => {
   const inView = (rows: Contract[]) =>
-    view.value === 'all' ? rows : rows.filter(c => c.status === view.value)
+    view.value.length === 0 ? rows : rows.filter(c => view.value.includes(c.status))
   const base = inView(searched.value)
   if (kind === '材采') {
     return [
@@ -207,10 +208,10 @@ function openCreate() {
 
 async function refresh() {
   searchText.value = ''
-  projFilter.value = 'all'
-  partyFilter.value = 'all'
-  view.value = '履约中'
-  subCat.value = 'all'
+  projFilter.value = []
+  partyFilter.value = []
+  view.value = ['履约中']
+  subCat.value = []
   await store.load()
 }
 function openEdit(row: Contract) {
@@ -307,11 +308,10 @@ onMounted(() => {
     <div :class="kind !== '施工' ? 'grid min-w-0 gap-3 sm:grid-cols-[13rem_minmax(0,1fr)] sm:items-start' : ''">
       <!-- 分包按劳务/专业分类；材采保留参考页的单层合同分类。 -->
       <div v-if="kind !== '施工'" class="min-w-0 sm:w-52">
-        <TreeNav
-          v-model="subCat"
-          :title="kind === '材采' ? '材料采购合同分类' : '分包合同分类'"
-          :items="catItems"
-        />
+        <div class="panel p-3">
+          <span class="mb-2 block text-12px font-600">{{ kind === '材采' ? '材料采购合同' : '分包合同分类' }}</span>
+          <KitEnumFilterOptions v-if="kind === '分包'" v-model="subCat" label="分包类别" :options="catItems.filter(item => item.key !== 'all').map(item => ({ key: item.key, label: item.label }))" />
+        </div>
       </div>
 
       <div class="min-w-0 flex-1">

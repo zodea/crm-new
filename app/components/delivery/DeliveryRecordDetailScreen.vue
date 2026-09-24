@@ -1,18 +1,28 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, shallowRef, watch } from 'vue'
 import { yuan } from '~/lib/util/money'
 
 const route = useRoute()
 const store = useDeliveryRecordStore()
-const projectStore = useProjectStore()
-const supplierStore = useSupplierStore()
+const projectStore = store.mode === 'central' ? null : useProjectStore()
+const supplierStore = store.mode === 'central' ? null : useSupplierStore()
 const { confirm, undoToast, error } = useKitUI()
 
 const recordId = computed(() => String(route.params.id))
-const record = computed(() => store.byId(recordId.value))
-const project = computed(() => record.value ? projectStore.byId(record.value.projectId) : undefined)
-const supplier = computed(() => record.value?.supplierId ? supplierStore.byId(record.value.supplierId) : undefined)
 const loaded = shallowRef(false)
+const loadError = shallowRef('')
+const deleting = shallowRef(false)
+const requestedOrigin = computed(() => route.query?.origin ?? 'real')
+const record = computed(() => loaded.value && !loadError.value ? store.byId(recordId.value) : undefined)
+const projectName = computed(() => store.mode === 'central' ? record.value?.projectName : record.value && projectStore?.byId(record.value.projectId)?.name)
+const supplierName = computed(() => store.mode === 'central' ? record.value?.supplierName : record.value?.supplierId && supplierStore?.byId(record.value.supplierId)?.name)
+const canWrite = computed(() => !!record.value && (store.mode !== 'central' || store.canWrite))
+let active = true
+let request = 0
+function path(value: string) {
+  return store.mode === 'central' ? `${value}?origin=${store.origin}` : value
+}
 
 useTabTitle(() => record.value?.orderNo ? `送货单 ${record.value.orderNo}` : record.value ? '未编号送货单' : undefined)
 
@@ -28,42 +38,87 @@ const columns: KitTableColumn[] = [
 ]
 
 async function handleDelete() {
-  if (!record.value)
+  const current = record.value
+  if (!current || !canWrite.value || deleting.value)
     return
-  const label = record.value.orderNo || record.value.id
-  const ok = await confirm({
-    variant: 'simple',
-    title: '删除送货单',
-    message: `确认删除送货单「${label}」？材料明细会随送货单一同隐藏，10 秒内可撤回。`,
-    confirmLabel: '删除',
-  })
-  if (!ok)
-    return
-  const logId = await store.remove(record.value.id)
-  if (!logId) {
-    error('删除失败：送货单不存在或已删除')
-    return
+  const generation = request
+  const label = current.orderNo || current.id
+  deleting.value = true
+  try {
+    const ok = await confirm({
+      variant: 'simple',
+      title: '删除送货单',
+      message: `确认删除送货单「${label}」？材料明细会随送货单一同隐藏，10 秒内可撤回。`,
+      confirmLabel: '删除',
+    })
+    if (!ok || !active || generation !== request || !canWrite.value)
+      return
+    const logId = await store.remove(current.id)
+    if (!active || generation !== request)
+      return
+    if (!logId) {
+      error('删除失败：送货单不存在或已删除')
+      return
+    }
+    undoToast(`已删除送货单「${label}」`, () => store.undo(logId))
+    await navigateTo(path('/material/delivery/archive'))
   }
-  undoToast(`已删除送货单「${label}」`, () => store.undo(logId))
-  await navigateTo('/material/delivery/archive')
+  catch (cause) {
+    if (active && generation === request)
+      error(cause instanceof Error ? cause.message : '删除送货单失败')
+  }
+  finally {
+    deleting.value = false
+  }
 }
 
 async function refresh() {
+  const generation = ++request
+  loaded.value = false
+  loadError.value = ''
   try {
-    await Promise.all([store.load(), projectStore.load(), supplierStore.load()])
+    if (store.mode === 'central' && requestedOrigin.value !== store.origin)
+      throw new Error('链接来源与当前数据模式不同，请切换到对应来源后重新读取')
+    await Promise.all([store.load(), projectStore?.load(), supplierStore?.load()])
+    if (!active || generation !== request)
+      return
+    const current = store.byId(recordId.value)
+    if (store.mode === 'central' && current && current.dataOrigin !== requestedOrigin.value)
+      throw new Error('当前记录来源不匹配，请重新读取')
+  }
+  catch (cause) {
+    if (active && generation === request)
+      loadError.value = cause instanceof Error ? cause.message : '送货记录读取失败'
   }
   finally {
-    loaded.value = true
+    if (active && generation === request)
+      loaded.value = true
   }
 }
 
-onMounted(refresh)
+function suspend() {
+  active = false
+  request++
+  loaded.value = false
+}
+watch([recordId, requestedOrigin, () => store.origin], () => {
+  if (active)
+    void refresh()
+}, { immediate: true })
+onActivated(() => {
+  if (!active) {
+    active = true
+    void refresh()
+  }
+})
+onDeactivated(suspend)
+onBeforeUnmount(suspend)
 </script>
 
 <template>
   <div v-if="record" class="delivery-record-detail flex min-w-0 flex-col gap-4">
     <div class="panel flex flex-wrap items-center gap-3 px-4 py-3">
-      <NuxtLink to="/material/delivery/archive" class="icon-btn" title="返回归档库">
+      <NuxtLink :to="path('/material/delivery/archive')" class="icon-btn" title="返回归档库">
         <span class="i-lucide-arrow-left text-14px" />
       </NuxtLink>
       <div class="min-w-0 flex-1">
@@ -71,16 +126,16 @@ onMounted(refresh)
           {{ record.orderNo || '未编号送货单' }}
         </div>
         <div class="mt-0.5 text-12px text-ink-faint">
-          {{ project?.name ?? record.projectId }} · {{ supplier?.name ?? '未区分分供方' }}
+          {{ projectName || '项目名称待核验' }} · {{ supplierName || '分供方待核验' }}
         </div>
       </div>
-      <div class="ml-auto flex flex-wrap items-center gap-2">
-        <NuxtLink :to="`/material/delivery/archive/form/${record.id}`" class="btn-secondary">
+      <div v-if="canWrite" class="ml-auto flex flex-wrap items-center gap-2">
+        <NuxtLink :to="path(`/material/delivery/archive/form/${encodeURIComponent(record.id)}`)" class="btn-secondary">
           <span class="i-lucide-square-pen mr-1 text-13px" /> 编辑
         </NuxtLink>
-        <button class="btn-danger" @click="handleDelete">
+        <KitButton variant="danger" :loading="deleting" @click="handleDelete">
           <span class="i-lucide-trash-2 mr-1 text-13px" /> 删除
-        </button>
+        </KitButton>
       </div>
     </div>
 
@@ -94,6 +149,7 @@ onMounted(refresh)
     <div class="delivery-record-layout grid min-w-0 items-start gap-4">
       <DeliveryRecordSourcePanel
         :record-id="record.id"
+        :read-only="!canWrite"
         min-height="clamp(22rem, 60dvh, 42.5rem)"
         class="delivery-record-source self-start"
       />
@@ -103,14 +159,14 @@ onMounted(refresh)
           <SectionHeader title="单据信息" subtitle="右侧结构化数据应与左侧原件逐项核对" />
           <div class="delivery-record-info mt-2 grid gap-x-8">
             <div class="detail-row">
-              <span class="detail-label">所属项目</span><NuxtLink :to="`/project/${record.projectId}`" class="cell--link">
-                {{ project?.name ?? record.projectId }}
+              <span class="detail-label">所属项目</span><NuxtLink :to="path(`/project/${encodeURIComponent(record.projectId)}`)" class="cell--link">
+                {{ projectName || '项目名称待核验' }}
               </NuxtLink>
             </div>
             <div class="detail-row">
-              <span class="detail-label">分供方</span><NuxtLink v-if="record.supplierId" :to="`/base/supplier/${record.supplierId}`" class="cell--link">
-                {{ supplier?.name ?? record.supplierId }}
-              </NuxtLink><span v-else class="text-warn-ink">未区分分供方</span>
+              <span class="detail-label">分供方</span><NuxtLink v-if="record.supplierId" :to="path(`/base/supplier/${encodeURIComponent(record.supplierId)}`)" class="cell--link">
+                {{ supplierName || '分供方名称待核验' }}
+              </NuxtLink><span v-else class="text-warn-ink">分供方待核验</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">送货单号</span><span class="font-mono">{{ record.orderNo || '—' }}</span>
@@ -130,8 +186,15 @@ onMounted(refresh)
         </div>
       </div>
     </div>
+    <DeliveryRecordHistory v-if="store.mode === 'central'" :record-id="record.id" :current-version="record.version" />
   </div>
 
+  <div v-else-if="loadError" role="alert" class="panel p-6 text-13px text-danger">
+    <p>{{ loadError }}</p>
+    <KitButton class="mt-3" @click="refresh">
+      重新读取
+    </KitButton>
+  </div>
   <div v-else-if="store.loading || !loaded" class="py-12 text-center text-ink-faint">
     加载中...
   </div>

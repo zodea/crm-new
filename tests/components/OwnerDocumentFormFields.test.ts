@@ -85,6 +85,17 @@ function mountFields(kind: Parameters<typeof ownerDocumentDefaults>[0], readonly
 }
 
 describe('ownerDocumentFormFields data flow', () => {
+  it('中央报量显式选择三量基准，提交后的表单不能再改基准', async () => {
+    const wrapper = mountFields('owner_report')
+    await wrapper.setProps({ quantityBasisEditable: true })
+    const selector = wrapper.getComponent('[data-testid="owner-document-quantityBasis"]')
+    expect(selector.props('modelValue')).toBe('field')
+    selector.vm.$emit('update:modelValue', 'contract')
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ quantityBasis: 'contract' })
+    await wrapper.setProps({ readonly: true })
+    expect(selector.props('disabled')).toBe(true)
+  })
+
   it('keeps the document type independent from BOQ line operation and emits numeric amounts', async () => {
     const wrapper = mountFields('owner_change')
 
@@ -159,5 +170,14 @@ describe('ownerDocumentFormFields data flow', () => {
 
     expect(wrapper.get('[role="status"]').text()).toContain('当前项目暂无可选的分包合同')
     expect(wrapper.get('a').attributes('href')).toBe('/contract/subcontract')
+  })
+
+  it('草稿仅允许编辑基本信息，未来验收和保修事实保持禁用', () => {
+    const wrapper = mountFields('acceptance')
+
+    expect(wrapper.get('[data-testid="owner-document-name"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="owner-document-acceptanceOrganization"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="owner-document-warrantyOwner"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="owner-document-warrantyConfirmationOrganization"]').attributes('disabled')).toBeDefined()
   })
 })

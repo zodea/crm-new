@@ -1,54 +1,107 @@
 <script setup lang="ts">
 import type { CustomerRelationTab } from './CustomerDetailRelations.vue'
-import { computed, shallowRef, watch } from 'vue'
-import { toErrorMessage } from '~/lib/util/error'
+import type { DataOriginDTO } from '~/types/read-model'
+import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
+import { useCustomerRelationReturnContext } from '~/composables/useCustomerRelationReturnContext'
+import {
+  createCustomerDetailReturnTo,
+  isCustomerReturnContextId,
+  loadCustomerReturnOrigin,
+  resolveCustomerRelationReturnOrigin,
+  resolveCustomerReturnContext,
+  validateCustomerReturnTo,
+} from '~/lib/customer/return-context'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { yuan } from '~/lib/util/money'
+import { useCustomerReadStore } from '~/stores/customer-read'
 
 const props = defineProps<{
   customerId: string
+  origin: DataOriginDTO
+  includeDemo: boolean
+  returnTo?: string
+  returnContext?: string
 }>()
-
 const route = useRoute()
 const router = useRouter()
-const store = useCustomerDetailStore()
-const detail = computed(() => store.byCustomer(props.customerId))
+const store = useCustomerReadStore()
+const relationTabs = new Set<CustomerRelationTab>(['projects', 'contracts', 'receipts'])
+const activeTab = shallowRef<CustomerRelationTab>(validTab(route.query.tab))
+const restoreRelationContext = useCustomerRelationReturnContext({ customerId: () => props.customerId, origin: () => props.origin })
+const relationReturnContext = computed(() => resolveCustomerRelationReturnOrigin(route.fullPath, { origin: props.origin }))
+let loadGeneration = 0
+
+const detail = computed(() => {
+  const state = store.detailState
+  const data = state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty'
+    ? state.data
+    : state.kind === 'loading' || state.kind === 'error' ? state.previous : null
+  return data?.customer.id === props.customerId && data.dataOrigin === props.origin ? data : null
+})
 const customer = computed(() => detail.value?.customer ?? null)
-const relationTabKeys = new Set<CustomerRelationTab>(['projects', 'contracts', 'receipts'])
-const activeTab = shallowRef<CustomerRelationTab>(validRelationTab(route.query.tab))
-const settledId = shallowRef('')
-const loadingId = shallowRef('')
-const loadError = shallowRef('')
-let latestRequest = 0
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin))
+const backTo = computed(() => ownerDocumentReturnTo.value ?? resolveCustomerReturnContext({
+  returnTo: props.returnTo,
+  contextId: props.returnContext,
+  now: Date.now(),
+  load: loadCustomerReturnOrigin,
+}).to)
+const backLabel = computed(() => ownerDocumentReturnTo.value ? '返回来源详情' : '返回客户列表')
+const relationshipReturnTo = computed(() => {
+  const listReturnTo = validateCustomerReturnTo(props.returnTo)
+  const hasListContext = listReturnTo && isCustomerReturnContextId(props.returnContext)
+  return createCustomerDetailReturnTo({
+    customerId: props.customerId,
+    origin: props.origin,
+    tab: activeTab.value,
+    returnTo: hasListContext ? listReturnTo : undefined,
+    returnContext: hasListContext ? props.returnContext : undefined,
+  })
+})
+const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
+  const kind = store.detailState.kind
+  if (detail.value)
+    return 'ready'
+  if (kind === 'ready' || kind === 'partial' || kind === 'empty')
+    return 'ready'
+  if (kind === 'idle' || kind === 'loading')
+    return 'loading'
+  if (kind === 'forbidden')
+    return 'forbidden'
+  if (kind === 'not-found')
+    return 'not-found'
+  return 'error'
+})
+const problem = computed(() => 'problem' in store.detailState ? store.detailState.problem : null)
+const deleted = shallowRef<boolean | null>(null)
+const hasLifecycle = computed(() => detail.value?.capabilities.includes('customer:lifecycle:write') === true)
+const canEdit = computed(() => detail.value?.dataOrigin === 'real'
+  && detail.value.capabilities.includes('customer:write') && (!hasLifecycle.value || deleted.value === false))
+const editTo = computed(() => {
+  const query = new URLSearchParams({ origin: 'real' })
+  if (props.returnTo && props.returnContext) {
+    query.set('returnTo', props.returnTo)
+    query.set('returnContext', props.returnContext)
+  }
+  return `/base/customer/form/${encodeURIComponent(props.customerId)}?${query.toString()}`
+})
+const tabs = computed(() => [
+  { key: 'projects', label: '名下项目', count: detail.value?.projectsProblem ? undefined : detail.value?.projects.length ?? 0 },
+  { key: 'contracts', label: '施工合同', count: detail.value?.contractsProblem ? undefined : detail.value?.contracts.length ?? 0 },
+  { key: 'receipts', label: '收款明细', count: detail.value?.receiptsProblem ? undefined : detail.value?.receipts.length ?? 0 },
+])
 
 useTabTitle(() => customer.value?.name)
 
-const statusLabel = computed(() => {
-  if (!customer.value?.status)
-    return '未登记'
-  return customer.value.status === 'active' ? '有效' : customer.value.status === 'draft' ? '草稿' : customer.value.status
-})
-const shellState = computed<'ready' | 'loading' | 'error' | 'not-found'>(() => {
-  if (detail.value)
-    return 'ready'
-  if (loadingId.value === props.customerId || settledId.value !== props.customerId)
-    return 'loading'
-  return loadError.value ? 'error' : 'not-found'
-})
-const relationTabs = computed(() => [
-  { key: 'projects', label: '名下项目', count: detail.value?.projects.length ?? 0 },
-  { key: 'contracts', label: '施工合同', count: detail.value?.contracts.length ?? 0 },
-  { key: 'receipts', label: '收款明细', count: detail.value?.receipts.length ?? 0 },
-])
-
-function validRelationTab(value: unknown): CustomerRelationTab {
+function validTab(value: unknown): CustomerRelationTab {
   const candidate = Array.isArray(value) ? value[0] : value
-  return typeof candidate === 'string' && relationTabKeys.has(candidate as CustomerRelationTab)
+  return typeof candidate === 'string' && relationTabs.has(candidate as CustomerRelationTab)
     ? candidate as CustomerRelationTab
     : 'projects'
 }
 
-function selectRelationTab(value: string | undefined) {
-  const next = validRelationTab(value)
+function selectTab(value: string | undefined) {
+  const next = validTab(value)
   activeTab.value = next
   const query = { ...route.query }
   if (next === 'projects')
@@ -58,110 +111,97 @@ function selectRelationTab(value: string | undefined) {
   void router.replace({ query })
 }
 
-async function loadCustomer() {
-  const id = props.customerId
-  const request = ++latestRequest
-  loadError.value = ''
-  loadingId.value = id
-  try {
-    await store.load(id)
-  }
-  catch (cause) {
-    if (request === latestRequest)
-      loadError.value = `客户详情加载失败：${toErrorMessage(cause)}`
-  }
-  finally {
-    if (request === latestRequest) {
-      loadingId.value = ''
-      settledId.value = id
-    }
+async function load() {
+  const generation = ++loadGeneration
+  await store.loadDetail({ id: props.customerId, origin: props.origin, includeDemo: props.includeDemo })
+  if (generation === loadGeneration && store.detailState.kind === 'ready') {
+    await nextTick()
+    if (!await restoreRelationContext())
+      document.querySelector<HTMLElement>('[data-entity-detail-title]')?.focus({ preventScroll: true })
   }
 }
 
-watch(
-  () => route.query.tab,
-  value => activeTab.value = validRelationTab(value),
-)
-watch(
-  () => props.customerId,
-  () => void loadCustomer(),
-  { immediate: true },
-)
+watch(() => [props.customerId, props.origin, props.includeDemo], () => void load(), { immediate: true })
+watch(() => route.query.tab, value => activeTab.value = validTab(value))
+onActivated(() => void load())
 </script>
 
 <template>
   <EntityDetailShell
     :title="customer?.name ?? '客户详情'"
-    :subtitle="customer
-      ? [customer.taxNo, customer.aliases.join('、')].filter(Boolean).join(' · ')
-      : ''"
-    back-to="/base/customer"
-    back-label="返回客户列表"
+    :subtitle="customer ? [customer.taxNo, customer.aliases.join('、')].filter(Boolean).join(' · ') : ''"
+    :back-to="backTo"
+    :back-label="backLabel"
     :state="shellState"
-    :state-title="shellState === 'not-found' ? '客户不存在或已删除' : shellState === 'loading' ? '正在加载客户详情' : '客户详情加载失败'"
-    :state-description="shellState === 'not-found' ? '该客户可能已被删除，可返回客户列表查看。' : loadError"
-    :state-action-label="shellState === 'error' ? '重新加载' : ''"
-    @state-action="loadCustomer"
+    :state-title="shellState === 'not-found' ? '客户不存在或已删除' : shellState === 'forbidden' ? '无权查看该客户' : shellState === 'loading' ? '正在加载客户详情' : '客户详情加载失败'"
+    :state-description="problem?.message ?? ''"
+    :state-action-label="problem?.retryable ? '重新加载' : ''"
+    @state-action="load"
   >
     <template #mark>
-      <div
-        v-if="customer"
-        class="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-soft text-18px font-800 text-brand"
-      >
+      <div v-if="customer" class="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-soft text-18px font-800 text-brand">
         {{ customer.name.slice(0, 1) }}
       </div>
     </template>
-
     <template #status>
       <span v-if="customer" :class="customer.status === 'active' ? 'chip chip-ok' : 'chip chip-warn'">
-        {{ statusLabel }}
+        {{ customer.status === 'active' ? '有效' : customer.status === 'draft' ? '草稿' : customer.status || '未登记' }}
       </span>
+      <span v-if="detail" class="chip">{{ detail.dataOrigin === 'demo' ? '测试数据' : '正式数据' }}</span>
     </template>
-
     <template #actions>
-      <NuxtLink
-        v-if="customer"
-        :to="`/base/customer/form/${customer.id}`"
-        class="btn-primary"
-        aria-label="编辑客户"
-      >
-        <span class="i-lucide-square-pen mr-1" aria-hidden="true" />
-        编辑
+      <NuxtLink v-if="canEdit" :to="editTo" class="btn-primary" aria-label="编辑客户">
+        <span class="i-lucide-square-pen mr-1" aria-hidden="true" />编辑
       </NuxtLink>
+      <span v-else-if="detail?.dataOrigin === 'demo'" class="text-11px text-ink-faint">测试客户只读</span>
     </template>
-
     <template #summary>
       <MetricGrid v-if="detail" :cols="5" data-testid="customer-summary">
-        <Metric label="名下项目" :value="`${detail.summary.projectCount} 个`" />
-        <Metric label="施工合同" :value="`${detail.summary.contractCount} 份`" />
-        <Metric label="有效合同额" :value="yuan(detail.summary.effectiveContractAmount)" />
-        <Metric label="有效收款" :value="yuan(detail.summary.effectiveReceiptAmount)" />
-        <Metric label="待收差额" :value="yuan(detail.summary.outstandingAmount)" />
+        <Metric label="名下项目" :value="detail.summary.projectCount === null ? '—' : `${detail.summary.projectCount} 个`" />
+        <Metric label="施工合同" :value="detail.summary.contractCount === null ? '—' : `${detail.summary.contractCount} 份`" />
+        <Metric label="有效合同额" :value="detail.summary.effectiveContractAmount === null ? '—' : yuan(detail.summary.effectiveContractAmount)" />
+        <Metric label="有效收款" :value="detail.summary.effectiveReceiptAmount === null ? '—' : yuan(detail.summary.effectiveReceiptAmount)" />
+        <Metric label="待收差额" :value="detail.summary.outstandingAmount === null ? '—' : yuan(detail.summary.outstandingAmount)" />
       </MetricGrid>
     </template>
-
     <div v-if="customer && detail" class="flex min-w-0 flex-col gap-4">
+      <CustomerStorageActions v-if="hasLifecycle" :customer-id="customerId" @state="deleted = $event" @changed="load" />
+      <StatePanel
+        v-if="store.detailState.kind === 'error'"
+        kind="error"
+        title="刷新客户详情失败"
+        :description="store.detailState.problem.message"
+        :action-label="store.detailState.problem.retryable ? '重新加载' : ''"
+        compact
+        @action="load"
+      />
       <CustomerDetailOverview :customer="customer" />
-
-      <section class="panel min-w-0 overflow-hidden" aria-labelledby="customer-relations-heading">
+      <section class="panel min-w-0 overflow-hidden" aria-labelledby="customer-relations-heading" data-customer-relations tabindex="-1">
         <div class="flex min-w-0 flex-wrap items-center gap-2 border-b border-line px-3 py-2">
           <h3 id="customer-relations-heading" class="m-0 mr-auto text-14px font-800 text-ink">
             业务关系
           </h3>
           <nav class="min-w-0 max-w-full overflow-x-auto" aria-label="客户业务关系">
-            <SegTab
-              :model-value="activeTab"
-              :tabs="relationTabs"
-              @update:model-value="selectRelationTab"
-            />
+            <SegTab :model-value="activeTab" :tabs="tabs" @update:model-value="selectTab" />
           </nav>
         </div>
         <div class="min-w-0 p-3">
           <CustomerDetailRelations
             :tab="activeTab"
             :projects="detail.projects"
+            :projects-problem="detail.projectsProblem"
+            :contracts-problem="detail.contractsProblem"
+            :receipts-problem="detail.receiptsProblem"
+            :restore-scroll-left="relationReturnContext?.scrollLeft"
             :contracts="detail.contracts"
             :receipts="detail.receipts"
+            :relationship-return-to="relationshipReturnTo"
+            :return-to="returnTo"
+            :return-context="returnContext"
+            @retry-projects="load"
+            @retry-contracts="load"
+            @retry-receipts="load"
+            @view-restored="restoreRelationContext"
           />
         </div>
       </section>

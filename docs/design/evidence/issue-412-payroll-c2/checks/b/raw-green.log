@@ -1,0 +1,51 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/daywork-facts.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/daywork-facts.test.ts (2 tests | 1 failed) 1151ms
+   × 坏原值不转成可用数值，未知原列/零/NULL保留；空月拒绝，坏日期不因月筛选消失 560ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/daywork-facts.test.ts > 坏原值不转成可用数值，未知原列/零/NULL保留；空月拒绝，坏日期不因月筛选消失
+AssertionError: expected ProjectRepositoryProblem: 签工项目与月份无效 { problem: { …(5) } } to match object { code: 'validation-failed' }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
++ ProjectRepositoryProblem {
++   "message": "签工项目与月份无效",
++   "problem": {
+      "code": "validation-failed",
++     "fieldErrors": {},
++     "message": "签工项目与月份无效",
++     "retryable": false,
++     "traceId": null,
++   },
++   "name": "ProjectRepositoryProblem",
+  }
+
+ ❯ tests/payroll/daywork-facts.test.ts:50:70
+     48|     expect(facts.diagnostics).toContainEqual(expect.objectContaining({…
+     49|     expect((await loadPayrollDayworkRecord(db, dayworkIds[0]!)).record…
+     50|     await expect(loadPayrollDayworkFacts(db, { ...query, month: '' }))…
+       |                                                                      ^
+     51|     await db.execute('UPDATE payroll_subject_configs SET unit_rate=0,r…
+     52|     const config = await loadPayrollC2ConfigFacts(db, { projectId: que…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  13:35:57
+   Duration  2.07s (transform 505ms, setup 0ms, import 703ms, tests 1.15s, environment 0ms)
+

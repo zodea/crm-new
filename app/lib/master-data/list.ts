@@ -5,6 +5,7 @@ import type {
 } from '~/stores/master-data-read'
 
 export type MasterDataListSort = 'updated-desc' | 'name-asc' | 'name-desc'
+export type MasterDataFilterValue = string | string[]
 export type MasterDataRegistryKind = Exclude<MasterDataListKind, 'target_cost'>
 export type MasterDataListFilterField
   = | 'crewName'
@@ -29,7 +30,7 @@ export interface MasterDataListProfile {
 export interface MasterDataListFilters {
   search: string
   sort: MasterDataListSort
-  values: Partial<Record<MasterDataListFilterField, string>>
+  values: Partial<Record<MasterDataListFilterField, MasterDataFilterValue>>
 }
 
 export interface MasterDataFilterOption {
@@ -116,8 +117,12 @@ export const MASTER_DATA_LIST_PROFILES: Record<MasterDataRegistryKind, MasterDat
 
 export function initialMasterDataFilterValues(
   profile: MasterDataListProfile,
-): Partial<Record<MasterDataListFilterField, string>> {
-  return Object.fromEntries(profile.filters.map(filter => [filter.field, 'all']))
+): Partial<Record<MasterDataListFilterField, MasterDataFilterValue>> {
+  return Object.fromEntries(profile.filters.map(filter => [filter.field, []]))
+}
+
+export function masterDataSelectedValues(value: MasterDataFilterValue | undefined): string[] {
+  return [...new Set((Array.isArray(value) ? value : [value]).filter((item): item is string => Boolean(item) && item !== 'all'))]
 }
 
 function comparable(value: unknown): string {
@@ -162,12 +167,12 @@ export function filterAndSortMasterDataRows(
       return false
     }
     for (const definition of profile.filters) {
-      const selected = filters.values[definition.field] ?? 'all'
-      if (selected === 'all')
+      const selected = masterDataSelectedValues(filters.values[definition.field])
+      if (!selected.length)
         continue
       const raw = row[definition.field]
       const values = Array.isArray(raw) ? raw.map(item => comparable(item)) : [comparable(raw)]
-      if (!values.includes(selected))
+      if (!selected.some(value => values.includes(value)))
         return false
     }
     return true

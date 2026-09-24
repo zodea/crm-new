@@ -1,0 +1,44 @@
+
+Running 1 test using 1 worker
+
+(node:25632) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [chromium] › e2e\payroll-adjustments-central.spec.ts:25:1 › 原工资独立更正、真退40、后月处理60与跨页同源冷读 (1.3m)
+
+
+  1) [chromium] › e2e\payroll-adjustments-central.spec.ts:25:1 › 原工资独立更正、真退40、后月处理60与跨页同源冷读 ────────
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByRole('region', { name: '工资实际收付', exact: true })
+    Expected substring: "1,900.00"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByRole('region', { name: '工资实际收付', exact: true })
+
+
+      193 |   await actualLink.click()
+      194 |   await page.reload()
+    > 195 |   await expect(page.getByRole('region', { name: '工资实际收付', exact: true })).toContainText('1,900.00')
+          |                                                                           ^
+      196 |   await page.getByRole('link', { name: '返回预算版本 · P4 工资同源预算', exact: true }).click()
+      197 |   await expect(page).toHaveURL(url => url.pathname + url.search === returnPath)
+      198 | }
+        at verifyBudgetReturn (D:\crm本地项目开发\e2e\payroll-adjustments-central.spec.ts:195:75)
+        at D:\crm本地项目开发\e2e\payroll-adjustments-central.spec.ts:121:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    .tmp\remaining-issues-20260910\payroll-p4-central\browser-final-fourth\payroll-adjustments-central-原工资独立更正、真退40、后月处理60与跨页同源冷读-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    .tmp\remaining-issues-20260910\payroll-p4-central\browser-final-fourth\payroll-adjustments-central-原工资独立更正、真退40、后月处理60与跨页同源冷读-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: .tmp\remaining-issues-20260910\payroll-p4-central\browser-final-fourth\payroll-adjustments-central-原工资独立更正、真退40、后月处理60与跨页同源冷读-chromium\error-context.md
+
+  1 failed
+    [chromium] › e2e\payroll-adjustments-central.spec.ts:25:1 › 原工资独立更正、真退40、后月处理60与跨页同源冷读 ─────────

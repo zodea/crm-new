@@ -108,6 +108,7 @@ describe('施工进度页签文案', () => {
 describe('本轮反馈所涉页签标题', () => {
   it.each([
     ['/subcontract/quantity/template', '户型模板'],
+    ['/subcontract/quantity/stages', '施工阶段配置'],
     ['/subcontract/quantity/project_1/unit_1', '户施工详情'],
     ['/contract/boq/import', '清单拆表'],
     ['/contract/subcontract', '分包合同'],

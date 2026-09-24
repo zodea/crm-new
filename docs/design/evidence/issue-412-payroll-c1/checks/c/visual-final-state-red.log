@@ -1,0 +1,72 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run tests/components/PayrollC1ReleasedEvidence.test.ts tests/components/PayrollC1ConfigRecovery.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |component| tests/components/PayrollC1ReleasedEvidence.test.ts (2 tests | 2 failed) 34ms
+   × 旧已发头缺配对证据只说明原记录只读，不宣告完整冻结或显示新建重核要求 28ms
+   × 已发状态本身不承诺冻结完整，真实输出核实可用后才显示配对成功 4ms
+ ❯ |component| tests/components/PayrollC1ConfigRecovery.test.ts (1 test | 1 failed) 102ms
+   × 冷实例重新打开同一配置，真实 store 保原编号及54/空日薪；读回成功才解除 100ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |component| tests/components/PayrollC1ConfigRecovery.test.ts > 冷实例重新打开同一配置，真实 store 保原编号及54/空日薪；读回成功才解除
+AssertionError: expected '项目生效月份班组' to contain '真实项目'
+
+Expected: "真实项目"
+Received: "项目生效月份班组"
+
+ ❯ tests/components/PayrollC1ConfigRecovery.test.ts:59:50
+     57|   const cold = open()
+     58|   await flushPromises()
+     59|   expect(cold.view.get('#section-scope').text()).toContain('真实项目')
+       |                                                  ^
+     60|   expect(cold.view.get('#section-scope').text()).toContain('原班组')
+     61|   expect((cold.view.get('[aria-label="原工人加班价"]').element as HTMLInputE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |component| tests/components/PayrollC1ReleasedEvidence.test.ts > 旧已发头缺配对证据只说明原记录只读，不宣告完整冻结或显示新建重核要求
+AssertionError: expected '核对考勤与实际发放本次工资与考勤已冻结，原全成员整月锁定。 资料已变化，本…' to contain '原记录标为已发放，本页只读；逐日来源或发放证据不完整，不能生成配对输出。'
+
+Expected: "原记录标为已发放，本页只读；逐日来源或发放证据不完整，不能生成配对输出。"
+Received: "核对考勤与实际发放本次工资与考勤已冻结，原全成员整月锁定。 资料已变化，本工资需要重新核对考勤。 请选择负责人冻结工资与考勤表旧 C1 未保留完整逐日来源或发放原文。"
+
+ ❯ tests/components/PayrollC1ReleasedEvidence.test.ts:31:23
+     29|   const view = open()
+     30|   await flushPromises()
+     31|   expect(view.text()).toContain('原记录标为已发放，本页只读；逐日来源或发放证据不完整，不能生成配对输出。')
+       |                       ^
+     32|   expect(view.text()).toContain('旧 C1 未保留完整逐日来源或发放原文。')
+     33|   expect(view.text()).not.toContain('本次工资与考勤已冻结')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |component| tests/components/PayrollC1ReleasedEvidence.test.ts > 已发状态本身不承诺冻结完整，真实输出核实可用后才显示配对成功
+AssertionError: expected '核对考勤与实际发放本次工资与考勤已冻结，原全成员整月锁定。 资料已变化，本…' not to contain '本次工资与考勤已冻结'
+
+Expected: "本次工资与考勤已冻结"
+Received: "核对考勤与实际发放本次工资与考勤已冻结，原全成员整月锁定。 资料已变化，本工资需要重新核对考勤。 请选择负责人"
+
+ ❯ tests/components/PayrollC1ReleasedEvidence.test.ts:44:27
+     42|   const view = open()
+     43|   await flushPromises()
+     44|   expect(view.text()).not.toContain('本次工资与考勤已冻结')
+       |                           ^
+     45|   resolve({ context: c1Form().context, statementId: 'wage', state: 'av…
+     46|   await flushPromises()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  3 failed (3)
+   Start at  12:27:27
+   Duration  3.67s (transform 613ms, setup 953ms, import 1.81s, tests 136ms, environment 2.77s)
+

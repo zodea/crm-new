@@ -2,6 +2,10 @@ import type { Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { expect, test } from '@playwright/test'
+import {
+  installMaterialProductionFixture,
+  MATERIAL_PRODUCTION_FIXTURE,
+} from './helpers/material-production-fixture'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const MATERIAL_FORM_ROUTES = [
@@ -62,7 +66,7 @@ const RESPONSIVE_ROUTES = [
     title: '新建 · 材料采购结算',
   },
   {
-    path: '/material/delivery/archive/form/del_mdv001_0',
+    path: `/material/delivery/archive/form/${MATERIAL_PRODUCTION_FIXTURE.deliveryId}`,
     title: /编辑 · 送货单归档/,
   },
   {
@@ -111,6 +115,10 @@ async function captureVisual(
 }
 
 test.describe('F4 物资领域整页表单', () => {
+  test.beforeEach(async ({ page }) => {
+    await installMaterialProductionFixture(page)
+  })
+
   test('九条物资表单与材料结算均可保存不完整草稿并进入真实编辑路由', async ({ page }) => {
     test.setTimeout(180_000)
     await page.setViewportSize({ width: 390, height: 844 })
@@ -145,7 +153,12 @@ test.describe('F4 物资领域整页表单', () => {
     const suffix = Date.now()
 
     await page.goto('/material/requisition/new')
-    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+    await chooseLookup(
+      page,
+      '检索项目',
+      MATERIAL_PRODUCTION_FIXTURE.projectName,
+      MATERIAL_PRODUCTION_FIXTURE.projectName,
+    )
     await page.getByTestId('material-applicant').fill('E2E 计划员')
     await page.getByTestId('material-materialName').fill(`E2E瓷砖-${suffix}`)
     await page.getByTestId('material-spec').fill('600×600')
@@ -169,12 +182,17 @@ test.describe('F4 物资领域整页表单', () => {
     await expect(attachments.getByText('已删除', { exact: true })).toHaveCount(0)
 
     await openMaterialCreate(page, '/material/arrival')
-    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+    await chooseLookup(
+      page,
+      '检索项目',
+      MATERIAL_PRODUCTION_FIXTURE.projectName,
+      MATERIAL_PRODUCTION_FIXTURE.projectName,
+    )
     await chooseLookup(
       page,
       '检索分供方',
-      '广州市大板东',
-      '广州市大板东建材有限公司',
+      MATERIAL_PRODUCTION_FIXTURE.supplierName,
+      MATERIAL_PRODUCTION_FIXTURE.supplierName,
     )
     await page.getByLabel('材料名称').fill(`E2E瓷砖-${suffix}`)
     await page.getByLabel('规格型号').fill('600×600')
@@ -199,7 +217,12 @@ test.describe('F4 物资领域整页表单', () => {
     await expect(page.getByText('5.000', { exact: true }).first()).toBeVisible()
 
     await openMaterialCreate(page, '/material/use')
-    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+    await chooseLookup(
+      page,
+      '检索项目',
+      MATERIAL_PRODUCTION_FIXTURE.projectName,
+      MATERIAL_PRODUCTION_FIXTURE.projectName,
+    )
     await page.getByTestId('material-materialName').fill(`E2E瓷砖-${suffix}`)
     await page.getByTestId('material-spec').fill('600×600')
     await page.getByTestId('material-unit').fill('㎡')
@@ -230,8 +253,18 @@ test.describe('F4 物资领域整页表单', () => {
 
     await page.goto('/material/settlement/form')
     await page.getByTestId('settlement-name').fill(`E2E材料结算-${suffix}`)
-    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
-    await chooseLookup(page, '检索材料采购合同', '瓷砖采购合同', '瓷砖采购合同')
+    await chooseLookup(
+      page,
+      '检索项目',
+      MATERIAL_PRODUCTION_FIXTURE.projectName,
+      MATERIAL_PRODUCTION_FIXTURE.projectName,
+    )
+    await chooseLookup(
+      page,
+      '检索材料采购合同',
+      MATERIAL_PRODUCTION_FIXTURE.contractName,
+      MATERIAL_PRODUCTION_FIXTURE.contractName,
+    )
     await page.getByTestId('settlement-amount').fill('100')
     await page.getByLabel('结算日期 *').fill('2026-07-26')
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
@@ -239,19 +272,25 @@ test.describe('F4 物资领域整页表单', () => {
     await expect(page).toHaveURL(/\/material\/settlement\/form\/[^/?]+$/)
     await expect(page.getByText('待确认', { exact: true }).first()).toBeVisible()
 
-    await page.goto('/material/delivery/archive/del_mdv001_0')
+    await page.goto(`/material/delivery/archive/${MATERIAL_PRODUCTION_FIXTURE.deliveryId}`)
     await page.getByRole('link', { name: '编辑' }).click()
-    await expect(page).toHaveURL('/material/delivery/archive/form/del_mdv001_0')
+    await expect(page).toHaveURL(
+      `/material/delivery/archive/form/${MATERIAL_PRODUCTION_FIXTURE.deliveryId}`,
+    )
     await expect(page.getByRole('heading', { name: /编辑 · 送货单归档/ })).toBeVisible()
-    await expect(page.getByText('大板东建材-送货单-0712.pdf', { exact: true })).toBeVisible()
-    await expect(page.getByText('合和新城', { exact: true }).last()).toBeVisible()
+    const sourcePanel = page.getByTestId('delivery-source-panel')
+    await expect(sourcePanel.getByText(MATERIAL_PRODUCTION_FIXTURE.deliverySourceName, { exact: true }))
+      .toBeVisible()
+    await expect(page.getByLabel('检索项目'))
+      .toHaveValue(MATERIAL_PRODUCTION_FIXTURE.projectName)
     await page.getByLabel('送货单号').fill(`E2E-SH-${suffix}`)
     await page.getByLabel('数量').first().fill('3')
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByRole('button', { name: '保存归档修改' }).click()
     await page.getByRole('dialog').getByRole('button', { name: '确认修改' }).click()
     await expect(page.getByLabel('送货单号')).toHaveValue(`E2E-SH-${suffix}`)
-    await expect(page.getByText('大板东建材-送货单-0712.pdf', { exact: true })).toBeVisible()
+    await expect(sourcePanel.getByText(MATERIAL_PRODUCTION_FIXTURE.deliverySourceName, { exact: true }))
+      .toBeVisible()
   })
 
   test('十二条整页表单在响应式验收矩阵中无页面级横向溢出', async ({ page }, testInfo) => {

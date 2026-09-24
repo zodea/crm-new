@@ -7,7 +7,7 @@ import type { FinancePageDraft } from '~/lib/finance/page'
 import type {
   FormFooterAction,
 } from '~/lib/master-data/page'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import {
   listFinanceFormAttachments,
   loadFinanceForm,
@@ -125,6 +125,33 @@ function fetchPaymentApplications(keyword: string) {
   }, keyword)
 }
 
+function queryValue(key: string): string {
+  const value = route.query[key]
+  return Array.isArray(value) ? value[0] ?? '' : String(value ?? '')
+}
+
+async function applyPaymentRecordPrefill(base: FinancePageDraft): Promise<FinancePageDraft> {
+  if (props.kind !== 'payment_record')
+    return base
+  const paymentApplicationId = queryValue('paymentApplicationId')
+  if (!paymentApplicationId)
+    return base
+  const application = await loadFinanceForm('payment_application', paymentApplicationId)
+  if (!application)
+    return base
+  const amount = Number(queryValue('amount')) || 0
+  return {
+    ...base,
+    projectId: queryValue('projectId') || application.projectId || null,
+    supplierId: queryValue('supplierId') || application.supplierId || null,
+    purpose: application.name || application.no || '',
+    amount,
+    applicationAllocations: amount > 0
+      ? [{ paymentApplicationId, allocatedAmount: amount, note: '' }]
+      : [],
+  } as FinancePageDraft
+}
+
 async function initialize() {
   loading.value = true
   resetAttachments()
@@ -132,6 +159,7 @@ async function initialize() {
     const id = routeId.value
     if (!id) {
       draft.value = f3FormDefaults(props.kind) as FinancePageDraft
+      draft.value = await applyPaymentRecordPrefill(draft.value)
       paymentTypeSelected.value = props.kind !== 'payment_application'
     }
     else {
@@ -333,10 +361,8 @@ async function leaveToList() {
   await navigateTo(meta.value.listPath)
 }
 
-onBeforeRouteLeave(async () => {
+useTabCloseGuard(async () => {
   if (allowLeave || !dirty.value)
-    return true
-  if (tabsStore.tabs.some(tab => tab.key === pageKey))
     return true
   const accepted = await confirm({
     variant: 'simple',
@@ -351,70 +377,73 @@ onMounted(() => void initialize())
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-1340px items-start gap-4 pb-6">
-    <aside
-      class="sticky top-4 hidden w-44 shrink-0 rounded-[var(--radius-card)] border border-line bg-panel p-2 xl:block"
-      aria-label="表单分区"
+  <div class="min-w-0">
+    <FinancePaymentTypeStep
+      v-if="showPaymentTypeStep"
+      :biz-types="PAYMENT_BIZ_TYPES"
+      @back="leaveToList"
+      @select="selectPaymentType"
+    />
+
+    <EntityFormShell
+      v-else
+      :title="title"
+      :subtitle="meta.subtitle"
+      :back-label="`返回${meta.label}`"
+      :sections="meta.sections"
+      :state="loading ? 'loading' : 'ready'"
+      @back="leaveToList"
     >
-      <a
-        v-for="section in meta.sections"
-        :key="section.key"
-        :href="`#section-${section.key}`"
-        class="block rounded-[var(--radius-control)] px-3 py-2 text-12px text-ink-soft transition-colors hover:bg-brand-soft hover:text-brand-deep"
+      <template v-if="kind === 'payment_record'" #status>
+        <span class="chip" :class="isConfirmedPayment ? 'chip-ok' : 'chip-brand'">
+          {{ isConfirmedPayment ? '已人工确认' : draft.confirmationStatus === 'needs_review' ? '待核对' : '草稿' }}
+        </span>
+      </template>
+      <template v-if="kind === 'payment_record'" #actions>
+        <KitButton
+          v-if="isConfirmedPayment"
+          variant="secondary"
+          :loading="loadingAction === 'unconfirmPayment'"
+          data-testid="unconfirm-payment"
+          @click="unconfirmPayment"
+        >
+          撤回确认
+        </KitButton>
+        <KitButton
+          v-else
+          :loading="loadingAction === 'confirmPayment'"
+          data-testid="confirm-payment"
+          @click="confirmPayment"
+        >
+          人工确认支付
+        </KitButton>
+      </template>
+
+      <section
+        v-if="kind === 'receipt'"
+        class="mb-4 grid min-w-0 gap-3 rounded-[var(--radius-card)] border border-ok/25 bg-ok-soft px-4 py-3 sm:grid-cols-4"
+        aria-label="收款方向"
+        data-testid="receipt-direction-summary"
       >
-        {{ section.label }}
-      </a>
-    </aside>
-
-    <main class="min-w-0 flex-1">
-      <FinancePaymentTypeStep
-        v-if="showPaymentTypeStep"
-        :biz-types="PAYMENT_BIZ_TYPES"
-        @back="leaveToList"
-        @select="selectPaymentType"
-      />
-
-      <header v-if="!showPaymentTypeStep" class="mb-4 flex flex-wrap items-start gap-3">
         <div>
-          <button type="button" class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
-            <span class="i-lucide-arrow-left" aria-hidden="true" />
-            返回{{ meta.label }}
-          </button>
-          <h1 class="text-20px font-800 text-ink">
-            {{ title }}
-          </h1>
-          <p class="mt-1 text-12px text-ink-faint">
-            {{ meta.subtitle }}；草稿允许缺项，提交时由领域 action 校验真实关联。
-          </p>
+          <span class="text-11px text-ink-faint">资金方向</span>
+          <strong class="mt-1 block text-14px text-ok-deep">收入</strong>
         </div>
-        <div v-if="kind === 'payment_record'" class="ml-auto flex items-center gap-2">
-          <span class="chip" :class="isConfirmedPayment ? 'chip-ok' : 'chip-brand'">
-            {{ isConfirmedPayment ? '已人工确认' : draft.confirmationStatus === 'needs_review' ? '待核对' : '草稿' }}
-          </span>
-          <KitButton
-            v-if="isConfirmedPayment"
-            variant="secondary"
-            :loading="loadingAction === 'unconfirmPayment'"
-            data-testid="unconfirm-payment"
-            @click="unconfirmPayment"
-          >
-            撤回确认
-          </KitButton>
-          <KitButton
-            v-else
-            :loading="loadingAction === 'confirmPayment'"
-            data-testid="confirm-payment"
-            @click="confirmPayment"
-          >
-            人工确认支付
-          </KitButton>
+        <div>
+          <span class="text-11px text-ink-faint">付款方</span>
+          <strong class="mt-1 block text-14px text-ink">甲方客户</strong>
         </div>
-      </header>
+        <div>
+          <span class="text-11px text-ink-faint">收款方</span>
+          <strong class="mt-1 block text-14px text-ink">我方乙方</strong>
+        </div>
+        <div class="sm:text-right">
+          <span class="text-11px text-ink-faint">本次收款事实</span>
+          <strong class="mt-1 block font-mono text-16px text-ok-deep">+¥{{ Number(draft.amount || 0).toFixed(2) }}</strong>
+        </div>
+      </section>
 
-      <div v-if="!showPaymentTypeStep && loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
-        正在载入表单…
-      </div>
-      <form v-else-if="!showPaymentTypeStep" class="flex flex-col gap-4" data-testid="finance-form" @submit.prevent>
+      <form class="flex min-w-0 flex-col gap-4" data-testid="finance-form" @submit.prevent>
         <FinanceFormFields
           :kind="kind"
           :draft="draft"
@@ -455,6 +484,6 @@ onMounted(() => void initialize())
           @action="handleFooterAction"
         />
       </form>
-    </main>
+    </EntityFormShell>
   </div>
 </template>

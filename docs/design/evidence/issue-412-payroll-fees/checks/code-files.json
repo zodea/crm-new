@@ -1,0 +1,722 @@
+[
+  {
+    "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+    "bytes": 11769,
+    "sha256": "7bc807ce9709676ec3a9a9b41702adf78359860146ae74c5882f2eec0525a1d8"
+  },
+  {
+    "path": "app/components/payroll/CentralPayrollDraftFormPage.vue",
+    "bytes": 4168,
+    "sha256": "db0dd3de4f57ac255c22c645436e7c9f662a195c2d1121cae28f19839d68f745"
+  },
+  {
+    "path": "app/components/payroll/CentralPayrollScreen.vue",
+    "bytes": 8659,
+    "sha256": "25797f9a19fb93153491c001a259d91c275f8a22452009fd041ed8bb2b7da674"
+  },
+  {
+    "path": "app/components/payroll/PayrollAConfigScreen.vue",
+    "bytes": 9233,
+    "sha256": "8ca558be4f3616cf7e768f46ad201c5ce4aef0c9f271b6ae6ed6f86e3f843311"
+  },
+  {
+    "path": "app/components/payroll/PayrollActualReferencePicker.vue",
+    "bytes": 2457,
+    "sha256": "26ec2e9b43d19993531c5af65e04cc9ed731d64f770f6259081ca5089259fa36"
+  },
+  {
+    "path": "app/components/payroll/PayrollAdjustmentBasisFields.vue",
+    "bytes": 10253,
+    "sha256": "479769c1de7756836e221f95e911ff1db0848fd35926d19d418b653b1b0c3248"
+  },
+  {
+    "path": "app/components/payroll/PayrollAFeeAdjustmentFields.vue",
+    "bytes": 4841,
+    "sha256": "40832d13a135d7a5f2867df8327a46cd097653bf8e4c6e3b547c5ae9f9f3d59d"
+  },
+  {
+    "path": "app/components/payroll/PayrollAFeeBasisEditor.vue",
+    "bytes": 4925,
+    "sha256": "e3a1e195ba3b5c46ef765a282c9f3bf5bde87460bf9f47d0350e58addfe12296"
+  },
+  {
+    "path": "app/components/payroll/PayrollAFeeEditor.vue",
+    "bytes": 6848,
+    "sha256": "b7d5e70ac090b6a95e40fd930787c333993d32c10dbc479951db0416654db88f"
+  },
+  {
+    "path": "app/components/payroll/PayrollAFeeLinesTable.vue",
+    "bytes": 3452,
+    "sha256": "11a71f9456dac25b6fe6caacdf848064b4e2d3515b3dcc9460a40e65a76d740a"
+  },
+  {
+    "path": "app/components/payroll/PayrollAFeesConfigSection.vue",
+    "bytes": 10098,
+    "sha256": "30a1ebc1b726845aef9569539dde9f82401b3c2259ba3ca9d436e9b41e05dd92"
+  },
+  {
+    "path": "app/components/payroll/PayrollAFeesFrozenSection.vue",
+    "bytes": 2510,
+    "sha256": "21d3668f912e5fc15c7259ddd26043dad7b731245c87167875cc969a7167258b"
+  },
+  {
+    "path": "app/components/payroll/PayrollAFeesReview.vue",
+    "bytes": 4560,
+    "sha256": "7aa59d6f994cf245da83a890482021aa5dd4f79b8c10d58da834fb6d45c9e7bf"
+  },
+  {
+    "path": "app/components/payroll/PayrollAFrozenPrint.vue",
+    "bytes": 5566,
+    "sha256": "2b0cf4d74fd71a7328460774aceb6fae1249b7981421284d62edf0fe705a13be"
+  },
+  {
+    "path": "app/components/payroll/PayrollAManagementBookEditor.vue",
+    "bytes": 3620,
+    "sha256": "08bc520848ace130ff135cab420e342b47b52e6f16d06d298c831904429dcd99"
+  },
+  {
+    "path": "app/components/payroll/PayrollAManagementScopeEditor.vue",
+    "bytes": 4600,
+    "sha256": "9c3284924dfe32c2a72e6da727179000027e12f2ed148335115cd94e1d6eff51"
+  },
+  {
+    "path": "app/components/payroll/PayrollANegativeLineEditor.vue",
+    "bytes": 4056,
+    "sha256": "9523beb440b734701b3dc37152741d70d33fbcaf4de1107924d59fe65b26b3d2"
+  },
+  {
+    "path": "app/components/payroll/PayrollANegativeLinesSection.vue",
+    "bytes": 3328,
+    "sha256": "f5290204ed8120aa3828bc341cc4b6136054a4fa80f263103d5b9044c45b7314"
+  },
+  {
+    "path": "app/components/payroll/PayrollANegativeLinesTable.vue",
+    "bytes": 2823,
+    "sha256": "e3286ac54442755d5104598f8527b492be4c5f204b79a576e7b5d1366c616b24"
+  },
+  {
+    "path": "app/components/payroll/PayrollASourceReturn.vue",
+    "bytes": 5222,
+    "sha256": "8fb6d538c6eb6fd3e2323d8b7ae5daebd99739de74e3575bd04cb9eeab41d963"
+  },
+  {
+    "path": "app/components/payroll/PayrollAStatementWorkspace.vue",
+    "bytes": 7756,
+    "sha256": "99512c0850881de7c6a8fde44eaeeacc75d108d72de79ae7ab31f43729979515"
+  },
+  {
+    "path": "app/components/payroll/PayrollReadNotice.vue",
+    "bytes": 704,
+    "sha256": "f0b3d3cc82d431fcd2def5e3a2de4be118d7eea492dceafd77aa0f1a180e3479"
+  },
+  {
+    "path": "app/composables/usePayrollAConfig.ts",
+    "bytes": 13770,
+    "sha256": "a2d2d64f3525183cb4e384aba87c4138b1390e5508f4f01c73b149da70f8246b"
+  },
+  {
+    "path": "app/composables/usePayrollAFeesConfig.ts",
+    "bytes": 13408,
+    "sha256": "6b8de2f2c01d1b19f9a98cbd5de2f3e0d25055d5920a707f68e7a6323479fd19"
+  },
+  {
+    "path": "app/composables/usePayrollAForm.ts",
+    "bytes": 13967,
+    "sha256": "1b1bfa7ed1e628da58fe4c86f02a1611596505309d9a3130fbe0933a125dbe82"
+  },
+  {
+    "path": "app/composables/usePayrollANegativeLines.ts",
+    "bytes": 10926,
+    "sha256": "ef6e5fe98c7398128dc9ffb8cd43349c6be902429b3ab5ca5f25b62d7a0ba99e"
+  },
+  {
+    "path": "app/composables/usePayrollAStatement.ts",
+    "bytes": 8481,
+    "sha256": "e772f5a60aa9777891180d2b15516b81bf99518535b01f0da54b74e939abd933"
+  },
+  {
+    "path": "app/lib/crew-worker/payroll-fee-defaults.ts",
+    "bytes": 3080,
+    "sha256": "fdb09bb5675f234c50b223c276c8b1d1701da94a0279198ddc990dfa879a7844"
+  },
+  {
+    "path": "app/lib/migration/core-http-repository.ts",
+    "bytes": 12261,
+    "sha256": "131188ea74ea4b55a20b42224f4b2912892e3e573476090da55ca2a2a46e1498"
+  },
+  {
+    "path": "app/lib/migration/core-local-source.ts",
+    "bytes": 61470,
+    "sha256": "3cef0951b5117ec1c7854f56af0fbe787b87b3436f326989bbe07d4c4a7709f6"
+  },
+  {
+    "path": "app/lib/migration/payroll-fees-source.ts",
+    "bytes": 3420,
+    "sha256": "8aafe73c63b19f53cb255243c651359c2e2bef79fde29cefb024f9be0b1dcc73"
+  },
+  {
+    "path": "app/lib/migration/payroll-source.ts",
+    "bytes": 13135,
+    "sha256": "45005a985eae934bfa683fa6cce3555c4c23cf21398f7e06dfc705b5203b4fb1"
+  },
+  {
+    "path": "app/lib/nav/target-registry.ts",
+    "bytes": 36676,
+    "sha256": "c565d19376ec51bc3f07284cc6beff7f5ad3570477b62e1b0c315091a18fec6e"
+  },
+  {
+    "path": "app/lib/payroll/a-export.ts",
+    "bytes": 2474,
+    "sha256": "bda14ae57f899a473f437ae61bba3cfbc8e781d5dc0537de26138602a15fc852"
+  },
+  {
+    "path": "app/lib/payroll/a-fees-export.ts",
+    "bytes": 3276,
+    "sha256": "56ce1c902743cdcf0463572920f22239680e5411307141996c1af4fffacb52df"
+  },
+  {
+    "path": "app/lib/payroll/a-navigation.ts",
+    "bytes": 7880,
+    "sha256": "c9ead0d24bb94f584cb50406235a438288f5ac88a3e511d3ad3c51b3485ad843"
+  },
+  {
+    "path": "app/lib/payroll/a-presentation.ts",
+    "bytes": 3467,
+    "sha256": "33fee3a53be847709c395f265a99ac684b7cb69f861932fc745200809618b721"
+  },
+  {
+    "path": "app/lib/payroll/central-a-adjustment-contract.ts",
+    "bytes": 1415,
+    "sha256": "175c5cd32cae22e4e24e0f541f4c6c4282a9b388f4c86448d000a4200c21086e"
+  },
+  {
+    "path": "app/lib/payroll/central-a-adjustment-coverage.ts",
+    "bytes": 1845,
+    "sha256": "9c6ea92abb803b114dfb245754b0906adb11b674c961abb212502215f6928377"
+  },
+  {
+    "path": "app/lib/payroll/central-a-adjustment-validation.ts",
+    "bytes": 5323,
+    "sha256": "7b1580f1fa9f61078b7fec08177ae220d569651cc80d87f9df73df8821c8e062"
+  },
+  {
+    "path": "app/lib/payroll/central-a-codec.ts",
+    "bytes": 23341,
+    "sha256": "fcc729002fc4183753fe97c375a0b4f0e28a0466b84d748c648c8de930b9d686"
+  },
+  {
+    "path": "app/lib/payroll/central-a-command.ts",
+    "bytes": 14228,
+    "sha256": "eb12bdbfb8653e4e75a16be1838d482ff5b0041b5bc0569103af393fe2fe5833"
+  },
+  {
+    "path": "app/lib/payroll/central-a-contract.ts",
+    "bytes": 13421,
+    "sha256": "740723189ee6e7153b8aa64733435f54615aef2cf972a50cde6b42f5bab21a96"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fee-adjustment.ts",
+    "bytes": 6786,
+    "sha256": "f38a356a7150054ed26af2fa1b01bcb8b4e98533400e01b1f839ee91a4edb31a"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fees-calculation.ts",
+    "bytes": 4040,
+    "sha256": "b157b63e3deb541411e20ea42aaa515830b985699a6e1ba73b98fc1afefd5041"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fees-codec.ts",
+    "bytes": 5541,
+    "sha256": "b51d12248705658f7fe9214b497385e964908ae4a2ed92cf79f6543e22e49797"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fees-contract.ts",
+    "bytes": 16274,
+    "sha256": "489b86e9ab8604696c70f7cf13ab490551b0457656b6ad832497236892b8ed3d"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fees-provenance.ts",
+    "bytes": 9100,
+    "sha256": "19cc14a66332219cd2094eed3114ede475a1014e4f885f3f173f694bec6f44b8"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fees-read-primitives.ts",
+    "bytes": 7051,
+    "sha256": "6b8e24c48ee859a24c3ef75e6e3aeb1b1423d9d199ec188456d47c976d089949"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fees-read-validation.ts",
+    "bytes": 6618,
+    "sha256": "8085bc78a58c33dd6781912a70302f52a382063660a06bf97a27198dd778f500"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fees-schema.ts",
+    "bytes": 9503,
+    "sha256": "675905ab60b73e4e25a794c392abb5809c7bb16eea1b80336ac6c10e42dcecb3"
+  },
+  {
+    "path": "app/lib/payroll/central-a-fees-validation.ts",
+    "bytes": 16157,
+    "sha256": "fba91fcad874edaa63a843b241fdbfebf7532a8e9dd34719b3ea7ce543dc4037"
+  },
+  {
+    "path": "app/lib/payroll/central-a-provenance.ts",
+    "bytes": 7436,
+    "sha256": "f5cb03289ba7b98ac253dd14727b5dd7b56d6e0bbccb35fb7ff2f5bab10a2313"
+  },
+  {
+    "path": "app/lib/payroll/central-actual-codec.ts",
+    "bytes": 8095,
+    "sha256": "4ee00a17f18f28f9238f098223eeaf283e96e936d1b2308291508e509ec42b9d"
+  },
+  {
+    "path": "app/lib/payroll/central-adjustment-calculation.ts",
+    "bytes": 2833,
+    "sha256": "f0721b8864e8ad864655f916dc3be6a778239d4bc042d7b10f5dae982f8b5b93"
+  },
+  {
+    "path": "app/lib/payroll/central-adjustment-codec.ts",
+    "bytes": 6518,
+    "sha256": "525de0bd11ba2447939c89896eb70af570b4763862a6fdba81de1a4b7621cc0c"
+  },
+  {
+    "path": "app/lib/payroll/central-adjustment-contract.ts",
+    "bytes": 7143,
+    "sha256": "dd64809c2068a05a68116266b5790dfcf92c2edeca5835f3bed24887b786a593"
+  },
+  {
+    "path": "app/lib/payroll/central-adjustment-validation.ts",
+    "bytes": 10856,
+    "sha256": "b7e0f842cac889acf6d4c8b2dd6dd6dc5e14b039df3784c6095a9293a9e99869"
+  },
+  {
+    "path": "app/lib/payroll/central-adjustment-wire.ts",
+    "bytes": 4771,
+    "sha256": "4a8365ad4b215a6437fa83f85b85626a2bbe5720af719c1c0de1d0ecd26df766"
+  },
+  {
+    "path": "app/lib/payroll/central-codec.ts",
+    "bytes": 10376,
+    "sha256": "70afc3f118ff79c2cef3b05a9053353c65aa9f46ccc383ad6e78abce5a276dde"
+  },
+  {
+    "path": "app/lib/payroll/central-contract.ts",
+    "bytes": 7798,
+    "sha256": "27b0f6222cc25401bfaeb0c013e7ba5743121c9623356e2c7eab97c755ca3f77"
+  },
+  {
+    "path": "app/lib/payroll/central-repository.ts",
+    "bytes": 8082,
+    "sha256": "70cc7de470bfc54e83f99e8efb79bfd038a8b09fd3a1648badeefffe57080421"
+  },
+  {
+    "path": "app/lib/quantity/migration-identity.ts",
+    "bytes": 803,
+    "sha256": "6fa25361ed47f2648b54cb2533a726d13b9eaaff0cd407fb04f0dec6eab15f3b"
+  },
+  {
+    "path": "app/lib/tabs/restore-target.ts",
+    "bytes": 19199,
+    "sha256": "40f6e935e960864ab2423bb28121ba285f2a2f183779a5e5feb71ad55413fde9"
+  },
+  {
+    "path": "app/stores/payroll-a-fees.ts",
+    "bytes": 7592,
+    "sha256": "7b958298579dd80ba9b99ad0f6a3f3322041c1e1d92bd162fe13c63031bc397a"
+  },
+  {
+    "path": "app/stores/payroll-a.ts",
+    "bytes": 6667,
+    "sha256": "c166da1e0f491f9ae62099c81defd46a8e438294a6bc41da32f7e549a9246374"
+  },
+  {
+    "path": "e2e/helpers/payroll-fees-boundaries.ts",
+    "bytes": 26529,
+    "sha256": "e9c6c8236d15aba1ad2a2e953a10f6524a438e69cb13e8ec4e6cfde60964b747"
+  },
+  {
+    "path": "e2e/helpers/payroll-fees-migration-source.ts",
+    "bytes": 5020,
+    "sha256": "af5e604b8dd5bb183af5b5ded645edde12f248a55c60e9224e594c29b0d7851d"
+  },
+  {
+    "path": "e2e/helpers/payroll-fees-workspace.ts",
+    "bytes": 4801,
+    "sha256": "94ba87f6266be8e4d048cc12a45482e61f857ba041e0b98f9bb9820175dd6af4"
+  },
+  {
+    "path": "e2e/payroll-fees-central.spec.ts",
+    "bytes": 15179,
+    "sha256": "bfca7930a2b7003f05d4d763c8998600a61dc8d9cb1c9b6d48e5d214a26e2de9"
+  },
+  {
+    "path": "server/api/commands/payroll-a-fees.post.ts",
+    "bytes": 466,
+    "sha256": "f727eb883a82b1eb23b9db170e2a2fb6bb55f50b9d7bf430da87cf58f2a708a1"
+  },
+  {
+    "path": "server/api/read/payroll/a-fee-config.post.ts",
+    "bytes": 1029,
+    "sha256": "2370cb259beea6445d4eb92fdded446ce47f5c1a403bddf2f53c7dcbed548616"
+  },
+  {
+    "path": "server/utils/core-migration-request.ts",
+    "bytes": 14870,
+    "sha256": "fcb59189dbcdefc8ebd3efc9529d657ab5951eec90d1a59bc3a942b131d5f0d4"
+  },
+  {
+    "path": "server/utils/crew-worker-command-test-instance.ts",
+    "bytes": 17109,
+    "sha256": "f5271d5dfa6ec2923b330481a69e5876aa9c23825c9301a65966345899a29ecd"
+  },
+  {
+    "path": "server/utils/payroll-a-adjustment-reconciliation.ts",
+    "bytes": 7628,
+    "sha256": "12a8d7bc16b024c77c992e0d9c7964f58ddca13581aeed274dcc322004a0ac8f"
+  },
+  {
+    "path": "server/utils/payroll-a-book.ts",
+    "bytes": 6043,
+    "sha256": "1e5df49f8e0bfbfb9188995a4e878f9972104678a985634747d867c544d50aa6"
+  },
+  {
+    "path": "server/utils/payroll-a-fee-reconciliation.ts",
+    "bytes": 7171,
+    "sha256": "a6a7006a46209068f3577052309227a3118be9c10e01e1a58308522bf1921075"
+  },
+  {
+    "path": "server/utils/payroll-a-fees-data.ts",
+    "bytes": 5180,
+    "sha256": "15fae75793d5591183145265a52d21a4156560f1ca971fd638598ebee50eb396"
+  },
+  {
+    "path": "server/utils/payroll-a-fees-policy.ts",
+    "bytes": 5046,
+    "sha256": "e51dd9afdff4378d53f9cfa2a8580bf7e4f838721127a13cbc3d2571854731ba"
+  },
+  {
+    "path": "server/utils/payroll-a-fees-read.ts",
+    "bytes": 17035,
+    "sha256": "86a4ced289410712509bf9178af69010aa25eb449a571ad6d04aeebbf2e0838c"
+  },
+  {
+    "path": "server/utils/payroll-a-fees-service.ts",
+    "bytes": 21149,
+    "sha256": "4f75b1e01cb33bcf2677d5a65d30605500d5628e269296a00e6c35dd2a2b6343"
+  },
+  {
+    "path": "server/utils/payroll-a-frozen-form.ts",
+    "bytes": 2510,
+    "sha256": "3c6bd21eb7b80f3a184d659a806cb4944edccb6bba6f5f67fa137437f3619ab8"
+  },
+  {
+    "path": "server/utils/payroll-a-migration-references.ts",
+    "bytes": 7459,
+    "sha256": "4d9083b89133322ad1aa30da2434934216adb250da2bfe743fa784792b15df0b"
+  },
+  {
+    "path": "server/utils/payroll-a-options.ts",
+    "bytes": 4832,
+    "sha256": "4c9398ac09a7116c4d3e928996df136c28ad807a4b1f2d52a36b5248bddb4325"
+  },
+  {
+    "path": "server/utils/payroll-a-reconciliation-shared.ts",
+    "bytes": 1095,
+    "sha256": "05f8e8491fa514c8e3dbc70dbe5fd1bb8a77bd15b59063a1b99ee260de5844fc"
+  },
+  {
+    "path": "server/utils/payroll-a-released-with-migration.ts",
+    "bytes": 533,
+    "sha256": "158033563ad350a4a8999dc8d97cd286ee2e5f1b84473012228a219837949c98"
+  },
+  {
+    "path": "server/utils/payroll-a-service.ts",
+    "bytes": 35538,
+    "sha256": "3cac7102397853741c28ef0f3128a266429893129afdebbcac62509f1a349a8f"
+  },
+  {
+    "path": "server/utils/payroll-actual-facts.ts",
+    "bytes": 4119,
+    "sha256": "5578ad15b3edaec2e73d9df726ba943b00bf271a1055ed5c11b97ce2829e9c88"
+  },
+  {
+    "path": "server/utils/payroll-actual-service.ts",
+    "bytes": 12573,
+    "sha256": "ab9d3f6232a76e7f3803cd030f962fe9e229f063b394795aaae89391254d9e98"
+  },
+  {
+    "path": "server/utils/payroll-adjustment-facts.ts",
+    "bytes": 6922,
+    "sha256": "6c177f37c7e19388b387c19d3e64d78dd5b084c5762988f471a354643832ac30"
+  },
+  {
+    "path": "server/utils/payroll-adjustment-migration-references.ts",
+    "bytes": 13341,
+    "sha256": "ad0d4fe90084e635107248e008cc4766b83b6a330a97630d294397234b959649"
+  },
+  {
+    "path": "server/utils/payroll-central-migration.ts",
+    "bytes": 6916,
+    "sha256": "47ca4c871356aea5c16f019d7390c9a46e30f339897e5fdb056cf56eb69586c1"
+  },
+  {
+    "path": "server/utils/payroll-fees-migration-references.ts",
+    "bytes": 10133,
+    "sha256": "b8b2f711b11aaf388b10ae2bbddd0279cb70e4e38dfb803e7b7d66ccaa9a91fd"
+  },
+  {
+    "path": "server/utils/payroll-fees-migration.ts",
+    "bytes": 5732,
+    "sha256": "d630e1a4cc51595acc89659a77b0ea4af6dc64d8956e6ef2251119902e49b12e"
+  },
+  {
+    "path": "server/utils/payroll-management-scope-facts.ts",
+    "bytes": 6821,
+    "sha256": "2db7337b91331126fd0a4ac31ac1c344af4f6c1dcea5bd929fc24b8b40d78712"
+  },
+  {
+    "path": "server/utils/payroll-migrated-fees-mapping.ts",
+    "bytes": 9939,
+    "sha256": "f2ae7473b2eafdabd89d0d22bdf1f9b26e72d5ff7f3c44d7f272a91c02aca91f"
+  },
+  {
+    "path": "server/utils/payroll-migrated-fees.ts",
+    "bytes": 5074,
+    "sha256": "326684935fec17738d03a8d97035623d6f6cd59a28143fe48178d3f07f161220"
+  },
+  {
+    "path": "server/utils/payroll-migrated-form.ts",
+    "bytes": 6779,
+    "sha256": "5f1ccf64ddc31a652341ae489a44878d34768e8ed89e86384bb1038b6dd6f0eb"
+  },
+  {
+    "path": "server/utils/payroll-migrated-mapping.ts",
+    "bytes": 21645,
+    "sha256": "166f473cd7eee5366a8121859f22a2b988676b83c579dcd8b0edde809d4ba6ae"
+  },
+  {
+    "path": "server/utils/payroll-migrated-proof.ts",
+    "bytes": 17388,
+    "sha256": "e80e2a361e162c47fdc978bb865419beebf44643d1b55a1640b50f098d49ef6b"
+  },
+  {
+    "path": "server/utils/payroll-migration.ts",
+    "bytes": 32060,
+    "sha256": "e7fcc45eaa0778714770950f8d8f34df6a4c8eb231fa6f45b03ea802bc916f10"
+  },
+  {
+    "path": "server/utils/payroll-release-adjustments.ts",
+    "bytes": 9105,
+    "sha256": "744d786ce498139615cf9c2e8e96f1a21c46e8135f318da69ad09dc14182029c"
+  },
+  {
+    "path": "server/utils/payroll-runtime.ts",
+    "bytes": 3549,
+    "sha256": "806588985c8c7560a3caeb29ab620aa607ed2cea989d369b51367dcbcdc3077b"
+  },
+  {
+    "path": "server/utils/payroll-service.ts",
+    "bytes": 13174,
+    "sha256": "4b05067f8a1bbc2b8f1476701acde3fb890536c864d7cb146afc9319ab7d6308"
+  },
+  {
+    "path": "tests/components/PayrollAConfigState.test.ts",
+    "bytes": 8583,
+    "sha256": "0e0ff731d7578f9bb527fa6c6f50ad13d23e662b625b352c5cfa93b12281d6a2"
+  },
+  {
+    "path": "tests/components/PayrollActualReferencePicker.test.ts",
+    "bytes": 1942,
+    "sha256": "ba943bb13138d68795dfa975468a5f0e7fb92dd83ab46d2a208e8e23277f20e9"
+  },
+  {
+    "path": "tests/components/PayrollAFeeAdjustmentFields.test.ts",
+    "bytes": 2385,
+    "sha256": "accfbd13a0513ffaafa5dda3ef059603d519434dc1ef0c33199839a17270fd8d"
+  },
+  {
+    "path": "tests/components/PayrollAFeesReview.test.ts",
+    "bytes": 3042,
+    "sha256": "1e2e5ca09007db3f5ca7d4096b2d9866d0ee4d9d76a1f99109b5d60099a29d50"
+  },
+  {
+    "path": "tests/components/PayrollANegativeLinesState.test.ts",
+    "bytes": 4322,
+    "sha256": "83328c6dee353d2598d6b4c621f89d7da77acbf3ba0bcfd89b6c3dece9a3e2a0"
+  },
+  {
+    "path": "tests/components/PayrollASourceReturn.test.ts",
+    "bytes": 5276,
+    "sha256": "7b80f3c13984ec10a0fc9cb2edfeaa2ed042d5845cb0daed7a489ebf2dbef54a"
+  },
+  {
+    "path": "tests/components/PayrollCentralRead.test.ts",
+    "bytes": 14396,
+    "sha256": "ceb6514166490295bbe9c4adf48bfaf6ad436934d21812abc922df0cd28934bd"
+  },
+  {
+    "path": "tests/components/PayrollFeeEditors.test.ts",
+    "bytes": 8416,
+    "sha256": "dc025dc3fd1451a0115abe27d5ace5d36629c5e29539b8d91098ac6e51ec2c19"
+  },
+  {
+    "path": "tests/fixtures/payroll/fees-config-captured.json",
+    "bytes": 14898,
+    "sha256": "66e1135698c9fffa7e7596e65e0ff4fbafb54bf5f1081b9e749e2a650e580929"
+  },
+  {
+    "path": "tests/helpers/payroll-a-fee-adjustment-fixture.ts",
+    "bytes": 4184,
+    "sha256": "39b09c7390944f364661d22c9d930241c3834805d948318a80016f4cfb34b324"
+  },
+  {
+    "path": "tests/helpers/payroll-a-fees-fixture.ts",
+    "bytes": 6516,
+    "sha256": "969bcd626da86d4ae07d0dfa865add35cd82ff2b10c6c5d50f63f0738010a4a1"
+  },
+  {
+    "path": "tests/helpers/payroll-a-service-fixture.ts",
+    "bytes": 4216,
+    "sha256": "77f11f34011340d6789b822d27678ab647d5cf4c9100be6ab852fd77bba38343"
+  },
+  {
+    "path": "tests/helpers/payroll-fees-migration-fixture.ts",
+    "bytes": 4703,
+    "sha256": "3b4c97b8cc1a26582168bebfc04e2c78410ff10c5a0d3a6b1f3b89e53531fccb"
+  },
+  {
+    "path": "tests/helpers/payroll-fees-ui-fixture.ts",
+    "bytes": 5691,
+    "sha256": "a114201b73ad0261f7206fc54ddee92c72f281cd194e07273d170d30f3fd8966"
+  },
+  {
+    "path": "tests/migration/core-local-source.test.ts",
+    "bytes": 43971,
+    "sha256": "dbb621bfd2bb716ef0f62c5fe8b8df32c495f77b78e3c357861055dca14565f4"
+  },
+  {
+    "path": "tests/migration/payroll-central-source.test.ts",
+    "bytes": 1569,
+    "sha256": "0b7f03a73b648594dad12074edebe9fc3ad0c2163d4461f8026ac1f44bca0929"
+  },
+  {
+    "path": "tests/payroll/a-fees-output.test.ts",
+    "bytes": 1553,
+    "sha256": "cdd97d57b3ebeb8611871d58036213795ce15d72463dad069a990253f32c6270"
+  },
+  {
+    "path": "tests/payroll/a-navigation.test.ts",
+    "bytes": 5681,
+    "sha256": "67e2ce19535afa0880e263a8ad7ee928c631f2eb1eee210cda6541786aa39bbf"
+  },
+  {
+    "path": "tests/payroll/a-quantity-migration-navigation.test.ts",
+    "bytes": 8718,
+    "sha256": "f93343c6b000ff89a7eced1dd3e196c738b3692031f549c96ae14b38743dcafb"
+  },
+  {
+    "path": "tests/payroll/central-a-book-history-gaps.test.ts",
+    "bytes": 1341,
+    "sha256": "ab8ad5979b9d0d1499bcb112059a59a9687a01b699ae74b9a74bb4ed20add26a"
+  },
+  {
+    "path": "tests/payroll/central-a-commands.test.ts",
+    "bytes": 4768,
+    "sha256": "7f35afb664776ff4ad4b2e6b02494b2483c5c50b2b8b9a81c339dc022318f109"
+  },
+  {
+    "path": "tests/payroll/central-a-fee-adjustment-calculation.test.ts",
+    "bytes": 5512,
+    "sha256": "0028a0201473760045dfe74bab63195bf52966163f5efeb8f802f4a64bd625b4"
+  },
+  {
+    "path": "tests/payroll/central-a-fee-adjustments.test.ts",
+    "bytes": 7007,
+    "sha256": "b33b77f138a3ddf40f3a12ac891a0e1aa0496833ec5b1ff87e524cef3d698a2a"
+  },
+  {
+    "path": "tests/payroll/central-a-fees-codec.test.ts",
+    "bytes": 9720,
+    "sha256": "35c6148217cbdd5705c9bda96c6916afd7297ed1d5fd73a1429417e705917bc3"
+  },
+  {
+    "path": "tests/payroll/central-a-fees-host-cost.test.ts",
+    "bytes": 4972,
+    "sha256": "59206992893047ab76cbc5e8045e630d3c7d34384c1b88ed142ec8c0e72df0d6"
+  },
+  {
+    "path": "tests/payroll/central-a-fees-integrity.test.ts",
+    "bytes": 5396,
+    "sha256": "19b3571ddd13eb655836e3f479547f4dc25efe659d9c80aeb43ce7a8efe1a2bc"
+  },
+  {
+    "path": "tests/payroll/central-a-fees-removal.test.ts",
+    "bytes": 11818,
+    "sha256": "4e8fd0f2ab65c0d0ffe3f80824cc5591b17b03334a266f5a46dec1b09e608fbd"
+  },
+  {
+    "path": "tests/payroll/central-a-fees-runtime-options.test.ts",
+    "bytes": 3725,
+    "sha256": "4f3c6758947a31fd75830e63c576d495035efe0a444baf2b5aa44bf06cddbf45"
+  },
+  {
+    "path": "tests/payroll/central-a-fees.test.ts",
+    "bytes": 11673,
+    "sha256": "e99ce9ebe6e960c96f054e17733d53ca4ac3f7871126d8f499c3f02f7ea7e25b"
+  },
+  {
+    "path": "tests/payroll/central-a-http.test.ts",
+    "bytes": 7777,
+    "sha256": "2bbb4217a06a15a973b5d10c1e414491413a6e32793188f1a7902db31353e0fb"
+  },
+  {
+    "path": "tests/payroll/central-a-management-ownership.test.ts",
+    "bytes": 8442,
+    "sha256": "2518496e7987f7e25f1f5648f5d472586a4bf09881f5e18d3f51b665e02a092a"
+  },
+  {
+    "path": "tests/payroll/central-a-management-ratio.test.ts",
+    "bytes": 2602,
+    "sha256": "6572840aef7f0b67b32003effd9f13c7a361fd8bda7a0c2696e3fa5fea1d2a01"
+  },
+  {
+    "path": "tests/payroll/central-adjustment-transport.test.ts",
+    "bytes": 4481,
+    "sha256": "ea419c1e58f167cdfc4a1a9179df8f0d93a6e88212117d9e57a7d40cb1f67722"
+  },
+  {
+    "path": "tests/payroll/crew-fee-default-facts.test.ts",
+    "bytes": 6045,
+    "sha256": "46a4946b06e9188abe9d811fdebea7541de392d1b7f95c1e778cd70f31c3d30d"
+  },
+  {
+    "path": "tests/payroll/fees-migration-batch-boundaries.test.ts",
+    "bytes": 13020,
+    "sha256": "becc21c90222630212234b9cc48ad44f079d800b381416a531fd00718d434ff2"
+  },
+  {
+    "path": "tests/payroll/fees-migration-graph.test.ts",
+    "bytes": 3063,
+    "sha256": "71a18b464a19742ca5b12f4df311de315a82ceee8d64fcfea6ac6aedc3259ba6"
+  },
+  {
+    "path": "tests/payroll/fees-migration-runtime.test.ts",
+    "bytes": 15286,
+    "sha256": "6ed92fa49240ed3cff060f7ddaf41232626d5a3ba3df458b1763e83ba5d89c90"
+  },
+  {
+    "path": "tests/payroll/management-scope-facts.test.ts",
+    "bytes": 3113,
+    "sha256": "a31044a64c9cdae2be55019e2c40e14a307df5c73397c523422ade8f384aa206"
+  },
+  {
+    "path": "tests/stores/payroll-a-fees-pending.test.ts",
+    "bytes": 5657,
+    "sha256": "b5d2ece3d64110ee03502529ffb2ec98cafe64fe4a2123a0b77e22a79439148d"
+  },
+  {
+    "path": "tests/stores/payroll-a-release-read.test.ts",
+    "bytes": 5452,
+    "sha256": "360d9193135acb471bf68623001809e71aaa8028a62c1cafcd609e58870c5263"
+  }
+]

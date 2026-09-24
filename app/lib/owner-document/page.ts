@@ -1,8 +1,10 @@
+import type { BoqChangeOperation } from '~/lib/boq/read-model'
 import type {
   OwnerDocumentBoqLine,
   OwnerDocumentDraft,
   OwnerDocumentKind,
 } from '~/lib/owner-document/forms'
+import { calculateBoqChangeLine } from '~/lib/boq/change-calculation'
 
 export type { OwnerDocumentBoqLine }
 
@@ -54,14 +56,14 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
   },
   acceptance: {
     label: '竣工验收·保修',
-    subtitle: '验收、移交与保修责任归档',
+    subtitle: '同一验收记录的竣工验收与保修到期双视图',
     listPath: '/owner/acceptance',
     contractListPath: '/contract/construction',
     contractListLabel: '施工合同列表',
     routeScope: 'owner',
     routeKind: 'acceptance',
     postLabel: '保存并提交',
-    postMessage: '提交后该验收或保修记录进入正式归档。',
+    postMessage: '提交后进入验收流程；验收、保修和到期确认均通过独立命令留痕。',
     sections: [
       { key: 'basic', label: '验收信息' },
       { key: 'attachments', label: '附件与备注' },
@@ -114,7 +116,7 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
   },
   sub_settlement: {
     label: '分包结算',
-    subtitle: '复用支出结算事实的分包结算单',
+    subtitle: '结算记录 · 累计金额 · 付款余额',
     listPath: '/subcontract/settlement',
     contractListPath: '/contract/subcontract',
     contractListLabel: '分包合同列表',
@@ -144,10 +146,12 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
   },
 }
 
-function today(): string {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+export function ownerDocumentLocalDate(
+  now: Pick<Date, 'getFullYear' | 'getMonth' | 'getDate'> = new Date(),
+): string {
+  return [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+    .map((part, index) => String(part).padStart(index === 0 ? 4 : 2, '0'))
+    .join('-')
 }
 
 export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDraft {
@@ -166,33 +170,41 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
         documentType: 'change_negotiation',
         directiveNo: '',
         directiveType: '',
-        applicationDate: today(),
+        applicationDate: ownerDocumentLocalDate(),
         reason: '',
         lines: [],
       }
     case 'owner_report':
       return {
         ...base,
-        periodNo: today().slice(0, 7),
-        applicationDate: today(),
+        periodNo: ownerDocumentLocalDate().slice(0, 7),
+        quantityBasis: 'field',
+        applicationDate: ownerDocumentLocalDate(),
         lines: [],
       }
     case 'acceptance':
       return {
         ...base,
-        type: 'acceptance',
         name: '',
-        documentDate: today(),
-        acceptor: '',
+        applicationDate: ownerDocumentLocalDate(),
+        acceptanceOrganization: '',
+        acceptancePerson: '',
+        acceptanceDate: null,
+        acceptanceConclusion: '',
         warrantyOwner: '',
-        conclusion: '',
+        warrantyStartDate: null,
+        warrantyEndDate: null,
+        warrantyConfirmationOrganization: null,
+        warrantyConfirmationDate: null,
+        warrantyConfirmationNote: '',
+        lifecycleEvents: [],
       }
     case 'final_settlement':
       return {
         ...base,
         name: '',
         settlementAmount: null,
-        submissionDate: today(),
+        submissionDate: ownerDocumentLocalDate(),
         basis: '',
         differenceNote: '',
       }
@@ -201,7 +213,7 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
         ...base,
         noticeNo: '',
         amount: null,
-        penaltyDate: today(),
+        penaltyDate: ownerDocumentLocalDate(),
         reason: '',
         appealNote: '',
       }
@@ -210,7 +222,7 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
         ...base,
         supplierId: null,
         changeType: '增项',
-        changeDate: today(),
+        changeDate: ownerDocumentLocalDate(),
         approvedAmount: null,
         changedArea: null,
         actualApprovedPrice: null,
@@ -223,7 +235,7 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
         name: '',
         settlementType: '过程结算',
         totalAmount: null,
-        settlementDate: today(),
+        settlementDate: ownerDocumentLocalDate(),
         deductionNote: '',
       }
     case 'project_penalty':
@@ -231,7 +243,7 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
         ...base,
         supplierId: null,
         crewId: null,
-        penaltyDate: today(),
+        penaltyDate: ownerDocumentLocalDate(),
         reason: '',
         amount: null,
         deductionMethod: '结算抵扣',
@@ -243,7 +255,25 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
 
 export function ownerDocumentFormPath(kind: OwnerDocumentKind, id?: string): string {
   const listPath = OWNER_DOCUMENT_META[kind].listPath
-  return id ? `${listPath}/${id}` : `${listPath}/new`
+  const centralReadOnly = kind === 'owner_change' || kind === 'owner_report'
+    || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty' || kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty'
+  return id && centralReadOnly ? `${listPath}/form/${id}` : id ? `${listPath}/${id}` : `${listPath}/new`
+}
+
+export function ownerDocumentDetailPath(
+  kind: OwnerDocumentKind,
+  id: string,
+  origin: 'real' | 'demo' = 'real',
+  variant?: 'acceptance' | 'warranty',
+): string {
+  if (kind !== 'owner_change' && kind !== 'owner_report'
+    && kind !== 'acceptance' && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change' && kind !== 'sub_settlement' && kind !== 'project_penalty') {
+    throw new Error('该甲方单据类型尚无中央只读详情')
+  }
+  const query = new URLSearchParams({ origin })
+  if (kind === 'acceptance')
+    query.set('variant', variant ?? 'acceptance')
+  return `${OWNER_DOCUMENT_META[kind].listPath}/${encodeURIComponent(id)}?${query.toString()}`
 }
 
 export function ownerDocumentKindFromRoute(
@@ -259,6 +289,7 @@ export function ownerDocumentKindFromRoute(
 export function validateOwnerDocumentForm(
   kind: OwnerDocumentKind,
   draft: OwnerDocumentDraft,
+  boqLines: OwnerDocumentBoqLine[] = [],
 ): Record<string, string> {
   const errors: Record<string, string> = {}
   const require = (field: string, label: string, positive = false) => {
@@ -283,28 +314,105 @@ export function validateOwnerDocumentForm(
       )) {
         errors.lines = '至少填写一条量价变更，或填写纯金额签证金额'
       }
+      else if (draft.lines?.length) {
+        const effective = new Map(boqLines.map(line => [line.id, {
+          effectiveQty: line.qty,
+          effectiveUnitPrice: line.unitPrice,
+        }]))
+        for (const [index, line] of draft.lines.entries()) {
+          const operation = String(line.operation ?? '')
+          if (!['add', 'qty', 'price'].includes(operation)) {
+            errors.lines = `第 ${index + 1} 行：请选择有效的变更操作`
+            break
+          }
+          if (operation === 'add' && !String(line.itemName ?? '').trim()) {
+            errors.lines = `第 ${index + 1} 行：新增 BOQ 项必须填写分项名称`
+            break
+          }
+          const boqLineId = String(line.boqLineId ?? '')
+          const target = operation === 'add' ? null : effective.get(boqLineId)
+          if (operation !== 'add' && (!boqLineId || !target)) {
+            errors.lines = `第 ${index + 1} 行：调量或调价必须选择有效 BOQ 行`
+            break
+          }
+          try {
+            const calculated = calculateBoqChangeLine(
+              operation as BoqChangeOperation,
+              target ?? null,
+              line.deltaQty == null || line.deltaQty === '' ? null : Number(line.deltaQty),
+              line.newUnitPrice == null || line.newUnitPrice === '' ? null : Number(line.newUnitPrice),
+            )
+            if (target) {
+              if (operation === 'qty' && target.effectiveQty !== null)
+                target.effectiveQty += calculated.deltaQty ?? 0
+              if (operation === 'price' && calculated.newUnitPrice != null)
+                target.effectiveUnitPrice = calculated.newUnitPrice
+            }
+          }
+          catch (cause) {
+            errors.lines = `第 ${index + 1} 行：${cause instanceof Error ? cause.message : '变更量价无效'}`
+            break
+          }
+        }
+      }
       break
     case 'owner_report':
       require('projectId', '项目')
       require('contractId', '施工合同')
       require('periodNo', '报量期次')
       require('applicationDate', '申报日期')
-      if (!draft.lines?.length)
+      if (!draft.lines?.length) {
         errors.lines = '至少填写一条报量明细'
+      }
+      else {
+        const boqLineIds = draft.lines.map(line => String(line.boqLineId ?? ''))
+        const invalidIndex = draft.lines.findIndex((line) => {
+          const id = String(line.boqLineId ?? '')
+          const source = boqLines.find(candidate => candidate.id === id)
+          const reportedQty = line.reportedQty == null || line.reportedQty === ''
+            ? source?.autoQty
+            : Number(line.reportedQty)
+          return !id || !source || source.unitPrice === null || reportedQty == null || !Number.isFinite(reportedQty) || reportedQty < 0
+            || (source.missingQtyCount > 0 && (line.reportedQty == null || line.reportedQty === ''))
+        })
+        if (invalidIndex >= 0) {
+          const line = draft.lines[invalidIndex]!
+          const id = String(line.boqLineId ?? '')
+          const source = boqLines.find(candidate => candidate.id === id)
+          const reportedQty = line.reportedQty == null || line.reportedQty === ''
+            ? source?.autoQty
+            : Number(line.reportedQty)
+          errors.lines = !id || !source
+            ? `第 ${invalidIndex + 1} 行：请选择有效 BOQ 行`
+            : source.unitPrice === null
+              ? `第 ${invalidIndex + 1} 行：当前清单单价未知，请补齐清单后再申报`
+              : source.missingQtyCount > 0 && (line.reportedQty == null || line.reportedQty === '')
+                ? `第 ${invalidIndex + 1} 行：自动完成量存在缺量，请核实后填写申报量`
+                : reportedQty != null && Number.isFinite(reportedQty) && reportedQty < 0
+                  ? `第 ${invalidIndex + 1} 行：申报量不能为负数`
+                  : `第 ${invalidIndex + 1} 行：请填写有效申报量`
+        }
+        else if (new Set(boqLineIds).size !== boqLineIds.length) {
+          errors.lines = '同一月度报量不能重复选择 BOQ 行'
+        }
+      }
       break
     case 'acceptance':
       require('name', '名称')
       require('projectId', '项目')
-      require('documentDate', '日期')
+      require('contractId', '施工合同')
+      require('applicationDate', '申报日期')
       break
     case 'final_settlement':
       require('name', '结算名称')
       require('projectId', '项目')
+      require('contractId', '施工合同')
       require('settlementAmount', '结算金额', true)
       require('submissionDate', '报审日期')
       break
     case 'owner_penalty':
       require('projectId', '项目')
+      require('contractId', '施工合同')
       require('amount', '罚扣金额', true)
       require('penaltyDate', '罚扣日期')
       require('reason', '罚扣事由')
@@ -361,17 +469,38 @@ export function ownerDocumentStatusLabel(status: string): string {
 export function ownerDocumentLineAmount(
   kind: OwnerDocumentKind,
   line: Record<string, unknown>,
-): number {
-  if (kind === 'owner_report')
-    return (Number(line.reportedQty) || 0) * (Number(line.unitPrice) || 0)
+): number | null {
+  const number = (value: unknown): number | null => {
+    if (value == null || value === '' || (typeof value === 'string' && !value.trim()))
+      return null
+    if (typeof value !== 'number' && typeof value !== 'string')
+      return null
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  const unitPrice = number(line.unitPrice)
+  if (kind === 'owner_report') {
+    const reportedQty = number(line.reportedQty)
+    return reportedQty == null || unitPrice == null ? null : reportedQty * unitPrice
+  }
   const operation = String(line.operation ?? 'qty')
-  const qty = Number(line.qty) || 0
-  const deltaQty = Number(line.deltaQty) || 0
-  const unitPrice = Number(line.unitPrice) || 0
-  const newUnitPrice = Number(line.newUnitPrice) || 0
+  const qty = number(line.qty)
+  const deltaQty = number(line.deltaQty)
+  const newUnitPrice = number(line.newUnitPrice)
   if (operation === 'add')
-    return deltaQty * newUnitPrice
+    return deltaQty == null || newUnitPrice == null ? null : deltaQty * newUnitPrice
   if (operation === 'price')
-    return qty * (newUnitPrice - unitPrice)
-  return deltaQty * unitPrice
+    return qty == null || newUnitPrice == null || unitPrice == null ? null : qty * (newUnitPrice - unitPrice)
+  return deltaQty == null || unitPrice == null ? null : deltaQty * unitPrice
+}
+
+export function ownerDocumentTotalAmount(kind: OwnerDocumentKind, lines: Array<Record<string, unknown>>): number | null {
+  let total = 0
+  for (const line of lines) {
+    const amount = ownerDocumentLineAmount(kind, line)
+    if (amount == null)
+      return null
+    total += amount
+  }
+  return Math.round(total * 100) / 100
 }

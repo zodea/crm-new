@@ -1,15 +1,20 @@
+import type { PayrollQuery } from '~/lib/payroll/central-contract'
 import type {
   SignedDayworkFilter,
   SignedDayworkInput,
   SignedDayworkRecord,
 } from '~/lib/payroll/daywork'
 import { defineStore } from 'pinia'
+import { reactive, shallowRef } from 'vue'
 import { getDb, withTransaction } from '~/lib/db/connection'
 import {
   listSignedDayworkRecords,
   saveSignedDayworkRecord,
 } from '~/lib/payroll/daywork'
+import { payrollScopeFromOptions } from '~/lib/payroll/navigation'
+import { loadPayrollSourcesRead, requirePayrollNative } from '~/lib/payroll/platform-read'
 import { loadPayrollWorkbenchOptions } from '~/lib/payroll/statements'
+import { useDataVisibilityStore } from './data-visibility'
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
@@ -30,40 +35,64 @@ export const useSignedDayworkStore = defineStore('signed-daywork-workbench', () 
     status: '',
   })
   const loading = shallowRef(false)
+  const hasSnapshot = shallowRef(false)
   const error = shallowRef('')
+  let loadSequence = 0
+  let snapshotScope = ''
+  const scopeKey = (value: SignedDayworkFilter) => JSON.stringify([value.projectId, value.month, value.crewId ?? ''])
 
   async function load() {
+    requirePayrollNative()
+    const sequence = ++loadSequence
+    const requestedFilters: SignedDayworkFilter = { ...filters }
+    if (snapshotScope !== scopeKey(requestedFilters)) {
+      records.value = []
+      hasSnapshot.value = false
+      snapshotScope = ''
+    }
     loading.value = true
     error.value = ''
     try {
       const db = await getDb()
-      options.value = await loadPayrollWorkbenchOptions(db, filters.projectId)
-      if (!filters.projectId)
-        filters.projectId = options.value.projects[0]?.id ?? ''
-      if (filters.projectId)
-        options.value = await loadPayrollWorkbenchOptions(db, filters.projectId)
-      records.value = filters.projectId
-        ? await listSignedDayworkRecords(db, filters)
+      let nextOptions = await loadPayrollWorkbenchOptions(db, requestedFilters.projectId)
+      const scope = payrollScopeFromOptions(requestedFilters, nextOptions)
+      if (scope.projectId !== requestedFilters.projectId)
+        nextOptions = await loadPayrollWorkbenchOptions(db, scope.projectId)
+      Object.assign(requestedFilters, scope)
+      const nextRecords = requestedFilters.projectId
+        ? await listSignedDayworkRecords(db, requestedFilters)
         : []
+      if (sequence !== loadSequence)
+        return
+      Object.assign(filters, requestedFilters)
+      options.value = nextOptions
+      records.value = nextRecords
+      snapshotScope = scopeKey(requestedFilters)
+      hasSnapshot.value = true
     }
     catch (cause) {
-      error.value = cause instanceof Error ? cause.message : String(cause)
+      if (sequence === loadSequence)
+        error.value = cause instanceof Error ? cause.message : String(cause)
     }
     finally {
-      loading.value = false
+      if (sequence === loadSequence)
+        loading.value = false
     }
   }
 
   async function save(input: SignedDayworkInput) {
+    requirePayrollNative()
     await withTransaction(tx => saveSignedDayworkRecord(tx, input))
     await load()
   }
 
   return {
+    loadRead: (query: PayrollQuery & { projectId: string }) => loadPayrollSourcesRead(useNuxtApp().$repositories.payroll, { ...query, includeDemo: useDataVisibilityStore().includeDemo }),
     records,
     options,
     filters,
     loading,
+    hasSnapshot,
     error,
     load,
     save,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { QuantityTemplateSummary } from '~/lib/quantity/template'
+import KitButton from '~/components/ui/KitButton.vue'
 
 const props = defineProps<{
   templates: readonly QuantityTemplateSummary[]
@@ -7,6 +8,7 @@ const props = defineProps<{
   selectedTemplate: QuantityTemplateSummary | null
   copiedFromTemplateId: string | null
   dirty: boolean
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -30,35 +32,36 @@ const name = defineModel<string>('name', { required: true })
           aria-label="当前户型模板"
           @change="emit('templateChange', $event)"
         >
-          <option value="">新建草稿</option>
+          <option v-if="!readonly" value="">新建草稿</option>
           <option v-for="template in props.templates" :key="template.id" :value="template.id">
             {{ template.code }} · {{ template.name }} · {{ template.unitCount }} 户
           </option>
         </select>
       </label>
-      <button type="button" class="btn-secondary" @click="emit('createBlank')">
+      <KitButton v-if="!readonly" type="button" variant="secondary" @click="emit('createBlank')">
         <span class="i-lucide-plus mr-1" aria-hidden="true" />新建空白
-      </button>
-      <button type="button" class="btn-secondary" :disabled="!props.selectedTemplateId" @click="emit('borrowCurrent')">
+      </KitButton>
+      <KitButton v-if="!readonly" type="button" variant="secondary" :disabled="!props.selectedTemplateId" @click="emit('borrowCurrent')">
         <span class="i-lucide-copy mr-1" aria-hidden="true" />借用当前模板新建
-      </button>
+      </KitButton>
     </div>
 
     <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <label>
         <span class="field-label">户型编码 *</span>
-        <input v-model="code" class="field-input w-full" placeholder="如 A / B / C" autocomplete="off">
+        <input v-model="code" :readonly="readonly" class="field-input w-full" placeholder="如 A / B / C" autocomplete="off">
       </label>
       <label>
         <span class="field-label">户型名称 *</span>
-        <input v-model="name" class="field-input w-full" placeholder="如 A户型" autocomplete="off">
+        <input v-model="name" :readonly="readonly" class="field-input w-full" placeholder="如 A户型" autocomplete="off">
       </label>
     </div>
     <div class="mt-2 flex flex-wrap items-center gap-2 text-11px text-ink-soft">
       <span v-if="props.selectedTemplate" class="chip-brand">活链接 {{ props.selectedTemplate.unitCount }} 户</span>
       <span v-if="props.copiedFromTemplateId" class="chip">一次性借用快照</span>
       <span v-if="props.dirty" class="status-warn">有未保存修改</span>
-      <span v-else class="status-ok">已同步正式版本</span>
+      <span v-else-if="selectedTemplate" class="status-ok">已同步当前读取版本</span>
+      <span v-else class="text-ink-faint">尚未保存的新草稿</span>
     </div>
   </section>
 </template>

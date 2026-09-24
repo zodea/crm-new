@@ -1,0 +1,64 @@
+{
+  "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-a-central",
+  "files": 728,
+  "bytes": 51052628.0,
+  "recovery": "Windows Recycle Bin",
+  "commit": "c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d",
+  "timestamp": "2026-09-13T10:33:53.2349495+08:00",
+  "preserved": "85 actual PNGs, original PDF/XLSX, 13 rendered PDF pages, final checks/reviews and 110 code identities",
+  "excluded": "Other task directories, worktrees, shared caches, browser profiles, unclassified Windows Temp items",
+  "extensions": [
+    {
+      "extension": ".html",
+      "count": 2
+    },
+    {
+      "extension": ".json",
+      "count": 80
+    },
+    {
+      "extension": ".log",
+      "count": 176
+    },
+    {
+      "extension": ".md",
+      "count": 14
+    },
+    {
+      "extension": ".mjs",
+      "count": 12
+    },
+    {
+      "extension": ".pdf",
+      "count": 13
+    },
+    {
+      "extension": ".png",
+      "count": 400
+    },
+    {
+      "extension": ".py",
+      "count": 7
+    },
+    {
+      "extension": ".sql",
+      "count": 1
+    },
+    {
+      "extension": ".ts",
+      "count": 6
+    },
+    {
+      "extension": ".txt",
+      "count": 3
+    },
+    {
+      "extension": ".webm",
+      "count": 10
+    },
+    {
+      "extension": ".xlsx",
+      "count": 4
+    }
+  ]
+}

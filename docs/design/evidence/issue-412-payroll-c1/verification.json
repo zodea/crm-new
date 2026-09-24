@@ -1,0 +1,127 @@
+{
+  "baseline": "579d9383357fffd2bd87e727dbc21b903a7cb69c",
+  "recordedAt": "2026-09-14T13:22:24.356460+08:00",
+  "checks": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "checks/npm-test.log",
+      "sha256": "2323bdd2eab659154ec1dd78cff353c4bd9ef025e9ddf9c1867a50af99529b72",
+      "files": 654,
+      "tests": 3866,
+      "durationSeconds": 259.37
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "checks/typecheck.log",
+      "sha256": "29aa230872b81c9be83929131e82e9487811170eb768324395f03ab1523ffa01"
+    },
+    {
+      "command": "ESLint lintFiles: 112 explicit code paths",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "checks/lint.log",
+      "sha256": "5f8fe7b7d689c7068be8b657808e776d9ab4836b025494e046388e3c08b2e152",
+      "files": 112,
+      "errors": 0
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "checks/build.log",
+      "sha256": "9b416f5f8567ba48da8cd350d36860626e4867492058b072076325f1aa87e0be"
+    },
+    {
+      "command": "Playwright: C1 and inherited boundary specs",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "checks/browser.log",
+      "sha256": "e32eb745f2923b2f37526e5188dae6a0654c00ca7b6a880ae51f810eec1e9762",
+      "tests": 14
+    }
+  ],
+  "browser": {
+    "tests": 14,
+    "failed": 0,
+    "interactionImages": 125,
+    "visuallyReviewed": 125,
+    "widths": [
+      390,
+      768,
+      1024,
+      1280,
+      1440
+    ],
+    "breakdown": {
+      "journey": 85,
+      "readonly": 20,
+      "recovery": 15,
+      "savedConfigSupplement": 5
+    },
+    "journey": "browser/journey-verification.json",
+    "scope": "同轮真实迁入与中央HTTP；最早三张配置图是标签过渡态，已保存原范围名称由5张补图证明"
+  },
+  "documents": {
+    "actualPairedPdfPages": 2,
+    "guidePages": 13,
+    "visuallyReviewed": true,
+    "realWorkbookSheetsRead": [
+      "工资表",
+      "考勤表"
+    ],
+    "actualPdfReview": "checks/actual-pdf-review.json",
+    "guideReview": "checks/a/guide-final-review.json"
+  },
+  "independentReviews": {
+    "spec": "checks/spec/review.md",
+    "standards": "checks/standards/review.md",
+    "unresolvedBlockers": 0
+  },
+  "sourceManifest": "checks/code-hashes.json",
+  "reviewReport": {
+    "images": 7,
+    "visuallyReviewed": 7,
+    "record": "report/review.json",
+    "verification": "report/verification.json",
+    "scope": "逐Issue流程与总图的报告图像，单独统计，不计作业务交互图"
+  },
+  "finalE2EIncrement": "release 14/14后，仅为日后主流程截图增加两个Lookup名称就绪等待；同实例只读5档补图已实证同一名称条件，未更改产品。最终提交钩子另记录。",
+  "scope": "P2 C1逐日考勤、个人标准、独立工资、核对/实发/月锁及配对输出的本地中央实例验收；P3–P7和#416仍分别承接。",
+  "deployed": false,
+  "pushed": false,
+  "commit": "fd0a7b6b4ab58eb177eea1db86a069067be92a4a",
+  "commitHook": {
+    "status": "passed",
+    "checks": [
+      "lint-staged eslint --fix",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "files": 654,
+    "tests": 3866,
+    "durationSeconds": 256.11,
+    "log": "checks/commit-hook.log",
+    "sha256": "d93c80c339a32b6f7dece6ee27e6a3de6fda71d6ba842f48bdd61231dcfaffc5"
+  },
+  "codeBlobsMatched": 112,
+  "metadataChecks": {
+    "scope": "P2产品提交后的固定证据与覆盖索引登记",
+    "npmTest": {
+      "exitCode": 0,
+      "files": 654,
+      "tests": 3866,
+      "durationSeconds": 234.2,
+      "log": "checks/metadata-npm-test.log"
+    },
+    "lint": {
+      "exitCode": 0,
+      "files": 2,
+      "errors": 0,
+      "log": "checks/metadata-lint.log"
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { migratePaymentApprovalAmounts } from './payment-approval-migration'
 import { ALL_SCHEMA, BATCH_5_PAYROLL_ATTENDANCE } from './schema'
 
 /** 迁移器依赖的最小驱动形状（connection.ts 的 DbDriver 结构兼容，测试可用 sql.js 内存库实现） */
@@ -64,6 +65,15 @@ async function columnExists(db: MigrationDb, table: string, column: string): Pro
     [table],
   )
   return columns.some(item => item.name === column)
+}
+
+async function tableExists(db: MigrationDb, table: string): Promise<boolean> {
+  assertIdentifier(table)
+  const rows = await db.select<{ name: string }>(
+    'SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?',
+    [table],
+  )
+  return rows.length > 0
 }
 
 async function dropColumnIfExists(
@@ -5558,7 +5568,152 @@ export const migrations: Migration[] = [
       await addColumnIfMissing(db, 'monthly_statements', 'submitted_at', 'TEXT DEFAULT NULL')
     },
   },
+  {
+    version: 41,
+    name: 'invoice-export-settings',
+    async up(db) {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS invoice_export_settings (
+          id            TEXT PRIMARY KEY CHECK (id = 'default'),
+          settings_json TEXT NOT NULL,
+          updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `)
+    },
+  },
+  {
+    version: 42,
+    name: 'construction-contract-actual-completion-date',
+    async up(db) {
+      // 存量施工合同没有可核验的实际竣工事实。只增加可空 canonical 字段，
+      // 不使用合同结束日期、状态或结算余额推断并回填实际竣工日期。
+      // 最小化测试/恢复库可能只持有后置设置表；此时保持迁移幂等，不创建残缺合同表。
+      if (await tableExists(db, 'contracts'))
+        await addColumnIfMissing(db, 'contracts', 'actual_completion_date', 'TEXT DEFAULT NULL')
+    },
+  },
+  {
+    version: 43,
+    name: 'subcontract-contract-independent-statuses',
+    async up(db) {
+      // 分包结算与清账是独立事实。存量合同未记录时保持 NULL，
+      // 不使用结算额、付款余额或合同状态推断回填。
+      if (await tableExists(db, 'contracts')) {
+        await addColumnIfMissing(db, 'contracts', 'settlement_status', 'TEXT DEFAULT NULL')
+        await addColumnIfMissing(db, 'contracts', 'clearance_status', 'TEXT DEFAULT NULL')
+      }
+    },
+  },
+  {
+    version: 44,
+    name: 'acceptance-warranty-canonical-lifecycle',
+    async up(db) {
+      // 验收与保修是同一 project_acceptances 记录的两个生命周期视图。
+      // 存量 generic 字段含义不够精确，故保留原值并让新增 canonical 字段为空，
+      // 由后续真实命令填写；禁止根据 type/status 伪造历史日期或结论。
+      if (!(await tableExists(db, 'project_acceptances')))
+        return
+      await addColumnIfMissing(db, 'project_acceptances', 'acceptance_organization', `TEXT NOT NULL DEFAULT ''`)
+      await addColumnIfMissing(db, 'project_acceptances', 'acceptance_date', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'acceptance_conclusion', `TEXT NOT NULL DEFAULT ''`)
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_start_date', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_end_date', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_confirmation_organization', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_confirmation_date', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_confirmation_note', `TEXT NOT NULL DEFAULT ''`)
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS project_acceptance_lifecycle_events (
+          id            TEXT PRIMARY KEY,
+          acceptance_id TEXT NOT NULL REFERENCES project_acceptances(id) ON DELETE RESTRICT,
+          action        TEXT NOT NULL CHECK (action IN ('submit', 'accept', 'start-warranty', 'confirm-expiry')),
+          from_status   TEXT NOT NULL CHECK (from_status IN ('draft', 'submitted', 'accepted', 'warranty')),
+          to_status     TEXT NOT NULL CHECK (to_status IN ('submitted', 'accepted', 'warranty', 'expired')),
+          actor_id      TEXT NOT NULL,
+          actor_name    TEXT NOT NULL DEFAULT '',
+          occurred_at   TEXT NOT NULL,
+          note          TEXT NOT NULL DEFAULT '',
+          UNIQUE (acceptance_id, to_status)
+        )
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_project_acceptance_events_acceptance
+          ON project_acceptance_lifecycle_events(acceptance_id, occurred_at, id)
+      `)
+    },
+  },
+  {
+    version: 45,
+    name: 'owner-final-settlement-audit-facts',
+    async up(db) {
+      // 既有最终结算没有可核验的审定金额与日期。只增加可空事实列，
+      // 不根据申报金额、状态或收款差额推断历史审定结果。
+      if (!(await tableExists(db, 'owner_final_settlements')))
+        return
+      await addColumnIfMissing(
+        db,
+        'owner_final_settlements',
+        'audited_amount',
+        'REAL DEFAULT NULL CHECK (audited_amount IS NULL OR audited_amount >= 0)',
+      )
+      await addColumnIfMissing(db, 'owner_final_settlements', 'audited_date', 'TEXT DEFAULT NULL')
+    },
+  },
 ]
+
+migrations.push({
+  version: 46,
+  name: 'auxiliary-contract-tax-audit-and-explicit-finance-links',
+  async up(db) {
+    for (const table of ['contracts', 'company_expense_contracts']) {
+      if (!await tableExists(db, table))
+        continue
+      for (const field of ['party_a', 'created_by', 'updated_by', 'responsible', 'department'])
+        await addColumnIfMissing(db, table, field, 'TEXT DEFAULT NULL')
+    }
+    if (await tableExists(db, 'company_expense_contracts')) {
+      await addColumnIfMissing(db, 'company_expense_contracts', 'tax_rate', 'REAL DEFAULT NULL CHECK (tax_rate IS NULL OR (tax_rate >= 0 AND tax_rate <= 100))')
+      await addColumnIfMissing(db, 'company_expense_contracts', 'invoice_type', 'TEXT DEFAULT NULL')
+    }
+    // 新外键不回填；名称、金额或个人开支归属都不是合同身份。
+    for (const table of ['invoices', 'payment_applications']) {
+      if (!await tableExists(db, table))
+        continue
+      await addColumnIfMissing(db, table, 'company_expense_contract_id', 'TEXT DEFAULT NULL REFERENCES company_expense_contracts(id)')
+      for (const operation of ['INSERT', 'UPDATE']) {
+        await db.execute(`CREATE TRIGGER IF NOT EXISTS ${table}_company_contract_${operation.toLowerCase()}
+          BEFORE ${operation} ON ${table}
+          WHEN NEW.company_expense_contract_id IS NOT NULL AND (NEW.contract_id IS NOT NULL OR NEW.project_id IS NOT NULL)
+          BEGIN SELECT RAISE(ABORT, 'company contract must not reference a project contract or project'); END`)
+      }
+    }
+  },
+})
+
+migrations.push({
+  version: 47,
+  name: 'other-settlement-nullable-audit',
+  async up(db) {
+    if (!await tableExists(db, 'expenditure_settlements'))
+      return
+    for (const field of ['created_by', 'updated_by', 'responsible', 'department'])
+      await addColumnIfMissing(db, 'expenditure_settlements', field, 'TEXT DEFAULT NULL')
+  },
+})
+
+migrations.push({
+  version: 48,
+  name: 'supplier-independent-optional-labor-scope',
+  async up(db) {
+    if (await tableExists(db, 'suppliers'))
+      await addColumnIfMissing(db, 'suppliers', 'labor_scope', 'TEXT NOT NULL DEFAULT \'\'')
+  },
+})
+
+migrations.push({
+  version: 49,
+  name: 'payment-approval-nullable-amount-and-origin',
+  up: migratePaymentApprovalAmounts,
+})
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)
 

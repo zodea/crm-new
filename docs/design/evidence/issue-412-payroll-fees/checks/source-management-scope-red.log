@@ -1,0 +1,31 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run tests/payroll/management-scope-facts.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/management-scope-facts.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/management-scope-facts.test.ts [ tests/payroll/management-scope-facts.test.ts ]
+Error: Cannot find module '../../server/utils/payroll-management-scope-facts' imported from D:/crm本地项目开发/tests/payroll/management-scope-facts.test.ts
+ ❯ tests/payroll/management-scope-facts.test.ts:2:1
+      1| import { expect, it } from 'vitest'
+      2| import { loadPayrollAManagementScopeFacts } from '../../server/utils/p…
+       | ^
+      3| import { createMemoryDb } from '../helpers/memory-db'
+      4| import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quant…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  22:34:07
+   Duration  287ms (transform 27ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

@@ -14,6 +14,7 @@
 | 领域术语或 ADR | `domain-modeling`；需要对话压测时用 `grill-with-docs` |
 | 方案压力测试 | `grill-me` / `grilling` |
 | 规格与 Issue 拆分 | `to-spec`、`to-tickets`、`triage` |
+| 大范围复核与路线 | `wayfinder`；逐模块按 [复核规程](module-review.md) 记录证据、决定和真实业务问题 |
 | 会话交接 | `handoff` |
 
 规则：

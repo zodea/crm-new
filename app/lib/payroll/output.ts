@@ -37,7 +37,7 @@ export function createPayrollDocumentView(statement: WageStatement): PayrollDocu
   if (statement.status !== 'released')
     throw new Error('工资单完成实际发放后才能生成正式输出')
   if (statement.formatFamily === 'B')
-    throw new Error('B 类合同清单工资尚未实现，不能生成无事实来源的输出')
+    throw new Error('B 类工资已退役，历史记录只读，不生成工资输出')
 
   const workerNames = new Map(
     statement.members.map(member => [member.workerId, member.workerName]),

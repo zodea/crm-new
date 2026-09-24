@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildCredentialOcrReview,
   parseCredentialOcr,
+  resolveCredentialOcrChoices,
   resolveCredentialOcrReview,
   suggestCredentialCategory,
 } from '~/lib/supplier/credential-ocr'
@@ -54,10 +55,49 @@ describe('supplier credential OCR', () => {
     expect(parsed.category.category).toBe('营业执照')
     expect(parsed.fields).toEqual(expect.arrayContaining([
       expect.objectContaining({ key: 'name', value: '示例材料有限公司' }),
-      expect.objectContaining({ key: 'uniqueCode', value: '91440000TEST123456' }),
+      expect.objectContaining({ key: 'taxNo', value: '91440000TEST123456' }),
       expect.objectContaining({ key: 'validFrom', value: '2024-01-02' }),
       expect.objectContaining({ key: 'expiresAt', value: '2034-01-01' }),
     ]))
+    expect(parsed.fields.some(field => field.key === 'uniqueCode')).toBe(false)
+  })
+
+  it('同一原件的不同税号候选全部保留，稳定身份区分并默认保留当前值', () => {
+    const original = result('统一社会信用代码：91440000TEST123456\n纳税人识别号：91440000TEST654321\n税号：91440000TEST654322')
+    const parsed = parseCredentialOcr(original)
+    const candidates = parsed.fields.filter(field => field.key === 'taxNo')
+    expect(candidates.map(field => field.value)).toEqual(['91440000TEST123456', '91440000TEST654321', '91440000TEST654322'])
+    expect(new Set(candidates.map(field => field.id)).size).toBe(3)
+    expect(parseCredentialOcr(original).fields).toEqual(parsed.fields)
+    const review = buildCredentialOcrReview(candidates, { uniqueCode: 'INTERNAL', taxNo: '' })
+    expect(review.every(field => field.conflict && field.decision === 'keep-current')).toBe(true)
+    expect(resolveCredentialOcrReview(review)).toEqual({})
+    review[0]!.decision = 'use-recognized'
+    expect(resolveCredentialOcrReview(review)).toEqual({ taxNo: '91440000TEST123456' })
+    review[1]!.decision = 'use-recognized'
+    expect(() => resolveCredentialOcrReview(review)).toThrow(/多个|一项|一个/)
+  })
+
+  it('不同原标签识别为同一税号时没有伪冲突，确认仍只有一个目标值', () => {
+    const parsed = parseCredentialOcr(result('统一社会信用代码：91440000TEST123456\n纳税人识别号：91440000TEST123456'))
+    expect(parsed.fields).toHaveLength(2)
+    const review = buildCredentialOcrReview(parsed.fields, { taxNo: '' })
+    expect(review.some(field => field.conflict)).toBe(false)
+    expect(resolveCredentialOcrReview(review)).toEqual({ taxNo: '91440000TEST123456' })
+  })
+
+  it('确认只接受所属候选身份和一项明确决定，旧内部编码目标不自动搬值', () => {
+    const candidates = [{ id: 'tax-candidate', key: 'taxNo' as const, label: '税号', value: '91440000TEST123456', confidence: 0.9 }]
+    expect(() => resolveCredentialOcrChoices(candidates, {}, [])).toThrow(/每个字段/)
+    expect(() => resolveCredentialOcrChoices(candidates, {}, [{ key: 'taxNo', decision: 'use-recognized', candidateId: 'other' }])).toThrow(/候选/)
+    expect(() => resolveCredentialOcrChoices(candidates, {}, [{ key: 'taxNo', decision: 'keep-current' }, { key: 'taxNo', decision: 'manual', manualValue: 'MANUAL' }])).toThrow(/一项/)
+    const legacy = [{ id: 'old-code', key: 'uniqueCode' as const, label: '统一社会信用代码', value: '91440000TEST123456', confidence: 0.9 }]
+    const review = buildCredentialOcrReview(legacy, { uniqueCode: 'INTERNAL', taxNo: 'TAX' })
+    expect(review[0]).toMatchObject({ key: 'uniqueCode', label: '内部唯一识别码', sourceLabel: '统一社会信用代码', currentValue: 'INTERNAL', decision: 'keep-current' })
+    expect(resolveCredentialOcrReview(review)).toEqual({ uniqueCode: 'INTERNAL' })
+    expect(() => resolveCredentialOcrChoices(legacy, {}, [{ key: 'uniqueCode', decision: 'use-recognized', candidateId: 'old-code' }])).toThrow(/内部编码/)
+    expect(resolveCredentialOcrChoices(legacy, {}, [{ key: 'uniqueCode', decision: 'manual', manualValue: 'CONFIRMED-INTERNAL' }])).toEqual({ uniqueCode: 'CONFIRMED-INTERNAL' })
+    expect(legacy[0]!.key).toBe('uniqueCode')
   })
 
   it('识别身份证常见姓名与起止式有效期限', () => {

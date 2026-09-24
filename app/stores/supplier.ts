@@ -25,6 +25,7 @@ import { withSupplierImportCreateDefaults } from '~/lib/supplier/import'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 import { toNum } from '~/lib/util/number'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 // 子表中文标签（PARENT_REFS 无展示名，这是唯一需本地保留的信息；缺省回退表名；对称 stores/project.ts）。
 const TABLE_LABELS: Record<string, string> = {
@@ -53,6 +54,7 @@ export interface Supplier {
   address: string
   taxpayerType: string
   mainBusiness: string
+  laborScope: string
   invoiceName: string
   invoiceAddress: string
   bank: string
@@ -120,6 +122,7 @@ const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
   address: { col: 'address', toBind: d => d.address ?? '', fromRow: r => (r.address ?? '') as string },
   taxpayerType: { col: 'taxpayer_type', toBind: d => d.taxpayerType ?? '', fromRow: r => (r.taxpayer_type ?? '') as string },
   mainBusiness: { col: 'main_business', toBind: d => d.mainBusiness ?? '', fromRow: r => (r.main_business ?? '') as string },
+  laborScope: { col: 'labor_scope', toBind: d => d.laborScope ?? '', fromRow: r => (r.labor_scope ?? '') as string },
   invoiceName: { col: 'invoice_name', toBind: d => d.invoiceName ?? '', fromRow: r => (r.invoice_name ?? '') as string },
   invoiceAddress: { col: 'invoice_address', toBind: d => d.invoiceAddress ?? '', fromRow: r => (r.invoice_address ?? '') as string },
   bank: { col: 'bank', toBind: d => d.bank ?? '', fromRow: r => (r.bank ?? '') as string },
@@ -167,6 +170,7 @@ function rowToSupplier(row: Record<string, unknown>): Supplier {
 }
 
 export const useSupplierStore = defineStore('supplier', () => {
+  const dataVisibilityStore = useDataVisibilityStore()
   const list = shallowRef<Supplier[]>([])
   const listStats = shallowRef<Record<string, SupplierListStats>>({})
   const projectOptions = shallowRef<SupplierProjectFilterOption[]>([])
@@ -175,7 +179,10 @@ export const useSupplierStore = defineStore('supplier', () => {
   async function load(businessDate?: string) {
     loading.value = true
     try {
-      await revalidateSupplierCredentialStatuses(db, businessDate)
+      // Demo snapshots are immutable evidence. Credential revalidation belongs to
+      // the writable production workspace; demo reads use the seeded status.
+      if (!dataVisibilityStore.includeDemo)
+        await revalidateSupplierCredentialStatuses(db, businessDate)
       const [rows, statsRows, projectRows] = await Promise.all([
         select<Record<string, unknown>>(
           selectVisibleSql('suppliers', 'ORDER BY created_at DESC'),
@@ -322,6 +329,7 @@ export const useSupplierStore = defineStore('supplier', () => {
       const safeData: Partial<Supplier> = {
         ...existing,
         ...data,
+        laborScope: data.laborScope ?? existing.laborScope,
         credentialStatus: existing.credentialStatus,
         credentialReviewedAt: existing.credentialReviewedAt,
         credentialReviewNote: existing.credentialReviewNote,

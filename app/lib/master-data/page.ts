@@ -143,6 +143,7 @@ export function formDefaults(kind: MasterDataOwnerType): Record<string, unknown>
       return {
         ...common,
         aliases: [],
+        laborScope: '',
         taxpayerType: '未核验',
         taxpayerVerificationStatus: 'not_checked',
         taxpayerVerificationSource: '',

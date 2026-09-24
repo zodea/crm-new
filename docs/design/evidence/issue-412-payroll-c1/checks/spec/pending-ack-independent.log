@@ -1,0 +1,26 @@
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/c1-spec-independent.test.ts (4 tests | 1 failed) 31ms
+   × 个人标准保存后原项目失效，只有空标准和只读原因的冷读不能解除原操作 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/c1-spec-independent.test.ts > 个人标准保存后原项目失效，只有空标准和只读原因的冷读不能解除原操作
+AssertionError: expected [Function] to throw an error
+ ❯ tests/payroll/c1-spec-independent.test.ts:61:59
+     59|   repository.c1Config.mockResolvedValueOnce({ ...original, options: { …
+     60|   const unavailable = await store.loadC1Config({ origin: 'real' }, sco…
+     61|   expect(() => store.acknowledgeC1(pending, unavailable)).toThrow()
+       |                                                           ^
+     62|   expect(store.getC1Pending(original)?.command).toEqual(pending.comman…
+     63| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  11:39:24
+   Duration  2.05s (transform 350ms, setup 0ms, import 486ms, tests 31ms, environment 1.32s)
+

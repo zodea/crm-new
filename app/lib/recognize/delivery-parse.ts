@@ -15,7 +15,7 @@ export interface ParsedDeliveryDocument {
   date: string
   orderNo: string
   siteText: string
-  docType: '送货单' | '销售单' | '出货单' | '收据' | ''
+  docType: '送货单' | '销售单' | '出货单' | '收据' | '协议' | '付款申请' | ''
   items: ParsedDeliveryItem[]
   statedTotal: number | null
   calculatedTotal: number
@@ -121,6 +121,7 @@ function pad2(value: number): string {
 function findDate(lines: string[]): string {
   const text = lines.join(' ')
   const match = text.match(/(20\d{2})\s*[年.\-/]\s*(\d{1,2})\s*[月.\-/]\s*(\d{1,2})/)
+    || text.match(/(20\d{2})\s+(\d{1,2})\s+(\d{1,2})/)
     || text.match(/(20\d{2})(\d{2})(\d{2})/)
   if (!match)
     return ''
@@ -202,7 +203,7 @@ function findSiteText(lines: string[]): string {
 }
 
 function findDocType(lines: string[]): ParsedDeliveryDocument['docType'] {
-  const match = lines.join(' ').match(/送货单|销售单|出货单|收据/)
+  const match = lines.join(' ').match(/送货单|销售单|出货单|付款申请|协议|收据/)
   return (match?.[0] as ParsedDeliveryDocument['docType'] | undefined) ?? ''
 }
 
@@ -490,6 +491,12 @@ function tableItems(table: DeliveryTable): ParsedItems {
       total = round2(quantity * unitPrice)
     if (/^\d+(?:\.\d+)?$/.test(name) || (unit && !UNIT_RE.test(unit)) || total == null)
       note = [note, 'OCR 低置信字段（待复核）'].filter(Boolean).join('；')
+    const missingAmountFields = [
+      quantity != null && unitPrice == null ? '单价缺失' : '',
+      quantity != null && unitPrice == null && total == null ? '金额缺失' : '',
+    ].filter(Boolean)
+    if (missingAmountFields.length)
+      note = [note, `${missingAmountFields.join('、')}（待复核）`].filter(Boolean).join('；')
     if (quantity != null && unitPrice != null && total != null && Math.abs(round2(quantity * unitPrice) - total) > 0.01)
       note = [note, '金额与数量×单价不符（待复核）'].filter(Boolean).join('；')
 
@@ -521,7 +528,7 @@ function tableItems(table: DeliveryTable): ParsedItems {
 
 function reviewSummary(items: ParsedDeliveryItem[], statedTotal: number | null): Pick<ParsedDeliveryDocument, 'calculatedTotal' | 'balanced' | 'note'> {
   const calculatedTotal = round2(items.reduce((sum, item) => sum + (item.total ?? 0), 0))
-  const badRows = items.filter(item => /待复核/.test(item.note)).length
+  const badRows = items.filter(item => item.note.includes('金额与数量×单价不符')).length
   const notes: string[] = []
   if (badRows)
     notes.push(`${badRows} 行金额与数量×单价不符（待复核）`)
@@ -844,12 +851,28 @@ function hasNewLogicalPage(
   document: ParsedDeliveryDocumentPart,
 ): boolean {
   const incoming = document.sources[0]
-  if (incoming?.pageNumber == null || incoming.pageCount == null)
-    return true
+  if (incoming?.pageNumber == null || incoming.pageCount == null) {
+    const previous = candidate.sources.at(-1)
+    return Boolean(
+      previous
+      && incoming
+      && previous.pageIndex < incoming.pageIndex
+      && previous.sequenceEnd != null
+      && incoming.sequenceStart != null
+      && incoming.sequenceStart === previous.sequenceEnd + 1,
+    )
+  }
   const existingPagination = candidate.sources.filter(source => source.pageNumber != null && source.pageCount != null)
+  if (existingPagination.length !== candidate.sources.length)
+    return false
   if (existingPagination.some(source => source.pageCount !== incoming.pageCount))
     return false
   return !existingPagination.some(source => source.pageNumber === incoming.pageNumber)
+}
+
+function appendDocumentNote(document: ParsedDeliveryDocumentPart, note: string): void {
+  if (!document.note.includes(note))
+    document.note = [document.note, note].filter(Boolean).join('；')
 }
 
 function mergeSameOrderDocuments(documents: ParsedDeliveryDocumentPart[]): ParsedDeliveryDocument[] {
@@ -864,6 +887,16 @@ function mergeSameOrderDocuments(documents: ParsedDeliveryDocumentPart[]): Parse
           && !candidate.sources.some(source => source.pageIndex === sourcePageIndex))
       : undefined
     if (!existing) {
+      const sameOrderOnAnotherPage = document.orderNo
+        ? output.find(candidate => candidate.orderNo === document.orderNo
+          && metadataCompatible(candidate, document)
+          && candidate.sources.some(source => source.pageIndex !== sourcePageIndex))
+        : undefined
+      if (sameOrderOnAnotherPage) {
+        const note = '多页/多单据合并条件不足，已拆分待人工确认'
+        appendDocumentNote(sameOrderOnAnotherPage, note)
+        appendDocumentNote(document, note)
+      }
       output.push(document)
       continue
     }

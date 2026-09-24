@@ -1,0 +1,30 @@
+{
+  "runId": "8a1b9aed-bdf5-4eca-af94-67422e0ce565",
+  "project": "core-projects-e8c4599b8aeed9b628556ee0",
+  "crew": "core-crews-2739882924ee04cb9d155aca",
+  "worker": "core-workers-54cf631b55eae109444e33f9",
+  "oldWorker": "core-workers-227f849754d937c46a59f845",
+  "multiWorker": "core-workers-7edd2f07813fe06870065ea0",
+  "multiUnitTwo": "core-quantity_projects-a0cbd60c1e44630a8189d55a:units:pa-unit-multi-two",
+  "zero": "core-workers-9487dc01b356baf8fad8f663",
+  "item": "core-quantity_projects-a0cbd60c1e44630a8189d55a:items:pa-item",
+  "unit": "core-quantity_projects-a0cbd60c1e44630a8189d55a:units:pa-unit-other",
+  "building": "core-quantity_projects-a0cbd60c1e44630a8189d55a:buildings:pa-building",
+  "batchId": "core-batch-f87066a513810651caa25d80",
+  "sourceHash": "e182fd9c8bc852cd7fc952de6563710fde95b0547608b0e6c600bb15cf4c002e",
+  "snapshotSha256": "5622fc588f7366f1c06f4f94a8aaf343573e6c3a87aa98e00aa0df1fd5a8ca76",
+  "byteLength": 2285568,
+  "august": "wage_mtyypxd5_5",
+  "september": "wage_mtyypy4z_n",
+  "resets": 0,
+  "snapshotGeneratedFromRealCommands": true,
+  "actualXlsxParsed": true,
+  "printPdfGenerated": true,
+  "widths": [
+    390,
+    768,
+    1024,
+    1280,
+    1440
+  ]
+}

@@ -1,0 +1,167 @@
+[
+  {
+    "number": 426,
+    "status": "local-done",
+    "solved": ["客户收款不再出现固定正式样例；同一收款多次引用只计一次。", "当前来源、权限和失效情况重新核验，读取失败不冒充零收款。"],
+    "remaining": ["本票成果尚未推送。普通收款完整录入由 #436 另行完成，生产保存由 #416 承接。"],
+    "flow": ["打开客户详情", "核验当前客户和来源", "读取当前收款事实", "按收款身份去重", "查看累计及单笔收款", "返回原客户"],
+    "exception": { "at": 2, "label": "来源失效或无权：撤下旧金额，显示原因并允许重试", "returnTo": 1 },
+    "screens": [{ "title": "客户 · 收款关联", "action": "选择一笔真实收款", "result": "查看同一来源的收款详情" }, { "title": "来源不可用", "action": "重新读取", "result": "成功后恢复真实事实，失败继续显示原因" }],
+    "evidence": ["docs/design/evidence/issue-426/customer-receipts-1440.png", "docs/design/evidence/issue-426/customer-receipts-390.png", "docs/design/evidence/issue-426/customer-receipt-verification.md"],
+    "questions": []
+  },
+  {
+    "number": 427,
+    "status": "local-done",
+    "solved": ["无效合同、未确认结算不抬高合作汇总，原始行仍可追溯。", "合作文件先匹配分供方全称，再匹配别名，同层取最长。"],
+    "remaining": ["多轮请款、合作终态与同名新建档案规则仍在 #408 待裁定；本票未推送。"],
+    "flow": ["进入项目合作工作台", "读取合同与结算原始行", "筛出有效合同和已确认结算", "查看真实汇总并下钻", "导入合作文件", "先全称后别名确认归属", "回读合作档案"],
+    "exception": { "at": 5, "label": "仍有同名归属冲突：保留候选，不自动决定新建或合并", "returnTo": 4 },
+    "screens": [{ "title": "合作工作台", "action": "点击有效结算金额", "result": "查看构成金额的已确认源单" }, { "title": "文件归属核对", "action": "核对全称匹配候选", "result": "确认后进入对应合作关系" }],
+    "evidence": ["docs/design/evidence/issue-427/cooperation-rules-verification.md"],
+    "questions": ["见 #408：多轮请款怎样回退，合作结束时未清余额怎样处理，同名新档怎样裁定？"]
+  },
+  {
+    "number": 428,
+    "status": "local-done",
+    "solved": ["付款候选、保存、往期结算和动态成本统一只认已确认结算。", "保存时复验来源状态；拒绝时不留下付款头或半份分摊。"],
+    "remaining": ["通用付款中央写源、材料结算完整确认流程仍由父模块承接；本票未推送。"],
+    "flow": ["办理本类结算", "按既定动作确认", "付款选择已确认来源", "核对项目合同与分供方", "保存时复验来源", "读取付款与动态成本"],
+    "exception": { "at": 4, "label": "来源未确认、失效或关系不符：拒绝保存并保留输入", "returnTo": 2 },
+    "screens": [{ "title": "付款 · 结算来源", "action": "选择已确认结算", "result": "纳入合法结算金额" }, { "title": "保存校验", "action": "修正失效来源后重试", "result": "成功才写入付款及分摊" }],
+    "evidence": ["docs/design/evidence/issue-428/settlement-confirmation-verification.md"],
+    "questions": []
+  },
+  {
+    "number": 429,
+    "status": "local-done",
+    "solved": ["OCR 设置读取失败时不能用默认草稿覆盖旧参数；提供独立重新读取入口。", "保存失败保稿，并发读取共用结果，成功前持续保护写入。"],
+    "remaining": ["真实 OCR 样本准确率和全附件流程仍属 #406；本票未推送。"],
+    "flow": ["进入 OCR 设置", "读取当前参数", "读取成功后编辑", "保存设置", "成功反馈并回读", "按需只读检测服务状态"],
+    "exception": { "at": 1, "label": "读取失败：禁用保存与恢复默认，点重新读取；保存失败保留草稿", "returnTo": 1 },
+    "screens": [{ "title": "设置未读成功", "action": "重新读取设置", "result": "显示原有参数，随后允许编辑" }, { "title": "有未保存修改", "action": "保存", "result": "成功显示已保存；失败保留当前输入" }],
+    "evidence": ["docs/design/evidence/issue-429/ocr-settings-recovery-1440.png", "docs/design/evidence/issue-429/ocr-settings-recovery-390.png", "docs/design/evidence/issue-429/ocr-settings-recovery-verification.md"],
+    "questions": []
+  },
+  {
+    "number": 430,
+    "status": "local-done",
+    "solved": ["中央撤回成功、本机恢复失败时明确显示待恢复，不再误报当前对账通过。", "恢复期间禁止开启新迁移；刷新和重试沿用原备份、批次和命令。"],
+    "remaining": ["全域迁移覆盖与生产备份恢复仍属 #415/#416；本票未推送。"],
+    "flow": ["查看迁移批次", "发起批次回滚", "中央撤回该批次", "恢复本机原始备份", "确认恢复成功", "重新开放新迁移入口"],
+    "exception": { "at": 3, "label": "本机恢复失败：保留备份与待恢复状态，禁止新迁移，仅重试原恢复", "returnTo": 3 },
+    "screens": [{ "title": "恢复待完成", "action": "重试恢复", "result": "继续原批次，不新建迁移" }, { "title": "已恢复", "action": "核对原数据后继续", "result": "恢复正常迁移准备入口" }],
+    "evidence": ["docs/design/evidence/issue-430/migration-recovery-1440.png", "docs/design/evidence/issue-430/migration-recovery-390.png", "docs/design/evidence/issue-430/migration-recovery-verification.md"],
+    "questions": []
+  },
+  {
+    "number": 431,
+    "status": "local-done",
+    "solved": ["登记 OCR、迁移、付款、因子工具的 26 项旧验收义务，并关联当前任务、证据和固定提交。", "修正源码采证日期误覆盖外部观察日期的问题。"],
+    "remaining": ["全部 75 个历史票的义务映射尚未完成，继续由 #415 承接；本票未推送。"],
+    "flow": ["读取旧票最终条款", "分配唯一验收义务", "关联当前承接 Issue", "区分实际通过与待实施", "连接测试和固定证据", "生成可追溯覆盖索引"],
+    "exception": { "at": 4, "label": "缺本轮证据：保留历史或待验证状态，不能标作本轮通过", "returnTo": 3 },
+    "screens": [{ "title": "验收义务索引（审阅示意）", "action": "选择一条旧义务", "result": "查看原条款、承接票、证据及遗留" }, { "title": "证据范围（审阅示意）", "action": "打开固定提交或运行记录", "result": "仅判断该证据实际覆盖的范围" }],
+    "evidence": ["docs/design/module-review-coverage.md"],
+    "questions": []
+  },
+  {
+    "number": 432,
+    "status": "local-done",
+    "solved": ["顶部税额四格和因子求解共用含税金额；下方左控制、右结果，窄屏堆叠。", "默认 68 个精确解、旧配置、明确清空、复制、取消及金额分值一致性已验证。"],
+    "remaining": ["本地工具限定范围已完成，尚未推送；不代表其他设置或正式存储完成。"],
+    "flow": ["输入共用含税金额", "即时查看四格税额", "设置因子与数量范围", "点击求解", "查看本轮金额对应结果", "筛选或复制结果"],
+    "exception": { "at": 3, "label": "耗时或主动取消：保留旧完整结果；完成后原子替换", "returnTo": 2 },
+    "screens": [{ "title": "税额与组合工作台", "action": "修改含税金额", "result": "四格税额即时变化，下一次求解使用同一金额" }, { "title": "组合结果", "action": "筛选、复制或取消计算", "result": "表内滚动，保留用户配置" }],
+    "evidence": ["docs/design/evidence/issue-432/factor-workbench-1440.png", "docs/design/evidence/issue-432/factor-workbench-390.png", "docs/design/evidence/issue-432/factor-workbench-verification.md"],
+    "questions": []
+  },
+  {
+    "number": 433,
+    "status": "local-done",
+    "solved": ["新建工资只提供 A/C1/C2，历史 B 保持只读，领域写入口也拒绝修改。", "C1 正确显示考勤来源；工资、考勤、签工和详情往返保留项目、月份、班组和工资状态。"],
+    "remaining": ["工资中央写源、已发调整、历史迁移及成本闭环仍在 #412；本票未推送。"],
+    "flow": ["设置项目月份班组与工资状态", "选择 A/C1/C2", "C1 进入真实考勤来源", "按需进入签工页面", "返回工资核对来源", "打开工资详情后返回原筛选"],
+    "exception": { "at": 2, "label": "读取失败保留输入；切换范围后旧响应不能覆盖新范围；历史 B 不开放写入", "returnTo": 0 },
+    "screens": [{ "title": "工资台账 · C1", "action": "核对考勤来源", "result": "进入同一项目月份班组的考勤" }, { "title": "签工或工资详情", "action": "返回工资台账", "result": "恢复原筛选；签工自身状态独立" }],
+    "evidence": ["docs/design/evidence/issue-433/c1-lines-1440.png", "docs/design/evidence/issue-433/c1-lines-390.png", "docs/design/evidence/issue-433/legacy-b-390.png", "docs/design/evidence/issue-433/payroll-verification.md"],
+    "questions": []
+  },
+  {
+    "number": 434,
+    "status": "local-done",
+    "solved": ["首页读取完整中央项目目录，新建和改名项目可回读，项目按来源与身份区分。", "缺中央排程时明确显示未知，失效来源撤下旧事实，往返保留同一项目。"],
+    "remaining": ["正式中央 WBS 与首页同源进度已由 #444 完成本地验收；新增暂估绑定见 #445，成本和工资继续由 #412 承接。本票未推送。"],
+    "flow": ["中央新建或修改项目", "刷新首页项目目录", "选择项目并核验当前身份", "显示该项目施工进度来源", "进入来源感知的只读进度页", "返回同一首页项目"],
+    "exception": { "at": 3, "label": "中央排程尚未接入：显示未知，不改选本地或演示项目；无权显示原因", "returnTo": 2 },
+    "screens": [{ "title": "首页项目选择", "action": "选择中央项目", "result": "显示当前名称与来源状态" }, { "title": "施工进度来源", "action": "查看后返回", "result": "保持同一项目；缺源显示未知" }],
+    "evidence": ["docs/design/evidence/issue-434/home-1440.png", "docs/design/evidence/issue-434/source-390.png", "docs/design/evidence/issue-434/README.md"],
+    "questions": []
+  },
+  {
+    "number": 435,
+    "status": "local-done",
+    "solved": ["浏览器刷新后恢复页签描述，逐次核验目标和权限，失败明确回退。", "恢复失败的页面可从有效业务入口重新打开；取消导航及迟到恢复不会抹掉问题或抢回页面。"],
+    "remaining": ["仅已接入目标支持完整恢复；其余详情、通知、Tauri 和生产持久化不因本票完成；尚未推送。"],
+    "flow": ["打开业务页面并形成页签", "刷新或恢复会话", "重新核验旧页签目标", "恢复可用页面及上下文", "从列表重新打开已失败目标", "正常导航成功后更新旧问题状态"],
+    "exception": { "at": 2, "label": "失效、无权或未接入：显示恢复原因；旧页签再次点击仍须核验", "returnTo": 2 },
+    "screens": [{ "title": "旧页签恢复失败", "action": "回到有效业务列表", "result": "保留明确失败原因，不泄露旧事实" }, { "title": "列表业务入口", "action": "重新打开同一记录", "result": "正常读取成功后恢复页面" }],
+    "evidence": ["docs/design/evidence/issue-435/reopen/reopen-problem-390.png", "docs/design/evidence/issue-435/reopen/reopened-1440.png", "docs/design/evidence/issue-435/reopen/README.md", "docs/design/evidence/issue-435/README.md"],
+    "questions": []
+  },
+  {
+    "number": 436,
+    "status": "local-done",
+    "solved": ["普通收款整页新建、编辑、保存、提交、详情和附件使用同一中央事实。", "客户、项目、合同和最终结算共同回读普通收款；受控迁移、幂等、版本冲突与批次回滚已有真实验证。"],
+    "remaining": ["审批、退款、红冲、确认撤回与生产保存仍保持原范围；分类、类型、质保、变现缺事实时为未知；尚未推送。"],
+    "flow": ["进入普通收款列表或关联入口", "整页填写收款并选择真实关系", "添加和核对凭证", "保存草稿或提交", "回读同一收款详情", "查看客户项目合同累计", "返回原来源和筛选"],
+    "exception": { "at": 3, "label": "权限、版本或关系变化：拒绝写入并保留草稿；缺附件正文明确提示", "returnTo": 1 },
+    "screens": [{ "title": "收款登记整页", "action": "填写资料和凭证后提交", "result": "进入同一收款详情，不要求先有最终结算" }, { "title": "收款详情与关联累计", "action": "预览凭证或返回来源", "result": "读取当前正文，保持原项目或客户上下文" }],
+    "evidence": ["docs/design/evidence/issue-436/receipt-form-1440.png", "docs/design/evidence/issue-436/receipt-detail-1440.png", "docs/design/evidence/issue-436/receipt-form-390.png", "docs/design/evidence/issue-436/README.md"],
+    "questions": []
+  },
+  {
+    "number": 437,
+    "status": "local-done",
+    "solved": ["发票 Excel 表头、数据各四向边框可配置，预览、保存和实际文件一致。", "修正金额格式显示和北京时间凌晨导出文件名日期；真实 XLSX 已回读验证。"],
+    "remaining": ["发票中央写入、Office/WPS 双引擎及父模块完整导出验收不在本切片；尚未推送。"],
+    "flow": ["进入发票台账导出", "分别设置表头和数据边框", "核对颜色与金额格式", "查看同屏预览", "保存配置或取消恢复", "实际下载 Excel 并回读"],
+    "exception": { "at": 2, "label": "无效颜色或保存失败：提示具体问题并保留设置，修正后重试", "returnTo": 1 },
+    "screens": [{ "title": "表头与数据边框", "action": "分别调整上下左右边框", "result": "预览反映同一设置" }, { "title": "导出预览", "action": "保存后下载 Excel", "result": "实际文件保留边框、金额格式与本地日期" }],
+    "evidence": ["docs/design/evidence/issue-437/header-1440.png", "docs/design/evidence/issue-437/data-1440.png", "docs/design/evidence/issue-437/preview-390.png", "docs/design/evidence/issue-437/README.md"],
+    "questions": []
+  },
+  {
+    "number": 438,
+    "status": "local-done",
+    "solved": ["合作档案可从当前中央正文预览完整 PDF、单份下载和原件 ZIP，校验字节与摘要。", "同名文件保留独立身份；缺正文、摘要失败、权限变化和慢响应有明确恢复路径。"],
+    "remaining": ["本票只覆盖合作档案 owner；其他原件归属及生产文件保存仍由对应模块承接；尚未推送。"],
+    "flow": ["进入项目合作档案", "选择一个或多个原件", "重验当前归属来源和权限", "读取并校验原件正文", "完整预览或单份下载", "打包所选原件 ZIP"],
+    "exception": { "at": 3, "label": "正文缺失或摘要不符：不输出错误文件，保留选择并允许重试", "returnTo": 2 },
+    "screens": [{ "title": "合作文件列表", "action": "选择原件并预览", "result": "显示完整多页 PDF" }, { "title": "原件下载", "action": "下载单份或 ZIP", "result": "同名文件仍各自独立，原字节不变" }],
+    "evidence": ["docs/design/evidence/issue-438/files-1440.png", "docs/design/evidence/issue-438/files-390.png", "docs/design/evidence/issue-438/hash-failure.png", "docs/design/evidence/issue-438/project-supplier-files-verification.md"],
+    "questions": []
+  },
+  {
+    "number": 439,
+    "status": "local-done",
+    "solved": ["批复空值、明确零和正数无损保存；历史零保留原值并提示含义待核验。", "详情和跨页面汇总共用金额语义，读取失败撤下旧余额与动作；实际迁移保留分摊关系。"],
+    "remaining": ["PAY-08 历史未知批复的新支付确认政策仍需 #413 裁定；通用付款中央写源及生产保存未完成；本票未推送。"],
+    "flow": ["打开付款申请", "区分未批复明确零与历史待核验", "明确编辑批复输入", "保存时核验用户输入意图", "重新打开详情核对金额", "关联页面回读同一语义"],
+    "exception": { "at": 1, "label": "历史零含义未知：保留原值并提示核验，普通备注或附件保存不代为确认", "returnTo": 1 },
+    "screens": [{ "title": "付款批复", "action": "明确输入空值、零或正数", "result": "保存后保持原含义" }, { "title": "历史付款详情", "action": "查看待核验提示", "result": "不把历史未知自动认作批准全额或明确零" }],
+    "evidence": ["docs/design/evidence/issue-439/approval-form-1440.png", "docs/design/evidence/issue-439/approval-detail-390.png", "docs/design/evidence/issue-439/README.md"],
+    "questions": ["PAY-08：历史批复含义尚未核清时，新增实际支付须先完成怎样的人工确认？"]
+  },
+  {
+    "number": 440,
+    "status": "local-done",
+    "solved": ["合同量、暂估量、现场量按单位分别汇总，未知与明确零保真，缺项及已知部分可核对。", "全户按稳定分项去重；月度只计实际完成且明确报量的阶段，真实 Excel 保持单位和缺值。"],
+    "remaining": ["本票修复原本地读取路径；中央工程量及甲方月报衔接由 #442、中央 WBS 由 #444 验收并独立本地提交。新增暂估绑定见 #445，工资仍属 #412；尚未推送。"],
+    "flow": ["查看阶段或全户工程量", "按稳定分项去重", "分别按计量单位汇总三量", "标出缺量和已知部分", "选择月份及已完成报量阶段", "导出月度台账并核对三张表"],
+    "exception": { "at": 3, "label": "缺量保留空值，明确零仍为零；不同或缺失单位不强行相加", "returnTo": 0 },
+    "screens": [{ "title": "工程量三量合计", "action": "查看每个单位的完整度", "result": "区分已知合计与缺量，不伪造完整总额" }, { "title": "月度台账导出", "action": "下载并打开三张工作表", "result": "保留数字零、空值、单位与缺项数量" }],
+    "evidence": ["docs/design/evidence/issue-440/totals-1440.png", "docs/design/evidence/issue-440/totals-390.png", "docs/design/evidence/issue-440/quantity-ledger.xlsx", "docs/design/evidence/issue-440/README.md"],
+    "questions": []
+  }
+]

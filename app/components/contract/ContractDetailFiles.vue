@@ -23,7 +23,6 @@ function fileSize(bytes: number): string {
     <SectionHeader
       id="contract-files-title"
       title="合同文件"
-      subtitle="读取合同附件引用；文件维护仍在合同编辑页完成"
     />
     <ul v-if="files.length" class="mt-3 grid gap-2" aria-label="合同文件列表">
       <li

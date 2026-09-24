@@ -1,0 +1,220 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/central-c1-http.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+stderr | tests/payroll/central-c1-http.test.ts > 真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率
+[h3] Please prefer using `message` for longer error messages instead of `statusMessage`. In the future, `statusMessage` will be sanitized by default.
+
+stderr | tests/payroll/central-c1-http.test.ts > 真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率
+[h3] Please prefer using `message` for longer error messages instead of `statusMessage`. In the future, `statusMessage` will be sanitized by default.
+
+ ❯ |unit| tests/payroll/central-c1-http.test.ts (1 test | 1 failed) 761ms
+   × 真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率 760ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/central-c1-http.test.ts > 真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率
+AssertionError: expected { id: 'wage_mu0qst5l_4', …(38) } to match object { status: 'draft', …(2) }
+(75 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "lines": [
+      {
+        "amount": 451.54,
++       "deletedAt": null,
++       "id": "wage_statement_lines_mu0qst5m_c",
++       "itemId": null,
++       "itemName": "正常工时",
+        "quantity": 7.51,
+-       "unitPrice": 60.125,
++       "sortOrder": 0,
++       "statementId": "wage_mu0qst5l_4",
++       "unit": "小时",
++       "unitPrice": 60.13,
++       "workerId": "w",
++       "workerName": "负责人",
++     },
++     {
++       "amount": 110,
++       "deletedAt": null,
++       "id": "wage_statement_lines_mu0qst5n_e",
++       "itemId": null,
++       "itemName": "加班工时",
++       "quantity": 2,
++       "sortOrder": 1,
++       "statementId": "wage_mu0qst5l_4",
++       "unit": "小时",
++       "unitPrice": 55,
+        "workerId": "w",
++       "workerName": "负责人",
++     },
++     {
++       "amount": 0,
++       "deletedAt": null,
++       "id": "wage_statement_lines_mu0qst5n_g",
++       "itemId": null,
++       "itemName": "正常工时",
++       "quantity": 0,
++       "sortOrder": 2,
++       "statementId": "wage_mu0qst5l_4",
++       "unit": "小时",
++       "unitPrice": 60,
++       "workerId": "member",
++       "workerName": "组员",
++     },
++     {
++       "amount": 0,
++       "deletedAt": null,
++       "id": "wage_statement_lines_mu0qst5n_i",
++       "itemId": null,
++       "itemName": "加班工时",
++       "quantity": 0,
++       "sortOrder": 3,
++       "statementId": "wage_mu0qst5l_4",
++       "unit": "小时",
++       "unitPrice": 60,
++       "workerId": "member",
++       "workerName": "组员",
++     },
++     {
++       "amount": 0,
++       "deletedAt": null,
++       "id": "wage_statement_lines_mu0qst5n_k",
++       "itemId": null,
++       "itemName": "正常工时",
++       "quantity": 0,
++       "sortOrder": 4,
++       "statementId": "wage_mu0qst5l_4",
++       "unit": "小时",
++       "unitPrice": 0,
++       "workerId": "zero",
++       "workerName": "零成员",
++     },
++     {
++       "amount": 0,
++       "deletedAt": null,
++       "id": "wage_statement_lines_mu0qst5n_m",
++       "itemId": null,
++       "itemName": "加班工时",
++       "quantity": 0,
++       "sortOrder": 5,
++       "statementId": "wage_mu0qst5l_4",
++       "unit": "小时",
++       "unitPrice": 0,
++       "workerId": "zero",
++       "workerName": "零成员",
+      },
+    ],
+    "status": "draft",
+    "stored": {
+      "lines": [
+        {
+          "amount": 451.54,
++         "deletedAt": null,
++         "id": "wage_statement_lines_mu0qst5m_c",
++         "itemId": null,
++         "itemName": "正常工时",
+          "quantity": 7.51,
+-         "unitPrice": 60.125,
++         "sortOrder": 0,
++         "statementId": "wage_mu0qst5l_4",
++         "unit": "小时",
++         "unitPrice": 60.13,
++         "workerId": "w",
++         "workerName": "负责人",
++       },
++       {
++         "amount": 110,
++         "deletedAt": null,
++         "id": "wage_statement_lines_mu0qst5n_e",
++         "itemId": null,
++         "itemName": "加班工时",
++         "quantity": 2,
++         "sortOrder": 1,
++         "statementId": "wage_mu0qst5l_4",
++         "unit": "小时",
++         "unitPrice": 55,
+          "workerId": "w",
++         "workerName": "负责人",
++       },
++       {
++         "amount": 0,
++         "deletedAt": null,
++         "id": "wage_statement_lines_mu0qst5n_g",
++         "itemId": null,
++         "itemName": "正常工时",
++         "quantity": 0,
++         "sortOrder": 2,
++         "statementId": "wage_mu0qst5l_4",
++         "unit": "小时",
++         "unitPrice": 60,
++         "workerId": "member",
++         "workerName": "组员",
++       },
++       {
++         "amount": 0,
++         "deletedAt": null,
++         "id": "wage_statement_lines_mu0qst5n_i",
++         "itemId": null,
++         "itemName": "加班工时",
++         "quantity": 0,
++         "sortOrder": 3,
++         "statementId": "wage_mu0qst5l_4",
++         "unit": "小时",
++         "unitPrice": 60,
++         "workerId": "member",
++         "workerName": "组员",
++       },
++       {
++         "amount": 0,
++         "deletedAt": null,
++         "id": "wage_statement_lines_mu0qst5n_k",
++         "itemId": null,
++         "itemName": "正常工时",
++         "quantity": 0,
++         "sortOrder": 4,
++         "statementId": "wage_mu0qst5l_4",
++         "unit": "小时",
++         "unitPrice": 0,
++         "workerId": "zero",
++         "workerName": "零成员",
++       },
++       {
++         "amount": 0,
++         "deletedAt": null,
++         "id": "wage_statement_lines_mu0qst5n_m",
++         "itemId": null,
++         "itemName": "加班工时",
++         "quantity": 0,
++         "sortOrder": 5,
++         "statementId": "wage_mu0qst5l_4",
++         "unit": "小时",
++         "unitPrice": 0,
++         "workerId": "zero",
++         "workerName": "零成员",
+        },
+      ],
+    },
+  }
+
+ ❯ detail tests/payroll/central-c1-http.test.ts:76:32
+
+ ❯ tests/payroll/central-c1-http.test.ts:81:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  12:28:12
+   Duration  1.49s (transform 497ms, setup 0ms, import 517ms, tests 761ms, environment 0ms)
+

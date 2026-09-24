@@ -119,11 +119,7 @@ describe('辅助合同整页表单状态', () => {
     vi.stubGlobal('navigateTo', vi.fn())
     vi.stubGlobal('useTabTitle', vi.fn())
     vi.stubGlobal('useState', (_key: string, init: () => boolean) => ref(init()))
-    vi.stubGlobal('useTabsStore', () => ({
-      tabs: [],
-      close: vi.fn(),
-      open: vi.fn(),
-    }))
+    vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, tabs: [], close: vi.fn(), open: vi.fn() }))
     vi.stubGlobal('useContractStore', () => ({
       load,
       byId: vi.fn(),

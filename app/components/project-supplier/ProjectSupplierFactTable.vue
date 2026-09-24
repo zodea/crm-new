@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { NavigationIntentDTO } from '~/types/read-model'
+
 interface ProjectSupplierFactTableRow {
   id: string
-  sourcePath: string
+  navigation: NavigationIntentDTO
   cells: Array<{
     text: string
     tone?: 'default' | 'money' | 'muted' | 'status'
@@ -12,6 +14,7 @@ defineProps<{
   columns: readonly string[]
   rows: readonly ProjectSupplierFactTableRow[]
   empty: string
+  returnTo: string
 }>()
 </script>
 
@@ -59,10 +62,7 @@ defineProps<{
             <span v-else class="break-words">{{ cell.text || '—' }}</span>
           </td>
           <td class="whitespace-nowrap px-3 py-2.5">
-            <NuxtLink v-if="row.sourcePath" :to="row.sourcePath" class="cell--link">
-              查看源单
-            </NuxtLink>
-            <span v-else class="text-ink-faint">暂无详情页</span>
+            <ProjectSupplierSourceLink label="查看源单" :intent="row.navigation" :return-to="returnTo" />
           </td>
         </tr>
       </tbody>

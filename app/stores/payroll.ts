@@ -1,3 +1,4 @@
+import type { PayrollQuery } from '~/lib/payroll/central-contract'
 import type {
   PayrollWorkbenchOptions,
   WageAllocationInput,
@@ -12,6 +13,8 @@ import { defineStore } from 'pinia'
 import { computed, reactive, ref, shallowRef } from 'vue'
 import { getDb, withTransaction } from '~/lib/db/connection'
 import { upsertC2SubjectConfig } from '~/lib/payroll/daywork'
+import { payrollScopeFromOptions } from '~/lib/payroll/navigation'
+import { loadPayrollListRead, requirePayrollNative } from '~/lib/payroll/platform-read'
 import {
   buildWageDraftSource,
   checkWageStatement,
@@ -21,6 +24,8 @@ import {
   releaseWageStatement,
   updateDraftLinePrice,
 } from '~/lib/payroll/statements'
+import { useDataVisibilityStore } from './data-visibility'
+import { usePayrollAStore } from './payroll-a'
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
@@ -46,6 +51,7 @@ export interface PayrollDraftCreateInput {
 }
 
 export const usePayrollStore = defineStore('payroll-workbench', () => {
+  const centralA = usePayrollAStore()
   const statements = shallowRef<WageStatement[]>([])
   const options = shallowRef<PayrollWorkbenchOptions>({
     projects: [],
@@ -55,6 +61,8 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   })
   const selectedId = ref('')
   const loading = ref(false)
+  const hasSnapshot = ref(false)
+  let snapshotScope = ''
   const error = ref('')
   let loadSequence = 0
   const filters = reactive<WageStatementFilter>({
@@ -68,12 +76,16 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     statements.value.find(statement => statement.id === selectedId.value) ?? null,
   )
 
+  const scopeKey = (value: WageStatementFilter) => JSON.stringify([value.projectId ?? '', value.month ?? '', value.crewId ?? ''])
+
   async function resolveOptions(projectId: string) {
+    requirePayrollNative()
     const db = await getDb()
     let resolvedProjectId = projectId
     let nextOptions = await loadPayrollWorkbenchOptions(db, resolvedProjectId)
-    if (!resolvedProjectId && nextOptions.projects[0]) {
-      resolvedProjectId = nextOptions.projects[0].id
+    const normalized = payrollScopeFromOptions({ projectId }, nextOptions)
+    if (resolvedProjectId !== normalized.projectId) {
+      resolvedProjectId = normalized.projectId
       nextOptions = await loadPayrollWorkbenchOptions(db, resolvedProjectId)
     }
     return { db, resolvedProjectId, nextOptions }
@@ -88,6 +100,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
       if (sequence !== loadSequence)
         return nextOptions
       filters.projectId = resolvedProjectId
+      filters.crewId = payrollScopeFromOptions(filters, nextOptions).crewId
       options.value = nextOptions
       return nextOptions
     }
@@ -106,27 +119,36 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   async function load() {
     const sequence = ++loadSequence
     const requestedFilters: WageStatementFilter = { ...filters }
+    const isCurrentRead = () => sequence === loadSequence
+      && scopeKey(filters) === scopeKey(requestedFilters)
+      && JSON.stringify(filters.status) === JSON.stringify(requestedFilters.status)
     loading.value = true
     error.value = ''
-    statements.value = []
+    if (snapshotScope !== scopeKey(requestedFilters)) {
+      statements.value = []
+      hasSnapshot.value = false
+      snapshotScope = ''
+    }
     selectedId.value = ''
     try {
       const { db, resolvedProjectId, nextOptions } = await resolveOptions(requestedFilters.projectId ?? '')
       const nextFilters: WageStatementFilter = {
         ...requestedFilters,
-        projectId: resolvedProjectId,
+        ...payrollScopeFromOptions({ ...requestedFilters, projectId: resolvedProjectId }, nextOptions),
       }
       const nextStatements = await listWageStatements(db, nextFilters)
-      if (sequence !== loadSequence)
+      if (!isCurrentRead())
         return
       Object.assign(filters, nextFilters)
       options.value = nextOptions
       statements.value = nextStatements
+      snapshotScope = scopeKey(nextFilters)
+      hasSnapshot.value = true
       if (!statements.value.some(statement => statement.id === selectedId.value))
         selectedId.value = statements.value[0]?.id ?? ''
     }
     catch (cause) {
-      if (sequence === loadSequence)
+      if (isCurrentRead())
         error.value = cause instanceof Error ? cause.message : String(cause)
     }
     finally {
@@ -136,8 +158,9 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   async function createDraft(input: PayrollDraftCreateInput) {
+    requirePayrollNative()
     if (input.formatFamily === 'B')
-      throw new Error('B 类合同清单直报尚未实现，不能按 A 类工程量代建工资单')
+      throw new Error('B 类工资已退役，请选择 A、C1 或 C2')
     const id = await withTransaction(async (tx) => {
       const subjectConfigId = input.formatFamily === 'C2'
         ? await upsertC2SubjectConfig(tx, {
@@ -174,6 +197,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   async function updatePrice(lineId: string, value: number) {
+    requirePayrollNative()
     if (!selected.value)
       return
     await withTransaction(tx => updateDraftLinePrice(tx, selected.value!.id, lineId, value))
@@ -181,6 +205,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   async function checkSelected() {
+    requirePayrollNative()
     if (!selected.value)
       return
     const statement = selected.value
@@ -234,6 +259,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     actualAmount: number,
     allocations: readonly WageAllocationInput[] = [],
   ) {
+    requirePayrollNative()
     if (!selected.value)
       return
     try {
@@ -250,11 +276,26 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   return {
+    loadAForm: centralA.loadAForm,
+    loadAConfig: centralA.loadAConfig,
+    loadAOutput: centralA.loadAOutput,
+    saveADraft: centralA.saveADraft,
+    checkA: centralA.checkA,
+    setAPayRatio: centralA.setAPayRatio,
+    releaseA: centralA.releaseA,
+    saveASubjectConfig: centralA.saveASubjectConfig,
+    saveAPrices: centralA.saveAPrices,
+    getAPending: centralA.getAPending,
+    recoverA: centralA.recoverA,
+    acknowledgeA: centralA.acknowledgeA,
+    aSaving: computed(() => centralA.aSaving),
+    loadRead: (query: PayrollQuery) => loadPayrollListRead(useNuxtApp().$repositories.payroll, { ...query, includeDemo: useDataVisibilityStore().includeDemo }),
     statements,
     options,
     selectedId,
     selected,
     loading,
+    hasSnapshot,
     error,
     filters,
     load,

@@ -59,7 +59,7 @@ function money(value: number): string {
                 {{ row.contractCount }} 份合同
               </div>
               <div v-for="contract in row.contracts" :key="contract.id" class="leading-6">
-                <NuxtLink :to="`/contract/${contract.id}`" class="text-brand hover:underline">
+                <NuxtLink :to="`/contract/${encodeURIComponent(contract.id)}${contract.dataOrigin ? `?contractKind=material&origin=${contract.dataOrigin}` : ''}`" class="text-brand hover:underline">
                   {{ contract.name }}
                 </NuxtLink>
                 <span class="ml-1 font-mono text-ink-faint">{{ contract.no }}</span>

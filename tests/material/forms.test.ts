@@ -62,6 +62,15 @@ beforeEach(async () => {
     VALUES ('supplier-material', '材料分供方', 'approved')
   `)
   await mem.execute(`
+    UPDATE suppliers
+    SET supplier_category = '材料供应商'
+    WHERE id = 'supplier-material'
+  `)
+  await mem.execute(`
+    INSERT INTO project_suppliers (id, project_id, supplier_id, status)
+    VALUES ('project-supplier-material', 'project-material', 'supplier-material', 'contracted')
+  `)
+  await mem.execute(`
     INSERT INTO crews (id, name, status)
     VALUES ('crew-material', '材料班组', '在场')
   `)
@@ -388,8 +397,20 @@ describe('f4 物资事实、派生库存与甲供材总控', () => {
     expect((await getMaterialStockSummary('中心仓', '腻子', '', '包')).availableQty).toBe(5)
   })
 
-  it('表单 lookup 由 material store 统一按项目和有效记录过滤', async () => {
+  it('到货表单 lookup 与保存统一限定项目材料分供方', async () => {
     const store = useMaterialStore()
+    await mem.execute(`
+      INSERT INTO suppliers (id, name, supplier_category, approval_status)
+      VALUES
+        ('supplier-legacy-null', '旧材料分供方', NULL, 'approved'),
+        ('supplier-labor', '劳务分供方', '劳务分包商', 'approved')
+    `)
+    await mem.execute(`
+      INSERT INTO project_suppliers (id, project_id, supplier_id, status)
+      VALUES
+        ('project-supplier-legacy-null', 'project-material', 'supplier-legacy-null', 'contracted'),
+        ('project-supplier-labor', 'project-material', 'supplier-labor', 'contracted')
+    `)
     const requisition = await store.saveForm('mat_requisition', {
       no: 'XL-LOOKUP',
       projectId: 'project-material',
@@ -423,6 +444,38 @@ describe('f4 物资事实、派生库存与甲供材总控', () => {
       },
     ])
     await expect(store.searchRequisitions('project-other', '瓷砖')).resolves.toEqual([])
+
+    const projectSuppliers = await store.searchSuppliers('分供方', 'project-material')
+    expect(projectSuppliers.map(option => option.id).sort()).toEqual([
+      'supplier-legacy-null',
+      'supplier-material',
+    ])
+
+    const legacyArrival = await store.saveForm('mat_arrival', {
+      projectId: 'project-material',
+      supplierId: 'supplier-legacy-null',
+      warehouse: '中心仓',
+      arrivalDate: '2026-07-20',
+      lines: [{ materialName: '水泥', unit: '袋', qty: 1 }],
+    }, 'post')
+    expect(store.byId('mat_arrival', legacyArrival.id)).toMatchObject({
+      supplierId: 'supplier-legacy-null',
+      status: 'posted',
+    })
+    await expect(store.saveForm('mat_arrival', {
+      projectId: 'project-material',
+      supplierId: 'supplier-labor',
+      warehouse: '中心仓',
+      arrivalDate: '2026-07-20',
+      lines: [{ materialName: '水泥', unit: '袋', qty: 1 }],
+    }, 'post')).rejects.toThrow('乙供材只能关联材料供应商')
+    await expect(store.saveForm('mat_arrival', {
+      projectId: 'project-other',
+      supplierId: 'supplier-material',
+      warehouse: '中心仓',
+      arrivalDate: '2026-07-20',
+      lines: [{ materialName: '水泥', unit: '袋', qty: 1 }],
+    }, 'post')).rejects.toThrow('分供方未关联所选项目')
   })
 
   it('附件失败会原子回滚单头、明细和操作日志', async () => {

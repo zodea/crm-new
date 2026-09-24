@@ -30,6 +30,7 @@ describe('施工排程合同绑定路由', () => {
         pid: 'project-1',
         gid: 'group-1',
       },
+      query: { origin: 'real' },
     }))
   })
 

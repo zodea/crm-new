@@ -16,26 +16,37 @@ export const useOcrSettingsStore = defineStore('ocr-settings', () => {
   const loading = shallowRef(false)
   const saving = shallowRef(false)
   const error = shallowRef('')
+  let pendingLoad: Promise<void> | null = null
 
   const recognitionOptions = computed(() => toOcrRuntimeOptions(settings.value))
 
-  async function load(database: OcrSettingsDatabase = db) {
+  function load(database: OcrSettingsDatabase = db): Promise<void> {
+    if (pendingLoad)
+      return pendingLoad
+    loaded.value = false
     loading.value = true
     error.value = ''
-    try {
-      settings.value = await loadOcrRecognitionSettings(database)
-      loaded.value = true
-    }
-    catch (cause) {
-      error.value = toErrorMessage(cause)
-      throw cause
-    }
-    finally {
-      loading.value = false
-    }
+    pendingLoad = loadOcrRecognitionSettings(database)
+      .then((next) => {
+        settings.value = next
+        loaded.value = true
+      })
+      .catch((cause) => {
+        error.value = toErrorMessage(cause)
+        throw cause
+      })
+      .finally(() => {
+        loading.value = false
+        pendingLoad = null
+      })
+    return pendingLoad
   }
 
   async function save(next: OcrRecognitionSettings, database: OcrSettingsDatabase = db) {
+    if (!loaded.value || loading.value) {
+      error.value = '请先成功读取 OCR 设置'
+      throw new Error(error.value)
+    }
     saving.value = true
     error.value = ''
     try {

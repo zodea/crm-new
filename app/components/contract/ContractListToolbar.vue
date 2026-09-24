@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '~/components/ui/button'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 
 interface ProjectOption {
   key: string
@@ -21,9 +22,9 @@ const emit = defineEmits<{
 }>()
 
 const search = defineModel<string>('search', { required: true })
-const project = defineModel<string>('project', { required: true })
-const party = defineModel<string>('party', { required: true })
-const status = defineModel<string>('status', { required: true })
+const project = defineModel<string[]>('project', { required: true })
+const party = defineModel<string[]>('party', { required: true })
+const status = defineModel<string[]>('status', { required: true })
 </script>
 
 <template>
@@ -40,21 +41,19 @@ const status = defineModel<string>('status', { required: true })
       </div>
 
       <div class="contract-list-toolbar__project min-w-0">
-        <SelectFilter
+        <KitMultiSelectFilter
           v-model="project"
           label="项目"
           :options="projectOptions"
-          placeholder="全部项目"
           :min-width="160"
         />
       </div>
 
       <div class="contract-list-toolbar__party min-w-0">
-        <SelectFilter
+        <KitMultiSelectFilter
           v-model="party"
           :label="partyLabel"
           :options="partyOptions"
-          :placeholder="`全部${partyLabel}`"
           :min-width="160"
         />
       </div>
@@ -63,7 +62,7 @@ const status = defineModel<string>('status', { required: true })
         data-ui="contract-list-toolbar-actions"
         class="contract-list-toolbar__actions min-w-0 flex flex-wrap items-center gap-2.5"
       >
-        <SelectFilter
+        <KitMultiSelectFilter
           v-model="status"
           label="状态"
           :options="statusOptions"

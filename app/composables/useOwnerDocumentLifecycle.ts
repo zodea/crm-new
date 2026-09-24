@@ -1,4 +1,5 @@
 import type { ComputedRef, MaybeRefOrGetter, Ref } from 'vue'
+import type { FileRefChanges } from '~/lib/forms/file-refs'
 import type {
   AcceptanceLifecycleTarget,
   OwnerDocumentDraft,
@@ -6,6 +7,7 @@ import type {
   PenaltyDeductionView,
 } from '~/lib/owner-document/forms'
 import { computed, shallowRef, toValue } from 'vue'
+import { ownerDocumentLocalDate } from '~/lib/owner-document/page'
 import { toErrorMessage } from '~/lib/util/error'
 
 interface OwnerDocumentLifecycleOptions {
@@ -14,6 +16,10 @@ interface OwnerDocumentLifecycleOptions {
   routeId: ComputedRef<string | undefined>
   label: ComputedRef<string>
   refresh: () => Promise<void>
+  complete?: () => Promise<void>
+  recoverConflict?: (cause: unknown) => Promise<boolean>
+  acceptanceAttachments?: () => FileRefChanges
+  clearAcceptanceAttachments?: () => void
 }
 
 export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions) {
@@ -116,12 +122,14 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
       return
     loading.value = true
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      await store.approveOwnerChange(id, today)
+      const today = ownerDocumentLocalDate()
+      await store.approveOwnerChange(id, today, options.draft.value)
       success('甲方签证已生效，收入变更台账已锁定')
-      await options.refresh()
+      await (options.complete?.() ?? options.refresh())
     }
     catch (cause) {
+      if (await options.recoverConflict?.(cause))
+        return
       error(`签证失败：${toErrorMessage(cause)}`)
     }
     finally {
@@ -134,6 +142,35 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
     const action = acceptanceAction.value
     if (!id || !action)
       return
+    const requiredFields: Record<AcceptanceLifecycleTarget, Array<[keyof OwnerDocumentDraft, string]>> = {
+      accepted: [
+        ['acceptanceOrganization', '验收单位'],
+        ['acceptancePerson', '验收人'],
+        ['acceptanceDate', '验收日期'],
+        ['acceptanceConclusion', '验收结论'],
+      ],
+      warranty: [
+        ['warrantyOwner', '保修责任单位'],
+        ['warrantyStartDate', '保修开始日期'],
+        ['warrantyEndDate', '保修结束日期'],
+      ],
+      expired: [
+        ['warrantyConfirmationOrganization', '到期验收单位'],
+        ['warrantyConfirmationDate', '到期确认日期'],
+        ['warrantyConfirmationNote', '到期确认结论'],
+      ],
+    }
+    const missing = requiredFields[action.target]
+      .find(([field]) => !String(options.draft.value[field] ?? '').trim())
+    if (missing) {
+      warning(`请先填写${missing[1]}`)
+      return
+    }
+    if (action.target === 'warranty'
+      && String(options.draft.value.warrantyEndDate) < String(options.draft.value.warrantyStartDate)) {
+      warning('保修结束日期不能早于开始日期')
+      return
+    }
     const accepted = await confirm({
       variant: 'simple',
       title: action.label,
@@ -144,11 +181,19 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
       return
     loading.value = true
     try {
-      await store.transitionAcceptance(id, action.target)
+      await store.transitionAcceptance(
+        id,
+        action.target,
+        options.draft.value,
+        options.acceptanceAttachments?.() ?? {},
+      )
+      options.clearAcceptanceAttachments?.()
       success(`${action.label}成功`)
-      await options.refresh()
+      await (options.complete?.() ?? options.refresh())
     }
     catch (cause) {
+      if (await options.recoverConflict?.(cause))
+        return
       error(`${action.label}失败：${toErrorMessage(cause)}`)
     }
     finally {
@@ -160,7 +205,13 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
     const id = options.routeId.value
     if (!id)
       return
-    const lines = (options.draft.value.lines ?? []).map(line => ({
+    const sourceLines = options.draft.value.lines ?? []
+    if (sourceLines.some(line => line.auditedQty == null
+      || (typeof line.auditedQty === 'string' && !line.auditedQty.trim()))) {
+      warning('请为每条报量明细填写有效的审定量')
+      return
+    }
+    const lines = sourceLines.map(line => ({
       boqLineId: String(line.boqLineId ?? ''),
       auditedQty: Number(line.auditedQty),
       auditedAmount: (Number(line.auditedQty) || 0) * (Number(line.unitPrice) || 0),
@@ -184,11 +235,13 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
       return
     loading.value = true
     try {
-      await store.auditOwnerReport(id, { auditedAmount, lines })
+      await store.auditOwnerReport(id, { auditedAmount, lines }, options.draft.value)
       success('甲方报量已审定')
-      await options.refresh()
+      await (options.complete?.() ?? options.refresh())
     }
     catch (cause) {
+      if (await options.recoverConflict?.(cause))
+        return
       error(`审定失败：${toErrorMessage(cause)}`)
     }
     finally {

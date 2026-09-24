@@ -1,0 +1,355 @@
+{
+  "baseline": "579d9383357fffd2bd87e727dbc21b903a7cb69c",
+  "capturedAt": "2026-09-14T11:46:45.6857687+08:00",
+  "stage": "third-review-before-S2-fix",
+  "files": [
+    {
+      "path": "app/components/crew-worker/CrewWorkerCentralDetailScreen.vue",
+      "sha256": "e3f89f9e1a129fa4a9ad8521f1327642222c38c84532c575c07e7877426a20bf"
+    },
+    {
+      "path": "app/components/payroll/AttendanceScreen.vue",
+      "sha256": "76d33358819ec8f64faca2f28106b9b3a3a28215fe3a10d4345489eebb7ef1ce"
+    },
+    {
+      "path": "app/components/payroll/CentralAttendanceGrid.vue",
+      "sha256": "f356b967cb323d72b76087b1efc6572772a5b35db5ca38829f8845256f3953a6"
+    },
+    {
+      "path": "app/components/payroll/CentralAttendanceScreen.vue",
+      "sha256": "e8fdedda00d6aa1b4826a3104b5de85b11d0ce3ffdb40ede520eec65668dbdb3"
+    },
+    {
+      "path": "app/components/payroll/CentralC1DraftFormPage.vue",
+      "sha256": "24a83d2a5c76294d76e83e5bd5978a8f48c5c222f56c0de723699bf83376dbce"
+    },
+    {
+      "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+      "sha256": "2d9de6c621fd814a3f9af1242b92ceb1219090995da6e1175aac132f37c1d9ad"
+    },
+    {
+      "path": "app/components/payroll/CentralPayrollFormPage.vue",
+      "sha256": "4d6976c34aeb36e83bcd56458bcff14888b2a77746093e18a529dfd5182ff27f"
+    },
+    {
+      "path": "app/components/payroll/CentralPayrollScreen.vue",
+      "sha256": "aca071b0593cc0e1d1c1943c9fbe9f25b7ce656431702a7092d46f2f0403cf95"
+    },
+    {
+      "path": "app/components/payroll/PayrollACommandState.vue",
+      "sha256": "8a773e6dba129ee3bceafca75d16aaa15febfa6bd65cb39affc196589eb8aad0"
+    },
+    {
+      "path": "app/components/payroll/PayrollAttendanceCellDialog.vue",
+      "sha256": "f1e8d3537af1e720c710c45092deb152342ad694103124aa39d4b067fc623378"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1ConfigScreen.vue",
+      "sha256": "c33794ffbc0a7c73826660564fa1550cb3ba5691ff11d80c10ebcb6b078baf15"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1FormFields.vue",
+      "sha256": "f26554a790360b832bdf183103d802c2f200ea8e45aad6922119219cbeedd258"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1FrozenPrint.vue",
+      "sha256": "2d34ac9f9da24d09e2584a3c82a5a5c0be0f7983a427a161ff1421ac01746727"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1RateEditor.vue",
+      "sha256": "3a3339d492dcae29b807539f8e721a3f8297b7178dc77713d7e915311cd607a8"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1ReleaseDialog.vue",
+      "sha256": "dca26bde661eac0f24dc331974d0276828baebd2ca9811576b84760b5d4a9ac7"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1SourceReturn.vue",
+      "sha256": "fdc0f16450ce564e388c168bef60b785d08d130c4df003cc744067a4b0e96792"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1SourceReview.vue",
+      "sha256": "0668b1b901f8f7590eb956dbceb90fe95426f13ad3318fee2e6e927f989aad98"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1StatementWorkspace.vue",
+      "sha256": "bc3a1196464f4aa42fcb52a75fd18c6bc6c48ffa11dd799ece18f444d6adfb54"
+    },
+    {
+      "path": "app/components/payroll/PayrollDraftFormPage.vue",
+      "sha256": "4cbec4041e8bc035276c5e4846c1f55416a766f9bc09b45c48a69945786e00b7"
+    },
+    {
+      "path": "app/components/payroll/PayrollReadNotice.vue",
+      "sha256": "29e31daced0eff93162afc3c7b9b5d45df65ef02251f3aab5b279e95a22ad1ff"
+    },
+    {
+      "path": "app/composables/useCentralAttendance.ts",
+      "sha256": "017b34248ed0340466e1720865882ab5778f906ff6abff796003bde3637941af"
+    },
+    {
+      "path": "app/composables/usePayrollC1Config.ts",
+      "sha256": "6b2f8de3bf7aeeb826764c301a8e95b823afb4a966b4927810a01c800e0bca28"
+    },
+    {
+      "path": "app/composables/usePayrollC1Form.ts",
+      "sha256": "eef4f0c7b04df019c307897fd25a1f017c9ebe8fd90d65c90a460251223068f1"
+    },
+    {
+      "path": "app/composables/usePayrollC1Statement.ts",
+      "sha256": "711430e66e9f203803641b93b4866b28715f556f728a2aacbaf3d89812f36986"
+    },
+    {
+      "path": "app/lib/nav/target-registry.ts",
+      "sha256": "d7200b3b332b314e2e3170b1797cffd2cf1e0ad0d48a87bd626c14bdeb915e9c"
+    },
+    {
+      "path": "app/lib/payroll/c1-export.ts",
+      "sha256": "c5d721d92148522a4fe456b1e2a686fff4cfe470dc575b864ac1624f4712f5c6"
+    },
+    {
+      "path": "app/lib/payroll/c1-navigation.ts",
+      "sha256": "8a3d2375c42e09d0b35a0b8ded564657ca134e101d733427d8fed1bfb84ecf09"
+    },
+    {
+      "path": "app/lib/payroll/c1-presentation.ts",
+      "sha256": "612f7c338c55845aaf6f6c4762a5d2cea8ade8ec2b7622a975d753a768fd189f"
+    },
+    {
+      "path": "app/lib/payroll/central-a-calculation.ts",
+      "sha256": "a3d032303006a9b7c2e08e2f209d0f07847fbacccd7de5283d75622c422c7858"
+    },
+    {
+      "path": "app/lib/payroll/central-a-command.ts",
+      "sha256": "d9beae29ea531f5243e7437c6a4c12ef48002105857f3c86a380bcd3d29ea624"
+    },
+    {
+      "path": "app/lib/payroll/central-attendance-codec.ts",
+      "sha256": "cc8040b6ee3d2667438514a33ee8277cb654c169bfdc9a2dd47386b32f36cb5f"
+    },
+    {
+      "path": "app/lib/payroll/central-attendance-contract.ts",
+      "sha256": "a98e89d179cc6997424175be743a1da040b95e20fb88dc2469eea88d902ec3fa"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-calculation.ts",
+      "sha256": "b329661a23300be3593868607b9eed02c32a5ba7cea81105bb4a9e16a1194cb8"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-codec.ts",
+      "sha256": "42fa5f14d5764d49a255d5281ff124018008fb7590b1db4c4fc79b844b22d45b"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-command.ts",
+      "sha256": "b0f2b80cd0315871d0e98826d49b6c7544a06f30c9e792d692e11c95d8017cc9"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-contract.ts",
+      "sha256": "0b2760dac263a536ef55986683a917448ba44b05cc57d7516d4843073b83beb2"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-provenance.ts",
+      "sha256": "01c2d74588d668f74b852af45658e91ffef67a0dcd66d8092956de6c590cf85c"
+    },
+    {
+      "path": "app/lib/payroll/central-command-shared.ts",
+      "sha256": "f5e33b541f98c6a5c248ce01d80ddce795c6f3e95154237e868d9ed5b0300997"
+    },
+    {
+      "path": "app/lib/payroll/central-contract.ts",
+      "sha256": "f27be38398196a10b86139d168fe2bded8ae4831a361c8a172e10bf1498a4d4f"
+    },
+    {
+      "path": "app/lib/payroll/central-payroll-wire.ts",
+      "sha256": "a29e811dad97b9123e4a6b5bbec26401f2db1a4594777bfd5805ae5043842b0a"
+    },
+    {
+      "path": "app/lib/payroll/central-pending.ts",
+      "sha256": "40b464dee05a073c2f9409e970b2ad54eb28c3e5d44155e7a5781c29feb58629"
+    },
+    {
+      "path": "app/lib/payroll/central-read.ts",
+      "sha256": "48635cff98c546c5ded3d66958cd3077ad45ba0e9af288f3b903295aa815a7ef"
+    },
+    {
+      "path": "app/lib/payroll/central-repository.ts",
+      "sha256": "a23de74963ac6a04aa68be6af55d2675f5964ea49cd594c36169a1bd81893444"
+    },
+    {
+      "path": "app/lib/payroll/central-schema.ts",
+      "sha256": "67c864d2e0e92be1368dd1a77512c48454791ff7f05caaf5192674d56beb307b"
+    },
+    {
+      "path": "app/lib/payroll/central-source-locks.ts",
+      "sha256": "2f40819f508332d5b92fb9e9ee61662b753ced49e86220008ad408eaf6f6f7b2"
+    },
+    {
+      "path": "app/lib/tabs/restore-target.ts",
+      "sha256": "ab0816d7da4826759bfc68bc3a71a11e6a1ae150fb0910309814443c2fc53b07"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/config.vue",
+      "sha256": "857aa362dc3e3a2e1136d4188ba4a8850c5968124dd9fe287a7b0adbb8ae534c"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/form/[id].vue",
+      "sha256": "b9aaa9513b7c7c5e171c4804cfc3ef127d4c43cc9e5bd6c6ed7f09703997719a"
+    },
+    {
+      "path": "app/stores/attendance-central.ts",
+      "sha256": "7b36d15d89d00fcf7fe1df325a6887c92127496a845c71271483f54d057b2935"
+    },
+    {
+      "path": "app/stores/payroll-c1.ts",
+      "sha256": "28a0b9955983fa6ebce23c35af507335e27b1fc367d188ca6fc52f9e32ecaa52"
+    },
+    {
+      "path": "e2e/helpers/payroll-c1-migration-source.ts",
+      "sha256": "e8625e8b9433fa60b772f3007681bf403f6c9c301d075b2ee2273f07de7eeff1"
+    },
+    {
+      "path": "e2e/helpers/payroll-c1-workspace.ts",
+      "sha256": "ac36ce1bcf2a6ee1ad355645b407a864aa9d574da1ba270d69f2475f3da9275f"
+    },
+    {
+      "path": "e2e/payroll-c1-central.spec.ts",
+      "sha256": "7180582b7b5ac4d4c5e77836051b989a915ffe453057700b3e78035a2951f629"
+    },
+    {
+      "path": "e2e/payroll-c1-recovery.spec.ts",
+      "sha256": "0f223f5c2419eaad5cdc884056fb0f2eff92b38e60de35c555eeb9ba1b8c7eb5"
+    },
+    {
+      "path": "server/api/commands/payroll-attendance.post.ts",
+      "sha256": "8e7a0d31025c29f114bb8215de89de0a9d32f94a76a9e9f729a43718f2282238"
+    },
+    {
+      "path": "server/api/commands/payroll-c1.post.ts",
+      "sha256": "8516b5e3af9741c9f11c6f07b59140a17bf6aebac0a5d7ad5eb01067239bdcdc"
+    },
+    {
+      "path": "server/api/read/payroll/attendance.get.ts",
+      "sha256": "cdb1724d13479421af7cb52463e3913db01b829c06fbd3da05280474e67bec17"
+    },
+    {
+      "path": "server/api/read/payroll/c1-config.get.ts",
+      "sha256": "1ab13d854adc5e904954d39865ab281566cb074771e1768c2a3dad25f0d910eb"
+    },
+    {
+      "path": "server/api/read/payroll/c1-form.post.ts",
+      "sha256": "4bd52089908e6c39a018209cf9fd70863575f799cec826d25a3fca8776f164af"
+    },
+    {
+      "path": "server/api/read/payroll/c1-output.get.ts",
+      "sha256": "78b85b9a89b698c3ec3ccd22cb923a182dfc90e759d344f1ff2c49c5c5a9dda6"
+    },
+    {
+      "path": "server/utils/payroll-attendance-service.ts",
+      "sha256": "8016b500329be9a33f92074cb10cb3afd9941be0bc7286ac3a35792a6f2d946a"
+    },
+    {
+      "path": "server/utils/payroll-c1-options.ts",
+      "sha256": "135d6c1596dd36c50491646240fef4f49e38d20b4732ff90c9129aabed44da7d"
+    },
+    {
+      "path": "server/utils/payroll-c1-service.ts",
+      "sha256": "c64d833439decd24ad3e0365fefa8e5200062b676e0821cf932f48bbe93d0ae5"
+    },
+    {
+      "path": "server/utils/payroll-runtime.ts",
+      "sha256": "152f4591975b4bec7b834aebba013d76caf86256f5b8b778a2ab2ceb413cecc1"
+    },
+    {
+      "path": "server/utils/payroll-service.ts",
+      "sha256": "d5fb9eadd24a65b8b38414d86d6dc8ff796d864fa21f1e03fef39d0c851bfb98"
+    },
+    {
+      "path": "tests/components/AttendanceCentralRace.test.ts",
+      "sha256": "eab2b47040193ae3ca2f3403f7a1296081d4c57549f74a9b9597176ed7c27197"
+    },
+    {
+      "path": "tests/components/AttendanceCentralState.test.ts",
+      "sha256": "4a13c26284c2069478622b39ad49dd6e64a87b4195dc0fb2bb386b19ac136ac1"
+    },
+    {
+      "path": "tests/components/PayrollAttendanceCell.test.ts",
+      "sha256": "9bcae512da8acd71cc3d9bd82387646f3425cdd9fbebf57cf733b7a920c70116"
+    },
+    {
+      "path": "tests/components/PayrollC1Completion.test.ts",
+      "sha256": "b99decef7e8e20aab0ea13e8f40946f14d092301590381043bd988e73197d675"
+    },
+    {
+      "path": "tests/components/PayrollC1Config.test.ts",
+      "sha256": "bdc6dbfa169e9cbfc2905933c647e2a0d015e8b8a78e89bfada8f13c3f031926"
+    },
+    {
+      "path": "tests/components/PayrollC1Form.test.ts",
+      "sha256": "3a1c1a8a959ae09568a8c151ed0eea27b0ac856010fc0b35f23a834178cd0986"
+    },
+    {
+      "path": "tests/components/PayrollC1FrozenPrint.test.ts",
+      "sha256": "7427809fd32ef7c66c662a0d13f231b70553eeadde34325720809d6516bf31a4"
+    },
+    {
+      "path": "tests/components/PayrollC1Release.test.ts",
+      "sha256": "7ac38c20578eb2e4a1ad02b88f9c71ae4d9be9f81696acdaa536f412b1d39ce9"
+    },
+    {
+      "path": "tests/components/PayrollC1SourceReturn.test.ts",
+      "sha256": "dc46c6bdb0e19fec20b049b8b2791ce14ea7104673a4629573582e53141f9038"
+    },
+    {
+      "path": "tests/components/PayrollCentralBoundary.test.ts",
+      "sha256": "a484f3e50e7adcf9cb3475334d6e1290bd686612938d6490848d6ef8dc9c1e88"
+    },
+    {
+      "path": "tests/helpers/payroll-c1-service-fixture.ts",
+      "sha256": "1f0a7e5f402344da0ee8a15b813da8fd2939579e2ed2348f7c9063202416bb7d"
+    },
+    {
+      "path": "tests/helpers/payroll-c1-ui.ts",
+      "sha256": "0ac868c3d8320a6cb9b262bc88ebb2914ef7a634a051cd86739ab44c7c884a87"
+    },
+    {
+      "path": "tests/payroll/c1-export.test.ts",
+      "sha256": "d28517f5fe8e61f4d7136c4a29f930b2fb811ed00d421c869949c0bfb0306182"
+    },
+    {
+      "path": "tests/payroll/c1-navigation.test.ts",
+      "sha256": "8f5da6648ca2df519f10c6d5007118ab9e425af6c1c0643be482ab0b979b0bd2"
+    },
+    {
+      "path": "tests/payroll/central-attendance-service.test.ts",
+      "sha256": "ec1b8324e00d98a35935f782014b72940728eed2eec7958894efcdfed3bf8177"
+    },
+    {
+      "path": "tests/payroll/central-c1-codec.test.ts",
+      "sha256": "84a36a3bb22357cf772fa8ed4db4b4836484b0ecc3338f77230cc9427a62bad8"
+    },
+    {
+      "path": "tests/payroll/central-c1-commands.test.ts",
+      "sha256": "1654e47282f771b153f7eb00d148b642312ffb5c0b41bff1ea7aaeb773c58e0d"
+    },
+    {
+      "path": "tests/payroll/central-c1-http.test.ts",
+      "sha256": "228f4df2de45851765ec5c173d228695fb09b3bcab9bd2f4d4041ab6346f2b98"
+    },
+    {
+      "path": "tests/payroll/central-c1-provenance.test.ts",
+      "sha256": "f5c94bc8df63c610bf097176b6159119afdf7137227c058b516e441945156115"
+    },
+    {
+      "path": "tests/payroll/central-c1-service.test.ts",
+      "sha256": "b2a588a63975c4545993d2d5355678b51b3f68b2f109731ee51f6547a3401d94"
+    },
+    {
+      "path": "tests/stores/attendance-central.test.ts",
+      "sha256": "b19f9347f3cc605f25daf2a355757e42159a44e0656e4806db4eefc1db854d56"
+    },
+    {
+      "path": "tests/stores/payroll-c1-central.test.ts",
+      "sha256": "01cd78b051b791424e503334df3bac2e138c6b7deecc8a16d55ab75df168244b"
+    }
+  ]
+}

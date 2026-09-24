@@ -327,80 +327,87 @@
   ];
 
   // ——— 资金域轻实体仓（批B：稳定 id 够蓝链，金额 mock、与 contracts 已付/收款口径大体对齐）———
-  // 付款申请 payApplies：8 业务类型；invoiceState 驱动默认视图「待追回发票」；status 付款类三档(审批中/已审批/已付款)
+  // 付款申请 payApplies：10 类业务(PAYMENT_BIZ_TYPES)；invoiceState=回票类型(先票后款/先款后票/无需发票，实现端 forms.ts 词表)；
+  // 回票状态由发票分摊(invoiceLinks)派生，不落库；status 付款类三档(审批中/已审批/已付款)
   const payApplies = [
-    { id: "fk01", no: "FKSQ-2026-0601", name: "泥水班组 5 月进度付款", bizType: "有合同-分包", projectId: "p1", supplierId: "s6", contractId: "fb01",
-      applyAmount: 500000, approvedAmount: 500000, paidAmount: 480000, invoiceState: "已收票", status: "已付款", costName: "劳务分包费/泥水", applicant: "刘志强", applyDate: "2026-05-28", payDate: "2026-06-03" },
-    { id: "fk02", no: "FKSQ-2026-0602", name: "泥水班组 6 月进度付款", bizType: "有合同-分包", projectId: "p1", supplierId: "s6", contractId: "fb01",
-      applyAmount: 500000, approvedAmount: 500000, paidAmount: 500000, invoiceState: "待追回", status: "已付款", costName: "劳务分包费/泥水", applicant: "刘志强", applyDate: "2026-06-25", payDate: "2026-06-30" },
+    { id: "fk01", no: "FKSQ-2026-0601", name: "泥水班组 5 月进度付款", bizType: "有合同-合同劳务", projectId: "p1", supplierId: "s6", contractId: "fb01",
+      applyAmount: 500000, approvedAmount: 500000, paidAmount: 480000, invoiceState: "先票后款", status: "已付款", costName: "合同劳务", applicant: "刘志强", applyDate: "2026-05-28", payDate: "2026-06-03" },
+    { id: "fk02", no: "FKSQ-2026-0602", name: "泥水班组 6 月进度付款", bizType: "有合同-合同劳务", projectId: "p1", supplierId: "s6", contractId: "fb01",
+      applyAmount: 500000, approvedAmount: 500000, paidAmount: 500000, invoiceState: "先款后票", status: "已付款", costName: "合同劳务", applicant: "刘志强", applyDate: "2026-06-25", payDate: "2026-06-30" },
     { id: "fk03", no: "FKSQ-2026-0603", name: "瓷砖采购 5 月结算付款", bizType: "有合同-材料", projectId: "p1", supplierId: "s7", contractId: "cg01",
-      applyAmount: 1200000, approvedAmount: 1000000, paidAmount: 980000, invoiceState: "已收票", status: "已付款", costName: "材料费/瓷砖", applicant: "黄伟明", applyDate: "2026-06-02", payDate: "2026-06-08" },
+      applyAmount: 1200000, approvedAmount: 1000000, paidAmount: 980000, invoiceState: "先票后款", status: "已付款", costName: "材料", applicant: "黄伟明", applyDate: "2026-06-02", payDate: "2026-06-08" },
     { id: "fk04", no: "FKSQ-2026-0604", name: "瓷砖采购 6 月付款", bizType: "有合同-材料", projectId: "p1", supplierId: "s7", contractId: "cg01",
-      applyAmount: 1000000, approvedAmount: 1000000, paidAmount: 1000000, invoiceState: "待追回", status: "已付款", costName: "材料费/瓷砖", applicant: "黄伟明", applyDate: "2026-06-22", payDate: "2026-06-28" },
+      applyAmount: 1000000, approvedAmount: 1000000, paidAmount: 1000000, invoiceState: "先款后票", status: "已付款", costName: "材料", applicant: "黄伟明", applyDate: "2026-06-22", payDate: "2026-06-28" },
     { id: "fk05", no: "FKSQ-2026-0605", name: "钢筋采购结算付款", bizType: "有合同-材料", projectId: "p1", supplierId: "s1", contractId: "cg02",
-      applyAmount: 865000, approvedAmount: 865000, paidAmount: 865000, invoiceState: "已收票", status: "已付款", costName: "材料费/钢筋", applicant: "黄伟明", applyDate: "2026-05-15", payDate: "2026-05-20" },
-    { id: "fk06", no: "FKSQ-2026-0606", name: "机电安装进度付款", bizType: "有合同-分包", projectId: "p2", supplierId: "s10", contractId: "fb05",
-      applyAmount: 600000, approvedAmount: 600000, paidAmount: 600000, invoiceState: "已收票", status: "已付款", costName: "专业分包费/机电", applicant: "梁国栋", applyDate: "2026-06-10", payDate: "2026-06-15" },
+      applyAmount: 865000, approvedAmount: 865000, paidAmount: 865000, invoiceState: "先票后款", status: "已付款", costName: "材料", applicant: "黄伟明", applyDate: "2026-05-15", payDate: "2026-05-20" },
+    { id: "fk06", no: "FKSQ-2026-0606", name: "机电安装进度付款", bizType: "有合同-专业分包", projectId: "p2", supplierId: "s10", contractId: "fb05",
+      applyAmount: 600000, approvedAmount: 600000, paidAmount: 600000, invoiceState: "先票后款", status: "已付款", costName: "专业分包", applicant: "梁国栋", applyDate: "2026-06-10", payDate: "2026-06-15" },
     { id: "fk07", no: "FKSQ-2026-0607", name: "电缆采购预付款", bizType: "预付款", projectId: "p2", supplierId: "s2", contractId: "cg04",
-      applyAmount: 200000, approvedAmount: 200000, paidAmount: 200000, invoiceState: "待追回", status: "已付款", costName: "材料费/电缆", applicant: "梁国栋", applyDate: "2026-03-02", payDate: "2026-03-05" },
+      applyAmount: 200000, approvedAmount: 200000, paidAmount: 200000, invoiceState: "先款后票", status: "已付款", costName: "材料", applicant: "梁国栋", applyDate: "2026-03-02", payDate: "2026-03-05" },
     { id: "fk08", no: "FKSQ-2026-0608", name: "电动工具零星采购", bizType: "无合同-零星采购", projectId: "p2", supplierId: "s4", contractId: null,
-      applyAmount: 12380, approvedAmount: 12380, paidAmount: 12380, invoiceState: "已收票", status: "已付款", costName: "材料费/五金杂项", applicant: "宋子豪", applyDate: "2026-06-11", payDate: "2026-06-12" },
+      applyAmount: 12380, approvedAmount: 12380, paidAmount: 12380, invoiceState: "无需发票", status: "已付款", costName: "材料", applicant: "宋子豪", applyDate: "2026-06-11", payDate: "2026-06-12" },
     { id: "fk09", no: "FKSQ-2026-0609", name: "翠湖花园项目部管理费", bizType: "管理费", projectId: "p3", supplierId: null, contractId: null,
-      applyAmount: 45000, approvedAmount: 45000, paidAmount: 0, invoiceState: "已收票", status: "已审批", costName: "间接费/项目部管理", applicant: "陈志明", applyDate: "2026-07-01", payDate: "" },
+      applyAmount: 45000, approvedAmount: 45000, paidAmount: 0, invoiceState: "先票后款", status: "已审批", costName: "管理费", applicant: "陈志明", applyDate: "2026-07-01", payDate: "" },
     { id: "fk10", no: "FKSQ-2026-0610", name: "车陂大楼垃圾清运费", bizType: "项目费用", projectId: "p5", supplierId: null, contractId: null,
-      applyAmount: 86000, approvedAmount: 80000, paidAmount: 0, invoiceState: "待追回", status: "已审批", costName: "人工费/垃圾外运", applicant: "周维", applyDate: "2026-07-03", payDate: "" },
-    { id: "fk11", no: "FKSQ-2026-0611", name: "泥水班组 7 月进度付款", bizType: "有合同-分包", projectId: "p1", supplierId: "s6", contractId: "fb01",
-      applyAmount: 300000, approvedAmount: 0, paidAmount: 0, invoiceState: "待追回", status: "审批中", costName: "劳务分包费/泥水", applicant: "刘志强", applyDate: "2026-07-08", payDate: "" },
+      applyAmount: 86000, approvedAmount: 80000, paidAmount: 0, invoiceState: "先款后票", status: "已审批", costName: "项目费用", applicant: "周维", applyDate: "2026-07-03", payDate: "" },
+    { id: "fk11", no: "FKSQ-2026-0611", name: "泥水班组 7 月进度付款", bizType: "有合同-合同劳务", projectId: "p1", supplierId: "s6", contractId: "fb01",
+      applyAmount: 300000, approvedAmount: 0, paidAmount: 0, invoiceState: "先款后票", status: "审批中", costName: "合同劳务", applicant: "刘志强", applyDate: "2026-07-08", payDate: "" },
     { id: "fk12", no: "FKSQ-2026-0612", name: "公司办公室房租(Q3)", bizType: "公司付款", projectId: null, supplierId: null, contractId: null,
-      applyAmount: 68000, approvedAmount: 68000, paidAmount: 0, invoiceState: "已收票", status: "已审批", costName: "公司费用/房租", applicant: "行政部", applyDate: "2026-07-05", payDate: "" },
+      applyAmount: 68000, approvedAmount: 68000, paidAmount: 0, invoiceState: "先票后款", status: "已审批", costName: "管理费", applicant: "行政部", applyDate: "2026-07-05", payDate: "" },
   ];
 
   // 收款登记 receipts（收入侧：甲方回款，关联施工合同；与 contracts.paid(施工=累计收款) 对齐）
   const receipts = [
-    { id: "sk01", no: "SK-2026-001", projectId: "p1", contractId: "sg01", amount: 15000000, method: "银行转账", date: "2026-03-30", payer: "合和地产集团" },
-    { id: "sk02", no: "SK-2026-002", projectId: "p1", contractId: "sg01", amount: 10367027, method: "银行转账", date: "2026-05-30", payer: "合和地产集团" },
-    { id: "sk03", no: "SK-2026-003", projectId: "p2", contractId: "sg02", amount: 9800000, method: "银行转账", date: "2026-05-18", payer: "锦绣置业有限公司" },
-    { id: "sk04", no: "SK-2026-004", projectId: "p5", contractId: "sg05", amount: 8600000, method: "银行承兑", date: "2026-06-12", payer: "天河城建投资" },
-    { id: "sk05", no: "SK-2026-005", projectId: "p3", contractId: "sg03", amount: 9100000, method: "银行转账", date: "2026-04-22", payer: "翠湖投资" },
-    { id: "sk06", no: "SK-2026-006", projectId: "p6", contractId: "sg06", amount: 3100000, method: "银行转账", date: "2026-06-28", payer: "广州开发区建设集团" },
-    { id: "sk07", no: "SK-2026-007", projectId: "p8", contractId: "sg08", amount: 2400000, method: "银行转账", date: "2026-06-05", payer: "利丰置业" },
-    { id: "sk08", no: "SK-2026-008", projectId: "p11", contractId: "sg11", amount: 1200000, method: "银行转账", date: "2026-06-30", payer: "白云机场建设" },
+    { id: "sk01", no: "SK-2026-001", projectId: "p1", contractId: "sg01", amount: 15000000, method: "银行转账", date: "2026-03-30", payer: "合和地产集团", status: "已确认" },
+    { id: "sk02", no: "SK-2026-002", projectId: "p1", contractId: "sg01", amount: 10367027, method: "银行转账", date: "2026-05-30", payer: "合和地产集团", status: "已确认" },
+    { id: "sk03", no: "SK-2026-003", projectId: "p2", contractId: "sg02", amount: 9800000, method: "银行转账", date: "2026-05-18", payer: "锦绣置业有限公司", status: "已确认" },
+    { id: "sk04", no: "SK-2026-004", projectId: "p5", contractId: "sg05", amount: 8600000, method: "承兑汇票", date: "2026-06-12", payer: "天河城建投资", status: "已确认" },
+    { id: "sk05", no: "SK-2026-005", projectId: "p3", contractId: "sg03", amount: 9100000, method: "银行转账", date: "2026-04-22", payer: "翠湖投资", status: "已确认" },
+    { id: "sk06", no: "SK-2026-006", projectId: "p6", contractId: "sg06", amount: 3100000, method: "银行转账", date: "2026-06-28", payer: "广州开发区建设集团", status: "已确认" },
+    { id: "sk07", no: "SK-2026-007", projectId: "p8", contractId: "sg08", amount: 2400000, method: "银行转账", date: "2026-06-05", payer: "利丰置业", status: "已确认" },
+    { id: "sk08", no: "SK-2026-008", projectId: "p11", contractId: "sg11", amount: 1200000, method: "银行转账", date: "2026-06-30", payer: "白云机场建设", status: "草稿" },
   ];
 
   // 开票申请 invApplies（收入侧起点：我方给甲方开票；与 contracts.invoiced(施工=累计开票) 大体对齐）
   const invApplies = [
     { id: "kp01", no: "KPSQ-2026-001", projectId: "p1", contractId: "sg01", amount: 15000000, tax: 1238532.11, rate: "9%", date: "2026-03-25", status: "已开票" },
-    { id: "kp02", no: "KPSQ-2026-002", projectId: "p1", contractId: "sg01", amount: 10800000, tax: 891743.12, rate: "9%", date: "2026-05-25", status: "已开票" },
-    { id: "kp03", no: "KPSQ-2026-003", projectId: "p2", contractId: "sg02", amount: 9800000, tax: 809174.31, rate: "9%", date: "2026-05-12", status: "已开票" },
-    { id: "kp04", no: "KPSQ-2026-004", projectId: "p5", contractId: "sg05", amount: 8600000, tax: 710091.74, rate: "9%", date: "2026-06-08", status: "已开票" },
-    { id: "kp05", no: "KPSQ-2026-005", projectId: "p3", contractId: "sg03", amount: 9200000, tax: 759633.03, rate: "9%", date: "2026-04-15", status: "已开票" },
-    { id: "kp06", no: "KPSQ-2026-006", projectId: "p1", contractId: "sg01", amount: 800000, tax: 66055.05, rate: "9%", date: "2026-07-06", status: "已审批" },
-    { id: "kp07", no: "KPSQ-2026-007", projectId: "p6", contractId: "sg06", amount: 1200000, tax: 99082.57, rate: "9%", date: "2026-07-09", status: "审批中" },
+    { id: "kp02", no: "KPSQ-2026-002", name: "合和新城 6 月进度款开票", buyer: "合和地产集团", projectId: "p1", contractId: "sg01", amount: 10800000, tax: 891743.12, rate: "9%", date: "2026-05-25", status: "已开票" },
+    { id: "kp03", no: "KPSQ-2026-003", name: "锦绣华庭 5 月进度款开票", buyer: "锦绣置业有限公司", projectId: "p2", contractId: "sg02", amount: 9800000, tax: 809174.31, rate: "9%", date: "2026-05-12", status: "已开票" },
+    { id: "kp04", no: "KPSQ-2026-004", name: "车陂商业大楼进度款开票", buyer: "天河城建投资", projectId: "p5", contractId: "sg05", amount: 8600000, tax: 710091.74, rate: "9%", date: "2026-06-08", status: "已开票" },
+    { id: "kp05", no: "KPSQ-2026-005", name: "翠湖花园进度款开票", buyer: "翠湖投资", projectId: "p3", contractId: "sg03", amount: 9200000, tax: 759633.03, rate: "9%", date: "2026-04-15", status: "已开票" },
+    { id: "kp06", no: "KPSQ-2026-006", name: "合和新城零星签证开票", buyer: "合和地产集团", projectId: "p1", contractId: "sg01", amount: 800000, tax: 66055.05, rate: "9%", date: "2026-07-06", status: "已审批" },
+    { id: "kp07", no: "KPSQ-2026-007", name: "科学城人才公寓进度款开票", buyer: "广州开发区建设集团", projectId: "p6", contractId: "sg06", amount: 1200000, tax: 99082.57, rate: "9%", date: "2026-07-09", status: "审批中" },
   ];
 
   // 往来收付 currents（非合同类往来；direction 收/付；与项目详情⑦往来口径对齐 p1 收 610万/付 595万）
   const currents = [
-    { id: "wl01", no: "WLSK-2026-001", direction: "收", projectId: "p1", counterparty: "合和地产集团", amount: 4000000, method: "银行转账", date: "2026-02-10", note: "工程借款往来" },
-    { id: "wl02", no: "WLSK-2026-002", direction: "收", projectId: "p1", counterparty: "广州市政集团", amount: 2100000, method: "银行转账", date: "2026-04-08", note: "代收往来" },
-    { id: "wl03", no: "WLFK-2026-001", direction: "付", projectId: "p1", counterparty: "合和地产集团", amount: 3950000, method: "银行转账", date: "2026-03-15", note: "借款归还" },
-    { id: "wl04", no: "WLFK-2026-002", direction: "付", projectId: "p1", counterparty: "广州市瑞航建筑工程有限公司", amount: 2000000, method: "内部转账", date: "2026-05-20", note: "公司调拨" },
-    { id: "wl05", no: "WLSK-2026-003", direction: "收", projectId: "p5", counterparty: "天河城建投资", amount: 500000, method: "银行转账", date: "2026-06-01", note: "临时借支归还" },
-    { id: "wl06", no: "WLFK-2026-003", direction: "付", projectId: "p2", counterparty: "锦绣置业有限公司", amount: 120000, method: "银行转账", date: "2026-06-18", note: "水电费代付" },
-    { id: "wl07", no: "WLSK-2026-004", direction: "收", projectId: null, counterparty: "广州亚运城开发", amount: 260000, method: "银行转账", date: "2026-06-25", note: "保证金退回" },
-    { id: "wl08", no: "WLFK-2026-004", direction: "付", projectId: null, counterparty: "广州开发区建设集团", amount: 180000, method: "银行转账", date: "2026-07-02", note: "投标保证金" },
+    { id: "wl01", no: "WLSK-2026-001", direction: "收", projectId: "p1", counterparty: "合和地产集团", amount: 4000000, method: "银行转账", date: "2026-02-10", note: "工程借款往来", status: "已确认" },
+    { id: "wl02", no: "WLSK-2026-002", direction: "收", projectId: "p1", counterparty: "广州市政集团", amount: 2100000, method: "银行转账", date: "2026-04-08", note: "代收往来", status: "已确认" },
+    { id: "wl03", no: "WLFK-2026-001", direction: "付", projectId: "p1", counterparty: "合和地产集团", amount: 3950000, method: "银行转账", date: "2026-03-15", note: "借款归还", status: "已确认" },
+    { id: "wl04", no: "WLFK-2026-002", direction: "付", projectId: "p1", counterparty: "广州市瑞航建筑工程有限公司", amount: 2000000, method: "其他", date: "2026-05-20", note: "公司调拨", status: "已确认" },
+    { id: "wl05", no: "WLSK-2026-003", direction: "收", projectId: "p5", counterparty: "天河城建投资", amount: 500000, method: "银行转账", date: "2026-06-01", note: "临时借支归还", status: "已确认" },
+    { id: "wl06", no: "WLFK-2026-003", direction: "付", projectId: "p2", counterparty: "锦绣置业有限公司", amount: 120000, method: "银行转账", date: "2026-06-18", note: "水电费代付", status: "已确认" },
+    { id: "wl07", no: "WLSK-2026-004", direction: "收", projectId: null, counterparty: "广州亚运城开发", amount: 260000, method: "银行转账", date: "2026-06-25", note: "保证金退回", status: "已确认" },
+    { id: "wl08", no: "WLFK-2026-004", direction: "付", projectId: null, counterparty: "广州开发区建设集团", amount: 180000, method: "银行转账", date: "2026-07-02", note: "投标保证金", status: "草稿" },
   ];
 
   // 支付记录 payRecords（实付流水终点；对应已付款的付款申请，列样=P1 项目详情⑧）
   const payRecords = [
-    { id: "zf01", no: "ZF-2026-0601", date: "2026-06-03", amount: 480000, method: "银行转账", payApplyId: "fk01", projectId: "p1", supplierId: "s6", account: "陈家泥水班组", bank: "农业银行广州白云支行", bankNo: "6228 4801 2233 9900" },
-    { id: "zf02", no: "ZF-2026-0602", date: "2026-06-30", amount: 500000, method: "银行转账", payApplyId: "fk02", projectId: "p1", supplierId: "s6", account: "陈家泥水班组", bank: "农业银行广州白云支行", bankNo: "6228 4801 2233 9900" },
-    { id: "zf03", no: "ZF-2026-0603", date: "2026-06-08", amount: 980000, method: "银行转账", payApplyId: "fk03", projectId: "p1", supplierId: "s7", account: "广东宏宇陶瓷有限公司", bank: "工商银行佛山禅城支行", bankNo: "6222 0203 1122 5566" },
-    { id: "zf04", no: "ZF-2026-0604", date: "2026-06-28", amount: 1000000, method: "银行承兑", payApplyId: "fk04", projectId: "p1", supplierId: "s7", account: "广东宏宇陶瓷有限公司", bank: "工商银行佛山禅城支行", bankNo: "6222 0203 1122 5566" },
-    { id: "zf05", no: "ZF-2026-0605", date: "2026-05-20", amount: 865000, method: "银行转账", payApplyId: "fk05", projectId: "p1", supplierId: "s1", account: "广州市大板东建材有限公司", bank: "中国银行广州天河支行", bankNo: "6217 8500 1234 5678" },
-    { id: "zf06", no: "ZF-2026-0606", date: "2026-06-15", amount: 600000, method: "银行转账", payApplyId: "fk06", projectId: "p2", supplierId: "s10", account: "恒安机电安装工程有限公司", bank: "招商银行广州番禺支行", bankNo: "6225 8802 7788 1122" },
-    { id: "zf07", no: "ZF-2026-0607", date: "2026-03-05", amount: 200000, method: "银行转账", payApplyId: "fk07", projectId: "p2", supplierId: "s2", account: "花城珠江电线电缆有限公司", bank: "工商银行广州越秀支行", bankNo: "6222 0202 8888 4321" },
-    { id: "zf08", no: "ZF-2026-0608", date: "2026-06-12", amount: 12380, method: "对公转账", payApplyId: "fk08", projectId: "p2", supplierId: "s4", account: "穗建五金机电经营部", bank: "农业银行广州海珠支行", bankNo: "6228 4800 5566 7788" },
+    { id: "zf01", no: "ZF-2026-0601", date: "2026-06-03", amount: 480000, method: "银行转账", payApplyId: "fk01", projectId: "p1", supplierId: "s6", account: "陈家泥水班组", bank: "农业银行广州白云支行", bankNo: "6228 4801 2233 9900", status: "已确认" },
+    { id: "zf02", no: "ZF-2026-0602", date: "2026-06-30", amount: 500000, method: "银行转账", payApplyId: "fk02", projectId: "p1", supplierId: "s6", account: "陈家泥水班组", bank: "农业银行广州白云支行", bankNo: "6228 4801 2233 9900", status: "已确认" },
+    { id: "zf03", no: "ZF-2026-0603", date: "2026-06-08", amount: 980000, method: "银行转账", payApplyId: "fk03", projectId: "p1", supplierId: "s7", account: "广东宏宇陶瓷有限公司", bank: "工商银行佛山禅城支行", bankNo: "6222 0203 1122 5566", status: "已确认" },
+    { id: "zf04", no: "ZF-2026-0604", date: "2026-06-28", amount: 1000000, method: "承兑汇票", payApplyId: "fk04", projectId: "p1", supplierId: "s7", account: "广东宏宇陶瓷有限公司", bank: "工商银行佛山禅城支行", bankNo: "6222 0203 1122 5566", status: "已确认" },
+    { id: "zf05", no: "ZF-2026-0605", date: "2026-05-20", amount: 865000, method: "银行转账", payApplyId: "fk05", projectId: "p1", supplierId: "s1", account: "广州市大板东建材有限公司", bank: "中国银行广州天河支行", bankNo: "6217 8500 1234 5678", status: "已确认" },
+    { id: "zf06", no: "ZF-2026-0606", date: "2026-06-15", amount: 600000, method: "银行转账", payApplyId: "fk06", projectId: "p2", supplierId: "s10", account: "恒安机电安装工程有限公司", bank: "招商银行广州番禺支行", bankNo: "6225 8802 7788 1122", status: "已确认" },
+    { id: "zf07", no: "ZF-2026-0607", date: "2026-03-05", amount: 200000, method: "银行转账", payApplyId: "fk07", projectId: "p2", supplierId: "s2", account: "花城珠江电线电缆有限公司", bank: "工商银行广州越秀支行", bankNo: "6222 0202 8888 4321", status: "已确认" },
+    { id: "zf08", no: "ZF-2026-0608", date: "2026-06-12", amount: 12380, method: "银行转账", payApplyId: "fk08", projectId: "p2", supplierId: "s4", account: "穗建五金机电经营部", bank: "农业银行广州海珠支行", bankNo: "6228 4800 5566 7788", status: "待核对" },
   ];
+  // 表单必填三字段（payeeName / voucherNo / bankRef）演示补齐：收款方=账户名，凭证号/银行流水按日期演绎
+  payRecords.forEach((z, i) => {
+    z.payeeName = z.account;
+    z.voucherNo = "PZ-" + z.date.replace(/-/g, "").slice(0, 6) + "-" + String(i + 1).padStart(3, "0");
+    z.bankRef = z.date.replace(/-/g, "") + "10044" + String(310 + i);
+  });
 
   // 费用报销 reimburses（个人报销；projectId=null 即公司/个人开支，连批E 房租线）
   const reimburses = [
@@ -553,34 +560,34 @@
   ];
 
   // ——— 批D 轻实体仓：乙供材单据（红圈05）+ 甲供材整域（红圈06）（稳定 id 够蓝链，金额/数量 mock）———
-  // 下料单（要料计划）：默认视图「未完全到货」；remain = plan - arrived（计算列）
+  // 下料单（要料计划）：状态=实现端词表(草稿/已提交)；已到量由到货事实派生
   const matRequisitions = [
-    { id: "xl01", no: "XL-2026-001", projectId: "p1", material: "HRB400 螺纹钢 Φ12", planQty: 320, arrivedQty: 290, unit: "吨", applicant: "赵铁柱", date: "2026-03-05", status: "未完全到货" },
-    { id: "xl02", no: "XL-2026-002", projectId: "p1", material: "墙砖 300×600（含瓷砖）", planQty: 26000, arrivedQty: 17800, unit: "㎡", applicant: "虞建华", date: "2026-04-10", status: "未完全到货" },
-    { id: "xl03", no: "XL-2026-003", projectId: "p1", material: "C30 商品混凝土", planQty: 2600, arrivedQty: 1900, unit: "m³", applicant: "匡志强", date: "2026-03-20", status: "未完全到货" },
-    { id: "xl04", no: "XL-2026-004", projectId: "p2", material: "电缆 YJV 3×25", planQty: 5000, arrivedQty: 5000, unit: "米", applicant: "周伟峰", date: "2026-02-15", status: "已齐套" },
-    { id: "xl05", no: "XL-2026-005", projectId: "p1", material: "地砖 800×800（含瓷砖）", planQty: 21000, arrivedQty: 14200, unit: "㎡", applicant: "虞建华", date: "2026-04-12", status: "未完全到货" },
-    { id: "xl06", no: "XL-2026-006", projectId: "p5", material: "铝扣板吊顶", planQty: 5200, arrivedQty: 0, unit: "㎡", applicant: "周维", date: "2026-06-01", status: "未完全到货" },
-    { id: "xl07", no: "XL-2026-007", projectId: "p3", material: "防水卷材 SBS", planQty: 1200, arrivedQty: 1200, unit: "卷", applicant: "郑明", date: "2026-03-30", status: "已齐套" },
+    { id: "xl01", no: "XL-2026-001", projectId: "p1", material: "HRB400 螺纹钢 Φ12", planQty: 320, arrivedQty: 290, unit: "吨", applicant: "赵铁柱", date: "2026-03-05", status: "已提交" },
+    { id: "xl02", no: "XL-2026-002", projectId: "p1", material: "墙砖 300×600（含瓷砖）", planQty: 26000, arrivedQty: 17800, unit: "㎡", applicant: "虞建华", date: "2026-04-10", status: "已提交" },
+    { id: "xl03", no: "XL-2026-003", projectId: "p1", material: "C30 商品混凝土", planQty: 2600, arrivedQty: 1900, unit: "m³", applicant: "匡志强", date: "2026-03-20", status: "已提交" },
+    { id: "xl04", no: "XL-2026-004", projectId: "p2", material: "电缆 YJV 3×25", planQty: 5000, arrivedQty: 5000, unit: "米", applicant: "周伟峰", date: "2026-02-15", status: "已提交" },
+    { id: "xl05", no: "XL-2026-005", projectId: "p1", material: "地砖 800×800（含瓷砖）", planQty: 21000, arrivedQty: 14200, unit: "㎡", applicant: "虞建华", date: "2026-04-12", status: "已提交" },
+    { id: "xl06", no: "XL-2026-006", projectId: "p5", material: "铝扣板吊顶", planQty: 5200, arrivedQty: 0, unit: "㎡", applicant: "周维", date: "2026-06-01", status: "草稿" },
+    { id: "xl07", no: "XL-2026-007", projectId: "p3", material: "防水卷材 SBS", planQty: 1200, arrivedQty: 1200, unit: "卷", applicant: "郑明", date: "2026-03-30", status: "已提交" },
   ];
-  // 材料到货（入库）：关联下料单/采购合同/仓库；status 待入库/已入库
+  // 材料到货（入库）：关联下料单/采购合同/仓库；status 草稿/已过账（实现端词表）
   const matArrivals = [
-    { id: "dh01", no: "DH-2026-0601", projectId: "p1", contractId: "cg02", supplierId: "s1", requisitionId: "xl01", material: "HRB400 螺纹钢 Φ12", qty: 120, unit: "吨", amount: 477600, warehouse: "中心仓", date: "2026-03-30", receiver: "赵铁柱", status: "已入库" },
-    { id: "dh02", no: "DH-2026-0602", projectId: "p1", contractId: "cg02", supplierId: "s1", requisitionId: "xl01", material: "HRB400 螺纹钢 Φ12", qty: 170, unit: "吨", amount: 676600, warehouse: "中心仓", date: "2026-05-12", receiver: "赵铁柱", status: "已入库" },
-    { id: "dh03", no: "DH-2026-0603", projectId: "p1", contractId: "cg01", supplierId: "s7", requisitionId: "xl02", material: "墙砖 300×600", qty: 8900, unit: "㎡", amount: 1139200, warehouse: "合和新城现场仓", date: "2026-05-08", receiver: "虞建华", status: "已入库" },
-    { id: "dh04", no: "DH-2026-0604", projectId: "p1", contractId: "cg03", supplierId: "s3", requisitionId: "xl03", material: "C30 商品混凝土", qty: 900, unit: "m³", amount: 415800, warehouse: "中心仓", date: "2026-04-06", receiver: "匡志强", status: "已入库" },
-    { id: "dh05", no: "DH-2026-0605", projectId: "p2", contractId: "cg04", supplierId: "s2", requisitionId: "xl04", material: "电缆 YJV 3×25", qty: 5000, unit: "米", amount: 230000, warehouse: "中心仓", date: "2026-03-01", receiver: "周伟峰", status: "已入库" },
-    { id: "dh06", no: "DH-2026-0606", projectId: "p1", contractId: "cg01", supplierId: "s7", requisitionId: "xl05", material: "地砖 800×800", qty: 7100, unit: "㎡", amount: 795200, warehouse: "合和新城现场仓", date: "2026-06-10", receiver: "虞建华", status: "待入库" },
-    { id: "dh07", no: "DH-2026-0607", projectId: "p3", contractId: "cg08", supplierId: "s1", requisitionId: "xl07", material: "防水卷材 SBS", qty: 1200, unit: "卷", amount: 384000, warehouse: "中心仓", date: "2026-03-30", receiver: "郑明", status: "已入库" },
+    { id: "dh01", no: "DH-2026-0601", projectId: "p1", contractId: "cg02", supplierId: "s1", requisitionId: "xl01", material: "HRB400 螺纹钢 Φ12", qty: 120, unit: "吨", amount: 477600, warehouse: "中心仓", date: "2026-03-30", receiver: "赵铁柱", status: "已过账" },
+    { id: "dh02", no: "DH-2026-0602", projectId: "p1", contractId: "cg02", supplierId: "s1", requisitionId: "xl01", material: "HRB400 螺纹钢 Φ12", qty: 170, unit: "吨", amount: 676600, warehouse: "中心仓", date: "2026-05-12", receiver: "赵铁柱", status: "已过账" },
+    { id: "dh03", no: "DH-2026-0603", projectId: "p1", contractId: "cg01", supplierId: "s7", requisitionId: "xl02", material: "墙砖 300×600", qty: 8900, unit: "㎡", amount: 1139200, warehouse: "合和新城现场仓", date: "2026-05-08", receiver: "虞建华", status: "已过账" },
+    { id: "dh04", no: "DH-2026-0604", projectId: "p1", contractId: "cg03", supplierId: "s3", requisitionId: "xl03", material: "C30 商品混凝土", qty: 900, unit: "m³", amount: 415800, warehouse: "中心仓", date: "2026-04-06", receiver: "匡志强", status: "已过账" },
+    { id: "dh05", no: "DH-2026-0605", projectId: "p2", contractId: "cg04", supplierId: "s2", requisitionId: "xl04", material: "电缆 YJV 3×25", qty: 5000, unit: "米", amount: 230000, warehouse: "中心仓", date: "2026-03-01", receiver: "周伟峰", status: "已过账" },
+    { id: "dh06", no: "DH-2026-0606", projectId: "p1", contractId: "cg01", supplierId: "s7", requisitionId: "xl05", material: "地砖 800×800", qty: 7100, unit: "㎡", amount: 795200, warehouse: "合和新城现场仓", date: "2026-06-10", receiver: "虞建华", status: "草稿" },
+    { id: "dh07", no: "DH-2026-0607", projectId: "p3", contractId: "cg08", supplierId: "s1", requisitionId: "xl07", material: "防水卷材 SBS", qty: 1200, unit: "卷", amount: 384000, warehouse: "中心仓", date: "2026-03-30", receiver: "郑明", status: "已过账" },
   ];
   // 材料领用（出库）：项目/仓库/领用人/用途
   const matUses = [
-    { id: "ly01", no: "LY-2026-0601", projectId: "p1", warehouse: "中心仓", material: "HRB400 螺纹钢 Φ12", qty: 110, unit: "吨", receiver: "赵铁柱", useFor: "3 号楼主体钢筋", date: "2026-04-02" },
-    { id: "ly02", no: "LY-2026-0602", projectId: "p1", warehouse: "合和新城现场仓", material: "墙砖 300×600", qty: 8600, unit: "㎡", receiver: "虞建华", useFor: "1-2 号楼墙面", date: "2026-05-15" },
-    { id: "ly03", no: "LY-2026-0603", projectId: "p1", warehouse: "中心仓", material: "C30 商品混凝土", qty: 880, unit: "m³", receiver: "匡志强", useFor: "3 号楼梁板", date: "2026-04-10" },
-    { id: "ly04", no: "LY-2026-0604", projectId: "p2", warehouse: "中心仓", material: "电缆 YJV 3×25", qty: 3000, unit: "米", receiver: "周伟峰", useFor: "南区强电", date: "2026-03-20" },
-    { id: "ly05", no: "LY-2026-0605", projectId: "p1", warehouse: "合和新城现场仓", material: "地砖 800×800", qty: 6800, unit: "㎡", receiver: "虞建华", useFor: "1-2 号楼地面", date: "2026-06-18" },
-    { id: "ly06", no: "LY-2026-0606", projectId: "p3", warehouse: "中心仓", material: "防水卷材 SBS", qty: 1100, unit: "卷", receiver: "郑明", useFor: "屋面防水", date: "2026-04-05" },
+    { id: "ly01", no: "LY-2026-0601", projectId: "p1", warehouse: "中心仓", material: "HRB400 螺纹钢 Φ12", qty: 110, unit: "吨", receiver: "赵铁柱", useFor: "3 号楼主体钢筋", date: "2026-04-02", status: "已过账" },
+    { id: "ly02", no: "LY-2026-0602", projectId: "p1", warehouse: "合和新城现场仓", material: "墙砖 300×600", qty: 8600, unit: "㎡", receiver: "虞建华", useFor: "1-2 号楼墙面", date: "2026-05-15", status: "已过账" },
+    { id: "ly03", no: "LY-2026-0603", projectId: "p1", warehouse: "中心仓", material: "C30 商品混凝土", qty: 880, unit: "m³", receiver: "匡志强", useFor: "3 号楼梁板", date: "2026-04-10", status: "已过账" },
+    { id: "ly04", no: "LY-2026-0604", projectId: "p2", warehouse: "中心仓", material: "电缆 YJV 3×25", qty: 3000, unit: "米", receiver: "周伟峰", useFor: "南区强电", date: "2026-03-20", status: "已过账" },
+    { id: "ly05", no: "LY-2026-0605", projectId: "p1", warehouse: "合和新城现场仓", material: "地砖 800×800", qty: 6800, unit: "㎡", receiver: "虞建华", useFor: "1-2 号楼地面", date: "2026-06-18", status: "草稿" },
+    { id: "ly06", no: "LY-2026-0606", projectId: "p3", warehouse: "中心仓", material: "防水卷材 SBS", qty: 1100, unit: "卷", receiver: "郑明", useFor: "屋面防水", date: "2026-04-05", status: "已过账" },
   ];
   // 材料采购结算：关联采购合同/结算金额；status 待确认/已确认
   const matSettles = [
@@ -599,41 +606,41 @@
     { id: "pd04", no: "PD-2026-Q3-01", warehouse: "中心仓", checker: "黄伟明", itemCount: 45, diffAmount: 0, date: "2026-07-08", status: "草稿" },
   ];
   // —— 甲供材（红圈06 整域，甲方供货、无采购合同；供货方=项目甲方）——
-  // 甲供材总控量：项目/材料/总控量/到货/已用；remain 现算
+  // 甲供材总控量：项目/材料/总控量/到货/已用；status 草稿/已生效；date=总控建立日期
   const omTotals = [
-    { id: "jz01", no: "ZK-2026-001", projectId: "p1", material: "甲供电梯（三菱）", unit: "台", totalQty: 6, arrivedQty: 4, usedQty: 2, party: "合和地产集团" },
-    { id: "jz02", no: "ZK-2026-002", projectId: "p1", material: "甲供铝合金门窗", unit: "㎡", totalQty: 8000, arrivedQty: 5200, usedQty: 4800, party: "合和地产集团" },
-    { id: "jz03", no: "ZK-2026-003", projectId: "p2", material: "甲供中央空调机组", unit: "台", totalQty: 12, arrivedQty: 8, usedQty: 6, party: "锦绣置业有限公司" },
-    { id: "jz04", no: "ZK-2026-004", projectId: "p5", material: "甲供幕墙玻璃", unit: "㎡", totalQty: 3200, arrivedQty: 1200, usedQty: 800, party: "天河城建投资" },
-    { id: "jz05", no: "ZK-2026-005", projectId: "p1", material: "甲供智能化设备", unit: "套", totalQty: 1, arrivedQty: 0, usedQty: 0, party: "合和地产集团" },
+    { id: "jz01", no: "ZK-2026-001", projectId: "p1", material: "甲供电梯（三菱）", unit: "台", totalQty: 6, arrivedQty: 4, usedQty: 2, party: "合和地产集团", date: "2026-02-20", status: "已生效" },
+    { id: "jz02", no: "ZK-2026-002", projectId: "p1", material: "甲供铝合金门窗", unit: "㎡", totalQty: 8000, arrivedQty: 5200, usedQty: 4800, party: "合和地产集团", date: "2026-03-02", status: "已生效" },
+    { id: "jz03", no: "ZK-2026-003", projectId: "p2", material: "甲供中央空调机组", unit: "台", totalQty: 12, arrivedQty: 8, usedQty: 6, party: "锦绣置业有限公司", date: "2026-04-15", status: "已生效" },
+    { id: "jz04", no: "ZK-2026-004", projectId: "p5", material: "甲供幕墙玻璃", unit: "㎡", totalQty: 3200, arrivedQty: 1200, usedQty: 800, party: "天河城建投资", date: "2026-05-10", status: "已生效" },
+    { id: "jz05", no: "ZK-2026-005", projectId: "p1", material: "甲供智能化设备", unit: "套", totalQty: 1, arrivedQty: 0, usedQty: 0, party: "合和地产集团", date: "2026-07-01", status: "草稿" },
   ];
   // 甲供材下料单
   const omRequisitions = [
-    { id: "jl01", no: "JXL-2026-001", projectId: "p1", material: "甲供铝合金门窗", planQty: 5200, unit: "㎡", applicant: "黄伟明", date: "2026-04-01", status: "已下单" },
-    { id: "jl02", no: "JXL-2026-002", projectId: "p1", material: "甲供电梯（三菱）", planQty: 4, unit: "台", applicant: "黄伟明", date: "2026-03-10", status: "已下单" },
-    { id: "jl03", no: "JXL-2026-003", projectId: "p2", material: "甲供中央空调机组", planQty: 8, unit: "台", applicant: "宋子豪", date: "2026-05-06", status: "已下单" },
-    { id: "jl04", no: "JXL-2026-004", projectId: "p5", material: "甲供幕墙玻璃", planQty: 1200, unit: "㎡", applicant: "周维", date: "2026-06-01", status: "待下单" },
+    { id: "jl01", no: "JXL-2026-001", projectId: "p1", material: "甲供铝合金门窗", planQty: 5200, unit: "㎡", applicant: "黄伟明", date: "2026-04-01", status: "已提交" },
+    { id: "jl02", no: "JXL-2026-002", projectId: "p1", material: "甲供电梯（三菱）", planQty: 4, unit: "台", applicant: "黄伟明", date: "2026-03-10", status: "已提交" },
+    { id: "jl03", no: "JXL-2026-003", projectId: "p2", material: "甲供中央空调机组", planQty: 8, unit: "台", applicant: "宋子豪", date: "2026-05-06", status: "已提交" },
+    { id: "jl04", no: "JXL-2026-004", projectId: "p5", material: "甲供幕墙玻璃", planQty: 1200, unit: "㎡", applicant: "周维", date: "2026-06-01", status: "草稿" },
   ];
   // 甲供材到货
   const omArrivals = [
-    { id: "jd01", no: "JDH-2026-001", projectId: "p1", material: "甲供铝合金门窗", qty: 3000, unit: "㎡", warehouse: "合和新城现场仓", date: "2026-05-10", receiver: "虞建华", status: "已入库" },
-    { id: "jd02", no: "JDH-2026-002", projectId: "p1", material: "甲供铝合金门窗", qty: 2200, unit: "㎡", warehouse: "合和新城现场仓", date: "2026-06-08", receiver: "虞建华", status: "已入库" },
-    { id: "jd03", no: "JDH-2026-003", projectId: "p1", material: "甲供电梯（三菱）", qty: 4, unit: "台", warehouse: "合和新城现场仓", date: "2026-05-20", receiver: "赵铁柱", status: "已入库" },
-    { id: "jd04", no: "JDH-2026-004", projectId: "p2", material: "甲供中央空调机组", qty: 8, unit: "台", warehouse: "中心仓", date: "2026-06-02", receiver: "周伟峰", status: "已入库" },
-    { id: "jd05", no: "JDH-2026-005", projectId: "p5", material: "甲供幕墙玻璃", qty: 1200, unit: "㎡", warehouse: "中心仓", date: "2026-06-20", receiver: "周维", status: "待入库" },
+    { id: "jd01", no: "JDH-2026-001", projectId: "p1", material: "甲供铝合金门窗", qty: 3000, unit: "㎡", warehouse: "合和新城现场仓", date: "2026-05-10", receiver: "虞建华", status: "已过账" },
+    { id: "jd02", no: "JDH-2026-002", projectId: "p1", material: "甲供铝合金门窗", qty: 2200, unit: "㎡", warehouse: "合和新城现场仓", date: "2026-06-08", receiver: "虞建华", status: "已过账" },
+    { id: "jd03", no: "JDH-2026-003", projectId: "p1", material: "甲供电梯（三菱）", qty: 4, unit: "台", warehouse: "合和新城现场仓", date: "2026-05-20", receiver: "赵铁柱", status: "已过账" },
+    { id: "jd04", no: "JDH-2026-004", projectId: "p2", material: "甲供中央空调机组", qty: 8, unit: "台", warehouse: "中心仓", date: "2026-06-02", receiver: "周伟峰", status: "已过账" },
+    { id: "jd05", no: "JDH-2026-005", projectId: "p5", material: "甲供幕墙玻璃", qty: 1200, unit: "㎡", warehouse: "中心仓", date: "2026-06-20", receiver: "周维", status: "草稿" },
   ];
   // 甲供材领用
   const omUses = [
-    { id: "jy01", no: "JLY-2026-001", projectId: "p1", material: "甲供铝合金门窗", qty: 2600, unit: "㎡", receiver: "虞建华", useFor: "1-2 号楼门窗安装", date: "2026-05-25" },
-    { id: "jy02", no: "JLY-2026-002", projectId: "p1", material: "甲供铝合金门窗", qty: 2200, unit: "㎡", receiver: "虞建华", useFor: "3 号楼门窗安装", date: "2026-06-15" },
-    { id: "jy03", no: "JLY-2026-003", projectId: "p1", material: "甲供电梯（三菱）", qty: 2, unit: "台", receiver: "赵铁柱", useFor: "1 号楼电梯安装", date: "2026-06-01" },
-    { id: "jy04", no: "JLY-2026-004", projectId: "p2", material: "甲供中央空调机组", qty: 6, unit: "台", receiver: "周伟峰", useFor: "南区空调安装", date: "2026-06-20" },
+    { id: "jy01", no: "JLY-2026-001", projectId: "p1", material: "甲供铝合金门窗", qty: 2600, unit: "㎡", receiver: "虞建华", useFor: "1-2 号楼门窗安装", date: "2026-05-25", status: "已过账" },
+    { id: "jy02", no: "JLY-2026-002", projectId: "p1", material: "甲供铝合金门窗", qty: 2200, unit: "㎡", receiver: "虞建华", useFor: "3 号楼门窗安装", date: "2026-06-15", status: "已过账" },
+    { id: "jy03", no: "JLY-2026-003", projectId: "p1", material: "甲供电梯（三菱）", qty: 2, unit: "台", receiver: "赵铁柱", useFor: "1 号楼电梯安装", date: "2026-06-01", status: "已过账" },
+    { id: "jy04", no: "JLY-2026-004", projectId: "p2", material: "甲供中央空调机组", qty: 6, unit: "台", receiver: "周伟峰", useFor: "南区空调安装", date: "2026-06-20", status: "已过账" },
   ];
   // 甲供材直入直出（不入库直接用到部位）
   const omDirects = [
-    { id: "jzz01", no: "ZR-2026-001", projectId: "p1", material: "甲供商砼（补量）", qty: 120, unit: "m³", party: "合和地产集团", useFor: "3 号楼直供直浇", date: "2026-04-18" },
-    { id: "jzz02", no: "ZR-2026-002", projectId: "p2", material: "甲供防水涂料", qty: 40, unit: "桶", party: "锦绣置业有限公司", useFor: "南区卫生间直用", date: "2026-05-30" },
-    { id: "jzz03", no: "ZR-2026-003", projectId: "p5", material: "甲供石材干挂件", qty: 800, unit: "套", party: "天河城建投资", useFor: "幕墙直装", date: "2026-06-25" },
+    { id: "jzz01", no: "ZR-2026-001", projectId: "p1", material: "甲供商砼（补量）", qty: 120, unit: "m³", party: "合和地产集团", useFor: "3 号楼直供直浇", usePlace: "3 号楼 12-15 层剪力墙", date: "2026-04-18", status: "已确认" },
+    { id: "jzz02", no: "ZR-2026-002", projectId: "p2", material: "甲供防水涂料", qty: 40, unit: "桶", party: "锦绣置业有限公司", useFor: "南区卫生间直用", usePlace: "南区 2 号楼 3-6 层卫生间", date: "2026-05-30", status: "已确认" },
+    { id: "jzz03", no: "ZR-2026-003", projectId: "p5", material: "甲供石材干挂件", qty: 800, unit: "套", party: "天河城建投资", useFor: "幕墙直装", usePlace: "东立面幕墙 4-8 轴", date: "2026-06-25", status: "已确认" },
   ];
 
   // ——— 批E 轻实体仓：客户（红圈09 甲方档案）+ 项目其他合同（红圈11）（稳定 id 够蓝链，金额 mock）———
@@ -735,8 +742,12 @@
     settleLinks: [{ sNo: "FBJS-2026-006", sName: "泥水班组 6 月过程结算", sAmt: 386500, sLink: 328525, sNote: "按 85% 支付" }],
     invoiceLinks: [{ iNo: "04403276911", iDate: "2026-07-02", iAmt: 328525, iLink: 328525 }],
   });
+  // 回票状态派生演示：已全额回票的四条补发票分摊（Σ iLink = 批复金额）；fk02 保持部分回票（328,525 / 500,000）
+  [["fk01", 500000, "04403276901", "2026-06-05"], ["fk03", 1000000, "04403276903", "2026-06-10"],
+   ["fk05", 865000, "04403276905", "2026-05-22"], ["fk06", 600000, "04403276906", "2026-06-18"]]
+    .forEach(([id, amt, iNo, iDate]) => patch(d.payApplies, id, { invoiceLinks: [{ iNo, iDate, iAmt: amt, iLink: amt }] }));
   // 收款登记 sk01：经办/期次/流水
-  patch(d.receipts, "sk01", { handler: "周维", periodLabel: "2026 年 5 月进度款", bankRef: "20260528100443172", status: "已登记", payerAccount: "8873" });
+  patch(d.receipts, "sk01", { handler: "周维", periodLabel: "2026 年 5 月进度款", bankRef: "20260528100443172", status: "已确认", payerAccount: "8873" });
   // 开票申请 kp01：名称/购方/开票内容
   patch(d.invApplies, "kp01", { name: "合和新城 5 月进度款开票", invoiceType: "增值税专用发票", buyer: "合和地产集团", buyerTaxNo: "91440101MA5CFH991Q", content: "建筑服务*工程款" });
   // 分供方 s1（材料）/ s5（劳务）：工商/开票/评价档案
@@ -763,17 +774,17 @@
   // 材料到货 dh01：到货明细 + 质检
   patch(d.matArrivals, "dh01", {
     quality: "合格",
+    // 明细与头字段同口径（HRB400 螺纹钢 120 吨 ×3980 = ¥477,600，对应下料单 xl01）
     lines: [
-      { material: "全抛釉瓷砖", spec: "800×800", unit: "块", qty: 4200, price: 42.8, amount: 179760, note: "10 栋首批" },
-      { material: "瓷砖胶", spec: "20kg/包", unit: "包", qty: 1400, price: 33.6, amount: 47040, note: "" },
+      { material: "HRB400 螺纹钢", spec: "Φ12", unit: "吨", qty: 120, price: 3980, amount: 477600, note: "关联下料单 XL-2026-101" },
     ],
   });
   // 库存盘点 pd01：盘点明细（盈亏聚合示范）
   patch(d.stockChecks, "pd01", {
     lines: [
-      { material: "全抛釉瓷砖", spec: "800×800", unit: "块", bookQty: 2600, realQty: 2588, diffQty: -12, diffAmount: -513.6 },
-      { material: "瓷砖胶", spec: "20kg/包", unit: "包", bookQty: 640, realQty: 640, diffQty: 0, diffAmount: 0 },
-      { material: "阳角线", spec: "2440mm", unit: "根", bookQty: 950, realQty: 962, diffQty: 12, diffAmount: 114 },
+      { material: "全抛釉瓷砖", spec: "800×800", unit: "块", bookQty: 2600, actualQty: 2588, diffQty: -12, diffAmount: -513.6 },
+      { material: "瓷砖胶", spec: "20kg/包", unit: "包", bookQty: 640, actualQty: 640, diffQty: 0, diffAmount: 0 },
+      { material: "阳角线", spec: "2440mm", unit: "根", bookQty: 950, actualQty: 962, diffQty: 12, diffAmount: 114 },
     ],
   });
   // 工人 w1：银行/紧急联系人/技能档案

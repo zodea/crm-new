@@ -207,6 +207,46 @@ describe('paddleOcrCloudClient', () => {
     })).rejects.toMatchObject({ code, retryable })
   })
 
+  it('官方返回任务提交队列已满时标记为可重试服务不可用', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () =>
+      jsonResponse({ code: 400, msg: '任务提交队列已满，请稍后重试' }, 400),
+    )
+    const client = new PaddleOcrCloudClient({ accessToken: 'test', fetch: fetchMock })
+
+    await expect(client.recognize({
+      fileName: 'delivery.pdf',
+      contentType: 'application/pdf',
+      data: new Uint8Array([1]),
+    })).rejects.toMatchObject({ code: 'service-unavailable', retryable: true })
+  })
+
+  it('提交队列暂满后短暂退避并重试提交', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ code: 400, msg: '任务提交队列已满，请稍后重试' }))
+      .mockResolvedValueOnce(jsonResponse({ code: 0, data: { jobId: 'retried_job' } }))
+      .mockResolvedValueOnce(jsonResponse({
+        code: 0,
+        data: { state: 'done', resultUrl: { jsonUrl: 'https://result.example/retried.jsonl' } },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        result: {
+          dataInfo: {},
+          layoutParsingResults: [{ markdown: { text: '# 重试成功' }, prunedResult: {} }],
+        },
+      })))
+    const sleep = vi.fn(async () => {})
+    const client = new PaddleOcrCloudClient({ accessToken: 'test', fetch: fetchMock, sleep })
+
+    const result = await client.recognize({
+      fileName: 'delivery.pdf',
+      contentType: 'application/pdf',
+      data: new Uint8Array([1]),
+    })
+
+    expect(result.jobId).toBe('retried_job')
+    expect(sleep).toHaveBeenCalledWith(1_500)
+  })
+
   it('任务失败时保留可操作错误但不泄露 Token', async () => {
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse({ code: 0, data: { jobId: 'failed_job' } }))

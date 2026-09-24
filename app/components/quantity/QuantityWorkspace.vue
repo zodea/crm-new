@@ -3,6 +3,7 @@ import type { QuantityMatrixCell, QuantityMatrixView } from '~/lib/quantity/matr
 
 defineProps<{
   matrix: QuantityMatrixView
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -16,6 +17,7 @@ const emit = defineEmits<{
   <div class="flex min-w-0 flex-col gap-3">
     <QuantityMatrix
       :matrix="matrix"
+      :readonly="readonly"
       @configure="emit('configure', $event)"
       @complete="emit('complete', $event)"
       @detail="emit('detail', $event)"

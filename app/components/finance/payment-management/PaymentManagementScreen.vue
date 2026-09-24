@@ -3,16 +3,20 @@ import type {
   PaymentManagementRow,
   PaymentManagementSummary,
 } from '~/stores/payment-management'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+import StatePanel from '~/components/ui/StatePanel.vue'
+import { financeDetailPath } from '~/lib/finance/page'
 import { clampPage, paginate } from '~/lib/kit/table'
-
-type PaymentView = 'due' | 'paid' | 'all'
+import { toErrorMessage } from '~/lib/util/error'
+import { summarizePayments } from '~/stores/payment-management'
 
 const store = usePaymentManagementStore()
-const { rows, loading, projectOptions } = storeToRefs(store)
+const { rows, loading, hasSnapshot, projectOptions } = storeToRefs(store)
+const loadError = shallowRef('')
 
 const search = shallowRef('')
 const project = shallowRef('all')
-const view = shallowRef<PaymentView>('due')
+const view = shallowRef<string[]>(['due'])
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 
@@ -33,43 +37,18 @@ const scopedRows = computed(() => {
   })
 })
 
-const viewTabs = computed(() => [
-  {
-    key: 'due',
-    label: '待支付',
-    count: scopedRows.value.filter(row => row.dueAmount > 0).length,
-  },
-  {
-    key: 'paid',
-    label: '已付清',
-    count: scopedRows.value.filter(row => row.paymentStatus === '已付清').length,
-  },
-  { key: 'all', label: '全部', count: scopedRows.value.length },
-])
+const viewOptions = [
+  { key: 'due', label: '待支付' },
+  { key: 'paid', label: '已付清' },
+]
 
-const filteredRows = computed(() => {
-  if (view.value === 'due')
-    return scopedRows.value.filter(row => row.dueAmount > 0)
-  if (view.value === 'paid')
-    return scopedRows.value.filter(row => row.paymentStatus === '已付清')
-  return scopedRows.value
-})
+const filteredRows = computed(() => scopedRows.value.filter(row =>
+  !view.value.length
+  || (view.value.includes('due') && (row.dueAmount ?? 0) > 0)
+  || (view.value.includes('paid') && row.paymentStatus === '已付清'),
+))
 
-const summary = computed<PaymentManagementSummary>(() =>
-  filteredRows.value.reduce<PaymentManagementSummary>((result, row) => ({
-    applicationCount: result.applicationCount + 1,
-    approvedAmount: result.approvedAmount + row.approvedAmount,
-    paidAmount: result.paidAmount + row.paidAmount,
-    dueAmount: result.dueAmount + row.dueAmount,
-    dueCount: result.dueCount + Number(row.dueAmount > 0),
-  }), {
-    applicationCount: 0,
-    approvedAmount: 0,
-    paidAmount: 0,
-    dueAmount: 0,
-    dueCount: 0,
-  }),
-)
+const summary = computed<PaymentManagementSummary>(() => summarizePayments(filteredRows.value))
 
 const currentPage = computed(() =>
   clampPage(page.value, filteredRows.value.length, pageSize.value),
@@ -96,13 +75,13 @@ function setProject(value: string) {
 }
 
 function openApplication(row: PaymentManagementRow) {
-  void navigateTo(`/finance/payment/${row.id}`)
+  void navigateTo(financeDetailPath('payment_application', row.id))
 }
 
 function createPayment(row: PaymentManagementRow) {
   const query: Record<string, string> = {
     paymentApplicationId: row.id,
-    amount: String(row.dueAmount),
+    amount: String(row.dueAmount ?? 0),
   }
   if (row.projectId)
     query.projectId = row.projectId
@@ -111,8 +90,14 @@ function createPayment(row: PaymentManagementRow) {
   void navigateTo({ path: '/finance/records/new', query })
 }
 
-function refresh() {
-  void store.load()
+async function refresh() {
+  loadError.value = ''
+  try {
+    await store.load()
+  }
+  catch (cause) {
+    loadError.value = toErrorMessage(cause)
+  }
 }
 
 function openRecords() {
@@ -120,15 +105,15 @@ function openRecords() {
 }
 
 onMounted(() => {
-  void store.load()
+  void refresh()
 })
 onActivated(() => {
-  void store.load()
+  void refresh()
 })
 </script>
 
 <template>
-  <main class="flex min-w-0 max-w-full flex-col gap-4">
+  <main class="flex min-w-0 max-w-full flex-col gap-4" :aria-busy="loading">
     <PaymentManagementToolbar
       :search="search"
       :project="project"
@@ -141,14 +126,15 @@ onActivated(() => {
     />
 
     <PaymentManagementSummary :summary="summary" />
+    <StatePanel v-if="loadError" kind="error" title="付款管理读取失败" :description="loadError" :compact="hasSnapshot" action-label="重试" @action="refresh" />
 
-    <section aria-label="付款状态视图" class="panel px-3">
-      <SegTab v-model="view" :tabs="viewTabs" />
+    <section aria-label="付款状态视图" class="panel px-3 py-2">
+      <KitMultiSelectFilter v-model="view" label="付款状态" :options="viewOptions" />
     </section>
 
     <PaymentManagementTable
       :rows="pageRows"
-      :loading="loading"
+      :loading="loading && !hasSnapshot"
       :page="currentPage"
       :page-size="pageSize"
       :total="filteredRows.length"
@@ -156,5 +142,6 @@ onActivated(() => {
       @open-application="openApplication"
       @create-payment="createPayment"
     />
+    <PaymentPayrollSection />
   </main>
 </template>

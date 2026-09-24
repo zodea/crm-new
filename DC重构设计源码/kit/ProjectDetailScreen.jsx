@@ -1,5 +1,11 @@
 // ProjectDetailScreen — 项目详情·经营驾驶舱（issue #35+#36 重做）
-// 布局：顶部摘要横跨全宽 → 下方分栏 = 主内容（进度成本卡/经营数据/票据/阶段时间线/Tab）+ 右侧文件栏(280px)。
+// #248 阶段式重排（骨架级）：
+//   改了什么——① 主内容列内把「阶段时间线·任务文件」提升为第一块（工程档案主轴），进度成本/经营数据/票据依次后移；
+//   ② 每个阶段卡挂「任务文件」入口：资料份数徽标（📎 n 份）+ 缺失任务 warn 徽标，点开阶段展开区新增该阶段文件清单（演示数据，与右侧文件栏同源 FILES）；
+//   ③ 阶段卡带 + 时间带包一层横向滚动容器（窄屏区内横滚，不引起页面级横滚）；
+//   ④ 顶部操作区新增「导出档案包」→ 打开 window.ProjectArchiveExport 多选树（kit/ProjectArchiveExport.jsx）。
+//   保留了什么——顶部摘要、进度成本卡、经营数据/票据指标格、全部业务 Tab、右侧文件栏、阶段编辑/上传交互与既有数据联动全部原样。
+// 布局：顶部摘要横跨全宽 → 下方分栏 = 主内容（阶段时间线/进度成本卡/经营数据/票据/Tab）+ 右侧文件栏(280px)。
 // 阶段时间线：红圈「胶囊步进器 + 时间带」两层合一，节点按阶段起始日期定位；
 // 施工中阶段起止实时取 window.SCHEDULE（p1=合和新城/p2=锦绣华庭/p3=翠湖花园，p4 无排程用 mock）。
 // 经营数据固定 5列×2行、票据固定 6列×1行（全局布局规则：禁 auto-fit，语义固定列数）。
@@ -234,7 +240,6 @@
   }
 
   // —— 进度 · 成本 驾驶舱卡（#30 原样保留）：迷你甘特（分组级，数据同首页）+ 人材机四科目 目标/实际/偏差 ——
-  const SCHED_NAME = { p1: "合和新城", p2: "锦绣华庭", p3: "翠湖花园" };
   function ScheduleCostCard({ proj, navigate }) {
     const [, force] = React.useReducer((x) => x + 1, 0);
     React.useEffect(() => {
@@ -245,13 +250,13 @@
       return window.SCHEDULE.subscribe(force);
     }, []);
     const S = window.SCHEDULE;
-    const name = SCHED_NAME[proj.id];
+    const schedule = S && S.byProjectId ? S.byProjectId[proj.id] : null;
     const header = (
-      <SectionHeader extra={<Button size="sm" variant="secondary" icon="calendar-range" onClick={() => navigate("schedule")}>打开施工进度</Button>}>
+      <SectionHeader extra={<Button size="sm" variant="secondary" icon="calendar-range" onClick={() => navigate("schedule", { projectId: proj.id })}>打开施工进度</Button>}>
         进度 · 成本
       </SectionHeader>
     );
-    if (!name) {
+    if (S && !schedule) {
       return (
         <Panel padding={16}>{header}
           <div style={{ padding: "18px 0", textAlign: "center", color: "var(--ink-faint)", fontSize: 12 }}>该项目暂无排程数据 · 可在「施工进度」新建楼栋分组套用工序模板</div>
@@ -260,7 +265,7 @@
     }
     if (!S) return <Panel padding={16}>{header}<div style={{ fontSize: 12, color: "var(--ink-soft)" }}>加载排程数据…</div></Panel>;
 
-    const p = S.state[name];
+    const p = schedule;
     const axisStart = p.start.slice(0, 8) + "01";
     const endD = S.D(p.plannedEnd); const axisEnd = new Date(endD.getFullYear(), endD.getMonth() + 1, 0);
     const total = Math.max((axisEnd - S.D(axisStart)) / 86400000, 1);
@@ -278,7 +283,7 @@
       <Panel padding={16}>{header}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 20 }}>
           {/* 左：迷你甘特（点击进入施工进度页） */}
-          <div onClick={() => navigate("schedule")} style={{ cursor: "pointer", minWidth: 0 }} title="点击打开施工进度">
+          <div onClick={() => navigate("schedule", { projectId: proj.id })} style={{ cursor: "pointer", minWidth: 0 }} title="点击打开施工进度">
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-mono)" }}>{Math.round(overall.pct * 100)}%</span>
               <StatusChip tone={overall.dev > 0 ? "ok" : overall.dev < 0 ? "warn" : "brand"}>
@@ -357,6 +362,7 @@
   // —— 阶段时间线（重做核心）：红圈「胶囊步进器 + 时间带」两层合一 ——
   // 上层胶囊节点按阶段起始日期定位（percent left，不均分）；下层 14px 时间带：
   // 已过=绿实色 / 当前=绿→蓝渐变填充到 today 红线 / 未来=浅灰；月份刻度 + today 红线贯穿两层。
+  // #248：阶段卡加「任务文件」徽标（份数/缺失 warn），展开区加该阶段文件清单；卡带+时间带包横滚容器。
   function PhaseTimeline({ proj, m }) {
     const [, force] = React.useReducer((x) => x + 1, 0);
     React.useEffect(() => {
@@ -367,13 +373,12 @@
       return window.SCHEDULE.subscribe(force);
     }, []);
     const S = window.SCHEDULE;
-    const schedName = SCHED_NAME[proj.id];
-    const sp = schedName && S ? S.state[schedName] : null;
+    const sp = S && S.byProjectId ? S.byProjectId[proj.id] : null;
 
     // 阶段起止（施工中一段取排程；其余可经节点旁编辑图标修改）
     const [dates, setDates] = React.useState(() => (PHASE_DATES[proj.id] || PHASE_DATES.p1).map((d) => ({ s: d[0], e: d[1] })));
     const eff = dates.map((d, i) => (i === 2 && sp ? { s: sp.start, e: sp.plannedEnd } : d));
-    const today = sp ? sp.today : "2026-06-30";
+    const today = sp ? sp.today : iso(new Date());
 
     // 任务上传状态（初始铺底自 META.phaseDone，上传按钮真实翻转 → 节点分数联动）
     const [uploaded, setUploaded] = React.useState(() => {
@@ -382,6 +387,8 @@
       return u;
     });
     const doneOf = (pi) => PHASES[pi].tasks.reduce((s, _, ti) => s + (uploaded[pi + "-" + ti] ? 1 : 0), 0);
+    // #248：阶段 → 归档文件（演示数据，与右侧文件栏同一份 FILES，按 tag 前缀「阶段名·」归属）
+    const phaseFiles = (pi) => (FILES[proj.id] || []).filter((f) => f.tag && f.tag.indexOf(PHASES[pi].name + "·") === 0);
 
     // 时间轴：立项开始 → 保修开始+90天（保修期长，右端渐隐截断并标注到期）
     const axisStart = eff[0].s;
@@ -435,6 +442,9 @@
           </span>
         }>阶段时间线 · 任务文件</SectionHeader>
 
+        {/* #248 响应式：阶段卡带 + 时间带包一层横滚容器（minWidth 720），窄屏只在本区横滚，页面不横滚 */}
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ minWidth: 720 }}>
         {/* 反馈轮8：等宽六卡（每阶段有足够位置），日期比例只保留在下方时间带 */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 12 }}>
           {PHASES.map((ph, i) => {
@@ -447,7 +457,7 @@
                 ? { bd: "var(--ok)", bg: "var(--ok-soft)", ink: "var(--ok-ink)", icon: "check" }
                 : { bd: "var(--line-strong)", bg: "var(--panel)", ink: "var(--ink-faint)", icon: "clock" };
             return (
-              <button key={i} onClick={() => setOpenPhase(isOpen ? -1 : i)} style={{
+              <button key={i} type="button" aria-expanded={isOpen} aria-controls={isOpen ? "project-phase-tasks" : undefined} onClick={() => setOpenPhase(i)} style={{
                 border: "1.5px solid " + C.bd, background: C.bg, borderRadius: 10, padding: "10px 10px 8px",
                 cursor: "pointer", textAlign: "left", minWidth: 0,
                 boxShadow: isOpen ? "0 0 0 3px var(--brand-soft)" : "none", transition: "box-shadow var(--dur-fast)",
@@ -458,6 +468,17 @@
                 </div>
                 <div style={{ marginTop: 6, fontSize: 15, fontWeight: 800, fontFamily: "var(--font-mono)", color: C.ink }}>{totalT ? done + "/" + totalT : "动态"}<span style={{ fontSize: 10, fontWeight: 600, marginLeft: 4, color: "var(--ink-faint)" }}>任务</span></div>
                 <div style={{ marginTop: 4, fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--ink-soft)", whiteSpace: "nowrap" }}>{dot(eff[i].s.slice(2))} → {dot(eff[i].e.slice(2))}</div>
+                {/* #248 任务文件入口徽标：📎 已归档份数；非未来阶段任务未传齐 → warn 缺 n（点卡即展开文件清单） */}
+                <div style={{ marginTop: 5, display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                  <span title="该阶段已归档任务文件份数" style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9.5, fontWeight: 700, fontFamily: "var(--font-mono)", color: phaseFiles(i).length ? "var(--brand-deep)" : "var(--ink-faint)", background: phaseFiles(i).length ? "rgba(255,255,255,0.75)" : "var(--surface-3)", borderRadius: 999, padding: "1px 6px" }}>
+                    <Icon name="paperclip" size={9} color={phaseFiles(i).length ? "var(--brand-deep)" : "var(--ink-faint)"} />{phaseFiles(i).length} 份
+                  </span>
+                  {st !== "future" && totalT > 0 && done < totalT && (
+                    <span title={"任务资料缺 " + (totalT - done) + " 项"} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9.5, fontWeight: 700, color: "var(--warn-ink)", background: "var(--warn-soft)", borderRadius: 999, padding: "1px 6px" }}>
+                      <Icon name="triangle-alert" size={9} color="var(--warn-ink)" />缺{totalT - done}
+                    </span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -495,10 +516,12 @@
             <span style={{ position: "absolute", right: 0, fontSize: 9, color: "var(--ink-faint)" }}>保修至 {dot(eff[5].e.slice(0, 7))}</span>
           </div>
         </div>
+        </div>
+        </div>{/* /#248 横滚容器 */}
 
         {/* 展开：阶段任务清单（数字块 + 任务行 + 上传/查看） */}
         {openPhase >= 0 && PHASES[openPhase] && (
-          <div style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+          <div id="project-phase-tasks" style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, fontWeight: 700 }}>{PHASES[openPhase].name} · 阶段任务</span>
               <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{dot(eff[openPhase].s)} → {dot(eff[openPhase].e)}</span>
@@ -528,6 +551,35 @@
                   </div>
                 );
               })}
+            </div>
+
+            {/* #248 任务文件清单：阶段节点点开即见该阶段归档文件（演示数据，与右侧文件栏同源）；缺失标 warn */}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                <Icon name="paperclip" size={13} color="var(--brand)" />
+                <span style={{ fontSize: 12.5, fontWeight: 700 }}>任务文件</span>
+                <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{phaseFiles(openPhase).length} 份</span>
+                {PHASES[openPhase].tasks.length > 0 && doneOf(openPhase) < PHASES[openPhase].tasks.length && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "var(--warn-ink)" }}>
+                    <Icon name="triangle-alert" size={11} color="var(--warn-ink)" />缺 {PHASES[openPhase].tasks.length - doneOf(openPhase)} 项任务资料
+                  </span>
+                )}
+              </div>
+              {phaseFiles(openPhase).length === 0
+                ? <div style={{ fontSize: 12, color: "var(--ink-faint)", padding: "4px 0" }}>该阶段暂无归档文件。</div>
+                : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 6 }}>
+                    {phaseFiles(openPhase).map((f, fi) => (
+                      <button key={fi} onClick={() => UI().toast("预览「" + f.name + "」（演示）")} style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", padding: "7px 10px", cursor: "pointer", textAlign: "left", minWidth: 0 }}>
+                        <Icon name={/\.(jpg|jpeg|png)$/i.test(f.name) ? "image" : "file-text"} size={14} color="var(--brand)" />
+                        <span style={{ minWidth: 0, flex: 1 }}>
+                          <span style={{ display: "block", fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.name}>{f.name}</span>
+                          <span style={{ display: "block", fontSize: 10.5, color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>{f.size} · {dot(f.time)} · {f.by}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
           </div>
         )}
@@ -588,6 +640,8 @@
     ["contractName", "operationType", "region", "riskLevel", "overview"].forEach((k) => { if (proj[k] != null && proj[k] !== "") m[k] = proj[k]; });
     if (proj.planEnd != null && proj.planEnd !== "") m.plannedEnd = proj.planEnd;
     const [tab, setTab] = React.useState("info");
+    // #248 档案导出多选树弹层开关（组件在 kit/ProjectArchiveExport.jsx，经预加载区 x-import 注册）
+    const [archiveOpen, setArchiveOpen] = React.useState(false);
 
     const TABS = [
       { key: "info", label: "详细资料" }, { key: "budget", label: "成本预算" },
@@ -614,6 +668,11 @@
               <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>{m.contractName} · {m.region}</div>
             </div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 8, flex: "none" }}>
+              {/* #248 项目入口：完整档案包导出（多选树，默认核心档案，敏感三原则） */}
+              <Button icon="archive" onClick={() => {
+                if (window.ProjectArchiveExport) setArchiveOpen(true);
+                else UI().toast("档案导出组件未加载：需在 app.dc.html 预加载区补 ProjectArchiveExportPreload 的 x-import", "warn");
+              }}>导出档案包</Button>
               <Button icon="download" onClick={() => UI().toast("正在导出项目台账…")}>导出</Button>
               {/* 2026-07-18 表单补全轮：模块级大编辑改整页表单（kit/forms/BaseForms.jsx projectForm，5 分区含参建单位/立项附件） */}
               <Button variant="primary" icon="square-pen" onClick={() => navigate("projectForm", { id: proj.id })}>编辑</Button>
@@ -636,6 +695,9 @@
         {/* 分栏：主内容 + 右侧文件栏（280px 固定） */}
         <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* #248 阶段式重排：阶段时间线提升为工程档案主轴（主内容第一块）；key 保证切项目重置内部状态 */}
+            <PhaseTimeline key={proj.id} proj={proj} m={m} />
+
             {/* 进度 · 成本 驾驶舱（#30：数据同首页 window.SCHEDULE） */}
             <ScheduleCostCard proj={proj} navigate={navigate} />
 
@@ -677,8 +739,7 @@
               })()}
             </Panel>
 
-            {/* 阶段时间线（胶囊步进器 + 时间带；key 保证切项目重置内部状态） */}
-            <PhaseTimeline key={proj.id} proj={proj} m={m} />
+            {/* #248：阶段时间线已上移为主内容第一块（原位于此），其余区块次序保持不变 */}
 
             {/* Tab 栏 */}
             <Panel padding={0} style={{ overflow: "hidden" }}>
@@ -697,6 +758,9 @@
             <FilesCard proj={proj} />
           </div>
         </div>
+
+        {/* #248 档案导出多选树弹层（自带全屏遮罩；meta 传 m 供阶段份数联动） */}
+        {archiveOpen && window.ProjectArchiveExport ? <window.ProjectArchiveExport proj={proj} meta={m} onClose={() => setArchiveOpen(false)} /> : null}
       </div>
     );
   }

@@ -1,10 +1,12 @@
 # 基础信息 / 工人信息
 
-> 路由：`/base/worker`、`/base/worker/:id`、`/base/worker/form/:id?`
+> 路由：`/base/worker`、`/base/worker/:id`、`/base/worker/form/:id?`、`/base/worker/private/:id`；工资名册工作区 `/subcontract/payroll/roster`
 >
 > 页面：`app/pages/base/worker/`
 >
 > 数据模型：[`DATABASE.md`](../DATABASE.md)
+>
+> 状态：浏览器中央列表—详情—显式编辑与班组/项目/责任/工资/扣罚链已闭合（#316）；独立私密资料与工资名册归档接入中央测试实例（#449，2026-09-22）。Tauri 保留本地路径。
 
 ## 定位
 
@@ -16,6 +18,17 @@
 | 设置班组、当前项目和在场状态 | 考勤与签工录入 |
 | 查看工人能力、附件和关联人员 | 工资单核对与发放 |
 | 汇总工人的项目、工资和扣罚事实 | 扣罚录入、整改与扣款 |
+
+### 浏览器中央边界
+
+- 浏览器列表、详情和表单只经 `CrewWorkerReadRepository` / `CrewWorkerCommandRepository` 与 `/api/read|commands/workers` 访问正式工人，不回退 production SQLite。
+- 详情按 `(dataOrigin,id)` 定位；测试工人只读，正式/测试班组、项目和事实不得跨来源拼接。
+- 所属班组、当前项目、责任单元、工资单、扣罚单和关联人员一律使用稳定 ID；同名实体保持独立。
+- 列表进入详情时携搜索、工种、排序、页码和来源行的安全 `returnTo`；工人与班组互跳，以及项目、责任单元、工资单、扣罚单下钻，均可返回原详情。
+- 浏览器中央附件边界尚未接入时不回退本地证书附件。Tauri 继续使用现有 SQLite 和 `file_refs`。
+- #449 的私密整页通过 `WorkerRosterRepository` 维护劳动合同事实和明确用途的证件照、银行卡照，原件复用中央 `file_refs/file_payloads`。普通证书附件没有因此获得自动识别用途或任意路径读取能力。
+- 私密整页和已有工人完整编辑表单要求 `worker:sensitive:read`；维护还要求 `worker:write`。普通列表/详情继续脱敏，默认工资权限不隐含私密资料权限。无权限时整页说明原因，不返回完整字段。
+- 工资名册只按同项目已发 A/C1/C2 的原冻结成员创建有独立登记日期的不可变版本；姓名、资料、劳动合同和照片均固定，并保留缺口。补充版本不是原工资发放时的原件。操作见 [Markdown 指南](../../guides/worker-roster-archive.md)。
 
 ## 真实关系
 
@@ -65,7 +78,7 @@
 | 项目分配 | 当前项目、在场状态、进场日期、退场日期、安全教育 |
 | 其他 | 亲属组、附件、备注 |
 
-班组和项目保存真实 ID。银行行号目前为普通可编辑字段，不承诺自动匹配外部银行行号库。
+班组和项目保存真实 ID；浏览器选择器同样只查询中央正式来源。浏览器保存经中央命令信封、服务端分配 ID、幂等 `commandId` 与 `baseVersion` 乐观锁完成。银行行号目前为普通可编辑字段，不承诺自动匹配外部银行行号库。
 
 ## 详情页 `/base/worker/:id`
 
@@ -104,11 +117,11 @@
 - 工资单
 - 项目扣罚
 
-每个项目保留其来源标签并跳转 `/project/:projectId`。直接责任单元显示楼栋、楼层、户、工种、责任范围和已完成阶段数，使用 `/subcontract/quantity/:projectId/:unitId` 下钻。
+每个项目保留其来源标签并跳转 `/project/:projectId`。直接责任单元显示楼栋、楼层、户、工种、责任范围和已完成阶段数，使用 `/subcontract/quantity/:projectId/:unitId` 下钻。中央关系入口会携工人来源主体，目标先显示只读事实详情，不回退本地编辑态。
 
 ### 工资
 
-工资关联包括工人作为班组长、工资单成员或工资清单行责任人的记录。每份工资单可跳转 `/subcontract/payroll/:statementId`。
+工资关联包括工人作为班组长、工资单成员或工资清单行责任人的记录。每份工资单可跳转 `/subcontract/payroll/:statementId`，中央关系入口默认显示当前工人的只读单据事实并可返回来源。
 
 - 个人清单金额来自该工人的 `wage_statement_lines`。
 - 个人收款来自 `wage_statement_allocations`。

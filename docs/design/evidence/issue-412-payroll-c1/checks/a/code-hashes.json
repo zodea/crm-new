@@ -1,0 +1,202 @@
+[
+  {
+    "path": "app/lib/payroll/central-a-calculation.ts",
+    "sha256": "a3d032303006a9b7c2e08e2f209d0f07847fbacccd7de5283d75622c422c7858",
+    "gitBlob": "97786bc8bb2c4e0bcd4e1ad6970f6a74ce8a1747"
+  },
+  {
+    "path": "app/lib/payroll/central-a-command.ts",
+    "sha256": "d9beae29ea531f5243e7437c6a4c12ef48002105857f3c86a380bcd3d29ea624",
+    "gitBlob": "9c20b38fe7892ac7388eddb5967b81150cd71a6d"
+  },
+  {
+    "path": "app/lib/payroll/central-attendance-codec.ts",
+    "sha256": "70d796c5141f13d78b90afa09cee960b311bebfa78129997ffdc59f48629db2b",
+    "gitBlob": "f926dacc5efb9847d84df5d6d451fc114fce0435"
+  },
+  {
+    "path": "app/lib/payroll/central-attendance-contract.ts",
+    "sha256": "a98e89d179cc6997424175be743a1da040b95e20fb88dc2469eea88d902ec3fa",
+    "gitBlob": "a4c2e2318125d821273556a020f6c5eac83d724a"
+  },
+  {
+    "path": "app/lib/payroll/central-c1-calculation.ts",
+    "sha256": "b329661a23300be3593868607b9eed02c32a5ba7cea81105bb4a9e16a1194cb8",
+    "gitBlob": "382b645766ed9945e88a304df2ca3445a2f7d86f"
+  },
+  {
+    "path": "app/lib/payroll/central-c1-codec.ts",
+    "sha256": "8d3b240891fc10257899f5f1d3c4ea8090e0acc175d1e726603d28038bc68fe8",
+    "gitBlob": "36778f01083fdd673a837b68fbc0f4421644b039"
+  },
+  {
+    "path": "app/lib/payroll/central-c1-command.ts",
+    "sha256": "b0f2b80cd0315871d0e98826d49b6c7544a06f30c9e792d692e11c95d8017cc9",
+    "gitBlob": "2e1eacc9f40151f79ef2156144b856fe40cf62d7"
+  },
+  {
+    "path": "app/lib/payroll/central-c1-contract.ts",
+    "sha256": "0b2760dac263a536ef55986683a917448ba44b05cc57d7516d4843073b83beb2",
+    "gitBlob": "71714d59911dd3d488cafc5431427464f6336d3a"
+  },
+  {
+    "path": "app/lib/payroll/central-c1-provenance.ts",
+    "sha256": "01c2d74588d668f74b852af45658e91ffef67a0dcd66d8092956de6c590cf85c",
+    "gitBlob": "a4912dc41d623278575339bc6cbaea7aa7f12158"
+  },
+  {
+    "path": "app/lib/payroll/central-codec.ts",
+    "sha256": "f9f9e8e4e9787e4f00da21d9c63756fcb95e7da1821add215800093f39ecc894",
+    "gitBlob": "639ba410c4195faee22394ecf203ea5369884ca1"
+  },
+  {
+    "path": "app/lib/payroll/central-command-shared.ts",
+    "sha256": "f5e33b541f98c6a5c248ce01d80ddce795c6f3e95154237e868d9ed5b0300997",
+    "gitBlob": "37790aac15bcd141643b68e78397950449db9eef"
+  },
+  {
+    "path": "app/lib/payroll/central-contract.ts",
+    "sha256": "f27be38398196a10b86139d168fe2bded8ae4831a361c8a172e10bf1498a4d4f",
+    "gitBlob": "db7d9f128f8af7d5e8fb55600722be7ab3a9f944"
+  },
+  {
+    "path": "app/lib/payroll/central-payroll-wire.ts",
+    "sha256": "a29e811dad97b9123e4a6b5bbec26401f2db1a4594777bfd5805ae5043842b0a",
+    "gitBlob": "7a6943c2c39046e011c641b0dabb9a27ea441a62"
+  },
+  {
+    "path": "app/lib/payroll/central-pending.ts",
+    "sha256": "40b464dee05a073c2f9409e970b2ad54eb28c3e5d44155e7a5781c29feb58629",
+    "gitBlob": "76998efaba7a6207940646b95bdc79754a7d632e"
+  },
+  {
+    "path": "app/lib/payroll/central-read.ts",
+    "sha256": "48635cff98c546c5ded3d66958cd3077ad45ba0e9af288f3b903295aa815a7ef",
+    "gitBlob": "5c17601290e5798033bacfc25f96acf2f2d40697"
+  },
+  {
+    "path": "app/lib/payroll/central-repository.ts",
+    "sha256": "a23de74963ac6a04aa68be6af55d2675f5964ea49cd594c36169a1bd81893444",
+    "gitBlob": "b78ae4e80fbed603c5aedefce80f87713ce1efb7"
+  },
+  {
+    "path": "app/lib/payroll/central-schema.ts",
+    "sha256": "67c864d2e0e92be1368dd1a77512c48454791ff7f05caaf5192674d56beb307b",
+    "gitBlob": "6f3bc9e9d828d936111522a300cbb97340cc3a17"
+  },
+  {
+    "path": "app/lib/payroll/central-source-locks.ts",
+    "sha256": "2f40819f508332d5b92fb9e9ee61662b753ced49e86220008ad408eaf6f6f7b2",
+    "gitBlob": "e76afdf56dd2fad5ca07bfa76a174945c72ade3b"
+  },
+  {
+    "path": "app/stores/attendance-central.ts",
+    "sha256": "7b36d15d89d00fcf7fe1df325a6887c92127496a845c71271483f54d057b2935",
+    "gitBlob": "272eccf85566dc0de7edd06d40e236c60acbcd3b"
+  },
+  {
+    "path": "app/stores/payroll-c1.ts",
+    "sha256": "7b50ce081d3485b9610ba2bb60225e97fa8f9e88a3bb7052510a2e98db889461",
+    "gitBlob": "fdf51a98f59f24f6dbff842eeac9ea6a29e2fed0"
+  },
+  {
+    "path": "server/api/commands/payroll-attendance.post.ts",
+    "sha256": "8e7a0d31025c29f114bb8215de89de0a9d32f94a76a9e9f729a43718f2282238",
+    "gitBlob": "62f3033d837c4835bdc18e4d0a3f43cbfdb1eee4"
+  },
+  {
+    "path": "server/api/commands/payroll-c1.post.ts",
+    "sha256": "8516b5e3af9741c9f11c6f07b59140a17bf6aebac0a5d7ad5eb01067239bdcdc",
+    "gitBlob": "9963d90d882d3d6438fb1f36be69caa1fb3e39e7"
+  },
+  {
+    "path": "server/api/read/payroll/attendance.get.ts",
+    "sha256": "cdb1724d13479421af7cb52463e3913db01b829c06fbd3da05280474e67bec17",
+    "gitBlob": "25e32cca410522c5f9fd36c57ef1ec1b4f9118f0"
+  },
+  {
+    "path": "server/api/read/payroll/c1-config.get.ts",
+    "sha256": "1ab13d854adc5e904954d39865ab281566cb074771e1768c2a3dad25f0d910eb",
+    "gitBlob": "3b61d30672a90d25cdfaa7ba2715846bfae30631"
+  },
+  {
+    "path": "server/api/read/payroll/c1-form.post.ts",
+    "sha256": "4bd52089908e6c39a018209cf9fd70863575f799cec826d25a3fca8776f164af",
+    "gitBlob": "3f46b6b449cb453e50e8ba0778a0f0843a5daaff"
+  },
+  {
+    "path": "server/api/read/payroll/c1-output.get.ts",
+    "sha256": "78b85b9a89b698c3ec3ccd22cb923a182dfc90e759d344f1ff2c49c5c5a9dda6",
+    "gitBlob": "03b487a59925dd3d9c68120246cfa913dff88c67"
+  },
+  {
+    "path": "server/utils/payroll-attendance-service.ts",
+    "sha256": "dae29745c7f02d33eff8ec68184737b403cfc4015852986af86e1100cbd67b1f",
+    "gitBlob": "06a7bf4417ad5036baa75e2d8cd6863a36359c1d"
+  },
+  {
+    "path": "server/utils/payroll-c1-options.ts",
+    "sha256": "135d6c1596dd36c50491646240fef4f49e38d20b4732ff90c9129aabed44da7d",
+    "gitBlob": "52dabb2572f7752cc122bb2ed2d5bb6d363041ca"
+  },
+  {
+    "path": "server/utils/payroll-c1-service.ts",
+    "sha256": "c64d833439decd24ad3e0365fefa8e5200062b676e0821cf932f48bbe93d0ae5",
+    "gitBlob": "74bdda106f41b52f6f242d5949597348945e9905"
+  },
+  {
+    "path": "server/utils/payroll-runtime.ts",
+    "sha256": "152f4591975b4bec7b834aebba013d76caf86256f5b8b778a2ab2ceb413cecc1",
+    "gitBlob": "9dc479b098f4326349a057d76378c57c32dd515e"
+  },
+  {
+    "path": "server/utils/payroll-service.ts",
+    "sha256": "d5fb9eadd24a65b8b38414d86d6dc8ff796d864fa21f1e03fef39d0c851bfb98",
+    "gitBlob": "843f7a42930355f34efe42e4bd7aeba99e968c81"
+  },
+  {
+    "path": "tests/helpers/payroll-c1-service-fixture.ts",
+    "sha256": "521f9d7f4ce18f36d40918192300a3f116a040c71dacc717353ce4a0f31fbd9b",
+    "gitBlob": "115b985d847b85e98a5f9f6791133676218888c8"
+  },
+  {
+    "path": "tests/payroll/central-attendance-service.test.ts",
+    "sha256": "0cf6cc0a4c37fa50feff28ad755089c4c238adc0f6795cfdb7b1cd6d13d92482",
+    "gitBlob": "d13b4500fe65dc96fefa55b0cb6f085936dce7bd"
+  },
+  {
+    "path": "tests/payroll/central-c1-codec.test.ts",
+    "sha256": "84a36a3bb22357cf772fa8ed4db4b4836484b0ecc3338f77230cc9427a62bad8",
+    "gitBlob": "5604c6ccc0db7e4d291881067279951ac671183e"
+  },
+  {
+    "path": "tests/payroll/central-c1-commands.test.ts",
+    "sha256": "1654e47282f771b153f7eb00d148b642312ffb5c0b41bff1ea7aaeb773c58e0d",
+    "gitBlob": "36d67d9137027b3dee09b542227a964f31a752b5"
+  },
+  {
+    "path": "tests/payroll/central-c1-http.test.ts",
+    "sha256": "10a5686095237236e779049cd1d038b41140039fa5b4aa85f208ebf4910506da",
+    "gitBlob": "83659ccd88a8e43bce856f3b656eace9c6d0c6ee"
+  },
+  {
+    "path": "tests/payroll/central-c1-provenance.test.ts",
+    "sha256": "f5c94bc8df63c610bf097176b6159119afdf7137227c058b516e441945156115",
+    "gitBlob": "80e30f69ba0c7ca26335c27b804545df2e41cd1b"
+  },
+  {
+    "path": "tests/payroll/central-c1-service.test.ts",
+    "sha256": "b2a588a63975c4545993d2d5355678b51b3f68b2f109731ee51f6547a3401d94",
+    "gitBlob": "ca836d5ed858737941f2da0840b969f44f668295"
+  },
+  {
+    "path": "tests/stores/attendance-central.test.ts",
+    "sha256": "b19f9347f3cc605f25daf2a355757e42159a44e0656e4806db4eefc1db854d56",
+    "gitBlob": "4228070d48519250282b5a1782b998886e510334"
+  },
+  {
+    "path": "tests/stores/payroll-c1-central.test.ts",
+    "sha256": "01cd78b051b791424e503334df3bac2e138c6b7deecc8a16d55ab75df168244b",
+    "gitBlob": "8bfef9aefafbf9883a959e2072521c92139239ad"
+  }
+]

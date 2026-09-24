@@ -1,0 +1,45 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/payroll/daywork-facts.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/daywork-facts.test.ts (3 tests | 1 failed) 2824ms
+   × 公开迁入的隔离原组保完整证据及映射，不能补造可写签工ID 1117ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/daywork-facts.test.ts > 公开迁入的隔离原组保完整证据及映射，不能补造可写签工ID
+AssertionError: expected [] to deep equally contain ObjectContaining{…}
+
+- Expected:
+ObjectContaining {
+  "code": "daywork-isolated",
+  "legacyRecordId": "signed_daywork_mu0tenbm_4",
+  "recordId": null,
+  "workerId": "core-workers-977a7aa752da739381d49437",
+}
+
++ Received:
+[]
+
+ ❯ tests/payroll/daywork-facts.test.ts:44:31
+     42|     const facts = await quantityTestInstance.withWorkspaceTransaction(…
+     43|     expect(facts.rows).toHaveLength(1)
+     44|     expect(facts.diagnostics).toContainEqual(expect.objectContaining({…
+       |                               ^
+     45|     expect(facts.evidence[0]!.source.daywork).toContainEqual(expect.ob…
+     46|     expect(facts.evidence[0]!.mappings).toContainEqual(expect.objectCo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  13:41:08
+   Duration  5.69s (transform 2.21s, setup 0ms, import 2.63s, tests 2.82s, environment 0ms)
+

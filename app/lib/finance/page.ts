@@ -9,6 +9,7 @@ import type {
   PaymentRecordFormDraft,
   ReceiptFormDraft,
 } from '~/lib/finance/forms'
+import type { DataOriginDTO } from '~/types/read-model'
 
 export type FinancePageDraft
   = ReceiptFormDraft
@@ -172,7 +173,7 @@ export function f3FormDefaults(kind: F3FormKind): F3FormDraft {
         applyDate: today(),
         invoiceState: '先款后票',
         prepayDeduct: 0,
-        approvedAmount: 0,
+        approvedAmount: null,
         status: 'draft',
         settlementAllocations: [],
         invoiceAllocations: [],
@@ -197,7 +198,26 @@ export function f3FormDefaults(kind: F3FormKind): F3FormDraft {
 
 export function financeFormPath(kind: F3FormKind, id?: string): string {
   const base = F3_FORM_META[kind].listPath
+  if (kind === 'receipt' && id)
+    return `${base}/form/${id}`
   return id ? `${base}/${id}` : `${base}/new`
+}
+
+export function financeDetailPath(kind: F3FormKind, id: string): string {
+  if (kind === 'receipt')
+    throw new Error('收款只读详情必须使用 receiptDetailPath 并携带来源身份')
+  if (kind === 'payment_application')
+    return `/finance/payment/${id}/detail`
+  return financeFormPath(kind, id)
+}
+
+export function receiptDetailPath(id: string, context: {
+  origin: DataOriginDTO
+  customerId: string
+}): string {
+  if (!id.trim() || !context.customerId.trim())
+    throw new Error('收款只读详情缺少稳定身份')
+  return `/finance/receipt/${encodeURIComponent(id)}?origin=${context.origin}&customerId=${encodeURIComponent(context.customerId)}`
 }
 
 export function validateFinanceForm(

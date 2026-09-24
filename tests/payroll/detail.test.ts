@@ -5,6 +5,7 @@ import { loadPayrollStatementDetail } from '~/lib/payroll/detail'
 import {
   checkWageStatement,
   createWageStatementDraft,
+  listWageStatements,
   releaseWageStatement,
 } from '~/lib/payroll/statements'
 import { createMemoryDb } from '../helpers/memory-db'
@@ -28,12 +29,12 @@ beforeEach(async () => {
 
 afterEach(() => db.close())
 
-async function createStatement() {
+async function createStatement(month = '2026-07') {
   return createWageStatementDraft(db, {
     projectId: 'project-a',
     crewId: 'crew-a',
     leaderWorkerId: 'worker-a',
-    month: '2026-07',
+    month,
     purpose: 'advance',
     formatFamily: 'A',
     periodKind: 'monthly',
@@ -50,6 +51,30 @@ async function createStatement() {
 }
 
 describe('payroll statement detail read model', () => {
+  it('queries multiple statuses with OR, supports single and cleared selection, and keeps other filters conjunctive', async () => {
+    const draftId = await createStatement('2026-07')
+    const checkedId = await createStatement('2026-08')
+    const releasedId = await createStatement('2026-09')
+    const lines = [{ workerId: 'worker-a', itemName: '墙砖铺贴', unit: '㎡', quantity: 100, unitPrice: 20 }]
+    await checkWageStatement(db, checkedId, lines, { sourceVersion: 'field-v1' })
+    await checkWageStatement(db, releasedId, lines, { sourceVersion: 'field-v1' })
+    await releaseWageStatement(db, releasedId, 1400, { currentSourceVersion: 'field-v1' })
+    const filter = { projectId: 'project-a', crewId: 'crew-a' }
+
+    const multiple = await listWageStatements(db, { ...filter, status: ['draft', 'checked', 'draft'] })
+    expect(multiple.map(statement => statement.id).sort()).toEqual([draftId, checkedId].sort())
+    const single = await listWageStatements(db, { ...filter, status: ['checked'] })
+    expect(single.map(statement => statement.id)).toEqual([checkedId])
+    const legacySingle = await listWageStatements(db, { ...filter, status: 'released' })
+    expect(legacySingle.map(statement => statement.id)).toEqual([releasedId])
+    const cleared = await listWageStatements(db, { ...filter, status: [] })
+    expect(cleared.map(statement => statement.id).sort()).toEqual([draftId, checkedId, releasedId].sort())
+    const legacyCleared = await listWageStatements(db, { ...filter, status: '' })
+    expect(legacyCleared.map(statement => statement.id).sort()).toEqual([draftId, checkedId, releasedId].sort())
+    const monthOnly = await listWageStatements(db, { ...filter, month: '2026-08', status: ['draft', 'checked'] })
+    expect(monthOnly.map(statement => statement.id)).toEqual([checkedId])
+  })
+
   it('does not count draft calculations as formally paid wages', async () => {
     const id = await createStatement()
 

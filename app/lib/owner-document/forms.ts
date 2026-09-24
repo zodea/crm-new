@@ -2,6 +2,7 @@ import type { BoqChangeLineDraft, BoqDirectiveType, BoqDocumentType } from '~/li
 import type { TransactionDb } from '~/lib/db/coordinator'
 import type { FileRefChanges, FileRefRecord } from '~/lib/forms/file-refs'
 import type { QuantityBasis } from '~/lib/quantity/basis'
+import type { NavigationIntentDTO } from '~/types/read-model'
 import {
   approveBoqChangeOrder,
   createBoqChangeOrder,
@@ -21,6 +22,7 @@ import { applyFileRefChanges, listFileRefs } from '~/lib/forms/file-refs'
 import { isQuantityBasis } from '~/lib/quantity/basis'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
+import { isISODateDTO } from '~/types/read-model'
 
 export type OwnerDocumentKind
   = | 'owner_change'
@@ -70,19 +72,43 @@ export interface OwnerDocumentListRecord {
   type: string
   period: string
   amount: number
-  secondaryAmount: number
+  secondaryAmount: number | null
   tertiaryAmount: number
   quantity: number | null
   date: string
   status: string
+  contractNavigation?: NavigationIntentDTO
+  projectNavigation?: NavigationIntentDTO
+  supplierNavigation?: NavigationIntentDTO
+  viewVariant?: 'acceptance' | 'warranty'
+  acceptanceOrganization?: string
+  acceptancePerson?: string
+  acceptanceConclusion?: string
+  warrantyOwner?: string
+  warrantyStartDate?: string
+  warrantyEndDate?: string
+  warrantyConfirmationOrganization?: string
+  warrantyConfirmationDate?: string
+  warrantyConfirmationNote?: string
+  attachmentCount?: number
+  deductions?: number | null
+  netSettlement?: number | null
+  cumulativeApplied?: number | null
+  remainingApplicable?: number | null
+  cumulativePaid?: number | null
+  remainingUnpaid?: number | null
 }
 
 export interface OwnerDocumentBoqLine {
+  unitType?: string | null
+  floorZone?: string | null
   id: string
   itemName: string
   unit: string
-  qty: number
-  unitPrice: number
+  qty: number | null
+  unitPrice: number | null
+  building?: string | null
+  updatedAt?: string | null
   autoQty: number
   /** 取数基准下缺量的模板明细条数；> 0 表示自动完成量不完整，需在界面显式标注。 */
   missingQtyCount: number
@@ -687,26 +713,36 @@ async function saveAcceptance(
   const contractId = text(draft.contractId) || null
   if (action === 'submit') {
     required(projectId, '项目')
+    required(contractId, '施工合同')
     required(draft.name, '名称')
-    required(draft.documentDate, '日期')
+    required(draft.applicationDate ?? draft.documentDate, '申报日期')
   }
+  await assertAcceptanceAttachmentChanges(tx, id, attachments, 'acceptance-report')
   if (projectId)
     await assertActiveProject(tx, projectId)
   if (contractId && projectId)
     await activeContract(tx, projectId, contractId, 'owner')
   const values = [
     documentNo(draft.no, 'YS'),
-    text(draft.type) || 'acceptance',
+    'acceptance',
     text(draft.name),
     projectId,
     contractId,
-    text(draft.documentDate),
+    text(draft.applicationDate ?? draft.documentDate),
     nullableNumber(draft.contractEstimate),
-    text(draft.acceptor),
+    text(draft.acceptancePerson ?? draft.acceptor),
     text(draft.warrantyOwner),
-    text(draft.conclusion),
+    text(draft.acceptanceConclusion ?? draft.conclusion),
     action === 'submit' ? 'submitted' : 'draft',
     text(draft.note),
+    text(draft.acceptanceOrganization),
+    text(draft.acceptanceDate) || null,
+    text(draft.acceptanceConclusion),
+    text(draft.warrantyStartDate) || null,
+    text(draft.warrantyEndDate) || null,
+    text(draft.warrantyConfirmationOrganization) || null,
+    text(draft.warrantyConfirmationDate) || null,
+    text(draft.warrantyConfirmationNote),
   ]
   const logId = draft.id
     ? await withUpdateLog(tx, 'project_acceptances', id, () => tx.execute(`
@@ -714,6 +750,10 @@ async function saveAcceptance(
         SET no = ?, type = ?, name = ?, project_id = ?, contract_id = ?,
             document_date = ?, contract_estimate = ?, acceptor = ?,
             warranty_owner = ?, conclusion = ?, status = ?, note = ?,
+            acceptance_organization = ?, acceptance_date = ?, acceptance_conclusion = ?,
+            warranty_start_date = ?, warranty_end_date = ?,
+            warranty_confirmation_organization = ?, warranty_confirmation_date = ?,
+            warranty_confirmation_note = ?,
             updated_at = datetime('now')
         WHERE id = ? AND deleted_at IS NULL
       `, [...values, id]))
@@ -721,15 +761,26 @@ async function saveAcceptance(
         await tx.execute(`
           INSERT INTO project_acceptances (
             id, no, type, name, project_id, contract_id, document_date,
-            contract_estimate, acceptor, warranty_owner, conclusion, status, note
+            contract_estimate, acceptor, warranty_owner, conclusion, status, note,
+            acceptance_organization, acceptance_date, acceptance_conclusion,
+            warranty_start_date, warranty_end_date, warranty_confirmation_organization,
+            warranty_confirmation_date, warranty_confirmation_note
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [id, ...values])
         return logCreate(tx, 'project_acceptances', id)
       })()
   if (draft.id && !logId)
     throw new Error('验收或保修记录不存在、已删除或不可编辑')
   await applyFileRefChanges(tx, 'project_acceptance', id, attachments)
+  if (action === 'submit') {
+    await tx.execute(`
+      INSERT INTO project_acceptance_lifecycle_events (
+        id, acceptance_id, action, from_status, to_status,
+        actor_id, actor_name, occurred_at, note
+      ) VALUES (?, ?, 'submit', 'draft', 'submitted', 'local-user', '本地用户', ?, ?)
+    `, [generateId('acceptance_event'), id, new Date().toISOString(), text(draft.note)])
+  }
   return { id, logIds: logId ? [logId] : [] }
 }
 
@@ -1385,7 +1436,14 @@ export async function loadOwnerDocumentForm(
     return loadOwnerReport(id)
   if (kind === 'acceptance') {
     const row = await loadSimple('project_acceptances', id)
-    return row && {
+    if (!row)
+      return null
+    const lifecycleEvents = await select<Record<string, unknown>>(`
+      SELECT * FROM project_acceptance_lifecycle_events
+      WHERE acceptance_id = ?
+      ORDER BY occurred_at, id
+    `, [id])
+    return {
       id: row.id,
       no: row.no,
       type: row.type,
@@ -1393,10 +1451,30 @@ export async function loadOwnerDocumentForm(
       projectId: row.project_id,
       contractId: row.contract_id,
       documentDate: row.document_date,
+      applicationDate: row.document_date,
       contractEstimate: nullableNumber(row.contract_estimate),
       acceptor: row.acceptor,
+      acceptanceOrganization: row.acceptance_organization,
+      acceptancePerson: row.acceptor,
+      acceptanceDate: row.acceptance_date,
+      acceptanceConclusion: row.acceptance_conclusion,
       warrantyOwner: row.warranty_owner,
+      warrantyStartDate: row.warranty_start_date,
+      warrantyEndDate: row.warranty_end_date,
+      warrantyConfirmationOrganization: row.warranty_confirmation_organization,
+      warrantyConfirmationDate: row.warranty_confirmation_date,
+      warrantyConfirmationNote: row.warranty_confirmation_note,
       conclusion: row.conclusion,
+      lifecycleEvents: lifecycleEvents.map(event => ({
+        id: event.id,
+        action: event.action,
+        fromStatus: event.from_status,
+        toStatus: event.to_status,
+        actorId: event.actor_id,
+        actorName: event.actor_name,
+        occurredAt: event.occurred_at,
+        note: event.note,
+      })),
       status: row.status,
       note: row.note,
     }
@@ -1855,14 +1933,50 @@ export async function updateOwnerDocumentAttachments(
     : FILE_OWNER_TYPES[kind]
   const table = await storageTable(kind, id)
   return withTransaction(async (tx) => {
-    const [record] = await tx.select<{ id: string }>(
-      `SELECT id FROM "${table}" WHERE id = ? AND deleted_at IS NULL`,
+    const [record] = await tx.select<{ id: string, status: string }>(
+      `SELECT id, status FROM "${table}" WHERE id = ? AND deleted_at IS NULL`,
       [id],
     )
     if (!record)
       throw new Error('单据不存在或已删除')
+    if (kind === 'acceptance') {
+      if (record.status === 'expired')
+        throw new Error('保修到期确认后单据只读')
+      await assertAcceptanceAttachmentChanges(
+        tx,
+        id,
+        changes,
+        ['draft', 'rejected', 'submitted'].includes(record.status)
+          ? 'acceptance-report'
+          : 'warranty-confirmation',
+      )
+    }
     return applyFileRefChanges(tx, ownerType, id, changes)
   })
+}
+
+async function assertAcceptanceAttachmentChanges(
+  tx: TransactionDb,
+  ownerId: string,
+  changes: FileRefChanges,
+  expected: 'acceptance-report' | 'warranty-confirmation',
+) {
+  for (const file of changes.add ?? []) {
+    if (text(file.category) !== expected)
+      throw new Error(`验收附件分类必须为 ${expected}`)
+  }
+  const changedIds = [...new Set([...(changes.removeIds ?? []), ...(changes.restoreIds ?? [])])]
+  if (!changedIds.length)
+    return
+  const rows = await tx.select<{ id: string, category: string }>(`
+    SELECT id, category
+    FROM file_refs
+    WHERE owner_type = 'project_acceptance'
+      AND owner_id = ?
+      AND id IN (${changedIds.map(() => '?').join(', ')})
+  `, [ownerId, ...changedIds])
+  if (rows.some(file => file.category !== expected))
+    throw new Error('附件不属于当前验收视图')
 }
 
 export async function approveOwnerChange(
@@ -1904,6 +2018,8 @@ export async function approveOwnerChange(
 export async function transitionAcceptance(
   id: string,
   target: AcceptanceLifecycleTarget,
+  facts: OwnerDocumentDraft = {},
+  attachments: FileRefChanges = {},
 ): Promise<void> {
   const allowed: Record<string, AcceptanceLifecycleTarget> = {
     submitted: 'accepted',
@@ -1911,8 +2027,8 @@ export async function transitionAcceptance(
     warranty: 'expired',
   }
   await withTransaction(async (tx) => {
-    const [record] = await tx.select<{ status: string }>(
-      `SELECT status
+    const [record] = await tx.select<{ status: string, warranty_end_date: string | null }>(
+      `SELECT status, warranty_end_date
        FROM project_acceptances
        WHERE id = ? AND deleted_at IS NULL`,
       [id],
@@ -1921,12 +2037,77 @@ export async function transitionAcceptance(
       throw new Error('验收或保修记录不存在或已删除')
     if (allowed[record.status] !== target)
       throw new Error('验收或保修状态已变化，请刷新后重试')
-    await withUpdateLog(tx, 'project_acceptances', id, () => tx.execute(`
-      UPDATE project_acceptances
-      SET type = CASE WHEN ? IN ('warranty', 'expired') THEN 'warranty' ELSE type END,
-          status = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `, [target, target, id]))
+    await assertAcceptanceAttachmentChanges(
+      tx,
+      id,
+      attachments,
+      target === 'accepted' ? 'acceptance-report' : 'warranty-confirmation',
+    )
+    if (target === 'accepted') {
+      const organization = required(facts.acceptanceOrganization, '验收单位')
+      const person = required(facts.acceptancePerson, '验收人')
+      const date = required(facts.acceptanceDate, '验收日期')
+      const conclusion = required(facts.acceptanceConclusion, '验收结论')
+      if (!isISODateDTO(date))
+        throw new Error('验收日期格式必须为 yyyy-mm-dd')
+      await withUpdateLog(tx, 'project_acceptances', id, () => tx.execute(`
+        UPDATE project_acceptances
+        SET acceptance_organization = ?, acceptor = ?, acceptance_date = ?,
+            acceptance_conclusion = ?, conclusion = ?, status = 'accepted',
+            updated_at = datetime('now')
+        WHERE id = ?
+      `, [organization, person, date, conclusion, conclusion, id]))
+    }
+    if (target === 'warranty') {
+      const owner = required(facts.warrantyOwner, '保修责任单位')
+      const startDate = required(facts.warrantyStartDate, '保修开始日期')
+      const endDate = required(facts.warrantyEndDate, '保修结束日期')
+      if (!isISODateDTO(startDate) || !isISODateDTO(endDate))
+        throw new Error('保修日期格式必须为 yyyy-mm-dd')
+      if (endDate < startDate)
+        throw new Error('保修结束日期不能早于开始日期')
+      await withUpdateLog(tx, 'project_acceptances', id, () => tx.execute(`
+        UPDATE project_acceptances
+        SET type = 'warranty', warranty_owner = ?, warranty_start_date = ?,
+            warranty_end_date = ?, status = 'warranty', updated_at = datetime('now')
+        WHERE id = ?
+      `, [owner, startDate, endDate, id]))
+    }
+    if (target === 'expired') {
+      const organization = required(facts.warrantyConfirmationOrganization, '到期验收单位')
+      const date = required(facts.warrantyConfirmationDate, '到期确认日期')
+      const conclusion = required(facts.warrantyConfirmationNote, '到期确认结论')
+      if (!isISODateDTO(date))
+        throw new Error('到期确认日期格式必须为 yyyy-mm-dd')
+      if (record.warranty_end_date && date < record.warranty_end_date)
+        throw new Error('到期确认日期不能早于保修结束日期')
+      await withUpdateLog(tx, 'project_acceptances', id, () => tx.execute(`
+        UPDATE project_acceptances
+        SET warranty_confirmation_organization = ?, warranty_confirmation_date = ?,
+            warranty_confirmation_note = ?, status = 'expired', updated_at = datetime('now')
+        WHERE id = ?
+      `, [organization, date, conclusion, id]))
+    }
+    const event = {
+      accepted: { action: 'accept', fromStatus: 'submitted' },
+      warranty: { action: 'start-warranty', fromStatus: 'accepted' },
+      expired: { action: 'confirm-expiry', fromStatus: 'warranty' },
+    }[target]
+    await tx.execute(`
+      INSERT INTO project_acceptance_lifecycle_events (
+        id, acceptance_id, action, from_status, to_status,
+        actor_id, actor_name, occurred_at, note
+      ) VALUES (?, ?, ?, ?, ?, 'local-user', '本地用户', ?, ?)
+    `, [
+      generateId('acceptance_event'),
+      id,
+      event.action,
+      event.fromStatus,
+      target,
+      new Date().toISOString(),
+      text(facts.note),
+    ])
+    await applyFileRefChanges(tx, 'project_acceptance', id, attachments)
   })
 }
 

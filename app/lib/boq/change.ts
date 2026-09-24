@@ -3,6 +3,7 @@ import type { SoftDb } from '~/lib/db/soft-delete'
 import { logCreate, softDelete, withUpdateLog } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
+import { calculateBoqChangeLine, requiredBoqFinite } from './change-calculation'
 import { loadBoqWorkspace } from './read-model'
 
 export type BoqChangeType = 'add' | 'qty' | 'price' | 'mixed'
@@ -96,58 +97,6 @@ interface ChangeLineRow {
   sort_order: number
 }
 
-interface CalculatedLine {
-  amount: number
-  deltaQty: number | null
-  newUnitPrice: number | null
-}
-
-function requiredFinite(value: number | undefined | null, label: string): number {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed))
-    throw new Error(`${label}必须是有效数字`)
-  return parsed
-}
-
-function calculatedLine(
-  operation: BoqChangeOperation,
-  target: BoqLineView | null,
-  deltaQty: number | null | undefined,
-  newUnitPrice: number | null | undefined,
-): CalculatedLine {
-  if (operation === 'add') {
-    const qty = requiredFinite(deltaQty, '新增工程量')
-    const price = requiredFinite(newUnitPrice, '新增合同单价')
-    if (qty <= 0 || price < 0)
-      throw new Error('新增工程量必须大于 0，合同单价不能为负数')
-    return { amount: round2(qty * price), deltaQty: qty, newUnitPrice: price }
-  }
-  if (!target)
-    throw new Error('调量或调价必须指向有效清单行')
-  if (operation === 'qty') {
-    const delta = requiredFinite(deltaQty, '调整工程量')
-    if (delta === 0)
-      throw new Error('调整工程量不能为 0')
-    if (target.effectiveQty + delta < 0)
-      throw new Error('调整后合同工程量不能为负数')
-    return {
-      amount: round2(delta * target.effectiveUnitPrice),
-      deltaQty: delta,
-      newUnitPrice: null,
-    }
-  }
-  const price = requiredFinite(newUnitPrice, '调整后合同单价')
-  if (price < 0)
-    throw new Error('调整后合同单价不能为负数')
-  if (price === target.effectiveUnitPrice)
-    throw new Error('调整后合同单价没有变化')
-  return {
-    amount: round2(target.effectiveQty * (price - target.effectiveUnitPrice)),
-    deltaQty: null,
-    newUnitPrice: price,
-  }
-}
-
 function derivedChangeType(lines: readonly Pick<BoqChangeLineDraft, 'operation'>[]): BoqChangeType {
   const operations = new Set(lines.map(line => line.operation))
   return operations.size === 1 ? [...operations][0]! : 'mixed'
@@ -156,7 +105,7 @@ function derivedChangeType(lines: readonly Pick<BoqChangeLineDraft, 'operation'>
 function nextTargetState(
   target: BoqLineView,
   operation: BoqChangeOperation,
-  calculation: CalculatedLine,
+  calculation: import('./change-calculation').CalculatedBoqChangeLine,
 ): BoqLineView {
   if (operation === 'qty') {
     return {
@@ -197,7 +146,7 @@ async function normalizeChangeDraft(
     const target = line.boqLineId ? lineById.get(line.boqLineId) ?? null : null
     if (line.operation !== 'add' && !target)
       throw new Error('调量或调价明细包含无效清单行')
-    const calculation = calculatedLine(
+    const calculation = calculateBoqChangeLine(
       line.operation,
       target,
       line.operation === 'add' ? line.qty : line.deltaQty,
@@ -443,7 +392,7 @@ export async function approveBoqChangeOrder(
   let totalAmount = 0
   for (const line of changeLines) {
     const target = line.boq_line_id ? targetById.get(line.boq_line_id) ?? null : null
-    const calculation = calculatedLine(
+    const calculation = calculateBoqChangeLine(
       line.operation,
       target,
       line.delta_qty,
@@ -635,9 +584,9 @@ export async function reviseApprovedBoqChangeOrder(
   let totalAmount = 0
   const logIds: string[] = []
   if (line.operation === 'add') {
-    deltaQty = requiredFinite(draft.line.deltaQty ?? line.delta_qty, '新增工程量')
-    newUnitPrice = requiredFinite(draft.line.newUnitPrice ?? line.new_unit_price, '新增合同单价')
-    const calculated = calculatedLine('add', null, deltaQty, newUnitPrice)
+    deltaQty = requiredBoqFinite(draft.line.deltaQty ?? line.delta_qty, '新增工程量')
+    newUnitPrice = requiredBoqFinite(draft.line.newUnitPrice ?? line.new_unit_price, '新增合同单价')
+    const calculated = calculateBoqChangeLine('add', null, deltaQty, newUnitPrice)
     totalAmount = calculated.amount
     if (!line.result_boq_line_id)
       throw new Error('签证新增行缺少结果清单引用')
@@ -653,7 +602,7 @@ export async function reviseApprovedBoqChangeOrder(
   else if (line.operation === 'qty') {
     if (!target)
       throw new Error('调量签证缺少目标清单行')
-    const nextDelta = requiredFinite(draft.line.deltaQty ?? line.delta_qty, '调整工程量')
+    const nextDelta = requiredBoqFinite(draft.line.deltaQty ?? line.delta_qty, '调整工程量')
     const effectiveQtyWithoutOrder = target.effectiveQty - Number(line.delta_qty ?? 0)
     if (nextDelta === 0)
       throw new Error('调整工程量不能为 0')
@@ -665,7 +614,7 @@ export async function reviseApprovedBoqChangeOrder(
   else {
     if (!target || !line.boq_line_id)
       throw new Error('调价签证缺少目标清单行')
-    const nextPrice = requiredFinite(draft.line.newUnitPrice ?? line.new_unit_price, '调整后合同单价')
+    const nextPrice = requiredBoqFinite(draft.line.newUnitPrice ?? line.new_unit_price, '调整后合同单价')
     if (nextPrice < 0)
       throw new Error('调整后合同单价不能为负数')
     const [priorPriceRow] = await db.select<{ unit_price: number }>(`

@@ -25,7 +25,6 @@ const columns: KitTableColumn[] = [
     <SectionHeader
       id="contract-documents-title"
       title="关联单据"
-      subtitle="仅展示通过合同外键关联的真实单据，不按项目、名称或金额猜测"
     />
     <div v-if="rows.length" data-testid="contract-documents-scroll" class="mt-3 min-w-0">
       <KitTable :columns="columns" :data="tableRows" :min-rows="5">

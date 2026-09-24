@@ -11,7 +11,6 @@ defineProps<{
     <SectionHeader
       id="contract-stage-title"
       title="合同阶段"
-      subtitle="阶段只依据合同当前状态展示，不模拟审批轨迹"
     />
     <ol class="contract-stage-grid mt-3 grid gap-2">
       <li

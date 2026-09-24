@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import type {
   MasterDataFilterOption,
+  MasterDataFilterValue,
   MasterDataListFilterDefinition,
   MasterDataListFilterField,
   MasterDataListSort,
 } from '~/lib/master-data/list'
 import { Button } from '~/components/ui/button'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+import { masterDataSelectedValues } from '~/lib/master-data/list'
 
 defineProps<{
   entityLabel: string
@@ -25,13 +28,13 @@ const emit = defineEmits<{
 }>()
 
 const search = defineModel<string>('search', { required: true })
-const filters = defineModel<Partial<Record<MasterDataListFilterField, string>>>('filters', { required: true })
+const filters = defineModel<Partial<Record<MasterDataListFilterField, MasterDataFilterValue>>>('filters', { required: true })
 const sort = defineModel<MasterDataListSort>('sort', { required: true })
 
-function setFilter(field: MasterDataListFilterField, value: string | undefined) {
+function setFilter(field: MasterDataListFilterField, value: string[]) {
   filters.value = {
     ...filters.value,
-    [field]: value ?? 'all',
+    [field]: value,
   }
 }
 </script>
@@ -85,10 +88,10 @@ function setFilter(field: MasterDataListFilterField, value: string | undefined) 
             :options="sortOptions"
             :min-width="132"
           />
-          <SelectFilter
+          <KitMultiSelectFilter
             v-for="definition in filterDefinitions"
             :key="definition.field"
-            :model-value="filters[definition.field] || 'all'"
+            :model-value="masterDataSelectedValues(filters[definition.field])"
             :label="definition.label"
             :options="filterOptions[definition.field] || []"
             :min-width="definition.field === 'projectNames' || definition.field === 'projectName' ? 160 : 132"

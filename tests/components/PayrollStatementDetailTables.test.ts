@@ -2,6 +2,7 @@ import type { WageStatement } from '~/lib/payroll/statements'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
+import PayrollStatementDetail from '~/components/payroll/PayrollStatementDetail.vue'
 import PayrollStatementLinesTable from '~/components/payroll/PayrollStatementLinesTable.vue'
 import PayrollStatementMembersTable from '~/components/payroll/PayrollStatementMembersTable.vue'
 import PayrollStatementTable from '~/components/payroll/PayrollStatementTable.vue'
@@ -28,7 +29,8 @@ const SectionHeader = defineComponent({
 
 const NuxtLink = defineComponent({
   props: ['to'],
-  template: '<a :href="to"><slot /></a>',
+  setup: props => ({ href: () => typeof props.to === 'string' ? props.to : `${props.to.path}?${new URLSearchParams(props.to.query)}` }),
+  template: '<a :href="href()"><slot /></a>',
 })
 
 function statement(status: WageStatement['status'] = 'released'): WageStatement {
@@ -90,6 +92,29 @@ function statement(status: WageStatement['status'] = 'released'): WageStatement 
 const tableGlobal = { components: { KitTable, SectionHeader } }
 
 describe('payroll statement dedicated detail tables', () => {
+  it.each(['draft', 'checked', 'released'] as const)('历史 B %s 只展示原金额，不提供写入或输出动作', (status) => {
+    const historical = { ...statement(status), formatFamily: 'B' as const }
+    const wrapper = mount(PayrollStatementDetail, {
+      props: { statement: historical },
+      global: { stubs: { PayrollReleaseAllocationDialog: true, PayrollPrintSheet: true } },
+    })
+    expect(wrapper.text()).toContain('B 类工资已退役，历史记录只读')
+    expect(wrapper.text()).toContain('1,600.00')
+    expect(wrapper.findAll('input, button')).toHaveLength(0)
+    expect(wrapper.text()).not.toContain('现场复核量')
+  })
+
+  it('c1 核对和数量展示使用考勤语义', () => {
+    const wrapper = mount(PayrollStatementDetail, {
+      props: { statement: { ...statement('draft'), formatFamily: 'C1', quantitySource: 'field' } },
+      global: { stubs: { PayrollReleaseAllocationDialog: true } },
+    })
+    expect(wrapper.text()).toContain('真实考勤')
+    expect(wrapper.get('button').text()).toBe('核对并锁定考勤')
+    expect(wrapper.text()).toContain('考勤数量')
+    expect(wrapper.text()).not.toContain('现场复核量')
+  })
+
   it('renders frozen allocation only for a released statement', () => {
     const released = mount(PayrollStatementMembersTable, {
       props: { statement: statement('released') },
@@ -121,10 +146,18 @@ describe('payroll statement dedicated detail tables', () => {
       props: {
         statements: [statement()],
         selectedId: '',
+        filters: { projectId: 'project-a', month: '2026-07', crewId: 'crew-a', status: ['draft', 'checked'] },
       },
       global: { components: { KitTable, SectionHeader, NuxtLink } },
     })
     expect(wrapper.get('button').text()).toBe('查看')
-    expect(wrapper.get('a').attributes('href')).toBe('/subcontract/payroll/statement-a')
+    const url = new URL(wrapper.get('a').attributes('href'), 'http://test')
+    expect(url.pathname).toBe('/subcontract/payroll/statement-a')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      project: 'project-a',
+      month: '2026-07',
+      crew: 'crew-a',
+      status: '["draft","checked"]',
+    })
   })
 })

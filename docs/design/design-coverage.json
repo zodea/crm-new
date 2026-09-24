@@ -5,13 +5,15 @@
     "designFormRoutes": 40,
     "designNavGroups": 9,
     "designNavLeaves": 50,
-    "designMountedScreens": 86,
-    "appPageFiles": 127,
-    "appNavLeaves": 50,
-    "covered": 127,
-    "designPending": 0,
+    "designMountedScreens": 88,
+    "trackedPageFiles": 164,
+    "devPageFiles": 5,
+    "appPageFiles": 159,
+    "appNavLeaves": 51,
+    "covered": 135,
+    "designPending": 24,
     "retired": 0,
-    "navTitleVariants": 6
+    "navTitleVariants": 7
   },
   "screenParity": [
     {
@@ -60,6 +62,11 @@
       "status": "covered"
     },
     {
+      "appRoute": "/base/supplier/credential/:id",
+      "designRoute": "supplierDetail",
+      "status": "covered"
+    },
+    {
       "appRoute": "/base/supplier/form/:id?",
       "designRoute": "supplierForm",
       "status": "covered"
@@ -80,6 +87,13 @@
       "status": "covered"
     },
     {
+      "appRoute": "/base/worker/private/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "独立私密工人资料与照片整页，无直接对应设计路由；沿 DC 工人表单与整页原语单独验收。",
+      "issue": "#449"
+    },
+    {
       "appRoute": "/contract/:id",
       "designRoute": "contractDetail",
       "status": "covered"
@@ -90,6 +104,13 @@
       "status": "covered"
     },
     {
+      "appRoute": "/contract/boq/building-evidence",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "#445 新增原合同清单楼栋证据更正与只读来源整页；沿 ADR 0014、现有合同原语及本地排程权威，当前没有一一对应的 DC 页面，已按本票五档实际视口验收。",
+      "issue": "#445"
+    },
+    {
       "appRoute": "/contract/boq/import",
       "designRoute": "boqImport",
       "status": "covered"
@@ -98,6 +119,13 @@
       "appRoute": "/contract/company-expense",
       "designRoute": "companyExp",
       "status": "covered"
+    },
+    {
+      "appRoute": "/contract/company-expense/:id",
+      "designRoute": "contractDetail",
+      "status": "covered",
+      "reason": "AX04 复用瑞航详情原语；专属字段与证据等级见 contract-forms.md 和 runtime-reference-audit.md",
+      "issue": 330
     },
     {
       "appRoute": "/contract/company-expense/form",
@@ -145,6 +173,13 @@
       "status": "covered"
     },
     {
+      "appRoute": "/contract/other-expense/:id",
+      "designRoute": "contractDetail",
+      "status": "covered",
+      "reason": "AX04 复用瑞航详情原语；专属字段与证据等级见 contract-forms.md 和 runtime-reference-audit.md",
+      "issue": 330
+    },
+    {
       "appRoute": "/contract/other-expense/form",
       "designRoute": "otherExpForm",
       "status": "covered"
@@ -157,6 +192,11 @@
     {
       "appRoute": "/contract/other-settlement",
       "designRoute": "otherSettle",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-settlement/:id",
+      "designRoute": "contractDetail",
       "status": "covered"
     },
     {
@@ -255,6 +295,13 @@
       "status": "covered"
     },
     {
+      "appRoute": "/finance/payment/:id/detail",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "本轮补齐的付款申请只读详情工作台，暂无一一对应的 DC 页面；沿用 EntityDetailShell 的详情骨架，并以用户提供的智能业务洞察侧栏为结构线索，先登记为待补设计。",
+      "issue": "#305"
+    },
+    {
       "appRoute": "/finance/payment/new",
       "designRoute": "payApplyForm",
       "status": "covered"
@@ -266,6 +313,11 @@
     },
     {
       "appRoute": "/finance/receipt/:id",
+      "designRoute": "receiptForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/receipt/form/:id",
       "designRoute": "receiptForm",
       "status": "covered"
     },
@@ -507,6 +559,14 @@
       "status": "covered"
     },
     {
+      "appRoute": "/owner/:kind/form/:id",
+      "designRoute": [
+        "ownerChangeForm",
+        "ownerReportForm"
+      ],
+      "status": "covered"
+    },
+    {
       "appRoute": "/owner/:kind/new",
       "designRoute": [
         "ownerChangeForm",
@@ -549,6 +609,11 @@
     },
     {
       "appRoute": "/project/penalty/:id",
+      "designRoute": "projPenaltyForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/penalty/form/:id",
       "designRoute": "projPenaltyForm",
       "status": "covered"
     },
@@ -598,9 +663,23 @@
       "status": "covered"
     },
     {
+      "appRoute": "/schedule/process-library/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "#443 新增不可变工序库版本的独立只读详情；采用已有工序库列表/表单、Table 原语与 ADR 0018 的只读语义，当前没有一一对应的 DC 详情页，按本票五档实际视口验证。",
+      "issue": "#443"
+    },
+    {
       "appRoute": "/schedule/process-library/form",
       "designRoute": "processLibraryForm",
       "status": "covered"
+    },
+    {
+      "appRoute": "/settings/data-migration",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "核心身份迁移是 #294 新增的浏览器专属工作台；当前先以运行契约、四档视口和局部滚动证据验收，尚无一一对应的 DC 页面。",
+      "issue": "#294"
     },
     {
       "appRoute": "/settings/ocr",
@@ -624,6 +703,11 @@
       "status": "covered"
     },
     {
+      "appRoute": "/subcontract/:kind/form/:id",
+      "designRoute": "subChangeForm",
+      "status": "covered"
+    },
+    {
       "appRoute": "/subcontract/:kind/new",
       "designRoute": [
         "subChangeForm",
@@ -642,6 +726,20 @@
       "status": "covered"
     },
     {
+      "appRoute": "/subcontract/daywork/form/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "中央签工固定记录的显式整页编辑，无直接对应设计路由；依据工资签工规则、DC 通用原语与 ADR 0014 独立实施验收，不继承台账覆盖结论。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/daywork/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "中央签工新增整页及人工证据信息，无直接对应设计路由；依据工资签工规则、DC 通用原语与 ADR 0014 独立实施验收，不继承台账覆盖结论。",
+      "issue": "#412"
+    },
+    {
       "appRoute": "/subcontract/payroll",
       "designRoute": "payroll",
       "status": "covered"
@@ -652,9 +750,100 @@
       "status": "covered"
     },
     {
+      "appRoute": "/subcontract/payroll/adjustments/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "独立更正详情与原链余额；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/adjustments/form/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "固定编号更正编辑与确认；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/adjustments/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "新建有依据的独立核算更正；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/config",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "A 主体比例/工资价格、C1 个人标准与 C2 主体单价/规则的独立配置页，无直接对应设计路由；按各格式工资规则、DC 工资蓝本及整页原语实施并单独验收。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/form/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "各格式工资固定单据的整页编辑入口，无直接对应设计路由；按工资页面、DC 工资蓝本及整页原语实施并单独验收。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/issue/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "单份冻结工资预览、旧纸号起点与正式出具整页，无直接对应设计路由；沿 DC 工资/整页原语独立验收，不继承外部台账证据。",
+      "issue": "#477"
+    },
+    {
       "appRoute": "/subcontract/payroll/new",
       "designRoute": "payroll",
       "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/payroll/payments",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "工资实际收付独立台账；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/payments/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "实际补退及错记冲销只读详情；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/payments/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "真实补退整页登记；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/payments/reversal/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "明确原引用的错记冲销与再纠错；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/roster",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "独立有日期的工资实名名册归档整页，无直接对应设计路由；沿 DC 工资表格与整页原语单独验收。",
+      "issue": "#449"
+    },
+    {
+      "appRoute": "/subcontract/payroll/sources",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "中央工资配置、独立考勤/签工与月锁只读来源页，按工资规格及 DC 通用原语实施；独立来源构图不继承旧考勤编辑页的覆盖结论。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/workbooks",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "固定工资目录、名册版本与完整文件组合独立整页，无直接对应设计路由；沿 DC 工资及整页原语验收，不继承台账参考证据。",
+      "issue": "#479"
     },
     {
       "appRoute": "/subcontract/quantity",
@@ -667,9 +856,37 @@
       "status": "covered"
     },
     {
+      "appRoute": "/subcontract/quantity/:pid/:uid/hollow/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "户级空鼓检查新增、修订及整改详情无独立 DC 设计屏；按 #412、工程量和工资页面及通用整页原语独立验收，不继承原户详情覆盖结论。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/quantity/:pid/:uid/hollow/form/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "户级空鼓检查新增、修订及整改详情无独立 DC 设计屏；按 #412、工程量和工资页面及通用整页原语独立验收，不继承原户详情覆盖结论。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/quantity/:pid/:uid/hollow/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "户级空鼓检查新增、修订及整改详情无独立 DC 设计屏；按 #412、工程量和工资页面及通用整页原语独立验收，不继承原户详情覆盖结论。",
+      "issue": "#412"
+    },
+    {
       "appRoute": "/subcontract/quantity/region",
       "designRoute": "quantityRegionForm",
       "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/quantity/stages",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "阶段目录与报量映射为 #442 新增整页，当前无一一对应的 DC 页面；按既有实体表单原语实现，本地运行验收见 evidence/issue-442/README.md，不等于设计源码已覆盖。",
+      "issue": "#442"
     },
     {
       "appRoute": "/subcontract/quantity/template",
@@ -690,6 +907,12 @@
       "navLabel": "工程量清单",
       "pageTitle": "工程量清单管理",
       "reason": "侧栏短名「工程量清单」；页标题「工程量清单管理」。属短名 vs 全称，保留。"
+    },
+    {
+      "key": "price",
+      "navLabel": "单价对比",
+      "pageTitle": "材料价格分析",
+      "reason": "短菜单名 vs 完整页标题：#207 裁定页内为四维材料价格分析，侧栏保留实现端现名「单价对比」，实现端更名后同步"
     },
     {
       "key": "omDirect",
@@ -904,7 +1127,7 @@
       "appNavTo": "/material/price",
       "appLabel": "单价对比",
       "designLabel": "单价对比",
-      "designPageTitle": "单价对比"
+      "designPageTitle": "材料价格分析"
     },
     {
       "key": "omTotal",
@@ -1059,6 +1282,13 @@
       "appLabel": "工人信息",
       "designLabel": "工人信息",
       "designPageTitle": "工人信息库"
+    },
+    {
+      "key": "dataMigration",
+      "appNavTo": "/settings/data-migration",
+      "appLabel": "本地数据迁移",
+      "designLabel": null,
+      "designPageTitle": null
     },
     {
       "key": "ocrSettings",

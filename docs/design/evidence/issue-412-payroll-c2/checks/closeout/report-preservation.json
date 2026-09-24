@@ -1,0 +1,9 @@
+{
+  "issueCount": 46,
+  "otherRowsUnchanged": 45,
+  "allStatusesUnchanged": true,
+  "svgCount": 46,
+  "graphsUnchanged": true,
+  "interactionScriptsUnchanged": true,
+  "note": "核验实际HTML嵌入46条目；排除git输出换行差异。此前核验错误来自误取7行增量输入与未统一CRLF，并非报告功能变化。"
+}

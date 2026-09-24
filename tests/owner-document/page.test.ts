@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   OWNER_DOCUMENT_META,
   ownerDocumentDefaults,
+  ownerDocumentDetailPath,
   ownerDocumentFormPath,
   ownerDocumentKindFromRoute,
   validateOwnerDocumentForm,
@@ -15,8 +16,27 @@ describe('f5 单据页面模型', () => {
     for (const [kind, meta] of Object.entries(OWNER_DOCUMENT_META)) {
       expect(ownerDocumentKindFromRoute(meta.routeScope, meta.routeKind)).toBe(kind)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META)).toBe(`${meta.listPath}/new`)
-      expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META, 'f5_1')).toBe(`${meta.listPath}/f5_1`)
+      expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META, 'f5_1')).toBe(
+        ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change', 'sub_settlement', 'project_penalty'].includes(kind)
+          ? `${meta.listPath}/form/f5_1`
+          : `${meta.listPath}/f5_1`,
+      )
     }
+  })
+
+  it('五类甲方单据与分包变洽签用独立只读详情地址，并显式保留来源和验收视图', () => {
+    expect(ownerDocumentDetailPath('owner_change', 'change/323', 'real'))
+      .toBe('/owner/change/change%2F323?origin=real')
+    expect(ownerDocumentDetailPath('owner_report', 'report-323', 'demo'))
+      .toBe('/owner/report/report-323?origin=demo')
+    expect(ownerDocumentDetailPath('acceptance', 'acceptance-324', 'real', 'warranty'))
+      .toBe('/owner/acceptance/acceptance-324?origin=real&variant=warranty')
+    expect(ownerDocumentDetailPath('final_settlement', 'final-settlement/325', 'real'))
+      .toBe('/owner/final-settlement/final-settlement%2F325?origin=real')
+    expect(ownerDocumentDetailPath('owner_penalty', 'owner-penalty/326', 'real'))
+      .toBe('/owner/penalty/owner-penalty%2F326?origin=real')
+    expect(ownerDocumentDetailPath('sub_change', 'sub-change/327', 'real'))
+      .toBe('/subcontract/change/sub-change%2F327?origin=real')
   })
 
   it('八类表单提供准确分区和对应合同入口', () => {
@@ -94,5 +114,54 @@ describe('f5 单据页面模型', () => {
     })).toEqual({
       lines: '至少填写一条量价变更，或填写纯金额签证金额',
     })
+
+    expect(validateOwnerDocumentForm('final_settlement', {
+      name: '最终结算',
+      projectId: 'project-1',
+      settlementAmount: 100,
+      submissionDate: '2026-08-25',
+    })).toMatchObject({ contractId: '施工合同为必填项' })
+
+    expect(validateOwnerDocumentForm('owner_penalty', {
+      projectId: 'project-1',
+      amount: 36000,
+      penaltyDate: '2026-08-26',
+      reason: '施工进度延误',
+    })).toMatchObject({ contractId: '施工合同为必填项' })
+  })
+
+  it('在页面命令前拦截空变更行、越界调量和无效报量行', () => {
+    const base = {
+      name: '负二层桥架变更',
+      projectId: 'project-1',
+      contractId: 'contract-1',
+      applicationDate: '2026-08-25',
+      reason: '现场调整',
+    }
+    const boqLines = [{
+      id: 'boq-1',
+      itemName: '桥架安装',
+      unit: 'm',
+      qty: 100,
+      unitPrice: 52,
+      autoQty: 80,
+      missingQtyCount: 0,
+    }]
+
+    expect(validateOwnerDocumentForm('owner_change', {
+      ...base,
+      lines: [{ operation: 'qty', boqLineId: '', deltaQty: null }],
+    }, boqLines)).toMatchObject({ lines: expect.stringContaining('BOQ') })
+    expect(validateOwnerDocumentForm('owner_change', {
+      ...base,
+      lines: [{ operation: 'qty', boqLineId: 'boq-1', deltaQty: -101 }],
+    }, boqLines)).toMatchObject({ lines: expect.stringContaining('调整后合同工程量不能为负数') })
+    expect(validateOwnerDocumentForm('owner_report', {
+      projectId: 'project-1',
+      contractId: 'contract-1',
+      periodNo: '2026-08',
+      applicationDate: '2026-08-25',
+      lines: [{ boqLineId: 'boq-1', reportedQty: -1 }],
+    }, boqLines)).toMatchObject({ lines: expect.stringContaining('申报量不能为负数') })
   })
 })

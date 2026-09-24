@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import { loadProjectDeliveryArchive } from '~/lib/project/delivery-archive'
 import { createMemoryDb } from '../helpers/memory-db'
 
 describe('project delivery archive read model', () => {
+  it('中央来源采用当前稳定身份与原件状态，错误读取或混源不回落本机 SQL', async () => {
+    const record = { id: 'same/id', dataOrigin: 'real', projectId: 'central-p', supplierName: '中央分供方', orderNo: 'CENTRAL', deliveryDate: '2026-09-11', archived: true, deletedAt: null, lines: [{ qty: 2, amount: 30 }], fileName: '中央原件.pdf', assetId: 'central-asset', hasSourceFile: true, ocrStatus: 'reviewed', reviewFlag: '', printDisposition: 'pending' }
+    const source = { load: vi.fn().mockResolvedValue({ origin: 'real', records: [record] }) }
+    const rows = await loadProjectDeliveryArchive(source)
+    expect(rows).toEqual([expect.objectContaining({ projectId: 'central-p', supplier: '中央分供方', totalAmount: 30, sourceFileId: 'central-asset', sourcePath: '/material/delivery/archive/same%2Fid?origin=real' })])
+    source.load.mockRejectedValueOnce(new Error('送货源无权'))
+    await expect(loadProjectDeliveryArchive(source)).rejects.toThrow('无权')
+    source.load.mockResolvedValueOnce({ origin: 'demo', records: [record] })
+    await expect(loadProjectDeliveryArchive(source)).rejects.toThrow('来源')
+  })
   it('only aggregates archived delivery records and their visible source lines', async () => {
     const db = await createMemoryDb()
     await runMigrations(db)

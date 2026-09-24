@@ -1,0 +1,618 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/payroll_c1_backend",
+  "date": "2026-09-14",
+  "scope": "P3 browser-final 已通过的6条recovery/readonly旅程45张原始PNG，独立逐图视觉QA；不包含central失败目录与旧C2缺快照失败目录。",
+  "method": {
+    "tool": "view_image",
+    "detail": "original",
+    "perImage": true,
+    "noImageEdits": true,
+    "noBrowserOrProductChanges": true
+  },
+  "totals": {
+    "images": 45,
+    "visibleProductDefects": 0,
+    "pass": 33,
+    "passWithCoverageGap": 12
+  },
+  "conclusion": "所有45张已逐张原图检查；当前可见范围未发现根横溢、输入裁切或提示遮挡。部分截图只覆盖首屏或下滚区，以下证据缺口不能冒充整页已验。",
+  "coverageGaps": [
+    {
+      "id": "V1",
+      "severity": "evidence-gap",
+      "description": "新签工unknown及后读失败的390图底部按钮仅上沿，配对首屏不覆盖底部操作标签。",
+      "requested": "关联最终同页390底部证据或补滚到底图。",
+      "imageIndices": [
+        23,
+        28,
+        38
+      ]
+    },
+    {
+      "id": "V2",
+      "severity": "evidence-gap",
+      "description": "原成功随后合法更新五宽的查看当前原记录均收起；摘要能区分当前11/04和原输入11/03，当前正文/证明尚未视觉覆盖。",
+      "requested": "补/关联390展开当前原记录图，明确保留原输入与当前事实两区。",
+      "imageIndices": [
+        30,
+        31,
+        32,
+        33,
+        34
+      ]
+    },
+    {
+      "id": "V3",
+      "severity": "evidence-gap",
+      "description": "success-read-failure五宽均下滚，成功后读取失败顶部恢复提示未入镜，后来的ack提示不是同一状态。",
+      "requested": "补/关联390失败状态首屏。",
+      "imageIndices": [
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
+    }
+  ],
+  "externalCoverage": [
+    {
+      "description": "迟到旧读旅程390/768/1024停表左端；Root说明最终main confirmed-records-tail五宽及键盘定位可覆盖同一签工表右端，仍需Root归档时关联最终路径。",
+      "imageIndices": [
+        15,
+        18,
+        19
+      ],
+      "reportedBy": "/root",
+      "independentlyInspectedHere": false
+    }
+  ],
+  "limitations": [
+    "静态原图不证明请求顺序、命令ID幂等、URL中的原scope/draftKey或根scrollWidth；这些由对应行为测试承担。",
+    "本45张均无打开的确认浮层，本轮不评价确认浮层尺寸/焦点。",
+    "若后续产品Notice或Dialog样式变更，当前hash只证明旧快照，不能代替新版受影响图。"
+  ],
+  "images": [
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\c2-demo-write-unavailable-1024.png",
+      "name": "c2-demo-write-unavailable-1024.png",
+      "sha256": "4b51ca6fc988b8ae29f2f68333e3eb6265e6769ecd725e66d98b3ba3a37c671e",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示工资新稿拒写态标题、原因、返回和重读完整，无写入控件或可见裁切。",
+      "limitations": [
+        "静态图不证明点击结果或页面滚动数值。"
+      ],
+      "width": 1024
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\c2-demo-write-unavailable-1280.png",
+      "name": "c2-demo-write-unavailable-1280.png",
+      "sha256": "e2f5c0357878b06c81aa9393b15cba03cf46ddf70ea8a45c14d7cade032a0e87",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示工资新稿拒写态标题、原因、返回和重读完整，无写入控件或可见裁切。",
+      "limitations": [
+        "静态图不证明点击结果或页面滚动数值。"
+      ],
+      "width": 1280
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\c2-demo-write-unavailable-1440.png",
+      "name": "c2-demo-write-unavailable-1440.png",
+      "sha256": "ab7d88b8ccbdaf5556d9276a55c4c8c8b5de824d444adc1810b72a198872a2ce",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示工资新稿拒写态标题、原因、返回和重读完整，无写入控件或可见裁切。",
+      "limitations": [
+        "静态图不证明点击结果或页面滚动数值。"
+      ],
+      "width": 1440
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\c2-demo-write-unavailable-390.png",
+      "name": "c2-demo-write-unavailable-390.png",
+      "sha256": "f6e95841c25f84f06406272e4b3c31b7e3a8b76a21e2e9cb6c023122b7d4fd1d",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "390宽标题、两行拒写说明与重新读取按钮完整；无输入或提交控件，无可见根横溢。",
+      "limitations": [
+        "静态图不证明点击结果或页面滚动数值。"
+      ],
+      "width": 390
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\c2-demo-write-unavailable-768.png",
+      "name": "c2-demo-write-unavailable-768.png",
+      "sha256": "d994fc4cec10f4b50195c869aa98f97b7ec5e084b642adc1cab528a1cb04a4b4",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示工资新稿拒写态标题、原因、返回和重读完整，无写入控件或可见裁切。",
+      "limitations": [
+        "静态图不证明点击结果或页面滚动数值。"
+      ],
+      "width": 768
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\daywork-demo-write-unavailable-1024.png",
+      "name": "daywork-demo-write-unavailable-1024.png",
+      "sha256": "1433452f42d66e3b538508140695516a64b25a90338007a8bf7aa403e4cc147f",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示签工新增被阻断，原页标题、返回、未能读取原因和重读按钮完整；390单列无可见横溢，较宽布局无挤压。",
+      "limitations": [
+        "此组为拒写空态，没有表单/确认浮层可验。"
+      ],
+      "width": 1024
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\daywork-demo-write-unavailable-1280.png",
+      "name": "daywork-demo-write-unavailable-1280.png",
+      "sha256": "bea0e4b9ddd77ae039c47e6d87eb09b5a9ad3ec4acbe812d89c9490a5cb09425",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示签工新增被阻断，原页标题、返回、未能读取原因和重读按钮完整；390单列无可见横溢，较宽布局无挤压。",
+      "limitations": [
+        "此组为拒写空态，没有表单/确认浮层可验。"
+      ],
+      "width": 1280
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\daywork-demo-write-unavailable-1440.png",
+      "name": "daywork-demo-write-unavailable-1440.png",
+      "sha256": "97cd4009f359955d6782a77a36e573df88b827ae215767b83180577254cabd72",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示签工新增被阻断，原页标题、返回、未能读取原因和重读按钮完整；390单列无可见横溢，较宽布局无挤压。",
+      "limitations": [
+        "此组为拒写空态，没有表单/确认浮层可验。"
+      ],
+      "width": 1440
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\daywork-demo-write-unavailable-390.png",
+      "name": "daywork-demo-write-unavailable-390.png",
+      "sha256": "0ce6453586a4cf907eed71fa25703216a76360783705b6bb6056197921a48439",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示签工新增被阻断，原页标题、返回、未能读取原因和重读按钮完整；390单列无可见横溢，较宽布局无挤压。",
+      "limitations": [
+        "此组为拒写空态，没有表单/确认浮层可验。"
+      ],
+      "width": 390
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-显式演示-C2-新稿及签工新稿保持不可写，不切到正式来源-chromium\\daywork-demo-write-unavailable-768.png",
+      "name": "daywork-demo-write-unavailable-768.png",
+      "sha256": "22f38746efcaedb77434015f25bbac04a67555772128a85288f7138497fc3846",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "演示签工新增被阻断，原页标题、返回、未能读取原因和重读按钮完整；390单列无可见横溢，较宽布局无挤压。",
+      "limitations": [
+        "此组为拒写空态，没有表单/确认浮层可验。"
+      ],
+      "width": 768
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-C2-来源拒权不能沿旧读保存，重读后仍保原项目及草稿编号-chromium\\c2-denied-read-retains-scope-1024.png",
+      "name": "c2-denied-read-retains-scope-1024.png",
+      "sha256": "982758dae1c926491bd2d99c7234ec1957457e88c157e25361d9a2d7ebbff2e0",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "来源拒权整屏可读：工资草稿未能读取、当前身份没有C2读取权限、重新读取与返回入口完整；无可见横溢或写入表单。",
+      "limitations": [
+        "原project/draftKey未呈现在拒权空态，截图不证明其内存/URL保留，需旅程行为断言。不是滚动缺拍。"
+      ],
+      "width": 1024
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-C2-来源拒权不能沿旧读保存，重读后仍保原项目及草稿编号-chromium\\c2-denied-read-retains-scope-1280.png",
+      "name": "c2-denied-read-retains-scope-1280.png",
+      "sha256": "9dfbb933d0b7efc6ceb1d8eadd98f510f23366addc597572befc36c860b52be6",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "来源拒权整屏可读：工资草稿未能读取、当前身份没有C2读取权限、重新读取与返回入口完整；无可见横溢或写入表单。",
+      "limitations": [
+        "原project/draftKey未呈现在拒权空态，截图不证明其内存/URL保留，需旅程行为断言。不是滚动缺拍。"
+      ],
+      "width": 1280
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-C2-来源拒权不能沿旧读保存，重读后仍保原项目及草稿编号-chromium\\c2-denied-read-retains-scope-1440.png",
+      "name": "c2-denied-read-retains-scope-1440.png",
+      "sha256": "d0479df87acc7e23e39ccc797c5f78ffa454cf9b1ba3c24476c1173771870bd4",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "来源拒权整屏可读：工资草稿未能读取、当前身份没有C2读取权限、重新读取与返回入口完整；无可见横溢或写入表单。",
+      "limitations": [
+        "原project/draftKey未呈现在拒权空态，截图不证明其内存/URL保留，需旅程行为断言。不是滚动缺拍。"
+      ],
+      "width": 1440
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-C2-来源拒权不能沿旧读保存，重读后仍保原项目及草稿编号-chromium\\c2-denied-read-retains-scope-390.png",
+      "name": "c2-denied-read-retains-scope-390.png",
+      "sha256": "d474cef4d8fc140aabafc6bd8f15a15b350a1f6d78d67f56548a7ed84c5c029d",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "来源拒权整屏可读：工资草稿未能读取、当前身份没有C2读取权限、重新读取与返回入口完整；无可见横溢或写入表单。",
+      "limitations": [
+        "原project/draftKey未呈现在拒权空态，截图不证明其内存/URL保留，需旅程行为断言。不是滚动缺拍。"
+      ],
+      "width": 390
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-readonly-C2-来源拒权不能沿旧读保存，重读后仍保原项目及草稿编号-chromium\\c2-denied-read-retains-scope-768.png",
+      "name": "c2-denied-read-retains-scope-768.png",
+      "sha256": "9b660b5174f53a5887322fd95319a9c1bde46772d374eac003cb5d61a2387773",
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "来源拒权整屏可读：工资草稿未能读取、当前身份没有C2读取权限、重新读取与返回入口完整；无可见横溢或写入表单。",
+      "limitations": [
+        "原project/draftKey未呈现在拒权空态，截图不证明其内存/URL保留，需旅程行为断言。不是滚动缺拍。"
+      ],
+      "width": 768
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-签工切换月份后迟到的旧读取不覆盖当前记录或两类状态筛选-chromium\\daywork-late-read-current-month-1024.png",
+      "name": "daywork-late-read-current-month-1024.png",
+      "sha256": "116718f00f968046664f06eb384ffa44c14ac4f8b72b8b863380647888a45fbf",
+      "width": 1024,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "当前范围清楚显示签工筛选项目、2027年02月、全部班组，待确认选中且已确认未选中；当前行2027-02-03、08:00–12:00、0.5工、2027-02当前月真实签工可辨。表格右端证明/状态/操作未全部入图；筛选区与页面根边界无可见横向溢出。",
+      "limitations": "当前截图停留表格左端，不能证明横向滚动后的右端操作可达；需关联相同表格右端证据或补拍。静态截图不证明请求顺序或根滚动数值。",
+      "coverageReference": {
+        "reportedBy": "/root",
+        "evidence": "最终主链 confirmed-records-tail 五宽及真实 ArrowLeft/Right+Tab 定位编辑",
+        "scope": "共用签工表右端操作",
+        "reviewedHere": false,
+        "requiresFinalPathAssociation": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-签工切换月份后迟到的旧读取不覆盖当前记录或两类状态筛选-chromium\\daywork-late-read-current-month-1280.png",
+      "name": "daywork-late-read-current-month-1280.png",
+      "sha256": "9cd13bea1ebc3ac1206810c8414ce4f45d9504e4dfc6432c298cffae616300fa",
+      "width": 1280,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "当前范围清楚显示签工筛选项目、2027年02月、全部班组，待确认选中且已确认未选中；当前行2027-02-03、08:00–12:00、0.5工、2027-02当前月真实签工可辨。证明、待确认状态、编辑/人工确认/原记录证据操作均完整可见。",
+      "limitations": "静态截图不证明迟到请求顺序或根滚动数值。",
+      "coverageReference": {
+        "reportedBy": "/root",
+        "evidence": "最终主链 confirmed-records-tail 五宽及真实 ArrowLeft/Right+Tab 定位编辑",
+        "scope": "共用签工表右端操作",
+        "reviewedHere": false,
+        "requiresFinalPathAssociation": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-签工切换月份后迟到的旧读取不覆盖当前记录或两类状态筛选-chromium\\daywork-late-read-current-month-1440.png",
+      "name": "daywork-late-read-current-month-1440.png",
+      "sha256": "6a90ee18066809fa3cc0c599e37048ac02d0869f169cd06c887fd3a2f917d2f8",
+      "width": 1440,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "当前范围清楚显示签工筛选项目、2027年02月、全部班组，待确认选中且已确认未选中；当前行2027-02-03、08:00–12:00、0.5工、2027-02当前月真实签工可辨。证明、待确认状态、编辑/人工确认/原记录证据操作均完整可见。",
+      "limitations": "静态截图不证明迟到请求顺序或根滚动数值。",
+      "coverageReference": {
+        "reportedBy": "/root",
+        "evidence": "最终主链 confirmed-records-tail 五宽及真实 ArrowLeft/Right+Tab 定位编辑",
+        "scope": "共用签工表右端操作",
+        "reviewedHere": false,
+        "requiresFinalPathAssociation": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-签工切换月份后迟到的旧读取不覆盖当前记录或两类状态筛选-chromium\\daywork-late-read-current-month-390.png",
+      "name": "daywork-late-read-current-month-390.png",
+      "sha256": "19ee4afa5999bebf2a680de654f59ed06b405b08fcfa37dc7bad772b8054e715",
+      "width": 390,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "当前范围清楚显示签工筛选项目、2027年02月、全部班组，待确认选中且已确认未选中；当前行2027-02-03、08:00–12:00、0.5工、2027-02当前月真实签工可辨。表格右端证明/状态/操作未全部入图；筛选区与页面根边界无可见横向溢出。头部操作自然换行，筛选单列，输入与月份无裁切。",
+      "limitations": "当前截图停留表格左端，不能证明横向滚动后的右端操作可达；需关联相同表格右端证据或补拍。静态截图不证明请求顺序或根滚动数值。",
+      "coverageReference": {
+        "reportedBy": "/root",
+        "evidence": "最终主链 confirmed-records-tail 五宽及真实 ArrowLeft/Right+Tab 定位编辑",
+        "scope": "共用签工表右端操作",
+        "reviewedHere": false,
+        "requiresFinalPathAssociation": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-签工切换月份后迟到的旧读取不覆盖当前记录或两类状态筛选-chromium\\daywork-late-read-current-month-768.png",
+      "name": "daywork-late-read-current-month-768.png",
+      "sha256": "b7ae4eea4bc8698df8e7fa944e51bc6f7ac6165a82aff2095ee3ab7457177804",
+      "width": 768,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "当前范围清楚显示签工筛选项目、2027年02月、全部班组，待确认选中且已确认未选中；当前行2027-02-03、08:00–12:00、0.5工、2027-02当前月真实签工可辨。表格右端证明/状态/操作未全部入图；筛选区与页面根边界无可见横向溢出。",
+      "limitations": "当前截图停留表格左端，不能证明横向滚动后的右端操作可达；需关联相同表格右端证据或补拍。静态截图不证明请求顺序或根滚动数值。",
+      "coverageReference": {
+        "reportedBy": "/root",
+        "evidence": "最终主链 confirmed-records-tail 五宽及真实 ArrowLeft/Right+Tab 定位编辑",
+        "scope": "共用签工表右端操作",
+        "reviewedHere": false,
+        "requiresFinalPathAssociation": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-1024.png",
+      "name": "daywork-cold-original-pending-1024.png",
+      "sha256": "885ce0b26ada41d12de39625314f87aae9212263385054884158476d227bdb03",
+      "width": 1024,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "冷页恢复显示“上次提交结果尚未确认，原输入已保留”，核对原提交/重新读取资料两按钮完整；原项目、签工负责人、零星签工班组、2026/10/03、08:00–12:00、半工0.5工与原长施工正文清楚。两列表单齐整，证明人及确认日期空值可见；备注与底部操作折在画面以下。",
+      "limitations": "首屏截图不能覆盖页面下部备注、保存操作及滚动可达性，需关联后续底部证据；截图本身不证明原命令ID与请求幂等。",
+      "coverageReference": {
+        "evidence": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1024.png",
+        "scope": "同旅程下半页原输入/证明/备注及禁用底部按钮",
+        "reviewedHere": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-1280.png",
+      "name": "daywork-cold-original-pending-1280.png",
+      "sha256": "79da963a32189e786a81e31b75e405eb05a6f5b0f317526000edefb3ece00343",
+      "width": 1280,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "冷页恢复显示“上次提交结果尚未确认，原输入已保留”，核对原提交/重新读取资料两按钮完整；原项目、签工负责人、零星签工班组、2026/10/03、08:00–12:00、半工0.5工与原长施工正文清楚。两列表单齐整，证明人及确认日期空值可见；备注与底部操作折在画面以下。",
+      "limitations": "首屏截图不能覆盖页面下部备注、保存操作及滚动可达性，需关联后续底部证据；截图本身不证明原命令ID与请求幂等。",
+      "coverageReference": {
+        "evidence": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1280.png",
+        "scope": "同旅程下半页原输入/证明/备注及禁用底部按钮",
+        "reviewedHere": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-1440.png",
+      "name": "daywork-cold-original-pending-1440.png",
+      "sha256": "f5ed477eba0f3cc2cb9e939e83bec8c9739a7af4f88cfdc6c1479c47e62eab52",
+      "width": 1440,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "冷页恢复显示“上次提交结果尚未确认，原输入已保留”，核对原提交/重新读取资料两按钮完整；原项目、签工负责人、零星签工班组、2026/10/03、08:00–12:00、半工0.5工与原长施工正文清楚。两列表单齐整，证明人及确认日期空值可见；备注与底部操作折在画面以下。",
+      "limitations": "首屏截图不能覆盖页面下部备注、保存操作及滚动可达性，需关联后续底部证据；截图本身不证明原命令ID与请求幂等。",
+      "coverageReference": {
+        "evidence": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1440.png",
+        "scope": "同旅程下半页原输入/证明/备注及禁用底部按钮",
+        "reviewedHere": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-390.png",
+      "name": "daywork-cold-original-pending-390.png",
+      "sha256": "50e3df8017dd2076ecf55cf70d0d3e6bca144c59d60a8961eef845d2466555a8",
+      "width": 390,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "冷页恢复显示“上次提交结果尚未确认，原输入已保留”，核对原提交/重新读取资料两按钮完整；原项目、签工负责人、零星签工班组、2026/10/03、08:00–12:00、半工0.5工与原长施工正文清楚。单列输入不超出卡片，提示自然换行；施工正文完整，后续说明和证明区域折在首屏以下。",
+      "limitations": "首屏截图不能覆盖页面下部备注、保存操作及滚动可达性，需关联后续底部证据；截图本身不证明原命令ID与请求幂等。",
+      "coverageReference": {
+        "evidence": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-390.png",
+        "scope": "同旅程下半页原输入/证明/备注（底部按钮仍未入镜）",
+        "reviewedHere": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-cold-original-pending-768.png",
+      "name": "daywork-cold-original-pending-768.png",
+      "sha256": "a8bc1e90444da15fe22d949cfbe13c3709623c2e5d0e4563b596385d35db3682",
+      "width": 768,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "冷页恢复显示“上次提交结果尚未确认，原输入已保留”，核对原提交/重新读取资料两按钮完整；原项目、签工负责人、零星签工班组、2026/10/03、08:00–12:00、半工0.5工与原长施工正文清楚。两列表单齐整，证明人及确认日期空值可见；备注与底部操作折在画面以下。",
+      "limitations": "首屏截图不能覆盖页面下部备注、保存操作及滚动可达性，需关联后续底部证据；截图本身不证明原命令ID与请求幂等。",
+      "coverageReference": {
+        "evidence": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-768.png",
+        "scope": "同旅程下半页原输入/证明/备注及禁用底部按钮",
+        "reviewedHere": true
+      }
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1024.png",
+      "name": "daywork-unknown-keeps-input-1024.png",
+      "sha256": "cdc4a1d2ab4e81ea89dc8ed40c30c0308771f03c81d4e6573224b3c9ce6b229c",
+      "width": 1024,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "失响应后保留2026/10/03、08:00–12:00、半工0.5工及原施工长正文，证明人/日期/备注仍为空，字段说明完整。两列表单与空备注完整，底部返回/保存待确认/保存并确认按钮呈禁用状态且完整可见。顶部pending提示因纵向滚动在折上，已由同宽cold-original-pending图覆盖。",
+      "limitations": "本图不单独证明顶部pending提示，参见同旅程cold-original-pending；静态图不能证明同键不重写。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1280.png",
+      "name": "daywork-unknown-keeps-input-1280.png",
+      "sha256": "5750d7e4d56274e4613d483a53e8b9ebfd2fd6749a3caa98685ac7cb0786bfb2",
+      "width": 1280,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "失响应后保留2026/10/03、08:00–12:00、半工0.5工及原施工长正文，证明人/日期/备注仍为空，字段说明完整。两列表单与空备注完整，底部返回/保存待确认/保存并确认按钮呈禁用状态且完整可见。顶部pending提示因纵向滚动在折上，已由同宽cold-original-pending图覆盖。",
+      "limitations": "本图不单独证明顶部pending提示，参见同旅程cold-original-pending；静态图不能证明同键不重写。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-1440.png",
+      "name": "daywork-unknown-keeps-input-1440.png",
+      "sha256": "218e1fae14ce9102d80de2976100151c08a3c0e90a560ad8443f07c6cde1f7ee",
+      "width": 1440,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "失响应后保留2026/10/03、08:00–12:00、半工0.5工及原施工长正文，证明人/日期/备注仍为空，字段说明完整。两列表单与空备注完整，底部返回/保存待确认/保存并确认按钮呈禁用状态且完整可见。顶部pending提示因纵向滚动在折上，已由同宽cold-original-pending图覆盖。",
+      "limitations": "本图不单独证明顶部pending提示，参见同旅程cold-original-pending；静态图不能证明同键不重写。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-390.png",
+      "name": "daywork-unknown-keeps-input-390.png",
+      "sha256": "e3370658f4b7bf233f3731c051a301ca71935720597a5b313fc66cd6b3664481",
+      "width": 390,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "失响应后保留2026/10/03、08:00–12:00、半工0.5工及原施工长正文，证明人/日期/备注仍为空，字段说明完整。单列正文与证明区无横向溢出；画面底部只见按钮上沿，操作标签未入图。",
+      "limitations": "同宽cold-original-pending首屏与本图共同覆盖提示、原输入、证明区，但两图仍未覆盖底部操作标签，需补滚动到底图或关联最终同页底部证据。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-新签工失响应后冷页按原编号保存一次，日期和正文不丢失-chromium\\daywork-unknown-keeps-input-768.png",
+      "name": "daywork-unknown-keeps-input-768.png",
+      "sha256": "ee44831960b24d17be46c30178e3932dd996d2c84171d72361f37c4b2177c242",
+      "width": 768,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "失响应后保留2026/10/03、08:00–12:00、半工0.5工及原施工长正文，证明人/日期/备注仍为空，字段说明完整。两列表单与空备注完整，底部返回/保存待确认/保存并确认按钮呈禁用状态且完整可见。顶部pending提示因纵向滚动在折上，已由同宽cold-original-pending图覆盖。",
+      "limitations": "本图不单独证明顶部pending提示，参见同旅程cold-original-pending；静态图不能证明同键不重写。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-1024.png",
+      "name": "daywork-original-ack-after-later-change-1024.png",
+      "sha256": "0ee88417c6d311ee42a9ad0b677c9e12fbaa8f64ac9925d4229a5879b592a26f",
+      "width": 1024,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "原提交已完成但记录随后更新提示清楚，当前原记录摘要为签工负责人、2026-11-04，原表单仍是2026/11/03、08:00–12:00和半工0.5工；重新读取资料与查看当前原记录入口完整。原施工正文“本窗口原提交的施工内容”完整，证明区仅标题入镜。当前原记录details保持收起。",
+      "limitations": "未展开“查看当前原记录”，故不能据此验当前正文/证明等详情可读；需补/关联展开后图。底部证明与操作未入镜，不据首屏作全页通过。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-1280.png",
+      "name": "daywork-original-ack-after-later-change-1280.png",
+      "sha256": "69bae98d97b7f38465038fac32c141cbcbfe577e4b452f04759291acb69e9580",
+      "width": 1280,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "原提交已完成但记录随后更新提示清楚，当前原记录摘要为签工负责人、2026-11-04，原表单仍是2026/11/03、08:00–12:00和半工0.5工；重新读取资料与查看当前原记录入口完整。原施工正文“本窗口原提交的施工内容”完整，证明区仅标题入镜。当前原记录details保持收起。",
+      "limitations": "未展开“查看当前原记录”，故不能据此验当前正文/证明等详情可读；需补/关联展开后图。底部证明与操作未入镜，不据首屏作全页通过。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-1440.png",
+      "name": "daywork-original-ack-after-later-change-1440.png",
+      "sha256": "c3c01c2cea3343febb6237959e277c3b5585f4a0af51f69b25c499808cbc38c3",
+      "width": 1440,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "原提交已完成但记录随后更新提示清楚，当前原记录摘要为签工负责人、2026-11-04，原表单仍是2026/11/03、08:00–12:00和半工0.5工；重新读取资料与查看当前原记录入口完整。原施工正文“本窗口原提交的施工内容”完整，证明区仅标题入镜。当前原记录details保持收起。",
+      "limitations": "未展开“查看当前原记录”，故不能据此验当前正文/证明等详情可读；需补/关联展开后图。底部证明与操作未入镜，不据首屏作全页通过。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-390.png",
+      "name": "daywork-original-ack-after-later-change-390.png",
+      "sha256": "7d1cbc7a874247a982e871e5b4bb1109205cf2d63672369925582b6f3764cb71",
+      "width": 390,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "原提交已完成但记录随后更新提示清楚，当前原记录摘要为签工负责人、2026-11-04，原表单仍是2026/11/03、08:00–12:00和半工0.5工；重新读取资料与查看当前原记录入口完整。提示多行、单列控件无可见根横溢；原施工正文和证明区折在画面以下。当前原记录details保持收起。",
+      "limitations": "未展开“查看当前原记录”，故不能据此验当前正文/证明等详情可读；需补/关联展开后图。底部证明与操作未入镜，不据首屏作全页通过。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-original-ack-after-later-change-768.png",
+      "name": "daywork-original-ack-after-later-change-768.png",
+      "sha256": "dc2c913383597264b018d3aebc2ec39046f7725273229fe5234a8245fd9b79b4",
+      "width": 768,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "原提交已完成但记录随后更新提示清楚，当前原记录摘要为签工负责人、2026-11-04，原表单仍是2026/11/03、08:00–12:00和半工0.5工；重新读取资料与查看当前原记录入口完整。原施工正文“本窗口原提交的施工内容”完整，证明区仅标题入镜。当前原记录details保持收起。",
+      "limitations": "未展开“查看当前原记录”，故不能据此验当前正文/证明等详情可读；需补/关联展开后图。底部证明与操作未入镜，不据首屏作全页通过。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-1024.png",
+      "name": "daywork-success-read-failure-1024.png",
+      "sha256": "a218430447dd205d26002e6362dfed63658711317739345d667123361e0b7371",
+      "width": 1024,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "保存成功但后读失败后的原输入仍可辨：2026/11/03、08:00–12:00、半工0.5工、“本窗口原提交的施工内容”；证明人、确认日期、备注为空，原记录与诊断收起。返回/保存待确认/保存并确认禁用按钮完整，表单区宽度正常。因画面已纵向下滚，顶部结果提示未入镜。",
+      "limitations": "本图不能证明后读失败时顶部结果/恢复提示的可读性，后续ack提示是不同状态不可替代；需关联或补失败状态首屏。 静态图不证明失读时原命令保留。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-1280.png",
+      "name": "daywork-success-read-failure-1280.png",
+      "sha256": "3e555bf7d638a6c4f9cd12f43d57a3f5e16167ad1f8ca64141d4078ae8566933",
+      "width": 1280,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "保存成功但后读失败后的原输入仍可辨：2026/11/03、08:00–12:00、半工0.5工、“本窗口原提交的施工内容”；证明人、确认日期、备注为空，原记录与诊断收起。返回/保存待确认/保存并确认禁用按钮完整，表单区宽度正常。因画面已纵向下滚，顶部结果提示未入镜。",
+      "limitations": "本图不能证明后读失败时顶部结果/恢复提示的可读性，后续ack提示是不同状态不可替代；需关联或补失败状态首屏。 静态图不证明失读时原命令保留。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-1440.png",
+      "name": "daywork-success-read-failure-1440.png",
+      "sha256": "401ffb12fe2b0d2e96cb571bd63cb8a611980af45dfda90848ec30f326d834bf",
+      "width": 1440,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "保存成功但后读失败后的原输入仍可辨：2026/11/03、08:00–12:00、半工0.5工、“本窗口原提交的施工内容”；证明人、确认日期、备注为空，原记录与诊断收起。返回/保存待确认/保存并确认禁用按钮完整，表单区宽度正常。因画面已纵向下滚，顶部结果提示未入镜。",
+      "limitations": "本图不能证明后读失败时顶部结果/恢复提示的可读性，后续ack提示是不同状态不可替代；需关联或补失败状态首屏。 静态图不证明失读时原命令保留。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-390.png",
+      "name": "daywork-success-read-failure-390.png",
+      "sha256": "41b77c96af69edb567a0c4617e9ef47793d6ceaa2a958c78f69c82325380df54",
+      "width": 390,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "保存成功但后读失败后的原输入仍可辨：2026/11/03、08:00–12:00、半工0.5工、“本窗口原提交的施工内容”；证明人、确认日期、备注为空，原记录与诊断收起。单列原内容和证明说明无横溢，底部按钮只有上沿，标签未入镜。因画面已纵向下滚，顶部结果提示未入镜。",
+      "limitations": "本图不能证明后读失败时顶部结果/恢复提示的可读性，后续ack提示是不同状态不可替代；需关联或补失败状态首屏。 390底部操作仍未入镜，需关联/补底部。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入-chromium\\daywork-success-read-failure-768.png",
+      "name": "daywork-success-read-failure-768.png",
+      "sha256": "5ce232a85406ed71fdc2b6271ea68e6f4493ead18cb5f3b47714020304f85130",
+      "width": 768,
+      "status": "pass-with-coverage-gap",
+      "inspection": "view_image original",
+      "notes": "保存成功但后读失败后的原输入仍可辨：2026/11/03、08:00–12:00、半工0.5工、“本窗口原提交的施工内容”；证明人、确认日期、备注为空，原记录与诊断收起。返回/保存待确认/保存并确认禁用按钮完整，表单区宽度正常。因画面已纵向下滚，顶部结果提示未入镜。",
+      "limitations": "本图不能证明后读失败时顶部结果/恢复提示的可读性，后续ack提示是不同状态不可替代；需关联或补失败状态首屏。 静态图不证明失读时原命令保留。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-C2-主体配置保存失响应后冷页仍按原键核对，明确空规则保持为空-chromium\\c2-config-cold-original-pending-1024.png",
+      "name": "c2-config-cold-original-pending-1024.png",
+      "sha256": "662d9ca1149c1df79262e0a9ebd4bce8877060c8058a81fb1bfc77f1fe7d9a0f",
+      "width": 1024,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "C2主体配置冷页原提交待核提示、核对原提交与重新读取资料完整；项目名称、签工负责人、零星签工班组可读；原配置360元/工有效、输入360，确认规则文本框明确为空；规则随发放冻结且不自动罚扣的说明完整，返回/保存主体配置禁用操作入镜。两列主体、单列配置输入，留白及卡片根边界正常。无浮层遮挡。",
+      "limitations": "原命令ID及明确空值的往返语义仍依赖本旅程行为/HTTP断言，静态截图只验证显示。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-C2-主体配置保存失响应后冷页仍按原键核对，明确空规则保持为空-chromium\\c2-config-cold-original-pending-1280.png",
+      "name": "c2-config-cold-original-pending-1280.png",
+      "sha256": "7f43cdfa99751839ef4f5539575653587799f91eb88a32739d955cdc37648e6f",
+      "width": 1280,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "C2主体配置冷页原提交待核提示、核对原提交与重新读取资料完整；项目名称、签工负责人、零星签工班组可读；原配置360元/工有效、输入360，确认规则文本框明确为空；规则随发放冻结且不自动罚扣的说明完整，返回/保存主体配置禁用操作入镜。两列主体、单列配置输入，留白及卡片根边界正常。无浮层遮挡。",
+      "limitations": "原命令ID及明确空值的往返语义仍依赖本旅程行为/HTTP断言，静态截图只验证显示。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-C2-主体配置保存失响应后冷页仍按原键核对，明确空规则保持为空-chromium\\c2-config-cold-original-pending-1440.png",
+      "name": "c2-config-cold-original-pending-1440.png",
+      "sha256": "00bf9cf657e9b0891e5326dc76627024dbb00f098d694b44f26546979a12f712",
+      "width": 1440,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "C2主体配置冷页原提交待核提示、核对原提交与重新读取资料完整；项目名称、签工负责人、零星签工班组可读；原配置360元/工有效、输入360，确认规则文本框明确为空；规则随发放冻结且不自动罚扣的说明完整，返回/保存主体配置禁用操作入镜。两列主体、单列配置输入，留白及卡片根边界正常。无浮层遮挡。",
+      "limitations": "原命令ID及明确空值的往返语义仍依赖本旅程行为/HTTP断言，静态截图只验证显示。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-C2-主体配置保存失响应后冷页仍按原键核对，明确空规则保持为空-chromium\\c2-config-cold-original-pending-390.png",
+      "name": "c2-config-cold-original-pending-390.png",
+      "sha256": "7b5b25cb7b3fac036aff3ac9f3345f6c800cc8b8dd0efb1146c85293d5ba0f81",
+      "width": 390,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "C2主体配置冷页原提交待核提示、核对原提交与重新读取资料完整；项目名称、签工负责人、零星签工班组可读；原配置360元/工有效、输入360，确认规则文本框明确为空；规则随发放冻结且不自动罚扣的说明完整，返回/保存主体配置禁用操作入镜。单列布局，长项目名称在卡片边界内，提示与规则说明自然换行，底部按钮完整无贴边裁切。无浮层遮挡。",
+      "limitations": "原命令ID及明确空值的往返语义仍依赖本旅程行为/HTTP断言，静态截图只验证显示。"
+    },
+    {
+      "path": "D:\\crm本地项目开发\\.tmp\\remaining-issues-20260910\\payroll-c2-central\\browser-final\\payroll-c2-recovery-C2-主体配置保存失响应后冷页仍按原键核对，明确空规则保持为空-chromium\\c2-config-cold-original-pending-768.png",
+      "name": "c2-config-cold-original-pending-768.png",
+      "sha256": "3bbaf09608fc58e770437f8b5e5519b23730ce688c2a1e57994761d4e384cc81",
+      "width": 768,
+      "status": "pass",
+      "inspection": "view_image original",
+      "notes": "C2主体配置冷页原提交待核提示、核对原提交与重新读取资料完整；项目名称、签工负责人、零星签工班组可读；原配置360元/工有效、输入360，确认规则文本框明确为空；规则随发放冻结且不自动罚扣的说明完整，返回/保存主体配置禁用操作入镜。两列主体、单列配置输入，留白及卡片根边界正常。无浮层遮挡。",
+      "limitations": "原命令ID及明确空值的往返语义仍依赖本旅程行为/HTTP断言，静态截图只验证显示。"
+    }
+  ]
+}

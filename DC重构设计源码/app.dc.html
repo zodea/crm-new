@@ -46,7 +46,6 @@
     <header style="position:sticky; top:0; z-index:20; height:64px; background:rgba(255,255,255,0.96); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 24px; flex:none; gap:12px;">
       <div>
         <div style="font-size:18px; font-weight:800; line-height:1.2;">{{ pageTitle }}</div>
-        <div style="font-size:12px; color:var(--ink-soft); margin-top:2px; min-height:16px;">{{ pageSubtitle }}</div>
       </div>
       <div style="margin-left:auto; font-size:12px; color:var(--ink-soft);">{{ today }}</div>
     </header>
@@ -75,6 +74,12 @@
       </sc-if>
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="EntityListPreload" from="./kit/EntityListScreen.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="StdListPreload" from="./kit/StdListScreen.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ProjectArchiveExportPreload" from="./kit/ProjectArchiveExport.jsx" hint-size="0,0"></x-import>
       </sc-if>
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="DetailShellPreload" from="./kit/DetailShell.jsx" hint-size="0,0"></x-import>
@@ -345,16 +350,16 @@ const PAGE = {
   conContract:   { title: "施工合同",  subtitle: "主合同管理 · 收入合同 · 四级对账" },
   subContract:   { title: "分包合同",  subtitle: "分包及人工 · 劳务 / 专业分包" },
   matContract:   { title: "材料采购合同", subtitle: "乙供材管理 · 采购合同台账" },
-  matRequisition:{ title: "下料单",      subtitle: "乙供材管理 · 要料计划 · 未完全到货" },
-  matArrival:    { title: "材料到货",    subtitle: "乙供材管理 · 入库 · 关联合同/仓库" },
-  matUse:        { title: "材料领用",    subtitle: "乙供材管理 · 出库 · 项目/仓库/用途" },
+  matRequisition:{ title: "下料单",      subtitle: "乙供材管理 · 要料计划 · 已到量由到货派生" },
+  matArrival:    { title: "材料到货",    subtitle: "乙供材管理 · 入库事实 · 明细行聚合" },
+  matUse:        { title: "材料领用",    subtitle: "乙供材管理 · 出库事实 · 校验可用库存" },
   matSettle:     { title: "材料采购结算", subtitle: "乙供材管理 · 采购合同结算台账" },
-  stockCheck:    { title: "库存盘点",    subtitle: "乙供材管理 · 仓库盘点 · 盈亏生效" },
-  omTotal:       { title: "甲供材总控量", subtitle: "甲供材管理 · 总控/到货/领用/剩余" },
-  omRequisition: { title: "甲供材下料单", subtitle: "甲供材管理 · 要料计划" },
-  omArrival:     { title: "甲供材到货",  subtitle: "甲供材管理 · 入库" },
-  omUse:         { title: "甲供材领用",  subtitle: "甲供材管理 · 出库" },
-  omDirect:      { title: "甲供材直入直出", subtitle: "甲供材管理 · 不入库直用" },
+  stockCheck:    { title: "库存盘点",    subtitle: "乙供材管理 · 账面量实时读取 · 生效盘点差入库存" },
+  omTotal:       { title: "甲供材总控量", subtitle: "甲供材管理 · 总控/到货/领用三量对账" },
+  omRequisition: { title: "甲供材下料单", subtitle: "甲供材管理 · 向甲方要料" },
+  omArrival:     { title: "甲供材到货",  subtitle: "甲供材管理 · 入库 · 不得超总控量" },
+  omUse:         { title: "甲供材领用",  subtitle: "甲供材管理 · 出库 · 校验库存与总控余量" },
+  omDirect:      { title: "甲供材直入直出", subtitle: "甲供材管理 · 不入库直供直用" },
   deliveryArchive:{ title: "送货单归档库", subtitle: "乙供材管理 · 项目→分供方 · 改归属" },
   companyExp:    { title: "公司支出合同", subtitle: "项目其他合同 · 房租/软件 · 连费用报销" },
   otherExp:      { title: "其他支出合同", subtitle: "项目其他合同 · 机械租赁/检测等杂项" },
@@ -381,7 +386,7 @@ const PAGE = {
   quantityUnit:  { title: "户详情", subtitle: "房间级三量 · 完成勾选 · 验收照片" },
   payroll:       { title: "工资核算",  subtitle: "项目 → 班组瀑布 → 请款簿总表（负责人制）" },
   payrollDetail: { title: "请款簿",  subtitle: "核对两步流 · A4 单据（格式族 A/B/C1/C2）" },
-  price:         { title: "单价对比",  subtitle: "材料价格分析" },
+  price:         { title: "材料价格分析",  subtitle: "价差 / 比价 / 趋势 / 项目四维分析" },
   // #244 设计稿回填：以下 7 屏对应实现已上线、设计稿此前无落点的生产路由
   processLibrary:{ title: "标准工序库", subtitle: "分包及人工 · 不可变版本 · 建组冻结快照" },
   scheduleBind:  { title: "绑定施工合同", subtitle: "暂估排程复核 · 楼栋覆盖 / 分项映射 / 数量差异" },
@@ -392,12 +397,14 @@ const PAGE = {
   projectSupplierImport: { title: "导入合作分供方", subtitle: "自动分类 · 人工确认新建 · 重复关系跳过" },
 };
 
+const INITIAL_DESIGN_PROTOTYPE = new URLSearchParams(window.location.search).get("prototype") === "delivery-review";
+
 class Component extends DCLogic {
   state = {
-    route: "home",
+    route: INITIAL_DESIGN_PROTOTYPE ? "delivery" : "home",
     params: {},
-    tabs: [{ id: "home", route: "home", params: {}, title: "首页" }],
-    activeId: "home",
+    tabs: INITIAL_DESIGN_PROTOTYPE ? [{ id: "delivery", route: "delivery", params: {}, title: "送货单识别" }] : [{ id: "home", route: "home", params: {}, title: "首页" }],
+    activeId: INITIAL_DESIGN_PROTOTYPE ? "delivery" : "home",
     collapsed: false,
     // 侧栏结构 = 1 个顶层项（首页）+ 9 个分组，共 50 个叶子（识别中心组已于 2026-07-09 退役，4 项迁回各域）。
     // openGroup = null 表示跟随当前路由所属分组（单开手风琴，见 _buildSidebar）。
@@ -632,7 +639,7 @@ class Component extends DCLogic {
         { key: "stockCheck", mark: "盘", label: "库存盘点", hint: "盘点生效" },
         { key: "delivery", mark: "送", label: "送货单识别", hint: "OCR 处理区" },
         { key: "deliveryArchive", mark: "档", label: "送货单归档库", hint: "项目→分供方" },
-        { key: "price", mark: "价", label: "单价对比", hint: "材料价格分析" },
+        { key: "price", mark: "价", label: "单价对比", hint: "价差/比价/趋势/项目" },
       ]},
       { type: "group", key: "g-owner-material", label: "甲供材管理", icon: "boxes", items: [
         { key: "omTotal", mark: "控", label: "甲供材总控量", hint: "总控/到货/领用" },
@@ -695,7 +702,7 @@ class Component extends DCLogic {
     const navItems = NAV.map(n => {
       if (n.type === "item") {
         return collapsed ? miniBtn(n) : React.createElement(NavItem, {
-          key: n.key, mark: n.mark, label: n.label, hint: n.hint,
+          key: n.key, mark: n.mark, label: n.label, hint: null,
           active: isActive(n.key), onClick: () => navigate(n.key)
         });
       }
@@ -717,7 +724,7 @@ class Component extends DCLogic {
           isOpen && React.createElement("div", {
             style: { display: "flex", flexDirection: "column", gap: 2, paddingLeft: 8, marginLeft: 8, borderLeft: "1px solid var(--line)" } },
             ...n.items.map(it => React.createElement(NavItem, {
-              key: it.key, mark: it.mark, label: it.label, hint: it.hint,
+              key: it.key, mark: it.mark, label: it.label, hint: null,
               active: isActive(it.key), onClick: () => navigate(it.key)
             }))
           )
@@ -756,10 +763,6 @@ class Component extends DCLogic {
           React.createElement(Icon, { name: collapsed ? "panel-left-open" : "panel-left-close", size: 16 }),
           !collapsed && React.createElement("span", null, "收起侧栏")
         ),
-        !collapsed && React.createElement("div", { style: { paddingTop: 12, fontSize: 11, color: "var(--ink-soft)", lineHeight: 1.7 } },
-          React.createElement("div", null, "本地工具 · 数据不上传"),
-          React.createElement("div", null, "设计稿运行态 · 非生产构建")
-        )
       )
     );
   }

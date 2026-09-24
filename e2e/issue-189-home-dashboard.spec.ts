@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+})
+
 test('Issue #189：首页默认工作台只展示真实排程并保持项目、分组与下钻入口可达', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 900 })
   await page.goto('/?project=proj_demo_001')
@@ -14,14 +18,16 @@ test('Issue #189：首页默认工作台只展示真实排程并保持项目、�
     window.history.pushState({}, '', '/?project=project-missing&group=stale-group&task=stale-task')
     window.dispatchEvent(new PopStateEvent('popstate'))
   })
-  await expect(page).toHaveURL('/?project=proj_demo_001')
+  await expect(page.getByRole('alert', { name: '首页施工进度加载失败' })).toBeVisible()
+  await expect(page).toHaveURL(/project=project-missing/)
+  await page.goto('/?project=proj_demo_001&origin=demo')
 
-  const group = page.getByRole('button', { name: /户内1栋-2栋/ })
+  const expandedGroup = page.getByRole('button', { name: '折叠分组：户内1栋-2栋' })
   const task = page.getByRole('button', { name: /卫生间回填及防水/ }).first()
   await expect(task).toBeVisible()
-  await group.click()
+  await expandedGroup.click()
   await expect(task).toBeHidden()
-  await group.click()
+  await page.getByRole('button', { name: '展开分组：户内1栋-2栋' }).click()
   await expect(task).toBeVisible()
 
   const widths = await page.evaluate(() => ({

@@ -1,6 +1,7 @@
 import type { OwnerDocumentListRecord } from '~/lib/owner-document/forms'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ownerCommercialDocumentProblem, OwnerCommercialDocumentRepositoryProblem } from '~/lib/owner-document/central-repository'
 import { useOwnerDocumentStore } from '~/stores/owner-document'
 
 const ownerDocumentStoreMocks = vi.hoisted(() => ({
@@ -86,5 +87,52 @@ describe('owner document store list state', () => {
     ).resolves.toEqual(ownerDocumentStoreMocks.saveResult)
     expect(store.listError('acceptance')).toBe('模拟列表刷新失败')
     expect(store.loading).toBe(false)
+  })
+
+  it.each(['forbidden', 'not-found', 'relationship-mismatch'] as const)('%s 后重试不能再次露出上次列表', async (code) => {
+    const store = useOwnerDocumentStore()
+    ownerDocumentStoreMocks.listResponses.push(async () => [row('restricted')])
+    await store.loadKind('owner_change')
+    ownerDocumentStoreMocks.listResponses.push(async () => {
+      throw new OwnerCommercialDocumentRepositoryProblem(ownerCommercialDocumentProblem(code, '来源不可读取'))
+    })
+    await expect(store.loadKind('owner_change')).rejects.toThrow('来源不可读取')
+    expect(store.recordsFor('owner_change')).toEqual([])
+    expect(store.records.owner_change).toBeUndefined()
+
+    let complete!: (rows: OwnerDocumentListRecord[]) => void
+    ownerDocumentStoreMocks.listResponses.push(() => new Promise(resolve => complete = resolve))
+    const retry = store.loadKind('owner_change')
+    expect(store.listError('owner_change')).toBe('')
+    expect(store.recordsFor('owner_change')).toEqual([])
+    complete([])
+    await retry
+    expect(store.hasListSnapshot('owner_change')).toBe(true)
+  })
+
+  it('同视图普通错误保留快照，验收与保修切换清空且仅最新请求可发布', async () => {
+    const store = useOwnerDocumentStore()
+    const query = (variant: 'acceptance' | 'warranty') => ({ search: '', projectId: null, contractId: null, status: null, documentType: null, variant, page: 1, pageSize: 20 as const })
+    ownerDocumentStoreMocks.listResponses.push(async () => [row('accepted')])
+    await store.loadKind('acceptance', query('acceptance'))
+    ownerDocumentStoreMocks.listResponses.push(async () => {
+      throw new Error('暂时离线')
+    })
+    await expect(store.loadKind('acceptance', query('acceptance'))).rejects.toThrow('暂时离线')
+    expect(store.recordsFor('acceptance').map(item => item.id)).toEqual(['accepted'])
+
+    let failOld!: (cause: Error) => void
+    ownerDocumentStoreMocks.listResponses.push(() => new Promise((_resolve, reject) => failOld = reject))
+    const oldLoad = store.loadKind('acceptance', query('warranty'))
+    const oldResult = expect(oldLoad).rejects.toThrow('旧请求权限错误')
+    expect(store.recordsFor('acceptance')).toEqual([])
+    expect(store.hasListSnapshot('acceptance', 'warranty')).toBe(false)
+    ownerDocumentStoreMocks.listResponses.push(async () => [])
+    await store.loadKind('acceptance', query('acceptance'))
+    failOld(new OwnerCommercialDocumentRepositoryProblem(ownerCommercialDocumentProblem('forbidden', '旧请求权限错误')))
+    await oldResult
+    expect(store.hasListSnapshot('acceptance', 'acceptance')).toBe(true)
+    expect(store.hasListSnapshot('acceptance', 'warranty')).toBe(false)
+    expect(store.listError('acceptance')).toBe('')
   })
 })

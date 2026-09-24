@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { ImportRunResult } from '~/composables/useImportRunner'
+import type { ImportRowRejection, ImportRunResult } from '~/composables/useImportRunner'
 import type { ImportColumnMatch, ImportStepId } from '~/lib/kit/import-mapping'
 import type { RawImportSheet } from '~/lib/util/excel'
 import { Button } from '~/components/ui/button'
+import { annotateInvoiceImportRows, getInvoiceImportSourceMeta } from '~/lib/invoice/excel'
 import { getImportEntity } from '~/lib/kit/import-entities'
 import {
   autoMatchColumns,
@@ -30,6 +31,9 @@ const mapping = shallowRef<Readonly<Record<string, ImportColumnMatch>>>({})
 const excludedRows = shallowRef<ReadonlySet<number>>(new Set())
 const runner = useImportRunner()
 const { done, error, phase, total } = runner
+const { exportFile } = useKitUI()
+const rowNumbers = new WeakMap<Record<string, unknown>, number>()
+const invoiceStore = useInvoiceStore()
 
 const steps = computed(() => importStepperSteps({
   currentStep: currentStep.value,
@@ -37,7 +41,10 @@ const steps = computed(() => importStepperSteps({
 }))
 const fieldStatus = computed(() => computeFieldStatus(mapping.value, fields))
 const missingRequired = computed(() => listMissingRequiredFields(mapping.value, fields))
-const allRows = computed(() => buildImportRows(mapping.value, sheet.value?.rows ?? []))
+const mappedRows = computed(() => buildImportRows(mapping.value, sheet.value?.rows ?? []))
+const allRows = computed(() => entityKey === 'invoice'
+  ? annotateInvoiceImportRows(mappedRows.value, invoiceStore.list.map(invoice => invoice.invoiceNumber))
+  : mappedRows.value)
 const keptEntries = computed(() => allRows.value
   .map((row, index) => ({ index, row }))
   .filter(entry => !excludedRows.value.has(entry.index)))
@@ -101,6 +108,10 @@ async function closeImportTab() {
 
 async function settle(result: ImportRunResult) {
   if (result.status === 'completed') {
+    if (result.rejected?.length) {
+      toast.warning(`已处理 ${done.value} 行，${result.rejected.length} 行被拒绝：${entity!.label}`)
+      return
+    }
     toast.success(`已导入 ${done.value} 行：${entity!.label}`)
     await closeImportTab()
   }
@@ -109,13 +120,69 @@ async function settle(result: ImportRunResult) {
 async function startImport() {
   if (!entity || phase.value === 'running' || !keptEntries.value.length)
     return
-  await settle(await runner.start(keptEntries.value.map(entry => entry.row), entity.importRow))
+  for (const entry of keptEntries.value)
+    rowNumbers.set(entry.row, entry.index + 2)
+  await settle(await runner.start(
+    keptEntries.value.map(entry => entry.row),
+    entity.importRow,
+    entity.validateRow,
+  ))
 }
 
 async function retryImport() {
   if (phase.value === 'running')
     return
   await settle(await runner.retry())
+}
+
+function rejectionRowNumber(rejection: ImportRowRejection): number {
+  const sourceRow = getInvoiceImportSourceMeta(rejection.row)?.sourceRow
+  if (entityKey === 'invoice' && sourceRow)
+    return sourceRow
+  return rowNumbers.get(rejection.row) ?? rejection.index + 2
+}
+
+function rejectionKey(rejection: ImportRowRejection): string {
+  const row = rejection.row
+  return String(row.invoiceNumber ?? row.orderNo ?? row.name ?? row.externalRef ?? '—')
+}
+
+function csvCell(value: unknown): string {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`
+}
+
+async function downloadRejections() {
+  if (!runner.rejected.value.length)
+    return
+  const originalKeys = [...new Set(runner.rejected.value.flatMap(rejection => Object.keys(rejection.row)))]
+  const invoiceRejectionColumns = entityKey === 'invoice'
+    ? ['来源文件', '来源Sheet', '来源原始行', '来源键', '复核原因']
+    : []
+  const lines = [
+    ['原始行号', '关键值', '拒绝原因', ...invoiceRejectionColumns, ...originalKeys].map(csvCell).join(','),
+    ...runner.rejected.value.map(rejection => [
+      rejectionRowNumber(rejection),
+      rejectionKey(rejection),
+      rejection.reason,
+      ...(entityKey === 'invoice'
+        ? (() => {
+            const source = getInvoiceImportSourceMeta(rejection.row)
+            return [source?.sourceFileName ?? '', source?.sourceSheet ?? '', source?.sourceRow ?? '', source?.sourceKey ?? '', source?.reviewReasons.join('；') ?? '']
+          })()
+        : []),
+      ...originalKeys.map(key => rejection.row[key]),
+    ].map(csvCell).join(',')),
+  ]
+  try {
+    await exportFile({
+      data: `\ufeff${lines.join('\r\n')}`,
+      defaultName: `${entity?.label ?? '导入'}_拒绝清单.csv`,
+      mimeType: 'text/csv;charset=utf-8',
+    })
+  }
+  catch (cause) {
+    toast.error(cause instanceof Error ? `拒绝清单下载失败：${cause.message}` : '拒绝清单下载失败')
+  }
 }
 
 // 页签被 X 关闭/卸载时停止后台入库：当前行完成后不再推进，
@@ -126,7 +193,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="mx-auto max-w-4xl py-3" aria-labelledby="import-mapping-title">
+  <ProjectImportScreen v-if="entityKey === 'project'" />
+  <main v-else class="mx-auto max-w-4xl py-3" aria-labelledby="import-mapping-title">
     <template v-if="entity">
       <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -149,7 +217,8 @@ onUnmounted(() => {
       </div>
 
       <section v-if="currentStep === 'upload'" aria-label="第一步：上传">
-        <ImportUploadStep @loaded="onLoaded" />
+        <InvoiceWorkbookUploadStep v-if="entityKey === 'invoice'" @loaded="onLoaded" />
+        <ImportUploadStep v-else @loaded="onLoaded" />
         <div class="mt-4 flex justify-end">
           <Button variant="ghost" @click="closeImportTab">
             取消
@@ -218,6 +287,56 @@ onUnmounted(() => {
             :valuetext="`已导入 ${done}/${total} 行`"
           />
         </div>
+
+        <section
+          v-if="runner.rejected.value.length"
+          class="mt-4 border border-warn/35 rounded-[var(--radius-card)] bg-warn-soft p-3"
+          aria-label="行级拒绝清单"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="text-13px text-warn-ink font-800">
+                {{ runner.rejected.value.length }} 行未导入
+              </h2>
+              <p class="mt-1 text-11px text-ink-soft">
+                可预期的业务问题按行拒绝，其余行已经继续处理；修正原文件后可重新导入。
+              </p>
+            </div>
+            <button type="button" class="btn-secondary" @click="downloadRejections">
+              <span class="i-lucide-download mr-1" aria-hidden="true" />下载拒绝清单
+            </button>
+          </div>
+          <div class="mt-3 max-h-52 overflow-auto border border-warn/25 rounded-[var(--radius-btn)] bg-panel">
+            <table class="w-full border-collapse text-11px">
+              <thead class="sticky top-0 bg-surface-2 text-left text-ink-soft">
+                <tr>
+                  <th class="px-3 py-2 font-700">
+                    原始行
+                  </th>
+                  <th class="px-3 py-2 font-700">
+                    关键值
+                  </th>
+                  <th class="px-3 py-2 font-700">
+                    拒绝原因
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="rejection in runner.rejected.value" :key="`${rejection.index}-${rejection.reason}`" class="border-t border-line">
+                  <td class="px-3 py-2 font-mono tabular-nums">
+                    {{ rejectionRowNumber(rejection) }}
+                  </td>
+                  <td class="max-w-52 truncate px-3 py-2" :title="rejectionKey(rejection)">
+                    {{ rejectionKey(rejection) }}
+                  </td>
+                  <td class="px-3 py-2 text-warn-ink">
+                    {{ rejection.reason }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         <div
           v-if="phase === 'failed'"

@@ -6,7 +6,7 @@
 >
 > 关联：[`base-supplier.md`](./base-supplier.md) · [`contract-forms.md`](./contract-forms.md) · [`finance-payment.md`](./finance-payment.md) · [`finance-invoice.md`](./finance-invoice.md)
 >
-> 数据权威：[`DATABASE.md`](../DATABASE.md) · [`CONTEXT.md`](../../../CONTEXT.md) · [ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md)
+> 数据权威：[`DATABASE.md`](../DATABASE.md) · [`COMMANDS.md`](../COMMANDS.md) · [`CONTEXT.md`](../../../CONTEXT.md) · [ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md) · [ADR 0020](../../adr/0020-browser-authority-and-demo-workspace-boundary.md)
 
 ---
 
@@ -20,40 +20,30 @@
 | **ProjectSupplier** | **项目维度合作状态、真实事实汇总、源单穿透、合作文件** | **`/project/:pid/supplier/:sid`** |
 | 支出合同 | 分包、材采、其他支出合同及附件 | `/contract/:id` |
 | 付款申请 | 请款、结算/发票分摊和审批状态 | `/finance/payment/:id` |
-| 发票台账 | 收票原件、归档状态、含税金额和税额 | `/finance/invoice/:id` |
-| 支付记录 | 银行回单、人工确认和付款申请分摊 | `/finance/records/:id` |
-| 支出结算单 | 分包、材料或其他支出合同的过程/完工结算 | 见“来源穿透” |
+| 发票台账 | 收票原件、归档状态、含税金额和税额 | 事实可见；只读来源目标待接入 |
+| 支付记录 | 银行回单、人工确认和付款申请分摊 | 事实可见；只读来源目标待接入 |
+| 支出结算单 | 分包、材料或其他支出合同的过程/完工结算 | 分包已有专属只读目标；各来源接线按 #408 / #409 / #410 逐类型核实 |
 
-项目详情右栏列出已有 ProjectSupplier 关系，并提供“从文件导入分供方”入口。工作台内的项目名和分供方名分别返回项目详情和分供方详情。
+项目详情右栏直接消费中央项目详情 DTO 中的 ProjectSupplier 反向关系，列出已有合作身份并提供“从文件导入分供方”入口，不从本地 store 拼关系。工作台内的项目名和分供方名分别进入项目详情和分供方详情；目标刷新后仍可显式返回原工作台页签。
 
 ---
 
 ## 一、事实归属
 
-工作台是只读聚合层。除“项目×分供方合作终态结算确认”外，各业务对象仍由自己的模块维护。
+工作台是只读聚合层。#317 后浏览器页面只消费中央 `ProjectSupplierReadRepository`，各业务对象仍由自己的模块维护；合作终态结算写入规则未闭合，本页不提供写入口。
 
 | 工作台内容 | 唯一事实来源 | 汇总口径 |
 | --- | --- | --- |
-| 合同 | `contracts` + `contract_supplements` | 有效合同额 = 非草稿支出合同 `amount` + 该合同非草稿补充协议 `amount`；不得读取迁移兼容列 `contracts.changed/paid` |
+| 合同 | `contracts` + `contract_supplements` | 有效合同额 = 有效支出合同 `amount` + 该合同有效补充协议 `amount`；草稿、作废和无效合同不计入汇总，明细仍保留；不得读取迁移兼容列 `contracts.changed/paid` |
 | 请款 | `payment_applications` | 只把有效审批态的 `approved_amount` 计入已批请款；列表保留草稿、提交中等状态供追溯 |
 | 收票 | `invoices` | 列表按项目和分供方关联；汇总只计 `account_status='archived'` 的 `total_amount` 与 `tax_amount` |
 | 付款 | `payment_records` + `payment_record_application_allocations` + `payment_applications` | 只计已确认支付，并按分摊到当前项目×分供方付款申请的 `allocated_amount` 归属；不得把整张回单金额或手写实付副本直接归入 |
-| 支出结算 | `expenditure_settlements` | 只计有效确认态的 `total_amount`，保留合同、分供方和项目外键 |
+| 支出结算 | `expenditure_settlements` | 只计有效确认态 `confirmed/已确认` 的 `total_amount`，仅审批通过不等于确认；保留合同、分供方和项目外键 |
 | 合作文件 | `file_refs` | 按真实 owner 分组；向导导入文件固定挂 `owner_type='project_supplier'` |
 
 ### 实时摘要
 
-```ts
-interface ProjectSupplierWorkbenchSummary {
-  contractTotal: number // 有效合同额
-  claimedTotal: number // 有效审批态的批复金额
-  invoiceTotal: number // 已归档进项票含税金额
-  taxTotal: number // 已归档进项票税额
-  paidTotal: number // 已确认支付对当前关系的有效分摊
-  settlementTotal: number // 已确认支出结算单金额
-  balance: number // contractTotal - paidTotal
-}
-```
+摘要字段与定点金额类型以 [READ-MODELS.md](../READ-MODELS.md) 为准；本页不复制数值 DTO。
 
 这些字段是查询时聚合，不回写 ProjectSupplier，也不作为可编辑金额。
 
@@ -67,28 +57,19 @@ interface ProjectSupplierWorkbenchSummary {
 
 来源路由按单据类型区分：
 
-| 类型 | 详情/编辑路由 |
+| 类型 | 查看与编辑边界 |
 | --- | --- |
-| 分包结算 | `/subcontract/settlement/:id` |
-| 材料结算 | `/material/settlement/form/:id` |
-| 其他支出结算 | `/contract/other-settlement/form/:id` |
+| 分包结算 | `/subcontract/settlement/:id` 为专属只读详情；显式编辑另走表单 |
+| 材料结算 | `/material/settlement/form/:id` 是编辑页，不能当工作台只读来源目标；#409 核实详情接线 |
+| 其他支出结算 | `/contract/other-settlement/form/:id` 是编辑页；只读目标继承 #331 / [PR #417](https://github.com/zodea/crm-new/pull/417) 的已合并成果，由 #409 按选定基线核验，不以编辑页代替详情或重复建设 |
 
 ### 合作终态结算确认
 
 `settlements` 与 ProjectSupplier 1:1，只表示该合作关系最终关闭。它不参与付款申请—结算分摊，也不能替代 `expenditure_settlements`。
 
-```ts
-interface Settlement {
-  id: string
-  projectSupplierId: string
-  date: string
-  finalAmount: number
-  pdfFile: FileRef | null
-  note: string
-}
-```
+合作终态的字段与关系只在 [DATABASE.md](../DATABASE.md) 维护；多轮请款回退、终态金额与负尾差、未付款及确认 PDF 由 [#408](https://github.com/zodea/crm-new/issues/408) 承接尚未闭合的业务细节，旧补图不等于用户已确认。
 
-工作台必须把“支出结算单”列表和“合作终态结算确认”分区展示，禁止用一个“结算额”混合两者。
+工作台只展示“支出结算单”列表和汇总。合作终态结算仍保留为独立概念，但在多轮确认与写入规则闭合前不得显示可操作入口，禁止用一个“结算额”混合两者。
 
 ---
 
@@ -114,7 +95,7 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 
 ### 顶部摘要
 
-顶部显示返回项目、项目名、分供方名、合作状态，以及有效合同额、已批请款、已归档收票、已确认付款、支出结算额和应付余额。金额为零时显示数值但不伪造下钻；加载失败时显示错误和重试入口。
+顶部显示返回项目、项目名、分供方名、合作状态，以及有效合同额、已批请款、已归档收票、已确认付款、支出结算额和应付余额。真实零值正常显示，是否可下钻由同来源目标能力决定；已验证空集合可以进入，不能只按金额禁用或生成链接；加载失败时显示错误和重试入口。
 
 ### 业务页签
 
@@ -125,27 +106,37 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 | 请款 | 申请单号、名称、状态、申请金额、批复金额、申请日期、回票类型、附件数 | `payment_applications` |
 | 收票 | 发票号、日期、类型、含税金额、税额、归档状态 | `invoices` |
 | 付款 | 支付单号、日期、本关系分摊金额、方式、凭证、确认状态、关联请款 | 支付记录与有效分摊 |
-| 结算 | 支出结算单列表 + 合作终态结算确认 | `expenditure_settlements`、`settlements` |
+| 结算 | 支出结算单列表；终态结算写入明确待后续闭合 | `expenditure_settlements` |
 
 业务表格只在自身区域横向滚动。行级“查看源单”进入真实来源，不在工作台复制编辑表单。
 
 ### 来源穿透
 
-| 来源 | 当前可达路由 |
+| 来源 | 当前来源状态 |
 | --- | --- |
-| 合同 | `/contract/:id` |
-| 付款申请 | `/finance/payment/:id` |
-| 发票 | `/finance/invoice/:id` |
-| 支付记录 | `/finance/records/:id` |
-| 分包结算 | `/subcontract/settlement/:id` |
-| 材料结算 | `/material/settlement/form/:id` |
-| 其他支出结算 | `/contract/other-settlement/form/:id` |
+| 合同 | 演示来源可进入 `/contract/:id` 只读详情并返回 |
+| 付款申请 | 演示来源可进入 `/finance/payment/:id/detail` 只读详情并返回 |
+| 发票 | 现有 `/finance/invoice/:id` 读写混用，工作台保持 `unverified-target` |
+| 支付记录 | 现有 `/finance/records/:id` 读写混用，工作台保持 `unverified-target` |
+| 分包结算 | #328 已有专属中央只读详情；工作台的同来源能力、父关系与返回链仍须 #408 / #410 联验 |
+| 材料结算 | 现有 `/material/settlement/form/:id` 为编辑页，工作台保持 `unverified-target` |
+| 其他支出结算 | 现有 `/contract/other-settlement/form/:id` 为编辑页，工作台保持 `unverified-target` |
 
-现有新增表单不会统一读取 `projectId`、`supplierId` 查询参数，因此工作台不得宣称已自动预填。没有真实预填能力的入口只写“前往对应模块”，不能伪装成已带筛选的新建流程。收票新增继续进入 `/finance/invoice` 的上传识别工作台，不虚构 `/finance/invoice/new`。
+工作台页签使用 `?tab=overview|contract|claim|ticket|payment|settlement`，刷新与浏览器返回后恢复原页签。项目和分供方名称分别使用真实 ID 进入 `/project/:pid` 与 `/base/supplier/:sid`，并携带由双父 ID、`dataOrigin` 和当前页签组成的受限 `returnTo`；目标 ID 或来源错配时丢弃返回链。导入向导只允许正式项目，取消或完成后回到 canonical `/project/:pid?origin=real`。
+
+工作台只输出携带 `dataOrigin` 的 `NavigationIntentDTO`，唯一 Target Registry 验证稳定 ID、同来源只读目标与受限返回上下文。#317 的“仅演示合同/付款申请可达”是历史范围，不能据此把后来接入的中央目标一律禁用；#408 按当前目标能力逐类型核验。未通过者继续显示 `unverified-target`，不得回落编辑页或本地库。合法返回必须匹配项目、分供方、来源与页签，外部地址或身份错配丢弃。
 
 ### 文件区
 
-文件按“合作档案、合同、付款申请、发票原件、支付记录、支出结算、最终结算”等真实来源分组。每个文件保留文件名、类别、大小、上传人和时间；有源单的分组可以进入源单。预览或下载只读取现有文件内容，不改变业务状态。
+文件按真实 owner 分组。中央 DTO 保留文件稳定 ID、文件名、类别、大小、上传人、时间与来源意图；有源单的分组可以进入源单。#317 只接元数据；#438 在现有 Repository 上单独接入 `ownerType='project_supplier'` 且 owner 为当前合作关系的原件读取，页面不得从路径或文件名推断可读取性。
+
+正文按需读取，列表和工作台 DTO 不夹带 Base64。服务端先校验当前业务会话能力，再重读当前项目、分供方和 canonical 合作关系，核验来源、文件稳定 ID 与 owner 后才读取同会话中央正文。导入时保存的父实体副本不能代替当前祖先验证。客户端验证响应身份、字节长度和 SHA-256；错误或缺原件都不得回退本地同名、同 ID 文件。读取人不要求等于上传人；这不代表生产 RBAC 或多租户隔离已经落地。
+
+PDF、常见图片和纯文本可安全预览，保留原件字节；其他类型只下载。预览窗口失败需提示并恢复可重试状态，对象 URL 随失效、离页和超时释放。单份下载与选中 ZIP 使用统一直接保存能力；支持目录选择时先请求位置，再读取正文，避免慢响应丢失用户激活。取消静默，来源切换或离页后的迟到结果不得写盘，不声称能撤销已经开始的原生写盘。
+
+选中 ZIP 按稳定 ID 去重，同名不同 ID 追加序号，安全文件名与清单路径必须和包内条目一致；PDF 不拆页，原始 ZIP 附件不解包。清单逐份保留文件身份、owner、原名、包内路径、字节数、摘要及明确缺失原因。只有中央明确历史缺正文允许部分包并提示“不齐套”；网络、权限、关系错配或摘要失败必须整包失败并保留选择。
+
+其他 owner 的正文继续返回明确 `not-connected`，不能通过已注册来源目标或同文件 ID 冒充完成；后续归属仍由 #406 / #408 / #409 / #410 / #413 按各域接入。合作终态写入与生产持久化不在 #438 完成范围。
 
 通过导入向导进入的文件只属于 ProjectSupplier 合作档案，不回写为分供方证照，也不自动生成合同、请款、发票、支付或结算单。
 
@@ -208,7 +199,7 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 - 复用已有项目关系；
 - 每个关系下将归档的文件和类别。
 
-提交后，新分供方、ProjectSupplier 关系、文件元数据与浏览器文件正文在同一事务中保存；任一写入失败则整批回滚。成功后返回当前项目详情的支出业务页签。
+提交后，页面以 `project-supplier:write + commandId + baseVersion` 调用中央导入命令，新分供方、ProjectSupplier 关系、文件元数据与文件正文一次性保存；任一身份、版本、文件或分供方中央接管失败都回滚全部事实与版本，不留半成品，同一 `baseVersion` 可直接重试。服务端从不可降级的 canonical 关系读面重验已有合作关系，关系禁止或暂不可读时拒绝写入；同时按工作区内完整、未分页的正式分供方稳定 ID 集合重验复用身份，拒绝七项正式分类以外的文件类别，并验证 Base64 正文的实际字节数与 `fileSize` 完全一致。上传人取服务端会话 `actorId`，不接受浏览器自报。重放同一 `commandId` 只返回首次结果，不重复创建身份或附件。成功后返回 canonical 正式项目详情并重读关系；新分供方立即可进入通用详情和中央编辑链，后续主档编辑也从同一事实源反映到项目合作身份。
 
 ### 生成规则
 
@@ -216,7 +207,7 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 2. 只有软删除关系时恢复原关系，并以 `collecting` 重新开始合作。
 3. 同一候选名称的多个文件合并到一个新分供方和一个 ProjectSupplier 关系。
 4. 未经用户确认的候选分供方不写入主数据。
-5. 文件固定写入 `file_refs(owner_type='project_supplier', owner_id=ProjectSupplier.id)`。
+5. 文件元数据固定携带 `ownerType='project_supplier'` 与 `ownerId=ProjectSupplier.id`，由中央命令保证归属；浏览器不直写本地 `file_refs`。
 6. 导入不创建或修改合同、付款申请、发票、支付记录、支出结算单或分供方证照。
 
 ---

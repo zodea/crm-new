@@ -1,0 +1,16 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run --project unit tests/ui/module-review-coverage.test.ts tests/ui/payroll-p5-registration.test.ts
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+
+ Test Files  2 passed (2)
+      Tests  19 passed (19)
+   Start at  01:46:07
+   Duration  4.26s (transform 123ms, setup 0ms, import 1.71s, tests 4.46s, environment 0ms)
+
