@@ -3,6 +3,10 @@
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.26.0",
+  "engines": {
+    "node": "24.12.0",
+    "pnpm": "10.26.0"
+  },
   "scripts": {
     "build": "nuxt build",
     "design:sync-coverage": "node scripts/sync-design-coverage.mjs",

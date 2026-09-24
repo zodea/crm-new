@@ -8,8 +8,10 @@
 
 ## 本地开发
 
+先切换到 [`.node-version`](.node-version) 固定的 Node 版本，并使用 `package.json` 中 `packageManager` 指定的 pnpm。运行时版本依据见 [ADR 0021](docs/adr/0021-single-operator-windows-production-storage.md)；CI 同样读取 `.node-version`。安装时按现有锁文件恢复依赖，不自动更新版本；版本不符会拒绝安装。
+
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
