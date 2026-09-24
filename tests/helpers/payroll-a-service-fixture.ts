@@ -14,7 +14,11 @@ export function payrollAFact(overrides: Partial<PayrollAQuantityFact> = {}): Pay
 export async function createPayrollAServiceFixture(options: Pick<PayrollServiceOptions, 'quantityFacts' | 'managementScopeFacts'> = {}) {
   const db = await createMemoryDb()
   await runMigrations(db)
-  const coordinator = createDbCoordinator(async () => db)
+  const coordinator = createDbCoordinator(async () => ({
+    execute: (sql, params) => db.execute(sql, params),
+    select: <T>(sql: string, params?: unknown[]) => db.select<T>(sql, params),
+    close: async () => db.close(),
+  }))
   let session: BusinessSession = { workspaceId: 'work', actorId: 'actor', capabilities: ['payroll:read', 'payroll:write'] }
   const source: PayrollIdentitySource = { version: 'identity-1', projects: [{ id: 'p', name: '工资项目', code: 'P' }], crews: [{ id: 'crew', name: '现场班组', defaultPayRatio: null, ratioExplicitlyConfigured: false }], workers: [{ id: 'w', name: '负责人', crewId: 'crew' }, { id: 'zero', name: '零成员', crewId: 'crew' }, { id: 'other', name: '另簿负责人', crewId: 'crew' }] }
   const facts: PayrollAQuantityFacts = { sourceVersion: 'quantity-1', rows: [payrollAFact()], diagnostics: [] }

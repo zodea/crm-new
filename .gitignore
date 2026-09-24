@@ -9,6 +9,31 @@ dist
 # Node dependencies
 node_modules
 
+# AI 开发临时文件与本地工作树（正式交付移入文档指定目录）
+/.tmp/
+/tmp/
+/temp/
+/.codex-tmp/
+/.worktrees/
+/.claude/worktrees/
+/.codex/cache/
+/.codex/logs/
+/.codex/sessions/
+
+# 本地包管理、检查与脚本缓存
+.pnpm-store/
+.npm/
+.vite/
+.vitest/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+/coverage/
+
 # Logs
 logs
 *.log

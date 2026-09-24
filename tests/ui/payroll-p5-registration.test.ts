@@ -24,7 +24,8 @@ interface ReportRow {
   graph: { width: number, height: number, nodes: ReportNode[], edges: unknown[] }
 }
 
-describe('p5 limited delivery registration', () => {
+// 仅验证证据登记与报告同步；通过不代表工资计算、发放或生产持久化已验收。
+describe('p5 文档与生成物一致性（非工资业务验收）', () => {
   it('binds the product evidence to existing A cases without upgrading page or production acceptance', () => {
     const coverage = buildModuleReviewCoverage()
     const byId = (id: string) => coverage.obligations.find(item => item.id === id)!
@@ -44,7 +45,9 @@ describe('p5 limited delivery registration', () => {
     expect(byId('WAGE-10').remaining).toContain('公开服务回归')
     expect(byId('WAGE-11').remaining).toContain('保持冻结')
     expect(byId('WAGE-12').remaining).toContain('P7')
-    expect(byId('WAGE-15').status).toBe('current-passed')
+    // 条件：P6 空鼓已独立登记；动作：读取 P5 登记；结果：不能误绑 P5 费用证据。
+    // 防止报告把费用交付当成空鼓扣款验收，业务正确性由工资服务测试验证。
+    expect(byId('WAGE-15').evidence).not.toContainEqual(expect.objectContaining({ reference: evidence }))
     for (const id of ['WAGE-16', 'WAGE-17']) {
       expect(byId(id).status).toBe('current-passed')
       expect(byId(id).evidence).toContainEqual(expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-batch-workbooks/README.md' }))

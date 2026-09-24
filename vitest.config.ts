@@ -18,7 +18,7 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           include: ['tests/**/*.test.ts'],
-          exclude: ['tests/components/**/*.test.ts'],
+          exclude: ['tests/components/**/*.test.ts', 'tests/browser/**/*.test.ts'],
         },
       },
       {

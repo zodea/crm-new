@@ -1,0 +1,18 @@
+{
+  "extends": "../../.nuxt/tsconfig.app.json",
+  "compilerOptions": {
+    "incremental": false,
+    "composite": false,
+    "types": ["node"],
+    "noEmit": true
+  },
+  // 随业务测试复核逐批纳入；Nuxt 默认 typecheck 不包含这些普通测试文件。
+  "include": [
+    "../../.nuxt/nuxt.d.ts",
+    "../../app/types/**/*.d.ts",
+    "./central-a-transactions.test.ts",
+    "./central-a-management-ratio.test.ts",
+    "../stores/payroll-a-release-read.test.ts"
+  ],
+  "exclude": ["../../node_modules"]
+}

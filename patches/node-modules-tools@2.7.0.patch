@@ -1,0 +1,37 @@
+diff --git a/dist/shared/node-modules-tools.CA9gHEKi.mjs b/dist/shared/node-modules-tools.CA9gHEKi.mjs
+index 00414fbdd0d045d9027183b325faed0f832966c4..5ff0a0adbcdb62aaae3fa51b5e4d5b5b888a113a 100644
+--- a/dist/shared/node-modules-tools.CA9gHEKi.mjs
++++ b/dist/shared/node-modules-tools.CA9gHEKi.mjs
+@@ -43,13 +43,15 @@ function mergeAnalysis(target, source) {
+   target.hasModule = target.hasModule || source.hasModule;
+ }
+ function analyzePackageModuleType(pkgJson) {
++  // Some packages publish main: false; treat non-string values as no entry.
++  const main = typeof pkgJson.main === "string" ? pkgJson.main : undefined;
+   if (pkgJson.name?.startsWith("@types/"))
+     return "dts";
+-  if (pkgJson.main?.endsWith(".node"))
++  if (main?.endsWith(".node"))
+     return "bin";
+   const hasExports = pkgJson.exports != null;
+   const hasModule = !!pkgJson.module;
+-  const hasMain = !!pkgJson.main;
++  const hasMain = !!main;
+   const isTypeModule = pkgJson.type === "module";
+   if (hasExports && pkgJson.exports) {
+     const exportInfo = analyzeExports(pkgJson.exports);
+@@ -67,12 +69,12 @@ function analyzePackageModuleType(pkgJson) {
+     }
+   }
+   if (hasModule && hasMain) {
+-    const mainIsCJS = pkgJson.main?.endsWith(".cjs") || pkgJson.main?.endsWith(".js") && !isTypeModule;
++    const mainIsCJS = main?.endsWith(".cjs") || main?.endsWith(".js") && !isTypeModule;
+     return mainIsCJS ? "faux" : "esm";
+   }
+   if (hasModule)
+     return "faux";
+-  if (isTypeModule || hasMain && pkgJson.main?.endsWith(".mjs"))
++  if (isTypeModule || hasMain && main?.endsWith(".mjs"))
+     return "esm";
+   if (hasMain)
+     return "cjs";

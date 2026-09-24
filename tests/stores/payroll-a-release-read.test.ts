@@ -14,6 +14,9 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 it.each(['ordinary', 'ordinary-unknown', 'management'] as const)('%s 真实费用工资发放后，以合法只读冻结输出完成原提交核对', async (scenario) => {
+  // 条件：普通簿应付3815（含215补贴）或管理簿实付100；动作：提交，失响应时换Pinia实例恢复原命令。
+  // 结果：原工资、分配、来源、版本、日志和回执只提交一次，授权原件冷读后才解除待核对。
+  // 防止响应丢失被误判成未付款、恢复时重写已发原件，或错误来源的读取解除原提交保护。
   const f = await createPayrollAFeesFixture()
   try {
     let statementId: string
@@ -59,10 +62,15 @@ it.each(['ordinary', 'ordinary-unknown', 'management'] as const)('%s 真实费�
     if (scenario === 'ordinary-unknown') {
       await expect(release).rejects.toThrow('服务暂时不可用')
       const original = store.getAPending(before)!
+      const tables = ['wage_statements', 'wage_statement_allocations', 'payroll_a_statement_sources', 'payroll_command_receipts', 'payroll_revision', 'operation_logs']
+      const persisted = async () => Object.fromEntries(await Promise.all(tables.map(async table => [table, await f.db.select(`SELECT * FROM ${table} ORDER BY rowid`)])))
+      const committedBeforeRecovery = await persisted()
+      expect((await f.service.actualLedger({ origin: 'real' }, { projectId: 'p' })).netAmount.value).toBe(3815)
       setActivePinia(createPinia())
       store = usePayrollAStore()
       await store.recoverA(store.getAPending(before)!)
       expect(commands).toEqual([original.command.commandId, original.command.commandId])
+      expect(await persisted()).toEqual(committedBeforeRecovery)
     }
     else {
       await release
@@ -96,7 +104,11 @@ it.each(['ordinary', 'ordinary-unknown', 'management'] as const)('%s 真实费�
     }
     store.acknowledgeA(original, refreshed, output)
     expect(store.getAPending(before)).toBeNull()
-    expect(await f.db.select('SELECT id FROM wage_statements WHERE status=\'released\'')).toHaveLength(1)
+    expect(await f.db.select('SELECT id,actual_amount FROM wage_statements WHERE status=\'released\'')).toEqual([{ id: statementId, actual_amount: actualAmount }])
+    expect(await f.db.select('SELECT worker_id,allocated_amount_fen FROM wage_statement_allocations WHERE statement_id=? AND deleted_at IS NULL ORDER BY worker_id', [statementId])).toEqual(scenario === 'management'
+      ? [{ worker_id: 'w', allocated_amount_fen: 10000 }]
+      : [{ worker_id: 'w', allocated_amount_fen: 381500 }, { worker_id: 'zero', allocated_amount_fen: 0 }])
+    expect((await f.service.actualLedger({ origin: 'real' }, { projectId: 'p' })).netAmount.value).toBe(actualAmount)
   }
   finally { await f.close() }
 })
