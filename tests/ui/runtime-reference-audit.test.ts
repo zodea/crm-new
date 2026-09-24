@@ -51,7 +51,8 @@ function markdownSection(markdown: string, heading: string, nextHeading: string)
   return markdown.slice(start, end)
 }
 
-describe('runtime reference audit contract', () => {
+// 仅验证参考证据登记及生成物同步；路由数和证据等级不证明任何工资业务通过。
+describe('运行参考文档与生成物一致性（非业务验收）', () => {
   it('routes current review work to the new map without losing historical evidence', () => {
     const ledger = buildRuntimeEvidenceLedger()
     const endpoint = (route: string) => ledger.endpoints.find(item => item.localRoute === route)!
