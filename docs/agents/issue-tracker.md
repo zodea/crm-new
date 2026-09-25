@@ -14,13 +14,37 @@ gh issue view <number> --repo zodea/crm-new --comments
 ## 常用写操作
 
 ```text
-gh issue create --repo zodea/crm-new --title "<标题>" --body "<正文>"
-gh issue comment <number> --repo zodea/crm-new --body "<证据或进度>"
+gh issue create --repo zodea/crm-new --title "<标题>" --body-file "<正文文件>"
+gh issue comment <number> --repo zodea/crm-new --body-file "<证据或进度文件>"
 gh issue edit <number> --repo zodea/crm-new --add-label "<标签>"
-gh issue close <number> --repo zodea/crm-new --comment "<完成证据>"
+gh issue close <number> --repo zodea/crm-new
 ```
 
-多行正文在 PowerShell 中使用任务专用变量或 here-string，避免把临时正文文件留在仓库。
+多行正文写入仓库外的任务专用临时 UTF-8 文件，通过 `--body-file` 发布，完成后删除临时文件。关闭 Issue 时先发布完成证据，再执行关闭操作。
+
+## 每次提交的 show-me 图解
+
+用户已要求在 GitHub Issue 工作中持续使用 [HumanLayer 的 `show-me`](https://github.com/humanlayer/skills/tree/main/plugins/show-me/skills/show-me)。首次撰写本任务反馈前读取已安装的 `show-me/SKILL.md`，按其“选能解释重点的最小视图”原则呈现。
+
+- 适用于每次创建或更新 Issue 正文、发布进度或完成评论，以及关联代码提交后的交付反馈。每个关联 commit 的反馈标注 SHA，并展示本次变化；Git commit 标题仍遵循 [Git 工作流](./git-workflow.md)。
+- 默认结构为一句结论、一张简约图或表、至多三条必要的验证结果／阻塞／下一步。正文仍覆盖下方最低要求；详细证据链接到权威文档或提交。
+- 流程、依赖和状态变化用 Mermaid；改前／改后与验收结果用小型 Markdown 表格；职责或调用结构用浅层树／`diff`。每次选最合适的一种，图表内容以本次实际变化为准。
+- Mermaid 默认保留 3–7 个关键节点，使用简短中文标签；表格只列受影响项。图表直接嵌入 GitHub 正文，使读者能就地查看；说明文字补充图中未表达的事实。
+- 明确区分已实现、已验证、待验证和阻塞。提交反馈中的图解不代替实际验收；单纯修改标签或指派无需额外刷评论。
+
+例如，下面仅演示一次修复提交的反馈结构，发布时须替换为真实内容与证据：
+
+> `<SHA>`：保存失败后保留用户输入，允许重试。
+
+```mermaid
+flowchart LR
+  A[提交保存] --> B{保存结果}
+  B -->|成功| C[返回详情]
+  B -->|失败| D[保留输入]
+  D --> E[提示并允许重试]
+```
+
+验证：`<实际命令与结果>`；待验证：`<尚未覆盖项或无>`。
 
 ## Issue 内容最低要求
 
