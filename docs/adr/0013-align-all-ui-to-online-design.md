@@ -14,7 +14,7 @@ ADR 0011（issue #82）将应用外壳定为「深蓝侧栏 `#162238` + 54px 顶
 
 界面对标采用以下权威链：
 
-1. 当前功能范围、字段含义和状态机以 open Issue、`docs/rewrite/pages/`、`DATABASE.md` 与 `CONTEXT.md` 为准。
+1. 当前功能范围按用户指令确定，字段含义和状态机查 `docs/rewrite/pages/`、`DATABASE.md` 与 `CONTEXT.md`；需求歧义直接问用户。
 2. 有直接对应页时，登录态运行参考决定构图、信息密度、控件状态和安全可观察的交互路径；证据等级与只读边界登记在 `docs/design/runtime-reference-audit.md`。
 3. `DC重构设计源码/app.dc.html`、`kit/*.jsx` 与 `_ds/.../tokens/*.css` 决定瑞航品牌、DC 独有能力、无直接参考页的当前方案和全站设计令牌。
 4. 新增/编辑业务实体继续遵守 ADR 0014 的独立路由整页表单，不能因参考站使用弹窗而改变产品边界。

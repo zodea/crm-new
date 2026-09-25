@@ -18,14 +18,12 @@
 | 用户应当怎样完成一条业务流程 | [`docs/guides/`](./guides/) |
 | 如何将浏览器旧核心身份数据显式切换到中央后台 | [`docs/guides/local-data-migration.md`](./guides/local-data-migration.md) |
 | 当前还有哪些界面未实现或未闭环 | [`docs/design/ui-implementation-status.md`](./design/ui-implementation-status.md) |
-| 当前工作是否已定稿、由谁领取 | [GitHub Issues](https://github.com/zodea/crm-new/issues) |
-| 本轮全模块复核、红圈对齐与任务替换 | [瑞航 CRM 全模块复核与红圈对齐路线：前台交互和数据处理优先](https://github.com/zodea/crm-new/issues/402) |
 | Agent 如何开工、分诊和提交 | [`docs/agents/`](./agents/) |
 
 ## 参照索引（非权威源）
 
 - [测试文件业务模块索引](./testing/README.md)：保留测试原位置，逐文件归类业务、界面行为、文档契约与辅助夹具，供分批测试审查使用；不代表业务验收通过。
-- [逐 Issue 流程与交互审阅](./research/issue-review-2026-09-11/README.md)：包含全部当前开放 Issue 的流程图、异常退回、交互示意、实际运行证据与完整业务总图；为开发快照，完成状态以 Issue 最新回执为准。
+- [逐 Issue 流程与交互审阅](./research/issue-review-2026-09-11/README.md)：历史流程图、异常退回、交互示意与运行证据；为开发快照，不表示当前完成状态。
 - [模块开发方向流程图](./research/module-development-flows.md)：全局业务衔接及八个模块的操作、结果与异常返回，用于核对方向；不表示功能已完成。
 - [正式保存、备份恢复与本机部署承接](./implementation/production-gate-work-breakdown.md)：#416 的存储现状、已定运行约束与生产子票入口；决策票关闭和正式上线分别验收。
 - [红圈四条业务流转](../红圈系统/业务流转.md)：收入、支出、物资、工程量·变更的对象流与关键勾稽索引。
@@ -40,17 +38,17 @@
 - `design/`：设计入口、组件规格和视觉验收规则。
 - `guides/`：面向最终用户的 Markdown 操作说明与[功能路由索引](./guides/routes.md)，是默认交付入口；需要 PDF 时再按需生成。
 - `rewrite/`：当前架构、数据模型、通用业务模式与页面蓝本。
-- `prd/`：仍有独立价值的产品需求文档；落地状态以 Issue 为准。
-- `implementation/`：实施承接与拆分入口，执行顺序以当前 Issue 为准，不是架构或业务权威源。
+- `prd/`：仍有独立价值的产品需求文档。
+- `implementation/`：实施承接与拆分入口，不是架构或业务权威源。
 - `migration/`：数据迁移、验收与对账材料。
 - `research/`：证据、竞品和历史调查，明确为非权威源。
 - `testing/`：现有测试的业务模块索引与运行入口，不替代业务规格或测试有效性评审。
 
 ## 冲突处理
 
-1. 先看相关 GitHub Issue 的当前状态和最新评论。
+1. 用户当前指令确定需求与范围；事实查代码和现行文档，需求疑问直接问用户。
 2. 术语冲突以 `CONTEXT.md` 为准，数据冲突以 `DATABASE.md` 为准，已采纳决策冲突以最新 ADR 为准。
 3. 视觉冲突按 ADR 0013：直接对应页采用运行参考，瑞航品牌、独有能力及无直接参考页采用 `app.dc.html`，响应式约束仍必须成立。
-4. 代码现状与权威文档冲突时，不用旧代码证明旧文档正确；先把冲突记入 Issue，再在同一工作单元同步实现与文档。
+4. 代码与权威文档冲突时核实依据；确定后在同一工作单元同步实现与文档。
 
-临时过程记录完成后应并入 Issue、ADR 或上述权威源并删除。历史版本由 Git 保存，不在工作树保留“旧版副本”。
+临时过程记录中仍有效的结论写入上述权威源，完成后删除过程记录；历史版本由 Git 保存。

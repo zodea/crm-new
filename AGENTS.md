@@ -1,94 +1,27 @@
 # 瑞航 CRM（crm-new）
 
-本文件只保留所有开发任务都必须遵守的规则。文档导航从 [`docs/README.md`](docs/README.md) 进入；不要把专题规格复制回本文件。
+## 开工与决策
 
-## 1. 开工顺序
+- 开始和结束时运行 `git status --short --branch`，保护其他会话与用户的改动。
+- 以用户当前指令为准，不主动查询 Issue。先查代码、现行文档及必要的官方资料核实事实；只有查证不能解决的需求歧义和业务取舍才问用户。Issue 操作仅在用户明确要求时按 [Issue 规则](docs/agents/issue-tracker.md) 执行。
+- 从 [文档入口](docs/README.md) 按任务读取权威源。确认变更后，同一工作单元同步实现与相关文档。
+- 普通业务逻辑可自行实现；复杂表格、通用 hooks、检测机制等成熟通用能力，先检查已有依赖和可用方案，优先复用。引入或替换依赖时核对官方文档、维护状态、许可证、兼容性与接入成本；影响业务、架构或替换范围的取舍问用户。
 
-1. 运行 `git status --short --branch`，保护其他会话或用户尚未提交的改动。
-2. 用 `gh issue list --state open` 搜本次工作的关键词，再用 `gh issue view <number> --comments` 核实现时状态。已有 open Issue 的定稿规格优先；关闭 Issue 不自动成为新工作的规格。
-3. 读与任务相关的权威源：术语看 `CONTEXT.md`，决策看 `docs/adr/`，数据看 `docs/rewrite/DATABASE.md`，页面看 `docs/rewrite/pages/`，视觉看 `docs/design/README.md`。
-4. 实现需求前，先调研市场上是否有成熟、可用的库或工具，核对官方文档、维护状态、许可证、现有技术栈兼容性与接入成本；优先复用合适的成品，不重复实现已有通用能力。无法确定是否采用或替换、替换范围或关键取舍时，暂停该需求的实施，说明候选方案与差异，直到用户明确答复后再继续；沉默、超时或默认偏好不视为同意。
-5. 规格与代码、设计稿互相冲突时，先在 Issue 留证，再在同一工作单元消除冲突；不要静默选一边。
+## 实现规范
 
-Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) 和 [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md)。
+- 包管理使用 pnpm，版本与命令以 `package.json` 为准；架构和数据读写边界见 [ARCHITECTURE.md](docs/rewrite/ARCHITECTURE.md)。
+- Vue、composable、store、路由及相关配置任务必须先加载 `vue-best-practices`，按需加载 `vue`、`nuxt`、`vue-router-best-practices`。统一 Composition API、`<script setup>` 和 TypeScript。
+- 可复用交互先查 `vueuse-functions`；样式使用 `unocss`；Vue 测试使用 `vue-testing-best-practices` 与 `vitest`；依赖和构建使用 `pnpm`、`vite`。按任务加载对应技能正文，不能用旧代码代替规范。
+- 数据归属：父子用 props/emits，单个双向值用 `v-model`；功能内深层共享用 `provide/inject` + `InjectionKey`，由 provider 修改；跨界面或需持久化的状态用 Pinia action；复用行为用 composable，无状态逻辑用 util。
+- 界面工作先读 [设计入口](docs/design/README.md)：直接对应页按登录态只读运行参考，品牌、独有能力与无对应页按 DC 设计稿。业务实体新增/编辑采用独立路由整页表单。
+- 先查 `app/components/ui/`、`app/components/shared/` 和 [组件契约](docs/design/kit-ui-component-specs.md)，复用通用原语，领域逻辑留在领域组件。只迁移本次涉及的界面，逐屏验收。
 
-逐模块复核、补全规格或承接旧 Issue 时，先按 [`docs/agents/module-review.md`](docs/agents/module-review.md) 调查事实、记录可直接作出的判断、补齐场景与验收，再对确有业务取舍的缺口使用 `grill-with-docs`。
+## 验证与交付
 
-## 2. 当前工程基线
-
-- Nuxt 4、Vue 3.5、TypeScript，SPA（`ssr: false`）；桌面壳为 Tauri 2。
-- 包管理固定为 pnpm；以 `package.json` 的 `packageManager` 和 scripts 为准。
-- 状态使用 Pinia；已接管浏览器实体读写统一走中央 Repository/HTTP/command，尚未接管的本地适配和桌面 SQLite 边界见 ADR 0020。浏览器测试实例不代表生产持久化已完成。
-- 样式使用 UnoCSS；交互底座为 reka-ui / shadcn-vue 结构与 vue-sonner；数据网格底座为 vxe-table。
-- 代码目录采用 Nuxt 4 的 `app/` 布局。架构入口见 [`docs/rewrite/ARCHITECTURE.md`](docs/rewrite/ARCHITECTURE.md)。
-
-### Vue 任务
-
-写或改 `.vue`、composable、store、路由或相关配置前，必须加载与任务匹配的技能：
-
-- 总是先用 `vue-best-practices`，并按需用 `vue`、`nuxt`、`vue-router-best-practices`。
-- 可复用交互先查 `vueuse-functions`；不要重复实现 VueUse 已提供的能力。
-- 样式用 `unocss`；测试用 `vue-testing-best-practices` 与 `vitest`；依赖和构建用 `pnpm`、`vite`。
-- 一律 Composition API、`<script setup>` 和 TypeScript；改到旧坏范式时就地纠正，不扩大到无关文件。
-
-### 数据归属阶梯
-
-1. 父子组件：props 向下、emits 向上；只有“单个可双向值”才用 `defineModel` / `v-model`。
-2. 同一功能的深层组件树：`provide/inject` + `InjectionKey`，mutation 留在 provider。
-3. 跨界面、需持久化或领域共享：Pinia store，写入只走 action。
-4. 只复用行为：composable；无状态逻辑：纯 util。
-
-## 3. 设计与界面实现
-
-- 有直接对应页时，登录态运行参考决定构图、密度、控件状态和安全交互路径；`DC重构设计源码/app.dc.html` 与 `kit/` 是瑞航品牌、DC 独有能力和无直接参考页的唯一视觉基准。证据与只读边界见 `docs/design/runtime-reference-audit.md`，冲突裁定见 ADR 0013。
-- 固定视口截图不是固定尺寸合同。每次界面工作按设计参考视口及 390 / 768 / 1024 / 1280–1440px 验证；密集表格只能在自己的区域横向滚动。
-- 业务实体新增/编辑使用独立路由的整页表单；弹窗只用于行级小对象、确认和明确的轻量任务，见 ADR 0014。
-- 框架组件的默认观感与设计稿冲突时，以设计稿定制或替换；可达性和交互底座约束仍按 ADR 0008 / 0009。
-- 当前“未实现”和“已搭但未闭环”必须分开统计，见 [`docs/design/ui-implementation-status.md`](docs/design/ui-implementation-status.md)。
-
-### 通用组件
-
-先检查 `app/components/ui/` 与 `app/components/shared/`。按钮、弹窗壳、表格尺度、状态标签、工具栏等跨领域稳定能力应沉淀到通用原语；WBS、甘特、工程量矩阵、领域表单保留为领域组件。
-
-采用“改到哪、迁到哪”：当前工作涉及的界面立即按新原语和设计稿验收，未触及界面不做无差别重刷。通用原语在 `/dev/kit-ui` 或组件测试验证，业务页面仍需逐屏对照。
-
-### KitUI 边界
-
-- 统一入口：`app/composables/useKitUI.ts`。
-- 单宿主：`app/components/shared/KitUIHost.vue`。
-- confirm / formModal 基于 reka-ui Dialog；toast 基于 vue-sonner 双 Toaster；不引入 Tailwind 引擎。
-- `system` 泳道承载结果与需要阅读的消息；`process` 泳道承载 loading / promise。
-- ripple 已全域废弃。
-
-具体组件契约只看 [`docs/design/kit-ui-component-specs.md`](docs/design/kit-ui-component-specs.md) 和相关 ADR。
-
-## 4. 验证
-
-按风险选择最小充分验证：
-
-- 类型：`pnpm typecheck`
-- 单测：`pnpm test:unit`
-- 组件：`pnpm test:components`
-- E2E：`pnpm test:e2e` 或精确 Playwright 文件
-- 质量：`pnpm lint`
-- 构建：`pnpm build`
-
-修 bug 时先建立能失败的复现；界面修改除行为断言外还要验证实际视口、滚动边界、键盘焦点与浮层层次。不要用静态源码检查替代运行态验收。
-
-GitHub Actions 只手动按需调用；没有后置依赖的叶子 PR 可单独验证，有后置依赖的 PR 等依赖链末端提交范围冻结后只做一次集成验证；单个 PR 不运行 E2E/Visual，一批 PR 合并完成后才按批次手动运行一次。CI 绑定提交 SHA，不锁定 PR；CI 后产生新提交时旧结果失效，按新提交按需重跑。调用前必须先估算 runner-minutes、说明所选套件并等待用户确认。选择规则与费用基线见 [`docs/agents/ci-usage.md`](docs/agents/ci-usage.md)。
-
-## 5. 文档纪律
-
-- 单一权威源：词义 → `CONTEXT.md`；架构决策 → `docs/adr/`；数据模型 → `docs/rewrite/DATABASE.md`；当前界面对标权威链 → ADR 0013 与 `docs/design/README.md`。
-- 二次文档只链接，不复制字段表、色值或状态快照。
-- 决策或实现状态变化时，同一提交更新权威源和受影响入口；暂不能重写的历史材料移入 `docs/research/` 并标明“非权威源”。
-- 新增或改变最终用户可见业务流程时，同一工作单元更新 `docs/guides/` 的 Markdown 使用指南，明确区分“当前已可用”与“已定稿待开发”。指南以 Markdown 交付；仅在用户明确需要 PDF 时按需生成并逐页检查。产品本身的打印、原件和导出功能仍按对应 Issue 验收。
-- 完成的临时计划、反馈轮、TODO 和交接副本应删除；Git 历史就是参考档案。
-
-## 6. 提交纪律
-
-- 每个独立工作单元完成并验证后立即提交，不把多个 Issue 攒成一个 commit。
-- 只 `git add` 本任务明确文件；禁止 `git add .` 和 `git add -A`。
-- 提交信息使用 conventional commits + 中文描述，例如 `docs(repo): 重建开发指引`。
-- 本地提交/推送检查与失败处理见 [`docs/agents/git-workflow.md`](docs/agents/git-workflow.md)；合并任务的收尾必须按该文档核对并清理对应本地、远端工作分支，关联工作树先完成保全检查。
-- 结束前再次检查 `git status`；不得把其他会话的改动混入提交。
+- 按改动风险选择最小充分验证，命令见 `package.json`，测试入口见 [docs/testing/](docs/testing/README.md)。修 bug 先建立失败复现。
+- 界面改动验证参考视口及 390 / 768 / 1024 / 1280–1440px，检查滚动边界、键盘焦点和浮层层次；密集表格仅在自身区域横向滚动。静态检查不能替代运行验收。
+- GitHub Actions 仅按需手动运行；调用前说明套件、估算 runner-minutes 并取得用户确认。批次与费用规则见 [CI 使用规则](docs/agents/ci-usage.md)。
+- 词义、决策、数据和页面规则各保留一个权威来源，其他位置用链接。流程变化同步更新 `docs/guides/` 的 Markdown，区分当前可用与待开发；PDF 仅在用户需要时生成并逐页检查。
+- 整理时删除重复、失效和无用内容；独有有效内容并入现有权威文档。完成的临时计划、TODO、反馈与交接副本及时删除，历史由 Git 保存。
+- 按完整、可审阅的工作单元提交，不按零碎编辑次数提交，也不混入无关任务。只暂存本任务明确文件，提交说明使用 Conventional Commits + 中文。
+- 一个 Issue 完成且验证通过后 push；推送前核对提交范围，避免夹带其他任务的本地提交。钩子、失败处理和合并后分支清理按 [Git 工作流](docs/agents/git-workflow.md) 执行。

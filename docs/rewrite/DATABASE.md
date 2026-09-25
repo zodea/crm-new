@@ -171,7 +171,7 @@ projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1�
 
 ```
 contracts(kind='施工') ─1:N→ boq_files ─1:N→ boq_lines（统一清单行模型，合同量+合同单价唯一来源）
-projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→已打回→已签证，CONTEXT.md「变更单」）
+projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→已打回→已签证，ADR 0002）
               ├─1:N→ boq_change_lines ─N:1→ boq_lines（调量/调价指向原行；变更新增行反向挂 change_order_id）
               └─已签证─自动生成→ owner_change_orders 台账行（1:1 ledgerId 追溯，ADR-0002）
 projects ─1:N→ monthly_statements ─1:N→ monthly_statement_lines（月度报量：自动汇总草稿+手调）
@@ -208,7 +208,7 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | `unique_code` | 分供方内部唯一识别码；中央字段 `uniqueCode` | 与税号独立维护，非空时按 [COMMANDS.md](./COMMANDS.md) 的身份校验分别判重 |
 | `tax_no` | 统一社会信用代码/纳税人识别号；中央字段 `taxNo` | 与内部编码独立维护，不以旧 OCR 或导出标签推断二者等义 |
 | `external_ref` | 外部旧 ID / 匹配标识 | 迁移、二次导入与对账身份，唯一性沿本节上方既有规则，不替代内部编码或税号 |
-| `business_type` | 经营类型，分供方业务描述的可选自由文本 | 保留原值，不推导成第二套类别；分供方类别仍使用 CONTEXT.md 的权威七类 |
+| `business_type` | 经营类型，分供方业务描述的可选自由文本 | 保留原值，不推导成第二套类别；分供方类别使用 [ADR 0014](../adr/0014-full-page-entity-forms.md) 的七类 |
 | `labor_scope` | 劳务承包范围；中央字段 `laborScope`，词义见 [CONTEXT.md](../../CONTEXT.md#业务) | 可选自由文本，默认空字符串；独立于 `main_business`，不按类别强制必填，也不从既有主营业务自动回填；修改不改变资料齐全度或既有人工作出的核验结论 |
 | `address` | 营业执照登记的住所/注册地址 | 工商信息；不得与经营地址或开票地址混用 |
 | `invoice_address` | 分供方确认使用的开票资料地址 | 选填；可从注册地址一次性复制，但保存后独立维护、不永久联动 |
@@ -271,7 +271,7 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | ContractLineItem | `contract_line_items` | `id` | `material-contract.md` |
 | BoqFile | `boq_files` | `id` | `boq-import.md`（清单文件：挂 `contracts(kind='施工')` 一对多，未拆表/已拆表） |
 | BoqLine | `boq_lines` | `id` | `boq-import.md` §二（统一清单行模型+来源追溯键；已确认导入行或已签证变更新增行二选一） |
-| BoqChangeOrder | `boq_change_orders` | `id` | CONTEXT.md「变更单」「指令单」（四档状态） |
+| BoqChangeOrder | `boq_change_orders` | `id` | [ADR 0002](../adr/0002-change-order-generates-ledger.md)（四档状态与签证台账关系）；附件分类见本文件 `file_refs` 关系 |
 | BoqChangeLine | `boq_change_lines` | `id` | 变更单行明细（新增/调量/调价） |
 | MonthlyStatement | `monthly_statements` | `id` | `owner-documents.md` + CONTEXT.md「月度报量」 |
 | MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |

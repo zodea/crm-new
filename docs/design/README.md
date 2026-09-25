@@ -6,7 +6,7 @@
 
 | 优先级 | 要回答的问题 | 唯一权威源 |
 |---|---|---|
-| 1 | 当前功能是否要做、做到什么程度 | [GitHub Issues](https://github.com/zodea/crm-new/issues) 中当下状态的 Issue；关闭 Issue 不作为新工作的规格 |
+| 1 | 当前功能是否要做、做到什么程度 | 用户当前指令；需求疑问直接问用户 |
 | 2 | 页面字段、Tab、业务边界 | [`docs/rewrite/pages/`](../rewrite/pages/)；数据实体看 [DATABASE.md](../rewrite/DATABASE.md)，领域术语看 [CONTEXT.md](../../CONTEXT.md) |
 | 3 | 有直接对应页时的构图、密度、控件状态和只读交互路径 | 用户已登录的运行态参考系统；证据、差异和只读边界登记在 [`runtime-reference-audit.md`](./runtime-reference-audit.md) |
 | 4 | 瑞航品牌、无直接对应页和 DC 独有能力的当前方案 | `DC重构设计源码/app.dc.html`；屏幕源码为 `DC重构设计源码/kit/**/*.jsx` |
@@ -19,7 +19,7 @@
 - 运行态参考只决定有直接对应页的界面信息流和安全可观察交互，不覆盖瑞航品牌、字段含义、数据、权限或领域状态机。
 - `app.dc.html` 与运行态参考中的固定视口都不是固定画布合同；与 ADR 0013 的响应式、滚动或可达性要求冲突时，以 ADR 0013 为准。
 - 参考系统没有直接对应页，或现有业务能力变化很大时，先按 `runtime-reference-audit.md` 提供脱敏标注图或重绘线框，不拿相邻页面伪装成直接证据。
-- Issue 已明确变更业务口径时，必须同轮更新 `docs/rewrite` 或 ADR，不能长期依赖评论覆盖旧正文。
+- 用户明确变更业务口径时，同轮更新 `docs/rewrite` 或 ADR。
 
 ## 当前设计源码只保留这些入口
 
