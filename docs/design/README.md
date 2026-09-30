@@ -1,10 +1,12 @@
 # 设计入口
 
-> 本文件是瑞航 CRM 设计工作的唯一导航入口。不要从散落的历史记录、旧 HTML 或截图反推现行规格。
+> 不清楚设计资料位置时查本页；已知任务直接读取相关规格，不从历史稿反推现行规则。
 
-## 权威源与优先级
+历史核对证据：[#292](https://github.com/zodea/crm-new/issues/292)、[#276](https://github.com/zodea/crm-new/issues/276)；不作为新任务的强制流程。
 
-| 优先级 | 要回答的问题 | 唯一权威源 |
+## 权威源与职责
+
+| 定位 | 要回答的问题 | 直接来源 |
 |---|---|---|
 | 1 | 当前功能是否要做、做到什么程度 | 用户当前指令；需求疑问直接问用户 |
 | 2 | 页面字段、Tab、业务边界 | [`docs/rewrite/pages/`](../rewrite/pages/)；数据实体看 [DATABASE.md](../rewrite/DATABASE.md)，领域术语看 [CONTEXT.md](../../CONTEXT.md) |
@@ -12,14 +14,39 @@
 | 4 | 瑞航品牌、无直接对应页和 DC 独有能力的当前方案 | `DC重构设计源码/app.dc.html`；屏幕源码为 `DC重构设计源码/kit/**/*.jsx` |
 | 5 | 颜色、间距、圆角等令牌 | `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css` |
 | 6 | 参考冲突、响应式和可达性裁定 | [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)；整页实体表单继续遵守 [ADR 0014](../adr/0014-full-page-entity-forms.md) |
-| 7 | 组件和交互原语 | 本目录除本入口外的专题文档 + ADR 0008 / 0009 |
+| 7 | 组件和交互原语 | [KitUI 组件规格](./kit-ui-component-specs.md)；底座选型见 ADR 0008 / 0009 |
 
-发生冲突时按表中优先级判断，并遵守以下边界：
+上表按问题定位来源，不是按行号覆盖规则。ADR 按明确的适用范围与替代关系理解：
+
+```mermaid
+flowchart TD
+  V["ADR 0013：视觉、密度、响应式"]
+  V -->|"更新视觉参数"| P["ADR 0007：保留单层容器原则"]
+  V -->|"替代旧视觉"| S["ADR 0011：保留外壳行为"]
+  F["ADR 0014：实体新增与编辑整页表单"] --> K["KitUI：组件结构、状态与交互"]
+  V --> K
+  B["ADR 0008 / 0009：交互与网格底座"] --> K
+```
+
+这些 ADR 共同约束实现，不是几套可任选的风格。冲突核对遵守以下边界：
 
 - 运行态参考只决定有直接对应页的界面信息流和安全可观察交互，不覆盖瑞航品牌、字段含义、数据、权限或领域状态机。
 - `app.dc.html` 与运行态参考中的固定视口都不是固定画布合同；与 ADR 0013 的响应式、滚动或可达性要求冲突时，以 ADR 0013 为准。
 - 参考系统没有直接对应页，或现有业务能力变化很大时，先按 `runtime-reference-audit.md` 提供脱敏标注图或重绘线框，不拿相邻页面伪装成直接证据。
 - 用户明确变更业务口径时，同轮更新 `docs/rewrite` 或 ADR。
+
+稳定设计原则、令牌消费与组件职责见 [DESIGN-SYSTEM](../rewrite/DESIGN-SYSTEM.md)；[DESIGN-TASTE](./DESIGN-TASTE.md)保留品味理由和规则示意，[交互参考](./interaction-style-references.md)保留外部来源与采纳理由，二者不另发实施规格。
+
+### 与协作、文档、测试和指南入口的关系
+
+| 入口 | 与设计整理的关联 |
+| --- | --- |
+| [AGENTS.md](../../AGENTS.md) | 确定任务授权、只读参考、权威唯一和交付边界 |
+| [文档入口](../README.md) | 定位 ADR、设计、页面、数据与读写契约；按职责直达 |
+| [测试入口](../testing/README.md) | 区分静态契约与运行验收，按受影响行为选测试；示意图不代替运行证据 |
+| [指南入口](../guides/README.md) | 用户操作变化时更新相应专题，并标明可用版本；仅纠正旧设计说明不重写既定用户流程 |
+
+图片、流程图和数据关系图就近嵌入承担该规则的 Markdown，并注明规则示意、历史证据或当前运行实拍。更正数据来源说明不等于修改数据库；实体、字段或关系实际变化仍由 DATABASE 承接。
 
 ## 当前设计源码只保留这些入口
 
@@ -37,9 +64,7 @@ DC重构设计源码/
 
 当前缺一一对应 DC 页面的路由统一登记在 [`design-coverage.json`](./design-coverage.json)，数量见[实现状态生成表](./ui-implementation-status.md#2-当前总数)。付款详情由 [#404](https://github.com/zodea/crm-new/issues/404) 联同 [#413](https://github.com/zodea/crm-new/issues/413) 复核；数据迁移由 [#414](https://github.com/zodea/crm-new/issues/414) 承接；阶段配置整页已在 [#442](https://github.com/zodea/crm-new/issues/442) 完成本地运行验收，仍缺一一对应的 DC 页面。工序库独立只读详情由 [#443](https://github.com/zodea/crm-new/issues/443) 新增，采用已有工序库与 Table 原语验证，明确保留缺直接设计页的边界。旧 #305/#294 仅作历史来源。迁移页在设计补齐前以运行契约、实际视口和表内局部滚动证据验收。此前施工进度「前后置依赖设置」已由 #244 合入设计源码，[补图 brief](../research/schedule-dependency-editor-brief.md) 保留为历史研究。
 
-当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据和差异看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。本轮任务统一进入[瑞航 CRM 全模块复核与红圈对齐路线：前台交互和数据处理优先](https://github.com/zodea/crm-new/issues/402)，复核与详细规格按 [`module-review.md`](../agents/module-review.md) 执行。旧总规格、地图及账本中的票号保留历史证据含义；被替代的旧票通过正文指向当前承接者，不再充当当前实施入口。选定代码基线后的路由与机器账本校正由[建立全模块功能清单与可信复核基线](https://github.com/zodea/crm-new/issues/403)负责。
-
-历史溯源继续保留：旧生产链总规格 [#292](https://github.com/zodea/crm-new/issues/292) 与证据账本重建 [#276](https://github.com/zodea/crm-new/issues/276)。这些链接用于核对已有决定和验收来源，当前工作仍跟随新总图与承接任务。
+当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据和差异看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。
 
 动态单据、导入阶段、当前挂载的页签/子表和 browser/Tauri 读写差异，进入 [全模块复核覆盖索引](./module-review-coverage.md)；其 [JSON](./module-review-coverage.json) 为派生清单。它与路由证据账本分别记录“需要核验哪些面”和“已有何种参考证据”，不以生成行数宣告功能完成。
 
@@ -59,16 +84,18 @@ DC重构设计源码/
 - 领域词义变化：只更新根目录 `CONTEXT.md`。
 - 组件级设计：放在 `docs/design/`，先检查是否已有对应专题文件。
 - 调研证据：放在 `docs/research/`，必须标注“非权威源”。
-- 临时实施记录完成后，应合并进 Issue、ADR 或权威文档并删除；不再新增长期“反馈轮次”副本。
+- 临时记录中的长期有效结论并入现有权威文档后删除；任务进度留在已授权使用的 Issue，写入须经用户授权，不另存本地反馈副本。
 
 ## 开工检查
 
-1. 从 GitHub 查看相关 Issue 的当前状态和最新评论。
-2. 查 `runtime-reference-audit.md` 的证据等级；有直接对应页时按严格只读协议核对运行态参考。
-3. 查对应页面蓝本和 DATABASE/CONTEXT，不从参考站或旧截图补猜瑞航字段。
-4. 打开 `app.dc.html` 核对品牌、DC 独有能力和无直接参考页的当前方案。
-5. 检查 ADR 0013 的响应式要求；不得按固定长宽实现。
-6. 若运行态参考、设计稿、Issue、Nuxt 现状互相冲突，在 Issue 中记录后再修改，并同轮消除旧文档冲突。
+| 当前任务 | 直接核对 |
+| --- | --- |
+| 页面布局或交互 | 对应页面规格、运行证据和 DC 对应页 |
+| 组件或底座调整 | 现有组件、安装版本官方 API/扩展与 KitUI 契约 |
+| 响应式、滚动和焦点 | ADR 0013 及受影响视口的实际运行 |
+| 业务或权限含义冲突 | 先核实事实并向用户说明；相关 Issue 仅按 AGENTS 定向核对，写入须授权 |
+
+既定方案内优先使用官方扩展。改变业务行为、组件契约或底层方案前说明依据与影响并取得用户确认；按确认范围同步直接受影响的文档。
 
 <!-- issue-441:begin -->
 ## #441 送货中央归档切片

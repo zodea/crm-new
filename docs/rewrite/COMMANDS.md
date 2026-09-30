@@ -81,7 +81,7 @@ Issue #281、#293、#314—#316、#318、#320—#331 已完成正式项目、客
 
 文件解析后选择一个 Sheet，映射现行项目模板字段，人工预览后才提交。项目名称、客户和项目经理必填，日期沿现行表单 decoder；阶段沿现行导入归一规则，预览同时展示原值和采用值。客户/次客户从完整分页的中央正式候选解析：精确稳定 ID 优先，其次唯一名称/别名；缺失、歧义、明确 `inactive=停用`、失效或越权逐行拒绝，不创建临时客户。准备后的请求固定关系 ID，提交时服务端重验正式关系与权限，客户改名不能改接别的身份。列表/详情同样按稳定 ID 解析最新客户名称；无权时不泄露身份。
 
-导入请求只允许无 `id`、`baseVersion=null`、`action=save`，附合法 `importSource`，成功后表单回读同一来源元数据。来源字段含义仅在 [DATABASE §10.7](./DATABASE.md#107-导入追溯与差异表) 维护。每个工作区内，同一文件摘要 + Sheet + 原始行，或本 Excel 链路已经保存的非空外部旧 ID，命中已保存回执时：相同规范内容返回原项目 ID；不同内容明确冲突，不能覆盖，修改须显式进入项目编辑。并发提交与响应丢失重试保持同一命令/回执。该外部旧 ID 规则不查询受控整库迁移 `legacyId → serverId` 映射，也不按名称自动合并；原文件变化且无外部旧 ID 视为新的来源。
+导入请求只允许无 `id`、`baseVersion=null`、`action=save`，附合法 `importSource`，成功后表单回读同一来源元数据。来源字段含义仅在 [DATABASE §2.9](./DATABASE.md#entity-import-source) 维护。每个工作区内，同一文件摘要 + Sheet + 原始行，或本 Excel 链路已经保存的非空外部旧 ID，命中已保存回执时：相同规范内容返回原项目 ID；不同内容明确冲突，不能覆盖，修改须显式进入项目编辑。并发提交与响应丢失重试保持同一命令/回执。该外部旧 ID 规则不查询受控整库迁移 `legacyId → serverId` 映射，也不按名称自动合并；原文件变化且无外部旧 ID 视为新的来源。
 
 业务拒绝保留原始行号并继续其他行；网络异常或写后回读失败停在当前行，重试复用原命令；已成功行不再创建。部分成功可下载来源定位和原因清单、进入成功项目详情或仅重试未导入行。导入前取消无写入；导入中停止等待当前行结束后返回列表，其余行停止；重新上传原文件可安全续导。来源切换沿全局确认后刷新契约，清空未保存的文件/映射/预览，中央已保存行仍可回读。原文件不作为附件上传。中央内存实例验证不表示 #416 的生产持久化、实际数据库迁移或备份恢复已经完成。
 
@@ -98,7 +98,7 @@ interface ProjectCommandRequestDTO {
   action: 'draft' | 'save' | 'submit'
   draft: ProjectFormDraft
   attachments: FormAttachmentChanges
-  importSource?: ProjectImportSource // 项目 Excel 新建来源；契约见下节和 DATABASE §10.7
+  importSource?: ProjectImportSource // 项目 Excel 新建来源；契约见下节和 DATABASE §2.9
 }
 
 interface CustomerCommandRequestDTO {
@@ -297,7 +297,7 @@ interface OwnerCommercialDocumentCommandRequestDTO {
 
 奖罚、申请、支付通过 `GET /api/read/other-settlements/:id/source` 独立读取中央源单；这不扩展为通用付款申请或支付记录写命令。#331 的受控迁移接管既有其他支出结算抵扣事实，不把 #329 当前只接受已确认分包结算的新增抵扣命令扩展到其他结算类型。金额、准确归属与迁移规则只见 [DATABASE](./DATABASE.md#ax05-其他支出结算中央事实) 和 [页面蓝本](./pages/contract-forms.md#ax05-当前浏览器实现331)。中央仍为可重置测试实例，附件正文服务与生产持久化不由这些命令入口宣告完成。
 
-PAY-07 的付款批复来源由现有本地付款保存域验证，中央关联源单只投影该事实；本切片不新增通用付款写命令。后续接管必须继续遵守 [DATABASE §10.2](./DATABASE.md#102-支付记录及付款申请分摊) 的明确输入、事务回滚与历史未知兼容边界，不能凭读 DTO 的来源标签确认历史批复。
+PAY-07 的付款批复来源由现有本地付款保存域验证，中央关联源单只投影该事实；本切片不新增通用付款写命令。后续接管必须继续遵守 [DATABASE §2.4 支付记录](./DATABASE.md#entity-payment-record) 的明确输入、事务回滚与历史未知兼容边界，不能凭读 DTO 的来源标签确认历史批复。
 
 ## 普通收款登记命令（#436）
 

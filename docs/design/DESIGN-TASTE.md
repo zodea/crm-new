@@ -1,304 +1,69 @@
-# 设计品味基准（DESIGN-TASTE）— 界面重构文档
+# 设计品味与历史说明（DESIGN-TASTE）
 
-> 生成方式：按 `stitch-design-taste` skill 的品味编码框架，对本项目**用户认可的满意版本**做的一次系统提炼（2026-07-17 快照；2026-07-27 按 #181 重构权威链）。
-> **双源基准**：有直接对应页时，登录态运行参考决定构图、密度、控件状态和安全交互路径；仓库镜像 `DC重构设计源码/app.dc.html` + `kit/*.jsx` 决定瑞航品牌、DC 独有能力和无直接参考页的当前方案。
-> 运行参考不覆盖瑞航字段含义、数据、权限或领域状态机；证据等级与只读协议看 [`runtime-reference-audit.md`](runtime-reference-audit.md)，冲突裁定看 ADR 0013。
->
-> **与既有权威源的关系**（本文是「品味层」，不推翻任何权威源）：
-> - 色值/形状令牌唯一权威源 = `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。本文 hex 为快照，冲突以该文件为准。
-> - 内容区风格 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)、交互底座 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)、表格 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md) 继续有效；**全站布局/排版/颜色（含应用外壳）基准 = [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)**，[ADR 0011](../adr/0011-redesign-application-shell.md) 仅存外壳行为条款。
-> - 与 [DESIGN-SYSTEM.md](../rewrite/DESIGN-SYSTEM.md)（既有 design 文档）的分工：那是逐组件规格清单；本文回答「为什么线上版本好看、哪些做法绝对不许、本地要往哪重构」。两文冲突处见 §8.2（已发现的冲突本文已点名）。
->
-> 后续任何页面实装/重构，以本文 §4–§7 为对照检查表；有直接参考页时还必须记录运行态证据与当前 app 差异。
+> 来源：2026-07-17 满意版本的品味提炼；2026-09-26 按 A01 清理过时指令与重复配方。本文保留设计理由、旧引用定位和规则对照，**不再作为独立实施规格**。现行职责见[设计入口](./README.md)。
 
----
+## 1. 为什么采用这套视觉语言
 
-## 0. 三轴定位（taste spectrum）
+“克制面板 × 高密度台账”服务于项目记账与核对：白底、细线和适量留白帮助扫读；品牌色突出关键操作；数字对齐帮助比较。早期密度 7 / 变化 2 / 动效 2 是品味描述，不是可量化验收阈值，也不覆盖具体页面的信息组织。
 
-| 轴 | 定位 | 说明 |
-|---|---|---|
-| 密度 Density | **7 / 10（双档）** | 仪表盘区保留可扫读留白，台账表格区更致密；行高、字号和响应式退化遵循 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)，不沿用本文历史尺寸快照覆盖当前规则。 |
-| 变化 Variance | **2 / 10** | 对称、可预期。CRM 工作台靠肌肉记忆吃饭：列表页/详情页模板全站同构（§5），不做非对称炫技。skill 默认值 Variance 8 **不适用**本项目。 |
-| 动效 Motion | **2 / 10** | 克制、瞬时反馈。skill 默认的 spring 物理与常驻微动效 **不适用**本项目（§6 覆盖声明）。 |
+这些原则的现行约束归[设计系统边界](../rewrite/DESIGN-SYSTEM.md)；按钮、表格、浮层与状态的结构和行为归 [KitUI 组件规格](./kit-ui-component-specs.md)。字体、颜色、圆角、间距与动效时长直接消费实际样式源，不再从本文复制历史数值。
 
-**一句话气质**：「克制面板 × 高密度台账」——小圆角 + 无卡片阴影 + 清楚分隔 + 适量留白；数据密而不挤，蓝色安静而不喧哗。
+## 2. 颜色与状态的来源
 
----
+[content-v5.css](../../DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css) 及其导入的 typography / spacing 文件维护共享令牌；[Nuxt tokens.css](../../app/assets/css/tokens.css) 维护应用桥接和外壳专属值。旧色值表、字阶与字体栈快照已移除，避免与实际源并行维护。
 
-## 1. 视觉气质与氛围
+### 2.3 业务状态（旧引用定位）
 
-工地记账员的桌面工具：机构级严肃感 + 数据密集型专业工具。像一间光线充足的项目部办公室——白纸台账、冷蓝灰文件柜、一枚深蓝公章（品牌蓝只在盖章处出现）。
+状态标签的现行裁定见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)，具体语义色与非交互边界直接见 [KitUI 状态规格](./kit-ui-component-specs.md#16--业务状态-tag-kit-status-tag--公共原语已实现2026-09-08)。历史“列表状态只用纯文字”不能作为当前要求；计数、来源、类别标识不随业务状态标签一起改形状。
 
-**正面（满意版本这样做）**：
-- 白纸面板落在轻机构灰画布上，1px 冷灰描边、小圆角、无卡片阴影；层级靠浅灰标题条、留白和分隔线，不靠堆叠。
-- 品牌蓝是「章」不是「墙」：整屏扫过去，实心蓝色块不超过一处（核心 CTA / 选中态），其余蓝只以细节出现——3×14 竖条、下划线、蓝链、聚焦环。
-- 数字是主角：金额/编号/日期一律等宽字体 + tabular-nums，右对齐，字重 600–800；文字 label 退居 11–12px 灰色。
+## 3. 顶栏：收回旧毛玻璃例外
 
-**反面（一眼廉价，出现即改）**：
-- 密集表格台账 + 横条工具栏挤满实心按钮（旧 CRM 风）。
-- 满屏实心蓝按钮、蓝色大色块标题栏、渐变。
-- 重网格线、多行紧凑筛选 pill 平铺、卡片套卡片。
+原 §7 仍把顶栏毛玻璃写成例外，与 [ADR 0013 的现行外壳规格](../adr/0013-align-all-ui-to-online-design.md#外壳规格2026-09-08-按直接复刻授权更新) 相反。该旧实施指令已移除，外壳直接遵循 ADR 0013。
 
----
+![顶栏清理前说明与已采纳规则的示意对照](./assets/a01-topbar-rule-comparison.png)
 
-## 2. 色彩（描述名 + hex + 角色）
+图为匿名重绘的规则说明，**不是红圈或 CRM 当前页面截图，也不是运行验收证据**。[HTML 图源](./assets/show-me-a01-ui-comparisons.html)用于维护这组示意。
 
-> 权威源 `content-v5.css`；以下为 2026-07-17 快照。**整站只此一套冷蓝灰阶，禁止混入暖灰**；唯一 accent = 瑞航蓝（饱和度 ≈55%，符合 skill「单 accent、饱和度 <80%」校准）。
+## 4. 组件配方的承接
 
-### 2.1 基底（画布与面板）
-
-| 描述名 | 令牌 | 色值 | 角色 |
-|---|---|---|---|
-| 轻机构灰 | `--bg` | `#f8f9fb` | 页面画布，永远的底 |
-| 白纸 | `--panel` | `#ffffff` | 卡片/面板填充 |
-| 台账表头灰 | `--surface-2` | `#f1f5f9` | 表头、卡片次级底、底部汇总条 |
-| 悬停灰 | `--surface-3` | `#f3f4f6` | 行 hover、占位、中性 chip 底 |
-| 凹底灰 | `--surface-sink` | `#e9edf4` | 预览区凹陷底 |
-| 细账线 | `--line` | `#e3e6ea` | 默认描边、表格分隔，1px 用足 |
-| 粗账线 | `--line-strong` | `#c9ced6` | 按钮/输入框描边（控件要「挺」） |
-
-### 2.2 品牌（唯一 accent）
-
-| 描述名 | 令牌 | 色值 | 角色 |
-|---|---|---|---|
-| 瑞航蓝 | `--brand` | `#3976C6` | 实心 CTA、选中态、聚焦、蓝链、竖条 |
-| 深海军蓝 | `--brand-deep` | `#2A5996` | 选中文字、浅底按钮文字 |
-| 晨雾蓝 | `--brand-soft` | `rgb(213 230 248)` | 选中行底、激活筛选、primary 按钮底 |
-| 聚焦环 | `--brand-ring` | `rgb(57 118 198 / 22%)` | `focus` 外环 3px |
-
-### 2.3 状态（三档制：实色 / 浅底 / 深字）
-
-| 状态 | 实色 | 浅底 `-soft` | 深字 `-ink` |
-|---|---|---|---|
-| ok 成功 | `#169D72` | `rgb(207 246 231)` | `#097251` |
-| warn 警告 | `#D38A20` | `rgb(255 239 191)` | `#8B590C` |
-| danger 危险 | `#E04E5C` | `rgb(253 219 224)` | `#9D313E` |
-
-**三档分工**：表格业务状态按 [ADR 0013 的 2026-09-08 裁定](../adr/0013-align-all-ui-to-online-design.md) 使用紧凑浅底、小圆角和明确文字，列表及详情子表保持同一语义映射，配方只看[组件规格](./kit-ui-component-specs.md)。实色用于图标、进度条和文字，不作大面积状态底色；字段与状态含义仍由领域权威定义。
-
-### 2.4 文字
-
-| 描述名 | 令牌 | 色值 | 角色 |
-|---|---|---|---|
-| 炭墨 | `--ink` | `#1f2329` | 主文字。**这是本项目的"黑"——禁用纯黑 `#000000`** |
-| 灰墨 | `--ink-soft` | `#5b6470` | 次级文字、label、未选中 tab |
-| 淡墨 | `--ink-faint` | `#8b93a1` | 弱提示、占位符、字段 label |
-
-### 2.5 遮罩与外壳
-
-- 浮层遮罩 = 中性黑 `rgb(0 0 0 / 28%)`（ADR 0003：不上毛玻璃、不用品牌蓝遮罩）。
-- 应用外壳按 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 最新直接复刻裁定使用深海军蓝窄侧栏、单行图标导航与紧凑白色顶栏；内容区与品牌色继续使用瑞航令牌。
-
----
-
-## 3. 排版规则
-
-### 3.1 字族（skill 字体禁令的中文语境落地）
-
-```css
---font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
---font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-```
-
-- 字族**锁死**上面两套，不引进新字体（skill 的「禁 Inter / 换 Geist」条款在中文 CRM 语境的对应物 = 禁止引进任何花哨西文字体、禁止衬线/宋体出现在界面任何位置）。
-- **数字等宽铁律**（skill 高密度覆盖条款，本项目密度 7 触发）：金额、编号、日期、数量、百分比、计数 pill——一切数字一律 `--font-mono` + `tabular-nums`。大额数字可加 `letter-spacing: -0.015em`（Metric 实测值）收紧。
-
-### 3.2 字号阶（快照自 typography.css）
-
-以下记录通用字阶；直接参考列表与应用外壳的字号、字重和密度以 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 的现行规则为准，不把该快照作为所有控件的固定配方。
-
-| 阶 | px | 用途 |
-|---|---|---|
-| 2xs | 11 | 序号 chip、计数 pill、备注 |
-| xs | 12 | 字段 label、次级元信息、SelectFilter label |
-| sm | 13 | 表头、按钮(md)、紧凑正文、SegTab |
-| base | 14 | 正文基准（html 根字号 14px） |
-| lg | 17 | 模块标题 |
-| xl | 20 | 空态标题 |
-| 2xl | 24 | 统计卡大数字（**字号封顶，不出现巨字**） |
-
-### 3.3 层级靠字重与颜色，不靠字号轰炸
-
-| 语义 | 字重 | 颜色 |
-|---|---|---|
-| 页面/区块标题 | 800 | `--ink` |
-| 小标题、数字强调、选中 tab | 700 | `--ink` / `--brand-deep` |
-| label、按钮文字 | 600 | `--ink-soft` |
-| 次要正文 | 500 | `--ink-soft` |
-| 正文 | 400 | `--ink` |
-
-行高：正文 1.5；紧凑数字 1.2–1.25。label 加 `letter-spacing: 0.02em`（中文 label-caps 感）。
-
----
-
-## 4. 组件风格配方（实测自 kit / _ds_bundle）
-
-### 4.1 Panel（L1 内容面，一切内容的容器）
-
-白底 `--panel` + `1px solid --line` + 圆角 `--radius-card`(4px) + 无卡片阴影。默认内边距 12–16（表格面 0 + `overflow:hidden`）。可点面板 hover：边框转 `--brand` 或底色转 `--surface-2`，不位移、不升级阴影。
-**不嵌套卡片**——卡内分区用 1px 分隔线或 `--surface-2` 底，绝不再套一层圆角阴影。
+原逐组件数值表和配方已归回现行组件规格。页面使用已有通用原语，按对应页面的事实组织信息；详情壳不固定所有领域的流程、经营指标与页签顺序。
 
 ### 4.2 按钮：五变体 + 「每屏一枚章」铁律
 
-这是满意版本气质的**第一来源**，也是目前本地最大出入（见 §8.2）。
+本节保留旧代码注释与历史讨论的定位。五变体用途、hover / active / disabled 和 loading / success 行为已完整承接到 [KitUI 按钮规格](./kit-ui-component-specs.md#06--按钮三态-button-states--已定案公共零件无-adr)，不在本文维护第二份配方。
 
-| 变体 | 配方（实测） | 何时用 |
-|---|---|---|
-| secondary（**默认**） | 白底 + `1px --line-strong` 边 + `--ink` 字；hover 底转 `#eceef1`、边转 `--ink-soft` | 绝大多数操作：刷新/导出/导入/取消… |
-| primary | `--brand-soft` 底 + `--brand` 边 + `--brand-deep` 字；hover 底转 `#dbeafe` | 区块内主操作（比 secondary 响半档） |
-| accent | 实心 `--brand` 底白字；hover opacity .9 | **核心 CTA，每屏最多 1 个**（新建/识别/保存） |
-| ghost | 透明；hover `--brand-soft` 底 + `--brand` 字 | 工具性弱操作、收起/展开 |
-| danger | 白底 + `--line-strong` 边 + `--danger` 字；hover 红边 + `rgba(220,38,38,.05)` 底 | 删除等破坏性操作（静默红，不实心） |
+### 4.5 StatusChip（旧引用定位）
 
-尺寸：sm `5px 11px`/12px、**md `7px 12px`/13px**、lg `9px 16px`/14px；字重 600；圆角 `--radius-btn`(4px)。
-交互态：hover = 平面变色（无位移无发光）；**active = `scale(0.97)`**（skill「tactile push」的本项目实现）；disabled = opacity .5。
+列表与详情状态的结构和语义统一直达 [KitUI 状态规格](./kit-ui-component-specs.md#16--业务状态-tag-kit-status-tag--公共原语已实现2026-09-08)，不使用旧版品味快照反推当前外观。
 
-### 4.3 IconButton（表格操作列 / 工具条）
+## 5. 演示数据：区分设计样例与正式事实
 
-28×28 描边白底方按钮，圆角 4px，图标 ≈16px `--ink-soft`；hover 蓝边蓝字；`tone="danger"` 红字、hover 红边浅红底。操作列统一纯图标 + `title`，不混文字按钮。
+原“演示数据取自真实蓝本”的要求已移除。设计演示来源遵循 [ADR 0014 §9](../adr/0014-full-page-entity-forms.md#9-数据与实施纪律)，运行时来源隔离遵循 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)。下图概括已定边界，**不新增表、字段、迁移或写入链路**。
 
-### 4.4 数字展示：StatCard / Metric / MetricGrid
+```mermaid
+flowchart LR
+  S["匿名合成样例"] --> D["设计演示与测试示意"]
+  R["真实参考资料"] --> O["受保护的只读核对"]
+  R -. "禁止直接搬入" .-> D
+  E["运行时演示来源"] --> V["经显式开启与授权后查看"]
+  E -. "不得作为正式命令输入" .-> W["正式业务写入"]
+  F["正式来源没有记录"] --> Z["保留真实空态"]
+```
 
-- **StatCard**：Panel 内 label（12/700/`--ink-soft`）+ 大数字（24/800，行高 1.1，tone 上色）。`clickable` 时升级为可跳面板（hover 蓝框或浅底，不浮起）。
-- **Metric**：label（11/600/`--ink-faint` + ⓘ公式 tooltip）+ mono 数字（big 17.5/800，普通 13.5/700，`letter-spacing:-0.015em`）。两位小数完整展示，禁省略号。
-- **MetricGrid**：宽屏的 `cols` 只表示**最多列数/语义分组提示**，不是所有宽度锁列。重复指标优先 `repeat(auto-fit, minmax(min(100%, var(--metric-min)), 1fr))`，或用容器查询在 1/2/N 列间降级；`gap:1px` + `--line` 底色透出细分隔线，外框 1px + 圆角 4 + `overflow:hidden`。金额必须完整可读，不能靠压缩列宽或省略号维持列数。
+本图不表示所有中央能力已生产验收；当前可用边界看对应[用户指南](../guides/README.md)与验收证据。无原始事实时不以合成记录填充正式列表，也不以演示反馈伪造成功。
 
-### 4.5 StatusChip
+## 6. 动效与排版
 
-业务状态 tag 的形状、尺度、语义色与非交互边界统一看[组件规格](./kit-ui-component-specs.md)。计数、来源、类别等其他 chip 按自身用途保留，不能将本轮状态样式变更全局套给所有标签。列表与详情的同一状态不得因位置不同改写业务结论。
+长期约束已并入[设计系统边界](../rewrite/DESIGN-SYSTEM.md#2-稳定视觉语言)。过去的组件位移、时长与字重实测属于历史快照，不作为新的全站尺寸或动画要求；具体交互按组件契约与实际令牌核对。
 
-### 4.6 SegTab（业务内容分段 tab，下划线式）
+## 8. 历史差异的处理
 
-容器 `border-bottom: 1px --line`、`flex-wrap: wrap`（**禁 overflow-x 滚动**）；项高 32px、水平 padding 12px、13px；选中 = `--brand-deep`/700 + 底部 `2px solid --brand`（`margin-bottom:-1`）；未选中 = `--ink-soft`/500。可带计数 pill（11px mono；选中 `--brand-soft` 底，未选中 `--surface-3` 底）。不用方块 tab、不用胶囊 tab。应用外壳路由页签的尺寸、观感和自身横滚例外统一看 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)，行为沿用其中保留的 ADR 0011 条款。
+### 8.1 外壳不再属于有意分叉
 
-### 4.7 SelectFilter / SearchInput（工具栏两件套）
+这是 ADR 0013 所引用的旧章节定位。早期“外壳不对照设计稿”的决定已被替代，外壳视觉归 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)，[ADR 0011](../adr/0011-redesign-application-shell.md) 保留页签、导航等行为条款。
 
-以下为通用控件快照；参考式密集列表的搜索和右侧工具密度遵循 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 与[列表组件规格](./kit-ui-component-specs.md)，在可读宽度前有序换行，不把所有筛选平铺为固定次行。
+按钮层级、字阶和 danger 变体的历史修正见 [#109 审计评论](https://github.com/zodea/crm-new/issues/109#issuecomment-4998491581)及 Git 历史；本文不再复制完成记录或旧代码问题。当前功能缺口直接看[界面实现状态](./ui-implementation-status.md)。
 
-- **SelectFilter**：label（12/700/`--ink-soft`）+ 原生 select（`appearance:none`，`1px --line-strong` 边、圆角 4px、13px/600、`padding 7px 30px 7px 12px`）+ 自绘 chevron-down（14px `--ink-faint`）。多分类筛选一律收进下拉并入工具栏，**不做 pill 平铺占行**。
-- **SearchInput**：小圆角矩形（4px）、`1px --line-strong` 边、`padding 8px 14px 8px 32px`、13px，左内嵌 14px search 图标，默认宽 210px。
+## 9. 维护边界
 
-### 4.8 TreeNav（左树导航）
-
-Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 4、选中 `--brand-soft` 底 + 800 字重 + `--brand-deep`；计数 pill mono 11px（选中白底，未选中 `--surface-3`）。发票台账/清单页同构复用。
-
-### 4.9 EntityLink / MoneyLink（全站穿透语言）
-
-- 实体名一律蓝链：`--brand`/600，hover 下划线，无实体退化纯文本（**不做死链**）。
-- 聚合金额可点穿透：mono/600 蓝字，`¥` + 两位小数 `toLocaleString`，点击跳对应单据列表带预筛参数；值为 0/空退化普通 mono 文本。
-
-### 4.10 表格（KitTable / vxe-table，ADR 0009）
-
-表格的行高、字号、承载面和分页密度统一遵循 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 与[组件规格第 12 节](./kit-ui-component-specs.md#12--数据表格-kit-table--已定案2026-08-15)，本文不再维护另一套固定尺寸。名称列保留真实蓝链，金额列等宽右对齐；工具、可操作表头、状态标签及分页均按对应页面的真实能力配置。筛选和排序必须联动完整查询结果，宽表仅在自身区域横滚。
-
-### 4.11 加载 / 空态 / 错误态
-
-- **区块/页面加载**：skeleton 扫光（1.5s loop），骨架尺寸贴合真实布局；**禁通用圆形大 spinner**。按钮内 loading 允许 14px 小 spinner（KitButton 既有模式）。
-- **空态**：简短标题说明当前无记录；只有能帮助下一步操作时才补充原因或 CTA。未开放功能给出明确可用边界，不展示数据结构、开发阶段等实现说明；信息显隐遵循 [CRM 模式](../rewrite/CRM-PATTERNS.md)。
-- **错误**：行内红字（`--danger-ink`）+ 字段下方说明；表单 label 上、error 下，无浮动 label。
-
----
-
-## 5. 布局原则
-
-**页面模板全站同构**（强制响应式契约见 [ADR 0013「响应式与自适应契约」](../adr/0013-align-all-ui-to-online-design.md)，此处只记品味要点）：
-
-- **列表页**：标题、搜索与工具、表格和有真实口径的汇总构成连续工作面，结构与密度看 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 及[列表组件规格](./kit-ui-component-specs.md)。不强制拆成多张卡，不强加没有业务依据的分类或汇总；窄屏工具可有序换行，主操作保持可达。
-- **详情页**：顶部摘要面板（返回 + 头像方块 + 标题行 + 摘要格行）→ 流程/进度事实 → 经营与票据概览 → SegTab / SectionHeader 分区。SectionHeader = 不超过 34px 的 `--surface-2` 层级条 + 3×14px 品牌竖条 + 13/700 标题；只有参考页或既有业务流程能明确证明更优信息流时才调整模块顺序。
-- **流式网格优先**：重复卡片按最小可读宽度自适应，可使用 `auto-fit` / `auto-fill` + `minmax()`；语义栏位可显式给宽屏列数或比例，但必须用容器/视口断点提供降列、堆叠、Tab 或 Sheet 退化。比例列是宽屏构图，不是固定画布。
-- **禁整页横滚**：宽内容（大表格/矩阵/甘特）在自身容器内 `overflow-x:auto`。SegTab 用 wrap 不用横滚。
-- **SVG 图表**：`viewBox` + 百分比宽随容器缩放；需要重绘时观察**容器**而非只监听窗口，不写死画布宽高。
-- 内容区宽度、gutter 与连续工作面的留白看 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)，不以历史最大宽度或面板间距锁死参考式列表；其他面板按自身可读宽度和内容量排布。
-- **退化基线**：<1024px 侧栏转 Sheet（ADR 0011）；业务区根据容器可用宽度自动降列，<768px 以单列/分段呈现为默认。断点是保护最小可读宽度的触发点，不是固定“两排模板”。
-
----
-
-## 6. 动效哲学（克制覆盖声明）
-
-> **覆盖声明**：stitch-design-taste 默认的 spring 物理（stiffness 100/damping 20）与「常驻微动效」（Pulse/Float/Shimmer 循环）**在本项目全部不适用**——这是数据工具，动效只做状态反馈，不做氛围。本节为唯一动效基准。
-
-| 令牌 | 值 |
-|---|---|
-| `--dur-fast` | 120ms（hover 变色、图标） |
-| `--dur-base` | 160ms（下拉、tab 切换） |
-| `--dur-dialog` | 220ms（弹窗进场） |
-| `--ease-snappy` | `cubic-bezier(0.2, 0, 0.2, 1)` |
-
-场景速查：tab 切换 = 淡入 + 6px 上移；弹窗 = 遮罩淡入 + 内容上移 12px；抽屉/toast = 侧滑；按钮 active = `scale(0.97)`；skeleton = 1.5s 扫光；进度条 = 600ms ease-out。只动 `transform`/`opacity`；`prefers-reduced-motion: reduce` 全部退化。
-
-**永久禁止**：全局路由动画、表格行持续动画、金额滚动计数、拖拽物理弹簧、滚动视差、**蓝色水波 ripple（全域已废弃，含导出完成动效，ADR 0004）**。
-
----
-
-## 7. 反模式清单（NEVER）
-
-**视觉**
-- 纯黑 `#000000`（黑 = `--ink #1f2329`）；暖灰混入冷蓝灰阶；第二 accent 色。
-- 霓虹外发光、紫蓝渐变、渐变大标题、毛玻璃进内容区（`backdrop-filter` 仅限外壳顶栏 blur(8px)，ADR 0013 设计稿规格；侧栏毛玻璃仍废弃）。
-- 实心状态色大色块底；一屏多枚实心蓝按钮；卡片套卡片。
-- 界面文案/图标混用 emoji；图标只用 Lucide（`i-lucide-*`）单色线性。
-
-**布局**
-- 固定页面画布、固定业务区长宽、任何宽度永不变化的列模板；没有最小可读宽度保护、会造成剧烈跳动的 `auto-fit/auto-fill` 滥用；`calc()` 百分比 hack；整页横向滚动条；SegTab 横滚。
-- 为凑对称硬摆「3 等分卡片行」——列数由内容语义决定。
-- 文字/元素重叠、绝对定位堆内容。
-
-**动效**：见 §6 禁止清单；不实现自定义鼠标指针。
-
-**文案与数据**
-- AI 味营销词（「赋能」「一站式」「极致」之类）；「点击探索」「下滑查看」等填充引导。
-- 假人名假公司（John Doe/Acme/某某公司）、整数假数（99.99%/50%）——演示数据一律取自真实数据蓝本（`数据蓝本/`，红圈收尾链为空就留空态，**勿造数据**）。
-- 未闭环页面不补演示 toast、不伪造成功状态、不以删功能换视觉相似（状态口径见 [ui-implementation-status.md](ui-implementation-status.md)）。
-- 金额两位小数完整展示，禁省略号截断。
-
----
-
-## 8. 线上 Design ↔ 本地开发出入清单（重构指引）
-
-> 用户最新裁定要求真实 app 对照登录态运行参考逐屏收敛，同时保留瑞航品牌与业务语义。本节把出入拆成三类：**必须保留的产品边界**、**已确证待收敛**、**待逐屏核对**。
-
-### 8.1 必须保留的产品边界
-
-| 面 | 设计稿（线上） | 本地（权威） | 结论 |
-|---|---|---|---|
-| 应用外壳 | 历史 DC 白底宽侧栏仅供溯源 | 深海军蓝紧凑侧栏与顶栏，具体尺寸看 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) | 按2026-09-08用户直接复刻裁定；保留瑞航品牌，ADR0011仅存行为条款 |
-| 交互底座 | 手写 React 弹窗/toast | reka-ui Dialog + vue-sonner（ADR 0008） | **本地为准**，视觉语义仍按本文 |
-| 业务字段与状态 | 参考页展示其自身业务对象 | 瑞航页面蓝本、DATABASE、CONTEXT 和现有 action | **瑞航为准**；只复刻信息流，不复制参考数据或状态机 |
-| 新增/编辑形态 | 参考站可能使用弹窗或整页 | ADR 0014 独立路由整页表单 | **ADR 0014 为准**；弹窗只留给行级小对象 |
-
-### 8.2 已确证待收敛——本轮实测代码逐条点名
-
-> **完整版清单已移交 [#109 审计评论](https://github.com/zodea/crm-new/issues/109#issuecomment-4998491581)**（2026-07-17 放开限制后的全站审计：13px 阶漂移、数字层级错乱、Panel 底座缺失、content-panel 扁平残留、EntityLink/MoneyLink 穿透件缺失、列表页 chip 违例、表格汇总条/skeleton/空态、实心蓝泛滥量化、SegTab 双轨等九组）。本节以下仅保留首轮发现，后续以 #109 为准。
-
-**① 按钮层级语言相反（最大出入，建议最先修）** ✅ **已落地（#109，2026-07-17）**：五变体齐备、缺省 secondary、实心蓝仅 accent、全站逐屏清点完成；下表现状列仅存历史。
-
-| 处 | 现状 | 基准（§4.2） |
-|---|---|---|
-| [uno.config.ts:187](../../uno.config.ts) | `btn-primary = bg-brand text-white`（实心蓝当 primary 用） | 实心蓝只属于 accent，每屏 ≤1 |
-| [button/index.ts:14](../../app/components/ui/button/index.ts) | shadcn `default` 变体 = 实心蓝白字、且是**缺省值** → 页面随手一个按钮就是实心蓝 | 缺省应为 secondary（描边白底安静按钮） |
-| [KitButton.vue:34-38](../../app/components/ui/KitButton.vue) | 只有 brand/danger/ghost 三档，缺 primary（浅蓝底深蓝字）与 accent 分档 | 五变体齐备，层级 secondary→primary→accent |
-| 同上 | 按钮 14px、无 active 按压态 | md 13px；active `scale(0.97)` |
-| [DESIGN-SYSTEM.md §4.2](../rewrite/DESIGN-SYSTEM.md) | 既有文档就把 `.btn-primary` 写成实心蓝——**出入的文档根源** | 按本文 §4.2 修订该节（后续轮次） |
-
-> 重构方向：给 Button/KitButton 补全五变体映射、把缺省降为安静按钮、实心蓝改名 accent 并全站清点「每屏一枚」。已随 #109 实施，DESIGN-SYSTEM.md §4.2 同轮修订。
-
-**② 正文基准文档冲突** ✅ **已处理（#110 阶段③）**：以 14px 为准，ADR 0007 该句已加勘误注；13px 控件阶（SegTab/SelectFilter/SearchInput/TreeNav）与数字字阶（StatCard 24/800、Metric 17.5/13.5）同轮回收。
-
-**③ danger 按钮** ✅ **已落地（#109）**：`destructive`/`btn-danger` 已改静默红（白底红字，§4.2 配方）。破坏性操作靠确认弹窗兜底（ADR 0003），按钮本身不必嘶吼。
-
-### 8.3 页面对齐状态——只指向不复制
-
-未实现与已搭未闭环清单以 [ui-implementation-status.md](ui-implementation-status.md) 为准；具体重构顺序以对应 GitHub open Issues 的优先级和依赖为准，不在品味文档维护排期快照。
-
-### 8.4 重构工作方式
-
-- 每屏先查 `runtime-reference-audit.md`：直接证据页按运行参考核对，邻近/待补采页不得冒充直接复刻。
-- 对照顺序：信息流与安全交互 → 按钮层级 → 数字排版（mono/对齐/小数）→ 卡片与分隔（不嵌套）→ 状态色 → 工具栏与列筛选 → 动效克制。
-- 同时查 `kit/*.jsx` 保留瑞航品牌和 DC 独有能力；与业务文档、ADR 冲突时业务权威源和 ADR 优先。
-
----
-
-## 9. 本文维护
-
-- 快照日期 2026-07-17。`content-v5.css`、相关 ADR、`kit/*.jsx` 任何一处变更，同轮更新本文对应小节或打「⚠️ 已过时」墓碑。
-- 本文不新增令牌、不定义数据模型；新增设计决策仍走 `docs/adr/`。
+现行规则变化时修改其直接权威来源；本文只同步受影响的示意与定位链接。运行参考差异按[运行参考审计](./runtime-reference-audit.md)留证，不能将本文图片写作新的现场观察。

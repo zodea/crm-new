@@ -1,8 +1,8 @@
 # 架构决策索引
 
-ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用下一个四位编号；被替代的 ADR 保留正文并在标题下明确指向新决策，不删除历史。
+ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用下一个四位编号；保留有效决定、理由与必要证据。失效正文可在确认范围内压缩，标明替代关系并修正引用；历史版本由 Git 保存。
 
-当前任务组织看[全模块复核路线](https://github.com/zodea/crm-new/issues/402)与[模块复核规程](../agents/module-review.md)。旧任务被替代不撤销已采纳决定；“已采纳”“历史切片已实现”和“当前模块已通过/生产可用”分别判断，实际完成状态只看[界面实现状态](../design/ui-implementation-status.md)及当前验收证据。
+按当前任务直接查相关决定；“已采纳”不等于功能或生产已验收。实现状态查对应验收证据，不在索引维护任务总图。
 
 | ADR | 主题 | 当前状态 |
 | --- | --- | --- |
@@ -12,13 +12,13 @@ ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用�
 | [0004](./0004-export-interaction-model.md) | 导出交互模型 | 已采纳 |
 | [0005](./0005-import-mapping-model.md) | 通用导入映射 | 已采纳 |
 | [0006](./0006-ocr-paddleocr-vl-single-model.md) | PaddleOCR-VL 单模型 | 已采纳 |
-| [0007](./0007-unified-visual-style-rounded-cards.md) | 圆角卡片视觉风格 | 已采纳 |
+| [0007](./0007-unified-visual-style-rounded-cards.md) | 业务内容区单层容器 | 有效；视觉参数由 0013 更新 |
 | [0008](./0008-adopt-shadcn-vue-on-unocss.md) | shadcn-vue / reka-ui / vue-sonner on UnoCSS | 已采纳 |
 | [0009](./0009-vxe-table-as-datagrid-engine.md) | vxe-table 数据网格底座 | 已采纳 |
 | [0010](./0010-quantity-matrix-and-construction-record-model.md) | 工程量矩阵与施工记录模型 | 已采纳 |
 | [0011](./0011-redesign-application-shell.md) | 应用外壳行为 | 视觉条款被 0013 取代；行为有效 |
 | [0012](./0012-exact-factor-combination-solver.md) | 开票因子精确组合求解 | 已采纳 |
-| [0013](./0013-align-all-ui-to-online-design.md) | 全站视觉统一到线上设计稿 | 已采纳 |
+| [0013](./0013-align-all-ui-to-online-design.md) | 运行参考与瑞航设计双源基准 | 已采纳 |
 | [0014](./0014-full-page-entity-forms.md) | 业务实体使用整页表单 | 已采纳；整页表单基线已落地，业务闭环逐模块复核 |
 | [0015](./0015-form-persistence-and-payment-reconciliation.md) | 表单持久化与付款勾稽 | 已采纳；当前写入范围见 COMMANDS，不能等同全域生产持久化 |
 | [0016](./0016-overlay-composition-contract.md) | 浮层组合采用单交互平面与模态栈契约 | 已采纳，迁移中 |

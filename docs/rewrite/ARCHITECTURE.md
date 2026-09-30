@@ -2,7 +2,7 @@
 
 本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，浏览器中央权威与演示隔离决策看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)，中央写入语义看 [`COMMANDS.md`](./COMMANDS.md)，跨域入口与返回语义看 [`NAVIGATION.md`](./NAVIGATION.md)。
 
-当前工作按[全模块复核路线](https://github.com/zodea/crm-new/issues/402)与[模块复核规程](../agents/module-review.md)逐模块推进，前台界面、交互和数据处理优先；可靠持久化、备份恢复与部署由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。顺序调整不撤销 ADR 0020，不开放本地正式写入旁路，也不把完整账号/RBAC、审批引擎或 Tauri 正式交付加入当前范围。
+任务顺序由用户当前指令确定；调整顺序不撤销 ADR 0020 的读写边界，也不自动纳入完整账号/RBAC、审批引擎或 Tauri 正式交付。
 
 首期单人本机的持久库、身份入口与备份恢复方案已由 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)裁定，具体执行见[生产子票入口](../implementation/production-gate-work-breakdown.md)。方案定稿与下述现有代码状态分别阅读；只有 [#471 最终上线验收](https://github.com/zodea/crm-new/issues/471)通过后才可宣称该范围正式可用。
 
@@ -63,7 +63,7 @@ app/
 │  └─ <domain>/     # 领域纯逻辑、适配器与读写服务
 ├─ pages/           # Nuxt 文件路由；页面负责组合，不承担全部领域逻辑
 ├─ plugins/         # 数据库、组件库等运行时接入
-├─ stores/          # 跨界面领域状态及唯一写 action
+├─ stores/          # 共享应用状态与领域写入 action
 ├─ types/           # 跨模块共享类型
 └─ workers/         # 重计算或文件处理 worker
 
@@ -112,8 +112,8 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
                                                                             └─ 回滚窗口内仅可由迁移适配器恢复备份
 ```
 
-- 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
-- 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
+- 状态归属按共享范围、生命周期与实例隔离选择，遵循 `AGENTS.md` 的实现规范；Pinia 可管理同页或跨页共享状态，不要求把所有局部状态迁入 store。
+- 业务数据经领域 store action、Repository 与既定读写层修改；简单界面状态可按框架公开 API 绑定，不因此引入业务持久化旁路。
 - 项目列表、来源感知详情与正式项目表单已接中央 HTTP。新增/编辑由 `project:write`、`commandId` 和 `baseVersion` 保护；#423 项目 Excel 导入复用中央项目命令与同源回读，独立于编辑草稿会话，入口和来源防重边界见 [COMMANDS](./COMMANDS.md#项目-excel-导入423)；删除仍禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
 - Issue #318、#320 与 #321 的材料采购、施工、分包合同浏览器链只经各自领域 Repository/Store 与中央 HTTP：列表和七分区详情按 `(dataOrigin,id,kind)` 校验，演示来源还要同时通过用户可见性开关与服务端 `demo:read`。正式表单以各自 write capability、`commandId`、`baseVersion` 和服务端关系校验保护，成功后回到同一中央详情重读；#294 受控迁移携带 canonical 施工/分包合同并在确认后进入同一中央命令源。没有稳定外键的事实保持空集合，实际竣工、分包结算与清账未知时保持 `null`。
 - Issue #294 的核心身份迁移是另一条显式中央命令链：`preflight → immutable backup → dry-run → import → post-write reconciliation → confirm → rollback`。#320 与 #321 将 canonical 施工/分包合同纳入同一受控拓扑，导入顺序固定为客户、分供方、班组、项目、施工合同、分包合同、工人、项目分供方；只接受稳定旧 ID 映射，不按名称、编号或金额猜关系。本地迁移适配器从快照字节重算摘要、来源哈希和版本并在恢复前再次核对；服务端重算 canonical 来源哈希、验证证明结构并将首份证明不可替换地绑定批次，但不上传或读取浏览器整库备份。服务端在实际写入后重新核对计数、金额、数量、关系、软删除与孤儿，客户端按钮状态不能替代后台门禁。确认后浏览器保存持久迁移标记并禁止六类身份与施工/分包合同走旧 production 的普通读写，重载时必须校验标记和中央活动批次。迁移适配器可以读取不可变备份用于恢复，不能以此重新开放普通旧库查询。
@@ -132,8 +132,8 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
 - 侧栏信息架构的代码权威源是 `app/lib/nav/nav-tree.ts`；`to` 缺省表示入口尚未实现。
 - 页面路由由 `app/pages/` 生成。列表、详情、表单之间的 active nav 和应用页签归属由 `app/lib/nav/`、`app/lib/tabs/` 统一处理；页签上限、可恢复 descriptor、活动页刷新和后台页暂停语义统一遵守 [`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)。
 - 蓝色名称、编号、金额、消息目标和跨域来源返回必须遵守 [`NAVIGATION.md`](./NAVIGATION.md)；后台返回语义目标与稳定 ID，前端唯一 target registry 解析站内路径，多态单据不得用名称或编号猜 variant。
-- 业务实体新增/编辑采用整页表单路由；共享字段、保存动作、脏数据拦截和持久化能力位于 `app/components/forms/`、`app/lib/forms/` 及相关 store，见 ADR 0014 / 0015。
-- 行级小对象、确认和轻量选择器才使用 Dialog；不得把大型业务实体重新塞回通用 formModal。
+- 业务实体新增/编辑默认采用整页表单路由，改变形态须说明场景并经用户确认；共享字段、保存、脏数据拦截与持久化能力位于 `app/components/forms/`、`app/lib/forms/` 及相关 store，见 ADR 0014 / 0015。
+- 行级明细、确认和轻量任务可用行内编辑或 Dialog。
 
 路由数量和“是否闭环”会持续变化，不在架构文档维护静态路由清单。
 
@@ -153,4 +153,4 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
 - 组件交互、可达性与边界：组件测试。
 - 路由、数据库、应用页签、整页表单和跨域旅程：Playwright E2E。
 - Tauri 专属文件、数据库和权限能力不能只由浏览器 mock 证明；发布前需桌面态验收。
-- UI 改动同时验证参考视口、390 / 768 / 1024 / 1280–1440px、200% 等效宽度、键盘焦点和局部滚动。
+- 界面按影响验证键盘焦点与滚动；布局、响应式和共享组件改动覆盖 ADR 0013 约定的主要视口、相关断点与 200% 缩放。
