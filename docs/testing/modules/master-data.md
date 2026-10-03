@@ -27,6 +27,6 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/central-master-data-multifilter.spec.ts](../../../e2e/central-master-data-multifilter.spec.ts) | Playwright E2E | ${kind} 固定筛选复选、候选保留和返回恢复 |
-| [e2e/master-data-forms.spec.ts](../../../e2e/master-data-forms.spec.ts) | Playwright E2E | F1 基础主数据整页表单 |
-| [e2e/master-data-lists.spec.ts](../../../e2e/master-data-lists.spec.ts) | Playwright E2E | Issue #194：客户、班组、工人列表 |
+| [e2e/central-master-data-multifilter.spec.ts](../../../e2e/central-master-data-multifilter.spec.ts) | Playwright E2E | 客户、班组与工人具名夹具复选；核对完整命中及排除集合、未选候选保留、返回地址的精确选值和清除恢复 |
+| [e2e/master-data-forms.spec.ts](../../../e2e/master-data-forms.spec.ts) | Playwright E2E | 六类主数据整页表单五档布局；两套正式客户输入、离开未保存表单及预算编辑 |
+| [e2e/master-data-lists.spec.ts](../../../e2e/master-data-lists.spec.ts) | Playwright E2E | 两组具名输入经中央命令创建客户、班组和工人；五档视口检查列表与局部滚动，键盘进入真实详情及清除空筛选 |

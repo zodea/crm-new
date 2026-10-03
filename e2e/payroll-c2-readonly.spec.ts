@@ -1,7 +1,7 @@
 import type { Page, TestInfo } from '@playwright/test'
 import { writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
-import { payrollC2Repository, payrollC2Workspace } from './helpers/payroll-c2-workspace'
+import { payrollC2Repository, payrollC2Workspace, preparePayrollC2Fixture } from './helpers/payroll-c2-workspace'
 
 test.use({ actionTimeout: 15000 })
 async function capture(page: Page, info: TestInfo, name: string, selector?: string) {
@@ -15,10 +15,11 @@ async function capture(page: Page, info: TestInfo, name: string, selector?: stri
 }
 
 test('旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签工输出', async ({ page }, info) => {
+  await preparePayrollC2Fixture(page, info)
   const repository = payrollC2Repository(page)
   const list = await repository.list({ origin: 'real' })
   const legacy = list.rows.find(row => row.legacyId === 'c2-history-missing')
-  expect(legacy, '需要主旅程真实迁入的旧缺损头').toBeTruthy()
+  expect(legacy, '需要本用例真实迁入的旧缺损头').toBeTruthy()
   expect(legacy!.snapshot.state).toBe('missing')
   expect(legacy!.actualAmount).toBeNull()
   const before = await repository.detail({ origin: 'real' }, legacy!.id)
@@ -49,7 +50,7 @@ test('旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签�
 })
 
 test('C2 来源拒权不能沿旧读保存，重读后仍保原项目及草稿编号', async ({ page }, info) => {
-  const { project, leader } = await payrollC2Workspace(page, '2026-09')
+  const { project, leader } = await payrollC2Workspace(page, '2026-09', info)
   const writes: string[] = []
   page.on('request', (request) => {
     if (request.url().includes('/api/commands/'))

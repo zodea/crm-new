@@ -19,14 +19,6 @@ const hasSummary = computed(() => operation.value != null && invoice.value != nu
 const resolvedOperation = computed(() => operation.value!)
 const resolvedInvoice = computed(() => invoice.value!)
 
-const taxBurdenRate = computed(() => !invoice.value || invoice.value.outputAmount === 0
-  ? '—'
-  : new Intl.NumberFormat('zh-CN', {
-      style: 'percent',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(invoice.value.taxBurdenRate))
-
 const currentBalance = computed(() => operation.value
   ? operation.value.currentReceipt - operation.value.currentPayment
   : '—')
@@ -52,6 +44,11 @@ const balanceMetricMeta = computed(() => ({
   cutoff: '当前数据库快照',
   missingSources: '管理费配置',
 }))
+const actualTaxMetricMeta = {
+  status: '待核实',
+  cutoff: '未核实属期',
+  missingSources: '纳税主体、计税方法、业务义务、抵扣资格及申报缴款依据',
+}
 
 function projectTab(tab: ProjectDetailTabKey) {
   return {
@@ -171,8 +168,8 @@ onMounted(refresh)
           :to="{ path: '/finance/ledger', query: { project: projectId } }"
         />
         <Metric v-bind="completeMetricMeta" label="进项税额" :value="resolvedInvoice.inputTax" money formula="Σ 本项目已归档发票.税额" :to="{ path: '/finance/ledger', query: { project: projectId } }" />
-        <Metric v-bind="completeMetricMeta" label="增值税" :value="resolvedInvoice.vat" money formula="销项税额 − 进项税额" :to="projectTab('tax')" />
-        <Metric v-bind="completeMetricMeta" label="税负率" :value="taxBurdenRate" formula="销项票额为 0 时不可计算；否则为增值税 ÷ 销项票额" />
+        <Metric v-bind="actualTaxMetricMeta" label="增值税" value="—" formula="须按真实主体、属期及适用计税方法核实；开票申请与归档票差额不能代替应纳税额。" />
+        <Metric v-bind="actualTaxMetricMeta" label="税负率" value="—" formula="真实税额及归属依据尚未接通，待核实后展示。" />
       </MetricGrid>
     </section>
   </template>

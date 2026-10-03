@@ -31,14 +31,33 @@ const workers = [
 ]
 
 describe('主数据列表筛选与排序', () => {
-  it('同字段多选取并集，字段间取交集，清空恢复全集', () => {
+  function createMasterDataFilterQuery() {
     const query = { search: '', sort: 'updated-desc' as const, values: { trade: ['泥水工', '油漆工'], status: [] as string[] } }
-    expect(filterAndSortMasterDataRows(workers, MASTER_DATA_LIST_PROFILES.worker, query)).toHaveLength(2)
+    return { query }
+  }
+
+  it('同字段多选取并集，字段间取交集，清空恢复全集', () => {
+    const { query } = createMasterDataFilterQuery()
     query.values.status = ['submitted']
     expect(filterAndSortMasterDataRows(workers, MASTER_DATA_LIST_PROFILES.worker, query).map(row => row.id)).toEqual(['worker-1'])
     query.values.status = []
     query.values.trade = []
-    expect(filterAndSortMasterDataRows(workers, MASTER_DATA_LIST_PROFILES.worker, query)).toHaveLength(2)
+  })
+
+  it.each([
+    { case: 'workers / MASTER_DATA_LIST_PROFILES.worker / query', prepare: ({ query }: ReturnType<typeof createMasterDataFilterQuery>) => {
+      return { input: workers, argument2: MASTER_DATA_LIST_PROFILES.worker, argument3: query, expected: 2 } as const
+    } },
+    { case: 'workers / MASTER_DATA_LIST_PROFILES.worker / query', prepare: ({ query }: ReturnType<typeof createMasterDataFilterQuery>) => {
+      query.values.status = ['submitted']
+      query.values.status = []
+      query.values.trade = []
+      return { input: workers, argument2: MASTER_DATA_LIST_PROFILES.worker, argument3: query, expected: 2 } as const
+    } },
+  ])('同字段多选取并集，字段间取交集，清空恢复全集 / filterAndSortMasterDataRows：$case', ({ prepare }) => {
+    const fixture = createMasterDataFilterQuery()
+    const { input, argument2, argument3, expected } = prepare(fixture)
+    expect(filterAndSortMasterDataRows(input, argument2, argument3)).toHaveLength(expected)
   })
   it('搜索覆盖实体字段并叠加班组和在场状态筛选', () => {
     expect(filterAndSortMasterDataRows(
@@ -95,14 +114,16 @@ describe('主数据列表筛选与排序', () => {
     ).map(row => row.id)).toEqual(['worker-2', 'worker-1'])
   })
 
-  it('从真实行生成去重且稳定排序的筛选项', () => {
-    expect(masterDataFilterOptions(workers, 'crewName')).toEqual([
+  it.each([
+    { case: 'workers / \'crewName\'', input: workers, argument2: 'crewName', expected: [
       { key: '泥水A班', label: '泥水A班' },
       { key: '油漆班', label: '油漆班' },
-    ])
-    expect(masterDataFilterOptions(workers, 'status')).toEqual([
+    ] },
+    { case: 'workers / \'status\'', input: workers, argument2: 'status', expected: [
       { key: 'draft', label: '草稿' },
       { key: 'submitted', label: '已提交' },
-    ])
+    ] },
+  ])('从真实行生成去重且稳定排序的筛选项 / masterDataFilterOptions：$case', ({ input, argument2, expected }) => {
+    expect(masterDataFilterOptions(input, argument2)).toEqual(expected)
   })
 })

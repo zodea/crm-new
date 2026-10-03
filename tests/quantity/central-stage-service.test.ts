@@ -59,7 +59,7 @@ it('阶段配置走中央命令与同源回读，新映射不自动报量，显�
   await expect(repository.execute(switchStage.command)).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
 })
 
-it('阶段回读拒绝跨工种映射和同分项多个报量阶段', async () => {
+it.each(['wrong-trade', 'duplicate-reporting-stage'] as const)('阶段回读拒绝 %s', async (violation) => {
   const envelope = { dataOrigin: 'real', sourceVersion: 'q:1', asOf: '2026-09-11T00:00:00.000Z', capabilities: ['quantity:read'] }
   const data = {
     projectId: query.projectId,
@@ -68,12 +68,10 @@ it('阶段回读拒绝跨工种映射和同分项多个报量阶段', async () =
     items: [{ id: 'item', code: 'I', name: '腻子', trade: '油漆工', unit: null }],
     mappings: [{ id: 'map-one', stageId: 'one', itemId: 'item', isReportingStage: true }],
   }
-  for (const invalid of [
-    { ...data, items: [{ ...data.items[0], trade: '木工' }] },
-    { ...data, mappings: [...data.mappings, { id: 'map-two', stageId: 'two', itemId: 'item', isReportingStage: true }] },
-  ]) {
-    await expect(createQuantityRepository(async () => ({ ...envelope, data: invalid })).stages(query)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
-  }
+  const invalid = violation === 'wrong-trade'
+    ? { ...data, items: [{ ...data.items[0], trade: '木工' }] }
+    : { ...data, mappings: [...data.mappings, { id: 'map-two', stageId: 'two', itemId: 'item', isReportingStage: true }] }
+  await expect(createQuantityRepository(async () => ({ ...envelope, data: invalid })).stages(query)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
 })
 
 it('矩阵归档与解除走相同版本和审计，归档后普通修改被拒且明确授权才可编辑', async () => {

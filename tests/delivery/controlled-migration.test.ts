@@ -96,7 +96,7 @@ describe('送货完整受控迁移', () => {
       const parsed = parseCoreMigrationSourceCommand({ ...envelope('delivery-preflight'), source, backup: null })
       expect(parsed.source).toEqual(source)
       await coreMigrationTestInstance.preflight(parsed, session)
-      const batch = await coreMigrationTestInstance.dryRun({ ...envelope('delivery-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 441, createdAt: new Date().toISOString(), immutable: true } }, session)
+      const batch = await coreMigrationTestInstance.dryRun({ ...envelope('delivery-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 441, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }, session)
       expect(batch.issues).toContainEqual(expect.objectContaining({ entityType: 'delivery_records', metricKey: 'legacy-audit' }))
       expect(batch.issues).toContainEqual(expect.objectContaining({ reason: expect.stringContaining('1 份历史原件已有逻辑 owner') }))
       await coreMigrationTestInstance.importBatch({ ...envelope('delivery-import'), batchId: batch.batchId }, session)

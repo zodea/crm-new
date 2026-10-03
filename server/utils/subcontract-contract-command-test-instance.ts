@@ -18,7 +18,7 @@ import {
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
-interface Option { id: string, name: string }
+interface Option { id: string, name: string, contact?: string, contactPhone?: string }
 
 interface StoredContract {
   draft: ProjectContractFormDraft & { id: string }
@@ -216,7 +216,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
         actorId: session.actorId,
         capabilities: [...session.capabilities],
         projects: [...new Map([...migratedProjects, ...projects]).values()].map(row => ({ id: row.id, label: row.name })),
-        suppliers: [...new Map([...migratedSuppliers, ...suppliers]).values()].map(row => ({ id: row.id, label: row.name })),
+        suppliers: [...new Map([...migratedSuppliers, ...suppliers]).values()].map(row => ({ id: row.id, label: row.name, contactName: row.contact ?? '', contactPhone: row.contactPhone ?? '' })),
       }
     },
     rows(sessionId?: string | null) {

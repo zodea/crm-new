@@ -14,16 +14,14 @@ function setup() {
   return { service, record, content }
 }
 describe('送货 HTTP Repository 边界', () => {
-  it('校验归属、完整字节和摘要，不让不同owner的同名原件冒充返回', async () => {
+  it.each(([{ recordId: 'other-owner' }, { projectId: 'other-project' }, { origin: 'demo' }, { fileSize: 1 }, { sha256: '0'.repeat(64) }]).map(input => ({ input })))('校验归属、完整字节和摘要，不让不同owner的同名原件冒充返回：输入案例 %#', async ({ input: patch }) => {
     const { record, content } = setup()
     const fetcher = vi.fn().mockResolvedValue(content)
     const repository = createDeliveryRepository(fetcher)
     const query = { id: record.id, assetId: record.assetId!, origin: 'real' as const, projectId: 'p', supplierId: 's' }
     expect((await repository.fileContent(query)).bytes).toEqual(Uint8Array.from(atob(payloadBase64), character => character.charCodeAt(0)))
-    for (const patch of [{ recordId: 'other-owner' }, { projectId: 'other-project' }, { origin: 'demo' }, { fileSize: 1 }, { sha256: '0'.repeat(64) }]) {
-      fetcher.mockResolvedValue({ ...content, ...patch })
-      await expect(repository.fileContent(query)).rejects.toThrow('原件')
-    }
+    fetcher.mockResolvedValue({ ...content, ...patch })
+    await expect(repository.fileContent(query)).rejects.toThrow('原件')
   })
 
   it('取消后到达的正文不生成可应用结果，且把signal交给传输层', async () => {

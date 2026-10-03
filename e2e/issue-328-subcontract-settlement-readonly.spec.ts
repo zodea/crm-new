@@ -7,8 +7,8 @@ import { expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } 
 const expect = baseExpect.configure({ timeout: 20_000 })
 
 async function chooseLookup(page: Page, label: string, option: string) {
-  await page.getByRole('combobox', { name: label }).click()
-  await page.getByText(option, { exact: true }).click()
+  await page.getByRole('combobox', { name: label, exact: true }).fill(option)
+  await page.getByRole('option').filter({ hasText: option }).first().click()
 }
 
 async function createSubcontract(page: Page, name: string): Promise<string> {
@@ -46,8 +46,7 @@ test.describe('AX02 分包结算中央只读链', () => {
     await page.goto('/subcontract/settlement/new')
     await expect(page.getByRole('heading', { name: '新建 · 分包结算' })).toBeVisible({ timeout: 20_000 })
     for (const [label, option] of [['检索项目', '中央正式施工项目'], ['检索分供方', '中央正式劳务分供方'], ['检索分包合同', contractName]]) {
-      await page.getByRole('combobox', { name: label }).click()
-      await page.getByText(option!, { exact: true }).click()
+      await chooseLookup(page, label!, option!)
     }
     await page.getByTestId('owner-document-no').fill('FBJS-E2E-328')
     await page.getByTestId('owner-document-name').fill('E2E 八月劳务结算')
@@ -84,8 +83,11 @@ test.describe('AX02 分包结算中央只读链', () => {
 
     await page.goto('/project/project-real-320?origin=real')
     await page.locator('#project-owner-document-card-sub-settlement').click()
-    await page.getByRole('combobox', { name: '状态' }).click()
-    await page.getByRole('option', { name: '已确认' }).click()
+    await page.getByRole('button', { name: /^状态，已选 1 项$/ }).click()
+    const status = page.getByRole('dialog').filter({ has: page.getByRole('group', { name: '状态', exact: true }) })
+    await status.getByRole('checkbox', { name: '待确认', exact: true }).uncheck()
+    await status.getByRole('checkbox', { name: '已确认', exact: true }).check()
+    await status.getByRole('button', { name: '应用', exact: true }).click()
     await page.getByRole('link', { name: 'FBJS-E2E-328', exact: true }).click()
     await page.getByRole('link', { name: '返回分包结算列表' }).click()
     await page.getByRole('link', { name: '返回来源详情' }).click()
@@ -144,6 +146,8 @@ test.describe('AX02 分包结算中央只读链', () => {
     expect((await saved).ok()).toBe(true)
     await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存并确认' })).toBeEnabled()
     await page.reload()
+    await expect(page.getByRole('heading', { name: '已补充名称的结算草稿' })).toBeVisible({ timeout: 20_000 })
+    await page.getByTestId('subcontract-settlement-edit').click()
     await expect(page.getByTestId('owner-document-name')).toHaveValue('已补充名称的结算草稿')
     await page.getByRole('button', { name: '返回来源', exact: true }).click()
     await expect(page.getByRole('heading', { name: '已补充名称的结算草稿' })).toBeVisible({ timeout: 20_000 })

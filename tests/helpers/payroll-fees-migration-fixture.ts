@@ -30,7 +30,7 @@ export async function createPayrollFeesMigrationFixture(options: { sameMonth?: b
     const session = resolveBusinessSession()
     const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, commandId })
     await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('fees-preflight'), source, backup: null }), session)
-    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('fees-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: new Date().toISOString(), immutable: true } }), session)
+    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('fees-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
     if (batch.issues.some(issue => issue.metricKey === 'apply-failed'))
       throw new Error(JSON.stringify(batch.issues))
     await coreMigrationTestInstance.importBatch({ ...envelope('fees-import'), batchId: batch.batchId }, session)

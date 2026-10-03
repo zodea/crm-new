@@ -62,19 +62,19 @@ describe('暂存路径保护', () => {
     expect(() => checkStagedPaths([path])).toThrow('不能提交')
   })
 
-  it('允许源码、正式证据、共享 AI 配置与文档', () => {
-    expect(() => checkStagedPaths([
-      'app/components/Template.vue',
-      'scripts/git-hooks.mjs',
-      'docs/guides/export.md',
-      'docs/design/evidence/example/screenshot.png',
-      'docs/design/evidence/example/verification.log',
-      'docs/design/evidence/example/result.json',
-      'AGENTS.md',
-      'CLAUDE.md',
-      '.codex/config.toml',
-      '.agents/skills/example/SKILL.md',
-    ])).not.toThrow()
+  it.each([
+    'app/components/Template.vue',
+    'scripts/git-hooks.mjs',
+    'docs/guides/export.md',
+    'docs/design/evidence/example/screenshot.png',
+    'docs/design/evidence/example/verification.log',
+    'docs/design/evidence/example/result.json',
+    'AGENTS.md',
+    'CLAUDE.md',
+    '.codex/config.toml',
+    '.agents/skills/example/SKILL.md',
+  ])('允许源码、正式证据、共享 AI 配置与文档：%s', (path) => {
+    expect(() => checkStagedPaths([path])).not.toThrow()
   })
 })
 

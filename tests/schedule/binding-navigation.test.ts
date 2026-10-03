@@ -13,10 +13,9 @@ describe('绑定与清单证据更正往返', () => {
     const location = buildScheduleBindingLocation('p', 'g', 'real', { task: 't', stage: 's', item: 'i', buildings: 'b1,b2', building: 'b2', month: '2026-09', view: 'crew', assignee: 'crew:c', trade: '泥水工', unsafe: '外部' }, 'c')
     expect(location).toEqual({ path: '/schedule/p/bind/g', query: { origin: 'real', contract: 'c', group: 'g', task: 't', stage: 's', item: 'i', buildings: 'b1,b2', building: 'b2', month: '2026-09', view: 'crew', assignee: 'crew:c', trade: '泥水工' } })
   })
-  it('更正来源仅可返回同项目同来源同合同的稳定分组，不容许失效或错配目标', () => {
+  it.each((['https://evil.invalid', '//evil.invalid', '/schedule/other/bind/g?origin=real&contract=c', '/schedule/p/bind/g?origin=demo&contract=c', '/schedule/p/bind/g?origin=real&contract=other', '/schedule/p/bind/g?origin=real&origin=real&contract=c', '/schedule/p/bind/g?origin=real&contract=c&group=other', '/schedule/p/bind/g?origin=real&contract=c&task=x&task=y']).map(input => ({ input })))('更正来源仅可返回同项目同来源同合同的稳定分组，不容许失效或错配目标：输入案例 %#', ({ input: bad }) => {
     const valid = '/schedule/p/bind/g?origin=real&contract=c&group=g&task=t&view=crew&assignee=crew%3Ac&unsafe=x'
     expect(parseScheduleBindingReturnTo(valid, 'p', 'c', 'real')).toBe('/schedule/p/bind/g?origin=real&contract=c&view=crew&assignee=crew%3Ac&group=g&task=t')
-    for (const bad of ['https://evil.invalid', '//evil.invalid', '/schedule/other/bind/g?origin=real&contract=c', '/schedule/p/bind/g?origin=demo&contract=c', '/schedule/p/bind/g?origin=real&contract=other', '/schedule/p/bind/g?origin=real&origin=real&contract=c', '/schedule/p/bind/g?origin=real&contract=c&group=other', '/schedule/p/bind/g?origin=real&contract=c&task=x&task=y'])
-      expect(parseScheduleBindingReturnTo(bad, 'p', 'c', 'real')).toBeNull()
+    expect(parseScheduleBindingReturnTo(bad, 'p', 'c', 'real')).toBeNull()
   })
 })

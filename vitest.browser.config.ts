@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [vue(), UnoCSS({
     ...unoConfig,
     configFile: false,
-    content: { ...unoConfig.content, filesystem: ['app/components/ui/**/*.{vue,ts}'] },
+    content: { ...unoConfig.content, filesystem: ['app/components/**/*.{vue,ts}'] },
   })],
   cacheDir: '.tmp/vitest-browser/vite',
   resolve: {

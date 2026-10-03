@@ -59,12 +59,14 @@ for (const width of [390, 768, 1024, 1440]) {
   })
 }
 
-test('来源 query 显示可清除范围且筛选空态可恢复', async ({ page }) => {
-  await page.goto('/owner/change?project=e2e-missing-project')
+for (const projectId of ['e2e-missing-project', 'e2e-missing-project-with-long-identity']) {
+  test(`来源 query 显示可清除范围且筛选空态可恢复：${projectId}`, async ({ page }) => {
+    await page.goto(`/owner/change?projectId=${projectId}`)
 
-  const context = page.locator('[data-ui="owner-document-route-context"]')
-  await expect(context).toBeVisible()
-  await expect(context).toContainText('项目：e2e-missing-project')
-  await context.getByRole('button', { name: /清除项目/ }).click()
-  await expect(page).toHaveURL('/owner/change')
-})
+    const context = page.locator('[data-ui="owner-document-route-context"]')
+    await expect(context).toBeVisible()
+    await expect(context).toContainText(`项目：${projectId}`)
+    await context.getByRole('button', { name: /清除项目/ }).click()
+    await expect(page).toHaveURL('/owner/change')
+  })
+}

@@ -39,7 +39,7 @@ describe('target cost list read model', () => {
     })
   })
 
-  it('combines keyword, project, baseline and status filters', () => {
+  describe('combines keyword, project, baseline and status filters', () => {
     const rows = [
       {
         id: 'a',
@@ -74,54 +74,60 @@ describe('target cost list read model', () => {
         updatedAt: '',
       },
     ]
+    it('关联事实保持原契约', () => {
+      expect(filterTargetCostList(rows, {
+        search: '项目甲',
+        project: 'project-a',
+        baseline: 'baseline',
+        status: 'submitted',
+      }).map(row => row.id)).toEqual(['a'])
+      expect(filterTargetCostList(rows, {
+        search: '',
+        project: 'unassigned',
+        baseline: 'history',
+        status: 'draft',
+      }).map(row => row.id)).toEqual(['b'])
+      expect(filterTargetCostList(rows, {
+        search: '',
+        project: 'all',
+        baseline: 'all',
+        status: ['draft', 'submitted'],
+      }).map(row => row.id)).toEqual(['a', 'b'])
+      expect(filterTargetCostList(rows, {
+        search: '',
+        project: 'all',
+        baseline: ['baseline', 'history'],
+        status: [],
+      }).map(row => row.id)).toEqual(['a', 'b'])
+      expect(filterTargetCostList(rows, {
+        search: '',
+        project: 'all',
+        baseline: ['history'],
+        status: ['draft', 'submitted'],
+      }).map(row => row.id)).toEqual(['b'])
+      expect(filterTargetCostList(rows, {
+        search: '',
+        project: 'all',
+        baseline: ['baseline', 'history'],
+        status: ['submitted'],
+      }).map(row => row.id)).toEqual(['a'])
+    })
 
-    expect(filterTargetCostList(rows, {
-      search: '项目甲',
-      project: 'project-a',
-      baseline: 'baseline',
-      status: 'submitted',
-    }).map(row => row.id)).toEqual(['a'])
-    expect(filterTargetCostList(rows, {
-      search: '',
-      project: 'unassigned',
-      baseline: 'history',
-      status: 'draft',
-    }).map(row => row.id)).toEqual(['b'])
-    expect(filterTargetCostList(rows, {
-      search: '',
-      project: 'all',
-      baseline: 'all',
-      status: ['draft', 'submitted'],
-    }).map(row => row.id)).toEqual(['a', 'b'])
-    expect(filterTargetCostList(rows, {
-      search: '',
-      project: 'all',
-      baseline: 'all',
-      status: [],
-    })).toHaveLength(2)
-    expect(filterTargetCostList(rows, {
-      search: '',
-      project: 'all',
-      baseline: ['baseline', 'history'],
-      status: [],
-    }).map(row => row.id)).toEqual(['a', 'b'])
-    expect(filterTargetCostList(rows, {
-      search: '',
-      project: 'all',
-      baseline: ['history'],
-      status: ['draft', 'submitted'],
-    }).map(row => row.id)).toEqual(['b'])
-    expect(filterTargetCostList(rows, {
-      search: '',
-      project: 'all',
-      baseline: ['baseline', 'history'],
-      status: ['submitted'],
-    }).map(row => row.id)).toEqual(['a'])
-    expect(filterTargetCostList(rows, {
-      search: '',
-      project: 'all',
-      baseline: [],
-      status: [],
-    })).toHaveLength(2)
+    it.each([
+      { case: 'rows / { search: \'\', project: \'all\', baseline: \'all\', status: [], }', input: rows, argument2: {
+        search: '',
+        project: 'all',
+        baseline: 'all',
+        status: [],
+      }, expected: 2 },
+      { case: 'rows / { search: \'\', project: \'all\', baseline: [], status: [], }', input: rows, argument2: {
+        search: '',
+        project: 'all',
+        baseline: [],
+        status: [],
+      }, expected: 2 },
+    ])('filterTargetCostList：$case', ({ input, argument2, expected }) => {
+      expect(filterTargetCostList(structuredClone(input), structuredClone(argument2))).toHaveLength(expected)
+    })
   })
 })

@@ -1,4 +1,5 @@
 import type { PayrollAFormInput, PayrollAFormRead, PayrollAPending } from '~/lib/payroll/central-a-contract'
+import { fireEvent, within } from '@testing-library/vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -126,13 +127,13 @@ describe('中央 A 独立草稿', () => {
     await flushPromises()
     await wrapper.get('input').setValue('原输入')
     load.mockResolvedValue(read('wage-a', 'v2'))
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '读取', exact: true }))
     await flushPromises()
     expect(wrapper.get('input').element.value).toBe('原输入')
     expect(values[0]!.matchingRead.value?.context.sourceVersion).toBe('v1')
     expect(values[0]!.latest.value?.context.sourceVersion).toBe('v2')
     expect(await guards.get(route.path)!()).toBe(false)
-    await wrapper.findAll('button')[0]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '保存', exact: true }))
     await flushPromises()
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ context: expect.objectContaining({ sourceVersion: 'v1' }) }), expect.objectContaining({ note: '原输入', payRatio: null }))
     expect(close).toHaveBeenCalledWith('/subcontract/payroll/form/wage-a')
@@ -170,7 +171,7 @@ describe('中央 A 独立草稿', () => {
     const wrapper = mount(defineComponent({ setup: () => () => h(KeepAlive, () => visible.value ? h(Harness) : h(Other)) }))
     await flushPromises()
     await wrapper.get('input').setValue('保留输入')
-    await wrapper.findAll('button')[0]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '保存', exact: true }))
     visible.value = false
     await flushPromises()
     reject(new Error('回执丢失'))
@@ -180,7 +181,7 @@ describe('中央 A 独立草稿', () => {
     expect(values[0]!.busy.value).toBe(false)
     expect(wrapper.get('input').element.value).toBe('保留输入')
     recover.mockResolvedValue({ statementId: 'wage-a', projectId: 'project', outcome: 'saved' })
-    await wrapper.findAll('button')[2]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '核对原提交', exact: true }))
     await flushPromises()
     expect(recover).toHaveBeenCalledWith(expect.objectContaining({ command: expect.objectContaining({ commandId: 'original-key', sourceVersion: 'v1' }) }))
     wrapper.unmount()

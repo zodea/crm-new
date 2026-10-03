@@ -2,6 +2,8 @@
 import type { SubcontractContractDetailReadDTO } from '~/lib/subcontract-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { computed, onActivated, watch } from 'vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import { contractStatusTone } from '~/lib/contract/status'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
@@ -100,7 +102,9 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
     <EntityDetailShell :title="detail?.contract.name ?? '分包合同详情'" :subtitle="detail?.contract.no || '编号未填写'" :back-to="returnTo" :back-label="backLabel" :state="shellState" :state-title="stateTitle" :state-description="problem?.message ?? ''" :state-action-label="problem?.retryable ? '重新加载' : ''" @state-action="load">
       <template #status>
         <template v-if="detail">
-          <span class="chip" :class="detail.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ detail.dataOrigin === 'demo' ? '演示只读' : '正式数据' }}</span><span class="chip bg-surface-3 text-ink-soft">{{ detail.contract.subKind }}</span><span class="chip bg-surface-3 text-ink-soft">{{ detail.contract.status }}</span>
+          <span class="chip" :class="detail.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ detail.dataOrigin === 'demo' ? '演示只读' : '正式数据' }}</span><span class="chip bg-surface-3 text-ink-soft">{{ detail.contract.subKind }}</span><KitStatusTag :tone="contractStatusTone(detail.contract.status)">
+            {{ detail.contract.status }}
+          </KitStatusTag>
         </template>
       </template>
       <template #actions>

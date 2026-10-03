@@ -19,12 +19,12 @@ const emit = defineEmits<{
 const editor = shallowRef<HTMLElement>()
 const showImporter = shallowRef(false)
 const tsvText = shallowRef('')
+const clipboardError = shallowRef('')
 const grid = useTemplateRef<{
   validate: () => { row: number, key: string }[]
 }>('grid')
 const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(editor)
 const total = computed(() => contractLineItemsTotal(props.lines))
-const UNIT_OPTIONS = ['㎡', 'm', '块', '套', '吨', '包', '桶', '樘', '个']
 
 type EditableContractLine = ContractLineItemDraft & Record<string, unknown>
 
@@ -53,8 +53,6 @@ const columns: KitEditGridColumn<EditableContractLine>[] = [
   {
     key: 'unit',
     label: '单位',
-    type: 'select',
-    options: UNIT_OPTIONS,
     width: 90,
   },
   {
@@ -97,7 +95,7 @@ function addLine() {
       materialName: '',
       spec: '',
       brand: '',
-      unit: '㎡',
+      unit: '',
       qty: 1,
       taxInclusiveUnitPrice: 0,
       plannedArrivalDate: '',
@@ -107,39 +105,143 @@ function addLine() {
 }
 
 function importTsv() {
-  const imported = tsvText.value
-    .split(/\r?\n/)
-    .map(row => row.trim())
-    .filter(Boolean)
-    .map((row): ContractLineItemDraft => {
-      const [
-        materialName = '',
-        spec = '',
-        brand = '',
-        unit = '',
-        qty = '',
-        taxInclusiveUnitPrice = '',
-        plannedArrivalDate = '',
-        note = '',
-      ] = row.split('\t')
-      return {
-        materialName: materialName.trim(),
-        spec: spec.trim(),
-        brand: brand.trim(),
-        unit: unit.trim() || '㎡',
-        qty: qty.trim() ? Number(qty) : null,
-        taxInclusiveUnitPrice: taxInclusiveUnitPrice.trim()
-          ? Number(taxInclusiveUnitPrice)
-          : null,
-        plannedArrivalDate: plannedArrivalDate.trim(),
-        note: note.trim(),
-      }
+  clipboardError.value = ''
+  const parsed = parseExcelClipboard(tsvText.value)
+  if (!parsed.ok) {
+    clipboardError.value = parsed.message
+    return
+  }
+  const imported: ContractLineItemDraft[] = []
+  for (const [index, row] of parsed.rows.entries()) {
+    if (row.every(cell => !cell.trim()))
+      continue
+    const [
+      materialName = '',
+      spec = '',
+      brand = '',
+      unit = '',
+      qty = '',
+      taxInclusiveUnitPrice = '',
+      plannedArrivalDate = '',
+      note = '',
+    ] = row
+    const parsedQty = clipboardNumber(qty)
+    const parsedPrice = clipboardNumber(taxInclusiveUnitPrice)
+    if (parsedQty === undefined || parsedPrice === undefined) {
+      clipboardError.value = `第 ${index + 1} 行${parsedQty === undefined ? '数量' : '含税单价'}不是有效数值，本次导入未应用。`
+      return
+    }
+    imported.push({
+      materialName: materialName.trim(),
+      spec: spec.trim(),
+      brand: brand.trim(),
+      unit: unit.trim(),
+      qty: parsedQty,
+      taxInclusiveUnitPrice: parsedPrice,
+      plannedArrivalDate: plannedArrivalDate.trim(),
+      note: note.trim(),
     })
+  }
   if (!imported.length)
     return
   emit('update', [...props.lines, ...imported])
   tsvText.value = ''
   showImporter.value = false
+}
+
+function parseExcelClipboard(text: string): { ok: true, rows: string[][] } | { ok: false, message: string } {
+  const source = text.replace(/\r\n?/g, '\n')
+  const rows: string[][] = []
+  let row: string[] = []
+  let cell = ''
+  let quoted = false
+  let quoteClosed = false
+  for (let index = 0; index < source.length; index++) {
+    const character = source[index]
+    if (quoted) {
+      if (character === '"') {
+        if (source[index + 1] === '"') {
+          cell += '"'
+          index++
+        }
+        else {
+          quoted = false
+          quoteClosed = true
+        }
+      }
+      else {
+        cell += character
+      }
+      continue
+    }
+    if (character === '\t' || character === '\n') {
+      row.push(cell)
+      cell = ''
+      quoteClosed = false
+      if (character === '\n') {
+        rows.push(row)
+        row = []
+      }
+      continue
+    }
+    if (quoteClosed)
+      return { ok: false, message: 'Excel 单元格引号后的内容无效，请重新复制；本次未应用。' }
+    if (character === '"' && cell === '')
+      quoted = true
+    else
+      cell += character
+  }
+  if (quoted)
+    return { ok: false, message: 'Excel 单元格引号未闭合，请重新复制；本次未应用。' }
+  if (row.length || cell || !source.endsWith('\n')) {
+    row.push(cell)
+    rows.push(row)
+  }
+  return { ok: true, rows }
+}
+
+function clipboardNumber(text: string): number | null | undefined {
+  const raw = text.trim()
+  if (!raw)
+    return null
+  const value = Number(raw)
+  return Number.isFinite(value) && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(raw)
+    ? value
+    : undefined
+}
+
+function pasteColumn(event: ClipboardEvent) {
+  const cell = event.target instanceof HTMLElement
+    ? event.target.closest<HTMLElement>('[data-kit-grid-cell]')
+    : null
+  const [rowPosition, key] = cell?.dataset.kitGridCell?.split(':') ?? []
+  const rowIndex = Number(rowPosition)
+  const column = columns.find(column => column.key === key && !column.derive && column.type !== 'readonly')
+  const text = event.clipboardData?.getData('text/plain')
+  if (!column || !Number.isSafeInteger(rowIndex) || rowIndex < 0 || rowIndex >= props.lines.length || text == null || text === '')
+    return
+
+  event.preventDefault()
+  clipboardError.value = ''
+  const parsed = parseExcelClipboard(text)
+  if (!parsed.ok) {
+    clipboardError.value = parsed.message
+    return
+  }
+  if (parsed.rows.some(row => row.length !== 1)) {
+    clipboardError.value = '请选择 Excel 的单列单元格后粘贴；完整明细请使用“粘贴导入”。'
+    return
+  }
+  const next = props.lines.map(line => ({ ...line }))
+  for (const [index, [cell = '']] of parsed.rows.entries()) {
+    const value = column.type === 'number' ? clipboardNumber(cell) : cell.trim()
+    if (value === undefined) {
+      clipboardError.value = `第 ${rowIndex + index + 1} 行${column.label}不是有效数值，本次粘贴未应用。`
+      return
+    }
+    next[rowIndex + index] = { ...next[rowIndex + index], [column.key]: value }
+  }
+  emit('update', next)
 }
 
 function validate() {
@@ -215,9 +317,12 @@ defineExpose({ validate })
       </div>
     </div>
 
-    <div class="p-3">
+    <div class="p-3" @paste.capture="pasteColumn">
       <p v-if="lines.length" class="mb-2 text-11px text-ink-faint">
-        勾选明细后可批量复制或删除；表格只在自身区域横向滚动。
+        选中起始单元格可向下粘贴 Excel 单列；勾选明细后可批量复制或删除。
+      </p>
+      <p v-if="clipboardError" role="alert" class="field-error">
+        {{ clipboardError }}
       </p>
       <KitEditGrid
         ref="grid"
@@ -239,6 +344,7 @@ defineExpose({ validate })
             type="date"
             class="field-input h-7 w-full px-2 text-12px"
             :aria-label="`计划到货日期，第 ${rowIndex + 1} 行`"
+            :data-kit-grid-cell="`${rowIndex}:plannedArrivalDate`"
             @input="update(($event.target as HTMLInputElement).value)"
           >
         </template>

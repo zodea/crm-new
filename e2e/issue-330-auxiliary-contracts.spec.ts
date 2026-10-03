@@ -8,7 +8,7 @@ test.describe('AX04 辅助合同只读与编辑', () => {
   test.beforeEach(async ({ page }, info) => {
     const session = Buffer.from(info.testId).toString('base64url')
     await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': session })
-    for (const domain of ['projects', 'suppliers', 'auxiliary-contracts']) {
+    for (const domain of ['projects', 'suppliers', 'construction-contracts', 'auxiliary-contracts']) {
       const response = await page.request.post(`/api/testing/${domain}/reset`, { headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': session }, data: { scenario: 'ready' } })
       expect(response.ok(), await response.text()).toBe(true)
     }
@@ -85,7 +85,7 @@ test.describe('AX04 辅助合同只读与编辑', () => {
   })
   test('从项目及分供方列表起步的完整来源链可以逐级返回', async ({ page }) => {
     for (const [list, name, backLabel] of [
-      ['/project', '中央正式施工项目', '返回项目列表'],
+      ['/project?search=中央正式施工项目', '中央正式施工项目', '返回项目列表'],
       ['/base/supplier', '中央正式劳务分供方', '返回分供方列表'],
     ]) {
       await page.goto(list!)
@@ -101,7 +101,8 @@ test.describe('AX04 辅助合同只读与编辑', () => {
       await expect(page.getByTestId('auxiliary-journey').getByRole('link')).toBeFocused()
       await expect.poll(() => new URL(page.url()).searchParams.get('returnTo')).toBe(source)
       await page.getByRole('link', { name: backLabel, exact: true }).click()
-      await expect.poll(() => new URL(page.url()).pathname).toBe(list)
+      await expect.poll(() => new URL(page.url()).pathname).toBe(new URL(list!, 'https://crm.test').pathname)
+      await expect(page).toHaveURL(url => url.searchParams.get('search') === new URL(list!, 'https://crm.test').searchParams.get('search'))
       await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
     }
   })

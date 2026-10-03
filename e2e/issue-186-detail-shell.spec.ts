@@ -4,47 +4,54 @@ import {
   expectLocalHorizontalScroll,
   expectNoPageOverflow,
   expectTabSequence,
-  RESPONSIVE_WIDTHS,
 } from './helpers/responsive'
 
-const VIEWPORT_HEIGHTS: Record<(typeof RESPONSIVE_WIDTHS)[number], number> = {
+const VIEWPORT_WIDTHS = [390, 768, 1024, 1280, 1440] as const
+const VIEWPORT_HEIGHTS: Record<(typeof VIEWPORT_WIDTHS)[number], number> = {
   390: 844,
   768: 900,
   1024: 900,
+  1280: 900,
   1440: 1000,
 }
 
 test.describe('Issue #186：统一实体详情壳', () => {
-  test('统一呈现 loading、empty、error、forbidden 与 not-found 状态', async ({ page }) => {
-    await page.goto('/dev/detail-shell')
-    const controls = page.getByRole('group', { name: '详情壳状态预览' })
-
-    await controls.getByRole('button', { name: '加载', exact: true }).click()
-    await expect(page.getByRole('status', { name: '正在加载分供方详情演示' })).toBeVisible()
-    await expect(page.getByRole('progressbar')).toHaveCount(0)
-
-    await controls.getByRole('button', { name: '空数据', exact: true }).click()
-    await expect(page.getByRole('status', { name: '该分供方还没有业务数据' })).toBeVisible()
-
-    await controls.getByRole('button', { name: '无权限', exact: true }).click()
-    await expect(page.getByRole('status', { name: '无权查看该分供方' })).toBeVisible()
-    await expect(page.getByRole('alert')).toHaveCount(0)
-
-    await controls.getByRole('button', { name: '不存在', exact: true }).click()
-    await expect(page.getByRole('status', { name: '分供方不存在或已删除' })).toBeVisible()
-    await expect(page.getByRole('link', { name: '返回 KitUI 演示' }))
-      .toHaveAttribute('href', '/dev/kit-ui')
-
-    await controls.getByRole('button', { name: '错误', exact: true }).click()
-    const error = page.getByRole('alert', { name: '分供方详情加载失败' })
-    await expect(error).toBeVisible()
-    await error.getByRole('button', { name: '重新加载' }).click()
-    await expect(page.getByRole('heading', {
-      name: '华南区域机电设备与建筑辅材长期战略合作分供方有限公司',
-    })).toBeVisible()
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+    await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
   })
+  for (const state of [
+    { button: '加载', role: 'status', title: '正在加载分供方详情演示' },
+    { button: '空数据', role: 'status', title: '该分供方还没有业务数据' },
+    { button: '无权限', role: 'status', title: '无权查看该分供方' },
+    { button: '不存在', role: 'status', title: '分供方不存在或已删除' },
+    { button: '错误', role: 'alert', title: '分供方详情加载失败' },
+  ] as const) {
+    test(`详情壳独立呈现 ${state.button} 状态与可用恢复动作`, async ({ page }) => {
+      await page.goto('/dev/detail-shell')
+      const controls = page.getByRole('group', { name: '详情壳状态预览' })
 
-  for (const width of RESPONSIVE_WIDTHS) {
+      await controls.getByRole('button', { name: state.button, exact: true }).click()
+      const panel = page.getByRole(state.role, { name: state.title })
+      await expect(panel).toBeVisible()
+      await expect(page.getByRole('progressbar')).toHaveCount(0)
+      if (state.button === '不存在') {
+        await expect(page.getByRole('link', { name: '返回 KitUI 演示' }))
+          .toHaveAttribute('href', '/dev/kit-ui')
+      }
+      if (state.role === 'alert') {
+        await panel.getByRole('button', { name: '重新加载' }).click()
+        await expect(page.getByRole('heading', {
+          name: '华南区域机电设备与建筑辅材长期战略合作分供方有限公司',
+        })).toBeVisible()
+      }
+      else {
+        await expect(page.getByRole('alert')).toHaveCount(0)
+      }
+    })
+  }
+
+  for (const width of VIEWPORT_WIDTHS) {
     test(`长标题、业务页签与右栏在 ${width}px 保持可用`, async ({ page }) => {
       await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
       await page.goto('/dev/detail-shell')
@@ -60,7 +67,7 @@ test.describe('Issue #186：统一实体详情壳', () => {
       const columnCount = await body.evaluate(element =>
         getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
       )
-      expect(columnCount).toBe(width === 1440 ? 2 : 1)
+      expect(columnCount).toBe(width >= 1280 ? 2 : 1)
 
       const tabs = page.getByRole('navigation', { name: '详情壳业务页签' })
       const firstTab = tabs.getByRole('tab', { name: '合同与结算事实 2', exact: true })
@@ -71,13 +78,14 @@ test.describe('Issue #186：统一实体详情壳', () => {
 
       await expectNoPageOverflow(page, `详情壳 @ ${width}px`)
 
-      await page.goto('/base/supplier/sup_demo_004')
+      await page.goto('/base/supplier/sup_demo_004?origin=demo')
       const realShell = page.locator('[data-ui="entity-detail-shell"]')
       await expect(realShell.getByRole('heading', { name: '穗建五金机电经营部' }))
         .toBeVisible()
-      await expect(page.getByRole('navigation', { name: '分供方详情分类' }).getByRole('tab'))
-        .toHaveCount(6)
-      await expect(page.getByTestId('supplier-summary')).toContainText('合同总额¥261,250.00')
+      const factTabs = page.getByRole('navigation', { name: '分供方业务事实' }).getByRole('tab')
+      await expect(factTabs).toHaveText([/^\s*详细资料\s*$/, /^\s*合作项目\s*(?:\d+\s*)?$/, /^\s*支出合同\s*(?:\d+\s*)?$/, /^\s*支出结算\s*(?:\d+\s*)?$/, /^\s*收票登记\s*(?:\d+\s*)?$/, /^\s*付款管理\s*(?:\d+\s*)?$/])
+      await expect(page.getByTestId('supplier-summary')).toContainText('累计合同金额')
+      await expect(page.getByTestId('supplier-summary')).toContainText('¥261,250.00')
       await expectNoPageOverflow(page, `真实分供方详情 @ ${width}px`)
     })
   }

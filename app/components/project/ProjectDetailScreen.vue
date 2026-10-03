@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { OwnerCommercialDocumentListPageDTO } from '~/lib/owner-document/central-repository'
 import type { ProjectDetailReadDTO } from '~/lib/project/repository'
-import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { resolveCustomerRelationReturnOrigin, validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
   createMaterialContractJourneyReturnOrigin,
@@ -25,7 +25,7 @@ import {
   saveOwnerDocumentReturnOrigin,
 } from '~/lib/owner-document/return-context'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
-import { PROJECT_STATUS_TONE } from '~/lib/project/status'
+import { projectStatusTone } from '~/lib/project/status'
 import { loadReceiptSourceOrigin, saveReceiptSourceOrigin } from '~/lib/receipt/return-context'
 import { yuan } from '~/lib/util/money'
 
@@ -328,17 +328,6 @@ async function loadOwnerJourneys() {
 
 useTabTitle(() => item.value?.project.label)
 
-const TONE_CHIP: Record<StatusTone, string> = {
-  warn: 'chip-warn',
-  brand: 'chip-brand',
-  muted: 'chip bg-surface-3 text-ink-faint',
-  ok: 'chip-ok',
-}
-const statusChipClass = computed(() => {
-  const tone = item.value ? PROJECT_STATUS_TONE[item.value.status] : undefined
-  return tone ? TONE_CHIP[tone] : 'chip-brand'
-})
-
 function refLabel(value: ProjectDetailReadDTO['item']['customer']): string {
   return value.state === 'resolved' ? value.label : ''
 }
@@ -491,7 +480,9 @@ onActivated(() => {
               {{ item.project.label }}
             </h2>
             <span class="chip bg-surface-3 text-ink-soft">项目信息</span>
-            <span class="chip" :class="statusChipClass">{{ item.status }}</span>
+            <KitStatusTag :tone="projectStatusTone(item.status)">
+              {{ item.status }}
+            </KitStatusTag>
             <span v-if="isDemo" class="chip chip-warn">测试数据</span>
           </div>
           <p class="m-0 mt-0.5 break-words text-11px leading-4 text-ink-soft">

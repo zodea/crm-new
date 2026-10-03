@@ -45,7 +45,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/components/ProjectArchiveExportDialog.test.ts](../../../tests/components/ProjectArchiveExportDialog.test.ts) | 组件（jsdom） | 项目档案包导出选择器 |
+| [tests/components/ProjectArchiveExportDialog.test.ts](../../../tests/components/ProjectArchiveExportDialog.test.ts) | 组件（jsdom） | 独立档案选择器：普通原件／缺正文／敏感资料的默认选择与权限，导出及取消写盘 |
 | [tests/components/ProjectDetailScreen.test.ts](../../../tests/components/ProjectDetailScreen.test.ts) | 组件（jsdom） | 项目详情中央来源边界 |
 | [tests/components/ProjectDetailTab.test.ts](../../../tests/components/ProjectDetailTab.test.ts) | 组件（jsdom） | 项目详细资料 |
 | [tests/components/ProjectFormPage.test.ts](../../../tests/components/ProjectFormPage.test.ts) | 组件（jsdom） | 项目整页表单 |
@@ -57,27 +57,33 @@
 | [tests/components/ProjectReturnLink.test.ts](../../../tests/components/ProjectReturnLink.test.ts) | 组件（jsdom） | project return link expiry |
 | [tests/components/ProjectSubTableSection.test.ts](../../../tests/components/ProjectSubTableSection.test.ts) | 组件（jsdom） | project subtable section read-only contract |
 | [tests/components/ProjectTaskFiles.test.ts](../../../tests/components/ProjectTaskFiles.test.ts) | 组件（jsdom） | project task files public behavior |
-| [tests/components/ProjectTimeline.test.ts](../../../tests/components/ProjectTimeline.test.ts) | 组件（jsdom） | 项目阶段时间线 |
+| [tests/components/ProjectTimeline.test.ts](../../../tests/components/ProjectTimeline.test.ts) | 组件（jsdom） | 独立六阶段组件：任务展开、已确认／已上传／待上传编辑，统一保存与重开回读；当前中央详情未接管该组件 |
 
 ## Playwright E2E
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-174-project-files.spec.ts](../../../e2e/issue-174-project-files.spec.ts) | Playwright E2E | 阶段任务文件与项目文件柜引用同一份持久化文件 |
-| [e2e/issue-177-project-finance-facts.spec.ts](../../../e2e/issue-177-project-finance-facts.spec.ts) | Playwright E2E | 往来调拨与实际支付保持不同事实和来源入口 |
-| [e2e/issue-178-project-delivery-archive.spec.ts](../../../e2e/issue-178-project-delivery-archive.spec.ts) | Playwright E2E | 物资页签只展示当前项目已归档送货单及有效明细聚合 |
-| [e2e/issue-180-project-integration.spec.ts](../../../e2e/issue-180-project-integration.spec.ts) | Playwright E2E | 项目驾驶舱与正式源事实同口径，并提供只读来源穿透 |
-| [e2e/issue-190-project-reference.spec.ts](../../../e2e/issue-190-project-reference.spec.ts) | Playwright E2E | Issue #190：项目列表、详情与表单参考旅程 |
-| [e2e/issue-248-project-archive.spec.ts](../../../e2e/issue-248-project-archive.spec.ts) | Playwright E2E | Issue #248：项目详情阶段重排与档案包导出 |
+| [e2e/issue-174-project-files.spec.ts](../../../e2e/issue-174-project-files.spec.ts) | Playwright E2E | 隔离正式项目刷新后身份与基础资料不丢失，未接管本地阶段上传不暴露；文件持久化正向保留在阶段文件单元／状态测试 |
+| [e2e/issue-177-project-finance-facts.spec.ts](../../../e2e/issue-177-project-finance-facts.spec.ts) | Playwright E2E | 筹备／施工项目的中央收款目标及返回锚点，不混入本地往来和支付记录 |
+| [e2e/issue-178-project-delivery-archive.spec.ts](../../../e2e/issue-178-project-delivery-archive.spec.ts) | Playwright E2E | 真实零材采关系仍可进入同项目正式列表，未接管到货归档不从本地拼接；到货正向另见领域中央 E2E |
+| [e2e/issue-180-project-integration.spec.ts](../../../e2e/issue-180-project-integration.spec.ts) | Playwright E2E | 中央材采／商务／工资／收款身份与来源，五档及等效 200% 视口的页面边界、工资密表局部滚动和键盘导航 |
+| [e2e/issue-190-project-reference.spec.ts](../../../e2e/issue-190-project-reference.spec.ts) | Playwright E2E | 中央项目列表、来源感知只读详情与整页表单，响应式滚动及键盘旅程 |
+| [e2e/issue-248-project-archive.spec.ts](../../../e2e/issue-248-project-archive.spec.ts) | Playwright E2E | 五档中央基础资料与整页编辑入口，未接管档案 ZIP 入口保持关闭；档案正向保留在独立组件及单元测试 |
 | [e2e/issue-288-project-http-read.spec.ts](../../../e2e/issue-288-project-http-read.spec.ts) | Playwright E2E | Issue #288：项目列表中央 HTTP 读链 |
 | [e2e/issue-293-project-command.spec.ts](../../../e2e/issue-293-project-command.spec.ts) | Playwright E2E | Issue #293：项目中央命令与本地草稿 |
 | [e2e/issue-312-project-target-registry.spec.ts](../../../e2e/issue-312-project-target-registry.spec.ts) | Playwright E2E | Issue #312：项目 Target Registry |
 | [e2e/issue-313-project-return-context.spec.ts](../../../e2e/issue-313-project-return-context.spec.ts) | Playwright E2E | Issue #313：项目列表完整来源上下文 |
 | [e2e/production-project-storage.spec.ts](../../../e2e/production-project-storage.spec.ts) | Playwright E2E | 关联生产存储：项目正式保存链 |
-| [e2e/project-crud.spec.ts](../../../e2e/project-crud.spec.ts) | Playwright E2E | 项目列表：中央新增可用，未迁移的导入仍禁用 |
-| [e2e/project-detail-metrics.spec.ts](../../../e2e/project-detail-metrics.spec.ts) | Playwright E2E | 项目详情票据面板：归档新票后金额、税额与张数实时更新 |
-| [e2e/project-detail.spec.ts](../../../e2e/project-detail.spec.ts) | Playwright E2E | 项目列表↔详情：中央列表可打开现有只读详情并复用同一页签 |
-| [e2e/project-import-central.spec.ts](../../../e2e/project-import-central.spec.ts) | Playwright E2E | 历史深链真实 Excel 保存后中央列表、详情与刷新回读；重传同文件只返回原 ID |
+| [e2e/project-crud.spec.ts](../../../e2e/project-crud.spec.ts) | Playwright E2E | 项目列表正式新增与中央导入均可进入现行整页命令 |
+| [e2e/project-detail-metrics.spec.ts](../../../e2e/project-detail-metrics.spec.ts) | Playwright E2E | 收款来源暂不可用／无权限时保留未知和基础资料，不冒零或把本地票面差额展示为真实税额 |
+| [e2e/project-detail.spec.ts](../../../e2e/project-detail.spec.ts) | Playwright E2E | 显式包含测试数据的两项目列表↔只读详情保持 demo 来源、页签复用及缺失实体空态 |
+| [e2e/project-import-central.spec.ts](../../../e2e/project-import-central.spec.ts) | Playwright E2E | 两组真实 Excel 输入按中央客户回执 ID／唯一名称解析筹备／施工阶段；中央保存、详情冷回读、重传 ID 与版本幂等，部分拒绝、响应丢失重试、取消和五视口 |
 | [e2e/project-import.spec.ts](../../../e2e/project-import.spec.ts) | Playwright E2E | 项目导入：有中央写权限时从项目列表打开真实导入流程 |
-| [e2e/project-phases.spec.ts](../../../e2e/project-phases.spec.ts) | Playwright E2E | 项目六阶段：编辑任务后持久化并实时更新阶段卡进度 |
-| [e2e/project-subtables.spec.ts](../../../e2e/project-subtables.spec.ts) | Playwright E2E | 项目详情十页签读取 SQLite 且不再显示待建设占位卡 |
+| [e2e/project-phases.spec.ts](../../../e2e/project-phases.spec.ts) | Playwright E2E | 筹备／施工中央业务阶段与正式整页编辑身份，未接管本地阶段任务编辑不暴露 |
+| [e2e/project-subtables.spec.ts](../../../e2e/project-subtables.spec.ts) | Playwright E2E | 九类项目商务卡片进入各自中央列表，保留项目、来源、variant 和具名返回锚点 |
+
+## 辅助文件与配置（非独立测试）
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [e2e/helpers/project-central-fixture.ts](../../../e2e/helpers/project-central-fixture.ts) | 辅助／夹具 | 每例统一浏览器与请求的隔离会话、关闭 demo、安装固定起点自然推进的时钟；通过项目命令创建筹备／施工输入并返回正式 ID、来源地址与中央回读 |

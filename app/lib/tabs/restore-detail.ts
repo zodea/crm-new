@@ -4,6 +4,7 @@ import type { OwnerCommercialDocumentKind } from '~/lib/owner-document/central-r
 import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '~/types/read-model'
 import { parseConstructionContractDetailQuery } from '~/lib/construction-contract/read-page'
+import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { payrollReadQuery, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { loadPayrollDetailRead } from '~/lib/payroll/platform-read'
@@ -126,7 +127,11 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   }
   if (family === 'project' || family === 'schedule-project') {
     const dto = await repos.projectList.get(query)
-    return { ...common, ...dto, subject: dto.item.project, origin: dto.item.dataOrigin }
+    const customer = [dto.item.customer, dto.item.secondaryCustomer].find(reference =>
+      reference?.state === 'resolved'
+      && validateCustomerDetailReturnTo(url.searchParams.get('returnTo'), dto.item.dataOrigin, reference.id),
+    )
+    return { ...common, ...dto, subject: dto.item.project, origin: dto.item.dataOrigin, filters: customer?.state === 'resolved' ? { customerId: customer.id } : {} }
   }
   if (family === 'customer') {
     const dto = await repos.customerRead.get(query)
@@ -170,7 +175,8 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
     const expectedKind = contractKind === 'material' ? '材采' : contractKind === 'construction' ? '施工' : '分包'
     if (dto.contract.kind !== expectedKind)
       return restoreProblem('mismatch')
-    return { ...common, ...dto, subject: reference('contract', dto.contract.id, dto.contract.name), origin: dto.dataOrigin, filters: { contractKind: expectedKind } }
+    const customer = 'customer' in dto.contract && dto.contract.customer?.state === 'resolved' ? dto.contract.customer : null
+    return { ...common, ...dto, subject: reference('contract', dto.contract.id, dto.contract.name), origin: dto.dataOrigin, filters: { contractKind: expectedKind, ...(customer ? { customerId: customer.id } : {}) } }
   }
   if (family === 'receipt') {
     const dto = await repos.receipts.detail(detail.id, { origin, includeDemo: query.includeDemo })

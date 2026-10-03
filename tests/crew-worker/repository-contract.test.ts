@@ -359,7 +359,7 @@ describe('班组—工人中央 Repository 契约', () => {
     })
   })
 
-  it('无敏感权限时不得用原始手机号或证件号探测工人命中', () => {
+  describe('无敏感权限时不得用原始手机号或证件号探测工人命中', () => {
     const worker = {
       dataOrigin: 'real' as const,
       id: 'worker-private-1',
@@ -395,10 +395,13 @@ describe('班组—工人中央 Repository 契约', () => {
       sourceVersion: 'crew-worker-v1',
       capabilities,
     })
-
-    expect(pageFor('12345678', ['worker:list:read']).items).toHaveLength(0)
-    expect(pageFor('19900101', ['worker:list:read']).items).toHaveLength(0)
-    expect(pageFor('12345678', ['worker:list:read', 'worker:sensitive:read']).items).toHaveLength(1)
+    it.each([
+      { case: '\'12345678\' / [\'worker:list:read\']', input: '12345678', argument2: ['worker:list:read'], expected: 0 },
+      { case: '\'19900101\' / [\'worker:list:read\']', input: '19900101', argument2: ['worker:list:read'], expected: 0 },
+      { case: '\'12345678\' / [\'worker:list:read\', \'worker:sensitive:read\']', input: '12345678', argument2: ['worker:list:read', 'worker:sensitive:read'], expected: 1 },
+    ])('pageFor：$case', ({ input, argument2, expected }) => {
+      expect(pageFor(structuredClone(input), structuredClone(argument2)).items).toHaveLength(expected)
+    })
   })
 
   it('工人详情闭合班组、项目、责任户、工资和罚扣，缺个人分配不反推整单金额', () => {

@@ -341,7 +341,15 @@ const refreshBoqLines = useDebounceFn(async () => {
   }
 }, 150)
 
+let contractSummarySequence = 0
+const contractSummaryIdentity = () => JSON.stringify([route.fullPath, props.kind, draft.value.id, draft.value.projectId, draft.value.supplierId, draft.value.contractId])
 const refreshContractSummary = useDebounceFn(async () => {
+  if (!pageActive || route.fullPath !== pageFullPath)
+    return
+  const sequence = ++contractSummarySequence
+  const identity = contractSummaryIdentity()
+  const isCurrent = () => pageActive && sequence === contractSummarySequence
+    && identity === contractSummaryIdentity() && route.fullPath === pageFullPath
   const contractId = typeof draft.value.contractId === 'string'
     ? draft.value.contractId
     : ''
@@ -366,7 +374,7 @@ const refreshContractSummary = useDebounceFn(async () => {
   }
   if (props.kind === 'final_settlement') {
     const summary = await store.loadContractSummary(contractId, '', 'central-owner')
-    if (!summary)
+    if (!isCurrent() || !summary)
       return
     const settlementAmount = Number(draft.value.settlementAmount) || 0
     draft.value = {
@@ -380,7 +388,7 @@ const refreshContractSummary = useDebounceFn(async () => {
   }
   if (props.kind === 'sub_settlement') {
     const summary = await store.loadContractSummary(contractId, routeId.value ?? '', 'central-subcontract')
-    if (!summary)
+    if (!isCurrent() || !summary)
       return
     const contractAmount = summary.contractAmount
     const totalAmount = Number(draft.value.totalAmount) || 0
@@ -669,13 +677,16 @@ onMounted(() => void initialize())
 onDeactivated(() => {
   pageActive = false
   boqSequence += 1
+  contractSummarySequence += 1
   boqLines.value = []
 })
 onActivated(() => {
   const returning = !pageActive
   pageActive = true
-  if (returning)
+  if (returning) {
     void refreshBoqLines()
+    void refreshContractSummary()
+  }
 })
 </script>
 

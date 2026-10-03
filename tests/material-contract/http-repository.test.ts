@@ -44,7 +44,7 @@ describe('材料采购合同中央 HTTP Repository', () => {
     })
   })
 
-  it('拒绝 subject、来源或关系不一致的嵌套导航 DTO', () => {
+  function createMaterialContractNavigationReads() {
     const read = createMaterialContractReadTestInstance(() => ['material-contract:read', 'demo:read'])
     const page = read.list({ includeDemo: 'true' })
     const invalidPage = structuredClone(page)
@@ -52,32 +52,90 @@ describe('材料采购合同中央 HTTP Repository', () => {
     if (navigation.kind !== 'entity-detail')
       throw new Error('测试夹具缺少合同详情意图')
     navigation.subject = { ...navigation.subject, id: 'wrong-contract-id' }
-    expect(() => decodeMaterialContractListPage(invalidPage)).toThrowError(/列表读模型无效/)
+    return { read, page, invalidPage, navigation }
+  }
 
-    const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
-    const invalidDetail = structuredClone(detail)
-    if (invalidDetail.projectNavigation.kind !== 'entity-detail')
-      throw new Error('测试夹具缺少项目详情意图')
-    invalidDetail.projectNavigation.filters.dataOrigin = 'real'
-    expect(() => decodeMaterialContractDetailRead(invalidDetail)).toThrowError(/详情读模型无效/)
+  it.each([
+    { case: 'invalidPage', prepare: ({ invalidPage }: ReturnType<typeof createMaterialContractNavigationReads>) => {
+      return { input: invalidPage, expected: /列表读模型无效/ } as const
+    } },
+    { case: 'invalidRowKey', prepare: ({ page, read }: ReturnType<typeof createMaterialContractNavigationReads>) => {
+      const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
+      const invalidDetail = structuredClone(detail)
+      if (invalidDetail.projectNavigation.kind !== 'entity-detail')
+        throw new Error('测试夹具缺少项目详情意图')
+      invalidDetail.projectNavigation.filters.dataOrigin = 'real'
+      const invalidRowKey = structuredClone(page)
+      invalidRowKey.items[0]!.rowKey = 'demo:wrong-id'
+      return { input: invalidRowKey, expected: /列表读模型无效/ } as const
+    } },
+  ])('拒绝 subject、来源或关系不一致的嵌套导航 DTO / decodeMaterialContractListPage：$case', ({ prepare }) => {
+    const fixture = createMaterialContractNavigationReads()
+    const { input, expected } = prepare(fixture)
+    expect(() => decodeMaterialContractListPage(input)).toThrowError(expected)
+  })
 
-    const invalidRowKey = structuredClone(page)
-    invalidRowKey.items[0]!.rowKey = 'demo:wrong-id'
-    expect(() => decodeMaterialContractListPage(invalidRowKey)).toThrowError(/列表读模型无效/)
-
-    const invalidVariant = structuredClone(detail)
-    if (invalidVariant.projectNavigation.kind !== 'entity-detail')
-      throw new Error('测试夹具缺少项目详情意图')
-    invalidVariant.projectNavigation.variant = 'edit'
-    expect(() => decodeMaterialContractDetailRead(invalidVariant)).toThrowError(/详情读模型无效/)
-
-    const invalidTaxRate = structuredClone(detail)
-    invalidTaxRate.contract.taxRate = 'not-a-number' as never
-    expect(() => decodeMaterialContractDetailRead(invalidTaxRate)).toThrowError(/详情读模型无效/)
-
-    const invalidRatio = structuredClone(detail)
-    invalidRatio.contract.retentionRatio = 0.03 as never
-    expect(() => decodeMaterialContractDetailRead(invalidRatio)).toThrowError(/详情读模型无效/)
+  it.each([
+    { case: 'invalidDetail', prepare: ({ read }: ReturnType<typeof createMaterialContractNavigationReads>) => {
+      const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
+      const invalidDetail = structuredClone(detail)
+      if (invalidDetail.projectNavigation.kind !== 'entity-detail')
+        throw new Error('测试夹具缺少项目详情意图')
+      invalidDetail.projectNavigation.filters.dataOrigin = 'real'
+      return { input: invalidDetail, expected: /详情读模型无效/ } as const
+    } },
+    { case: 'invalidVariant', prepare: ({ read, page }: ReturnType<typeof createMaterialContractNavigationReads>) => {
+      const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
+      const invalidDetail = structuredClone(detail)
+      if (invalidDetail.projectNavigation.kind !== 'entity-detail')
+        throw new Error('测试夹具缺少项目详情意图')
+      invalidDetail.projectNavigation.filters.dataOrigin = 'real'
+      const invalidRowKey = structuredClone(page)
+      invalidRowKey.items[0]!.rowKey = 'demo:wrong-id'
+      const invalidVariant = structuredClone(detail)
+      if (invalidVariant.projectNavigation.kind !== 'entity-detail')
+        throw new Error('测试夹具缺少项目详情意图')
+      invalidVariant.projectNavigation.variant = 'edit'
+      return { input: invalidVariant, expected: /详情读模型无效/ } as const
+    } },
+    { case: 'invalidTaxRate', prepare: ({ read, page }: ReturnType<typeof createMaterialContractNavigationReads>) => {
+      const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
+      const invalidDetail = structuredClone(detail)
+      if (invalidDetail.projectNavigation.kind !== 'entity-detail')
+        throw new Error('测试夹具缺少项目详情意图')
+      invalidDetail.projectNavigation.filters.dataOrigin = 'real'
+      const invalidRowKey = structuredClone(page)
+      invalidRowKey.items[0]!.rowKey = 'demo:wrong-id'
+      const invalidVariant = structuredClone(detail)
+      if (invalidVariant.projectNavigation.kind !== 'entity-detail')
+        throw new Error('测试夹具缺少项目详情意图')
+      invalidVariant.projectNavigation.variant = 'edit'
+      const invalidTaxRate = structuredClone(detail)
+      invalidTaxRate.contract.taxRate = 'not-a-number' as never
+      return { input: invalidTaxRate, expected: /详情读模型无效/ } as const
+    } },
+    { case: 'invalidRatio', prepare: ({ read, page }: ReturnType<typeof createMaterialContractNavigationReads>) => {
+      const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
+      const invalidDetail = structuredClone(detail)
+      if (invalidDetail.projectNavigation.kind !== 'entity-detail')
+        throw new Error('测试夹具缺少项目详情意图')
+      invalidDetail.projectNavigation.filters.dataOrigin = 'real'
+      const invalidRowKey = structuredClone(page)
+      invalidRowKey.items[0]!.rowKey = 'demo:wrong-id'
+      const invalidVariant = structuredClone(detail)
+      if (invalidVariant.projectNavigation.kind !== 'entity-detail')
+        throw new Error('测试夹具缺少项目详情意图')
+      invalidVariant.projectNavigation.variant = 'edit'
+      const invalidTaxRate = structuredClone(detail)
+      invalidTaxRate.contract.taxRate = 'not-a-number' as never
+      const invalidRatio = structuredClone(detail)
+      invalidRatio.contract.retentionRatio = 0.03 as never
+      return { input: invalidRatio, expected: /详情读模型无效/ } as const
+    } },
+  ])('拒绝 subject、来源或关系不一致的嵌套导航 DTO / decodeMaterialContractDetailRead：$case', ({ prepare }) => {
+    const fixture = createMaterialContractNavigationReads()
+    const { input, expected } = prepare(fixture)
+    expect(() => decodeMaterialContractDetailRead(input)).toThrowError(expected)
   })
 
   it('拒绝畸形中央表单 draft 与附件', async () => {

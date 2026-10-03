@@ -35,16 +35,14 @@ it('项目、原班组及个人冷读同一1000实发与退40，更正不另计�
   finally { await f.close() }
 })
 
-it('缺工资或目标页权限时返回无金额、姓名和来源的空分区，且不读数据库', async () => {
+it.each(Array.from([['worker:list:read'], ['payroll:read']]).map(input1 => ({ input1 })))('缺工资或目标页权限时返回无金额、姓名和来源的空分区，且不读数据库：输入案例 %#', async ({ input1: capabilities }) => {
   const f = await createPayrollAdjustmentFixture()
   try {
-    for (const capabilities of [['worker:list:read'], ['payroll:read']]) {
-      const result = await f.withTransaction(tx => loadPayrollHostSection(tx, { kind: 'worker', id: 'w' }, { ...session, capabilities }))
-      expect(result.status).toBe('forbidden')
-      expect(result.rows).toEqual([])
-      expect(result.netAmount).toMatchObject({ value: null, knownValue: null, state: 'unknown' })
-      expect(JSON.stringify(result)).not.toContain(f.statementId)
-    }
+    const result = await f.withTransaction(tx => loadPayrollHostSection(tx, { kind: 'worker', id: 'w' }, { ...session, capabilities }))
+    expect(result.status).toBe('forbidden')
+    expect(result.rows).toEqual([])
+    expect(result.netAmount).toMatchObject({ value: null, knownValue: null, state: 'unknown' })
+    expect(JSON.stringify(result)).not.toContain(f.statementId)
   }
   finally { await f.close() }
 })

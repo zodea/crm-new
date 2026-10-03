@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { installMaterialProductionFixture } from './helpers/material-production-fixture'
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
@@ -71,22 +73,18 @@ for (const width of [390, 1440]) {
     await expect(paymentTable).toHaveAttribute('data-retained-table', 'yes')
     await expect(paymentTable).not.toHaveAttribute('data-refresh-covered', 'yes')
 
-    await page.goto('/material/price')
-    const category = page.getByRole('button', { name: '按官方材料大类筛选，已选 0 项', exact: true })
-    await expect(category).toBeVisible()
-    await category.click()
-    const categoryPopup = page.getByRole('dialog', { name: /^按官方材料大类筛选/ })
-    const categories = categoryPopup.getByRole('checkbox')
-    await expect(categories.first()).toBeVisible()
-    const labels = await categories.evaluateAll(elements => elements.map(element => element.closest('label')?.textContent?.trim() ?? '').filter(label => label && label !== '不限'))
-    await page.keyboard.press('Escape')
-    await choose('按官方材料大类筛选', 0, labels.slice(0, 2))
+    await installMaterialProductionFixture(page, { deliveryLines: [
+      { materialName: 'E2E正式钢筋', spec: 'HRB400', unit: '吨', qty: 1, unitPrice: 100, amount: 100, amountSource: 'ocr', note: '' },
+      { materialName: 'E2E正式木地板', spec: '600×600', unit: '㎡', qty: 0.5, unitPrice: 10, amount: 5, amountSource: 'ocr', note: '' },
+    ] })
+    await page.goto('/material/price?origin=real')
+    await choose('按官方材料大类筛选', 0, ['1. 黑色及有色金属材料', '6. 装饰装修材料'])
     await expect(page.getByRole('heading', { name: '选择材料', exact: true })).toBeVisible()
     expect(await page.getByRole('option', { selected: true }).count()).toBe(1)
 
-    await page.goto('/subcontract/quantity')
+    await installQuantityProductionFixture(page, { totals: true })
     await page.getByRole('button', { name: '量差总表', exact: true }).click()
-    await choose('分部', 0, ['装饰装修'])
+    await choose('分部', 0, ['装饰'])
     await choose('工种', 0, ['泥水工'])
     await expect(page.getByRole('combobox', { name: '对比口径', exact: true })).toHaveText(/现场量/)
     expect(errors).toEqual([])

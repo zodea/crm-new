@@ -50,7 +50,7 @@ async function secondReleasedSource() {
 async function stage(core: ReturnType<typeof createCoreMigrationTestInstance>, f: Awaited<ReturnType<typeof createPayrollFeesMigrationFixture>>, source: CoreMigrationSourceDTO, bytes: Uint8Array, prefix: string) {
   const snapshotSha256 = createHash('sha256').update(bytes).digest('hex')
   await core.preflight(parseCoreMigrationSourceCommand({ ...f.envelope(`${prefix}-preflight`), source, backup: null }), f.session)
-  const batch = await core.dryRun(parseCoreMigrationSourceCommand({ ...f.envelope(`${prefix}-dry`), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: new Date().toISOString(), immutable: true } }), f.session)
+  const batch = await core.dryRun(parseCoreMigrationSourceCommand({ ...f.envelope(`${prefix}-dry`), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), f.session)
   expect(batch.issues.filter(issue => issue.metricKey === 'apply-failed')).toEqual([])
   return batch
 }

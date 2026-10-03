@@ -24,11 +24,14 @@ describe('central payroll batch funding', () => {
     expect(result).toMatchObject({ state: 'ready', suggestedTotalFen: 100_000, unallocatedFen: 0, overAllocatedFen: 0 })
   })
 
-  it('uses stable book identity then original ID for ties regardless of selection order', () => {
+  it.each([
+    { order: 'original', reverse: false },
+    { order: 'reversed', reverse: true },
+  ])('uses stable book identity then original ID for ties in $order selection order', ({ reverse }) => {
     const items = [item('z-original', 1, { bookKey: 'first-book' }), item('a-original', 1, { bookKey: 'later-book' }), item('a-same-book', 1, { bookKey: 'first-book' })]
-    const byId = (rows: typeof items) => Object.fromEntries(suggestions(rows, 2).items.map(row => [row.itemId, row.suggestedAmountFen]))
-    expect(byId(items)).toEqual({ 'z-original': 1, 'a-original': 0, 'a-same-book': 1 })
-    expect(byId([...items].reverse())).toEqual(byId(items))
+    const selected = reverse ? items.reverse() : items
+    const result = Object.fromEntries(suggestions(selected, 2).items.map(row => [row.itemId, row.suggestedAmountFen]))
+    expect(result).toEqual({ 'z-original': 1, 'a-original': 0, 'a-same-book': 1 })
   })
 
   it('resolves a one-cent C1/C2 tie without overspending', () => {
@@ -102,30 +105,30 @@ describe('central payroll batch funding', () => {
     expect(result.items.map(row => row.suggestedAmountFen)).toEqual([maximum - 1, 1])
   })
 
-  it('uses all flexible capacity without exceeding any row across small budgets and weights', () => {
-    for (const weights of [[0, 1, 2], [1, 1, 1], [3, 7, 11], [0, 0, 0]]) {
-      for (let funding = 0; funding <= 25; funding++) {
-        const result = suggestions(weights.map((weight, index) => item(String(index), weight)), funding)
-        expect(result.suggestedTotalFen).toBe(Math.min(funding, weights.reduce((sum, weight) => sum + weight, 0)))
-        expect(result.overAllocatedFen).toBe(0)
-        result.items.forEach((row, index) => {
-          expect(Number.isSafeInteger(row.suggestedAmountFen)).toBe(true)
-          expect(row.suggestedAmountFen).toBeGreaterThanOrEqual(0)
-          expect(row.suggestedAmountFen).toBeLessThanOrEqual(weights[index]!)
-        })
-      }
-    }
+  it.each([
+    { weights: [0, 1, 2], capacity: 3 },
+    { weights: [1, 1, 1], capacity: 3 },
+    { weights: [3, 7, 11], capacity: 21 },
+    { weights: [0, 0, 0], capacity: 0 },
+  ].flatMap(({ weights, capacity }) => Array.from({ length: 26 }, (_, funding) => ({ weights, funding, expectedTotal: Math.min(funding, capacity) }))))('flexible weights $weights with budget $funding use $expectedTotal cents', ({ weights, funding, expectedTotal }) => {
+    const result = suggestions(weights.map((weight, index) => item(String(index), weight)), funding)
+    expect(result.suggestedTotalFen).toBe(expectedTotal)
+    expect(result.overAllocatedFen).toBe(0)
+    result.items.forEach((row, index) => {
+      expect(Number.isSafeInteger(row.suggestedAmountFen)).toBe(true)
+      expect(row.suggestedAmountFen).toBeGreaterThanOrEqual(0)
+      expect(row.suggestedAmountFen).toBeLessThanOrEqual(weights[index]!)
+    })
   })
 
   it('rejects missing stable identity rather than using the current row position', () => {
     expect(() => suggestions([item('a', 1, { bookKey: '' })], 1)).toThrow('稳定簿')
   })
 
-  it('parses explicit yuan without coercing blank, negative or over-precision input', () => {
+  it.each((['', ' ', '-1', '1.001', 'NaN', '90071992547409.92']).map(input => ({ input })))('parses explicit yuan without coercing blank, negative or over-precision input：输入案例 %#', ({ input: value }) => {
     expect(parsePayrollBatchFundingFen('500')).toBe(50_000)
     expect(parsePayrollBatchFundingFen('500.0')).toBe(50_000)
     expect(parsePayrollBatchFundingFen('500.01')).toBe(50_001)
-    for (const value of ['', ' ', '-1', '1.001', 'NaN', '90071992547409.92'])
-      expect(() => parsePayrollBatchFundingFen(value)).toThrow('资金金额')
+    expect(() => parsePayrollBatchFundingFen(value)).toThrow('资金金额')
   })
 })

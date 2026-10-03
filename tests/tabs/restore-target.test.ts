@@ -16,9 +16,14 @@ it('绑定来源的三项身份仅在只读排程入口保留，两个写态页�
   const query = 'project=p&origin=real&group=g&floorPlan=f&bindingContract=c&bindingLine=line'
   expect(inspectRestorableTabPath(`/schedule?${query}`)?.fullPath).toBe(`/schedule?${query}`)
   expect(inspectRestorableTabPath(`/?${query}`)?.fullPath).not.toContain('floorPlan')
-  expect(inspectRestorableTabPath('/schedule/p/bind/g?origin=real')).toBeNull()
-  expect(inspectRestorableTabPath('/contract/boq/building-evidence?project=p&contract=c&origin=real')).toBeNull()
   expect(inspectRestorableTabPath(`/schedule?${query}&floorPlan=other`)).toBeNull()
+})
+
+it.each([
+  { case: '\'/schedule/p/bind/g?origin=real\'', input: '/schedule/p/bind/g?origin=real' },
+  { case: '\'/contract/boq/building-evidence?project=p&contract=c&origin=real\'', input: '/contract/boq/building-evidence?project=p&contract=c&origin=real' },
+])('绑定来源的三项身份仅在只读排程入口保留，两个写态页面不注册恢复 / inspectRestorableTabPath：$case', ({ input }) => {
+  expect(inspectRestorableTabPath(input)).toBeNull()
 })
 
 const capabilities = ['project:list:read', 'customer:list:read', 'supplier:list:read', 'crew:list:read', 'worker:list:read', 'project-supplier:read', 'material-contract:read', 'construction-contract:read', 'subcontract-contract:read', 'owner-document:read', 'subcontract-document:read', 'auxiliary-contract:read', 'other-settlement:read', 'receipt:read', 'demo:read']
@@ -42,15 +47,76 @@ function validator(repository: string, method: string, read: ReturnType<typeof v
 }
 
 describe('页签恢复目标白名单', () => {
-  it('保留列表筛选与来源，丢弃未登记的 query', () => {
-    expect(inspectRestorableTabPath('/project?status=active&status=closed&page=2&token=secret')).toEqual({
+  it.each([
+    { label: '同一客户列表', sourceId: 'record-1', sourceContext: 'origin_customer_424', targetContext: 'origin_customer_424', preserve: true },
+    { label: '其他客户行', sourceId: 'record-other', sourceContext: 'origin_customer_424', targetContext: 'origin_customer_424', preserve: false },
+    { label: '不匹配会话', sourceId: 'record-1', sourceContext: 'origin_customer_424', targetContext: 'origin_customer_425', preserve: false },
+    { label: '非法会话', sourceId: 'record-1', sourceContext: 'origin_customer_424', targetContext: 'bad', preserve: false },
+  ])('客户详情恢复列表来源：$label', async (input) => {
+    const source = `/base/customer?search=controlled&page=2&nav=${input.sourceContext}#customer-row-real%253A${input.sourceId}`
+    const path = '/base/customer/record-1?origin=real'
+    const fullPath = `${path}&returnTo=${encodeURIComponent(source)}&returnContext=${input.targetContext}`
+    const read = vi.fn().mockResolvedValue({ ...base, customer: { id: 'record-1', name: '当前名称' } })
+    expect(await validator('customerRead', 'get', read)(descriptor(fullPath)))
+      .toMatchObject({ state: 'resolved', fullPath: input.preserve ? fullPath : path })
+  })
+
+  it.each([
+    { label: '单个源单', suffix: 'tab=penalty&fact=penalty-1' },
+    { label: '一层来源', suffix: 'tab=application&fact=application-1&sourceTrail=payment-1' },
+    { label: '四层来源', suffix: 'tab=payment&fact=payment-1&sourceTrail=source-1,source-2,source-3,source-4' },
+  ])('仅其他支出结算详情保留源单阅读链：$label', ({ suffix }) => {
+    const path = `/contract/other-settlement/record-1?origin=real&${suffix}`
+    expect(inspectRestorableTabPath(path)?.fullPath).toBe(new URL(path, 'https://ruihang.invalid').pathname + new URL(path, 'https://ruihang.invalid').search)
+  })
+
+  it.each([
+    { label: '空身份', path: '/contract/other-settlement/record-1?tab=payment&fact=' },
+    { label: '伪造参数', path: '/contract/other-settlement/record-1?tab=payment&fact=%3Cscript%3E' },
+    { label: '重复源单参数', path: '/contract/other-settlement/record-1?tab=payment&fact=a&fact=b' },
+    { label: '重复来源参数', path: '/contract/other-settlement/record-1?tab=payment&fact=a&sourceTrail=b&sourceTrail=c' },
+    { label: '缺少当前源单', path: '/contract/other-settlement/record-1?tab=payment&sourceTrail=a' },
+    { label: '超过四层', path: '/contract/other-settlement/record-1?tab=payment&fact=a&sourceTrail=b,c,d,e,f' },
+    { label: '来源空身份', path: '/contract/other-settlement/record-1?tab=payment&fact=a&sourceTrail=b,,c' },
+    { label: '来源身份畸形', path: '/contract/other-settlement/record-1?tab=payment&fact=a&sourceTrail=b,%3Cscript%3E' },
+    { label: '非事实页签', path: '/contract/other-settlement/record-1?tab=info&fact=a' },
+    { label: '其他合同类型', path: '/contract/other-expense/record-1?tab=payment&fact=a' },
+    { label: '其他主体类型', path: '/project/record-1?tab=payment&fact=a&sourceTrail=b' },
+  ])('拒绝非法、重复或跨领域源单阅读参数：$label', ({ path }) => {
+    expect(inspectRestorableTabPath(path)).toBeNull()
+  })
+
+  it.each([
+    { label: '项目主客户', family: 'project', customer: 'customer-main', secondary: 'customer-other', source: 'customer-main', preserve: true },
+    { label: '项目次客户', family: 'project', customer: 'customer-main', secondary: 'customer-other', source: 'customer-other', preserve: true },
+    { label: '项目无关客户', family: 'project', customer: 'customer-main', secondary: 'customer-other', source: 'customer-unrelated', preserve: false },
+    { label: '施工合同甲方', family: 'contract', customer: 'customer-main', secondary: null, source: 'customer-main', preserve: true },
+    { label: '施工合同无关客户', family: 'contract', customer: 'customer-main', secondary: null, source: 'customer-unrelated', preserve: false },
+  ])('冷刷新核验并保留客户来源：$label', async (input) => {
+    const source = `/base/customer/${input.source}?origin=real&relationContext=origin_customer_424`
+    const path = input.family === 'project'
+      ? '/project/record-1?origin=real'
+      : '/contract/record-1?origin=real&contractKind=construction'
+    const fullPath = `${path}&returnTo=${encodeURIComponent(source)}`
+    const customer = ref('customer', input.customer)
+    const read = vi.fn().mockResolvedValue(input.family === 'project'
+      ? { ...base, item: { project: ref('project'), dataOrigin: 'real', customer, secondaryCustomer: ref('customer', input.secondary!) } }
+      : { ...base, contract: { id: 'record-1', name: '当前名称', kind: '施工', customer } })
+    const result = await validator(input.family === 'project' ? 'projectList' : 'constructionContractRead', 'get', read)(descriptor(fullPath))
+    expect(result).toMatchObject({ state: 'resolved', fullPath: input.preserve ? fullPath : path })
+  })
+
+  it.each([
+    { case: '\'/project?status=active&status=closed&page=2&token=secret\'', input: '/project?status=active&status=closed&page=2&token=secret', expected: {
       fullPath: '/project?status=active&status=closed&page=2',
       origin: null,
-    })
-    expect(inspectRestorableTabPath('/base/customer/customer-1?origin=demo&tab=receipts')).toEqual({
+    } },
+    { case: '\'/base/customer/customer-1?origin=demo&tab=receipts\'', input: '/base/customer/customer-1?origin=demo&tab=receipts', expected: {
       fullPath: '/base/customer/customer-1?origin=demo&tab=receipts',
       origin: 'demo',
-    })
+    } },
+  ])('保留列表筛选与来源，丢弃未登记的 query / inspectRestorableTabPath：$case', ({ input, expected }) => {
+    expect(inspectRestorableTabPath(input)).toEqual(expected)
   })
 
   it.each(['/project/form/new', '/base/customer/new', '/finance/invoice/invoice-1', '/finance/invoice', '/import/mapping/project', '/dev/kit-ui', '/settings/data-migration', '/settings/ocr', '/subcontract/quantity/stages?project=p&origin=real', '//evil.example/project', '/project/%2e%2e/base/customer', '/project/id?origin=other'])('排除写态或非法目标 %s', (path) => {
@@ -62,10 +128,15 @@ describe('页签恢复目标白名单', () => {
   })
 
   it('显式登记缺只读接线的稳定详情，而非借编辑路由兜底', () => {
-    expect(inspectRestorableTabPath('/finance/payment/pay-1/detail')).toEqual({ fullPath: '/finance/payment/pay-1/detail', origin: 'real' })
     expect(inspectRestorableTabPath('/finance/payment/pay-1')).toBeNull()
-    expect(inspectRestorableTabPath('/subcontract/daywork')).toEqual({ fullPath: '/subcontract/daywork', origin: null })
-    expect(inspectRestorableTabPath('/subcontract/attendance')).toEqual({ fullPath: '/subcontract/attendance', origin: null })
+  })
+
+  it.each([
+    { case: '\'/finance/payment/pay-1/detail\'', input: '/finance/payment/pay-1/detail', expected: { fullPath: '/finance/payment/pay-1/detail', origin: 'real' } },
+    { case: '\'/subcontract/daywork\'', input: '/subcontract/daywork', expected: { fullPath: '/subcontract/daywork', origin: null } },
+    { case: '\'/subcontract/attendance\'', input: '/subcontract/attendance', expected: { fullPath: '/subcontract/attendance', origin: null } },
+  ])('显式登记缺只读接线的稳定详情，而非借编辑路由兜底 / inspectRestorableTabPath：$case', ({ input, expected }) => {
+    expect(inspectRestorableTabPath(input)).toEqual(expected)
   })
 
   it.each([
@@ -82,6 +153,26 @@ describe('页签恢复目标白名单', () => {
 })
 
 describe('页签恢复重新读取当前权威目标', () => {
+  it.each([
+    { label: '材采项目来源', source: '/project/record-1?origin=real&materialJourney=origin_material_319#project-material-contract-link' },
+    { label: '项目商务卡片来源', source: '/project/record-1?origin=real&ownerJourney=origin_owner_319#project-owner-document-card-change' },
+    { label: '材料合同分供方事实来源', source: '/contract/record-1?origin=real&contractKind=material&supplierFactJourney=origin_fact_319#material-contract-supplier-fact-invoices' },
+  ])('冷恢复保留领域校验后的嵌套来源操作：$label', ({ source }) => {
+    const detail = `/base/supplier/supplier-1?origin=real&returnTo=${encodeURIComponent(source)}`
+    expect(inspectRestorableTabPath(detail)?.fullPath).toBe(detail)
+  })
+
+  it.each([
+    '/project/record-1?origin=real&materialJourney=bad#project-material-contract-link',
+    '/project/record-1?origin=real&materialJourney=origin_material_319#project-owner-document-card-change',
+    '/project/record-1?origin=real&materialJourney=origin_material_319&materialJourney=origin_material_320#project-material-contract-link',
+    '/project/record-1?origin=real&materialJourney=origin_material_319&ownerJourney=origin_owner_319#project-material-contract-link',
+    '/contract/record-1?origin=real&contractKind=construction&supplierFactJourney=origin_fact_319#material-contract-supplier-fact-invoices',
+    '/contract/record-1?origin=real&contractKind=material&supplierFactJourney=origin_fact_319#project-material-contract-link',
+  ])('冷恢复拒绝畸形或与路由锚点错配的来源操作：%s', (source) => {
+    expect(inspectRestorableTabPath(source)).toBeNull()
+  })
+
   it.each(CASES)('$path 使用领域读取及当前版本，不把域版本变化当删除', async ({ path, repository, method, data }) => {
     const read = vi.fn().mockResolvedValue(data)
     const result = await validator(repository, method, read)(descriptor(path))
@@ -112,16 +203,14 @@ describe('页签恢复重新读取当前权威目标', () => {
     expect(await validator('projectList', 'get', read)(descriptor('/project/record-1?origin=real'))).toMatchObject({ state: code === 'relationship-mismatch' ? 'mismatch' : code === 'stale-source' ? 'stale' : code })
   })
 
-  it('不接受错误来源、稳定身份或合同kind', async () => {
-    for (const data of [
-      { ...base, dataOrigin: 'demo', contract: { id: 'record-1', kind: '施工', name: '泄露' } },
-      { ...base, contract: { id: 'another', kind: '施工', name: '泄露' } },
-      { ...base, contract: { id: 'record-1', kind: '分包', name: '泄露' } },
-    ]) {
-      const result = await validator('constructionContractRead', 'get', vi.fn().mockResolvedValue(data))(descriptor('/contract/record-1?origin=real&contractKind=construction'))
-      expect(result).toMatchObject({ state: 'mismatch' })
-      expect(JSON.stringify(result)).not.toContain('泄露')
-    }
+  it.each(([
+    { ...base, dataOrigin: 'demo', contract: { id: 'record-1', kind: '施工', name: '泄露' } },
+    { ...base, contract: { id: 'another', kind: '施工', name: '泄露' } },
+    { ...base, contract: { id: 'record-1', kind: '分包', name: '泄露' } },
+  ]).map(input => ({ input })))('不接受错误来源、稳定身份或合同kind：输入案例 %#', async ({ input: data }) => {
+    const result = await validator('constructionContractRead', 'get', vi.fn().mockResolvedValue(data))(descriptor('/contract/record-1?origin=real&contractKind=construction'))
+    expect(result).toMatchObject({ state: 'mismatch' })
+    expect(JSON.stringify(result)).not.toContain('泄露')
   })
 
   it('缺只读入口不借本地记录或写态恢复', async () => {
@@ -142,21 +231,19 @@ describe('页签恢复重新读取当前权威目标', () => {
     expect(read).not.toHaveBeenCalled()
   })
 
-  it('后台读取期间权限或演示开关改变时不应用已失权结果', async () => {
-    for (const revoke of ['capability', 'demo']) {
-      let finish!: (value: unknown) => void
-      let permissions = capabilities
-      let includeDemo = true
-      const read = vi.fn(() => new Promise(resolve => finish = resolve))
-      const validate = createTabRestoreValidator({ repositories: { projectList: { get: read } } as unknown as DomainRepositories, capabilities: () => permissions, includeDemo: () => includeDemo })
-      const pending = validate({ ...descriptor('/project/record-1?origin=demo'), origin: 'demo' })
-      if (revoke === 'capability')
-        permissions = []
-      else
-        includeDemo = false
-      finish({ ...CASES[0]!.data, item: { dataOrigin: 'demo', project: ref('project') } })
-      expect(await pending).toMatchObject({ state: 'forbidden' })
-    }
+  it.each((['capability', 'demo']).map(input => ({ input })))('后台读取期间权限或演示开关改变时不应用已失权结果：输入案例 %#', async ({ input: revoke }) => {
+    let finish!: (value: unknown) => void
+    let permissions = capabilities
+    let includeDemo = true
+    const read = vi.fn(() => new Promise(resolve => finish = resolve))
+    const validate = createTabRestoreValidator({ repositories: { projectList: { get: read } } as unknown as DomainRepositories, capabilities: () => permissions, includeDemo: () => includeDemo })
+    const pending = validate({ ...descriptor('/project/record-1?origin=demo'), origin: 'demo' })
+    if (revoke === 'capability')
+      permissions = []
+    else
+      includeDemo = false
+    finish({ ...CASES[0]!.data, item: { dataOrigin: 'demo', project: ref('project') } })
+    expect(await pending).toMatchObject({ state: 'forbidden' })
   })
 
   it('取消后的迟到读取不返回可应用结果', async () => {
@@ -184,11 +271,11 @@ describe('页签恢复重新读取当前权威目标', () => {
     expect(construction).toHaveBeenCalledWith(expect.objectContaining({ focus: { id: 'fact-1', scope: 'acceptance', view: null } }))
   })
 
-  it('其他支出结算保留并核对来源合同，丢弃抽屉状态', async () => {
-    const path = '/contract/other-settlement/record-1?origin=real&contractId=contract-1&fact=fact-1&sourceTrail=old'
+  it('其他支出结算保留并核对来源合同和源单阅读链', async () => {
+    const path = '/contract/other-settlement/record-1?origin=real&contractId=contract-1&tab=payment&fact=fact-1&sourceTrail=old'
     const data = { ...base, settlement: { id: 'record-1', dataOrigin: 'real', version: 'current-version', draft: { name: '当前名称', contractId: 'contract-1' } } }
     const read = vi.fn().mockResolvedValue(data)
-    expect(await validator('otherSettlements', 'detail', read)(descriptor(path))).toMatchObject({ state: 'resolved', fullPath: '/contract/other-settlement/record-1?origin=real&contractId=contract-1' })
+    expect(await validator('otherSettlements', 'detail', read)(descriptor(path))).toMatchObject({ state: 'resolved', fullPath: path })
     expect(read).toHaveBeenCalledWith('record-1', expect.objectContaining({ contractId: 'contract-1' }))
     read.mockResolvedValue({ ...data, settlement: { ...data.settlement, draft: { ...data.settlement.draft, contractId: 'another' } } })
     expect(await validator('otherSettlements', 'detail', read)(descriptor(path))).toMatchObject({ state: 'mismatch' })

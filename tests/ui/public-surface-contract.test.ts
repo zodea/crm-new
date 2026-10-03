@@ -28,38 +28,32 @@ describe('public surface contract', () => {
     }
   })
 
-  it('defines layered insight, atomic notification opening and recovery boundaries', () => {
+  it.each([
+    '`metadataKey + position + capability`',
+    '`subject.id + sourceVersion`',
+    '`report.key + visibility fingerprint + asOf + sourceVersion`',
+    '`openNotification(eventId)`',
+    '`NotificationOpenResultDTO`',
+    'toast 自动消失或手动关闭',
+    '不写 `readAt`',
+    '默认不恢复 `/new`、`/form`、`/edit`',
+    '`onDeactivated`',
+    '全局通知连接只允许由应用壳维护一个实例',
+  ])('defines layered insight, atomic notification opening and recovery boundaries: %s', (token) => {
     const contract = readFileSync(PUBLIC_SURFACES_PATH, 'utf8')
-
-    for (const token of [
-      '`metadataKey + position + capability`',
-      '`subject.id + sourceVersion`',
-      '`report.key + visibility fingerprint + asOf + sourceVersion`',
-      '`openNotification(eventId)`',
-      '`NotificationOpenResultDTO`',
-      'toast 自动消失或手动关闭',
-      '不写 `readAt`',
-      '默认不恢复 `/new`、`/form`、`/edit`',
-      '`onDeactivated`',
-      '全局通知连接只允许由应用壳维护一个实例',
-    ]) {
-      expect(contract, token).toContain(token)
-    }
+    expect(contract, token).toContain(token)
   })
 
-  it('promotes stable public DTOs into the read model authority', () => {
+  it.each([
+    'interface InsightAvailabilityDTO',
+    `availability: 'available' | 'unavailable' | 'forbidden'`,
+    'interface NotificationOpenResultDTO',
+    'openNotification(eventId)',
+    '同一事务内按当前权限解析目标并首次写入 `readAt`',
+    '[`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)',
+  ])('promotes stable public DTOs into the read model authority: %s', (token) => {
     const readModels = readFileSync(READ_MODELS_PATH, 'utf8')
-
-    for (const token of [
-      'interface InsightAvailabilityDTO',
-      `availability: 'available' | 'unavailable' | 'forbidden'`,
-      'interface NotificationOpenResultDTO',
-      'openNotification(eventId)',
-      '同一事务内按当前权限解析目标并首次写入 `readAt`',
-      '[`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)',
-    ]) {
-      expect(readModels, token).toContain(token)
-    }
+    expect(readModels, token).toContain(token)
   })
 
   it('is linked from the canonical indexes and direct runtime evidence', () => {

@@ -52,7 +52,7 @@ it('公开迁入后经真实 HTTP/Repository 读冻结姓名、零分配、完�
     const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, commandId })
     await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('http-pay-preflight'), source, backup: null }), session)
     const hash = '8'.repeat(64)
-    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('http-pay-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 412, createdAt: new Date().toISOString(), immutable: true } }), session)
+    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('http-pay-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 412, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
     await coreMigrationTestInstance.importBatch({ ...envelope('http-pay-import'), batchId: batch.batchId }, session)
     await coreMigrationTestInstance.confirm({ ...envelope('http-pay-confirm'), batchId: batch.batchId }, session)
     const list = await repo.list({ origin: 'real' })

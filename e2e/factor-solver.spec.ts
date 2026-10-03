@@ -87,7 +87,8 @@ test.describe('精确因子组合工作台', () => {
     })
 
     await calculateButton.click()
-    await page.waitForTimeout(250)
+    await expect(calculateButton).toBeEnabled()
+    await expect(resultRows).toHaveCount(68)
 
     const snapshots = await page.evaluate(() => {
       const probe = Reflect.get(window, '__factorFlickerProbe') as {
@@ -107,19 +108,27 @@ test.describe('精确因子组合工作台', () => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
 
-    await page.locator('#factor-target').fill('597140')
-    await page.locator('#factor-tax-rate').fill('13')
-
-    await expect(page.getByText('528,442.48', { exact: true })).toBeVisible()
+    for (const { amount, rate, net } of [
+      { amount: '113', rate: '13', net: '100.00' },
+      { amount: '109', rate: '9', net: '100.00' },
+      { amount: '103', rate: '3', net: '100.00' },
+      { amount: '597140', rate: '13', net: '528,442.48' },
+    ]) {
+      await page.locator('#factor-target').fill(amount)
+      await page.locator('#factor-tax-rate').fill(rate)
+      await expect(page.getByText(net, { exact: true })).toBeVisible()
+    }
     await expect(page.getByText('伍拾玖万柒仟壹佰肆拾元整', { exact: true })).toBeVisible()
 
     const taxRateInput = page.locator('#factor-tax-rate')
-    await taxRateInput.fill('0')
-    await expect(taxRateInput).toHaveValue('1')
-    await taxRateInput.fill('14')
-    await expect(taxRateInput).toHaveValue('13')
-    await taxRateInput.fill('1.5')
-    await expect(taxRateInput).toHaveValue('13')
+    for (const { input, expected } of [
+      { input: '0', expected: '1' },
+      { input: '14', expected: '13' },
+      { input: '1.5', expected: '13' },
+    ]) {
+      await taxRateInput.fill(input)
+      await expect(taxRateInput).toHaveValue(expected)
+    }
     await taxRateInput.fill('')
     await expect(page.getByRole('alert')).toHaveText('税率请输入 1-13 的正整数')
 

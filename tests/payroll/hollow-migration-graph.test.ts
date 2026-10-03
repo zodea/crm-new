@@ -18,17 +18,16 @@ it('工资只出现部分空鼓扣款三表时拒绝导出，不能静默降回�
   finally { db.close() }
 })
 
-it('空结构合同采用outer v4及独立扣款三表，旧三个版本仍只接受原封闭字段', () => {
+it.each([1, 2, 3])('空鼓扣款图保留 v4，旧版本 %i 仍只接受原封闭字段', (legacyVersion) => {
   const original = { schemaVersion: 1, projectId: 'p', ...Object.fromEntries(PAYROLL_MIGRATION_PARTS.map(part => [part, []])) }
   const central = { schemaVersion: 1, tables: Object.fromEntries(PAYROLL_CENTRAL_MIGRATION_TABLES.map(table => [table, []])) }
   const fees = { schemaVersion: 1, tables: Object.fromEntries(PAYROLL_A_FEES_MIGRATION_TABLES.map(table => [table, []])) }
   const deductions = { schemaVersion: 1, tables: Object.fromEntries(PAYROLL_HOLLOW_DEDUCTION_TABLES.map(table => [table, []])), quantity: emptyQuantityHollowMigrationGraph() }
   const current = { ...original, schemaVersion: 4, central, fees, deductions }
   expect(parsePayrollProjectGraph(current).schemaVersion).toBe(4)
-  for (const legacy of [original, { ...original, schemaVersion: 2, central }, { ...original, schemaVersion: 3, central, fees }]) {
-    expect(parsePayrollProjectGraph(legacy).schemaVersion).toBe(legacy.schemaVersion)
-    expect(() => parsePayrollProjectGraph({ ...legacy, deductions })).toThrow()
-  }
+  const legacy = [original, { ...original, schemaVersion: 2, central }, { ...original, schemaVersion: 3, central, fees }].find(value => value.schemaVersion === legacyVersion)!
+  expect(parsePayrollProjectGraph(legacy).schemaVersion).toBe(legacyVersion)
+  expect(() => parsePayrollProjectGraph({ ...legacy, deductions })).toThrow()
   expect(() => parsePayrollProjectGraph({ ...current, deductions: { ...deductions, quantity: undefined } })).toThrow()
   expect(() => parsePayrollProjectGraph({ ...current, deductions: { ...deductions, tables: { ...deductions.tables, unexpected: [] } } })).toThrow()
 })

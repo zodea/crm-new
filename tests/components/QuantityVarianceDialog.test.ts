@@ -100,7 +100,7 @@ describe('quantity variance dialog', () => {
     expect((screen.getByRole('combobox', { name: '对比口径' }) as HTMLSelectElement).value).toBe('field')
   })
 
-  it('clears prior-project facts before a failed reload and keeps mobile content vertically reachable', async () => {
+  it('clears prior-project facts before a failed reload', async () => {
     loadQuantityVarianceFacts
       .mockResolvedValueOnce([factA])
       .mockRejectedValueOnce(new Error('项目 B 读取失败'))
@@ -143,11 +143,5 @@ describe('quantity variance dialog', () => {
       expect(screen.getByRole('alert').textContent).toContain('项目 B 读取失败'),
     )
     expect(screen.getByTestId('variance-table').textContent).not.toContain('项目 A 墙砖')
-
-    const mobileScroll = document.querySelector<HTMLElement>('[data-ui="quantity-variance-scroll"]')
-    const tableRegion = document.querySelector<HTMLElement>('[data-ui="quantity-variance-table"]')
-    expect(mobileScroll?.classList.contains('overflow-y-auto')).toBe(true)
-    expect(tableRegion?.classList.contains('h-80')).toBe(true)
-    expect(tableRegion?.classList.contains('md:flex-1')).toBe(true)
   })
 })

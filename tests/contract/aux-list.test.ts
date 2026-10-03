@@ -2,7 +2,7 @@ import type { ContractAuxRow } from '~/lib/contract/aux-list'
 import { describe, expect, it } from 'vitest'
 import {
   CONTRACT_AUX_LIST_CONFIG,
-  contractAuxStatusClass,
+  contractAuxStatusTone,
   filterContractAuxRows,
 } from '~/lib/contract/aux-list'
 
@@ -44,12 +44,16 @@ const rows: ContractAuxRow[] = [
 ]
 
 describe('contract aux list configuration', () => {
-  it('supports OR within each selection and AND across fields while preserving route context', () => {
+  describe('supports OR within each selection and AND across fields while preserving route context', () => {
     const filters = { search: '', project: [], category: ['房租', '材料'], status: ['履约中', '待确认'] }
-    expect(filterContractAuxRows('material_settlement', rows, filters)).toEqual(rows)
-    expect(filterContractAuxRows('material_settlement', rows, { ...filters, status: ['待确认'] })).toEqual([rows[1]])
-    expect(filterContractAuxRows('material_settlement', rows, { ...filters, routeProject: 'project-1' })).toEqual([rows[1]])
-    expect(filterContractAuxRows('material_settlement', rows, { ...filters, category: [] })).toEqual(rows)
+    it.each([
+      { case: '\'material_settlement\' / rows / filters', input: 'material_settlement', argument2: rows, argument3: filters, expected: rows },
+      { case: '\'material_settlement\' / rows / { ...filters, status: [\'待确认\'] }', input: 'material_settlement', argument2: rows, argument3: { ...filters, status: ['待确认'] }, expected: [rows[1]] },
+      { case: '\'material_settlement\' / rows / { ...filters, routeProject: \'project-1\' }', input: 'material_settlement', argument2: rows, argument3: { ...filters, routeProject: 'project-1' }, expected: [rows[1]] },
+      { case: '\'material_settlement\' / rows / { ...filters, category: [] }', input: 'material_settlement', argument2: rows, argument3: { ...filters, category: [] }, expected: rows },
+    ])('filterContractAuxRows：$case', ({ input, argument2, argument3, expected }) => {
+      expect(filterContractAuxRows(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toEqual(expected)
+    })
   })
   it('keeps company expenses project-free and preserves settlement relations', () => {
     const companyFields = CONTRACT_AUX_LIST_CONFIG.company_expense.columns.map(column => column.field)
@@ -64,36 +68,38 @@ describe('contract aux list configuration', () => {
     ]))
   })
 
-  it('filters by business fields and route context without flattening ids', () => {
-    expect(filterContractAuxRows('company_expense', rows, {
+  it.each([
+    { case: '\'company_expense\' / rows / { search: \'天河物业\', project: \'all\', category: \'房租\', status: \'履约中\', }', input: 'company_expense', argument2: rows, argument3: {
       search: '天河物业',
       project: 'all',
       category: '房租',
       status: '履约中',
-    })).toEqual([rows[0]])
-
-    expect(filterContractAuxRows('material_settlement', rows, {
+    }, expected: [rows[0]] },
+    { case: '\'material_settlement\' / rows / { search: \'采购合同\', project: \'project-1\', category: \'all\', status: \'待确认\', routeContract: \'contra', input: 'material_settlement', argument2: rows, argument3: {
       search: '采购合同',
       project: 'project-1',
       category: 'all',
       status: '待确认',
       routeContract: 'contract-1',
       routeSupplier: 'supplier-1',
-    })).toEqual([rows[1]])
-
-    expect(filterContractAuxRows('material_settlement', rows, {
+    }, expected: [rows[1]] },
+    { case: '\'material_settlement\' / rows / { search: \'\', project: \'all\', category: \'all\', status: \'all\', routeProject: \'another-project\',', input: 'material_settlement', argument2: rows, argument3: {
       search: '',
       project: 'all',
       category: 'all',
       status: 'all',
       routeProject: 'another-project',
-    })).toEqual([])
+    }, expected: [] },
+  ])('filters by business fields and route context without flattening ids / filterContractAuxRows：$case', ({ input, argument2, argument3, expected }) => {
+    expect(filterContractAuxRows(input, argument2, argument3)).toEqual(expected)
   })
 
-  it('maps lifecycle states to stable semantic tones', () => {
-    expect(contractAuxStatusClass('已确认')).toBe('chip-ok')
-    expect(contractAuxStatusClass('履约中')).toBe('chip-brand')
-    expect(contractAuxStatusClass('待确认')).toBe('chip-warn')
-    expect(contractAuxStatusClass('草稿')).toContain('text-ink-faint')
+  it.each([
+    { case: '\'已确认\'', input: '已确认', expected: 'ok' },
+    { case: '\'履约中\'', input: '履约中', expected: 'brand' },
+    { case: '\'待确认\'', input: '待确认', expected: 'warn' },
+    { case: '\'草稿\'', input: '草稿', expected: 'neutral' },
+  ])('maps lifecycle states to stable semantic tones / contractAuxStatusTone：$case', ({ input, expected }) => {
+    expect(contractAuxStatusTone(input)).toBe(expected)
   })
 })

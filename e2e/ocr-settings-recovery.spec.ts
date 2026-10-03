@@ -5,6 +5,11 @@ import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ video: 'off', trace: 'off', screenshot: 'off' })
 
+const OCR_INPUT = {
+  settings: { useChartRecognition: true, requestTimeoutMs: 45000 },
+  updatedAt: '2026-09-15T00:00:00.000Z',
+}
+
 test('OCR 设置重读失败锁定写入，键盘重试恢复原配置', async ({ page }) => {
   test.setTimeout(120_000)
   const databaseModules: string[] = []
@@ -18,11 +23,11 @@ test('OCR 设置重读失败锁定写入，键盘重试恢复原配置', async (
   await expect(form.getByText('已保存', { exact: true })).toBeVisible()
 
   expect(databaseModules).toHaveLength(1)
-  await page.evaluate(async (moduleUrl) => {
+  await page.evaluate(async ({ moduleUrl, settings, updatedAt }) => {
     const { db } = await import(moduleUrl)
     await db.execute(
       'INSERT INTO ocr_settings (id, settings_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET settings_json = excluded.settings_json',
-      ['default', JSON.stringify({ useChartRecognition: true, requestTimeoutMs: 45000 }), new Date().toISOString()],
+      ['default', JSON.stringify(settings), updatedAt],
     )
     const select = db.select.bind(db)
     let shouldFail = true
@@ -39,7 +44,7 @@ test('OCR 设置重读失败锁定写入，键盘重试恢复原配置', async (
         throw new Error('重读场景禁止写入设置')
       return execute(sql, args)
     }
-  }, databaseModules[0]!)
+  }, { moduleUrl: databaseModules[0]!, ...OCR_INPUT })
 
   await page.getByRole('button', { name: '刷新当前页', exact: true }).click()
   await expect(page.getByText('测试：暂时无法读取 OCR 设置', { exact: true })).toBeVisible()

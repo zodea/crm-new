@@ -1,4 +1,6 @@
+import type { Page } from '@playwright/test'
 import type { SupplierListSourceRow } from '../app/lib/supplier/read-contract'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { buildSupplierDetailRead, buildSupplierListPage, parseSupplierDetailQuery, parseSupplierListQuery } from '../app/lib/supplier/read-page'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
@@ -35,12 +37,22 @@ const suppliers: SupplierListSourceRow[] = Array.from({ length: 25 }, (_, index)
   note: '',
   updatedAt: '2026-09-08T00:00:00.000Z',
 }))
+const supplierIdentities = new WeakMap<Page, SupplierListSourceRow[]>()
 
 test.beforeEach(async ({ page }) => {
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `supplier-replica-${randomUUID()}` })
+  const session = await (await page.request.get('/api/read/business-session')).json()
+  const rows: SupplierListSourceRow[] = []
+  for (const input of suppliers) {
+    const created = await page.request.post('/api/commands/suppliers', { data: { ...session, commandId: randomUUID(), requiredCapability: 'supplier:write', baseVersion: null, action: 'draft', draft: { name: input.name, supplierCategory: input.supplierCategory, contact: input.contact }, attachments: {} } })
+    expect(created.ok(), await created.text()).toBe(true)
+    rows.push({ ...input, id: (await created.json()).id })
+  }
+  supplierIdentities.set(page, rows)
   await page.route('**/api/read/suppliers?*', async (route) => {
     const query = parseSupplierListQuery(Object.fromEntries(new URL(route.request().url()).searchParams))
     await route.fulfill({ json: buildSupplierListPage({
-      suppliers,
+      suppliers: rows,
       query,
       projectSuppliers: [],
       contracts: [],
@@ -50,17 +62,17 @@ test.beforeEach(async ({ page }) => {
       settlements: [],
       asOf: '2026-09-08T00:00:00.000Z',
       sourceVersion: 'replica-synthetic',
-      capabilities: ['supplier:read', 'supplier:write'],
+      capabilities: ['supplier:list:read', 'supplier:read', 'supplier:write'],
     }) })
   })
 })
 
 for (const width of RESPONSIVE_WIDTHS) {
-  test(`${width}px：完整列、紧凑标签、表格内滚动及可访问工具`, async ({ page }) => {
+  test(`${width}px：完整列、紧凑标签、表格内滚动及可访问工具`, async ({ page }, testInfo) => {
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     await page.setViewportSize({ width, height: 900 })
-    await page.goto('/base/supplier')
+    await page.goto('/base/supplier?sort=name-asc')
     const list = page.locator('.supplier-reference-list')
     await expect(list.getByRole('heading', { name: '全部分供方' })).toBeVisible()
     await expect(list.getByRole('link', { name: '界面对照供应商01', exact: true })).toBeVisible()
@@ -89,7 +101,7 @@ for (const width of RESPONSIVE_WIDTHS) {
     await scroller.evaluate(el => el.scrollLeft = 0)
     await expectNoPageOverflow(page, `${width}px 设置浮层`)
     expect(errors).toEqual([])
-    await page.screenshot({ path: `docs/design/evidence/issue-419/supplier-list-${width}.png`, fullPage: false })
+    await page.screenshot({ path: testInfo.outputPath(`supplier-list-${width}.png`), fullPage: false })
   })
 }
 
@@ -120,7 +132,8 @@ test('搜索与列头条件都筛全量记录，分页、工具筛选与清空�
 })
 
 test('返回定位仅执行一次，继续搜索不抢焦点且数值升序正确显示', async ({ page }) => {
-  await page.goto('/base/supplier?sort=paymentAmount-asc#supplier-row-real%253Areplica-supplier-1')
+  const id = supplierIdentities.get(page)![0]!.id
+  await page.goto(`/base/supplier?sort=paymentAmount-asc#supplier-row-${encodeURIComponent(encodeURIComponent(`real:${id}`))}`)
   const list = page.locator('.supplier-reference-list')
   await expect(list.getByRole('link', { name: '界面对照供应商01', exact: true })).toBeFocused()
   const focusedName = list.getByRole('link', { name: '界面对照供应商01', exact: true })
@@ -137,7 +150,7 @@ test('返回定位仅执行一次，继续搜索不抢焦点且数值升序正�
 })
 
 test('列表默认控件使用细实线，不出现浏览器原生凹凸边框', async ({ page }) => {
-  await page.goto('/base/supplier')
+  await page.goto('/base/supplier?sort=name-asc')
   const list = page.locator('.supplier-reference-list')
   await expect(list.getByText('共 25 条', { exact: true })).toBeVisible()
   await expect(list.getByRole('searchbox')).toHaveCSS('border-top-style', 'solid')
@@ -162,7 +175,10 @@ test('筛选等待响应时保留现有表格，不闪出整块加载遮罩', as
     await route.fallback()
   })
   const scroller = list.locator('.vxe-table--main-wrapper .vxe-table--body-inner-wrapper')
+  await expect.poll(() => scroller.evaluate(el => el.scrollWidth - el.clientWidth)).toBeGreaterThan(600)
+  await page.clock.install()
   await scroller.evaluate(el => el.scrollLeft = 600)
+  await expect.poll(() => scroller.evaluate(el => el.scrollLeft)).toBe(600)
   await search.fill('精细油漆')
   await started
   try {
@@ -186,15 +202,16 @@ test('筛选等待响应时保留现有表格，不闪出整块加载遮罩', as
   await page.keyboard.press('Escape')
   await expect(list.getByText('共 25 条', { exact: true })).toBeVisible()
   // 覆盖180ms防抖窗口，清空操作不能又触发第二次相同请求。
-  await page.waitForTimeout(300)
+  await page.clock.runFor(360)
   expect(requests - beforeClear).toBe(1)
 })
 
 test('四态从筛选列表进入同来源详情，刷新及返回后文字、色调和定位一致', async ({ page }) => {
-  await page.route(/\/api\/read\/suppliers\/replica-supplier-\d+\?/, async (route) => {
+  const rows = supplierIdentities.get(page)!
+  await page.route(/\/api\/read\/suppliers\/[^/?]+\?/, async (route) => {
     const url = new URL(route.request().url())
     await route.fulfill({ json: buildSupplierDetailRead({
-      suppliers,
+      suppliers: rows,
       projects: [],
       projectSuppliers: [],
       contracts: [],
@@ -206,7 +223,7 @@ test('四态从筛选列表进入同来源详情，刷新及返回后文字、�
       query: parseSupplierDetailQuery(url.pathname.split('/').at(-1)!, Object.fromEntries(url.searchParams)),
       asOf: '2026-09-08T00:00:00.000Z',
       sourceVersion: 'replica-synthetic',
-      capabilities: ['supplier:read'],
+      capabilities: ['supplier:list:read', 'supplier:read'],
     }) })
   })
   const states = [
@@ -216,14 +233,14 @@ test('四态从筛选列表进入同来源详情，刷新及返回后文字、�
     { label: '退回', tone: 'danger' },
   ]
   for (const [index, state] of states.entries()) {
-    const name = suppliers[index]!.name
+    const { name, id } = rows[index]!
     await page.goto(`/base/supplier?sort=name-asc&search=${encodeURIComponent(name)}`)
     const list = page.locator('.supplier-reference-list')
     const status = list.locator('[data-ui="status-tag"]').first()
     await expect(status).toHaveText(state.label)
     await expect(status).toHaveAttribute('data-tone', state.tone)
     await list.getByRole('link', { name, exact: true }).click()
-    await expect(page).toHaveURL(new RegExp(`/base/supplier/replica-supplier-${index + 1}\\?origin=real`))
+    await expect(page).toHaveURL(url => url.pathname === `/base/supplier/${id}` && url.searchParams.get('origin') === 'real')
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
     const detailStatus = page.locator('[data-ui="status-tag"]').first()
     await expect(detailStatus).toHaveText(state.label)

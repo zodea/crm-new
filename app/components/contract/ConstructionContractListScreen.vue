@@ -5,6 +5,7 @@ import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import {
   constructionContractProblemFromUnknown,
@@ -20,7 +21,7 @@ import {
   saveConstructionContractReturnOrigin,
 } from '~/lib/construction-contract/return-context'
 import { contractListFilterValues } from '~/lib/contract/list-filters'
-import { CONTRACT_STATUSES } from '~/lib/contract/status'
+import { CONTRACT_STATUSES, contractStatusTone } from '~/lib/contract/status'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { yuan } from '~/lib/util/money'
 import { useConstructionContractReadStore } from '~/stores/construction-contract-read'
@@ -73,7 +74,7 @@ const columns: KitTableColumn[] = [
   { field: 'received', title: '累计收款', width: 120, type: 'money', slot: 'received' },
   { field: 'receivable', title: '按结算应收', width: 125, type: 'money', slot: 'receivable' },
   { field: 'unreceived', title: '开票未回', width: 120, type: 'money', slot: 'unreceived' },
-  { field: 'status', title: '状态', width: 110, customHeader: true },
+  { field: 'status', title: '状态', width: 110, customHeader: true, slot: 'status' },
 ]
 
 function patchQuery(patch: Record<string, string | string[] | number | null | undefined>) {
@@ -215,6 +216,11 @@ useTabTitle('施工合同')
         <KitTable :columns="columns" :data="page.items" :loading="false" :page="page.pagination" :page-size-options="[10, 20, 50, 100]" :empty="{ title: page.empty?.reason === 'no-filter-match' ? '没有符合当前筛选条件的合同' : '暂无施工合同', description: '可调整筛选条件，或新建正式施工合同。' }" row-key="rowKey" @page-change="({ page: nextPage, pageSize: nextSize }) => patchQuery({ page: nextPage, pageSize: nextSize })">
           <template #columnHeader="{ column }">
             <KitColumnHeader :title="column.title" kind="multi-enum" :value="selectedStatuses" :options="statusOptions" @apply="Array.isArray($event) && patchQuery({ status: $event, page: 1 })" />
+          </template>
+          <template #status="{ row }">
+            <KitStatusTag :tone="contractStatusTone(row.status)">
+              {{ row.status }}
+            </KitStatusTag>
           </template>
           <template #name="{ row }">
             <NuxtLink v-if="link(row)" :id="`construction-contract-row-${row.rowKey}`" :to="link(row)!" class="font-700 text-brand hover:underline" @click="captureReturnOrigin(row)">

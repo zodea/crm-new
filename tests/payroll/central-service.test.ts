@@ -113,10 +113,15 @@ describe('工资 P0 中央读取事务', () => {
   })
   it('严格读范围及 wire 校验不会把错误来源或 number 金额当成有效响应', async () => {
     const f = await fixture()
-    expect(() => parsePayrollQuery({ month: '2026-13' })).toThrow()
-    expect(() => parsePayrollQuery({ projectId: ' ' })).toThrow()
-    expect(() => parsePayrollQuery({ actorId: 'forged' })).toThrow()
     const valid = await f.service.list({ origin: 'real' })
     expect(() => decodePayrollRead({ ...valid, context: { ...valid.context, origin: 'demo' } }, 'list', { origin: 'real' })).toThrow()
+  })
+
+  it.each([
+    { case: '{ month: \'2026-13\' }', input: { month: '2026-13' } },
+    { case: '{ projectId: \' \' }', input: { projectId: ' ' } },
+    { case: '{ actorId: \'forged\' }', input: { actorId: 'forged' } },
+  ])('严格读范围及 wire 校验不会把错误来源或 number 金额当成有效响应 / parsePayrollQuery：$case', ({ input }) => {
+    expect(() => parsePayrollQuery(input)).toThrow()
   })
 })

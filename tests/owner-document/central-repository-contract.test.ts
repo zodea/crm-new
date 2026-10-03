@@ -822,16 +822,17 @@ describe('甲方商务单据中央读取契约', () => {
     ]))
   })
 
-  it('来源、类型或关系不匹配时拒绝用同 ID 猜测另一条记录', () => {
-    expect(() => buildOwnerCommercialDocumentDetail({
+  it.each([
+    { case: '{ ...base, query: parseOwnerCommercialDocumentDetailQuery(\'owner_change\', \'change-real-323\', { origin: \'demo\', includeDemo: t', input: {
       ...base,
       query: parseOwnerCommercialDocumentDetailQuery('owner_change', 'change-real-323', { origin: 'demo', includeDemo: true }),
-    })).toThrow('来源与地址不匹配')
-
-    expect(() => buildOwnerCommercialDocumentDetail({
+    }, expected: '来源与地址不匹配' },
+    { case: '{ ...base, query: parseOwnerCommercialDocumentDetailQuery(\'owner_report\', \'change-real-323\', { origin: \'real\' }), }', input: {
       ...base,
       query: parseOwnerCommercialDocumentDetailQuery('owner_report', 'change-real-323', { origin: 'real' }),
-    })).toThrow('类型与地址不匹配')
+    }, expected: '类型与地址不匹配' },
+  ])('来源、类型或关系不匹配时拒绝用同 ID 猜测另一条记录 / buildOwnerCommercialDocumentDetail：$case', ({ input, expected }) => {
+    expect(() => buildOwnerCommercialDocumentDetail(input)).toThrow(expected)
   })
 
   it('被禁止的关系只显示禁止态，不泄露项目名称', () => {

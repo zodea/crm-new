@@ -121,7 +121,7 @@ describe('c1 独立复验：事务末端、历史原组与月份边界', () => {
     expect((await f.service.c1Output({ origin: 'real' }, august.statementId!)).document).toEqual(frozen.document)
   })
 
-  it('冻结配对读取必须拒绝另一项目、月份或已经删除的考勤，金额相等也不能通过', async () => {
+  it.each(([{ projectId: 'other-project' }, { workDate: '2026-09-01' }, { workDate: '2026-08-32' }, { deletedAt: '2026-09-01' }]).map(input => ({ input })))('冻结配对读取必须拒绝另一项目、月份或已经删除的考勤，金额相等也不能通过：输入案例 %#', async ({ input: change }) => {
     const f = await fixture()
     await f.attendance()
     const read = await checked(f)
@@ -130,13 +130,11 @@ describe('c1 独立复验：事务末端、历史原组与月份边界', () => {
     const frozen = await f.service.c1Output({ origin: 'real' }, form.statementId!)
     expect(frozen.state).toBe('available')
     expect(() => decodePayrollC1Read(encodePayrollC1Wire(frozen), 'output', { origin: 'real' }, form.statementId!)).not.toThrow()
-    for (const change of [{ projectId: 'other-project' }, { workDate: '2026-09-01' }, { workDate: '2026-08-32' }, { deletedAt: '2026-09-01' }]) {
-      const corrupt = structuredClone(frozen)
-      if (corrupt.state !== 'available')
-        throw new Error('公开发放未返回完整配对输出')
-      Object.assign(corrupt.document.attendance[0]!, change)
-      expect(() => decodePayrollC1Read(encodePayrollC1Wire(corrupt), 'output', { origin: 'real' }, form.statementId!), JSON.stringify(change)).toThrow()
-    }
+    const corrupt = structuredClone(frozen)
+    if (corrupt.state !== 'available')
+      throw new Error('公开发放未返回完整配对输出')
+    Object.assign(corrupt.document.attendance[0]!, change)
+    expect(() => decodePayrollC1Read(encodePayrollC1Wire(corrupt), 'output', { origin: 'real' }, form.statementId!), JSON.stringify(change)).toThrow()
   })
 
   it('全部班组筛选不能冒充工资主体的空班组，保存前拒绝无法原样冷读的来源', async () => {

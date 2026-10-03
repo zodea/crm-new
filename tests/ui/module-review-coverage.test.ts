@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildModuleReviewCoverage, MODULE_REVIEW_COVERAGE_PATH, MODULE_REVIEW_INDEX_PATH, renderModuleReviewIndex } from '../../scripts/module-review-coverage.mjs'
+import { REFERENCE_MENUS } from '../../scripts/module-review-inventory.mjs'
 import { REVIEW_OBLIGATIONS, validateReviewObligations } from '../../scripts/module-review-obligations.mjs'
 import { buildRuntimeEvidenceLedger } from '../../scripts/runtime-evidence-ledger.mjs'
 
@@ -44,7 +45,9 @@ describe('module review coverage', () => {
     expect(surfaces.filter(surface => surface.path === 'central/p4/host-actual').map(surface => surface.route).sort()).toEqual(['/base/crew/:id', '/base/worker/:id', '/finance/payment-management', '/project/:id', '/project/target-cost/:id'])
     expect(surfaces.filter(surface => surface.path.endsWith('-release-selection')).map(surface => surface.path).sort()).toEqual(['central/p4/a-release-selection', 'central/p4/c1-release-selection', 'central/p4/c2-release-selection'])
     const selected = cases.filter(item => item.host === 'browser' && surfaces.some(surface => surface.id === item.surfaceId && (routes.includes(surface.route) || surface.path.startsWith('central/p4/'))))
-    expect(selected).toHaveLength(43)
+    const selectedSurfaces = surfaces.filter(surface => surface.hosts.includes('browser') && (routes.includes(surface.route) || surface.path.startsWith('central/p4/')))
+    expect(new Set(selected.map(item => item.surfaceId))).toEqual(new Set(selectedSurfaces.map(surface => surface.id)))
+    expect(selected).toHaveLength(selectedSurfaces.length)
     expect(selected.every(item => item.adapter === 'payroll-adjustment-central' && item.acceptance.frontend === 'not-verified' && item.acceptance.production === 'not-verified')).toBe(true)
     expect(selected.every(item => item.obligationIds.includes('WAGE-10'))).toBe(true)
     const byId = (id: string) => obligations.find(item => item.id === id)!
@@ -95,8 +98,12 @@ describe('module review coverage', () => {
     )
     expect(new Set(coverage.cases.map(item => item.id)).size).toBe(coverage.cases.length)
     expect(coverage.cases.every(item => item.acceptance.production !== 'passed')).toBe(true)
-    expect(coverage.cases.filter(item => item.reference.status === 'not-observed').length).toBeGreaterThan(137)
-    expect(coverage.excludedDevPages).toHaveLength(5)
+    for (const item of coverage.cases.filter(item => item.reference.status === 'not-observed')) {
+      const surface = coverage.surfaces.find(surface => surface.id === item.surfaceId)!
+      expect(item.reference.routeEvidenceId).toBe(surface.routeEvidenceId)
+      expect(item.reference.note).toContain('不继承')
+    }
+    expect(new Set(coverage.excludedDevPages)).toEqual(new Set(readdirSync('app/pages/dev').filter(name => name.endsWith('.vue')).map(name => `app/pages/dev/${name}`)))
   })
 
   it('records central quantity pages and imports while preserving desktop and downstream boundaries', () => {
@@ -207,7 +214,7 @@ describe('module review coverage', () => {
     const coverage = buildModuleReviewCoverage()
     const originalMenus = coverage.referenceMenus.filter(menu => menu.evidence === 'docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界')
     expect(coverage.sourceInspectedAt > '2026-09-08').toBe(true)
-    expect(originalMenus).toHaveLength(59)
+    expect(originalMenus).toEqual(REFERENCE_MENUS.filter(menu => menu.evidence === 'docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界'))
     expect(new Set(originalMenus.map(menu => menu.date))).toEqual(new Set(['2026-09-08']))
   })
 
@@ -218,7 +225,7 @@ describe('module review coverage', () => {
 
   it('links legacy obligations to actual host cases without inheriting page or production acceptance', () => {
     const coverage = buildModuleReviewCoverage()
-    expect(coverage.obligations.length).toBeGreaterThan(20)
+    expect(new Set(coverage.obligations.map(item => item.id))).toEqual(new Set(REVIEW_OBLIGATIONS.map(item => item.id)))
     expect(new Set(coverage.obligations.map(item => item.id)).size).toBe(coverage.obligations.length)
     for (const obligation of coverage.obligations) {
       expect(obligation.sources.length).toBeGreaterThan(0)

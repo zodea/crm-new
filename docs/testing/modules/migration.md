@@ -28,4 +28,4 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-294-core-identity-migration.spec.ts](../../../e2e/issue-294-core-identity-migration.spec.ts) | Playwright E2E | Issue #294：核心身份迁移与可回滚切换 |
+| [e2e/issue-294-core-identity-migration.spec.ts](../../../e2e/issue-294-core-identity-migration.spec.ts) | Playwright E2E | 两组真实旧 SQLite 量价输入、核心身份及证照/工序完整图、真实命令重放与冷刷新回滚；五视口对账局部滚动、软删除实体行与本地恢复失败后的键盘人工重试 |

@@ -266,7 +266,7 @@ describe('core migration store', () => {
     expect(repository.snapshot).toHaveBeenCalledTimes(3)
   })
 
-  it('中央已回滚但本地恢复失败时保留可重试状态', async () => {
+  it.each(['preflight', 'createBackup', 'dryRun', 'importBatch'] as const)('中央已回滚但本地恢复失败时保留可重试状态：%s', async (method) => {
     const store = useStore()
     await store.preflight()
     await store.createBackup()
@@ -283,12 +283,11 @@ describe('core migration store', () => {
     const recoveryBatch = store.batch
     const protectedBackup = store.backup
     const eventCount = events.length
-    for (const action of [store.preflight, store.createBackup, store.dryRun, store.importBatch]) {
+    { const action = store[method]
       await expect(action()).rejects.toThrow('不能重新发起迁移')
       expect(store.phase).toBe('rollback-pending')
       expect(store.batch).toBe(recoveryBatch)
-      expect(store.backup).toBe(protectedBackup)
-    }
+      expect(store.backup).toBe(protectedBackup) }
     expect(events).toHaveLength(eventCount)
 
     await store.rollback()
@@ -442,7 +441,7 @@ describe('core migration store', () => {
     expect(localSource.rollback).not.toHaveBeenCalled()
   })
 
-  it('来源变化但中央撤回失败时保留待切换锁', async () => {
+  it.each(['preflight', 'createBackup', 'dryRun', 'importBatch'] as const)('来源变化但中央撤回失败时保留待切换锁：%s', async (method) => {
     const store = useStore()
     await store.preflight()
     await store.createBackup()
@@ -455,13 +454,12 @@ describe('core migration store', () => {
 
     expect(localSource.abortSwitch).not.toHaveBeenCalled()
     expect(store.phase).toBe('cutover-pending')
-    for (const action of [store.preflight, store.createBackup, store.dryRun, store.importBatch]) {
+    { const action = store[method]
       await expect(action()).rejects.toThrow('不能重新发起迁移')
-      expect(store.phase).toBe('cutover-pending')
-    }
+      expect(store.phase).toBe('cutover-pending') }
   })
 
-  it('刷新重放中央确认后本机落地失败，持续保护待切换标记并可再次恢复', async () => {
+  it.each(['preflight', 'createBackup', 'dryRun', 'importBatch'] as const)('刷新重放中央确认后本机落地失败，持续保护待切换标记并可再次恢复：%s', async (method) => {
     const pending = {
       batchId: 'batch-1',
       backupId: backup().backupId,
@@ -475,10 +473,9 @@ describe('core migration store', () => {
     const store = useStore()
     await expect(store.hydrate()).rejects.toThrow('本机切换标记暂时写入失败')
     expect(store.preparationBlocked).toBe(true)
-    for (const action of [store.preflight, store.createBackup, store.dryRun, store.importBatch]) {
+    { const action = store[method]
       await expect(action()).rejects.toThrow('不能重新发起迁移')
-      expect(store.phase).toBe('cutover-pending')
-    }
+      expect(store.phase).toBe('cutover-pending') }
     expect(localSource.readSource).not.toHaveBeenCalled()
     expect(localSource.abortSwitch).not.toHaveBeenCalled()
     await store.hydrate()

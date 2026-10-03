@@ -112,7 +112,7 @@ it('真实SQL准备失败时总确认不切权威且其他命令来源完全不�
     const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'core:migration:write' as const, commandId })
     await core.preflight({ ...envelope('preflight'), source, backup: null }, session)
     const hash = 'e'.repeat(64)
-    const batch = await core.dryRun({ ...envelope('dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 442, createdAt: new Date().toISOString(), immutable: true } }, session)
+    const batch = await core.dryRun({ ...envelope('dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 442, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }, session)
     await core.importBatch({ ...envelope('import'), batchId: batch.batchId }, session)
     await expect(core.confirm({ ...envelope('confirm'), batchId: batch.batchId }, session)).rejects.toThrow()
     expect(core.snapshot(session).authority).toBe('local')

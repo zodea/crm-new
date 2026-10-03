@@ -1,7 +1,9 @@
+import { within } from '@testing-library/vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import ContractFormFields from '~/components/contract/ContractFormFields.vue'
+import { f2FormDefaults } from '~/lib/contract/page'
 
 const SectionHeader = defineComponent({
   props: { title: { type: String, required: true } },
@@ -48,7 +50,7 @@ const NuxtLink = defineComponent({
 const fetchLookup = vi.fn(async () => [])
 
 function mountFields(
-  kind: 'construction' | 'other_settlement' | 'material_settlement' | 'company_expense',
+  kind: 'material' | 'construction' | 'other_settlement' | 'material_settlement' | 'company_expense',
   draft: Record<string, unknown>,
   editing = false,
   extraProps: Record<string, unknown> = {},
@@ -214,5 +216,44 @@ describe('contractFormFields lookup data flow', () => {
     }, true)
     expect(wrapper.get('[data-testid="contract-is-supplement"]').attributes('disabled'))
       .toBeDefined()
+  })
+})
+
+describe('合同税率录入', () => {
+  it.each(['construction', 'subcontract', 'material', 'other_expense'] as const)('新 %s 合同不预先认定适用税率', (kind) => {
+    expect(f2FormDefaults(kind)).toMatchObject({ taxRate: null })
+  })
+
+  it.each([
+    { amount: 113, taxRate: null, net: '113.00', tax: '0.00' },
+    { amount: 113, taxRate: 0, net: '113.00', tax: '0.00' },
+    { amount: 103, taxRate: 3, net: '100.00', tax: '3.00' },
+    { amount: 106, taxRate: 6, net: '100.00', tax: '6.00' },
+    { amount: 109, taxRate: 9, net: '100.00', tax: '9.00' },
+    { amount: 113, taxRate: 13, net: '100.00', tax: '13.00' },
+    { amount: 0, taxRate: 13, net: '0.00', tax: '0.00' },
+    { amount: 113.01, taxRate: 13, net: '100.01', tax: '13.00' },
+    { amount: 113, taxRate: -1, net: '—', tax: '—' },
+    { amount: 113, taxRate: Number.NaN, net: '—', tax: '—' },
+  ])('含税金额 $amount / 税率 $taxRate 独立派生无税金额 $net、税额 $tax', ({ amount, taxRate, net, tax }) => {
+    const wrapper = mountFields('material', { amount, taxRate })
+    const fields = within(wrapper.element as HTMLElement)
+    expect(within(fields.getByText('无税金额', { exact: true }).parentElement!).getByText(net, { exact: true })).not.toBeNull()
+    expect(within(fields.getByText('税额', { exact: true }).parentElement!).getByText(tax, { exact: true })).not.toBeNull()
+    wrapper.unmount()
+  })
+
+  it.each([
+    { selected: 'unknown', expected: null },
+    { selected: '0', expected: 0 },
+    { selected: '3', expected: 3 },
+    { selected: '13', expected: 13 },
+  ])('税率选择 $selected 保存 $expected，未填事实与明确零分别保留', ({ selected, expected }) => {
+    const wrapper = mountFields('material', { amount: 113, taxRate: null })
+    const rate = wrapper.findAllComponents({ name: 'SelectFilter' }).find(field => field.attributes('aria-label') === '税率')!
+    expect(rate.props('modelValue')).toBe('unknown')
+    rate.vm.$emit('update:modelValue', selected)
+    expect(wrapper.emitted('patch')?.at(-1)).toEqual([{ taxRate: expected }])
+    wrapper.unmount()
   })
 })

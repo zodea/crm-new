@@ -40,6 +40,8 @@ const props = defineProps<{
 
 const route = useRoute()
 const router = useRouter()
+const listPath = route.path
+const listRoot = shallowRef<HTMLElement | null>(null)
 const store = useOwnerDocumentStore()
 const { confirm, undoToast, error } = useKitUI()
 
@@ -352,9 +354,9 @@ async function clearRouteFilter(key: 'project' | 'contract' | 'supplier') {
   const query = { ...route.query }
   delete query[key]
   if (centralReadOnly.value) {
+    delete query.page
     if (key === 'project') {
       delete query.projectId
-      projectFilter.value = 'all'
     }
     if (key === 'contract')
       delete query.contractId
@@ -364,20 +366,37 @@ async function clearRouteFilter(key: 'project' | 'contract' | 'supplier') {
   await navigateTo({ path: route.path, query }, { replace: true })
 }
 
+let resettingFilters = false
+let applyingNavigation = false
 async function resetFilters(showAllStatuses = false) {
-  search.value = ''
-  projectFilter.value = 'all'
-  typeFilter.value = 'all'
-  statusView.value = showAllStatuses ? 'all' : config.value.defaultView
-  if (contextFilters.value.length) {
-    const query = { ...route.query }
-    delete query.project
-    delete query.contract
-    delete query.supplier
-    delete query.projectId
-    delete query.contractId
-    delete query.supplierId
-    await navigateTo({ path: route.path, query }, { replace: true })
+  if (resettingFilters)
+    return
+  const kind = props.kind
+  const path = route.path
+  resettingFilters = true
+  try {
+    if (contextFilters.value.length) {
+      const query = { ...route.query }
+      delete query.project
+      delete query.contract
+      delete query.supplier
+      delete query.projectId
+      delete query.contractId
+      delete query.supplierId
+      await navigateTo({ path: route.path, query }, { replace: true })
+    }
+    if (props.kind !== kind || route.path !== path)
+      return
+    search.value = ''
+    projectFilter.value = 'all'
+    typeFilter.value = 'all'
+    statusView.value = showAllStatuses ? 'all' : config.value.defaultView
+    await nextTick()
+  }
+  finally {
+    resettingFilters = false
+    if (centralReadOnly.value && props.kind === kind && route.path === path)
+      void load()
   }
 }
 
@@ -446,11 +465,14 @@ async function handleDelete(row: OwnerDocumentListRecord) {
 }
 
 watch([search, projectFilter, typeFilter, statusView, routeProject, routeContract, routeSupplier], () => {
-  page.value = 1
+  if (!applyingNavigation)
+    page.value = 1
 })
 watch(acceptanceVariant, () => {
-  page.value = 1
-  statusView.value = 'all'
+  if (!applyingNavigation) {
+    page.value = 1
+    statusView.value = 'all'
+  }
 })
 watch(
   () => props.kind,
@@ -466,14 +488,41 @@ watch(
 )
 // 筛选与重置页码在同一轮更新完成后，只请求最终查询一次。
 watch([() => props.kind, search, projectFilter, typeFilter, statusView, routeContract, routeSupplier, acceptanceVariant, page, pageSize], () => {
-  if (centralReadOnly.value)
+  if (centralReadOnly.value && !resettingFilters)
     void load()
 }, { flush: 'post' })
 
 let hasActivated = false
 let restoredRoute = ''
+watch(() => route.query, async (query, previousQuery) => {
+  if (!centralReadOnly.value || route.path !== listPath || resettingFilters)
+    return
+  const navigation = ownerDocumentListNavigationStateFromQuery(query, centralKind.value)
+  const previousNavigation = ownerDocumentListNavigationStateFromQuery(previousQuery, centralKind.value)
+  const contextChanged = navigation.contractId !== previousNavigation.contractId
+    || navigation.supplierId !== previousNavigation.supplierId
+    || (props.kind === 'acceptance' && (navigation.variant ?? 'acceptance') !== (previousNavigation.variant ?? 'acceptance'))
+  const types = enumSelectionFromQuery(navigation.documentType)
+  const statuses = navigation.status === null
+    ? config.value.defaultView
+    : enumSelectionFromQuery(navigation.status).filter(value => config.value.views.some(view => view.key === value))
+  const next = [navigation.search, navigation.projectId ?? 'all', serializeEnumSelection(types), serializeEnumSelection(statuses), navigation.page, navigation.pageSize]
+  const current = [search.value, projectFilter.value, serializeEnumSelection(typeFilter.value), serializeEnumSelection(statusView.value), page.value, pageSize.value]
+  if (JSON.stringify(next) === JSON.stringify(current) && !contextChanged)
+    return
+  applyingNavigation = true
+  search.value = navigation.search
+  projectFilter.value = navigation.projectId ?? 'all'
+  typeFilter.value = types
+  statusView.value = statuses
+  page.value = navigation.page
+  pageSize.value = navigation.pageSize
+  await nextTick()
+  applyingNavigation = false
+}, { flush: 'sync' })
+
 watch([search, projectFilter, typeFilter, statusView, page, pageSize], () => {
-  if (!centralReadOnly.value)
+  if (!centralReadOnly.value || applyingNavigation)
     return
   const query = { ...route.query }
   if (search.value)
@@ -504,10 +553,15 @@ watch([search, projectFilter, typeFilter, statusView, page, pageSize], () => {
 })
 
 async function restoreReturnOrigin() {
-  if (!centralReadOnly.value || restoredRoute === route.fullPath || !isOwnerDocumentReturnContextId(route.query.nav))
+  if (!centralReadOnly.value || loading.value || loadError.value || !hasSnapshot.value
+    || route.path !== listPath || restoredRoute === route.fullPath || !isOwnerDocumentReturnContextId(route.query.nav)) {
     return
+  }
+  const fullPath = route.fullPath
+  const isCurrent = () => route.fullPath === fullPath && route.path === listPath
+    && !loading.value && !loadError.value && hasSnapshot.value && listRoot.value?.isConnected
   const kind = props.kind as OwnerCommercialDocumentKind
-  const validated = validateOwnerDocumentListReturnTo(route.fullPath, kind, 'real')
+  const validated = validateOwnerDocumentListReturnTo(fullPath, kind, 'real')
   const origin = loadOwnerDocumentReturnOrigin(route.query.nav)
   if (!validated || !origin || origin.returnTo !== validated || origin.expiresAt <= Date.now())
     return
@@ -515,23 +569,27 @@ async function restoreReturnOrigin() {
   for (let attempt = 0; attempt < 4 && !anchor; attempt += 1) {
     await nextTick()
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-    anchor = document.getElementById(origin.anchorId)
+    if (!isCurrent())
+      return
+    anchor = [...listRoot.value!.querySelectorAll<HTMLElement>('[id]')].find(node => node.id === origin.anchorId) ?? null
   }
   if (!anchor)
     return
-  const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
+  const workspace = listRoot.value!.closest<HTMLElement>('[data-shell-workspace]')
   if (workspace)
     workspace.scrollTop = origin.scrollTop
   else
     window.scrollTo({ top: origin.scrollTop })
   anchor.focus({ preventScroll: true })
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  if (!isCurrent())
+    return
   if (workspace)
     workspace.scrollTop = origin.scrollTop
-  restoredRoute = route.fullPath
+  restoredRoute = fullPath
 }
 
-watch(() => [loading.value, rows.value.length, route.fullPath], () => void restoreReturnOrigin(), { flush: 'post' })
+watch(() => [loading.value, loadError.value, hasSnapshot.value, rows.value.length, route.fullPath], () => void restoreReturnOrigin(), { flush: 'post' })
 
 onMounted(async () => {
   await load()
@@ -548,7 +606,7 @@ onActivated(async () => {
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col gap-3">
+  <div ref="listRoot" class="flex min-w-0 flex-col gap-3">
     <TargetCostSourceReturn v-if="kind === 'sub_settlement' && centralReadOnly" />
     <div v-if="journeyReturnTo" class="flex">
       <NuxtLink :to="journeyReturnTo" class="btn-ghost text-12px">

@@ -4,6 +4,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { NavigationIntentDTO } from '~/types/read-model'
 import { computed, nextTick } from 'vue'
 import ReceiptSourceLink from '~/components/receipt/ReceiptSourceLink.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import KitTable from '~/components/ui/KitTable.vue'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { yuan } from '~/lib/util/money'
@@ -124,7 +125,7 @@ const vFocusTarget: Directive<HTMLElement, boolean> = {
       <span class="font-mono">{{ yuan(Number(row.paidAmount ?? 0)) }}</span>
     </template>
     <template #status="{ row }">
-      <span class="chip bg-surface-3 text-ink-soft">{{ row.status || '未记录' }}</span>
+      <KitStatusTag>{{ row.status || '未记录' }}</KitStatusTag>
     </template>
   </KitTable>
 </template>

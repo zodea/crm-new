@@ -115,26 +115,24 @@ it('真实已发C2沿正式128号保存目录，缺名册只标部分，不改52
   finally { await f.close() }
 })
 
-it('读取协议拒绝错月分组、跨单实际账、假名册摘要、浮点金额与私密字段注入', async () => {
+it.each(([
+  (copy) => { copy.groups[0].key = '2026-01' },
+  (copy) => { copy.groups[0].actualLedger.scope.originalStatementIds = ['unselected-original'] },
+  (copy) => { copy.groups[0].entries[0].document.actualAmount = 525 },
+  (copy) => { copy.groups[0].entries[0].row.projectId = 'other-project' },
+  (copy) => { copy.roster = { id: 'unrelated-roster' } },
+  (copy) => { copy.privateWorkers = [{ idCard: 'injected' }] },
+  (copy) => { copy.context.sourceVersion = 'different-preview' },
+  (copy) => { copy.groups.push(structuredClone(copy.groups[0])) },
+]) as Array<(copy: Record<string, any>) => void>)('读取协议拒绝错月分组、跨单实际账、假名册摘要、浮点金额与私密字段注入：输入案例 %#', async (corrupt) => {
   const f = await fixture()
   try {
     const read = await f.preview()
     const wire = encodePayrollWorkbookRead(read)
-    const variants: Array<(copy: Record<string, any>) => void> = [
-      (copy) => { copy.groups[0].key = '2026-01' },
-      (copy) => { copy.groups[0].actualLedger.scope.originalStatementIds = ['unselected-original'] },
-      (copy) => { copy.groups[0].entries[0].document.actualAmount = 525 },
-      (copy) => { copy.groups[0].entries[0].row.projectId = 'other-project' },
-      (copy) => { copy.roster = { id: 'unrelated-roster' } },
-      (copy) => { copy.privateWorkers = [{ idCard: 'injected' }] },
-      (copy) => { copy.context.sourceVersion = 'different-preview' },
-      (copy) => { copy.groups.push(structuredClone(copy.groups[0])) },
-    ]
-    for (const corrupt of variants) {
-      const copy = structuredClone(wire)
-      corrupt(copy)
-      expect(() => decodePayrollWorkbookRead(copy, 'preview', { origin: 'real' }, f.input)).toThrow()
-    }
+
+    const copy = structuredClone(wire)
+    corrupt(copy)
+    expect(() => decodePayrollWorkbookRead(copy, 'preview', { origin: 'real' }, f.input)).toThrow()
   }
   finally { await f.close() }
 })

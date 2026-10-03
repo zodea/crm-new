@@ -7,9 +7,10 @@ import { auxiliaryDetailPath } from '~/lib/auxiliary-contract/contract'
 import { validateAuxiliaryDetailReturnTo, validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
-import { isCustomerReturnContextId, validateCustomerDetailReturnTo, validateCustomerReturnTo } from '~/lib/customer/return-context'
+import { customerReturnAnchorIdentity, isCustomerReturnContextId, validateCustomerDetailReturnTo, validateCustomerReturnTo } from '~/lib/customer/return-context'
 import {
   validateMaterialContractDetailJourneyReturnTo,
+  validateMaterialContractReturnTo,
   validateProjectJourneyReturnTo,
 } from '~/lib/material-contract/return-context'
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
@@ -564,6 +565,15 @@ export function resolveNavigationTarget(
           to = `${to}${to.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(listReturn)}`
       }
     }
+    if (key === 'contract:detail' && intent.filters.contractKind === '材采' && options.returnTo) {
+      const listReturn = validateMaterialContractReturnTo(options.returnTo, intent.filters.dataOrigin)
+      if (listReturn) {
+        const url = new URL(listReturn, 'https://ruihang.invalid')
+        const identity = decodeURIComponent(url.hash.slice(1)).replace(/^material-contract-row-/, '')
+        if (identity === `${intent.filters.dataOrigin}:${intent.subject.id}`)
+          to = `${to}&returnTo=${encodeURIComponent(listReturn)}`
+      }
+    }
     if (options.returnTo && (key === 'crew:detail' || key === 'project:detail' || key === 'customer:detail' || key === 'supplier:detail'
       || key === 'contract:detail' || key === 'contract:owner-document-source' || key === 'contract:subcontract-document-source')) {
       const ownerReturnTo = validateOwnerDocumentDetailReturnTo(options.returnTo, intent.filters.dataOrigin)
@@ -630,6 +640,15 @@ export function resolveNavigationTarget(
       const returnTo = validateCustomerReturnTo(options.returnTo)
       if (returnTo && isCustomerReturnContextId(options.returnContextId))
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}&returnContext=${encodeURIComponent(options.returnContextId)}`
+    }
+    if (key === 'customer:detail' && options.returnTo && options.returnContextId) {
+      const returnTo = validateCustomerReturnTo(options.returnTo)
+      if (returnTo && isCustomerReturnContextId(options.returnContextId)) {
+        const url = new URL(returnTo, 'https://ruihang.invalid')
+        const identity = customerReturnAnchorIdentity(url.hash.slice(1))
+        if (identity === `${intent.filters.dataOrigin}:${intent.subject.id}` && url.searchParams.get('nav') === options.returnContextId)
+          to = `${to}${to.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(returnTo)}&returnContext=${encodeURIComponent(options.returnContextId)}`
+      }
     }
     if (key === 'supplier:detail' && options.returnTo) {
       const returnTo = validateMaterialContractDetailJourneyReturnTo(options.returnTo, intent.filters.dataOrigin)

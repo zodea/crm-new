@@ -41,7 +41,7 @@ describe('project list toolbar', () => {
     density: 'compact' as const,
   }
 
-  it('以单行可滚动工具带保留参考操作和本地新建能力', () => {
+  it('保留参考操作和本地新建能力', () => {
     render(ProjectListToolbar, { props, global })
 
     expect(screen.getByRole('heading', { name: '施工项目' })).not.toBeNull()
@@ -53,7 +53,6 @@ describe('project list toolbar', () => {
     expect(screen.getByRole('button', { name: '切换表格密度' })).not.toBeNull()
     expect(screen.getByRole('button', { name: '导入项目' })).not.toBeNull()
     expect(screen.getByRole('button', { name: '新增项目' })).not.toBeNull()
-    expect(screen.getByTestId('project-list-toolbar-scroll').className).toContain('overflow-x-auto')
   })
 
   it('通过公开事件传递搜索、刷新、排序、筛选、设置、导入和导出操作', async () => {

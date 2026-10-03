@@ -1,32 +1,118 @@
 import type { APIRequestContext, Page } from '@playwright/test'
+import type { CoreMigrationBatchDTO, CoreMigrationEntityType, CoreMigrationSnapshotDTO } from '../app/lib/migration/core-contract'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import { LATEST_VERSION, migrations, runMigrations } from '../app/lib/db/migrations'
 import { createMemoryDb } from '../tests/helpers/memory-db'
-import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
+import { expectLocalHorizontalScroll, expectNoPageOverflow } from './helpers/responsive'
+
+const VIEWPORTS = [
+  { width: 390, height: 844 },
+  { width: 768, height: 900 },
+  { width: 1024, height: 900 },
+  { width: 1280, height: 900 },
+  { width: 1440, height: 1000 },
+] as const
+
+const MIGRATION_NOW = '2026-10-03T04:00:00.000Z'
+const SOURCE_CREATED_AT = '2026-07-01T04:00:00.000Z'
+const MIGRATION_INPUTS = [
+  { name: '正量价', projectName: '迁移验收项目甲', customerName: '迁移验收客户甲', supplierName: '迁移验收分供方甲', area: 125.5, contractAmount: 8800, expectedAmount: '8800.00', libraryName: '迁移验收工序甲', durationDays: 3, deletedAt: '2026-08-15T08:00:00.000Z' },
+  { name: '显式零量价', projectName: '迁移验收项目乙', customerName: '迁移验收客户乙', supplierName: '迁移验收分供方乙', area: 0, contractAmount: 0, expectedAmount: '0.00', libraryName: '迁移验收工序乙', durationDays: 7, deletedAt: '2026-09-20T08:00:00.000Z' },
+] as const
+type MigrationInput = (typeof MIGRATION_INPUTS)[number]
+
+async function migrationCommand(page: Page, label: string, endpoint: string) {
+  const receipt = page.waitForResponse(response =>
+    new URL(response.url()).pathname === endpoint && response.request().method() === 'POST',
+  )
+  await page.getByRole('button', { name: label, exact: true }).click()
+  const response = await receipt
+  expect(response.ok(), `${label} 的真实中央回执`).toBe(true)
+  return response
+}
+
+async function expectSoftDeletedGraphs(page: Page) {
+  const table = page.getByRole('table', { name: '迁移对账问题' })
+  for (const entity of ['分供方', '分供方证照、原件与核验凭证']) {
+    const row = table.getByRole('row').filter({
+      has: page.getByRole('cell', { name: entity, exact: true }),
+    }).filter({ has: page.getByRole('cell', { name: 'supplier-local-294', exact: true }) })
+    await expect(row.getByText('已保留软删除', { exact: true })).toBeVisible()
+  }
+}
+
+async function reloadMigrationPage(page: Page) {
+  await page.reload()
+  // 冷启动的安全恢复只重新打开已登记业务目标；设置入口需显式再次进入。
+  await page.goto('/settings/data-migration')
+  await expect(page.getByTestId('core-migration-page')).toBeVisible()
+}
 
 async function resetMigrationBackend(request: APIRequestContext) {
   const response = await request.post('/api/testing/core-migration/reset', {
     headers: { 'x-ruihang-test-reset': '1' },
   })
   expect(response.ok()).toBe(true)
+  expect(await response.json()).toEqual({ authority: 'local', activeBatchId: null })
 }
 
-async function legacyProductionSnapshot(options: { withSoftDeletedSupplier?: boolean } = {}): Promise<Uint8Array> {
+function expectCompleteGraph(snapshot: CoreMigrationSnapshotDTO, input: MigrationInput) {
+  const expected = [
+    { entityType: 'customers', legacyId: 'customer-local-294', name: input.customerName },
+    { entityType: 'suppliers', legacyId: 'supplier-local-294', name: input.supplierName },
+    { entityType: 'supplier_credentials', legacyId: 'supplier-local-294', name: input.supplierName },
+    { entityType: 'crews', legacyId: 'crew-local-294', name: '迁移验收班组' },
+    { entityType: 'projects', legacyId: 'project-local-294', name: input.projectName },
+    { entityType: 'workers', legacyId: 'worker-local-294', name: '迁移验收工人' },
+    { entityType: 'project_suppliers', legacyId: 'project-supplier-local-294', name: 'project-local-294 × supplier-local-294' },
+    { entityType: 'process_libraries', legacyId: 'library-local-294', name: input.libraryName },
+  ]
+  expect(snapshot.entities.map(({ entityType, legacyId, name }) => ({ entityType, legacyId, name })))
+    .toEqual(expect.arrayContaining(expected))
+  expect(snapshot.entities).toHaveLength(expected.length)
+  expect(new Set(snapshot.entities.map(entity => entity.id)).size).toBe(expected.length)
+  const entity = (entityType: CoreMigrationEntityType) => snapshot.entities.find(row => row.entityType === entityType)!
+  const customer = entity('customers')
+  const project = entity('projects')
+  const supplier = entity('suppliers')
+  expect(project).toMatchObject({ quantity: input.area, amount: input.expectedAmount, references: { customerId: customer.id, secondaryCustomerId: null } })
+  expect(entity('workers').references).toEqual({ crewId: entity('crews').id, projectId: project.id })
+  expect(entity('project_suppliers').references).toEqual({ projectId: project.id, supplierId: supplier.id })
+  const credentials = entity('supplier_credentials')
+  expect(credentials.references).toEqual({ supplierId: supplier.id })
+  expect(JSON.parse(String(credentials.attributes.graphJson))).toMatchObject({
+    schemaVersion: 1,
+    supplier: { id: 'supplier-local-294', name: input.supplierName },
+    credentials: [],
+    files: [],
+    payloads: [],
+    credentialAudits: [],
+    supplierAudits: [],
+  })
+  expect(JSON.parse(String(entity('process_libraries').attributes.graphJson))).toMatchObject({
+    schemaVersion: 1,
+    library: { id: 'library-local-294', name: input.libraryName, version: 1 },
+    tasks: [{ id: 'library-task-local-294', library_id: 'library-local-294', task_key: 'setting-out', name: '放线', duration_days: input.durationDays }],
+  })
+  return { project, customer }
+}
+
+async function legacyProductionSnapshot(input: MigrationInput, options: { withSoftDeletedSupplier?: boolean } = {}): Promise<Uint8Array> {
   const db = await createMemoryDb()
   await runMigrations(db, migrations.filter(migration => migration.version <= 40))
   const database = db.raw
   database.run(
     'INSERT INTO customers (id, name) VALUES (?, ?)',
-    ['customer-local-294', '迁移验收客户'],
+    ['customer-local-294', input.customerName],
   )
   database.run(
     'INSERT INTO suppliers (id, name, deleted_at) VALUES (?, ?, ?)',
     [
       'supplier-local-294',
-      '迁移验收分供方',
-      options.withSoftDeletedSupplier ? '2026-08-15T08:00:00.000Z' : null,
+      input.supplierName,
+      options.withSoftDeletedSupplier ? input.deletedAt : null,
     ],
   )
   database.run(
@@ -39,11 +125,11 @@ async function legacyProductionSnapshot(options: { withSoftDeletedSupplier?: boo
     ) VALUES (?, ?, ?, ?, ?, ?)`,
     [
       'project-local-294',
-      '迁移验收项目',
+      input.projectName,
       'customer-local-294',
       null,
-      125.5,
-      8800,
+      input.area,
+      input.contractAmount,
     ],
   )
   database.run(
@@ -58,6 +144,17 @@ async function legacyProductionSnapshot(options: { withSoftDeletedSupplier?: boo
     ) VALUES (?, ?, ?)`,
     ['project-supplier-local-294', 'project-local-294', 'supplier-local-294'],
   )
+  // 真实旧 schema 保留，业务图由夹具显式准备，不依赖迁移自带的默认工序。
+  database.run('DELETE FROM schedule_process_library_tasks')
+  database.run('DELETE FROM schedule_process_libraries')
+  database.run(`INSERT INTO schedule_process_libraries
+    (id, code, name, version, is_default, created_at, updated_at)
+    VALUES (?, ?, ?, 1, 1, ?, ?)`, ['library-local-294', 'migration-library-294', input.libraryName, SOURCE_CREATED_AT, SOURCE_CREATED_AT])
+  database.run(`INSERT INTO schedule_process_library_tasks
+    (id, library_id, task_key, name, trade, duration_days, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 10, ?, ?)`, ['library-task-local-294', 'library-local-294', 'setting-out', '放线', '泥水工', input.durationDays, SOURCE_CREATED_AT, SOURCE_CREATED_AT])
+  for (const table of ['customers', 'suppliers', 'crews', 'projects', 'workers', 'project_suppliers'])
+    database.run(`UPDATE ${table} SET created_at = ?, updated_at = ?`, [SOURCE_CREATED_AT, SOURCE_CREATED_AT])
   const snapshot = database.export()
   database.close()
   return snapshot
@@ -143,143 +240,141 @@ async function localMigrationState(page: Page) {
 }
 
 test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
-  test.beforeEach(async ({ request }) => {
+  test.beforeEach(async ({ request, page }) => {
     await resetMigrationBackend(request)
+    await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
+    await page.clock.install({ time: new Date(MIGRATION_NOW) })
   })
 
   test.afterEach(async ({ request }) => {
     await resetMigrationBackend(request)
   })
 
-  test('真实旧库快照经显式流程进入中央读链，刷新后仍可回滚', async ({ page }) => {
-    test.slow()
-    await page.goto('/settings/data-migration')
-    await expect(page.getByTestId('core-migration-page').getByRole('heading', { name: '本地数据迁移' }))
-      .toBeVisible({ timeout: 60_000 })
-    await installProductionSnapshot(page, await legacyProductionSnapshot())
-    await page.reload()
+  for (const input of MIGRATION_INPUTS) {
+    test(`真实旧库快照 ${input.name} 经显式流程进入中央读链，刷新后仍可回滚`, async ({ page }) => {
+      test.slow()
+      await page.goto('/settings/data-migration')
+      await expect(page.getByTestId('core-migration-page').getByRole('heading', { name: '本地数据迁移' }))
+        .toBeVisible({ timeout: 60_000 })
+      await installProductionSnapshot(page, await legacyProductionSnapshot(input))
+      await reloadMigrationPage(page)
 
-    const preflightResponse = page.waitForResponse(response =>
-      response.url().endsWith('/api/migrations/core/preflight')
-      && response.request().method() === 'POST',
-    )
-    await page.getByRole('button', { name: '运行预检' }).click()
-    expect((await preflightResponse).ok()).toBe(true)
-    await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
+      await migrationCommand(page, '运行预检', '/api/migrations/core/preflight')
+      await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
 
-    await page.getByRole('button', { name: '创建不可变备份' }).click()
-    await expect(page.getByText('不可变备份', { exact: true })).toBeVisible()
-    const afterBackup = await localMigrationState(page)
-    expect(afterBackup.backupId).toMatch(/^core-migration-[a-f0-9]{64}-[a-f0-9]{64}$/)
-    expect(afterBackup.readOnly).not.toBe(true)
+      await page.getByRole('button', { name: '创建不可变备份' }).click()
+      await expect(page.getByText('不可变备份', { exact: true })).toBeVisible()
+      const afterBackup = await localMigrationState(page)
+      expect(afterBackup.backupId).toMatch(/^core-migration-[a-f0-9]{64}-[a-f0-9]{64}$/)
+      expect(afterBackup.readOnly).not.toBe(true)
+      expect(afterBackup.backup).toEqual(afterBackup.production)
 
-    const dryRunResponse = page.waitForResponse(response =>
-      response.url().endsWith('/api/migrations/core/dry-run')
-      && response.request().method() === 'POST',
-    )
-    await page.getByRole('button', { name: '执行 dry-run' }).click()
-    const dryRun = await dryRunResponse
-    expect(dryRun.ok()).toBe(true)
-    const dryRunBody = await dryRun.json() as { batchId: string }
-    await expect(page.getByText('对账通过，未发现迁移差异')).toBeVisible()
+      const dryRun = await migrationCommand(page, '执行 dry-run', '/api/migrations/core/dry-run')
+      const dryRunBody = await dryRun.json() as CoreMigrationBatchDTO
+      expect(dryRunBody.status).toBe('dry-run')
+      await expect(page.getByText('对账通过，未发现迁移差异')).toBeVisible()
 
-    await page.getByRole('button', { name: '导入可导入记录' }).click()
-    await expect(page.getByText('客户 1 条')).toBeVisible()
-    await expect(page.getByText('项目 1 条')).toBeVisible()
+      const imported = await migrationCommand(page, '导入可导入记录', `/api/migrations/core/${dryRunBody.batchId}/import`)
+      expect(await imported.json()).toMatchObject({ batchId: dryRunBody.batchId, status: 'applied' })
+      await expect(page.getByText('客户 1 条')).toBeVisible()
+      await expect(page.getByText('项目 1 条')).toBeVisible()
 
-    const firstSnapshot = await page.evaluate(async () => {
-      const response = await fetch('/api/migrations/core/snapshot')
-      return await response.json() as { entities: Array<{ id: string, references: Record<string, string | null> }> }
-    })
-    const replay = await page.evaluate(async (batchId) => {
-      const context = await (await fetch('/api/read/business-session')).json() as {
-        workspaceId: string
-        actorId: string
-      }
-      const response = await fetch(`/api/migrations/core/${batchId}/import`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId: context.workspaceId,
-          actorId: context.actorId,
-          requiredCapability: 'core:migration:write',
-          commandId: 'browser-import-replay',
-          batchId,
-        }),
+      const firstSnapshot = await page.evaluate(async () => {
+        const response = await fetch('/api/migrations/core/snapshot')
+        return await response.json() as CoreMigrationSnapshotDTO
       })
-      return { ok: response.ok, body: await response.json() }
-    }, dryRunBody.batchId)
-    expect(replay.ok).toBe(true)
-    const secondSnapshot = await page.evaluate(async () =>
-      await (await fetch('/api/migrations/core/snapshot')).json() as typeof firstSnapshot,
-    )
-    expect(secondSnapshot.entities).toEqual(firstSnapshot.entities)
-    expect(secondSnapshot.entities).toHaveLength(6)
-    const project = secondSnapshot.entities.find(entity =>
-      entity.id.includes('projects'),
-    )
-    const customer = secondSnapshot.entities.find(entity =>
-      entity.id.includes('customers'),
-    )
-    expect(project?.references.customerId).toBe(customer?.id)
+      const replay = await page.evaluate(async (batchId) => {
+        const context = await (await fetch('/api/read/business-session')).json() as {
+          workspaceId: string
+          actorId: string
+        }
+        const response = await fetch(`/api/migrations/core/${batchId}/import`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            workspaceId: context.workspaceId,
+            actorId: context.actorId,
+            requiredCapability: 'core:migration:write',
+            commandId: 'browser-import-replay',
+            batchId,
+          }),
+        })
+        return { ok: response.ok, body: await response.json() }
+      }, dryRunBody.batchId)
+      expect(replay.ok).toBe(true)
+      const secondSnapshot = await page.evaluate(async () =>
+        await (await fetch('/api/migrations/core/snapshot')).json() as typeof firstSnapshot,
+      )
+      expect(secondSnapshot.entities).toEqual(firstSnapshot.entities)
+      const { project, customer } = expectCompleteGraph(secondSnapshot, input)
 
-    await page.getByRole('button', { name: '确认切换中央后台' }).click()
-    await expect(page.getByText('已切换中央后台')).toBeVisible()
-    const confirmedLocal = await localMigrationState(page)
-    expect(confirmedLocal.readOnly).toBe(true)
-    expect(confirmedLocal.marker).toMatchObject({ batchId: dryRunBody.batchId })
+      const confirmed = await migrationCommand(page, '确认切换中央后台', `/api/migrations/core/${dryRunBody.batchId}/confirm`)
+      expect(await confirmed.json()).toMatchObject({ batchId: dryRunBody.batchId, status: 'confirmed' })
+      await expect(page.getByText('已切换中央后台')).toBeVisible()
+      const confirmedLocal = await localMigrationState(page)
+      expect(confirmedLocal.readOnly).toBe(true)
+      expect(confirmedLocal.marker).toMatchObject({ batchId: dryRunBody.batchId })
 
-    await page.reload()
-    await expect(page.getByText('已切换中央后台')).toBeVisible()
-    await expect(page.getByRole('button', { name: '回滚到本地快照' })).toBeEnabled()
+      await reloadMigrationPage(page)
+      await expect(page.getByText('已切换中央后台')).toBeVisible()
+      await expect(page.getByRole('button', { name: '回滚到本地快照' })).toBeEnabled()
 
-    await page.goto('/project')
-    await expect(page.getByRole('link', { name: '迁移验收项目', exact: true })).toBeVisible()
-    const projectRead = await page.evaluate(async () => {
-      const response = await fetch('/api/read/projects?includeDemo=false&page=1&pageSize=10')
-      return await response.json() as {
-        items: Array<{
-          project: { id: string }
-          customer: { id: string | null, label: string | null }
-        }>
-      }
+      await page.goto('/project')
+      await expect(page.getByRole('link', { name: input.projectName, exact: true })).toBeVisible()
+      const projectRead = await page.evaluate(async () => {
+        const response = await fetch('/api/read/projects?includeDemo=false&page=1&pageSize=10')
+        return await response.json() as {
+          items: Array<{
+            project: { id: string }
+            customer: { id: string | null, label: string | null }
+          }>
+        }
+      })
+      expect(projectRead.items).toContainEqual(expect.objectContaining({
+        project: expect.objectContaining({ id: project.id }),
+        customer: expect.objectContaining({ id: customer.id, label: input.customerName }),
+      }))
+
+      await page.goto('/settings/data-migration')
+      const rollback = await migrationCommand(page, '回滚到本地快照', `/api/migrations/core/${dryRunBody.batchId}/rollback`)
+      expect(await rollback.json()).toMatchObject({ batchId: dryRunBody.batchId, status: 'rolled-back' })
+      await expect(page.getByText('已回滚本地快照')).toBeVisible()
+      const rolledBackLocal = await localMigrationState(page)
+      expect(rolledBackLocal.readOnly).toBe(false)
+      expect(rolledBackLocal.marker).toBeUndefined()
+      expect(rolledBackLocal.production).toEqual(rolledBackLocal.backup)
+      const afterRollback = await page.evaluate(async () =>
+        await (await fetch('/api/read/projects?includeDemo=false&page=1&pageSize=10')).json() as {
+          items: Array<{ project: { label: string } }>
+        },
+      )
+      expect(afterRollback.items.map(item => item.project.label)).not.toContain(input.projectName)
     })
-    expect(projectRead.items).toContainEqual(expect.objectContaining({
-      project: expect.objectContaining({ id: project?.id }),
-      customer: expect.objectContaining({ id: customer?.id, label: '迁移验收客户' }),
-    }))
+  }
 
-    await page.goto('/settings/data-migration')
-    await page.getByRole('button', { name: '回滚到本地快照' }).click()
-    await expect(page.getByText('已回滚本地快照')).toBeVisible()
-    const rolledBackLocal = await localMigrationState(page)
-    expect(rolledBackLocal.readOnly).toBe(false)
-    expect(rolledBackLocal.marker).toBeUndefined()
-    expect(rolledBackLocal.production).toEqual(rolledBackLocal.backup)
-    const afterRollback = await page.evaluate(async () =>
-      await (await fetch('/api/read/projects?includeDemo=false&page=1&pageSize=10')).json() as {
-        items: Array<{ project: { label: string } }>
-      },
-    )
-    expect(afterRollback.items.map(item => item.project.label)).not.toContain('迁移验收项目')
-  })
-
-  for (const width of RESPONSIVE_WIDTHS) {
+  for (const [index, viewport] of VIEWPORTS.entries()) {
+    const { width } = viewport
     test(`${width}px 迁移页只由对账表自身承载横向滚动`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+      await page.setViewportSize(viewport)
       await page.goto('/settings/data-migration')
       await expect(page.getByTestId('core-migration-page').getByRole('heading', { name: '本地数据迁移' }))
         .toBeVisible()
-      await installProductionSnapshot(page, await legacyProductionSnapshot({ withSoftDeletedSupplier: true }))
-      await page.reload()
-      await page.getByRole('button', { name: '运行预检' }).click()
+      const input = MIGRATION_INPUTS[index % MIGRATION_INPUTS.length]!
+      await installProductionSnapshot(page, await legacyProductionSnapshot(input, { withSoftDeletedSupplier: true }))
+      await reloadMigrationPage(page)
+      await migrationCommand(page, '运行预检', '/api/migrations/core/preflight')
       await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
       await page.getByRole('button', { name: '创建不可变备份' }).click()
-      await page.getByRole('button', { name: '执行 dry-run' }).click()
-      await expect(page.getByText('已保留软删除')).toBeVisible()
+      const dryRun = await migrationCommand(page, '执行 dry-run', '/api/migrations/core/dry-run')
+      expect(await dryRun.json()).toMatchObject({ status: 'dry-run' })
+      await expectSoftDeletedGraphs(page)
       const reconciliationScroll = page.getByTestId('migration-reconciliation-scroll')
       await expect(reconciliationScroll).toBeVisible()
-      expect(await reconciliationScroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+      await expectLocalHorizontalScroll(reconciliationScroll, `${width}px 迁移对账表`)
+      await reconciliationScroll.evaluate((element) => {
+        element.scrollLeft = element.scrollWidth
+      })
+      expect(await reconciliationScroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
       await expectNoPageOverflow(page, `#294 核心身份迁移 @ ${width}px`)
     })
   }
@@ -288,15 +383,19 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
     test.setTimeout(120_000)
     await page.goto('/settings/data-migration')
     await expect(page.getByTestId('core-migration-page')).toBeVisible({ timeout: 60_000 })
-    await installProductionSnapshot(page, await legacyProductionSnapshot({ withSoftDeletedSupplier: true }))
-    await page.reload()
-    await page.getByRole('button', { name: '运行预检' }).click()
+    await installProductionSnapshot(page, await legacyProductionSnapshot(MIGRATION_INPUTS[1], { withSoftDeletedSupplier: true }))
+    await reloadMigrationPage(page)
+    await migrationCommand(page, '运行预检', '/api/migrations/core/preflight')
     await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
     await page.getByRole('button', { name: '创建不可变备份' }).click()
-    await page.getByRole('button', { name: '执行 dry-run' }).click()
-    await expect(page.getByText('已保留软删除', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: '导入可导入记录' }).click()
-    await page.getByRole('button', { name: '确认切换中央后台' }).click()
+    const dryRun = await migrationCommand(page, '执行 dry-run', '/api/migrations/core/dry-run')
+    const batch = await dryRun.json() as CoreMigrationBatchDTO
+    expect(batch.status).toBe('dry-run')
+    await expectSoftDeletedGraphs(page)
+    const imported = await migrationCommand(page, '导入可导入记录', `/api/migrations/core/${batch.batchId}/import`)
+    expect(await imported.json()).toMatchObject({ batchId: batch.batchId, status: 'applied' })
+    const confirmed = await migrationCommand(page, '确认切换中央后台', `/api/migrations/core/${batch.batchId}/confirm`)
+    expect(await confirmed.json()).toMatchObject({ batchId: batch.batchId, status: 'confirmed' })
     await expect(page.getByText('已切换中央后台', { exact: true })).toBeVisible()
     const protectedState = await localMigrationState(page)
 
@@ -313,7 +412,8 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
       }
     })
     const rollback = page.getByRole('button', { name: '回滚到本地快照' })
-    await rollback.click()
+    const rollbackReceipt = await migrationCommand(page, '回滚到本地快照', `/api/migrations/core/${batch.batchId}/rollback`)
+    expect(await rollbackReceipt.json()).toMatchObject({ batchId: batch.batchId, status: 'rolled-back' })
     await expect(page.getByRole('alert')).toHaveText('测试：本地快照暂时无法恢复')
     await expect(page.getByText('中央已回滚，等待恢复本地快照', { exact: true })).toBeVisible()
     await expect(page.getByText('对账通过，未发现迁移差异')).toHaveCount(0)
@@ -322,11 +422,14 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
     const pendingState = await localMigrationState(page)
     expect(pendingState.marker).toEqual(protectedState.marker)
     expect(pendingState.backup).toEqual(protectedState.backup)
+    expect(pendingState.readOnly).toBe(true)
+    expect(pendingState.production).toEqual(protectedState.production)
     const central = await page.request.get('/api/migrations/core/snapshot')
-    expect(await central.json()).toMatchObject({ authority: 'local', activeBatchId: null })
+    expect(await central.json()).toMatchObject({ authority: 'local', activeBatchId: null, entities: [] })
 
-    for (const width of [390, 768, 1024, 1280, 1440]) {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+    for (const viewport of VIEWPORTS) {
+      const { width } = viewport
+      await page.setViewportSize(viewport)
       await page.getByText('中央已回滚，等待恢复本地快照', { exact: true }).scrollIntoViewIfNeeded()
       await expectNoPageOverflow(page, `迁移回滚待恢复 @ ${width}px`)
       if (process.env.CRM_EVIDENCE_DIR) {
@@ -338,7 +441,14 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
     await rollback.press('Tab')
     await page.keyboard.press('Shift+Tab')
     await expect(rollback).toBeFocused()
+    const retried = page.waitForResponse(response =>
+      new URL(response.url()).pathname === `/api/migrations/core/${batch.batchId}/rollback`
+        && response.request().method() === 'POST',
+    )
     await rollback.press('Enter')
+    const retryReceipt = await retried
+    expect(retryReceipt.ok()).toBe(true)
+    expect(await retryReceipt.json()).toMatchObject({ batchId: batch.batchId, status: 'rolled-back' })
     await expect(page.getByText('已回滚本地快照', { exact: true })).toBeVisible()
     const restored = await localMigrationState(page)
     expect(restored.marker).toBeUndefined()

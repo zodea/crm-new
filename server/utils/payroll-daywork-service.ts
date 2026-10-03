@@ -73,6 +73,11 @@ export async function projectPayrollDayworkRecords(db: TransactionDb, context: P
 export function createPayrollDayworkService(run: PayrollRun, options: PayrollServiceOptions) {
   async function list(db: TransactionDb, base: PayrollWritableContext, source: PayrollIdentitySource, scope: PayrollDayworkScope): Promise<PayrollDayworkListRead> {
     parsePayrollDayworkScope(scope)
+    if (scope.projectId && !source.projects.some(project => project.id === scope.projectId)) {
+      const historical = await db.select('SELECT id FROM signed_daywork_records WHERE project_id=? UNION SELECT entity_id FROM payroll_migration_evidence WHERE project_id=?', [scope.projectId, scope.projectId])
+      if (!historical.length)
+        throw payrollProblem('not-found', '签工项目不存在，请核对原项目')
+    }
     const catalog = await loadPayrollParticipantOptions(db, source, base, scope.projectId)
     const facts = scope.projectId && scope.month ? await (options.dayworkFacts ?? loadPayrollDayworkFacts)(db, scope) : { sourceVersion: '', rows: [], occupations: [], diagnostics: [], evidence: [] }
     const records = (await projectPayrollDayworkRecords(db, base, source, facts, catalog, scope.month)).filter(r => (scope.crewId === null || r.crewId === scope.crewId) && (!scope.dayworkStatuses.length || ((r.status === 'draft' || r.status === 'confirmed') && scope.dayworkStatuses.includes(r.status))))

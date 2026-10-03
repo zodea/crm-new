@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildRuntimeEvidenceLedger,
@@ -18,6 +18,14 @@ const COVERAGE_PATH = join(PROJECT_ROOT, 'docs/design/design-coverage.json')
 const DESIGN_INDEX_PATH = join(PROJECT_ROOT, 'docs/design/README.md')
 const STATUS_PATH = join(PROJECT_ROOT, 'docs/design/ui-implementation-status.md')
 const PAGE_TEMPLATES = new Set(['列表', '详情', '整页表单', '工作台', '特殊工具'])
+
+function pageFiles(directory = join(PROJECT_ROOT, 'app/pages')): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory()
+    ? pageFiles(join(directory, entry.name))
+    : entry.name.endsWith('.vue')
+      ? [relative(PROJECT_ROOT, join(directory, entry.name)).replaceAll('\\', '/')]
+      : [])
+}
 
 function markdownCells(line: string): string[] {
   return line
@@ -75,23 +83,37 @@ describe('运行参考文档与生成物一致性（非业务验收）', () => {
     const committed = JSON.parse(readFileSync(RUNTIME_EVIDENCE_LEDGER_PATH, 'utf8'))
 
     expect(committed).toEqual(ledger)
+    const files = pageFiles()
+    const productionFiles = files.filter(file => !file.startsWith('app/pages/dev/'))
+    const audit = readFileSync(AUDIT_PATH, 'utf8')
+    const rows = audit.split(/\r?\n/).filter(line => line.startsWith('| `app/pages/')).map(markdownCells)
+    const domains = readFileSync(join(PROJECT_ROOT, 'docs/rewrite/READ-MODELS.md'), 'utf8')
+      .split(/\r?\n/)
+      .filter(line => /^\| `[a-z][a-z-]+` \|/.test(line))
+      .map(line => markdownCells(line)[0].replaceAll('`', ''))
+    expect(new Set(rows.map(row => row[0].replaceAll('`', '')))).toEqual(new Set(productionFiles))
+    expect(new Set(ledger.endpoints.map(endpoint => endpoint.page))).toEqual(new Set(productionFiles))
+    expect(new Set(ledger.domains.map(domain => domain.code))).toEqual(new Set(domains))
     expect(ledger.counts).toMatchObject({
-      trackedPageFiles: 164,
-      devPageFiles: 5,
-      productionRoutes: 159,
-      pageDomains: 20,
-      evidenceEndpointRecords: 159,
-      referenceEndpoints: 159,
-      referenceProfiles: 50,
-      usedReferenceProfiles: 44,
-      directEvidenceRoutes: 54,
-      adjacentEvidenceRoutes: 18,
-      localAuthorityRoutes: 43,
-      historicalEvidenceRoutes: 34,
-      unverifiedTargetRoutes: 10,
+      trackedPageFiles: files.length,
+      devPageFiles: files.length - productionFiles.length,
+      productionRoutes: productionFiles.length,
+      pageDomains: domains.length,
+      evidenceEndpointRecords: rows.length,
+      referenceEndpoints: new Set(ledger.endpoints.map(endpoint => endpoint.referenceEndpointId)).size,
+      referenceProfiles: definedProfileCodes(audit, 'R-').size,
+      usedReferenceProfiles: new Set(rows.map(row => row[5].replaceAll('`', ''))).size,
     })
-    expect(ledger.endpoints).toHaveLength(159)
-    expect(ledger.domains).toHaveLength(20)
+    expect(ledger.endpoints).toHaveLength(rows.length)
+    expect(ledger.domains).toHaveLength(domains.length)
+    for (const [count, grade] of [
+      ['directEvidenceRoutes', 'direct'],
+      ['adjacentEvidenceRoutes', 'adjacent'],
+      ['localAuthorityRoutes', 'local-authority'],
+      ['historicalEvidenceRoutes', 'historical'],
+      ['unverifiedTargetRoutes', 'unverified-target'],
+    ] as const)
+      expect(ledger.counts[count]).toBe(ledger.endpoints.filter(endpoint => endpoint.evidenceGrade === grade).length)
 
     for (const endpoint of ledger.endpoints) {
       expect(endpoint.evidenceRecordId).toMatch(/^E-[0-9A-F]{12}$/)
@@ -183,10 +205,10 @@ describe('运行参考文档与生成物一致性（非业务验收）', () => {
     const coverage = JSON.parse(readFileSync(COVERAGE_PATH, 'utf8'))
     const designPending = coverage.screenParity.filter((entry: { status: string }) => entry.status === 'design-pending')
 
-    expect(status).toContain('> 核对日期：2026-08-25')
-    expect(status).toContain('| 实现页面文件（含 dev） | 164 |')
-    expect(status).toContain('| 开发预览路由 | 5 |')
-    expect(status).toContain('| 实现生产路由（排除 dev） | 159 |')
+    expect(status).toContain(`> 核对日期：${ledger.auditedAt}`)
+    expect(status).toContain(`| 实现页面文件（含 dev） | ${ledger.counts.trackedPageFiles} |`)
+    expect(status).toContain(`| 开发预览路由 | ${ledger.counts.devPageFiles} |`)
+    expect(status).toContain(`| 实现生产路由（排除 dev） | ${ledger.counts.productionRoutes} |`)
     expect(status).toContain('`/finance/payment/:id/detail`')
     expect(status).not.toMatch(/\| 已闭环 \|/)
 
@@ -309,10 +331,9 @@ describe('运行参考文档与生成物一致性（非业务验收）', () => {
     expect(existsSync(AUDIT_PATH)).toBe(true)
 
     const endpoints = buildRuntimeEvidenceLedger().endpoints
-    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(159)
-    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(159)
-    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(159)
-    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(159)
+    expect(new Set(endpoints.map(endpoint => endpoint.page))).toEqual(new Set(pageFiles().filter(file => !file.startsWith('app/pages/dev/'))))
+    for (const key of ['evidenceRecordId', 'page', 'localRoute', 'referenceEndpointId'] as const)
+      expect(new Set(endpoints.map(endpoint => endpoint[key])).size, key).toBe(endpoints.length)
   })
 
   it('records classification, evidence, differences and constraints for each route', () => {

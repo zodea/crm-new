@@ -23,7 +23,7 @@ function projectIntent(overrides: Partial<NavigationIntentDTO> = {}): Navigation
 }
 
 describe('唯一 Target Registry', () => {
-  it('项目材采聚合入口只按稳定项目 ID 与来源解析真实列表', () => {
+  describe('项目材采聚合入口只按稳定项目 ID 与来源解析真实列表', () => {
     const intent: NavigationIntentDTO = {
       kind: 'entity-list',
       entity: 'contract',
@@ -31,26 +31,32 @@ describe('唯一 Target Registry', () => {
       view: null,
       filters: { projectId: 'project/central-001', dataOrigin: 'demo' },
     }
-
-    expect(resolveNavigationTarget(intent, {
-      returnTo: '/project/project%2Fcentral-001?origin=demo&returnTo=%2Fproject%3Fnav%3Dorigin_319%23project-row-demo%253Aproject%252Fcentral-001&returnContext=origin_319',
-    })).toEqual({
-      state: 'resolved',
-      label: '材料采购合同',
-      to: '/contract/material?projectId=project%2Fcentral-001&origin=demo&returnTo=%2Fproject%2Fproject%252Fcentral-001%3Forigin%3Ddemo%26returnTo%3D%252Fproject%253Fnav%253Dorigin_319%2523project-row-demo%25253Aproject%25252Fcentral-001%26returnContext%3Dorigin_319',
-    })
-
-    expect(resolveNavigationTarget({
-      ...intent,
-      filters: { projectId: 'project-1', dataOrigin: 'real' },
-    }, { returnTo: '/project/project-1' })).toEqual({
-      state: 'resolved',
-      label: '材料采购合同',
-      to: '/contract/material?projectId=project-1&origin=real&returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal',
+    it.each([
+      { case: '演示项目嵌套来源', intent, options: {
+        returnTo: '/project/project%2Fcentral-001?origin=demo&returnTo=%2Fproject%3Fnav%3Dorigin_319%23project-row-demo%253Aproject%252Fcentral-001&returnContext=origin_319',
+      }, expected: {
+        state: 'resolved',
+        label: '材料采购合同',
+        to: '/contract/material?projectId=project%2Fcentral-001&origin=demo&returnTo=%2Fproject%2Fproject%252Fcentral-001%3Forigin%3Ddemo%26returnTo%3D%252Fproject%253Fnav%253Dorigin_319%2523project-row-demo%25253Aproject%25252Fcentral-001%26returnContext%3Dorigin_319',
+      }, partial: false },
+      { case: '正式项目默认来源', intent: {
+        ...intent,
+        filters: { projectId: 'project-1', dataOrigin: 'real' },
+      }, options: { returnTo: '/project/project-1' }, expected: {
+        state: 'resolved',
+        label: '材料采购合同',
+        to: '/contract/material?projectId=project-1&origin=real&returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal',
+      }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
   })
 
-  it('材采聚合入口缺少项目身份、来源或使用未知 variant 时不猜列表', () => {
+  describe('材采聚合入口缺少项目身份、来源或使用未知 variant 时不猜列表', () => {
     const intent = (filters: Record<string, string | null>, variant = 'material'): NavigationIntentDTO => ({
       kind: 'entity-list',
       entity: 'contract',
@@ -58,11 +64,17 @@ describe('唯一 Target Registry', () => {
       view: null,
       filters,
     })
-
-    expect(resolveNavigationTarget(intent({ dataOrigin: 'real' }))).toMatchObject({ state: 'error' })
-    expect(resolveNavigationTarget(intent({ projectId: 'project-1' }))).toMatchObject({ state: 'error' })
-    expect(resolveNavigationTarget(intent({ projectId: 'project-1', dataOrigin: 'real' }, 'construction')))
-      .toMatchObject({ state: 'unverified-target' })
+    it.each([
+      { case: '缺少项目身份', intent: intent({ dataOrigin: 'real' }), options: undefined, expected: { state: 'error' }, partial: true },
+      { case: '缺少数据来源', intent: intent({ projectId: 'project-1' }), options: undefined, expected: { state: 'error' }, partial: true },
+      { case: '未登记合同变体', intent: intent({ projectId: 'project-1', dataOrigin: 'real' }, 'construction'), options: undefined, expected: { state: 'unverified-target' }, partial: true },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
+    })
   })
 
   it('材料合同进入分供方事实页签时保留受限合同来源', () => {
@@ -81,30 +93,37 @@ describe('唯一 Target Registry', () => {
     })
   })
 
-  it('仅为 DOC01 两类甲方单据按稳定 ID 进入中央只读详情，其他种类仍不猜路由', () => {
+  describe('仅为 DOC01 两类甲方单据按稳定 ID 进入中央只读详情，其他种类仍不猜路由', () => {
     const returnTo = '/owner/change?search=%E6%A1%A5%E6%9E%B6&origin=real&nav=origin_323#owner-document-row-real%3Aowner_change%3Achange-1'
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'owner-document', id: 'change-1', label: '变更一', no: 'BG-001' },
-      variant: 'change',
-      view: null,
-      filters: { dataOrigin: 'real' },
-    }, { returnTo, returnContextId: 'origin_323' })).toEqual({
-      state: 'resolved',
-      label: '变更一',
-      to: `/owner/change/change-1?origin=real&returnTo=${encodeURIComponent(returnTo)}&returnContext=origin_323`,
+    it.each([
+      { case: '甲方变更专属详情', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'owner-document', id: 'change-1', label: '变更一', no: 'BG-001' },
+        variant: 'change',
+        view: null,
+        filters: { dataOrigin: 'real' },
+      }, options: { returnTo, returnContextId: 'origin_323' }, expected: {
+        state: 'resolved',
+        label: '变更一',
+        to: `/owner/change/change-1?origin=real&returnTo=${encodeURIComponent(returnTo)}&returnContext=origin_323`,
+      }, partial: false },
+      { case: '未登记最终结算变体', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'owner-document', id: 'final-settlement-1', label: '竣工结算一', no: 'JS-001' },
+        variant: 'detail',
+        view: null,
+        filters: { dataOrigin: 'real', documentKind: 'final-settlement' },
+      }, options: undefined, expected: { state: 'unverified-target', label: '竣工结算一' }, partial: true },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
-
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'owner-document', id: 'final-settlement-1', label: '竣工结算一', no: 'JS-001' },
-      variant: 'detail',
-      view: null,
-      filters: { dataOrigin: 'real', documentKind: 'final-settlement' },
-    })).toMatchObject({ state: 'unverified-target', label: '竣工结算一' })
   })
 
-  it('施工合同 BOQ 只按正式项目与合同稳定 ID 进入专属工作台', () => {
+  describe('施工合同 BOQ 只按正式项目与合同稳定 ID 进入专属工作台', () => {
     const intent = {
       kind: 'entity-subview' as const,
       subject: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract-320', label: '施工合同', no: 'SG-320' },
@@ -112,21 +131,27 @@ describe('唯一 Target Registry', () => {
       view: null,
       filters: { dataOrigin: 'real', contractKind: '施工', projectId: 'project-320' },
     }
-    expect(resolveNavigationTarget(intent)).toEqual({
-      state: 'resolved',
-      label: '施工合同',
-      to: '/contract/boq?project=project-320&contract=contract-320',
-    })
-    expect(resolveNavigationTarget({ ...intent, filters: { ...intent.filters, dataOrigin: 'demo' } }))
-      .toMatchObject({ state: 'error' })
-
-    expect(resolveNavigationTarget({
-      ...intent,
-      view: 'change-source-323',
-      filters: { ...intent.filters, boqTab: 'changes' },
-    })).toMatchObject({
-      state: 'resolved',
-      to: '/contract/boq?project=project-320&contract=contract-320&tab=changes&focus=change-source-323',
+    it.each([
+      { case: '正式 BOQ 工作台', intent, options: undefined, expected: {
+        state: 'resolved',
+        label: '施工合同',
+        to: '/contract/boq?project=project-320&contract=contract-320',
+      }, partial: false },
+      { case: '演示来源拒绝', intent: { ...intent, filters: { ...intent.filters, dataOrigin: 'demo' } }, options: undefined, expected: { state: 'error' }, partial: true },
+      { case: '变更来源精确定位', intent: {
+        ...intent,
+        view: 'change-source-323',
+        filters: { ...intent.filters, boqTab: 'changes' },
+      }, options: undefined, expected: {
+        state: 'resolved',
+        to: '/contract/boq?project=project-320&contract=contract-320&tab=changes&focus=change-source-323',
+      }, partial: true },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
   })
 
@@ -146,69 +171,81 @@ describe('唯一 Target Registry', () => {
     })
   })
 
-  it('甲方单据来源进入中央施工合同事实行，并保留原详情返回链', () => {
+  describe('甲方单据来源进入中央施工合同事实行，并保留原详情返回链', () => {
     const returnTo = '/owner/report/report-323?origin=real'
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'contract', id: 'contract-323', label: '施工合同', no: 'SG-323' },
-      variant: 'owner-document-source',
-      view: 'report-323',
-      filters: { dataOrigin: 'real', contractKind: '施工', ownerTab: 'settlements' },
-    }, { returnTo })).toEqual({
-      state: 'resolved',
-      label: '施工合同',
-      to: `/contract/contract-323?origin=real&contractKind=construction&tab=settlements&focus=report-323&returnTo=${encodeURIComponent(returnTo)}`,
-    })
-
     const acceptanceReturnTo = '/owner/acceptance/acceptance-324?origin=real&variant=warranty'
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'contract', id: 'contract-323', label: '施工合同', no: 'SG-323' },
-      variant: 'owner-document-source',
-      view: 'acceptance-324',
-      filters: { dataOrigin: 'real', contractKind: '施工', ownerTab: 'acceptance', ownerView: 'warranty' },
-    }, { returnTo: acceptanceReturnTo })).toEqual({
-      state: 'resolved',
-      label: '施工合同',
-      to: `/contract/contract-323?origin=real&contractKind=construction&tab=acceptance&focus=acceptance-324&focusView=warranty&returnTo=${encodeURIComponent(acceptanceReturnTo)}`,
+    it.each([
+      { case: '月度报量事实行', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'contract', id: 'contract-323', label: '施工合同', no: 'SG-323' },
+        variant: 'owner-document-source',
+        view: 'report-323',
+        filters: { dataOrigin: 'real', contractKind: '施工', ownerTab: 'settlements' },
+      }, options: { returnTo }, expected: {
+        state: 'resolved',
+        label: '施工合同',
+        to: `/contract/contract-323?origin=real&contractKind=construction&tab=settlements&focus=report-323&returnTo=${encodeURIComponent(returnTo)}`,
+      }, partial: false },
+      { case: '保修验收事实行', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'contract', id: 'contract-323', label: '施工合同', no: 'SG-323' },
+        variant: 'owner-document-source',
+        view: 'acceptance-324',
+        filters: { dataOrigin: 'real', contractKind: '施工', ownerTab: 'acceptance', ownerView: 'warranty' },
+      }, options: { returnTo: acceptanceReturnTo }, expected: {
+        state: 'resolved',
+        label: '施工合同',
+        to: `/contract/contract-323?origin=real&contractKind=construction&tab=acceptance&focus=acceptance-324&focusView=warranty&returnTo=${encodeURIComponent(acceptanceReturnTo)}`,
+      }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
   })
 
-  it('最终结算详情及其补充协议、收款来源均保留专属详情返回链', () => {
+  describe('最终结算详情及其补充协议、收款来源均保留专属详情返回链', () => {
     const returnTo = '/owner/final-settlement/final-settlement-325?origin=real'
-    const document = resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'owner-document', id: 'final-settlement-325', label: '最终结算', no: 'JS-325' },
-      variant: 'final-settlement',
-      view: null,
-      filters: { dataOrigin: 'real' },
-    })
-    expect(document).toEqual({
-      state: 'resolved',
-      label: '最终结算',
-      to: '/owner/final-settlement/final-settlement-325?origin=real',
-    })
-
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'contract', id: 'contract-325', label: '施工合同', no: 'SG-325' },
-      variant: 'supplement',
-      view: 'supplement-325',
-      filters: { dataOrigin: 'real', contractKind: '施工' },
-    }, { returnTo })).toMatchObject({
-      state: 'resolved',
-      to: expect.stringContaining(`returnTo=${encodeURIComponent(returnTo)}`),
-    })
-
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'receipt', id: 'receipt-325', label: '一期工程款', no: 'SK-325' },
-      variant: 'detail',
-      view: null,
-      filters: { dataOrigin: 'real', customerId: 'customer-325' },
-    }, { returnTo })).toMatchObject({
-      state: 'resolved',
-      to: expect.stringContaining(`returnTo=${encodeURIComponent(returnTo)}`),
+    it.each([
+      { case: '最终结算详情', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'owner-document', id: 'final-settlement-325', label: '最终结算', no: 'JS-325' },
+        variant: 'final-settlement',
+        view: null,
+        filters: { dataOrigin: 'real' },
+      }, options: undefined, expected: {
+        state: 'resolved',
+        label: '最终结算',
+        to: '/owner/final-settlement/final-settlement-325?origin=real',
+      }, partial: false },
+      { case: '补充协议来源', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'contract', id: 'contract-325', label: '施工合同', no: 'SG-325' },
+        variant: 'supplement',
+        view: 'supplement-325',
+        filters: { dataOrigin: 'real', contractKind: '施工' },
+      }, options: { returnTo }, expected: {
+        state: 'resolved',
+        to: expect.stringContaining(`returnTo=${encodeURIComponent(returnTo)}`),
+      }, partial: true },
+      { case: '收款来源', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'receipt', id: 'receipt-325', label: '一期工程款', no: 'SK-325' },
+        variant: 'detail',
+        view: null,
+        filters: { dataOrigin: 'real', customerId: 'customer-325' },
+      }, options: { returnTo }, expected: {
+        state: 'resolved',
+        to: expect.stringContaining(`returnTo=${encodeURIComponent(returnTo)}`),
+      }, partial: true },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
   })
 
@@ -243,33 +280,38 @@ describe('唯一 Target Registry', () => {
     })
   })
 
-  it('项目与分供方目标拒绝跨来源 returnTo，而不是保留错配链', () => {
-    const projectList = resolveNavigationTarget({
-      kind: 'entity-list',
-      entity: 'contract',
-      variant: 'material',
-      view: null,
-      filters: { projectId: 'project-1', dataOrigin: 'real' },
-    }, { returnTo: '/project/project-1?origin=demo' })
-    expect(projectList).toEqual({
-      state: 'resolved',
-      label: '材料采购合同',
-      to: '/contract/material?projectId=project-1&origin=real',
-    })
-
+  describe('项目与分供方目标拒绝跨来源 returnTo，而不是保留错配链', () => {
     const listReturnTo = '/contract/material?origin=demo&nav=origin_319_contract#material-contract-row-demo%3Acontract-1'
     const contractReturnTo = `/contract/contract-1?origin=demo&contractKind=material&returnTo=${encodeURIComponent(listReturnTo)}`
-    const supplier = resolveNavigationTarget({
-      kind: 'entity-subview',
-      subject: { state: 'resolved', entity: 'supplier', id: 'supplier-1', label: '分供方一', no: null },
-      variant: 'detail',
-      view: 'contracts',
-      filters: { dataOrigin: 'real' },
-    }, { returnTo: contractReturnTo })
-    expect(supplier).toEqual({ state: 'resolved', label: '分供方一', to: '/base/supplier/supplier-1?origin=real&tab=contracts' })
+    it.each([
+      { case: '项目列表跨来源', intent: {
+        kind: 'entity-list',
+        entity: 'contract',
+        variant: 'material',
+        view: null,
+        filters: { projectId: 'project-1', dataOrigin: 'real' },
+      }, options: { returnTo: '/project/project-1?origin=demo' }, expected: {
+        state: 'resolved',
+        label: '材料采购合同',
+        to: '/contract/material?projectId=project-1&origin=real',
+      }, partial: false },
+      { case: '分供方详情跨来源', intent: {
+        kind: 'entity-subview',
+        subject: { state: 'resolved', entity: 'supplier', id: 'supplier-1', label: '分供方一', no: null },
+        variant: 'detail',
+        view: 'contracts',
+        filters: { dataOrigin: 'real' },
+      }, options: { returnTo: contractReturnTo }, expected: { state: 'resolved', label: '分供方一', to: '/base/supplier/supplier-1?origin=real&tab=contracts' }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
+    })
   })
 
-  it('客户事实穿透项目时只保留同来源的受限详情返回链', () => {
+  describe('客户事实穿透项目时只保留同来源的受限详情返回链', () => {
     const returnTo = '/base/customer/customer-1?origin=demo&tab=receipts'
     const intent = projectIntent({
       subject: {
@@ -281,55 +323,66 @@ describe('唯一 Target Registry', () => {
       },
       filters: { dataOrigin: 'demo', customerId: 'customer-1' },
     })
-
-    expect(resolveNavigationTarget(intent, { returnTo })).toEqual({
-      state: 'resolved',
-      label: '项目一',
-      to: `/project/project-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+    it.each([
+      { case: '匹配客户来源', intent, options: { returnTo }, expected: {
+        state: 'resolved',
+        label: '项目一',
+        to: `/project/project-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+      }, partial: false },
+      { case: '不同数据来源', intent: { ...intent, filters: { dataOrigin: 'real' } }, options: { returnTo }, expected: { state: 'resolved', label: '项目一', to: '/project/project-1?origin=real' }, partial: false },
+      { case: '不同客户身份', intent: { ...intent, filters: { dataOrigin: 'demo', customerId: 'customer-2' } }, options: { returnTo }, expected: { state: 'resolved', label: '项目一', to: '/project/project-1?origin=demo' }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
-    expect(resolveNavigationTarget({ ...intent, filters: { dataOrigin: 'real' } }, { returnTo }))
-      .toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1?origin=real' })
-    expect(resolveNavigationTarget({ ...intent, filters: { dataOrigin: 'demo', customerId: 'customer-2' } }, { returnTo }))
-      .toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1?origin=demo' })
   })
 
-  it('分包变洽签专属详情、关系下钻与合同事实来源形成受限返回链', () => {
+  describe('分包变洽签专属详情、关系下钻与合同事实来源形成受限返回链', () => {
     const contractReturnTo = '/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes&focus=sub-change-327'
     const detailReturnTo = `/subcontract/change/sub-change-327?origin=real&returnTo=${encodeURIComponent(contractReturnTo)}`
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'subcontract-document', id: 'sub-change-327', label: '样板层范围调整', no: 'FB-BQ-327' },
-      variant: 'change',
-      view: null,
-      filters: { dataOrigin: 'real', projectId: 'project-327', supplierId: 'supplier-327', contractId: 'subcontract-327' },
-    }, { returnTo: contractReturnTo, returnContextId: 'origin_327_sub' })).toEqual({
-      state: 'resolved',
-      label: '样板层范围调整',
-      to: `/subcontract/change/sub-change-327?origin=real&returnTo=${encodeURIComponent(contractReturnTo)}&returnContext=origin_327_sub`,
-    })
-
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'supplier', id: 'supplier-327', label: '中央分供方', no: null },
-      variant: 'detail',
-      view: null,
-      filters: { dataOrigin: 'real' },
-    }, { returnTo: detailReturnTo })).toEqual({
-      state: 'resolved',
-      label: '中央分供方',
-      to: `/base/supplier/supplier-327?origin=real&returnTo=${encodeURIComponent(detailReturnTo)}`,
-    })
-
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'contract', id: 'subcontract-327', label: '中央分包合同', no: 'FB-327' },
-      variant: 'subcontract-document-source',
-      view: 'sub-change-327',
-      filters: { dataOrigin: 'real', contractKind: '分包', subcontractTab: 'changes' },
-    }, { returnTo: detailReturnTo })).toEqual({
-      state: 'resolved',
-      label: '中央分包合同',
-      to: `/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes&focus=sub-change-327&returnTo=${encodeURIComponent(detailReturnTo)}`,
+    it.each([
+      { case: '分包变更详情', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'subcontract-document', id: 'sub-change-327', label: '样板层范围调整', no: 'FB-BQ-327' },
+        variant: 'change',
+        view: null,
+        filters: { dataOrigin: 'real', projectId: 'project-327', supplierId: 'supplier-327', contractId: 'subcontract-327' },
+      }, options: { returnTo: contractReturnTo, returnContextId: 'origin_327_sub' }, expected: {
+        state: 'resolved',
+        label: '样板层范围调整',
+        to: `/subcontract/change/sub-change-327?origin=real&returnTo=${encodeURIComponent(contractReturnTo)}&returnContext=origin_327_sub`,
+      }, partial: false },
+      { case: '分供方关系来源', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'supplier', id: 'supplier-327', label: '中央分供方', no: null },
+        variant: 'detail',
+        view: null,
+        filters: { dataOrigin: 'real' },
+      }, options: { returnTo: detailReturnTo }, expected: {
+        state: 'resolved',
+        label: '中央分供方',
+        to: `/base/supplier/supplier-327?origin=real&returnTo=${encodeURIComponent(detailReturnTo)}`,
+      }, partial: false },
+      { case: '分包合同事实来源', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'contract', id: 'subcontract-327', label: '中央分包合同', no: 'FB-327' },
+        variant: 'subcontract-document-source',
+        view: 'sub-change-327',
+        filters: { dataOrigin: 'real', contractKind: '分包', subcontractTab: 'changes' },
+      }, options: { returnTo: detailReturnTo }, expected: {
+        state: 'resolved',
+        label: '中央分包合同',
+        to: `/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes&focus=sub-change-327&returnTo=${encodeURIComponent(detailReturnTo)}`,
+      }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
   })
 
@@ -343,6 +396,30 @@ describe('唯一 Target Registry', () => {
     })).toEqual({ state: 'resolved', label: '材料合同', to: '/contract/contract-318?origin=demo&contractKind=material' })
   })
 
+  it.each([
+    { label: '演示列表筛选', origin: 'demo', id: 'contract-318', returnTo: '/contract/material?search=%E7%93%B7%E7%A0%96&origin=demo&nav=origin_318#material-contract-row-demo%3Acontract-318', accepted: true },
+    { label: '正式列表分页', origin: 'real', id: 'contract-real-318', returnTo: '/contract/material?origin=real&page=2&pageSize=20&nav=origin_319#material-contract-row-real%3Acontract-real-318', accepted: true },
+    { label: '错误来源', origin: 'real', id: 'contract-318', returnTo: '/contract/material?origin=demo&nav=origin_318#material-contract-row-demo%3Acontract-318', accepted: false },
+    { label: '其他合同行锚点', origin: 'demo', id: 'contract-318', returnTo: '/contract/material?origin=demo&nav=origin_318#material-contract-row-demo%3Acontract-other', accepted: false },
+    { label: '缺少返回上下文', origin: 'demo', id: 'contract-318', returnTo: '/contract/material?origin=demo#material-contract-row-demo%3Acontract-318', accepted: false },
+    { label: '外部地址', origin: 'demo', id: 'contract-318', returnTo: 'https://example.com/contract/material?origin=demo&nav=origin_318#material-contract-row-demo%3Acontract-318', accepted: false },
+    { label: '其他合同列表', origin: 'demo', id: 'contract-318', returnTo: '/contract/subcontract?origin=demo&nav=origin_318#material-contract-row-demo%3Acontract-318', accepted: false },
+    { label: '锚点含控制字符', origin: 'demo', id: 'contract-318', returnTo: '/contract/material?origin=demo&nav=origin_318#material-contract-row-demo%3Acontract-318%0A', accepted: false },
+  ])('材料合同规范导航保留身份匹配的列表来源：$label', ({ origin, id, returnTo, accepted }) => {
+    const detailTo = `/contract/${id}?origin=${origin}&contractKind=material`
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'contract', id, label: '材料合同', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: origin, contractKind: '材采' },
+    }, { returnTo })).toEqual({
+      state: 'resolved',
+      label: '材料合同',
+      to: accepted ? `${detailTo}&returnTo=${encodeURIComponent(returnTo)}` : detailTo,
+    })
+  })
+
   it('未声明材采类型的合同意图继续沿用原详情，避免改写施工与分包链路', () => {
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
@@ -353,25 +430,32 @@ describe('唯一 Target Registry', () => {
     })).toEqual({ state: 'resolved', label: '既有合同', to: '/contract/contract-old' })
   })
 
-  it('分供方事实使用稳定 ID 解析项目分供方视图与付款申请详情', () => {
-    expect(resolveNavigationTarget({
-      kind: 'entity-subview',
-      subject: { state: 'resolved', entity: 'project', id: 'project-1', label: '项目一', no: null },
-      variant: 'supplier-workbench',
-      view: 'overview',
-      filters: { supplierId: 'supplier-1', dataOrigin: 'demo' },
-    })).toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1/supplier/supplier-1?origin=demo&tab=overview' })
-
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'payment-application', id: 'payment-1', label: 'FK-001', no: 'FK-001' },
-      variant: 'detail',
-      view: null,
-      filters: {},
-    })).toEqual({ state: 'resolved', label: 'FK-001', to: '/finance/payment/payment-1/detail' })
+  describe('分供方事实使用稳定 ID 解析项目分供方视图与付款申请详情', () => {
+    it.each([
+      { case: '项目分供方工作台', intent: {
+        kind: 'entity-subview',
+        subject: { state: 'resolved', entity: 'project', id: 'project-1', label: '项目一', no: null },
+        variant: 'supplier-workbench',
+        view: 'overview',
+        filters: { supplierId: 'supplier-1', dataOrigin: 'demo' },
+      }, options: undefined, expected: { state: 'resolved', label: '项目一', to: '/project/project-1/supplier/supplier-1?origin=demo&tab=overview' }, partial: false },
+      { case: '付款申请详情', intent: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'payment-application', id: 'payment-1', label: 'FK-001', no: 'FK-001' },
+        variant: 'detail',
+        view: null,
+        filters: {},
+      }, options: undefined, expected: { state: 'resolved', label: 'FK-001', to: '/finance/payment/payment-1/detail' }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
+    })
   })
 
-  it('项目分供方身份卡仅向匹配的项目与分供方详情附加工作台返回链', () => {
+  describe('项目分供方身份卡仅向匹配的项目与分供方详情附加工作台返回链', () => {
     const returnTo = '/project/project-1/supplier/supplier-1?origin=demo&tab=overview'
     const project = projectIntent({
       subject: { state: 'resolved', entity: 'project', id: 'project-1', label: '项目一', no: null },
@@ -384,24 +468,31 @@ describe('唯一 Target Registry', () => {
       view: null,
       filters: { dataOrigin: 'demo' },
     }
-
-    expect(resolveNavigationTarget(project, { returnTo })).toEqual({
-      state: 'resolved',
-      label: '项目一',
-      to: `/project/project-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
-    })
-    expect(resolveNavigationTarget(supplier, { returnTo })).toEqual({
-      state: 'resolved',
-      label: '分供方一',
-      to: `/base/supplier/supplier-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
-    })
-    expect(resolveNavigationTarget({
-      ...project,
-      subject: { ...project.subject, id: 'project-other' },
-    }, { returnTo })).toEqual({
-      state: 'resolved',
-      label: '项目一',
-      to: '/project/project-other?origin=demo',
+    it.each([
+      { case: '匹配项目身份', intent: project, options: { returnTo }, expected: {
+        state: 'resolved',
+        label: '项目一',
+        to: `/project/project-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+      }, partial: false },
+      { case: '匹配分供方身份', intent: supplier, options: { returnTo }, expected: {
+        state: 'resolved',
+        label: '分供方一',
+        to: `/base/supplier/supplier-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+      }, partial: false },
+      { case: '其他项目身份', intent: {
+        ...project,
+        subject: { ...project.subject, id: 'project-other' },
+      }, options: { returnTo }, expected: {
+        state: 'resolved',
+        label: '项目一',
+        to: '/project/project-other?origin=demo',
+      }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
   })
 
@@ -445,7 +536,7 @@ describe('唯一 Target Registry', () => {
     })
   })
 
-  it('来源记录只在演示来源与返回来源一致时解析', () => {
+  describe('来源记录只在演示来源与返回来源一致时解析', () => {
     const intent: NavigationIntentDTO = {
       kind: 'source-record',
       subject: { state: 'resolved', entity: 'contract', id: 'source-1', label: '来源单', no: 'NO-1' },
@@ -453,14 +544,21 @@ describe('唯一 Target Registry', () => {
       view: null,
       filters: { dataOrigin: 'real' },
     }
-    expect(resolveNavigationTarget(intent, { returnTo: '/project/project-1/supplier/supplier-1?tab=contract' }))
-      .toMatchObject({ state: 'unverified-target' })
-    expect(resolveNavigationTarget({ ...intent, filters: { dataOrigin: 'demo' } }, {
-      returnTo: '/project/project-1/supplier/supplier-1?tab=contract',
-    })).toMatchObject({ state: 'unverified-target' })
+    it.each([
+      { case: '正式来源未接入', intent, options: { returnTo: '/project/project-1/supplier/supplier-1?tab=contract' }, expected: { state: 'unverified-target' }, partial: true },
+      { case: '缺少返回数据来源', intent: { ...intent, filters: { dataOrigin: 'demo' } }, options: {
+        returnTo: '/project/project-1/supplier/supplier-1?tab=contract',
+      }, expected: { state: 'unverified-target' }, partial: true },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
+    })
   })
 
-  it('收款详情要求稳定来源与客户上下文', () => {
+  describe('收款详情要求稳定来源与客户上下文', () => {
     const subject = {
       state: 'resolved' as const,
       entity: 'receipt' as const,
@@ -468,24 +566,57 @@ describe('唯一 Target Registry', () => {
       label: 'SK-001',
       no: 'SK-001',
     }
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject,
-      variant: 'detail',
-      view: null,
-      filters: { dataOrigin: 'demo', customerId: 'customer-1' },
-    })).toEqual({
-      state: 'resolved',
-      label: 'SK-001',
-      to: '/finance/receipt/receipt-1?origin=demo&customerId=customer-1',
+    it.each([
+      { case: '完整收款上下文', intent: {
+        kind: 'entity-detail',
+        subject,
+        variant: 'detail',
+        view: null,
+        filters: { dataOrigin: 'demo', customerId: 'customer-1' },
+      }, options: undefined, expected: {
+        state: 'resolved',
+        label: 'SK-001',
+        to: '/finance/receipt/receipt-1?origin=demo&customerId=customer-1',
+      }, partial: false },
+      { case: '缺少收款上下文', intent: {
+        kind: 'entity-detail',
+        subject,
+        variant: 'detail',
+        view: null,
+        filters: {},
+      }, options: undefined, expected: { state: 'error' }, partial: true },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
-    expect(resolveNavigationTarget({
+  })
+
+  it.each([
+    { case: '未完成百分号编码', anchor: 'customer-row-%', id: 'customer-1', valid: false },
+    { case: '非法十六进制编码', anchor: 'customer-row-%ZZ', id: 'customer-1', valid: false },
+    { case: '嵌套未完成百分号编码', anchor: 'customer-row-%25', id: 'customer-1', valid: false },
+    { case: '单层来源身份编码', anchor: 'customer-row-real%3Acustomer-1', id: 'customer-1', valid: true },
+    { case: '双层来源身份编码', anchor: 'customer-row-real%253Acustomer-1', id: 'customer-1', valid: true },
+    { case: '单层百分号实体身份', anchor: 'customer-row-real%3Acustomer%25id', id: 'customer%id', valid: true },
+    { case: '双层百分号实体身份', anchor: 'customer-row-real%253Acustomer%2525id', id: 'customer%id', valid: true },
+  ])('客户详情忽略坏可选来源并保留合法编码：$case', ({ anchor, id, valid }) => {
+    const returnTo = `/base/customer?nav=origin_314#${anchor}`
+    const intent: NavigationIntentDTO = {
       kind: 'entity-detail',
-      subject,
+      subject: { state: 'resolved', entity: 'customer', id, label: '合成客户', no: null },
       variant: 'detail',
       view: null,
-      filters: {},
-    })).toMatchObject({ state: 'error' })
+      filters: { dataOrigin: 'real' },
+    }
+    const canonical = `/base/customer/${encodeURIComponent(id)}?origin=real`
+    expect(resolveNavigationTarget(intent, { returnTo, returnContextId: 'origin_314' })).toEqual({
+      state: 'resolved',
+      label: '合成客户',
+      to: valid ? `${canonical}&returnTo=${encodeURIComponent(returnTo)}&returnContext=origin_314` : canonical,
+    })
   })
 
   it('收款详情只透传已校验的客户列表返回上下文', () => {
@@ -578,29 +709,36 @@ describe('唯一 Target Registry', () => {
     })
   })
 
-  it('entity ref 的 missing/forbidden 状态不会按 label 或编号回退', () => {
-    expect(resolveNavigationTarget(projectIntent({
-      subject: {
-        state: 'missing',
-        entity: 'project',
-        id: null,
-        label: null,
-        reason: 'not-recorded',
-      },
-    }))).toEqual({ state: 'missing', label: null, message: '未记录稳定身份' })
-
-    expect(resolveNavigationTarget(projectIntent({
-      subject: {
+  describe('entity ref 的 missing/forbidden 状态不会按 label 或编号回退', () => {
+    it.each([
+      { case: '缺失稳定身份', intent: projectIntent({
+        subject: {
+          state: 'missing',
+          entity: 'project',
+          id: null,
+          label: null,
+          reason: 'not-recorded',
+        },
+      }), options: undefined, expected: { state: 'missing', label: null, message: '未记录稳定身份' }, partial: false },
+      { case: '禁止查看实体', intent: projectIntent({
+        subject: {
+          state: 'forbidden',
+          entity: 'project',
+          id: 'project-secret',
+          label: null,
+          reason: 'permission-denied',
+        },
+      }), options: { label: '不能泄露的项目名' }, expected: {
         state: 'forbidden',
-        entity: 'project',
-        id: 'project-secret',
         label: null,
-        reason: 'permission-denied',
-      },
-    }), { label: '不能泄露的项目名' })).toEqual({
-      state: 'forbidden',
-      label: null,
-      message: '无查看权限',
+        message: '无查看权限',
+      }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
     })
   })
 
@@ -648,29 +786,36 @@ describe('唯一 Target Registry', () => {
     expect(resolveNavigationTarget(intent, { label: '不能越权保留的名称' })).toEqual(expected)
   })
 
-  it('未登记实体保持 not-connected，路由构造异常保持 error', () => {
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: {
-        state: 'resolved',
-        entity: 'warehouse',
-        id: 'warehouse-1',
-        label: '一号仓',
-        no: null,
-      },
-      variant: 'detail',
-      view: null,
-      filters: {},
-    })).toEqual({ state: 'not-connected', label: '一号仓', message: '详情待接入' })
-
-    expect(resolveNavigationTarget(projectIntent({
-      subject: {
-        state: 'resolved',
-        entity: 'project',
-        id: '\uD800',
-        label: '坏 ID',
-        no: null,
-      },
-    }))).toEqual({ state: 'error', label: '坏 ID', message: '目标解析失败' })
+  describe('未登记实体保持 not-connected，路由构造异常保持 error', () => {
+    it.each([
+      { case: '未接仓库详情', intent: {
+        kind: 'entity-detail',
+        subject: {
+          state: 'resolved',
+          entity: 'warehouse',
+          id: 'warehouse-1',
+          label: '一号仓',
+          no: null,
+        },
+        variant: 'detail',
+        view: null,
+        filters: {},
+      }, options: undefined, expected: { state: 'not-connected', label: '一号仓', message: '详情待接入' }, partial: false },
+      { case: '无法编码的稳定 ID', intent: projectIntent({
+        subject: {
+          state: 'resolved',
+          entity: 'project',
+          id: '\uD800',
+          label: '坏 ID',
+          no: null,
+        },
+      }), options: undefined, expected: { state: 'error', label: '坏 ID', message: '目标解析失败' }, partial: false },
+    ] as const)('规范导航：$case', ({ intent, options, expected, partial }) => {
+      const result = resolveNavigationTarget(intent, options)
+      if (partial)
+        expect(result).toMatchObject(expected)
+      else
+        expect(result).toEqual(expected)
+    })
   })
 })

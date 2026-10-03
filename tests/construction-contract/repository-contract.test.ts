@@ -324,7 +324,7 @@ describe('施工合同中央 Repository contract', () => {
     })).toThrowError(/来源/)
   })
 
-  it('直接深链按稳定补充协议 ID 区分父合同错配与目标不存在', () => {
+  describe('直接深链按稳定补充协议 ID 区分父合同错配与目标不存在', () => {
     const contracts = [
       source(),
       source({ id: 'construction-contract-2', no: 'SG-002', name: '其他施工合同' }),
@@ -350,11 +350,15 @@ describe('施工合同中央 Repository contract', () => {
       sourceVersion: 'construction-contract-v3',
       capabilities: ['construction-contract:read'],
     })
-    expect(() => build('supplement-other-contract')).toThrowError(/补充协议与施工合同不匹配/)
-    expect(() => build('missing-supplement')).toThrowError(/补充协议不存在/)
+    it.each([
+      { case: '\'supplement-other-contract\'', input: 'supplement-other-contract', expected: /补充协议与施工合同不匹配/ },
+      { case: '\'missing-supplement\'', input: 'missing-supplement', expected: /补充协议不存在/ },
+    ])('build：$case', ({ input, expected }) => {
+      expect(() => build(structuredClone(input))).toThrowError(expected)
+    })
   })
 
-  it('按聚焦范围区分补充协议与甲方业务单据的缺失状态', () => {
+  describe('按聚焦范围区分补充协议与甲方业务单据的缺失状态', () => {
     const build = (focusScope: 'supplement' | 'change') => buildConstructionContractDetail({
       contracts: [source()],
       facts: emptyFacts(),
@@ -367,9 +371,12 @@ describe('施工合同中央 Repository contract', () => {
       sourceVersion: 'construction-contract-v3',
       capabilities: ['construction-contract:read'],
     })
-
-    expect(() => build('supplement')).toThrowError(/^补充协议不存在或已删除$/)
-    expect(() => build('change')).toThrowError(/^聚焦业务单据不存在或已删除$/)
+    it.each([
+      { case: '\'supplement\'', input: 'supplement', expected: /^补充协议不存在或已删除$/ },
+      { case: '\'change\'', input: 'change', expected: /^聚焦业务单据不存在或已删除$/ },
+    ])('build：$case', ({ input, expected }) => {
+      expect(() => build(structuredClone(input))).toThrowError(expected)
+    })
   })
 
   it('拒绝把其他详情分区的 canonical 单据当作当前聚焦目标', () => {
@@ -522,7 +529,10 @@ describe('施工合同中央 Repository contract', () => {
     })
   })
 
-  it('允许按稳定业务单据 ID 聚焦合同内的变洽签与月度报量', () => {
+  it.each([
+    { focusId: 'change-323', section: 'change', expected: 'change-323' },
+    { focusId: 'report-323', section: 'monthly', expected: 'report-323' },
+  ])('按稳定 ID 聚焦合同业务单据：$focusId', ({ focusId, section, expected }) => {
     const facts: ConstructionContractFactSources = {
       ...emptyFacts(),
       changes: [{
@@ -555,7 +565,8 @@ describe('施工合同中央 Repository contract', () => {
       capabilities: ['construction-contract:read'],
     })
 
-    expect(build('change-323').sections.changes[0]?.id).toBe('change-323')
-    expect(build('report-323').sections.settlements.monthlyStatements[0]?.id).toBe('report-323')
+    const detail = build(focusId)
+    const row = section === 'change' ? detail.sections.changes[0] : detail.sections.settlements.monthlyStatements[0]
+    expect(row?.id).toBe(expected)
   })
 })

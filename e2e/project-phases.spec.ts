@@ -1,34 +1,22 @@
 import { expect, test } from '@playwright/test'
+import { installProjectCentralFixture, PROJECT_INPUTS } from './helpers/project-central-fixture'
 
-test('项目六阶段：编辑任务后持久化并实时更新阶段卡进度', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', error => pageErrors.push(error.message))
+// 六阶段与本地编辑正向覆盖保留在 tests/project/phases.test.ts、
+// tests/stores/phase-task.test.ts 和 tests/components/ProjectTimeline.test.ts。
+// 当前中央详情读取业务阶段，不提供尚未接管的本地阶段任务编辑。
+for (const input of PROJECT_INPUTS) {
+  test(`${input.label}：中央业务阶段与整页编辑目标保持同一正式身份`, async ({ page }) => {
+    const fixture = await installProjectCentralFixture(page, input)
+    await fixture.open()
 
-  await page.goto('/project/proj_demo_001')
-  await page.waitForLoadState('networkidle')
-
-  const timeline = page.locator('section[aria-labelledby="project-phase-title"]')
-  for (const name of ['项目立项', '施工准备', '施工中', '完工及验收', '交付', '保修'])
-    await expect(timeline.getByRole('button').filter({ hasText: name })).toHaveCount(1)
-  const preparationPhase = timeline.getByRole('listitem').filter({ hasText: '施工准备' })
-  await expect(preparationPhase).toContainText('0/5')
-
-  await timeline.getByRole('button', { name: '编辑阶段', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '编辑阶段任务 · 全部六阶段' })
-  const taskCard = dialog.locator('[data-phase-task-id="phase_mz0x1_3"]')
-  const titleInput = taskCard.locator('input').first()
-  await expect(titleInput).toHaveValue('材料定样板')
-  await titleInput.fill('材料定样板（已核）')
-  await taskCard.locator('select').selectOption('confirmed')
-  await dialog.getByRole('button', { name: '保存阶段任务' }).click()
-
-  await expect(page.getByText('阶段任务已更新', { exact: true })).toBeVisible()
-  await expect(preparationPhase).toContainText('1/5')
-
-  // 重新打开编辑器，确认 action 重载后的 DB 值回填，而非只改了组件局部草稿。
-  await timeline.getByRole('button', { name: '编辑阶段', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: '编辑阶段任务 · 全部六阶段' })
-    .locator('[data-phase-task-id="phase_mz0x1_3"] input').first()).toHaveValue('材料定样板（已核）')
-
-  expect(pageErrors, '阶段编辑旅程不应产生客户端运行错误').toEqual([])
-})
+    const readonly = page.getByRole('status', { name: '中央项目只读详情', exact: true })
+    await expect(readonly.getByRole('group', { name: '基础信息' })).toContainText(input.status)
+    await expect(readonly.getByRole('group', { name: '基础信息' })).toContainText(input.code)
+    await expect(page.getByRole('link', { name: '编辑项目', exact: true }))
+      .toHaveAttribute('href', `/project/form/${fixture.id}?origin=real`)
+    await expect(page.getByRole('button', { name: '编辑阶段', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('list', { name: '项目六阶段流程' })).toHaveCount(0)
+    await expect(readonly.getByRole('textbox')).toHaveCount(0)
+    expect(fixture.errors).toEqual([])
+  })
+}

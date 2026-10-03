@@ -31,23 +31,32 @@ describe('初始态', () => {
 
 describe('deriveKey', () => {
   it('页内锚点不增加页签身份，首页仍是固定首页', () => {
-    expect(deriveKey('/project#summary')).toBe('/project')
-    expect(deriveKey('/#progress')).toBe(HOME_KEY)
     const first = openTab(initialTabsState(), { fullPath: '/project', title: '项目' }).state
     const next = openTab(first, { fullPath: '/project#summary', title: '项目' }).state
     expect(next.tabs).toHaveLength(2)
     expect(next.tabs[1]?.fullPath).toBe('/project#summary')
   })
-  it('首页归一 HOME_KEY，其余用路径', () => {
-    expect(deriveKey('/')).toBe(HOME_KEY)
-    expect(deriveKey('')).toBe(HOME_KEY)
-    expect(deriveKey('/base/supplier')).toBe('/base/supplier')
+
+  it.each([
+    { case: '\'/project#summary\'', input: '/project#summary', expected: '/project' },
+    { case: '\'/#progress\'', input: '/#progress', expected: HOME_KEY },
+  ])('页内锚点不增加页签身份，首页仍是固定首页 / deriveKey：$case', ({ input, expected }) => {
+    expect(deriveKey(input)).toBe(expected)
+  })
+  it.each([
+    { case: '\'/\'', input: '/', expected: HOME_KEY },
+    { case: '\'\'', input: '', expected: HOME_KEY },
+    { case: '\'/base/supplier\'', input: '/base/supplier', expected: '/base/supplier' },
+  ])('首页归一 HOME_KEY，其余用路径 / deriveKey：$case', ({ input, expected }) => {
+    expect(deriveKey(input)).toBe(expected)
   })
 
-  it('穿透预筛不进页签身份：query 不参与键判定（CONTEXT.md 页签词条 / specs §07）', () => {
-    expect(deriveKey('/project/1?tab=info')).toBe('/project/1')
-    expect(deriveKey('/finance/ledger?project=p1')).toBe('/finance/ledger')
-    expect(deriveKey('/?from=x')).toBe(HOME_KEY)
+  it.each([
+    { case: '\'/project/1?tab=info\'', input: '/project/1?tab=info', expected: '/project/1' },
+    { case: '\'/finance/ledger?project=p1\'', input: '/finance/ledger?project=p1', expected: '/finance/ledger' },
+    { case: '\'/?from=x\'', input: '/?from=x', expected: HOME_KEY },
+  ])('穿透预筛不进页签身份：query 不参与键判定（CONTEXT.md 页签词条 / specs §07） / deriveKey：$case', ({ input, expected }) => {
+    expect(deriveKey(input)).toBe(expected)
   })
 })
 

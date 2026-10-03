@@ -34,10 +34,8 @@ it.each(['%XX', '%E4%B8', '%e4%b8%89', 'https://outside.invalid/%E4%B8%89'])('�
   expect(() => decodePayrollAFeeConfigRead(raw, { origin: 'real' }, { ...raw.scope, book: { bookPurpose: 'ordinary', managementBookId: null } })).toThrow()
 })
 
-it('编码相同也不接受伪造迁入命名空间或跨表身份', () => {
-  for (const roomId of ['other-namespace:rooms:room-%E4%B8%89', 'core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:room-%E4%B8%89']) {
-    const raw = structuredClone(captured)
-    raw.cellOptions[1]!.roomId = roomId
-    expect(() => decodePayrollAFeeConfigRead(raw, { origin: 'real' }, { ...raw.scope, book: { bookPurpose: 'ordinary', managementBookId: null } })).toThrow()
-  }
+it.each((['other-namespace:rooms:room-%E4%B8%89', 'core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:room-%E4%B8%89']).map(input => ({ input })))('编码相同也不接受伪造迁入命名空间或跨表身份：输入案例 %#', ({ input: roomId }) => {
+  const raw = structuredClone(captured)
+  raw.cellOptions[1]!.roomId = roomId
+  expect(() => decodePayrollAFeeConfigRead(raw, { origin: 'real' }, { ...raw.scope, book: { bookPurpose: 'ordinary', managementBookId: null } })).toThrow()
 })

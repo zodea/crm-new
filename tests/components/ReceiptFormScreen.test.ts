@@ -133,21 +133,19 @@ describe('收款整页表单读写边界', () => {
     expect(navigateTo).toHaveBeenLastCalledWith('/finance/receipt?search=B')
   })
 
-  it('缓存的正式表单再次打开为演示或非法来源时撤下编辑和保存，不读取正式草稿', async () => {
+  it.each(['demo', 'invalid'])('缓存的正式表单再次打开为 %s 来源时撤下编辑和保存，不读取正式草稿', async (origin) => {
     const active = ref(true)
     render(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => active.value ? h(ReceiptFormScreen) : h('div') }) }), { global: { components: { StatePanel }, stubs: { LookupSelect: true, ReceiptContractSummary: true, SectionHeader: true, KitStatusTag: true } } })
     await flushPromises()
-    for (const origin of ['demo', 'invalid']) {
-      active.value = false
-      await flushPromises()
-      const reads = detail.mock.calls.length
-      route.query.origin = origin
-      active.value = true
-      await flushPromises()
-      expect(screen.getByRole('alert').textContent).toContain('当前来源不可编辑')
-      expect(screen.queryByRole('button', { name: '保存', exact: true })).toBeNull()
-      expect(screen.queryByRole('textbox', { name: '收款金额' })).toBeNull()
-      expect(detail).toHaveBeenCalledTimes(reads)
-    }
+    active.value = false
+    await flushPromises()
+    const reads = detail.mock.calls.length
+    route.query.origin = origin
+    active.value = true
+    await flushPromises()
+    expect(screen.getByRole('alert').textContent).toContain('当前来源不可编辑')
+    expect(screen.queryByRole('button', { name: '保存', exact: true })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: '收款金额' })).toBeNull()
+    expect(detail).toHaveBeenCalledTimes(reads)
   })
 })

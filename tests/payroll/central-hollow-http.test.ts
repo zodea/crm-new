@@ -12,7 +12,7 @@ vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
 } }))
 afterEach(() => vi.unstubAllGlobals())
 
-it('真实HTTP配置、启动及冻结沿Repository同源往返，非法范围和客户端自报扣款不写入', async () => {
+it.each(Array.from([null, [], 'real']).map(input1 => ({ input1 })))('真实HTTP配置、启动及冻结沿Repository同源往返，非法范围和客户端自报扣款不写入：输入案例 %#', async ({ input1: query }) => {
   const f = await createPayrollHollowFixture()
   runtime.service = f.service
   for (const name of ['defineEventHandler', 'getQuery', 'getHeader', 'readBody', 'createError'] as const)
@@ -52,10 +52,9 @@ it('真实HTTP配置、启动及冻结沿Repository同源往返，非法范围�
     const policyResult = await repo.executeHollow(policyCommand)
     expect(await repo.executeHollow(policyCommand)).toEqual(policyResult)
     expect((await repo.hollowConfig({ origin: 'real' }, configQuery)).policies.find(policy => policy.itemId === f.target.itemId)?.unitAmount).toBe(30.125)
-    for (const query of [null, [], 'real']) {
-      const response = await fetch(`${base}/api/read/payroll/hollow-config`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query, config: configQuery }) })
-      expect(response.status).toBe(400)
-    }
+
+    const response = await fetch(`${base}/api/read/payroll/hollow-config`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query, config: configQuery }) })
+    expect(response.status).toBe(400)
     const initial = await repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'hollow-http-new', draft: f.draft })
     const saved = await repo.execute(f.command(initial, { kind: 'save-a-draft', draft: f.draft }))
     const statementId = saved.statementId!

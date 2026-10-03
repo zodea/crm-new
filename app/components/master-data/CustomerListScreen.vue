@@ -19,6 +19,7 @@ const filters = shallowRef<Partial<Record<MasterDataListFilterField, MasterDataF
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 const profile = MASTER_DATA_LIST_PROFILES.customer
+const listRoot = shallowRef<HTMLElement | null>(null)
 
 const readPage = computed<CustomerListPageDTO | null>(() => {
   const state = readStore.listState
@@ -60,6 +61,8 @@ const empty = computed(() => hasFilters.value
   : { title: '还没有客户档案', description: '正式工作区暂无客户；测试数据默认隐藏。', actionLabel: '新建客户' })
 
 const returnContext = useCustomerListReturnContext({
+  root: () => listRoot.value,
+  isReady: () => ['ready', 'partial', 'empty'].includes(readStore.listState.kind),
   readState: () => ({
     search: search.value,
     status: filters.value.status ?? [],
@@ -74,7 +77,7 @@ const returnContext = useCustomerListReturnContext({
     page.value = state.page
     pageSize.value = state.pageSize
   },
-  fallbackFocus: () => document.querySelector<HTMLElement>('[data-customer-list-return-fallback]'),
+  fallbackFocus: () => listRoot.value?.querySelector<HTMLElement>('[data-customer-list-return-fallback]') ?? null,
 })
 
 function currentQuery(): CustomerListQueryDTO {
@@ -136,7 +139,7 @@ onActivated(() => void load())
 </script>
 
 <template>
-  <div class="grid min-w-0 gap-3">
+  <div ref="listRoot" class="grid min-w-0 gap-3">
     <CustomerPendingRecovery v-if="readPage?.capabilities.includes('customer:original:write')" />
     <StatePanel
       v-if="problem"

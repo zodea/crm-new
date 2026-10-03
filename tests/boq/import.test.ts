@@ -90,7 +90,10 @@ describe('boq import pipeline', () => {
     ])
   })
 
-  it('applies B-room extraction and E-unit-price-library quantity rules', () => {
+  it.each([
+    { format: 'B' as const, expected: { room: '厨房' } },
+    { format: 'E' as const, expected: { qty: 1 } },
+  ])('applies $format quantity and location rules', ({ format, expected }) => {
     const sheet = {
       name: '交标',
       headerRow: 1,
@@ -101,12 +104,14 @@ describe('boq import pipeline', () => {
       }],
     }
     const mapping = autoMapBoqColumns(sheet.columns)
-    expect(buildBoqImportRows(sheet, mapping, 'B')[0]?.room).toBe('厨房')
-    expect(buildBoqImportRows(sheet, {
-      itemName: mapping.itemName,
-      unit: mapping.unit,
-      unitPrice: mapping.unitPrice,
-    }, 'E')[0]?.qty).toBe(1)
+    const selectedMapping = format === 'B'
+      ? mapping
+      : {
+          itemName: mapping.itemName,
+          unit: mapping.unit,
+          unitPrice: mapping.unitPrice,
+        }
+    expect(buildBoqImportRows(sheet, selectedMapping, format)[0]).toMatchObject(expected)
   })
 
   it('persists E-class rows to the item unit-price library without creating contract quantities', async () => {

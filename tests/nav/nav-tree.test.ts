@@ -57,90 +57,113 @@ describe('侧栏导航树', () => {
 
   it('目录使用单开手风琴，恢复旧状态时只保留当前路由所属分组', () => {
     expect(DEFAULT_OPEN_GROUPS).toEqual([])
-    expect(ensureActiveGroupOpen([], 'project')).toEqual(['g-project'])
-    expect(ensureActiveGroupOpen(['g-project'], 'project')).toEqual(['g-project'])
-    expect(ensureActiveGroupOpen(['g-owner', 'g-material', 'g-settings'], 'project'))
-      .toEqual(['g-project'])
-    expect(ensureActiveGroupOpen(['g-owner', 'g-material'], null)).toEqual(['g-material'])
   })
 
-  it('点击一级目录时关闭前一个，再次点击当前目录则收起', () => {
-    expect(toggleExclusiveGroup(['g-project'], 'g-owner')).toEqual(['g-owner'])
-    expect(toggleExclusiveGroup(['g-owner'], 'g-owner')).toEqual([])
+  it.each([
+    { case: '[] / \'project\'', input: [], argument2: 'project', expected: ['g-project'] },
+    { case: '[\'g-project\'] / \'project\'', input: ['g-project'], argument2: 'project', expected: ['g-project'] },
+    { case: '[\'g-owner\', \'g-material\', \'g-settings\'] / \'project\'', input: ['g-owner', 'g-material', 'g-settings'], argument2: 'project', expected: ['g-project'] },
+    { case: '[\'g-owner\', \'g-material\'] / null', input: ['g-owner', 'g-material'], argument2: null, expected: ['g-material'] },
+  ])('目录使用单开手风琴，恢复旧状态时只保留当前路由所属分组 / ensureActiveGroupOpen：$case', ({ input, argument2, expected }) => {
+    expect(ensureActiveGroupOpen(input, argument2)).toEqual(expected)
+  })
+
+  it.each([
+    { case: '[\'g-project\'] / \'g-owner\'', input: ['g-project'], argument2: 'g-owner', expected: ['g-owner'] },
+    { case: '[\'g-owner\'] / \'g-owner\'', input: ['g-owner'], argument2: 'g-owner', expected: [] },
+  ])('点击一级目录时关闭前一个，再次点击当前目录则收起 / toggleExclusiveGroup：$case', ({ input, argument2, expected }) => {
+    expect(toggleExclusiveGroup(input, argument2)).toEqual(expected)
   })
 
   it('送货单归档库入口可导航，列表与详情都点亮归档库', () => {
     expect(leaves().find(item => item.key === 'deliveryArchive')?.to).toBe('/material/delivery/archive')
-    expect(activeNavKey('/material/delivery/archive')).toBe('deliveryArchive')
-    expect(activeNavKey('/material/delivery/archive/del_1')).toBe('deliveryArchive')
-    expect(activeNavKey('/material/delivery')).toBe('delivery')
+  })
+
+  it.each([
+    { case: '\'/material/delivery/archive\'', input: '/material/delivery/archive', expected: 'deliveryArchive' },
+    { case: '\'/material/delivery/archive/del_1\'', input: '/material/delivery/archive/del_1', expected: 'deliveryArchive' },
+    { case: '\'/material/delivery\'', input: '/material/delivery', expected: 'delivery' },
+  ])('送货单归档库入口可导航，列表与详情都点亮归档库 / activeNavKey：$case', ({ input, expected }) => {
+    expect(activeNavKey(input)).toBe(expected)
   })
 
   it('施工进度入口与新建子路由都点亮排程导航', () => {
     expect(leaves().find(item => item.key === 'schedule')?.to).toBe('/schedule')
-    expect(activeNavKey('/schedule')).toBe('schedule')
-    expect(activeNavKey('/schedule/new')).toBe('schedule')
+  })
+
+  it.each([
+    { case: '\'/schedule\'', input: '/schedule', expected: 'schedule' },
+    { case: '\'/schedule/new\'', input: '/schedule/new', expected: 'schedule' },
+  ])('施工进度入口与新建子路由都点亮排程导航 / activeNavKey：$case', ({ input, expected }) => {
+    expect(activeNavKey(input)).toBe(expected)
   })
 
   it('f1 客户与目标成本入口已启用并保持子路由点亮', () => {
     expect(leaves().find(item => item.key === 'customer')?.to).toBe('/base/customer')
-    expect(activeNavKey('/base/customer/form/customer_1')).toBe('customer')
     expect(leaves().find(item => item.key === 'targetCost')?.to).toBe('/project/target-cost')
-    expect(activeNavKey('/project/target-cost/form/target_1')).toBe('targetCost')
+  })
+
+  it.each([
+    { case: '\'/base/customer/form/customer_1\'', input: '/base/customer/form/customer_1', expected: 'customer' },
+    { case: '\'/project/target-cost/form/target_1\'', input: '/project/target-cost/form/target_1', expected: 'targetCost' },
+  ])('f1 客户与目标成本入口已启用并保持子路由点亮 / activeNavKey：$case', ({ input, expected }) => {
+    expect(activeNavKey(input)).toBe(expected)
   })
 
   it('boq 工作区与专用拆表页开放入口并点亮各自导航', () => {
     expect(leaves().find(item => item.key === 'boqList')?.to).toBe('/contract/boq')
     expect(leaves().find(item => item.key === 'boqImport')?.to).toBe('/contract/boq/import')
-    expect(activeNavKey('/contract/boq')).toBe('boqList')
-    expect(activeNavKey('/contract/boq/import')).toBe('boqImport')
+  })
+
+  it.each([
+    { case: '\'/contract/boq\'', input: '/contract/boq', expected: 'boqList' },
+    { case: '\'/contract/boq/import\'', input: '/contract/boq/import', expected: 'boqImport' },
+  ])('boq 工作区与专用拆表页开放入口并点亮各自导航 / activeNavKey：$case', ({ input, expected }) => {
+    expect(activeNavKey(input)).toBe(expected)
   })
 
   it('f2 三类新增台账入口已启用，表单子路由保持来源导航点亮', () => {
     expect(leaves().find(item => item.key === 'companyExp')?.to).toBe('/contract/company-expense')
     expect(leaves().find(item => item.key === 'otherExp')?.to).toBe('/contract/other-expense')
     expect(leaves().find(item => item.key === 'otherSettle')?.to).toBe('/contract/other-settlement')
-    expect(activeNavKey('/contract/company-expense/form/company_1')).toBe('companyExp')
-    expect(activeNavKey('/contract/other-expense/form/contract_1')).toBe('otherExp')
-    expect(activeNavKey('/contract/other-settlement/form/settlement_1')).toBe('otherSettle')
   })
 
-  it('f3 六类资金表单入口已启用，新增和编辑路由保持来源导航点亮', () => {
-    const routes = [
-      ['receipt', '/finance/receipt'],
-      ['invApply', '/finance/billing'],
-      ['current', '/finance/current'],
-      ['payRecord', '/finance/records'],
-      ['reimburse', '/finance/reimbursement'],
-      ['payApply', '/finance/payment'],
-    ] as const
-
-    for (const [key, route] of routes) {
-      expect(leaves().find(item => item.key === key)?.to).toBe(route)
-      expect(activeNavKey(`${route}/new`)).toBe(key)
-      expect(activeNavKey(`${route}/form/f3_1`)).toBe(key)
-    }
+  it.each([
+    { case: '\'/contract/company-expense/form/company_1\'', input: '/contract/company-expense/form/company_1', expected: 'companyExp' },
+    { case: '\'/contract/other-expense/form/contract_1\'', input: '/contract/other-expense/form/contract_1', expected: 'otherExp' },
+    { case: '\'/contract/other-settlement/form/settlement_1\'', input: '/contract/other-settlement/form/settlement_1', expected: 'otherSettle' },
+  ])('f2 三类新增台账入口已启用，表单子路由保持来源导航点亮 / activeNavKey：$case', ({ input, expected }) => {
+    expect(activeNavKey(input)).toBe(expected)
   })
 
-  it('f4 乙供材与甲供材入口全部启用，整页表单保持来源导航点亮', () => {
-    const routes = [
-      ['matRequisition', '/material/requisition'],
-      ['matArrival', '/material/arrival'],
-      ['matUse', '/material/use'],
-      ['matSettle', '/material/settlement'],
-      ['stockCheck', '/material/stock-check'],
-      ['omTotal', '/owner-material/control'],
-      ['omRequisition', '/owner-material/requisition'],
-      ['omArrival', '/owner-material/arrival'],
-      ['omUse', '/owner-material/use'],
-      ['omDirect', '/owner-material/direct'],
-    ] as const
+  it.each(Array.from([
+    ['receipt', '/finance/receipt'],
+    ['invApply', '/finance/billing'],
+    ['current', '/finance/current'],
+    ['payRecord', '/finance/records'],
+    ['reimburse', '/finance/reimbursement'],
+    ['payApply', '/finance/payment'],
+  ] as const))('f3 六类资金表单入口已启用，新增和编辑路由保持来源导航点亮：输入案例 %#', (key, route) => {
+    expect(leaves().find(item => item.key === key)?.to).toBe(route)
+    expect(activeNavKey(`${route}/new`)).toBe(key)
+    expect(activeNavKey(`${route}/form/f3_1`)).toBe(key)
+  })
 
-    for (const [key, route] of routes) {
-      expect(leaves().find(item => item.key === key)?.to).toBe(route)
-      expect(activeNavKey(`${route}/new`)).toBe(key)
-      expect(activeNavKey(`${route}/f4_1`)).toBe(key)
-    }
+  it.each(Array.from([
+    ['matRequisition', '/material/requisition'],
+    ['matArrival', '/material/arrival'],
+    ['matUse', '/material/use'],
+    ['matSettle', '/material/settlement'],
+    ['stockCheck', '/material/stock-check'],
+    ['omTotal', '/owner-material/control'],
+    ['omRequisition', '/owner-material/requisition'],
+    ['omArrival', '/owner-material/arrival'],
+    ['omUse', '/owner-material/use'],
+    ['omDirect', '/owner-material/direct'],
+  ] as const))('f4 乙供材与甲供材入口全部启用，整页表单保持来源导航点亮：输入案例 %#', (key, route) => {
+    expect(leaves().find(item => item.key === key)?.to).toBe(route)
+    expect(activeNavKey(`${route}/new`)).toBe(key)
+    expect(activeNavKey(`${route}/f4_1`)).toBe(key)
     expect(activeNavKey('/material/delivery/archive/form')).toBe('deliveryArchive')
     expect(activeNavKey('/material/delivery/archive/form/delivery_1')).toBe('deliveryArchive')
   })
@@ -148,26 +171,27 @@ describe('侧栏导航树', () => {
   it('付款管理工作台入口已启用，且不会被付款申请前缀误点亮', () => {
     expect(leaves().find(item => item.key === 'payManage')?.to)
       .toBe('/finance/payment-management')
-    expect(activeNavKey('/finance/payment-management')).toBe('payManage')
-    expect(activeNavKey('/finance/payment/payment_1')).toBe('payApply')
   })
 
-  it('f5 八类甲方与分包单据入口全部启用，新增和编辑路由保持来源导航点亮', () => {
-    const routes = [
-      ['ownerChange', '/owner/change'],
-      ['ownerReport', '/owner/report'],
-      ['acceptance', '/owner/acceptance'],
-      ['finalSettle', '/owner/final-settlement'],
-      ['ownerPenalty', '/owner/penalty'],
-      ['subChange', '/subcontract/change'],
-      ['subSettle', '/subcontract/settlement'],
-      ['projPenalty', '/project/penalty'],
-    ] as const
+  it.each([
+    { case: '\'/finance/payment-management\'', input: '/finance/payment-management', expected: 'payManage' },
+    { case: '\'/finance/payment/payment_1\'', input: '/finance/payment/payment_1', expected: 'payApply' },
+  ])('付款管理工作台入口已启用，且不会被付款申请前缀误点亮 / activeNavKey：$case', ({ input, expected }) => {
+    expect(activeNavKey(input)).toBe(expected)
+  })
 
-    for (const [key, route] of routes) {
-      expect(leaves().find(item => item.key === key)?.to).toBe(route)
-      expect(activeNavKey(`${route}/new`)).toBe(key)
-      expect(activeNavKey(`${route}/f5_1`)).toBe(key)
-    }
+  it.each(Array.from([
+    ['ownerChange', '/owner/change'],
+    ['ownerReport', '/owner/report'],
+    ['acceptance', '/owner/acceptance'],
+    ['finalSettle', '/owner/final-settlement'],
+    ['ownerPenalty', '/owner/penalty'],
+    ['subChange', '/subcontract/change'],
+    ['subSettle', '/subcontract/settlement'],
+    ['projPenalty', '/project/penalty'],
+  ] as const))('f5 八类甲方与分包单据入口全部启用，新增和编辑路由保持来源导航点亮：输入案例 %#', (key, route) => {
+    expect(leaves().find(item => item.key === key)?.to).toBe(route)
+    expect(activeNavKey(`${route}/new`)).toBe(key)
+    expect(activeNavKey(`${route}/f5_1`)).toBe(key)
   })
 })

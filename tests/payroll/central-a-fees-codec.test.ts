@@ -36,8 +36,13 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
 
   it('公开服务的配置、费用表单和冻结输出仍可读取', () => {
     expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(config), { origin: 'real' }, config.scope)).not.toThrow()
-    expect(() => decodePayrollARead(encodePayrollAWire(form), 'form', { origin: 'real' }, { statementId: form.statementId! })).not.toThrow()
-    expect(() => decodePayrollARead(encodePayrollAWire({ context: { ...form.context, readonly: true }, statementId: document.id, state: 'available', document, reasons: [] }), 'output', { origin: 'real' }, document.id)).not.toThrow()
+  })
+
+  it.each([
+    { case: '费用表单', input: () => encodePayrollAWire(form), view: 'form' as const, target: () => ({ statementId: form.statementId! }) },
+    { case: '冻结输出', input: () => encodePayrollAWire({ context: { ...form.context, readonly: true }, statementId: document.id, state: 'available', document, reasons: [] }), view: 'output' as const, target: () => document.id },
+  ])('公开服务的配置、费用表单和冻结输出仍可读取 / decodePayrollARead：$case', ({ input, view, target }) => {
+    expect(() => decodePayrollARead(input(), view, { origin: 'real' }, target())).not.toThrow()
   })
   const configCorruptions: Array<[string, (value: PayrollAFeeConfigRead) => void]> = [
     ['上下文缺工作区', v => Reflect.deleteProperty(v.context, 'workspaceId')],
@@ -80,33 +85,49 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
     const read = { ...structuredClone(form), book: null, fees: null, bookProof: { state: 'unproven', book: null, reasons: ['原用途不可证'] }, bookEligibility: { canSave: false, canCheck: false, canRelease: false, reasons: ['原用途不可证'] }, previousBookPayments: [null] }
     expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: form.statementId! })).toThrow()
   })
-  it('管理原量、永久归属、此前已领和负价引用逐层验证', () => {
+  it.each(Array.from(([
+    r => Object.assign(r.fees!.management!.book, { managerWorkerId: 42 }),
+    r => Object.assign(r.fees!.management!.revision, { scope: null }),
+    r => Object.assign(r.fees!.managementOwnership[0]!.proof, { fact: {} }),
+    r => Object.assign(r.fees!.negativeLines[0]!, { actualRef: { kind: 'actual-event' } }),
+    r => Object.assign(r.fees!.negativeLines[0]!, { extra: 0 }),
+    r => Object.assign(r.previousBookPayments[0]!, { actualRefs: [null] }),
+    r => Object.assign(r, { negativeLineDrafts: [{ lineId: null, baseRevisionId: null }] }),
+    r => Object.assign(r, { negativeLineRevisions: [null] }),
+  ]) as Array<(read: PayrollAFeesFormRead) => void>).map(input => ({ input })))('管理原量、永久归属、此前已领和负价引用逐层验证：输入案例 %#', ({ input: corrupt }) => {
     const decode = (read: unknown) => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: managementForm.statementId! })
     expect(() => decode(managementForm)).not.toThrow()
-    const corruptions: Array<(read: PayrollAFeesFormRead) => void> = [
-      r => Object.assign(r.fees!.management!.book, { managerWorkerId: 42 }),
-      r => Object.assign(r.fees!.management!.revision, { scope: null }),
-      r => Object.assign(r.fees!.managementOwnership[0]!.proof, { fact: {} }),
-      r => Object.assign(r.fees!.negativeLines[0]!, { actualRef: { kind: 'actual-event' } }),
-      r => Object.assign(r.fees!.negativeLines[0]!, { extra: 0 }),
-      r => Object.assign(r.previousBookPayments[0]!, { actualRefs: [null] }),
-      r => Object.assign(r, { negativeLineDrafts: [{ lineId: null, baseRevisionId: null }] }),
-      r => Object.assign(r, { negativeLineRevisions: [null] }),
-    ]
-    for (const corrupt of corruptions) {
-      const value = structuredClone(managementForm)
-      corrupt(value)
-      expect(() => decode(value)).toThrow()
-    }
+
+    const value = structuredClone(managementForm)
+    corrupt(value)
+    expect(() => decode(value)).toThrow()
   })
-  it('费用回执也不能缺失继承字段或错配原单', () => {
+  function createFeeCommandReceipt() {
     const command = fixture.feeCommand(config, { kind: 'save-a-fees', baseVersion: config.baseVersion, fees: [], remove: [] })
     const result = { commandId: command.commandId, projectId: command.projectId, statementId: null, subjectConfigId: null, priceRevisionIds: [], sourceVersion: 'version', outcome: 'saved', logIds: [], book: command.book, managementBookId: null, managementRevisionId: null, feeRevisionIds: [], negativeLineRevisionIds: [], locatedExistingDraft: false }
     expect(() => decodePayrollAFeesResult(result, command)).not.toThrow()
     const value = structuredClone(result)
     Reflect.deleteProperty(value, 'subjectConfigId')
-    expect(() => decodePayrollAFeesResult(value, command)).toThrow()
-    expect(() => decodePayrollAFeesResult({ ...result, statementId: 'other' }, { ...command, statementId: 'original' })).toThrow()
+    return { command, result, value }
+  }
+
+  it('费用回执也不能缺失继承字段或错配原单', () => {
+    createFeeCommandReceipt()
+  })
+
+  it.each([
+    { case: 'value / command', prepare: ({ command, value }: ReturnType<typeof createFeeCommandReceipt>) => {
+      return { input: value, argument2: command } as const
+    } },
+    { case: '{ ...result, statementId: \'other\' } / { ...command, statementId: \'original\' }', prepare: ({ command, result }: ReturnType<typeof createFeeCommandReceipt>) => {
+      const value = structuredClone(result)
+      Reflect.deleteProperty(value, 'subjectConfigId')
+      return { input: { ...result, statementId: 'other' }, argument2: { ...command, statementId: 'original' } } as const
+    } },
+  ])('费用回执也不能缺失继承字段或错配原单 / decodePayrollAFeesResult：$case', ({ prepare }) => {
+    const fixture = createFeeCommandReceipt()
+    const { input, argument2 } = prepare(fixture)
+    expect(() => decodePayrollAFeesResult(input, argument2)).toThrow()
   })
   it('原负价证据失效仍能读取真实不可用诊断，不能用于冻结输出', async () => {
     const old = managementForm.fees!.negativeLines[0]!

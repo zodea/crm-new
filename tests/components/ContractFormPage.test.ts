@@ -13,6 +13,13 @@ import {
   useTemplateRef,
 } from 'vue'
 import ContractFormPage from '~/components/contract/ContractFormPage.vue'
+import { f2FormDefaults } from '~/lib/contract/page'
+
+const { loadForm } = vi.hoisted(() => ({ loadForm: vi.fn() }))
+vi.mock('~/lib/contract/forms', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/lib/contract/forms')>()
+  return { ...actual, loadF2Form: loadForm, listContractFormAttachments: vi.fn().mockResolvedValue([]) }
+})
 
 vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn(),
@@ -38,6 +45,7 @@ const EntityFormShellStub = defineComponent({
   setup(props, { emit, slots }) {
     return () => h('main', { 'data-testid': 'contract-form-shell' }, [
       h('h1', props.title),
+      props.state === 'ready' ? slots.status?.() : null,
       props.state === 'error'
         ? h('section', { role: 'alert' }, [
             h('p', props.stateTitle),
@@ -104,6 +112,10 @@ const globalComponents: Record<string, Component> = {
 
 describe('辅助合同整页表单状态', () => {
   beforeEach(() => {
+    route.fullPath = '/contract/company-expense/form'
+    route.params = {}
+    route.query = {}
+    loadForm.mockReset()
     load.mockReset()
     saveForm.mockReset()
     load.mockResolvedValue(undefined)
@@ -152,6 +164,33 @@ describe('辅助合同整页表单状态', () => {
       patchPending: vi.fn(),
       toggleExisting: vi.fn(),
     }))
+  })
+
+  it.each([
+    { kind: 'construction', status: '审批中', tone: 'warn' },
+    { kind: 'construction', status: '已签订', tone: 'neutral' },
+    { kind: 'construction', status: '已结清', tone: 'ok' },
+    { kind: 'subcontract', status: '履约中', tone: 'brand' },
+    { kind: 'subcontract', status: '历史业务状态', tone: 'neutral' },
+    { kind: 'material', status: '已结算', tone: 'warn' },
+    { kind: 'material', status: '草稿', tone: 'neutral' },
+    { kind: 'company_expense', status: '审批中', tone: 'warn' },
+    { kind: 'company_expense', status: '履约中', tone: 'brand' },
+    { kind: 'company_expense', status: '历史业务状态', tone: 'neutral' },
+    { kind: 'other_expense', status: '已结清', tone: 'ok' },
+    { kind: 'other_settlement', status: '已确认', tone: 'ok' },
+    { kind: 'material_settlement', status: '待确认', tone: 'warn' },
+    { kind: 'material_settlement', status: '历史业务状态', tone: 'neutral' },
+  ] as const)('编辑 $kind 的 $status 保留原文并使用领域语义色 $tone', async ({ kind, status, tone }) => {
+    const id = `status-fixture-${kind}`
+    route.fullPath = `/contract/${kind}/form/${id}`
+    route.params = { id }
+    loadForm.mockResolvedValue({ ...f2FormDefaults(kind), id, name: '合成状态合同', status })
+    render(ContractFormPage, { props: { kind }, global: { components: globalComponents } })
+    await flushPromises()
+    const tag = screen.getByText(status)
+    expect(tag.getAttribute('data-ui')).toBe('status-tag')
+    expect(tag.getAttribute('data-tone')).toBe(tone)
   })
 
   it('载入失败时隐藏可写表单，并允许重新载入', async () => {

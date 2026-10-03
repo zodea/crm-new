@@ -1,4 +1,5 @@
 import type { TargetCostDetailRead, TargetCostPending } from '~/lib/target-cost/central-contract'
+import { fireEvent, within } from '@testing-library/vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, reactive, shallowRef } from 'vue'
@@ -48,13 +49,13 @@ describe('预算科目整份保存状态', () => {
     const wrapper = mount(Harness)
     await flushPromises()
     expect(sessions[0]!.current.value?.view.items[0]?.itemName).toBe('')
-    await wrapper.findAll('button')[0]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '编辑', exact: true }))
     await wrapper.get('input').setValue('人工目标')
     load.mockResolvedValue(detail('a', 'v2'))
-    await wrapper.findAll('button')[2]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '核对', exact: true }))
     await flushPromises()
     saveItems.mockRejectedValue(new ProjectRepositoryProblem({ ...projectProblem('validation-failed', '金额错误'), fieldErrors: { 'items.0.amount': ['请核对'] } }))
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '保存', exact: true }))
     await flushPromises()
     expect(saveItems).toHaveBeenCalledWith(expect.objectContaining({ context: expect.objectContaining({ sourceVersion: 'v1' }) }), [expect.objectContaining({ itemName: '人工目标', qty: null, unitPrice: null, amount: 0 })])
     expect(fields).toHaveBeenCalledWith({ 'items.0.amount': ['请核对'] })
@@ -69,13 +70,13 @@ describe('预算科目整份保存状态', () => {
     const shown = shallowRef('a')
     const wrapper = mount(defineComponent({ setup: () => () => h(KeepAlive, () => h(Harness, { key: shown.value })) }))
     await flushPromises()
-    await wrapper.findAll('button')[0]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '编辑', exact: true }))
     await wrapper.get('input').setValue('A稿')
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '保存', exact: true }))
     Object.assign(route, { params: { id: 'b' }, path: '/project/target-cost/b', fullPath: '/project/target-cost/b?origin=real' })
     shown.value = 'b'
     await flushPromises()
-    await wrapper.findAll('button')[0]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '编辑', exact: true }))
     await wrapper.get('input').setValue('B稿')
     resolveSave({ id: 'a' })
     await flushPromises()
@@ -91,7 +92,7 @@ describe('预算科目整份保存状态', () => {
   it('重核后权限撤回或删除只读，但原稿保留', async () => {
     const wrapper = mount(Harness)
     await flushPromises()
-    await wrapper.findAll('button')[0]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '编辑', exact: true }))
     await wrapper.get('input').setValue('保稿')
     const next = detail('a', 'v2')
     next.context.capabilities = ['target-cost:read']

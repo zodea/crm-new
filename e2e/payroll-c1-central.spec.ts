@@ -1,23 +1,10 @@
 import type { Page, TestInfo } from '@playwright/test'
-import type { CoreMigrationBatchDTO } from '../app/lib/migration/core-contract'
-import { execFile } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
-import process from 'node:process'
-import { promisify } from 'node:util'
 import { expect, test } from '@playwright/test'
 import * as XLSX from 'xlsx'
-import { createPayrollRepository } from '../app/lib/payroll/central-repository'
+import { preparePayrollC1Fixture as fixture, payrollC1Repository as repository } from './helpers/payroll-c1-workspace'
 
 test.use({ actionTimeout: 15000 })
-function repository(page: Page) {
-  return createPayrollRepository(async (path, options) => {
-    const response = await page.request.fetch(path, { method: options?.method || 'GET', params: options?.query ? Object.fromEntries(Object.entries(options.query).map(([key, value]) => [key, String(value)])) : undefined, data: options?.body })
-    expect(response.ok(), await response.text()).toBe(true)
-    return response.json()
-  })
-}
 async function capture(page: Page, info: TestInfo, name: string, selector?: string, horizontal?: 'last-day' | 'totals' | 'normal-totals' | 'source-values') {
   await expect(page.locator('[data-sonner-toast]:visible')).toHaveCount(0, { timeout: 15000 })
   for (const width of [390, 768, 1024, 1280, 1440]) {
@@ -28,19 +15,15 @@ async function capture(page: Page, info: TestInfo, name: string, selector?: stri
       await page.locator('[data-ui="attendance-grid-scroll"]').evaluate(node => node.scrollLeft = node.scrollWidth - node.clientWidth)
     if (horizontal === 'normal-totals') {
       const normal = page.getByRole('columnheader', { name: '正常工时', exact: true })
-      await normal.evaluate((column) => {
+      await expect.poll(() => normal.evaluate((column) => {
         const scroll = column.closest('[data-ui="attendance-grid-scroll"]')!
         const worker = scroll.querySelector('.c1-attendance-worker')!
         const bounds = scroll.getBoundingClientRect()
         const fixedWidth = worker.getBoundingClientRect().width
         const cell = column.getBoundingClientRect()
         scroll.scrollLeft += cell.left - bounds.left - fixedWidth - (bounds.width - fixedWidth - cell.width) / 2
-      })
-      await expect.poll(() => normal.evaluate((column) => {
-        const scroll = column.closest('[data-ui="attendance-grid-scroll"]')!
-        const worker = scroll.querySelector('.c1-attendance-worker')!
-        const cell = column.getBoundingClientRect()
-        return cell.left >= worker.getBoundingClientRect().right - 1 && cell.right <= scroll.getBoundingClientRect().right + 1
+        const visible = column.getBoundingClientRect()
+        return visible.left >= worker.getBoundingClientRect().right - 1 && visible.right <= scroll.getBoundingClientRect().right + 1
       })).toBe(true)
       const worker = page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: '日薪480工人', exact: true }) })
       await expect(worker.getByRole('cell').nth(31)).toHaveText('7.51')
@@ -70,31 +53,6 @@ async function capture(page: Page, info: TestInfo, name: string, selector?: stri
     await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await page.setViewportSize({ width: 1440, height: 960 })
-}
-async function fixture(page: Page, info: TestInfo) {
-  const output = info.outputPath('source.json')
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('e2e/helpers/payroll-c1-migration-source.ts'), output, randomUUID()])
-  const prepared = JSON.parse(await readFile(output, 'utf8'))
-  const { source, snapshotSha256, byteLength } = prepared
-  const session = await (await page.request.get('/api/read/business-session')).json()
-  const envelope = () => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId: randomUUID(), requiredCapability: 'core:migration:write' })
-  const preflight = await page.request.post('/api/migrations/core/preflight', { data: { ...envelope(), source, backup: null } })
-  expect(preflight.ok(), await preflight.text()).toBe(true)
-  const dry = await page.request.post('/api/migrations/core/dry-run', { data: { ...envelope(), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: new Date().toISOString(), immutable: true } } })
-  expect(dry.ok(), await dry.text()).toBe(true)
-  const batch: CoreMigrationBatchDTO = await dry.json()
-  for (const action of ['import', 'confirm']) {
-    const response = await page.request.post(`/api/migrations/core/${batch.batchId}/${action}`, { data: { ...envelope(), batchId: batch.batchId } })
-    expect(response.ok(), await response.text()).toBe(true)
-  }
-  const mapped = (entityType: string, legacyId: string) => {
-    const row = batch.mappings.find(row => row.entityType === entityType && row.legacyId === legacyId)
-    expect(row?.serverId).toBeTruthy()
-    return row!.serverId!
-  }
-  const f = { project: mapped('projects', 'c1-live'), crew: mapped('crews', 'c1-live-crew'), leader: mapped('workers', 'c1-live-leader'), worker: mapped('workers', 'c1-live-worker'), zero: mapped('workers', 'c1-live-zero'), historicalProject: mapped('projects', 'c1-project'), batchId: batch.batchId }
-  await writeFile(info.outputPath('identities.json'), JSON.stringify(f, null, 2))
-  return f
 }
 async function cell(page: Page, name: string, date: string, hours: string, overtime: string) {
   await page.getByRole('button', { name: `${name} ${date} 考勤`, exact: true }).click()
@@ -228,10 +186,13 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   const path = info.outputPath(file.suggestedFilename())
   await file.saveAs(path)
   const book = XLSX.read(await readFile(path))
-  expect(book.SheetNames).toEqual(['工资表', '考勤表'])
+  expect(book.SheetNames).toEqual(['工资表', '考勤表', '空鼓扣款汇总', '空鼓采用来源'])
+  expect(XLSX.utils.sheet_to_json(book.Sheets.空鼓扣款汇总!)).toEqual([expect.objectContaining({ 本单空鼓扣款: 0 })])
+  expect(XLSX.utils.sheet_to_json(book.Sheets.空鼓采用来源!)).toEqual([])
   expect(JSON.stringify(XLSX.utils.sheet_to_json(book.Sheets.工资表!, { header: 1 }))).toContain('900')
   expect(JSON.stringify(XLSX.utils.sheet_to_json(book.Sheets.考勤表!, { header: 1 }))).toContain('只改施工内容')
   await page.emulateMedia({ media: 'print' })
+  await expect(page.locator('.payroll-c1-print')).toBeVisible()
   const pdf = await page.pdf({ path: info.outputPath('c1-paired-output.pdf'), printBackground: true, preferCSSPageSize: true })
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const printed = await getDocument({ data: new Uint8Array(pdf) }).promise

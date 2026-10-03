@@ -1,44 +1,22 @@
-import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import { installProjectCentralFixture, PROJECT_INPUTS } from './helpers/project-central-fixture'
 
-test('阶段任务文件与项目文件柜引用同一份持久化文件', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', error => pageErrors.push(error.message))
+// 阶段文件的持久化正文、同一 file_refs、软删及撤回正向覆盖：
+// tests/project/phase-task-files.test.ts、tests/stores/phase-task.test.ts。
+// 当前中央项目尚未接管本地阶段文件柜，浏览与刷新不能暴露本地上传路径。
+for (const input of PROJECT_INPUTS) {
+  test(`${input.label}：刷新中央基础资料保留正式身份，不暴露本地阶段文件写入口`, async ({ page }) => {
+    const fixture = await installProjectCentralFixture(page, input)
+    await fixture.open()
+    await page.reload()
 
-  await page.goto('/project/proj_demo_001')
-  await page.waitForLoadState('networkidle')
-  await page.getByRole('button', { name: /施工准备/ }).click()
-
-  const beforeButton = page.getByRole('button', {
-    name: /施工组织设计方案文件，共 \d+ 份/,
+    const detail = page.getByRole('status', { name: '中央项目只读详情', exact: true })
+    await expect(detail.getByRole('group', { name: '基础信息' })).toContainText(input.address)
+    await expect(detail.getByRole('group', { name: '参建单位' })).toContainText(input.manager)
+    await expect(page).toHaveURL(fixture.url)
+    await expect(page.getByRole('region', { name: '项目文件柜' })).toHaveCount(0)
+    await expect(page.getByLabel(/上传.*阶段|上传施工组织设计方案文件/)).toHaveCount(0)
+    await expect(detail.locator('input[type="file"]')).toHaveCount(0)
+    expect(fixture.errors).toEqual([])
   })
-  const beforeLabel = await beforeButton.getAttribute('aria-label')
-  const beforeCount = Number(beforeLabel?.match(/共 (\d+) 份/)?.[1] ?? 0)
-  await page.getByLabel('上传施工组织设计方案文件').setInputFiles({
-    name: '施工组织设计-现场签认.pdf',
-    mimeType: 'application/pdf',
-    buffer: Buffer.from('phase-file-payload'),
-  })
-  await expect(page.getByText('已登记 1 份阶段文件', { exact: true })).toBeVisible()
-
-  const taskFiles = page.getByRole('button', {
-    name: `施工组织设计方案文件，共 ${beforeCount + 1} 份`,
-  })
-  await expect(taskFiles).toBeVisible()
-  await expect(page.getByLabel('施工组织设计方案文件列表')).toContainText(
-    '施工组织设计-现场签认.pdf',
-  )
-
-  await page.getByRole('button', { name: /项目文件柜/ }).click()
-  const cabinet = page.getByRole('region', { name: '项目文件柜' })
-  await expect(cabinet.getByText('施工组织设计-现场签认.pdf', { exact: true }).last()).toBeVisible()
-  await expect(cabinet.getByText('施工准备', { exact: true }).last()).toBeVisible()
-  await expect(cabinet.getByText('施工组织设计方案', { exact: true }).last()).toBeVisible()
-
-  await page.reload()
-  await page.waitForLoadState('networkidle')
-  await page.getByRole('button', { name: /项目文件柜/ }).click()
-  await expect(page.getByText('施工组织设计-现场签认.pdf', { exact: true }).last()).toBeVisible()
-
-  expect(pageErrors, '附件闭环不应产生客户端运行错误').toEqual([])
-})
+}

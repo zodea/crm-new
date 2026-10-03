@@ -111,7 +111,7 @@ describe('公共单据列表的真实状态与表头筛选', () => {
   ])('$kind 同字段多选取并集，跨字段取交集，候选与工具选中态保留', async ({ component, kind, first, second, status }) => {
     mountList(component, kind)
     const trigger = screen.getByRole('button', { name: '筛选项目' })
-    expect(trigger.classList.contains('is-active')).toBe(false)
+    expect(within(trigger).queryByText('已筛选')).toBeNull()
     await fireEvent.click(trigger)
     await fireEvent.click(screen.getByRole('checkbox', { name: '一期项目' }))
     await fireEvent.click(screen.getByRole('checkbox', { name: '二期项目' }))
@@ -127,7 +127,7 @@ describe('公共单据列表的真实状态与表头筛选', () => {
     expect((screen.getByRole('checkbox', { name: '二期项目' }) as HTMLInputElement).checked).toBe(true)
     await fireEvent.click(screen.getByRole('button', { name: '清除' }))
     expect(screen.queryByRole('article', { name: second })).toBeNull()
-    expect(trigger.classList.contains('is-active')).toBe(false)
+    expect(within(trigger).queryByText('已筛选')).toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '列表筛选' }))
     const statuses = within(screen.getByRole('group', { name: '状态' }))
     expect(statuses.getAllByRole('checkbox')).toHaveLength(3)

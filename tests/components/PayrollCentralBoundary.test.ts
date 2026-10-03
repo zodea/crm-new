@@ -34,14 +34,12 @@ describe('工资浏览器与桌面入口边界', () => {
     expect(legacy).not.toHaveBeenCalled()
     wrapper.unmount()
   })
-  it('桌面入口保留原适配，不伪装成中央运行验收', () => {
+  it.each(cases)('$native 桌面入口保留原适配，不伪装成中央运行验收', ({ component, central, native }) => {
     runtime.native = true
-    for (const { component, central, native } of cases) {
-      const wrapper = mount(component, { global: { stubs: { [central]: { template: '<div data-central />' }, [native]: { template: '<div data-native />' } } } })
-      expect(wrapper.find('[data-native]').exists()).toBe(true)
-      expect(wrapper.find('[data-central]').exists()).toBe(false)
-      wrapper.unmount()
-    }
+    const wrapper = mount(component, { global: { stubs: { [central]: { template: '<div data-central />' }, [native]: { template: '<div data-native />' } } } })
+    expect(wrapper.find('[data-native]').exists()).toBe(true)
+    expect(wrapper.find('[data-central]').exists()).toBe(false)
+    wrapper.unmount()
   })
   it('新的独立来源路由在桌面明确提示原工作台，不挂浏览器来源页', () => {
     runtime.native = true

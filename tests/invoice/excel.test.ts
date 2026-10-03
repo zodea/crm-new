@@ -215,7 +215,10 @@ describe('发票 Excel 导入/回读来源证据', () => {
     expect(blank.sourceRows).toHaveLength(0)
   })
 
-  it('公式无缓存或缓存为错误值时保留原文并进入逐行复核', async () => {
+  it.each([
+    { rowIndex: 0, expected: { formula: 'SUM(C2:C2)', formulaStatus: 'resolved' } },
+    { rowIndex: 1, expected: { formula: 'SUM(C3:C3)', formulaStatus: 'invalid' } },
+  ])('公式行 $rowIndex 保留原文和复核状态', async ({ rowIndex, expected }) => {
     const worksheet = XLSX.utils.aoa_to_sheet([
       ['发票号码', '价税合计'],
       ['000000000000000099', undefined],
@@ -232,14 +235,7 @@ describe('发票 Excel 导入/回读来源证据', () => {
     )
     const rows = parsed.sheets[0]!.rows
     expect(rows).toHaveLength(2)
-    expect(getInvoiceImportSourceMeta(rows[0]!)?.formulaCells[0]).toMatchObject({
-      formula: 'SUM(C2:C2)',
-      formulaStatus: 'resolved',
-    })
-    expect(getInvoiceImportSourceMeta(rows[1]!)?.formulaCells[0]).toMatchObject({
-      formula: 'SUM(C3:C3)',
-      formulaStatus: 'invalid',
-    })
+    expect(getInvoiceImportSourceMeta(rows[rowIndex]!)?.formulaCells[0]).toMatchObject(expected)
   })
 
   it('缺少发票号码的真实业务行保留来源键并进入逐行复核，明确合计行才忽略', async () => {
@@ -267,7 +263,11 @@ describe('发票 Excel 导入/回读来源证据', () => {
     })
   })
 
-  it('重新导入按自然键和来源键双重标记重复，不删除行也不静默覆盖', async () => {
+  it.each([
+    { rowIndex: 0, expected: [] as string[], exact: true },
+    { rowIndex: 1, expected: ['发票号码重复，需逐行复核', '来源键重复，需逐行复核'], exact: true },
+    { rowIndex: 2, expected: ['来源键重复，需逐行复核', '发票号码重复，需逐行复核'], exact: false },
+  ])('重导行 $rowIndex 保留自然键和来源键复核', async ({ rowIndex, expected, exact }) => {
     const workbook = await parseInvoiceWorkbookForMapping(createSyntheticInvoiceWorkbook(), '重导.xlsx')
     const detail = workbook.sheets[0]!
     const rows = detail.rows.map((row) => {
@@ -291,13 +291,7 @@ describe('发票 Excel 导入/回读来源证据', () => {
     ], ['000000000000000002'])
 
     expect(duplicated).toHaveLength(3)
-    expect(invoiceImportReview(duplicated[0]!).reasons).toEqual([])
-    expect(invoiceImportReview(duplicated[1]!).reasons).toEqual([
-      '发票号码重复，需逐行复核',
-      '来源键重复，需逐行复核',
-    ])
-    expect(invoiceImportReview(duplicated[2]!).reasons).toContain('来源键重复，需逐行复核')
-    expect(invoiceImportReview(duplicated[2]!).reasons).toContain('发票号码重复，需逐行复核')
+    expect(invoiceImportReview(duplicated[rowIndex]!).reasons).toEqual(exact ? expected : expect.arrayContaining(expected))
     expect(invoiceImportReview(duplicated[1]!).row).toHaveProperty('invoiceNumber')
   })
 

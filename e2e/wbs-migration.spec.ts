@@ -20,7 +20,7 @@ test('完整旧 WBS 经真实 HTTP 接管，冻结绑定历史与冷读一致，
     const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId, requiredCapability: 'core:migration:write' })
     const preflight = await request.post('/api/migrations/core/preflight', { data: { ...envelope('wbs-http-preflight'), source, backup: null } })
     expect(preflight.ok(), await preflight.text()).toBe(true)
-    const dry = await request.post('/api/migrations/core/dry-run', { data: { ...envelope('wbs-http-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: new Date().toISOString(), immutable: true } } })
+    const dry = await request.post('/api/migrations/core/dry-run', { data: { ...envelope('wbs-http-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } } })
     expect(dry.ok(), await dry.text()).toBe(true)
     const batch: CoreMigrationBatchDTO = await dry.json()
     expect(batch.issues.filter(row => ['apply-failed', 'missing-relation', 'orphan'].includes(row.metricKey))).toEqual([])

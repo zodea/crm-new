@@ -326,34 +326,23 @@ describe('项目整页表单', () => {
     expect(navigateTo).not.toHaveBeenCalled()
   })
 
-  it('取消时新建返回列表，编辑返回原项目详情', async () => {
-    const newView = render(MasterDataFormPage, {
-      props: { kind: 'project', hideSections: true, returnToDetail: true },
-      global: { components: globalComponents },
-    })
-    await flushPromises()
-    await fireEvent.click(screen.getByRole('button', { name: '取消' }))
-    expect(navigateTo).toHaveBeenLastCalledWith('/project')
-    newView.unmount()
-
-    route.fullPath = '/project/form/project-42'
-    route.path = '/project/form/project-42'
-    route.params = { id: 'project-42' }
-    hydrateCommandForm.mockResolvedValue({
-      draft: {
-        id: 'project-42',
-        name: '原项目',
-        manager: '原经理',
-        customerId: 'customer-old-id',
-        status: '施工中',
-        approvalStatus: 'draft',
-      },
-      attachments: [],
-      pendingAttachments: [],
-      pendingRemoveIds: [],
-      pendingRestoreIds: [],
-      restoredLocalDraft: null,
-    })
+  it.each([
+    { label: '新建', id: null, expected: '/project' },
+    { label: '编辑', id: 'project-42', expected: '/project/project-42?origin=real' },
+  ])('$label 取消返回 $expected', async ({ id, expected }) => {
+    if (id) {
+      route.fullPath = `/project/form/${id}`
+      route.path = `/project/form/${id}`
+      route.params = { id }
+      hydrateCommandForm.mockResolvedValue({
+        draft: { id, name: '原项目', manager: '原经理', customerId: 'customer-old-id', status: '施工中', approvalStatus: 'draft' },
+        attachments: [],
+        pendingAttachments: [],
+        pendingRemoveIds: [],
+        pendingRestoreIds: [],
+        restoredLocalDraft: null,
+      })
+    }
 
     render(MasterDataFormPage, {
       props: { kind: 'project', hideSections: true, returnToDetail: true },
@@ -363,7 +352,7 @@ describe('项目整页表单', () => {
     await fireEvent.click(screen.getByRole('button', { name: '取消' }))
 
     await waitFor(() => {
-      expect(navigateTo).toHaveBeenLastCalledWith('/project/project-42?origin=real')
+      expect(navigateTo).toHaveBeenLastCalledWith(expected)
     })
   })
 

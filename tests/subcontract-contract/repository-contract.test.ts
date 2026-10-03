@@ -168,7 +168,7 @@ describe('分包合同中央 Repository 契约', () => {
       .toEqual({ kind: 'unavailable', reason: 'forbidden' })
   })
 
-  it('直接深链按稳定补充协议 ID 区分父合同错配与目标不存在', () => {
+  describe('直接深链按稳定补充协议 ID 区分父合同错配与目标不存在', () => {
     const otherContract = { ...contract, id: 'subcontract-322', no: 'FB-2026-0322', name: '其他分包合同' }
     const focusFacts: SubcontractContractFactSources = {
       ...facts,
@@ -191,9 +191,12 @@ describe('分包合同中央 Repository 契约', () => {
       sourceVersion: 'subcontract-contract-v2',
       capabilities: ['subcontract-contract:read'],
     })
-
-    expect(() => build('supplement-other-contract')).toThrowError(/补充协议与分包合同不匹配/)
-    expect(() => build('missing-supplement')).toThrowError(/聚焦的分包合同事实不存在/)
+    it.each([
+      { case: '\'supplement-other-contract\'', input: 'supplement-other-contract', expected: /补充协议与分包合同不匹配/ },
+      { case: '\'missing-supplement\'', input: 'missing-supplement', expected: /聚焦的分包合同事实不存在/ },
+    ])('build：$case', ({ input, expected }) => {
+      expect(() => build(structuredClone(input))).toThrowError(expected)
+    })
   })
 
   it('合同变洽签页签可按稳定变洽签 ID 聚焦同一合同事实', () => {

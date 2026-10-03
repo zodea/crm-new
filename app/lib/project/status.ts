@@ -1,6 +1,5 @@
-// 项目状态枚举与语义色调——单一权威源（表单下拉 / 列表筛选 / 列表与详情的颜色映射共用）。
-// 各页面的具体 class 系统不同（列表用 cell--status-*、详情用 chip-*），故只共享
-// 「状态键集」与「语义色调」，class 由各页按色调映射，避免多处各抄一份状态清单而漂移。
+// 项目状态枚举与语义色调——表单下拉、列表筛选和 KitStatusTag 共用。
+import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
 
 /** 项目状态清单（业务枚举，顺序即下拉/筛选展示顺序） */
 export const PROJECT_STATUSES = ['筹备中', '施工中', '停工', '已竣工', '已结算'] as const
@@ -29,4 +28,11 @@ export const PROJECT_STATUS_TONE: Record<string, StatusTone> = {
   停工: 'muted',
   已竣工: 'ok',
   已结算: 'ok',
+}
+
+/** 保留状态事实；未归一的历史值只回退展示色，不改写业务状态。 */
+export function projectStatusTone(status: string | null | undefined): KitStatusTone {
+  const value = status ?? ''
+  const tone = Object.hasOwn(PROJECT_STATUS_TONE, value) ? PROJECT_STATUS_TONE[value] : undefined
+  return !tone || tone === 'muted' ? 'neutral' : tone
 }

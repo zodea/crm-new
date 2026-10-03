@@ -28,11 +28,10 @@ function matches(pattern: RegExp): string[] {
 }
 
 describe('overlay composition contract', () => {
-  it('contains no legacy layer aliases or classes', () => {
-    expect(matches(LEGACY_LAYER)).toEqual([])
-  })
-
-  it('contains no raw global z-index values', () => {
-    expect(matches(RAW_GLOBAL_Z_INDEX)).toEqual([])
+  it.each([
+    { rule: 'legacy layer aliases or classes', pattern: LEGACY_LAYER },
+    { rule: 'raw global z-index values', pattern: RAW_GLOBAL_Z_INDEX },
+  ])('contains no $rule', ({ pattern }) => {
+    expect(matches(pattern)).toEqual([])
   })
 })

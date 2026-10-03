@@ -14,7 +14,7 @@ async function evidence(page: Page, info: TestInfo, name: string) {
 
 test('原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取', async ({ page }, info) => {
   test.setTimeout(150000)
-  const { repository, project, leader } = await payrollC1Workspace(page, '2026-10')
+  const { repository, project, leader } = await payrollC1Workspace(page, '2026-10', info)
   const url = `/subcontract/attendance?${new URLSearchParams({ origin: 'real', project: project.id, month: '2026-10', crew: leader.crewId || '' })}`
   await page.goto(url)
   await page.getByRole('button', { name: '日薪481负责人 2026-10-03 考勤', exact: true }).click()
@@ -83,7 +83,7 @@ test('原考勤保存失败保稿、冷页原编号恢复与切月份迟到读�
 
 test('个人标准保存失响应后冷页仍按原编号确认，不覆盖原配置空值', async ({ page }, info) => {
   test.setTimeout(120000)
-  const { repository, project, leader } = await payrollC1Workspace(page, '2026-11')
+  const { repository, project, leader } = await payrollC1Workspace(page, '2026-11', info)
   const url = `/subcontract/payroll/config?${new URLSearchParams({ origin: 'real', format: 'C1', project: project.id, month: '2026-11', crew: leader.crewId || '' })}`
   const before = await repository.c1Config({ origin: 'real' }, { projectId: project.id, month: '2026-11', crewId: leader.crewId })
   const previous = before.rates.find(rate => rate.workerId === leader.id)!

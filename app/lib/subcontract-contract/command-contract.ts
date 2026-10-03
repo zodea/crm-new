@@ -4,6 +4,7 @@ import type {
   F2SaveAction,
   ProjectContractFormDraft,
 } from '../contract/forms'
+import type { ContractSupplierOption } from '../contract/page'
 
 export const SUBCONTRACT_CONTRACT_WRITE_CAPABILITY = 'subcontract-contract:write' as const
 
@@ -12,7 +13,7 @@ export interface SubcontractContractCommandContextDTO {
   actorId: string
   capabilities: string[]
   projects: Array<{ id: string, label: string }>
-  suppliers: Array<{ id: string, label: string }>
+  suppliers: ContractSupplierOption[]
 }
 
 export interface SubcontractContractCommandRequestDTO {

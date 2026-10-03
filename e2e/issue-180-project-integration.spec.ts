@@ -1,112 +1,55 @@
-import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
+import { installProjectCentralFixture } from './helpers/project-central-fixture'
+import { expectLocalHorizontalScroll, expectNoPageOverflow, tabUntilFocused } from './helpers/responsive'
 
-async function expectNoDocumentOverflow(page: Page) {
-  const widths = await page.evaluate(() => ({
-    viewport: window.innerWidth,
-    rootClient: document.documentElement.clientWidth,
-    rootScroll: document.documentElement.scrollWidth,
-    bodyScroll: document.body.scrollWidth,
-  }))
-  expect(widths.rootScroll).toBeLessThanOrEqual(widths.rootClient)
-  expect(widths.bodyScroll).toBeLessThanOrEqual(widths.viewport)
-}
-
-async function hasLocalHorizontalScroller(
-  region: import('@playwright/test').Locator,
-): Promise<boolean> {
-  return region.evaluate(root =>
-    Array.from(root.querySelectorAll<HTMLElement>('*')).some((element) => {
-      const style = getComputedStyle(element)
-      return element.scrollWidth > element.clientWidth + 1
-        && /auto|scroll/.test(style.overflowX)
-    }),
-  )
-}
-
-test('项目驾驶舱与正式源事实同口径，并提供只读来源穿透', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', error => pageErrors.push(error.message))
-
-  await page.goto('/project/proj_demo_001')
-  await page.waitForLoadState('networkidle')
-
-  const operation = page.getByRole('region', { name: '项目经营数据' })
-  await expect(operation.getByRole('group', { name: '确认支付' })).toContainText('¥4,200,000.00')
-  await expect(operation.getByRole('group', { name: '管理费' })).toContainText('—')
-  await expect(operation.getByRole('group', { name: '已知资金余额' })).toBeVisible()
-
-  await page.getByRole('tab', { name: '施工合同管理', exact: true }).click()
-  const construction = page.getByRole('region', { name: '施工合同', exact: true })
-  const constructionSource = construction.getByRole('link', { name: '合和新城施工总承包合同' }).first()
-  await expect(constructionSource).toHaveAttribute('href', '/contract/con_demo_sg01')
-  await expect(construction.getByText('正式含税合同金额合计')).toContainText('¥32,388,422.00')
-  await expect(
-    construction.getByRole('button', { name: /新增|编辑|删除|确认|审批|归档/ }),
-  ).toHaveCount(0)
-
-  const supplement = page.getByRole('region', { name: '补充协议', exact: true })
-  await expect(supplement.getByRole('link', { name: '材料调价补充协议' }).first())
-    .toHaveAttribute('href', '/contract/con_demo_sg01')
-
-  const ownerChange = page.getByRole('region', { name: '甲方变洽签', exact: true })
-  await expect(ownerChange.getByRole('link', { name: 'BQ-2026-001' }).first())
-    .toHaveAttribute('href', '/owner/change/oco_mz0x1_0')
-  await expect(ownerChange.getByText('正式含税审定金额合计')).toContainText('¥120,520.00')
-
-  await page.getByRole('tab', { name: '票税管理', exact: true }).click()
-  const outgoing = page.getByRole('region', { name: '开票申请', exact: true })
-  await expect(outgoing.getByRole('link', { name: '2026年6月进度开票申请' }).first())
-    .toHaveAttribute('href', '/finance/billing/ia_mz0x1_0')
-  await expect(outgoing.getByText('正式开票金额合计')).toContainText('¥25,663,629.00')
-
-  await page.getByRole('tab', { name: '资金管理', exact: true }).click()
-  const receipts = page.getByRole('region', { name: '收款登记', exact: true })
-  await expect(receipts.getByRole('link', { name: 'SK-2026-001' }).first())
-    .toHaveAttribute('href', '/finance/receipt/rr_mz0x1_0')
-  await expect(receipts.getByText('正式收款金额合计')).toContainText('¥25,367,027.00')
-
-  const applications = page.getByRole('region', { name: '付款申请', exact: true })
-  await expect(applications.getByRole('link', { name: 'FK-2026-001' }).first())
-    .toHaveAttribute('href', '/finance/payment/pa_mz0x1_0/detail')
-  await expect(applications.getByText('已付金额合计')).toContainText('¥4,200,000.00')
-
-  expect(pageErrors, '跨页签来源穿透旅程不应产生客户端运行错误').toEqual([])
+// 旧经营汇总与只读来源穿透正向覆盖保留在 tests/project/detail-aggregate.test.ts、
+// tests/project/finance-facts.test.ts、tests/components/ProjectMetrics.test.ts。
+// 中央已接旅程由当前来源感知卡片进入；未接管领域不重建本地十页签。
+test('中央项目的材采、商务、工资与收款使用同一项目身份且来源不混合', async ({ page }) => {
+  const fixture = await installProjectCentralFixture(page)
+  await fixture.open()
+  const dto = await fixture.read()
+  expect(dto.item.dataOrigin).toBe('real')
+  expect(dto.item.project.id).toBe(fixture.id)
+  expect(dto.item.budget.value).toBeNull()
+  await expect(page.getByRole('region', { name: '材料采购合同', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: /^项目商务单据/ })).toBeVisible()
+  await expect(page.getByRole('region', { name: '工资实际收付', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '项目收款', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '项目经营数据', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: '施工合同管理', exact: true })).toHaveCount(0)
+  await expect(page.getByText('测试数据仅供查看。', { exact: true })).toHaveCount(0)
+  expect(fixture.errors).toEqual([])
 })
 
 const VIEWPORTS = [
-  { label: '390px', width: 390, height: 844, expectLocalScroll: true },
-  { label: '768px', width: 768, height: 900, expectLocalScroll: true },
-  { label: '1024px', width: 1024, height: 900, expectLocalScroll: false },
-  { label: '1440px', width: 1440, height: 1000, expectLocalScroll: false },
-  // 1440px 物理窗口在浏览器 200% 缩放时，等效布局视口约为 720 CSS px。
-  { label: '1440px @ 200%', width: 720, height: 900, expectLocalScroll: true },
+  { label: '390px', width: 390, height: 844, requireLocalScroll: true },
+  { label: '768px', width: 768, height: 900, requireLocalScroll: true },
+  { label: '1024px', width: 1024, height: 900, requireLocalScroll: false },
+  { label: '1280px', width: 1280, height: 900, requireLocalScroll: false },
+  { label: '1440px', width: 1440, height: 1000, requireLocalScroll: false },
+  { label: '1440px @ 200%', width: 720, height: 900, requireLocalScroll: true },
 ] as const
 
 for (const viewport of VIEWPORTS) {
-  test(`${viewport.label} 项目详情不产生页面级横滚，密集表格保持局部滚动与键盘可达`, async ({ page }) => {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height })
-    await page.goto('/project/proj_demo_001')
-    await page.waitForLoadState('networkidle')
-
-    await page.getByRole('tab', { name: '施工合同管理', exact: true }).click()
-    const construction = page.getByRole('region', { name: '施工合同', exact: true })
-    await expect(construction).toBeVisible()
-    await expectNoDocumentOverflow(page)
-
-    if (viewport.expectLocalScroll)
-      expect(await hasLocalHorizontalScroller(construction)).toBe(true)
-
-    const source = construction.getByRole('link', { name: '合和新城施工总承包合同' }).first()
-    await source.focus()
-    await expect(source).toBeFocused()
-
-    await page.getByRole('tab', { name: '票税管理', exact: true }).click()
-    await expect(page.getByRole('region', { name: '开票申请', exact: true })).toBeVisible()
-    await expectNoDocumentOverflow(page)
-
-    await page.getByRole('tab', { name: '竣工验收及保修', exact: true }).click()
-    await expect(page.getByRole('region', { name: '竣工验收与保修', exact: true })).toBeVisible()
-    await expectNoDocumentOverflow(page)
+  test(`${viewport.label} 中央项目保持页面边界，工资密表局部滚动及导航键盘可达`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    const fixture = await installProjectCentralFixture(page)
+    await fixture.open()
+    const table = page.getByRole('region', { name: '工资实际收付明细，可横向滚动', exact: true })
+    await expect(table).toBeVisible()
+    await expectNoPageOverflow(page, `${viewport.label} 中央项目详情`)
+    if (viewport.requireLocalScroll) {
+      await expectLocalHorizontalScroll(table, `${viewport.label} 工资实际收付`)
+      await table.evaluate((element) => {
+        element.scrollLeft = element.scrollWidth
+      })
+      expect(await table.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    }
+    const receipts = page.getByRole('region', { name: '项目收款', exact: true }).getByRole('link', { name: '查看收款登记', exact: true })
+    await tabUntilFocused(page, receipts)
+    await expect(receipts).toBeInViewport()
+    await expectNoPageOverflow(page, `${viewport.label} 键盘导航后`)
+    expect(fixture.errors).toEqual([])
   })
 }

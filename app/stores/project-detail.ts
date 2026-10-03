@@ -19,6 +19,7 @@ import type {
 import { db } from '~/lib/db/client'
 import { select } from '~/lib/db/connection'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
+import { ownerFinalSettlementReceiptIsActive } from '~/lib/owner-document/central-repository'
 import { loadProjectAcceptanceLifecycle } from '~/lib/project/acceptance-lifecycle'
 import { loadProjectCostControl } from '~/lib/project/cost-control'
 import { loadProjectDeliveryArchive } from '~/lib/project/delivery-archive'
@@ -333,7 +334,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
           payerUnit: (row.payer_account ?? '') as string,
           cumulativeReceivable: amount,
           status,
-          effectiveAmount: effectiveAmount(amount, status),
+          effectiveAmount: ownerFinalSettlementReceiptIsActive(status) ? amount : 0,
           sourcePath: '',
         }
       })

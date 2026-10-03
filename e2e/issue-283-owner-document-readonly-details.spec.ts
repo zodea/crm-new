@@ -26,7 +26,7 @@ test.describe('Issue #283：甲方六类单据专属只读详情与双视图', (
   test('项目按稳定 ID 提供六类入口，最终结算与罚扣可恢复原锚点、滚动和焦点', async ({ page }) => {
     await page.goto('/project/project-real-320?origin=real')
     await expect(page.getByRole('heading', { name: '中央正式施工项目' })).toBeVisible({ timeout: 20_000 })
-    const journey = page.getByRole('region', { name: '甲方商务单据' })
+    const journey = page.getByRole('region', { name: '项目商务单据' })
     for (const name of ['甲方变洽签', '月度报量', '竣工验收', '保修管理', '最终结算', '甲方罚扣'])
       await expect(journey.getByRole('link', { name: new RegExp(name) })).toBeVisible()
 
@@ -66,8 +66,10 @@ test.describe('Issue #283：甲方六类单据专属只读详情与双视图', (
     test(`${width}px 六类项目入口无页面级横滚`, async ({ page }) => {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       await page.goto('/project/project-real-320?origin=real')
-      const journey = page.getByRole('region', { name: '甲方商务单据' })
-      await expect(journey.getByRole('link')).toHaveCount(6, { timeout: 20_000 })
+      const journey = page.getByRole('region', { name: '项目商务单据' })
+      await expect(journey.getByRole('link')).toHaveCount(9, { timeout: 20_000 })
+      for (const name of ['甲方变洽签', '月度报量', '竣工验收', '保修管理', '最终结算', '甲方罚扣'])
+        await expect(journey.getByRole('link', { name: new RegExp(name) })).toBeVisible()
       await expectNoPageOverflow(page, `#283 项目甲方六类入口 @ ${width}px`)
     })
   }

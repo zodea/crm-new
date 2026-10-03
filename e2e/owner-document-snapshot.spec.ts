@@ -55,7 +55,9 @@ test('普通错误保留旧表，受限错误清空权限与记录，重试及�
     const query = parseOwnerCommercialDocumentListQuery('owner_change', Object.fromEntries(new URL(route.request().url()).searchParams))
     await route.fulfill({ json: buildOwnerCommercialDocumentListPage({ documents: empty ? [] : [document], query, asOf: document.updatedAt, sourceVersion: 'snapshot-regression', capabilities: ['owner-document:read', 'owner-document:write'] }) })
   })
+  const initialRead = page.waitForResponse(response => new URL(response.url()).pathname === '/api/read/owner-documents/owner_change' && response.status() === 200)
   await page.goto('/owner/change')
+  await initialRead
   const table = page.locator('[data-ui="owner-document-table"]')
   const oldRow = table.getByRole('link', { name: 'SNAP-001', exact: true })
   await expect(oldRow).toBeVisible()
@@ -110,7 +112,9 @@ test('验收切至保修等待期间不沿用前视图的记录和权限', async
       : [{ ...document, kind: 'acceptance', no: 'YS-SNAPSHOT', status: 'accepted' }]
     await route.fulfill({ json: buildOwnerCommercialDocumentListPage({ documents, query, asOf: document.updatedAt, sourceVersion: 'variant-regression', capabilities: ['owner-document:read'] }) })
   })
+  const initialRead = page.waitForResponse(response => new URL(response.url()).pathname === '/api/read/owner-documents/acceptance' && response.status() === 200)
   await page.goto('/owner/acceptance?variant=acceptance&status=all')
+  await initialRead
   const table = page.locator('[data-ui="owner-document-table"]')
   await expect(table.getByRole('link', { name: 'YS-SNAPSHOT', exact: true })).toBeVisible()
   await page.getByRole('link', { name: '保修到期确认', exact: true }).click()

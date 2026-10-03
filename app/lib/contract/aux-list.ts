@@ -161,10 +161,10 @@ export function filterContractAuxRows(
   })
 }
 
-export function contractAuxStatusClass(status: string): string {
+export function contractAuxStatusTone(status: string): 'brand' | 'ok' | 'warn' | 'neutral' {
   if (['已确认', '已结清', '履约中'].includes(status))
-    return status === '履约中' ? 'chip-brand' : 'chip-ok'
+    return status === '履约中' ? 'brand' : 'ok'
   if (['待确认', '审批中'].includes(status))
-    return 'chip-warn'
-  return 'chip bg-surface-3 text-ink-faint'
+    return 'warn'
+  return 'neutral'
 }

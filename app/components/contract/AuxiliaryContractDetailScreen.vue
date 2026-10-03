@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { AuxiliaryContractKind } from '~/lib/auxiliary-contract/contract'
 import type { EntityRefDTO } from '~/types/read-model'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { AUXILIARY_LABELS, auxiliaryListPath } from '~/lib/auxiliary-contract/contract'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
+import { contractAuxStatusTone } from '~/lib/contract/aux-list'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 const props = defineProps<{ kind: AuxiliaryContractKind, contractId: string }>()
@@ -54,7 +56,9 @@ useTabTitle(() => contract.value?.draft.name || AUXILIARY_LABELS[props.kind])
         </KitButton>
       </template>
       <template #status>
-        <span class="chip chip-brand">{{ contract?.draft.status || '未记录' }}</span>
+        <KitStatusTag :tone="contractAuxStatusTone(contract?.draft.status ?? '')">
+          {{ contract?.draft.status || '未记录' }}
+        </KitStatusTag>
       </template>
       <template #actions>
         <KitButton v-if="detail?.capabilities.includes('auxiliary-contract:write') && contract?.dataOrigin === 'real'" variant="primary" @click="navigateTo(`${auxiliaryListPath(kind)}/form/${contractId}?origin=real&returnTo=${encodeURIComponent(route.fullPath)}`)">
@@ -108,7 +112,7 @@ useTabTitle(() => contract.value?.draft.name || AUXILIARY_LABELS[props.kind])
                     </NuxtLink><span v-else>{{ fact.name || '未记录' }}</span>
                   </td><td>{{ fact.date || '未记录' }}</td><td class="font-mono">
                     {{ auxiliaryMoney(fact.amount) }}
-                  </td><td>{{ fact.status || '未记录' }}</td>
+                  </td><td><KitStatusTag>{{ fact.status || '未记录' }}</KitStatusTag></td>
                 </tr><tr v-if="!facts.length">
                   <td colspan="5" class="p-8 text-center text-ink-faint">
                     {{ noFacts }}

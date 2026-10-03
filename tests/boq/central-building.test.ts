@@ -49,12 +49,12 @@ describe('中央导入 BOQ 楼栋证据', () => {
     expect(source.boqBuildingContext(query, session, evidence).audit).toEqual([])
   })
 
-  it('拒绝越权、跨项目楼栋、来源资格和量价字段注入，失败不写审计', () => {
+  it.each([{ qty: 999 }, { source: { confirmed: true } }])('拒绝越权、跨项目楼栋、来源资格和量价字段注入：%j', (patch) => {
     const source = owner()
     const context = source.boqBuildingContext(query, session, evidence)
     const command = { ...query, commandId: 'guard', workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'owner-document:write' as const, sourceVersion: context.sourceVersion, lineId: 'line', buildingId: 'building', reason: '请求更正' }
-    for (const input of [{ ...command, qty: 999 }, { ...command, source: { confirmed: true } }])
-      expect(() => source.correctBoqBuilding(input, session, evidence)).toThrow(/只允许更正/)
+    const input = { ...command, ...patch }
+    expect(() => source.correctBoqBuilding(input, session, evidence)).toThrow(/只允许更正/)
     expect(() => source.correctBoqBuilding({ ...command, buildingId: 'other-project-building' }, session, evidence)).toThrow(/不属于当前项目/)
     expect(() => source.correctBoqBuilding(command, { ...session, capabilities: session.capabilities.filter(cap => cap !== 'owner-document:write') }, evidence)).toThrow(/无权/)
     expect(() => source.correctBoqBuilding({ ...command, actorId: 'other-actor' }, session, evidence)).toThrow(/无权/)

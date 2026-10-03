@@ -82,9 +82,14 @@ describe('工程量矩阵页签文案', () => {
 
 describe('boq 页签文案', () => {
   it('清单工作区与专用拆表页不会落入通用合同详情', () => {
-    expect(routeTitle('/contract/boq')).toBe('工程量清单')
     expect(routeSubtitle('/contract/boq')).toBe('合同清单 · 变更单 · 月度报量')
-    expect(routeTitle('/contract/boq/import')).toBe('清单拆表')
+  })
+
+  it.each([
+    { case: '\'/contract/boq\'', input: '/contract/boq', expected: '工程量清单' },
+    { case: '\'/contract/boq/import\'', input: '/contract/boq/import', expected: '清单拆表' },
+  ])('清单工作区与专用拆表页不会落入通用合同详情 / routeTitle：$case', ({ input, expected }) => {
+    expect(routeTitle(input)).toBe(expected)
   })
 })
 
@@ -98,10 +103,12 @@ describe('施工进度页签文案', () => {
     expect(routeTitle(path)).toBe(title)
   })
 
-  it('工作台与新建页分别说明排程和生成流程', () => {
-    expect(routeSubtitle('/schedule')).toBe('WBS 排程 · 计划与实际进度')
-    expect(routeSubtitle('/schedule/new')).toBe('选择楼栋 · 标准工序 · 生成排程')
-    expect(routeSubtitle('/schedule/project_1/bind/group_1')).toBe('楼栋覆盖 · 分项映射 · 数量差异')
+  it.each([
+    { case: '\'/schedule\'', input: '/schedule', expected: 'WBS 排程 · 计划与实际进度' },
+    { case: '\'/schedule/new\'', input: '/schedule/new', expected: '选择楼栋 · 标准工序 · 生成排程' },
+    { case: '\'/schedule/project_1/bind/group_1\'', input: '/schedule/project_1/bind/group_1', expected: '楼栋覆盖 · 分项映射 · 数量差异' },
+  ])('工作台与新建页分别说明排程和生成流程 / routeSubtitle：$case', ({ input, expected }) => {
+    expect(routeSubtitle(input)).toBe(expected)
   })
 })
 

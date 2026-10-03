@@ -190,14 +190,13 @@ describe('工人 owner 私密资料与有日期名册归档', () => {
     })
     await expect(f.service.preview(scope)).rejects.toThrow('私密')
   })
-  it('插入版本失败时上传原件、正文、回执和日志不留下半份数据', async () => {
+  it.each((['worker_roster_assets', 'worker_roster_profile_versions', 'worker_roster_receipts', 'file_refs', 'file_payloads', 'operation_logs']).map(input => ({ input })))('插入版本失败时上传原件、正文、回执和日志不留下半份数据：输入案例 %#', async ({ input: table }) => {
     const f = await setup()
     const profile = await f.service.profile('w')
     await f.db.execute('CREATE TRIGGER reject_profile BEFORE INSERT ON worker_roster_profile_versions BEGIN SELECT RAISE(ABORT,\'roster test failure\'); END')
     const payloadBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII='
     await expect(f.service.execute(f.command({ action: 'save-profile', workerId: 'w', sourceVersion: profile.sourceVersion, values: EMPTY_WORKER_PRIVATE, uploads: { portrait: { fileName: '证件照.png', mimeType: 'image/png', fileSize: Buffer.from(payloadBase64, 'base64').length, payloadBase64 } } }))).rejects.toThrow('roster test failure')
-    for (const table of ['worker_roster_assets', 'worker_roster_profile_versions', 'worker_roster_receipts', 'file_refs', 'file_payloads', 'operation_logs'])
-      expect(await f.db.select(`SELECT * FROM ${table}`)).toHaveLength(0)
+    expect(await f.db.select(`SELECT * FROM ${table}`)).toHaveLength(0)
   })
   it('损坏的冻结统计不能以健康归档返回或导出', async () => {
     const f = await setup()

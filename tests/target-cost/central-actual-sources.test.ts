@@ -33,7 +33,7 @@ describe('中央预算实际来源的金额完整度与身份', () => {
     })
   })
 
-  it('同一支付分摊被映射到两个科目时保持关系未知，不能分别计入两笔成本', () => {
+  it.each((['专业分包', '合同劳务']).map(input => ({ input })))('同一支付分摊被映射到两个科目时保持关系未知，不能分别计入两笔成本：输入案例 %#', ({ input: category }) => {
     const facts = aggregateTargetCostActual('project-budget', [paymentSource({
       categories: ['专业分包', '合同劳务'],
       rows: [
@@ -41,13 +41,11 @@ describe('中央预算实际来源的金额完整度与身份', () => {
         { identity: 'payment-1:allocation-1', projectId: 'project-budget', category: '合同劳务', amount: 300 },
       ],
     })])
-    for (const category of ['专业分包', '合同劳务']) {
-      expect(facts.categories.find(row => row.category === category)?.paidAmount).toMatchObject({
-        value: null,
-        knownValue: null,
-        status: 'pending',
-      })
-    }
+    expect(facts.categories.find(row => row.category === category)?.paidAmount).toMatchObject({
+      value: null,
+      knownValue: null,
+      status: 'pending',
+    })
   })
 
   it('合同与结算展示的同一支付只计一次，独立分摊可累计，未知部分与无权来源不填数', () => {
@@ -114,13 +112,23 @@ describe('中央预算实际来源的金额完整度与身份', () => {
         { identity: 'contract-labour', projectId: 'project-budget', category: '合同劳务', amount: 200 },
       ],
     })])
-    for (const category of ['工人工资', '费用报销']) {
-      expect(facts.categories.find(row => row.category === category)?.signedAmount).toMatchObject({ value: null, knownValue: null, status: 'not-applicable' })
-      expect(facts.categories.find(row => row.category === category)?.settledAmount).toMatchObject({ value: null, knownValue: null, status: 'pending' })
-    }
     const comparison = buildTargetCostComparison('budget-a', [], facts)
     expect(comparison.summary.signedAmount).toMatchObject({ value: 1000, knownValue: 1000, status: 'complete' })
     expect(comparison.summary.settledAmount.value).toBeNull()
+  })
+
+  it.each(Array.from(['工人工资', '费用报销']).map(input => ({ input })))('五类合同读取完整时已签合计可核对，工资和报销未接成本不伪造成缺失合同：输入组合 1 案例 %#', ({ input: category }) => {
+    const facts = aggregateTargetCostActual('project-budget', [paymentSource({
+      id: 'all-contracts',
+      metric: 'signedAmount',
+      categories: ['专业分包', '合同劳务', '材料', '机械', '其他'],
+      rows: [
+        { identity: 'contract-material', projectId: 'project-budget', category: '材料', amount: 800 },
+        { identity: 'contract-labour', projectId: 'project-budget', category: '合同劳务', amount: 200 },
+      ],
+    })])
+    expect(facts.categories.find(row => row.category === category)?.signedAmount).toMatchObject({ value: null, knownValue: null, status: 'not-applicable' })
+    expect(facts.categories.find(row => row.category === category)?.settledAmount).toMatchObject({ value: null, knownValue: null, status: 'pending' })
   })
 
   it('个别科目余额可计算时，项目总余额仍不把其他缺失科目按零合并', () => {

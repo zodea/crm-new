@@ -12,7 +12,7 @@ function command(read: PayrollC2CommandRead, action: PayrollC2Action): PayrollC2
 
 test('真实长签工发放后两表分页与下载回读，精确单价及明确空规则不被改写', async ({ page }, info) => {
   test.setTimeout(240000)
-  const { repository, project, leader, ledger } = await payrollC2Workspace(page, '2027-03')
+  const { repository, project, leader, ledger } = await payrollC2Workspace(page, '2027-03', info)
   const member = ledger.options.workers.find(worker => worker.name === '签工成员')!
   const zero = ledger.options.workers.find(worker => worker.name === '无签工零收款成员')!
   const query = { origin: 'real' as const }
@@ -57,7 +57,9 @@ test('真实长签工发放后两表分页与下载回读，精确单价及明�
   const path = info.outputPath(file.suggestedFilename())
   await file.saveAs(path)
   const book = XLSX.read(await readFile(path))
-  expect(book.SheetNames).toEqual(['工资表', '签工表'])
+  expect(book.SheetNames).toEqual(['工资表', '签工表', '空鼓扣款汇总', '空鼓采用来源'])
+  expect(XLSX.utils.sheet_to_json(book.Sheets.空鼓扣款汇总!)).toEqual([expect.objectContaining({ 本单空鼓扣款: 0 })])
+  expect(XLSX.utils.sheet_to_json(book.Sheets.空鼓采用来源!)).toEqual([])
   const rows = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets.签工表!, { header: 1, defval: null })
   expect(rows[2]).toEqual(['计算规则', '', null, null, null, null, null, null, null])
   expect(rows.slice(4, 60)).toHaveLength(56)
@@ -67,6 +69,7 @@ test('真实长签工发放后两表分页与下载回读，精确单价及明�
   expect(wageRows.some(row => row[0] === zero.name && row[2] === 0)).toBe(true)
   expect(wageRows.filter(row => row[3] === 350.125)).toHaveLength(2)
   await page.emulateMedia({ media: 'print' })
+  await expect(page.locator('.payroll-c2-print')).toBeVisible()
   const bytes = await page.pdf({ path: info.outputPath('c2-long-paired-output.pdf'), printBackground: true, preferCSSPageSize: true })
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const pdf = await getDocument({ data: new Uint8Array(bytes) }).promise

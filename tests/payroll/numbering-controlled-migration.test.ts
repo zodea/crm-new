@@ -23,7 +23,7 @@ async function prepare(db: TestDb, source: CoreMigrationSourceDTO) {
   const bytes = db.raw.export()
   const snapshotSha256 = createHash('sha256').update(bytes).digest('hex')
   await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('number-preflight'), source, backup: null }), session)
-  return coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('number-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: new Date().toISOString(), immutable: true } }), session)
+  return coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('number-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
 }
 it('正式旧号和起点随完整原图迁入，原单再次出具不增号，日常回执阻挡危险恢复', async () => {
   const original = await createPayrollNumberingFixture()

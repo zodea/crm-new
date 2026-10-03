@@ -103,6 +103,8 @@ function setRoute(input: string) {
 
 describe('材料采购合同列表返回上下文', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-24T08:00:00Z'))
     sessionStorage.clear()
     document.querySelectorAll('[data-shell-workspace]').forEach(item => item.remove())
     mocks.store.loadList.mockClear()
@@ -209,5 +211,41 @@ describe('材料采购合同列表返回上下文', () => {
     const heading = screen.getByRole('heading', { name: '材料采购合同' })
     await waitFor(() => expect(document.activeElement).toBe(heading))
     expect(workspace.scrollTop).toBe(320)
+  })
+
+  it.each([
+    { label: '尚无快照', previous: null },
+    { label: '旧快照仍有同一行', previous: page() },
+  ])('返回期间先等待当前读取完成再恢复行焦点：$label', async ({ previous }) => {
+    const contextId = 'origin_delayed_contract'
+    const returnTo = `/contract/material?origin=real&nav=${contextId}#material-contract-row-real%3Acontract-material-1`
+    sessionStorage.setItem(`ruihang:material-contract-return:${contextId}`, JSON.stringify({
+      id: contextId,
+      returnTo,
+      anchorId: 'material-contract-row-real:contract-material-1',
+      scrollTop: 210,
+      expiresAt: Date.now() + 60_000,
+    }))
+    const delayed = reactive({ kind: 'loading', previous, data: page() })
+    mocks.store.listState = delayed
+    setRoute(returnTo)
+    const inactiveAnchor = document.createElement('a')
+    inactiveAnchor.id = 'material-contract-row-real:contract-material-1'
+    inactiveAnchor.tabIndex = 0
+    document.body.append(inactiveAnchor)
+    const rendered = render(MaterialContractListScreen, { global })
+    try {
+      await nextTick()
+      await nextTick()
+      expect(document.activeElement).not.toBe(inactiveAnchor)
+      expect(document.activeElement).not.toBe(screen.getByRole('heading', { name: '材料采购合同' }))
+      delayed.kind = 'ready'
+      const link = await screen.findByRole('link', { name: '瓷砖采购合同' })
+      await waitFor(() => expect(document.activeElement).toBe(link))
+    }
+    finally {
+      rendered.unmount()
+      inactiveAnchor.remove()
+    }
   })
 })

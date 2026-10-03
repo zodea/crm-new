@@ -16,28 +16,36 @@ describe('matchSupplierName', () => {
     })
   })
 
-  it('别名或少量 OCR 错字可给出唯一模糊候选', () => {
-    expect(matchSupplierName('兴裕丰材料', suppliers)).toMatchObject({ id: 's1', kind: 'exact' })
-    expect(matchSupplierName('广州市兴裕丰装饰材科有限公可', suppliers)).toMatchObject({
+  it.each([
+    { case: '\'兴裕丰材料\' / suppliers', input: '兴裕丰材料', argument2: suppliers, expected: { id: 's1', kind: 'exact' } },
+    { case: '\'广州市兴裕丰装饰材科有限公可\' / suppliers', input: '广州市兴裕丰装饰材科有限公可', argument2: suppliers, expected: {
       id: 's1',
       kind: 'fuzzy',
-    })
+    } },
+  ])('别名或少量 OCR 错字可给出唯一模糊候选 / matchSupplierName：$case', ({ input, argument2, expected }) => {
+    expect(matchSupplierName(input, argument2)).toMatchObject(expected)
   })
 
-  it('低分或同分歧义时留给人工选择，不武断绑定主数据', () => {
+  describe('低分或同分歧义时留给人工选择，不武断绑定主数据', () => {
     const ambiguous = [
       { id: 'a', name: '广州宏达建材有限公司', aliases: [] },
       { id: 'b', name: '广州宏达建材经营部', aliases: [] },
     ]
-    expect(matchSupplierName('广州宏达建材', ambiguous)).toBeNull()
-    expect(matchSupplierName('完全无关抬头', suppliers)).toBeNull()
+    it.each([
+      { case: '\'广州宏达建材\' / ambiguous', input: '广州宏达建材', argument2: ambiguous },
+      { case: '\'完全无关抬头\' / suppliers', input: '完全无关抬头', argument2: suppliers },
+    ])('matchSupplierName：$case', ({ input, argument2 }) => {
+      expect(matchSupplierName(structuredClone(input), structuredClone(argument2))).toBeNull()
+    })
   })
 })
 
 describe('matchProjectText', () => {
-  it('同名项目或同长命中不能按数组顺序误选稳定身份', () => {
-    expect(matchProjectText(['中央项目送货'], [{ id: 'a', name: '中央项目' }, { id: 'b', name: '中央项目' }])).toBeNull()
-    expect(matchProjectText(['北门东区'], [{ id: 'a', name: '项目甲', aliases: ['北门'] }, { id: 'b', name: '项目乙', aliases: ['东区'] }])).toBeNull()
+  it.each([
+    { case: '[\'中央项目送货\'] / [{ id: \'a\', name: \'中央项目\' }, { id: \'b\', name: \'中央项目\' }]', input: ['中央项目送货'], argument2: [{ id: 'a', name: '中央项目' }, { id: 'b', name: '中央项目' }] },
+    { case: '[\'北门东区\'] / [{ id: \'a\', name: \'项目甲\', aliases: [\'北门\'] }, { id: \'b\', name: \'项目乙\', aliases: [\'东区\'] }]', input: ['北门东区'], argument2: [{ id: 'a', name: '项目甲', aliases: ['北门'] }, { id: 'b', name: '项目乙', aliases: ['东区'] }] },
+  ])('同名项目或同长命中不能按数组顺序误选稳定身份 / matchProjectText：$case', ({ input, argument2 }) => {
+    expect(matchProjectText(input, argument2)).toBeNull()
   })
   it('从工地原文或文件名中预选项目，多个命中时取更具体的长名称', () => {
     const projects = [

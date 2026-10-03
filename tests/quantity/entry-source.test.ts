@@ -11,18 +11,20 @@ describe('quantity entry source', () => {
     })).toBe('provisional')
   })
 
-  it('施工前默认先展示合同量，没有合同量时才就近定位其他已有口径', () => {
-    expect(defaultQuantityEntrySource({
+  it.each([
+    { case: '{ recognizedContractQty: 10, contractQty: 11, provisionalQty: 12, fieldFormula: \'3×5\', }', input: {
       recognizedContractQty: 10,
       contractQty: 11,
       provisionalQty: 12,
       fieldFormula: '3×5',
-    })).toBe('contract')
-    expect(defaultQuantityEntrySource({
+    }, expected: 'contract' },
+    { case: '{ recognizedContractQty: null, contractQty: null, provisionalQty: 12, fieldFormula: \'3×5\', }', input: {
       recognizedContractQty: null,
       contractQty: null,
       provisionalQty: 12,
       fieldFormula: '3×5',
-    })).toBe('field')
+    }, expected: 'field' },
+  ])('施工前默认先展示合同量，没有合同量时才就近定位其他已有口径 / defaultQuantityEntrySource：$case', ({ input, expected }) => {
+    expect(defaultQuantityEntrySource(input)).toBe(expected)
   })
 })

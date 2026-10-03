@@ -1,5 +1,14 @@
 import { Buffer } from 'node:buffer'
+import { execFile, spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { createServer as createPortProbe } from 'node:net'
+import { resolve } from 'node:path'
+import process from 'node:process'
+import { promisify } from 'node:util'
+import { expect } from '@playwright/test'
 
 /** 仅监听回环且只接受约定合成原件，不接触真实 OCR 服务或真实凭证。 */
 export async function startSyntheticCredentialOcr(pdf: Buffer, port = 3188) {
@@ -43,12 +52,77 @@ export async function startSyntheticCredentialOcr(pdf: Buffer, port = 3188) {
     server.once('error', reject)
     server.listen(port, '127.0.0.1', resolve)
   })
+  port = (server.address() as { port: number }).port
   return {
+    origin: `http://127.0.0.1:${port}`,
     captured,
     failOnce: () => { failNext = true },
     close: () => new Promise<void>((resolve, reject) => {
       server.close(error => error ? reject(error) : resolve())
       server.closeAllConnections()
     }),
+  }
+}
+
+/** 专属 Nuxt 测试实例持有合成 OCR 配置和构建目录，不继承日常服务的 OCR 身份。 */
+export async function startSyntheticCredentialApplication(pdf: Buffer, outputDirectory: string) {
+  const synthetic = await startSyntheticCredentialOcr(pdf, 0)
+  const directory = resolve(outputDirectory)
+  await mkdir(directory, { recursive: true })
+  const probe = createPortProbe().listen(0, '127.0.0.1')
+  await once(probe, 'listening')
+  const port = (probe.address() as { port: number }).port
+  await new Promise<void>(resolve => probe.close(() => resolve()))
+  const origin = `http://127.0.0.1:${port}`
+  // Windows 生成的类型相对路径须与项目同盘；独立目录同时避开主服务的 .nuxt。
+  const buildDir = resolve('.codex-tmp', 'credential-ocr', randomUUID(), 'build')
+  await writeFile(resolve(directory, 'nuxt.config.ts'), `export default { buildDir: ${JSON.stringify(buildDir)}, devtools: { enabled: false } }`, 'utf8')
+  const child = spawn(process.execPath, [resolve('node_modules/nuxt/bin/nuxt.mjs'), 'dev', '--host', '127.0.0.1', '--port', String(port), '--no-fork', '--extends', directory, '--dotenv', resolve(directory, 'synthetic-only.env')], {
+    cwd: resolve('.'),
+    windowsHide: true,
+    env: { ...process.env, NODE_ENV: 'development', CRM_RUN_MODE: 'development', NUXT_DEVTOOLS: 'false', NUXT_IGNORE_LOCK: '1', NUXT_PADDLE_OCR_BASE_URL: synthetic.origin, NUXT_PADDLE_OCR_ACCESS_TOKEN: 'synthetic-credential-447' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let logs = ''
+  const captureOutput = (data: unknown) => {
+    logs = `${logs}${String(data)}`.slice(-12_000)
+  }
+  child.stdout!.on('data', captureOutput)
+  child.stderr!.on('data', captureOutput)
+  let closed = false
+  const close = async () => {
+    if (closed)
+      return
+    closed = true
+    try {
+      if (child.exitCode === null) {
+        const exited = once(child, 'exit')
+        if (process.platform === 'win32' && child.pid)
+          await promisify(execFile)('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true })
+        else
+          child.kill()
+        await exited
+      }
+    }
+    finally {
+      await synthetic.close()
+      await writeFile(resolve(directory, 'application.log'), logs, 'utf8')
+    }
+  }
+  try {
+    await expect.poll(async () => {
+      if (child.exitCode !== null)
+        throw new Error(`合成 OCR 应用启动失败：${logs}`)
+      try {
+        const response = await fetch(`${origin}/api/ocr/status`, { signal: AbortSignal.timeout(5_000) })
+        return response.ok && (await response.json()).configured === true
+      }
+      catch { return false }
+    }, { timeout: 150_000 }).toBe(true)
+    return { ...synthetic, origin, close }
+  }
+  catch (cause) {
+    await close()
+    throw cause
   }
 }

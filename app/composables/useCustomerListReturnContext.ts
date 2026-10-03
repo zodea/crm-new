@@ -11,6 +11,8 @@ import {
 export function useCustomerListReturnContext(options: {
   readState: () => CustomerListNavigationState
   applyState: (state: CustomerListNavigationState) => void
+  root: () => HTMLElement | null
+  isReady: () => boolean
   fallbackFocus?: () => HTMLElement | null
 }) {
   const route = useRoute()
@@ -32,7 +34,7 @@ export function useCustomerListReturnContext(options: {
   }
 
   async function restore() {
-    if (route.path !== '/base/customer' || restored === route.fullPath)
+    if (route.path !== '/base/customer' || restored === route.fullPath || !options.isReady())
       return false
     const resolved = resolveCustomerReturnContext({
       returnTo: route.fullPath,
@@ -40,19 +42,26 @@ export function useCustomerListReturnContext(options: {
       now: Date.now(),
       load: loadCustomerReturnOrigin,
     })
-    if (!resolved.origin)
+    const savedOrigin = resolved.origin
+    if (!savedOrigin)
       return false
+    const fullPath = route.fullPath
     await nextTick()
-    const anchor = document.getElementById(resolved.origin.anchorId)
+    if (route.fullPath !== fullPath || !options.isReady())
+      return false
+    const root = options.root()
+    if (!root?.isConnected)
+      return false
+    const anchor = [...root.querySelectorAll<HTMLElement>('[id]')].find(element => element.id === savedOrigin.anchorId)
     const target = anchor?.querySelector<HTMLElement>('a, button, [tabindex]')
       ?? options.fallbackFocus?.()
     if (!target)
       return false
     const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
     if (workspace)
-      workspace.scrollTop = resolved.origin.scrollTop
+      workspace.scrollTop = savedOrigin.scrollTop
     target.focus({ preventScroll: true })
-    restored = route.fullPath
+    restored = fullPath
     return true
   }
 

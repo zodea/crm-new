@@ -3,15 +3,15 @@ import type { ConfiguredExportSource, ExportData } from '~/lib/kit/export'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repository'
-import type { StatusTone } from '~/lib/project/status'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { useProjectListReturnContext } from '~/composables/useProjectListReturnContext'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { projectLedgerRows } from '~/lib/project/export'
 import { projectListViewRow } from '~/lib/project/list'
 import { IMPORTED_PROJECT_STATUS } from '~/lib/project/repository'
-import { PROJECT_STATUS_TONE, PROJECT_STATUSES } from '~/lib/project/status'
+import { PROJECT_STATUSES, projectStatusTone } from '~/lib/project/status'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
@@ -37,14 +37,6 @@ const listViews = [
   { key: 'updated-desc', label: '最近更新' },
   { key: 'name-asc', label: '项目名称' },
 ]
-
-// 列表页状态一律纯文字色，chip 只进详情页/表单（DESIGN-TASTE §2.3/§4.5，#110 阶段⑤）
-const toneText: Record<StatusTone, string> = {
-  warn: 'cell--status-warn',
-  brand: 'font-600 text-brand-deep',
-  muted: 'font-600 text-ink-soft',
-  ok: 'cell--status-ok',
-}
 
 const readPage = computed<ProjectListPageDTO | null>(() => {
   const state = readStore.state
@@ -190,11 +182,6 @@ function controlledFacets(
     ...facet,
     checked: selected.has(facet.value),
   }))
-}
-
-function statusClass(status: string): string {
-  const tone = PROJECT_STATUS_TONE[status]
-  return tone ? toneText[tone] : 'font-600 text-ink-soft'
 }
 
 function handlePageChange(payload: { page: number, pageSize: number }) {
@@ -570,7 +557,9 @@ onDeactivated(() => {
           </template>
 
           <template #status="{ row }">
-            <span :class="statusClass(row.status)">{{ row.status }}</span>
+            <KitStatusTag :tone="projectStatusTone(row.status)">
+              {{ row.status }}
+            </KitStatusTag>
           </template>
 
           <template #developer="{ row }">

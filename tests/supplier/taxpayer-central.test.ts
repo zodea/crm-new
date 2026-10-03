@@ -79,12 +79,30 @@ describe('人工税务核验中央边界', () => {
     expect(() => state.service.execute({ ...command, workspaceId: 'another' }, session)).toThrow('当前会话')
     expect(state.instance.form(state.created.id, session).version).toBe(command.baseSupplierVersion)
   })
-  it('hTTP 不接收客户端时间、来源、其他字段或错路由主体', async () => {
+  async function createParseSupplierTaxpayerCommandFixture() {
     const state = await setup()
     const command = state.command()
     expect(parseSupplierTaxpayerCommand(command, state.created.id)).toEqual(command)
-    expect(() => parseSupplierTaxpayerCommand({ ...command, taxpayerVerifiedAt: '2000-01-01' }, state.created.id)).toThrow('格式')
-    expect(() => parseSupplierTaxpayerCommand({ ...command, draft: { ...command.draft, source: '伪来源' } }, state.created.id)).toThrow('格式')
-    expect(() => parseSupplierTaxpayerCommand(command, 'another')).toThrow('格式')
+    return { state, command }
+  }
+
+  it('hTTP 不接收客户端时间、来源、其他字段或错路由主体', async () => {
+    await createParseSupplierTaxpayerCommandFixture()
+  })
+
+  it.each([
+    { case: '{ ...command, taxpayerVerifiedAt: \'2000-01-01\' } / state.created.id', prepare: async ({ state, command }: Awaited<ReturnType<typeof createParseSupplierTaxpayerCommandFixture>>) => {
+      return { input: { ...command, taxpayerVerifiedAt: '2000-01-01' }, argument2: state.created.id, expected: '格式' } as const
+    } },
+    { case: '{ ...command, draft: { ...command.draft, source: \'伪来源\' } } / state.created.id', prepare: async ({ state, command }: Awaited<ReturnType<typeof createParseSupplierTaxpayerCommandFixture>>) => {
+      return { input: { ...command, draft: { ...command.draft, source: '伪来源' } }, argument2: state.created.id, expected: '格式' } as const
+    } },
+    { case: 'command / \'another\'', prepare: async ({ command }: Awaited<ReturnType<typeof createParseSupplierTaxpayerCommandFixture>>) => {
+      return { input: command, argument2: 'another', expected: '格式' } as const
+    } },
+  ])('hTTP 不接收客户端时间、来源、其他字段或错路由主体 / parseSupplierTaxpayerCommand：$case', async ({ prepare }) => {
+    const fixture = await createParseSupplierTaxpayerCommandFixture()
+    const { input, argument2, expected } = await prepare(fixture)
+    expect(() => parseSupplierTaxpayerCommand(input, argument2)).toThrow(expected)
   })
 })

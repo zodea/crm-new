@@ -44,17 +44,16 @@ it('班组费用默认经真实导出与owner保留0/false/null/缺字段，改�
   finally { db.close() }
 })
 
-it('真实旧库没有费用列时导出不补空，来源非法开关/负价/字符串被拒绝', async () => {
+it.each(Array.from([['rentSubsidyEnabled', 2], ['mgmtFeeEnabled', false], ['rentSubsidyPrice', -1], ['mgmtFeePrice', '0']] as const).map(input1 => ({ input1 })))('真实旧库没有费用列时导出不补空，来源非法开关/负价/字符串被拒绝：输入案例 %#', async ({ input1: [field, invalid] }) => {
   const db = await createMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     const source = await readQuantityCoreSource(db)
     const envelope = { workspaceId: 'w', actorId: 'a', requiredCapability: CORE_MIGRATION_CAPABILITY, commandId: 'bad-fees', backup: null }
-    for (const [field, invalid] of [['rentSubsidyEnabled', 2], ['mgmtFeeEnabled', false], ['rentSubsidyPrice', -1], ['mgmtFeePrice', '0']] as const) {
-      const bad = structuredClone(source)
-      bad.entities.crews[0]!.attributes = { ...bad.entities.crews[0]!.attributes, [field]: invalid } as typeof bad.entities.crews[number]['attributes']
-      expect(() => parseCoreMigrationSourceCommand({ ...envelope, source: bad })).toThrow()
-    }
+
+    const bad = structuredClone(source)
+    bad.entities.crews[0]!.attributes = { ...bad.entities.crews[0]!.attributes, [field]: invalid } as typeof bad.entities.crews[number]['attributes']
+    expect(() => parseCoreMigrationSourceCommand({ ...envelope, source: bad })).toThrow()
     await db.execute('PRAGMA ignore_check_constraints=ON')
     await db.execute('UPDATE crews SET rent_subsidy_price=-1 WHERE id=\'pa-crew-current\'')
     await expect(readQuantityCoreSource(db)).rejects.toMatchObject({ code: 'unidentifiable-source-row' })

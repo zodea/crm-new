@@ -115,12 +115,12 @@ const CATEGORY_RULES: ReadonlyArray<{ id: string, pattern: RegExp }> = [
   { id: 'glass', pattern: /玻璃/ },
   { id: 'doors-windows', pattern: /门|窗|五金配件/ },
   { id: 'concrete-mortar', pattern: /商品混凝土|预拌混凝土|砂浆/ },
-  { id: 'cement-sand-products', pattern: /水泥|砂|碎石|砌块|砖/ },
   { id: 'prefabricated-components', pattern: /预制构件|叠合板|预制楼梯/ },
   { id: 'prefabricated-decoration', pattern: /装配式装修|集成墙板|整体卫浴/ },
   { id: 'road-bridge', pattern: /沥青|路缘石|桥梁|道路/ },
   { id: 'metal', pattern: /钢筋|螺纹钢|型钢|钢板|铝材|铜材/ },
   { id: 'finishes', pattern: /墙砖|地砖|瓷砖|石材|木地板|乳胶漆|涂料|腻子/ },
+  { id: 'cement-sand-products', pattern: /水泥|砂|碎石|砌块|砖/ },
 ]
 
 const BV_2_5_IDENTITY: OfficialMaterialIdentity = {

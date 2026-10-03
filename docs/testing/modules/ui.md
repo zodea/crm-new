@@ -26,6 +26,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/browser/ResponsiveControls.test.ts](../../../tests/browser/ResponsiveControls.test.ts) | 真实浏览器组件 | 五档视口验证弹窗、搜索栏、项目工具栏与排程控件的宽度、局部滚动及操作可达性；共享 Dialog 默认关闭按钮通过真实 Tab/Shift+Tab 检查非 hover 的可见焦点及 Escape 返回入口 |
 | [tests/browser/ContextHelp.test.ts](../../../tests/browser/ContextHelp.test.ts) | 浏览器组件行为 | 就近帮助的真实浏览器交互 |
 | [tests/browser/KitMultiSelectFilter.test.ts](../../../tests/browser/KitMultiSelectFilter.test.ts) | 浏览器组件行为 | 多选筛选器的真实浏览器交互 |
 
@@ -34,58 +35,72 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/form-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/form-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/form-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/form-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/form-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/form-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/form-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/form-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/form-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/form-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-default-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-empty-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-error-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-loading-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/home-dashboard-partial-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/list-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/list-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/list-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/list-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/list-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/list-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/list-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/list-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/list-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/list-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/notification-sheet-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/overlay-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/shell-stress-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/workspace-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
@@ -119,7 +134,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/runtime-visual-matrix.spec.ts](../../../e2e/runtime-visual-matrix.spec.ts) | Playwright 视觉矩阵 | #184 / #186 / #187 / #188 / #189 运行态视觉基线 |
+| [e2e/runtime-visual-matrix.spec.ts](../../../e2e/runtime-visual-matrix.spec.ts) | Playwright 视觉矩阵 | 14 个运行样态 × 390/768/1024/1280/1440px；普通截图记录中性鼠标与焦点状态，表单保留自身 autofocus、浮层保留真实焦点；独立 Windows/Chromium 演示配置校验 origin/data-profile，矩阵及责任配置经隔离中央会话的正式命令回执准备；两组表单名称的键盘主操作、矩阵局部滚动及弹层 Esc 返回焦点分别参数化 |
 
 ## Playwright E2E
 

@@ -14,6 +14,7 @@ import type {
 } from '~/lib/supplier/detail'
 import { defineStore } from 'pinia'
 import { shallowRef } from 'vue'
+import { effectiveExpenditureSupplementAmountSql } from '~/lib/contract/effective-status'
 import { select, withTransaction } from '~/lib/db/connection'
 import { hiddenCtes, hiddenCtesFor, logCreate, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
 import { approvalPaymentCap, readApprovalAmount } from '~/lib/finance/approval-amount'
@@ -226,6 +227,7 @@ function rowToContract(row: Record<string, unknown>): SupplierContractSummary {
     projectId: (row.project_id ?? '') as string,
     projectName: (row.project_name ?? '') as string,
     amount: Number(row.amount ?? 0),
+    supplementAmount: Number(row.supplement_amount ?? 0),
     changed: Number(row.changed ?? 0),
     settled: Number(row.settled ?? 0),
     paid: Number(row.paid ?? 0),
@@ -361,8 +363,9 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
           ORDER BY p.name
         `, [supplierId]),
       select<Record<string, unknown>>(`
-          ${hiddenCtes('contracts')}
-          SELECT c.*, p.name AS project_name
+          ${hiddenCtesFor('contracts', 'contract_supplements')}
+          SELECT c.*, p.name AS project_name,
+                 ${effectiveExpenditureSupplementAmountSql('c')} AS supplement_amount
           FROM contracts c
           LEFT JOIN projects p ON p.id = c.project_id
           WHERE ${visibleCond('contracts', 'c')} AND c.supplier_id = ?

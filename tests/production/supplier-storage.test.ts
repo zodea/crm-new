@@ -266,7 +266,11 @@ it('正式写入门禁关闭时，跨日读取也不能持久撤销结论或递�
   }
 })
 
-it('磁盘人工核验元数据缺项或损坏必须拒绝，不能补空并覆盖原主档', async () => {
+it.each([
+  (value: Record<string, unknown>) => { delete value.review },
+  (value: Record<string, unknown>) => { value.review = Object.assign({}, value.review, { decision: 'unknown' }) },
+  (value: Record<string, unknown>) => { value.changedAfterMigration = null },
+])('磁盘人工核验元数据缺项或损坏必须拒绝：%#', async (mutate) => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-09-22T15:59:59Z'))
   const state = await reviewedExpiringSupplier()
@@ -274,18 +278,12 @@ it('磁盘人工核验元数据缺项或损坏必须拒绝，不能补空并覆�
     const before = await state.storage.select('SELECT * FROM suppliers')
     const row = (await state.storage.select<{ metadata_json: string }>('SELECT metadata_json FROM supplier_credential_scopes'))[0]!
     const metadata = JSON.parse(row.metadata_json)
-    for (const mutate of [
-      (value: Record<string, unknown>) => { delete value.review },
-      (value: Record<string, unknown>) => { value.review = { ...metadata.review, decision: 'unknown' } },
-      (value: Record<string, unknown>) => { value.changedAfterMigration = null },
-    ]) {
-      const broken = structuredClone(metadata)
-      mutate(broken)
-      await state.storage.execute('UPDATE supplier_credential_scopes SET metadata_json=?', [JSON.stringify(broken)])
-      await state.storage.close()
-      await expect(state.service.credentials(state.created.id, session)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
-      expect(await state.storage.select('SELECT * FROM suppliers')).toEqual(before)
-    }
+    const broken = structuredClone(metadata)
+    mutate(broken)
+    await state.storage.execute('UPDATE supplier_credential_scopes SET metadata_json=?', [JSON.stringify(broken)])
+    await state.storage.close()
+    await expect(state.service.credentials(state.created.id, session)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    expect(await state.storage.select('SELECT * FROM suppliers')).toEqual(before)
   }
   finally {
     await state.storage.close()

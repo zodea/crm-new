@@ -23,11 +23,20 @@ describe('中央工资阅读往返', () => {
     expect(new URL(restored!.fullPath, 'https://test.invalid').searchParams.get('dayworkStatus')).toBe('confirmed')
   })
   it('非法来源与重复项目不回默认；外部、写态及跨来源返回拒绝', () => {
+    expect(inspectRestorableTabPath('/subcontract/payroll/new?origin=real')).toBeNull()
+  })
+
+  it.each([
+    { case: '{ origin: \'invalid\' }', input: { origin: 'invalid' }, expected: '' },
+    { case: '{ project: [\'a\', \'b\'] }', input: { project: ['a', 'b'] }, expected: '' },
+  ])('非法来源与重复项目不回默认；外部、写态及跨来源返回拒绝 / payrollViewScope：$case', ({ input, expected }) => {
+    expect(payrollViewScope(input).error).not.toBe(expected)
+  })
+
+  it.each(Array.from(['//evil.invalid', '/subcontract/payroll/new?origin=real', '/subcontract/payroll/wage-a?origin=demo']).map(input => ({ input })))('非法来源与重复项目不回默认；外部、写态及跨来源返回拒绝：输入组合 1 案例 %#', ({ input: path }) => {
     expect(payrollViewScope({ origin: 'invalid' }).error).not.toBe('')
     expect(payrollViewScope({ project: ['a', 'b'] }).error).not.toBe('')
-    for (const path of ['//evil.invalid', '/subcontract/payroll/new?origin=real', '/subcontract/payroll/wage-a?origin=demo'])
-      expect(payrollReturnTo(path, 'real')).toBeNull()
-    expect(inspectRestorableTabPath('/subcontract/payroll/new?origin=real')).toBeNull()
+    expect(payrollReturnTo(path, 'real')).toBeNull()
   })
   it('非法工资状态按现行规则恢复全部，不污染签工确认状态', () => {
     const parsed = payrollViewScope({ origin: 'real', status: 'confirmed', dayworkStatus: 'confirmed' })

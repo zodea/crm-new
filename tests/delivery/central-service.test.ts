@@ -143,19 +143,17 @@ describe('送货原件与修订中央公开行为', () => {
     expect(service.execute(archive(), session).version).toBe('1')
   })
 
-  it('测试会话、workspace、origin和当前权限均不可借同名或共享资产绕过', () => {
+  it.each((['delivery:read', 'project:list:read', 'supplier:list:read']).map(input => ({ input })))('测试会话、workspace、origin和当前权限均不可借同名或共享资产绕过：输入案例 %#', ({ input: removed }) => {
     const { service } = setup()
     const first = service.execute(archive(), session, 'test-one')
     const assetId = service.detail(first.id, session, 'test-one').assetId!
     expect(() => service.detail(first.id, session, 'test-two')).toThrow('不存在')
     expect(() => service.detail(first.id, { ...session, workspaceId: 'workspace-two' }, 'test-one')).toThrow('不存在')
     expect(() => service.execute({ ...archive(), origin: 'demo' }, session)).toThrow('来源')
-    for (const removed of ['delivery:read', 'project:list:read', 'supplier:list:read']) {
-      const denied = { ...session, capabilities: session.capabilities.filter(cap => cap !== removed) }
-      expect(() => service.fileContent(first.id, assetId, denied, 'test-one')).toThrow('权限')
-      expect(() => service.history(first.id, denied, 'test-one')).toThrow('权限')
-      expect(() => service.list(denied, 'test-one')).toThrow('权限')
-    }
+    const denied = { ...session, capabilities: session.capabilities.filter(cap => cap !== removed) }
+    expect(() => service.fileContent(first.id, assetId, denied, 'test-one')).toThrow('权限')
+    expect(() => service.history(first.id, denied, 'test-one')).toThrow('权限')
+    expect(() => service.list(denied, 'test-one')).toThrow('权限')
   })
 
   it('归档后祖先消失或换来源，正文、历史与新写入都重验当前关系', () => {

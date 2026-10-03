@@ -92,6 +92,19 @@ const detail: ProjectDetailReadDTO = {
 const get = vi.fn()
 const ownerList = vi.fn()
 
+// 独立列出当前已接管商务种类；新增／丢失卡片必须重新核对领域职责。
+const OWNER_CARD_FIXTURE = [
+  { kind: 'owner_change', label: '甲方变洽签' },
+  { kind: 'owner_report', label: '月度报量' },
+  { kind: 'acceptance', variant: 'acceptance', label: '竣工验收' },
+  { kind: 'acceptance', variant: 'warranty', label: '保修管理' },
+  { kind: 'final_settlement', label: '最终结算' },
+  { kind: 'owner_penalty', label: '甲方罚扣' },
+  { kind: 'project_penalty', label: '项目罚扣' },
+  { kind: 'sub_settlement', label: '分包结算' },
+  { kind: 'sub_change', label: '分包变洽签' },
+] as const
+
 function ownerPage(total = 0) {
   return {
     items: [],
@@ -280,13 +293,20 @@ describe('项目详情中央来源边界', () => {
 
     for (const request of pending.filter(entry => entry.projectId === 'project-2'))
       request.resolve(ownerPage(2))
-    await screen.findAllByText('2')
+    await screen.findByRole('link', { name: /分包变洽签.*2/ })
     for (const request of pending.filter(entry => entry.projectId === 'project-1'))
       request.resolve(ownerPage(9))
     await Promise.resolve()
 
     expect(screen.queryByText('9')).toBeNull()
-    expect(screen.getAllByText('2')).toHaveLength(9)
+    const cards = within(screen.getByRole('region', { name: '项目商务单据' })).getAllByRole('link')
+    expect(cards.map(card => OWNER_CARD_FIXTURE.find(entry => within(card).queryByText(entry.label, { exact: true }))?.label).sort())
+      .toEqual(OWNER_CARD_FIXTURE.map(card => card.label).sort())
+    for (const card of cards)
+      expect(within(card).getByText('2', { exact: true })).not.toBeNull()
+    expect(ownerList.mock.calls.filter(([query]) => query.projectId === 'project-2').map(([query]) => `${query.kind}:${query.variant ?? ''}`).sort())
+      .toEqual(OWNER_CARD_FIXTURE.map(card => `${card.kind}:${'variant' in card ? card.variant : ''}`).sort())
+    expect(screen.getByRole('heading', { name: 'project-2' })).not.toBeNull()
   })
 
   it('正式项目按同一 canonical 来源提供甲方六类单据及分包变洽签、结算入口', async () => {

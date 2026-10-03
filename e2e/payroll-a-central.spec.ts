@@ -38,7 +38,33 @@ async function capture(page: Page, info: TestInfo, name: string, selector?: stri
         await expect.poll(() => scroller.evaluate(node => node.scrollLeft)).toBeGreaterThan(0)
     }
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+    const workspaceOverflow = await page.locator('.shell-workspace').evaluate((workspace) => {
+      const bounds = workspace.getBoundingClientRect()
+      return {
+        clientWidth: workspace.clientWidth,
+        scrollWidth: workspace.scrollWidth,
+        bounds: { left: bounds.left, right: bounds.right, width: bounds.width },
+        nodes: Array.from(workspace.querySelectorAll<HTMLElement>('*')).flatMap((node) => {
+          const rect = node.getBoundingClientRect()
+          return rect.right > bounds.right + 1 || node.scrollWidth > node.clientWidth + 1
+            ? [{ tag: node.tagName, className: node.className, text: node.textContent?.slice(0, 60), left: rect.left, right: rect.right, width: rect.width, clientWidth: node.clientWidth, scrollWidth: node.scrollWidth }]
+            : []
+        }),
+      }
+    })
+    if (workspaceOverflow.scrollWidth > workspaceOverflow.clientWidth)
+      await writeFile(info.outputPath(`${name}-${width}-overflow.json`), JSON.stringify({ url: page.url(), ...workspaceOverflow }, null, 2))
     await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+    const rounding = page.getByRole('region', { name: 'A 工资发放取整', exact: true })
+    if (await rounding.isVisible()) {
+      await expect.poll(() => rounding.evaluate((section) => {
+        const bounds = section.getBoundingClientRect()
+        return Array.from(section.children).every((child) => {
+          const rect = child.getBoundingClientRect()
+          return rect.left >= bounds.left && rect.right <= bounds.right
+        })
+      })).toBe(true)
+    }
     const sourceCard = page.locator('#section-source:visible')
     if (await sourceCard.count()) {
       const sourceBounds = await sourceCard.evaluate((card) => {
@@ -78,9 +104,11 @@ async function fixture(page: Page, info: TestInfo) {
   const { source, snapshotSha256, byteLength } = prepared
   const session = await (await page.request.get('/api/read/business-session')).json()
   const envelope = () => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId: randomUUID(), requiredCapability: 'core:migration:write' })
+  const reset = await page.request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
+  expect(reset.ok(), await reset.text()).toBe(true)
   const preflight = await page.request.post('/api/migrations/core/preflight', { data: { ...envelope(), source, backup: null } })
   expect(preflight.ok(), await preflight.text()).toBe(true)
-  const dry = await page.request.post('/api/migrations/core/dry-run', { data: { ...envelope(), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: new Date().toISOString(), immutable: true } } })
+  const dry = await page.request.post('/api/migrations/core/dry-run', { data: { ...envelope(), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } } })
   expect(dry.ok(), await dry.text()).toBe(true)
   const batch: CoreMigrationBatchDTO = await dry.json()
   await writeFile(info.outputPath('migration-batch.json'), JSON.stringify(batch, null, 2))

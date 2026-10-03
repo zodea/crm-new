@@ -23,18 +23,20 @@ beforeEach(async () => {
 })
 afterEach(() => memory.close())
 
-it('验收照片的编码、实际长度及图片类型都要验证，拒绝伪造元数据', () => {
+it.each(([{ ...photo, fileSize: 4 }, { ...photo, contentBase64: 'AQI=' }, { ...photo, contentBase64: 'AQI#' }, { ...photo, mimeType: 'text/html' }]).map(input => ({ input })))('验收照片的编码、实际长度及图片类型都要验证，拒绝伪造元数据：输入案例 %#', ({ input: invalid }) => {
   expect(validateQuantityPhoto(photo)).toEqual(new Uint8Array([1, 2, 3]))
-  for (const invalid of [{ ...photo, fileSize: 4 }, { ...photo, contentBase64: 'AQI=' }, { ...photo, contentBase64: 'AQI#' }, { ...photo, mimeType: 'text/html' }])
-    expect(() => validateQuantityPhoto(invalid)).toThrow()
+  expect(() => validateQuantityPhoto(invalid)).toThrow()
 })
 
 it('照片只按当前项目、户和阶段完成的稳定身份返回，并给出可独立校验的 SHA-256', async () => {
   expect(await readQuantityCentralPhoto(memory, query)).toMatchObject({ ...query, ...photo, sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81' })
-  for (const wrong of [{ ...query, projectId: 'other' }, { ...query, unitId: 'other-unit' }, { ...query, completionId: 'other-done' }])
-    await expect(readQuantityCentralPhoto(memory, wrong)).rejects.toMatchObject({ problem: { code: 'not-found' } })
   await memory.execute('UPDATE buildings SET deleted_at = \'2026-09-11\' WHERE id = \'building\'')
   await expect(readQuantityCentralPhoto(memory, query)).rejects.toMatchObject({ problem: { code: 'not-found' } })
+})
+
+it.each(Array.from([{ ...query, projectId: 'other' }, { ...query, unitId: 'other-unit' }, { ...query, completionId: 'other-done' }]).map(input => ({ input })))('照片只按当前项目、户和阶段完成的稳定身份返回，并给出可独立校验的 SHA-256：输入组合 1 案例 %#', async ({ input: wrong }) => {
+  expect(await readQuantityCentralPhoto(memory, query)).toMatchObject({ ...query, ...photo, sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81' })
+  await expect(readQuantityCentralPhoto(memory, wrong)).rejects.toMatchObject({ problem: { code: 'not-found' } })
 })
 
 it('历史照片没有正文或保存后长度不符时明确拒绝，不能把文件名伪装为可预览原件', async () => {

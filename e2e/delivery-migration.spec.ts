@@ -7,6 +7,8 @@ import process from 'node:process'
 import { promisify } from 'node:util'
 import { expect, test } from '@playwright/test'
 
+const BACKUP_INPUT = { createdAt: '2026-09-15T00:00:00.000Z' }
+
 test('真实 SQLite 送货头行原件打印与历史通过 HTTP 迁移、重试和回滚', async ({ request }, info) => {
   test.setTimeout(120_000)
   const reset = await request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
@@ -19,7 +21,7 @@ test('真实 SQLite 送货头行原件打印与历史通过 HTTP 迁移、重试
     const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId, requiredCapability: 'core:migration:write' })
     const preflight = await request.post('/api/migrations/core/preflight', { data: { ...envelope('delivery-http-preflight'), source, backup: null } })
     expect(preflight.ok(), await preflight.text()).toBe(true)
-    const dry = await request.post('/api/migrations/core/dry-run', { data: { ...envelope('delivery-http-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: new Date().toISOString(), immutable: true } } })
+    const dry = await request.post('/api/migrations/core/dry-run', { data: { ...envelope('delivery-http-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: BACKUP_INPUT.createdAt, immutable: true } } })
     expect(dry.ok(), await dry.text()).toBe(true)
     const batch = await dry.json()
     expect(batch.issues).toContainEqual(expect.objectContaining({ entityType: 'delivery_records', metricKey: 'missing-original' }))

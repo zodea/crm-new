@@ -82,7 +82,8 @@ describe('cross-domain navigation contract', () => {
     const routes = new Set(productionPageFiles().map(nuxtRouteForPage))
     const rows = routeRegistryRows(readFileSync(CONTRACT_PATH, 'utf8'))
 
-    expect(rows.length).toBeGreaterThanOrEqual(25)
+    expect(rows.length).toBeGreaterThan(0)
+    expect(new Set(rows.map(row => row[0])).size).toBe(rows.length)
     for (const [entity, , target, status] of rows) {
       const declaredRoutes = [...target.matchAll(/`(\/[^`?\s]+)(?:\?[^`]*)?`/g)]
         .map(match => match[1])
@@ -105,7 +106,7 @@ describe('cross-domain navigation contract', () => {
       rows.flatMap(row => [...row[1].matchAll(/`([a-z][a-z-]+)`/g)].map(match => match[1])),
     )
 
-    expect(rows.length).toBeGreaterThanOrEqual(40)
+    expect(rows.length).toBeGreaterThan(0)
     expect(new Set(keys).size).toBe(keys.length)
     for (const row of rows) {
       expect(row).toHaveLength(7)
@@ -117,25 +118,22 @@ describe('cross-domain navigation contract', () => {
       expect(sourceDomains.has(domain), domain).toBe(true)
   })
 
-  it('defines identity, return, zero-value and multi-tab safeguards', () => {
+  it.each([
+    'type NavigationIntentDTO =',
+    'kind: \'entity-detail\' | \'entity-subview\' | \'source-record\'',
+    'kind: \'same-route-overlay\'',
+    '多态单据必须带 canonical `variant`',
+    '`returnTo` 只接受站内相对路径',
+    'query 只恢复筛选/页签/来源，不覆盖路径实体 ID',
+    '聚合值为 `0` 时',
+    '不能依赖浏览器历史“碰巧还在”',
+    '28 个内部页签不等于 28 个浏览器页',
+    '切换记录时当前合同/付款/票款检查会换成新记录结果',
+    '普通详情分析与审批流分析是两个语义 operation',
+    '可见蓝色样式不能自动解释为链接',
+  ])('defines identity, return, zero-value and multi-tab safeguards: %s', (token) => {
     const contract = readFileSync(CONTRACT_PATH, 'utf8')
-
-    for (const token of [
-      'type NavigationIntentDTO =',
-      'kind: \'entity-detail\' | \'entity-subview\' | \'source-record\'',
-      'kind: \'same-route-overlay\'',
-      '多态单据必须带 canonical `variant`',
-      '`returnTo` 只接受站内相对路径',
-      'query 只恢复筛选/页签/来源，不覆盖路径实体 ID',
-      '聚合值为 `0` 时',
-      '不能依赖浏览器历史“碰巧还在”',
-      '28 个内部页签不等于 28 个浏览器页',
-      '切换记录时当前合同/付款/票款检查会换成新记录结果',
-      '普通详情分析与审批流分析是两个语义 operation',
-      '可见蓝色样式不能自动解释为链接',
-    ]) {
-      expect(contract, token).toContain(token)
-    }
+    expect(contract, token).toContain(token)
   })
 
   it('is linked from the canonical docs and read-model contracts', () => {

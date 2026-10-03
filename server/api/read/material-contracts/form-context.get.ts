@@ -3,6 +3,8 @@ import { materialContractCommandTestInstance } from '../../../utils/material-con
 
 export default defineEventHandler((event) => {
   const session = resolveBusinessSession()
+  if (!session.capabilities.includes('material-contract:write'))
+    throw createError({ statusCode: 403, statusMessage: '无材料采购合同写入权限' })
   const sessionId = getHeader(event, 'x-ruihang-test-session')
   const context = materialContractCommandTestInstance.formContext(sessionId)
   return {
@@ -10,6 +12,6 @@ export default defineEventHandler((event) => {
     actorId: session.actorId,
     capabilities: [...session.capabilities],
     projects: context.projects.map(row => ({ id: row.id, label: row.name })),
-    suppliers: context.suppliers.map(row => ({ id: row.id, label: row.name })),
+    suppliers: context.suppliers.map(row => ({ id: row.id, label: row.name, contactName: row.contact ?? '', contactPhone: row.contactPhone ?? '' })),
   }
 })

@@ -1,4 +1,5 @@
 import type { CrewFormDraft } from '~/lib/master-data/forms'
+import { fireEvent, within } from '@testing-library/vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
@@ -60,7 +61,10 @@ describe('班组表单领域字段', () => {
     expect(wrapper.get('input[data-field="mgmtFeePrice"]').attributes('disabled')).toBeDefined()
   })
 
-  it('勾选补贴和提成后开放对应单价字段', async () => {
+  it.each([
+    { label: '房租补贴', field: 'rentSubsidyPrice', other: 'mgmtFeePrice' },
+    { label: '管理提成', field: 'mgmtFeePrice', other: 'rentSubsidyPrice' },
+  ])('勾选 $label 只开放对应单价字段', async ({ label, field, other }) => {
     const wrapper = mount(CrewFormFields, {
       props: {
         modelValue: draft(),
@@ -74,11 +78,8 @@ describe('班组表单领域字段', () => {
       },
     })
 
-    const toggles = wrapper.findAll('input[type="checkbox"]')
-    await toggles[0]!.setValue(true)
-    await toggles[1]!.setValue(true)
-
-    expect(wrapper.get('input[data-field="rentSubsidyPrice"]').attributes('disabled')).toBeUndefined()
-    expect(wrapper.get('input[data-field="mgmtFeePrice"]').attributes('disabled')).toBeUndefined()
+    await fireEvent.update(within(wrapper.element as HTMLElement).getByRole('checkbox', { name: new RegExp(`^${label}`) }), true)
+    expect(wrapper.get(`input[data-field="${field}"]`).attributes('disabled')).toBeUndefined()
+    expect(wrapper.get(`input[data-field="${other}"]`).attributes('disabled')).toBeDefined()
   })
 })

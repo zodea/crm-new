@@ -2,6 +2,7 @@ import type { RestorableTabPath, TabRestoreValidator } from './restoration-contr
 import type { PayrollSourceKind } from '~/lib/payroll/a-navigation'
 import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO } from '~/types/read-model'
+import { validateMaterialContractDetailJourneyReturnTo, validateProjectJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { PAYROLL_A_CONFIG_PATH, PAYROLL_SOURCE_KEYS, payrollSourceContext } from '~/lib/payroll/a-navigation'
 import { PAYROLL_C1_SOURCE_KEYS, payrollC1SourceContext } from '~/lib/payroll/c1-navigation'
 import { PAYROLL_C2_SOURCE_KEYS, payrollC2SourceContext } from '~/lib/payroll/c2-navigation'
@@ -161,6 +162,38 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
+    const projectJourneyKeys = ['materialJourney', 'ownerJourney']
+    if (projectJourneyKeys.some(key => url.searchParams.has(key))) {
+      if (detail?.family !== 'project'
+        || projectJourneyKeys.some(key => url.searchParams.getAll(key).length > 1)
+        || !validateProjectJourneyReturnTo(fullPath, origin)) {
+        return null
+      }
+      projectJourneyKeys.forEach(key => allowed.add(key))
+    }
+    if (url.searchParams.has('supplierFactJourney')) {
+      if (detail?.family !== 'contract'
+        || url.searchParams.getAll('supplierFactJourney').length !== 1
+        || !validateMaterialContractDetailJourneyReturnTo(fullPath, origin)) {
+        return null
+      }
+      allowed.add('supplierFactJourney')
+    }
+    if (url.searchParams.has('fact') || url.searchParams.has('sourceTrail')) {
+      const fact = url.searchParams.get('fact')
+      const trail = url.searchParams.has('sourceTrail') ? url.searchParams.get('sourceTrail')!.split(',') : []
+      if (detail?.family !== 'other-settlement'
+        || url.searchParams.getAll('fact').length !== 1
+        || !isStableRouteIdentity(fact)
+        || !['penalty', 'application', 'payment'].includes(url.searchParams.get('tab') ?? '')
+        || url.searchParams.getAll('sourceTrail').length > 1
+        || trail.length > 4
+        || !trail.every(isStableRouteIdentity)) {
+        return null
+      }
+      allowed.add('fact')
+      allowed.add('sourceTrail')
+    }
     if (detail?.family === 'payroll-numbering') {
       if (originValue !== 'real' || url.searchParams.getAll('project').length !== 1 || !isStableRouteIdentity(url.searchParams.get('project')))
         return null

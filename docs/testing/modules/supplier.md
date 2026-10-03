@@ -66,20 +66,20 @@
 | [e2e/production-supplier-storage.spec.ts](../../../e2e/production-supplier-storage.spec.ts) | Playwright E2E | 分供方主档、证照原件与人工核验失响应后独立重启，以原键恢复且不重复提交 |
 | [e2e/supplier-credential-ocr-central.spec.ts](../../../e2e/supplier-credential-ocr-central.spec.ts) | Playwright E2E | 授权合成原件识别失败重试、稍后冷读、税号矛盾和陈旧确认保选择、重新识别保留确认 |
 | [e2e/supplier-credentials-central.spec.ts](../../../e2e/supplier-credentials-central.spec.ts) | Playwright E2E | 真实旧库完整图迁入、历史凭证回读、同原件撤回与缺正文不冒充齐全 |
-| [e2e/supplier-crud.spec.ts](../../../e2e/supplier-crud.spec.ts) | Playwright E2E | 分供方 CRUD：新增编辑、详情双页联动、页签复用与 simple 删除撤回 |
+| [e2e/supplier-crud.spec.ts](../../../e2e/supplier-crud.spec.ts) | Playwright E2E | 两类正式分供方新建、显式编辑、冷回读与页签复用；中央行菜单仅提供只读入口，旧本地删除由数据库及通用主数据测试覆盖 |
 | [e2e/supplier-detail.spec.ts](../../../e2e/supplier-detail.spec.ts) | Playwright E2E | 分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双页联动 |
-| [e2e/supplier-export.spec.ts](../../../e2e/supplier-export.spec.ts) | Playwright E2E | 分供方单文件导出：当前筛选行生成真实 xlsx 并走浏览器下载降级 |
+| [e2e/supplier-export.spec.ts](../../../e2e/supplier-export.spec.ts) | Playwright E2E | 两类正式主档 × 五档视口核对中央导出尚未接入的边界；实际 XLSX 内容和分类目录由 supplier/export 参数表覆盖 |
 | [e2e/supplier-import.spec.ts](../../../e2e/supplier-import.spec.ts) | Playwright E2E | 中央导入：信用代码和唯一识别码独立映射，同外部旧 ID 重导更新并保留未映射资料 |
 | [e2e/supplier-list-replica.spec.ts](../../../e2e/supplier-list-replica.spec.ts) | Playwright E2E | ${width}px：完整列、紧凑标签、表格内滚动及可访问工具 |
 | [e2e/supplier-multifilter.spec.ts](../../../e2e/supplier-multifilter.spec.ts) | Playwright E2E | ${width}px 固定枚举复选与表头联动，返回链接保留组合且清空恢复全量 |
-| [e2e/supplier-reference-layout.spec.ts](../../../e2e/supplier-reference-layout.spec.ts) | Playwright E2E | Issue #193/#206：分供方直接参考布局 |
+| [e2e/supplier-reference-layout.spec.ts](../../../e2e/supplier-reference-layout.spec.ts) | Playwright E2E | Issue #193/#206：两类正式主档、脱敏、局部滚动、类别选择及独立证照入口 |
 
 ## 辅助文件与配置（非独立测试）
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/helpers/supplier-credential-migration-source.ts](../../../e2e/helpers/supplier-credential-migration-source.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
-| [e2e/helpers/synthetic-credential-ocr.ts](../../../e2e/helpers/synthetic-credential-ocr.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
+| [e2e/helpers/synthetic-credential-ocr.ts](../../../e2e/helpers/synthetic-credential-ocr.ts) | 辅助／夹具 | worker 内持有独立 Nuxt 与回环合成 OCR，显式合成配置和同盘隔离构建目录，结束清理两类服务；不依赖日常 OCR 配置 |
 | [tests/helpers/production-supplier-process.ts](../../../tests/helpers/production-supplier-process.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/production-supplier-server.ts](../../../tests/helpers/production-supplier-server.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/supplier/credential-ui-fixtures.ts](../../../tests/supplier/credential-ui-fixtures.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |

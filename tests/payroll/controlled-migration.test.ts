@@ -17,7 +17,7 @@ const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, act
 async function prepare(source: CoreMigrationSourceDTO) {
   await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('pay-preflight'), source, backup: null }), session)
   const hash = 'e'.repeat(64)
-  return coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('pay-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 412, createdAt: new Date().toISOString(), immutable: true } }), session)
+  return coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('pay-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 412, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
 }
 async function confirm(source: CoreMigrationSourceDTO) {
   const batch = await prepare(source)

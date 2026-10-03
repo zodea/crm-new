@@ -46,8 +46,13 @@ describe('发票打印排版', () => {
     expect(initial).toEqual({ 'inv-1': 270, 'inv-2': 90, 'inv-3': 0 })
     expect(single).toEqual({ 'inv-1': 0, 'inv-2': 90, 'inv-3': 0 })
     expect(page).toEqual({ 'inv-1': 90, 'inv-2': 180, 'inv-3': 0 })
-    expect(normalizePrintRotation(-90)).toBe(270)
-    expect(normalizePrintRotation(450)).toBe(90)
+  })
+
+  it.each([
+    { case: '-90', input: -90, expected: 270 },
+    { case: '450', input: 450, expected: 90 },
+  ])('单张与整页旋转都按 90° 归一且不修改旧状态 / normalizePrintRotation：$case', ({ input, expected }) => {
+    expect(normalizePrintRotation(input)).toBe(expected)
   })
 
   it('#257 打印队列只接收识别完成、人工确认且未重复排除的当前值', () => {

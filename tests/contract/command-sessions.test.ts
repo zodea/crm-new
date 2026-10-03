@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { f2FormDefaults } from '~/lib/contract/page'
+import { contractSupplierSelectionPatch, f2FormDefaults } from '~/lib/contract/page'
 import { useConstructionContractCommandStore } from '~/stores/construction-contract-command'
 import { useMaterialContractCommandStore } from '~/stores/material-contract-command'
 import { useSubcontractContractCommandStore } from '~/stores/subcontract-contract-command'
@@ -13,6 +13,28 @@ const cases = [
 
 beforeEach(() => setActivePinia(createPinia()))
 afterEach(() => vi.unstubAllGlobals())
+
+describe('合同选择分供方', () => {
+  const suppliers = [
+    { id: 'a', label: '分供方 A', contactName: '张先生', contactPhone: '13800000001' },
+    { id: 'b', label: '分供方 B', contactName: '', contactPhone: '' },
+  ]
+
+  it.each([
+    { case: '{ supplierId: null } / { supplierId: \'a\' } / suppliers', input: { supplierId: null }, argument2: { supplierId: 'a' }, argument3: suppliers, expected: { supplierId: 'a', contactName: '张先生', contactPhone: '13800000001' } },
+    { case: '{ supplierId: \'a\', contactName: \'手填\', contactPhone: \'自定\' } / { supplierId: \'b\' } / suppliers', input: { supplierId: 'a', contactName: '手填', contactPhone: '自定' }, argument2: { supplierId: 'b' }, argument3: suppliers, expected: { supplierId: 'b', contactName: '', contactPhone: '' } },
+  ])('首次或改选带出主档联系资料，覆盖手填值；缺值清空旧资料 / contractSupplierSelectionPatch：$case', ({ input, argument2, argument3, expected }) => {
+    expect(contractSupplierSelectionPatch(input, argument2, argument3)).toEqual(expected)
+  })
+
+  it.each([
+    { case: '{ supplierId: \'a\', contactName: \'手填\' } / { supplierId: \'a\' } / suppliers', input: { supplierId: 'a', contactName: '手填' }, argument2: { supplierId: 'a' }, argument3: suppliers, expected: { supplierId: 'a' } },
+    { case: '{ supplierId: \'a\' } / { contactName: \'合同联系人\' } / suppliers', input: { supplierId: 'a' }, argument2: { contactName: '合同联系人' }, argument3: suppliers, expected: { contactName: '合同联系人' } },
+    { case: '{ isSupplement: true, supplierId: \'a\' } / { supplierId: \'b\' } / suppliers', input: { isSupplement: true, supplierId: 'a' }, argument2: { supplierId: 'b' }, argument3: suppliers, expected: { supplierId: 'b' } },
+  ])('相同分供方、其他字段编辑和补充协议不触发资料覆盖 / contractSupplierSelectionPatch：$case', ({ input, argument2, argument3, expected }) => {
+    expect(contractSupplierSelectionPatch(input, argument2, argument3)).toEqual(expected)
+  })
+})
 
 describe.each(cases)('%s 合同表单会话', (kind, useStore) => {
   it('失败重试复用命令身份，保存并新建后不会沿用刚保存的记录', async () => {

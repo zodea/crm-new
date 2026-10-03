@@ -51,7 +51,7 @@ describe('project detail data-origin boundary', () => {
     })
   })
 
-  it('真实零合同仍返回可达列表；未知或禁止不伪装为零', () => {
+  describe('真实零合同仍返回可达列表；未知或禁止不伪装为零', () => {
     const demo = PROJECT_READ_FIXTURE[0]!
     const read = (
       materialContractCount: number | null,
@@ -64,21 +64,29 @@ describe('project detail data-origin boundary', () => {
       materialContractCount,
       materialContractAccess,
     })
+    it.each([
+      { case: '0', input: 0, argument2: undefined, expected: {
+        count: { value: 0, status: 'complete', drilldown: { entity: 'contract' } },
+        navigation: { kind: 'entity-list' },
+      } },
+      { case: 'null', input: null, argument2: undefined, expected: {
+        count: { value: null, status: 'pending', drilldown: null },
+        navigation: { kind: 'unavailable', reason: 'not-connected' },
+      } },
+      { case: 'null / \'forbidden\'', input: null, argument2: 'forbidden', expected: {
+        count: { value: null, status: 'pending', drilldown: null },
+        navigation: { kind: 'unavailable', reason: 'forbidden' },
+      } },
+    ])('read：$case', ({ input, argument2, expected }) => {
+      expect(read(structuredClone(input), structuredClone(argument2)).materialContracts).toMatchObject(expected)
+    })
 
-    expect(read(0).materialContracts).toMatchObject({
-      count: { value: 0, status: 'complete', drilldown: { entity: 'contract' } },
-      navigation: { kind: 'entity-list' },
+    it.each([
+      { case: 'null / \'missing\'', input: null, argument2: 'missing', expected: { kind: 'unavailable', reason: 'missing-id' } },
+      { case: 'null / \'error\'', input: null, argument2: 'error', expected: { kind: 'unavailable', reason: 'error' } },
+    ])('read：$case', ({ input, argument2, expected }) => {
+      expect(read(structuredClone(input), structuredClone(argument2)).materialContracts.navigation).toEqual(expected)
     })
-    expect(read(null).materialContracts).toMatchObject({
-      count: { value: null, status: 'pending', drilldown: null },
-      navigation: { kind: 'unavailable', reason: 'not-connected' },
-    })
-    expect(read(null, 'forbidden').materialContracts).toMatchObject({
-      count: { value: null, status: 'pending', drilldown: null },
-      navigation: { kind: 'unavailable', reason: 'forbidden' },
-    })
-    expect(read(null, 'missing').materialContracts.navigation).toEqual({ kind: 'unavailable', reason: 'missing-id' })
-    expect(read(null, 'error').materialContracts.navigation).toEqual({ kind: 'unavailable', reason: 'error' })
   })
 
   it('does not let a missing or forged origin relabel a demo record as production', async () => {
@@ -138,7 +146,7 @@ describe('project detail data-origin boundary', () => {
     expect(JSON.stringify(detail.projectSuppliers)).not.toContain('sup_demo_')
   })
 
-  it('同一 ID 的正式与演示项目按复合身份分别读取', () => {
+  describe('同一 ID 的正式与演示项目按复合身份分别读取', () => {
     const demo = PROJECT_READ_FIXTURE[0]!
     const rows = [
       demo,
@@ -150,14 +158,17 @@ describe('project detail data-origin boundary', () => {
       asOf: '2026-08-15T00:00:00.000Z',
       sourceVersion: 'same-id-fixture-v1',
     })
-
-    expect(read('real').item).toMatchObject({
-      dataOrigin: 'real',
-      project: { id: demo.id, label: '正式同 ID 项目' },
-    })
-    expect(read('demo').item).toMatchObject({
-      dataOrigin: 'demo',
-      project: { id: demo.id, label: demo.name },
+    it.each([
+      { case: '\'real\'', input: 'real', expected: {
+        dataOrigin: 'real',
+        project: { id: demo.id, label: '正式同 ID 项目' },
+      } },
+      { case: '\'demo\'', input: 'demo', expected: {
+        dataOrigin: 'demo',
+        project: { id: demo.id, label: demo.name },
+      } },
+    ])('read：$case', ({ input, expected }) => {
+      expect(read(structuredClone(input)).item).toMatchObject(expected)
     })
   })
 })

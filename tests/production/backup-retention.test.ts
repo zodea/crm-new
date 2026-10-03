@@ -6,7 +6,7 @@ import { createLocalBackup } from '../../server/utils/production-backup-package'
 import { pruneProductionBackups } from '../../server/utils/production-backup-retention'
 import { createProductionStorage } from '../../server/utils/production-storage'
 
-it('只清理有成功回执且完整的到期包，保留最后成功/基线及混入未知文件的包', async () => {
+it.each(Array.from([0, 1, 3]).map(input1 => ({ input1 })))('只清理有成功回执且完整的到期包，保留最后成功/基线及混入未知文件的包：输入案例 %#', async ({ input1: index }) => {
   const base = resolve('.codex-tmp/issue-451-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/retention-`)
@@ -27,7 +27,8 @@ it('只清理有成功回执且完整的到期包，保留最后成功/基线及
     expect(result.removed).toEqual([packages[2]!.id])
     expect(result.skipped).toEqual([packages[1]!.id])
     await expect(access(join(target, packages[2]!.id))).rejects.toThrow()
-    for (const index of [0, 1, 3]) expect((await readFile(join(target, packages[index]!.id, 'data.sqlite'))).length).toBeGreaterThan(0)
+
+    expect((await readFile(join(target, packages[index]!.id, 'data.sqlite'))).length).toBeGreaterThan(0)
     expect(await readFile(join(target, packages[1]!.id, 'unclassified.txt'), 'utf8')).toBe('keep this file')
   }
   finally { await storage.close() }

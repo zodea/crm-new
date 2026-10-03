@@ -16,13 +16,18 @@ function setup() {
 }
 it('私密资料与名册冷恢复只保存阅读身份并拒绝演示或缺来源', async () => {
   expect(inspectRestorableTabPath(`${workerPath}&idCard=secret&draft=private`)).toEqual({ fullPath: workerPath, origin: 'real' })
-  expect(inspectRestorableTabPath(workerPath.replace('?origin=real', ''))).toBeNull()
-  expect(inspectRestorableTabPath(rosterPath.replace('origin=real', 'origin=demo'))).toBeNull()
   const f = setup()
   expect(await f.restore(f.descriptor(workerPath))).toMatchObject({ state: 'resolved', fullPath: workerPath, title: '工人私密资料', sourceVersion: 'private-current' })
   expect(f.profile).toHaveBeenCalledWith('worker-one')
   expect(await f.restore(f.descriptor(rosterPath))).toMatchObject({ state: 'resolved', fullPath: rosterPath })
   expect(f.archives).toHaveBeenCalledWith('project-one')
+})
+
+it.each([
+  { case: 'workerPath.replace(\'?origin=real\', \'\')', input: workerPath.replace('?origin=real', '') },
+  { case: 'rosterPath.replace(\'origin=real\', \'origin=demo\')', input: rosterPath.replace('origin=real', 'origin=demo') },
+])('私密资料与名册冷恢复只保存阅读身份并拒绝演示或缺来源 / inspectRestorableTabPath：$case', ({ input }) => {
+  expect(inspectRestorableTabPath(input)).toBeNull()
 })
 it('恢复私密页面必须从服务重新授权，撤权不能沿旧页签恢复', async () => {
   const f = setup()

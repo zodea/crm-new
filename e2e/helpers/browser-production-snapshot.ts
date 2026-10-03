@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import type { Database } from 'sql.js'
+import { Buffer } from 'node:buffer'
 import path from 'node:path'
 import initSqlJs from 'sql.js'
 
@@ -35,15 +36,15 @@ async function openBrowserDatabase(page: Page): Promise<void> {
 /** Waits for the application to persist its initialized production SQLite snapshot. */
 export async function readProductionSnapshot(page: Page, timeoutMs = 60_000): Promise<number[]> {
   await openBrowserDatabase(page)
-  return page.evaluate(async ({ databaseName, databaseVersion, snapshotStore, timeout }) => {
+  const snapshot = await page.evaluate(async ({ databaseName, databaseVersion, snapshotStore, timeout }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(databaseName, databaseVersion)
       request.addEventListener('success', () => resolve(request.result), { once: true })
       request.addEventListener('error', () => reject(request.error), { once: true })
     })
     try {
-      const deadline = Date.now() + timeout
-      while (Date.now() < deadline) {
+      const deadline = performance.now() + timeout
+      while (performance.now() < deadline) {
         const value = await new Promise<ArrayBuffer | Uint8Array | undefined>((resolve, reject) => {
           const transaction = database.transaction(snapshotStore, 'readonly')
           const request = transaction.objectStore(snapshotStore).get('production')
@@ -55,8 +56,14 @@ export async function readProductionSnapshot(page: Page, timeoutMs = 60_000): Pr
           : value
             ? new Uint8Array(value)
             : null
-        if (bytes?.byteLength)
-          return Array.from(bytes)
+        if (bytes?.byteLength) {
+          // 数百万个数字的协议序列化会超过字段持久化断言的等待时间。
+          // 分块编码完整字节，调用方仍收到同一份 SQLite 快照。
+          const chunks: string[] = []
+          for (let offset = 0; offset < bytes.length; offset += 0x8000)
+            chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)))
+          return btoa(chunks.join(''))
+        }
         await new Promise(resolve => setTimeout(resolve, 50))
       }
       throw new Error(`production 快照未在 ${timeout}ms 内完成初始化`)
@@ -70,6 +77,7 @@ export async function readProductionSnapshot(page: Page, timeoutMs = 60_000): Pr
     snapshotStore: SNAPSHOT_STORE,
     timeout: timeoutMs,
   })
+  return Array.from(Buffer.from(snapshot, 'base64'))
 }
 
 /** Replaces only the isolated browser test's production SQLite snapshot. */

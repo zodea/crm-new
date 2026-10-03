@@ -28,15 +28,15 @@
 | --- | --- | --- |
 | [tests/components/CustomerDetail.test.ts](../../../tests/components/CustomerDetail.test.ts) | 组件（jsdom） | 客户详情展示 |
 | [tests/components/CustomerDetailScreen.test.ts](../../../tests/components/CustomerDetailScreen.test.ts) | 组件（jsdom） | 客户详情业务页签 |
-| [tests/components/CustomerProjectReturnContext.test.ts](../../../tests/components/CustomerProjectReturnContext.test.ts) | 组件（jsdom） | 客户项目返回的稳定来源行 |
+| [tests/components/CustomerProjectReturnContext.test.ts](../../../tests/components/CustomerProjectReturnContext.test.ts) | 组件（jsdom） | 客户关系返回稳定来源行；列表读取未完成时等待、当前行消失时回退当前工具栏 |
 
 ## Playwright E2E
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/customer-construction-contract-central.spec.ts](../../../e2e/customer-construction-contract-central.spec.ts) | Playwright E2E | 关联施工合同：客户端合同来源 |
-| [e2e/customer-detail.spec.ts](../../../e2e/customer-detail.spec.ts) | Playwright E2E | Issue #194：客户详情 |
-| [e2e/customer-project-central.spec.ts](../../../e2e/customer-project-central.spec.ts) | Playwright E2E | 正式项目保存后同一客户详情返回关联身份、数量并往返项目详情 |
-| [e2e/customer-receipt-source.spec.ts](../../../e2e/customer-receipt-source.spec.ts) | Playwright E2E | 中央收款按当前会话读取，源撤回后客户与收款详情都不保留固定样例 |
+| [e2e/customer-construction-contract-central.spec.ts](../../../e2e/customer-construction-contract-central.spec.ts) | Playwright E2E | 两套金额与日期输入的正式合同回读、主次客户隔离及嵌套来源冷恢复；普通截图先验证无焦点和悬停，再执行键盘及返回焦点验收 |
+| [e2e/customer-detail.spec.ts](../../../e2e/customer-detail.spec.ts) | Playwright E2E | 具名演示客户只读关系；项目、施工合同及收款完整来源/返回地址、关系上下文与原链接焦点；四档视口局部横滚及键盘页签 |
+| [e2e/customer-project-central.spec.ts](../../../e2e/customer-project-central.spec.ts) | Playwright E2E | 两套阶段与名称输入的项目保存、真实 Excel、主次客户稳定身份及列表—客户—项目冷刷新返回 |
+| [e2e/customer-receipt-source.spec.ts](../../../e2e/customer-receipt-source.spec.ts) | Playwright E2E | 同会话正式提交普通收款，独立中央源撤回后客户及详情移除原记录；无权/不可用分别隐藏旧金额并保持未知、权限恢复与键盘重试；五档视口保留局部横滚 |
 | [e2e/issue-314-customer-central-chain.spec.ts](../../../e2e/issue-314-customer-central-chain.spec.ts) | Playwright E2E | Issue #314：客户中央列表—详情—显式编辑链 |
 | [e2e/production-customer-storage.spec.ts](../../../e2e/production-customer-storage.spec.ts) | Playwright E2E | 公开客户保存、丢响应、独立进程重启、原件和删除恢复保持一致 |

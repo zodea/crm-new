@@ -33,11 +33,18 @@ it('预算只读恢复保留筛选和来源链，版本头及明细写态不恢�
   expect(new URL(result.fullPath, 'https://ruihang.invalid').searchParams.get('returnTo')).toBe(list)
 })
 
-it('只有五个已接来源列表恢复预算身份，拒绝重复身份与写态来源', () => {
+it.each([
+  { case: '已接来源列表', suffix: '', writePath: false, restorable: true },
+  { case: '重复预算身份', suffix: '&budgetId=b', writePath: false, restorable: false },
+  { case: '明细编辑路径', suffix: '', writePath: true, restorable: false },
+])('预算来源冷恢复拒绝重复身份与写态：$case', ({ suffix, writePath, restorable }) => {
   const result = resolveNavigationTarget({ kind: 'entity-list', entity: 'settlement', variant: 'other_settlement', view: null, filters: { projectId: 'p', dataOrigin: 'real' } }, { returnTo: '/project/target-cost/a?origin=real&tab=comparison' })
   if (result.state !== 'resolved')
     throw new Error('未生成来源')
-  expect(inspectRestorableTabPath(result.to)?.fullPath).toBe(result.to)
-  expect(inspectRestorableTabPath(`${result.to}&budgetId=b`)).toBeNull()
-  expect(inspectRestorableTabPath(result.to.replace('/contract/other-settlement?', '/contract/other-settlement/form?'))).toBeNull()
+  const candidate = `${writePath ? result.to.replace('/contract/other-settlement?', '/contract/other-settlement/form?') : result.to}${suffix}`
+  const restored = inspectRestorableTabPath(candidate)
+  if (restorable)
+    expect(restored?.fullPath).toBe(result.to)
+  else
+    expect(restored).toBeNull()
 })

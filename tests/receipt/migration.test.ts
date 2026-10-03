@@ -104,7 +104,7 @@ describe('普通收款完整受控迁移', () => {
         sourceVersion: source.sourceVersion,
         snapshotSha256: hash,
         byteLength: 436,
-        createdAt: new Date().toISOString(),
+        createdAt: '2026-09-15T00:00:00.000Z',
         immutable: true,
       } }), session)
       await coreMigrationTestInstance.importBatch({ ...envelope('receipt-import'), batchId: batch.batchId }, session)

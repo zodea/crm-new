@@ -94,37 +94,64 @@ describe('迁入编码量身份的工资来源往返', () => {
     expect(restored).not.toBeNull()
     const restoredUrl = new URL(restored!.fullPath, 'https://test.invalid')
     expect(decodeURIComponent(restoredUrl.pathname.split('/').at(-1)!)).toBe(mapped.unitId)
-    for (const key of ['stageId', 'itemId', 'completionId'] as const)
-      expect(restoredUrl.searchParams.get(key)).toBe(mapped[key])
     expect(restoredUrl.searchParams.get('payrollReturnTo')).toBe(back)
     expect(payrollSourceContext(Object.fromEntries(restoredUrl.searchParams), { kind: 'quantity-unit', id: mapped.unitId, projectId: 'project-a', origin: 'real' })?.configScope?.book.managementBookId).toBe('book-a')
     expect(inspectRestorableTabPath(back)).toBeNull()
   })
 
-  it('编码扩展不接受错表、非迁入百分号或坏编码，也不扩展其他主体', () => {
-    for (const id of [mapped.itemId, 'unit%20a', mapped.unitId.replace('core-quantity_projects-', 'untrusted-'), mapped.unitId.replace(/:units:.+$/, ':units:%ZZ'), mapped.unitId.replace(/:units:.+$/, ':units:%41')]) {
-      const url = sourceTarget(id)
-      expect(payrollSourceContext(Object.fromEntries(url.searchParams), { kind: 'quantity-unit', id, projectId: 'project-a', origin: 'real' })).toBeNull()
-      expect(inspectRestorableTabPath(`${url.pathname}${url.search}`)).toBeNull()
-    }
+  it.each(Array.from(['stageId', 'itemId', 'completionId'] as const).map(input => ({ input })))('冷恢复保留迁入户和三处原量焦点、原费用配置范围，配置本身仍不恢复：输入组合 1 案例 %#', ({ input: key }) => {
+    const url = sourceTarget(mapped.unitId, mapped)
+    const restored = inspectRestorableTabPath(`${url.pathname}${url.search}`)
+    expect(restored).not.toBeNull()
+    const restoredUrl = new URL(restored!.fullPath, 'https://test.invalid')
+    expect(decodeURIComponent(restoredUrl.pathname.split('/').at(-1)!)).toBe(mapped.unitId)
+    expect(restoredUrl.searchParams.get(key)).toBe(mapped[key])
+  })
+
+  function createPayrollSourceContextFixture() {
     const url = sourceTarget(mapped.unitId)
     const query = Object.fromEntries(url.searchParams)
-    for (const kind of ['worker', 'crew', 'quantity-project'] as const)
-      expect(payrollSourceContext({ ...query, payrollSourceKind: kind }, { kind, id: mapped.unitId, projectId: 'project-a', origin: 'real' })).toBeNull()
     expect(inspectRestorableTabPath(`/base/worker/${encodeURIComponent(mapped.unitId)}?origin=real`)).toBeNull()
-    expect(payrollSourceContext(query, { kind: 'quantity-unit', id: mapped.unitId, projectId: 'other-project', origin: 'real' })).toBeNull()
-    expect(payrollSourceContext(query, { kind: 'quantity-unit', id: mapped.unitId, projectId: 'project-a', origin: 'demo' })).toBeNull()
+    return { url, query }
+  }
+
+  it('编码扩展不接受错表、非迁入百分号或坏编码，也不扩展其他主体', () => {
+    expect(inspectRestorableTabPath(`/base/worker/${encodeURIComponent(mapped.unitId)}?origin=real`)).toBeNull()
+  })
+
+  it.each([
+    { case: 'query / { kind: \'quantity-unit\', id: mapped.unitId, projectId: \'other-project\', origin: \'real\' }', prepare: ({ query }: Awaited<ReturnType<typeof createPayrollSourceContextFixture>>) => {
+      return { input: query, argument2: { kind: 'quantity-unit', id: mapped.unitId, projectId: 'other-project', origin: 'real' } } as const
+    } },
+    { case: 'query / { kind: \'quantity-unit\', id: mapped.unitId, projectId: \'project-a\', origin: \'demo\' }', prepare: ({ query }: Awaited<ReturnType<typeof createPayrollSourceContextFixture>>) => {
+      return { input: query, argument2: { kind: 'quantity-unit', id: mapped.unitId, projectId: 'project-a', origin: 'demo' } } as const
+    } },
+  ])('编码扩展不接受错表、非迁入百分号或坏编码，也不扩展其他主体 / payrollSourceContext：$case', ({ prepare }) => {
+    const fixture = createPayrollSourceContextFixture()
+    const { input, argument2 } = prepare(fixture)
+    expect(payrollSourceContext(input, argument2)).toBeNull()
+  })
+
+  it.each([
+    { case: '错表', makeId: (source: MappedSource) => source.itemId },
+    { case: '非迁入百分号', makeId: () => 'unit%20a' },
+    { case: '假命名空间', makeId: (source: MappedSource) => source.unitId.replace('core-quantity_projects-', 'untrusted-') },
+    { case: '非法编码', makeId: (source: MappedSource) => source.unitId.replace(/:units:.+$/, ':units:%ZZ') },
+    { case: '非规范编码', makeId: (source: MappedSource) => source.unitId.replace(/:units:.+$/, ':units:%41') },
+  ])('编码扩展拒绝 $case', ({ makeId }) => {
+    const id = makeId(mapped)
+    const url = sourceTarget(id)
+    expect(payrollSourceContext(Object.fromEntries(url.searchParams), { kind: 'quantity-unit', id, projectId: 'project-a', origin: 'real' })).toBeNull()
+    expect(inspectRestorableTabPath(`${url.pathname}${url.search}`)).toBeNull()
+  })
+
+  it.each(Array.from(['worker', 'crew', 'quantity-project'] as const).map(input => ({ input })))('编码扩展不接受错表、非迁入百分号或坏编码，也不扩展其他主体：输入组合 2 案例 %#', ({ input: kind }) => {
+    const url = sourceTarget(mapped.unitId)
+    const query = Object.fromEntries(url.searchParams)
+    expect(payrollSourceContext({ ...query, payrollSourceKind: kind }, { kind, id: mapped.unitId, projectId: 'project-a', origin: 'real' })).toBeNull()
   })
 
   it('三个焦点仅接受其明确表，冷恢复仍拒绝重复参数并移除未接入的房间焦点', () => {
-    const invalid = sourceTarget(mapped.unitId, { stageId: mapped.itemId, itemId: mapped.completionId, completionId: mapped.stageId })
-    for (const key of ['stageId', 'itemId', 'completionId'])
-      expect(invalid.searchParams.has(key)).toBe(false)
-    for (const [key, value] of [['stageId', mapped.itemId], ['itemId', mapped.completionId], ['completionId', mapped.stageId]] as const) {
-      const url = sourceTarget(mapped.unitId, mapped)
-      url.searchParams.set(key, value)
-      expect(inspectRestorableTabPath(`${url.pathname}${url.search}`)).toBeNull()
-    }
     const duplicated = sourceTarget(mapped.unitId, mapped)
     duplicated.searchParams.append('stageId', mapped.stageId)
     expect(inspectRestorableTabPath(`${duplicated.pathname}${duplicated.search}`)).toBeNull()
@@ -133,5 +160,17 @@ describe('迁入编码量身份的工资来源往返', () => {
     const restored = inspectRestorableTabPath(`${extraRoom.pathname}${extraRoom.search}`)
     expect(restored).not.toBeNull()
     expect(new URL(restored!.fullPath, 'https://test.invalid').searchParams.has('roomId')).toBe(false)
+  })
+
+  it.each(Array.from(['stageId', 'itemId', 'completionId']).map(input => ({ input })))('三个焦点仅接受其明确表，冷恢复仍拒绝重复参数并移除未接入的房间焦点：输入组合 1 案例 %#', ({ input: key }) => {
+    const invalid = sourceTarget(mapped.unitId, { stageId: mapped.itemId, itemId: mapped.completionId, completionId: mapped.stageId })
+    expect(invalid.searchParams.has(key)).toBe(false)
+  })
+
+  it.each([['stageId', 'itemId'], ['itemId', 'completionId'], ['completionId', 'stageId']] as const)('焦点 %s 拒绝来自 %s 的身份', (key, sourceKey) => {
+    const value = mapped[sourceKey]
+    const url = sourceTarget(mapped.unitId, mapped)
+    url.searchParams.set(key, value)
+    expect(inspectRestorableTabPath(`${url.pathname}${url.search}`)).toBeNull()
   })
 })

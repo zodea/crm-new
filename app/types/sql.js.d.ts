@@ -2,17 +2,17 @@
 // （app/lib/db/connection.ts 与 tests/helpers/memory-db.ts）。
 declare module 'sql.js' {
   export interface Statement {
-    bind(params?: unknown[]): boolean
-    step(): boolean
-    getAsObject(): Record<string, unknown>
-    free(): boolean
+    bind: (params?: unknown[]) => boolean
+    step: () => boolean
+    getAsObject: () => Record<string, unknown>
+    free: () => boolean
   }
 
   export interface Database {
-    run(sql: string, params?: unknown[]): Database
-    prepare(sql: string): Statement
-    export(): Uint8Array
-    close(): void
+    run: (sql: string, params?: unknown[]) => Database
+    prepare: (sql: string) => Statement
+    export: () => Uint8Array
+    close: () => void
   }
 
   export interface SqlJsStatic {

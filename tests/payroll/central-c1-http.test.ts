@@ -11,7 +11,7 @@ vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
   return runtime.service
 } }))
 afterEach(() => vi.unstubAllGlobals())
-it('真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率', async () => {
+it.each(Array.from(['lines', 'stored'] as const).map(input1 => ({ input1 })))('真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率：输入案例 %#', async ({ input1: section }) => {
   const f = await createPayrollC1ServiceFixture()
   runtime.service = f.service
   for (const name of ['defineEventHandler', 'getQuery', 'getHeader', 'getRouterParam', 'readBody', 'createError'] as const) vi.stubGlobal(name, h3[name])
@@ -83,12 +83,11 @@ it('真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配�
     await repo.executeC1(f.command(await read(), { kind: 'check-c1' }))
     await repo.executeC1(f.command(await read(), { kind: 'release-c1', release: { actualAmount: 500, allocations: [{ workerId: 'w', amount: 500 }, { workerId: 'member', amount: 0 }, { workerId: 'zero', amount: 0 }] } }))
     const releasedWire = await detail('released')
-    for (const section of ['lines', 'stored'] as const) {
-      const malformed = structuredClone(releasedWire) as { statement: { lines: { amount: string }[], stored: { lines: { amount: string }[] } } }
-      const lines = section === 'lines' ? malformed.statement.lines : malformed.statement.stored.lines
-      lines[0]!.amount = '451.541'
-      expect(() => decodePayrollRead(malformed, 'detail', { origin: 'real' }, saved.statementId!)).toThrow()
-    }
+
+    const malformed = structuredClone(releasedWire) as { statement: { lines: { amount: string }[], stored: { lines: { amount: string }[] } } }
+    const lines = section === 'lines' ? malformed.statement.lines : malformed.statement.stored.lines
+    lines[0]!.amount = '451.541'
+    expect(() => decodePayrollRead(malformed, 'detail', { origin: 'real' }, saved.statementId!)).toThrow()
     const otherFormat = structuredClone(releasedWire) as { statement: { formatFamily: string } }
     otherFormat.statement.formatFamily = 'A'
     expect(() => decodePayrollRead(otherFormat, 'detail', { origin: 'real' }, saved.statementId!)).toThrow()

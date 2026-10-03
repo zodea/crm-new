@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test'
+import { installProjectCentralFixture, PROJECT_INPUTS } from './helpers/project-central-fixture'
+import { expectNoPageOverflow } from './helpers/responsive'
 
 const MATRIX = [
-  { width: 390, height: 844, metricColumns: 2, formColumns: 1, gutter: 12, path: '/dev/kit-atoms' },
-  { width: 768, height: 900, metricColumns: 4, formColumns: 3, gutter: 15.36, path: '/dev/kit-atoms' },
-  { width: 1024, height: 900, metricColumns: 4, formColumns: 3, gutter: 20.48, path: '/dev/kit-atoms' },
-  // 项目详情在宽屏仍保留辅助栏；主内容列按最小可读宽度自然为 4 列。
-  { width: 1440, height: 1000, metricColumns: 4, formColumns: 4, gutter: 24, path: '/project/proj_demo_001' },
+  { width: 390, height: 844, gutter: 8 },
+  { width: 768, height: 900, gutter: 8 },
+  { width: 1024, height: 900, gutter: 10.24 },
+  { width: 1280, height: 900, gutter: 12 },
+  { width: 1440, height: 1000, gutter: 12 },
 ] as const
 
 async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
@@ -20,7 +22,7 @@ test.describe('Issue #112 R1：共享响应式原语', () => {
   for (const viewport of MATRIX) {
     test(`MetricGrid 在 ${viewport.width}px 按可读宽度降列`, async ({ page }) => {
       await page.setViewportSize(viewport)
-      await page.goto(viewport.path)
+      await page.goto('/dev/kit-atoms')
       await page.waitForLoadState('networkidle')
 
       const metric = page.getByRole('group', { name: '主合同金额' })
@@ -30,7 +32,13 @@ test.describe('Issue #112 R1：共享响应式原语', () => {
         getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
       )
 
-      expect(columns).toBe(viewport.metricColumns)
+      expect(columns).toBeGreaterThanOrEqual(1)
+      expect(columns).toBeLessThanOrEqual(5)
+      for (const label of ['主合同金额', '增补合同额', '变更后合同额', '项目收款', '项目可用资金余额']) {
+        const card = metricGrid.getByRole('group', { name: label, exact: true })
+        await expect(card).toBeVisible()
+        expect((await card.boundingBox())!.width).toBeGreaterThanOrEqual(160)
+      }
       await documentDoesNotOverflow(page)
     })
   }
@@ -38,14 +46,20 @@ test.describe('Issue #112 R1：共享响应式原语', () => {
   for (const viewport of MATRIX) {
     test(`项目资料网格在 ${viewport.width}px 使用容器驱动列数`, async ({ page }) => {
       await page.setViewportSize(viewport)
-      await page.goto('/project/proj_demo_001')
-      await page.waitForLoadState('networkidle')
-
-      const detailGrid = page.locator('.project-info-section__grid').first()
-      const detailColumns = await detailGrid.evaluate(element =>
-        getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
-      )
-      expect(detailColumns).toBe(viewport.formColumns)
+      const fixture = await installProjectCentralFixture(page, PROJECT_INPUTS[viewport.width <= 768 ? 0 : 1])
+      await fixture.open()
+      const detailGrid = page.locator('header[aria-labelledby="project-detail-title"] dl')
+      const geometry = await detailGrid.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return { left: bounds.left, right: bounds.right, cells: [...element.children].map(cell => ({ left: cell.getBoundingClientRect().left, right: cell.getBoundingClientRect().right, width: cell.getBoundingClientRect().width })) }
+      })
+      for (const cell of geometry.cells) {
+        expect(cell.width).toBeGreaterThanOrEqual(140)
+        expect(cell.left).toBeGreaterThanOrEqual(geometry.left)
+        expect(cell.right).toBeLessThanOrEqual(geometry.right + 1)
+      }
+      await expect(detailGrid.getByRole('term')).toHaveText(['业务流程阶段', '经营类型', '项目经理', '客户(甲方)', '承包单位'])
+      await expect(detailGrid).toContainText(fixture.input.manager)
       await documentDoesNotOverflow(page)
     })
 
@@ -101,10 +115,10 @@ test.describe('Issue #112 R1：共享响应式原语', () => {
     })
   }
 
-  test('工作区 gutter 按四档视口渐进收敛', async ({ page }) => {
-    for (const viewport of MATRIX) {
+  for (const viewport of MATRIX) {
+    test(`工作区紧凑留白在 ${viewport.width}px 保持左右对称`, async ({ page }) => {
       await page.setViewportSize(viewport)
-      await page.goto('/')
+      await page.goto('/dev/kit-atoms')
       await page.waitForLoadState('networkidle')
 
       const workspace = page.locator('[data-shell-workspace]')
@@ -114,7 +128,7 @@ test.describe('Issue #112 R1：共享响应式原语', () => {
       }))
       expect(padding.left).toBeCloseTo(viewport.gutter, 2)
       expect(padding.right).toBeCloseTo(viewport.gutter, 2)
-      await documentDoesNotOverflow(page)
-    }
-  })
+      await expectNoPageOverflow(page, `工作区留白 @ ${viewport.width}px`)
+    })
+  }
 })

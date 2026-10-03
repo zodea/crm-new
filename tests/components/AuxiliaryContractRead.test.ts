@@ -56,16 +56,13 @@ describe('辅助合同列表快照', () => {
     expect(result.data.value).toEqual({ id: 'new-source' })
   })
 
-  it('权限、来源不存在和关系错配清除已有快照', async () => {
-    for (const code of ['forbidden', 'not-found', 'relationship-mismatch'] as const) {
-      const read = vi.fn().mockResolvedValueOnce({ id: 'first' }).mockRejectedValueOnce(new AuxiliaryContractProblem({ code, message: '不可用', retryable: false, fieldErrors: {}, traceId: null }))
-      const { result, view } = harness(read, () => 'real')
-      await result.load()
-      await result.load()
-      expect(result.data.value).toBeNull()
-      expect(result.problem.value?.code).toBe(code)
-      view.unmount()
-    }
+  it.each(['forbidden', 'not-found', 'relationship-mismatch'] as const)('%s 清除已有快照', async (code) => {
+    const read = vi.fn().mockResolvedValueOnce({ id: 'first' }).mockRejectedValueOnce(new AuxiliaryContractProblem({ code, message: '不可用', retryable: false, fieldErrors: {}, traceId: null }))
+    const { result } = harness(read, () => 'real')
+    await result.load()
+    await result.load()
+    expect(result.data.value).toBeNull()
+    expect(result.problem.value?.code).toBe(code)
   })
 
   it('未配置快照身份的详情调用仍在重新读取时清空旧数据', async () => {

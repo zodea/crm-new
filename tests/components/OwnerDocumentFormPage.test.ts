@@ -37,6 +37,7 @@ const route = {
 const loadOne = vi.fn()
 const loadAttachments = vi.fn()
 const loadContractOptions = vi.fn()
+const loadContractSummary = vi.fn()
 const loadBoqLines = vi.fn()
 const confirm = vi.fn()
 const saveForm = vi.fn()
@@ -76,6 +77,7 @@ const EntityFormShellStub = defineComponent({
 
 const OwnerDocumentFormFieldsStub = defineComponent({
   props: {
+    kind: { type: String, default: '' },
     draft: { type: Object, required: true },
     fieldErrors: { type: Object, required: true },
     readonly: { type: Boolean, default: false },
@@ -101,6 +103,14 @@ const OwnerDocumentFormFieldsStub = defineComponent({
             h('output', { 'data-testid': 'report-draft' }, JSON.stringify(props.draft)),
             h('button', { type: 'button', onClick: () => emit('patch', { quantityBasis: 'contract' }) }, '切换合同量'),
             h('button', { type: 'button', onClick: () => emit('patch', { name: '等待期间编辑' }) }, '修改报量名称'),
+          ])
+        : null,
+      ['final_settlement', 'sub_settlement'].includes(props.kind)
+        ? h('div', [
+            h('output', { 'data-testid': 'settlement-draft' }, JSON.stringify(props.draft)),
+            h('button', { type: 'button', onClick: () => emit('patch', { contractId: 'contract-a' }) }, '选择合同甲'),
+            h('button', { type: 'button', onClick: () => emit('patch', { contractId: 'contract-b' }) }, '选择合同乙'),
+            h('button', { type: 'button', onClick: () => emit('patch', { projectId: null }) }, '清空结算项目'),
           ])
         : null,
     ])
@@ -164,6 +174,7 @@ describe('甲方与分包单据整页表单状态', () => {
     loadOne.mockReset()
     loadAttachments.mockReset()
     loadContractOptions.mockReset()
+    loadContractSummary.mockReset().mockResolvedValue(null)
     loadBoqLines.mockReset().mockResolvedValue([])
     confirm.mockReset().mockResolvedValue(true)
     saveForm.mockReset()
@@ -190,7 +201,7 @@ describe('甲方与分包单据整页表单状态', () => {
       loadBasicOptions: vi.fn().mockResolvedValue([]),
       loadContractOptions,
       loadBoqLines,
-      loadContractSummary: vi.fn().mockResolvedValue(null),
+      loadContractSummary,
       saveForm,
       saveAttachments,
     }))
@@ -258,6 +269,89 @@ describe('甲方与分包单据整页表单状态', () => {
       missingQtyCount: 0,
     }])
   }
+
+  const SETTLEMENT_CASES = [
+    {
+      kind: 'final_settlement' as const,
+      path: '/owner/final-settlement/form/settlement-current',
+      amount: { settlementAmount: 100 },
+      expected: { changedContractAmount: 250, receivedAmount: 18, settlementReceiptGap: 82 },
+      cleared: { changedContractAmount: null, receivedAmount: null, settlementReceiptGap: null },
+    },
+    {
+      kind: 'sub_settlement' as const,
+      path: '/subcontract/settlement/form/settlement-current',
+      amount: { totalAmount: 100 },
+      expected: { contractAmount: 250, priorSettlementAmount: 20, settlementRatio: '40.00%' },
+      cleared: { contractAmount: null, priorSettlementAmount: null, settlementRatio: null },
+    },
+  ]
+  const OLD_SUMMARY = { contractAmount: 100, receivedAmount: 7, priorSettlementAmount: 10 }
+  const CURRENT_SUMMARY = { contractAmount: 250, receivedAmount: 18, priorSettlementAmount: 20 }
+
+  function prepareSettlement(input: typeof SETTLEMENT_CASES[number]) {
+    route.fullPath = input.path
+    route.params = { id: 'settlement-current' }
+    loadOne.mockResolvedValue({ id: 'settlement-current', status: 'draft', name: '摘要竞态结算', projectId: 'project-current', contractId: null, ...input.amount })
+  }
+
+  it.each(SETTLEMENT_CASES)('$kind 切换合同后拒绝迟到旧摘要，不混入另一合同金额', async (input) => {
+    prepareSettlement(input)
+    render(OwnerDocumentFormPage, { props: { kind: input.kind }, global: { components: globalComponents } })
+    await flushPromises()
+    let completeOld!: (summary: typeof OLD_SUMMARY) => void
+    loadContractSummary.mockImplementationOnce(() => new Promise((resolve) => {
+      completeOld = resolve
+    }))
+      .mockResolvedValueOnce(CURRENT_SUMMARY)
+    await fireEvent.click(screen.getByRole('button', { name: '选择合同甲' }))
+    await fireEvent.click(screen.getByRole('button', { name: '选择合同乙' }))
+    await flushPromises()
+    expect(JSON.parse(screen.getByTestId('settlement-draft').textContent!)).toMatchObject({ contractId: 'contract-b', ...input.expected })
+    completeOld(OLD_SUMMARY)
+    await flushPromises()
+    expect(JSON.parse(screen.getByTestId('settlement-draft').textContent!)).toMatchObject({ contractId: 'contract-b', ...input.expected })
+  })
+
+  it.each(SETTLEMENT_CASES)('$kind 清空项目后拒绝迟到摘要，派生金额保持未记录', async (input) => {
+    prepareSettlement(input)
+    render(OwnerDocumentFormPage, { props: { kind: input.kind }, global: { components: globalComponents } })
+    await flushPromises()
+    let completeOld!: (summary: typeof OLD_SUMMARY) => void
+    loadContractSummary.mockImplementationOnce(() => new Promise((resolve) => {
+      completeOld = resolve
+    }))
+    await fireEvent.click(screen.getByRole('button', { name: '选择合同甲' }))
+    await fireEvent.click(screen.getByRole('button', { name: '清空结算项目' }))
+    completeOld(OLD_SUMMARY)
+    await flushPromises()
+    expect(JSON.parse(screen.getByTestId('settlement-draft').textContent!)).toMatchObject({ projectId: null, contractId: null, ...input.cleared })
+  })
+
+  it.each(SETTLEMENT_CASES)('$kind 离开缓存页后拒绝旧摘要，返回重新读取当前合同', async (input) => {
+    prepareSettlement(input)
+    const visible = ref(true)
+    render(defineComponent({
+      setup: () => () => h(KeepAlive, () => visible.value ? h(OwnerDocumentFormPage, { kind: input.kind }) : null),
+    }), { global: { components: globalComponents } })
+    await flushPromises()
+    let completeOld!: (summary: typeof OLD_SUMMARY) => void
+    loadContractSummary.mockImplementationOnce(() => new Promise((resolve) => {
+      completeOld = resolve
+    }))
+      .mockResolvedValueOnce(CURRENT_SUMMARY)
+    await fireEvent.click(screen.getByRole('button', { name: '选择合同甲' }))
+    visible.value = false
+    route.fullPath = '/'
+    await nextTick()
+    route.fullPath = input.path
+    visible.value = true
+    await flushPromises()
+    completeOld(OLD_SUMMARY)
+    await flushPromises()
+    expect(JSON.parse(screen.getByTestId('settlement-draft').textContent!)).toMatchObject({ contractId: 'contract-a', ...input.expected })
+    expect(loadOne).toHaveBeenCalledTimes(1)
+  })
 
   it('月报离开缓存页再返回后拒绝旧取数响应，重新读取当前基准且保留手工稿', async () => {
     prepareReport()
@@ -384,12 +478,17 @@ describe('甲方与分包单据整页表单状态', () => {
     expect(loadOne).toHaveBeenCalledTimes(2)
   })
 
-  it('uses the kind-aware status label and tone from the matching list', async () => {
+  it.each([
+    { state: 'draft', label: '草稿', editable: true },
+    { state: 'submitted', label: '已上报', editable: false },
+    { state: 'rejected', label: '已打回', editable: true },
+    { state: 'approved', label: '已签证', editable: false },
+  ])('甲方变洽签 $state 显示 $label，编辑能力=$editable', async ({ state, label, editable }) => {
     route.fullPath = '/owner/change/change-submitted'
     route.params = { id: 'change-submitted' }
     loadOne.mockResolvedValue({
       id: 'change-submitted',
-      status: 'submitted',
+      status: state,
       name: '已上报签证',
       projectId: 'project-owner',
       contractId: 'contract-owner',
@@ -402,9 +501,10 @@ describe('甲方与分包单据整页表单状态', () => {
     })
     await flushPromises()
 
-    const status = screen.getByText('已上报')
-    expect(status.classList.contains('chip-warn')).toBe(true)
+    expect(screen.getByText(label)).not.toBeNull()
     expect(screen.queryByText('已提交')).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存并提交' }) !== null).toBe(editable)
+    expect(screen.queryByRole('button', { name: '保存附件' }) !== null).toBe(!editable)
   })
 
   it('focuses the first invalid control before opening the submit confirmation', async () => {

@@ -6,6 +6,8 @@ import process from 'node:process'
 import { promisify } from 'node:util'
 import { expect, test } from '@playwright/test'
 
+const BACKUP_INPUT = { createdAt: '2026-09-15T00:00:00.000Z' }
+
 test('工程量真实SQLite十五表经HTTP迁移，更正与独立新增保留，回滚撤下原批次事实', async ({ request }, info) => {
   test.setTimeout(90_000)
   const reset = () => request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
@@ -27,7 +29,7 @@ test('工程量真实SQLite十五表经HTTP迁移，更正与独立新增保留�
       sourceVersion: source.sourceVersion,
       snapshotSha256,
       byteLength,
-      createdAt: new Date().toISOString(),
+      createdAt: BACKUP_INPUT.createdAt,
       immutable: true,
     } } })
     expect(dry.ok(), await dry.text()).toBe(true)

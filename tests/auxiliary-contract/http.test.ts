@@ -3,7 +3,12 @@ import { createAuxiliaryContractRepository } from '../../app/lib/auxiliary-contr
 import { createAuxiliaryContractTestInstance } from '../../server/utils/auxiliary-contract-test-instance'
 
 describe('辅助合同 HTTP Repository', () => {
-  it('拒绝缺失金额契约和串合同的事实响应', async () => {
+  it.each([
+    { filters: { dataOrigin: 'demo', contractKind: 'company_expense' } },
+    { filters: { dataOrigin: 'real', contractKind: 'other_expense' } },
+    { subject: { entity: 'project' } },
+    { subject: { state: 'forbidden' } },
+  ])('拒绝缺失金额契约和串合同的事实响应：%j', async (patch) => {
     const server = createAuxiliaryContractTestInstance({ createId: () => 'decode-330' })
     const session = { workspaceId: 'w', actorId: 'a', capabilities: ['auxiliary-contract:read', 'auxiliary-contract:write'] }
     await server.execute({ ...session, requiredCapability: 'auxiliary-contract:write', commandId: 'create', baseVersion: null, action: 'draft', draft: { kind: 'company_expense', name: '测试' }, attachments: {} }, session)
@@ -12,15 +17,9 @@ describe('辅助合同 HTTP Repository', () => {
     await expect(missingMoney.detail('decode-330', { kind: 'company_expense' })).rejects.toMatchObject({ problem: { code: 'internal-error' } })
     const foreignFact = createAuxiliaryContractRepository(async () => ({ ...detail, facts: [{ id: 'wrong', contractId: 'different', kind: 'invoice', amount: '1.00', effective: true }] }))
     await expect(foreignFact.detail('decode-330', { kind: 'company_expense' })).rejects.toMatchObject({ problem: { code: 'internal-error' } })
-    for (const navigation of [
-      { ...detail.contract.navigation, filters: { dataOrigin: 'demo', contractKind: 'company_expense' } },
-      { ...detail.contract.navigation, filters: { dataOrigin: 'real', contractKind: 'other_expense' } },
-      { ...detail.contract.navigation, subject: { ...detail.contract.navigation.subject, entity: 'project' } },
-      { ...detail.contract.navigation, subject: { ...detail.contract.navigation.subject, state: 'forbidden' } },
-    ]) {
-      const invalidNavigation = createAuxiliaryContractRepository(async () => ({ ...detail, contract: { ...detail.contract, navigation } }))
-      await expect(invalidNavigation.detail('decode-330', { kind: 'company_expense' })).rejects.toMatchObject({ problem: { code: 'internal-error' } })
-    }
+    const navigation = { ...detail.contract.navigation, filters: patch.filters ?? detail.contract.navigation.filters, subject: { ...detail.contract.navigation.subject, ...patch.subject } }
+    const invalidNavigation = createAuxiliaryContractRepository(async () => ({ ...detail, contract: { ...detail.contract, navigation } }))
+    await expect(invalidNavigation.detail('decode-330', { kind: 'company_expense' })).rejects.toMatchObject({ problem: { code: 'internal-error' } })
   })
   it('通过公开 HTTP 接缝读写同一合同，错误响应保留无权限及可重试语义', async () => {
     const server = createAuxiliaryContractTestInstance({ createId: () => 'http-330' })

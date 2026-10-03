@@ -43,7 +43,6 @@ it.each(['policy-zero', 'adoption-missing', 'start-raw', 'release-log', 'quantit
 it('迁入配置可追加真实0修订，原raw不改；重复迁入保全而恢复拒绝抹掉新修订', async () => {
   const f = await createReleasedPayrollHollowMigrationFixture()
   closers.push(f.close)
-  const before = await f.instance.withWorkspaceTransaction(async tx => Object.fromEntries(await Promise.all(PAYROLL_HOLLOW_DEDUCTION_TABLES.map(async table => [table, await tx.select<Record<string, unknown>>(`SELECT * FROM ${table}`)]))))
   const query = { scope: { projectId: f.scope.projectId, crewId: null, leaderWorkerId: f.id('workers', f.original.draft.leaderWorkerId), formatFamily: 'A' as const, book: f.original.draft.book! }, month: '2026-09' }
   const config = await f.service.hollowConfig({ origin: 'real' }, query)
   expect(config.policies[0]?.unitAmount).toBe(30)
@@ -53,11 +52,6 @@ it('迁入配置可追加真实0修订，原raw不改；重复迁入保全而恢
   const prepared = await f.instance.prepareMigrationSnapshot(f.core.snapshot(f.session))
   prepared.commit()
   expect((await f.reloadPayroll().hollowConfig({ origin: 'real' }, query)).policies[0]?.unitAmount).toBe(0)
-  for (const table of PAYROLL_HOLLOW_DEDUCTION_TABLES) {
-    const current = await f.instance.withWorkspaceTransaction(tx => tx.select<Record<string, unknown>>(`SELECT * FROM ${table}`))
-    for (const row of before[table]!)
-      expect(current.find(value => value.id === row.id)).toEqual(row)
-  }
   await expect(f.rollback()).rejects.toThrow()
   expect((await f.reloadPayroll().hollowConfig({ origin: 'real' }, query)).policies[0]?.unitAmount).toBe(0)
   const cloned = await cloneQuantityHollowSnapshot(await f.instance.exportSnapshotBytes())
@@ -75,4 +69,22 @@ it('迁入配置可追加真实0修订，原raw不改；重复迁入保全而恢
     await second.rollback()
   }
   finally { cloned.close() }
+}, 30_000)
+
+it.each(Array.from(PAYROLL_HOLLOW_DEDUCTION_TABLES).map(input => ({ input })))('迁入配置可追加真实0修订，原raw不改；重复迁入保全而恢复拒绝抹掉新修订：输入组合 1 案例 %#', async ({ input: table }) => {
+  const f = await createReleasedPayrollHollowMigrationFixture()
+  closers.push(f.close)
+  const before = await f.instance.withWorkspaceTransaction(async tx => Object.fromEntries(await Promise.all(PAYROLL_HOLLOW_DEDUCTION_TABLES.map(async table => [table, await tx.select<Record<string, unknown>>(`SELECT * FROM ${table}`)]))))
+  const query = { scope: { projectId: f.scope.projectId, crewId: null, leaderWorkerId: f.id('workers', f.original.draft.leaderWorkerId), formatFamily: 'A' as const, book: f.original.draft.book! }, month: '2026-09' }
+  const config = await f.service.hollowConfig({ origin: 'real' }, query)
+  expect(config.policies[0]?.unitAmount).toBe(30)
+  const previous = config.revisions[0]!
+  await f.service.executeHollow({ commandId: 'central-hollow-new-zero', workspaceId: config.context.workspaceId, actorId: config.context.actorId, origin: 'real', requiredCapability: 'payroll:write', sourceVersion: config.context.sourceVersion, projectId: f.scope.projectId, target: null, config: query, action: { kind: 'save-hollow-policies', policies: [{ policyId: previous.policyId, baseRevisionId: previous.id, itemId: previous.itemId, enabled: true, unitAmount: 0, effectiveMonth: query.month }] } })
+  expect((await f.service.hollowConfig({ origin: 'real' }, query)).policies[0]?.unitAmount).toBe(0)
+  const prepared = await f.instance.prepareMigrationSnapshot(f.core.snapshot(f.session))
+  prepared.commit()
+  expect((await f.reloadPayroll().hollowConfig({ origin: 'real' }, query)).policies[0]?.unitAmount).toBe(0)
+  const current = await f.instance.withWorkspaceTransaction(tx => tx.select<Record<string, unknown>>(`SELECT * FROM ${table}`))
+  for (const row of before[table]!)
+    expect(current.find(value => value.id === row.id)).toEqual(row)
 }, 30_000)

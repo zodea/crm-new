@@ -133,6 +133,24 @@ describe('项目档案包导出选择器', () => {
     expect(screen.getAllByText('仅查看').length).toBeGreaterThan(0)
   })
 
+  it.each([
+    { label: '普通原件', sensitivity: 'normal', hasPayload: true, selected: true, disabled: false, checkboxName: '取消 立项批复.pdf' },
+    { label: '缺正文的普通附件', sensitivity: 'normal', hasPayload: false, selected: false, disabled: true, checkboxName: '勾选 立项批复.pdf' },
+    { label: '有正文的敏感资料', sensitivity: 'sensitive', hasPayload: true, selected: false, disabled: true, checkboxName: '查看 立项批复.pdf，原件导出权限待配置' },
+  ] as const)('$label 的默认选择与导出权限保持独立', async ({ sensitivity, hasPayload, selected, disabled, checkboxName }) => {
+    const current = structuredClone(snapshot)
+    Object.assign(current.files[0]!, { sensitivity, hasPayload })
+    current.tree[0]!.children![0]!.sensitive = sensitivity === 'sensitive'
+    loadSnapshot.mockResolvedValue(current)
+    render(ProjectArchiveExportDialog, {
+      props: { projectId: current.project.id, open: true },
+      global: { components: globalComponents },
+    })
+    const checkbox = await screen.findByRole('checkbox', { name: checkboxName, exact: true })
+    expect(checkbox.getAttribute('aria-checked')).toBe(String(selected))
+    expect(checkbox.hasAttribute('disabled')).toBe(disabled)
+  })
+
   it('证照在目录中可见但不可勾选，当前导出只提交普通原件', async () => {
     const view = render(ProjectArchiveExportDialog, {
       props: { projectId: 'project-1', open: true },

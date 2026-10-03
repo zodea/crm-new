@@ -107,7 +107,12 @@ describe('payroll workbench components', () => {
     })
   })
 
-  it('shows C1 and C2 rate errors and focuses the first invalid rate', async () => {
+  it.each([
+    { format: 'C1', input: '-1', name: 'C1 日薪', message: 'C1 默认日薪不能为负数' },
+    { format: 'C1', input: '-0.01', name: 'C1 日薪', message: 'C1 默认日薪不能为负数' },
+    { format: 'C2', input: '0', name: 'C2 大工单价', message: 'C2 大工单价必须大于 0' },
+    { format: 'C2', input: '-1', name: 'C2 大工单价', message: 'C2 大工单价必须大于 0' },
+  ])('$format rate $input shows an error and focuses the first invalid rate', async ({ format: value, input, name, message }) => {
     const { emitted } = render(PayrollDraftFormFields, {
       props: {
         options,
@@ -117,25 +122,14 @@ describe('payroll workbench components', () => {
     const format = screen.getByRole<HTMLSelectElement>('combobox', { name: '工资格式族' })
     const submit = screen.getByRole('button', { name: '生成工资草稿' })
 
-    await fireEvent.update(format, 'C1')
-    const dailyRate = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'C1 日薪' })
-    await fireEvent.update(dailyRate, '-1')
+    await fireEvent.update(format, value)
+    const rate = screen.getByRole<HTMLInputElement>('spinbutton', { name })
+    await fireEvent.update(rate, input)
     await fireEvent.click(submit)
     await nextTick()
 
-    expect(screen.getByRole('alert').textContent).toContain('C1 默认日薪不能为负数')
-    expect(document.activeElement).toBe(dailyRate)
-    expect(emitted().submit).toBeUndefined()
-
-    await fireEvent.update(dailyRate, '400')
-    await fireEvent.update(format, 'C2')
-    const c2Rate = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'C2 大工单价' })
-    await fireEvent.update(c2Rate, '0')
-    await fireEvent.click(submit)
-    await nextTick()
-
-    expect(screen.getByRole('alert').textContent).toContain('C2 大工单价必须大于 0')
-    expect(document.activeElement).toBe(c2Rate)
+    expect(screen.getByRole('alert').textContent).toContain(message)
+    expect(document.activeElement).toBe(rate)
     expect(emitted().submit).toBeUndefined()
   })
 
@@ -298,7 +292,7 @@ describe('payroll workbench components', () => {
     expect(document.querySelector('[data-payroll-print-kind="wage"]')).not.toBeNull()
   })
 
-  it('validates the release total and persists a complete member split', async () => {
+  it.each(['0.004', '100.01'])('rejects release total %s, then persists a corrected complete member split', async (invalidTotal) => {
     const { emitted } = render(PayrollStatementDetail, {
       props: {
         statement: {
@@ -358,9 +352,7 @@ describe('payroll workbench components', () => {
     expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: '张师傅分配金额' }).value).toBe('100')
     expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: '李师傅分配金额' }).value).toBe('0')
 
-    await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放总额' }), '0.004')
-    expect(release.disabled).toBe(true)
-    await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放总额' }), '100.01')
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放总额' }), invalidTotal)
     expect(release.disabled).toBe(true)
 
     await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放总额' }), '100')

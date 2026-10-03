@@ -12,7 +12,7 @@ vi.mock('../../server/utils/payroll-runtime', () => ({
   },
 }))
 afterEach(() => vi.unstubAllGlobals())
-it('真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发放及冻结，价保原精度而金额到分', async () => {
+it.each(Array.from([[0.0000001, '0.0000001'], [1e21, '1000000000000000000000'], [350.125, '350.125']] as const).map(input1 => ({ input1 })))('真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发放及冻结，价保原精度而金额到分：输入案例 %#', async ({ input1: [unitRate, expected] }) => {
   const f = await createPayrollC2ServiceFixture()
   runtime.service = f.service
   for (const name of ['defineEventHandler', 'getQuery', 'getHeader', 'getRouterParam', 'readBody', 'createError'] as const) vi.stubGlobal(name, h3[name])
@@ -55,12 +55,13 @@ it('真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发�
     expect((await repo.dayworkForm({ origin: 'real' }, { recordId: null, draftKey: 'empty-daywork' })).draft.projectId).toBe('')
     expect((await repo.c2Config({ origin: 'real' }, { projectId: '', leaderWorkerId: '' })).options.projects).toHaveLength(2)
     const cfg = await repo.c2Config({ origin: 'real' }, { projectId: 'p', leaderWorkerId: 'w' })
-    for (const [unitRate, expected] of [[0.0000001, '0.0000001'], [1e21, '1000000000000000000000'], [350.125, '350.125']] as const) {
-      const current = await repo.c2Config({ origin: 'real' }, cfg.scope)
-      await repo.executeC2(f.c2Command(current, { kind: 'save-c2-config', config: { crewId: 'crew', unitRate, ruleText: '' } }))
-      expect((await repo.c2Config({ origin: 'real' }, cfg.scope)).config?.unitRate).toBe(unitRate)
-      expect(wire.at(-1)).toMatchObject({ config: { unitRate: expected } })
-    }
+
+    const current = await repo.c2Config({ origin: 'real' }, cfg.scope)
+    await repo.executeC2(f.c2Command(current, { kind: 'save-c2-config', config: { crewId: 'crew', unitRate, ruleText: '' } }))
+    expect((await repo.c2Config({ origin: 'real' }, cfg.scope)).config?.unitRate).toBe(unitRate)
+    expect(wire.at(-1)).toMatchObject({ config: { unitRate: expected } })
+    const workflowConfig = await repo.c2Config({ origin: 'real' }, cfg.scope)
+    await repo.executeC2(f.c2Command(workflowConfig, { kind: 'save-c2-config', config: { crewId: 'crew', unitRate: 350.125, ruleText: '' } }))
     const exponentCommand = f.c2Command(await repo.c2Config({ origin: 'real' }, cfg.scope), { kind: 'save-c2-config', config: { crewId: 'crew', unitRate: 0.0000001, ruleText: '' } })
     const exponentResponse = await fetch(`${base}/api/commands/payroll-c2`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...exponentCommand, action: { kind: 'save-c2-config', config: { crewId: 'crew', unitRate: '1e-7', ruleText: '' } } }) })
     expect(exponentResponse.status).toBe(422)

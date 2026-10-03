@@ -8,14 +8,18 @@ describe('普通收款中央命令与公开读回', () => {
   it('非空银行流水号在草稿与提交记录间唯一，编辑自身与空流水号不误拦截', () => {
     const instance = createReceiptCommandTestInstance({ references: () => references })
     const first = instance.execute(command({ draft: { ...draft, bankSerialNo: 'BANK-UNIQUE' } }), session)
-    for (const action of ['draft', 'save', 'submit'] as const) {
-      expect(() => instance.execute(command({ commandId: `duplicate-${action}`, action, draft: { ...draft, bankSerialNo: ' BANK-UNIQUE ' } }), session)).toThrow(/银行流水号/)
-    }
     expect(instance.facts().rows).toHaveLength(1)
     instance.execute(command({ id: first.id, baseVersion: first.version, commandId: 'own-bank', draft: { ...draft, bankSerialNo: 'BANK-UNIQUE' } }), session)
     instance.execute(command({ commandId: 'empty-bank-1', draft: { ...draft, bankSerialNo: '' } }), session)
     instance.execute(command({ commandId: 'empty-bank-2', draft: { ...draft, bankSerialNo: ' ' } }), session)
     expect(instance.facts().rows).toHaveLength(3)
+  })
+
+  it.each(Array.from(['draft', 'save', 'submit'] as const).map(input => ({ input })))('非空银行流水号在草稿与提交记录间唯一，编辑自身与空流水号不误拦截：输入组合 1 案例 %#', ({ input: action }) => {
+    const instance = createReceiptCommandTestInstance({ references: () => references })
+    instance.execute(command({ draft: { ...draft, bankSerialNo: 'BANK-UNIQUE' } }), session)
+    expect(() => instance.execute(command({ commandId: `duplicate-${action}`, action, draft: { ...draft, bankSerialNo: ' BANK-UNIQUE ' } }), session)).toThrow(/银行流水号/)
+    expect(instance.facts().rows).toHaveLength(1)
   })
 
   it.each(['project:list:read', 'customer:list:read', 'construction-contract:read'])('写入复验 %s，受限关联不能通过手工请求或重试绕过', (capability) => {
@@ -59,31 +63,33 @@ describe('普通收款中央命令与公开读回', () => {
 
   it('错误关系、非法日期与空值零值提交均被拒绝，不产生收款事实', () => {
     const instance = createReceiptCommandTestInstance({ references: () => references })
-    for (const patch of [
-      { projectId: 'missing' },
-      { customerId: 'missing' },
-      { contractId: 'missing' },
-      { projectId: null },
-      { customerId: null },
-      { receiptDate: '2026-02-30' },
-      { amount: null },
-      { amount: '0.00' },
-      { amount: '-1.00' },
-      { amount: '1.005' },
-    ]) {
-      expect(() => instance.execute({
-        workspaceId: session.workspaceId,
-        actorId: session.actorId,
-        requiredCapability: 'receipt:write',
-        commandId: 'invalid',
-        baseVersion: null,
-        origin: 'real',
-        action: 'submit',
-        draft: { ...draft, ...patch },
-        attachments: {},
-      }, session)).toThrow()
-    }
     expect(instance.facts().rows).toEqual([])
+  })
+
+  it.each(Array.from([
+    { projectId: 'missing' },
+    { customerId: 'missing' },
+    { contractId: 'missing' },
+    { projectId: null },
+    { customerId: null },
+    { receiptDate: '2026-02-30' },
+    { amount: null },
+    { amount: '0.00' },
+    { amount: '-1.00' },
+    { amount: '1.005' },
+  ]).map(input => ({ input })))('错误关系、非法日期与空值零值提交均被拒绝，不产生收款事实：输入组合 1 案例 %#', ({ input: patch }) => {
+    const instance = createReceiptCommandTestInstance({ references: () => references })
+    expect(() => instance.execute({
+      workspaceId: session.workspaceId,
+      actorId: session.actorId,
+      requiredCapability: 'receipt:write',
+      commandId: 'invalid',
+      baseVersion: null,
+      origin: 'real',
+      action: 'submit',
+      draft: { ...draft, ...patch },
+      attachments: {},
+    }, session)).toThrow()
   })
 
   it('不完整草稿保留空金额与明确零，保存不接受客户端伪造已确认状态', () => {
@@ -118,9 +124,15 @@ describe('普通收款中央命令与公开读回', () => {
     const first = instance.execute(command(), session)
     expect(instance.form(first.id, { ...session, capabilities: ['receipt:read'] })).toMatchObject({ id: first.id })
     expect(() => instance.form(first.id, { ...session, capabilities: [] })).toThrow(/权限/)
-    for (const patch of [{ origin: 'demo' }, { actorId: 'other' }, { workspaceId: 'other' }, { commandId: '' }, { action: 'confirm' }])
-      expect(() => instance.execute(command(patch as Partial<ReceiptCommand>), session)).toThrow()
     expect(() => instance.execute(command(), { ...session, capabilities: ['receipt:read'] })).toThrow(/权限/)
+  })
+
+  it.each(Array.from([{ origin: 'demo' }, { actorId: 'other' }, { workspaceId: 'other' }, { commandId: '' }, { action: 'confirm' }]).map(input => ({ input })))('读取权限与写权限独立，演示来源、伪造会话及未知动作不能写入：输入组合 1 案例 %#', ({ input: patch }) => {
+    const instance = createReceiptCommandTestInstance({ references: () => references })
+    const first = instance.execute(command(), session)
+    expect(instance.form(first.id, { ...session, capabilities: ['receipt:read'] })).toMatchObject({ id: first.id })
+    expect(() => instance.form(first.id, { ...session, capabilities: [] })).toThrow(/权限/)
+    expect(() => instance.execute(command(patch as Partial<ReceiptCommand>), session)).toThrow()
   })
 
   it('附件正文随收款保存、刷新读回和删除恢复，跨收款附件操作不产生部分修改', () => {
@@ -142,14 +154,18 @@ describe('普通收款中央命令与公开读回', () => {
 
   it('无正文、错误大小及非法编码拒绝整个新建，合法空文件仍能保存', () => {
     const instance = createReceiptCommandTestInstance({ references: () => references })
-    for (const file of [
-      { fileName: '只有路径', filePath: 'C:/secret.txt', fileSize: 1 },
-      { fileName: '大小不符', fileSize: 9, payloadBase64: 'YQ==' },
-      { fileName: '错误编码', fileSize: 1, payloadBase64: '!!!!' },
-    ]) expect(() => instance.execute({ ...command(), attachments: { add: [file] } }, session)).toThrow(/附件/)
     expect(instance.facts().rows).toEqual([])
     const result = instance.execute({ ...command(), attachments: { add: [{ fileName: '空文件', fileSize: 0, payloadBase64: '' }] } }, session)
     expect(instance.fileContent(result.id, result.attachmentIds[0]!, session).payloadBase64).toBe('')
+  })
+
+  it.each(Array.from([
+    { fileName: '只有路径', filePath: 'C:/secret.txt', fileSize: 1 },
+    { fileName: '大小不符', fileSize: 9, payloadBase64: 'YQ==' },
+    { fileName: '错误编码', fileSize: 1, payloadBase64: '!!!!' },
+  ]).map(input => ({ input })))('无正文、错误大小及非法编码拒绝整个新建，合法空文件仍能保存：输入组合 1 案例 %#', ({ input: file }) => {
+    const instance = createReceiptCommandTestInstance({ references: () => references })
+    expect(() => instance.execute({ ...command(), attachments: { add: [file] } }, session)).toThrow(/附件/)
   })
 
   it('迁移准备无副作用，全部字段和正文导入后编辑不被重复同步覆盖，回滚只移除本批收款', () => {
@@ -181,7 +197,7 @@ describe('普通收款中央命令与公开读回', () => {
     expect(() => instance.fileContent('migrated', 'm-file', session)).toThrow(/不存在/)
   })
 
-  it('迁入缺正文附件保留元数据并明确不可读；无效载荷使准备整体失败', () => {
+  it.each(([{ ownerId: 'another-receipt' }, { payloadEncoding: 'utf8' }]).map(input => ({ input })))('迁入缺正文附件保留元数据并明确不可读；无效载荷使准备整体失败：输入案例 %#', ({ input: fields }) => {
     const instance = createReceiptCommandTestInstance({ references: () => references })
     const snapshot: CoreMigrationSnapshotDTO = { authority: 'central', activeBatchId: 'batch-a', entities: [{
       entityType: 'receipt_registrations',
@@ -203,10 +219,8 @@ describe('普通收款中央命令与公开读回', () => {
     invalid.entities[0]!.attributes.attachmentsJson = JSON.stringify([{ id: 'invalid-file', fileName: '坏正文', fileSize: 10, payloadBase64: 'YQ==' }])
     expect(() => instance.prepareMigrationSnapshot(invalid)).toThrow(/附件/)
     expect(instance.facts().rows.map(row => row.id)).toEqual(['historical'])
-    for (const fields of [{ ownerId: 'another-receipt' }, { payloadEncoding: 'utf8' }]) {
-      invalid.entities[0]!.attributes.attachmentsJson = JSON.stringify([{ id: 'foreign-file', fileName: '坏归属凭证', fileSize: 1, payloadBase64: 'YQ==', ...fields }])
-      expect(() => instance.prepareMigrationSnapshot(invalid)).toThrow(/附件|编码/)
-      expect(instance.facts().rows.map(row => row.id)).toEqual(['historical'])
-    }
+    invalid.entities[0]!.attributes.attachmentsJson = JSON.stringify([{ id: 'foreign-file', fileName: '坏归属凭证', fileSize: 1, payloadBase64: 'YQ==', ...fields }])
+    expect(() => instance.prepareMigrationSnapshot(invalid)).toThrow(/附件|编码/)
+    expect(instance.facts().rows.map(row => row.id)).toEqual(['historical'])
   })
 })

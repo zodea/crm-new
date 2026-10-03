@@ -47,27 +47,31 @@ function makeSupplier(overrides: Partial<Supplier> = {}): Supplier {
   }
 }
 
-describe('分供方台账导出行', () => {
+describe.each([
+  { name: '广州市大板东建材有限公司', category: '材料供应商' },
+  { name: '合成机电设备有限公司', category: '设备供应商' },
+])('分供方台账导出行：$category', (input) => {
+  const fixture = (overrides: Partial<Supplier> = {}) => makeSupplier({ name: input.name, supplierCategory: input.category, ...overrides })
   it('每家分供方产出一行，别名与资料状态使用可读文本', () => {
-    const [row] = supplierLedgerRows([makeSupplier()])
+    const [row] = supplierLedgerRows([fixture()])
 
-    expect(row['公司全称']).toBe('广州市大板东建材有限公司')
+    expect(row['公司全称']).toBe(input.name)
     expect(row['外部旧ID / 匹配标识']).toBe('OLD-SUP-001')
     expect(row['简称/别名']).toBe('大板东、板东建材')
-    expect(row['分供方类别']).toBe('材料供应商')
+    expect(row['分供方类别']).toBe(input.category)
     expect(row['资料状态']).toBe('合格')
     expect(row['注册资金（万元）']).toBe(500)
   })
 
   it('空数值与空别名导出空串，不出现 null 或数组文本', () => {
-    const [row] = supplierLedgerRows([makeSupplier({ aliases: [], registeredCapital: null })])
+    const [row] = supplierLedgerRows([fixture({ aliases: [], registeredCapital: null })])
 
     expect(row['简称/别名']).toBe('')
     expect(row['注册资金（万元）']).toBe('')
   })
 
   it('列数与列定义一致，行数与分供方数一致', () => {
-    const rows = supplierLedgerRows([makeSupplier(), makeSupplier({ id: 'sup-2' })])
+    const rows = supplierLedgerRows([fixture(), fixture({ id: 'sup-2' })])
 
     expect(rows).toHaveLength(2)
     expect(Object.keys(rows[0]!)).toHaveLength(SUPPLIER_EXPORT_COLUMNS.length)
@@ -75,7 +79,7 @@ describe('分供方台账导出行', () => {
 
   it('单文件请求使用本地日历日并生成可读工作簿', () => {
     const request = createSupplierLedgerExport(
-      [makeSupplier()],
+      [fixture()],
       new Date(2026, 6, 17, 0, 30),
     )
     const workbook = XLSX.read(request.data)
@@ -85,7 +89,7 @@ describe('分供方台账导出行', () => {
     expect(request.defaultName).toBe('分供方台账_2026-07-17.xlsx')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({
-      '公司全称': '广州市大板东建材有限公司',
+      '公司全称': input.name,
       '简称/别名': '大板东、板东建材',
       '资料状态': '合格',
     })
@@ -93,13 +97,13 @@ describe('分供方台账导出行', () => {
 
   it('分类请求生成类别/资料状态目录与逐户 xlsx', () => {
     const request = createSupplierCategoryExport([
-      makeSupplier(),
-      makeSupplier({ id: 'sup-2', name: '广州固力劳务', supplierCategory: '劳务分包商' }),
+      fixture(),
+      fixture({ id: 'sup-2', name: '广州固力劳务', supplierCategory: '劳务分包商' }),
     ])
     const files = buildConfiguredExportFiles(request)
 
     expect(files.map(file => file.relativePath)).toEqual([
-      '材料供应商/合格/广州市大板东建材有限公司.xlsx',
+      `${input.category}/合格/${input.name}.xlsx`,
       '劳务分包商/合格/广州固力劳务.xlsx',
     ])
     const workbook = XLSX.read(files[1]!.data)

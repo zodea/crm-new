@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
+import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
 import {
   EQUIVALENT_200_PERCENT_VIEWPORT,
@@ -49,104 +50,117 @@ async function waitForProjectList(page: Page) {
 }
 
 test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
-  test('真实阶段与搜索进入详情，业务 Tab 通过应用页签返回后保持复用', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 1000 })
-    await page.goto('/project')
-    await waitForProjectList(page)
-
-    const phaseNavigation = page.getByRole('navigation', { name: '列表分类' })
-    await phaseNavigation.getByRole('button', { name: /施工中/ }).click()
-
-    const search = page.getByRole('searchbox', {
-      name: '搜索项目、客户、经理…',
+  test.beforeEach(async ({ page }, info) => {
+    const sessionId = Buffer.from(info.testId).toString('base64url')
+    await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId })
+    const reset = await page.request.post('/api/testing/projects/reset', {
+      headers: { 'x-ruihang-test-reset': '1' },
+      data: { scenario: 'ready' },
     })
-    await search.fill('合和新城')
-    const projectLink = page.getByRole('link', {
-      name: '合和新城',
-      exact: true,
-    }).first()
-    await expect(projectLink).toBeVisible()
-    await expect(page.getByRole('link', { name: '锦绣华庭', exact: true }))
-      .toHaveCount(0)
-
-    await projectLink.click()
-    await expect(page).toHaveURL('/project/proj_demo_001')
-    await expect(page.getByRole('heading', { name: '合和新城', exact: true }))
-      .toBeVisible()
-
-    const expenditureTab = page.getByRole('tab', {
-      name: '支出合同管理',
-      exact: true,
-    })
-    await expenditureTab.click()
-    await expect(expenditureTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('region', { name: '支出合同', exact: true }))
-      .toBeVisible()
-
-    const appTabs = page.getByRole('navigation', { name: '已打开页面' })
-    const detailAppTab = appTabs.getByRole('button', {
-      name: '合和新城',
-      exact: true,
-    })
-    await expect(detailAppTab).toHaveCount(1)
-    const tabCount = (await page.getByTitle('当前页签数量').textContent() ?? '').trim()
-
-    await appTabs.getByRole('button', { name: '项目列表', exact: true }).click()
-    await expect(page).toHaveURL('/project')
-    await expect(search).toHaveValue('合和新城')
-    await expect(projectLink).toBeVisible()
-
-    await detailAppTab.click()
-    await expect(page).toHaveURL(/\/project\/proj_demo_001\?tab=expenditure$/)
-    await expect(expenditureTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByTitle('当前页签数量')).toContainText(tabCount)
-    await expect(detailAppTab).toHaveCount(1)
+    expect(reset.ok()).toBe(true)
+    await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
   })
 
-  test('新建取消回项目列表，编辑取消或保存均回原项目详情', async ({ page }) => {
-    await page.goto('/project/form')
-    await expect(page.getByRole('heading', { name: '新建 · 项目' })).toBeVisible()
-    await page.getByRole('group', { name: '表单操作' })
-      .getByRole('button', { name: '取消', exact: true })
-      .click()
-    await expect(page).toHaveURL('/project')
+  for (const input of [
+    { id: 'proj_demo_001', name: '合和新城', excludedName: '锦绣华庭' },
+    { id: 'proj_demo_002', name: '锦绣华庭', excludedName: '合和新城' },
+  ]) {
+    test(`${input.name} 阶段与搜索来源返回保持筛选并复用应用页签`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 1000 })
+      await page.goto('/project')
+      await waitForProjectList(page)
 
-    await page.goto('/project/form')
-    const createdProjectName = `E2E 新建项目 ${Date.now()}`
-    await page.getByLabel('项目名称 *').fill(createdProjectName)
-    await page.getByLabel('项目经理 *').fill('E2E 项目经理')
-    const customerLookup = page.getByRole('combobox', { name: '检索客户' })
-    await customerLookup.click()
-    const firstCustomer = page.locator('[role="option"]:visible').first()
-    await expect(firstCustomer).toBeVisible()
-    await firstCustomer.click()
-    await page.getByRole('group', { name: '表单操作' })
-      .getByRole('button', { name: '保存', exact: true })
-      .click()
-    await expect(page).toHaveURL(/\/project\/proj_/)
-    await expect(page.getByRole('heading', { name: createdProjectName, exact: true }))
-      .toBeVisible()
+      const phaseNavigation = page.getByRole('navigation', { name: '列表分类' })
+      await phaseNavigation.getByRole('button', { name: /施工中/ }).click()
 
-    await page.goto('/project/proj_demo_001')
-    await page.getByRole('link', { name: '编辑项目', exact: true }).click()
-    await expect(page).toHaveURL('/project/form/proj_demo_001')
-    await expect(page.getByRole('heading', { name: '编辑 · 项目' })).toBeVisible()
-    await page.getByRole('group', { name: '表单操作' })
-      .getByRole('button', { name: '取消', exact: true })
-      .click()
-    await expect(page).toHaveURL('/project/proj_demo_001')
-    await expect(page.getByRole('heading', { name: '合和新城', exact: true }))
-      .toBeVisible()
+      const search = page.getByRole('searchbox', {
+        name: '搜索项目、客户、经理…',
+      })
+      await search.fill(input.name)
+      const projectLink = page.getByRole('link', {
+        name: input.name,
+        exact: true,
+      }).first()
+      await expect(projectLink).toBeVisible()
+      await expect(page.getByRole('link', { name: input.excludedName, exact: true }))
+        .toHaveCount(0)
 
-    await page.getByRole('link', { name: '编辑项目', exact: true }).click()
-    await expect(page).toHaveURL('/project/form/proj_demo_001')
-    await page.getByRole('group', { name: '表单操作' })
-      .getByRole('button', { name: '保存', exact: true })
-      .click()
-    await expect(page).toHaveURL('/project/proj_demo_001')
-    await expect(page.getByRole('heading', { name: '合和新城', exact: true }))
-      .toBeVisible()
-  })
+      await projectLink.click()
+      await expect(page).toHaveURL(new RegExp(`/project/${input.id}\\?origin=demo`))
+      await expect(page.getByRole('heading', { name: input.name, exact: true }))
+        .toBeVisible()
+
+      const readonlyDetails = page.getByRole('status', { name: '测试数据只读详情' })
+      await expect(readonlyDetails).toBeVisible()
+      await expect(readonlyDetails.getByRole('heading', { name: '基础信息' })).toBeVisible()
+
+      const appTabs = page.getByRole('navigation', { name: '已打开页面' })
+      const detailAppTab = appTabs.getByRole('button', {
+        name: input.name,
+        exact: true,
+      })
+      await expect(detailAppTab).toHaveCount(1)
+      const tabCount = await appTabs.locator('[data-tab-trigger]').count()
+
+      await page.getByRole('link', { name: '返回项目列表', exact: true }).click()
+      await expect(page).toHaveURL(/\/project\?.*search=/)
+      await expect(search).toHaveValue(input.name)
+      await expect(projectLink).toBeVisible()
+
+      await detailAppTab.click()
+      await expect(page).toHaveURL(new RegExp(`/project/${input.id}\\?origin=demo`))
+      await expect(readonlyDetails).toBeVisible()
+      await expect(appTabs.locator('[data-tab-trigger]')).toHaveCount(tabCount)
+      await expect(detailAppTab).toHaveCount(1)
+    })
+  }
+
+  for (const input of [
+    { name: '中央参考项目甲', manager: '张经理' },
+    { name: '中央参考项目乙', manager: '李经理' },
+  ]) {
+    test(`新建取消及正式项目 ${input.name} 编辑取消、保存往返`, async ({ page }) => {
+      await page.goto('/project/form')
+      await expect(page.getByRole('heading', { name: '新建 · 项目' })).toBeVisible()
+      await page.getByRole('group', { name: '表单操作' })
+        .getByRole('button', { name: '取消', exact: true })
+        .click()
+      await expect(page).toHaveURL('/project')
+
+      await page.goto('/project/form')
+      const createdProjectName = input.name
+      await page.getByLabel('项目名称 *').fill(createdProjectName)
+      await page.getByLabel('项目经理 *').fill(input.manager)
+      await page.getByRole('group', { name: '表单操作' })
+        .getByRole('button', { name: '保存草稿', exact: true })
+        .click()
+      await expect(page).toHaveURL(/\/project\/[^/?]+\?origin=real/)
+      const createdId = new URL(page.url()).pathname.split('/').at(-1)!
+      await expect(page.getByRole('heading', { name: createdProjectName, exact: true }))
+        .toBeVisible()
+
+      await page.getByRole('link', { name: '编辑项目', exact: true }).click()
+      await expect(page).toHaveURL(new RegExp(`/project/form/${createdId}\\?origin=real`))
+      await expect(page.getByRole('heading', { name: '编辑 · 项目' })).toBeVisible()
+      await page.getByRole('group', { name: '表单操作' })
+        .getByRole('button', { name: '取消', exact: true })
+        .click()
+      await expect(page).toHaveURL(new RegExp(`/project/${createdId}\\?origin=real`))
+      await expect(page.getByRole('heading', { name: createdProjectName, exact: true }))
+        .toBeVisible()
+
+      await page.getByRole('link', { name: '编辑项目', exact: true }).click()
+      await expect(page).toHaveURL(new RegExp(`/project/form/${createdId}\\?origin=real`))
+      const updatedName = `${createdProjectName}（已修改）`
+      await page.getByLabel('项目名称 *').fill(updatedName)
+      await page.getByRole('group', { name: '表单操作' })
+        .getByRole('button', { name: '保存草稿', exact: true })
+        .click()
+      await expect(page).toHaveURL(new RegExp(`/project/${createdId}\\?origin=real`))
+      await expect(page.getByRole('heading', { name: updatedName, exact: true }))
+        .toBeVisible()
+    })
+  }
 
   for (const viewport of RESPONSIVE_CASES) {
     test(`${viewport.label} 无页面横滚，项目宽表局部横滚且关键操作键盘可达`, async ({ page }) => {
@@ -175,7 +189,7 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
       )
       await expectInViewport(createProject, `${viewport.label} 新增项目操作`)
 
-      await page.goto('/project/proj_demo_001')
+      await page.goto('/project/proj_demo_001?origin=demo')
       const detail = page.locator('[data-ui="project-detail-screen"]')
       await expect(detail).toBeVisible()
       await expectNoPageOverflow(page, `${viewport.label} 项目详情`)
@@ -184,23 +198,11 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
         name: '编辑项目',
         exact: true,
       })).toHaveCount(0)
-      const closeDetail = page.getByRole('link', { name: '关闭项目详情' })
+      const closeDetail = page.getByRole('link', { name: '返回项目列表' })
       await tabUntilFocused(page, closeDetail)
       await expectInViewport(closeDetail, `${viewport.label} 关闭项目详情操作`)
 
-      await page.getByRole('tab', {
-        name: '支出合同管理',
-        exact: true,
-      }).click()
-      const detailTableScroller = page
-        .locator('[data-ui="project-detail-table-scroll"]')
-        .getByRole('region', { name: '支出合同', exact: true })
-        .locator('[data-ui="kit-table"]')
-        .locator('.vxe-table--main-wrapper .vxe-table--body-inner-wrapper')
-      await expectLocalHorizontalScroll(
-        detailTableScroller,
-        `${viewport.label} 项目详情宽表`,
-      )
+      await expect(page.getByRole('status', { name: '测试数据只读详情' })).toBeVisible()
       await expectNoPageOverflow(page, `${viewport.label} 项目详情业务 Tab`)
 
       await page.goto('/project/form')
@@ -212,8 +214,9 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
       await expectInViewport(footer, `${viewport.label} 项目表单固定操作条`)
 
       const firstField = page.getByLabel('项目名称 *')
+      await firstField.fill(`视口 ${viewport.width} 项目草稿`)
       const cancel = footer.getByRole('button', { name: '取消', exact: true })
-      const save = footer.getByRole('button', { name: '保存', exact: true })
+      const save = footer.getByRole('button', { name: '保存草稿', exact: true })
       await expectTabSequence(
         page,
         firstField,

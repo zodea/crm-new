@@ -15,9 +15,11 @@ import {
 
 describe('材料采购合同列表返回上下文', () => {
   it('以共享白名单识别项目甲方六类卡片锚点', () => {
-    for (const kind of ['change', 'report', 'acceptance', 'warranty', 'final-settlement', 'penalty'])
-      expect(isProjectOwnerDocumentCardAnchor(`project-owner-document-card-${kind}`)).toBe(true)
     expect(isProjectOwnerDocumentCardAnchor('project-owner-document-card-forged')).toBe(false)
+  })
+
+  it.each(Array.from(['change', 'report', 'acceptance', 'warranty', 'final-settlement', 'penalty']).map(input => ({ input })))('以共享白名单识别项目甲方六类卡片锚点：输入组合 1 案例 %#', ({ input: kind }) => {
+    expect(isProjectOwnerDocumentCardAnchor(`project-owner-document-card-${kind}`)).toBe(true)
   })
 
   it('保留来源、筛选、分页、行锚点与滚动位置', () => {
@@ -86,31 +88,20 @@ describe('材料采购合同列表返回上下文', () => {
     expect(validateProjectJourneyReturnTo('/project/project-1', 'demo')).toBeNull()
   })
 
-  it('保留项目材采操作与甲方商务卡片的稳定返回锚点', () => {
-    expect(validateProjectJourneyReturnTo(
-      '/project/project-1?origin=real&materialJourney=origin_277_project#project-material-contract-link',
-      'real',
-    )).toBe('/project/project-1?origin=real&materialJourney=origin_277_project#project-material-contract-link')
-    expect(validateProjectJourneyReturnTo(
-      '/project/project-1?origin=real#project-owner-document-card-warranty',
-      'real',
-    )).toBe('/project/project-1?origin=real#project-owner-document-card-warranty')
-    expect(validateProjectJourneyReturnTo(
-      '/project/project-1?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement',
-      'real',
-    )).toBe('/project/project-1?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement')
-    expect(validateProjectJourneyReturnTo(
-      '/project/project-1?origin=real#project-owner-document-card-penalty',
-      'real',
-    )).toBe('/project/project-1?origin=real#project-owner-document-card-penalty')
-    expect(validateProjectJourneyReturnTo(
-      '/project/project-1?origin=real#project-owner-document-card-forged',
-      'real',
-    )).toBeNull()
-    expect(validateProjectJourneyReturnTo(
-      '/project/project-1?origin=real&ownerJourney=bad#project-owner-document-card-penalty',
-      'real',
-    )).toBeNull()
+  it.each([
+    { case: '\'/project/project-1?origin=real&materialJourney=origin_277_project#project-material-contract-link\' / \'real\'', input: '/project/project-1?origin=real&materialJourney=origin_277_project#project-material-contract-link', argument2: 'real', expected: '/project/project-1?origin=real&materialJourney=origin_277_project#project-material-contract-link' },
+    { case: '\'/project/project-1?origin=real#project-owner-document-card-warranty\' / \'real\'', input: '/project/project-1?origin=real#project-owner-document-card-warranty', argument2: 'real', expected: '/project/project-1?origin=real#project-owner-document-card-warranty' },
+    { case: '\'/project/project-1?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement\' / \'real\'', input: '/project/project-1?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement', argument2: 'real', expected: '/project/project-1?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement' },
+    { case: '\'/project/project-1?origin=real#project-owner-document-card-penalty\' / \'real\'', input: '/project/project-1?origin=real#project-owner-document-card-penalty', argument2: 'real', expected: '/project/project-1?origin=real#project-owner-document-card-penalty' },
+  ])('保留项目材采操作与甲方商务卡片的稳定返回锚点 / validateProjectJourneyReturnTo：$case', ({ input, argument2, expected }) => {
+    expect(validateProjectJourneyReturnTo(input, argument2)).toBe(expected)
+  })
+
+  it.each([
+    { case: '\'/project/project-1?origin=real#project-owner-document-card-forged\' / \'real\'', input: '/project/project-1?origin=real#project-owner-document-card-forged', argument2: 'real' },
+    { case: '\'/project/project-1?origin=real&ownerJourney=bad#project-owner-document-card-penalty\' / \'real\'', input: '/project/project-1?origin=real&ownerJourney=bad#project-owner-document-card-penalty', argument2: 'real' },
+  ])('保留项目材采操作与甲方商务卡片的稳定返回锚点 / validateProjectJourneyReturnTo：$case', ({ input, argument2 }) => {
+    expect(validateProjectJourneyReturnTo(input, argument2)).toBeNull()
   })
 
   it('用短期会话上下文恢复项目入口和合同分供方入口的滚动与焦点锚点', () => {

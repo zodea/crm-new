@@ -5,25 +5,32 @@ import ReceiptFormFields from '../../app/components/receipt/ReceiptFormFields.vu
 import { draft, references, session } from '../receipt/fixtures'
 
 describe('收款独立表单字段', () => {
-  it('关联错误接到真实选择控件及说明，供表单首错聚焦', () => {
+  it.each([
+    { field: 'projectId', message: '请选择项目' },
+    { field: 'customerId', message: '请选择付款方客户' },
+    { field: 'contractId', message: '合同关系已改变' },
+  ])('$field 关联错误接到真实选择控件及说明，供表单首错聚焦', ({ field, message }) => {
     setActivePinia(createPinia())
-    const wrapper = mount(ReceiptFormFields, { props: { draft, context: { ...references, ...session }, fieldErrors: { projectId: ['请选择项目'], customerId: ['请选择付款方客户'], contractId: ['合同关系已改变'] } }, global: { stubs: { SectionHeader: true, KitButton: true } } })
-    for (const field of ['projectId', 'customerId', 'contractId']) {
-      const input = wrapper.get(`input[data-field="${field}"]`)
-      expect(input.attributes('aria-invalid')).toBe('true')
-      const descriptionId = input.attributes('aria-describedby')
-      expect(descriptionId).toBe(`receipt-${field}-error`)
-      expect(wrapper.get(`#${descriptionId}`).text()).not.toBe('')
-    }
+    const wrapper = mount(ReceiptFormFields, { props: { draft, context: { ...references, ...session }, fieldErrors: { [field]: [message] } }, global: { stubs: { SectionHeader: true, KitButton: true } } })
+    const input = wrapper.get(`input[data-field="${field}"]`)
+    expect(input.attributes('aria-invalid')).toBe('true')
+    const descriptionId = input.attributes('aria-describedby')
+    expect(descriptionId).toBe(`receipt-${field}-error`)
+    expect(wrapper.get(`#${descriptionId}`).text()).toBe(message)
     wrapper.unmount()
   })
-  it('清空金额保存为未知，显式零和超精度输入保留供校验，不以零替代错误', async () => {
+  it.each([
+    { value: '', expected: null },
+    { value: '0', expected: '0' },
+    { value: '123.45', expected: '123.45' },
+    { value: '1.005', expected: '1.005' },
+    { value: '-1', expected: '-1' },
+  ])('金额输入 $value 保存为 $expected，未知、零及待校验输入保持区分', async ({ value, expected }) => {
     const wrapper = mount(ReceiptFormFields, { props: { draft, context: { ...references, ...session }, fieldErrors: {} }, global: { stubs: { LookupSelect: true, SectionHeader: true } } })
     const input = wrapper.get('input[aria-label="收款金额"]')
-    for (const [value, expected] of [['', null], ['0', '0'], ['1.005', '1.005']] as const) {
-      await input.setValue(value)
-      expect(wrapper.emitted('patch')!.at(-1)).toEqual([{ amount: expected }])
-    }
+    await input.setValue(value)
+    expect(wrapper.emitted('patch')!.at(-1)).toEqual([{ amount: expected }])
+    wrapper.unmount()
   })
 
   it('项目变化使用当前中央主客户并清空旧合同；不可写时禁用输入', async () => {

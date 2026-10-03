@@ -5,6 +5,7 @@ import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { contractListFilterValues } from '~/lib/contract/list-filters'
 import { CONTRACT_STATUSES, CONTRACT_SUB_KINDS } from '~/lib/contract/status'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
@@ -268,9 +269,9 @@ useTabTitle('分包合同')
             {{ yuan(Number(row.amounts.completionSettlement)) }}
           </template>
           <template #settlementStatus="{ row }">
-            {{ row.settlementStatus || '未记录' }}
+            <KitStatusTag>{{ row.settlementStatus || '未记录' }}</KitStatusTag>
           </template><template #clearanceStatus="{ row }">
-            {{ row.clearanceStatus || '未记录' }}
+            <KitStatusTag>{{ row.clearanceStatus || '未记录' }}</KitStatusTag>
           </template>
         </KitTable>
       </section>

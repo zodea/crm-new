@@ -39,16 +39,18 @@ describe('多选筛选器的真实浏览器交互', () => {
     await expect.element(trigger).toHaveFocus()
   })
 
-  it('长候选列表由弹层内部滚动，末项可选择且页面不横向溢出', async () => {
+  it.each([40, 80])('%s 项候选由弹层内部滚动，末项可选择且页面不横向溢出', async (count) => {
     const update = vi.fn()
+    const options = Array.from({ length: count }, (_, i) => ({ key: `p${i + 1}`, label: `项目 ${i + 1}` }))
+    const lastOption = options.at(-1)!
     await render(KitMultiSelectFilter, { props: {
       'label': '项目',
       'modelValue': [],
-      'options': Array.from({ length: 40 }, (_, i) => ({ key: `p${i + 1}`, label: `项目 ${i + 1}` })),
+      options,
       'onUpdate:modelValue': update,
     } })
     await page.getByRole('button', { name: '项目，已选 0 项' }).click()
-    const last = page.getByRole('checkbox', { name: '项目 40', exact: true })
+    const last = page.getByRole('checkbox', { name: lastOption.label, exact: true })
     // Playwright 的实际点击会滚动候选容器，不调用 mock scrollIntoView。
     await last.click()
     await expect.element(last).toBeChecked()
@@ -58,6 +60,6 @@ describe('多选筛选器的真实浏览器交互', () => {
     expect(window.scrollY).toBe(0)
     expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth)
     await page.getByRole('button', { name: '应用', exact: true }).click()
-    expect(update).toHaveBeenCalledExactlyOnceWith(['p40'])
+    expect(update).toHaveBeenCalledExactlyOnceWith([lastOption.key])
   })
 })

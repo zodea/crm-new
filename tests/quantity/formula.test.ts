@@ -41,11 +41,14 @@ describe('现场量算式', () => {
       expect(result.error).toContain(message)
   })
 
-  it('限制过深或过长输入，避免递归和大输入拖垮界面', () => {
+  describe('限制过深或过长输入，避免递归和大输入拖垮界面', () => {
     const tooDeep = `${'('.repeat(65)}1${')'.repeat(65)}`
     const tooLong = `1+${'1'.repeat(4096)}`
-
-    expect(evaluateQuantityFormula(tooDeep)).toMatchObject({ ok: false, error: expect.stringContaining('过于复杂') })
-    expect(evaluateQuantityFormula(tooLong)).toMatchObject({ ok: false, error: expect.stringContaining('过长') })
+    it.each([
+      { case: 'tooDeep', input: tooDeep, expected: { ok: false, error: expect.stringContaining('过于复杂') } },
+      { case: 'tooLong', input: tooLong, expected: { ok: false, error: expect.stringContaining('过长') } },
+    ])('evaluateQuantityFormula：$case', ({ input, expected }) => {
+      expect(evaluateQuantityFormula(structuredClone(input))).toMatchObject(expected)
+    })
   })
 })

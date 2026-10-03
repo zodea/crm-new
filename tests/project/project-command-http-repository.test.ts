@@ -82,32 +82,29 @@ describe('project command HTTP repository', () => {
     })
   })
 
-  it('完整解码中央项目表单并拒绝无正式 ID 或脏字段', async () => {
-    const validForm = {
-      draft: {
-        id: 'opaque-1',
-        name: '中央项目',
-        startDate: '2026-08-15',
-        contractAmount: 100,
-      },
-      attachments: [],
-      version: '1',
-      updatedAt: '2026-08-15T08:00:00.000Z',
-    }
-    const invalidDrafts = [
-      { name: '缺少正式 ID' },
-      { ...validForm.draft, startDate: '15/08/2026' },
-      { ...validForm.draft, contractAmount: -1 },
-      { ...validForm.draft, unexpected: true },
-    ]
+  const validForm = {
+    draft: {
+      id: 'opaque-1',
+      name: '中央项目',
+      startDate: '2026-08-15',
+      contractAmount: 100,
+    },
+    attachments: [],
+    version: '1',
+    updatedAt: '2026-08-15T08:00:00.000Z',
+  }
 
-    for (const draft of invalidDrafts) {
-      const repository = createHttpProjectCommandRepository({
-        fetcher: vi.fn().mockResolvedValue({ ...validForm, draft }),
-      })
-      await expect(repository.loadForm('opaque-1')).rejects.toMatchObject({
-        problem: { code: 'internal-error' },
-      })
-    }
+  it.each(([
+    { name: '缺少正式 ID' },
+    { ...validForm.draft, startDate: '15/08/2026' },
+    { ...validForm.draft, contractAmount: -1 },
+    { ...validForm.draft, unexpected: true },
+  ]).map(input => ({ input })))('完整解码中央项目表单并拒绝无正式 ID 或脏字段', async ({ input: draft }) => {
+    const repository = createHttpProjectCommandRepository({
+      fetcher: vi.fn().mockResolvedValue({ ...validForm, draft }),
+    })
+    await expect(repository.loadForm('opaque-1')).rejects.toMatchObject({
+      problem: { code: 'internal-error' },
+    })
   })
 })

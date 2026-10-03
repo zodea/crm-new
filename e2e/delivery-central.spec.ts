@@ -9,8 +9,8 @@ import { expectNoPageOverflow } from './helpers/responsive'
 const original = cooperationPdfFixture('Delivery original')
 const widths = [390, 768, 1024, 1280, 1440]
 test.use({ channel: 'chromium', actionTimeout: 15_000 })
-test.beforeEach(async ({ page }, info) => {
-  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `delivery-441-${Buffer.from(info.testId).toString('base64url')}` })
+test.beforeEach(async ({ page }) => {
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `delivery-441-${randomUUID()}` })
   await page.addInitScript(() => {
     if (window.top !== window || !['http:', 'https:'].includes(location.protocol))
       return
@@ -82,7 +82,7 @@ async function waitForPdfPaint(preview: Locator) {
     }).catch(() => false)
   }, { message: '当前原件已载入两页，原生 PDF 绘制区域可见', timeout: 15_000 }).toBe(true)
   // Chromium 原生 PDF 在视口变化后异步重排，完成信号之后再等待绘制帧稳定。
-  await preview.page().waitForTimeout(250)
+  await preview.page().evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
 }
 
 test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，刷新修订下载与五档界面保持同源', async ({ page }, info) => {
@@ -108,10 +108,13 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
   await expect(page.getByRole('button', { name: '上传送货单', exact: true })).toBeVisible({ timeout: 60_000 })
   const picker = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: '上传送货单', exact: true }).click()
+  const recognized = page.waitForResponse(response => new URL(response.url()).pathname === '/api/ocr/recognize' && response.request().method() === 'POST')
   await (await picker).setFiles({ name: '双页送货原件.pdf', mimeType: 'application/pdf', buffer: Buffer.from(original) })
+  const recognition = await recognized
+  expect(recognition.ok(), await recognition.text()).toBe(true)
   const review = page.locator('.delivery-review-panel')
   for (const index of [1, 2]) {
-    await expect(review.getByText('单号', { exact: true }).locator('..').locator('input')).toHaveValue(`DL-441-${index}`)
+    await expect(review.getByPlaceholder('未识别时可手工填写', { exact: true })).toHaveValue(`DL-441-${index}`)
     await review.locator('select').first().selectOption(project.id)
     await review.getByPlaceholder('搜索分供方名称').fill(supplier.name)
     await review.getByRole('button', { name: supplier.name, exact: true }).click()
@@ -150,11 +153,17 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
   expect(archived[0]!.uploadBatchId).toBe(archived[1]!.uploadBatchId)
   const first = archived.find(record => record.orderNo === 'DL-441-1')!
   const second = archived.find(record => record.orderNo === 'DL-441-2')!
+  expect(archived.every(record => record.archived && record.printDisposition === 'pending')).toBe(true)
   expect(JSON.stringify(archived)).not.toContain(Buffer.from(original).toString('base64'))
   await page.reload()
   // 识别处理区属于写态，页签恢复按既定规则返回首页；通过可见菜单重新进入。
   await expect(page).toHaveURL(url => url.pathname === '/')
+  const restoredQueue = page.waitForResponse(response => new URL(response.url()).pathname === '/api/read/deliveries' && response.request().method() === 'GET')
   await page.getByRole('navigation').getByRole('link', { name: '送货单识别', exact: true }).click()
+  const restoredResponse = await restoredQueue
+  expect(restoredResponse.ok(), await restoredResponse.text()).toBe(true)
+  const restoredRecords: DeliveryCentralRecord[] = (await restoredResponse.json()).records
+  expect(restoredRecords.map(record => record.id)).toEqual(expect.arrayContaining([first.id, second.id]))
   await expect(page.getByText('已归档 · 待打印', { exact: true }).first()).toBeVisible({ timeout: 60_000 })
   await page.getByRole('link', { name: '归档库', exact: true }).click()
   await page.locator('[data-ui="kit-table"]').getByRole('link', { name: first.orderNo, exact: true }).click()

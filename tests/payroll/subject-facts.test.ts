@@ -8,7 +8,7 @@ import { createMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
-it('真实 SQLite 的原比例经网络来源保留 0 与 0.8，旧缺字段不变成表单默认 0.95', async () => {
+it.each(Array.from(['0.8', -0.1, 1.1]).map(input1 => ({ input1 })))('真实 SQLite 的原比例经网络来源保留 0 与 0.8，旧缺字段不变成表单默认 0.95：输入案例 %#', async ({ input1: invalid }) => {
   const db = await createMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
@@ -48,11 +48,10 @@ it('真实 SQLite 的原比例经网络来源保留 0 与 0.8，旧缺字段不�
     expect(changed.rows.find(row => row.crewId === 'old-unknown')).toMatchObject({ value: 0, explicitlyConfigured: true })
     owner.prepareMigrationSnapshot(snapshot)()
     expect(owner.payrollRatioFacts()).toEqual(changed)
-    for (const invalid of ['0.8', -0.1, 1.1]) {
-      const altered = structuredClone(request)
-      altered.source.entities.crews[0]!.attributes = { defaultPayRatio: invalid }
-      expect(() => parseCoreMigrationSourceCommand(altered)).toThrow()
-    }
+
+    const altered = structuredClone(request)
+    altered.source.entities.crews[0]!.attributes = { defaultPayRatio: invalid }
+    expect(() => parseCoreMigrationSourceCommand(altered)).toThrow()
   }
   finally { db.close() }
 })

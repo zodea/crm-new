@@ -81,9 +81,13 @@ describe('项目阶段目录与显式报量映射', () => {
   it('重复编码、重复映射、非法排序及对象形式的模式均给稳定业务错误', async () => {
     await save({ kind: 'save-stage', draft, allowArchivedEdit: false })
     await expect(save({ kind: 'save-stage', draft, allowArchivedEdit: false })).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
-    for (const patch of [{ itemIds: ['putty', 'putty'] }, { sortOrder: Number.NaN }, { completionMode: { toString: null } }])
-      await expect(save({ kind: 'save-stage', draft: { ...draft, ...patch }, allowArchivedEdit: false })).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
     expect((await loadQuantityStageWorkspace(memory, projectId)).stages).toHaveLength(1)
+  })
+
+  it.each(Array.from([{ itemIds: ['putty', 'putty'] }, { sortOrder: Number.NaN }, { completionMode: { toString: null } }]).map(input => ({ input })))('重复编码、重复映射、非法排序及对象形式的模式均给稳定业务错误：输入组合 1 案例 %#', async ({ input: patch }) => {
+    await save({ kind: 'save-stage', draft, allowArchivedEdit: false })
+    await expect(save({ kind: 'save-stage', draft, allowArchivedEdit: false })).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    await expect(save({ kind: 'save-stage', draft: { ...draft, ...patch }, allowArchivedEdit: false })).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
   })
 
   it('归档只在明确确认后保存，取消不会写入或产生完成', async () => {

@@ -8,8 +8,6 @@ const path = '/subcontract/payroll/workbooks?origin=real&project=project-one&mod
 it('工资目录冷恢复仅带公开身份，重新受权读取原目录且不预读私密正文', async () => {
   expect(inspectRestorableTabPath(path)).toMatchObject({ fullPath: path, origin: 'real' })
   expect(payrollAdjustmentReturn(path, 'real')).toBe(path)
-  expect(inspectRestorableTabPath(path.replace('origin=real', 'origin=demo'))).toBeNull()
-  expect(inspectRestorableTabPath(`${path}&payload=private`)).toBeNull()
   const list = vi.fn(async () => ({ context: { sourceVersion: 'current' } }))
   const workbookArchive = vi.fn(async () => ({}))
   const privateRead = vi.fn()
@@ -22,12 +20,24 @@ it('工资目录冷恢复仅带公开身份，重新受权读取原目录且不�
   expect((await restore(descriptor)).state).toBe('forbidden')
 })
 
+it.each([
+  { case: 'path.replace(\'origin=real\', \'origin=demo\')', input: path.replace('origin=real', 'origin=demo') },
+  { case: '`{path}&payload=private`', input: `${path}&payload=private` },
+])('工资目录冷恢复仅带公开身份，重新受权读取原目录且不预读私密正文 / inspectRestorableTabPath：$case', ({ input }) => {
+  expect(inspectRestorableTabPath(input)).toBeNull()
+})
+
 it('跳实名名册保留所选原工资身份和安全返回路径，不接收跨来源返回', () => {
   const query = new URLSearchParams({ origin: 'real', project: 'project-one', returnTo: path })
   query.append('statement', 'salary-one')
   query.append('statement', 'salary:import:%E5%B7%A5%E8%B5%84')
   const rosterPath = `/subcontract/payroll/roster?${query}`
   expect(inspectRestorableTabPath(rosterPath)?.fullPath).toBe(rosterPath)
-  expect(payrollAdjustmentReturn(path, 'demo')).toBeNull()
-  expect(payrollAdjustmentReturn('//outside.invalid', 'real')).toBeNull()
+})
+
+it.each([
+  { case: 'path / \'demo\'', input: path, argument2: 'demo' },
+  { case: '\'//outside.invalid\' / \'real\'', input: '//outside.invalid', argument2: 'real' },
+])('跳实名名册保留所选原工资身份和安全返回路径，不接收跨来源返回 / payrollAdjustmentReturn：$case', ({ input, argument2 }) => {
+  expect(payrollAdjustmentReturn(input, argument2)).toBeNull()
 })

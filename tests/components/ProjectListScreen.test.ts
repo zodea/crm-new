@@ -190,7 +190,7 @@ const KitTableStub = defineComponent({
       ...(props.data as any[]).map(row =>
         h('div', { role: 'row' }, [
           slots.name?.({ row }),
-          row.status,
+          slots.status?.({ row }),
           slots.origin?.({ row }),
           slots.developer?.({ row }),
           slots.action?.({ row }),
@@ -290,6 +290,8 @@ const route = reactive({
 
 describe('project list screen', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-24T08:00:00Z'))
     vi.stubGlobal('computed', computed)
     sessionStorage.clear()
     route.fullPath = '/project'
@@ -362,6 +364,22 @@ describe('project list screen', () => {
 
     expect(within(tree).queryByRole('button', { name: /项目立项/ })).toBeNull()
     expect(within(tree).queryByRole('button', { name: /保修结束/ })).toBeNull()
+  })
+
+  it('列表使用紧凑业务状态标签，并保留未知阶段的原文与中性呈现', async () => {
+    const data = projectPage()
+    data.items[1]!.status = '历史待核实阶段'
+    projectReadStore.state = { kind: 'ready', data }
+    projectReadStore.load.mockResolvedValue(undefined)
+    render(ProjectListScreen, { global })
+
+    const table = screen.getByRole('region', { name: '项目宽表' })
+    const current = within(table).getByText('施工中')
+    expect(current.getAttribute('data-ui')).toBe('status-tag')
+    expect(current.getAttribute('data-tone')).toBe('brand')
+    const historical = within(table).getByText('历史待核实阶段')
+    expect(historical.getAttribute('data-ui')).toBe('status-tag')
+    expect(historical.getAttribute('data-tone')).toBe('neutral')
   })
 
   it('同范围刷新保留已有表格，首次或新范围等待仍显示加载态', async () => {

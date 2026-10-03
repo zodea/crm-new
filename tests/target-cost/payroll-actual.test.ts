@@ -60,14 +60,12 @@ it('预算在工资同一队列事务内读取真实1000→退40→后月940，�
   finally { await f.close() }
 }, 30_000)
 
-it('工资资金读取需同时具备目的权限和工资来源权限，不能只凭内部读取入口取得金额', async () => {
+it.each(Array.from([[], ['payroll:read'], ['target-cost:read']]).map(input1 => ({ input1 })))('工资资金读取需同时具备目的权限和工资来源权限，不能只凭内部读取入口取得金额：输入案例 %#', async ({ input1: capabilities }) => {
   const f = await createPayrollAdjustmentFixture()
   try {
-    for (const capabilities of [[], ['payroll:read'], ['target-cost:read']]) {
-      const sources = await f.withTransaction(tx => loadPayrollBudgetActual(tx, 'p', { workspaceId: 'work', actorId: 'actor', capabilities }))
-      expect(sources.every(s => s.status === 'forbidden' && !s.rows.length)).toBe(true)
-      expect(buildTargetCostComparison('budget', [], aggregateTargetCostActual('p', sources)).summary.settledAmount.knownValue).toBeNull()
-    }
+    const sources = await f.withTransaction(tx => loadPayrollBudgetActual(tx, 'p', { workspaceId: 'work', actorId: 'actor', capabilities }))
+    expect(sources.every(s => s.status === 'forbidden' && !s.rows.length)).toBe(true)
+    expect(buildTargetCostComparison('budget', [], aggregateTargetCostActual('p', sources)).summary.settledAmount.knownValue).toBeNull()
   }
   finally { await f.close() }
 })

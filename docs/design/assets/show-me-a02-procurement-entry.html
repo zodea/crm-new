@@ -174,6 +174,7 @@
   </style>
 </head>
 <body>
+  <aside id="a02-baseline-note" style="max-width:1160px;margin:16px auto;padding:12px 16px;border:1px solid #e3e6ea;background:#fff;font-size:13px;line-height:1.6">对照基线：原六张示意中的代码现状按已提交版本 8756be2d。工作区未提交源码已有单位文本/空值、按列粘贴、联系人带出和未知税率处理，本轮未运行验收。后三张为本次补答后的规则示意，均不表示功能已交付。</aside>
   <main id="procurement-entry" data-state="after">
     <header>
       <p class="eyebrow">A02 · 采购合同明细</p>
@@ -340,6 +341,111 @@
       <div class="discount-total"><span>合计（元）</span><strong class="number">4,800.00</strong></div>
     </article>
     <p class="discount-note">有优惠或扣减时单列减项，参与合计。</p>
+  </section>
+  <section id="supplier-price-scope" class="unit-figure" aria-labelledby="supplier-scope-heading">
+    <header>
+      <h2 id="supplier-scope-heading">材料分供方：按查看目的展示</h2>
+      <p class="notice">已确认范围 · 虚构规则示意 · 不是运行截图</p>
+    </header>
+    <article class="card">
+      <div class="unit-context"><span>原说明 <b>“材料分供方数”按项目登记统计，未区分使用场景</b></span></div>
+      <div class="unit-context"><span>调整为 <b>价格比较展示各家并标明来源；合同查找展示实际签约采购方</b></span></div>
+      <div class="unit-table-wrap" tabindex="0" role="region" aria-label="分供方报价与合同关系示意，窄屏表内横向滚动">
+        <table class="unit-table">
+          <thead><tr><th scope="col">分供方</th><th scope="col">价格（元/米）</th><th scope="col">来源</th><th scope="col">正式材采合同</th><th scope="col">价格比较</th><th scope="col">合同查找 / 采购方</th></tr></thead>
+          <tbody>
+            <tr><td>甲材料公司</td><td class="number">100.00</td><td>合同约定价</td><td>2 份</td><td>展示</td><td>展示甲（1 家）</td></tr>
+            <tr><td>甲材料公司</td><td class="number">101.00</td><td>实际送货价</td><td>同一采购方</td><td>另标来源</td><td>仍是甲</td></tr>
+            <tr><td>乙材料公司</td><td class="number">98.00</td><td>未签约询价</td><td>无</td><td>展示</td><td>无正式签约关系</td></tr>
+            <tr><td>丙材料公司</td><td class="number">105.00</td><td>未签约询价</td><td>仅草稿</td><td>展示</td><td>不冒充已签约</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="unit-context"><span>价格比较 <b>甲、乙、丙 3 家；三种来源分开标明</b></span><span>已签约采购方 <b>仅甲 1 家；2 份合同仍是同一家</b></span></div>
+    </article>
+    <p class="unit-source">现行价格分析来自已归档送货明细；包含未签约询价、合同约定价、实际送货价并分别标明是确认目标。独立报价实体与综合比较尚未实现。</p>
+  </section>
+  <section id="quantity-unit-review" class="a02-followup" aria-labelledby="quantity-unit-heading">
+    <style>
+      .a02-followup { max-width: 1160px; margin: 30px auto 0; padding: 26px 30px; border-top: 1px solid var(--line-strong); }
+      .a02-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .a02-followup .a02-body { padding: 16px 18px; }
+      .a02-followup .a02-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+      .a02-followup .a02-row:last-child { border-bottom: 0; }
+      .a02-followup .a02-detail { color: var(--muted); font-size: 13px; margin-top: 10px; }
+      .a02-followup .a02-result { padding: 10px 14px; margin-top: 12px; color: var(--brand-deep); background: var(--brand-soft); }
+      .a02-followup .a02-caption { margin-top: 12px; font-size: 13px; color: var(--muted); }
+      .a02-followup [role="region"]:focus-visible { outline: 2px solid var(--brand); outline-offset: -3px; }
+      @media (max-width: 700px) { .a02-followup { padding: 20px 12px; } .a02-compare { grid-template-columns: minmax(0, 1fr); } }
+    </style>
+    <header><h2 id="quantity-unit-heading">数量与单位：一起核对，再追加</h2><p class="notice">已确认规则示意 · 示例数据 · 不是运行截图</p></header>
+    <div class="a02-compare">
+      <article class="card">
+        <div class="section-head"><strong>原来：数值校验</strong><span class="tag">代码现状示意</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>填入数量 / 单位</span><strong>10 根</strong></div>
+          <div class="a02-row"><span>原资料的单价</span><strong>20 元 / 米</strong></div>
+          <div class="a02-row"><span>已有数值门槛</span><strong>数量正、单价非负</strong></div>
+          <p class="a02-detail">每根长度未知。数值条件可通过，单位与计价关系尚未校验。</p>
+        </div>
+      </article>
+      <article class="card target">
+        <div class="section-head"><strong>调整为：对照同一源行</strong><span class="tag">目标 · 待实现</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>正确源行示例</span><strong>100 米 × 20 元 / 米</strong></div>
+          <div class="a02-row"><span>金额</span><strong>2,000 元</strong></div>
+          <div class="a02-row"><span>根 → 米的倍数未核实</span><strong>保留待核，不猜</strong></div>
+          <p class="a02-result">10 行中仍有 2 行错误：整批留预览。修好全部错误后，再追加当前合同草稿。</p>
+        </div>
+      </article>
+    </div>
+    <p class="a02-caption">保留已有明细及源行定位；正式保存仍一次校验合同头与全部明细，不逐行偷偷写入。</p>
+  </section>
+  <section id="actual-tax-sources" class="a02-followup" aria-labelledby="actual-tax-heading">
+    <header><h2 id="actual-tax-heading">真实税额：按主体与期间核实</h2><p class="notice">已确认规则示意 · 不推算未知税额 · 不是运行截图</p></header>
+    <div class="a02-compare">
+      <article class="card">
+        <div class="section-head"><strong>原来：项目票据算法</strong><span class="tag">代码现状示意</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>“增值税”</span><strong>申请税额 − 归档票税额</strong></div>
+          <div class="a02-row"><span>“税负率”</span><strong>税额差 / 销项票额</strong></div>
+          <p class="a02-detail">申请不等于已开票，归档不等于可抵扣。尚缺纳税主体、真实属期及申报/缴款依据。</p>
+        </div>
+      </article>
+      <article class="card target">
+        <div class="section-head"><strong>调整为：真实来源分开</strong><span class="tag">目标 · 待实现</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>公司税款</span><strong>真实主体 + 所属期间</strong></div>
+          <div class="a02-row"><span>应纳 / 申报 / 实缴</span><strong>各有依据，分别查看</strong></div>
+          <div class="a02-row"><span>项目税额</span><strong>明确归属 + 完整性</strong></div>
+          <p class="a02-result">销项票晚开：核实业务义务属期。进项票迟到：核实凭证及抵扣属期。缺源显示待核实。</p>
+        </div>
+      </article>
+    </div>
+    <p class="a02-caption">晚开 / 未到票不按零；不自动倒期，不把项目差额当成公司真实应纳，不猜分摊。</p>
+  </section>
+  <section id="management-fee-sources" class="a02-followup" aria-labelledby="management-fee-heading">
+    <header><h2 id="management-fee-heading">管理费：看实际成本，展开来源</h2><p class="notice">已确认规则示意 · 示例不含真实金额 · 不是运行截图</p></header>
+    <div class="a02-compare">
+      <article class="card">
+        <div class="section-head"><strong>原来：顶部完整来源未接通</strong><span class="tag">现有规则示意</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>管理费</span><strong>—</strong></div>
+          <div class="a02-row"><span>完整性</span><strong>来源未齐</strong></div>
+          <p class="a02-detail">不能用占位 0 表示没有费用。合同记取、管理人员和仓储等没有统一聚合来源。</p>
+        </div>
+      </article>
+      <article class="card target">
+        <div class="section-head"><strong>调整为：已核实实际成本</strong><span class="tag">目标 · 待实现</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>合同记取相关成本</span><strong>核实费用发生与归属</strong></div>
+          <div class="a02-row"><span>管理人员</span><strong>工资域原事实</strong></div>
+          <div class="a02-row"><span>仓储等</span><strong>真实结算 / 报销来源</strong></div>
+          <p class="a02-result">成本按来源展开；合同记取额、实际收付分别看。缺来源时，已知部分保留不完整标记。</p>
+        </div>
+      </article>
+    </div>
+    <p class="a02-caption">引用原费用及支付，不复制成本；已进入工资或支付的现金，资金余额只计一次。</p>
   </section>
   <script>
     const main = document.querySelector('main');

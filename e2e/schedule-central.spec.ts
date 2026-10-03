@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import type { CoreMigrationBatchDTO } from '../app/lib/migration/core-contract'
 import type { ScheduleRead } from '../app/lib/schedule/central-contract'
 import { execFile } from 'node:child_process'
@@ -12,6 +12,15 @@ import { blankQuantityTemplateDraft } from '../app/lib/quantity/template'
 import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 test.use({ actionTimeout: 15_000 })
+const BACKUP_INPUT = { createdAt: '2026-09-15T00:00:00.000Z' }
+
+async function resetMigrationFixture({ request }: { request: APIRequestContext }) {
+  const response = await request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
+  expect(response.ok(), await response.text()).toBe(true)
+}
+
+test.beforeEach(resetMigrationFixture)
+test.afterEach(resetMigrationFixture)
 
 async function choose(page: Page, label: string, name: string | RegExp) {
   await page.getByRole('combobox', { name: label, exact: true }).click()
@@ -43,7 +52,7 @@ async function importWbs(page: Page, info: TestInfo) {
   const envelope = () => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId: randomUUID(), requiredCapability: 'core:migration:write' })
   const preflight = await page.request.post('/api/migrations/core/preflight', { data: { ...envelope(), source, backup: null } })
   expect(preflight.ok(), await preflight.text()).toBe(true)
-  const dry = await page.request.post('/api/migrations/core/dry-run', { data: { ...envelope(), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: new Date().toISOString(), immutable: true } } })
+  const dry = await page.request.post('/api/migrations/core/dry-run', { data: { ...envelope(), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: BACKUP_INPUT.createdAt, immutable: true } } })
   expect(dry.ok(), await dry.text()).toBe(true)
   const batch: CoreMigrationBatchDTO = await dry.json()
   for (const action of ['import', 'confirm']) {

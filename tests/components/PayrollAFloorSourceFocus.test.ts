@@ -5,7 +5,7 @@ import { defineComponent, h } from 'vue'
 import PayrollAFloorReview from '~/components/payroll/PayrollAFloorReview.vue'
 import { createPayrollHollowFixture } from '../helpers/payroll-hollow-fixture'
 
-it('同层同分项第二户空鼓入口返回自己的原完成定位', async () => {
+it.each(['完成事实缺失', '完成事实歧义'] as const)('同层同分项第二户空鼓入口返回自己的原完成定位，%s 时撤掉失效定位', async (condition) => {
   const f = await createPayrollHollowFixture()
   let wrapper: ReturnType<typeof mount> | undefined
   try {
@@ -27,13 +27,14 @@ it('同层同分项第二户空鼓入口返回自己的原完成定位', async (
     expect(decodeURIComponent(target.pathname)).toContain(`/${second.id}/hollow/`)
     const back = new URL(target.searchParams.get('payrollReturnTo')!, 'https://test.invalid')
     expect(back.searchParams.get('focus')).toBe(secondFact.completionId)
-    for (const facts of [read.facts.filter(fact => fact.unitId !== second.id), [...read.facts, { ...secondFact, completionId: 'conflicting-completion' }]]) {
-      await wrapper.setProps({ facts, returnTo: '/subcontract/payroll/new?origin=real&draftKey=review-second-unit&focus=previous-completion' })
-      const candidate = wrapper.findAll('a').find(link => link.text().includes('102室'))!
-      const next = new URL(candidate.attributes('href'), 'https://test.invalid')
-      expect(decodeURIComponent(next.pathname)).toContain(`/${second.id}/hollow/`)
-      expect(new URL(next.searchParams.get('payrollReturnTo')!, 'https://test.invalid').searchParams.get('focus')).toBeNull()
-    }
+    const facts = condition === '完成事实缺失'
+      ? read.facts.filter(fact => fact.unitId !== second.id)
+      : [...read.facts, { ...secondFact, completionId: 'conflicting-completion' }]
+    await wrapper.setProps({ facts, returnTo: '/subcontract/payroll/new?origin=real&draftKey=review-second-unit&focus=previous-completion' })
+    const candidate = wrapper.findAll('a').find(link => link.text().includes('102室'))!
+    const next = new URL(candidate.attributes('href'), 'https://test.invalid')
+    expect(decodeURIComponent(next.pathname)).toContain(`/${second.id}/hollow/`)
+    expect(new URL(next.searchParams.get('payrollReturnTo')!, 'https://test.invalid').searchParams.get('focus')).toBeNull()
   }
   finally {
     wrapper?.unmount()

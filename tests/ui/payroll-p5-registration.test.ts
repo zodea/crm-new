@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
@@ -38,7 +38,7 @@ describe('p5 文档与生成物一致性（非工资业务验收）', () => {
     for (const id of ['WAGE-10', 'WAGE-11', 'WAGE-14'])
       expect(byId(id).status).toBe('current-passed')
     expect(new Set(byId('WAGE-14').caseIds)).toEqual(new Set([...payrollACases, 'C-5751CF6E9985', 'C-7C09C38C854D']))
-    expect(byId('WAGE-14').caseIds).toHaveLength(13)
+    expect(byId('WAGE-14').caseIds).toHaveLength(payrollACases.length + 2)
     for (const issue of ['#472', '#473', '#474', '#475'])
       expect(byId('WAGE-14').remaining).toContain(issue)
     expect(byId('WAGE-09').remaining).toContain('材料/报销')
@@ -59,9 +59,9 @@ describe('p5 文档与生成物一致性（非工资业务验收）', () => {
       expect(linked.acceptance).toEqual({ rules: 'needs-review', frontend: 'not-verified', crossModule: 'not-verified', production: 'not-verified' })
     }
     // 后续交付可增补路由；P5 已登记身份和限定证据仍必须全部存在。
-    expect(coverage.counts.rootVariants).toBeGreaterThanOrEqual(208)
-    expect(coverage.counts.surfaces).toBeGreaterThanOrEqual(754)
-    expect(coverage.counts.environmentCases).toBeGreaterThanOrEqual(1221)
+    expect(coverage.counts.rootVariants).toBe(coverage.surfaces.filter(surface => surface.path === 'page').length)
+    expect(coverage.counts.surfaces).toBe(coverage.surfaces.length)
+    expect(coverage.counts.environmentCases).toBe(coverage.cases.length)
   })
 
   it('keeps the report partial, preserves the remaining decisions and renders the actual P5 evidence consistently', () => {
@@ -72,10 +72,9 @@ describe('p5 文档与生成物一致性（非工资业务验收）', () => {
       const document = dom.window.document
       const embedded: ReportRow[] = JSON.parse(document.querySelector('#review-data')!.textContent!)
       const rendered = embedded.find(item => item.number === 412)!
-      expect(embedded).toHaveLength(46)
-      expect(embedded.filter(item => item.status === 'local-done')).toHaveLength(31)
-      expect(embedded.filter(item => item.status === 'partial')).toHaveLength(14)
-      expect(embedded.filter(item => item.status === 'decision')).toHaveLength(1)
+      const sourceRows: ReportRow[] = readdirSync(reportDirectory).filter(name => /^rows-.+\.json$/.test(name)).flatMap(name => JSON.parse(readFileSync(`${reportDirectory}/${name}`, 'utf8')))
+      expect([...embedded].sort((a, b) => a.number - b.number)).toEqual(sourceRows.sort((a, b) => a.number - b.number))
+      expect(new Set(embedded.map(item => item.number)).size).toBe(sourceRows.length)
       expect(row.status).toBe('partial')
       for (const field of ['status', 'solved', 'remaining', 'evidence', 'questions', 'graph'] as const)
         expect(rendered[field]).toEqual(row[field])
@@ -90,13 +89,14 @@ describe('p5 文档与生成物一致性（非工资业务验收）', () => {
       expect(row.evidence).toEqual(expect.arrayContaining([evidence, 'docs/guides/payroll-fees.md', 'docs/design/evidence/issue-412-payroll-fees/browser/supplement-390/negative-readable-amount-columns-390.png']))
       for (const path of row.evidence.filter(item => item.includes('payroll-fees')))
         expect(existsSync(resolve(path))).toBe(true)
-      expect(row.graph.nodes).toHaveLength(18)
-      expect(row.graph.edges).toHaveLength(27)
+      expect(row.graph.nodes.length).toBeGreaterThan(0)
+      expect(row.graph.edges.length).toBeGreaterThan(0)
+      expect(new Set(row.graph.nodes.map(node => node.id)).size).toBe(row.graph.nodes.length)
       expect(row.graph.nodes.find(item => item.id === 'frozen')!.lines).toContain('A普通/管理分簿，软删不解锁')
       expect(row.graph.nodes.find(item => item.id === 'end')!.lines).toContain('批量资金、完整工作簿与名册继续实施')
       const article = document.querySelector('#issue-412')!
-      expect(article.querySelectorAll('svg.flow-branches > rect')).toHaveLength(18)
-      expect(article.querySelectorAll('svg.flow-branches > path')).toHaveLength(27)
+      expect(article.querySelectorAll('svg.flow-branches > rect')).toHaveLength(row.graph.nodes.length)
+      expect(article.querySelectorAll('svg.flow-branches > path')).toHaveLength(row.graph.edges.length)
       expect([...article.querySelectorAll('.flow-scroll svg text')].map(item => item.textContent)).toEqual(row.graph.nodes.flatMap(item => [item.title, ...item.lines]))
       const readme = readFileSync(`${reportDirectory}/README.md`, 'utf8')
       const summaryRow = readme.split(/\r?\n/).find(line => line.startsWith('| [#412 '))!

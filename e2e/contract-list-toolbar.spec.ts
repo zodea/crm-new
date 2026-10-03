@@ -1,135 +1,92 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import {
-  expectLocalHorizontalScroll,
-  expectNoPageOverflow,
-  RESPONSIVE_WIDTHS,
-} from './helpers/responsive'
+import { expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
-for (const width of RESPONSIVE_WIDTHS) {
-  test(`分包合同工具栏在 ${width}px 保持稳定且仅表格内部横滚`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 })
-    await page.goto('/contract/subcontract')
-    await page.waitForLoadState('networkidle')
+const listCases = [
+  { domain: 'construction', title: '施工合同', party: '客户', root: 'construction-contract-list', search: '搜索施工合同', searchRole: 'searchbox' },
+  { domain: 'subcontract', title: '分包合同', party: '分供方', root: 'subcontract-contract-list', search: '搜索分包合同', searchRole: 'textbox' },
+  { domain: 'material', title: '材料采购合同', party: '分供方', root: 'material-contract-list', search: '搜索材料采购合同', searchRole: 'searchbox' },
+] as const
 
-    const toolbar = page.locator('[data-ui="contract-list-toolbar"]')
-    await expect(toolbar).toBeVisible()
-    await expect(toolbar.getByRole('heading', { name: '分包合同' })).toBeVisible()
-    await expect(toolbar.getByText(/共\s*\d+\s*份/)).toHaveCount(0)
-    await expect(toolbar.getByText(/当前\s*\d+\s*份/)).toHaveCount(0)
-    await expect(toolbar.getByRole('combobox', { name: '项目' })).toBeVisible()
-    await expect(toolbar.getByRole('combobox', { name: '分供方' })).toBeVisible()
-    await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
-    await expect(toolbar.getByRole('searchbox', { name: '搜索合同名称 / 编号' })).toBeVisible()
-    await expect(toolbar.getByRole('button', { name: '刷新' })).toBeVisible()
-    await expect(toolbar.getByRole('button', { name: '新增分包合同' })).toBeVisible()
-
-    const titleBox = await toolbar.getByRole('heading', { name: '分包合同' }).boundingBox()
-    const projectBox = await toolbar.getByRole('combobox', { name: '项目' }).boundingBox()
-    const partyBox = await toolbar.getByRole('combobox', { name: '分供方' }).boundingBox()
-    const search = toolbar.getByRole('searchbox', { name: '搜索合同名称 / 编号' })
-    const searchBox = await search.boundingBox()
-    const createBox = await toolbar.getByRole('button', { name: '新增分包合同' }).boundingBox()
-    expect(titleBox).not.toBeNull()
-    expect(projectBox).not.toBeNull()
-    expect(partyBox).not.toBeNull()
-    expect(searchBox).not.toBeNull()
-    expect(createBox).not.toBeNull()
-
-    if (width >= 1280) {
-      expect(Math.abs(titleBox!.y - projectBox!.y)).toBeLessThanOrEqual(8)
-      expect(Math.abs(projectBox!.y - partyBox!.y)).toBeLessThanOrEqual(8)
-      expect(Math.abs(projectBox!.y - searchBox!.y)).toBeLessThanOrEqual(8)
-      expect(Math.abs(searchBox!.y - createBox!.y)).toBeLessThanOrEqual(8)
-    }
-    else if (width >= 768) {
-      expect(Math.abs(titleBox!.y - projectBox!.y)).toBeLessThanOrEqual(8)
-      expect(Math.abs(projectBox!.y - partyBox!.y)).toBeLessThanOrEqual(8)
-      expect(searchBox!.y).toBeGreaterThan(projectBox!.y)
-      expect(Math.abs(searchBox!.y - createBox!.y)).toBeLessThanOrEqual(8)
-    }
-    else {
-      expect(projectBox!.y).toBeGreaterThanOrEqual(titleBox!.y)
-      expect(partyBox!.y).toBeGreaterThan(projectBox!.y)
-      expect(searchBox!.y).toBeGreaterThan(partyBox!.y)
-    }
-
-    await expectNoPageOverflow(page, `${width}px 分包合同列表`)
-    await expectLocalHorizontalScroll(
-      page.locator('.vxe-table--scroll-x-handle').first(),
-      `${width}px 分包合同表格`,
-    )
-    if (width === 390) {
-      const category = await page.getByText('分包合同分类', { exact: true }).boundingBox()
-      const table = await page.locator('.vxe-table--main-wrapper').first().boundingBox()
-      expect(category).not.toBeNull()
-      expect(table).not.toBeNull()
-      expect(table!.width).toBeGreaterThan(300)
-      expect(table!.y).toBeGreaterThan(category!.y)
-    }
-
-    const toolbarHeight = (await toolbar.boundingBox())!.height
-    await search.fill('不存在的合同')
-    const filteredToolbarHeight = (await toolbar.boundingBox())!.height
-    expect(Math.abs(filteredToolbarHeight - toolbarHeight)).toBeLessThanOrEqual(1)
-  })
-}
-
-test('材料采购合同列表复刻单层分类与紧凑省略号操作', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 })
-  await page.goto('/contract/material')
-  await page.waitForLoadState('networkidle')
-
-  await expect(page.getByText('材料采购合同分类', { exact: true })).toBeVisible()
-  await expect(page.getByText('全部材料采购合同', { exact: true })).toBeVisible()
-  const toolbar = page.locator('[data-ui="contract-list-toolbar"]')
-  await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
-  await expect(toolbar.getByRole('combobox', { name: '分供方' })).toBeVisible()
-  await expect(page.locator('[data-ui="contract-list-toolbar"] + .panel')).toHaveCount(0)
-  const rowMenu = page.locator('[data-ui="row-action-menu-trigger"]').first()
-  await expect(rowMenu).toBeVisible()
-  const targetLabel = await rowMenu.getAttribute('aria-label')
-  const targetName = targetLabel?.replace(/合同操作$/, '') ?? ''
-  const mainRows = page.locator('.vxe-table--main-wrapper .vxe-body--row')
-  const rowCount = await mainRows.count()
-  await rowMenu.focus()
-  await rowMenu.press('Enter')
-  const menu = page.getByRole('menu').first()
-  await expect(menu).toBeVisible()
-  await menu.getByRole('menuitem', { name: '删除' }).click()
-  const confirm = page.getByRole('dialog', { name: /删除材料采购合同/ })
-  await expect(confirm).toBeVisible()
-  await expect(page.locator('a').filter({ hasText: targetName }).first()).toBeVisible()
-  await expect(mainRows).toHaveCount(rowCount)
-  await confirm.getByRole('button', { name: '取消' }).click()
-  await expect(confirm).toBeHidden()
-  await expect(page.getByRole('link', { name: targetName, exact: true }).first()).toBeVisible()
-  await expect(mainRows).toHaveCount(rowCount)
-  await expect(rowMenu).toBeFocused()
-  await expectNoPageOverflow(page, '材料采购合同列表')
-  await expectLocalHorizontalScroll(
-    page.locator('.vxe-table--scroll-x-handle').first(),
-    '材料采购合同表格',
-  )
+test.beforeEach(async ({ page }) => {
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `contract-list-${randomUUID()}` })
+  await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+  for (const list of listCases) {
+    const response = await page.request.post(`/api/testing/${list.domain}-contracts/reset`, {
+      headers: { 'x-ruihang-test-reset': '1' },
+      data: { scenario: 'ready' },
+    })
+    expect(response.ok(), await response.text()).toBe(true)
+  }
 })
 
-for (const width of RESPONSIVE_WIDTHS) {
-  test(`材料采购合同工具栏在 ${width}px 不隐藏状态与新增操作`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 })
-    await page.goto('/contract/material')
-    await page.waitForLoadState('networkidle')
-
-    const toolbar = page.locator('[data-ui="contract-list-toolbar"]')
-    await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
-    await expect(toolbar.getByRole('button', { name: '新增材料采购合同' })).toBeVisible()
-    await expectNoPageOverflow(page, `${width}px 材料采购合同列表`)
-  })
+for (const list of listCases) {
+  for (const width of RESPONSIVE_WIDTHS) {
+    test(`${list.title} ${width}px 保留领域筛选与新建入口，宽表只在内部滚动`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(`/contract/${list.domain}`)
+      const root = page.getByTestId(list.root)
+      await expect(root.getByRole('heading', { name: list.title, exact: true })).toBeVisible({ timeout: 20_000 })
+      const filters = root.getByRole('region', { name: `${list.title}筛选`, exact: true })
+      await expect(filters.getByRole('combobox', { name: '筛选项目', exact: true })).toBeVisible()
+      await expect(filters.getByRole('combobox', { name: `筛选${list.party}`, exact: true })).toBeVisible()
+      await expect(filters.getByRole('button', { name: /^筛选状态，已选 0 项$/ })).toBeVisible()
+      const search = root.getByRole(list.searchRole, { name: list.search, exact: true })
+      await expect(search).toBeVisible()
+      const create = root.getByRole('link', { name: `新建${list.title}`, exact: true })
+      await expect(create).toHaveAttribute('href', `/contract/${list.domain}/form`)
+      await expect(create).toBeVisible()
+      if (list.domain === 'subcontract')
+        await expect(filters.getByRole('button', { name: /^筛选分包类别，已选 0 项$/ })).toBeVisible()
+      await expectNoPageOverflow(page, `${width}px ${list.title}列表`)
+      const scroller = root.locator('.vxe-table--body-inner-wrapper').first()
+      await expect(scroller).toBeVisible()
+      if (width <= 768)
+        await expectLocalHorizontalScroll(scroller, `${width}px ${list.title}表格`)
+      const filterBox = await filters.boundingBox()
+      expect(filterBox).not.toBeNull()
+      await search.fill(`不存在的${list.title}`)
+      await expect(page.getByRole('status', { name: '没有符合当前筛选条件的合同', exact: true })).toBeVisible()
+      await expect(search).toHaveValue(`不存在的${list.title}`)
+      expect(Math.abs((await filters.boundingBox())!.height - filterBox!.height)).toBeLessThanOrEqual(1)
+      await expect(create).toBeVisible()
+      await expectNoPageOverflow(page, `${width}px ${list.title}空结果`)
+    })
+  }
 }
 
-test('施工合同统一提供项目、客户与状态筛选', async ({ page }) => {
-  await page.goto('/contract/construction')
-
-  const toolbar = page.locator('[data-ui="contract-list-toolbar"]')
-  await expect(toolbar.getByRole('combobox', { name: '项目' })).toBeVisible()
-  await expect(toolbar.getByRole('combobox', { name: '客户' })).toBeVisible()
-  await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
+test('材料采购演示合同只读，名称链接支持键盘进入并返回原筛选', async ({ page }) => {
+  await page.goto('/contract/material?search=瓷砖采购合同')
+  const root = page.getByTestId('material-contract-list')
+  const rowLink = root.getByRole('link', { name: '瓷砖采购合同', exact: true })
+  await expect(rowLink).toHaveAttribute('href', /\/contract\/con_demo_cg01\?origin=demo&contractKind=material&returnTo=/)
+  await expect(root.locator('[data-ui="row-action-menu-trigger"]')).toHaveCount(0)
+  await rowLink.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('heading', { name: '瓷砖采购合同', exact: true })).toBeVisible()
+  await expect(page.getByTestId('material-contract-edit')).toHaveCount(0)
+  await expect(page.getByText('演示只读', { exact: true })).toBeVisible()
+  await page.getByRole('link', { name: '返回材料采购合同列表', exact: true }).click()
+  await expect(root.getByRole('searchbox', { name: '搜索材料采购合同', exact: true })).toHaveValue('瓷砖采购合同')
+  await expect(rowLink).toBeFocused()
 })
+
+for (const state of [
+  { name: '履约中', visible: true },
+  { name: '草稿', visible: false },
+]) {
+  test(`材料采购状态多选筛选保持独立预期：${state.name}`, async ({ page }) => {
+    await page.goto('/contract/material?search=瓷砖采购合同')
+    await expect(page.getByRole('link', { name: '瓷砖采购合同', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: /^筛选状态，已选 0 项$/ }).click()
+    await page.getByRole('checkbox', { name: state.name, exact: true }).check()
+    await page.getByRole('button', { name: '应用', exact: true }).click()
+    await expect(page).toHaveURL(url => url.searchParams.get('status') === JSON.stringify([state.name]))
+    if (state.visible)
+      await expect(page.getByRole('link', { name: '瓷砖采购合同', exact: true })).toBeVisible()
+    else
+      await expect(page.getByRole('status', { name: '没有符合当前筛选条件的合同', exact: true })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('button', { name: /^筛选状态，已选 1 项$/ })).toHaveText(state.name)
+  })
+}

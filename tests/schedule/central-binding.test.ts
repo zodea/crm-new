@@ -1,3 +1,4 @@
+import type { ScheduleBindingRead } from '../../app/lib/schedule/central-binding-contract'
 import type { ScheduleSources } from '../../server/utils/schedule-sources'
 import type { ScheduleCommand } from '~/lib/schedule/central-contract'
 import { once } from 'node:events'
@@ -202,20 +203,18 @@ describe('中央暂估绑定冻结比较与原子确认', () => {
     }
     finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
   })
-  it('hTTP解码拒绝错项目组、假确定差值和缺单位伪完整，保留真实null', async () => {
+  it.each([
+    (wire: ScheduleBindingRead) => { wire.group.id = 'other' },
+    (wire: ScheduleBindingRead) => { wire.group.projectId = 'other' },
+    (wire: ScheduleBindingRead) => { wire.preview!.items[0]!.differenceQty = 0 },
+    (wire: ScheduleBindingRead) => { wire.preview!.items[0]!.unit = '' },
+  ])('hTTP解码拒绝错项目组、假确定差值和缺单位伪完整：%#', async (mutate) => {
     const actual = await service.binding(query, groupId, 'c')
     const repository = (wire: unknown) => createScheduleRepository(async () => wire)
     expect((await repository(actual).binding(query, groupId, 'c')).preview!.items.find(row => row.id === 'wall')!.provisional.value).toBeNull()
-    for (const mutate of [
-      (wire: typeof actual) => { wire.group.id = 'other' },
-      (wire: typeof actual) => { wire.group.projectId = 'other' },
-      (wire: typeof actual) => { wire.preview!.items[0]!.differenceQty = 0 },
-      (wire: typeof actual) => { wire.preview!.items[0]!.unit = '' },
-    ]) {
-      const changed = structuredClone(actual)
-      mutate(changed)
-      await expect(repository(changed).binding(query, groupId, 'c')).rejects.toMatchObject({ problem: { code: 'unavailable' } })
-    }
+    const changed = structuredClone(actual)
+    mutate(changed)
+    await expect(repository(changed).binding(query, groupId, 'c')).rejects.toMatchObject({ problem: { code: 'unavailable' } })
   })
   it('组内合同独有稳定分项照实显示合同量，缺暂估依据不会补零或新增阻断', async () => {
     sources.boq.lines.push({ ...sources.boq.lines[0]!, id: 'only-line', itemName: '合同独有', qty: 12 })

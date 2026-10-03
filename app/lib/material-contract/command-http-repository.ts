@@ -30,7 +30,10 @@ function invalid(message: string): never {
 function context(value: unknown): MaterialContractCommandContextDTO {
   if (!object(value) || typeof value.workspaceId !== 'string' || typeof value.actorId !== 'string'
     || !Array.isArray(value.capabilities) || !value.capabilities.every(item => typeof item === 'string')
-    || !options(value.projects) || !options(value.suppliers)) {
+    || !options(value.projects) || !options(value.suppliers)
+    || !(value.suppliers as Record<string, unknown>[]).every(row =>
+      (row.contactName === undefined || typeof row.contactName === 'string')
+      && (row.contactPhone === undefined || typeof row.contactPhone === 'string'))) {
     return invalid('中央后台返回的材料采购合同业务会话无效')
   }
   return value as unknown as MaterialContractCommandContextDTO

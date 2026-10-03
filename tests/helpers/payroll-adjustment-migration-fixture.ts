@@ -24,7 +24,7 @@ export async function createPayrollAdjustmentMigrationFixture(options: { unrelat
     const session = resolveBusinessSession()
     const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, commandId })
     await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('p4-source-preflight'), source, backup: null }), session)
-    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('p4-source-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: new Date().toISOString(), immutable: true } }), session)
+    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('p4-source-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
     await coreMigrationTestInstance.importBatch({ ...envelope('p4-source-import'), batchId: batch.batchId }, session)
     await coreMigrationTestInstance.confirm({ ...envelope('p4-source-confirm'), batchId: batch.batchId }, session)
     const projectId = batch.mappings.find(row => row.entityType === 'projects' && row.legacyId === 'p')!.serverId

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 async function openHome(page: import('@playwright/test').Page, width: number) {
   await page.setViewportSize({ width, height: width <= 768 ? 844 : 900 })
   await page.addInitScript(() => {
+    localStorage.setItem('ruihang:workspace-default:include-demo', 'true')
     localStorage.removeItem('ruihang-sidebar-pinned')
     localStorage.removeItem('ruihang-sidebar-groups')
   })
@@ -17,7 +18,7 @@ async function expectWorkspaceLocked(page: import('@playwright/test').Page) {
 test.describe('Issue #171：Sheet、通知抽屉与项目切换器', () => {
   test('通知抽屉锁定工作区，子 Select 逐层关闭并恢复焦点', async ({ page }) => {
     await openHome(page, 1440)
-    const trigger = page.getByRole('button', { name: '打开通知中心' })
+    const trigger = page.getByRole('button', { name: /^打开通知中心/ })
     await trigger.click()
 
     const drawer = page.getByRole('dialog', { name: '消息中心' })
@@ -26,10 +27,11 @@ test.describe('Issue #171：Sheet、通知抽屉与项目切换器', () => {
     await expect(drawer).toHaveAttribute('data-overlay-surface', '')
     await expect(drawer).toHaveCSS('z-index', '9000')
 
-    const typeSelect = drawer.getByRole('combobox')
+    const typeSelect = drawer.getByRole('button', { name: /^消息类型，已选/ })
     await typeSelect.click()
     const ownedLayer = page.locator('[data-overlay-owned][data-state="open"]').last()
     await expect(ownedLayer).toBeVisible()
+    await expect(ownedLayer.getByRole('checkbox', { name: '付款审批', exact: true })).toBeVisible()
     await expect(ownedLayer).toHaveCSS('z-index', '9000')
 
     await page.keyboard.press('Escape')
@@ -60,7 +62,7 @@ test.describe('Issue #171：Sheet、通知抽屉与项目切换器', () => {
     })
   }
 
-  for (const width of [390, 768, 1440]) {
+  for (const width of [390, 768, 1024, 1280, 1440]) {
     test(`${width}px 项目切换器打开、选择并把焦点还给触发器`, async ({ page }) => {
       await openHome(page, width)
       const trigger = page.getByTestId('project-switcher-trigger').first()
@@ -84,16 +86,10 @@ test.describe('Issue #171：Sheet、通知抽屉与项目切换器', () => {
       }
 
       const projectList = page.getByRole('listbox', { name: '全部项目' })
-      const firstOption = projectList.getByRole('option').first()
-      await expect(firstOption).toHaveCSS('border-top-width', '0px')
-
       await search.fill('锦绣华庭')
-      await expect(projectList.getByRole('option')).toHaveCount(1)
-
-      const alternative = projectList
-        .locator('[role="option"][aria-selected="false"]')
-        .first()
+      const alternative = projectList.getByRole('option', { name: /锦绣华庭/ })
       await expect(alternative).toBeVisible()
+      await expect(alternative).toHaveAttribute('aria-selected', 'false')
       await alternative.click()
 
       await expect(search).toBeHidden()

@@ -23,8 +23,13 @@ afterEach(() => memory.close())
 
 it('迁移时间不把不存在的日期滚动到下一月，也不接收含糊时间格式', () => {
   expect(quantityMigrationTimestamp('2026-09-11 00:00:00', '创建')).toBe('2026-09-11T00:00:00.000Z')
-  expect(() => quantityMigrationTimestamp('2026-02-30 00:00:00', '创建')).toThrow()
-  expect(() => quantityMigrationTimestamp('09/11/2026', '创建')).toThrow()
+})
+
+it.each([
+  { case: '\'2026-02-30 00:00:00\' / \'创建\'', input: '2026-02-30 00:00:00', argument2: '创建' },
+  { case: '\'09/11/2026\' / \'创建\'', input: '09/11/2026', argument2: '创建' },
+])('迁移时间不把不存在的日期滚动到下一月，也不接收含糊时间格式 / quantityMigrationTimestamp：$case', ({ input, argument2 }) => {
+  expect(() => quantityMigrationTimestamp(input, argument2)).toThrow()
 })
 
 it('真实SQLite工程量源保留三量空零、稳定区域模板与删除边界，空项目不造数据', async () => {
@@ -61,7 +66,13 @@ it('跨项目父关系、未知列和重复身份均显式拒绝，不按名称�
   await expect(readQuantityMigrationGraphs(memory)).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
 })
 
-it('区域、责任、完成、照片和审计快照按稳定旧ID整体映射，重复映射确定且原稿不变', async () => {
+it.each([
+  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.construction_stage_items[0]!.is_reporting_stage = null },
+  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_payloads[0]!.content = 'AQIE=' },
+  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_refs[0]!.file_size = 4 },
+  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_refs[0]!.mime_type = 'application/pdf' },
+  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.operation_logs[0]!.action = 'execute-sql' },
+])('区域、责任、完成、照片和审计快照按稳定旧ID整体映射，重复映射确定且原稿不变：输入案例 %#', async (change) => {
   await memory.execute('INSERT INTO crews (id, name, trade) VALUES (?, ?, ?)', ['crew', '原班组', '油漆工'])
   await memory.execute('INSERT INTO construction_stages (id, project_id, code, name, trade) VALUES (?, ?, ?, ?, ?)', ['stage', 'p', 'S', '腻子', '油漆工'])
   await memory.execute('INSERT INTO construction_stage_items (id, stage_id, item_id, is_reporting_stage) VALUES (?, ?, ?, ?)', ['mapping', 'stage', 'i', 1])
@@ -93,18 +104,10 @@ it('区域、责任、完成、照片和审计快照按稳定旧ID整体映射�
   historicalTime.tables.unit_stage_completions[0]!.completed_at = '2026-06-20T09:00:00.000Z'
   expect(parseQuantityMigrationGraph(historicalTime).tables.unit_stage_completions[0]!.completed_at).toBe('2026-06-20T09:00:00.000Z')
   expect(mapped.identities).toContainEqual({ table: 'file_payloads', legacyId: 'file', id: mapped.graph.tables.file_refs[0]!.id })
-  const invalidGraphs = [
-    (copy: typeof source) => { copy.tables.construction_stage_items[0]!.is_reporting_stage = null },
-    (copy: typeof source) => { copy.tables.file_payloads[0]!.content = 'AQIE=' },
-    (copy: typeof source) => { copy.tables.file_refs[0]!.file_size = 4 },
-    (copy: typeof source) => { copy.tables.file_refs[0]!.mime_type = 'application/pdf' },
-    (copy: typeof source) => { copy.tables.operation_logs[0]!.action = 'execute-sql' },
-  ]
-  for (const change of invalidGraphs) {
-    const copy = structuredClone(source)
-    change(copy)
-    expect(() => parseQuantityMigrationGraph(copy)).toThrow()
-  }
+
+  const copy = structuredClone(source)
+  change(copy)
+  expect(() => parseQuantityMigrationGraph(copy)).toThrow()
   const noBody = structuredClone(source)
   noBody.tables.file_payloads = []
   expect(parseQuantityMigrationGraph(noBody).tables.file_refs).toHaveLength(1)

@@ -213,11 +213,41 @@ describe('证照与中央迁移协调器完整接缝', () => {
     await instance.core.confirm(batchCommand('confirm-deleted-requirements', batch.batchId), session)
     const current = instance.read()
     expect(current.status).toBe('qualified')
-    for (const category of ['营业执照', '法人身份证', '银行账户资料'])
-      expect(current.requirements).toContainEqual(expect.objectContaining({ category, requirement: 'required' }))
     const aggregate = instance.suppliers.readCredentialScope(current.supplierId, sessionId).aggregate
     expect(aggregate.requirements).toHaveLength(invalidActiveRequirements.length)
-    for (const [index, requirement] of invalidActiveRequirements.entries())
-      expect(aggregate.requirements).toContainEqual(expect.objectContaining({ legacyId: `old-deleted-requirement-${index}`, ...requirement, reason: '  ', deletedAt: at }))
+  })
+
+  it.each(Array.from(['营业执照', '法人身份证', '银行账户资料']).map(input => ({ input })))('软删除的旧要求完整保留，过去降级或缺原因不阻断整图迁入也不改变当前固定要求：输入组合 1 案例 %#', async ({ input: category }) => {
+    const instance = fixture()
+    const source = structuredClone(original)
+    const entity = source.entities.supplier_credentials!.find(row => row.legacyId === 'old-supplier')!
+    const graph = JSON.parse(String(entity.attributes!.graphJson))
+    graph.requirements = invalidActiveRequirements.map((requirement, index) => ({ id: `old-deleted-requirement-${index}`, supplier_id: 'old-supplier', ...requirement, reason: '  ', updated_at: at, deleted_at: at }))
+    entity.attributes!.graphJson = JSON.stringify(graph)
+    const batch = await plan(instance, rehash(source))
+    expect(batch.issues.some(isCoreMigrationBlockingIssue)).toBe(false)
+    await instance.core.importBatch(batchCommand('import-deleted-requirements', batch.batchId), session)
+    await instance.core.confirm(batchCommand('confirm-deleted-requirements', batch.batchId), session)
+    const current = instance.read()
+    expect(current.status).toBe('qualified')
+    expect(current.requirements).toContainEqual(expect.objectContaining({ category, requirement: 'required' }))
+  })
+
+  it.each(Array.from(invalidActiveRequirements.entries()))('软删除的旧要求完整保留，过去降级或缺原因不阻断整图迁入也不改变当前固定要求：输入组合 2 案例 %#', async (index, requirement) => {
+    const instance = fixture()
+    const source = structuredClone(original)
+    const entity = source.entities.supplier_credentials!.find(row => row.legacyId === 'old-supplier')!
+    const graph = JSON.parse(String(entity.attributes!.graphJson))
+    graph.requirements = invalidActiveRequirements.map((requirement, index) => ({ id: `old-deleted-requirement-${index}`, supplier_id: 'old-supplier', ...requirement, reason: '  ', updated_at: at, deleted_at: at }))
+    entity.attributes!.graphJson = JSON.stringify(graph)
+    const batch = await plan(instance, rehash(source))
+    expect(batch.issues.some(isCoreMigrationBlockingIssue)).toBe(false)
+    await instance.core.importBatch(batchCommand('import-deleted-requirements', batch.batchId), session)
+    await instance.core.confirm(batchCommand('confirm-deleted-requirements', batch.batchId), session)
+    const current = instance.read()
+    expect(current.status).toBe('qualified')
+    const aggregate = instance.suppliers.readCredentialScope(current.supplierId, sessionId).aggregate
+    expect(aggregate.requirements).toHaveLength(invalidActiveRequirements.length)
+    expect(aggregate.requirements).toContainEqual(expect.objectContaining({ legacyId: `old-deleted-requirement-${index}`, ...requirement, reason: '  ', deletedAt: at }))
   })
 })

@@ -38,15 +38,14 @@ function seed(sessionId: string) {
 
 describe('工序库测试重置端点', () => {
   afterEach(() => vi.unstubAllEnvs())
-  it('生产环境始终404；非生产缺少reset或session证明均403且保留事实', async () => {
-    const id = 'reset-blocked-443'
+  const id = 'reset-blocked-443'
+  it.each([{}, { 'x-ruihang-test-reset': '1' }, { 'x-ruihang-test-session': id }])('生产环境404；非生产缺少reset或session证明403：%j', async (headers) => {
     seed(id)
     await runHttp(async (url) => {
       vi.stubEnv('NODE_ENV', 'production')
       expect((await fetch(url, { method: 'POST', headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': id } })).status).toBe(404)
       vi.stubEnv('NODE_ENV', 'test')
-      for (const headers of [{}, { 'x-ruihang-test-reset': '1' }, { 'x-ruihang-test-session': id }])
-        expect((await fetch(url, { method: 'POST', headers })).status).toBe(403)
+      expect((await fetch(url, { method: 'POST', headers })).status).toBe(403)
       expect(processLibraryService.catalog('real', processLibrarySession(id), id).libraries).toHaveLength(1)
     })
     processLibraryService.resetTestSession(processLibrarySession(id), id)

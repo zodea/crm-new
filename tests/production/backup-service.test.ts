@@ -62,6 +62,7 @@ it('计划补跑、原键回执、介质失败保上份、离线时点和隔离�
 
 it('失效会话不能确认成功；中断回执冷启动标明未确认，不自动放开正式写入', async () => {
   const f = await fixture()
+  let now = '2026-09-22T00:00:00.000Z'
   let calls = 0
   const session = () => {
     calls++
@@ -69,12 +70,13 @@ it('失效会话不能确认成功；中断回执冷启动标明未确认，不�
       throw new Error('session revoked')
     return f.session()
   }
-  const service = createProductionBackupService(f.storage, f.config)
+  const service = createProductionBackupService(f.storage, f.config, () => now)
   try {
     await expect(service.execute({ commandId: 'revoked-owner', action: 'backup', sourceBackupId: null }, session)).rejects.toThrow('session revoked')
     expect((await service.status(f.session)).recent[0]?.state).toBe('failed')
-    await f.storage.execute('INSERT INTO production_backup_runs(id,action,fingerprint,actor_id,state,started_at) VALUES(\'interrupted-operation\',\'backup\',\'test\',?,\'running\',?)', [f.identity.ownerId, new Date().toISOString()])
-    const restarted = createProductionBackupService(f.storage, f.config)
+    now = '2026-09-22T01:00:00.000Z'
+    await f.storage.execute('INSERT INTO production_backup_runs(id,action,fingerprint,actor_id,state,started_at) VALUES(\'interrupted-operation\',\'backup\',\'test\',?,\'running\',?)', [f.identity.ownerId, now])
+    const restarted = createProductionBackupService(f.storage, f.config, () => now)
     expect((await restarted.status(f.session)).recent[0]).toMatchObject({ commandId: 'interrupted-operation', state: 'failed', message: expect.stringContaining('停止') })
     await expect(restarted.execute({ commandId: 'invalid origin', action: 'backup', sourceBackupId: null }, f.session)).rejects.toThrow('编号')
     await expect(restarted.execute({ commandId: 'invalid-envelope', action: 'backup', sourceBackupId: null, origin: 'demo' }, f.session)).rejects.toThrow('内容')

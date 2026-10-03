@@ -52,12 +52,11 @@ describe('标准工序库工序编辑表', () => {
     ])
   })
 
-  it('提供新增工序动作和局部横向滚动容器', async () => {
+  it('提供新增工序动作', async () => {
     const view = render(ScheduleProcessLibraryTaskEditor, {
       props: { tasks },
     })
 
-    expect(screen.getByTestId('process-library-task-scroll').className).toContain('overflow-x-auto')
     await fireEvent.click(screen.getByRole('button', { name: '新增工序' }))
     expect(view.emitted().add).toHaveLength(1)
   })

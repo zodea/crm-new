@@ -72,14 +72,13 @@ describe('ocr 运行参数契约', () => {
   it('旧版方向分类字段只允许提交一次且必须为布尔文本', () => {
     expect(parseLegacyOcrBooleanOption([], 'useDocOrientationClassify')).toBeUndefined()
     expect(parseLegacyOcrBooleanOption(['false'], 'useDocOrientationClassify')).toBe(false)
-    expect(() => parseLegacyOcrBooleanOption(
-      ['true', 'false'],
-      'useDocOrientationClassify',
-    )).toThrowError(expect.objectContaining({ code: 'invalid-option' }))
-    expect(() => parseLegacyOcrBooleanOption(
-      ['yes'],
-      'useDocOrientationClassify',
-    )).toThrowError(expect.objectContaining({ code: 'invalid-option' }))
+  })
+
+  it.each([
+    { case: '[\'true\', \'false\'] / \'useDocOrientationClassify\'', input: ['true', 'false'], argument2: 'useDocOrientationClassify', expected: expect.objectContaining({ code: 'invalid-option' }) },
+    { case: '[\'yes\'] / \'useDocOrientationClassify\'', input: ['yes'], argument2: 'useDocOrientationClassify', expected: expect.objectContaining({ code: 'invalid-option' }) },
+  ])('旧版方向分类字段只允许提交一次且必须为布尔文本 / parseLegacyOcrBooleanOption：$case', ({ input, argument2, expected }) => {
+    expect(() => parseLegacyOcrBooleanOption(input, argument2)).toThrowError(expected)
   })
 
   it('状态响应只公开固定引擎、可写能力和安全默认值', () => {

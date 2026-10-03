@@ -15,10 +15,12 @@ const valid = {
 }
 
 describe('送货 HTTP 命令解析', () => {
-  it('保留缺值和明确零，按动作读取必要字段', () => {
-    expect(parseDeliveryCommand(valid)).toEqual(valid)
-    const withZero = { ...valid, draft: { ...valid.draft, lines: [{ ...valid.draft.lines[0], unitPrice: 0, amount: 0 }] } }
-    expect(parseDeliveryCommand(withZero)).toEqual(withZero)
+  it.each([
+    { case: '缺值', amount: null },
+    { case: '明确零', amount: 0 },
+  ])('保留$case，按动作读取必要字段', ({ amount }) => {
+    const body = { ...valid, draft: { ...valid.draft, lines: [{ ...valid.draft.lines[0], unitPrice: amount, amount }] } }
+    expect(parseDeliveryCommand(body)).toEqual(body)
     expect(parseDeliveryCommand({ action: 'print', commandId: 'print', workspaceId: 'workspace', actorId: 'actor', requiredCapability: 'delivery:write', origin: 'real', targets: [{ id: 'record', baseVersion: '1' }], disposition: 'printed' })).toMatchObject({ targets: [{ id: 'record', baseVersion: '1' }] })
   })
 

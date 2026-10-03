@@ -38,13 +38,11 @@ describe('中央工程量户详情只读恢复', () => {
     expect(completion).not.toHaveBeenCalled()
   })
 
-  it('列表与户详情刷新后仍保留矩阵班组、月份和楼栋范围', async () => {
+  it.each((['/subcontract/quantity', descriptor.key]).map(input => ({ input })))('列表与户详情刷新后仍保留矩阵班组、月份和楼栋范围：输入案例 %#', async ({ input: path }) => {
     const { validate } = setup()
     const filters = 'origin=real&project=project-1&building=building-1&month=2026-08&view=crew&trade=masonry&assignee=crew%3Acrew-1'
-    for (const path of ['/subcontract/quantity', descriptor.key]) {
-      const fullPath = `${path}?${filters}`
-      await expect(validate({ ...descriptor, key: path, fullPath })).resolves.toMatchObject({ state: 'resolved', fullPath })
-    }
+    const fullPath = `${path}?${filters}`
+    await expect(validate({ ...descriptor, key: path, fullPath })).resolves.toMatchObject({ state: 'resolved', fullPath })
   })
   it('排程下钻到户详情冷读仍保留来源链，返回链接可以核对原工序', async () => {
     const { validate } = setup()

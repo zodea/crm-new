@@ -38,9 +38,11 @@ describe('project returnTo contract', () => {
     })
   })
 
-  it('accepts only the registered project-list route and consumes known recovery query', () => {
-    expect(validateProjectReturnTo(RETURN_TO)).toBe(RETURN_TO)
-    expect(validateProjectReturnTo(RETURN_TO.replace('#', '&unknown=discarded#'))).toBe(RETURN_TO)
+  it.each([
+    { case: 'RETURN_TO', input: RETURN_TO, expected: RETURN_TO },
+    { case: 'RETURN_TO.replace(\'#\', \'&unknown=discarded#\')', input: RETURN_TO.replace('#', '&unknown=discarded#'), expected: RETURN_TO },
+  ])('accepts only the registered project-list route and consumes known recovery query / validateProjectReturnTo：$case', ({ input, expected }) => {
+    expect(validateProjectReturnTo(input)).toBe(expected)
   })
 
   it('keeps the complete legal multi-filter context beyond legacy 2048-character URLs', () => {
@@ -84,7 +86,12 @@ describe('project returnTo contract', () => {
     expect(validateProjectReturnTo(candidate)).toBeNull()
   })
 
-  it('falls back to the canonical list for missing, mismatched, or expired local context', () => {
+  it.each([
+    { case: 'ready context', contextId: 'origin_313', returnTo: RETURN_TO, now: NOW, available: true, restored: true },
+    { case: 'missing context', contextId: 'missing_context', returnTo: RETURN_TO, now: NOW, available: false, restored: false },
+    { case: 'tampered search', contextId: 'origin_313', returnTo: RETURN_TO.replace('search=%E5%90%88%E5%92%8C', 'search=tampered'), now: NOW, available: true, restored: false },
+    { case: 'expired context', contextId: 'origin_313', returnTo: RETURN_TO, now: NOW + 60_000, available: true, restored: false },
+  ])('restores the list context or uses the canonical fallback: $case', ({ contextId, returnTo, now, available, restored }) => {
     const ready = {
       id: 'origin_313',
       returnTo: RETURN_TO,
@@ -95,31 +102,10 @@ describe('project returnTo contract', () => {
     }
 
     expect(resolveProjectReturnContext({
-      returnTo: RETURN_TO,
-      contextId: 'origin_313',
-      now: NOW,
-      load: id => id === ready.id ? ready : null,
-    })).toEqual({ to: RETURN_TO, origin: ready })
-
-    expect(resolveProjectReturnContext({
-      returnTo: RETURN_TO,
-      contextId: 'missing_context',
-      now: NOW,
-      load: () => null,
-    })).toEqual({ to: '/project', origin: null })
-
-    expect(resolveProjectReturnContext({
-      returnTo: RETURN_TO.replace('search=%E5%90%88%E5%92%8C', 'search=tampered'),
-      contextId: ready.id,
-      now: NOW,
-      load: () => ready,
-    })).toEqual({ to: '/project', origin: null })
-
-    expect(resolveProjectReturnContext({
-      returnTo: RETURN_TO,
-      contextId: ready.id,
-      now: ready.expiresAt,
-      load: () => ready,
-    })).toEqual({ to: '/project', origin: null })
+      returnTo,
+      contextId,
+      now,
+      load: () => available ? ready : null,
+    })).toEqual(restored ? { to: RETURN_TO, origin: ready } : { to: '/project', origin: null })
   })
 })

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import {
   EQUIVALENT_200_PERCENT_VIEWPORT,
@@ -6,8 +7,34 @@ import {
   RESPONSIVE_WIDTHS,
 } from './helpers/responsive'
 
+const SUPPLIER_INPUTS = [
+  { name: '受控参考材料供方', category: '材料供应商', phone: '13800131234', taxNo: '91440101MA5CBX1234', maskedPhone: '138 **** 1234', maskedTax: '9144 **** 1234' },
+  { name: '受控参考劳务供方', category: '劳务分包商', phone: '13900135678', taxNo: '91440101MA5CBX5678', maskedPhone: '139 **** 5678', maskedTax: '9144 **** 5678' },
+] as const
+
 test.describe('Issue #193/#206：分供方直接参考布局', () => {
-  for (const width of RESPONSIVE_WIDTHS) {
+  test.beforeEach(async ({ page }) => {
+    await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `supplier-layout-${randomUUID()}` })
+    await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
+    const reset = await page.request.post('/api/testing/suppliers/reset', { headers: { 'x-ruihang-test-reset': '1' }, data: { scenario: 'ready' } })
+    expect(reset.ok(), await reset.text()).toBe(true)
+    const session = await (await page.request.get('/api/read/business-session')).json()
+    for (const input of SUPPLIER_INPUTS) {
+      const created = await page.request.post('/api/commands/suppliers', { data: {
+        workspaceId: session.workspaceId,
+        actorId: session.actorId,
+        requiredCapability: 'supplier:write',
+        commandId: randomUUID(),
+        baseVersion: null,
+        action: 'draft',
+        draft: { name: input.name, supplierCategory: input.category, contact: '合成联系人', contactPhone: input.phone, taxNo: input.taxNo },
+        attachments: {},
+      } })
+      expect(created.ok(), await created.text()).toBe(true)
+    }
+  })
+
+  for (const width of [...RESPONSIVE_WIDTHS, 1280]) {
     test(`列表在 ${width}px 使用单行工具栏、紧凑局部滚动表格和底部分页`, async ({ page }) => {
       await page.setViewportSize({
         width,
@@ -18,12 +45,11 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
       const toolbar = page.locator('[data-ui="supplier-list-toolbar"]')
       await expect(toolbar).toBeVisible({ timeout: 15_000 })
       await expect(toolbar).toHaveCSS('overflow-x', 'visible')
-      await expect(toolbar.locator('[data-ui="supplier-list-toolbar-row"]')).toHaveCSS('flex-wrap', 'nowrap')
-      await expect(toolbar.getByRole('searchbox', { name: /搜索公司名/ })).toBeVisible()
+      await expect(toolbar.locator('[data-ui="supplier-list-toolbar-row"]')).toHaveCSS('flex-wrap', width < 768 ? 'wrap' : 'nowrap')
+      await expect(toolbar.getByRole('searchbox', { name: '搜索关键词…' })).toBeVisible()
       await expect(toolbar.getByRole('button', { name: '刷新' })).toBeVisible()
-      await expect(toolbar.getByRole('combobox', { name: '排序' })).toBeVisible()
-      await expect(toolbar.getByRole('combobox', { name: '类别' })).toBeVisible()
-      await expect(toolbar.getByRole('combobox', { name: '资料' })).toBeVisible()
+      await expect(toolbar.getByRole('button', { name: '排序', exact: true })).toBeVisible()
+      await expect(toolbar.getByRole('button', { name: '筛选', exact: true })).toBeVisible()
       await expect(toolbar.getByRole('button', { name: '列设置' })).toBeVisible()
       const importButton = toolbar.getByRole('button', { name: /导入分供方/ })
       await importButton.scrollIntoViewIfNeeded()
@@ -32,16 +58,20 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
 
       const table = page.locator('[data-ui="supplier-list-table"]')
       await expect(table).toBeVisible()
-      await expect(table.getByText('9144 **** 1234').first()).toBeVisible()
-      await expect(table.getByText('138 **** 1234').first()).toBeVisible()
-      await expect(table.locator('.vxe-header--column').first()).toHaveCSS('height', '36px')
-      await expect(table.locator('.vxe-body--column').first()).toHaveCSS('height', '36px')
+      for (const input of SUPPLIER_INPUTS) {
+        await expect(table.getByText(input.maskedTax, { exact: true })).toBeVisible()
+        await expect(table.getByText(input.maskedPhone, { exact: true })).toBeVisible()
+      }
+      const headerHeight = await table.locator('.vxe-header--column').first().evaluate(element => element.getBoundingClientRect().height)
+      expect(headerHeight).toBeGreaterThanOrEqual(32)
+      expect(headerHeight).toBeLessThanOrEqual(44)
+      await expect(table.locator('.vxe-body--column').first()).toHaveCSS('height', '32px')
       await expectLocalHorizontalScroll(
         table.locator('.vxe-table--main-wrapper .vxe-table--body-inner-wrapper'),
         `${width}px 分供方表格`,
       )
-      await expect(table.getByRole('link', { name: '查看分供方详情' }).first()).toBeVisible()
-      await expect(table.getByRole('button', { name: '关联分供方项目' }).first()).toBeVisible()
+      for (const input of SUPPLIER_INPUTS)
+        await expect(table.getByRole('link', { name: input.name, exact: true })).toBeVisible()
       await expect(table.getByText(/共 \d+ 条/)).toBeVisible()
       await expectNoPageOverflow(page, `${width}px 分供方列表`)
     })
@@ -71,49 +101,29 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
     await expect(page.getByRole('navigation', { name: '表单分区' })).toHaveCount(0)
   })
 
-  test('聚合列、项目/欠款/证照筛选与行级证照入口消费真实数据', async ({ page }) => {
-    await page.setViewportSize({ width: 1024, height: 900 })
-    await page.goto('/base/supplier')
-
-    const toolbar = page.locator('[data-ui="supplier-list-toolbar"]')
-    await expect(toolbar).toBeVisible({ timeout: 15_000 })
-    await toolbar.getByRole('searchbox', { name: /搜索公司名/ }).fill('穗建五金机电经营部')
-
-    const supplierLink = page.getByRole('link', { name: '穗建五金机电经营部', exact: true })
-    const table = page.locator('[data-ui="supplier-list-table"]')
-    await expect(table.getByRole('cell', { name: '1', exact: true }).last()).toBeVisible()
-    await expect(table.getByText('¥261,250.00', { exact: true })).toBeVisible()
-    await expect(table.getByText('¥101,138.00', { exact: true })).toBeVisible()
-    await expect(table.getByRole('link', { name: '维护分供方证照' }))
-      .toHaveAttribute('href', '/base/supplier/sup_demo_004?tab=credential')
-    await expect(table.getByRole('button', { name: '关联分供方项目' })).toBeVisible()
-    await expect(table.getByRole('button', { name: '删除分供方' })).toBeVisible()
-
-    const summary = page.getByRole('status', { name: '列表汇总' })
-    await expect(summary).toContainText('当前分供方: 1 家')
-    await expect(summary).toContainText('累计合同额: ¥261,250.00')
-    await expect(summary).toContainText('累计已付: ¥101,138.00')
-
-    await toolbar.getByRole('searchbox', { name: /搜索公司名/ }).fill('')
-    await toolbar.getByRole('combobox', { name: '项目' }).click()
-    await page.getByRole('option', { name: '锦绣华庭', exact: true }).click()
-    await expect(supplierLink).toBeVisible()
-    await toolbar.getByRole('button', { name: '欠款' }).click()
-    await expect(toolbar.getByRole('button', { name: '欠款' })).toHaveAttribute('aria-pressed', 'true')
-    await expect(supplierLink).toBeVisible()
-    await toolbar.getByRole('button', { name: '证照缺失' }).click()
-    await expect(toolbar.getByRole('button', { name: '证照缺失' })).toHaveAttribute('aria-pressed', 'true')
-    await expect(supplierLink).toBeVisible()
-
-    await toolbar.getByRole('searchbox', { name: /搜索公司名/ }).fill('穗建五金机电经营部')
-    await table.getByRole('button', { name: '关联分供方项目' }).last().click()
-    const associationDialog = page.getByRole('dialog', { name: '关联合作项目' })
-    await associationDialog.getByRole('combobox', { name: '项目' })
-      .selectOption({ label: '锦绣华庭（proj_demo_002）' })
-    await associationDialog.getByRole('button', { name: '确认关联' }).click()
-    await expect(page.getByText('该合作关系已存在，已为你保留原记录', { exact: true })).toBeVisible()
-    await expectNoPageOverflow(page, '1024px 分供方聚合筛选')
-  })
+  for (const input of SUPPLIER_INPUTS) {
+    test(`${input.category} 受控主档筛选、可读事实和独立证照入口`, async ({ page }) => {
+      await page.setViewportSize({ width: 1024, height: 900 })
+      await page.goto('/base/supplier')
+      const toolbar = page.locator('[data-ui="supplier-list-toolbar"]')
+      await toolbar.getByRole('searchbox', { name: '搜索关键词…', exact: true }).fill(input.name)
+      const table = page.locator('[data-ui="supplier-list-table"]')
+      const rowId = await table.getByRole('link', { name: input.name, exact: true }).locator('xpath=ancestor::tr').getAttribute('rowid')
+      expect(rowId).toBeTruthy()
+      const row = table.locator(`.vxe-table--main-wrapper tr[rowid="${rowId}"]`)
+      await expect(row).toContainText(input.category)
+      // ready 隔离实例接通事实源；生产源未接通时的未知金额另由服务测试覆盖。
+      await expect(page.getByRole('status').filter({ hasText: '关联项目、合同' })).toHaveCount(0)
+      await expect(row.getByRole('link', { name: '缺少原件', exact: true })).toHaveAttribute('href', /\/base\/supplier\/credential\/[^?]+\?origin=real&returnTo=/)
+      await toolbar.getByRole('button', { name: '排序', exact: true }).click()
+      const sort = page.getByRole('combobox', { name: '排序方式', exact: true })
+      await expect(sort.locator('option[value="paymentAmount-asc"]')).toBeEnabled()
+      await page.keyboard.press('Escape')
+      await row.getByRole('link', { name: '缺少原件', exact: true }).click()
+      await expect(page.getByRole('heading', { name: `${input.name} · 证照附件`, exact: true })).toBeVisible()
+      await expectNoPageOverflow(page, '1024px 分供方证照来源')
+    })
+  }
 
   test('复用新建页签时按新选择类别重建空白草稿', async ({ page }) => {
     await page.goto('/base/supplier/form?category=材料供应商')
@@ -135,7 +145,7 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
 
     await expect(page.getByText('draft', { exact: true })).toHaveCount(0)
     const guidance = page.locator('[data-ui="supplier-credential-guidance"]')
-    await expect(guidance).toContainText('不会把普通附件伪装成证照')
+    await expect(guidance).toContainText('保存分供方后可维护证照资料。')
     await expect(page.getByText('选择附件')).toHaveCount(0)
     await page.getByLabel('公司全称 *').fill(longName)
     await page.getByLabel('主要联系人 *').fill('长名称验收联系人')
@@ -143,18 +153,18 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
       .getByRole('button', { name: '保存', exact: true })
       .click()
 
-    await expect(page).toHaveURL(/\/base\/supplier\/sup_.+\?tab=credential$/)
+    await expect(page).toHaveURL(/\/base\/supplier\/[^/?]+\?origin=real/)
     await expect(page.getByRole('heading', { name: longName, exact: true })).toBeVisible()
-    await expect(page.getByRole('tab', { name: /证照附件/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('link', { name: '证照附件', exact: true })).toHaveAttribute('href', /\/base\/supplier\/credential\/[^?]+\?origin=real/)
 
-    for (const width of RESPONSIVE_WIDTHS) {
+    for (const width of [...RESPONSIVE_WIDTHS, 1280]) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       await expect(page.getByRole('heading', { name: longName, exact: true })).toBeVisible()
       await expectNoPageOverflow(page, `${width}px 长分供方名称详情`)
     }
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
+  for (const width of [...RESPONSIVE_WIDTHS, 1280]) {
     test(`短表单在 ${width}px 保持内容滚动、字段可读与底部操作可达`, async ({ page }) => {
       await page.setViewportSize({
         width,

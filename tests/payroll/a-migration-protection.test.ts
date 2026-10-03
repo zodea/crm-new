@@ -25,7 +25,7 @@ it.each(['deleted-config', 'receipt', 'price-scope', 'price-audit', 'source-fact
     const bytes = db.raw.export()
     const hash = createHash('sha256').update(bytes).digest('hex')
     await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('a-preflight'), source, backup: null }), session)
-    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('a-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: bytes.length, createdAt: new Date().toISOString(), immutable: true } }), session)
+    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('a-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
     await coreMigrationTestInstance.importBatch({ ...envelope('a-import'), batchId: batch.batchId }, session)
     await coreMigrationTestInstance.confirm({ ...envelope('a-confirm'), batchId: batch.batchId }, session)
     const projectId = batch.mappings.find(row => row.entityType === 'projects' && row.legacyId === 'pa-project')!.serverId

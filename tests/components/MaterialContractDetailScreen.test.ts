@@ -98,6 +98,19 @@ describe('材料采购合同中央详情', () => {
     store.detailState = { kind: 'ready', data: detail }
   })
 
+  it.each([
+    { status: '履约中', tone: 'brand' },
+    { status: '已结清', tone: 'ok' },
+    { status: '待外部复核', tone: 'neutral' },
+  ])('展示合同真实业务状态 $status，数据来源仍使用独立来源标识', ({ status: text, tone }) => {
+    store.detailState = { kind: 'ready', data: { ...detail, contract: { ...detail.contract, status: text } } }
+    render(MaterialContractDetailScreen, { props: { contractId: 'c1', origin: 'demo' }, ...common })
+    const status = screen.getByText(text)
+    expect(status.getAttribute('data-ui')).toBe('status-tag')
+    expect(status.getAttribute('data-tone')).toBe(tone)
+    expect(screen.getByText('演示只读').getAttribute('data-ui')).not.toBe('status-tag')
+  })
+
   it('从合同按稳定分供方 ID 进入四类事实，并携带当前合同页签来源', () => {
     const listReturnTo = '/contract/material?projectId=p1&origin=demo&nav=origin_319_contract#material-contract-row-demo%3Ac1'
     route.query = { tab: 'invoices', returnTo: listReturnTo }

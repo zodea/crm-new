@@ -1,12 +1,16 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
-import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
+const sessions = new Map<string, string>()
 
 function testSession(testInfo: TestInfo) {
-  return Buffer.from(testInfo.testId, 'utf8').toString('base64url')
+  const sessionId = sessions.get(testInfo.testId)
+  if (!sessionId)
+    throw new Error('当前用例尚未建立隔离会话')
+  return sessionId
 }
 
 type SupplierScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
@@ -36,13 +40,15 @@ async function createFormalSupplier(page: Page, name: string) {
 
 test.describe('Issue #315：分供方中央详情与四类真实事实', () => {
   test.beforeEach(async ({ page }, testInfo) => {
-    const sessionId = testSession(testInfo)
-    await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId })
+    const sessionId = `supplier-315-${randomUUID()}`
+    sessions.set(testInfo.testId, sessionId)
+    await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId })
     await resetSupplierBackend(page.context().request, sessionId)
   })
 
   test.afterEach(async ({ page }, testInfo) => {
     await resetSupplierBackend(page.context().request, testSession(testInfo))
+    sessions.delete(testInfo.testId)
   })
 
   test('新建—详情—显式编辑通过中央命令，带筛选返回列表', async ({ page }) => {

@@ -168,7 +168,7 @@ describe('materialPriceAnalysisScreen', () => {
     expect(screen.getByText('价差')).not.toBeNull()
   })
 
-  it('使用等价截面写法搜索时都能找到同一电线材料', async () => {
+  it.each(['2.5mm2', '1×2.5 mm²'])('使用等价截面 %s 搜索时能找到同一电线材料', async (query) => {
     render(MaterialPriceAnalysisScreen, {
       props: {
         records,
@@ -181,12 +181,7 @@ describe('materialPriceAnalysisScreen', () => {
 
     const search = screen.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
 
-    await fireEvent.update(search, '2.5mm2')
-    expect(
-      screen.getByRole('option', { name: /BV 电线.*1×2\.5 mm².*m/ }),
-    ).not.toBeNull()
-
-    await fireEvent.update(search, '1×2.5 mm²')
+    await fireEvent.update(search, query)
     expect(
       screen.getByRole('option', { name: /BV 电线.*1×2\.5 mm².*m/ }),
     ).not.toBeNull()
