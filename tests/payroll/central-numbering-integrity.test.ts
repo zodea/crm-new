@@ -132,12 +132,19 @@ it('异步写入期间操作者撤权时整单回滚，恢复权限后原键安�
   expect(await f.db.select('SELECT * FROM payroll_official_issues')).toHaveLength(0)
   expect((await f.service.executeNumbering(command)).issue?.number).toBe('128')
 })
-it('读写codec拒绝错误原单、项目、权限和越界起点', async () => {
+it.each([{ input: { projectId: 'other-project' } }, { context: { capabilities: [] } }, { document: { id: 'unrelated' } }])('读写codec拒绝错误原单、项目、权限：%j', async (patch) => {
   const f = await createPayrollNumberingFixture()
   closers.push(f.close)
   const read = await f.read()
   expect(decodePayrollNumberingRead(encodePayrollNumberingRead(read), { origin: 'real' }, f.input)).toEqual(read)
-  for (const value of [0, -1, 1.2, Number.MAX_SAFE_INTEGER]) expect(() => parsePayrollNumberingCommand(numberingCommand(read, 'invalid-init', { kind: 'initialize', nextNumber: value, evidenceNote: '依据' }))).toThrow()
-  for (const changed of [{ ...read, input: { ...f.input, projectId: 'other-project' } }, { ...read, context: { ...read.context, capabilities: [] } }, { ...read, document: { ...read.document, id: 'unrelated' } }])
-    expect(() => decodePayrollNumberingRead(changed, { origin: 'real' }, f.input)).toThrow()
+  const changed = { ...read, input: { ...f.input, ...patch.input }, context: { ...read.context, ...patch.context }, document: patch.document ? { ...read.document, ...patch.document } : read.document }
+  expect(() => decodePayrollNumberingRead(changed, { origin: 'real' }, f.input)).toThrow()
+})
+
+it.each(Array.from([0, -1, 1.2, Number.MAX_SAFE_INTEGER]).map(input => ({ input })))('读写codec拒绝错误原单、项目、权限和越界起点：输入组合 1 案例 %#', async ({ input: value }) => {
+  const f = await createPayrollNumberingFixture()
+  closers.push(f.close)
+  const read = await f.read()
+  expect(decodePayrollNumberingRead(encodePayrollNumberingRead(read), { origin: 'real' }, f.input)).toEqual(read)
+  expect(() => parsePayrollNumberingCommand(numberingCommand(read, 'invalid-init', { kind: 'initialize', nextNumber: value, evidenceNote: '依据' }))).toThrow()
 })

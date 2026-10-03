@@ -8,7 +8,7 @@ import { createMemoryDb } from '../helpers/memory-db'
 import { seedPayrollC1Source } from '../helpers/payroll-c1-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
-it('真实工人日薪经受控网络保 NULL/0/481，旧缺字段不补价且重复迁入保日常更正', async () => {
+it.each(Array.from(['481', -1, Number.POSITIVE_INFINITY]).map(input1 => ({ input1 })))('真实工人日薪经受控网络保 NULL/0/481，旧缺字段不补价且重复迁入保日常更正：输入案例 %#', async ({ input1: invalid }) => {
   const db = await createMemoryDb()
   try {
     const source = await seedPayrollC1Source(db)
@@ -39,11 +39,10 @@ it('真实工人日薪经受控网络保 NULL/0/481，旧缺字段不补价且�
     expect(changed.rows.find(row => row.workerId === 'c1-missing')).toMatchObject({ dailyWage: 0, dailyWageState: 'value' })
     owner.prepareMigrationSnapshot(snapshot)()
     expect(owner.payrollWorkerFacts()).toEqual(changed)
-    for (const invalid of ['481', -1, Number.POSITIVE_INFINITY]) {
-      const altered = structuredClone(request)
-      altered.source.entities.workers[0]!.attributes = { dailyWage: invalid }
-      expect(() => parseCoreMigrationSourceCommand(altered)).toThrow()
-    }
+
+    const altered = structuredClone(request)
+    altered.source.entities.workers[0]!.attributes = { dailyWage: invalid }
+    expect(() => parseCoreMigrationSourceCommand(altered)).toThrow()
   }
   finally { db.close() }
 })

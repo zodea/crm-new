@@ -45,7 +45,7 @@ describe('分供方列表返回上下文', () => {
     expect(parsed.sort).toBe('paymentAmount-desc')
     expect(parsed.pageSize).toBe(20)
   })
-  it('包含来源身份的锚点经过多层页面透传仍保持规范且幂等', () => {
+  describe('包含来源身份的锚点经过多层页面透传仍保持规范且幂等', () => {
     const returnTo = createSupplierReturnTo('real:supplier-1', {
       search: '中央',
       category: 'all',
@@ -54,12 +54,18 @@ describe('分供方列表返回上下文', () => {
       page: 1,
       pageSize: 10,
     })
-
-    expect(validateSupplierReturnTo(returnTo)).toBe(returnTo)
-    expect(validateSupplierReturnTo(validateSupplierReturnTo(returnTo))).toBe(returnTo)
+    it.each([
+      { case: 'returnTo', input: returnTo, expected: returnTo },
+      { case: 'validateSupplierReturnTo(returnTo)', input: validateSupplierReturnTo(returnTo), expected: returnTo },
+    ])('validateSupplierReturnTo：$case', ({ input, expected }) => {
+      expect(validateSupplierReturnTo(structuredClone(input))).toBe(expected)
+    })
   })
 
-  it('分包变洽签来源只接受匹配上下文，并保留分供方入口锚点与滚动位置', () => {
+  it.each([
+    { case: '匹配来源', contextId: 'origin_327_supplier', restored: true },
+    { case: '篡改上下文', contextId: 'origin_tampered', restored: false },
+  ])('分包变洽签来源保留精确锚点与滚动位置：$case', ({ contextId, restored }) => {
     const returnTo = '/base/supplier/supplier-1?origin=real&subChangeJourney=origin_327_supplier#supplier-subcontract-change-link'
     const origin = createSupplierDetailJourneyReturnOrigin({
       contextId: 'origin_327_supplier',
@@ -72,15 +78,9 @@ describe('分供方列表返回上下文', () => {
     expect(validateSupplierDetailReturnTo(returnTo, 'real', 'supplier-1')).toBe(returnTo)
     expect(resolveSupplierDetailJourneyReturnOrigin({
       returnTo,
-      contextId: 'origin_327_supplier',
+      contextId,
       now: 1500,
       load: () => origin,
-    })).toEqual(origin)
-    expect(resolveSupplierDetailJourneyReturnOrigin({
-      returnTo,
-      contextId: 'origin_tampered',
-      now: 1500,
-      load: () => origin,
-    })).toBeNull()
+    })).toEqual(restored ? origin : null)
   })
 })

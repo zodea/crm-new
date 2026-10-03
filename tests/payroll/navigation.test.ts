@@ -8,14 +8,20 @@ import {
 } from '~/lib/payroll/navigation'
 
 describe('payroll navigation state', () => {
-  it('多状态往返保留并清除空选，不影响旧单值URL', () => {
-    const filters = { status: ['draft', 'checked'] as ('draft' | 'checked')[] }
-    expect(payrollFiltersFromQuery(payrollFilterQuery(filters)).status).toEqual(filters.status)
-    const cleared = payrollFilterQuery({ status: [] })
-    expect(cleared).toEqual({ status: '[]' })
-    expect(payrollFiltersFromQuery(cleared, { status: ['released'] }).status).toEqual([])
-    expect(payrollFiltersFromQuery({}, { status: 'released' }).status).toBe('released')
-    expect(payrollFiltersFromQuery({ status: 'checked' }, { status: ['released'] }).status).toBe('checked')
+  it.each([
+    { case: '多状态', status: ['draft', 'checked'] as ('draft' | 'checked')[], expectedQuery: { status: '["draft","checked"]' }, expectedStatus: ['draft', 'checked'] },
+    { case: '明确清空', status: [] as ('draft' | 'checked')[], expectedQuery: { status: '[]' }, expectedStatus: [] },
+  ])('$case 往返保留输入，不受旧默认状态覆盖', ({ status, expectedQuery, expectedStatus }) => {
+    const query = payrollFilterQuery({ status })
+    expect(query).toEqual(expectedQuery)
+    expect(payrollFiltersFromQuery(query, { status: ['released'] }).status).toEqual(expectedStatus)
+  })
+
+  it.each([
+    { case: '{} / { status: \'released\' }', input: {}, argument2: { status: 'released' }, expected: 'released' },
+    { case: '{ status: \'checked\' } / { status: [\'released\'] }', input: { status: 'checked' }, argument2: { status: ['released'] }, expected: 'checked' },
+  ])('多状态往返保留并清除空选，不影响旧单值URL / payrollFiltersFromQuery：$case', ({ input, argument2, expected }) => {
+    expect(payrollFiltersFromQuery(input, argument2).status).toBe(expected)
   })
   it('restores only supported filters from route query', () => {
     expect(payrollFiltersFromQuery({
@@ -79,18 +85,19 @@ describe('payroll navigation state', () => {
     })
   })
 
-  it('载入完成后只在用户仍停留在列表页时才规范化 URL', () => {
-    expect(shouldSyncPayrollListUrl('/subcontract/payroll')).toBe(true)
-
-    // 载入期间用户可能已经点进建单页或其他页面；此时补一次 replace 会把人拉回列表。
-    expect(shouldSyncPayrollListUrl('/subcontract/payroll/new')).toBe(false)
-    expect(shouldSyncPayrollListUrl('/subcontract/payroll/wage_statement_001')).toBe(false)
-    expect(shouldSyncPayrollListUrl('/subcontract/attendance')).toBe(false)
+  it.each([
+    { case: '\'/subcontract/payroll\'', input: '/subcontract/payroll', expected: true },
+    { case: '\'/subcontract/payroll/new\'', input: '/subcontract/payroll/new', expected: false },
+    { case: '\'/subcontract/payroll/wage_statement_001\'', input: '/subcontract/payroll/wage_statement_001', expected: false },
+    { case: '\'/subcontract/attendance\'', input: '/subcontract/attendance', expected: false },
+  ])('载入完成后只在用户仍停留在列表页时才规范化 URL / shouldSyncPayrollListUrl：$case', ({ input, expected }) => {
+    expect(shouldSyncPayrollListUrl(input)).toBe(expected)
   })
 
-  it('导航已开始但尚未确认时，路径还是列表页也不再规范化 URL', () => {
-    // 点击后到导航确认之间 route 仍指向列表页，只看路径会误判成「用户还在原地」。
-    expect(shouldSyncPayrollListUrl('/subcontract/payroll', true)).toBe(false)
-    expect(shouldSyncPayrollListUrl('/subcontract/payroll', false)).toBe(true)
+  it.each([
+    { case: '\'/subcontract/payroll\' / true', input: '/subcontract/payroll', argument2: true, expected: false },
+    { case: '\'/subcontract/payroll\' / false', input: '/subcontract/payroll', argument2: false, expected: true },
+  ])('导航已开始但尚未确认时，路径还是列表页也不再规范化 URL / shouldSyncPayrollListUrl：$case', ({ input, argument2, expected }) => {
+    expect(shouldSyncPayrollListUrl(input, argument2)).toBe(expected)
   })
 })

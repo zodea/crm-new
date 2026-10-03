@@ -1,5 +1,6 @@
 import type { ApprovedAmountState } from '../finance/approval-amount'
 import { round2 } from '~/lib/util/number'
+import { isEffectiveExpenditureContract } from '../contract/effective-status'
 
 export {
   canonicalCredentialCategory,
@@ -35,6 +36,7 @@ export interface SupplierContractSummary {
   projectId: string
   projectName: string
   amount: number
+  supplementAmount?: number
   changed: number
   settled: number
   paid: number
@@ -93,6 +95,12 @@ export interface SupplierReadonlySummary {
   payableBalance: number
 }
 
+function effectiveContractAmount(contract: SupplierContractSummary): number {
+  return contract.kind !== '施工' && isEffectiveExpenditureContract(contract.status)
+    ? contract.amount + (contract.supplementAmount ?? 0)
+    : 0
+}
+
 export function buildSupplierProjectSummaries(
   relations: readonly SupplierProjectRelation[],
   contracts: readonly SupplierContractSummary[],
@@ -119,7 +127,7 @@ export function buildSupplierProjectSummaries(
     if (!project)
       continue
     project.contractCount++
-    project.contractTotal = round2(project.contractTotal + contract.amount)
+    project.contractTotal = round2(project.contractTotal + effectiveContractAmount(contract))
   }
 
   for (const payment of payments) {
@@ -148,7 +156,7 @@ export function buildSupplierReadonlySummary(
   payments: readonly SupplierPaymentSummary[],
   invoices: readonly SupplierInvoiceSummary[],
 ): SupplierReadonlySummary {
-  const contractTotal = round2(contracts.reduce((sum, row) => sum + row.amount, 0))
+  const contractTotal = round2(contracts.reduce((sum, row) => sum + effectiveContractAmount(row), 0))
   const settledTotal = round2(contracts.reduce((sum, row) => sum + row.settled, 0))
   const paidTotal = round2(payments.reduce((sum, row) => sum + row.actualPayment, 0))
   return {

@@ -85,7 +85,7 @@ describe('材料采购合同中央测试实例', () => {
       ])
       expect(materialContractCommandTestInstance.formContext(sessionId)).toEqual({
         projects: [{ id: 'project-real-318', name: '中央正式材料项目' }],
-        suppliers: [{ id: 'supplier-real-318', name: '中央正式材料供应商' }],
+        suppliers: [{ id: 'supplier-real-318', name: '中央正式材料供应商', contact: '', contactPhone: '' }],
       })
 
       const supplier = await supplierReadTestInstance.detail('supplier-real-318', { origin: 'real' }, sessionId)

@@ -45,14 +45,15 @@ describe('浏览器页签描述持久化', () => {
   })
 
   it('损坏、未知版本和其他用户的记录安全回到首页并保留诊断', () => {
-    for (const input of ['{broken', { schemaVersion: 99 }, { ...captureTabSession(opened(['/project']), null, scope, 100, inspect), scope: { ...scope, actorId: 'someone-else' } }]) {
-      const result = readTabSession(input, scope, inspect)
-      expect(result.snapshot.tabs).toEqual([])
-      expect(result.snapshot.activeKey).toBe('home')
-      expect(result.diagnostics.length).toBeGreaterThan(0)
-    }
     expect(readTabSession(null, scope, inspect).diagnostics).toEqual([])
     expect(tabSessionStorageKey(scope)).not.toBe(tabSessionStorageKey({ ...scope, actorId: 'another' }))
+  })
+
+  it.each(Array.from(['{broken', { schemaVersion: 99 }, { ...captureTabSession(opened(['/project']), null, scope, 100, inspect), scope: { ...scope, actorId: 'someone-else' } }]).map(input => ({ input })))('损坏、未知版本和其他用户的记录安全回到首页并保留诊断：输入组合 1 案例 %#', ({ input }) => {
+    const result = readTabSession(input, scope, inspect)
+    expect(result.snapshot.tabs).toEqual([])
+    expect(result.snapshot.activeKey).toBe('home')
+    expect(result.diagnostics.length).toBeGreaterThan(0)
   })
 
   it('恢复去重并按更新时间保留最近15个，保持保留页签原来的排列', () => {

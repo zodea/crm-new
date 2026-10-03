@@ -1,16 +1,20 @@
 import type { OwnerDocumentListRecord } from '~/lib/owner-document/forms'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
+import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   computed,
   defineComponent,
   h,
+  nextTick,
   onActivated,
   onMounted,
+  reactive,
   shallowRef,
   watch,
 } from 'vue'
 import OwnerDocumentListScreen from '~/components/owner-document/OwnerDocumentListScreen.vue'
+import { createOwnerDocumentReturnOrigin, saveOwnerDocumentReturnOrigin } from '~/lib/owner-document/return-context'
 
 const runtime = vi.hoisted(() => ({ desktop: true }))
 vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => runtime.desktop }))
@@ -108,7 +112,8 @@ const route = {
   query: { project: 'project-1' } as Record<string, string>,
 }
 const navigateTo = vi.fn()
-const loadKind = vi.fn(async () => listRows)
+const loadKind = vi.fn(async (_kind?: unknown, _query?: { page: number, pageSize: number }) => listRows)
+const centralPagination = shallowRef({ page: 1, pageSize: 10, total: 25 })
 let activeRows = listRows
 let centralEmptyReason: 'no-records' | 'no-filter-match' | 'missing-relation' | null = null
 let centralSummary: any = null
@@ -121,6 +126,7 @@ const global = {
     NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot /></a>' }),
     OwnerDocumentListToolbar: ToolbarStub,
     RowActionMenu: true,
+    TargetCostSourceReturn: true,
     StatePanel: defineComponent({
       props: ['title', 'actionLabel'],
       emits: ['action'],
@@ -137,10 +143,12 @@ describe('owner document list screen', () => {
     centralSummary = null
     centralCapabilities = ['owner-document:write']
     navigateTo.mockReset()
-    loadKind.mockClear()
+    loadKind.mockReset().mockResolvedValue(listRows)
+    centralPagination.value = { page: 1, pageSize: 10, total: 25 }
     route.path = '/owner/change'
     route.query = { project: 'project-1' }
     vi.stubGlobal('computed', computed)
+    vi.stubGlobal('nextTick', nextTick)
     vi.stubGlobal('navigateTo', navigateTo)
     vi.stubGlobal('onActivated', onActivated)
     vi.stubGlobal('onMounted', onMounted)
@@ -156,7 +164,7 @@ describe('owner document list screen', () => {
       listLoadingFor: () => false,
       listError: () => '',
       loadKind,
-      centralPageFor: () => ({ page: 1, pageSize: 10, total: 25 }),
+      centralPageFor: () => centralPagination.value,
       centralSummaryFor: () => centralSummary,
       centralCapabilitiesFor: () => centralCapabilities,
       centralEmptyReasonFor: () => centralEmptyReason,
@@ -329,6 +337,227 @@ describe('owner document list screen', () => {
     await vi.waitFor(() => expect(loadKind).toHaveBeenLastCalledWith('owner_change', expect.objectContaining({
       status: null,
     })))
+  })
+
+  it.each([
+    { label: '上一查询仍有旧行', previousRows: listRows },
+    { label: '首次查询尚无行', previousRows: [] },
+  ])('返回来源在$label时等待读取完成，再聚焦本实例中的行', async ({ previousRows }) => {
+    runtime.desktop = false
+    const now = Date.parse('2026-10-03T04:00:00Z')
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+    const origin = createOwnerDocumentReturnOrigin({
+      kind: 'owner_change',
+      contextId: 'origin_0123456789abcdef0123456789abcdef',
+      rowIdentity: 'real:owner_change:change-1',
+      scrollTop: 0,
+      now,
+      state: { search: '', projectId: null, contractId: null, supplierId: null, status: 'approved', documentType: [], origin: 'real', page: 1, pageSize: 20 },
+    })
+    const target = new URL(origin.returnTo, 'https://ruihang.invalid')
+    const currentRoute = reactive({ path: target.pathname, query: Object.fromEntries(target.searchParams), fullPath: origin.returnTo })
+    const snapshot = shallowRef<OwnerDocumentListRecord[]>(previousRows)
+    const pending = shallowRef(false)
+    let complete!: () => void
+    const fetchPage = vi.fn(async () => {
+      pending.value = true
+      await new Promise<void>((resolve) => {
+        complete = resolve
+      })
+      snapshot.value = listRows
+      pending.value = false
+      return snapshot.value
+    })
+    const outside = document.createElement('a')
+    outside.href = '#outside'
+    outside.id = origin.anchorId
+    outside.textContent = '其他页签中的同名单据'
+    const previousFocus = document.createElement('button')
+    previousFocus.textContent = '返回入口'
+    document.body.append(outside, previousFocus)
+    previousFocus.focus()
+    saveOwnerDocumentReturnOrigin(origin)
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      queueMicrotask(() => callback(0))
+      return 0
+    })
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    vi.stubGlobal('useRoute', () => currentRoute)
+    vi.stubGlobal('useOwnerDocumentStore', () => ({
+      hasListSnapshot: () => true,
+      recordsFor: () => snapshot.value,
+      listLoadingFor: () => pending.value,
+      listError: () => '',
+      loadKind: fetchPage,
+      centralPageFor: () => ({ page: 1, pageSize: 20, total: 1 }),
+      centralSummaryFor: () => null,
+      centralCapabilitiesFor: () => [],
+      centralEmptyReasonFor: () => null,
+    }))
+    try {
+      render(OwnerDocumentListScreen, { props: { kind: 'owner_change' }, global })
+      await flushPromises()
+      expect(pending.value).toBe(true)
+      expect(document.activeElement).toBe(previousFocus)
+      complete()
+      await flushPromises()
+      const ownRow = screen.getByRole('link', { name: 'BQ-001' })
+      await vi.waitFor(() => expect(document.activeElement).toBe(ownRow))
+      expect(document.activeElement).not.toBe(outside)
+    }
+    finally {
+      complete?.()
+      outside.remove()
+      previousFocus.remove()
+      sessionStorage.removeItem(`ruihang:owner-document-return:${origin.id}`)
+      clock.mockRestore()
+    }
+  })
+
+  it.each([
+    {
+      label: '新项目及完整筛选',
+      query: { projectId: 'project-next', contractId: 'contract-next', supplierId: 'supplier-next', search: '新来源搜索', status: 'submitted', documentType: 'site_visa', page: '3', pageSize: '50' },
+      expected: { projectId: 'project-next', contractId: 'contract-next', supplierId: 'supplier-next', search: '新来源搜索', status: 'submitted', documentType: 'site_visa', page: 3, pageSize: 50 },
+    },
+    {
+      label: '不带来源与筛选的新入口',
+      query: {},
+      expected: { projectId: null, contractId: null, supplierId: null, search: '', status: 'approved', documentType: null, page: 1, pageSize: 20 },
+    },
+  ])('中央同路径复用应用$label，不沿用旧来源条件', async ({ query, expected }) => {
+    runtime.desktop = false
+    const currentRoute = reactive({ path: '/owner/change', query: { projectId: 'project-old', search: '旧来源搜索', status: 'approved', page: '2', pageSize: '10' } as Record<string, string> })
+    const replace = vi.fn(async (target: { query: Record<string, string> }) => {
+      await nextTick()
+      currentRoute.query = { ...target.query }
+    })
+    vi.stubGlobal('useRoute', () => currentRoute)
+    vi.stubGlobal('useRouter', () => ({ replace }))
+    render(OwnerDocumentListScreen, { props: { kind: 'owner_change' }, global })
+    await nextTick()
+    loadKind.mockClear()
+    currentRoute.query = { ...query } as Record<string, string>
+    await nextTick()
+    await vi.waitFor(() => expect(loadKind).toHaveBeenLastCalledWith('owner_change', expect.objectContaining(expected)))
+    expect(currentRoute.query).toEqual(query)
+    expect(loadKind).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { source: 'projectId', previous: 'project-1', next: 'project-2', kind: 'owner_change', status: 'approved', expected: { projectId: 'project-2', contractId: null, supplierId: null, variant: null } },
+    { source: 'contractId', previous: 'contract-1', next: 'contract-2', kind: 'owner_change', status: 'approved', expected: { projectId: null, contractId: 'contract-2', supplierId: null, variant: null } },
+    { source: 'supplierId', previous: 'supplier-1', next: 'supplier-2', kind: 'owner_change', status: 'approved', expected: { projectId: null, contractId: null, supplierId: 'supplier-2', variant: null } },
+    { source: 'variant', previous: 'acceptance', next: 'warranty', kind: 'acceptance', status: 'all', expected: { projectId: null, contractId: null, supplierId: null, variant: 'warranty' } },
+  ] as const)('同路径只改变 $source 时仍保留明确来源页码', async ({ source, previous, next, kind, status, expected }) => {
+    runtime.desktop = false
+    const currentRoute = reactive({ path: kind === 'acceptance' ? '/owner/acceptance' : '/owner/change', query: { [source]: previous, page: '3', pageSize: '20', status } as Record<string, string> })
+    const replace = vi.fn(async (target: { query: Record<string, string> }) => {
+      await nextTick()
+      currentRoute.query = { ...target.query }
+    })
+    vi.stubGlobal('useRoute', () => currentRoute)
+    vi.stubGlobal('useRouter', () => ({ replace }))
+    render(OwnerDocumentListScreen, { props: { kind }, global })
+    await nextTick()
+    loadKind.mockClear()
+    const incoming = { [source]: next, page: '3', pageSize: '20', status }
+    currentRoute.query = incoming
+    await flushPromises()
+    expect(loadKind).toHaveBeenLastCalledWith(kind, expect.objectContaining({ ...expected, page: 3, pageSize: 20 }))
+    expect(currentRoute.query).toEqual(incoming)
+    expect(loadKind).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { source: 'projectId', value: 'project-1', label: '项目' },
+    { source: 'contractId', value: 'contract-1', label: '合同' },
+    { source: 'supplierId', value: 'supplier-1', label: '分供方' },
+  ])('主动清除单个$label来源从第一页开始并保留其他筛选', async ({ source, value }) => {
+    runtime.desktop = false
+    centralPagination.value = { page: 3, pageSize: 50, total: 150 }
+    loadKind.mockImplementation(async (_kind, query) => {
+      await nextTick()
+      if (query)
+        centralPagination.value = { page: query.page, pageSize: query.pageSize, total: 150 }
+      return listRows
+    })
+    const filters = { pageSize: '50', status: 'submitted', search: '保留受控搜索', documentType: 'site_visa' }
+    const currentRoute = reactive({ path: '/owner/change', query: { ...filters, [source]: value, page: '3' } as Record<string, string> })
+    const replace = vi.fn(async (target: { query: Record<string, string> }) => {
+      await nextTick()
+      currentRoute.query = { ...target.query }
+    })
+    navigateTo.mockImplementation(async (target: { query: Record<string, string> }) => {
+      await nextTick()
+      currentRoute.query = { ...target.query }
+    })
+    vi.stubGlobal('useRoute', () => currentRoute)
+    vi.stubGlobal('useRouter', () => ({ replace }))
+    render(OwnerDocumentListScreen, { props: { kind: 'owner_change' }, global })
+    await flushPromises()
+    expect(centralPagination.value.page).toBe(3)
+    loadKind.mockClear()
+    await fireEvent.click(screen.getByRole('button', { name: /^清除.+筛选$/ }))
+    await flushPromises()
+    expect(currentRoute.query).toEqual(filters)
+    expect(loadKind).toHaveBeenLastCalledWith('owner_change', expect.objectContaining({ page: 1, pageSize: 50, status: 'submitted', search: '保留受控搜索', documentType: 'site_visa' }))
+    expect(loadKind).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { previous: 'acceptance', next: 'warranty', page: 3, pageSize: 50, status: 'expired' },
+    { previous: 'warranty', next: 'acceptance', page: 4, pageSize: 10, status: 'accepted' },
+  ] as const)('同路径返回从 $previous 到 $next 时保留来源分页和 $status 状态', async ({ previous, next, page, pageSize, status }) => {
+    runtime.desktop = false
+    const currentRoute = reactive({ path: '/owner/acceptance', query: { variant: previous, status: 'all', page: '2' } as Record<string, string> })
+    vi.stubGlobal('useRoute', () => currentRoute)
+    render(OwnerDocumentListScreen, { props: { kind: 'acceptance' }, global })
+    await nextTick()
+    loadKind.mockClear()
+    const incoming = { variant: next, status, page: String(page), pageSize: String(pageSize) }
+    currentRoute.query = incoming
+    await nextTick()
+    expect(loadKind).toHaveBeenLastCalledWith('acceptance', expect.objectContaining({ variant: next, page, pageSize, status }))
+    expect(loadKind).toHaveBeenCalledTimes(1)
+    expect(currentRoute.query).toEqual(incoming)
+  })
+
+  it.each([
+    { label: '项目', source: { projectId: 'project-clear' } },
+    { label: '合同', source: { contractId: 'contract-clear' } },
+    { label: '分供方', source: { supplierId: 'supplier-clear' } },
+    { label: '组合来源', source: { projectId: 'project-clear', contractId: 'contract-clear', supplierId: 'supplier-clear' } },
+  ])('中央空态清除$label条件后，普通筛选同步不能写回旧来源', async ({ source }) => {
+    runtime.desktop = false
+    activeRows = []
+    centralEmptyReason = 'no-filter-match'
+    const currentRoute = reactive({ path: '/owner/change', query: { ...source, search: '无匹配受控搜索', status: 'approved' } as Record<string, string> })
+    const replace = vi.fn(async (target: { query: Record<string, string> }) => {
+      await nextTick()
+      currentRoute.query = { ...target.query }
+    })
+    navigateTo.mockImplementation(async (target: { query: Record<string, string> }) => {
+      await nextTick()
+      currentRoute.query = { ...target.query }
+    })
+    vi.stubGlobal('useRoute', () => currentRoute)
+    vi.stubGlobal('useRouter', () => ({ replace }))
+    render(OwnerDocumentListScreen, { props: { kind: 'owner_change' }, global })
+    await nextTick()
+    loadKind.mockClear()
+
+    await fireEvent.click(within(screen.getByRole('status', { name: '没有符合条件的甲方变洽签' })).getByRole('button', { name: '清除筛选' }))
+    await vi.waitFor(() => expect(currentRoute.query).toEqual({ status: 'all' }))
+    expect(document.querySelector('[data-ui="owner-document-route-context"]')).toBeNull()
+    await vi.waitFor(() => expect(loadKind).toHaveBeenLastCalledWith('owner_change', expect.objectContaining({
+      search: '',
+      projectId: null,
+      contractId: null,
+      supplierId: null,
+      status: null,
+    })))
+    expect(loadKind).toHaveBeenCalledTimes(1)
   })
 
   it('验收与保修列表从同一 canonical 查询切换专属列和 variant', async () => {

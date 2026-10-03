@@ -19,11 +19,23 @@ function expectInvalid(value: unknown) {
 }
 
 describe('工序库公开命令解析', () => {
-  it('只复制允许字段，保留工序定义与禁用前置；不把显示名称当身份', () => {
+  function createParseProcessLibraryCommandFixture() {
     const input = command()
-    expect(parseProcessLibraryCommand(input)).toEqual(input)
-    const adjusted = { ...input, baseVersion: 3, sourceVersion: '1', draft: { ...input.draft, sourceLibraryId: 'original-version', tasks: [{ ...input.draft.tasks[0]!, predecessorKey: 'previous', predecessorDisabled: true }] } }
-    expect(parseProcessLibraryCommand(adjusted)).toEqual(adjusted)
+    return { input }
+  }
+
+  it.each([
+    { case: 'input', prepare: ({ input }: ReturnType<typeof createParseProcessLibraryCommandFixture>) => {
+      return { input, expected: input } as const
+    } },
+    { case: 'adjusted', prepare: ({ input }: ReturnType<typeof createParseProcessLibraryCommandFixture>) => {
+      const adjusted = { ...input, baseVersion: 3, sourceVersion: '1', draft: { ...input.draft, sourceLibraryId: 'original-version', tasks: [{ ...input.draft.tasks[0]!, predecessorKey: 'previous', predecessorDisabled: true }] } }
+      return { input: adjusted, expected: adjusted } as const
+    } },
+  ])('只复制允许字段，保留工序定义与禁用前置；不把显示名称当身份 / parseProcessLibraryCommand：$case', ({ prepare }) => {
+    const fixture = createParseProcessLibraryCommandFixture()
+    const { input, expected } = prepare(fixture)
+    expect(parseProcessLibraryCommand(input)).toEqual(expected)
   })
 
   it.each([null, [], 'command', 1, {}])('拒绝非命令载荷 %s', input => expectInvalid(input))
@@ -60,11 +72,9 @@ describe('工序库公开命令解析', () => {
     expectInvalid({ ...command(), draft: { ...command().draft, tasks: [{ ...command().draft.tasks[0], durationDays }] } })
   })
 
-  it('结构解析保留原始整数，工期范围交由命令服务的领域校验拒绝', () => {
-    for (const durationDays of [-1, 0, 366]) {
-      const input = { ...command(), draft: { ...command().draft, tasks: [{ ...command().draft.tasks[0]!, durationDays }] } }
-      expect(parseProcessLibraryCommand(input).draft.tasks[0]!.durationDays).toBe(durationDays)
-    }
+  it.each(([-1, 0, 366]).map(input => ({ input })))('结构解析保留原始整数，工期范围交由命令服务的领域校验拒绝：输入案例 %#', ({ input: durationDays }) => {
+    const input = { ...command(), draft: { ...command().draft, tasks: [{ ...command().draft.tasks[0]!, durationDays }] } }
+    expect(parseProcessLibraryCommand(input).draft.tasks[0]!.durationDays).toBe(durationDays)
   })
 
   it.each([{ action: 'delete' }, { requiredCapability: 'process-library:read' }, { origin: 'other' }])('拒绝未声明的动作、来源与能力 %s', (overrides) => {

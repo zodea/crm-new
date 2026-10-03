@@ -1,6 +1,38 @@
 import type { Page } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { expectNoPageOverflow } from './helpers/responsive'
+import { updateProductionSnapshot } from './helpers/browser-production-snapshot'
+import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
+
+const OWNER_INPUTS = [
+  { label: '整数樘', project: '受控甲供工程甲', owner: '受控甲方甲', unrelated: '无关甲方甲', material: '受控甲供门甲', spec: '1000×2100', unit: '樘', control: '10', planned: '8', arrival: '6', use: '2', direct: '1', arrived: '7', used: '3', remaining: '7', stock: '4', boundary: '2', over: '3', applicant: '计划员甲', receiver: '领料员甲', location: '二层', clock: '2026-08-10T04:00:00Z' },
+  { label: '小数米', project: '受控甲供工程乙', owner: '受控甲方乙', unrelated: '无关甲方乙', material: '受控甲供管乙', spec: 'DN50', unit: '米', control: '5.5', planned: '4.5', arrival: '3.5', use: '1.25', direct: '0.75', arrived: '4.25', used: '2', remaining: '3.5', stock: '2.25', boundary: '2.5', over: '3.5', applicant: '计划员乙', receiver: '领料员乙', location: '首层', clock: '2024-02-29T04:00:00Z' },
+] as const
+
+type OwnerInput = typeof OWNER_INPUTS[number]
+
+async function installOwnerFixture(page: Page, input: OwnerInput) {
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `owner-material-${randomUUID()}` })
+  await page.clock.install({ time: new Date(input.clock) })
+  const session = await (await page.request.get('/api/read/business-session')).json()
+  const create = async (domain: string, draft: Record<string, unknown>) => {
+    const response = await page.request.post(`/api/commands/${domain}`, { data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: domain === 'customers' ? 'customer:write' : 'project:write', commandId: randomUUID(), baseVersion: null, action: 'draft', draft, attachments: {} } })
+    expect(response.ok(), await response.text()).toBe(true)
+    return response.json()
+  }
+  const owner = await create('customers', { name: input.owner, contact: input.applicant })
+  const unrelated = await create('customers', { name: input.unrelated, contact: input.receiver })
+  const project = await create('projects', { name: input.project, manager: input.applicant, customerId: owner.id, status: '筹备中' })
+  await page.goto('/owner-material/control')
+  await expect(page.getByLabel('单据列表工具栏')).toBeVisible()
+  // 甲供材尚未迁入；其既有本地校验读取中央命令生成的正式身份镜像。
+  await updateProductionSnapshot(page, (database) => {
+    for (const customer of [{ id: owner.id, name: input.owner }, { id: unrelated.id, name: input.unrelated }])
+      database.run('INSERT INTO customers (id, name, status) VALUES (?, ?, ?)', [customer.id, customer.name, 'draft'])
+    database.run('INSERT INTO projects (id, name, customer_id, status, source) VALUES (?, ?, ?, ?, ?)', [project.id, input.project, owner.id, '筹备中', 'e2e-production-fixture'])
+  })
+  await page.reload()
+}
 
 const OWNER_MATERIAL_ROUTES = [
   {
@@ -50,11 +82,11 @@ async function confirmBusinessAction(page: Page, action: string) {
   await expect(page.getByRole('dialog')).toBeHidden()
 }
 
-async function chooseProject(page: Page) {
-  await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+async function chooseProject(page: Page, input: OwnerInput) {
+  await chooseLookup(page, '检索项目', input.project, input.project)
 }
 
-async function chooseOwnerCustomer(page: Page, name = '合和地产集团') {
+async function chooseOwnerCustomer(page: Page, name: string) {
   await chooseLookup(page, '检索甲供单位', name, name)
 }
 
@@ -67,7 +99,10 @@ async function expectOwnerPageContract(page: Page, kind: string) {
 }
 
 test.describe('Issue #200 甲供材页面', () => {
-  for (const width of [390, 768, 1024, 1440]) {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
+  })
+  for (const width of RESPONSIVE_WIDTHS) {
     for (const route of OWNER_MATERIAL_ROUTES) {
       test(`${route.title} @ ${width}px 可运行并保持甲供边界`, async ({ page }) => {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
@@ -79,128 +114,130 @@ test.describe('Issue #200 甲供材页面', () => {
     }
   }
 
-  test('总控、下料、到货、领用与直入直出按真实甲方关系贯通派生量', async ({ page }) => {
-    test.setTimeout(180_000)
-    const suffix = Date.now()
-    const material = `E2E甲供材-${suffix}`
+  for (const input of OWNER_INPUTS) {
+    test(`${input.label} 总控、下料、到货、领用与直入直出按真实甲方关系贯通派生量`, async ({ page }) => {
+      test.setTimeout(180_000)
+      await installOwnerFixture(page, input)
+      const material = input.material
 
-    await page.goto('/owner-material/control/new')
-    await chooseProject(page)
-    await chooseOwnerCustomer(page)
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-spec').fill('1000×2100')
-    await page.getByTestId('material-unit').fill('樘')
-    await page.getByTestId('material-controlQty').fill('10')
-    await expect(page.getByTestId('material-arrivedQty')).toHaveText('0')
-    await expect(page.getByTestId('material-usedQty')).toHaveText('0')
-    await expect(page.getByTestId('material-remainingQty')).toHaveText('0')
-    await confirmBusinessAction(page, '生效')
-    await expect(page).not.toHaveURL(/\/owner-material\/control\/new$/)
-    await expect(page).toHaveURL(/\/owner-material\/control\/[^/?]+$/)
-    const controlId = page.url().split('/').pop()
-    await expect(page.getByText('已生效', { exact: true })).toBeVisible()
-    await expect(page.getByTestId('material-remainingQty')).toHaveText('10')
+      await page.goto('/owner-material/control/new')
+      await chooseProject(page, input)
+      await chooseOwnerCustomer(page, input.owner)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-spec').fill(input.spec)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-controlQty').fill(input.control)
+      await expect(page.getByTestId('material-arrivedQty')).toHaveText('0')
+      await expect(page.getByTestId('material-usedQty')).toHaveText('0')
+      await expect(page.getByTestId('material-remainingQty')).toHaveText('0')
+      await confirmBusinessAction(page, '生效')
+      await expect(page).not.toHaveURL(/\/owner-material\/control\/new$/)
+      await expect(page).toHaveURL(/\/owner-material\/control\/[^/?]+$/)
+      const controlId = page.url().split('/').pop()
+      await expect(page.getByText('已生效', { exact: true })).toBeVisible()
+      await expect(page.getByTestId('material-remainingQty')).toHaveText(input.control)
 
-    await page.goto('/owner-material/requisition/new')
-    await chooseProject(page)
-    await page.getByTestId('material-applicant').fill('E2E 甲供计划员')
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-spec').fill('1000×2100')
-    await page.getByTestId('material-unit').fill('樘')
-    await page.getByTestId('material-plannedQty').fill('8')
-    await confirmBusinessAction(page, '提交')
-    await expect(page).not.toHaveURL(/\/owner-material\/requisition\/new$/)
-    await expect(page).toHaveURL(/\/owner-material\/requisition\/[^/?]+$/)
-    await expect(page.getByText('已生效', { exact: true })).toBeVisible()
+      await page.goto('/owner-material/requisition/new')
+      await chooseProject(page, input)
+      await page.getByTestId('material-applicant').fill(input.applicant)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-spec').fill(input.spec)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-plannedQty').fill(input.planned)
+      await confirmBusinessAction(page, '提交')
+      await expect(page).not.toHaveURL(/\/owner-material\/requisition\/new$/)
+      await expect(page).toHaveURL(/\/owner-material\/requisition\/[^/?]+$/)
+      await expect(page.getByText('已生效', { exact: true })).toBeVisible()
 
-    await page.goto('/owner-material/arrival/new')
-    await chooseProject(page)
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-spec').fill('1000×2100')
-    await page.getByTestId('material-unit').fill('樘')
-    await page.getByTestId('material-qty').fill('6')
-    await expect(page.getByTestId('material-stockStatus')).toHaveText('待入库')
-    await confirmBusinessAction(page, '入库')
-    await expect(page).not.toHaveURL(/\/owner-material\/arrival\/new$/)
-    await expect(page).toHaveURL(/\/owner-material\/arrival\/[^/?]+$/)
-    await expect(page.getByTestId('material-stockStatus')).toHaveText('已入库')
+      await page.goto('/owner-material/arrival/new')
+      await chooseProject(page, input)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-spec').fill(input.spec)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-qty').fill(input.arrival)
+      await expect(page.getByTestId('material-stockStatus')).toHaveText('待入库')
+      await confirmBusinessAction(page, '入库')
+      await expect(page).not.toHaveURL(/\/owner-material\/arrival\/new$/)
+      await expect(page).toHaveURL(/\/owner-material\/arrival\/[^/?]+$/)
+      await expect(page.getByTestId('material-stockStatus')).toHaveText('已入库')
 
-    await page.goto('/owner-material/use/new')
-    await chooseProject(page)
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-unit').fill('樘')
-    await page.getByTestId('material-qty').fill('2')
-    await page.getByTestId('material-receiver').fill('E2E 甲供领料员')
-    await confirmBusinessAction(page, '出库')
-    await expect(page).not.toHaveURL(/\/owner-material\/use\/new$/)
-    await expect(page).toHaveURL(/\/owner-material\/use\/[^/?]+$/)
-    await expect(page.getByText('已生效', { exact: true })).toBeVisible()
+      await page.goto('/owner-material/use/new')
+      await chooseProject(page, input)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-qty').fill(input.use)
+      await page.getByTestId('material-receiver').fill(input.receiver)
+      await confirmBusinessAction(page, '出库')
+      await expect(page).not.toHaveURL(/\/owner-material\/use\/new$/)
+      await expect(page).toHaveURL(/\/owner-material\/use\/[^/?]+$/)
+      await expect(page.getByText('已生效', { exact: true })).toBeVisible()
 
-    await page.goto('/owner-material/direct/new')
-    await chooseProject(page)
-    await chooseOwnerCustomer(page)
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-unit').fill('樘')
-    await page.getByTestId('material-qty').fill('1')
-    await page.getByTestId('material-useLocation').fill('二层')
-    await confirmBusinessAction(page, '确认')
-    await expect(page).not.toHaveURL(/\/owner-material\/direct\/new$/)
-    await expect(page).toHaveURL(/\/owner-material\/direct\/[^/?]+$/)
-    await expect(page.getByText('已生效', { exact: true })).toBeVisible()
+      await page.goto('/owner-material/direct/new')
+      await chooseProject(page, input)
+      await chooseOwnerCustomer(page, input.owner)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-qty').fill(input.direct)
+      await page.getByTestId('material-useLocation').fill(input.location)
+      await confirmBusinessAction(page, '确认')
+      await expect(page).not.toHaveURL(/\/owner-material\/direct\/new$/)
+      await expect(page).toHaveURL(/\/owner-material\/direct\/[^/?]+$/)
+      await expect(page.getByText('已生效', { exact: true })).toBeVisible()
 
-    await page.goto(`/owner-material/control/${controlId}`)
-    await expect(page.getByTestId('material-controlQty')).toHaveValue('10')
-    await expect(page.getByTestId('material-arrivedQty')).toHaveText('7')
-    await expect(page.getByTestId('material-usedQty')).toHaveText('3')
-    await expect(page.getByTestId('material-remainingQty')).toHaveText('7')
-    await expect(page.getByTestId('material-stockQty')).toHaveText('4')
-  })
+      await page.goto(`/owner-material/control/${controlId}`)
+      await expect(page.getByTestId('material-controlQty')).toHaveValue(input.control)
+      await expect(page.getByTestId('material-arrivedQty')).toHaveText(input.arrived)
+      await expect(page.getByTestId('material-usedQty')).toHaveText(input.used)
+      await expect(page.getByTestId('material-remainingQty')).toHaveText(input.remaining)
+      await expect(page.getByTestId('material-stockQty')).toHaveText(input.stock)
+    })
 
-  test('阻断非项目甲方、超总控到货和超总控余量的业务动作', async ({ page }) => {
-    test.setTimeout(180_000)
-    const suffix = Date.now()
-    const material = `E2E甲供边界-${suffix}`
+    test(`${input.label} 阻断非项目甲方、超总控到货和超总控余量的业务动作`, async ({ page }) => {
+      test.setTimeout(180_000)
+      await installOwnerFixture(page, input)
+      const material = `${input.material}边界`
 
-    await page.goto('/owner-material/control/new')
-    await chooseProject(page)
-    await chooseOwnerCustomer(page, '锦绣置业有限公司')
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-unit').fill('套')
-    await page.getByTestId('material-controlQty').fill('2')
-    await confirmBusinessAction(page, '生效')
-    await expect(page.getByText('甲供单位不属于所选项目')).toBeVisible()
-    await expect(page).toHaveURL('/owner-material/control/new')
+      await page.goto('/owner-material/control/new')
+      await chooseProject(page, input)
+      await chooseOwnerCustomer(page, input.unrelated)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-controlQty').fill(input.boundary)
+      await confirmBusinessAction(page, '生效')
+      await expect(page.getByText('甲供单位不属于所选项目')).toBeVisible()
+      await expect(page).toHaveURL('/owner-material/control/new')
 
-    await page.goto('/owner-material/control/new')
-    await chooseProject(page)
-    await chooseOwnerCustomer(page)
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-unit').fill('套')
-    await page.getByTestId('material-controlQty').fill('2')
-    await confirmBusinessAction(page, '生效')
-    await expect(page).not.toHaveURL(/\/owner-material\/control\/new$/)
-    const controlId = page.url().split('/').pop()
+      await page.goto('/owner-material/control/new')
+      await chooseProject(page, input)
+      await chooseOwnerCustomer(page, input.owner)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-controlQty').fill(input.boundary)
+      await confirmBusinessAction(page, '生效')
+      await expect(page).not.toHaveURL(/\/owner-material\/control\/new$/)
+      const controlId = page.url().split('/').pop()
 
-    await page.goto('/owner-material/arrival/new')
-    await chooseProject(page)
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-unit').fill('套')
-    await page.getByTestId('material-qty').fill('3')
-    await confirmBusinessAction(page, '入库')
-    await expect(page.getByText('到货数量超过总控量')).toBeVisible()
-    await expect(page).toHaveURL('/owner-material/arrival/new')
+      await page.goto('/owner-material/arrival/new')
+      await chooseProject(page, input)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-qty').fill(input.over)
+      await confirmBusinessAction(page, '入库')
+      await expect(page.getByText('到货数量超过总控量')).toBeVisible()
+      await expect(page).toHaveURL('/owner-material/arrival/new')
 
-    await page.goto('/owner-material/direct/new')
-    await chooseProject(page)
-    await chooseOwnerCustomer(page)
-    await page.getByTestId('material-materialName').fill(material)
-    await page.getByTestId('material-unit').fill('套')
-    await page.getByTestId('material-qty').fill('3')
-    await page.getByTestId('material-useLocation').fill('首层')
-    await confirmBusinessAction(page, '确认')
-    await expect(page.getByText('总控余量不足')).toBeVisible()
-    await expect(page).toHaveURL('/owner-material/direct/new')
+      await page.goto('/owner-material/direct/new')
+      await chooseProject(page, input)
+      await chooseOwnerCustomer(page, input.owner)
+      await page.getByTestId('material-materialName').fill(material)
+      await page.getByTestId('material-unit').fill(input.unit)
+      await page.getByTestId('material-qty').fill(input.over)
+      await page.getByTestId('material-useLocation').fill(input.location)
+      await confirmBusinessAction(page, '确认')
+      await expect(page.getByText('总控余量不足')).toBeVisible()
+      await expect(page).toHaveURL('/owner-material/direct/new')
 
-    await expect(controlId).toBeTruthy()
-  })
+      await expect(controlId).toBeTruthy()
+    })
+  }
 })

@@ -29,23 +29,29 @@ describe('项目列表筛选', () => {
     expect(filterProjects(rows, { search: '', status: 'all' })).toEqual(rows)
   })
 
-  it('状态与关键词组合过滤', () => {
-    expect(filterProjects(rows, { search: '江湾', status: '停工' })).toEqual([rows[1]])
-    expect(filterProjects(rows, { search: '江湾', status: '施工中' })).toEqual([])
+  it.each([
+    { case: 'rows / { search: \'江湾\', status: \'停工\' }', input: rows, argument2: { search: '江湾', status: '停工' }, expected: [rows[1]] },
+    { case: 'rows / { search: \'江湾\', status: \'施工中\' }', input: rows, argument2: { search: '江湾', status: '施工中' }, expected: [] },
+  ])('状态与关键词组合过滤 / filterProjects：$case', ({ input, argument2, expected }) => {
+    expect(filterProjects(input, argument2)).toEqual(expected)
   })
 
-  it('关键词覆盖名称、编号、地址、合同名、客户与经理且忽略大小写和首尾空格', () => {
-    expect(filterProjects(rows, { search: ' hhxc ', status: 'all' })).toEqual([rows[0]])
-    expect(filterProjects(rows, { search: '白云', status: 'all' })).toEqual([rows[0]])
-    expect(filterProjects(rows, { search: '施工合同', status: 'all' })).toEqual([rows[0]])
-    expect(filterProjects(rows, { search: '陈工', status: 'all' })).toEqual([rows[1]])
+  it.each([
+    { case: 'rows / { search: \' hhxc \', status: \'all\' }', input: rows, argument2: { search: ' hhxc ', status: 'all' }, expected: [rows[0]] },
+    { case: 'rows / { search: \'白云\', status: \'all\' }', input: rows, argument2: { search: '白云', status: 'all' }, expected: [rows[0]] },
+    { case: 'rows / { search: \'施工合同\', status: \'all\' }', input: rows, argument2: { search: '施工合同', status: 'all' }, expected: [rows[0]] },
+    { case: 'rows / { search: \'陈工\', status: \'all\' }', input: rows, argument2: { search: '陈工', status: 'all' }, expected: [rows[1]] },
+  ])('关键词覆盖名称、编号、地址、合同名、客户与经理且忽略大小写和首尾空格 / filterProjects：$case', ({ input, argument2, expected }) => {
+    expect(filterProjects(input, argument2)).toEqual(expected)
   })
 
-  it('列头筛选按多个字段取交集，空选项不限制', () => {
-    expect(filterProjectColumns(rows, [
+  it.each([
+    { case: 'rows / [ { field: \'status\', values: [\'施工中\'] }, { field: \'manager\', values: [\'张工\'] }, ]', input: rows, argument2: [
       { field: 'status', values: ['施工中'] },
       { field: 'manager', values: ['张工'] },
-    ])).toEqual([rows[0]])
-    expect(filterProjectColumns(rows, [{ field: 'status', values: [] }])).toEqual(rows)
+    ], expected: [rows[0]] },
+    { case: 'rows / [{ field: \'status\', values: [] }]', input: rows, argument2: [{ field: 'status', values: [] }], expected: rows },
+  ])('列头筛选按多个字段取交集，空选项不限制 / filterProjectColumns：$case', ({ input, argument2, expected }) => {
+    expect(filterProjectColumns(input, argument2)).toEqual(expected)
   })
 })

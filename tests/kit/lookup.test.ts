@@ -17,24 +17,24 @@ describe('lookup keyword highlighting', () => {
     ])
   })
 
-  it('returns one plain segment for an empty or unmatched keyword', () => {
-    expect(highlightMatch('车陂项目', '')).toEqual([
+  it.each([
+    { case: '\'车陂项目\' / \'\'', input: '车陂项目', argument2: '', expected: [
       { text: '车陂项目', highlighted: false },
-    ])
-    expect(highlightMatch('车陂项目', '天河')).toEqual([
+    ] },
+    { case: '\'车陂项目\' / \'天河\'', input: '车陂项目', argument2: '天河', expected: [
       { text: '车陂项目', highlighted: false },
-    ])
+    ] },
+  ])('returns one plain segment for an empty or unmatched keyword / highlightMatch：$case', ({ input, argument2, expected }) => {
+    expect(highlightMatch(input, argument2)).toEqual(expected)
   })
 })
 
 describe('lookup recent selections', () => {
-  it('partitions business recents by workspace data origin', () => {
-    expect(lookupRecentStorageKey('projects', 'workspace-default', 'real')).toBe(
-      'kit-lookup:workspace-default:real:projects:recent',
-    )
-    expect(lookupRecentStorageKey('projects', 'workspace-default', 'demo')).toBe(
-      'kit-lookup:workspace-default:demo:projects:recent',
-    )
+  it.each([
+    { case: '\'projects\' / \'workspace-default\' / \'real\'', input: 'projects', argument2: 'workspace-default', argument3: 'real', expected: 'kit-lookup:workspace-default:real:projects:recent' },
+    { case: '\'projects\' / \'workspace-default\' / \'demo\'', input: 'projects', argument2: 'workspace-default', argument3: 'demo', expected: 'kit-lookup:workspace-default:demo:projects:recent' },
+  ])('partitions business recents by workspace data origin / lookupRecentStorageKey：$case', ({ input, argument2, argument3, expected }) => {
+    expect(lookupRecentStorageKey(input, argument2, argument3)).toBe(expected)
   })
 
   it('keeps the five newest unique selections', () => {

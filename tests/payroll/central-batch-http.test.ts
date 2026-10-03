@@ -15,7 +15,7 @@ vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
 } }))
 afterEach(() => vi.unstubAllGlobals())
 
-it('batch HTTP/Repository roundtrip binds preview, identity and immutable plan while rejecting altered commands', async () => {
+it.each([{ actorId: 'other-actor' }, { workspaceId: 'other-workspace' }])('batch HTTP/Repository rejects altered identity: %j', async (contextPatch) => {
   const f = await createPayrollAServiceFixture()
   runtime.service = f.service
   f.facts.rows = [payrollAFact({ ownershipKey: 'left', completionId: 'left-complete', assignmentId: 'left-assignment', workerId: 'w', fieldQty: 1 })]
@@ -84,8 +84,8 @@ it('batch HTTP/Repository roundtrip binds preview, identity and immutable plan w
     expect(await repo.executeBatch(execute)).toEqual(completed)
     expect(await repo.batch(query, plan.planId)).toEqual(completed)
     expect(() => decodePayrollBatchPlan({ ...completed, planId: 'unrelated-plan' }, query, undefined, execute)).toThrow('批量工资计划回读不完整')
-    for (const context of [{ ...completed.context, actorId: 'other-actor' }, { ...completed.context, workspaceId: 'other-workspace' }])
-      expect(() => decodePayrollBatchPlan({ ...completed, context }, query, undefined, execute)).toThrow('批量工资计划回读不完整')
+    const context = { ...completed.context, ...contextPatch }
+    expect(() => decodePayrollBatchPlan({ ...completed, context }, query, undefined, execute)).toThrow('批量工资计划回读不完整')
   }
   finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))

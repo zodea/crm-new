@@ -71,7 +71,7 @@ watch(() => [props.origin, props.scope] as const, load, { deep: true, immediate:
 </script>
 
 <template>
-  <section id="section-rounding" class="panel mt-4 grid min-w-0 scroll-mt-4 gap-3 p-4" aria-label="A 工资发放取整">
+  <section id="section-rounding" class="panel mt-4 grid min-w-0 grid-cols-1 scroll-mt-4 gap-3 p-4" aria-label="A 工资发放取整">
     <SectionHeader title="发放取整" subtitle="每个负责人、请款簿和生效月份都必须明确选择；新修订不追改已发记录。" />
     <p v-if="!scope" class="text-12px text-ink-soft">
       请选择负责人和请款簿后配置。

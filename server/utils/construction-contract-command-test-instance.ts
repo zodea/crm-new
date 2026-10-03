@@ -529,7 +529,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
       }
       const stored: StoredContract = {
         id,
-        draft: cleanDraft(request.draft, id),
+        draft: cleanDraft({ ...request.draft, status: request.action === 'submit' ? '审批中' : request.action === 'draft' ? '草稿' : request.draft.status }, id),
         attachments,
         version: (existing?.version ?? 0) + 1,
         createdAt: existing?.createdAt ?? timestamp,

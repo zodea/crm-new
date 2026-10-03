@@ -1,12 +1,18 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
-import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
+const sessions = new Map<string, string>()
 
 function testSession(testInfo: TestInfo) {
-  return Buffer.from(testInfo.testId, 'utf8').toString('base64url')
+  let id = sessions.get(testInfo.testId)
+  if (!id) {
+    id = `customer-chain-${randomUUID()}`
+    sessions.set(testInfo.testId, id)
+  }
+  return id
 }
 
 async function resetCustomerBackend(request: APIRequestContext, sessionId: string) {
@@ -42,6 +48,7 @@ async function seedFormalCustomers(request: APIRequestContext, sessionId: string
 async function createFormalCustomer(page: Page, name: string) {
   await page.goto('/base/customer')
   await expect(page.getByRole('heading', { name: '客户档案' })).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('[data-ui="customer-list-table"]')).toHaveAttribute('aria-busy', 'false')
   await page.getByRole('button', { name: '新建客户' }).first().click()
   await page.getByLabel('客户名称 *').fill(name)
   await page.getByLabel('联系人').fill('陈经理')
@@ -55,8 +62,9 @@ async function createFormalCustomer(page: Page, name: string) {
 
 test.describe('Issue #314：客户中央列表—详情—显式编辑链', () => {
   test.beforeEach(async ({ page }, testInfo) => {
+    await page.clock.install({ time: new Date('2026-09-15T04:00:00Z') })
     const sessionId = testSession(testInfo)
-    await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId })
+    await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId })
     await resetCustomerBackend(page.context().request, sessionId)
   })
 
@@ -129,7 +137,9 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
     await expect(page.getByRole('heading', { name: 'SK-2026-001' })).toBeFocused()
     await page.reload()
     await expect(page.getByRole('heading', { name: 'SK-2026-001' })).toBeVisible()
-    await page.getByRole('link', { name: '返回客户收款明细' }).click()
+    const receiptReturn = page.getByRole('link', { name: '返回来源页面', exact: true })
+    await expect(receiptReturn).toHaveAttribute('href', /\/base\/customer\/customer_demo_001\?origin=demo&tab=receipts&relationContext=/)
+    await receiptReturn.click()
     await expect(page.getByRole('tab', { name: /收款明细/ })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByText('未记录', { exact: true })).toBeVisible()
     await page.getByRole('link', { name: '返回客户列表' }).click()
@@ -146,16 +156,51 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
       .toBeVisible()
   })
 
-  test('未携带中央来源的既有收款降级为普通文本，编辑仍是独立动作', async ({ page }) => {
-    await page.addInitScript(key => localStorage.setItem(key, 'true'), DATA_VISIBILITY_STORAGE_KEY)
-    await page.goto('/finance/receipt')
-    await expect(page.getByTestId('non-central-receipt-name').filter({ hasText: '合和地产集团' }).first()).toBeVisible()
-    await expect(page.getByRole('button', { name: '合和地产集团', exact: true })).toHaveCount(0)
-
-    await page.getByTitle('编辑').first().click()
-    await expect(page).toHaveURL('/finance/receipt/form/rr_mz0x1_0')
-    await expect(page.getByRole('heading', { name: '编辑 · 收款登记' })).toBeVisible()
-  })
+  for (const input of [
+    { label: '演示收款只读', origin: 'demo', no: 'SK-2026-001', amount: null, date: '', editable: false },
+    { label: '正式整数收款', origin: 'real', no: 'E2E-SK-125', amount: '125.00', date: '2026-09-12', editable: true },
+    { label: '正式小数收款与闰日', origin: 'real', no: 'E2E-SK-DECIMAL', amount: '0.75', date: '2028-02-29', editable: true },
+  ] as const) {
+    test(`中央收款名称进入同来源只读详情，编辑为显式动作：${input.label}`, async ({ page }) => {
+      await page.addInitScript(key => localStorage.setItem(key, 'true'), DATA_VISIBILITY_STORAGE_KEY)
+      let id = 'rr_mz0x1_0'
+      if (input.editable) {
+        const session = await (await page.request.get('/api/read/business-session')).json()
+        const response = await page.request.post('/api/commands/receipts', { data: {
+          workspaceId: session.workspaceId,
+          actorId: session.actorId,
+          requiredCapability: 'receipt:write',
+          commandId: randomUUID(),
+          baseVersion: null,
+          origin: 'real',
+          action: 'draft',
+          attachments: {},
+          draft: { no: input.no, amount: input.amount, receiptDate: input.date, projectId: null, customerId: null, contractId: null, payerAccount: '', paymentMethod: '银行转账', acceptanceBillNo: '', billDueDate: '', periodNo: '', bankSerialNo: '', handler: '', reviewStatus: '待审核', status: 'draft', note: '' },
+        } })
+        expect(response.ok(), await response.text()).toBe(true)
+        id = (await response.json()).id
+      }
+      await page.goto(`/finance/receipt?origin=${input.origin}&search=${encodeURIComponent(input.no)}`)
+      const name = page.getByRole('link', { name: input.no, exact: true })
+      await expect(name).toHaveAttribute('href', new RegExp(`/finance/receipt/${id}\\?origin=${input.origin}`))
+      await name.click()
+      await expect(page.getByRole('heading', { name: input.no, exact: true })).toBeVisible()
+      const edit = page.getByRole('link', { name: '编辑收款', exact: true })
+      if (input.editable) {
+        await edit.click()
+        await expect(page).toHaveURL(url => url.pathname === `/finance/receipt/form/${id}` && url.searchParams.get('origin') === 'real')
+        await expect(page.getByRole('heading', { name: '编辑 · 收款登记', exact: true })).toBeVisible()
+        const savedResponse = await page.request.get(`/api/read/receipts/${id}/record`, { params: { origin: 'real' } })
+        expect(savedResponse.ok(), await savedResponse.text()).toBe(true)
+        const saved = await savedResponse.json()
+        expect(saved.record.draft).toMatchObject({ no: input.no, amount: input.amount, receiptDate: input.date })
+      }
+      else {
+        await expect(edit).toHaveCount(0)
+        await expect(page.getByText('演示', { exact: true })).toBeVisible()
+      }
+    })
+  }
 
   test('返回列表恢复状态、排序、非默认页码、每页条数、滚动与行焦点', async ({ page }, testInfo) => {
     await seedFormalCustomers(page.context().request, testSession(testInfo), 10)
@@ -166,15 +211,16 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
     await expect(page.getByRole('button', { name: '第 2 页' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByLabel('每页条数')).toHaveValue('20')
     await expect(page.getByRole('combobox', { name: '排序' })).toContainText('名称升序')
-    await expect(page.getByRole('combobox', { name: '档案状态' })).toContainText('active')
+    await expect(page.getByRole('button', { name: '档案状态，已选 1 项', exact: true })).toContainText('有效')
 
     const workspace = page.locator('[data-shell-workspace]')
     await workspace.evaluate((element) => {
       element.scrollTop = Math.min(120, element.scrollHeight - element.clientHeight)
     })
+    const rowLink = page.locator('[data-ui="customer-list-table"] a.cell--link').first()
+    await rowLink.scrollIntoViewIfNeeded()
     const expectedScroll = await workspace.evaluate(element => element.scrollTop)
     expect(expectedScroll).toBeGreaterThan(0)
-    const rowLink = page.locator('[data-ui="customer-list-table"] a.cell--link').first()
     const customerName = (await rowLink.textContent())?.trim() ?? ''
     expect(customerName).not.toBe('')
     await rowLink.click()
@@ -191,7 +237,7 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
     await expect(page.getByRole('button', { name: '第 2 页' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByLabel('每页条数')).toHaveValue('20')
     await expect(page.getByRole('combobox', { name: '排序' })).toContainText('名称升序')
-    await expect(page.getByRole('combobox', { name: '档案状态' })).toContainText('active')
+    await expect(page.getByRole('button', { name: '档案状态，已选 1 项', exact: true })).toContainText('有效')
     await expect(page.getByRole('link', { name: customerName, exact: true }).first()).toBeFocused()
     await expect.poll(() => workspace.evaluate(element => element.scrollTop)).toBe(expectedScroll)
 

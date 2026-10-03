@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 const ROUTES_FOR_OVERFLOW = [
@@ -36,8 +37,11 @@ async function openTabs(page: Page, labels: readonly string[]) {
 }
 
 test.beforeEach(async ({ page }) => {
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `shell-ui-${randomUUID()}` })
+  await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
   await page.addInitScript(() => {
-    localStorage.removeItem('ruihang-sidebar-pinned')
+    localStorage.setItem('ruihang:workspace-default:include-demo', 'true')
+    localStorage.setItem('ruihang-sidebar-pinned', 'true')
     localStorage.removeItem('ruihang-sidebar-groups')
   })
 })
@@ -88,38 +92,61 @@ test('Issue #188：导航搜索与页签溢出均可由键盘可达控件操作'
   await expect(next).toBeVisible()
 })
 
-test('Issue #188：真实详情长标题会重新计算页签溢出', async ({ page }) => {
-  await page.setViewportSize({ width: 1024, height: 800 })
-  await page.goto('/')
-  await page.waitForLoadState('networkidle')
-  await openTabs(page, [
-    '项目列表',
-    '施工合同',
-    '分包合同',
-    '工程量管理',
-    '分供方',
-  ])
+for (const supplier of [
+  { name: '广州市大板东建材有限公司', id: 'sup_demo_001' },
+  { name: '穗建五金机电经营部', id: 'sup_demo_004' },
+]) {
+  test(`Issue #188：只读演示详情标题会重新计算页签溢出：${supplier.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 800 })
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await openTabs(page, ROUTES_FOR_OVERFLOW)
+    await openSidebarRoute(page, '分供方')
 
-  const tabList = page.getByRole('navigation', { name: '已打开页面' })
-  const next = page.getByRole('button', { name: '向后翻动页签' })
-  await expect(next).toHaveCount(0)
-  expect(await tabList.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    const tabList = page.getByRole('navigation', { name: '已打开页面' })
+    const next = page.getByRole('button', { name: '向后翻动页签' })
+    await expect(next).toHaveCount(0)
+    expect(await tabList.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
 
-  const supplierName = '广州市大板东建材有限公司'
-  await page.getByPlaceholder('搜索公司名、税号、简称…').fill(supplierName)
-  await page.getByRole('link', { name: supplierName, exact: true }).click()
-  await expect(page).toHaveURL(/\/base\/supplier\/sup_demo_001$/)
-  await expect(page.locator('[data-shell-tab][data-active="true"] [data-tab-trigger]'))
-    .toHaveText(supplierName)
+    let release!: () => void
+    const pending = new Promise<void>(resolve => release = resolve)
+    await page.route(`**/api/read/suppliers/${supplier.id}?*`, async (route) => {
+      const response = await route.fetch()
+      await pending
+      await route.fulfill({ response })
+    })
+    await page.getByRole('searchbox', { name: '搜索关键词…' }).fill(supplier.name)
+    await page.getByRole('link', { name: supplier.name, exact: true }).click()
+    try {
+      await expect(tabList.getByRole('button', { name: '分供方详情', exact: true })).toHaveAttribute('aria-current', 'page')
+      const geometry = await tabList.evaluate((element) => {
+        const bounds = [...element.querySelectorAll('[data-shell-tab]')].map(item => item.getBoundingClientRect())
+        const style = getComputedStyle(element)
+        return { client: element.clientWidth, content: Math.max(...bounds.map(rect => rect.right)) - Math.min(...bounds.map(rect => rect.left)) + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight) }
+      })
+      const width = Math.ceil(1440 - geometry.client + geometry.content + 8)
+      expect(width).toBeGreaterThanOrEqual(1024)
+      await page.setViewportSize({ width, height: 800 })
+      await expect(next).toHaveCount(0)
+      expect(await tabList.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    }
+    finally { release() }
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/base/supplier/${supplier.id}`)
+    expect(new URL(page.url()).searchParams.get('origin')).toBe('demo')
+    await expect(page.getByRole('heading', { name: supplier.name, exact: true })).toBeVisible()
+    await expect(page.locator('[data-shell-topbar] h1')).toHaveText('分供方详情')
+    await expect(tabList.getByRole('button', { name: supplier.name, exact: true })).toHaveAttribute('aria-current', 'page')
 
-  await expect(next).toBeVisible()
-  expect(await tabList.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
-})
+    await expect(next).toBeVisible()
+    expect(await tabList.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+  })
+}
 
 for (const sample of [
   { width: 390, height: 844, placement: 'bottom' },
   { width: 768, height: 900, placement: 'bottom' },
   { width: 1024, height: 900, placement: 'right' },
+  { width: 1280, height: 900, placement: 'right' },
   { width: 1440, height: 1000, placement: 'right' },
 ] as const) {
   test(`Issue #188：通知 Sheet @ ${sample.width}px`, async ({ page }) => {
@@ -127,7 +154,7 @@ for (const sample of [
     await page.goto('/')
     await page.waitForLoadState('networkidle')
 
-    const trigger = page.getByRole('button', { name: /打开通知中心，\d+ 条未读/ })
+    const trigger = page.getByRole('button', { name: /^打开通知中心/ })
     await trigger.click()
 
     const sheet = page.getByRole('dialog', { name: '消息中心' })

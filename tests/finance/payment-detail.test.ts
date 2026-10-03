@@ -103,20 +103,18 @@ beforeEach(async () => {
 afterEach(() => mem.close())
 
 describe('付款申请智能业务洞察', () => {
-  it('详情区分未填、明确零和历史未知；已付始终来自确认支付', async () => {
-    for (const [value, origin, state, approved, unpaid] of [
-      [null, 'user-entry', 'not-entered', null, 70],
-      [0, 'user-entry', 'known', 0, 0],
-      [80, 'user-entry', 'known', 80, 50],
-      [0, 'legacy', 'legacy-unknown', null, null],
-    ] as const) {
-      await mem.execute('UPDATE payment_applications SET approved_amount = ?, approved_amount_origin = ? WHERE id = ?', [value, origin, 'detail-application'])
-      const detail = await loadPaymentApplicationDetail('detail-application')
-      expect(detail).toMatchObject({ approvedAmount: approved, approvedAmountState: state, unpaidAmount: unpaid, paidAmount: 30 })
-      if (state === 'legacy-unknown') {
-        expect(detail?.insight.checks.find(check => check.key === 'payment')?.summary).toBe('历史批复待核验')
-        expect(detail?.registrationAmount).toBe(70)
-      }
+  it.each([
+    [null, 'user-entry', 'not-entered', null, 70],
+    [0, 'user-entry', 'known', 0, 0],
+    [80, 'user-entry', 'known', 80, 50],
+    [0, 'legacy', 'legacy-unknown', null, null],
+  ] as const)('详情区分未填、明确零和历史未知；已付始终来自确认支付：输入案例 %#', async (value, origin, state, approved, unpaid) => {
+    await mem.execute('UPDATE payment_applications SET approved_amount = ?, approved_amount_origin = ? WHERE id = ?', [value, origin, 'detail-application'])
+    const detail = await loadPaymentApplicationDetail('detail-application')
+    expect(detail).toMatchObject({ approvedAmount: approved, approvedAmountState: state, unpaidAmount: unpaid, paidAmount: 30 })
+    if (state === 'legacy-unknown') {
+      expect(detail?.insight.checks.find(check => check.key === 'payment')?.summary).toBe('历史批复待核验')
+      expect(detail?.registrationAmount).toBe(70)
     }
   })
   it.each(['pending', '待确认', 'approved', '已审批'])('往期结算不计入 %s 状态，确认后再纳入', async (status) => {

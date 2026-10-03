@@ -62,7 +62,7 @@ describe('supplier credential OCR', () => {
     expect(parsed.fields.some(field => field.key === 'uniqueCode')).toBe(false)
   })
 
-  it('同一原件的不同税号候选全部保留，稳定身份区分并默认保留当前值', () => {
+  function createTaxNumberCandidateReview() {
     const original = result('统一社会信用代码：91440000TEST123456\n纳税人识别号：91440000TEST654321\n税号：91440000TEST654322')
     const parsed = parseCredentialOcr(original)
     const candidates = parsed.fields.filter(field => field.key === 'taxNo')
@@ -71,11 +71,28 @@ describe('supplier credential OCR', () => {
     expect(parseCredentialOcr(original).fields).toEqual(parsed.fields)
     const review = buildCredentialOcrReview(candidates, { uniqueCode: 'INTERNAL', taxNo: '' })
     expect(review.every(field => field.conflict && field.decision === 'keep-current')).toBe(true)
-    expect(resolveCredentialOcrReview(review)).toEqual({})
+    return { original, parsed, candidates, review }
+  }
+
+  it('同一原件的不同税号候选全部保留，稳定身份区分并默认保留当前值', () => {
+    const { review } = createTaxNumberCandidateReview()
     review[0]!.decision = 'use-recognized'
-    expect(resolveCredentialOcrReview(review)).toEqual({ taxNo: '91440000TEST123456' })
     review[1]!.decision = 'use-recognized'
     expect(() => resolveCredentialOcrReview(review)).toThrow(/多个|一项|一个/)
+  })
+
+  it.each([
+    { case: 'review', prepare: ({ review }: ReturnType<typeof createTaxNumberCandidateReview>) => {
+      return { input: review, expected: {} } as const
+    } },
+    { case: 'review', prepare: ({ review }: ReturnType<typeof createTaxNumberCandidateReview>) => {
+      review[0]!.decision = 'use-recognized'
+      return { input: review, expected: { taxNo: '91440000TEST123456' } } as const
+    } },
+  ])('同一原件的不同税号候选全部保留，稳定身份区分并默认保留当前值 / resolveCredentialOcrReview：$case', ({ prepare }) => {
+    const fixture = createTaxNumberCandidateReview()
+    const { input, expected } = prepare(fixture)
+    expect(resolveCredentialOcrReview(input)).toEqual(expected)
   })
 
   it('不同原标签识别为同一税号时没有伪冲突，确认仍只有一个目标值', () => {
@@ -86,18 +103,40 @@ describe('supplier credential OCR', () => {
     expect(resolveCredentialOcrReview(review)).toEqual({ taxNo: '91440000TEST123456' })
   })
 
-  it('确认只接受所属候选身份和一项明确决定，旧内部编码目标不自动搬值', () => {
+  function createCredentialTaxNumberCandidates() {
     const candidates = [{ id: 'tax-candidate', key: 'taxNo' as const, label: '税号', value: '91440000TEST123456', confidence: 0.9 }]
-    expect(() => resolveCredentialOcrChoices(candidates, {}, [])).toThrow(/每个字段/)
-    expect(() => resolveCredentialOcrChoices(candidates, {}, [{ key: 'taxNo', decision: 'use-recognized', candidateId: 'other' }])).toThrow(/候选/)
-    expect(() => resolveCredentialOcrChoices(candidates, {}, [{ key: 'taxNo', decision: 'keep-current' }, { key: 'taxNo', decision: 'manual', manualValue: 'MANUAL' }])).toThrow(/一项/)
+    return { candidates }
+  }
+
+  it('确认只接受所属候选身份和一项明确决定，旧内部编码目标不自动搬值', () => {
+    createCredentialTaxNumberCandidates()
     const legacy = [{ id: 'old-code', key: 'uniqueCode' as const, label: '统一社会信用代码', value: '91440000TEST123456', confidence: 0.9 }]
     const review = buildCredentialOcrReview(legacy, { uniqueCode: 'INTERNAL', taxNo: 'TAX' })
     expect(review[0]).toMatchObject({ key: 'uniqueCode', label: '内部唯一识别码', sourceLabel: '统一社会信用代码', currentValue: 'INTERNAL', decision: 'keep-current' })
     expect(resolveCredentialOcrReview(review)).toEqual({ uniqueCode: 'INTERNAL' })
-    expect(() => resolveCredentialOcrChoices(legacy, {}, [{ key: 'uniqueCode', decision: 'use-recognized', candidateId: 'old-code' }])).toThrow(/内部编码/)
     expect(resolveCredentialOcrChoices(legacy, {}, [{ key: 'uniqueCode', decision: 'manual', manualValue: 'CONFIRMED-INTERNAL' }])).toEqual({ uniqueCode: 'CONFIRMED-INTERNAL' })
     expect(legacy[0]!.key).toBe('uniqueCode')
+  })
+
+  it.each([
+    { case: 'candidates / {} / []', prepare: ({ candidates }: ReturnType<typeof createCredentialTaxNumberCandidates>) => {
+      return { input: candidates, argument2: {}, argument3: [], expected: /每个字段/ } as const
+    } },
+    { case: 'candidates / {} / [{ key: \'taxNo\', decision: \'use-recognized\', candidateId: \'other\' }]', prepare: ({ candidates }: ReturnType<typeof createCredentialTaxNumberCandidates>) => {
+      return { input: candidates, argument2: {}, argument3: [{ key: 'taxNo', decision: 'use-recognized', candidateId: 'other' }], expected: /候选/ } as const
+    } },
+    { case: 'candidates / {} / [{ key: \'taxNo\', decision: \'keep-current\' }, { key: \'taxNo\', decision: \'manual\', manualValue', prepare: ({ candidates }: ReturnType<typeof createCredentialTaxNumberCandidates>) => {
+      return { input: candidates, argument2: {}, argument3: [{ key: 'taxNo', decision: 'keep-current' }, { key: 'taxNo', decision: 'manual', manualValue: 'MANUAL' }], expected: /一项/ } as const
+    } },
+    { case: 'legacy / {} / [{ key: \'uniqueCode\', decision: \'use-recognized\', candidateId: \'old-code\' }]', prepare: (_fixture: ReturnType<typeof createCredentialTaxNumberCandidates>) => {
+      const legacy = [{ id: 'old-code', key: 'uniqueCode' as const, label: '统一社会信用代码', value: '91440000TEST123456', confidence: 0.9 }]
+
+      return { input: legacy, argument2: {}, argument3: [{ key: 'uniqueCode', decision: 'use-recognized', candidateId: 'old-code' }], expected: /内部编码/ } as const
+    } },
+  ])('确认只接受所属候选身份和一项明确决定，旧内部编码目标不自动搬值 / resolveCredentialOcrChoices：$case', ({ prepare }) => {
+    const fixture = createCredentialTaxNumberCandidates()
+    const { input, argument2, argument3, expected } = prepare(fixture)
+    expect(() => resolveCredentialOcrChoices(input, argument2, argument3)).toThrow(expected)
   })
 
   it('识别身份证常见姓名与起止式有效期限', () => {

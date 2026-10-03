@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { EMPTY_WORKER_PRIVATE } from '../../app/lib/worker-roster/contract'
 import { parsePrivateValues, rosterObject } from '../../app/lib/worker-roster/validation'
+import { importedWorkerPhotoId, insertWorkerModernVersions, prepareWorkerModernRemoval } from './worker-roster-modern-migration'
 import { initializeWorkerRosterSchema, photoBytes, rosterHash } from './worker-roster-storage'
 
 interface LegacyFile {
@@ -23,7 +24,7 @@ interface LegacyFile {
   payloadEncoding: string | null
   payloadContent: string | null
 }
-interface Evidence { worker_id: string, batch_id: string, fingerprint: string }
+interface Evidence { worker_id: string, batch_id: string, fingerprint: string, source_json: string }
 interface RemovedSources { projects: ReadonlySet<string>, workers: ReadonlySet<string>, statements: ReadonlySet<string> }
 function invalid(message: string): never {
   throw new ProjectRepositoryProblem(projectProblem('conflict', `工人实名资料迁移：${message}`))
@@ -93,6 +94,10 @@ async function assertNoRemovedReferences(db: TransactionDb, removed: RemovedSour
     if (row.worker_id && removed.workers.has(row.worker_id))
       return invalid('工人已有日常提交回执，不能恢复删除')
   }
+  for (const row of await db.select<{ record_id: string }>('SELECT record_id FROM operation_logs WHERE table_name=\'worker_roster_profile_versions\'')) {
+    if (removed.workers.has(row.record_id))
+      return invalid('工人已有独立实名资料审计，不能恢复删除')
+  }
 }
 
 /** 在迁移候选 SQL 内执行；与其他 owner 一起提交/放弃，不修改当前可见库。 */
@@ -101,11 +106,35 @@ export async function applyWorkerRosterMigration(db: TransactionDb, snapshot: Co
   await db.execute('CREATE TABLE IF NOT EXISTS worker_roster_migration_evidence(worker_id TEXT PRIMARY KEY,batch_id TEXT NOT NULL,fingerprint TEXT NOT NULL,source_json TEXT NOT NULL)')
   const batchId = snapshot.authority === 'central' ? snapshot.activeBatchId : null
   const entities = batchId ? snapshot.entities.filter(row => row.entityType === 'workers') : []
-  const evidence = await db.select<Evidence>('SELECT worker_id,batch_id,fingerprint FROM worker_roster_migration_evidence')
+  const evidence = await db.select<Evidence>('SELECT worker_id,batch_id,fingerprint,source_json FROM worker_roster_migration_evidence')
   const removals = evidence.filter(row => row.batch_id !== batchId || !entities.some(entity => entity.id === row.worker_id))
   const workers = new Set([...removed.workers, ...removals.map(row => row.worker_id)])
   const assets = await db.select<{ id: string, worker_id: string, file_ref_id: string, migration_batch_id: string | null }>('SELECT id,worker_id,file_ref_id,migration_batch_id FROM worker_roster_assets')
   const oldAssets = assets.filter(asset => removals.some(row => row.worker_id === asset.worker_id && row.batch_id === asset.migration_batch_id))
+  for (const old of removals) {
+    const entity = JSON.parse(old.source_json) as CoreMigrationServerEntityDTO
+    if (entity.attributes.workerRosterGraphJson !== undefined)
+      continue
+    const expected = legacyValues(entity)
+    const candidates: Record<'portrait' | 'bank-card', string[]> = { 'portrait': [], 'bank-card': [] }
+    for (const file of filesFor(entity)) {
+      if (file.deletedAt !== null || (file.category !== 'portrait' && file.category !== 'bank-card'))
+        continue
+      if (file.payloadEncoding === 'base64' && file.payloadContent !== null) {
+        try {
+          photoBytes({ fileName: file.fileName, mimeType: file.mimeType, fileSize: file.fileSize ?? Buffer.from(file.payloadContent, 'base64').length, payloadBase64: file.payloadContent })
+        }
+        catch { continue }
+      }
+      candidates[file.category].push(importedWorkerPhotoId(entity.id, file.id))
+    }
+    expected.portraitId = candidates.portrait.length === 1 ? candidates.portrait[0]! : null
+    expected.bankCardId = candidates['bank-card'].length === 1 ? candidates['bank-card'][0]! : null
+    const versions = await db.select<{ revision: number, values_json: string }>('SELECT revision,values_json FROM worker_roster_profile_versions WHERE worker_id=? AND migration_batch_id=?', [old.worker_id, old.batch_id])
+    if (versions.length !== 1 || versions[0]!.revision !== 1 || rosterHash(JSON.parse(versions[0]!.values_json)) !== rosterHash(expected))
+      return invalid('原工人迁入资料已被改写，不能恢复删除')
+  }
+  await prepareWorkerModernRemoval(db, removals)
   await assertNoRemovedReferences(db, { ...removed, workers }, new Set(oldAssets.map(asset => asset.id)))
   for (const old of removals) {
     if (assets.some(asset => asset.worker_id === old.worker_id && asset.migration_batch_id === null))
@@ -134,7 +163,7 @@ export async function applyWorkerRosterMigration(db: TransactionDb, snapshot: Co
     const files = filesFor(entity)
     const candidates: Record<'portrait' | 'bank-card', string[]> = { 'portrait': [], 'bank-card': [] }
     for (const file of files) {
-      const id = `worker-photo-import-${rosterHash({ workerId: entity.id, legacyFileId: file.id })}`
+      const id = importedWorkerPhotoId(entity.id, file.id)
       const content = file.payloadEncoding === 'base64' ? file.payloadContent : null
       let sha256: string | null = null
       if (content !== null) {
@@ -161,7 +190,8 @@ export async function applyWorkerRosterMigration(db: TransactionDb, snapshot: Co
     }
     values.portraitId = candidates.portrait.length === 1 ? candidates.portrait[0]! : null
     values.bankCardId = candidates['bank-card'].length === 1 ? candidates['bank-card'][0]! : null
-    await db.execute('INSERT INTO worker_roster_profile_versions(worker_id,revision,values_json,created_at,actor_id,migration_batch_id) VALUES (?,1,?,?,?,?)', [entity.id, JSON.stringify(values), String(entity.attributes.updatedAt ?? entity.attributes.createdAt ?? '1970-01-01T00:00:00.000Z'), `migration:${batchId}`, batchId])
+    if (!await insertWorkerModernVersions(db, entity, batchId!))
+      await db.execute('INSERT INTO worker_roster_profile_versions(worker_id,revision,values_json,created_at,actor_id,migration_batch_id) VALUES (?,1,?,?,?,?)', [entity.id, JSON.stringify(values), String(entity.attributes.updatedAt ?? entity.attributes.createdAt ?? '1970-01-01T00:00:00.000Z'), `migration:${batchId}`, batchId])
     await db.execute('INSERT INTO worker_roster_migration_evidence(worker_id,batch_id,fingerprint,source_json) VALUES (?,?,?,?)', [entity.id, batchId, fingerprint, JSON.stringify(entity)])
   }
 }

@@ -52,23 +52,26 @@ describe('预算原值和受控回程', () => {
     expect(wrapper.get('a').attributes('href')).toBe('/project/target-cost/budget-a?origin=real&tab=comparison')
     wrapper.unmount()
   })
-  it('来源状态中文可读，未知与真实零显示不同', async () => {
-    const wrapper = mount(TargetCostMetricValue, { props: { metric: { value: null, knownValue: null, status: 'pending', missingSources: ['分包合同:forbidden', '材料结算:pending'] } } })
-    expect(wrapper.text()).toContain('未知')
-    expect(wrapper.text()).toContain('当前身份无权读取')
-    expect(wrapper.text()).not.toContain('forbidden')
-    await wrapper.setProps({ metric: { value: 0, knownValue: 0, status: 'complete', missingSources: [] } })
-    expect(wrapper.text()).not.toContain('未知')
-    expect(wrapper.text()).toContain('0.00')
+  it.each([
+    { label: '未知来源', metric: { value: null, knownValue: null, status: 'pending' as const, missingSources: ['分包合同:forbidden', '材料结算:pending'] }, expected: ['未知', '当前身份无权读取'], absent: ['forbidden', '0.00'] },
+    { label: '真实零', metric: { value: 0, knownValue: 0, status: 'complete' as const, missingSources: [] }, expected: ['0.00'], absent: ['forbidden', '未知'] },
+  ])('$label 状态中文可读，不混淆未知与真实零', ({ metric, expected, absent }) => {
+    const wrapper = mount(TargetCostMetricValue, { props: { metric } })
+    for (const text of expected)
+      expect(wrapper.text()).toContain(text)
+    for (const text of absent)
+      expect(wrapper.text()).not.toContain(text)
     wrapper.unmount()
   })
-  it('版本头清空金额产生null，录入零产生0', async () => {
+  it.each([
+    { input: '', expected: null },
+    { input: '0', expected: 0 },
+    { input: '12.50', expected: 12.5 },
+  ])('版本头金额 $input 产生 $expected', async ({ input: value, expected }) => {
     const wrapper = mount(TargetCostFormFields, { props: { modelValue: { taxAmount: 2 }, fieldErrors: {}, fetchProjects: async () => [] }, global: { stubs: { SectionHeader: true, LookupSelect: true } } })
     const input = wrapper.get('input[data-field="taxAmount"]')
-    await input.setValue('')
-    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatchObject({ taxAmount: null })
-    await input.setValue('0')
-    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatchObject({ taxAmount: 0 })
+    await input.setValue(value)
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toMatchObject({ taxAmount: expected })
     wrapper.unmount()
   })
 })

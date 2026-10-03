@@ -123,10 +123,10 @@ describe('工资已发放快照导出', () => {
     ])
   })
 
-  it('refuses mutable and unimplemented sources', () => {
-    expect(() => createPayrollWorkbookExport(statement({ status: 'checked' })))
-      .toThrow('完成实际发放后')
-    expect(() => createPayrollWorkbookExport(statement({ formatFamily: 'B' })))
-      .toThrow('B 类工资已退役')
+  it.each([
+    { case: 'statement({ status: \'checked\' })', input: statement({ status: 'checked' }), expected: '完成实际发放后' },
+    { case: 'statement({ formatFamily: \'B\' })', input: statement({ formatFamily: 'B' }), expected: 'B 类工资已退役' },
+  ])('refuses mutable and unimplemented sources / createPayrollWorkbookExport：$case', ({ input, expected }) => {
+    expect(() => createPayrollWorkbookExport(input)).toThrow(expected)
   })
 })

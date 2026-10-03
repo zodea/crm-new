@@ -33,7 +33,7 @@ function saveCommand(read: PayrollDayworkFormRead, record: PayrollDayworkRecordD
 
 test('新签工失响应后冷页按原编号保存一次，日期和正文不丢失', async ({ page }, info) => {
   test.setTimeout(150000)
-  const { repository, project, leader } = await payrollC2Workspace(page, '2026-10')
+  const { repository, project, leader } = await payrollC2Workspace(page, '2026-10', info)
   const url = `/subcontract/daywork/new?${new URLSearchParams({ origin: 'real', project: project.id, month: '2026-10', crew: leader.crewId || '', draftKey: 'c2-daywork-cold-original' })}`
   await page.goto(url)
   await page.getByRole('combobox', { name: '签工用工人', exact: true }).fill('签工负责人')
@@ -76,7 +76,7 @@ test('新签工失响应后冷页按原编号保存一次，日期和正文不�
 
 test('原签工保存成功但冷读失败，后来合法修改后仍可确认原提交并保留旧输入', async ({ page }, info) => {
   test.setTimeout(150000)
-  const { repository, project, leader } = await payrollC2Workspace(page, '2026-11')
+  const { repository, project, leader } = await payrollC2Workspace(page, '2026-11', info)
   const record: PayrollDayworkRecordDraft = { projectId: project.id, crewId: leader.crewId, workerId: leader.id, workDate: '2026-11-03', workContent: '起始原签工', startTime: '08:00', endTime: '12:00', laborUnits: 0.5, witness: '', confirmedOn: null, status: 'draft', note: '' }
   const initial = await repository.dayworkForm({ origin: 'real' }, { recordId: null, draftKey: 'c2-later-change-source', draft: record })
   const created = await repository.executeDaywork(saveCommand(initial, record))
@@ -128,7 +128,7 @@ test('原签工保存成功但冷读失败，后来合法修改后仍可确认�
 
 test('C2 主体配置保存失响应后冷页仍按原键核对，明确空规则保持为空', async ({ page }, info) => {
   test.setTimeout(120000)
-  const { repository, project, leader } = await payrollC2Workspace(page, '2026-12')
+  const { repository, project, leader } = await payrollC2Workspace(page, '2026-12', info)
   const scope = { projectId: project.id, leaderWorkerId: leader.id }
   const before = await repository.c2Config({ origin: 'real' }, scope)
   const price = before.config?.unitRate === 360 ? 361 : 360
@@ -168,7 +168,7 @@ test('C2 主体配置保存失响应后冷页仍按原键核对，明确空规�
 
 test('签工切换月份后迟到的旧读取不覆盖当前记录或两类状态筛选', async ({ page }, info) => {
   test.setTimeout(120000)
-  const { repository, project, leader } = await payrollC2Workspace(page, '2027-01')
+  const { repository, project, leader } = await payrollC2Workspace(page, '2027-01', info)
   for (const month of ['2027-01', '2027-02']) {
     const record: PayrollDayworkRecordDraft = { projectId: project.id, crewId: leader.crewId, workerId: leader.id, workDate: `${month}-03`, workContent: `${month} 当前月真实签工`, startTime: '08:00', endTime: '12:00', laborUnits: 0.5, witness: '', confirmedOn: null, status: 'draft', note: '' }
     const read = await repository.dayworkForm({ origin: 'real' }, { recordId: null, draftKey: `c2-late-read-${month}`, draft: record })

@@ -26,12 +26,18 @@ describe('boq catalog scope keys', () => {
     expect(boqCatalogScopeLineIds(key, catalog)).toEqual(new Set(['line:b', 'line:a']))
   })
 
-  it('keeps identical names and colon characters irrelevant to lookup', () => {
+  describe('keeps identical names and colon characters irrelevant to lookup', () => {
     const tradeKey = boqCatalogScopeKey('trade', ['line:b'])
     const itemKey = boqCatalogScopeKey('item', ['line:b'])
+    it('关联事实保持原契约', () => {
+      expect(tradeKey).not.toBe(itemKey)
+    })
 
-    expect(tradeKey).not.toBe(itemKey)
-    expect(boqCatalogScopeLineIds(tradeKey, catalog)).toEqual(new Set(['line:b']))
-    expect(boqCatalogScopeLineIds('section:["missing"]', catalog)).toEqual(new Set())
+    it.each([
+      { case: 'tradeKey / catalog', input: tradeKey, argument2: catalog, expected: new Set(['line:b']) },
+      { case: '\'section:["missing"]\' / catalog', input: 'section:["missing"]', argument2: catalog, expected: new Set() },
+    ])('boqCatalogScopeLineIds：$case', ({ input, argument2, expected }) => {
+      expect(boqCatalogScopeLineIds(structuredClone(input), structuredClone(argument2))).toEqual(expected)
+    })
   })
 })

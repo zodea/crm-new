@@ -1,23 +1,25 @@
 import { expect, it, vi } from 'vitest'
 import { createPayrollC1ServiceFixture } from '../helpers/payroll-c1-service-fixture'
 
-it('未选择项目或月份时保原空范围与候选，空矩阵不读取整年事实；非法非空月和空月写入仍拒绝', async () => {
+it.each(['2026-13', '2026-00', '2026-8', '2026-08-01', ' '].flatMap(month => [
+  { scope: { projectId: '', month: '', crewId: null }, expectedCrews: [] },
+  { scope: { projectId: '', month: '2026-08', crewId: null }, expectedCrews: [] },
+  { scope: { projectId: 'p', month: '', crewId: null }, expectedCrews: ['crew'] },
+].map(example => ({ ...example, month }))))('缺项范围 $scope 拒绝非法月份 $month，空矩阵不读整年事实', async ({ month, scope, expectedCrews }) => {
   const attendanceFacts = vi.fn(async () => {
     throw new Error('未选月份不得读取事实')
   })
   const f = await createPayrollC1ServiceFixture({ attendanceFacts })
   try {
-    for (const scope of [{ projectId: '', month: '', crewId: null }, { projectId: '', month: '2026-08', crewId: null }, { projectId: 'p', month: '', crewId: null }]) {
-      const read = await f.service.attendanceMatrix({ origin: 'real' }, scope)
-      expect(read.scope).toEqual(scope)
-      expect(read.options.projects.map(project => project.id)).toEqual(['p', 'other-project'])
-      expect(read.options.crews.map(crew => crew.id)).toEqual(scope.projectId ? ['crew'] : [])
-      expect(read).toMatchObject({ workers: [], records: [], locks: [], diagnostics: [], evidence: [] })
-      expect(read.context.readonly).toBe(false)
-    }
+    const read = await f.service.attendanceMatrix({ origin: 'real' }, scope)
+    expect(read.scope).toEqual(scope)
+    expect(read.options.projects.map(project => project.id)).toEqual(['p', 'other-project'])
+    expect(read.options.crews.map(crew => crew.id)).toEqual(expectedCrews)
+    expect(read).toMatchObject({ workers: [], records: [], locks: [], diagnostics: [], evidence: [] })
+    expect(read.context.readonly).toBe(false)
     expect(attendanceFacts).not.toHaveBeenCalled()
-    for (const month of ['2026-13', '2026-00', '2026-8', '2026-08-01', ' '])
-      await expect(f.service.attendanceMatrix({ origin: 'real' }, { projectId: 'p', month, crewId: null })).rejects.toThrow('范围无效')
+
+    await expect(f.service.attendanceMatrix({ origin: 'real' }, { projectId: 'p', month, crewId: null })).rejects.toThrow('范围无效')
     const emptyMonth = await f.service.attendanceMatrix({ origin: 'real' }, { projectId: 'p', month: '', crewId: null })
     await expect(f.service.executeAttendance(f.attendanceCommand(emptyMonth, { workerId: 'w', crewId: 'crew', workDate: '2026-08-01', hours: 8, overtimeHours: 0, workContent: '', note: '' }))).rejects.toThrow('范围无效')
     await expect(f.service.c1Config({ origin: 'real' }, { projectId: 'p', month: '', crewId: null })).rejects.toThrow()
@@ -27,7 +29,7 @@ it('未选择项目或月份时保原空范围与候选，空矩阵不读取整�
   finally { await f.close() }
 })
 
-it('同日重存保持稳定原行与审计；非法日期工时和串项目班组拒绝且库不变', async () => {
+it.each(Array.from([{ workDate: '2026-02-30' }, { hours: -1 }, { hours: Number.NaN }, { hours: Infinity }, { hours: 23, overtimeHours: 2 }, { workerId: 'outside' }, { crewId: 'next-crew' }]).map(input1 => ({ input1 })))('同日重存保持稳定原行与审计；非法日期工时和串项目班组拒绝且库不变：输入案例 %#', async ({ input1: change }) => {
   const f = await createPayrollC1ServiceFixture()
   try {
     const first = await f.attendance({ hours: 7.51, overtimeHours: 0 })
@@ -35,8 +37,8 @@ it('同日重存保持稳定原行与审计；非法日期工时和串项目班�
     expect(second.recordId).toBe(first.recordId)
     expect((await f.matrix()).records).toHaveLength(1)
     const baseline = await f.db.select('SELECT * FROM attendance_records')
-    for (const change of [{ workDate: '2026-02-30' }, { hours: -1 }, { hours: Number.NaN }, { hours: Infinity }, { hours: 23, overtimeHours: 2 }, { workerId: 'outside' }, { crewId: 'next-crew' }])
-      await expect(f.attendance(change)).rejects.toThrow()
+
+    await expect(f.attendance(change)).rejects.toThrow()
     expect(await f.db.select('SELECT * FROM attendance_records')).toEqual(baseline)
     expect((await f.db.select('SELECT * FROM operation_logs WHERE table_name=\'attendance_records\''))).toHaveLength(2)
   }

@@ -7,10 +7,12 @@ import { checkArchiveOwnership, checkInvoiceArchiveReady, checkNotDuplicate, che
 import { createMemoryDb } from '../helpers/memory-db'
 
 describe('checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.4「核对完成是归档唯一前置」)', () => {
-  it('reviewStatus 非 reviewed(unreviewed/undefined/null)一律拒绝', () => {
-    expect(checkReviewed('unreviewed').ok).toBe(false)
-    expect(checkReviewed(undefined).ok).toBe(false)
-    expect(checkReviewed(null).ok).toBe(false)
+  it.each([
+    { case: '\'unreviewed\'', input: 'unreviewed', expected: false },
+    { case: 'undefined', input: undefined, expected: false },
+    { case: 'null', input: null, expected: false },
+  ])('reviewStatus 非 reviewed(unreviewed/undefined/null)一律拒绝 / checkReviewed：$case', ({ input, expected }) => {
+    expect(checkReviewed(input).ok).toBe(expected)
   })
 
   it('reviewStatus=reviewed 放行', () => {
@@ -25,17 +27,21 @@ describe('checkNotDuplicate:重复票排除在确认/归档路径之外(#60 revi
     expect(r.reason).toBeTruthy()
   })
 
-  it('normal / 未知值 放行(只有明确标了重复才拦)', () => {
-    expect(checkNotDuplicate('normal')).toEqual({ ok: true })
-    expect(checkNotDuplicate(undefined)).toEqual({ ok: true })
+  it.each([
+    { case: '\'normal\'', input: 'normal', expected: { ok: true } },
+    { case: 'undefined', input: undefined, expected: { ok: true } },
+  ])('normal / 未知值 放行(只有明确标了重复才拦) / checkNotDuplicate：$case', ({ input, expected }) => {
+    expect(checkNotDuplicate(input)).toEqual(expected)
   })
 })
 
 describe('checkArchiveOwnership:归档归属校验(纯逻辑)', () => {
-  it('无归属(null/undefined/非法值)一律拒绝归档', () => {
-    expect(checkArchiveOwnership(null, null).ok).toBe(false)
-    expect(checkArchiveOwnership(undefined, 'proj1').ok).toBe(false)
-    expect(checkArchiveOwnership('other', 'proj1').ok).toBe(false)
+  it.each([
+    { case: 'null / null', input: null, argument2: null, expected: false },
+    { case: 'undefined / \'proj1\'', input: undefined, argument2: 'proj1', expected: false },
+    { case: '\'other\' / \'proj1\'', input: 'other', argument2: 'proj1', expected: false },
+  ])('无归属(null/undefined/非法值)一律拒绝归档 / checkArchiveOwnership：$case', ({ input, argument2, expected }) => {
+    expect(checkArchiveOwnership(input, argument2).ok).toBe(expected)
   })
 
   it('归属为项目(project)但缺 projectId 拒绝', () => {
@@ -48,9 +54,11 @@ describe('checkArchiveOwnership:归档归属校验(纯逻辑)', () => {
     expect(checkArchiveOwnership('project', 'proj1')).toEqual({ ok: true })
   })
 
-  it('归属为个人开支(personal)不挂项目也放行', () => {
-    expect(checkArchiveOwnership('personal', null)).toEqual({ ok: true })
-    expect(checkArchiveOwnership('personal', undefined)).toEqual({ ok: true })
+  it.each([
+    { case: '\'personal\' / null', input: 'personal', argument2: null, expected: { ok: true } },
+    { case: '\'personal\' / undefined', input: 'personal', argument2: undefined, expected: { ok: true } },
+  ])('归属为个人开支(personal)不挂项目也放行 / checkArchiveOwnership：$case', ({ input, argument2, expected }) => {
+    expect(checkArchiveOwnership(input, argument2)).toEqual(expected)
   })
 
   it('个人开支不能同时携带项目归属', () => {
@@ -170,7 +178,7 @@ describe('§4.2 台账聚合口径:进项票额/税额按 project_id + account_s
 
   it('软删除的已归档发票不计入 §4.2 口径(配合软删层可见性口径,此处验证 deleted_at 被过滤)', async () => {
     const db = await seedInvoices()
-    await db.execute(`UPDATE invoices SET deleted_at = ? WHERE id = 'inv1'`, [new Date().toISOString()])
+    await db.execute(`UPDATE invoices SET deleted_at = ? WHERE id = 'inv1'`, ['2026-09-15T00:00:00.000Z'])
     const [row] = await db.select<{ n: number, amount_sum: number | null }>(
       `SELECT COUNT(*) AS n, SUM(amount) AS amount_sum
        FROM invoices WHERE project_id = 'p1' AND account_status = 'archived' AND deleted_at IS NULL`,

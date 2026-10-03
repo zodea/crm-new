@@ -9,13 +9,24 @@ import {
 } from '~/lib/owner-document/form-version'
 
 describe('甲方商务单据表单实例版本', () => {
-  it('同一单据的两个页面实例各自保留打开时版本，互不前移', () => {
+  function createIndependentOwnerDocumentTabs() {
     const firstTab = withOwnerDocumentFormVersion({ id: 'change-323', name: '页签一' }, '1')
     const secondTab = withOwnerDocumentFormVersion({ id: 'change-323', name: '页签二' }, '1')
     advanceOwnerDocumentFormVersion(firstTab, '2')
+    return { firstTab, secondTab }
+  }
 
-    expect(requireOwnerDocumentFormVersion(firstTab)).toBe('2')
-    expect(requireOwnerDocumentFormVersion(secondTab)).toBe('1')
+  it.each([
+    { case: 'firstTab', prepare: ({ firstTab }: ReturnType<typeof createIndependentOwnerDocumentTabs>) => {
+      return { input: firstTab, expected: '2' } as const
+    } },
+    { case: 'secondTab', prepare: ({ secondTab }: ReturnType<typeof createIndependentOwnerDocumentTabs>) => {
+      return { input: secondTab, expected: '1' } as const
+    } },
+  ])('同一单据的两个页面实例各自保留打开时版本，互不前移 / requireOwnerDocumentFormVersion：$case', ({ prepare }) => {
+    const fixture = createIndependentOwnerDocumentTabs()
+    const { input, expected } = prepare(fixture)
+    expect(requireOwnerDocumentFormVersion(input)).toBe(expected)
   })
 
   it('缺失页面实例版本时拒绝猜测服务端最新版本', () => {

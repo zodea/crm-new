@@ -61,41 +61,39 @@ describe('ocr 真实样本运行结果摘要', () => {
     expect(lineItemCount('| 名称 | 数量 |\n| --- | --- |\n| 电线 | 2 |\n| 线管 | 3 |')).toBe(2)
   })
 
-  it('独立按 OCR 内容判断合同、证照与发票，不依赖目录分类', () => {
-    expect(classifyContent('增值税专用发票\n发票号码：123\n购买方：甲方\n销售方：乙方\n价税合计：100')).toMatchObject({
+  it.each([
+    { case: '\'增值税专用发票\\n发票号码：123\\n购买方：甲方\\n销售方：乙方\\n价税合计：100\'', input: '增值税专用发票\n发票号码：123\n购买方：甲方\n销售方：乙方\n价税合计：100', expected: {
       type: 'invoice',
       needsReview: false,
       evidenceKeywords: expect.arrayContaining(['发票号码', '购买方', '销售方', '价税合计']),
       source: 'ocr-content',
-    })
-    expect(classifyContent('合同编号：HT-001\n甲方：甲公司\n乙方：乙公司\n履行期限：2026年')).toMatchObject({
+    } },
+    { case: '\'合同编号：HT-001\\n甲方：甲公司\\n乙方：乙公司\\n履行期限：2026年\'', input: '合同编号：HT-001\n甲方：甲公司\n乙方：乙公司\n履行期限：2026年', expected: {
       type: 'contract',
       evidenceKeywords: expect.arrayContaining(['合同', '合同编号', '甲方', '乙方']),
-    })
-    expect(classifyContent('营业执照\n统一社会信用代码：9133\n法定代表人：某某')).toMatchObject({
+    } },
+    { case: '\'营业执照\\n统一社会信用代码：9133\\n法定代表人：某某\'', input: '营业执照\n统一社会信用代码：9133\n法定代表人：某某', expected: {
       type: 'certificate',
       needsReview: false,
-    })
-    expect(classifyContent('项目移交单\n入户门\n接收人：某某')).toMatchObject({
+    } },
+    { case: '\'项目移交单\\n入户门\\n接收人：某某\'', input: '项目移交单\n入户门\n接收人：某某', expected: {
       type: 'other',
       needsReview: true,
       evidenceKeywords: expect.arrayContaining(['移交单', '入户门']),
-    })
+    } },
+  ])('独立按 OCR 内容判断合同、证照与发票，不依赖目录分类 / classifyContent：$case', ({ input, expected }) => {
+    expect(classifyContent(input)).toMatchObject(expected)
   })
 
-  it('将 429 明确识别为限流，而不是请求或识别失败', () => {
-    expect(classifyResponseFailure(
-      jsonResponse({ data: { code: 'rate-limit', message: '请求过于频繁' } }, 429),
-      { data: { code: 'rate-limit', message: '请求过于频繁' } },
-    )).toMatchObject({
+  it.each([
+    { case: 'jsonResponse({ data: { code: \'rate-limit\', message: \'请求过于频繁\' } }, 429) / { data: { code: \'rate-limit\', message: \'请求过于频繁\' } }', input: jsonResponse({ data: { code: 'rate-limit', message: '请求过于频繁' } }, 429), argument2: { data: { code: 'rate-limit', message: '请求过于频繁' } }, expected: {
       failureKind: 'rate-limit',
       errorCode: 'rate-limit',
       retryable: true,
-    })
-    expect(classifyResponseFailure(
-      jsonResponse({ data: { code: 'job-failed', message: '图片无法解析' } }, 502),
-      { data: { code: 'job-failed', message: '图片无法解析' } },
-    )).toMatchObject({ failureKind: 'recognition' })
+    } },
+    { case: 'jsonResponse({ data: { code: \'job-failed\', message: \'图片无法解析\' } }, 502) / { data: { code: \'job-failed\', message: \'图片无法解析\' } }', input: jsonResponse({ data: { code: 'job-failed', message: '图片无法解析' } }, 502), argument2: { data: { code: 'job-failed', message: '图片无法解析' } }, expected: { failureKind: 'recognition' } },
+  ])('将 429 明确识别为限流，而不是请求或识别失败 / classifyResponseFailure：$case', ({ input, argument2, expected }) => {
+    expect(classifyResponseFailure(input, argument2)).toMatchObject(expected)
   })
 
   it('为成功结果生成字段、明细和差异摘要骨架', () => {

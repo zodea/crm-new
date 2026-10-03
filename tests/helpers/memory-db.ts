@@ -1,10 +1,10 @@
 import type { Database } from 'sql.js'
-import initSqlJs from 'sql.js'
 import type { MigrationDb } from '~/lib/db/migrations'
+import initSqlJs from 'sql.js'
 
 export interface TestDb extends MigrationDb {
   raw: Database
-  close(): void
+  close: () => void
 }
 
 let sqlJsPromise: ReturnType<typeof initSqlJs> | null = null
@@ -20,7 +20,8 @@ export async function createMemoryDb(): Promise<TestDb> {
     },
     async select<T>(sql: string, params: unknown[] = []): Promise<T[]> {
       const stmt = conn.prepare(sql)
-      if (params.length) stmt.bind(params as never[])
+      if (params.length)
+        stmt.bind(params as never[])
       const rows: T[] = []
       while (stmt.step()) {
         rows.push(stmt.getAsObject() as T)

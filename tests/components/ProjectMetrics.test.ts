@@ -91,6 +91,12 @@ describe('项目详情真实聚合摘要', () => {
     expect(within(screen.getByRole('group', { name: '主合同金额' })).getByText('当前数据库快照')).not.toBeNull()
     expect(within(screen.getByRole('group', { name: '主合同金额' })).getByText('无已知缺口')).not.toBeNull()
     expect(within(screen.getByRole('group', { name: '管理费' })).getByText('管理费配置')).not.toBeNull()
+    for (const label of ['增值税', '税负率']) {
+      const tax = screen.getByRole('group', { name: label })
+      expect(within(tax).getByText('—')).not.toBeNull()
+      expect(within(tax).getByText('待核实')).not.toBeNull()
+      expect(within(tax).queryByRole('link')).toBeNull()
+    }
   })
 
   it('汇总源没有返回当前项目时展示未知状态，不把缺失事实格式化为零', async () => {

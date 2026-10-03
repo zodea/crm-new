@@ -1,8 +1,8 @@
 # KitUI 交互原语组件规格（可落地模板）
 
-> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal/typeSelect 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文定义现行结构、状态与行为；具体调用签名须与公共 API 一致，发现差异在 [#404](https://github.com/zodea/crm-new/issues/404) 记录并同轮纠正。历史迁移映射见 [KitUI → shadcn-vue](../research/kitui-to-shadcn-migration.md)。
+> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal/typeSelect 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文定义现行结构、状态与行为；具体调用签名须与公共 API 一致，发现差异先核对官方用法与实际调用；改变契约或底层方案须经用户确认，Issue 写入另需授权。历史迁移映射见 [KitUI → shadcn-vue](../research/kitui-to-shadcn-migration.md)。
 
-把已定交互方向转成组件规格：结构锚点、变体/状态、配色令牌、行为规则和调用签名。设计优先级见[设计入口](./README.md)，决定依据见 `docs/adr/`；[交互参考目录](./interaction-style-references.md) 只保留来源，不要求对已经采纳的方向重新选型。
+把已定交互方向转成组件规格：结构锚点、变体/状态、配色令牌、行为规则和调用签名。视觉与响应式裁定见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)；[交互参考目录](./interaction-style-references.md) 只保留来源，不要求对已经采纳的方向重新选型。
 
 - 技术栈:Nuxt 4 + Vue 3 + UnoCSS,SSR 关闭;交互底座 shadcn-vue(reka-ui)+vue-sonner。统一入口 `app/composables/useKitUI.ts`,单宿主 `app/components/shared/KitUIHost.vue`。
 - dev 验证载体:`/dev/kit-ui`。令牌见 `app/assets/css/tokens.css`。
@@ -75,7 +75,7 @@ await confirm({
 | 长表单吸底 | 标题栏 + footer 固定,中间字段区 `overflow-y:auto`;短表单自然高度、不吸底 | shadcn Dialog Sticky Footer |
 | 自动聚焦 | 打开后焦点落在**第一个输入框** | Vercel Geist |
 | 失焦即时校验 | 字段 `blur` 时校验,错误红字贴**该字段下方**(非顶部汇总);提交时再全量校验 | — |
-| 提交三态 | 主按钮 default→loading(spinner + disabled 防重复)→success 关窗;复用 [按钮三态](#06--按钮三态-button-states) 原语 | Vercel Geist |
+| 提交三态 | 主按钮 default→loading(spinner + disabled 防重复)→success 关窗;复用 [按钮三态](#06--按钮三态-button-states--已定案公共零件无-adr) 原语 | Vercel Geist |
 
 **未保存内容拦截**:仅当表单**已被改动(dirty)** 时,点遮罩/Esc 关闭要弹一道 `confirm`(`simple` 变体,确认按钮文案「放弃修改」);未动过的表单直接关、不打扰。
 
@@ -242,6 +242,18 @@ openDrawer({
 
 **用途**:提交类按钮的状态机,被表单提交 / confirm 确认 / 导入导出「开始」按钮复用。保持克制,不做花哨展示。
 
+**五变体与层级**：按钮缺省使用 `secondary`；区块主操作使用 `primary`；实心品牌蓝只用于 `accent`，每屏最多一个核心操作。
+
+| 变体 | 视觉语义 | 适用操作 |
+| --- | --- | --- |
+| `secondary`（默认） | 白底、中性描边与文字 | 刷新、导出、导入、取消等常规操作 |
+| `primary` | 浅品牌底、品牌描边与深品牌文字 | 区块内主操作 |
+| `accent` | 实心品牌底、白字 | 新建、识别、保存等当前核心操作 |
+| `ghost` | 透明弱按钮，悬停时浅品牌底与品牌文字 | 工具性弱操作、收起与展开 |
+| `danger` | 白底红字，悬停时红边与浅红底 | 删除等破坏性操作；确认与撤回边界另遵守对应契约 |
+
+hover 只做平面颜色反馈，不位移、不发光；active 使用轻微按压反馈；disabled 降低视觉强调并禁止触发。圆角、尺寸、字阶及各状态的具体取值消费现行令牌和组件实现，不在本节维护第二份数值表。
+
 **核心机制**(无争议):
 
 - 进 loading **立即 disabled** 防重复提交;**锁死宽度不跳动**。
@@ -251,11 +263,19 @@ openDrawer({
 
 | 状态 | 表现 | 默认 |
 |---|---|---|
-| default | 按变体配方渲染(缺省 secondary 安静按钮,见 DESIGN-TASTE §4.2 / #109) | — |
+| default | 按本节五变体渲染，缺省 `secondary` | — |
 | loading | 前置 spinner + disabled + 锁宽 | 启用 |
 | success 打勾 | 缩字→打勾 `--ok`→停约 1s 复位 | **默认关** |
 
 **success 打勾按需开**:多数按钮成功后已有别的落点(表单关窗 / 导出/confirm 弹 toast),按钮再打勾是**重复反馈**——故默认只走 default→loading,成功后随容器消失或复位。**仅**「原地保存、不关不跳、无其他反馈」的按钮(如页内「保存设置」)才开 success 打勾。
+
+```mermaid
+flowchart LR
+  D["default"] -->|提交| L["loading<br/>前置 spinner · 禁用 · 锁宽"]
+  L -->|成功：默认| R["复位或随容器消失"]
+  L -->|仅原地保存、不关不跳且无其他反馈| S["success 打勾"]
+  S -->|约 1s 后复位| D
+```
 
 **行内校验**:配套表单时,错误红字 `--danger` 贴**字段下方**,不在按钮上表达。
 
@@ -265,7 +285,7 @@ openDrawer({
 <KitButton
   :loading="submitting"      // 受控 loading
   :success="false"           // 可选第三态,默认关
-  variant="secondary | primary | accent | ghost | danger"  // 五变体层级,缺省 secondary(#109,DESIGN-TASTE §4.2)
+  variant="secondary | primary | accent | ghost | danger"  // 五变体层级，缺省 secondary
   @click="onSubmit"
 />
 ```
@@ -515,11 +535,12 @@ openDrawer({
 
 **已有底座与运行参考规格**：
 
-- 表头与数据行默认 36px；调用点可通过 `rowHeight` 明确覆盖，但不得在页面内分别改表头和行高。
+- 表头与数据行默认 36px，单元格水平留白 6px；调用点可通过 `rowHeight` 明确覆盖，但不得在页面内分别改表头和行高。
 - 宽表只能在 `KitTable` 自身滚动区横向滚动，应用工作区与页面不得横滚；390 / 768 / 1024 / 1440px 均按此验收。
 - 可调整列的命中区只位于该列表头右边缘：7px、`right:-4px`、`cursor:col-resize`；悬停显示品牌色竖线。拖该列表头的右边界只改变当前列：向右增宽、向左缩窄，双击按内容自适应。
 - 默认开启拖拽提示和双击自适配；`resizeConfig.isDblclickAutoWidth=false` 可按领域关闭，`resizable=false` 可关闭整表列宽调整，单列 `resizable=false` 优先。
 - `action` 列默认宽 112px、固定右侧且禁止拖拽，避免固定右列出现左侧含混手柄；业务动作超过该宽度时必须显式加宽，不能靠通用表格猜测或静默裁切。
+- 标准操作列按钮使用纯图标并提供 `title`，同列不混用文字按钮；名称、金额穿透链接和字段内的领域动作仍按各自契约。图标按钮悬停时以蓝边蓝字反馈，危险操作保留红字、红边与浅红悬停底，尺寸消费现有组件令牌。
 - `seq` / 重要名称列可由业务显式固定左侧；固定方向和显式宽度始终优先于默认值。
 - 非分页小表可用 `filterable: true` 从当前行推导筛选项；受控分页必须传显式 `KitFilterOption[]`，选项来自后台完整快照 facet，不能从当前页反推。
 - `remoteFilter` 开启后，`KitTable` 不在当前页本地过滤，只发出包含全部列条件的 `filter-change`；调用方负责把条件交给 Repository 并回填新页。动态 facet 通过 vxe `setFilter` 同步，`KitFilterOption.checked` 表示受控选中态，刷新 facet 后不得丢失当前条件。
@@ -611,7 +632,9 @@ const columns: KitTableColumn[] = [{
 
 **用途与依据**：`app/components/ui/KitStatusTag.vue` 统一列表行及其他业务界面的事实状态呈现，对应用户圈出的紧凑浅底、小圆角标签。它替代第 07 节此前“状态色纯文字化”方向；冲突与本轮依据见 [#404 记录](https://github.com/zodea/crm-new/issues/404#issuecomment-5582280040)。原语只承载文案与视觉语义，不读取实体、不推算业务状态、不生成审批流程。
 
-**当前 API 与接入范围**：可选 `tone: 'ok' | 'warn' | 'brand' | 'danger' | 'neutral'`，默认 `neutral`；默认插槽传入状态文字，无内置点击行为。分供方列表与详情、共用材料及资金列表已接入；分供方四种资料状态、材料未知状态的中性回退、资金驳回与待核对的不同语义已由组件测试覆盖。原语实现和本批公共列表运行验证不等于所有专页完成对标；未接入界面、领域专属列、真实来源及跨页一致性继续逐页验收，状态登记见[实现状态](./ui-implementation-status.md)。
+**当前 API 与接入范围**：可选 `tone: 'ok' | 'warn' | 'brand' | 'danger' | 'neutral'`，默认 `neutral`；默认插槽传入状态文字，无内置点击行为。分供方列表与详情、共用材料及资金列表已接入。项目列表、详情与子表，合同列表、详情、表单与关联事实表，以及首页排程整体偏差和 `ScheduleTimeline` 行状态也已复用本原语；类别、来源和计数继续使用各自标识。项目与合同的未知状态保留原文、空值保留领域约定的说明或空值，展示色回退 `neutral`，不改写业务事实。
+
+分供方四种资料状态、材料未知状态的中性回退、资金驳回与待核对的不同语义，以及项目未知阶段、合同业务状态与来源标识区分、首页与排程行状态复用已由组件测试覆盖。2026-10-02 的[浏览器回归](../../e2e/issue-318-material-contract-detail.spec.ts)覆盖项目列表/详情、材采列表/详情、首页和排程在 390/768/1024/1280/1440px 下的标签尺寸及页面无横向溢出。原语接入及这些验证不等于所有专页完成对标；未接入界面、领域专属列、真实来源及跨页一致性继续逐页验收，状态登记见[实现状态](./ui-implementation-status.md)。
 
 - 文字、前景色和浅背景共同表达状态；原语采用 2px 小圆角、11px 文字、14px 行高和上下 1px / 左右 4px 内边距，适配第 12 节紧凑行高，不把普通状态渲染成大胶囊、按钮或厚边框。颜色复用现有语义令牌，不逐页复制配方；常态与选中/悬停行上都须保持文字可读。
 - 相同业务语义在各页使用一致外观：成功/已通过、进行中/待处理、失败/已驳回及中性事实分别使用对应语义色系，具体状态值、文案和映射由领域权威源决定；颜色不能替代文字。不能因示例有审批标签，就把启停、履约、付款或归档状态改称审批。

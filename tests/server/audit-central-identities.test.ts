@@ -56,7 +56,7 @@ describe('审计正式身份边界', () => {
     source.sourceHash = createHash('sha256').update(coreMigrationSourceHashInput(source)).digest('hex')
     const command = { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY }
     await coreMigrationTestInstance.preflight({ ...command, commandId: 'preflight', source, backup: null }, session)
-    const dry = await coreMigrationTestInstance.dryRun({ ...command, commandId: 'dry', source, backup: { backupId: `core-migration-${source.sourceHash}-${'c'.repeat(64)}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: 'c'.repeat(64), byteLength: 1024, createdAt: new Date().toISOString(), immutable: true } }, session)
+    const dry = await coreMigrationTestInstance.dryRun({ ...command, commandId: 'dry', source, backup: { backupId: `core-migration-${source.sourceHash}-${'c'.repeat(64)}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: 'c'.repeat(64), byteLength: 1024, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }, session)
     await coreMigrationTestInstance.importBatch({ ...command, commandId: 'import', batchId: dry.batchId }, session)
     expect(projectCommandTestInstance.rows()).toEqual([])
     await coreMigrationTestInstance.confirm({ ...command, commandId: 'confirm', batchId: dry.batchId }, session)

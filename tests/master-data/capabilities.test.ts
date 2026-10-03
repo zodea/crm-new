@@ -15,21 +15,32 @@ describe('班组/工人可承接能力', () => {
     expect(parseCapabilityColumn('not-json')).toEqual([])
   })
 
-  it('规范化多工种与活项，并按限定活项判断兼容范围', () => {
+  describe('规范化多工种与活项，并按限定活项判断兼容范围', () => {
     const capability = effectiveMasterDataCapabilities(
       '泥水工',
       ['防水工', '泥水工', '  防水工 '],
       ['墙砖铺贴', '地砖铺贴', '墙砖铺贴'],
     )
-
-    expect(capability).toEqual({
-      trades: ['泥水工', '防水工'],
-      itemNames: ['墙砖铺贴', '地砖铺贴'],
+    it('关联事实保持原契约', () => {
+      expect(capability).toEqual({
+        trades: ['泥水工', '防水工'],
+        itemNames: ['墙砖铺贴', '地砖铺贴'],
+      })
     })
-    expect(capabilityAllowsItem(capability, '泥水工', '墙砖铺贴')).toBe(true)
-    expect(capabilityAllowsItem(capability, '泥水工', '水泥砂浆找平')).toBe(false)
-    expect(capabilityCoversItems(capability, '泥水工', ['墙砖铺贴', '地砖铺贴'])).toBe(true)
-    expect(capabilityCoversItems(capability, '泥水工', ['墙砖铺贴', '水泥砂浆找平'])).toBe(false)
+
+    it.each([
+      { case: 'capability / \'泥水工\' / \'墙砖铺贴\'', input: capability, argument2: '泥水工', argument3: '墙砖铺贴', expected: true },
+      { case: 'capability / \'泥水工\' / \'水泥砂浆找平\'', input: capability, argument2: '泥水工', argument3: '水泥砂浆找平', expected: false },
+    ])('capabilityAllowsItem：$case', ({ input, argument2, argument3, expected }) => {
+      expect(capabilityAllowsItem(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toBe(expected)
+    })
+
+    it.each([
+      { case: 'capability / \'泥水工\' / [\'墙砖铺贴\', \'地砖铺贴\']', input: capability, argument2: '泥水工', argument3: ['墙砖铺贴', '地砖铺贴'], expected: true },
+      { case: 'capability / \'泥水工\' / [\'墙砖铺贴\', \'水泥砂浆找平\']', input: capability, argument2: '泥水工', argument3: ['墙砖铺贴', '水泥砂浆找平'], expected: false },
+    ])('capabilityCoversItems：$case', ({ input, argument2, argument3, expected }) => {
+      expect(capabilityCoversItems(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toBe(expected)
+    })
   })
 
   it('没有限定活项时表示可做能力工种下全部活项', () => {

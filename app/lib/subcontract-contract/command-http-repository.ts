@@ -24,7 +24,10 @@ function invalid(message: string): never {
 
 function context(value: unknown): SubcontractContractCommandContextDTO {
   if (!object(value) || typeof value.workspaceId !== 'string' || typeof value.actorId !== 'string'
-    || !Array.isArray(value.capabilities) || !Array.isArray(value.projects) || !Array.isArray(value.suppliers)) {
+    || !Array.isArray(value.capabilities) || !Array.isArray(value.projects) || !Array.isArray(value.suppliers)
+    || !value.suppliers.every(row => object(row) && typeof row.id === 'string' && typeof row.label === 'string'
+      && (row.contactName === undefined || typeof row.contactName === 'string')
+      && (row.contactPhone === undefined || typeof row.contactPhone === 'string'))) {
     return invalid('中央后台返回的分包合同业务会话无效')
   }
   return value as unknown as SubcontractContractCommandContextDTO

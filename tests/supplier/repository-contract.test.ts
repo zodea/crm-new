@@ -50,12 +50,10 @@ function supplier(
 }
 
 describe('分供方中央 Repository contract', () => {
-  it('分供方请款读回不把历史零和未填解释成零元批复', () => {
-    for (const [amount, origin, state, expected] of [[null, 'user-entry', 'not-entered', null], [0, 'legacy', 'legacy-unknown', null], [0, 'user-entry', 'known', '0.00']] as const) {
-      const result = buildSupplierDetailRead({ suppliers: [supplier('s', '分供方')], projects: [], projectSuppliers: [], contracts: [], settlements: [], invoices: [], paymentRecords: [], paymentAllocations: [], paymentApplications: [{ dataOrigin: 'real', id: 'a', supplierId: 's', projectId: null, contractId: null, no: '', name: '请款', applyAmount: 100, approvedAmount: amount, approvedAmountOrigin: origin, status: 'approved', applyDate: null }], query: parseSupplierDetailQuery('s', {}), asOf: AS_OF, sourceVersion: 'approval', capabilities: [] })
-      expect(result.payments[0]).toMatchObject({ approvedAmount: expected, approvedAmountState: state, actualPaidAmount: '0.00' })
-      expect(decodeSupplierDetailRead(result)).toEqual(result)
-    }
+  it.each([[null, 'user-entry', 'not-entered', null], [0, 'legacy', 'legacy-unknown', null], [0, 'user-entry', 'known', '0.00']] as const)('分供方请款读回不把历史零和未填解释成零元批复：输入案例 %#', (amount, origin, state, expected) => {
+    const result = buildSupplierDetailRead({ suppliers: [supplier('s', '分供方')], projects: [], projectSuppliers: [], contracts: [], settlements: [], invoices: [], paymentRecords: [], paymentAllocations: [], paymentApplications: [{ dataOrigin: 'real', id: 'a', supplierId: 's', projectId: null, contractId: null, no: '', name: '请款', applyAmount: 100, approvedAmount: amount, approvedAmountOrigin: origin, status: 'approved', applyDate: null }], query: parseSupplierDetailQuery('s', {}), asOf: AS_OF, sourceVersion: 'approval', capabilities: [] })
+    expect(result.payments[0]).toMatchObject({ approvedAmount: expected, approvedAmountState: state, actualPaidAmount: '0.00' })
+    expect(decodeSupplierDetailRead(result)).toEqual(result)
   })
   it('固定枚举多选同字段取并集、跨字段取交集，分页汇总与自身排除 facet 同步', () => {
     const suppliers = Array.from({ length: 30 }, (_, index) => supplier(`multi-${index}`, `多选 ${index}`, {
@@ -86,12 +84,21 @@ describe('分供方中央 Repository contract', () => {
     expect(repeated.category).toHaveLength(2)
     expect(repeated.credentialStatus).toHaveLength(2)
     expect(parseSupplierListQuery(serializeSupplierListQuery(repeated))).toEqual(repeated)
-    for (const value of [[12], ['qualified', null], {}, '[broken']) {
-      expect(() => parseSupplierListQuery({ credentialStatus: value })).toThrow()
-      expect(() => parseSupplierListQuery({ columnFilters: { taxpayerType: value } })).toThrow()
-    }
     expect(parseSupplierListQuery({ category: 'all', credentialStatus: '[]' })).toMatchObject({ category: null, credentialStatus: null })
     expect(parseSupplierListQuery({ credentialStatus: ['legacy-state'] }).credentialStatus).toEqual(['legacy-state'])
+  })
+
+  it.each(Array.from([[12], ['qualified', null], {}, '[broken']).map(input => ({ input })))('多选编码兼容旧单值和重复参数，去重空白并拒绝非字符串选项：输入组合 1 案例 %#', ({ input: value }) => {
+    const single = parseSupplierListQuery({ category: '材料供应商', credentialStatus: 'qualified', columnFilters: { taxpayerType: '一般纳税人' } })
+    expect(single).toMatchObject({ category: ['材料供应商'], credentialStatus: ['qualified'], columnFilters: { taxpayerType: ['一般纳税人'] } })
+    expect(serializeSupplierListQuery(single)).toMatchObject({ category: '材料供应商', credentialStatus: 'qualified' })
+    const repeated = parseSupplierListQuery({ category: [' 材料供应商 ', '劳务分包商', '材料供应商', ''], credentialStatus: '["qualified","reviewing","qualified"]' })
+    expect(repeated.category).toEqual(expect.arrayContaining(['材料供应商', '劳务分包商']))
+    expect(repeated.category).toHaveLength(2)
+    expect(repeated.credentialStatus).toHaveLength(2)
+    expect(parseSupplierListQuery(serializeSupplierListQuery(repeated))).toEqual(repeated)
+    expect(() => parseSupplierListQuery({ credentialStatus: value })).toThrow()
+    expect(() => parseSupplierListQuery({ columnFilters: { taxpayerType: value } })).toThrow()
   })
 
   it.each([false, true])('短敏感值在列表、详情和复制后查询保持一致（敏感权限：%s）', (canReadSensitive) => {
@@ -182,7 +189,7 @@ describe('分供方中央 Repository contract', () => {
     ]))
   })
 
-  it('敏感查询只匹配可见值；真实零结算与未接入分开，草稿不计入累计', () => {
+  it.each(([{ contains: { unsupported: 'x' } }, { ranges: { contractAmount: { min: 2, max: 1 } } }, '{broken']).map(input => ({ input })))('敏感查询只匹配可见值；真实零结算与未接入分开，草稿不计入累计：输入案例 %#', ({ input: columnFilters }) => {
     const input = {
       suppliers: [supplier('supplier-1', '来源验证')],
       projectSuppliers: [],
@@ -204,8 +211,7 @@ describe('分供方中央 Repository contract', () => {
     const oldPayload = structuredClone(noSource) as unknown as { items: Record<string, unknown>[] }
     delete oldPayload.items[0]!.laborScope
     expect(decodeSupplierListPage(oldPayload).items[0]?.laborScope).toBe('')
-    for (const columnFilters of [{ contains: { unsupported: 'x' } }, { ranges: { contractAmount: { min: 2, max: 1 } } }, '{broken'])
-      expect(() => parseSupplierListQuery({ columnFilters })).toThrow()
+    expect(() => parseSupplierListQuery({ columnFilters })).toThrow()
   })
 
   it('列表在中央侧筛选分页并只返回语义详情目标', () => {

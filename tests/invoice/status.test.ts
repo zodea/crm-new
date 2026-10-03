@@ -8,21 +8,27 @@ function inv(patch: Partial<{ ocrStatus: string, dupStatus: string, reviewStatus
 }
 
 describe('invoiceDocStatus:单一权威的状态优先级', () => {
-  it('识别中(会话态)压过一切持久状态', () => {
-    expect(invoiceDocStatus(inv({ ocrStatus: 'pending' }), true)).toBe('recognizing')
-    expect(invoiceDocStatus(inv({ dupStatus: 'duplicate' }), true)).toBe('recognizing')
+  it.each([
+    { case: 'inv({ ocrStatus: \'pending\' }) / true', input: inv({ ocrStatus: 'pending' }), argument2: true, expected: 'recognizing' },
+    { case: 'inv({ dupStatus: \'duplicate\' }) / true', input: inv({ dupStatus: 'duplicate' }), argument2: true, expected: 'recognizing' },
+  ])('识别中(会话态)压过一切持久状态 / invoiceDocStatus：$case', ({ input, argument2, expected }) => {
+    expect(invoiceDocStatus(input, argument2)).toBe(expected)
   })
 
-  it('未产出内容的 pending/failed 优先于 duplicate(此时发票号还没识别出来,谈不上重复)', () => {
-    expect(invoiceDocStatus(inv({ ocrStatus: 'pending' }))).toBe('pending')
-    expect(invoiceDocStatus(inv({ ocrStatus: 'failed' }))).toBe('failed')
-    expect(invoiceDocStatus(inv({ ocrStatus: 'failed', dupStatus: 'duplicate' }))).toBe('failed')
+  it.each([
+    { case: 'inv({ ocrStatus: \'pending\' })', input: inv({ ocrStatus: 'pending' }), expected: 'pending' },
+    { case: 'inv({ ocrStatus: \'failed\' })', input: inv({ ocrStatus: 'failed' }), expected: 'failed' },
+    { case: 'inv({ ocrStatus: \'failed\', dupStatus: \'duplicate\' })', input: inv({ ocrStatus: 'failed', dupStatus: 'duplicate' }), expected: 'failed' },
+  ])('未产出内容的 pending/failed 优先于 duplicate(此时发票号还没识别出来,谈不上重复) / invoiceDocStatus：$case', ({ input, expected }) => {
+    expect(invoiceDocStatus(input)).toBe(expected)
   })
 
-  it('done 后:duplicate > unreviewed > reviewed', () => {
-    expect(invoiceDocStatus(inv({ dupStatus: 'duplicate' }))).toBe('duplicate')
-    expect(invoiceDocStatus(inv({ dupStatus: 'duplicate', reviewStatus: 'reviewed' }))).toBe('duplicate')
-    expect(invoiceDocStatus(inv())).toBe('unreviewed')
-    expect(invoiceDocStatus(inv({ reviewStatus: 'reviewed' }))).toBe('reviewed')
+  it.each([
+    { case: 'inv({ dupStatus: \'duplicate\' })', input: inv({ dupStatus: 'duplicate' }), expected: 'duplicate' },
+    { case: 'inv({ dupStatus: \'duplicate\', reviewStatus: \'reviewed\' })', input: inv({ dupStatus: 'duplicate', reviewStatus: 'reviewed' }), expected: 'duplicate' },
+    { case: 'inv()', input: inv(), expected: 'unreviewed' },
+    { case: 'inv({ reviewStatus: \'reviewed\' })', input: inv({ reviewStatus: 'reviewed' }), expected: 'reviewed' },
+  ])('done 后:duplicate > unreviewed > reviewed / invoiceDocStatus：$case', ({ input, expected }) => {
+    expect(invoiceDocStatus(input)).toBe(expected)
   })
 })

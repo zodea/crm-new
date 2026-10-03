@@ -87,19 +87,21 @@ describe('甲方商务单据 HTTP 命令解析', () => {
     })
   })
 
-  it('拒绝畸形 draft 行和附件嵌套对象', () => {
-    expect(() => parseOwnerCommercialDocumentCommandRequest({
+  it.each([
+    { case: '{ ...envelope, action: \'save\', draft: { lines: [{ boqLineId: { nested: true } }] }, attachments: { add: [] }, }', input: {
       ...envelope,
       action: 'save',
       draft: { lines: [{ boqLineId: { nested: true } }] },
       attachments: { add: [] },
-    })).toThrow('保存命令无效')
-    expect(() => parseOwnerCommercialDocumentCommandRequest({
+    }, expected: '保存命令无效' },
+    { case: '{ ...envelope, action: \'save\', draft: {}, attachments: { add: [{ fileName: \'依据.pdf\', payload: { nested: true } }] }, }', input: {
       ...envelope,
       action: 'save',
       draft: {},
       attachments: { add: [{ fileName: '依据.pdf', payload: { nested: true } }] },
-    })).toThrow('保存命令无效')
+    }, expected: '保存命令无效' },
+  ])('拒绝畸形 draft 行和附件嵌套对象 / parseOwnerCommercialDocumentCommandRequest：$case', ({ input, expected }) => {
+    expect(() => parseOwnerCommercialDocumentCommandRequest(input)).toThrow(expected)
   })
 
   it('审定命令只接受稳定 BOQ 行 ID 与有限数值', () => {

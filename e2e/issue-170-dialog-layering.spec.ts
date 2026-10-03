@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test'
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 async function openResponsibilityDialog(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/subcontract/quantity')
-  await page.waitForLoadState('networkidle')
+  await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
+  await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
+  await installQuantityProductionFixture(page)
   await page.getByRole('button', { name: '责任配置', exact: true }).click()
   const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
   await expect(editor).toBeVisible()
@@ -45,7 +47,8 @@ test.describe('Issue #170：Dialog 子浮层与嵌套确认', () => {
   test('Dialog 内 Select 位于所属内容上方，Esc 后焦点返回触发器', async ({ page }) => {
     const editor = await openResponsibilityDialog(page)
     const tradeSelect = editor.getByRole('combobox', { name: '工种' })
-    await tradeSelect.click()
+    await tradeSelect.focus()
+    await tradeSelect.press('ArrowDown')
 
     const option = page.getByRole('option', { name: '水暖工', exact: true })
     await expect(option).toBeVisible()

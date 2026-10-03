@@ -275,14 +275,6 @@ describe('core migration test instance', () => {
     const migrationSource = source()
     const valid = sourceCommand('strict-backup', migrationSource, attestation(migrationSource))
     expect(parseCoreMigrationSourceCommand(valid)).toEqual(valid)
-    expect(() => parseCoreMigrationSourceCommand({
-      ...valid,
-      backup: { ...attestation(migrationSource), immutable: false },
-    })).toThrowError(expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed' }) }))
-    expect(() => parseCoreMigrationSourceCommand({
-      ...valid,
-      backup: { ...attestation(migrationSource), byteLength: 1.5 },
-    })).toThrowError(expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed' }) }))
 
     const instance = createCoreMigrationTestInstance()
     await instance.preflight(sourceCommand('strict-backup-preflight', migrationSource), SESSION)
@@ -299,6 +291,16 @@ describe('core migration test instance', () => {
       backupId: `core-migration-${migrationSource.sourceHash}-${'d'.repeat(64)}`,
       snapshotSha256: 'd'.repeat(64),
     }), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+  })
+
+  it.each([
+    { case: '非不可变', patch: { immutable: false } },
+    { case: '非整数字节数', patch: { byteLength: 1.5 } },
+  ])('来源命令拒绝 $case 的备份证明', ({ patch }) => {
+    const migrationSource = source()
+    const valid = sourceCommand('strict-backup', migrationSource, attestation(migrationSource))
+    const input = { ...valid, backup: { ...attestation(migrationSource), ...patch } }
+    expect(() => parseCoreMigrationSourceCommand(input)).toThrowError(expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed' }) }))
   })
 
   it('确认会拒绝阻塞问题，软删除记录本身不阻塞切换', async () => {
@@ -437,23 +439,25 @@ describe('core migration test instance', () => {
       commandId: 'batch-1',
     }, 'core-batch-1')).toEqual(batchCommand('batch-1', 'core-batch-1'))
 
-    const nonFinite = sourceCommand('decode-nan')
-    Reflect.set(nonFinite.source.entities.projects[0], 'amount', Number.NaN)
-    expect(() => parseCoreMigrationSourceCommand(nonFinite)).toThrowError(
-      expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed' }) }),
-    )
-
-    const invalidDate = sourceCommand('decode-date')
-    invalidDate.source.entities.customers[0].deletedAt = '2026-02-30T00:00:00.000Z'
-    expect(() => parseCoreMigrationSourceCommand(invalidDate)).toThrowError(
-      expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed' }) }),
-    )
-
     const instance = createCoreMigrationTestInstance()
     await expect(instance.preflight({
       ...sourceCommand('forged-workspace'),
       workspaceId: 'forged-workspace',
     }, SESSION)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+  })
+
+  it.each([
+    { case: '非有限金额', amount: Number.NaN, deletedAt: null },
+    { case: '非法日期', amount: null, deletedAt: '2026-02-30T00:00:00.000Z' },
+  ])('来源信封拒绝 $case', ({ amount, deletedAt }) => {
+    const input = sourceCommand('decode-invalid')
+    if (amount !== null)
+      Reflect.set(input.source.entities.projects[0], 'amount', amount)
+    if (deletedAt !== null)
+      input.source.entities.customers[0].deletedAt = deletedAt
+    expect(() => parseCoreMigrationSourceCommand(input)).toThrowError(
+      expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed' }) }),
+    )
   })
 
   it('补充协议取得稳定服务端 ID，并把显式旧主合同 ID 映射为唯一中央父引用', async () => {

@@ -1,3 +1,4 @@
+import type { PayrollADraft, PayrollAFormRead } from '../../app/lib/payroll/central-a-contract'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import * as h3 from 'h3'
@@ -12,7 +13,12 @@ vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
 } }))
 afterEach(() => vi.unstubAllGlobals())
 
-it('首次新建 A 尚未选择负责人时返回缺项诊断和未知空鼓依据，不能抛出服务错误', async () => {
+type HollowFixture = Awaited<ReturnType<typeof createPayrollHollowFixture>>
+it.each([
+  (read: PayrollAFormRead, f: HollowFixture) => ({ ...read, draft: f.draft }),
+  (read: PayrollAFormRead) => ({ ...read, hollow: { ...read.hollow, state: 'available' } }),
+  (read: PayrollAFormRead) => ({ ...read, hollow: { ...read.hollow, eligibility: { canStart: true, reasons: [] } } }),
+])('首次新建 A 缺负责人保持未知空鼓依据，拒绝提升资格：%#', async (makeForged) => {
   const f = await createPayrollHollowFixture()
   try {
     const read = await f.service.aForm({ origin: 'real' }, {
@@ -26,19 +32,20 @@ it('首次新建 A 尚未选择负责人时返回缺项诊断和未知空鼓依�
     expect(read.totals.grossAmount).toMatchObject({ state: 'unknown', value: null })
     const input = { statementId: null, draftKey: read.draftKey!, draft: read.draft }
     // 尚未选全的分支不能冒充完整主体，或被响应中的可启动标记提升权限。
-    for (const forged of [
-      { ...read, draft: f.draft },
-      { ...read, hollow: { ...read.hollow, state: 'available' } },
-      { ...read, hollow: { ...read.hollow, eligibility: { canStart: true, reasons: [] } } },
-    ])
-      expect(() => decodePayrollARead(encodePayrollAWire(forged), 'form', { origin: 'real' }, input)).toThrow()
+    const forged = makeForged(read, f)
+    expect(() => decodePayrollARead(encodePayrollAWire(forged), 'form', { origin: 'real' }, input)).toThrow()
   }
   finally {
     await f.close()
   }
 })
 
-it('空稿、部分主体和清空月份均经真实 HTTP/Repository 返回诊断，补齐选择后恢复原 1000 核算', async () => {
+it.each([
+  () => ({}),
+  (draft: PayrollADraft) => ({ projectId: draft.projectId, month: draft.month, crewId: null }),
+  (draft: PayrollADraft) => ({ ...draft, leaderWorkerId: '', memberWorkerIds: [] }),
+  (draft: PayrollADraft) => ({ ...draft, month: '' }),
+])('空稿、缺项主体与空月份经 HTTP 返回诊断，补齐后恢复核算：%#', async (makeDraft) => {
   const f = await createPayrollHollowFixture()
   runtime.service = f.service
   for (const name of ['defineEventHandler', 'getHeader', 'readBody', 'createError'] as const)
@@ -62,19 +69,13 @@ it('空稿、部分主体和清空月份均经真实 HTTP/Repository 返回诊�
     return data
   })
   try {
-    for (const draft of [
-      {},
-      { projectId: f.draft.projectId, month: f.draft.month, crewId: null },
-      { ...f.draft, leaderWorkerId: '', memberWorkerIds: [] },
-      { ...f.draft, month: '' },
-    ]) {
-      const read = await repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'incomplete-http-a', draft })
-      expect(read.draft).toMatchObject(draft)
-      expect(read.blockers.length).toBeGreaterThan(0)
-      expect(read.eligibility).toMatchObject({ canSaveDraft: false, canCheck: false, canRelease: false })
-      expect(read.hollow).toMatchObject({ state: 'unavailable' })
-      expect(read.totals.grossAmount).toMatchObject({ state: 'unknown', value: null })
-    }
+    const draft = makeDraft(f.draft)
+    const read = await repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'incomplete-http-a', draft })
+    expect(read.draft).toMatchObject(draft)
+    expect(read.blockers.length).toBeGreaterThan(0)
+    expect(read.eligibility).toMatchObject({ canSaveDraft: false, canCheck: false, canRelease: false })
+    expect(read.hollow).toMatchObject({ state: 'unavailable' })
+    expect(read.totals.grossAmount).toMatchObject({ state: 'unknown', value: null })
     const complete = await repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'incomplete-http-a', draft: f.draft })
     expect(complete.eligibility.canSaveDraft).toBe(true)
     expect(complete.totals.grossAmount.value).toBe(1000)

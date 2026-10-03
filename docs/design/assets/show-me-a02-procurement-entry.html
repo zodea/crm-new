@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A02 · 采购明细录入与报价核对</title>
+  <style>
+    :root {
+      --bg: #f8f9fb;
+      --panel: #fff;
+      --surface: #f1f5f9;
+      --line: #e3e6ea;
+      --line-strong: #c9ced6;
+      --ink: #1f2329;
+      --muted: #5b6470;
+      --brand: #3976c6;
+      --brand-deep: #2a5996;
+      --brand-soft: #eaf2fc;
+      --green: #28734a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; font-size: 14px; line-height: 1.6; }
+    main { max-width: 1160px; margin: auto; padding: 26px 30px 22px; }
+    h1 { margin: 4px 0 6px; font-size: 27px; line-height: 1.4; }
+    h2 { margin: 0; font-size: 18px; line-height: 1.5; }
+    p { margin: 0; }
+    .eyebrow { font-size: 13px; font-weight: 700; color: var(--brand-deep); }
+    .notice, .muted { color: var(--muted); }
+    .notice { font-size: 13px; }
+    .card { margin-top: 18px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); overflow: hidden; }
+    .section-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+    .section-head .muted { margin-left: auto; font-size: 13px; }
+    .tag { display: inline-block; border-radius: 3px; padding: 2px 7px; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; }
+    .target .tag { color: var(--brand-deep); background: var(--brand-soft); }
+    .current-body { padding: 12px 18px 14px; }
+    .import-label { display: block; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+    .tsv { margin: 0; border: 1px solid var(--line-strong); border-radius: 4px; padding: 9px 11px; color: var(--muted); font: 12px/1.65 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; background: white; }
+    .current-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 9px; margin-top: 9px; }
+    .current-bottom p { font-size: 13px; color: var(--muted); }
+    .mock-actions { display: flex; align-items: center; gap: 12px; font-size: 12px; }
+    .mock-button { border: 1px solid var(--brand); border-radius: 4px; padding: 4px 11px; background: var(--brand); color: white; }
+    .demo-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding-top: 19px; }
+    .demo-label { color: var(--muted); font-size: 12px; }
+    .switch { display: inline-flex; gap: 4px; }
+    button { min-height: 32px; border: 1px solid var(--line-strong); border-radius: 4px; background: white; color: var(--muted); padding: 4px 11px; font: inherit; font-size: 12px; cursor: pointer; }
+    button:hover { border-color: var(--brand); color: var(--brand-deep); }
+    button[aria-pressed="true"] { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-deep); font-weight: 700; }
+    button:focus-visible, .grid-scroll:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+    .target { margin-top: 9px; }
+    .paste-guide { display: flex; align-items: center; gap: 20px; padding: 16px 18px; background: #fbfcfe; border-bottom: 1px solid var(--line); }
+    .excel { flex: 0 0 112px; }
+    .excel-label { margin-bottom: 5px; color: var(--green); font-size: 12px; font-weight: 600; }
+    .excel-grid { border: 2px dashed var(--green); background: white; }
+    .excel-head { background: #edf5ef; color: #305840; padding: 2px 10px; font-size: 12px; text-align: center; }
+    .excel-cell { padding: 1px 11px; text-align: right; font-family: Consolas, monospace; border-top: 1px solid var(--line); }
+    .arrow { flex: 0 0 auto; color: var(--brand); font-size: 30px; font-weight: 400; }
+    .guide-text strong { display: block; font-size: 16px; margin-bottom: 4px; }
+    .guide-text p { color: var(--muted); font-size: 13px; }
+    .guide-text .result { color: var(--brand-deep); margin-top: 5px; font-weight: 600; }
+    .grid-title { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px; padding: 12px 18px 8px; font-weight: 700; }
+    .grid-title span { font-size: 12px; font-weight: 400; color: var(--muted); }
+    .grid-scroll { overflow-x: auto; overscroll-behavior-inline: contain; margin: 0 18px; border: 1px solid var(--line-strong); border-radius: 3px; }
+    .procurement { table-layout: fixed; border-spacing: 0; border-collapse: separate; min-width: 855px; width: 100%; font-size: 13px; }
+    .procurement th { height: 45px; background: var(--surface); color: var(--muted); font-weight: 600; text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line-strong); }
+    .procurement th:first-child, .procurement td:first-child { width: 39px; text-align: center; color: var(--muted); }
+    .procurement th:nth-child(2) { width: 125px; }
+    .procurement th:nth-child(3) { width: 140px; }
+    .procurement th:nth-child(4) { width: 85px; }
+    .procurement th:nth-child(5) { width: 85px; }
+    .procurement th:nth-child(6) { width: 115px; }
+    .procurement th:nth-child(7) { width: 130px; }
+    .procurement th:nth-child(8) { width: 135px; }
+    .procurement td { height: 55px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+    .procurement th + th, .procurement td + td { border-left: 1px solid var(--line); }
+    .procurement tbody tr:last-child td { border-bottom: 0; }
+    .procurement .quantity-head { color: var(--brand-deep); background: #dceafb; }
+    .procurement .quantity-head small { display: block; font-size: 10px; font-weight: 400; line-height: 1.3; }
+    .number { font-family: Consolas, "Microsoft YaHei", monospace; font-variant-numeric: tabular-nums; text-align: right; }
+    .text-field { display: inline-block; width: 100%; padding: 3px 6px; border: 1px solid var(--line-strong); border-radius: 3px; background: white; line-height: 22px; }
+    .quantity { background: var(--brand-soft); color: var(--brand-deep); font-size: 15px; font-weight: 600; }
+    .quantity.start { outline: 2px solid var(--brand); outline-offset: -2px; }
+    .quantity.next { box-shadow: inset 2px 0 var(--brand), inset -2px 0 var(--brand), inset 0 -2px var(--brand); }
+    .readonly { background: #fafbfc; }
+    .readonly small { display: block; color: var(--muted); font: 10px/1.4 "Microsoft YaHei", sans-serif; }
+    .summary { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 11px 18px 14px; color: var(--muted); font-size: 13px; }
+    .summary strong { color: var(--ink); font-size: 15px; }
+    .notes { display: flex; flex-wrap: wrap; gap: 6px 24px; padding: 11px 18px; border-top: 1px solid var(--line); background: #fbfcfe; font-size: 12px; color: var(--muted); }
+    .notes strong { color: var(--ink); font-weight: 600; }
+    .footer { margin-top: 12px; font-size: 12px; color: var(--muted); }
+    [data-state="before"] .quantity { color: var(--muted); background: white; }
+    [data-state="before"] .quantity.start { background: var(--brand-soft); }
+    [data-state="before"] .quantity.next { box-shadow: none; }
+    @media (max-width: 620px) {
+      main { padding: 18px 12px; }
+      h1 { font-size: 23px; }
+      .section-head, .current-body { padding-left: 12px; padding-right: 12px; }
+      .section-head .muted { width: 100%; margin-left: 0; }
+      .paste-guide { padding: 14px 12px; gap: 10px; }
+      .excel { flex-basis: 86px; }
+      .arrow { font-size: 23px; }
+      .guide-text strong { font-size: 14px; }
+      .guide-text p { font-size: 12px; }
+      .grid-scroll { margin-left: 12px; margin-right: 12px; }
+      .grid-title, .summary, .notes { padding-left: 12px; padding-right: 12px; }
+      .tsv { font-size: 11px; }
+      .demo-controls { align-items: flex-start; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+    .unit-figure { max-width: 1160px; margin: 28px auto 0; padding: 26px 30px; border-top: 1px solid var(--line-strong); }
+    .unit-figure h2 { font-size: 27px; margin: 4px 0 6px; }
+    .unit-figure h3 { margin: 0; font-size: 17px; }
+    .pending { display: inline-block; color: #835410; background: #fff2d6; border: 1px solid #f1d399; padding: 2px 8px; border-radius: 3px; font-size: 12px; }
+    .unit-context { display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 13px 18px; background: #fbfcfe; border-bottom: 1px solid var(--line); }
+    .unit-context span { color: var(--muted); }
+    .unit-context b { color: var(--ink); font-weight: 600; }
+    .unit-table-wrap { overflow-x: auto; overscroll-behavior-inline: contain; }
+    .unit-table-wrap:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+    .unit-table { width: 100%; min-width: 740px; border-collapse: collapse; font-size: 14px; }
+    .unit-table th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 10px 16px; background: var(--surface); }
+    .unit-table td { padding: 13px 16px; border-top: 1px solid var(--line); }
+    .unit-table small { display: block; font-size: 12px; color: var(--muted); }
+    .unit-table .price { color: var(--brand-deep); background: #f3f7fd; font-weight: 700; font-size: 19px; }
+    .unit-table .price small { color: var(--brand-deep); font-size: 12px; font-weight: 400; }
+    .comparison-foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; padding: 12px 18px; border-top: 1px solid var(--line); background: #f3f7fd; color: var(--brand-deep); }
+    .unit-alternative { display: flex; flex-wrap: wrap; gap: 14px; padding: 14px 18px; align-items: center; }
+    .unit-alternative .quote { border: 1px solid var(--line); border-radius: 3px; padding: 7px 14px; min-width: 190px; background: #fbfcfe; }
+    .unit-alternative small { display: block; color: var(--muted); }
+    .unit-boundary { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.8; }
+    .unit-source { margin-top: 8px; font-size: 12px; color: var(--muted); }
+    .unit-source a { color: var(--brand-deep); }
+    #tax-comparison h2 { font-size: 18px; margin: 0 0 5px; }
+    #tax-comparison .unit-table th, #tax-comparison .unit-table td { height: 40px; padding: 8px 16px; white-space: nowrap; font-size: 14px; }
+    #tax-comparison .unit-table td { font-weight: 400; }
+    #tax-comparison .unit-table th.number { text-align: right; }
+    #amount-reconciliation { max-width: 1160px; margin: 28px auto 0; padding: 26px 30px; border-top: 1px solid var(--line-strong); }
+    #amount-reconciliation h2 { margin: 0 0 5px; font-size: 18px; }
+    #amount-reconciliation .amount-scroll { overflow-x: auto; overscroll-behavior-inline: contain; }
+    #amount-reconciliation .amount-scroll:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+    #amount-reconciliation table { width: 100%; min-width: 740px; border-collapse: collapse; font-size: 14px; }
+    #amount-reconciliation th, #amount-reconciliation td { height: 40px; padding: 8px 16px; text-align: left; white-space: nowrap; }
+    #amount-reconciliation th { color: var(--muted); background: var(--surface); font-weight: 600; }
+    #amount-reconciliation td { border-top: 1px solid var(--line); }
+    #amount-reconciliation .number { text-align: right; }
+    #amount-reconciliation .freight-note { margin-top: 10px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 620px) {
+      #amount-reconciliation { padding: 20px 12px; }
+      #amount-reconciliation table { min-width: 690px; }
+    }
+    @media(max-width:620px) {
+      .unit-figure { padding: 20px 12px; }
+      .unit-figure h2 { font-size: 23px; }
+      .unit-context, .unit-alternative, .comparison-foot { padding-left: 12px; padding-right: 12px; }
+      .unit-table { min-width: 690px; }
+      .unit-alternative .quote { flex: 1 1 130px; min-width: 130px; }
+    }
+    #order-discount { max-width: 1160px; margin: 28px auto 0; padding: 26px 30px; border-top: 1px solid var(--line-strong); }
+    #order-discount h2 { margin: 0 0 5px; font-size: 18px; }
+    #order-discount .discount-scroll { overflow-x: auto; overscroll-behavior-inline: contain; }
+    #order-discount .discount-scroll:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+    #order-discount table { width: 100%; min-width: 740px; border-collapse: collapse; font-size: 14px; }
+    #order-discount th, #order-discount td { height: 40px; padding: 8px 16px; text-align: left; white-space: nowrap; }
+    #order-discount th { color: var(--muted); background: var(--surface); font-weight: 600; }
+    #order-discount td { border-top: 1px solid var(--line); }
+    #order-discount .number { text-align: right; }
+    #order-discount .deduction-row { background: #fffaf0; }
+    #order-discount .deduction-row td:last-child { color: #885018; }
+    #order-discount .discount-total { display: flex; justify-content: flex-end; align-items: baseline; gap: 18px; padding: 13px 16px; border-top: 1px solid var(--line); }
+    #order-discount .discount-total strong { color: var(--brand-deep); font-size: 18px; }
+    #order-discount .discount-note { margin-top: 11px; color: var(--muted); font-size: 13px; }
+    @media(max-width:620px) {
+      #order-discount { padding: 20px 12px; }
+      #order-discount table { min-width: 690px; }
+    }
+  </style>
+</head>
+<body>
+  <aside id="a02-baseline-note" style="max-width:1160px;margin:16px auto;padding:12px 16px;border:1px solid #e3e6ea;background:#fff;font-size:13px;line-height:1.6">对照基线：原六张示意中的代码现状按已提交版本 8756be2d。工作区未提交源码已有单位文本/空值、按列粘贴、联系人带出和未知税率处理，本轮未运行验收。后三张为本次补答后的规则示意，均不表示功能已交付。</aside>
+  <main id="procurement-entry" data-state="after">
+    <header>
+      <p class="eyebrow">A02 · 采购合同明细</p>
+      <h1>从 Excel 一列一列复制，填到对应列</h1>
+      <p class="notice"><strong>规则界面示意 · 非运行截图。</strong>目标已确认，尚待实现；以下两行及金额均为合成示例。</p>
+    </header>
+
+    <section class="card current" aria-labelledby="current-heading">
+      <header class="section-head">
+        <h2 id="current-heading">当前方式</h2>
+        <span class="tag">按现有代码重绘</span>
+        <span class="muted">“粘贴导入”框 · 固定八列 · 追加新行</span>
+      </header>
+      <div class="current-body">
+        <p class="import-label">从 Excel 复制后粘贴（列序：物资、规格、品牌、单位、数量、含税单价、到货日、备注）</p>
+        <pre class="tsv" aria-label="现有整批 TSV 输入框示意">方管    40×40×2    示例品牌    米    100    20    2026-10-01    首批
+方管    50×50×2    示例品牌    米     80    30    2026-10-01    首批</pre>
+        <div class="current-bottom">
+          <p>目前还不能选中“数量”列，只填入这两格。</p>
+          <div class="mock-actions" aria-label="现有导入按钮外观示意，不可操作"><span>取消</span><span class="mock-button">导入明细</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="demo-controls" aria-label="本图演示控件，不属于产品工具栏">
+      <span class="demo-label">仅切换本图状态 · 非产品工具栏</span>
+      <div class="switch">
+        <button type="button" id="before" aria-pressed="false">查看粘贴前</button>
+        <button type="button" id="after" aria-pressed="true">查看粘贴后</button>
+      </div>
+    </div>
+
+    <section class="card target" aria-labelledby="target-heading">
+      <header class="section-head">
+        <h2 id="target-heading">目标效果</h2>
+        <span class="tag">已确认，待实现</span>
+        <span class="muted">无需先整理完整行</span>
+      </header>
+      <div class="paste-guide">
+        <div class="excel">
+          <p class="excel-label">Excel 中复制</p>
+          <div class="excel-grid" aria-label="复制数量列：100、80">
+            <div class="excel-head">数量</div>
+            <div class="excel-cell">100</div>
+            <div class="excel-cell">80</div>
+          </div>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="guide-text">
+          <strong>选中“数量”第 1 格，再粘贴</strong>
+          <p>蓝色边框是起点；数值按顺序向下填入。</p>
+          <p id="state-caption" class="result" aria-live="polite">粘贴后：100、80 落在原来的两行</p>
+        </div>
+      </div>
+
+      <div class="grid-title">采购合同明细 <span>两行示例 · 只展示相关字段</span></div>
+      <div class="grid-scroll" tabindex="0" role="region" aria-label="采购明细示意表，窄屏可在表内横向滚动">
+        <table class="procurement" aria-label="采购明细逐列粘贴目标">
+          <thead><tr><th scope="col">序号</th><th scope="col">物资名称</th><th scope="col">规格</th><th scope="col">材质</th><th scope="col">单位</th><th scope="col" class="quantity-head">数量<small>本次粘贴这一列</small></th><th scope="col" class="number">含税单价</th><th scope="col" class="number">含税金额</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>方管</td><td>40×40×2</td><td>304</td><td><span class="text-field" aria-label="单位文本输入示意：米">米</span></td><td class="number quantity start" data-qty="100">100</td><td class="number">20.00</td><td class="number readonly"><span data-amount="2,000.00">2,000.00</span><small>数量 × 含税单价</small></td></tr>
+            <tr><td>2</td><td>方管</td><td>50×50×2</td><td>304</td><td><span class="text-field" aria-label="单位文本输入示意：米">米</span></td><td class="number quantity next" data-qty="80">80</td><td class="number">30.00</td><td class="number readonly"><span data-amount="2,400.00">2,400.00</span><small>数量 × 含税单价</small></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="summary"><p><strong>仍是 2 行</strong> · 其他已填列保持原值</p><p>含税金额合计 <strong id="total" class="number">4,400.00</strong> 元</p></div>
+      <div class="notes"><span><strong>单位：</strong>文本填写，无下拉和默认值</span><span><strong>材质：</strong>独立字段</span><span><strong>金额：</strong>随数量重新计算</span></div>
+    </section>
+    <p class="footer">当前方式依据 ContractLineItemsEditor.vue 的固定列 TSV 导入代码重绘；本图未操作运行页面，也不表示逐列粘贴已可用。</p>
+  </main>
+  <section id="unit-comparison" class="unit-figure" aria-labelledby="unit-heading">
+    <header>
+      <p class="eyebrow">A02 · 合同约定单价 / 单位换算</p>
+      <h2 id="unit-heading">倍数明确时，换算为同一单位比较</h2>
+      <p class="notice"><strong>已确认目标，待实现 · 非运行截图。</strong>只说明单位换算；以下合同与价格均为合成示例。</p>
+    </header>
+
+    <article class="card">
+      <header class="section-head"><h3>两份合同原来怎么写</h3><span class="tag">原始记录保留</span></header>
+      <div class="unit-context"><span>项目 <b>示意项目 A</b></span><span>材料 <b>方管</b></span><span>规格 <b>40×40×2</b></span><span>材质 <b>304</b></span></div>
+      <div class="unit-table-wrap" tabindex="0" role="region" aria-label="合同原始报价，窄屏表内横向滚动">
+        <table class="unit-table">
+          <thead><tr><th>合同 / 签订日期</th><th>分供方</th><th>数量与单位</th><th>含税单价</th><th>行含税金额</th></tr></thead>
+          <tbody>
+            <tr><td>示例合同 A<small>2026-09-01</small></td><td>示例分供方 A</td><td>1 吨</td><td class="number">18,000 元/吨</td><td class="number">18,000 元</td></tr>
+            <tr><td>示例合同 B<small>2026-09-20</small></td><td>示例分供方 B</td><td>1,000 千克</td><td class="number">19 元/千克</td><td class="number">19,000 元</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="card target">
+      <header class="section-head"><h3>目标效果：在同一单位下比较</h3><span class="tag">已确认，待实现</span><span class="muted">合同约定报价 · 比较单位：千克</span></header>
+      <div class="unit-table-wrap" tabindex="0" role="region" aria-label="已确认的统一单位比较目标，窄屏表内横向滚动">
+        <table class="unit-table">
+          <thead><tr><th>来源</th><th>合同原价</th><th>换算说明</th><th>用于比较的含税单价</th></tr></thead>
+          <tbody>
+            <tr><td>示例合同 A<small>分供方 A · 09-01</small></td><td class="number">18,000 元/吨</td><td>1 吨 = 1,000 千克<small>18,000 ÷ 1,000</small></td><td class="price number">18.00<small>元/千克</small></td></tr>
+            <tr><td>示例合同 B<small>分供方 B · 09-20</small></td><td class="number">19 元/千克</td><td>原单位已经是千克<small>无需换算</small></td><td class="price number">19.00<small>元/千克</small></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="comparison-foot"><strong>本例 B 的单价每千克高 1.00 元</strong><span>只在比较时换算；原合同单位、数量、报价保留</span></div>
+    </article>
+
+    <p class="unit-boundary"><strong>例外：倍数未知时分开。</strong>例如“箱 → 件”缺少每箱数量，不猜比例，不给出跨单位高低比较。示例假定税与运费条件一致，未据此确定其他比较口径。</p>
+    <p class="unit-source">换算依据：<a href="https://scjgj.xinjiang.gov.cn/xjaic/flfg/202106/2ce0e077f50e49bfa5c0a3cb43ff80d1.shtml">国家法定计量单位表 4</a>。倍数明确时换算用于合同报价比较已确认，实际功能尚待实现。</p>
+  </section>
+  <section id="tax-comparison" class="unit-figure" aria-labelledby="tax-heading">
+    <header>
+      <h2 id="tax-heading">合同单价对比</h2>
+      <p class="notice">已确认目标 · 界面示意 · 待实现</p>
+    </header>
+
+    <article class="card">
+      <div class="unit-context"><span>项目 <b>示意项目 A</b></span><span>材料 <b>方管</b></span><span>规格 <b>40×40×2</b></span><span>材质 <b>304</b></span></div>
+      <div class="unit-table-wrap" tabindex="0" role="region" aria-label="合同含税单价与税点，窄屏表内横向滚动">
+        <table class="unit-table">
+          <thead><tr><th scope="col">签订日期</th><th scope="col">分供方</th><th scope="col">合同</th><th scope="col">单位</th><th scope="col" class="number">含税单价（元）</th><th scope="col">税点</th></tr></thead>
+          <tbody>
+            <tr><td>2026-09-01</td><td>示例分供方 A</td><td>示例合同 A</td><td>米</td><td class="number">113.00</td><td>13%</td></tr>
+            <tr><td>2026-09-20</td><td>示例分供方 B</td><td>示例合同 B</td><td>米</td><td class="number">110.00</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+    <p class="unit-source">— 表示未记录</p>
+  </section>
+  <section id="amount-reconciliation" aria-labelledby="amount-heading">
+    <header>
+      <h2 id="amount-heading">运费与合同金额</h2>
+      <p class="notice">已确认规则 · 界面示意 · 待实现</p>
+    </header>
+    <article class="card">
+      <div class="amount-scroll" tabindex="0" role="region" aria-label="合同运费约定与另收运费示意，窄屏表内横向滚动">
+        <table>
+          <thead><tr><th scope="col">合同</th><th scope="col" class="number">合同金额（元）</th><th scope="col">运费约定</th><th scope="col" class="number">另收运费（元）</th><th scope="col">说明</th></tr></thead>
+          <tbody>
+            <tr><td>示例 A</td><td class="number">4,400.00</td><td>不含</td><td class="number">600.00</td><td>合同外另计</td></tr>
+            <tr><td>示例 B</td><td class="number">4,400.00</td><td>已含</td><td class="number">600.00</td><td>多收取</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+    <p class="freight-note">示例均保持原合同 4,400 元；B 假设合同约定未变更。</p>
+    <p class="freight-note">报价比较：保留含运费 / 不含运费条件，仅作范围参考。</p>
+  </section>
+  <section id="order-discount" aria-labelledby="discount-heading">
+    <header>
+      <h2 id="discount-heading">优惠与扣减</h2>
+      <p class="notice">已确认表达方式 · 界面示意 · 待实现</p>
+    </header>
+    <article class="card">
+      <div class="discount-scroll" tabindex="0" role="region" aria-label="材料与优惠扣减明细，窄屏表内横向滚动">
+        <table>
+          <thead><tr><th scope="col">项目</th><th scope="col">规格</th><th scope="col">单位</th><th scope="col" class="number">数量</th><th scope="col" class="number">含税单价（元）</th><th scope="col" class="number">金额（元）</th></tr></thead>
+          <tbody>
+            <tr><td>方管</td><td>40×40×2</td><td>米</td><td class="number">100</td><td class="number">20.00</td><td class="number">2,000.00</td></tr>
+            <tr><td>方管</td><td>50×50×2</td><td>米</td><td class="number">100</td><td class="number">30.00</td><td class="number">3,000.00</td></tr>
+            <tr class="deduction-row"><td>整单优惠</td><td>—</td><td>—</td><td class="number">—</td><td class="number">—</td><td class="number">-200.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="discount-total"><span>合计（元）</span><strong class="number">4,800.00</strong></div>
+    </article>
+    <p class="discount-note">有优惠或扣减时单列减项，参与合计。</p>
+  </section>
+  <section id="supplier-price-scope" class="unit-figure" aria-labelledby="supplier-scope-heading">
+    <header>
+      <h2 id="supplier-scope-heading">材料分供方：按查看目的展示</h2>
+      <p class="notice">已确认范围 · 虚构规则示意 · 不是运行截图</p>
+    </header>
+    <article class="card">
+      <div class="unit-context"><span>原说明 <b>“材料分供方数”按项目登记统计，未区分使用场景</b></span></div>
+      <div class="unit-context"><span>调整为 <b>价格比较展示各家并标明来源；合同查找展示实际签约采购方</b></span></div>
+      <div class="unit-table-wrap" tabindex="0" role="region" aria-label="分供方报价与合同关系示意，窄屏表内横向滚动">
+        <table class="unit-table">
+          <thead><tr><th scope="col">分供方</th><th scope="col">价格（元/米）</th><th scope="col">来源</th><th scope="col">正式材采合同</th><th scope="col">价格比较</th><th scope="col">合同查找 / 采购方</th></tr></thead>
+          <tbody>
+            <tr><td>甲材料公司</td><td class="number">100.00</td><td>合同约定价</td><td>2 份</td><td>展示</td><td>展示甲（1 家）</td></tr>
+            <tr><td>甲材料公司</td><td class="number">101.00</td><td>实际送货价</td><td>同一采购方</td><td>另标来源</td><td>仍是甲</td></tr>
+            <tr><td>乙材料公司</td><td class="number">98.00</td><td>未签约询价</td><td>无</td><td>展示</td><td>无正式签约关系</td></tr>
+            <tr><td>丙材料公司</td><td class="number">105.00</td><td>未签约询价</td><td>仅草稿</td><td>展示</td><td>不冒充已签约</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="unit-context"><span>价格比较 <b>甲、乙、丙 3 家；三种来源分开标明</b></span><span>已签约采购方 <b>仅甲 1 家；2 份合同仍是同一家</b></span></div>
+    </article>
+    <p class="unit-source">现行价格分析来自已归档送货明细；包含未签约询价、合同约定价、实际送货价并分别标明是确认目标。独立报价实体与综合比较尚未实现。</p>
+  </section>
+  <section id="quantity-unit-review" class="a02-followup" aria-labelledby="quantity-unit-heading">
+    <style>
+      .a02-followup { max-width: 1160px; margin: 30px auto 0; padding: 26px 30px; border-top: 1px solid var(--line-strong); }
+      .a02-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .a02-followup .a02-body { padding: 16px 18px; }
+      .a02-followup .a02-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+      .a02-followup .a02-row:last-child { border-bottom: 0; }
+      .a02-followup .a02-detail { color: var(--muted); font-size: 13px; margin-top: 10px; }
+      .a02-followup .a02-result { padding: 10px 14px; margin-top: 12px; color: var(--brand-deep); background: var(--brand-soft); }
+      .a02-followup .a02-caption { margin-top: 12px; font-size: 13px; color: var(--muted); }
+      .a02-followup [role="region"]:focus-visible { outline: 2px solid var(--brand); outline-offset: -3px; }
+      @media (max-width: 700px) { .a02-followup { padding: 20px 12px; } .a02-compare { grid-template-columns: minmax(0, 1fr); } }
+    </style>
+    <header><h2 id="quantity-unit-heading">数量与单位：一起核对，再追加</h2><p class="notice">已确认规则示意 · 示例数据 · 不是运行截图</p></header>
+    <div class="a02-compare">
+      <article class="card">
+        <div class="section-head"><strong>原来：数值校验</strong><span class="tag">代码现状示意</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>填入数量 / 单位</span><strong>10 根</strong></div>
+          <div class="a02-row"><span>原资料的单价</span><strong>20 元 / 米</strong></div>
+          <div class="a02-row"><span>已有数值门槛</span><strong>数量正、单价非负</strong></div>
+          <p class="a02-detail">每根长度未知。数值条件可通过，单位与计价关系尚未校验。</p>
+        </div>
+      </article>
+      <article class="card target">
+        <div class="section-head"><strong>调整为：对照同一源行</strong><span class="tag">目标 · 待实现</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>正确源行示例</span><strong>100 米 × 20 元 / 米</strong></div>
+          <div class="a02-row"><span>金额</span><strong>2,000 元</strong></div>
+          <div class="a02-row"><span>根 → 米的倍数未核实</span><strong>保留待核，不猜</strong></div>
+          <p class="a02-result">10 行中仍有 2 行错误：整批留预览。修好全部错误后，再追加当前合同草稿。</p>
+        </div>
+      </article>
+    </div>
+    <p class="a02-caption">保留已有明细及源行定位；正式保存仍一次校验合同头与全部明细，不逐行偷偷写入。</p>
+  </section>
+  <section id="actual-tax-sources" class="a02-followup" aria-labelledby="actual-tax-heading">
+    <header><h2 id="actual-tax-heading">真实税额：按主体与期间核实</h2><p class="notice">已确认规则示意 · 不推算未知税额 · 不是运行截图</p></header>
+    <div class="a02-compare">
+      <article class="card">
+        <div class="section-head"><strong>原来：项目票据算法</strong><span class="tag">代码现状示意</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>“增值税”</span><strong>申请税额 − 归档票税额</strong></div>
+          <div class="a02-row"><span>“税负率”</span><strong>税额差 / 销项票额</strong></div>
+          <p class="a02-detail">申请不等于已开票，归档不等于可抵扣。尚缺纳税主体、真实属期及申报/缴款依据。</p>
+        </div>
+      </article>
+      <article class="card target">
+        <div class="section-head"><strong>调整为：真实来源分开</strong><span class="tag">目标 · 待实现</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>公司税款</span><strong>真实主体 + 所属期间</strong></div>
+          <div class="a02-row"><span>应纳 / 申报 / 实缴</span><strong>各有依据，分别查看</strong></div>
+          <div class="a02-row"><span>项目税额</span><strong>明确归属 + 完整性</strong></div>
+          <p class="a02-result">销项票晚开：核实业务义务属期。进项票迟到：核实凭证及抵扣属期。缺源显示待核实。</p>
+        </div>
+      </article>
+    </div>
+    <p class="a02-caption">晚开 / 未到票不按零；不自动倒期，不把项目差额当成公司真实应纳，不猜分摊。</p>
+  </section>
+  <section id="management-fee-sources" class="a02-followup" aria-labelledby="management-fee-heading">
+    <header><h2 id="management-fee-heading">管理费：看实际成本，展开来源</h2><p class="notice">已确认规则示意 · 示例不含真实金额 · 不是运行截图</p></header>
+    <div class="a02-compare">
+      <article class="card">
+        <div class="section-head"><strong>原来：顶部完整来源未接通</strong><span class="tag">现有规则示意</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>管理费</span><strong>—</strong></div>
+          <div class="a02-row"><span>完整性</span><strong>来源未齐</strong></div>
+          <p class="a02-detail">不能用占位 0 表示没有费用。合同记取、管理人员和仓储等没有统一聚合来源。</p>
+        </div>
+      </article>
+      <article class="card target">
+        <div class="section-head"><strong>调整为：已核实实际成本</strong><span class="tag">目标 · 待实现</span></div>
+        <div class="a02-body">
+          <div class="a02-row"><span>合同记取相关成本</span><strong>核实费用发生与归属</strong></div>
+          <div class="a02-row"><span>管理人员</span><strong>工资域原事实</strong></div>
+          <div class="a02-row"><span>仓储等</span><strong>真实结算 / 报销来源</strong></div>
+          <p class="a02-result">成本按来源展开；合同记取额、实际收付分别看。缺来源时，已知部分保留不完整标记。</p>
+        </div>
+      </article>
+    </div>
+    <p class="a02-caption">引用原费用及支付，不复制成本；已进入工资或支付的现金，资金余额只计一次。</p>
+  </section>
+  <script>
+    const main = document.querySelector('main');
+    function showState(state) {
+      const after = state === 'after';
+      main.dataset.state = state;
+      document.querySelectorAll('[data-qty]').forEach(cell => { cell.textContent = after ? cell.dataset.qty : ''; });
+      document.querySelectorAll('[data-amount]').forEach(cell => { cell.textContent = after ? cell.dataset.amount : '—'; });
+      document.querySelector('#total').textContent = after ? '4,400.00' : '—';
+      document.querySelector('#state-caption').textContent = after ? '粘贴后：100、80 落在原来的两行' : '粘贴前：数量留空，其他列已经填好';
+      document.querySelector('#before').setAttribute('aria-pressed', String(!after));
+      document.querySelector('#after').setAttribute('aria-pressed', String(after));
+    }
+    document.querySelector('#before').addEventListener('click', () => showState('before'));
+    document.querySelector('#after').addEventListener('click', () => showState('after'));
+  </script>
+</body>
+</html>

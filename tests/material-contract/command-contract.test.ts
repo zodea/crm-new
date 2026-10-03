@@ -45,6 +45,25 @@ function request(
 }
 
 describe('材料采购合同中央 command contract', () => {
+  it('提交必须头行一致，保存不自动改量价且保留未知税率和合同联系人', async () => {
+    const instance = createMaterialContractCommandTestInstance({
+      createId: () => 'contract-amount-check',
+      projects: [{ id: 'project-1', name: '中央项目' }],
+      suppliers: [{ id: 'supplier-1', name: '中央分供方' }],
+    })
+    const draft = { ...request().draft, amount: 200, taxRate: null, contactName: '合同联系人', contactPhone: '13800000001' }
+    await expect(instance.execute(request({ draft }), SESSION)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    expect(instance.rows()).toEqual([])
+    await instance.execute(request({ commandId: 'save-mismatch', action: 'save', draft }), SESSION)
+    expect(instance.form('contract-amount-check', SESSION).draft).toMatchObject({
+      amount: 200,
+      taxRate: null,
+      contactName: '合同联系人',
+      contactPhone: '13800000001',
+      lineItems: [{ qty: 10, taxInclusiveUnitPrice: 25.5 }],
+    })
+  })
+
   it('由服务器分配 ID，重复 commandId 不重复创建，刷新可读回合同与采购明细', async () => {
     const instance = createMaterialContractCommandTestInstance({
       createId: () => 'contract-central-1',
@@ -111,28 +130,28 @@ describe('材料采购合同中央 command contract', () => {
     expect(instance.form('contract-central-1', SESSION).draft.name).toBe('最新合同名称')
   })
 
-  it('区分新建与编辑信封，拒绝客户端指定或错配正式合同 ID', () => {
-    expect(() => parseMaterialContractCommandRequest(request({ id: 'client-id' }), { kind: 'create' }))
-      .toThrowError(/不得指定合同 ID/)
-    expect(() => parseMaterialContractCommandRequest(request(), { kind: 'update', routeId: 'contract-1' }))
-      .toThrowError(/必须携带合同 ID/)
-    expect(() => parseMaterialContractCommandRequest(request({ id: 'contract-2' }), { kind: 'update', routeId: 'contract-1' }))
-      .toThrowError(/地址与请求主体不一致/)
+  it.each([
+    { case: 'request({ id: \'client-id\' }) / { kind: \'create\' }', input: request({ id: 'client-id' }), argument2: { kind: 'create' }, expected: /不得指定合同 ID/ },
+    { case: 'request() / { kind: \'update\', routeId: \'contract-1\' }', input: request(), argument2: { kind: 'update', routeId: 'contract-1' }, expected: /必须携带合同 ID/ },
+    { case: 'request({ id: \'contract-2\' }) / { kind: \'update\', routeId: \'contract-1\' }', input: request({ id: 'contract-2' }), argument2: { kind: 'update', routeId: 'contract-1' }, expected: /地址与请求主体不一致/ },
+  ])('区分新建与编辑信封，拒绝客户端指定或错配正式合同 ID / parseMaterialContractCommandRequest：$case', ({ input, argument2, expected }) => {
+    expect(() => parseMaterialContractCommandRequest(input, argument2)).toThrowError(expected)
   })
 
-  it('严格拒绝空 ID、畸形明细、附件数组和未知字段', () => {
-    expect(() => parseMaterialContractCommandRequest(request({ id: '' }), { kind: 'create' }))
-      .toThrowError(/不得指定合同 ID/)
-    expect(() => parseMaterialContractCommandRequest(request({
+  it.each([
+    { case: 'request({ id: \'\' }) / { kind: \'create\' }', input: request({ id: '' }), argument2: { kind: 'create' }, expected: /不得指定合同 ID/ },
+    { case: 'request({ draft: { ...request().draft, lineItems: {} as never }, }) / { kind: \'create\' }', input: request({
       draft: { ...request().draft, lineItems: {} as never },
-    }), { kind: 'create' })).toThrowError(/采购明细无效/)
-    expect(() => parseMaterialContractCommandRequest(request({
+    }), argument2: { kind: 'create' }, expected: /采购明细无效/ },
+    { case: 'request({ attachments: { add: {} as never }, }) / { kind: \'create\' }', input: request({
       attachments: { add: {} as never },
-    }), { kind: 'create' })).toThrowError(/新增附件无效/)
-    expect(() => parseMaterialContractCommandRequest({
+    }), argument2: { kind: 'create' }, expected: /新增附件无效/ },
+    { case: '{ ...request(), draft: { ...request().draft, injected: true }, } / { kind: \'create\' }', input: {
       ...request(),
       draft: { ...request().draft, injected: true },
-    }, { kind: 'create' })).toThrowError(/未知材料采购合同字段/)
+    }, argument2: { kind: 'create' }, expected: /未知材料采购合同字段/ },
+  ])('严格拒绝空 ID、畸形明细、附件数组和未知字段 / parseMaterialContractCommandRequest：$case', ({ input, argument2, expected }) => {
+    expect(() => parseMaterialContractCommandRequest(input, argument2)).toThrowError(expected)
   })
 
   it('草稿也拒绝非法引用与负数，且新行 ID 只能由服务端分配', async () => {

@@ -52,11 +52,13 @@ describe('kitButton 变体映射（DESIGN-TASTE §4.2 五变体，#109）', () =
     expect(resolveKitButtonVariant()).toBe('secondary')
   })
 
-  it('五档各自映射到底层 Button 变体', () => {
-    expect(resolveKitButtonVariant('secondary')).toBe('secondary')
-    expect(resolveKitButtonVariant('primary')).toBe('primary')
-    expect(resolveKitButtonVariant('accent')).toBe('accent')
-    expect(resolveKitButtonVariant('ghost')).toBe('ghost')
-    expect(resolveKitButtonVariant('danger')).toBe('destructive')
+  it.each([
+    { case: '\'secondary\'', input: 'secondary', expected: 'secondary' },
+    { case: '\'primary\'', input: 'primary', expected: 'primary' },
+    { case: '\'accent\'', input: 'accent', expected: 'accent' },
+    { case: '\'ghost\'', input: 'ghost', expected: 'ghost' },
+    { case: '\'danger\'', input: 'danger', expected: 'destructive' },
+  ])('五档各自映射到底层 Button 变体 / resolveKitButtonVariant：$case', ({ input, expected }) => {
+    expect(resolveKitButtonVariant(input)).toBe(expected)
   })
 })

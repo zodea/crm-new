@@ -1,5 +1,6 @@
 import type { APIRequestContext, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
@@ -21,12 +22,48 @@ test.describe('Issue #322：补充协议稳定聚焦与来源恢复', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const id = session(testInfo)
     await page.addInitScript(key => localStorage.setItem(key, 'true'), DATA_VISIBILITY_STORAGE_KEY)
-    await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': id })
+    await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': id })
     await reset(page.context().request, id, 'construction')
     await reset(page.context().request, id, 'subcontract')
   })
 
   test('施工补充协议从列表进入、稳定聚焦并恢复筛选、滚动与原合同焦点', async ({ page }) => {
+    const sessionResponse = await page.request.get('/api/read/business-session')
+    expect(sessionResponse.ok(), await sessionResponse.text()).toBe(true)
+    const { workspaceId, actorId } = await sessionResponse.json()
+    const projectResponse = await page.request.post('/api/commands/projects', { data: {
+      workspaceId,
+      actorId,
+      requiredCapability: 'project:write',
+      commandId: randomUUID(),
+      baseVersion: null,
+      action: 'draft',
+      draft: { name: '补充协议滚动验收项目', status: '筹备中' },
+      attachments: {},
+    } })
+    expect(projectResponse.ok(), await projectResponse.text()).toBe(true)
+    const { id: projectId } = await projectResponse.json()
+    for (const input of [
+      { label: '01', date: '2026-09-12', amount: 100 },
+      { label: '02', date: '2028-02-29', amount: 125.5 },
+      { label: '03', date: '2026-09-13', amount: 250 },
+      { label: '04', date: '2026-09-14', amount: 500 },
+      { label: '05', date: '2026-09-15', amount: 750 },
+      { label: '06', date: '2026-09-16', amount: 1000 },
+    ]) {
+      const response = await page.request.post('/api/commands/construction-contracts', { data: {
+        workspaceId,
+        actorId,
+        requiredCapability: 'construction-contract:write',
+        commandId: randomUUID(),
+        baseVersion: null,
+        action: 'draft',
+        draft: { name: `合和新城滚动合同${input.label}`, projectId, signDate: input.date, amount: input.amount },
+        attachments: {},
+      } })
+      expect(response.ok(), await response.text()).toBe(true)
+      expect((await response.json()).id).toBeTruthy()
+    }
     await page.setViewportSize({ width: 390, height: 420 })
     await page.goto('/contract/construction?search=合和新城&pageSize=20')
     const contractLink = page.getByRole('link', { name: '合和新城施工总承包合同', exact: true })
@@ -91,7 +128,7 @@ test.describe('Issue #322：补充协议稳定聚焦与来源恢复', () => {
     await expect(page.getByText('补充协议与分包合同不匹配')).toBeVisible({ timeout: 20_000 })
 
     await page.goto('/contract/con_demo_fb01?origin=demo&contractKind=subcontract&tab=changes&focus=supplement-missing')
-    await expect(page.getByText('补充协议不存在或已删除')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('聚焦的分包合同事实不存在或已删除')).toBeVisible({ timeout: 20_000 })
 
     await page.goto('/contract/con_demo_sg01?origin=demo&contractKind=construction&tab=supplements&focus=%00')
     await expect(page.getByText('施工合同详情查询参数无效')).toBeVisible({ timeout: 20_000 })

@@ -25,6 +25,20 @@ test('Issue #419：十五类单据列表均保留紧凑工具与真实可操作�
   page.on('pageerror', error => errors.push(error.message))
   for (const list of lists) {
     await page.goto(list.path)
+    if (list.path === '/finance/receipt') {
+      await expect(page.getByRole('heading', { name: list.label, exact: true }).last()).toBeVisible()
+      await expect(page.getByRole('searchbox', { name: '查找收款', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '重新读取', exact: true })).toBeVisible()
+      await expect(page.getByRole('link', { name: '新增收款', exact: true })).toHaveAttribute('href', /^\/finance\/receipt\/new\?origin=real&returnTo=/)
+      await expect(page.getByRole('combobox', { name: '筛选项目', exact: true })).toHaveValue('')
+      const status = page.getByRole('combobox', { name: '筛选状态', exact: true })
+      await status.click()
+      await expect(page.getByRole('option', { name: '草稿', exact: true })).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(status).toBeFocused()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440)
+      continue
+    }
     const toolbar = page.getByLabel('单据列表工具栏')
     await expect(toolbar.getByRole('heading', { name: list.label, exact: true })).toBeVisible()
     expect((await toolbar.boundingBox())!.height).toBeLessThanOrEqual(32)

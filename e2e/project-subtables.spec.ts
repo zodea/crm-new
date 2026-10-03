@@ -1,42 +1,41 @@
 import { expect, test } from '@playwright/test'
+import { installProjectCentralFixture } from './helpers/project-central-fixture'
 
-test('项目详情十页签读取 SQLite 且不再显示待建设占位卡', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', error => pageErrors.push(error.message))
+// 旧本地子表取数、归档范围与金额的正向覆盖保留在 tests/project/subtables.test.ts、
+// tests/project/detail-aggregate.test.ts、tests/project/finance-facts.test.ts。
+// 当前项目商务卡片进入各领域中央列表，不再要求本地十页签或固定演示金额。
+const JOURNEYS = [
+  { name: '甲方变洽签', path: '/owner/change', kind: 'change' },
+  { name: '月度报量', path: '/owner/report', kind: 'report' },
+  { name: '竣工验收', path: '/owner/acceptance', kind: 'acceptance', variant: 'acceptance' },
+  { name: '保修管理', path: '/owner/acceptance', kind: 'warranty', variant: 'warranty' },
+  { name: '最终结算', path: '/owner/final-settlement', kind: 'final-settlement' },
+  { name: '甲方罚扣', path: '/owner/penalty', kind: 'penalty' },
+  { name: '项目罚扣', path: '/project/penalty', kind: 'project-penalty' },
+  { name: '分包结算', path: '/subcontract/settlement', kind: 'sub-settlement' },
+  { name: '分包变洽签', path: '/subcontract/change', kind: 'sub-change' },
+] as const
 
-  await page.goto('/project/proj_demo_001')
-  await page.waitForLoadState('networkidle')
-  const contentTabs = page.getByRole('main')
+for (const journey of JOURNEYS) {
+  test(`项目商务 ${journey.name}：中央目标保留项目、来源与返回锚点`, async ({ page }) => {
+    const fixture = await installProjectCentralFixture(page)
+    await fixture.open()
+    const section = page.getByRole('region', { name: /^项目商务单据/ })
+    const link = section.getByRole('link', { name: new RegExp(`^${journey.name}\\s`) })
+    await expect(link).toBeVisible()
+    const target = new URL((await link.getAttribute('href'))!, page.url())
+    expect(target.pathname).toBe(journey.path)
+    expect(target.searchParams.get('projectId')).toBe(fixture.id)
+    expect(target.searchParams.get('origin')).toBe('real')
+    expect(target.searchParams.get('variant')).toBe('variant' in journey ? journey.variant : null)
+    const returnTo = new URL(target.searchParams.get('returnTo')!, page.url())
+    expect(returnTo.pathname).toBe(`/project/${fixture.id}`)
+    expect(returnTo.searchParams.get('origin')).toBe('real')
+    expect(returnTo.searchParams.get('ownerJourney')).toBeTruthy()
+    expect(returnTo.hash).toBe(`#project-owner-document-card-${journey.kind}`)
 
-  await expect(page.getByRole('heading', { name: '基础信息' })).toBeVisible()
-  await expect(page.getByText('HHXC-01', { exact: true })).toBeVisible()
-
-  await contentTabs.getByRole('tab', { name: '施工合同管理', exact: true }).click()
-  const construction = page.getByRole('region', { name: '施工合同' })
-  await expect(construction.getByText('合和新城施工总承包合同', { exact: true })).toBeVisible()
-  await expect(construction.getByText('¥32,388,422.00', { exact: true }).first()).toBeVisible()
-  await expect(construction.getByText('含税合同金额合计')).toContainText('¥32,388,422.00')
-  await construction.getByRole('searchbox', { name: '搜索施工合同' }).fill('总承包')
-  await expect(construction.getByText('施工合同（1）', { exact: true })).toBeVisible()
-  await construction.getByRole('searchbox', { name: '搜索施工合同' }).fill('不存在的合同')
-  await expect(construction.getByText('施工合同（0）', { exact: true })).toBeVisible()
-  await expect(construction.getByText('¥0.00', { exact: true })).toBeVisible()
-  await construction.getByRole('searchbox', { name: '搜索施工合同' }).fill('')
-  await expect(page.getByRole('region', { name: '补充协议' }).getByText('¥320,000.00', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('region', { name: '甲方变洽签' }).getByText('¥120,000.00', { exact: true }).first()).toBeVisible()
-
-  await contentTabs.getByRole('tab', { name: '票税管理', exact: true }).click()
-  const outgoing = page.getByRole('region', { name: '开票申请' })
-  await expect(outgoing.getByText('2026年6月进度开票申请', { exact: true })).toBeVisible()
-  await expect(outgoing.getByText('¥25,663,629.00', { exact: true }).first()).toBeVisible()
-
-  await contentTabs.getByRole('tab', { name: '资金管理', exact: true }).click()
-  await expect(page.getByRole('region', { name: '收款登记' }).getByText('¥25,367,027.00', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('region', { name: '付款申请' }).getByText('¥4,200,000.00', { exact: true }).first()).toBeVisible()
-
-  await contentTabs.getByRole('tab', { name: '竣工验收及保修', exact: true }).click()
-  await expect(page.getByRole('region', { name: '竣工验收与保修', exact: true })).toBeVisible()
-  await expect(page.getByText('待建设', { exact: true })).toHaveCount(0)
-
-  expect(pageErrors, '子表页签旅程不应产生客户端运行错误').toEqual([])
-})
+    await link.click()
+    await expect(page).toHaveURL(target.href)
+    expect(fixture.errors).toEqual([])
+  })
+}

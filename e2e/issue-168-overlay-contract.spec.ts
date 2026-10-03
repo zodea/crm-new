@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 test.describe('Issue #168：浮层组合契约扩展底座', () => {
   test('模态期间锁定应用工作区，嵌套关闭后不提前解锁', async ({ page }) => {
     await page.setViewportSize({ width: 1740, height: 974 })
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await installQuantityProductionFixture(page)
 
     const trigger = page.getByRole('button', { name: '责任配置', exact: true })
     const workspace = page.locator('[data-shell-workspace]')

@@ -15,7 +15,7 @@ const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, act
 async function prepare(source: CoreMigrationSourceDTO) {
   await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('budget-preflight'), source, backup: null }), session)
   const hash = 'd'.repeat(64)
-  return coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('budget-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 412, createdAt: new Date().toISOString(), immutable: true } }), session)
+  return coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('budget-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 412, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
 }
 afterEach(async () => {
   await quantityTestInstance.reset()

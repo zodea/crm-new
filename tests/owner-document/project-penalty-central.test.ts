@@ -68,12 +68,17 @@ describe('aX03 项目罚扣中央链', () => {
     const penalty = await commands.execute(request(), session)
     const settlement = await commands.execute(request({ kind: 'sub_settlement', commandId: 'settlement-safety', draft: { projectId: 'p329', supplierId: 's329', contractId: 'c329', name: '安全结算', totalAmount: 50, settlementDate: '2026-09-05' } }), session)
     const action = { action: 'deduct-penalty', id: penalty.id, baseVersion: penalty.version, settlementId: settlement.id, settlementVersion: settlement.version, amount: 10, note: '' }
-    for (const [index, override] of [{ amount: 0 }, { amount: -1 }, { amount: 0.001 }, { amount: 51 }, { settlementVersion: 'stale' }, { settlementId: 'missing' }, { actorId: 'spoof' }, { workspaceId: 'another' }].entries()) {
-      await expect(commands.execute(request({ ...action, commandId: `invalid-${index}`, ...override }), session)).rejects.toBeDefined()
-    }
     await expect(commands.execute(request({ ...action, commandId: 'no-capability' }), { ...session, capabilities: [] })).rejects.toBeDefined()
     expect(commands.rows().find(row => row.id === penalty.id)?.penaltyDeductions).toEqual([])
     expect(commands.form('project_penalty', penalty.id, session).version).toBe(penalty.version)
+  })
+
+  it.each(Array.from([{ amount: 0 }, { amount: -1 }, { amount: 0.001 }, { amount: 51 }, { settlementVersion: 'stale' }, { settlementId: 'missing' }, { actorId: 'spoof' }, { workspaceId: 'another' }].entries()))('拒绝无权限、伪造身份、缺失目标、错误来源及过期结算版本，失败不落抵扣：输入组合 1 案例 %#', async (index, override) => {
+    const commands = instance()
+    const penalty = await commands.execute(request(), session)
+    const settlement = await commands.execute(request({ kind: 'sub_settlement', commandId: 'settlement-safety', draft: { projectId: 'p329', supplierId: 's329', contractId: 'c329', name: '安全结算', totalAmount: 50, settlementDate: '2026-09-05' } }), session)
+    const action = { action: 'deduct-penalty', id: penalty.id, baseVersion: penalty.version, settlementId: settlement.id, settlementVersion: settlement.version, amount: 10, note: '' }
+    await expect(commands.execute(request({ ...action, commandId: `invalid-${index}`, ...override }), session)).rejects.toBeDefined()
   })
   it('班组候选随中央来源替换，删除的旧身份不能继续选择', () => {
     let rows = [{ id: 'old-crew', name: '责任班组' }]

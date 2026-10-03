@@ -37,6 +37,39 @@ async function insertSeed(db: TestDb, table: string) {
 }
 
 describe('project detail SQL aggregates', () => {
+  it('普通收款按有效登记事实汇总，草稿、作废和软删不进入项目收款', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      await db.execute(`INSERT INTO projects (id, name) VALUES ('receipt-project', '收款项目')`)
+      for (const [index, status] of ['draft', '草稿', 'void', '作废', '已作废'].entries()) {
+        await db.execute(`
+          INSERT INTO receipt_registrations (id, project_id, amount, status)
+          VALUES (?, 'receipt-project', 100, ?)
+        `, [`excluded-receipt-${index}`, status])
+      }
+      await db.execute(`
+        INSERT INTO receipt_registrations (id, project_id, amount, status, deleted_at)
+        VALUES
+          ('submitted-receipt', 'receipt-project', 50, 'submitted', NULL),
+          ('historical-receipt', 'receipt-project', 25, '', NULL),
+          ('received-receipt', 'receipt-project', 25, '已收款', NULL),
+          ('deleted-receipt', 'receipt-project', 200, 'submitted', '2026-10-02T00:00:00.000Z')
+      `)
+
+      const [aggregate] = await loadProjectDetailAggregates(db)
+
+      expect(aggregate).toMatchObject({
+        projectId: 'receipt-project',
+        projectReceipt: 100,
+        availableBalance: 100,
+      })
+    }
+    finally {
+      db.close()
+    }
+  })
+
   it('aggregates operation and output invoice values in SQLite', async () => {
     const db = await createMemoryDb()
     await runMigrations(db)

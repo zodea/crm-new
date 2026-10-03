@@ -3,9 +3,10 @@ import type {
   ContractAuxListKind,
   ContractAuxRow,
 } from '~/lib/contract/aux-list'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import {
   CONTRACT_AUX_LIST_CONFIG,
-  contractAuxStatusClass,
+  contractAuxStatusTone,
   filterContractAuxRows,
 } from '~/lib/contract/aux-list'
 import { F2_FORM_META, formPath } from '~/lib/contract/page'
@@ -351,9 +352,9 @@ onActivated(() => {
           <span v-else>—</span>
         </template>
         <template #status="{ row }">
-          <span class="chip" :class="contractAuxStatusClass(row.status)">
+          <KitStatusTag :tone="contractAuxStatusTone(row.status)">
             {{ row.status }}
-          </span>
+          </KitStatusTag>
         </template>
         <template #action="{ row }">
           <RowActionMenu

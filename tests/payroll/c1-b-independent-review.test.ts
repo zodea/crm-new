@@ -49,7 +49,7 @@ it.each(['frozen-lines', 'frozen-leader', 'frozen-month', 'deleted-source-link',
     const bytes = db.raw.export()
     const hash = createHash('sha256').update(bytes).digest('hex')
     await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('review-preflight'), source, backup: null }), session)
-    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('review-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: bytes.length, createdAt: new Date().toISOString(), immutable: true } }), session)
+    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('review-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
     await coreMigrationTestInstance.importBatch({ ...envelope('review-import'), batchId: batch.batchId }, session)
     await coreMigrationTestInstance.confirm({ ...envelope('review-confirm'), batchId: batch.batchId }, session)
     const authority = coreMigrationTestInstance.snapshot(session)

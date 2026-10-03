@@ -1,7 +1,7 @@
 import type { Download, Page, TestInfo } from '@playwright/test'
 import type { ProjectSupplierWorkbenchReadDTO } from '../app/lib/project-supplier/read-contract'
 import { Buffer } from 'node:buffer'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { cooperationPdfFixture } from '../tests/project-supplier/pdf-fixture'
 import { updateProductionSnapshot } from './helpers/browser-production-snapshot'
@@ -46,7 +46,7 @@ async function appendFiles(page: Page, targetSupplier: string, files: Array<{ na
     workspaceId: context.workspaceId,
     actorId: context.actorId,
     requiredCapability: 'project-supplier:write',
-    commandId: `files-${Date.now()}`,
+    commandId: randomUUID(),
     baseVersion: context.sourceVersion,
     groups: [{ supplierId: targetSupplier, supplierName: supplier.name, files: files.map(file => ({
       fileName: file.name,

@@ -4,7 +4,7 @@ import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import { useContractFormNavigation } from '~/composables/useContractFormNavigation'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
-import { F2_FORM_META, f2FormDefaults } from '~/lib/contract/page'
+import { contractSupplierSelectionPatch, F2_FORM_META, f2FormDefaults } from '~/lib/contract/page'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/repository'
 import { MaterialContractCommandConflictError, useMaterialContractCommandStore } from '~/stores/material-contract-command'
 
@@ -41,7 +41,7 @@ const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = ref(true)
 const savedSnapshot = shallowRef('')
 const context = shallowRef<Awaited<ReturnType<typeof store.hydrate>>['context'] | null>(null)
-const lineItemsEditor = useTemplateRef<{ validate: () => { row: number, key: string }[] }>('lineItemsEditor')
+const lineItemsEditor = useTemplateRef<{ validate: () => { row: number, key: string }[], $el: HTMLElement }>('lineItemsEditor')
 
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value || attachmentDirty.value)
 const pageState = computed(() => loading.value ? 'loading' : loadError.value ? 'error' : 'ready')
@@ -87,7 +87,7 @@ async function initialize(targetId = routeId.value) {
 }
 
 function patchDraft(patch: Partial<ProjectContractFormDraft>) {
-  draft.value = { ...draft.value, ...patch }
+  draft.value = { ...draft.value, ...contractSupplierSelectionPatch(draft.value, patch, context.value?.suppliers ?? []) }
 }
 
 function clearFieldError(field: string) {
@@ -126,6 +126,8 @@ async function save(action: FormFooterAction) {
     return
   if (saveAction === 'submit' && (lineItemsEditor.value?.validate().length ?? 0) > 0) {
     warning('采购合同明细仍有必填项未填写')
+    await nextTick()
+    lineItemsEditor.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
     return
   }
   loadingAction.value = action

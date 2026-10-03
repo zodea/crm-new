@@ -1,10 +1,16 @@
 import type { PayrollActualRef } from '~/lib/payroll/central-actual-contract'
-import { expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createPayrollAdjustmentFixture } from '../helpers/payroll-adjustment-service-fixture'
 
-async function reversalCommand(f: Awaited<ReturnType<typeof createPayrollAdjustmentFixture>>, original: PayrollActualRef, key: string) {
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime('2026-09-15T00:00:00.000Z')
+})
+afterEach(() => vi.useRealTimers())
+
+async function reversalCommand(f: Awaited<ReturnType<typeof createPayrollAdjustmentFixture>>, original: PayrollActualRef, key: string, confirmedOn = '2026-09-15') {
   const target = { kind: 'recording-reversal' as const, draftKey: key, original }
-  const draft = { confirmedNotOccurred: true, confirmedOn: new Date().toISOString().slice(0, 10), evidenceNote: '经办人与负责人逐项核对，该记录所述事实不成立，保留原件追加纠错' }
+  const draft = { confirmedNotOccurred: true, confirmedOn, evidenceNote: '经办人与负责人逐项核对，该记录所述事实不成立，保留原件追加纠错' }
   const read = await f.service.actualReversalForm({ origin: 'real' }, { target, draft })
   return { commandId: key, workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, sourceVersion: read.context.sourceVersion, projectId: read.originalFact.projectId, target, action: { kind: 'confirm-recording-reversal' as const, reversal: draft } }
 }

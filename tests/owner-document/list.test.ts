@@ -55,11 +55,18 @@ const rows: OwnerDocumentListRecord[] = [
 ]
 
 describe('owner document list configuration', () => {
-  it('类型和状态多选遵循同字段并集、跨字段交集', () => {
+  describe('类型和状态多选遵循同字段并集、跨字段交集', () => {
     const query = { search: '', project: 'all', type: ['site_visa', 'change_negotiation'], statusView: ['approved', 'submitted'] }
-    expect(filterOwnerDocumentRows('owner_change', rows, query)).toHaveLength(2)
-    expect(filterOwnerDocumentRows('owner_change', rows, { ...query, type: ['site_visa'] }).map(row => row.id)).toEqual(['change-1'])
-    expect(filterOwnerDocumentRows('owner_change', rows, { ...query, type: [], statusView: [] })).toHaveLength(2)
+    it('关联事实保持原契约', () => {
+      expect(filterOwnerDocumentRows('owner_change', rows, { ...query, type: ['site_visa'] }).map(row => row.id)).toEqual(['change-1'])
+    })
+
+    it.each([
+      { case: '\'owner_change\' / rows / query', input: 'owner_change', argument2: rows, argument3: query, expected: 2 },
+      { case: '\'owner_change\' / rows / { ...query, type: [], statusView: [] }', input: 'owner_change', argument2: rows, argument3: { ...query, type: [], statusView: [] }, expected: 2 },
+    ])('filterOwnerDocumentRows：$case', ({ input, argument2, argument3, expected }) => {
+      expect(filterOwnerDocumentRows(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toHaveLength(expected)
+    })
   })
   it('分包付款余额只出现在分包结算列表，甲方最终结算保持原业务列', () => {
     const paymentFields = ['deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid']
@@ -91,62 +98,81 @@ describe('owner document list configuration', () => {
       .toEqual(expect.arrayContaining(['合同估算', '验收结论', '附件']))
   })
 
-  it('按搜索、项目、类型、状态与来源 query 共同收窄真实 ID', () => {
-    expect(filterOwnerDocumentRows('owner_change', rows, {
+  it.each([
+    { case: '\'owner_change\' / rows / { search: \'地下室\', project: \'project-1\', type: \'site_visa\', statusView: \'approved\', routeProject: \'proj', input: 'owner_change', argument2: rows, argument3: {
       search: '地下室',
       project: 'project-1',
       type: 'site_visa',
       statusView: 'approved',
       routeProject: 'project-1',
       routeContract: 'contract-1',
-    })).toEqual([rows[0]])
-
-    expect(filterOwnerDocumentRows('owner_change', rows, {
+    }, expected: [rows[0]] },
+    { case: '\'owner_change\' / rows / { search: \'施工合同\', project: \'all\', type: \'all\', statusView: \'submitted\', routeProject: \'project-1\', }', input: 'owner_change', argument2: rows, argument3: {
       search: '施工合同',
       project: 'all',
       type: 'all',
       statusView: 'submitted',
       routeProject: 'project-1',
-    })).toEqual([])
+    }, expected: [] },
+  ])('按搜索、项目、类型、状态与来源 query 共同收窄真实 ID / filterOwnerDocumentRows：$case', ({ input, argument2, argument3, expected }) => {
+    expect(filterOwnerDocumentRows(input, argument2, argument3)).toEqual(expected)
   })
 
   it('按单据类型解释本地状态与类型，而不把英文存储值暴露给用户', () => {
-    expect(ownerDocumentStatusViewKey('owner_report', 'adjusted')).toBe('reported')
-    expect(ownerDocumentStatusLabelForList('owner_change', 'submitted')).toBe('已上报')
     expect(OWNER_DOCUMENT_LIST_CONFIG.owner_penalty.views).toEqual([
       { key: 'all', label: '全部' },
       { key: 'draft', label: '草稿' },
       { key: 'submitted', label: '已提交' },
     ])
-    expect(ownerDocumentStatusViewKey('owner_penalty', 'submitted')).toBe('submitted')
-    expect(ownerDocumentStatusLabelForList('owner_penalty', 'submitted')).toBe('已提交')
-    expect(ownerDocumentStatusLabelForList('acceptance', 'expired')).toBe('已到期')
-    expect(ownerDocumentStatusViewKey('project_penalty', 'draft')).toBe('draft')
-    expect(ownerDocumentStatusLabelForList('project_penalty', 'draft')).toBe('草稿')
-    expect(ownerDocumentStatusLabelForList('project_penalty', 'repairing')).toBe('整改中')
-    expect(ownerDocumentStatusLabelForList('project_penalty', 'repaired_self')).toBe('自行整改')
     expect(ownerDocumentStatusClass('sub_change', 'rejected')).toBe('chip-danger')
     expect(ownerDocumentTypeLabel('owner_change', 'site_visa')).toBe('现场签证')
   })
 
-  it('验收列表按 canonical 状态区分已验收与已到期', () => {
+  it.each([
+    { case: '\'owner_report\' / \'adjusted\'', input: 'owner_report', argument2: 'adjusted', expected: 'reported' },
+    { case: '\'owner_penalty\' / \'submitted\'', input: 'owner_penalty', argument2: 'submitted', expected: 'submitted' },
+    { case: '\'project_penalty\' / \'draft\'', input: 'project_penalty', argument2: 'draft', expected: 'draft' },
+  ])('按单据类型解释本地状态与类型，而不把英文存储值暴露给用户 / ownerDocumentStatusViewKey：$case', ({ input, argument2, expected }) => {
+    expect(ownerDocumentStatusViewKey(input, argument2)).toBe(expected)
+  })
+
+  it.each([
+    { case: '\'owner_change\' / \'submitted\'', input: 'owner_change', argument2: 'submitted', expected: '已上报' },
+    { case: '\'owner_penalty\' / \'submitted\'', input: 'owner_penalty', argument2: 'submitted', expected: '已提交' },
+    { case: '\'acceptance\' / \'expired\'', input: 'acceptance', argument2: 'expired', expected: '已到期' },
+    { case: '\'project_penalty\' / \'draft\'', input: 'project_penalty', argument2: 'draft', expected: '草稿' },
+    { case: '\'project_penalty\' / \'repairing\'', input: 'project_penalty', argument2: 'repairing', expected: '整改中' },
+    { case: '\'project_penalty\' / \'repaired_self\'', input: 'project_penalty', argument2: 'repaired_self', expected: '自行整改' },
+  ])('按单据类型解释本地状态与类型，而不把英文存储值暴露给用户 / ownerDocumentStatusLabelForList：$case', ({ input, argument2, expected }) => {
+    expect(ownerDocumentStatusLabelForList(input, argument2)).toBe(expected)
+  })
+
+  describe('验收列表按 canonical 状态区分已验收与已到期', () => {
     const accepted = { ...rows[0], id: 'acceptance-accepted', status: 'accepted' }
     const expired = { ...rows[0], id: 'acceptance-expired', status: 'expired' }
+    it.each([
+      { case: '\'acceptance\' / accepted.status', input: 'acceptance', argument2: accepted.status, expected: 'accepted' },
+      { case: '\'acceptance\' / expired.status', input: 'acceptance', argument2: expired.status, expected: 'expired' },
+    ])('ownerDocumentStatusViewKey：$case', ({ input, argument2, expected }) => {
+      expect(ownerDocumentStatusViewKey(structuredClone(input), structuredClone(argument2))).toBe(expected)
+    })
 
-    expect(ownerDocumentStatusViewKey('acceptance', accepted.status)).toBe('accepted')
-    expect(ownerDocumentStatusViewKey('acceptance', expired.status)).toBe('expired')
-    expect(filterOwnerDocumentRows('acceptance', [accepted, expired], {
-      search: '',
-      project: 'all',
-      type: 'all',
-      statusView: 'accepted',
-    })).toEqual([accepted])
-    expect(filterOwnerDocumentRows('acceptance', [accepted, expired], {
-      search: '',
-      project: 'all',
-      type: 'all',
-      statusView: 'expired',
-    })).toEqual([expired])
+    it.each([
+      { case: '\'acceptance\' / [accepted, expired] / { search: \'\', project: \'all\', type: \'all\', statusView: \'accepted\', }', input: 'acceptance', argument2: [accepted, expired], argument3: {
+        search: '',
+        project: 'all',
+        type: 'all',
+        statusView: 'accepted',
+      }, expected: [accepted] },
+      { case: '\'acceptance\' / [accepted, expired] / { search: \'\', project: \'all\', type: \'all\', statusView: \'expired\', }', input: 'acceptance', argument2: [accepted, expired], argument3: {
+        search: '',
+        project: 'all',
+        type: 'all',
+        statusView: 'expired',
+      }, expected: [expired] },
+    ])('filterOwnerDocumentRows：$case', ({ input, argument2, argument3, expected }) => {
+      expect(filterOwnerDocumentRows(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toEqual(expected)
+    })
   })
 
   it('甲方罚扣可按联系单编号搜索', () => {

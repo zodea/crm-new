@@ -20,9 +20,11 @@ test('真实冻结楼层范围在预览、XLSX及分页打印一致，不补断�
   const { source, snapshotSha256, byteLength } = JSON.parse(await readFile(output, 'utf8'))
   const session = await (await page.request.get('/api/read/business-session')).json()
   const envelope = () => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId: randomUUID(), requiredCapability: 'core:migration:write' })
+  const reset = await page.request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
+  expect(reset.ok(), await reset.text()).toBe(true)
   const preflight = await page.request.post('/api/migrations/core/preflight', { data: { ...envelope(), source, backup: null } })
   expect(preflight.ok(), await preflight.text()).toBe(true)
-  const dry = await page.request.post('/api/migrations/core/dry-run', { data: { ...envelope(), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: new Date().toISOString(), immutable: true } } })
+  const dry = await page.request.post('/api/migrations/core/dry-run', { data: { ...envelope(), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } } })
   expect(dry.ok(), await dry.text()).toBe(true)
   const batch: CoreMigrationBatchDTO = await dry.json()
   for (const action of ['import', 'confirm']) {

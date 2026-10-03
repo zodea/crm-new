@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
-import type { SupplierListSort } from '~/lib/supplier/repository'
+import type { SupplierListNumericField, SupplierListSort } from '~/lib/supplier/repository'
 
 defineProps<{
   loading: boolean
@@ -10,6 +10,7 @@ defineProps<{
   taxpayerOptions: { key: string, label: string }[]
   hasFilters: boolean
   canWrite: boolean
+  disabledNumericFields?: SupplierListNumericField[]
 }>()
 const emit = defineEmits<{ refresh: [], create: [], import: [], clear: [], resetView: [] }>()
 const search = defineModel<string>('search', { required: true })
@@ -19,6 +20,13 @@ const taxpayerType = defineModel<string[]>('taxpayerType', { required: true })
 const sort = defineModel<SupplierListSort>('sort', { required: true })
 const hiddenColumns = defineModel<string[]>('hiddenColumns', { required: true })
 const comfortable = defineModel<boolean>('comfortable', { required: true })
+const numericSortFields: { field: SupplierListNumericField, label: string }[] = [
+  { field: 'settlementAmount', label: '累计结算金额' },
+  { field: 'cumulativeContractAmount', label: '累计合同金额' },
+  { field: 'contractAmount', label: '有效合同额' },
+  { field: 'paymentAmount', label: '确认实付' },
+  { field: 'projectCount', label: '合作项目数' },
+]
 
 function toggleColumn(field: string) {
   hiddenColumns.value = hiddenColumns.value.includes(field)
@@ -48,16 +56,10 @@ function toggleColumn(field: string) {
               <option value="name-asc">名称升序</option>
               <option value="name-desc">名称降序</option>
               <option value="category-asc">类别升序</option>
-              <option value="settlementAmount-asc">累计结算金额升序</option>
-              <option value="settlementAmount-desc">累计结算金额降序</option>
-              <option value="cumulativeContractAmount-asc">累计合同金额升序</option>
-              <option value="cumulativeContractAmount-desc">累计合同金额降序</option>
-              <option value="contractAmount-asc">有效合同额升序</option>
-              <option value="contractAmount-desc">有效合同额降序</option>
-              <option value="paymentAmount-asc">确认实付升序</option>
-              <option value="paymentAmount-desc">确认实付降序</option>
-              <option value="projectCount-asc">合作项目数升序</option>
-              <option value="projectCount-desc">合作项目数降序</option>
+              <template v-for="item in numericSortFields" :key="item.field">
+                <option :value="`${item.field}-asc`" :disabled="disabledNumericFields?.includes(item.field)">{{ item.label }}升序{{ disabledNumericFields?.includes(item.field) ? '（尚未接入）' : '' }}</option>
+                <option :value="`${item.field}-desc`" :disabled="disabledNumericFields?.includes(item.field)">{{ item.label }}降序{{ disabledNumericFields?.includes(item.field) ? '（尚未接入）' : '' }}</option>
+              </template>
             </select>
           </label>
         </KitToolbarPopover>

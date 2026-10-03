@@ -5,8 +5,47 @@ import { CORE_MIGRATION_CONTRACT_VERSION, CORE_MIGRATION_SOURCE_MODE, CORE_MIGRA
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { prepareCoreMigrationCommandSources } from '../../server/utils/core-migration-preparation'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
+import { createBoqBuildingFixture } from '../helpers/boq-building-fixture'
 
 const snapshot: CoreMigrationSnapshotDTO = { authority: 'central', activeBatchId: 'batch-quantity', entities: [] }
+
+it('测试专用重置销毁默认合成清单更正，正常回滚仍保护原始来源及其他会话', async () => {
+  const fixture = await createBoqBuildingFixture()
+  const isolatedSession = 'reset-independent-owner'
+  try {
+    const current = fixture.core.snapshot(fixture.session)
+    fixture.owner.synchronizeMigrationSnapshot(current, isolatedSession)
+    const isolatedQuantity = await fixture.quantity.prepareMigrationSnapshot(current, isolatedSession)
+    isolatedQuantity.commit()
+    const independentOwner = fixture.owner.quantityBoqFacts(fixture.query.projectId, isolatedSession)
+    const independentBytes = await fixture.quantity.exportSnapshotBytes(isolatedSession)
+    const context = await fixture.service.read(fixture.query)
+    await fixture.service.execute({ ...fixture.query, workspaceId: context.workspaceId, actorId: context.actorId, requiredCapability: 'owner-document:write', commandId: 'reset-corrected-boq', sourceVersion: context.sourceVersion, lineId: 'q-boq', buildingId: context.buildings[0]!.id, reason: '合成清单的原始楼栋更正' })
+    await expect(fixture.core.rollback({ ...fixture.envelope('reset-protected-rollback'), batchId: fixture.batch.batchId }, fixture.session)).rejects.toThrow(/中央日常更正/)
+    expect(fixture.core.snapshot(fixture.session)).toEqual(current)
+
+    vi.doMock('../../server/utils/core-migration-test-instance', () => ({ coreMigrationTestInstance: fixture.core }))
+    vi.doMock('../../server/utils/owner-commercial-document-command-test-instance', () => ({ ownerCommercialDocumentCommandTestInstance: fixture.owner }))
+    vi.doMock('../../server/utils/quantity-runtime', () => ({ quantityTestInstance: fixture.quantity }))
+    vi.stubGlobal('defineEventHandler', (handler: (event: unknown) => unknown) => handler)
+    vi.stubGlobal('getHeader', () => '1')
+    vi.stubEnv('NODE_ENV', 'test')
+    const reset = (await import('../../server/api/testing/core-migration/reset.post')).default
+    await expect(reset({} as Parameters<typeof reset>[0])).resolves.toEqual({ authority: 'local', activeBatchId: null })
+    expect(fixture.core.snapshot(fixture.session)).toEqual({ authority: 'local', activeBatchId: null, entities: [] })
+    expect(fixture.owner.quantityBoqFacts(fixture.query.projectId).lines).toEqual([])
+    expect(fixture.owner.quantityBoqFacts(fixture.query.projectId, isolatedSession)).toEqual(independentOwner)
+    expect(await fixture.quantity.exportSnapshotBytes(isolatedSession)).toEqual(independentBytes)
+  }
+  finally {
+    vi.doUnmock('../../server/utils/core-migration-test-instance')
+    vi.doUnmock('../../server/utils/owner-commercial-document-command-test-instance')
+    vi.doUnmock('../../server/utils/quantity-runtime')
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+    await fixture.close()
+  }
+}, 30_000)
 
 async function appliedBatch(core: ReturnType<typeof createCoreMigrationTestInstance>) {
   const session = resolveBusinessSession()
@@ -19,7 +58,7 @@ async function appliedBatch(core: ReturnType<typeof createCoreMigrationTestInsta
   const source = { ...emptySource, sourceHash: createHash('sha256').update(coreMigrationSourceHashInput(emptySource)).digest('hex') }
   const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId, requiredCapability: 'core:migration:write' as const })
   await core.preflight({ ...envelope('preflight'), source, backup: null }, session)
-  const batch = await core.dryRun({ ...envelope('dry-run'), source, backup: { backupId: `core-migration-${source.sourceHash}-${'e'.repeat(64)}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: 'e'.repeat(64), byteLength: 442, createdAt: new Date().toISOString(), immutable: true } }, session)
+  const batch = await core.dryRun({ ...envelope('dry-run'), source, backup: { backupId: `core-migration-${source.sourceHash}-${'e'.repeat(64)}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: 'e'.repeat(64), byteLength: 442, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }, session)
   await core.importBatch({ ...envelope('import'), batchId: batch.batchId }, session)
   return { session, envelope, batch }
 }

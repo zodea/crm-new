@@ -18,11 +18,19 @@ describe('甲方商务单据返回上下文', () => {
     expect(ownerDocumentListNavigationStateFromQuery({ status: 'all' }, 'owner_change').status).toBe('all')
   })
   it('项目罚扣拒绝同 ID 的跨来源班组返回', () => {
-    expect(validateOwnerDocumentJourneyReturnTo('/base/crew/shared-id?origin=demo', 'project_penalty', 'real')).toBeNull()
-    expect(validateOwnerDocumentJourneyReturnTo('/base/crew/shared-id?origin=real', 'project_penalty', 'demo')).toBeNull()
     expect(validateOwnerDocumentJourneyReturnTo('/base/crew/shared-id?origin=real', 'project_penalty', 'real')).toBe('/base/crew/shared-id?origin=real')
   })
-  it('项目六类卡片来源按受限上下文恢复精确滚动位置', () => {
+
+  it.each([
+    { case: '\'/base/crew/shared-id?origin=demo\' / \'project_penalty\' / \'real\'', input: '/base/crew/shared-id?origin=demo', argument2: 'project_penalty', argument3: 'real' },
+    { case: '\'/base/crew/shared-id?origin=real\' / \'project_penalty\' / \'demo\'', input: '/base/crew/shared-id?origin=real', argument2: 'project_penalty', argument3: 'demo' },
+  ])('项目罚扣拒绝同 ID 的跨来源班组返回 / validateOwnerDocumentJourneyReturnTo：$case', ({ input, argument2, argument3 }) => {
+    expect(validateOwnerDocumentJourneyReturnTo(input, argument2, argument3)).toBeNull()
+  })
+  it.each([
+    { case: '原卡片', requestedCard: 'final-settlement', restored: true },
+    { case: '篡改卡片', requestedCard: 'penalty', restored: false },
+  ])('项目商务卡片按受限上下文恢复精确滚动位置：$case', ({ requestedCard, restored }) => {
     const returnTo = '/project/project-283?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement'
     const origin = createOwnerDocumentProjectReturnOrigin({
       contextId: 'origin_283_final',
@@ -33,17 +41,11 @@ describe('甲方商务单据返回上下文', () => {
     })
 
     expect(resolveOwnerDocumentProjectReturnOrigin({
-      returnTo,
+      returnTo: returnTo.replace('final-settlement', requestedCard),
       contextId: 'origin_283_final',
       now: 1500,
       load: () => origin,
-    })).toEqual(origin)
-    expect(resolveOwnerDocumentProjectReturnOrigin({
-      returnTo: returnTo.replace('final-settlement', 'penalty'),
-      contextId: 'origin_283_final',
-      now: 1500,
-      load: () => origin,
-    })).toBeNull()
+    })).toEqual(restored ? origin : null)
   })
 
   it('分包变洽签沿用受限列表、项目卡片与分包合同返回链', () => {
@@ -66,17 +68,28 @@ describe('甲方商务单据返回上下文', () => {
     expect(validateOwnerDocumentJourneyReturnTo(contract.replace('origin=real', 'origin=demo'), 'sub_change', 'real')).toBeNull()
   })
 
-  it('按单据领域隔离合同来源，并允许分包变洽签返回匹配分供方详情', () => {
+  describe('按单据领域隔离合同来源，并允许分包变洽签返回匹配分供方详情', () => {
     const construction = '/contract/construction-327?origin=real&contractKind=construction&tab=changes'
     const subcontract = '/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes'
     const supplier = '/base/supplier/supplier-327?origin=real'
+    it('关联事实保持原契约', () => {
+      expect(validateOwnerDocumentJourneyReturnTo(supplier, 'sub_change', 'real')).toBe(supplier)
+    })
 
-    expect(validateOwnerDocumentJourneyReturnTo(subcontract, 'owner_change', 'real')).toBeNull()
-    expect(validateOwnerDocumentJourneyReturnTo(construction, 'sub_change', 'real')).toBeNull()
-    expect(validateOwnerDocumentJourneyReturnTo(supplier, 'sub_change', 'real')).toBe(supplier)
-    expect(validateOwnerDocumentJourneyReturnTo(supplier, 'owner_change', 'real')).toBeNull()
-    expect(ownerDocumentListNavigationStateFromQuery({ returnTo: subcontract }, 'owner_change').returnTo).toBeNull()
-    expect(ownerDocumentListNavigationStateFromQuery({ returnTo: construction }, 'sub_change').returnTo).toBeNull()
+    it.each([
+      { case: '{ returnTo: subcontract } / \'owner_change\'', input: { returnTo: subcontract }, argument2: 'owner_change' },
+      { case: '{ returnTo: construction } / \'sub_change\'', input: { returnTo: construction }, argument2: 'sub_change' },
+    ])('关联事实保持原契约 / ownerDocumentListNavigationStateFromQuery：$case', ({ input, argument2 }) => {
+      expect(ownerDocumentListNavigationStateFromQuery(input, argument2).returnTo).toBeNull()
+    })
+
+    it.each([
+      { case: 'subcontract / \'owner_change\' / \'real\'', input: subcontract, argument2: 'owner_change', argument3: 'real' },
+      { case: 'construction / \'sub_change\' / \'real\'', input: construction, argument2: 'sub_change', argument3: 'real' },
+      { case: 'supplier / \'owner_change\' / \'real\'', input: supplier, argument2: 'owner_change', argument3: 'real' },
+    ])('validateOwnerDocumentJourneyReturnTo：$case', ({ input, argument2, argument3 }) => {
+      expect(validateOwnerDocumentJourneyReturnTo(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toBeNull()
+    })
   })
 
   it('白名单化列表筛选、分页、行锚点与滚动位置', () => {
@@ -113,23 +126,47 @@ describe('甲方商务单据返回上下文', () => {
     })).toEqual({ to: origin.returnTo, origin })
   })
 
-  it('表单和关系下钻只接受同来源的稳定单据详情返回链', () => {
+  describe('表单和关系下钻只接受同来源的稳定单据详情返回链', () => {
     const detail = '/owner/report/report-323?origin=real&returnTo=%2Fproject%2Fproject-323%3Forigin%3Dreal'
-    expect(validateOwnerDocumentDetailReturnTo(detail, 'real')).toBe(detail)
-    expect(validateOwnerDocumentDetailReturnTo(detail, 'real', 'sub_change')).toBeNull()
-    expect(validateOwnerDocumentDetailReturnTo('/subcontract/change/sub-change-327?origin=real', 'real', 'owner_report')).toBeNull()
-    expect(validateOwnerDocumentDetailReturnTo(detail, 'demo')).toBeNull()
-    expect(validateOwnerDocumentDetailReturnTo('/owner/report/%2F?origin=real', 'real')).toBeNull()
+    it('关联事实保持原契约', () => {
+      expect(validateOwnerDocumentDetailReturnTo(detail, 'real')).toBe(detail)
+    })
+
+    it.each([
+      { case: 'detail / \'real\' / \'sub_change\'', input: detail, argument2: 'real', argument3: 'sub_change' },
+      { case: 'detail / \'demo\'', input: detail, argument2: 'demo', argument3: undefined },
+    ])('validateOwnerDocumentDetailReturnTo：$case', ({ input, argument2, argument3 }) => {
+      expect(validateOwnerDocumentDetailReturnTo(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toBeNull()
+    })
   })
 
-  it('允许同来源施工合同详情或项目详情返回，拒绝外链与跨来源链', () => {
+  it.each([
+    { case: '\'/subcontract/change/sub-change-327?origin=real\' / \'real\' / \'owner_report\'', input: '/subcontract/change/sub-change-327?origin=real', argument2: 'real', argument3: 'owner_report' },
+    { case: '\'/owner/report/%2F?origin=real\' / \'real\'', input: '/owner/report/%2F?origin=real', argument2: 'real', argument3: undefined },
+  ])('表单和关系下钻只接受同来源的稳定单据详情返回链 / validateOwnerDocumentDetailReturnTo：$case', ({ input, argument2, argument3 }) => {
+    expect(validateOwnerDocumentDetailReturnTo(input, argument2, argument3)).toBeNull()
+  })
+
+  describe('允许同来源施工合同详情或项目详情返回，拒绝外链与跨来源链', () => {
     const contract = '/contract/contract-323?origin=real&contractKind=construction&tab=changes'
     const project = '/project/project-323?origin=real'
-    expect(validateOwnerDocumentJourneyReturnTo(contract, 'owner_change', 'real')).toBe(contract)
-    expect(validateOwnerDocumentJourneyReturnTo(project, 'owner_report', 'real')).toBe(project)
-    expect(validateOwnerDocumentJourneyReturnTo(contract, 'owner_change', 'demo')).toBeNull()
-    expect(validateOwnerDocumentJourneyReturnTo('https://evil.example/owner/change', 'owner_change', 'real')).toBeNull()
-    expect(validateOwnerDocumentListReturnTo('/owner/report?nav=origin_323#owner-document-row-real%3Areport-1', 'owner_change', 'real')).toBeNull()
+    it('关联事实保持原契约', () => {
+      expect(validateOwnerDocumentListReturnTo('/owner/report?nav=origin_323#owner-document-row-real%3Areport-1', 'owner_change', 'real')).toBeNull()
+    })
+
+    it.each([
+      { case: 'contract / \'owner_change\' / \'real\'', input: contract, argument2: 'owner_change', argument3: 'real', expected: contract },
+      { case: 'project / \'owner_report\' / \'real\'', input: project, argument2: 'owner_report', argument3: 'real', expected: project },
+    ])('validateOwnerDocumentJourneyReturnTo：$case', ({ input, argument2, argument3, expected }) => {
+      expect(validateOwnerDocumentJourneyReturnTo(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toBe(expected)
+    })
+
+    it.each([
+      { case: 'contract / \'owner_change\' / \'demo\'', input: contract, argument2: 'owner_change', argument3: 'demo' },
+      { case: '\'https://evil.example/owner/change\' / \'owner_change\' / \'real\'', input: 'https://evil.example/owner/change', argument2: 'owner_change', argument3: 'real' },
+    ])('validateOwnerDocumentJourneyReturnTo：$case', ({ input, argument2, argument3 }) => {
+      expect(validateOwnerDocumentJourneyReturnTo(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toBeNull()
+    })
   })
 
   it('白名单化甲方罚扣列表与详情返回链', () => {

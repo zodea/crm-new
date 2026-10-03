@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { OwnerCommercialDocumentListPageDTO } from '~/lib/owner-document/central-repository'
 import type { ProjectDetailReadDTO } from '~/lib/project/repository'
-import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { resolveCustomerRelationReturnOrigin, validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
   createMaterialContractJourneyReturnOrigin,
@@ -25,7 +25,7 @@ import {
   saveOwnerDocumentReturnOrigin,
 } from '~/lib/owner-document/return-context'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
-import { PROJECT_STATUS_TONE } from '~/lib/project/status'
+import { projectStatusTone } from '~/lib/project/status'
 import { loadReceiptSourceOrigin, saveReceiptSourceOrigin } from '~/lib/receipt/return-context'
 import { yuan } from '~/lib/util/money'
 
@@ -50,6 +50,8 @@ const ownerDocumentRepository = useNuxtApp().$repositories.ownerCommercialDocume
 const commandStore = useProjectCommandStore()
 const projectSupplierCommandStore = useProjectSupplierCommandStore()
 const detail = shallowRef<ProjectDetailReadDTO | null>(null)
+const deleted = shallowRef<boolean | null>(null)
+const hasLifecycle = computed(() => detail.value?.capabilities.includes('project:lifecycle:write') === true)
 const state = shallowRef<'loading' | 'ready' | 'forbidden' | 'not-found' | 'mismatch' | 'error'>('loading')
 const problem = shallowRef<ProblemDTO | null>(null)
 const titleRef = useTemplateRef<HTMLHeadingElement>('titleRef')
@@ -326,17 +328,6 @@ async function loadOwnerJourneys() {
 
 useTabTitle(() => item.value?.project.label)
 
-const TONE_CHIP: Record<StatusTone, string> = {
-  warn: 'chip-warn',
-  brand: 'chip-brand',
-  muted: 'chip bg-surface-3 text-ink-faint',
-  ok: 'chip-ok',
-}
-const statusChipClass = computed(() => {
-  const tone = item.value ? PROJECT_STATUS_TONE[item.value.status] : undefined
-  return tone ? TONE_CHIP[tone] : 'chip-brand'
-})
-
 function refLabel(value: ProjectDetailReadDTO['item']['customer']): string {
   return value.state === 'resolved' ? value.label : ''
 }
@@ -489,7 +480,9 @@ onActivated(() => {
               {{ item.project.label }}
             </h2>
             <span class="chip bg-surface-3 text-ink-soft">项目信息</span>
-            <span class="chip" :class="statusChipClass">{{ item.status }}</span>
+            <KitStatusTag :tone="projectStatusTone(item.status)">
+              {{ item.status }}
+            </KitStatusTag>
             <span v-if="isDemo" class="chip chip-warn">测试数据</span>
           </div>
           <p class="m-0 mt-0.5 break-words text-11px leading-4 text-ink-soft">
@@ -498,7 +491,7 @@ onActivated(() => {
         </div>
         <ProjectReturnLink :to="effectiveReturnTo" :expires-at="effectiveReturnExpiresAt" :label="effectiveReturnLabel" class="ml-auto" />
         <NuxtLink
-          v-if="!isDemo && detail?.capabilities.includes('project:write')"
+          v-if="!isDemo && detail?.capabilities.includes('project:write') && (!hasLifecycle || deleted === false)"
           :to="`/project/form/${encodeURIComponent(projectId)}?origin=real`"
           class="btn-primary"
           aria-label="编辑项目"
@@ -563,6 +556,7 @@ onActivated(() => {
 
     <PayrollHostSection v-if="detail.payrollActual" :section="detail.payrollActual" :return-to="journeyReturnTo" @retry="loadProject" />
 
+    <ProjectStorageActions v-if="hasLifecycle" :project-id="projectId" @state="deleted = $event" />
     <section class="panel flex min-w-0 flex-wrap items-center justify-between gap-3 p-4" aria-label="项目收款">
       <div class="min-w-0">
         <SectionHeader title="项目收款" /><p class="mb-0 mt-2 text-12px text-ink-soft">

@@ -18,8 +18,11 @@ const hash = `scrypt$${salt}$${scryptSync(code, Buffer.from(salt, 'hex'), 64).to
 let server: Server
 let origin: string
 let sequence = 0
+const sessionStartedAt = Date.parse('2026-09-22T00:00:00.000Z')
 
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(sessionStartedAt)
   const app = createApp({ debug: false })
   app.use(middleware)
   app.use(defineEventHandler(async (event) => {
@@ -30,7 +33,7 @@ beforeEach(async () => {
       return loginHandler(event)
     if (path === '/api/auth/logout')
       return logoutProductionOwner(event)
-    const session = requireProductionBusinessSession(event)
+    const session = requireProductionBusinessSession(event, { touch: path !== '/api/production/backup/status' })
     if (event.method !== 'GET')
       await readBody(event)
     return session
@@ -78,17 +81,27 @@ async function login() {
 }
 
 describe('单人正式访问保护', () => {
+  it('后台备份状态轮询不续期，空闲过期后业务读取仍要求重新登录', async () => {
+    const cookie = await login()
+    vi.setSystemTime(sessionStartedAt + 29 * 60_000)
+    expect((await request('/api/production/backup/status', { cookie })).status).toBe(200)
+    vi.setSystemTime(sessionStartedAt + 31 * 60_000)
+    expect((await request('/api/read/customers', { cookie })).status).toBe(401)
+  })
+
   it('配置缺失或非回环入口停止处理；不会退回默认操作者', async () => {
     expect(() => resolveBusinessSession()).toThrow('正式业务必须')
-    for (const [name, value] of [['CRM_PUBLIC_ORIGIN', 'http://localhost:3100'], ['NITRO_HOST', '0.0.0.0'], ['CRM_ACCESS_CODE_HASH', ''], ['CRM_RUN_MODE', 'productoin']]) {
-      const previous = process.env[name!]
-      vi.stubEnv(name!, value)
-      expect((await request('/api/auth/status')).status).toBe(503)
-      vi.stubEnv(name!, previous)
-    }
     vi.stubEnv('CRM_RUN_MODE', 'development')
     expect(getProductionRuntimeConfig()).toBeNull()
     expect(resolveBusinessSession().actorId).toBe('actor-default')
+  })
+
+  it.each(Array.from([['CRM_PUBLIC_ORIGIN', 'http://localhost:3100'], ['NITRO_HOST', '0.0.0.0'], ['CRM_ACCESS_CODE_HASH', ''], ['CRM_RUN_MODE', 'productoin']]))('配置缺失或非回环入口停止处理；不会退回默认操作者：输入组合 1 案例 %#', async (name, value) => {
+    expect(() => resolveBusinessSession()).toThrow('正式业务必须')
+    const previous = process.env[name!]
+    vi.stubEnv(name!, value)
+    expect((await request('/api/auth/status')).status).toBe(503)
+    vi.stubEnv(name!, previous)
   })
 
   it('登录成功后服务端固定身份，退出和再次登录立即撤销旧会话', async () => {
@@ -96,7 +109,7 @@ describe('单人正式访问保护', () => {
     expect((await request('/api/auth/login', { method: 'POST', body: { accessCode: `${code}-wrong` } })).status).toBe(401)
     const first = await login()
     const session = await (await request('/api/read/business-session', { cookie: first, headers: { 'x-actor-id': 'forged' } })).json()
-    expect(session).toEqual({ workspaceId: process.env.CRM_WORKSPACE_ID, actorId: 'only-owner', capabilities: ['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write'] })
+    expect(session).toEqual({ workspaceId: process.env.CRM_WORKSPACE_ID, actorId: 'only-owner', capabilities: ['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', 'project:list:read', 'project:write', 'project:original:write', 'project:lifecycle:write', 'process-library:read', 'process-library:write', 'supplier:list:read', 'supplier:write', 'supplier:sensitive:read', 'supplier-credential:read', 'supplier-credential:write', 'supplier:persistent:write'] })
     const second = await login()
     expect((await request('/api/read/customers', { cookie: first })).status).toBe(401)
     expect((await request('/api/auth/logout', { method: 'POST', cookie: second })).status).toBe(200)
@@ -114,10 +127,6 @@ describe('单人正式访问保护', () => {
       req.end('{}')
     })
     expect(falseHost).toBe(403)
-    for (const headers of [{ Origin: 'https://example.com' }, { 'x-ruihang-test-session': 'fake' }, { 'x-forwarded-for': '127.0.0.1' }, { 'Sec-Fetch-Site': 'cross-site' }])
-      expect((await request('/api/commands/customers', { method: 'POST', cookie, body: {}, headers })).status, JSON.stringify(headers)).toBe(403)
-    for (const path of ['/api/read/payroll', '/api/testing/customers/reset', '/api/read/customers/bad/id'])
-      expect((await request(path, { cookie })).status).toBe(503)
     expect((await request('/api/read/customers?origin=demo', { cookie })).status).toBe(403)
     expect((await request('/api/read/customers?includeDemo=true', { cookie })).status).toBe(403)
     expect((await request('/api/read/customers?origin=all', { cookie })).status).toBe(403)
@@ -126,9 +135,36 @@ describe('单人正式访问保护', () => {
     expect((await request('/api/commands/customers/customer-123/lifecycle', { method: 'PUT', cookie, body: {} })).status).toBe(503)
   })
 
+  it.each(Array.from([{ Origin: 'https://example.com' }, { 'x-ruihang-test-session': 'fake' }, { 'x-forwarded-for': '127.0.0.1' }, { 'Sec-Fetch-Site': 'cross-site' }]).map(input => ({ input })))('跨站、假Host和测试/代理头不可突破，未接管API保持关闭：输入组合 1 案例 %#', async ({ input: headers }) => {
+    const cookie = await login()
+    const falseHost = await new Promise<number>((resolve, reject) => {
+      const req = rawRequest(`${origin}/api/commands/customers`, { method: 'POST', headers: { Host: 'evil.example', Cookie: cookie, Origin: origin } }, (response) => {
+        response.resume()
+        resolve(response.statusCode!)
+      })
+      req.on('error', reject)
+      req.end('{}')
+    })
+    expect(falseHost).toBe(403)
+    expect((await request('/api/commands/customers', { method: 'POST', cookie, body: {}, headers })).status, JSON.stringify(headers)).toBe(403)
+  })
+
+  it.each(Array.from(['/api/read/payroll', '/api/testing/customers/reset', '/api/read/customers/bad/id']).map(input => ({ input })))('跨站、假Host和测试/代理头不可突破，未接管API保持关闭：输入组合 2 案例 %#', async ({ input: path }) => {
+    const cookie = await login()
+    const falseHost = await new Promise<number>((resolve, reject) => {
+      const req = rawRequest(`${origin}/api/commands/customers`, { method: 'POST', headers: { Host: 'evil.example', Cookie: cookie, Origin: origin } }, (response) => {
+        response.resume()
+        resolve(response.statusCode!)
+      })
+      req.on('error', reject)
+      req.end('{}')
+    })
+    expect(falseHost).toBe(403)
+    expect((await request(path, { cookie })).status).toBe(503)
+  })
+
   it('只查状态不会延长空闲时间，身份配置改变后原会话失效', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    const start = Date.now()
+    const start = sessionStartedAt
     const cookie = await login()
     vi.setSystemTime(start + 29 * 60_000)
     expect(await (await request('/api/auth/status', { cookie })).json()).toMatchObject({ authenticated: true })
@@ -141,8 +177,7 @@ describe('单人正式访问保护', () => {
   })
 
   it('持续操作仍受八小时绝对期限约束；尝试过多受限且不回显访问码', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    const start = Date.now()
+    const start = sessionStartedAt
     const cookie = await login()
     for (let minutes = 29; minutes < 480; minutes += 29) {
       vi.setSystemTime(start + minutes * 60_000)

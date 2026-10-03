@@ -3,7 +3,6 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import * as XLSX from 'xlsx'
 import { payrollAdjustmentWorkspace } from './helpers/payroll-adjustment-workspace'
-import { payrollC2Workspace } from './helpers/payroll-c2-workspace'
 
 test.use({ actionTimeout: 15000 })
 const browserErrors: string[] = []
@@ -120,6 +119,7 @@ test('原工资独立更正、真退40、后月处理60与跨页同源冷读', a
   }
   await verifyPaymentAndReversal(page, info, f, refundId)
   await verifyBudgetReturn(page, info, f)
+  await verifyCorrectionLabelAndColdProject(page, info, f)
   expect(browserErrors.filter(error => error !== 'POST /api/commands/payroll-adjustment: net::ERR_FAILED' && !error.endsWith(': net::ERR_ABORTED'))).toEqual([])
   await writeFile(info.outputPath('verification.json'), JSON.stringify({ statementId: f.statementId, laterId, adjustmentId, originalCommand, projectId: f.projectId, originalSignature: 1000, refund: -40, laterActual: 940, net: 1900, remaining: 0, widths: [390, 768, 1024, 1280, 1440] }, null, 2))
 })
@@ -182,9 +182,8 @@ async function verifyPaymentAndReversal(page: Page, info: TestInfo, f: Awaited<R
   }
 }
 
-test('沿已确认原链核对纠正冲销的依据标题和项目冷回显', async ({ page }, info) => {
-  const f = await payrollC2Workspace(page, '2026-09')
-  const ledger = await f.repository.actualLedger({ origin: 'real' }, { projectId: f.project.id })
+async function verifyCorrectionLabelAndColdProject(page: Page, info: TestInfo, f: Awaited<ReturnType<typeof payrollAdjustmentWorkspace>>) {
+  const ledger = await f.repository.actualLedger(f.query, { projectId: f.projectId })
   expect(ledger.netAmount.value).toBe(1900)
   const reversal = ledger.rows.find(row => row.kind === 'recording-reversal')!
   expect(reversal.ref.kind).toBe('actual-event')
@@ -196,11 +195,12 @@ test('沿已确认原链核对纠正冲销的依据标题和项目冷回显', as
   await expect(page.getByText('请记录纠正原冲销的具名核查依据', { exact: true })).toBeVisible()
   await expect(page.getByText('请记录为什么确认这笔原收付未真实发生的具名核查依据', { exact: true })).toHaveCount(0)
   await capture(page, info, 'reversal-correction-label-final', '#section-proof')
-  await page.goto(`/subcontract/payroll/payments?${new URLSearchParams({ origin: 'real', project: f.project.id })}`)
-  await expect(page.getByRole('combobox')).toHaveValue(f.project.name)
+  await page.goto(`/subcontract/payroll/payments?${new URLSearchParams({ origin: 'real', project: f.projectId })}`)
+  await page.reload()
+  await expect(page.getByRole('combobox')).toHaveValue(/^C2 无工程量验收 /)
   await expect(page.getByRole('region', { name: '工资实际收付', exact: true })).toContainText('1,900.00')
   await capture(page, info, 'ledger-project-resolved-final')
-})
+}
 
 async function verifyBudgetReturn(page: Page, info: TestInfo, f: Awaited<ReturnType<typeof payrollAdjustmentWorkspace>>) {
   const id = await f.createBudget()

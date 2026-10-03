@@ -14,9 +14,14 @@ describe('敏感信息展示脱敏', () => {
   })
 
   it('空值保持为空，短值也至少隐藏一位', () => {
-    expect(maskMiddle('')).toBe('')
-    expect(maskMiddle(null)).toBe('')
     expect(maskPhone('1234567')).toBe('123 **** 567')
-    expect(maskMiddle('12')).toBe('**')
+  })
+
+  it.each([
+    { case: '\'\'', input: '', expected: '' },
+    { case: 'null', input: null, expected: '' },
+    { case: '\'12\'', input: '12', expected: '**' },
+  ])('空值保持为空，短值也至少隐藏一位 / maskMiddle：$case', ({ input, expected }) => {
+    expect(maskMiddle(input)).toBe(expected)
   })
 })

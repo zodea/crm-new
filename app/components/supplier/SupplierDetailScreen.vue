@@ -135,12 +135,15 @@ const subcontractChangesTo = computed(() => {
 })
 const tabs = computed(() => [
   { key: 'overview', label: '详细资料' },
-  { key: 'projects', label: '合作项目', count: detail.value?.projects.length ?? 0 },
-  { key: 'contracts', label: '支出合同', count: detail.value?.contracts.length ?? 0 },
-  { key: 'settlements', label: '支出结算', count: detail.value?.settlements.length ?? 0 },
-  { key: 'invoices', label: '收票登记', count: detail.value?.invoices.length ?? 0 },
-  { key: 'payments', label: '付款管理', count: detail.value?.payments.length ?? 0 },
+  { key: 'projects', label: '合作项目', count: unavailable('projects') ? undefined : detail.value?.projects.length ?? 0 },
+  { key: 'contracts', label: '支出合同', count: unavailable('contracts') ? undefined : detail.value?.contracts.length ?? 0 },
+  { key: 'settlements', label: '支出结算', count: unavailable('settlements') ? undefined : detail.value?.settlements.length ?? 0 },
+  { key: 'invoices', label: '收票登记', count: unavailable('invoices') ? undefined : detail.value?.invoices.length ?? 0 },
+  { key: 'payments', label: '付款管理', count: unavailable('payments') ? undefined : detail.value?.payments.length ?? 0 },
 ])
+function unavailable(tab: SupplierDetailTab) {
+  return tab !== 'overview' && detail.value?.unavailableSources?.includes(tab) === true
+}
 const overviewMetadata = computed(() => supplier.value
   ? [
       { label: '分供方类别', value: supplier.value.supplierCategory },
@@ -160,7 +163,7 @@ const recordFields = computed(() => supplier.value
   : [])
 const summaryRows = computed(() => detail.value
   ? [
-      { label: '合作项目', value: `${detail.value.summary.projectCount} 个`, tab: 'projects' as const, metric: null },
+      { label: '合作项目', value: detail.value.summary.projectCount === null ? '—' : `${detail.value.summary.projectCount} 个`, tab: 'projects' as const, metric: null },
       { label: '累计合同金额', value: yuan(detail.value.summary.contractAmount.value), tab: 'contracts' as const, metric: detail.value.summary.contractAmount },
       { label: '累计结算金额', value: yuan(detail.value.summary.settlementAmount.value), tab: 'settlements' as const, metric: detail.value.summary.settlementAmount },
       { label: '累计收票金额', value: yuan(detail.value.summary.invoiceAmount.value), tab: 'invoices' as const, metric: detail.value.summary.invoiceAmount },
@@ -188,7 +191,7 @@ function selectTab(value: string | undefined) {
 }
 
 function summaryClickable(row: { tab: SupplierFactTab | null, metric: MetricDTO | null }) {
-  return Boolean(row.tab && (row.metric === null || row.metric.drilldown))
+  return Boolean(row.tab && !unavailable(row.tab) && (row.metric === null || row.metric.drilldown))
 }
 
 async function selectSummaryTab(tab: SupplierFactTab | null) {
@@ -336,7 +339,8 @@ onActivated(() => void load())
       <StatePanel v-if="store.detailState.kind === 'error'" kind="error" title="刷新分供方详情失败" :description="store.detailState.problem.message" :action-label="store.detailState.problem.retryable ? '重新加载' : ''" compact @action="load" />
       <SupplierDetailOverview v-if="activeTab === 'overview'" :supplier="supplier" />
       <section v-else class="min-w-0 bg-panel p-3" :aria-label="tabs.find(tab => tab.key === activeTab)?.label">
-        <SupplierFactTable :tab="activeTab" :projects="detail.projects" :contracts="detail.contracts" :settlements="detail.settlements" :invoices="detail.invoices" :payments="detail.payments" />
+        <StatePanel v-if="unavailable(activeTab)" kind="empty" title="此项业务事实尚未接入" description="当前无法核对数量与金额，不能按零或没有记录理解。分供方主档及证照资料仍可查看。" compact />
+        <SupplierFactTable v-else :tab="activeTab" :projects="detail.projects" :contracts="detail.contracts" :settlements="detail.settlements" :invoices="detail.invoices" :payments="detail.payments" />
       </section>
     </div>
     <template v-if="supplier && detail" #aside>
@@ -360,7 +364,7 @@ onActivated(() => void load())
           </dl>
         </section>
         <ReadOnlySection title="档案信息" :fields="recordFields" />
-        <AuxiliaryContractJourney v-if="detail.dataOrigin === 'real'" :supplier-id="supplierId" />
+        <AuxiliaryContractJourney v-if="detail.dataOrigin === 'real' && !unavailable('contracts')" :supplier-id="supplierId" />
       </div>
     </template>
   </EntityDetailShell>

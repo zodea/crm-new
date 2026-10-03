@@ -73,7 +73,7 @@ function onPointerDownOutside(e: PointerDownOutsideEvent) {
       <DialogClose
         v-if="showClose !== false"
         aria-label="关闭"
-        class="absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-btn)] text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink focus:outline-none"
+        class="absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center border-0 rounded-[var(--radius-btn)] bg-transparent text-ink-faint outline-none cursor-pointer transition-colors hover:bg-surface-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-brand focus-visible:outline-offset-2"
       >
         <span class="i-lucide-x text-15px" />
       </DialogClose>

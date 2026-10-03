@@ -9,7 +9,10 @@ afterEach(async () => {
 })
 
 describe('真实户记录到工资扣款', () => {
-  it('公开检查19整改4后只列示15，明确启动后工资1000扣450并冻结现金550', async () => {
+  it.each([
+    { case: '重复当前原量', corruption: 'duplicate' },
+    { case: '跨项目当前原量', corruption: 'cross-project' },
+  ])('公开空鼓扣款流程冻结原金额，解码拒绝 $case', async ({ corruption }) => {
     const f = await createPayrollHollowFixture()
     closers.push(f.close)
     const initial = await f.form()
@@ -58,12 +61,12 @@ describe('真实户记录到工资扣款', () => {
     expect(frozenForm.hollow?.totals).toEqual(output.document.hollow?.totals)
     expect(decodePayrollARead(encodePayrollAWire(frozenForm), 'form', { origin: 'real' }, { statementId })).toEqual(frozenForm)
     interface HollowWire { hollow: { current: { rows: Array<{ fact: { location: { projectId: string } } }> } } }
-    const duplicateCurrent = structuredClone(encodePayrollAWire(frozenForm)) as HollowWire
-    duplicateCurrent.hollow.current.rows.push(structuredClone(duplicateCurrent.hollow.current.rows[0]!))
-    expect(() => decodePayrollARead(duplicateCurrent, 'form', { origin: 'real' }, { statementId })).toThrow()
-    const crossProjectCurrent = structuredClone(encodePayrollAWire(frozenForm)) as HollowWire
-    crossProjectCurrent.hollow.current.rows[0]!.fact.location.projectId = 'other-project'
-    expect(() => decodePayrollARead(crossProjectCurrent, 'form', { origin: 'real' }, { statementId })).toThrow()
+    const input = structuredClone(encodePayrollAWire(frozenForm)) as HollowWire
+    if (corruption === 'duplicate')
+      input.hollow.current.rows.push(structuredClone(input.hollow.current.rows[0]!))
+    else
+      input.hollow.current.rows[0]!.fact.location.projectId = 'other-project'
+    expect(() => decodePayrollARead(input, 'form', { origin: 'real' }, { statementId })).toThrow()
   }, 30_000)
 
   it('配置逐分项保留零价、关闭与缺价，原修订和配置回执不互相覆盖', async () => {

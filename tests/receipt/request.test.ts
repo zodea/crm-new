@@ -3,13 +3,11 @@ import { parseReceiptCommand } from '../../server/utils/receipt-command-request'
 import { command } from './fixtures'
 
 describe('收款 HTTP 写入边界', () => {
-  it('完整载荷按已声明字段解析，草稿缺值与明确零保持不同', () => {
+  it.each(([null, '0.00']).map(input => ({ input })))('完整载荷按已声明字段解析，草稿缺值与明确零保持不同：输入案例 %#', ({ input: amount }) => {
     expect(parseReceiptCommand(command())).toEqual(command())
-    for (const amount of [null, '0.00']) {
-      const request = command()
-      request.draft = { ...request.draft, amount, customerId: null, projectId: null }
-      expect(parseReceiptCommand(request).draft).toMatchObject({ amount, customerId: null, projectId: null })
-    }
+    const request = command()
+    request.draft = { ...request.draft, amount, customerId: null, projectId: null }
+    expect(parseReceiptCommand(request).draft).toMatchObject({ amount, customerId: null, projectId: null })
   })
 
   it.each([

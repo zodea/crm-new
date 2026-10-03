@@ -76,7 +76,7 @@ describe('工程量量差总表', () => {
       .toBe(232)
   })
 
-  it('待分摊签证只调整合同量，工资口径下按缺值暴露而不产生虚假结余', async () => {
+  it.each((['provisional', 'field'] as const).map(input => ({ input })))('待分摊签证只调整合同量，工资口径下按缺值暴露而不产生虚假结余：输入案例 %#', async ({ input: basis }) => {
     const facts = await loadQuantityVarianceFacts(db, 'proj_demo_001')
     const contractChange = buildQuantityVarianceRows(facts, 'contract')
       .find(row => row.buildingName === '待分摊签证')
@@ -87,13 +87,10 @@ describe('工程量量差总表', () => {
       differenceAmount: 0,
       basisStatus: 'complete',
     })
-
-    for (const basis of ['provisional', 'field'] as const) {
-      const change = buildQuantityVarianceRows(facts, basis)
-        .find(row => row.buildingName === '待分摊签证')
-      expect(change?.basisQty, basis).toBeNull()
-      expect(change?.differenceAmount, basis).toBeNull()
-    }
+    const change = buildQuantityVarianceRows(facts, basis)
+      .find(row => row.buildingName === '待分摊签证')
+    expect(change?.basisQty, basis).toBeNull()
+    expect(change?.differenceAmount, basis).toBeNull()
   })
 
   it('只采用已审批的最新价格变更，草稿变更不得进入金额口径', async () => {

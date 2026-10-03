@@ -31,21 +31,26 @@ const group = {
 } as ScheduleGroupView
 
 describe('排程下钻导航', () => {
-  it('按原工序往返时保留用户筛选，日期只作说明且不更换阶段身份', () => {
+  describe('按原工序往返时保留用户筛选，日期只作说明且不更换阶段身份', () => {
     const location = buildQuantityDrillLocation('schedule', group, task, 'real', { building: 'building-2', month: '2026-09', view: 'crew', trade: '防水工', assignee: 'crew:1' }) as { query: Record<string, string> }
     const context = parseScheduleDrillContext(location.query)!
-    expect(buildScheduleReturnLocation(context)).toMatchObject({ query: { building: 'building-2', month: '2026-09', view: 'crew', trade: '防水工', assignee: 'crew:1', stage: 'stage-1' } })
-    expect(parseScheduleDrillContext({ ...location.query, task: ['task-1', 'task-2'] })).toBeNull()
-    expect(parseScheduleDrillContext({ ...location.query, origin: 'invalid' })).toBeNull()
+    it('关联事实保持原契约', () => {
+      expect(buildScheduleReturnLocation(context)).toMatchObject({ query: { building: 'building-2', month: '2026-09', view: 'crew', trade: '防水工', assignee: 'crew:1', stage: 'stage-1' } })
+    })
+
+    it.each([
+      { case: '{ ...location.query, task: [\'task-1\', \'task-2\'] }', input: { ...location.query, task: ['task-1', 'task-2'] } },
+      { case: '{ ...location.query, origin: \'invalid\' }', input: { ...location.query, origin: 'invalid' } },
+    ])('parseScheduleDrillContext：$case', ({ input }) => {
+      expect(parseScheduleDrillContext(structuredClone(input))).toBeNull()
+    })
   })
-  it('来源感知的排程下钻及返回保留正式或测试身份', () => {
-    for (const origin of ['real', 'demo'] as const) {
-      const location = buildQuantityDrillLocation('home', group, task, origin) as { query: Record<string, string> }
-      expect(location.query.origin).toBe(origin)
-      const context = parseScheduleDrillContext(location.query)!
-      expect(buildScheduleReturnLocation(context)).toMatchObject({ path: '/', query: { project: task.projectId, origin } })
-      expect(buildScheduleReturnLocation({ ...context, source: 'schedule' })).toMatchObject({ path: '/schedule', query: { origin } })
-    }
+  it.each((['real', 'demo'] as const).map(input => ({ input })))('来源感知的排程下钻及返回保留正式或测试身份：输入案例 %#', ({ input: origin }) => {
+    const location = buildQuantityDrillLocation('home', group, task, origin) as { query: Record<string, string> }
+    expect(location.query.origin).toBe(origin)
+    const context = parseScheduleDrillContext(location.query)!
+    expect(buildScheduleReturnLocation(context)).toMatchObject({ path: '/', query: { project: task.projectId, origin } })
+    expect(buildScheduleReturnLocation({ ...context, source: 'schedule' })).toMatchObject({ path: '/schedule', query: { origin } })
   })
   it('首页和施工进度页共用完整工程量筛选参数', () => {
     const location = buildQuantityDrillLocation('home', group, task)
@@ -70,7 +75,7 @@ describe('排程下钻导航', () => {
     })
   })
 
-  it('解析来源并返回对应首页或施工进度上下文', () => {
+  describe('解析来源并返回对应首页或施工进度上下文', () => {
     const homeContext = parseScheduleDrillContext({
       project: 'project-1',
       group: 'group-1',
@@ -84,16 +89,22 @@ describe('排程下钻导航', () => {
       task: 'task-1',
       from: 'schedule',
     })
+    it('关联事实保持原契约', () => {
+      expect(homeContext?.buildingIds).toEqual(['building-1', 'building-2'])
+      expect(parseScheduleDrillContext({ from: 'invoice' })).toBeNull()
+    })
 
-    expect(homeContext?.buildingIds).toEqual(['building-1', 'building-2'])
-    expect(buildScheduleReturnLocation(homeContext!)).toEqual({
-      path: '/',
-      query: { project: 'project-1', group: 'group-1', task: 'task-1', buildings: 'building-1,building-2' },
+    it.each([
+      { case: 'homeContext!', input: homeContext!, expected: {
+        path: '/',
+        query: { project: 'project-1', group: 'group-1', task: 'task-1', buildings: 'building-1,building-2' },
+      } },
+      { case: 'scheduleContext!', input: scheduleContext!, expected: {
+        path: '/schedule',
+        query: { project: 'project-1', group: 'group-1', task: 'task-1' },
+      } },
+    ])('buildScheduleReturnLocation：$case', ({ input, expected }) => {
+      expect(buildScheduleReturnLocation(structuredClone(input))).toEqual(expected)
     })
-    expect(buildScheduleReturnLocation(scheduleContext!)).toEqual({
-      path: '/schedule',
-      query: { project: 'project-1', group: 'group-1', task: 'task-1' },
-    })
-    expect(parseScheduleDrillContext({ from: 'invoice' })).toBeNull()
   })
 })

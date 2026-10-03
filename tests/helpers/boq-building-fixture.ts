@@ -23,7 +23,7 @@ export async function createBoqBuildingFixture() {
   const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId, requiredCapability: CORE_MIGRATION_CAPABILITY })
   await core.preflight({ ...envelope('boq-preflight'), source, backup: null }, session)
   const hash = 'd'.repeat(64)
-  const batch = await core.dryRun({ ...envelope('boq-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 445, createdAt: new Date().toISOString(), immutable: true } }, session)
+  const batch = await core.dryRun({ ...envelope('boq-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 445, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }, session)
   await core.importBatch({ ...envelope('boq-import'), batchId: batch.batchId }, session)
   await core.confirm({ ...envelope('boq-confirm'), batchId: batch.batchId }, session)
   const query = { origin: 'real' as const, projectId: batch.mappings.find(row => row.entityType === 'projects' && row.legacyId === 'q-project')!.serverId, contractId: batch.mappings.find(row => row.entityType === 'construction_contracts' && row.legacyId === 'q-contract')!.serverId }

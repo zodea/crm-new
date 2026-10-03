@@ -6,6 +6,7 @@ import {
   selectVisibleSql,
   visibleCond,
 } from '~/lib/db/soft-delete'
+import { INACTIVE_RECEIPT_STATUSES } from '~/lib/owner-document/central-repository'
 import {
   formalOwnerChangeSql,
   nonDraftStatusSql,
@@ -34,17 +35,20 @@ interface ProjectSumRow {
   total: number
 }
 
-async function loadNonDraftProjectSums(
+async function loadEffectiveProjectSums(
   db: SoftDb,
   table: 'invoice_applications' | 'receipt_registrations',
   valueColumn: string,
 ): Promise<Map<string, number>> {
+  const effectiveStatusSql = table === 'receipt_registrations'
+    ? `r.status NOT IN (${INACTIVE_RECEIPT_STATUSES.map(status => `'${status}'`).join(', ')})`
+    : nonDraftStatusSql('r.status')
   const rows = await db.select<ProjectSumRow>(`
     ${hiddenCtes(table)}
     SELECT r.project_id, COALESCE(SUM(r."${valueColumn}"), 0) AS total
     FROM "${table}" r
     WHERE ${visibleCond(table, 'r')}
-      AND ${nonDraftStatusSql('r.status')}
+      AND ${effectiveStatusSql}
     GROUP BY r.project_id
   `)
   return new Map(rows.map(row => [row.project_id, number(row.total)]))
@@ -129,12 +133,12 @@ export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDe
     loadConstructionContractSums(db),
     loadConstructionSupplementSums(db),
     loadFormalOwnerChangeSums(db),
-    loadNonDraftProjectSums(db, 'receipt_registrations', 'amount'),
+    loadEffectiveProjectSums(db, 'receipt_registrations', 'amount'),
     loadConfirmedPaymentSums(db),
     loadCurrentSums(db, 'receipt'),
     loadCurrentSums(db, 'payment'),
-    loadNonDraftProjectSums(db, 'invoice_applications', 'amount'),
-    loadNonDraftProjectSums(db, 'invoice_applications', 'tax_amount'),
+    loadEffectiveProjectSums(db, 'invoice_applications', 'amount'),
+    loadEffectiveProjectSums(db, 'invoice_applications', 'tax_amount'),
   ])
 
   return projects.map(({ id: projectId }) => {

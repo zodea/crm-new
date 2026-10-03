@@ -1,59 +1,61 @@
 # Issue tracker：GitHub
 
-本仓库的任务、缺陷和 PRD 记录在 [zodea/crm-new GitHub Issues](https://github.com/zodea/crm-new/issues)，通过 `gh` CLI 读写。
+[GitHub Issues](https://github.com/zodea/crm-new/issues) 用于任务记录。定向查询条件与写入授权遵守 [AGENTS.md](../../AGENTS.md#开工与决策)，只读查询不包含发布、指派或改标签。
 
-本轮唯一任务入口为[瑞航 CRM 全模块复核与红圈对齐路线：前台交互和数据处理优先](https://github.com/zodea/crm-new/issues/402)。模块目录与当前范围放在该图；详细复核和规格门槛看 [`module-review.md`](./module-review.md)。
-
-## 开工检查
+## 查询
 
 ```text
 gh issue list --repo zodea/crm-new --state open --search "<关键词>"
 gh issue view <number> --repo zodea/crm-new --comments
 ```
 
-- 每个新工序都重新查询，不依赖文档里的状态快照。
-- 有可执行 open Issue 时按其当前正文和评论工作，不重新设计。
-- 领取实施票前按 `module-review.md` 检查场景、数据影响、异常和验收是否充分；标签不能代替规格。能由有效证据与现行规则补齐的直接作出判断并留依据；真实业务取舍才进入有文档记录的访谈。
-- 关闭 Issue 只代表历史工作结束；新需求需要新 Issue。
-- 规格与现场冲突时先评论留证，再修改实现。
+已知票号直接读取；需检索时限于当前问题。模块场景与验收方法见 [`module-review.md`](./module-review.md)，标签和历史关闭状态不作为完成证据。
 
 ## 常用写操作
 
 ```text
-gh issue create --repo zodea/crm-new --title "<标题>" --body "<正文>"
-gh issue comment <number> --repo zodea/crm-new --body "<证据或进度>"
+gh issue create --repo zodea/crm-new --title "<标题>" --body-file "<正文文件>"
+gh issue comment <number> --repo zodea/crm-new --body-file "<证据或进度文件>"
 gh issue edit <number> --repo zodea/crm-new --add-label "<标签>"
-gh issue close <number> --repo zodea/crm-new --comment "<完成证据>"
+gh issue close <number> --repo zodea/crm-new
 ```
 
-多行正文在 PowerShell 中使用任务专用变量或 here-string，避免把临时正文文件留在仓库。
+获授权后再执行对应写操作。多行正文使用仓库外临时 UTF-8 文件与 `--body-file`，用后删除；关闭前回写实际完成证据。
+
+## 每次提交的 show-me 图解
+
+撰写正文、评论及关联提交反馈前加载 `show-me`，用一句结论、最小必要图表和简短验证说明。提交反馈标注 SHA，区分已实现、已验证、待验证与阻塞；仅改标签或指派无需刷评论。
+
+| 要解释的内容 | 内嵌 Markdown 形式 |
+| --- | --- |
+| 流程、依赖、状态 | 简短 Mermaid |
+| 改前/改后、验收结果 | 小型对照表 |
+| 职责、调用或代码变化 | 浅层树或 `diff` |
+
+只展示实际变化，详细证据链接到权威文档或提交；图解不替代验收。
 
 ## Issue 内容最低要求
 
-- 问题或目标，以及为什么现在要做。
-- 明确范围与不在范围内的事项。
-- 可验证的验收条件。
-- 已知依赖、相关 ADR/页面蓝本和复现证据。
-- 不复制数据模型或长期规格；链接到权威源。
+- 目标与原因、范围与排除项、可验证的验收条件。
+- 真实依赖、复现证据和相关权威源链接；字段表与长期规格不复制到票内，任务要求、待办和进度也不另抄成本地文档。
 
-当技能要求“publish to the issue tracker”时，含义是创建或更新这里的 GitHub Issue。
+## 任务关系
 
-## Wayfinding operations
+地图使用 `wayfinder:map`，调查任务用 `wayfinder:task`，待用户裁定用 `wayfinder:grilling`；类型与状态标签分开。
 
-地图使用 `wayfinder:map`，调查/前置任务使用 `wayfinder:task`，确需用户裁定的事项使用 `wayfinder:grilling`；外部研究和可交互原型按需使用各自类型。子票通过 GitHub 原生父子关系挂接，先创建 Issue，再建立原生阻塞关系。
+父子关系和阻塞关系使用 GitHub 原生接口：
 
-```text
-gh api repos/zodea/crm-new/issues/402/sub_issues --paginate
-gh api repos/zodea/crm-new/issues/<number>/dependencies/blocked_by
-gh api repos/zodea/crm-new/issues/<number> --jq .id
-```
+| 关系 | POST 路径 | JSON 参数 |
+| --- | --- | --- |
+| 子任务 | `/repos/zodea/crm-new/issues/<parent>/sub_issues` | `sub_issue_id` |
+| 阻塞依赖 | `/repos/zodea/crm-new/issues/<dependent>/dependencies/blocked_by` | `issue_id` |
 
-添加父子关系使用 `POST /repos/zodea/crm-new/issues/<parent>/sub_issues`，JSON 参数 `sub_issue_id` 是上面取得的数据库 ID；添加依赖使用 `POST /repos/zodea/crm-new/issues/<dependent>/dependencies/blocked_by`，`issue_id` 同样是阻塞票的数据库 ID，而非可见票号。按需传递 `replace_parent`，只重挂明确获授权的任务。接口说明见 [GitHub 子任务文档](https://docs.github.com/en/rest/issues/sub-issues)与[依赖文档](https://docs.github.com/en/rest/issues/issue-dependencies)。
+参数使用目标 Issue 的数据库 `id`，不是可见票号；重挂父级仅限获授权范围。接口细节见 [子任务](https://docs.github.com/en/rest/issues/sub-issues)与[依赖](https://docs.github.com/en/rest/issues/issue-dependencies)官方文档。
 
-可领取前沿为开放、无未完成阻塞、尚未认领的子票；开工前先指派给实际执行者。调查依赖与实施依赖分开：只读采证可并行，实施前必须接齐真实依赖的公共能力和上游事实。基线票不以修完全部历史问题为关闭条件；模块决定充分后即可发布规格和实施票。
+指派前核对开放状态、未完成阻塞和认领情况；只读采证可独立推进，实施须接齐真实依赖。调查完成不等于功能完成。
 
 ## 旧任务替换
 
-被替代的旧票保留正文、评论和已采纳决定，在正文顶部标明主要承接者及跨域协作入口，使用 `superseded` 标签并以 `not_planned` 关闭；该关闭只表示旧工单停止执行，不能作为功能完成证据。`wontfix` 在这类旧票上表示停止旧工作安排，业务义务继续由承接票处理。
+获授权替换时保留旧票正文、评论和已采纳决定，顶部写明承接者及跨域入口；加 `superseded` 与 `wontfix`，以 `not_planned` 关闭，仅表示旧安排停止。
 
-每项旧验收义务必须在承接票中登记保留、已有证据满足、经依据修订或明确待裁定的去向。遇到旧链接先跟随承接指针，再读取现时规格。已关闭的历史领域决议、正在开发的代码和仅本地成果都保留；重组任务不自动授权合并、推送或删除工作树。
+每项旧验收义务在承接票中标明：继续保留、已有证据满足、经依据修订或待用户裁定。替换任务不撤销业务义务，也不授权合并或删除工作树。

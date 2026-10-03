@@ -8,10 +8,12 @@ describe('中央 WBS 请求边界', () => {
     expect(() => parseScheduleRead({ projectId: 'p', origin: 'real', today: '2026-02-30' })).toThrow()
     expect(() => parseScheduleCommand({ ...command, origin: 'demo' })).toThrow()
   })
-  it('不接受任意动作、越权顶层字段、字符串进度或重复楼层', () => {
-    expect(() => parseScheduleCommand({ ...command, admin: true })).toThrow()
-    expect(() => parseScheduleCommand({ ...command, action: { kind: 'bind-contract' } })).toThrow()
-    expect(() => parseScheduleCommand({ ...command, action: { kind: 'update-task', taskId: 't', patch: { manualProgress: '0.5' } } })).toThrow()
-    expect(() => parseScheduleCommand({ ...command, action: { kind: 'update-floors', taskId: 't', patches: [{ id: 'f', plannedStart: '2026-09-01', plannedFinish: '2026-09-02' }, { id: 'f', plannedStart: '2026-09-01', plannedFinish: '2026-09-02' }] } })).toThrow()
+  it.each([
+    { case: '{ ...command, admin: true }', input: { ...command, admin: true } },
+    { case: '{ ...command, action: { kind: \'bind-contract\' } }', input: { ...command, action: { kind: 'bind-contract' } } },
+    { case: '{ ...command, action: { kind: \'update-task\', taskId: \'t\', patch: { manualProgress: \'0.5\' } } }', input: { ...command, action: { kind: 'update-task', taskId: 't', patch: { manualProgress: '0.5' } } } },
+    { case: '{ ...command, action: { kind: \'update-floors\', taskId: \'t\', patches: [{ id: \'f\', plannedStart: \'2026-09-01\', plannedFinish: \'', input: { ...command, action: { kind: 'update-floors', taskId: 't', patches: [{ id: 'f', plannedStart: '2026-09-01', plannedFinish: '2026-09-02' }, { id: 'f', plannedStart: '2026-09-01', plannedFinish: '2026-09-02' }] } } },
+  ])('不接受任意动作、越权顶层字段、字符串进度或重复楼层 / parseScheduleCommand：$case', ({ input }) => {
+    expect(() => parseScheduleCommand(input)).toThrow()
   })
 })

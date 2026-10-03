@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { F2FormKind } from '~/lib/contract/forms'
-import type { StatusTone } from '~/lib/project/status'
 import type { DataOriginDTO } from '~/types/read-model'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
 import { contractStages } from '~/lib/contract/detail'
 import { formPath } from '~/lib/contract/page'
 import {
-  CONTRACT_STATUS_TONE,
   contractBalance,
+  contractStatusTone,
   kindLabels,
 } from '~/lib/contract/status'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
@@ -70,17 +70,6 @@ const backTo = computed(() => {
   }
 })
 const backLabel = computed(() => projectSupplierReturn.value ? '返回项目分供方工作台' : `返回${kindLabel.value}列表`)
-
-const TONE_CHIP: Record<StatusTone, string> = {
-  warn: 'chip-warn',
-  brand: 'chip-brand',
-  muted: 'chip bg-surface-3 text-ink-faint',
-  ok: 'chip-ok',
-}
-const statusChip = computed(() => {
-  const tone = CONTRACT_STATUS_TONE[contract.value?.status ?? '']
-  return tone ? TONE_CHIP[tone] : 'chip-brand'
-})
 
 const metrics = computed(() => {
   const current = contract.value
@@ -216,7 +205,9 @@ watch(contractId, () => {
           <div class="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-12px text-ink-soft">
             <span class="break-all font-mono" :title="contract.no">{{ contract.no || '编号未填写' }}</span>
             <span>{{ kindLabel }}</span>
-            <span class="chip" :class="statusChip">{{ contract.status }}</span>
+            <KitStatusTag :tone="contractStatusTone(contract.status)">
+              {{ contract.status }}
+            </KitStatusTag>
           </div>
         </div>
         <button type="button" class="btn-secondary ml-auto" @click="openEdit">

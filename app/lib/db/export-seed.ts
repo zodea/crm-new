@@ -30,7 +30,8 @@ export async function exportAllSeeds(): Promise<SeedExportResult[]> {
 
   for (const table of tables) {
     const count = await getTableRowCount(table)
-    if (count === 0) continue
+    if (count === 0)
+      continue
 
     const rows = await exportTableToJson(table)
     results.push({

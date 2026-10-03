@@ -1,207 +1,90 @@
 import type { Page } from '@playwright/test'
-import path from 'node:path'
+import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import initSqlJs from 'sql.js'
-import {
-  expectInViewport,
-  expectLocalHorizontalScroll,
-  expectNoPageOverflow,
-  RESPONSIVE_WIDTHS,
-} from './helpers/responsive'
+import { installMaterialProductionFixture } from './helpers/material-production-fixture'
+import { expectInViewport, expectLocalHorizontalScroll, expectNoPageOverflow } from './helpers/responsive'
 
-const SQL_JS = initSqlJs({
-  locateFile: file => path.resolve('node_modules/sql.js/dist', file),
-})
+const PRICE_INPUTS = [
+  { key: 'wire', orderNo: 'E2E-PRICE-WIRE-LATEST', query: '电线', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', qty: 1000, firstPrice: 2.5, nextPrice: 2.8, nextAmount: 2800, nextSupplier: false, heading: 'BV 电线 · 1×2.5 mm²', chart: 'BV 电线 1×2.5 mm² 价格趋势图', option: /BV 电线.*2\.5 mm².*m/, prices: ['¥2.50', '¥2.80'], expectedOfficialChange: '-0.47%' },
+  { key: 'steel', orderNo: 'E2E-PRICE-STEEL-LATEST', query: 'HRB400', materialName: 'HRB400 螺纹钢', spec: 'Φ12', unit: '吨', qty: 1, firstPrice: 3800, nextPrice: 3950, nextAmount: 3950, nextSupplier: true, heading: 'HRB400 螺纹钢 · Φ12', chart: 'HRB400 螺纹钢 Φ12 价格趋势图', option: /HRB400 螺纹钢.*Φ12.*吨/, prices: ['¥3,800.00', '¥3,950.00'] },
+] as const
+const VIEWPORTS = [390, 768, 1024, 1280, 1440] as const
+const SOURCE_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1cAAAAASUVORK5CYII='
 
-const VIEWPORT_HEIGHTS: Record<(typeof RESPONSIVE_WIDTHS)[number], number> = {
-  390: 844,
-  768: 900,
-  1024: 900,
-  1440: 1000,
-}
-
-async function readBrowserSnapshot(page: Page): Promise<number[]> {
-  return page.evaluate(async () => {
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('crm-new-browser', 1)
-      request.addEventListener('upgradeneeded', () => {
-        if (!request.result.objectStoreNames.contains('database_snapshots'))
-          request.result.createObjectStore('database_snapshots')
-      })
-      request.addEventListener('success', () => resolve(request.result), { once: true })
-      request.addEventListener('error', () => reject(request.error), { once: true })
-    })
-    try {
-      const transaction = database.transaction('database_snapshots', 'readonly')
-      const value = await new Promise<ArrayBuffer | Uint8Array>((resolve, reject) => {
-        const request = transaction.objectStore('database_snapshots').get('main')
-        request.addEventListener('success', () => resolve(request.result), { once: true })
-        request.addEventListener('error', () => reject(request.error), { once: true })
-      })
-      return Array.from(value instanceof Uint8Array ? value : new Uint8Array(value))
-    }
-    finally {
-      database.close()
-    }
-  })
-}
-
-async function writeBrowserSnapshot(page: Page, bytes: number[]) {
-  await page.evaluate(async (snapshot) => {
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('crm-new-browser', 1)
-      request.addEventListener('upgradeneeded', () => {
-        if (!request.result.objectStoreNames.contains('database_snapshots'))
-          request.result.createObjectStore('database_snapshots')
-      })
-      request.addEventListener('success', () => resolve(request.result), { once: true })
-      request.addEventListener('error', () => reject(request.error), { once: true })
-    })
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction('database_snapshots', 'readwrite')
-        transaction.objectStore('database_snapshots').put(
-          new Uint8Array(snapshot).buffer,
-          'main',
-        )
-        transaction.addEventListener('complete', () => resolve(), { once: true })
-        transaction.addEventListener('abort', () => reject(transaction.error), { once: true })
-        transaction.addEventListener('error', () => reject(transaction.error), { once: true })
-      })
-    }
-    finally {
-      database.close()
-    }
-  }, bytes)
-}
-
-async function snapshotWithPriceFacts(snapshot: number[]): Promise<number[]> {
-  const SQL = await SQL_JS
-  const database = new SQL.Database(new Uint8Array(snapshot))
-  try {
-    database.run(`
-      INSERT INTO delivery_records (
-        id, project_id, supplier_id, order_no, delivery_date,
-        ocr_status, archived, created_at, updated_at
-      ) VALUES
-        (
-          'del_price_cmp_b', 'proj_demo_001', 'sup_demo_002', 'XS-CMP-001',
-          '2026-07-13', 'reviewed', 1,
-          '2026-07-13T09:00:00.000Z', '2026-07-13T09:00:00.000Z'
-        ),
-        (
-          'del_price_trend_1', 'proj_demo_002', 'sup_demo_002', 'XS-TREND-001',
-          '2026-06-01', 'reviewed', 1,
-          '2026-06-01T09:00:00.000Z', '2026-06-01T09:00:00.000Z'
-        ),
-        (
-          'del_price_trend_2', 'proj_demo_002', 'sup_demo_002', 'XS-TREND-002',
-          '2026-07-01', 'reviewed', 1,
-          '2026-07-01T09:00:00.000Z', '2026-07-01T09:00:00.000Z'
-        );
-
-      INSERT INTO delivery_lines (
-        id, delivery_record_id, material_name, spec, unit, qty,
-        unit_price, amount, amount_source, sort_order, created_at, updated_at
-      ) VALUES
-        (
-          'dline_price_cmp_b', 'del_price_cmp_b', 'HRB400 螺纹钢', 'Φ12', '吨',
-          1, 3950, 3950, 'manual', 0,
-          '2026-07-13T09:00:00.000Z', '2026-07-13T09:00:00.000Z'
-        ),
-        (
-          'dline_price_trend_1', 'del_price_trend_1', 'BV 电线', '2.5 mm²', 'm',
-          1000, 2.50, 2500, 'manual', 0,
-          '2026-06-01T09:00:00.000Z', '2026-06-01T09:00:00.000Z'
-        ),
-        (
-          'dline_price_trend_2', 'del_price_trend_2', 'BV 电线', '2.5 mm²', 'm',
-          1000, 2.80, 2800, 'manual', 0,
-          '2026-07-01T09:00:00.000Z', '2026-07-01T09:00:00.000Z'
-        );
-    `)
-    return Array.from(database.export())
+async function openPriceAnalysisWithFacts(page: Page, input: (typeof PRICE_INPUTS)[number]) {
+  await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
+  const fixture = await installMaterialProductionFixture(page, { deliveryLines: [{ materialName: input.materialName, spec: input.spec, unit: input.unit, qty: input.qty, unitPrice: input.firstPrice, amount: input.qty * input.firstPrice, amountSource: 'manual', note: '合成价格事实' }] })
+  const session = await (await page.request.get('/api/read/business-session')).json()
+  const identity = { workspaceId: session.workspaceId, actorId: session.actorId }
+  let supplierId = fixture.supplierId
+  if (input.nextSupplier) {
+    const created = await page.request.post('/api/commands/suppliers', { data: { ...identity, requiredCapability: 'supplier:write', commandId: randomUUID(), baseVersion: null, action: 'draft', draft: { name: 'E2E价格比较第二厂家', supplierCategory: '材料供应商', aliases: [] }, attachments: {} } })
+    expect(created.ok(), await created.text()).toBe(true)
+    supplierId = (await created.json()).id
   }
-  finally {
-    database.close()
-  }
+  const orderNo = input.orderNo
+  const archived = await page.request.post('/api/commands/deliveries', { data: {
+    ...identity,
+    requiredCapability: 'delivery:write',
+    commandId: randomUUID(),
+    origin: 'real',
+    baseVersion: null,
+    action: 'archive',
+    uploadBatchId: null,
+    source: { fileName: `${input.key}-price.png`, mimeType: 'image/png', fileSize: Buffer.from(SOURCE_PNG, 'base64').length, payloadBase64: SOURCE_PNG },
+    draft: { projectId: fixture.projectId, supplierId, orderNo, deliveryDate: '2026-09-01', note: '合成后续归档价格', rawSiteText: fixture.projectSiteAlias, reviewFlag: '', confirmations: {}, lines: [{ materialName: input.materialName, spec: input.spec, unit: input.unit, qty: input.qty, unitPrice: input.nextPrice, amount: input.nextAmount, amountSource: 'manual', note: '' }] },
+  } })
+  expect(archived.ok(), await archived.text()).toBe(true)
+  const latest = await archived.json()
+  await page.goto('/material/price?origin=real')
+  const search = page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
+  await expect(search).toBeVisible({ timeout: 30_000 })
+  await search.fill(input.query)
+  await page.getByRole('option', { name: input.option }).click()
+  await expect(page.getByRole('heading', { name: input.heading, exact: true })).toBeVisible()
+  return { ...fixture, latestId: latest.id, orderNo }
 }
 
-async function openPriceAnalysisWithFacts(page: Page) {
-  await page.goto('/material/price')
-  await Promise.any([
-    page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
-      .waitFor({ state: 'visible', timeout: 15_000 }),
-    page.getByText('尚无可分析的材料价格', { exact: true })
-      .waitFor({ state: 'visible', timeout: 15_000 }),
-  ])
-
-  const seededSnapshot = await readBrowserSnapshot(page)
-  await writeBrowserSnapshot(page, await snapshotWithPriceFacts(seededSnapshot))
-  await page.reload()
-  await expect(page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' }))
-    .toBeVisible({ timeout: 15_000 })
-}
-
-test.describe('材料单价分析真实价格事实', () => {
-  test('搜索选择材料后按事实切换趋势与厂家比较，并提供来源和合同下钻', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 1000 })
-    await openPriceAnalysisWithFacts(page)
-
-    const search = page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
-    await search.fill('电线')
-    await page.getByRole('option', { name: /BV 电线.*2\.5 mm².*m/ }).click()
-
-    await expect(page.getByRole('heading', { name: 'BV 电线 · 1×2.5 mm²' })).toBeVisible()
-    await expect(page.getByText('官方与市场趋势', { exact: true })).toBeVisible()
-    await expect(page.getByRole('img', { name: 'BV 电线 1×2.5 mm² 价格趋势图' })).toBeVisible()
-    await expect(page.getByRole('region', { name: '官方信息价对比' }).getByText('信息价环比')).toBeVisible()
-    await expect(page.getByRole('region', { name: '官方信息价对比' }).getByText('-0.47%')).toBeVisible()
-    await page.getByText(/查看全部 \d+ 个价格来源/).click()
-    await expect(page.getByRole('link', { name: /XS-TREND-002/ })).toHaveAttribute(
-      'href',
-      '/material/delivery/archive/del_price_trend_2',
-    )
-
-    const contracts = page.getByRole('region', { name: '相关厂家合作合同' })
-    await expect(contracts.getByText('锦绣华庭')).toBeVisible()
-    await expect(contracts.getByRole('link', { name: '电线电缆采购合同' }))
-      .toHaveAttribute('href', '/contract/con_demo_cg04')
-
-    await search.fill('HRB400')
-    await page.getByRole('option', { name: /HRB400 螺纹钢.*Φ12.*吨/ }).click()
-    await expect(page.getByText('厂家最新价对比', { exact: true })).toBeVisible()
-    await expect(page.getByRole('list', { name: '厂家最新价' })).toContainText('¥3,800.00')
-    await expect(page.getByRole('list', { name: '厂家最新价' })).toContainText('¥3,950.00')
-    await expect(page.getByRole('list', { name: '厂家最新价' }).getByRole('link', { name: /XS-CMP-001/ }))
-      .toHaveAttribute('href', '/material/delivery/archive/del_price_cmp_b')
-  })
-
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`搜索、材料选择和趋势图在 ${width}px 可达且页面不横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
-      await openPriceAnalysisWithFacts(page)
-
-      const search = page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
-      await search.fill('电线')
-      await page.getByRole('option', { name: /BV 电线.*2\.5 mm².*m/ }).click()
-
-      const chart = page.getByRole('img', { name: 'BV 电线 1×2.5 mm² 价格趋势图' })
-      await chart.scrollIntoViewIfNeeded()
-      await expectInViewport(chart, `${width}px 价格趋势图`)
-      await expectNoPageOverflow(page, `${width}px 材料单价分析`)
-
-      if (width <= 1024) {
-        await expectLocalHorizontalScroll(
-          page.getByTestId('material-price-trend-scroll'),
-          `${width}px 价格趋势图`,
-        )
+test.describe('材料单价分析中央归档价格事实', () => {
+  for (const input of PRICE_INPUTS) {
+    test(`${input.query} 搜索、真实价格、归档来源与厂家合同下钻`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 1000 })
+      const fixture = await openPriceAnalysisWithFacts(page, input)
+      if (input.nextSupplier) {
+        await expect(page.getByText('厂家最新价对比', { exact: true })).toBeVisible()
+        const comparison = page.getByRole('list', { name: '厂家最新价' })
+        for (const price of input.prices)
+          await expect(comparison).toContainText(price)
+        await expect(comparison.getByRole('link', { name: `来源 ${fixture.orderNo}`, exact: true })).toHaveAttribute('href', `/material/delivery/archive/${fixture.latestId}?origin=real`)
       }
-
+      else {
+        await expect(page.getByText('官方与市场趋势', { exact: true })).toBeVisible()
+        await expect(page.getByRole('img', { name: input.chart, exact: true })).toBeVisible()
+        const officialComparison = page.getByRole('region', { name: '官方信息价对比' })
+        await expect(officialComparison.getByText('信息价环比')).toBeVisible()
+        await expect(officialComparison.getByText(input.expectedOfficialChange, { exact: true })).toBeVisible()
+      }
+      await page.getByText(/查看全部 \d+ 个价格来源/).click()
+      await expect(page.locator('details').getByRole('link', { name: new RegExp(fixture.orderNo) })).toHaveAttribute('href', `/material/delivery/archive/${fixture.latestId}?origin=real`)
       const contracts = page.getByRole('region', { name: '相关厂家合作合同' })
-      await contracts.scrollIntoViewIfNeeded()
-      await expect(contracts).toBeVisible()
-      await expect(contracts.getByRole('link', { name: '电线电缆采购合同' })).toBeVisible()
+      await expect(contracts.getByText(fixture.projectName, { exact: true })).toBeVisible()
+      await expect(contracts.getByRole('link', { name: fixture.contractName, exact: true })).toHaveAttribute('href', `/contract/${fixture.contractId}?contractKind=material&origin=real`)
     })
+    for (const width of VIEWPORTS) {
+      test(`${input.query} ${width}px 搜索、趋势、合作合同与自身滚动边界`, async ({ page }) => {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+        const fixture = await openPriceAnalysisWithFacts(page, input)
+        const visual = input.nextSupplier ? page.getByRole('list', { name: '厂家最新价' }) : page.getByRole('img', { name: input.chart, exact: true })
+        await visual.scrollIntoViewIfNeeded()
+        await expectInViewport(visual, `${width}px ${input.query}价格事实`)
+        await expectNoPageOverflow(page, `${width}px 材料单价分析`)
+        if (!input.nextSupplier && width <= 1024)
+          await expectLocalHorizontalScroll(page.getByTestId('material-price-trend-scroll'), `${width}px ${input.query}趋势图`)
+        const contracts = page.getByRole('region', { name: '相关厂家合作合同' })
+        await contracts.scrollIntoViewIfNeeded()
+        await expect(contracts.getByRole('link', { name: fixture.contractName, exact: true })).toBeVisible()
+      })
+    }
   }
 })

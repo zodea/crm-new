@@ -97,30 +97,63 @@ describe('工序库迁入候选与恢复', () => {
     expect(() => prepareProcessLibraryMigration([], candidate)).toThrow()
   })
 
-  it('服务端再次拒绝无效前置和损坏映射，不信任来源客户端', () => {
+  function createInvalidProcessTaskGraph() {
     const source = graph()
     source.tasks[0]!.item_codes_json = '{}'
-    expect(() => prepareProcessLibraryMigration([], snapshot(source))).toThrow(/映射/)
-    source.tasks[0]!.item_codes_json = '[]'
-    source.tasks[0]!.predecessor_task_key = 'missing'
-    expect(() => prepareProcessLibraryMigration([], snapshot(source))).toThrow(/前置/)
+    return { source }
+  }
+
+  it.each([
+    { case: '[] / snapshot(source)', prepare: ({ source }: ReturnType<typeof createInvalidProcessTaskGraph>) => {
+      return { input: [], argument2: snapshot(source), expected: /映射/ } as const
+    } },
+    { case: '[] / snapshot(source)', prepare: ({ source }: ReturnType<typeof createInvalidProcessTaskGraph>) => {
+      source.tasks[0]!.item_codes_json = '[]'
+      source.tasks[0]!.predecessor_task_key = 'missing'
+      return { input: [], argument2: snapshot(source), expected: /前置/ } as const
+    } },
+  ])('服务端再次拒绝无效前置和损坏映射，不信任来源客户端 / prepareProcessLibraryMigration：$case', ({ prepare }) => {
+    const fixture = createInvalidProcessTaskGraph()
+    const { input, argument2, expected } = prepare(fixture)
+    expect(() => prepareProcessLibraryMigration(input, argument2)).toThrow(expected)
   })
 
-  it('一批次中拒绝重复旧库、code/version 或跨库旧任务身份', () => {
+  function createDuplicateProcessLibrarySnapshot() {
     const candidate = snapshot()
     const other = structuredClone(candidate.entities[0]!)
     other.id = 'another-central'
     candidate.entities.push(other)
-    expect(() => prepareProcessLibraryMigration([], candidate)).toThrow(/重复/)
-    const otherGraph = graph()
-    otherGraph.library.id = 'another-old'
-    for (const task of otherGraph.tasks) task.library_id = 'another-old'
-    other.legacyId = 'another-old'
-    other.attributes.graphJson = JSON.stringify(otherGraph)
-    expect(() => prepareProcessLibraryMigration([], candidate)).toThrow(/编码.*版本/)
-    otherGraph.library.code = 'another-code'
-    other.attributes.graphJson = JSON.stringify(otherGraph)
-    expect(() => prepareProcessLibraryMigration([], candidate)).toThrow(/任务.*身份.*重复/)
+    return { candidate, other }
+  }
+
+  it.each([
+    { case: '重复旧库', prepare: ({ candidate }: ReturnType<typeof createDuplicateProcessLibrarySnapshot>) => {
+      return { input: [], argument2: candidate, expected: /重复/ } as const
+    } },
+    { case: '重复编码和版本', prepare: ({ candidate, other }: ReturnType<typeof createDuplicateProcessLibrarySnapshot>) => {
+      const otherGraph = graph()
+      otherGraph.library.id = 'another-old'
+      for (const task of otherGraph.tasks)
+        task.library_id = 'another-old'
+      other.legacyId = 'another-old'
+      other.attributes.graphJson = JSON.stringify(otherGraph)
+      return { input: [], argument2: candidate, expected: /编码.*版本/ } as const
+    } },
+    { case: '跨库重复任务身份', prepare: ({ candidate, other }: ReturnType<typeof createDuplicateProcessLibrarySnapshot>) => {
+      const otherGraph = graph()
+      otherGraph.library.id = 'another-old'
+      for (const task of otherGraph.tasks)
+        task.library_id = 'another-old'
+      other.legacyId = 'another-old'
+      other.attributes.graphJson = JSON.stringify(otherGraph)
+      otherGraph.library.code = 'another-code'
+      other.attributes.graphJson = JSON.stringify(otherGraph)
+      return { input: [], argument2: candidate, expected: /任务.*身份.*重复/ } as const
+    } },
+  ])('一批次中拒绝重复旧库、code/version 或跨库旧任务身份 / prepareProcessLibraryMigration：$case', ({ prepare }) => {
+    const fixture = createDuplicateProcessLibrarySnapshot()
+    const { input, argument2, expected } = prepare(fixture)
+    expect(() => prepareProcessLibraryMigration(input, argument2)).toThrow(expected)
   })
 
   it('整个已删除库仍完整保留隐藏子任务，不反推来源版或 WBS 使用量', () => {

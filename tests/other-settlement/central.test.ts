@@ -71,7 +71,7 @@ describe('aX05 其他支出结算中央命令', () => {
     const service = createOtherSettlementInstance({ identities: () => ({ projects: [], suppliers: [], contracts: [] }), records: [record] })
     expect(service.detail(record.id, {}, session).settlement.amounts).toMatchObject({ total: '1060.00', applied: null, paid: null, applicable: null, unpaid: null })
   })
-  it('只选择同项目非草稿真实其他支出合同，保存后读回稳定关系并幂等保护版本', async () => {
+  it.each((['draft', 'wrong', 'missing']).map(input => ({ input })))('只选择同项目非草稿真实其他支出合同，保存后读回稳定关系并幂等保护版本：输入案例 %#', async ({ input: contractId }) => {
     const service = setup()
     expect(service.context(session).contracts.map(row => row.id)).toEqual(['c1'])
     const saved = await service.execute(command(), session)
@@ -79,7 +79,6 @@ describe('aX05 其他支出结算中央命令', () => {
     expect(service.detail(saved.id, { origin: 'real' }, session).settlement).toMatchObject({ id: saved.id, draft: { contractId: 'c1', projectId: 'p1', supplierId: 's1', totalAmount: 1060 }, amounts: { total: '1060.00', taxExclusive: '1000.00', tax: '60.00' } })
     expect(service.list({}, session).pagination.total).toBe(1)
     await expect(service.execute(command({ id: saved.id, commandId: 'stale', baseVersion: '0' }), session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
-    for (const contractId of ['draft', 'wrong', 'missing'])
-      await expect(service.execute(command({ commandId: contractId, draft: { ...command().draft, contractId } }), session)).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
+    await expect(service.execute(command({ commandId: contractId, draft: { ...command().draft, contractId } }), session)).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
   })
 })

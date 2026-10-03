@@ -55,11 +55,13 @@ const isSupplement = computed(() =>
 const isMaterialSettlement = computed(() => props.kind === 'material_settlement')
 const taxExclusiveAmount = computed(() => {
   const amount = Number(props.draft.amount) || 0
-  const rate = Number(props.draft.taxRate) || 0
-  return rate >= 0 ? amount / (1 + rate / 100) : 0
+  const rate = props.draft.taxRate ?? 0
+  return typeof rate === 'number' && Number.isFinite(rate) && rate >= 0
+    ? amount / (1 + rate / 100)
+    : null
 })
 const taxAmount = computed(() =>
-  (Number(props.draft.amount) || 0) - taxExclusiveAmount.value,
+  taxExclusiveAmount.value === null ? null : (Number(props.draft.amount) || 0) - taxExclusiveAmount.value,
 )
 
 function options(values: Array<string | number>) {
@@ -71,10 +73,10 @@ const OTHER_EXPENSE_KIND_OPTIONS = options(['机械租赁', '检测服务', '其
 const CONTRACT_STATUS_OPTIONS = options(['草稿', '审批中', '已签订', '履约中', '已结算', '已结清'])
 const SUPPLEMENT_STATUS_OPTIONS = options(['草稿', '审批中', '有效'])
 const INVOICE_TYPE_OPTIONS = options(['增值税专用发票', '增值税普通发票'])
-const TAX_RATE_OPTIONS = [13, 9, 6, 3, 1, 0].map(rate => ({
+const TAX_RATE_OPTIONS = [{ key: 'unknown', label: '未填写' }, ...[13, 9, 6, 3, 1, 0].map(rate => ({
   key: String(rate),
   label: `${rate}%`,
-}))
+}))]
 const PAYMENT_CYCLE_OPTIONS = options(['月付', '季付', '年付', '一次性'])
 const COMPANY_CATEGORY_OPTIONS = options(['房租', '软件', '其他'])
 const COMPANY_STATUS_OPTIONS = options(['草稿', '审批中', '履约中', '已结清'])
@@ -313,23 +315,23 @@ function inputChecked(event: Event): boolean {
           <div class="field-block">
             <span class="field-label">税率</span>
             <SelectFilter
-              :model-value="String(draft.taxRate ?? 0)"
+              :model-value="draft.taxRate == null ? 'unknown' : String(draft.taxRate)"
               :options="TAX_RATE_OPTIONS"
               aria-label="税率"
               full-width
-              @update:model-value="patch('taxRate', Number($event))"
+              @update:model-value="patch('taxRate', $event === 'unknown' ? null : Number($event))"
             />
           </div>
           <div class="field-block">
             <span class="field-label">无税金额</span>
             <div class="field-readonly">
-              {{ taxExclusiveAmount.toFixed(2) }}
+              {{ taxExclusiveAmount?.toFixed(2) ?? '—' }}
             </div>
           </div>
           <div class="field-block">
             <span class="field-label">税额</span>
             <div class="field-readonly">
-              {{ taxAmount.toFixed(2) }}
+              {{ taxAmount?.toFixed(2) ?? '—' }}
             </div>
           </div>
           <div v-if="aggregate" class="field-block">

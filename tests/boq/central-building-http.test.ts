@@ -1,4 +1,4 @@
-import type { BoqBuildingCommand } from '~/lib/boq/central-building-contract'
+import type { BoqBuildingCommand, BoqBuildingContext } from '~/lib/boq/central-building-contract'
 import type { BoqBuildingFetcher } from '~/lib/boq/central-building-repository'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
@@ -8,18 +8,17 @@ import { parseBoqBuildingQuery } from '~/lib/boq/central-building-request'
 import { createBoqBuildingFixture } from '../helpers/boq-building-fixture'
 
 describe('中央清单楼栋实际 HTTP', () => {
-  it('运行态decoder拒绝错项目、重复行、伪数字和错配回执', async () => {
+  it.each([
+    (context: BoqBuildingContext) => ({ ...context, projectId: 'foreign-project' }),
+    (context: BoqBuildingContext) => ({ ...context, lines: [context.lines[0], context.lines[0]] }),
+    (context: BoqBuildingContext) => ({ ...context, lines: [{ ...context.lines[0], qty: '0' }] }),
+  ])('运行态decoder拒绝错项目、重复行、伪数字和错配回执：%#', async (makeBad) => {
     const fixture = await createBoqBuildingFixture()
     try {
       const context = await fixture.service.read(fixture.query)
-      for (const bad of [
-        { ...context, projectId: 'foreign-project' },
-        { ...context, lines: [context.lines[0], context.lines[0]] },
-        { ...context, lines: [{ ...context.lines[0], qty: '0' }] },
-      ]) {
-        const repository = createBoqBuildingRepository(async () => bad)
-        await expect(repository.read(fixture.query)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
-      }
+      const bad = makeBad(context)
+      const badRepository = createBoqBuildingRepository(async () => bad)
+      await expect(badRepository.read(fixture.query)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
       const command: BoqBuildingCommand = { ...fixture.query, workspaceId: context.workspaceId, actorId: context.actorId, requiredCapability: 'owner-document:write', commandId: 'wrong-receipt', sourceVersion: context.sourceVersion, lineId: 'q-boq', buildingId: context.buildings[0]!.id, reason: '原始更正' }
       const repository = createBoqBuildingRepository(async () => ({ ...command, lineId: 'other-line', building: 'B1', auditId: 'audit' }))
       await expect(repository.execute(command)).rejects.toMatchObject({ problem: { code: 'unavailable' } })

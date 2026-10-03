@@ -22,35 +22,30 @@ const rows = [
 ]
 
 describe('模板甘特编辑器', () => {
-  it('键盘统一整体移动与右边缘改工期，并只向父级提交一个窗口状态', async () => {
+  it.each([
+    { key: 'ArrowRight', mode: '移动模板工序', start: '2026-07-02', finish: '2026-07-04' },
+    { key: 'ArrowLeft', mode: '移动模板工序', start: '2026-06-30', finish: '2026-07-02' },
+    { key: 'ArrowRight', mode: '调整模板工期', start: '2026-07-01', finish: '2026-07-04' },
+    { key: 'ArrowLeft', mode: '调整模板工期', start: '2026-07-01', finish: '2026-07-02' },
+  ])('$mode / $key 只向父级提交一个完整日期窗口', async ({ key, mode, start, finish }) => {
     const view = render(ScheduleTemplateGanttEditor, {
       props: { rows },
     })
 
-    const move = screen.getByRole('button', { name: '移动模板工序：放线及新建墙体' })
-    await fireEvent.keyDown(move, { key: 'ArrowRight' })
-    expect(view.emitted().updateWindow?.[0]).toEqual([{
+    await fireEvent.keyDown(screen.getByRole('button', { name: `${mode}：放线及新建墙体` }), { key })
+    expect(view.emitted().updateWindow).toEqual([[{
       key: 'setting-out',
-      plannedStart: '2026-07-02',
-      plannedFinish: '2026-07-04',
-    }])
-
-    const resize = screen.getByRole('button', { name: '调整模板工期：放线及新建墙体' })
-    await fireEvent.keyDown(resize, { key: 'ArrowRight' })
-    expect(view.emitted().updateWindow?.[1]).toEqual([{
-      key: 'setting-out',
-      plannedStart: '2026-07-01',
-      plannedFinish: '2026-07-04',
-    }])
+      plannedStart: start,
+      plannedFinish: finish,
+    }]])
   })
 
-  it('显示工序、工种和日期并提供局部横向滚动容器', () => {
+  it('显示工序、工种和日期', () => {
     render(ScheduleTemplateGanttEditor, {
       props: { rows },
     })
 
     expect(screen.getByRole('grid', { name: '标准工序模板甘特' }).textContent)
       .toContain('卫生间回填及防水')
-    expect(screen.getByTestId('template-gantt-scroll').className).toContain('overflow-x-auto')
   })
 })

@@ -68,26 +68,28 @@ describe('中央证照独立页签恢复', () => {
     expect(allowed.read).toHaveBeenCalledWith('supplier-a', 'demo', { signal: undefined })
   })
 
-  it('返回同一分供方详情与列表位置保留，错误祖先身份和来源去除', async () => {
+  const list = createSupplierReturnTo('real:supplier-a', { search: '合成', category: [], credentialStatus: [], page: 2, pageSize: 20, sort: 'updated-desc' })
+  const detail = `/base/supplier/supplier-a?origin=real&returnTo=${encodeURIComponent(list)}`
+
+  it.each(([list, detail]).map(input => ({ input })))('返回同一分供方详情与列表位置保留，错误祖先身份和来源去除：输入案例 %#', async ({ input: caseInput }) => {
     const { validate } = setup()
-    const list = createSupplierReturnTo('real:supplier-a', { search: '合成', category: [], credentialStatus: [], page: 2, pageSize: 20, sort: 'updated-desc' })
-    const detail = `/base/supplier/supplier-a?origin=real&returnTo=${encodeURIComponent(list)}`
-    for (const returnTo of [list, detail]) {
+    { const returnTo = caseInput
       const result = await validate({ ...descriptor, fullPath: `${descriptor.fullPath}&returnTo=${encodeURIComponent(returnTo)}` })
       expect(result.state).toBe('resolved')
       if (result.state === 'resolved')
-        expect(new URL(result.fullPath, 'https://example.test').searchParams.get('returnTo')).toBe(returnTo)
-    }
-    for (const returnTo of [
-      '/base/supplier/supplier-b?origin=real',
-      '/base/supplier/supplier-a?origin=demo',
-      createSupplierReturnTo('demo:supplier-a', { search: '', category: [], credentialStatus: [], page: 1, pageSize: 20, sort: 'updated-desc' }),
-      createSupplierReturnTo('real:supplier-b', { search: '', category: [], credentialStatus: [], page: 1, pageSize: 20, sort: 'updated-desc' }),
-      'https://external.example/credentials',
-    ]) {
-      const result = await validate({ ...descriptor, fullPath: `${descriptor.fullPath}&returnTo=${encodeURIComponent(returnTo)}` })
-      expect(result).toMatchObject({ state: 'resolved', fullPath: descriptor.fullPath })
-    }
+        expect(new URL(result.fullPath, 'https://example.test').searchParams.get('returnTo')).toBe(returnTo) }
+  })
+
+  it.each(Array.from([
+    '/base/supplier/supplier-b?origin=real',
+    '/base/supplier/supplier-a?origin=demo',
+    createSupplierReturnTo('demo:supplier-a', { search: '', category: [], credentialStatus: [], page: 1, pageSize: 20, sort: 'updated-desc' }),
+    createSupplierReturnTo('real:supplier-b', { search: '', category: [], credentialStatus: [], page: 1, pageSize: 20, sort: 'updated-desc' }),
+    'https://external.example/credentials',
+  ]).map(input => ({ input })))('返回同一分供方详情与列表位置保留，错误祖先身份和来源去除：输入组合 1 案例 %#', async ({ input: returnTo }) => {
+    const { validate } = setup()
+    const result = await validate({ ...descriptor, fullPath: `${descriptor.fullPath}&returnTo=${encodeURIComponent(returnTo)}` })
+    expect(result).toMatchObject({ state: 'resolved', fullPath: descriptor.fullPath })
   })
 
   it('恢复中取消后迟到专用读面不能重新打开页签', async () => {

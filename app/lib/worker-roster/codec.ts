@@ -75,5 +75,7 @@ export function decodeRosterArchive(value: unknown, projectId: string, archiveId
   const preview = decodeRosterPreview(value)
   if (!rosterObject(value) || value.id !== archiveId || preview.scope.projectId !== projectId || value.evidenceKind !== 'dated-supplement' || !Number.isSafeInteger(value.version) || Number(value.version) < 1 || typeof value.createdAt !== 'string' || !rosterId(value.createdBy))
     return invalid()
+  if (value.migration !== undefined && (!rosterObject(value.migration) || Object.keys(value.migration).length !== 2 || !rosterId(value.migration.originalId) || !/^[a-f0-9]{64}$/.test(String(value.migration.originalContentHash))))
+    return invalid()
   return value as unknown as WorkerRosterArchive
 }

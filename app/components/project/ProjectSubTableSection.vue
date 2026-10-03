@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T extends Record<string, any>">
 import type { KitTableColumn } from '~/lib/kit/table'
 import { computed, shallowRef, watch } from 'vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
 
@@ -112,7 +113,7 @@ function changeFilters(payload: {
       </template>
       <template #status="{ row, rowIndex }">
         <slot name="status" :row="row" :row-index="rowIndex">
-          {{ row.status || '—' }}
+          <KitStatusTag>{{ row.status || '—' }}</KitStatusTag>
         </slot>
       </template>
       <template #source="{ row, rowIndex }">

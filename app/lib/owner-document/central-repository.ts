@@ -560,8 +560,10 @@ export function ownerFinalSettlementSupplementIsActive(status: string): boolean 
   return !['draft', '草稿'].includes(status)
 }
 
+export const INACTIVE_RECEIPT_STATUSES: readonly string[] = ['draft', '草稿', 'void', '作废', '已作废']
+
 export function ownerFinalSettlementReceiptIsActive(status: string): boolean {
-  return !['draft', '草稿', 'void', '作废', '已作废'].includes(status)
+  return !INACTIVE_RECEIPT_STATUSES.includes(status)
 }
 
 function finalSettlementSourceStatusLabel(kind: 'contract-supplement' | 'receipt', status: string): string {

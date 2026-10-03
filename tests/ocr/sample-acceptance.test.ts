@@ -12,30 +12,39 @@ import {
 } from '../../scripts/ocr-sample-acceptance.mjs'
 
 describe('ocr 本地样本验收清单', () => {
-  it('按路径区分发票和送货单，未知资料不猜测', () => {
-    expect(classifyDocument('发票/专用发票/供应商.pdf')).toBe('invoice')
-    expect(classifyDocument('合和新城送货单/送货单-001.jpg')).toBe('delivery')
-    expect(classifyDocument('分供方附件/营业执照.pdf')).toBe('certificate')
+  it.each([
+    { case: '\'发票/专用发票/供应商.pdf\'', input: '发票/专用发票/供应商.pdf', expected: 'invoice' },
+    { case: '\'合和新城送货单/送货单-001.jpg\'', input: '合和新城送货单/送货单-001.jpg', expected: 'delivery' },
+    { case: '\'分供方附件/营业执照.pdf\'', input: '分供方附件/营业执照.pdf', expected: 'certificate' },
+  ])('按路径区分发票和送货单，未知资料不猜测 / classifyDocument：$case', ({ input, expected }) => {
+    expect(classifyDocument(input)).toBe(expected)
   })
 
-  it('目录分类保留证据与待复核状态，不把路径当作业务事实', () => {
-    expect(classifyPath('发票/合同-补充协议.pdf')).toMatchObject({
+  it.each([
+    { case: '\'发票/合同-补充协议.pdf\'', input: '发票/合同-补充协议.pdf', expected: {
       type: 'unknown',
       needsReview: true,
       evidenceKeywords: expect.arrayContaining(['发票', '合同', '补充协议']),
       source: 'folder-and-file-name',
-    })
-    expect(classifyPath('分供方附件/营业执照.pdf')).toMatchObject({
+    } },
+    { case: '\'分供方附件/营业执照.pdf\'', input: '分供方附件/营业执照.pdf', expected: {
       type: 'certificate',
       confidence: expect.any(Number),
       evidenceKeywords: ['营业执照'],
-    })
+    } },
+  ])('目录分类保留证据与待复核状态，不把路径当作业务事实 / classifyPath：$case', ({ input, expected }) => {
+    expect(classifyPath(input)).toMatchObject(expected)
   })
 
   it('按扩展名区分 PDF 和图片，不支持格式返回空值', () => {
-    expect(classifyFormat('invoice.PDF')).toBe('pdf')
-    expect(classifyFormat('delivery.jpeg')).toBe('image')
     expect(classifyFormat('invoice.xlsx')).toBeNull()
+  })
+
+  it.each([
+    { case: '\'invoice.PDF\'', input: 'invoice.PDF', expected: 'pdf' },
+    { case: '\'delivery.jpeg\'', input: 'delivery.jpeg', expected: 'image' },
+  ])('按扩展名区分 PDF 和图片，不支持格式返回空值 / classifyFormat：$case', ({ input, expected }) => {
+    expect(classifyFormat(input)).toBe(expected)
   })
 
   it('为未来 AI 对照预留字段、明细行和差异状态', () => {

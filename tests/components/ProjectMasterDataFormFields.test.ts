@@ -30,7 +30,7 @@ const SectionHeaderStub = defineComponent({
 })
 
 describe('项目表单字段', () => {
-  it('按可见字段顺序呈现两列自适应分区，并让两个客户 lookup 绑定真实 ID', async () => {
+  it('按可见字段顺序呈现业务分区，并让两个客户 lookup 绑定真实 ID', async () => {
     const fetchCustomers = vi.fn().mockResolvedValue([])
     const Harness = defineComponent({
       components: { ProjectMasterDataFormFields },
@@ -57,7 +57,7 @@ describe('项目表单字段', () => {
       `,
     })
 
-    const view = render(Harness, {
+    render(Harness, {
       global: {
         components: {
           LookupSelect: LookupSelectStub,
@@ -72,9 +72,10 @@ describe('项目表单字段', () => {
       '参建单位',
       '风控与立项',
     ])
-    expect(view.container.querySelectorAll('.form-fields-grid')).toHaveLength(4)
-    expect(view.container.querySelector('[data-field="customerId"]')).not.toBeNull()
-    expect(view.container.querySelector('[data-field="secondaryCustomerId"]')).not.toBeNull()
+    expect(screen.getByRole('textbox', { name: '项目名称 *' })).not.toBeNull()
+    expect(screen.getByRole('combobox', { name: '项目风险级别' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '检索客户' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '检索次客户' })).not.toBeNull()
 
     await fireEvent.click(screen.getByRole('button', { name: '检索客户' }))
     await fireEvent.click(screen.getByRole('button', { name: '检索次客户' }))

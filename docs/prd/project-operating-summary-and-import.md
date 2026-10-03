@@ -71,7 +71,7 @@
 
 ### R-03 合同、结算、付款分离
 
-合同、结算、付款申请和支付记录的领域含义统一见 [`CONTEXT.md`](../../CONTEXT.md)，数据来源与派生约束统一见 [`DATABASE.md §10.1-10.4`](../rewrite/DATABASE.md)。页面必须把四类金额分栏展示并提供各自的源单下钻，不允许用户用一种金额回填另一种金额。
+合同、结算、付款申请和支付记录的领域含义统一见 [`CONTEXT.md`](../../CONTEXT.md)，数据来源与派生约束统一见 [`DATABASE.md §2 实体与 §4.8 成本`](../rewrite/DATABASE.md#48-动态成本与合同付款)。页面必须把四类金额分栏展示并提供各自的源单下钻，不允许用户用一种金额回填另一种金额。
 
 ### R-04 支付事实与确认
 
@@ -87,19 +87,19 @@
 
 ### R-07 工人工资例外
 
-工人工资的领域边界见 [`CONTEXT.md`](../../CONTEXT.md)，状态、成本与支付事实统一见 [`DATABASE.md §10.3`](../rewrite/DATABASE.md) 和[工资蓝本](../rewrite/pages/subcontract-payroll.md)。当前由 [#412](https://github.com/zodea/crm-new/issues/412)复核 A/C1/C2 与 B 类退役的落实；产品必须把工人工资与合同劳务分开展示，并提供工资确认发放及历史快照查询，不要求逐工人支付记录。
+工人工资的领域边界见 [`CONTEXT.md`](../../CONTEXT.md)，状态、成本与支付事实统一见 [`DATABASE.md §2.6 工资事实`](../rewrite/DATABASE.md#工资成本与实际支付的同源事实) 和[工资蓝本](../rewrite/pages/subcontract-payroll.md)。当前由 [#412](https://github.com/zodea/crm-new/issues/412)复核 A/C1/C2 与 B 类退役的落实；产品必须把工人工资与合同劳务分开展示，并提供工资确认发放及历史快照查询，不要求逐工人支付记录。
 
 ### R-08 动态成本
 
-动态成本定义见 [`CONTEXT.md`](../../CONTEXT.md)，计算与禁止混入口径见 [`DATABASE.md §10.4`](../rewrite/DATABASE.md)。页面必须展示分类构成、完整性状态和源单下钻；睿璟样本只在[验收清单](../migration/ruijing-acceptance.md)维护。
+动态成本定义见 [`CONTEXT.md`](../../CONTEXT.md)，计算与禁止混入口径见 [`DATABASE.md §4.8`](../rewrite/DATABASE.md#48-动态成本与合同付款)。页面必须展示分类构成、完整性状态和源单下钻；睿璟样本只在[验收清单](../migration/ruijing-acceptance.md)维护。
 
 ### R-09 资金指标
 
-资金指标公式统一见 [`DATABASE.md §10.6`](../rewrite/DATABASE.md)。页面必须展示流入、流出、收支差额和工程款余缺，并允许下钻到资金源单；迁移前显示值只在[验收清单](../migration/ruijing-acceptance.md)维护，差异进入对账队列。
+资金指标公式统一见 [`DATABASE.md §4.10`](../rewrite/DATABASE.md#410-资金计算)。页面必须展示流入、流出、收支差额和工程款余缺，并允许下钻到资金源单；迁移前显示值只在[验收清单](../migration/ruijing-acceptance.md)维护，差异进入对账队列。
 
 ### R-10 票税、动态效益和完整性
 
-票税实体口径沿用现有票税域；动态效益公式见 [`DATABASE.md §10.4`](../rewrite/DATABASE.md)，完整性状态见 [`DATABASE.md §10.5`](../rewrite/DATABASE.md)。页面必须区分待补录、不适用、尚未定义和真实零值，不自行补零或推算票税。
+票税实体口径沿用现有票税域；动态效益公式见 [`DATABASE.md §4.8`](../rewrite/DATABASE.md#48-动态成本与合同付款)，完整性状态见 [`DATABASE.md §4.9`](../rewrite/DATABASE.md#49-经营汇总完整性)。页面必须区分待补录、不适用、尚未定义和真实零值，不自行补零或推算票税。
 
 ## 5. 汇总页输出
 
@@ -121,7 +121,7 @@
 
 ### 5.5 状态
 
-接口形状和状态语义统一见 [`DATABASE.md §10.5`](../rewrite/DATABASE.md)。页面必须呈现指标状态、缺失来源、汇总截止时间和源单下钻入口。
+接口形状和状态语义统一见 [`DATABASE.md §4.9`](../rewrite/DATABASE.md#49-经营汇总完整性)。页面必须呈现指标状态、缺失来源、汇总截止时间和源单下钻入口。
 
 ## 6. 导入流程
 

@@ -16,9 +16,11 @@ const ledgerTree: TreeNode[] = [
 ]
 
 describe('节点计数聚合：resolveNodeCount', () => {
-  it('显式 count 优先（含 0）', () => {
-    expect(resolveNodeCount({ key: 'x', label: 'x', count: 7 })).toBe(7)
-    expect(resolveNodeCount({ key: 'x', label: 'x', count: 0 })).toBe(0)
+  it.each([
+    { case: '{ key: \'x\', label: \'x\', count: 7 }', input: { key: 'x', label: 'x', count: 7 }, expected: 7 },
+    { case: '{ key: \'x\', label: \'x\', count: 0 }', input: { key: 'x', label: 'x', count: 0 }, expected: 0 },
+  ])('显式 count 优先（含 0） / resolveNodeCount：$case', ({ input, expected }) => {
+    expect(resolveNodeCount(input)).toBe(expected)
   })
 
   it('父节点缺省 count → 聚合子节点之和（台账「全部」口径）', () => {
@@ -47,10 +49,12 @@ describe('选中判定：isNodeActive', () => {
     expect(isNodeActive('p1', 'p1')).toBe(true)
   })
 
-  it('不相等或 active 空 → false', () => {
-    expect(isNodeActive('p1', 'p2')).toBe(false)
-    expect(isNodeActive('p1', null)).toBe(false)
-    expect(isNodeActive('p1', undefined)).toBe(false)
+  it.each([
+    { case: '\'p1\' / \'p2\'', input: 'p1', argument2: 'p2', expected: false },
+    { case: '\'p1\' / null', input: 'p1', argument2: null, expected: false },
+    { case: '\'p1\' / undefined', input: 'p1', argument2: undefined, expected: false },
+  ])('不相等或 active 空 → false / isNodeActive：$case', ({ input, argument2, expected }) => {
+    expect(isNodeActive(input, argument2)).toBe(expected)
   })
 })
 

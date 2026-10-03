@@ -35,12 +35,14 @@ describe('分供方列表筛选', () => {
     })).toEqual([rows[1]])
   })
 
-  it('关键词覆盖公司名、简称、信用代码、税号、类别、联系人与电话', () => {
-    expect(filterSuppliers(rows, { search: '大板东', category: 'all', credentialStatus: 'all' })).toEqual([rows[0]])
-    expect(filterSuppliers(rows, { search: 'PQR1122', category: 'all', credentialStatus: 'all' })).toEqual([rows[1]])
-    expect(filterSuppliers(rows, { search: '材料供应商', category: 'all', credentialStatus: 'all' })).toEqual([rows[0]])
-    expect(filterSuppliers(rows, { search: '陈志强', category: 'all', credentialStatus: 'all' })).toEqual([rows[0]])
-    expect(filterSuppliers(rows, { search: '9988', category: 'all', credentialStatus: 'all' })).toEqual([rows[1]])
+  it.each([
+    { case: 'rows / { search: \'大板东\', category: \'all\', credentialStatus: \'all\' }', input: rows, argument2: { search: '大板东', category: 'all', credentialStatus: 'all' }, expected: [rows[0]] },
+    { case: 'rows / { search: \'PQR1122\', category: \'all\', credentialStatus: \'all\' }', input: rows, argument2: { search: 'PQR1122', category: 'all', credentialStatus: 'all' }, expected: [rows[1]] },
+    { case: 'rows / { search: \'材料供应商\', category: \'all\', credentialStatus: \'all\' }', input: rows, argument2: { search: '材料供应商', category: 'all', credentialStatus: 'all' }, expected: [rows[0]] },
+    { case: 'rows / { search: \'陈志强\', category: \'all\', credentialStatus: \'all\' }', input: rows, argument2: { search: '陈志强', category: 'all', credentialStatus: 'all' }, expected: [rows[0]] },
+    { case: 'rows / { search: \'9988\', category: \'all\', credentialStatus: \'all\' }', input: rows, argument2: { search: '9988', category: 'all', credentialStatus: 'all' }, expected: [rows[1]] },
+  ])('关键词覆盖公司名、简称、信用代码、税号、类别、联系人与电话 / filterSuppliers：$case', ({ input, argument2, expected }) => {
+    expect(filterSuppliers(input, argument2)).toEqual(expected)
   })
 
   it('按名称、类别或更新时间产生稳定只读排序，不改写原数组', () => {

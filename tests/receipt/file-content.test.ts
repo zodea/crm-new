@@ -14,7 +14,16 @@ describe('收款附件公开正文边界', () => {
     expect(await repository.fileContent(saved.id, fileId, 'real')).toMatchObject({ payloadBase64: 'YQ==', fileName: '凭证.txt' })
   })
 
-  it('拒绝串收款、串附件、串来源与正文损坏，合法空附件仍可读取', async () => {
+  it.each([
+    { receiptId: 'other' },
+    { fileId: 'other' },
+    { dataOrigin: 'demo' },
+    { fileSize: 1 },
+    { payloadBase64: '!!!!' },
+    { payloadBase64: 'YQ==' },
+    { sha256: '0'.repeat(64) },
+    { sha256: null },
+  ])('拒绝串收款、串附件、串来源与正文损坏：%j', async (patch) => {
     const source = createReceiptCommandTestInstance({ references: () => references })
     const saved = source.execute(command({ attachments: { add: [{ fileName: '空凭证.txt', fileSize: 0, payloadBase64: '' }] } }), session)
     const fileId = saved.attachmentIds[0]!
@@ -22,18 +31,7 @@ describe('收款附件公开正文边界', () => {
     let response: unknown = good
     const repository = createReceiptRepository(async () => response)
     expect(await repository.fileContent(saved.id, fileId, 'real')).toMatchObject({ payloadBase64: '' })
-    for (const patch of [
-      { receiptId: 'other' },
-      { fileId: 'other' },
-      { dataOrigin: 'demo' },
-      { fileSize: 1 },
-      { payloadBase64: '!!!!' },
-      { payloadBase64: 'YQ==' },
-      { sha256: '0'.repeat(64) },
-      { sha256: null },
-    ]) {
-      response = { ...good, ...patch }
-      await expect(repository.fileContent(saved.id, fileId, 'real')).rejects.toThrow(/附件|响应|数据/)
-    }
+    response = { ...good, ...patch }
+    await expect(repository.fileContent(saved.id, fileId, 'real')).rejects.toThrow(/附件|响应|数据/)
   })
 })

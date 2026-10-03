@@ -8,15 +8,18 @@ async function checked(f: Awaited<ReturnType<typeof createPayrollC1ServiceFixtur
   await f.service.executeC1(f.command(await f.service.c1Form({ origin: 'real' }, { statementId: id }), { kind: 'check-c1' }))
   return f.service.c1Form({ origin: 'real' }, { statementId: id })
 }
-it('核算与真实实发分离，全成员到分且原键只发一次，已发不可改', async () => {
+it.each([
+  [{ workerId: 'w', amount: 550 }, { workerId: 'member', amount: 350 }],
+  [{ workerId: 'w', amount: 550.01 }, { workerId: 'member', amount: 350 }, { workerId: 'zero', amount: 0 }],
+  [{ workerId: 'w', amount: 550 }, { workerId: 'w', amount: 550 }, { workerId: 'zero', amount: 0 }],
+].map(allocations => ({ allocations })))('核算与实发分离，拒绝非法全成员分配：%#', async ({ allocations }) => {
   const f = await createPayrollC1ServiceFixture()
   try {
     await f.attendance()
     await f.attendance({ workerId: 'member', hours: 7.5, overtimeHours: 0 })
     const read = await checked(f)
     const release = { actualAmount: 900, allocations: [{ workerId: 'w', amount: 550 }, { workerId: 'member', amount: 350 }, { workerId: 'zero', amount: 0 }] }
-    for (const allocations of [release.allocations.slice(0, 2), release.allocations.map((a, i) => ({ ...a, amount: a.amount + (i === 0 ? 0.01 : 0) })), [release.allocations[0]!, release.allocations[0]!, release.allocations[2]!]])
-      await expect(f.service.executeC1(f.command(read, { kind: 'release-c1', release: { ...release, allocations } }))).rejects.toThrow()
+    await expect(f.service.executeC1(f.command(read, { kind: 'release-c1', release: { ...release, allocations } }))).rejects.toThrow()
     const command = f.command(read, { kind: 'release-c1', release })
     const result = await f.service.executeC1(command)
     expect(await f.service.executeC1(command)).toEqual(result)

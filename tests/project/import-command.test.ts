@@ -58,23 +58,57 @@ function harness() {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('项目中央逐行导入命令', () => {
-  it('完整分页解析唯一 ID/名称/别名，重复同名必须用稳定 ID，不采用演示候选', async () => {
+  async function createResolveImportCustomerFixture() {
     const h = harness()
     h.customers.unshift(...Array.from({ length: 102 }, (_, index) => customer(`before-${index}`, `客户${index}`)))
     const request = await h.importer.prepare(sourceRow({ customerName: '简称423' }))
     expect(h.list).toHaveBeenCalledTimes(2)
     expect(request.draft.customerId).toBe('customer-423')
     h.customers.push(customer('second', '甲方423'))
-    expect(resolveImportCustomer('customer-423', h.customers, '客户')).toBe('customer-423')
-    expect(() => resolveImportCustomer('甲方423', h.customers, '客户')).toThrow('歧义')
-    expect(() => resolveImportCustomer('demo', [{ ...customer('demo', '测试客户'), dataOrigin: 'demo' }], '客户')).toThrow('正式可读范围')
+    return { h, request }
+  }
+
+  it('完整分页解析唯一 ID/名称/别名，重复同名必须用稳定 ID，不采用演示候选', async () => {
+    const { h } = await createResolveImportCustomerFixture()
     expect(projectDraftFromImport(sourceRow({ status: '旧阶段' }), h.customers).status).toBe('筹备中')
-    expect(() => projectDraftFromImport(sourceRow({ manager: '' }), h.customers)).toThrow('项目经理')
-    expect(() => projectDraftFromImport(sourceRow({ startDate: '2026/09/09' }), h.customers)).toThrow('ISO 日期')
+  })
+
+  it.each([
+    { case: '缺项目经理', patch: { manager: '' }, customers: 'original', expected: '项目经理' },
+    { case: '非 ISO 日期', patch: { startDate: '2026/09/09' }, customers: 'original', expected: 'ISO 日期' },
+    { case: '停用客户', patch: { customerName: 'inactive-423' }, customers: 'inactive', expected: '已停用' },
+    { case: '停用次客户', patch: { secondaryCustomerName: 'inactive-423' }, customers: 'both', expected: '次客户“停用客户”已停用' },
+  ])('导入草稿拒绝 $case', ({ patch, customers, expected }) => {
+    const h = harness()
     const inactive = { ...customer('inactive-423', '停用客户'), status: 'inactive' }
-    expect(() => projectDraftFromImport(sourceRow({ customerName: inactive.customer.id }), [inactive])).toThrow('已停用')
-    expect(() => projectDraftFromImport(sourceRow({ secondaryCustomerName: inactive.customer.id }), [...h.customers, inactive])).toThrow('次客户“停用客户”已停用')
-    expect(resolveImportCustomer('other-status', [{ ...customer('other-status', '其他状态'), status: 'legacy-unknown' }], '客户')).toBe('other-status')
+    const lookup = customers === 'inactive' ? [inactive] : customers === 'both' ? [...h.customers, inactive] : h.customers
+    expect(() => projectDraftFromImport(sourceRow(patch), lookup)).toThrow(expected)
+  })
+
+  it.each([
+    { case: '\'customer-423\' / h.customers / \'客户\'', prepare: async ({ h }: Awaited<ReturnType<typeof createResolveImportCustomerFixture>>) => {
+      return { input: 'customer-423', argument2: h.customers, argument3: '客户', expected: 'customer-423' } as const
+    } },
+    { case: '\'other-status\' / [{ ...customer(\'other-status\', \'其他状态\'), status: \'legacy-unknown\' }] / \'客户\'', prepare: async (_fixture: Awaited<ReturnType<typeof createResolveImportCustomerFixture>>) => {
+      return { input: 'other-status', argument2: [{ ...customer('other-status', '其他状态'), status: 'legacy-unknown' }], argument3: '客户', expected: 'other-status' } as const
+    } },
+  ])('完整分页解析唯一 ID/名称/别名，重复同名必须用稳定 ID，不采用演示候选 / resolveImportCustomer：$case', async ({ prepare }) => {
+    const fixture = await createResolveImportCustomerFixture()
+    const { input, argument2, argument3, expected } = await prepare(fixture)
+    expect(resolveImportCustomer(input, argument2, argument3)).toBe(expected)
+  })
+
+  it.each([
+    { case: '\'甲方423\' / h.customers / \'客户\'', prepare: async ({ h }: Awaited<ReturnType<typeof createResolveImportCustomerFixture>>) => {
+      return { input: '甲方423', argument2: h.customers, argument3: '客户', expected: '歧义' } as const
+    } },
+    { case: '\'demo\' / [{ ...customer(\'demo\', \'测试客户\'), dataOrigin: \'demo\' }] / \'客户\'', prepare: async (_fixture: Awaited<ReturnType<typeof createResolveImportCustomerFixture>>) => {
+      return { input: 'demo', argument2: [{ ...customer('demo', '测试客户'), dataOrigin: 'demo' }], argument3: '客户', expected: '正式可读范围' } as const
+    } },
+  ])('完整分页解析唯一 ID/名称/别名，重复同名必须用稳定 ID，不采用演示候选 / resolveImportCustomer：$case', async ({ prepare }) => {
+    const fixture = await createResolveImportCustomerFixture()
+    const { input, argument2, argument3, expected } = await prepare(fixture)
+    expect(() => resolveImportCustomer(input, argument2, argument3)).toThrow(expected)
   })
 
   it('相同来源并发/重传及外部旧 ID 重试返回同一项目，修改内容明确冲突', async () => {
@@ -146,15 +180,31 @@ describe('项目中央逐行导入命令', () => {
     expect(h.commands.rows()).toHaveLength(2)
   })
 
-  it('中央信封拒绝伪造身份、导入编辑目标和未知来源字段格式', async () => {
+  async function createParseProjectCommandRequestFixture() {
     const h = harness()
     const request = await h.importer.prepare(sourceRow())
     await expect(h.commands.execute({ ...request, actorId: 'spoof' }, context)).rejects.toThrow('操作人')
     await expect(h.commands.execute(request, { ...context, capabilities: [] })).rejects.toThrow('写入权限')
-    expect(() => parseProjectCommandRequest({ ...request, id: 'overwrite' }, 'overwrite')).toThrow('只能新建')
-    expect(() => parseProjectCommandRequest({ ...request, importSource: { ...request.importSource, rowNumber: -1 } })).toThrow('来源信息无效')
+    return { h, request }
+  }
+
+  it('中央信封拒绝伪造身份、导入编辑目标和未知来源字段格式', async () => {
+    const { h, request } = await createParseProjectCommandRequestFixture()
     await expect(h.commands.execute({ ...request, action: 'submit' } as ProjectCommandRequestDTO, context)).rejects.toThrow('只能新建')
     expect(h.commands.rows()).toHaveLength(0)
+  })
+
+  it.each([
+    { case: '{ ...request, id: \'overwrite\' } / \'overwrite\'', prepare: async ({ request }: Awaited<ReturnType<typeof createParseProjectCommandRequestFixture>>) => {
+      return { input: { ...request, id: 'overwrite' }, argument2: 'overwrite', expected: '只能新建' } as const
+    } },
+    { case: '{ ...request, importSource: { ...request.importSource, rowNumber: -1 } }', prepare: async ({ request }: Awaited<ReturnType<typeof createParseProjectCommandRequestFixture>>) => {
+      return { input: { ...request, importSource: { ...request.importSource, rowNumber: -1 } }, argument2: undefined, expected: '来源信息无效' } as const
+    } },
+  ])('中央信封拒绝伪造身份、导入编辑目标和未知来源字段格式 / parseProjectCommandRequest：$case', async ({ prepare }) => {
+    const fixture = await createParseProjectCommandRequestFixture()
+    const { input, argument2, expected } = await prepare(fixture)
+    expect(() => parseProjectCommandRequest(input, argument2)).toThrow(expected)
   })
 
   it('提交期业务拒绝继续下一行，取消阻止尚未执行的剩余行', async () => {

@@ -13,7 +13,7 @@ describe('可操作表头', () => {
       options: [{ key: 'draft', label: '草稿' }, { key: 'submitted', label: '已提交' }],
     } })
     const trigger = screen.getByRole('button', { name: '筛选状态' })
-    expect(trigger.classList.contains('is-active')).toBe(false)
+    expect(screen.queryByText('已筛选')).toBeNull()
     await fireEvent.click(trigger)
     await fireEvent.click(screen.getByRole('checkbox', { name: '草稿' }))
     await fireEvent.click(screen.getByRole('checkbox', { name: '已提交' }))
@@ -21,14 +21,14 @@ describe('可操作表头', () => {
     await fireEvent.click(screen.getByRole('button', { name: '应用' }))
     expect(emitted().apply).toEqual([[['draft', 'submitted']]])
     await rerender({ value: ['draft', 'submitted'] })
-    expect(trigger.classList.contains('is-active')).toBe(true)
+    expect(screen.getByText('已筛选')).not.toBeNull()
     await fireEvent.click(trigger)
     expect((screen.getByRole('checkbox', { name: '草稿' }) as HTMLInputElement).checked).toBe(true)
     await fireEvent.click(screen.getByRole('checkbox', { name: '不限' }))
     await fireEvent.click(screen.getByRole('button', { name: '应用' }))
     expect(emitted().apply).toEqual([[['draft', 'submitted']], [[]]])
     await rerender({ value: [] })
-    expect(trigger.classList.contains('is-active')).toBe(false)
+    expect(screen.queryByText('已筛选')).toBeNull()
   })
 
   it('打开真实文本筛选，应用输入并可重新打开清空', async () => {
@@ -43,7 +43,11 @@ describe('可操作表头', () => {
     expect(emitted().apply).toEqual([['广州'], ['']])
   })
 
-  it('拒绝倒置范围；排序动作独立发出且不吞掉筛选', async () => {
+  it.each([
+    { min: '100', max: '10' },
+    { min: '0', max: '-1' },
+    { min: '10.01', max: '10' },
+  ])('拒绝倒置范围 $min > $max；排序动作独立发出且不吞掉筛选', async ({ min, max }) => {
     const { emitted } = render(KitColumnHeader, { props: {
       title: '有效合同额',
       kind: 'number',
@@ -51,12 +55,27 @@ describe('可操作表头', () => {
       sortOptions: [{ key: 'contractAmount-asc', label: '金额升序' }],
     } })
     await fireEvent.click(screen.getByRole('button', { name: '筛选有效合同额' }))
-    await fireEvent.update(screen.getByRole('spinbutton', { name: '最小值' }), '100')
-    await fireEvent.update(screen.getByRole('spinbutton', { name: '最大值' }), '10')
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '最小值' }), min)
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '最大值' }), max)
     await fireEvent.click(screen.getByRole('button', { name: '应用' }))
     expect(screen.getByRole('alert').textContent).toContain('最大值不能小于最小值')
     expect(emitted().apply).toBeUndefined()
     await fireEvent.click(screen.getByRole('button', { name: '金额升序' }))
     expect(emitted().sort).toEqual([['contractAmount-asc']])
+  })
+
+  it.each([
+    { min: '0', max: '10', expected: { min: 0, max: 10 } },
+    { min: '10', max: '10', expected: { min: 10, max: 10 } },
+    { min: '', max: '10', expected: { max: 10 } },
+    { min: '10', max: '', expected: { min: 10 } },
+  ])('有效范围 $min 到 $max 按原始边界提交', async ({ min, max, expected }) => {
+    const { emitted } = render(KitColumnHeader, { props: { title: '有效合同额', kind: 'number', value: null } })
+    await fireEvent.click(screen.getByRole('button', { name: '筛选有效合同额' }))
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '最小值' }), min)
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '最大值' }), max)
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(emitted().apply).toEqual([[expected]])
   })
 })

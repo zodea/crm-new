@@ -57,6 +57,7 @@ export function useScheduleGroupWizard() {
   const active = shallowRef(true)
   let initializeSequence = 0
   let rangeSequence = 0
+  let recheckSequence = 0
   const submitError = shallowRef('')
   const confirming = shallowRef(false)
   const draftNotice = shallowRef('')
@@ -549,12 +550,24 @@ export function useScheduleGroupWizard() {
     }
   }
   async function recheck() {
+    const request = ++recheckSequence
+    const generation = initializeSequence
+    const requestedProject = projectId.value
+    const requestedOrigin = libraryOrigin.value
+    const requestedSession = store.sessionKey
+    const isCurrent = () => active.value && request === recheckSequence && generation === initializeSequence
+      && requestedProject === projectId.value && requestedOrigin === libraryOrigin.value && requestedSession === store.sessionKey
     try {
-      await store.recheck()
-      if (await loadRange(false))
+      await Promise.all([store.recheck(), store.loadProcessLibraries()])
+      if (!isCurrent())
+        return
+      if (await loadRange(false) && isCurrent())
         submitError.value = ''
     }
-    catch (cause) { submitError.value = toErrorMessage(cause) }
+    catch (cause) {
+      if (isCurrent())
+        submitError.value = toErrorMessage(cause)
+    }
   }
   async function recoverPending() {
     try {

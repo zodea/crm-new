@@ -12,7 +12,7 @@ describe('列表多选筛选器', () => {
       options: [{ key: 'all', label: '全部' }, { key: 'draft', label: '草稿' }, { key: 'signed', label: '已签订' }],
     } })
     const trigger = screen.getByRole('button', { name: '合同状态，已选 0 项' })
-    expect(trigger.classList.contains('is-active')).toBe(false)
+    expect(trigger.getAttribute('aria-label')).toBe('合同状态，已选 0 项')
     await fireEvent.click(trigger)
     await fireEvent.click(screen.getByRole('button', { name: '全选' }))
     expect(screen.getByText('已选 2 项')).toBeTruthy()

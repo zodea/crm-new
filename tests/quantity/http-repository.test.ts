@@ -18,16 +18,13 @@ describe('工程量 HTTP Repository', () => {
     expect(fetcher).toHaveBeenCalledWith('/api/read/quantity/region', { query })
   })
 
-  it('响应项目、来源或区域祖先错配均拒绝，不能采纳到请求项目', async () => {
-    const malformed = [
-      { ...response, dataOrigin: 'demo' },
-      { ...response, data: { ...response.data, projectId: 'other' } },
-      { ...response, data: { ...response.data, floors: [{ id: 'f', buildingId: 'missing', code: '1', name: '1层', sortOrder: 1 }] } },
-    ]
-    for (const value of malformed) {
-      const repository = createQuantityRepository(async () => value)
-      await expect(repository.region(query)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
-    }
+  it.each([
+    { ...response, dataOrigin: 'demo' },
+    { ...response, data: { ...response.data, projectId: 'other' } },
+    { ...response, data: { ...response.data, floors: [{ id: 'f', buildingId: 'missing', code: '1', name: '1层', sortOrder: 1 }] } },
+  ])('响应项目、来源或区域祖先错配均拒绝：%#', async (value) => {
+    const repository = createQuantityRepository(async () => value)
+    await expect(repository.region(query)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
   })
 
   it('保留服务器冲突状态，断网明确不可用且每次只请求当前端点', async () => {
@@ -60,15 +57,15 @@ describe('工程量 HTTP Repository', () => {
     await expect(createQuantityRepository(async () => ({ ...result, id: 'project', batch: { completed: [{ unitId: 'other', stageId: 'stage', unitName: '其他户', stageName: '阶段', completionId: 'c', reason: null }], drafted: [], unchanged: [], logIds: [] } })).execute(batch)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
   })
 
-  it('照片校验完整归属和正文摘要，取消后的迟到响应不能提供内容', async () => {
+  it.each([{ completionId: 'other' }, { contentBase64: 'AQIE' }, { fileSize: 4 }])('照片校验完整归属和正文摘要，取消后的迟到响应不能提供内容：%j', async (patch) => {
     const scope = { ...query, unitId: 'unit', completionId: 'completion', photoId: 'photo' }
     const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array([1, 2, 3])))].map(byte => byte.toString(16).padStart(2, '0')).join('')
     const value = { ...response, data: { projectId: query.projectId, unitId: scope.unitId, completionId: scope.completionId, photoId: scope.photoId, fileName: '验收.png', mimeType: 'image/png', fileSize: 3, contentBase64: 'AQID', sha256 } }
     const fetcher = vi.fn(async () => structuredClone(value))
     expect(await createQuantityRepository(fetcher).photo(scope)).toEqual(value)
     expect(fetcher).toHaveBeenCalledWith('/api/read/quantity/photo', { query: scope, signal: undefined })
-    for (const data of [{ ...value.data, completionId: 'other' }, { ...value.data, contentBase64: 'AQIE' }, { ...value.data, fileSize: 4 }])
-      await expect(createQuantityRepository(async () => ({ ...value, data })).photo(scope)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    const data = { ...value.data, ...patch }
+    await expect(createQuantityRepository(async () => ({ ...value, data })).photo(scope)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
     const controller = new AbortController()
     const late = createQuantityRepository(async () => {
       controller.abort()

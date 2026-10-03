@@ -29,7 +29,12 @@ describe('subcontract contract return context', () => {
     const expected = `/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=supplement-1&returnTo=${encodeURIComponent(canonicalList)}`
 
     expect(validateSubcontractContractDetailReturnTo(input, 'real')).toBe(expected)
-    expect(validateSubcontractContractDetailReturnTo('/contract/contract-1?origin=real&contractKind=subcontract&tab=payments&focus=supplement-1', 'real')).toBeNull()
-    expect(validateSubcontractContractDetailReturnTo('/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=%00', 'real')).toBeNull()
+  })
+
+  it.each([
+    { case: '\'/contract/contract-1?origin=real&contractKind=subcontract&tab=payments&focus=supplement-1\' / \'real\'', input: '/contract/contract-1?origin=real&contractKind=subcontract&tab=payments&focus=supplement-1', argument2: 'real' },
+    { case: '\'/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=%00\' / \'real\'', input: '/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=%00', argument2: 'real' },
+  ])('只接受变更页签上的稳定补充协议聚焦，并将详情 URL 收敛为白名单字段 / validateSubcontractContractDetailReturnTo：$case', ({ input, argument2 }) => {
+    expect(validateSubcontractContractDetailReturnTo(input, argument2)).toBeNull()
   })
 })

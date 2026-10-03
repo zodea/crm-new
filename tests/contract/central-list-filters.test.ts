@@ -16,22 +16,20 @@ describe('合同中央列表固定条件多选', () => {
     { name: '分包', parse: parseSubcontractContractListQuery, serialize: serializeSubcontractContractListQuery },
   ] as const
 
-  for (const item of cases) {
-    it(`${item.name}经 HTTP 编解码保留多个状态，兼容旧单选链接`, () => {
-      const query = item.parse({ status: JSON.stringify(['草稿', '履约中', '草稿']), page: 2 })
-      expect(query.status).toEqual(['草稿', '履约中'])
-      // 三种 DTO 的关联方字段不同，在各自分支内验证同一编解码契约。
-      const encoded = item.name === '材料采购'
-        ? serializeMaterialContractListQuery(parseMaterialContractListQuery({ ...query }))
-        : item.name === '施工'
-          ? serializeConstructionContractListQuery(parseConstructionContractListQuery({ ...query }))
-          : serializeSubcontractContractListQuery(parseSubcontractContractListQuery({ ...query }))
-      expect(item.parse(encoded).status).toEqual(['草稿', '履约中'])
-      expect(item.parse({ status: '履约中' }).status).toBe('履约中')
-      expect(item.parse({ status: '[]' }).status).toBeNull()
-      expect(() => item.parse({ status: '["草稿",1]' })).toThrow()
-    })
-  }
+  it.each(cases)('$name 经 HTTP 编解码保留多个状态，兼容旧单选链接', (item) => {
+    const query = item.parse({ status: JSON.stringify(['草稿', '履约中', '草稿']), page: 2 })
+    expect(query.status).toEqual(['草稿', '履约中'])
+    // 三种 DTO 的关联方字段不同，在各自分支内验证同一编解码契约。
+    const encoded = item.name === '材料采购'
+      ? serializeMaterialContractListQuery(parseMaterialContractListQuery({ ...query }))
+      : item.name === '施工'
+        ? serializeConstructionContractListQuery(parseConstructionContractListQuery({ ...query }))
+        : serializeSubcontractContractListQuery(parseSubcontractContractListQuery({ ...query }))
+    expect(item.parse(encoded).status).toEqual(['草稿', '履约中'])
+    expect(item.parse({ status: '履约中' }).status).toBe('履约中')
+    expect(item.parse({ status: '[]' }).status).toBeNull()
+    expect(() => item.parse({ status: '["草稿",1]' })).toThrow()
+  })
 
   it('三个详情返回地址都保留多选状态与分包类型', () => {
     const input = { status: '["草稿","履约中"]', subKind: '["劳务","专业"]', origin: 'real', page: '2' }

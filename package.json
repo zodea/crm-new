@@ -3,8 +3,14 @@
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.26.0",
+  "engines": {
+    "node": "24.12.0",
+    "pnpm": "10.26.0"
+  },
   "scripts": {
     "build": "nuxt build",
+    "check:cycles": "dpdm",
+    "check:deps": "node-modules-inspector report duplicates --depth 20",
     "design:sync-coverage": "node scripts/sync-design-coverage.mjs",
     "design:sync-manifest": "node scripts/sync-design-token-manifest.mjs",
     "dev": "nuxt dev",
@@ -14,6 +20,8 @@
     "tauri": "tauri",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:browser:watch": "vitest --config vitest.browser.config.ts --project chromium-1280 --browser.headless=false",
     "test:components": "vitest run --project component",
     "test:e2e": "playwright test",
     "test:unit": "vitest run --project unit",
@@ -51,18 +59,29 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.1.0",
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
     "@nuxt/eslint": "^1.16.0",
     "@playwright/test": "^1.61.1",
     "@tauri-apps/cli": "^2.11.4",
     "@testing-library/vue": "8.1.0",
     "@vitejs/plugin-vue": "6.0.8",
+    "@vitest/browser-playwright": "4.1.10",
     "@vue/test-utils": "2.4.11",
+    "dpdm": "4.3.0",
     "eslint": "^10.6.0",
     "husky": "^9.1.7",
     "jsdom": "29.1.1",
     "lint-staged": "^17.0.8",
+    "node-modules-inspector": "2.7.0",
     "vitest": "^4.1.10",
     "vitest-axe": "0.1.0",
+    "vitest-browser-vue": "3.1.0",
     "vue-tsc": "^3.3.7"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "node-modules-tools@2.7.0": "patches/node-modules-tools@2.7.0.patch"
+    }
   }
 }

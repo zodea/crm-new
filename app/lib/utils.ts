@@ -1,4 +1,5 @@
-import { clsx, type ClassValue } from 'clsx'
+import type { ClassValue } from 'clsx'
+import { clsx } from 'clsx'
 
 /**
  * class 合并（UnoCSS 版）——仅用 clsx，**不依赖 tailwind-merge**。

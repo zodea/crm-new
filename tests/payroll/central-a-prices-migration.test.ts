@@ -23,7 +23,10 @@ async function fixture() {
   return { original, ...migrated, draft, scope, command, form }
 }
 
-it('迁入的单元工资价按已证身份供后月读取和修订，原范围 JSON 保持原文', async () => {
+it.each([
+  { field: 'unitId', makeId: (id: string) => id.replace(':units:', ':rooms:') },
+  { field: 'roomId', makeId: () => 'arbitrary%3Aroom' },
+] as const)('迁入工资价拒绝错配 $field，后月修订保原范围 JSON', async ({ field, makeId }) => {
   const f = await fixture()
   const [sourceRow] = await f.original.db.select<{ scope_json: string }>('SELECT scope_json FROM payroll_a_price_revisions')
   let config = await f.service.aConfig({ origin: 'real' }, f.scope)
@@ -33,12 +36,9 @@ it('迁入的单元工资价按已证身份供后月读取和修订，原范围 
   expect((await f.form()).totals.grossAmount.value).toBe(1000)
   if (price.scope.kind !== 'cells')
     throw new Error('真实迁入夹具须保留明确责任单元范围')
-  for (const cell of [
-    { ...price.scope.cells[0]!, unitId: price.scope.cells[0]!.unitId.replace(':units:', ':rooms:') },
-    { ...price.scope.cells[0]!, roomId: 'arbitrary%3Aroom' },
-  ]) {
-    await expect(f.service.execute(f.command(config, { kind: 'save-a-prices', prices: [{ priceId: price.priceId, itemId: price.itemId, unit: price.unit, mode: price.mode, workerId: price.workerId, effectiveMonth: f.scope.month, unitPrice: 300, scope: { kind: 'cells', cells: [cell] } }] }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
-  }
+  const originalCell = price.scope.cells[0]!
+  const cell = { ...originalCell, [field]: makeId(originalCell[field]) }
+  await expect(f.service.execute(f.command(config, { kind: 'save-a-prices', prices: [{ priceId: price.priceId, itemId: price.itemId, unit: price.unit, mode: price.mode, workerId: price.workerId, effectiveMonth: f.scope.month, unitPrice: 300, scope: { kind: 'cells', cells: [cell] } }] }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
   await expect(f.service.execute(f.command(config, { kind: 'save-a-prices', prices: [{ priceId: null, itemId: price.itemId, unit: price.unit, mode: price.mode, workerId: price.workerId, effectiveMonth: f.scope.month, unitPrice: 300, scope: price.scope }] }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
   config = await f.service.aConfig({ origin: 'real' }, f.scope)
   await f.service.execute(f.command(config, { kind: 'save-a-prices', prices: [{ priceId: price.priceId, itemId: price.itemId, unit: price.unit, mode: price.mode, workerId: price.workerId, effectiveMonth: f.scope.month, unitPrice: 300, scope: price.scope }] }))
@@ -50,7 +50,11 @@ it('迁入的单元工资价按已证身份供后月读取和修订，原范围 
   expect(unchanged?.scope_json).toBe(sourceRow?.scope_json)
 }, 30_000)
 
-it('两次真实迁入后沿原价格系列续改并发放，价格身份只接受对应规范映射', async () => {
+it.each([
+  (id: string) => id.replace(':payroll-price:', ':payroll-hollow-policy:'),
+  () => 'arbitrary%3Aprice',
+  (id: string) => id.replace('%3A', '%3a'),
+])('两次迁入后沿原价格系列续改发放，拒绝非规范身份：%#', async (makePriceId) => {
   const first = await fixture()
   const cloned = await cloneQuantityHollowSnapshot(await first.instance.exportSnapshotBytes())
   try {
@@ -87,8 +91,8 @@ it('两次真实迁入后沿原价格系列续改并发放，价格身份只接�
     const [after] = await second.instance.withWorkspaceTransaction(tx => tx.select<{ scope_json: string }>('SELECT scope_json FROM payroll_a_price_revisions WHERE id=?', [price.id]))
     expect(after?.scope_json).toBe(before?.scope_json)
 
-    for (const priceId of [price.priceId.replace(':payroll-price:', ':payroll-hollow-policy:'), 'arbitrary%3Aprice', price.priceId.replace('%3A', '%3a')])
-      await expect(second.service.execute(command(updated, { ...action, prices: [{ ...action.prices[0]!, priceId }] }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    const priceId = makePriceId(price.priceId)
+    await expect(second.service.execute(command(updated, { ...action, prices: [{ ...action.prices[0]!, priceId }] }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
     const wrongRevisionId = price.id.replace(':payroll_a_price_revisions:', ':wage_statements:')
     expect(() => decodePayrollARead(encodePayrollAWire({ ...config, prices: [{ ...price, id: wrongRevisionId }] }), 'config', { origin: 'real' }, scope)).toThrow()
     expect(() => decodePayrollARead(encodePayrollAWire({ ...config, prices: [{ ...price, priceId: wrongRevisionId }] }), 'config', { origin: 'real' }, scope)).toThrow()

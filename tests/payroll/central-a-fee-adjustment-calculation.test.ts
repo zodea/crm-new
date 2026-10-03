@@ -16,21 +16,24 @@ function basis(management = false): PayrollAAdjustmentBasis {
 }
 
 describe('a 费用独立更正计算', () => {
-  it('普通工资与独立住房补贴组成3730，再按同一A比例核算', () => {
+  it.each([
+    { quantity: 100, payRatio: 1, expected: 3730 },
+    { quantity: 90, payRatio: 1, expected: 3717 },
+    { quantity: 90, payRatio: 0.8, expected: 2973.6 },
+  ])('普通工资与独立住房补贴按数量 $quantity、比例 $payRatio 核算 $expected', ({ quantity, payRatio, expected }) => {
     const draft = basis()
-    expect(payrollCorrectionAmount(draft).value).toBe(3730)
-    draft.fees!.components[0]!.quantity = 90
-    expect(payrollCorrectionAmount(draft).value).toBe(3717)
-    draft.payRatio = 0.8
-    expect(payrollCorrectionAmount(draft).value).toBe(2973.6)
+    draft.fees!.components[0]!.quantity = quantity
+    draft.payRatio = payRatio
+    expect(payrollCorrectionAmount(draft).value).toBe(expected)
   })
 
-  it('1500管理清单加30套×-20后乘80%=720，负价不二次扣除', () => {
+  it.each([
+    { quantity: 30, expected: 720 },
+    { quantity: 20, expected: 880 },
+  ])('1500管理清单加 $quantity 套×-20后乘80%=$expected，负价不二次扣除', ({ quantity, expected }) => {
     const draft = basis(true)
-    draft.fees!.negativeLines.push({ lineId: 'negative', originalNegativeRevisionId: 'negative-r1', label: '未收尾代付', quantity: 30, unit: '套', unitPrice: -20, scope: { assignments: [{ assignmentId: 'assignment', scopeIds: ['scope'], cells: [{ unitId: 'u', roomId: 'r', itemId: 'item' }] }] }, reason: '明确未收尾范围', evidenceNote: '负责人复核记录', actualRef: null })
-    expect(payrollCorrectionAmount(draft).value).toBe(720)
-    draft.fees!.negativeLines[0]!.quantity = 20
-    expect(payrollCorrectionAmount(draft).value).toBe(880)
+    draft.fees!.negativeLines.push({ lineId: 'negative', originalNegativeRevisionId: 'negative-r1', label: '未收尾代付', quantity, unit: '套', unitPrice: -20, scope: { assignments: [{ assignmentId: 'assignment', scopeIds: ['scope'], cells: [{ unitId: 'u', roomId: 'r', itemId: 'item' }] }] }, reason: '明确未收尾范围', evidenceNote: '负责人复核记录', actualRef: null })
+    expect(payrollCorrectionAmount(draft).value).toBe(expected)
   })
 
   it('同费用同楼栋同分项同价先汇总数量，两个0.005只结算0.01', () => {
@@ -46,23 +49,23 @@ describe('a 费用独立更正计算', () => {
     expect(payrollCorrectionAmount(draft).value).toBe(0.01)
   })
 
-  it('v2缺费用不能降级成只算普通工资，未知量仍是未知', () => {
+  it.each([
+    { case: 'v2缺费用', change: (draft: PayrollAAdjustmentBasis) => Reflect.deleteProperty(draft, 'fees') },
+    { case: '费用量未知', change: (draft: PayrollAAdjustmentBasis) => { draft.fees!.components[0]!.quantity = null } },
+  ])('$case 不能降级成只算普通工资或已知量', ({ change }) => {
     const draft = basis()
-    delete draft.fees
+    change(draft)
     expect(payrollCorrectionAmount(draft).value).toBeNull()
-    const unknown = basis()
-    unknown.fees!.components[0]!.quantity = null
-    expect(payrollCorrectionAmount(unknown).value).toBeNull()
   })
 
-  it('更正不能借费项替换、移除或换簿转移原来源', () => {
+  it.each([
+    { case: '替换费项', change: (draft: PayrollAAdjustmentBasis) => { draft.fees!.components[0]!.feeId = 'other-fee' } },
+    { case: '移除费项', change: (draft: PayrollAAdjustmentBasis) => { draft.fees!.components = [] } },
+    { case: '更换账簿', change: (draft: PayrollAAdjustmentBasis) => { draft.fees!.book = { bookPurpose: 'management', managementBookId: 'other-book' } } },
+  ])('更正不能借 $case 转移原来源', ({ change }) => {
     const original = basis()
     const draft = structuredClone(original)
-    draft.fees!.components[0]!.feeId = 'other-fee'
-    expect(payrollCorrectionReasons(draft, original).length).toBeGreaterThan(0)
-    draft.fees = { ...structuredClone(original.fees!), components: [] }
-    expect(payrollCorrectionReasons(draft, original).length).toBeGreaterThan(0)
-    draft.fees = { ...structuredClone(original.fees!), book: { bookPurpose: 'management', managementBookId: 'other-book' } }
+    change(draft)
     expect(payrollCorrectionReasons(draft, original).length).toBeGreaterThan(0)
   })
 })

@@ -4,6 +4,28 @@ import type {
   ProjectContractFormDraft,
 } from '~/lib/contract/forms'
 
+export interface ContractSupplierOption {
+  id: string
+  label: string
+  contactName?: string
+  contactPhone?: string
+}
+
+export function contractSupplierSelectionPatch(
+  draft: ProjectContractFormDraft,
+  patch: Partial<ProjectContractFormDraft>,
+  suppliers: readonly ContractSupplierOption[],
+): Partial<ProjectContractFormDraft> {
+  if (draft.isSupplement || !Object.hasOwn(patch, 'supplierId') || patch.supplierId === draft.supplierId)
+    return patch
+  const supplier = suppliers.find(row => row.id === patch.supplierId)
+  return {
+    ...patch,
+    contactName: supplier?.contactName ?? '',
+    contactPhone: supplier?.contactPhone ?? '',
+  }
+}
+
 export interface ContractFormSection {
   key: string
   label: string
@@ -143,7 +165,7 @@ export function f2FormDefaults(kind: F2FormKind): F2FormDraft {
         signDate: '',
         status: '草稿',
         invoiceType: '增值税专用发票',
-        taxRate: kind === 'material' ? 13 : 9,
+        taxRate: null,
         otherExpenseKind: kind === 'other_expense' ? '机械租赁' : '',
         paymentCycle: kind === 'other_expense' ? '月付' : '',
         amount: 0,

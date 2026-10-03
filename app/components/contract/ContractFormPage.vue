@@ -8,7 +8,9 @@ import type {
   ProjectContractFormDraft,
 } from '~/lib/contract/forms'
 import type { FormFooterAction } from '~/lib/master-data/page'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
+import { contractAuxStatusTone } from '~/lib/contract/aux-list'
 import {
   listContractFormAttachments,
   loadContractSupplementForm,
@@ -19,6 +21,7 @@ import {
   f2FormDefaults,
   formPath,
 } from '~/lib/contract/page'
+import { contractStatusTone } from '~/lib/contract/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -67,6 +70,11 @@ const title = computed(() =>
 useTabTitle(title)
 
 const draft = ref<PageDraft>(f2FormDefaults(props.kind) as PageDraft)
+const statusTone = computed(() =>
+  ['construction', 'subcontract', 'material'].includes(props.kind)
+    ? contractStatusTone(draft.value.status)
+    : contractAuxStatusTone(draft.value.status ?? ''),
+)
 const lineItemsEditor = useTemplateRef<{
   validate: () => { row: number, key: string }[]
 }>('lineItemsEditor')
@@ -400,9 +408,9 @@ onMounted(() => void initialize())
     @state-action="initialize"
   >
     <template #status>
-      <span v-if="draft.status" class="chip bg-surface-3 text-ink-soft">
+      <KitStatusTag v-if="draft.status" :tone="statusTone">
         {{ draft.status }}
-      </span>
+      </KitStatusTag>
     </template>
 
     <form class="flex min-w-0 flex-col gap-4" @submit.prevent>

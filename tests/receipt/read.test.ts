@@ -13,8 +13,6 @@ describe('普通收款中央读模型与 Repository', () => {
     const mixed = read.list({ includeDemo: true }, { ...session, capabilities: [...session.capabilities, 'demo:read'] })
     let response = mixed
     const repository = createReceiptRepository(async () => response)
-    for (const query of [{}, { includeDemo: false }, { origin: 'real', includeDemo: true }])
-      await expect(repository.list(query)).rejects.toThrow(/响应|数据/)
     await expect(repository.list({ includeDemo: true })).resolves.toEqual(mixed)
     const formal = read.list({}, session)
     response = { ...formal, projectOptions: mixed.projectOptions }
@@ -23,6 +21,17 @@ describe('普通收款中央读模型与 Repository', () => {
     await expect(repository.list({})).rejects.toThrow(/响应|数据/)
     response = formal
     await expect(repository.list({ origin: 'real' })).resolves.toEqual(formal)
+  })
+
+  it.each(Array.from([{}, { includeDemo: false }, { origin: 'real', includeDemo: true }]).map(input => ({ input })))('repository 按本次来源查询拒绝串入的演示行、候选与累计，显式启用后才接收：输入组合 1 案例 %#', async ({ input: query }) => {
+    const commands = createReceiptCommandTestInstance({ references: () => references })
+    const saved = commands.execute(command(), session)
+    const demo = { ...commands.form(saved.id, session), dataOrigin: 'demo' as const }
+    const read = createReceiptReadService({ commands, references: () => references, demoRecords: () => [demo], demoReferences: () => references })
+    const mixed = read.list({ includeDemo: true }, { ...session, capabilities: [...session.capabilities, 'demo:read'] })
+    const response = mixed
+    const repository = createReceiptRepository(async () => response)
+    await expect(repository.list(query)).rejects.toThrow(/响应|数据/)
   })
   it('未记录分类和类型保持未知，历史草稿能按草稿筛选且不计入不含本次累计', () => {
     const commands = createReceiptCommandTestInstance({ references: () => references })
@@ -93,7 +102,12 @@ describe('普通收款中央读模型与 Repository', () => {
     expect(() => read.list({}, { ...session, capabilities: [] })).toThrow(/权限/)
   })
 
-  it('repository 校验来源、完整金额和附件归属，不接受服务端串记录响应', async () => {
+  it.each([
+    { id: 'other' },
+    { dataOrigin: 'demo' },
+    { draft: { amount: 120.35 } },
+    { attachments: [{ id: 'file', ownerId: 'other' }] },
+  ])('repository 校验来源、完整金额和附件归属：%j', async (patch) => {
     const commands = createReceiptCommandTestInstance({ references: () => references })
     const read = createReceiptReadService({ commands, references: () => references })
     const result = commands.execute(command(), session)
@@ -101,14 +115,7 @@ describe('普通收款中央读模型与 Repository', () => {
     let response: unknown = good
     const repository = createReceiptRepository(async () => response)
     expect(await repository.detail(result.id, { origin: 'real' })).toMatchObject({ record: { id: result.id } })
-    for (const wrong of [
-      { ...good, record: { ...good.record, id: 'other' } },
-      { ...good, record: { ...good.record, dataOrigin: 'demo' } },
-      { ...good, record: { ...good.record, draft: { ...good.record.draft, amount: 120.35 } } },
-      { ...good, record: { ...good.record, attachments: [{ id: 'file', ownerId: 'other' }] } },
-    ]) {
-      response = wrong
-      await expect(repository.detail(result.id, { origin: 'real' })).rejects.toThrow(/响应|数据/)
-    }
+    response = { ...good, record: { ...good.record, ...patch, draft: { ...good.record.draft, ...patch.draft } } }
+    await expect(repository.detail(result.id, { origin: 'real' })).rejects.toThrow(/响应|数据/)
   })
 })

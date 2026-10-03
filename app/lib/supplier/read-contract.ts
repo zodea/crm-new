@@ -17,6 +17,7 @@ export const SUPPLIER_LIST_TEXT_FIELDS = ['name', 'uniqueCode', 'taxNo', 'aliase
 export type SupplierListTextField = typeof SUPPLIER_LIST_TEXT_FIELDS[number]
 export const SUPPLIER_LIST_NUMERIC_FIELDS = ['settlementAmount', 'cumulativeContractAmount', 'contractAmount', 'paymentAmount', 'projectCount'] as const
 export type SupplierListNumericField = typeof SUPPLIER_LIST_NUMERIC_FIELDS[number]
+export const SUPPLIER_NUMERIC_SOURCE: Record<SupplierListNumericField, SupplierFactSource> = { settlementAmount: 'settlements', cumulativeContractAmount: 'contracts', contractAmount: 'contracts', paymentAmount: 'payments', projectCount: 'projects' }
 export type SupplierListSort = 'updated-desc' | 'name-asc' | 'name-desc' | 'category-asc' | `${SupplierListNumericField}-${'asc' | 'desc'}`
 export type SupplierEnumSelection = string | string[] | null
 
@@ -87,6 +88,8 @@ export interface SupplierListSourceRow {
   updatedAt: ISODateTimeDTO
 }
 
+export type SupplierFactSource = 'projects' | 'contracts' | 'settlements' | 'invoices' | 'payments'
+
 export interface SupplierListItemDTO {
   dataOrigin: DataOriginDTO
   supplier: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'supplier' }
@@ -98,7 +101,7 @@ export interface SupplierListItemDTO {
   credentialStatus: string
   contact: string
   contactPhone: string
-  projectCount: number
+  projectCount: number | null
   address: string
   taxpayerType: string
   mainBusiness: string
@@ -110,7 +113,7 @@ export interface SupplierListItemDTO {
   cumulativeContractAmount: MoneyDTO | null
   settlementAmount: MoneyDTO | null
   contractAmount: MoneyDTO | null
-  paymentAmount: MoneyDTO
+  paymentAmount: MoneyDTO | null
   updatedAt: ISODateTimeDTO
 }
 
@@ -118,10 +121,10 @@ export interface SupplierListSummaryDTO {
   categories: Array<{ value: string, label: string, count: number }>
   credentialStatuses: Array<{ value: string, label: string, count: number }>
   taxpayerTypes?: Array<{ value: string, label: string, count: number }>
-  origins: Record<DataOriginDTO, { supplierCount: number, contractAmount: MoneyDTO | null, paymentAmount: MoneyDTO }>
+  origins: Record<DataOriginDTO, { supplierCount: number, contractAmount: MoneyDTO | null, paymentAmount: MoneyDTO | null }>
 }
 
-export type SupplierListPageDTO = PageDTO<SupplierListItemDTO, SupplierListSummaryDTO>
+export type SupplierListPageDTO = PageDTO<SupplierListItemDTO, SupplierListSummaryDTO> & { unavailableSources?: SupplierFactSource[] }
 
 export interface SupplierProjectSourceRow {
   dataOrigin: DataOriginDTO
@@ -216,11 +219,11 @@ export interface SupplierPaymentAllocationSourceRow {
 }
 
 export interface SupplierDetailSummaryDTO {
-  projectCount: number
-  contractCount: number
-  settlementCount: number
-  invoiceCount: number
-  paymentCount: number
+  projectCount: number | null
+  contractCount: number | null
+  settlementCount: number | null
+  invoiceCount: number | null
+  paymentCount: number | null
   contractAmount: MetricDTO
   settlementAmount: MetricDTO
   invoiceAmount: MetricDTO
@@ -290,6 +293,7 @@ export interface SupplierPaymentDTO {
 }
 
 export interface SupplierDetailReadDTO {
+  unavailableSources?: SupplierFactSource[]
   dataOrigin: DataOriginDTO
   supplier: SupplierListSourceRow
   projects: SupplierProjectDTO[]

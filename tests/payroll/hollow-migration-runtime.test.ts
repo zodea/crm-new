@@ -17,7 +17,7 @@ afterEach(async () => {
   await Promise.all(closers.splice(0).map(close => close()))
 })
 
-it('真实原检查19整改4与工资550整体迁入，公开冻结输出和后月已处理450保留', async () => {
+it.each((PAYROLL_HOLLOW_DEDUCTION_TABLES).map(input => ({ input })))('真实原检查19整改4与工资550整体迁入，公开冻结输出和后月已处理450保留：输入案例 %#', async ({ input: table }) => {
   const original = await createPayrollHollowFixture()
   closers.push(original.close)
   let read = await original.form()
@@ -51,8 +51,7 @@ it('真实原检查19整改4与工资550整体迁入，公开冻结输出和后�
   repeated.commit()
   expect((await f.reloadPayroll().aOutput({ origin: 'real' }, mappedStatement)).state).toBe('available')
   await f.rollback()
-  for (const table of PAYROLL_HOLLOW_DEDUCTION_TABLES)
-    expect(await f.instance.withWorkspaceTransaction(tx => tx.select(`SELECT * FROM ${table}`))).toEqual([])
+  expect(await f.instance.withWorkspaceTransaction(tx => tx.select(`SELECT * FROM ${table}`))).toEqual([])
 }, 30_000)
 
 it.each(['C1', 'C2'] as const)('%s真实原检查与550实发迁入，原签字事实和受控身份同时保留', async (format) => {

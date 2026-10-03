@@ -1,5 +1,5 @@
 import type { OcrRecognitionResult, OcrRuntimeRequestOptions } from '../../app/lib/recognize/engine'
-import type { SupplierCredentialAudit, SupplierCredentialCommand, SupplierCredentialCommandResult } from '../../app/lib/supplier/credential-contract'
+import type { SupplierCredentialAudit, SupplierCredentialCommand, SupplierCredentialCommandResult, SupplierCredentialFileContent, SupplierCredentialFileQuery } from '../../app/lib/supplier/credential-contract'
 import type { CredentialOcrFieldKey } from '../../app/lib/supplier/credential-ocr'
 import type { BusinessSession } from './business-session'
 import type { SupplierCredentialPorts, SupplierCredentialScope } from './supplier-credential-service'
@@ -18,6 +18,17 @@ interface Options {
   recognize: (input: { fileName: string, contentType: string, data: Uint8Array, options: OcrRuntimeRequestOptions }) => Promise<OcrRecognitionResult>
   now?: () => string
   createId?: () => string
+}
+
+export interface PersistentSupplierCredentialOcrPorts {
+  read: (supplierId: string, sessionId?: string | null) => Promise<SupplierCredentialScope>
+  file: (query: SupplierCredentialFileQuery, session: BusinessSession, sessionId?: string | null) => Promise<SupplierCredentialFileContent>
+  transact: <T>(supplierId: string, operation: (scope: SupplierCredentialScope) => { changed: boolean, value: T, commandId?: string }, sessionId?: string | null) => Promise<T>
+}
+interface OcrPorts {
+  read: (supplierId: string, sessionId?: string | null) => SupplierCredentialScope | Promise<SupplierCredentialScope>
+  file: (query: SupplierCredentialFileQuery, session: BusinessSession, sessionId?: string | null) => SupplierCredentialFileContent | Promise<SupplierCredentialFileContent>
+  transact: <T>(supplierId: string, operation: (scope: SupplierCredentialScope) => { changed: boolean, value: T, commandId?: string }, sessionId?: string | null) => T | Promise<T>
 }
 
 function authorize(command: SupplierCredentialCommand, session: BusinessSession, confirmation = false) {
@@ -50,9 +61,29 @@ function current(scope: SupplierCredentialScope, command: RecognitionCommand | C
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
 export function createSupplierCredentialOcrService(ports: SupplierCredentialPorts, options: Options) {
+  const credentials = createSupplierCredentialService(ports, options)
+  const service = createSupplierCredentialOcrCore({ ...ports, file: credentials.file }, options)
+  return {
+    recognize: service.recognize,
+    confirm(command: ConfirmationCommand, session: BusinessSession, sessionId?: string | null): SupplierCredentialCommandResult {
+      return service.confirm(command, session, sessionId) as SupplierCredentialCommandResult
+    },
+  }
+}
+
+export function createPersistentSupplierCredentialOcrService(ports: PersistentSupplierCredentialOcrPorts, options: Options) {
+  const service = createSupplierCredentialOcrCore(ports, options)
+  return {
+    recognize: service.recognize,
+    async confirm(command: ConfirmationCommand, session: BusinessSession, sessionId?: string | null) {
+      return service.confirm(command, session, sessionId)
+    },
+  }
+}
+
+function createSupplierCredentialOcrCore(ports: OcrPorts, options: Options) {
   const now = options.now ?? (() => new Date().toISOString())
   const createId = options.createId ?? randomUUID
-  const credentials = createSupplierCredentialService(ports, { now, createId })
   const pending = new Map<string, { fingerprint: string, promise: Promise<SupplierCredentialCommandResult> }>()
   function publish(scope: SupplierCredentialScope, command: RecognitionCommand | ConfirmationCommand, fingerprint: string, audit: SupplierCredentialAudit) {
     scope.aggregate.audits.push(audit)
@@ -71,12 +102,14 @@ export function createSupplierCredentialOcrService(ports: SupplierCredentialPort
     async recognize(command: RecognitionCommand, session: () => BusinessSession, sessionId?: string | null): Promise<SupplierCredentialCommandResult> {
       authorize(command, session())
       const fingerprint = digest(command)
-      const captured = ports.read(command.supplierId, sessionId)
+      const capture = ports.read(command.supplierId, sessionId)
+      const captured = capture instanceof Promise ? await capture : capture
       const previous = receipt(captured, command, fingerprint)
       if (previous)
         return previous
       const { target, file } = current(captured, command)
-      const content = credentials.file({ supplierId: command.supplierId, credentialId: target.id, fileId: file.id, origin: 'real' }, session(), sessionId)
+      const original = ports.file({ supplierId: command.supplierId, credentialId: target.id, fileId: file.id, origin: 'real' }, session(), sessionId)
+      const content = original instanceof Promise ? await original : original
       if (content.state !== 'available')
         throw credentialProblem('not-found', '此证照缺少原件正文')
       const key = JSON.stringify([sessionId ?? '', command.workspaceId, command.actorId, command.supplierId, command.commandId])
@@ -126,7 +159,7 @@ export function createSupplierCredentialOcrService(ports: SupplierCredentialPort
           pending.delete(key)
       }
     },
-    confirm(command: ConfirmationCommand, session: BusinessSession, sessionId?: string | null): SupplierCredentialCommandResult {
+    confirm(command: ConfirmationCommand, session: BusinessSession, sessionId?: string | null): SupplierCredentialCommandResult | Promise<SupplierCredentialCommandResult> {
       authorize(command, session, true)
       const fingerprint = digest(command)
       return ports.transact(command.supplierId, (scope) => {

@@ -54,16 +54,14 @@ describe('辅助合同中央事实', () => {
     expect(repository.detail(saved.id, { kind: draft.kind }, session).contract).toMatchObject({ project: { id: 'p-1' }, supplier: { id: 's-1' }, amounts: { contract: '0.00' } })
     expect(() => repository.detail(saved.id, { kind: 'company_expense' }, session)).toThrow(/不匹配/)
   })
-  it('命令隔离会话、版本和幂等内容，未知身份、金额、日期与状态不可写入', async () => {
+  it.each(([{ amount: -1 }, { amount: 1.001 }, { amount: Number.NaN }, { signDate: '2026-02-30' }, { status: '已结清' }]).map(input => ({ input })))('命令隔离会话、版本和幂等内容，未知身份、金额、日期与状态不可写入：输入案例 %#', async ({ input: patch }) => {
     const repository = createAuxiliaryContractTestInstance()
     const saved = await repository.execute(command(), session)
     await expect(repository.execute({ ...command(), draft: { ...company, name: '偷换内容' } }, session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await expect(repository.execute({ ...command(), commandId: 'update', id: saved.id, baseVersion: '0' }, session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     expect(() => repository.detail(saved.id, { kind: 'company_expense' }, { ...session, workspaceId: 'another' })).toThrow(/不存在/)
     expect(() => repository.list({ kind: 'company_expense' }, { ...session, capabilities: [] })).toThrow(/权限/)
-    for (const patch of [{ amount: -1 }, { amount: 1.001 }, { amount: Number.NaN }, { signDate: '2026-02-30' }, { status: '已结清' }]) {
-      await expect(repository.execute({ ...command({ ...company, ...patch }), commandId: crypto.randomUUID() }, session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
-    }
+    await expect(repository.execute({ ...command({ ...company, ...patch }), commandId: crypto.randomUUID() }, session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
   })
   it('附件归当前合同，移除可恢复；票款只汇总同类型同 ID 的有效事实并保留未知金额', async () => {
     const repository = createAuxiliaryContractTestInstance({ createId: () => 'c-330', facts: [

@@ -4,6 +4,7 @@ import type { DataOriginDTO } from '~/types/read-model'
 import { computed } from 'vue'
 import ScheduleTimeline from '~/components/schedule/ScheduleTimeline.vue'
 import { Button } from '~/components/ui/button'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { scheduleReturnContextQuery } from '~/lib/schedule/navigation'
 
 const props = defineProps<{
@@ -49,9 +50,9 @@ function dottedDate(value: string | null): string {
       <h1 id="home-schedule-title" class="text-15px font-800 text-ink">
         施工进度
       </h1>
-      <StatusChip :tone="overallTone">
+      <KitStatusTag :tone="overallTone">
         {{ overallLabel }}
-      </StatusChip>
+      </KitStatusTag>
       <span class="text-12px text-ink-soft">
         开工 <strong>{{ dottedDate(snapshot.plannedStart) }}</strong>
         <span class="mx-1.5 text-ink-faint">→</span>

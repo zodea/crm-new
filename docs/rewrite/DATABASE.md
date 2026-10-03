@@ -1,13 +1,15 @@
 # 数据库设计 — 全局实体关系 + 外键索引 + 建表顺序
 
+> 阅读顺序：§2 按实体查字段、关系、约束和迁移例外；§4 查跨实体计算；§2.10 只列整页表单覆盖与来源批次。已确认目标、旧 SQLite 来源、中央测试实例和本机正式库分开标注，不按章节靠后或编号较新自动覆盖业务规则。下列 PG 清单是已登记存储切片，不代表全库生产接管或上线放行。
+
 ## PG-01 本机客户持久参与者（#450）
 
-`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite` 和独立正式 schema 版本 1；不把旧浏览器/Tauri schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
+`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite`，由独立正式 schema 版本 1 引导；当前版本及逐域升级见下方共享存储清单。不把旧浏览器/Tauri schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
 
 | 同库参与者 | 不可遗漏的事实 |
 | --- | --- |
 | `production_metadata` | schema 版本、固定工作区/维护人、用途及创建时间；重开必须相符 |
-| `production_participants` | 已接管领域与领域 schema 版本；本票仅 `customer:1` |
+| `production_participants` | 已接管领域与领域 schema 版本；PG-01 引导为 `customer:1`，后续按显式升级追加 |
 | `customer_revision` / `customers` | 全域客户版本、稳定 ID、原字段、实体版本、创建/更新时间和软删除；税号唯一包含已删除客户 |
 | `file_refs` / `file_payloads` | 客户 owner、稳定文件 ID、文件描述/大小、服务端上传人、删除状态、原字节和 SHA-256；不保存客户端路径来冒充原件 |
 | `customer_command_receipts` | 原编号、工作区/操作者、客户、完整命令指纹、动作、原结果、提交时间 |
@@ -17,6 +19,64 @@
 客户、原件、审计、版本和成功回执同一 `BEGIN IMMEDIATE` 事务提交，单连接由既有 coordinator 排队；WAL、`synchronous=FULL`、外键及每次重开完整性/身份校验。版本不兼容、损坏、不可写明确拒绝，禁止创建内存替代。SQLite/设备故障保证仍按 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md) 分层验收，不以进程终止冒充物理断电。
 
 这份表是 PG-02 的首个完整备份参与者清单：一致备份必须覆盖全部上述表与原件字节，核对外键、owner、数量、摘要、版本及原回执；活动主文件单独复制不构成备份。后续领域只增补此单库的参与者与版本迁移，不新建平行正式权威。
+
+## PG-03 本机项目持久参与者（#452）
+
+项目加入既有 `ruihang.sqlite` 和同一 coordinator，单独领域版本为 `project:1`，不使用原可重置项目实例或浏览器草稿充当正式事实。当前本分支显式 v2→v3 追加项目域；后续领域按实际合入顺序连续追加，不能重写已经使用的升级步。
+
+| 表 | 权威内容与关系 |
+| --- | --- |
+| `projects` | 稳定系统 ID、名称/业务编号、主次客户外键、封闭项目字段 `draft_json`、版本及创建/更正/软删时间。索引列必须与封闭正文一致，读取发现不一致拒绝 |
+| `project_revision` | 项目事实变化的全域修订；只在事务成功时递增 |
+| `project_command_receipts` | 每次命令的工作区、可信操作者、完整请求指纹、项目、动作、结果与时间；同键异文冲突 |
+| `project_command_resolutions` | 未应用原键的封存事实，阻止迟到请求再写入 |
+| `project_import_receipts` | 每项目原导入命令、文件摘要/Sheet/原行唯一键、非空外部旧 ID 唯一键、来源 JSON、规范 draft 指纹；外部旧 ID 是保真字符串，不是系统主键 |
+| `project_audits` | 项目、原命令、操作者、动作和前后字段/附件元数据，不复制原件正文 |
+| 共享 `file_refs` / `file_payloads` | 固定 `owner_type=project` 与稳定项目 ID；正文 BLOB、大小、SHA-256、服务端上传人和独立软删除状态 |
+
+正式项目保存核对主/次客户存在、可读、未停用/删除；读取按稳定 ID 解析当前客户名，客户不可读时不泄露名称。项目软删除保留全部回执和原件，恢复不改写独立删除附件或客户状态。实体、附件、版本、审计及导入回执在同事务内提交，提交前再次验证会话。备份清单通过 `productionStorageManifest` 包含项目全部表和共享原件表；缺表、坏正文或不兼容清单均不能降级为空项目。
+
+## 共享正式存储版本与参与者（#463）
+
+schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`，v2→v3 加入 `project:1`，v3→v4 加入 `supplier:1`，v4→v5 追加 `backup:1`，各自保留既有参与者。新域的 SQL 定义独立存放，按实际合入顺序追加连续升级；事务内先核旧清单，再执行新表、参与者与版本更新。缺域、未知域、实表缺失或领域版本不符明确停止，不能重新插入空参与者掩盖问题。`productionStorageManifest(version)` 是备份代码消费的同一登记表，列出公共元数据表与逐域完整表名；维护它时必须同步本节。
+
+| 工序库参与表 | 不可遗漏的事实 |
+| --- | --- |
+| `process_library_revision` | 目录修订计数，与本次成功版本共同提交 |
+| `process_library_versions` | 稳定版本ID、编码与版本唯一关系、来源旧版ID、完整不可变工序图JSON、可信创建人和时间、原命令ID |
+| `process_library_command_receipts` | 原命令ID、工作区/操作者、版本ID、完整命令JSON/指纹和原结果 |
+| `process_library_audits` | 原版本、原命令、操作者、创建动作、完整版本事实和时间 |
+
+所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态见下节 #451，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力。
+
+工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 的使用投影尚未接通，引用数量为未知。存量中央迁入与 WBS 生产接管不由此切片证明。验证见 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)。
+
+## PG-04 本机分供方持久参与者（#453）
+
+`supplier:1` 加入上述同一磁盘库和事务协调器；领域规则从开发实例抽出为事务内纯状态服务，`Map` 只承载本次从磁盘加载的候选，不能成为另一个正式数据源。
+
+| 参与表 | 不可遗漏的事实 |
+| --- | --- |
+| `supplier_revision` / `suppliers` | 稳定 ID、主档原字段及税务核验、证照状态、实体和来源版本、更新时间、迁移批次及是否由表格导入；非空税号和内部编码唯一 |
+| `supplier_credential_scopes` | 证照版本、完整迁移元数据及可空人工审核凭证；字段缺损或凭证无效拒绝，不能补空代替历史 |
+| `supplier_credentials` | 稳定证照 ID、分供方及原文件引用、有效期/删除历史、OCR 原始候选和人工确认分别保存 |
+| `supplier_credential_files` + `file_refs` / `file_payloads` | 分供方→证照→文件的稳定归属、迁移线索、字节与 SHA-256；文件元数据另保留原摘要，正文丢失不能变成合法缺件。公用原件 owner 为 `supplier_credential`，owner ID 为证照 ID |
+| `supplier_credential_requirements` / `supplier_credential_audits` / `supplier_audits` | 要求原因、资料更正/删除/撤回历史、主档及人工核验审计，保留可信操作者 |
+| `supplier_command_receipts` / `supplier_command_resolutions` | 原键、工作区/操作者、主档或证照动作类别、普通命令与导入各自指纹、原结果，以及明确未应用的封存键 |
+
+以上十张领域表与共享原件表构成完整备份参与者。原件正文只有一份，不能用元数据或旧路径冒充；读取核验字节长度、摘要及完整 owner 链。命令、事实、原件、审计、版本和原回执同事务提交。过期审核的自动撤销也属于持久变化，受同一业务写入门禁约束；门禁关闭时需要变更的读取明确失败并保持原记录。普通无变化读取不写业务表。
+
+## PG-02 备份记录与隔离恢复证明（#451）
+
+`backup:1` 参加同一正式磁盘库与完整备份清单，不另建运维 JSON 权威。`production_backup_runs` 以原命令 ID 为主键，保存动作、来源包、受控配置及命令指纹、可信维护人、开始/完成时间、数据捕获时点、包身份、运行/成功/失败状态、诊断和结果摘要。先可靠登记意图，再在事务外生成与传输副本，最后按当前会话确认回执；中断的运行记录在冷启动标为未完成，不能推定成功。
+
+`production_backup_baseline` 单行关联成功恢复命令，保存包身份、数据库摘要、数据时点、恢复时点、schema 与参与者摘要。版本或参与者改变后旧证明不再表示当前版本已验证。此证明不代替最终上线放行，正式业务写门禁保持关闭。
+
+完整包为 `data.sqlite + manifest.json`。清单保存身份/用途、schema/领域版本、每张实表行数与稳定内容摘要、原件数量/总字节、数据库字节数及摘要。生成方按共享清单核对所有表、完整性/外键、原件 owner/长度/SHA-256；未知表/域、缺正文、不兼容版本和内容损坏均拒绝。副本包含同一时点的全部原件、软删除历史、审计、回执和运维事实，不只备份当前列表。原件缺口不能仅凭 legacy ID 推定合法。
+
+一致副本先独占共享协调队列完成数据库 backup；仅新副本转为独立 DELETE 日志形式并同步，不改变活动库 WAL/FULL。向介质复制使用新临时包、落盘与回读校验，成功后发布新编号目录；旧包不得覆盖。隔离恢复只建立新目录并按原清单核对，不能切换/覆盖活动库。同编号目标必须完全一致才可确认原结果。
+
+保留策略只接受同库成功回执对应的完整包，以北京时间日/月选择，保留最新及基线；未知内容、链接、不完整包和损坏包不自动清理。未来领域接管须同时更新共享清单、原件 owner 校验和恢复验收，不能把本票客户切片升级为所有尚未接管领域已可恢复。配置及操作见[使用指南](../guides/local-backup-and-restore.md)。
 
 > 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 
@@ -36,58 +96,25 @@
 
 ## § 1 实体关系总览
 
+图只说明稳定身份与数据归属，所有标记为 ID 的关系均须同来源核验；不是执行迁移的顺序图。
+
+```mermaid
+flowchart TD
+  R["项目分供方<br/>project_suppliers"] -->|"project_id"| P["项目"]
+  R -->|"supplier_id"| S["分供方"]
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            核心实体关系图                                    │
-│                                                                             │
-│  ┌──────────┐    1:N    ┌─────────────────┐    N:1    ┌──────────┐         │
-│  │ Project  │◄─────────│ ProjectSupplier  │─────────►│ Supplier │         │
-│  └────┬─────┘           └───────┬─────────┘           └────┬─────┘         │
-│       │                         │                          │               │
-│       │ 1:N                     │ 1:1                      │ 1:N           │
-│       ▼                         ▼                          ▼               │
-│  ┌──────────┐           ┌──────────────┐           ┌────────────────┐     │
-│  │PhaseTask │           │ Settlement   │           │SupplierCred.   │     │
-│  └──────────┘           └──────────────┘           └────────────────┘     │
-│       │                                                                     │
-│       │ 1:N                                                                 │
-│       ▼                                                                     │
-│  ┌──────────┐                                                               │
-│  │ FileRef  │ (共用文件引用，多个实体引用)                                     │
-│  └──────────┘                                                               │
-│                                                                             │
-│  ════════════════════════════════════════════════════════════════════════    │
-│                                                                             │
-│       Project 1:N 以下所有业务单据（通过 projectId 关联）                      │
-│       Supplier 通过 ProjectSupplier 间接关联以下单据                          │
-│                                                                             │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
-│  │ConstructionCont. │  │SupplementAgree.  │  │OwnerChangeOrder │         │
-│  │  施工合同          │  │  补充协议          │  │  甲方变洽签       │         │
-│  │  projectId → Proj │  │  contractId → CC │  │  projectId → Proj│         │
-│  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
-│                                                                             │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
-│  │ExpenditureContr. │  │InvoiceApplication│  │Invoice           │         │
-│  │  支出合同          │  │  开票申请          │  │  发票单表         │         │
-│  │  projectId → Proj │  │  projectId → Proj │  │  owner_kind归属  │         │
-│  │  supplierId → Sup │  │                    │  │  supplierId → Sup│         │
-│  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
-│                                                                             │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
-│  │ReceiptRegistr.   │  │PaymentApplication│  │CurrentTransaction│         │
-│  │  收款登记          │  │  付款申请          │  │  往来收付         │         │
-│  │  projectId → Proj │  │  projectId → Proj │  │  projectId → Proj│         │
-│  └──────────────────┘  │  supplierId → Sup │  └──────────────────┘         │
-│                         │  contractId → EC  │                               │
-│                         └──────────────────┘  ┌──────────────────┐         │
-│                                               │PaymentRecord     │         │
-│                                               │  支付记录         │         │
-│                                               │  projectId → Proj│         │
-│                                               └──────────────────┘         │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+
+```mermaid
+flowchart TD
+  U["补充协议"] -->|"contract_id"| C["canonical 合同"]
+  C -->|"project_id"| P["项目<br/>草稿可空"]
+  C -->|"customer_id<br/>或 supplier_id"| O["交易对方<br/>施工：客户<br/>支出：分供方"]
+  U -.->|"沿原合同<br/>取得公司归属"| O
 ```
+
+实线表示保存的外键，虚线表示沿原合同取得的公司归属；补充协议与公司有关联，不需要另存一套可编辑公司外键。字段与聚合边界见下文补充协议定义。
+
+`project_suppliers` 不拥有合同、票、款的金额副本；这些单据直接保存各自项目/合同/分供方外键。`settlements` 是合作关系终态对象；真正的过程/完工结算是 `expenditure_settlements`，见 §2.4。旧总图的“所有单据经 ProjectSupplier 间接关联分供方”不再适用。
 
 ### 1.1 施工进度线（工期 × 工程量，2026-07 新增）
 
@@ -102,7 +129,7 @@ projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1�
     │                  └────────N:1──────── units（户通过模板活链接读取房间）
     ├─1:N→ schedule_tasks（工序任务；project→group→task 由 project_id/group_id 表达，引用 stage_id）
     │        ├─ N:M → task_dependencies（FS/SS/FF/SF + lag）
-    │        ├─ 1:N → task_item_map ─(itemName)→ items ─→ house_type_template_items
+    │        ├─ 1:N → task_item_map ─(item_id)→ items ←N:1─ house_type_template_items
     │        └─ 1:N → schedule_task_floor_plans ─→ floors / boq_lines
     │                  实际完成率 = 分组内该阶段已完成户数 / 该阶段应做户数
     ├─1:N→ unit_assignments（户 × 工种责任；完成不存这里）
@@ -113,18 +140,29 @@ projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1�
 
 ```
 contracts(kind='施工') ─1:N→ boq_files ─1:N→ boq_lines（统一清单行模型，合同量+合同单价唯一来源）
-projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→已打回→已签证，CONTEXT.md「变更单」）
+projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→已打回→已签证，ADR 0002）
               ├─1:N→ boq_change_lines ─N:1→ boq_lines（调量/调价指向原行；变更新增行反向挂 change_order_id）
               └─已签证─自动生成→ owner_change_orders 台账行（1:1 ledgerId 追溯，ADR-0002）
 projects ─1:N→ monthly_statements ─1:N→ monthly_statement_lines（月度报量：自动汇总草稿+手调）
 invoices = 识别+台账单表（ADR-0001，废弃 ticket_registrations）→ 归属：projects 或 个人开支
 delivery_records ─1:N→ delivery_lines（送货单归档即写入材料台账；单价对比=聚合查询视图，无独立表）
-projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑人工确认、同写法后续自动，CONTEXT.md「工地」）
+projects ─1:N→ project_aliases（旧本地别名；中央迁移未完成，当前建议来自已确认送货事实，仍须人工选定）
 ```
 
 ---
 
 ## § 2 全部实体清单
+
+以下按实体保留一处字段定义及其例外；旧 §2.10 的 F1—F5 字段、旧 §10 的领域增补已归入对应实体。跨实体指标集中在 §4，§3/§6 仅供关系与索引查找。
+
+**实现证据基线：**2026-10-02 文档核对的已提交版本为 `8756be2d`，历史差距按该版本及既有测试判断。随后按已确认范围修复现有代码冲突：工作区的单位文本/空值、按列粘贴、材采/分包主合同联系资料带出及未填税率处理已接通，具体验证见对应实体说明及现有回归测试。工作区实现尚未提交，中央验证实例的运行验收不代表生产持久化或全部目标模型完成。
+
+- 标注“已确认目标”的内容是业务约束；“来源物理结构”指旧 SQLite 迁移后结构；“中央事实”须再看该节部署边界；“旧模型”仅用于迁移、对账及恢复，不能恢复新写入。
+- 下列字段目录及 SQL 摘录不是可执行的全库建表脚本。历史表的混合命名保真；新列采用 `snake_case`，DTO 的 camelCase 不代表数据库列名。完整来源定义核对 [schema.ts](../../app/lib/db/schema.ts) 与 [migrations.ts](../../app/lib/db/migrations.ts)，中央/正式库按各领域实现单独核对。
+- 来源表通常使用 `id TEXT PRIMARY KEY`、`status`、`note`、创建/更新时间和 `deleted_at`；单例配置、追加事件、快照及旧表按实体例外，不由通则强加这些列。日期/时间使用 ISO-8601 `TEXT`；旧来源金额常为 `REAL`，工资等明确整数分模型不回退为浮点。
+- 提交/确认必填不等于数据库 `NOT NULL`：草稿允许不完整业务字段，关系、正金额、勾稽和状态在同一领域事务中校验。仅明细父键、稳定身份等结构约束不能省略。
+- lookup 保存真实外键，普通可编辑网格保存子表，附件引用 `file_refs`。税号/购方名等时点证据、OCR 候选及不可变工资快照按实体明确保留；正式项目的封闭 `draft_json` 等已定 owner 存储也不受旧表单列式示意覆盖。
+- `_` 展示字段、`readonly + compute` 和纯聚合不持久化；人工核验金额、发放快照等具有审计意义的值除外。完整关系、名称或金额不能从同名、近似金额或默认 0 猜补。
 
 ### 2.1 基础主数据（跨项目共享）
 
@@ -138,8 +176,57 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | SupplierCredentialAudit | `supplier_credential_audits` | `id` | `base-supplier.md`（迁移 v36，脱敏审计） |
 | SupplierAudit | `supplier_audits` | `id` | `base-supplier.md`（迁移 v36，脱敏审计） |
 | FileRef | `file_refs` | `id` | 共用 |
-| FilePayload | `file_payloads` | `fileRefId` | 共用（附件正文，仅按需读取） |
-| BankCode | `bank_codes` | `id` | `base-worker.md` §五（银行行号字典，内置 seed，无外键） |
+| FilePayload | `file_payloads` | `file_ref_id` | 共用（附件正文，仅按需读取；DTO 为 `fileRefId`） |
+| BankCode | `bank_codes` | `id` | 旧银行行号字典设计登记；未查得建表、seed 或读取实现，不表示已建字典。当前工人只保存 `workers.bank_code` 文本，无该字典外键 |
+
+<a id="2102-f1-基础主数据"></a>
+
+#### 客户与项目字段（F1）
+
+已确认字段的 SQLite 来源增量由 v19 落地；正式客户/项目使用上方 PG 参与者及其 owner，不要求重写成旧表单 SQL。项目 PK 为稳定 `id`，`customer_id` / `secondary_customer_id` 分别引用主/次客户，不保存客户名称副本。
+
+```sql
+customers(
+  id, name TEXT NOT NULL, aliases TEXT DEFAULT '[]',
+  tax_no TEXT DEFAULT '', legal_rep TEXT DEFAULT '',
+  registered_address TEXT DEFAULT '',
+  invoice_name TEXT DEFAULT '', bank TEXT DEFAULT '', bank_account TEXT DEFAULT '',
+  contact TEXT DEFAULT '', contact_phone TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'draft',
+  note, created_at, updated_at, deleted_at
+)
+
+projects += (
+  customer_id TEXT REFERENCES customers(id),
+  secondary_customer_id TEXT REFERENCES customers(id),
+  contract_name TEXT DEFAULT '', region TEXT DEFAULT '', overview TEXT DEFAULT '',
+  operation_type TEXT DEFAULT '', planned_duration INTEGER,
+  developer_supervisor TEXT DEFAULT '', designer TEXT DEFAULT '',
+  contractor TEXT DEFAULT '', manager TEXT DEFAULT '', manager_phone TEXT DEFAULT '',
+  exec_manager TEXT DEFAULT '', builder TEXT DEFAULT '',
+  site_leader TEXT DEFAULT '', site_leader_phone TEXT DEFAULT '',
+  risk_level TEXT DEFAULT '', approval_status TEXT DEFAULT '',
+  acceptance_date TEXT DEFAULT '', filing_date TEXT DEFAULT '',
+  deleted_at TEXT
+)
+```
+
+旧 `developer/developer2` 名称只作迁移匹配输入；v19 已在唯一匹配后写真实客户 ID，缺失/歧义进入 `reconciliation_issues`，并移除旧列。项目字段是原 F1 增量目录，不代表省略了原项目主键、编号和名称。
+
+`customers.status` 为客户档案状态，沿 v19 来源保留；中央客户按其现行 decoder 校验，不以项目阶段、税号是否存在或合同余额推定状态。
+
+#### 分供方主档字段补齐（F1）
+
+```sql
+suppliers += (
+  contact_title TEXT DEFAULT '',
+  credential_reviewed_at TEXT,
+  credential_review_note TEXT DEFAULT '',
+  deleted_at TEXT
+)
+```
+
+`parent_supplier_id` 不属于已确认模型；v19 已记录旧层级对账信息后移除，不再等待另一次 F1 删除。证照审核底座是 v36，不能从 F1 通用表单批次推定证照闭环。资料类别及人工核验遵守下方 #13 / #446 的实体规则。
 
 `suppliers.external_ref TEXT DEFAULT ''` 保存 ADR 0005 的「外部旧ID / 匹配标识」，作为旧系统迁移对账、二次导入修正与去重键；非空且未软删的记录必须唯一（迁移 v11）。
 
@@ -150,7 +237,7 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | `unique_code` | 分供方内部唯一识别码；中央字段 `uniqueCode` | 与税号独立维护，非空时按 [COMMANDS.md](./COMMANDS.md) 的身份校验分别判重 |
 | `tax_no` | 统一社会信用代码/纳税人识别号；中央字段 `taxNo` | 与内部编码独立维护，不以旧 OCR 或导出标签推断二者等义 |
 | `external_ref` | 外部旧 ID / 匹配标识 | 迁移、二次导入与对账身份，唯一性沿本节上方既有规则，不替代内部编码或税号 |
-| `business_type` | 经营类型，分供方业务描述的可选自由文本 | 保留原值，不推导成第二套类别；分供方类别仍使用 CONTEXT.md 的权威七类 |
+| `business_type` | 经营类型，分供方业务描述的可选自由文本 | 保留原值，不推导成第二套类别；分供方类别使用 [ADR 0014](../adr/0014-full-page-entity-forms.md) 的七类 |
 | `labor_scope` | 劳务承包范围；中央字段 `laborScope`，词义见 [CONTEXT.md](../../CONTEXT.md#业务) | 可选自由文本，默认空字符串；独立于 `main_business`，不按类别强制必填，也不从既有主营业务自动回填；修改不改变资料齐全度或既有人工作出的核验结论 |
 | `address` | 营业执照登记的住所/注册地址 | 工商信息；不得与经营地址或开票地址混用 |
 | `invoice_address` | 分供方确认使用的开票资料地址 | 选填；可从注册地址一次性复制，但保存后独立维护、不永久联动 |
@@ -172,7 +259,7 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 
 供应商新增、编辑、导入、删除/撤回、人工资料核验与纳税人核验统一写 `supplier_audits`。该表只保存 `action`、规范化 `outcome`、`source_category`、变更字段名、备注是否存在和时间，不保存税号、银行账号、核验备注正文或外部来源原文。供应商与证照即使误走通用日志，快照也必须先按安全字段白名单脱敏；迁移 v36 会逐行清洗历史 `operation_logs` 中 `suppliers` / `supplier_credentials` 的敏感快照，坏 JSON 安全置空而不阻断升级。
 
-### 分供方证照中央事实（#446）
+#### 分供方证照中央事实（#446）
 
 浏览器证照以中央 `(dataOrigin, supplierId)` 为唯一所有者，主档、列表与证照页共用当前资料状态和原件投影。证照专用领域保存稳定证照身份、文件关系与正文、类别要求、有效期、整体人工凭证、原始及已确认 OCR 事实和专用审计；普通主档附件集合仍为空。#447 在 #446 保全历史的基础上接通日常 OCR 识别与人工回填，上传和迁移均不自动重新识别。Tauri 历史 schema 与本地适配不被中央接管改写。
 
@@ -202,6 +289,18 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | Settlement | `settlements` | `id` | `project-supplier.md` |
 | PhaseTask | `phase_tasks` | `id` | `project-info.md`（阶段资料/手续 checklist；**非排程**，排程工序见 §2.7 `schedule_tasks`） |
 
+<a id="entity-project-supplier"></a>
+
+#### 项目分供方、终态关闭与阶段资料
+
+| 实体 | 来源字段与关系 | 目标语义及边界 |
+| --- | --- | --- |
+| `project_suppliers` | `id` PK；`project_id → projects.id`、`supplier_id → suppliers.id`；`status`、`reviewer_id`、`note`、时间及软删除 | 合作关系身份；请款、票、支付和结算按同来源的项目与分供方 ID 聚合，见 [§4.4](#44-projectsupplier-汇总project-suppliermd)，不在本表保存累计金额 |
+| `settlements` | `id` PK；`project_supplier_id → project_suppliers.id`；`date`、`final_amount`、`pdf_file`、`note`、创建/软删事实 | 既定 1:1 合作终态关闭对象，不是过程结算或付款源单；本地旧来源未用 UNIQUE 证明此业务基数。多轮请款、负尾差、未付款及确认 PDF 仍按 [#408](https://github.com/zodea/crm-new/issues/408) 核对，不将旧 `final_amount` 默认 0 当作最终已确认结算 |
+| `phase_tasks` | `id` PK；`project_id → projects.id`；`phase_index`、`task_index`、`title`、`description`、`responsible`、`status`、创建/软删事实 | 项目阶段资料/手续 checklist；工程排程使用 §2.7 的 `schedule_tasks` |
+
+浏览器项目分供方工作台的中央关系与聚合由 #317 接管，旧 SQLite 只作迁移/恢复来源；终态业务并未因此全部闭合。字段来源见 [schema.ts](../../app/lib/db/schema.ts)，读面与当前流程见[页面规格](./pages/project-supplier.md)。
+
 ### 2.3 合同类（通用基础 + 类型定制）
 
 | 实体 | 表名 | PK | 设计文档 |
@@ -213,48 +312,346 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | ContractLineItem | `contract_line_items` | `id` | `material-contract.md` |
 | BoqFile | `boq_files` | `id` | `boq-import.md`（清单文件：挂 `contracts(kind='施工')` 一对多，未拆表/已拆表） |
 | BoqLine | `boq_lines` | `id` | `boq-import.md` §二（统一清单行模型+来源追溯键；已确认导入行或已签证变更新增行二选一） |
-| BoqChangeOrder | `boq_change_orders` | `id` | CONTEXT.md「变更单」「指令单」（四档状态） |
+| BoqChangeOrder | `boq_change_orders` | `id` | [ADR 0002](../adr/0002-change-order-generates-ledger.md)（四档状态与签证台账关系）；附件分类见本文件 `file_refs` 关系 |
 | BoqChangeLine | `boq_change_lines` | `id` | 变更单行明细（新增/调量/调价） |
 | MonthlyStatement | `monthly_statements` | `id` | `owner-documents.md` + CONTEXT.md「月度报量」 |
 | MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |
 | Contract | `contracts` | `id` | **合同域 canonical ID（#90 批A 新 IA，v3；BOQ v15 收口）**：施工/分包/材采/其他支出单表 `kind` 区分。BOQ 文件、清单行、变更单、月度报量和进度分组统一引用这里的施工合同；旧 `construction_contracts` / `expenditure_contracts` 只作迁移兼容，不接受新表单写入 |
-| ContractSupplement | `contract_supplements` | `id` | canonical 合同补充协议；施工/支出侧均引用 `contracts.id`，见 §10.1 |
+| ContractSupplement | `contract_supplements` | `id` | canonical 合同补充协议；施工/支出侧均引用 `contracts.id`，见本节 canonical 合同定义 |
 | CompanyExpenseContract | `company_expense_contracts` | `id` | `contract-forms.md`（公司支出，不挂虚拟项目） |
 | ProjectAcceptance | `project_acceptances` | `id` | `owner-documents.md`（竣工验收/保修） |
 | OwnerFinalSettlement | `owner_final_settlements` | `id` | `owner-documents.md`（甲方最终结算） |
 | OwnerPenalty | `owner_penalties` | `id` | `owner-documents.md`（甲方罚扣） |
 | SubcontractChangeOrder | `subcontract_change_orders` | `id` | `owner-documents.md`（分包变更） |
 
+<a id="101-合同分类与补充协议"></a>
+
+<a id="2103-f2-合同与支出结算"></a>
+
+#### Canonical 合同与补充协议
+
+**已确认目标：**施工/分包/材采/其他支出主合同只使用 `contracts` 稳定身份；公司支出使用独立 `company_expense_contracts`，不创建虚拟项目。F2 字段及草稿边界见 [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md) 与 [#148](https://github.com/zodea/crm-new/issues/148)。下列为 v21 后来源物理字段目录，合入 v42/v43/v46 增量；中央和正式存储是否接管须看该领域部署说明。
+
 ```sql
--- 合同域轻实体仓（#90 批A，migrations v3 contracts-light-entity）
 CREATE TABLE contracts (
-  id          TEXT PRIMARY KEY,
-  no          TEXT DEFAULT '',
-  name        TEXT NOT NULL,
-  kind        TEXT NOT NULL DEFAULT '施工',   -- '施工' | '分包' | '材采' | '其他支出'
-  sub_kind    TEXT DEFAULT '',                -- '劳务' | '专业'，仅 kind='分包'
-  cost_category TEXT DEFAULT '',              -- '专业分包' | '合同劳务' | '材料' | '机械' | '其他'
-  legacy_type TEXT DEFAULT '',                -- 迁移源原始细类
-  classification_state TEXT DEFAULT 'classified', -- 'classified' | 'unclassified' | 'no_contract'
-  project_id  TEXT NOT NULL,                  -- → projects.id
-  supplier_id TEXT,                           -- → suppliers.id；施工合同（乙方=我方）为 NULL
-  amount      REAL DEFAULT 0,                 -- 含税合同金额
-  changed     REAL DEFAULT 0,                 -- 变更后合同金额
-  settled     REAL DEFAULT 0,                 -- 累计结算
-  invoiced    REAL DEFAULT 0,                 -- 累计收票（施工=累计开票）
-  paid        REAL DEFAULT 0,                 -- 累计支付（施工=累计收款）
-  signer_name TEXT DEFAULT '',                -- 签约人
-  contact_phone TEXT DEFAULT '',              -- 合同联系人电话，按文本保存
-  tax_rate    REAL,                           -- 合同税率；不据此推算发票金额
-  sign_date   TEXT DEFAULT '',
-  actual_completion_date TEXT NULL,           -- v42，仅施工合同实际竣工事实；未知保持 NULL
-  settlement_status TEXT NULL,                -- v43，分包结算独立事实；未记录保持 NULL
-  clearance_status TEXT NULL,                 -- v43，分包清账独立事实；不从余额推断
-  status      TEXT DEFAULT '履约中',          -- '履约中' | '已签订' | '已结算' | '已结清'
-  note        TEXT DEFAULT '',
-  created_at  TEXT, updated_at TEXT, deleted_at TEXT
+  id                    TEXT PRIMARY KEY,
+  no                    TEXT NOT NULL DEFAULT '',
+  name                  TEXT NOT NULL DEFAULT '',
+  kind                  TEXT NOT NULL DEFAULT '施工'
+                          CHECK (kind IN ('施工', '分包', '材采', '其他支出')),
+  sub_kind              TEXT NOT NULL DEFAULT '',
+  cost_category         TEXT NOT NULL DEFAULT '',
+  legacy_type           TEXT NOT NULL DEFAULT '',
+  classification_state  TEXT NOT NULL DEFAULT 'classified'
+                          CHECK (classification_state IN ('classified', 'unclassified', 'no_contract')),
+  project_id            TEXT REFERENCES projects(id),
+  customer_id           TEXT REFERENCES customers(id),
+  supplier_id           TEXT REFERENCES suppliers(id),
+  amount                REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  changed               REAL NOT NULL DEFAULT 0 CHECK (changed >= 0),
+  settled               REAL NOT NULL DEFAULT 0 CHECK (settled >= 0),
+  invoiced              REAL NOT NULL DEFAULT 0 CHECK (invoiced >= 0),
+  paid                  REAL NOT NULL DEFAULT 0 CHECK (paid >= 0),
+  content               TEXT NOT NULL DEFAULT '',
+  invoice_type          TEXT NOT NULL DEFAULT '',
+  signer_name           TEXT NOT NULL DEFAULT '',
+  contact_name          TEXT NOT NULL DEFAULT '',
+  contact_phone         TEXT NOT NULL DEFAULT '',
+  tax_rate              REAL CHECK (tax_rate IS NULL OR tax_rate >= 0),
+  sign_date             TEXT NOT NULL DEFAULT '',
+  main_terms            TEXT NOT NULL DEFAULT '',
+  payment_terms         TEXT NOT NULL DEFAULT '',
+  brand_quality_terms   TEXT NOT NULL DEFAULT '',
+  schedule_terms        TEXT NOT NULL DEFAULT '',
+  warranty_terms        TEXT NOT NULL DEFAULT '',
+  special_terms         TEXT NOT NULL DEFAULT '',
+  retention_ratio       REAL CHECK (
+                          retention_ratio IS NULL
+                          OR (retention_ratio >= 0 AND retention_ratio <= 1)
+                        ),
+  retention_amount      REAL CHECK (retention_amount IS NULL OR retention_amount >= 0),
+  retention_days        INTEGER CHECK (retention_days IS NULL OR retention_days >= 0),
+  invoice_name          TEXT NOT NULL DEFAULT '',
+  invoice_tax_no        TEXT NOT NULL DEFAULT '',
+  invoice_address_phone TEXT NOT NULL DEFAULT '',
+  invoice_bank          TEXT NOT NULL DEFAULT '',
+  invoice_bank_account  TEXT NOT NULL DEFAULT '',
+  other_expense_kind    TEXT NOT NULL DEFAULT '',
+  service_period        TEXT NOT NULL DEFAULT '',
+  payment_cycle         TEXT NOT NULL DEFAULT '',
+  actual_completion_date TEXT NULL, -- v42：未知不填
+  settlement_status     TEXT NULL, -- v43：分包独立事实
+  clearance_status      TEXT NULL, -- v43：不从余额推断
+  party_a TEXT NULL, created_by TEXT NULL, updated_by TEXT NULL,
+  responsible TEXT NULL, department TEXT NULL, -- v46：未知审计不反推
+  status                TEXT NOT NULL DEFAULT '草稿',
+  note                  TEXT NOT NULL DEFAULT '',
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at            TEXT DEFAULT NULL
 );
 ```
+
+`project_id` 草稿可空，提交要求真实项目；施工合同引用客户，支出合同引用分供方。`amount` 是用户确认的含税额，`tax_exclusive_amount` / `tax_amount` 为实时派生而非持久列。**2026-10-02 用户确认：合同金额录入未填写税率时按无税费计算，税额为 0，不含税金额等于含税金额；填写税率后按该值派生。**税率字段的未填 `null` 与明确录入 0 分别保留；本规则只定义合同金额录入，不推定合同价比较中缺失税点或真实税务来源。`changed/settled/invoiced/paid` 仅保留旧物理列作迁移对账，新表单不写，新读面从补充协议、变更/结算、票和实际支付分摊聚合。
+
+实现核对：已提交基线的共用材采草稿税率初值为 13%；当前工作区三类项目合同新建税率为 `null`，共用金额表单显示“未填写”，并按上述最新裁定计算无税费金额。未填、明确零与正税率的组件回归已覆盖；存量税率未改写。此录入规则及合同头税率不证明某一材料行的税点或真实计税依据已经核实。
+
+<a id="contract-party-selection"></a>
+
+**已确认目标：主档选择与联系资料带出。**项目、分供方和甲方须从已经建档、可读且符合准入条件的记录中选定，不能把手填名称当作已建立关系。施工合同的甲方是客户；分包、材采等支出合同的甲方是我方签约主体，不能用项目客户替代。
+
+我方可能有多家签约公司，逐份支出合同选择真实我方主体，关系采用稳定身份；不能以工作区默认公司替代每份合同的实际签约方。补充协议仍从原合同带出该主体，不独立改选。此为 2026-10-02 确认目标，不表示已建我方主体主档或主体外键。
+
+```mermaid
+flowchart TD
+  O["多家我方主体<br/>稳定身份目标<br/>尚未建档接线"] -->|"逐份选择"| C["支出主合同<br/>独立合同 ID"]
+  C -->|"contract_id；归属只读"| S["补充协议<br/>沿原合同我方与分供方"]
+```
+
+支出主合同首次选定分供方或在表单中改选另一分供方时，带出所选主档的主要联系人及联系人电话，直接覆盖合同中的原值，包括已手工修改的值，不增加替换确认；带出后仍允许用户在合同内自行编辑、更换。合同 `contact_name` / `contact_phone` 保存本合同最终采用的值：合同修改不反写分供方，分供方主档后续变更也不自动替换已保存合同；重新打开合同读取合同自己的值。默认值不以公司电话或开票电话代替联系人电话；新选主档缺值保持空白，不残留上一分供方对应的旧值，沿现行选填规则允许合同补录，不因自动带出新增必填要求。
+
+```mermaid
+flowchart TD
+  S["所选分供方主档<br/>主要联系人、联系人电话"] -->|"首次选定或改选"| C["以所选主档值覆盖原值<br/>包括手填值；之后仍可编辑"]
+  C -->|"保存最终采用值"| H["合同独立保存<br/>后续读取本合同值"]
+```
+
+上图为已确认目标；覆盖由用户选定或改选分供方触发，主档与合同资料的后续修改不互相自动覆盖。
+
+**实现边界：**项目、客户和分供方已有稳定 ID 关系；v46 的 `party_a` 仍是可空文本，不是主体外键，本项目尚无可供该字段选择的我方公司主档，核心中央材采草稿 DTO 也未接入该主体身份。多家、逐份选择的业务范围已定；物理承接、权限及历史文本映射接线尚未实现，逻辑定义如下。合同已有独立可编辑的 `contact_name` / `contact_phone` 保存及回读；当前工作区的中央材采/分包主合同已从候选 context 带出联系资料，并由[选择回归](../../tests/contract/command-sessions.test.ts)覆盖切换、缺值清空及手填覆盖，材采[浏览器验收](../../e2e/issue-318-material-contract-detail.spec.ts)覆盖保存及详情刷新后重新编辑。其他合同链与主体选择不据此声明完成；现有历史列继续保留，不执行迁移或覆盖。
+
+我方签约主体的逻辑身份按已确认范围登记如下，表内名称不是已建 SQL 列：
+
+| 对象 | 身份、字段及关系目标 | 来源与实现边界 |
+| --- | --- | --- |
+| 我方签约主体 | 稳定主体 ID、真实签约名称、核实身份所依据的资料；每份支出主合同选择该身份 | 尚无已接线主档；本轮不将客户、分供方或工作区默认公司改型为我方主体 |
+| 合同主体关系 | 原合同 ID → 我方主体 ID，文书中的签约名称与资料保留；补充协议沿原合同读取 | 主档后来更名不改写原签约文书；旧 `party_a/partyA` 仍是文本来源，不是关系 ID |
+| 历史映射 | 原合同及原文书 → 经人工核实的主体身份，保留原值和映射依据 | 不按同名猜接；核心迁移拓扑未登记该实体，不能声称已迁入 |
+
+本节闭合逻辑归属；物理主档、权限及接线属于后续实现设计。甲供 [#285](https://github.com/zodea/crm-new/issues/285#issuecomment-5294844478) 在本事项批准甲供角色，未批准我方签约角色；如实施时选择扩展 Party，须单独说明架构影响并确认，不能以此文档登记宣告扩展完成。
+
+`kind/sub_kind` 负责界面分类；`cost_category` 为经营五类：专业分包→分包/专业，合同劳务→分包/劳务，材料→材采，机械/其他→其他支出。`legacy_type` 保留原细类，`classification_state` 保留已分类/未分类/无合同状态；不从用途文本猜分类。
+
+```sql
+CREATE TABLE contract_supplements (
+  id          TEXT PRIMARY KEY,
+  contract_id TEXT NOT NULL REFERENCES contracts(id),
+  no          TEXT NOT NULL DEFAULT '',
+  name        TEXT NOT NULL DEFAULT '',
+  content     TEXT NOT NULL DEFAULT '',
+  amount      REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  sign_date   TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT '草稿',
+  external_ref TEXT NOT NULL DEFAULT '',
+  note        TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at  TEXT DEFAULT NULL
+);
+```
+
+补充协议 PK 为 `id`，父键唯一指向 canonical `contracts.id`；施工与支出共用此表。**2026-10-02 已确认业务方向：补充协议只增加金额，不用补充协议减少金额。**`amount` 表示本次增额，不是变更后合同总额；有效合同金额=`contracts.amount + Σ有效 contract_supplements.amount`，草稿、软删除及失效记录不进入正式合计。现有 `amount >= 0` 不允许负额，与不减方向一致，但仍允许零额，不证明正式增额及补充明细校验已经接通；不据此宣称零额协议可正式提交。§4.1 的项目收入另按已确认变洽签纳入。旧目标快照默认“有效”已由 F2 草稿创建规则取代，保留 `external_ref` 供幂等/来源核对。父键索引见 §6。
+
+补充协议的项目及交易对方沿同来源原合同读取：施工取 `customer_id`，支出取 `supplier_id`，不按公司名称猜补关系。清单中单列协议属于读取展示，仍须保留协议自己的 ID 与父合同 ID，不能变成第二份主合同或重复累计金额。当前分供方合同读面将有效协议金额合入主合同行，不能写成已逐份单列；页面范围见[分供方详情](./pages/base-supplier.md#浏览器中央详情6-个页签)。
+
+已确认录入目标是先按原合同编号检索并选定已有主合同，再只读带出其项目、甲方和乙方；补充协议内不单独改选这些归属。编号用于检索与展示，实际父键仍为 `contract_id`，不能按同编号猜关系。此目标不代表中央补充协议新增/编辑表单已经完整交付；#322 证明的仍是迁入协议读取与聚焦，表单流程见[合同表单](./pages/contract-forms.md#主体选择与自动带出目标)。
+
+**材采补充明细目标（2026-10-02）：**协议会调整材料明细，须记录材料、数量或单价的实际变更及依据，保留原签约明细，不能覆盖原行来隐藏变更。变更行拥有独立身份，沿协议 ID 归原主合同；修改已有行须保留原行 ID，新材料的原行引用可空，不凭同名猜接。协议内容、适用范围及生效依据按真实文书记录，不一律追溯或一律只向后；缺明确依据不自动重计旧送货或结算。确需更正已确认材料结算时，直接沿 [#291 既定全额冲销与替代](#已确认目标关系与迁移边界)，原票款保留原 ID，不原地覆盖。合同价样本区分原签约与协议变更来源、日期，不用新价格覆盖历史点。当前 `contract_supplements` 仅承接协议头，`contract_line_items` 仅有主合同父键，尚未接通协议明细及其复算；物理承接和更正接线属于实现缺口，本轮不新增 SQL 或自动追溯计价公式。
+
+```mermaid
+flowchart TD
+  C["主合同稳定 ID"] --> L["原签约材料明细<br/>保留原行身份及量价"]
+  C -->|"contract_id"| S["材采补充协议<br/>协议 ID / 本次增额"]
+  S -.-> M["补充明细变更目标<br/>内容与依据；尚未接线"]
+  M -.->|"修改原行须可追溯"| L
+```
+
+图中实线为已有主合同父关系，虚线为未实现的补充明细承接，不将其当作已建 SQL 外键。
+
+`construction_contracts`、`expenditure_contracts`、`supplement_agreements` 仅是旧 IA 迁移源；v21 使用 `contract_legacy_mappings(source_table, legacy_id, contract_id, source_no, source_name, mapped_at)` 保留来源键，`id` 为主键，`(source_table, legacy_id)` 唯一。不得直接把同名合同或旧补充协议连到新父键；中央 #322 再按显式映射接管。
+
+#### 材采明细与公司支出合同
+
+```sql
+CREATE TABLE contract_line_items (
+  id                       TEXT PRIMARY KEY,
+  contract_id              TEXT NOT NULL REFERENCES contracts(id),
+  material_name            TEXT NOT NULL DEFAULT '',
+  spec                     TEXT NOT NULL DEFAULT '',
+  brand                    TEXT NOT NULL DEFAULT '',
+  unit                     TEXT NOT NULL DEFAULT '',
+  qty                      REAL CHECK (qty IS NULL OR qty > 0),
+  tax_inclusive_unit_price REAL
+                            CHECK (tax_inclusive_unit_price IS NULL
+                              OR tax_inclusive_unit_price >= 0),
+  planned_arrival_date     TEXT NOT NULL DEFAULT '',
+  note                     TEXT NOT NULL DEFAULT '',
+  sort_order               INTEGER NOT NULL DEFAULT 0,
+  created_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at               TEXT DEFAULT NULL
+);
+```
+
+行含税金额=`qty × tax_inclusive_unit_price`，纯计算不存；草稿量/价可空，提交时材料名称、正数量、非负单价必填。中央材料合同按 #318 的命令复算，不能据旧目标 SQL 的 `NOT NULL` 禁止保存不完整草稿。
+
+| 中央材采动作 | 已有校验事实与边界 |
+| --- | --- |
+| `draft` | 可缺合同名称、项目、分供方及明细量价；已提供的错误关系、非正数量或负单价仍拒绝，不等于任意非法数据都可保存 |
+| `save` | 校验名称、真实项目/分供方、合同内容、签约日期及已有材料行必填，允许头行金额差额；不同于旧 SQLite 只在提交检查必填的路径 |
+| `submit` | 同上，另执行下述头行金额差额校验；合同头与自身明细一致的目标已确认，具体容差仍只是当前实现值 |
+
+草稿不完整的业务边界已由 [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md)及 [#148](https://github.com/zodea/crm-new/issues/148)确认；动作差异查 [中央命令](../../server/utils/material-contract-command-test-instance.ts)、[契约测试](../../tests/material-contract/command-contract.test.ts)与[旧表单路径](../../app/lib/contract/forms.ts)。导入预览中的非法原始单元格如何暂存并不由上述领域草稿能力证明。
+
+<a id="contract-amount-reconciliation"></a>
+
+**头行金额勾稽：目标与当前实现分开。**合同头 `amount` 独立录入，不随明细合计自动覆盖。现有中央材采命令在 `draft` / `save` 时不要求头行等额（`save` 仍校验其他必填条件），在 `submit` 时若 `abs(明细含税合计 - amount) > 0.005` 则拒绝。差额门槛以[中央命令校验](../../server/utils/material-contract-command-test-instance.ts)及[实际命令入口](../../server/api/commands/material-contracts.post.ts)为证据；[中央契约测试](../../tests/material-contract/command-contract.test.ts)覆盖草稿非法引用、负数、行身份，以及头行差额可保存但提交拒绝且不改写量价的分支，未专项覆盖所有不完整业务字段，旧[表单测试](../../tests/contract/forms.test.ts)只证明旧 SQLite 路径。该容差是实现值，不是法律门槛。
+
+**2026-10-02 用户确认：**合同签订保持简洁，合同头与自身明细仍须一致；实际采购可以低于签约额，重点在付款时核对真实业务及实际应付。同份合同头 4,800、材料行 5,000 不能仅凭“实际可能少采购”直接作为等额合同提交；有明确优惠 200 时按下文独立减项表达，使合计成为 4,800。保留真实材料量价，不为凑总额自动改数量或单价，合同外运费不补平材料合同差额。合同签约 5,000、后来实际采购 4,800 则保留签约事实，实际采购、开票及付款分别核对，不强行将付款抬成 5,000。开票场景的量价调整另属开票核对，不据此制定通用调整公式、税务处理或反写合同规则。付款承接见 [PAY-08](#entity-payment-record)。本轮未调整当前校验，独立减项参与正式提交的实现仍缺失；未明头行差额须查明事实后形成一致定义。
+
+```mermaid
+flowchart TD
+  D["材料合计 5,000<br/>真实整单优惠 200"] --> T["确认目标：独立减项 -200<br/>头与明细合计均为 4,800"]
+  T --> I["当前缺减项类型及提交接线<br/>不能靠负材料量价对平"]
+  I --> P["后续实际采购可低于签约额<br/>付款核对真实业务及应付"]
+```
+
+<a id="contract-detail-deductions"></a>
+
+**已确认表达方式：优惠、扣减在明细中单列减项并参与合计。**有对应事项时保留材料正项的数量、单价和金额，再以独立减项记录优惠或扣减的名称、金额及依据；减项显示为负金额，合计为各行金额之和，同一扣减只纳入一次。例如材料两行金额为 `2,000 + 3,000 = 5,000`，另列“整单优惠 `-200`”，合计为 `4,800`；不是只写备注、保留 5,000 合计，也不靠改写材料单价隐藏优惠。
+
+用户提供的请款单仅用于确认上述计算表达方式，不将其具体税费、进度比例或取整方式推广为通用规则。扣减可以是与税率无关的直接金额，本项不确定税务字段、开票分配或税额算法。
+
+**实现边界：**当前 `contract_line_items` 仍是数量为正、单价非负的材料行，未有独立优惠/扣减行类型及其计算链；不能把已确认的负金额展示直接实现为负材料数量或负材料单价。减项的物理承接、写入及提交校验仍待实施方案确定，本轮不改 SQL、命令或旧数据。完整实例及界面见[合同表单：优惠与扣减](./pages/contract-forms.md#优惠与扣减的明细表达)。
+
+减项的逻辑记录包含稳定减项 ID、所属合同或协议 ID、名称、明确扣减金额、依据及排序；在明细视图以负金额纳入一次，材料行与减项共同复算头行合计。签约优惠与后续结算罚扣按各自实际发生环节归属，不将同一事项重复扣入合同及结算。是否采用独立子表或带类型的统一明细是物理实现设计，不能继续列为“优惠如何表达”的业务未决；当前来源 SQL 保持不变。
+
+<a id="contract-freight-treatment"></a>
+
+**已确认目标：运费归属及比价边界。**签订时约定不含运费的材料采购合同，运费在合同外另外计算，不并入该材料合同金额。合同已经包含同一运输事项的运费、且相应约定未变更时，再收取的部分须注明“合同已含运费，另收部分为多收取”，保留原合同金额与收费依据，不能将其当作正常合同增额。是否含运费依据真实条款，不从单价高低或金额差额推断；未记录时保持未知。
+
+```mermaid
+flowchart TD
+  A["核对合同运费约定"] -->|"不含"| B["合同外另计"]
+  A -->|"已含且未变更"| C["同项运费再次收取<br/>注明多收取"]
+```
+
+图示为已确认规则，不代表已实现自动识别或生成费用单据。
+
+合同报价比较须保留是否含运费的条件；条件不一致时只作价格范围参考，不能直接得出同一到货成本下谁更便宜的结论。不自行补算未知运费、按任意比例摊入材料单价，或将额外收费自动改写进原合同价格；本轮不制定精确区间算法或材料单价分摊公式。支付承接按下方已确认费用链，真实多收款的处置不由标注自动决定。
+
+当前合同头的 `payment_terms` / `special_terms` / `note` 和明细 `note` 可保留文本约定，但[合同与明细 DTO](../../app/lib/material-contract/read-contract.ts)、[命令字段](../../app/lib/contract/command-validation.ts)均没有结构化的含运费标识、另收金额或多收核查链。运费单独核算与标注属于确认目标，不能写成现有自动功能；物理费用承接与写入接线尚未实现，本轮不改表结构。
+
+**2026-10-02 已确认收费范围与费用链：**材料供应商另收、独立运输公司收费、员工先垫付三种情形都可能；分别保留真实交易方、收款方与费用依据。材料供应商的另收不是原材料合同自动增额，运输公司的债权不挂成材料供应商债权，员工垫付不改原实际交易方。有真实运输合同则沿该合同结算；没有独立合同也可按真实费用核验→结算→申请→实付承接，不虚构合同。独立费用逻辑记录保留费用 ID、项目或真实公司归属、实际服务与依据、金额、交易/收款方，以及有垫付时的垫付人和原垫付证据。员工报销只结清已记录垫款，引用原费用身份，不再新增第二份运费成本；公司资金流只计公司实际收付，不把员工私人先垫也算成公司银行支付。
+
+```mermaid
+flowchart TD
+  F["真实合同外运费<br/>费用 ID / 交易方 / 依据"] --> V["核验并结算<br/>有合同则关联真实合同"]
+  V --> A["付款申请<br/>无合同不虚构合同"]
+  A --> P["公司真实实付<br/>一笔现金只计一次"]
+  E["员工已垫付同一费用"] -.->|"报销引用原费用；只清垫款"| A
+```
+
+图为已确认目标流程。现有正式材料/其他支出结算仍要求合同，`expense_reimbursements.applicant` 为文本，尚无上述费用、垫付与清偿的完整身份链；草稿结算父键可空不证明无合同费用可正式走通。**已确认成本归集：合同外运费单列，统一归“其他支出”，保留对应采购依据，不随收款方或垫付人变化。**结构化归集及无合同费用链尚未实现；已含运费的材料价不再拆出一笔重复费用，报销原费用不再重复进入报销成本。
+
+本项查证的全国性依据为自 2021 年 1 月 1 日起施行的[《民法典》合同编第 509—511、543—544、596、626 条](https://www.cac.gov.cn/2020-06/01/c_15925617772683192.htm)：普通材料买卖按约定价款履行，约定不明须依相应规则处理，合同变更须有依据。上述多收标注适用于原合同已包含同一运输事项、约定未变更而另行收取的例子，不泛化为所有额外收费均违法，也不自动作出拒付或冲回决定。法条未规定软件保存/提交门槛或上述数值容差；具体特殊交易、施行前法律事实或地方计价规则须按实际项目另核。
+
+**已确认使用方向：**采购明细须支持从 Excel 录入，并直接复用于按合同签订日期、项目、分供方查看合同约定单价及趋势，保留 `contract_id + line.id` 追溯，不另建可编辑价格副本。这是合同约定价，不能覆盖或混充送货明细的实际送货价。
+
+**已确认录入目标：逐列粘贴。**允许从 Excel 分次复制单列，填入采购明细的对应列，同一行各字段仍属于同一条明细；不要求每次按固定列序复制完整行。起始格、行对应示例及当前实现差距见[采购明细格式与导入核对](./pages/contract-forms.md#采购明细格式与导入核对)。此项不表示 `.xlsx` 文件导入格式或自动表头映射已经定稿。
+
+**已确认文件用途（2026-10-02）：**将材料明细导入当前这一份合同，先预览，确认后追加新行，保留已有行；不按材料名称覆盖、不替换整份明细，不扩展为批量建多份合同。追加行的父键归当前稳定 `contract_id`，材料名称不充当行身份。错误行先修好再整批追加，不默认或静默跳过；字段及事务边界如下，模板登记、列映射与来源回执接线尚未实现。[ADR 0005](../adr/0005-import-mapping-model.md)的通用能力不证明本实体已接线，现有[导入实体登记](../../app/lib/kit/import-entities.ts)未登记材采合同明细。Excel 文件、现有 TSV 追加及受控历史迁移是三条不同入口，不能混称已实现导入。
+
+模板字段承接本实体已有定义及已确认目标：材料名称、规格、材质、品牌、单位、数量、含税单价、计划到货日期、备注；来源另外保留文件、Sheet、原行号及已提供的外部标识。量价只进入对应材料字段，不将显示金额重复写成第二份价格。未知单位/材质/量价不补默认值；正式提交的材料必填仍按本节规则，文件表头映射的门控复用 ADR 0005。
+
+**数量与单位核对目标（2026-10-02）：**填写和预览逐行对照原资料，把数量、计量单位及单价的计价单位一起核对。`100 米 × 20 元/米 = 2,000`；若填 `10 根` 而价格是 `20 元/米`，每根长度未核实不能直接算成 `200`。同单位写法归一不等于不同单位换算，可靠倍数边界见[单位换算](#contract-price-unit-conversion)；未知不猜，不自动改量价或单位，不追加“根数必须整数”等新规则。当前中央校验数量为正、单价非负，尚未核对单位及计价单位关系。
+
+复用通用解析、映射与预览，不照搬逐行正式入库。预览中的错误先保留原定位和原因，由填写人修正后重新核对；仍有错误或未核实的量/单位时，整批留在预览，不追加那 8 条正确行。全部通过才追加当前合同编辑草稿；合同头、全部明细及附件仍沿同一合同领域事务保存，失败不留一半正式行，正式行身份由保存域分配。此为本实体确认目标，不改其他导入实体已有的部分成功规则；模板登记、路由承接与源行回执的物理接线不表示已实现。
+
+```mermaid
+flowchart TD
+  I["当前合同 Excel 明细"] --> R["逐行核对数量 / 单位 / 计价<br/>保留源行定位"]
+  R -->|"仍有错误或未核实"| E["整批留预览<br/>修正后重核；不跳行"]
+  E --> R
+  R -->|"全部通过"| D["一次追加当前编辑草稿<br/>保留已有行"]
+  D --> S["正式保存：合同头与全明细<br/>同一领域事务"]
+```
+
+图为已确认目标流程，不是现行 TSV 导入或通用逐行入库流程。
+
+<a id="material-price-sources"></a>
+
+**已确认价格来源目标（2026-10-02）：**价格比较包括尚未签约、仅收到报价单的各家价格；未签约询价、合同约定价和实际送货价分别标明，不能把其中一种称作其余两种。
+
+| 来源 | 事实归属与追溯 | 当前状态 |
+| --- | --- | --- |
+| 未签约询价 | 报价资料中的价格；逻辑头行及可空关系见[报价实体](#quotation-target)，不推定正式采购关系 | 包含通用报价和未建档报价方已确认；未查得已有报价表，录入及综合比较未接线 |
+| 合同约定价 | `contract_line_items.contract_id → contracts.id`；价格归该明细，合同日期及签约分供方沿真实合同读取 | 来源表及合同录入已存在；价格分析接入、材质与明细税点等目标未交付 |
+| 实际送货价 | `delivery_lines.delivery_record_id → delivery_records.id`；价格与日期追溯送货原件及修订 | 现行 `/material/price` 读取已归档、具有价格的送货明细，不是合同价或询价库 |
+
+```mermaid
+flowchart LR
+  Q["未签约询价<br/>独立报价头 / 行目标"] --> V["比较标明来源<br/>不存价格副本"]
+  C["合同约定价<br/>合同与明细 ID"] --> V
+  D["实际送货价<br/>送货与明细 ID"] --> V
+```
+
+图为已确认来源分工，三来源综合比较仍是目标；现行送货单价分析的分组和官方参考价规则另见[材料页面](./pages/material-management.md#三材料单价分析)，官方信息价不改称供应方报价。
+
+独立报价头/行及原件的逻辑定义直达[物资报价实体](#quotation-target)。综合价格视图按来源种类、原头 ID、原行 ID、日期及已核实供货方身份追溯；同一家不同来源、不同日期的多个价格点不算成多家。已有合同与送货记录不自动补生成询价；缺少真实对应身份时保持未关联，不按同名强行合并。
+
+**已确认目标：独立材质与对比条件。**按参考网格保留独立“材质”字段，不合并到规格或品牌；未记录材质时保留缺失状态，不强制补成已知材质。合同约定单价先按材料名称、单位、规格对比；已记录材质时，材质也参与对比。缺材质仍可按前三项进行对比，不从其他明细猜补材质，也不把这种结果表述为“已确认同材质”。例如名称、单位、规格相同的两行中，一行注明 304、另一行未填材质，后者可以参与基础条件对比，但不能自动归为 304。
+
+```mermaid
+flowchart TD
+  B["合同明细对比<br/>名称、单位、规格"] -->|"有材质"| M["增加材质对比"]
+  B -->|"缺材质"| U["按三项对比<br/>材质保持缺失"]
+```
+
+上图为已确认目标，不代表现有比价页面已接通。文件具体映射与补充明细物理承接仍待设计，已确认用途见本节对应段落。当前来源表、读写 DTO、明细网格及八列粘贴均未包含独立材质，来源表也没有物料主档 ID、明细税率或补充协议父键。中央材采命令仍将 `isSupplement=false`、`originalContractId=null`，不能用 #322 的迁入协议读取证明材采补充明细已可创建。上述 SQL 保持实际来源结构，不将待实现字段写成已经落地。
+
+**已确认比较口径：含税单价与税点。**比较读取采购明细的含税单价，税点独立展示已核实适用于本行的税率或征收率；未知保持缺失，不补零、不套用其他合同或表单默认税率。合同头税率只有确认适用于本行时才可采用。独立展示列不等于已新增明细税率字段，简洁列组织与效果图见[合同约定单价的税口径](./pages/contract-forms.md#合同约定单价的税口径)。
+
+<a id="contract-price-unit-conversion"></a>
+
+**已确认目标：明确倍数时换算比较。**合同约定价允许按有明确依据、适用于该材料的固定倍数统一比较单位；没有可靠倍数时保持分组，不从材料名称或规格猜重量、长度及包装数。原明细的单位、数量、含税单价和金额保留；换算值只作为比较派生，不建立可编辑价格副本，也不回写合同。若 `1 原单位 = k 比较单位`，其中 `k` 为已确认的正倍数，则比较数量=`原数量 × k`、比较单价=`原单价 ÷ k`，换算前后对应总额不变。`1 吨 × 18,000 元/吨` 对应 `1,000 千克 × 18 元/千克`，不能将单价也乘以 1,000。完整实例、依据和界面示意见[合同约定单价的跨单位对比](./pages/contract-forms.md#合同约定单价的跨单位对比)。这是尚未接通的合同价目标，不改变已归档送货单价格分析的现行单位规则。
+
+**已确认阶段方案：单位手工填写。**尚未接入单位字典维护功能时，`unit` 保留文本字段，明细使用可编辑文本输入，不以写死的下拉选项限制输入，也不预填“㎡”等默认单位。Excel 中已有单位时带入该值并允许编辑；缺单位时保持空白，由用户填写。手工录入不以单位字典接入为前提；上文比较换算不改写原始单位或历史明细。
+
+已提交基线的明细编辑器使用固定单位选项，新行及粘贴空单位默认“㎡”，导入框按固定八列追加。当前工作区改为文本单位、默认空，并支持目标起始格的单列纵向粘贴：保留中间空格及行位置，只更新对应列，超出行追加；既有八列追加入口保留。两个入口共同解析 Excel 引号、单元格内换行及转义引号，非法数字或畸形引号整批拒绝。[组件回归](../../tests/components/ContractLineItemsEditor.test.ts)及[材采浏览器验收](../../e2e/issue-318-material-contract-detail.spec.ts)覆盖主要行为和保存回读，不证明完整 `.xlsx` 文件导入、材质字段、模板映射、数量与单位业务核对或合同单价样本接入完成；历史格式及基线对照见[合同表单的采购明细核对](./pages/contract-forms.md#采购明细格式与导入核对)。
+
+```sql
+company_expense_contracts(
+  id, no TEXT DEFAULT '', name TEXT NOT NULL,
+  category TEXT DEFAULT '', counterparty TEXT NOT NULL,
+  sign_date TEXT DEFAULT '', service_period TEXT DEFAULT '',
+  amount REAL DEFAULT 0 CHECK (amount >= 0), payment_cycle TEXT DEFAULT '',
+  party_a TEXT NULL, created_by TEXT NULL, updated_by TEXT NULL,
+  responsible TEXT NULL, department TEXT NULL,
+  tax_rate REAL NULL, invoice_type TEXT NULL, -- v46：未知不反推
+  main_terms TEXT DEFAULT '', status, note,
+  created_at, updated_at, deleted_at
+)
+```
+
+公司合同没有 `project_id`，甲乙方文本不自动变为客户/分供方关系。公司票款通过可空 `company_expense_contract_id` 引用，有该键时 `project_id` / `contract_id` 必须为空；详细来源、聚合和迁移边界紧接如下。
+
+### AX04 辅助合同中央事实
+
+物理来源保持 `contracts(kind='其他支出')` 与独立 `company_expense_contracts`；不建第二套正式合同表。SQLite v46 为两表补充可空 `party_a / created_by / updated_by / responsible / department`，为公司合同补充可空 `tax_rate / invoice_type`。未知审计、税率、结算或结清状态不反推、不补零。
+
+`invoices` 与 `payment_applications` 新增可空外键 `company_expense_contract_id`，指向公司合同；有该外键时，`contract_id` 和 `project_id` 必须为空，由插入、更新约束共同保证。存量不回填，不以名称、编号、金额或“个人开支”分类猜关联。项目其他支出票款继续使用原 `contract_id`。
+
+中央传输身份为 `(dataOrigin, id, kind)`，`kind` 为 `other_expense / company_expense`。迁移旧键为 `kind:legacyId`，避免两表同 ID 冲突；项目与分供方引用先经核心身份映射。公司合同只保留甲乙方事实文本，项目与分供方 EntityRef 为 null。
+
+- 中央合同头保存专属资料、版本、创建/修改审计；新增和修改操作者取可信业务会话。普通保存保留既有状态，提交草稿进入审批中；不提供虚构审批或结清命令。
+- 金额用 MoneyDTO 表达。含税金额及税率均存在时计算无税额和税额；无税额按两位小数舍入，税额取差。缺失金额或税率保持 null，真实零值保持零。
+- 关联投影按明确外键读取：已归档发票金额、已确认支付的分摊金额、同项目同分供方的已确认支出结算、有效合同增补。增补属于其他支出合同时随辅助合同接管，不再重复进入施工/分包补充协议节点。
+- 累计收票、累计支付、累计结算分别求和；按票应付为收票减支付，按结算应付为结算减支付。其他支出变更后金额为原合同加有效增补；公司合同没有项目结算与增补口径。存在未记录金额的聚合保持 null。
+- 附件仍来自 `file_refs` 的 `contract / company_expense_contract` 所属关系，保留文件 ID、分类、上传人、时间及软删除事实；接管后统一由同一中央命令维护元数据。当前不接管文件字节，不保存本机路径。
+- 受控迁移确认前不接管，准备阶段校验全部候选，任何无效附件或事实使整次准备失败；确认后同源回读，回滚撤销该批接管和相关命令重放缓存。普通正式新建不因迁移回滚被误删。
+
+本切片不创建合同分项、项目其他收入合同或虚拟项目。端到端验证与部署边界见 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md#ax04-辅助合同接管)。
 
 ```sql
 -- v15 `boq-change-monthly-foundation`：下列关系全部使用 snake_case。
@@ -280,6 +677,9 @@ boq_change_orders(
   status ['draft'|'submitted'|'rejected'|'approved'], status_note,
   directive_no, directive_type [''|'issued'|'changed'|'supplemented'],
   total_amount, approved_at, ledger_id -> owner_change_orders.id,
+  document_type ['change_negotiation'|'site_visa'|'claim'|'material_price_approval'],
+  application_date, reason, approved_tax_inclusive_amount,
+  approved_tax_exclusive_amount, applied_tax_exclusive_amount,
   note, created_at, updated_at, deleted_at
 )
 -- approved 必须同时有 approved_at、ledger_id；ledger_id 对活跃变更单唯一。
@@ -295,13 +695,15 @@ boq_change_lines(
 -- v16 `boq-change-added-line-metadata` 为已发布 v15 的存量库补齐 item_id/section/trade/spec。
 
 monthly_statements(
-  id, project_id -> projects.id, contract_id -> contracts.id, month,
+  id, project_id -> projects.id NULL, contract_id -> contracts.id NULL, month,
+  no, period_no, application_date, reported_amount, audited_amount,
   status ['draft'|'adjusted'|'exported'], total_amount,
   quantity_basis ['contract'|'provisional'|'field'],
   source_version, source_updated_at, operator_name, submitted_at, note,
   created_at, updated_at, deleted_at
 )
--- (contract_id, month) 对活跃报量单唯一。
+-- v24 来源中 (contract_id, month) 对活跃、合同非空且 month 非空的报量单唯一；草稿缺关系不占该键。
+-- month 与表单 period_no 同为 YYYY-MM；保存同值，中央以 contractId + periodNo 校验同合同同月份唯一。
 -- 状态沿用存量值：draft=草稿，adjusted=已有真实申报金额，exported=已有真实审定金额。
 -- 清单工作台手调/导出不推进状态；v37 仅以 audited_amount 保留“已审定”，其余旧 adjusted/exported 保守回草稿。
 -- v39 `quantity_basis` 记录本单选定的取数基准，缺省 field。基准归每次报量单，不做项目全局唯一。
@@ -317,6 +719,7 @@ monthly_statements(
 monthly_statement_lines(
   id, statement_id -> monthly_statements.id, boq_line_id -> boq_lines.id,
   item_name, unit, auto_qty, adjusted_qty, unit_price, amount, note, sort_order,
+  reported_qty, audited_qty, audited_amount,
   created_at, updated_at, deleted_at
 )
 ```
@@ -340,6 +743,107 @@ Issue #323—#327 的核心迁移拓扑使用逻辑实体名 `owner_documents`�
 
 变更附件复用 `file_refs(owner_type='boq_change_order', owner_id, category)`；我方指令单、甲方指令单、报价、算量和施工照片的展示分类不改变 `boq_change_orders` 的状态职责。已签证时自动生成且锁定一条 `owner_change_orders` 来源行，来源键为 `source_type='boq_change_order' + source_id`（ADR-0002）。其中“新增”明细必须在签证后物化为带稳定 ID 的 `boq_lines` 结果行，后续变更和月度报量从结果行及时序量价链派生有效数据，不重放原始合同量价。单明细已签证变更允许在明确的二次确认后受控更正，并在同一事务内同步变更明细、变更新增结果行和锁定台账且写操作日志；若同一目标清单行已有后续签证，或原签证含多明细/混合操作，则禁止原地改写，必须新增更正变更单以保持金额链可追溯。
 
+<a id="2106-f5-甲方分包单据"></a>
+
+#### 甲方台账、验收与分包单据（F5）
+
+F5 来源由 v24 落地，报量状态/依据/来源冻结按上方 v37/v39/v40 规则；验收/保修及最终结算审定事实分别由 v44/v45 补齐。`document_type` 是表单文种，不能替代 BOQ 的行操作汇总 `change_type`；指令编号/类型仍复用 `directive_no/directive_type`。
+
+月度报量审定差额=`audited_amount - reported_amount`，纯计算不存；自动量按项目、合同、期次及该单 `quantity_basis` 从真实阶段/所选基准派生，客户端 `auto_qty` 不受信任。空项目/合同/期次仅允许草稿且不落明细，不能把 F5 早期“现场量”说明理解为跨基准回退。
+
+```sql
+owner_change_orders += (
+  contract_id TEXT REFERENCES contracts(id),
+  name TEXT DEFAULT '',
+  document_type TEXT DEFAULT 'change_negotiation'
+    CHECK (document_type IN ('change_negotiation', 'site_visa', 'claim', 'material_price_approval')),
+  directive_no TEXT DEFAULT '', directive_type TEXT DEFAULT '',
+  application_date TEXT DEFAULT '', reason TEXT DEFAULT '',
+  status TEXT DEFAULT 'draft', status_note TEXT DEFAULT '',
+  note TEXT DEFAULT '', updated_at TEXT
+)
+```
+
+```sql
+project_acceptances(
+  id, no TEXT DEFAULT '', type TEXT DEFAULT 'acceptance',
+  name TEXT NOT NULL, project_id TEXT REFERENCES projects(id),
+  contract_id TEXT REFERENCES contracts(id), document_date TEXT DEFAULT '',
+  contract_estimate REAL, acceptor TEXT DEFAULT '',
+  warranty_owner TEXT DEFAULT '', conclusion TEXT DEFAULT '',
+  acceptance_organization TEXT NOT NULL DEFAULT '',
+  acceptance_date TEXT NULL,
+  acceptance_conclusion TEXT NOT NULL DEFAULT '',
+  warranty_start_date TEXT NULL, warranty_end_date TEXT NULL,
+  warranty_confirmation_organization TEXT NULL,
+  warranty_confirmation_date TEXT NULL,
+  warranty_confirmation_note TEXT NOT NULL DEFAULT '',
+  status TEXT DEFAULT 'draft'
+    CHECK (status IN ('draft', 'submitted', 'accepted', 'warranty', 'expired')),
+  note, created_at, updated_at, deleted_at
+)
+```
+
+```sql
+project_acceptance_lifecycle_events(
+  id TEXT PRIMARY KEY,
+  acceptance_id TEXT NOT NULL REFERENCES project_acceptances(id) ON DELETE RESTRICT,
+  action TEXT NOT NULL CHECK (action IN ('submit', 'accept', 'start-warranty', 'confirm-expiry')),
+  from_status TEXT NOT NULL, to_status TEXT NOT NULL,
+  actor_id TEXT NOT NULL, actor_name TEXT NOT NULL DEFAULT '',
+  occurred_at TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
+  UNIQUE (acceptance_id, to_status)
+)
+```
+
+```sql
+owner_final_settlements(
+  id, no TEXT DEFAULT '', name TEXT NOT NULL,
+  project_id TEXT REFERENCES projects(id), contract_id TEXT REFERENCES contracts(id),
+  settlement_amount REAL DEFAULT 0 CHECK (settlement_amount >= 0),
+  audited_amount REAL NULL CHECK (audited_amount IS NULL OR audited_amount >= 0),
+  audited_date TEXT NULL,
+  submission_date TEXT DEFAULT '', basis TEXT DEFAULT '',
+  difference_note TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+```
+
+```sql
+owner_penalties(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  contract_id TEXT REFERENCES contracts(id), notice_no TEXT DEFAULT '',
+  amount REAL DEFAULT 0 CHECK (amount >= 0), penalty_date TEXT DEFAULT '',
+  reason TEXT NOT NULL, appeal_note TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+```
+
+```sql
+subcontract_change_orders(
+  id, no TEXT DEFAULT '', change_type TEXT DEFAULT '',
+  project_id TEXT REFERENCES projects(id),
+  supplier_id TEXT REFERENCES suppliers(id),
+  contract_id TEXT REFERENCES contracts(id),
+  change_date TEXT DEFAULT '', approved_amount REAL DEFAULT 0,
+  changed_area REAL, actual_approved_price REAL,
+  reason TEXT NOT NULL, status, note,
+  created_at, updated_at, deleted_at
+)
+```
+
+`owner_change_orders` 的上述列为既有金额台账的 F5 增量，原金额/来源列保留。只有不含量价明细的纯金额签证直写台账；量价变更由 BOQ 签证生成 `source_locked=1` 的一对一行。v24 去除台账项目的 `NOT NULL`，不完整草稿先保存为 manual 草稿，补齐量价明细后以原 ID 转入 BOQ 变更实体。
+
+验收生命周期 `draft → submitted → accepted → warranty → expired`：同一 `project_acceptances.id` 支撑验收/保修两个投影，状态仅由相应 command 单向推进，每步追加事件，不伪造历史日期或事件。附件 owner 为 `project_acceptance`，分类 `acceptance-report / warranty-confirmation`，不复制单据。
+
+最终结算只读口径不读 `contracts.changed/paid`：变更后合同金额取
+`contracts.amount + Σ非草稿 contract_supplements.amount`，累计收款取同合同的活跃
+`receipt_registrations.amount`，两者均为查询时聚合、不回写最终结算头。结算申报金额取 `settlement_amount`；审定金额/日期只取 `audited_amount` / `audited_date`，任一未记录都返回 `null`，不用申报值、状态或 `0` 代填。
+
+甲方罚扣只读口径直接读取 `owner_penalties` 的金额、日期、事由、联系单号、申诉说明、状态和备注；附件只读取 `owner_type='owner_penalty'` 且 `owner_id` 匹配的有效 `file_refs`。罚扣金额以负向业务含义展示，但存储保持正数金额；申诉说明只是事实字段，不派生“申诉中/已确认”等未定义审批状态。
+
+分包结算复用 §2.4 的 `expenditure_settlements`；项目罚扣及抵扣见 §2.6，甲方罚扣不进入该抵扣链。
+
 ### 2.4 资金管理类
 
 | 实体 | 表名 | PK | 设计文档 |
@@ -354,7 +858,7 @@ Issue #323—#327 的核心迁移拓扑使用逻辑实体名 `owner_documents`�
 | PaymentApplicationInvoiceAllocation | `payment_application_invoice_allocations` | `id` | 付款申请—真实发票分摊（ADR 0015） |
 | CurrentTransaction | `current_transactions` | `id` | `finance-receipt.md`（收/付共表，`direction` 区分） |
 | PaymentRecord | `payment_records` | `id` | `finance-records.md` |
-| PaymentRecordApplicationAllocation | `payment_record_application_allocations` | `id` | 支付记录—付款申请多对多分摊（ADR 0015、§10.2） |
+| PaymentRecordApplicationAllocation | `payment_record_application_allocations` | `id` | 支付记录—付款申请多对多分摊（ADR 0015；见本节支付记录定义） |
 | ExpenseReimbursement | `expense_reimbursements` | `id` | `finance-reimbursement.md`（已确认费用进入动态成本） |
 | ExpenseReimbursementLine | `expense_reimbursement_lines` | `id` | `finance-reimbursement.md`（费用事实明细） |
 
@@ -366,7 +870,7 @@ Issue #323—#327 的核心迁移拓扑使用逻辑实体名 `owner_documents`�
 --   owner_kind     TEXT  'project' | 'personal'（个人开支）——归档那刻强制选定，无归属禁止归档/导入
 --   project_id     TEXT  owner_kind='project' 时必填 → projects.id
 --   supplier_id    TEXT  销方对应分供方（可选）→ suppliers.id
---   contract_id    TEXT  合同收票（可选，红圈式，本期不做交互）→ expenditure_contracts.id
+--   contract_id    TEXT  合同收票（可选）→ contracts.id；旧 expenditure_contracts 仅迁移来源
 --   account_status TEXT  'none' | 'archived'（归档=进台账；核对完成是归档唯一前置；归档后仍可改但弹二次确认；
 --                        「确认」= review_status 独立字段 unreviewed→reviewed，不占用 account_status）
 --   print_count    INTEGER 累计打印次数
@@ -381,6 +885,10 @@ Issue #323—#327 的核心迁移拓扑使用逻辑实体名 `owner_documents`�
 
 `invoice_export_settings` 是发票领域的本机单例配置表（迁移 v41），`settings_json` 保存发票台账 XLSX 的行列尺寸、字体、边框、格式、冻结与合并默认值。业务预览只保留本次草稿；保存和加载必须经 invoice store action 进入 SQLite，浏览器开发态随数据库 snapshot fallback 持久化，不再另写 `localStorage`，也不得复用只属于 OCR 的 `ocr_settings`。
 
+#### 支出结算统一源单
+
+已确认模型由 ADR 0015 定义；以下为来源字段目录，v21 容许不完整草稿，提交时才要求项目、分供方与真实合同一致。
+
 Issue #328 将分包 `expenditure_settlements` 作为逻辑 `owner_documents` 迁移节点的 `sub_settlement` kind 接管，正式 ID 由中央分配，不新增分包结算主表；兼容旧 `biz_type=分包` 及专业分包/合同劳务分类。项目、分供方与 canonical 分包合同必须唯一映射且一致。附件继续使用 `owner_type=expenditure_settlement`。金额与扣款说明来自原结算；确认状态只有 `draft → confirmed`。累计金额只在查询时派生，项目分供方终态 `settlements` 和材料冲销不在本票范围。
 
 ```sql
@@ -391,22 +899,43 @@ CREATE TABLE expenditure_settlements (
   no                TEXT NOT NULL,
   name              TEXT NOT NULL,
   biz_type          TEXT NOT NULL,       -- '专业分包' | '合同劳务' | '材料' | '机械' | '其他'
-  project_id        TEXT NOT NULL,       -- → projects.id
-  supplier_id       TEXT NOT NULL,       -- → suppliers.id
-  contract_id       TEXT NOT NULL,       -- → contracts.id；仅支出侧 kind（分包/材采等）
+  project_id        TEXT REFERENCES projects(id), -- 草稿可空，提交必填
+  supplier_id       TEXT REFERENCES suppliers(id), -- 草稿可空，提交必填
+  contract_id       TEXT REFERENCES contracts(id), -- 支出侧；草稿可空，提交必填
   settlement_type   TEXT,                -- 过程结算/完工结算/零星用工等
-  total_amount      REAL NOT NULL,       -- 含税结算金额；付款勾稽展示与额度口径
+  total_amount      REAL NOT NULL DEFAULT 0 CHECK (total_amount >= 0),       -- 含税结算金额；付款勾稽展示与额度口径
   amount            REAL,                -- 不含税结算金额
   tax_amount        REAL,
   tax_rate          REAL,
-  settlement_date   TEXT NOT NULL,
+  settlement_date   TEXT NOT NULL DEFAULT '',
   settlement_period TEXT DEFAULT '',
   deduction_note    TEXT DEFAULT '',
+  created_by TEXT NULL, updated_by TEXT NULL, responsible TEXT NULL, department TEXT NULL, -- v47
   status            TEXT DEFAULT 'draft',
   note              TEXT DEFAULT '',
   created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
 
+```
+
+### AX05 其他支出结算中央事实
+
+物理来源仍为 `expenditure_settlements` 的其他支出种类，不新建结算主表或明细表。SQLite v47 仅补充可空 `created_by / updated_by / responsible / department`，旧审计不反推。浏览器通过 `other-settlements` Repository/HTTP/command 接入，中央测试实例不声明生产持久化能力。
+
+- 受控迁移新增 `other_settlements` 与 `other_settlement_sources` 节点，位于 `auxiliary_contracts` 后；后者为真实关联付款申请与支付记录的独立中央源单，使用 `application:旧ID / payment:旧ID` 映射。罚扣沿用 `owner_documents.project_penalty`，其其他支出合同旧 ID 同样使用 `other_expense:` 命名空间，抵扣目标支持统一结算的准确类型。试跑重验合同类型、非草稿状态及项目、分供方一致性，错误关系阻断导入。
+- 结算头只保存资料、含税金额、税率和状态；金额链实时投影，有效抵扣来自 `penalty_settlement_deductions`，申请来自 `payment_application_settlement_allocations`，支付来自 `payment_record_application_allocations` 及已确认 `payment_records`。源单 ID、支付来源申请 ID 均映射中央身份，事实 ID 按结算与种类命名空间保持稳定。金额及有效状态重新读取中央源单及其分配记录，罚扣复用既有中央源，不以迁移时事实副本继续充当正式来源。源单详情通过独立只读 HTTP 请求获取资料、分配、审计及文件元数据。
+- 对明确抵扣其他支出结算的巡检、甲方通知和验收来源罚扣，同样接管到既有中央罚扣实体；`penaltyFacts.origin` 保留原始来源并在源单展示，不改造成手工项目罚扣，也不按名称补接原始来源业务页。
+- 本次金额为含税金额减有效抵扣；可申请为本次金额减有效申请；未付为本次金额减已确认且精确归属的支付。草稿、无效、已删除事实不计入。涉及多结算但无结算级支付分摊时已付/未付为 null，不按比例分配。无有效记录的真实空集合为零；未知集合、未知金额或身份失效保持 null。无税额复用整数分及税率基点舍入。
+- 同一合同的累计结算仅纳入已确认、同项目同分供方结算。前期金额仅纳入早于本单结算日期的记录；日期缺失或同日先后不明时保持未知。合同详情不再持有独立结算快照，而由同一结算源投影。中央身份被移除时关联不继续显示可用。
+- 附件仍归 `file_refs(owner_type='expenditure_settlement')`；中央只保存元数据，不公开本地路径。保存使用服务端 ID、版本与 commandId，重试幂等，旧版本拒绝覆盖；确认后锁定。未知事实或已有下游事实的结算禁止改挂关系，历史空审计在编辑后仍为空。
+
+专属页面与当前源单下钻边界见[页面蓝本](./pages/contract-forms.md#ax05-当前浏览器实现331)，环境边界见 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md#ax05-其他支出结算接管)。材料到货分摊、冲销和虚构结算明细均未引入。
+
+<a id="entity-payment-application"></a>
+
+#### 付款申请与结算、发票分摊
+
+```sql
 -- 付款申请头：可编辑标量落实体列；attachFiles 走 file_refs，不存 JSON。
 -- `_biz` / `_c1`..`_c4` / `isPrepay` 等 readonly+compute 展示字段不存。
 CREATE TABLE payment_applications (
@@ -427,7 +956,8 @@ CREATE TABLE payment_applications (
   prepay_note     TEXT,
   approved_amount REAL DEFAULT NULL CHECK (approved_amount IS NULL OR approved_amount >= 0),
   approved_amount_origin TEXT NOT NULL DEFAULT 'legacy' CHECK (approved_amount_origin IN ('legacy', 'user-entry')),
-  paid_amount     REAL,                -- 兼容旧列，只读；新值由已确认支付记录分摊派生（§10.2）
+  approval_note   TEXT DEFAULT '',
+  company_expense_contract_id TEXT REFERENCES company_expense_contracts(id), -- v46
   external_ref    TEXT DEFAULT '',      -- 外部业务键；导入时用于幂等和来源关联
   status          TEXT DEFAULT 'draft',
   note            TEXT DEFAULT '',
@@ -455,6 +985,233 @@ CREATE TABLE payment_application_invoice_allocations (
 
 付款申请头与两类分摊行必须由同一个 store action 在事务内保存。草稿允许金额不平并显示差额；提交规则、`先款后票`待回票金额与单票全局额度见 `finance-payment.md` 和 ADR 0015。
 
+<a id="2104-f3-资金"></a>
+
+#### 收款、开票与往来
+
+F3 的来源表由 v22 落地；项目/合同/客户 lookup 保存稳定 ID，公司开支不挂虚拟项目。下列保留字段目录，不把提交必填当草稿数据库限制。
+
+普通收款的浏览器 owner 已由 #436 接管：草稿金额未填为 `null`，明确 0 保留为 0；`draft/save/submit` 分别按[收款规格](./pages/finance-receipt.md#一收款登记)校验，不新增 `confirm` 动作。有效收款按中央记录排除 `draft/草稿/void/作废/已作废` 及软删；下方 v22 的 `amount DEFAULT 0` 是旧来源物理默认，不能当作中央金额默认，未获取或未知金额不能补 0。
+
+<a id="receipt-other-sources"></a>
+
+**其他收款与真实付款人（2026-10-02 已确认目标）：**废料出售、赔偿、非主客户付款等真实收款均可能发生。每笔沿稳定收款身份保留真实性质、金额、日期、付款人、收款我方主体、凭证及业务依据；项目有真实归属才关联，无项目的公司收款不挂虚拟项目。存在施工合同债权时另外保留合同及债务客户，实际付款人和债务客户分别表达；第三方代付同一施工合同款仍归合同收款，不因付款人不同再造一笔其他收入。非合同收入按自身来源归属，一笔实际流入只聚合一次，不以主客户、名称或备注猜补关系。
+
+当前[普通收款领域校验](../../app/lib/receipt/domain.ts)要求付款客户等于项目主客户，并核对施工合同项目/客户，尚不能完整承接上述来源；现有 `customer_id` 不同时代表真实第三方付款人和合同债务客户。不改项目主客户或伪建合同绕过限制，本轮保留旧 SQL。收款性质及真实付款人等物理字段、源单与收款命令接线属于实现缺口。废料、赔偿等名称本身不决定收入确认或税务待遇，实际认定须结合交易及适用依据，不能自动按全部应税或免税处理。
+
+```sql
+receipt_registrations(
+  id, no TEXT DEFAULT '', receipt_date TEXT,
+  project_id TEXT REFERENCES projects(id),
+  contract_id TEXT REFERENCES contracts(id),
+  customer_id TEXT REFERENCES customers(id),
+  payer_account TEXT DEFAULT '',
+  amount REAL DEFAULT 0 CHECK (amount >= 0),
+  payment_method TEXT DEFAULT '', acceptance_bill_no TEXT DEFAULT '',
+  bill_due_date TEXT DEFAULT '', period_no TEXT DEFAULT '',
+  bank_serial_no TEXT DEFAULT '', handler TEXT DEFAULT '',
+  review_status TEXT DEFAULT 'draft', status, note,
+  created_at, updated_at, deleted_at
+)
+```
+
+```sql
+invoice_applications(
+  id, no TEXT DEFAULT '', name TEXT NOT NULL,
+  project_id TEXT REFERENCES projects(id),
+  contract_id TEXT REFERENCES contracts(id),
+  customer_id TEXT REFERENCES customers(id),
+  buyer_name_snapshot TEXT DEFAULT '', buyer_tax_no_snapshot TEXT DEFAULT '',
+  invoice_type TEXT DEFAULT '', amount REAL DEFAULT 0 CHECK (amount >= 0),
+  tax_rate REAL, tax_amount REAL DEFAULT 0 CHECK (tax_amount >= 0),
+  invoice_content TEXT DEFAULT '', invoice_remark TEXT DEFAULT '',
+  applicant TEXT DEFAULT '', application_date TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+```
+
+```sql
+current_transactions(
+  id, no TEXT DEFAULT '',
+  direction TEXT NOT NULL CHECK (direction IN ('receipt', 'payment')),
+  project_id TEXT REFERENCES projects(id),
+  counterparty TEXT NOT NULL, purpose TEXT DEFAULT '',
+  amount REAL DEFAULT 0 CHECK (amount >= 0),
+  payment_method TEXT DEFAULT '', transaction_date TEXT DEFAULT '',
+  bank_serial_no TEXT DEFAULT '', handler TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+```
+
+开票价税合计由 `amount + tax_amount` 派生；购方名称/税号保存提交时业务快照。`current_receipts/current_payments` 仅为 v22 来源，迁移后退出日常读写。
+
+<a id="102-支付记录及付款申请分摊"></a>
+
+<a id="entity-payment-record"></a>
+
+#### 支付记录及付款申请分摊
+
+**已确认目标（ADR 0015）：**普通合同及一般付款的实际支付金额只保存于 `payment_records.amount`，一张银行凭据一条支付，通过分摊关联多份申请。以下是 v22 已落地来源物理字段（非生产接管声明），OCR 的 `not_applicable/pending` 等实现值不构成自动确认。
+
+```sql
+CREATE TABLE payment_records (
+  id                   TEXT PRIMARY KEY,
+  no                   TEXT NOT NULL DEFAULT '',
+  project_id           TEXT REFERENCES projects(id),
+  supplier_id          TEXT REFERENCES suppliers(id),
+  payee_name           TEXT NOT NULL DEFAULT '',
+  purpose              TEXT NOT NULL DEFAULT '',
+  payment_date         TEXT NOT NULL DEFAULT '',
+  amount               REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  payment_method       TEXT NOT NULL DEFAULT '',
+  voucher_no           TEXT NOT NULL DEFAULT '',
+  bank_serial_no       TEXT NOT NULL DEFAULT '',
+  payee_account        TEXT NOT NULL DEFAULT '',
+  payee_bank           TEXT NOT NULL DEFAULT '',
+  payee_bank_account   TEXT NOT NULL DEFAULT '',
+  handler              TEXT NOT NULL DEFAULT '',
+  source               TEXT NOT NULL DEFAULT 'manual'
+                       CHECK (source IN ('manual', 'image_ocr', 'excel_import')),
+  recognition_status   TEXT NOT NULL DEFAULT 'not_applicable',
+  ocr_payload           TEXT NOT NULL DEFAULT '{}',
+  field_confidence     TEXT NOT NULL DEFAULT '{}',
+  confirmation_status  TEXT NOT NULL DEFAULT 'draft'
+                       CHECK (confirmation_status IN ('draft', 'needs_review', 'confirmed')),
+  confirmed_by         TEXT NOT NULL DEFAULT '',
+  confirmed_at         TEXT,
+  external_ref         TEXT NOT NULL DEFAULT '',
+  note                 TEXT NOT NULL DEFAULT '',
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at           TEXT DEFAULT NULL,
+  CHECK (
+    confirmation_status <> 'confirmed'
+    OR (
+      amount > 0
+      AND TRIM(payment_date) <> ''
+      AND TRIM(payee_name) <> ''
+      AND TRIM(voucher_no) <> ''
+      AND TRIM(bank_serial_no) <> ''
+      AND TRIM(confirmed_by) <> ''
+      AND confirmed_at IS NOT NULL
+    )
+  )
+);
+```
+
+旧 `payment_records.payment_application_id` 已在 v22 重建时移除；旧可证关系转换为分摊，不继续双写。项目字段可空，用于公司付款。
+
+```sql
+CREATE TABLE payment_record_application_allocations (
+  id                     TEXT PRIMARY KEY,
+  payment_record_id      TEXT NOT NULL REFERENCES payment_records(id),
+  payment_application_id TEXT NOT NULL REFERENCES payment_applications(id),
+  allocated_amount       REAL NOT NULL CHECK (allocated_amount > 0),
+  note                   TEXT DEFAULT '',
+  created_at             TEXT,
+  updated_at             TEXT,
+  deleted_at             TEXT
+);
+
+CREATE UNIQUE INDEX uq_payment_record_application_allocation
+  ON payment_record_application_allocations(payment_record_id, payment_application_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX idx_praa_record
+  ON payment_record_application_allocations(payment_record_id, deleted_at);
+CREATE INDEX idx_praa_application
+  ON payment_record_application_allocations(payment_application_id, deleted_at);
+```
+
+确认支付记录的事务约束：
+
+1. 金额、日期、收款方和凭证均已人工核对；
+2. `Σ该支付有效分摊.allocated_amount = payment_records.amount`；
+3. 同一 `bank_serial_no` 在有效记录中不得重复；
+4. OCR 置信度不替代人工确认；
+5. 未确认支付不进入已付、合同付款或现金流汇总。
+
+付款申请批复来源（[#439 / PAY-07](https://github.com/zodea/crm-new/issues/439)）：
+
+- `approved_amount = NULL` 表示未填写，明确录入 `0` 表示批复零元；只有未填写时才回退申请金额作为可付上限。新申请默认保存 `NULL`，不得经过 `|| 0` 或默认值压成零。
+- `approved_amount_origin` 由保存域维护：新建及明确编辑批复后为 `user-entry`，迁移前存量为 `legacy`。修改批复必须携带与金额一致的明确输入意图；仅改备注、整单保存或客户端声称来源已确认，不会升级存量来源。金额、来源、分摊和附件沿用同一保存事务，取消或保存失败不留下来源变更。
+- v21/v22 曾把空值、缺列和非法负值压成零，无法从零值、状态、备注或时间戳恢复当时批复事实。v49 仅改为可空列并给旧记录添加来源标记，原始金额、银行记录、三类分摊、索引及约束保持；不批量猜测旧零的含义。
+- `legacy + 0` 读为“历史批复待核验”，批复金额、依赖它的余额及完整合计为未知；原存储零仍保留。旧非零批复仍按已有金额读取，已确认银行实付独立显示，不为对平批复而修改。
+- **PAY-08 已确认目标（2026-10-02）：**历史未知批复允许保存真实回单草稿，先核实业务再确认新支付；既有确认实付与分摊保持原事实，不为对平而改写。材料相关的金额冲突首先由填写人核实送货单是否正确，再核实超合同数量的原因及处理；送货与增额依据都正确时，承接有依据的合同金额上涨及本次实际应付，例中按核实正确的 2,000 元处理；有错误则查明实际应付多少。不只针对批复数字判断，不为通过校验单改批复、清空旧值或修改真实回单。[原调查问题](https://github.com/zodea/crm-new/issues/413#issuecomment-5616431545)保留历史证据，不以其未决文字覆盖本次裁定。核验结果沿既有合同依据→已确认结算→付款申请及累计批复核实→实际支付链承接（2026-10-02 已确认），不另设绕过原链的核验例外；非材料申请不机械要求送货单。核验记录及确认接线尚未实现。
+- **实际实现边界：**PAY-07 仍保留既有登记与确认操作的申请额兼容上限，并在读侧显示未知；该技术兼容不构成批准申请全额的业务裁定，也尚未执行上述新增确认门槛。本轮只整理文档，不修改保存域、支付确认或数据库。明确重填后使用新金额语义。
+
+付款申请派生字段（批复来源已明确，或批复为未填写时）：
+
+```text
+paid_amount =
+  Σ payment_record_application_allocations.allocated_amount
+  WHERE payment_record.confirmation_status = 'confirmed'
+    AND 支付记录与分摊行均未软删除
+
+actual_payment = paid_amount
+unpaid_amount = max(COALESCE(approved_amount, apply_amount) - paid_amount, 0)
+```
+
+历史待核验批复的 `unpaid_amount` 为 `NULL`，不能使用上式回退申请额并将结果冒充已知余额；登记动作的兼容回填与读侧金额事实分开。当前实现覆盖本地付款表单、详情、付款管理、分供方/项目分供方读投影及其他支出结算关联源单，不代表通用付款中央写命令或生产持久化已经接管。
+
+`payment_applications.paid_amount/actual_payment` 属于旧模型；v22 重建后的表和 v49 已无这两列，旧手写值不得进入现行金额。v22 仅对旧正数 `paid_amount` 写 `reconciliation_issues`；其余恢复须核对旧版本及备份证据，不能声称 `actual_payment` 已完整归档，也不覆盖支付分摊。分摊金额写入、支付确认、撤回及操作日志必须在同一事务内。
+
+```mermaid
+flowchart TD
+  B["银行回单"] --> R["识别 / 手工录入"]
+  R --> H["人工核对实际支付"]
+  H --> A["按申请 ID 分摊<br/>分摊合计 = 支付额"]
+  A --> C["确认支付<br/>派生已付与现金流"]
+```
+
+```mermaid
+flowchart TD
+  P["历史批复为零<br/>但原意无法确定"] --> U["批复、余额读为未知"]
+  U --> G["冲突发生在<br/>确认新支付时"]
+  G --> S["可保存真实回单草稿<br/>既有确认实付不改写"]
+```
+
+```mermaid
+flowchart TD
+  H["填写人核实送货单"] --> Q["核实合同超量处理"]
+  Q --> V{"事实及依据正确？"}
+  V -->|是| T["承接合同增额<br/>核实实际应付"]
+  V -->|否| E["查明错误<br/>核实实际应付"]
+  T --> L["保留真实合同依据<br/>承接已确认结算"]
+  E --> L
+  L --> A["核实付款申请与累计批复<br/>不能只为对平改数字"]
+  A --> C["核验后确认真实本次支付<br/>保全原回单与既有实付"]
+```
+
+图为规则与冲突位置示意：PAY-08 的材料核验顺序及沿合同依据→结算→申请→实付链承接已确认，目标门槛尚未实现，登记兼容上限不等于批准申请全额。合同确需增额时保留明确变更依据；源结算须真实已确认，申请和累计批复依据核实后再确认实际支付，不另设绕过申请额度的核验例外。示例申请 10,000、历史批复未知、已付 3,000、新回单 2,000，不能单凭总数决定应付；核实正确的本次 2,000 与申请累计可付金额是不同事实，不能把本次金额直接填作累计批复上限。仅录入非负批复、清空为 NULL 或改备注都不能替代上述业务核验；核验记录、界面与审计接线仍待实施。
+
+PAY-08 的逻辑核验依据归付款申请及当前源单，不复制一套可编辑合同量价：稳定申请身份、核验范围、合同/变更与已确认结算的真实引用、实际应付结论、累计批复依据、核验人和时间、相关源单版本及原件引用。`user-entry` 只证明明确输入批复，不证明上述业务核验已经完成；当前代码和通用日志未保存完整核验记录。新确认在原支付事务复验当前依据、累计实付及本次分摊，依据变化时重核，不信任客户端“已核验”布尔值。物理审计承接与中央支付接线是实现义务，业务顺序不再列为待裁定；本轮没有新建核验表或支付命令。
+
+**官方依据及适用边界：**已核对财政部发布的[《会计法》（2024 年修正）](https://kjs.mof.gov.cn/zt/kjfxcgc/kjfqw/202408/t20240814_3941788.htm)第 2、9、14、17、25 条；[财政部施行时间说明](https://kjs.mof.gov.cn/zt/kjfxcgc/kjfqw/202408/t20240814_3941778.htm)区分 2024 年 7 月 1 日起施行的修改内容与原施行时间：适用于其规定的单位会计事务，要求真实业务、凭证审核、账实核对与内部监督。法条没有规定 CRM 的批复字段或本门槛；“先核实再确认”是本项目确认的内部业务控制，不能据此否认已发生银行实付、推定债务不存在或决定拒付。合同增额另按本文件已引用的《民法典》合同编第 543—544 条核对协商一致及明确变更内容，不因送货量超过原合同就自动推定价款上涨。此次不处理特定项目、主体或历史交易的会计认定、合同责任及地方规则适用；涉及这些实际调整时须按所在地、主体及业务发生时间另核。
+
+#### 费用报销与明细
+
+```sql
+expense_reimbursements(
+  id, project_id TEXT REFERENCES projects(id),
+  no TEXT DEFAULT '', applicant TEXT DEFAULT '', category TEXT DEFAULT '',
+  reimbursement_date TEXT DEFAULT '', invoice_count INTEGER DEFAULT 0,
+  reason TEXT DEFAULT '', status TEXT DEFAULT 'draft', note TEXT DEFAULT '',
+  external_ref TEXT DEFAULT '',
+  created_at, updated_at, deleted_at
+)
+```
+
+```sql
+expense_reimbursement_lines(
+  id, reimbursement_id TEXT NOT NULL REFERENCES expense_reimbursements(id),
+  expense_item TEXT NOT NULL, expense_date TEXT DEFAULT '',
+  amount REAL NOT NULL CHECK (amount > 0), note TEXT DEFAULT '',
+  sort_order INTEGER DEFAULT 0, created_at, updated_at, deleted_at
+)
+```
+
+`project_id` 可空，明确表示公司开支；总额只从有效明细聚合，头表不保存第二份可编辑金额。只有 `status='confirmed'` 且头/明细未软删的费用进入动态成本。v22 已把旧头金额大于 0 的记录转成 `expense_item='迁移汇总'` 明细并保留来源；空值或资料不完整写 `reconciliation_issues`，不得补 0。旧头金额已由 F3 重建移除。
+
 ### 2.5 物资管理类
 
 本节 SQLite 表仍是现有来源结构。[材料到货与送货归档基数决定](https://github.com/zodea/crm-new/issues/284)、[甲供材供货身份与计划决定](https://github.com/zodea/crm-new/issues/285)及[已确认材料结算冲销决定](https://github.com/zodea/crm-new/issues/291)已经采纳；不能因为下文尚保留旧表而重新讨论单一明细、Party/计划行或整张冲销。目标结构、旧表退役和迁移的实际完成度按[物资模块复核](https://github.com/zodea/crm-new/issues/411)与[合同及材料结算复核](https://github.com/zodea/crm-new/issues/409)逐项核验，不由本段宣告完成。缺价格可保留归档到货事实，价格分析排除缺价格行；归档标记本身不证明有效到货、库存与结算门禁全部满足。
@@ -481,30 +1238,34 @@ CREATE TABLE payment_application_invoice_allocations (
 ```sql
 CREATE TABLE delivery_records (
   id         TEXT PRIMARY KEY,
-  projectId  TEXT NOT NULL,          -- 写入持久化记录前强制归项目；工地名经 project_aliases 归一而来
-  supplierId TEXT,                   -- 可空=归档库左树「⚠未区分分供方」兜底节点
-  rawSiteText TEXT,                  -- OCR/文件夹推断的工地原文本，仅留痕追溯，不参与任何键（2026-07-06 定）
-  orderNo TEXT, deliveryDate TEXT,   -- 去重自然键 = projectId+supplierId+orderNo（全 ID 化，见 §6 唯一索引）
-  fileName TEXT, filePath TEXT,
-  ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
+  project_id  TEXT NOT NULL REFERENCES projects(id),          -- 写入持久化记录前强制归项目；工地名经 project_aliases 归一而来
+  supplier_id TEXT REFERENCES suppliers(id),                   -- 可空=归档库左树「⚠未区分分供方」兜底节点
+  raw_site_text TEXT,                  -- OCR/文件夹推断的工地原文本，仅留痕追溯，不参与任何键（2026-07-06 定）
+  order_no TEXT, delivery_date TEXT,   -- 去重自然键 = project_id+supplier_id+order_no（全 ID 化，见 §6 唯一索引）
+  file_name TEXT, file_path TEXT,
+  ocr_status TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
   archived  INTEGER DEFAULT 0,       -- 已人工核对、归属齐全并触发归档后置 1；有效到货与价格分析另按本节现行门禁判断
   stored    INTEGER DEFAULT 0,       -- v25 起只作存量兼容镜像，归档记录统一回填 1；禁止作为独立业务资格判断
-  printBatchId TEXT DEFAULT '',      -- v32：同一上传原件拆出的多张送货单共享；跨刷新按批次恢复一个打印任务
-  printDisposition TEXT DEFAULT 'excluded', -- pending | printed | excluded；新归档由 store 显式写 pending
-  printedAt TEXT,                    -- 仅真实打印完成后的用户回执写入；打开打印窗口不得写
-  printExcludedAt TEXT,              -- 明确排除打印范围的时间；排除不写 printedAt
-  reviewFlag TEXT,                   -- 问题标记（缺公司/缺日期/缺单号/0明细行/待复核）
-  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+  print_batch_id TEXT DEFAULT '',      -- v32：同一上传原件拆出的多张送货单共享；跨刷新按批次恢复一个打印任务
+  print_disposition TEXT DEFAULT 'excluded', -- pending | printed | excluded；新归档由 store 显式写 pending
+  printed_at TEXT,                    -- 仅真实打印完成后的用户回执写入；打开打印窗口不得写
+  print_excluded_at TEXT,              -- 明确排除打印范围的时间；排除不写 printed_at
+  review_flag TEXT,                   -- 问题标记（缺公司/缺日期/缺单号/0明细行/待复核）
+  note TEXT, created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
 
 CREATE TABLE delivery_lines (
   id               TEXT PRIMARY KEY,
-  deliveryRecordId TEXT NOT NULL,    -- → delivery_records.id
-  materialName TEXT, spec TEXT, unit TEXT,
-  qty REAL, unitPrice REAL, amount REAL,
-  amountSource TEXT DEFAULT 'manual', -- calculated | ocr | manual
-  note TEXT, sortOrder INTEGER
+  delivery_record_id TEXT NOT NULL REFERENCES delivery_records(id),    -- → delivery_records.id
+  material_name TEXT, spec TEXT, unit TEXT,
+  qty REAL, unit_price REAL, amount REAL,
+  amount_source TEXT DEFAULT 'manual', -- calculated | ocr | manual
+  note TEXT, sort_order INTEGER,
+  created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
+```
+
+> 来源物理列使用 `amount_source` / `unit_price` / `print_batch_id` 等 snake_case；以下 camelCase 是页面/DTO 映射，不是另一份列定义。
 
 > `delivery_lines.amount` 是人工复核后的独立金额，不是数据库生成列。默认可由 `qty × unitPrice` 补出；`amountSource='calculated'` 时数量/单价继续联动，`ocr` / `manual` 时冻结票面或人工金额。迁移 v9 将无法可靠反推来源的存量行标为 `manual`，避免升级后覆盖既有值。`qty × unitPrice = amount` 仅作为界面勾稽规则，不作为写入时强制重算规则。
 
@@ -514,17 +1275,187 @@ CREATE TABLE delivery_lines (
 
 项目详情的到货视图只查询 `delivery_records.archived=1` 且头/项目/分供方祖先未软删的记录，并聚合未软删 `delivery_lines`。原件正文继续归属 `file_refs(owner_type='delivery_record', owner_id=delivery_records.id, category='source')`；`delivery_records.file_name` 仅作兼容显示，不建立详情附件副本。
 
+```sql
 CREATE TABLE project_aliases (
   id        TEXT PRIMARY KEY,
-  projectId TEXT NOT NULL,           -- → projects.id
+  project_id TEXT NOT NULL REFERENCES projects(id),           -- → projects.id
   alias     TEXT NOT NULL,           -- 工地名写法变体（全局唯一，见 §6）；首次人工确认时写入，之后同写法自动绑定
-  createdAt TEXT, deleted_at TEXT
+  created_at TEXT, deleted_at TEXT
 );
 ```
 
 > `project_aliases` 已由迁移 v8 落地：人工选定项目并完成核对时记忆 `rawSiteText`，同一归一化写法后续自动预选；若该写法已属于其他项目则拒绝静默改绑。
 
+上述为旧本地适配事实。浏览器中央尚未完整迁入 `project_aliases`；当前项目建议仅由已人工确认送货记录的 `rawSiteText + projectId` 派生，仍须人工选定。旧别名保留用于受控迁移、冲突核对与恢复，不能把当前建议当作旧别名全量接管，见[送货中央边界](./pages/material-delivery.md#441-浏览器中央来源与修订)及 [#411](https://github.com/zodea/crm-new/issues/411#issuecomment-5624420257)。
+
 `ocr_settings` 是不参与通用软删除和操作日志的本机基础设施表（迁移 v33）。固定单例 `id='default'`，`settings_json` 只保存 PaddleOCR-VL 已接线的非敏感识别能力、请求/轮询超时和暂未接线的只读人工校对阈值；Access Token、API 地址和模型名禁止进入该表。
+
+<a id="2105-f4-物资"></a>
+
+#### F4 来源字段与旧模型
+
+以下是 v23 的来源字段目录，保留迁移与恢复依据；其中独立 `material_arrival_lines`、甲供材单行总控和仓库文本属于待归并旧模型。已确认目标见紧接的[目标关系](#material-target)，不能再把这组旧表写成后续建表目标。
+
+```sql
+material_requisitions(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  contract_id TEXT REFERENCES contracts(id), applicant TEXT DEFAULT '',
+  requisition_date TEXT DEFAULT '', required_date TEXT DEFAULT '',
+  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
+  planned_qty REAL DEFAULT 0 CHECK (planned_qty >= 0),
+  warehouse TEXT DEFAULT '', purpose TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+
+material_arrivals(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  supplier_id TEXT REFERENCES suppliers(id), contract_id TEXT REFERENCES contracts(id),
+  requisition_id TEXT REFERENCES material_requisitions(id),
+  warehouse TEXT DEFAULT '', arrival_date TEXT DEFAULT '', receiver TEXT DEFAULT '',
+  quality_result TEXT DEFAULT '', stock_status TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+material_arrival_lines(
+  id, arrival_id TEXT NOT NULL REFERENCES material_arrivals(id),
+  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
+  qty REAL NOT NULL CHECK (qty > 0), unit_price REAL,
+  note TEXT DEFAULT '', sort_order INTEGER DEFAULT 0,
+  created_at, updated_at, deleted_at
+)
+-- 已到量、到货头材料摘要/数量/金额均从有效到货明细聚合。
+
+material_uses(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  warehouse TEXT DEFAULT '', use_date TEXT DEFAULT '',
+  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
+  qty REAL DEFAULT 0 CHECK (qty >= 0), receiver TEXT DEFAULT '',
+  crew_id TEXT REFERENCES crews(id), purpose TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+
+stock_checks(
+  id, no TEXT DEFAULT '', warehouse TEXT NOT NULL,
+  checker TEXT NOT NULL, check_date TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+stock_check_lines(
+  id, stock_check_id TEXT NOT NULL REFERENCES stock_checks(id),
+  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
+  book_qty REAL DEFAULT 0, actual_qty REAL DEFAULT 0,
+  variance_amount REAL DEFAULT 0,
+  sort_order INTEGER DEFAULT 0, created_at, updated_at, deleted_at
+)
+-- variance_qty = actual_qty - book_qty；仅 status='effective' 的盘点影响库存。
+
+owner_material_controls(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  customer_id TEXT REFERENCES customers(id),
+  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
+  control_qty REAL DEFAULT 0 CHECK (control_qty >= 0),
+  status, note, created_at, updated_at, deleted_at
+)
+owner_material_requisitions(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  applicant TEXT DEFAULT '', application_date TEXT DEFAULT '', required_date TEXT DEFAULT '',
+  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
+  planned_qty REAL DEFAULT 0 CHECK (planned_qty >= 0),
+  status, note, created_at, updated_at, deleted_at
+)
+owner_material_arrivals(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  warehouse TEXT DEFAULT '', arrival_date TEXT DEFAULT '', receiver TEXT DEFAULT '',
+  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
+  qty REAL DEFAULT 0 CHECK (qty >= 0), quality_result TEXT DEFAULT '',
+  stock_status TEXT DEFAULT '', status, note, created_at, updated_at, deleted_at
+)
+owner_material_uses(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  use_date TEXT DEFAULT '', material_name TEXT NOT NULL, unit TEXT DEFAULT '',
+  qty REAL DEFAULT 0 CHECK (qty >= 0), receiver TEXT DEFAULT '',
+  crew_id TEXT REFERENCES crews(id), purpose TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+owner_material_directs(
+  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
+  customer_id TEXT REFERENCES customers(id), transaction_date TEXT DEFAULT '',
+  material_name TEXT NOT NULL, unit TEXT DEFAULT '',
+  qty REAL DEFAULT 0 CHECK (qty >= 0),
+  purpose TEXT DEFAULT '', use_location TEXT DEFAULT '',
+  status, note, created_at, updated_at, deleted_at
+)
+```
+
+来源计算：到货头数量/金额原由旧到货行聚合，库存盘点差量=`actual_qty - book_qty`，仅 effective 盘点影响库存；甲供材累计到货/领用/剩余从各事实聚合，不维护可编辑累计列。送货归档的摘要、数量、金额仍从 `delivery_lines` 派生，原件归 `file_refs(owner_type='delivery_record')`。
+
+<a id="material-target"></a>
+
+#### 已确认目标关系与迁移边界
+
+依据 [#284 最终裁定](https://github.com/zodea/crm-new/issues/284#issuecomment-5294731518)、[#285 最终裁定](https://github.com/zodea/crm-new/issues/285#issuecomment-5294844478)及 [#291 最终裁定](https://github.com/zodea/crm-new/issues/291#issuecomment-5295010103)。目标已定，物理接线与实际完成度仍由 #411 / #409 核对；以下概念身份不冒充已有 SQL 表名。
+
+| 对象 | 稳定身份、归属与不变量 | 来源/迁移边界 |
+| --- | --- | --- |
+| 物理原件 / 逻辑送货 | 一批可含多文件，一原件可含多逻辑单；正文不可变且仅存一份、共享引用 | 原件身份与修订保全见 §3.5；不伪造拆分页码、不重复导出、不从旧路径读取正文 |
+| 送货 / 到货 / 材料行 | 有效逻辑送货与到货头显式 1:1；`delivery_lines` 是唯一 canonical 明细；到货头保存项目/合同/仓库/收货人/质检/状态 | 旧 `material_arrival_lines` 受控归并退役，不双写、不按名称/单号/金额补关系 |
+| Party 供货方 | Party 稳定根身份 + 当前项目 `owner_designated_supplier` 角色；其他客户/分供方角色也须显式授予 | 项目 `customer_id` 仅表示甲方，不自动成为供货方，不按名称合并或改名冒充 `supplierPartyId` |
+| 甲供总计划 | `OwnerMaterialPlan(planId)` 拥有项目、编号、日期、备注、盖章要求、说明、状态/审计和头附件 | `owner_material_controls` 是旧单行总控，不是新计划头 |
+| 计划行 | `OwnerMaterialPlanLine(planLineId)` 保存 `materialId`、规格/单位、计划量、唯一 `supplierPartyId`；项目从头继承 | 有效计划内同一稳定材料仅一行和一供货方；已被下游引用的行禁止改供货方；本期不支持换供/拆供/部分履约分配 |
+| 甲供下游 | 下料、到货、领用、直入直出、送货归档及项目投影均经 `planLineId` 归集和追溯 | 未迁移关系维持 null/未配置，目录提示“甲供材供货单位待配置”，不自建桥表猜接 |
+| 材料结算 | 复用 `expenditure_settlements`；一结算多到货，每到货至多一个有效已确认正向结算，后到货另建结算 | 结算—到货成员关系不同于送货—到货 1:1；成本只取结算，价格只追溯送货行 |
+
+```mermaid
+flowchart TD
+  F["物理原件<br/>正文仅一份"] -->|"1:N 显式引用"| D["逻辑送货记录"]
+  D -->|"1:N"| L["delivery_lines<br/>唯一量价明细"]
+  D -->|"有效态 1:1"| A["到货头<br/>归属 / 收货 / 质检"]
+```
+
+```mermaid
+flowchart TD
+  P["项目"] --> H["计划头<br/>planId / 附件"]
+  H --> L["计划行<br/>planLineId / 材料 / 量"]
+  L -->|"supplierPartyId"| S["Party<br/>本项目供货角色"]
+  L -->|"planLineId"| D["下料 / 到货<br/>领用 / 直入直出"]
+```
+
+两图均为已确认目标关系示意，不是运行截图或已完成迁移证明。旧 `material_arrival_lines` 待受控归并到唯一送货明细；价格分析取该明细并排除缺价格行，已闭合到货经显式结算成员关系进入材料结算，再进入动态成本。项目客户不能冒充计划行供货 Party。2026-08-13 观察到的总计划、供货方、源单等列只是旧参考证据；其后 #284/#285 已裁定，不能继续称身份/头行边界“未裁定”。当前可空读 DTO 见[物资规格](./pages/material-management.md)。
+
+缺原件或数量偏差未闭合仅可暂存，不进入正式库存、价格分析或结算；补件/解决偏差/修正唯一结构化单后记录原因、操作者与时间，在原身份上闭合。缺价格但送货事实已核对使用独立价格待补状态，不抹掉到货事实，价格分析排除缺价格行。
+
+```mermaid
+flowchart TD
+  E["已确认结算出错"] --> B["禁止重开 / 覆盖原单"]
+  B --> R["追加全额反向冲销<br/>镜像原冻结量额与成员"]
+  R --> N["追加替代结算<br/>记入实际更正期间"]
+  N --> V["最新替代承接<br/>有效正向成员归属"]
+```
+
+冲销与替代计入实际更正期间，累计成本按原单、冲销、替代的有符号金额求和；已有票款仍指原 ID，必要时另建调整。再次更正只针对最新替代追加，命令须幂等并保护并发及可识别的替代状态；此为 #291 既定目标流程，不证明写命令已完成。
+
+<a id="quotation-target"></a>
+
+#### 独立报价（已确认目标，未实现）
+
+报价是独立价格依据，不要求先有项目或采购合同。2026-10-02 已确认：通用报价和未在系统建档的报价方均可收录；关系未核实保持未关联，签约时仍按[真实主档选择](#contract-party-selection)。本节是逻辑实体定义，不宣告新表、Party 角色或录入已落地。
+
+| 对象 | 身份、字段与归属 | 约束及例外 |
+| --- | --- | --- |
+| 报价头 | 独立报价 ID、原报价方名称、报价日期、真实报价范围、备注及原件引用 | 已核实项目 ID、分供方 ID 可关联；通用报价不挂项目，项目尚未核实也可未关联，但不自动称为通用报价；未建档/未核实报价方保留原文，不自动建正式分供方 |
+| 报价行 | 独立行 ID → 报价头 ID；原材料名称、规格、材质、品牌、单位、真实单价及已提供的税费、运费、数量等条件 | 项目/报价方归报价头，行不再存另一份可编辑归属；真实有效期、数量和付款条件按原资料保留，未知不补默认，不套合同或送货税率 |
+| 报价原件 | 归报价头，沿[文件 owner 机制](#35-文件引用多态关联)引用 | 报价 owner 尚未登记，不建立第二份附件正文库 |
+| 比较投影 | 来源种类、原头/行 ID、来源日期及已核实供货方身份 | 未关联报价仍可展示；已核实家数按供货方稳定 ID 去重，未知身份注明未关联，不把同名、每份未知报价或三个价格来源自动算成不同供应商 |
+
+```mermaid
+flowchart TD
+  F["报价原件<br/>归报价头"] --> Q["报价头<br/>报价 ID / 原报价方"]
+  Q --> L["报价行<br/>行 ID / 原单位与价格"]
+  Q -.->|"可空；核实后关联"| P["真实项目<br/>通用报价不挂项目"]
+  Q -.->|"可空；核实后关联"| S["真实分供方<br/>不凭同名猜接"]
+  L ~~~ P
+  P ~~~ S
+```
+
+全图为目标关系，虚线表示可空关系，未实现 SQL 外键。当前价格分析仅消费送货来源；报价修订保留原价格与资料依据，不用后来报价覆盖历史价格点。现有合同/送货不自动生成询价；旧报价资料须先保留原文和原件，人工核实后才建立关系。核心受控迁移未登记报价与我方主体，`import_source_refs` 也未建，不能称报价身份已迁入；物理表、权限及录入接线为后续实现设计。
 
 ### 2.6 分包及人工类
 
@@ -554,6 +1485,89 @@ CREATE TABLE project_aliases (
 
 > ~~PayrollRecord `payroll_records`~~ **已细化拆分**为上述工资与考勤表（禁用旧名）。工资单不是纯计算视图：草稿可活算，核对强制刷新现场复核量，发放时冻结量、价、比例、明细及实际发放金额。合同量禁止进入应付取数。
 
+#### 班组、工人字段（F1）
+
+PK 沿用各自 `id`；工人主档归 `workers.crew_id → crews.id`，当前项目是分配关系，不是删除父级。以下为既有字段上的 F1 来源增量；工资配置、私密资料与冻结事实继续按本节各 owner 保存。
+
+```sql
+crews += (
+  default_pay_ratio REAL DEFAULT 0.95 CHECK (default_pay_ratio BETWEEN 0 AND 1),
+  rent_subsidy_enabled INTEGER DEFAULT 0 CHECK (rent_subsidy_enabled IN (0, 1)),
+  rent_subsidy_price REAL,
+  mgmt_fee_enabled INTEGER DEFAULT 0 CHECK (mgmt_fee_enabled IN (0, 1)),
+  mgmt_fee_price REAL,
+  assignment_level TEXT DEFAULT 'crew'
+    CHECK (assignment_level IN ('crew', 'worker')),
+  status TEXT DEFAULT 'draft',
+  updated_at TEXT, deleted_at TEXT
+)
+```
+
+```sql
+workers += (
+  bank_name TEXT DEFAULT '', bank_account TEXT DEFAULT '', bank_code TEXT DEFAULT '',
+  current_project_id TEXT REFERENCES projects(id),
+  family_group_id TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  safety_education INTEGER DEFAULT 0 CHECK (safety_education IN (0, 1)),
+  deleted_at TEXT
+)
+```
+
+v19 已将旧 `current_project` 名称在唯一匹配时转为 `current_project_id`，缺失/歧义写 `reconciliation_issues` 后移除旧列。`family_group_id` 是既有家庭分组值，未声明为虚构家庭主表外键。班组默认费率不反写冻结工资。
+
+`workers.status` 是档案生命周期，`project_status` 是在场状态，二者分开保存与展示。v26 已为班组和工人各追加 `trade_capabilities TEXT NOT NULL DEFAULT '[]'` 与 `item_capabilities TEXT NOT NULL DEFAULT '[]'`（JSON 能力列表）；旧 `trade` 仍是主工种，存量仅在能力列表为空时沿主工种回填。能力配置不等于项目责任或完成事实，不能替代 `unit_assignments` / `unit_stage_completions`。字段与用途见[工人规格](./pages/base-worker.md)。
+
+#### 项目罚扣与抵扣关系（F5）
+
+v24 核对发现 v1—v23 并未创建此前蓝本声明的 `penalty_records`，因此按 F5 与班组既有字段一次建表；旧 `projectId/crewId/workerId` 是真实混合列，不在文档整理中改名。下列补齐字段与关系保留原实体，不另建罚扣头。
+
+```sql
+penalty_records += (
+  projectId TEXT NULL, reason TEXT DEFAULT '',
+  supplier_id TEXT REFERENCES suppliers(id),
+  contract_id TEXT REFERENCES contracts(id),
+  deduction_method TEXT DEFAULT '', rectification_note TEXT DEFAULT '',
+  updated_at TEXT, deleted_at TEXT
+)
+```
+
+```sql
+penalty_settlement_deductions(
+  id,
+  penalty_id TEXT REFERENCES penalty_records(id),
+  settlement_id TEXT REFERENCES expenditure_settlements(id),
+  amount REAL CHECK (amount > 0),
+  note TEXT DEFAULT '',
+  created_at TEXT, updated_at TEXT, deleted_at TEXT
+)
+```
+
+旧 SQLite 对活跃 `(penalty_id, settlement_id)` 唯一；中央 AX03 允许同一关系对分次追加，不能把旧唯一索引套成中央审计约束。已抵扣金额按有效关系聚合，不回写罚扣头；每次写真实结算引用及操作日志。
+
+### AX03 中央项目罚扣与独立抵扣事实
+
+`project_penalty` 接管 `penalty_records.source='project'`；现有巡检/验收等其他来源不改归属。浏览器正式头事实、整改及抵扣由同一中央 command 权威管理，旧 SQLite 只用于受控备份/迁移；不增加平行罚扣主表。中央实例部署边界见 ADR 0020。
+
+- 罚扣头保留项目、可空分供方/分包合同/班组、日期、金额、事由、扣除方式、最新整改期限/说明、状态及附件身份。迁移保留草稿、待抵扣、整改中、自行/委托整改完成和已抵扣状态；缺失历史不伪造。
+- 中央抵扣是独立追加事实：`id, penaltyId, settlementId, amount, actorId, occurredAt, commandId, note`。同一罚扣可向同一结算分次追加；旧 SQLite 活跃关系对唯一约束仅为历史表约束，不限制中央审计。旧 ID、时间与金额按原事实映射；经办或命令未记录保持空值。
+- 中央整改事件独立保存 `id, penaltyId, actorId, occurredAt, deadline, note`，读面只投影当前罚扣的历史。
+- 候选必须是已确认真实分包结算，项目 ID 相同，罚扣已填写的合同和分供方 ID 都必须相同。罚扣至少具备合同或分供方证据；仅项目、班组、名称、金额均不能猜接。合同已填时仍验证合同所属项目和分供方。
+- 罚扣已抵扣额为独立关系金额合计，剩余为罚扣额减已抵扣额；结算抵扣同样按 `settlementId` 聚合。金额正数且最多两位小数，同时不能超过双方余额，不回写罚扣已扣金额副本，也不改结算原金额。写入以双方版本和幂等命令保护。
+- 受控迁移先映射真实结算 ID，再接管抵扣事实；缺失、歧义、归属不符、金额超额或状态矛盾阻断确认。中央读回复用同一事实；回滚按迁移边界撤销接管。甲方罚扣不进入此链。
+
+### 工人私密资料与工资名册（#449）
+
+实名和银行字段继续归工人主档，不形成工资私有人事主档。劳动合同事实和照片用途由 `worker_roster_profile_versions` 按 `(worker_id,revision)` 追加：`values_json` 保存签订三态、签订日期、证件照与银行卡照原件身份，另记操作者、实际时间及可选迁入批次。
+
+`worker_roster_assets` 记录独立原件身份、工人 owner、`file_ref_id`、SHA-256、形成时间、旧分类、迁入批次与旧软删除事实。元数据/正文复用 `file_refs/file_payloads`；上传追加身份，当前用途放在工人资料版本中，不能覆盖原件字节。缺正文的旧附件保留为缺口。
+
+`worker_roster_archives` 固定项目、规范工资范围摘要、同范围递增版本和完整 `snapshot_json`；正文记录登记日期、实际归档时间、原工资稳定成员与原姓名、登记时实名字段、资料版本、照片身份/摘要和缺口。历史正文不回写。`worker_roster_receipts` 的工作区/操作者/命令编号唯一，保存请求摘要与回执；核对确认未应用的编号保存取消墓碑，拒绝迟到应用。资料、原件、归档和回执共用工作区 SQL 事务。
+
+`worker_roster_migration_evidence` 以工人稳定身份保存批次、来源指纹和完整来源 JSON。它用于重复确认与受控恢复证明，不是日常可编辑主档。原表没有劳动合同事实时保持未记录，只有明确且唯一有效的照片分类才关联用途；文件路径只保留为原证据，不作为文件读取入口。
+
+归档需要独立 `worker:sensitive:read`；工资读写不自动授予。当前 SQL 由中央测试实例承载，生产持久化不是此表结构的验收结论。迁入和回滚沿受控映射保留原字段与原件，未知用途不猜，日常版本及归档引用不能被重复迁入或回滚覆盖。
+
 ### 工资完整资料中央接管（#412）
 
 工资接管按真实项目组织，包含上表八类工资/来源实体和可证明归属的操作历史。项目即使没有工资头，其主体配置、考勤和待确认/已确认签工也属于完整图；禁止仅从工资头向下取关联。四类来源根的 `project_id` 必须映射到真实项目，不能使用预算的空项目草稿规则。缺项目身份阻断接管；其他缺关系保留明确隔离原因，不凭名称或相同金额猜接。
@@ -581,7 +1595,7 @@ A 日常核算仍写既有工资头、明细、全体成员和整数分分配；
 
 工资价格独立于合同价和 E 类维修单价库。每个稳定价格先选目标月份适用的最新修订，再判范围；缩小范围后不能使旧修订复活。不同价格身份在同主体、分项、单位、模式及生效条件重叠时须明确拒绝，不按数组顺序猜价。原班组比例只有真实录入或迁入来源可证明时才作为默认依据；界面初始化产生的 0.95 不能伪装已配置事实。月份比例沿用规则只见[工资页面](./pages/subcontract-payroll.md#工资核算)。
 
-本期发放按同主体 A 的真实此前已付核算，不叠加成员分配，不混入 B/C 类或另一负责人。已知实际少发使用实际值，历史实际未知令此前已付及本次应发保持未知；软删不能让已经发生的工资支付消失。发放事务重新校验量、价、身份、来源及此前已付，变化时保存需重核状态。成功冻结原事实 ID、显示名称、量与单位、价格修订、比例、累计/此前已付/本次应发与实发、全成员含零分配、操作者及时间；已发不提供普通编辑、删除或撤销。
+本期 A 发放按同项目、同负责人及同用途工资簿的已证此前实付核算；普通簿与管理簿不互相抵扣，旧 V1 只按可证明关系读取。不叠加成员分配，不混入 B/C 类或另一负责人。已知实际少发使用实际值，历史实际未知令此前已付及本次应发保持未知；软删不能让已经发生的工资支付消失。发放事务重新校验量、价、身份、来源及此前已付，变化时保存需重核状态。成功冻结原事实 ID、显示名称、量与单位、价格修订、比例、累计/此前已付/本次应发与实发、全成员含零分配、操作者及时间；已发不提供普通编辑、删除或撤销。
 
 新中央 A 的来源资格由已采用来源、完整冻结内容和相同工资/项目的正式发放回执共同证明；来源主体、原事实、成员、实际使用价格、回执正文指纹及操作者必须一致。实际重算原命令正文的 SHA-256，并比对其中实发及全成员分配；仅指纹格式正确不能证明正文一致。冻结价格须按原完整主体、月份、数量、单位和范围复算出同一工资行；相同价格 ID 不代替内容核对。旧回执缺原文时保持未证，同键恢复原结果不能自动补造来源资格。历史区与冻结输出共用这项核验，不能仅凭 `format_family='A'` 或某个同名快照字段升级资格。签工正文是 C2 的适用完整性要求，A 不因缺少不适用的签工字段被误判；真实历史缺损继续按原格式保留。
 
@@ -624,6 +1638,14 @@ A 日常核算仍写既有工资头、明细、全体成员和整数分分配；
 
 新输出需同时核实采用来源、专属冻结及原发放回执，保完整签工和配置、明细、实发及全员到分分配；旧缺损 C2 不从当前名册或单价补全。真实工资与零星用工记录表配对，不生成考勤表，不代替 P4 更正和 P5–P7 完整费用工作簿。
 
+<a id="103-工人工资与费用报销"></a>
+
+#### 工资成本与实际支付的同源事实
+
+工人工资按 #117 的负责人请款簿管理：确认发放同时形成工资成本与已支付事实，不另建逐工人支付记录或合同付款申请。工资金额保存发放时快照，后续工程量/人员资料不追溯改写。
+
+工资动态成本与工资资金流出均为同一有效实际事实集合的有符号金额（稳定身份去重），包括原发放、真实补退及有效错记冲销；两指标不可再相加。只取已发头金额的旧简式不足以覆盖 P4，具体事实和未知边界见紧接的更正章节。费用报销是独立来源，定义见 §2.4。
+
 ### 工资更正、实际补退与后月处理（#412，P4）
 
 原已发 `wage_statements`、全员分配和 `snapshot_json` 始终不可变。更正与实际收付使用同一工资工作区事务、版本、审计及命令回执，新增以下五张工资域表；具体列约束由 `app/lib/payroll/central-adjustment-schema.ts` 落地。
@@ -632,7 +1654,7 @@ A 日常核算仍写既有工资头、明细、全体成员和整数分分配；
 | --- | --- | --- |
 | `payroll_adjustments` | 原工资、项目、格式族；根更正及可选前次更正 ID | 草稿/已确认、新旧核算依据、原因、证据说明、有符号整数分差额、不可变确认快照、经办人与时间 |
 | `payroll_actual_events` | 项目、稳定事件 ID；错记冲销指向原工资发放或原事件 | 补发/退款/错记冲销、发生日、有符号整数分实额、证据、确认快照与经办人；同一原事实只允许一个直接冲销 |
-| `payroll_actual_allocations` | 实际事件×稳定工人唯一 | 有符号整数分收付额及当时人员关系依据；全员分配合计等于本次实额，真实零保留 |
+| `payroll_actual_allocations` | 实际事件×稳定工人唯一 | 本次实际参与收付的原成员按有符号整数分分配，合计等于本次实额；未参与不补 0，明确 0 保留；保留当时人员关系依据 |
 | `payroll_adjustment_applications` | 更正及其根，关联独立实际事件或后续已发工资，两者互斥 | 本次处理的整数分差额、当时余额版本、处理种类与证据；错记冲销另引用被冲销的处理关系 |
 | `payroll_a_adjustment_coverage` | A 工资×更正×稳定计薪组件唯一 | 原施工责任/范围、量、价、比例与真实修订沿革，记录本次累计已经包含的差额及确认命令 |
 
@@ -805,6 +1827,7 @@ CREATE TABLE house_type_template_items (
   id                      TEXT PRIMARY KEY,
   room_id                 TEXT NOT NULL REFERENCES rooms(id),
   item_id                 TEXT NOT NULL REFERENCES items(id),
+  boq_line_id             TEXT REFERENCES boq_lines(id), -- v15：可空的合同来源追溯
   recognized_contract_qty REAL,
   contract_qty            REAL,
   provisional_qty         REAL,
@@ -899,6 +1922,8 @@ BEGIN
 END;
 ```
 
+`house_type_template_items.boq_line_id` 由 v15 加入，为可空 `boq_lines.id` 追溯外键，索引为 `idx_hti_boq_line`；不是另一套合同量价。中央工程量对应外部身份索引的边界见下方 #442 段落。
+
 每个户型模板必须有且仅有一个 `kind='whole_unit'` 的稳定“整户范围”节点，承接合同清单中没有天然房间粒度的整户/分部项；v12 在模板插入时自动创建该系统节点，并禁止单独软删，模板整体软删仍由祖先可见性隐藏。普通模板房间使用 `kind='room'`。两类节点都使用稳定 ID；`rooms.code` 是模板内唯一、创建后不可修改的机器码，界面可修改的是 `rooms.name` 显示名。`house_type_template_items.room_id` 不允许为空。
 
 同一分项可以映射多个施工阶段以分别计算进度，但月度报量只能选择其中一个活跃映射：`construction_stage_items.is_reporting_stage=1`。v13 对存量按阶段排序最末项作一次性兼容回填，并用活跃部分唯一索引保证每个 `item_id` 最多一个报量阶段；月度派生只读取该映射，避免同量重复计取。
@@ -917,6 +1942,24 @@ END;
 
 #442 浏览器中央工程量适配中的 `quantity_boq_references` 仅存 `id + project_id + contract_id` 外部身份索引，模板行的 BOQ 外键指向此索引；量价与已签证增减仍读取中央施工合同/变洽签。该索引不是第二份 BOQ 业务表，也不改变显式桌面 SQLite 的物理 schema。迁移使用完整数据库候选准备，在外键、祖先及跨域对账通过后原子切换；月报自动完成量与有效 BOQ 来源在同一串行窗口重验后固化，具体读写契约见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442) 与 [COMMANDS](./COMMANDS.md#工程量中央命令与迁移接管442)。
 
+### 工资完整工作簿保存目录（#479）
+
+`payroll_workbook_archives` 保存不可变的输出目录，而不是另一份可编辑工资：`id / project_id / scope_key / version` 固定项目、模式和原工资集合，同范围版本递增；`snapshot_json / snapshot_hash` 固定原工资正文、原正式编号、保存时实际收付、工资正文缺口、文件交付缺口和可空名册引用；`created_at / created_by` 记录真实保存时间与可信经办人，`migration_batch_id` 仅用于来源归属。同范围可选择后补名册再保存新版本，旧版本不回写。
+
+目录只保名册身份、版本、登记日、来源版本与正文 SHA-256，不保存身份证、银行卡或照片正文。名册原归档及照片仍由工人 owner 提供；所选名册必须与目录项目、原工资集合完全相同。原工资零额成员、已离场成员及历史姓名均不从当前主档删掉。
+
+`payroll_workbook_receipts` 以工作区×操作者×原命令身份唯一，绑定规范命令正文、指纹、项目、目录身份、版本及摘要；确认未应用使用取消墓碑，阻止迟到写入。`payroll_workbook_references` 按目录×原表×稳定身份去重，保存明确原工资、成员、来源、正式出具、实际收付及名册原件关系，用于受控恢复保护；不扫描姓名或正文文本猜 ID。目录、引用、审计和回执共用同一个工作区事务。
+
+目录摘要不含当前会话 context；读取重新验证物理行、规范正文、原预览指纹及唯一提交回执。实际台账冻结于保存时点：之后真实补退只进入新目录版本，原单冻结实发及旧目录均不重写。保存成功不证明 XLSX/ZIP 已下载，文件生成失败不撤销已保存目录。
+
+当前目录仍由中央测试实例承载，生产落盘由 #467 承接；浏览器冷打开及原目录重读不能作为进程重启耐久验收。读取与命令分别见 [READ-MODELS](./READ-MODELS.md#工资完整工作簿与保存目录读取479)、[COMMANDS](./COMMANDS.md#工资完整工作簿目录命令479)。
+
+完整工资项目迁移图 V6 同时运输目录、名册、各自回执与明确引用；工人来源属性 `workerRosterGraphJson` 运输全部私密资料版本、原件身份、工人资料回执与实名审计，照片元数据和字节仍由同 owner 的原件清单运输。不能只迁名册 JSON 而丢工人版本或照片正文。迁入前交叉证明冻结工资、实际收付原事实、名册成员及版本、照片字节，以及目录对名册的原正文摘要；真实后续收付允许追加，不改变旧目录的原事实前缀。
+
+`payroll_publication_migration_proofs` 按原表与本代归档身份保存不可变原行、原回执、原数量闭包及显式映射证明。读取必须再次与 `payroll_migration_evidence` 的完整来源及映射核对，不能由该证明表自报摘要取得信任。原 `snapshot_json`、原目录摘要和来源版本逐代保持不变，本代项目、工资、工人、原件及归档身份只用于读取投影。`worker_roster_migration_receipts` 只登记由工人原证据运输的回执归属，不给日常回执贴迁入标记。
+
+危险恢复在候选 SQL 中先核对并移除本批仍完全相同的目录、名册和回执，再交给原工资与工人 owner 检查。独立新目录、资料、回执或审计仍引用原工资、零额成员、软删除历史、费用责任或空鼓原检查时整批拒绝；修改过的原件正文、资料版本或证明也拒绝。无关工人的独立资料不阻止本批安全恢复。SQL、缓存 authority、revision 及回执仍一起提交或一起放弃。
+
 ### 2.7 施工进度类（工期 × 工程量主线）
 
 | 实体 | 表名 | PK | 设计文档 |
@@ -933,6 +1976,21 @@ END;
 | TaskDependency | `task_dependencies` | `id` | `schedule-progress.md`（前后置依赖） |
 | TaskItemMap | `task_item_map` | `id` | `schedule-progress.md`（工序↔分项） |
 | ScheduleTaskFloorPlan | `schedule_task_floor_plans` | `id` | `schedule-progress.md`（分项×楼层自动计划及个别微调） |
+
+以下登记旧 SQLite 字段及其中央复用含义；公共时间、排序和软删除列按原来源保留，不能把旧物理表名强加给本机正式 owner。领域细则紧接本表，不再由后续批次覆盖。
+
+| 实体 | 稳定身份、父关系及主要字段 | 唯一范围与来源边界 |
+| --- | --- | --- |
+| `schedule_process_libraries` | `id`；`code/name/version/description/is_default/sort_order` | v27 活跃 `(code,version)` 唯一、至多一个活跃默认库；现行不可变编号不回收，正式 owner 完整版本图见 §1.3 及本节 #443 |
+| `schedule_process_library_tasks` | `id`；`library_id`；`task_key/name/trade/color/duration_days/stage_code/item_codes_json`；`predecessor_task_key/predecessor_disabled` | 活跃 `(library_id,task_key)` 唯一；前置 key 为同版本身份，阶段/分项码不是项目 FK；v34/v35 增量及不可变规则见下文 |
+| `schedule_groups` | `id`；`project_id/contract_id`；`name/scope_basis/contract_bound_at`；`process_library_id` 与库名/版本快照 | 活跃 `(project_id,name)` 唯一；库 ID 为旧逻辑引用，无 SQL `REFERENCES`；同项目及条件合同规则见 ADR 0017 段 |
+| `schedule_group_buildings` | `id`；`group_id/building_id` 父外键；排序与时间 | 活跃 `(group_id,building_id)` 唯一；缺范围不解释为全项目 |
+| `schedule_tasks` | `id`；`project_id/group_id/parent_id/stage_id`；`name/trade/color/duration_days/planned_start/planned_finish`；基线日期对；`has_qty/manual_progress`；`source_library_task_id/source_library_version/template_snapshot_json` | 日期先后合法，基线同时为空或成对有效；有量须阶段且无人工进度，无量无阶段且人工进度为 0–1；库来源为旧逻辑引用，创建快照不追溯覆盖 |
+| `task_dependencies` | `id`；`pred_id/succ_id` 任务 FK；`dependency_type/lag_days` | 类型 FS/SS/FF/SF，禁止自引用；活跃 `(pred_id,succ_id,dependency_type)` 唯一；领域另核循环与冲突 |
+| `task_item_map` | `id`；`task_id/item_id` 稳定 FK；可空 `boq_line_id` | 活跃 `(task_id,item_id)` 唯一；v15 BOQ 追溯不存合同量价副本，不按 `itemName` 建关系 |
+| `schedule_task_floor_plans` | `id`；`task_id/floor_id/item_id/boq_line_id`；`source_basis/provisional_qty/planned_start/planned_finish/is_manual/note` | v38 按合同/暂估区分条件字段与活跃唯一范围，详见下文；冻结量与单位完整性由中央来源保存，不反推历史 |
+
+字段与约束依据为[版本化迁移](../../app/lib/db/migrations.ts) v14/v15/v17/v27/v34/v35/v38、[中央排程辅助 schema](../../app/lib/schedule/central-schema.ts)及[正式工序库 schema](../../server/utils/production-process-library-schema.ts)；来源约束与现行正式版本规则分开。
 
 > [ADR 0017](../adr/0017-provisional-schedule-before-contract.md) 将楼栋分组范围依据扩为 `scope_basis IN ('contract','provisional')`。`scope_basis='contract'` 时 `schedule_groups.contract_id` 必填，且只能指向一份同项目的 `contracts(kind='施工')`；分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供，只有清单行的显式楼栋字段才可证明合同覆盖。`scope_basis='provisional'` 时 `contract_id` 必须为 NULL，候选楼栋来自项目手工区域树，量值来自户型模板的手工分项与暂估量。两种依据不能在同一分组混用，合同分组禁止跨合同混组；`construction_contracts` 仅作旧 IA 兼容，不得再保存新的 BOQ/进度引用。
 >
@@ -952,7 +2010,7 @@ END;
 
 #### 中央 WBS 事实与整图接管（#444）
 
-浏览器正式 WBS 复用本节六类排程表，并与中央工程量处于同一候选数据库和串行事务；不把旧浏览器整库作为正式读写的第二源。中央验证实例另保存项目修订、命令回执和楼层冻结数量的完整性说明，分别用于陈旧来源检查、原命令恢复及历史缺口展示。项目、合同/清单和全局工序库保持原领域权威，只消费稳定身份及来源版本，不另建可独立改写的合同量价或库版本。
+浏览器正式 WBS 复用本节六类排程表，并与中央工程量处于同一候选数据库和串行事务；不把旧浏览器整库作为正式读写的第二源。中央验证实例辅助保存 `schedule_revisions(project_id, revision)`、`schedule_command_receipts(command_id, project_id, actor_id, fingerprint, result_json)` 和 `schedule_floor_quantity_snapshots(id, project_id, snapshot_json, legacy_missing)`，分别承接修订、原命令回执和楼层冻结来源完整性；它们不是旧 SQLite 升级表。项目、合同/清单和全局工序库保持原领域权威，只消费稳定身份及来源版本，不另建可独立改写的合同量价或库版本。
 
 新建暂估快照保留有效分项及逐户来源、计量单位、已知数量和缺失情况。真实 `0` 与 `null` 分开，单位不同不混算，不能以全组正数掩盖某栋缺少有效范围。当前模板后来变化不改写冻结快照。自动进度读取当前阶段的适用应做户与完成户交集，责任配置和其他阶段不进入分子；具体显示计算以[排程页面](./pages/schedule-progress.md)为准。
 
@@ -1033,21 +2091,73 @@ CREATE TABLE target_cost_items (
 | 实体 | 表名 | PK | 说明 |
 |---|---|---|---|
 | ImportBatch | `import_batches` | `id` | 一次源文件实体迁移批次 |
-| ImportSourceRef | `import_source_refs` | `id` | 系统实体到源文件/工作表/行的追溯 |
+| ImportSourceRef | `import_source_refs` | `id` | 系统实体到源文件/工作表/行的追溯目标；尚未建表，不冒充现有命令回执 |
 | ReconciliationIssue | `reconciliation_issues` | `id` | Excel 与系统聚合差异及项目/Excel/映射/缺源归因 |
 
-### 2.10 ADR 0014 整页表单目标 schema（Issue #116 定稿）
+<a id="107-导入追溯与差异表"></a>
 
-本节是 37 条整页表单的目标字段权威；与前文旧建表快照冲突时，以本节为准，后续迁移按批次逐步合并回基线 schema。页面蓝本只规定业务字段和可观察行为，不复制数据库列。
+<a id="entity-import-source"></a>
 
-统一约束：
+#### 导入追溯与差异表
 
-- 列名统一 `snake_case`；日期/时间使用 ISO-8601 `TEXT`，金额使用 `REAL`，布尔值使用 `INTEGER CHECK (... IN (0, 1))`。
-- 所有业务头表均有 `id TEXT PRIMARY KEY`、`status TEXT`、`note TEXT DEFAULT ''`、`created_at`、`updated_at`、`deleted_at`；下文不重复列出。
-- `*` 表示提交/确认动作必填，不等同于数据库 `NOT NULL`。草稿必须可保存不完整字段；关系、正金额、勾稽和状态条件由同一领域 action 在提交事务内校验。
-- lookup 一律保存真实外键 ID；名称、合同额、累计量等只读带出字段不复制。只有税号、购方名称等具有业务时点证据意义的字段才保存快照。
-- 可编辑网格进入子表；附件进入 `file_refs`；不得在业务头保存文件数组或明细 JSON。
-- `_` 前缀展示字段、`readonly + compute` 字段及纯聚合不持久化。
+#423 项目 Excel 切片在同一中央项目事实内保存 `importSource` 回执，命令和表单回读共享它；不向浏览器 SQLite 写正式项目，也不新增平行业务表。该切片可重置内存实例中的字段语义对应：`fileName → source_file`、`fileDigest → source_hash`（原文件字节 SHA-256）、`sheetName → source_sheet`、`rowNumber → source_row`（原 Sheet 的 1 起始行号）、`externalRef → source_key`、`rawSnapshot → raw_snapshot`（包含未映射源列的解析值）。这是追溯语义对应，不证明已写入 `import_source_refs`。项目 ID 为中央分配的稳定 ID；客户关系使用中央正式客户 ID。
+
+原 Excel 文件字节仅在当前浏览器解析，不作为中央附件上传；文件名、摘要、Sheet、行号和源行快照随成功行保留。下载的拒绝清单携来源定位与原因，未成功行不冒充正式项目。当前回执仅对本 Excel 链路已保存行去重，不解释既有受控迁移的 `legacyId → serverId` 映射；处理历史整库身份必须沿既有迁移边界。防重与冲突契约见 [COMMANDS 项目 Excel 导入](./COMMANDS.md#项目-excel-导入423)。v19 已建立 `import_batches/reconciliation_issues` 底座；通用 `import_source_refs` 仍是追溯目标，未查得建表、写读或测试，不与项目 Excel 命令回执混称一套已部署结构。项目 Excel 后续 PG-03 已用 `project_import_receipts` 持久保存于本机库，见上方参与者清单；#423 的可重置实例与目标 SQL 均不能单独证明 #416 的全部生产验收。
+
+```sql
+CREATE TABLE import_batches (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT REFERENCES projects(id),
+  source_file    TEXT NOT NULL,
+  source_hash    TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'draft',
+  created_at     TEXT,
+  completed_at   TEXT
+);
+
+-- 登记目标，当前 schema / 迁移尚未创建此表；不是已执行的建表 SQL。
+CREATE TABLE import_source_refs (
+  id              TEXT PRIMARY KEY,
+  import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
+  entity_type     TEXT NOT NULL,
+  entity_id       TEXT NOT NULL,
+  source_sheet    TEXT NOT NULL,
+  source_row      INTEGER NOT NULL,
+  source_key      TEXT DEFAULT '',
+  raw_snapshot    TEXT DEFAULT ''      -- JSON 对象；保留未进入业务表的源列及原始文本
+);
+
+CREATE TABLE reconciliation_issues (
+  id              TEXT PRIMARY KEY,
+  import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
+  project_id      TEXT REFERENCES projects(id), -- 允许为空：实体映射失败时可能尚无合法项目
+  entity_type     TEXT DEFAULT '',
+  entity_id       TEXT DEFAULT '',
+  field_name      TEXT DEFAULT '',
+  source_value    TEXT DEFAULT '',
+  metric_key      TEXT NOT NULL,
+  source_ref      TEXT DEFAULT '',
+  excel_value     REAL,
+  system_value    REAL,
+  difference      REAL,
+  attribution     TEXT NOT NULL,
+  -- 'project' | 'excel' | 'mapping' | 'missing_source'
+  status          TEXT NOT NULL DEFAULT 'open',
+  resolution      TEXT DEFAULT '',
+  created_at      TEXT,
+  resolved_at     TEXT
+);
+```
+
+`entity_type + entity_id + field_name + source_value` 定位无法进入真实外键的源值；`project_id` 只在已有合法项目归属时填写，不创建“公司”或“待核对”等虚拟项目补空。
+
+导入有效行以业务字段判断，不以 Excel `usedRange`、序号或公式存在判断。所有金额在应用边界统一 `round2`；在全库迁移为整数分之前，禁止直接比较浮点绝对相等。
+
+<a id="210-adr-0014-整页表单目标-schemaissue-116-定稿"></a>
+
+### 2.10 整页表单覆盖与来源迁移批次
+
+本节保留 #116 / ADR 0014 的 37 条表单及 F1—F5 覆盖定位，字段权威已按实体归入 §2.1—§2.9，不再用“后文优先”覆盖前述定义。旧章节锚点保留在实际承接处；原始历史可从 Git 恢复。
 
 #### 2.10.1 路由覆盖与迁移批次
 
@@ -1059,444 +2169,17 @@ CREATE TABLE target_cost_items (
 | F4 物资 | `matRequisitionForm`、`matArrivalForm`、`matUseForm`、`matSettleForm`、`stockCheckForm`、`omTotalForm`、`omRequisitionForm`、`omArrivalForm`、`omUseForm`、`omDirectForm`、`deliveryArchiveForm`（11） | §2.5 物资实体；材料结算复用 `expenditure_settlements`，送货归档复用 `delivery_records` / `delivery_lines` |
 | F5 甲方/分包单据 | `ownerChangeForm`、`ownerReportForm`、`acceptanceForm`、`finalSettleForm`、`ownerPenaltyForm`、`subChangeForm`、`subSettleForm`、`projPenaltyForm`（8） | `boq_change_orders` / `boq_change_lines`、`monthly_statements` / `monthly_statement_lines`、`project_acceptances`、`owner_final_settlements`、`owner_penalties`、`subcontract_change_orders`、`expenditure_settlements`、`penalty_records` |
 
-#### 2.10.2 F1 基础主数据
-
-```sql
--- customers：客户/甲方主数据；aliases 是检索别名，不是业务明细。
-customers(
-  id, name TEXT NOT NULL, aliases TEXT DEFAULT '[]',
-  tax_no TEXT DEFAULT '', legal_rep TEXT DEFAULT '',
-  registered_address TEXT DEFAULT '',
-  invoice_name TEXT DEFAULT '', bank TEXT DEFAULT '', bank_account TEXT DEFAULT '',
-  contact TEXT DEFAULT '', contact_phone TEXT DEFAULT '',
-  note, created_at, updated_at, deleted_at
-)
-
--- suppliers 在既有列上补齐；parent_supplier_id 不属于领域模型。
-suppliers += (
-  contact_title TEXT DEFAULT '',
-  credential_reviewed_at TEXT,
-  credential_review_note TEXT DEFAULT '',
-  deleted_at TEXT
-)
--- parent_supplier_id：停止写入；F1 迁移确认无有效层级数据后删除。
-
-crews += (
-  default_pay_ratio REAL DEFAULT 0.95 CHECK (default_pay_ratio BETWEEN 0 AND 1),
-  rent_subsidy_enabled INTEGER DEFAULT 0 CHECK (rent_subsidy_enabled IN (0, 1)),
-  rent_subsidy_price REAL,
-  mgmt_fee_enabled INTEGER DEFAULT 0 CHECK (mgmt_fee_enabled IN (0, 1)),
-  mgmt_fee_price REAL,
-  assignment_level TEXT DEFAULT 'crew'
-    CHECK (assignment_level IN ('crew', 'worker')),
-  status TEXT DEFAULT 'draft',
-  updated_at TEXT, deleted_at TEXT
-)
-
-workers += (
-  bank_name TEXT DEFAULT '', bank_account TEXT DEFAULT '', bank_code TEXT DEFAULT '',
-  current_project_id TEXT REFERENCES projects(id),
-  family_group_id TEXT,
-  safety_education INTEGER DEFAULT 0 CHECK (safety_education IN (0, 1)),
-  deleted_at TEXT
-)
--- current_project（名称文本）停止写入；迁移能唯一匹配时写 current_project_id，
--- 无法唯一匹配的记录进入 reconciliation_issues。
-
-projects += (
-  customer_id TEXT REFERENCES customers(id),
-  secondary_customer_id TEXT REFERENCES customers(id),
-  contract_name TEXT DEFAULT '', region TEXT DEFAULT '', overview TEXT DEFAULT '',
-  operation_type TEXT DEFAULT '', planned_duration INTEGER,
-  developer_supervisor TEXT DEFAULT '', designer TEXT DEFAULT '',
-  contractor TEXT DEFAULT '', manager TEXT DEFAULT '', manager_phone TEXT DEFAULT '',
-  exec_manager TEXT DEFAULT '', builder TEXT DEFAULT '',
-  site_leader TEXT DEFAULT '', site_leader_phone TEXT DEFAULT '',
-  risk_level TEXT DEFAULT '', approval_status TEXT DEFAULT '',
-  acceptance_date TEXT DEFAULT '', filing_date TEXT DEFAULT '',
-  deleted_at TEXT
-)
--- developer/developer2（客户名称文本）停止写入；只作为 F1 迁移匹配输入。
-```
-
-`supplierForm` 的资料类别、条件必需和人工核验状态继续由 Issue #13 规则约束；`credential_status` 不是普通下拉字段。`target_costs` / `target_cost_items` 的完整目标列见 §2.8。
-
-> F1 表结构由迁移 v19 落地。旧客户名、工人当前项目名仅在唯一匹配时转为真实 ID；分供方旧层级及歧义/缺失映射写入 `reconciliation_issues` 后删除停止写入的旧列。迁移对账可能尚无可确认的项目，因此该表的 `project_id` 允许为空，并以实体定位列保存来源。
-
-> 分供方证照审核底座由迁移 v36 补齐；其新增列与要求表见 §2.1，不能从 v19 的 F1 通用表单批次反推证照闭环。
-
-#### 2.10.3 F2 合同与支出结算
-
-```sql
-contracts += (
-  customer_id TEXT REFERENCES customers(id),
-  content TEXT DEFAULT '', invoice_type TEXT DEFAULT '',
-  contact_name TEXT DEFAULT '', contact_phone TEXT DEFAULT '',
-  main_terms TEXT DEFAULT '', payment_terms TEXT DEFAULT '',
-  brand_quality_terms TEXT DEFAULT '', schedule_terms TEXT DEFAULT '',
-  warranty_terms TEXT DEFAULT '', special_terms TEXT DEFAULT '',
-  retention_ratio REAL, retention_amount REAL, retention_days INTEGER,
-  invoice_name TEXT DEFAULT '', invoice_tax_no TEXT DEFAULT '',
-  invoice_address_phone TEXT DEFAULT '', invoice_bank TEXT DEFAULT '',
-  invoice_bank_account TEXT DEFAULT '',
-  other_expense_kind TEXT DEFAULT '', service_period TEXT DEFAULT '',
-  payment_cycle TEXT DEFAULT '', deleted_at TEXT
-)
--- amount 是用户确认的含税合同额；tax_exclusive_amount / tax_amount 为实时派生。
--- changed / settled / invoiced / paid 退出写表单路径，后续由变更、结算、票、资金事实聚合。
-
-contract_supplements(
-  id, contract_id TEXT NOT NULL REFERENCES contracts(id),
-  no TEXT DEFAULT '', name TEXT NOT NULL, content TEXT DEFAULT '',
-  amount REAL DEFAULT 0 CHECK (amount >= 0), sign_date TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-
-contract_line_items(
-  id, contract_id TEXT NOT NULL REFERENCES contracts(id),
-  material_name TEXT NOT NULL, spec TEXT DEFAULT '', brand TEXT DEFAULT '',
-  unit TEXT DEFAULT '', qty REAL NOT NULL CHECK (qty > 0),
-  tax_inclusive_unit_price REAL NOT NULL CHECK (tax_inclusive_unit_price >= 0),
-  planned_arrival_date TEXT DEFAULT '', note TEXT DEFAULT '',
-  sort_order INTEGER DEFAULT 0, created_at, updated_at, deleted_at
-)
--- 行含税金额 = qty × tax_inclusive_unit_price，纯计算不存。
-
-company_expense_contracts(
-  id, no TEXT DEFAULT '', name TEXT NOT NULL,
-  category TEXT DEFAULT '', counterparty TEXT NOT NULL,
-  sign_date TEXT DEFAULT '', service_period TEXT DEFAULT '',
-  amount REAL DEFAULT 0 CHECK (amount >= 0), payment_cycle TEXT DEFAULT '',
-  main_terms TEXT DEFAULT '', status, note,
-  created_at, updated_at, deleted_at
-)
--- 公司支出合同没有 project_id；禁止建立“公司”虚拟项目。
-
-expenditure_settlements += (
-  settlement_period TEXT DEFAULT '',
-  deduction_note TEXT DEFAULT '',
-  updated_at TEXT, deleted_at TEXT
-)
-```
-
-施工/分包/材采/其他支出主合同的新写路径只使用 `contracts`；`construction_contracts`、`expenditure_contracts` 和只挂旧施工合同的 `supplement_agreements` 是迁移兼容源，不再承接整页表单。`otherSettleForm`、`matSettleForm`、`subSettleForm` 均写 `expenditure_settlements`，不得各建结算副本。
-
-#### 2.10.4 F3 资金
-
-```sql
-receipt_registrations(
-  id, no TEXT DEFAULT '', receipt_date TEXT,
-  project_id TEXT REFERENCES projects(id),
-  contract_id TEXT REFERENCES contracts(id),
-  customer_id TEXT REFERENCES customers(id),
-  payer_account TEXT DEFAULT '',
-  amount REAL DEFAULT 0 CHECK (amount >= 0),
-  payment_method TEXT DEFAULT '', acceptance_bill_no TEXT DEFAULT '',
-  bill_due_date TEXT DEFAULT '', period_no TEXT DEFAULT '',
-  bank_serial_no TEXT DEFAULT '', handler TEXT DEFAULT '',
-  review_status TEXT DEFAULT 'draft', status, note,
-  created_at, updated_at, deleted_at
-)
-
-invoice_applications(
-  id, no TEXT DEFAULT '', name TEXT NOT NULL,
-  project_id TEXT REFERENCES projects(id),
-  contract_id TEXT REFERENCES contracts(id),
-  customer_id TEXT REFERENCES customers(id),
-  buyer_name_snapshot TEXT DEFAULT '', buyer_tax_no_snapshot TEXT DEFAULT '',
-  invoice_type TEXT DEFAULT '', amount REAL DEFAULT 0 CHECK (amount >= 0),
-  tax_rate REAL, tax_amount REAL DEFAULT 0 CHECK (tax_amount >= 0),
-  invoice_content TEXT DEFAULT '', invoice_remark TEXT DEFAULT '',
-  applicant TEXT DEFAULT '', application_date TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
--- 价税合计由 amount + tax_amount 派生；客户名称/税号是提交时业务快照。
-
-current_transactions(
-  id, no TEXT DEFAULT '',
-  direction TEXT NOT NULL CHECK (direction IN ('receipt', 'payment')),
-  project_id TEXT REFERENCES projects(id),
-  counterparty TEXT NOT NULL, purpose TEXT DEFAULT '',
-  amount REAL DEFAULT 0 CHECK (amount >= 0),
-  payment_method TEXT DEFAULT '', transaction_date TEXT DEFAULT '',
-  bank_serial_no TEXT DEFAULT '', handler TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
--- current_receipts/current_payments 仅作 F3 迁移源，迁移后退出查询和写入。
-
-payment_records += (
-  supplier_id TEXT REFERENCES suppliers(id),
-  payee_name TEXT DEFAULT '', purpose TEXT DEFAULT '',
-  bank_serial_no TEXT DEFAULT '', handler TEXT DEFAULT '',
-  source TEXT DEFAULT 'manual',
-  recognition_status TEXT DEFAULT 'manual',
-  field_confidence TEXT DEFAULT '{}',
-  confirmation_status TEXT DEFAULT 'draft',
-  confirmed_at TEXT, updated_at TEXT, deleted_at TEXT
-)
--- F3 以重建表迁移将既有 project_id 改为可空；公司付款的支付事实不挂虚拟项目。
-
-expense_reimbursements(
-  id, project_id TEXT REFERENCES projects(id),
-  no TEXT DEFAULT '', applicant TEXT DEFAULT '', category TEXT DEFAULT '',
-  reimbursement_date TEXT DEFAULT '', invoice_count INTEGER DEFAULT 0,
-  reason TEXT DEFAULT '', status TEXT DEFAULT 'draft', note TEXT DEFAULT '',
-  external_ref TEXT DEFAULT '',
-  created_at, updated_at, deleted_at
-)
--- project_id 可空=公司开支；报销总额只从有效 expense_reimbursement_lines 聚合。
--- 旧 amount 列停止写入并在 F3 重建表时移除。
-
-expense_reimbursement_lines(
-  id, reimbursement_id TEXT NOT NULL REFERENCES expense_reimbursements(id),
-  expense_item TEXT NOT NULL, expense_date TEXT DEFAULT '',
-  amount REAL NOT NULL CHECK (amount > 0), note TEXT DEFAULT '',
-  sort_order INTEGER DEFAULT 0, created_at, updated_at, deleted_at
-)
-```
-
-支付记录的申请分摊继续以 §10.2 为准：`payment_application_id` 旧单外键停止写入，确认时要求有效分摊合计等于支付金额，只有 `confirmation_status='confirmed'` 进入资金聚合。付款申请及真实结算/发票分摊以 §2.4 和 ADR 0015 为准，不存设计稿 `_biz` / `_c1..._c4` 展示字段。
-
-#### 2.10.5 F4 物资
-
-```sql
-material_requisitions(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  contract_id TEXT REFERENCES contracts(id), applicant TEXT DEFAULT '',
-  requisition_date TEXT DEFAULT '', required_date TEXT DEFAULT '',
-  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
-  planned_qty REAL DEFAULT 0 CHECK (planned_qty >= 0),
-  warehouse TEXT DEFAULT '', purpose TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-
-material_arrivals(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  supplier_id TEXT REFERENCES suppliers(id), contract_id TEXT REFERENCES contracts(id),
-  requisition_id TEXT REFERENCES material_requisitions(id),
-  warehouse TEXT DEFAULT '', arrival_date TEXT DEFAULT '', receiver TEXT DEFAULT '',
-  quality_result TEXT DEFAULT '', stock_status TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-material_arrival_lines(
-  id, arrival_id TEXT NOT NULL REFERENCES material_arrivals(id),
-  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
-  qty REAL NOT NULL CHECK (qty > 0), unit_price REAL,
-  note TEXT DEFAULT '', sort_order INTEGER DEFAULT 0,
-  created_at, updated_at, deleted_at
-)
--- 已到量、到货头材料摘要/数量/金额均从有效到货明细聚合。
-
-material_uses(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  warehouse TEXT DEFAULT '', use_date TEXT DEFAULT '',
-  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
-  qty REAL DEFAULT 0 CHECK (qty >= 0), receiver TEXT DEFAULT '',
-  crew_id TEXT REFERENCES crews(id), purpose TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-
-stock_checks(
-  id, no TEXT DEFAULT '', warehouse TEXT NOT NULL,
-  checker TEXT NOT NULL, check_date TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-stock_check_lines(
-  id, stock_check_id TEXT NOT NULL REFERENCES stock_checks(id),
-  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
-  book_qty REAL DEFAULT 0, actual_qty REAL DEFAULT 0,
-  variance_amount REAL DEFAULT 0,
-  sort_order INTEGER DEFAULT 0, created_at, updated_at, deleted_at
-)
--- variance_qty = actual_qty - book_qty；仅 status='effective' 的盘点影响库存。
-
-owner_material_controls(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  customer_id TEXT REFERENCES customers(id),
-  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
-  control_qty REAL DEFAULT 0 CHECK (control_qty >= 0),
-  status, note, created_at, updated_at, deleted_at
-)
-owner_material_requisitions(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  applicant TEXT DEFAULT '', application_date TEXT DEFAULT '', required_date TEXT DEFAULT '',
-  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
-  planned_qty REAL DEFAULT 0 CHECK (planned_qty >= 0),
-  status, note, created_at, updated_at, deleted_at
-)
-owner_material_arrivals(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  warehouse TEXT DEFAULT '', arrival_date TEXT DEFAULT '', receiver TEXT DEFAULT '',
-  material_name TEXT NOT NULL, spec TEXT DEFAULT '', unit TEXT DEFAULT '',
-  qty REAL DEFAULT 0 CHECK (qty >= 0), quality_result TEXT DEFAULT '',
-  stock_status TEXT DEFAULT '', status, note, created_at, updated_at, deleted_at
-)
-owner_material_uses(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  use_date TEXT DEFAULT '', material_name TEXT NOT NULL, unit TEXT DEFAULT '',
-  qty REAL DEFAULT 0 CHECK (qty >= 0), receiver TEXT DEFAULT '',
-  crew_id TEXT REFERENCES crews(id), purpose TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-owner_material_directs(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  customer_id TEXT REFERENCES customers(id), transaction_date TEXT DEFAULT '',
-  material_name TEXT NOT NULL, unit TEXT DEFAULT '',
-  qty REAL DEFAULT 0 CHECK (qty >= 0),
-  purpose TEXT DEFAULT '', use_location TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-```
-
-甲供材累计到货、累计领用和剩余可用从甲供材事实聚合，不在 `owner_material_controls` 保存可编辑累计列。`deliveryArchiveForm` 更新 §2.5 的 `delivery_records`，其中材料摘要、数量与单据金额只作 `delivery_lines` 聚合展示；原件仍由 `file_refs(owner_type='delivery_record')` 保存。
-
-2026-08-13 运行态走查确认甲供材列表读模型还包含总计划头/可能的二级明细、供货分供方、源单、送货单、仓库、采购类型、班组合同及结算/付款快照；这些可观察列不等于已裁定写模型。当前 `customer_id` 只表示项目甲方，不得冒充供货分供方；现有五张甲供材表也没有证明总计划头/行、下料—到货、到货—送货归档或供货单位关系。关系未迁移前，读 DTO 对这些字段返回明确 `null`/未配置状态，项目档案目录继续使用“甲供材供货单位待配置”；禁止按名称、单号或金额猜外键。后续迁移必须先裁定供货单位实体身份和总计划头/明细边界，再建立真实外键或桥表。页面字段与可空 DTO 见 [`material-management.md`](./pages/material-management.md)。
-
-#### 2.10.6 F5 甲方/分包单据
-
-```sql
-boq_change_orders += (
-  document_type TEXT DEFAULT 'change_negotiation'
-    CHECK (document_type IN ('change_negotiation', 'site_visa', 'claim', 'material_price_approval')),
-  application_date TEXT DEFAULT '', reason TEXT DEFAULT '',
-  approved_tax_inclusive_amount REAL,
-  approved_tax_exclusive_amount REAL,
-  applied_tax_exclusive_amount REAL,
-  updated_at TEXT, deleted_at TEXT
-)
--- document_type 保存表单“变更洽商/现场签证/索赔/材料认价”；
--- change_type 继续只表示行操作汇总 add/qty/price/mixed，二者不得复用。
--- 指令编号/类型复用既有 directive_no / directive_type。
--- 量、价、合价明细继续写 boq_change_lines；已签证金额链规则见 §2.3。
-
-owner_change_orders += (
-  contract_id TEXT REFERENCES contracts(id),
-  name TEXT DEFAULT '',
-  document_type TEXT DEFAULT 'change_negotiation'
-    CHECK (document_type IN ('change_negotiation', 'site_visa', 'claim', 'material_price_approval')),
-  directive_no TEXT DEFAULT '', directive_type TEXT DEFAULT '',
-  application_date TEXT DEFAULT '', reason TEXT DEFAULT '',
-  status TEXT DEFAULT 'draft', status_note TEXT DEFAULT '',
-  note TEXT DEFAULT '', updated_at TEXT
-)
--- 上述扩展只服务“不含量价明细的纯金额签证”直写台账；
--- 量价变更仍由 boq_change_orders 生成 source_locked=1 的一对一锁定行。
--- v24 同时将 owner_change_orders.project_id 收窄前的 NOT NULL 去除：
--- 不完整草稿先保存为 manual 草稿，补齐量价明细后原 ID 转入 BOQ 变更实体。
-
-monthly_statements += (
-  project_id TEXT NULL, contract_id TEXT NULL, month TEXT DEFAULT '',
-  no TEXT DEFAULT '', period_no TEXT DEFAULT '',
-  application_date TEXT DEFAULT '',
-  reported_amount REAL, audited_amount REAL,
-  status TEXT DEFAULT 'draft', note TEXT DEFAULT '',
-  updated_at TEXT, deleted_at TEXT
-)
-monthly_statement_lines += (
-  reported_qty REAL, audited_qty REAL, audited_amount REAL,
-  updated_at TEXT, deleted_at TEXT
-)
--- 审定差额为 audited_amount - reported_amount，纯计算不存。
--- 自动完成量在每次保存时按 project+contract+period 从阶段完成事实重新派生，
--- 客户端 auto_qty 不进入信任边界；空项目/合同/期次只允许草稿且不落明细。
-
-project_acceptances(
-  id, no TEXT DEFAULT '', type TEXT DEFAULT 'acceptance',
-  name TEXT NOT NULL, project_id TEXT REFERENCES projects(id),
-  contract_id TEXT REFERENCES contracts(id), document_date TEXT DEFAULT '',
-  contract_estimate REAL, acceptor TEXT DEFAULT '',
-  warranty_owner TEXT DEFAULT '', conclusion TEXT DEFAULT '',
-  acceptance_organization TEXT NOT NULL DEFAULT '',
-  acceptance_date TEXT NULL,
-  acceptance_conclusion TEXT NOT NULL DEFAULT '',
-  warranty_start_date TEXT NULL, warranty_end_date TEXT NULL,
-  warranty_confirmation_organization TEXT NULL,
-  warranty_confirmation_date TEXT NULL,
-  warranty_confirmation_note TEXT NOT NULL DEFAULT '',
-  status TEXT DEFAULT 'draft'
-    CHECK (status IN ('draft', 'submitted', 'accepted', 'warranty', 'expired')),
-  note, created_at, updated_at, deleted_at
-)
-project_acceptance_lifecycle_events(
-  id TEXT PRIMARY KEY,
-  acceptance_id TEXT NOT NULL REFERENCES project_acceptances(id) ON DELETE RESTRICT,
-  action TEXT NOT NULL CHECK (action IN ('submit', 'accept', 'start-warranty', 'confirm-expiry')),
-  from_status TEXT NOT NULL, to_status TEXT NOT NULL,
-  actor_id TEXT NOT NULL, actor_name TEXT NOT NULL DEFAULT '',
-  occurred_at TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
-  UNIQUE (acceptance_id, to_status)
-)
--- 生命周期：draft -> submitted -> accepted -> warranty -> expired；同一 acceptance ID
--- 同时支撑 acceptance / warranty 两个 canonical 投影，不复制保修单据。
--- 状态只能由 submit / accept / start-warranty / confirm-expiry command 单向推进，
--- 每次转换追加事件；迁移不根据 type/status 伪造历史日期或事件。
--- 项目、合同和中央详情原样读取持久化状态与事件；附件继续使用
--- file_refs(owner_type='project_acceptance', owner_id=project_acceptances.id)，并按
--- acceptance-report / warranty-confirmation 分类进入对应视图。
-
-owner_final_settlements(
-  id, no TEXT DEFAULT '', name TEXT NOT NULL,
-  project_id TEXT REFERENCES projects(id), contract_id TEXT REFERENCES contracts(id),
-  settlement_amount REAL DEFAULT 0 CHECK (settlement_amount >= 0),
-  audited_amount REAL NULL CHECK (audited_amount IS NULL OR audited_amount >= 0),
-  audited_date TEXT NULL,
-  submission_date TEXT DEFAULT '', basis TEXT DEFAULT '',
-  difference_note TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-
-owner_penalties(
-  id, no TEXT DEFAULT '', project_id TEXT REFERENCES projects(id),
-  contract_id TEXT REFERENCES contracts(id), notice_no TEXT DEFAULT '',
-  amount REAL DEFAULT 0 CHECK (amount >= 0), penalty_date TEXT DEFAULT '',
-  reason TEXT NOT NULL, appeal_note TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
-)
-
-subcontract_change_orders(
-  id, no TEXT DEFAULT '', change_type TEXT DEFAULT '',
-  project_id TEXT REFERENCES projects(id),
-  supplier_id TEXT REFERENCES suppliers(id),
-  contract_id TEXT REFERENCES contracts(id),
-  change_date TEXT DEFAULT '', approved_amount REAL DEFAULT 0,
-  changed_area REAL, actual_approved_price REAL,
-  reason TEXT NOT NULL, status, note,
-  created_at, updated_at, deleted_at
-)
-
-penalty_records += (
-  projectId TEXT NULL, reason TEXT DEFAULT '',
-  supplier_id TEXT REFERENCES suppliers(id),
-  contract_id TEXT REFERENCES contracts(id),
-  deduction_method TEXT DEFAULT '', rectification_note TEXT DEFAULT '',
-  updated_at TEXT, deleted_at TEXT
-)
-
-penalty_settlement_deductions(
-  id,
-  penalty_id TEXT REFERENCES penalty_records(id),
-  settlement_id TEXT REFERENCES expenditure_settlements(id),
-  amount REAL CHECK (amount > 0),
-  note TEXT DEFAULT '',
-  created_at TEXT, updated_at TEXT, deleted_at TEXT
-)
--- (penalty_id, settlement_id) 对活跃关系唯一；累计已抵扣金额从活跃关系行聚合，
--- 不回写 penalty_records 头表。
-```
-
-`ownerChangeForm` 复用 BOQ 变更模型；只有不含量价明细的纯金额签证直接写 `owner_change_orders`。`subSettleForm` 复用 `expenditure_settlements`。项目罚扣抵扣结算时由独立 action 写真实结算引用/操作日志，不在罚扣头维护“已扣金额”副本。
-
-最终结算只读口径不读 `contracts.changed/paid`：变更后合同金额取
-`contracts.amount + Σ非草稿 contract_supplements.amount`，累计收款取同合同的活跃
-`receipt_registrations.amount`，两者均为查询时聚合、不回写最终结算头。结算申报金额取 `settlement_amount`；审定金额/日期只取 `audited_amount` / `audited_date`，任一未记录都返回 `null`，不用申报值、状态或 `0` 代填。
-
-甲方罚扣只读口径直接读取 `owner_penalties` 的金额、日期、事由、联系单号、申诉说明、状态和备注；附件只读取 `owner_type='owner_penalty'` 且 `owner_id` 匹配的有效 `file_refs`。罚扣金额以负向业务含义展示，但存储保持正数金额；申诉说明只是事实字段，不派生“申诉中/已确认”等未定义审批状态。
-
-> v24 实装核对：v1-v23 物理库并未创建蓝本已声明的 `penalty_records`，因此 F5 迁移按本节与 `pages/base-crew.md` 的既有字段一次性建表，并同时加入 F5 外键和软删除列；不另建项目罚扣头表。
-
----
+| 来源实现批次 | 字段承接与验证边界 |
+| --- | --- |
+| F1 v19 / 目标成本 v20 | [主数据](#21-基础主数据跨项目共享)、[班组工人](#26-分包及人工类)、[目标成本](#28-目标成本类成本控制基线)；旧名称/层级转关系和对账，不宣告中央/生产接管 |
+| F2 v21 | [合同](#23-合同类通用基础--类型定制)与[支出结算](#24-资金管理类)；草稿可空、canonical 来源映射 |
+| F3 v22 / 批复 v49 | [资金实体](#24-资金管理类)；旧单外键、手写已付及报销头金额退出，新批复保留 NULL/0/来源 |
+| F4 v23 | [物资旧来源与已确认目标](#material-target)分别保留；不代表 #284/#285/#291 后续迁移完成 |
+| F5 v24 / v37 / v39—v45 | [BOQ 与甲方单据](#23-合同类通用基础--类型定制)、[项目罚扣](#26-分包及人工类)；状态、量价基准、验收事件和审定事实各按真实来源 |
 
 ## § 3 外键索引
+
+本节是 §2 的查找索引：同源关系不等于所有部署均有 SQL 外键，来源物理列与中央 EntityRef 分别核对。物资旧表关系不覆盖 [已确认目标](#material-target)，混合命名仅在真实旧列存在时保留。
 
 ### 3.1 核心关联
 
@@ -1505,25 +2188,25 @@ penalty_settlement_deductions(
 | `projects` | `customer_id` / `secondary_customer_id` | `customers.id` | N:1 | 项目 → 主/次客户；名称文本列只作迁移输入 |
 | `workers` | `crew_id` | `crews.id` | N:1 | 工人 → 所属班组；班组是主档归属父级 |
 | `workers` | `current_project_id` | `projects.id` | N:1 | 工人当前项目引用；仅表示当前分配，不是工人主档的删除父级，项目不可见时工人仍保留 |
-| `project_suppliers` | `projectId` | `projects.id` | N:1 | 项目×分供方关联 |
-| `project_suppliers` | `supplierId` | `suppliers.id` | N:1 | |
-| `supplier_credentials` | `supplierId` | `suppliers.id` | N:1 | 分供方证照 |
+| `project_suppliers` | `project_id` | `projects.id` | N:1 | 项目×分供方关联 |
+| `project_suppliers` | `supplier_id` | `suppliers.id` | N:1 | |
+| `supplier_credentials` | `supplier_id` | `suppliers.id` | N:1 | 分供方证照 |
 | `supplier_credentials` | `file_ref_id` | `file_refs.id` | 0..1:1 | 证照元数据 → 唯一活跃原件 |
 | `supplier_credential_requirements` | `supplier_id` | `suppliers.id` | N:1 | 分供方逐类别要求覆盖 |
 | `supplier_credential_audits` | `supplier_id` / `credential_id` | `suppliers.id` / `supplier_credentials.id` | N:1 | 不含 OCR 正文的证照动作审计 |
 | `supplier_audits` | `supplier_id` | `suppliers.id` | N:1 | 不含敏感字段正文的供应商动作审计 |
-| `settlements` | `projectSupplierId` | `project_suppliers.id` | 1:1 | 结算（每个关联最多一条） |
-| `phase_tasks` | `projectId` | `projects.id` | N:1 | 阶段任务 |
+| `settlements` | `project_supplier_id` | `project_suppliers.id` | 目标 1:1 | 合作终态关闭；旧库无 UNIQUE，不是付款源单 |
+| `phase_tasks` | `project_id` | `projects.id` | N:1 | 阶段任务 |
 
 ### 3.2 合同关联
 
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
-| `construction_contracts` | `projectId` | `projects.id` | N:1 | 旧施工合同 → 项目（迁移兼容，只读） |
-| `supplement_agreements` | `contractId` | `construction_contracts.id` | N:1 | 旧补充协议 → 旧施工合同（迁移兼容，只读） |
-| `owner_change_orders` | `projectId` | `projects.id` | N:1 | 甲方变洽签 → 项目 |
-| `expenditure_contracts` | `projectId` | `projects.id` | N:1 | 支出合同 → 项目 |
-| `expenditure_contracts` | `supplierId` | `suppliers.id` | N:1 | 支出合同 → 分供方 |
+| `construction_contracts` | `project_id` | `projects.id` | N:1 | 旧施工合同 → 项目（迁移兼容，只读） |
+| `supplement_agreements` | `contract_id` | `construction_contracts.id` | N:1 | 旧补充协议 → 旧施工合同（迁移兼容，只读） |
+| `owner_change_orders` | `project_id` | `projects.id` | N:1 | 甲方变洽签 → 项目 |
+| `expenditure_contracts` | `project_id` | `projects.id` | N:1 | 支出合同 → 项目 |
+| `expenditure_contracts` | `supplier_id` | `suppliers.id` | N:1 | 支出合同 → 分供方 |
 | `contract_line_items` | `contract_id` | `contracts.id` | N:1 | 材采明细行 → canonical 合同 |
 | `boq_files` | `contract_id` | `contracts.id` | N:1 | 清单文件 → canonical 施工合同（一对多） |
 | `boq_lines` | `boq_file_id` / `project_id` / `contract_id` / `item_id` | `boq_files.id` / `projects.id` / `contracts.id` / `items.id` | N:1 | 清单行；项目、合同为高频查询冗余，标准分项映射可空 |
@@ -1570,7 +2253,7 @@ penalty_settlement_deductions(
 
 ### 3.4 分包及人工关联
 
-当前物理 schema 不存在独立的 `crew_workers`、`crew_project_config`、`crew_project_items` 或 `worker_certs`。班组成员以 `workers.crew_id` 表达（见 §3.1）；班组参与项目从成员当前项目、`unit_assignments` 与 `wage_statements` 的真实事实聚合；班组和工人附件走 §4 的多态 `file_refs`。不得恢复蓝本中的幽灵表名，若要新增班组项目单价或证件有效期能力，必须先完成领域决策与迁移设计。
+当前物理 schema 不存在独立的 `crew_workers`、`crew_project_config`、`crew_project_items` 或 `worker_certs`。班组成员以 `workers.crew_id` 表达（见 §3.1）；班组参与项目从成员当前项目、`unit_assignments` 与 `wage_statements` 的真实事实聚合；班组和工人附件走 §3.5 的多态 `file_refs`。不得恢复蓝本中的幽灵表名，若要新增班组项目单价或证件有效期能力，必须先完成领域决策与迁移设计。
 
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
@@ -1596,9 +2279,9 @@ penalty_settlement_deductions(
 | `attendance_records` | `project_id` / `worker_id` | `projects.id` / `workers.id` | N:1 | C1 日工/加班来源；项目×工人×日期唯一，原班组证据不随转组改写 |
 | `signed_daywork_records` | `project_id` / `crew_id` / `worker_id` | `projects.id` / `crews.id` / `workers.id` | N:1 | C2 逐日签工来源；整工 1 / 半工 0.5 |
 | `wage_statement_daywork_records` | `statement_id` / `daywork_record_id` | `wage_statements.id` / `signed_daywork_records.id` | N:1 | C2 核对来源关联；活跃 `daywork_record_id` 全局唯一，禁止重复计薪 |
-| `delivery_records` | `projectId` / `supplierId` | `projects.id` / `suppliers.id` | N:1 | 送货单（supplierId 可空=未区分分供方兜底） |
-| `delivery_lines` | `deliveryRecordId` | `delivery_records.id` | N:1 | 送货单明细行 |
-| `project_aliases` | `projectId` | `projects.id` | N:1 | 工地名别名 → 项目归一（CONTEXT.md「工地」） |
+| `delivery_records` | `project_id` / `supplier_id` | `projects.id` / `suppliers.id` | N:1 | 送货单（supplierId 可空=未区分分供方兜底） |
+| `delivery_lines` | `delivery_record_id` | `delivery_records.id` | N:1 | 送货单明细行 |
+| `project_aliases` | `project_id` | `projects.id` | N:1 | 工地名别名 → 项目归一（CONTEXT.md「工地」） |
 | `material_requisitions` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 乙供材下料 → 项目/材采合同 |
 | `material_arrivals` | `project_id` / `supplier_id` / `contract_id` / `requisition_id` | `projects.id` / `suppliers.id` / `contracts.id` / `material_requisitions.id` | N:1 | 乙供材到货头 |
 | `material_arrival_lines` | `arrival_id` | `material_arrivals.id` | N:1 | 到货明细 |
@@ -1615,12 +2298,12 @@ penalty_settlement_deductions(
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
 | `import_batches` | `project_id` | `projects.id` | N:1 | 项目迁移批次（通用主数据导入可空） |
-| `import_source_refs` | `import_batch_id` | `import_batches.id` | N:1 | 逐实体来源追溯 |
+| `import_source_refs` | `import_batch_id` | `import_batches.id` | N:1 | 未建追溯目标的关系设计，不是已落地物理 FK |
 | `reconciliation_issues` | `import_batch_id` / `project_id` | `import_batches.id` / `projects.id` | N:1 | 迁移差异与归因 |
 
 ### 3.5 文件引用（多态关联）
 
-`file_refs` 使用 `ownerType` + `ownerId` 多态关联到多种实体：
+`file_refs` 来源物理列为 `owner_type` + `owner_id`；以下接口以 `ownerType` + `ownerId` 表达同一多态归属，不是 SQL 列定义：
 
 | ownerType | 关联实体 | 说明 |
 |---|---|---|
@@ -1706,16 +2389,16 @@ interface FilePayload {
 | `units` | `floor_id` | `floors.id` | N:1 | 户 → 楼层 |
 | `units` | `house_type_template_id` | `house_type_templates.id` | N:1 | 户 → 户型模板；房间通过模板活链接派生 |
 | `schedule_process_library_tasks` | `library_id` | `schedule_process_libraries.id` | N:1 | 标准工序定义 → 不可变标准工序库版本；前置 key 与 disabled 状态随版本保存 |
-| `schedule_groups` | `projectId` | `projects.id` | N:1 | 楼栋分组 → 项目 |
+| `schedule_groups` | `project_id` | `projects.id` | N:1 | 楼栋分组 → 项目 |
 | `schedule_groups` | `contract_id` | `contracts.id`（`kind='施工'`） | N:1 | 条件外键；`scope_basis='contract'` 时必填且项目必须一致，`provisional` 时必须为空；合同分组禁止跨合同混组 |
-| `schedule_group_buildings` | `groupId` | `schedule_groups.id` | N:1 | 分组×楼栋 |
-| `schedule_group_buildings` | `buildingId` | `buildings.id` | N:1 | 一分组含多栋 |
-| `schedule_tasks` | `projectId` | `projects.id` | N:1 | 工序 → 项目 |
-| `schedule_tasks` | `groupId` | `schedule_groups.id` | N:1 | 工序 → 楼栋分组；项目/分组 summary 直接由对应实体及其子工序派生，不复制为任务行 |
-| `schedule_tasks` | `parentId` | `schedule_tasks.id` | N:1 | 可选的工序任务 → 子任务扩展；当前项目→分组→工序三层由实体外键表达，普通工序为 NULL |
+| `schedule_group_buildings` | `group_id` | `schedule_groups.id` | N:1 | 分组×楼栋 |
+| `schedule_group_buildings` | `building_id` | `buildings.id` | N:1 | 一分组含多栋 |
+| `schedule_tasks` | `project_id` | `projects.id` | N:1 | 工序 → 项目 |
+| `schedule_tasks` | `group_id` | `schedule_groups.id` | N:1 | 工序 → 楼栋分组；项目/分组 summary 直接由对应实体及其子工序派生，不复制为任务行 |
+| `schedule_tasks` | `parent_id` | `schedule_tasks.id` | N:1 | 可选的工序任务 → 子任务扩展；当前项目→分组→工序三层由实体外键表达，普通工序为 NULL |
 | `schedule_tasks` | `stage_id` | `construction_stages.id` | N:1 | 工序任务 → 稳定阶段；`has_qty=1` 必填 |
-| `task_dependencies` | `predId` / `succId` | `schedule_tasks.id` | N:1 | 前后置依赖（FS/SS/FF/SF + lag） |
-| `task_item_map` | `taskId` | `schedule_tasks.id` | N:1 | 工序 → 分项映射 |
+| `task_dependencies` | `pred_id` / `succ_id` | `schedule_tasks.id` | N:1 | 前后置依赖（FS/SS/FF/SF + lag） |
+| `task_item_map` | `task_id` / `item_id` | `schedule_tasks.id` / `items.id` | N:1 | 工序 → 稳定分项映射，不按名称建立关系；BOQ 来源另见 §3.2 |
 | `schedule_task_floor_plans` | `task_id` / `floor_id` / `item_id` / `boq_line_id` | `schedule_tasks.id` / `floors.id` / `items.id` / `boq_lines.id` | N:1 | 排程域拥有的分项×楼层计划；`source_basis=contract` 必须有 BOQ，`provisional` 只保留暂估量且 BOQ 为空 |
 
 > 工序实际进度不另存值：运行时按 `schedule_tasks.stage_id` + `schedule_group_buildings` 聚合 `unit_stage_completions(status='completed')`；`task_item_map` 只圈定应做户、量值和下钻范围（见 `schedule-progress.md` §五）。
@@ -1726,12 +2409,14 @@ interface FilePayload {
 
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
-| `target_costs` | `projectId` | `projects.id` | N:1 | 目标成本 → 项目 |
-| `target_cost_items` | `targetCostId` | `target_costs.id` | N:1 | 科目行 → 目标成本 |
+| `target_costs` | `project_id` | `projects.id` | N:1 | 目标成本 → 项目 |
+| `target_cost_items` | `target_cost_id` | `target_costs.id` | N:1 | 科目行 → 目标成本 |
 
 ---
 
 ## § 4 计算字段汇总（不存储，实时查询）
+
+下列 SQL 是指标来源示意，执行须使用当前 owner/Repository 的有效状态、软删除、权限和同来源身份过滤；旧 camelCase 展示名不作为可执行列名。空集合可证为 0，缺来源/未知金额保持不完整，详见 §4.9。页面当前实现不等于目标聚合已全部接通。
 
 ### 4.1 项目经营数据面板（project-info.md）
 
@@ -1741,20 +2426,41 @@ interface FilePayload {
 | 增补合同额 | `SELECT SUM(s.amount) FROM contract_supplements s JOIN contracts c ON c.id = s.contract_id WHERE c.project_id = ? AND c.kind = '施工' AND c.status NOT IN ('draft','草稿') AND s.status NOT IN ('draft','草稿')` |
 | 变洽签审定额 | `SELECT SUM(tax_inc_amount) FROM owner_change_orders WHERE project_id = ? AND (source_locked = 1 OR status = 'approved' OR approval_date <> '')`（锁定的 BOQ 自动台账、已签证记录及迁移前有审定日期的历史记录；提交未审定不计） |
 | 变更后合同额 | 主合同 + 增补 + 变洽签 |
-| 项目收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE project_id = ? AND status NOT IN ('draft','草稿')` |
+| 项目收款 | 同来源有效普通收款金额聚合，按项目过滤，排除 `draft/草稿/void/作废/已作废` 及软删；未知金额不忽略，来源见 §2.4 |
 | 确认支付 | `SELECT SUM(amount) FROM payment_records WHERE project_id = ? AND confirmation_status = 'confirmed'`；是否分摊到付款申请另由 §4.2.1 的勾稽差额表达 |
-| 工人工资支付 | `SUM(wage_statements.actual_amount)`，仅 `status='released'`（界面“已发放”） |
-| 动态成本 | 五类已确认 `expenditure_settlements.totalAmount` + 已发放工资 + 已确认费用报销（§10.4） |
+| 工人工资支付 | §2.6/P4 的同源有效实际事实净额；原发放、真实补退及有效错记冲销按稳定身份去重 |
+| 动态成本 | 见 [§4.8](#48-动态成本与合同付款) 的三类真实来源及更正边界 |
 | 往来收款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'receipt' AND status NOT IN ('draft','草稿') AND deleted_at IS NULL` |
 | 往来付款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'payment' AND status NOT IN ('draft','草稿') AND deleted_at IS NULL` |
-| 收支差额 | 全部已确认资金流入 − 全部已确认资金流出（§10.6） |
-| 工程款余缺 | 项目合同收款 − 确认支付 |
-| 管理费 | 当前未接入权威来源，界面显示 `—`，不得以 `0` 冒充已知事实 |
-| 已知资金余额 | 项目收款 + 往来收款 − 确认支付 − 往来付款；当前明确不含尚未接入的管理费，不能命名为完整“可用资金余额” |
+| 收支差额 | 见 [§4.10](#410-资金计算)；不得把局部已知余额称为完整资金余额 |
+| 工程款余缺 | 项目合同收款 − 合同类支付记录（§4.10 目标；不混入无合同支付） |
+| 管理费 | 目标主展示已核实的实际成本，按真实来源展开，见下方定义；当前顶部未接入完整权威来源，显示 `—`，不得以 `0` 冒充已知事实 |
+| 已知资金余额 | 项目收款 + 往来收款 − 确认支付 − 往来付款；仅为已接入现金来源的局部余额，管理费实付沿原支付渠道计入一次，不再额外减成本合计，完整缺源见 §4.10 |
+
+表中旧 SQLite SQL 为来源示意，不完整表达中央有效状态。例如普通收款当前排除草稿、作废及软删，见收款实体（§2.4）及[有效记录定义](../../app/lib/receipt/effective.ts)；不增加“收款确认”动作。旧 [SQLite 项目聚合](../../app/lib/project/detail-aggregate.ts)与[项目明细 store](../../app/stores/project-detail.ts)的收款有效金额已使用同一状态清单排除草稿及作废；[聚合回归](../../tests/project/detail-aggregate.test.ts)覆盖草稿、作废、软删与有效历史登记。已知记录缺金额时总额保持未知，不因 SQL `SUM` 忽略空值就声称完整。
+
+<a id="management-fee-sources"></a>
+
+**管理费范围与金额基准（2026-10-02 已确认目标）：**包含合同记取、管理人员、仓储等真实费用；顶部主展示已经核实的实际成本，并按来源展开。合同记取额、实际成本、实际收付是三个维度，不能相加或互相替代，不统一套用一条“合同额 × 管理费率”。实际成本合计引用已核实源单或明细归属，同一费用只计一次；资料不齐显示已知部分和缺口，不能把“已知合计”标成完整合计。
+
+| 来源 | 实际成本依据与例外 | 实际收付边界 |
+| --- | --- | --- |
+| 合同记取 | 保留真实合同条款及结算依据；仅约定/计提不自动等于已核实成本，须有明确费用发生及归属依据 | 未发生收付不进现金；已在净收款中扣留的同一事项不再额外扣一次，缺毛净额/扣留依据保持待核实 |
+| 管理人员 | 已走 P5 独立管理簿者引用[工资域同源实际事实](#a-工资费用独立管理簿与负价清单412p5)，不与普通工资混簿 | 已进入工资实际净额的支付不再作为额外“管理费支付”相减 |
+| 仓储等 | 按真实合同结算、费用报销等既有来源保留类型和原费用身份，不从用途文本猜接 | 真实支付按原支付渠道引用，不因归类为管理费再造现金；原费用垫付清偿不重复成本 |
+
+```mermaid
+flowchart TD
+  C["合同 / 管理人员 / 仓储<br/>真实成本来源"] --> V["核实成本归属<br/>引用原费用"]
+  V --> M["顶部管理费目标<br/>成本及来源"]
+  V --> P["实际收付单独看<br/>原现金只计一次"]
+```
+
+图为目标来源示意。P5 管理簿已有同源规则，但顶部聚合尚无完整管理费来源；[当前项目聚合](../../app/lib/project/detail-aggregate.ts)的占位值不能证明费用为零，付款申请 `biz_type='管理费'` 也不是已发生成本或实付。分类与明细归属、完整性及下钻接线是实现缺口，本轮不复制成本/支付表。
 
 ### 4.2 票据信息面板（project-info.md）
 
-| 字段 | SQL 计算 |
+| 现有展示字段 | 当前来源计算（保留实现与历史核对依据） |
 |---|---|
 | 销项票额 | `SELECT SUM(amount) FROM invoice_applications WHERE project_id = ? AND status NOT IN ('draft','草稿')` |
 | 销项税额 | `SELECT SUM(tax_amount) FROM invoice_applications WHERE project_id = ? AND status NOT IN ('draft','草稿')` |
@@ -1762,6 +2468,34 @@ interface FilePayload {
 | 进项税额 | `SELECT SUM(tax_amount) FROM invoices WHERE project_id = ? AND account_status = 'archived'` |
 | 增值税 | 销项税额 − 进项税额 |
 | 税负率 | 增值税 / 销项票额；销项票额为 0 时不可计算，界面显示 `—` 而不是 `0%` |
+
+本节“票额”的 `invoice_applications.amount` / `invoices.amount` 为不含税基数，当前[项目聚合](../../app/lib/project/detail-aggregate.ts)沿此来源；开票价税合计另为 `amount + tax_amount`。B05 的含税收票额读取 `invoices.total_amount`，不能将两项指标的字段互换。上表保留历史算法证据，**不再作为真实应纳税额及真实税负的目标公式**：非草稿开票申请不等于实际开票，已归档进项票不证明抵扣资格及属期，项目差额不等于公司实际应纳税额。旧[指标组件](../../app/components/project/ProjectMetrics.vue)已将增值税、税负率显示为待核实，撤下差额推导值及无真实依据的下钻；底层历史聚合保留作来源核对，真实计税链尚未接通。
+
+<a id="actual-tax-sources"></a>
+
+**真实税额目标（2026-10-02 已确认）：**按实际纳税主体、期间及计税方法核实；应纳、申报及实缴分别保留依据。项目展示可追溯归属的税额和发票缺口，不把项目票面差额冒充公司实际应纳，不另设公司税额的项目分摊公式。资料不足显示待核实，不因发票晚开或未到而填成零税额，也不以“票面税额统计”替代本次真实税目标。
+
+| 逻辑事实 | 必要身份与来源 | 时点与例外 |
+| --- | --- | --- |
+| 主体及适用口径 | 稳定纳税主体身份、税号快照、实际所在地、计税方法、税款所属期间及适用依据/有效期 | 逐主体、逐交易核实；不默认全部项目适用同一税率、方法或期间，不将我方签约名称直接当作已核实纳税主体 |
+| 销项业务及义务 | 真实业务/合同身份、金额、履行与收款、约定付款、义务日期及属期；实际出票日期、票号与原件另留 | 晚开票不当然推迟已经发生的义务；先开票及特殊业务按适用依据核实，不一律按开票月、收款月或上传月归期 |
+| 进项及抵扣 | 购进身份、合法扣税凭证、开具和取得日期、真实用途、抵扣资格/金额、用途确认及抵扣属期 | 购进、取得、归档和抵扣是不同事实；迟到票不自动倒灌原交易月，不凭归档状态取得抵扣资格，缺凭证/资格保留缺口 |
+| 财务确认及申报/缴款 | 经财务核实的税额、确认人/时间/依据版本；申报原件与更正版本、缴款或预缴凭证和真实金额 | 各自稳定身份及明确关联，保留原事实；预缴、申报应纳和实缴不相加成第二份税额 |
+| 项目读取 | 项目 ID、真实交易/税额来源及明确归属依据 | 仅展示可证明归属的部分及完整性；缺归属不按项目金额比例猜分摊 |
+
+```mermaid
+flowchart TD
+  O["当前：申请税额 - 归档票税额"] --> X["冲突：缺真实业务属期<br/>抵扣资格与主体税款依据"]
+  X --> T["目标：按真实主体 / 期间核实<br/>业务义务与凭证分别追溯"]
+  T --> R["应纳 / 申报 / 实缴分别留依据"]
+  R --> P["项目只取明确归属<br/>晚开 / 未到票及缺源可见"]
+```
+
+图为已确认规则及冲突位置，不代表税务功能已上线。现有开票申请、归档票及项目聚合尚不具备上述完整来源，不能以文档补齐字段冒充已实现真实计税；本轮不新增税务表或计算引擎。
+
+**官方依据与适用边界（核对日 2026-10-02）：**全国性[《增值税法》](https://fgk.chinatax.gov.cn/zcfgk/c100009/c5237365/content.html)及[《实施条例》](https://fgk.chinatax.gov.cn/zcfgk/c100010/c5246349/content.html)均于 2026-01-01 施行；法第 14、16、21—22 条区分一般/简易计税、合法扣税凭证、留抵及不得抵扣情形，第 28—30 条和条例第 39 条规定义务时间、地点及期间。晚开销项与迟到进项须分别核实；[财政部、税务总局 2026 年第 13 号公告](https://fgk.chinatax.gov.cn/zcfgk/c102416/c5247494/content.html)第一、四条另有抵扣及特别义务时间规定（2026-01-01 起），不推广为统一迟票倒期公式。预缴按[第 14 号公告](https://fgk.chinatax.gov.cn/zcfgk/c102416/c5247497/content.html)，申报表调整见[国家税务总局 2026 年第 6 号公告](https://fgk.chinatax.gov.cn/zcfgk/c100012/c5247507/content.html)（2026-02-01 起施行）。此处确定来源边界，不替未知主体、所在地或交易日期选税率和地方规则；真实计税前仍须逐业务核对适用事实，2026 年前交易不能直接套用上述新法。
+
+票面事实与合同采购明细分别保存：`invoices.items` 是票面 JSON，不是 `contract_line_items`；`invoice_applications` 关联施工合同及客户，不是材采行导入入口。用户提及开票时核对数量或单价，不授权为凑总额自动改写票面或签约事实。已核[国家税务总局现行《发票管理办法实施细则》](https://fgk.chinatax.gov.cn/zcfgk/c100011/c5221006/content.html)（2024-03-01 起施行、官方标注全文有效）第 25、28—29 条：涉及金额计算的量价和票面须与真实业务一致；该全国性规定不设 CRM 合同金额容差。具体开票方向、交易日期、纳税主体与调整依据未齐，本轮不裁定税额、折扣计税或地方特殊规则。
 
 ### 4.2.1 付款申请勾稽（finance-payment.md · ADR 0015）
 
@@ -1779,34 +2513,75 @@ interface FilePayload {
 
 | 字段 | SQL 计算 |
 |---|---|
-| 合作项目数 | `SELECT COUNT(*) FROM project_suppliers WHERE supplierId = ?` |
+| 合作项目数 | `SELECT COUNT(*) FROM project_suppliers WHERE supplier_id = ?` |
 | 合同数 | `SELECT COUNT(*) FROM contracts WHERE supplier_id = ? AND kind <> '施工'` |
-| 合同总额 | `Σ contracts.amount + Σ有效 contract_supplements.amount`，按 `supplier_id` 过滤 |
+| 合同总额 | 同来源有效支出主合同金额 + 有效补充协议金额，按真实 `supplier_id` 过滤；缺金额为未知 |
 | 累计已付 | 按分供方连接已确认 `payment_records` 与 `payment_record_application_allocations` 求和 |
 | 应付余额 | 合同总额 − 累计已付 |
+
+金额聚合与关系计数分别过滤。当前中央[分供方读面](../../app/lib/supplier/read-page.ts)及[项目分供方读面](../../app/lib/project-supplier/read-page.ts)排除草稿（`draft/草稿`）、失效（`无效/作废/cancelled`）和软删合同，纳入有效补充协议；详情中的可追溯合同/关系列表不因此只剩金额纳入项。旧 [SQLite 列表 store](../../app/stores/supplier.ts)及[详情 store](../../app/stores/supplier-detail.ts)的已知合同金额聚合已对齐此口径，共用[有效状态与补充协议查询](../../app/lib/contract/effective-status.ts)；[store 回归](../../tests/stores/supplier-detail.test.ts)覆盖失效及草稿排除、有效补充协议、列表与详情金额一致，并验证合同计数与合作项目范围保留。旧路径未因此退役，也不改变中央读写边界。
 
 ### 4.4 ProjectSupplier 汇总（project-supplier.md）
 
 | 字段 | SQL 计算 |
 |---|---|
 | contractTotal | `Σ contracts.amount + Σ有效 contract_supplements.amount`，按 `project_id + supplier_id` 过滤 |
-| claimedTotal | `SELECT SUM(amount) FROM payment_applications WHERE projectId = ? AND supplierId = ? AND approvalStatus = 'approved'` |
+| claimedTotal | Σ有效审批态申请的已知 `approved_amount`；纳入记录有未填写/历史未知时完整合计为 `NULL`，明确批复 0 保留为 0，无记录为已知 0；不回退 `apply_amount` |
 | paidTotal | 按 `project_id + supplier_id` 连接已确认支付记录分摊求和 |
-| invoiceTotal | `SELECT SUM(amount) FROM invoices WHERE project_id = ? AND supplier_id = ? AND account_status = 'archived'` |
+| invoiceTotal | Σ同项目、同分供方有效已归档发票的含税 `total_amount`；不使用不含税 `amount` |
 | balance | contractTotal − paidTotal |
+
+B05 的依据为 [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md)、[项目分供方规格](./pages/project-supplier.md)与 [PAY-07 / #439](https://github.com/zodea/crm-new/issues/439)：申请额、批复额、银行实付属于不同事实。具体批复来源和余额回退仅按[付款实体](#entity-payment-record)处理；可付上限的兼容回退不能用于已批请款合计。当前实现证据为 [read-page](../../app/lib/project-supplier/read-page.ts) 及 [Repository 契约测试](../../tests/project-supplier/repository-contract.test.ts)，不以其代替业务决定。
+
+```mermaid
+flowchart TD
+  A["同来源项目 + 分供方"] --> B["只纳入有效审批态申请"]
+  B --> K["批复已知<br/>包含明确 0"]
+  B --> U["未填写<br/>或历史未知"]
+  K --> T["计入已批请款"]
+  U --> N["完整合计未知<br/>不回退申请额"]
+```
+
+```mermaid
+flowchart TD
+  R["已确认支付记录"] --> L["同项目、分供方<br/>有效支付分摊"]
+  L --> D["paidTotal：实际已付<br/>不受未知批复抹除"]
+```
 
 ### 4.5 可复用经营聚合（旧首页 Dashboard 指标）
 
-> 2026-07-18：当前首页已裁定以统一施工进度甘特为准，本节只保留可复用的数据聚合口径，不代表首页必须展示指标卡或固定网格；旧 UI 蓝本见 `homepage-dashboard.md` 废弃横幅。
+当前首页已裁定为统一施工进度甘特，本节只保留旧引用定位，不定义首页指标卡。可复用合同/收款聚合直达 §4.1，票据直达 §4.2，资金直达 §4.10；不再引用旧 `expenditure_contracts`、camelCase SQL 或不筛草稿的旧合计。历史显示与样本仍见原 Git 版本及[迁移验收](../migration/ruijing-acceptance.md)。
 
-| 字段 | SQL 计算 |
-|---|---|
-| 合同总额 | `SELECT SUM(amount) FROM contracts WHERE project_id = ? AND kind = '施工'` + `contract_supplements` 有效补充协议 + 变更 |
-| 累计收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
-| 累计支出 | 已确认支付记录 + 已确认工资发放 + 已确认往来/保证金/备用金等其他资金流出；禁止读取付款申请头手写已付值 |
-| 已开票额 | `SELECT SUM(amount) FROM invoice_applications WHERE projectId = ?` |
-| 材料分供方数 | `SELECT COUNT(DISTINCT supplierId) FROM project_suppliers ps JOIN suppliers s ON ps.supplierId = s.id WHERE ps.projectId = ? AND s.supplierCategory = '材料供应商'` |
-| 采购合同数 | `SELECT COUNT(*) FROM expenditure_contracts WHERE projectId = ? AND contractType = '材料采购'` |
+旧指标中两项独有计数单独保留，不能因首页不再展示经营卡片而丢失来源：
+
+| 指标 | 口径与状态 | 来源及边界 |
+| --- | --- | --- |
+| 采购合同数 | 当前项目详情读取同来源、同项目的中央材采合同列表 `pagination.total`；不是正式合同金额的纳入数量，不额外套用金额聚合的排除草稿条件 | [项目详情规格](./pages/project-info.md)、[读取实现](../../server/utils/project-read-test-instance.ts)、[边界测试](../../tests/project/project-detail-boundary.test.ts)；真实 0、未知、无权限及失败分开。旧 `expenditure_contracts` / `contractType='材料采购'` 仅为历史来源，不恢复为现行 SQL；中央验证实例不代表生产接管 |
+| 价格比较中的分供方范围 | **已确认目标（2026-10-02）：**具有价格的各家均展示，包括未签约报价；未签约询价、合同约定价、实际送货价分别标明 | 不按项目关系数或合同数代替来源；事实归属直达[材采价格来源](#material-price-sources)。现行分析仍是已归档送货价，三来源综合比较及独立报价实体未接通 |
+| 合同查找、签约分供方及材料采购方 | **已确认目标（2026-10-02）：**按实际合同与对应材料的采购关系展示；示例只有甲公司有正式材采合同，则为 1 家，甲有多份合同仍是同一家 | 按同来源稳定合同/分供方身份查找，不按主档材料类别或项目成员关系推定签约；材料对应关系仍须真实明细依据，不能按名称猜补外键。此范围不等同采购合同列表总数；正式关系的状态和来源仍须可追溯，报价逻辑承接见对应实体，不推定已实现 |
+
+**旧口径恢复：**原 §4.5 的“项目分供方关系连接主档、类别为材料供应商、按稳定分供方 ID 去重”从 `8756be2d^` 的本文件恢复。它只回答项目登记范围，不能继续冒充报价家数或正式签约家数；不新建一个通用“材料分供方数”覆盖上述不同场景。
+
+![材料价格比较展示三家报价，合同查找仅展示一家正式签约采购方的规则示意](../design/assets/a02-supplier-price-scope.png)
+
+图为虚构规则效果示意，包含旧指标混用的问题、已确认展示范围及三种价格来源标记，**不是运行截图**。沿用已有[HTML 图源](../design/assets/show-me-a02-procurement-entry.html#supplier-price-scope)。来源定义直达[材采价格来源](#material-price-sources)；独立报价实体与综合比较尚未接通。
+
+```mermaid
+flowchart TD
+  P["项目 ID + 数据来源"] --> C["中央材采合同列表<br/>project_id 归属"]
+  C --> N["pagination.total<br/>采购合同数"]
+  P --> R["正式材采合同 + 对应材料<br/>真实分供方关系"]
+  R --> H["合同查找 / 签约采购方<br/>按稳定身份展示"]
+```
+
+图为关系与口径示意：采购合同数已核对现行读取；签约采购方范围是已确认目标，尚未证明所有材料级查找已实现，不新增外键、持久化汇总列或首页卡片。
+
+```mermaid
+flowchart TD
+  M["同一材料的价格比较"] --> Q["展示各家<br/>包含未签约报价"]
+  Q --> S["分别标明三来源<br/>未签约询价 / 合同 / 送货"]
+  S -.-> U["综合比较尚未实现<br/>独立报价目标尚未接线"]
+```
 
 ### 4.6 施工进度与成本对比（schedule-progress.md）
 
@@ -1817,7 +2592,7 @@ interface FilePayload {
 | 工序计划应完成率 | `clamp((today − plannedStart) / (plannedFinish − plannedStart), 0, 1)` |
 | 提前/延后天数 | `(实际完成率 − 计划应完成率) × durationDays`（分组/项目行按子工序工期加权） |
 | 项目目标成本（按科目） | `SELECT cost_category, SUM(amount) FROM target_cost_items ti JOIN target_costs t ON ti.target_cost_id=t.id WHERE t.project_id=? AND t.is_baseline=1 AND t.status='submitted' AND t.deleted_at IS NULL AND ti.deleted_at IS NULL GROUP BY cost_category`；草稿基线不进入正式控制 |
-| 项目实际成本（按科目） | 专业分包/合同劳务/材料/机械/其他=对应已确认支出结算；工人工资=已发放工资快照；费用报销=已确认报销。付款和送货单不重复计入成本 |
+| 项目实际成本（按科目） | 专业分包/合同劳务/材料/机械/其他=对应已确认支出结算；工人工资=§2.6/P4 有效实际净额；费用报销=已确认报销。付款和送货单不重复计入成本 |
 | 项目已签/已付（按科目） | 已签=正式支出合同主额 + 非草稿补充协议；已付=已确认 `payment_records` 经付款申请分摊到合同后按 `contracts.cost_category` 聚合。无合同归属的支付不得按用途文本猜入成本分类 |
 | 项目支出合同关系 | 主合同、`contract_supplements`、`subcontract_change_orders`、`expenditure_settlements` 与确认支付均以 canonical `contracts.id` 串联，并同时校验 `project_id`；详情页不按名称、金额或分供方文本补关系 |
 | 成本偏差率 | `(实际 − 目标) / 目标`（科目级与合计级） |
@@ -1833,16 +2608,96 @@ interface FilePayload {
 | 分项毛利 | (合同单价 − 班组分项单价) × 量（现场量未核定用暂估量预估） |
 | 月度报量草稿行 | 按报量阶段映射筛当月 `unit_stage_completions.completed_at`，连接户型模板现场量 × 合同单价 → `monthly_statement_lines.auto_qty`；同一分项映射多阶段不得重复计量 |
 
+<a id="104-动态成本与合同付款"></a>
+
+### 4.8 动态成本与合同付款
+
+```text
+动态成本 =
+  Σ已确认支出结算.total_amount（按合同 cost_category 五类）
+  + Σ工资有效实际事实.有符号金额（原发放、真实补退及有效错记冲销）
+  + Σ费用报销明细.amount（仅头 status='confirmed' 且头/明细均未软删）
+
+动态效益 = 客户已确认收入 - 动态成本
+动态效益率 = 动态效益 / 客户已确认收入
+```
+
+上式为既定三类来源口径，不证明所有读面已接通。旧[成本聚合](../../app/lib/project/cost-control.ts)仍只取已发工资头 `actual_amount`，中央项目另附 `payrollActual` 不证明完整成本已纳入 P4 补退/冲销净额；接入按各自证据核实。新增独立合同外运费按[费用链定义](#contract-freight-treatment)单列归“其他支出”，无合同费用不能继续靠 `contracts.kind` 派生类别；新增来源及归集未接线时声明缺口。员工报销清偿已有费用只引用原费用，不再加第二份成本；现有确认报销聚合尚无完整清偿引用，不能声称已自动去重。管理费分类看[原成本来源](#management-fee-sources)，不在动态成本之外再次加管理费合计。
+
+客户确认收入尚未取得时，动态效益和动态效益率返回 `pending`，不得用施工合同额、项目收款或支出金额代替；客户确认收入为 0 时，动态效益率不做除法并按完整性契约返回状态。
+
+合同付款只统计：
+
+```text
+Σ已确认 payment_record 分摊
+WHERE payment_application.contract_id IS NOT NULL
+GROUP BY contract.cost_category
+```
+
+禁止：
+
+- 用合同金额补空结算；
+- 用付款申请金额或支付记录金额补动态成本；
+- 用送货单金额与材料结算重复计成本；
+- 根据付款用途文本推断合同分类。
+
+<a id="105-经营汇总完整性"></a>
+
+### 4.9 经营汇总完整性
+
+经营汇总 API 的每个指标返回：
+
+```ts
+interface OperatingMetric {
+  value: number | null
+  status: 'complete' | 'partial' | 'pending' | 'not_applicable' | 'undefined'
+  missingSources: string[]
+  asOf: string
+  drilldown: { entity: string, filter: Record<string, string> } | null
+}
+```
+
+含义：
+
+- `complete`：所需来源均已纳入；
+- `partial`：已有部分金额，但至少一个组成来源缺失；
+- `pending`：应有来源尚未取得，不返回伪造 0；
+- `not_applicable`：本期明确不统计，例如库存；
+- `undefined`：业务公式尚未定义，例如资金效能。
+
+<a id="106-资金计算"></a>
+
+### 4.10 资金计算
+
+```text
+总流入 = Σ范围内唯一有效实际流入
+  来源包括：合同/其他收款、往来收款、保证金及备用金实际退回
+
+总流出 = Σ范围内唯一有效实际流出（含真实退回/冲销的有符号影响）
+  来源包括：确认支付、工资有效实际净额、往来付款、保证金实际缴纳、备用金实际拨付
+  不包含：付款/备用金/保证金申请额、仅确认成本、合同记取额
+
+收支差额 = 总流入 - 总流出
+工程款余缺 = 项目合同收款 - 合同类支付记录
+```
+
+首个样本的迁移前显示值只在[睿璟验收清单](../migration/ruijing-acceptance.md)维护。系统按实体重新派生；差异进入对账，不反写静态值。
+
+以上是完整资金目标，不是全部来源已接通的声明。范围固定真实项目或公司、我方主体及截止时间；按原实际记录稳定身份及明确跨域引用去重，保证金/备用金若已在确认支付或往来中记录，只分类一次，不再另加。备用金申请是待办，不是实际拨付；同一付款申请、费用/结算和实付不能都进入现金。管理人员既有工资支付、仓储已确认支付与员工垫款清偿也沿原现金来源一次归集，管理费实际成本合计不再另扣；其他收款性质和真实付款人直达[收款定义](#receipt-other-sources)。
+
+普通收款按当前有效记录，不新增 `confirm` 动作；工资只消费同来源有效实际收付净额。其他收款、管理费完整归属、保证金及备用金的真实来源/跨域关系尚未完整接入，缺源保持未知及不完整提示，不补 0，不将 §4.1 的局部已知余额称为本式完整收支差额。此为目标归集规则，不能按金额或备注相同猜两条现金记录是同一笔。
+
 ---
 
 ## § 5 SQLite 建表顺序
 
-按外键依赖排序，先建被引用的表；同批次内仍按下列先后执行：
+以下保留来源模型的依赖分组，不是完整可执行建表计划：同组仍有父子依赖，循环引用须按已有迁移处理。`construction_contracts` 等旧表仅为恢复来源，物资目标表/关系未落地者不能按旧清单再建。实际顺序以版本化迁移为准，不修改已发布迁移。
 
 ```
 第 1 批（无外键依赖）
-  customers, suppliers, bank_codes, crews
-  company_expense_contracts, stock_checks, import_batches
+  customers, suppliers, crews
+  company_expense_contracts, stock_checks
+  bank_codes（旧字典设计，未查得建表）
   schedule_process_libraries, invoice_export_settings
 
 第 2 批（只依赖第 1 批）
@@ -1861,7 +2716,8 @@ interface FilePayload {
   material_requisitions, material_arrivals, material_uses
   owner_material_controls, owner_material_requisitions, owner_material_arrivals
   owner_material_uses, owner_material_directs, delivery_records, project_aliases
-  import_source_refs, reconciliation_issues
+  import_batches, reconciliation_issues
+  import_source_refs（追溯目标，尚未建表）
   buildings, schedule_groups, target_costs, items
   penalty_records
   construction_stages, house_type_templates, monthly_statements
@@ -1900,12 +2756,14 @@ Issue #116 的实现迁移分成 F1→F5 五个可独立验收批次（§2.10.1�
 
 ## § 6 索引建议
 
+以下为来源 SQLite 的索引摘要，不是全库执行脚本；旧表索引仅供迁移/恢复，不能覆盖 §2 的目标关系或中央领域约束。物理命名与过滤条件需沿版本化迁移核对。
+
 ```sql
 -- 高频查询：按项目查所有单据
-CREATE INDEX idx_project_suppliers_proj ON project_suppliers(projectId);
-CREATE INDEX idx_project_suppliers_sup ON project_suppliers(supplierId);
-CREATE INDEX idx_expenditure_contracts_proj ON expenditure_contracts(projectId);
-CREATE INDEX idx_expenditure_contracts_sup ON expenditure_contracts(supplierId);
+CREATE INDEX idx_project_suppliers_proj ON project_suppliers(project_id);
+CREATE INDEX idx_project_suppliers_sup ON project_suppliers(supplier_id);
+CREATE INDEX idx_expenditure_contracts_proj ON expenditure_contracts(project_id);
+CREATE INDEX idx_expenditure_contracts_sup ON expenditure_contracts(supplier_id);
 CREATE INDEX idx_payment_applications_proj ON payment_applications(project_id);
 CREATE INDEX idx_payment_applications_sup ON payment_applications(supplier_id);
 CREATE INDEX idx_contract_supplements_contract ON contract_supplements(contract_id);
@@ -1922,6 +2780,7 @@ CREATE INDEX idx_praa_record ON payment_record_application_allocations(payment_r
 CREATE INDEX idx_praa_application ON payment_record_application_allocations(payment_application_id);
 CREATE INDEX idx_expense_reimbursements_project ON expense_reimbursements(project_id, status);
 CREATE INDEX idx_import_batches_project ON import_batches(project_id);
+-- 尚未建表的追溯目标建议索引，不是现有物理索引。
 CREATE INDEX idx_import_source_refs_batch ON import_source_refs(import_batch_id);
 CREATE INDEX idx_reconciliation_issues_batch ON reconciliation_issues(import_batch_id, status);
 CREATE UNIQUE INDEX uq_pasa_source ON payment_application_settlement_allocations(payment_application_id, settlement_id) WHERE deleted_at IS NULL;
@@ -1946,8 +2805,7 @@ CREATE INDEX idx_current_transactions_project_direction
 CREATE UNIQUE INDEX uq_payment_records_bank_serial
   ON payment_records(bank_serial_no)
   WHERE deleted_at IS NULL
-    AND confirmation_status = 'confirmed'
-    AND bank_serial_no <> '';
+    AND TRIM(bank_serial_no) <> '';
 CREATE INDEX idx_expense_reimbursement_lines_head
   ON expense_reimbursement_lines(reimbursement_id);
 CREATE INDEX idx_material_requisitions_project ON material_requisitions(project_id);
@@ -1967,7 +2825,7 @@ CREATE INDEX idx_owner_penalties_project ON owner_penalties(project_id);
 CREATE INDEX idx_subcontract_changes_project ON subcontract_change_orders(project_id);
 
 -- 证照查询
-CREATE INDEX idx_supplier_credentials_sup ON supplier_credentials(supplierId);
+CREATE INDEX idx_supplier_credentials_sup ON supplier_credentials(supplier_id);
 CREATE INDEX idx_supplier_credential_requirements_supplier
   ON supplier_credential_requirements(supplier_id);
 CREATE UNIQUE INDEX uq_supplier_credential_requirement
@@ -1984,10 +2842,10 @@ CREATE UNIQUE INDEX uq_file_refs_delivery_source
   WHERE deleted_at IS NULL AND owner_type = 'delivery_record' AND category = 'source';
 
 -- 合同子表
-CREATE INDEX idx_supplement_agreements_contract ON supplement_agreements(contractId);
+CREATE INDEX idx_supplement_agreements_contract ON supplement_agreements(contract_id);
 
 -- 阶段任务
-CREATE INDEX idx_phase_tasks_proj ON phase_tasks(projectId);
+CREATE INDEX idx_phase_tasks_proj ON phase_tasks(project_id);
 
 -- 区域树与工程量
 CREATE INDEX idx_buildings_project ON buildings(project_id);
@@ -2005,6 +2863,7 @@ CREATE UNIQUE INDEX uq_item_code ON items(project_id, code) WHERE deleted_at IS 
 CREATE INDEX idx_ht_project ON house_type_templates(project_id);
 CREATE UNIQUE INDEX uq_ht_code ON house_type_templates(project_id, code) WHERE deleted_at IS NULL;
 CREATE INDEX idx_hti_room ON house_type_template_items(room_id);
+CREATE INDEX idx_hti_boq_line ON house_type_template_items(boq_line_id); -- 来源 v15
 CREATE INDEX idx_hti_item ON house_type_template_items(item_id);
 CREATE UNIQUE INDEX uq_hti_room_item ON house_type_template_items(room_id, item_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_stages_project ON construction_stages(project_id);
@@ -2039,14 +2898,15 @@ CREATE INDEX idx_unit_assignment_scopes_deleted ON unit_assignment_scopes(delete
 CREATE INDEX idx_unit_stage_completions_deleted ON unit_stage_completions(deleted_at) WHERE deleted_at IS NOT NULL;
 
 -- 施工进度
-CREATE INDEX idx_schedule_groups_proj ON schedule_groups(projectId);
-CREATE INDEX idx_sgb_group ON schedule_group_buildings(groupId);
-CREATE INDEX idx_schedule_tasks_proj ON schedule_tasks(projectId);
-CREATE INDEX idx_schedule_tasks_group ON schedule_tasks(groupId);
-CREATE INDEX idx_schedule_tasks_stage ON schedule_tasks(stageId);
-CREATE INDEX idx_task_deps_pred ON task_dependencies(predId);
-CREATE INDEX idx_task_deps_succ ON task_dependencies(succId);
-CREATE INDEX idx_task_item_map_task ON task_item_map(taskId);
+CREATE INDEX idx_schedule_groups_proj ON schedule_groups(project_id);
+CREATE INDEX idx_sgb_group ON schedule_group_buildings(group_id);
+CREATE INDEX idx_schedule_tasks_proj ON schedule_tasks(project_id);
+CREATE INDEX idx_schedule_tasks_group ON schedule_tasks(group_id);
+CREATE INDEX idx_schedule_tasks_stage ON schedule_tasks(stage_id);
+CREATE INDEX idx_task_deps_pred ON task_dependencies(pred_id);
+CREATE INDEX idx_task_deps_succ ON task_dependencies(succ_id);
+CREATE INDEX idx_task_item_map_task ON task_item_map(task_id);
+CREATE INDEX idx_task_item_map_boq_line ON task_item_map(boq_line_id); -- 来源 v15
 CREATE INDEX idx_schedule_floor_plans_task ON schedule_task_floor_plans(task_id);
 CREATE INDEX idx_schedule_floor_plans_floor ON schedule_task_floor_plans(floor_id);
 CREATE INDEX idx_schedule_floor_plans_item ON schedule_task_floor_plans(item_id);
@@ -2088,25 +2948,26 @@ CREATE UNIQUE INDEX uq_boq_change_order_ledger ON boq_change_orders(ledger_id)
   WHERE deleted_at IS NULL AND ledger_id IS NOT NULL;
 
 -- 月度报量
-CREATE INDEX idx_monthly_statements_project_period ON monthly_statements(project_id, period_no);
+CREATE INDEX idx_monthly_statements_project_month ON monthly_statements(project_id, month);
 CREATE INDEX idx_monthly_statement_lines_statement ON monthly_statement_lines(statement_id);
-CREATE UNIQUE INDEX uq_monthly_statement_contract_period ON monthly_statements(contract_id, period_no)
-  WHERE deleted_at IS NULL;
+-- v24 来源唯一键按 month；period_no 是表单期次列，不把它替换成物理唯一键。
+CREATE UNIQUE INDEX uq_monthly_statement_contract_month ON monthly_statements(contract_id, month)
+  WHERE deleted_at IS NULL AND contract_id IS NOT NULL AND month <> '';
 
 -- 送货单
-CREATE INDEX idx_delivery_proj ON delivery_records(projectId);
-CREATE INDEX idx_delivery_sup ON delivery_records(supplierId);
-CREATE INDEX idx_delivery_lines_rec ON delivery_lines(deliveryRecordId);
+CREATE INDEX idx_delivery_proj ON delivery_records(project_id);
+CREATE INDEX idx_delivery_sup ON delivery_records(supplier_id);
+CREATE INDEX idx_delivery_lines_rec ON delivery_lines(delivery_record_id);
 -- 去重自然键（2026-07-06 定：全 ID 化，不用工地原文本；supplierId 为 NULL 不参与去重，本就带「缺公司」问题标记）
-CREATE UNIQUE INDEX uq_delivery_natural ON delivery_records(projectId, supplierId, orderNo) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX uq_delivery_natural ON delivery_records(project_id, supplier_id, order_no) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX uq_project_alias ON project_aliases(alias) WHERE deleted_at IS NULL;
 
 -- 工资与考勤
-CREATE INDEX idx_ws_proj ON wage_statements(projectId);
-CREATE INDEX idx_wsl_statement ON wage_statement_lines(statementId);
-CREATE INDEX idx_att_worker ON attendance_records(workerId);
+CREATE INDEX idx_ws_proj ON wage_statements(project_id);
+CREATE INDEX idx_wsl_statement ON wage_statement_lines(statement_id);
+CREATE INDEX idx_att_worker ON attendance_records(worker_id);
 
--- 银行行号（idx_bank_codes_name / idx_bank_codes_brand_city 见 base-worker.md §五）
+-- bank_codes 仅旧字典设计登记；未查得物理表/seed/索引，不引用已退役的 base-worker.md §五。
 ```
 
 ---
@@ -2131,7 +2992,7 @@ CREATE INDEX idx_att_worker ON attendance_records(workerId);
 1. 迁移为一次性操作，成功后标记 `migration_done` flag
 2. 旧数据保留不删除（用户可手动清理）
 3. 旧 `Supplier.attachments[]` 内嵌数组 → 拆为 `supplier_credentials` 多行
-4. 旧 `Supplier.purchases[]` / `payments[]` → 保留在 `suppliers` 表的 JSON 字段中（兼容），新数据走独立表
+4. 旧 `Supplier.purchases[]` / `payments[]` 留在 `suppliers` JSON 的说法为历史方案，当前 schema/迁移/adapter 未有对应列或读取实现；恢复时须核对原数据与不可变备份，不能宣称已执行此映射，更不能据此伪造当前票款。
 5. 区域树/工程量/施工进度/目标成本等表**无上述 localStorage 旧数据来源**，不参与这条旧 key 映射；这不等于它们不参与后续 SQLite → 中央迁移。浏览器正式 `production` 不 seed，确定性工程量、排程和工序样本只允许在授权演示来源使用。
 6. 旧 `credential_status` 按新必需资料和有效期重新计算：缺失/过期 → `incomplete`；齐全 → `reviewing`。没有人工核验时间/备注凭证的旧自动 `qualified` 不得迁为人工合格，也应进入 `reviewing`；旧 `rejected` 仅在有明确退回凭证时保留，否则同样重算。迁移不得伪造 `credential_reviewed_at` 或核验备注。
 
@@ -2195,9 +3056,9 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 
 1. 新增实体时必须同步更新本文件的 § 2 实体清单、§ 3 外键索引、§ 5 建表顺序、§ 6 索引
 2. 各模块设计文档只定义业务字段，实体间关系统一在本文件管理
-3. 所有业务表的删除操作使用软删除（§ 8.1），并记录操作日志（§ 8.2）
-4. 字段命名规范：camelCase（TypeScript 侧）→ snake_case（SQLite 列名），ORM 层自动转换
-5. 所有业务实体 id 使用 `{表缩写}_{timestamp36}_{seq36}` 格式（如 `sup_m1abc_0`）；不参与业务关联的本机单例设置表可在 §2 明确登记例外并使用固定主键 `default`（当前仅 `ocr_settings`、`invoice_export_settings`）
+3. 通用本地删除/日志基础见 §8；实体已定义的专用审计、脱敏、不可变事件、快照及冲销/更正规则优先。不能因通则改用整行 `operation_logs`，也不能给受保护事实补通用删除/撤回入口；直接遵守 §2 各实体的例外。
+4. 新增 TypeScript / SQLite 字段通常分别使用 camelCase / snake_case，由既有 adapter/mapper 显式映射；不假定存在 ORM 自动转换。真实旧混合列按来源保真，不借文档整理改名。
+5. `{表缩写}_{timestamp36}_{seq36}`（如 `sup_m1abc_0`）为旧本地 `generateId` 来源格式；中央及本机 owner 的正式 ID 由各领域服务分配，客户端按不透明稳定值处理，不能用名称、时间戳或草稿 ID 替代正式主外键。不参与业务关联的本机单例设置表可在 §2 登记固定主键 `default`（当前 `ocr_settings`、`invoice_export_settings`）；命令身份规则见 [COMMANDS](./COMMANDS.md)。
 6. 遵守 [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md)：用户可编辑业务字段默认持久化（标量列 / lookup 外键 / grid 子表 / file_refs）；`readonly + compute`、`_` 展示字段和纯聚合不存。人工复核后具有审计意义的值例外，例如 `delivery_lines.amount` 必须独立存储，不能在保存时重算覆盖
 7. 新增支出类实体必须定义 **costCategory 归集口径**（专业分包/合同劳务/材料/机械/工人工资/费用报销/其他，§ 2.8），否则成本对比（§ 4.6）会漏项
 8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量矩阵以 **[ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md)** 为准：量=`house_type_template_items`、责任=`unit_assignments`、完成=`unit_stage_completions`，稳定阶段=`construction_stages`
@@ -2206,325 +3067,3 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 11. 页面读模型、DTO 标量、关系引用、空错权限和 adapter 边界统一看 [`READ-MODELS.md`](./READ-MODELS.md)；DTO 中出现可观察字段不等于授权新增数据库列，写模型和 canonical 外键仍须先在本文件裁定
 
 ---
-
-## § 10 通用项目经营汇总增补（2026-07-23）
-
-> 来源：车陂商业大楼项目迁移分析。该项目只是首个验收样本，以下模型是通用规则。与前文冲突时，本节及 ADR 0015 的较新决策优先。
-
-### 10.1 合同分类与补充协议
-
-`contracts.kind/sub_kind` 继续承担界面分组，新增稳定经营维度和迁移留痕：
-
-```sql
-ALTER TABLE contracts ADD COLUMN cost_category TEXT DEFAULT '';
--- '专业分包' | '合同劳务' | '材料' | '机械' | '其他'
-
-ALTER TABLE contracts ADD COLUMN legacy_type TEXT DEFAULT '';
-ALTER TABLE contracts ADD COLUMN classification_state TEXT DEFAULT 'classified';
--- 'classified' | 'unclassified' | 'no_contract'
-ALTER TABLE contracts ADD COLUMN signer_name TEXT DEFAULT '';
-ALTER TABLE contracts ADD COLUMN contact_phone TEXT DEFAULT '';
-ALTER TABLE contracts ADD COLUMN tax_rate REAL;
-```
-
-`kind` 目标值扩展为 `'施工' | '分包' | '材采' | '其他支出'`。映射：
-
-- 专业分包：`kind='分包', sub_kind='专业'`
-- 合同劳务：`kind='分包', sub_kind='劳务'`
-- 材料：`kind='材采'`
-- 机械、其他：`kind='其他支出'`
-
-施工和支出合同的新补充协议均不得继续复用只挂 `construction_contracts` 的旧 `supplement_agreements`；统一引用 canonical `contracts`：
-
-```sql
-CREATE TABLE contract_supplements (
-  id             TEXT PRIMARY KEY,
-  contract_id    TEXT NOT NULL REFERENCES contracts(id),
-  no             TEXT DEFAULT '',
-  name           TEXT NOT NULL,
-  content        TEXT DEFAULT '',
-  amount         REAL NOT NULL DEFAULT 0,
-  sign_date      TEXT DEFAULT '',
-  status         TEXT NOT NULL DEFAULT '有效',
-  external_ref   TEXT DEFAULT '',
-  note           TEXT DEFAULT '',
-  created_at     TEXT,
-  updated_at     TEXT,
-  deleted_at     TEXT
-);
-
-CREATE INDEX idx_contract_supplements_contract
-  ON contract_supplements(contract_id, deleted_at);
-```
-
-合同有效金额=`contracts.amount + Σ有效 contract_supplements.amount`；支出合同经营汇总使用同一口径。`contracts.changed/settled/invoiced/paid` 的存量静态值只能用于迁移对账；新读路径分别从补充协议、变更/结算、发票和支付分摊聚合。
-
-### 10.2 支付记录及付款申请分摊
-
-普通合同付款的权威金额只保存于 `payment_records.amount`。目标表补齐识别、审核和银行流水字段：
-
-```sql
--- 现有表按 SQLite 重建表迁移补齐；此处列出目标增量
-ALTER TABLE payment_records ADD COLUMN supplier_id TEXT REFERENCES suppliers(id);
-ALTER TABLE payment_records ADD COLUMN payee_name TEXT DEFAULT '';
-ALTER TABLE payment_records ADD COLUMN purpose TEXT DEFAULT '';
-ALTER TABLE payment_records ADD COLUMN source TEXT DEFAULT 'manual';
--- 'image_ocr' | 'manual' | 'excel_import'
-ALTER TABLE payment_records ADD COLUMN recognition_status TEXT DEFAULT 'manual';
-ALTER TABLE payment_records ADD COLUMN confirmation_status TEXT DEFAULT 'draft';
--- 'draft' | 'needs_review' | 'confirmed'
-ALTER TABLE payment_records ADD COLUMN bank_serial_no TEXT DEFAULT '';
-ALTER TABLE payment_records ADD COLUMN ocr_payload TEXT DEFAULT '';
-ALTER TABLE payment_records ADD COLUMN field_confidence TEXT DEFAULT '';
-ALTER TABLE payment_records ADD COLUMN confirmed_by TEXT DEFAULT '';
-ALTER TABLE payment_records ADD COLUMN confirmed_at TEXT;
-ALTER TABLE payment_records ADD COLUMN external_ref TEXT DEFAULT '';
-ALTER TABLE payment_records ADD COLUMN updated_at TEXT;
-ALTER TABLE payment_records ADD COLUMN deleted_at TEXT;
-ALTER TABLE payment_applications ADD COLUMN external_ref TEXT DEFAULT '';
-```
-
-旧 `payment_records.payment_application_id` 退出写入路径，改用分摊表：
-
-```sql
-CREATE TABLE payment_record_application_allocations (
-  id                     TEXT PRIMARY KEY,
-  payment_record_id      TEXT NOT NULL REFERENCES payment_records(id),
-  payment_application_id TEXT NOT NULL REFERENCES payment_applications(id),
-  allocated_amount       REAL NOT NULL CHECK (allocated_amount > 0),
-  note                   TEXT DEFAULT '',
-  created_at             TEXT,
-  updated_at             TEXT,
-  deleted_at             TEXT
-);
-
-CREATE UNIQUE INDEX uq_payment_record_application_allocation
-  ON payment_record_application_allocations(payment_record_id, payment_application_id)
-  WHERE deleted_at IS NULL;
-CREATE INDEX idx_praa_record
-  ON payment_record_application_allocations(payment_record_id, deleted_at);
-CREATE INDEX idx_praa_application
-  ON payment_record_application_allocations(payment_application_id, deleted_at);
-```
-
-确认支付记录的事务约束：
-
-1. 金额、日期、收款方和凭证均已人工核对；
-2. `Σ该支付有效分摊.allocated_amount = payment_records.amount`；
-3. 同一 `bank_serial_no` 在有效记录中不得重复；
-4. OCR 置信度不替代人工确认；
-5. 未确认支付不进入已付、合同付款或现金流汇总。
-
-付款申请批复来源（[#439 / PAY-07](https://github.com/zodea/crm-new/issues/439)）：
-
-- `approved_amount = NULL` 表示未填写，明确录入 `0` 表示批复零元；只有未填写时才回退申请金额作为可付上限。新申请默认保存 `NULL`，不得经过 `|| 0` 或默认值压成零。
-- `approved_amount_origin` 由保存域维护：新建及明确编辑批复后为 `user-entry`，迁移前存量为 `legacy`。修改批复必须携带与金额一致的明确输入意图；仅改备注、整单保存或客户端声称来源已确认，不会升级存量来源。金额、来源、分摊和附件沿用同一保存事务，取消或保存失败不留下来源变更。
-- v21/v22 曾把空值、缺列和非法负值压成零，无法从零值、状态、备注或时间戳恢复当时批复事实。v49 仅改为可空列并给旧记录添加来源标记，原始金额、银行记录、三类分摊、索引及约束保持；不批量猜测旧零的含义。
-- `legacy + 0` 读为“历史批复待核验”，批复金额、依赖它的余额及完整合计为未知；原存储零仍保留。旧非零批复仍按已有金额读取，已确认银行实付独立显示，不为对平批复而修改。
-- 历史未知批复的新支付确认政策仍由 [PAY-08 待裁定项](https://github.com/zodea/crm-new/issues/413#issuecomment-5616431545) 决定。PAY-07 保留既有登记与确认操作的申请额兼容上限，并在读侧显示未知；该技术兼容不构成批准申请全额的业务裁定。明确重填后使用新金额语义。
-
-付款申请派生字段（批复来源已明确，或批复为未填写时）：
-
-```text
-paid_amount =
-  Σ payment_record_application_allocations.allocated_amount
-  WHERE payment_record.confirmation_status = 'confirmed'
-
-actual_payment = paid_amount
-unpaid_amount = max(COALESCE(approved_amount, apply_amount) - paid_amount, 0)
-```
-
-历史待核验批复的 `unpaid_amount` 为 `NULL`，不能使用上式回退申请额并将结果冒充已知余额；登记动作的兼容回填与读侧金额事实分开。当前实现覆盖本地付款表单、详情、付款管理、分供方/项目分供方读投影及其他支出结算关联源单，不代表通用付款中央写命令或生产持久化已经接管。
-
-`payment_applications.paid_amount/actual_payment` 旧列在兼容期只读；迁移完成后移除。分摊金额写入、支付确认、撤回及操作日志必须在同一事务内。
-
-### 10.3 工人工资与费用报销
-
-工人工资按 #117 的负责人请款簿管理。工资单通过“确认发放”动作进入“已发放”状态时，同时确认成本和已支付事实，不生成逐工人支付记录或合同付款申请：
-
-```text
-工资动态成本 = Σ 工资有效实际事实的有符号金额（稳定身份去重）
-
-工资资金流出 = 同一集合
-```
-
-工资金额必须保存发放时快照；工程量或人员资料后改不追溯历史发放。
-
-费用报销的目标头表与明细表见 §2.10.4。`project_id` 可空，空值明确表示公司开支；总额始终由有效 `expense_reimbursement_lines.amount` 聚合，头表不保存第二份可编辑金额。
-
-F3 迁移将旧 `expense_reimbursements.amount > 0` 的记录转换为一条 `expense_item='迁移汇总'` 的明细并记录来源追溯；旧金额为空或资料不完整时写 `reconciliation_issues`，不得补 0。只有 `status='confirmed'` 的报销进入动态成本。
-
-### 10.4 动态成本与合同付款
-
-```text
-动态成本 =
-  Σ已确认支出结算.total_amount（按合同 cost_category 五类）
-  + Σ工资有效实际事实.有符号金额（原发放、真实补退及有效错记冲销）
-  + Σ费用报销明细.amount（仅头 status='confirmed' 且头/明细均未软删）
-
-动态效益 = 客户已确认收入 - 动态成本
-动态效益率 = 动态效益 / 客户已确认收入
-```
-
-客户确认收入尚未取得时，动态效益和动态效益率返回 `pending`，不得用施工合同额、项目收款或支出金额代替；客户确认收入为 0 时，动态效益率不做除法并按完整性契约返回状态。
-
-合同付款只统计：
-
-```text
-Σ已确认 payment_record 分摊
-WHERE payment_application.contract_id IS NOT NULL
-GROUP BY contract.cost_category
-```
-
-禁止：
-
-- 用合同金额补空结算；
-- 用付款申请金额或支付记录金额补动态成本；
-- 用送货单金额与材料结算重复计成本；
-- 根据付款用途文本推断合同分类。
-
-### 10.5 经营汇总完整性
-
-经营汇总 API 的每个指标返回：
-
-```ts
-interface OperatingMetric {
-  value: number | null
-  status: 'complete' | 'partial' | 'pending' | 'not_applicable' | 'undefined'
-  missingSources: string[]
-  asOf: string
-  drilldown: { entity: string, filter: Record<string, string> } | null
-}
-```
-
-含义：
-
-- `complete`：所需来源均已纳入；
-- `partial`：已有部分金额，但至少一个组成来源缺失；
-- `pending`：应有来源尚未取得，不返回伪造 0；
-- `not_applicable`：本期明确不统计，例如库存；
-- `undefined`：业务公式尚未定义，例如资金效能。
-
-### 10.6 资金计算
-
-```text
-总流入 =
-  已确认项目收款 + 其他收款 + 往来收款
-  + 保证金退回 + 备用金退回
-
-总流出 =
-  已确认支付记录 + 已确认工资发放 + 往来付款
-  + 保证金缴纳 + 备用金申请
-
-收支差额 = 总流入 - 总流出
-工程款余缺 = 项目合同收款 - 合同类支付记录
-```
-
-首个样本的迁移前显示值只在[睿璟验收清单](../migration/ruijing-acceptance.md)维护。系统按实体重新派生；差异进入对账，不反写静态值。
-
-### 10.7 导入追溯与差异表
-
-#423 项目 Excel 切片在同一中央项目事实内保存 `importSource` 回执，命令和表单回读共享它；不向浏览器 SQLite 写正式项目，也不新增平行业务表。当前为可重置内存实例中的映射：`fileName → source_file`、`fileDigest → source_hash`（原文件字节 SHA-256）、`sheetName → source_sheet`、`rowNumber → source_row`（原 Sheet 的 1 起始行号）、`externalRef → source_key`、`rawSnapshot → raw_snapshot`（包含未映射源列的解析值）。项目 ID 为中央分配的稳定 ID；客户关系使用中央正式客户 ID。
-
-原 Excel 文件字节仅在当前浏览器解析，不作为中央附件上传；文件名、摘要、Sheet、行号和源行快照随成功行保留。下载的拒绝清单携来源定位与原因，未成功行不冒充正式项目。当前回执仅对本 Excel 链路已保存行去重，不解释既有受控迁移的 `legacyId → serverId` 映射；处理历史整库身份必须沿既有迁移边界。防重与冲突契约见 [COMMANDS 项目 Excel 导入](./COMMANDS.md#项目-excel-导入423)。下列持久化表的实际部署、唯一约束、重启与备份恢复仍由 #416 验收，本切片没有执行迁移。
-
-```sql
-CREATE TABLE import_batches (
-  id             TEXT PRIMARY KEY,
-  project_id     TEXT REFERENCES projects(id),
-  source_file    TEXT NOT NULL,
-  source_hash    TEXT NOT NULL,
-  status         TEXT NOT NULL DEFAULT 'draft',
-  created_at     TEXT,
-  completed_at   TEXT
-);
-
-CREATE TABLE import_source_refs (
-  id              TEXT PRIMARY KEY,
-  import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
-  entity_type     TEXT NOT NULL,
-  entity_id       TEXT NOT NULL,
-  source_sheet    TEXT NOT NULL,
-  source_row      INTEGER NOT NULL,
-  source_key      TEXT DEFAULT '',
-  raw_snapshot    TEXT DEFAULT ''      -- JSON 对象；保留未进入业务表的源列及原始文本
-);
-
-CREATE TABLE reconciliation_issues (
-  id              TEXT PRIMARY KEY,
-  import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
-  project_id      TEXT REFERENCES projects(id), -- 允许为空：实体映射失败时可能尚无合法项目
-  entity_type     TEXT DEFAULT '',
-  entity_id       TEXT DEFAULT '',
-  field_name      TEXT DEFAULT '',
-  source_value    TEXT DEFAULT '',
-  metric_key      TEXT NOT NULL,
-  source_ref      TEXT DEFAULT '',
-  excel_value     REAL,
-  system_value    REAL,
-  difference      REAL,
-  attribution     TEXT NOT NULL,
-  -- 'project' | 'excel' | 'mapping' | 'missing_source'
-  status          TEXT NOT NULL DEFAULT 'open',
-  resolution      TEXT DEFAULT '',
-  created_at      TEXT,
-  resolved_at     TEXT
-);
-```
-
-`entity_type + entity_id + field_name + source_value` 定位无法进入真实外键的源值；`project_id` 只在已有合法项目归属时填写，不创建“公司”或“待核对”等虚拟项目补空。
-
-导入有效行以业务字段判断，不以 Excel `usedRange`、序号或公式存在判断。所有金额在应用边界统一 `round2`；在全库迁移为整数分之前，禁止直接比较浮点绝对相等。
-
-### AX03 中央项目罚扣与独立抵扣事实
-
-`project_penalty` 接管 `penalty_records.source='project'`；现有巡检/验收等其他来源不改归属。浏览器正式头事实、整改及抵扣由同一中央 command 权威管理，旧 SQLite 只用于受控备份/迁移；不增加平行罚扣主表。中央实例部署边界见 ADR 0020。
-
-- 罚扣头保留项目、可空分供方/分包合同/班组、日期、金额、事由、扣除方式、最新整改期限/说明、状态及附件身份。迁移保留草稿、待抵扣、整改中、自行/委托整改完成和已抵扣状态；缺失历史不伪造。
-- 中央抵扣是独立追加事实：`id, penaltyId, settlementId, amount, actorId, occurredAt, commandId, note`。同一罚扣可向同一结算分次追加；旧 SQLite 活跃关系对唯一约束仅为历史表约束，不限制中央审计。旧 ID、时间与金额按原事实映射；经办或命令未记录保持空值。
-- 中央整改事件独立保存 `id, penaltyId, actorId, occurredAt, deadline, note`，读面只投影当前罚扣的历史。
-- 候选必须是已确认真实分包结算，项目 ID 相同，罚扣已填写的合同和分供方 ID 都必须相同。罚扣至少具备合同或分供方证据；仅项目、班组、名称、金额均不能猜接。合同已填时仍验证合同所属项目和分供方。
-- 罚扣已抵扣额为独立关系金额合计，剩余为罚扣额减已抵扣额；结算抵扣同样按 `settlementId` 聚合。金额正数且最多两位小数，同时不能超过双方余额，不回写罚扣已扣金额副本，也不改结算原金额。写入以双方版本和幂等命令保护。
-- 受控迁移先映射真实结算 ID，再接管抵扣事实；缺失、歧义、归属不符、金额超额或状态矛盾阻断确认。中央读回复用同一事实；回滚按迁移边界撤销接管。甲方罚扣不进入此链。
-
-### AX04 辅助合同中央事实
-
-物理来源保持 `contracts(kind='其他支出')` 与独立 `company_expense_contracts`；不建第二套正式合同表。SQLite v46 为两表补充可空 `party_a / created_by / updated_by / responsible / department`，为公司合同补充可空 `tax_rate / invoice_type`。未知审计、税率、结算或结清状态不反推、不补零。
-
-`invoices` 与 `payment_applications` 新增可空外键 `company_expense_contract_id`，指向公司合同；有该外键时，`contract_id` 和 `project_id` 必须为空，由插入、更新约束共同保证。存量不回填，不以名称、编号、金额或“个人开支”分类猜关联。项目其他支出票款继续使用原 `contract_id`。
-
-中央传输身份为 `(dataOrigin, id, kind)`，`kind` 为 `other_expense / company_expense`。迁移旧键为 `kind:legacyId`，避免两表同 ID 冲突；项目与分供方引用先经核心身份映射。公司合同只保留甲乙方事实文本，项目与分供方 EntityRef 为 null。
-
-- 中央合同头保存专属资料、版本、创建/修改审计；新增和修改操作者取可信业务会话。普通保存保留既有状态，提交草稿进入审批中；不提供虚构审批或结清命令。
-- 金额用 MoneyDTO 表达。含税金额及税率均存在时计算无税额和税额；无税额按两位小数舍入，税额取差。缺失金额或税率保持 null，真实零值保持零。
-- 关联投影按明确外键读取：已归档发票金额、已确认支付的分摊金额、同项目同分供方的已确认支出结算、有效合同增补。增补属于其他支出合同时随辅助合同接管，不再重复进入施工/分包补充协议节点。
-- 累计收票、累计支付、累计结算分别求和；按票应付为收票减支付，按结算应付为结算减支付。其他支出变更后金额为原合同加有效增补；公司合同没有项目结算与增补口径。存在未记录金额的聚合保持 null。
-- 附件仍来自 `file_refs` 的 `contract / company_expense_contract` 所属关系，保留文件 ID、分类、上传人、时间及软删除事实；接管后统一由同一中央命令维护元数据。当前不接管文件字节，不保存本机路径。
-- 受控迁移确认前不接管，准备阶段校验全部候选，任何无效附件或事实使整次准备失败；确认后同源回读，回滚撤销该批接管和相关命令重放缓存。普通正式新建不因迁移回滚被误删。
-
-本切片不创建合同分项、项目其他收入合同或虚拟项目。端到端验证与部署边界见 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md#ax04-辅助合同接管)。
-
-### AX05 其他支出结算中央事实
-
-物理来源仍为 `expenditure_settlements` 的其他支出种类，不新建结算主表或明细表。SQLite v47 仅补充可空 `created_by / updated_by / responsible / department`，旧审计不反推。浏览器通过 `other-settlements` Repository/HTTP/command 接入，中央测试实例不声明生产持久化能力。
-
-- 受控迁移新增 `other_settlements` 与 `other_settlement_sources` 节点，位于 `auxiliary_contracts` 后；后者为真实关联付款申请与支付记录的独立中央源单，使用 `application:旧ID / payment:旧ID` 映射。罚扣沿用 `owner_documents.project_penalty`，其其他支出合同旧 ID 同样使用 `other_expense:` 命名空间，抵扣目标支持统一结算的准确类型。试跑重验合同类型、非草稿状态及项目、分供方一致性，错误关系阻断导入。
-- 结算头只保存资料、含税金额、税率和状态；金额链实时投影，有效抵扣来自 `penalty_settlement_deductions`，申请来自 `payment_application_settlement_allocations`，支付来自 `payment_record_application_allocations` 及已确认 `payment_records`。源单 ID、支付来源申请 ID 均映射中央身份，事实 ID 按结算与种类命名空间保持稳定。金额及有效状态重新读取中央源单及其分配记录，罚扣复用既有中央源，不以迁移时事实副本继续充当正式来源。源单详情通过独立只读 HTTP 请求获取资料、分配、审计及文件元数据。
-- 对明确抵扣其他支出结算的巡检、甲方通知和验收来源罚扣，同样接管到既有中央罚扣实体；`penaltyFacts.origin` 保留原始来源并在源单展示，不改造成手工项目罚扣，也不按名称补接原始来源业务页。
-- 本次金额为含税金额减有效抵扣；可申请为本次金额减有效申请；未付为本次金额减已确认且精确归属的支付。草稿、无效、已删除事实不计入。涉及多结算但无结算级支付分摊时已付/未付为 null，不按比例分配。无有效记录的真实空集合为零；未知集合、未知金额或身份失效保持 null。无税额复用整数分及税率基点舍入。
-- 同一合同的累计结算仅纳入已确认、同项目同分供方结算。前期金额仅纳入早于本单结算日期的记录；日期缺失或同日先后不明时保持未知。合同详情不再持有独立结算快照，而由同一结算源投影。中央身份被移除时关联不继续显示可用。
-- 附件仍归 `file_refs(owner_type='expenditure_settlement')`；中央只保存元数据，不公开本地路径。保存使用服务端 ID、版本与 commandId，重试幂等，旧版本拒绝覆盖；确认后锁定。未知事实或已有下游事实的结算禁止改挂关系，历史空审计在编辑后仍为空。
-
-专属页面与当前源单下钻边界见[页面蓝本](./pages/contract-forms.md#ax05-当前浏览器实现331)，环境边界见 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md#ax05-其他支出结算接管)。材料到货分摊、冲销和虚构结算明细均未引入。
-
-### 工人私密资料与工资名册（#449）
-
-实名和银行字段继续归工人主档，不形成工资私有人事主档。劳动合同事实和照片用途由 `worker_roster_profile_versions` 按 `(worker_id,revision)` 追加：`values_json` 保存签订三态、签订日期、证件照与银行卡照原件身份，另记操作者、实际时间及可选迁入批次。
-
-`worker_roster_assets` 记录独立原件身份、工人 owner、`file_ref_id`、SHA-256、形成时间、旧分类、迁入批次与旧软删除事实。元数据/正文复用 `file_refs/file_payloads`；上传追加身份，当前用途放在工人资料版本中，不能覆盖原件字节。缺正文的旧附件保留为缺口。
-
-`worker_roster_archives` 固定项目、规范工资范围摘要、同范围递增版本和完整 `snapshot_json`；正文记录登记日期、实际归档时间、原工资稳定成员与原姓名、登记时实名字段、资料版本、照片身份/摘要和缺口。历史正文不回写。`worker_roster_receipts` 的工作区/操作者/命令编号唯一，保存请求摘要与回执；核对确认未应用的编号保存取消墓碑，拒绝迟到应用。资料、原件、归档和回执共用工作区 SQL 事务。
-
-`worker_roster_migration_evidence` 以工人稳定身份保存批次、来源指纹和完整来源 JSON。它用于重复确认与受控恢复证明，不是日常可编辑主档。原表没有劳动合同事实时保持未记录，只有明确且唯一有效的照片分类才关联用途；文件路径只保留为原证据，不作为文件读取入口。
-
-归档需要独立 `worker:sensitive:read`；工资读写不自动授予。当前 SQL 由中央测试实例承载，生产持久化不是此表结构的验收结论。迁入和回滚沿受控映射保留原字段与原件，未知用途不猜，日常版本及归档引用不能被重复迁入或回滚覆盖。

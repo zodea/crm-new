@@ -7,22 +7,24 @@ import {
 } from '~/lib/db/data-workspace'
 
 describe('local data workspace boundary', () => {
-  it('keeps production empty and gives demo an isolated seeded snapshot', () => {
-    expect(localDataWorkspace(false)).toEqual({
+  it.each([
+    { case: 'false', input: false, argument2: undefined, expected: {
       snapshotKey: 'production',
       seedDemo: false,
       readOnly: false,
-    })
-    expect(localDataWorkspace(false, true)).toEqual({
+    } },
+    { case: 'false / true', input: false, argument2: true, expected: {
       snapshotKey: 'production',
       seedDemo: false,
       readOnly: true,
-    })
-    expect(localDataWorkspace(true)).toEqual({
+    } },
+    { case: 'true', input: true, argument2: undefined, expected: {
       snapshotKey: 'demo',
       seedDemo: true,
       readOnly: true,
-    })
+    } },
+  ])('keeps production empty and gives demo an isolated seeded snapshot / localDataWorkspace：$case', ({ input, argument2, expected }) => {
+    expect(localDataWorkspace(input, argument2)).toEqual(expected)
   })
 
   it('lets demo reads through but rejects every formal write seam', async () => {

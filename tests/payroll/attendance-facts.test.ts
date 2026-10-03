@@ -53,7 +53,7 @@ it('公开迁入隔离旧考勤仍可定位原图，已知工人保映射但不�
     const hash = createHash('sha256').update(bytes).digest('hex')
     const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, commandId })
     await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('attendance-preflight'), source, backup: null }), session)
-    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('attendance-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: bytes.length, createdAt: new Date().toISOString(), immutable: true } }), session)
+    const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('attendance-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
     await coreMigrationTestInstance.importBatch({ ...envelope('attendance-import'), batchId: batch.batchId }, session)
     await coreMigrationTestInstance.confirm({ ...envelope('attendance-confirm'), batchId: batch.batchId }, session)
     const projectId = batch.mappings.find(row => row.entityType === 'projects')!.serverId

@@ -37,41 +37,39 @@ describe('配置导出：命名规则预览', () => {
     })).toBe('未归属项目_华东建材')
   })
 
-  it('预览即为可写盘的安全文件名', () => {
-    expect(renderNamePreview({
+  it.each([
+    { case: '{ parts: [{ field: \'supplierShortName\' }], extension: \'.pdf\', } / { supplierShortName: \'../华东:建材\', }', input: {
       parts: [{ field: 'supplierShortName' }],
       extension: '.pdf',
-    }, {
+    }, argument2: {
       supplierShortName: '../华东:建材',
-    })).toBe('-华东-建材.pdf')
-
-    expect(renderNamePreview({
+    }, expected: '-华东-建材.pdf' },
+    { case: '{ parts: [{ field: \'supplierShortName\' }], extension: \'pdf\', } / { supplierShortName: \'CON\', }', input: {
       parts: [{ field: 'supplierShortName' }],
       extension: 'pdf',
-    }, {
+    }, argument2: {
       supplierShortName: 'CON',
-    })).toBe('_CON.pdf')
-
-    expect(renderNamePreview({
+    }, expected: '_CON.pdf' },
+    { case: '{ parts: [{ field: \'supplierShortName\' }], extension: \'pdf\', } / { supplierShortName: \'COM¹\', }', input: {
       parts: [{ field: 'supplierShortName' }],
       extension: 'pdf',
-    }, {
+    }, argument2: {
       supplierShortName: 'COM¹',
-    })).toBe('_COM¹.pdf')
-
-    expect(renderNamePreview({
+    }, expected: '_COM¹.pdf' },
+    { case: '{ parts: [{ field: \'projectName\' }], extension: \'pdf\', } / { projectName: \'项\'.repeat(256), }', input: {
       parts: [{ field: 'projectName' }],
       extension: 'pdf',
-    }, {
+    }, argument2: {
       projectName: '项'.repeat(256),
-    })).toBe(`${'项'.repeat(251)}.pdf`)
-
-    expect(renderNamePreview({
+    }, expected: `${'项'.repeat(251)}.pdf` },
+    { case: '{ parts: [{ field: \'projectName\' }], extension: \'x\'.repeat(251), } / { projectName: \'CONTRACT\', }', input: {
       parts: [{ field: 'projectName' }],
       extension: 'x'.repeat(251),
-    }, {
+    }, argument2: {
       projectName: 'CONTRACT',
-    })).toBe(`_CO.${'x'.repeat(251)}`)
+    }, expected: `_CO.${'x'.repeat(251)}` },
+  ])('预览即为可写盘的安全文件名 / renderNamePreview：$case', ({ input, argument2, expected }) => {
+    expect(renderNamePreview(input, argument2)).toBe(expected)
   })
 
   it('后 N 位按码点截取，不劈开星平面字符', () => {
@@ -202,34 +200,39 @@ describe('配置导出：两级目录结构', () => {
     }, {})).toThrowError('导出目录结构最多支持两级')
   })
 
-  it('把目录穿越、绝对路径和 Windows 非法名称清理成安全目录段', () => {
+  describe('把目录穿越、绝对路径和 Windows 非法名称清理成安全目录段', () => {
     const config = {
       levels: [
         { field: 'projectName' },
         { field: 'supplierShortName' },
       ],
     }
+    it.each([
+      { case: 'config / { projectName: \'..\', supplierShortName: \'C:\\\\合同/原件:*?\', }', input: config, argument2: {
+        projectName: '..',
+        supplierShortName: 'C:\\合同/原件:*?',
+      }, expected: ['未分类', 'C-合同-原件-'] },
+      { case: 'config / { projectName: \'滨江壹号\', supplierShortName: \'CON\', }', input: config, argument2: {
+        projectName: '滨江壹号',
+        supplierShortName: 'CON',
+      }, expected: ['滨江壹号', '_CON'] },
+    ])('resolveTwoLevelFolderPath：$case', ({ input, argument2, expected }) => {
+      expect(resolveTwoLevelFolderPath(structuredClone(input), structuredClone(argument2))).toEqual(expected)
+    })
+  })
 
-    expect(resolveTwoLevelFolderPath(config, {
-      projectName: '..',
-      supplierShortName: 'C:\\合同/原件:*?',
-    })).toEqual(['未分类', 'C-合同-原件-'])
-
-    expect(resolveTwoLevelFolderPath(config, {
-      projectName: '滨江壹号',
-      supplierShortName: 'CON',
-    })).toEqual(['滨江壹号', '_CON'])
-
-    expect(resolveTwoLevelFolderPath({
+  it.each([
+    { case: '{ levels: [{ field: \'projectName\', fallback: \'..\' }], } / {}', input: {
       levels: [{ field: 'projectName', fallback: '..' }],
-    }, {})).toEqual(['未分类'])
-
-    expect(resolveTwoLevelFolderPath({
+    }, argument2: {}, expected: ['未分类'] },
+    { case: '{ levels: [{ field: \'projectName\' }, { field: \'supplierShortName\' }], } / { projectName: \'项\'.repeat(256), supplierShortName: ', input: {
       levels: [{ field: 'projectName' }, { field: 'supplierShortName' }],
-    }, {
+    }, argument2: {
       projectName: '项'.repeat(256),
       supplierShortName: 'LPT³.txt',
-    })).toEqual(['项'.repeat(255), '_LPT³.txt'])
+    }, expected: ['项'.repeat(255), '_LPT³.txt'] },
+  ])('把目录穿越、绝对路径和 Windows 非法名称清理成安全目录段 / resolveTwoLevelFolderPath：$case', ({ input, argument2, expected }) => {
+    expect(resolveTwoLevelFolderPath(input, argument2)).toEqual(expected)
   })
 
   it('长度截断后仍移除 Windows 禁止的尾随点与空格', () => {

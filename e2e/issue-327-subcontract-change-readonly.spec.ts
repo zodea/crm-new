@@ -19,8 +19,8 @@ async function reset(request: APIRequestContext, id: string, domain: Domain, sce
 }
 
 async function chooseLookup(page: Page, label: string, option: string) {
-  await page.getByRole('combobox', { name: label }).click()
-  await page.getByText(option, { exact: true }).click()
+  await page.getByRole('combobox', { name: label, exact: true }).fill(option)
+  await page.getByRole('option').filter({ hasText: option }).first().click()
 }
 
 async function createSubcontract(page: Page, name: string): Promise<string> {
@@ -110,7 +110,7 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
   })
 
   test('中央命令保存后从全局、项目和分包合同进入同一专属详情并精确返回', async ({ page }, testInfo) => {
-    const contractName = `E2E 中央劳务分包合同 ${Date.now()}`
+    const contractName = 'E2E 中央劳务分包合同'
     const contractId = await createSubcontract(page, contractName)
     const changeId = await createChange(page, contractName, 'submit')
     await createPaginationDrafts(page.context().request, session(testInfo), contractId)
@@ -122,7 +122,7 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await expect(mainLink).toBeVisible({ timeout: 20_000 })
     const listSearch = page.getByRole('searchbox', { name: '搜索变更编号 / 类型 / 分供方' })
     await expect(listSearch).toHaveValue('FB-E2E-327')
-    await expect(page.getByRole('combobox', { name: '类型' })).toContainText('增项')
+    await expect(page.getByRole('button', { name: /^类型，已选 1 项$/ })).toHaveText('增项')
     await expect(page.getByRole('button', { name: '第 2 页' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByRole('combobox', { name: '每页条数' })).toHaveValue('10')
     const globalWorkspace = page.locator('[data-shell-workspace]')
@@ -162,7 +162,7 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
       hash: `#${encodeURIComponent(`owner-document-row-real:sub_change:${changeId}`)}`,
     })
     await expect(listSearch).toHaveValue('FB-E2E-327')
-    await expect(page.getByRole('combobox', { name: '类型' })).toContainText('增项')
+    await expect(page.getByRole('button', { name: /^类型，已选 1 项$/ })).toHaveText('增项')
     await expect(page.getByRole('button', { name: '第 2 页' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByRole('combobox', { name: '每页条数' })).toHaveValue('10')
     await expect(mainLink).toBeFocused()
@@ -221,7 +221,7 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
   })
 
   test('正式草稿只能通过显式整页入口编辑，取消后恢复原详情与合同来源', async ({ page }) => {
-    const contractName = `E2E 草稿劳务分包合同 ${Date.now()}`
+    const contractName = 'E2E 草稿劳务分包合同'
     const contractId = await createSubcontract(page, contractName)
     const changeId = await createChange(page, contractName, 'draft')
     const contractSource = `/contract/${contractId}?origin=real&contractKind=subcontract&tab=changes&focus=${changeId}`

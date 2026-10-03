@@ -4,7 +4,7 @@ import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import { useContractFormNavigation } from '~/composables/useContractFormNavigation'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
-import { F2_FORM_META, f2FormDefaults } from '~/lib/contract/page'
+import { contractSupplierSelectionPatch, F2_FORM_META, f2FormDefaults } from '~/lib/contract/page'
 import { subcontractContractProblemFromUnknown } from '~/lib/subcontract-contract/repository'
 import { validateSubcontractContractDetailReturnTo, validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
 import { SubcontractContractCommandConflictError, useSubcontractContractCommandStore } from '~/stores/subcontract-contract-command'
@@ -87,7 +87,7 @@ async function initialize(targetId = routeId.value) {
 }
 
 function patchDraft(patch: Partial<ProjectContractFormDraft>) {
-  draft.value = { ...draft.value, ...patch }
+  draft.value = { ...draft.value, ...contractSupplierSelectionPatch(draft.value, patch, context.value?.suppliers ?? []) }
 }
 
 function clearFieldError(field: string) {

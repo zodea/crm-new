@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
@@ -7,46 +8,54 @@ const FORM_ROUTES = [
   {
     path: '/contract/construction/form',
     title: '新建 · 施工合同',
-    field: '[data-testid="contract-name"]',
-    editUrl: /\/contract\/construction\/form\/[^/?]+$/,
+    field: '合同名称 *',
+    editUrl: /\/contract\/construction\/form\/[^/?]+(?:\?|$)/,
   },
   {
     path: '/contract/subcontract/form',
     title: '新建 · 分包合同',
-    field: '[data-testid="contract-name"]',
-    editUrl: /\/contract\/subcontract\/form\/[^/?]+$/,
+    field: '合同名称 *',
+    editUrl: /\/contract\/subcontract\/form\/[^/?]+(?:\?|$)/,
   },
   {
     path: '/contract/material/form',
     title: '新建 · 材料采购合同',
-    field: '[data-testid="contract-name"]',
-    editUrl: /\/contract\/material\/form\/[^/?]+$/,
+    field: '合同名称 *',
+    editUrl: /\/contract\/material\/form\/[^/?]+(?:\?|$)/,
   },
   {
     path: '/contract/other-expense/form',
     title: '新建 · 其他支出合同',
-    field: '[data-testid="contract-name"]',
-    editUrl: /\/contract\/other-expense\/form\/[^/?]+$/,
+    field: '合同名称 *',
+    editUrl: /\/contract\/other-expense\/form\/[^/?]+(?:\?|$)/,
   },
   {
     path: '/contract/company-expense/form',
     title: '新建 · 公司支出合同',
-    field: '[data-testid="company-contract-name"]',
-    editUrl: /\/contract\/company-expense\/form\/[^/?]+$/,
+    field: '合同名称 *',
+    editUrl: /\/contract\/company-expense\/form\/[^/?]+(?:\?|$)/,
   },
   {
     path: '/contract/other-settlement/form',
     title: '新建 · 其他支出结算',
-    field: '[data-testid="settlement-name"]',
-    editUrl: /\/contract\/other-settlement\/form\/[^/?]+$/,
+    field: '结算名称 *',
+    editUrl: /\/contract\/other-settlement\/form\/[^/?]+(?:\?|$)/,
   },
   {
     path: '/material/settlement/form',
     title: '新建 · 材料采购结算',
-    field: '[data-testid="settlement-name"]',
-    editUrl: /\/material\/settlement\/form\/[^/?]+$/,
+    field: '结算名称 *',
+    editUrl: /\/material\/settlement\/form\/[^/?]+(?:\?|$)/,
   },
 ] as const
+
+const MASTER_INPUTS = {
+  project: 'F2 正式合成项目',
+  customer: 'F2 正式合成客户',
+  supplier: 'F2 正式合成分供方',
+} as const
+
+const masterIds = new WeakMap<Page, { project: string, customer: string, supplier: string }>()
 
 async function chooseLookup(
   page: Page,
@@ -60,63 +69,92 @@ async function chooseLookup(
 }
 
 test.describe('F2 canonical 合同与支出结算整页表单', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `f2-${randomUUID()}` })
+    const sessionResponse = await page.request.get('/api/read/business-session')
+    expect(sessionResponse.ok()).toBe(true)
+    const session = await sessionResponse.json()
+    const ids = { project: '', customer: '', supplier: '' }
+    for (const { key, domain, capability, draft } of [
+      { key: 'customer', domain: 'customers', capability: 'customer:write', draft: { name: MASTER_INPUTS.customer } },
+      { key: 'supplier', domain: 'suppliers', capability: 'supplier:write', draft: { name: MASTER_INPUTS.supplier, supplierCategory: '材料供应商', contact: '合成联系人' } },
+    ] as const) {
+      const response = await page.request.post(`/api/commands/${domain}`, {
+        data: { ...session, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action: 'draft', draft, attachments: {} },
+      })
+      expect(response.ok(), await response.text()).toBe(true)
+      ids[key] = (await response.json()).id
+    }
+    const project = await page.request.post('/api/commands/projects', { data: { ...session, requiredCapability: 'project:write', commandId: randomUUID(), baseVersion: null, action: 'draft', draft: { name: MASTER_INPUTS.project, manager: 'F2 合成经办人', customerId: ids.customer, status: '筹备中' }, attachments: {} } })
+    expect(project.ok(), await project.text()).toBe(true)
+    ids.project = (await project.json()).id
+    masterIds.set(page, ids)
+  })
+
   test('七条命名路由均可保存不完整草稿并进入真实编辑路由', async ({ page }) => {
     test.setTimeout(120_000)
     await page.setViewportSize({ width: 390, height: 844 })
 
     for (const [index, form] of FORM_ROUTES.entries()) {
-      const name = `E2E-F2-${index}-${Date.now()}`
+      const name = `E2E-F2-草稿-${index}`
       await page.goto(form.path)
       await expect(page.getByRole('heading', { name: form.title })).toBeVisible({
         timeout: 20_000,
       })
       await expect(page.locator('[data-ui="entity-form-shell"]')).toBeVisible()
-      await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button')).toHaveCount(5)
+      await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button'))
+        .toHaveText(['取消', '保存草稿', '保存并新建', '保存并提交', '保存'])
 
-      await page.locator(form.field).fill(name)
+      await page.getByLabel(form.field, { exact: true }).fill(name)
       await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
       await page.getByRole('group', { name: '表单操作' })
         .getByRole('button', { name: '保存草稿' })
         .click()
 
       await expect(page).toHaveURL(form.editUrl)
-      await expect(page.locator(form.field)).toHaveValue(name, { timeout: 20_000 })
+      await expect(page.getByLabel(form.field, { exact: true })).toHaveValue(name, { timeout: 20_000 })
       await expect(page.getByRole('button', { name: '保存草稿' })).toBeDisabled()
       await expectNoPageOverflow(page, form.path)
     }
   })
 
-  test('材采明细新增、复制、删除与派生合计在真实页面成立', async ({ page }) => {
-    await page.goto('/contract/material/form')
-    await expect(page.getByRole('navigation', { name: '表单分区' })).toBeVisible()
-    await page.getByTestId('add-contract-line').click()
-    await page.getByRole('textbox', { name: '物资名称，第 1 行' }).fill('E2E瓷砖')
-    await page.getByRole('spinbutton', { name: '数量，第 1 行' }).fill('3')
-    await page.getByRole('spinbutton', { name: '含税单价，第 1 行' }).fill('12.5')
-    await expect(page.getByText('37.50', { exact: true })).toHaveCount(2)
+  for (const lineCase of [
+    { name: '整数数量', qty: '3', price: '12.5', lineAmount: '37.50', importedQty: '2', importedPrice: '15', total: '67.50', arrival: '2026-08-01' },
+    { name: '小数数量与闰日', qty: '0.5', price: '7.5', lineAmount: '3.75', importedQty: '1.25', importedPrice: '4', total: '8.75', arrival: '2028-02-29' },
+  ]) {
+    test(`材采明细新增、复制、删除与派生合计：${lineCase.name}`, async ({ page }) => {
+      await page.goto('/contract/material/form')
+      await expect(page.getByRole('navigation', { name: '表单分区' })).toBeVisible()
+      await page.getByTestId('add-contract-line').click()
+      await page.getByRole('textbox', { name: '物资名称，第 1 行' }).fill('E2E瓷砖')
+      await page.getByRole('spinbutton', { name: '数量，第 1 行' }).fill(lineCase.qty)
+      await page.getByRole('spinbutton', { name: '含税单价，第 1 行' }).fill(lineCase.price)
+      await expect(page.getByText(lineCase.lineAmount, { exact: true })).toHaveCount(2)
 
-    await page.getByRole('checkbox', { name: '选择第 1 行' }).check()
-    await page.getByRole('button', { name: '复制选中' }).click()
-    await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveValue('E2E瓷砖')
-    await page.getByRole('checkbox', { name: '选择第 1 行' }).check()
-    await page.getByRole('button', { name: '删除选中' }).click()
-    await expect(page.getByRole('textbox', { name: '物资名称，第 1 行' })).toHaveValue('E2E瓷砖')
-    await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveCount(0)
+      await page.getByRole('checkbox', { name: '选择第 1 行' }).check()
+      await page.getByRole('button', { name: '复制选中' }).click()
+      await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveValue('E2E瓷砖')
+      await page.getByRole('checkbox', { name: '选择第 1 行' }).check()
+      await page.getByRole('button', { name: '删除选中' }).click()
+      await expect(page.getByRole('textbox', { name: '物资名称，第 1 行' })).toHaveValue('E2E瓷砖')
+      await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveCount(0)
 
-    await page.getByTestId('import-contract-lines').click()
-    await page.getByTestId('contract-lines-tsv').fill(
-      '砂浆\tM10\t品牌A\t包\t2\t15\t2026-08-01\tTSV导入',
-    )
-    await page.getByTestId('confirm-contract-lines-import').click()
-    await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveValue('砂浆')
-    await expect(page.getByText('67.50', { exact: true })).toHaveCount(1)
-  })
+      await page.getByTestId('import-contract-lines').click()
+      await page.getByTestId('contract-lines-tsv').fill(
+        ['砂浆', 'M10', '品牌A', '包', lineCase.importedQty, lineCase.importedPrice, lineCase.arrival, 'TSV导入'].join('\t'),
+      )
+      await page.getByTestId('confirm-contract-lines-import').click()
+      await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveValue('砂浆')
+      await expect(page.getByText(lineCase.total, { exact: true })).toHaveCount(1)
+      await expect(page.getByLabel('计划到货日期，第 2 行')).toHaveValue(lineCase.arrival)
+    })
+  }
 
   test('材采提交会阻止空明细并聚焦首个无效单元格', async ({ page }) => {
     await page.goto('/contract/material/form')
-    await page.getByTestId('contract-name').fill(`E2E材采校验-${Date.now()}`)
-    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
-    await chooseLookup(page, '检索分供方', '广州市大板东', '广州市大板东建材有限公司')
+    await page.getByTestId('contract-name').fill('E2E材采校验')
+    await chooseLookup(page, '检索项目', MASTER_INPUTS.project, MASTER_INPUTS.project)
+    await chooseLookup(page, '检索分供方', MASTER_INPUTS.supplier, MASTER_INPUTS.supplier)
     await page.getByTestId('contract-content').fill('E2E 材料采购内容')
     await page.getByTestId('contract-sign-date').fill('2026-07-30')
     await page.getByTestId('contract-amount').fill('100')
@@ -128,28 +166,29 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
     await expect(page).toHaveURL('/contract/material/form')
     await expect(firstInvalidCell).toHaveAttribute('aria-invalid', 'true')
     await expect(firstInvalidCell).toBeFocused()
-    await expect(page.getByText(/采购合同明细还有 \d+ 处必填项未填写/)).toBeVisible()
+    await expect(page.getByText('采购合同明细仍有必填项未填写', { exact: true })).toBeVisible()
   })
 
   test('保存并新建会在同一页可靠重置为空表单', async ({ page }) => {
     await page.goto('/contract/company-expense/form')
-    await page.getByTestId('company-contract-name').fill(`E2E保存并新建-${Date.now()}`)
+    await page.getByLabel('合同名称 *', { exact: true }).fill('E2E保存并新建')
     await page.getByLabel('对方单位 *').fill('E2E服务商')
     await page.getByLabel('签订日期 *').fill('2026-07-25')
+    await page.getByLabel('合同金额 *', { exact: true }).fill('100')
     await page.getByRole('button', { name: '保存并新建' }).click()
     await expect(page).toHaveURL('/contract/company-expense/form')
-    await expect(page.getByTestId('company-contract-name')).toHaveValue('')
+    await expect(page.getByLabel('合同名称 *', { exact: true })).toHaveValue('')
     await expect(page.getByRole('button', { name: '保存草稿' })).toBeDisabled()
   })
 
   test('真实 lookup、提交、附件删除恢复与其他支出结算链路成立', async ({ page }) => {
     test.setTimeout(120_000)
-    const suffix = Date.now()
+    const suffix = '独立合成链'
     const constructionName = `E2E施工提交-${suffix}`
     await page.goto('/contract/construction/form')
     await page.getByTestId('contract-name').fill(constructionName)
-    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
-    await chooseLookup(page, '检索客户', '合和地产集团', '合和地产集团')
+    await chooseLookup(page, '检索项目', MASTER_INPUTS.project, MASTER_INPUTS.project)
+    await chooseLookup(page, '检索客户', MASTER_INPUTS.customer, MASTER_INPUTS.customer)
     await page.getByTestId('contract-content').fill('E2E 施工内容')
     await page.getByTestId('contract-sign-date').fill('2026-07-25')
     await page.getByTestId('contract-amount').fill('100')
@@ -160,10 +199,15 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
     })
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByRole('button', { name: '保存并提交' }).click()
-    await expect(page).toHaveURL(/\/contract\/construction\/form\/[^/?]+$/)
-    await expect(page.getByRole('checkbox', { name: '【保存】后关闭' })).not.toBeChecked()
-    await expect(page.getByText('审批中', { exact: true }).first()).toBeVisible()
+    await expect(page).toHaveURL(/\/contract\/construction\/form\/[^/?]+(?:\?|$)/)
+    await expect(page.getByRole('checkbox', { name: '【保存】后关闭' })).toBeChecked()
+    await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
+    await expect(page.getByRole('combobox', { name: '合同状态', exact: true })).toHaveText('审批中')
     await expect(page.getByText('e2e-contract.pdf', { exact: true })).toBeVisible()
+    const constructionId = new URL(page.url()).pathname.split('/').at(-1)!
+    const savedForm = await page.request.get(`/api/read/construction-contracts/${constructionId}/form`)
+    expect(savedForm.ok()).toBe(true)
+    expect((await savedForm.json()).draft).toMatchObject({ projectId: masterIds.get(page)!.project, customerId: masterIds.get(page)!.customer, amount: 100, status: '审批中' })
 
     const attachments = page.locator('#section-attachments')
     await attachments.getByRole('button', { name: '删除' }).click()
@@ -175,29 +219,33 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
 
     const expenseName = `E2E其他支出-${suffix}`
     await page.goto('/contract/other-expense/form')
-    await page.getByTestId('contract-name').fill(expenseName)
-    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
-    await chooseLookup(page, '检索分供方', '广州市大板东', '广州市大板东建材有限公司')
-    await page.getByTestId('contract-content').fill('E2E 租赁服务')
-    await page.getByTestId('contract-sign-date').fill('2026-07-25')
-    await page.getByTestId('contract-amount').fill('80')
+    await page.getByLabel('合同名称 *', { exact: true }).fill(expenseName)
+    await chooseLookup(page, '检索项目', MASTER_INPUTS.project, MASTER_INPUTS.project)
+    await chooseLookup(page, '检索分供方', MASTER_INPUTS.supplier, MASTER_INPUTS.supplier)
+    await page.getByLabel('主要条款').fill('E2E 租赁服务')
+    await page.getByLabel('签订日期 *').fill('2026-07-25')
+    await page.getByLabel('合同金额 *', { exact: true }).fill('80')
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByRole('button', { name: '保存并提交' }).click()
-    await expect(page).toHaveURL(/\/contract\/other-expense\/form\/[^/?]+$/)
+    await page.getByRole('dialog', { name: '提交合同' }).getByRole('button', { name: '提交', exact: true }).click()
+    await expect(page).toHaveURL(/\/contract\/other-expense\/form\/[^/?]+(?:\?|$)/)
 
     await page.locator('a[href="/contract/other-settlement"]').click()
-    await page.getByRole('region', { name: '其他支出结算列表工具栏' })
-      .getByRole('button', { name: '新建其他支出结算' })
-      .click()
-    await page.getByTestId('settlement-name').fill(`E2E结算-${suffix}`)
-    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+    await page.getByRole('button', { name: '新建结算', exact: true }).click()
+    await page.getByLabel('结算名称 *', { exact: true }).fill(`E2E结算-${suffix}`)
+    await chooseLookup(page, '检索项目', MASTER_INPUTS.project, MASTER_INPUTS.project)
     await chooseLookup(page, '检索其他支出合同', expenseName, expenseName)
-    await page.getByTestId('settlement-amount').fill('60')
+    await page.getByLabel('含税结算金额 *').fill('60')
     await page.getByLabel('结算日期 *').fill('2026-07-25')
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByRole('button', { name: '保存并提交' }).click()
-    await expect(page).toHaveURL(/\/contract\/other-settlement\/form\/[^/?]+$/)
-    await expect(page.getByText('待确认', { exact: true }).first()).toBeVisible()
+    await page.getByRole('dialog').getByRole('button', { name: '提交', exact: true }).click()
+    await expect(page).toHaveURL(/\/contract\/other-settlement\/form\/[^/?]+(?:\?|$)/)
+    await expect(page.getByRole('button', { name: '确认结算', exact: true })).toBeEnabled()
+    const settlementId = new URL(page.url()).pathname.split('/').at(-1)!
+    const settlementRead = await page.request.get(`/api/read/other-settlements/${settlementId}`, { params: { origin: 'real' } })
+    expect(settlementRead.ok(), await settlementRead.text()).toBe(true)
+    expect((await settlementRead.json()).settlement.draft).toMatchObject({ id: settlementId, status: 'pending', projectId: masterIds.get(page)!.project, totalAmount: 60 })
   })
 
   test('七条表单在响应式参考矩阵均无页面级横向溢出', async ({ page }) => {

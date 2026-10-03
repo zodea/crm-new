@@ -32,6 +32,8 @@ import { payrollHollowMigrationReferences } from './payroll-hollow-migration-ref
 import { loadPayrollMigratedProof, withPayrollMigratedSource } from './payroll-migrated-proof'
 import { provePayrollNumberingState } from './payroll-numbering-facts'
 import { insertPayrollNumberingMigrationRows, mapPayrollNumberingMigrationGraph, payrollNumberingGraphFingerprint, payrollNumberingGraphKeys, payrollNumberingMigrationReferences, readPayrollNumberingMigrationRows, removePayrollNumberingMigrationRows } from './payroll-numbering-migration'
+import { insertPayrollPublicationRows, mapPayrollPublicationGraph, provePublicationWageParents } from './payroll-publication-migration'
+import { workerModernAssetMappings } from './worker-roster-modern-migration'
 
 export interface ImportedPayrollProject {
   entityId: string
@@ -242,6 +244,14 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
       graph.schemaVersion = 5
       graph.numbering = mapPayrollNumberingMigrationGraph(source.numbering, entity.id, mapping)
     }
+    if (source.publication) {
+      for (const worker of snapshot.entities.filter(row => row.entityType === 'workers')) {
+        for (const identity of workerModernAssetMappings(worker))
+          mapping.set(key(identity.tableName, identity.legacyId), identity)
+      }
+      graph.schemaVersion = 6
+      graph.publication = mapPayrollPublicationGraph(source.publication, entity.id, mapping, source.deductions?.quantity)
+    }
     graph.logs = source.logs.map(row => ({ ...row, id: mapping.get(key('operation_logs', row.id))!.centralId!, record_id: mapping.get(key(String(row.table_name), row.record_id))?.centralId ?? `payroll-report-record:${entity.id}:${String(row.table_name)}:${encodeURIComponent(String(row.record_id))}` }))
     const mappings = [...mapping.values()]
     const fingerprint = createHash('sha256').update(JSON.stringify([source, mappings])).digest('hex')
@@ -257,6 +267,7 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
 }
 
 function graphFingerprint(graph: PayrollProjectGraph) {
+  // Publication rows are checked and removed earlier by their owner in the same candidate transaction.
   return JSON.stringify([PAYROLL_MIGRATION_PARTS.map(part => graph[part].toSorted((a, b) => String(a.id).localeCompare(String(b.id))).map(row => PAYROLL_MIGRATION_COLUMNS[part].map(field => row[field]))), payrollCentralGraphFingerprint(graph.central), payrollFeesGraphFingerprint(graph.fees), payrollHollowGraphFingerprint(graph.deductions), payrollNumberingGraphFingerprint(graph.numbering)])
 }
 export interface PayrollRemovedIdentities { projects: ReadonlySet<string>, crews: ReadonlySet<string>, workers: ReadonlySet<string>, quantity: readonly QuantityMigrationIdentity[] }
@@ -471,11 +482,14 @@ export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<
   for (const incoming of plan.incoming) {
     if (incoming.source.deductions)
       await withPayrollMigratedSource(incoming.source, source => provePayrollHollowMigrationSource(source, incoming.source))
-    if (incoming.source.numbering) {
+    if (incoming.source.numbering || incoming.source.publication) {
       await withPayrollMigratedSource(incoming.source, async (source) => {
         const inherited = await loadPayrollMigratedProof(source, incoming.source.projectId)
         const documents = new Map<string, PayrollNumberingDocument>([...inherited.aDocuments, ...inherited.c1Documents, ...inherited.c2Documents, ...await loadPayrollAReleasedWithMigration(source), ...await loadPayrollC1ReleasedWithMigration(source), ...await loadPayrollC2ReleasedWithMigration(source)])
-        await provePayrollNumberingState(source, incoming.source.projectId, documents, inherited.numbering)
+        if (incoming.source.numbering)
+          await provePayrollNumberingState(source, incoming.source.projectId, documents, inherited.numbering)
+        if (incoming.source.publication)
+          await provePublicationWageParents(source, incoming.source.publication, documents)
       })
     }
   }
@@ -509,6 +523,7 @@ export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<
     await insertPayrollCentralMigrationGraph(db, next.graph.central)
     await insertPayrollHollowMigrationRows(db, next.graph.deductions)
     await insertPayrollNumberingMigrationRows(db, next.graph.numbering)
+    await insertPayrollPublicationRows(db, next.graph.publication)
     plan.imports.set(next.entityId, next)
   }
   if (plan.incoming.length || plan.removed.length)

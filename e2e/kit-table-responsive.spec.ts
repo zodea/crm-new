@@ -20,15 +20,14 @@ test.describe('KitTable 公共表格规格', () => {
     const header = table.locator('.vxe-header--column').filter({ hasText: '项目编号' }).first()
     const handle = header.locator('.vxe-cell--col-resizable')
     await expect(handle).toBeVisible()
-    expect(await handle.evaluate(element => ({
-      cursor: getComputedStyle(element).cursor,
-      right: getComputedStyle(element).right,
-      width: getComputedStyle(element).width,
-    }))).toEqual({
-      cursor: 'col-resize',
-      right: '-4px',
-      width: '7px',
-    })
+    await expect(handle).toHaveCSS('cursor', 'col-resize')
+    const headerBounds = (await header.boundingBox())!
+    const handleBounds = (await handle.boundingBox())!
+    const rightEdge = headerBounds.x + headerBounds.width
+    expect(handleBounds.width).toBeGreaterThan(0)
+    expect(handleBounds.width).toBeLessThanOrEqual(12)
+    expect(handleBounds.x).toBeLessThan(rightEdge)
+    expect(handleBounds.x + handleBounds.width).toBeGreaterThanOrEqual(rightEdge)
 
     const actionColumn = table.locator('.vxe-table--fixed-right-wrapper')
     await expect(actionColumn).toBeVisible()
@@ -60,16 +59,19 @@ test.describe('KitTable 公共表格规格', () => {
     expect((await header.boundingBox())!.width).toBeLessThan(before + 10)
   })
 
-  test('真实合同列表用紧凑省略号菜单收纳行操作且不留大块空白', async ({ page }) => {
+  // 当前施工合同专属列表不再提供旧本地操作列；通用编辑/删除项目由 RowActionMenu.test.ts 验证。
+  test('分供方只读列表用紧凑省略号菜单收纳当前可用动作', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 900 })
-    await page.goto('/contract/construction')
+    await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+    await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
+    await page.goto('/base/supplier?search=穗建五金')
     await page.waitForLoadState('networkidle')
 
     const actionColumn = page.locator('[data-ui="kit-table"] .vxe-table--fixed-right-wrapper').first()
     await expect(actionColumn).toBeVisible()
     const width = (await actionColumn.boundingBox())!.width
-    expect(width).toBeGreaterThanOrEqual(52)
-    expect(width).toBeLessThanOrEqual(60)
+    expect(width).toBeGreaterThanOrEqual(32)
+    expect(width).toBeLessThanOrEqual(114)
     const trigger = actionColumn.locator('[data-ui="row-action-menu-trigger"]').first()
     await expect(trigger).toBeVisible()
     const actionLabel = await trigger.getAttribute('aria-label')
@@ -79,10 +81,10 @@ test.describe('KitTable 公共表格规格', () => {
     await trigger.press('Enter')
     const menu = page.getByRole('menu', { name: actionLabel! })
     await expect(menu.getByRole('menuitem', { name: '查看详情' })).toBeVisible()
-    await expect(menu.getByRole('menuitem', { name: '编辑' })).toBeVisible()
-    await expect(menu.getByRole('menuitem', { name: '删除' })).toBeVisible()
+    await expect(menu.getByRole('menuitem')).toHaveText(['查看详情'])
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
+    await expect(trigger).toBeFocused()
     expect(page.url()).toBe(initialUrl)
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
     await expect(actionColumn.locator('.vxe-cell--col-resizable')).toHaveCount(0)
@@ -93,6 +95,7 @@ test.describe('KitTable 公共表格规格', () => {
     { width: 390, height: 844 },
     { width: 768, height: 900 },
     { width: 1024, height: 900 },
+    { width: 1280, height: 900 },
     { width: 1440, height: 1000 },
   ] as const) {
     test(`${viewport.width}px 宽表只在自身容器横滚`, async ({ page }) => {

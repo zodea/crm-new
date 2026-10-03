@@ -84,9 +84,9 @@
 
 ### 6. 审批与支付
 
-本期批复金额和审批备注按 ADR 0015 持久化。已付金额、实际支付金额和支付状态均为只读派生值；关系、公式、存量字段兼容和确认约束只在 [ADR 0015 决策 6](../../adr/0015-form-persistence-and-payment-reconciliation.md) 与 [`DATABASE.md §10.2`](../DATABASE.md) 维护。本页负责显示支付记录、分摊明细、未付提示和源单下钻。
+本期批复金额和审批备注按 ADR 0015 持久化。已付金额、实际支付金额和支付状态均为只读派生值；关系、公式、存量字段兼容和确认约束只在 [ADR 0015 决策 6](../../adr/0015-form-persistence-and-payment-reconciliation.md) 与 [`DATABASE.md §2.4 支付记录`](../DATABASE.md#entity-payment-record) 维护。本页负责显示支付记录、分摊明细、未付提示和源单下钻。
 
-[#439](https://github.com/zodea/crm-new/issues/439) 已接本期批复的输入语义：新建留空、填写零元和清空后保存均按真实输入往返；表单明确提示空与零的区别，临时非法输入保留可编辑状态并由保存域拒绝。详情与付款管理用“未填写”或“历史批复待核验”解释空金额，已确认实付照常显示。历史待核验记录的完整批复/余额合计显示不完整，不能冒充零元或已付清。仅改备注或放弃修改不会确认历史来源；历史新支付确认政策仍见 DATABASE 链接的 PAY-08 待裁定项。
+[#439](https://github.com/zodea/crm-new/issues/439) 已接本期批复的输入语义：新建留空、填写零元和清空后保存均按真实输入往返；表单明确提示空与零的区别，临时非法输入保留可编辑状态并由保存域拒绝。详情与付款管理用“未填写”或“历史批复待核验”解释空金额，已确认实付照常显示。历史待核验记录的完整批复/余额合计显示不完整，不能冒充零元或已付清。仅改备注或放弃修改不会确认历史来源；历史新支付确认的已确认目标、尚待核对项与未实施边界见 [DATABASE 的 PAY-08](../DATABASE.md#entity-payment-record)。
 
 ---
 
@@ -124,13 +124,13 @@
 
 ## 五、与工资进度款边界
 
-本页不处理工人工资，也不提供工资付款申请或支付记录入口。工资的领域边界见 [`CONTEXT.md`](../../../CONTEXT.md)，状态和成本/支付事实见 [`DATABASE.md §10.3`](../DATABASE.md) 与 [#412](https://github.com/zodea/crm-new/issues/412)。
+本页不处理工人工资，也不提供工资付款申请或支付记录入口。工资的领域边界见 [`CONTEXT.md`](../../../CONTEXT.md)，状态和成本/支付事实见 [`DATABASE.md §2.6 工资事实`](../DATABASE.md#工资成本与实际支付的同源事实) 与 [#412](https://github.com/zodea/crm-new/issues/412)。
 
 ---
 
 ## 六、支付记录与 OCR
 
-页面提供图片/PDF识别和手工录入两种入口，并排展示原图、识别值、置信度和人工修订值；OCR 失败时允许切换手工录入。支付事实、人工确认、重复提示、分摊守恒和撤回后的重算规则只在 [ADR 0015 决策 5-6](../../adr/0015-form-persistence-and-payment-reconciliation.md) 与 [`DATABASE.md §10.2`](../DATABASE.md) 维护。样本数值场景见[睿璟验收清单](../../migration/ruijing-acceptance.md)。
+页面提供图片/PDF识别和手工录入两种入口，并排展示原图、识别值、置信度和人工修订值；OCR 失败时允许切换手工录入。支付事实、人工确认、重复提示、分摊守恒和撤回后的重算规则只在 [ADR 0015 决策 5-6](../../adr/0015-form-persistence-and-payment-reconciliation.md) 与 [`DATABASE.md §2.4 支付记录`](../DATABASE.md#entity-payment-record) 维护。样本数值场景见[睿璟验收清单](../../migration/ruijing-acceptance.md)。
 
 ---
 

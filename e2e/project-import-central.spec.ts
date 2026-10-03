@@ -1,13 +1,22 @@
 import type { Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import * as XLSX from 'xlsx'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ screenshot: 'off', video: 'off', trace: 'off' })
 const projectName = 'Excel中央浏览器423'
+const customerName = 'Excel导入合成甲方'
+const sessions = new Map<string, string>()
+const customers = new WeakMap<Page, { id: string, name: string }>()
 function headers(info: TestInfo) {
-  return { 'x-ruihang-test-session': `project-excel-${Buffer.from(info.testId).toString('base64url')}` }
+  let session = sessions.get(info.testId)
+  if (!session) {
+    session = `project-excel-${randomUUID()}`
+    sessions.set(info.testId, session)
+  }
+  return { 'x-ruihang-test-session': session }
 }
 async function reset(page: Page, info: TestInfo) {
   for (const entity of ['projects', 'customers']) {
@@ -16,14 +25,27 @@ async function reset(page: Page, info: TestInfo) {
   }
 }
 test.beforeEach(async ({ page }, info) => {
+  await page.context().setExtraHTTPHeaders(headers(info))
   await page.setExtraHTTPHeaders(headers(info))
+  await page.addInitScript(() => {
+    const key = 'ruihang:workspace-default:include-demo'
+    if (localStorage.getItem(key) === null)
+      localStorage.setItem(key, 'false')
+  })
+  await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
   await reset(page, info)
+  const session = await (await page.request.get('/api/read/business-session')).json()
+  const created = await page.request.post('/api/commands/customers', { data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'customer:write', commandId: randomUUID(), baseVersion: null, action: 'save', draft: { name: customerName, contact: 'Excel合成联系人' }, attachments: {} } })
+  expect(created.ok(), await created.text()).toBe(true)
+  const receipt = await created.json()
+  customers.set(page, { id: receipt.id, name: customerName })
 })
 test.afterEach(async ({ page }, info) => {
   await reset(page, info)
+  sessions.delete(info.testId)
 })
 
-function workbook(rows: unknown[][] = [[projectName, 'customer-real-320', '合成经理423', '施工中', 'EXCEL-423-001']]) {
+function workbook(rows: unknown[][] = [[projectName, customerName, '合成经理423', '施工中', 'EXCEL-423-001']]) {
   const book = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['说明'], ['隔离合成样本，不含真实业务数据']]), '说明')
   XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([]), '空白预留')
@@ -47,44 +69,54 @@ async function centralRows(page: Page) {
   return page.evaluate(async () => ((await (await fetch('/api/read/projects?includeDemo=false&pageSize=100')).json()).items as Array<{ project: { id: string, label: string } }>).filter(item => item.project.id !== 'project-real-320'))
 }
 
-test('历史深链真实 Excel 保存后中央列表、详情与刷新回读；重传同文件只返回原 ID', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  const file = workbook()
-  await page.goto('/project')
-  await page.getByRole('button', { name: '导入项目', exact: true }).click()
-  await expect(page).toHaveURL(/\/import\/mapping\/project$/)
-  await upload(page, file)
-  const preview = page.getByRole('region', { name: '客户身份与阶段核对表' })
-  await expect(preview).toContainText('customer-real-320')
-  await expect(preview.getByRole('cell', { name: '4', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '开始导入', exact: true }).click()
-  await expect(page).toHaveURL(/\/project$/)
-  await expect(page.getByRole('link', { name: projectName, exact: true })).toBeVisible()
-  const rows = await centralRows(page)
-  expect(rows).toHaveLength(1)
-  const id = rows[0]!.project.id
-  expect(rows[0]).toMatchObject({ customer: { state: 'resolved', id: 'customer-real-320', label: '中央正式甲方客户' } })
-  const form = await page.evaluate(async id => (await (await fetch(`/api/read/projects/${id}/form`)).json()), id)
-  expect(form).toMatchObject({ draft: { customerId: 'customer-real-320', manager: '合成经理423', status: '施工中' }, importSource: { fileName: file.name, sheetName: '项目423', rowNumber: 4, externalRef: 'EXCEL-423-001', rawSnapshot: { 项目名称: projectName } } })
-  await page.getByRole('link', { name: projectName, exact: true }).click()
-  await expect(page.getByRole('heading', { name: projectName, exact: true })).toBeVisible()
-  await page.reload()
-  await expect(page.getByRole('heading', { name: projectName, exact: true })).toBeVisible()
-  await page.goto('/import/mapping/project')
-  await upload(page, file)
-  await page.getByRole('button', { name: '开始导入', exact: true }).click()
-  await expect(page).toHaveURL(/\/project$/)
-  expect(await centralRows(page)).toEqual(rows)
-  expect(errors).toEqual([])
-})
+for (const input of [
+  { name: 'Excel中央合成筹备工程', customerBy: 'id', manager: '合成经理甲', status: '筹备中', externalRef: 'EXCEL-PREP-001' },
+  { name: 'Excel中央合成施工工程', customerBy: 'name', manager: '合成经理乙', status: '施工中', externalRef: 'EXCEL-ACTIVE-002' },
+] as const) {
+  test(`真实 Excel ${input.customerBy}/${input.status}保存与冷回读，重传只返回原 ID`, async ({ page }) => {
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    const customer = customers.get(page)!
+    const customerToken = input.customerBy === 'id' ? customer.id : customer.name
+    const file = workbook([[input.name, customerToken, input.manager, input.status, input.externalRef]])
+    await page.goto('/project')
+    await page.getByRole('button', { name: '导入项目', exact: true }).click()
+    await expect(page).toHaveURL(/\/import\/mapping\/project$/)
+    await upload(page, file)
+    const preview = page.getByRole('region', { name: '客户身份与阶段核对表' })
+    await expect(preview).toContainText(customer.id)
+    await expect(preview.getByRole('cell', { name: '4', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '开始导入', exact: true }).click()
+    await expect(page).toHaveURL(/\/project$/)
+    await expect(page.getByRole('link', { name: input.name, exact: true })).toBeVisible()
+    const rows = await centralRows(page)
+    expect(rows).toHaveLength(1)
+    const id = rows[0]!.project.id
+    expect(rows[0]).toMatchObject({ customer: { state: 'resolved', id: customer.id, label: customer.name } })
+    const form = await page.evaluate(async id => (await (await fetch(`/api/read/projects/${id}/form`)).json()), id)
+    expect(form).toMatchObject({ draft: { customerId: customer.id, manager: input.manager, status: input.status }, importSource: { fileName: file.name, sheetName: '项目423', rowNumber: 4, externalRef: input.externalRef, rawSnapshot: { 项目名称: input.name } } })
+    await page.getByRole('link', { name: input.name, exact: true }).click()
+    await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
+    await page.goto('/import/mapping/project')
+    await upload(page, file)
+    await page.getByRole('button', { name: '开始导入', exact: true }).click()
+    await expect(page).toHaveURL(/\/project$/)
+    const reimportedRows = await centralRows(page)
+    expect(reimportedRows.map(item => item.project)).toEqual(rows.map(item => item.project))
+    const reimportedForm = await page.evaluate(async id => (await (await fetch(`/api/read/projects/${id}/form`)).json()), id)
+    expect(reimportedForm).toMatchObject({ version: form.version, draft: form.draft, importSource: form.importSource })
+    expect(errors).toEqual([])
+  })
+}
 
 test('部分成功保留原始行拒绝，响应丢失及回读失败沿原命令重试，成功行不重复', async ({ page }) => {
   await page.goto('/import/mapping/project')
   await upload(page, workbook([
-    ['成功行423', 'customer-real-320', '经理423', '施工中', 'PART-423-1'],
+    ['成功行423', customerName, '经理423', '施工中', 'PART-423-1'],
     ['缺客户423', '不存在客户423', '经理423', '施工中', 'PART-423-2'],
-    ['响应丢失423', 'customer-real-320', '经理423', '旧阶段', 'PART-423-3'],
+    ['响应丢失423', customerName, '经理423', '旧阶段', 'PART-423-3'],
   ]))
   await expect(page.getByRole('region', { name: '客户身份与阶段核对表' })).toContainText('旧阶段 → 筹备中')
   let lost = false
@@ -147,6 +179,8 @@ test('预览期间锁定映射；取消不写入，确认来源切换后重载�
   expect(await centralRows(page)).toHaveLength(0)
   await page.getByRole('button', { name: '包含测试数据' }).click()
   await page.getByRole('button', { name: '确认切换' }).click()
+  await expect(page.getByRole('button', { name: '关闭测试数据' })).toBeVisible()
+  await page.goto('/import/mapping/project')
   await expect(page.getByLabel('选择导入文件')).toBeAttached()
   expect(await centralRows(page)).toHaveLength(0)
   await upload(page, file)
@@ -182,7 +216,7 @@ test('预览后客户停用或权限撤回在中央提交时给出行级拒绝',
 })
 
 test('导入期间取消只完成当前行，重新上传原文件恢复剩余行不重复创建', async ({ page }) => {
-  const file = workbook([['取消当前行423', 'customer-real-320', '经理423', '', 'CANCEL-1'], ['取消后续行423', 'customer-real-320', '经理423', '', 'CANCEL-2']])
+  const file = workbook([['取消当前行423', customerName, '经理423', '', 'CANCEL-1'], ['取消后续行423', customerName, '经理423', '', 'CANCEL-2']])
   await page.goto('/import/mapping/project')
   await upload(page, file)
   let release!: () => void
@@ -219,7 +253,7 @@ test('导入期间取消只完成当前行，重新上传原文件恢复剩余�
 })
 
 for (const width of [390, 768, 1024, 1280, 1440]) {
-  test(`${width}px 上传映射预览失败表局部横滚、键盘焦点与取消`, async ({ page }) => {
+  test(`${width}px 上传映射预览失败表局部横滚、键盘焦点与取消`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/import/mapping/project')
     await expectNoPageOverflow(page, '上传')
@@ -232,7 +266,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: '开始导入', exact: true }).click()
     await expect(page.getByRole('region', { name: '项目行级拒绝清单' })).toBeVisible()
     await expectNoPageOverflow(page, `失败 ${width}`)
-    await page.screenshot({ path: `.codex-tmp/project-import-408/viewport-${width}.png`, fullPage: true })
+    await page.screenshot({ path: info.outputPath(`viewport-${width}.png`), fullPage: true })
     await page.getByRole('button', { name: '返回项目列表', exact: true }).click()
     await expect(page).toHaveURL(/\/project$/)
     expect(await centralRows(page)).toHaveLength(0)

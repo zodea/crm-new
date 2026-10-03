@@ -144,15 +144,13 @@ afterEach(() => {
 })
 
 describe('supplier detail store', () => {
-  it('分供方本地快照区分未填、明确零与历史未知，保留确认银行实付', async () => {
+  it.each([[null, 'user-entry', 'not-entered', null], [0, 'user-entry', 'known', 0], [0, 'legacy', 'legacy-unknown', null]] as const)('分供方本地快照区分未填、明确零与历史未知，保留确认银行实付：输入案例 %#', async (amount, origin, state, claimed) => {
     const store = useSupplierDetailStore()
-    for (const [amount, origin, state, claimed] of [[null, 'user-entry', 'not-entered', null], [0, 'user-entry', 'known', 0], [0, 'legacy', 'legacy-unknown', null]] as const) {
-      await mem.execute('UPDATE payment_applications SET approved_amount = ?, approved_amount_origin = ? WHERE id = ?', [amount, origin, 'pay1'])
-      await store.loadReadonlySnapshot('s1')
-      const snapshot = store.bySupplier('s1')
-      expect(snapshot.payments[0]).toMatchObject({ approvedAmount: state === 'known' ? 0 : null, approvedAmountState: state, paidAmount: 200 })
-      expect(snapshot.summary.claimedTotal).toBe(claimed)
-    }
+    await mem.execute('UPDATE payment_applications SET approved_amount = ?, approved_amount_origin = ? WHERE id = ?', [amount, origin, 'pay1'])
+    await store.loadReadonlySnapshot('s1')
+    const snapshot = store.bySupplier('s1')
+    expect(snapshot.payments[0]).toMatchObject({ approvedAmount: state === 'known' ? 0 : null, approvedAmountState: state, paidAmount: 200 })
+    expect(snapshot.summary.claimedTotal).toBe(claimed)
   })
   it('只读快照只执行查询，不启动状态同步事务或改写测试分供方', async () => {
     await mem.execute(`UPDATE suppliers SET credential_status = 'reviewing' WHERE id = 's1'`)
@@ -197,6 +195,50 @@ describe('supplier detail store', () => {
       projectIds: [],
     })
     expect(supplierStore.projectOptions).toEqual([])
+  })
+
+  it('列表和详情合同金额只汇总有效支出主合同和补充协议，合同与合作范围不受草稿影响', async () => {
+    for (const [index, status] of ['draft', '草稿', '无效', '作废', 'cancelled'].entries()) {
+      await mem.execute(`
+        INSERT INTO contracts (id, kind, project_id, supplier_id, amount, status)
+        VALUES (?, '材采', 'p1', 's1', 100, ?)
+      `, [`excluded-contract-${index}`, status])
+      await mem.execute(`
+        INSERT INTO contract_supplements (id, contract_id, amount, status)
+        VALUES (?, 'c1', 50, ?)
+      `, [`excluded-supplement-${index}`, status])
+    }
+    await mem.execute(`
+      INSERT INTO contract_supplements (id, contract_id, amount, status, deleted_at)
+      VALUES
+        ('effective-supplement', 'c1', 120, '有效', NULL),
+        ('draft-parent-supplement', 'excluded-contract-0', 200, '有效', NULL),
+        ('deleted-supplement', 'c1', 300, '有效', '2026-10-02T00:00:00.000Z')
+    `)
+    const store = useSupplierStore()
+
+    await store.load()
+
+    expect(store.listStats.s1).toEqual({
+      projectCount: 1,
+      contractTotal: 1120,
+      paidTotal: 200,
+      payableBalance: 920,
+      projectIds: ['p1'],
+    })
+    expect(store.projectOptions).toEqual([{ id: 'p1', name: '项目甲' }])
+
+    const detail = useSupplierDetailStore()
+    await detail.loadReadonlySnapshot('s1')
+
+    expect(detail.bySupplier('s1').summary).toMatchObject({
+      contractCount: 6,
+      contractTotal: 1120,
+      payableBalance: 920,
+    })
+    expect(detail.bySupplier('s1').projects).toEqual([
+      expect.objectContaining({ projectId: 'p1', contractCount: 6, contractTotal: 1120, payableBalance: 920 }),
+    ])
   })
 
   it('deduplicates overlapping loads for the same supplier and keeps loading state accurate', async () => {

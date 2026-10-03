@@ -169,6 +169,7 @@ test.describe('Issue #293：项目中央命令与本地草稿', () => {
     expect(localDraft).toHaveLength(1)
     expect(localDraft[0]).toContain('project-draft-')
     expect(localDraft[0]).toContain('断网本地项目')
+    const draftUrl = page.url()
 
     await page.unroute('**/api/read/business-session')
     const total = await page.evaluate(async () => {
@@ -177,6 +178,8 @@ test.describe('Issue #293：项目中央命令与本地草稿', () => {
     })
     expect(total).toBe(0)
     await page.reload()
+    // 编辑表单不属于默认冷恢复页面；用持有的本地 draftId 显式重新进入。
+    await page.goto(draftUrl)
     await expect(page.getByRole('status')).toContainText('已恢复上次仅保留在本地的草稿')
     await expect(page.getByLabel('项目名称 *')).toHaveValue('断网本地项目')
   })

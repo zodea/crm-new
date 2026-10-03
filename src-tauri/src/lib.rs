@@ -1,9 +1,4 @@
-use std::{
-    fs::create_dir_all,
-    future::Future,
-    process::Command,
-    time::Duration,
-};
+use std::{fs::create_dir_all, future::Future, process::Command, time::Duration};
 
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
@@ -164,8 +159,18 @@ mod tests {
 
     #[test]
     fn external_url_allowlist_only_contains_tax_query() {
-        assert!(is_allowed_external_url(GUANGDONG_TAX_QUERY_URL));
-        assert!(!is_allowed_external_url("https://example.com"));
-        assert!(!is_allowed_external_url("file:///C:/Windows/System32"));
+        for (url, allowed) in [
+            (GUANGDONG_TAX_QUERY_URL.to_string(), true),
+            ("https://example.com".to_string(), false),
+            ("file:///C:/Windows/System32".to_string(), false),
+            ("javascript:alert(1)".to_string(), false),
+            (
+                format!("{GUANGDONG_TAX_QUERY_URL}?redirect=https://example.com"),
+                false,
+            ),
+            (format!(" {GUANGDONG_TAX_QUERY_URL}"), false),
+        ] {
+            assert_eq!(is_allowed_external_url(&url), allowed, "URL: {url}");
+        }
     }
 }

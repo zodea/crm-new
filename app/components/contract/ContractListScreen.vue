@@ -7,11 +7,11 @@ import type { F2FormKind } from '~/lib/contract/forms'
 import type { ContractKind } from '~/lib/contract/status'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
-import type { StatusTone } from '~/lib/project/status'
 import type { Contract } from '~/stores/contract'
 import KitEnumFilterOptions from '~/components/ui/KitEnumFilterOptions.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { formPath } from '~/lib/contract/page'
-import { CONTRACT_STATUS_TONE, CONTRACT_STATUSES, CONTRACT_SUB_KINDS, contractBalance, kindLabels, sumField } from '~/lib/contract/status'
+import { CONTRACT_STATUSES, CONTRACT_SUB_KINDS, contractBalance, contractStatusTone, kindLabels, sumField } from '~/lib/contract/status'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
 
@@ -185,18 +185,6 @@ const summary = computed(() => {
   ]
 })
 
-// 状态 chip（语义色调 → chip class，色调映射见 ~/lib/contract/status）
-const TONE_CHIP: Record<StatusTone, string> = {
-  warn: 'chip-warn',
-  brand: 'chip-brand',
-  muted: 'chip bg-surface-3 text-ink-faint',
-  ok: 'chip-ok',
-}
-function statusChip(status: string): string {
-  const tone = CONTRACT_STATUS_TONE[status]
-  return tone ? TONE_CHIP[tone] : 'chip-brand'
-}
-
 function projectName(id: string): string {
   return kindRows.value.find(row => row.projectId === id)?.projectName || '—'
 }
@@ -351,7 +339,9 @@ onMounted(() => {
             >{{ yuan(contractBalance(row)) }}</span>
           </template>
           <template #status="{ row }">
-            <span class="chip" :class="statusChip(row.status)">{{ row.status }}</span>
+            <KitStatusTag :tone="contractStatusTone(row.status)">
+              {{ row.status }}
+            </KitStatusTag>
           </template>
           <template #action="{ row }">
             <RowActionMenu

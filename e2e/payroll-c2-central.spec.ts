@@ -1,14 +1,8 @@
 import type { Page, TestInfo } from '@playwright/test'
-import type { CoreMigrationBatchDTO } from '../app/lib/migration/core-contract'
-import { execFile } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
-import process from 'node:process'
-import { promisify } from 'node:util'
 import { expect, test } from '@playwright/test'
 import * as XLSX from 'xlsx'
-import { payrollC2Repository } from './helpers/payroll-c2-workspace'
+import { preparePayrollC2Fixture as fixture, payrollC2Repository } from './helpers/payroll-c2-workspace'
 
 test.use({ actionTimeout: 15000 })
 function urlIdentity(value: string) {
@@ -196,10 +190,13 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   const path = info.outputPath(file.suggestedFilename())
   await file.saveAs(path)
   const book = XLSX.read(await readFile(path))
-  expect(book.SheetNames).toEqual(['工资表', '签工表'])
+  expect(book.SheetNames).toEqual(['工资表', '签工表', '空鼓扣款汇总', '空鼓采用来源'])
+  expect(XLSX.utils.sheet_to_json(book.Sheets.空鼓扣款汇总!)).toEqual([expect.objectContaining({ 本单空鼓扣款: 0 })])
+  expect(XLSX.utils.sheet_to_json(book.Sheets.空鼓采用来源!)).toEqual([])
   expect(JSON.stringify(XLSX.utils.sheet_to_json(book.Sheets.工资表!, { header: 1 }))).toContain('500')
   expect(JSON.stringify(XLSX.utils.sheet_to_json(book.Sheets.签工表!, { header: 1 }))).toContain('只改原签工内容')
   await page.emulateMedia({ media: 'print' })
+  await expect(page.locator('.payroll-c2-print')).toBeVisible()
   const pdf = await page.pdf({ path: info.outputPath('c2-paired-output.pdf'), printBackground: true, preferCSSPageSize: true })
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const printed = await getDocument({ data: new Uint8Array(pdf) }).promise
@@ -220,28 +217,3 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   await capture(page, info, 'zero-member-month-lock', '[aria-label="签工与工资月份占用"]')
   await writeFile(info.outputPath('verification.json'), JSON.stringify({ ...f, statementId, originalCommand: original, actual: 500, gross: 525, dayworkIds: [first, half], realWorkbookRead: true, printedPdf: true, widths: [390, 768, 1024, 1280, 1440] }, null, 2))
 })
-async function fixture(page: Page, info: TestInfo) {
-  const output = info.outputPath('source.json')
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('e2e/helpers/payroll-c2-migration-source.ts'), output, randomUUID()])
-  const prepared = JSON.parse(await readFile(output, 'utf8'))
-  const { source, snapshotSha256, byteLength } = prepared
-  const session = await (await page.request.get('/api/read/business-session')).json()
-  const envelope = () => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId: randomUUID(), requiredCapability: 'core:migration:write' })
-  const preflight = await page.request.post('/api/migrations/core/preflight', { data: { ...envelope(), source, backup: null } })
-  expect(preflight.ok(), await preflight.text()).toBe(true)
-  const dry = await page.request.post('/api/migrations/core/dry-run', { data: { ...envelope(), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength, createdAt: new Date().toISOString(), immutable: true } } })
-  expect(dry.ok(), await dry.text()).toBe(true)
-  const batch: CoreMigrationBatchDTO = await dry.json()
-  for (const action of ['import', 'confirm']) {
-    const response = await page.request.post(`/api/migrations/core/${batch.batchId}/${action}`, { data: { ...envelope(), batchId: batch.batchId } })
-    expect(response.ok(), await response.text()).toBe(true)
-  }
-  const mapped = (entityType: string, legacyId: string) => {
-    const row = batch.mappings.find(row => row.entityType === entityType && row.legacyId === legacyId)
-    expect(row?.serverId).toBeTruthy()
-    return row!.serverId!
-  }
-  const f = { project: mapped('projects', 'c2-live'), crew: mapped('crews', 'c2-live-crew'), leader: mapped('workers', 'c2-live-leader'), worker: mapped('workers', 'c2-live-worker'), zero: mapped('workers', 'c2-live-zero'), historicalProject: mapped('projects', 'c2-project'), batchId: batch.batchId }
-  await writeFile(info.outputPath('identities.json'), JSON.stringify(f, null, 2))
-  return f
-}

@@ -4,7 +4,7 @@ import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { createTabRestoreValidator, inspectRestorableTabPath } from '~/lib/tabs/restore-target'
 import { createQuantityHollowFixture } from '../helpers/quantity-hollow-fixture'
 
-it('真实原户空鼓冷恢复分别核验户、记录和历史修订并保工资原稿返回', async () => {
+it.each(['record', 'revision', 'project', 'unit'] as const)('空鼓冷恢复拒绝错配 %s 并保工资原稿返回', async (identity) => {
   const f = await createQuantityHollowFixture()
   try {
     const initial = await f.service.hollow(f.scope)
@@ -25,8 +25,9 @@ it('真实原户空鼓冷恢复分别核验户、记录和历史修订并保工�
     const restored = await validate(descriptor)
     expect(restored).toMatchObject({ state: 'resolved', fullPath: target.to })
     expect(hollow).toHaveBeenCalledWith(f.scope, { signal: undefined })
-    for (const fullPath of [target.to.replace(created.hollow.recordId, 'wrong-record'), target.to.replace(created.hollow.revisionId, 'wrong-revision'), target.to.replace(f.scope.projectId, 'wrong-project'), target.to.replace(f.scope.unitId, 'wrong-unit')])
-      expect((await validate({ ...descriptor, fullPath })).state).not.toBe('resolved')
+    const identities = { record: created.hollow.recordId, revision: created.hollow.revisionId, project: f.scope.projectId, unit: f.scope.unitId }
+    const fullPath = target.to.replace(identities[identity], `wrong-${identity}`)
+    expect((await validate({ ...descriptor, fullPath })).state).not.toBe('resolved')
     capabilities = []
     hollow.mockClear()
     expect((await validate(descriptor)).state).toBe('forbidden')

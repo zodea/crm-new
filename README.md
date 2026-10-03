@@ -1,24 +1,14 @@
 # 瑞航 CRM
 
-基于 Nuxt 4 + Vue 3.5 的工程项目管理应用，当前交付方向为浏览器版。已接管实体采用中央读写，过渡本地适配与桌面壳边界见 [ADR 0020](docs/adr/0020-browser-authority-and-demo-workspace-boundary.md)；正式持久化、备份恢复与部署仍需独立验收。
-
-## 文档入口
-
-项目术语、ADR、设计、页面蓝本、数据模型和界面状态统一从 [`docs/README.md`](docs/README.md) 进入。视觉工作再进入 [`docs/design/README.md`](docs/design/README.md)。不要从历史反馈稿、调研笔记或截图开始查规格。
+装修工程公司的项目、合同、资金、物资与施工管理应用，当前交付方向为浏览器版。运行与持久化边界见 [架构说明](docs/rewrite/ARCHITECTURE.md)，正式保存、备份恢复与部署需独立验收。
 
 ## 本地开发
 
+使用 [`.node-version`](.node-version) 指定的 Node 和 `package.json` 指定的 pnpm，按锁文件安装：
+
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-常用校验：
-
-```bash
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-协作约定见 [`AGENTS.md`](AGENTS.md)。本地真实业务参考资料位于被 Git 忽略的目录，不得提交到仓库、测试夹具或 CI。
+验证命令见 `package.json`。文档从 [docs/README.md](docs/README.md) 进入，协作规则见 [AGENTS.md](AGENTS.md)。本地真实业务参考资料不得提交到仓库、测试夹具或 CI。

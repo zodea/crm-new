@@ -58,17 +58,15 @@ describe('中央工序库公开状态', () => {
     expect(state.detail.value).toBeNull()
   })
 
-  it('与对象原型同名的合法新编码使用零基准，已有同名系列使用自身版本', async () => {
-    for (const code of ['constructor', 'toString', '__proto__']) {
-      const { state, repository } = harness()
-      await state.loadLibraries()
-      await state.saveVersion({ ...draft, sourceLibraryId: null, code })
-      expect(repository.execute.mock.calls[0]![0].baseVersion).toBe(0)
-      repository.list.mockResolvedValue({ ...catalog(), seriesVersions: Object.fromEntries([[code, 2]]) })
-      await state.loadLibraries()
-      await state.saveVersion({ ...draft, sourceLibraryId: null, code })
-      expect(repository.execute.mock.calls[1]![0].baseVersion).toBe(2)
-    }
+  it.each((['constructor', 'toString', '__proto__']).map(input => ({ input })))('与对象原型同名的合法新编码使用零基准，已有同名系列使用自身版本：输入案例 %#', async ({ input: code }) => {
+    const { state, repository } = harness()
+    await state.loadLibraries()
+    await state.saveVersion({ ...draft, sourceLibraryId: null, code })
+    expect(repository.execute.mock.calls[0]![0].baseVersion).toBe(0)
+    repository.list.mockResolvedValue({ ...catalog(), seriesVersions: Object.fromEntries([[code, 2]]) })
+    await state.loadLibraries()
+    await state.saveVersion({ ...draft, sourceLibraryId: null, code })
+    expect(repository.execute.mock.calls[1]![0].baseVersion).toBe(2)
   })
 
   it('未读不能保存；从任意旧版复制使用已读同编码最高版及旧版来源凭据', async () => {

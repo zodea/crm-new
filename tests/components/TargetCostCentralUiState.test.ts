@@ -1,4 +1,5 @@
 import type { TargetCostFormRead, TargetCostPending } from '~/lib/target-cost/central-contract'
+import { fireEvent, within } from '@testing-library/vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, reactive, shallowRef } from 'vue'
@@ -23,7 +24,10 @@ const Harness = defineComponent({ setup() {
   const ui = useTargetCostForm()
   sessions.push(ui)
   return () => h('div', [
-    h('input', { 'aria-label': '预算版本名', 'value': ui.draft.value.name ?? '', 'onInput': (event: Event) => ui.draft.value.name = (event.target as HTMLInputElement).value }),
+    h('form', { ref: ui.formElement }, [
+      h('input', { 'aria-label': '预算版本名', 'data-field': 'name', 'disabled': !ui.editable.value, 'value': ui.draft.value.name ?? '', 'onInput': (event: Event) => ui.draft.value.name = (event.target as HTMLInputElement).value }),
+      ui.editable.value ? h('input', { 'aria-label': '预算项目', 'data-field': 'projectId', 'value': ui.draft.value.projectId ?? '' }) : h('span', '预算项目暂不可编辑'),
+    ]),
     h('output', { 'data-testid': 'read-version' }, ui.read.value?.context.sourceVersion),
     h('output', { 'data-testid': 'latest-version' }, ui.latest.value?.context.sourceVersion),
     h('output', { 'data-testid': 'error' }, ui.error.value),
@@ -87,11 +91,11 @@ describe('中央预算版本头独立草稿', () => {
     await flushPromises()
     await wrapper.get('input').setValue('A 未保存')
     loadForm.mockResolvedValue(form('budget-a', 'v2'))
-    await wrapper.findAll('button')[0]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '核对', exact: true }))
     await flushPromises()
     expect(wrapper.get('[data-testid="read-version"]').text()).toBe('v1')
     expect(wrapper.get('[data-testid="latest-version"]').text()).toBe('v2')
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '保存', exact: true }))
     await flushPromises()
     expect(saveForm).toHaveBeenCalledWith(expect.objectContaining({ context: expect.objectContaining({ sourceVersion: 'v1' }) }), expect.objectContaining({ name: 'A 未保存', contractRevenue: null, taxInclusiveTotal: 0 }), 'save', { add: [], removeIds: [], restoreIds: [] })
     expect(close).toHaveBeenCalledWith('/project/target-cost/form/budget-a')
@@ -104,10 +108,57 @@ describe('中央预算版本头独立草稿', () => {
     expect(await guards.get(route.path)!()).toBe(false)
     expect(wrapper.get('input').element.value).toBe('保存前名称')
     saveForm.mockRejectedValue(new ProjectRepositoryProblem({ ...projectProblem('validation-failed', '金额有误'), fieldErrors: { 'draft.taxAmount': ['不能为负数'] } }))
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '保存', exact: true }))
     await flushPromises()
     expect(sessions[0]!.fieldErrors.value).toEqual({ taxAmount: '不能为负数' })
     expect(wrapper.get('input').element.value).toBe('保存前名称')
+    expect(close).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+  it.each([
+    { field: 'name', label: '预算版本名', message: '请填写版本名称' },
+    { field: 'projectId', label: '预算项目', message: '请选择项目' },
+  ])('提交失败后等待编辑控件恢复，再聚焦首错：$field', async ({ field, label, message }) => {
+    saveForm.mockRejectedValue(new ProjectRepositoryProblem({ ...projectProblem('validation-failed', '请检查预算版本字段'), fieldErrors: { [`draft.${field}`]: [message] } }))
+    const wrapper = mount(Harness, { attachTo: document.body })
+    await flushPromises()
+    await fireEvent.click(within(wrapper.element).getByRole('button', { name: '保存', exact: true }))
+    await flushPromises()
+    expect(sessions[0]!.busy.value).toBe(false)
+    expect(sessions[0]!.fieldErrors.value).toEqual({ [field]: message })
+    expect(document.activeElement).toBe(within(wrapper.element).getByRole('textbox', { name: label }))
+    expect(close).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+  it.each([
+    { label: '页签已停用', deactivate: true },
+    { label: '目标已更换', deactivate: false },
+  ])('迟到字段错误不能抢走当前页面焦点：$label', async ({ deactivate }) => {
+    let rejectSave!: (cause: Error) => void
+    saveForm.mockImplementation(() => new Promise((_resolve, reject) => rejectSave = reject))
+    const visible = shallowRef(true)
+    const Other = defineComponent({ render: () => h('p', '其他页签') })
+    const wrapper = mount(defineComponent({ setup: () => () => h('div', [
+      h(KeepAlive, () => visible.value ? h(Harness) : h(Other)),
+      h('input', { 'aria-label': '当前页面输入' }),
+    ]) }), { attachTo: document.body })
+    await flushPromises()
+    await fireEvent.click(within(wrapper.element).getByRole('button', { name: '保存', exact: true }))
+    if (deactivate) {
+      visible.value = false
+    }
+    else {
+      route.params.id = 'budget-b'
+      route.path = '/project/target-cost/form/budget-b'
+      route.fullPath = `${route.path}?origin=real`
+    }
+    await flushPromises()
+    const current = within(wrapper.element).getByRole('textbox', { name: '当前页面输入' })
+    current.focus()
+    rejectSave(new ProjectRepositoryProblem({ ...projectProblem('validation-failed', '旧稿名称有误'), fieldErrors: { 'draft.name': ['旧稿请填写名称'] } }))
+    await flushPromises()
+    expect(document.activeElement).toBe(current)
+    expect(sessions[0]!.fieldErrors.value).toEqual({})
     expect(close).not.toHaveBeenCalled()
     wrapper.unmount()
   })
@@ -122,7 +173,7 @@ describe('中央预算版本头独立草稿', () => {
     const wrapper = mount(defineComponent({ setup: () => () => h(KeepAlive, () => visible.value ? h(Harness) : h(Other)) }))
     await flushPromises()
     await wrapper.get('input').setValue('未决预算')
-    await wrapper.findAll('button')[1]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '保存', exact: true }))
     visible.value = false
     await flushPromises()
     rejectSave(new Error('回执丢失'))
@@ -132,7 +183,7 @@ describe('中央预算版本头独立草稿', () => {
     expect(wrapper.get('input').element.value).toBe('未决预算')
     expect(sessions[0]!.busy.value).toBe(false)
     expect(await guards.get(route.path)!()).toBe(false)
-    await wrapper.findAll('button')[2]!.trigger('click')
+    await fireEvent.click(within(wrapper.element as HTMLElement).getByRole('button', { name: '恢复原提交', exact: true }))
     await flushPromises()
     expect(recover).toHaveBeenCalledWith(expect.objectContaining({ command: expect.objectContaining({ commandId: 'cmd', sourceVersion: 'v1' }) }))
     wrapper.unmount()

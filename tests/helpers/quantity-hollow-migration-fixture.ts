@@ -57,7 +57,7 @@ export async function importQuantityHollowFixture(native: TestDb) {
     await native.execute('PRAGMA foreign_keys=ON')
     const hash = createHash('sha256').update(bytes).digest('hex')
     await core.preflight({ ...envelope('hollow-preflight'), source, backup: null }, session)
-    const batch = await core.dryRun({ ...envelope('hollow-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: bytes.length, createdAt: new Date().toISOString(), immutable: true } }, session)
+    const batch = await core.dryRun({ ...envelope('hollow-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }, session)
     await core.importBatch({ ...envelope('hollow-import'), batchId: batch.batchId }, session)
     await core.confirm({ ...envelope('hollow-confirm'), batchId: batch.batchId }, session)
     const projectId = projects()[0]!.id

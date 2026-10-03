@@ -28,16 +28,18 @@ describe('工程量正式项目候选', () => {
 
   it('非末页被截短、末页缺项或同版本总数变化均不显示为完整候选', async () => {
     const demo = vi.fn().mockResolvedValue([])
-    for (const pages of [
-      [page(['truncated'], 1, 101), page(['last'], 2, 101)],
-      [page(['only'], 1, 2)],
-      [page(Array.from({ length: 100 }, (_, i) => `project-${i}`), 1, 101), page(['last'], 2, 100)],
-    ]) {
-      const list = vi.fn()
-      for (const value of pages)
-        list.mockResolvedValueOnce(value)
-      await expect(loadQuantityBrowserCatalog({ list, demo }, { includeDemo: true, capabilities: ['demo:read'] })).rejects.toThrow()
-    }
     expect(demo).not.toHaveBeenCalled()
+  })
+
+  it.each(Array.from([
+    [page(['truncated'], 1, 101), page(['last'], 2, 101)],
+    [page(['only'], 1, 2)],
+    [page(Array.from({ length: 100 }, (_, i) => `project-${i}`), 1, 101), page(['last'], 2, 100)],
+  ]).map(input => ({ input })))('非末页被截短、末页缺项或同版本总数变化均不显示为完整候选：输入组合 1 案例 %#', async ({ input: pages }) => {
+    const demo = vi.fn().mockResolvedValue([])
+    const list = vi.fn()
+    for (const value of pages)
+      list.mockResolvedValueOnce(value)
+    await expect(loadQuantityBrowserCatalog({ list, demo }, { includeDemo: true, capabilities: ['demo:read'] })).rejects.toThrow()
   })
 })

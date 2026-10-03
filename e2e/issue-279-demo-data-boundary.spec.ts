@@ -122,9 +122,8 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
     await page.goto('/base/customer')
-    await page.waitForTimeout(500)
-    expect(pageErrors).toEqual([])
     await expect(page.getByRole('status', { name: '还没有客户档案' })).toBeVisible({ timeout: 20_000 })
+    expect(pageErrors).toEqual([])
     await expect(page.getByRole('button', { name: '打开通知中心，没有未读消息' })).toBeVisible()
 
     await page.getByRole('button', { name: '包含测试数据' }).click()

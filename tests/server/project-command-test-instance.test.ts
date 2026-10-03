@@ -163,7 +163,36 @@ describe('project command test instance', () => {
     )).rejects.toMatchObject({ problem: { code: 'forbidden' } })
   })
 
-  it('在命令边界拒绝非法日期、负数与脏附件字段', async () => {
+  it.each(Array.from(([
+    {
+      ...createRequest('command-invalid-date'),
+      draft: { ...createRequest('command-invalid-date').draft, startDate: '15/08/2026' },
+    },
+    {
+      ...createRequest('command-negative-number'),
+      draft: { ...createRequest('command-negative-number').draft, contractAmount: -1 },
+    },
+    {
+      ...createRequest('command-invalid-attachment-text'),
+      attachments: {
+        add: [{ fileName: '立项.pdf', filePath: 123 }],
+        removeIds: [],
+        restoreIds: [],
+      },
+    },
+    {
+      ...createRequest('command-invalid-attachment-size'),
+      attachments: {
+        add: [{ fileName: '立项.pdf', fileSize: -1 }],
+        removeIds: [],
+        restoreIds: [],
+      },
+    },
+    {
+      ...createRequest('command-invalid-remove-id'),
+      attachments: { add: [], removeIds: [''], restoreIds: [] },
+    },
+  ]) as unknown[]).map(input => ({ input })))('在命令边界拒绝非法日期、负数与脏附件字段：输入案例 %#', async ({ input: request }) => {
     const invalidRequests: unknown[] = [
       {
         ...createRequest('command-invalid-date'),
@@ -195,11 +224,9 @@ describe('project command test instance', () => {
       },
     ]
 
-    for (const request of invalidRequests) {
-      expect(() => parseProjectCommandRequest(request)).toThrowError(expect.objectContaining({
-        problem: expect.objectContaining({ code: 'validation-failed' }),
-      }))
-    }
+    expect(() => parseProjectCommandRequest(request)).toThrowError(expect.objectContaining({
+      problem: expect.objectContaining({ code: 'validation-failed' }),
+    }))
 
     const instance = createProjectCommandTestInstance()
     await expect(instance.execute(

@@ -61,26 +61,17 @@ describe('entityDetailShell', () => {
     expect(modules).toEqual(['summary', 'process', 'tabs', 'content'])
   })
 
-  it('uses the shared state surface for loading, empty, forbidden and not-found states', () => {
-    const states = [
-      { state: 'loading', role: 'status', title: '正在加载分供方详情' },
-      { state: 'empty', role: 'status', title: '该分供方还没有业务数据' },
-      { state: 'forbidden', role: 'status', title: '无权查看该分供方' },
-      { state: 'not-found', role: 'status', title: '分供方不存在或已删除' },
-    ] as const
-
-    for (const item of states) {
-      const view = render(EntityDetailShell, {
-        props: {
-          title: '分供方详情',
-          state: item.state,
-          stateTitle: item.title,
-        },
-        global,
-      })
-      expect(screen.getByRole(item.role, { name: item.title })).not.toBeNull()
-      view.unmount()
-    }
+  it.each([
+    { state: 'loading', role: 'status', title: '正在加载分供方详情' },
+    { state: 'empty', role: 'status', title: '该分供方还没有业务数据' },
+    { state: 'forbidden', role: 'status', title: '无权查看该分供方' },
+    { state: 'not-found', role: 'status', title: '分供方不存在或已删除' },
+  ] as const)('uses the shared state surface for $state', ({ state, role, title }) => {
+    render(EntityDetailShell, {
+      props: { title: '分供方详情', state, stateTitle: title },
+      global,
+    })
+    expect(screen.getByRole(role, { name: title })).not.toBeNull()
   })
 
   it('keeps the return route available when the entity does not exist', () => {

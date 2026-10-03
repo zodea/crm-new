@@ -1,7 +1,8 @@
-// 合同域枚举与语义色调——单一权威源（三列表 SegTab 视图 / 表单下拉 / 状态 chip 共用）。
+// 合同域枚举与语义色调——单一权威源（三列表 SegTab 视图 / 表单下拉 / KitStatusTag 共用）。
 // 蓝本：DC重构设计源码/kit/{ConContract,SubContract,MatContract,ContractDetail}Screen.jsx（issue #90 批A）。
-// 与 ~/lib/project/status.ts 同构：只共享「枚举集」与「语义色调」，具体 class 由各页按色调映射。
+// 状态事实由领域维护，视觉由 KitStatusTag 承接。
 
+import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
 import type { StatusTone } from '~/lib/project/status'
 
 /** 合同类别（kind）：施工=收入侧（甲方=项目 developer），分包/材采=支出侧（乙方=分供方） */
@@ -25,6 +26,13 @@ export const CONTRACT_STATUS_TONE: Record<string, StatusTone> = {
   已签订: 'muted',
   已结算: 'warn',
   已结清: 'ok',
+}
+
+/** 未知及空状态保留原文或调用点空值文案，使用中性展示。 */
+export function contractStatusTone(status: string | null | undefined): KitStatusTone {
+  const value = status ?? ''
+  const tone = Object.hasOwn(CONTRACT_STATUS_TONE, value) ? CONTRACT_STATUS_TONE[value] : undefined
+  return !tone || tone === 'muted' ? 'neutral' : tone
 }
 
 /** 收入/支出侧口径文案：施工=开票/收款/应收，支出侧（分包/材采）=收票/支付/应付 */

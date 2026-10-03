@@ -396,7 +396,7 @@ useEventListener(() => document, 'click', () => {
 }
 
 @media print {
-  :global(body *) {
+  :global(:where(body:has(.invoice-print-output)) *) {
     visibility: hidden !important;
   }
 

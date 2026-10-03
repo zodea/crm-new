@@ -223,6 +223,19 @@ function positive(source: URLSearchParams, target: URLSearchParams, key: string,
     target.set(key, raw)
 }
 
+/** 兼容旧单层锚点与当前 DOM 身份再编码的双层锚点；实体 ID 中的百分号仍是事实身份。 */
+export function customerReturnAnchorIdentity(anchor: string): string | null {
+  try {
+    const identity = decodeURIComponent(anchor).replace(/^customer-row-/, '')
+    return identity.startsWith('real:') || identity.startsWith('demo:')
+      ? identity
+      : decodeURIComponent(identity)
+  }
+  catch {
+    return null
+  }
+}
+
 export function validateCustomerReturnTo(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 4096 || !value.startsWith('/')
     || value.startsWith('//') || value.includes('\\') || control(value)) {
@@ -235,8 +248,10 @@ export function validateCustomerReturnTo(value: unknown): string | null {
   catch {
     return null
   }
-  if (url.origin !== 'https://ruihang.invalid' || url.pathname !== ROUTE || !ANCHOR.test(url.hash.slice(1)))
+  if (url.origin !== 'https://ruihang.invalid' || url.pathname !== ROUTE || !ANCHOR.test(url.hash.slice(1))
+    || customerReturnAnchorIdentity(url.hash.slice(1)) === null) {
     return null
+  }
   const query = new URLSearchParams()
   const search = url.searchParams.get('search')
   const statuses = url.searchParams.getAll('status')

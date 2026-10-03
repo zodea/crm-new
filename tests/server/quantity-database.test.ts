@@ -35,7 +35,7 @@ it('实际SQL导入保留软删、历史BOQ与审计双快照，完成后恢复�
     const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'core:migration:write' as const, commandId })
     await core.preflight({ ...envelope('preflight'), source, backup: null }, session)
     const hash = 'e'.repeat(64)
-    const batch = await core.dryRun({ ...envelope('dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 442, createdAt: new Date().toISOString(), immutable: true } }, session)
+    const batch = await core.dryRun({ ...envelope('dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 442, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }, session)
     await core.importBatch({ ...envelope('import'), batchId: batch.batchId }, session)
     await core.confirm({ ...envelope('confirm'), batchId: batch.batchId }, session)
     const plan = planQuantityMigration(core.snapshot(session), new Map())

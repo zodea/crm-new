@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 test.describe('Issue #169：责任配置弹窗视觉与模态边界', () => {
   test('1740×974 下无原生外框、空网格列或背景双滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1740, height: 974 })
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await installQuantityProductionFixture(page)
     await page.getByRole('button', { name: '责任配置', exact: true }).click()
 
     const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
@@ -43,8 +43,7 @@ test.describe('Issue #169：责任配置弹窗视觉与模态边界', () => {
 
   test('代表视口保持内容与操作可达且不撑宽页面', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await installQuantityProductionFixture(page)
     await page.getByRole('button', { name: '责任配置', exact: true }).click()
 
     const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })

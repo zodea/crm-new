@@ -12,8 +12,10 @@ describe('datetime formatting', () => {
       .toBe('2026-07-31 00:20:30')
   })
 
-  it('空值或无效时间使用回退文案', () => {
-    expect(formatShanghaiDateTime(null)).toBe('—')
-    expect(formatShanghaiDateTime('invalid', '未记录时间')).toBe('未记录时间')
+  it.each([
+    { case: 'null', input: null, argument2: undefined, expected: '—' },
+    { case: '\'invalid\' / \'未记录时间\'', input: 'invalid', argument2: '未记录时间', expected: '未记录时间' },
+  ])('空值或无效时间使用回退文案 / formatShanghaiDateTime：$case', ({ input, argument2, expected }) => {
+    expect(formatShanghaiDateTime(input, argument2)).toBe(expected)
   })
 })

@@ -2,8 +2,10 @@
 import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useTimeoutFn } from '@vueuse/core'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { useReceiptSourceReturn } from '~/composables/useReceiptSourceReturn'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
+import { contractStatusTone } from '~/lib/contract/status'
 import { resolveCustomerRelationReturnOrigin } from '~/lib/customer/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
@@ -182,7 +184,9 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
       <template #status>
         <template v-if="detail">
           <span class="chip" :class="detail.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ detail.dataOrigin === 'demo' ? '演示只读' : '正式数据' }}</span>
-          <span class="chip bg-surface-3 text-ink-soft">{{ detail.contract.status }}</span>
+          <KitStatusTag :tone="contractStatusTone(detail.contract.status)">
+            {{ detail.contract.status }}
+          </KitStatusTag>
         </template>
       </template>
       <template #actions>

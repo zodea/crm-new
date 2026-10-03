@@ -9,8 +9,6 @@ import {
 
 describe('送货单号规范化', () => {
   it('用 NFKC、首尾去空格和大写形成持久化与自然键共用值', () => {
-    expect(normalizeDeliveryOrderNo('  ａｂｃ－１２３  ')).toBe('ABC-123')
-    expect(normalizeDeliveryOrderNo('　')).toBe('')
     expect(deliveryNaturalKey({
       projectId: 'project-1',
       supplierId: 'supplier-1',
@@ -21,10 +19,17 @@ describe('送货单号规范化', () => {
       orderNo: 'ＡＢＣ－１２３',
     }))
   })
+
+  it.each([
+    { case: '\' ａｂｃ－１２３ \'', input: '  ａｂｃ－１２３  ', expected: 'ABC-123' },
+    { case: '\' \'', input: '　', expected: '' },
+  ])('用 NFKC、首尾去空格和大写形成持久化与自然键共用值 / normalizeDeliveryOrderNo：$case', ({ input, expected }) => {
+    expect(normalizeDeliveryOrderNo(input)).toBe(expected)
+  })
 })
 
 describe('送货单人工复核金额', () => {
-  it('计算行随数量/单价更新，OCR 或手改金额不被覆盖', () => {
+  function createCalculatedDeliveryLine() {
     const calculated = {
       id: 'calculated',
       qty: 2,
@@ -32,17 +37,29 @@ describe('送货单人工复核金额', () => {
       amount: 20,
       amountSource: 'calculated' as const,
     }
-    expect(editDeliveryAmountLine(calculated, 'qty', 3)).toMatchObject({ amount: 30 })
+    return { calculated }
+  }
 
-    const ocr = { ...calculated, id: 'ocr', amount: 19.5, amountSource: 'ocr' as const }
-    expect(editDeliveryAmountLine(ocr, 'qty', 3)).toMatchObject({ qty: 3, amount: 19.5, amountSource: 'ocr' })
-
-    const manual = editDeliveryAmountLine(calculated, 'amount', 18)
-    expect(editDeliveryAmountLine(manual, 'unitPrice', 12)).toMatchObject({
-      unitPrice: 12,
-      amount: 18,
-      amountSource: 'manual',
-    })
+  it.each([
+    { case: 'calculated / \'qty\' / 3', prepare: ({ calculated }: ReturnType<typeof createCalculatedDeliveryLine>) => {
+      return { input: calculated, argument2: 'qty', argument3: 3, expected: { amount: 30 } } as const
+    } },
+    { case: 'ocr / \'qty\' / 3', prepare: ({ calculated }: ReturnType<typeof createCalculatedDeliveryLine>) => {
+      const ocr = { ...calculated, id: 'ocr', amount: 19.5, amountSource: 'ocr' as const }
+      return { input: ocr, argument2: 'qty', argument3: 3, expected: { qty: 3, amount: 19.5, amountSource: 'ocr' } } as const
+    } },
+    { case: 'manual / \'unitPrice\' / 12', prepare: ({ calculated }: ReturnType<typeof createCalculatedDeliveryLine>) => {
+      const manual = editDeliveryAmountLine(calculated, 'amount', 18)
+      return { input: manual, argument2: 'unitPrice', argument3: 12, expected: {
+        unitPrice: 12,
+        amount: 18,
+        amountSource: 'manual',
+      } } as const
+    } },
+  ])('计算行随数量/单价更新，OCR 或手改金额不被覆盖 / editDeliveryAmountLine：$case', ({ prepare }) => {
+    const fixture = createCalculatedDeliveryLine()
+    const { input, argument2, argument3, expected } = prepare(fixture)
+    expect(editDeliveryAmountLine(input, argument2, argument3)).toMatchObject(expected)
   })
 
   it('按当前可编辑金额重算合计，并定位数量×单价不平的行', () => {
@@ -108,7 +125,7 @@ describe('送货单人工复核金额', () => {
     })).toEqual([])
   })
 
-  it('材料名称、单位和非零数量继续作为归档硬门禁', () => {
+  it.each([{ name: '' }, { unit: '' }, { qty: 0 }])('材料名称、单位和非零数量继续作为归档硬门禁：%j', (patch) => {
     const base = {
       projectId: 'project-1',
       supplierId: 'supplier-1',
@@ -128,14 +145,9 @@ describe('送货单人工复核金额', () => {
       confirmations: { humanReviewed: true },
     }
 
-    for (const item of [
-      { ...base.items[0]!, name: '' },
-      { ...base.items[0]!, unit: '' },
-      { ...base.items[0]!, qty: 0 },
-    ]) {
-      expect(deliveryReviewIssueDetails({ ...base, items: [item] })
-        .some(issue => issue.key === 'items')).toBe(true)
-    }
+    const item = { ...base.items[0]!, ...patch }
+    expect(deliveryReviewIssueDetails({ ...base, items: [item] })
+      .some(issue => issue.key === 'items')).toBe(true)
   })
 
   it('金额与数量乘单价不一致时仍需人工复核并记录原因', () => {

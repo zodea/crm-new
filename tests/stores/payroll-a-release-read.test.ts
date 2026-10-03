@@ -13,11 +13,29 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-it.each(['ordinary', 'ordinary-unknown', 'management'] as const)('%s 真实费用工资发放后，以合法只读冻结输出完成原提交核对', async (scenario) => {
+type AvailableOutput = Extract<PayrollAOutputRead, { state: 'available' }>
+const corruptedOutputs = [
+  (output: AvailableOutput): PayrollAOutputRead => ({ ...output, context: { ...output.context, actorId: 'other' } }),
+  (output: AvailableOutput): PayrollAOutputRead => ({ ...output, context: { ...output.context, workspaceId: 'other' } }),
+  (output: AvailableOutput): PayrollAOutputRead => ({ ...output, context: { ...output.context, origin: 'demo' } }),
+  (output: AvailableOutput): PayrollAOutputRead => ({ ...output, context: { ...output.context, capabilities: ['payroll:read'] } }),
+  (output: AvailableOutput): PayrollAOutputRead => ({ ...output, statementId: 'other' }),
+  (output: AvailableOutput): PayrollAOutputRead => ({ ...output, document: { ...output.document, id: 'other' } }),
+  (output: AvailableOutput): PayrollAOutputRead => ({ ...output, document: { ...output.document, projectId: 'other' } }),
+  (output: AvailableOutput): PayrollAOutputRead => ({ ...output, state: 'unavailable', document: null, reasons: ['原件不可用'] }),
+]
+
+it.each([
+  ...corruptedOutputs.map(corrupt => ({ scenario: 'ordinary' as const, actualAmount: 3815, corrupt })),
+  { scenario: 'ordinary-unknown' as const, actualAmount: 3815, corrupt: null },
+  { scenario: 'management' as const, actualAmount: 100, corrupt: null },
+])('$scenario 工资实发 $actualAmount 后以授权原件核对提交：%#', async ({ scenario, actualAmount, corrupt }) => {
+  // 条件：普通簿应付3815（含215补贴）或管理簿实付100；动作：提交，失响应时换Pinia实例恢复原命令。
+  // 结果：原工资、分配、来源、版本、日志和回执只提交一次，授权原件冷读后才解除待核对。
+  // 防止响应丢失被误判成未付款、恢复时重写已发原件，或错误来源的读取解除原提交保护。
   const f = await createPayrollAFeesFixture()
   try {
     let statementId: string
-    const actualAmount = scenario === 'management' ? 100 : 3815
     if (scenario === 'management') {
       statementId = (await (await f.management()).start()).statementId!
     }
@@ -59,10 +77,15 @@ it.each(['ordinary', 'ordinary-unknown', 'management'] as const)('%s 真实费�
     if (scenario === 'ordinary-unknown') {
       await expect(release).rejects.toThrow('服务暂时不可用')
       const original = store.getAPending(before)!
+      const tables = ['wage_statements', 'wage_statement_allocations', 'payroll_a_statement_sources', 'payroll_command_receipts', 'payroll_revision', 'operation_logs']
+      const persisted = async () => Object.fromEntries(await Promise.all(tables.map(async table => [table, await f.db.select(`SELECT * FROM ${table} ORDER BY rowid`)])))
+      const committedBeforeRecovery = await persisted()
+      expect((await f.service.actualLedger({ origin: 'real' }, { projectId: 'p' })).netAmount.value).toBe(3815)
       setActivePinia(createPinia())
       store = usePayrollAStore()
       await store.recoverA(store.getAPending(before)!)
       expect(commands).toEqual([original.command.commandId, original.command.commandId])
+      expect(await persisted()).toEqual(committedBeforeRecovery)
     }
     else {
       await release
@@ -75,28 +98,22 @@ it.each(['ordinary', 'ordinary-unknown', 'management'] as const)('%s 真实费�
     expect(() => store.acknowledgeA(original, before, output)).toThrow()
     expect(() => store.acknowledgeA(original, refreshed, structuredClone(output))).toThrow()
 
-    if (scenario === 'ordinary' && output.state === 'available') {
-      const invalidOutputs: PayrollAOutputRead[] = [
-        { ...output, context: { ...output.context, actorId: 'other' } },
-        { ...output, context: { ...output.context, workspaceId: 'other' } },
-        { ...output, context: { ...output.context, origin: 'demo' } },
-        { ...output, context: { ...output.context, capabilities: ['payroll:read'] } },
-        { ...output, statementId: 'other' },
-        { ...output, document: { ...output.document, id: 'other' } },
-        { ...output, document: { ...output.document, projectId: 'other' } },
-        { ...output, state: 'unavailable', document: null, reasons: ['原件不可用'] },
-      ]
-      for (const invalid of invalidOutputs) {
-        const mock = vi.spyOn(repository, 'aOutput').mockResolvedValueOnce(invalid)
-        const read = await store.loadAOutput({ origin: 'real' }, statementId)
-        expect(() => store.acknowledgeA(original, refreshed, read)).toThrow()
-        expect(store.getAPending(before)?.state).toBe('awaiting-read')
-        mock.mockRestore()
-      }
+    if (corrupt && output.state === 'available') {
+      const invalid = corrupt(output)
+
+      const mock = vi.spyOn(repository, 'aOutput').mockResolvedValueOnce(invalid)
+      const read = await store.loadAOutput({ origin: 'real' }, statementId)
+      expect(() => store.acknowledgeA(original, refreshed, read)).toThrow()
+      expect(store.getAPending(before)?.state).toBe('awaiting-read')
+      mock.mockRestore()
     }
     store.acknowledgeA(original, refreshed, output)
     expect(store.getAPending(before)).toBeNull()
-    expect(await f.db.select('SELECT id FROM wage_statements WHERE status=\'released\'')).toHaveLength(1)
+    expect(await f.db.select('SELECT id,actual_amount FROM wage_statements WHERE status=\'released\'')).toEqual([{ id: statementId, actual_amount: actualAmount }])
+    expect(await f.db.select('SELECT worker_id,allocated_amount_fen FROM wage_statement_allocations WHERE statement_id=? AND deleted_at IS NULL ORDER BY worker_id', [statementId])).toEqual(scenario === 'management'
+      ? [{ worker_id: 'w', allocated_amount_fen: 10000 }]
+      : [{ worker_id: 'w', allocated_amount_fen: 381500 }, { worker_id: 'zero', allocated_amount_fen: 0 }])
+    expect((await f.service.actualLedger({ origin: 'real' }, { projectId: 'p' })).netAmount.value).toBe(actualAmount)
   }
   finally { await f.close() }
 })

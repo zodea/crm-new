@@ -142,7 +142,12 @@ describe('quantity store：户×工种责任配置唯一写路径', () => {
     ])
   })
 
-  it('候选按多工种与活项能力过滤，存量单一 trade 仍兼容', async () => {
+  it.each([
+    { assigneeId: 'crew-old', expected: true },
+    { assigneeId: 'crew-cross', expected: true },
+    { assigneeId: 'crew-partial', expected: false },
+    { assigneeId: 'worker-partial', expected: true },
+  ])('候选按多工种与活项能力过滤：$assigneeId', async ({ assigneeId, expected }) => {
     await mem.execute(`
       INSERT INTO crews (
         id, name, trade, trade_capabilities, item_capabilities
@@ -165,10 +170,7 @@ describe('quantity store：户×工种责任配置唯一写路径', () => {
       .map(option => option.itemName)
     const byId = new Map(source.assignees.map(assignee => [assignee.id, assignee]))
 
-    expect(quantityAssigneeIsCandidate(byId.get('crew-old')!, '泥水工', mudItems)).toBe(true)
-    expect(quantityAssigneeIsCandidate(byId.get('crew-cross')!, '泥水工', mudItems)).toBe(true)
-    expect(quantityAssigneeIsCandidate(byId.get('crew-partial')!, '泥水工', mudItems)).toBe(false)
-    expect(quantityAssigneeIsCandidate(byId.get('worker-partial')!, '泥水工', mudItems)).toBe(true)
+    expect(quantityAssigneeIsCandidate(byId.get(assigneeId)!, '泥水工', mudItems)).toBe(expected)
     expect(quantityAssigneeRequiresDetailedScope(
       byId.get('worker-partial')!,
       '泥水工',

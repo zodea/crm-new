@@ -50,9 +50,10 @@ test.describe('Issue #321：分包合同专属中央详情', () => {
     await expect(page.getByText('五月过程结算')).toBeVisible()
     await expect(page.getByText('样板层完工结算')).toBeVisible()
     await page.getByRole('tab', { name: '材料领用' }).click()
-    await expect(page.getByTestId('subcontract-material-uses')).toContainText('缺少合同或分供方稳定外键')
+    await expect(page.getByTestId('subcontract-material-uses')).toContainText('暂无材料使用记录')
+    await expect(page.getByTestId('subcontract-material-uses').getByRole('link')).toHaveCount(0)
     await page.reload()
-    await expect(page.getByTestId('subcontract-material-uses')).toContainText('不做名称推断')
+    await expect(page.getByTestId('subcontract-material-uses')).toContainText('材料使用记录尚未关联到此合同。')
   })
 
   test('正式分包合同经中央命令新建、编辑、详情和刷新闭合', async ({ page }) => {

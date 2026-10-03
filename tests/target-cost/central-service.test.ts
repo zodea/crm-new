@@ -56,7 +56,7 @@ describe('中央预算工作区事务', () => {
     expect((await f.service.list({ origin: 'real' })).rows).toEqual([])
     await expect(f.service.detail({ origin: 'real' }, saved.id)).rejects.toThrow('所属项目')
   })
-  it('详情边界保留旧小数数量与null金额，缺损头金额及错科目来源不进入页面', async () => {
+  async function createDecodeTargetCostReadFixture() {
     const f = await fixture()
     const result = await f.create('来源核对', false, 'p')
     await f.db.execute('INSERT INTO target_cost_items(id,target_cost_id,cost_category,item_name,qty,unit_price,amount) VALUES (?,?,?,?,?,?,?)', ['legacy-precision', result.id, '材料', '保留原数量', 0.001, null, 0])
@@ -65,11 +65,30 @@ describe('中央预算工作区事务', () => {
     expect(decoded.view.items[0]).toMatchObject({ qty: 0.001, unitPrice: null, amount: 0 })
     const incomplete = structuredClone(wire)
     delete incomplete.view.header.contractRevenue
-    expect(() => decodeTargetCostRead(incomplete, 'detail', { origin: 'real' }, result.id)).toThrow('不完整')
+    return { f, result, wire, decoded, incomplete }
+  }
+
+  it('详情边界保留旧小数数量与null金额，缺损头金额及错科目来源不进入页面', async () => {
+    const { wire } = await createDecodeTargetCostReadFixture()
     const wrongSource = structuredClone(wire)
     const category = wrongSource.view.categories.find(row => row.category === '材料')!
     category.sources.contract = { kind: 'entity-list', entity: 'contract', variant: 'material', view: null, filters: { projectId: 'p', dataOrigin: 'real', costCategory: '其他' } }
-    expect(() => decodeTargetCostRead(wrongSource, 'detail', { origin: 'real' }, result.id)).toThrow('不完整')
+  })
+
+  it.each([
+    { case: 'incomplete / \'detail\' / { origin: \'real\' } / result.id', prepare: async ({ result, incomplete }: Awaited<ReturnType<typeof createDecodeTargetCostReadFixture>>) => {
+      return { input: incomplete, argument2: 'detail', argument3: { origin: 'real' }, argument4: result.id, expected: '不完整' } as const
+    } },
+    { case: 'wrongSource / \'detail\' / { origin: \'real\' } / result.id', prepare: async ({ result, wire }: Awaited<ReturnType<typeof createDecodeTargetCostReadFixture>>) => {
+      const wrongSource = structuredClone(wire)
+      const category = wrongSource.view.categories.find(row => row.category === '材料')!
+      category.sources.contract = { kind: 'entity-list', entity: 'contract', variant: 'material', view: null, filters: { projectId: 'p', dataOrigin: 'real', costCategory: '其他' } }
+      return { input: wrongSource, argument2: 'detail', argument3: { origin: 'real' }, argument4: result.id, expected: '不完整' } as const
+    } },
+  ])('详情边界保留旧小数数量与null金额，缺损头金额及错科目来源不进入页面 / decodeTargetCostRead：$case', async ({ prepare }) => {
+    const fixture = await createDecodeTargetCostReadFixture()
+    const { input, argument2, argument3, argument4, expected } = await prepare(fixture)
+    expect(() => decodeTargetCostRead(input, argument2, argument3, argument4)).toThrow(expected)
   })
   it('无项目草稿不借工程量权限，保留null/0并读回真实附件正文', async () => {
     const f = await fixture()

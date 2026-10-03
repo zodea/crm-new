@@ -3,12 +3,13 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { MaterialContractListPageDTO } from '~/lib/material-contract/repository'
 import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
+import { useTemplateRef } from 'vue'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { contractListFilterValues } from '~/lib/contract/list-filters'
-import { CONTRACT_STATUS_TONE, CONTRACT_STATUSES } from '~/lib/contract/status'
+import { CONTRACT_STATUSES, contractStatusTone } from '~/lib/contract/status'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/read-decoder'
 import { materialContractReferenceLabel } from '~/lib/material-contract/reference-state'
 import { parseMaterialContractListQuery } from '~/lib/material-contract/repository'
@@ -65,6 +66,7 @@ const search = shallowRef(query.value.search)
 const statusOptions = CONTRACT_STATUSES.map(value => ({ key: value, label: value }))
 const selectedStatuses = computed(() => contractListFilterValues(query.value.status))
 const rowNavigationPending = shallowRef(false)
+const listShellRef = useTemplateRef<{ $el: HTMLElement }>('listShellRef')
 const returnContextId = shallowRef(isMaterialContractReturnContextId(route.query.nav)
   ? route.query.nav
   : newMaterialContractReturnContextId())
@@ -104,11 +106,6 @@ function relationshipTarget(intent: NavigationIntentDTO) {
 function unavailableLabel(label: string, intent: NavigationIntentDTO) {
   const target = resolveNavigationTarget(intent)
   return target.state === 'resolved' ? label : `${label}（${target.message}）`
-}
-
-function statusTone(status: string) {
-  const tone = CONTRACT_STATUS_TONE[status]
-  return tone === 'muted' || !tone ? 'neutral' : tone
 }
 
 function patchQuery(patch: Record<string, string | string[] | number | null | undefined>) {
@@ -154,12 +151,9 @@ function returnOrigin(row: MaterialContractListPageDTO['items'][number], scrollT
 }
 
 function link(row: MaterialContractListPageDTO['items'][number]) {
-  const target = resolveNavigationTarget(row.navigation)
-  if (target.state !== 'resolved')
-    return null
   const origin = returnOrigin(row)
-  const separator = target.to.includes('?') ? '&' : '?'
-  return `${target.to}${separator}returnTo=${encodeURIComponent(origin.returnTo)}`
+  const target = resolveNavigationTarget(row.navigation, { returnTo: origin.returnTo })
+  return target.state === 'resolved' ? target.to : null
 }
 
 function captureReturnOrigin(row: MaterialContractListPageDTO['items'][number]) {
@@ -175,31 +169,35 @@ function captureReturnOrigin(row: MaterialContractListPageDTO['items'][number]) 
 async function restoreReturnOrigin() {
   if (route.path !== '/contract/material' || restoredRoute === route.fullPath)
     return
+  const currentState = state.value
+  if (queryProblem.value || (currentState.kind !== 'ready' && currentState.kind !== 'empty'))
+    return
+  const fullPath = route.fullPath
   const result = resolveMaterialContractReturnContext({
-    returnTo: route.fullPath,
+    returnTo: fullPath,
     contextId: route.query.nav,
     now: Date.now(),
     load: loadMaterialContractReturnOrigin,
   })
   if (!result.origin)
     return
-  let anchor: HTMLElement | null = null
-  for (let attempt = 0; attempt < 4 && !anchor; attempt += 1) {
-    await nextTick()
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-    anchor = document.getElementById(result.origin.anchorId)
-  }
-  const focusTarget = anchor ?? document.getElementById('material-contract-list-heading')
+  await nextTick()
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  const root = listShellRef.value?.$el
+  if (!root?.isConnected || route.fullPath !== fullPath || state.value !== currentState)
+    return
+  const anchor = [...root.querySelectorAll<HTMLElement>('[id]')].find(element => element.id === result.origin!.anchorId)
+  const focusTarget = anchor ?? root.querySelector<HTMLElement>('#material-contract-list-heading')
   if (!focusTarget)
     return
-  const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
+  const workspace = root.closest<HTMLElement>('[data-shell-workspace]') ?? document.querySelector<HTMLElement>('[data-shell-workspace]')
   if (workspace)
     workspace.scrollTop = result.origin.scrollTop
   focusTarget.focus({ preventScroll: true })
-  restoredRoute = route.fullPath
+  restoredRoute = fullPath
 }
 
-watch(() => [state.value.kind, page.value?.items.length, route.fullPath], () => void restoreReturnOrigin(), { flush: 'post' })
+watch(() => [state.value, state.value.kind, route.fullPath], () => void restoreReturnOrigin(), { flush: 'post' })
 onMounted(() => void restoreReturnOrigin())
 onActivated(() => void restoreReturnOrigin())
 
@@ -207,7 +205,7 @@ useTabTitle('材料采购合同')
 </script>
 
 <template>
-  <ListShell continuous data-testid="material-contract-list">
+  <ListShell ref="listShellRef" continuous data-testid="material-contract-list">
     <template #heading>
       <TargetCostSourceReturn />
       <h1 id="material-contract-list-heading" tabindex="-1" class="text-14px font-700 text-ink outline-none" title="正式数据与已授权演示数据分源展示；演示数据只读。">
@@ -339,7 +337,7 @@ useTabTitle('材料采购合同')
               {{ row.signDate || '未记录' }}
             </template>
             <template #status="{ row }">
-              <KitStatusTag :tone="statusTone(row.status)">
+              <KitStatusTag :tone="contractStatusTone(row.status)">
                 {{ row.status }}
               </KitStatusTag>
             </template>

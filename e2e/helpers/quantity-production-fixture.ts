@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { QuantityCommand } from '../../app/lib/quantity/central-contract'
+import type { ScheduleAction, ScheduleRead } from '../../app/lib/schedule/central-contract'
+import type { ProcessLibraryVersion } from '../../app/lib/schedule/process-library-contract'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { expect } from '@playwright/test'
@@ -9,8 +11,9 @@ import { blankQuantityTemplateDraft } from '../../app/lib/quantity/template'
 export async function installQuantityProductionFixture(page: Page, options: { totals?: boolean, detailedStages?: boolean } = {}) {
   await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `quantity-fixture-${randomUUID()}` })
   const session = await (await page.request.get('/api/read/business-session')).json()
+  const identity = { workspaceId: session.workspaceId, actorId: session.actorId }
   const create = async (entity: string, capability: string, draft: Record<string, unknown>, action = 'save') => {
-    const response = await page.request.post(`/api/commands/${entity}`, { data: { ...session, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action, draft, attachments: {} } })
+    const response = await page.request.post(`/api/commands/${entity}`, { data: { ...identity, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action, draft, attachments: {} } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }
@@ -24,7 +27,7 @@ export async function installQuantityProductionFixture(page: Page, options: { to
   }
   let version: string
   const execute = async (action: QuantityCommand['action']) => {
-    const response = await page.request.post('/api/commands/quantity', { data: { ...session, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action } })
+    const response = await page.request.post('/api/commands/quantity', { data: { ...identity, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action } })
     expect(response.ok(), await response.text()).toBe(true)
     const result = await response.json()
     version = result.sourceVersion
@@ -91,5 +94,45 @@ export async function installQuantityProductionFixture(page: Page, options: { to
   const matrixUrl = `/subcontract/quantity?project=${projectId}&origin=real`
   await page.goto(matrixUrl)
   await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible({ timeout: 30_000 })
-  return { projectId, matrixUrl, units, read, execute }
+  return { projectId, matrixUrl, units, templateId: template.id, create, read, execute }
+}
+
+/** 复用正式工程量来源，排程和库版本同样经中央命令创建。 */
+export async function installScheduleProductionFixture(page: Page, options: { createGroup?: boolean, startDate?: string } = {}) {
+  const quantity = await installQuantityProductionFixture(page)
+  const session = await (await page.request.get('/api/read/business-session')).json()
+  const catalog = (await quantity.read('templates')).data
+  const building = await quantity.execute({ kind: 'create-building', draft: { code: 'B2', name: '2栋' } })
+  const floor = await quantity.execute({ kind: 'create-floor', buildingId: building.id, draft: { code: 'F1', name: '1层' } })
+  await quantity.execute({ kind: 'create-unit', floorId: floor.id, draft: { code: '101', name: '101户', templateId: catalog.templates[0].id } })
+  const libraryTasks = [
+    { key: 'layout', name: '放线及新建墙体', trade: '其他', color: '#64748b', durationDays: 2, stageCode: '', itemCodes: [], predecessorKey: null, predecessorDisabled: false },
+    { key: 'plumbing', name: '给排水安装', trade: '其他', color: '#64748b', durationDays: 3, stageCode: '', itemCodes: [], predecessorKey: 'layout', predecessorDisabled: false },
+    { key: 'waterproof', name: '卫生间回填及防水', trade: '泥水工', color: '#0f766e', durationDays: 4, stageCode: 'MASONRY-DONE', itemCodes: ['MASONRY'], predecessorKey: 'plumbing', predecessorDisabled: false },
+    { key: 'cleanup', name: '开荒保洁', trade: '其他', color: '#64748b', durationDays: 2, stageCode: '', itemCodes: [], predecessorKey: 'waterproof', predecessorDisabled: false },
+  ]
+  const libraryResponse = await page.request.post('/api/commands/process-libraries', {
+    data: { workspaceId: session.workspaceId, actorId: session.actorId, commandId: randomUUID(), origin: 'real', requiredCapability: 'process-library:write', action: 'create-version', baseVersion: 0, sourceVersion: null, draft: { sourceLibraryId: null, code: 'E2E-SCHEDULE', name: 'E2E四工序库', description: '正式排程验收输入', tasks: libraryTasks } },
+  })
+  expect(libraryResponse.ok(), await libraryResponse.text()).toBe(true)
+  const receipt = await libraryResponse.json()
+  const libraryResponseRead = await page.request.get(`/api/read/process-libraries/${receipt.id}?origin=real`)
+  expect(libraryResponseRead.ok(), await libraryResponseRead.text()).toBe(true)
+  const library: ProcessLibraryVersion = await libraryResponseRead.json()
+  const readSchedule = async (): Promise<ScheduleRead> => {
+    const response = await page.request.get('/api/read/schedule/workspace', { params: { projectId: quantity.projectId, origin: 'real', includeDemo: false } })
+    expect(response.ok(), await response.text()).toBe(true)
+    return response.json()
+  }
+  const executeSchedule = async (action: ScheduleAction) => {
+    const current = await readSchedule()
+    const response = await page.request.post('/api/commands/schedule', { data: { workspaceId: session.workspaceId, actorId: session.actorId, commandId: randomUUID(), origin: 'real', requiredCapability: 'schedule:write', projectId: quantity.projectId, sourceVersion: current.sourceVersion, action } })
+    expect(response.ok(), await response.text()).toBe(true)
+    return response.json()
+  }
+  if (options.createGroup !== false) {
+    const region = (await quantity.read('region')).data
+    await executeSchedule({ kind: 'create-group', draft: { projectId: quantity.projectId, scopeBasis: 'provisional', contractId: null, processLibraryId: library.id, librarySourceVersion: library.sourceVersion, name: '正式一栋组', buildingIds: [region.buildings.find((row: { code: string }) => row.code === 'B1').id], startDate: options.startDate ?? '2026-08-01', overlapMode: 'seq', tasks: libraryTasks.map(task => ({ templateKey: task.key, durationDays: task.durationDays, enabled: true, anchorStart: null })) } })
+  }
+  return { ...quantity, library, readSchedule, executeSchedule, newBuildingId: building.id, scheduleUrl: `/schedule?project=${quantity.projectId}&origin=real`, wizardUrl: `/schedule/new?project=${quantity.projectId}&origin=real` }
 }

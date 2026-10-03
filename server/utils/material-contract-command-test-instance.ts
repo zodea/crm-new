@@ -25,6 +25,8 @@ import { supplierCommandTestInstance } from './supplier-command-test-instance'
 interface ReferenceOption {
   id: string
   name: string
+  contact?: string
+  contactPhone?: string
 }
 
 interface StoredContract {
@@ -93,7 +95,7 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
   const legacyProjects = new Map((options.projects ?? []).map(row => [row.id, row.name]))
   const legacySuppliers = new Map((options.suppliers ?? []).map(row => [row.id, row.name]))
   const resolveProjects = options.resolveProjects ?? (() => [...legacyProjects].map(([id, name]) => ({ id, name })))
-  const resolveSuppliers = options.resolveSuppliers ?? (() => [...legacySuppliers].map(([id, name]) => ({ id, name })))
+  const resolveSuppliers: NonNullable<Options['resolveSuppliers']> = options.resolveSuppliers ?? (() => [...legacySuppliers].map(([id, name]) => ({ id, name })))
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
   const stateFor = (sessionId?: string | null) => {
     const key = keyFor(sessionId)
@@ -513,5 +515,5 @@ export const MATERIAL_CONTRACT_EXISTING_RECORD: MaterialContractMigrationRecord 
 
 export const materialContractCommandTestInstance = createMaterialContractCommandTestInstance({
   resolveProjects: sessionId => projectCommandTestInstance.rows(sessionId).map(row => ({ id: row.id, name: row.name })),
-  resolveSuppliers: sessionId => supplierCommandTestInstance.rows(sessionId).map(row => ({ id: row.id, name: row.name })),
+  resolveSuppliers: sessionId => supplierCommandTestInstance.rows(sessionId).map(row => ({ id: row.id, name: row.name, contact: row.contact, contactPhone: row.contactPhone })),
 })

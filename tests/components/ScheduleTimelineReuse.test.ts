@@ -22,12 +22,6 @@ const NuxtLinkStub = defineComponent({
   },
 })
 
-const StatusChipStub = defineComponent({
-  setup(_, { slots }) {
-    return () => h('span', slots.default?.())
-  },
-})
-
 const snapshot: ScheduleProjectView = {
   id: 'project-1',
   name: '示范项目',
@@ -87,19 +81,36 @@ const snapshot: ScheduleProjectView = {
 const global = {
   components: {
     NuxtLink: NuxtLinkStub,
-    StatusChip: StatusChipStub,
   },
 }
 
 describe('施工排程时间轴复用', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 4, 20, 12))
     window.sessionStorage.clear()
     setActivePinia(createPinia())
   })
 
-  it('今天线读取本机系统日期，不使用传入的固定演示日期', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 4, 20, 12))
+  it('首页偏差与排程行状态共用紧凑标签，并保留实际状态文案', () => {
+    const home = render(HomeScheduleOverview, { props: { snapshot, today: '2026-05-20' }, global })
+    const overall = screen.getByText('整体落后约 2 天')
+    expect(overall.getAttribute('data-ui')).toBe('status-tag')
+    expect(overall.getAttribute('data-tone')).toBe('warn')
+    home.unmount()
+    render(ScheduleBoard, { props: { snapshot, today: '2026-05-20' }, global })
+    const rows = document.querySelectorAll('.row-status')
+    expect(rows.length).toBeGreaterThan(0)
+    for (const status of rows)
+      expect(status.getAttribute('data-ui')).toBe('status-tag')
+  })
+
+  it.each([
+    { day: 1, month: 4, expectedPosition: 0 },
+    { day: 20, month: 4, expectedPosition: 31.1475 },
+    { day: 30, month: 5, expectedPosition: 98.3607 },
+  ])('今天线读取本机系统日期 $month/$day，不使用固定演示日期', ({ day, month, expectedPosition }) => {
+    vi.setSystemTime(new Date(2026, month, day, 12))
     const board = render(ScheduleBoard, {
       props: {
         snapshot,
@@ -108,9 +119,9 @@ describe('施工排程时间轴复用', () => {
       global,
     })
 
-    expect(document.querySelector('.today-label')?.getAttribute('style')).toContain('31.1475')
+    const today = screen.getByText('今天')
+    expect(Number.parseFloat(today.style.left)).toBeCloseTo(expectedPosition, 3)
     board.unmount()
-    vi.useRealTimers()
   })
 
   it('以同一棵 WBS Tree 呈现首页与工作台，并默认只展开首个楼栋分组', async () => {

@@ -23,7 +23,7 @@ async function dryRun(source: CoreMigrationSourceDTO) {
     sourceVersion: source.sourceVersion,
     snapshotSha256: hash,
     byteLength: 442,
-    createdAt: new Date().toISOString(),
+    createdAt: '2026-09-15T00:00:00.000Z',
     immutable: true,
   } }), session)
 }

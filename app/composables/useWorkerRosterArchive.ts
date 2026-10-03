@@ -4,6 +4,7 @@ import { useEventListener } from '@vueuse/core'
 import { computed, onActivated, onDeactivated, ref, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { CrewWorkerRepositoryProblem } from '~/lib/crew-worker/read-contract'
+import { payrollAdjustmentReturn } from '~/lib/payroll/adjustment-navigation'
 import { toErrorMessage } from '~/lib/util/error'
 import { WORKER_PRIVATE_READ } from '~/lib/worker-roster/contract'
 import { createWorkerRosterArchiveZip, workerRosterFilename } from '~/lib/worker-roster/export'
@@ -49,6 +50,10 @@ export function useWorkerRosterArchive() {
         return
       list.value = value
       versions.value = saved
+      if (!selectedIds.value.length) {
+        const requested = Array.isArray(route.query.statement) ? route.query.statement : [route.query.statement]
+        selectedIds.value = [...new Set(requested.filter((id): id is string => typeof id === 'string' && rows.value.some(row => row.id === id && row.snapshot.state === 'complete')))]
+      }
     }
     catch (cause) {
       if (token === generation) {
@@ -252,5 +257,5 @@ export function useWorkerRosterArchive() {
     store.restore()
     void load()
   }, { immediate: true })
-  return { projectId, list, rows, selectedIds, registeredOn, preview, opened, versions, busy, error, writable, pending: computed(() => store.pending), load, buildPreview, open, recover, save, download, toggle, changeProject: (id: string) => router.replace({ path: '/subcontract/payroll/roster', query: { origin: 'real', project: id } }), leave: () => router.push({ path: '/subcontract/payroll', query: { origin: 'real', project: projectId.value } }) }
+  return { projectId, list, rows, selectedIds, registeredOn, preview, opened, versions, busy, error, writable, pending: computed(() => store.pending), load, buildPreview, open, recover, save, download, toggle, changeProject: (id: string) => router.replace({ path: '/subcontract/payroll/roster', query: { origin: 'real', project: id } }), leave: () => router.push(payrollAdjustmentReturn(route.query.returnTo, 'real') || { path: '/subcontract/payroll', query: { origin: 'real', project: projectId.value } }) }
 }

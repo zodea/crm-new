@@ -1,117 +1,78 @@
+import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
 
-const TEMP_NAME = 'E2E临时分供方'
-const EDITED_NAME = 'E2E临时分供方·改'
-const CASCADE_NAME = '广州市大板东建材有限公司'
+const SUPPLIER_INPUTS = [
+  { name: '中央维护供方甲', category: '专业分包商', contact: '张经理', editedContact: '李经理', aliases: '临时；甲供方', expectedAliases: '临时、甲供方' },
+  { name: '中央维护供方乙', category: '材料供应商', contact: '王经理', editedContact: '陈经理', aliases: '临时；乙供方', expectedAliases: '临时、乙供方' },
+] as const
 
-async function searchSupplier(page: import('@playwright/test').Page, name: string) {
-  await page.getByPlaceholder('搜索公司名、税号、简称…').fill(name)
-  await expect(page.locator('section').filter({
-    has: page.getByRole('heading', { name: '分供方资料库', exact: true }),
-  })).toContainText('当前 1 家')
+test.beforeEach(async ({ page }, info) => {
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `supplier-crud-${Buffer.from(info.testId).toString('base64url')}` })
+  const reset = await page.request.post('/api/testing/suppliers/reset', { headers: { 'x-ruihang-test-reset': '1' }, data: { scenario: 'ready' } })
+  expect(reset.ok(), await reset.text()).toBe(true)
+  await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
+})
+
+for (const input of SUPPLIER_INPUTS) {
+  test(`中央分供方 ${input.category} 新建、显式编辑、详情回读和页签复用`, async ({ page }) => {
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.goto('/base/supplier')
+    await page.getByRole('button', { name: '新增分供方', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '选择分供方类别' })
+    await dialog.getByRole('radio', { name: input.category, exact: true }).check()
+    await dialog.getByRole('button', { name: '进入新建表单', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '新建 · 分供方', exact: true })).toBeVisible()
+    await page.getByLabel('公司全称 *', { exact: true }).fill(input.name)
+    await page.getByLabel('简称/别名', { exact: true }).fill(input.aliases)
+    await page.getByLabel('主要联系人 *', { exact: true }).fill(input.contact)
+    const saved = page.waitForResponse(response => response.url().endsWith('/api/commands/suppliers') && response.request().method() === 'POST')
+    await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
+    const response = await saved
+    expect(response.ok(), await response.text()).toBe(true)
+    const { id } = await response.json()
+    await expect(page).toHaveURL(new RegExp(`/base/supplier/${id}\\?origin=real`))
+    await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
+    const tabs = page.getByRole('navigation', { name: '已打开页面' })
+    const detailTab = tabs.getByRole('button', { name: input.name, exact: true })
+    const tabCount = await tabs.locator('[data-tab-trigger]').count()
+    await page.getByRole('link', { name: '编辑分供方', exact: true }).click()
+    await expect(page.getByLabel('简称/别名', { exact: true })).toHaveValue(input.expectedAliases)
+    await expect(page.getByLabel('分供方类别 *')).toHaveValue(input.category)
+    await page.getByLabel('主要联系人 *', { exact: true }).fill(input.editedContact)
+    const edited = page.waitForResponse(response => response.url().endsWith(`/api/commands/suppliers/${id}`) && response.request().method() === 'PUT')
+    await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
+    expect((await edited).ok()).toBe(true)
+    await expect(page.getByText(input.editedContact, { exact: true }).first()).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
+    await expect(page.getByText(input.editedContact, { exact: true }).first()).toBeVisible()
+    await page.getByRole('link', { name: '返回分供方列表', exact: true }).click()
+    await page.getByRole('searchbox', { name: '搜索关键词…', exact: true }).fill(input.name)
+    const link = page.getByRole('link', { name: input.name, exact: true })
+    await expect(link).toBeVisible()
+    await link.click()
+    await expect(detailTab).toHaveCount(1)
+    await expect(tabs.locator('[data-tab-trigger]')).toHaveCount(tabCount)
+    expect(errors).toEqual([])
+  })
 }
 
-test('分供方 CRUD：新增编辑、详情双页联动、页签复用与 simple 删除撤回', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', error => pageErrors.push(error.message))
-
-  await page.goto('/base/supplier')
-
-  await page.getByRole('button', { name: '新增分供方', exact: true }).click()
-  const typeDialog = page.getByRole('dialog', { name: '选择分供方类别' })
-  await typeDialog.getByRole('radio', { name: '专业分包商' }).check()
-  await typeDialog.getByRole('button', { name: '进入新建表单' }).click()
-  await expect(page).toHaveURL(/\/base\/supplier\/form\?category=/)
-  await expect(page.getByRole('heading', { name: '新建 · 分供方' })).toBeVisible()
-  await page.getByLabel('公司全称 *', { exact: true }).fill(TEMP_NAME)
-  await expect(page.locator('select[data-field="supplierCategory"]')).toHaveValue('专业分包商')
-  await page.getByLabel('简称/别名', { exact: true }).fill('临时；E2E供方')
-  await page.getByLabel('主要联系人 *', { exact: true }).fill('张经理')
-  await page.getByRole('group', { name: '表单操作' })
-    .getByRole('button', { name: '保存', exact: true })
-    .click()
-  await expect(page).toHaveURL('/base/supplier')
-
-  await searchSupplier(page, TEMP_NAME)
-  await expect(page.getByRole('link', { name: TEMP_NAME, exact: true })).toBeVisible()
-  await expect(page.getByRole('cell', { name: '专业分包商', exact: true })).toBeVisible()
-
-  await page.getByRole('button', { name: '编辑分供方', exact: true }).click()
-  await expect(page).toHaveURL(/\/base\/supplier\/form\/sup_/)
-  await expect(page.getByLabel('简称/别名', { exact: true })).toHaveValue('临时、E2E供方')
-  await page.getByLabel('公司全称 *', { exact: true }).fill(EDITED_NAME)
-  await page.getByRole('group', { name: '表单操作' })
-    .getByRole('button', { name: '保存', exact: true })
-    .click()
-  await searchSupplier(page, EDITED_NAME)
-  await expect(page.getByRole('link', { name: EDITED_NAME, exact: true })).toBeVisible()
-
-  const tabBar = page.getByRole('navigation', { name: '已打开页面' })
-  await page.getByRole('link', { name: EDITED_NAME, exact: true }).click()
-  await expect(page).toHaveURL(/\/base\/supplier\/sup_/)
-  await expect(page.getByRole('heading', { name: EDITED_NAME, exact: true })).toBeVisible()
-  const tabCount = (await page.getByTitle('当前页签数量').textContent() ?? '').trim()
-
-  await page.getByRole('button', { name: '编辑', exact: true }).click()
-  await expect(page).toHaveURL(/\/base\/supplier\/form\/sup_/)
-  await page.getByLabel('主要联系人 *', { exact: true }).fill('李经理')
-  await page.getByRole('group', { name: '表单操作' })
-    .getByRole('button', { name: '保存', exact: true })
-    .click()
-
-  await tabBar.getByRole('button', { name: '分供方', exact: true }).click()
-  await searchSupplier(page, EDITED_NAME)
-  await expect(page.getByRole('link', { name: EDITED_NAME, exact: true })).toBeVisible()
-  await page.getByRole('link', { name: EDITED_NAME, exact: true }).click()
-  await expect(page.getByText('李经理', { exact: true }).first()).toBeVisible()
-  await expect(page.getByTitle('当前页签数量')).toContainText(tabCount)
-
-  await tabBar.getByRole('button', { name: '分供方', exact: true }).click()
-  await searchSupplier(page, EDITED_NAME)
-  await page.getByRole('button', { name: '删除分供方', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '删除分供方' })
-  await expect(dialog).toContainText(`确认删除分供方「${EDITED_NAME}」`)
-  await expect(dialog.getByPlaceholder(EDITED_NAME)).toHaveCount(0)
-  await dialog.getByRole('button', { name: '删除', exact: true }).click()
-  await expect(page.getByRole('link', { name: EDITED_NAME, exact: true })).toHaveCount(0)
-  await page.getByRole('button', { name: '撤回', exact: true }).click()
-  await expect(page.getByRole('link', { name: EDITED_NAME, exact: true })).toBeVisible()
-
-  expect(pageErrors, '分供方 CRUD 旅程不应产生客户端运行错误').toEqual([])
-})
-
-test('分供方 cascade 删除：打名门控、预提交撤销、最终删除且无事后撤回', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', error => pageErrors.push(error.message))
-
-  await page.goto('/base/supplier')
-  await searchSupplier(page, CASCADE_NAME)
-
-  const openCascade = async () => {
-    await page.getByRole('button', { name: '删除分供方', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '删除分供方' })
-    await expect(dialog).toContainText('此操作将影响以下关联数据')
-    await expect(dialog).toContainText(/发票\s*×\d+/)
-    await expect(dialog.getByRole('button', { name: '删除', exact: true })).toBeDisabled()
-    await dialog.getByPlaceholder(CASCADE_NAME).fill(CASCADE_NAME)
-    await expect(dialog.getByRole('button', { name: '删除', exact: true })).toBeEnabled()
-    return dialog
-  }
-
-  let dialog = await openCascade()
-  await dialog.getByRole('button', { name: '删除', exact: true }).click()
-  await expect(dialog.getByRole('button', { name: /撤销（\d+s 内可停）/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: CASCADE_NAME, exact: true })).toHaveCount(0)
-  await dialog.getByRole('button', { name: /撤销/ }).click()
-  await expect(dialog).toHaveCount(0)
-  await expect(page.getByRole('link', { name: CASCADE_NAME, exact: true })).toBeVisible()
-
-  dialog = await openCascade()
-  await dialog.getByRole('button', { name: '删除', exact: true }).click()
-  await expect(dialog).toHaveCount(0, { timeout: 6_000 })
-  await expect(page.getByRole('link', { name: CASCADE_NAME, exact: true })).toHaveCount(0)
-  await expect(page.getByText(`已删除「${CASCADE_NAME}」及其下游数据`, { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '撤回', exact: true })).toHaveCount(0)
-
-  expect(pageErrors, '分供方 cascade 删除不应产生客户端运行错误').toEqual([])
-})
+// 旧本地删除/级联算法继续由 tests/db/soft-delete.test.ts 和通用主数据组件测试覆盖。
+for (const input of SUPPLIER_INPUTS) {
+  test(`中央列表 ${input.category} 行菜单保持只读入口，不暴露旧本地删除`, async ({ page }) => {
+    await page.goto(`/base/supplier/form?category=${encodeURIComponent(input.category)}`)
+    await page.getByLabel('公司全称 *', { exact: true }).fill(input.name)
+    await page.getByLabel('主要联系人 *', { exact: true }).fill(input.contact)
+    await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
+    await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
+    await page.getByRole('link', { name: '返回分供方列表', exact: true }).click()
+    await page.getByRole('searchbox', { name: '搜索关键词…', exact: true }).fill(input.name)
+    await page.getByRole('button', { name: `${input.name}操作`, exact: true }).click()
+    const menu = page.getByRole('menu')
+    await expect(menu.getByRole('menuitem')).toHaveText(['查看详情'])
+    await expect(menu.getByRole('menuitem', { name: /删除|编辑/ })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('button', { name: `${input.name}操作`, exact: true })).toBeFocused()
+  })
+}

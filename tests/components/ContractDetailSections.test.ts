@@ -1,3 +1,4 @@
+import { fireEvent, within } from '@testing-library/vue'
 import { mount } from '@vue/test-utils'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
@@ -56,14 +57,21 @@ describe('contract detail sections', () => {
     vi.unstubAllGlobals()
   })
 
-  it('合同阶段为当前节点设置 aria-current', () => {
+  it.each([
+    { status: '草稿', current: '拟定' },
+    { status: '审批中', current: '审批与签订' },
+    { status: '履约中', current: '履约' },
+    { status: '已结算', current: '结算' },
+    { status: '已结清', current: '结清' },
+  ])('合同状态 $status 为 $current 节点设置 aria-current', ({ status, current }) => {
     const wrapper = mount(ContractLifecycle, {
-      props: { stages: contractStages('履约中') },
+      props: { stages: contractStages(status) },
       global,
     })
 
-    expect(wrapper.get('[aria-current="step"]').text()).toContain('履约')
-    expect(wrapper.findAll('li')).toHaveLength(5)
+    expect(wrapper.get('[aria-current="step"]').text()).toContain(current)
+    expect(wrapper.findAll('li').map(item => item.get('span[title]').text())).toEqual(['拟定', '审批与签订', '履约', '结算', '结清'])
+    wrapper.unmount()
   })
 
   it('关联单据展示真实下钻；无数据时展示明确空态', () => {
@@ -112,8 +120,9 @@ describe('contract detail sections', () => {
       global,
     })
 
-    await wrapper.get('button:nth-of-type(1)').trigger('click')
-    await wrapper.get('button:nth-of-type(2)').trigger('click')
+    const files = within(wrapper.element as HTMLElement)
+    await fireEvent.click(files.getByRole('button', { name: '预览' }))
+    await fireEvent.click(files.getByRole('button', { name: '下载' }))
     expect(preview).toHaveBeenCalledWith(file)
     expect(download).toHaveBeenCalledWith(file)
     expect(wrapper.text()).toContain('2.0 KB')

@@ -42,6 +42,22 @@ afterEach(() => {
 })
 
 describe('正式施工合同保存→客户中央回读', () => {
+  it.each([
+    { action: 'draft', inputStatus: '履约中', expectedStatus: '草稿' },
+    { action: 'submit', inputStatus: '草稿', expectedStatus: '审批中' },
+    { action: 'save', inputStatus: '履约中', expectedStatus: '履约中' },
+  ] as const)('$action 按动作写入状态并由详情回读', async (input) => {
+    const result = await commands.execute({
+      ...envelope(),
+      action: input.action,
+      requiredCapability: 'construction-contract:write',
+      draft: { name: '状态回读施工合同', projectId: 'project-real-320', customerId: 'customer-real-320', content: '合成施工', signDate: '2026-09-09', amount: 113, status: input.inputStatus },
+    }, session, scope)
+    expect(commands.form(result.id, session, scope).draft.status).toBe(input.expectedStatus)
+    const read = await contracts.detail(result.id, { origin: 'real', includeDemo: 'false' }, scope)
+    expect(read.contract.status).toBe(input.expectedStatus)
+  })
+
   it('表单保存的同一客户、合同 ID 与有效金额回读，合同更正后版本和金额刷新', async () => {
     const contract = await save()
     const first = await detail()
@@ -98,19 +114,34 @@ describe('正式施工合同保存→客户中央回读', () => {
     expect(read.contracts[0]).toMatchObject({ contract: { id: saved.id }, project: { state: 'missing' } })
   })
 
-  it('hTTP 解码拒绝来源/类别/客户错配、失败态假零以及伪造正常计数', async () => {
+  async function createDecodeCustomerDetailReadFixture() {
     await save()
     const valid = await detail()
-    for (const patch of [{ dataOrigin: 'demo' }, { contractKind: '分包' }, { customerId: 'other' }]) {
-      const invalid = structuredClone(valid)
-      const navigation = invalid.contracts[0]!.navigation
-      if (navigation.kind === 'entity-detail')
-        Object.assign(navigation.filters, patch)
-      expect(() => decodeCustomerDetailRead(invalid)).toThrow()
-    }
-    expect(() => decodeCustomerDetailRead({ ...valid, summary: { ...valid.summary, contractCount: 99 } })).toThrow()
-    contracts.reset('unavailable', scope)
-    const failed = await detail()
-    expect(() => decodeCustomerDetailRead({ ...failed, summary: { ...failed.summary, effectiveContractAmount: '0.00' } })).toThrow()
+    return { valid }
+  }
+
+  it.each([
+    { case: '{ ...valid, summary: { ...valid.summary, contractCount: 99 } }', prepare: async ({ valid }: Awaited<ReturnType<typeof createDecodeCustomerDetailReadFixture>>) => {
+      return { input: { ...valid, summary: { ...valid.summary, contractCount: 99 } } } as const
+    } },
+    { case: '{ ...failed, summary: { ...failed.summary, effectiveContractAmount: \'0.00\' } }', prepare: async (_fixture: Awaited<ReturnType<typeof createDecodeCustomerDetailReadFixture>>) => {
+      contracts.reset('unavailable', scope)
+      const failed = await detail()
+      return { input: { ...failed, summary: { ...failed.summary, effectiveContractAmount: '0.00' } } } as const
+    } },
+  ])('hTTP 解码拒绝来源/类别/客户错配、失败态假零以及伪造正常计数 / decodeCustomerDetailRead：$case', async ({ prepare }) => {
+    const fixture = await createDecodeCustomerDetailReadFixture()
+    const { input } = await prepare(fixture)
+    expect(() => decodeCustomerDetailRead(input)).toThrow()
+  })
+
+  it.each(Array.from([{ dataOrigin: 'demo' }, { contractKind: '分包' }, { customerId: 'other' }]).map(input => ({ input })))('hTTP 解码拒绝来源/类别/客户错配、失败态假零以及伪造正常计数：输入组合 1 案例 %#', async ({ input: patch }) => {
+    await save()
+    const valid = await detail()
+    const invalid = structuredClone(valid)
+    const navigation = invalid.contracts[0]!.navigation
+    if (navigation.kind === 'entity-detail')
+      Object.assign(navigation.filters, patch)
+    expect(() => decodeCustomerDetailRead(invalid)).toThrow()
   })
 })

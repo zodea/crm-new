@@ -1,7 +1,7 @@
 import type { Page, TestInfo } from '@playwright/test'
 import { writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
-import { payrollC1Repository, payrollC1Workspace } from './helpers/payroll-c1-workspace'
+import { payrollC1Repository, payrollC1Workspace, preparePayrollC1Fixture } from './helpers/payroll-c1-workspace'
 
 test.use({ actionTimeout: 15_000 })
 
@@ -16,10 +16,11 @@ async function capture(page: Page, info: TestInfo, name: string, selector?: stri
 }
 
 test('旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出', async ({ page }, info) => {
+  await preparePayrollC1Fixture(page, info)
   const repository = payrollC1Repository(page)
   const list = await repository.list({ origin: 'real' })
   const legacy = list.rows.find(row => row.legacyId === 'c1-history-missing')
-  expect(legacy, '需要主旅程真实迁入的原缺损头').toBeTruthy()
+  expect(legacy, '需要本用例真实迁入的原缺损头').toBeTruthy()
   expect(legacy!.snapshot.state).toBe('missing')
   expect(legacy!.actualAmount).toBeNull()
   const before = await repository.detail({ origin: 'real' }, legacy!.id)
@@ -51,7 +52,7 @@ test('旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出
 })
 
 test('C1来源拒权时不沿旧读取开放保存，恢复读取仍保原范围', async ({ page }, info) => {
-  const { project, leader } = await payrollC1Workspace(page, '2026-09')
+  const { project, leader } = await payrollC1Workspace(page, '2026-09', info)
   const writes: string[] = []
   page.on('request', (request) => {
     if (request.url().includes('/api/commands/'))

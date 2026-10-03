@@ -68,14 +68,16 @@ const KitTable = defineComponent({
 
 const fetchLookup = vi.fn(async () => [])
 
-it('批复输入的空值和明确零分别携带输入意图；仅改备注不产生批复修改', async () => {
+it.each([
+  { input: '', expected: null },
+  { input: '0', expected: 0 },
+  { input: '12.50', expected: 12.5 },
+])('批复输入 $input 携带独立输入意图；仅改备注不产生批复修改', async ({ input, expected }) => {
   const wrapper = mountFields('payment_application', { bizType: '公司付款', approvedAmount: 0, approvedAmountOrigin: 'legacy' })
   expect(wrapper.text()).toContain('历史批复待核验')
   const amount = wrapper.get('input[aria-describedby="approval-amount-help"]')
-  await amount.setValue('')
-  expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ approvedAmount: null, approvedAmountEdit: { value: null } })
-  await amount.setValue('0')
-  expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ approvedAmount: 0, approvedAmountEdit: { value: 0 } })
+  await amount.setValue(input)
+  expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ approvedAmount: expected, approvedAmountEdit: { value: expected } })
   await wrapper.get('#section-approval textarea').setValue('核对备注')
   expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ approvalNote: '核对备注' })
 })

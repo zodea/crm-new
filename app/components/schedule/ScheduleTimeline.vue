@@ -4,6 +4,7 @@ import type { ScheduleGroupView, ScheduleProjectView, ScheduleTaskView } from '~
 import { useNow } from '@vueuse/core'
 import { TreeItem, TreeRoot } from 'reka-ui'
 import { computed, shallowRef, watch } from 'vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { buildScheduleBindingLocation } from '~/lib/schedule/binding-navigation'
 import {
@@ -561,9 +562,9 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
             <span>{{ planRange(projectRow) }}</span>
             <span class="font-700">{{ percent(projectRow.actual) }}</span>
             <span>
-              <span class="row-status" :data-tone="rowStatusTone(projectRow)">
+              <KitStatusTag class="row-status" :tone="rowStatusTone(projectRow)">
                 {{ rowStatusLabel(projectRow) }}
-              </span>
+              </KitStatusTag>
             </span>
           </div>
 
@@ -680,9 +681,9 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                 <span>{{ planRange(item.value) }}</span>
                 <span :class="item.value.kind !== 'task' && 'font-700'">{{ percent(item.value.actual) }}</span>
                 <span>
-                  <span class="row-status" :data-tone="rowStatusTone(item.value)">
+                  <KitStatusTag class="row-status" :tone="rowStatusTone(item.value)">
                     {{ rowStatusLabel(item.value) }}
-                  </span>
+                  </KitStatusTag>
                 </span>
               </template>
             </div>
@@ -778,12 +779,6 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
 .binding-entry { display: inline-flex; flex: none; align-items: center; gap: 2px; border-radius: var(--radius-sm); color: var(--brand-deep); font-size: 9px; font-weight: 700; }
 .binding-entry:hover { color: var(--brand); text-decoration: underline; }
 .status-label { margin-left: auto; flex: none; color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; font-variant-numeric: tabular-nums; }
-.row-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
-.row-status[data-tone='ok'] { background: var(--ok-soft); color: var(--ok-ink); }
-.row-status[data-tone='brand'] { background: var(--brand-soft); color: var(--brand-deep); }
-.row-status[data-tone='warn'] { background: var(--warn-soft); color: var(--warn-ink); }
-.row-status[data-tone='danger'] { background: var(--danger-soft); color: var(--danger-ink); }
-.row-status[data-tone='neutral'] { background: var(--surface-3); color: var(--ink-soft); }
 .month-label { position: absolute; top: 6px; transform: translateX(4px); white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .month-line, .today-line { position: absolute; inset-block: 0; width: 1px; background: var(--line); pointer-events: none; }
 .month-line { border-left: 1px dashed color-mix(in srgb, var(--line) 65%, transparent); background: transparent; }

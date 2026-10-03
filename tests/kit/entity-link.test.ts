@@ -4,83 +4,89 @@ import { resolveEntityLink } from '~/lib/kit/entity-link'
 import { registeredTargetKeys, resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不做死链）', () => {
-  it('已实装类型 + id + label → 蓝链，路由按映射表', () => {
-    expect(resolveEntityLink({ type: 'project', id: 'p1', label: '合和新城' }))
-      .toEqual({ state: 'resolved', to: '/project/p1', label: '合和新城' })
-    expect(resolveEntityLink({ type: 'supplier', id: 's6', label: '陈家班' }))
-      .toEqual({ state: 'resolved', to: '/base/supplier/s6', label: '陈家班' })
-    expect(resolveEntityLink({ type: 'contract', id: 'fb01', label: '总包合同' }))
-      .toEqual({ state: 'resolved', to: '/contract/fb01', label: '总包合同' })
-    expect(resolveEntityLink({ type: 'invoice', id: 'iv9', label: '票 00058760' }))
-      .toEqual({ state: 'resolved', to: '/finance/invoice/iv9', label: '票 00058760' })
-    expect(resolveEntityLink({ type: 'customer', id: 'c1', label: '保利发展' }))
-      .toEqual({ state: 'resolved', to: '/base/customer/c1', label: '保利发展' })
+  it.each([
+    { case: '{ type: \'project\', id: \'p1\', label: \'合和新城\' }', input: { type: 'project', id: 'p1', label: '合和新城' }, expected: { state: 'resolved', to: '/project/p1', label: '合和新城' } },
+    { case: '{ type: \'supplier\', id: \'s6\', label: \'陈家班\' }', input: { type: 'supplier', id: 's6', label: '陈家班' }, expected: { state: 'resolved', to: '/base/supplier/s6', label: '陈家班' } },
+    { case: '{ type: \'contract\', id: \'fb01\', label: \'总包合同\' }', input: { type: 'contract', id: 'fb01', label: '总包合同' }, expected: { state: 'resolved', to: '/contract/fb01', label: '总包合同' } },
+    { case: '{ type: \'invoice\', id: \'iv9\', label: \'票 00058760\' }', input: { type: 'invoice', id: 'iv9', label: '票 00058760' }, expected: { state: 'resolved', to: '/finance/invoice/iv9', label: '票 00058760' } },
+    { case: '{ type: \'customer\', id: \'c1\', label: \'保利发展\' }', input: { type: 'customer', id: 'c1', label: '保利发展' }, expected: { state: 'resolved', to: '/base/customer/c1', label: '保利发展' } },
+  ])('已实装类型 + id + label → 蓝链，路由按映射表 / resolveEntityLink：$case', ({ input, expected }) => {
+    expect(resolveEntityLink(input)).toEqual(expected)
   })
 
-  it('项目来源感知链接始终显式携带来源身份', () => {
-    expect(resolveEntityLink({
+  it.each([
+    { case: '{ type: \'project\', id: \'p1\', label: \'测试项目\', dataOrigin: \'demo\', }', input: {
       type: 'project',
       id: 'p1',
       label: '测试项目',
       dataOrigin: 'demo',
-    })).toEqual({ state: 'resolved', to: '/project/p1?origin=demo', label: '测试项目' })
-    expect(resolveEntityLink({
+    }, expected: { state: 'resolved', to: '/project/p1?origin=demo', label: '测试项目' } },
+    { case: '{ type: \'project\', id: \'p1\', label: \'正式项目\', dataOrigin: \'real\', }', input: {
       type: 'project',
       id: 'p1',
       label: '正式项目',
       dataOrigin: 'real',
-    })).toEqual({ state: 'resolved', to: '/project/p1?origin=real', label: '正式项目' })
+    }, expected: { state: 'resolved', to: '/project/p1?origin=real', label: '正式项目' } },
+  ])('项目来源感知链接始终显式携带来源身份 / resolveEntityLink：$case', ({ input, expected }) => {
+    expect(resolveEntityLink(input)).toEqual(expected)
   })
 
-  it('客户详情消费来源策略后，来源感知关联保留身份', () => {
-    expect(resolveEntityLink({
+  it.each([
+    { case: '{ type: \'customer\', id: \'c-demo\', label: \'演示客户\', dataOrigin: \'demo\', }', input: {
       type: 'customer',
       id: 'c-demo',
       label: '演示客户',
       dataOrigin: 'demo',
-    })).toEqual({ state: 'resolved', to: '/base/customer/c-demo?origin=demo', label: '演示客户' })
-    expect(resolveEntityLink({
+    }, expected: { state: 'resolved', to: '/base/customer/c-demo?origin=demo', label: '演示客户' } },
+    { case: '{ type: \'customer\', id: \'c-real\', label: \'正式客户\', dataOrigin: \'real\', }', input: {
       type: 'customer',
       id: 'c-real',
       label: '正式客户',
       dataOrigin: 'real',
-    })).toEqual({ state: 'resolved', to: '/base/customer/c-real?origin=real', label: '正式客户' })
+    }, expected: { state: 'resolved', to: '/base/customer/c-real?origin=real', label: '正式客户' } },
+  ])('客户详情消费来源策略后，来源感知关联保留身份 / resolveEntityLink：$case', ({ input, expected }) => {
+    expect(resolveEntityLink(input)).toEqual(expected)
   })
 
-  it('班组与工人使用稳定 ID 进入中央详情，并保留来源身份', () => {
-    expect(resolveEntityLink({ type: 'crew', id: 'g1', label: '泥水一组' }))
-      .toEqual({ state: 'resolved', to: '/base/crew/g1', label: '泥水一组' })
-    expect(resolveEntityLink({ type: 'worker', id: 'w1', label: '张三', dataOrigin: 'demo' }))
-      .toEqual({ state: 'resolved', to: '/base/worker/w1?origin=demo', label: '张三' })
+  it.each([
+    { case: '{ type: \'crew\', id: \'g1\', label: \'泥水一组\' }', input: { type: 'crew', id: 'g1', label: '泥水一组' }, expected: { state: 'resolved', to: '/base/crew/g1', label: '泥水一组' } },
+    { case: '{ type: \'worker\', id: \'w1\', label: \'张三\', dataOrigin: \'demo\' }', input: { type: 'worker', id: 'w1', label: '张三', dataOrigin: 'demo' }, expected: { state: 'resolved', to: '/base/worker/w1?origin=demo', label: '张三' } },
+  ])('班组与工人使用稳定 ID 进入中央详情，并保留来源身份 / resolveEntityLink：$case', ({ input, expected }) => {
+    expect(resolveEntityLink(input)).toEqual(expected)
   })
 
   it('班组—工人业务事实使用稳定事实 ID 穿透到责任单元、工资单和扣罚单', () => {
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'quantity-unit', id: 'u1', label: '201户', no: null },
-      variant: 'detail',
-      view: null,
-      filters: { projectId: 'p1', dataOrigin: 'real' },
-    })).toEqual({ state: 'resolved', to: '/subcontract/quantity/p1/u1?origin=real', label: '201户' })
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'wage-statement', id: 'ws1', label: '7月工资单', no: null },
-      variant: 'detail',
-      view: null,
-      filters: { dataOrigin: 'real' },
-    })).toEqual({ state: 'resolved', to: '/subcontract/payroll/ws1?origin=real', label: '7月工资单' })
-    expect(resolveNavigationTarget({
-      kind: 'entity-detail',
-      subject: { state: 'resolved', entity: 'subcontract-document', id: 'f1', label: 'FK-1', no: null },
-      variant: 'penalty-detail',
-      view: null,
-      filters: { dataOrigin: 'real' },
-    })).toEqual({ state: 'unverified-target', label: 'FK-1', message: '目标待核验' })
     expect(registeredTargetKeys()).toEqual(expect.arrayContaining([
       'quantity-unit:detail',
       'wage-statement:detail',
       'subcontract-document:penalty-detail',
     ]))
+  })
+
+  it.each([
+    { case: '{ kind: \'entity-detail\', subject: { state: \'resolved\', entity: \'quantity-unit\', id: \'u1\', label: \'201户\', no: null }, variant:', input: {
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'quantity-unit', id: 'u1', label: '201户', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { projectId: 'p1', dataOrigin: 'real' },
+    }, expected: { state: 'resolved', to: '/subcontract/quantity/p1/u1?origin=real', label: '201户' } },
+    { case: '{ kind: \'entity-detail\', subject: { state: \'resolved\', entity: \'wage-statement\', id: \'ws1\', label: \'7月工资单\', no: null }, varia', input: {
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'wage-statement', id: 'ws1', label: '7月工资单', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    }, expected: { state: 'resolved', to: '/subcontract/payroll/ws1?origin=real', label: '7月工资单' } },
+    { case: '{ kind: \'entity-detail\', subject: { state: \'resolved\', entity: \'subcontract-document\', id: \'f1\', label: \'FK-1\', no: null }, v', input: {
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'subcontract-document', id: 'f1', label: 'FK-1', no: null },
+      variant: 'penalty-detail',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    }, expected: { state: 'unverified-target', label: 'FK-1', message: '目标待核验' } },
+  ])('班组—工人业务事实使用稳定事实 ID 穿透到责任单元、工资单和扣罚单 / resolveNavigationTarget：$case', ({ input, expected }) => {
+    expect(resolveNavigationTarget(input)).toEqual(expected)
   })
 
   it('中央班组工人事实链携带来源主体和经校验的返回上下文', () => {
@@ -99,7 +105,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
     })
   })
 
-  it('补充协议只用稳定事实 ID 生成合同类别对应的 canonical 聚焦地址', () => {
+  describe('补充协议只用稳定事实 ID 生成合同类别对应的 canonical 聚焦地址', () => {
     const intent = (contractKind: '施工' | '分包', view: string | null) => ({
       kind: 'entity-subview' as const,
       subject: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract-1', label: '主合同', no: 'HT-1' },
@@ -107,29 +113,32 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       view,
       filters: { dataOrigin: 'real' as const, contractKind },
     })
-
-    expect(resolveNavigationTarget(intent('施工', 'supplement-1'))).toMatchObject({
-      state: 'resolved',
-      to: '/contract/contract-1?origin=real&contractKind=construction&tab=supplements&focus=supplement-1',
+    it.each([
+      { case: 'intent(\'施工\', \'supplement-1\')', input: intent('施工', 'supplement-1'), expected: {
+        state: 'resolved',
+        to: '/contract/contract-1?origin=real&contractKind=construction&tab=supplements&focus=supplement-1',
+      } },
+      { case: 'intent(\'分包\', \'supplement-1\')', input: intent('分包', 'supplement-1'), expected: {
+        state: 'resolved',
+        to: '/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=supplement-1',
+      } },
+      { case: 'intent(\'施工\', null)', input: intent('施工', null), expected: { state: 'error' } },
+      { case: 'intent(\'施工\', \'targetless focus\')', input: intent('施工', 'targetless focus'), expected: { state: 'error' } },
+      { case: '{ ...intent(\'施工\', \'supplement-1\'), filters: { dataOrigin: \'real\' }, }', input: {
+        ...intent('施工', 'supplement-1'),
+        filters: { dataOrigin: 'real' },
+      }, expected: { state: 'error' } },
+      { case: '{ ...intent(\'施工\', \'supplement-1\'), filters: { contractKind: \'施工\' }, }', input: {
+        ...intent('施工', 'supplement-1'),
+        filters: { contractKind: '施工' },
+      }, expected: { state: 'error' } },
+      { case: '{ ...intent(\'施工\', \'supplement-1\'), filters: { dataOrigin: \'real\', contractKind: \'材采\' }, }', input: {
+        ...intent('施工', 'supplement-1'),
+        filters: { dataOrigin: 'real', contractKind: '材采' },
+      }, expected: { state: 'error' } },
+    ])('resolveNavigationTarget：$case', ({ input, expected }) => {
+      expect(resolveNavigationTarget(structuredClone(input))).toMatchObject(expected)
     })
-    expect(resolveNavigationTarget(intent('分包', 'supplement-1'))).toMatchObject({
-      state: 'resolved',
-      to: '/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=supplement-1',
-    })
-    expect(resolveNavigationTarget(intent('施工', null))).toMatchObject({ state: 'error' })
-    expect(resolveNavigationTarget(intent('施工', 'targetless focus'))).toMatchObject({ state: 'error' })
-    expect(resolveNavigationTarget({
-      ...intent('施工', 'supplement-1'),
-      filters: { dataOrigin: 'real' },
-    })).toMatchObject({ state: 'error' })
-    expect(resolveNavigationTarget({
-      ...intent('施工', 'supplement-1'),
-      filters: { contractKind: '施工' },
-    })).toMatchObject({ state: 'error' })
-    expect(resolveNavigationTarget({
-      ...intent('施工', 'supplement-1'),
-      filters: { dataOrigin: 'real', contractKind: '材采' },
-    })).toMatchObject({ state: 'error' })
   })
 
   it('补充协议 canonical 目标仅携带经来源校验的合同列表返回上下文', () => {
@@ -149,11 +158,12 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
     })
   })
 
-  it('有 label 无 id → 纯文本；label 解析为空 → 空态「—」', () => {
-    expect(resolveEntityLink({ type: 'project', label: '车陂商业大楼' }))
-      .toEqual({ state: 'missing', label: '车陂商业大楼', message: '未记录稳定身份' })
-    expect(resolveEntityLink({ type: 'project', id: 'p1' })).toEqual({ state: 'empty', label: null })
-    expect(resolveEntityLink({ type: 'project', id: 'p1', label: '' })).toEqual({ state: 'empty', label: null })
+  it.each([
+    { case: '{ type: \'project\', label: \'车陂商业大楼\' }', input: { type: 'project', label: '车陂商业大楼' }, expected: { state: 'missing', label: '车陂商业大楼', message: '未记录稳定身份' } },
+    { case: '{ type: \'project\', id: \'p1\' }', input: { type: 'project', id: 'p1' }, expected: { state: 'empty', label: null } },
+    { case: '{ type: \'project\', id: \'p1\', label: \'\' }', input: { type: 'project', id: 'p1', label: '' }, expected: { state: 'empty', label: null } },
+  ])('有 label 无 id → 纯文本；label 解析为空 → 空态「—」 / resolveEntityLink：$case', ({ input, expected }) => {
+    expect(resolveEntityLink(input)).toEqual(expected)
   })
 
   it('映射表只登记已实装详情页', () => {

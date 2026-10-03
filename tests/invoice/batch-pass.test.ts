@@ -40,9 +40,11 @@ describe('isAllGreen:全绿判定(建议通过标记与批量通过入围条件)
     expect(isAllGreen(GREEN)).toBe(true)
   })
 
-  it('存在黄/红字段为假;经人工确认置满后变真(确认/修正变绿即进入范围)', () => {
-    expect(isAllGreen(HAS_WARN)).toBe(false)
-    expect(isAllGreen({ ...HAS_WARN, seller: 1 })).toBe(true)
+  it.each([
+    { case: 'HAS_WARN', input: HAS_WARN, expected: false },
+    { case: '{ ...HAS_WARN, seller: 1 }', input: { ...HAS_WARN, seller: 1 }, expected: true },
+  ])('存在黄/红字段为假;经人工确认置满后变真(确认/修正变绿即进入范围) / isAllGreen：$case', ({ input, expected }) => {
+    expect(isAllGreen(input)).toBe(expected)
   })
 
   it('无置信度数据(人工录入/未识别)不标建议通过', () => {
@@ -61,9 +63,11 @@ describe('resolveAttribution:归属解析(项目须命中主数据规范名 / �
       .toEqual({ ownerKind: 'project', projectId: 'p1', projectName: '合和新城' })
   })
 
-  it('未填项目 / 项目名未命中主数据 → null(字段标红+归档禁用的依据)', () => {
-    expect(resolveAttribution(inv(), findProject)).toBeNull()
-    expect(resolveAttribution(inv({ projectName: '不存在的项目' }), findProject)).toBeNull()
+  it.each([
+    { case: 'inv() / findProject', input: inv(), argument2: findProject },
+    { case: 'inv({ projectName: \'不存在的项目\' }) / findProject', input: inv({ projectName: '不存在的项目' }), argument2: findProject },
+  ])('未填项目 / 项目名未命中主数据 → null(字段标红+归档禁用的依据) / resolveAttribution：$case', ({ input, argument2 }) => {
+    expect(resolveAttribution(input, argument2)).toBeNull()
   })
 })
 

@@ -10,17 +10,15 @@ describe('普通收款稳定身份与来源往返', () => {
     expect(resolveNavigationTarget(intent)).toMatchObject({ state: 'resolved', to: '/finance/receipt/draft%2Fa?origin=real' })
   })
 
-  it('客户、施工合同和收款列表来源均由统一入口保存，查询不承担收款身份', () => {
-    for (const source of ['/base/customer/customer-a?origin=real&tab=receipts', '/contract/contract-a?origin=real&contractKind=construction&tab=receipts', '/finance/receipt?search=SK&page=2&pageSize=10']) {
-      const result = resolveNavigationTarget(intent, { returnTo: source })
-      expect(result.state).toBe('resolved')
-      if (result.state === 'resolved')
-        expect(new URL(result.to, 'https://crm.invalid').searchParams.get('returnTo')).toBe(source)
-    }
+  it.each((['/base/customer/customer-a?origin=real&tab=receipts', '/contract/contract-a?origin=real&contractKind=construction&tab=receipts', '/finance/receipt?search=SK&page=2&pageSize=10']).map(input => ({ input })))('客户、施工合同和收款列表来源均由统一入口保存，查询不承担收款身份：输入案例 %#', ({ input: source }) => {
+    const result = resolveNavigationTarget(intent, { returnTo: source })
+    expect(result.state).toBe('resolved')
+    if (result.state === 'resolved')
+      expect(new URL(result.to, 'https://crm.invalid').searchParams.get('returnTo')).toBe(source)
   })
 
-  it('返回仅接受相同来源的已知业务路径，保留列表筛选分页并拒绝外部或写态目标', () => {
+  it.each((['https://outside.invalid/', '//outside.invalid/', '/finance/receipt/new', '/finance/receipt/form/a', '/finance/receipt/a?origin=demo', '/finance/receipt?unknown=1']).map(input => ({ input })))('返回仅接受相同来源的已知业务路径，保留列表筛选分页并拒绝外部或写态目标：输入案例 %#', ({ input: value }) => {
     expect(validateReceiptReturnTo('/finance/receipt?search=SK&page=3&pageSize=20#receipt-real-a', 'real')).toBe('/finance/receipt?search=SK&page=3&pageSize=20#receipt-real-a')
-    for (const value of ['https://outside.invalid/', '//outside.invalid/', '/finance/receipt/new', '/finance/receipt/form/a', '/finance/receipt/a?origin=demo', '/finance/receipt?unknown=1']) expect(validateReceiptReturnTo(value, 'real')).toBeNull()
+    expect(validateReceiptReturnTo(value, 'real')).toBeNull()
   })
 })

@@ -1,5 +1,5 @@
 import type { TestDb } from '../helpers/memory-db'
-import { fireEvent, screen } from '@testing-library/vue'
+import { fireEvent, screen, within } from '@testing-library/vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -27,6 +27,8 @@ vi.mock('~/lib/db/connection', () => ({ getDb: () => Promise.resolve(db), withTr
 const query = { project: 'project-b', month: '2025-11', crew: 'crew-b', status: '["draft","checked"]' }
 
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-09-24T08:00:00Z'))
   db = await createMemoryDb()
   await runMigrations(db)
   await db.execute('INSERT INTO projects (id, name, code) VALUES (\'project-a\', \'A 项目\', \'PA\'), (\'project-b\', \'B 项目\', \'PB\')')
@@ -97,9 +99,9 @@ describe('工资跨页筛选恢复', () => {
     })
     await flushPromises()
     const toolbar = wrapper.get('[aria-label="签工筛选"]')
-    expect((toolbar.findAll('select')[0]!.element as HTMLSelectElement).value).toBe('project-b')
+    expect((within(toolbar.element as HTMLElement).getByRole('combobox', { name: '项目' }) as HTMLSelectElement).value).toBe('project-b')
     expect((toolbar.get('input[type="month"]').element as HTMLInputElement).value).toBe('2025-11')
-    expect((toolbar.findAll('select')[1]!.element as HTMLSelectElement).value).toBe('crew-b')
+    expect((within(toolbar.element as HTMLElement).getByRole('combobox', { name: '班组' }) as HTMLSelectElement).value).toBe('crew-b')
     const returnLink = wrapper.findAll('a').find(link => link.text() === '返回工资核算')!
     expect(new URL(returnLink.attributes('href'), 'http://test').searchParams.get('status')).toBe(query.status)
     await toolbar.get('button[aria-label="确认状态，已选 0 项"]').trigger('click')
@@ -114,11 +116,15 @@ describe('工资跨页筛选恢复', () => {
     wrapper.unmount()
   })
 
-  it('签工丢弃不存在的项目、班组及无效月份和工资状态', async () => {
+  it.each([
+    { month: '2025-99', status: 'confirmed', returnedStatus: null },
+    { month: '2025-00', status: 'not-a-status', returnedStatus: null },
+    { month: '25-11', status: '["unknown"]', returnedStatus: '[]' },
+  ])('签工丢弃不存在的项目、班组及无效月份 $month 和工资状态 $status', async ({ month, status, returnedStatus }) => {
     const router = createRouter({ history: createMemoryHistory(), routes: [
       { path: '/:pathMatch(.*)*', component: defineComponent({ template: '<div />' }) },
     ] })
-    await router.push({ path: '/subcontract/daywork', query: { project: 'missing', crew: 'missing', month: '2025-99', status: 'confirmed' } })
+    await router.push({ path: '/subcontract/daywork', query: { project: 'missing', crew: 'missing', month, status } })
     const wrapper = mount(SignedDayworkScreen, {
       global: { plugins: [createPinia(), router], components: {
         NuxtLink: RouterLink,
@@ -132,8 +138,8 @@ describe('工资跨页筛选恢复', () => {
     const returned = new URL(returnLink.attributes('href'), 'http://test').searchParams
     expect(returned.get('project')).toBe('project-a')
     expect(returned.has('crew')).toBe(false)
-    expect(returned.has('status')).toBe(false)
-    expect(returned.get('month')).not.toBe('2025-99')
+    expect(returned.get('status')).toBe(returnedStatus)
+    expect(returned.get('month')).toBe('2026-09')
     wrapper.unmount()
   })
 
@@ -168,7 +174,7 @@ describe('工资跨页筛选恢复', () => {
     await router.push('/subcontract/payroll')
     await router.push({ path: '/subcontract/daywork', query: { project: query.project, month: query.month } })
     await flushPromises()
-    expect((wrapper.get('[aria-label="签工筛选"]').findAll('select')[1]!.element as HTMLSelectElement).value).toBe('')
+    expect((within(wrapper.get('[aria-label="签工筛选"]').element as HTMLElement).getByRole('combobox', { name: '班组' }) as HTMLSelectElement).value).toBe('')
     const clearedLink = wrapper.findAll('a').find(link => link.text() === '返回工资核算')!
     expect(Object.fromEntries(new URL(clearedLink.attributes('href'), 'http://test').searchParams)).toEqual({ project: query.project, month: query.month })
     await router.push('/subcontract/payroll')
@@ -176,7 +182,7 @@ describe('工资跨页筛选恢复', () => {
     await router.push({ path: '/subcontract/daywork', query: changed })
     await flushPromises()
     const toolbar = wrapper.get('[aria-label="签工筛选"]')
-    expect((toolbar.findAll('select')[0]!.element as HTMLSelectElement).value).toBe('project-a')
+    expect((within(toolbar.element as HTMLElement).getByRole('combobox', { name: '项目' }) as HTMLSelectElement).value).toBe('project-a')
     expect((toolbar.get('input[type="month"]').element as HTMLInputElement).value).toBe('2025-12')
     const returnLink = wrapper.findAll('a').find(link => link.text() === '返回工资核算')!
     expect(Object.fromEntries(new URL(returnLink.attributes('href'), 'http://test').searchParams)).toEqual(changed)

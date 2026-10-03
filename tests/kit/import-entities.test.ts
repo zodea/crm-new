@@ -56,9 +56,11 @@ describe('导入实体注册表', () => {
     expect(getImportEntity('unknown-entity')).toBeUndefined()
   })
 
-  it('原型键不沿原型链误命中', () => {
-    expect(getImportEntity('constructor')).toBeUndefined()
-    expect(getImportEntity('toString')).toBeUndefined()
+  it.each([
+    { case: '\'constructor\'', input: 'constructor' },
+    { case: '\'toString\'', input: 'toString' },
+  ])('原型键不沿原型链误命中 / getImportEntity：$case', ({ input }) => {
+    expect(getImportEntity(input)).toBeUndefined()
   })
 
   it('演示写入：FAIL 行首次失败、重试成功，普通行直接成功', async () => {

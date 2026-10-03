@@ -1,6 +1,6 @@
 import { cleanup, render, waitFor } from '@testing-library/vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, reactive } from 'vue'
+import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from 'vue'
 import { useScheduleGroupWizard } from '~/composables/useScheduleGroupWizard'
 import { useScheduleWorkspace } from '~/composables/useScheduleWorkspace'
 
@@ -65,6 +65,79 @@ afterEach(() => {
 })
 
 describe('中央排程界面目标与草稿边界', () => {
+  it.each([
+    { editedDuration: 13, editedEnabled: false, editedAnchor: '2026-09-08' },
+    { editedDuration: 21, editedEnabled: true, editedAnchor: '2026-09-12' },
+  ])('返回建组刷新新版候选，保留旧版选择与人工 $editedDuration 天草稿', async ({ editedDuration, editedEnabled, editedAnchor }) => {
+    const { store } = fixture()
+    const visible = ref(true)
+    let wizard!: ReturnType<typeof useScheduleGroupWizard>
+    const Wizard = defineComponent({ setup() {
+      wizard = useScheduleGroupWizard()
+      return () => h('div')
+    } })
+    render(defineComponent({ setup() {
+      return () => h(KeepAlive, null, { default: () => visible.value ? h(Wizard) : null })
+    } }))
+    await waitFor(() => expect(wizard.initialized.value).toBe(true))
+    wizard.currentStep.value = 2
+    wizard.name.value = '人工保留分组'
+    Object.assign(wizard.tasks.value[0]!, { durationDays: editedDuration, enabled: editedEnabled, anchorStart: editedAnchor, predecessorDisabled: true })
+    store.loadProcessLibraries.mockImplementationOnce(async () => {
+      store.processLibraries.push({ id: 'lib2', name: '标准工序', isDefault: false, version: 2, sourceVersion: 'lib:v2', taskCount: 1 })
+    })
+    const taskReads = store.loadProcessLibraryTasks.mock.calls.length
+    visible.value = false
+    await nextTick()
+    visible.value = true
+    await waitFor(() => expect(wizard.processLibraryOptions.value.map(option => option.key)).toEqual(['lib1', 'lib2']))
+    expect(wizard.processLibraryId.value).toBe('lib1')
+    expect(wizard.currentStep.value).toBe(2)
+    expect(wizard.name.value).toBe('人工保留分组')
+    expect(wizard.tasks.value).toEqual([{ templateKey: 'one', enabled: editedEnabled, durationDays: editedDuration, anchorStart: editedAnchor, predecessorKey: null, predecessorDisabled: true }])
+    expect(store.loadProcessLibraryTasks).toHaveBeenCalledTimes(taskReads)
+  })
+
+  it.each([
+    { target: '项目', nextProject: 'p2', nextSession: 'w:a:real' },
+    { target: '会话', nextProject: 'p1', nextSession: 'w:other:real' },
+  ])('旧请求的晚失败不覆盖新$target错误或人工草稿', async ({ nextProject, nextSession }) => {
+    const { store, route } = fixture()
+    const wizard = mountHook(useScheduleGroupWizard)
+    await waitFor(() => expect(wizard.initialized.value).toBe(true))
+    let reject!: (cause: Error) => void
+    store.recheck.mockImplementationOnce(() => new Promise<void>((_, rejectRequest) => {
+      reject = rejectRequest
+    }))
+    const rechecking = wizard.recheck()
+    route.query.project = nextProject
+    store.sessionKey = nextSession
+    await waitFor(() => expect(wizard.projectId.value).toBe(nextProject))
+    await waitFor(() => expect(wizard.initialized.value).toBe(true))
+    wizard.name.value = '新项目人工稿'
+    wizard.submitError.value = '新项目当前错误'
+    reject(new Error('旧项目迟到失败'))
+    await rechecking
+    expect(wizard.submitError.value).toBe('新项目当前错误')
+    expect(wizard.name.value).toBe('新项目人工稿')
+    expect(wizard.projectId.value).toBe(nextProject)
+  })
+
+  it('同一目标后发核对成功后，先发请求的晚失败不能恢复旧错误', async () => {
+    const { store } = fixture()
+    const wizard = mountHook(useScheduleGroupWizard)
+    await waitFor(() => expect(wizard.initialized.value).toBe(true))
+    let reject!: (cause: Error) => void
+    store.recheck.mockImplementationOnce(() => new Promise<void>((_, rejectRequest) => {
+      reject = rejectRequest
+    }))
+    const earlier = wizard.recheck()
+    await wizard.recheck()
+    reject(new Error('先发请求迟到失败'))
+    await earlier
+    expect(wizard.submitError.value).toBe('')
+  })
+
   it('已绑定清单按冻结楼层ID精确打开原工序，错配合同与失效楼层不回退', async () => {
     const { store, route } = fixture()
     Object.assign(store.snapshot.groups[0]!, { contractId: 'bound-contract' })

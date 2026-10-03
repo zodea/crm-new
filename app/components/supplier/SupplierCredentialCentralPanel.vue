@@ -49,6 +49,13 @@ const fileBusy = shallowRef(false)
 const ocrRecordId = shallowRef('')
 const ocrRecognizeOnOpen = shallowRef(false)
 const ocrPreparing = shallowRef(false)
+watch(session.recoveryNotice, (notice) => {
+  if (notice && active.value) {
+    resetEditor()
+    ocrRecordId.value = ''
+    ocrPreparing.value = false
+  }
+})
 const ocrWorkflow = shallowRef<InstanceType<typeof SupplierCredentialOcrWorkflow> | null>(null)
 const fileError = shallowRef('')
 const downloadUrls = new Set<string>()
@@ -357,6 +364,9 @@ onScopeDispose(() => {
 <template>
   <EntityDetailShell ref="detailShell" :title="data ? `${data.supplierName} · 证照附件` : '分供方证照附件'" subtitle="原件、资料要求和人工核验结果统一保存在当前分供方。" :back-to="backTo" back-label="返回分供方详情" :state="shellState" :state-title="stateTitle" :state-description="error" :state-action-label="shellState === 'error' ? '重新加载' : ''" @state-action="load(true)">
     <div v-if="data" class="grid min-w-0 gap-4">
+      <p v-if="session.recoveryNotice.value" class="m-0 border border-brand/25 bg-brand-soft p-3 text-12px leading-5 text-brand" role="status">
+        {{ session.recoveryNotice.value }}
+      </p>
       <p v-if="origin === 'demo'" class="m-0 text-12px text-ink-soft">
         测试证照只读，原件按当前测试身份读取。
       </p>

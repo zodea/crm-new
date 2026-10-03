@@ -1,5 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 import {
   expectEscapeReturnsFocus,
   expectInViewport,
@@ -7,16 +9,17 @@ import {
   expectNoPageOverflow,
   expectOverlayAboveShell,
   expectTabSequence,
-  RESPONSIVE_WIDTHS,
 } from './helpers/responsive'
 import { VISUAL_BASE_URL, VISUAL_DATA_PROFILE } from './helpers/visual-environment'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
+const RESPONSIVE_WIDTHS = [390, 768, 1024, 1280, 1440] as const
 const VISUAL_NOW = new Date('2026-08-12T12:00:00+08:00')
 const VIEWPORT_HEIGHTS: Record<(typeof RESPONSIVE_WIDTHS)[number], number> = {
   390: 844,
   768: 900,
   1024: 900,
+  1280: 900,
   1440: 1000,
 }
 const MASK_COLOR = '#e9edf4'
@@ -42,9 +45,11 @@ function tableSensitive(page: Page): Locator[] {
   return [
     page.locator('.vxe-body--row .vxe-cell--label').filter({
       hasNot: page.locator('button'),
+    }).filter({
+      hasNot: page.locator('[data-ui="status-tag"]'),
     }),
     page.locator('.vxe-body--row a:not(.icon-btn)'),
-    page.locator('.vxe-body--row span.font-600'),
+    page.locator('.vxe-body--row span.font-600:not([data-ui="status-tag"])'),
     page.locator('nav[aria-label="表格分页"] > span'),
     page.locator('nav[aria-label="表格分页"] [data-pager-page]'),
     page.locator('nav[aria-label="表格分页"] select'),
@@ -56,7 +61,6 @@ function workspaceSensitive(page: Page): Locator[] {
     page.getByRole('combobox'),
     page.locator('[data-shell-workspace] .font-mono'),
     page.locator('[data-shell-workspace] strong'),
-    page.locator('section[aria-label="阶段进度"] article > div:first-child > span:not(.font-mono)'),
     page.locator('.quantity-matrix thead th:not(.quantity-matrix__corner)'),
     page.locator('.quantity-matrix tbody th[role="rowheader"]'),
     page.locator('[data-testid="quantity-matrix-cell"] > span'),
@@ -77,8 +81,6 @@ function homeSensitive(page: Page): Locator[] {
     dashboard.locator('.home-schedule .month-label'),
     dashboard.locator('.home-schedule .group-button .truncate'),
     dashboard.locator('.home-schedule .task-button .truncate'),
-    dashboard.locator('.home-schedule .chip'),
-    dashboard.locator('.home-schedule statuschip'),
   ]
 }
 
@@ -90,7 +92,6 @@ function entityDetailSensitive(page: Page): Locator[] {
     shell.locator('[data-ui="entity-detail-mark"]'),
     shell.locator('header h2'),
     shell.locator('header p'),
-    shell.locator('header .chip'),
     shell.locator('[data-ui="entity-detail-summary"] .font-mono'),
     shell.locator('ol li strong'),
     shell.locator('ol li span'),
@@ -119,11 +120,14 @@ async function expectVisualEnvironment(page: Page) {
     mode: VISUAL_DATA_PROFILE,
     origin: new URL(VISUAL_BASE_URL).origin,
   })
-  await expect(page.getByRole('button', { name: '关闭测试数据' }))
+  // head 元信息先于客户端外壳出现；冷编译就绪以实际标题挂载为准。
+  await expect(page.locator('[data-shell-topbar] h1')).toBeVisible({ timeout: 30_000 })
+  // 模态浮层正确隐藏背景的可访问树；这里只核对配置状态，不与背景交互。
+  await expect(page.getByRole('button', { name: '关闭测试数据', includeHidden: true }))
     .toHaveAttribute('aria-pressed', 'true')
 }
 
-async function navigateFromSidebar(page: Page, width: number, label: string) {
+async function navigateFromSidebar(page: Page, width: number, label: string, pathname: string) {
   let sidebar: Locator
   if (width < 1024) {
     await page.getByRole('button', { name: '切换侧边栏' }).click()
@@ -136,7 +140,10 @@ async function navigateFromSidebar(page: Page, width: number, label: string) {
 
   await sidebar.getByRole('searchbox', { name: '搜索菜单' }).fill(label)
   await sidebar.getByRole('link', { name: label, exact: true }).click()
+  await expect.poll(() => new URL(page.url()).pathname).toBe(pathname)
   await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
+  if (width < 1024)
+    await expect(sidebar).toBeHidden()
 }
 
 const SAMPLES: VisualSample[] = [
@@ -157,7 +164,7 @@ const SAMPLES: VisualSample[] = [
   },
   {
     key: 'home-dashboard-default',
-    path: '/?project=proj_demo_001',
+    path: '/?project=proj_demo_001&origin=demo',
     prepare: async (page) => {
       await expect(page.locator('[data-home-dashboard] .home-schedule')).toBeVisible()
     },
@@ -200,33 +207,36 @@ const SAMPLES: VisualSample[] = [
     key: 'shell-stress',
     path: '/',
     prepare: async (page, width) => {
-      await navigateFromSidebar(page, width, '项目列表')
+      await navigateFromSidebar(page, width, '项目列表', '/project')
       const detailLink = page.getByRole('link', { name: '合和新城', exact: true }).first()
       await expect(detailLink).toBeVisible()
       await detailLink.click()
-      await expect(page).toHaveURL(/\/project\/[^/]+$/)
+      await expect.poll(() => new URL(page.url()).pathname).toBe('/project/proj_demo_001')
+      expect(new URL(page.url()).searchParams.get('origin')).toBe('demo')
 
-      for (const label of [
-        '施工合同',
-        '分包合同',
-        '工程量管理',
-        '工资核算',
-        '材料采购合同',
-        '送货单识别',
-        '单价对比',
-        '发票识别',
-        '发票台账',
-        '分供方',
+      for (const { label, pathname } of [
+        { label: '施工合同', pathname: '/contract/construction' },
+        { label: '分包合同', pathname: '/contract/subcontract' },
+        { label: '工程量管理', pathname: '/subcontract/quantity' },
+        { label: '工资核算', pathname: '/subcontract/payroll' },
+        { label: '材料采购合同', pathname: '/contract/material' },
+        { label: '送货单识别', pathname: '/material/delivery' },
+        { label: '单价对比', pathname: '/material/price' },
+        { label: '发票识别', pathname: '/finance/invoice' },
+        { label: '发票台账', pathname: '/finance/ledger' },
+        { label: '分供方', pathname: '/base/supplier' },
       ])
-        await navigateFromSidebar(page, width, label)
+        await navigateFromSidebar(page, width, label, pathname)
 
       await expect(page.locator('[data-ui="supplier-list-table"] .vxe-body--row').first())
         .toBeVisible()
 
       const tabList = page.getByRole('navigation', { name: '已打开页面' })
-      await expect(page.getByRole('button', { name: '向前翻动页签' })).toBeVisible()
-      await expect(page.getByRole('button', { name: '向后翻动页签' })).toBeVisible()
-      expect(await tabList.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+      const overflow = await tabList.evaluate(element => element.scrollWidth > element.clientWidth)
+      if (width <= 1024)
+        expect(overflow, '窄视口中多个业务页签应在自身区域滚动').toBe(true)
+      await expect(page.getByRole('button', { name: '向前翻动页签' })).toHaveCount(overflow ? 1 : 0)
+      await expect(page.getByRole('button', { name: '向后翻动页签' })).toHaveCount(overflow ? 1 : 0)
 
       if (width < 1024)
         await page.getByRole('button', { name: '切换侧边栏' }).click()
@@ -247,7 +257,7 @@ const SAMPLES: VisualSample[] = [
   },
   {
     key: 'notification-sheet',
-    path: '/',
+    path: '/?project=proj_demo_001&origin=demo',
     prepare: async (page, width) => {
       await page.getByRole('button', { name: /打开通知中心/ }).click()
       const sheet = page.getByRole('dialog', { name: '消息中心' })
@@ -269,15 +279,11 @@ const SAMPLES: VisualSample[] = [
     path: '/project',
     prepare: async (page) => {
       await expect(page.locator('.vxe-body--row').first()).toBeVisible()
-      await page.locator('.vxe-body--row span[class*="cell--status"], .vxe-body--row span.font-600')
-        .evaluateAll(elements => elements.forEach(element =>
-          element.setAttribute('data-visual-status', ''),
-        ))
+      await expect(page.locator('.vxe-body--row [data-ui="status-tag"]').first()).toBeVisible()
     },
     sensitive: page => [
       ...stableSensitive(page),
       ...tableSensitive(page),
-      page.locator('.vxe-body--row [data-visual-status]'),
       page.locator('[data-shell-workspace] section.panel').first().locator('.text-12px.text-ink-soft').first(),
     ],
   },
@@ -300,12 +306,6 @@ const SAMPLES: VisualSample[] = [
       page.locator('[data-shell-workspace] .font-mono'),
       page.locator('[data-shell-workspace] strong'),
       page.locator('[data-shell-workspace] .text-right'),
-      page.locator('[data-shell-workspace] section[aria-labelledby="project-phase-title"] [class*="min-w-48"]'),
-      page.locator('[data-shell-workspace] .space-y-1\\.5 > div > .chip'),
-      page.locator('[data-shell-workspace] section[aria-labelledby="project-phase-title"] button[aria-label*="文件，共"]'),
-      page.locator('[data-shell-workspace] section.panel.mb-3 .grid.gap-2 > div > span:first-child'),
-      page.locator('[data-shell-workspace] #project-file-list-title + .chip'),
-      page.locator('[data-shell-workspace] .chip-brand'),
       page.locator('[data-shell-workspace] a.cell--link'),
       page.locator('[data-ui="project-detail-screen"] header p'),
       page.locator('[data-ui="project-detail-screen"] header dd'),
@@ -336,6 +336,7 @@ const SAMPLES: VisualSample[] = [
     key: 'workspace',
     path: '/subcontract/quantity',
     prepare: async (page) => {
+      await installQuantityProductionFixture(page, { detailedStages: true })
       await expect(page.getByRole('grid', { name: '工程量楼层房号矩阵' })).toBeVisible()
     },
     sensitive: page => [
@@ -354,8 +355,10 @@ const SAMPLES: VisualSample[] = [
         return
       }
 
+      await installQuantityProductionFixture(page, { detailedStages: true })
       await page.getByRole('button', { name: '责任配置', exact: true }).click()
       await expect(page.getByRole('dialog', { name: '户 × 工种责任配置' })).toBeVisible()
+      await expect(page.getByTestId('quantity-assignment-unit-picker')).toBeVisible()
     },
     sensitive: (page, width) => [
       ...stableSensitive(page),
@@ -368,6 +371,7 @@ const SAMPLES: VisualSample[] = [
 ]
 
 test.beforeEach(async ({ page }) => {
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `visual-${randomUUID()}` })
   await page.clock.install({ time: VISUAL_NOW })
   await page.addInitScript((dataVisibilityStorageKey) => {
     localStorage.removeItem('ruihang-sidebar-pinned')
@@ -394,18 +398,19 @@ test.beforeEach(async ({ page }) => {
 test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
   for (const sample of SAMPLES) {
     for (const width of RESPONSIVE_WIDTHS) {
-      test(`${sample.key} @ ${width}px`, async ({ page }) => {
+      test(`${sample.key} @ ${width}px`, async ({ page }, testInfo) => {
+        // 独立开发服务首次编译客户端可能超过默认 30s，断言仍等待真实就绪。
+        test.setTimeout(sample.key === 'shell-stress' ? 90_000 : 60_000)
         await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
         const path = typeof sample.path === 'function' ? sample.path(width) : sample.path
         await page.goto(path)
         await page.waitForLoadState('networkidle')
         await expectVisualEnvironment(page)
+        await sample.prepare(page, width)
+        await page.waitForLoadState('networkidle')
+        // 夹具可能通过正式回执地址重新加载文档，截图脱敏样式须注入最终文档。
         await page.addStyleTag({
           content: `
-            :root {
-              --font-sans: "Microsoft YaHei", sans-serif !important;
-              --font-mono: Consolas, "Courier New", monospace !important;
-            }
             [data-shell-topbar] [class*="bg-danger"] {
               width: 16px !important;
               min-width: 16px !important;
@@ -425,53 +430,36 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
               -webkit-text-fill-color: transparent !important;
               text-shadow: none !important;
             }
-            [data-visual-status] {
-              position: relative;
-            }
-            [data-visual-status]::after {
-              position: absolute;
-              top: 50%;
-              left: 0;
-              width: 30px;
-              height: 4px;
-              border-radius: 999px;
-              content: "";
-              transform: translateY(-50%);
-            }
-            [data-visual-status].cell--status-warn::after {
-              background: var(--warn);
-            }
-            [data-visual-status].cell--status-ok::after {
-              background: var(--ok);
-            }
-            [data-visual-status].text-brand-deep::after {
-              background: var(--brand);
-            }
-            [data-visual-status].text-ink-soft::after {
-              background: var(--ink-faint);
-            }
             nuxt-devtools-frame {
               display: none !important;
             }
-            .today-line,
-            .today-label {
-              left: 50% !important;
-            }
           `,
         })
-        await sample.prepare(page, width)
+        await expectVisualEnvironment(page)
+        // 普通页面使用中性点击清除准备导航留下的输入/键盘焦点；保留表单
+        // 自身 autofocus 和已打开浮层的真实焦点，不用 CSS 隐藏交互反馈。
+        if (!['form', 'overlay', 'notification-sheet'].includes(sample.key))
+          await page.locator('[data-shell-topbar] h1').click()
+        await page.mouse.move(0, 0)
+        const interaction = await page.evaluate(() => {
+          const active = document.activeElement
+          return {
+            activeTag: active?.tagName,
+            activeName: active?.getAttribute('aria-label'),
+            focusVisible: active?.matches(':focus-visible') ?? false,
+          }
+        })
+        await testInfo.attach('screenshot-interaction-state', {
+          body: JSON.stringify(interaction, null, 2),
+          contentType: 'application/json',
+        })
+        if (!['form', 'overlay', 'notification-sheet'].includes(sample.key))
+          expect(interaction.focusVisible, '常态截图没有准备操作残留的键盘焦点').toBe(false)
         await page.locator('input[type="date"]').evaluateAll(inputs => inputs.forEach((input) => {
           if (input instanceof HTMLInputElement && !input.value)
             input.dataset.visualEmptyDate = ''
         }))
         await redactSensitiveText(sample.sensitive?.(page, width) ?? stableSensitive(page))
-        if (sample.key === 'detail') {
-          await page.getByTestId('project-schedule-progress-value')
-            .evaluateAll(elements => elements.forEach((element) => {
-              if (element instanceof HTMLElement)
-                element.style.width = '50%'
-            }))
-        }
         await expectNoPageOverflow(page, `${sample.key} @ ${width}px`)
 
         await expect(page).toHaveScreenshot(`${sample.key}-${width}.png`, {
@@ -487,46 +475,54 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
 })
 
 test.describe('#184 公共交互断言', () => {
-  test('整页表单主操作可达且键盘顺序稳定', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/project/form')
+  for (const width of RESPONSIVE_WIDTHS) {
+    for (const name of ['视觉验收项目', '视觉验收多栋楼区域综合施工及长期维护项目']) {
+      test(`整页表单主操作可达且键盘顺序稳定：${name} @ ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
+        await page.goto('/project/form')
 
-    const firstField = page.getByLabel('项目名称 *')
-    const actions = page.getByRole('group', { name: '表单操作' })
-    const cancel = actions.getByRole('button', { name: '取消', exact: true })
-    const save = actions.getByRole('button', { name: '保存', exact: true })
+        const firstField = page.getByLabel('项目名称 *')
+        const actions = page.getByRole('group', { name: '表单操作' })
+        const cancel = actions.getByRole('button', { name: '取消', exact: true })
+        const save = actions.getByRole('button', { name: '保存', exact: true })
+        await firstField.fill(name)
 
-    await expectTabSequence(page, firstField, [cancel, save], '项目整页表单')
-    await expectInViewport(save, '项目保存主操作')
-    await expectNoPageOverflow(page, '项目整页表单 @ 390px')
-  })
+        await expectTabSequence(page, firstField, [cancel, save], `项目整页表单 @ ${width}px`)
+        await expect(firstField).toHaveValue(name)
+        await expectInViewport(save, '项目保存主操作')
+        await expectNoPageOverflow(page, `项目整页表单 @ ${width}px`)
+      })
+    }
 
-  test('密集矩阵局部横滚，Dialog 保持层级并在 Esc 后归还焦点', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/subcontract/quantity')
+    test(`密集矩阵局部滚动，Dialog 层级、Esc 与焦点返回 @ ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
+      await installQuantityProductionFixture(page, { detailedStages: true })
+      await expectVisualEnvironment(page)
+      const scroll = page.getByTestId('quantity-matrix-scroll')
+      await expect(scroll).toHaveCSS('overflow-x', 'auto')
+      if (width === 390)
+        await expectLocalHorizontalScroll(scroll, '工程量矩阵')
+      await expectNoPageOverflow(page, `工程量矩阵 @ ${width}px`)
 
-    await expectLocalHorizontalScroll(
-      page.getByTestId('quantity-matrix-scroll'),
-      '工程量矩阵',
-    )
-    await expectNoPageOverflow(page, '工程量矩阵 @ 390px')
+      const trigger = page.getByRole('button', { name: '责任配置', exact: true })
+      await trigger.click()
+      const dialog = page.getByRole('dialog', { name: '户 × 工种责任配置' })
+      await expect(page.getByTestId('quantity-assignment-unit-picker')).toBeVisible()
+      await expectOverlayAboveShell(dialog, '责任配置 Dialog')
+      await expectEscapeReturnsFocus(page, dialog, trigger, '责任配置 Dialog')
+    })
+  }
 
-    await page.setViewportSize({ width: 1440, height: 1000 })
-    const trigger = page.getByRole('button', { name: '责任配置', exact: true })
-    await trigger.click()
-    const dialog = page.getByRole('dialog', { name: '户 × 工种责任配置' })
-    await expectOverlayAboveShell(dialog, '责任配置 Dialog')
-    await expectEscapeReturnsFocus(page, dialog, trigger, '责任配置 Dialog')
-  })
+  for (const width of [390, 768] as const) {
+    test(`移动导航 Sheet 层级、Esc 与焦点返回 @ ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
+      await page.goto('/')
 
-  test('移动导航 Sheet 保持层级并在 Esc 后归还焦点', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/')
-
-    const trigger = page.getByRole('button', { name: '切换侧边栏' })
-    await trigger.click()
-    const sheet = page.getByRole('dialog', { name: '导航菜单' })
-    await expectOverlayAboveShell(sheet, '移动导航 Sheet')
-    await expectEscapeReturnsFocus(page, sheet, trigger, '移动导航 Sheet')
-  })
+      const trigger = page.getByRole('button', { name: '切换侧边栏' })
+      await trigger.click()
+      const sheet = page.getByRole('dialog', { name: '导航菜单' })
+      await expectOverlayAboveShell(sheet, '移动导航 Sheet')
+      await expectEscapeReturnsFocus(page, sheet, trigger, '移动导航 Sheet')
+    })
+  }
 })

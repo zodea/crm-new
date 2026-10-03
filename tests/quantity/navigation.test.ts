@@ -16,17 +16,29 @@ describe('quantity route context', () => {
     const invalid = quantityUnitReturnPath('p1', { origin: 'real', returnTo: `${path}&task=other` })
     expect(invalid).toBe('/subcontract/quantity?project=p1&origin=real')
   })
-  it('直接户链接返回其稳定项目，合法同来源返回范围可保留', () => {
-    expect(quantityUnitReturnPath('p1', { origin: 'real' })).toBe('/subcontract/quantity?project=p1&origin=real')
-    expect(quantityUnitReturnPath('p1', { origin: 'real', returnTo: '/subcontract/quantity?project=p1&view=crew&origin=real' })).toBe('/subcontract/quantity?project=p1&view=crew&origin=real')
-    expect(quantityUnitReturnPath('p1', { origin: 'real', project: 'wrong', returnTo: '/subcontract/quantity?project=p2&origin=demo' })).toBe('/subcontract/quantity?project=p1&origin=real')
+  it.each([
+    { case: '\'p1\' / { origin: \'real\' }', input: 'p1', argument2: { origin: 'real' }, expected: '/subcontract/quantity?project=p1&origin=real' },
+    { case: '\'p1\' / { origin: \'real\', returnTo: \'/subcontract/quantity?project=p1&view=crew&origin=real\' }', input: 'p1', argument2: { origin: 'real', returnTo: '/subcontract/quantity?project=p1&view=crew&origin=real' }, expected: '/subcontract/quantity?project=p1&view=crew&origin=real' },
+    { case: '\'p1\' / { origin: \'real\', project: \'wrong\', returnTo: \'/subcontract/quantity?project=p2&origin=demo\' }', input: 'p1', argument2: { origin: 'real', project: 'wrong', returnTo: '/subcontract/quantity?project=p2&origin=demo' }, expected: '/subcontract/quantity?project=p1&origin=real' },
+  ])('直接户链接返回其稳定项目，合法同来源返回范围可保留 / quantityUnitReturnPath：$case', ({ input, argument2, expected }) => {
+    expect(quantityUnitReturnPath(input, argument2)).toBe(expected)
   })
   it('明确携带正式或演示来源，非法来源不能回退正式', () => {
-    expect(readQuantityOrigin({})).toBe('real')
-    expect(readQuantityOrigin({ origin: 'demo' })).toBe('demo')
-    expect(readQuantityOrigin({ origin: ['real', 'demo'] })).toBeNull()
-    expect(readQuantityOrigin({ origin: 'missing' })).toBeNull()
     expect(quantityMatrixReturnPath({ project: 'same', origin: 'demo' })).toBe('/subcontract/quantity?project=same&origin=demo')
+  })
+
+  it.each([
+    { case: '{}', input: {}, expected: 'real' },
+    { case: '{ origin: \'demo\' }', input: { origin: 'demo' }, expected: 'demo' },
+  ])('明确携带正式或演示来源，非法来源不能回退正式 / readQuantityOrigin：$case', ({ input, expected }) => {
+    expect(readQuantityOrigin(input)).toBe(expected)
+  })
+
+  it.each([
+    { case: '{ origin: [\'real\', \'demo\'] }', input: { origin: ['real', 'demo'] } },
+    { case: '{ origin: \'missing\' }', input: { origin: 'missing' } },
+  ])('明确携带正式或演示来源，非法来源不能回退正式 / readQuantityOrigin：$case', ({ input }) => {
+    expect(readQuantityOrigin(input)).toBeNull()
   })
   it('round-trips matrix filters through detail and template routes', () => {
     const query = buildQuantityFilterQuery({

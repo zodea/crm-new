@@ -3,6 +3,7 @@ import type {
   SupplierContractSourceRow,
   SupplierDetailQueryDTO,
   SupplierDetailReadDTO,
+  SupplierFactSource,
   SupplierInvoiceSourceRow,
   SupplierListNumericField,
   SupplierListPageDTO,
@@ -21,10 +22,11 @@ import { isConfirmedExpenditureSettlement as confirmedSettlement, isEffectiveExp
 import { readApprovalAmount } from '../finance/approval-amount'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
-import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_PAGE_SIZES, supplierProblem, SupplierRepositoryProblem } from './read-contract'
+import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_NUMERIC_SOURCE, SUPPLIER_PAGE_SIZES, supplierProblem, SupplierRepositoryProblem } from './read-contract'
 import { normalizeSupplierEnumSelection, parseSupplierColumnFilters } from './read-query'
 
 interface BuildSupplierListPageInput {
+  unavailableSources?: readonly SupplierFactSource[]
   suppliers: readonly SupplierListSourceRow[]
   projectSuppliers: readonly SupplierProjectRelationSourceRow[]
   contracts: readonly SupplierContractSourceRow[]
@@ -39,6 +41,7 @@ interface BuildSupplierListPageInput {
 }
 
 interface BuildSupplierDetailReadInput {
+  unavailableSources?: readonly SupplierFactSource[]
   suppliers: readonly SupplierListSourceRow[]
   projects: readonly SupplierProjectSourceRow[]
   projectSuppliers: readonly SupplierProjectRelationSourceRow[]
@@ -237,6 +240,10 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   const allowedOrigins = query.includeDemo ? new Set(['real', 'demo']) : new Set(['real'])
   const normalizedSearch = query.search.trim().toLocaleLowerCase('zh-CN')
   const columnFilters = parseSupplierColumnFilters(query.columnFilters)
+  for (const field of SUPPLIER_LIST_NUMERIC_FIELDS) {
+    if (input.unavailableSources?.includes(SUPPLIER_NUMERIC_SOURCE[field]) && (columnFilters?.ranges?.[field] || query.sort === `${field}-asc` || query.sort === `${field}-desc`))
+      throw new SupplierRepositoryProblem(supplierProblem('unavailable', '此数量或金额的业务来源尚未接入，暂不能按它筛选或排序。请清除此条件后重新读取。'))
+  }
   const categories = normalizeSupplierEnumSelection(query.category)
   const credentialStatuses = normalizeSupplierEnumSelection(query.credentialStatus)
   const taxpayerTypes = normalizeSupplierEnumSelection(columnFilters?.taxpayerType)
@@ -255,11 +262,11 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
           .filter(item => item.dataOrigin === row.dataOrigin && item.supplierId === row.id && confirmedSettlement(item.status))
           .map(item => item.totalAmount))
     return [`${row.dataOrigin}:${row.id}`, {
-      projectCount: relationIds.size,
-      contractAmount,
-      cumulativeContractAmount: contractAmount,
-      settlementAmount,
-      paymentAmount: paid.get(`${row.dataOrigin}:${row.id}`) ?? 0,
+      projectCount: input.unavailableSources?.includes('projects') ? null : relationIds.size,
+      contractAmount: input.unavailableSources?.includes('contracts') ? null : contractAmount,
+      cumulativeContractAmount: input.unavailableSources?.includes('contracts') ? null : contractAmount,
+      settlementAmount: input.unavailableSources?.includes('settlements') ? null : settlementAmount,
+      paymentAmount: input.unavailableSources?.includes('payments') ? null : paid.get(`${row.dataOrigin}:${row.id}`) ?? 0,
     }] as const
   }))
   const stats = (row: SupplierListSourceRow) => summaryById.get(`${row.dataOrigin}:${row.id}`)!
@@ -354,8 +361,8 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   const origins = (['real', 'demo'] as const).reduce<SupplierListPageDTO['summary']['origins']>((result, origin) => {
     const rows = filtered.filter(row => row.dataOrigin === origin)
     const totals = {
-      contractAmount: sumKnown(rows.map(row => stats(row).contractAmount)),
-      paymentAmount: rows.reduce((sum, row) => sum + stats(row).paymentAmount, 0),
+      contractAmount: input.unavailableSources?.includes('contracts') ? null : sumKnown(rows.map(row => stats(row).contractAmount)),
+      paymentAmount: input.unavailableSources?.includes('payments') ? null : sumKnown(rows.map(row => stats(row).paymentAmount)),
     }
     result[origin] = {
       supplierCount: rows.length,
@@ -366,6 +373,7 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   }, { real: { supplierCount: 0, contractAmount: '0.00', paymentAmount: '0.00' }, demo: { supplierCount: 0, contractAmount: '0.00', paymentAmount: '0.00' } })
   return {
     items,
+    ...(input.unavailableSources?.length ? { unavailableSources: [...input.unavailableSources] } : {}),
     pagination: { page, pageSize: query.pageSize, total: filtered.length },
     summary: {
       categories: countBy('supplierCategory'),
@@ -496,6 +504,7 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
 
   return {
     dataOrigin: input.query.origin,
+    ...(input.unavailableSources?.length ? { unavailableSources: [...input.unavailableSources] } : {}),
     supplier: visibleSupplier(source, input.capabilities),
     projects: projectRelations.map((row) => {
       const project = projectRef(row.projectId, input.projects, input.query.origin)
@@ -513,16 +522,16 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
     invoices: invoiceDTOs,
     payments: paymentDTOs,
     summary: {
-      projectCount: projectRelations.length,
-      contractCount: contractDTOs.length,
-      settlementCount: settlementDTOs.length,
-      invoiceCount: invoiceDTOs.length,
-      paymentCount: paymentDTOs.length,
-      contractAmount: moneyMetric(contractAmount, 'contract', source.id, input.asOf),
-      settlementAmount: moneyMetric(settlementAmount, 'settlement', source.id, input.asOf),
-      invoiceAmount: moneyMetric(invoiceAmount, 'invoice', source.id, input.asOf),
-      paymentAmount: moneyMetric(paymentAmount, 'payment-record', source.id, input.asOf),
-      payableAmount: moneyMetric(contractAmount === null ? null : round2(contractAmount - paymentAmount), 'payment-record', source.id, input.asOf, false),
+      projectCount: input.unavailableSources?.includes('projects') ? null : projectRelations.length,
+      contractCount: input.unavailableSources?.includes('contracts') ? null : contractDTOs.length,
+      settlementCount: input.unavailableSources?.includes('settlements') ? null : settlementDTOs.length,
+      invoiceCount: input.unavailableSources?.includes('invoices') ? null : invoiceDTOs.length,
+      paymentCount: input.unavailableSources?.includes('payments') ? null : paymentDTOs.length,
+      contractAmount: moneyMetric(input.unavailableSources?.includes('contracts') ? null : contractAmount, 'contract', source.id, input.asOf),
+      settlementAmount: moneyMetric(input.unavailableSources?.includes('settlements') ? null : settlementAmount, 'settlement', source.id, input.asOf),
+      invoiceAmount: moneyMetric(input.unavailableSources?.includes('invoices') ? null : invoiceAmount, 'invoice', source.id, input.asOf),
+      paymentAmount: moneyMetric(input.unavailableSources?.includes('payments') ? null : paymentAmount, 'payment-record', source.id, input.asOf),
+      payableAmount: moneyMetric(contractAmount === null || input.unavailableSources?.some(source => source === 'contracts' || source === 'payments') ? null : round2(contractAmount - paymentAmount), 'payment-record', source.id, input.asOf, false),
     },
     asOf: input.asOf,
     sourceVersion: input.sourceVersion,

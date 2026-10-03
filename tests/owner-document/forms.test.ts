@@ -738,11 +738,15 @@ describe('f5 甲方/分包单据领域事务', () => {
       totalAmount: 10,
       settlementDate: '2026-07-30',
     }, 'submit')).rejects.toThrow('草稿合同不能用于业务单据')
+  })
 
-    expect(ownerDocumentStatusIsEditable('draft')).toBe(true)
-    expect(ownerDocumentStatusIsEditable('rejected')).toBe(true)
-    expect(ownerDocumentStatusIsEditable('confirmed')).toBe(false)
-    expect(ownerDocumentStatusIsEditable('deducted')).toBe(false)
+  it.each([
+    { case: '\'draft\'', input: 'draft', expected: true },
+    { case: '\'rejected\'', input: 'rejected', expected: true },
+    { case: '\'confirmed\'', input: 'confirmed', expected: false },
+    { case: '\'deducted\'', input: 'deducted', expected: false },
+  ])('草稿合同不进入候选，伪造合同 ID 也不能保存业务单据 / ownerDocumentStatusIsEditable：$case', ({ input, expected }) => {
+    expect(ownerDocumentStatusIsEditable(input)).toBe(expected)
   })
 
   it('甲方变更、月度报量与项目罚扣草稿允许缺少项目、合同和必填业务字段', async () => {

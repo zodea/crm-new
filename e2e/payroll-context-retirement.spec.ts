@@ -19,26 +19,32 @@ test.describe('工资中央来源、筛选与退役写入口', () => {
   })
   test('未选项目的来源往返保月份与工资状态，签工确认状态分开', async ({ page }) => {
     await page.goto('/subcontract/daywork?origin=real&month=2026-08&status=%5B%22draft%22%2C%22checked%22%5D&dayworkStatus=confirmed')
-    await expect(page.getByRole('heading', { name: '工资来源', exact: true })).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByRole('combobox', { name: '项目', exact: true })).toHaveValue('')
-    await expect(page.getByRole('combobox', { name: '签工确认状态', exact: true })).toHaveValue('confirmed')
-    await page.getByRole('link', { name: '返回工资记录', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '零星签工', exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('combobox', { name: '签工筛选项目', exact: true })).toHaveValue('')
+    await expect(page.getByRole('checkbox', { name: '已确认', exact: true })).toBeChecked()
+    await expect(page.getByRole('checkbox', { name: '待确认', exact: true })).not.toBeChecked()
+    await page.getByRole('link', { name: '返回工资核算', exact: true }).click()
     await expect(page.getByRole('button', { name: '工资状态，已选 2 项', exact: true })).toBeVisible()
     expect(new URL(page.url()).searchParams.get('month')).toBe('2026-08')
     expect(new URL(page.url()).searchParams.get('crew')).toBeNull()
   })
-  test('未知中央项目在工资、考勤和签工都显示失效而不归一为首项', async ({ page }) => {
-    for (const path of ['/subcontract/payroll', '/subcontract/attendance', '/subcontract/daywork']) {
-      await page.goto(`${path}?origin=real&project=missing-payroll-project&crew=missing-crew`)
+  for (const { path, projectField } of [
+    { path: '/subcontract/payroll', projectField: '项目' },
+    { path: '/subcontract/attendance', projectField: null },
+    { path: '/subcontract/daywork', projectField: null },
+  ]) {
+    test(`未知中央项目在${path}显示失效而不归一为首项`, async ({ page }) => {
+      await page.goto(`${path}?origin=real&project=missing-payroll-project&crew=missing-crew&month=2026-08`)
       await expect(page.getByRole('alert')).toBeVisible({ timeout: 30_000 })
       expect(new URL(page.url()).searchParams.get('project')).toBe('missing-payroll-project')
       if (path === '/subcontract/attendance') {
         await expect(page.getByRole('region', { name: '月度考勤矩阵', exact: true })).toHaveCount(0)
         await expect(page.getByRole('button', { name: '保存考勤', exact: true })).toHaveCount(0)
       }
-      else {
-        await expect(page.getByRole('combobox', { name: '项目', exact: true })).toHaveValue('missing-payroll-project')
+      else if (projectField) {
+        await expect(page.getByRole('combobox', { name: projectField, exact: true })).toHaveValue('missing-payroll-project')
       }
-    }
-  })
+      await expect(page.getByRole('button', { name: /保存|确认签工|确认实际发放/ })).toHaveCount(0)
+    })
+  }
 })

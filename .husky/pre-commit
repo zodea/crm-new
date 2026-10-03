@@ -1,2 +1,3 @@
 git diff --cached --check || exit $?
+node scripts/git-hooks.mjs staged || exit $?
 pnpm exec lint-staged

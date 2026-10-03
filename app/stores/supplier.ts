@@ -6,6 +6,7 @@ import type {
 } from '~/lib/master-data/forms'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
+import { effectiveExpenditureSupplementAmountSql, INEFFECTIVE_EXPENDITURE_CONTRACT_SQL_VALUES } from '~/lib/contract/effective-status'
 import { db } from '~/lib/db/client'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
@@ -192,6 +193,7 @@ export const useSupplierStore = defineStore('supplier', () => {
             'suppliers',
             'project_suppliers',
             'contracts',
+            'contract_supplements',
             'payment_applications',
             'payment_record_application_allocations',
             'payment_records',
@@ -204,10 +206,12 @@ export const useSupplierStore = defineStore('supplier', () => {
                      AND ${visibleCond('project_suppliers', 'relation')}
                  ) AS project_count,
                  (
-                   SELECT COALESCE(SUM(contract.amount), 0)
+                   SELECT COALESCE(SUM(contract.amount + ${effectiveExpenditureSupplementAmountSql('contract')}), 0)
                    FROM contracts AS contract
                    WHERE contract.supplier_id = supplier.id
                      AND ${visibleCond('contracts', 'contract')}
+                     AND contract.kind <> '施工'
+                     AND contract.status NOT IN (${INEFFECTIVE_EXPENDITURE_CONTRACT_SQL_VALUES})
                  ) AS contract_total,
                  (
                    SELECT COALESCE(SUM(allocation.allocated_amount), 0)

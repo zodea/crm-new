@@ -133,7 +133,7 @@ describe('工序库公开 HTTP Repository', () => {
     await expect(createProcessLibraryRepository(async () => wire).list('real')).rejects.toMatchObject(invalid)
   })
 
-  it('新建命令与回执精确对应，调用方后改草稿不改变已发请求', async () => {
+  it.each([{ commandId: 'other' }, { id: '' }, { version: 2 }, { sourceVersion: '' }])('新建命令与回执精确对应，调用方后改草稿不改变已发请求：%j', async (patch) => {
     const input = command()
     const expected = structuredClone(input)
     const answer = { commandId: input.commandId, id: 'version-c', version: 3, sourceVersion: '3' }
@@ -142,35 +142,35 @@ describe('工序库公开 HTTP Repository', () => {
     input.draft.name = '稍后改稿'
     expect(await pending).toEqual(answer)
     expect(fetcher).toHaveBeenCalledWith('/api/commands/process-libraries', { method: 'POST', body: expected })
-    for (const wrong of [{ ...answer, commandId: 'other' }, { ...answer, id: '' }, { ...answer, version: 2 }, { ...answer, sourceVersion: '' }])
-      await expect(createProcessLibraryRepository(async () => wrong).execute(expected)).rejects.toMatchObject(invalid)
+    const wrong = { ...answer, ...patch }
+    await expect(createProcessLibraryRepository(async () => wrong).execute(expected)).rejects.toMatchObject(invalid)
   })
 
-  it('取消发生在发送前、等待后或失败后都保留 AbortError，不采纳迟到结果', async () => {
+  it.each(([false, true]).map(input => ({ input })))('取消发生在发送前、等待后或失败后都保留 AbortError，不采纳迟到结果：输入案例 %#', async ({ input: shouldReject }) => {
     const before = new AbortController()
     before.abort()
     const untouched = vi.fn(async () => version())
     await expect(createProcessLibraryRepository(untouched).detail('version-a', 'real', { signal: before.signal })).rejects.toMatchObject({ name: 'AbortError' })
     expect(untouched).not.toHaveBeenCalled()
-    for (const shouldReject of [false, true]) {
-      const controller = new AbortController()
-      let finish!: () => void
-      const fetcher = vi.fn(() => new Promise<unknown>((resolve, reject) => {
-        finish = () => shouldReject ? reject(new TypeError('network')) : resolve(version())
-      }))
-      const pending = createProcessLibraryRepository(fetcher).detail('version-a', 'real', { signal: controller.signal })
-      controller.abort()
-      finish()
-      await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
-    }
+    const controller = new AbortController()
+    let finish!: () => void
+    const fetcher = vi.fn(() => new Promise<unknown>((resolve, reject) => {
+      finish = () => shouldReject ? reject(new TypeError('network')) : resolve(version())
+    }))
+    const pending = createProcessLibraryRepository(fetcher).detail('version-a', 'real', { signal: controller.signal })
+    controller.abort()
+    finish()
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
   })
 
-  it('真实 HTTP 错误保留服务器错误码、字段和追踪号；断网无本地回退', async () => {
-    const codes = new Map([[403, 'forbidden'], [409, 'conflict'], [503, 'unavailable']])
-    let status = 409
+  it.each([
+    { status: 403, code: 'forbidden', retryable: false },
+    { status: 409, code: 'conflict', retryable: false },
+    { status: 503, code: 'unavailable', retryable: true },
+  ])('hTTP $status 保留 $code、字段与追踪号；断网无本地回退', async ({ status, code, retryable }) => {
     const server = createServer((_request, response) => {
       response.writeHead(status, { 'Content-Type': 'application/json' })
-      response.end(JSON.stringify({ statusCode: status, data: { code: codes.get(status), message: '中央错误', retryable: status === 503, fieldErrors: { code: ['保留人工稿'] }, traceId: 'trace-wire' } }))
+      response.end(JSON.stringify({ statusCode: status, data: { code, message: '中央错误', retryable, fieldErrors: { code: ['保留人工稿'] }, traceId: 'trace-wire' } }))
     })
     server.listen(0, '127.0.0.1')
     await once(server, 'listening')
@@ -186,11 +186,8 @@ describe('工序库公开 HTTP Repository', () => {
         return data
       })
       const repository = createProcessLibraryRepository(fetcher)
-      for (const [httpStatus, code] of codes) {
-        status = httpStatus
-        await expect(repository.execute(command())).rejects.toMatchObject({ problem: { code, message: '中央错误', fieldErrors: { code: ['保留人工稿'] }, traceId: 'trace-wire' } })
-      }
-      expect(fetcher).toHaveBeenCalledTimes(3)
+      await expect(repository.execute(command())).rejects.toMatchObject({ problem: { code, message: '中央错误', retryable, fieldErrors: { code: ['保留人工稿'] }, traceId: 'trace-wire' } })
+      expect(fetcher).toHaveBeenCalledTimes(1)
     }
     finally {
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))

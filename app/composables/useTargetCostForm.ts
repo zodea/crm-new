@@ -168,8 +168,10 @@ export function useTargetCostForm() {
     error.value = ''
     fieldErrors.value = {}
   }
-  async function focusError() {
+  async function focusError(requested: ReturnType<typeof target>, request: number) {
     await nextTick()
+    if (!sameTarget(requested, request))
+      return
     const first = Object.keys(fieldErrors.value)[0]
     const element = [...formElement.value?.querySelectorAll<HTMLElement>('[data-field]') ?? []].find(element => element.dataset.field === first)
     element?.focus()
@@ -192,6 +194,7 @@ export function useTargetCostForm() {
       return
     const requested = target()
     const request = sequence
+    let focusFailedFields = false
     saving.value = true
     loadingAction.value = action
     error.value = ''
@@ -205,13 +208,15 @@ export function useTargetCostForm() {
     catch (cause) {
       if (sameTarget(requested, request)) {
         captureError(cause)
-        await focusError()
+        focusFailedFields = true
       }
     }
     finally {
       if (sameTarget(requested, request)) {
         saving.value = false
         loadingAction.value = null
+        if (focusFailedFields)
+          await focusError(requested, request)
       }
     }
   }

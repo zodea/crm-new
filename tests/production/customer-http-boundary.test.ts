@@ -6,11 +6,14 @@ import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import { createApp, createError, createRouter, defineEventHandler, getHeader, getRouterParam, readBody, toNodeListener } from 'h3'
 import { expect, it, vi } from 'vitest'
-import middleware from '../../server/middleware/production-access'
-import { loginProductionOwner } from '../../server/utils/production-auth'
-import { productionCustomerRuntime } from '../../server/utils/production-customer-runtime'
 
-it('生产公开命令在解码前拒绝跨来源、伪能力与无法回查的编号', async () => {
+it.each(Array.from([{ origin: 'demo' }, { includeDemo: true }, { capabilities: ['customer:write'] }, { commandId: 'with spaces' }, { commandId: 'x'.repeat(81) }]).flatMap(input1 => Array.from([{ origin: 'demo' }, { includeDemo: true }, { commandId: 'with spaces' }]).map(input2 => ({ input1, input2 }))))('生产公开命令在解码前拒绝跨来源、伪能力与无法回查的编号：输入案例 %#', async ({ input1, input2 }) => {
+  vi.resetModules()
+  const [{ default: middleware }, { loginProductionOwner }, { productionCustomerRuntime }] = await Promise.all([
+    import('../../server/middleware/production-access'),
+    import('../../server/utils/production-auth'),
+    import('../../server/utils/production-customer-runtime'),
+  ])
   for (const [key, value] of Object.entries({ defineEventHandler, createError, getHeader, getRouterParam, readBody })) vi.stubGlobal(key, value)
   const create = (await import('../../server/api/commands/customers.post')).default
   const update = (await import('../../server/api/commands/customers/[id].put')).default
@@ -40,8 +43,8 @@ it('生产公开命令在解码前拒绝跨来源、伪能力与无法回查的�
     expect(login.status).toBe(200)
     cookie = login.headers.get('set-cookie')!.split(';')[0]!
     const command = { commandId: 'valid-create-key', workspaceId: 'http-workspace', actorId: 'http-owner', requiredCapability: 'customer:write', baseVersion: null, action: 'save', draft: { name: 'HTTP边界验证', contact: '合成人' }, attachments: {} }
-    for (const invalid of [{ origin: 'demo' }, { includeDemo: true }, { capabilities: ['customer:write'] }, { commandId: 'with spaces' }, { commandId: 'x'.repeat(81) }])
-      expect((await send('/api/commands/customers', { ...command, ...invalid })).status, JSON.stringify(invalid)).toBe(422)
+
+    expect((await send('/api/commands/customers', { ...command, ...input1 })).status, JSON.stringify(input1)).toBe(422)
     const response = await send('/api/commands/customers', command)
     expect(response.status).toBe(200)
     const saved = await response.json()
@@ -51,8 +54,8 @@ it('生产公开命令在解码前拒绝跨来源、伪能力与无法回查的�
     const lifecycleCommand = { id: saved.id, commandId: 'bad key', workspaceId: command.workspaceId, actorId: command.actorId, requiredCapability: command.requiredCapability, baseVersion: '1', action: 'delete' }
     expect((await send(`/api/commands/customers/${saved.id}/lifecycle`, lifecycleCommand)).status).toBe(422)
     expect((await send(`/api/commands/customers/${saved.id}/lifecycle`, { ...lifecycleCommand, commandId: 'valid-delete', origin: 'demo' })).status).toBe(422)
-    for (const invalid of [{ origin: 'demo' }, { includeDemo: true }, { commandId: 'with spaces' }])
-      expect((await send(`/api/commands/customers/${saved.id}`, { ...command, id: saved.id, baseVersion: '1', commandId: 'valid-update-key', ...invalid }, 'PUT')).status).toBe(422)
+
+    expect((await send(`/api/commands/customers/${saved.id}`, { ...command, id: saved.id, baseVersion: '1', commandId: 'valid-update-key', ...input2 }, 'PUT')).status).toBe(422)
     const storage = productionCustomerRuntime()!.storage
     await storage.withTransaction(tx => tx.execute('CREATE TRIGGER fail_http_audit BEFORE INSERT ON customer_audits BEGIN SELECT RAISE(ABORT,\'synthetic-before-commit\'); END'))
     expect((await send(`/api/commands/customers/${saved.id}`, { ...command, id: saved.id, commandId: 'before-commit-failure', baseVersion: '1', draft: { ...command.draft, name: '不可留下的更正' }, attachments: { add: [{ fileName: '不可留下.txt', fileSize: 3, contentBase64: 'YWJj' }] } }, 'PUT')).status).toBe(500)

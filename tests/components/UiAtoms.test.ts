@@ -28,13 +28,16 @@ describe('ui atom public contracts', () => {
     expect(screen.getByText('项目经营数据')).not.toBeNull()
   })
 
-  it('keeps SearchInput width on its responsive wrapper', async () => {
+  it.each([
+    { width: 160, query: '合和' },
+    { width: 280, query: '滨江一期' },
+  ])('searchInput 保留受控宽度 $width 和搜索输入 $query', async ({ width, query }) => {
     const onUpdate = vi.fn()
     const { container } = render(SearchInput, {
       props: {
         'modelValue': '',
         'placeholder': '搜索项目',
-        'width': 280,
+        width,
         'class': 'w-72',
         'onUpdate:modelValue': onUpdate,
       },
@@ -42,13 +45,11 @@ describe('ui atom public contracts', () => {
 
     const root = container.firstElementChild as HTMLElement
     const input = screen.getByRole('searchbox', { name: '搜索项目' })
-    expect(root.getAttribute('style')).toContain('width: 280px')
-    expect(root.classList).toContain('max-w-full')
+    expect(root.style.width).toBe(`${width}px`)
     expect(input.getAttribute('style')).toBeNull()
-    expect(input.classList).toContain('w-full')
 
-    await fireEvent.update(input, '滨江')
-    expect(onUpdate).toHaveBeenLastCalledWith('滨江')
+    await fireEvent.update(input, query)
+    expect(onUpdate).toHaveBeenLastCalledWith(query)
     expect((await axe(container, {
       rules: {
         'color-contrast': { enabled: false },

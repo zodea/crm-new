@@ -442,117 +442,113 @@ describe('甲方商务单据受控中央迁移', () => {
     expect(form.draft).toMatchObject({ totalAmount: 28000, status: 'confirmed', deductionNote: '按合同扣款', contractId: 'central-subcontract_contracts-subcontract-legacy-327', supplierId: 'central-suppliers-supplier-legacy-327' })
     expect(form.attachments[0]).toMatchObject({ ownerType: 'expenditure_settlement', fileName: '结算单.pdf' })
   })
-  it('dry-run 阻断甲方与分包商务单据缺失或错配的专属关系', async () => {
-    const scenarios = [
-      {
-        suffix: 'missing-supplier',
-        documentLegacyId: 'sub-change-legacy-327',
-        field: 'supplierId',
-        metricKey: 'orphan',
-        mutate: (invalidSource: CoreMigrationSourceDTO) => {
-          const document = invalidSource.entities.owner_documents
-            .find(row => row.legacyId === 'sub-change-legacy-327')!
-          document.references!.supplierId = null
-        },
+  it.each(Array.from([
+    {
+      suffix: 'missing-supplier',
+      documentLegacyId: 'sub-change-legacy-327',
+      field: 'supplierId',
+      metricKey: 'orphan',
+      mutate: (invalidSource: CoreMigrationSourceDTO) => {
+        const document = invalidSource.entities.owner_documents
+          .find(row => row.legacyId === 'sub-change-legacy-327')!
+        document.references!.supplierId = null
       },
-      {
-        suffix: 'construction-contract',
-        documentLegacyId: 'sub-change-legacy-327',
-        field: 'contractId',
-        metricKey: 'orphan',
-        mutate: (invalidSource: CoreMigrationSourceDTO) => {
-          const document = invalidSource.entities.owner_documents
-            .find(row => row.legacyId === 'sub-change-legacy-327')!
-          document.references!.contractId = 'contract-legacy-323'
-        },
+    },
+    {
+      suffix: 'construction-contract',
+      documentLegacyId: 'sub-change-legacy-327',
+      field: 'contractId',
+      metricKey: 'orphan',
+      mutate: (invalidSource: CoreMigrationSourceDTO) => {
+        const document = invalidSource.entities.owner_documents
+          .find(row => row.legacyId === 'sub-change-legacy-327')!
+        document.references!.contractId = 'contract-legacy-323'
       },
-      {
-        suffix: 'supplier-mismatch',
-        documentLegacyId: 'sub-change-legacy-327',
-        field: 'contractId',
-        metricKey: 'missing-relation',
-        mutate: (invalidSource: CoreMigrationSourceDTO) => {
-          invalidSource.entities.suppliers.push({
-            legacyId: 'supplier-other-327',
-            name: '另一劳务分供方',
-            deletedAt: null,
-          })
-          const document = invalidSource.entities.owner_documents
-            .find(row => row.legacyId === 'sub-change-legacy-327')!
-          document.references!.supplierId = 'supplier-other-327'
-        },
+    },
+    {
+      suffix: 'supplier-mismatch',
+      documentLegacyId: 'sub-change-legacy-327',
+      field: 'contractId',
+      metricKey: 'missing-relation',
+      mutate: (invalidSource: CoreMigrationSourceDTO) => {
+        invalidSource.entities.suppliers.push({
+          legacyId: 'supplier-other-327',
+          name: '另一劳务分供方',
+          deletedAt: null,
+        })
+        const document = invalidSource.entities.owner_documents
+          .find(row => row.legacyId === 'sub-change-legacy-327')!
+        document.references!.supplierId = 'supplier-other-327'
       },
-      {
-        suffix: 'owner-to-subcontract',
-        documentLegacyId: 'change-legacy-323',
-        field: 'contractId',
-        metricKey: 'orphan',
-        mutate: (invalidSource: CoreMigrationSourceDTO) => {
-          const document = invalidSource.entities.owner_documents
-            .find(row => row.legacyId === 'change-legacy-323')!
-          document.references!.contractId = 'subcontract-legacy-327'
-        },
+    },
+    {
+      suffix: 'owner-to-subcontract',
+      documentLegacyId: 'change-legacy-323',
+      field: 'contractId',
+      metricKey: 'orphan',
+      mutate: (invalidSource: CoreMigrationSourceDTO) => {
+        const document = invalidSource.entities.owner_documents
+          .find(row => row.legacyId === 'change-legacy-323')!
+        document.references!.contractId = 'subcontract-legacy-327'
       },
-    ] as const
+    },
+  ] as const).map(input => ({ input })))('dry-run 阻断甲方与分包商务单据缺失或错配的专属关系：输入案例 %#', async ({ input: scenario }) => {
+    const core = createCoreMigrationTestInstance({
+      createServerId: input => `central-${input.entityType}-${input.legacyId}`,
+      now: () => '2026-08-27T10:00:00.000Z',
+    })
+    const invalidSource = structuredClone(source())
+    scenario.mutate(invalidSource)
+    const { sourceHash: _sourceHash, ...withoutHash } = invalidSource
+    invalidSource.sourceHash = createHash('sha256')
+      .update(coreMigrationSourceHashInput(withoutHash as CoreMigrationSourceDTO))
+      .digest('hex')
+    const envelope = (commandId: string) => ({
+      workspaceId: session.workspaceId,
+      actorId: session.actorId,
+      requiredCapability: CORE_MIGRATION_CAPABILITY,
+      commandId,
+    })
+    await core.preflight({
+      ...envelope(`preflight-sub-change-${scenario.suffix}-327`),
+      source: invalidSource,
+      backup: null,
+    }, session)
+    const snapshotSha256 = createHash('sha256').update(scenario.suffix).digest('hex')
+    const dryRun = await core.dryRun({
+      ...envelope(`dry-run-sub-change-${scenario.suffix}-327`),
+      source: invalidSource,
+      backup: {
+        backupId: `core-migration-${invalidSource.sourceHash}-${snapshotSha256}`,
+        sourceHash: invalidSource.sourceHash,
+        sourceVersion: invalidSource.sourceVersion,
+        snapshotSha256,
+        byteLength: 327,
+        createdAt: '2026-08-27T10:00:00.000Z',
+        immutable: true,
+      },
+    }, session)
 
-    for (const scenario of scenarios) {
-      const core = createCoreMigrationTestInstance({
-        createServerId: input => `central-${input.entityType}-${input.legacyId}`,
-        now: () => '2026-08-27T10:00:00.000Z',
-      })
-      const invalidSource = structuredClone(source())
-      scenario.mutate(invalidSource)
-      const { sourceHash: _sourceHash, ...withoutHash } = invalidSource
-      invalidSource.sourceHash = createHash('sha256')
-        .update(coreMigrationSourceHashInput(withoutHash as CoreMigrationSourceDTO))
-        .digest('hex')
-      const envelope = (commandId: string) => ({
-        workspaceId: session.workspaceId,
-        actorId: session.actorId,
-        requiredCapability: CORE_MIGRATION_CAPABILITY,
-        commandId,
-      })
-      await core.preflight({
-        ...envelope(`preflight-sub-change-${scenario.suffix}-327`),
-        source: invalidSource,
-        backup: null,
-      }, session)
-      const snapshotSha256 = createHash('sha256').update(scenario.suffix).digest('hex')
-      const dryRun = await core.dryRun({
-        ...envelope(`dry-run-sub-change-${scenario.suffix}-327`),
-        source: invalidSource,
-        backup: {
-          backupId: `core-migration-${invalidSource.sourceHash}-${snapshotSha256}`,
-          sourceHash: invalidSource.sourceHash,
-          sourceVersion: invalidSource.sourceVersion,
-          snapshotSha256,
-          byteLength: 327,
-          createdAt: '2026-08-27T10:00:00.000Z',
-          immutable: true,
-        },
-      }, session)
-
-      expect(dryRun.steps.find(step => step.entityType === 'owner_documents')).toMatchObject({
-        sourceCount: invalidSource.entities.owner_documents.length,
-        importableCount: invalidSource.entities.owner_documents.length - 1,
-        skippedCount: 1,
-      })
-      expect(dryRun.mappings).not.toContainEqual(expect.objectContaining({
-        entityType: 'owner_documents',
-        legacyId: scenario.documentLegacyId,
-      }))
-      expect(dryRun.issues).toContainEqual(expect.objectContaining({
-        entityType: 'owner_documents',
-        legacyId: scenario.documentLegacyId,
-        field: scenario.field,
-        metricKey: scenario.metricKey,
-        attribution: 'missing-source',
-      }))
-      await expect(core.importBatch({
-        ...envelope(`import-sub-change-${scenario.suffix}-327`),
-        batchId: dryRun.batchId,
-      }, session)).rejects.toThrow('dry-run 存在阻断问题')
-    }
+    expect(dryRun.steps.find(step => step.entityType === 'owner_documents')).toMatchObject({
+      sourceCount: invalidSource.entities.owner_documents.length,
+      importableCount: invalidSource.entities.owner_documents.length - 1,
+      skippedCount: 1,
+    })
+    expect(dryRun.mappings).not.toContainEqual(expect.objectContaining({
+      entityType: 'owner_documents',
+      legacyId: scenario.documentLegacyId,
+    }))
+    expect(dryRun.issues).toContainEqual(expect.objectContaining({
+      entityType: 'owner_documents',
+      legacyId: scenario.documentLegacyId,
+      field: scenario.field,
+      metricKey: scenario.metricKey,
+      attribution: 'missing-source',
+    }))
+    await expect(core.importBatch({
+      ...envelope(`import-sub-change-${scenario.suffix}-327`),
+      batchId: dryRun.batchId,
+    }, session)).rejects.toThrow('dry-run 存在阻断问题')
   })
 
   it.each([
@@ -692,99 +688,97 @@ describe('甲方商务单据受控中央迁移', () => {
     }, session)).rejects.toThrow('迁移收款登记的项目、施工合同与客户关系无效')
   })
 
-  it('拒绝缺少金额的最终结算来源事实', async () => {
-    for (const [entityType, expectedMessage] of [
-      ['contract_supplements', '迁移补充协议金额缺失'],
-      ['receipt_registrations', '迁移收款登记金额缺失'],
-    ] as const) {
-      const constructionCommands = createConstructionContractCommandTestInstance()
-      const subcontractCommands = createSubcontractContractCommandTestInstance()
-      const commands = createOwnerCommercialDocumentCommandTestInstance()
-      const core = createCoreMigrationTestInstance({
-        createServerId: input => `central-${input.entityType}-${input.legacyId}`,
-        now: () => '2026-08-25T00:00:00.000Z',
-        afterConfirm: snapshot => synchronizeCoreMigrationCommandSources(snapshot, [
-          constructionCommands,
-          subcontractCommands,
-          commands,
-        ]),
-      })
-      const invalidSource = structuredClone(source())
-      Object.assign(invalidSource.entities.construction_contracts[0]!.attributes!, {
-        content: '既有施工合同内容',
-        signDate: '2026-01-01',
-      })
-      invalidSource.entities[entityType][0]!.amount = null
-      const { sourceHash: _sourceHash, ...withoutHash } = invalidSource
-      invalidSource.sourceHash = createHash('sha256')
-        .update(coreMigrationSourceHashInput(withoutHash as CoreMigrationSourceDTO))
-        .digest('hex')
-      const envelope = (commandId: string) => ({
-        workspaceId: session.workspaceId,
-        actorId: session.actorId,
-        requiredCapability: CORE_MIGRATION_CAPABILITY,
-        commandId,
-      })
-      await core.preflight({ ...envelope(`preflight-null-${entityType}-325`), source: invalidSource, backup: null }, session)
-      const snapshotSha256 = entityType === 'contract_supplements' ? 'f'.repeat(64) : 'a'.repeat(64)
-      const dryRun = await core.dryRun({
-        ...envelope(`dry-run-null-${entityType}-325`),
-        source: invalidSource,
-        backup: {
-          backupId: `core-migration-${invalidSource.sourceHash}-${snapshotSha256}`,
-          sourceHash: invalidSource.sourceHash,
-          sourceVersion: invalidSource.sourceVersion,
-          snapshotSha256,
-          byteLength: 325,
-          createdAt: '2026-08-25T00:00:00.000Z',
-          immutable: true,
-        },
-      }, session)
-      await core.importBatch({ ...envelope(`import-null-${entityType}-325`), batchId: dryRun.batchId }, session)
-      const beforeFailure = {
-        core: core.snapshot(session),
-        construction: {
-          rows: constructionCommands.rows(),
-          facts: constructionCommands.facts(),
-          sourceVersion: constructionCommands.sourceVersion(),
-        },
-        subcontract: {
-          rows: subcontractCommands.rows(),
-          context: subcontractCommands.context(session),
-          facts: subcontractCommands.facts(),
-          sourceVersion: subcontractCommands.sourceVersion(),
-        },
-        owner: {
-          rows: commands.rows(),
-          context: commands.context(session),
-          sourceVersion: commands.sourceVersion(),
-        },
-      }
-
-      await expect(core.confirm({
-        ...envelope(`confirm-null-${entityType}-325`),
-        batchId: dryRun.batchId,
-      }, session)).rejects.toThrow(expectedMessage)
-      expect({
-        core: core.snapshot(session),
-        construction: {
-          rows: constructionCommands.rows(),
-          facts: constructionCommands.facts(),
-          sourceVersion: constructionCommands.sourceVersion(),
-        },
-        subcontract: {
-          rows: subcontractCommands.rows(),
-          context: subcontractCommands.context(session),
-          facts: subcontractCommands.facts(),
-          sourceVersion: subcontractCommands.sourceVersion(),
-        },
-        owner: {
-          rows: commands.rows(),
-          context: commands.context(session),
-          sourceVersion: commands.sourceVersion(),
-        },
-      }).toEqual(beforeFailure)
+  it.each([
+    ['contract_supplements', '迁移补充协议金额缺失'],
+    ['receipt_registrations', '迁移收款登记金额缺失'],
+  ] as const)('拒绝缺少金额的最终结算来源事实：输入案例 %#', async (entityType, expectedMessage) => {
+    const constructionCommands = createConstructionContractCommandTestInstance()
+    const subcontractCommands = createSubcontractContractCommandTestInstance()
+    const commands = createOwnerCommercialDocumentCommandTestInstance()
+    const core = createCoreMigrationTestInstance({
+      createServerId: input => `central-${input.entityType}-${input.legacyId}`,
+      now: () => '2026-08-25T00:00:00.000Z',
+      afterConfirm: snapshot => synchronizeCoreMigrationCommandSources(snapshot, [
+        constructionCommands,
+        subcontractCommands,
+        commands,
+      ]),
+    })
+    const invalidSource = structuredClone(source())
+    Object.assign(invalidSource.entities.construction_contracts[0]!.attributes!, {
+      content: '既有施工合同内容',
+      signDate: '2026-01-01',
+    })
+    invalidSource.entities[entityType][0]!.amount = null
+    const { sourceHash: _sourceHash, ...withoutHash } = invalidSource
+    invalidSource.sourceHash = createHash('sha256')
+      .update(coreMigrationSourceHashInput(withoutHash as CoreMigrationSourceDTO))
+      .digest('hex')
+    const envelope = (commandId: string) => ({
+      workspaceId: session.workspaceId,
+      actorId: session.actorId,
+      requiredCapability: CORE_MIGRATION_CAPABILITY,
+      commandId,
+    })
+    await core.preflight({ ...envelope(`preflight-null-${entityType}-325`), source: invalidSource, backup: null }, session)
+    const snapshotSha256 = entityType === 'contract_supplements' ? 'f'.repeat(64) : 'a'.repeat(64)
+    const dryRun = await core.dryRun({
+      ...envelope(`dry-run-null-${entityType}-325`),
+      source: invalidSource,
+      backup: {
+        backupId: `core-migration-${invalidSource.sourceHash}-${snapshotSha256}`,
+        sourceHash: invalidSource.sourceHash,
+        sourceVersion: invalidSource.sourceVersion,
+        snapshotSha256,
+        byteLength: 325,
+        createdAt: '2026-08-25T00:00:00.000Z',
+        immutable: true,
+      },
+    }, session)
+    await core.importBatch({ ...envelope(`import-null-${entityType}-325`), batchId: dryRun.batchId }, session)
+    const beforeFailure = {
+      core: core.snapshot(session),
+      construction: {
+        rows: constructionCommands.rows(),
+        facts: constructionCommands.facts(),
+        sourceVersion: constructionCommands.sourceVersion(),
+      },
+      subcontract: {
+        rows: subcontractCommands.rows(),
+        context: subcontractCommands.context(session),
+        facts: subcontractCommands.facts(),
+        sourceVersion: subcontractCommands.sourceVersion(),
+      },
+      owner: {
+        rows: commands.rows(),
+        context: commands.context(session),
+        sourceVersion: commands.sourceVersion(),
+      },
     }
+
+    await expect(core.confirm({
+      ...envelope(`confirm-null-${entityType}-325`),
+      batchId: dryRun.batchId,
+    }, session)).rejects.toThrow(expectedMessage)
+    expect({
+      core: core.snapshot(session),
+      construction: {
+        rows: constructionCommands.rows(),
+        facts: constructionCommands.facts(),
+        sourceVersion: constructionCommands.sourceVersion(),
+      },
+      subcontract: {
+        rows: subcontractCommands.rows(),
+        context: subcontractCommands.context(session),
+        facts: subcontractCommands.facts(),
+        sourceVersion: subcontractCommands.sourceVersion(),
+      },
+      owner: {
+        rows: commands.rows(),
+        context: commands.context(session),
+        sourceVersion: commands.sourceVersion(),
+      },
+    }).toEqual(beforeFailure)
   })
 
   it('按父合同类型分流施工与分包补充协议后原子确认', async () => {

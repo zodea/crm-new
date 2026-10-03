@@ -2,6 +2,7 @@
 import type { ContractRelatedDocument } from '~/lib/contract/detail'
 import type { KitTableColumn } from '~/lib/kit/table'
 import { computed } from 'vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
@@ -41,7 +42,7 @@ const columns: KitTableColumn[] = [
           <span class="font-mono tabular-nums">{{ row.amount == null ? '—' : yuan(row.amount) }}</span>
         </template>
         <template #status="{ row }">
-          <span class="chip bg-surface-3 text-ink-soft">{{ row.status || '—' }}</span>
+          <KitStatusTag>{{ row.status || '—' }}</KitStatusTag>
         </template>
       </KitTable>
     </div>

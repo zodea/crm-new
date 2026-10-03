@@ -1,120 +1,108 @@
-# 交互原语改版 · 多风格参考站
+# 交互公开参考与采纳理由（历史索引）
 
-收录早期交互选型使用的公开网站与采纳记录，作为设计来源索引。链接可用性只代表当时的核对结果；当前设计优先级见[设计入口](./README.md)，组件合同见 [KitUI 组件规格](./kit-ui-component-specs.md)，品牌值以令牌文件为准。
+本文保留早期选型用过的公开来源与采纳理由，属于**非权威历史参考**，不定义现行组件配方，也不代表红圈运行页面的现状。当前视觉分工见[设计入口](./README.md)，组件行为见 [KitUI 组件规格](./kit-ui-component-specs.md)；来源索引不要求重新选择整套风格或引入新依赖。
 
-> **当前使用方式**：沿用已采纳方向，不重新要求用户挑选整套风格。只有当前 Issue 需要且现有规则不能解决的取舍才补充方案；通用能力在 `/dev/kit-ui` 验证，业务页面仍逐屏对照红圈直接证据和瑞航设计基准。
+历史可视菜单：[六类交互参考 Artifact](https://claude.ai/code/artifact/2d65b7a8-ab04-4634-8d69-0d89b481c4de)。其中活泼圆润、玻璃拟态、炫技动效等探索未作为项目整体风格采用。
 
-在线可视版（本会话生成的 Artifact，含卡片式排版）：
-- toast 五风格菜单 · <https://claude.ai/code/artifact/2d65b7a8-ab04-4634-8d69-0d89b481c4de>（六类交互版）
+## 表单与抽屉：如何理解旧参考
 
----
+旧“编辑项目使用右侧 Drawer”建议不再适用；实体表单形态遵循 [ADR 0014](../adr/0014-full-page-entity-forms.md)，轻量弹窗和速览边界查 [KitUI §02 / §05](./kit-ui-component-specs.md)。
 
-## 应用路由页签与控件形状 —— ⛔ 视觉结论已废弃（2026-07-17，见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)）
+![旧项目编辑抽屉建议与整页实体表单规则的重绘对照](./assets/a01-entity-form-rule-comparison.png)
 
-> 页签视觉与控件形状采用 ADR 0013 及现行令牌；2026-07-27 已将表面/按钮/小控件圆角收敛为 4/4/3px。原关闭、右键菜单、滚动与缓存行为按现行公共表面合同继续维护。以下 36px、8/10/12px 等旧方案只作未采用来源留档。
+*规则重绘：比较旧文档建议与已采纳规则，不是红圈或本地应用的运行截图，也不证明对应功能已实现。*
 
-- **决策（2026-07-13，Issue #82）**：路由页签采用 Chrome 式连接造型。激活页签顶部圆弧、底部与工作区连成一体，两侧以内凹肩线自然过渡；保留 36px 页签栏与既有关闭、右键菜单、滚动和缓存行为。
-- **控件形状**：按钮/输入/选择器统一 10px，小型图标与分页控件 8px，卡片 12px，chip 保持 pill；不再使用 3px 的硬方角。
-- 参考站：
-  - [Google Chrome · 管理标签页](https://support.google.com/chrome/answer/2391819?hl=zh-Hans&co=GENIE.Platform%3DDesktop) — 连接内容区的激活标签与弧形肩线。
-  - [Firefox · 标签页概览菜单](https://support.mozilla.org/zh-CN/kb/%E6%A0%87%E7%AD%BE%E9%A1%B5%E6%A6%82%E8%A7%88%E8%8F%9C%E5%8D%95) — 作为浮动标签的未采用对照。
-  - [Fluent 2 · Shape](https://fluent2.microsoft.design/shapes) — 8/10/12px 形状层级的设计参考。
+```mermaid
+flowchart TD
+  T["当前任务"] --> E["实体新增 / 编辑"]
+  T --> L["行级明细 / 轻量操作"]
+  T --> R["只读速览"]
+  E --> A["ADR 0014<br/>独立路由 · 整页 · 页签"]
+  L --> B["适用的行内编辑 / 弹窗<br/>ADR 0014 · KitUI §02"]
+  R --> C["KitUI §05<br/>通用速览 / openDrawer API 延期"]
+  N["通知中心专用抽屉"] --> X["按 KitUI §05 保留领域动作<br/>不作为纯只读速览示例"]
+```
 
----
+## 公开来源与历史取舍
 
-## Toast —— 已定：Sonner 风格双泳道（已实装 = vue-sonner，[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）
+### 页签与控件形状
 
-> 实装底座：**vue-sonner 两个 Toaster**（`toasterId` 路由双泳道），非自研。下面的风格决策据此落地。
+曾采用连接工作区的 Chrome 式页签方向；旧造型与圆角方案已被 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 替代。关闭、右键菜单、滚动与恢复行为查 [PUBLIC-SURFACES](../rewrite/PUBLIC-SURFACES.md)。
 
-- **决策**：走 [Sonner](https://sonner.emilkowal.ski/) 风格。分两条泳道：
-  - **system 道**（右上，展开可读）：系统消息 + 需确认后的结果类。
-  - **process 道**（右下，重叠堆叠省空间、hover 展开）：上传/识别等界面交互过程提示。
-  - **promise/loading**：HeroUI 式加载中转圈 → 自动成功/失败。
-- 关键参考（已实测）：
-  - [Sonner](https://sonner.emilkowal.ski/) · 可交互 — Action 型即带 Undo 撤回按钮 + 折叠/展开堆叠
-  - [Vercel Geist · Toast](https://vercel.com/geist/toast) · 可交互 — Undo 撤回条口径最规范
-  - [shadcn · Sonner](https://ui.shadcn.com/docs/components/radix/sonner) · 可交互 — 六向 position + promise
-  - [HeroUI · Toast](https://heroui.com/docs/react/components/toast) · 可交互 — promise/loading 态样板
-  - [Mantine · Notifications](https://mantine.dev/x/notifications/) · 可交互 — 队列堆叠上限、loading→success 原地打勾
+- [Google Chrome · 管理标签页](https://support.google.com/chrome/answer/2391819?hl=zh-Hans&co=GENIE.Platform%3DDesktop)：当时采用的激活标签与肩线来源。
+- [Firefox · 标签页概览菜单](https://support.mozilla.org/zh-CN/kb/%E6%A0%87%E7%AD%BE%E9%A1%B5%E6%A6%82%E8%A7%88%E8%8F%9C%E5%8D%95)：浮动标签的未采用对照。
+- [Fluent 2 · Shape](https://fluent2.microsoft.design/shapes)：形状层级参考，不沿用旧圆角数值。
 
-> 其余探索过的方向（活泼圆润 / 玻璃拟态 / 动效炫酷 / 潮流组件集）见上方在线菜单，未采用。
+### Toast
 
----
+采用 Sonner 的克制消息与堆叠方向；底座选择见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)，双泳道及反馈查 [KitUI](./kit-ui-component-specs.md)，导出收尾按 [ADR 0004](../adr/0004-export-interaction-model.md)。
 
-## 其余交互的来源与采纳边界
+- [Sonner](https://sonner.emilkowal.ski/)：Action / Undo 与折叠展开堆叠的主要来源。
+- [Vercel Geist · Toast](https://vercel.com/geist/toast)：撤回消息的文案与动作关系。
+- [shadcn · Sonner](https://ui.shadcn.com/docs/components/radix/sonner)：位置与异步反馈。
+- [HeroUI · Toast](https://heroui.com/docs/react/components/toast)：loading 到结果的状态过渡。
+- [Mantine · Notifications](https://mantine.dev/x/notifications/)：队列上限及原地反馈的对照，不据此统一添加成功打勾。
 
-### 00 · 项目切换器 `project-switcher` —— 已定：统一触发器 + 可搜索 SelectPanel
+### 项目切换器
 
-**要点**：同一个入口必须覆盖 1、3、12 到更多项目，不能按数量在「横向按钮 / 下拉框」之间切换皮肤；当前项目持续可见，项目多时支持搜索和键盘选择。完整调研与模式对比见 [头部项目切换器公开产品模式调研](../research/project-switcher-patterns.md)。
+采用 GitHub 型“当前上下文触发器 + 可搜索面板”，以同一入口覆盖不同项目数量；未采用最近使用分组、访问历史持久化、按数量切换皮肤或两级 scope。现行结构见 [KitUI §08](./kit-ui-component-specs.md)，完整比较见[项目切换器调研](../research/project-switcher-patterns.md)。
 
-- [GitHub · Repository switcher](https://github.blog/changelog/2026-06-18-repository-switcher-generally-available-in-global-navigation/) + [Primer SelectPanel](https://primer.style/product/components/select-panel/) — 当前上下文触发器打开可搜索选择面板；最贴合“当前项目”语义。
-- [GitLab · Search or go to](https://docs.gitlab.com/tutorials/left_sidebar/) — 搜索优先、常访问项目优先；适合作为信息组织参考。
-- [Jira · 切换项目与看板](https://support.atlassian.com/jira-software-cloud/docs/switch-between-projects-and-boards/) — Recent/Starred 降低长列表噪音。
-- [Vercel · Team switcher](https://vercel.com/kb/guide/how-do-i-select-a-team-on-vercel) — 单一 scope 触发器；两级 scope 当前不采用。
-- [Linear · Workspaces](https://linear.app/docs/workspaces) — 左上当前 workspace 入口与快捷键思路。
+- [GitHub · Repository switcher](https://github.blog/changelog/2026-06-18-repository-switcher-generally-available-in-global-navigation/) 与 [Primer SelectPanel](https://primer.style/product/components/select-panel/)：当前上下文可见、打开后搜索的主要来源。
+- [GitLab · Search or go to](https://docs.gitlab.com/tutorials/left_sidebar/)：搜索和常访问项目的信息组织。
+- [Jira · 切换项目与看板](https://support.atlassian.com/jira-software-cloud/docs/switch-between-projects-and-boards/)：Recent / Starred 的长列表降噪对照，未移植该分组。
+- [Vercel · Team switcher](https://vercel.com/kb/guide/how-do-i-select-a-team-on-vercel)：单一 scope 触发器参考，未采用两级 scope。
+- [Linear · Workspaces](https://linear.app/docs/workspaces)：当前 workspace 入口与快捷键思路。
 
-**决策（2026-07-28 用户复核）**：统一采用 GitHub 型「当前项目触发器 + 可搜索 SelectPanel」，但不引入“最近使用”分组和访问历史持久化。桌面为锚定弹层，窄屏仅把同一内容容器全屏化；搜索、选中状态和键盘逻辑完全同源。明确不保留“三个以内按钮平铺”、不做项目按钮横向滚动、不按数量切换样式。落地规格见 [KitUI 组件规格 §08](./kit-ui-component-specs.md#08--项目切换器-project-switcher--已定案2026-07-22)。
+### 确认弹窗
 
-### 01 · 确认弹窗 `confirm-dialog`
-**要点**：确认使用遮罩、焦点锁定与 Esc/取消退路；取消走中性、确认走 danger 红，说明真实影响和是否可撤回，不能把支持 10 秒撤回的软删除写成“不可撤销”。打字确认与预提交挂起只按 ADR 0003 的适用变体使用。
+借鉴克制结构、异步状态和明确影响说明；打字确认、删除与撤回条件按 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md)，组件行为见 [KitUI §01](./kit-ui-component-specs.md)，不从参考站推导业务删除规则。
 
-- [DesignRevision · Alert Dialog](https://designrevision.com/components/alert-dialog) · 可交互 — 一页 5 个 demo：基础→红色破坏性→Async(点确认转 spinner 不关弹窗)→GitHub 式打字确认
-- [shadcn/ui · Alert Dialog](https://ui.shadcn.com/docs/components/radix/alert-dialog) · 可交互 — 最贴现有克制风，Delete Chat 红色破坏性范式
-- [Radix Themes · Alert Dialog](https://www.radix-ui.com/themes/docs/components/alert-dialog) · 可交互 — 评估「品牌蓝主色 + 红确认」配色关系
-- [Mantine · Modals manager](https://mantine.dev/x/modals/) · 可交互 — 命令式调用 + 堆叠/递进确认
+- [DesignRevision · Alert Dialog](https://designrevision.com/components/alert-dialog)：基础、破坏性、异步和打字确认变体的比较。
+- [shadcn/ui · Alert Dialog](https://ui.shadcn.com/docs/components/radix/alert-dialog)：克制结构与破坏性动作表达。
+- [Radix Themes · Alert Dialog](https://www.radix-ui.com/themes/docs/components/alert-dialog)：品牌色与危险操作色的关系。
+- [Mantine · Modals manager](https://mantine.dev/x/modals/)：命令式调用与递进确认；浮层组合按 [ADR 0016](../adr/0016-overlay-composition-contract.md)。
 
-**推荐**：骨架用 shadcn/DesignRevision 克制结构，高危项叠 type-to-confirm + Async spinner。**落到瑞航**：确认按钮绑 `--danger`、取消用 ghost 灰，品牌蓝不当主角；不用毛玻璃，`rgba(0,0,0,.28)` 轻遮罩即可。
+### 轻量表单弹窗
 
-### 02 · 轻量表单弹窗 `form-modal`
-**适用边界**：仅用于行级小对象和明确的轻量任务；业务实体新增/编辑遵守 ADR 0014 的整页表单。标题「动词+名词」；字段分组、失焦即时校验、错误贴字段下方；主按钮放右下 footer、动词与标题一致；打开聚焦第一个输入框；有未保存内容要拦。
+借鉴白面板、字段滚动和焦点反馈；公开 CRUD 示例不决定瑞航实体形态。适用边界见 [ADR 0014](../adr/0014-full-page-entity-forms.md)，组件结构见 [KitUI §02](./kit-ui-component-specs.md)。
 
-- [Mantine · Modal](https://mantine.dev/core/modal/) · 可交互 — 最贴现基准，Focus on inner element / size / centered
-- [shadcn/ui · Dialog](https://ui.shadcn.com/docs/components/dialog) · 可交互 — Sticky Footer / Scrollable（长表单吸底）
-- [Vercel Geist · Modal](https://vercel.com/geist/modal) · 可交互 — 打开自动聚焦 + 提交 loading/disabled
-- [Flowbite · Modal](https://flowbite.com/docs/components/modal/) · 可交互 — Create new product 标准 CRUD 表单样板
+- [Mantine · Modal](https://mantine.dev/core/modal/)：内部焦点、尺寸与居中方式。
+- [shadcn/ui · Dialog](https://ui.shadcn.com/docs/components/dialog)：字段滚动与固定操作区。
+- [Vercel Geist · Modal](https://vercel.com/geist/modal)：打开后的焦点及提交反馈。
+- [Flowbite · Modal](https://flowbite.com/docs/components/modal/)：CRUD 结构对照，未采用实体弹窗作为项目默认。
 
-**采纳范围**：借鉴白面板、右下主操作、字段滚动与焦点反馈；主按钮使用 `--brand`，校验错误使用 `--danger`。控件形状与间距采用现行令牌，不能把公开产品的 8–12px 圆角或 CRUD 弹窗示例当作瑞航业务实体形态。
+### 导出进度
 
-### 03 · 导出进度 `export-progress`
-**要点**：架构与降级策略以 [ADR 0004](../adr/0004-export-interaction-model.md) 为唯一权威。直接保存写盘时立即显示 process loading，成功后 dismiss；最终只显示 system 成功 toast「已导出到 X 文件夹」，不重复 process success。需要目录分类的多阶段导出用页签内步骤条，失败在原载体转 error。
+借鉴 loading 载体、多阶段步骤与失败定位；裁定见 [ADR 0004](../adr/0004-export-interaction-model.md)，组件见 [KitUI §03](./kit-ui-component-specs.md)。不照搬 Sonner promise 的成功终态，以免重复反馈。
 
-- [Sonner · Toast(promise 段)](https://sonner.emilkowal.ski/toast) · 可交互 — 直接保存只借鉴 loading 载体；成功时 dismiss，不能照抄 promise 的终态 success
-- [Material UI · Stepper](https://mui.com/material-ui/react-stepper/) · 可交互 — 多阶段：读数据→生成→写盘→完成，走过的步打勾
-- [Mantine · Progress](https://mantine.dev/core/progress/) · 可交互 — 配置导出有可测进度时的平滑宽度过渡
-- [PatternFly · Progress stepper](https://www.patternfly.org/components/progress-stepper/design-guidelines/) · 图解为主 — completed/in-progress/failure/warning/pending 五态配色最全
+- [Sonner · Toast](https://sonner.emilkowal.ski/toast)：直接保存的 loading 载体。
+- [Material UI · Stepper](https://mui.com/material-ui/react-stepper/)：多阶段骨架及已完成步骤。
+- [Mantine · Progress](https://mantine.dev/core/progress/)：有可测进度时的平滑过渡。
+- [PatternFly · Progress stepper](https://www.patternfly.org/components/progress-stepper/design-guidelines/)：完成、进行中、失败、警告与待处理状态。
 
-**推荐**：直接保存走 Sonner loading toast，多阶段走 MUI Stepper（带打勾），失败态参照 PatternFly。**落到瑞航**：激活步 `--brand`、完成步 `--ok`、失败步 `--danger`；成功收尾只有静态 system toast、无动效（全局蓝色水波已废弃，见 ADR 0004）。
+### 导入映射
 
-### 04 · 导入映射 `import-mapping`
-**要点**：「上传→认列→校验→入库」拆成清晰 stepper；映射步用源列↔系统字段两栏对照 + 智能预匹配（高亮已匹配/未匹配/必填缺失）；一屏可滚动行预览；导入走进度条而非空等。
+借鉴 Dromo 的克制布局、列映射与行预览，步骤参考 MUI；未采用 CSVbox 的饱和配色。流程见 [ADR 0005](../adr/0005-import-mapping-model.md)，组件见 [KitUI §04](./kit-ui-component-specs.md)。公开演示站不是业务资料处理入口；演示资料边界见 [ADR 0014 §9](../adr/0014-full-page-entity-forms.md#9-数据与实施纪律)。
 
-- [Dromo · sandbox](https://demo.dromo.io) · 可交互 — 白底克制，第 2 步 AI 自动列映射 + 行内校验，浏览器内跑完整流程免注册
-- [CSVbox · Demo](https://csvbox.io/demo/) · 可上传实测 — 直接传真实 CSV/Excel，自动 map + 逐行校验
-- [importcsv · Playground](https://docs.importcsv.com/playground) · 可交互 — 左配字段规则右实测导入向导
-- [Material UI · Stepper](https://mui.com/material-ui/react-stepper/) · 可交互 — 多步骨架范式（含错误态）
+- [Dromo · sandbox](https://demo.dromo.io)：列匹配、行内校验与预览布局。
+- [CSVbox · Demo](https://csvbox.io/demo/)：字段映射与逐行校验的历史对照。
+- [importcsv · Playground](https://docs.importcsv.com/playground)：字段规则配置与导入向导的并列观察。
+- [Material UI · Stepper](https://mui.com/material-ui/react-stepper/)：多步流程及错误状态。
 
-**推荐**：以 Dromo 克制布局为骨架（三步 stepper：上传→映射→预览/导入），stepper 参照 MUI；避免 CSVbox 过饱和配色。**落到瑞航**：映射步 `--brand` 标已匹配、`--warn` 待确认、`--danger` 必填缺失；导入进度条用蓝色，与导出呼应。
+### 抽屉 Sheet
 
-### 05 · 抽屉 Sheet `drawer-sheet`
-**要点**：右侧滑出装表单/详情、底部升起装移动端快捷操作；重滑入物理感（缓动、可拖拽把手、拖一半回弹）、背板处理、顶部标题栏 + 底部操作条固定 + 中间可滚动三段式。
+借鉴 shadcn-vue 结构和 Vaul 缓动；项目编辑抽屉、统一底部操作条和固定宽度不再作为要求。只读速览、通知专用例外及通用 API 延期边界见 [KitUI §05](./kit-ui-component-specs.md)，浮层组合按 [ADR 0016](../adr/0016-overlay-composition-contract.md)。
 
-- [shadcn-vue · Sheet](https://www.shadcn-vue.com/docs/components/sheet) · 可交互 — **Vue 原生**（技术栈直接对齐），右侧滑出三段式，代码可直接抄
-- [Vaul · Drawer](https://vaul.emilkowal.ski/) · 可交互 — iOS 质感拖拽把手 + 拖一半回弹，缓动手感全网最佳
-- [Mantine · Drawer](https://mantine.dev/core/drawer/) · 可交互 — 四向 + 毛玻璃开关实拖对比 + 多层叠开
-- [HeroUI · Drawer](https://heroui.com/docs/react/components/drawer) · 可交互 — 毛玻璃背板（仅作展示性灵感）
+- [shadcn-vue · Sheet](https://www.shadcn-vue.com/docs/components/sheet)：与现有 Vue 底座相符的面板结构。
+- [Vaul · Drawer](https://vaul.emilkowal.ski/)：把手、回弹与缓动的历史参考，不据此新增交互能力。
+- [Mantine · Drawer](https://mantine.dev/core/drawer/)：方向、背板与多层组合的对照。
+- [HeroUI · Drawer](https://heroui.com/docs/react/components/drawer)：玻璃背板仅作早期展示探索，未采用为项目方案；视觉裁定见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)。
 
-**推荐**：结构与代码抄 shadcn-vue Sheet（就是本项目技术栈），动效缓动抄 Vaul。**落到瑞航**：桌面端「编辑项目/看工程量详情」走右侧 Drawer（宽 420-520px），三段式，背板 `rgba(0,0,0,.28)` 轻遮罩、**别上毛玻璃**（Tauri 性价比低）；窄窗退化为底部 Sheet + 拖拽把手。
+### 按钮反馈
 
-### 06 · 按钮三态 `button-states`
-**要点**：同一颗按钮原地走完 default→loading（转圈+禁用防重复提交）→success（打勾），**锁死宽度不跳动**，成功停约 1s 再复位；行内校验把错误贴字段下方。
+借鉴 shadcn 的克制骨架与 loading 反馈，成功打勾保留为可选来源。适用条件、五变体和状态行为见 [KitUI §06](./kit-ui-component-specs.md)，不要求所有按钮经过成功动画。
 
-- [shadcn/ui · Button](https://ui.shadcn.com/docs/components/radix/button) · 半交互 — Spinner 小节：Generating…/Downloading… 禁用态
-- [Aceternity · Stateful Button](https://ui.aceternity.com/components/stateful-button) · 可交互 — 文字缩掉→转圈→打勾一气呵成，「成功一击」记忆点
-- [MUI · Button(loading)](https://mui.com/material-ui/react-button/) · 可交互 — 锁宽/禁用细节、spinner 三种位置
-- [Indie UI · Stateful Buttons](https://ui.indie-starter.dev/docs/stateful-buttons) · 可交互 — spinner/pulsing 两种反馈
-
-**推荐**：shadcn 克制骨架当基线，嫁接 Aceternity 的 loading→打勾弹性微动画当「成功一击」。**落到瑞航**：默认 `--brand`、success 打勾 `--ok`、校验 `--danger` 贴行内；进 loading 立即 disabled 防重复、锁死宽度、成功停约 1s 复位。
-
----
-
-_链接均经实测可打开且相关；候选中若干因 SPA/反爬/无自助 demo（403/404）未收录。_
+- [shadcn/ui · Button](https://ui.shadcn.com/docs/components/radix/button)：spinner 与禁用态。
+- [Aceternity · Stateful Button](https://ui.aceternity.com/components/stateful-button)：loading 到成功打勾的历史动效来源，不据此默认启用。
+- [MUI · Button](https://mui.com/material-ui/react-button/)：锁宽、禁用与 spinner 位置。
+- [Indie UI · Stateful Buttons](https://ui.indie-starter.dev/docs/stateful-buttons)：spinner / pulsing 的反馈对照。

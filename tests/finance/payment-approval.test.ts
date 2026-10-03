@@ -31,14 +31,12 @@ beforeEach(async () => {
 afterEach(() => db.close())
 
 describe('付款批复输入意图', () => {
-  it('保存域拒绝负数与非有限输入，失败后仍保留原金额与来源', async () => {
+  it.each(([-1, Number.NaN, Number.POSITIVE_INFINITY]).map(input => ({ input })))('保存域拒绝负数与非有限输入，失败后仍保留原金额与来源：输入案例 %#', async ({ input: value }) => {
     const store = useFinanceStore()
     const saved = await store.saveForm('payment_application', { name: '批复校验', bizType: '公司付款', applyAmount: 100 }, 'draft')
     const original = await store.loadOne('payment_application', saved.id)
-    for (const value of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
-      await expect(store.saveForm('payment_application', { ...original, approvedAmount: value, approvedAmountEdit: { value } }, 'draft')).rejects.toThrow('非负有效金额')
-      expect(await store.loadOne('payment_application', saved.id)).toMatchObject({ approvedAmount: null, approvedAmountOrigin: 'user-entry' })
-    }
+    await expect(store.saveForm('payment_application', { ...original, approvedAmount: value, approvedAmountEdit: { value } }, 'draft')).rejects.toThrow('非负有效金额')
+    expect(await store.loadOne('payment_application', saved.id)).toMatchObject({ approvedAmount: null, approvedAmountOrigin: 'user-entry' })
   })
   it('整单保存不确认历史来源，明确重填零或清空才更新，失败不留下修改', async () => {
     const store = useFinanceStore()
@@ -60,46 +58,52 @@ describe('付款批复输入意图', () => {
     expect(await store.loadOne('payment_application', 'legacy')).toMatchObject({ approvedAmount: null, approvedAmountOrigin: 'user-entry' })
   })
 
-  it('明确零拒绝支付，空批复按申请额校验，旧零保持原确认兼容且不更改来源', async () => {
+  it.each([
+    { id: 'zero', value: 0, origin: 'user-entry', canPay: false },
+    { id: 'empty', value: null, origin: 'user-entry', canPay: true },
+    { id: 'legacy', value: 0, origin: 'legacy', canPay: true },
+    { id: 'known', value: 80, origin: 'user-entry', canPay: true },
+  ] as const)('批复 $id 的支付结果为 $canPay', async ({ id, value, origin, canPay }) => {
     const store = useFinanceStore()
-    for (const [id, value, origin] of [['zero', 0, 'user-entry'], ['empty', null, 'user-entry'], ['legacy', 0, 'legacy'], ['known', 80, 'user-entry']] as const) {
-      await db.execute('INSERT INTO payment_applications (id, apply_amount, approved_amount, approved_amount_origin) VALUES (?, 100, ?, ?)', [id, value, origin])
-      const draft = {
-        amount: 30,
-        paymentDate: '2026-09-11',
-        payeeName: '收款方',
-        voucherNo: `V-${id}`,
-        bankSerialNo: `B-${id}`,
-        confirmedBy: '经办人',
-        applicationAllocations: [{ paymentApplicationId: id, allocatedAmount: 30 }],
-      }
-      if (id === 'zero') {
-        await expect(store.saveForm('payment_record', draft, 'confirm')).rejects.toThrow('超过付款申请可付金额')
-        continue
-      }
-      const saved = await store.saveForm('payment_record', draft, 'confirm')
-      expect(await store.loadOne('payment_record', saved.id)).toMatchObject({ amount: 30, confirmationStatus: 'confirmed' })
-      expect(await store.loadOne('payment_application', id)).toMatchObject({ approvedAmount: value, approvedAmountOrigin: origin, paidAmount: 30 })
-      await expect(store.saveForm('payment_record', { ...draft, amount: 71, applicationAllocations: [{ paymentApplicationId: id, allocatedAmount: 71 }] }, 'confirm')).rejects.toThrow('超过付款申请可付金额')
+    await db.execute('INSERT INTO payment_applications (id, apply_amount, approved_amount, approved_amount_origin) VALUES (?, 100, ?, ?)', [id, value, origin])
+    const draft = {
+      amount: 30,
+      paymentDate: '2026-09-11',
+      payeeName: '收款方',
+      voucherNo: `V-${id}`,
+      bankSerialNo: `B-${id}`,
+      confirmedBy: '经办人',
+      applicationAllocations: [{ paymentApplicationId: id, allocatedAmount: 30 }],
     }
+    if (!canPay) {
+      await expect(store.saveForm('payment_record', draft, 'confirm')).rejects.toThrow('超过付款申请可付金额')
+      return
+    }
+    const saved = await store.saveForm('payment_record', draft, 'confirm')
+    expect(await store.loadOne('payment_record', saved.id)).toMatchObject({ amount: 30, confirmationStatus: 'confirmed' })
+    expect(await store.loadOne('payment_application', id)).toMatchObject({ approvedAmount: value, approvedAmountOrigin: origin, paidAmount: 30 })
+    await expect(store.saveForm('payment_record', { ...draft, amount: 71, applicationAllocations: [{ paymentApplicationId: id, allocatedAmount: 71 }] }, 'confirm')).rejects.toThrow('超过付款申请可付金额')
   })
-  it('新申请未填批复保留 null，明确输入零存为零，并由保存域记录来源', async () => {
+  it.each([
+    { approvedAmount: undefined, expectedAmount: null },
+    { approvedAmount: null, expectedAmount: null },
+    { approvedAmount: 0, expectedAmount: 0 },
+    { approvedAmount: 80, expectedAmount: 80 },
+  ])('新申请批复 $approvedAmount 读回为 $expectedAmount', async ({ approvedAmount, expectedAmount }) => {
     const store = useFinanceStore()
-    for (const approvedAmount of [undefined, null, 0, 80]) {
-      const { id } = await store.saveForm('payment_application', {
-        name: '批复来源',
-        bizType: '公司付款',
-        applyAmount: 100,
-        approvedAmount,
-      }, 'draft')
-      expect(await store.loadOne('payment_application', id)).toMatchObject({
-        approvedAmount: approvedAmount ?? null,
-        approvedAmountOrigin: 'user-entry',
-      })
-      expect(await db.select('SELECT approved_amount, approved_amount_origin FROM payment_applications WHERE id = ?', [id])).toEqual([{
-        approved_amount: approvedAmount ?? null,
-        approved_amount_origin: 'user-entry',
-      }])
-    }
+    const { id } = await store.saveForm('payment_application', {
+      name: '批复来源',
+      bizType: '公司付款',
+      applyAmount: 100,
+      approvedAmount,
+    }, 'draft')
+    expect(await store.loadOne('payment_application', id)).toMatchObject({
+      approvedAmount: expectedAmount,
+      approvedAmountOrigin: 'user-entry',
+    })
+    expect(await db.select('SELECT approved_amount, approved_amount_origin FROM payment_applications WHERE id = ?', [id])).toEqual([{
+      approved_amount: expectedAmount,
+      approved_amount_origin: 'user-entry',
+    }])
   })
 })

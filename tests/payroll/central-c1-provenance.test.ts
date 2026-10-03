@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { payrollC1Canonical } from '~/lib/payroll/central-c1-calculation'
 import { createPayrollC1ServiceFixture } from '../helpers/payroll-c1-service-fixture'
 
-it('原考勤/个人标准/成功回执须相互证明，改两份来源仍不能复用旧指纹输出', async () => {
+it.each(Array.from(['0'.repeat(64), null]).map(input1 => ({ input1 })))('原考勤/个人标准/成功回执须相互证明，改两份来源仍不能复用旧指纹输出：输入案例 %#', async ({ input1: fingerprint }) => {
   const f = await createPayrollC1ServiceFixture()
   try {
     await f.attendance()
@@ -17,10 +17,9 @@ it('原考勤/个人标准/成功回执须相互证明，改两份来源仍不�
     const [receipt] = await f.db.select<{ command_json: string, fingerprint: string }>('SELECT command_json,fingerprint FROM payroll_command_receipts WHERE command_id=?', [command.commandId])
     const [head] = await f.db.select<{ snapshot_json: string }>('SELECT snapshot_json FROM wage_statements WHERE id=?', [id])
     const [source] = await f.db.select<{ source_json: string }>('SELECT source_json FROM payroll_c1_statement_sources WHERE statement_id=?', [id])
-    for (const fingerprint of ['0'.repeat(64), null]) {
-      await f.db.execute('UPDATE payroll_command_receipts SET command_json=?,fingerprint=? WHERE command_id=?', [fingerprint === null ? null : receipt!.command_json, fingerprint ?? receipt!.fingerprint, command.commandId])
-      expect((await output()).state).toBe('unavailable')
-    }
+
+    await f.db.execute('UPDATE payroll_command_receipts SET command_json=?,fingerprint=? WHERE command_id=?', [fingerprint === null ? null : receipt!.command_json, fingerprint ?? receipt!.fingerprint, command.commandId])
+    expect((await output()).state).toBe('unavailable')
     await f.db.execute('UPDATE payroll_command_receipts SET command_json=?,fingerprint=? WHERE command_id=?', [receipt!.command_json, receipt!.fingerprint, command.commandId])
     const changedSource = JSON.parse(source!.source_json)
     const changedSnapshot = JSON.parse(head!.snapshot_json)

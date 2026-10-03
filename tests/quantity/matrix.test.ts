@@ -217,25 +217,30 @@ describe('工程量矩阵纯投影', () => {
 describe('工程量矩阵方向键', () => {
   const positions = matrix().positions
 
-  it('按二维坐标移动并在边界原地停留', () => {
-    expect(moveQuantityFocus(positions, 'u201', 'ArrowRight')).toBe('u202')
-    expect(moveQuantityFocus(positions, 'u201', 'ArrowDown')).toBe('u101')
-    expect(moveQuantityFocus(positions, 'u201', 'ArrowLeft')).toBe('u201')
-    expect(moveQuantityFocus(positions, 'u201', 'ArrowUp')).toBe('u201')
-    expect(moveQuantityFocus(positions, 'u102', 'ArrowRight')).toBe('u102')
+  it.each([
+    { case: 'positions / \'u201\' / \'ArrowRight\'', input: positions, argument2: 'u201', argument3: 'ArrowRight', expected: 'u202' },
+    { case: 'positions / \'u201\' / \'ArrowDown\'', input: positions, argument2: 'u201', argument3: 'ArrowDown', expected: 'u101' },
+    { case: 'positions / \'u201\' / \'ArrowLeft\'', input: positions, argument2: 'u201', argument3: 'ArrowLeft', expected: 'u201' },
+    { case: 'positions / \'u201\' / \'ArrowUp\'', input: positions, argument2: 'u201', argument3: 'ArrowUp', expected: 'u201' },
+    { case: 'positions / \'u102\' / \'ArrowRight\'', input: positions, argument2: 'u102', argument3: 'ArrowRight', expected: 'u102' },
+  ])('按二维坐标移动并在边界原地停留 / moveQuantityFocus：$case', ({ input, argument2, argument3, expected }) => {
+    expect(moveQuantityFocus(input, argument2, argument3)).toBe(expected)
   })
 
-  it('稀疏楼层跳过空房号，并在下一行选择最接近的真实格', () => {
+  describe('稀疏楼层跳过空房号，并在下一行选择最接近的真实格', () => {
     const sparse = [
       { id: 'top-left', row: 0, column: 0 },
       { id: 'top-right', row: 0, column: 2 },
       { id: 'middle', row: 1, column: 1 },
       { id: 'bottom-right', row: 2, column: 2 },
     ]
-
-    expect(moveQuantityFocus(sparse, 'top-left', 'ArrowRight')).toBe('top-right')
-    expect(moveQuantityFocus(sparse, 'top-left', 'ArrowDown')).toBe('middle')
-    expect(moveQuantityFocus(sparse, 'top-right', 'ArrowDown')).toBe('middle')
-    expect(moveQuantityFocus(sparse, 'middle', 'ArrowDown')).toBe('bottom-right')
+    it.each([
+      { case: 'sparse / \'top-left\' / \'ArrowRight\'', input: sparse, argument2: 'top-left', argument3: 'ArrowRight', expected: 'top-right' },
+      { case: 'sparse / \'top-left\' / \'ArrowDown\'', input: sparse, argument2: 'top-left', argument3: 'ArrowDown', expected: 'middle' },
+      { case: 'sparse / \'top-right\' / \'ArrowDown\'', input: sparse, argument2: 'top-right', argument3: 'ArrowDown', expected: 'middle' },
+      { case: 'sparse / \'middle\' / \'ArrowDown\'', input: sparse, argument2: 'middle', argument3: 'ArrowDown', expected: 'bottom-right' },
+    ])('moveQuantityFocus：$case', ({ input, argument2, argument3, expected }) => {
+      expect(moveQuantityFocus(structuredClone(input), structuredClone(argument2), structuredClone(argument3))).toBe(expected)
+    })
   })
 })

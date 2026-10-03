@@ -1,6 +1,6 @@
 # Husky 钩子由 sh 执行,CRLF 会在 Windows 上导致 `\r` 报错,强制 LF。
-.husky/pre-commit text eol=lf
-.husky/pre-push text eol=lf
+.husky/* text eol=lf
+.gitignore text eol=lf
 *.sh text eol=lf
 
 # P5 原始运行记录保留原字节,避免 Windows 检出换行改写归档摘要。
