@@ -86,7 +86,7 @@ function git(args) {
 
 function verify() {
   // 仅执行固定命令，兼容 Windows 的 .cmd 启动器；不将路径或用户输入插入 shell。
-  execSync('pnpm typecheck && npm test', { stdio: 'inherit' })
+  execSync('pnpm typecheck && pnpm test', { stdio: 'inherit' })
 }
 
 function main() {
