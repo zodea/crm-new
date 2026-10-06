@@ -137,7 +137,7 @@
                     })}
                     <td style={{ ...TD, textAlign: "center" }}>
                       <span style={{ display: "inline-flex", gap: 4 }}>
-                        <IconButton icon="square-pen" title={props.onDelete ? "查看/编辑" : "编辑"} onClick={() => props.onRowOpen && props.onRowOpen(r)} />
+                        <IconButton icon={props.rowOpenIcon || "square-pen"} title={props.rowOpenLabel || (props.onDelete ? "查看/编辑" : "编辑")} onClick={() => props.onRowOpen && props.onRowOpen(r)} />
                         {props.onDelete && <IconButton icon="trash-2" tone="danger" title="删除" onClick={() => props.onDelete(r)} />}
                       </span>
                     </td>

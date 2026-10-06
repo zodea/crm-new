@@ -349,6 +349,7 @@
                 '<div>· 分项目录与合同量来自<b>工程量清单</b>（合同附件拆表入库）；各层计划时间由施工进度自动分摊</div>' +
                 "</div>",
             })} />
+            <Button size="sm" icon="list-tree" onClick={() => navigate("quantityStages")}>阶段配置</Button>
             <Button size="sm" icon="table-2" onClick={() => setVariance(true)}>量差总表</Button>
             <Button size="sm" icon="download" onClick={() => UI().toast("正在导出工程量 Excel…")}>导出</Button>
             <Button size="sm" variant="primary" icon="clipboard-list" onClick={() => navigate("boqList", { project: "合和新城", contract: "合和七期户内合同版-清单" })}>工程量清单</Button>

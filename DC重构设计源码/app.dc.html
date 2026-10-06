@@ -18,7 +18,7 @@
   <script src="kit/data.local.js" onerror="console.info('[KIT] data.local.js 不存在，使用虚构兜底数据')"></script>
   <style>
     /* —— 红圈式页签栏 —— */
-    .dc-tabbar { position: sticky; top: 64px; z-index: 19; height: 40px; flex: none;
+    .dc-tabbar { position: sticky; top: 0; z-index: 19; height: 40px; flex: none;
       background: var(--surface-2); border-bottom: 1px solid var(--line);
       display: flex; align-items: stretch; gap: 2px; padding: 0 16px;
       overflow-x: auto; overflow-y: hidden; }
@@ -36,21 +36,55 @@
       border: 0; border-radius: 4px; background: transparent; padding: 0;
       color: var(--ink-soft); font-size: 13px; line-height: 1; cursor: pointer; }
     .dc-tab-x:hover { background: var(--danger-soft); color: var(--danger-ink); }
+    .dc-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:12px; }
+    .dc-form-fields { grid-template-columns:repeat(auto-fit,minmax(min(100%,max(280px,calc(50% - 6px))),1fr)); }
+    .dc-fields label { display:grid; gap:6px; min-width:0; }
+    .dc-fields input, .dc-fields select, .dc-fields textarea, .dc-state-select { min-width:0; max-width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:var(--radius-btn); background:var(--panel); color:var(--ink); font:inherit; }
+    .dc-fields dd { margin:4px 0 0; overflow-wrap:anywhere; }
+    .dc-fields dt { color:var(--ink-soft); font-size:12px; }
+    :root {
+  --shell-sidebar-bg: #182237;
+  --shell-sidebar-text: #f3f6fc;
+  --shell-sidebar-muted: #c8d2e1;
+  --shell-sidebar-hover: rgb(255 255 255 / 7%);
+  --shell-sidebar-active: rgb(57 118 198 / 32%);
+  --shell-sidebar-active-text: #ffffff;
+  --shell-sidebar-border: rgb(255 255 255 / 10%);
+  --shell-sidebar-input: rgb(255 255 255 / 9%);
+    }
+    .dc-workspace { height:100dvh; padding-left:var(--sidebar-w); flex:1; min-width:0; display:flex; flex-direction:column; }
+    .dc-workspace.is-collapsed { padding-left:48px; }
+    .dc-header { min-height:var(--header-h); background:var(--panel); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:4px 12px; flex:none; gap:12px; flex-wrap:wrap; }
+    .dc-main { flex:1; min-width:0; min-height:0; overflow-y:auto; padding:12px; }
+    .dc-nav { display:flex; flex-direction:column; gap:2px; min-height:0; overflow:auto; }
+    .dc-nav button { width:100%; display:flex; align-items:center; gap:8px; flex-shrink:0; min-height:38px; padding:6px 10px; border:0; border-radius:var(--radius-btn); background:transparent; color:var(--shell-sidebar-text); font-size:14px; text-align:left; }
+    .dc-nav button:hover { background:var(--shell-sidebar-hover); }
+    .dc-nav button[aria-current=page] { background:var(--shell-sidebar-active); box-shadow:var(--ring-selected); color:var(--shell-sidebar-active-text); }
+    .dc-mobile-nav, .dc-menu-toggle { display:none; }
+    .dc-mobile-nav { max-height:100dvh; height:100dvh; width:min(320px,90vw); max-width:90vw; margin:0; border:0; padding:12px; background:var(--shell-sidebar-bg); color:var(--shell-sidebar-text); }
+    .dc-mobile-nav::backdrop { background:var(--ink-soft); opacity:.5; }
+    .dc-detail { container-type:inline-size; }
+    .dc-detail-columns { grid-template-columns:minmax(0,1fr) 264px; }
+    @container (max-width:850px) { .dc-detail-columns { grid-template-columns:minmax(0,1fr); } }
+    .dc-main section, .dc-main fieldset { min-width:0; }
+    .dc-main select { max-width:100%; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline:1px solid var(--brand); outline-offset:2px; }
+    @media (max-width:1023px) { .dc-workspace, .dc-workspace.is-collapsed { padding-left:0; } .dc-desktop-nav { display:none !important; } .dc-menu-toggle { display:inline-flex; } .dc-mobile-nav[open] { display:flex; flex-direction:column; gap:12px; } .dc-main { padding:8px; } }
   </style>
 </helmet>
 
-<div style="display:flex; min-height:100vh; background:var(--bg); color:var(--ink);">
+<div style="display:flex; height:100dvh; min-width:0; background:var(--bg); color:var(--ink);">
   {{ sidebar }}
   <!-- min-width:0：flex 项默认 min-width:auto 会让深层表格 min-content 穿透滚动容器撑宽整页（反馈轮8 四：整页横滚根因） -->
-  <div style="padding-left:{{ sideW }}px; flex:1; min-width:0; display:flex; flex-direction:column; min-height:100vh; transition:padding-left 0.18s ease;">
-    <header style="position:sticky; top:0; z-index:20; height:64px; background:rgba(255,255,255,0.96); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 24px; flex:none; gap:12px;">
-      <div>
-        <div style="font-size:18px; font-weight:800; line-height:1.2;">{{ pageTitle }}</div>
-      </div>
-      <div style="margin-left:auto; font-size:12px; color:var(--ink-soft);">{{ today }}</div>
+  <div class="{{ workspaceClass }}">
+    <header class="dc-header">
+      {{ menuToggle }}
+      <strong style="font-size:14px;">{{ pageTitle }}</strong>
+      <span style="margin-left:auto; font-size:12px; color:var(--ink-soft);">{{ today }}</span>
+      {{ statePreview }}
     </header>
     {{ tabbar }}
-    <main style="flex:1; padding:20px 24px 36px; min-height:0; overflow-y:auto;">
+    <main class="dc-main">
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="KitUIScreen" from="./kit/KitUI.jsx" hint-size="0,0"></x-import>
       </sc-if>
@@ -317,6 +351,18 @@
       <sc-if value="{{ isProjectSupplierImport }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="ProjectSupplierImportScreen" from="./kit/ProjectSupplierImportScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
       </sc-if>
+      <sc-if value="{{ isDataMigration }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="DataMigrationScreen" from="./kit/DataMigrationScreen.jsx" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayApplyDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayApplyDetailScreen" from="./kit/PayApplyDetailScreen.jsx" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isProcessLibraryDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ScheduleProcessLibraryDetailScreen" from="./kit/ScheduleProcessLibraryDetailScreen.jsx" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isQuantityStages }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="QuantityStagesScreen" from="./kit/QuantityStagesScreen.jsx" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
     </main>
   </div>
 </div>
@@ -325,6 +371,10 @@
 <script type="text/x-dc" data-dc-script>
 
 const PAGE = {
+  quantityStages: { title: "施工阶段配置", subtitle: "" },
+  processLibraryDetail: { title: "工序库版本详情", subtitle: "" },
+  payApplyDetail: { title: "付款申请详情", subtitle: "" },
+  dataMigration: { title: "本地数据迁移", subtitle: "" },
   home:          { title: "首页",     subtitle: "在建工程总览" },
   project:       { title: "施工项目",  subtitle: "项目管理" },
   projectDetail: { title: "项目详情",  subtitle: "经营驾驶舱 · 阶段 · 子表" },
@@ -406,7 +456,7 @@ class Component extends DCLogic {
     tabs: INITIAL_DESIGN_PROTOTYPE ? [{ id: "delivery", route: "delivery", params: {}, title: "送货单识别" }] : [{ id: "home", route: "home", params: {}, title: "首页" }],
     activeId: INITIAL_DESIGN_PROTOTYPE ? "delivery" : "home",
     collapsed: false,
-    // 侧栏结构 = 1 个顶层项（首页）+ 9 个分组，共 50 个叶子（识别中心组已于 2026-07-09 退役，4 项迁回各域）。
+    // 侧栏结构 = 1 个顶层项（首页）+ 9 个分组，共 51 个叶子（识别中心组已于 2026-07-09 退役，4 项迁回各域）。
     // openGroup = null 表示跟随当前路由所属分组（单开手风琴，见 _buildSidebar）。
     openGroup: null,
   };
@@ -420,6 +470,7 @@ class Component extends DCLogic {
     if (window.KIT_FORM_PAGES && window.KIT_FORM_PAGES[route]) return route + ":" + (p.id || "new");
     if (route === "projectDetail" || route === "supplierDetail" || route === "workerDetail" || route === "invoiceEdit" || route === "contractDetail" || route === "targetCostDetail" || route === "customerDetail")
       return route + ":" + (p.id || "");
+    if (route === "payApplyDetail" || route === "processLibraryDetail") return route + ":" + (p.id || "");
     if (route === "projectSupplier") return route + ":" + (p.pid || "") + ":" + (p.sid || "");
     if (route === "boqImport" || route === "boqList") return route + ":" + (p.contract || "");
     if (route === "crewDetail") return route + ":" + (p.crewId || "");
@@ -573,13 +624,14 @@ class Component extends DCLogic {
     const fp = window.KIT_FORM_PAGES && window.KIT_FORM_PAGES[r];
     if (fp && fp.listRoute) r = fp.listRoute;
     if (key === "payroll") return r === "payroll" || r === "payrollDetail";
-    if (key === "quantity") return r === "quantity" || r === "quantityUnit";
+    if (key === "quantity") return ["quantity", "quantityUnit", "quantityStages"].includes(r);
+    if (key === "payApply") return r === "payApply" || r === "payApplyDetail";
     if (key === "crew") return r === "crew" || r === "crewDetail";
     if (key === "supplier") return r === "supplier" || r === "supplierDetail";
     if (key === "worker") return r === "worker" || r === "workerDetail";
     if (key === "project") return r === "project" || r === "projectDetail" || r === "projectSupplier";
     if (key === "invoice") return r === "invoice";
-    if (key === "schedule") return r === "schedule" || r === "scheduleGroupNew";
+    if (key === "schedule") return ["schedule", "scheduleGroupNew", "scheduleBind", "processLibrary", "processLibraryDetail"].includes(r);
     if (key === "invoiceLedger") return r === "invoiceLedger" || r === "invoiceEdit";
     if (key === "boqList") return r === "boqList";           // 批A：清单拆表独立入主合同管理组，不再挂工程量清单下
     if (key === "customer") return r === "customer" || r === "customerDetail";  // 批E：客户列表/详情同亮
@@ -598,11 +650,11 @@ class Component extends DCLogic {
     const DS = window.DesignSystem_e3d871;
     if (!DS) return null;
     const { NavItem, Icon } = DS;
-    const navigate = this.navigate;
+    const navigate = (route, params) => { this.navigate(route, params); if (this.mobileNav && this.mobileNav.open) this.mobileNav.close(); };
     const isActive = k => this._isActive(k);
-    const W = collapsed ? 68 : 248;
+    const W = collapsed ? 48 : 208;
 
-    // 侧栏导航（锁定版）：1 个顶层项 + 9 个分组 = 50 个叶子，与实现 app/lib/nav/nav-tree.ts 逐条对齐
+    // 侧栏导航（锁定版）：1 个顶层项 + 9 个分组 = 51 个叶子，与实现 app/lib/nav/nav-tree.ts 逐条对齐
     // （key 与 label 一致性由 tests/ui/design-token-contract.test.ts 的设计覆盖契约断言）。
     // 所有叶子均已实装，不再保留「待建 / 待设计」占位机制。
     const NAV = [
@@ -676,6 +728,7 @@ class Component extends DCLogic {
         { key: "worker", mark: "工", label: "工人信息", hint: "人员证书" },
       ]},
       { type: "group", key: "g-settings", label: "设置", icon: "settings", items: [
+        { key: "dataMigration", mark: "迁", icon: "database-backup", label: "本地数据迁移", hint: "预检·备份" },
         { key: "ocrSettings", mark: "设", label: "OCR 设置", hint: "引擎·参数" },
       ]},
     ];
@@ -689,82 +742,25 @@ class Component extends DCLogic {
       openGroup: { followedGroup: activeGroupKey, key: openKey === key ? null : key },
     });
 
-    const miniBtn = n => React.createElement("button", {
-      key: n.key, onClick: () => navigate(n.key), title: n.label,
-      style: { display: "grid", placeItems: "center", width: 40, height: 40, margin: "2px auto",
-        border: "1px solid", borderRadius: "var(--radius-btn)", cursor: "pointer",
-        fontSize: 15, fontWeight: 800,
-        background: isActive(n.key) ? "var(--brand-soft)" : "var(--surface-2)",
-        borderColor: isActive(n.key) ? "rgba(57,118,198,0.25)" : "var(--line)",
-        color: isActive(n.key) ? "var(--brand)" : "var(--ink-soft)" }
-    }, n.mark);
-
-    const navItems = NAV.map(n => {
-      if (n.type === "item") {
-        return collapsed ? miniBtn(n) : React.createElement(NavItem, {
-          key: n.key, mark: n.mark, label: n.label, hint: null,
-          active: isActive(n.key), onClick: () => navigate(n.key)
-        });
-      }
-      if (n.type === "group") {
-        const isOpen = openKey === n.key;
-        if (collapsed) return React.createElement(React.Fragment, { key: n.key },
-          React.createElement("div", { style: { height: 1, background: "var(--line)", margin: "8px 6px" } }),
-          ...n.items.map(it => miniBtn(it))
-        );
-        return React.createElement("div", { key: n.key },
-          React.createElement("button", { type: "button", onClick: () => toggleGroup(n.key),
-            style: { display: "flex", alignItems: "center", gap: 8, width: "100%", border: 0,
-              background: "transparent", borderRadius: "var(--radius-btn)", padding: "8px 10px",
-              marginTop: 4, cursor: "pointer", color: "var(--ink-soft)" } },
-            React.createElement(Icon, { name: n.icon, size: 15 }),
-            React.createElement("span", { style: { fontSize: 12, fontWeight: 800, letterSpacing: "0.05em", flex: 1, textAlign: "left" } }, n.label),
-            React.createElement(Icon, { name: isOpen ? "chevron-down" : "chevron-right", size: 14 })
-          ),
-          isOpen && React.createElement("div", {
-            style: { display: "flex", flexDirection: "column", gap: 2, paddingLeft: 8, marginLeft: 8, borderLeft: "1px solid var(--line)" } },
-            ...n.items.map(it => React.createElement(NavItem, {
-              key: it.key, mark: it.mark, label: it.label, hint: null,
-              active: isActive(it.key), onClick: () => navigate(it.key)
-            }))
-          )
-        );
-      }
-      return null;
-    });
-
-    return React.createElement("aside", {
-      style: { position: "fixed", insetBlock: 0, left: 0, zIndex: 30, width: W,
-        background: "var(--panel)", borderRight: "1px solid var(--line)",
-        display: "flex", flexDirection: "column",
-        padding: collapsed ? "16px 8px" : "16px 12px",
-        transition: "width 0.18s ease", overflowX: "hidden", overflowY: "auto" }
-    },
-      React.createElement("div", {
-        style: { display: "flex", alignItems: "center", gap: 10,
-          padding: collapsed ? "0 0 16px" : "0 8px 20px",
-          justifyContent: collapsed ? "center" : "flex-start", flex: "none" }
-      },
-        React.createElement("span", { style: { display: "grid", placeItems: "center", width: 36, height: 36,
-          borderRadius: 8, background: "var(--brand)", color: "#fff", fontWeight: 800, fontSize: 16, flex: "none" } }, "瑞"),
-        !collapsed && React.createElement("div", { style: { minWidth: 0, flex: 1 } },
-          React.createElement("div", { style: { fontSize: 16, fontWeight: 800, lineHeight: 1.2 } }, "瑞航 CRM"),
-          React.createElement("div", { style: { fontSize: 11, color: "var(--ink-soft)", marginTop: 2 } }, "工程财务管理")
-        )
-      ),
-      React.createElement("nav", {
-        style: { flex: 1, display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", overflowX: "hidden" }
-      }, ...navItems),
-      React.createElement("div", { style: { flex: "none", paddingTop: 12, marginTop: 12, borderTop: "1px solid var(--line)" } },
-        React.createElement("button", { type: "button", onClick: () => this.setState(s => ({ collapsed: !s.collapsed })),
-          style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%",
-            border: "1px solid var(--line)", background: "var(--surface-2)", borderRadius: "var(--radius-btn)",
-            padding: 8, cursor: "pointer", color: "var(--ink-soft)", fontSize: 12, fontWeight: 700 } },
-          React.createElement(Icon, { name: collapsed ? "panel-left-open" : "panel-left-close", size: 16 }),
-          !collapsed && React.createElement("span", null, "收起侧栏")
-        ),
-      )
-    );
+    const query = "";
+    const matches = n => !query || (n.label + n.hint).toLowerCase().includes(query);
+    const leaf = (n, compact) => React.createElement("button", { key:n.key, type:"button", title:n.label, "aria-label":n.label, "aria-current":isActive(n.key) ? "page" : undefined, onClick:()=>navigate(n.key), style:compact ? {justifyContent:"center",padding:6} : undefined }, React.createElement(Icon,{name:n.icon || "file-text",size:18}), !compact && n.label);
+    const nav = compact => React.createElement("nav", {className:"dc-nav", "aria-label":"主导航",style:{flex:1}}, ...NAV.map(n => {
+      if (n.type === "item") return matches(n) ? leaf(n,compact) : null;
+      const items = n.items.filter(matches);
+      if (!items.length) return null;
+      if (compact) return React.createElement("div",{key:n.key},...items.map(it=>leaf(it,true)));
+      const opened = !!query || openKey === n.key;
+      return React.createElement("div", {key:n.key}, React.createElement("button", {type:"button", "aria-expanded":opened, onClick:()=>toggleGroup(n.key), style:{width:"100%",color:"var(--shell-sidebar-muted)"}}, React.createElement(Icon,{name:n.icon,size:18}), React.createElement("span",{style:{flex:1}},n.label), React.createElement(Icon,{name:opened?"chevron-down":"chevron-right",size:14})), opened && React.createElement("div",{style:{paddingLeft:8}},...items.map(it=>leaf(it,false))));
+    }));
+    const brand = compact => React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10,padding:"8px 4px",justifyContent:compact?"center":"flex-start"}},
+      React.createElement("span",{style:{display:"grid",placeItems:"center",width:36,height:36,borderRadius:8,background:"var(--brand)",color:"#fff",fontWeight:800,fontSize:16,flex:"none"}},"瑞"),
+      !compact && React.createElement("strong",{style:{fontSize:16}},"瑞航 CRM"));
+    return React.createElement(React.Fragment,null,
+      React.createElement("aside",{className:"dc-desktop-nav",style:{position:"fixed",insetBlock:0,left:0,zIndex:30,width:W,background:"var(--shell-sidebar-bg)",color:"var(--shell-sidebar-text)",display:"flex",flexDirection:"column",gap:8,padding:collapsed?4:12}},
+        brand(collapsed), nav(collapsed),
+        React.createElement("button",{type:"button",title:collapsed?"展开侧栏":"收起侧栏",onClick:()=>this.setState({collapsed:!collapsed}),style:{border:0,padding:8,background:"var(--shell-sidebar-input)",color:"var(--shell-sidebar-text)"}},React.createElement(Icon,{name:collapsed?"panel-left-open":"panel-left-close",size:18}))),
+      React.createElement("dialog",{className:"dc-mobile-nav",ref:el=>{this.mobileNav=el;},"aria-label":"主导航"},brand(false),React.createElement("button",{type:"button",onClick:()=>this.mobileNav.close()},"关闭导航"),nav(false)));
   }
 
   componentDidMount() {
@@ -789,6 +785,9 @@ class Component extends DCLogic {
       sidebar:         this._buildSidebar(),
       tabbar:          this._buildTabbar(),
       sideW:           collapsed ? 68 : 248,
+      workspaceClass: "dc-workspace" + (collapsed ? " is-collapsed" : ""),
+      menuToggle: React.createElement("button", {type:"button",className:"dc-menu-toggle",onClick:()=>this.mobileNav && this.mobileNav.showModal(), "aria-label":"打开导航"}, "☰"),
+      statePreview: (["dataMigration", "payApplyDetail", "processLibraryDetail", "quantityStages"].includes(route) || formPage) ? React.createElement("label", {style:{fontSize:12,display:"flex",alignItems:"center",gap:4}}, "设计状态", React.createElement("select", {className:"dc-state-select", "aria-label":"设计状态",value:params.previewState || "ready", onChange:e=>this.setState({params:{...params,previewState:e.target.value}})}, ...[["ready","正常"],["empty","空"],["loading","加载"],["error","错误"],["readonly","只读"]].map(([value,label])=>React.createElement("option",{key:value,value},label)))) : null,
       pageTitle:       page.title,
       pageSubtitle:    page.subtitle,
       isHome:          route === "home",
@@ -860,6 +859,10 @@ class Component extends DCLogic {
       isExportConfig:          route === "exportConfig",
       isImportMapping:         route === "importMapping",
       isProjectSupplierImport: route === "projectSupplierImport",
+      isDataMigration: route === "dataMigration",
+      isPayApplyDetail: route === "payApplyDetail",
+      isProcessLibraryDetail: route === "processLibraryDetail",
+      isQuantityStages: route === "quantityStages",
       // 顶栏日期按实际当天渲染；此前硬编码为某次演示当天，会被误当规格
       today:           (() => {
         const now = new Date();

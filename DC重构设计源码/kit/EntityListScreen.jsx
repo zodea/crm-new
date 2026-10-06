@@ -21,6 +21,7 @@
 //   searchKeys 搜索命中字段                              leftNav  {title,items:[{key,label,filter(row)}]} 左侧分类
 //   summary(rows) → [{label,value}] 底部业务汇总行        newDefaults() 新增行隐藏字段（kind/subKind 等）
 //   importOpts {targetFields,sourceCols,fileName,rowCount}  onRowOpen(row) 行点击（一般=打开详情）
+//   rowActions(row) [{key,label,icon?,onSelect,disabled?}] 已声明的领域行操作；提供时替代默认编辑/删除。
 //   pageSize / tableMinWidth 透传 KitTable
 (function () {
   if (window.EntityListScreen) { window.EntityListPreload = window.EntityListPreload || function () { return null; }; return; }
@@ -209,8 +210,10 @@
       key: "_ops", label: "操作", width: 92, align: "center", noForm: true,
       render: (v, r) => (
         <span style={{ display: "inline-flex", gap: 4 }} onClick={(e) => e.stopPropagation()}>
-          <IconButton icon="square-pen" title="编辑" onClick={() => editRow(r)} />
-          <IconButton icon="trash-2" title="删除" onClick={() => delRow(r)} />
+          {meta.rowActions ? meta.rowActions(r).map(action => <IconButton key={action.key} icon={action.icon || "ellipsis"} title={action.label} disabled={action.disabled} onClick={action.onSelect} />) : <>
+            <IconButton icon="square-pen" title="编辑" onClick={() => editRow(r)} />
+            <IconButton icon="trash-2" title="删除" onClick={() => delRow(r)} />
+          </>}
         </span>
       ),
     }]);

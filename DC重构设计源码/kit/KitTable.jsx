@@ -40,9 +40,9 @@
     const pageBtns = [];
     for (let i = 0; i < pages && i < 7; i++) pageBtns.push(pagerBtn(i, i, false));
 
-    return React.createElement(Panel, { padding: 0, style: { overflow: "hidden", display: "flex", flexDirection: "column" } },
+    return React.createElement(Panel, { padding: 0, style: { overflow: "hidden", display: "flex", flexDirection: "column", minWidth: 0, maxWidth: "100%" } },
       props.toolbar || null,
-      React.createElement("div", { style: { overflowX: "auto", overflowY: "hidden" } },
+      React.createElement("div", { tabIndex: 0, role: "region", "aria-label": props.label || "数据表格，可横向滚动", style: { overflowX: "auto", overflowY: "hidden", minWidth: 0 } },
         React.createElement("table", { style: { width: "100%", minWidth: totalW, borderCollapse: "collapse" } },
           React.createElement("thead", null,
             React.createElement("tr", { style: { borderBottom: "1px solid var(--line)" } },
@@ -57,6 +57,8 @@
             ...view.map((r, i) => React.createElement("tr", {
               key: rid(r, i), style: { borderBottom: "1px solid var(--line)", cursor: props.onRowClick ? "pointer" : "default", height: ROW_H },
               onClick: props.onRowClick ? () => props.onRowClick(r) : undefined,
+              tabIndex: props.onRowClick ? 0 : undefined,
+              onKeyDown: props.onRowClick ? (e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); props.onRowClick(r); } } : undefined,
               onMouseEnter: (e) => (e.currentTarget.style.background = "var(--surface-3)"),
               onMouseLeave: (e) => (e.currentTarget.style.background = "transparent"),
             },

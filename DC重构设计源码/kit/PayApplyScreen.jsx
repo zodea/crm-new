@@ -43,7 +43,8 @@
         title="付款申请" subtitle="10 类业务 · 真实结算/发票勾稽"
         searchPlaceholder="搜索名称、编号、项目或关联方" searchKeys={["no", "name", "projectName", "partyName", "status"]}
         createLabel="新建付款申请" onCreate={openCreate}
-        onRowOpen={(r) => nav && nav("payApplyForm", { id: r.id })}
+        rowOpenLabel="查看详情" rowOpenIcon="eye"
+        onRowOpen={(r) => nav && nav("payApplyDetail", { id: r.id, returnParams: params || {} })}
         columns={[
           { key: "name", label: "名称/对象", minWidth: 220, link: true },
           { key: "no", label: "编号", width: 170, mono: true },

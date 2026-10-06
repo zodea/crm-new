@@ -49,7 +49,7 @@
     );
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="dc-detail" style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
         {/* —— 摘要条 —— */}
         <Panel padding={0} style={{ overflow: "hidden" }}>
           <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", borderBottom: props.metrics ? "1px solid var(--line)" : "none" }}>
@@ -61,7 +61,7 @@
               </div>
               {props.code && <div style={{ fontSize: 12, color: "var(--ink-soft)", fontFamily: "var(--font-mono)", marginTop: 2 }}>{props.code}</div>}
             </div>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>{props.headerExtra}</div>
+            <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>{props.headerExtra}</div>
           </div>
           {props.metrics && props.metrics.length > 0 && (
             <div style={{ padding: "12px 16px" }}>
@@ -73,7 +73,7 @@
         </Panel>
 
         {/* —— 主列 + 右侧文书/文件栏 —— */}
-        <div style={{ display: "grid", gridTemplateColumns: hasAside ? "minmax(0,1fr) 264px" : "minmax(0,1fr)", gap: 16, alignItems: "start" }}>
+        <div className={hasAside ? "dc-detail-columns" : undefined} style={{ display: "grid", gap: 12, alignItems: "start", minWidth: 0 }}>
           <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
             {props.tabs && props.tabs.length > 0 && (
               <KA.SegTab tabs={props.tabs} active={props.activeTab} onChange={props.onTabChange} />

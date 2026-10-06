@@ -10,8 +10,8 @@
 //   { coll, entity, listRoute, title, statusKey?, row,           row=编辑目标行（null=新建）
 //     fields:[KitUI.buildFormBody 字段契约], coerce(vals)->patch, newDefaults()->obj, cols?,
 //     submitLabel?, submitStatus? }   提交按钮文案与提交后状态（对齐实现端 postLabel：如
-//       材料到货 submitLabel:"保存并入库" submitStatus:"已过账"；缺省 = "保存并提交" / "审批中"）
-// 行为要点：草稿=跳过必填校验+statusKey 写「草稿」；保存并提交=statusKey 写 submitStatus（默认「审批中」）；
+//       材料到货 submitLabel:"保存并入库" submitStatus:"已过账"；仅显式声明才提供提交动作）
+// 行为要点：草稿=跳过必填校验+statusKey 写「草稿」；保存并提交=仅写规格显式声明的 submitStatus；
 //   保存并新建=落库后原地重开空表单；页签切走自动缓存填写值（含明细行）、切回恢复（决议 8d 硬性要求）。
 (function () {
   if (window.KitFormPage) { window.KitFormPagePreload = window.KitFormPagePreload || function () { return null; }; return; }
@@ -89,6 +89,7 @@
     );
     const cacheKey = route + ":" + (editId || "new") + ":" + instanceKey;
     const isEdit = !!spec.row;
+    const readOnly = !!spec.readOnly || (params && params.previewState === "readonly");
     const isDraftRow = isEdit && spec.statusKey && spec.row[spec.statusKey] === "草稿";
 
     // —— 挂载：buildFormBody(cards) 注入 + 恢复页签缓存；卸载：dirty 且未完结 → 缓存填写值（决议 8d）——
@@ -123,7 +124,7 @@
       if (cached) { dirtyRef.current = true; setDirty(true); UI.toast("已恢复上次未保存的填写内容"); }
       else { dirtyRef.current = false; setDirty(false); }
       doneRef.current = false;
-      fb.focusFirst();
+      if (!readOnly) fb.focusFirst();
       // 滚动联动锚点高亮：应用实际滚动在 document 层（main 不产生滚动），window+main 双挂兜底
       const scroller = host.closest("main");
       const onScroll = () => {
@@ -156,13 +157,14 @@
     };
     const doSave = (action) => {
       const fb = fbRef.current;
-      if (!fb) return;
+      if (!fb || readOnly) return;
+      if (action === "saveSubmit" && (!spec.submitLabel || !spec.submitStatus)) return;
       if (action === "draft" && !dirtyRef.current) return;
       if (action !== "draft" && !fb.validate()) return;
       const patch = spec.coerce(fb.getVals());
       if (spec.statusKey) {
         if (action === "draft") patch[spec.statusKey] = "草稿";
-        else if (action === "saveSubmit") patch[spec.statusKey] = spec.submitStatus || "审批中";
+        else if (action === "saveSubmit") patch[spec.statusKey] = spec.submitStatus;
         else if (isDraftRow && !patch[spec.statusKey]) patch[spec.statusKey] = "草稿";   // 草稿续存但未提交：维持草稿态
       }
       let savedId = spec.row ? spec.row.id : null;
@@ -209,6 +211,7 @@
           {spec.headerNote && <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{spec.headerNote}</span>}
         </div>
         {/* 锚点导航 + 分区卡片（.kfp-layout 容器查询：窄容器降为单栏、锚点隐藏，ADR 0013） */}
+        {readOnly && <p role="status">仅可查看，当前记录不能修改。</p>}
         <div className={showNav ? "kfp-layout" : undefined}>
           {showNav && (
             <nav className="kfp-anchors" style={{ position: "sticky", top: 116, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: 8 }}>
@@ -225,10 +228,10 @@
               ))}
             </nav>
           )}
-          <div ref={hostRef} />
+          <fieldset ref={hostRef} disabled={readOnly} onClickCapture={readOnly ? e => e.stopPropagation() : undefined} style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }} />
         </div>
         {/* 吸底动作条（红圈五件套 + 保存后关闭勾选） */}
-        <div style={{ position: "sticky", bottom: 0, zIndex: 15, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+        {!readOnly && <div style={{ position: "sticky", bottom: 0, zIndex: 15, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
           background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "10px 14px",
           marginTop: 4, boxShadow: "0 -4px 16px rgba(16,24,40,0.06)" }}>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--ink-soft)", cursor: "pointer", userSelect: "none" }}>
@@ -237,12 +240,12 @@
           </label>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <button type="button" style={btnStyle()} onClick={doCancel}>取消</button>
-            <button type="button" disabled={!dirty} style={btnStyle(dirty ? "" : "disabled")} onClick={() => doSave("draft")}>保存草稿</button>
+            {spec.statusKey && <button type="button" disabled={!dirty} style={btnStyle(dirty ? "" : "disabled")} onClick={() => doSave("draft")}>保存草稿</button>}
             <button type="button" style={btnStyle()} onClick={() => doSave("saveNew")}>保存并新建</button>
-            <button type="button" style={btnStyle()} onClick={() => doSave("saveSubmit")}>{spec.submitLabel || "保存并提交"}</button>
+            {spec.submitLabel && spec.submitStatus && <button type="button" style={btnStyle()} onClick={() => doSave("saveSubmit")}>{spec.submitLabel}</button>}
             <button type="button" style={btnStyle("primary")} onClick={() => doSave("save")}>保存</button>
           </div>
-        </div>
+        </div>}
       </div>
     );
   }

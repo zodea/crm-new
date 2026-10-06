@@ -18,13 +18,13 @@
     // ============ 标准工序库版本 processLibraryForm（ADR 0018：既有版本只读，沿用原 code 新建下一版） ============
     KF.registerForm("processLibraryForm", { title: "标准工序库版本", subtitle: "不可变版本 · 沿用原 code 新建下一版 · 建组时冻结快照", listRoute: "processLibrary" }, (params) => {
       const row = params.id ? A.get("processLibraries", params.id) : null;
-      const frozen = !!(row && row.status === "已发布");
+      const frozen = !!row;
+      const source = params.sourceId ? A.get("processLibraries", params.sourceId) : null;
       const defs = [
-        { key: "code", label: "库编码", form: { section: "版本身份", type: frozen ? "readonly" : "text", placeholder: "如 STD-HOME", hint: "新建下一版时沿用原 code，不另起编码" } },
+        { key: "code", label: "库编码", form: { section: "版本身份", type: frozen || params.code ? "readonly" : "text", saveValue: true, placeholder: "如 STD-HOME", hint: "新建下一版时沿用原 code，不另起编码" } },
         { key: "name", label: "库名称", form: { type: frozen ? "readonly" : "text", placeholder: "如 户内装修标准工序库" } },
-        { key: "version", label: "版本号", form: { type: frozen ? "readonly" : "number", suffix: "版", hint: "同一 code 下递增；已发布版本只读" } },
+        { key: "version", label: "版本号", form: { type: frozen ? "readonly" : "number", suffix: "版", hint: "同一 code 下递增；已保存版本只读" } },
         { key: "scope", label: "适用范围", form: { type: "select", options: ["户内装修", "公区装修", "外立面", "机电安装"] } },
-        { key: "status", label: "状态", form: { type: "select", options: ["草稿", "已发布"], hint: "发布后本版冻结，只能沿用 code 新建下一版" } },
         { key: "taskCount", label: "工序道数", form: { section: "工序快照", type: "readonly", compute: (vals) => textToList(vals.tasks).length + " 道" } },
         {
           key: "tasks", label: "工序清单", form: {
@@ -37,9 +37,9 @@
         { key: "note", label: "备注", form: { section: "备注", type: "textarea" } },
       ];
       return {
-        coll: "processLibraries", entity: "pl", listRoute: "processLibrary", title: "标准工序库版本", statusKey: "status", row,
-        fields: KF.buildFields(defs, row), coerce: (vals) => KF.coerce(defs, vals),
-        newDefaults: () => ({ status: "草稿", version: 1, scope: "户内装修", tasks: [] }),
+        coll: "processLibraries", entity: "pl", listRoute: "processLibrary", title: "标准工序库版本", row, readOnly: frozen,
+        fields: KF.buildFields(defs, row || { ...(source || {}), code: params.code || "", version: params.version || 1, scope: source ? source.scope : "户内装修" }), coerce: (vals) => KF.coerce(defs, vals),
+        newDefaults: () => ({ version: 1, scope: "户内装修", tasks: [] }),
       };
     });
 

@@ -506,6 +506,7 @@
           <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>{fmtF(p.start)} → {fmtF(p.plannedEnd)}</span>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <Button size="sm" icon="flag" onClick={() => UI().toast("已将当前计划保存为基线（V1 写入 schedule_baselines，偏差以基线对比）", "ok")}>设为基线</Button>
+            <Button size="sm" icon="library" onClick={() => navigate("processLibrary")}>标准工序库</Button>
             <Button size="sm" variant="primary" icon="plus" onClick={() => navigate("scheduleGroupNew", { project: proj })}>新建楼栋分组</Button>
           </div>
         </Panel>

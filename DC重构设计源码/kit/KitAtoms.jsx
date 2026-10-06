@@ -78,10 +78,10 @@
     );
   }
 
-  // —— 指标网格（语义固定列数，禁 auto-fit）——
+  // —— 指标网格：cols 为宽屏上限，窄容器自动降列（ADR 0013）——
   function MetricGrid({ children, cols = 5 }) {
-    return h("div", { style: { display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 1, background: "var(--line)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" } },
-      ...React.Children.map(children, (c) => h("div", { style: { background: "var(--panel)", minWidth: 0 } }, c)));
+    return h("div", { style: { display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, max(160px, calc(100% / ${cols} - 1px))), 1fr))`, gap: 0, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", overflow: "hidden" } },
+      ...React.Children.map(children, (c) => h("div", { style: { background: "var(--panel)", minWidth: 0, border: "1px solid var(--line)" } }, c)));
   }
 
   // —— 实体蓝链（批A 底座件①）：全站实体名一律蓝色可点，type→route 映射只写这一处 ——

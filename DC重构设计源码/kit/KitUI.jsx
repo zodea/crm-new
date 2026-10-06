@@ -37,11 +37,27 @@
   // —— Overlay 基础 ——
   function overlay(onClose) {
     var ov = el("div", { position: "fixed", inset: "0", zIndex: Z, background: "rgba(16,24,40,0.45)", display: "grid", placeItems: "center", padding: "24px" });
+    var returnFocus = document.activeElement;
+    ov.setAttribute("role", "dialog");
+    ov.setAttribute("aria-modal", "true");
+    ov.tabIndex = -1;
+    var remove = ov.remove.bind(ov);
+    ov.remove = function () { remove(); if (returnFocus && returnFocus.isConnected) returnFocus.focus(); };
+    ov.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onClose(); return; }
+      if (e.key !== "Tab") return;
+      var focusable = Array.from(ov.querySelectorAll("button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex='0']")).filter(function (node) { return node.getClientRects().length; });
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (!first) { e.preventDefault(); ov.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+    requestAnimationFrame(function () { if (ov.isConnected) { var first = ov.querySelector("button:not(:disabled), input:not(:disabled), select:not(:disabled)"); (first || ov).focus(); } });
     ov.addEventListener("click", function (e) { if (e.target === ov) onClose(); });
     return ov;
   }
   function panel(width) {
-    return el("div", { background: "var(--panel)", borderRadius: "12px", width: (width || 460) + "px", maxWidth: "94vw", maxHeight: "86vh", overflow: "auto", boxShadow: "var(--shadow-pop)" });
+    return el("div", { background: "var(--panel)", borderRadius: "var(--radius-card)", width: (width || 460) + "px", maxWidth: "calc(100vw - 48px)", maxHeight: "86dvh", overflow: "auto", boxShadow: "var(--shadow-pop)" });
   }
   function header(box, title, subtitle, onClose) {
     var h = el("div", { padding: "16px 20px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: "12px" });
@@ -49,6 +65,7 @@
     left.appendChild(el("div", { fontSize: "15px", fontWeight: "800" }, title));
     if (subtitle) left.appendChild(el("div", { fontSize: "12px", color: "var(--ink-soft)", marginTop: "2px" }, subtitle));
     var x = el("button", { marginLeft: "auto", border: "0", background: "transparent", cursor: "pointer", fontSize: "22px", lineHeight: "1", color: "var(--ink-soft)" }, "×");
+    x.setAttribute("aria-label", "关闭弹窗");
     x.addEventListener("click", onClose);
     h.appendChild(left); h.appendChild(x);
     box.appendChild(h);
@@ -67,6 +84,7 @@
     var close = function () { ov.remove(); if (opts.onCancel) { var f = opts.onCancel; opts.onCancel = null; f(); } };
     var ov = overlay(close);
     var box = panel(opts.width || 380);
+    ov.setAttribute("aria-label", opts.title || "确认操作");
     header(box, opts.title || "确认操作", null, close);
     box.appendChild(el("div", { padding: "18px 20px", fontSize: "13px", color: "var(--ink)", lineHeight: "1.7" }, opts.message || "确定执行该操作？"));
     var foot = el("div", { padding: "0 20px 18px", display: "flex", justifyContent: "flex-end", gap: "8px" });
@@ -76,6 +94,7 @@
     ok.addEventListener("click", function () { opts.onCancel = null; ov.remove(); if (opts.onConfirm) opts.onConfirm(); });
     foot.appendChild(cancel); foot.appendChild(ok);
     box.appendChild(foot); ov.appendChild(box); document.body.appendChild(ov);
+    requestAnimationFrame(function () { if (cancel.isConnected) cancel.focus(); });
   }
 
   // —— Modal（自定义 body HTML + actions）——
@@ -84,7 +103,8 @@
     var close = function () { ov.remove(); };
     var ov = overlay(close);
     var box = panel(opts.width || 460);
-    header(box, opts.title || "", opts.subtitle, close);
+    ov.setAttribute("aria-label", opts.title || "操作弹窗");
+    header(box, opts.title || "操作弹窗", opts.subtitle, close);
     var body = el("div", { padding: "18px 20px" }, opts.bodyHTML || "");
     box.appendChild(body);
     var foot = el("div", { padding: "0 20px 18px", display: "flex", justifyContent: "flex-end", gap: "8px" });
@@ -497,6 +517,7 @@
     };
     var onKey = function (e) { if (e.key === "Escape") { e.stopPropagation(); tryClose(); } };
     var ov = overlay(tryClose);
+    ov.setAttribute("aria-label", opts.title || "编辑");
     var box = panel(opts.width || 480);
     Object.assign(box.style, { overflow: "hidden", display: "flex", flexDirection: "column" });
     header(box, opts.title || "编辑", opts.subtitle, tryClose);
@@ -545,12 +566,15 @@
       var picked = { v: opts.defaultValue || (opts.options && opts.options[0] && opts.options[0].value) };
       var done = function (v) { ov.remove(); resolve(v); };
       var ov = overlay(function () { done(null); });
+      ov.setAttribute("aria-label", opts.title || "选择业务类型");
       var box = panel(opts.width || 460);
       header(box, opts.title || "选择业务类型", opts.subtitle || "先选类型，再填写对应表单", function () { done(null); });
       var body = el("div", { padding: "14px 16px", display: "flex", flexDirection: "column", gap: "6px", maxHeight: "52vh", overflowY: "auto" });
       var items = [];
       (opts.options || []).forEach(function (o) {
-        var it = el("div", { display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid var(--line)", borderRadius: "10px", cursor: "pointer" });
+        var it = el("button", { display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid var(--line)", borderRadius: "10px", cursor: "pointer", textAlign: "left", color: "inherit", fontFamily: "inherit" });
+        it.type = "button";
+        it.setAttribute("aria-label", o.label);
         var dot = el("span", { width: "14px", height: "14px", borderRadius: "50%", border: "2px solid var(--line-strong)", flex: "none", boxSizing: "border-box" });
         var tx = el("div", null);
         tx.appendChild(el("div", { fontSize: "13px", fontWeight: "700" }, o.label));
@@ -558,6 +582,7 @@
         it.appendChild(dot); it.appendChild(tx);
         var paint = function () {
           var on = picked.v === o.value;
+          it.setAttribute("aria-pressed", String(on));
           it.style.borderColor = on ? "var(--brand)" : "var(--line)";
           it.style.background = on ? "var(--brand-soft)" : "transparent";
           dot.style.borderColor = on ? "var(--brand)" : "var(--line-strong)";
@@ -604,6 +629,7 @@
   function folderPicker(onPick) {
     var close = function () { ov.remove(); };
     var ov = overlay(close);
+    ov.setAttribute("aria-label", "选择文件夹");
     ov.style.zIndex = Z + 50;
     var box = panel(400);
     header(box, "选择文件夹", "选择导出文件的保存位置", close);
@@ -652,6 +678,7 @@
     var unit = opts.unit || "个文件";
     var close = function () { ov.remove(); };
     var ov = overlay(close);
+    ov.setAttribute("aria-label", opts.title || "导出");
     var box = panel(opts.width || 520);
     header(box, opts.title || "导出", opts.subtitle || "共 " + count + " " + unit + " · 配置保存方式", close);
     var body = el("div", { padding: "18px 20px", display: "flex", flexDirection: "column", gap: "14px" });
@@ -760,6 +787,7 @@
     var rowCount = opts.rowCount != null ? opts.rowCount : 8;
     var close = function () { ov.remove(); };
     var ov = overlay(close);
+    ov.setAttribute("aria-label", opts.title || "Excel 导入");
     var box = panel(opts.width || 520);
     header(box, opts.title || "Excel 导入", opts.subtitle || "选择文件并核对字段映射", close);
     var body = el("div", { padding: "18px 20px", display: "flex", flexDirection: "column", gap: "14px" });
