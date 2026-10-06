@@ -15,6 +15,9 @@ function text(value: unknown): value is string {
 function nullableText(value: unknown) {
   return value === null || text(value)
 }
+function nullableAmount(value: unknown) {
+  return value === null || (typeof value === 'number' && Number.isFinite(value))
+}
 function strings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(text)
 }
@@ -94,7 +97,7 @@ export function decodeTargetCostRead<T extends TargetCostListRead | TargetCostFo
     checkFiles(value.files, id)
   }
   else if (kind === 'detail') {
-    if (value.targetCostId !== id || !nullableText(value.deletedAt) || !object(value.view) || !detailHeader(value.view.header, id) || !Array.isArray(value.view.items) || !value.view.items.every(row => object(row) && text(row.id) && text(row.category) && text(row.itemName) && text(row.unit) && (row.qty === null || typeof row.qty === 'number') && (row.unitPrice === null || typeof row.unitPrice === 'number') && typeof row.amount === 'number') || !Array.isArray(value.view.categories) || !value.view.categories.every(row => object(row) && text(row.id) && text(row.category) && typeof row.targetAmount === 'number' && metrics(row) && sources(row.sources, (value.view as { header: { projectId: unknown } }).header.projectId, query.origin, row.category)) || !object(value.view.summary) || typeof value.view.summary.itemTotal !== 'number' || !metrics(value.view.summary) || !Array.isArray(value.history) || !text(value.actualSourceVersion))
+    if (value.targetCostId !== id || !nullableText(value.deletedAt) || !object(value.view) || !detailHeader(value.view.header, id) || !Array.isArray(value.view.items) || !value.view.items.every(row => object(row) && text(row.id) && text(row.category) && text(row.itemName) && text(row.unit) && nullableAmount(row.qty) && nullableAmount(row.unitPrice) && nullableAmount(row.amount)) || !Array.isArray(value.view.categories) || !value.view.categories.every(row => object(row) && text(row.id) && text(row.category) && nullableAmount(row.targetAmount) && metrics(row) && sources(row.sources, (value.view as { header: { projectId: unknown } }).header.projectId, query.origin, row.category)) || !object(value.view.summary) || !nullableAmount(value.view.summary.itemTotal) || !metrics(value.view.summary) || !Array.isArray(value.history) || !text(value.actualSourceVersion))
       fail()
     checkFiles(value.files, id)
   }

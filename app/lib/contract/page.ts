@@ -56,7 +56,11 @@ export const F2_FORM_META: Record<F2FormKind, ContractFormMeta> = {
     listLabel: '施工合同',
     listPath: '/contract/construction',
     newPath: '/contract/construction/form',
-    sections: COMMON_CONTRACT_SECTIONS,
+    sections: [
+      ...COMMON_CONTRACT_SECTIONS.slice(0, 2),
+      { key: 'management-fee', label: '总合同管理费配置' },
+      ...COMMON_CONTRACT_SECTIONS.slice(2),
+    ],
   },
   subcontract: {
     label: '分包合同',
@@ -169,6 +173,7 @@ export function f2FormDefaults(kind: F2FormKind): F2FormDraft {
         otherExpenseKind: kind === 'other_expense' ? '机械租赁' : '',
         paymentCycle: kind === 'other_expense' ? '月付' : '',
         amount: 0,
+        ...(kind === 'construction' ? { managementFeeAmount: null, managementFeeBasis: '' } : {}),
         lineItems: [],
       } satisfies ProjectContractFormDraft
     }

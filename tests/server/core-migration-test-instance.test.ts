@@ -27,7 +27,59 @@ const SESSION: BusinessSession = {
   capabilities: [CORE_MIGRATION_CAPABILITY],
 }
 
-it.each(['sqlite-v47', 'sqlite-v48', 'sqlite-v49'])('批复来源迁移后仍接受 %s 受保护来源，并重验来源哈希', async (sourceVersion) => {
+describe('总合同管理费来源的严格 HTTP 解析', () => {
+  const basis = '  原总合同配置依据  '
+  const attributes = (amount: number | null) => ({
+    managementFeeAmount: amount,
+    managementFeeBasis: basis,
+    managementFeeConfigurationJson: JSON.stringify({
+      amount,
+      basis,
+      version: 'fee-current',
+      history: [
+        { version: 'fee-old', amount: 17.500001, basis: '历史原文', contractVersion: 'contract-old', adoptedAt: '2026-10-04T01:00:00.000Z', actorId: null, commandId: null },
+        { version: 'fee-current', amount, basis, contractVersion: 'contract-current', adoptedAt: '2026-10-05T01:00:00.000Z', actorId: 'actor-native', commandId: 'command-native' },
+      ],
+    }, null, 2),
+  })
+  const envelope = (input: Record<string, string | number | null>, entity: 'construction_contracts' | 'subcontract_contracts' = 'construction_contracts') => {
+    const baseline = source()
+    return {
+      workspaceId: SESSION.workspaceId,
+      actorId: SESSION.actorId,
+      requiredCapability: CORE_MIGRATION_CAPABILITY,
+      commandId: 'management-fee-source',
+      backup: null,
+      source: source({ entities: { ...baseline.entities, [entity]: [{ legacyId: 'contract-native', name: '原合同', attributes: input }] } }),
+    }
+  }
+
+  it.each([null, 0])('当前金额 %s 与全部原冻结文本、精度和身份保持原值', (amount) => {
+    const input = attributes(amount)
+    const parsed = parseCoreMigrationSourceCommand(envelope(input))
+    expect(parsed.source.entities.construction_contracts[0]?.attributes).toEqual(input)
+    expect(JSON.parse(String(parsed.source.entities.construction_contracts[0]?.attributes?.managementFeeConfigurationJson))).toMatchObject({
+      amount,
+      basis,
+      history: [
+        { amount: 17.500001, actorId: null, commandId: null },
+        { amount, actorId: 'actor-native', commandId: 'command-native' },
+      ],
+    })
+  })
+
+  it('头部与冻结采用不一致、损坏历史和非总合同属性均拒绝', () => {
+    const input = attributes(0)
+    expect(() => parseCoreMigrationSourceCommand(envelope({ ...input, managementFeeAmount: 1 }))).toThrow('不一致')
+    const broken = JSON.parse(input.managementFeeConfigurationJson)
+    broken.history[0].adoptedAt = '未知历史时间'
+    expect(() => parseCoreMigrationSourceCommand(envelope({ ...input, managementFeeConfigurationJson: JSON.stringify(broken) }))).toThrow('冻结历史无效')
+    expect(() => parseCoreMigrationSourceCommand(envelope({ ...input, managementFeeAmount: -1 }))).toThrow('非负')
+    expect(() => parseCoreMigrationSourceCommand(envelope(input, 'subcontract_contracts'))).toThrow('未知字段')
+  })
+})
+
+it.each(['sqlite-v47', 'sqlite-v48', 'sqlite-v49', 'sqlite-v50'])('批复来源迁移后仍接受 %s 受保护来源，并重验来源哈希', async (sourceVersion) => {
   const instance = createCoreMigrationTestInstance()
   const input = source({ sourceVersion })
   const envelope = { workspaceId: SESSION.workspaceId, actorId: SESSION.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, source: input, backup: null }
@@ -187,6 +239,17 @@ function batchCommand(commandId: string, batchId: string): CoreMigrationBatchCom
 }
 
 describe('core migration test instance', () => {
+  it('受控核对按原workspace/actor返回回执，未应用键封存且不接受新的意图', async () => {
+    const instance = createCoreMigrationTestInstance()
+    const originalRequest = sourceCommand('core-original')
+    const original = await instance.preflight(originalRequest, SESSION)
+    await expect(instance.resolve(originalRequest.commandId, SESSION)).resolves.toEqual({ outcome: 'applied', result: original })
+    await expect(instance.resolve('core-never-applied', SESSION)).resolves.toEqual({ outcome: 'not-applied', commandId: 'core-never-applied' })
+    await expect(instance.preflight(sourceCommand('core-never-applied'), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(() => instance.resolve(originalRequest.commandId, { ...SESSION, capabilities: [] })).toThrow(/无权/)
+    await expect(instance.resolve(originalRequest.commandId, { ...SESSION, actorId: 'other-actor' })).resolves.toEqual({ outcome: 'not-applied', commandId: originalRequest.commandId })
+    await expect(instance.resolve(originalRequest.commandId, SESSION)).resolves.toEqual({ outcome: 'applied', result: original })
+  })
   it.each(['sqlite-v47', 'sqlite-v48'])('兼容已定版本 %s 的合法快照', async (sourceVersion) => {
     const instance = createCoreMigrationTestInstance()
     await expect(instance.preflight(sourceCommand(`version-${sourceVersion}`, cleanSource({ sourceVersion })), SESSION)).resolves.toBeDefined()
@@ -552,10 +615,11 @@ describe('core migration test instance', () => {
 
     await instance.preflight(sourceCommand('preflight-idem', migrationSource), SESSION)
     const dryRun = await instance.dryRun(sourceCommand('dry-run-idem', migrationSource, attestation(migrationSource)), SESSION)
-    const commandReplay = await instance.dryRun(sourceCommand('dry-run-idem', {
+    await expect(instance.dryRun(sourceCommand('dry-run-idem', {
       ...migrationSource,
       contractVersion: 'forged-after-first-result',
-    }), SESSION)
+    }), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const commandReplay = await instance.dryRun(sourceCommand('dry-run-idem', migrationSource, attestation(migrationSource)), SESSION)
     const sourceReplay = await instance.dryRun(sourceCommand('dry-run-source-replay', migrationSource, attestation(migrationSource)), SESSION)
     expect(commandReplay).toEqual(dryRun)
     expect(sourceReplay.batchId).toBe(dryRun.batchId)
@@ -574,10 +638,11 @@ describe('core migration test instance', () => {
     ]))
 
     const imported = await instance.importBatch(batchCommand('import-idem', dryRun.batchId), SESSION)
-    const commandReplayImport = await instance.importBatch(
+    await expect(instance.importBatch(
       batchCommand('import-idem', 'missing-batch'),
       SESSION,
-    )
+    )).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const commandReplayImport = await instance.importBatch(batchCommand('import-idem', dryRun.batchId), SESSION)
     const batchReplayImport = await instance.importBatch(
       batchCommand('import-batch-replay', dryRun.batchId),
       SESSION,
@@ -633,7 +698,8 @@ describe('core migration test instance', () => {
     await expect(instance.importBatch(
       batchCommand('atomic-import', 'forged-after-failure'),
       SESSION,
-    )).resolves.toEqual(retried)
+    )).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    await expect(instance.importBatch(batchCommand('atomic-import', dryRun.batchId), SESSION)).resolves.toEqual(retried)
   })
 
   it('同一 workspace 不允许第二批次覆盖待确认的活动批次', async () => {

@@ -32,13 +32,15 @@
 
 工作台是只读聚合层。#317 后浏览器页面只消费中央 `ProjectSupplierReadRepository`，各业务对象仍由自己的模块维护；合作终态结算写入规则未闭合，本页不提供写入口。
 
-| 工作台内容 | 唯一事实来源 | 汇总口径 |
+工作台金额与未知值的唯一口径见 [DATABASE §4.4](../DATABASE.md#44-projectsupplier-汇总project-suppliermd)，结算来源与确认事实见[支出结算定义](../DATABASE.md#支出结算统一源单)。本页只规定各来源的展示差异，不复制公式或有效状态清单。
+
+| 工作台内容 | 事实来源 | 展示与例外 |
 | --- | --- | --- |
-| 合同 | `contracts` + `contract_supplements` | 有效合同额 = 有效支出合同 `amount` + 该合同有效补充协议 `amount`；草稿、作废和无效合同不计入汇总，明细仍保留；不得读取迁移兼容列 `contracts.changed/paid` |
-| 请款 | `payment_applications` | 只把有效审批态的 `approved_amount` 计入已批请款；列表保留草稿、提交中等状态供追溯 |
-| 收票 | `invoices` | 列表按项目和分供方关联；汇总只计 `account_status='archived'` 的 `total_amount` 与 `tax_amount` |
-| 付款 | `payment_records` + `payment_record_application_allocations` + `payment_applications` | 只计已确认支付，并按分摊到当前项目×分供方付款申请的 `allocated_amount` 归属；不得把整张回单金额或手写实付副本直接归入 |
-| 支出结算 | `expenditure_settlements` | 只计有效确认态 `confirmed/已确认` 的 `total_amount`，仅审批通过不等于确认；保留合同、分供方和项目外键 |
+| 合同 | `contracts` + `contract_supplements` | 可追溯明细保留未进入金额汇总的合同；协议保留独立身份及父合同归属 |
+| 请款 | `payment_applications` | 明细并列申请额与批复额，并保留草稿、提交中等状态供追溯；未知批复不抹去真实实付 |
+| 收票 | `invoices` | 展示票号、含税额、税额、归档状态及当前项目/分供方归属 |
+| 付款 | `payment_records` + `payment_record_application_allocations` + `payment_applications` | 展示真实支付及其申请分摊，保留原支付与分摊身份供源单核验 |
+| 支出结算 | `expenditure_settlements` | 展示原结算金额、确认状态、合同/分供方/项目归属，保留各结算类型的专属来源目标 |
 | 合作文件 | `file_refs` | 按真实 owner 分组；向导导入文件固定挂 `owner_type='project_supplier'` |
 
 ### 实时摘要

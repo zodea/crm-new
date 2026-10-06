@@ -16,6 +16,7 @@ import type {
   CoreMigrationSourceRefDTO,
 } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
+import type { CommandJournal } from './command-journal'
 import type { PreparedCoreMigration } from './core-migration-preparation'
 import { createHash } from 'node:crypto'
 import {
@@ -31,11 +32,13 @@ import {
 } from '../../app/lib/migration/core-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { auxiliaryContractInstance } from './auxiliary-contract-runtime'
+import { commandJournalKey, commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { prepareCoreMigrationCommandSources } from './core-migration-preparation'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { deliveryCommandTestInstance } from './delivery-runtime'
+import { materialContractCommandTestInstance } from './material-contract-command-test-instance'
 import { migratedOtherSettlement } from './other-settlement-migration'
 import { otherSettlementInstance } from './other-settlement-runtime'
 import { migratedSettlementSource } from './other-settlement-sources'
@@ -77,7 +80,7 @@ interface StoredBatch {
   backup: BatchBackup | null
 }
 
-interface WorkspaceState {
+interface WorkspaceState extends CommandJournal<StoredCommand> {
   authority: CoreMigrationSnapshotDTO['authority']
   activeBatchId: string | null
   entities: CoreMigrationServerEntityDTO[]
@@ -96,7 +99,7 @@ export interface CoreMigrationTestInstanceOptions {
   afterConfirm?: (snapshot: CoreMigrationSnapshotDTO, batchId: string) => void | Promise<void>
   afterRollback?: (snapshot: CoreMigrationSnapshotDTO, batchId: string) => void | Promise<void>
   afterReset?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => void | Promise<void>
-  prepareTransition?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => Promise<PreparedCoreMigration>
+  prepareTransition?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string, previousSnapshot?: CoreMigrationSnapshotDTO) => Promise<PreparedCoreMigration>
 }
 
 interface ReferenceRule {
@@ -143,6 +146,10 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
     { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
   ],
+  material_contracts: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true },
+    { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
+  ],
   auxiliary_contracts: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
     { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
@@ -150,7 +157,7 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
   contract_supplements: [
     {
       field: 'contractId',
-      target: ['construction_contracts', 'subcontract_contracts'],
+      target: ['construction_contracts', 'subcontract_contracts', 'material_contracts'],
       orphanWhenMissing: true,
     },
   ],
@@ -224,6 +231,8 @@ function freshWorkspace(): WorkspaceState {
     batchBySourceHash: new Map(),
     preflightSourceHashes: new Set(),
     commands: new Map(),
+    commandFingerprints: new Map(),
+    sealedCommands: new Set(),
   }
 }
 
@@ -303,7 +312,9 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
   async function commitTransition(snapshot: CoreMigrationSnapshotDTO, workspaceId: string | undefined, beforeCommit: () => void | Promise<void>, commitAuthority: () => void) {
     let prepared: PreparedCoreMigration | undefined
     try {
-      prepared = await options.prepareTransition?.(snapshot, workspaceId)
+      const current = workspaceId ? workspace(workspaceId) : undefined
+      const previousSnapshot = current ? clone({ authority: current.authority, activeBatchId: current.activeBatchId, entities: current.entities }) : undefined
+      prepared = await options.prepareTransition?.(snapshot, workspaceId, previousSnapshot)
       await beforeCommit()
       prepared?.commit()
       commitAuthority()
@@ -338,10 +349,11 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
 
   function replay<T extends CommandResult>(
     state: WorkspaceState,
-    commandId: string,
+    command: CoreMigrationSourceCommandDTO | CoreMigrationBatchCommandDTO,
+    session: BusinessSession,
     operation: Operation,
   ): T | null {
-    const stored = state.commands.get(commandId)
+    const stored = commandReplay(state, { ...command, operation }, session, 'core-migration', conflict).previous
     if (!stored)
       return null
     if (stored.operation !== operation)
@@ -351,11 +363,12 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
 
   function remember(
     state: WorkspaceState,
-    commandId: string,
+    command: CoreMigrationSourceCommandDTO | CoreMigrationBatchCommandDTO,
+    session: BusinessSession,
     operation: Operation,
     result: CommandResult,
   ): void {
-    state.commands.set(commandId, { operation, result: clone(result) })
+    state.commands.set(commandJournalKey(command.commandId, session, 'core-migration'), { operation, result: clone(result) })
   }
 
   function assertSupported(source: CoreMigrationSourceDTO): void {
@@ -1157,7 +1170,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     session: BusinessSession,
   ): Promise<CoreMigrationPreflightDTO> {
     const state = authorize(command, session)
-    const previous = replay<CoreMigrationPreflightDTO>(state, command.commandId, 'preflight')
+    const previous = replay<CoreMigrationPreflightDTO>(state, command, session, 'preflight')
     if (previous)
       return previous
     assertPreflightCommand(command)
@@ -1173,7 +1186,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       ),
     }
     state.preflightSourceHashes.add(command.source.sourceHash)
-    remember(state, command.commandId, 'preflight', result)
+    remember(state, command, session, 'preflight', result)
     return clone(result)
   }
 
@@ -1182,7 +1195,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     session: BusinessSession,
   ): Promise<CoreMigrationBatchDTO> {
     const state = authorize(command, session)
-    const previous = replay<CoreMigrationBatchDTO>(state, command.commandId, 'dry-run')
+    const previous = replay<CoreMigrationBatchDTO>(state, command, session, 'dry-run')
     if (previous)
       return previous
     const attestation = assertDryRunCommand(state, command)
@@ -1196,7 +1209,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
         throw conflict('相同 sourceHash 对应了不同来源内容')
       if (!hasSameAttestation(existing.attestation, attestation))
         throw conflict('相同来源不能替换已证明的不可变备份')
-      remember(state, command.commandId, 'dry-run', existing.dto)
+      remember(state, command, session, 'dry-run', existing.dto)
       return clone(existing.dto)
     }
 
@@ -1204,7 +1217,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     const stored = plan(command, batchId, now(), attestation)
     state.batches.set(batchId, stored)
     state.batchBySourceHash.set(command.source.sourceHash, batchId)
-    remember(state, command.commandId, 'dry-run', stored.dto)
+    remember(state, command, session, 'dry-run', stored.dto)
     return clone(stored.dto)
   }
 
@@ -1220,12 +1233,12 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     session: BusinessSession,
   ): Promise<CoreMigrationBatchDTO> {
     const state = authorize(command, session)
-    const previous = replay<CoreMigrationBatchDTO>(state, command.commandId, 'import')
+    const previous = replay<CoreMigrationBatchDTO>(state, command, session, 'import')
     if (previous)
       return previous
     const batch = storedBatch(state, command.batchId)
     if (batch.dto.status === 'applied' || batch.dto.status === 'confirmed') {
-      remember(state, command.commandId, 'import', batch.dto)
+      remember(state, command, session, 'import', batch.dto)
       return clone(batch.dto)
     }
     if (batch.dto.status !== 'dry-run' && batch.dto.status !== 'failed')
@@ -1297,7 +1310,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       ...batch.dto,
       issues: reconcileAppliedBatch(state, batch, command.commandId),
     }
-    remember(state, command.commandId, 'import', batch.dto)
+    remember(state, command, session, 'import', batch.dto)
     return clone(batch.dto)
   }
 
@@ -1306,12 +1319,12 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     session: BusinessSession,
   ): Promise<CoreMigrationBatchDTO> {
     const state = authorize(command, session)
-    const previous = replay<CoreMigrationBatchDTO>(state, command.commandId, 'confirm')
+    const previous = replay<CoreMigrationBatchDTO>(state, command, session, 'confirm')
     if (previous)
       return previous
     const batch = storedBatch(state, command.batchId)
     if (batch.dto.status === 'confirmed') {
-      remember(state, command.commandId, 'confirm', batch.dto)
+      remember(state, command, session, 'confirm', batch.dto)
       return clone(batch.dto)
     }
     if (batch.dto.status !== 'applied')
@@ -1340,7 +1353,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       state.authority = 'central'
       state.activeBatchId = command.batchId
       batch.dto = confirmedBatch
-      remember(state, command.commandId, 'confirm', batch.dto)
+      remember(state, command, session, 'confirm', batch.dto)
     })
     return clone(batch.dto)
   }
@@ -1350,12 +1363,12 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     session: BusinessSession,
   ): Promise<CoreMigrationBatchDTO> {
     const state = authorize(command, session)
-    const previous = replay<CoreMigrationBatchDTO>(state, command.commandId, 'rollback')
+    const previous = replay<CoreMigrationBatchDTO>(state, command, session, 'rollback')
     if (previous)
       return previous
     const batch = storedBatch(state, command.batchId)
     if (batch.dto.status === 'rolled-back') {
-      remember(state, command.commandId, 'rollback', batch.dto)
+      remember(state, command, session, 'rollback', batch.dto)
       return clone(batch.dto)
     }
     if ((batch.dto.status !== 'applied' && batch.dto.status !== 'confirmed') || !batch.backup)
@@ -1376,7 +1389,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       state.activeBatchId = nextSnapshot.activeBatchId
       state.entities = clone(nextSnapshot.entities)
       batch.dto = { ...batch.dto, status: 'rolled-back', authority: state.authority, updatedAt: rolledBackAt, rolledBackAt }
-      remember(state, command.commandId, 'rollback', batch.dto)
+      remember(state, command, session, 'rollback', batch.dto)
     })
     return clone(batch.dto)
   }
@@ -1408,6 +1421,19 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     importBatch: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, importBatch),
     confirm: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, confirm),
     rollback: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, rollback),
+    resolve(commandId: string, session: BusinessSession) {
+      parseResolveCommandBody({ commandId })
+      if (!session.capabilities.includes(CORE_MIGRATION_CAPABILITY))
+        throw forbidden('当前会话无权核对核心迁移原命令')
+      return enqueue(session.workspaceId, async () => {
+        if (!session.capabilities.includes(CORE_MIGRATION_CAPABILITY))
+          throw forbidden('当前会话无权核对核心迁移原命令')
+        const resolution = resolveJournalCommand(workspace(session.workspaceId), commandId, session, 'core-migration')
+        return resolution.outcome === 'applied'
+          ? { outcome: 'applied' as const, result: resolution.result.result }
+          : resolution
+      })
+    },
     snapshot,
     reset(workspaceId?: string): Promise<void> {
       if (workspaceId)
@@ -1434,19 +1460,20 @@ export function synchronizeCoreMigrationCommandSources(
 
 const commandSources = [
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => processLibraryService.prepareMigrationSnapshot(snapshot, processLibrarySession()) },
-  { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => auxiliaryContractInstance().prepareMigrationSnapshot(snapshot) },
-  { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => otherSettlementInstance().prepareMigrationSnapshot(snapshot) },
+  { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => auxiliaryContractInstance().prepareMigrationSnapshot(snapshot), assertMigrationRemoval: (removed: readonly CoreMigrationServerEntityDTO[]) => auxiliaryContractInstance().assertMigrationRemoval(removed) },
+  { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => otherSettlementInstance().prepareMigrationSnapshot(snapshot), assertMigrationRemoval: (removed: readonly CoreMigrationServerEntityDTO[]) => otherSettlementInstance().assertMigrationRemoval(removed) },
   projectCommandTestInstance,
   customerCommandTestInstance,
   supplierCommandTestInstance,
   crewWorkerCommandTestInstance,
   constructionContractCommandTestInstance,
   subcontractContractCommandTestInstance,
+  materialContractCommandTestInstance,
   receiptCommandTestInstance,
   deliveryCommandTestInstance,
   ownerCommercialDocumentCommandTestInstance,
 ] as const
 
 export const coreMigrationTestInstance = createCoreMigrationTestInstance({
-  prepareTransition: snapshot => prepareCoreMigrationCommandSources(snapshot, commandSources, [quantityTestInstance]),
+  prepareTransition: (snapshot, _workspaceId, previousSnapshot) => prepareCoreMigrationCommandSources(snapshot, commandSources, [quantityTestInstance], previousSnapshot),
 })

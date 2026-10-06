@@ -54,6 +54,17 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('中央证照人工工作面', () => {
+  it('当前资格失效仍展示人工历史；逐件使用服务器业务日状态，坏日期显示待核对', async () => {
+    const proof = { decision: 'qualified' as const, reviewedAt: '2026-09-10T00:00:00Z', actorId: '历史核验人', note: '核验时所见原件已保全' }
+    read.mockResolvedValue(credentialSnapshot({ status: 'incomplete', review: proof, reviewCurrent: false, reviewHistory: [proof], credentials: [credentialRecord({ expiresAt: '2026-02-30', validity: { businessDate: '2026-09-12', state: 'unrecorded', reason: 'invalid-date' } })] }))
+    await setup()
+    await screen.findByText('核验时所见原件已保全', { exact: false })
+    expect(screen.getByText('历史凭证已保留；当前资料或有效期已变化，不能据此认定当前资料已核验。')).toBeTruthy()
+    expect(screen.getByText('日期无效 · 待核对')).toBeTruthy()
+    expect((screen.getByRole('button', { name: '人工核验通过' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(execute).not.toHaveBeenCalled()
+  })
+
   it('pDF 预览先聚焦关闭按钮，退出后恢复原预览按钮', async () => {
     const record = credentialRecord()
     read.mockResolvedValue(credentialSnapshot({ credentials: [record] }))

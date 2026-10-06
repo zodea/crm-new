@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 164,
+    "trackedPageFiles": 171,
     "devPageFiles": 5,
-    "productionRoutes": 159,
+    "productionRoutes": 166,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 159,
-    "referenceEndpoints": 159,
+    "evidenceEndpointRecords": 166,
+    "referenceEndpoints": 166,
     "referenceProfiles": 50,
     "usedReferenceProfiles": 44,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
     "localAuthorityRoutes": 43,
-    "historicalEvidenceRoutes": 34,
-    "unverifiedTargetRoutes": 10,
-    "designCoveredRoutes": 135,
-    "designPendingRoutes": 24
+    "historicalEvidenceRoutes": 35,
+    "unverifiedTargetRoutes": 16,
+    "designCoveredRoutes": 139,
+    "designPendingRoutes": 27
   },
   "domains": [
     {
@@ -98,7 +98,7 @@
     {
       "code": "aux-contract",
       "domain": "辅助合同与结算",
-      "routeCount": 15,
+      "routeCount": 16,
       "implementationIssues": [
         409
       ],
@@ -180,7 +180,7 @@
     {
       "code": "material-price",
       "domain": "材料价格",
-      "routeCount": 1,
+      "routeCount": 5,
       "implementationIssues": [
         411
       ],
@@ -270,7 +270,7 @@
     {
       "code": "ocr-settings",
       "domain": "系统设置",
-      "routeCount": 1,
+      "routeCount": 3,
       "implementationIssues": [
         414
       ],
@@ -1442,6 +1442,33 @@
         "routeKey": "/contract/other-settlement/form"
       },
       "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-1CFFF7CCEFF7",
+      "page": "app/pages/contract/other-settlement/import.vue",
+      "localRoute": "/contract/other-settlement/import",
+      "domainCode": "aux-contract",
+      "template": "特殊工具",
+      "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [],
+      "referenceProfile": "R-TOOL-PENDING",
+      "referenceEndpointId": "unverified-1CFFF7CCEFF7",
+      "referenceEndpointLabel": "目标端点未验证：/contract/other-settlement/import",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/other-settlement/import"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/other-settlement/import"
+      },
+      "constraints": "C-TOOL"
     },
     {
       "evidenceRecordId": "E-8DBEF13E368C",
@@ -2700,6 +2727,114 @@
         "routeKey": "/material/price"
       },
       "constraints": "C-TOOL"
+    },
+    {
+      "evidenceRecordId": "E-BA5AC505108E",
+      "page": "app/pages/material/quotations/[id].vue",
+      "localRoute": "/material/quotations/:id",
+      "domainCode": "material-price",
+      "template": "详情",
+      "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [],
+      "referenceProfile": "R-TOOL-PENDING",
+      "referenceEndpointId": "unverified-BA5AC505108E",
+      "referenceEndpointLabel": "目标端点未验证：/material/quotations/:id",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/material/quotations/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/material/quotations/:id"
+      },
+      "constraints": "C-BASE"
+    },
+    {
+      "evidenceRecordId": "E-21CA8147B2AE",
+      "page": "app/pages/material/quotations/form/[[id]].vue",
+      "localRoute": "/material/quotations/form/:id?",
+      "domainCode": "material-price",
+      "template": "整页表单",
+      "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [],
+      "referenceProfile": "R-TOOL-PENDING",
+      "referenceEndpointId": "unverified-21CA8147B2AE",
+      "referenceEndpointLabel": "目标端点未验证：/material/quotations/form/:id?",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/material/quotations/form/:id?"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/material/quotations/form/:id?"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-EEC7A64A99F7",
+      "page": "app/pages/material/quotations/import.vue",
+      "localRoute": "/material/quotations/import",
+      "domainCode": "material-price",
+      "template": "特殊工具",
+      "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [],
+      "referenceProfile": "R-TOOL-PENDING",
+      "referenceEndpointId": "unverified-EEC7A64A99F7",
+      "referenceEndpointLabel": "目标端点未验证：/material/quotations/import",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/material/quotations/import"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/material/quotations/import"
+      },
+      "constraints": "C-TOOL"
+    },
+    {
+      "evidenceRecordId": "E-80041CE8195E",
+      "page": "app/pages/material/quotations/index.vue",
+      "localRoute": "/material/quotations",
+      "domainCode": "material-price",
+      "template": "列表",
+      "implementationIssues": [
+        411
+      ],
+      "historicalImplementationIssues": [],
+      "referenceProfile": "R-TOOL-PENDING",
+      "referenceEndpointId": "unverified-80041CE8195E",
+      "referenceEndpointLabel": "目标端点未验证：/material/quotations",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/material/quotations"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/material/quotations"
+      },
+      "constraints": "C-DENSE"
     },
     {
       "evidenceRecordId": "E-6C54BE12AA19",
@@ -4284,6 +4419,60 @@
         "routeKey": "/settings/ocr"
       },
       "constraints": "C-TOOL"
+    },
+    {
+      "evidenceRecordId": "E-C14704820FFC",
+      "page": "app/pages/settings/our-signatories/index.vue",
+      "localRoute": "/settings/our-signatories",
+      "domainCode": "ocr-settings",
+      "template": "列表",
+      "implementationIssues": [
+        414
+      ],
+      "historicalImplementationIssues": [],
+      "referenceProfile": "R-TOOL-PENDING",
+      "referenceEndpointId": "unverified-C14704820FFC",
+      "referenceEndpointLabel": "目标端点未验证：/settings/our-signatories",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/settings/our-signatories"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/settings/our-signatories"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-28468CD5D467",
+      "page": "app/pages/settings/our-signatories/form/[[id]].vue",
+      "localRoute": "/settings/our-signatories/form/:id?",
+      "domainCode": "ocr-settings",
+      "template": "整页表单",
+      "implementationIssues": [
+        414
+      ],
+      "historicalImplementationIssues": [],
+      "referenceProfile": "R-FORM-PRIOR",
+      "referenceEndpointId": "historical-28468CD5D467",
+      "referenceEndpointLabel": "历史整页表单目标未登记：/settings/our-signatories/form/:id?",
+      "evidenceGrade": "historical",
+      "observationDate": null,
+      "observationDateStatus": "not-recorded-historical",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/settings/our-signatories/form/:id?"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/settings/our-signatories/form/:id?"
+      },
+      "constraints": "C-FORM"
     },
     {
       "evidenceRecordId": "E-5921316E3C4F",

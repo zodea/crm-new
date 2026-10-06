@@ -10,8 +10,11 @@ import {
   parseProjectSupplierWorkbenchQuery,
 } from '~/lib/project-supplier/repository'
 
+import { withReadMeta } from '../../server/utils/read-meta'
+import { publicReadMeta } from '../helpers/public-read-meta'
+
 function validRead() {
-  return buildProjectSupplierWorkbenchRead({
+  const projection = buildProjectSupplierWorkbenchRead({
     projects: [{ dataOrigin: 'demo', id: 'project/1', name: '中央项目', status: '在建', developer: '', manager: '' }],
     suppliers: [{ dataOrigin: 'demo', id: 'supplier/1', name: '中央分供方', supplierCategory: '材料供应商', contact: '', contactPhone: '' }],
     relations: [{ dataOrigin: 'demo', id: 'relation-1', projectId: 'project/1', supplierId: 'supplier/1', status: 'collecting', note: '' }],
@@ -40,6 +43,7 @@ function validRead() {
     sourceVersion: 'fixture-v1',
     capabilities: ['project-supplier:read', 'demo:read'],
   })
+  return withReadMeta(projection, publicReadMeta({ schemaVersion: 'project-supplier-read-v2', dataOrigin: 'demo', asOf: projection.asOf, sourceVersion: projection.sourceVersion, capabilities: projection.capabilities, scope: { projectId: 'project/1', supplierId: 'supplier/1', origin: 'demo' }, requested: true }))
 }
 
 describe('项目×分供方 HTTP Repository', () => {

@@ -1,4 +1,4 @@
-import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ReadProjection } from '../../types/read-model'
 import type {
   ProjectSupplierClaimSourceRow,
   ProjectSupplierContractSourceRow,
@@ -111,7 +111,7 @@ function sourceOwnerNavigation(
 
 export function buildProjectSupplierWorkbenchRead(
   input: BuildProjectSupplierWorkbenchReadInput,
-): ProjectSupplierWorkbenchReadDTO {
+): ReadProjection<ProjectSupplierWorkbenchReadDTO> {
   const { query } = input
   if (!input.capabilities.includes(PROJECT_SUPPLIER_READ_CAPABILITY)) {
     throw new ProjectSupplierRepositoryProblem(projectSupplierProblem('forbidden', '无项目分供方工作台查看权限'))

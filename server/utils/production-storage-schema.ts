@@ -1,15 +1,56 @@
+import { CONTRACT_NUMBER_SCHEMA, CONTRACT_NUMBER_TABLES, OUR_SIGNATORY_SCHEMA, OUR_SIGNATORY_TABLES } from '../../app/lib/our-signatory/schema'
 import { PRODUCTION_BACKUP_SCHEMA, PRODUCTION_BACKUP_TABLES } from './production-backup-schema'
+import { PRODUCTION_CREW_WORKER_SCHEMA, PRODUCTION_CREW_WORKER_TABLES } from './production-crew-worker-schema'
+import { PRODUCTION_FINANCE_CLEARANCE_SCHEMA, PRODUCTION_FINANCE_CLEARANCE_TABLES, PRODUCTION_OTHER_CLEARANCE_SCHEMA, PRODUCTION_OTHER_CLEARANCE_TABLES } from './production-finance-clearance-schema'
+import { PRODUCTION_FINANCE_SCHEMA, PRODUCTION_FINANCE_TABLES } from './production-finance-schema'
+import { PRODUCTION_FINANCE_VERIFICATION_SCHEMA, PRODUCTION_FINANCE_VERIFICATION_TABLES } from './production-finance-verification-schema'
+import { PRODUCTION_MATERIAL_CONTRACT_SCHEMA, PRODUCTION_MATERIAL_CONTRACT_TABLES } from './production-material-contract-schema'
+import { PRODUCTION_MATERIAL_QUOTATION_SCHEMA, PRODUCTION_MATERIAL_QUOTATION_TABLES } from './production-material-quotation-schema'
+import { PRODUCTION_NOTIFICATION_SCHEMA, PRODUCTION_NOTIFICATION_TABLES } from './production-notification-schema'
+import { PRODUCTION_OTHER_SETTLEMENT_SCHEMA, PRODUCTION_OTHER_SETTLEMENT_TABLES } from './production-other-settlement-schema'
 import { PRODUCTION_PROCESS_LIBRARY_SCHEMA, PRODUCTION_PROCESS_LIBRARY_TABLES } from './production-process-library-schema'
 import { PRODUCTION_PROJECT_SCHEMA, PRODUCTION_PROJECT_TABLES } from './production-project-schema'
 import { PRODUCTION_SUPPLIER_SCHEMA, PRODUCTION_SUPPLIER_TABLES } from './production-supplier-schema'
 
-export const PRODUCTION_STORAGE_VERSION = 5
+export const PRODUCTION_STORAGE_VERSION = 14
 /** Append a new numbered upgrade when a domain lands; never rewrite an applied step. */
 export const PRODUCTION_STORAGE_UPGRADES = [
   { from: 1, to: 2, sql: PRODUCTION_PROCESS_LIBRARY_SCHEMA, participants: { 'process-library': { schemaVersion: 1, tables: PRODUCTION_PROCESS_LIBRARY_TABLES } } },
   { from: 2, to: 3, sql: PRODUCTION_PROJECT_SCHEMA, participants: { project: { schemaVersion: 1, tables: PRODUCTION_PROJECT_TABLES } } },
   { from: 3, to: 4, sql: PRODUCTION_SUPPLIER_SCHEMA, participants: { supplier: { schemaVersion: 1, tables: PRODUCTION_SUPPLIER_TABLES } } },
   { from: 4, to: 5, sql: PRODUCTION_BACKUP_SCHEMA, participants: { backup: { schemaVersion: 1, tables: PRODUCTION_BACKUP_TABLES } } },
+  { from: 5, to: 6, sql: PRODUCTION_MATERIAL_CONTRACT_SCHEMA, participants: { 'material-contracts': { schemaVersion: 1, tables: PRODUCTION_MATERIAL_CONTRACT_TABLES } } },
+  { from: 6, to: 7, sql: PRODUCTION_NOTIFICATION_SCHEMA, participants: { notifications: { schemaVersion: 1, tables: PRODUCTION_NOTIFICATION_TABLES } } },
+  { from: 7, to: 8, sql: `${OUR_SIGNATORY_SCHEMA}\n${CONTRACT_NUMBER_SCHEMA}
+    INSERT INTO production_participants VALUES('our-signatories',1);
+    INSERT INTO production_participants VALUES('contract-number-registry',1);
+    INSERT INTO contract_number_claims(owner_domain,contract_id,number,version,claimed_at)
+      WITH versions AS (
+        SELECT id,record_json AS evidence FROM material_contract_records WHERE parent_id IS NULL
+        UNION ALL
+        SELECT m.id,h.value FROM material_contract_records m,json_each(m.record_json,'$.history') h WHERE m.parent_id IS NULL
+      ), formal AS (
+        SELECT *,ROW_NUMBER() OVER(PARTITION BY id ORDER BY CAST(json_extract(evidence,'$.version') AS INTEGER) DESC) AS priority
+        FROM versions WHERE COALESCE(json_extract(evidence,'$.draft.status'),'') NOT IN ('draft','草稿')
+      )
+      SELECT 'material-contracts',id,trim(json_extract(evidence,'$.draft.no')),CAST(json_extract(evidence,'$.version') AS TEXT),json_extract(evidence,'$.updatedAt')
+      FROM formal WHERE priority=1 AND trim(COALESCE(json_extract(evidence,'$.draft.no'),''))<>'';
+    INSERT INTO contract_number_history(id,owner_domain,contract_id,number,version,occurred_at,reason)
+      SELECT 'material-'||id||'-v'||json_extract(record_json,'$.version'),'material-contracts',id,trim(json_extract(record_json,'$.draft.no')),CAST(json_extract(record_json,'$.version') AS TEXT),json_extract(record_json,'$.updatedAt'),'upgrade-evidence'
+      FROM material_contract_records WHERE parent_id IS NULL AND trim(COALESCE(json_extract(record_json,'$.draft.no'),''))<>'';
+    INSERT INTO contract_number_history(id,owner_domain,contract_id,number,version,occurred_at,reason)
+      SELECT 'material-'||m.id||'-v'||json_extract(h.value,'$.version'),'material-contracts',m.id,trim(json_extract(h.value,'$.draft.no')),CAST(json_extract(h.value,'$.version') AS TEXT),json_extract(h.value,'$.updatedAt'),'upgrade-history'
+      FROM material_contract_records m,json_each(m.record_json,'$.history') h
+      WHERE m.parent_id IS NULL AND trim(COALESCE(json_extract(h.value,'$.draft.no'),''))<>'';`, participants: { 'our-signatories': { schemaVersion: 1, tables: OUR_SIGNATORY_TABLES }, 'contract-number-registry': { schemaVersion: 1, tables: CONTRACT_NUMBER_TABLES } } },
+  { from: 8, to: 9, sql: PRODUCTION_MATERIAL_QUOTATION_SCHEMA, participants: { 'material-quotations': { schemaVersion: 1, tables: PRODUCTION_MATERIAL_QUOTATION_TABLES } } },
+  { from: 9, to: 10, sql: PRODUCTION_FINANCE_SCHEMA, participants: { finance: { schemaVersion: 1, tables: PRODUCTION_FINANCE_TABLES } } },
+  { from: 10, to: 11, sql: PRODUCTION_CREW_WORKER_SCHEMA, participants: { 'crew-worker': { schemaVersion: 1, tables: PRODUCTION_CREW_WORKER_TABLES } } },
+  { from: 11, to: 12, sql: PRODUCTION_OTHER_SETTLEMENT_SCHEMA, participants: { 'other-settlements': { schemaVersion: 1, tables: PRODUCTION_OTHER_SETTLEMENT_TABLES } } },
+  { from: 12, to: 13, sql: PRODUCTION_FINANCE_VERIFICATION_SCHEMA, participants: { finance: { schemaVersion: 1, tables: [...PRODUCTION_FINANCE_TABLES, ...PRODUCTION_FINANCE_VERIFICATION_TABLES] } } },
+  { from: 13, to: 14, sql: `${PRODUCTION_FINANCE_CLEARANCE_SCHEMA}\n${PRODUCTION_OTHER_CLEARANCE_SCHEMA}`, participants: {
+    'finance': { schemaVersion: 1, tables: [...PRODUCTION_FINANCE_TABLES, ...PRODUCTION_FINANCE_VERIFICATION_TABLES, ...PRODUCTION_FINANCE_CLEARANCE_TABLES] },
+    'other-settlements': { schemaVersion: 1, tables: [...PRODUCTION_OTHER_SETTLEMENT_TABLES, ...PRODUCTION_OTHER_CLEARANCE_TABLES] },
+  } },
 ] as const
 
 export function productionStorageManifest(version = PRODUCTION_STORAGE_VERSION) {

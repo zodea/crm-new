@@ -9,6 +9,7 @@ import {
   PROJECT_READ_FIXTURE,
 } from '../../server/utils/project-read-test-instance'
 import { createMemoryDb } from '../helpers/memory-db'
+import { projectSnapshotEvidence } from '../helpers/project-read-meta'
 
 const NOW = '2026-08-15T00:00:00.000Z'
 const QUERY = {
@@ -131,7 +132,7 @@ function contract(repository: () => Promise<ProjectListRepository>) {
     const repo = await repository()
 
     const first = await repo.list(QUERY)
-    expect(first.pagination).toEqual({ page: 1, pageSize: 10, total: 12 })
+    expect(first.pagination).toEqual({ requestedPage: 1, page: 1, pageSize: 10, total: 12 })
     expect(first.items).toHaveLength(10)
     expect(first.items[0]?.project).toMatchObject({
       state: 'resolved',
@@ -166,7 +167,7 @@ function contract(repository: () => Promise<ProjectListRepository>) {
     expect(first.summary.origins.real.projectCount).toBe(0)
 
     const second = await repo.list({ ...QUERY, page: 2 })
-    expect(second.pagination).toEqual({ page: 2, pageSize: 10, total: 12 })
+    expect(second.pagination).toEqual({ requestedPage: 2, page: 2, pageSize: 10, total: 12 })
     expect(second.items).toHaveLength(2)
     expect(second.items.find(item => item.project.id === 'proj_demo_012')?.plannedEnd)
       .toBeNull()
@@ -211,17 +212,20 @@ function contract(repository: () => Promise<ProjectListRepository>) {
     expect(noMatch.empty).toEqual({ reason: 'no-filter-match', missingRelations: [] })
   })
 
-  it('does not leak a forbidden relationship label', async () => {
+  it('does not leak a forbidden relationship identity or label', async () => {
     const repo = await repository()
     const page = await repo.list({ ...QUERY, search: '翠湖花园' })
 
     expect(page.items[0]?.customer).toEqual({
       state: 'forbidden',
       entity: 'customer',
-      id: 'customer_demo_003',
+      id: null,
       label: null,
       reason: 'permission-denied',
     })
+
+    expect(JSON.stringify(page.items[0])).not.toContain('customer_demo_003')
+    expect(JSON.stringify(page.items[0])).not.toContain('翠湖投资')
 
     const inferred = await repo.list({ ...QUERY, search: '翠湖投资' })
     expect(inferred.items).toEqual([])
@@ -387,21 +391,24 @@ describe('project repository contract', () => {
 
     contract(async () => createSqliteProjectListRepository({
       gateway: db,
+      readEvidence: projectSnapshotEvidence,
       canViewDemo: true,
       dataOrigin: 'demo',
       canReadCustomer: id => id !== 'customer_demo_003',
       now: () => NOW,
-      sourceVersion: 'project-read-fixture-v1',
+
     }))
 
     it('uses the same whole-page permission problem as HTTP', async () => {
       const repo = createSqliteProjectListRepository({
         gateway: db,
+        readEvidence: projectSnapshotEvidence,
+
         canViewDemo: true,
         dataOrigin: 'demo',
         canReadProjects: false,
         now: () => NOW,
-        sourceVersion: 'project-read-fixture-v1',
+
       })
 
       await expect(repo.list(QUERY)).rejects.toBeInstanceOf(ProjectRepositoryProblem)
@@ -413,11 +420,13 @@ describe('project repository contract', () => {
     it('hides both primary and secondary customer labels without customer capability', async () => {
       const repo = createSqliteProjectListRepository({
         gateway: db,
+        readEvidence: projectSnapshotEvidence,
+
         canViewDemo: true,
         dataOrigin: 'demo',
         canReadCustomers: false,
         now: () => NOW,
-        sourceVersion: 'project-read-fixture-v1',
+
       })
 
       const page = await repo.list(QUERY)
@@ -432,6 +441,8 @@ describe('project repository contract', () => {
     it('rejects a non-ISO SQLite snapshot timestamp', async () => {
       const repo = createSqliteProjectListRepository({
         gateway: db,
+        readEvidence: projectSnapshotEvidence,
+
         canViewDemo: true,
         dataOrigin: 'demo',
         now: () => 'tomorrow',

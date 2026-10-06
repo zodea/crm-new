@@ -3,7 +3,7 @@ import type {
   ProjectSupplierReadRepository,
   ProjectSupplierWorkbenchQueryDTO,
 } from './read-contract'
-import { isProblemCodeDTO } from '../../types/read-model'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { decodeProjectSupplierFileContent } from './file-content'
 import { ProjectSupplierRepositoryProblem } from './read-contract'
 import {
@@ -22,22 +22,8 @@ export interface ProjectSupplierHttpFetchOptions {
 
 export type ProjectSupplierHttpFetcher = (url: string, options?: ProjectSupplierHttpFetchOptions) => Promise<unknown>
 
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function problemPayload(cause: unknown): ProblemDTO | null {
-  if (!object(cause))
-    return null
-  const response = object(cause.response) ? cause.response : null
-  const raw = response?._data ?? cause.data
-  const candidate = object(raw) && object(raw.data) ? raw.data : raw
-  if (!object(candidate) || !isProblemCodeDTO(candidate.code) || typeof candidate.message !== 'string'
-    || typeof candidate.retryable !== 'boolean' || !object(candidate.fieldErrors)
-    || !(candidate.traceId === null || typeof candidate.traceId === 'string')) {
-    return null
-  }
-  return candidate as unknown as ProblemDTO
+  return problemFromHttpFailure(cause)
 }
 
 async function read<T>(request: () => Promise<unknown>, decode: (value: unknown) => T | Promise<T>): Promise<T> {
@@ -79,7 +65,7 @@ export function createHttpProjectSupplierReadRepository(options: { fetcher: Proj
         `/api/read/project-suppliers/${encodeURIComponent(query.projectId)}/${encodeURIComponent(query.supplierId)}`,
         { query: serializeProjectSupplierWorkbenchQuery(query) },
       ),
-      decodeProjectSupplierWorkbenchRead,
+      value => decodeProjectSupplierWorkbenchRead(value, query),
     ),
   }
 }

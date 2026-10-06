@@ -1,4 +1,5 @@
-import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ReadProjection } from '../../types/read-model'
+
 import type {
   CrewDetailQueryDTO,
   CrewDetailReadDTO,
@@ -17,6 +18,7 @@ import type {
   WorkerProjectSourceLabel,
   WorkerSourceRow,
 } from './read-contract'
+import { parsePageQuery, resolvePagination } from '../read-model/pagination'
 import { normalizeEnumSelection } from '../util/enum-selection'
 import { maskIdentifier, maskPhone } from '../util/privacy'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from './read-contract'
@@ -88,7 +90,7 @@ function missingRef<const T extends EntityKindDTO>(entity: T): Extract<EntityRef
 
 function detailNavigation(reference: EntityRefDTO, origin: 'real' | 'demo', variant = 'detail', filters: Record<string, string | null> = {}): NavigationIntentDTO {
   if (reference.state !== 'resolved')
-    return { kind: 'unavailable', reason: reference.state === 'forbidden' ? 'forbidden' : 'missing-id' }
+    return { kind: 'unavailable', reason: reference.state === 'forbidden' ? 'forbidden' : reference.state === 'unavailable' ? 'not-connected' : 'missing-id' }
   return {
     kind: 'entity-detail',
     subject: reference,
@@ -105,7 +107,9 @@ function projectReference(projectId: string | null, projects: readonly CrewWorke
   if (!project)
     return missingRef('project')
   if (project.permission === 'forbidden')
-    return { state: 'forbidden', entity: 'project', id: project.id, label: null, reason: 'permission-denied' }
+    return { state: 'forbidden', entity: 'project', id: null, label: null, reason: 'permission-denied' }
+  if (project.permission === 'unavailable')
+    return { state: 'unavailable', entity: 'project', id: null, label: null, reason: 'source-unavailable' }
   return resolvedRef('project', project.id, project.name)
 }
 
@@ -129,13 +133,10 @@ function bool(value: unknown): boolean {
   return value === true || value === 'true'
 }
 
-function positiveInteger(value: unknown, fallback: number): number {
-  const parsed = Number(value)
-  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : fallback
-}
-
 function parseCommonListQuery(input: Record<string, unknown> | undefined) {
-  const pageSize = positiveInteger(input?.pageSize, 10)
+  const { requestedPage, pageSize } = parsePageQuery(input ?? {}, () => {
+    throw new CrewWorkerRepositoryProblem(crewWorkerProblem('invalid-query', '分页参数无效'))
+  }, 10)
   const sort = String(input?.sort ?? 'updated-desc')
   if (![10, 20, 50, 100].includes(pageSize) || !['updated-desc', 'name-asc', 'name-desc'].includes(sort))
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('invalid-query', '班组或工人列表查询参数无效'))
@@ -143,7 +144,7 @@ function parseCommonListQuery(input: Record<string, unknown> | undefined) {
     includeDemo: bool(input?.includeDemo),
     search: typeof input?.search === 'string' ? input.search.trim() : '',
     sort: sort as 'updated-desc' | 'name-asc' | 'name-desc',
-    page: positiveInteger(input?.page, 1),
+    page: requestedPage,
     pageSize: pageSize as CrewWorkerPageSize,
   }
 }
@@ -192,7 +193,7 @@ export function parseWorkerDetailQuery(id: string, input: Record<string, unknown
   return parseDetailQuery(id, input)
 }
 
-export function buildCrewListPage(input: BuildCrewListPageInput): CrewListPageDTO {
+export function buildCrewListPage(input: BuildCrewListPageInput): ReadProjection<CrewListPageDTO> {
   const allowedOrigins = input.query.includeDemo
     ? new Set(['real', 'demo'])
     : new Set(['real'])
@@ -241,7 +242,7 @@ export function buildCrewListPage(input: BuildCrewListPageInput): CrewListPageDT
       projectCount: projectIds.size,
     }
   }
-  const page = Math.min(input.query.page, Math.max(1, Math.ceil(filtered.length / input.query.pageSize)))
+  const { page } = resolvePagination(input.query.page, input.query.pageSize, filtered.length)
   const start = (page - 1) * input.query.pageSize
   const items = sorted.slice(start, start + input.query.pageSize).map((source) => {
     const crew = crewRef(source)
@@ -278,7 +279,7 @@ export function buildCrewListPage(input: BuildCrewListPageInput): CrewListPageDT
   }, { real: { crewCount: 0, workerCount: 0 }, demo: { crewCount: 0, workerCount: 0 } })
   return {
     items,
-    pagination: { page, pageSize: input.query.pageSize, total: filtered.length },
+    pagination: { requestedPage: input.query.page, page, pageSize: input.query.pageSize, total: filtered.length },
     summary: {
       trades: countBy('trade'),
       statuses: countBy('status'),
@@ -293,7 +294,7 @@ export function buildCrewListPage(input: BuildCrewListPageInput): CrewListPageDT
   }
 }
 
-export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerListPageDTO {
+export function buildWorkerListPage(input: BuildWorkerListPageInput): ReadProjection<WorkerListPageDTO> {
   const allowedOrigins = input.query.includeDemo ? new Set(['real', 'demo']) : new Set(['real'])
   const search = input.query.search.toLocaleLowerCase('zh-CN')
   const canReadSensitive = input.capabilities.includes('worker:sensitive:read')
@@ -328,7 +329,7 @@ export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerList
       return right.name.localeCompare(left.name, 'zh-CN') || left.id.localeCompare(right.id)
     return right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)
   })
-  const page = Math.min(input.query.page, Math.max(1, Math.ceil(filtered.length / input.query.pageSize)))
+  const { page } = resolvePagination(input.query.page, input.query.pageSize, filtered.length)
   const start = (page - 1) * input.query.pageSize
   const items = sorted.slice(start, start + input.query.pageSize).map((source) => {
     const worker = resolvedRef('worker', source.id, source.name)
@@ -373,7 +374,7 @@ export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerList
   }, { real: { workerCount: 0, activeWorkerCount: 0 }, demo: { workerCount: 0, activeWorkerCount: 0 } })
   return {
     items,
-    pagination: { page, pageSize: input.query.pageSize, total: filtered.length },
+    pagination: { requestedPage: input.query.page, page, pageSize: input.query.pageSize, total: filtered.length },
     summary: { trades: countBy('trade'), projectStatuses: countBy('projectStatus'), origins },
     empty: filtered.length === 0
       ? { reason: input.workers.some(row => allowedOrigins.has(row.dataOrigin)) ? 'no-filter-match' : 'no-records', missingRelations: [] }
@@ -384,7 +385,7 @@ export function buildWorkerListPage(input: BuildWorkerListPageInput): WorkerList
   }
 }
 
-export function buildWorkerDetailRead(input: BuildWorkerDetailReadInput): WorkerDetailReadDTO {
+export function buildWorkerDetailRead(input: BuildWorkerDetailReadInput): ReadProjection<WorkerDetailReadDTO> {
   if (input.query.origin === 'demo' && !input.query.includeDemo) {
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('forbidden', '测试工人未授权显示'))
   }
@@ -437,11 +438,13 @@ export function buildWorkerDetailRead(input: BuildWorkerDetailReadInput): Worker
         project,
         projectNavigation: detailNavigation(project, origin),
         unit,
-        navigation: detailNavigation(unit, origin, 'detail', {
-          projectId: row.projectId,
-          ownerKind: 'worker',
-          ownerId: source.id,
-        }),
+        navigation: project.state !== 'resolved'
+          ? detailNavigation(project, origin)
+          : detailNavigation(unit, origin, 'detail', {
+              projectId: row.projectId,
+              ownerKind: 'worker',
+              ownerId: source.id,
+            }),
         buildingName: row.buildingName ?? '',
         floorName: row.floorName ?? '',
         trade: row.trade ?? '',
@@ -517,8 +520,8 @@ export function buildWorkerDetailRead(input: BuildWorkerDetailReadInput): Worker
     return {
       project,
       navigation: detailNavigation(project, origin),
-      code: projectSource?.code ?? '',
-      status: projectSource?.status ?? '',
+      code: project.state === 'resolved' ? projectSource?.code ?? '' : '',
+      status: project.state === 'resolved' ? projectSource?.status ?? '' : '',
       sources: sourceOrder.filter(label => labels.has(label)),
     }
   }).sort((left, right) => {
@@ -531,6 +534,7 @@ export function buildWorkerDetailRead(input: BuildWorkerDetailReadInput): Worker
     dataOrigin: origin,
     worker: {
       ...source,
+      currentProjectId: projectReference(source.currentProjectId, input.projects, origin).state === 'resolved' ? source.currentProjectId : null,
       tradeCapabilities: [...(source.tradeCapabilities ?? [])],
       itemCapabilities: [...(source.itemCapabilities ?? [])],
       gender: source.gender ?? '',
@@ -578,7 +582,7 @@ export function buildWorkerDetailRead(input: BuildWorkerDetailReadInput): Worker
   }
 }
 
-export function buildCrewDetailRead(input: BuildCrewDetailReadInput): CrewDetailReadDTO {
+export function buildCrewDetailRead(input: BuildCrewDetailReadInput): ReadProjection<CrewDetailReadDTO> {
   if (input.query.origin === 'demo' && !input.query.includeDemo) {
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('forbidden', '测试班组未授权显示'))
   }
@@ -638,8 +642,8 @@ export function buildCrewDetailRead(input: BuildCrewDetailReadInput): CrewDetail
     return {
       project,
       navigation: detailNavigation(project, origin),
-      projectCode: sourceRow?.code ?? '',
-      projectStatus: sourceRow?.status ?? '',
+      projectCode: project.state === 'resolved' ? sourceRow?.code ?? '' : '',
+      projectStatus: project.state === 'resolved' ? sourceRow?.status ?? '' : '',
       sources,
       activeMemberCount,
       assignmentCount: projectAssignments.length,

@@ -12,7 +12,7 @@ import type {
   ProjectSupplierSupplierSourceRow,
 } from '../../app/lib/project-supplier/repository'
 import type { ProjectSupplierReferenceSourceRow } from '../../app/lib/project/repository'
-import type { DataOriginDTO } from '../../app/types/read-model'
+import type { DataOriginDTO, SourceEvidenceDTO } from '../../app/types/read-model'
 import supplementsSeed from '../../app/lib/db/seed/contract_supplements.json'
 import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import invoicesSeed from '../../app/lib/db/seed/invoices.json'
@@ -33,10 +33,10 @@ import { resolveBusinessSession } from './business-session'
 import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { projectSupplierCommandTestInstance } from './project-supplier-command-test-instance'
+import { createReadMeta, readSourceVersion, withReadMeta } from './read-meta'
 
 export type ProjectSupplierReadTestScenario = 'ready' | 'formal-ready' | 'zero' | 'empty' | 'forbidden' | 'unavailable'
 
-const FIXED_AS_OF = '2026-08-24T00:00:00.000Z'
 const SOURCE_VERSION = 'project-supplier-read-fixture-v1'
 
 const demoProjects: ProjectSupplierProjectSourceRow[] = projectsSeed.map(row => ({
@@ -376,8 +376,8 @@ export function createProjectSupplierReadTestInstance(
     projectId: string,
     origin: DataOriginDTO,
     sessionId?: string | null,
+    data = context(sessionId),
   ): ProjectSupplierReferenceSourceRow[] {
-    const data = context(sessionId)
     const suppliers = new Map(
       data.suppliers
         .filter(supplier => supplier.dataOrigin === origin)
@@ -396,6 +396,17 @@ export function createProjectSupplierReadTestInstance(
   }
 
   return {
+    referencesRead(projectId: string, origin: DataOriginDTO, sessionId?: string | null): { rows: ProjectSupplierReferenceSourceRow[], source: SourceEvidenceDTO } {
+      if (!resolveCapabilities(sessionId).includes(PROJECT_SUPPLIER_READ_CAPABILITY))
+        throw problem('forbidden', '无项目分供方反向关系查看权限')
+      const data = context(sessionId)
+      if (origin === 'demo' && !data.capabilities.includes('demo:read'))
+        throw problem('forbidden', '无测试分供方关系查看权限')
+      return {
+        rows: relationshipReferences(projectId, origin, sessionId, data),
+        source: { key: 'project-suppliers', state: 'readable', sourceVersion: readSourceVersion('project-suppliers', { ...data, capabilities: undefined }), asOf: new Date().toISOString() },
+      }
+    },
     sourceVersion(sessionId?: string | null) {
       return projectSupplierCommandTestInstance.sourceVersion(sessionId)
     },
@@ -412,11 +423,19 @@ export function createProjectSupplierReadTestInstance(
       sessionId?: string | null,
     ) {
       const data = context(sessionId)
-      return buildProjectSupplierWorkbenchRead({
-        ...data,
-        query: parseProjectSupplierWorkbenchQuery(projectId, supplierId, input),
-        asOf: FIXED_AS_OF,
-      })
+      const query = parseProjectSupplierWorkbenchQuery(projectId, supplierId, input)
+      const asOf = new Date().toISOString()
+      const projection = buildProjectSupplierWorkbenchRead({ ...data, query, asOf })
+      return withReadMeta(projection, createReadMeta({
+        session: { ...resolveBusinessSession(), capabilities: data.capabilities },
+        schemaVersion: 'project-supplier-read-v2',
+        operation: 'project-supplier:detail',
+        dataOrigin: query.origin,
+        asOf,
+        sources: [{ key: 'project-suppliers', state: 'readable', sourceVersion: readSourceVersion('project-suppliers', { ...data, capabilities: undefined }), asOf }],
+        coverage: 'complete',
+        scope: { query, testSession: sessionId ?? null },
+      }))
     },
     references(
       projectId: string,

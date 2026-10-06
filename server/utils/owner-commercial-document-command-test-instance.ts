@@ -25,6 +25,7 @@ import type { ReceiptRecord } from '../../app/lib/receipt/contract'
 import type { SubcontractContractDetailSource } from '../../app/lib/subcontract-contract/repository'
 import type { ProblemDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
+import type { CommandJournal } from './command-journal'
 import { createHash } from 'node:crypto'
 import { parseBoqBuildingCommand } from '../../app/lib/boq/central-building-request'
 import { calculateBoqChangeLine } from '../../app/lib/boq/change-calculation'
@@ -42,7 +43,9 @@ import { matchesPenaltySettlement } from '../../app/lib/owner-document/project-p
 import { isQuantityBasis } from '../../app/lib/quantity/basis'
 import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
 import { isISODateDTO, isISODateTimeDTO } from '../../app/types/read-model'
+import { assertCommandUnsealed, commandFingerprint, commandJournalKey, commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
+import { assertRetainedMigrationReferences } from './core-identity-migration'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
@@ -148,7 +151,9 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   documents?: readonly OwnerCommercialDocumentSource[]
 }
 
-interface WorkspaceState {
+interface WorkspaceState extends CommandJournal<OwnerCommercialDocumentCommandResultDTO> {
+  migrationSnapshotFingerprint: string | null
+  commandKinds: Map<string, OwnerCommercialDocumentKind>
   linkedCrewIds: Set<string>
   crews: Map<string, SupplierSeed>
   penaltyDeductions: Map<string, PenaltyDeductionSource>
@@ -590,6 +595,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       penaltyRectifications: new Map(),
       documents: new Map(baseDocuments.map(row => [key(row.kind, row.id), clone(row)])),
       commands: new Map(),
+      commandFingerprints: new Map(),
+      sealedCommands: new Set(),
+      migrationSnapshotFingerprint: null,
+      commandKinds: new Map(),
       migrationKeys: new Set(),
       projects: new Map(baseProjects.map(row => [row.id, clone(row)])),
       customers: new Map(baseCustomers.map(row => [row.id, clone(row)])),
@@ -1982,7 +1991,38 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     snapshot: CoreMigrationSnapshotDTO,
     sessionId?: string | null,
   ): () => void {
-    const state = clone(stateFor(sessionId))
+    const current = stateFor(sessionId)
+    const snapshotFingerprint = commandFingerprint(snapshot)
+    if (current.migrationSnapshotFingerprint === snapshotFingerprint)
+      return () => {}
+    const incoming = snapshot.authority === 'central' ? snapshot.entities : []
+    const nextKeys = new Set(incoming.filter(row => row.entityType === 'owner_documents' && row.deletedAt === null).map(row => key(entityAttribute(row, 'kind') as OwnerCommercialDocumentKind, row.id)))
+    for (const migratedKey of current.migrationKeys) {
+      const source = current.documents.get(migratedKey)
+      if (source && (source.version !== 1 || [...current.commands.values()].some(result => result.id === source.id)))
+        throw failure('conflict', '迁入商务单据已有后来修改、删除或原命令，不能回滚覆盖')
+    }
+    const surviving = (type: CoreMigrationSnapshotDTO['entities'][number]['entityType'], base: readonly { id: string }[]) => new Set([...base.map(row => row.id), ...incoming.filter(row => row.entityType === type).map(row => row.id)])
+    const projects = surviving('projects', baseProjects)
+    const contracts = surviving('construction_contracts', baseContracts)
+    const subcontracts = surviving('subcontract_contracts', baseSubcontractContracts)
+    const suppliers = surviving('suppliers', baseSuppliers)
+    const customers = surviving('customers', baseCustomers)
+    const crews = surviving('crews', options.crews ?? [])
+    for (const [sourceKey, source] of current.documents) {
+      if (current.migrationKeys.has(sourceKey) && !nextKeys.has(sourceKey))
+        continue
+      if ((source.projectId && current.projects.has(source.projectId) && !projects.has(source.projectId))
+        || (source.contractId && (current.contracts.has(source.contractId) || current.subcontractContracts.has(source.contractId))
+          && !contracts.has(source.contractId) && !subcontracts.has(source.contractId))
+        || (source.customerId && current.customers.has(source.customerId) && !customers.has(source.customerId))
+        || (source.supplierId && current.suppliers.has(source.supplierId) && !suppliers.has(source.supplierId))
+        || (source.crewId && current.crews.has(source.crewId) && !crews.has(source.crewId))) {
+        throw failure('conflict', '独立商务单据仍引用迁入项目或合同，不能回滚移除')
+      }
+    }
+    const state = clone(current)
+    state.migrationSnapshotFingerprint = snapshotFingerprint
     const previousBoqLines = new Map(state.boqLines)
     for (const migratedKey of state.migrationKeys)
       state.documents.delete(migratedKey)
@@ -2591,6 +2631,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         state.sourceVersion += 1
       return imported
     },
+    assertMigrationRemoval(removed: readonly CoreMigrationServerEntityDTO[], sessionId?: string | null) {
+      assertRetainedMigrationReferences(removed, 'owner_documents', [...stateFor(sessionId).documents.values()].map(row => ({
+        id: row.id,
+        references: [{ type: 'projects', id: row.projectId }, { type: 'customers', id: row.customerId }, { type: 'suppliers', id: row.supplierId }, { type: 'crews', id: row.crewId }, { type: 'construction_contracts', id: row.contractId }, { type: 'subcontract_contracts', id: row.contractId }],
+      })), message => failure('conflict', message))
+    },
     prepareMigrationSnapshot,
     synchronizeMigrationSnapshot,
     context(
@@ -2724,6 +2770,15 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         updatedAt: source.updatedAt,
       }
     },
+    resolve(commandId: string, kind: OwnerCommercialDocumentKind, session: BusinessSession, sessionId?: string | null) {
+      authorize(session, kind)
+      parseResolveCommandBody({ commandId })
+      const state = stateFor(sessionId)
+      const expectedKind = state.commandKinds.get(commandJournalKey(commandId, session, 'owner-commercial-document'))
+      if (expectedKind !== undefined && expectedKind !== kind)
+        throw failure('conflict', '原命令类型与待核对单据不一致')
+      return resolveJournalCommand(state, commandId, session, 'owner-commercial-document')
+    },
     async execute(
       input: OwnerCommercialDocumentCommandRequestDTO,
       session: BusinessSession,
@@ -2732,12 +2787,16 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const request = clone(input)
       authorizeCommand(request, session)
       const state = stateFor(sessionId)
-      const duplicate = state.commands.get(request.commandId)
+      const reject = (message: string) => failure('conflict', message)
+      const { key: commandKey, previous: duplicate } = commandReplay(state, request, session, 'owner-commercial-document', reject)
+      state.commandKinds.set(commandKey, request.kind)
       if (duplicate)
         return clone(duplicate)
       const run = (monthlyFacts?: readonly QuantityMonthlyBoqFact[]) => {
         const state = stateFor(sessionId)
-        const duplicate = state.commands.get(request.commandId)
+        authorizeCommand(request, session)
+        assertCommandUnsealed(state, commandKey, reject)
+        const duplicate = commandReplay(state, request, session, 'owner-commercial-document', reject).previous
         if (duplicate)
           return clone(duplicate)
         const previousMonthlyFacts = state.monthlyQuantityFacts
@@ -2771,7 +2830,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
               break
           }
           const commandResult = result(request, source)
-          state.commands.set(request.commandId, commandResult)
+          state.commands.set(commandKey, clone(commandResult))
           return clone(commandResult)
         }
         finally {

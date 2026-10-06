@@ -68,7 +68,7 @@ describe('材料采购合同中央测试实例', () => {
     supplierReadTestInstance.reset('ready', sessionId)
 
     try {
-      expect(materialContractCommandTestInstance.formContext(sessionId)).toEqual({ projects: [], suppliers: [] })
+      expect(materialContractCommandTestInstance.formContext(sessionId)).toEqual({ projects: [], suppliers: [], originalContracts: [] })
       expect(() => materialContractCommandTestInstance.importExisting([MATERIAL_CONTRACT_EXISTING_RECORD], sessionId))
         .toThrowError(/项目不存在/)
       expect(projectCommandTestInstance.rows(sessionId)).toEqual([])
@@ -86,6 +86,7 @@ describe('材料采购合同中央测试实例', () => {
       expect(materialContractCommandTestInstance.formContext(sessionId)).toEqual({
         projects: [{ id: 'project-real-318', name: '中央正式材料项目' }],
         suppliers: [{ id: 'supplier-real-318', name: '中央正式材料供应商', contact: '', contactPhone: '' }],
+        originalContracts: [{ id: 'contract-existing-318', no: 'CG-EXISTING-318', label: 'CG-EXISTING-318 · 既有中央材料采购合同', projectId: 'project-real-318', supplierId: 'supplier-real-318', lineItems: [{ id: 'line-existing-318', materialName: '既有瓷砖', spec: '', materialGrade: '', brand: '', unit: '㎡', qty: 400, taxInclusiveUnitPrice: 24, applicableTaxRate: null, plannedArrivalDate: '', note: '', sortOrder: 0, originalLineId: null, changeAmount: null, changeBasis: '', source: null }], ourSignatorySnapshot: null }],
       })
 
       const supplier = await supplierReadTestInstance.detail('supplier-real-318', { origin: 'real' }, sessionId)
@@ -96,8 +97,8 @@ describe('材料采购合同中央测试实例', () => {
           project: { state: 'resolved', id: 'project-real-318', label: '中央正式材料项目' },
         }],
         summary: {
-          contractAmount: { value: '9600.00', drilldown: { entity: 'contract' } },
-          settlementAmount: { value: '0.00', drilldown: { entity: 'settlement' } },
+          contractAmount: { value: '9600.00', drilldown: { kind: 'entity-subview', subject: { entity: 'supplier', id: 'supplier-real-318' }, variant: 'contracts', filters: { dataOrigin: 'real' } } },
+          settlementAmount: { value: '0.00', drilldown: { kind: 'entity-subview', subject: { entity: 'supplier', id: 'supplier-real-318' }, variant: 'settlements', filters: { dataOrigin: 'real' } } },
         },
       })
 

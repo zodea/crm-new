@@ -7,6 +7,7 @@ import type {
   NavigationIntentDTO,
   PageDTO,
   ProblemDTO,
+  ReadMetaDTO,
 } from '../../types/read-model'
 
 export const CUSTOMER_PAGE_SIZES = [10, 20, 50, 100] as const
@@ -67,7 +68,7 @@ export interface CustomerListSummaryDTO {
   origins: Record<DataOriginDTO, { customerCount: number }>
 }
 
-export type CustomerListPageDTO = PageDTO<CustomerListItemDTO, CustomerListSummaryDTO>
+export type CustomerListPageDTO = PageDTO<CustomerListItemDTO, CustomerListSummaryDTO> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO> }
 
 export interface CustomerReadRepository {
   list: (query: CustomerListQueryDTO) => Promise<CustomerListPageDTO>
@@ -104,8 +105,8 @@ export interface CustomerContractSourceRow {
   name: string
   projectId: string | null
   customerId: string | null
-  amount: number
-  supplementAmount: number
+  amount: number | null
+  supplementAmount: number | null
   receiptAmount: number | null
   signDate: ISODateDTO | null
   status: string
@@ -147,7 +148,7 @@ export interface CustomerContractDTO {
   navigation: NavigationIntentDTO
   project: EntityRefDTO & { entity: 'project' }
   projectNavigation: NavigationIntentDTO
-  effectiveAmount: MoneyDTO
+  effectiveAmount: MoneyDTO | null
   receiptAmount: MoneyDTO | null
   outstandingAmount: MoneyDTO | null
   signDate: ISODateDTO | null
@@ -172,6 +173,7 @@ export interface CustomerReceiptDTO {
 }
 
 export interface CustomerReceiptDetailReadDTO {
+  meta: ReadMetaDTO
   dataOrigin: DataOriginDTO
   receipt: CustomerReceiptDTO
   customer: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'customer' }
@@ -192,6 +194,7 @@ export interface CustomerDetailSummaryDTO {
 }
 
 export interface CustomerDetailReadDTO {
+  meta: ReadMetaDTO
   receiptsProblem?: ProblemDTO
   contractsProblem?: ProblemDTO
   projectsProblem?: ProblemDTO

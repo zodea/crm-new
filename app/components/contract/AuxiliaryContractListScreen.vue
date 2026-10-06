@@ -13,11 +13,12 @@ const props = defineProps<{ kind: AuxiliaryContractKind }>()
 const listRoot = useTemplateRef<HTMLElement>('listRoot')
 let pendingRestore = false
 const route = useRoute()
+const router = useRouter()
 const repository = useNuxtApp().$repositories.auxiliaryContracts
 const { data: page, shellState, problem, load } = useAuxiliaryContractRead(
   () => repository.list({ ...route.query, kind: props.kind }),
   data => data.empty ? { kind: 'empty', data, empty: data.empty } : { kind: 'ready', data },
-  { snapshotKey: () => JSON.stringify([props.kind, route.query.origin ?? 'real']) },
+  { snapshotKey: () => JSON.stringify([props.kind, route.path, Object.fromEntries(Object.entries(route.query).filter(([key]) => !['page', 'pageSize', 'returnTo'].includes(key)))]) },
 )
 const search = shallowRef(String(route.query.search ?? ''))
 const category = computed({ get: () => enumFilterValues(route.query.category), set: (value: string[]) => void filter({ category: value.length ? value : undefined }) })
@@ -28,7 +29,7 @@ const categories = computed(() => AUXILIARY_CATEGORIES[props.kind].map(value => 
 const statuses = ['草稿', '审批中', '已签订', '履约中', '已结算', '已结清'].map(value => ({ key: value, label: value }))
 const columns = computed(() => auxiliaryColumns(props.kind))
 const rows = computed(() => page.value?.items.map(auxiliaryTableRow) ?? [])
-const canWrite = computed(() => page.value?.capabilities.includes('auxiliary-contract:write') ?? false)
+const canWrite = computed(() => shellState.value === 'ready' && (page.value?.capabilities.includes('auxiliary-contract:write') ?? false))
 const hasFilters = computed(() => ['search', 'projectId', 'supplierId', 'project', 'supplier'].some(key => route.query[key]) || category.value.length > 0 || status.value.length > 0)
 const empty = computed(() => ({ title: hasFilters.value ? '没有符合条件的合同' : `暂无${AUXILIARY_LABELS[props.kind]}`, description: hasFilters.value ? '请调整或清除筛选。' : '当前范围内还没有合同。', actionLabel: hasFilters.value ? '清除筛选' : '' }))
 async function filter(patch: Record<string, string | string[] | undefined>) {
@@ -69,11 +70,21 @@ async function restore() {
 }
 // Vxe renders rows after its own asynchronous layout; restore when the actual anchor exists.
 useMutationObserver(listRoot, () => void restore(), { childList: true, subtree: true })
+let refreshGeneration = 0
 async function refresh() {
   if (route.path !== auxiliaryListPath(props.kind))
     return
+  const generation = ++refreshGeneration
+  const scope = route.fullPath
   pendingRestore = true
   await load()
+  if (generation !== refreshGeneration || route.fullPath !== scope || shellState.value !== 'ready')
+    return
+  const pagination = page.value?.pagination
+  if (pagination && pagination.page !== pagination.requestedPage) {
+    await router.replace({ query: { ...route.query, page: pagination.page === 1 ? undefined : String(pagination.page) } })
+    return
+  }
   await restore()
 }
 watch(() => route.fullPath, () => {

@@ -29,7 +29,7 @@ ADR 按明确的采纳、替代与适用范围理解，不按编号新旧覆盖�
 | 入口 | 用途与边界 |
 | --- | --- |
 | [`prd/`](./prd/) · [`migration/`](./migration/) | 独立产品需求、迁移验收与对账材料；结合对应现行契约使用 |
-| [生产存储、备份恢复与部署](./implementation/production-gate-work-breakdown.md) | 实施承接与验收入口；方案定稿不等于正式上线 |
+| [生产运行与验证边界](./rewrite/ARCHITECTURE.md#runtime-environments) | 运行范围见架构，存储与恢复决定见 [ADR 0021](./adr/0021-single-operator-windows-production-storage.md)，实际上线直接核对 [#471](https://github.com/zodea/crm-new/issues/471) |
 | [调研与历史证据](./research/README.md) | 非权威来源，保留观察与论证 |
 | [历史 Issue 流程审阅](./research/issue-review-2026-09-11/README.md) · [模块开发方向](./research/module-development-flows.md) | 流程与交互快照，不代表当前完成状态 |
 | [红圈业务流转](../红圈系统/业务流转.md) · [红圈对象与 DC 命名对照](../红圈系统/命名对照与全景.md) | 竞品对象及业务流索引，不定义 DC 术语、实体或字段 |

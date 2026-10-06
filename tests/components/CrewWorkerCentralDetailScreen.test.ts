@@ -50,7 +50,7 @@ const workerDetail = {
   crew: { crew: resolved('crew', 'crew-1', '中央泥水班组'), navigation: nav(resolved('crew', 'crew-1', '中央泥水班组')), trade: '泥工', contactName: '陈师傅', contactPhone: '138****0000' },
   capabilitiesDetail: { trades: ['泥工'], itemNames: ['墙砖'] },
   relatedWorkers: [],
-  projects: [],
+  projects: [{ project: resolved('project', 'project-1', '当前主档项目'), navigation: nav(resolved('project', 'project-1', '当前主档项目')), code: 'PROJECT-1', status: '在建', sources: ['当前项目'] }],
   assignments: [{ id: 'assignment-1', project: resolved('project', 'project-1', '中央项目'), projectNavigation: nav(resolved('project', 'project-1', '中央项目')), unit: resolved('quantity-unit', 'unit-1', '201户'), navigation: { ...nav(resolved('quantity-unit', 'unit-1', '201户')), filters: { dataOrigin: 'real', projectId: 'project-1' } }, buildingName: '1栋', floorName: '2层', trade: '泥工', note: '', completedStageCount: 2, scopes: [{ roomName: '客厅', itemName: '墙砖' }] }],
   attendance: [],
   daywork: [],
@@ -89,6 +89,7 @@ describe('班组—工人中央详情', () => {
     expect(screen.getByText('138****5678')).not.toBeNull()
     expect(screen.getByText('4401**********1234')).not.toBeNull()
     expect(screen.getByText('中央泥水班组')).not.toBeNull()
+    expect(screen.getByText('当前项目').closest('div')?.textContent).toContain('当前主档项目')
     expect(screen.getByText('201户')).not.toBeNull()
     expect(screen.getByText('2026-07工资单')).not.toBeNull()
     expect(screen.getByText('FK-001')).not.toBeNull()

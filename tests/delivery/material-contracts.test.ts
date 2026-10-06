@@ -1,12 +1,14 @@
 import type { MaterialContractListItemDTO, MaterialContractListPageDTO, MaterialContractReadRepository } from '~/lib/material-contract/read-contract'
 import { describe, expect, it, vi } from 'vitest'
 import { readDeliveryMaterialContracts } from '~/lib/delivery-record/material-contracts'
+import { materialOriginMeta } from '../helpers/material-read-meta'
 
 function row(id: string): MaterialContractListItemDTO {
   return { id, dataOrigin: 'real', name: id, no: `CG-${id}`, project: { state: 'resolved', entity: 'project', id: 'p', label: '项目', no: null }, supplier: { state: 'resolved', entity: 'supplier', id: 's', label: '厂家', no: null }, signDate: '2026-09-11', amounts: { contract: '12.35' } } as MaterialContractListItemDTO
 }
 function page(items: MaterialContractListItemDTO[], current: number, total = items.length, sourceVersion = 'v1'): MaterialContractListPageDTO {
-  return { items, pagination: { page: current, pageSize: 100, total }, sourceVersion } as MaterialContractListPageDTO
+  const originMeta = materialOriginMeta(['material-contract:read'], sourceVersion)
+  return { items, pagination: { requestedPage: current, page: current, pageSize: 100, total }, meta: originMeta.real, originMeta, asOf: originMeta.real.asOf, capabilities: originMeta.real.capabilities, sourceVersion: originMeta.real.sourceVersion } as MaterialContractListPageDTO
 }
 
 describe('送货既有材采合同来源', () => {
@@ -16,6 +18,15 @@ describe('送货既有材采合同来源', () => {
     expect(result).toHaveLength(101)
     expect(result.at(-1)).toMatchObject({ id: 'last', projectId: 'p', supplierId: 's', signDate: '2026-09-11', amount: 12.35, dataOrigin: 'real' })
     expect(list).toHaveBeenNthCalledWith(2, expect.objectContaining({ page: 2, origin: 'real', includeDemo: false }))
+  })
+
+  it('真实零与未知头金额分别保留，不在价格和送货消费者中变成零', async () => {
+    const zero = row('zero')
+    zero.amounts.contract = '0.00'
+    const unknown = row('unknown')
+    unknown.amounts.contract = null
+    const list = vi.fn().mockResolvedValue(page([zero, unknown], 1))
+    expect(await readDeliveryMaterialContracts({ list } as unknown as MaterialContractReadRepository, 'real')).toMatchObject([{ id: 'zero', amount: 0 }, { id: 'unknown', amount: null }])
   })
 
   it('跨来源、受限关系、重复记录或读取中版本变化不发布部分合同', async () => {

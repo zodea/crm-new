@@ -3,8 +3,24 @@ import type { CoreMigrationEntityType, CoreMigrationServerEntityDTO, CoreMigrati
 import { formDefaults } from '../../app/lib/master-data/page'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 
+/** 回滚只可移除本批未变更事实；仍留存的独立或历史记录必须保持有效引用。 */
+export function assertRetainedMigrationReferences(
+  removed: readonly CoreMigrationServerEntityDTO[],
+  type: CoreMigrationEntityType,
+  records: Iterable<{ id: string, references: readonly { type: CoreMigrationEntityType, id: string | null | undefined }[] }>,
+  reject: (message: string) => Error,
+): void {
+  const keys = new Set(removed.map(row => `${row.entityType}:${row.id}`))
+  for (const record of records) {
+    if (keys.has(`${type}:${record.id}`))
+      continue
+    if (record.references.some(reference => reference.id && keys.has(`${reference.type}:${reference.id}`)))
+      throw reject('独立或历史记录仍引用迁入身份，不能回滚移除')
+  }
+}
+
 /** 迁移仅补入本批身份；同批已由普通命令编辑的记录保持原样。 */
-export function migratedIdentityRecords<T extends { id: string, migrationBatchId?: string | null }>(
+export function migratedIdentityRecords<T extends { id: string, version: number | string, migrationBatchId?: string | null }>(
   current: Map<string, T>,
   snapshot: CoreMigrationSnapshotDTO,
   type: CoreMigrationEntityType,
@@ -15,8 +31,11 @@ export function migratedIdentityRecords<T extends { id: string, migrationBatchId
   const ids = new Set(entities.map(entity => entity.id))
   const next = new Map(current)
   for (const [id, record] of next) {
-    if (record.migrationBatchId && (record.migrationBatchId !== batchId || !ids.has(id)))
+    if (record.migrationBatchId && (record.migrationBatchId !== batchId || !ids.has(id))) {
+      if (String(record.version) !== '1')
+        throw new ProjectRepositoryProblem(projectProblem('conflict', '迁入身份已有后来修改或删除，不能回滚移除'))
       next.delete(id)
+    }
   }
   for (const entity of entities) {
     const record = next.get(entity.id)

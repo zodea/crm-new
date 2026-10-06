@@ -4,6 +4,7 @@ import type {
   MasterDataSaveAction,
   SupplierFormDraft,
 } from '~/lib/master-data/forms'
+import type { SupplierCredentialRequirementFact, SupplierCredentialStatusFact } from '~/lib/supplier/credentials'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { effectiveExpenditureSupplementAmountSql, INEFFECTIVE_EXPENDITURE_CONTRACT_SQL_VALUES } from '~/lib/contract/effective-status'
@@ -21,7 +22,7 @@ import {
   saveSupplierForm,
 } from '~/lib/master-data/forms'
 import { writeSupplierAudit } from '~/lib/supplier/audit'
-import { revalidateSupplierCredentialStatuses } from '~/lib/supplier/credentials'
+import { shanghaiBusinessDate, storedSupplierCredentialStatus } from '~/lib/supplier/credentials'
 import { withSupplierImportCreateDefaults } from '~/lib/supplier/import'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
@@ -180,10 +181,6 @@ export const useSupplierStore = defineStore('supplier', () => {
   async function load(businessDate?: string) {
     loading.value = true
     try {
-      // Demo snapshots are immutable evidence. Credential revalidation belongs to
-      // the writable production workspace; demo reads use the seeded status.
-      if (!dataVisibilityStore.includeDemo)
-        await revalidateSupplierCredentialStatuses(db, businessDate)
       const [rows, statsRows, projectRows] = await Promise.all([
         select<Record<string, unknown>>(
           selectVisibleSql('suppliers', 'ORDER BY created_at DESC'),
@@ -249,7 +246,23 @@ export const useSupplierStore = defineStore('supplier', () => {
           ORDER BY project.name
         `),
       ])
-      list.value = rows.map(rowToSupplier)
+      const now = new Date(`${businessDate ?? shanghaiBusinessDate()}T12:00:00+08:00`)
+      const [credentials, requirements] = dataVisibilityStore.includeDemo
+        ? [[], []]
+        : await Promise.all([
+            select<SupplierCredentialStatusFact & { supplier_id: string }>(`SELECT c.supplier_id, c.category, c.expires_at AS expiresAt, c.long_term AS longTerm,
+          EXISTS(SELECT 1 FROM file_refs f JOIN file_payloads p ON p.file_ref_id=f.id
+            WHERE f.id=c.file_ref_id AND f.owner_type='supplier_credential' AND f.owner_id=c.id AND f.deleted_at IS NULL) AS hasAccessibleFile
+          FROM supplier_credentials c WHERE c.deleted_at IS NULL`),
+            select<SupplierCredentialRequirementFact & { supplier_id: string }>('SELECT supplier_id,category,requirement FROM supplier_credential_requirements WHERE deleted_at IS NULL'),
+          ])
+      list.value = rows.map((row) => {
+        const supplier = rowToSupplier(row)
+        if (!dataVisibilityStore.includeDemo) {
+          supplier.credentialStatus = storedSupplierCredentialStatus({ status: supplier.credentialStatus, reviewedAt: supplier.credentialReviewedAt, reviewNote: supplier.credentialReviewNote }, credentials.filter(item => item.supplier_id === supplier.id).map(item => ({ ...item, longTerm: Boolean(item.longTerm), hasAccessibleFile: Boolean(item.hasAccessibleFile) })), requirements.filter(item => item.supplier_id === supplier.id), now)
+        }
+        return supplier
+      })
       listStats.value = Object.fromEntries(statsRows.map((row) => {
         const contractTotal = Number(row.contract_total ?? 0)
         const paidTotal = Number(row.paid_total ?? 0)

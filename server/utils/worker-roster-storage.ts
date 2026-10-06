@@ -8,11 +8,16 @@ import { parsePrivateValues, rosterCanonical } from '../../app/lib/worker-roster
 export function rosterHash(value: unknown) {
   return createHash('sha256').update(rosterCanonical(value)).digest('hex')
 }
+export const WORKER_ROSTER_TABLES = ['worker_roster_profile_versions', 'worker_roster_assets', 'worker_roster_archives', 'worker_roster_receipts'] as const
+export const WORKER_ROSTER_SCHEMA_STATEMENTS = [
+  'CREATE TABLE worker_roster_profile_versions(worker_id TEXT NOT NULL, revision INTEGER NOT NULL, values_json TEXT NOT NULL, created_at TEXT NOT NULL, actor_id TEXT NOT NULL, migration_batch_id TEXT, PRIMARY KEY(worker_id,revision))',
+  'CREATE TABLE worker_roster_assets(id TEXT PRIMARY KEY, worker_id TEXT NOT NULL, file_ref_id TEXT NOT NULL, sha256 TEXT, created_at TEXT NOT NULL, legacy_category TEXT, migration_batch_id TEXT, legacy_deleted_at TEXT)',
+  'CREATE TABLE worker_roster_archives(id TEXT PRIMARY KEY, project_id TEXT NOT NULL, scope_key TEXT NOT NULL, version INTEGER NOT NULL, snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(scope_key,version))',
+  'CREATE TABLE worker_roster_receipts(command_id TEXT NOT NULL, workspace_id TEXT NOT NULL, actor_id TEXT NOT NULL, fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, worker_id TEXT, archive_id TEXT, PRIMARY KEY(workspace_id,actor_id,command_id))',
+] as const
 export async function initializeWorkerRosterSchema(db: TransactionDb) {
-  await db.execute('CREATE TABLE IF NOT EXISTS worker_roster_profile_versions(worker_id TEXT NOT NULL, revision INTEGER NOT NULL, values_json TEXT NOT NULL, created_at TEXT NOT NULL, actor_id TEXT NOT NULL, migration_batch_id TEXT, PRIMARY KEY(worker_id,revision))')
-  await db.execute('CREATE TABLE IF NOT EXISTS worker_roster_assets(id TEXT PRIMARY KEY, worker_id TEXT NOT NULL, file_ref_id TEXT NOT NULL, sha256 TEXT, created_at TEXT NOT NULL, legacy_category TEXT, migration_batch_id TEXT, legacy_deleted_at TEXT)')
-  await db.execute('CREATE TABLE IF NOT EXISTS worker_roster_archives(id TEXT PRIMARY KEY, project_id TEXT NOT NULL, scope_key TEXT NOT NULL, version INTEGER NOT NULL, snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(scope_key,version))')
-  await db.execute('CREATE TABLE IF NOT EXISTS worker_roster_receipts(command_id TEXT NOT NULL, workspace_id TEXT NOT NULL, actor_id TEXT NOT NULL, fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, worker_id TEXT, archive_id TEXT, PRIMARY KEY(workspace_id,actor_id,command_id))')
+  for (const sql of WORKER_ROSTER_SCHEMA_STATEMENTS)
+    await db.execute(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))
 }
 export function photoBytes(photo: WorkerPhotoUpload): Buffer {
   const bytes = Buffer.from(photo.payloadBase64, 'base64')

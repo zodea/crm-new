@@ -8,6 +8,9 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_sql::{DbInstances, DbPool};
 use tokio::sync::Mutex;
 
+mod database_snapshot;
+pub use database_snapshot::create_database_snapshot;
+
 const APP_DATABASE_URL: &str = "sqlite:crm.db";
 const GUANGDONG_TAX_QUERY_URL: &str =
     "https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx";
@@ -83,6 +86,17 @@ async fn prepare_app_database(
         .await
 }
 
+#[tauri::command]
+async fn backup_app_database(
+    destination: String,
+    preparation: State<'_, AppDatabasePreparation>,
+) -> Result<(), String> {
+    let current = preparation.0.lock().await;
+    let pool = current.as_ref().filter(|pool| !pool.is_closed())
+        .ok_or("桌面数据库尚未就绪，请先完成数据库初始化")?;
+    create_database_snapshot(pool, std::path::Path::new(&destination)).await
+}
+
 fn is_allowed_external_url(url: &str) -> bool {
     url == GUANGDONG_TAX_QUERY_URL
 }
@@ -137,6 +151,7 @@ pub fn run() {
         .manage(AppDatabasePreparation::default())
         .invoke_handler(tauri::generate_handler![
             prepare_app_database,
+            backup_app_database,
             open_external_url
         ])
         .setup(|app| {

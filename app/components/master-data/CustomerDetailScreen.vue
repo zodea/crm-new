@@ -12,6 +12,7 @@ import {
   validateCustomerReturnTo,
 } from '~/lib/customer/return-context'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
 import { useCustomerReadStore } from '~/stores/customer-read'
 
@@ -33,9 +34,9 @@ let loadGeneration = 0
 
 const detail = computed(() => {
   const state = store.detailState
-  const data = state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty'
+  const data = state.kind === 'ready' || state.kind === 'empty'
     ? state.data
-    : state.kind === 'loading' || state.kind === 'error' ? state.previous : null
+    : state.kind === 'loading' || (state.kind === 'error' || state.kind === 'unavailable') ? state.previous : null
   return data?.customer.id === props.customerId && data.dataOrigin === props.origin ? data : null
 })
 const customer = computed(() => detail.value?.customer ?? null)
@@ -62,7 +63,7 @@ const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-f
   const kind = store.detailState.kind
   if (detail.value)
     return 'ready'
-  if (kind === 'ready' || kind === 'partial' || kind === 'empty')
+  if (kind === 'ready' || kind === 'empty')
     return 'ready'
   if (kind === 'idle' || kind === 'loading')
     return 'loading'
@@ -133,7 +134,7 @@ onActivated(() => void load())
     :back-to="backTo"
     :back-label="backLabel"
     :state="shellState"
-    :state-title="shellState === 'not-found' ? '客户不存在或已删除' : shellState === 'forbidden' ? '无权查看该客户' : shellState === 'loading' ? '正在加载客户详情' : '客户详情加载失败'"
+    :state-title="readProblemTitle(problem, shellState === 'not-found' ? '客户不存在或已删除' : shellState === 'forbidden' ? '无权查看该客户' : shellState === 'loading' ? '正在加载客户详情' : '客户详情加载失败')"
     :state-description="problem?.message ?? ''"
     :state-action-label="problem?.retryable ? '重新加载' : ''"
     @state-action="load"
@@ -167,7 +168,7 @@ onActivated(() => void load())
     <div v-if="customer && detail" class="flex min-w-0 flex-col gap-4">
       <CustomerStorageActions v-if="hasLifecycle" :customer-id="customerId" @state="deleted = $event" @changed="load" />
       <StatePanel
-        v-if="store.detailState.kind === 'error'"
+        v-if="(store.detailState.kind === 'error' || store.detailState.kind === 'unavailable')"
         kind="error"
         title="刷新客户详情失败"
         :description="store.detailState.problem.message"

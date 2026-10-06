@@ -2,6 +2,7 @@ import type { TestDb } from '../helpers/memory-db'
 // #90 合同域 store 单测:mock connection 路由到 sql.js 内存库,node 直测唯一写路径 action 闭环。
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadF2Form } from '~/lib/contract/forms'
 import { runMigrations } from '~/lib/db/migrations'
 import { restoreRecord, softDelete } from '~/lib/db/soft-delete'
 import { useContractStore } from '~/stores/contract'
@@ -73,6 +74,29 @@ beforeEach(async () => {
 })
 
 describe('contract store:唯一写路径 action 闭环', () => {
+  it('native 公司与其他支出合同金额 NULL 贯穿列表和结算候选，真实零单独保留', async () => {
+    await mem.execute('INSERT INTO company_expense_contracts(id,no,name,amount,status) VALUES(\'company-null\',\'NULL-C\',\'未知公司金额\',NULL,\'履约中\'),(\'company-zero\',\'ZERO-C\',\'真实零公司金额\',0,\'履约中\')')
+    await mem.execute('INSERT INTO contracts(id,no,name,kind,project_id,supplier_id,amount,status) VALUES(\'other-null\',\'NULL-O\',\'未知其他金额\',\'其他支出\',\'p1\',\'supplier-1\',NULL,\'履约中\'),(\'other-zero\',\'ZERO-O\',\'真实零其他金额\',\'其他支出\',\'p1\',\'supplier-1\',0,\'履约中\')')
+    const store = useContractStore()
+    await store.loadAux('company_expense')
+    await store.loadAux('other_expense')
+    expect(store.auxByKind('company_expense').find(row => row.id === 'company-null')?.amount).toBeNull()
+    expect(store.auxByKind('company_expense').find(row => row.id === 'company-zero')?.amount).toBe(0)
+    expect(store.auxByKind('other_expense').find(row => row.id === 'other-null')?.amount).toBeNull()
+    expect(store.auxByKind('other_expense').find(row => row.id === 'other-zero')?.amount).toBe(0)
+    expect(await store.searchSettlementContracts('other_settlement', 'p1', '未知其他')).toEqual([{ id: 'other-null', label: '未知其他金额', hint: 'NULL-O · 金额未知' }])
+    expect(await store.searchSettlementContracts('other_settlement', 'p1', '真实零')).toEqual([{ id: 'other-zero', label: '真实零其他金额', hint: 'ZERO-O · 0.00' }])
+  })
+  it('独立 Native 正式路径保未知金额与原文主体，不凭中央目录扩展猜映射或补零', async () => {
+    await mem.execute('INSERT INTO contracts(id,name,kind,project_id,customer_id,amount,party_a,status) VALUES(\'legacy-formal\',\'原正式合同\',\'施工\',\'p1\',\'customer-1\',NULL,\'  历史我方原文  \',\'履约中\')')
+    const store = useContractStore()
+    const draft = await loadF2Form('construction', 'legacy-formal')
+    expect(draft).toMatchObject({ amount: null, ourSignatoryId: null, ourSignatorySnapshot: null, legacyPartyA: '  历史我方原文  ' })
+    await store.saveForm('construction', { ...draft!, content: '补原事实说明', signDate: '2026-10-04' }, 'submit')
+    expect(await mem.select('SELECT amount,party_a,our_signatory_id,our_signatory_snapshot FROM contracts WHERE id=?', ['legacy-formal'])).toEqual([{ amount: null, party_a: '  历史我方原文  ', our_signatory_id: null, our_signatory_snapshot: null }])
+    expect(store.byId('legacy-formal')).toMatchObject({ amount: null, changed: null })
+    expect(await mem.select('SELECT * FROM our_signatories')).toEqual([])
+  })
   it('saveForm: canonical action 落库并聚合只读金额', async () => {
     const store = useContractStore()
     const { id } = await store.saveForm('construction', {

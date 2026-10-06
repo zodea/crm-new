@@ -2,10 +2,11 @@ import type { SQLInputValue } from 'node:sqlite'
 import type { DbDriver } from '../../app/lib/db/coordinator'
 import { constants } from 'node:fs'
 import { access, lstat, open, realpath } from 'node:fs/promises'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve, toNamespacedPath } from 'node:path'
 import process from 'node:process'
 import { backup, DatabaseSync } from 'node:sqlite'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
+import { normalizeSqlDefinition } from '../../app/lib/db/schema-evidence'
 import { PRODUCTION_PARTICIPANTS, PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES, PRODUCTION_STORAGE_VERSION, productionParticipantVersions, productionStorageManifest } from './production-storage-schema'
 
 export interface ProductionStorageOptions {
@@ -26,6 +27,34 @@ function invalid(message: string): never {
 const identity = (value: string) => /^[a-z0-9][\w-]{2,79}$/i.test(value)
 const samePath = (left: string, right: string) => process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right
 
+interface SchemaDefinition { type: string, name: string, sql: string }
+const schemaDefinitions = new Map<number, readonly SchemaDefinition[]>()
+
+/** Derive the expected structure from the real numbered upgrades, including immutable guards. */
+export function verifyProductionStorageSchema(db: DatabaseSync, version: number): void {
+  productionStorageManifest(version)
+  let expected = schemaDefinitions.get(version)
+  if (!expected) {
+    const reference = new DatabaseSync(':memory:', { enableForeignKeyConstraints: true, defensive: true })
+    try {
+      reference.exec(PRODUCTION_STORAGE_SCHEMA)
+      for (const upgrade of PRODUCTION_STORAGE_UPGRADES) {
+        if (upgrade.to <= version)
+          reference.exec(upgrade.sql)
+      }
+      expected = reference.prepare('SELECT type,name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE \'sqlite_%\'').all() as unknown as SchemaDefinition[]
+      schemaDefinitions.set(version, expected)
+    }
+    finally { reference.close() }
+  }
+  const definition = db.prepare('SELECT type,sql FROM sqlite_schema WHERE name=?')
+  for (const item of expected) {
+    const actual = definition.get(item.name)
+    if (!actual || actual.type !== item.type || typeof actual.sql !== 'string' || normalizeSqlDefinition(actual.sql) !== normalizeSqlDefinition(item.sql))
+      invalid(`${item.name.includes('quotation') ? '独立报价' : '正式数据库'}结构或历史保护不完整（${item.name}）；停止读取、升级和备份发布，不覆盖已有事实。`)
+  }
+}
+
 function metadataVersion(db: DatabaseSync, options: ProductionStorageOptions): number {
   const meta = db.prepare('SELECT * FROM production_metadata WHERE singleton=1').get()
   if (!meta || typeof meta.schema_version !== 'number' || !Number.isSafeInteger(meta.schema_version) || meta.schema_version < 1 || meta.schema_version > PRODUCTION_STORAGE_VERSION)
@@ -44,6 +73,7 @@ function verifyParticipants(db: DatabaseSync, version: number) {
   const tables = new Set(db.prepare('SELECT name FROM sqlite_schema WHERE type=\'table\'').all().map(row => row.name))
   if ([...manifest.coreTables, ...Object.values(manifest.participants).flatMap(participant => participant.tables)].some(table => !tables.has(table)))
     invalid('正式数据库缺少已登记领域的业务表；停止读取和升级。')
+  verifyProductionStorageSchema(db, version)
 }
 
 async function backupTo(db: DatabaseSync, source: string, destination: string): Promise<void> {
@@ -72,7 +102,7 @@ async function backupTo(db: DatabaseSync, source: string, destination: string): 
   }
   try {
     // The new file is exclusively reserved by this call. Node's backup API otherwise overwrites a target.
-    await backup(db, path)
+    await backup(db, toNamespacedPath(path))
     const [current, owned] = await Promise.all([lstat(path), reserved.stat()])
     if (!current.isFile() || current.isSymbolicLink() || current.dev !== owned.dev || current.ino !== owned.ino)
       invalid('备份目标身份发生变化；不能发布为有效副本。')
@@ -118,7 +148,7 @@ async function openDriver(options: ProductionStorageOptions): Promise<DbDriver> 
   }
   let db: DatabaseSync | null = null
   try {
-    db = new DatabaseSync(path, { timeout: 5000, enableForeignKeyConstraints: true, enableDoubleQuotedStringLiterals: false, allowExtension: false, defensive: true })
+    db = new DatabaseSync(toNamespacedPath(path), { timeout: 5000, enableForeignKeyConstraints: true, enableDoubleQuotedStringLiterals: false, allowExtension: false, defensive: true })
     if (existed) {
       verifyParticipants(db, metadataVersion(db, options))
       if (db.prepare('PRAGMA quick_check').get()?.quick_check !== 'ok' || db.prepare('PRAGMA foreign_key_check').all().length)

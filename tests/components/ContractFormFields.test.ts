@@ -80,6 +80,23 @@ function mountFields(
 }
 
 describe('contractFormFields lookup data flow', () => {
+  it('总合同配置输入保留空与零，只在施工主合同显示，金额不自动跟随合同总额', async () => {
+    const wrapper = mountFields('construction', { amount: 5000, managementFeeAmount: null, managementFeeBasis: '' })
+    const amount = wrapper.get('[data-testid="contract-management-fee-amount"]')
+    expect((amount.element as HTMLInputElement).value).toBe('')
+    await amount.setValue('0')
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ managementFeeAmount: 0 })
+    await amount.setValue('')
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ managementFeeAmount: null })
+    await wrapper.get('[data-testid="contract-management-fee-basis"]').setValue('合同原件第八条')
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ managementFeeBasis: '合同原件第八条' })
+    await wrapper.setProps({ draft: { amount: 9000, managementFeeAmount: 0, managementFeeBasis: '合同原件第八条' } })
+    expect((amount.element as HTMLInputElement).value).toBe('0')
+    await wrapper.setProps({ kind: 'material' })
+    expect(wrapper.find('[data-testid="contract-management-fee-amount"]').exists()).toBe(false)
+    await wrapper.setProps({ kind: 'construction', draft: { isSupplement: true } })
+    expect(wrapper.find('[data-testid="contract-management-fee-amount"]').exists()).toBe(false)
+  })
   it('enforces project-first settlement cascade and emits selected real IDs', async () => {
     const wrapper = mountFields('other_settlement', {
       name: '',
@@ -226,6 +243,7 @@ describe('合同税率录入', () => {
 
   it.each([
     { amount: 113, taxRate: null, net: '113.00', tax: '0.00' },
+    { amount: null, taxRate: 13, net: '—', tax: '—' },
     { amount: 113, taxRate: 0, net: '113.00', tax: '0.00' },
     { amount: 103, taxRate: 3, net: '100.00', tax: '3.00' },
     { amount: 106, taxRate: 6, net: '100.00', tax: '6.00' },

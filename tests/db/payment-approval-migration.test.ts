@@ -68,10 +68,33 @@ describe('付款批复金额来源迁移', () => {
       const relations = ['payment_application_settlement_allocations', 'payment_application_invoice_allocations', 'payment_record_application_allocations', 'payment_records']
       const before = await Promise.all(relations.map(table => db.select(`SELECT * FROM ${table}`)))
       await runMigrations(db)
-      expect(await Promise.all(relations.map(table => db.select(`SELECT * FROM ${table}`)))).toEqual(before)
+      const after = await Promise.all(relations.map(table => db.select<Record<string, unknown>>(`SELECT * FROM ${table}`)))
+      expect(after.map((rows, index) => relations[index] === 'payment_records'
+        ? rows.map(({ worker_id, payee_name_snapshot, ...original }) => {
+            expect(worker_id).toBeNull()
+            expect(payee_name_snapshot).toBeNull()
+            return original
+          })
+        : rows)).toEqual(before)
+      expect(await db.select('SELECT worker_id,payee_name_snapshot,apply_amount,approved_amount,approved_amount_origin FROM payment_applications WHERE id=\'linked\'')).toEqual([{ worker_id: null, payee_name_snapshot: null, apply_amount: 100, approved_amount: 0, approved_amount_origin: 'legacy' }])
       expect(await db.select('PRAGMA foreign_key_check')).toEqual([])
       expect(await db.select('SELECT name FROM sqlite_master WHERE type = \'trigger\' AND name LIKE \'payment_applications_company_contract_%\'')).toHaveLength(2)
-      await expect(db.execute('UPDATE payment_applications SET project_id = \'project\', company_expense_contract_id = \'company\' WHERE id = \'linked\'')).rejects.toThrow('company contract must not reference a project contract or project')
+      await expect(db.execute('UPDATE payment_applications SET project_id = \'project\', company_expense_contract_id = \'company\' WHERE id = \'linked\'')).rejects.toThrow('已被支付采用的付款对象与归属不可改写')
+      await db.execute(`INSERT INTO payment_applications(id,apply_amount,approved_amount) VALUES('unallocated-company-guard',100,0)`)
+      await expect(db.execute('UPDATE payment_applications SET project_id = \'project\', company_expense_contract_id = \'company\' WHERE id = \'unallocated-company-guard\'')).rejects.toThrow('company contract must not reference a project contract or project')
+      await db.execute('PRAGMA foreign_keys=ON')
+      await db.execute(`INSERT INTO workers(id,name) VALUES('actual-worker-a','同名工人'),('actual-worker-b','同名工人')`)
+      const snapshot = '\t采用时工人原名\n'
+      await db.execute(`INSERT INTO payment_applications(id,worker_id,payee_name_snapshot,apply_amount,approved_amount,approved_amount_origin) VALUES('actual-worker-zero','actual-worker-b',?,0,0,'user-entry'),('actual-worker-null','actual-worker-a',?,0,NULL,'user-entry')`, [snapshot, snapshot])
+      await db.execute(`INSERT INTO payment_records(id,worker_id,payee_name_snapshot,amount) VALUES('actual-worker-payment','actual-worker-b',?,0)`, [snapshot])
+      await db.execute(`UPDATE workers SET name='后来主档名称' WHERE id='actual-worker-b'`)
+      expect(await db.select('SELECT id,worker_id,payee_name_snapshot,apply_amount,approved_amount,approved_amount_origin FROM payment_applications WHERE id LIKE \'actual-worker-%\' ORDER BY id')).toEqual([
+        { id: 'actual-worker-null', worker_id: 'actual-worker-a', payee_name_snapshot: snapshot, apply_amount: 0, approved_amount: null, approved_amount_origin: 'user-entry' },
+        { id: 'actual-worker-zero', worker_id: 'actual-worker-b', payee_name_snapshot: snapshot, apply_amount: 0, approved_amount: 0, approved_amount_origin: 'user-entry' },
+      ])
+      expect(await db.select('SELECT worker_id,payee_name_snapshot,amount FROM payment_records WHERE id=\'actual-worker-payment\'')).toEqual([{ worker_id: 'actual-worker-b', payee_name_snapshot: snapshot, amount: 0 }])
+      await expect(db.execute(`INSERT INTO payment_records(id,worker_id,amount) VALUES('unknown-worker-payment','missing-worker',0)`)).rejects.toThrow('FOREIGN KEY')
+      expect(await db.select('PRAGMA foreign_key_check')).toEqual([])
     }
     finally {
       db.close()

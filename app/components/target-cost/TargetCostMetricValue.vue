@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { DeepReadonly } from 'vue'
 import type { TargetCostMetric } from '~/lib/target-cost/central-contract'
 import { yuan } from '~/lib/util/money'
 
-defineProps<{ metric: TargetCostMetric }>()
+defineProps<{ metric: DeepReadonly<TargetCostMetric> }>()
 function sourceDescription(value: string): string {
   const labels: Record<string, string> = { forbidden: '当前身份无权读取', pending: '资料或关系待完善', unavailable: '来源暂不可用' }
   const match = /^(.*):(forbidden|pending|unavailable)$/.exec(value)

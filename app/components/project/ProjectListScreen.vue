@@ -3,6 +3,7 @@ import type { ConfiguredExportSource, ExportData } from '~/lib/kit/export'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repository'
+import type { MetricDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
@@ -12,12 +13,15 @@ import { projectLedgerRows } from '~/lib/project/export'
 import { projectListViewRow } from '~/lib/project/list'
 import { IMPORTED_PROJECT_STATUS } from '~/lib/project/repository'
 import { PROJECT_STATUSES, projectStatusTone } from '~/lib/project/status'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
 const readStore = useProjectListStore()
 const commandStore = useProjectCommandStore()
 const dataVisibilityStore = useDataVisibilityStore()
+const route = useRoute()
+const router = useRouter()
 const includeDemo = computed(() => dataVisibilityStore.includeDemo)
 const { error, exportFile, openImportTab } = useKitUI()
 
@@ -40,9 +44,9 @@ const listViews = [
 
 const readPage = computed<ProjectListPageDTO | null>(() => {
   const state = readStore.state
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
+  if (state.kind === 'ready' || state.kind === 'empty')
     return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
+  if (state.kind === 'loading' || (state.kind === 'error' || state.kind === 'unavailable'))
     return state.previous
   return null
 })
@@ -58,16 +62,28 @@ const visibleTotal = computed(() => readPage.value?.pagination.total ?? 0)
 const summary = computed(() => readPage.value?.summary ?? null)
 const realSummary = computed(() => summary.value?.origins.real ?? null)
 const demoSummary = computed(() => summary.value?.origins.demo ?? null)
+function metricLabel(metric: MetricDTO | undefined): string {
+  if (!metric)
+    return '—'
+  if (metric.status === 'complete')
+    return yuan(metric.value)
+  if (metric.knownValue !== null)
+    return `未知（已知小计 ${yuan(metric.knownValue)}）`
+  return metric.status === 'undefined' ? '无记录' : '未知'
+}
+function scopeLabel(origin: 'real' | 'demo'): string {
+  return readPage.value?.originMeta[origin].authorizedScope.coverage === 'complete' ? '当前筛选范围' : '当前可见范围'
+}
 const listSummary = computed<Record<string, string | number>>(() => {
   const result: Record<string, string | number> = {
     正式项目: realSummary.value?.projectCount ?? 0,
-    正式收入: yuan(realSummary.value?.income.value),
-    正式预算: yuan(realSummary.value?.budget.value),
+    正式收入: metricLabel(realSummary.value?.income),
+    正式预算: metricLabel(realSummary.value?.budget),
   }
   if (includeDemo.value) {
     result.测试项目 = demoSummary.value?.projectCount ?? 0
-    result.测试收入 = yuan(demoSummary.value?.income.value)
-    result.测试预算 = yuan(demoSummary.value?.budget.value)
+    result.测试收入 = metricLabel(demoSummary.value?.income)
+    result.测试预算 = metricLabel(demoSummary.value?.budget)
   }
   return result
 })
@@ -77,7 +93,7 @@ const problem = computed(() => {
   return state.kind === 'forbidden'
     || state.kind === 'not-found'
     || state.kind === 'mismatch'
-    || state.kind === 'error'
+    || (state.kind === 'error' || state.kind === 'unavailable')
     ? state.problem
     : null
 })
@@ -262,7 +278,7 @@ const returnContext = useProjectListReturnContext({
     phase: selectedPhase.value,
     sort: sortMode.value,
     page: page.value,
-    pageSize: pageSize.value === 20 || pageSize.value === 50 ? pageSize.value : 10,
+    pageSize: pageSize.value === 20 || pageSize.value === 50 || pageSize.value === 100 ? pageSize.value : 10,
     filters: {
       statuses: columnFilterValues('status'),
       plannedEnds: columnFilterValues('plannedEnd'),
@@ -298,12 +314,27 @@ function projectDetailTarget(row: typeof tableRows.value[number]): string {
       : '/project'
 }
 
+let listActive = true
+let latestViewLoad = 0
 async function loadProjects() {
+  const request = ++latestViewLoad
   const query = currentQuery()
+  const path = route.fullPath
   await readStore.load(query)
+  if (!listActive || request !== latestViewLoad || path !== route.fullPath || JSON.stringify(currentQuery()) !== JSON.stringify(query))
+    return
+  const state = readStore.state
+  if (state.kind !== 'ready' && state.kind !== 'empty')
+    return
+  const pagination = state.data.pagination
+  if (pagination.requestedPage !== query.page || pagination.pageSize !== query.pageSize)
+    return
+  if (pagination.page !== page.value) {
+    page.value = pagination.page
+    await router.replace({ query: { ...route.query, page: String(pagination.page) } })
+  }
 }
 
-let listActive = true
 let loadedWriteKey = ''
 
 function latestWriteKey(): string {
@@ -438,6 +469,7 @@ onActivated(() => {
 
 onDeactivated(() => {
   listActive = false
+  latestViewLoad++
 })
 </script>
 
@@ -455,7 +487,7 @@ onDeactivated(() => {
     <StatePanel
       v-else-if="readStore.state.kind === 'forbidden'"
       kind="forbidden"
-      title="无项目查看权限"
+      :title="readProblemTitle(problem, '无项目查看权限')"
       :description="problem?.message"
       compact
     />
@@ -477,7 +509,7 @@ onDeactivated(() => {
     />
 
     <StatePanel
-      v-else-if="readStore.state.kind === 'error'"
+      v-else-if="(readStore.state.kind === 'error' || readStore.state.kind === 'unavailable')"
       kind="error"
       title="项目列表加载失败"
       :description="problem?.message"
@@ -571,6 +603,7 @@ onDeactivated(() => {
               :data-origin="row.dataOrigin"
             />
             <span v-else-if="row.customer.state === 'forbidden'" class="text-ink-soft">无权限</span>
+            <span v-else-if="row.customer.state === 'unavailable'" class="text-ink-soft">来源暂不可用</span>
             <span v-else class="text-ink-faint">—</span>
           </template>
 
@@ -633,11 +666,12 @@ onDeactivated(() => {
         >
           <span data-origin-summary="real" class="inline-flex flex-wrap items-center gap-x-2">
             <b class="text-ink">正式数据</b>
+            <small class="text-ink-faint">{{ scopeLabel('real') }}</small>
             <span><b class="font-mono text-ink">{{ realSummary?.projectCount ?? 0 }}</b> 个</span>
-            <span>累计收入 <b class="font-mono text-ink">{{ yuan(realSummary?.income.value) }}</b></span>
-            <small v-if="realSummary?.income.missingSources.length" class="text-ink-faint">收入缺失 {{ realSummary.income.missingSources.length }} 个</small>
-            <span>预算总额 <b class="font-mono text-ink">{{ yuan(realSummary?.budget.value) }}</b></span>
-            <small v-if="realSummary?.budget.missingSources.length" class="text-ink-faint">预算缺失 {{ realSummary.budget.missingSources.length }} 个</small>
+            <span>累计收入 <b class="font-mono text-ink">{{ metricLabel(realSummary?.income) }}</b></span>
+            <small v-if="realSummary?.income.missingCount" class="text-ink-faint">收入缺失 {{ realSummary.income.missingCount }} 个</small>
+            <span>预算总额 <b class="font-mono text-ink">{{ metricLabel(realSummary?.budget) }}</b></span>
+            <small v-if="realSummary?.budget.missingCount" class="text-ink-faint">预算缺失 {{ realSummary.budget.missingCount }} 个</small>
           </span>
           <span
             v-if="includeDemo"
@@ -645,11 +679,12 @@ onDeactivated(() => {
             class="inline-flex flex-wrap items-center gap-x-2 border-l border-line pl-5"
           >
             <b class="text-warn">测试数据</b>
+            <small class="text-ink-faint">{{ scopeLabel('demo') }}</small>
             <span><b class="font-mono text-warn">{{ demoSummary?.projectCount ?? 0 }}</b> 个</span>
-            <span>累计收入 <b class="font-mono text-ink">{{ yuan(demoSummary?.income.value) }}</b></span>
-            <small v-if="demoSummary?.income.missingSources.length" class="text-ink-faint">收入缺失 {{ demoSummary.income.missingSources.length }} 个</small>
-            <span>预算总额 <b class="font-mono text-ink">{{ yuan(demoSummary?.budget.value) }}</b></span>
-            <small v-if="demoSummary?.budget.missingSources.length" class="text-ink-faint">预算缺失 {{ demoSummary.budget.missingSources.length }} 个</small>
+            <span>累计收入 <b class="font-mono text-ink">{{ metricLabel(demoSummary?.income) }}</b></span>
+            <small v-if="demoSummary?.income.missingCount" class="text-ink-faint">收入缺失 {{ demoSummary.income.missingCount }} 个</small>
+            <span>预算总额 <b class="font-mono text-ink">{{ metricLabel(demoSummary?.budget) }}</b></span>
+            <small v-if="demoSummary?.budget.missingCount" class="text-ink-faint">预算缺失 {{ demoSummary.budget.missingCount }} 个</small>
           </span>
         </div>
       </template>

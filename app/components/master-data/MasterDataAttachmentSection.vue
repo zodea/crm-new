@@ -17,6 +17,7 @@ defineProps<{
   pendingAttachments: PendingMasterDataAttachment[]
   pendingRemoveIds: string[]
   pendingRestoreIds: string[]
+  filesDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -45,6 +46,7 @@ function inputValue(event: Event) {
     <button
       v-if="desktopPicker"
       type="button"
+      :disabled="filesDisabled"
       class="flex min-h-24 w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
       @click="emit('pickNative')"
     >
@@ -59,7 +61,7 @@ function inputValue(event: Event) {
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
       <span class="text-12px font-600 text-ink">点击选择附件</span>
       <span class="mt-0.5 text-11px text-ink-faint">{{ storesOriginals ? originalDescription || '原件随客户一同保存，重启后可下载；最多 9 份，单份不超过 10 MiB' : '浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径' }}</span>
-      <input type="file" multiple class="sr-only" @change="handleFiles">
+      <input type="file" multiple class="sr-only" :disabled="filesDisabled" @change="handleFiles">
     </label>
 
     <div v-if="attachments.length || pendingAttachments.length" class="mt-3 grid gap-2">
@@ -82,6 +84,7 @@ function inputValue(event: Event) {
         </button>
         <button
           type="button"
+          :disabled="filesDisabled"
           class="text-11px"
           :class="file.deletedAt ? 'text-brand' : 'text-danger'"
           @click="emit('toggleExisting', file.id)"
@@ -100,11 +103,12 @@ function inputValue(event: Event) {
         <span class="min-w-36 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
         <input
           :value="file.category"
+          :disabled="filesDisabled"
           class="field-input h-7 w-32 text-11px"
           aria-label="附件分类"
           @input="emit('updatePendingCategory', file.localId, inputValue($event))"
         >
-        <button type="button" class="text-11px text-danger" @click="emit('removePending', file.localId)">
+        <button type="button" class="text-11px text-danger" :disabled="filesDisabled" @click="emit('removePending', file.localId)">
           移除
         </button>
       </div>

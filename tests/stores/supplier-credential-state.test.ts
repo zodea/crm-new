@@ -71,6 +71,21 @@ describe('中央证照会话所有权和原提交恢复', () => {
     await state.execute(action)
     expect(execute.mock.calls[2]![0]).toEqual(original)
   })
+
+  it('初次提交遇登录失效立即清事实但保原命令；身份恢复后仍核同一编号', async () => {
+    const { state, execute } = setup()
+    await state.load()
+    execute.mockRejectedValueOnce(credentialProblem('unauthenticated', '登录已失效'))
+    await expect(state.execute(action)).rejects.toThrow('登录已失效')
+    const original = execute.mock.calls[0]![0]
+    expect(state.data.value).toBeNull()
+    expect(state.errorCode.value).toBe('unauthenticated')
+    expect(state.canWrite.value).toBe(false)
+    expect(state.hasPending(action, { supplierId: original.supplierId, origin: original.origin, workspaceId: original.workspaceId, actorId: original.actorId, supplierVersion: original.baseSupplierVersion, credentialVersion: original.baseCredentialVersion, generation: 0 })).toBe(true)
+    await state.load()
+    await state.execute(action)
+    expect(execute.mock.calls[1]![0]).toEqual(original)
+  })
   it('断网请求未到后台，恢复时获同命令未应用冲突证明后可保选择重新核对', async () => {
     const { state, read, execute } = setup()
     await state.load()

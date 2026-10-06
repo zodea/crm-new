@@ -792,7 +792,7 @@ async function demoImportMapping() {
       <!-- ⑩ 按钮五变体 -->
       <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
-          ⑩ 按钮五变体 — 层级语言（DESIGN-TASTE §4.2 / #109）
+          ⑩ 按钮五变体 — 层级语言（KitUI §06 / #109）
         </h2>
         <p class="text-12px text-ink-soft mb-3">
           缺省 = secondary 安静按钮；实心蓝只属于 <b>accent</b>（业务屏每屏 ≤1 枚章，本演示页除外）；

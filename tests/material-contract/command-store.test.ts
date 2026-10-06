@@ -26,7 +26,11 @@ const latest = {
 }
 
 describe('材料采购合同冲突恢复', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    const markers = new Map<string, string>()
+    vi.stubGlobal('sessionStorage', { getItem: (key: string) => markers.get(key) ?? null, setItem: (key: string, value: string) => markers.set(key, value), removeItem: (key: string) => markers.delete(key) })
+  })
 
   it('保留我的内容后采用服务器新版本再次提交', async () => {
     const repository = {
@@ -39,7 +43,10 @@ describe('材料采购合同冲突恢复', () => {
       }),
       loadForm: vi.fn()
         .mockResolvedValueOnce(initial)
-        .mockResolvedValueOnce(latest),
+        .mockResolvedValueOnce(latest)
+        .mockResolvedValueOnce({ ...latest, draft, version: '3' }),
+      // 原断言保护乐观锁后保留输入；新会话须先明确封存未应用的原编号。
+      resolve: vi.fn(commandId => Promise.resolve({ outcome: 'not-applied', commandId })),
       execute: vi.fn()
         .mockRejectedValueOnce(new MaterialContractRepositoryProblem(materialContractProblem('conflict', '版本冲突')))
         .mockResolvedValueOnce({

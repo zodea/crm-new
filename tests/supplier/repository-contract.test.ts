@@ -1,14 +1,13 @@
 import type { SupplierListSourceRow } from '~/lib/supplier/repository'
 import { describe, expect, it } from 'vitest'
 import {
-  buildSupplierDetailRead,
-  buildSupplierListPage,
   decodeSupplierDetailRead,
   decodeSupplierListPage,
   parseSupplierDetailQuery,
   parseSupplierListQuery,
   serializeSupplierListQuery,
 } from '~/lib/supplier/repository'
+import { buildSupplierDetailRead, buildSupplierListPage } from '../helpers/supplier-read-meta'
 
 const AS_OF = '2026-08-23T00:00:00.000Z'
 
@@ -65,11 +64,11 @@ describe('分供方中央 Repository contract', () => {
     const query = parseSupplierListQuery({ category: ['材料供应商', '劳务分包商'], credentialStatus: ['qualified', 'reviewing'], columnFilters: { taxpayerType: ['一般纳税人', '小规模纳税人'] }, pageSize: 10, page: 2 })
     expect(parseSupplierListQuery(serializeSupplierListQuery(query))).toEqual(query)
     const result = buildSupplierListPage({ ...input, query })
-    expect(result.pagination).toEqual({ page: 2, pageSize: 10, total: 20 })
+    expect(result.pagination).toEqual({ requestedPage: 2, page: 2, pageSize: 10, total: 20 })
     expect(result.summary.origins.real.supplierCount).toBe(20)
     expect(result.summary.categories).toEqual(expect.arrayContaining([{ value: '设备供应商', label: '设备供应商', count: 10 }]))
     const narrowed = buildSupplierListPage({ ...input, query: { ...query, credentialStatus: ['qualified'], columnFilters: { taxpayerType: ['一般纳税人'] } } })
-    expect(narrowed.pagination).toEqual({ page: 1, pageSize: 10, total: 7 })
+    expect(narrowed.pagination).toEqual({ requestedPage: 2, page: 1, pageSize: 10, total: 7 })
     expect(narrowed.items.every(item => ['材料供应商', '劳务分包商'].includes(item.supplierCategory) && item.credentialStatus === 'qualified' && item.taxpayerType === '一般纳税人')).toBe(true)
     expect(narrowed.summary.taxpayerTypes).toEqual(expect.arrayContaining([{ value: '小规模纳税人', label: '小规模纳税人', count: 7 }]))
     expect(buildSupplierListPage({ ...input, query: { ...query, category: [], credentialStatus: [], columnFilters: { taxpayerType: [] } } }).pagination.total).toBe(30)
@@ -138,7 +137,7 @@ describe('分供方中央 Repository contract', () => {
   it('列表和详情使用同一有效合同与确认结算口径，缺金额保留 partial 与 null', () => {
     const contract = { dataOrigin: 'real' as const, id: 'contract', supplierId: 'supplier', projectId: null, no: '', name: '', kind: '分包', amount: 100, supplementAmount: 20, signDate: null, status: '生效' }
     const settlement = { dataOrigin: 'real' as const, id: 'settlement', supplierId: 'supplier', projectId: null, contractId: contract.id, no: '', name: '', settlementType: 'progress', totalAmount: 30, settlementDate: null, status: 'confirmed' }
-    const input = { suppliers: [supplier('supplier', '统计验证')], projects: [], projectSuppliers: [], contracts: [contract, { ...contract, id: 'draft', amount: 999, status: '草稿' }, { ...contract, id: 'cancelled', amount: 888, status: 'cancelled' }], settlements: [settlement, { ...settlement, id: 'approval-is-not-confirmation', totalAmount: 777, status: 'approved' }], invoices: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], asOf: AS_OF, sourceVersion: 'facts', capabilities: [] }
+    const input = { suppliers: [supplier('supplier', '统计验证')], projects: [], projectSuppliers: [], contracts: [contract, { ...contract, id: 'draft', amount: 999, status: '草稿' }, { ...contract, id: 'cancelled', amount: 888, status: 'cancelled' }, { ...contract, id: 'void-history', amount: 666, status: '已作废' }], settlements: [settlement, { ...settlement, id: 'approval-is-not-confirmation', totalAmount: 777, status: 'approved' }], invoices: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], asOf: AS_OF, sourceVersion: 'facts', capabilities: [] }
     const list = buildSupplierListPage({ ...input, query: parseSupplierListQuery({}) })
     const detail = buildSupplierDetailRead({ ...input, query: parseSupplierDetailQuery('supplier', {}) })
     expect(list.items[0]).toMatchObject({ cumulativeContractAmount: '120.00', contractAmount: '120.00', settlementAmount: '30.00' })
@@ -148,6 +147,8 @@ describe('分供方中央 Repository contract', () => {
     const unknownList = decodeSupplierListPage(buildSupplierListPage({ ...unknown, query: parseSupplierListQuery({}) }))
     const unknownDetail = decodeSupplierDetailRead(buildSupplierDetailRead({ ...unknown, query: parseSupplierDetailQuery('supplier', {}) }))
     expect(unknownList.items[0]).toMatchObject({ cumulativeContractAmount: null, contractAmount: null, settlementAmount: null })
+    expect(unknownDetail.summary.contractAmount).toMatchObject({ value: null, knownValue: '100.00', participatingCount: 1, missingCount: 1 })
+    expect(unknownDetail.summary.settlementAmount).toMatchObject({ value: null, knownValue: null, participatingCount: 1, missingCount: 1 })
     expect(unknownList.summary.origins.real.contractAmount).toBeNull()
     expect(unknownDetail.contracts[0]?.effectiveAmount).toBeNull()
     expect(unknownDetail.settlements[0]?.totalAmount).toBeNull()
@@ -155,6 +156,81 @@ describe('分供方中央 Repository contract', () => {
     expect(unknownDetail.summary.settlementAmount).toMatchObject({ value: null, status: 'partial', missingSources: ['settlement'] })
     expect(unknownDetail.summary.payableAmount.value).toBeNull()
     expect(buildSupplierListPage({ ...unknown, query: parseSupplierListQuery({ columnFilters: { ranges: { contractAmount: { min: 0 } } } }) }).items).toEqual([])
+  })
+
+  it('可信身份、来源和可证小计必须同读点一致，不可读来源不能以零或隐藏计数冒充', () => {
+    const input = { suppliers: [supplier('supplier-1', '可见主档')], projects: [], projectSuppliers: [], contracts: [], settlements: [], invoices: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], asOf: AS_OF, sourceVersion: 'trusted-source', capabilities: ['supplier:list:read'] }
+    const detail = buildSupplierDetailRead({ ...input, query: parseSupplierDetailQuery('supplier-1', {}), unavailableSources: ['contracts', 'invoices', 'payments'] })
+    expect(decodeSupplierDetailRead(detail)).toEqual(detail)
+    expect(detail.summary.contractAmount).toMatchObject({ value: null, knownValue: null, participatingCount: null, missingCount: null })
+    for (const mutation of [
+      (value: any) => {
+        value.meta.schemaVersion = 'old-supplier-schema'
+      },
+      (value: any) => {
+        value.meta.asOf = '2026-08-24T00:00:00.000Z'
+      },
+      (value: any) => {
+        value.capabilities.push('supplier:write')
+      },
+      (value: any) => {
+        value.summary.contractCount = 0
+      },
+      (value: any) => {
+        value.summary.contractAmount = { ...value.summary.contractAmount, value: '0.00', knownValue: '0.00', status: 'complete', missingSources: [], participatingCount: 0, missingCount: 0,
+        }
+      },
+      (value: any) => {
+        value.summary.contractAmount.knownValue = '0.00'
+      },
+      (value: any) => {
+        value.summary.contractAmount.participatingCount = 3
+      },
+      (value: any) => {
+        value.summary.contractAmount.drilldown.subject.id = 'another-supplier'
+      },
+      (value: any) => {
+        value.summary.contractAmount.drilldown.filters.dataOrigin = 'demo'
+      },
+      (value: any) => {
+        delete value.summary.contractAmount.knownValue
+      },
+    ]) {
+      const malicious = structuredClone(detail)
+      mutation(malicious)
+      expect(() => decodeSupplierDetailRead(malicious)).toThrow()
+    }
+    const page = buildSupplierListPage({ ...input, query: parseSupplierListQuery({}) })
+    for (const mutation of [
+      (value: any) => {
+        delete value.originMeta
+      },
+      (value: any) => {
+        value.originMeta.demo.actorId = 'another-actor'
+      },
+      (value: any) => {
+        value.originMeta.real.workspaceId = 'another-workspace'
+      },
+      (value: any) => {
+        value.meta.sources[0].state = 'unavailable'
+      },
+    ]) {
+      const malicious = structuredClone(page)
+      mutation(malicious)
+      expect(() => decodeSupplierListPage(malicious)).toThrow()
+    }
+  })
+
+  it('相关项目含受限身份时项目总数未知，保授权关系及必要无ID占位而不反推隐藏行数', () => {
+    const input = { suppliers: [supplier('supplier-1', '可见供应商')], projects: [{ dataOrigin: 'real' as const, id: 'visible-project', name: '授权项目', status: '施工中', permission: 'allowed' as const }, { dataOrigin: 'real' as const, id: 'secret-project', name: '隐藏项目名称', status: '施工中', permission: 'forbidden' as const }], projectSuppliers: [{ dataOrigin: 'real' as const, id: 'visible-relation', supplierId: 'supplier-1', projectId: 'visible-project', status: 'active' }, { dataOrigin: 'real' as const, id: 'opaque-relation', supplierId: 'supplier-1', projectId: 'secret-project', status: 'active' }], contracts: [], settlements: [], invoices: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], asOf: AS_OF, sourceVersion: 'privacy-proof', capabilities: ['supplier:list:read'] }
+    const page = decodeSupplierListPage(buildSupplierListPage({ ...input, query: parseSupplierListQuery({}) }))
+    const detail = decodeSupplierDetailRead(buildSupplierDetailRead({ ...input, query: parseSupplierDetailQuery('supplier-1', {}) }))
+    expect(page.items[0]?.projectCount).toBeNull()
+    expect(detail.summary.projectCount).toBeNull()
+    expect(detail.projects[0]?.project).toMatchObject({ state: 'resolved', id: 'visible-project' })
+    expect(detail.projects[1]?.project).toMatchObject({ state: 'forbidden', id: null, label: null })
+    expect(JSON.stringify({ page, detail })).not.toContain('secret-project')
+    expect(JSON.stringify({ page, detail })).not.toContain('隐藏项目名称')
   })
 
   it('表头条件先筛完整集合，数值排序分页，facet不被自身选中值锁死', () => {
@@ -176,10 +252,10 @@ describe('分供方中央 Repository contract', () => {
     const query = parseSupplierListQuery({ page: 2, pageSize: 10, sort: 'projectCount-desc', columnFilters: JSON.stringify({ contains: { laborScope: ' 石材 ' }, ranges: { projectCount: { min: 0, max: 0 } } }) })
     expect(parseSupplierListQuery(serializeSupplierListQuery(query))).toEqual(query)
     const page = buildSupplierListPage({ ...input, query })
-    expect(page.pagination).toEqual({ page: 2, pageSize: 10, total: 22 })
+    expect(page.pagination).toEqual({ requestedPage: 2, page: 2, pageSize: 10, total: 22 })
     expect(page.items).toHaveLength(10)
     const clamped = buildSupplierListPage({ ...input, query: { ...query, page: 999 } })
-    expect(clamped.pagination).toEqual({ page: 3, pageSize: 10, total: 22 })
+    expect(clamped.pagination).toEqual({ requestedPage: 999, page: 3, pageSize: 10, total: 22 })
     expect(clamped.items).toHaveLength(2)
     expect(page.summary.origins.real.supplierCount).toBe(22)
     const selected = buildSupplierListPage({ ...input, query: parseSupplierListQuery({ columnFilters: { taxpayerType: '一般纳税人' } }) })
@@ -255,7 +331,7 @@ describe('分供方中央 Repository contract', () => {
     expect(serialized).not.toContain('91440101TEST000001')
     expect(serialized).not.toContain('6217850012345678')
     expect(serialized).not.toContain('13800001234')
-    expect(page.pagination).toEqual({ page: 1, pageSize: 10, total: 1 })
+    expect(page.pagination).toEqual({ requestedPage: 1, page: 1, pageSize: 10, total: 1 })
     expect(page.empty).toBeNull()
   })
 
@@ -289,22 +365,25 @@ describe('分供方中央 Repository contract', () => {
       contractAmount: {
         value: '0.00',
         status: 'complete',
-        drilldown: { entity: 'contract', filters: { supplierId: 'supplier-1' } },
+        knownValue: '0.00',
+        participatingCount: 0,
+        missingCount: 0,
+        drilldown: { kind: 'entity-subview', subject: { entity: 'supplier', id: 'supplier-1' }, variant: 'contracts', filters: { dataOrigin: 'real' } },
       },
       settlementAmount: {
         value: '0.00',
         status: 'complete',
-        drilldown: { entity: 'settlement', filters: { supplierId: 'supplier-1' } },
+        drilldown: { kind: 'entity-subview', subject: { entity: 'supplier', id: 'supplier-1' }, variant: 'settlements', filters: { dataOrigin: 'real' } },
       },
       invoiceAmount: {
         value: '0.00',
         status: 'complete',
-        drilldown: { entity: 'invoice', filters: { supplierId: 'supplier-1' } },
+        drilldown: { kind: 'entity-subview', subject: { entity: 'supplier', id: 'supplier-1' }, variant: 'invoices', filters: { dataOrigin: 'real' } },
       },
       paymentAmount: {
         value: '0.00',
         status: 'complete',
-        drilldown: { entity: 'payment-record', filters: { supplierId: 'supplier-1' } },
+        drilldown: { kind: 'entity-subview', subject: { entity: 'supplier', id: 'supplier-1' }, variant: 'payments', filters: { dataOrigin: 'real' } },
       },
       payableAmount: {
         value: '0.00',
@@ -436,7 +515,7 @@ describe('分供方中央 Repository contract', () => {
     })
     expect(detail.invoices[0]).toMatchObject({
       invoice: { state: 'resolved', entity: 'invoice', id: 'invoice-1' },
-      project: { state: 'forbidden', entity: 'project', id: 'project-secret', label: null },
+      project: { state: 'forbidden', entity: 'project', id: null, label: null },
       totalAmount: '8.00',
     })
     expect(detail.payments[0]).toMatchObject({
@@ -444,5 +523,24 @@ describe('分供方中央 Repository contract', () => {
       actualPaidAmount: '40.00',
     })
     expect(JSON.stringify(detail)).not.toContain('/base/supplier')
+    expect(JSON.stringify(detail)).not.toContain('project-secret')
+    expect(JSON.stringify(detail)).not.toContain('不可泄露项目')
+    expect(decodeSupplierDetailRead(detail)).toEqual(detail)
+    const leaked = structuredClone(detail)
+    Object.assign(leaked.invoices[0]!.project, { id: 'project-secret' })
+    expect(() => decodeSupplierDetailRead(leaked)).toThrow()
+    Object.assign(leaked.invoices[0]!.project, { id: null, legacyId: 'project-secret' })
+    expect(() => decodeSupplierDetailRead(leaked)).toThrow()
+  })
+
+  it('关系来源不可用与没有记录分开；DTO不泄漏旧关系身份且导航不可连接', () => {
+    const detail = buildSupplierDetailRead({ suppliers: [supplier('supplier-1', '中央分供方')], projects: [], projectSuppliers: [], contracts: [], settlements: [{ dataOrigin: 'real', id: 'settlement-1', supplierId: 'supplier-1', projectId: 'private-project', contractId: 'private-contract', no: 'JS-1', name: '结算', settlementType: '过程结算', totalAmount: 10, settlementDate: null, status: 'confirmed' }], invoices: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], query: parseSupplierDetailQuery('supplier-1', {}), asOf: AS_OF, sourceVersion: 'unavailable-sources', capabilities: [], unavailableSources: ['projects', 'contracts'] })
+    expect(detail.settlements[0]).toMatchObject({ project: { state: 'unavailable', entity: 'project', id: null, label: null, reason: 'source-unavailable' }, contract: { state: 'unavailable', entity: 'contract', id: null, label: null, reason: 'source-unavailable' }, projectNavigation: { kind: 'unavailable', reason: 'not-connected' }, contractNavigation: { kind: 'unavailable', reason: 'not-connected' } })
+    expect(JSON.stringify(detail)).not.toContain('private-project')
+    expect(JSON.stringify(detail)).not.toContain('private-contract')
+    expect(decodeSupplierDetailRead(detail)).toEqual(detail)
+    const malformed = structuredClone(detail)
+    Object.assign(malformed.settlements[0]!.project, { id: 'private-project' })
+    expect(() => decodeSupplierDetailRead(malformed)).toThrow()
   })
 })

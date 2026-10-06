@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, defineComponent, h, nextTick, onMounted, ref, shallowRef, toRef } from 'vue'
+import { computed, defineComponent, h, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, toRef, watch } from 'vue'
 import FinanceFormPage from '~/components/finance/FinanceFormPage.vue'
 import FinancePaymentTypeStep from '~/components/finance/FinancePaymentTypeStep.vue'
 import MaterialFormPage from '~/components/material/MaterialFormPage.vue'
@@ -10,7 +11,7 @@ import FormFooter from '~/components/ui/FormFooter.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { loadMaterialForm } from '~/lib/material/forms'
 
-vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
+vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))
 vi.mock('~/lib/material/forms', async (importOriginal) => {
   const original = await importOriginal<typeof import('~/lib/material/forms')>()
   return {
@@ -65,6 +66,10 @@ function attachmentState() {
     dirty: ref(false),
     reset: vi.fn(),
     clearPending: vi.fn(),
+    readingFiles: ref(false),
+    invalidatePreparation: vi.fn(),
+    capture: () => ({ add: [], removeIds: [], restoreIds: [] }),
+    acknowledge: vi.fn(),
     changes: () => ({ add: [], removeIds: [], restoreIds: [] }),
     handleFiles: vi.fn(),
     pickNativeFiles: vi.fn(),
@@ -76,15 +81,16 @@ function attachmentState() {
 
 describe('财务和物资整页表单布局接线', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     route.params = {}
     route.fullPath = '/finance/payment/new'
     confirm.mockResolvedValue(false)
     navigate.mockResolvedValue(undefined)
-    saveForm.mockResolvedValue({ id: 'saved-id' })
+    saveForm.mockResolvedValue({ id: 'saved-id', logId: null, attachmentIds: [], readbackConfirmed: false, readbackProblem: '只读恢复由财务专属组件套件验证' })
     saveAttachments.mockResolvedValue(undefined)
     vi.mocked(loadMaterialForm).mockResolvedValue(null)
-    for (const [name, value] of Object.entries({ computed, nextTick, onMounted, ref, shallowRef, toRef }))
+    for (const [name, value] of Object.entries({ computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, toRef, watch }))
       vi.stubGlobal(name, value)
     vi.stubGlobal('useRoute', () => route)
     vi.stubGlobal('navigateTo', navigate)
@@ -92,6 +98,7 @@ describe('财务和物资整页表单布局接线', () => {
     vi.stubGlobal('useKitUI', () => ({ confirm, success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
     vi.stubGlobal('useTabsStore', () => ({ tabs: [], close: vi.fn(), open: vi.fn(), registerCloseGuard: vi.fn(() => vi.fn()) }))
     const store = {
+      isCentral: () => false,
       saveForm,
       saveAttachments,
       searchProjects: vi.fn(),
@@ -129,6 +136,7 @@ describe('财务和物资整页表单布局接线', () => {
       expect.objectContaining({ bizType: '公司付款', note: '保留的付款备注' }),
       'draft',
       { add: [], removeIds: [], restoreIds: [] },
+      undefined,
     )
   })
 

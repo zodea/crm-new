@@ -3,7 +3,7 @@
 > 路由：`/base/crew` · `/base/crew/form/:id?` · `/base/crew/:id`
 > 页面：`pages/base/crew/index.vue` · `pages/base/crew/form/[[id]].vue` · `pages/base/crew/[id].vue`
 > 表单蓝本：`crewForm`（ADR 0014）
-> 状态：浏览器中央列表—详情—显式编辑、成员关系维护与真实关系链已闭合；Tauri 保留本地路径 · 2026-08-24（#316 后续补齐）
+> 状态：正式全局主档及成员关系维护已接中央持久 owner，显式迁入保留稳定 ID、历史与原件；未接工资、工程量和扣罚来源显示未知。开发验证链及 Tauri 本地路径保留。运行边界见 [ARCHITECTURE](../ARCHITECTURE.md#implementation-gaps)，共享主档见 [DATABASE](../DATABASE.md#global-worker-crew-directory)。
 
 ## 定位
 

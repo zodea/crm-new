@@ -45,4 +45,24 @@ describe('班组—工人中央 command HTTP Repository', () => {
       body: expect.objectContaining({ commandId: 'command-1', draft }),
     })
   })
+
+  it.each(['crew', 'worker'] as const)('严格核验%s原编号的可靠封存与原回执', async (kind) => {
+    const receipt = { id: `${kind}-original`, commandId: 'command-original', version: '2', updatedAt: '2026-10-04T00:00:00.000Z', attachmentIds: [] }
+    const fetcher = vi.fn().mockResolvedValue({ outcome: 'applied', result: receipt })
+    const repository = createHttpCrewWorkerCommandRepository({ fetcher })
+    const resolve = kind === 'crew' ? repository.resolveCrew : repository.resolveWorker
+    await expect(resolve('command-original')).resolves.toEqual({ outcome: 'applied', result: receipt })
+    expect(fetcher).toHaveBeenLastCalledWith(`/api/commands/${kind}s/resolve`, { method: 'POST', body: { commandId: 'command-original' } })
+    fetcher.mockResolvedValue({ outcome: 'not-applied', commandId: 'command-original' })
+    await expect(resolve('command-original')).resolves.toEqual({ outcome: 'not-applied', commandId: 'command-original' })
+    for (const value of [
+      { outcome: 'not-applied', commandId: 'another-command' },
+      { outcome: 'not-applied', commandId: 'command-original', result: null },
+      { outcome: 'applied', result: { ...receipt, commandId: 'another-command' } },
+      { outcome: 'applied', result: { ...receipt, version: 'unknown' } },
+    ]) {
+      fetcher.mockResolvedValue(value)
+      await expect(resolve('command-original')).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    }
+  })
 })

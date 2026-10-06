@@ -1,6 +1,6 @@
 import type { DataOriginDTO } from '../../types/read-model'
 import type { SupplierCredentialCommand, SupplierCredentialCommandResult, SupplierCredentialFile, SupplierCredentialFileContent, SupplierCredentialFileQuery, SupplierCredentialRepository, SupplierCredentialSnapshot } from './credential-contract'
-import { isProblemCodeDTO } from '../../types/read-model'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { credentialProblem, SupplierCredentialNotAppliedProblem } from './credential-contract'
 import { CREDENTIAL_MASTER_FIELDS } from './credential-domain'
 import { CREDENTIAL_OCR_FIELD_KEYS } from './credential-ocr'
@@ -71,9 +71,18 @@ function decodeSnapshot(value: unknown, supplierId: string, origin: DataOriginDT
     || !Array.isArray(value.credentials) || !Array.isArray(value.requirements) || !Array.isArray(value.audits)) {
     invalid()
   }
-  if (value.review !== null && (!object(value.review) || !['qualified', 'rejected'].includes(String(value.review.decision))
-    || !text(value.review.reviewedAt) || !nullableText(value.review.actorId) || !text(value.review.note))) {
+  if (value.reviewCurrent !== undefined && (typeof value.reviewCurrent !== 'boolean' || (value.reviewCurrent && (!object(value.review) || value.review.decision !== value.status))))
     invalid()
+  if (value.reviewHistory !== undefined && !Array.isArray(value.reviewHistory))
+    invalid()
+  for (const proof of [value.review, ...(Array.isArray(value.reviewHistory) ? value.reviewHistory : [])]) {
+    if (proof !== null && (!object(proof) || !['qualified', 'rejected'].includes(String(proof.decision))
+      || !text(proof.reviewedAt) || !Number.isFinite(Date.parse(proof.reviewedAt)) || !nullableText(proof.actorId) || !text(proof.note)
+      || (proof.decision === 'rejected' && !proof.note.trim())
+      || (proof.historyIdentity !== undefined && (!object(proof.historyIdentity) || !text(proof.historyIdentity.id) || !proof.historyIdentity.id
+        || !text(proof.historyIdentity.legacyId) || !proof.historyIdentity.legacyId || !text(proof.historyIdentity.archivedAt) || !Number.isFinite(Date.parse(proof.historyIdentity.archivedAt)))))) {
+      invalid()
+    }
   }
   if (value.masterValues !== undefined && (origin !== 'real' || !value.capabilities.includes('supplier:write') || !object(value.masterValues)
     || Object.entries(value.masterValues).some(([key, entry]) => !(CREDENTIAL_MASTER_FIELDS as readonly string[]).includes(key) || !text(entry)))) {
@@ -90,6 +99,11 @@ function decodeSnapshot(value: unknown, supplierId: string, origin: DataOriginDT
       invalid()
     }
     ids.add(row.id)
+    if (row.validity !== undefined && (!object(row.validity) || row.validity.businessDate !== value.businessDate
+      || !['expired', 'expiring', 'valid', 'unrecorded'].includes(String(row.validity.state))
+      || !['long-term', 'invalid-date', 'missing-date', 'expired', 'within-seven-days', 'outside-warning-window'].includes(String(row.validity.reason)))) {
+      invalid()
+    }
     if (row.file !== null) {
       file(row.file, row.id)
       if (fileIds.has(row.file.id))
@@ -136,12 +150,13 @@ function failure(cause: unknown, command?: SupplierCredentialCommand): Error {
   const response = object(cause) && object(cause.response) ? cause.response : null
   const body = response?._data ?? (object(cause) ? cause.data : null)
   const problem = object(body) && object(body.data) ? body.data : body
-  if (object(problem) && command && ['ocr-recognize', 'ocr-confirm'].includes(command.action) && problem.commandId === command.commandId && problem.commandOutcome === 'not-applied'
+  const remote = problemFromHttpFailure(cause)
+  if (remote && !['unauthenticated', 'forbidden'].includes(remote.code) && object(problem) && command && ['ocr-recognize', 'ocr-confirm'].includes(command.action) && problem.commandId === command.commandId && problem.commandOutcome === 'not-applied'
     && ['unavailable', 'conflict', 'not-found', 'validation-failed'].includes(String(problem.code)) && text(problem.message) && typeof problem.retryable === 'boolean' && object(problem.fieldErrors) && nullableText(problem.traceId)) {
     return new SupplierCredentialNotAppliedProblem(command.commandId, problem.message, problem.code as 'unavailable' | 'conflict' | 'not-found' | 'validation-failed')
   }
-  if (object(problem) && isProblemCodeDTO(problem.code) && text(problem.message))
-    return credentialProblem(problem.code, problem.message)
+  if (remote)
+    return new SupplierRepositoryProblem(remote, { cause })
   return credentialProblem('unavailable', '证照服务暂时不可用，请保留输入并重试')
 }
 

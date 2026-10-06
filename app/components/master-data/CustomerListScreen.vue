@@ -2,8 +2,9 @@
 import type { CustomerListPageDTO, CustomerListQueryDTO } from '~/lib/customer/repository'
 import type { MasterDataFilterValue, MasterDataListFilterField, MasterDataListSort } from '~/lib/master-data/list'
 import { useDebounceFn } from '@vueuse/core'
-import { computed, onActivated, onMounted, shallowRef, watch } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
 import { MASTER_DATA_LIST_PROFILES, masterDataStatusLabel } from '~/lib/master-data/list'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { normalizeEnumSelection } from '~/lib/util/enum-selection'
 import { maskIdentifier, maskPhone } from '~/lib/util/privacy'
 import { useCustomerCommandStore } from '~/stores/customer-command'
@@ -12,6 +13,8 @@ import { useCustomerReadStore } from '~/stores/customer-read'
 const readStore = useCustomerReadStore()
 const commandStore = useCustomerCommandStore()
 const visibility = useDataVisibilityStore()
+const route = useRoute()
+const router = useRouter()
 const { error } = useKitUI()
 const search = shallowRef('')
 const sort = shallowRef<MasterDataListSort>('updated-desc')
@@ -23,9 +26,9 @@ const listRoot = shallowRef<HTMLElement | null>(null)
 
 const readPage = computed<CustomerListPageDTO | null>(() => {
   const state = readStore.listState
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
+  if (state.kind === 'ready' || state.kind === 'empty')
     return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
+  if (state.kind === 'loading' || (state.kind === 'error' || state.kind === 'unavailable'))
     return state.previous
   return null
 })
@@ -42,7 +45,7 @@ const rows = computed(() => (readPage.value?.items ?? []).map(item => ({
   navigation: item.navigation,
 })))
 const loading = computed(() => readStore.listState.kind === 'loading')
-const problem = computed(() => ['forbidden', 'not-found', 'mismatch', 'error'].includes(readStore.listState.kind)
+const problem = computed(() => ['forbidden', 'unauthenticated', 'not-found', 'mismatch', 'unavailable', 'error'].includes(readStore.listState.kind)
   && 'problem' in readStore.listState
   ? readStore.listState.problem
   : null)
@@ -62,7 +65,7 @@ const empty = computed(() => hasFilters.value
 
 const returnContext = useCustomerListReturnContext({
   root: () => listRoot.value,
-  isReady: () => ['ready', 'partial', 'empty'].includes(readStore.listState.kind),
+  isReady: () => ['ready', 'empty'].includes(readStore.listState.kind),
   readState: () => ({
     search: search.value,
     status: filters.value.status ?? [],
@@ -91,10 +94,27 @@ function currentQuery(): CustomerListQueryDTO {
   }
 }
 
+let latestViewLoad = 0
+let viewActive = true
 async function load() {
-  await readStore.loadList(currentQuery())
-  if (readPage.value)
-    page.value = readPage.value.pagination.page
+  const request = ++latestViewLoad
+  const query = currentQuery()
+  const path = route.fullPath
+  await readStore.loadList(query)
+  if (!viewActive || request !== latestViewLoad || path !== route.fullPath || JSON.stringify(currentQuery()) !== JSON.stringify(query))
+    return
+  const state = readStore.listState
+  if (state.kind !== 'ready' && state.kind !== 'empty')
+    return
+  const pagination = state.data.pagination
+  if (pagination.requestedPage !== query.page || pagination.pageSize !== query.pageSize)
+    return
+  if (pagination.page !== page.value) {
+    page.value = pagination.page
+    await router.replace({ query: { ...route.query, page: String(pagination.page) } })
+    if (!viewActive || request !== latestViewLoad)
+      return
+  }
   await returnContext.restore()
 }
 
@@ -135,7 +155,16 @@ watch(() => visibility.includeDemo, () => {
 })
 watch(() => commandStore.latestWrite, () => void load(), { deep: true })
 onMounted(() => void load())
-onActivated(() => void load())
+onActivated(() => {
+  viewActive = true
+  void load()
+})
+function deactivateView() {
+  viewActive = false
+  latestViewLoad++
+}
+onDeactivated(deactivateView)
+onScopeDispose(deactivateView)
 </script>
 
 <template>
@@ -143,8 +172,8 @@ onActivated(() => void load())
     <CustomerPendingRecovery v-if="readPage?.capabilities.includes('customer:original:write')" />
     <StatePanel
       v-if="problem"
-      :kind="problem.code === 'forbidden' ? 'forbidden' : 'error'"
-      title="客户列表加载失败"
+      :kind="['forbidden', 'unauthenticated'].includes(problem.code) ? 'forbidden' : 'error'"
+      :title="readProblemTitle(problem, '客户列表加载失败')"
       :description="problem.message"
       :action-label="problem.retryable ? '重新加载' : ''"
       :compact="Boolean(readPage)"

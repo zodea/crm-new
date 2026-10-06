@@ -1,14 +1,18 @@
 import type { Component } from 'vue'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   computed,
   defineComponent,
   h,
+  KeepAlive,
   nextTick,
   onMounted,
+  reactive,
   ref,
+  shallowReactive,
   shallowRef,
   useTemplateRef,
   watch,
@@ -19,6 +23,7 @@ import {
   ProjectCommandConflictError,
   ProjectLocalDraftOnlyError,
 } from '~/stores/project-command'
+import { useProjectPersistentCommandStore } from '~/stores/project-persistent-command'
 
 const formMocks = vi.hoisted(() => ({
   listFormAttachments: vi.fn(),
@@ -34,23 +39,26 @@ vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn(),
 }))
 
-const route = {
+const route = reactive({
   fullPath: '/project/form',
   path: '/project/form',
   params: {} as Record<string, string>,
   query: {} as Record<string, string>,
-}
+})
 const navigateTo = vi.fn()
 const commandSession = {}
 const saveForm = vi.fn()
 const closeTab = vi.fn()
 const confirm = vi.fn()
 const hydrateCommandForm = vi.fn()
+const revalidateCommandForm = vi.fn()
+const deactivateCommandForm = vi.fn()
 const startNewProject = vi.fn()
 const rebaseCommandForm = vi.fn()
 const acceptLatestCommandForm = vi.fn()
 const errorToast = vi.fn()
 const warningToast = vi.fn()
+const downloadOriginal = vi.fn()
 
 const EntityFormShellStub = defineComponent({
   props: {
@@ -134,6 +142,7 @@ const SectionHeaderStub = defineComponent({
 })
 
 const globalComponents: Record<string, Component> = {
+  CentralTargetCostFormScreen: EmptyStub,
   EntityFormShell: EntityFormShellStub,
   MasterDataFormFields: ProjectFieldsStub,
   MasterDataAttachmentSection: EmptyStub,
@@ -150,14 +159,18 @@ describe('项目整页表单', () => {
     route.fullPath = '/project/form'
     route.path = '/project/form'
     route.params = {}
+    route.query = {}
     navigateTo.mockReset()
     saveForm.mockReset()
     hydrateCommandForm.mockReset()
+    revalidateCommandForm.mockReset().mockResolvedValue({ form: null, context: {} })
+    deactivateCommandForm.mockReset()
     startNewProject.mockReset()
     rebaseCommandForm.mockReset()
     acceptLatestCommandForm.mockReset()
     errorToast.mockReset()
     warningToast.mockReset()
+    downloadOriginal.mockReset()
     closeTab.mockReset()
     confirm.mockReset()
     formMocks.listFormAttachments.mockReset()
@@ -194,10 +207,13 @@ describe('项目整页表单', () => {
     vi.stubGlobal('useProjectCommandStore', () => ({
       createSession: () => commandSession,
       hydrate: hydrateCommandForm,
+      revalidate: revalidateCommandForm,
+      deactivate: deactivateCommandForm,
       saveForm,
       startNewProject,
       rebase: rebaseCommandForm,
       acceptLatest: acceptLatestCommandForm,
+      downloadOriginal,
     }))
     vi.stubGlobal('useSupplierStore', () => ({ saveForm: vi.fn() }))
     vi.stubGlobal('useCustomerStore', () => ({ save: vi.fn() }))
@@ -424,5 +440,163 @@ describe('项目整页表单', () => {
 
     expect((await screen.findByRole('status')).textContent).toContain('仅保留本地草稿，未正式保存')
     expect(navigateTo).not.toHaveBeenCalled()
+  })
+
+  function formalFixture() {
+    setActivePinia(createPinia())
+    window.sessionStorage.clear()
+    const context = { workspaceId: 'ui-project-workspace', actorId: 'ui-owner', capabilities: ['project:write', 'project:original:write'] }
+    let savedForm: { draft: Record<string, unknown> & { id: string }, version: string, updatedAt: string, attachments: [] } | null = null
+    const journal = new Map<string, object>()
+    const repository = {
+      context: vi.fn(async () => context),
+      loadForm: vi.fn(async () => savedForm!),
+      execute: vi.fn(async (request) => {
+        savedForm = { draft: { ...request.draft, id: 'ui-saved-project' }, version: '1', updatedAt: '2026-10-04T08:00:00.000Z', attachments: [] }
+        const result = { id: savedForm.draft.id, commandId: request.commandId, version: '1', updatedAt: savedForm.updatedAt, attachmentIds: [] }
+        journal.set(request.commandId, result)
+        return result
+      }),
+    }
+    const resolve = vi.fn(async (commandId: string) => journal.has(commandId) ? { outcome: 'applied', result: journal.get(commandId) } : { outcome: 'not-applied', commandId, result: null })
+    vi.stubGlobal('useNuxtApp', () => ({ $repositories: { projectCommands: repository, projectProduction: { resolve } } }))
+    const store = useProjectPersistentCommandStore()
+    const session = shallowReactive({ storesOriginals: false, persistent: store.createSession() })
+    vi.stubGlobal('useProjectCommandStore', () => ({
+      createSession: () => session,
+      hydrate: (_session, id: string | null) => {
+        session.storesOriginals = true
+        return store.hydrate(session.persistent, id)
+      },
+      saveForm: (_session, draft, action, attachments) => store.saveForm(session.persistent, draft, action, attachments),
+      recover: () => store.recover(session.persistent),
+      revalidate: () => store.revalidate(session.persistent),
+      deactivate: () => store.deactivate(session.persistent),
+      startNewProject: () => store.startNewProject(session.persistent),
+      rebase: (_session, version: string) => store.rebase(session.persistent, version),
+      acceptLatest: (_session, form) => store.acceptLatest(session.persistent, form),
+    }))
+    return { repository, resolve, session }
+  }
+
+  it('正式项目可靠回执后读取失败保留输入和原编号，不关闭；只读核对后仍保留后来输入', async () => {
+    const { repository, resolve, session } = formalFixture()
+    repository.loadForm.mockRejectedValueOnce(new Error('read failed'))
+    render(MasterDataFormPage, { props: { kind: 'project', hideSections: true, returnToDetail: true }, global: { components: globalComponents } })
+    await flushPromises()
+    await fireEvent.update(screen.getByRole('textbox', { name: '项目名称' }), '已发出项目')
+    await fireEvent.update(screen.getByRole('textbox', { name: '项目经理' }), '发出经理')
+    await fireEvent.click(screen.getByRole('button', { name: '选择主客户' }))
+    await fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await flushPromises()
+    expect(screen.getByRole('status', { name: '原提交恢复' }).textContent).toContain('已保存待刷新')
+    expect(session.persistent.pending?.result?.id).toBe('ui-saved-project')
+    expect(window.sessionStorage.length).toBe(1)
+    expect(navigateTo).not.toHaveBeenCalled()
+    expect(closeTab).not.toHaveBeenCalled()
+    await fireEvent.update(screen.getByRole('textbox', { name: '项目名称' }), '后来继续编辑')
+    await fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    expect(repository.execute).toHaveBeenCalledTimes(1)
+    await fireEvent.click(screen.getByRole('button', { name: '重新读取已保存记录' }))
+    await flushPromises()
+    expect(resolve).not.toHaveBeenCalled()
+    expect(repository.loadForm).toHaveBeenCalledTimes(2)
+    expect((screen.getByRole('textbox', { name: '项目名称' }) as HTMLInputElement).value).toBe('后来继续编辑')
+    expect(window.sessionStorage.length).toBe(0)
+    expect(navigateTo).not.toHaveBeenCalled()
+    expect(closeTab).not.toHaveBeenCalled()
+  })
+
+  it('正式项目保存期间的后来输入不会被成功关闭或保存并新建清掉', async () => {
+    const { repository } = formalFixture()
+    const execute = repository.execute.getMockImplementation()!
+    let release: (() => void) | undefined
+    repository.execute.mockImplementationOnce(async (request) => {
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return execute(request)
+    })
+    render(MasterDataFormPage, { props: { kind: 'project', hideSections: true }, global: { components: globalComponents } })
+    await flushPromises()
+    await fireEvent.update(screen.getByRole('textbox', { name: '项目名称' }), '本次提交')
+    await fireEvent.update(screen.getByRole('textbox', { name: '项目经理' }), '合成经理')
+    await fireEvent.click(screen.getByRole('button', { name: '选择主客户' }))
+    await fireEvent.click(screen.getByRole('button', { name: '保存并新建' }))
+    await waitFor(() => expect(release).toBeTypeOf('function'))
+    await fireEvent.update(screen.getByRole('textbox', { name: '项目名称' }), '尚未发出的后来输入')
+    release!()
+    await flushPromises()
+    expect(repository.execute.mock.calls[0]?.[0].draft.name).toBe('本次提交')
+    expect((screen.getByRole('textbox', { name: '项目名称' }) as HTMLInputElement).value).toBe('尚未发出的后来输入')
+    expect(navigateTo).not.toHaveBeenCalled()
+    expect(closeTab).not.toHaveBeenCalled()
+    expect(warningToast).toHaveBeenCalledWith(expect.stringContaining('继续编辑'))
+  })
+
+  it('迟到初始化与保存冲突都不能覆盖已切换的新项目页面', async () => {
+    const central = (id: string) => ({ draft: { id, name: id, manager: '经理', customerId: 'customer' }, attachments: [], pendingAttachments: [], pendingRemoveIds: [], pendingRestoreIds: [], restoredLocalDraft: null })
+    let releaseRead!: (value: ReturnType<typeof central>) => void
+    hydrateCommandForm.mockImplementationOnce(() => new Promise(resolve => releaseRead = resolve)).mockImplementation(async (_session, id) => central(id))
+    route.fullPath = route.path = '/project/form/project-a'
+    route.params = { id: 'project-a' }
+    render(MasterDataFormPage, { props: { kind: 'project' }, global: { components: globalComponents } })
+    await flushPromises()
+    route.fullPath = route.path = '/project/form/project-b'
+    route.params = { id: 'project-b' }
+    await flushPromises()
+    releaseRead(central('project-a'))
+    await flushPromises()
+    expect((screen.getByRole('textbox', { name: '项目名称' }) as HTMLInputElement).value).toBe('project-b')
+    let rejectSave!: (cause: Error) => void
+    saveForm.mockImplementationOnce(() => new Promise((_resolve, reject) => rejectSave = reject))
+    await fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    route.fullPath = route.path = '/project/form/project-c'
+    route.params = { id: 'project-c' }
+    await flushPromises()
+    rejectSave(new Error('旧目标失败'))
+    await flushPromises()
+    expect((screen.getByRole('textbox', { name: '项目名称' }) as HTMLInputElement).value).toBe('project-c')
+    expect(errorToast).not.toHaveBeenCalled()
+    expect(closeTab).not.toHaveBeenCalled()
+    expect(navigateTo).not.toHaveBeenCalled()
+  })
+
+  it('页面卸载后迟到的原件字节不能生成下载链接', async () => {
+    const file = { id: 'original-a', ownerId: 'project-a', fileName: '原件.txt', fileSize: 3, deletedAt: null }
+    hydrateCommandForm.mockResolvedValue({ draft: { id: 'project-a', name: 'A' }, attachments: [file], pendingAttachments: [], pendingRemoveIds: [], pendingRestoreIds: [], restoredLocalDraft: null })
+    route.fullPath = route.path = '/project/form/project-a'
+    route.params = { id: 'project-a' }
+    let release!: (blob: Blob) => void
+    downloadOriginal.mockImplementationOnce(() => new Promise(resolve => release = resolve))
+    const AttachmentStub = defineComponent({ emits: ['download'], setup: (_props, { emit }) => () => h('button', { onClick: () => emit('download', file) }, '下载原件') })
+    const createObjectURL = vi.fn(() => 'blob:synthetic-original')
+    vi.stubGlobal('URL', class extends URL { static createObjectURL = createObjectURL })
+    const view = render(MasterDataFormPage, { props: { kind: 'project' }, global: { components: { ...globalComponents, MasterDataAttachmentSection: AttachmentStub } } })
+    await flushPromises()
+    await fireEvent.click(screen.getByRole('button', { name: '下载原件' }))
+    expect(downloadOriginal).toHaveBeenCalledWith('project-a', 'original-a')
+    view.unmount()
+    release(new Blob(['abc']))
+    await flushPromises()
+    expect(createObjectURL).not.toHaveBeenCalled()
+  })
+  it('页签重新激活只重验原目标，保留未保存输入且不重复 hydrate', async () => {
+    hydrateCommandForm.mockResolvedValue({ draft: { id: 'project-1', name: '已保存名称', manager: '张经理', customerId: 'customer-1' }, attachments: [], pendingAttachments: [], pendingRemoveIds: [], pendingRestoreIds: [], restoredLocalDraft: null })
+    Object.assign(route, { fullPath: '/project/form/project-1?origin=real', path: '/project/form/project-1', params: { id: 'project-1' }, query: { origin: 'real' } })
+    const active = ref(true)
+    const host = defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => active.value ? h(MasterDataFormPage, { kind: 'project' }) : null }) })
+    render(host, { global: { components: globalComponents } })
+    await waitFor(() => expect((screen.getByRole('textbox', { name: '项目名称' }) as HTMLInputElement).value).toBe('已保存名称'))
+    const input = screen.getByRole('textbox', { name: '项目名称' })
+    await fireEvent.update(input, '本页未保存名称')
+    active.value = false
+    await flushPromises()
+    expect(deactivateCommandForm).toHaveBeenCalledTimes(1)
+    active.value = true
+    await waitFor(() => expect(revalidateCommandForm).toHaveBeenCalledWith(commandSession))
+    expect((await screen.findByRole('textbox', { name: '项目名称' }) as HTMLInputElement).value).toBe('本页未保存名称')
+    expect(hydrateCommandForm).toHaveBeenCalledTimes(1)
+    expect(saveForm).not.toHaveBeenCalled()
   })
 })

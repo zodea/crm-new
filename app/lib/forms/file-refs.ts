@@ -128,7 +128,7 @@ export async function applyFileRefChanges(
       file.uploader?.trim() ?? '',
     ])
     await logCreate(tx, 'file_refs', id)
-    if (file.payloadBase64) {
+    if (typeof file.payloadBase64 === 'string') {
       await tx.execute(
         `INSERT INTO file_payloads (file_ref_id, encoding, content)
          VALUES (?, 'base64', ?)`,
@@ -209,7 +209,7 @@ export async function loadFileRefContent(
       AND file.deleted_at IS NULL
     LIMIT 1
   `, [file.id, file.ownerType, file.ownerId])
-  if (!payload?.content)
+  if (typeof payload?.content !== 'string')
     return null
   if (payload.encoding !== 'base64')
     throw new Error(`不支持的附件编码：${payload.encoding}`)

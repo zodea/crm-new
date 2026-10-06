@@ -1,7 +1,8 @@
-import type { Page } from '@playwright/test'
+import type { Page, Request, Response } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const FORM_ROUTES = [
@@ -56,6 +57,48 @@ const MASTER_INPUTS = {
 } as const
 
 const masterIds = new WeakMap<Page, { project: string, customer: string, supplier: string }>()
+const diagnosticTitles = new Set([
+  '七条命名路由均可保存不完整草稿并进入真实编辑路由',
+  '七条表单在响应式参考矩阵均无页面级横向溢出',
+])
+interface FormDiagnostics {
+  pageErrors: string[]
+  requestFailures: { url: string, method: string, resourceType: string, error: string | null }[]
+  responseFailures: { url: string, status: number, resourceType: string }[]
+  detach: () => void
+}
+const formDiagnostics = new WeakMap<Page, FormDiagnostics>()
+function diagnosticUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return `${url.origin}${url.pathname}`
+  }
+  catch { return '[无法解析的URL]' }
+}
+function observeFormDiagnostics(page: Page) {
+  const diagnostics: FormDiagnostics = { pageErrors: [], requestFailures: [], responseFailures: [], detach: () => {} }
+  const pageError = (error: Error) => {
+    if (diagnostics.pageErrors.length < 100)
+      diagnostics.pageErrors.push(error.message)
+  }
+  const requestFailed = (request: Request) => {
+    if (diagnostics.requestFailures.length < 100)
+      diagnostics.requestFailures.push({ url: diagnosticUrl(request.url()), method: request.method(), resourceType: request.resourceType(), error: request.failure()?.errorText ?? null })
+  }
+  const responseFailed = (response: Response) => {
+    if (response.status() >= 400 && diagnostics.responseFailures.length < 100)
+      diagnostics.responseFailures.push({ url: diagnosticUrl(response.url()), status: response.status(), resourceType: response.request().resourceType() })
+  }
+  page.on('pageerror', pageError)
+  page.on('requestfailed', requestFailed)
+  page.on('response', responseFailed)
+  diagnostics.detach = () => {
+    page.off('pageerror', pageError)
+    page.off('requestfailed', requestFailed)
+    page.off('response', responseFailed)
+  }
+  formDiagnostics.set(page, diagnostics)
+}
 
 async function chooseLookup(
   page: Page,
@@ -69,7 +112,9 @@ async function chooseLookup(
 }
 
 test.describe('F2 canonical 合同与支出结算整页表单', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, info) => {
+    if (diagnosticTitles.has(info.title))
+      observeFormDiagnostics(page)
     await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `f2-${randomUUID()}` })
     const sessionResponse = await page.request.get('/api/read/business-session')
     expect(sessionResponse.ok()).toBe(true)
@@ -89,6 +134,53 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
     expect(project.ok(), await project.text()).toBe(true)
     ids.project = (await project.json()).id
     masterIds.set(page, ids)
+  })
+
+  test.afterEach(async ({ page }, info) => {
+    const diagnostics = formDiagnostics.get(page)
+    if (!diagnostics)
+      return
+    try {
+      if (info.status === info.expectedStatus)
+        return
+      let dom: unknown
+      try {
+        dom = await page.locator('body').evaluate(body => ({
+          readyState: document.readyState,
+          elementCount: body.querySelectorAll('*').length,
+          bodyText: (() => {
+            const copy = body.cloneNode(true)
+            if (!(copy instanceof Element))
+              return ''
+            copy.querySelectorAll('script,style,template,noscript').forEach(node => node.remove())
+            return (copy.textContent ?? '').slice(0, 4000)
+          })(),
+          headings: Array.from(body.querySelectorAll('h1,h2,h3,[role="heading"]'), node => node.textContent?.trim()),
+          states: Array.from(body.querySelectorAll('[role="alert"],[role="status"]'), node => node.textContent?.trim()).slice(0, 20),
+          nuxtRoot: (() => {
+            const root = body.querySelector('#__nuxt')
+            if (!root)
+              return null
+            const style = getComputedStyle(root)
+            const rect = root.getBoundingClientRect()
+            return { children: root.childElementCount, display: style.display, visibility: style.visibility, width: rect.width, height: rect.height }
+          })(),
+        }), undefined, { timeout: 2000 })
+      }
+      catch (cause) { dom = { error: cause instanceof Error ? cause.message : String(cause) } }
+      await info.attach('f2-form-passive-diagnostic', { contentType: 'application/json', body: JSON.stringify({
+        url: diagnosticUrl(page.url()),
+        viewport: page.viewportSize(),
+        pageErrors: diagnostics.pageErrors,
+        requestFailures: diagnostics.requestFailures,
+        responseFailures: diagnostics.responseFailures,
+        dom,
+      }) })
+    }
+    finally {
+      diagnostics.detach()
+      formDiagnostics.delete(page)
+    }
   })
 
   test('七条命名路由均可保存不完整草稿并进入真实编辑路由', async ({ page }) => {
@@ -151,7 +243,10 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
   }
 
   test('材采提交会阻止空明细并聚焦首个无效单元格', async ({ page }) => {
+    const ownName = 'F2空明细校验已核实我方主体'
+    const ownId = await createVerifiedSignatory(page, ownName)
     await page.goto('/contract/material/form')
+    await selectVerifiedSignatory(page, ownId, ownName)
     await page.getByTestId('contract-name').fill('E2E材采校验')
     await chooseLookup(page, '检索项目', MASTER_INPUTS.project, MASTER_INPUTS.project)
     await chooseLookup(page, '检索分供方', MASTER_INPUTS.supplier, MASTER_INPUTS.supplier)
@@ -183,9 +278,12 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
 
   test('真实 lookup、提交、附件删除恢复与其他支出结算链路成立', async ({ page }) => {
     test.setTimeout(120_000)
+    const ownName = 'F2流程已核实我方主体'
+    const ownId = await createVerifiedSignatory(page, ownName)
     const suffix = '独立合成链'
     const constructionName = `E2E施工提交-${suffix}`
     await page.goto('/contract/construction/form')
+    await selectVerifiedSignatory(page, ownId, ownName)
     await page.getByTestId('contract-name').fill(constructionName)
     await chooseLookup(page, '检索项目', MASTER_INPUTS.project, MASTER_INPUTS.project)
     await chooseLookup(page, '检索客户', MASTER_INPUTS.customer, MASTER_INPUTS.customer)
@@ -232,6 +330,7 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
 
     await page.locator('a[href="/contract/other-settlement"]').click()
     await page.getByRole('button', { name: '新建结算', exact: true }).click()
+    await page.getByRole('combobox', { name: '结算来源', exact: true }).selectOption('contract')
     await page.getByLabel('结算名称 *', { exact: true }).fill(`E2E结算-${suffix}`)
     await chooseLookup(page, '检索项目', MASTER_INPUTS.project, MASTER_INPUTS.project)
     await chooseLookup(page, '检索其他支出合同', expenseName, expenseName)
@@ -250,10 +349,12 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
 
   test('七条表单在响应式参考矩阵均无页面级横向溢出', async ({ page }) => {
     test.setTimeout(120_000)
-    for (const width of RESPONSIVE_WIDTHS.slice(1)) {
-      await page.setViewportSize({ width, height: 900 })
-      for (const form of FORM_ROUTES) {
-        await page.goto(form.path)
+    const widths = [...RESPONSIVE_WIDTHS, 1280].sort((a, b) => a - b)
+    for (const form of FORM_ROUTES) {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto(form.path)
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
         await expect(page.getByRole('heading', { name: form.title })).toBeVisible({
           timeout: 20_000,
         })

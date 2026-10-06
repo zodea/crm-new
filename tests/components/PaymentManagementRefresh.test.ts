@@ -6,11 +6,13 @@ import PaymentManagementScreen from '~/components/finance/payment-management/Pay
 import { usePaymentManagementStore } from '~/stores/payment-management'
 
 const select = vi.hoisted(() => vi.fn())
-vi.mock('~/lib/db/connection', () => ({ select }))
+vi.mock('~/lib/db/connection', () => ({ select, withTransaction: (work: (tx: { select: typeof select }) => Promise<unknown>) => work({ select }) }))
+// 本组验证 Native 同一来源的旧快照刷新；正式工作台另走真实中央读模型。
+vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => true }))
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  select.mockReset()
+  select.mockReset().mockResolvedValue([])
   for (const [name, value] of Object.entries({ computed, onActivated, onMounted, shallowRef, watch, storeToRefs, usePaymentManagementStore }))
     vi.stubGlobal(name, value)
 })

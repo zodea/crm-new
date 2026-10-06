@@ -4,7 +4,6 @@ import type { SupplierCredentialAggregate } from '../../app/lib/supplier/credent
 import { createHash } from 'node:crypto'
 import { parseSupplierCredentialAuditFields, parseSupplierCredentialJson, parseSupplierCredentialMigrationGraph, supplierCredentialMigrationBytes } from '../../app/lib/migration/supplier-credential-source'
 import { credentialProblem } from '../../app/lib/supplier/credential-contract'
-import { revalidateCredentialReview } from '../../app/lib/supplier/credential-domain'
 import { canonicalCredentialCategory, hasManualCredentialReviewProof } from '../../app/lib/supplier/credentials'
 
 function invalid(message: string): never {
@@ -40,7 +39,7 @@ function graphFor(entity: CoreMigrationServerEntityDTO, snapshot: CoreMigrationS
   return graph
 }
 
-function mappedAggregate(entity: CoreMigrationServerEntityDTO, graph: SupplierCredentialMigrationGraph, fingerprint: string, now: Date): SupplierCredentialAggregate {
+function mappedAggregate(entity: CoreMigrationServerEntityDTO, graph: SupplierCredentialMigrationGraph, fingerprint: string, _now: Date): SupplierCredentialAggregate {
   const supplierId = entity.references.supplierId!
   const mappedId = (part: string, id: unknown) => `credential-migration:${hash(JSON.stringify([entity.id, part, id]))}`
   const nullableId = (part: string, id: unknown) => id === null ? null : mappedId(part, id)
@@ -135,12 +134,20 @@ function mappedAggregate(entity: CoreMigrationServerEntityDTO, graph: SupplierCr
       actorId: null,
     })),
     review: null,
+    ...(graph.reviewHistory
+      ? { reviewHistory: graph.reviewHistory.map(row => ({
+          decision: row.decision as 'qualified' | 'rejected',
+          reviewedAt: text(row.reviewed_at),
+          note: text(row.note),
+          actorId: row.actor_id as string | null,
+          historyIdentity: { id: mappedId('reviewHistory', row.id), legacyId: text(row.id), archivedAt: text(row.archived_at) },
+        })) }
+      : {}),
   }
   const proof = { status: text(graph.supplier.credential_status), reviewedAt: graph.supplier.credential_reviewed_at as string | null, reviewNote: text(graph.supplier.credential_review_note) }
   if (hasManualCredentialReviewProof(proof)) {
     aggregate.review = { decision: proof.status as 'qualified' | 'rejected', reviewedAt: proof.reviewedAt!, note: proof.reviewNote, actorId: null }
   }
-  revalidateCredentialReview(aggregate, now)
   for (const credential of aggregate.credentials) {
     if (!credential.deletedAt)
       continue
@@ -178,8 +185,8 @@ export function prepareSupplierCredentialMigration(current: readonly SupplierCre
     suppliers.add(entity.references.supplierId)
     legacySuppliers.add(entity.legacyId)
     const graph = graphFor(entity, snapshot)
-    for (const part of ['credentials', 'requirements', 'files', 'credentialAudits', 'supplierAudits'] as const) {
-      for (const row of graph[part]) {
+    for (const part of ['credentials', 'requirements', 'files', 'credentialAudits', 'supplierAudits', 'reviewHistory'] as const) {
+      for (const row of graph[part] ?? []) {
         const key = JSON.stringify([part, row.id])
         if (physicalIds.has(key))
           invalid('物理旧身份跨分供方重复')

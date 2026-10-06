@@ -7,25 +7,13 @@ import type {
 import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readFailureState, readStateData } from '~/lib/read-model/state'
 import { supplierProblemFromUnknown } from '~/lib/supplier/repository'
-
-function previous<T>(state: ReadState<T>): T | null {
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
-}
 
 function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
   const { problem } = supplierProblemFromUnknown(cause)
-  if (problem.code === 'forbidden')
-    return { kind: 'forbidden', problem }
-  if (problem.code === 'not-found')
-    return { kind: 'not-found', problem }
-  if (problem.code === 'relationship-mismatch')
-    return { kind: 'mismatch', problem }
-  return { kind: 'error', problem, previous: prior }
+  return readFailureState(problem, prior)
 }
 
 function sameDetail(left: SupplierDetailQueryDTO | null, right: SupplierDetailQueryDTO) {
@@ -40,10 +28,16 @@ export const useSupplierReadStore = defineStore('supplier-read', () => {
   const detailQuery = shallowRef<SupplierDetailQueryDTO | null>(null)
   let latestList = 0
   let latestDetail = 0
+  bindReadAuthority((problem) => {
+    ++latestList
+    ++latestDetail
+    listState.value = readFailureState<SupplierListPageDTO>(problem, null)
+    detailState.value = readFailureState<SupplierDetailReadDTO>(problem, null)
+  })
 
   async function loadList(query: SupplierListQueryDTO) {
     const request = ++latestList
-    const prior = listQuery.value?.includeDemo === query.includeDemo ? previous(listState.value) : null
+    const prior = listQuery.value?.includeDemo === query.includeDemo ? readStateData(listState.value) : null
     listQuery.value = { ...query }
     listState.value = { kind: 'loading', previous: prior }
     try {
@@ -60,7 +54,7 @@ export const useSupplierReadStore = defineStore('supplier-read', () => {
 
   async function loadDetail(query: SupplierDetailQueryDTO) {
     const request = ++latestDetail
-    const prior = sameDetail(detailQuery.value, query) ? previous(detailState.value) : null
+    const prior = sameDetail(detailQuery.value, query) ? readStateData(detailState.value) : null
     detailQuery.value = { ...query }
     detailState.value = { kind: 'loading', previous: prior }
     try {

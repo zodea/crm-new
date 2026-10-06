@@ -13,7 +13,7 @@ import { expect, test } from '@playwright/test'
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '需先构建，在专属合成目录验证，不连接用户数据')
 test('分供方主档、证照原件与人工核验失响应后独立重启，以原键恢复且不重复提交', async ({ page }, info) => {
   test.setTimeout(120_000)
-  const base = resolve('.codex-tmp/issue-453-browser')
+  const base = resolve('.tmp/a01-supplier-browser')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const probe = createServer().listen(0, '127.0.0.1')
@@ -25,6 +25,7 @@ test('分供方主档、证照原件与人工核验失响应后独立重启，�
   const salt = '0123456789abcdef0123456789abcdef'
   const hash = `scrypt$${salt}$${scryptSync(code, Buffer.from(salt, 'hex'), 64).toString('hex')}`
   let child: ChildProcess | null = null
+  let starts = 0
   let logs = ''
   const pageErrors: string[] = []
   const unavailableRequests: string[] = []
@@ -43,6 +44,7 @@ test('分供方主档、证照原件与人工核验失响应后独立重启，�
     child = null
   }
   async function start() {
+    starts++
     child = spawn(process.execPath, ['.output/server/index.mjs'], {
       cwd: resolve('.'),
       windowsHide: true,
@@ -109,22 +111,74 @@ test('分供方主档、证照原件与人工核验失响应后独立重启，�
     await page.reload()
     await login()
     await page.goto(`${origin}/base/supplier`)
+    // Empty actual finance collections prove zero; missing project/contract sources remain unknown.
+    for (const kind of ['payment_application', 'payment_record']) {
+      const emptyFinanceResponse = await page.request.get(`${origin}/api/read/finance/${kind}/list`)
+      expect(emptyFinanceResponse.ok(), await emptyFinanceResponse.text()).toBe(true)
+      expect((await emptyFinanceResponse.json()).items).toEqual([])
+    }
+    const coldListResponse = await page.request.get(`${origin}/api/read/suppliers`)
+    expect(coldListResponse.ok(), await coldListResponse.text()).toBe(true)
+    const coldList = await coldListResponse.json()
+    expect(coldList.items).toHaveLength(1)
+    expect(coldList.items).toMatchObject([{ supplier: { id: supplierId }, paymentAmount: '0.00', projectCount: null, contractAmount: null }])
+    expect(coldList.meta.sources).toContainEqual(expect.objectContaining({ key: 'payments', state: 'readable', sourceVersion: 'finance-0' }))
+    expect(coldList.unavailableSources).toEqual(expect.arrayContaining(['projects', 'contracts']))
+    const coldDetailResponse = await page.request.get(`${origin}/api/read/suppliers/${supplierId}?origin=real`)
+    expect(coldDetailResponse.ok(), await coldDetailResponse.text()).toBe(true)
+    expect((await coldDetailResponse.json()).summary.paymentAmount).toMatchObject({ status: 'complete', value: '0.00', knownValue: '0.00', participatingCount: 0, missingSources: [] })
     await page.getByRole('button', { name: '排序', exact: true }).click()
     const sortSelect = page.getByRole('combobox', { name: '排序方式' })
     await expect.poll(() => sortSelect.locator('option[value="projectCount-asc"]').evaluate(element => (element as HTMLOptionElement).disabled)).toBe(true)
-    await expect.poll(() => sortSelect.locator('option[value="paymentAmount-desc"]').evaluate(element => (element as HTMLOptionElement).disabled)).toBe(true)
+    await expect.poll(() => sortSelect.locator('option[value="contractAmount-desc"]').evaluate(element => (element as HTMLOptionElement).disabled)).toBe(true)
+    await expect.poll(() => sortSelect.locator('option[value="paymentAmount-desc"]').evaluate(element => (element as HTMLOptionElement).disabled)).toBe(false)
+    const paymentSortRead = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return url.origin === origin && url.pathname === '/api/read/suppliers' && url.searchParams.get('sort') === 'paymentAmount-desc' && response.request().method() === 'GET'
+    })
+    await sortSelect.selectOption('paymentAmount-desc')
+    const sortedResponse = await paymentSortRead
+    expect(sortedResponse.ok(), await sortedResponse.text()).toBe(true)
+    const sortedList = await sortedResponse.json()
+    expect(sortedList.items).toHaveLength(1)
+    expect(sortedList.items).toMatchObject([{ supplier: { id: supplierId }, paymentAmount: '0.00', projectCount: null, contractAmount: null }])
+    expect(sortedList.meta.sources).toContainEqual(expect.objectContaining({ key: 'payments', state: 'readable', sourceVersion: 'finance-0' }))
+    await expect(page.locator('[data-ui="supplier-list-table"]').getByText('¥0.00', { exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: '分供方磁盘原键验收', exact: true })).toBeVisible()
+    // End skips the still-disabled project options and remains on the last readable payment sort.
     await sortSelect.press('End')
-    await expect(sortSelect).toHaveValue('category-asc')
+    await expect(sortSelect).toHaveValue('paymentAmount-desc')
     await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: '筛选合作项目数', exact: true })).toHaveCount(0)
     await page.getByRole('link', { name: '核对分供方提交 1' }).click()
     await expect(page.getByText('已核对上次提交：保存成功，现已读取磁盘中的分供方。')).toBeVisible()
     await expect(page.getByLabel('公司全称 *', { exact: true })).toHaveValue('分供方磁盘原键验收')
     await page.goto(`${origin}/base/supplier/${supplierId}?origin=real`)
+    const materialContractsResponse = await page.request.get(`${origin}/api/read/material-contracts?includeDemo=false&supplierId=${encodeURIComponent(supplierId)}`)
+    expect(materialContractsResponse.ok(), await materialContractsResponse.text()).toBe(true)
+    const materialContracts = await materialContractsResponse.json()
+    expect(materialContracts.items).toEqual([])
+    expect(materialContracts.meta.dataOrigin).toBe('real')
+    expect(materialContracts.meta.sources).toContainEqual(expect.objectContaining({ key: 'material-contracts', state: 'readable', sourceVersion: 'material-contract-command-0' }))
+    const contractFactsResponse = await page.request.get(`${origin}/api/read/suppliers/${supplierId}?origin=real`)
+    expect(contractFactsResponse.ok(), await contractFactsResponse.text()).toBe(true)
+    const contractFacts = await contractFactsResponse.json()
+    expect(contractFacts).toMatchObject({ dataOrigin: 'real', supplier: { id: supplierId }, contracts: [], summary: { contractCount: null, contractAmount: { status: 'partial', value: null, knownValue: '0.00', participatingCount: 0, missingCount: null, missingSources: expect.arrayContaining(['other-contract-domains']) } } })
+    expect(contractFacts.meta.sources).toContainEqual(expect.objectContaining({ key: 'contracts', state: 'readable', sourceVersion: 'material-contracts-0' }))
+    expect(contractFacts.meta.sources).toContainEqual(expect.objectContaining({ key: 'material-contracts', state: 'readable', sourceVersion: 'material-contract-command-0' }))
+    expect(contractFacts.meta.sources).toContainEqual({ key: 'other-contract-domains', state: 'unavailable', sourceVersion: null, asOf: null })
     await page.getByRole('tab', { name: '支出合同', exact: true }).click()
-    await expect(page.getByText('此项业务事实尚未接入', { exact: true })).toBeVisible()
+    const contractsRegion = page.getByRole('region', { name: '支出合同', exact: true })
+    await expect(contractsRegion.getByRole('status', { name: '合同来源范围', exact: true })).toContainText('已核对材料采购合同来源；其他合同来源当前不可读取，完整合同数量与金额仍待核实。')
+    await expect(contractsRegion.getByRole('status', { name: '暂无合同事实', exact: true })).toBeVisible()
+    const contractSummary = page.getByRole('region', { name: '往期合作情况', exact: true }).getByRole('term').filter({ hasText: /^累计合同金额$/ }).locator('..')
+    await expect(contractSummary.getByRole('button', { name: '查看累计合同金额明细', exact: true })).toHaveText('—')
+    await expect(contractSummary.getByText('已核对金额 ¥0.00', { exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: '支出合同', exact: true })).toHaveText('支出合同')
+    await expect(page.getByTestId('auxiliary-journey')).toHaveCount(0)
+    await expect(page.getByRole('link', { name: '查看其他支出合同', exact: true })).toHaveCount(0)
     expect(unavailableRequests).toEqual([])
-    await viewports('unavailable-facts')
+    await viewports('material-partial-facts')
     await page.getByRole('link', { name: '证照附件', exact: true }).click()
     await page.getByRole('button', { name: '上传原件', exact: true }).click()
     let editor = page.getByRole('dialog', { name: '上传证照原件' })
@@ -186,21 +240,119 @@ test('分供方主档、证照原件与人工核验失响应后独立重启，�
     await page.reload()
     await login()
     await page.goto(`${origin}/base/supplier/form/${supplierId}?origin=real`)
-    await expect(page.getByText('已核对上次提交：保存成功，现已读取磁盘中的分供方。')).toBeVisible()
+    await expect(page.getByText('已核对上次税务核验：已读取同一分供方的保存结果。')).toBeVisible()
     const savedTaxpayer = await (await page.request.get(`${origin}/api/read/suppliers/${supplierId}/form?origin=real`)).json()
     expect(savedTaxpayer.draft).toMatchObject({ taxpayerVerificationStatus: 'not_found', taxpayerVerificationNote: '合成核验：仅验证原键冷恢复', taxpayerType: '未核验' })
     const recoveredTaxpayerResponse = await page.request.post(`${origin}/api/commands/supplier-resolve`, { headers: { origin }, data: { commandId: taxpayerCommand } })
     expect(recoveredTaxpayerResponse.ok(), await recoveredTaxpayerResponse.text()).toBe(true)
     const recoveredTaxpayer = await recoveredTaxpayerResponse.json()
     expect(recoveredTaxpayer.result).toMatchObject({ commandId: taxpayerCommand, supplierId, verification: { taxpayerVerificationStatus: 'not_found' } })
+    const unavailableProjectRead = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return url.origin === origin && url.pathname === '/api/read/suppliers' && url.searchParams.get('columnFilters')?.includes('projectCount') === true && response.request().method() === 'GET'
+    })
     await page.goto(`${origin}/base/supplier?columnFilters=${encodeURIComponent(JSON.stringify({ ranges: { projectCount: { min: 0 } } }))}`)
+    expect((await unavailableProjectRead).status()).toBe(503)
     await expect(page.getByText('分供方列表加载失败', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: '清除数值条件并重试', exact: true }).click()
     await expect(page.getByRole('link', { name: '分供方磁盘原键验收', exact: true })).toBeVisible()
     await viewports('unavailable-list')
     expect((await (await page.request.get(`${origin}/api/read/suppliers`)).json()).items).toHaveLength(1)
+    // Use the real owner in this synthetic directory. Startup catch-up, read receipts and problem state remain independent.
+    let warningScope: SupplierCredentialSnapshot = await (await page.request.get(`${origin}/api/read/supplier-credentials/${supplierId}?origin=real`)).json()
+    const uploadedWarning = await page.request.post(`${origin}/api/commands/supplier-credentials`, { headers: { origin }, data: {
+      workspaceId: warningScope.workspaceId,
+      actorId: warningScope.actorId,
+      supplierId,
+      origin: 'real',
+      requiredCapability: 'supplier-credential:write',
+      commandId: 'synthetic-expiry-original',
+      baseSupplierVersion: warningScope.supplierVersion,
+      baseCredentialVersion: warningScope.credentialVersion,
+      action: 'upload',
+      draft: { category: '品牌授权书', validFrom: '', expiresAt: warningScope.businessDate, longTerm: false, fileName: '合成到期通知原件.png', mimeType: 'image/png', fileSize: bytes.length, payloadBase64: bytes.toString('base64') },
+    } })
+    expect(uploadedWarning.ok(), await uploadedWarning.text()).toBe(true)
+    const warningCredentialId = (await uploadedWarning.json()).credentialId
+    await stop()
+    await start()
+    await page.reload()
+    await login()
+    await page.goto(`${origin}/base/supplier`)
+    await expect(page.getByRole('button', { name: '打开通知中心，1 条未读', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: /^打开通知中心/ }).click()
+    let inbox = page.getByRole('dialog', { name: '消息中心', exact: true })
+    await inbox.getByRole('tab', { name: /^通知/ }).click()
+    await expect(inbox.getByText('持续问题 · 7 天内到期')).toBeVisible()
+    await expect(inbox.getByRole('button', { name: '删除消息', exact: true })).toHaveCount(0)
+    let notificationCommand: Record<string, any> | null = null
+    let notificationReceipt: Record<string, any> | null = null
+    await page.route('**/api/commands/notifications', async (route) => {
+      notificationCommand = route.request().postDataJSON()
+      const response = await route.fetch()
+      expect(response.ok(), await response.text()).toBe(true)
+      notificationReceipt = await response.json()
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'synthetic-notification-response-lost' }) })
+    }, { times: 1 })
+    const lostNotificationResponse = page.waitForResponse(response => response.url().endsWith('/api/commands/notifications') && response.request().method() === 'POST' && response.status() === 503)
+    await inbox.getByRole('button', { name: '全部标记为已读', exact: true }).click()
+    expect((await lostNotificationResponse).status()).toBe(503)
+    expect(notificationReceipt).toBeTruthy()
+    await expect(inbox.getByRole('button', { name: '恢复原已读操作', exact: true })).toBeVisible()
+    expect(notificationCommand).toMatchObject({ action: 'mark-all-read', eventId: null })
+    const notificationStorage = await page.evaluate(() => JSON.stringify({ ...sessionStorage }))
+    expect(notificationStorage).not.toContain('合成到期通知原件')
+    expect(notificationStorage).not.toContain(bytes.toString('base64'))
+    await stop()
+    await start()
+    await page.reload()
+    await login()
+    await page.goto(`${origin}/base/supplier`)
+    await page.getByRole('button', { name: /^打开通知中心/ }).click()
+    inbox = page.getByRole('dialog', { name: '消息中心', exact: true })
+    await inbox.getByRole('tab', { name: /^通知/ }).click()
+    // Readback alone says zero unread; the pending original still has a visible recovery action after a cold open.
+    await expect(inbox.getByText('消息均已读', { exact: true })).toBeVisible()
+    await expect(inbox.getByRole('button', { name: '恢复原已读操作', exact: true })).toBeVisible()
+    const recoveredNotification = page.waitForResponse(response => response.url().endsWith('/api/commands/notifications') && response.request().method() === 'POST')
+    await inbox.getByRole('button', { name: '恢复原已读操作', exact: true }).click()
+    const restoredNotification = await recoveredNotification
+    expect(restoredNotification.request().postDataJSON()).toEqual(notificationCommand)
+    expect(await restoredNotification.json()).toEqual(notificationReceipt)
+    await expect(inbox.getByRole('button', { name: '恢复原已读操作', exact: true })).toHaveCount(0)
+    await expect(inbox.getByText('持续问题 · 7 天内到期 · 已读仍需处理', { exact: true })).toBeVisible()
+    await viewports('notification-persistent-problem')
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('button', { name: /^打开通知中心/ })).toBeFocused()
+    warningScope = await (await page.request.get(`${origin}/api/read/supplier-credentials/${supplierId}?origin=real`)).json()
+    const renewed = await page.request.post(`${origin}/api/commands/supplier-credentials`, { headers: { origin }, data: {
+      workspaceId: warningScope.workspaceId,
+      actorId: warningScope.actorId,
+      supplierId,
+      origin: 'real',
+      requiredCapability: 'supplier-credential:write',
+      commandId: 'synthetic-expiry-renewed',
+      baseSupplierVersion: warningScope.supplierVersion,
+      baseCredentialVersion: warningScope.credentialVersion,
+      action: 'edit',
+      credentialId: warningCredentialId,
+      draft: { category: '品牌授权书', validFrom: '', expiresAt: '', longTerm: true },
+    } })
+    expect(renewed.ok(), await renewed.text()).toBe(true)
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await page.getByRole('button', { name: /^打开通知中心/ }).click()
+    inbox = page.getByRole('dialog', { name: '消息中心', exact: true })
+    await inbox.getByRole('tab', { name: /^通知/ }).click()
+    await expect(inbox.getByText('问题已解除，历史提醒保留', { exact: true })).toBeVisible()
+    const noticeEvidence = await (await page.request.get(`${origin}/api/read/notifications`)).json()
+    expect(noticeEvidence).toMatchObject({ unreadCount: 0, items: [{ problem: { state: 'resolved' } }] })
+    expect(noticeEvidence.items[0].readAt).toBe(notificationReceipt!.readAt)
+    await viewports('notification-resolved-history')
+    const retainedOriginal = await (await page.request.get(`${origin}/api/read/supplier-credentials/${supplierId}/files/${original.file!.id}?origin=real&credentialId=${original.id}`)).json()
+    expect(Buffer.from(retainedOriginal.payloadBase64, 'base64')).toEqual(bytes)
+    expect(unavailableRequests).toEqual([])
     expect(pageErrors).toEqual([])
-    await writeFile(info.outputPath('verification.json'), `${JSON.stringify({ supplierId, masterCommand, credentialCommand, taxpayerCommand, credentialId: original.id, fileId: original.file!.id, sha256: file.sha256, coldRestarts: 3, supplierCount: 1, credentialCount: 1, unavailableNumericFilters: 'disabled; old link explicitly rejected, cleared by user', unavailableRequests, pageErrors }, null, 2)}\n`)
+    await writeFile(info.outputPath('verification.json'), `${JSON.stringify({ supplierId, masterCommand, credentialCommand, taxpayerCommand, notificationCommand, notificationReceipt, credentialId: original.id, fileId: original.file!.id, sha256: file.sha256, coldRestarts: starts - 1, supplierCount: 1, credentialCount: warningScope.credentials.length, paymentSort: new URL(sortedResponse.url()).searchParams.get('sort'), confirmedPaymentAmount: sortedList.items[0].paymentAmount, paymentSourceVersion: 'finance-0', knownMaterialContractCount: materialContracts.items.length, contractSummary: contractFacts.summary.contractAmount, completeContractCount: contractFacts.summary.contractCount, unavailableNumericFilters: 'project/contract disabled; old project link explicitly rejected, cleared by user', unavailableRequests, pageErrors }, null, 2)}\n`)
   }
   finally {
     await stop()

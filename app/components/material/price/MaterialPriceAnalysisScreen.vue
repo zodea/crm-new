@@ -116,7 +116,7 @@ function money(value: number | null): string {
 </script>
 
 <template>
-  <div class="material-price-screen">
+  <div class="material-price-screen" role="region" aria-label="已归档送货单价格分析">
     <div v-if="loading" role="status" class="panel px-4 py-10 text-center text-13px text-ink-soft">
       正在读取已归档送货单价格…
     </div>

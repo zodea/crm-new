@@ -9,6 +9,18 @@ let mem: TestDb
 
 vi.mock('~/lib/db/connection', () => ({
   select: <T>(sql: string, params?: unknown[]) => mem.select<T>(sql, params),
+  withTransaction: async <T>(work: (tx: TestDb) => Promise<T>) => {
+    await mem.execute('BEGIN')
+    try {
+      const result = await work(mem)
+      await mem.execute('COMMIT')
+      return result
+    }
+    catch (cause) {
+      await mem.execute('ROLLBACK')
+      throw cause
+    }
+  },
 }))
 
 beforeEach(async () => {
@@ -102,6 +114,52 @@ afterEach(() => {
 })
 
 describe('payment management store', () => {
+  it.each([
+    ['先款后票', 1000, '待回票'],
+    ['先票后款', 0, '待关联发票'],
+    ['无需发票', 0, '无需发票'],
+    ['旧回票类型待核实', null, '回票类型待核实'],
+  ] as const)('native工作台%s同源待回票派生不改变实际已付和可付', async (state, pending, invoiceStatus) => {
+    // An explicitly damaged synthetic legacy row must retain an unknown state, not inherit post-payment invoicing.
+    if (state === '旧回票类型待核实')
+      await mem.execute('PRAGMA ignore_check_constraints=ON')
+    await mem.execute('UPDATE payment_applications SET invoice_state=? WHERE id=\'application-partial\'', [state])
+    await mem.execute('PRAGMA ignore_check_constraints=OFF')
+    const store = usePaymentManagementStore()
+    await store.load()
+    expect(store.rows.find(row => row.id === 'application-partial')).toMatchObject({ invoiceStatus, pendingInvoiceAmount: pending, paidAmount: 300, dueAmount: 500, approvedAmount: 800 })
+  })
+  it('原金额与实际分摊逐行核实，未知不产生零、付清或可登记余额，旧快照标记失效', async () => {
+    const store = usePaymentManagementStore()
+    await store.load()
+    await mem.execute(`UPDATE payment_applications SET apply_amount='unknown' WHERE id='application-partial'`)
+    await expect(store.load()).rejects.toThrow('不能按零')
+    expect(store.currentRead).toBe(false)
+    expect(store.hasSnapshot).toBe(true)
+    expect(store.rows.find(row => row.id === 'application-partial')?.paidAmount).toBe(300)
+    await mem.execute(`UPDATE payment_applications SET apply_amount=1000 WHERE id='application-partial'`)
+    const guards = await mem.select<{ name: string, sql: string }>(`SELECT name,sql FROM sqlite_schema WHERE type='trigger' AND tbl_name='payment_record_application_allocations'`)
+    for (const guard of guards)
+      await mem.execute(`DROP TRIGGER ${guard.name}`)
+    await mem.execute(`UPDATE payment_record_application_allocations SET allocated_amount='unknown' WHERE id='allocation-partial'`)
+    for (const guard of guards)
+      await mem.execute(guard.sql)
+    await expect(store.load()).rejects.toThrow('不能按零')
+    expect(store.currentRead).toBe(false)
+    expect(await mem.select(`SELECT allocated_amount FROM payment_record_application_allocations WHERE id='allocation-partial'`)).toEqual([{ allocated_amount: 'unknown' }])
+    expect(await mem.select(`SELECT amount,confirmation_status FROM payment_records WHERE id='payment-confirmed-partial'`)).toEqual([{ amount: 300, confirmation_status: 'confirmed' }])
+  })
+  it('已证明的空集是真实零，原金额小数精度不在读取或合计时先舍去', async () => {
+    await mem.execute('DELETE FROM payment_record_application_allocations WHERE payment_record_id=\'payment-needs-review\'')
+    await mem.execute(`UPDATE payment_applications SET status='draft'`)
+    const store = usePaymentManagementStore()
+    await store.load()
+    expect(store.summary).toEqual({ applicationCount: 0, approvedAmount: 0, paidAmount: 0, dueAmount: 0, dueCount: 0 })
+    await mem.execute(`INSERT INTO payment_applications(id,name,apply_amount,approved_amount,status) VALUES('native-precision','精确小数',10.000001,NULL,'approved')`)
+    await store.load()
+    expect(store.rows).toContainEqual(expect.objectContaining({ id: 'native-precision', dueAmount: 10.000001, paidAmount: 0 }))
+    expect(store.summary.dueAmount).toBe(10.000001)
+  })
   it('明确改为零元后保留真实已付，并指出超额而非已付清', async () => {
     await mem.execute('UPDATE payment_applications SET approved_amount = 0, approved_amount_origin = \'user-entry\' WHERE id = \'application-partial\'')
     const store = usePaymentManagementStore()

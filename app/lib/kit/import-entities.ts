@@ -11,6 +11,7 @@ import {
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
 import { round2 } from '~/lib/util/number'
 import { useBrowserQuantityStore } from '~/stores/quantity-browser'
+import { MATERIAL_CONTRACT_LINE_IMPORT_FIELDS } from '../material-contract/import'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
 // 工程量三类目标（#103 切片 6B）：逐行复用领域唯一写路径，行内自带项目编码定位归属；
@@ -341,3 +342,8 @@ export function getImportEntity(key: string): ImportEntityDef | undefined {
   // hasOwn 守卫：路由参数可为任意字符串（如 constructor），不得沿原型链误命中。
   return Object.hasOwn(IMPORT_ENTITIES, key) ? IMPORT_ENTITIES[key] : undefined
 }
+
+/** 当前合同草稿整批追加的模板登记；正式保存由合同命令负责。 */
+export const DRAFT_IMPORT_TEMPLATES = {
+  'material-contract-lines': { key: 'material-contract-lines', label: '材料采购合同明细', fields: MATERIAL_CONTRACT_LINE_IMPORT_FIELDS },
+} as const

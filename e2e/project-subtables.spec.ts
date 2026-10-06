@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { installProjectCentralFixture } from './helpers/project-central-fixture'
 
-// 旧本地子表取数、归档范围与金额的正向覆盖保留在 tests/project/subtables.test.ts、
-// tests/project/detail-aggregate.test.ts、tests/project/finance-facts.test.ts。
+// 归档发票范围与金额仍由 tests/project/detail-aggregate.test.ts 保护；
+// 当前领域取数由对应中央存储、读取及来源故障测试保护，无入口的旧子表已清理。
 // 当前项目商务卡片进入各领域中央列表，不再要求本地十页签或固定演示金额。
 const JOURNEYS = [
   { name: '甲方变洽签', path: '/owner/change', kind: 'change' },

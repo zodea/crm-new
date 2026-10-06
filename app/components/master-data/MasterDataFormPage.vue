@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { PendingMasterDataAttachment } from './MasterDataAttachmentSection.vue'
 import type { CrewFormReadDTO, WorkerFormReadDTO } from '~/lib/crew-worker/command-contract'
+import type { CrewListPageDTO } from '~/lib/crew-worker/read-contract'
 import type { CustomerFormReadDTO } from '~/lib/customer/command-contract'
+import type { CustomerListPageDTO } from '~/lib/customer/read-contract'
 import type {
   FormAttachment,
   FormAttachmentChanges,
@@ -14,8 +16,10 @@ import type {
   MasterDataPageDraft,
 } from '~/lib/master-data/page'
 import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
+import type { ProjectListPageDTO } from '~/lib/project/read-contract'
 import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
 import { onActivated, onDeactivated, onScopeDispose } from 'vue'
+import CommandRecoveryPanel from '~/components/shared/CommandRecoveryPanel.vue'
 import SupplierTaxpayerDialog from '~/components/supplier/SupplierTaxpayerDialog.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
@@ -36,6 +40,7 @@ import {
 } from '~/lib/master-data/page'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { projectOriginal } from '~/lib/project/original'
+import { collectReadPages } from '~/lib/read-model/collection'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { createTaxpayerEditorState } from '~/lib/supplier/taxpayer-editor-state'
@@ -174,9 +179,26 @@ const desktopAttachmentPicker = shallowRef(false)
 const localDraftNotice = shallowRef('')
 const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | SupplierFormReadDTO | CrewFormReadDTO | WorkerFormReadDTO | null>(null)
 const customerAlreadyApplied = shallowRef(false)
+const formalSession = computed(() => customerSession?.storesOriginals
+  ? customerSession.persistent
+  : props.kind === 'project' && projectSession.storesOriginals
+    ? projectSession.persistent
+    : supplierSession?.persistent
+      ? supplierSession.formal
+      : crewWorkerSession && (props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime() ? crewWorkerCommandStore().formSession(crewWorkerSession, props.kind) : null)
+const pendingOriginal = computed(() => formalSession.value?.pending ?? null)
+const heldSubmission = shallowRef<{ draft: MasterDataPageDraft, files: PendingMasterDataAttachment[], changes: FormAttachmentChanges } | null>(null)
 const formElement = useTemplateRef<HTMLFormElement>('formElement')
 let allowLeave = false
 let lastInitializedTarget = ''
+let viewGeneration = 0
+let viewActive = true
+function captureView() {
+  return { generation: viewGeneration, path: pageFullPath.value }
+}
+function isCurrentView(view: ReturnType<typeof captureView>) {
+  return viewActive && view.generation === viewGeneration && view.path === pageFullPath.value
+}
 
 const dirty = computed(() => hydrated.value && (
   JSON.stringify(draft.value) !== savedSnapshot.value
@@ -214,20 +236,26 @@ async function openTaxpayerEditor() {
     warning(message)
 }
 async function closeTaxpayerEditor() {
+  const view = captureView()
+  const trigger = taxpayerTrigger
   if (taxpayerEditor.busy.value || taxpayerEditor.locked.value)
     return
   if (taxpayerEditor.dirty.value && !await confirm({ variant: 'simple', title: '放弃未保存的核验输入？', message: '仅放弃本次核验输入，主档其他输入继续保留。', confirmLabel: '放弃核验输入' }))
     return
+  if (!isCurrentView(view))
+    return
   taxpayerEditor.close()
   await nextTick()
-  if (taxpayerEditor.active.value && taxpayerTrigger?.isConnected)
-    taxpayerTrigger.focus()
+  if (isCurrentView(view) && taxpayerEditor.active.value && trigger?.isConnected)
+    trigger.focus()
 }
 async function submitTaxpayerEditor() {
+  const view = captureView()
+  const trigger = taxpayerTrigger
   if (await taxpayerEditor.save()) {
     await nextTick()
-    if (taxpayerEditor.active.value && taxpayerTrigger?.isConnected)
-      taxpayerTrigger.focus()
+    if (isCurrentView(view) && taxpayerEditor.active.value && trigger?.isConnected)
+      trigger.focus()
   }
 }
 
@@ -261,36 +289,39 @@ const shellStateTitle = computed(() =>
 async function fetchCustomers(keyword: string) {
   if (isDesktopRuntime() || props.kind !== 'project')
     return readStore.searchCustomers(keyword)
-  const page = await useNuxtApp().$repositories.customerRead.list({ includeDemo: false, search: keyword, status: null, sort: 'name-asc', page: 1, pageSize: 50 })
-  return page.items.filter(item => item.dataOrigin === 'real' && item.status !== 'inactive').map(item => ({ id: item.customer.id, label: item.customer.label }))
+  const view = captureView()
+  const collection = await collectReadPages<CustomerListPageDTO>({ load: page => useNuxtApp().$repositories.customerRead.list({ includeDemo: false, search: keyword, status: null, sort: 'name-asc', page, pageSize: 100 }), identity: item => `${item.dataOrigin}:${item.customer.id}`, isCurrent: () => isCurrentView(view) })
+  return collection.items.filter(item => item.dataOrigin === 'real' && item.status !== 'inactive').map(item => ({ id: item.customer.id, label: item.customer.label }))
 }
 async function fetchProjects(keyword: string) {
   if (isDesktopRuntime() || props.kind !== 'worker')
     return readStore.searchProjects(keyword)
-  const page = await useNuxtApp().$repositories.projectList.list({
+  const view = captureView()
+  const collection = await collectReadPages<ProjectListPageDTO>({ load: page => useNuxtApp().$repositories.projectList.list({
     includeDemo: false,
     search: keyword,
     status: null,
     filters: { statuses: [], plannedEnds: [], managers: [], customerIds: [] },
     sort: 'name-asc',
-    page: 1,
-    pageSize: 20,
-  })
-  return page.items.map(item => ({ id: item.project.id, label: item.project.label, hint: item.code }))
+    page,
+    pageSize: 100,
+  }), identity: item => `${item.dataOrigin}:${item.project.id}`, isCurrent: () => isCurrentView(view) })
+  return collection.items.map(item => ({ id: item.project.id, label: item.project.label, hint: item.code }))
 }
 async function fetchCrews(keyword: string) {
   if (isDesktopRuntime() || props.kind !== 'worker')
     return readStore.searchCrews(keyword)
-  const page = await useNuxtApp().$repositories.crewWorkerRead.listCrews({
+  const view = captureView()
+  const collection = await collectReadPages<CrewListPageDTO>({ load: page => useNuxtApp().$repositories.crewWorkerRead.listCrews({
     includeDemo: false,
     search: keyword,
     trade: null,
     status: null,
     sort: 'name-asc',
-    page: 1,
-    pageSize: 20,
-  })
-  return page.items.map(item => ({ id: item.crew.id, label: item.crew.label, hint: item.trade }))
+    page,
+    pageSize: 100,
+  }), identity: item => `${item.dataOrigin}:${item.crew.id}`, isCurrent: () => isCurrentView(view) })
+  return collection.items.map(item => ({ id: item.crew.id, label: item.crew.label, hint: item.trade }))
 }
 
 async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
@@ -316,7 +347,56 @@ function createDefaultDraft(): MasterDataPageDraft {
   }
 }
 
-async function initialize() {
+async function initialize(retainInput = false) {
+  viewGeneration++
+  preparingOriginals.value = 0
+  const view = captureView()
+  if (pendingOriginal.value && route.query.origin && route.query.origin !== 'real') {
+    hydrated.value = false
+    loadError.value = '请恢复原真实来源后核对提交。'
+    return
+  }
+  if (pendingOriginal.value && heldSubmission.value && pendingOriginal.value.descriptor.targetId === (routeId.value ?? null) && (!route.query.origin || route.query.origin === 'real')) {
+    await recoverOriginal()
+    return
+  }
+  if (retainInput && savedSnapshot.value && lastInitializedTarget === `${props.kind}:${routeId.value ?? 'new'}`) {
+    hydrated.value = false
+    loading.value = true
+    loadError.value = ''
+    try {
+      if (!isDesktopRuntime() && route.query.origin && route.query.origin !== 'real')
+        throw new Error('请恢复原真实来源后继续编辑；本页输入仍保留。')
+      if (isDesktopRuntime()) {
+        const record = routeId.value ? await loadRecord(routeId.value) : null
+        if (routeId.value && !record)
+          throw new Error('原记录不存在或已删除；本页输入仍保留。')
+      }
+      else if (props.kind === 'project') {
+        await projectCommandStore.revalidate(projectSession)
+      }
+      else if (props.kind === 'customer') {
+        await customerCommandStore().revalidate(customerSession!)
+      }
+      else if (props.kind === 'supplier') {
+        await supplierCommandStore().revalidate(supplierSession!)
+      }
+      else if (props.kind === 'crew' || props.kind === 'worker') {
+        await crewWorkerCommandStore().revalidate(crewWorkerSession!, props.kind)
+      }
+      if (isCurrentView(view))
+        hydrated.value = true
+    }
+    catch (cause) {
+      if (isCurrentView(view))
+        loadError.value = toErrorMessage(cause)
+    }
+    finally {
+      if (isCurrentView(view))
+        loading.value = false
+    }
+    return
+  }
   lastInitializedTarget = `${props.kind}:${routeId.value ?? 'new'}`
   hydrated.value = false
   loading.value = true
@@ -330,6 +410,8 @@ async function initialize() {
   customerAlreadyApplied.value = false
   let shouldFocus = false
   try {
+    if (!isDesktopRuntime() && (props.kind === 'customer' || props.kind === 'project' || props.kind === 'supplier') && route.query.origin && route.query.origin !== 'real')
+      throw new Error('正式表单只能读取真实来源，请恢复原来源后继续。')
     if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier' || props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime()) {
       const central = props.kind === 'project'
         ? await projectCommandStore.hydrate(projectSession, routeId.value ?? null)
@@ -338,6 +420,8 @@ async function initialize() {
           : props.kind === 'supplier'
             ? await supplierCommandStore().hydrate(supplierSession!, routeId.value ?? null)
             : await crewWorkerCommandStore().hydrate(crewWorkerSession!, props.kind, routeId.value ?? null)
+      if (!isCurrentView(view))
+        return
       draft.value = {
         ...formDefaults(props.kind),
         ...(central.draft ?? createDefaultDraft()),
@@ -368,6 +452,8 @@ async function initialize() {
           ? Promise.resolve([])
           : listFormAttachments(props.kind, routeId.value, true),
       ])
+      if (!isCurrentView(view))
+        return
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
         allowLeave = true
@@ -381,20 +467,26 @@ async function initialize() {
       attachments.value = files
     }
     await nextTick()
+    if (!isCurrentView(view))
+      return
     savedSnapshot.value = JSON.stringify(draft.value)
     hydrated.value = true
     shouldFocus = true
   }
   catch (cause) {
-    loadError.value = toErrorMessage(cause)
+    if (isCurrentView(view))
+      loadError.value = toErrorMessage(cause)
   }
   finally {
-    loading.value = false
-    if (shouldFocus) {
+    if (isCurrentView(view))
+      loading.value = false
+    if (shouldFocus && isCurrentView(view)) {
       await nextTick()
-      formElement.value
-        ?.querySelector<HTMLElement>('input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
-        ?.focus({ preventScroll: true })
+      if (isCurrentView(view)) {
+        formElement.value
+          ?.querySelector<HTMLElement>('input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
+          ?.focus({ preventScroll: true })
+      }
     }
   }
 }
@@ -493,6 +585,10 @@ async function saveThroughStore(action: MasterDataSaveAction) {
 }
 
 async function handleFooterAction(action: FormFooterAction) {
+  if (action !== 'cancel' && (loadingAction.value || pendingOriginal.value)) {
+    warning('请先核对原提交，再保存新的内容。')
+    return
+  }
   if (action !== 'cancel' && customerAlreadyApplied.value) {
     warning('上次提交已经保存，请先使用已保存内容，再继续更正；不要重复添加原件。')
     return
@@ -520,8 +616,22 @@ async function handleFooterAction(action: FormFooterAction) {
     return
 
   loadingAction.value = action
+  const view = captureView()
+  const sent = { draft: JSON.parse(JSON.stringify(draft.value)) as MasterDataPageDraft, files: JSON.parse(JSON.stringify(pendingAttachments.value)) as PendingMasterDataAttachment[], changes: JSON.parse(JSON.stringify(attachmentChanges())) as FormAttachmentChanges }
+  if (formalSession.value)
+    heldSubmission.value = sent
   try {
     const result = await saveThroughStore(saveAction)
+    if (!isCurrentView(view))
+      return
+    if ('readbackConfirmed' in result && result.readbackConfirmed) {
+      const retained = acknowledgeSubmission(result.form, sent)
+      heldSubmission.value = null
+      if (retained) {
+        warning('本次提交已保存；保存期间继续编辑的内容仍在页面，请作为新的更正保存。')
+        return
+      }
+    }
     success(saveAction === 'draft'
       ? '草稿已保存'
       : meta.value.saveSuccessMessage ?? '保存成功')
@@ -571,8 +681,9 @@ async function handleFooterAction(action: FormFooterAction) {
                   ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
                   : meta.value.listPath
       if (meta.value.postSaveDetailTab) {
+        const submittedKey = pageKey.value
         await navigateTo(closePath)
-        tabsStore.close(pageKey.value)
+        tabsStore.close(submittedKey)
       }
       else {
         tabsStore.close(pageKey.value)
@@ -587,9 +698,12 @@ async function handleFooterAction(action: FormFooterAction) {
       await navigateTo(`${meta.value.newPath}/${result.id}`)
       return
     }
-    await initialize()
+    if (!('readbackConfirmed' in result))
+      await initialize()
   }
   catch (cause) {
+    if (!isCurrentView(view))
+      return
     if (cause instanceof ProjectPersistentConflictError) {
       conflictLatest.value = cause.latest
       customerAlreadyApplied.value = cause.alreadyApplied
@@ -619,17 +733,87 @@ async function handleFooterAction(action: FormFooterAction) {
       error(cause.message)
     }
     else {
+      if (pendingOriginal.value && !formalSession.value?.context) {
+        hydrated.value = false
+        loadError.value = toErrorMessage(cause)
+      }
       error(`保存失败：${toErrorMessage(cause)}`)
     }
   }
   finally {
-    loadingAction.value = null
+    if (isCurrentView(view))
+      loadingAction.value = null
+  }
+}
+
+function acknowledgeSubmission(form: CustomerFormReadDTO | ProjectFormReadDTO | SupplierFormReadDTO, sent: NonNullable<typeof heldSubmission.value>) {
+  const retained = JSON.stringify(draft.value) !== JSON.stringify(sent.draft)
+  attachments.value = form.attachments
+  pendingAttachments.value = pendingAttachments.value.filter(file => !sent.files.some(original => original.localId === file.localId && JSON.stringify(original) === JSON.stringify(file)))
+  pendingRemoveIds.value = pendingRemoveIds.value.filter(id => !sent.changes.removeIds?.includes(id))
+  pendingRestoreIds.value = pendingRestoreIds.value.filter(id => !sent.changes.restoreIds?.includes(id))
+  if (retained) {
+    draft.value = { ...draft.value, id: form.draft.id }
+    savedSnapshot.value = JSON.stringify({ ...sent.draft, id: form.draft.id })
+  }
+  else {
+    draft.value = { ...formDefaults(props.kind), ...form.draft } as MasterDataPageDraft
+    savedSnapshot.value = JSON.stringify(draft.value)
+  }
+  fieldErrors.value = {}
+  return retained || pendingAttachments.value.length > 0 || pendingRemoveIds.value.length > 0 || pendingRestoreIds.value.length > 0
+}
+
+async function recoverOriginal() {
+  if (!pendingOriginal.value || formalSession.value?.busy)
+    return
+  const view = captureView()
+  try {
+    if (route.query.origin && route.query.origin !== 'real')
+      throw new Error('请恢复原真实来源后核对提交。')
+    const resolved = props.kind === 'customer'
+      ? await customerCommandStore().recover(customerSession!)
+      : props.kind === 'supplier'
+        ? await supplierCommandStore().recover(supplierSession!)
+        : (props.kind === 'crew' || props.kind === 'worker') ? await crewWorkerCommandStore().recover(crewWorkerSession!, props.kind) : await projectCommandStore.recover(projectSession)
+    if (!isCurrentView(view))
+      return
+    if (resolved.outcome === 'applied') {
+      if (heldSubmission.value) {
+        acknowledgeSubmission(resolved.form, heldSubmission.value)
+      }
+      else {
+        draft.value = { ...formDefaults(props.kind), ...resolved.form.draft } as MasterDataPageDraft
+        attachments.value = resolved.form.attachments
+        savedSnapshot.value = JSON.stringify(draft.value)
+      }
+      localDraftNotice.value = '已核对原提交并读取已保存记录。当前页面保留继续编辑的内容，请确认后再作新的更正。'
+    }
+    else {
+      localDraftNotice.value = '原提交没有保存，原编号已封存；当前输入保留，可以重新保存。'
+    }
+    heldSubmission.value = null
+    loadError.value = ''
+    hydrated.value = true
+  }
+  catch (cause) {
+    if (!isCurrentView(view))
+      return
+    error(`核对失败：${toErrorMessage(cause)}`)
+    if (!formalSession.value?.context) {
+      hydrated.value = false
+      loadError.value = toErrorMessage(cause)
+    }
   }
 }
 
 function keepLocalAgainstLatest() {
   if (!conflictLatest.value)
     return
+  if (conflictLatest.value.draft.id !== draft.value.id || !hydrated.value || !viewActive) {
+    conflictLatest.value = null
+    return
+  }
   if (props.kind === 'customer')
     customerCommandStore().rebase(customerSession!, conflictLatest.value.version)
   else if (props.kind === 'supplier')
@@ -644,8 +828,9 @@ function keepLocalAgainstLatest() {
 
 async function useLatestServerVersion() {
   const latest = conflictLatest.value
-  if (!latest)
+  if (!latest || latest.draft.id !== draft.value.id || !hydrated.value || !viewActive)
     return
+  const view = captureView()
   if (props.kind === 'customer') {
     try {
       customerCommandStore().acceptLatest(customerSession!, latest as CustomerFormReadDTO)
@@ -676,7 +861,8 @@ async function useLatestServerVersion() {
   conflictLatest.value = null
   localDraftNotice.value = ''
   await nextTick()
-  savedSnapshot.value = JSON.stringify(draft.value)
+  if (isCurrentView(view))
+    savedSnapshot.value = JSON.stringify(draft.value)
 }
 
 function appendPendingAttachments(files: FormAttachmentDraft[]) {
@@ -702,21 +888,40 @@ function appendPendingAttachments(files: FormAttachmentDraft[]) {
 }
 
 async function handleFiles(files: File[]) {
+  const view = captureView()
   preparingOriginals.value++
   try {
-    appendPendingAttachments(storesOriginals.value
+    const originals = storesOriginals.value
       ? await Promise.all(files.map(props.kind === 'project' ? projectOriginal : customerOriginal))
-      : files.map(file => ({ fileName: file.name, fileSize: file.size, mimeType: file.type })))
+      : files.map(file => ({ fileName: file.name, fileSize: file.size, mimeType: file.type }))
+    if (isCurrentView(view))
+      appendPendingAttachments(originals)
   }
-  catch (cause) { error(toErrorMessage(cause)) }
-  finally { preparingOriginals.value-- }
+  catch (cause) {
+    if (isCurrentView(view)) {
+      error(toErrorMessage(cause))
+    }
+  }
+  finally {
+    if (isCurrentView(view))
+      preparingOriginals.value = Math.max(0, preparingOriginals.value - 1)
+  }
 }
 
 async function downloadCustomerOriginal(file: FormAttachment) {
+  const view = captureView()
+  const session = formalSession.value
+  const generation = session?.generation
+  const context = session?.context
   try {
     const blob = props.kind === 'project'
       ? await projectCommandStore.downloadOriginal(file.ownerId, file.id)
       : await customerCommandStore().downloadOriginal(file.ownerId, file.id)
+    if (!isCurrentView(view) || !hydrated.value || file.ownerId !== draft.value.id
+      || session !== formalSession.value || session?.generation !== generation || session?.context !== context
+      || !attachments.value.some(current => current.id === file.id && current.ownerId === file.ownerId && !current.deletedAt)) {
+      return
+    }
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -724,10 +929,14 @@ async function downloadCustomerOriginal(file: FormAttachment) {
     anchor.click()
     URL.revokeObjectURL(url)
   }
-  catch (cause) { error(toErrorMessage(cause)) }
+  catch (cause) {
+    if (isCurrentView(view))
+      error(toErrorMessage(cause))
+  }
 }
 
 async function pickNativeFiles() {
+  const view = captureView()
   try {
     const [{ open }, { stat }, { basename }] = await Promise.all([
       import('@tauri-apps/plugin-dialog'),
@@ -743,10 +952,12 @@ async function pickNativeFiles() {
       filePath,
       fileSize: (await stat(filePath)).size,
     })))
-    appendPendingAttachments(files)
+    if (isCurrentView(view))
+      appendPendingAttachments(files)
   }
   catch (cause) {
-    error(`选择附件失败：${toErrorMessage(cause)}`)
+    if (isCurrentView(view))
+      error(`选择附件失败：${toErrorMessage(cause)}`)
   }
 }
 
@@ -778,7 +989,7 @@ function toggleExistingAttachment(id: string) {
 async function leaveForm() {
   if (taxpayerEditor.busy.value)
     return
-  if (dirty.value || taxpayerEditor.dirty.value) {
+  if (dirty.value || pendingOriginal.value || taxpayerEditor.dirty.value) {
     const leave = await confirm({
       variant: 'simple',
       title: '放弃修改',
@@ -797,7 +1008,7 @@ if (!centralTargetCost) {
   useTabCloseGuard(async () => {
     if (taxpayerEditor.busy.value)
       return false
-    if (allowLeave || (!dirty.value && !taxpayerEditor.dirty.value))
+    if (allowLeave || (!dirty.value && !pendingOriginal.value && !taxpayerEditor.dirty.value))
       return true
 
     const leave = await confirm({
@@ -821,20 +1032,52 @@ onActivated(() => {
   if (centralTargetCost)
     return
   taxpayerEditor.activate()
+  const wasInactive = !viewActive
+  viewActive = true
   const target = `${props.kind}:${routeId.value ?? 'new'}`
-  if (lastInitializedTarget && target !== lastInitializedTarget)
-    void initialize()
+  if (wasInactive || (lastInitializedTarget && target !== lastInitializedTarget))
+    void initialize(wasInactive && target === lastInitializedTarget)
 })
-onDeactivated(taxpayerEditor.deactivate)
-onScopeDispose(taxpayerEditor.deactivate)
+function deactivateView() {
+  viewActive = false
+  viewGeneration++
+  taxpayerEditor.deactivate()
+  if (props.kind === 'project')
+    projectCommandStore.deactivate(projectSession)
+  else if (customerSession)
+    customerCommandStore().deactivate(customerSession)
+  else if (supplierSession)
+    supplierCommandStore().deactivate(supplierSession)
+  if (crewWorkerSession && (props.kind === 'crew' || props.kind === 'worker'))
+    crewWorkerCommandStore().deactivate(crewWorkerSession, props.kind)
+  preparingOriginals.value = 0
+  loadingAction.value = null
+  loading.value = false
+}
+onDeactivated(deactivateView)
+onScopeDispose(deactivateView)
 
 watch(routeSupplierCategory, () => {
   if (props.kind === 'supplier' && !isEditing.value)
     void initialize()
 })
+watch(() => [routeId.value, route.query.origin], () => {
+  if (isDesktopRuntime() || (props.kind !== 'customer' && props.kind !== 'project' && props.kind !== 'supplier' && props.kind !== 'crew' && props.kind !== 'worker'))
+    return
+  const session = formalSession.value
+  if (session) {
+    session.generation++
+    session.context = null
+    session.busy = false
+  }
+  if (pendingOriginal.value?.descriptor.targetId !== (routeId.value ?? null))
+    heldSubmission.value = null
+  void initialize()
+})
 </script>
 
 <template>
+  <CommandRecoveryPanel v-if="pendingOriginal" :command-id="pendingOriginal.id" :saved="Boolean(pendingOriginal.result)" :busy="Boolean(formalSession?.busy)" @recover="recoverOriginal" />
   <CentralTargetCostFormScreen v-if="centralTargetCost" />
   <EntityFormShell
     v-else
@@ -918,6 +1161,7 @@ watch(routeSupplierCategory, () => {
         :pending-attachments="pendingAttachments"
         :pending-remove-ids="pendingRemoveIds"
         :pending-restore-ids="pendingRestoreIds"
+        :files-disabled="Boolean(loadingAction || pendingOriginal || preparingOriginals)"
         @pick-native="pickNativeFiles"
         @files="handleFiles"
         @download="downloadCustomerOriginal"
@@ -970,6 +1214,7 @@ watch(routeSupplierCategory, () => {
         :dirty="dirty"
         close-after-save
         :loading-action="loadingAction"
+        :write-disabled="Boolean(pendingOriginal || preparingOriginals || !hydrated)"
         @action="handleFooterAction"
       />
     </template>

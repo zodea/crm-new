@@ -57,10 +57,13 @@ test.describe('Issue #203：付款管理', () => {
     await expect(page.getByRole('button', { name: '付款状态，已选 0 项' })).toContainText('不限')
   })
 
-  test('窄窗宽表只在表格自身横滚，登记支付仅导航到整页表单', async ({ page }) => {
+  test('窄窗宽表只在表格自身横滚，测试来源仅可查看且禁止登记正式支付', async ({ page }) => {
+    const writes: string[] = []
+    page.on('request', request => request.method() === 'POST' && request.url().includes('/api/commands/finance') && writes.push(request.url()))
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/finance/payment-management')
     await expect(page.getByText('五金机电采购首期请款', { exact: true })).toBeVisible()
+    await expect(page.getByText('当前为测试数据，只读查看；正式付款请切回实际来源。', { exact: true })).toBeVisible()
 
     const tableScroll = page.locator(
       '[data-testid="payment-management-table"] .vxe-table--scroll-x-handle',
@@ -70,31 +73,38 @@ test.describe('Issue #203：付款管理', () => {
     const action = page.getByRole('button', {
       name: '五金机电采购首期请款付款操作',
     })
-    await action.click()
-    await page.getByRole('menuitem', { name: '登记支付记录' }).click()
-
-    await expect(page).toHaveURL(/\/finance\/records\/new\?/)
-    await expect(page).toHaveURL(/paymentApplicationId=pa_demo_sup004_1/)
-    await expect(page.getByRole('heading', { name: /新建 · 支付记录/ })).toBeVisible()
-    await expect(page.getByTestId('finance-amount')).toHaveValue('20000')
+    await action.focus()
+    await expect(action).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menuitem', { name: '登记支付记录', exact: true })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: '查看付款申请', exact: true }).click()
+    await expect(page).toHaveURL(/\/finance\/payment\/pa_demo_sup004_1\/detail/)
+    await expect(page.getByRole('alert', { name: '付款申请详情加载失败', exact: true })).toContainText('当前为测试数据来源，不能使用正式财务记录或原提交')
+    await expect(page.getByTestId('payment-application-edit')).toHaveCount(0)
+    await expect(page.getByTestId('payment-application-create-payment')).toHaveCount(0)
+    expect(writes).toEqual([])
   })
 
-  test('付款申请详情展示真实勾稽洞察，并能回填登记支付流程', async ({ page }) => {
+  test('测试来源不能读取正式付款详情、编辑或登记，重新读取保持来源门禁', async ({ page }) => {
+    const writes: string[] = []
+    page.on('request', request => request.method() === 'POST' && request.url().includes('/api/commands/finance') && writes.push(request.url()))
     await page.goto('/finance/payment/pa_demo_sup004_1/detail')
-
-    await expect(page.getByRole('heading', { name: '五金机电采购首期请款' })).toBeVisible()
-    await expect(page.getByTestId('payment-application-insight')).toBeVisible()
-    await expect(page.getByText('跨项目/分供方付款', { exact: true })).toBeVisible()
-    await expect(page.getByRole('group', { name: '待支付' })).toContainText('¥20,000.00')
-
-    await page.getByTestId('payment-application-edit').click()
-    await expect(page).toHaveURL('/finance/payment/pa_demo_sup004_1')
-    await expect(page.getByRole('heading', { name: /编辑 · 付款申请/ })).toBeVisible()
-
-    await page.goto('/finance/payment/pa_demo_sup004_1/detail')
-    await page.getByTestId('payment-application-create-payment').click()
-    await expect(page).toHaveURL(/\/finance\/records\/new\?/)
-    await expect(page).toHaveURL(/paymentApplicationId=pa_demo_sup004_1/)
-    await expect(page.getByTestId('finance-amount')).toHaveValue('20000')
+    const unavailable = page.getByRole('alert', { name: '付款申请详情加载失败', exact: true })
+    await expect(unavailable).toContainText('当前为测试数据来源，不能使用正式财务记录或原提交')
+    await expect(page.getByTestId('payment-application-insight')).toHaveCount(0)
+    await expect(page.getByTestId('payment-application-edit')).toHaveCount(0)
+    await expect(page.getByTestId('payment-application-create-payment')).toHaveCount(0)
+    const retry = unavailable.getByRole('button', { name: '重新加载', exact: true })
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expectNoPageOverflow(page, `测试来源付款详情门禁 @ ${width}px`)
+      await retry.focus()
+      await expect(retry).toBeFocused()
+    }
+    await page.keyboard.press('Enter')
+    await expect(unavailable).toContainText('当前为测试数据来源，不能使用正式财务记录或原提交')
+    await expect(page.getByTestId('payment-application-edit')).toHaveCount(0)
+    await expect(page.getByTestId('payment-application-create-payment')).toHaveCount(0)
+    expect(writes).toEqual([])
   })
 })

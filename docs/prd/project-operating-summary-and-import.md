@@ -99,7 +99,7 @@
 
 ### R-10 票税、动态效益和完整性
 
-票税实体口径沿用现有票税域；动态效益公式见 [`DATABASE.md §4.8`](../rewrite/DATABASE.md#48-动态成本与合同付款)，完整性状态见 [`DATABASE.md §4.9`](../rewrite/DATABASE.md#49-经营汇总完整性)。页面必须区分待补录、不适用、尚未定义和真实零值，不自行补零或推算票税。
+票税实体口径沿用现有票税域；动态效益公式见 [`DATABASE.md §4.8`](../rewrite/DATABASE.md#48-动态成本与合同付款)，公共状态与完整性见 [READ-MODELS](../rewrite/READ-MODELS.md#read-status-and-completeness)。页面必须区分待补录、不适用、尚未定义和真实零值，不自行补零或推算票税。
 
 ## 5. 汇总页输出
 
@@ -121,7 +121,7 @@
 
 ### 5.5 状态
 
-接口形状和状态语义统一见 [`DATABASE.md §4.9`](../rewrite/DATABASE.md#49-经营汇总完整性)。页面必须呈现指标状态、缺失来源、汇总截止时间和源单下钻入口。
+接口形状和状态语义统一见 [READ-MODELS](../rewrite/READ-MODELS.md#read-status-and-completeness)。页面必须呈现指标状态、缺失来源、汇总截止时间和源单下钻入口。
 
 ## 6. 导入流程
 

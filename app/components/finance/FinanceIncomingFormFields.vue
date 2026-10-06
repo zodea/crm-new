@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FinancePageDraft } from '~/lib/finance/page'
 import type { LookupOption } from '~/lib/kit/lookup'
+import { financeDraftMoney, financeInputNumber as inputNumber } from '~/lib/finance/input-number'
 
 const props = defineProps<{
   kind: 'receipt' | 'invoice_application'
@@ -34,10 +35,6 @@ function patch(field: keyof FinancePageDraft, value: unknown) {
 
 function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value
-}
-
-function inputNumber(event: Event): number {
-  return Number((event.target as HTMLInputElement).value) || 0
 }
 
 function fieldClass(field: string) {
@@ -191,7 +188,7 @@ function fieldClass(field: string) {
         <div class="field-block">
           <span class="field-label">价税合计（只读）</span>
           <div class="field-input flex items-center bg-surface-2 font-mono">
-            ¥ {{ ((Number(draft.amount) || 0) + (Number(draft.taxAmount) || 0)).toFixed(2) }}
+            ¥ {{ financeDraftMoney(draft.amount == null || draft.taxAmount == null ? null : Number(draft.amount) + Number(draft.taxAmount)) }}
           </div>
         </div>
         <label class="field-block form-span-full">

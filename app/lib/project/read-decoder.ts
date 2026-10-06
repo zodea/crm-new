@@ -7,8 +7,14 @@ import type {
   ProjectListStatusFacetDTO,
   ProjectPageSize,
 } from './read-contract'
-import { isDataOriginDTO, isEntityKindDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { isDataOriginDTO, isEntityKindDTO, isEntityRefDTO, isISODateDTO, isISODateTimeDTO, isUnavailableEntityNavigationDTO } from '../../types/read-model'
 import { decodePayrollHostSection } from '../crew-worker/payroll-read'
+import { hasConsistentOriginReadMeta, hasConsistentReadMeta } from '../read-model/meta'
+import { isMetricDTO } from '../read-model/metric'
+import { isPaginationDTO } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
+import { isProjectConstructionManagementFeeRead } from './construction-management-fee'
+import { isProjectManagementFeeRead } from './management-fee'
 import {
   PROJECT_PAGE_SIZES,
   projectProblem,
@@ -37,6 +43,8 @@ function isStringRecord(value: unknown): value is Record<string, string> {
 }
 
 function isMetric(value: unknown): value is MetricDTO {
+  if (!isMetricDTO(value))
+    return false
   const drilldown = isObject(value) ? value.drilldown : undefined
   return isObject(value)
     && (value.value === null || isMoney(value.value))
@@ -46,12 +54,14 @@ function isMetric(value: unknown): value is MetricDTO {
     && value.missingSources.every(item => typeof item === 'string')
     && isISODateTimeDTO(value.asOf)
     && (value.drilldown === null
-      || (isObject(drilldown)
+      || (isObject(drilldown) && drilldown.kind === 'entity-list'
         && isEntityKindDTO(drilldown.entity)
         && isStringRecord(drilldown.filters)))
 }
 
 function isCountMetric(value: unknown): value is MetricDTO {
+  if (!isMetricDTO(value))
+    return false
   const drilldown = isObject(value) ? value.drilldown : undefined
   return isObject(value)
     && (value.value === null || (Number.isSafeInteger(value.value) && Number(value.value) >= 0))
@@ -61,7 +71,7 @@ function isCountMetric(value: unknown): value is MetricDTO {
     && value.missingSources.every(item => typeof item === 'string')
     && isISODateTimeDTO(value.asOf)
     && (value.drilldown === null
-      || (isObject(drilldown)
+      || (isObject(drilldown) && drilldown.kind === 'entity-list'
         && drilldown.entity === 'contract'
         && isStringRecord(drilldown.filters)))
 }
@@ -84,36 +94,17 @@ function isMaterialContractJourney(value: unknown, item: unknown): boolean {
 }
 
 function isEntityRef(value: unknown, entity: 'project' | 'customer' | 'supplier'): boolean {
-  if (!isObject(value) || value.entity !== entity || typeof value.state !== 'string')
-    return false
-  if (value.state === 'resolved') {
-    return typeof value.id === 'string'
-      && value.id.trim().length > 0
-      && typeof value.label === 'string'
-      && (value.no === null || typeof value.no === 'string')
-  }
-  if (value.state === 'missing') {
-    return value.id === null
-      && value.label === null
-      && ['not-configured', 'not-recorded', 'not-applicable'].includes(String(value.reason))
-  }
-  if (value.state === 'forbidden') {
-    return (value.id === null || typeof value.id === 'string')
-      && value.label === null
-      && value.reason === 'permission-denied'
-  }
-  return false
+  return isEntityRefDTO(value, entity)
 }
 
 function isProjectSupplierReference(value: unknown, item: unknown): boolean {
   const supplier = isObject(value) ? value.supplier : null
   if (!isObject(value) || typeof value.relationId !== 'string'
-    || !isObject(supplier) || !isEntityRef(supplier, 'supplier') || !isObject(value.navigation)) {
+    || !isEntityRefDTO(supplier, 'supplier') || !isObject(value.navigation)) {
     return false
   }
   if (supplier.state !== 'resolved') {
-    return value.navigation.kind === 'unavailable'
-      && ['forbidden', 'missing-id'].includes(String(value.navigation.reason))
+    return isUnavailableEntityNavigationDTO(value.navigation, supplier)
   }
   if (!isObject(item) || !isObject(item.project))
     return false
@@ -250,11 +241,11 @@ function isEmpty(value: unknown): boolean {
 }
 
 export function decodeProjectListPage(value: unknown): ProjectListPageDTO {
-  const valid = isObject(value)
+  const valid = hasConsistentOriginReadMeta(value, 'project-read-v2') && isObject(value)
     && Array.isArray(value.items)
     && value.items.every(isProjectItem)
     && isObject(value.pagination)
-    && Number.isSafeInteger(value.pagination.page) && Number(value.pagination.page) >= 1
+    && isPaginationDTO(value.pagination, Array.isArray(value.items) ? value.items.length : undefined)
     && PROJECT_PAGE_SIZES.includes(value.pagination.pageSize as ProjectPageSize)
     && Number.isSafeInteger(value.pagination.total) && Number(value.pagination.total) >= 0
     && isObject(value.summary)
@@ -277,8 +268,10 @@ export function decodeProjectListPage(value: unknown): ProjectListPageDTO {
 }
 
 export function decodeProjectDetailRead(value: unknown): ProjectDetailReadDTO {
-  const valid = isObject(value)
+  const valid = isObject(value) && hasConsistentReadMeta(value, 'project-read-v2', isObject(value.item) ? value.item.dataOrigin : undefined)
     && isProjectItem(value.item)
+    && isProjectConstructionManagementFeeRead(value.constructionManagementFees, value.item.project.id, value.item.dataOrigin)
+    && isProjectManagementFeeRead(value.managementFees, { projectId: value.item.project.id, dataOrigin: value.item.dataOrigin, asOf: String(value.asOf) })
     && isMaterialContractJourney(value.materialContracts, value.item)
     && isProjectSupplierJourney(value.projectSuppliers, value.item)
     && isISODateTimeDTO(value.asOf)
@@ -292,6 +285,21 @@ export function decodeProjectDetailRead(value: unknown): ProjectDetailReadDTO {
     ))
   }
   const detail = value as unknown as ProjectDetailReadDTO
+  const configuration = detail.constructionManagementFees
+  const configurationProof = detail.meta.sources.find(source => source.key === 'construction-management-fee-configurations')
+  if ((configuration.state === 'complete' && (!detail.capabilities.includes('construction-contract:read') || !configurationProof))
+    || (configurationProof && (configurationProof.state !== (configuration.state === 'complete' ? 'readable' : configuration.state) || configurationProof.sourceVersion !== configuration.sourceVersion || configurationProof.asOf !== configuration.asOf))) {
+    throw new ProjectRepositoryProblem(projectProblem('internal-error', '总合同配置缺少一致的独立来源授权或证明'))
+  }
+  const payrollFee = detail.managementFees.sources[0]!
+  if ((!detail.capabilities.includes('payroll:read') || detail.item.dataOrigin !== 'real') && ['complete', 'partial'].includes(payrollFee.state))
+    throw new ProjectRepositoryProblem(projectProblem('internal-error', '管理费分区与来源授权不一致'))
+  for (const source of detail.managementFees.sources) {
+    const evidence = detail.meta.sources.find(evidence => evidence.key === source.key)
+    const readable = source.state === 'complete' || source.state === 'partial'
+    if ((readable && !evidence) || (evidence && (evidence.state !== (readable ? 'readable' : source.state) || evidence.sourceVersion !== source.sourceVersion || evidence.asOf !== source.asOf)))
+      throw new ProjectRepositoryProblem(projectProblem('internal-error', '管理费分区缺少一致的实际来源证明'))
+  }
   if (detail.payrollActual !== undefined && (detail.item.dataOrigin !== 'real' || (!detail.capabilities.includes('payroll:read') && detail.payrollActual.status !== 'forbidden')))
     throw new ProjectRepositoryProblem(projectProblem('internal-error', '工资收付分区与来源授权不一致'))
   return detail.payrollActual === undefined ? detail : { ...detail, payrollActual: decodePayrollHostSection(detail.payrollActual, { kind: 'project', id: detail.item.project.id }) }
@@ -300,6 +308,9 @@ export function decodeProjectDetailRead(value: unknown): ProjectDetailReadDTO {
 export function projectProblemFromUnknown(cause: unknown): ProjectRepositoryProblem {
   if (cause instanceof ProjectRepositoryProblem)
     return cause
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new ProjectRepositoryProblem(remote, { cause })
   return new ProjectRepositoryProblem(
     projectProblem('unavailable', '项目读取服务暂时不可用，请重试', true),
     { cause },

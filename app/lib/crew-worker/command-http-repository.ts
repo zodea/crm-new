@@ -1,3 +1,4 @@
+import type { CommandResolution } from '../forms/command-recovery'
 import type { CrewFormDraft, WorkerFormDraft } from '../master-data/forms'
 import type {
   CrewFormReadDTO,
@@ -8,6 +9,7 @@ import type {
 } from './command-contract'
 import type { CrewWorkerHttpFetcher } from './http-repository'
 import { isISODateTimeDTO } from '../../types/read-model'
+import { commandVersionAtLeast } from '../forms/command-recovery'
 import { readCrewWorkerHttp } from './http-repository'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from './repository'
 
@@ -29,11 +31,24 @@ function context(value: unknown): CrewWorkerCommandContextDTO {
 
 function result(value: unknown): CrewWorkerCommandResultDTO {
   if (!object(value) || typeof value.id !== 'string' || typeof value.commandId !== 'string'
-    || typeof value.version !== 'string' || !isISODateTimeDTO(value.updatedAt)
+    || typeof value.version !== 'string' || !commandVersionAtLeast(value.version, value.version) || !isISODateTimeDTO(value.updatedAt)
     || !Array.isArray(value.attachmentIds) || !value.attachmentIds.every(item => typeof item === 'string')) {
     return invalid('中央后台返回的班组—工人命令结果无效')
   }
   return value as unknown as CrewWorkerCommandResultDTO
+}
+
+function resolution(value: unknown, commandId: string): CommandResolution<CrewWorkerCommandResultDTO> {
+  if (!object(value))
+    return invalid('班组—工人原提交核对结果无效')
+  if (value.outcome === 'not-applied' && value.commandId === commandId && Object.keys(value).sort().join(',') === 'commandId,outcome')
+    return { outcome: 'not-applied', commandId }
+  if (value.outcome === 'applied' && Object.keys(value).sort().join(',') === 'outcome,result') {
+    const receipt = result(value.result)
+    if (receipt.commandId === commandId)
+      return { outcome: 'applied', result: receipt }
+  }
+  return invalid('班组—工人核对回执与原编号不一致，请保留原编号')
 }
 
 const CREW_TEXT_FIELDS = [
@@ -145,14 +160,32 @@ export function createHttpCrewWorkerCommandRepository(options: { fetcher: CrewWo
         method: request.id ? 'PUT' : 'POST',
         body: { ...request },
       }),
-      result,
+      (value) => {
+        const receipt = result(value)
+        if (receipt.commandId !== request.commandId || (request.id && receipt.id !== request.id))
+          return invalid('班组回执与原提交编号或目标不一致')
+        return receipt
+      },
     ),
     executeWorker: request => readCrewWorkerHttp(
       () => options.fetcher(request.id ? `/api/commands/workers/${encodeURIComponent(request.id)}` : '/api/commands/workers', {
         method: request.id ? 'PUT' : 'POST',
         body: { ...request },
       }),
-      result,
+      (value) => {
+        const receipt = result(value)
+        if (receipt.commandId !== request.commandId || (request.id && receipt.id !== request.id))
+          return invalid('工人回执与原提交编号或目标不一致')
+        return receipt
+      },
+    ),
+    resolveCrew: commandId => readCrewWorkerHttp(
+      () => options.fetcher('/api/commands/crews/resolve', { method: 'POST', body: { commandId } }),
+      value => resolution(value, commandId),
+    ),
+    resolveWorker: commandId => readCrewWorkerHttp(
+      () => options.fetcher('/api/commands/workers/resolve', { method: 'POST', body: { commandId } }),
+      value => resolution(value, commandId),
     ),
   }
 }

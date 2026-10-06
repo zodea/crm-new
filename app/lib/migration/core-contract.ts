@@ -3,8 +3,9 @@ import type { MoneyDTO } from '../../types/read-model'
 export const CORE_MIGRATION_CAPABILITY = 'core:migration:write' as const
 export const CORE_MIGRATION_CONTRACT_VERSION = 'core-migration.v1' as const
 export const CORE_MIGRATION_SOURCE_MODE = 'browser-production-snapshot' as const
-export const CORE_MIGRATION_SOURCE_VERSION = 'sqlite-v49' as const
-export const CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS = ['sqlite-v47', 'sqlite-v48', CORE_MIGRATION_SOURCE_VERSION] as const
+export const CORE_MIGRATION_SOURCE_VERSION = 'sqlite-v60' as const
+// 51 人工核验历史、52 原行证据、53 合同可空金额与主体资料、54 原费用引用、55 行税点、56 财务稳定身份、57 总合同管理费配置、58 独立报价完整图、59 付款工人身份、60 原费用结算；只承接已核实的图。
+export const CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS = ['sqlite-v47', 'sqlite-v48', 'sqlite-v49', 'sqlite-v50', 'sqlite-v51', 'sqlite-v52', 'sqlite-v53', 'sqlite-v54', 'sqlite-v55', 'sqlite-v56', 'sqlite-v57', 'sqlite-v58', 'sqlite-v59', CORE_MIGRATION_SOURCE_VERSION] as const
 export const CORE_MIGRATION_TOPOLOGY = [
   'customers',
   'suppliers',
@@ -13,6 +14,7 @@ export const CORE_MIGRATION_TOPOLOGY = [
   'projects',
   'construction_contracts',
   'subcontract_contracts',
+  'material_contracts',
   'auxiliary_contracts',
   'other_settlements',
   'other_settlement_sources',
@@ -49,8 +51,8 @@ export interface CoreMigrationSourceEntityDTO {
 }
 
 export type CoreMigrationSourceEntitiesDTO = {
-  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts' | 'other_settlements' | 'other_settlement_sources' | 'delivery_records' | 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects' | 'target_cost_versions' | 'payroll_projects'>]: CoreMigrationSourceEntityDTO[]
-} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[], other_settlement_sources?: CoreMigrationSourceEntityDTO[], delivery_records?: CoreMigrationSourceEntityDTO[], quantity_projects?: CoreMigrationSourceEntityDTO[], process_libraries?: CoreMigrationSourceEntityDTO[], supplier_credentials?: CoreMigrationSourceEntityDTO[], wbs_projects?: CoreMigrationSourceEntityDTO[], target_cost_versions?: CoreMigrationSourceEntityDTO[], payroll_projects?: CoreMigrationSourceEntityDTO[] }
+  [K in Exclude<CoreMigrationEntityType, 'material_contracts' | 'auxiliary_contracts' | 'other_settlements' | 'other_settlement_sources' | 'delivery_records' | 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects' | 'target_cost_versions' | 'payroll_projects'>]: CoreMigrationSourceEntityDTO[]
+} & { material_contracts?: CoreMigrationSourceEntityDTO[], auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[], other_settlement_sources?: CoreMigrationSourceEntityDTO[], delivery_records?: CoreMigrationSourceEntityDTO[], quantity_projects?: CoreMigrationSourceEntityDTO[], process_libraries?: CoreMigrationSourceEntityDTO[], supplier_credentials?: CoreMigrationSourceEntityDTO[], wbs_projects?: CoreMigrationSourceEntityDTO[], target_cost_versions?: CoreMigrationSourceEntityDTO[], payroll_projects?: CoreMigrationSourceEntityDTO[] }
 
 export type CoreMigrationTotalExpectationDTO
   = | { entityType: CoreMigrationEntityType, metric: 'quantity', expected: number }

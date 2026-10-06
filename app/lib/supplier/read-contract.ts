@@ -8,10 +8,13 @@ import type {
   NavigationIntentDTO,
   PageDTO,
   ProblemDTO,
+  ReadMetaDTO,
 } from '../../types/read-model'
 import type { ApprovedAmountOrigin, ApprovedAmountState } from '../finance/approval-amount'
 
 export const SUPPLIER_PAGE_SIZES = [10, 20, 50, 100] as const
+export const SUPPLIER_LIST_READ_SCHEMA = 'supplier-list.v1'
+export const SUPPLIER_DETAIL_READ_SCHEMA = 'supplier-detail.v1'
 export type SupplierPageSize = typeof SUPPLIER_PAGE_SIZES[number]
 export const SUPPLIER_LIST_TEXT_FIELDS = ['name', 'uniqueCode', 'taxNo', 'aliases', 'address', 'contact', 'contactPhone', 'mainBusiness', 'laborScope', 'bank', 'bankAccount', 'businessType'] as const
 export type SupplierListTextField = typeof SUPPLIER_LIST_TEXT_FIELDS[number]
@@ -124,7 +127,7 @@ export interface SupplierListSummaryDTO {
   origins: Record<DataOriginDTO, { supplierCount: number, contractAmount: MoneyDTO | null, paymentAmount: MoneyDTO | null }>
 }
 
-export type SupplierListPageDTO = PageDTO<SupplierListItemDTO, SupplierListSummaryDTO> & { unavailableSources?: SupplierFactSource[] }
+export type SupplierListPageDTO = PageDTO<SupplierListItemDTO, SupplierListSummaryDTO> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO>, unavailableSources?: SupplierFactSource[] }
 
 export interface SupplierProjectSourceRow {
   dataOrigin: DataOriginDTO
@@ -168,6 +171,8 @@ export interface SupplierSettlementSourceRow {
   totalAmount: number | null
   settlementDate: ISODateDTO | null
   status: string
+  /** Only the trusted actual Other owner supplies its registered detail target. */
+  navigationVariant?: 'other_settlement'
 }
 
 export interface SupplierInvoiceSourceRow {
@@ -293,6 +298,7 @@ export interface SupplierPaymentDTO {
 }
 
 export interface SupplierDetailReadDTO {
+  meta: ReadMetaDTO
   unavailableSources?: SupplierFactSource[]
   dataOrigin: DataOriginDTO
   supplier: SupplierListSourceRow

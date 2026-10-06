@@ -1,4 +1,4 @@
-import { isEntityKindDTO } from '../../types/read-model'
+import { isEntityKindDTO, isEntityRefDTO } from '../../types/read-model'
 import { isQuantitySourceIdentity } from '../quantity/migration-identity'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { payrollObject } from './central-snapshot'
@@ -21,13 +21,11 @@ export function isPayrollAFeePriceScope(v: unknown) {
     || (exact(v, ['kind', 'cells']) && v.kind === 'cells' && array(v.cells, isPayrollAFeeCell))
 }
 function entity(v: unknown) {
-  if (!object(v) || !isEntityKindDTO(v.entity))
+  if (!isEntityRefDTO(v))
     return false
   if (v.state === 'resolved')
-    return exact(v, ['state', 'entity', 'id', 'label', 'no']) && (v.entity === 'quantity-unit' ? isQuantitySourceIdentity(v.id, 'units') : id(v.id)) && text(v.label) && nullableText(v.no)
-  if (!exact(v, ['state', 'entity', 'id', 'label', 'reason']) || v.label !== null)
-    return false
-  return v.state === 'missing' ? v.id === null && ['not-configured', 'not-recorded', 'not-applicable'].includes(String(v.reason)) : v.state === 'forbidden' && nullableId(v.id) && v.reason === 'permission-denied'
+    return v.entity === 'quantity-unit' ? isQuantitySourceIdentity(v.id, 'units') : id(v.id)
+  return true
 }
 export function isPayrollAFeeNavigation(v: unknown) {
   if (!object(v))

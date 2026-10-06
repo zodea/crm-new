@@ -1,6 +1,11 @@
 import { createError, defineEventHandler, getQuery, setResponseHeader } from 'h3'
 import { assertProductionRequest, requireProductionBusinessSession } from '../utils/production-auth'
 import { getProductionRuntimeConfig } from '../utils/production-config'
+import { isProductionCrewWorkerRoute } from '../utils/production-crew-worker-access'
+import { isProductionFinanceRoute } from '../utils/production-finance-access'
+import { isProductionMaterialContractRoute } from '../utils/production-material-contract-access'
+import { isProductionMaterialQuotationRoute } from '../utils/production-material-quotation-access'
+import { isProductionOtherSettlementRoute } from '../utils/production-other-settlement-access'
 import { isProductionProcessLibraryRequest } from '../utils/production-process-library-access'
 import { isProductionProjectRoute } from '../utils/production-project-access'
 import { isProductionSupplierRoute } from '../utils/production-supplier-access'
@@ -22,15 +27,20 @@ export default defineEventHandler((event) => {
     return
   if ((event.method === 'GET' && path === '/api/auth/status') || (event.method === 'POST' && ['/api/auth/login', '/api/auth/logout'].includes(path)))
     return
-  requireProductionBusinessSession(event, { touch: event.method !== 'GET' || path !== '/api/production/backup/status' })
+  requireProductionBusinessSession(event, { touch: event.method !== 'GET' || !['/api/production/backup/status', '/api/read/notifications'].includes(path) })
   const query = getQuery(event)
   if ((query.includeDemo !== undefined && query.includeDemo !== 'false') || Object.values(query).some(value => ['demo', 'all'].includes(String(value)) || (Array.isArray(value) && value.some(item => ['demo', 'all'].includes(String(item))))))
     throw createError({ statusCode: 403, message: '正式入口不提供演示数据源。' })
-  const ready = (event.method === 'GET' && (readyReads.test(path) || ['/api/production/status', '/api/production/backup/status'].includes(path)))
+  const ready = (event.method === 'GET' && (readyReads.test(path) || ['/api/production/status', '/api/production/backup/status', '/api/read/notifications'].includes(path)))
     || isProductionProjectRoute(event.method, path)
+    || isProductionFinanceRoute(event.method, path)
+    || isProductionCrewWorkerRoute(event.method, path)
+    || isProductionOtherSettlementRoute(event.method, path)
     || isProductionProcessLibraryRequest(event.method, path)
-    || (event.method === 'POST' && (['/api/commands/customers', '/api/commands/customer-resolve', '/api/commands/production-backups'].includes(path) || (readyWrites.test(path) && path.endsWith('/lifecycle'))))
+    || (event.method === 'POST' && (['/api/commands/customers', '/api/commands/customer-resolve', '/api/commands/production-backups', '/api/commands/notifications'].includes(path) || (readyWrites.test(path) && path.endsWith('/lifecycle'))))
     || (event.method === 'PUT' && readyWrites.test(path) && !path.endsWith('/lifecycle'))
-  if (!ready && !isProductionSupplierRoute(event.method, path))
+  const signatories = (event.method === 'GET' && path === '/api/read/our-signatories')
+    || (event.method === 'POST' && ['/api/commands/our-signatories', '/api/commands/our-signatories/resolve'].includes(path))
+  if (!ready && !signatories && !isProductionSupplierRoute(event.method, path) && !isProductionMaterialContractRoute(event.method, path) && !isProductionMaterialQuotationRoute(event.method, path))
     throw createError({ statusCode: 503, message: '此功能的正式保存尚未就绪，请返回已开放的资料页面；不会使用测试实例替代。' })
 })

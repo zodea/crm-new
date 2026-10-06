@@ -35,7 +35,7 @@ flowchart TD
 - 参考系统没有直接对应页，或现有业务能力变化很大时，先按 `runtime-reference-audit.md` 提供脱敏标注图或重绘线框，不拿相邻页面伪装成直接证据。
 - 用户明确变更业务口径时，同轮更新 `docs/rewrite` 或 ADR。
 
-稳定设计原则、令牌消费与组件职责见 [DESIGN-SYSTEM](../rewrite/DESIGN-SYSTEM.md)；[DESIGN-TASTE](./DESIGN-TASTE.md)保留品味理由和规则示意，[交互参考](./interaction-style-references.md)保留外部来源与采纳理由，二者不另发实施规格。
+稳定设计原则、令牌消费与组件职责见 [DESIGN-SYSTEM](../rewrite/DESIGN-SYSTEM.md)；品味理由与规则对照已[并入同一文件](../rewrite/DESIGN-SYSTEM.md#a01-history)，旧 DESIGN-TASTE 文件已退役。[交互参考](./interaction-style-references.md)只保留独有外部来源与采纳理由，不另发实施规格。
 
 ### 与协作、文档、测试和指南入口的关系
 
@@ -60,9 +60,9 @@ DC重构设计源码/
 
 `app-old.html`、`app-new.html`、打印试验页、色彩对比原型、`DC重构设计源码/docs/` 副本均属于旧稿，不再保留在工作树。历史需要通过 Git 记录查看。
 
-## 当前待补设计
+## 当前设计覆盖与待补设计
 
-当前缺一一对应 DC 页面的路由统一登记在 [`design-coverage.json`](./design-coverage.json)，数量见[实现状态生成表](./ui-implementation-status.md#2-当前总数)。付款详情由 [#404](https://github.com/zodea/crm-new/issues/404) 联同 [#413](https://github.com/zodea/crm-new/issues/413) 复核；数据迁移由 [#414](https://github.com/zodea/crm-new/issues/414) 承接；阶段配置整页已在 [#442](https://github.com/zodea/crm-new/issues/442) 完成本地运行验收，仍缺一一对应的 DC 页面。工序库独立只读详情由 [#443](https://github.com/zodea/crm-new/issues/443) 新增，采用已有工序库与 Table 原语验证，明确保留缺直接设计页的边界。旧 #305/#294 仅作历史来源。迁移页在设计补齐前以运行契约、实际视口和表内局部滚动证据验收。此前施工进度「前后置依赖设置」已由 #244 合入设计源码，[补图 brief](../research/schedule-dependency-editor-brief.md) 保留为历史研究。
+缺一一对应 DC 页面的路由统一登记在 [`design-coverage.json`](./design-coverage.json)，数量见[实现状态生成表](./ui-implementation-status.md#2-当前总数)。当前工作区已注册并挂载付款详情 `payApplyDetail`、数据迁移 `dataMigration`、施工阶段配置 `quantityStages` 和工序库版本详情 `processLibraryDetail`，覆盖映射按其实际 PAGE、路由开关与 x-import 登记。DC 源码的并行改动属于既有工作区成果，本轮只同步索引；设计落点不提升页面业务、运行或生产验收等级。付款、迁移、阶段与工序库的历史实施来源分别保留 #305/#294、#442、#443；当前复核范围仍按对应领域规格。此前施工进度「前后置依赖设置」已由 #244 合入设计源码，[补图 brief](../research/schedule-dependency-editor-brief.md) 保留为历史研究。
 
 当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据和差异看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。
 

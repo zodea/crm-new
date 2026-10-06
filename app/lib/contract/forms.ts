@@ -1,3 +1,4 @@
+import type { OurSignatorySnapshot } from '../our-signatory/contract'
 import type { TransactionDb } from '~/lib/db/coordinator'
 import type { LookupOption } from '~/lib/kit/lookup'
 import { select, withTransaction } from '~/lib/db/connection'
@@ -5,14 +6,22 @@ import {
   hiddenCtesFor,
   logCreate,
   PARENT_REFS,
-  restoreRecord,
   selectVisibleSql,
   softDelete,
+  undoOperationIfUnchanged,
   visibleCond,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
+import { applyFileRefChanges } from '~/lib/forms/file-refs'
+import { contractOriginalPayloadDigest } from '~/lib/forms/original-content'
+import { materialContractTotal, validateMaterialDetails, validateMaterialSourceOriginals } from '~/lib/material-contract/line-model'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { generateId } from '~/lib/util/id'
+import { adoptConstructionManagementFee, emptyConstructionManagementFee, validateConstructionManagementFee } from '../construction-contract/management-fee'
+import { persistNativeConstructionManagementFee, readNativeConstructionManagementFee } from '../construction-contract/management-fee-storage'
+import { decodeOurSignatorySnapshot } from '../our-signatory/contract'
+import { contractNumberConflict, recordContractNumber } from '../our-signatory/number-registry'
+import { resolveContractSignatory } from '../our-signatory/storage'
 import { CONFIRMED_SETTLEMENT_SQL_VALUES } from './effective-status'
 
 export type F2FormKind
@@ -39,6 +48,8 @@ export interface ContractFormAttachmentDraft {
   mimeType?: string
   category?: string
   uploader?: string
+  /** 原件正文沿公共文件输入；旧路径只作留痕。 */
+  payloadBase64?: string
 }
 
 export interface ContractFormAttachmentChanges {
@@ -59,18 +70,46 @@ export interface ContractFormAttachment {
   uploader: string
   uploadedAt: string
   deletedAt: string | null
+  sha256?: string
 }
 
 export interface ContractLineItemDraft {
   id?: string
   materialName?: string
   spec?: string
+  materialGrade?: string
   brand?: string
   unit?: string
   qty?: number | null
   taxInclusiveUnitPrice?: number | null
+  /** 明确录入适用于本行的税点；未知不沿用合同头税率。 */
+  applicableTaxRate?: number | null
   plannedArrivalDate?: string
   note?: string
+  sortOrder?: number
+  /** 协议实际变更对应的原签约行；新材料保持 null。 */
+  originalLineId?: string | null
+  /** 引用原行时，文书明确核实的本次增额；不自动追溯计价。 */
+  changeAmount?: number | null
+  changeBasis?: string
+  source?: ContractLineSourceEvidence | null
+}
+
+export interface ContractLineSourceEvidence {
+  fileName: string
+  sheetName: string
+  rowNumber: number
+  sourceHash: string
+  externalRef: string | null
+  priceUnit: string
+  quantityUnitVerified: boolean
+}
+
+export interface ContractDeductionDraft {
+  id?: string
+  name?: string
+  amount?: number | null
+  basis?: string
   sortOrder?: number
 }
 
@@ -79,6 +118,10 @@ export interface ProjectContractFormDraft {
   isSupplement?: boolean
   originalContractId?: string | null
   no?: string
+  ourSignatoryId?: string | null
+  ourSignatoryVersion?: string | null
+  ourSignatorySnapshot?: OurSignatorySnapshot | null
+  legacyPartyA?: string | null
   name?: string
   projectId?: string | null
   customerId?: string | null
@@ -96,6 +139,9 @@ export interface ProjectContractFormDraft {
   scheduleTerms?: string
   warrantyTerms?: string
   specialTerms?: string
+  /** 仅施工主合同；合同配置不生成实际成本或现金。 */
+  managementFeeAmount?: number | null
+  managementFeeBasis?: string
   retentionRatio?: number | null
   retentionAmount?: number | null
   retentionDays?: number | null
@@ -111,11 +157,16 @@ export interface ProjectContractFormDraft {
   status?: string
   note?: string
   lineItems?: ContractLineItemDraft[]
+  deductions?: ContractDeductionDraft[]
 }
 
 export interface CompanyExpenseContractFormDraft {
   id?: string
   no?: string
+  ourSignatoryId?: string | null
+  ourSignatoryVersion?: string | null
+  ourSignatorySnapshot?: OurSignatorySnapshot | null
+  legacyPartyA?: string | null
   name?: string
   category?: string
   counterparty?: string
@@ -155,6 +206,7 @@ export interface F2FormSaveResult {
   id: string
   logId: string | null
   attachmentIds: string[]
+  warnings?: string[]
 }
 
 interface ContractReferenceRow {
@@ -325,7 +377,14 @@ async function validateProjectContract(
   draft: ProjectContractFormDraft,
   action: F2SaveAction,
 ): Promise<void> {
-  const amount = nonNegativeNumber('含税合同金额', draft.amount)
+  if (draft.managementFeeAmount !== undefined || draft.managementFeeBasis !== undefined) {
+    if (formKind !== 'construction' || draft.isSupplement)
+      throw new Error('管理费配置仅适用于施工主合同')
+    validateConstructionManagementFee(draft.managementFeeAmount ?? null, draft.managementFeeBasis ?? '')
+  }
+  const amount = nullableNumber(draft.amount)
+  if (amount != null && amount < 0)
+    throw new Error('含税合同金额不能为负数')
   const taxRate = nullableNumber(draft.taxRate)
   if (taxRate != null && taxRate < 0)
     throw new Error('税率不能为负数')
@@ -342,6 +401,22 @@ async function validateProjectContract(
       draft.originalContractId,
       '原合同',
     )
+    if (formKind === 'material') {
+      const parent = await activeRow<ContractReferenceRow>(tx, 'contracts', draft.originalContractId)
+      if (parent?.kind !== '材采')
+        throw new Error('原合同必须是材料采购主合同')
+      const originalLines = await tx.select<{ id: string }>('SELECT id FROM contract_line_items WHERE contract_id = ?', [draft.originalContractId])
+      validateMaterialDetails(draft.lineItems ?? [], draft.deductions ?? [], {
+        formal: action === 'submit',
+        supplement: true,
+        originalLineIds: new Set(originalLines.map(row => row.id)),
+      })
+      if (action === 'submit' && (amount == null || amount <= 0))
+        throw new Error('正式补充协议本次增额必须大于 0')
+      const total = materialContractTotal(draft.lineItems ?? [], draft.deductions ?? [], true)
+      if (action === 'submit' && (total == null || amount == null || Math.abs(total - amount) > 0.005))
+        throw new Error('协议自有明细及减项合计与本次增额不一致')
+    }
     if (action === 'submit') {
       requireFields([
         ['原合同', draft.originalContractId],
@@ -364,10 +439,13 @@ async function validateProjectContract(
 
   const lines = formKind === 'material' ? draft.lineItems ?? [] : []
   validateLineItems(lines, action)
+  if (formKind === 'material')
+    validateMaterialDetails(lines, draft.deductions ?? [], { formal: action === 'submit', supplement: false })
+  const materialTotal = materialContractTotal(lines, draft.deductions ?? [])
   if (
     action === 'submit'
     && formKind === 'material'
-    && Math.abs(contractLineItemsTotal(lines) - amount) > 0.005
+    && (materialTotal == null || amount == null || Math.abs(materialTotal - amount) > 0.005)
   ) {
     throw new Error('材采明细含税汇总与合同头金额不一致')
   }
@@ -392,116 +470,120 @@ async function applyAttachmentChanges(
   ownerId: string,
   changes: ContractFormAttachmentChanges = {},
 ): Promise<string[]> {
-  const attachmentIds: string[] = []
-  for (const attachmentId of changes.removeIds ?? []) {
-    await assertAttachmentOwner(tx, ownerType, ownerId, attachmentId)
-    await softDelete(tx, 'file_refs', attachmentId)
-  }
-  for (const attachmentId of changes.restoreIds ?? []) {
-    await assertAttachmentOwner(tx, ownerType, ownerId, attachmentId)
-    await restoreRecord(tx, 'file_refs', attachmentId)
-  }
   for (const attachment of changes.add ?? []) {
-    const fileName = normalizedText(attachment.fileName)
-    if (!fileName)
-      throw new Error('附件文件名必填')
-    const id = generateId('file')
-    await tx.execute(`
-      INSERT INTO file_refs (
-        id, owner_type, owner_id, file_name, file_path, file_size,
-        category, uploader, uploaded_at, mime_type
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      id,
-      ownerType,
-      ownerId,
-      fileName,
-      normalizedText(attachment.filePath),
-      Math.max(0, nullableNumber(attachment.fileSize) ?? 0),
-      normalizedText(attachment.category),
-      normalizedText(attachment.uploader),
-      new Date().toISOString(),
-      normalizedText(attachment.mimeType),
-    ])
-    await logCreate(tx, 'file_refs', id)
-    attachmentIds.push(id)
+    if (typeof attachment.payloadBase64 === 'string')
+      await contractOriginalPayloadDigest(attachment.payloadBase64, attachment.fileSize ?? 0, () => { throw new Error('附件原件编码或长度无效') })
   }
-  return attachmentIds
+  return applyFileRefChanges(tx, ownerType, ownerId, changes)
 }
 
-async function assertAttachmentOwner(
-  tx: TransactionDb,
-  ownerType: ContractAttachmentOwnerType,
-  ownerId: string,
-  attachmentId: string,
-): Promise<void> {
-  const rows = await tx.select<{ id: string }>(`
-    SELECT id
-    FROM file_refs
-    WHERE id = ? AND owner_type = ? AND owner_id = ?
-    LIMIT 1
-  `, [attachmentId, ownerType, ownerId])
-  if (!rows[0])
-    throw new Error('附件不存在或不属于当前记录')
+async function assertMaterialSourceOriginals(tx: TransactionDb, draft: ProjectContractFormDraft, changes: ContractFormAttachmentChanges) {
+  const files = draft.id
+    ? await tx.select<{ file_name: string, file_size: number, encoding: string | null, content: string | null }>(`
+    SELECT f.file_name,f.file_size,p.encoding,p.content FROM file_refs f
+    LEFT JOIN file_payloads p ON p.file_ref_id=f.id WHERE f.owner_type=? AND f.owner_id=?
+  `, [draft.isSupplement ? 'contract_supplement' : 'contract', draft.id])
+    : []
+  const originals: { fileName: string, sha256: string }[] = []
+
+  const invalid = () => {
+    throw new Error('材采来源原件编码或长度无效')
+  }
+  for (const file of files) {
+    if (typeof file.content === 'string') {
+      if (file.encoding !== 'base64')
+        invalid()
+      originals.push({ fileName: file.file_name, sha256: await contractOriginalPayloadDigest(file.content!, file.file_size, invalid) })
+    }
+  }
+  for (const file of changes.add ?? []) {
+    if (typeof file.payloadBase64 === 'string')
+      originals.push({ fileName: file.fileName.trim(), sha256: await contractOriginalPayloadDigest(file.payloadBase64, file.fileSize ?? 0, invalid) })
+  }
+  const prior = draft.id ? await tx.select<{ id: string, source_evidence: string | null }>(`SELECT id,source_evidence FROM ${draft.isSupplement ? 'contract_supplement_line_items' : 'contract_line_items'} WHERE ${draft.isSupplement ? 'supplement_id' : 'contract_id'}=?`, [draft.id]) : []
+  validateMaterialSourceOriginals(draft.lineItems ?? [], prior.map(row => ({ id: row.id, source: row.source_evidence ? JSON.parse(row.source_evidence) : null })), originals)
 }
 
 async function persistContractLineItems(
   tx: TransactionDb,
-  contractId: string,
+  ownerId: string,
   lines: ContractLineItemDraft[],
+  supplement = false,
 ): Promise<void> {
-  const existing = await tx.select<{ id: string }>(`
-    SELECT id
-    FROM contract_line_items
-    WHERE contract_id = ? AND deleted_at IS NULL
-  `, [contractId])
+  const table = supplement ? 'contract_supplement_line_items' : 'contract_line_items'
+  const parentField = supplement ? 'supplement_id' : 'contract_id'
+  const existing = await tx.select<{ id: string, original_line_id?: string | null, original_line_snapshot?: string | null, original_source_updated_at?: string | null }>(`
+    SELECT id${supplement ? ', original_line_id, original_line_snapshot, original_source_updated_at' : ''}
+    FROM ${table}
+    WHERE ${parentField} = ? AND deleted_at IS NULL
+  `, [ownerId])
   const incomingIds = new Set(lines.flatMap(line => line.id ? [line.id] : []))
   for (const row of existing) {
     if (!incomingIds.has(row.id))
-      await softDelete(tx, 'contract_line_items', row.id)
+      await softDelete(tx, table, row.id)
   }
 
   for (const [index, line] of lines.entries()) {
-    const values = [
-      normalizedText(line.materialName),
-      rawText(line.spec),
-      rawText(line.brand),
-      rawText(line.unit),
-      nullableNumber(line.qty),
-      nullableNumber(line.taxInclusiveUnitPrice),
-      normalizedText(line.plannedArrivalDate),
-      rawText(line.note),
-      line.sortOrder ?? index,
-      new Date().toISOString(),
-    ]
+    const prior = existing.find(row => row.id === line.id)
+    const originalId = nullableText(line.originalLineId)
+    let snapshot: string | null = null
+    let sourceUpdatedAt: string | null = null
+    if (supplement && originalId) {
+      if (prior && prior.original_line_id === originalId) {
+        // 旧协议缺少当时证据时继续保留未知，不能用今天的原行反填历史。
+        snapshot = prior.original_line_snapshot ?? null
+        sourceUpdatedAt = prior.original_source_updated_at ?? null
+      }
+      else {
+        const original = await tx.select<Record<string, unknown>>(`SELECT line.* FROM contract_line_items line
+          JOIN contract_supplements supplement ON supplement.contract_id=line.contract_id
+          WHERE supplement.id=? AND line.id=?`, [ownerId, originalId])
+        if (!original[0])
+          throw new Error('协议原材料行不属于此主合同')
+        snapshot = JSON.stringify(original[0])
+        sourceUpdatedAt = String(original[0].updated_at)
+      }
+    }
+    const fields = ['material_name', 'spec', 'material_grade', 'brand', 'unit', 'qty', 'tax_inclusive_unit_price', 'applicable_tax_rate', 'planned_arrival_date', 'note', 'sort_order', 'source_evidence', ...(supplement ? ['original_line_id', 'change_amount', 'change_basis', 'original_line_snapshot', 'original_source_updated_at'] : [])]
+    const values = [normalizedText(line.materialName), rawText(line.spec), rawText(line.materialGrade), rawText(line.brand), rawText(line.unit), nullableNumber(line.qty), nullableNumber(line.taxInclusiveUnitPrice), nullableNumber(line.applicableTaxRate), normalizedText(line.plannedArrivalDate), rawText(line.note), line.sortOrder ?? index, line.source ? JSON.stringify(line.source) : null, ...(supplement ? [originalId, nullableNumber(line.changeAmount), rawText(line.changeBasis), snapshot, sourceUpdatedAt] : [])]
+    const now = new Date().toISOString()
     if (line.id && existing.some(row => row.id === line.id)) {
-      await withUpdateLog(tx, 'contract_line_items', line.id, () => tx.execute(`
-        UPDATE contract_line_items
-        SET material_name = ?, spec = ?, brand = ?, unit = ?, qty = ?,
-            tax_inclusive_unit_price = ?, planned_arrival_date = ?, note = ?,
-            sort_order = ?, updated_at = ?
+      await withUpdateLog(tx, table, line.id, () => tx.execute(`
+        UPDATE ${table}
+        SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = ?
         WHERE id = ?
-      `, [...values, line.id]))
+      `, [...values, now, line.id]))
       continue
     }
 
     const id = generateId('contract_line')
     await tx.execute(`
-      INSERT INTO contract_line_items (
-        id, contract_id, material_name, spec, brand, unit, qty,
-        tax_inclusive_unit_price, planned_arrival_date, note, sort_order,
-        created_at, updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      id,
-      contractId,
-      ...values.slice(0, -1),
-      values.at(-1),
-      values.at(-1),
-    ])
-    await logCreate(tx, 'contract_line_items', id)
+      INSERT INTO ${table} (id, ${parentField}, ${fields.join(', ')}, created_at, updated_at)
+      VALUES (${Array.from({ length: fields.length + 4 }).fill('?').join(', ')})
+    `, [id, ownerId, ...values, now, now])
+    await logCreate(tx, table, id)
+  }
+}
+
+async function persistContractDeductions(tx: TransactionDb, ownerId: string, rows: ContractDeductionDraft[], supplement = false): Promise<void> {
+  const parentField = supplement ? 'supplement_id' : 'contract_id'
+  const existing = await tx.select<{ id: string }>(`SELECT id FROM contract_deductions WHERE ${parentField} = ? AND deleted_at IS NULL`, [ownerId])
+  const incoming = new Set(rows.flatMap(row => row.id ? [row.id] : []))
+  for (const row of existing) {
+    if (!incoming.has(row.id))
+      await softDelete(tx, 'contract_deductions', row.id)
+  }
+  for (const [index, row] of rows.entries()) {
+    const now = new Date().toISOString()
+    const values = [rawText(row.name), nullableNumber(row.amount), rawText(row.basis), row.sortOrder ?? index, now]
+    if (row.id && existing.some(prior => prior.id === row.id)) {
+      await withUpdateLog(tx, 'contract_deductions', row.id, () => tx.execute('UPDATE contract_deductions SET name = ?, amount = ?, basis = ?, sort_order = ?, updated_at = ? WHERE id = ?', [...values, row.id]))
+    }
+    else {
+      const id = generateId('contract_deduction')
+      await tx.execute(`INSERT INTO contract_deductions (id, ${parentField}, name, amount, basis, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [id, ownerId, ...values.slice(0, -1), now, now])
+      await logCreate(tx, 'contract_deductions', id)
+    }
   }
 }
 
@@ -526,6 +608,16 @@ async function saveProjectContract(
   }
   await validateProjectContract(tx, formKind, draft, action)
   const now = new Date().toISOString()
+  const ownerTable = draft.isSupplement ? 'contract_supplements' : 'contracts'
+  const owner = draft.id ? (await tx.select<Record<string, unknown>>(`SELECT * FROM ${ownerTable} WHERE id=?`, [draft.id]))[0] : null
+  const parent = draft.isSupplement ? (await tx.select<Record<string, unknown>>('SELECT * FROM contracts WHERE id=?', [draft.originalContractId]))[0] : null
+  const priorSnapshot = owner?.our_signatory_snapshot ? decodeOurSignatorySnapshot(JSON.parse(String(owner.our_signatory_snapshot))) : null
+  const inherited = draft.isSupplement ? (owner ? priorSnapshot : (parent?.our_signatory_snapshot ? decodeOurSignatorySnapshot(JSON.parse(String(parent.our_signatory_snapshot))) : null)) : null
+  if (draft.isSupplement && draft.ourSignatoryId && draft.ourSignatoryId !== inherited?.id)
+    throw new Error('补充协议不能更换我方签约主体')
+  const signatory = draft.isSupplement ? inherited : await resolveContractSignatory(tx, { id: draft.ourSignatoryId ?? priorSnapshot?.id, version: draft.ourSignatoryVersion, prior: priorSnapshot, required: false })
+  if (!draft.isSupplement && action === 'submit' && await contractNumberConflict(tx, 'native-contracts', draft.id ?? null, rawText(draft.no)))
+    throw new Error('已填写合同编号与其他正式主合同重复')
   if (draft.isSupplement) {
     const id = draft.id ?? generateId('contract_supplement')
     const values = [
@@ -533,10 +625,12 @@ async function saveProjectContract(
       rawText(draft.no),
       rawText(draft.name),
       rawText(draft.content),
-      nonNegativeNumber('补充协议金额', draft.amount),
+      nullableNumber(draft.amount),
       normalizedText(draft.signDate),
       lifecycleStatus(action, draft.status, '审批中'),
       rawText(draft.note),
+      signatory?.id ?? null,
+      signatory ? JSON.stringify(signatory) : null,
       now,
     ]
     const existing = draft.id
@@ -546,16 +640,16 @@ async function saveProjectContract(
       ? await withUpdateLog(tx, 'contract_supplements', id, () => tx.execute(`
           UPDATE contract_supplements
           SET contract_id = ?, no = ?, name = ?, content = ?, amount = ?,
-              sign_date = ?, status = ?, note = ?, updated_at = ?
+              sign_date = ?, status = ?, note = ?, our_signatory_id = ?, our_signatory_snapshot = ?, updated_at = ?
           WHERE id = ?
         `, [...values, id]))
       : await (async () => {
           await tx.execute(`
             INSERT INTO contract_supplements (
               id, contract_id, no, name, content, amount, sign_date,
-              status, note, created_at, updated_at
+              status, note, our_signatory_id, our_signatory_snapshot, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `, [id, ...values.slice(0, -1), now, now])
           return logCreate(tx, 'contract_supplements', id)
         })()
@@ -565,17 +659,10 @@ async function saveProjectContract(
       id,
       attachments,
     )
-    await tx.execute(`
-      UPDATE contracts
-      SET changed = amount + COALESCE((
-        SELECT SUM(supplement.amount)
-        FROM contract_supplements AS supplement
-        WHERE supplement.contract_id = contracts.id
-          AND supplement.deleted_at IS NULL
-          AND supplement.status NOT IN ('draft', '草稿')
-      ), 0)
-      WHERE id = ?
-    `, [draft.originalContractId])
+    if (formKind === 'material') {
+      await persistContractLineItems(tx, id, draft.lineItems ?? [], true)
+      await persistContractDeductions(tx, id, draft.deductions ?? [], true)
+    }
     return { id, logId, attachmentIds }
   }
 
@@ -589,6 +676,9 @@ async function saveProjectContract(
       ? /机械|租赁/.test(normalizedText(draft.otherExpenseKind)) ? '机械' : '其他'
       : classification.costCategory
   const id = draft.id ?? generateId('contract')
+  const managementFee = formKind === 'construction'
+    ? adoptConstructionManagementFee(owner ? await readNativeConstructionManagementFee(tx, id) : emptyConstructionManagementFee(), draft, { version: generateId('construction_management_fee'), contractVersion: now, adoptedAt: now, actorId: null, commandId: null })
+    : null
   const values = [
     rawText(draft.no),
     rawText(draft.name),
@@ -598,7 +688,7 @@ async function saveProjectContract(
     nullableText(draft.projectId),
     formKind === 'construction' ? nullableText(draft.customerId) : null,
     formKind === 'construction' ? null : nullableText(draft.supplierId),
-    nonNegativeNumber('含税合同金额', draft.amount),
+    nullableNumber(draft.amount),
     rawText(draft.content),
     rawText(draft.invoiceType),
     rawText(draft.contactName),
@@ -624,13 +714,16 @@ async function saveProjectContract(
     rawText(draft.paymentCycle),
     lifecycleStatus(action, draft.status, '审批中'),
     rawText(draft.note),
+    signatory?.id ?? null,
+    signatory ? JSON.stringify(signatory) : null,
     now,
   ]
   const existing = draft.id
     ? await activeRow<{ id: string }>(tx, 'contracts', draft.id)
     : null
   const logId = existing
-    ? await withUpdateLog(tx, 'contracts', id, () => tx.execute(`
+    ? await withUpdateLog(tx, 'contracts', id, async () => {
+        await tx.execute(`
         UPDATE contracts
         SET no = ?, name = ?, kind = ?, sub_kind = ?, cost_category = ?,
             project_id = ?, customer_id = ?, supplier_id = ?, amount = ?,
@@ -642,16 +735,13 @@ async function saveProjectContract(
             invoice_address_phone = ?, invoice_bank = ?,
             invoice_bank_account = ?, other_expense_kind = ?,
             service_period = ?, payment_cycle = ?, status = ?, note = ?,
-            changed = ? + COALESCE((
-              SELECT SUM(supplement.amount)
-              FROM contract_supplements AS supplement
-              WHERE supplement.contract_id = contracts.id
-                AND supplement.deleted_at IS NULL
-                AND supplement.status NOT IN ('draft', '草稿')
-            ), 0),
+            our_signatory_id = ?, our_signatory_snapshot = ?,
             updated_at = ?
         WHERE id = ?
-      `, [...values.slice(0, -1), nonNegativeNumber('含税合同金额', draft.amount), values.at(-1), id]))
+      `, [...values, id])
+        if (managementFee)
+          await persistNativeConstructionManagementFee(tx, id, managementFee)
+      })
     : await (async () => {
         await tx.execute(`
           INSERT INTO contracts (
@@ -662,30 +752,31 @@ async function saveProjectContract(
             special_terms, retention_ratio, retention_amount, retention_days,
             invoice_name, invoice_tax_no, invoice_address_phone, invoice_bank,
             invoice_bank_account, other_expense_kind, service_period,
-            payment_cycle, status, note, created_at, updated_at
+            payment_cycle, status, note, our_signatory_id, our_signatory_snapshot, created_at, updated_at
           )
           VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           )
         `, [id, ...values.slice(0, -1), now, now])
-        await tx.execute(`
-          UPDATE contracts
-          SET changed = amount
-          WHERE id = ?
-        `, [id])
+        if (managementFee)
+          await persistNativeConstructionManagementFee(tx, id, managementFee)
         return logCreate(tx, 'contracts', id)
       })()
 
-  if (formKind === 'material')
+  const duplicateDraftNumber = action === 'draft' && await contractNumberConflict(tx, 'native-contracts', id, rawText(draft.no))
+  await recordContractNumber(tx, { owner: 'native-contracts', id, number: rawText(draft.no), version: now, occurredAt: now, formal: action === 'submit' || !['draft', '草稿'].includes(lifecycleStatus(action, draft.status, '审批中')) }, { enforce: action === 'submit', historyId: generateId('contract_number_history') })
+  if (formKind === 'material') {
     await persistContractLineItems(tx, id, draft.lineItems ?? [])
+    await persistContractDeductions(tx, id, draft.deductions ?? [])
+  }
   const attachmentIds = await applyAttachmentChanges(
     tx,
     'contract',
     id,
     attachments,
   )
-  return { id, logId, attachmentIds }
+  return { id, logId, attachmentIds, ...(duplicateDraftNumber ? { warnings: ['草稿编号与其他正式主合同重复，正式提交前请核对。'] } : {}) }
 }
 
 async function saveCompanyExpenseContract(
@@ -694,7 +785,9 @@ async function saveCompanyExpenseContract(
   action: F2SaveAction,
   attachments: ContractFormAttachmentChanges,
 ): Promise<F2FormSaveResult> {
-  const amount = nonNegativeNumber('合同金额', draft.amount)
+  const amount = nullableNumber(draft.amount)
+  if (amount != null && amount < 0)
+    throw new Error('合同金额不能为负数')
   if (action === 'submit') {
     requireFields([
       ['合同名称', draft.name],
@@ -704,6 +797,11 @@ async function saveCompanyExpenseContract(
   }
   const id = draft.id ?? generateId('company_expense_contract')
   const now = new Date().toISOString()
+  const prior = draft.id ? (await tx.select<{ our_signatory_snapshot: string | null }>('SELECT our_signatory_snapshot FROM company_expense_contracts WHERE id=?', [draft.id]))[0] : null
+  const priorSnapshot = prior?.our_signatory_snapshot ? decodeOurSignatorySnapshot(JSON.parse(prior.our_signatory_snapshot)) : null
+  const signatory = await resolveContractSignatory(tx, { id: draft.ourSignatoryId ?? priorSnapshot?.id, version: draft.ourSignatoryVersion, prior: priorSnapshot, required: false })
+  if (action === 'submit' && await contractNumberConflict(tx, 'native-company-expense', draft.id ?? null, rawText(draft.no)))
+    throw new Error('已填写合同编号与其他正式主合同重复')
   const values = [
     rawText(draft.no),
     rawText(draft.name),
@@ -716,6 +814,8 @@ async function saveCompanyExpenseContract(
     rawText(draft.mainTerms),
     lifecycleStatus(action, draft.status, '审批中'),
     rawText(draft.note),
+    signatory?.id ?? null,
+    signatory ? JSON.stringify(signatory) : null,
     now,
   ]
   const existing = draft.id
@@ -726,16 +826,16 @@ async function saveCompanyExpenseContract(
         UPDATE company_expense_contracts
         SET no = ?, name = ?, category = ?, counterparty = ?, sign_date = ?,
             service_period = ?, amount = ?, payment_cycle = ?, main_terms = ?,
-            status = ?, note = ?, updated_at = ?
+            status = ?, note = ?, our_signatory_id = ?, our_signatory_snapshot = ?, updated_at = ?
         WHERE id = ?
       `, [...values, id]))
     : await (async () => {
         await tx.execute(`
           INSERT INTO company_expense_contracts (
             id, no, name, category, counterparty, sign_date, service_period,
-            amount, payment_cycle, main_terms, status, note, created_at, updated_at
+            amount, payment_cycle, main_terms, status, note, our_signatory_id, our_signatory_snapshot, created_at, updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [id, ...values.slice(0, -1), now, now])
         return logCreate(tx, 'company_expense_contracts', id)
       })()
@@ -745,7 +845,9 @@ async function saveCompanyExpenseContract(
     id,
     attachments,
   )
-  return { id, logId, attachmentIds }
+  const duplicateDraftNumber = action === 'draft' && await contractNumberConflict(tx, 'native-company-expense', id, rawText(draft.no))
+  await recordContractNumber(tx, { owner: 'native-company-expense', id, number: rawText(draft.no), version: now, occurredAt: now, formal: action === 'submit' || !['draft', '草稿'].includes(lifecycleStatus(action, draft.status, '审批中')) }, { enforce: action === 'submit', historyId: generateId('contract_number_history') })
+  return { id, logId, attachmentIds, ...(duplicateDraftNumber ? { warnings: ['草稿编号与其他正式主合同重复，正式提交前请核对。'] } : {}) }
 }
 
 async function saveExpenditureSettlement(
@@ -872,6 +974,8 @@ export async function saveF2Form(
   if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis && !isDesktopRuntime())
     throw new Error('浏览器辅助合同请通过中央合同表单保存')
   return withTransaction(async (tx) => {
+    if (kind === 'material')
+      await assertMaterialSourceOriginals(tx, draft as ProjectContractFormDraft, attachments)
     if (PROJECT_FORM_KINDS.has(kind)) {
       return saveProjectContract(
         tx,
@@ -931,10 +1035,18 @@ function mapProjectContractRow(row: Record<string, unknown>) {
     otherExpenseKind: (row.other_expense_kind ?? '') as string,
     servicePeriod: (row.service_period ?? '') as string,
     paymentCycle: (row.payment_cycle ?? '') as string,
-    amount: Number(row.amount ?? 0),
+    amount: nullableNumber(row.amount),
+    ...mapContractSignatory(row),
     status: (row.status ?? 'draft') as string,
     note: (row.note ?? '') as string,
   }
+}
+
+function mapContractSignatory(row: Record<string, unknown>) {
+  const snapshot = row.our_signatory_snapshot ? decodeOurSignatorySnapshot(JSON.parse(String(row.our_signatory_snapshot))) : null
+  if ((row.our_signatory_id ?? null) !== (snapshot?.id ?? null))
+    throw new Error('合同我方主体关系与签约快照不一致')
+  return { ourSignatoryId: snapshot?.id ?? null, ourSignatoryVersion: snapshot?.version ?? null, ourSignatorySnapshot: snapshot, legacyPartyA: typeof row.party_a === 'string' ? row.party_a : null }
 }
 
 function mapLineItem(row: Record<string, unknown>): ContractLineItemDraft {
@@ -942,14 +1054,24 @@ function mapLineItem(row: Record<string, unknown>): ContractLineItemDraft {
     id: row.id as string,
     materialName: (row.material_name ?? '') as string,
     spec: (row.spec ?? '') as string,
+    materialGrade: (row.material_grade ?? '') as string,
     brand: (row.brand ?? '') as string,
     unit: (row.unit ?? '') as string,
     qty: nullableNumber(row.qty),
     taxInclusiveUnitPrice: nullableNumber(row.tax_inclusive_unit_price),
+    applicableTaxRate: nullableNumber(row.applicable_tax_rate),
     plannedArrivalDate: (row.planned_arrival_date ?? '') as string,
     note: (row.note ?? '') as string,
     sortOrder: Number(row.sort_order ?? 0),
+    originalLineId: (row.original_line_id ?? null) as string | null,
+    changeAmount: nullableNumber(row.change_amount),
+    changeBasis: (row.change_basis ?? '') as string,
+    source: row.source_evidence == null ? null : JSON.parse(String(row.source_evidence)) as ContractLineSourceEvidence,
   }
+}
+
+function mapDeduction(row: Record<string, unknown>): ContractDeductionDraft {
+  return { id: String(row.id), name: String(row.name ?? ''), amount: nullableNumber(row.amount), basis: String(row.basis ?? ''), sortOrder: Number(row.sort_order ?? 0) }
 }
 
 export async function loadF2Form(
@@ -964,6 +1086,12 @@ export async function loadF2Form(
     if (!rows[0])
       return null
     const draft = mapProjectContractRow(rows[0])
+    if (kind === 'construction') {
+      const configuration = await readNativeConstructionManagementFee({ select, execute: async () => {
+        throw new Error('只读配置不能执行写入')
+      } }, id)
+      Object.assign(draft, { managementFeeAmount: configuration.amount, managementFeeBasis: configuration.basis })
+    }
     if (kind === 'material') {
       const lines = await select<Record<string, unknown>>(
         selectVisibleSql(
@@ -972,7 +1100,8 @@ export async function loadF2Form(
         ),
         [id],
       )
-      return { ...draft, lineItems: lines.map(mapLineItem) }
+      const deductions = await select<Record<string, unknown>>(selectVisibleSql('contract_deductions', 'AND contract_id = ? ORDER BY sort_order, id'), [id])
+      return { ...draft, lineItems: lines.map(mapLineItem), deductions: deductions.map(mapDeduction) }
     }
     return draft
   }
@@ -992,7 +1121,8 @@ export async function loadF2Form(
       counterparty: (row.counterparty ?? '') as string,
       signDate: (row.sign_date ?? '') as string,
       servicePeriod: (row.service_period ?? '') as string,
-      amount: Number(row.amount ?? 0),
+      amount: nullableNumber(row.amount),
+      ...mapContractSignatory(row),
       paymentCycle: (row.payment_cycle ?? '') as string,
       mainTerms: (row.main_terms ?? '') as string,
       status: (row.status ?? 'draft') as string,
@@ -1041,6 +1171,10 @@ export async function loadContractSupplementForm(
   if (!rows[0])
     return null
   const row = rows[0]
+  const [lines, deductions] = await Promise.all([
+    select<Record<string, unknown>>(selectVisibleSql('contract_supplement_line_items', 'AND supplement_id = ? ORDER BY sort_order, id'), [id]),
+    select<Record<string, unknown>>(selectVisibleSql('contract_deductions', 'AND supplement_id = ? ORDER BY sort_order, id'), [id]),
+  ])
   return {
     id: row.id as string,
     isSupplement: true,
@@ -1048,10 +1182,13 @@ export async function loadContractSupplementForm(
     no: (row.no ?? '') as string,
     name: (row.name ?? '') as string,
     content: (row.content ?? '') as string,
-    amount: Number(row.amount ?? 0),
+    amount: nullableNumber(row.amount),
+    ...mapContractSignatory(row),
     signDate: (row.sign_date ?? '') as string,
     status: (row.status ?? 'draft') as string,
     note: (row.note ?? '') as string,
+    lineItems: lines.map(mapLineItem),
+    deductions: deductions.map(mapDeduction),
   }
 }
 
@@ -1217,5 +1354,34 @@ export async function deleteF2Form(
       return softDelete(tx, 'company_expense_contracts', id)
     await assertSettlementCanDelete(tx, id)
     return softDelete(tx, 'expenditure_settlements', id)
+  })
+}
+
+/** Restore and number ownership share the actual Native transaction; generic undo cannot bypass it. */
+export async function undoF2Form(kind: F2FormKind, logId: string): Promise<boolean> {
+  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis && !isDesktopRuntime())
+    throw new Error('浏览器辅助合同不允许从旧本地源撤回')
+  return withTransaction(async (tx) => {
+    const log = (await tx.select<{ table_name: string, record_id: string }>('SELECT table_name,record_id FROM operation_logs WHERE id=?', [logId]))[0]
+    if (!log)
+      return false
+    const table = PROJECT_FORM_KINDS.has(kind) ? 'contracts' : kind === 'company_expense' ? 'company_expense_contracts' : 'expenditure_settlements'
+    if (log.table_name !== table)
+      throw new Error('撤回日志不属于当前合同入口')
+    const prior = (await tx.select<Record<string, unknown>>(`SELECT * FROM ${table} WHERE id=?`, [log.record_id]))[0]
+    if (table === 'contracts' && prior?.kind !== projectContractKind(kind).kind)
+      throw new Error('撤回日志的合同类型与当前入口不一致')
+    const restored = await undoOperationIfUnchanged(tx, logId)
+    const row = (await tx.select<Record<string, unknown>>(`SELECT * FROM ${table} WHERE id=?`, [log.record_id]))[0]
+    if (!restored) {
+      if (JSON.stringify(row) !== JSON.stringify(prior))
+        throw new Error('撤回未完整记录，事务已回滚')
+      return false
+    }
+    if (row && (table === 'contracts' || table === 'company_expense_contracts')) {
+      const now = new Date().toISOString()
+      await recordContractNumber(tx, { owner: table === 'contracts' ? 'native-contracts' : 'native-company-expense', id: log.record_id, number: String(row.no ?? ''), version: String(row.updated_at ?? now), occurredAt: now, formal: !['draft', '草稿'].includes(String(row.status ?? '')) }, { enforce: false, historyId: generateId('contract_number_history') })
+    }
+    return true
   })
 }

@@ -190,9 +190,14 @@ describe('project cost control read model', () => {
       status: '当前基线',
       targetAmount: 2600,
       signedAmount: 360,
-      settledAmount: 192,
-      paidAmount: 130,
-      remainingAmount: 2408,
+      settledAmount: null,
+      paidAmount: null,
+      remainingAmount: null,
+      metrics: {
+        settledAmount: { value: null, knownValue: 122, status: 'partial', missingSources: ['P4实际工资源:unavailable'] },
+        paidAmount: { value: null, knownValue: 60, status: 'partial', missingSources: ['P4实际支付源:unavailable'] },
+        remainingAmount: { value: null, knownValue: null },
+      },
       sourcePath: '/project/target-cost/target-baseline',
     })
     expect(result.versions.find(row => row.id === 'target-draft')?.status).toBe('草稿（不入控制）')
@@ -232,10 +237,11 @@ describe('project cost control read model', () => {
     expect(rows.find(row => row.category === '工人工资')).toMatchObject({
       targetAmount: 300,
       signedAmount: 0,
-      settledAmount: 70,
-      paidAmount: 70,
-      remainingAmount: 230,
-      paymentCount: 1,
+      settledAmount: null,
+      paidAmount: null,
+      remainingAmount: null,
+      paymentCount: null,
+      metrics: { settledAmount: { value: null, knownValue: null, status: 'pending' }, paidAmount: { value: null, knownValue: null, status: 'pending' } },
       settlementPath: '/subcontract/payroll',
       paymentPath: '/subcontract/payroll',
     })
@@ -244,5 +250,52 @@ describe('project cost control read model', () => {
       settledAmount: 40,
       reimbursementCount: 1,
     })
+  })
+
+  it('unknown contract and supplement amounts retain independently known money without inventing a baseline or wage total', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      await db.execute(`INSERT INTO projects(id,name) VALUES ('project-null','空金额项目')`)
+      await db.execute(`INSERT INTO contracts(id,kind,cost_category,project_id,amount,status) VALUES
+        ('missing-head','材采','材料','project-null',NULL,'履约中'),
+        ('known-head','材采','材料','project-null',80,'履约中'),
+        ('zero-head','分包','合同劳务','project-null',0,'履约中')`)
+      await db.execute(`INSERT INTO contract_supplements(id,contract_id,amount,status) VALUES
+        ('known-add','missing-head',20,'有效'), ('missing-add','known-head',NULL,'有效')`)
+      const result = await loadProjectCostControl(db)
+      const material = result.categories.find(row => row.category === '材料')!
+      expect(material).toMatchObject({ targetAmount: null, signedAmount: null, settledAmount: 0, paidAmount: 0, remainingAmount: null, contractCount: 2 })
+      expect(material.metrics.signedAmount).toEqual({ value: null, knownValue: 100, status: 'partial', missingSources: ['合同及补充协议金额:pending'] })
+      expect(material.metrics.targetAmount).toEqual({ value: null, knownValue: null, status: 'pending', missingSources: ['当前基线:pending'] })
+      expect(result.categories.find(row => row.category === '合同劳务')?.metrics.signedAmount).toEqual({ value: 0, knownValue: 0, status: 'complete', missingSources: [] })
+      expect(result.categories.find(row => row.category === '工人工资')?.paidAmount).toBeNull()
+    }
+    finally { db.close() }
+  })
+
+  it('counts an original expense once while retaining adopted and withdrawn clearance references as separate historical evidence', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      await db.execute(`INSERT INTO projects(id,name) VALUES ('project-expense','原费用项目')`)
+      await db.execute(`INSERT INTO expense_reimbursements(id,project_id,applicant,status) VALUES
+        ('expense-owner','project-expense','旧申请人原文','confirmed'),
+        ('clearance-owner','project-expense','原清偿记录','confirmed')`)
+      await db.execute(`INSERT INTO expense_reimbursement_lines(id,reimbursement_id,expense_item,amount) VALUES ('original','expense-owner','原费用',40)`)
+      await db.execute(`INSERT INTO expense_reimbursement_lines(id,reimbursement_id,expense_item,amount,original_expense_line_id) VALUES
+        ('clearance','clearance-owner','清偿',40,'original'), ('correction','clearance-owner','撤回的清偿',10,'original')`)
+      await db.execute(`UPDATE expense_reimbursement_lines SET deleted_at='2026-10-04' WHERE id='correction'`)
+      const row = (await loadProjectCostControl(db)).categories.find(row => row.category === '费用报销')!
+      expect(row).toMatchObject({ settledAmount: 40, reimbursementCount: 1 })
+      expect(row.metrics.settledAmount).toEqual({ value: 40, knownValue: 40, status: 'complete', missingSources: [] })
+      expect(await db.select(`SELECT id,amount,original_expense_line_id FROM expense_reimbursement_lines ORDER BY id`)).toEqual([
+        { id: 'clearance', amount: 40, original_expense_line_id: 'original' },
+        { id: 'correction', amount: 10, original_expense_line_id: 'original' },
+        { id: 'original', amount: 40, original_expense_line_id: null },
+      ])
+      expect((await db.select<{ applicant: string }>(`SELECT applicant FROM expense_reimbursements WHERE id='expense-owner'`))[0]?.applicant).toBe('旧申请人原文')
+    }
+    finally { db.close() }
   })
 })

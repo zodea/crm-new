@@ -9,8 +9,11 @@ import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import KitToolbarPopover from '~/components/ui/KitToolbarPopover.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { F3_FORM_META, financeDetailPath, financeFormPath, receiptDetailPath } from '~/lib/finance/page'
+import { verifiedFinanceSum } from '~/lib/finance/persistent-rows'
 import { financeStatusLabel, financeStatusTone } from '~/lib/finance/status'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
@@ -30,6 +33,12 @@ const statusFilter = shallowRef<string[]>([])
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 const filtersOpen = shallowRef(false)
+const readError = shallowRef<string | null>(null)
+let readGeneration = 0
+bindReadAuthority((problem) => {
+  ++readGeneration
+  readError.value = problem.message
+})
 const hasFilters = computed(() => projectFilter.value.length > 0 || partyFilter.value.length > 0 || statusFilter.value.length > 0)
 
 const displayRows = computed(() => rows.value.map(row => ({
@@ -55,6 +64,14 @@ const filtered = computed(() => {
 
 const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
 const pageRows = computed(() => paginate(filtered.value, currentPage.value, pageSize.value))
+const amountSummary = computed(() => {
+  if (listRows.value[props.kind] === undefined || readError.value)
+    return null
+  try {
+    return verifiedFinanceSum(filtered.value.map(row => row.amount))
+  }
+  catch { return null }
+})
 const filterDefinitions = computed(() => [
   {
     key: 'project',
@@ -128,7 +145,15 @@ const columns = computed<KitTableColumn[]>(() => [
 ])
 
 async function load() {
-  await financeStore.loadList(props.kind)
+  const generation = ++readGeneration
+  readError.value = null
+  try {
+    await financeStore.loadList(props.kind)
+  }
+  catch (cause) {
+    if (generation === readGeneration)
+      readError.value = toErrorMessage(cause)
+  }
 }
 
 function openCreate() {
@@ -190,7 +215,16 @@ onActivated(() => {
     </template>
 
     <template #table>
+      <div v-if="listRows[kind] === undefined && !loading" class="p-3 text-12px" role="status" data-testid="finance-list-unavailable">
+        <p class="text-ink-soft">
+          {{ readError || '记录与金额尚未可靠读取，请重新读取。' }}
+        </p>
+        <button type="button" class="btn-secondary mt-2 h-7" @click="load">
+          重新读取
+        </button>
+      </div>
       <KitTable
+        v-else
         :columns="columns"
         :data="pageRows"
         :loading="loading && listRows[kind] === undefined"
@@ -226,12 +260,13 @@ onActivated(() => {
       </KitTable>
     </template>
     <template #summary>
-      <span class="ml-auto">
+      <span v-if="amountSummary !== null" class="ml-auto">
         当前页 {{ pageRows.length }} 条 · {{ amountSummaryLabel }}
         <strong class="ml-1 font-mono text-ink">
-          {{ yuan(filtered.reduce((total, row) => total + row.amount, 0)) }}
+          {{ yuan(amountSummary) }}
         </strong>
       </span>
+      <span v-else class="ml-auto text-ink-soft" data-testid="finance-list-summary-unknown">金额合计尚未核实</span>
     </template>
   </ListShell>
 </template>

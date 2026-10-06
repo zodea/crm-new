@@ -5,6 +5,7 @@ import type {
   ProjectContractFormDraft,
 } from '../contract/forms'
 import type { ContractSupplierOption } from '../contract/page'
+import type { CommandResolution } from '../forms/command-recovery'
 
 export const SUBCONTRACT_CONTRACT_WRITE_CAPABILITY = 'subcontract-contract:write' as const
 
@@ -47,4 +48,5 @@ export interface SubcontractContractCommandRepository {
   context: () => Promise<SubcontractContractCommandContextDTO>
   loadForm: (id: string) => Promise<SubcontractContractFormReadDTO>
   execute: (request: SubcontractContractCommandRequestDTO) => Promise<SubcontractContractCommandResultDTO>
+  resolve: (commandId: string) => Promise<CommandResolution<SubcontractContractCommandResultDTO>>
 }

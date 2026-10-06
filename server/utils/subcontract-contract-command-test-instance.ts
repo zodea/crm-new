@@ -1,5 +1,7 @@
 import type { ContractFormAttachment, ProjectContractFormDraft } from '../../app/lib/contract/forms'
+import type { ContractOriginalContent } from '../../app/lib/forms/original-content'
 import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { OurSignatorySnapshot } from '../../app/lib/our-signatory/contract'
 import type {
   SubcontractContractCommandRequestDTO,
   SubcontractContractCommandResultDTO,
@@ -10,11 +12,20 @@ import type {
   SubcontractContractFactSources,
 } from '../../app/lib/subcontract-contract/repository'
 import type { BusinessSession } from './business-session'
+import type { CommandJournal } from './command-journal'
+import { Buffer } from 'node:buffer'
+import { OurSignatoryRepositoryProblem } from '../../app/lib/our-signatory/contract'
+import { resolveContractSignatory } from '../../app/lib/our-signatory/storage'
 import { SUBCONTRACT_CONTRACT_WRITE_CAPABILITY } from '../../app/lib/subcontract-contract/command-contract'
 import {
   subcontractContractProblem,
   SubcontractContractRepositoryProblem,
 } from '../../app/lib/subcontract-contract/repository'
+import { assertCommandUnsealed, commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
+import { contractMigratedAttachments, contractOriginalBytes, contractOriginalDigest } from './contract-original'
+import { contractMigratedSignatory } from './contract-signatory-migration'
+import { assertRetainedMigrationReferences } from './core-identity-migration'
+import { developmentOurSignatoryOwner } from './our-signatory-runtime'
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
@@ -23,6 +34,7 @@ interface Option { id: string, name: string, contact?: string, contactPhone?: st
 interface StoredContract {
   draft: ProjectContractFormDraft & { id: string }
   attachments: ContractFormAttachment[]
+  originals: Map<string, { bytes: Uint8Array, sha256: string }>
   version: number
   createdAt: string
   updatedAt: string
@@ -32,6 +44,7 @@ interface StoredContract {
 }
 
 interface Options {
+  resolveSignatory?: (draft: ProjectContractFormDraft, existing: StoredContract | null, required: boolean, session: BusinessSession, sessionId?: string | null) => Promise<OurSignatorySnapshot | null>
   createId?: () => string
   createAttachmentId?: () => string
   now?: () => string
@@ -41,7 +54,7 @@ interface Options {
   resolveSuppliers?: (sessionId?: string | null) => readonly Option[]
 }
 
-function failure(code: 'forbidden' | 'validation-failed' | 'not-found' | 'conflict', message: string, fieldErrors: Record<string, string[]> = {}) {
+function failure(code: 'forbidden' | 'validation-failed' | 'not-found' | 'conflict' | 'relationship-mismatch' | 'unavailable', message: string, fieldErrors: Record<string, string[]> = {}) {
   return new SubcontractContractRepositoryProblem({
     ...subcontractContractProblem(code, message),
     fieldErrors,
@@ -63,6 +76,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
   })
   let contracts = new Map<string, StoredContract>()
   const replay = new Map<string, SubcontractContractCommandResultDTO>()
+  const journal: CommandJournal<SubcontractContractCommandResultDTO> = { commands: replay, commandFingerprints: new Map(), sealedCommands: new Set() }
   let migratedProjects = new Map<string, Option>()
   let migratedSuppliers = new Map<string, Option>()
   let migratedSupplements: SubcontractContractFactSources['supplements'] = []
@@ -125,6 +139,8 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
     const { projects, suppliers } = refs
     const draft = stored.draft
     return {
+      ourSignatorySnapshot: draft.ourSignatorySnapshot ? structuredClone(draft.ourSignatorySnapshot) : null,
+      legacyPartyA: draft.legacyPartyA ?? null,
       dataOrigin: 'real',
       id: draft.id,
       no: text(draft.no),
@@ -137,7 +153,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       supplierId: draft.supplierId ?? null,
       supplierName: suppliers.get(draft.supplierId ?? '')?.name ?? migratedSuppliers.get(draft.supplierId ?? '')?.name ?? '',
       supplierPermission: 'allowed',
-      amount: Number(draft.amount ?? 0),
+      amount: draft.amount === null || draft.amount === undefined ? null : Number(draft.amount),
       settlementStatus: stored.settlementStatus,
       clearanceStatus: stored.clearanceStatus,
       content: text(draft.content),
@@ -203,6 +219,8 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
     reset() {
       contracts.clear()
       replay.clear()
+      journal.commandFingerprints.clear()
+      journal.sealedCommands.clear()
       migratedProjects = new Map()
       migratedSuppliers = new Map()
       migratedSupplements = []
@@ -259,6 +277,12 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
     sourceVersion() {
       return `subcontract-contract-command-${sourceVersion}`
     },
+    assertMigrationRemoval(removed: readonly CoreMigrationServerEntityDTO[]) {
+      assertRetainedMigrationReferences(removed, 'subcontract_contracts', [...contracts.values()].map(row => ({
+        id: row.draft.id!,
+        references: [{ type: 'projects', id: row.draft.projectId }, { type: 'suppliers', id: row.draft.supplierId }],
+      })), message => failure('conflict', message))
+    },
     prepareMigrationSnapshot,
     synchronizeMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO) {
       prepareMigrationSnapshot(snapshot)()
@@ -269,6 +293,8 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       const migratedIds = new Set(entities.filter(entity => entity.entityType === 'subcontract_contracts' && entity.deletedAt === null).map(entity => entity.id))
       for (const [id, stored] of contracts) {
         if (stored.migrationBatchId && (!migratedIds.has(id) || stored.migrationBatchId !== activeBatchId)) {
+          if (stored.version !== 1)
+            throw failure('conflict', '迁入分包合同已有后来修改、删除或附件变更，不能回滚移除')
           contracts.delete(id)
           sourceVersion += 1
         }
@@ -299,6 +325,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
           continue
         const createdAt = attribute(entity, 'createdAt') || '1970-01-01T00:00:00.000Z'
         const draft: ProjectContractFormDraft = {
+          ...contractMigratedSignatory(entity, (message) => { throw failure('unavailable', message) }),
           id: entity.id,
           no: attribute(entity, 'no'),
           name: entity.name,
@@ -317,14 +344,25 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
           retentionRatio: numeric(entity, 'retentionRatio'),
           retentionAmount: numeric(entity, 'retentionAmount'),
           retentionDays: numeric(entity, 'retentionDays'),
-          amount: Number(entity.amount ?? 0),
+          amount: entity.amount === null ? null : Number(entity.amount),
           status: attribute(entity, 'status') || '履约中',
           note: attribute(entity, 'note'),
         }
         validate(draft, 'save')
+        const originals = new Map<string, { bytes: Uint8Array, sha256: string }>()
+        const attachments = contractMigratedAttachments(entity.attributes.attachmentsJson ?? '[]', {
+          ownerId: entity.id,
+          legacyOwnerId: entity.legacyId,
+          originals,
+          allocatedIds: new Set([...contracts.values()].flatMap(row => row.attachments.map(file => file.id))),
+          fail: (message) => {
+            throw failure('validation-failed', message)
+          },
+        })
         contracts.set(entity.id, {
           draft: cleanDraft(draft, entity.id),
-          attachments: [],
+          attachments,
+          originals,
           version: 1,
           createdAt,
           updatedAt: attribute(entity, 'updatedAt') || createdAt,
@@ -347,13 +385,28 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
         updatedAt: stored.updatedAt,
       }
     },
+    readFileContent(id: string, fileId: string, session: BusinessSession): ContractOriginalContent {
+      if (!session.capabilities.includes('subcontract-contract:read'))
+        throw failure('forbidden', '无分包合同原件读取权限')
+      const stored = contracts.get(id)
+      const file = stored?.attachments.find(row => row.id === fileId && row.ownerId === id && row.ownerType === 'contract' && row.deletedAt === null)
+      if (!stored || !file)
+        throw failure('not-found', '分包合同附件不存在、已删除或不属于当前合同')
+      const original = stored.originals.get(fileId)
+      if (!original)
+        throw failure('not-found', '旧分包合同附件正文未迁入，请核对原始文件；路径不代表可读取的原件')
+      if (original.bytes.byteLength !== file.fileSize || contractOriginalDigest(original.bytes) !== original.sha256 || (file.sha256 !== undefined && file.sha256 !== original.sha256))
+        throw failure('unavailable', '分包合同原件正文、长度或摘要不一致，停止读取')
+      return { ownerId: id, fileId, dataOrigin: 'real', fileName: file.fileName, mimeType: file.mimeType, fileSize: file.fileSize, sha256: original.sha256, payloadBase64: Buffer.from(original.bytes).toString('base64') }
+    },
     async execute(request: SubcontractContractCommandRequestDTO, session: BusinessSession, sessionId?: string | null): Promise<SubcontractContractCommandResultDTO> {
+      request = structuredClone(request)
       authorize(session)
       if (request.workspaceId !== session.workspaceId || request.actorId !== session.actorId
         || request.requiredCapability !== SUBCONTRACT_CONTRACT_WRITE_CAPABILITY) {
         throw failure('forbidden', '分包合同命令会话不一致')
       }
-      const replayed = replay.get(request.commandId)
+      const { key: commandKey, previous: replayed } = commandReplay(journal, request, session, 'subcontract-contract', message => failure('conflict', message))
       if (replayed)
         return replayed
       const existing = request.id ? contracts.get(request.id) ?? null : null
@@ -364,33 +417,70 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       if (!existing && request.baseVersion !== null)
         throw failure('conflict', '新建分包合同不能携带旧版本')
       validate(request.draft, request.action, sessionId)
+      let candidate = request.draft
+      if (options.resolveSignatory) {
+        const snapshot = await options.resolveSignatory(candidate, existing, request.action !== 'draft', session, sessionId)
+        candidate = { ...candidate, ourSignatoryId: snapshot?.id ?? null, ourSignatoryVersion: snapshot?.version ?? null, ourSignatorySnapshot: snapshot }
+        authorize(session)
+        assertCommandUnsealed(journal, commandKey, message => failure('conflict', message))
+        const completed = commandReplay(journal, request, session, 'subcontract-contract', message => failure('conflict', message)).previous
+        if (completed)
+          return structuredClone(completed)
+        if (existing && contracts.get(existing.draft.id) !== existing)
+          throw failure('conflict', '合同在核对签约主体期间已变化，请保留输入并核对版本')
+        validate(candidate, request.action, sessionId)
+      }
       const id = existing?.draft.id ?? createId()
+      if (!existing && contracts.has(id))
+        throw failure('conflict', '新合同稳定编号已存在，不能覆盖既有事实')
       const timestamp = now()
       const version = (existing?.version ?? 0) + 1
       const removed = new Set(request.attachments.removeIds ?? [])
       const restored = new Set(request.attachments.restoreIds ?? [])
+      for (const fileId of [...removed, ...restored]) {
+        if (removed.has(fileId) && restored.has(fileId))
+          throw failure('validation-failed', '同一附件不能同时删除和恢复')
+        if (!existing?.attachments.some(row => row.id === fileId && row.ownerId === id && row.ownerType === 'contract'))
+          throw failure('relationship-mismatch', '附件不存在或不属于当前分包合同')
+      }
       const attachments = (existing?.attachments ?? []).map(file => ({
         ...file,
         deletedAt: removed.has(file.id) ? timestamp : restored.has(file.id) ? null : file.deletedAt,
       }))
+      const originals = new Map(existing?.originals ?? [])
+      const allocated = new Set([...contracts.values()].flatMap(row => row.attachments.map(file => file.id)))
       for (const file of request.attachments.add ?? []) {
+        if (!text(file.fileName))
+          throw failure('validation-failed', '分包合同附件名称不能为空')
+        const bytes = contractOriginalBytes(file, { required: true, fail: (message) => {
+          throw failure('validation-failed', message)
+        } })
+        if (bytes === null)
+          throw failure('validation-failed', '分包合同附件正文缺失')
+        const fileId = createAttachmentId()
+        if (!fileId.trim() || allocated.has(fileId) || originals.has(fileId))
+          throw failure('conflict', '附件稳定编号已存在，不能覆盖原件或历史')
+        allocated.add(fileId)
+        originals.set(fileId, { bytes, sha256: contractOriginalDigest(bytes) })
         attachments.push({
-          id: createAttachmentId(),
+          id: fileId,
           ownerType: 'contract',
           ownerId: id,
           fileName: text(file.fileName),
-          filePath: text(file.filePath),
-          fileSize: Number(file.fileSize) || 0,
+          filePath: '',
+          fileSize: bytes.byteLength,
+          sha256: contractOriginalDigest(bytes),
           mimeType: text(file.mimeType),
           category: text(file.category),
-          uploader: text(file.uploader),
+          uploader: session.actorId,
           uploadedAt: timestamp,
           deletedAt: null,
         })
       }
       contracts.set(id, {
-        draft: cleanDraft({ ...request.draft, status: request.action === 'submit' ? '审批中' : request.action === 'draft' ? '草稿' : request.draft.status }, id),
+        draft: cleanDraft({ ...candidate, status: request.action === 'submit' ? '审批中' : request.action === 'draft' ? '草稿' : candidate.status }, id),
         attachments,
+        originals,
         version,
         createdAt: existing?.createdAt ?? timestamp,
         updatedAt: timestamp,
@@ -400,8 +490,13 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       })
       sourceVersion += 1
       const result = { id, commandId: request.commandId, version: String(version), updatedAt: timestamp, attachmentIds: attachments.filter(file => file.deletedAt === null).map(file => file.id) }
-      replay.set(request.commandId, result)
+      replay.set(commandKey, structuredClone(result))
       return result
+    },
+    resolve(commandId: string, session: BusinessSession) {
+      authorize(session)
+      parseResolveCommandBody({ commandId })
+      return resolveJournalCommand(journal, commandId, session, 'subcontract-contract')
     },
   }
   applyMigrationSnapshot = instance.applyMigrationSnapshot
@@ -409,6 +504,16 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
 }
 
 export const subcontractContractCommandTestInstance = createSubcontractContractCommandTestInstance({
+  resolveSignatory: (draft, existing, required, _session, sessionId) => developmentOurSignatoryOwner(sessionId).withTransaction(async (tx) => {
+    try {
+      return await resolveContractSignatory(tx, { id: draft.ourSignatoryId, version: draft.ourSignatoryVersion, prior: existing?.draft.ourSignatorySnapshot, required })
+    }
+    catch (cause) {
+      if (cause instanceof OurSignatoryRepositoryProblem)
+        throw new SubcontractContractRepositoryProblem(cause.problem)
+      throw cause
+    }
+  }),
   resolveProjects: sessionId => projectCommandTestInstance.rows(sessionId),
   resolveSuppliers: sessionId => supplierCommandTestInstance.rows(sessionId),
 })

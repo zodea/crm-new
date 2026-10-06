@@ -57,7 +57,7 @@
 
 [#477](https://github.com/zodea/crm-new/issues/477)、[#478](https://github.com/zodea/crm-new/issues/478)、[#479](https://github.com/zodea/crm-new/issues/479) 与四个决策票均是 #412 原生子任务且已指定 zodea。#479 的原生前置为 #449/#477/#478；#449 已闭合，另外两项继续实施。只登记去向，不用父票关闭替代子票行为验收。
 
-生产方案已由 [ADR 0021](../../adr/0021-single-operator-windows-production-storage.md) 定稿，[#416 的生产拆分](../../implementation/production-gate-work-breakdown.md) #450–#471 仍执行：本模块直接对应 #454 私密 owner、#463 工序库、#464 工程量、#465 排程、#466 预算、#467 全部已定工资；#468–#471 负责原子迁入、发布、恢复和放行。#467 的实际前置包含 #454/#464/#449/#479，不再把父票调查关闭当成功能或生产证据。
+生产方案已由 [ADR 0021](../../adr/0021-single-operator-windows-production-storage.md) 定稿；当时 [#416 生产拆分](https://github.com/zodea/crm-new/issues/416)与依赖的历史说明可在 [Git 固定调查记录](../../rewrite/ARCHITECTURE.md#production-investigation-evidence)核对，当前子票范围和原生依赖直接见各 Issue。本记录不把父票调查关闭当成功能或生产证据，最终放行仍由 [#471](https://github.com/zodea/crm-new/issues/471)验收。
 
 #403 是本次定稿所需的基线事实依赖。当前可解析主线、路由/kind/宿主来源清单、28 项旧义务、原生实施票与固定证据已经足够决定本模块下一步，已移除 #412 → #403 的阻塞边并重新读取为空；理由分别留在 [#412](https://github.com/zodea/crm-new/issues/412#issuecomment-5770313269)和 [#403](https://github.com/zodea/crm-new/issues/403#issuecomment-5770369815)。#403 自己的全模块盘点和缺口继续开放；#402/#411/#413/#415 也不随本票关闭。
 

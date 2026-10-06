@@ -9,6 +9,6 @@ export function createTargetCostRepository(fetcher: ProjectHttpFetcher): TargetC
     form: (query, id, draftKey) => readProjectHttp(() => fetcher('/api/read/target-costs/form', { query: { ...query, id, draftKey } }), value => decodeTargetCostRead<TargetCostFormRead>(value, 'form', query, id)),
     detail: (query, id) => readProjectHttp(() => fetcher(`/api/read/target-costs/${encodeURIComponent(id)}`, { query: { ...query } }), value => decodeTargetCostRead<TargetCostDetailRead>(value, 'detail', query, id)),
     file: (query, id, fileId) => readProjectHttp(() => fetcher(`/api/read/target-costs/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}`, { query: { ...query } }), value => decodeTargetCostRead<TargetCostFileRead>(value, 'file', query, id, fileId)),
-    execute: command => readProjectHttp(() => fetcher('/api/commands/target-costs', { method: 'POST', body: encodeTargetCostWire(command) as Record<string, unknown> }), value => decodeTargetCostResult(value, command)),
+    execute: command => readProjectHttp(() => fetcher('/api/commands/target-costs', { method: 'POST', body: encodeTargetCostWire(command) as Record<string, unknown> }), value => decodeTargetCostResult(value, command), command.commandId),
   }
 }

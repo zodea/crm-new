@@ -1,5 +1,6 @@
 import type { TransactionDb } from '~/lib/db/coordinator'
 import type { FileRefDraft, FileRefRecord } from '~/lib/forms/file-refs'
+import type { SupplierCredentialReviewProof } from '~/lib/supplier/credential-contract'
 import type {
   SupplierCredentialCategory,
   SupplierCredentialRequirement,
@@ -28,6 +29,7 @@ import {
   defaultCredentialRequirement,
   hasManualCredentialReviewProof,
   resolveAutomaticCredentialStatus,
+  storedSupplierCredentialStatus,
 } from '~/lib/supplier/credentials'
 import {
   buildSupplierProjectSummaries,
@@ -131,6 +133,7 @@ export interface SupplierDetailSnapshot {
   payments: readonly SupplierPaymentSummary[]
   invoices: readonly SupplierInvoiceSummary[]
   summary: SupplierReadonlySummary
+  reviewHistory: readonly SupplierCredentialReviewProof[]
 }
 
 const EMPTY_SUMMARY: SupplierReadonlySummary = {
@@ -153,6 +156,7 @@ const EMPTY_SNAPSHOT: SupplierDetailSnapshot = {
   payments: [],
   invoices: [],
   summary: EMPTY_SUMMARY,
+  reviewHistory: [],
 }
 
 function rowToCredential(row: Record<string, unknown>): SupplierCredential {
@@ -314,6 +318,7 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
       contractRows,
       paymentRows,
       invoiceRows,
+      reviewRows,
     ] = await Promise.all([
       select<Record<string, unknown>>(`
           ${hiddenCtes('supplier_credentials')}
@@ -402,6 +407,15 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
             AND i.supplier_id = ? AND i.account_status = 'archived'
           ORDER BY i.invoice_date DESC, i.created_at DESC
         `, [supplierId]),
+      select<Record<string, unknown>>(`SELECT id,decision,reviewed_at,note,actor_id,archived_at
+        FROM supplier_credential_review_history WHERE supplier_id=?
+        UNION ALL SELECT NULL,credential_status,credential_reviewed_at,credential_review_note,NULL,NULL
+        FROM suppliers WHERE id=? AND credential_status IN ('qualified','rejected')
+          AND credential_reviewed_at IS NOT NULL AND trim(credential_reviewed_at) <> ''
+          AND (credential_status <> 'rejected' OR trim(credential_review_note) <> '')
+          AND NOT EXISTS(SELECT 1 FROM supplier_credential_review_history history WHERE history.supplier_id=suppliers.id
+            AND history.decision=suppliers.credential_status AND history.reviewed_at=suppliers.credential_reviewed_at AND history.note=suppliers.credential_review_note)
+        ORDER BY reviewed_at,id`, [supplierId, supplierId]),
     ])
 
     const credentials = credentialRows.map(rowToCredential)
@@ -427,6 +441,7 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
         payments,
         invoices,
         summary: buildSupplierReadonlySummary(projects, contracts, payments, invoices),
+        reviewHistory: reviewRows.map(row => ({ decision: row.decision as 'qualified' | 'rejected', reviewedAt: String(row.reviewed_at), note: String(row.note), actorId: row.actor_id as string | null, ...(row.id === null ? {} : { historyIdentity: { id: String(row.id), legacyId: String(row.id), archivedAt: String(row.archived_at) } }) })),
       },
     }
   }
@@ -451,7 +466,7 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
     tx: TransactionDb,
     supplierId: string,
     options: { invalidateReview?: boolean } = {},
-  ): Promise<boolean> {
+  ): Promise<{ changed: boolean, status: string }> {
     const [supplier] = await tx.select<{
       credential_status: string
       credential_reviewed_at: string | null
@@ -517,18 +532,19 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
       reviewedAt: supplier.credential_reviewed_at,
       reviewNote: supplier.credential_review_note,
     })
-    const preserveManualReview = !options.invalidateReview
-      && hasManualProof
-      && automaticStatus === 'reviewing'
-    const status = preserveManualReview ? supplier.credential_status : automaticStatus
-    const reviewedAt = preserveManualReview ? supplier.credential_reviewed_at : null
-    const reviewNote = preserveManualReview ? supplier.credential_review_note : ''
+    const projection = storedSupplierCredentialStatus({ status: supplier.credential_status, reviewedAt: supplier.credential_reviewed_at, reviewNote: supplier.credential_review_note }, credentials.map(row => ({ category: row.category, hasAccessibleFile: row.has_accessible_file === 1, expiresAt: row.expires_at, longTerm: row.long_term === 1 })), requirements, new Date())
+    // 可选资料等无关写动作不能因跨日而清旧凭证；门禁消费本次真实事实的只读投影。
+    if (!options.invalidateReview && hasManualProof)
+      return { changed: false, status: projection }
+    const status = automaticStatus
+    const reviewedAt = null
+    const reviewNote = ''
     if (
       supplier.credential_status === status
       && supplier.credential_reviewed_at === reviewedAt
       && supplier.credential_review_note === reviewNote
     ) {
-      return false
+      return { changed: false, status }
     }
 
     await tx.execute(
@@ -538,7 +554,7 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
        WHERE id = ?`,
       [status, reviewedAt, reviewNote, new Date().toISOString(), supplierId],
     )
-    return true
+    return { changed: true, status }
   }
 
   async function refreshCaches(supplierId: string) {
@@ -561,9 +577,7 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
       setLoading(supplierId, true)
       try {
         await loadSnapshot(supplierId)
-        const statusChanged = await withTransaction(tx => syncCredentialStatusInTransaction(tx, supplierId))
-        if (statusChanged)
-          await useSupplierStore().load()
+        await useSupplierStore().load()
       }
       finally {
         setLoading(supplierId, false)
@@ -1178,16 +1192,10 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
     if (input.decision === 'rejected' && !note)
       throw new Error('人工退回必须填写原因')
     await withTransaction(async (tx) => {
-      await syncCredentialStatusInTransaction(tx, input.supplierId)
-      const [supplier] = await tx.select<{ credential_status: string }>(
-        'SELECT credential_status FROM suppliers WHERE id = ? AND deleted_at IS NULL',
-        [input.supplierId],
-      )
-      if (!supplier)
-        throw new Error('分供方不存在或已删除')
-      if (input.decision === 'qualified' && supplier.credential_status !== 'reviewing')
+      const current = await syncCredentialStatusInTransaction(tx, input.supplierId)
+      if (input.decision === 'qualified' && current.status !== 'reviewing')
         throw new Error('只有资料齐全待核验时才能人工通过')
-      if (input.decision === 'rejected' && supplier.credential_status !== 'reviewing')
+      if (input.decision === 'rejected' && current.status !== 'reviewing')
         throw new Error('只有资料齐全待核验时才能人工退回')
       const now = new Date().toISOString()
       await tx.execute(

@@ -1,12 +1,18 @@
+import type { BusinessSession } from './business-session'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { auxiliaryContractInstance } from './auxiliary-contract-runtime'
 import { resolveBusinessSession } from './business-session'
 import { createOtherSettlementInstance } from './other-settlement-instance'
 import { otherSettlementTestRecords, otherSettlementTestSources } from './other-settlement-test-fixtures'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { createReadMeta, readSourceVersion, withReadMeta } from './read-meta'
 
 const instances = new Map<string, ReturnType<typeof createOtherSettlementInstance>>()
 const scenarios = new Map<string, string>()
+export function otherSettlementDevelopmentRead<T extends object>(value: T, session: BusinessSession, records: unknown, operation: string, scope: unknown = {}) {
+  const asOf = new Date().toISOString()
+  return withReadMeta(value, createReadMeta({ session, schemaVersion: 'other-settlement-read-v1', operation: `other-settlement:${operation}`, dataOrigin: 'real', asOf, coverage: 'complete', scope, sources: [{ key: 'other-settlements', state: 'readable', sourceVersion: readSourceVersion('other-settlements', records), asOf }] }))
+}
 export function otherSettlementInstance(key?: string | null) {
   const id = key || 'default'
   if (!instances.has(id))

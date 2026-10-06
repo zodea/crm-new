@@ -130,4 +130,45 @@ describe('施工合同中央 command contract', () => {
     expect(instance.importExisting([record])).toEqual([])
     expect(instance.rows()[0]?.actualCompletionDate).toBeNull()
   })
+
+  it('核对原键返回首次回执，拒绝异文和撤权，另一操作人的核对不会泄露或封存原键', async () => {
+    const instance = createConstructionContractCommandTestInstance({ createId: () => 'recovery-construction', projects: [{ id: 'project-1', name: '项目', customerId: 'customer-1' }], customers: [{ id: 'customer-1', name: '客户' }] })
+    const original = await instance.execute(request(), SESSION)
+    const changed = await instance.execute(request({ commandId: 'construction-later-edit', id: original.id, baseVersion: original.version, draft: { ...request().draft, name: '后续编辑' } }), SESSION)
+    expect(instance.resolve(original.commandId, SESSION)).toEqual({ outcome: 'applied', result: original })
+    expect(instance.form(original.id, SESSION)).toMatchObject({ version: changed.version, draft: { name: '后续编辑' } })
+    await expect(instance.execute(request({ draft: { ...request().draft, name: '同键另一意图' } }), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(() => instance.resolve(original.commandId, { ...SESSION, capabilities: [] })).toThrow(/权限/)
+    expect(instance.resolve(original.commandId, { ...SESSION, actorId: 'another-actor' })).toEqual({ outcome: 'not-applied', commandId: original.commandId })
+    expect(instance.resolve(original.commandId, SESSION)).toEqual({ outcome: 'applied', result: original })
+  })
+
+  it('关系校验等待中核对未应用会封存原请求，迟到提交不能保存，新意图仍可正常执行', async () => {
+    let release!: () => void
+    let entered!: () => void
+    const began = new Promise<void>(resolve => entered = resolve)
+    const wait = new Promise<void>(resolve => release = resolve)
+    let first = true
+    const instance = createConstructionContractCommandTestInstance({
+      createId: () => 'after-seal-construction',
+      projects: [{ id: 'project-1', name: '项目', customerId: 'customer-1' }],
+      customers: [{ id: 'customer-1', name: '客户' }],
+      async assertReferences() {
+        if (first) {
+          first = false
+          entered()
+          await wait
+        }
+      },
+    })
+    const pending = instance.execute(request(), SESSION)
+    await began
+    expect(instance.resolve(request().commandId, SESSION)).toEqual({ outcome: 'not-applied', commandId: request().commandId })
+    release()
+    await expect(pending).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(instance.rows()).toEqual([])
+    await expect(instance.execute(request(), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const saved = await instance.execute(request({ commandId: 'construction-new-intent' }), SESSION)
+    expect(instance.form(saved.id, SESSION).version).toBe('1')
+  })
 })

@@ -6,10 +6,11 @@ import { createHttpProjectListRepository } from '~/lib/project/http-repository'
 import { createScheduleRepository } from '~/lib/schedule/central-repository'
 import { createProjectReadTestInstance, PROJECT_READ_FIXTURE } from '../../server/utils/project-read-test-instance'
 import { createMemoryDb } from '../helpers/memory-db'
+import { fixtureProjectCustomerReferences } from '../helpers/project-read-meta'
 
 function central() {
   const rows: ProjectListSourceRow[] = [{ ...PROJECT_READ_FIXTURE[0]!, dataOrigin: 'real', id: 'new-central-project', name: '新建中央项目' }]
-  const instance = createProjectReadTestInstance(() => ['project:list:read', 'demo:read'], () => rows, () => `v${rows[0]?.name}`, undefined, async () => 0, async () => [])
+  const instance = createProjectReadTestInstance(() => ['project:list:read', 'demo:read'], () => rows, () => `v${rows[0]?.name}`, undefined, async () => 0, async () => [], fixtureProjectCustomerReferences)
   const repository = createHttpProjectListRepository({
     fetcher: async (url, options) => url === '/api/read/projects'
       ? instance.list(options?.query)

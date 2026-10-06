@@ -60,6 +60,7 @@ test('客户原件公开备份、失响应原键、离线副本与隔离冷恢�
     await page.getByLabel('本机访问码').fill(code)
     await page.getByRole('button', { name: '进入工作区', exact: true }).click()
     await expect(page.getByRole('button', { name: '退出本机登录' })).toBeVisible()
+    await expect(page).toHaveURL(`${origin}/base/customer`)
   }
   const request = (path: string, data?: unknown) => page.request.fetch(`${origin}${path}`, { method: data === undefined ? 'GET' : 'POST', headers: { Origin: origin }, ...(data === undefined ? {} : { data }) })
   const state = async () => (await request('/api/production/backup/status')).json()

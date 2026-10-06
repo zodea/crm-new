@@ -1,5 +1,17 @@
+import { ensureConstructionManagementFeeSchema } from '../construction-contract/management-fee-storage'
+import { migrateExpenseReferences } from '../finance/expense-references'
+import { migrateFinancePartyReferences } from '../finance/party-references'
+import { FINANCE_PAYMENT_ALLOCATION_GUARDS } from '../finance/payment-allocation-guards'
+import { migrateFinancePaymentParties } from '../finance/payment-party-upgrade'
+import { ensureMaterialQuotationSchema } from '../material-quotation/schema-upgrade'
+import { migrateExpenditureSettlementOwner } from '../other-settlement/schema-upgrade'
+import { CONTRACT_NUMBER_SCHEMA, OUR_SIGNATORY_SCHEMA } from '../our-signatory/schema'
+import { migrateNullableContractAmounts } from './nullable-contract-amounts'
 import { migratePaymentApprovalAmounts } from './payment-approval-migration'
 import { ALL_SCHEMA, BATCH_5_PAYROLL_ATTENDANCE } from './schema'
+import { assertIdentifier } from './schema-evidence'
+
+export { assertIdentifier } from './schema-evidence'
 
 /** 迁移器依赖的最小驱动形状（connection.ts 的 DbDriver 结构兼容，测试可用 sql.js 内存库实现） */
 export interface MigrationDb {
@@ -27,12 +39,6 @@ export function splitStatements(sql: string): string[] {
 export async function execScript(db: MigrationDb, sql: string): Promise<void> {
   for (const stmt of splitStatements(sql)) {
     await db.execute(`${stmt};`)
-  }
-}
-
-export function assertIdentifier(name: string): void {
-  if (!/^[A-Z_]\w*$/i.test(name)) {
-    throw new Error(`[db] 非法标识符: ${name}`)
   }
 }
 
@@ -1639,59 +1645,7 @@ BEGIN
   END;
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_payment_confirmation_balanced
-BEFORE UPDATE OF confirmation_status ON payment_records
-WHEN NEW.confirmation_status = 'confirmed'
-  AND OLD.confirmation_status <> 'confirmed'
-BEGIN
-  SELECT CASE
-    WHEN ABS(
-      COALESCE((
-        SELECT SUM(allocation.allocated_amount)
-        FROM payment_record_application_allocations AS allocation
-        WHERE allocation.payment_record_id = NEW.id
-          AND allocation.deleted_at IS NULL
-      ), 0) - NEW.amount
-    ) > 0.0001
-    THEN RAISE(ABORT, '支付分摊合计必须等于支付金额')
-  END;
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_confirmed_payment_allocation_insert
-BEFORE INSERT ON payment_record_application_allocations
-WHEN EXISTS (
-  SELECT 1 FROM payment_records
-  WHERE id = NEW.payment_record_id
-    AND confirmation_status = 'confirmed'
-    AND deleted_at IS NULL
-)
-BEGIN
-  SELECT RAISE(ABORT, '已确认支付需先撤回再修改分摊');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_confirmed_payment_allocation_update
-BEFORE UPDATE ON payment_record_application_allocations
-WHEN EXISTS (
-  SELECT 1 FROM payment_records
-  WHERE id = NEW.payment_record_id
-    AND confirmation_status = 'confirmed'
-    AND deleted_at IS NULL
-)
-BEGIN
-  SELECT RAISE(ABORT, '已确认支付需先撤回再修改分摊');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_confirmed_payment_allocation_delete
-BEFORE DELETE ON payment_record_application_allocations
-WHEN EXISTS (
-  SELECT 1 FROM payment_records
-  WHERE id = OLD.payment_record_id
-    AND confirmation_status = 'confirmed'
-    AND deleted_at IS NULL
-)
-BEGIN
-  SELECT RAISE(ABORT, '已确认支付需先撤回再修改分摊');
-END;
+${FINANCE_PAYMENT_ALLOCATION_GUARDS}
 `
 
 const F2_IMPORT_BATCH_ID = 'migration_f2_v21'
@@ -5713,6 +5667,244 @@ migrations.push({
   version: 49,
   name: 'payment-approval-nullable-amount-and-origin',
   up: migratePaymentApprovalAmounts,
+})
+
+migrations.push({
+  version: 50,
+  name: 'material-contract-owned-details',
+  async up(db) {
+    await addColumnIfMissing(db, 'contract_line_items', 'material_grade', 'TEXT NOT NULL DEFAULT \'\'')
+    await addColumnIfMissing(db, 'contract_line_items', 'source_evidence', 'TEXT')
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS contract_supplement_line_items (
+        id TEXT PRIMARY KEY,
+        supplement_id TEXT NOT NULL REFERENCES contract_supplements(id),
+        original_line_id TEXT REFERENCES contract_line_items(id),
+        material_name TEXT NOT NULL DEFAULT '',
+        spec TEXT NOT NULL DEFAULT '',
+        material_grade TEXT NOT NULL DEFAULT '',
+        brand TEXT NOT NULL DEFAULT '',
+        unit TEXT NOT NULL DEFAULT '',
+        qty REAL CHECK (qty IS NULL OR qty > 0),
+        tax_inclusive_unit_price REAL CHECK (tax_inclusive_unit_price IS NULL OR tax_inclusive_unit_price >= 0),
+        change_amount REAL CHECK (change_amount IS NULL OR change_amount >= 0),
+        change_basis TEXT NOT NULL DEFAULT '',
+        planned_arrival_date TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        source_evidence TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        deleted_at TEXT
+      )
+    `)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS contract_deductions (
+        id TEXT PRIMARY KEY,
+        contract_id TEXT REFERENCES contracts(id),
+        supplement_id TEXT REFERENCES contract_supplements(id),
+        name TEXT NOT NULL DEFAULT '',
+        amount REAL CHECK (amount IS NULL OR amount > 0),
+        basis TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        deleted_at TEXT,
+        CHECK ((contract_id IS NOT NULL) <> (supplement_id IS NOT NULL))
+      )
+    `)
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_contract_supplement_lines_owner ON contract_supplement_line_items(supplement_id, deleted_at)')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_contract_supplement_lines_original ON contract_supplement_line_items(original_line_id)')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_contract_deductions_contract ON contract_deductions(contract_id, deleted_at)')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_contract_deductions_supplement ON contract_deductions(supplement_id, deleted_at)')
+  },
+})
+
+migrations.push({
+  version: 51,
+  name: 'supplier-manual-review-history-preservation',
+  async up(db) {
+    await db.execute(`CREATE TABLE IF NOT EXISTS supplier_credential_review_history (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+      decision TEXT NOT NULL CHECK(decision IN ('qualified','rejected')),
+      reviewed_at TEXT NOT NULL CHECK(trim(reviewed_at) <> ''),
+      note TEXT NOT NULL,
+      actor_id TEXT,
+      archived_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      CHECK(decision <> 'rejected' OR trim(note) <> ''),
+      UNIQUE(supplier_id,decision,reviewed_at,note)
+    )`)
+    // 原 Native 凭证未记录操作者；归档时间是本次保全副本的时间，不伪造原核验人或失效时点。
+    await db.execute(`INSERT OR IGNORE INTO supplier_credential_review_history(supplier_id,decision,reviewed_at,note,actor_id)
+      SELECT id,credential_status,credential_reviewed_at,credential_review_note,NULL FROM suppliers
+      WHERE credential_status IN ('qualified','rejected') AND credential_reviewed_at IS NOT NULL
+        AND trim(credential_reviewed_at) <> ''
+        AND (credential_status <> 'rejected' OR trim(credential_review_note) <> '')`)
+    await db.execute(`CREATE TRIGGER IF NOT EXISTS supplier_review_history_preserve
+      BEFORE UPDATE OF credential_status,credential_reviewed_at,credential_review_note ON suppliers
+      WHEN OLD.credential_status IN ('qualified','rejected') AND OLD.credential_reviewed_at IS NOT NULL
+        AND trim(OLD.credential_reviewed_at) <> ''
+        AND (OLD.credential_status <> 'rejected' OR trim(OLD.credential_review_note) <> '')
+        AND (NEW.credential_status IS NOT OLD.credential_status
+          OR NEW.credential_reviewed_at IS NOT OLD.credential_reviewed_at
+          OR NEW.credential_review_note IS NOT OLD.credential_review_note)
+      BEGIN
+        INSERT OR IGNORE INTO supplier_credential_review_history(supplier_id,decision,reviewed_at,note,actor_id)
+        VALUES(OLD.id,OLD.credential_status,OLD.credential_reviewed_at,OLD.credential_review_note,NULL);
+      END`)
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_supplier_review_history_owner
+      ON supplier_credential_review_history(supplier_id,reviewed_at,id)`)
+    for (const operation of ['UPDATE', 'DELETE']) {
+      await db.execute(`CREATE TRIGGER IF NOT EXISTS supplier_review_history_${operation.toLowerCase()}_guard
+        BEFORE ${operation} ON supplier_credential_review_history
+        BEGIN SELECT RAISE(ABORT,'supplier review history is immutable'); END`)
+    }
+  },
+})
+
+migrations.push({
+  version: 52,
+  name: 'material-contract-original-line-evidence',
+  async up(db) {
+    // 历史协议缺冻结依据时保持空，不用今天的原行反填旧签约事实。
+    await addColumnIfMissing(db, 'contract_supplement_line_items', 'original_line_snapshot', 'TEXT')
+    await addColumnIfMissing(db, 'contract_supplement_line_items', 'original_source_updated_at', 'TEXT')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_contract_supplement_line_items_deleted ON contract_supplement_line_items(deleted_at) WHERE deleted_at IS NOT NULL')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_contract_deductions_deleted ON contract_deductions(deleted_at) WHERE deleted_at IS NOT NULL')
+  },
+})
+
+migrations.push({
+  version: 53,
+  name: 'contract-signatories-global-numbers-nullable-amounts',
+  async up(db) {
+    await migrateNullableContractAmounts(db, async () => {
+      // Exact known DDL: each trigger has one statement; keep its BEGIN…END intact.
+      const schema = `${OUR_SIGNATORY_SCHEMA}\n${CONTRACT_NUMBER_SCHEMA}`
+        .replaceAll('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ')
+        .replaceAll('CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS ')
+        .replaceAll('CREATE TRIGGER ', 'CREATE TRIGGER IF NOT EXISTS ')
+        .replace('INSERT INTO our_signatory_revision', 'INSERT OR IGNORE INTO our_signatory_revision')
+      for (const statement of schema.match(/\s*CREATE TRIGGER[\s\S]*?END;|[^;]+;/g) ?? [])
+        await db.execute(statement)
+      for (const table of ['contracts', 'contract_supplements', 'company_expense_contracts']) {
+        await addColumnIfMissing(db, table, 'our_signatory_id', 'TEXT REFERENCES our_signatories(id)')
+        await addColumnIfMissing(db, table, 'our_signatory_snapshot', 'TEXT')
+      }
+      for (const [table, owner] of [['contracts', 'native-contracts'], ['company_expense_contracts', 'native-company-expense']] as const) {
+        await db.execute(`INSERT OR IGNORE INTO contract_number_claims(owner_domain,contract_id,number,version,claimed_at)
+          SELECT ?,id,trim(no),updated_at,updated_at FROM ${table}
+          WHERE trim(no)<>'' AND status NOT IN ('draft','草稿')`, [owner])
+        await db.execute(`INSERT OR IGNORE INTO contract_number_history(id,owner_domain,contract_id,number,version,occurred_at,reason)
+          SELECT ?||':'||id||':upgrade:'||updated_at,?,id,trim(no),updated_at,updated_at,'native-upgrade-evidence' FROM ${table}
+          WHERE trim(no)<>''`, [owner, owner])
+      }
+    })
+  },
+})
+
+migrations.push({
+  version: 54,
+  name: 'expense-original-stable-references',
+  up: migrateExpenseReferences,
+})
+
+migrations.push({
+  version: 55,
+  name: 'material-line-applicable-tax-point',
+  async up(db) {
+    await db.execute('BEGIN IMMEDIATE')
+    try {
+      for (const table of ['contract_line_items', 'contract_supplement_line_items'])
+        await addColumnIfMissing(db, table, 'applicable_tax_rate', 'REAL DEFAULT NULL CHECK (applicable_tax_rate IS NULL OR applicable_tax_rate >= 0)')
+      if ((await db.select('PRAGMA foreign_key_check')).length)
+        throw new Error('行税点迁移后外键核验失败')
+      await db.execute('COMMIT')
+    }
+    catch (cause) {
+      await db.execute('ROLLBACK')
+      throw cause
+    }
+  },
+})
+
+migrations.push({
+  version: 56,
+  name: 'finance-worker-supplier-stable-references',
+  async up(db) {
+    await db.execute('BEGIN IMMEDIATE')
+    try {
+      await migrateFinancePartyReferences(db)
+      if ((await db.select('PRAGMA foreign_key_check')).length)
+        throw new Error('财务身份迁移后外键核验失败')
+      await db.execute('COMMIT')
+    }
+    catch (cause) {
+      await db.execute('ROLLBACK')
+      throw cause
+    }
+  },
+})
+
+migrations.push({
+  version: 57,
+  name: 'construction-management-fee-configuration',
+  async up(db) {
+    await db.execute('BEGIN IMMEDIATE')
+    try {
+      await ensureConstructionManagementFeeSchema(db)
+      if ((await db.select('PRAGMA foreign_key_check')).length)
+        throw new Error('总合同管理费配置迁移后外键核验失败')
+      await db.execute('COMMIT')
+    }
+    catch (cause) {
+      await db.execute('ROLLBACK')
+      throw cause
+    }
+  },
+})
+
+migrations.push({
+  version: 58,
+  name: 'independent-material-quotation-owner',
+  async up(db) {
+    await db.execute('BEGIN IMMEDIATE')
+    try {
+      await ensureMaterialQuotationSchema(db)
+      if ((await db.select('PRAGMA foreign_key_check')).length)
+        throw new Error('独立报价迁移后外键核验失败')
+      await db.execute('COMMIT')
+    }
+    catch (cause) {
+      await db.execute('ROLLBACK')
+      throw cause
+    }
+  },
+})
+
+migrations.push({
+  version: 59,
+  name: 'finance-worker-payment-identities',
+  async up(db) {
+    await db.execute('BEGIN IMMEDIATE')
+    try {
+      await migrateFinancePaymentParties(db)
+      if ((await db.select('PRAGMA foreign_key_check')).length)
+        throw new Error('付款工人身份迁移后外键核验失败')
+      await db.execute('COMMIT')
+    }
+    catch (cause) {
+      await db.execute('ROLLBACK')
+      throw cause
+    }
+  },
+})
+
+migrations.push({
+  version: 60,
+  name: 'other-settlement-original-expense-owner',
+  up: migrateExpenditureSettlementOwner,
 })
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

@@ -1,13 +1,18 @@
-import type { DataOriginDTO, ProblemDTO } from '../../types/read-model'
+import type { DataOriginDTO, ProblemDTO, ReadMetaDTO } from '../../types/read-model'
+import type { ProjectConstructionManagementFeeRead } from './construction-management-fee'
 import type {
   ProjectDetailQueryDTO,
   ProjectListQueryDTO,
   ProjectListRepository,
   ProjectListSourceRow,
 } from './repository'
+import { isISODateTimeDTO } from '../../types/read-model'
+import { attachOriginReadMeta, attachReadMeta, isReadMetaDTO } from '../read-model/meta'
+import { readNativeProjectConstructionManagementFees } from './native-construction-management-fee'
 import {
   buildProjectDetailRead,
   buildProjectListPage,
+  projectProblem,
   projectProblemFromUnknown,
   ProjectRepositoryProblem,
 } from './repository'
@@ -20,11 +25,14 @@ interface SqliteProjectRepositoryOptions {
   gateway: ProjectSqliteGateway
   canReadProjects?: boolean
   canReadCustomers?: boolean
+  /** 仅同一 Native owner 明确授权后读取本机总合同配置。 */
+  canReadConstructionContracts?: boolean
   canReadCustomer?: (id: string) => boolean
   canViewDemo: boolean
   dataOrigin: DataOriginDTO
   now?: () => string
-  sourceVersion?: string | null
+  /** The SQLite snapshot owner supplies both source proofs from the same read, including excluded origins. */
+  readEvidence: (input: { query: ProjectListQueryDTO | ProjectDetailQueryDTO, rows: readonly ProjectListSourceRow[], asOf: string, constructionManagementFees?: ProjectConstructionManagementFeeRead }) => Promise<Record<DataOriginDTO, ReadMetaDTO>> | Record<DataOriginDTO, ReadMetaDTO>
 }
 
 function text(value: unknown): string {
@@ -169,16 +177,29 @@ export function createSqliteProjectListRepository(
     return rows.map(row => sourceRow(row, canReadCustomer, options.dataOrigin))
   }
 
+  async function evidence(query: ProjectListQueryDTO | ProjectDetailQueryDTO, rows: readonly ProjectListSourceRow[], asOf: string, constructionManagementFees?: ProjectConstructionManagementFeeRead) {
+    if (!isISODateTimeDTO(asOf))
+      throw new ProjectRepositoryProblem(projectProblem('internal-error', 'SQLite 快照读取时间无效'))
+    const result = await options.readEvidence({ query, rows, asOf, ...(constructionManagementFees ? { constructionManagementFees } : {}) })
+    if (!(['real', 'demo'] as const).every(origin => isReadMetaDTO(result[origin], 'project-read-v2') && result[origin].dataOrigin === origin && result[origin].asOf === asOf))
+      throw new Error('SQLite 读取缺少同次可信证据')
+    return result
+  }
+
   return {
     async list(query: ProjectListQueryDTO) {
       try {
         assertRead(query.includeDemo)
-        return buildProjectListPage({
-          rows: await sourceRows(),
+        const rows = await sourceRows()
+        const asOf = options.now?.() ?? new Date().toISOString()
+        const readMeta = await evidence(query, rows, asOf)
+        return attachOriginReadMeta(buildProjectListPage({
+          rows,
           query,
-          asOf: options.now?.() ?? new Date().toISOString(),
-          sourceVersion: options.sourceVersion ?? null,
-        })
+          asOf,
+          sourceVersion: readMeta[options.dataOrigin].sourceVersion,
+          capabilities: readMeta[options.dataOrigin].capabilities,
+        }), readMeta, options.dataOrigin)
       }
       catch (cause) {
         throw projectProblemFromUnknown(cause)
@@ -187,12 +208,21 @@ export function createSqliteProjectListRepository(
     async get(query: ProjectDetailQueryDTO) {
       try {
         assertRead(query.includeDemo)
-        return buildProjectDetailRead({
-          rows: await sourceRows(),
+        const rows = await sourceRows()
+        const asOf = options.now?.() ?? new Date().toISOString()
+        const configuration = options.dataOrigin === 'real' && query.origin === 'real' && options.canReadConstructionContracts === true
+          ? await readNativeProjectConstructionManagementFees({ select: options.gateway.select, execute: async () => { throw new Error('Native 配置读取不能写入') } }, query.id, asOf)
+          : undefined
+        const readMeta = await evidence(query, rows, asOf, configuration)
+        if (configuration && !readMeta.real.capabilities.includes('construction-contract:read'))
+          throw new ProjectRepositoryProblem(projectProblem('forbidden', 'Native 总合同配置授权与读取证明不一致'))
+        return attachReadMeta({ ...buildProjectDetailRead({
+          rows,
           query,
-          asOf: options.now?.() ?? new Date().toISOString(),
-          sourceVersion: options.sourceVersion ?? null,
-        })
+          asOf,
+          sourceVersion: readMeta[options.dataOrigin].sourceVersion,
+          capabilities: readMeta[options.dataOrigin].capabilities,
+        }), ...(configuration ? { constructionManagementFees: configuration } : {}) }, readMeta[options.dataOrigin])
       }
       catch (cause) {
         throw projectProblemFromUnknown(cause)

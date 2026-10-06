@@ -133,7 +133,7 @@ describe('cross-domain navigation contract', () => {
     '可见蓝色样式不能自动解释为链接',
   ])('defines identity, return, zero-value and multi-tab safeguards: %s', (token) => {
     const contract = readFileSync(CONTRACT_PATH, 'utf8')
-    expect(contract, token).toContain(token)
+    expect(contract.replace(/\s+/g, ' '), token).toContain(token.replace(/\s+/g, ' '))
   })
 
   it('is linked from the canonical docs and read-model contracts', () => {

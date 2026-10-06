@@ -1,4 +1,4 @@
-import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ProblemDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ProblemDTO, ReadProjection } from '../../types/read-model'
 import type {
   ConstructionContractDetailFocusDTO,
   ConstructionContractDetailFocusScope,
@@ -15,9 +15,11 @@ import type {
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
 import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
-import { round2 } from '../util/number'
+import { parsePageQuery, resolvePagination } from '../read-model/pagination'
+import { subtractKnownMoney, sumKnownMoney } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
+import { decodeConstructionManagementFee, emptyConstructionManagementFee } from './management-fee'
 import {
   CONSTRUCTION_CONTRACT_DETAIL_FOCUS_SCOPES,
   CONSTRUCTION_CONTRACT_PAGE_SIZES,
@@ -49,11 +51,6 @@ function bool(value: unknown): boolean {
   return value === true || value === 'true'
 }
 
-function positiveInteger(value: unknown, fallback: number): number {
-  const parsed = Number(value)
-  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : fallback
-}
-
 function origin(value: unknown) {
   if (value == null || value === '')
     return null
@@ -65,7 +62,9 @@ function origin(value: unknown) {
 export function parseConstructionContractListQuery(
   input: Record<string, unknown> | undefined,
 ): ConstructionContractListQueryDTO {
-  const pageSize = positiveInteger(input?.pageSize, 10)
+  const { requestedPage, pageSize } = parsePageQuery(input ?? {}, () => {
+    throw new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '分页参数无效'))
+  }, 10)
   if (!CONSTRUCTION_CONTRACT_PAGE_SIZES.includes(pageSize as ConstructionContractPageSize)) {
     throw new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '施工合同列表查询参数无效'))
   }
@@ -77,7 +76,7 @@ export function parseConstructionContractListQuery(
     projectId: optional(input?.projectId),
     customerId: optional(input?.customerId),
     status: parseContractListFilter(input?.status, () => new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '合同筛选参数无效'))),
-    page: positiveInteger(input?.page, 1),
+    page: requestedPage,
     pageSize: pageSize as ConstructionContractPageSize,
   }
 }
@@ -121,8 +120,9 @@ export function parseConstructionContractDetailQuery(
   return { id, origin: dataOrigin, includeDemo: bool(input?.includeDemo), focus }
 }
 
-function money(value: number): string {
-  return round2(value).toFixed(2)
+function money(value: number | null): string | null {
+  const normalized = sumKnownMoney([value])
+  return normalized === null ? null : normalized.toFixed(2)
 }
 
 function ratio(value: number): string {
@@ -142,13 +142,15 @@ function entityRef<T extends 'project' | 'customer'>(
   if (!id)
     return { state: 'missing', entity, id: null, label: null, reason: 'not-recorded' } as EntityRefDTO & { entity: T }
   if (permission === 'forbidden')
-    return { state: 'forbidden', entity, id, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
+    return { state: 'forbidden', entity, id: null, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
   return resolvedRef(entity, id, label, null) as EntityRefDTO & { entity: T }
 }
 
 function detailNavigation(reference: EntityRefDTO, dataOrigin: ConstructionContractDetailQueryDTO['origin']): NavigationIntentDTO {
   if (reference.state === 'forbidden')
     return { kind: 'unavailable', reason: 'forbidden' }
+  if (reference.state === 'unavailable')
+    return { kind: 'unavailable', reason: 'not-connected' }
   if (reference.state !== 'resolved')
     return { kind: 'unavailable', reason: 'missing-id' }
   return { kind: 'entity-detail', subject: reference, variant: 'detail', view: null, filters: { dataOrigin } }
@@ -179,18 +181,14 @@ function sameContract<T extends { dataOrigin: string, contractId: string | null 
   return rows.filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)
 }
 
-export function constructionContractSupplementAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number {
-  return round2(sameContract(facts.supplements, source)
-    .filter(activeSupplement)
-    .reduce((sum, row) => sum + (row.amount ?? 0), 0))
+export function constructionContractSupplementAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number | null {
+  return sumKnownMoney(sameContract(facts.supplements, source).filter(activeSupplement).map(row => row.amount))
 }
 
-function changedAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number {
+function changedAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number | null {
   const supplements = constructionContractSupplementAmount(source, facts)
-  const changes = sameContract(facts.changes, source)
-    .filter(approvedChange)
-    .reduce((sum, row) => sum + (row.amount ?? 0), 0)
-  return round2(source.amount + supplements + changes)
+  const changes = sumKnownMoney(sameContract(facts.changes, source).filter(approvedChange).map(row => row.amount))
+  return sumKnownMoney([source.amount, supplements, changes])
 }
 
 function amounts(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources) {
@@ -199,15 +197,15 @@ function amounts(source: ConstructionContractDetailSource, facts: ConstructionCo
     changed: money(changedAmount(source, facts)),
     settled: money(source.settledAmount),
     invoiced: money(source.invoicedAmount),
-    received: source.receivedAmount === null ? null : money(source.receivedAmount),
-    bySettlementReceivable: source.receivedAmount === null ? null : money(source.settledAmount - source.receivedAmount),
-    invoicedUnreceived: source.receivedAmount === null ? null : money(source.invoicedAmount - source.receivedAmount),
+    received: money(source.receivedAmount),
+    bySettlementReceivable: money(subtractKnownMoney(source.settledAmount, source.receivedAmount)),
+    invoicedUnreceived: money(subtractKnownMoney(source.invoicedAmount, source.receivedAmount)),
   }
 }
 
 export function buildConstructionContractListPage(
   input: BuildConstructionContractListPageInput,
-): ConstructionContractListPageDTO {
+): ReadProjection<ConstructionContractListPageDTO> {
   const allowedOrigins = input.query.includeDemo ? new Set(['real', 'demo']) : new Set(['real'])
   const search = input.query.search.toLocaleLowerCase('zh-CN')
   const filtered = input.contracts
@@ -223,7 +221,8 @@ export function buildConstructionContractListPage(
       return !search || [row.name, row.no].some(value => value.toLocaleLowerCase('zh-CN').includes(search))
     })
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id))
-  const start = (input.query.page - 1) * input.query.pageSize
+  const { page } = resolvePagination(input.query.page, input.query.pageSize, filtered.length)
+  const start = (page - 1) * input.query.pageSize
   const items = filtered.slice(start, start + input.query.pageSize).map((source) => {
     const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)
     const customer = entityRef('customer', source.customerId, source.customerName, source.customerPermission)
@@ -249,9 +248,9 @@ export function buildConstructionContractListPage(
     const rows = filtered.filter(row => row.dataOrigin === dataOrigin)
     return {
       contractCount: rows.length,
-      changedAmount: money(rows.reduce((sum, row) => sum + changedAmount(row, input.facts), 0)),
-      invoicedAmount: money(rows.reduce((sum, row) => sum + row.invoicedAmount, 0)),
-      receivedAmount: (dataOrigin === 'real' && input.receiptsProblem) || rows.some(row => row.receivedAmount === null) ? null : money(rows.reduce((sum, row) => sum + row.receivedAmount!, 0)),
+      changedAmount: money(sumKnownMoney(rows.map(row => changedAmount(row, input.facts)))),
+      invoicedAmount: money(sumKnownMoney(rows.map(row => row.invoicedAmount))),
+      receivedAmount: dataOrigin === 'real' && input.receiptsProblem ? null : money(sumKnownMoney(rows.map(row => row.receivedAmount))),
     }
   }
   const options = (id: (row: ConstructionContractDetailSource) => string | null, label: (row: ConstructionContractDetailSource) => string) =>
@@ -264,10 +263,10 @@ export function buildConstructionContractListPage(
   return {
     items,
     ...(input.query.origin !== 'demo' && input.receiptsProblem ? { receiptsProblem: input.receiptsProblem } : {}),
-    pagination: { page: input.query.page, pageSize: input.query.pageSize, total: filtered.length },
+    pagination: { requestedPage: input.query.page, page, pageSize: input.query.pageSize, total: filtered.length },
     summary: {
-      projects: options(row => row.projectId, row => row.projectName),
-      customers: options(row => row.customerId, row => row.customerName),
+      projects: options(row => row.projectPermission === 'allowed' ? row.projectId : null, row => row.projectName),
+      customers: options(row => row.customerPermission === 'allowed' ? row.customerId : null, row => row.customerName),
       statuses,
       origins: { real: originSummary('real'), demo: originSummary('demo') },
     },
@@ -333,7 +332,7 @@ function mapFacts(
     id: row.id,
     no: row.no,
     name: row.name,
-    amount: row.amount == null ? null : money(row.amount),
+    amount: money(row.amount),
     date: row.date,
     status: row.status,
     navigation: factNavigation(row, source, kind),
@@ -342,7 +341,7 @@ function mapFacts(
 
 export function buildConstructionContractDetail(
   input: BuildConstructionContractDetailInput,
-): ConstructionContractDetailReadDTO {
+): ReadProjection<ConstructionContractDetailReadDTO> {
   if (input.query.origin === 'demo' && !input.query.includeDemo) {
     throw new ConstructionContractRepositoryProblem(constructionContractProblem('forbidden', '测试施工合同未授权显示'))
   }
@@ -435,6 +434,9 @@ export function buildConstructionContractDetail(
     dataOrigin: source.dataOrigin,
     ...(source.dataOrigin === 'real' && input.receiptsProblem ? { receiptsProblem: input.receiptsProblem } : {}),
     contract: {
+      managementFee: source.managementFee ? decodeConstructionManagementFee(source.managementFee) : emptyConstructionManagementFee(),
+      ourSignatorySnapshot: source.ourSignatorySnapshot ? structuredClone(source.ourSignatorySnapshot) : null,
+      legacyPartyA: source.legacyPartyA ?? null,
       dataOrigin: source.dataOrigin,
       id: source.id,
       no: source.no,

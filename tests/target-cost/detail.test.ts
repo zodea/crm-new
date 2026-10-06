@@ -86,9 +86,10 @@ describe('target cost detail read model', () => {
     expect(detail?.summary).toMatchObject({
       itemTotal: 1300,
       signedAmount: 200,
-      settledAmount: 120,
-      paidAmount: 0,
-      remainingAmount: 1180,
+      settledAmount: null,
+      paidAmount: null,
+      remainingAmount: null,
+      metrics: { settledAmount: { knownValue: 120, status: 'partial' }, paidAmount: { knownValue: 0, status: 'partial' }, remainingAmount: { knownValue: null } },
     })
     expect(detail?.categories.find(row => row.category === '材料')).toMatchObject({
       targetAmount: 1000,
@@ -100,7 +101,9 @@ describe('target cost detail read model', () => {
     expect(detail?.categories.find(row => row.category === '工人工资')).toMatchObject({
       targetAmount: 300,
       signedAmount: 0,
-      settledAmount: 0,
+      settledAmount: null,
+      paidAmount: null,
+      metrics: { settledAmount: { knownValue: null, missingSources: ['P4实际工资源:unavailable'] } },
       targetLineCount: 1,
     })
     expect(detail?.categories.find(row => row.category === '专业分包')).toMatchObject({

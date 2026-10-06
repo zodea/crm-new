@@ -23,14 +23,28 @@ it('真实公开服务重启后恢复原件、OCR候选/人工值及失响应原
     expect(recovered.outcome).toBe('applied')
     const id: string = recovered.result.id
     expect(await (await f.request('/api/commands/suppliers', command)).json()).toEqual(recovered.result)
+    const currentSession = await (await f.request('/api/read/business-session')).json()
+    expect(currentSession.capabilities).toEqual(expect.arrayContaining(['finance-payment-application:read', 'finance-payment-record:read']))
+    const paymentSource = new DatabaseSync(join(f.directory, 'ruihang.sqlite'), { readOnly: true })
+    try {
+      expect(paymentSource.prepare('SELECT schema_version FROM production_participants WHERE domain=?').all('finance')).toEqual([{ schema_version: 1 }])
+      expect(paymentSource.prepare('SELECT revision FROM finance_revision WHERE singleton=1').all()).toEqual([{ revision: 0 }])
+      expect(paymentSource.prepare('SELECT COUNT(*) AS n FROM payment_records').all()).toEqual([{ n: 0 }])
+      expect(paymentSource.prepare('SELECT COUNT(*) AS n FROM payment_record_application_allocations').all()).toEqual([{ n: 0 }])
+    }
+    finally { paymentSource.close() }
     const list = decodeSupplierListPage(await (await f.request('/api/read/suppliers')).json())
     expect(list.items).toHaveLength(1)
-    expect(list.items[0]).toMatchObject({ projectCount: null, paymentAmount: null, contractAmount: null })
+    expect(list.items[0]).toMatchObject({ projectCount: null, paymentAmount: '0.00', contractAmount: null })
+    expect(list.meta.sources).toContainEqual(expect.objectContaining({ key: 'payments', state: 'readable', sourceVersion: 'finance-0' }))
     expect(list.unavailableSources).toContain('contracts')
     expect((await f.request(`/api/read/suppliers?columnFilters=${encodeURIComponent(JSON.stringify({ ranges: { projectCount: { min: 0 } } }))}`)).status).toBe(503)
-    expect((await f.request('/api/read/suppliers?sort=paymentAmount-desc')).status).toBe(503)
+    const paymentSorted = await f.request('/api/read/suppliers?sort=paymentAmount-desc')
+    expect(paymentSorted.status).toBe(200)
+    expect(decodeSupplierListPage(await paymentSorted.json()).items.map(row => [row.supplier.id, row.paymentAmount])).toEqual([[id, '0.00']])
     const detail = decodeSupplierDetailRead(await (await f.request(`/api/read/suppliers/${id}?origin=real`)).json())
     expect(detail.summary).toMatchObject({ projectCount: null, contractCount: null, contractAmount: { value: null } })
+    expect(detail.summary.paymentAmount).toMatchObject({ status: 'complete', value: '0.00', knownValue: '0.00', participatingCount: 0, missingSources: [] })
     const bytes = Buffer.from('%PDF-1.7\nSynthetic original\n%%EOF')
     const base = { ...identity, requiredCapability: 'supplier-credential:write', origin: 'real', supplierId: id }
     const upload = { ...base, commandId: 'restart-upload-original', baseSupplierVersion: '1', baseCredentialVersion: '0', action: 'upload', draft: { fileName: '合成原件.pdf', mimeType: 'application/pdf', fileSize: bytes.length, payloadBase64: bytes.toString('base64'), category: '营业执照', validFrom: '', expiresAt: '', longTerm: false } }
@@ -53,6 +67,9 @@ it('真实公开服务重启后恢复原件、OCR候选/人工值及失响应原
     await f.stop()
     await f.start(true)
     await f.login()
+    const secondColdList = decodeSupplierListPage(await (await f.request('/api/read/suppliers')).json())
+    expect(secondColdList.items.map(row => [row.supplier.id, row.paymentAmount])).toEqual([[id, '0.00']])
+    expect(secondColdList.meta.sources).toContainEqual(expect.objectContaining({ key: 'payments', state: 'readable', sourceVersion: 'finance-0' }))
     const saved = await (await f.request('/api/commands/supplier-resolve', { commandId: confirmation.commandId })).json()
     expect(saved).toMatchObject({ outcome: 'applied', result: { supplierId: id } })
     expect(await (await f.request('/api/commands/supplier-credentials', confirmation)).json()).toEqual(saved.result)

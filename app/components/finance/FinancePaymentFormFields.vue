@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { FinancePageDraft } from '~/lib/finance/page'
 import type { LookupOption } from '~/lib/kit/lookup'
-import { computed } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { approvalAmountLabel, readApprovalAmount } from '~/lib/finance/approval-amount'
+import { needsSettlementAllocation, PAYMENT_BIZ_TYPES } from '~/lib/finance/domain'
+import { financeDraftMoney, financeInputNumber as inputNumber } from '~/lib/finance/input-number'
 import FinanceLineGrid from './FinanceLineGrid.vue'
 
 const props = defineProps<{
@@ -11,6 +13,7 @@ const props = defineProps<{
   fieldErrors?: Record<string, string>
   fetchProjects: (keyword: string) => Promise<LookupOption[]>
   fetchSuppliers: (keyword: string) => Promise<LookupOption[]>
+  fetchWorkers?: (keyword: string) => Promise<LookupOption[]>
   fetchExpenseContracts: (keyword: string) => Promise<LookupOption[]>
   fetchSettlements: (keyword: string) => Promise<LookupOption[]>
   fetchInvoices: (keyword: string) => Promise<LookupOption[]>
@@ -27,18 +30,37 @@ function options(values: string[]) {
 }
 
 const PAYMENT_METHOD_OPTIONS = options(['银行转账', '承兑汇票', '现金', '其他'])
-const BIZ_TYPE_OPTIONS = options([
-  '有合同-合同劳务',
-  '有合同-材料',
-  '有合同-专业分包',
-  '有合同-机械',
-  '有合同-其他',
-  '无合同-零星采购',
-  '预付款',
-  '管理费',
-  '项目费用',
-  '公司付款',
-])
+const BIZ_TYPE_OPTIONS = options([...PAYMENT_BIZ_TYPES])
+const PAYEE_OPTIONS = [{ key: 'supplier', label: '分供方' }, { key: 'worker', label: '工人垫款清偿' }]
+const payeeKind = shallowRef<'worker' | 'supplier'>(props.draft.workerId ? 'worker' : 'supplier')
+watch(() => [props.kind, props.draft.id, props.draft.workerId, props.draft.supplierId] as const, (value, previous) => {
+  if (value[0] !== previous[0] || value[1] !== previous[1] || value[2] || value[3])
+    payeeKind.value = value[2] ? 'worker' : 'supplier'
+})
+const payeeLabels = new Map<string, string>()
+async function fetchPayees(keyword: string) {
+  const scope = `${props.kind}:${props.draft.id ?? 'new'}:${payeeKind.value}`
+  const fetch = payeeKind.value === 'worker' ? props.fetchWorkers : props.fetchSuppliers
+  if (!fetch)
+    throw new Error('全局工人来源尚未可靠读取')
+  const rows = await fetch(keyword)
+  if (scope !== `${props.kind}:${props.draft.id ?? 'new'}:${payeeKind.value}`)
+    throw new DOMException('实际收款对象范围已变化。', 'AbortError')
+  payeeLabels.clear()
+  rows.forEach(row => payeeLabels.set(row.id, row.label))
+  return rows
+}
+function choosePayeeKind(value: string | undefined) {
+  payeeKind.value = value === 'worker' ? 'worker' : 'supplier'
+  payeeLabels.clear()
+  emit('patch', { supplierId: null, workerId: null, payeeNameSnapshot: null, contractId: null, settlementAllocations: [], invoiceAllocations: [], applicationAllocations: [] })
+}
+function choosePayee(value: string | null | undefined) {
+  const id = value || null
+  const name = id ? payeeLabels.get(id) : undefined
+  emit('patch', { supplierId: payeeKind.value === 'supplier' ? id : null, workerId: payeeKind.value === 'worker' ? id : null, payeeNameSnapshot: null, ...(props.kind === 'payment_record' ? { payeeName: name ?? '' } : {}), contractId: null, settlementAllocations: [], invoiceAllocations: [], applicationAllocations: [] })
+  emit('clearError', 'supplierId')
+}
 const COST_OPTIONS = options(['合同劳务', '专业分包', '材料', '机械', '管理费', '项目费用', '其他'])
 const INVOICE_STATE_OPTIONS = options(['先票后款', '先款后票', '无需发票'])
 const SOURCE_OPTIONS = [
@@ -56,25 +78,25 @@ const showsContract = computed(() =>
 )
 const showsSettlements = computed(() =>
   props.kind === 'payment_application'
-  && Boolean(props.draft.bizType?.startsWith('有合同-')),
+  && (needsSettlementAllocation(props.draft.bizType ?? '') || props.draft.bizType === '公司付款'),
 )
 const showsInvoices = computed(() =>
   props.kind === 'payment_application' && props.draft.invoiceState !== '无需发票',
 )
 const settlementTotal = computed(() =>
   (props.draft.settlementAllocations ?? [])
-    .reduce((sum, line) => sum + (Number(line.allocatedAmount) || 0), 0),
+    .reduce((sum, line) => sum + Number(line.allocatedAmount), 0),
 )
 const invoiceTotal = computed(() =>
   (props.draft.invoiceAllocations ?? [])
-    .reduce((sum, line) => sum + (Number(line.allocatedAmount) || 0), 0),
+    .reduce((sum, line) => sum + Number(line.allocatedAmount), 0),
 )
 const paymentAllocationTotal = computed(() =>
   (props.draft.applicationAllocations ?? [])
-    .reduce((sum, line) => sum + (Number(line.allocatedAmount) || 0), 0),
+    .reduce((sum, line) => sum + Number(line.allocatedAmount), 0),
 )
-const applyAmount = computed(() => Number(props.draft.applyAmount) || 0)
-const paymentAmount = computed(() => Number(props.draft.amount) || 0)
+const applyAmount = computed(() => props.draft.applyAmount == null ? Number.NaN : Number(props.draft.applyAmount))
+const paymentAmount = computed(() => props.draft.amount == null ? Number.NaN : Number(props.draft.amount))
 const approvalHint = computed(() => {
   const amount = props.draft.approvedAmount ?? null
   if (amount !== null && (!Number.isFinite(amount) || amount < 0))
@@ -120,10 +142,6 @@ function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value
 }
 
-function inputNumber(event: Event): number {
-  return Number((event.target as HTMLInputElement).value) || 0
-}
-
 function jsonValue(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value ?? {}, null, 2)
 }
@@ -158,10 +176,11 @@ function fieldClass(field: string) {
           <span v-if="fieldErrors?.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
         </div>
         <div class="field-block" :class="fieldClass('supplierId')">
-          <span class="field-label">实际收款单位</span>
-          <LookupSelect :model-value="draft.supplierId" :fetch="fetchSuppliers" recent-key="finance-payment-supplier" placeholder="检索分供方" @update:model-value="patch('supplierId', $event)" />
+          <span class="field-label">实际收款对象</span>
+          <SelectFilter :model-value="payeeKind" :options="PAYEE_OPTIONS" full-width aria-label="实际收款对象类型" @update:model-value="choosePayeeKind" />
+          <LookupSelect :key="payeeKind" :model-value="draft.workerId || draft.supplierId" :fetch="fetchPayees" :recent-key="`finance-payment-${payeeKind}`" :placeholder="payeeKind === 'worker' ? '选择全局工人' : '检索分供方'" @update:model-value="choosePayee" />
           <span v-if="fieldErrors?.supplierId" class="field-error">{{ fieldErrors.supplierId }}</span>
-          <span class="field-hint">有合同类型必须由真实支出合同证明；甲方、开发商和沟通联系人不属于此字段。</span>
+          <span class="field-hint">工人垫款清偿须采用原费用结算；工人工资在工资实际收付流程办理。个人临时金选择分供方。</span>
         </div>
         <div v-if="showsContract" class="field-block" :class="fieldClass('contractId')">
           <span class="field-label">关联合同 *</span>
@@ -207,9 +226,9 @@ function fieldClass(field: string) {
         kind="settlement"
         :lines="draft.settlementAllocations ?? []"
         :fetch-options="fetchSettlements"
-        :disabled-reason="draft.contractId ? undefined : '请先选择关联合同'"
-        :total-label="`已关联 ¥ ${settlementTotal.toFixed(2)} · 差额 ¥ ${(applyAmount - settlementTotal).toFixed(2)}`"
-        empty="请选择当前项目/合同的真实支出结算单"
+        :disabled-reason="showsContract && !draft.contractId ? '请先选择关联合同' : undefined"
+        :total-label="`已关联 ¥ ${financeDraftMoney(settlementTotal)} · 差额 ¥ ${financeDraftMoney(applyAmount - settlementTotal)}`"
+        empty="选择已确认的原费用或合同结算；保留真实项目或公司归属"
         @update="updateGrid('settlementAllocations', $event)"
       />
     </section>
@@ -222,7 +241,7 @@ function fieldClass(field: string) {
         kind="invoice"
         :lines="draft.invoiceAllocations ?? []"
         :fetch-options="fetchInvoices"
-        :total-label="`已关联 ¥ ${invoiceTotal.toFixed(2)} · ${draft.invoiceState === '先款后票' ? '待回票' : '差额'} ¥ ${Math.max(applyAmount - invoiceTotal, 0).toFixed(2)}`"
+        :total-label="`已关联 ¥ ${financeDraftMoney(invoiceTotal)} · ${draft.invoiceState === '先款后票' ? '待回票' : '差额'} ¥ ${financeDraftMoney(Math.max(applyAmount - invoiceTotal, 0))}`"
         empty="先款后票允许无票提交；后续可补关联"
         @update="updateGrid('invoiceAllocations', $event)"
       />
@@ -267,9 +286,11 @@ function fieldClass(field: string) {
           <span class="field-label">项目（公司付款可空）</span>
           <LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" recent-key="finance-record-project" placeholder="检索项目" @update:model-value="patch('projectId', $event)" />
         </div>
-        <div class="field-block">
-          <span class="field-label">关联分供方（可选）</span>
-          <LookupSelect :model-value="draft.supplierId" :fetch="fetchSuppliers" recent-key="finance-record-supplier" placeholder="检索分供方" @update:model-value="patch('supplierId', $event)" />
+        <div class="field-block" :class="fieldClass('supplierId')">
+          <span class="field-label">实际收款对象 *</span>
+          <SelectFilter :model-value="payeeKind" :options="PAYEE_OPTIONS" full-width aria-label="实际收款对象类型" @update:model-value="choosePayeeKind" />
+          <LookupSelect :key="payeeKind" :model-value="draft.workerId || draft.supplierId" :fetch="fetchPayees" :recent-key="`finance-record-${payeeKind}`" :placeholder="payeeKind === 'worker' ? '选择全局工人' : '检索分供方'" @update:model-value="choosePayee" />
+          <span v-if="fieldErrors?.supplierId" class="field-error">{{ fieldErrors.supplierId }}</span>
         </div>
         <label class="field-block">
           <span class="field-label">实际收款方名称 *</span>
@@ -333,7 +354,7 @@ function fieldClass(field: string) {
         kind="payment"
         :lines="draft.applicationAllocations ?? []"
         :fetch-options="fetchPaymentApplications"
-        :total-label="`已分摊 ¥ ${paymentAllocationTotal.toFixed(2)} · 差额 ¥ ${(paymentAmount - paymentAllocationTotal).toFixed(2)}`"
+        :total-label="`已分摊 ¥ ${financeDraftMoney(paymentAllocationTotal)} · 差额 ¥ ${financeDraftMoney(paymentAmount - paymentAllocationTotal)}`"
         empty="确认前，分摊合计必须等于支付金额"
         @update="updateGrid('applicationAllocations', $event)"
       />

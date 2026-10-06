@@ -168,4 +168,55 @@ describe('桌面数据库连接协调器', () => {
       'execute:ROLLBACK',
     ])
   })
+
+  it('一致磁盘备份等事务提交后独占队列，失败后继续读取原库', async () => {
+    const events: string[] = []
+    const driver = driverWithLog(events)
+    const entered = deferred()
+    const release = deferred()
+    const backupStarted = deferred()
+    const finishBackup = deferred()
+    driver.backupTo = async (destination) => {
+      events.push(`backup:${destination}`)
+      backupStarted.resolve()
+      await finishBackup.promise
+      throw new Error('备份校验失败，原库保留')
+    }
+    const coordinator = createDbCoordinator(async () => driver)
+    const write = coordinator.withTransaction(async (tx) => {
+      await tx.execute('WRITE')
+      entered.resolve()
+      await release.promise
+    })
+    await entered.promise
+    const backup = coordinator.backupTo('protected.sqlite')
+    const rejectedBackup = expect(backup).rejects.toThrow('备份校验失败')
+    await Promise.resolve()
+    expect(events).toEqual(['execute:BEGIN', 'execute:WRITE'])
+    release.resolve()
+    await write
+    await backupStarted.promise
+    const later = coordinator.select('AFTER_BACKUP')
+    await Promise.resolve()
+    expect(events).toEqual(['execute:BEGIN', 'execute:WRITE', 'execute:COMMIT', 'backup:protected.sqlite'])
+    finishBackup.resolve()
+    await rejectedBackup
+    await later
+    expect(events.at(-1)).toBe('select:AFTER_BACKUP')
+  })
+
+  it('显式恢复备份不初始化或升级原库，既有初始化失败后仍可保全来源', async () => {
+    const load = vi.fn(async (): Promise<DbDriver> => {
+      throw new Error('业务结构升级失败')
+    })
+    const backup = vi.fn(async (_destination: string) => undefined)
+    const coordinator = createDbCoordinator(load, { backupWithoutDriver: backup })
+    await coordinator.backupTo('before-upgrade.sqlite')
+    expect(load).not.toHaveBeenCalled()
+    expect(backup).toHaveBeenCalledWith('before-upgrade.sqlite')
+    await expect(coordinator.getDb()).rejects.toThrow('业务结构升级失败')
+    await coordinator.backupTo('failed-upgrade-source.sqlite')
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(backup).toHaveBeenLastCalledWith('failed-upgrade-source.sqlite')
+  })
 })

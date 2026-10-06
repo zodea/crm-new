@@ -54,7 +54,7 @@ export function approvalPaymentCap(applyAmount: number, approvedAmount: number |
   return approval.state === 'legacy-unknown' ? null : approval.amount ?? applyAmount
 }
 
-/** PAY-08 待裁定：旧零保持既有确认兼容上限，此分支不把它升级为批复事实。 */
+/** Registration drafts may retain the old request amount; confirmation separately requires the original PAY-08 proof. */
 export function paymentConfirmationCap(applyAmount: number, approvedAmount: number | null, origin?: ApprovedAmountOrigin): number {
   return approvalPaymentCap(applyAmount, approvedAmount, origin) ?? applyAmount
 }

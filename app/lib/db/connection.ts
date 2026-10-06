@@ -13,8 +13,6 @@ import {
   legacyProductionReadOnlyDriver,
   localDataWorkspace,
 } from './data-workspace'
-import { runMigrations } from './migrations'
-import { seedIfEmpty } from './seed'
 import { openBrowserSqlite } from './sqljs'
 
 async function createTauriDriver(): Promise<DbDriver> {
@@ -31,6 +29,9 @@ async function createTauriDriver(): Promise<DbDriver> {
     },
     async close() {
       await conn.close(databaseUrl)
+    },
+    async backupTo(destination) {
+      await invoke('backup_app_database', { destination })
     },
   }
 }
@@ -77,9 +78,12 @@ async function initializeDb(): Promise<DbDriver> {
     : await createSqlJsDriver(workspace.snapshotKey)
 
   try {
+    const { runMigrations } = await import('./migrations')
     await runMigrations(db)
-    if (workspace.seedDemo)
+    if (workspace.seedDemo) {
+      const { seedIfEmpty } = await import('./seed')
       await seedIfEmpty(db)
+    }
     await db.persist?.()
     if (workspace.readOnly)
       await db.execute('PRAGMA query_only = ON')
@@ -100,7 +104,14 @@ async function initializeDb(): Promise<DbDriver> {
   }
 }
 
-const coordinator = createDbCoordinator(initializeDb)
+const coordinator = createDbCoordinator(initializeDb, {
+  async backupWithoutDriver(destination) {
+    if (!isTauri())
+      throw new Error('一致磁盘备份仅支持当前桌面 SQLite。')
+    await invoke('prepare_app_database')
+    await invoke('backup_app_database', { destination })
+  },
+})
 
 export async function getDb(): Promise<DbDriver> {
   return coordinator.getDb()
@@ -116,6 +127,13 @@ export async function select<T>(sql: string, params?: unknown[]): Promise<T[]> {
 
 export async function withTransaction<T>(work: (tx: TransactionDb) => Promise<T>): Promise<T> {
   return coordinator.withTransaction(work)
+}
+
+/** Takes the same exclusive queue as writes; never copies a live SQLite file. */
+export async function backupNativeDatabase(destination: string): Promise<void> {
+  if (!isTauri())
+    throw new Error('一致磁盘备份仅支持当前桌面 SQLite。')
+  return coordinator.backupTo(destination)
 }
 
 /**

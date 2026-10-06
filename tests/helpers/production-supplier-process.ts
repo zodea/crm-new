@@ -10,7 +10,7 @@ import process from 'node:process'
 import { expect } from 'vitest'
 
 export async function supplierProductionProcess() {
-  const base = resolve('.codex-tmp/issue-453-tests')
+  const base = resolve('.tmp/a01-supplier-process-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/process-`)
   const probe = createServer().listen(0, '127.0.0.1')

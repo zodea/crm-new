@@ -20,12 +20,13 @@ describe('施工合同聚合读取版本', () => {
       constructionContractCommandTestInstance,
       ownerDocuments,
     )
-    const first = read.list({ origin: 'real' }).sourceVersion
+    const first = read.list({ origin: 'real' })
     ownerVersion = 'owner-v2'
-    const second = read.list({ origin: 'real' }).sourceVersion
+    const second = read.list({ origin: 'real' })
 
-    expect(first).not.toBe(second)
-    expect(second).toContain('owner-v2')
+    expect(first.sourceVersion).not.toBe(second.sourceVersion)
+    expect(first.meta.sources).toContainEqual(expect.objectContaining({ key: 'owner-commercial-documents', state: 'readable', sourceVersion: 'owner-v1' }))
+    expect(second.meta.sources).toContainEqual(expect.objectContaining({ key: 'owner-commercial-documents', state: 'readable', sourceVersion: 'owner-v2' }))
   })
 
   it('把同一 canonical 验收记录同步为施工合同的验收与保修双事实入口', () => {
@@ -151,4 +152,28 @@ describe('施工合同聚合读取版本', () => {
       constructionContractCommandTestInstance.reset(sessionId)
     }
   })
+})
+
+it('累计结算只纳入同来源非草稿月报；最终结算不重复相加，未接开票保持未知', () => {
+  const scope = 'construction-settled-real-facts'
+  constructionContractCommandTestInstance.reset(scope)
+  prepareConstructionContractChainIdentityFixtures(scope)
+  constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], scope)
+  try {
+    const report = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.find(row => row.kind === 'owner_report')!
+    if (!report)
+      throw new Error('真实月报fixture缺失')
+    let rows: import('../../app/lib/owner-document/central-repository').OwnerCommercialDocumentSource[] = [{ ...report, id: 'monthly-first', status: 'submitted', amount: 125.5, contractId: CONSTRUCTION_CONTRACT_EXISTING_ID }, { ...report, id: 'monthly-draft', status: 'draft', amount: 99999, contractId: CONSTRUCTION_CONTRACT_EXISTING_ID }, { ...report, id: 'final-independent', kind: 'final_settlement' as const, status: 'submitted', amount: 800, contractId: CONSTRUCTION_CONTRACT_EXISTING_ID }]
+    const owner = { rows: () => rows, sourceVersion: () => JSON.stringify(rows) }
+    const read = createConstructionContractReadTestInstance(() => ['construction-contract:read'], constructionContractCommandTestInstance, owner)
+    const detail = () => read.detail(CONSTRUCTION_CONTRACT_EXISTING_ID, { origin: 'real' }, scope)
+    expect(detail().contract.amounts).toMatchObject({ settled: '125.50', invoiced: null, invoicedUnreceived: null })
+    expect(detail().meta.sources).toContainEqual({ key: 'invoice-applications', state: 'unavailable', sourceVersion: null, asOf: null })
+    rows = [{ ...rows[0]!, amount: null }]
+    expect(detail().contract.amounts.settled).toBeNull()
+    rows = []
+    expect(detail().contract.amounts.settled).toBe('0.00')
+    expect(detail().contract.amounts.invoiced).toBeNull()
+  }
+  finally { constructionContractCommandTestInstance.reset(scope) }
 })

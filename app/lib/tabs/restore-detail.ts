@@ -7,7 +7,7 @@ import { parseConstructionContractDetailQuery } from '~/lib/construction-contrac
 import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { payrollReadQuery, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
-import { loadPayrollDetailRead } from '~/lib/payroll/platform-read'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { readRestoredCrewWorkerFact } from './restore-crew-worker'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
@@ -82,6 +82,16 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   if (!capabilities.includes(capability))
     return restoreProblem('forbidden')
   const common = { capability, variant: 'detail' }
+  if (family === 'material-quotation') {
+    if (origin !== 'real' || isDesktopRuntime())
+      return restoreProblem('not-connected')
+    const dto = await repos.materialQuotations.list()
+    checkRestoreAbort(options.signal)
+    const record = dto.records.find(record => record.id === detail.id)
+    if (!record)
+      return restoreProblem('not-found')
+    return { ...common, subject: reference('material-quotation', record.id, record.draft.partyName || '材料报价'), origin: 'real', capabilities: dto.meta.capabilities, sourceVersion: dto.meta.sourceVersion }
+  }
   if (family === 'payroll-adjustment') {
     const dto = await repos.payroll.adjustmentDetail({ origin }, detail.id)
     return { ...common, capabilities: dto.context.capabilities, sourceVersion: dto.context.sourceVersion, subject: reference('wage-adjustment', dto.adjustment.id, '工资更正详情'), origin: dto.context.origin }
@@ -95,6 +105,8 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   if (family === 'payroll') {
     const scope = payrollViewScope(Object.fromEntries(url.searchParams))
     const sourceQuery = payrollReadQuery(scope, query.includeDemo)
+    const { loadPayrollDetailRead } = await import('~/lib/payroll/platform-read')
+    checkRestoreAbort(options.signal)
     const dto = await loadPayrollDetailRead(repos.payroll, { origin: sourceQuery.origin, includeDemo: sourceQuery.includeDemo }, detail.id)
     return { ...common, capabilities: dto.context.capabilities, sourceVersion: dto.context.sourceVersion, subject: reference('wage-statement', dto.statement.id, `${dto.statement.month} · 工资历史`), origin: dto.context.origin, filters: payrollViewQuery(scope) }
   }
@@ -229,6 +241,8 @@ export async function readRestoredDetail(options: RestoreDetailOptions): Promise
     return restoreProblem('forbidden')
   if (options.path.origin === 'demo' && (!options.includeDemo() || !options.capabilities().includes('demo:read')))
     return restoreProblem('forbidden')
+  if (loaded.subject.state === 'unavailable')
+    return restoreProblem('error')
   if (loaded.subject.state !== 'resolved')
     return restoreProblem('not-found')
   const subjectId = options.detail.family === 'quantity-hollow' ? options.detail.unitId : options.detail.id

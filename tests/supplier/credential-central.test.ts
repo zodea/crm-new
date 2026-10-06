@@ -41,7 +41,7 @@ describe('中央证照与主档同一事务旅程', () => {
     expect(file).toMatchObject({ state: 'available', payloadBase64: pdf.toString('base64') })
   })
 
-  it('关键主档字段实际变化后重算为待核验，普通编辑和重导都不能保留旧凭证', async () => {
+  it('关键主档字段实际变化后重算待核验，普通编辑与重导保留历史但不复用旧核验资格', async () => {
     const state = await setup()
     state.complete()
     state.execute({ action: 'review', draft: { decision: 'qualified', note: '' } })
@@ -49,7 +49,7 @@ describe('中央证照与主档同一事务旅程', () => {
     await state.commands.execute({ id: state.created.id, workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'supplier:write', commandId: 'master-noncritical', baseVersion: form.version, action: 'save', attachments: {}, draft: { ...form.draft, laborScope: '安装', note: '普通备注' } }, session)
     expect(state.read().status).toBe('qualified')
     await state.commands.importRow({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'supplier:write', commandId: 'import-critical', draft: { name: '更正工商名称', externalRef: 'legacy-import' } }, session)
-    expect(state.read()).toMatchObject({ status: 'reviewing', review: null })
+    expect(state.read()).toMatchObject({ status: 'reviewing', reviewCurrent: false, review: { decision: 'qualified' }, reviewHistory: [{ decision: 'qualified' }] })
     expect(state.commands.rows()[0]?.credentialStatus).toBe('reviewing')
   })
 
@@ -73,7 +73,7 @@ describe('中央证照与主档同一事务旅程', () => {
     state.execute({ action: 'requirement', draft: { category: '其他', requirement: 'optional', reason: '补充材料' } })
     expect(state.read().status).toBe('qualified')
     state.execute({ action: 'requirement', draft: { category: '其他', requirement: 'required', reason: '当前合同明确要求' } })
-    expect(state.read()).toMatchObject({ status: 'reviewing', review: null })
+    expect(state.read()).toMatchObject({ status: 'reviewing', reviewCurrent: false, review: { decision: 'qualified' } })
   })
 
   it('固定必需不可降级，条件资料设为必需才要求原因；仅原因更正保留人工结论', async () => {
@@ -87,19 +87,31 @@ describe('中央证照与主档同一事务旅程', () => {
     expect(state.read().status).toBe('qualified')
   })
 
-  it('按上海日期过期撤销结论，未登记有效期仍沿原有齐全语义', async () => {
+  it('按上海日只读计算到期次日当前状态，人工历史、版本、原件和审计不随读取改变', async () => {
     const state = await setup()
     state.upload('营业执照', '2026-09-12')
     state.upload('法人身份证')
     state.upload('银行账户资料')
     state.execute({ action: 'review', draft: { decision: 'qualified', note: '' } })
     expect(state.read().status).toBe('qualified')
+    const before = state.commands.snapshot()
+    const sourceBefore = state.commands.sourceVersion()
+    expect(state.commands.sourceVersion()).toBe(sourceBefore)
     state.setClock('2026-09-12T16:00:00.000Z')
+    const sourceAfter = state.commands.sourceVersion()
+    expect(sourceAfter).not.toBe(sourceBefore)
+    expect(sourceBefore).toContain('2026-09-12')
+    expect(sourceAfter).toContain('2026-09-13')
+    expect(state.commands.sourceVersion()).toBe(sourceAfter)
     expect(state.commands.rows()[0]?.credentialStatus).toBe('incomplete')
-    expect(state.read().review).toBeNull()
+    expect(state.read()).toMatchObject({ status: 'incomplete', reviewCurrent: false, review: { decision: 'qualified' }, businessDate: '2026-09-13' })
+    expect(state.read().credentials[0]?.validity).toMatchObject({ state: 'expired', reason: 'expired' })
+    state.commands.form(state.created.id, session)
+    state.read()
+    expect(state.commands.snapshot()).toEqual(before)
   })
 
-  it('同类另一原件仍有效时，新过期也撤旧凭证；重新人工核验不被历史过期件反复撤销', async () => {
+  it('同类另一原件仍有效时，新过期使旧凭证不适用；新核验不受历史过期件反复影响', async () => {
     const state = await setup()
     state.upload('营业执照', '2026-09-12')
     state.upload('营业执照', '2027-09-12')
@@ -109,9 +121,10 @@ describe('中央证照与主档同一事务旅程', () => {
     state.execute({ action: 'review', draft: { decision: 'qualified', note: '' } })
     state.setClock('2026-09-12T16:00:00.000Z')
     expect(state.commands.rows()[0]?.credentialStatus).toBe('reviewing')
-    expect(state.read().review).toBeNull()
+    expect(state.read()).toMatchObject({ reviewCurrent: false, review: { decision: 'qualified' } })
     state.execute({ action: 'review', draft: { decision: 'qualified', note: '核验了当前仍有效原件' } })
     expect(state.read().status).toBe('qualified')
+    expect(state.read().reviewHistory).toHaveLength(2)
     state.setClock('2026-09-13T16:00:00.000Z')
     expect(state.read().status).toBe('qualified')
   })

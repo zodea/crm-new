@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import { createError } from 'h3'
 import { projectProblem } from '../../app/lib/project/repository'
+import { MigrationEvidenceProblem } from './migration-snapshot'
 import { requireProductionBusinessSession } from './production-auth'
 import { getProductionRuntimeConfig } from './production-config'
 import { createProductionStorage, ProductionStorageProblem } from './production-storage'
@@ -22,4 +23,9 @@ export const productionSession = (event: H3Event, options: { touch?: boolean } =
 export function throwProductionStorageError(cause: unknown) {
   if (cause instanceof ProductionStorageProblem)
     throw createError({ statusCode: 503, data: projectProblem('unavailable', cause.message) })
+  if (cause instanceof MigrationEvidenceProblem) {
+    const code = cause.problem.code
+    const statusCode = code === 'forbidden' ? 403 : code === 'unavailable' ? 503 : code === 'not-found' ? 404 : ['stale-source', 'conflict'].includes(code) ? 409 : 422
+    throw createError({ statusCode, data: cause.problem })
+  }
 }

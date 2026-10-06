@@ -81,8 +81,11 @@ export function prepareReceiptMigration(current: Map<string, StoredReceipt>, cur
   const records = new Map(current)
   const payloads = new Map(currentPayloads)
   for (const [id, row] of records) {
-    if (row.migrationBatchId && (row.migrationBatchId !== batchId || !ids.has(id)))
+    if (row.migrationBatchId && (row.migrationBatchId !== batchId || !ids.has(id))) {
+      if (row.version !== '1')
+        throw receiptProblem('conflict', '迁入收款已有后来修改、删除或附件变更，不能回滚移除')
       records.delete(id)
+    }
   }
   const references = referencesFor(snapshot, referenceFacts)
   for (const entity of entities) {

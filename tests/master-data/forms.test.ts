@@ -526,6 +526,23 @@ describe('f1 整页表单领域 action', () => {
     })
   })
 
+  it('工人跨项目复用原稳定ID，当前归属可更新而旧项目工资冻结与同名他人均不改写', async () => {
+    await mem.execute('INSERT INTO projects(id,name,customer_id,manager,approval_status) VALUES(\'project-next\',\'下一个项目\',\'customer-ref\',\'项目经理\',\'submitted\')')
+    const input = { name: '跨项目同名工人', phone: '13800000011', bankName: '合成银行', bankAccount: '62220011', trade: '泥工', crewId: 'crew-ref', currentProjectId: 'project-ref', note: '经人工核实的原人员' }
+    const original = await saveWorkerForm(input, 'submit')
+    const other = await saveWorkerForm({ ...input, phone: '13800000022', bankAccount: '62220022', currentProjectId: 'project-next', note: '同名不同人员' }, 'submit')
+    const snapshot = JSON.stringify({ workerId: original.id, name: input.name, originalProjectId: 'project-ref', adoptedAmount: 500, evidence: '历史已签收原件' })
+    await mem.execute('INSERT INTO wage_statements(id,project_id,crew_id,leader_worker_id,month,quantity_source,status,actual_amount,source_version,snapshot_json) VALUES(\'old-worker-wage\',\'project-ref\',\'crew-ref\',?,\'2026-07\',\'field\',\'released\',500,\'old-frozen-version\',?)', [original.id, snapshot])
+    const previous = (await mem.select<Record<string, unknown>>('SELECT * FROM wage_statements WHERE id=\'old-worker-wage\''))[0]
+    const read = await loadWorkerForm(original.id)
+    await saveWorkerForm({ ...read!, currentProjectId: 'project-next', name: '跨项目工人（现名）' }, 'submit')
+    expect(await loadWorkerForm(original.id)).toMatchObject({ id: original.id, name: '跨项目工人（现名）', currentProjectId: 'project-next', crewId: 'crew-ref', bankAccount: '62220011' })
+    expect((await mem.select<Record<string, unknown>>('SELECT * FROM wage_statements WHERE id=\'old-worker-wage\''))[0]).toEqual(previous)
+    expect((await mem.select<{ snapshot_json: string }>('SELECT snapshot_json FROM wage_statements WHERE id=\'old-worker-wage\''))[0]!.snapshot_json).toBe(snapshot)
+    expect(await loadWorkerForm(other.id)).toMatchObject({ id: other.id, name: '跨项目同名工人', phone: '13800000022', currentProjectId: 'project-next' })
+    expect((await mem.select<{ id: string }>('SELECT id FROM workers ORDER BY id')).map(row => row.id).sort()).toEqual([original.id, other.id].sort())
+  })
+
   it('客户统一社会信用代码冲突时返回可理解的领域提示', async () => {
     await saveCustomerForm({
       name: '第一建设单位',

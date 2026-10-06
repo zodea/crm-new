@@ -16,6 +16,7 @@ import {
 } from 'reka-ui'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { useModalLayerRegistration } from '~/composables/useOverlayStack'
+import { readProblemTitle, readStateProblem } from '~/lib/read-model/state'
 import { NOTIFICATION_TYPE_META } from '~/stores/notifications'
 
 const props = defineProps<{
@@ -27,7 +28,9 @@ const emit = defineEmits<{
 }>()
 
 const notificationStore = useNotificationStore()
-const { items, unreadCount } = storeToRefs(notificationStore)
+const { items, unreadCount, loading, error, pending, evaluationUnavailable, readState } = storeToRefs(notificationStore)
+const readingProblem = computed(() => readStateProblem(readState.value))
+const dataVisibilityStore = useDataVisibilityStore()
 const { layerStyle } = useModalLayerRegistration(toRef(props, 'open'))
 const isCompact = useMediaQuery('(max-width: 768px)', { ssrWidth: 1024 })
 const sheetPlacement = computed(() => isCompact.value ? 'bottom' : 'right')
@@ -58,11 +61,19 @@ watch(activeKind, () => {
 })
 
 async function openItem(id: string) {
-  const route = notificationStore.openItem(id)
+  const route = await notificationStore.openItem(id)
   if (!route)
     return
   emit('update:open', false)
   await navigateTo(route)
+}
+
+async function recoverPending() {
+  const route = await notificationStore.recoverPending()
+  if (route) {
+    emit('update:open', false)
+    await navigateTo(route)
+  }
 }
 </script>
 
@@ -95,7 +106,7 @@ async function openItem(id: string) {
               消息中心
             </DialogTitle>
             <DialogDescription data-notification-count class="mt-0.5 text-11px text-ink-soft">
-              {{ unreadCount ? `${unreadCount} 条未读消息` : '消息均已读' }}
+              {{ error || evaluationUnavailable ? '未读状态待核对' : loading ? '正在核对消息' : unreadCount ? `${unreadCount} 条未读消息` : '消息均已读' }}
             </DialogDescription>
           </div>
           <button
@@ -142,6 +153,21 @@ async function openItem(id: string) {
           </div>
 
           <TabsContent :value="activeKind" class="min-h-0 flex-1 overflow-y-auto outline-none">
+            <div v-if="error || evaluationUnavailable" role="status" class="border-b border-line p-3 text-12px leading-5 text-warn">
+              {{ readProblemTitle(readingProblem, error || '持续提醒来源暂未就绪；资料当前有效性仍以资料页为准。') }}
+              <button type="button" class="ml-2 border-0 bg-transparent text-brand underline" @click="notificationStore.refresh()">
+                重试读取
+              </button>
+            </div>
+            <div v-if="pending" role="status" class="border-b border-line p-3 text-12px leading-5 text-warn">
+              上次已读操作尚待核对；当前已读显示不会代替原提交回执。
+              <button type="button" class="ml-2 border-0 bg-transparent text-brand underline" @click="recoverPending">
+                恢复原已读操作
+              </button>
+            </div>
+            <p v-if="loading" role="status" class="px-4 text-12px text-ink-soft">
+              正在核对消息…
+            </p>
             <div v-if="filteredItems.length" class="divide-y divide-line">
               <article
                 v-for="item in filteredItems"
@@ -165,6 +191,10 @@ async function openItem(id: string) {
                       <span v-if="!item.read" class="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-brand" aria-label="未读" />
                     </span>
                     <span class="mt-1 block text-11px leading-relaxed text-ink-soft">{{ item.description }}</span>
+                    <span v-if="item.problem" class="mt-1 block text-11px leading-relaxed" :class="item.problem.state === 'active' ? 'text-warn' : 'text-ok'">
+                      {{ item.problem.state === 'resolved' ? '问题已解除，历史提醒保留' : item.problem.severity === 'expired' ? '持续问题 · 已过期' : '持续问题 · 7 天内到期' }}
+                      <span v-if="item.problem.state === 'active' && item.read"> · 已读仍需处理</span>
+                    </span>
                     <span class="mt-1.5 flex items-center gap-2 text-10px text-ink-faint">
                       <span>{{ NOTIFICATION_TYPE_META[item.type].label }}</span>
                       <span aria-hidden="true">·</span>
@@ -174,6 +204,7 @@ async function openItem(id: string) {
                 </button>
 
                 <button
+                  v-if="dataVisibilityStore.includeDemo"
                   type="button"
                   class="absolute bottom-2 right-2 grid h-7 w-7 place-items-center border-0 rounded-[var(--radius-btn)] bg-transparent text-ink-faint opacity-0 transition-opacity duration-[var(--dur-fast)] hover:bg-danger-soft hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
                   title="删除消息"
@@ -189,7 +220,7 @@ async function openItem(id: string) {
               <div>
                 <span class="i-lucide-inbox mx-auto h-9 w-9 text-ink-faint" aria-hidden="true" />
                 <p class="mt-3 text-13px font-600 text-ink-soft">
-                  {{ query || selectedType.length ? '没有匹配的消息' : activeKind === 'todo' ? '暂无待办' : '暂无通知' }}
+                  {{ error ? '消息读取失败' : loading ? '正在核对消息' : query || selectedType.length ? '没有匹配的消息' : activeKind === 'todo' ? '暂无待办' : '暂无通知' }}
                 </p>
               </div>
             </div>
@@ -200,7 +231,7 @@ async function openItem(id: string) {
           <button
             type="button"
             class="h-9 w-full border border-brand rounded-[var(--radius-btn)] bg-panel text-12px font-600 text-brand transition-colors duration-[var(--dur-fast)] hover:bg-brand-soft disabled:cursor-not-allowed disabled:border-line disabled:text-ink-faint disabled:hover:bg-panel"
-            :disabled="unreadCount === 0"
+            :disabled="unreadCount === 0 || loading || Boolean(error) || evaluationUnavailable || Boolean(pending)"
             @click="notificationStore.markAllRead"
           >
             全部标记为已读

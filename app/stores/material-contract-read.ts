@@ -8,24 +8,12 @@ import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/repository'
-
-function previous<T>(state: ReadState<T>): T | null {
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
-}
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readFailureState, readStateData } from '~/lib/read-model/state'
 
 function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
   const { problem } = materialContractProblemFromUnknown(cause)
-  if (problem.code === 'forbidden')
-    return { kind: 'forbidden', problem }
-  if (problem.code === 'not-found')
-    return { kind: 'not-found', problem }
-  if (problem.code === 'relationship-mismatch')
-    return { kind: 'mismatch', problem }
-  return { kind: 'error', problem, previous: prior }
+  return readFailureState(problem, prior)
 }
 
 function sameDetail(left: MaterialContractDetailQueryDTO | null, right: MaterialContractDetailQueryDTO) {
@@ -40,11 +28,19 @@ export const useMaterialContractReadStore = defineStore('material-contract-read'
   const detailQuery = shallowRef<MaterialContractDetailQueryDTO | null>(null)
   let latestList = 0
   let latestDetail = 0
+  bindReadAuthority((problem) => {
+    latestList++
+    latestDetail++
+    listQuery.value = null
+    detailQuery.value = null
+    listState.value = readFailureState<MaterialContractListPageDTO>(problem, null)
+    detailState.value = readFailureState<MaterialContractDetailReadDTO>(problem, null)
+  })
 
   async function loadList(query: MaterialContractListQueryDTO) {
     const request = ++latestList
     const prior = listQuery.value?.origin === query.origin && listQuery.value.includeDemo === query.includeDemo
-      ? previous(listState.value)
+      ? readStateData(listState.value)
       : null
     listQuery.value = { ...query }
     listState.value = { kind: 'loading', previous: prior }
@@ -62,7 +58,7 @@ export const useMaterialContractReadStore = defineStore('material-contract-read'
 
   async function loadDetail(query: MaterialContractDetailQueryDTO) {
     const request = ++latestDetail
-    const prior = sameDetail(detailQuery.value, query) ? previous(detailState.value) : null
+    const prior = sameDetail(detailQuery.value, query) ? readStateData(detailState.value) : null
     detailQuery.value = { ...query }
     detailState.value = { kind: 'loading', previous: prior }
     try {

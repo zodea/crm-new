@@ -5,6 +5,7 @@ import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-sourc
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
+import { createDeliveryCommandService } from '../../server/utils/delivery-command-service'
 import { deliveryCommandTestInstance } from '../../server/utils/delivery-runtime'
 import { createMemoryDb } from '../helpers/memory-db'
 
@@ -13,8 +14,8 @@ async function unused(): Promise<never> {
   throw new Error('本例仅读取显式内存 SQLite')
 }
 afterEach(async () => {
-  await coreMigrationTestInstance.reset(session.workspaceId)
   deliveryCommandTestInstance.reset(session)
+  await coreMigrationTestInstance.reset(session.workspaceId)
 })
 
 describe('送货完整受控迁移', () => {
@@ -30,7 +31,7 @@ describe('送货完整受控迁移', () => {
         isNative: () => false,
         isDemoActive: () => false,
         currentSchemaVersion: async () => LATEST_VERSION,
-        select: sql => db.select(sql),
+        select: (sql, params) => db.select(sql, params),
         closeDatabase: unused,
         loadProductionSnapshot: unused,
         readSnapshotSource: unused,
@@ -52,7 +53,7 @@ describe('送货完整受控迁移', () => {
     finally { db.close() }
   })
 
-  it('预检到确认统一原件、历史与打印状态，重复确认不覆盖修订，回滚去除迁入事实', async () => {
+  it('完整迁入原件、历史与打印状态；安全回滚可撤回，后续修订后回滚严格保全', async () => {
     const db = await createMemoryDb()
     try {
       await runMigrations(db)
@@ -76,7 +77,7 @@ describe('送货完整受控迁移', () => {
         isNative: () => false,
         isDemoActive: () => false,
         currentSchemaVersion: async () => LATEST_VERSION,
-        select: sql => db.select(sql),
+        select: (sql, params) => db.select(sql, params),
         closeDatabase: unused,
         loadProductionSnapshot: unused,
         readSnapshotSource: unused,
@@ -102,6 +103,13 @@ describe('送货完整受控迁移', () => {
       await coreMigrationTestInstance.importBatch({ ...envelope('delivery-import'), batchId: batch.batchId }, session)
       expect(deliveryCommandTestInstance.list(session).records).toEqual([])
       await coreMigrationTestInstance.confirm({ ...envelope('delivery-confirm'), batchId: batch.batchId }, session)
+      const importedSnapshot = coreMigrationTestInstance.snapshot(session)
+      const identities = (type: 'projects' | 'suppliers') => importedSnapshot.entities.filter(row => row.entityType === type).map(row => ({ id: row.id, name: row.name, dataOrigin: 'real' as const }))
+      const safe = createDeliveryCommandService({ references: () => ({ projects: identities('projects'), suppliers: identities('suppliers') }) })
+      safe.prepareMigrationSnapshot(importedSnapshot)()
+      expect(safe.list(session).records).toHaveLength(2)
+      safe.prepareMigrationSnapshot({ authority: 'local', activeBatchId: null, entities: [] })()
+      expect(safe.list(session).records).toEqual([])
       const migrated = deliveryCommandTestInstance.list(session).records
       expect(migrated.find(row => row.orderNo === 'OLD-MISSING')).toMatchObject({ supplierId: null, ocrStatus: 'reviewed', currentValuesConfirmed: false, reviewStatus: 'unreviewed', lines: [{ currentValueConfirmed: false }] })
       const record = migrated.find(row => row.orderNo === 'OLD-441')!
@@ -126,9 +134,13 @@ describe('送货完整受控迁移', () => {
       const verified = deliveryCommandTestInstance.execute({ action: 'revise', id: record.id, commandId: 'delivery-verify', workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'delivery:write', origin: 'real', baseVersion: '3', reason: '逐行对照原件完成核对', draft: { projectId: record.projectId, supplierId: record.supplierId, orderNo: record.orderNo, deliveryDate: record.deliveryDate, note: '', rawSiteText: record.rawSiteText, reviewFlag: '', confirmations: {}, lines: record.lines } }, session)
       expect(deliveryCommandTestInstance.detail(record.id, session)).toMatchObject({ version: verified.version, currentValuesConfirmed: true, reviewStatus: 'reviewed', ocrStatus: 'reviewed', lines: [{ currentValueConfirmed: true }] })
       expect(deliveryCommandTestInstance.history(record.id, session).at(-1)?.before?.currentValuesConfirmed).toBe(false)
-      await coreMigrationTestInstance.rollback({ ...envelope('delivery-rollback'), batchId: batch.batchId }, session)
-      expect(deliveryCommandTestInstance.list(session).records).toHaveLength(0)
-      expect(() => deliveryCommandTestInstance.fileContent(record.id, record.assetId!, session)).toThrow('不存在')
+      const beforeRollback = coreMigrationTestInstance.snapshot(session)
+      const history = deliveryCommandTestInstance.history(record.id, session)
+      await expect(coreMigrationTestInstance.rollback({ ...envelope('delivery-rollback'), batchId: batch.batchId }, session)).rejects.toThrow(/后来修改|仍引用迁入/)
+      expect(coreMigrationTestInstance.snapshot(session)).toEqual(beforeRollback)
+      expect(deliveryCommandTestInstance.detail(record.id, session)).toMatchObject({ version: verified.version, currentValuesConfirmed: true })
+      expect(deliveryCommandTestInstance.history(record.id, session)).toEqual(history)
+      expect(deliveryCommandTestInstance.fileContent(record.id, record.assetId!, session).payloadBase64).toBe(payload)
     }
     finally {
       db.close()

@@ -406,7 +406,7 @@ export function buildRuntimeEvidenceLedger() {
       throw new Error(`runtime-evidence-ledger: ${row.route} 的页面域“${row.domain}”未进入 READ-MODELS`)
     if (!row.layoutConclusion || !row.stateAndNavigationConclusion)
       throw new Error(`runtime-evidence-ledger: ${row.route} 缺少布局或状态与跳转结论`)
-    if (!/^#\d+$/.test(row.historicalFoundationTicket))
+    if (!/^#\d+$/.test(row.historicalFoundationTicket) && row.historicalFoundationTicket !== '—')
       throw new Error(`runtime-evidence-ledger: ${row.route} 的历史基础票格式无效`)
     if (!profile.endpoint)
       throw new Error(`runtime-evidence-ledger: ${profile.code} 缺少参考端点说明`)
@@ -420,7 +420,7 @@ export function buildRuntimeEvidenceLedger() {
       domainCode: contract.code,
       template: row.template,
       implementationIssues: currentIssues(row.route, contract.code),
-      historicalImplementationIssues: HISTORICAL_IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE.get(contract.code),
+      historicalImplementationIssues: row.historicalFoundationTicket === '—' ? [] : HISTORICAL_IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE.get(contract.code),
       referenceProfile: row.referenceProfile,
       referenceEndpointId: reference.id,
       referenceEndpointLabel: reference.label,

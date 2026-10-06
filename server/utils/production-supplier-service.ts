@@ -1,12 +1,15 @@
+import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { SupplierCredentialCommand, SupplierCredentialFileQuery } from '../../app/lib/supplier/credential-contract'
-import type { SupplierFactSource } from '../../app/lib/supplier/read-contract'
 import type { SupplierTaxpayerCommand } from '../../app/lib/supplier/taxpayer-verification'
 import type { BusinessSession } from './business-session'
 import type { ProductionStorage } from './production-storage'
 import type { SupplierCredentialScope } from './supplier-credential-service'
 import { isDeepStrictEqual } from 'node:util'
+import { SUPPLIER_DETAIL_READ_SCHEMA, SUPPLIER_LIST_READ_SCHEMA } from '../../app/lib/supplier/read-contract'
 import { buildSupplierDetailRead, buildSupplierListPage, parseSupplierDetailQuery, parseSupplierListQuery } from '../../app/lib/supplier/repository'
+import { projectSupplierPartialFacts, readProductionSupplierFacts, supplierFactUnavailableSources } from './production-supplier-facts'
 import { productionSupplierFailure as fail, loadProductionSuppliers, saveProductionSuppliers } from './production-supplier-record'
+import { createReadMeta, readQueryScope, withOriginReadMeta, withReadMeta } from './read-meta'
 import { parseSupplierCommandRequest, parseSupplierImportCommandRequest } from './supplier-command-request'
 import { createSupplierCommandService } from './supplier-command-service'
 import { createPersistentSupplierCredentialOcrService } from './supplier-credential-ocr-service'
@@ -34,7 +37,8 @@ function masterRequest(value: unknown, routeId?: string, imported = false) {
   return imported ? parseSupplierImportCommandRequest(value) : parseSupplierCommandRequest(value, routeId)
 }
 
-export function createProductionSupplierService(storage: ProductionStorage) {
+export function createProductionSupplierService(storage: ProductionStorage, options: { now?: () => string } = {}) {
+  const now = options.now ?? (() => new Date().toISOString())
   const recognitionPending = new Map<string, { fingerprint: string, promise: Promise<unknown> }>()
   function authorize(session: Session, write = false, capability = 'supplier:write') {
     const actor = session()
@@ -42,7 +46,7 @@ export function createProductionSupplierService(storage: ProductionStorage) {
       fail('forbidden', '当前会话无此工作区的分供方权限。')
     return actor
   }
-  async function run<T>(session: Session, write: boolean, operation: (service: ReturnType<typeof createSupplierCommandService>, actor: BusinessSession) => T | Promise<T>, commandId?: string, kind?: 'master' | 'credential', capability = 'supplier:write'): Promise<T> {
+  async function run<T>(session: Session, write: boolean, operation: (service: ReturnType<typeof createSupplierCommandService>, actor: BusinessSession, timestamp: string, tx: TransactionDb) => T | Promise<T>, commandId?: string, kind?: 'master' | 'credential', capability = 'supplier:write'): Promise<T> {
     const actor = authorize(session, write, capability)
     if (write)
       storage.assertBusinessWrite()
@@ -57,11 +61,14 @@ export function createProductionSupplierService(storage: ProductionStorage) {
           fail('conflict', '此提交编号已用于其他分供方操作。')
       }
       const before = await loadProductionSuppliers(tx, actor)
-      const service = createSupplierCommandService({ initialState: before })
-      const result = await operation(service, actor)
+      // 一次事务内状态、来源版本及 asOf 共享同一时刻，避免上海午夜跨界时响应内部矛盾。
+      const timestamp = now()
+      const service = createSupplierCommandService({ initialState: before, now: () => timestamp })
+      const result = await operation(service, actor, timestamp, tx)
       const after = service.snapshot()
       if (!isDeepStrictEqual(after, before)) {
-        // Reading may revoke an expired review; it must obey the same write gate.
+        if (!write)
+          fail('unavailable', '只读资料投影意外改变了持久事实，请停止操作并核对。')
         storage.assertBusinessWrite()
         await saveProductionSuppliers(tx, after, before, actor)
       }
@@ -71,23 +78,31 @@ export function createProductionSupplierService(storage: ProductionStorage) {
     })
   }
   const ports = (service: ReturnType<typeof createSupplierCommandService>) => ({ read: service.readCredentialScope, transact: service.transactCredentialScope })
-  const unavailableSources: SupplierFactSource[] = ['projects', 'contracts', 'settlements', 'invoices', 'payments']
-  const readContext = (service: ReturnType<typeof createSupplierCommandService>, actor: BusinessSession) => ({ suppliers: service.rows(), projects: [], projectSuppliers: [], contracts: [], settlements: [], invoices: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], sourceVersion: `production-${service.sourceVersion()}`, asOf: new Date().toISOString(), capabilities: [...actor.capabilities], unavailableSources })
+  const readContext = (service: ReturnType<typeof createSupplierCommandService>, actor: BusinessSession, timestamp: string, facts: Awaited<ReturnType<typeof readProductionSupplierFacts>>, list: boolean) => ({ ...facts, suppliers: service.rows(), projectSuppliers: [], invoices: [], sourceVersion: `production-${service.sourceVersion()}`, asOf: timestamp, capabilities: [...actor.capabilities], unavailableSources: supplierFactUnavailableSources(facts, list), incompleteContractSource: true })
+  function readMeta(service: ReturnType<typeof createSupplierCommandService>, actor: BusinessSession, timestamp: string, schemaVersion: string, operation: string, dataOrigin: 'real' | 'demo', scope: unknown, facts: Awaited<ReturnType<typeof readProductionSupplierFacts>>) {
+    return createReadMeta({ session: actor, schemaVersion, operation, dataOrigin, asOf: timestamp, coverage: dataOrigin === 'real' ? 'complete' : 'unknown', scope: typeof scope === 'object' && scope !== null ? readQueryScope(scope) : scope, sources: dataOrigin === 'demo'
+      ? [{ key: 'suppliers', state: 'not-requested', sourceVersion: null, asOf: null }]
+      : [{ key: 'suppliers', state: 'readable', sourceVersion: service.sourceVersion(), asOf: timestamp }, ...facts.sources] })
+  }
   const instance = {
     list(input: Record<string, unknown>, session: Session) {
-      return run(session, false, (service, actor) => {
+      return run(session, false, async (service, actor, timestamp, tx) => {
         const query = parseSupplierListQuery(input)
         if (query.includeDemo)
           fail('forbidden', '正式分供方不接受测试数据来源。')
-        return buildSupplierListPage({ ...readContext(service, actor), query })
+        const facts = await readProductionSupplierFacts(tx, actor, timestamp)
+        const projection = buildSupplierListPage({ ...readContext(service, actor, timestamp, facts, true), query })
+        return withOriginReadMeta(projection, { real: readMeta(service, actor, timestamp, SUPPLIER_LIST_READ_SCHEMA, 'supplier-list', 'real', query, facts), demo: readMeta(service, actor, timestamp, SUPPLIER_LIST_READ_SCHEMA, 'supplier-list', 'demo', query, facts) })
       })
     },
     detail(id: string, input: Record<string, unknown>, session: Session) {
-      return run(session, false, (service, actor) => {
+      return run(session, false, async (service, actor, timestamp, tx) => {
         const query = parseSupplierDetailQuery(id, input)
         if (query.origin !== 'real' || query.includeDemo)
           fail('forbidden', '正式分供方不接受测试数据来源。')
-        return buildSupplierDetailRead({ ...readContext(service, actor), query })
+        const facts = await readProductionSupplierFacts(tx, actor, timestamp)
+        const projection = buildSupplierDetailRead({ ...readContext(service, actor, timestamp, facts, false), query })
+        return withReadMeta(projectSupplierPartialFacts(projection, facts), readMeta(service, actor, timestamp, SUPPLIER_DETAIL_READ_SCHEMA, 'supplier-detail', 'real', query, facts))
       })
     },
     execute(value: unknown, session: Session, routeId?: string) {
@@ -107,7 +122,7 @@ export function createProductionSupplierService(storage: ProductionStorage) {
     },
     credentials(supplierId: string, session: Session) {
       productionSupplierId(supplierId)
-      return run(session, false, (service, actor) => createSupplierCredentialService(ports(service)).read(supplierId, 'real', actor))
+      return run(session, false, (service, actor, timestamp) => createSupplierCredentialService(ports(service), { now: () => timestamp }).read(supplierId, 'real', actor))
     },
     file(query: SupplierCredentialFileQuery, session: Session) {
       if (query.origin !== 'real')
@@ -115,7 +130,7 @@ export function createProductionSupplierService(storage: ProductionStorage) {
       return run(session, false, (service, actor) => createSupplierCredentialService(ports(service)).file(query, actor))
     },
     executeCredential(command: SupplierCredentialCommand, session: Session) {
-      return run(session, true, (service, actor) => createSupplierCredentialService(ports(service)).execute(command, actor), command.commandId, 'credential', 'supplier-credential:write')
+      return run(session, true, (service, actor, timestamp) => createSupplierCredentialService(ports(service), { now: () => timestamp }).execute(command, actor), command.commandId, 'credential', 'supplier-credential:write')
     },
     recordTaxpayer(command: SupplierTaxpayerCommand, session: Session) {
       return run(session, true, (service, actor) => createSupplierTaxpayerService(ports(service)).execute(command, actor), command.commandId, 'credential')
@@ -127,7 +142,11 @@ export function createProductionSupplierService(storage: ProductionStorage) {
         return service.readCredentialScope(supplierId)
       })
     },
-    transactCredential<T>(supplierId: string, operation: (scope: SupplierCredentialScope) => { changed: boolean, value: T, commandId?: string }, session: Session, commandId: string) {
+    transactCredential<T>(supplierId: string, operation: (scope: SupplierCredentialScope) => {
+      changed: boolean
+      value: T
+      commandId?: string
+    }, session: Session, commandId: string) {
       return run(session, true, (service, actor) => {
         if (!actor.capabilities.includes('supplier-credential:write') || !actor.capabilities.includes('supplier-credential:read'))
           fail('forbidden', '当前会话无证照读取和写入权限。')

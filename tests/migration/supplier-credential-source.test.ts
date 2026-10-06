@@ -78,6 +78,35 @@ describe('分供方证照完整物理图来源', () => {
     expect(graph.supplier).toMatchObject({ labor_scope: '', tax_no: 'TAX-ORIGINAL', unique_code: 'INTERNAL-123456789012345678' })
   })
 
+  it('v50 仅新增材采归属表，证照完整物理图与 v49 相同，未知未来版本仍拒绝', async () => {
+    const source = await setup()
+    const legacy = await readSupplierCredentialMigrationGraphs(source, 49)
+    expect(await readSupplierCredentialMigrationGraphs(source, 50)).toEqual(legacy)
+    await expect(readSupplierCredentialMigrationGraphs(source, 999)).rejects.toThrow(/不支持/)
+  })
+
+  it('v51/v52/v53/v54/v55/v56 原样带出真实核验历史，旧 v49/v50 图不反造新记录，归属/结构损坏阻断', async () => {
+    const source = await setup()
+    await source.execute('UPDATE suppliers SET name=? WHERE id=?', ['更正后分供方', 'old-supplier'])
+    const proof = (await source.select<Record<string, unknown>>('SELECT * FROM supplier_credential_review_history'))[0]!
+    expect(proof).toMatchObject({ supplier_id: 'old-supplier', decision: 'qualified', reviewed_at: at, note: '原人工备注', actor_id: null })
+    const v51 = await readSupplierCredentialMigrationGraphs(source, 51)
+    expect(await readSupplierCredentialMigrationGraphs(source, 52)).toEqual(v51)
+    expect(await readSupplierCredentialMigrationGraphs(source, 53)).toEqual(v51)
+    expect(await readSupplierCredentialMigrationGraphs(source, 54)).toEqual(v51)
+    expect(await readSupplierCredentialMigrationGraphs(source, 55)).toEqual(v51)
+    expect(await readSupplierCredentialMigrationGraphs(source, 56)).toEqual(v51)
+    const graph = JSON.parse(String(v51[0]!.attributes!.graphJson))
+    expect(graph).toMatchObject({ schemaVersion: 2, reviewHistory: [{ id: proof.id, note: '原人工备注', actor_id: null, reviewed_at: '2026-09-12T08:00:00.000Z' }] })
+    expect(JSON.parse(String((await readSupplierCredentialMigrationGraphs(source, 50))[0]!.attributes!.graphJson))).not.toHaveProperty('reviewHistory')
+    const foreign = structuredClone(graph)
+    foreign.reviewHistory[0].supplier_id = 'other-supplier'
+    expect(() => parseSupplierCredentialMigrationGraph(foreign)).toThrow(/归属/)
+    const missing = structuredClone(graph)
+    delete missing.reviewHistory
+    expect(() => parseSupplierCredentialMigrationGraph(missing)).toThrow(/完整/)
+  })
+
   it('供应商已软删仍保留其证照和凭证，断裂物理祖先则阻断', async () => {
     const source = await setup()
     await source.execute('UPDATE suppliers SET deleted_at = ? WHERE id = \'old-supplier\'', [at])

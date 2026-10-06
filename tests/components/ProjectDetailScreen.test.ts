@@ -3,9 +3,12 @@ import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import ProjectDetailScreen from '~/components/project/ProjectDetailScreen.vue'
+import { managementFeeSource, projectManagementFees } from '~/lib/project/management-fee'
 import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
 
 const detail: ProjectDetailReadDTO = {
+  constructionManagementFees: { projectId: 'project-1', dataOrigin: 'demo', state: 'unavailable', sourceVersion: null, asOf: null, reason: '总合同来源未接入', contracts: [] },
+  managementFees: projectManagementFees('project-1', 'demo', '2026-08-15T00:00:00.000Z'),
   item: {
     dataOrigin: 'demo',
     project: { state: 'resolved', entity: 'project', id: 'project-1', label: '合和新城', no: 'HHXC-01' },
@@ -171,6 +174,74 @@ describe('项目详情中央来源边界', () => {
     get.mockReset()
     ownerList.mockReset()
     ownerList.mockResolvedValue(ownerPage())
+  })
+
+  it('总合同配置单独展示真实零与原依据，配置历史和稳定下钻不改实际管理费未知状态', async () => {
+    get.mockResolvedValue({ ...detail, item: { ...detail.item, dataOrigin: 'real' }, capabilities: ['project:list:read', 'construction-contract:read'], constructionManagementFees: {
+      projectId: 'project-1',
+      dataOrigin: 'real',
+      state: 'complete',
+      sourceVersion: 'original-contract-source',
+      asOf: detail.asOf,
+      reason: null,
+      contracts: [{ id: 'main-contract', no: 'MAIN-01', name: '实际总合同', status: '履约中', configuration: { amount: 0, basis: '原件第八条明确不记取', version: 'fee-version-2', history: [
+        { version: 'fee-version-1', amount: 1200, basis: '历史原件', contractVersion: '1', adoptedAt: '2026-08-01T00:00:00.000Z', actorId: 'original-actor', commandId: 'original-command' },
+        { version: 'fee-version-2', amount: 0, basis: '原件第八条明确不记取', contractVersion: '2', adoptedAt: detail.asOf, actorId: 'original-actor', commandId: 'change-command' },
+      ] }, navigation: { kind: 'entity-detail', subject: { state: 'resolved', entity: 'contract', id: 'main-contract', label: '实际总合同', no: 'MAIN-01' }, variant: 'detail', view: null, filters: { dataOrigin: 'real', contractKind: '施工' } } }],
+    } })
+    const rendered = renderDetail({ originHint: 'real' })
+    const configuration = await screen.findByTestId('project-construction-management-fees')
+    expect(configuration.textContent).toContain('原件第八条明确不记取')
+    expect(within(configuration).getByTestId('construction-management-fee-amount').textContent).toContain('0.00')
+    expect(within(configuration).getByRole('link', { name: '查看总合同' }).getAttribute('href')).toBe('/contract/main-contract?origin=real&contractKind=construction&returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal')
+    await fireEvent.click(within(configuration).getByText('查看配置历史（2）'))
+    expect(configuration.textContent).toContain('历史原件')
+    expect(configuration.textContent).toContain('1,200.00')
+    expect((await screen.findByRole('region', { name: '管理费实际成本' })).textContent).toContain('总额未知')
+    rendered.unmount()
+  })
+
+  it('实际详情屏保留管理费未知、真实零及原来源下钻，不把可证明小计当完整管理费或额外扣现金', async () => {
+    const asOf = detail.asOf
+    const zero = managementFeeSource({ key: 'management-payroll', state: 'complete', sourceVersion: 'verified-empty-p5', asOf, reasons: [], missingCount: 0, rows: [] }, asOf)
+    get.mockResolvedValue({ ...detail, managementFees: projectManagementFees('project-1', 'real', asOf, zero), item: { ...detail.item, dataOrigin: 'real' }, capabilities: ['project:list:read', 'payroll:read'] })
+    const rendered = renderDetail({ originHint: 'real' })
+    const section = await screen.findByRole('region', { name: '管理费实际成本' })
+    expect(within(section).getByLabelText('管理费合计').textContent).toContain('总额未知')
+    const payroll = within(section).getByRole('region', { name: '管理人员：独立管理簿' })
+    expect(payroll.textContent).toContain('¥0.00')
+    expect(within(payroll).queryByRole('link')).toBeNull()
+    expect(section.textContent).not.toContain('管理费配置')
+    expect(within(section).getByRole('region', { name: '合同记取及实际成本归属' }).textContent).toContain('未知')
+    expect(within(section).getByRole('region', { name: '仓储等原费用归属' }).textContent).toContain('未知')
+    expect(section.textContent).toContain('不再重复计成本或扣现金')
+    rendered.unmount()
+
+    const source = managementFeeSource({ key: 'management-payroll', state: 'partial', sourceVersion: 'actual-p5', asOf, reasons: ['一笔原工资缺少管理簿用途证明'], missingCount: 1, rows: [{ identity: 'real:payroll:released:wage-original', ref: { kind: 'released-statement', statementId: 'wage-original' }, originalStatementIds: ['wage-original'], managementBookId: 'book-original', amount: '83.50', knownValue: '83.50', occurredOn: '2026-08-10', sourceVersion: 'original-v1' }] }, asOf)
+    get.mockResolvedValue({ ...detail, managementFees: projectManagementFees('project-1', 'real', asOf, source), item: { ...detail.item, dataOrigin: 'real' }, capabilities: ['project:list:read', 'payroll:read'] })
+    renderDetail({ originHint: 'real' })
+    const partial = await screen.findByRole('region', { name: '管理费实际成本' })
+    expect(within(partial).getByLabelText('管理费合计').textContent).toContain('总额未知')
+    expect(within(partial).getByLabelText('管理费合计').textContent).toContain('已核实小计 ¥83.50')
+    const original = within(partial).getByRole('link', { name: '原工资发放' })
+    expect(original.getAttribute('href')).toContain('wage-original')
+    expect(original.getAttribute('href')).toContain('returnTo')
+    await fireEvent.click(within(partial).getByRole('button', { name: '重新读取管理费' }))
+    await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(3))
+  })
+
+  it('当前实际详情保留真实零收款可下钻，完整现金及税款未接时不从旧票面差额造经营数值', async () => {
+    get.mockResolvedValue({ ...detail, item: { ...detail.item, income: { ...detail.item.income, value: '0.00', status: 'complete', missingSources: [] } }, capabilities: ['project:list:read', 'demo:read', 'receipt:read'] })
+    renderDetail({ originHint: 'demo', includeDemo: true })
+    const receipts = await screen.findByRole('region', { name: '项目收款' })
+    expect(receipts.textContent).toContain('有效收款 ¥0.00')
+    expect(within(receipts).getByRole('link', { name: '查看收款登记' }).getAttribute('href')).toContain('projectId=project-1')
+    for (const label of ['增值税', '税负率', '完整可用资金', '已知资金余额'])
+      expect(screen.queryByRole('group', { name: label, exact: true })).toBeNull()
+    expect(screen.queryByRole('region', { name: '票据信息' })).toBeNull()
+    const fees = screen.getByRole('region', { name: '管理费实际成本' })
+    expect(within(fees).getByLabelText('管理费合计').textContent).toContain('总额未知')
+    expect(fees.textContent).not.toContain('¥0.00')
   })
 
   it('由 Repository 返回权威来源，并只呈现演示只读详情', async () => {
@@ -410,6 +481,8 @@ describe('项目详情中央来源边界', () => {
     finishLoad(null as unknown as ProjectDetailReadDTO)
     const failed = await screen.findByRole('alert', { name: '项目详情加载失败' })
     expect(within(failed).getByRole('link', { name: '返回项目列表' }).getAttribute('href')).toBe(returnTo)
+    expect(screen.queryByRole('region', { name: '管理费实际成本' })).toBeNull()
+    expect(screen.queryByText('¥0.00')).toBeNull()
   })
 
   it.each([

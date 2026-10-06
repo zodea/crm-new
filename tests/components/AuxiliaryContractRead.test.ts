@@ -1,8 +1,12 @@
 import { render } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, onBeforeUnmount, shallowRef } from 'vue'
 import { useAuxiliaryContractRead } from '~/composables/useAuxiliaryContractRead'
 import { AuxiliaryContractProblem } from '~/lib/auxiliary-contract/contract'
+
+beforeEach(() => setActivePinia(createPinia()))
+afterEach(() => vi.unstubAllGlobals())
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -42,7 +46,7 @@ describe('辅助合同列表快照', () => {
     expect(result.state.value).toMatchObject({ kind: 'loading', previous: { id: 'first' } })
     refresh.reject(new Error('offline'))
     await refreshing
-    expect(result.state.value).toMatchObject({ kind: 'error', previous: { id: 'first' } })
+    expect(result.state.value).toMatchObject({ kind: 'unavailable', previous: { id: 'first' }, problem: { code: 'unavailable' } })
     expect(result.data.value).toEqual({ id: 'first' })
     const older = result.load()
     source = 'other_expense:demo'
@@ -56,7 +60,7 @@ describe('辅助合同列表快照', () => {
     expect(result.data.value).toEqual({ id: 'new-source' })
   })
 
-  it.each(['forbidden', 'not-found', 'relationship-mismatch'] as const)('%s 清除已有快照', async (code) => {
+  it.each(['unauthenticated', 'forbidden', 'not-found', 'relationship-mismatch'] as const)('%s 清除已有快照', async (code) => {
     const read = vi.fn().mockResolvedValueOnce({ id: 'first' }).mockRejectedValueOnce(new AuxiliaryContractProblem({ code, message: '不可用', retryable: false, fieldErrors: {}, traceId: null }))
     const { result } = harness(read, () => 'real')
     await result.load()

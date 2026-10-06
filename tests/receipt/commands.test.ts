@@ -5,6 +5,16 @@ import { createReceiptCommandTestInstance } from '../../server/utils/receipt-com
 import { command, draft, references, session } from './fixtures'
 
 describe('普通收款中央命令与公开读回', () => {
+  it('核对原键保留首次回执，未应用键永久封存，撤权或其他操作人不能读取原回执', () => {
+    const instance = createReceiptCommandTestInstance({ references: () => references, createId: () => 'receipt-recovery' })
+    const original = instance.execute(command(), session)
+    expect(instance.resolve(original.commandId, session)).toEqual({ outcome: 'applied', result: original })
+    expect(instance.resolve('receipt-never-applied', session)).toEqual({ outcome: 'not-applied', commandId: 'receipt-never-applied' })
+    expect(() => instance.execute(command({ commandId: 'receipt-never-applied' }), session)).toThrow(/封存/)
+    expect(() => instance.resolve(original.commandId, { ...session, capabilities: [] })).toThrow(/权限/)
+    expect(instance.resolve(original.commandId, { ...session, actorId: 'other' })).toEqual({ outcome: 'not-applied', commandId: original.commandId })
+    expect(instance.resolve(original.commandId, session)).toEqual({ outcome: 'applied', result: original })
+  })
   it('非空银行流水号在草稿与提交记录间唯一，编辑自身与空流水号不误拦截', () => {
     const instance = createReceiptCommandTestInstance({ references: () => references })
     const first = instance.execute(command({ draft: { ...draft, bankSerialNo: 'BANK-UNIQUE' } }), session)
@@ -168,7 +178,7 @@ describe('普通收款中央命令与公开读回', () => {
     expect(() => instance.execute({ ...command(), attachments: { add: [file] } }, session)).toThrow(/附件/)
   })
 
-  it('迁移准备无副作用，全部字段和正文导入后编辑不被重复同步覆盖，回滚只移除本批收款', () => {
+  it('迁移准备无副作用，重复同步保留编辑，危险回滚保全修改、原件和回执', () => {
     const instance = createReceiptCommandTestInstance({ references: () => references, createId: () => 'independent' })
     const snapshot: CoreMigrationSnapshotDTO = { authority: 'central', activeBatchId: 'batch-a', entities: [{
       entityType: 'receipt_registrations',
@@ -187,14 +197,21 @@ describe('普通收款中央命令与公开读回', () => {
     commit()
     expect(instance.form('migrated', session)).toMatchObject({ draft, createdAt: '2025-01-01T00:00:00.000Z' })
     expect(instance.fileContent('migrated', 'm-file', session).payloadBase64).toBe('YQ==')
-    instance.execute({ ...command(), id: 'migrated', baseVersion: '1', action: 'save', draft: { ...draft, note: '中央修改' } }, session)
+    const modified = instance.execute({ ...command(), id: 'migrated', baseVersion: '1', action: 'save', draft: { ...draft, note: '中央修改' } }, session)
     instance.prepareMigrationSnapshot(snapshot)()
     expect(instance.form('migrated', session).draft.note).toBe('中央修改')
     const created = instance.execute({ ...command(), commandId: 'independent' }, session)
-    instance.prepareMigrationSnapshot({ authority: 'local', activeBatchId: null, entities: [] })()
-    expect(instance.facts().rows.map(row => row.id)).toEqual([created.id])
+    expect(() => instance.prepareMigrationSnapshot({ authority: 'local', activeBatchId: null, entities: [] })).toThrow(/后来修改/)
+    expect(instance.facts().rows.map(row => row.id)).toEqual(['migrated', created.id])
     expect(instance.execute({ ...command(), commandId: 'independent' }, session)).toEqual(created)
-    expect(() => instance.fileContent('migrated', 'm-file', session)).toThrow(/不存在/)
+    expect(instance.fileContent('migrated', 'm-file', session).payloadBase64).toBe('YQ==')
+    expect(instance.resolve(modified.commandId, session)).toEqual({ outcome: 'applied', result: modified })
+    const untouched = createReceiptCommandTestInstance({ references: () => references, createId: () => 'safe-independent' })
+    untouched.prepareMigrationSnapshot(snapshot)()
+    const independent = untouched.execute({ ...command(), commandId: 'safe-independent' }, session)
+    untouched.prepareMigrationSnapshot({ authority: 'local', activeBatchId: null, entities: [] })()
+    expect(untouched.facts().rows.map(row => row.id)).toEqual([independent.id])
+    expect(untouched.resolve(independent.commandId, session)).toEqual({ outcome: 'applied', result: independent })
   })
 
   it.each(([{ ownerId: 'another-receipt' }, { payloadEncoding: 'utf8' }]).map(input => ({ input })))('迁入缺正文附件保留元数据并明确不可读；无效载荷使准备整体失败：输入案例 %#', ({ input: fields }) => {

@@ -13,6 +13,7 @@ const options = {
   lineItemLabel: '施工合同明细',
   allowLineItems: false,
   allowSupplier: false,
+  allowManagementFee: true,
   fail(message: string): never { throw new ConstructionContractCommandValidationError(message) },
 }
 

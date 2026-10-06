@@ -3,7 +3,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { MaterialContractListPageDTO } from '~/lib/material-contract/repository'
 import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
-import { useTemplateRef } from 'vue'
+import { onBeforeUnmount, onDeactivated, useTemplateRef } from 'vue'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
@@ -24,6 +24,7 @@ import {
   validateProjectJourneyReturnTo,
 } from '~/lib/material-contract/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { readProblemTitle, readStateData, readStateProblem } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import { useMaterialContractReadStore } from '~/stores/material-contract-read'
@@ -33,14 +34,8 @@ const router = useRouter()
 const store = useMaterialContractReadStore()
 const visibilityStore = useDataVisibilityStore()
 const state = computed(() => store.listState as ReadState<MaterialContractListPageDTO>)
-const page = computed(() => {
-  const current = state.value
-  if (current.kind === 'ready' || current.kind === 'empty')
-    return current.data
-  if ((current.kind === 'loading' || current.kind === 'error') && current.previous)
-    return current.previous
-  return null
-})
+const page = computed(() => readStateData(state.value))
+const problem = computed(() => readStateProblem(state.value))
 const parsedQuery = computed(() => {
   try {
     return {
@@ -72,7 +67,7 @@ const returnContextId = shallowRef(isMaterialContractReturnContextId(route.query
   : newMaterialContractReturnContextId())
 let restoredRoute = ''
 const projectReturnTo = computed(() => validateProjectJourneyReturnTo(route.query.returnTo, query.value.origin))
-const canCreate = computed(() => page.value?.capabilities.includes('material-contract:write') ?? false)
+const canCreate = computed(() => (state.value.kind === 'ready' || state.value.kind === 'empty') && (page.value?.capabilities.includes('material-contract:write') ?? false))
 const columns: KitTableColumn[] = [
   { title: '#', type: 'seq', width: 48, fixed: 'left' },
   { field: 'name', title: '合同名称', width: 210, fixed: 'left', slot: 'name' },
@@ -127,10 +122,34 @@ watch(search, (value) => {
   rowNavigationPending.value = false
   void commitSearch(value)
 })
-watch(parsedQuery, (value) => {
-  if (value.query)
-    void store.loadList(value.query)
-}, { immediate: true })
+let listGeneration = 0
+let listActive = true
+async function loadCurrentQuery() {
+  const current = parsedQuery.value.query
+  if (!current || !listActive || route.path !== '/contract/material')
+    return
+  const generation = ++listGeneration
+  const signature = JSON.stringify(current)
+  await store.loadList(current)
+  if (generation !== listGeneration || !listActive || route.path !== '/contract/material'
+    || signature !== JSON.stringify(parsedQuery.value.query) || signature !== JSON.stringify(store.listQuery)) {
+    return
+  }
+  const completed = state.value
+  if ((completed.kind === 'ready' || completed.kind === 'empty')
+    && completed.data.pagination.requestedPage === current.page
+    && completed.data.pagination.pageSize === current.pageSize
+    && completed.data.pagination.page !== current.page) {
+    patchQuery({ page: completed.data.pagination.page })
+  }
+}
+watch(parsedQuery, () => void loadCurrentQuery(), { immediate: true })
+function deactivateList() {
+  listActive = false
+  listGeneration++
+}
+onDeactivated(deactivateList)
+onBeforeUnmount(deactivateList)
 
 function workspaceScrollTop(): number {
   return document.querySelector<HTMLElement>('[data-shell-workspace]')?.scrollTop ?? 0
@@ -199,7 +218,13 @@ async function restoreReturnOrigin() {
 
 watch(() => [state.value, state.value.kind, route.fullPath], () => void restoreReturnOrigin(), { flush: 'post' })
 onMounted(() => void restoreReturnOrigin())
-onActivated(() => void restoreReturnOrigin())
+onActivated(() => {
+  if (!listActive) {
+    listActive = true
+    void loadCurrentQuery()
+  }
+  void restoreReturnOrigin()
+})
 
 useTabTitle('材料采购合同')
 </script>
@@ -252,9 +277,9 @@ useTabTitle('材料采购合同')
     <template v-if="page && !queryProblem" #summary>
       <div v-for="summary in summaries" :key="summary.origin" class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 tabular-nums" :aria-label="`${summary.label}数据汇总`">
         <strong class="font-600 text-ink">{{ summary.label }} · {{ summary.contractCount }} 份</strong>
-        <span>变更后合同金额 <strong class="font-600 text-ink">{{ yuan(Number(summary.changedAmount)) }}</strong></span>
-        <span>累计收票金额 <strong class="font-600 text-ink">{{ yuan(Number(summary.invoicedAmount)) }}</strong></span>
-        <span>累计支付金额 <strong class="font-600 text-ink">{{ yuan(Number(summary.paidAmount)) }}</strong></span>
+        <span>变更后合同金额 <strong class="font-600 text-ink">{{ summary.changedAmount == null ? '待核实' : yuan(Number(summary.changedAmount)) }}</strong></span>
+        <span>累计收票金额 <strong class="font-600 text-ink">{{ summary.invoicedAmount == null ? '待核实' : yuan(Number(summary.invoicedAmount)) }}</strong></span>
+        <span>累计支付金额 <strong class="font-600 text-ink">{{ summary.paidAmount == null ? '待核实' : yuan(Number(summary.paidAmount)) }}</strong></span>
       </div>
     </template>
 
@@ -262,7 +287,7 @@ useTabTitle('材料采购合同')
       <StatePanel v-if="queryProblem" kind="error" title="材料采购合同查询条件无效" :description="queryProblem.message" action-label="清除无效条件" @action="router.replace({ query: {} })" />
       <div v-else-if="page" class="relative min-w-0" :aria-busy="state.kind === 'loading'">
         <span v-if="state.kind === 'loading'" role="status" class="pointer-events-none absolute right-3 top-1 z-1 rounded-sm bg-panel px-2 py-1 text-12px text-ink-soft">正在更新列表…</span>
-        <div v-if="state.kind === 'error'" class="border-y border-danger/40 bg-danger/5 p-3 text-12px text-danger" role="alert">
+        <div v-if="state.kind === 'error' || state.kind === 'unavailable'" class="border-y border-danger/40 bg-danger/5 p-3 text-12px text-danger" role="alert">
           {{ state.problem.message }}；当前保留上一次成功读取的列表。
           <button v-if="state.problem.retryable" type="button" class="ml-2 underline" @click="store.loadList(query)">
             重试
@@ -313,25 +338,25 @@ useTabTitle('材料采购合同')
               <span v-else>{{ row.supplier.state === 'resolved' ? unavailableLabel(row.supplier.label, row.supplierNavigation) : materialContractReferenceLabel(row.supplier) }}</span>
             </template>
             <template #contract="{ row }">
-              {{ yuan(Number(row.amounts.contract)) }}
+              {{ row.amounts.contract == null ? '待核实' : yuan(Number(row.amounts.contract)) }}
             </template>
             <template #changed="{ row }">
-              {{ yuan(Number(row.amounts.changed)) }}
+              {{ row.amounts.changed == null ? '待核实' : yuan(Number(row.amounts.changed)) }}
             </template>
             <template #invoiced="{ row }">
-              {{ yuan(Number(row.amounts.invoiced)) }}
+              {{ row.amounts.invoiced == null ? '待核实' : yuan(Number(row.amounts.invoiced)) }}
             </template>
             <template #paid="{ row }">
-              {{ yuan(Number(row.amounts.paid)) }}
+              {{ row.amounts.paid == null ? '待核实' : yuan(Number(row.amounts.paid)) }}
             </template>
             <template #settled="{ row }">
-              {{ yuan(Number(row.amounts.settled)) }}
+              {{ row.amounts.settled == null ? '待核实' : yuan(Number(row.amounts.settled)) }}
             </template>
             <template #payable="{ row }">
-              {{ yuan(Number(row.amounts.payable)) }}
+              {{ row.amounts.payable == null ? '待核实' : yuan(Number(row.amounts.payable)) }}
             </template>
             <template #invoicePayable="{ row }">
-              {{ yuan(Number(row.amounts.invoiced) - Number(row.amounts.paid)) }}
+              {{ row.amounts.invoiced == null || row.amounts.paid == null ? '待核实' : yuan(Number(row.amounts.invoiced) - Number(row.amounts.paid)) }}
             </template>
             <template #signDate="{ row }">
               {{ row.signDate || '未记录' }}
@@ -346,8 +371,8 @@ useTabTitle('材料采购合同')
       </div>
 
       <StatePanel v-else-if="state.kind === 'loading' || state.kind === 'idle'" kind="loading" title="正在读取材料采购合同" description="正在从中央读模型加载列表。" />
-      <StatePanel v-else-if="state.kind === 'forbidden'" kind="forbidden" title="无权查看材料采购合同" :description="state.problem.message" />
-      <StatePanel v-else kind="error" title="材料采购合同读取失败" :description="state.kind === 'error' ? state.problem.message : '中央列表暂不可用'" action-label="重新加载" @action="store.loadList(query)" />
+      <StatePanel v-else-if="state.kind === 'forbidden'" kind="forbidden" :title="readProblemTitle(problem, '无权查看材料采购合同')" :description="state.problem.message" />
+      <StatePanel v-else kind="error" title="材料采购合同读取失败" :description="problem?.message ?? '中央列表暂不可用'" :action-label="problem?.retryable ? '重新加载' : ''" @action="store.loadList(query)" />
     </template>
   </ListShell>
 </template>

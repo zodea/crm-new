@@ -8,8 +8,10 @@ import type {
   PageDTO,
   ProblemDTO,
   RatioDTO,
+  ReadMetaDTO,
 } from '../../types/read-model'
 import type { ContractListFilter } from '../contract/list-filters'
+import type { OurSignatorySnapshot } from '../our-signatory/contract'
 
 export const SUBCONTRACT_CONTRACT_PAGE_SIZES = [10, 20, 50, 100] as const
 export type SubcontractContractPageSize = typeof SUBCONTRACT_CONTRACT_PAGE_SIZES[number]
@@ -34,6 +36,8 @@ export interface SubcontractContractDetailQueryDTO {
 }
 
 export interface SubcontractContractDetailSource {
+  ourSignatorySnapshot?: OurSignatorySnapshot | null
+  legacyPartyA?: string | null
   dataOrigin: DataOriginDTO
   id: string
   no: string
@@ -46,7 +50,7 @@ export interface SubcontractContractDetailSource {
   supplierId: string | null
   supplierName: string
   supplierPermission: 'allowed' | 'forbidden'
-  amount: number
+  amount: number | null
   settlementStatus: string | null
   clearanceStatus: string | null
   content: string
@@ -105,17 +109,19 @@ export interface SubcontractContractFactSources {
 }
 
 export interface SubcontractContractAmountsDTO {
-  contract: MoneyDTO
-  changed: MoneyDTO
-  settled: MoneyDTO
-  invoiced: MoneyDTO
-  paid: MoneyDTO
-  bySettlementPayable: MoneyDTO
-  byInvoicePayable: MoneyDTO
-  completionSettlement: MoneyDTO
+  contract: MoneyDTO | null
+  changed: MoneyDTO | null
+  settled: MoneyDTO | null
+  invoiced: MoneyDTO | null
+  paid: MoneyDTO | null
+  bySettlementPayable: MoneyDTO | null
+  byInvoicePayable: MoneyDTO | null
+  completionSettlement: MoneyDTO | null
 }
 
 export interface SubcontractContractDTO {
+  ourSignatorySnapshot: OurSignatorySnapshot | null
+  legacyPartyA: string | null
   dataOrigin: DataOriginDTO
   id: string
   no: string
@@ -164,6 +170,7 @@ export interface SubcontractContractFileDTO {
 }
 
 export interface SubcontractContractDetailReadDTO {
+  meta: ReadMetaDTO
   dataOrigin: DataOriginDTO
   contract: SubcontractContractDTO
   projectNavigation: NavigationIntentDTO
@@ -220,20 +227,21 @@ export interface SubcontractContractListSummaryDTO {
   subKinds: Array<{ value: string, count: number }>
   origins: Record<DataOriginDTO, {
     contractCount: number
-    changedAmount: MoneyDTO
-    settledAmount: MoneyDTO
-    paidAmount: MoneyDTO
+    changedAmount: MoneyDTO | null
+    settledAmount: MoneyDTO | null
+    paidAmount: MoneyDTO | null
   }>
 }
 
 export type SubcontractContractListPageDTO = PageDTO<
   SubcontractContractListItemDTO,
   SubcontractContractListSummaryDTO
->
+> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO> }
 
 export interface SubcontractContractReadRepository {
   list: (query: SubcontractContractListQueryDTO) => Promise<SubcontractContractListPageDTO>
   get: (query: SubcontractContractDetailQueryDTO) => Promise<SubcontractContractDetailReadDTO>
+  fileContent: (id: string, fileId: string, origin: DataOriginDTO, options?: { signal?: AbortSignal }) => Promise<import('../forms/original-content').ContractOriginalContent>
 }
 
 export class SubcontractContractRepositoryProblem extends Error {

@@ -73,7 +73,10 @@ export function defaultCredentialRequirement(
 
 function isoDate(value: string | null | undefined): string {
   const normalized = value?.trim() ?? ''
-  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : ''
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized))
+    return ''
+  const parsed = new Date(`${normalized}T00:00:00.000Z`)
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === normalized ? normalized : ''
 }
 
 function utcDay(value: string): number {
@@ -107,7 +110,20 @@ export function credentialExpiryState(
   const days = Math.round((utcDay(expiresAt) - utcDay(today)) / 86_400_000)
   if (days < 0)
     return 'expired'
-  return days <= 30 ? 'expiring' : 'valid'
+  return days <= 7 ? 'expiring' : 'valid'
+}
+
+export function credentialValidityProjection(credential: Pick<SupplierCredentialStatusFact, 'expiresAt' | 'longTerm'>, now: Date = new Date()) {
+  const state = credentialExpiryState(credential, now)
+  return {
+    businessDate: shanghaiBusinessDate(now),
+    state,
+    reason: credential.longTerm
+      ? 'long-term' as const
+      : state === 'unrecorded'
+        ? (credential.expiresAt?.trim() ? 'invalid-date' as const : 'missing-date' as const)
+        : state === 'expired' ? 'expired' as const : state === 'expiring' ? 'within-seven-days' as const : 'outside-warning-window' as const,
+  }
 }
 
 function requirementMap(
@@ -165,118 +181,23 @@ export function hasManualCredentialReviewProof(input: {
   return input.status === 'rejected' && Boolean(input.reviewNote.trim())
 }
 
-export async function revalidateSupplierCredentialStatuses(
-  db: { execute: (sql: string, params?: unknown[]) => Promise<void> },
-  businessDate: string = shanghaiBusinessDate(),
-): Promise<void> {
-  await db.execute(`
-    WITH automatic_status AS (
-      SELECT supplier.id,
-             CASE
-               WHEN NOT EXISTS (
-                 SELECT required.category
-                 FROM (
-                   SELECT '营业执照' AS category
-                   UNION ALL SELECT '法人身份证'
-                   UNION ALL SELECT '银行账户资料'
-                 ) AS required
-                 WHERE COALESCE((
-                   SELECT requirement.requirement
-                   FROM supplier_credential_requirements AS requirement
-                   WHERE requirement.supplier_id = supplier.id
-                     AND requirement.category = required.category
-                     AND requirement.deleted_at IS NULL
-                   LIMIT 1
-                 ), 'required') = 'required'
-                   AND NOT EXISTS (
-                     SELECT 1
-                     FROM supplier_credentials AS credential
-                     WHERE credential.supplier_id = supplier.id
-                       AND credential.category = required.category
-                       AND credential.deleted_at IS NULL
-                       AND (
-                         credential.long_term = 1
-                         OR trim(credential.expires_at) = ''
-                         OR credential.expires_at >= ?
-                       )
-                       AND EXISTS (
-                         SELECT 1
-                         FROM file_refs AS file
-                         JOIN file_payloads AS payload ON payload.file_ref_id = file.id
-                         WHERE file.id = credential.file_ref_id
-                           AND file.owner_type = 'supplier_credential'
-                           AND file.owner_id = credential.id
-                           AND file.deleted_at IS NULL
-                       )
-                   )
-               )
-               AND NOT EXISTS (
-                 SELECT 1
-                 FROM supplier_credential_requirements AS requirement
-                 WHERE requirement.supplier_id = supplier.id
-                   AND requirement.requirement = 'required'
-                   AND requirement.deleted_at IS NULL
-                   AND NOT EXISTS (
-                     SELECT 1
-                     FROM supplier_credentials AS credential
-                     WHERE credential.supplier_id = supplier.id
-                       AND credential.category = requirement.category
-                       AND credential.deleted_at IS NULL
-                       AND (
-                         credential.long_term = 1
-                         OR trim(credential.expires_at) = ''
-                         OR credential.expires_at >= ?
-                       )
-                       AND EXISTS (
-                         SELECT 1
-                         FROM file_refs AS file
-                         JOIN file_payloads AS payload ON payload.file_ref_id = file.id
-                         WHERE file.id = credential.file_ref_id
-                           AND file.owner_type = 'supplier_credential'
-                           AND file.owner_id = credential.id
-                           AND file.deleted_at IS NULL
-                       )
-                   )
-               )
-               THEN 'reviewing'
-               ELSE 'incomplete'
-             END AS status
-      FROM suppliers AS supplier
-      WHERE supplier.deleted_at IS NULL
-    )
-    UPDATE suppliers
-    SET credential_status = (
-          SELECT status FROM automatic_status WHERE automatic_status.id = suppliers.id
-        ),
-        credential_reviewed_at = NULL,
-        credential_review_note = ''
-    WHERE id IN (
-      SELECT supplier.id
-      FROM suppliers AS supplier
-      JOIN automatic_status ON automatic_status.id = supplier.id
-      WHERE (
-        supplier.credential_status IN ('incomplete', 'reviewing')
-        AND (
-          supplier.credential_status <> automatic_status.status
-          OR supplier.credential_reviewed_at IS NOT NULL
-          OR trim(supplier.credential_review_note) <> ''
-        )
-      )
-      OR (
-        supplier.credential_status = 'qualified'
-        AND (
-          supplier.credential_reviewed_at IS NULL
-          OR automatic_status.status = 'incomplete'
-        )
-      )
-      OR (
-        supplier.credential_status = 'rejected'
-        AND (
-          supplier.credential_reviewed_at IS NULL
-          OR trim(supplier.credential_review_note) = ''
-          OR automatic_status.status = 'incomplete'
-        )
-      )
-    )
-  `, [businessDate, businessDate])
+/** 原 Native 库只读投影：人工凭证字段保留原义，不回写状态、时间或审计。 */
+export function storedSupplierCredentialStatus(
+  proof: { status: string, reviewedAt: string | null, reviewNote: string },
+  credentials: readonly SupplierCredentialStatusFact[],
+  requirements: readonly SupplierCredentialRequirementFact[],
+  now: Date,
+): string {
+  const automatic = resolveAutomaticCredentialStatus(credentials, requirements, now)
+  if (automatic === 'incomplete' || !hasManualCredentialReviewProof(proof))
+    return automatic
+  const reviewedAt = new Date(proof.reviewedAt!)
+  if (!Number.isFinite(reviewedAt.getTime()))
+    return automatic
+  const required = requirementMap(requirements)
+  const expiredSinceReview = credentials.some(row =>
+    (required.get(canonicalCredentialCategory(row.category)) ?? defaultCredentialRequirement(row.category)) === 'required'
+    && row.hasAccessibleFile && credentialExpiryState(row, reviewedAt) !== 'expired' && credentialExpiryState(row, now) === 'expired',
+  )
+  return expiredSinceReview ? automatic : proof.status
 }

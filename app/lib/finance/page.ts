@@ -11,6 +11,8 @@ import type {
 } from '~/lib/finance/forms'
 import type { DataOriginDTO } from '~/types/read-model'
 
+export { PAYMENT_BIZ_TYPES } from './domain'
+
 export type FinancePageDraft
   = ReceiptFormDraft
     & InvoiceApplicationFormDraft
@@ -18,19 +20,6 @@ export type FinancePageDraft
     & ExpenseReimbursementFormDraft
     & PaymentApplicationFormDraft
     & PaymentRecordFormDraft
-
-export const PAYMENT_BIZ_TYPES = [
-  '有合同-合同劳务',
-  '有合同-材料',
-  '有合同-专业分包',
-  '有合同-机械',
-  '有合同-其他',
-  '无合同-零星采购',
-  '预付款',
-  '管理费',
-  '项目费用',
-  '公司付款',
-]
 
 export interface FinanceFormMeta {
   label: string
@@ -256,12 +245,14 @@ export function validateFinanceForm(
     case 'current':
       require('direction', '收付方向')
       require('projectId', '项目')
-      require('counterparty', '往来单位')
+      if (!draft.id || draft.status === 'draft')
+        require('supplierId', '往来分供方')
       require('transactionDate', '发生日期')
       require('amount', '发生金额', true)
       break
     case 'reimbursement':
-      require('applicant', '报销人')
+      if ((!draft.id || draft.status === 'draft') && !draft.applicantWorkerId && !draft.applicantSupplierId)
+        errors.applicantWorkerId = '请从工人或分供方清单选择报销身份'
       require('reimbursementDate', '报销日期')
       if (!(draft.lines?.length)
         || draft.lines.some(line => !line.expenseItem?.trim() || !(Number(line.amount) > 0))) {
@@ -270,6 +261,8 @@ export function validateFinanceForm(
       break
     case 'payment_application':
       require('name', '付款申请名称')
+      if (!draft.supplierId && !draft.workerId)
+        errors.supplierId = '请选择工人或分供方作为实际收款对象'
       require('bizType', '业务类型')
       require('applyAmount', '申请金额', true)
       require('applyDate', '申请日期')
@@ -284,6 +277,8 @@ export function validateFinanceForm(
       break
     case 'payment_record':
       require('payeeName', '收款方名称')
+      if (!draft.supplierId && !draft.workerId)
+        errors.supplierId = '请选择工人或分供方作为实际收款对象'
       require('paymentDate', '支付日期')
       require('amount', '支付金额', true)
       require('voucherNo', '付款凭证号')

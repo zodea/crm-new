@@ -1,4 +1,4 @@
-import type { DataOriginDTO } from '../../types/read-model'
+import type { DataOriginDTO, ProblemDTO } from '../../types/read-model'
 import type { SupplierCredentialAction, SupplierCredentialCommand, SupplierCredentialRepository, SupplierCredentialSnapshot } from './credential-contract'
 import type { SupplierProductionRepository } from './production-repository'
 import { computed, shallowReadonly, shallowRef } from 'vue'
@@ -51,6 +51,13 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
     controller = null
     ready.value = false
     loading.value = false
+  }
+  function invalidate(problem: ProblemDTO) {
+    cancelRead()
+    snapshot.value = null
+    error.value = problem.message
+    errorCode.value = problem.code
+    recoveryNotice.value = ''
   }
   function recordError(cause: unknown) {
     error.value = cause instanceof Error ? cause.message : '证照操作失败，请重试'
@@ -202,7 +209,7 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
     }
     catch (cause) {
       const notApplied = cause instanceof SupplierCredentialNotAppliedProblem && cause.commandId === command.commandId
-      if (notApplied || (!recovering && !acknowledged && cause instanceof SupplierRepositoryProblem && !['unavailable', 'internal-error'].includes(cause.problem.code)))
+      if (notApplied || (!recovering && !acknowledged && cause instanceof SupplierRepositoryProblem && !['unavailable', 'internal-error', 'unauthenticated', 'forbidden'].includes(cause.problem.code)))
         pending.delete(key)
       if ((!recovering || notApplied) && !acknowledged && cause instanceof SupplierRepositoryProblem && cause.problem.code === 'conflict') {
         pending.delete(key)
@@ -212,6 +219,8 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
       }
       if (sequence === generation && matches(target))
         recordError(cause)
+      if (sequence === generation && cause instanceof SupplierRepositoryProblem && ['unauthenticated', 'forbidden'].includes(cause.problem.code))
+        invalidate(cause.problem)
       throw cause
     }
     finally { saving.value = false }
@@ -233,10 +242,18 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
     const record = data.value?.credentials.find(row => row.id === credentialId)
     if (!record?.file || !ready.value)
       throw credentialProblem('not-found', '此证照未保存可读取的原件')
-    const result = await repository.file({ supplierId: target.supplierId, credentialId, fileId: record.file.id, origin: target.origin })
+    let result
+    try {
+      result = await repository.file({ supplierId: target.supplierId, credentialId, fileId: record.file.id, origin: target.origin })
+    }
+    catch (cause) {
+      if (sequence === generation && cause instanceof SupplierRepositoryProblem && ['unauthenticated', 'forbidden'].includes(cause.problem.code))
+        invalidate(cause.problem)
+      throw cause
+    }
     if (sequence !== generation || !matches(target))
       throw new DOMException('原件读取目标已变化', 'AbortError')
     return result
   }
-  return { data, loading: shallowReadonly(loading), saving: shallowReadonly(saving), error: shallowReadonly(error), errorCode: shallowReadonly(errorCode), conflict: shallowReadonly(conflict), recoveryNotice: shallowReadonly(recoveryNotice), canWrite, baseline, load, execute, recheck, file, cancelRead, hasPending }
+  return { data, loading: shallowReadonly(loading), saving: shallowReadonly(saving), error: shallowReadonly(error), errorCode: shallowReadonly(errorCode), conflict: shallowReadonly(conflict), recoveryNotice: shallowReadonly(recoveryNotice), canWrite, baseline, load, execute, recheck, file, cancelRead, invalidate, hasPending }
 }

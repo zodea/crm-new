@@ -7,9 +7,13 @@ import {
   buildConstructionContractDetail,
   buildConstructionContractListPage,
   constructionContractSupplementAmount,
+  decodeConstructionContractDetailRead,
+  decodeConstructionContractListPage,
   parseConstructionContractDetailQuery,
   parseConstructionContractListQuery,
 } from '~/lib/construction-contract/repository'
+import { withOriginReadMeta, withReadMeta } from '../../server/utils/read-meta'
+import { publicReadMeta } from '../helpers/public-read-meta'
 
 const AS_OF = '2026-08-24T00:00:00.000Z'
 
@@ -75,6 +79,28 @@ function emptyFacts(): ConstructionContractFactSources {
 }
 
 describe('施工合同中央 Repository contract', () => {
+  it('受限关联清空身份；列表和详情拒绝隐藏定位及失配导航，独立金额仍可读', () => {
+    const restricted = source({ projectPermission: 'forbidden', customerPermission: 'forbidden' })
+    const input = { contracts: [restricted], facts: emptyFacts(), asOf: AS_OF, sourceVersion: 'privacy-v1', capabilities: ['construction-contract:read'] }
+    const evidence = { ...input, schemaVersion: 'construction-contract-read-v2', scope: { fixture: 'restricted-owner' }, requested: true }
+    const page = withOriginReadMeta(buildConstructionContractListPage({ ...input, query: parseConstructionContractListQuery({}) }), { real: publicReadMeta({ ...evidence, dataOrigin: 'real' }), demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }) })
+    const detail = withReadMeta(buildConstructionContractDetail({ ...input, query: parseConstructionContractDetailQuery(restricted.id, { origin: 'real' }) }), publicReadMeta({ ...evidence, dataOrigin: 'real' }))
+    const reference = { state: 'forbidden', entity: 'customer', id: null, label: null, reason: 'permission-denied' }
+    expect(page.summary.projects).toEqual([])
+    expect(page.summary.customers).toEqual([])
+    expect(page.items[0]!.customer).toEqual(reference)
+    expect(detail.contract.customer).toEqual(reference)
+    expect(detail.contract.project.id).toBeNull()
+    expect(detail.contract.amounts.contract).toBe('1000.00')
+    expect(decodeConstructionContractListPage(page).items[0]!.customer.id).toBeNull()
+    expect(decodeConstructionContractDetailRead(detail).contract.customer.id).toBeNull()
+    for (const changed of [{ ...reference, id: 'restricted-identity' }, { ...reference, originalId: 'restricted-identity' }, { ...reference, label: '敏感旧名称' }]) {
+      expect(() => decodeConstructionContractListPage({ ...page, items: [{ ...page.items[0], customer: changed }] })).toThrow('无效')
+      expect(() => decodeConstructionContractDetailRead({ ...detail, contract: { ...detail.contract, customer: changed } })).toThrow('无效')
+    }
+    expect(() => decodeConstructionContractDetailRead({ ...detail, customerNavigation: { kind: 'unavailable', reason: 'forbidden', filters: { customerId: 'restricted-identity' } } })).toThrow('无效')
+  })
+
   it('有效补充金额与变更后金额分开，排除草稿/作废及其他来源或合同', () => {
     const contract = source()
     const row = { dataOrigin: 'real' as const, id: 's', contractId: contract.id, no: '', name: '', amount: 100, date: null, status: '有效' }
@@ -568,5 +594,49 @@ describe('施工合同中央 Repository contract', () => {
     const detail = build(focusId)
     const row = section === 'change' ? detail.sections.changes[0] : detail.sections.settlements.monthlyStatements[0]
     expect(row?.id).toBe(expected)
+  })
+})
+
+describe('施工合同未知金额连续投影', () => {
+  it.each(['amount', 'settledAmount', 'invoicedAmount', 'receivedAmount'] as const)('%s 缺失保持未知且不改变其他合法金额', (field) => {
+    const row = source({ [field]: null })
+    const input = { contracts: [row], facts: emptyFacts(), asOf: AS_OF, sourceVersion: 'nullable-fixture', capabilities: [] }
+    const detail = buildConstructionContractDetail({ ...input, query: parseConstructionContractDetailQuery(row.id, { origin: 'real' }) })
+    const expected = field === 'amount'
+      ? { contract: null, changed: null, settled: '600.00', invoiced: '500.00', received: '450.00', bySettlementReceivable: '150.00', invoicedUnreceived: '50.00' }
+      : field === 'settledAmount'
+        ? { contract: '1000.00', changed: '1000.00', settled: null, invoiced: '500.00', received: '450.00', bySettlementReceivable: null, invoicedUnreceived: '50.00' }
+        : field === 'invoicedAmount'
+          ? { contract: '1000.00', changed: '1000.00', settled: '600.00', invoiced: null, received: '450.00', bySettlementReceivable: '150.00', invoicedUnreceived: null }
+          : { contract: '1000.00', changed: '1000.00', settled: '600.00', invoiced: '500.00', received: null, bySettlementReceivable: null, invoicedUnreceived: null }
+    expect(detail.contract.amounts).toEqual(expected)
+    const page = buildConstructionContractListPage({ ...input, contracts: [row, source({ id: 'known-zero', amount: 0, settledAmount: 0, invoicedAmount: 0, receivedAmount: 0 })], query: parseConstructionContractListQuery({}) })
+    expect(page.summary.origins.real.changedAmount).toBe(field === 'amount' ? null : '1000.00')
+    expect(page.summary.origins.real.invoicedAmount).toBe(field === 'invoicedAmount' ? null : '500.00')
+    expect(page.summary.origins.demo).toEqual({ contractCount: 0, changedAmount: '0.00', invoicedAmount: '0.00', receivedAmount: '0.00' })
+  })
+  it.each(['supplements', 'changes'] as const)('有效 %s 未知进入总额，草稿和作废不污染', (kind) => {
+    const row = source()
+    const fact = { dataOrigin: 'real' as const, id: 'missing', contractId: row.id, no: '', name: '未核金额事实', amount: null, date: null, status: kind === 'changes' ? 'approved' : '有效' }
+    const facts = { ...emptyFacts(), [kind]: [fact] }
+    const read = (facts: ConstructionContractFactSources) => buildConstructionContractDetail({ contracts: [row], facts, query: parseConstructionContractDetailQuery(row.id, { origin: 'real' }), asOf: AS_OF, sourceVersion: 'nullable-fixture', capabilities: [] })
+    expect(read(facts).contract.amounts.changed).toBeNull()
+    for (const status of ['draft', '草稿', '无效', '作废', 'cancelled'])
+      expect(read({ ...facts, [kind]: [{ ...fact, status }] }).contract.amounts.changed).toBe('1000.00')
+  })
+})
+
+describe('construction 列表汇总公开边界', () => {
+  it('允许真实未知金额，拒绝把未知行汇总成零、畸形金额和错误总数', () => {
+    const query = parseConstructionContractListQuery({})
+    const input = { contracts: [source({ amount: null })], facts: emptyFacts(), query, asOf: '2026-08-25T00:00:00.000Z', sourceVersion: 'unknown-owner-v1', capabilities: ['construction-contract:read'] }
+    const evidence = { ...input, schemaVersion: 'construction-contract-read-v2', scope: query, requested: true }
+    const page = withOriginReadMeta(buildConstructionContractListPage(input), { real: publicReadMeta({ ...evidence, dataOrigin: 'real' }), demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }) })
+    expect(page.summary.origins.real.changedAmount).toBeNull()
+    expect(decodeConstructionContractListPage(page).summary.origins.real.changedAmount).toBeNull()
+    for (const patch of [{ changedAmount: '0.00' }, { changedAmount: 'NaN' }, { changedAmount: 0 }, { contractCount: -1 }, { contractCount: 2 }]) {
+      const summary = { ...page.summary, origins: { ...page.summary.origins, real: { ...page.summary.origins.real, ...patch } } }
+      expect(() => decodeConstructionContractListPage({ ...page, summary })).toThrow('无效')
+    }
   })
 })

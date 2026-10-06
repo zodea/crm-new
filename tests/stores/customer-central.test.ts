@@ -72,8 +72,8 @@ describe('客户中央 stores', () => {
     await store.loadReceipt({ id: 'receipt-a', customerId: 'customer-a', origin: 'demo', includeDemo: true })
     await store.loadReceipt({ id: 'receipt-b', customerId: 'customer-b', origin: 'demo', includeDemo: true })
 
-    expect(store.detailState).toMatchObject({ kind: 'error', previous: null })
-    expect(store.receiptState).toMatchObject({ kind: 'error', previous: null })
+    expect(store.detailState).toMatchObject({ kind: 'unavailable', previous: null })
+    expect(store.receiptState).toMatchObject({ kind: 'unavailable', previous: null })
   })
 
   it('命令使用会话身份和服务端版本，并记录最新写入供读模型刷新', async () => {

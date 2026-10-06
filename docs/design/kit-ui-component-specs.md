@@ -19,45 +19,44 @@
 | 进出动效 | `--dur-dialog`(220ms)+ `--ease-snappy`;进场 `opacity 0→1 + translateY(12→0)` |
 | 退路 | Esc 关闭、遮罩点击关闭、焦点锁定在浮层内 |
 | 配色语义 | 建设性主操作 = `--brand`;破坏性确认 = `--danger`;取消 = ghost 灰 |
-| z-index | 浮层 9000 段;toast 在其上 |
+| 层级 | 按 [ADR 0016](../adr/0016-overlay-composition-contract.md) 消费语义平面与模态栈槽，不按组件种类分配固定 z-index |
 
 ---
 
 ## 01 · 确认弹窗 `confirm-dialog` ✅ 已定案(ADR 0003)
 
-**用途**:**所有业务删除一律先弹本弹窗确认**(单条 / 批量 / 级联,2026-07-07 起单条也确认),外加其他「不可撤回 / 高后果」操作(如归档后修改)。纯信息阻断(页签上限等)走 toast、不弹本弹窗。
+**用途**：呈现已经由领域允许的删除或其他高后果动作。确认强度、撤回、级联父子过滤及受保护历史的适用范围只见 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) 和 [COMMANDS](../rewrite/COMMANDS.md)；本组件不开放删除能力、不写库。纯信息阻断使用结果消息。
 
 **结构锚点**(自上而下):标题 → 正文/杀伤清单 → [type-to-confirm 输入框] → footer(取消 ghost 左 · 确认 danger 右)。
 
-**三档变体 & 行为**:
+**三档呈现与返回行为**（领域动作及撤回窗口由 ADR 0003 决定）：
 
-| 变体 | 触发 | 打字确认 | 点确认后 | 事后撤回 |
-|---|---|---|---|---|
-| `simple` | **单条删除**、归档后修改、删未入库扫描件等 | 无 | 立即关窗 → 交 toast 反馈 | 删除类 **10 秒 undoToast**;非删除类一般无 |
-| `batch` | 批量删除 | 无(仅显示「将删除 N 条」) | 立即关窗 | **10 秒 undoToast** 整批恢复 |
-| `cascade` | 删有下游关联的父级(如分供方) | **必填,打记录自身名称** | **原地 spinner、弹窗不关、≥3 秒预提交挂起** | **无**(挂起期即撤销窗口) |
+| 变体 | 内容与门控 | 点确认后 |
+| --- | --- | --- |
+| `simple` | 标题与正文，无打字输入 | 关窗并 resolve(true)，调用方执行命令及结果反馈 |
+| `batch` | 正文显示「将删除 N 条」，无打字输入 | 关窗并 resolve(true) |
+| `cascade` | 显示只读影响清单；输入精确匹配 `requireTyping` 才可确认 | 窗内 spinner 与撤销按钮，按 ADR 0003 的挂起时长等待；撤销 resolve(false)，等待完成 resolve(true) |
 
-**cascade 细节**:
+`impact` 的标签和数量由调用方提供，组件只读展示；级联匹配名由当前记录提供，不使用固定“删除”一词。挂起期间组件尚未允许调用方执行写入，关闭或撤销都不得返回成功。父子标记、恢复审计和受保护记录处理属于命令层。
 
-- 弹窗列**杀伤清单**:「将影响 3 份合同、12 条材料、8 张发票」(只读 count 查询得出)。
-- 输入框需精确匹配记录名(如「华东建材」)才激活确认按钮。
-- 点确认 → 进入 **≥3 秒**挂起(关联多则更久,永不少于 3 秒),期间 **不写库**、显示显眼「撤销」按钮;撤销即彻底中止;超时未撤才写父级删除标记、关窗。
-- 软删除**只标父级**,子级靠「祖先是否已删」过滤隐藏,不逐条标记。
+**配色与焦点**：确认 `--danger`、取消 ghost 灰；遮罩消费本文件全局约定，打开焦点默认落取消按钮。Esc、遮罩和焦点关系按 ADR 0016。
 
-**配色 & 令牌**:确认 `--danger`、取消 ghost 灰、品牌蓝不当主角;遮罩 `rgba(0,0,0,.28)`(中性);打开焦点默认落**取消**按钮(危险操作停在安全选项)。
-
-**调用签名**(命令式 Promise,沿用 `useKitUI`):
+**调用示例**(命令式 Promise,沿用 `useKitUI`；参数类型以 `app/composables/useKitUI.ts` 的 `ConfirmOptions` 为准):
 
 ```ts
-await confirm({
-  variant: 'simple' | 'batch' | 'cascade',
-  title, message,
-  count?: number,                 // batch: 显示删除条数
-  impact?: { label: string; n: number }[], // cascade: 杀伤清单
-  requireTyping?: string,         // cascade: 需精确打入的记录名
-  holdMs?: number,                // cascade: 预提交挂起时长,默认 ≥3000
-  confirmLabel?, cancelLabel?,
-}) // resolve(true) 执行 / resolve(false) 取消
+import type { ConfirmOptions } from '~/composables/useKitUI'
+
+const options: ConfirmOptions = {
+  variant: 'cascade',
+  title: '删除记录',
+  message: '请核对关联影响后输入记录名称。',
+  impact: [{ label: '关联明细', n: 3 }],
+  requireTyping: '待删除记录',
+  confirmLabel: '删除',
+  cancelLabel: '取消',
+}
+const confirmed = await useKitUI().confirm(options)
+// confirmed 为 true 时，调用方才能执行命令；false 表示取消。
 ```
 
 ---
@@ -81,22 +80,21 @@ await confirm({
 
 **配色与令牌**：主按钮和聚焦态使用 `--brand`，校验错误使用 `--danger` 并贴字段显示；圆角、留白和密度遵守本文件全局约定与 ADR 0013，不从参考网站另引一套尺寸。
 
-**调用签名**(沿用现有,字段配置驱动):
+**调用示例**(沿用现有,字段配置驱动；参数及字段类型以 `app/lib/kit/form-modal.ts` 为准，初始值使用字段的 `value`):
 
 ```ts
-await formModal({
-  title,                          // 动词+名词
-  fields: FieldConfig[],          // 类型/label/必填/校验规则/分组
-  initial?: Record<string, any>,  // 编辑态回填;有值即判 dirty 基线
-  submitLabel?,                   // 与 title 动词一致
-}) // resolve(values) 提交 / resolve(null) 取消
+const values = await useKitUI().formModal({
+  title: '修改行备注',
+  fields: [{ key: 'note', label: '备注', type: 'textarea', value: '原备注' }],
+  saveText: '保存备注',
+}) // values 为字段值对象；null 表示取消。
 ```
 
 ---
 
 ## 02-b · 业务类型选择弹窗 `typeSelect` ✅ 已落地（#95）
 
-**用途**：大单据“三段式新建”的第一段，只负责在进入独立整页表单前选择业务类型。付款申请 8 类型是开发页范本；原语不读取领域 store、不创建单据，也不替代 `EntityFormShell`。
+**用途**：大单据“三段式新建”的第一段，只负责在进入独立整页表单前选择业务类型。付款申请开发示例只验证选择器，实际业务类型及数量由领域规格和当前注册表确定；原语不读取领域 store、不创建单据，也不替代 `EntityFormShell`。
 
 **结构锚点**：标题与简短说明 → 可滚动单选列表 → footer（取消 ghost 左 · 确定品牌色右）。选项使用原生 radio 语义，label 为可访问名称，hint 只补充差异，不替代类型全名。
 
@@ -129,7 +127,7 @@ const selected = await useKitUI().typeSelect({
 // string：确定后的 option.value；null：取消 / Esc / 遮罩 / 同类抢占
 ```
 
-开发验收入口为 `/dev/kit-ui` 的付款申请 8 类型示例；返回值在页面底部“最近一次返回值”区域回读。
+开发验收入口为 `/dev/kit-ui` 的付款申请类型示例；返回值在页面底部“最近一次返回值”区域回读。
 
 ---
 
@@ -180,9 +178,9 @@ await openExportTab({ source, structure, naming })
 
 ## 04 · 导入映射 `import-mapping` ✅ 已定案(ADR 0005)
 
-**用途**:旧数据迁移——把 Excel/CSV 导进某个系统实体。**模板驱动 + 实体触发 + 独立页签**。识别类(发票/送货单)、清单拆表**不套此原语**。
+**用途**：通用 Excel/CSV 映射的呈现原语；目标实体、载体、排除路径、解析与续导以 [ADR 0005](../adr/0005-import-mapping-model.md) 为唯一权威。专属受控迁移继续按 [COMMANDS](../rewrite/COMMANDS.md) 执行，不因外观相近改套本原语。
 
-**载体**:独立页签(复杂流程少用弹窗;不遮罩、不误关),算 [[页签导航]] 15 上限、成功自动关闭。**从目标实体列表页触发**,模板隐含、无统一入口。
+**载体与生命周期**：遵守 ADR 0005；页签身份、上限及来源返回直接见 [NAVIGATION](../rewrite/NAVIGATION.md)。
 
 **三步 stepper**:
 
@@ -194,18 +192,16 @@ await openExportTab({ source, structure, naming })
 
 **映射步三色态**:`--brand` 已匹配 / `--warn` 待确认 / `--danger` 必填缺失。
 
-**完成**:toast 成功提示 + 页签自动关闭(与导出一致)。失败:页签内标失败、可重试(从失败行续导,已成功行不重复入库),不自动关。路由与实体注册表见 ADR 0005。
+**反馈**：真实导入结果决定完成、部分失败和重试状态，保存/回读及未知结果恢复见 COMMANDS；已成功行续导边界见 ADR 0005。组件不把预览或提示当作真实入库成功。
 
-**前置依赖**:各实体的「主要字段模板」(字段 + 必填)来自红圈数据结构分析,单列 issue 产出(草案已备:`scratchpad/import-template-fields-draft.md`,8 主实体证据充分;班组/工人、施工记录待用户拍板)。
-
-**外部旧ID列**:每个实体的导入模板预留一列「外部旧ID / 匹配标识」(仿红圈 `field3__c 匹配标识`),存源系统主键,便于迁移后对账与二次修正、避免重复导入。
+**模板来源**：当前实体字段、必填与关系以 [DATABASE](../rewrite/DATABASE.md) 和对应页面规格为准，静态模板在 `app/lib/kit/import-entities.ts` 登记；来源分析只帮助匹配，不生成第二套字段规则。外部旧 ID 的保留与去重边界直达 ADR 0005 / DATABASE。已退役草案和早期待办不能覆盖当前确认结果。
 
 **调用签名**:
 
 ```ts
 // 从目标实体列表页触发,实体隐含决定模板
 openImportTab({
-  entity,            // 目标实体(分供方/工程量清单/...),隐含选模板
+  entity, // 目标实体(分供方/工程量清单/...),隐含选模板
 }) // 页签内 上传→映射→预览(可删非归属行)→导入→toast 成功→自动关页签
 ```
 
@@ -220,18 +216,19 @@ openImportTab({
 
 **结构**(抄 shadcn-vue Sheet):顶部标题栏(固定)+ 中间可滚动内容;因只读,**无底部操作条**。
 
-**样式**:**不上毛玻璃**(Tauri 性价比低);背板 `rgba(0,0,0,.28)` 中性轻遮罩;宽约 380–420px。Esc / 遮罩点击关闭。
+**样式**：遮罩和形状消费本文件全局约定；宽约 380–420px。Esc / 遮罩与焦点按 ADR 0016。
 
 **窄窗退化**:退化为**底部 Sheet + 拖拽把手**,缓动手感借 Vaul(拖一半回弹)。
 
-**调用签名**:
+**拟议调用签名（通用 API 延期，不能据此当作已实现接口）**：
 
-```ts
-openDrawer({
-  title,
-  content,          // 只读内容(字段/附件/通知列表)
-  side?: 'right' | 'bottom', // 默认 right;窄窗自动 bottom
-})
+以下是拟议参数说明，不是现行 TypeScript 调用示例：
+
+```text
+openDrawer
+  title：标题
+  content：只读内容（字段、附件或通知列表）
+  side（可选）：right / bottom，默认 right，窄窗自动 bottom
 ```
 
 **#188 审计结论**：通知中心以领域专用 `NotificationDrawer` **替代**通用命令式 `openDrawer`，但复用本节的中性遮罩、桌面右侧 390px、窄窗底部 Sheet、固定标题、内容滚动、Esc、焦点返回和滚动锁合同；它为保留既有已读、全部已读、删除及路由打开能力，仍不是纯只读容器。项目切换器会改变当前工作项目，属于选择器而非只读速览，继续使用 Popover / Dialog，不纳入本原语。列表行级纯只读速览和通用 `openDrawer` API 本期明确**延期**，因此 #78 保持 open，不作为 #188 的 blocker。
@@ -281,11 +278,12 @@ flowchart LR
 
 **调用签名**:
 
-```ts
+```vue
+<!-- loading 受控；success 为可选第三态，默认关闭；variant 缺省 secondary。 -->
 <KitButton
-  :loading="submitting"      // 受控 loading
-  :success="false"           // 可选第三态,默认关
-  variant="secondary | primary | accent | ghost | danger"  // 五变体层级，缺省 secondary
+  :loading="submitting"
+  :success="false"
+  variant="secondary"
   @click="onSubmit"
 />
 ```
@@ -382,14 +380,7 @@ flowchart LR
 
 **与 #97 KitListShell 的边界**：#185 实施时不采用也不替代 `KitListShell`，当时延期到具有真实左树、视图切换或服务端汇总需求的领域列表票。后续 `ListShell` 已用于领域列表，#418 的连续工作面合同见第 13 节；`StatePanel` 与 `KitTable` 继续可组合，不为状态原语虚构列表业务。
 
-**页面状态机**：
-
-1. 首次请求未完成：loading，不先闪 empty。
-2. 成功且无数据：empty；筛选无结果与业务从未建档必须使用不同文案和动作。
-3. 失败且无缓存：error；失败但有缓存可显示 compact error，并保留旧数据。
-4. 点击重试：立即清旧错误并回 loading；成功进入默认/empty，失败更新 error。并发加载必须采用“最新请求胜出”，过期请求不得覆盖新数据或提前结束 loading。
-
-已成功读取快照的列表在同一数据来源内刷新或筛选时，保留表格与焦点，用就近工具进度和 `aria-busy` 表达等待；不要把每次查询显示成整表遮罩或骨架。首次加载仍使用真实 loading；来源切换立即失效旧快照，不允许上一个正式/测试范围的数据短暂出现。该规则由读状态及调用页实现，不取消 `KitTable.loading` 对首次请求和阻塞操作的能力。
+**读取状态与呈现的边界**：首次/同源重读、来源切换、失效快照、过期响应和失败资格只由 [READ-MODELS](../rewrite/READ-MODELS.md) 决定，领域将其映射到本节四态。筛选无结果与业务从未建档使用不同文案/动作；可保留旧数据的失败用 compact error，不能当作新查询成功。同源重读用就近工具进度与 `aria-busy` 保持表格和焦点，首次请求及阻塞操作仍可使用 `KitTable.loading`。
 
 表头筛选参与业务空态时，「清除筛选」除重置页面筛选模型外，还必须调用 `KitTable.clearFilter()` 清除 vxe-table 内部选中态，保证筛选图标、弹层选项与实际数据一致。
 
@@ -427,7 +418,7 @@ flowchart LR
 | 页面状态 | 参考设计稿只有不存在的简略落点 | 各页散落文字 loading/不存在 | 复用 `StatePanel`：loading、empty、error、forbidden、not-found；页面仍持有领域加载与权限判断 |
 | 代表详情 | 分供方详情已有 `R-SUPPLIER-DETAIL-LIVE` 直接结构证据；参考业务数据不可写入仓库 | 分供方六页签及合同、结算、收票、付款事实按稳定身份与实际可用性展示 | `/base/supplier/:id` 沿既有领域事实和来源边界使用详情壳；不能只换壳就认定全部关系已闭环 |
 
-#186 实施时只取得 `R-DETAIL-PRIOR` 历史结构线索，因此当时没有把邻近模板写成目标页事实。后续分供方直接证据已登记为 `R-SUPPLIER-DETAIL-LIVE`；本轮按 [#407](https://github.com/zodea/crm-new/issues/407) 核对领域字段与关系，跨实体稳定层级由 [#404](https://github.com/zodea/crm-new/issues/404) 复核，旧 #186/#193 仅保留来源含义。
+`#186` 实施时只取得 `R-DETAIL-PRIOR` 历史结构线索，因此当时没有把邻近模板写成目标页事实。后续分供方直接证据已登记为 `R-SUPPLIER-DETAIL-LIVE`；本轮按 [#407](https://github.com/zodea/crm-new/issues/407) 核对领域字段与关系，跨实体稳定层级由 [#404](https://github.com/zodea/crm-new/issues/404) 复核，旧 #186/#193 仅保留来源含义。
 
 **#418 已实现补充（2026-09-08）**：`compact` 为可选紧凑变体，缩减壳内间距及标题、摘要留白；新增 `navigation` 插槽位于主内容列顶部，辅助列与主区域并列，不把业务页签复制到壳内。分供方已使用该变体，把详细资料纳入默认一级页签、实际合作摘要移入辅助区；字段与页签合同只看[分供方页面](../rewrite/pages/base-supplier.md)，不据此声明其他详情均完成逐屏对齐。
 
@@ -502,9 +493,9 @@ flowchart LR
 
 **关联原语审计**：
 
-- #79：旧表单弹窗范围已由 ADR 0014 替代；#187 在整页形态采用其吸底动作、首次聚焦、校验双通道、提交三态和 dirty 拦截语义，弹窗仅保留轻量对象兜底。
-- #94 `KitEditGrid`：继续作为跨领域明细网格独立原语；代表 MasterData 表单没有可编辑明细矩阵，本期明确延期，不阻塞表单壳。
-- #95 `typeSelect`：已作为付款申请等“三段式新建”的独立首段原语落地；代表 MasterData 表单没有业务类型首段，所以 `EntityFormShell` 不内置也不替代它。后续付款申请领域流程可直接调用该原语，再进入对应整页表单。
+- `#79`：旧表单弹窗范围已由 ADR 0014 替代；#187 在整页形态采用其吸底动作、首次聚焦、校验双通道、提交三态和 dirty 拦截语义，弹窗仅保留轻量对象兜底。
+- `#94` `KitEditGrid`：继续作为跨领域明细网格独立原语；代表 MasterData 表单没有可编辑明细矩阵，本期明确延期，不阻塞表单壳。2026-07 未采纳的泛型网格 API 与其他第二波原语提案只通过[固定 Git 历史](https://github.com/zodea/crm-new/blob/31f8ec34293f7edca8cc732285073f044acb5b03/docs/research/kit-ui-primitives-wave2-prd.md)及原 Issue 定位，不作为当前接口。
+- `#95` `typeSelect`：已作为付款申请等“三段式新建”的独立首段原语落地；代表 MasterData 表单没有业务类型首段，所以 `EntityFormShell` 不内置也不替代它。后续付款申请领域流程可直接调用该原语，再进入对应整页表单。
 
 **调用签名**：
 
@@ -547,7 +538,7 @@ flowchart LR
 
 **可操作表头（公共原语已实现，调用页继续验收，2026-09-08）**：
 
-- 每页按[列表模式](../rewrite/CRM-PATTERNS.md#11-全站逐页对应本轮定稿待实现2026-09-08)完整对应适用参考列；通用表格不自行删列、猜字段或替领域决定默认顺序。表头、名称列和状态列需作为逐页对照点。
+- 每页按[逐页对应规则](../rewrite/DESIGN-SYSTEM.md#a01-list-mapping)完整对应适用参考列；通用表格不自行删列、猜字段或替领域决定默认顺序。表头、名称列和状态列需作为逐页对照点。
 - 支持筛选的表头常态显示漏斗入口，支持排序的表头常态显示排序入口；不得只有 hover 才知道可操作。活动筛选、升序/降序与默认态可分辨，颜色之外提供形状/文字或可访问状态；不支持的能力不显示假图标。筛选、排序与列宽拖动的命中区必须可区分，调整列宽不得意外改变排序或打开筛选。
 - 各入口具有含字段名的可访问名称及清晰 focus-visible，Tab 可到达，Enter/Space 可操作；筛选面板打开后焦点进入内容，Esc 关闭并返回原入口。排序状态使用适当的 `aria-sort` 语义；可同时提供筛选/排序时不得把两种操作混成无明确结果的整块表头点击。
 - 筛选面板显示当前选中条件，提供单列清除；全局清除同步页面模型和 `KitTable.clearFilter()`，不能留下亮着的漏斗或隐藏条件。没有候选、候选加载失败和无权限须分别说明；空候选不伪装成正常可筛数据。
@@ -646,7 +637,7 @@ const columns: KitTableColumn[] = [{
 
 ## 17 · 就近说明 `tooltip` / `popover`（2026-09-08 已有原语）
 
-**用途与边界**：承载字段释义、口径及低频帮助；内容显隐规则见 [CRM 信息显隐合同](../rewrite/CRM-PATTERNS.md#0-界面信息显隐本轮定稿待实现2026-09-08)。必要反馈仍可见，重复标题、开发说明直接移除。使用指南与规格文档不按界面显隐规则删减。现有 `ContextHelp` API 为 `label`、`text` 及可选长内容默认插槽；分供方纳税人字段已接入，其他页面仍需逐项迁移。
+**用途与边界**：承载字段释义、口径及低频帮助；内容显隐只见 [DESIGN-SYSTEM](../rewrite/DESIGN-SYSTEM.md#a01-interface-information)。现有 `ContextHelp` API 为 `label`、`text` 及可选长内容默认插槽；分供方纳税人字段已接入，其他页面仍需逐项迁移。
 
 - **入口**：就近放在字段标题、指标标题或有关操作旁的问号按钮，视觉紧凑但保留可点击范围与 focus-visible；可访问名称明确为“查看某字段说明”等。说明通过适当描述关系关联原对象，不用问号、tooltip 或原生 `title` 替代字段标签和操作名称。
 - **短说明 tooltip**：只承载非交互文本；hover 与键盘 focus 均能查看，出现时不搬走焦点，移入说明区域可继续阅读。触摸设备可点按同一入口查看/收起，不依赖悬停。Esc 可关闭；关闭和再次展示采用一致状态，不能因焦点仍在入口而立即重开。浮层内有链接、按钮或需持续阅读的长内容时改用 popover。

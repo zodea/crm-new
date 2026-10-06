@@ -10,7 +10,7 @@ const actor = { workspaceId: 'supplier-disk-test', actorId: 'synthetic-owner', c
 const session = () => actor
 const command = { workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: 'create-supplier', requiredCapability: 'supplier:write', baseVersion: null, action: 'save', attachments: {}, draft: { name: '合成分供方', supplierCategory: '其他', contact: '合成人', taxNo: 'SYNTHETIC-TAX', externalRef: 'synthetic-external-key' } }
 async function setup() {
-  const base = resolve('.codex-tmp/issue-453-tests')
+  const base = resolve('.tmp/a01-supplier-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/storage-`)
   const options = { directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' as const }
@@ -20,9 +20,60 @@ async function setup() {
   return { options, storage, service, created }
 }
 const bytes = Buffer.from('%PDF-1.7\nSynthetic supplier original\n%%EOF')
-function upload(supplierId: string, supplierVersion: string, credentialVersion: string): SupplierCredentialCommand {
+function upload(supplierId: string, supplierVersion: string, credentialVersion: string): Extract<SupplierCredentialCommand, { action: 'upload' }> {
   return { workspaceId: actor.workspaceId, actorId: actor.actorId, origin: 'real', requiredCapability: 'supplier-credential:write', commandId: 'upload-credential', supplierId, baseSupplierVersion: supplierVersion, baseCredentialVersion: credentialVersion, action: 'upload', draft: { category: '营业执照', validFrom: '', expiresAt: '', longTerm: false, fileName: '合成原件.pdf', mimeType: 'application/pdf', fileSize: bytes.length, payloadBase64: bytes.toString('base64') } }
 }
+
+it('上海日跨期的列表、筛选、详情与资料GET保持磁盘只读，关键写失效保留凭证可冷恢复', async () => {
+  const state = await setup()
+  let clock = '2026-09-12T15:59:59.000Z'
+  const service = createProductionSupplierService(state.storage, { now: () => clock })
+  try {
+    for (const [index, category] of ['营业执照', '法人身份证', '银行账户资料'].entries()) {
+      const current = await service.credentials(state.created.id, session)
+      await service.executeCredential({ ...upload(state.created.id, current.supplierVersion, current.credentialVersion), commandId: `dated-upload-${index}`, draft: { ...upload(state.created.id, '', '').draft, category: category as '营业执照', expiresAt: index === 0 ? '2026-09-12' : '' } }, session)
+    }
+    const current = await service.credentials(state.created.id, session)
+    await service.executeCredential({ ...upload(state.created.id, current.supplierVersion, current.credentialVersion), action: 'review', commandId: 'manual-proof', draft: { decision: 'qualified', note: '合成人工历史，必须保全' } }, session)
+    const before = await state.storage.select('SELECT * FROM supplier_credential_scopes')
+    const masterBefore = await state.storage.select('SELECT * FROM suppliers')
+    const revisionBefore = await state.storage.select('SELECT * FROM supplier_revision')
+    const auditsBefore = await state.storage.select('SELECT * FROM supplier_audits')
+    const receiptsBefore = await state.storage.select('SELECT * FROM supplier_command_receipts')
+    const original = (await service.credentials(state.created.id, session)).credentials[0]!
+    const previousPage = await service.list({}, session)
+    // 同一次响应只能采样一个时刻，故意使第二次调用跨越上海午夜。
+    let clockReads = 0
+    const boundaryService = createProductionSupplierService(state.storage, { now: () => ++clockReads === 1 ? '2026-09-12T15:59:59.000Z' : '2026-09-12T16:00:00.000Z' })
+    const coherent = await boundaryService.list({}, session)
+    expect(clockReads).toBe(1)
+    expect(coherent).toMatchObject({ asOf: '2026-09-12T15:59:59.000Z', sourceVersion: previousPage.sourceVersion, items: [expect.objectContaining({ credentialStatus: 'qualified' })] })
+    clock = '2026-09-12T16:00:00.000Z'
+    expect((await service.list({}, session)).sourceVersion).not.toBe(previousPage.sourceVersion)
+    expect((await service.list({ credentialStatus: 'incomplete' }, session)).items).toHaveLength(1)
+    expect((await service.list({ credentialStatus: 'qualified' }, session)).items).toHaveLength(0)
+    expect((await service.credentials(state.created.id, session))).toMatchObject({ status: 'incomplete', reviewCurrent: false, review: { note: '合成人工历史，必须保全' }, businessDate: '2026-09-13' })
+    await service.form(state.created.id, session)
+    await service.rows(session)
+    expect(await state.storage.select('SELECT * FROM supplier_credential_scopes')).toEqual(before)
+    expect(await state.storage.select('SELECT * FROM suppliers')).toEqual(masterBefore)
+    expect(await state.storage.select('SELECT * FROM supplier_revision')).toEqual(revisionBefore)
+    expect(await state.storage.select('SELECT * FROM supplier_audits')).toEqual(auditsBefore)
+    expect(await state.storage.select('SELECT * FROM supplier_command_receipts')).toEqual(receiptsBefore)
+    const read = await service.credentials(state.created.id, session)
+    await service.executeCredential({ ...upload(state.created.id, read.supplierVersion, read.credentialVersion), action: 'edit', commandId: 'renew-original', credentialId: original.id, draft: { category: '营业执照', validFrom: '', expiresAt: '2027-09-12', longTerm: false } }, session)
+    await state.storage.close()
+    const reopened = createProductionStorage(state.options)
+    try {
+      const recovered = createProductionSupplierService(reopened, { now: () => clock })
+      expect(await recovered.credentials(state.created.id, session)).toMatchObject({ status: 'reviewing', reviewCurrent: false, review: { note: '合成人工历史，必须保全' }, reviewHistory: [{ note: '合成人工历史，必须保全' }] })
+      expect(await recovered.file({ supplierId: state.created.id, credentialId: original.id, fileId: original.file!.id, origin: 'real' }, session)).toMatchObject({ payloadBase64: bytes.toString('base64') })
+      expect(await recovered.command('manual-proof', session)).toMatchObject({ outcome: 'applied', result: { commandId: 'manual-proof' } })
+    }
+    finally { await reopened.close() }
+  }
+  finally { await state.storage.close() }
+})
 
 it('磁盘冷打开保留主档、原件、人工核验、原回执及导入指纹', async () => {
   const state = await setup()
@@ -195,7 +246,7 @@ async function reviewedExpiringSupplier() {
   return state
 }
 
-it('上海日期跨日撤销过期合格结论且冷开不重复递增，原件和核验审计保留', async () => {
+it('上海日期跨日只读失效当前资格，冷开保留人工凭证、原件和核验审计', async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-09-22T15:59:59Z'))
   const state = await reviewedExpiringSupplier()
@@ -204,7 +255,9 @@ it('上海日期跨日撤销过期合格结论且冷开不重复递增，原件�
     vi.setSystemTime(new Date('2026-09-22T16:00:00Z'))
     await state.storage.close()
     const after = await state.service.credentials(state.created.id, session)
-    expect(after).toMatchObject({ status: 'incomplete', review: null })
+    expect(after).toMatchObject({ status: 'incomplete', reviewCurrent: false, review: { decision: 'qualified', note: '合成证照核验' } })
+    expect(after.supplierVersion).toBe('5')
+    expect(after.credentialVersion).toBe('4')
     expect(after.credentials).toHaveLength(3)
     expect((await state.storage.select<{ record_json: string }>('SELECT record_json FROM supplier_audits')).some(row => JSON.parse(row.record_json).action === 'credential_review')).toBe(true)
     await state.storage.close()
@@ -257,7 +310,8 @@ it('正式写入门禁关闭时，跨日读取也不能持久撤销结论或递�
   try {
     expect((await service.credentials(state.created.id, session)).status).toBe('qualified')
     vi.setSystemTime(new Date('2026-09-22T16:00:00Z'))
-    await expect(service.credentials(state.created.id, session)).rejects.toThrow('正式写入尚未')
+    await expect(service.credentials(state.created.id, session)).resolves.toMatchObject({ status: 'incomplete', reviewCurrent: false, review: { decision: 'qualified' } })
+    await expect(service.execute({ ...command, commandId: 'closed-gate-save' }, session)).rejects.toThrow('正式写入尚未')
     expect(await official.select('SELECT * FROM suppliers')).toEqual(before)
   }
   finally {

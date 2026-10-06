@@ -43,8 +43,10 @@
 
 四个目录和活动数据目录必须彼此独立、不能相互包含，也不能使用符号链接或重定向目录。配置变更后按维护流程重启。程序检查目录和内容，不能据此证明它们在不同物理设备上；真实介质独立性另行验收。
 
+中文或深层目录仍按原目录填写配置，无需手工改成特殊路径格式。已验证的长路径范围及恢复限制直接见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md#正式存储与运行边界)；实际介质和权限仍须按本节核实。
+
 保留策略按北京时间挑选每天/月的最新完整包，始终保留最后成功包和当前基线。清理只处理已有成功回执、内容完整且校验通过的本工具包；不识别的文件、不完整包和校验失败包留存待核对。自动到期清理属于备份保留策略，不能代替额外离线副本。
 
-每个完整包只有 `data.sqlite` 和 `manifest.json`。原件与数据库同库，清单只含版本、身份、数量与摘要，不复制业务正文。原生原件缺正文、坏摘要、未知领域/实表或不兼容版本都会拒绝。历史缺件不能仅凭迁入身份被当作可恢复原件；未来受控迁入的缺件证明由其领域另行登记。
+每个完整包只有 `data.sqlite` 和 `manifest.json`。原件与数据库同库，清单只含版本、身份、数量与摘要，不复制业务正文。原生原件缺正文、坏摘要、未知领域/实表或不兼容版本都会拒绝。历史缺件只按 [DATABASE 备份清单](../rewrite/DATABASE.md#pg-02-备份记录与隔离恢复证明451)及[旧清偿精确缺件证明](../rewrite/DATABASE.md#historical-expense-clearance)保留原状态；迁入身份或替代材料不表示原文件已找回，隔离恢复也不补造正文。
 
-运行决策见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)，模型及完整参与者清单见 [DATABASE](../rewrite/DATABASE.md#pg-02-备份记录与隔离恢复证明451)，运行证据见 [PG-02 验收](../design/evidence/issue-451-customer-backup/README.md)。固定 Node `24.12.0` 的 `node:sqlite` 仍属实验 API，升级须先在副本验证。
+运行决策见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)，模型及完整参与者清单见 [DATABASE](../rewrite/DATABASE.md#pg-02-备份记录与隔离恢复证明451)，运行证据见 [PG-02 验收](../design/evidence/issue-451-production-backup/README.md)。固定 Node `24.12.0` 的 `node:sqlite` 仍属实验 API，升级须先在副本验证。

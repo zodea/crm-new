@@ -5,6 +5,7 @@ import type {
 } from '~/lib/contract/forms'
 import { isTauri } from '@tauri-apps/api/core'
 import { computed, readonly, shallowRef } from 'vue'
+import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
 
 export interface PendingContractAttachment extends ContractFormAttachmentDraft {
@@ -18,6 +19,8 @@ export function useContractFormAttachments() {
   const pendingRemoveIds = shallowRef<string[]>([])
   const pendingRestoreIds = shallowRef<string[]>([])
   const desktopAttachmentPicker = shallowRef(isTauri())
+  const readingFiles = shallowRef(false)
+  let fileGeneration = 0
 
   const dirty = computed(() =>
     pendingAttachments.value.length > 0
@@ -25,7 +28,13 @@ export function useContractFormAttachments() {
     || pendingRestoreIds.value.length > 0,
   )
 
+  function invalidatePreparation() {
+    fileGeneration++
+    readingFiles.value = false
+  }
+
   function clearPending() {
+    invalidatePreparation()
     pendingAttachments.value = []
     pendingRemoveIds.value = []
     pendingRestoreIds.value = []
@@ -36,6 +45,23 @@ export function useContractFormAttachments() {
     clearPending()
   }
 
+  function capture() {
+    return JSON.parse(JSON.stringify({ add: pendingAttachments.value, removeIds: pendingRemoveIds.value, restoreIds: pendingRestoreIds.value })) as {
+      add: PendingContractAttachment[]
+      removeIds: string[]
+      restoreIds: string[]
+    }
+  }
+
+  /** Settle only the input acknowledged by the same saved target; retain subsequent edits. */
+  function acknowledge(files: ContractFormAttachment[], sent: ReturnType<typeof capture>) {
+    attachments.value = files
+    const submitted = new Map(sent.add.map(file => [file.localId, JSON.stringify(file)]))
+    pendingAttachments.value = pendingAttachments.value.filter(file => submitted.get(file.localId) !== JSON.stringify(file))
+    pendingRemoveIds.value = pendingRemoveIds.value.filter(id => !sent.removeIds.includes(id))
+    pendingRestoreIds.value = pendingRestoreIds.value.filter(id => !sent.restoreIds.includes(id))
+  }
+
   function changes(): ContractFormAttachmentChanges {
     return {
       add: pendingAttachments.value.map(({ localId: _localId, ...file }) => file),
@@ -44,28 +70,40 @@ export function useContractFormAttachments() {
     }
   }
 
-  function append(files: ContractFormAttachmentDraft[]) {
+  function appendDrafts(files: ContractFormAttachmentDraft[]) {
     pendingAttachments.value = [
       ...pendingAttachments.value,
-      ...files.map((file, index) => ({
+      ...files.map(file => ({
         ...file,
-        localId: `${file.filePath || file.fileName}-${Date.now()}-${index}`,
+        localId: crypto.randomUUID(),
         category: file.category || '合同附件',
       })),
     ]
   }
 
-  function handleFiles(files: File[]) {
-    append(files.map(file => ({
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
-    })))
+  async function handleFiles(files: File[]) {
+    const generation = ++fileGeneration
+    readingFiles.value = true
+    try {
+      const drafts = await Promise.all(files.map(file => fileRefDraftFromFile(file)))
+      if (generation === fileGeneration)
+        appendDrafts(drafts)
+    }
+    catch (cause) {
+      if (generation === fileGeneration)
+        error(`附件读取失败：${toErrorMessage(cause)}`)
+    }
+    finally {
+      if (generation === fileGeneration)
+        readingFiles.value = false
+    }
   }
 
   async function pickNativeFiles() {
+    const generation = ++fileGeneration
+    readingFiles.value = true
     try {
-      const [{ open }, { stat }, { basename }] = await Promise.all([
+      const [{ open }, { stat, readFile }, { basename }] = await Promise.all([
         import('@tauri-apps/plugin-dialog'),
         import('@tauri-apps/plugin-fs'),
         import('@tauri-apps/api/path'),
@@ -74,15 +112,22 @@ export function useContractFormAttachments() {
       const paths = selected == null
         ? []
         : Array.isArray(selected) ? selected : [selected]
-      const files = await Promise.all(paths.map(async filePath => ({
-        fileName: await basename(filePath),
-        filePath,
-        fileSize: (await stat(filePath)).size,
-      })))
-      append(files)
+      const files = await Promise.all(paths.map(async (filePath) => {
+        if ((await stat(filePath)).size > 10 * 1024 * 1024)
+          throw new Error('合同原件单份不能超过 10 MiB')
+        const bytes = await readFile(filePath)
+        return { ...await fileRefDraftFromFile(new File([bytes], await basename(filePath))), filePath }
+      }))
+      if (generation === fileGeneration)
+        appendDrafts(files)
     }
     catch (cause) {
-      error(`选择附件失败：${toErrorMessage(cause)}`)
+      if (generation === fileGeneration)
+        error(`选择附件失败：${toErrorMessage(cause)}`)
+    }
+    finally {
+      if (generation === fileGeneration)
+        readingFiles.value = false
     }
   }
 
@@ -118,10 +163,15 @@ export function useContractFormAttachments() {
     pendingRemoveIds: readonly(pendingRemoveIds),
     pendingRestoreIds: readonly(pendingRestoreIds),
     desktopAttachmentPicker: readonly(desktopAttachmentPicker),
+    readingFiles: readonly(readingFiles),
     dirty,
+    invalidatePreparation,
     reset,
+    capture,
+    acknowledge,
     clearPending,
     changes,
+    appendDrafts,
     handleFiles,
     pickNativeFiles,
     removePending,

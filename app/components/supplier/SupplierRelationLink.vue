@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { EntityRefDTO, NavigationIntentDTO } from '~/types/read-model'
 import { computed } from 'vue'
+import { entityReferenceLabel } from '~/lib/kit/entity-link'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 const props = defineProps<{
   reference: EntityRefDTO
   navigation: NavigationIntentDTO
 }>()
-const resolution = computed(() => resolveNavigationTarget(props.navigation))
+const resolution = computed(() => resolveNavigationTarget(props.reference.state === 'resolved' ? props.navigation : { kind: 'entity-detail', subject: props.reference, variant: 'detail', view: null, filters: {} }))
 </script>
 
 <template>
@@ -20,6 +21,6 @@ const resolution = computed(() => resolveNavigationTarget(props.navigation))
     {{ resolution.label }}
   </NuxtLink>
   <span v-else :data-target-state="resolution.state" :title="resolution.message" class="text-ink-faint">
-    {{ reference.state === 'forbidden' ? '无权限' : reference.state === 'missing' ? '未记录' : reference.label }}
+    {{ entityReferenceLabel(reference) }}
   </span>
 </template>

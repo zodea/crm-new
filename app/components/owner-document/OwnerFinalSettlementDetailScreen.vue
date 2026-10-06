@@ -25,7 +25,7 @@ const detail = computed(() => {
   const current = store.detailState
   if (current.kind === 'ready')
     return current.data
-  if ((current.kind === 'loading' || current.kind === 'error') && current.previous)
+  if ((current.kind === 'loading' || (current.kind === 'error' || current.kind === 'unavailable')) && current.previous)
     return current.previous
   return null
 })

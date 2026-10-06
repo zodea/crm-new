@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { supplierPendingKey } from '../../app/lib/supplier/pending'
-import { SupplierCommandConflictError, useSupplierCommandStore } from '../../app/stores/supplier-command'
+import { useSupplierCommandStore } from '../../app/stores/supplier-command'
 
 const context = { workspaceId: 'supplier-workspace', actorId: 'supplier-owner', capabilities: ['supplier:write', 'supplier:persistent:write'] }
 const form = { draft: { id: 'saved-supplier', name: '原分供方', supplierCategory: '材料供货', taxNo: 'SYNTHETIC-453' }, attachments: [], version: '1', updatedAt: '2026-09-22T00:00:00.000Z' }
@@ -39,7 +39,7 @@ it('主档丢响应后只存原键，冷恢复先读原分供方，不重复创�
   expect(execute).toHaveBeenCalledTimes(1)
 })
 
-it('原提交已保存时先显式读回，保留原键到采用，读失败也不能丢键', async () => {
+it('未知提交拒绝换正文，原回执及同目标读取可靠后显式采用更新版本再提交', async () => {
   let commandId = ''
   const execute = vi.fn(async (request) => {
     commandId = request.commandId
@@ -54,11 +54,27 @@ it('原提交已保存时先显式读回，保留原键到采用，读失败也�
   loadForm.mockRejectedValueOnce(new Error('read unavailable'))
   await expect(store.hydrate(store.createSession(), null)).rejects.toThrow('read unavailable')
   expect([...values.values()]).toEqual([commandId])
-  const failure = await store.saveForm(session, { name: '新的人工稿' }, 'save').catch(cause => cause)
-  expect(failure).toBeInstanceOf(SupplierCommandConflictError)
-  expect(failure.alreadyApplied).toBe(true)
+  const laterDraft = { name: '新的人工稿' }
+  await expect(store.saveForm(session, laterDraft, 'save')).rejects.toThrow('原提交结果未知')
+  expect([...values.values()]).toEqual([commandId])
+  expect(() => store.acceptLatest(session, form)).toThrow('核对原提交')
   expect(execute).toHaveBeenCalledTimes(1)
-  store.acceptLatest(session, form)
+  const originalCommandId = commandId
+  const latest = { ...form, draft: { ...form.draft, name: '别人更正的主档' }, version: '3' }
+  loadForm.mockResolvedValue(latest)
+  const recovered = await store.recover(session)
+  expect(recovered.outcome).toBe('applied')
+  expect(recovered.form).toEqual(latest)
+  expect(laterDraft).toEqual({ name: '新的人工稿' })
+  expect(values.size).toBe(0)
+  store.acceptLatest(session, latest)
+  const saved = { ...latest, draft: { ...latest.draft, ...laterDraft }, version: '4' }
+  loadForm.mockResolvedValue(saved)
+  execute.mockImplementation(async request => ({ id: form.draft.id, commandId: request.commandId, version: '4', updatedAt: form.updatedAt, attachmentIds: [] }))
+  await store.saveForm(session, laterDraft, 'save')
+  expect(execute).toHaveBeenCalledTimes(2)
+  expect(execute.mock.calls[1]![0]).toMatchObject({ id: form.draft.id, baseVersion: '3', draft: { id: form.draft.id, name: '新的人工稿' } })
+  expect(execute.mock.calls[1]![0].commandId).not.toBe(originalCommandId)
   expect(values.size).toBe(0)
 })
 
@@ -86,7 +102,8 @@ it('税务失响应后的冷恢复读原主档，原核验备注不会进入浏�
 
 it('浏览器无法保存原键时不能发送，未应用证明清理后换新键', async () => {
   const execute = vi.fn()
-  vi.stubGlobal('useNuxtApp', () => ({ $repositories: { supplierCommands: { context: async () => context, execute, loadForm: async () => form }, supplierProduction: { resolve: async () => ({ outcome: 'not-applied', result: null }) } } }))
+  const resolve = vi.fn(async commandId => ({ outcome: 'not-applied', commandId, result: null }))
+  vi.stubGlobal('useNuxtApp', () => ({ $repositories: { supplierCommands: { context: async () => context, execute, loadForm: async () => form }, supplierProduction: { resolve } } }))
   const store = useSupplierCommandStore()
   const session = store.createSession()
   await store.hydrate(session, null)
@@ -95,8 +112,16 @@ it('浏览器无法保存原键时不能发送，未应用证明清理后换新�
   expect(execute).not.toHaveBeenCalled()
   write.mockRestore()
   values.set(supplierPendingKey(context, 'form:new'), 'sealed-original-command')
+  await expect(store.saveForm(session, { name: '不能替换未核对编号' }, 'save')).rejects.toThrow('请先核对')
+  expect(execute).not.toHaveBeenCalled()
+  expect(values.get(supplierPendingKey(context, 'form:new'))).toBe('sealed-original-command')
+  const restored = store.createSession()
+  const read = await store.hydrate(restored, null)
+  expect(read.productionNotice).toContain('迟到请求已封存')
+  expect(resolve).toHaveBeenCalledWith('sealed-original-command')
+  expect(values.size).toBe(0)
   execute.mockImplementation(async request => ({ id: form.draft.id, commandId: request.commandId, version: '1', updatedAt: form.updatedAt, attachmentIds: [] }))
-  await store.saveForm(session, { name: '确认没有保存后再提交' }, 'save')
+  await store.saveForm(restored, { name: '确认没有保存后再提交' }, 'save')
   expect(execute.mock.calls[0]![0].commandId).not.toBe('sealed-original-command')
   expect(values.size).toBe(0)
 })

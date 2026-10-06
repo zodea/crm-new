@@ -4,10 +4,16 @@ import {
   createHttpOwnerCommercialDocumentReadRepository,
 } from '~/lib/owner-document/central-http-repository'
 import {
-  buildOwnerCommercialDocumentDetail,
+  buildOwnerCommercialDocumentDetail as detailProjection,
   parseOwnerCommercialDocumentDetailQuery,
   parseOwnerCommercialDocumentListQuery,
 } from '~/lib/owner-document/central-repository'
+import { withOriginReadMeta, withReadMeta } from '../../server/utils/read-meta'
+import { publicReadMeta } from '../helpers/public-read-meta'
+
+function buildOwnerCommercialDocumentDetail(input: Parameters<typeof detailProjection>[0]) {
+  return withReadMeta(detailProjection(input), publicReadMeta({ schemaVersion: 'owner-document-read-v2', dataOrigin: input.query.origin, asOf: input.asOf, sourceVersion: input.sourceVersion, capabilities: input.capabilities, requested: true, scope: input.query }))
+}
 
 const project = { state: 'resolved', entity: 'project', id: 'project-323', label: '中央项目', no: null }
 const customer = { state: 'resolved', entity: 'customer', id: 'customer-323', label: '中央客户', no: null }
@@ -24,7 +30,8 @@ function navigation(subject: typeof project | typeof customer | typeof supplier 
 }
 
 function validListPage(itemOverrides: Record<string, unknown> = {}) {
-  return {
+  const evidence = { schemaVersion: 'owner-document-read-v2', asOf: '2026-08-25T00:00:00.000Z', sourceVersion: 'v1', capabilities: ['owner-document:read'], scope: { fixture: 'owner_change' }, requested: true }
+  return withOriginReadMeta({
     items: [{
       rowKey: 'real:owner_change:change-323',
       dataOrigin: 'real',
@@ -52,7 +59,7 @@ function validListPage(itemOverrides: Record<string, unknown> = {}) {
       updatedAt: '2026-08-25T00:00:00.000Z',
       ...itemOverrides,
     }],
-    pagination: { page: 1, pageSize: 20, total: 1 },
+    pagination: { requestedPage: 1, page: 1, pageSize: 20, total: 1 },
     summary: {
       projects: [],
       contracts: [],
@@ -67,7 +74,7 @@ function validListPage(itemOverrides: Record<string, unknown> = {}) {
     asOf: '2026-08-25T00:00:00.000Z',
     sourceVersion: 'v1',
     capabilities: ['owner-document:read'],
-  }
+  }, { real: publicReadMeta({ ...evidence, dataOrigin: 'real' }), demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }) })
 }
 
 function validForm(overrides: Record<string, unknown> = {}) {
@@ -478,7 +485,7 @@ describe('甲方商务单据中央 HTTP Repository', () => {
     const malformedList = createHttpOwnerCommercialDocumentReadRepository({
       fetcher: vi.fn().mockResolvedValue({
         items: [{ id: 'change-323' }],
-        pagination: { page: 1, pageSize: 20, total: 1 },
+        pagination: { requestedPage: 1, page: 1, pageSize: 20, total: 1 },
         summary: { projects: [], contracts: [], statuses: [], documentTypes: [], origins: {} },
         empty: null,
         asOf: '2026-08-25T00:00:00.000Z',
@@ -526,6 +533,18 @@ describe('甲方商务单据中央 HTTP Repository', () => {
     await expect(repository.list(parseOwnerCommercialDocumentListQuery('owner_change', {})))
       .rejects
       .toMatchObject({ problem: { code: 'internal-error' } })
+  })
+
+  it.each(['forbidden', 'unavailable'] as const)('拒绝 %s 身份泄漏和导航携带隐藏筛选 ID', async (state) => {
+    const reference = { state, entity: 'project', id: null, label: null, reason: state === 'forbidden' ? 'permission-denied' : 'source-unavailable' }
+    const target = { kind: 'unavailable', reason: state === 'forbidden' ? 'forbidden' : 'not-connected' }
+    const query = parseOwnerCommercialDocumentListQuery('owner_change', {})
+    const valid = createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => validListPage({ project: reference, projectNavigation: target }) })
+    expect((await valid.list(query)).items[0]!.project.id).toBeNull()
+    for (const overrides of [{ project: { ...reference, id: 'hidden-project' }, projectNavigation: target }, { project: reference, projectNavigation: { ...target, filters: { projectId: 'hidden-project' } } }]) {
+      const repository = createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => validListPage(overrides) })
+      await expect(repository.list(query)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    }
   })
 
   it.each([

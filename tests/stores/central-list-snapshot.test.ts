@@ -30,6 +30,6 @@ describe('中央档案列表旧快照范围', () => {
     const changedScope = load(false)
     expect(state()).toMatchObject({ kind: 'loading', previous: null })
     await changedScope
-    expect(state()).toMatchObject({ kind: 'error', previous: null })
+    expect(state()).toMatchObject({ kind: 'unavailable', previous: null, problem: { code: 'unavailable' } })
   })
 })

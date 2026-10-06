@@ -10,6 +10,7 @@ defineProps<{
   page: number
   pageSize: number
   total: number
+  canRegister?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -55,9 +56,9 @@ function paymentStatusClass(status: PaymentManagementRow['paymentStatus']): stri
 }
 
 function invoiceStatusClass(status: PaymentManagementRow['invoiceStatus']): string {
-  if (status === '已回票' || status === '无需发票')
+  if (status === '已回票' || status === '无需发票' || status === '已关联')
     return 'chip-ok'
-  if (status === '部分回票')
+  if (status === '部分回票' || status === '部分关联')
     return 'chip-brand'
   return 'chip-warn'
 }
@@ -136,7 +137,7 @@ function handleAction(action: string, row: PaymentManagementRow) {
 
       <template #action="{ row }">
         <RowActionMenu
-          :items="rowActions"
+          :items="canRegister !== false && row.canRegisterPayment !== false && row.dueAmount !== null ? rowActions : rowActions.filter(action => action.key !== 'payment')"
           :label="`${row.name || row.no}付款操作`"
           @select="handleAction($event, row)"
         />

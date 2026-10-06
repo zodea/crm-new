@@ -5,7 +5,8 @@ import type {
   CustomerReceiptSourceRow,
 } from '../../app/lib/customer/repository'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
-import type { DataOriginDTO, ProblemDTO } from '../../app/types/read-model'
+import type { DataOriginDTO, ProblemDTO, SourceEvidenceDTO } from '../../app/types/read-model'
+import type { BusinessSession } from './business-session'
 import { ConstructionContractRepositoryProblem } from '../../app/lib/construction-contract/repository'
 import {
   buildCustomerDetailRead,
@@ -21,10 +22,12 @@ import projectsSeed from '../../app/lib/db/seed/projects.json'
 import receiptsSeed from '../../app/lib/db/seed/receipt_registrations.json'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
+import { resolveBusinessSession } from './business-session'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { customerConstructionContractFacts } from './customer-construction-contract-facts'
 import { customerReceiptFacts } from './customer-receipt-facts'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
 
 export type CustomerReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -144,6 +147,7 @@ export function createCustomerReadTestInstance(
     sourceVersion: string
     asOf: string
   } = customerConstructionContractFacts,
+  resolveSession: (sessionId?: string | null) => BusinessSession = () => resolveBusinessSession(),
 ) {
   const scenarios = new Map<string, CustomerReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -167,11 +171,7 @@ export function createCustomerReadTestInstance(
       projects: scenario === 'ready' ? demoProjects : [],
       contracts: [] as CustomerContractSourceRow[],
       receipts: scenario === 'ready' ? demoReceipts : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
-        migrationSnapshot.authority === 'central'
-          ? migrationSnapshot.activeBatchId ?? 'migration-central'
-          : 'migration-local'
-      }`,
+      sourceVersion: readSourceVersion('customers', { formalVersion: resolveFormalSourceVersion(sessionId), migrationSnapshot, customers: customers.filter(row => row.dataOrigin === 'real') }),
     }
   }
 
@@ -182,15 +182,15 @@ export function createCustomerReadTestInstance(
     let receiptsProblem: ProblemDTO | undefined
     let projects: readonly CustomerProjectSourceRow[] = []
     let contracts: readonly CustomerContractSourceRow[] = []
-    let asOf = FIXED_AS_OF
     let sourceVersion = data.sourceVersion
+    const sources: SourceEvidenceDTO[] = [{ key: 'customers', state: 'readable', sourceVersion: data.sourceVersion, asOf: new Date().toISOString() }]
     if ((scenarios.get(keyFor(sessionId)) ?? 'ready') !== 'ready')
-      return { ...data, projectsProblem, contractsProblem, receiptsProblem, asOf: FIXED_AS_OF }
+      return { ...data, projectsProblem, contractsProblem, receiptsProblem, asOf: new Date().toISOString(), sources: [...sources, ...['projects', 'construction-contracts', 'receipts'].map(key => ({ key, state: 'not-requested' as const, sourceVersion: null, asOf: null }))] }
     try {
       const source = await resolveProjectFacts(sessionId)
       projects = source.rows
-      asOf = source.asOf > asOf ? source.asOf : asOf
       sourceVersion += `:${source.sourceVersion}`
+      sources.push({ key: 'projects', state: 'readable', sourceVersion: source.sourceVersion, asOf: new Date().toISOString() })
     }
     catch (cause) {
       if (!(cause instanceof ProjectRepositoryProblem)
@@ -198,12 +198,13 @@ export function createCustomerReadTestInstance(
         throw cause
       }
       projectsProblem = cause.problem
+      sources.push({ key: 'projects', state: cause.problem.code === 'forbidden' ? 'forbidden' : 'unavailable', sourceVersion: null, asOf: null })
     }
     try {
       const source = resolveContractFacts(sessionId)
       contracts = source.rows
-      asOf = source.asOf > asOf ? source.asOf : asOf
       sourceVersion += `:${source.sourceVersion}`
+      sources.push({ key: 'construction-contracts', state: 'readable', sourceVersion: source.sourceVersion, asOf: new Date().toISOString() })
     }
     catch (cause) {
       if (!(cause instanceof ConstructionContractRepositoryProblem)
@@ -211,15 +212,19 @@ export function createCustomerReadTestInstance(
         throw cause
       }
       contractsProblem = cause.problem
+      sources.push({ key: 'construction-contracts', state: cause.problem.code === 'forbidden' ? 'forbidden' : 'unavailable', sourceVersion: null, asOf: null })
     }
     let receipts: readonly CustomerReceiptSourceRow[] = data.receipts
-    if (origin === 'demo')
-      return { ...data, receipts, projects, contracts, projectsProblem, contractsProblem, receiptsProblem, asOf, sourceVersion }
+    if (origin === 'demo') {
+      sources.push({ key: 'receipts', state: 'readable', sourceVersion: SOURCE_VERSION, asOf: new Date().toISOString() })
+      assertUnchanged(data, sessionId)
+      return { ...data, receipts, projects, contracts, projectsProblem, contractsProblem, receiptsProblem, asOf: new Date().toISOString(), sourceVersion, sources }
+    }
     try {
       const source = customerReceiptFacts(sessionId)
       receipts = [...source.rows, ...data.receipts]
-      asOf = source.asOf > asOf ? source.asOf : asOf
       sourceVersion += `:${source.sourceVersion}`
+      sources.push({ key: 'receipts', state: 'readable', sourceVersion: source.sourceVersion, asOf: new Date().toISOString() })
     }
     catch (cause) {
       if (!(cause instanceof ReceiptRepositoryProblem)
@@ -227,8 +232,16 @@ export function createCustomerReadTestInstance(
         throw cause
       }
       receiptsProblem = cause.problem
+      sources.push({ key: 'receipts', state: cause.problem.code === 'forbidden' ? 'forbidden' : 'unavailable', sourceVersion: null, asOf: null })
     }
-    return { ...data, receipts, projects, contracts, projectsProblem, contractsProblem, receiptsProblem, asOf, sourceVersion }
+    assertUnchanged(data, sessionId)
+    return { ...data, receipts, projects, contracts, projectsProblem, contractsProblem, receiptsProblem, asOf: new Date().toISOString(), sourceVersion, sources }
+  }
+
+  function assertUnchanged(data: ReturnType<typeof context>, sessionId?: string | null) {
+    const latest = context(sessionId)
+    if (latest.sourceVersion !== data.sourceVersion || JSON.stringify(latest.capabilities) !== JSON.stringify(data.capabilities))
+      throw problem('unavailable', '读取期间客户档案或权限已变化，请重新读取', true)
   }
 
   return {
@@ -247,20 +260,26 @@ export function createCustomerReadTestInstance(
       const query = parseCustomerListQuery(input)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
-      return buildCustomerListPage({
+      const asOf = new Date().toISOString()
+      const session = { ...resolveSession(sessionId), capabilities: data.capabilities }
+      const common = { session, schemaVersion: 'customer-read-v2', operation: 'customer:list', asOf, scope: { query: readQueryScope(query), testSession: sessionId ?? null } }
+      const real = createReadMeta({ ...common, dataOrigin: 'real', coverage: 'complete', sources: [{ key: 'customers', state: 'readable', sourceVersion: data.sourceVersion, asOf }] })
+      const demo = createReadMeta({ ...common, dataOrigin: 'demo', coverage: query.includeDemo ? 'complete' : 'unknown', sources: [{ key: 'customers', state: query.includeDemo ? 'readable' : 'not-requested', sourceVersion: query.includeDemo ? SOURCE_VERSION : null, asOf: query.includeDemo ? asOf : null }] })
+      return withOriginReadMeta(buildCustomerListPage({
         rows: data.customers,
         query,
-        asOf: FIXED_AS_OF,
+        asOf,
         sourceVersion: data.sourceVersion,
         capabilities: data.capabilities,
-      })
+      }), { real, demo })
     },
     async detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const query = parseCustomerDetailQuery(id, input)
       const data = await detailContext(query.origin, sessionId)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
-      return buildCustomerDetailRead({ ...data, query })
+      const meta = createReadMeta({ session: { ...resolveSession(sessionId), capabilities: data.capabilities }, schemaVersion: 'customer-read-v2', operation: 'customer:detail', dataOrigin: query.origin, asOf: data.asOf, scope: { query, testSession: sessionId ?? null }, coverage: 'complete', sources: data.sources ?? [{ key: 'customers', state: 'readable', sourceVersion: data.sourceVersion, asOf: data.asOf }] })
+      return withReadMeta(buildCustomerDetailRead({ ...data, query }), meta)
     },
     async receipt(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const query = parseCustomerReceiptDetailQuery(id, input)
@@ -303,7 +322,8 @@ export function createCustomerReadTestInstance(
         label: customerDetail.customer.name,
         no: customerDetail.customer.taxNo || null,
       }
-      return {
+      const meta = createReadMeta({ session: { ...resolveSession(sessionId), capabilities: data.capabilities }, schemaVersion: 'customer-read-v2', operation: 'customer:receipt', dataOrigin: query.origin, asOf: data.asOf, scope: { query, testSession: sessionId ?? null }, coverage: 'complete', sources: data.sources ?? [{ key: 'customers', state: 'readable', sourceVersion: data.sourceVersion, asOf: data.asOf }] })
+      return withReadMeta({
         dataOrigin: query.origin,
         receipt,
         customer,
@@ -317,7 +337,7 @@ export function createCustomerReadTestInstance(
         asOf: data.asOf,
         sourceVersion: data.sourceVersion,
         capabilities: data.capabilities,
-      }
+      }, meta)
     },
   }
 }

@@ -16,14 +16,19 @@ const routerReplace = vi.fn()
 function metric(value: string, entity: string, clickable = true) {
   return {
     value,
+    knownValue: value,
     unit: 'CNY',
+    quantityUnit: null,
     status: 'complete',
     missingSources: [],
+    participatingCount: 0,
+    missingCount: 0,
     asOf: '2026-08-23T00:00:00.000Z',
-    drilldown: clickable ? { entity, filters: { supplierId: 'supplier-1' } } : null,
+    drilldown: clickable ? { kind: 'entity-subview', subject: { state: 'resolved', entity: 'supplier', id: 'supplier-1', label: '中央分供方', no: null }, variant: { 'contract': 'contracts', 'settlement': 'settlements', 'invoice': 'invoices', 'payment-record': 'payments' }[entity], view: null, filters: { dataOrigin: 'real' } } : null,
   }
 }
 const detail = {
+  meta: { sources: [{ key: 'contracts', state: 'readable', sourceVersion: 'unified-contract-source-1', asOf: '2026-08-23T00:00:00.000Z' }] },
   dataOrigin: 'real' as const,
   capabilities: ['supplier:list:read', 'supplier:write', 'subcontract-document:read'],
   supplier: { id: 'supplier-1', name: '中央分供方', aliases: [], taxNo: '9144 **** 0001', supplierCategory: '材料供应商', credentialStatus: 'incomplete' },
@@ -57,6 +62,21 @@ const tabs = defineComponent({
 })
 const metricStub = defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' })
 
+function renderContractSourceScope() {
+  return render(SupplierDetailScreen, {
+    props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
+    global: { components: {
+      EntityDetailShell: shell,
+      SegTab: tabs,
+      ReadOnlySection,
+      SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+      SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="known-contract-facts">{{ tab }}</section>' }),
+      AuxiliaryContractJourney: defineComponent({ props: ['supplierId'], template: '<section data-testid="auxiliary-contract-source">{{ supplierId }}</section>' }),
+      NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
+    } },
+  })
+}
+
 vi.stubGlobal('useRoute', () => route)
 vi.stubGlobal('useRouter', () => ({ replace: routerReplace }))
 vi.stubGlobal('useTabTitle', () => {})
@@ -67,6 +87,40 @@ describe('分供方中央详情', () => {
     routerReplace.mockReset()
     supplierStoreMock.detailState = { kind: 'ready', data: detail }
     supplierStoreMock.loadDetail.mockClear()
+  })
+
+  it.each(['unavailable', 'forbidden', undefined])('已核材采空集合而其他合同来源%s时不挂载该领域，不把完整金额或数量写成零', (state) => {
+    route.query = { tab: 'contracts' }
+    supplierStoreMock.detailState = { kind: 'ready', data: {
+      ...detail,
+      meta: { sources: [
+        { key: 'contracts', state: 'readable', sourceVersion: 'material-contracts-0', asOf: '2026-08-23T00:00:00.000Z' },
+        { key: 'material-contracts', state: 'readable', sourceVersion: 'material-contract-command-0', asOf: '2026-08-23T00:00:00.000Z' },
+        ...(state ? [{ key: 'other-contract-domains', state, sourceVersion: null, asOf: null }] : []),
+      ] },
+      summary: { ...detail.summary, contractCount: null, contractAmount: { ...metric('0.00', 'contract'), value: null, status: 'partial', missingCount: null, missingSources: state ? ['other-contract-domains'] : [] } },
+    } }
+    renderContractSourceScope()
+    expect(screen.queryByTestId('auxiliary-contract-source')).toBeNull()
+    expect(screen.getByTestId('known-contract-facts').textContent).toBe('contracts')
+    expect(screen.getByRole('status', { name: '合同来源范围' }).textContent).toContain('其他合同来源当前不可读取')
+    const summary = screen.getByRole('button', { name: '查看累计合同金额明细' }).parentElement!.parentElement!
+    expect(within(summary).getByText('—')).not.toBeNull()
+    expect(within(summary).getByText('已核对金额 ¥0.00')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: '支出合同' }).textContent?.trim()).toBe('支出合同')
+  })
+
+  it('缺少可信合同来源不能仅凭主档能力开启其他合同入口', () => {
+    supplierStoreMock.detailState = { kind: 'ready', data: { ...detail, meta: { sources: [] } } }
+    renderContractSourceScope()
+    expect(screen.queryByTestId('auxiliary-contract-source')).toBeNull()
+  })
+
+  it.each(['real', 'demo'])('统一可信合同来源仍保留%s原领域规则', (dataOrigin) => {
+    supplierStoreMock.detailState = { kind: 'ready', data: { ...detail, dataOrigin } }
+    renderContractSourceScope()
+    expect(screen.queryByTestId('auxiliary-contract-source')?.textContent ?? null).toBe(dataOrigin === 'real' ? 'supplier-1' : null)
+    expect(screen.queryByRole('status', { name: '合同来源范围' })).toBeNull()
   })
 
   it.each([
@@ -96,6 +150,25 @@ describe('分供方中央详情', () => {
     expect(status.getAttribute('data-tone')).toBe(tone)
     expect(within(screen.getByRole('region', { name: '档案信息' })).getByText(label)).not.toBeNull()
     expect(screen.queryByText('资料待完善')).toBeNull()
+  })
+
+  it('当前正式来源的合同和结算小计显示核对金额，完整未知仍为横线；已确认付款显示真实零', async () => {
+    supplierStoreMock.detailState = { kind: 'ready', data: { ...detail, unavailableSources: ['projects', 'invoices'], summary: { ...detail.summary, projectCount: null, contractCount: null, settlementCount: null, invoiceCount: null, contractAmount: { ...metric('100.00', 'contract'), value: null, status: 'partial', missingCount: null, participatingCount: 1, missingSources: ['other-contract-domains'] }, settlementAmount: { ...metric('70.00', 'settlement'), value: null, status: 'partial', missingCount: null, participatingCount: 2, missingSources: ['other-settlement-domains'] }, invoiceAmount: { ...metric('0.00', 'invoice'), value: null, knownValue: null, status: 'partial', participatingCount: null, missingCount: null, missingSources: ['invoices'] }, payableAmount: { ...metric('0.00', 'payment-record', false), value: null, knownValue: null, status: 'partial', participatingCount: null, missingCount: null, missingSources: ['other-contract-domains'] } },
+    } }
+    render(SupplierDetailScreen, {
+      props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
+      global: { components: { EntityDetailShell: shell, SegTab: tabs, ReadOnlySection, SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }), SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="actual-fact-tab">{{ tab }}</section>' }), NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }) } },
+    })
+    const summary = within(screen.getByTestId('supplier-summary'))
+    expect(summary.getByRole('button', { name: '查看累计合同金额明细' }).textContent?.trim()).toBe('—')
+    expect(summary.getByRole('button', { name: '查看累计结算金额明细' }).textContent?.trim()).toBe('—')
+    expect(summary.getByRole('button', { name: '查看累计付款金额明细' }).textContent?.trim()).toBe('¥0.00')
+    expect(summary.getByText('已核对金额 ¥100.00')).not.toBeNull()
+    expect(summary.getByText('已核对金额 ¥70.00')).not.toBeNull()
+    expect(summary.queryByRole('button', { name: '查看合作项目明细' })).toBeNull()
+    await fireEvent.click(summary.getByRole('button', { name: '查看累计结算金额明细' }))
+    expect(screen.getByTestId('actual-fact-tab').textContent).toBe('settlements')
+    expect(screen.getByRole('tab', { name: '支出结算' }).getAttribute('aria-selected')).toBe('true')
   })
 
   it('零金额仍可进入四类真实事实页签，应付金额保持不可点击', async () => {
@@ -152,14 +225,15 @@ describe('分供方中央详情', () => {
 
   it('缺金额的合同和结算显示未知占位，仍可进入源记录核对', () => {
     supplierStoreMock.detailState = {
-      kind: 'partial',
+      // 原断言保护未知金额及源核对入口；读取已成功，partial 留在独立金额完整性上。
+      kind: 'ready',
       data: {
         ...detail,
         summary: {
           ...detail.summary,
-          contractAmount: { ...metric('0.00', 'contract'), value: null, status: 'partial', missingSources: ['contract'] },
-          settlementAmount: { ...metric('0.00', 'settlement'), value: null, status: 'partial', missingSources: ['settlement'] },
-          payableAmount: { ...metric('0.00', 'payment-record', false), value: null, status: 'partial', missingSources: ['contract'] },
+          contractAmount: { ...metric('100.00', 'contract'), value: null, status: 'partial', missingSources: ['contract'], participatingCount: 2, missingCount: 1 },
+          settlementAmount: { ...metric('0.00', 'settlement'), knownValue: null, value: null, status: 'partial', missingSources: ['settlement'], participatingCount: 1, missingCount: 1 },
+          payableAmount: { ...metric('0.00', 'payment-record', false), knownValue: null, value: null, status: 'partial', missingSources: ['contract'], participatingCount: null, missingCount: null },
         },
       },
     }
@@ -178,6 +252,37 @@ describe('分供方中央详情', () => {
     const payable = within(screen.getByTestId('supplier-summary')).getByText('应付金额').parentElement!
     expect(payable.textContent).toContain('—')
     expect(payable.textContent).not.toContain('¥0.00')
+    expect(screen.getByText('已核对金额 ¥100.00 · 1 份记录金额未知')).not.toBeNull()
+    expect(screen.getByText('来源未就绪，金额待核对')).not.toBeNull()
+  })
+
+  it('无权项目保留必要占位，但汇总与标签都不从关系数组推断总数', () => {
+    supplierStoreMock.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        projects: [
+          { projectRef: { state: 'resolved', entity: 'project', id: 'visible-project', label: '可查看项目', no: null } },
+          { projectRef: { state: 'forbidden', entity: 'project', id: null, label: null, reason: 'permission-denied' } },
+        ],
+        summary: { ...detail.summary, projectCount: null },
+      },
+    }
+    render(SupplierDetailScreen, {
+      props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
+      global: { components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+        NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
+      } },
+    })
+
+    expect(screen.getByRole('tab', { name: '合作项目' }).textContent?.trim()).toBe('合作项目')
+    expect(screen.queryByRole('tab', { name: '合作项目 2' })).toBeNull()
+    expect(screen.getByRole('tab', { name: '支出合同 0' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '查看合作项目明细' }).textContent).toBe('—')
   })
 
   it('从 query 恢复付款页签，刷新失败保留记录并可返回详细资料', async () => {

@@ -49,7 +49,7 @@ describe('project command test instance', () => {
     expect(instance.rows('browser-a')).toHaveLength(1)
   })
 
-  it('鉴权后优先返回 commandId 的首次成功结果', async () => {
+  it('鉴权后同文返回首次结果，同键异文拒绝且保留原事实', async () => {
     const instance = createProjectCommandTestInstance({
       createId: () => 'opaque-replay-1',
       now: () => '2026-08-15T08:00:00.000Z',
@@ -64,7 +64,8 @@ describe('project command test instance', () => {
       ...createRequest('command-replay-variant'),
       action: 'save',
       draft: { name: '' },
-    }, SESSION, 'browser-a')).resolves.toEqual(first)
+    }, SESSION, 'browser-a')).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    await expect(instance.execute(createRequest('command-replay-variant'), SESSION, 'browser-a')).resolves.toEqual(first)
     await expect(instance.execute({
       ...createRequest('command-replay-variant'),
       actorId: 'actor-spoofed',
@@ -72,6 +73,7 @@ describe('project command test instance', () => {
       problem: { code: 'forbidden' },
     })
     expect(instance.rows('browser-a')).toHaveLength(1)
+    expect(instance.form(first.id, SESSION, 'browser-a').draft.name).toBe('中央命令项目')
   })
 
   it('用 baseVersion 阻止过期页面覆盖最新数据', async () => {
@@ -247,24 +249,39 @@ describe('project command test instance', () => {
       sessionId => commands.rows(sessionId),
       sessionId => commands.sourceVersion(sessionId),
     )
+    const before = await reads.list({ includeDemo: 'false' }, 'browser-a')
     await commands.execute(createRequest('command-visible-1'), SESSION, 'browser-a')
-
-    await expect(reads.list({ includeDemo: 'false' }, 'browser-a')).resolves.toMatchObject({
+    const readingStarted = Date.now()
+    const page = await reads.list({ includeDemo: 'false' }, 'browser-a')
+    expect(page).toMatchObject({
       items: [{
         dataOrigin: 'real',
         project: { id: 'opaque-read-1', label: '中央命令项目' },
       }],
       pagination: { total: 1 },
-      asOf: '2026-08-15T08:00:00.000Z',
-      sourceVersion: expect.stringContaining('project-command-1'),
+      meta: { workspaceId: SESSION.workspaceId, actorId: SESSION.actorId, dataOrigin: 'real' },
     })
-    await expect(reads.detail(
-      'opaque-read-1',
-      { dataOrigin: 'real' },
-      'browser-a',
-    )).resolves.toMatchObject({
-      item: { project: { id: 'opaque-read-1', label: '中央命令项目' } },
-      asOf: '2026-08-15T08:00:00.000Z',
+    expect(Date.parse(page.asOf)).toBeGreaterThanOrEqual(readingStarted)
+    expect(Date.parse(page.asOf)).toBeLessThanOrEqual(Date.now())
+    const source = page.meta.sources.find(source => source.key === 'projects')!
+    expect(source.state).toBe('readable')
+    expect(source.sourceVersion).not.toBeNull()
+    expect(source.sourceVersion).not.toBe(before.meta.sources.find(source => source.key === 'projects')!.sourceVersion)
+    const detail = await reads.detail('opaque-read-1', { origin: 'real' }, 'browser-a')
+    expect(detail).toMatchObject({
+      item: { project: { id: 'opaque-read-1', label: '中央命令项目' }, updatedAt: '2026-08-15T08:00:00.000Z' },
     })
+    expect(Date.parse(detail.asOf)).toBeGreaterThanOrEqual(readingStarted)
+  })
+
+  it('原命令核对只返回首次回执，未应用键封存，撤权和切换操作人不串回执', async () => {
+    const instance = createProjectCommandTestInstance({ createId: () => 'project-resolve' })
+    const original = await instance.execute(createRequest('project-original'), SESSION)
+    expect(instance.resolve(original.commandId, SESSION)).toEqual({ outcome: 'applied', result: original })
+    expect(instance.resolve('project-never-applied', SESSION)).toEqual({ outcome: 'not-applied', commandId: 'project-never-applied' })
+    await expect(instance.execute(createRequest('project-never-applied'), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(() => instance.resolve(original.commandId, { ...SESSION, capabilities: [] })).toThrow(/权限/)
+    expect(instance.resolve(original.commandId, { ...SESSION, actorId: 'other' })).toEqual({ outcome: 'not-applied', commandId: original.commandId })
+    expect(instance.resolve(original.commandId, SESSION)).toEqual({ outcome: 'applied', result: original })
   })
 })

@@ -37,21 +37,46 @@ const factTables = {
 } as const
 
 type ScopeMetadata = Omit<SupplierCredentialAggregate, keyof typeof factTables | 'files' | 'commands'>
-function scopeMetadata(raw: string): ScopeMetadata {
+export function validateProductionSupplierScopeMetadata(raw: string): ScopeMetadata {
   const value = json<ScopeMetadata>(raw)
-  if (Object.keys(value).sort().join(',') !== 'changedAfterMigration,legacySupplierId,migrationBatchId,migrationSourceHash,review,supplierId,version'
+  if (Object.keys(value).filter(key => !['reviewHistory', 'expiryProblems'].includes(key)).sort().join(',') !== 'changedAfterMigration,legacySupplierId,migrationBatchId,migrationSourceHash,review,supplierId,version'
     || typeof value.changedAfterMigration !== 'boolean'
     || [value.legacySupplierId, value.migrationBatchId, value.migrationSourceHash].some(item => item !== null && typeof item !== 'string')) {
     corrupt()
   }
-  const review = value.review
-  if (review !== null && (!review || typeof review !== 'object' || Array.isArray(review)
-    || Object.keys(review).sort().join(',') !== 'actorId,decision,note,reviewedAt'
-    || !['qualified', 'rejected'].includes(review.decision) || typeof review.note !== 'string'
-    || typeof review.reviewedAt !== 'string' || !Number.isFinite(Date.parse(review.reviewedAt))
-    || (review.actorId !== null && typeof review.actorId !== 'string')
-    || !hasManualCredentialReviewProof({ status: review.decision, reviewedAt: review.reviewedAt, reviewNote: review.note }))) {
+  if (value.reviewHistory !== undefined && !Array.isArray(value.reviewHistory))
     corrupt()
+  const proofs = [value.review, ...(value.reviewHistory ?? [])]
+  for (const review of proofs) {
+    if (review !== null && (!review || typeof review !== 'object' || Array.isArray(review)
+      || Object.keys(review).filter(key => key !== 'historyIdentity').sort().join(',') !== 'actorId,decision,note,reviewedAt'
+      || !['qualified', 'rejected'].includes(review.decision) || typeof review.note !== 'string'
+      || typeof review.reviewedAt !== 'string' || !Number.isFinite(Date.parse(review.reviewedAt))
+      || (review.historyIdentity !== undefined && (!review.historyIdentity || typeof review.historyIdentity !== 'object'
+        || Object.keys(review.historyIdentity).sort().join(',') !== 'archivedAt,id,legacyId'
+        || !review.historyIdentity.id || typeof review.historyIdentity.id !== 'string' || !review.historyIdentity.legacyId || typeof review.historyIdentity.legacyId !== 'string'
+        || typeof review.historyIdentity.archivedAt !== 'string' || !Number.isFinite(Date.parse(review.historyIdentity.archivedAt))))
+      || (review.actorId !== null && typeof review.actorId !== 'string')
+      || !hasManualCredentialReviewProof({ status: review.decision, reviewedAt: review.reviewedAt, reviewNote: review.note }))) {
+      corrupt()
+    }
+  }
+  if (value.expiryProblems !== undefined) {
+    if (!Array.isArray(value.expiryProblems))
+      corrupt()
+    const ids = new Set<string>()
+    for (const problem of value.expiryProblems) {
+      if (!problem || Object.keys(problem).sort().join(',') !== 'credentialId,expiresAt,firstSeenAt,id,lastSeenAt,resolvedAt,severity,supplierId'
+        || problem.supplierId !== value.supplierId || typeof problem.credentialId !== 'string' || !problem.credentialId
+        || problem.id !== `credential-expiry:${problem.supplierId}:${problem.credentialId}:${problem.expiresAt}` || ids.has(problem.id)
+        || !['expiring', 'expired'].includes(problem.severity) || !/^\d{4}-\d{2}-\d{2}$/.test(problem.expiresAt)
+        || !Number.isFinite(Date.parse(`${problem.expiresAt}T00:00:00.000Z`)) || new Date(`${problem.expiresAt}T00:00:00.000Z`).toISOString().slice(0, 10) !== problem.expiresAt
+        || ![problem.firstSeenAt, problem.lastSeenAt, ...(problem.resolvedAt === null ? [] : [problem.resolvedAt])].every(item => typeof item === 'string' && Number.isFinite(Date.parse(item)))
+        || problem.lastSeenAt < problem.firstSeenAt || (problem.resolvedAt !== null && problem.resolvedAt < problem.firstSeenAt)) {
+        corrupt()
+      }
+      ids.add(problem.id)
+    }
   }
   return value
 }
@@ -76,7 +101,7 @@ export async function loadProductionSuppliers(tx: TransactionDb, actor: Business
       state.importedIds.add(row.id)
   }
   for (const row of await tx.select<ScopeRow>('SELECT * FROM supplier_credential_scopes')) {
-    const metadata = scopeMetadata(row.metadata_json)
+    const metadata = validateProductionSupplierScopeMetadata(row.metadata_json)
     if (!state.suppliers.has(row.supplier_id) || metadata.supplierId !== row.supplier_id || metadata.version !== row.version || !Number.isSafeInteger(row.version) || row.version < 0) {
       corrupt()
     }
@@ -111,6 +136,8 @@ export async function loadProductionSuppliers(tx: TransactionDb, actor: Business
   }
   for (const aggregate of state.credentialScopes.values()) {
     if (aggregate.credentials.some(row => row.fileRefId && !aggregate.files.some(file => file.id === row.fileRefId && file.ownerId === row.id)))
+      corrupt()
+    if (aggregate.expiryProblems?.some(problem => !aggregate.credentials.some(row => row.id === problem.credentialId && row.supplierId === problem.supplierId)))
       corrupt()
   }
   for (const row of await tx.select<SupplierReceiptRow>('SELECT * FROM supplier_command_receipts')) {

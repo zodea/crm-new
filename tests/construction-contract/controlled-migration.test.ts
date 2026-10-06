@@ -40,6 +40,9 @@ function source(): CoreMigrationSourceDTO {
           signDate: '2026-01-08',
           status: '履约中',
           actualCompletionDate: null,
+          managementFeeAmount: 0,
+          managementFeeBasis: '旧总合同明确零配置',
+          managementFeeConfigurationJson: JSON.stringify({ amount: 0, basis: '旧总合同明确零配置', version: 'native-original-config', history: [{ version: 'native-original-config', amount: 0, basis: '旧总合同明确零配置', contractVersion: 'native-original-version', adoptedAt: '2026-08-24T00:00:00.000Z', actorId: null, commandId: null }] }),
           createdAt: '2026-01-08T00:00:00.000Z',
           updatedAt: '2026-08-24T00:00:00.000Z',
         },
@@ -115,6 +118,7 @@ describe('施工合同受控中央迁移', () => {
     const detail = read.detail(id, { origin: 'real', focusId: supplementId })
 
     expect(detail.contract).toMatchObject({
+      managementFee: { amount: 0, basis: '旧总合同明确零配置', version: 'native-original-config', history: [{ contractVersion: 'native-original-version' }] },
       id,
       no: 'SG-LEGACY-320',
       name: '既有施工合同',
@@ -157,6 +161,8 @@ describe('施工合同受控中央迁移', () => {
       actualCompletionDate: null,
     })
 
+    // 显式销毁合成夹具不走普通迁移回滚；后续编辑必须由回滚保护保全。
+    commands.reset()
     await core.reset(session.workspaceId)
     expect(() => commands.form(id, session)).toThrow('正式施工合同不存在')
     expect(() => read.detail(id, { origin: 'real' })).toThrow('施工合同不存在')

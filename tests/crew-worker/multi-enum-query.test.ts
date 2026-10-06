@@ -45,7 +45,7 @@ describe('班组工人多选查询', () => {
     const query = parseCrewListQuery({ trade: ['木工', '泥工'], status: 'active', page: 999 })
     expect(parseCrewListQuery(serializeCrewListQuery(query))).toEqual(query)
     const page = buildCrewListPage({ crews: [...crews, { ...crews[0]!, id: 'hidden', dataOrigin: 'demo', trade: '隐藏工种' }], workers, assignments: [], wages: [], query, asOf, sourceVersion: 'multi', capabilities: [] })
-    expect(page.pagination).toEqual({ page: 1, pageSize: 10, total: 2 })
+    expect(page.pagination).toEqual({ requestedPage: 999, page: 1, pageSize: 10, total: 2 })
     expect(page.summary.trades.map(item => item.value)).toEqual(['电工', '木工', '泥工'])
     expect(page.summary.statuses).toEqual([{ value: 'active', label: 'active', count: 2 }, { value: 'inactive', label: 'inactive', count: 2 }])
   })
@@ -54,7 +54,7 @@ describe('班组工人多选查询', () => {
     expect(parseWorkerListQuery(serializeWorkerListQuery(query))).toEqual(query)
     const input = { workers, crews, projects: [], query, asOf, sourceVersion: 'multi', capabilities: [] }
     const page = buildWorkerListPage(input)
-    expect(page.pagination).toEqual({ page: 1, pageSize: 10, total: 2 })
+    expect(page.pagination).toEqual({ requestedPage: 999, page: 1, pageSize: 10, total: 2 })
     expect(page.summary.projectStatuses).toHaveLength(2)
     expect(buildWorkerListPage({ ...input, query: { ...query, trade: [], status: [], projectStatus: [] } }).pagination.total).toBe(6)
     expect(buildWorkerListPage({ ...input, query: { ...query, trade: '电工', status: 'active' } }).items).toHaveLength(1)

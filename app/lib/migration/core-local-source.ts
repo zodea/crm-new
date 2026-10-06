@@ -26,6 +26,7 @@ import {
 import { closeDb, getDb } from '../db/connection'
 import { getCurrentVersion } from '../db/migrations'
 import { openBrowserSqlite } from '../db/sqljs'
+import { assertQuotationCoreMigrationGate } from '../material-quotation/migration-gate'
 import { quantityMigrationTimestamp } from '../quantity/migration-graph'
 import { readQuantityMigrationGraphs } from '../quantity/migration-source'
 import { AUXILIARY_CONTRACT_SOURCE_SQL, auxiliaryContractSourceEntity, COMPANY_CONTRACT_SOURCE_SQL } from './auxiliary-contract-source'
@@ -41,6 +42,7 @@ import {
 } from './core-contract'
 import { DELIVERY_RECORD_SOURCE_SQL, deliveryRecordSourceEntities } from './delivery-record-source'
 import { assertDeliverySourceDiagnostics, DELIVERY_SOURCE_DIAGNOSTICS_SQL } from './delivery-source-diagnostics'
+import { readMaterialContractGraphs } from './material-contract-source'
 import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './other-settlement-source'
 import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
 import { readPayrollProjectMigrationGraphs } from './payroll-source'
@@ -55,7 +57,7 @@ export interface CoreMigrationLocalSourceDependencies {
   isNative: () => boolean
   isDemoActive: () => boolean
   currentSchemaVersion: () => Promise<number>
-  select: <T extends Record<string, unknown>>(sql: string) => Promise<T[]>
+  select: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<T[]>
   closeDatabase: () => Promise<void>
   loadProductionSnapshot: () => Promise<Uint8Array | null>
   readSnapshotSource: (snapshot: Uint8Array) => Promise<CoreMigrationSourceDTO>
@@ -80,7 +82,7 @@ export interface CoreMigrationLocalSourceProblem extends Error {
     | 'unidentifiable-source-row'
 }
 
-const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects' | 'target_cost_versions' | 'payroll_projects'>, string> = {
+const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'material_contracts' | 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects' | 'target_cost_versions' | 'payroll_projects'>, string> = {
   delivery_records: DELIVERY_RECORD_SOURCE_SQL,
   customers: `
     SELECT id, name, deleted_at
@@ -106,13 +108,22 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
   `,
   construction_contracts: `
     SELECT
-      c.id, c.no, c.name, c.project_id, p.customer_id,
+      c.id, c.no, c.name, c.party_a, c.project_id, p.customer_id,
       c.content, c.invoice_type, c.contact_name, c.contact_phone,
       c.tax_rate, c.sign_date, c.main_terms, c.payment_terms,
       c.warranty_terms, c.retention_ratio, c.retention_amount,
       c.retention_days, c.invoice_name, c.invoice_tax_no,
       c.invoice_address_phone, c.invoice_bank, c.invoice_bank_account,
       c.amount, c.status, c.note, c.actual_completion_date,
+      (SELECT COALESCE(json_group_array(json_object(
+        'id', f.id, 'ownerType', f.owner_type, 'ownerId', f.owner_id,
+        'fileName', f.file_name, 'filePath', f.file_path, 'fileSize', f.file_size,
+        'mimeType', f.mime_type, 'category', f.category, 'uploader', f.uploader,
+        'uploadedAt', f.uploaded_at, 'deletedAt', f.deleted_at,
+        'payloadEncoding', payload.encoding, 'payloadBase64', CASE WHEN payload.encoding = 'base64' THEN payload.content ELSE NULL END
+      )), '[]') FROM (
+        SELECT * FROM file_refs WHERE owner_type = 'contract' AND owner_id = c.id ORDER BY id
+      ) f LEFT JOIN file_payloads payload ON payload.file_ref_id = f.id) AS attachments_json,
       COALESCE((
         SELECT json_group_array(json_object(
           'id', boq_catalog.id,
@@ -212,14 +223,23 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
   other_settlement_sources: OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL,
   subcontract_contracts: `
     SELECT
-      c.id, c.no, c.name, c.sub_kind, c.project_id, c.supplier_id,
+      c.id, c.no, c.name, c.party_a, c.sub_kind, c.project_id, c.supplier_id,
       c.content, c.invoice_type, c.contact_name, c.contact_phone,
       c.tax_rate, c.sign_date, c.main_terms, c.payment_terms,
       c.warranty_terms, c.retention_ratio, c.retention_amount,
       c.retention_days, c.invoice_name, c.invoice_tax_no,
       c.invoice_address_phone, c.invoice_bank, c.invoice_bank_account,
       c.amount, c.status, c.settlement_status, c.clearance_status,
-      c.note, c.created_at, c.updated_at, c.deleted_at
+      c.note, c.created_at, c.updated_at, c.deleted_at,
+      (SELECT COALESCE(json_group_array(json_object(
+        'id', f.id, 'ownerType', f.owner_type, 'ownerId', f.owner_id,
+        'fileName', f.file_name, 'filePath', f.file_path, 'fileSize', f.file_size,
+        'mimeType', f.mime_type, 'category', f.category, 'uploader', f.uploader,
+        'uploadedAt', f.uploaded_at, 'deletedAt', f.deleted_at,
+        'payloadEncoding', payload.encoding, 'payloadBase64', CASE WHEN payload.encoding = 'base64' THEN payload.content ELSE NULL END
+      )), '[]') FROM (
+        SELECT * FROM file_refs WHERE owner_type = 'contract' AND owner_id = c.id ORDER BY id
+      ) f LEFT JOIN file_payloads payload ON payload.file_ref_id = f.id) AS attachments_json
     FROM contracts c
     WHERE c.kind = '分包'
     ORDER BY c.id
@@ -959,6 +979,7 @@ function sourceEntity(
     }
   }
   if (entityType === 'construction_contracts') {
+    const signatory = { legacyPartyA: typeof row.party_a === 'string' ? row.party_a : null, ourSignatoryId: nullableText(row.our_signatory_id), ourSignatorySnapshotJson: typeof row.our_signatory_snapshot === 'string' ? row.our_signatory_snapshot : 'null' }
     return {
       ...entity,
       references: {
@@ -967,6 +988,10 @@ function sourceEntity(
       },
       amount: nullableMoney(row.amount),
       attributes: {
+        ...signatory,
+        managementFeeAmount: nullableNumber(row.management_fee_amount),
+        managementFeeBasis: text(row.management_fee_basis),
+        ...(row.management_fee_configuration_json !== undefined ? { managementFeeConfigurationJson: text(row.management_fee_configuration_json) } : {}),
         no: text(row.no),
         content: text(row.content),
         invoiceType: text(row.invoice_type),
@@ -988,6 +1013,7 @@ function sourceEntity(
         status: text(row.status),
         note: text(row.note),
         actualCompletionDate: nullableText(row.actual_completion_date),
+        attachmentsJson: text(row.attachments_json) || '[]',
         boqCatalogJson: normalizeBoqCatalogJson(row.boq_catalog_json),
         monthlyQuantityFactsJson: normalizeMonthlyQuantityFactsJson(row.monthly_quantity_facts_json),
         createdAt: text(row.created_at),
@@ -996,6 +1022,7 @@ function sourceEntity(
     }
   }
   if (entityType === 'subcontract_contracts') {
+    const signatory = { legacyPartyA: typeof row.party_a === 'string' ? row.party_a : null, ourSignatoryId: nullableText(row.our_signatory_id), ourSignatorySnapshotJson: typeof row.our_signatory_snapshot === 'string' ? row.our_signatory_snapshot : 'null' }
     return {
       ...entity,
       references: {
@@ -1004,6 +1031,7 @@ function sourceEntity(
       },
       amount: nullableMoney(row.amount),
       attributes: {
+        ...signatory,
         no: text(row.no),
         subKind: text(row.sub_kind),
         content: text(row.content),
@@ -1026,6 +1054,7 @@ function sourceEntity(
         status: text(row.status),
         settlementStatus: nullableText(row.settlement_status),
         clearanceStatus: nullableText(row.clearance_status),
+        attachmentsJson: text(row.attachments_json) || '[]',
         note: text(row.note),
         createdAt: text(row.created_at),
         updatedAt: text(row.updated_at),
@@ -1228,14 +1257,18 @@ const PROJECT_PENALTY_SOURCE_SQL = `
     OR EXISTS (SELECT 1 FROM penalty_settlement_deductions d JOIN expenditure_settlements s ON s.id = d.settlement_id WHERE d.penalty_id = penalty.id AND s.biz_type IN ('机械', '其他', '其他支出'))
 `
 
-type SourceSelect = <T extends Record<string, unknown>>(sql: string) => Promise<T[]>
+type SourceSelect = <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<T[]>
 
 async function buildSource(
   schemaVersion: number,
   selectSource: SourceSelect,
 ): Promise<CoreMigrationSourceDTO> {
+  await assertQuotationCoreMigrationGate(schemaVersion, selectSource)
   const credentialGraphs = await readSupplierCredentialMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> }, schemaVersion)
+  const material = await readMaterialContractGraphs(selectSource, schemaVersion)
   const entries = await Promise.all(CORE_MIGRATION_TOPOLOGY.map(async (entityType) => {
+    if (entityType === 'material_contracts')
+      return [entityType, material.entities] as const
     if (entityType === 'supplier_credentials')
       return [entityType, credentialGraphs] as const
     if (entityType === 'suppliers')
@@ -1259,6 +1292,15 @@ async function buildSource(
       }))] as const
     }
     let sql = ENTITY_SQL[entityType]
+    if (schemaVersion >= 53 && (entityType === 'construction_contracts' || entityType === 'subcontract_contracts'))
+      sql = sql.replace('c.id, c.no, c.name,', 'c.id, c.no, c.name, c.our_signatory_id, c.our_signatory_snapshot,')
+    if (schemaVersion >= 57 && entityType === 'construction_contracts') {
+      sql = sql.replace('c.id, c.no, c.name,', `c.id, c.no, c.name, c.management_fee_amount, c.management_fee_basis,
+        json_object('amount',c.management_fee_amount,'basis',c.management_fee_basis,'version',c.management_fee_version,'history',json(COALESCE((
+          SELECT json_group_array(json_object('version',history.version,'amount',history.amount,'basis',history.basis,'contractVersion',history.contract_version,'adoptedAt',history.adopted_at,'actorId',history.actor_id,'commandId',history.command_id))
+          FROM (SELECT * FROM construction_management_fee_history WHERE contract_id=c.id ORDER BY adopted_at,version) history
+        ),'[]'))) AS management_fee_configuration_json,`)
+    }
     if (entityType === 'crews') {
       const columns = new Set((await selectSource<{ name: string }>('PRAGMA table_info(crews)')).map(row => row.name))
       const fees = CREW_PAYROLL_FEE_FIELDS.filter(field => columns.has(field.column)).map(field => field.column)
@@ -1289,6 +1331,13 @@ async function buildSource(
     const entities = rows
       .map(row => entityType === 'other_settlements' ? otherSettlementSourceEntity(row) : entityType === 'auxiliary_contracts' ? auxiliaryContractSourceEntity(row) : sourceEntity(entityType, row))
       .sort((left, right) => compareCanonicalText(left.legacyId, right.legacyId))
+    if (entityType === 'contract_supplements') {
+      for (const entity of entities) {
+        const graph = material.graphs.get(entity.legacyId)
+        if (graph)
+          entity.attributes = { ...entity.attributes, materialGraphJson: JSON.stringify(graph) }
+      }
+    }
     const invalid = entities.find(entity => !entity.legacyId || !entity.name)
     if (invalid) {
       throw problem(
@@ -1317,8 +1366,10 @@ async function buildSource(
 
 async function readSqliteSnapshotSource(snapshot: Uint8Array): Promise<CoreMigrationSourceDTO> {
   const database = await openBrowserSqlite(snapshot)
-  const selectSnapshot: SourceSelect = async <T extends Record<string, unknown>>(sql: string) => {
+  const selectSnapshot: SourceSelect = async <T extends Record<string, unknown>>(sql: string, params: unknown[] = []) => {
     const statement = database.prepare(sql)
+    if (params.length)
+      statement.bind(params as (string | number | null)[])
     const rows: T[] = []
     try {
       while (statement.step())
@@ -1346,9 +1397,9 @@ function defaultDependencies(): CoreMigrationLocalSourceDependencies {
     isNative: isTauri,
     isDemoActive: () => useDataVisibilityStore().includeDemo,
     currentSchemaVersion: async () => getCurrentVersion(await getDb()),
-    select: async <T extends Record<string, unknown>>(sql: string) => {
+    select: async <T extends Record<string, unknown>>(sql: string, params: unknown[] = []) => {
       const database = await getDb()
-      return database.select<T>(sql)
+      return database.select<T>(sql, params)
     },
     closeDatabase: closeDb,
     loadProductionSnapshot: () => loadBrowserDatabase('production'),
@@ -1430,6 +1481,7 @@ export function createCoreMigrationLocalSource(
   }
 
   async function prepareSwitch(marker: BrowserCoreMigrationPendingMarker): Promise<void> {
+    await assertQuotationCoreMigrationGate(await dependencies.currentSchemaVersion(), dependencies.select)
     await dependencies.closeDatabase()
     await dependencies.prepareMigration(marker)
   }
@@ -1439,6 +1491,7 @@ export function createCoreMigrationLocalSource(
   }
 
   async function confirmSwitch(marker: BrowserCoreMigrationMarker): Promise<void> {
+    await assertQuotationCoreMigrationGate(await dependencies.currentSchemaVersion(), dependencies.select)
     await dependencies.closeDatabase()
     await dependencies.activateMigration(marker)
   }

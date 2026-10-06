@@ -21,6 +21,22 @@ beforeEach(() => {
 })
 
 describe('undo toast', () => {
+  it('系统消息关闭或自然消失只通知呈现层，查看操作保持显式', async () => {
+    const dismissed = vi.fn()
+    const opened = vi.fn()
+    useToast().push({ lane: 'system', message: '合成证照提醒', description: '同一事件摘要与时点', onDismiss: dismissed, action: { label: '查看', onClick: opened } })
+    const options = sonner.mock.calls[0]![1] as { toasterId: string, action: { label: string, onClick: () => void }, onDismiss: (toast: { id: string }) => void, onAutoClose: (toast: { id: string }) => void }
+    expect(options.toasterId).toBe('system')
+    expect(options.action.label).toBe('查看')
+    options.onDismiss({ id: 'toast-default' })
+    expect(dismissed).toHaveBeenCalledTimes(1)
+    expect(opened).not.toHaveBeenCalled()
+    options.onAutoClose({ id: 'toast-default' })
+    expect(dismissed).toHaveBeenCalledTimes(2)
+    options.action.onClick()
+    expect(opened).toHaveBeenCalledTimes(1)
+  })
+
   it('等待异步撤回完成后才提示成功', async () => {
     let finish!: (restored: boolean) => void
     const restoring = new Promise<boolean>((resolve) => {

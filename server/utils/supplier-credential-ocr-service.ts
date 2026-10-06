@@ -6,7 +6,7 @@ import type { SupplierCredentialPorts, SupplierCredentialScope } from './supplie
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { credentialProblem, SupplierCredentialNotAppliedProblem } from '../../app/lib/supplier/credential-contract'
-import { CREDENTIAL_MASTER_FIELDS, credentialReviewBasis, normalizeCredentialValidity } from '../../app/lib/supplier/credential-domain'
+import { CREDENTIAL_MASTER_FIELDS, credentialReviewBasis, invalidateCredentialReview, normalizeCredentialValidity } from '../../app/lib/supplier/credential-domain'
 import { parseCredentialOcr, resolveCredentialOcrChoices } from '../../app/lib/supplier/credential-ocr'
 import { preserveTaxpayerVerification } from '../../app/lib/supplier/taxpayer-verification'
 import { supplierCredentialRecognition } from './supplier-credential-recognition'
@@ -208,7 +208,7 @@ function createSupplierCredentialOcrCore(ports: OcrPorts, options: Options) {
         audit.changedFields = [...changedMaster, ...(['category', 'validFrom', 'expiresAt', 'longTerm'] as const).filter(key => audit[`${key}Before` as keyof SupplierCredentialAudit] !== target[key]), 'ocrConfirmedResult', 'ocrConfirmedAt', 'ocrReviewStatus']
         audit.confidence = target.ocrConfidence
         if (basis !== credentialReviewBasis(scope.aggregate) || changedMaster.length)
-          scope.aggregate.review = null
+          invalidateCredentialReview(scope.aggregate)
         scope.aggregate.supplierAudits.push({ id: audit.id, action: 'credential_ocr_confirm', outcome: 'confirmed', sourceCategory: 'manual_ocr', changedFields: changedMaster, notePresent: false, createdAt: timestamp, actorId: session.actorId })
         return publish(scope, command, fingerprint, audit)
       }, sessionId)

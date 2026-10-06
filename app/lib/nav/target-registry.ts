@@ -13,6 +13,7 @@ import {
   validateMaterialContractReturnTo,
   validateProjectJourneyReturnTo,
 } from '~/lib/material-contract/return-context'
+import { validId as validQuotationId } from '~/lib/material-quotation/contract'
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
 import {
   isOwnerDocumentReturnContextId,
@@ -347,6 +348,11 @@ const TARGET_REGISTRY = {
   'crew:detail': crewPath,
   'worker:detail': workerPath,
   'contract:detail': contractPath,
+  'material-quotation:detail': (intent: EntityTargetIntent) => {
+    if (intent.filters.dataOrigin !== 'real' || !validQuotationId(intent.subject.id))
+      throw new Error('invalid material quotation identity or origin')
+    return `${entityPath('/material/quotations', intent)}?origin=real`
+  },
   'contract:other_expense': contractPath,
   'contract:company_expense': contractPath,
   'contract:supplement': contractPath,
@@ -516,6 +522,8 @@ export function resolveNavigationTarget(
     return unavailable('missing', null)
   if (intent.subject.state === 'forbidden')
     return unavailable('forbidden', null)
+  if (intent.subject.state === 'unavailable')
+    return { state: 'not-connected', label: null, message: '来源暂不可用' }
   if (intent.subject.id.trim() === '')
     return unavailable('missing', intent.subject.label)
   if (intent.kind === 'same-route-overlay')

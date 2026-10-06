@@ -20,6 +20,17 @@ const suppliers = [
   { id: 'supplier-c', name: '丙厂' },
 ]
 
+it('相关厂家合同总额保留未知；真实零可与已知金额相加', () => {
+  const base = { kind: '材采', projectId: 'p', supplierId: 'supplier-a', name: '合同', no: '', signDate: '', dataOrigin: 'real' as const }
+  const rows = buildSupplierContractRows(['supplier-a'], [
+    { ...base, id: 'zero', amount: 0 },
+    { ...base, id: 'unknown', amount: null },
+  ], suppliers, [{ id: 'p', name: '项目' }])
+  expect(rows).toMatchObject([{ contractCount: 2, totalAmount: null, contracts: expect.arrayContaining([{ id: 'unknown', name: '合同', no: '', amount: null, signDate: '', dataOrigin: 'real' }]) }])
+  const known = buildSupplierContractRows(['supplier-a'], [{ ...base, id: 'zero', amount: 0 }, { ...base, id: 'known', amount: 12 }], suppliers, [{ id: 'p', name: '项目' }])
+  expect(known[0]?.totalAmount).toBe(12)
+})
+
 const projects = [
   { id: 'project-a', name: '项目甲' },
   { id: 'project-b', name: '项目乙' },

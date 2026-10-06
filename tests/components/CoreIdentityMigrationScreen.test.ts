@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/vue'
+import { createPinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CoreIdentityMigrationScreen from '~/components/migration/CoreIdentityMigrationScreen.vue'
 
@@ -68,7 +69,7 @@ describe('核心身份迁移整页流程', () => {
   afterEach(cleanup)
 
   it('初次进入只恢复既有迁移状态，不静默启动迁移', async () => {
-    render(CoreIdentityMigrationScreen)
+    render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })
 
     expect(await screen.findByRole('heading', { name: '本地数据迁移' })).not.toBeNull()
     expect(screen.getByText(/旧项目别名尚未迁移/)).toBeTruthy()
@@ -99,7 +100,7 @@ describe('核心身份迁移整页流程', () => {
       }),
     })
 
-    render(CoreIdentityMigrationScreen)
+    render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })
 
     expect(await screen.findByText('customerId 指向不存在的客户')).not.toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '导入可导入记录' }))
@@ -124,7 +125,7 @@ describe('核心身份迁移整页流程', () => {
       },
     })
 
-    render(CoreIdentityMigrationScreen)
+    render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })
 
     expect(await screen.findByText('客户 1 条')).not.toBeNull()
     expect(screen.getByText('项目 1 条')).not.toBeNull()
@@ -151,7 +152,7 @@ describe('核心身份迁移整页流程', () => {
       }),
     })
 
-    render(CoreIdentityMigrationScreen)
+    render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })
 
     await fireEvent.click(await screen.findByRole('button', { name: '确认切换中央后台' }))
     expect(migrationStore.confirmSwitch).toHaveBeenCalledOnce()
@@ -176,7 +177,7 @@ describe('核心身份迁移整页流程', () => {
       }),
     })
 
-    render(CoreIdentityMigrationScreen)
+    render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })
 
     expect((await screen.findByRole('button', { name: '确认切换中央后台' }) as HTMLButtonElement).disabled).toBe(true)
   })
@@ -193,7 +194,7 @@ describe('核心身份迁移整页流程', () => {
       }),
     })
 
-    render(CoreIdentityMigrationScreen)
+    render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })
 
     expect(await screen.findByText('2026-08-16T08:00:00.000Z')).not.toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '回滚到本地快照' }))
@@ -213,7 +214,7 @@ describe('核心身份迁移整页流程', () => {
       },
     })
 
-    render(CoreIdentityMigrationScreen)
+    render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })
 
     expect(await screen.findByText('中央切换前已完成对账')).not.toBeNull()
     expect(screen.queryByText('尚未执行迁移对账')).toBeNull()
@@ -239,7 +240,7 @@ describe('核心身份迁移整页流程', () => {
       }),
       activeMigration: { rollbackExpiresAt: '2026-09-17T08:00:00.000Z' },
     })
-    render(CoreIdentityMigrationScreen)
+    render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })
     expect(await screen.findByText('中央已回滚，等待恢复本地快照')).not.toBeNull()
     expect(screen.queryByText('对账通过，未发现迁移差异')).toBeNull()
     expect(screen.queryByText('对账未通过')).toBeNull()

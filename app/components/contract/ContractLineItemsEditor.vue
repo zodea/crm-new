@@ -3,13 +3,12 @@ import type { ContractLineItemDraft } from '~/lib/contract/forms'
 import type { KitEditGridColumn } from '~/lib/kit/edit-grid'
 import { useFullscreen } from '@vueuse/core'
 import { computed, shallowRef, useTemplateRef } from 'vue'
-import {
-  contractLineItemAmount,
-  contractLineItemsTotal,
-} from '~/lib/contract/forms'
+import { materialContractTotal, materialLineAmount } from '~/lib/material-contract/line-model'
 
 const props = defineProps<{
   lines: ContractLineItemDraft[]
+  supplement?: boolean
+  originalLines?: ContractLineItemDraft[]
 }>()
 
 const emit = defineEmits<{
@@ -24,7 +23,7 @@ const grid = useTemplateRef<{
   validate: () => { row: number, key: string }[]
 }>('grid')
 const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(editor)
-const total = computed(() => contractLineItemsTotal(props.lines))
+const total = computed(() => materialContractTotal(props.lines, [], props.supplement))
 
 type EditableContractLine = ContractLineItemDraft & Record<string, unknown>
 
@@ -44,6 +43,11 @@ const columns: KitEditGridColumn<EditableContractLine>[] = [
     key: 'spec',
     label: '规格型号',
     minWidth: 140,
+  },
+  {
+    key: 'materialGrade',
+    label: '材质',
+    minWidth: 110,
   },
   {
     key: 'brand',
@@ -73,8 +77,14 @@ const columns: KitEditGridColumn<EditableContractLine>[] = [
     key: 'amount',
     label: '含税金额',
     type: 'readonly',
-    derive: row => contractLineItemAmount(row),
+    derive: row => materialLineAmount(row, props.supplement),
     width: 140,
+  },
+  {
+    key: 'applicableTaxRate',
+    label: '本行适用税点（%）',
+    type: 'number',
+    width: 160,
   },
   {
     key: 'plannedArrivalDate',
@@ -94,14 +104,25 @@ function addLine() {
     {
       materialName: '',
       spec: '',
+      materialGrade: '',
       brand: '',
       unit: '',
       qty: 1,
       taxInclusiveUnitPrice: 0,
+      applicableTaxRate: null,
       plannedArrivalDate: '',
       note: '',
     },
   ])
+}
+
+function patchLine(index: number, patch: Partial<ContractLineItemDraft>) {
+  emit('update', props.lines.map((row, current) => current === index ? { ...row, ...patch } : row))
+}
+
+function chooseOriginal(index: number, id: string) {
+  const original = props.originalLines?.find(row => row.id === id)
+  patchLine(index, original ? { ...original, id: props.lines[index]?.id, originalLineId: id, changeAmount: null, changeBasis: '', source: null } : { originalLineId: null, changeAmount: null, changeBasis: '' })
 }
 
 function importTsv() {
@@ -263,13 +284,13 @@ defineExpose({ validate })
           采购合同明细
         </h2>
         <p class="mt-0.5 text-11px text-ink-faint">
-          含税金额由数量 × 含税单价派生；提交时与合同头金额勾稽。
+          {{ supplement ? '新材料按量价计算；原行变更须填写文书核实的本次增额及依据。' : '含税金额由数量 × 含税单价派生；材料与减项合计须与合同头一致。' }}
         </p>
       </div>
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <span class="text-12px text-ink-soft">
           {{ lines.length }} 行 · 合计
-          <b class="font-mono text-ink">{{ total.toFixed(2) }}</b> 元
+          <b class="font-mono text-ink">{{ total == null ? '待完善' : total.toFixed(2) }}</b> 元
         </span>
         <KitButton
           type="button"
@@ -335,7 +356,7 @@ defineExpose({ validate })
       >
         <template #cell-amount="{ row }">
           <span class="block px-2 text-right font-mono text-12px text-ink">
-            {{ contractLineItemAmount(row).toFixed(2) }}
+            {{ materialLineAmount(row, supplement)?.toFixed(2) ?? '—' }}
           </span>
         </template>
         <template #cell-plannedArrivalDate="{ row, rowIndex, update }">
@@ -349,6 +370,13 @@ defineExpose({ validate })
           >
         </template>
       </KitEditGrid>
+      <div v-if="supplement" class="mt-3 space-y-3" aria-label="协议原行与增额核对">
+        <div v-for="(row, index) in lines" :key="row.id ?? index" class="grid grid-cols-1 gap-2 rounded border border-line p-3 sm:grid-cols-3">
+          <label class="field-block"><span class="field-label">第 {{ index + 1 }} 行的原明细</span><select class="field-input" :value="row.originalLineId ?? ''" :aria-label="`原明细，第 ${index + 1} 行`" @change="chooseOriginal(index, ($event.target as HTMLSelectElement).value)"><option value="">新增材料（无原行）</option><option v-for="original in originalLines ?? []" :key="original.id" :value="original.id">{{ original.materialName }} · {{ original.spec }} · {{ original.id }}</option></select></label>
+          <label v-if="row.originalLineId" class="field-block"><span class="field-label">本次含税增额 *</span><input class="field-input" type="number" min="0" step="0.01" :value="row.changeAmount" :aria-label="`本次增额，第 ${index + 1} 行`" @input="patchLine(index, { changeAmount: ($event.target as HTMLInputElement).value === '' ? null : Number(($event.target as HTMLInputElement).value) })"></label>
+          <label v-if="row.originalLineId" class="field-block"><span class="field-label">增额依据 *</span><input class="field-input" :value="row.changeBasis" :aria-label="`增额依据，第 ${index + 1} 行`" @input="patchLine(index, { changeBasis: ($event.target as HTMLInputElement).value })"></label>
+        </div>
+      </div>
     </div>
   </section>
 </template>

@@ -10,24 +10,11 @@ import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
 import { customerProblemFromUnknown } from '~/lib/customer/repository'
-
-function previous<T>(state: ReadState<T>): T | null {
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
-}
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readStateData as previous, readFailureState } from '~/lib/read-model/state'
 
 function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
-  const { problem } = customerProblemFromUnknown(cause)
-  if (problem.code === 'forbidden')
-    return { kind: 'forbidden', problem }
-  if (problem.code === 'not-found')
-    return { kind: 'not-found', problem }
-  if (problem.code === 'relationship-mismatch')
-    return { kind: 'mismatch', problem }
-  return { kind: 'error', problem, previous: prior }
+  return readFailureState(customerProblemFromUnknown(cause).problem, prior)
 }
 
 function sameDetailQuery(left: CustomerDetailQueryDTO | null, right: CustomerDetailQueryDTO): boolean {
@@ -52,6 +39,17 @@ export const useCustomerReadStore = defineStore('customer-read', () => {
   let latestList = 0
   let latestDetail = 0
   let latestReceipt = 0
+  bindReadAuthority((problem) => {
+    latestList++
+    latestDetail++
+    latestReceipt++
+    listQuery.value = null
+    detailQuery.value = null
+    receiptQuery.value = null
+    listState.value = readFailureState<CustomerListPageDTO>(problem, null)
+    detailState.value = readFailureState<CustomerDetailReadDTO>(problem, null)
+    receiptState.value = readFailureState<CustomerReceiptDetailReadDTO>(problem, null)
+  })
 
   async function loadList(query: CustomerListQueryDTO) {
     const request = ++latestList

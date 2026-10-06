@@ -15,10 +15,14 @@ import type {
 } from './central-repository'
 import {
   isDataOriginDTO,
+  isEntityRefDTO,
   isISODateDTO,
   isISODateTimeDTO,
-  isProblemCodeDTO,
+  isUnavailableEntityNavigationDTO,
 } from '../../types/read-model'
+import { hasConsistentOriginReadMeta, hasConsistentReadMeta } from '../read-model/meta'
+import { isPaginationDTO } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { serializeEnumSelection } from '../util/enum-selection'
 import {
   ownerCommercialDocumentProblem,
@@ -87,31 +91,34 @@ function nullableDateTime(value: unknown): boolean {
 }
 
 function entityRef(value: unknown): boolean {
-  if (!object(value) || typeof value.entity !== 'string' || typeof value.state !== 'string')
-    return false
-  if (value.state === 'resolved')
-    return typeof value.id === 'string' && typeof value.label === 'string' && nullableString(value.no)
-  if (value.state === 'missing')
-    return value.id === null && value.label === null && typeof value.reason === 'string'
-  if (value.state === 'forbidden')
-    return nullableString(value.id) && value.label === null && value.reason === 'permission-denied'
-  return false
+  return isEntityRefDTO(value)
 }
 
 function navigation(value: unknown): boolean {
   if (!object(value) || typeof value.kind !== 'string')
     return false
   if (value.kind === 'unavailable')
-    return typeof value.reason === 'string'
+    return Object.keys(value).length === 2 && ['missing-id', 'missing-route', 'not-connected', 'forbidden', 'unverified-target', 'error'].includes(String(value.reason))
   if (value.kind === 'same-route-overlay')
-    return entityRef(value.subject) && typeof value.view === 'string'
+    return isEntityRefDTO(value.subject) && value.subject.state === 'resolved' && typeof value.view === 'string'
   if (value.kind === 'entity-list') {
     return typeof value.entity === 'string' && nullableString(value.variant)
       && nullableString(value.view) && object(value.filters)
   }
   return ['entity-detail', 'entity-subview', 'source-record'].includes(value.kind)
-    && entityRef(value.subject) && nullableString(value.variant)
+    && isEntityRefDTO(value.subject) && value.subject.state === 'resolved' && nullableString(value.variant)
     && nullableString(value.view) && object(value.filters)
+}
+
+function relationNavigation(value: unknown, reference: unknown, origin: unknown): boolean {
+  if (!isEntityRefDTO(reference))
+    return false
+  if (reference.state !== 'resolved')
+    return isUnavailableEntityNavigationDTO(value, reference)
+  return object(value) && navigation(value) && isEntityRefDTO(value.subject) && value.subject.state === 'resolved'
+    && value.subject.entity === reference.entity && value.subject.id === reference.id
+    && value.subject.label === reference.label && value.subject.no === reference.no
+    && object(value.filters) && value.filters.dataOrigin === origin
 }
 
 function amounts(value: unknown): boolean {
@@ -176,8 +183,8 @@ function listItem(value: unknown): boolean {
       && value.rowKey === `${value.dataOrigin}:${value.kind}:${value.id}`
       && nullableDate(value.applicationDate) && isISODateTimeDTO(value.updatedAt) && amounts(value.amounts)
       && entityRef(value.project) && entityRef(value.customer) && entityRef(value.supplier) && entityRef(value.contract)
-      && navigation(value.projectNavigation) && navigation(value.customerNavigation)
-      && navigation(value.supplierNavigation) && navigation(value.contractNavigation) && navigation(value.navigation)
+      && relationNavigation(value.projectNavigation, value.project, value.dataOrigin) && relationNavigation(value.customerNavigation, value.customer, value.dataOrigin)
+      && relationNavigation(value.supplierNavigation, value.supplier, value.dataOrigin) && relationNavigation(value.contractNavigation, value.contract, value.dataOrigin) && navigation(value.navigation)
       && acceptanceView(value.acceptanceView)
       && ownerPenaltyListFacts(value.ownerPenaltyFacts)
       && (value.kind === 'owner_penalty' ? value.ownerPenaltyFacts !== null : value.ownerPenaltyFacts === null)
@@ -304,17 +311,7 @@ function boqLine(value: unknown): boolean {
 }
 
 function problemPayload(cause: unknown): ProblemDTO | null {
-  if (!object(cause))
-    return null
-  const response = object(cause.response) ? cause.response : null
-  const raw = response?._data ?? cause.data
-  const candidate = object(raw) && object(raw.data) ? raw.data : raw
-  if (!object(candidate) || !isProblemCodeDTO(candidate.code) || typeof candidate.message !== 'string'
-    || typeof candidate.retryable !== 'boolean' || !object(candidate.fieldErrors)
-    || !(candidate.traceId === null || typeof candidate.traceId === 'string')) {
-    return null
-  }
-  return candidate as unknown as ProblemDTO
+  return problemFromHttpFailure(cause)
 }
 
 async function read<T>(request: () => Promise<unknown>, decode: (value: unknown) => T): Promise<T> {
@@ -336,14 +333,13 @@ async function read<T>(request: () => Promise<unknown>, decode: (value: unknown)
 
 function decodeList(value: unknown, expected: OwnerCommercialDocumentListQueryDTO): OwnerCommercialDocumentListPageDTO {
   const requiredCapability = (expected.kind === 'sub_change' || expected.kind === 'sub_settlement' || expected.kind === 'project_penalty') ? 'subcontract-document:read' : 'owner-document:read'
-  if (!object(value) || !Array.isArray(value.items) || !value.items.every(listItem)
-    || !object(value.pagination) || !count(value.pagination.page, 1)
-    || !count(value.pagination.pageSize, 1) || !count(value.pagination.total)
+  if (!object(value) || !hasConsistentOriginReadMeta(value, 'owner-document-read-v2') || !Array.isArray(value.items) || !value.items.every(listItem)
+    || !isPaginationDTO(value.pagination, value.items.length)
     || !listSummary(value.summary) || !strings(value.capabilities)
     || !isISODateTimeDTO(value.asOf) || !nullableString(value.sourceVersion)
     || !(value.empty === null || (object(value.empty) && typeof value.empty.reason === 'string'
       && strings(value.empty.missingRelations)))
-    || value.pagination.page !== expected.page || value.pagination.pageSize !== expected.pageSize
+    || value.pagination.requestedPage !== expected.page || value.pagination.pageSize !== expected.pageSize
     || !value.capabilities.includes(requiredCapability)
     || !value.items.every(item => object(item)
       && item.kind === expected.kind
@@ -366,12 +362,12 @@ function projectPenaltyFacts(value: Record<string, unknown>): boolean {
 
 function decodeDetail(value: unknown, expected: OwnerCommercialDocumentDetailQueryDTO): OwnerCommercialDocumentDetailReadDTO {
   const requiredCapability = (expected.kind === 'sub_change' || expected.kind === 'sub_settlement' || expected.kind === 'project_penalty') ? 'subcontract-document:read' : 'owner-document:read'
-  if (!object(value) || !isDataOriginDTO(value.dataOrigin) || !detailDocument(value.document)
+  if (!object(value) || !hasConsistentReadMeta(value, 'owner-document-read-v2', value.dataOrigin) || !isDataOriginDTO(value.dataOrigin) || !detailDocument(value.document)
     || !Array.isArray(value.lines) || !value.lines.every(documentLine)
     || !Array.isArray(value.files) || !value.files.every(detailFile)
-    || !navigation(value.projectNavigation) || !navigation(value.customerNavigation)
-    || !navigation(value.supplierNavigation)
-    || !navigation(value.contractNavigation) || !navigation(value.sourceNavigation)
+    || !object(value.document) || !relationNavigation(value.projectNavigation, value.document.project, value.dataOrigin) || !relationNavigation(value.customerNavigation, value.document.customer, value.dataOrigin)
+    || !relationNavigation(value.supplierNavigation, value.document.supplier, value.dataOrigin)
+    || !relationNavigation(value.contractNavigation, value.document.contract, value.dataOrigin) || !navigation(value.sourceNavigation)
     || !navigation(value.documentNavigation) || !acceptanceView(value.acceptanceView)
     || !Array.isArray(value.lifecycleEvents) || !value.lifecycleEvents.every(lifecycleEvent)
     || !finalSettlementEvidence(value.finalSettlementEvidence)

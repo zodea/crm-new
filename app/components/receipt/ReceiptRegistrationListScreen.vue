@@ -85,14 +85,19 @@ async function load() {
   if (!active || route.path !== '/finance/receipt')
     return
   const current = ++generation
+  const requestQuery = query.value
   loading.value = true
   page.value = null
   problem.value = null
   try {
-    const result = await repository.list(query.value)
+    const result = await repository.list(requestQuery)
     if (current !== generation || !active)
       return
     page.value = result
+    if (result.pagination.page !== result.pagination.requestedPage) {
+      await patchQuery({ page: result.pagination.page === 1 ? null : result.pagination.page })
+      return
+    }
   }
   catch (cause) {
     if (current === generation)
@@ -165,7 +170,7 @@ onScopeDispose(() => {
         </div>
       </template>
       <template #table>
-        <StatePanel v-if="problem" :kind="problem.code === 'forbidden' ? 'forbidden' : 'error'" title="收款列表暂不可用" :description="problem.message" action-label="重新读取" @action="load" /><KitTable v-else :columns="columns" :data="rows" :loading="loading" :page="page?.pagination" :page-size-options="[10, 20, 50, 100]" :restore-scroll-left="restored?.scrollLeft" :empty="{ title: '暂无符合条件的收款', description: '可以调整筛选条件，或新增收款登记。' }" @page-change="({ page: nextPage, pageSize }) => patchQuery({ page: nextPage, pageSize })" @view-restored="restorePosition">
+        <StatePanel v-if="problem" :kind="['forbidden', 'unauthenticated'].includes(problem.code) ? 'forbidden' : 'error'" :title="problem.code === 'unauthenticated' ? '登录已失效' : '收款列表暂不可用'" :description="problem.message" action-label="重新读取" @action="load" /><KitTable v-else :columns="columns" :data="rows" :loading="loading" :page="page?.pagination" :page-size-options="[10, 20, 50, 100]" :restore-scroll-left="restored?.scrollLeft" :empty="{ title: '暂无符合条件的收款', description: '可以调整筛选条件，或新增收款登记。' }" @page-change="({ page: nextPage, pageSize }) => patchQuery({ page: nextPage, pageSize })" @view-restored="restorePosition">
           <template #no="{ row }">
             <ReceiptRowLink :detail="row.detail" :source="route.fullPath" :context-id="contextId" />
           </template>

@@ -11,6 +11,8 @@ import type {
 import type { DataOriginDTO, ProblemDTO, ReadState } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
 import { crewWorkerProblemFromUnknown } from '~/lib/crew-worker/read-decoder'
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readProblemTitle } from '~/lib/read-model/state'
 
 const props = defineProps<{
   factKind: 'assignment' | 'wage' | 'penalty'
@@ -29,6 +31,13 @@ const queryKey = computed(() => `${props.factKind}:${props.factId}:${props.proje
 const settledKey = shallowRef('')
 const identity = shallowRef<CrewWorkerRelationFactIdentityDTO | null>(null)
 const identityProblem = shallowRef<ProblemDTO | null>(null)
+let generation = 0
+bindReadAuthority((problem) => {
+  generation++
+  identity.value = null
+  identityProblem.value = problem
+  settledKey.value = queryKey.value
+})
 const state = computed<ReadState<CrewDetailReadDTO> | ReadState<WorkerDetailReadDTO>>(() => props.ownerKind === 'crew'
   ? store.crewDetailState
   : store.workerDetailState)
@@ -37,12 +46,12 @@ const detail = computed(() => {
     return null
   if (props.ownerKind === 'crew') {
     const value = store.crewDetailState
-    if (value.kind !== 'ready' && value.kind !== 'partial' && value.kind !== 'empty')
+    if (value.kind !== 'ready' && value.kind !== 'empty')
       return null
     return value.data.crew.id === props.ownerId && value.data.dataOrigin === props.origin ? value.data : null
   }
   const value = store.workerDetailState
-  if (value.kind !== 'ready' && value.kind !== 'partial' && value.kind !== 'empty')
+  if (value.kind !== 'ready' && value.kind !== 'empty')
     return null
   return value.data.worker.id === props.ownerId && value.data.dataOrigin === props.origin ? value.data : null
 })
@@ -79,7 +88,7 @@ const problem = computed(() => identityProblem.value ?? ('problem' in state.valu
 const shellState = computed(() => {
   if (settledKey.value !== queryKey.value)
     return 'loading' as const
-  if (identityProblem.value?.code === 'forbidden')
+  if (identityProblem.value?.code === 'forbidden' || identityProblem.value?.code === 'unauthenticated')
     return 'forbidden' as const
   if (identityProblem.value?.code === 'not-found')
     return 'not-found' as const
@@ -89,7 +98,7 @@ const shellState = computed(() => {
     return 'loading' as const
   if (state.value.kind === 'forbidden')
     return 'forbidden' as const
-  if (state.value.kind === 'error')
+  if (state.value.kind === 'error' || state.value.kind === 'unavailable')
     return 'error' as const
   if (relationshipMismatch.value)
     return 'error' as const
@@ -99,6 +108,7 @@ const shellState = computed(() => {
 })
 
 async function load() {
+  const requestedGeneration = ++generation
   const requestedKey = queryKey.value
   settledKey.value = ''
   identity.value = null
@@ -110,7 +120,7 @@ async function load() {
       origin: props.origin,
       includeDemo: props.includeDemo,
     })
-    if (requestedKey !== queryKey.value)
+    if (requestedGeneration !== generation || requestedKey !== queryKey.value)
       return
     identity.value = resolved
     const ownerMatches = resolved.owners.some(owner => owner.kind === props.ownerKind && owner.id === props.ownerId)
@@ -122,7 +132,7 @@ async function load() {
     }
   }
   catch (cause) {
-    if (requestedKey !== queryKey.value)
+    if (requestedGeneration !== generation || requestedKey !== queryKey.value)
       return
     identityProblem.value = crewWorkerProblemFromUnknown(cause).problem
     settledKey.value = requestedKey
@@ -134,7 +144,7 @@ async function load() {
     await store.loadCrewDetail(query)
   else
     await store.loadWorkerDetail(query)
-  if (requestedKey !== queryKey.value)
+  if (requestedGeneration !== generation || requestedKey !== queryKey.value)
     return
   settledKey.value = requestedKey
   await focusTitle()
@@ -156,7 +166,7 @@ onActivated(() => void load())
     :back-to="returnTo"
     back-label="返回来源详情"
     :state="shellState"
-    :state-title="relationshipMismatch || identityProblem?.code === 'relationship-mismatch' || state.kind === 'mismatch' ? '关系来源不匹配' : shellState === 'not-found' ? '事实不存在或已删除' : shellState === 'error' ? '事实详情加载失败' : '正在加载事实详情'"
+    :state-title="readProblemTitle(problem, relationshipMismatch || identityProblem?.code === 'relationship-mismatch' || state.kind === 'mismatch' ? '关系来源不匹配' : shellState === 'not-found' ? '事实不存在或已删除' : shellState === 'error' ? '事实详情加载失败' : '正在加载事实详情')"
     :state-description="relationshipMismatch ? '该事实不属于地址中的来源对象或项目，已拒绝展示。' : problem?.message ?? ''"
     :state-action-label="shellState === 'error' && problem?.retryable ? '重新加载' : ''"
     @state-action="load"

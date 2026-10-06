@@ -10,8 +10,11 @@ import type {
   OpaqueIdDTO,
   PageDTO,
   ProblemDTO,
+  ReadMetaDTO,
 } from '../../types/read-model'
 import type { PayrollHostSection } from '../crew-worker/payroll-read'
+import type { ProjectConstructionManagementFeeRead } from './construction-management-fee'
+import type { ProjectManagementFeeRead } from './management-fee'
 
 export const PROJECT_PAGE_SIZES = [10, 20, 50, 100] as const
 export const IMPORTED_PROJECT_STATUS = '__unrecognized__'
@@ -59,10 +62,10 @@ export interface ProjectListSourceRow {
   builder: string
   customerId: string | null
   customerName: string | null
-  customerPermission: 'allowed' | 'forbidden'
+  customerPermission: 'allowed' | 'forbidden' | 'unavailable'
   secondaryCustomerId: string | null
   secondaryCustomerName: string | null
-  secondaryCustomerPermission: 'allowed' | 'forbidden'
+  secondaryCustomerPermission: 'allowed' | 'forbidden' | 'unavailable'
   contractName: string
   contractor: string
   region: string
@@ -147,9 +150,12 @@ export interface ProjectListSummaryDTO {
   origins: Record<DataOriginDTO, ProjectListOriginSummaryDTO>
 }
 
-export type ProjectListPageDTO = PageDTO<ProjectListItemDTO, ProjectListSummaryDTO>
+export type ProjectListPageDTO = PageDTO<ProjectListItemDTO, ProjectListSummaryDTO> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO> }
 
 export interface ProjectDetailReadDTO {
+  meta: ReadMetaDTO
+  constructionManagementFees: ProjectConstructionManagementFeeRead
+  managementFees: ProjectManagementFeeRead
   payrollActual?: PayrollHostSection
   item: ProjectListItemDTO
   materialContracts: {

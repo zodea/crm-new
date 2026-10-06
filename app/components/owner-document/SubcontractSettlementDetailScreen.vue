@@ -60,7 +60,7 @@ function fileSize(bytes: number): string {
 
       <div v-if="detail" class="space-y-3">
         <StatePanel
-          v-if="store.detailState.kind === 'error'"
+          v-if="(store.detailState.kind === 'error' || store.detailState.kind === 'unavailable')"
           kind="error"
           title="刷新分包结算失败"
           :description="`${store.detailState.problem.message}；当前保留上一次成功读取的详情。`"

@@ -3,16 +3,18 @@ import type { ColumnFilterValue } from '~/components/ui/KitColumnHeader.vue'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { SupplierListColumnFilters, SupplierListNumericField, SupplierListPageDTO, SupplierListQueryDTO, SupplierListSort, SupplierListTextField } from '~/lib/supplier/repository'
 import { useDebounceFn, useMediaQuery, useStorage } from '@vueuse/core'
-import { computed, nextTick, onActivated, onMounted, shallowRef, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
+import { readProblemTitle, readStateData, readStateProblem } from '~/lib/read-model/state'
 import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_NUMERIC_SOURCE } from '~/lib/supplier/read-contract'
 import { normalizeSupplierEnumSelection } from '~/lib/supplier/read-query'
-import { createSupplierReturnTo, supplierListNavigationStateFromQuery } from '~/lib/supplier/return-context'
+import { createSupplierReturnTo, supplierListNavigationQuery, supplierListNavigationStateFromQuery } from '~/lib/supplier/return-context'
 import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE, CREDENTIAL_STATUSES, SUPPLIER_CATEGORIES, SUPPLIER_TAXPAYER_TYPES } from '~/lib/supplier/status'
 import { yuan } from '~/lib/util/money'
 import { useSupplierCommandStore } from '~/stores/supplier-command'
 import { useSupplierReadStore } from '~/stores/supplier-read'
 
 const route = useRoute()
+const router = useRouter()
 const readStore = useSupplierReadStore()
 const commandStore = useSupplierCommandStore()
 const visibility = useDataVisibilityStore()
@@ -27,11 +29,17 @@ const pageSize = shallowRef(initial.pageSize)
 const columnFilters = shallowRef<SupplierListColumnFilters>(initial.columnFilters ?? {})
 const taxpayerType = computed({
   get: () => normalizeSupplierEnumSelection(columnFilters.value.taxpayerType),
-  set: (value: string[]) => { columnFilters.value = { ...columnFilters.value, taxpayerType: value } },
+  set: (value: string[]) => {
+    columnFilters.value = { ...columnFilters.value, taxpayerType: value,
+    }
+  },
 })
 const businessLicense = computed({
   get: () => columnFilters.value.businessLicense ?? [],
-  set: (value: NonNullable<SupplierListColumnFilters['businessLicense']>) => { columnFilters.value = { ...columnFilters.value, businessLicense: value } },
+  set: (value: NonNullable<SupplierListColumnFilters['businessLicense']>) => {
+    columnFilters.value = { ...columnFilters.value, businessLicense: value,
+    }
+  },
 })
 const hiddenColumns = useStorage<string[]>('ruihang:supplier-list:columns:v1', [], undefined, {
   serializer: {
@@ -48,13 +56,11 @@ const hiddenColumns = useStorage<string[]>('ruihang:supplier-list:columns:v1', [
 const comfortable = useStorage('ruihang:supplier-list:comfortable:v1', false)
 const fixedName = useMediaQuery('(min-width: 768px)')
 
-const readPage = computed<SupplierListPageDTO | null>(() => {
-  const state = readStore.listState
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
+const readPage = computed<SupplierListPageDTO | null>(() => readStateData(readStore.listState))
+const unavailableSourceLabel = computed(() => {
+  const labels = { projects: '项目', contracts: '合同', settlements: '结算', invoices: '发票', payments: '付款' }
+  const sources = (readPage.value?.unavailableSources ?? []).map(source => labels[source])
+  return sources.length > 1 ? `${sources.slice(0, -1).join('、')}与${sources.at(-1)}` : sources[0]
 })
 const rows = computed(() => (readPage.value?.items ?? []).map(item => ({
   id: item.supplier.id,
@@ -83,7 +89,7 @@ const rows = computed(() => (readPage.value?.items ?? []).map(item => ({
   paymentAmount: item.paymentAmount,
 })))
 const loading = computed(() => readStore.listState.kind === 'loading')
-const problem = computed(() => ['forbidden', 'not-found', 'mismatch', 'error'].includes(readStore.listState.kind) && 'problem' in readStore.listState ? readStore.listState.problem : null)
+const problem = computed(() => readStateProblem(readStore.listState))
 function enumOptions(values: readonly string[], selected: string[], facets: { value: string, label: string, count: number }[] = [], labels: Record<string, string> = {}) {
   const counts = new Map(facets.map(item => [item.value, item]))
   return [...new Set([...values, ...facets.map(item => item.value), ...selected])].filter(Boolean).map(key => ({
@@ -212,18 +218,44 @@ function currentQuery(): SupplierListQueryDTO {
 }
 
 let returnFocusPending = true
+let loadGeneration = 0
+onDeactivated(() => {
+  ++loadGeneration
+})
+onScopeDispose(() => {
+  ++loadGeneration
+})
 
 async function load() {
-  await readStore.loadList(currentQuery())
-  if (readPage.value)
-    page.value = readPage.value.pagination.page
-  if (returnFocusPending && ['ready', 'partial', 'empty'].includes(readStore.listState.kind) && route.path === '/base/supplier') {
+  const generation = ++loadGeneration
+  const query = JSON.parse(JSON.stringify(currentQuery())) as SupplierListQueryDTO
+  const queryKey = JSON.stringify(query)
+  const routeKey = JSON.stringify({ path: route.path, query: route.query, hash: route.hash })
+  const isCurrent = () => generation === loadGeneration && route.path === '/base/supplier'
+    && JSON.stringify({ path: route.path, query: route.query, hash: route.hash }) === routeKey
+    && JSON.stringify(currentQuery()) === queryKey && JSON.stringify(readStore.listQuery) === queryKey
+  await readStore.loadList(query)
+  if (!isCurrent() || !['ready', 'empty'].includes(readStore.listState.kind) || !readPage.value)
+    return
+  const actualPage = readPage.value.pagination.page
+  if (actualPage !== query.page) {
+    const nextQuery = { ...route.query }
+    for (const key of ['search', 'category', 'credentialStatus', 'columnFilters', 'sort', 'page', 'pageSize'])
+      delete nextQuery[key]
+    Object.assign(nextQuery, supplierListNavigationQuery({ ...query, category: query.category ?? [], credentialStatus: query.credentialStatus ?? [], page: actualPage }))
+    // The current response alone may canonicalize its own page; stale reads never change another query's URL.
+    page.value = actualPage
+    await router.replace({ path: route.path, query: nextQuery, hash: route.hash })
+  }
+  if (generation !== loadGeneration || route.path !== '/base/supplier')
+    return
+  if (returnFocusPending) {
     returnFocusPending = false
-    await focusReturnAnchor()
+    await focusReturnAnchor(() => generation === loadGeneration && route.path === '/base/supplier')
   }
 }
 
-async function focusReturnAnchor() {
+async function focusReturnAnchor(isCurrent: () => boolean) {
   if (!route.hash.startsWith('#'))
     return
   const candidates = new Set<string>([route.hash.slice(1)])
@@ -239,6 +271,8 @@ async function focusReturnAnchor() {
   }
   for (let frame = 0; frame < 4; frame += 1) {
     await nextTick()
+    if (!isCurrent())
+      return
     const target = [...document.querySelectorAll<HTMLElement>('[data-supplier-row-link]')].find(element =>
       candidates.has(element.parentElement?.id ?? '') && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden',
     )
@@ -248,7 +282,8 @@ async function focusReturnAnchor() {
     }
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
   }
-  document.querySelector<HTMLElement>('[data-supplier-list-return-fallback]')?.focus({ preventScroll: true })
+  if (isCurrent())
+    document.querySelector<HTMLElement>('[data-supplier-list-return-fallback]')?.focus({ preventScroll: true })
 }
 
 const debouncedLoad = useDebounceFn(() => {
@@ -293,6 +328,9 @@ function clearFilters() {
 }
 
 watch([search, category, credentialStatus, sort, columnFilters], debouncedLoad)
+watch([search, category, credentialStatus, sort, columnFilters, page, pageSize], () => {
+  ++loadGeneration
+}, { flush: 'sync' })
 watch(() => visibility.includeDemo, () => {
   page.value = 1
   void load()
@@ -309,9 +347,9 @@ onActivated(() => {
   <div class="grid min-w-0 gap-3">
     <SupplierPendingRecovery v-if="readPage?.capabilities.includes('supplier:persistent:write')" />
     <p v-if="readPage?.unavailableSources?.length" class="m-0 border border-line bg-panel p-3 text-12px text-ink-muted" role="status">
-      关联项目、合同、结算、发票与付款尚未接入，相关数量和金额显示为未知；分供方主档与证照可正常维护。
+      关联{{ unavailableSourceLabel }}尚未接入，相关数量和金额显示为未知；分供方主档与证照可正常维护。
     </p>
-    <StatePanel v-if="problem" :kind="problem.code === 'forbidden' ? 'forbidden' : 'error'" title="分供方列表加载失败" :description="problem.message" :action-label="problem.retryable ? '重新加载' : ''" :compact="Boolean(readPage)" @action="load" />
+    <StatePanel v-if="problem" :kind="['forbidden', 'unauthenticated'].includes(problem.code) ? 'forbidden' : 'error'" :title="readProblemTitle(problem, '分供方列表加载失败')" :description="problem.message" :action-label="problem.retryable ? '重新加载' : ''" :compact="Boolean(readPage)" @action="load" />
     <button v-if="problem && hasNumericQuery" type="button" class="btn-secondary justify-self-start" @click="clearNumericQuery">
       清除数值条件并重试
     </button>
@@ -339,7 +377,9 @@ onActivated(() => {
             :empty="{ title: hasFilters ? '没有符合条件的分供方' : '还没有分供方档案', actionLabel: hasFilters ? '清除筛选' : '新建分供方' }"
             row-key="identity"
             @empty-action="hasFilters ? clearFilters() : createSupplier()"
-            @page-change="({ page: nextPage, pageSize: nextSize }) => { page = nextPage; pageSize = nextSize as 10 | 20 | 50 | 100; load() }"
+            @page-change="({ page: nextPage, pageSize: nextSize }) => {
+              page = nextPage; pageSize = nextSize as 10 | 20 | 50 | 100; load()
+            }"
           >
             <template #columnHeader="{ column }">
               <span v-if="disabledNumericFields.includes(column.field as SupplierListNumericField)" role="columnheader" :title="`${column.title}尚未接入，暂不支持筛选或排序`">

@@ -12,24 +12,11 @@ import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
 import { crewWorkerProblemFromUnknown } from '~/lib/crew-worker/repository'
-
-function previous<T>(state: ReadState<T>): T | null {
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
-}
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readStateData as previous, readFailureState } from '~/lib/read-model/state'
 
 function failure<T>(cause: unknown, prior: T | null): ReadState<T> {
-  const { problem } = crewWorkerProblemFromUnknown(cause)
-  if (problem.code === 'forbidden')
-    return { kind: 'forbidden', problem }
-  if (problem.code === 'not-found')
-    return { kind: 'not-found', problem }
-  if (problem.code === 'relationship-mismatch')
-    return { kind: 'mismatch', problem }
-  return { kind: 'error', problem, previous: prior }
+  return readFailureState(crewWorkerProblemFromUnknown(cause).problem, prior)
 }
 
 export const useCrewWorkerReadStore = defineStore('crew-worker-read', () => {
@@ -44,6 +31,22 @@ export const useCrewWorkerReadStore = defineStore('crew-worker-read', () => {
   let workerDetailRequest = 0
   let crewIncludeDemo: boolean | undefined
   let workerIncludeDemo: boolean | undefined
+  let crewDetailQuery: CrewDetailQueryDTO | null = null
+  let workerDetailQuery: WorkerDetailQueryDTO | null = null
+  bindReadAuthority((problem) => {
+    crewListRequest++
+    workerListRequest++
+    crewDetailRequest++
+    workerDetailRequest++
+    crewIncludeDemo = undefined
+    workerIncludeDemo = undefined
+    crewDetailQuery = null
+    workerDetailQuery = null
+    crewListState.value = readFailureState<CrewListPageDTO>(problem, null)
+    workerListState.value = readFailureState<WorkerListPageDTO>(problem, null)
+    crewDetailState.value = readFailureState<CrewDetailReadDTO>(problem, null)
+    workerDetailState.value = readFailureState<WorkerDetailReadDTO>(problem, null)
+  })
 
   async function loadCrewList(query: CrewListQueryDTO) {
     const request = ++crewListRequest
@@ -79,7 +82,11 @@ export const useCrewWorkerReadStore = defineStore('crew-worker-read', () => {
 
   async function loadCrewDetail(query: CrewDetailQueryDTO) {
     const request = ++crewDetailRequest
-    const prior = previous(crewDetailState.value)
+    const prior = crewDetailQuery?.id === query.id && crewDetailQuery.origin === query.origin
+      && crewDetailQuery.includeDemo === query.includeDemo
+      ? previous(crewDetailState.value)
+      : null
+    crewDetailQuery = { ...query }
     crewDetailState.value = { kind: 'loading', previous: prior }
     try {
       const detail = await repository().getCrew(query)
@@ -94,7 +101,11 @@ export const useCrewWorkerReadStore = defineStore('crew-worker-read', () => {
 
   async function loadWorkerDetail(query: WorkerDetailQueryDTO) {
     const request = ++workerDetailRequest
-    const prior = previous(workerDetailState.value)
+    const prior = workerDetailQuery?.id === query.id && workerDetailQuery.origin === query.origin
+      && workerDetailQuery.includeDemo === query.includeDemo
+      ? previous(workerDetailState.value)
+      : null
+    workerDetailQuery = { ...query }
     workerDetailState.value = { kind: 'loading', previous: prior }
     try {
       const detail = await repository().getWorker(query)

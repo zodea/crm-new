@@ -1,7 +1,10 @@
+import type { TargetCostCommand } from '~/lib/target-cost/central-contract'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import * as h3 from 'h3'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { encodeTargetCostWire } from '~/lib/target-cost/central-codec'
+import { createTargetCostRepository } from '~/lib/target-cost/central-repository'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
 
 afterEach(async () => {
@@ -47,6 +50,25 @@ describe('预算真实 HTTP 路由与事务边界', () => {
       expect((await post({ ...command, commandId: 'bad-numeric', action: { ...command.action, draft: { plannedProfit: 0 } } })).status).toBe(422)
       expect((await post({ ...command, commandId: 'demo-write', origin: 'demo' })).status).toBe(403)
       expect((await (await get('/api/read/target-costs?origin=real')).json()).rows).toHaveLength(1)
+      const rejected: TargetCostCommand = {
+        ...read.context,
+        requiredCapability: 'target-cost:write',
+        commandId: 'stale-original-http-key',
+        targetCostId: result.id,
+        action: { kind: 'save-header', saveAction: 'draft', draft: { name: '旧依据不能覆盖预算' } },
+      }
+      const rejection = await post(encodeTargetCostWire(rejected))
+      expect(rejection.status).toBe(409)
+      expect(await rejection.json()).toMatchObject({ data: { code: 'stale-source', commandId: rejected.commandId, commandOutcome: 'not-applied' } })
+      const repository = createTargetCostRepository(async (_path, options) => {
+        const response = await post(options?.body)
+        const body = await response.json()
+        if (!response.ok)
+          throw Object.assign(new Error('HTTP预算提交被拒绝'), { response: { status: response.status, _data: body } })
+        return body
+      })
+      await expect(repository.execute(rejected)).rejects.toMatchObject({ problem: { code: 'stale-source', commandId: rejected.commandId, commandOutcome: 'not-applied' } })
+      expect((await (await get(`/api/read/target-costs/${result.id}?origin=real`)).json()).view.header.name).toBe('预算草稿')
     }
     finally {
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))

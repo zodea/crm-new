@@ -10,13 +10,7 @@ import { createCustomerReadTestInstance } from '../../server/utils/customer-read
 
 describe('客户中央 HTTP Repository', () => {
   it('序列化列表与详情查询，不把路由字符串塞进领域结果', async () => {
-    const page = buildCustomerListPage({
-      rows: [],
-      query: parseCustomerListQuery({}),
-      asOf: '2026-08-23T00:00:00.000Z',
-      sourceVersion: 'v1',
-      capabilities: ['customer:list:read'],
-    })
+    const page = await createCustomerReadTestInstance(() => ['customer:list:read'], () => [], () => 'customer-empty-fixture-v1').list({ search: '合和', page: '2' })
     const fetcher = vi.fn().mockResolvedValue(page)
     const repository = createHttpCustomerReadRepository({ fetcher })
 

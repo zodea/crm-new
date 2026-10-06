@@ -724,7 +724,7 @@ describe('唯一 Target Registry', () => {
         subject: {
           state: 'forbidden',
           entity: 'project',
-          id: 'project-secret',
+          id: null,
           label: null,
           reason: 'permission-denied',
         },
@@ -759,11 +759,16 @@ describe('唯一 Target Registry', () => {
       {
         state: 'forbidden',
         entity: 'project',
-        id: 'project-secret',
+        id: null,
         label: null,
         reason: 'permission-denied',
       },
       { state: 'forbidden', label: null, message: '无查看权限' },
+    ],
+    [
+      'unavailable',
+      { state: 'unavailable', entity: 'project', id: null, label: null, reason: 'source-unavailable' },
+      { state: 'not-connected', label: null, message: '来源暂不可用' },
     ],
     [
       'blank-id',
@@ -818,4 +823,11 @@ describe('唯一 Target Registry', () => {
         expect(result).toEqual(expected)
     })
   })
+})
+
+it('独立报价只按真实来源和稳定ID导航，不把未建档报价方当分供方', () => {
+  const intent: NavigationIntentDTO = { kind: 'entity-detail', subject: { state: 'resolved', entity: 'material-quotation', id: 'quotation-1', label: '未建档报价方', no: null }, variant: 'detail', view: null, filters: { dataOrigin: 'real' } }
+  expect(resolveNavigationTarget(intent)).toEqual({ state: 'resolved', label: '未建档报价方', to: '/material/quotations/quotation-1?origin=real' })
+  expect(resolveNavigationTarget({ ...intent, filters: { dataOrigin: 'demo' } })).toMatchObject({ state: 'error' })
+  expect(resolveNavigationTarget({ ...intent, subject: { ...intent.subject, id: '../other' } })).toMatchObject({ state: 'error' })
 })

@@ -1,3 +1,4 @@
+import type { CommandResolution } from '../forms/command-recovery'
 import type {
   CrewFormDraft,
   FormAttachmentChanges,
@@ -61,4 +62,6 @@ export interface CrewWorkerCommandRepository {
   loadWorkerForm: (id: string) => Promise<WorkerFormReadDTO>
   executeCrew: (request: CrewCommandRequestDTO) => Promise<CrewWorkerCommandResultDTO>
   executeWorker: (request: WorkerCommandRequestDTO) => Promise<CrewWorkerCommandResultDTO>
+  resolveCrew: (commandId: string) => Promise<CommandResolution<CrewWorkerCommandResultDTO>>
+  resolveWorker: (commandId: string) => Promise<CommandResolution<CrewWorkerCommandResultDTO>>
 }

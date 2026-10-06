@@ -12,7 +12,7 @@ export interface ProjectListNavigationState {
   phase: string
   sort: 'updated-desc' | 'name-asc'
   page: number
-  pageSize: 10 | 20 | 50
+  pageSize: 10 | 20 | 50 | 100
   filters: {
     statuses: string[]
     plannedEnds: string[]
@@ -161,7 +161,7 @@ export function projectListNavigationStateFromQuery(
     phase: queryValue(query.phase)?.slice(0, 48) || 'all',
     sort: sort === 'name-asc' ? 'name-asc' : 'updated-desc',
     page: positiveInteger(query.page, 1),
-    pageSize: pageSize === 20 || pageSize === 50 ? pageSize : 10,
+    pageSize: pageSize === 20 || pageSize === 50 || pageSize === 100 ? pageSize : 10,
     filters: {
       statuses: queryValues(query.status).slice(0, 20),
       plannedEnds: queryValues(query.plannedEnd).slice(0, 20),
@@ -246,7 +246,7 @@ export function validateProjectReturnTo(value: unknown): string | null {
     query.set('sort', sort)
 
   appendPositiveInteger(url.searchParams, query, 'page')
-  appendPositiveInteger(url.searchParams, query, 'pageSize', [10, 20, 50])
+  appendPositiveInteger(url.searchParams, query, 'pageSize', [10, 20, 50, 100])
 
   for (const key of MULTI_VALUE_KEYS) {
     for (const item of url.searchParams.getAll(key).slice(0, 20)) {

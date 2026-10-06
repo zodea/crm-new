@@ -1,6 +1,6 @@
 import type { BusinessSession } from '../../server/utils/business-session'
 import type { SupplierListSourceRow } from '~/lib/supplier/repository'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { SUPPLIER_WRITE_CAPABILITY } from '~/lib/supplier/command-contract'
 import { SupplierRepositoryProblem } from '~/lib/supplier/repository'
 import { parseSupplierCommandRequest } from '../../server/utils/supplier-command-request'
@@ -14,6 +14,30 @@ const session: BusinessSession = {
 }
 
 describe('分供方中央写入测试实例', () => {
+  it('读取证据来自实际会话与同一上海业务日，翻页不换授权范围，跨日不写事实', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-08-23T15:59:59.000Z'))
+      const commands = createSupplierCommandTestInstance({ createId: () => 'read-proof-supplier' })
+      const reads = createSupplierReadTestInstance(() => session.capabilities, (id, asOf) => commands.rows(id, asOf), (id, asOf) => commands.sourceVersion(id, asOf))
+      await commands.execute({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: SUPPLIER_WRITE_CAPABILITY, commandId: 'read-proof-create', baseVersion: null, action: 'save', draft: { name: '读取证据', supplierCategory: '材料供应商', contact: '联系人' }, attachments: {} }, session)
+      const facts = structuredClone(commands.snapshot())
+      const first = await reads.list({ page: 1, pageSize: 10 }, null, session)
+      const clamped = await reads.list({ page: 99, pageSize: 10 }, null, session)
+      expect(first.meta).toMatchObject({ workspaceId: session.workspaceId, actorId: session.actorId, dataOrigin: 'real', authorizedScope: { coverage: 'complete' } })
+      expect(first.meta.sources.filter(source => source.state === 'readable').every(source => source.asOf === first.asOf)).toBe(true)
+      expect(clamped.meta.authorizedScope).toEqual(first.meta.authorizedScope)
+      expect(clamped.sourceVersion).toBe(first.sourceVersion)
+      expect(clamped.pagination).toMatchObject({ requestedPage: 99, page: 1 })
+      vi.setSystemTime(new Date('2026-08-23T16:00:00.000Z'))
+      const nextDay = await reads.list({ page: 1, pageSize: 10 }, null, session)
+      expect(nextDay.sourceVersion).not.toBe(first.sourceVersion)
+      expect(nextDay.meta.sources.find(source => source.key === 'suppliers')?.sourceVersion).not.toBe(first.meta.sources.find(source => source.key === 'suppliers')?.sourceVersion)
+      expect(nextDay.meta.authorizedScope).toEqual(first.meta.authorizedScope)
+      expect(commands.snapshot()).toEqual(facts)
+    }
+    finally { vi.useRealTimers() }
+  })
   it('独立保存劳务范围，省略保留、显式清空，并从列表与详情回读', async () => {
     const commands = createSupplierCommandTestInstance({ createId: () => 'labor-supplier' })
     const reads = createSupplierReadTestInstance(() => session.capabilities, id => commands.rows(id), id => commands.sourceVersion(id))
@@ -91,7 +115,11 @@ describe('分供方中央写入测试实例', () => {
         credentialStatus: 'incomplete',
       }),
     ])
-    expect(commands.sourceVersion('session-a')).toBe('supplier-command-1')
+    // 原断言保护首写只推进一次真实修订；派生业务日也是读取来源版本的独立维度。
+    expect(commands.snapshot('session-a').sourceVersion).toBe(1)
+    const version = commands.sourceVersion('session-a')
+    expect(version).toContain('2026-08-23')
+    expect(commands.sourceVersion('session-a')).toBe(version)
   })
 
   it('由同一中央读取端回读正式主档，并让演示四类事实保持真实来源', async () => {
@@ -122,11 +150,13 @@ describe('分供方中央写入测试实例', () => {
       dataOrigin: 'real',
       supplier: { id: 'supplier-real-read', name: '正式分供方' },
       summary: {
-        contractAmount: { value: '0.00', drilldown: { entity: 'contract' } },
-        settlementAmount: { value: '0.00', drilldown: { entity: 'settlement' } },
-        invoiceAmount: { value: '0.00', drilldown: { entity: 'invoice' } },
-        paymentAmount: { value: '0.00', drilldown: { entity: 'payment-record' } },
+        // The old assertion protected empty authorized facts and stable drilldowns. Unconnected sources cannot prove zero.
+        contractAmount: { value: '0.00', knownValue: '0.00', participatingCount: 0, drilldown: { kind: 'entity-subview', variant: 'contracts', subject: { id: 'supplier-real-read' }, filters: { dataOrigin: 'real' } } },
+        settlementAmount: { value: null, knownValue: null, participatingCount: null, missingCount: null, drilldown: { variant: 'settlements' } },
+        invoiceAmount: { value: null, knownValue: null, participatingCount: null, missingCount: null, drilldown: { variant: 'invoices' } },
+        paymentAmount: { value: null, knownValue: null, participatingCount: null, missingCount: null, drilldown: { variant: 'payments' } },
       },
+      meta: { authorizedScope: { coverage: 'complete' }, sources: expect.arrayContaining([{ key: 'invoices', state: 'unavailable', sourceVersion: null, asOf: null }]) },
     })
     expect(demo.summary).toMatchObject({
       contractAmount: { value: '261250.00' },

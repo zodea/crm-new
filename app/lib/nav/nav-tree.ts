@@ -53,6 +53,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'payroll', mark: '资', icon: 'i-lucide-wallet-cards', label: '工资核算', hint: '核算发放', to: '/subcontract/payroll' },
   ] },
   { type: 'group', key: 'g-material', label: '乙供材管理', icon: 'i-lucide-package', items: [
+    { key: 'materialQuotation', mark: '报', icon: 'i-lucide-file-text', label: '材料报价', hint: '独立报价 · 原件', to: '/material/quotations' },
     { key: 'matContract', mark: '采', icon: 'i-lucide-shopping-cart', label: '材料采购合同', hint: '采购台账', to: '/contract/material' },
     { key: 'matRequisition', mark: '料', icon: 'i-lucide-clipboard-list', label: '下料单', hint: '要料计划', to: '/material/requisition' },
     { key: 'matArrival', mark: '到', icon: 'i-lucide-package-check', label: '材料到货', hint: '入库', to: '/material/arrival' },
@@ -94,6 +95,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'worker', mark: '工', icon: 'i-lucide-user-round', label: '工人信息', hint: '人员证书', to: '/base/worker' },
   ] },
   { type: 'group', key: 'g-settings', label: '设置', icon: 'i-lucide-settings', items: [
+    { key: 'ourSignatories', mark: '司', icon: 'i-lucide-building-2', label: '我方签约主体', hint: '核实·快照', to: '/settings/our-signatories' },
     { key: 'dataMigration', mark: '迁', icon: 'i-lucide-database-backup', label: '本地数据迁移', hint: '预检·备份', to: '/settings/data-migration' },
     { key: 'ocrSettings', mark: '设', icon: 'i-lucide-scan-search', label: 'OCR 设置', hint: '引擎·参数', to: '/settings/ocr' },
   ] },
@@ -143,6 +145,8 @@ export function toggleExclusiveGroup(openKeys: string[], key: string): string[] 
 export function activeNavKey(path: string, contractKindOfDetail?: string | null): string | null {
   if (path === '/')
     return 'home'
+  if (path.startsWith('/settings/our-signatories'))
+    return 'ourSignatories'
   if (path.startsWith('/settings/data-migration'))
     return 'dataMigration'
   if (path.startsWith('/settings/ocr'))
@@ -252,6 +256,8 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
     return 'delivery'
   if (path.startsWith('/material/price'))
     return 'price'
+  if (path.startsWith('/material/quotations'))
+    return 'materialQuotation'
   if (path.startsWith('/material/requisition'))
     return 'matRequisition'
   if (path.startsWith('/material/arrival'))

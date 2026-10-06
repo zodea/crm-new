@@ -3,7 +3,7 @@ import type {
   ConstructionContractFactSource,
   ConstructionContractFactSources,
 } from '../../app/lib/construction-contract/repository'
-import type { ProblemDTO } from '../../app/types/read-model'
+import type { DataOriginDTO, ProblemDTO, SourceEvidenceDTO } from '../../app/types/read-model'
 import {
   buildConstructionContractDetail,
   buildConstructionContractListPage,
@@ -19,15 +19,18 @@ import {
   ownerFinalSettlementReceiptIsActive,
   ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
+import { isDraftStatus } from '../../app/lib/project/formal-facts'
 import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
+import { sumKnownMoney } from '../../app/lib/util/number'
+import { resolveBusinessSession } from './business-session'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
 import { receiptReadTestInstance } from './receipt-read-test-instance'
 
 export type ConstructionContractReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
-const FIXED_AS_OF = '2026-08-24T00:00:00.000Z'
 const projects = new Map(projectsSeed.map(row => [row.id, row]))
 const customers = new Map(customersSeed.map(row => [row.id, row.name]))
 
@@ -48,9 +51,9 @@ const demoContracts: ConstructionContractDetailSource[] = contractsSeed
       customerId,
       customerName: customers.get(customerId ?? '') ?? '',
       customerPermission: 'allowed',
-      amount: Number(row.amount ?? 0),
-      settledAmount: Number(row.settled ?? 0),
-      invoicedAmount: Number(row.invoiced ?? 0),
+      amount: row.amount === null ? null : Number(row.amount),
+      settledAmount: row.settled === null ? null : Number(row.settled),
+      invoicedAmount: row.invoiced === null ? null : Number(row.invoiced),
       receivedAmount: Number(row.paid ?? 0),
       actualCompletionDate: null,
       content: row.name.replace(/合同$/, ''),
@@ -63,7 +66,7 @@ const demoContracts: ConstructionContractDetailSource[] = contractsSeed
       paymentTerms: '按审定进度与开票情况收款。',
       warrantyTerms: '按合同约定承担竣工验收及保修责任。',
       retentionRatio: 0.03,
-      retentionAmount: Number(row.amount ?? 0) * 0.03,
+      retentionAmount: row.amount === null ? null : Number(row.amount) * 0.03,
       retentionDays: 730,
       invoiceName: customers.get(customerId ?? '') ?? '',
       invoiceTaxNo: '91440100DEMO0320',
@@ -143,6 +146,7 @@ export function createConstructionContractReadTestInstance(
     let formalRows = commandInstance.rows(sessionId)
     const formalFacts = commandInstance.facts(sessionId)
     const ownerDocuments = ownerDocumentCommandInstance.rows(sessionId)
+    const ownerSourceVersion = ownerDocumentCommandInstance.sourceVersion(sessionId)
     const ownerChanges = ownerDocuments
       .filter(row => row.kind === 'owner_change')
       .map(row => ({
@@ -297,6 +301,11 @@ export function createConstructionContractReadTestInstance(
       acceptances: [...formalFacts.acceptances, ...ownerAcceptances],
       warranties: [...formalFacts.warranties, ...ownerWarranties],
     }
+    formalRows = formalRows.map(row => ({
+      ...row,
+      settledAmount: sumKnownMoney(synchronizedFacts.monthlyStatements.filter(fact => fact.dataOrigin === row.dataOrigin && fact.contractId === row.id && !isDraftStatus(fact.status)).map(fact => fact.amount)),
+      invoicedAmount: null,
+    }))
     return {
       contracts: scenario === 'empty' ? formalRows : [...formalRows, ...demoContracts],
       facts: scenario === 'empty'
@@ -316,13 +325,27 @@ export function createConstructionContractReadTestInstance(
           },
       capabilities,
       receiptsProblem,
-      sourceVersion: `${commandInstance.sourceVersion(sessionId)}+${ownerDocumentCommandInstance.sourceVersion(sessionId)}${receiptSourceVersion ? `+${receiptSourceVersion}` : ''}`,
+      receiptSourceVersion,
+      ownerSourceVersion,
+      sourceVersion: `${commandInstance.sourceVersion(sessionId)}+${ownerSourceVersion}${receiptSourceVersion ? `+${receiptSourceVersion}` : ''}`,
     }
+  }
+
+  function metadata(data: ReturnType<typeof context>, query: Record<string, unknown>, operation: string, dataOrigin: DataOriginDTO, asOf: string, sessionId?: string | null) {
+    const requested = (query.origin === undefined || query.origin === null || query.origin === dataOrigin) && (dataOrigin === 'real' || query.includeDemo === true)
+    const sources: SourceEvidenceDTO[] = [{ key: 'construction-contracts', state: requested ? 'readable' : 'not-requested', sourceVersion: requested ? readSourceVersion('construction-contracts', { contracts: data.contracts.filter(row => row.dataOrigin === dataOrigin), facts: Object.fromEntries(Object.entries(data.facts).map(([key, rows]) => [key, rows.filter(row => row.dataOrigin === dataOrigin)])), revision: data.sourceVersion }) : null, asOf: requested ? asOf : null }]
+    sources.push({ key: 'owner-commercial-documents', state: requested ? 'readable' : 'not-requested', sourceVersion: requested ? data.ownerSourceVersion : null, asOf: requested ? asOf : null })
+    if (dataOrigin === 'real' && requested)
+      sources.push({ key: 'invoice-applications', state: 'unavailable', sourceVersion: null, asOf: null })
+    if (dataOrigin === 'real' && receiptSource) {
+      sources.push({ key: 'receipts', state: !requested ? 'not-requested' : data.receiptsProblem?.code === 'forbidden' ? 'forbidden' : data.receiptsProblem ? 'unavailable' : 'readable', sourceVersion: !requested || data.receiptsProblem ? null : data.receiptSourceVersion || null, asOf: !requested || data.receiptsProblem ? null : asOf })
+    }
+    return createReadMeta({ session: { ...resolveBusinessSession(), capabilities: data.capabilities }, schemaVersion: 'construction-contract-read-v2', operation, dataOrigin, asOf, sources, coverage: requested ? 'complete' : 'unknown', scope: { query: readQueryScope(query), testSession: sessionId ?? null } })
   }
 
   return {
     facts(sessionId?: string | null) {
-      return { ...context(sessionId), asOf: FIXED_AS_OF }
+      return { ...context(sessionId), asOf: new Date().toISOString() }
     },
     reset(scenario: ConstructionContractReadTestScenario, sessionId?: string | null) {
       if (scenario === 'ready')
@@ -333,20 +356,24 @@ export function createConstructionContractReadTestInstance(
     list(input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const parsed = parseConstructionContractListQuery(input)
-      return buildConstructionContractListPage({
+      const query = { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') }
+      const asOf = new Date().toISOString()
+      return withOriginReadMeta(buildConstructionContractListPage({
         ...data,
-        query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') },
-        asOf: FIXED_AS_OF,
-      })
+        query,
+        asOf,
+      }), { real: metadata(data, query, 'construction-contract:list', 'real', asOf, sessionId), demo: metadata(data, query, 'construction-contract:list', 'demo', asOf, sessionId) }, query.origin ?? 'real')
     },
     detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const parsed = parseConstructionContractDetailQuery(id, input)
-      return buildConstructionContractDetail({
+      const query = { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') }
+      const asOf = new Date().toISOString()
+      return withReadMeta(buildConstructionContractDetail({
         ...data,
-        query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') },
-        asOf: FIXED_AS_OF,
-      })
+        query,
+        asOf,
+      }), metadata(data, query, 'construction-contract:detail', query.origin, asOf, sessionId))
     },
   }
 }

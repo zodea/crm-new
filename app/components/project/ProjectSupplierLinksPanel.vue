@@ -59,7 +59,7 @@ const relationships = computed(() => props.relationships.map(relationship => ({
         class="flex min-w-0 items-center gap-2 px-3 py-2 text-12px text-ink-faint"
       >
         <span class="i-lucide-lock-keyhole shrink-0" aria-hidden="true" />
-        <span>{{ relationship.supplier.state === 'forbidden' ? '无权查看分供方' : '分供方身份未记录' }}</span>
+        <span>{{ relationship.supplier.state === 'forbidden' ? '无权查看分供方' : relationship.supplier.state === 'unavailable' ? '来源暂不可用' : '分供方身份未记录' }}</span>
       </div>
     </div>
     <p v-else class="m-0 px-3 py-4 text-center text-11px text-ink-faint">

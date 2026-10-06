@@ -3,17 +3,21 @@ import type { CrewListPageDTO, WorkerListPageDTO } from '~/lib/crew-worker/repos
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { DataOriginDTO, EntityRefDTO, NavigationIntentDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
-import { computed, onActivated, onMounted, shallowRef, watch } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { enumSelectionFromQuery, serializeEnumSelection } from '~/lib/util/enum-selection'
 import { useCrewWorkerCommandStore } from '~/stores/crew-worker-command'
 import { useCrewWorkerReadStore } from '~/stores/crew-worker-read'
 
 const props = defineProps<{ kind: 'crew' | 'worker' }>()
 const route = useRoute()
+const router = useRouter()
 const store = useCrewWorkerReadStore()
 const commandStore = useCrewWorkerCommandStore()
 const visibility = useDataVisibilityStore()
+const viewActive = shallowRef(true)
 function queryText(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
@@ -50,7 +54,7 @@ interface CrewCentralRow extends CentralRowBase {
   contactPhone: string
   memberCount: number
   activeMemberCount: number
-  projectCount: number
+  projectCount: number | null
 }
 
 interface WorkerCentralRow extends CentralRowBase {
@@ -69,13 +73,14 @@ type CentralRow = CrewCentralRow | WorkerCentralRow
 const state = computed(() => props.kind === 'crew' ? store.crewListState : store.workerListState)
 const readPage = computed<CrewListPageDTO | WorkerListPageDTO | null>(() => {
   const value = state.value
-  if (value.kind === 'ready' || value.kind === 'empty' || value.kind === 'partial')
+  if (value.kind === 'ready' || value.kind === 'empty')
     return value.data
-  if (value.kind === 'loading' || value.kind === 'error')
+  if (value.kind === 'loading' || (value.kind === 'error' || value.kind === 'unavailable'))
     return value.previous
   return null
 })
 const loading = computed(() => state.value.kind === 'loading')
+const canCreate = computed(() => viewActive.value && (state.value.kind === 'ready' || state.value.kind === 'empty') && (readPage.value?.capabilities.includes(`${props.kind}:write`) ?? false))
 const initialLoading = computed(() => state.value.kind === 'idle' || (state.value.kind === 'loading' && !readPage.value))
 const problem = computed(() => 'problem' in state.value ? state.value.problem : null)
 const rows = computed<CentralRow[]>(() => props.kind === 'crew'
@@ -150,15 +155,50 @@ const summary = computed<Record<string, string | number>>(() => {
 })
 const tradeOptions = computed(() => (readPage.value?.summary.trades ?? []).map(item => ({ key: item.value, label: `${item.label}（${item.count}）` })))
 
+let listLoadTicket = 0
+function invalidateLoad() {
+  listLoadTicket++
+}
+bindReadAuthority(invalidateLoad)
+onDeactivated(() => {
+  viewActive.value = false
+  invalidateLoad()
+})
+onScopeDispose(() => {
+  viewActive.value = false
+  invalidateLoad()
+})
+function currentLoadScope() {
+  return JSON.stringify([props.kind, route.path, visibility.includeDemo, search.value, trade.value, status.value, sort.value, page.value, pageSize.value])
+}
+
 async function load() {
+  if (!viewActive.value)
+    return
+  const ticket = ++listLoadTicket
+  const scope = currentLoadScope()
+  const requestedPage = page.value
+  const requestedSize = pageSize.value
   if (props.kind === 'crew') {
     await store.loadCrewList({ includeDemo: visibility.includeDemo, search: search.value, trade: trade.value, status: status.value, sort: sort.value, page: page.value, pageSize: pageSize.value })
   }
   else {
     await store.loadWorkerList({ includeDemo: visibility.includeDemo, search: search.value, trade: trade.value, crewId: null, projectStatus: null, status: status.value, sort: sort.value, page: page.value, pageSize: pageSize.value })
   }
-  if (readPage.value)
-    page.value = readPage.value.pagination.page
+  if (!viewActive.value || ticket !== listLoadTicket || currentLoadScope() !== scope || (state.value.kind !== 'ready' && state.value.kind !== 'empty'))
+    return
+  const pagination = readPage.value?.pagination
+  if (!pagination || pagination.requestedPage !== requestedPage || pagination.pageSize !== requestedSize)
+    return
+  if (pagination.page !== requestedPage) {
+    page.value = pagination.page
+    const query = { ...route.query }
+    if (pagination.page === 1)
+      delete query.page
+    else
+      query.page = String(pagination.page)
+    await router.replace({ query })
+  }
 }
 const debouncedLoad = useDebounceFn(() => {
   page.value = 1
@@ -198,14 +238,18 @@ watch(() => visibility.includeDemo, () => {
   void load()
 })
 watch(() => commandStore.latestWrite, () => void load(), { deep: true })
+watch(() => props.kind, () => void load())
 onMounted(() => void load())
-onActivated(() => void load())
+onActivated(() => {
+  viewActive.value = true
+  void load()
+})
 </script>
 
 <template>
   <div class="grid min-w-0 gap-3">
-    <StatePanel v-if="initialLoading" kind="loading" :title="`正在加载${kind === 'crew' ? '班组' : '工人'}资料库`" />
-    <StatePanel v-else-if="problem" :kind="problem.code === 'forbidden' ? 'forbidden' : 'error'" :title="`${kind === 'crew' ? '班组' : '工人'}列表加载失败`" :description="problem.message" :action-label="problem.retryable ? '重新加载' : ''" :compact="Boolean(readPage)" @action="load" />
+    <StatePanel v-if="initialLoading" kind="loading" :title="readProblemTitle(problem, `正在加载${kind === 'crew' ? '班组' : '工人'}资料库`)" />
+    <StatePanel v-else-if="problem" :kind="['forbidden', 'unauthenticated'].includes(problem.code) ? 'forbidden' : 'error'" :title="readProblemTitle(problem, `${kind === 'crew' ? '班组' : '工人'}列表加载失败`)" :description="problem.message" :action-label="problem.retryable ? '重新加载' : ''" :compact="Boolean(readPage)" @action="load" />
     <ListShell v-if="!initialLoading && (!problem || readPage)" :summary="summary">
       <template #toolbar>
         <section class="panel flex min-w-0 flex-wrap items-center gap-2 p-2.5">
@@ -223,14 +267,14 @@ onActivated(() => void load())
           <button type="button" class="btn-secondary" :disabled="loading" @click="load">
             <span class="i-lucide-refresh-cw mr-1" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />刷新
           </button>
-          <NuxtLink :to="`/base/${kind}/form`" class="btn-primary">
+          <NuxtLink v-if="canCreate" :to="`/base/${kind}/form`" class="btn-primary">
             <span class="i-lucide-plus mr-1" aria-hidden="true" />新增{{ kind === 'crew' ? '班组' : '工人' }}
           </NuxtLink>
         </section>
       </template>
       <template #table>
         <div :data-ui="`${kind}-central-list-table`" class="min-w-0 max-w-full" :aria-busy="loading">
-          <KitTable :columns="columns" :data="rows" :loading="loading && !readPage" :page="{ page, pageSize, total: readPage?.pagination.total ?? 0 }" :page-size-options="[10, 20, 50, 100]" :empty="{ title: search || trade.length || status.length ? '没有符合条件的记录' : `还没有${kind === 'crew' ? '班组' : '工人'}档案`, description: '可调整筛选或新建正式档案。', actionLabel: search || trade.length || status.length ? '清除筛选' : `新建${kind === 'crew' ? '班组' : '工人'}` }" row-key="identity" @empty-action="search || trade.length || status.length ? clearFilters() : navigateTo(`/base/${kind}/form`)" @page-change="({ page: nextPage, pageSize: nextSize }) => { page = nextPage; pageSize = nextSize as 10 | 20 | 50 | 100; load() }">
+          <KitTable :columns="columns" :data="rows" :loading="loading && !readPage" :page="{ page, pageSize, total: readPage?.pagination.total ?? 0 }" :page-size-options="[10, 20, 50, 100]" :empty="{ title: search || trade.length || status.length ? '没有符合条件的记录' : `还没有${kind === 'crew' ? '班组' : '工人'}档案`, description: '可调整筛选或新建正式档案。', actionLabel: search || trade.length || status.length ? '清除筛选' : canCreate ? `新建${kind === 'crew' ? '班组' : '工人'}` : '' }" row-key="identity" @empty-action="search || trade.length || status.length ? clearFilters() : canCreate && navigateTo(`/base/${kind}/form`)" @page-change="({ page: nextPage, pageSize: nextSize }) => { page = nextPage; pageSize = nextSize as 10 | 20 | 50 | 100; load() }">
             <template #name="{ row }">
               <div :id="`${kind}-row-${row.identity}`">
                 <EntityLink :id="row.id" :type="kind" :label="row.name" :intent="row.intent" :return-to="rowReturnTo(row)" /><span class="ml-1 text-10px text-ink-faint">{{ row.dataOrigin === 'demo' ? '测试' : '正式' }}</span>

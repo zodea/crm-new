@@ -14,7 +14,8 @@ import { randomUUID } from 'node:crypto'
 import { supplierCredentialMasterDraft } from '../../app/lib/migration/supplier-credential-source'
 import { SUPPLIER_WRITE_CAPABILITY } from '../../app/lib/supplier/command-contract'
 import { SupplierCredentialNotAppliedProblem } from '../../app/lib/supplier/credential-contract'
-import { credentialMasterChanged, credentialRecords, currentCredentialStatus, emptySupplierCredentialAggregate, revalidateCredentialReview } from '../../app/lib/supplier/credential-domain'
+import { credentialMasterChanged, credentialRecords, currentCredentialStatus, emptySupplierCredentialAggregate, invalidateCredentialReview } from '../../app/lib/supplier/credential-domain'
+import { shanghaiBusinessDate } from '../../app/lib/supplier/credentials'
 import { supplierProblem, SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
 import { preserveTaxpayerVerification } from '../../app/lib/supplier/taxpayer-verification'
 import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
@@ -225,15 +226,6 @@ export function createSupplierCommandService(options: Options = {}) {
     if (!supplier)
       throw failure('not-found', '当前正式分供方不存在')
     const aggregate = state.credentialScopes.get(supplierId) ?? emptySupplierCredentialAggregate(supplierId)
-    const previousReview = aggregate.review
-    revalidateCredentialReview(aggregate, new Date(now()))
-    if (previousReview && !aggregate.review) {
-      aggregate.version++
-      supplier.version++
-      state.sourceVersion++
-    }
-    state.credentialScopes.set(supplierId, aggregate)
-    supplier.credentialStatus = currentCredentialStatus(aggregate, new Date(now()))
     return { draft: structuredClone(supplier.draft), version: supplier.version, aggregate: structuredClone(aggregate) }
   }
 
@@ -259,7 +251,7 @@ export function createSupplierCommandService(options: Options = {}) {
           throw cause
         }
         if (credentialMasterChanged(supplier.draft, draft))
-          scope.aggregate.review = null
+          invalidateCredentialReview(scope.aggregate)
         state.credentialScopes.set(supplierId, scope.aggregate)
         state.suppliers.set(supplierId, { ...supplier, draft: { ...draft, id: supplierId }, version: supplier.version + 1, credentialStatus: currentCredentialStatus(scope.aggregate, new Date(now())), updatedAt: now() })
         state.sourceVersion++
@@ -331,15 +323,15 @@ export function createSupplierCommandService(options: Options = {}) {
       if (removed)
         state.sourceVersion += 1
     },
-    rows(sessionId?: string | null): SupplierListSourceRow[] {
+    rows(sessionId?: string | null, asOf = now()): SupplierListSourceRow[] {
       return [...stateFor(sessionId).suppliers.values()].map((stored) => {
         const scope = credentialScope(stored.id, sessionId)
         const fileIds = credentialRecords(scope.aggregate).filter(row => row.category === '营业执照' && row.file?.state === 'available').map(row => row.file!.id)
-        return { ...toRow(stored), businessLicense: { state: fileIds.length ? 'available' as const : 'missing' as const, fileCount: fileIds.length, fileIds } }
+        return { ...toRow(stored), credentialStatus: currentCredentialStatus(scope.aggregate, new Date(asOf)), businessLicense: { state: fileIds.length ? 'available' as const : 'missing' as const, fileCount: fileIds.length, fileIds } }
       })
     },
-    sourceVersion(sessionId?: string | null): string {
-      return `supplier-command-${stateFor(sessionId).sourceVersion}`
+    sourceVersion(sessionId?: string | null, asOf = now()): string {
+      return `supplier-command-${stateFor(sessionId).sourceVersion}-${shanghaiBusinessDate(new Date(asOf))}`
     },
     form(id: string, session: BusinessSession, sessionId?: string | null): SupplierFormReadDTO {
       if (!session.capabilities.includes(SUPPLIER_WRITE_CAPABILITY))
@@ -432,7 +424,7 @@ export function createSupplierCommandService(options: Options = {}) {
       const id = existing?.id ?? createId()
       const aggregate = structuredClone(state.credentialScopes.get(id) ?? emptySupplierCredentialAggregate(id))
       if (existing && credentialMasterChanged(existing.draft, draft))
-        aggregate.review = null
+        invalidateCredentialReview(aggregate)
       if (aggregate.migrationBatchId)
         aggregate.changedAfterMigration = true
       const stored: StoredSupplier = {

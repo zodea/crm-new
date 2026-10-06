@@ -1,3 +1,4 @@
+import type { SupplierFactSource } from '../../app/lib/supplier/read-contract'
 import type {
   SupplierContractSourceRow,
   SupplierInvoiceSourceRow,
@@ -9,6 +10,7 @@ import type {
   SupplierProjectSourceRow,
   SupplierSettlementSourceRow,
 } from '../../app/lib/supplier/repository'
+import type { BusinessSession } from './business-session'
 import supplementsSeed from '../../app/lib/db/seed/contract_supplements.json'
 import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import invoicesSeed from '../../app/lib/db/seed/invoices.json'
@@ -19,6 +21,8 @@ import projectSuppliersSeed from '../../app/lib/db/seed/project_suppliers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import suppliersSeed from '../../app/lib/db/seed/suppliers.json'
 import { currentCredentialStatus } from '../../app/lib/supplier/credential-domain'
+import { shanghaiBusinessDate } from '../../app/lib/supplier/credentials'
+import { SUPPLIER_DETAIL_READ_SCHEMA, SUPPLIER_LIST_READ_SCHEMA } from '../../app/lib/supplier/read-contract'
 import {
   buildSupplierDetailRead,
   buildSupplierListPage,
@@ -27,16 +31,17 @@ import {
   supplierProblem,
   SupplierRepositoryProblem,
 } from '../../app/lib/supplier/repository'
+import { resolveBusinessSession } from './business-session'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { projectSupplierCommandTestInstance } from './project-supplier-command-test-instance'
+import { createReadMeta, readQueryScope, withOriginReadMeta, withReadMeta } from './read-meta'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 import { supplierCredentialDemoScope } from './supplier-credential-demo'
 import { supplierFactSource } from './supplier-fact-source'
 
 export type SupplierReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
-const FIXED_AS_OF = '2026-08-23T00:00:00.000Z'
 const SOURCE_VERSION = 'supplier-read-fixture-v1'
 
 function jsonArray(value: unknown): string[] {
@@ -178,8 +183,8 @@ function problem(code: 'forbidden' | 'unavailable', message: string, retryable =
 
 export function createSupplierReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[] = id => demoWorkspaceTestInstance.capabilities(id),
-  resolveFormalRows: (sessionId?: string | null) => readonly SupplierListSourceRow[] = id => supplierCommandTestInstance.rows(id),
-  resolveFormalSourceVersion: (sessionId?: string | null) => string = id => supplierCommandTestInstance.sourceVersion(id),
+  resolveFormalRows: (sessionId?: string | null, asOf?: string) => readonly SupplierListSourceRow[] = (id, asOf) => supplierCommandTestInstance.rows(id, asOf),
+  resolveFormalSourceVersion: (sessionId?: string | null, asOf?: string) => string = (id, asOf) => supplierCommandTestInstance.sourceVersion(id, asOf),
   resolveImportedRelations: (sessionId?: string | null) => {
     projects: readonly SupplierProjectSourceRow[]
     relations: readonly SupplierProjectRelationSourceRow[]
@@ -200,7 +205,7 @@ export function createSupplierReadTestInstance(
   const scenarios = new Map<string, SupplierReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
 
-  function context(sessionId?: string | null) {
+  function context(sessionId?: string | null, asOf = new Date().toISOString()) {
     const scenario = scenarios.get(keyFor(sessionId)) ?? 'ready'
     if (scenario === 'forbidden')
       throw problem('forbidden', '无分供方查看权限')
@@ -216,7 +221,7 @@ export function createSupplierReadTestInstance(
     const settlementSource = resolveSettlementSource?.(sessionId)
     return {
       capabilities,
-      suppliers: ready ? [...resolveFormalRows(sessionId), ...demoSuppliers.map(row => ({ ...row, credentialStatus: currentCredentialStatus(supplierCredentialDemoScope(row.id).aggregate, new Date()), businessLicense: { state: 'missing' as const, fileCount: 0, fileIds: [] } }))] : [],
+      suppliers: ready ? [...resolveFormalRows(sessionId, asOf), ...demoSuppliers.map(row => ({ ...row, credentialStatus: currentCredentialStatus(supplierCredentialDemoScope(row.id).aggregate, new Date(asOf)), businessLicense: { state: 'missing' as const, fileCount: 0, fileIds: [] } }))] : [],
       projects: ready ? [...formalProjects.rows, ...imported.projects, ...demoProjects] : [],
       projectSuppliers: ready ? [...imported.relations, ...demoProjectSuppliers] : [],
       contracts: ready ? [...formalContracts.rows, ...demoContracts] : [],
@@ -226,9 +231,19 @@ export function createSupplierReadTestInstance(
       paymentApplications: ready ? demoPaymentApplications : [],
       paymentRecords: ready ? demoPaymentRecords : [],
       paymentAllocations: ready ? demoPaymentAllocations : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${formalContracts.sourceVersion}:${formalProjects.sourceVersion}:${settlementSource?.sourceVersion ?? 'settlements-not-connected'}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
+      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId, asOf)}:${formalContracts.sourceVersion}:${formalProjects.sourceVersion}:${settlementSource?.sourceVersion ?? 'settlements-not-connected'}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
+      sourceVersions: { suppliers: resolveFormalSourceVersion(sessionId, asOf), projects: `${formalProjects.sourceVersion}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`, contracts: formalContracts.sourceVersion, settlements: settlementSource?.sourceVersion ?? null },
     }
   }
+
+  function meta(data: ReturnType<typeof context>, session: BusinessSession, schemaVersion: string, origin: 'real' | 'demo', asOf: string, scope: unknown, demoRequested: boolean) {
+    const actual = { ...session, capabilities: data.capabilities }
+    const sources = origin === 'demo'
+      ? [{ key: 'demo-supplier-fixtures', state: demoRequested ? 'readable' as const : 'not-requested' as const, sourceVersion: demoRequested ? `${SOURCE_VERSION}:${shanghaiBusinessDate(new Date(asOf))}` : null, asOf: demoRequested ? asOf : null }]
+      : [{ key: 'suppliers', state: 'readable' as const, sourceVersion: data.sourceVersions.suppliers, asOf }, { key: 'projects', state: 'readable' as const, sourceVersion: data.sourceVersions.projects, asOf }, { key: 'contracts', state: 'readable' as const, sourceVersion: data.sourceVersions.contracts, asOf }, { key: 'settlements', state: data.settlementSourceConnected ? 'readable' as const : 'unavailable' as const, sourceVersion: data.sourceVersions.settlements, asOf: data.settlementSourceConnected ? asOf : null }, { key: 'invoices', state: 'unavailable' as const, sourceVersion: null, asOf: null }, { key: 'payments', state: 'unavailable' as const, sourceVersion: null, asOf: null }]
+    return createReadMeta({ session: actual, schemaVersion, operation: schemaVersion, dataOrigin: origin, asOf, sources, coverage: origin === 'demo' && !demoRequested ? 'unknown' : 'complete', scope: typeof scope === 'object' && scope !== null ? readQueryScope(scope) : scope })
+  }
+  const missingSources = (connected: boolean): SupplierFactSource[] => connected ? ['invoices', 'payments'] : ['settlements', 'invoices', 'payments']
 
   return {
     reset(next: SupplierReadTestScenario, sessionId?: string | null) {
@@ -240,27 +255,32 @@ export function createSupplierReadTestInstance(
     async formalOptions(sessionId?: string | null) {
       return context(sessionId).suppliers.filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, name: row.name, aliases: [...row.aliases] }))
     },
-    async list(input: Record<string, unknown> | undefined, sessionId?: string | null) {
-      const data = context(sessionId)
+    async list(input: Record<string, unknown> | undefined, sessionId?: string | null, session: BusinessSession = resolveBusinessSession()) {
+      const asOf = new Date().toISOString()
+      const data = context(sessionId, asOf)
       const query = parseSupplierListQuery(input)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
-      return buildSupplierListPage({ ...data, settlements: data.settlementSourceConnected ? data.settlements : undefined, query, asOf: FIXED_AS_OF })
+      const unavailableSources = missingSources(data.settlementSourceConnected)
+      const projection = buildSupplierListPage({ ...data, unavailableSources, unavailableSourcesByOrigin: { real: unavailableSources, demo: [] }, query, asOf })
+      return withOriginReadMeta(projection, { real: meta(data, session, SUPPLIER_LIST_READ_SCHEMA, 'real', asOf, query, query.includeDemo), demo: meta(data, session, SUPPLIER_LIST_READ_SCHEMA, 'demo', asOf, query, query.includeDemo) })
     },
-    async detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
-      const data = context(sessionId)
+    async detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null, session: BusinessSession = resolveBusinessSession()) {
+      const asOf = new Date().toISOString()
+      const data = context(sessionId, asOf)
       const query = parseSupplierDetailQuery(id, input)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
-      return buildSupplierDetailRead({ ...data, query, asOf: FIXED_AS_OF })
+      const unavailableSources = query.origin === 'real' ? missingSources(data.settlementSourceConnected) : []
+      return withReadMeta(buildSupplierDetailRead({ ...data, unavailableSources, query, asOf }), meta(data, session, SUPPLIER_DETAIL_READ_SCHEMA, query.origin, asOf, query, query.origin === 'demo'))
     },
   }
 }
 
 export const supplierReadTestInstance = createSupplierReadTestInstance(
   id => demoWorkspaceTestInstance.capabilities(id),
-  id => supplierCommandTestInstance.rows(id),
-  id => `${supplierCommandTestInstance.sourceVersion(id)}`,
+  (id, asOf) => supplierCommandTestInstance.rows(id, asOf),
+  (id, asOf) => supplierCommandTestInstance.sourceVersion(id, asOf),
   id => projectSupplierCommandTestInstance.supplierProjectRows(id),
   (id) => {
     const source = supplierFactSource(id)

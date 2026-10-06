@@ -7,10 +7,10 @@ import { formatShanghaiDateTime } from '~/lib/util/datetime'
 const props = defineProps<{ credentials: readonly SupplierCredentialRecord[], canWrite: boolean, businessDate: string, busy: boolean }>()
 defineEmits<{ upload: [], edit: [record: SupplierCredentialRecord], remove: [record: SupplierCredentialRecord], preview: [record: SupplierCredentialRecord], download: [record: SupplierCredentialRecord], recognize: [record: SupplierCredentialRecord], reviewOcr: [record: SupplierCredentialRecord] }>()
 const rows = computed(() => props.credentials.map((record) => {
-  const expiry = credentialExpiryState(record, new Date(`${props.businessDate}T12:00:00+08:00`))
+  const expiry = record.validity?.state ?? credentialExpiryState(record, new Date(`${props.businessDate}T12:00:00+08:00`))
   return {
     record,
-    expiryLabel: record.longTerm ? '长期有效' : expiry === 'expired' ? `已过期 · ${record.expiresAt}` : expiry === 'unrecorded' ? '有效期未录入' : `${expiry === 'expiring' ? '即将到期' : '有效至'} · ${record.expiresAt}`,
+    expiryLabel: record.longTerm ? '长期有效' : expiry === 'expired' ? `已过期 · ${record.expiresAt}` : expiry === 'unrecorded' ? (record.expiresAt.trim() ? '日期无效 · 待核对' : '有效期未录入') : `${expiry === 'expiring' ? '即将到期' : '有效至'} · ${record.expiresAt}`,
     expiryClass: expiry === 'expired' ? 'chip-danger' : expiry === 'expiring' || expiry === 'unrecorded' ? 'chip-warn' : 'chip-ok',
   }
 }))

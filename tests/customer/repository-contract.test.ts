@@ -43,7 +43,7 @@ describe('客户中央 Repository contract', () => {
     expect(parseCustomerListQuery(serializeCustomerListQuery(query))).toEqual(query)
     const input = { rows, query, asOf: AS_OF, sourceVersion: 'multi-status', capabilities: [] }
     const result = buildCustomerListPage(input)
-    expect(result.pagination).toEqual({ page: 1, pageSize: 10, total: 2 })
+    expect(result.pagination).toEqual({ requestedPage: 999, page: 1, pageSize: 10, total: 2 })
     expect(result.summary.statuses.map(item => item.value)).toEqual(['active', 'draft', 'inactive'])
     expect(result.summary.origins).toEqual({ real: { customerCount: 2 }, demo: { customerCount: 0 } })
     expect(buildCustomerListPage({ ...input, query: { ...query, search: '乙', status: ['active', 'inactive'] } }).items.map(item => item.customer.id)).toEqual(['b'])
@@ -90,7 +90,7 @@ describe('客户中央 Repository contract', () => {
       },
     })
     expect(JSON.stringify(page.items[0]?.navigation)).not.toContain('/base/customer')
-    expect(page.pagination).toEqual({ page: 1, pageSize: 10, total: 1 })
+    expect(page.pagination).toEqual({ requestedPage: 1, page: 1, pageSize: 10, total: 1 })
     expect(page.summary).toEqual({
       statuses: [{ value: 'active', label: 'active', count: 1 }],
       origins: {
@@ -240,4 +240,17 @@ describe('客户中央 Repository contract', () => {
       expect((cause as CustomerRepositoryProblem).problem.code).toBe('relationship-mismatch')
     }
   })
+})
+
+it.each(['amount', 'supplementAmount'] as const)('客户采用的有效合同%s未知沿项目、总额与余额传播，草稿不纳入', (field) => {
+  const row = { dataOrigin: 'real' as const, id: 'c', no: 'SG', name: '有效未知合同', projectId: 'p', customerId: 'customer-1', amount: 100, supplementAmount: 20, receiptAmount: 0, signDate: null, status: '履约中', [field]: null }
+  const projects = [{ dataOrigin: 'real' as const, id: 'p', name: '项目', code: 'P', customerId: 'customer-1', secondaryCustomerId: null, permission: 'allowed' as const, status: '', startDate: null, plannedEnd: null, manager: '' }]
+  const read = (status = row.status) => buildCustomerDetailRead({ customers: [customer('customer-1', '客户')], projects, contracts: [{ ...row, status }], receipts: [], query: parseCustomerDetailQuery('customer-1', { origin: 'real' }), asOf: AS_OF, sourceVersion: 'known-fixture', capabilities: [] })
+  const result = read()
+  expect(result.projects[0]).toMatchObject({ contractCount: 1, effectiveContractAmount: null, receiptCount: 0, effectiveReceiptAmount: '0.00' })
+  expect(result.contracts[0]).toMatchObject({ effectiveAmount: null, receiptAmount: '0.00', outstandingAmount: null })
+  expect(result.summary).toMatchObject({ contractCount: 1, effectiveContractAmount: null, effectiveReceiptAmount: '0.00', outstandingAmount: null })
+  const draft = read('draft')
+  expect(draft.contracts[0]).toMatchObject({ effectiveAmount: '0.00', receiptAmount: '0.00', outstandingAmount: '0.00' })
+  expect(draft.summary).toMatchObject({ effectiveContractAmount: '0.00', outstandingAmount: '0.00' })
 })

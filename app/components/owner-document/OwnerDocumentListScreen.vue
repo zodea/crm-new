@@ -284,7 +284,16 @@ function rowActions(row: OwnerDocumentListRecord): RowActionItem[] {
   ]
 }
 
+let listLoadTicket = 0
+function currentLoadScope() {
+  return JSON.stringify([props.kind, route.path, centralReadOnly.value, search.value, projectFilter.value, routeContract.value, routeSupplier.value, selectedQuery(statusView.value), selectedQuery(typeFilter.value), acceptanceVariant.value, page.value, pageSize.value])
+}
+
 async function load() {
+  const ticket = ++listLoadTicket
+  const scope = currentLoadScope()
+  const requestedPage = page.value
+  const requestedSize = pageSize.value
   try {
     await store.loadKind(props.kind, centralReadOnly.value
       ? {
@@ -299,6 +308,11 @@ async function load() {
           pageSize: pageSize.value as 10 | 20 | 50 | 100,
         }
       : undefined)
+    if (ticket !== listLoadTicket || scope !== currentLoadScope() || !centralReadOnly.value || !hasSnapshot.value)
+      return
+    const pagination = store.centralPageFor(centralKind.value)
+    if (pagination.requestedPage === requestedPage && pagination.pageSize === requestedSize && pagination.page !== requestedPage)
+      page.value = pagination.page
   }
   catch {
     // Store 持有当前类型的可重试错误态，避免生命周期出现未处理拒绝。
@@ -541,8 +555,8 @@ watch([search, projectFilter, typeFilter, statusView, page, pageSize], () => {
     query.documentType = serializeEnumSelection(typeFilter.value)
   else
     delete query.documentType
-  if (currentPage.value !== 1)
-    query.page = String(currentPage.value)
+  if (page.value !== 1)
+    query.page = String(page.value)
   else
     delete query.page
   if (pageSize.value !== 20)

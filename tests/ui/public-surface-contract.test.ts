@@ -31,7 +31,7 @@ describe('public surface contract', () => {
   it.each([
     '`metadataKey + position + capability`',
     '`subject.id + sourceVersion`',
-    '`report.key + visibility fingerprint + asOf + sourceVersion`',
+    '[READ-MODELS 的分层缓存身份](./READ-MODELS.md#insight-cache-identity)',
     '`openNotification(eventId)`',
     '`NotificationOpenResultDTO`',
     'toast 自动消失或手动关闭',
@@ -39,29 +39,35 @@ describe('public surface contract', () => {
     '默认不恢复 `/new`、`/form`、`/edit`',
     '`onDeactivated`',
     '全局通知连接只允许由应用壳维护一个实例',
+    '`subject.id + sourceVersion`',
+    '静态样本只在服务端授权后的演示模式展示',
+    // 旧断言保护不拿样本填正式源；未接入现在须明示不可用，不能冒充已核实空集。
+    '其他运行环境或未接领域明确显示来源尚未就绪',
+    '演示 fixture 不得成为正式运行 fallback',
   ])('defines layered insight, atomic notification opening and recovery boundaries: %s', (token) => {
     const contract = readFileSync(PUBLIC_SURFACES_PATH, 'utf8')
-    expect(contract, token).toContain(token)
+    expect(contract.includes(token), token).toBe(true)
   })
 
   it.each([
     'interface InsightAvailabilityDTO',
     `availability: 'available' | 'unavailable' | 'forbidden'`,
-    'interface NotificationOpenResultDTO',
-    'openNotification(eventId)',
-    '同一事务内按当前权限解析目标并首次写入 `readAt`',
+    'NotificationOpenResultDTO 返回 {eventId,readAt,target}',
+    '读取接口不修改 readAt',
     '[`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)',
+    '`subject.id + sourceVersion`',
+    '`report.key + visibility fingerprint + asOf + sourceVersion`',
   ])('promotes stable public DTOs into the read model authority: %s', (token) => {
     const readModels = readFileSync(READ_MODELS_PATH, 'utf8')
-    expect(readModels, token).toContain(token)
+    expect(readModels.includes(token), token).toBe(true)
   })
 
   it('is linked from the canonical indexes and direct runtime evidence', () => {
     expect(readFileSync(DOCS_INDEX_PATH, 'utf8')).toContain(
       '[`docs/rewrite/PUBLIC-SURFACES.md`](./rewrite/PUBLIC-SURFACES.md)',
     )
-    expect(readFileSync(ARCHITECTURE_PATH, 'utf8')).toContain(
-      '[`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)',
+    expect(readFileSync(ARCHITECTURE_PATH, 'utf8')).toMatch(
+      /\[[^\]]+\]\(\.\/PUBLIC-SURFACES\.md\)/,
     )
     expect(readFileSync(AUDIT_PATH, 'utf8')).toContain('`R-PUBLIC-SURFACES-LIVE`')
   })

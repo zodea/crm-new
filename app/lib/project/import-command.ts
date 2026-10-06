@@ -1,7 +1,8 @@
-import type { CustomerReadRepository } from '../customer/read-contract'
+import type { CustomerListItemDTO, CustomerListPageDTO, CustomerReadRepository } from '../customer/read-contract'
 import type { ProjectCommandRepository, ProjectCommandRequestDTO } from './command-contract'
 import { CustomerRepositoryProblem } from '../customer/repository'
 import { ImportRowRejected } from '../kit/import-mapping'
+import { collectReadPages } from '../read-model/collection'
 import { PROJECT_WRITE_CAPABILITY } from './command-contract'
 import { decodeProjectImportSource, projectDraftFromImport, projectImportSource, projectImportSourceKey } from './import'
 import { projectProblemFromUnknown } from './repository'
@@ -16,13 +17,18 @@ export function createProjectRowImporter(repository: ProjectCommandRepository, c
     const context = await repository.context()
     if (!context.capabilities.includes(PROJECT_WRITE_CAPABILITY))
       throw new ImportRowRejected('无项目导入权限')
-    const candidates = []
-    for (let page = 1; ; page++) {
-      const result = await customers.list({ includeDemo: false, search: '', status: null, sort: 'name-asc', page, pageSize: 100 })
-      candidates.push(...result.items)
-      if (page * 100 >= result.pagination.total)
-        break
+    const collected = await collectReadPages<CustomerListPageDTO>({
+      load: page => customers.list({ includeDemo: false, search: '', status: null, sort: 'name-asc', page, pageSize: 100 }),
+      identity: (item: CustomerListItemDTO) => `${item.dataOrigin}:${item.customer.id}`,
+    })
+    const current = await repository.context()
+    if (current.workspaceId !== context.workspaceId || current.actorId !== context.actorId
+      || collected.first.meta.workspaceId !== current.workspaceId || collected.first.meta.actorId !== current.actorId
+      || !current.capabilities.includes(PROJECT_WRITE_CAPABILITY) || !current.capabilities.includes('customer:list:read')
+      || collected.items.some(item => item.dataOrigin !== 'real')) {
+      throw new ImportRowRejected('导入期间权限、身份或候选来源已变化，请重新读取')
     }
+    const candidates = collected.items
     let draft
     let source
     try {

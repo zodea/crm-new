@@ -10,6 +10,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/notifications/pending.test.ts](../../../tests/notifications/pending.test.ts) | 单元／服务／状态 | 通知最小原提交描述及恢复 |
+| [tests/notifications/repository.test.ts](../../../tests/notifications/repository.test.ts) | 单元／服务／状态 | 全局通知HTTP契约与真实未知状态 |
 | [tests/composables/useToast.test.ts](../../../tests/composables/useToast.test.ts) | 单元／服务／状态 | undo toast |
 | [tests/kit/button.test.ts](../../../tests/kit/button.test.ts) | 单元／服务／状态 | kitButton 状态 |
 | [tests/kit/confirm.test.ts](../../../tests/kit/confirm.test.ts) | 单元／服务／状态 | cascade 打字确认门控：matchesConfirmName |

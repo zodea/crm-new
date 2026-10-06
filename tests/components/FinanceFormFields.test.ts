@@ -57,6 +57,8 @@ const KitTable = defineComponent({
     <div>
       <div v-for="(row, rowIndex) in data" :key="rowIndex">
         <slot name="source" :row="row" :row-index="rowIndex" />
+        <slot name="counterparty" :row="row" :row-index="rowIndex" />
+        <slot name="original" :row="row" :row-index="rowIndex" />
         <slot name="date" :row="row" :row-index="rowIndex" />
         <slot name="amount" :row="row" :row-index="rowIndex" />
         <slot name="note" :row="row" :row-index="rowIndex" />
@@ -100,6 +102,7 @@ function mountFields(
       fetchProjects: fetchLookup,
       fetchCustomers: fetchLookup,
       fetchSuppliers: fetchLookup,
+      fetchWorkers: fetchLookup,
       fetchIncomeContracts: fetchLookup,
       fetchExpenseContracts: fetchLookup,
       fetchSettlements: fetchLookup,
@@ -123,6 +126,28 @@ function mountFields(
 }
 
 describe('financeFormFields real-ID and detail-grid flow', () => {
+  it('切换垫付身份后保留选择种类与历史原文，其他字段补录不会退回工人种类', async () => {
+    const draft = { applicant: '原报销人文字', applicantWorkerId: null, applicantSupplierId: null, lines: [] }
+    const wrapper = mountFields('reimbursement', draft)
+    wrapper.getComponent(SelectFilter).vm.$emit('update:modelValue', 'supplier')
+    await wrapper.setProps({ draft: { ...draft, reason: '补充报销事由' } })
+    expect(wrapper.find('[data-placeholder="从全局工人清单选择"]').exists()).toBe(false)
+    await wrapper.get('[data-placeholder="选择垫付分供方"]').trigger('click')
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ applicantSupplierId: 'lookup-real-id' })
+    expect(wrapper.text()).toContain('原报销人文字')
+  })
+
+  it('父级替换未保存明细时移除旧可选引用和冻结名，显示行不保留上一份表单的来源', async () => {
+    const wrapper = mountFields('reimbursement', { lines: [{ expenseItem: '旧费用', amount: 10, counterpartyNameSnapshot: '旧交易方快照', originalExpenseLineId: 'old-original' }] })
+    expect(wrapper.text()).toContain('旧交易方快照')
+    expect(wrapper.text()).toContain('old-original')
+    await wrapper.setProps({ draft: { lines: [{ expenseItem: '新费用', amount: 20 }] } })
+    expect(wrapper.text()).not.toContain('旧交易方快照')
+    expect(wrapper.text()).not.toContain('old-original')
+    expect(wrapper.get('[data-testid="reimbursement-item-0"]').element).toHaveProperty('value', '新费用')
+    expect(wrapper.text()).toContain('20.00')
+  })
+
   it('enforces project/contract cascade and emits real settlement IDs', async () => {
     const wrapper = mountFields('payment_application', {
       name: '',

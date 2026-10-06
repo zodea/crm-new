@@ -1,7 +1,9 @@
-import type { ProblemDTO } from '../../types/read-model'
 import type { AuxiliaryContractCommand, AuxiliaryContractDetail, AuxiliaryContractPage } from './contract'
-import { isISODateTimeDTO, isProblemCodeDTO } from '../../types/read-model'
+import { isEntityRefDTO, isISODateTimeDTO } from '../../types/read-model'
 import { isCoreMigrationMoney } from '../migration/core-contract'
+import { hasConsistentOriginReadMeta, hasConsistentReadMeta } from '../read-model/meta'
+import { isPaginationDTO, parsePageQuery } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { AuxiliaryContractProblem, auxiliaryProblem } from './contract'
 
 export interface AuxiliaryContractContext { workspaceId: string, actorId: string, capabilities: readonly string[], projects: Array<{ id: string, label: string }>, suppliers: Array<{ id: string, label: string }> }
@@ -10,10 +12,9 @@ export type AuxiliaryFetcher = (url: string, options?: { method?: 'POST', body?:
 export function auxiliaryProblemFromUnknown(cause: unknown): AuxiliaryContractProblem {
   if (cause instanceof AuxiliaryContractProblem)
     return cause
-  const raw = cause as { data?: { data?: ProblemDTO } & Partial<ProblemDTO> }
-  const problem = raw?.data?.data ?? raw?.data
-  if (problem && isProblemCodeDTO(problem.code) && typeof problem.message === 'string')
-    return new AuxiliaryContractProblem({ code: problem.code, message: problem.message, retryable: problem.retryable === true, fieldErrors: problem.fieldErrors ?? {}, traceId: problem.traceId ?? null })
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new AuxiliaryContractProblem(remote)
   return auxiliaryProblem('unavailable', '合同服务暂时不可用，请重试')
 }
 function object(value: unknown): value is Record<string, unknown> {
@@ -38,13 +39,15 @@ function validateContract(value: unknown) {
     invalid()
   if (value.kind === 'company_expense' ? value.project !== null || value.supplier !== null : !object(value.project) || !object(value.supplier))
     invalid()
-  for (const key of ['project', 'supplier']) {
+  for (const key of ['project', 'supplier'] as const) {
     const ref = value[key]
     if (ref === null)
       continue
-    if (!object(ref) || ref.entity !== key || !['resolved', 'missing', 'forbidden'].includes(String(ref.state)))
+    if (!isEntityRefDTO(ref, key))
       invalid()
     if (ref.state === 'resolved' && (typeof ref.id !== 'string' || typeof ref.label !== 'string' || ref.id !== value.draft[`${key}Id`]))
+      invalid()
+    if (['forbidden', 'unavailable'].includes(ref.state) && value.draft[`${key}Id`] !== null)
       invalid()
   }
   if (!object(value.navigation) || value.navigation.kind !== 'entity-detail' || value.navigation.variant !== value.kind
@@ -64,7 +67,10 @@ export function createAuxiliaryContractRepository(fetcher: AuxiliaryFetcher) {
   }
   return {
     list: (query: Record<string, unknown>) => read('/api/read/auxiliary-contracts', { query }, (value) => {
-      if (!object(value) || !Array.isArray(value.items) || !object(value.pagination) || !Number.isSafeInteger(value.pagination.total) || !Number.isSafeInteger(value.pagination.page) || !Number.isSafeInteger(value.pagination.pageSize) || !object(value.summary) || !Array.isArray(value.capabilities) || typeof value.asOf !== 'string')
+      const { requestedPage, pageSize } = parsePageQuery(query, () => {
+        throw auxiliaryProblem('invalid-query', '合同分页参数无效')
+      })
+      if (!object(value) || !hasConsistentOriginReadMeta(value, 'auxiliary-contract-read-v2') || !Array.isArray(value.items) || !isPaginationDTO(value.pagination, value.items.length) || value.pagination.requestedPage !== requestedPage || value.pagination.pageSize !== pageSize || !object(value.summary) || !Array.isArray(value.capabilities) || typeof value.asOf !== 'string')
         return invalid()
       value.items.forEach(validateContract)
       if (!isISODateTimeDTO(value.asOf) || !Array.isArray(value.projectOptions) || !value.projectOptions.every(row => object(row) && typeof row.id === 'string' && typeof row.label === 'string'))
@@ -79,7 +85,7 @@ export function createAuxiliaryContractRepository(fetcher: AuxiliaryFetcher) {
       return value as unknown as AuxiliaryContractPage
     }),
     detail: (id: string, query: Record<string, unknown>) => read(`/api/read/auxiliary-contracts/${encodeURIComponent(id)}`, { query }, (value) => {
-      if (!object(value) || !object(value.contract) || value.contract.id !== id || value.contract.kind !== query.kind || (query.origin && value.contract.dataOrigin !== query.origin) || !Array.isArray(value.facts) || !Array.isArray(value.attachments) || !Array.isArray(value.capabilities))
+      if (!object(value) || !hasConsistentReadMeta(value, 'auxiliary-contract-read-v2', query.origin ?? 'real') || !object(value.contract) || value.contract.id !== id || value.contract.kind !== query.kind || (query.origin && value.contract.dataOrigin !== query.origin) || !Array.isArray(value.facts) || !Array.isArray(value.attachments) || !Array.isArray(value.capabilities))
         return invalid()
       validateContract(value.contract)
       const contract = value.contract

@@ -3,6 +3,7 @@ import type {
   SubcontractContractFactSource,
   SubcontractContractFactSources,
 } from '../../app/lib/subcontract-contract/repository'
+import type { DataOriginDTO } from '../../app/types/read-model'
 import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import suppliersSeed from '../../app/lib/db/seed/suppliers.json'
@@ -14,13 +15,14 @@ import {
   subcontractContractProblem,
   SubcontractContractRepositoryProblem,
 } from '../../app/lib/subcontract-contract/repository'
+import { resolveBusinessSession } from './business-session'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 
 export type SubcontractContractReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
-const FIXED_AS_OF = '2026-08-25T00:00:00.000Z'
 const projects = new Map(projectsSeed.map(row => [row.id, row.name]))
 const suppliers = new Map(suppliersSeed.map(row => [row.id, row.name]))
 
@@ -121,7 +123,9 @@ export function createSubcontractContractReadTestInstance(
       throw problem('forbidden', '无分包合同查看权限')
     const formalRows = commandInstance.rows(sessionId)
     const formalFacts = commandInstance.facts()
-    const formalChanges: SubcontractContractFactSource[] = ownerDocumentSource.rows(sessionId)
+    const ownerDocuments = ownerDocumentSource.rows(sessionId)
+    const ownerSourceVersion = ownerDocumentSource.sourceVersion(sessionId)
+    const formalChanges: SubcontractContractFactSource[] = ownerDocuments
       .filter(row => row.dataOrigin === 'real' && row.kind === 'sub_change')
       .map(row => ({
         dataOrigin: row.dataOrigin,
@@ -133,12 +137,12 @@ export function createSubcontractContractReadTestInstance(
         date: row.applicationDate,
         status: subcontractChangeStatusLabel(row.status),
       }))
-    const formalSettlements: SubcontractContractFactSource[] = ownerDocumentSource.rows(sessionId)
+    const formalSettlements: SubcontractContractFactSource[] = ownerDocuments
       .filter(row => row.dataOrigin === 'real' && row.kind === 'sub_settlement')
       .map(row => ({ dataOrigin: row.dataOrigin, id: row.id, contractId: row.contractId, no: row.no, name: row.name, amount: row.amount, date: row.applicationDate, status: row.status === 'confirmed' ? '已确认' : '草稿', settlementKind: row.documentType === '最终结算' || row.documentType === '完工结算' ? 'completion' : 'progress' }))
     const combinedFacts = {
       ...formalFacts,
-      penalties: ownerDocumentSource.rows(sessionId).filter(row => row.kind === 'project_penalty' && row.dataOrigin === 'real').map(row => ({ dataOrigin: row.dataOrigin, id: row.id, contractId: row.contractId, no: row.no, name: row.name, amount: row.amount, date: row.applicationDate, status: row.status === 'deducted' ? '已抵扣' : row.status === 'draft' ? '草稿' : '待抵扣' })),
+      penalties: ownerDocuments.filter(row => row.kind === 'project_penalty' && row.dataOrigin === 'real').map(row => ({ dataOrigin: row.dataOrigin, id: row.id, contractId: row.contractId, no: row.no, name: row.name, amount: row.amount, date: row.applicationDate, status: row.status === 'deducted' ? '已抵扣' : row.status === 'draft' ? '草稿' : '待抵扣' })),
       settlements: formalSettlements,
       changes: [...formalFacts.changes, ...formalChanges],
     }
@@ -157,8 +161,14 @@ export function createSubcontractContractReadTestInstance(
             files: [...formalFacts.files, ...demoFacts.files],
           },
       capabilities,
-      sourceVersion: `${commandInstance.sourceVersion()}+${ownerDocumentSource.sourceVersion(sessionId)}`,
+      ownerSourceVersion,
+      sourceVersion: `${commandInstance.sourceVersion()}+${ownerSourceVersion}`,
     }
+  }
+
+  function metadata(data: ReturnType<typeof context>, query: Record<string, unknown>, operation: string, dataOrigin: DataOriginDTO, asOf: string, sessionId?: string | null) {
+    const requested = (query.origin === undefined || query.origin === null || query.origin === dataOrigin) && (dataOrigin === 'real' || query.includeDemo === true)
+    return createReadMeta({ session: { ...resolveBusinessSession(), capabilities: data.capabilities }, schemaVersion: 'subcontract-contract-read-v2', operation, dataOrigin, asOf, coverage: requested ? 'complete' : 'unknown', scope: { query: readQueryScope(query), testSession: sessionId ?? null }, sources: [{ key: 'subcontract-contracts', state: requested ? 'readable' : 'not-requested', sourceVersion: requested ? readSourceVersion('subcontract-contracts', { contracts: data.contracts.filter(row => row.dataOrigin === dataOrigin), facts: Object.fromEntries(Object.entries(data.facts).map(([key, rows]) => [key, rows.filter(row => row.dataOrigin === dataOrigin)])), revision: data.sourceVersion }) : null, asOf: requested ? asOf : null }, { key: 'subcontract-documents', state: requested ? 'readable' : 'not-requested', sourceVersion: requested ? data.ownerSourceVersion : null, asOf: requested ? asOf : null }] })
   }
 
   return {
@@ -171,12 +181,16 @@ export function createSubcontractContractReadTestInstance(
     list(input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const parsed = parseSubcontractContractListQuery(input)
-      return buildSubcontractContractListPage({ ...data, query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') }, asOf: FIXED_AS_OF })
+      const query = { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') }
+      const asOf = new Date().toISOString()
+      return withOriginReadMeta(buildSubcontractContractListPage({ ...data, query, asOf }), { real: metadata(data, query, 'subcontract-contract:list', 'real', asOf, sessionId), demo: metadata(data, query, 'subcontract-contract:list', 'demo', asOf, sessionId) }, query.origin ?? 'real')
     },
     detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const parsed = parseSubcontractContractDetailQuery(id, input)
-      return buildSubcontractContractDetail({ ...data, query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') }, asOf: FIXED_AS_OF })
+      const query = { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') }
+      const asOf = new Date().toISOString()
+      return withReadMeta(buildSubcontractContractDetail({ ...data, query, asOf }), metadata(data, query, 'subcontract-contract:detail', query.origin, asOf, sessionId))
     },
   }
 }

@@ -6,7 +6,7 @@ import { useReceiptFiles } from '~/composables/useReceiptFiles'
 
 const props = defineProps<{ record: ReceiptRecord }>()
 const kit = useKitUI()
-const { previewOpen, previewUrl, previewTitle, previewMime, busy, problem, canPreview, preview, download, cancel } = useReceiptFiles({
+const { previewOpen, previewUrl, previewTitle, previewMime, busy, problem, canPreview, preview, download, cancel, restoreFocus } = useReceiptFiles({
   record: () => props.record,
   repository: useNuxtApp().$repositories.receipts,
   exportFile: kit.exportFile,
@@ -37,7 +37,7 @@ const files = computed(() => props.record.attachments.filter(file => file.delete
       取消附件读取
     </KitButton>
     <Dialog v-model:open="previewOpen">
-      <DialogContent class="flex h-[85vh] w-[calc(100vw-2rem)] max-w-1100px flex-col gap-3 overflow-hidden p-4">
+      <DialogContent class="flex h-[85vh] w-[calc(100vw-2rem)] max-w-1100px flex-col gap-3 overflow-hidden p-4" @close-auto-focus="restoreFocus">
         <DialogTitle class="m-0 pr-8 text-16px font-700">
           {{ previewTitle }}
         </DialogTitle>

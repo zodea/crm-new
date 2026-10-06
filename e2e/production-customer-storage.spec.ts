@@ -15,7 +15,7 @@ test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '需先构建，再在�
 test('公开客户保存、丢响应、独立进程重启、原件和删除恢复保持一致', async ({ page }, testInfo) => {
   test.setTimeout(180_000)
   const root = resolve('.')
-  const base = resolve('.codex-tmp/issue-450-browser')
+  const base = resolve('.tmp/a01-a03-production/customer')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const portProbe = createServer().listen(0, '127.0.0.1')
@@ -64,6 +64,7 @@ test('公开客户保存、丢响应、独立进程重启、原件和删除恢�
     await expect(target.getByRole('button', { name: '进入工作区', exact: true })).toBeFocused()
     await target.keyboard.press('Enter')
     await expect(target.getByRole('button', { name: '退出本机登录' })).toBeVisible()
+    await expect(target).toHaveURL(`${origin}/base/customer`)
   }
   async function request(path: string, options?: { method?: string, data?: unknown }) {
     return page.request.fetch(`${origin}${path}`, { ...options, headers: { Origin: origin } })
@@ -90,6 +91,7 @@ test('公开客户保存、丢响应、独立进程重启、原件和删除恢�
     await page.clock.fastForward(60_000)
     await expect(page.getByRole('heading', { name: '连接暂不可用', exact: true })).toBeVisible()
     await page.getByRole('button', { name: '重新核对', exact: true }).click()
+    await page.clock.resume()
     await expect(page.getByLabel('客户名称 *')).toHaveValue('独立重启验证客户')
     await expect(page.getByText('原件核对.txt', { exact: true })).toBeVisible()
     let originalCommand = ''
@@ -134,9 +136,43 @@ test('公开客户保存、丢响应、独立进程重启、原件和删除恢�
     const filePath = resolve(directory, 'downloaded-original.txt')
     await downloaded.saveAs(filePath)
     expect(await readFile(filePath)).toEqual(bytes)
+    let failSavedRead = true
+    await page.route(`**/api/read/customers/${id}/form`, async (route) => {
+      if (failSavedRead)
+        await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'synthetic-post-save-read-unavailable' }) })
+      else
+        await route.continue()
+    })
     await page.getByLabel('客户名称 *').fill('更正后重启验证客户')
     await page.getByRole('button', { name: '保存并提交', exact: true }).click()
     await expect.poll(async () => (await (await request(`/api/read/customers/${id}/form`)).json()).version).toBe('2')
+    await expect(page.getByRole('status', { name: '原提交恢复' })).toContainText('已保存待刷新')
+    const savedReadButton = page.getByRole('button', { name: '重新读取已保存记录', exact: true })
+    await expect(savedReadButton).toBeEnabled()
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      await savedReadButton.focus()
+      await expect(savedReadButton).toBeFocused()
+      if ([390, 1440].includes(width))
+        await page.screenshot({ path: testInfo.outputPath(`customer-recovery-${width}.png`), fullPage: true })
+    }
+    await page.getByLabel('客户名称 *').fill('读取失败后继续编辑的稿件')
+    await expect(page.getByRole('button', { name: '保存并提交', exact: true })).toBeDisabled()
+    let repeatedSaves = 0
+    await page.route('**/api/commands/customers', async (route) => {
+      repeatedSaves++
+      await route.continue()
+    })
+    await page.getByLabel('客户名称 *').press('Enter')
+    expect((await (await request(`/api/read/customers/${id}/form`)).json()).version).toBe('2')
+    expect(repeatedSaves).toBe(0)
+    await page.unroute('**/api/commands/customers')
+    failSavedRead = false
+    await savedReadButton.press('Enter')
+    await expect(page.getByRole('status', { name: '原提交恢复' })).toHaveCount(0)
+    await expect(page.getByLabel('客户名称 *')).toHaveValue('读取失败后继续编辑的稿件')
+    expect(await (await request(`/api/read/customers/${id}/form`)).json()).toMatchObject({ version: '2', draft: { name: '更正后重启验证客户' } })
     await page.goto(`${origin}/base/customer/${id}?origin=real`)
     await expect(page.getByRole('heading', { name: '更正后重启验证客户', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '删除客户', exact: true })).toBeEnabled()

@@ -16,6 +16,7 @@ const route = reactive({ query: {} as Record<string, string>, fullPath: '/contra
 vi.stubGlobal('useRoute', () => route)
 vi.stubGlobal('useRouter', () => ({ replace: vi.fn() }))
 vi.stubGlobal('useTabTitle', () => {})
+vi.stubGlobal('useNuxtApp', () => ({ $repositories: { subcontractContractRead: { fileContent: vi.fn() } } }))
 
 const shell = defineComponent({
   props: ['title', 'backTo', 'backLabel'],

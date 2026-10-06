@@ -29,4 +29,4 @@
 
 正常提交钩子对提交 `80d13f445ab40a33c7c554063c1c4f491de59727` 完成：`lint-staged`、`pnpm typecheck` 与完整 `npm test` 均通过；822 个测试文件、4447 项测试通过（约 11 分钟）。这是该提交树的结果，后续依赖链冻结后的集成回归仍按生产承接约定执行。
 
-本验证证明受控进程终止与实际文件重开，不等同物理断电、独立介质恢复或全站正式上线。后续按[生产承接表](../../../implementation/production-gate-work-breakdown.md)执行。
+本验证证明受控进程终止与实际文件重开，不等同物理断电、独立介质恢复或全站正式上线。现行边界见 [ARCHITECTURE](../../../rewrite/ARCHITECTURE.md#runtime-environments)，历史生产调查见[固定 Git 定位](../../../rewrite/ARCHITECTURE.md#production-investigation-evidence)，后续放行直接核对 [#471](https://github.com/zodea/crm-new/issues/471)。

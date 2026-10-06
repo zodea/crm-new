@@ -1,5 +1,5 @@
 import type { SupplierFormDraft } from '../master-data/forms'
-import type { SupplierCredentialAudit, SupplierCredentialCommandResult, SupplierCredentialRecord, SupplierCredentialRequirementRecord, SupplierCredentialReviewProof, SupplierCredentialStatus, SupplierCredentialValidity } from './credential-contract'
+import type { SupplierCredentialAudit, SupplierCredentialCommandResult, SupplierCredentialExpiryProblem, SupplierCredentialRecord, SupplierCredentialRequirementRecord, SupplierCredentialReviewProof, SupplierCredentialStatus, SupplierCredentialValidity } from './credential-contract'
 import { credentialProblem } from './credential-contract'
 import { canonicalCredentialCategory, credentialExpiryState, defaultCredentialRequirement, hasManualCredentialReviewProof, resolveAutomaticCredentialStatus, SUPPLIER_CREDENTIAL_CATEGORIES } from './credentials'
 
@@ -60,6 +60,9 @@ export interface SupplierCredentialAggregate {
   audits: SupplierCredentialAudit[]
   supplierAudits: SupplierCredentialMasterAudit[]
   review: SupplierCredentialReviewProof | null
+  /** 历史人工凭证不随业务日流逝或后续关键资料变更丢失。旧磁盘记录缺省为空。 */
+  reviewHistory?: SupplierCredentialReviewProof[]
+  expiryProblems?: SupplierCredentialExpiryProblem[]
   commands: Array<{ commandId: string, fingerprint: string, result: SupplierCredentialCommandResult }>
 }
 
@@ -105,10 +108,54 @@ function requiredOriginalExpiredSinceReview(aggregate: SupplierCredentialAggrega
     && credentialExpiryState(row, now) === 'expired')
 }
 
-/** 过期会永久撤销旧凭证，不因日后换回有效资料而复活。 */
-export function revalidateCredentialReview(aggregate: SupplierCredentialAggregate, now: Date): void {
-  if (aggregate.review && currentCredentialStatus(aggregate, now) !== aggregate.review.decision)
+/** 仅在已确认的关键事实写动作内失效；时间投影始终只读。 */
+export function invalidateCredentialReview(aggregate: SupplierCredentialAggregate): void {
+  if (aggregate.review) {
+    const history = aggregate.reviewHistory ??= []
+    if (!history.some(row => sameCredentialReview(row, aggregate.review!)))
+      history.push(structuredClone(aggregate.review))
     aggregate.review = null
+  }
+}
+
+export function credentialReviewHistory(aggregate: SupplierCredentialAggregate): SupplierCredentialReviewProof[] {
+  const history = [...(aggregate.reviewHistory ?? [])]
+  if (aggregate.review && !history.some(row => sameCredentialReview(row, aggregate.review!)))
+    history.push(aggregate.review)
+  return structuredClone(history)
+}
+
+function sameCredentialReview(left: SupplierCredentialReviewProof, right: SupplierCredentialReviewProof): boolean {
+  return left.decision === right.decision && left.reviewedAt === right.reviewedAt && left.note === right.note && left.actorId === right.actorId
+}
+
+/** 受控后台评估/写命令调用；GET 不调用，业务版本与原件、审计、凭证均不改写。 */
+export function reconcileCredentialExpiryProblems(aggregate: SupplierCredentialAggregate, timestamp: string): void {
+  const now = new Date(timestamp)
+  const active = new Set<string>()
+  const problems = aggregate.expiryProblems ??= []
+  for (const credential of credentialRecords(aggregate)) {
+    const state = credentialExpiryState(credential, now)
+    if (state !== 'expiring' && state !== 'expired')
+      continue
+    const id = `credential-expiry:${aggregate.supplierId}:${credential.id}:${credential.expiresAt.trim()}`
+    active.add(id)
+    const existing = problems.find(row => row.id === id)
+    if (existing) {
+      existing.severity = state
+      existing.lastSeenAt = timestamp
+      existing.resolvedAt = null
+    }
+    else {
+      problems.push({ id, supplierId: aggregate.supplierId, credentialId: credential.id, expiresAt: credential.expiresAt.trim(), severity: state, firstSeenAt: timestamp, lastSeenAt: timestamp, resolvedAt: null })
+    }
+  }
+  for (const problem of problems) {
+    if (!active.has(problem.id) && problem.resolvedAt === null) {
+      problem.lastSeenAt = timestamp
+      problem.resolvedAt = timestamp
+    }
+  }
 }
 
 export const CREDENTIAL_MASTER_FIELDS = ['name', 'uniqueCode', 'taxNo', 'legalRep', 'address', 'bank', 'bankAccount'] as const

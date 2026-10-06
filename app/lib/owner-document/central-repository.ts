@@ -8,10 +8,14 @@ import type {
   PageDTO,
   ProblemDTO,
   QuantityDTO,
+  ReadMetaDTO,
+  ReadProjection,
 } from '../../types/read-model'
 import type { PenaltyDeductionDTO, PenaltyDeductionSource, PenaltyRectificationEvent } from './project-penalty'
 import type { SubcontractSettlementAmounts, SubcontractSettlementEvidence } from './subcontract-settlement'
 import { isDataOriginDTO } from '../../types/read-model'
+import { parsePageQuery, resolvePagination } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { normalizeEnumSelection } from '../util/enum-selection'
 import { round2 } from '../util/number'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
@@ -306,7 +310,7 @@ export interface OwnerCommercialDocumentListSummaryDTO {
 export type OwnerCommercialDocumentListPageDTO = PageDTO<
   OwnerCommercialDocumentListItemDTO,
   OwnerCommercialDocumentListSummaryDTO
->
+> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO> }
 
 export interface OwnerCommercialDocumentLineDTO {
   id: string
@@ -327,6 +331,7 @@ export interface OwnerCommercialDocumentLineDTO {
 }
 
 export interface OwnerCommercialDocumentDetailReadDTO {
+  meta: ReadMetaDTO
   crewNavigation?: NavigationIntentDTO
   penaltyFacts?: OwnerCommercialDocumentSource['penaltyFacts']
   penaltyDeductions?: PenaltyDeductionDTO[]
@@ -439,6 +444,9 @@ export function ownerCommercialDocumentProblemFromUnknown(
 ): OwnerCommercialDocumentRepositoryProblem {
   if (cause instanceof OwnerCommercialDocumentRepositoryProblem)
     return cause
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new OwnerCommercialDocumentRepositoryProblem(remote, { cause })
   return new OwnerCommercialDocumentRepositoryProblem(
     ownerCommercialDocumentProblem(
       'unavailable',
@@ -455,11 +463,6 @@ function fail(code: ProblemDTO['code'], message: string): never {
 
 function bool(value: unknown): boolean {
   return value === true || value === 'true'
-}
-
-function positiveInteger(value: unknown, fallback: number): number {
-  const parsed = Number(value)
-  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : fallback
 }
 
 function optional(value: unknown): string | null {
@@ -500,7 +503,7 @@ export function parseOwnerCommercialDocumentListQuery(
   kind: unknown,
   input: Record<string, unknown> | undefined,
 ): OwnerCommercialDocumentListQueryDTO {
-  const pageSize = positiveInteger(input?.pageSize, 20)
+  const { requestedPage, pageSize } = parsePageQuery(input ?? {}, () => fail('invalid-query', '分页参数无效'), 20)
   if (!OWNER_COMMERCIAL_DOCUMENT_PAGE_SIZES.includes(pageSize as OwnerCommercialDocumentPageSize))
     fail('invalid-query', '甲方商务单据列表查询参数无效')
   const parsedKind = parseKind(kind)
@@ -522,7 +525,7 @@ export function parseOwnerCommercialDocumentListQuery(
     status: status.length > 1 ? status : status[0] ?? null,
     documentType: documentType.length > 1 ? documentType : documentType[0] ?? null,
     variant: parseVariant(parsedKind, input?.variant),
-    page: positiveInteger(input?.page, 1),
+    page: requestedPage,
     pageSize: pageSize as OwnerCommercialDocumentPageSize,
   }
 }
@@ -667,7 +670,7 @@ function entityRef<T extends 'project' | 'customer' | 'supplier' | 'contract' | 
   if (!id)
     return { state: 'missing', entity, id: null, label: null, reason: 'not-recorded' } as EntityRefDTO & { entity: T }
   if (permission === 'forbidden')
-    return { state: 'forbidden', entity, id, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
+    return { state: 'forbidden', entity, id: null, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
   return { state: 'resolved', entity, id, label, no } as EntityRefDTO & { entity: T }
 }
 
@@ -678,6 +681,8 @@ function relationNavigation(
 ): NavigationIntentDTO {
   if (reference.state === 'forbidden')
     return { kind: 'unavailable', reason: 'forbidden' }
+  if (reference.state === 'unavailable')
+    return { kind: 'unavailable', reason: 'not-connected' }
   if (reference.state !== 'resolved')
     return { kind: 'unavailable', reason: 'missing-id' }
   return {
@@ -811,7 +816,7 @@ interface BuildListInput {
 
 export function buildOwnerCommercialDocumentListPage(
   input: BuildListInput,
-): OwnerCommercialDocumentListPageDTO {
+): ReadProjection<OwnerCommercialDocumentListPageDTO> {
   const allowedOrigins = input.query.includeDemo ? new Set<DataOriginDTO>(['real', 'demo']) : new Set<DataOriginDTO>(['real'])
   const search = input.query.search.toLocaleLowerCase('zh-CN')
   const candidates = input.documents
@@ -822,18 +827,18 @@ export function buildOwnerCommercialDocumentListPage(
       || row.status === 'expired')
   const filtered = candidates
     .filter(row => input.query.origin === null || row.dataOrigin === input.query.origin)
-    .filter(row => !input.query.projectId || row.projectId === input.query.projectId)
-    .filter(row => !input.query.contractId || row.contractId === input.query.contractId)
-    .filter(row => !input.query.supplierId || row.supplierId === input.query.supplierId)
+    .filter(row => !input.query.projectId || (row.projectPermission === 'allowed' && row.projectId === input.query.projectId))
+    .filter(row => !input.query.contractId || (row.contractPermission === 'allowed' && row.contractId === input.query.contractId))
+    .filter(row => !input.query.supplierId || (row.supplierPermission !== 'forbidden' && row.supplierId === input.query.supplierId))
     .filter(row => statusMatches(row, input.query.status))
     .filter(row => !normalizeEnumSelection(input.query.documentType).length || normalizeEnumSelection(input.query.documentType).includes(row.documentType))
     .filter(row => !search || [
       row.no,
       row.name,
-      row.projectName,
-      row.contractName,
+      row.projectPermission === 'allowed' ? row.projectName : '',
+      row.contractPermission === 'allowed' ? row.contractName : '',
       row.documentType,
-      row.supplierName ?? '',
+      row.supplierPermission !== 'forbidden' ? row.supplierName ?? '' : '',
       row.periodNo,
       row.noticeNo ?? '',
       row.penaltyReason ?? '',
@@ -842,7 +847,8 @@ export function buildOwnerCommercialDocumentListPage(
     ]
       .some(value => value.toLocaleLowerCase('zh-CN').includes(search)))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id))
-  const start = (input.query.page - 1) * input.query.pageSize
+  const { page } = resolvePagination(input.query.page, input.query.pageSize, filtered.length)
+  const start = (page - 1) * input.query.pageSize
   const items = filtered.slice(start, start + input.query.pageSize).map((source) => {
     const { project, customer, supplier, contract } = relations(source)
     return {
@@ -916,10 +922,10 @@ export function buildOwnerCommercialDocumentListPage(
   }
   return {
     items,
-    pagination: { page: input.query.page, pageSize: input.query.pageSize, total: filtered.length },
+    pagination: { requestedPage: input.query.page, page, pageSize: input.query.pageSize, total: filtered.length },
     summary: {
-      projects: options(row => row.projectId, row => row.projectName),
-      contracts: options(row => row.contractId, row => row.contractName),
+      projects: options(row => row.projectPermission === 'allowed' ? row.projectId : null, row => row.projectName),
+      contracts: options(row => row.contractPermission === 'allowed' ? row.contractId : null, row => row.contractName),
       statuses,
       documentTypes,
       origins: { real: originSummary('real'), demo: originSummary('demo') },
@@ -943,7 +949,7 @@ interface BuildDetailInput {
 
 export function buildOwnerCommercialDocumentDetail(
   input: BuildDetailInput,
-): OwnerCommercialDocumentDetailReadDTO {
+): ReadProjection<OwnerCommercialDocumentDetailReadDTO> {
   if (input.query.origin === 'demo' && !input.query.includeDemo)
     fail('forbidden', '测试甲方商务单据未授权显示')
   const source = input.documents.find(row => row.id === input.query.id

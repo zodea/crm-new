@@ -4,6 +4,7 @@ import { computed, nextTick, watch } from 'vue'
 import { loadCustomerReturnOrigin, resolveCustomerReturnContext } from '~/lib/customer/return-context'
 import { financeStatusLabel, financeStatusTone } from '~/lib/finance/status'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
 import { useCustomerReadStore } from '~/stores/customer-read'
 
@@ -18,9 +19,9 @@ const props = defineProps<{
 const store = useCustomerReadStore()
 const detail = computed(() => {
   const state = store.receiptState
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
+  if (state.kind === 'ready' || state.kind === 'empty')
     return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
+  if (state.kind === 'loading' || (state.kind === 'error' || state.kind === 'unavailable'))
     return state.previous
   return null
 })
@@ -81,7 +82,7 @@ watch(() => [props.receiptId, props.customerId, props.origin, props.includeDemo]
     :back-to="backTo"
     :back-label="backLabel"
     :state="shellState"
-    :state-title="shellState === 'not-found' ? '收款记录不存在或已删除' : shellState === 'forbidden' ? '无权查看该收款记录' : shellState === 'loading' ? '正在加载收款详情' : '收款详情加载失败'"
+    :state-title="readProblemTitle(problem, shellState === 'not-found' ? '收款记录不存在或已删除' : shellState === 'forbidden' ? '无权查看该收款记录' : shellState === 'loading' ? '正在加载收款详情' : '收款详情加载失败')"
     :state-description="problem?.message ?? ''"
     :state-action-label="problem?.retryable ? '重新加载' : ''"
     @state-action="load"
@@ -101,7 +102,7 @@ watch(() => [props.receiptId, props.customerId, props.origin, props.includeDemo]
     </template>
 
     <StatePanel
-      v-if="store.receiptState.kind === 'error' && detail"
+      v-if="(store.receiptState.kind === 'error' || store.receiptState.kind === 'unavailable') && detail"
       kind="error"
       title="刷新收款详情失败"
       :description="store.receiptState.problem.message"

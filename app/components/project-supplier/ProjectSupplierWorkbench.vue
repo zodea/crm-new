@@ -4,6 +4,7 @@ import type { ProjectSupplierWorkbenchTab } from '~/lib/project-supplier/workben
 import { computed, shallowRef, watch } from 'vue'
 import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { projectSupplierWorkbenchTab } from '~/lib/project-supplier/workbench'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
 import { isDataOriginDTO } from '~/types/read-model'
 
@@ -16,9 +17,9 @@ const activeTab = shallowRef<ProjectSupplierWorkbenchTab>('overview')
 const origin = computed(() => isDataOriginDTO(route.query.origin) ? route.query.origin : 'real')
 const data = computed<ProjectSupplierWorkbenchReadDTO | null>(() => {
   const state = readStore.state
-  if (state.kind === 'ready' || state.kind === 'empty' || state.kind === 'partial')
+  if (state.kind === 'ready' || state.kind === 'empty')
     return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
+  if (state.kind === 'loading' || (state.kind === 'error' || state.kind === 'unavailable'))
     return state.previous
   return null
 })
@@ -117,13 +118,13 @@ watch(() => [props.projectId, props.supplierId, origin.value, route.query.tab, v
 <template>
   <main class="mx-auto min-w-0 max-w-[96rem] space-y-3 px-3 py-3 sm:px-4" data-testid="project-supplier-workbench">
     <StatePanel v-if="!data && (readStore.state.kind === 'idle' || readStore.state.kind === 'loading')" kind="loading" title="正在加载项目分供方事实" />
-    <StatePanel v-else-if="!data && readStore.state.kind === 'forbidden'" kind="forbidden" title="无权查看项目分供方事实" :description="readStore.state.problem.message" />
+    <StatePanel v-else-if="!data && readStore.state.kind === 'forbidden'" kind="forbidden" :title="readProblemTitle(readStore.state.problem, '无权查看项目分供方事实')" :description="readStore.state.problem.message" />
     <StatePanel v-else-if="!data && readStore.state.kind === 'mismatch'" kind="error" title="项目与分供方关系不匹配" :description="readStore.state.problem.message" />
     <StatePanel v-else-if="!data && readStore.state.kind === 'not-found'" kind="empty" title="未找到项目或分供方" :description="readStore.state.problem.message" />
-    <StatePanel v-else-if="!data && readStore.state.kind === 'error'" kind="error" title="工作台加载失败" :description="readStore.state.problem.message" :action-label="readStore.state.problem.retryable ? '重新加载' : ''" @action="load" />
+    <StatePanel v-else-if="!data && (readStore.state.kind === 'error' || readStore.state.kind === 'unavailable')" kind="error" title="工作台加载失败" :description="readStore.state.problem.message" :action-label="readStore.state.problem.retryable ? '重新加载' : ''" @action="load" />
     <template v-else-if="data">
       <ProjectSupplierWorkbenchHeader :data="data" :refreshing="refreshing" @refresh="load" />
-      <StatePanel v-if="readStore.state.kind === 'error'" kind="error" title="刷新失败，当前展示上次成功数据" :description="readStore.state.problem.message" :action-label="readStore.state.problem.retryable ? '重试' : ''" compact @action="load" />
+      <StatePanel v-if="(readStore.state.kind === 'error' || readStore.state.kind === 'unavailable')" kind="error" title="刷新失败，当前展示上次成功数据" :description="readStore.state.problem.message" :action-label="readStore.state.problem.retryable ? '重试' : ''" compact @action="load" />
       <nav class="panel min-w-0 overflow-x-auto" aria-label="项目分供方事实分类">
         <div class="flex min-w-max border-b border-line" role="tablist">
           <button v-for="tab in tabs" :key="tab.key" type="button" role="tab" :aria-selected="activeTab === tab.key" class="border-b-2 px-4 py-3 text-12px font-700" :class="activeTab === tab.key ? 'border-brand text-brand' : 'border-transparent text-ink-soft hover:text-ink'" @click="selectTab(tab.key)">

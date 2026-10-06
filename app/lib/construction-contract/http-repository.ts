@@ -2,7 +2,8 @@ import type { ProblemDTO } from '../../types/read-model'
 import type {
   ConstructionContractReadRepository,
 } from './read-contract'
-import { isProblemCodeDTO } from '../../types/read-model'
+import { decodeContractOriginalContent } from '../forms/original-content'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { ConstructionContractRepositoryProblem } from './read-contract'
 import {
   constructionContractProblemFromUnknown,
@@ -13,6 +14,7 @@ import {
 } from './read-decoder'
 
 export interface ConstructionContractHttpFetchOptions {
+  signal?: AbortSignal
   method?: 'GET' | 'POST' | 'PUT'
   query?: Record<string, unknown>
   body?: Record<string, any>
@@ -23,27 +25,13 @@ export type ConstructionContractHttpFetcher = (
   options?: ConstructionContractHttpFetchOptions,
 ) => Promise<unknown>
 
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function problemPayload(cause: unknown): ProblemDTO | null {
-  if (!object(cause))
-    return null
-  const response = object(cause.response) ? cause.response : null
-  const raw = response?._data ?? cause.data
-  const candidate = object(raw) && object(raw.data) ? raw.data : raw
-  if (!object(candidate) || !isProblemCodeDTO(candidate.code) || typeof candidate.message !== 'string'
-    || typeof candidate.retryable !== 'boolean' || !object(candidate.fieldErrors)
-    || !(candidate.traceId === null || typeof candidate.traceId === 'string')) {
-    return null
-  }
-  return candidate as unknown as ProblemDTO
+  return problemFromHttpFailure(cause)
 }
 
-export async function readConstructionContractHttp<T>(request: () => Promise<unknown>, decode: (value: unknown) => T): Promise<T> {
+export async function readConstructionContractHttp<T>(request: () => Promise<unknown>, decode: (value: unknown) => T | Promise<T>): Promise<T> {
   try {
-    return decode(await request())
+    return await decode(await request())
   }
   catch (cause) {
     if (cause instanceof ConstructionContractRepositoryProblem)
@@ -61,11 +49,15 @@ export function createHttpConstructionContractReadRepository(
   return {
     list: query => readConstructionContractHttp(
       () => options.fetcher('/api/read/construction-contracts', { query: serializeConstructionContractListQuery(query) }),
-      decodeConstructionContractListPage,
+      value => decodeConstructionContractListPage(value, query),
     ),
     get: query => readConstructionContractHttp(
       () => options.fetcher(`/api/read/construction-contracts/${encodeURIComponent(query.id)}`, { query: serializeConstructionContractDetailQuery(query) }),
-      decodeConstructionContractDetailRead,
+      value => decodeConstructionContractDetailRead(value, query),
+    ),
+    fileContent: (id, fileId, origin, request) => readConstructionContractHttp(
+      () => options.fetcher(`/api/read/construction-contracts/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}`, { query: { origin }, signal: request?.signal }),
+      value => decodeContractOriginalContent(value, { ownerId: id, fileId, origin }, () => { throw new ConstructionContractRepositoryProblem({ code: 'validation-failed', message: '施工合同原件正文或所属记录不一致', retryable: false, fieldErrors: {}, traceId: null }) }),
     ),
   }
 }

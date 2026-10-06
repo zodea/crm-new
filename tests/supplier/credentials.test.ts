@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   canonicalCredentialCategory,
   credentialExpiryState,
+  credentialValidityProjection,
   defaultCredentialRequirement,
   hasManualCredentialReviewProof,
   resolveAutomaticCredentialStatus,
   shanghaiBusinessDate,
+  storedSupplierCredentialStatus,
 } from '~/lib/supplier/credentials'
 
 const NOW = new Date('2026-07-30T12:00:00.000Z')
@@ -40,11 +42,11 @@ describe('分供方证照规则', () => {
   it.each([
     { case: '{ expiresAt: \'2026-07-29\' } / NOW', input: { expiresAt: '2026-07-29' }, argument2: NOW, expected: 'expired' },
     { case: '{ expiresAt: \'2026-07-30\' } / NOW', input: { expiresAt: '2026-07-30' }, argument2: NOW, expected: 'expiring' },
-    { case: '{ expiresAt: \'2026-08-29\' } / NOW', input: { expiresAt: '2026-08-29' }, argument2: NOW, expected: 'expiring' },
-    { case: '{ expiresAt: \'2026-08-30\' } / NOW', input: { expiresAt: '2026-08-30' }, argument2: NOW, expected: 'valid' },
+    { case: '{ expiresAt: \'2026-08-06\' } / NOW', input: { expiresAt: '2026-08-06' }, argument2: NOW, expected: 'expiring' },
+    { case: '{ expiresAt: \'2026-08-07\' } / NOW', input: { expiresAt: '2026-08-07' }, argument2: NOW, expected: 'valid' },
     { case: '{ expiresAt: \'2020-01-01\', longTerm: true } / NOW', input: { expiresAt: '2020-01-01', longTerm: true }, argument2: NOW, expected: 'valid' },
     { case: '{} / NOW', input: {}, argument2: NOW, expected: 'unrecorded' },
-  ])('按过期、30 天内临期、有效、长期和未录入计算有效期状态 / credentialExpiryState：$case', ({ input, argument2, expected }) => {
+  ])('按过期、7 天内临期、有效、长期和未录入计算有效期状态 / credentialExpiryState：$case', ({ input, argument2, expected }) => {
     expect(credentialExpiryState(input, argument2)).toBe(expected)
   })
 
@@ -64,6 +66,19 @@ describe('分供方证照规则', () => {
     ])('credentialExpiryState：$case', ({ input, argument2, expected }) => {
       expect(credentialExpiryState(structuredClone(input), structuredClone(argument2))).toBe(expected)
     })
+  })
+
+  it.each(['2026-02-29', '2026-02-30', '2026-13-01', '2026-04-31', 'not-a-date'])('坏日期 %s 保留未知，不能被日期归一误判为有效', (expiresAt) => {
+    expect(credentialValidityProjection({ expiresAt }, NOW)).toEqual({ businessDate: '2026-07-30', state: 'unrecorded', reason: 'invalid-date' })
+  })
+
+  it('真实闰日有效；未知截止日期不新增原件齐全或历史人工核验门槛', () => {
+    expect(credentialExpiryState({ expiresAt: '2028-02-29' }, NOW)).toBe('valid')
+    const facts = ['营业执照', '法人身份证', '银行账户资料'].map(category => ({ category, hasAccessibleFile: true, expiresAt: '2026-02-30' }))
+    const proof = { status: 'qualified', reviewedAt: '2026-07-01T00:00:00.000Z', reviewNote: '人工历史' }
+    expect(resolveAutomaticCredentialStatus(facts, [], NOW)).toBe('reviewing')
+    expect(storedSupplierCredentialStatus(proof, facts, [], NOW)).toBe('qualified')
+    expect(proof).toEqual({ status: 'qualified', reviewedAt: '2026-07-01T00:00:00.000Z', reviewNote: '人工历史' })
   })
 
   describe('只产出 incomplete/reviewing，临期仍算已收到，过期必需资料不齐全', () => {

@@ -53,17 +53,17 @@
 - 施工累计收款：非草稿且关联当前合同的收款登记；
 - 支出侧累计支付：已确认支付记录经付款申请分摊到当前合同的金额。
 
-不得按项目、分供方、合同名称或金额相近推断合同归属；存量静态金额不回填到缺失的关联单据。
+不得按项目、分供方、合同名称或金额相近推断合同归属；存量静态金额不回填到缺失的关联单据。施工当前读取同一甲方单据 owner 的非草稿月报量作为累计结算，最终结算在独立分区展示，不与月报量重复相加；尚未接入当前 owner 的开票申请来源保持未知。合同、补充协议或关联金额缺失时，行、摘要及依赖余额沿 [READ-MODELS 的零、未知与小计](../READ-MODELS.md#read-status-and-completeness)共同表达，不能由显示层补零。
 
 ## 二、通用合同详情
 
-> 当前实现边界（#277、#282、#318—#322）：材料采购、施工与分包合同已分别切到中央专属列表、七分区只读详情和正式中央表单。三类入口意图都必须携带 `dataOrigin` 与对应 `contractKind`；演示数据只读。
+> 当前实现边界（#277、#282、#318—#322）：三类合同均已切到中央专属列表和表单，施工、分包为七分区只读详情，材料采购为八分区。三类入口意图都必须携带 `dataOrigin` 与对应 `contractKind`；演示数据只读。这里的中央验证链不代替 [ARCHITECTURE 的正式接管及运行门禁](../ARCHITECTURE.md#implementation-gaps)。
 
 详情共用顶部合同标题、编号、类型、状态、编辑入口和六项金额摘要。合同阶段只根据 `contracts.status` 展示“拟定 → 审批与签订 → 履约 → 结算 → 结清”，不伪造审批人或审批记录。
 
 ### 基本信息
 
-合同编号、合同类型、所属项目、客户或分供方、签约日期、发票类型、履约联系人、联系电话、合同内容、主要条款和备注。项目、客户、分供方均提供真实详情下钻；联系电话在只读详情中脱敏。
+合同编号、合同类型、所属项目、客户或分供方、签约日期、发票类型、履约联系人、联系电话、合同内容、主要条款和备注。项目、客户、分供方均提供真实详情下钻；联系电话在只读详情中脱敏。施工、分包详情只读展示该合同已采用的 `ourSignatorySnapshot`；无已采用身份时保留 `legacyPartyA` 原文，不据名称自动映射目录。主体采用与协议继承直接见 [ARCHITECTURE 签约主体](../ARCHITECTURE.md#our-signatories)，表单选择见[合同表单](./contract-forms.md)。
 
 ### 关联单据
 
@@ -76,7 +76,9 @@
 | 分包 | `subcontract_change_orders`、`expenditure_settlements`、`invoices`、`payment_applications` 及已确认支付分摊 |
 | 材料采购 | `expenditure_settlements`、`invoices`、`payment_applications` 及已确认支付分摊、`material_requisitions`、`material_arrivals` |
 
-没有真实外键关系时展示“暂无关联单据”，不以同项目记录填充空白。
+已成功读取且没有真实外键关系时展示“暂无关联单据”，不以同项目记录填充空白。来源无权、未接管或不可用时沿 [READ-MODELS](../READ-MODELS.md#permissions-and-stale-data)分别提示，保留独立可读合同本体，不能把来源失败显示成无记录。
+
+施工主合同的详细资料另有“总合同管理费配置”，显示合同配置、依据与冻结历史；项目详情按每份总合同独立展示并可返回原合同。配置的归属、空与零、历史及实际成本边界直接见 [DATABASE](../DATABASE.md#construction-contract-management-fee-configuration)。
 
 ### 类型专有页签
 
@@ -102,13 +104,13 @@
 | 分包 | 支出结算 | `expenditure_settlements.contract_id`，按过程结算/完工结算分区 → `/subcontract/settlement/:id` |
 | 分包 | 项目罚扣 | `penalty_records.contract_id` 及 `penalty_settlement_deductions` → `/subcontract/penalty/:id` |
 | 分包 | 材料领用情况 | 参考页分新仓/历史领用；旧接线缺合同/分供方外键时返回缺关系；真实来源关系由 #411 继承已定材料身份落实，#409 联验，不按项目/班组猜合同归属 |
-| 材料采购 | 详细资料、采购合同明细、物资管理、收票登记、付款信息、支出结算、项目罚扣 | 各分组复用同一来源 DTO，不复制静态金额；合同分供方可进入同来源合同/结算/收票/付款事实页签，其他尚未消费同一中央来源的行目标保持 `unverified-target` 普通文本 |
+| 材料采购 | 详细资料、采购合同明细、补充协议、物资管理、收票登记、付款信息、支出结算、项目罚扣 | 各分组复用同一来源 DTO，不复制静态金额；协议核对父合同及稳定身份后聚焦；合同分供方可进入同来源合同/结算/收票/付款事实页签，其他尚未消费同一中央来源的行目标保持 `unverified-target` 普通文本 |
 
 施工七组在 URL 中以 `tab=info|supplements|changes|settlements|invoices|receipts|acceptance` 恢复；补充合同使用同一详情的稳定 `focus` 深链，验收/保修再以 `focusView` 区分同 ID 的两个分组。读取请求同时携带 `supplement|change|settlement|acceptance` 聚焦范围，并在验收范围继续校验 `focusView=acceptance|warranty`，使目标不存在、父子错配、跨分区错配和验收/保修跨分组错配保持精确状态；返回时恢复原施工合同列表筛选、分页、滚动、合同焦点以及验收/保修分组。甲方变洽签、月报量、最终结算、甲方罚扣、验收与保修只有在聚合层给出与事实行一致的 canonical owner-document ID 时生成目标；未核验的 demo/旧事实保持普通文本。详情显式编辑进入独立整页表单，保存或生命周期动作后回到同一详情并保留嵌套列表返回上下文。刷新失败时保留上一版成功详情并提示重试；实际竣工日期为 `null` 时显示“未记录”。
 
 分包七组在 URL 中以 `tab=info|changes|invoices|payments|settlements|penalties|material-uses` 恢复；补充合同与分包变洽签在“分包变洽签”中按各自 canonical variant 和稳定 `focus` 深链并验证父合同。#327 的分包变洽签事实行进入 `/subcontract/change/:id` 专属只读详情，返回恢复原合同分区、行和焦点；详情内打开合同后仍可显式返回原单据。目标不存在与父子关系错配使用不同问题语义，不按编号或名称回退。付款申请与付款登记、过程结算与完工结算分区展示。`material_uses` 缺少合同/分供方外键时返回 `missing-relation` 空态，不按项目、班组或名称猜测。
 
-材料采购七组在 URL 中以 `tab=info|lines|materials|invoices|payments|settlements|penalties` 恢复；物资管理内部只展示已核验的下料、到货事实，直调、出库及其他缺稳定外键集合返回真实空态。合同到分供方事实的 `tab=contracts|settlements|invoices|payments` 只接受白名单值，返回时保留原合同页签及材采列表上下文。#277 的父级联合验收进一步固定：既有正式合同受控迁入时，所引用项目与分供方必须先进入各自中央主档，表单候选与合同校验只读该中央集合；正式合同再按同一 `supplier_id` 回流分供方合同事实。结算金额为 `0` 仍进入真实空表，混合来源列表的返回快照以所点击行的 `dataOrigin` 为准。正式详情才显示显式编辑入口，演示详情即使有相同字段也始终只读。
+材料采购八组在 URL 中以 `tab=info|lines|supplements|materials|invoices|payments|settlements|penalties` 恢复，协议以 `supplementId` 核验父键并聚焦；物资管理内部只展示已核验的下料、到货事实，直调、出库及其他缺稳定外键集合返回真实空态。合同到分供方事实的 `tab=contracts|settlements|invoices|payments` 只接受白名单值，返回时保留原合同页签及材采列表上下文。#277 的父级联合验收进一步固定：既有正式合同受控迁入时，所引用项目与分供方必须先进入各自中央主档，表单候选与合同校验只读该中央集合；正式合同再按同一 `supplier_id` 回流分供方合同事实。结算金额为 `0` 仍进入真实空表，混合来源列表的返回快照以所点击行的 `dataOrigin` 为准。正式详情才显示显式编辑入口，演示详情即使有相同字段也始终只读。
 
 从客户“施工合同”进入时使用同一中央施工合同详情，并在刷新、读取失败及显式编辑保存后保留有效客户来源。返回需核验目标类型、合同稳定 ID、来源和有效期，恢复客户页签、原合同链接、局部滚动及嵌套客户列表状态；无有效来源则返回施工合同列表。归属及客户金额口径见[客户详情](./base-customer.md)，返回白名单见[导航契约](../NAVIGATION.md)。
 
@@ -129,19 +131,13 @@
 
 ## 四、后台接口投影
 
-后端接口以数据库真实外键为源，前端不再自行拼接名称或 Mock 聚合。共享关系、金额、分页、空态、权限与错误语义统一引用 [`READ-MODELS.md`](../READ-MODELS.md)；其中 `MoneyDTO` 是固定两位十进制定点字符串，关系目标路由由前端路由矩阵生成。合同域稳定为三层响应：
+后端接口以数据库真实外键为源，前端不再自行拼接名称或 Mock 聚合。共享关系、金额、分页、来源证明、空态、权限与错误语义统一引用 [`READ-MODELS.md`](../READ-MODELS.md#shared-dto)；金额与缺项计算直接遵循[零、未知与小计](../READ-MODELS.md#read-status-and-completeness)。下例仅摘录各领域 DTO 的公共显示字段，实际请求及完整响应见[施工契约](../../../app/lib/construction-contract/read-contract.ts)、[分包契约](../../../app/lib/subcontract-contract/read-contract.ts)和[材采契约](../../../app/lib/material-contract/read-contract.ts)：
 
 ```ts
-interface ContractListQueryDTO {
-  kind: 'construction' | 'subcontract' | 'material'
-  q?: string
-  projectId?: string
-  partyId?: string
-  status?: string
-  category?: string
-  page: number
-  pageSize: number
-}
+type ContractListQueryDTO
+  = | ConstructionContractListQueryDTO
+    | SubcontractContractListQueryDTO
+    | MaterialContractListQueryDTO
 
 interface ContractListRowDTO {
   id: string
@@ -153,14 +149,14 @@ interface ContractListRowDTO {
   signDate: string | null
   actualCompletionDate?: string | null
   amounts: {
-    contract: MoneyDTO
-    changed: MoneyDTO
-    settled: MoneyDTO
-    invoiced: MoneyDTO
-    paid: MoneyDTO
-    bySettlementBalance: MoneyDTO
-    byInvoiceBalance?: MoneyDTO
-    completionSettlement?: MoneyDTO
+    contract: MoneyDTO | null
+    changed: MoneyDTO | null
+    settled: MoneyDTO | null
+    invoiced: MoneyDTO | null
+    paid: MoneyDTO | null
+    bySettlementBalance: MoneyDTO | null
+    byInvoiceBalance?: MoneyDTO | null
+    completionSettlement?: MoneyDTO | null
   }
   contractStatus: string
   settlementStatus?: string | null
@@ -179,7 +175,11 @@ interface RelatedDocumentDTO {
 }
 
 interface ContractDetailDTO {
-  contract: ContractListRowDTO
+  meta: ReadMetaDTO
+  contract: ContractListRowDTO & {
+    ourSignatorySnapshot: OurSignatorySnapshot | null
+    legacyPartyA: string | null
+  }
   sections: Array<{
     key: string
     label: string

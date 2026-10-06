@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, nextTick, onActivated, onMounted, reactive, shallowRef, watch } from 'vue'
 import MaterialContractListScreen from '~/components/contract/MaterialContractListScreen.vue'
+import { materialOriginMeta } from '../helpers/material-read-meta'
 
 const mocks = vi.hoisted(() => ({ store: {} as any }))
 vi.mock('~/stores/material-contract-read', () => ({ useMaterialContractReadStore: () => mocks.store }))
@@ -14,7 +15,10 @@ const replace = vi.fn()
 const unavailable = { kind: 'unavailable', reason: 'unverified-target' } as const
 const project = { state: 'resolved', entity: 'project', id: 'project-test', label: '合成项目', no: null } as const
 const supplier = { state: 'resolved', entity: 'supplier', id: 'supplier-test', label: '合成分供方', no: null } as const
+const originMeta = materialOriginMeta(['material-contract:read'], 'test-v1', '2026-09-08T00:00:00.000Z')
 const data: MaterialContractListPageDTO = {
+  meta: originMeta.real,
+  originMeta,
   items: [{
     rowKey: 'real:contract-test',
     dataOrigin: 'real',
@@ -43,7 +47,7 @@ const data: MaterialContractListPageDTO = {
   },
   empty: null,
   asOf: '2026-09-08T00:00:00.000Z',
-  sourceVersion: 'test-v1',
+  sourceVersion: originMeta.real.sourceVersion,
   capabilities: ['material-contract:read'],
 }
 

@@ -3,6 +3,7 @@ import type { OwnerCommercialDocumentCommandRequestDTO } from '~/lib/owner-docum
 import type {
   OwnerAcceptanceViewVariant,
   OwnerCommercialDocumentKind,
+  OwnerCommercialDocumentListPageDTO,
   OwnerCommercialDocumentListQueryDTO,
   OwnerCommercialDocumentListSummaryDTO,
 } from '~/lib/owner-document/central-repository'
@@ -50,6 +51,7 @@ import {
   updateOwnerDocumentAttachments,
 } from '~/lib/owner-document/forms'
 import { ownerDocumentListRecordFromCentral } from '~/lib/owner-document/list'
+import { bindReadAuthority } from '~/lib/read-model/authority'
 
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const usesCentralBrowser = import.meta.client && !isTauri()
@@ -102,7 +104,9 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const listErrors = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
   const listLoadSequence: Partial<Record<OwnerDocumentKind, number>> = {}
   const listSources = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
-  const centralPagination = shallowRef<Partial<Record<OwnerCommercialDocumentKind, { page: number, pageSize: number, total: number }>>>({})
+  const centralPagination = shallowRef<Partial<Record<OwnerCommercialDocumentKind, { requestedPage: number, page: number, pageSize: number, total: number }>>>({})
+  const centralReads = shallowRef<Partial<Record<OwnerCommercialDocumentKind, OwnerCommercialDocumentListPageDTO>>>({})
+  const centralQueryScopes = new Map<OwnerDocumentKind, string>()
   const centralSummaries = shallowRef<Partial<Record<OwnerCommercialDocumentKind, OwnerCommercialDocumentListSummaryDTO>>>({})
   const centralCapabilities = shallowRef<Partial<Record<OwnerCommercialDocumentKind, string[]>>>({})
   const centralEmptyReasons = shallowRef<Partial<Record<OwnerCommercialDocumentKind, 'no-records' | 'no-filter-match' | 'missing-relation' | null>>>({})
@@ -115,12 +119,25 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   function clearListSnapshot(kind: OwnerDocumentKind) {
     records.value = { ...records.value, [kind]: undefined }
     if (isCentralKind(kind)) {
+      centralReads.value = { ...centralReads.value, [kind]: undefined }
       centralPagination.value = { ...centralPagination.value, [kind]: undefined }
       centralSummaries.value = { ...centralSummaries.value, [kind]: undefined }
       centralCapabilities.value = { ...centralCapabilities.value, [kind]: [] }
       centralEmptyReasons.value = { ...centralEmptyReasons.value, [kind]: undefined }
     }
   }
+
+  bindReadAuthority((problem) => {
+    if (!usesCentralBrowser)
+      return
+    for (const kind of Object.keys(listLoadSequence) as OwnerDocumentKind[]) {
+      listLoadSequence[kind] = (listLoadSequence[kind] ?? 0) + 1
+      clearListSnapshot(kind)
+      listLoading.value = { ...listLoading.value, [kind]: false }
+      listErrors.value = { ...listErrors.value, [kind]: problem.message }
+    }
+    centralQueryScopes.clear()
+  })
 
   function hasListSnapshot(kind: OwnerDocumentKind, variant?: OwnerAcceptanceViewVariant | null) {
     return records.value[kind] !== undefined && listSources.value[kind] === listSource(kind, variant)
@@ -133,8 +150,11 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     const sequence = (listLoadSequence[kind] ?? 0) + 1
     listLoadSequence[kind] = sequence
     const source = listSource(kind, centralQuery?.variant)
-    if (listSources.value[kind] !== source)
+    const { page: _page, pageSize: _pageSize, ...range } = centralQuery ?? {}
+    const queryScope = JSON.stringify(range)
+    if (listSources.value[kind] !== source || (usesCentralBrowser && centralQueryScopes.get(kind) !== queryScope))
       clearListSnapshot(kind)
+    centralQueryScopes.set(kind, queryScope)
     listSources.value = { ...listSources.value, [kind]: source }
     listLoading.value = { ...listLoading.value, [kind]: true }
     listErrors.value = { ...listErrors.value, [kind]: '' }
@@ -159,6 +179,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
         ? centralPage.items.map(ownerDocumentListRecordFromCentral)
         : await listOwnerDocumentForms(kind)
       if (centralPage && isCentralKind(kind) && listLoadSequence[kind] === sequence) {
+        centralReads.value = { ...centralReads.value, [kind]: centralPage }
         centralPagination.value = { ...centralPagination.value, [kind]: centralPage.pagination }
         centralSummaries.value = { ...centralSummaries.value, [kind]: centralPage.summary }
         centralCapabilities.value = { ...centralCapabilities.value, [kind]: [...centralPage.capabilities] }
@@ -171,7 +192,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     catch (cause) {
       if (listLoadSequence[kind] === sequence) {
         const problem = ownerCommercialDocumentProblemFromUnknown(cause).problem
-        if (['forbidden', 'not-found', 'relationship-mismatch'].includes(problem.code))
+        if (['unauthenticated', 'forbidden', 'not-found', 'relationship-mismatch'].includes(problem.code))
           clearListSnapshot(kind)
         listErrors.value = {
           ...listErrors.value,
@@ -199,7 +220,11 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   }
 
   function centralPageFor(kind: OwnerCommercialDocumentKind) {
-    return centralPagination.value[kind] ?? { page: 1, pageSize: 20, total: 0 }
+    return centralPagination.value[kind] ?? { requestedPage: 1, page: 1, pageSize: 20, total: 0 }
+  }
+
+  function centralReadFor(kind: OwnerCommercialDocumentKind) {
+    return centralReads.value[kind] ?? null
   }
 
   function centralSummaryFor(kind: OwnerCommercialDocumentKind) {
@@ -566,6 +591,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     listLoadingFor,
     listError,
     centralPageFor,
+    centralReadFor,
     centralSummaryFor,
     centralCapabilitiesFor,
     centralEmptyReasonFor,

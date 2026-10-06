@@ -9,6 +9,7 @@ import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { contractListFilterValues } from '~/lib/contract/list-filters'
 import { CONTRACT_STATUSES, CONTRACT_SUB_KINDS } from '~/lib/contract/status'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { parseSubcontractContractListQuery, subcontractContractProblemFromUnknown } from '~/lib/subcontract-contract/repository'
 import {
   createSubcontractContractReturnOrigin,
@@ -32,7 +33,7 @@ const page = computed(() => {
   const current = state.value
   if (current.kind === 'ready' || current.kind === 'empty')
     return current.data
-  if ((current.kind === 'loading' || current.kind === 'error') && current.previous)
+  if ((current.kind === 'loading' || (current.kind === 'error' || current.kind === 'unavailable')) && current.previous)
     return current.previous
   return null
 })
@@ -52,13 +53,14 @@ const subKindOptions = CONTRACT_SUB_KINDS.map(value => ({ key: value, label: val
 const selectedSubKinds = computed(() => contractListFilterValues(query.value.subKind))
 const returnContextId = ref(isSubcontractContractReturnContextId(route.query.nav) ? route.query.nav : newSubcontractContractReturnContextId())
 const canCreate = computed(() => page.value?.capabilities.includes('subcontract-contract:write') ?? false)
-const summaryOrigins = computed(() => (['real', 'demo'] as const)
-  .filter(origin => origin === 'real' || visibilityStore.includeDemo || (page.value?.summary.origins[origin].contractCount ?? 0) > 0)
-  .map(origin => ({
-    origin,
-    label: origin === 'demo' ? '演示数据' : '正式数据',
-    values: page.value?.summary.origins[origin] ?? { contractCount: 0, changedAmount: '0', settledAmount: '0', paidAmount: '0' },
-  })))
+const summaryOrigins = computed(() => {
+  const current = page.value
+  if (!current)
+    return []
+  return (['real', 'demo'] as const)
+    .filter(origin => origin === 'real' || visibilityStore.includeDemo || current.summary.origins[origin].contractCount > 0)
+    .map(origin => ({ origin, label: origin === 'demo' ? '演示数据' : '正式数据', values: current.summary.origins[origin] }))
+})
 let restoredRoute = ''
 
 const columns: KitTableColumn[] = [
@@ -93,7 +95,22 @@ function patchQuery(patch: Record<string, string | string[] | number | null | un
 
 const commitSearch = useDebounceFn((value: string) => patchQuery({ search: value.trim(), page: 1 }), 250)
 watch(search, value => void commitSearch(value))
-watch(parsedQuery, value => value.query && void store.loadList(value.query), { immediate: true })
+let listLoadTicket = 0
+watch(parsedQuery, async (value) => {
+  const ticket = ++listLoadTicket
+  if (!value.query)
+    return
+  const requested = value.query
+  await store.loadList(requested)
+  if (ticket !== listLoadTicket || parsedQuery.value.query !== requested)
+    return
+  const current = state.value
+  if (current.kind !== 'ready' && current.kind !== 'empty')
+    return
+  const pagination = current.data.pagination
+  if (pagination.requestedPage === requested.page && pagination.pageSize === requested.pageSize && pagination.page !== requested.page)
+    patchQuery({ page: pagination.page })
+}, { immediate: true })
 
 function returnOrigin(row: SubcontractContractListPageDTO['items'][number], scrollTop = 0) {
   return createSubcontractContractReturnOrigin({
@@ -198,7 +215,7 @@ useTabTitle('分包合同')
       </div>
     </section>
     <div v-if="!parsedQuery.problem && page" class="relative space-y-3" :aria-busy="state.kind === 'loading'">
-      <StatePanel v-if="state.kind === 'error'" kind="error" title="刷新分包合同失败" :description="`${state.problem.message}；当前保留上一次成功读取。`" compact />
+      <StatePanel v-if="(state.kind === 'error' || state.kind === 'unavailable')" kind="error" title="刷新分包合同失败" :description="`${state.problem.message}；当前保留上一次成功读取。`" compact />
       <section class="grid gap-2 md:grid-cols-2" aria-label="分包合同汇总">
         <article v-for="item in summaryOrigins" :key="item.origin" class="panel min-w-0 p-3" :data-testid="`subcontract-summary-${item.origin}`">
           <div class="flex items-center justify-between gap-2">
@@ -209,21 +226,21 @@ useTabTitle('分包合同')
               <dt class="text-ink-soft">
                 变更后
               </dt><dd class="mt-1 font-700 text-ink">
-                {{ yuan(Number(item.values.changedAmount)) }}
+                {{ yuan(item.values.changedAmount, '未知') }}
               </dd>
             </div>
             <div>
               <dt class="text-ink-soft">
                 累计结算
               </dt><dd class="mt-1 font-700 text-ink">
-                {{ yuan(Number(item.values.settledAmount)) }}
+                {{ yuan(item.values.settledAmount, '未知') }}
               </dd>
             </div>
             <div>
               <dt class="text-ink-soft">
                 累计付款
               </dt><dd class="mt-1 font-700 text-ink">
-                {{ yuan(Number(item.values.paidAmount)) }}
+                {{ yuan(item.values.paidAmount, '未知') }}
               </dd>
             </div>
           </dl>
@@ -254,19 +271,19 @@ useTabTitle('分包合同')
             </NuxtLink><span v-else>{{ row.supplier.state === 'resolved' ? row.supplier.label : '不可用' }}</span>
           </template>
           <template #changed="{ row }">
-            {{ yuan(Number(row.amounts.changed)) }}
+            {{ yuan(row.amounts.changed, '未知') }}
           </template><template #settled="{ row }">
-            {{ yuan(Number(row.amounts.settled)) }}
+            {{ yuan(row.amounts.settled, '未知') }}
           </template><template #invoiced="{ row }">
-            {{ yuan(Number(row.amounts.invoiced)) }}
+            {{ yuan(row.amounts.invoiced, '未知') }}
           </template><template #paid="{ row }">
-            {{ yuan(Number(row.amounts.paid)) }}
+            {{ yuan(row.amounts.paid, '未知') }}
           </template><template #settlementPayable="{ row }">
-            {{ yuan(Number(row.amounts.bySettlementPayable)) }}
+            {{ yuan(row.amounts.bySettlementPayable, '未知') }}
           </template><template #invoicePayable="{ row }">
-            {{ yuan(Number(row.amounts.byInvoicePayable)) }}
+            {{ yuan(row.amounts.byInvoicePayable, '未知') }}
           </template><template #completionSettlement="{ row }">
-            {{ yuan(Number(row.amounts.completionSettlement)) }}
+            {{ yuan(row.amounts.completionSettlement, '未知') }}
           </template>
           <template #settlementStatus="{ row }">
             <KitStatusTag>{{ row.settlementStatus || '未记录' }}</KitStatusTag>
@@ -277,7 +294,7 @@ useTabTitle('分包合同')
       </section>
     </div>
     <StatePanel v-else-if="!parsedQuery.problem && (state.kind === 'loading' || state.kind === 'idle')" kind="loading" title="正在读取分包合同" description="正在从中央读模型加载列表。" />
-    <StatePanel v-else-if="!parsedQuery.problem && state.kind === 'forbidden'" kind="forbidden" title="无权查看分包合同" :description="state.problem.message" />
-    <StatePanel v-else-if="!parsedQuery.problem" kind="error" title="分包合同读取失败" :description="state.kind === 'error' ? state.problem.message : '中央列表暂不可用'" action-label="重新加载" @action="store.loadList(query)" />
+    <StatePanel v-else-if="!parsedQuery.problem && state.kind === 'forbidden'" kind="forbidden" :title="readProblemTitle(state.problem, '无权查看分包合同')" :description="state.problem.message" />
+    <StatePanel v-else-if="!parsedQuery.problem" kind="error" title="分包合同读取失败" :description="(state.kind === 'error' || state.kind === 'unavailable') ? state.problem.message : '中央列表暂不可用'" action-label="重新加载" @action="store.loadList(query)" />
   </div>
 </template>

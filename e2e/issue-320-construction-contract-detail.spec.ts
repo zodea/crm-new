@@ -1,6 +1,7 @@
 import type { APIRequestContext, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 type Scenario = 'ready' | 'empty' | 'forbidden' | 'unavailable' | 'demo-forbidden'
@@ -67,7 +68,9 @@ test.describe('Issue #320：施工合同专属中央详情', () => {
     await expect(page.locator('[data-ui="kit-table-empty"]:visible').filter({ hasText: '暂无保修到期记录' })).toBeVisible()
   })
 
-  test('既有正式合同从显式编辑保存后返回同一详情并可刷新', async ({ page }) => {
+  test('既有正式合同从显式编辑保存后返回同一详情并可刷新', async ({ page }, testInfo) => {
+    const ownName = '此历史合同本次明确核实我方主体'
+    const ownId = await createVerifiedSignatory(page, ownName, session(testInfo))
     await page.goto('/contract/construction?search=既有中央')
     await page.getByRole('link', { name: '既有中央施工合同' }).click()
     await expect(page.getByRole('heading', { name: '既有中央施工合同' })).toBeVisible()
@@ -76,6 +79,7 @@ test.describe('Issue #320：施工合同专属中央详情', () => {
     await expect(page).toHaveURL(/tab=receipts/)
     await page.getByTestId('construction-contract-edit').click()
     await expect(page.getByLabel('合同名称 *')).toHaveValue('既有中央施工合同')
+    await selectVerifiedSignatory(page, ownId, ownName)
     await page.getByLabel('合同名称 *').fill('既有中央施工合同（已编辑）')
     const saved = page.waitForResponse(response => response.url().includes('/api/commands/construction-contracts/') && response.request().method() === 'PUT')
     await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
@@ -92,6 +96,7 @@ test.describe('Issue #320：施工合同专属中央详情', () => {
     await page.getByRole('button', { name: '主合同管理' }).click()
     await page.locator('nav a[href="/contract/construction"]').click()
     await page.getByRole('searchbox', { name: '搜索施工合同' }).fill('既有中央')
+    await expect(page).toHaveURL(/search=%E6%97%A2%E6%9C%89%E4%B8%AD%E5%A4%AE/)
     await page.getByRole('link', { name: '既有中央施工合同' }).click()
     await page.getByTestId('construction-contract-boq').click()
 
@@ -101,9 +106,12 @@ test.describe('Issue #320：施工合同专属中央详情', () => {
     await expect(page.getByTestId('boq-workspace-header').getByText('既有中央施工合同')).toHaveCount(0)
   })
 
-  test('正式施工合同经中央命令新建、详情与刷新闭合', async ({ page }) => {
+  test('正式施工合同经中央命令新建、详情与刷新闭合', async ({ page }, testInfo) => {
+    const ownName = '施工验收已核实签约主体'
+    const ownId = await createVerifiedSignatory(page, ownName, session(testInfo))
     await page.goto('/contract/construction/form')
     await expect(page.getByRole('heading', { name: /新建 · 施工合同/ })).toBeVisible({ timeout: 20_000 })
+    await selectVerifiedSignatory(page, ownId, ownName)
     await page.getByLabel('合同名称 *').fill('中央正式施工合同')
     await page.getByRole('combobox', { name: '检索项目' }).click()
     await page.getByText('中央正式施工项目').click()
@@ -118,6 +126,7 @@ test.describe('Issue #320：施工合同专属中央详情', () => {
     await expect(page.getByRole('heading', { name: '中央正式施工合同' })).toBeVisible()
     await page.reload()
     await expect(page.getByRole('heading', { name: '中央正式施工合同' })).toBeVisible()
+    await expect(page.getByTestId('contract-frozen-signatory')).toHaveText(ownName)
   })
 
   for (const width of RESPONSIVE_WIDTHS) {

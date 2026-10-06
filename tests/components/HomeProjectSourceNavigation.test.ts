@@ -11,6 +11,7 @@ import StatePanel from '~/components/ui/StatePanel.vue'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
 import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
 import { createProjectReadTestInstance, PROJECT_READ_FIXTURE } from '../../server/utils/project-read-test-instance'
+import { fixtureProjectCustomerReferences } from '../helpers/project-read-meta'
 
 vi.mock('~/lib/db/connection', () => ({ select: () => {
   throw new Error('正式项目不得回读旧本地库')
@@ -30,7 +31,7 @@ let instance: ReturnType<typeof createProjectReadTestInstance>
 beforeEach(() => {
   beforeRead = async () => {}
   rows = ['a', 'b'].map(id => ({ ...PROJECT_READ_FIXTURE[0]!, id, name: `中央项目 ${id}`, dataOrigin: 'real' }))
-  instance = createProjectReadTestInstance(() => ['project:list:read'], () => rows, () => 'v1', undefined, async () => 0, async () => [])
+  instance = createProjectReadTestInstance(() => ['project:list:read'], () => rows, () => 'v1', undefined, async () => 0, async () => [], fixtureProjectCustomerReferences)
   const repository = createHttpProjectListRepository({ fetcher: async (url, options) => {
     if (url === '/api/read/projects')
       return instance.list(options?.query)

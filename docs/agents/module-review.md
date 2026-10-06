@@ -56,7 +56,7 @@
 
 按“路由 + 实际 kind + 视图/页签 + 运行环境 + 子表”展开，同一路由的动态类型、浏览器/桌面分支及每张子表分别核对。非侧栏入口、原生表格和导入预览也判断适用性；矩阵、甘特与明细编辑保留领域结构。
 
-公共目标见 [CRM 列表模式](../rewrite/CRM-PATTERNS.md#1-列表页)和[组件规格](../design/kit-ui-component-specs.md)，字段与动作结论写回对应页面蓝本。
+公共目标见 [DESIGN-SYSTEM 列表结构](../rewrite/DESIGN-SYSTEM.md#a01-list-pattern)和[组件规格](../design/kit-ui-component-specs.md)，查询与写入直达 READ-MODELS / COMMANDS，字段与动作差异写回对应页面蓝本。
 
 | 对应项 | 必须登记的事实与验收 |
 | --- | --- |

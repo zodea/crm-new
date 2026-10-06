@@ -9,9 +9,11 @@ import { createHttpProjectCommandRepository } from '~/lib/project/command-http-r
 import { projectDraftFromImport, resolveImportCustomer } from '~/lib/project/import'
 import { createProjectRowImporter } from '~/lib/project/import-command'
 import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
+import { resolvePagination } from '~/lib/read-model/pagination'
 import { useProjectCommandStore } from '~/stores/project-command'
 import { parseProjectCommandRequest } from '../../server/utils/project-command-request'
 import { createProjectCommandTestInstance } from '../../server/utils/project-command-test-instance'
+import { createReadMeta, readSourceVersion, withOriginReadMeta } from '../../server/utils/read-meta'
 
 function customer(id: string, label: string, aliases: string[] = []): CustomerListItemDTO {
   return { dataOrigin: 'real', customer: { id, label, entity: 'customer', state: 'resolved', no: null }, aliases } as CustomerListItemDTO
@@ -31,10 +33,12 @@ function sourceRow(overrides: Record<string, unknown> = {}, source: Record<strin
 function harness() {
   let sequence = 0
   const customers = [customer('customer-423', '甲方423', ['简称423'])]
-  const list = vi.fn<CustomerReadRepository['list']>(async query => ({
-    items: customers.slice((query.page - 1) * 100, query.page * 100),
-    pagination: { total: customers.length },
-  } as Awaited<ReturnType<CustomerReadRepository['list']>>))
+  const list = vi.fn<CustomerReadRepository['list']>(async (query) => {
+    const asOf = '2026-10-04T08:00:00.000Z'
+    const real = createReadMeta({ session: context, schemaVersion: 'customer-read-v2', operation: 'customer:list', dataOrigin: 'real', asOf, sources: [{ key: 'customers', state: 'readable', sourceVersion: readSourceVersion('import-customers-fixture', customers), asOf }], coverage: 'complete', scope: { search: '', status: null, sort: 'name-asc' } })
+    const demo = createReadMeta({ session: context, schemaVersion: 'customer-read-v2', operation: 'customer:list', dataOrigin: 'demo', asOf, sources: [{ key: 'customers', state: 'not-requested', sourceVersion: null, asOf: null }], coverage: 'unknown', scope: { search: '', status: null, sort: 'name-asc' } })
+    return withOriginReadMeta({ items: customers.slice((query.page - 1) * 100, query.page * 100), pagination: resolvePagination(query.page, query.pageSize, customers.length) }, { real, demo }) as Awaited<ReturnType<CustomerReadRepository['list']>>
+  })
   const customerRead = { list } as unknown as CustomerReadRepository
   const commands = createProjectCommandTestInstance({ createId: () => `project-${++sequence}`, validateImportCustomers: async (draft) => {
     for (const id of [draft.customerId, draft.secondaryCustomerId].filter(Boolean)) {
@@ -111,6 +115,34 @@ describe('项目中央逐行导入命令', () => {
     expect(() => resolveImportCustomer(input, argument2, argument3)).toThrow(expected)
   })
 
+  it.each([
+    { label: '操作者切换', patch: { actorId: 'another-importer' } },
+    { label: '候选读取撤权', patch: { capabilities: ['project:write'] } },
+  ])('完成候选后$label，不能发出项目命令', async ({ patch }) => {
+    const h = harness()
+    vi.spyOn(h.repository, 'context').mockResolvedValueOnce(context).mockResolvedValueOnce({ ...context, ...patch })
+    const execute = vi.spyOn(h.repository, 'execute')
+    await expect(h.importer.importRow(sourceRow())).rejects.toThrow('身份或候选来源已变化')
+    expect(execute).not.toHaveBeenCalled()
+    expect(h.commands.rows()).toHaveLength(0)
+  })
+
+  it('跨页候选版本变化拒绝整个导入，不能只使用已读部分匹配名称', async () => {
+    const h = harness()
+    h.customers.unshift(...Array.from({ length: 101 }, (_, index) => customer(`candidate-${index}`, `候选${index}`)))
+    const read = h.list.getMockImplementation()!
+    h.list.mockImplementationOnce(async (query) => {
+      const first = await read(query)
+      h.customers[0] = customer('candidate-0', '后来更名')
+      return first
+    })
+    const execute = vi.spyOn(h.repository, 'execute')
+    await expect(h.importer.importRow(sourceRow())).rejects.toThrow('版本或授权范围已变化')
+    expect(h.list).toHaveBeenCalledTimes(2)
+    expect(execute).not.toHaveBeenCalled()
+    expect(h.commands.rows()).toHaveLength(0)
+  })
+
   it('相同来源并发/重传及外部旧 ID 重试返回同一项目，修改内容明确冲突', async () => {
     const h = harness()
     const source = { externalRef: 'EXT-423' }
@@ -118,7 +150,12 @@ describe('项目中央逐行导入命令', () => {
     expect(first.id).toBe(second.id)
     const reuploaded = await createProjectRowImporter(h.repository, h.customerRead).importRow(sourceRow({}, { ...source, fileDigest: 'b'.repeat(64) }))
     expect(reuploaded.id).toBe(first.id)
-    await expect(h.importer.importRow(sourceRow({ name: '不能覆盖' }, source))).rejects.toThrow('内容不同')
+    // 原断言保护同来源异文不能覆盖；保留此行为，验证领域 conflict 与原回执。
+    const changed = sourceRow({ name: '不能覆盖' }, source)
+    await expect(h.commands.execute(await h.importer.prepare(changed), context)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    await expect(h.importer.importRow(changed)).rejects.toBeInstanceOf(ImportRowRejected)
+    const prepared = await h.importer.prepare(sourceRow({}, source))
+    expect(h.commands.resolve(prepared.commandId, context)).toEqual({ outcome: 'applied', result: first })
     expect(h.commands.rows()).toHaveLength(1)
     expect(h.commands.form(first.id, context)).toMatchObject({ draft: { name: '项目423', customerId: 'customer-423', approvalStatus: 'draft' }, importSource: { externalRef: 'EXT-423', rowNumber: 4, rawSnapshot: { 原始名称: '项目423' } } })
   })

@@ -4,6 +4,7 @@ import type {
   F2SaveAction,
   ProjectContractFormDraft,
 } from '../contract/forms'
+import type { CommandResolution } from '../forms/command-recovery'
 
 export const CONSTRUCTION_CONTRACT_WRITE_CAPABILITY = 'construction-contract:write' as const
 
@@ -46,4 +47,5 @@ export interface ConstructionContractCommandRepository {
   context: () => Promise<ConstructionContractCommandContextDTO>
   loadForm: (id: string) => Promise<ConstructionContractFormReadDTO>
   execute: (request: ConstructionContractCommandRequestDTO) => Promise<ConstructionContractCommandResultDTO>
+  resolve: (commandId: string) => Promise<CommandResolution<ConstructionContractCommandResultDTO>>
 }

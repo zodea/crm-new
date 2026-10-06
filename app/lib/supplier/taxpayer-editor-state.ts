@@ -48,7 +48,8 @@ export function createTaxpayerEditorState(options: {
     error.value = ''
     summary.value = ''
     conflict.value = false
-    locked.value = false
+    busy.value = false
+    locked.value = options.pending() !== null
     return ''
   }
   async function save() {
@@ -81,12 +82,14 @@ export function createTaxpayerEditorState(options: {
       return false
     }
     finally {
-      locked.value = options.pending() !== null
-      busy.value = false
+      if (sequence === generation) {
+        locked.value = options.pending() !== null
+        busy.value = false
+      }
     }
   }
   async function recheck() {
-    if (busy.value || locked.value)
+    if (!active.value || !open.value || busy.value || locked.value)
       return
     const sequence = generation
     const id = targetId
@@ -107,7 +110,10 @@ export function createTaxpayerEditorState(options: {
       if (isCurrent(id, sequence))
         error.value = cause instanceof Error ? cause.message : '重新读取失败'
     }
-    finally { busy.value = false }
+    finally {
+      if (sequence === generation)
+        busy.value = false
+    }
   }
   function close() {
     if (busy.value)
@@ -122,6 +128,8 @@ export function createTaxpayerEditorState(options: {
   function deactivate() {
     active.value = false
     generation++
+    busy.value = false
+    locked.value = options.pending() !== null
   }
   function activate() {
     active.value = true

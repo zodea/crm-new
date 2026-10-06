@@ -1,7 +1,7 @@
 import type { DataOriginDTO, ProblemCodeDTO } from '../../types/read-model'
 import type { OcrRuntimeRequestOptions } from '../recognize/engine'
 import type { CredentialOcrDecision, CredentialOcrFieldChoice, CredentialOcrFieldKey, ParsedCredentialOcr } from './credential-ocr'
-import type { SupplierCredentialCategory, SupplierCredentialRequirement } from './credentials'
+import type { credentialValidityProjection, SupplierCredentialCategory, SupplierCredentialRequirement } from './credentials'
 import { supplierProblem, SupplierRepositoryProblem } from './read-contract'
 
 export const SUPPLIER_CREDENTIAL_READ_CAPABILITY = 'supplier-credential:read' as const
@@ -41,6 +41,7 @@ export interface SupplierCredentialRecord extends SupplierCredentialValidity {
   updatedAt: string | null
   /** 新识别的原件边界；历史 OCR 原文保留原义，不自动生成确认。 */
   recognition?: SupplierCredentialRecognition | null
+  validity?: ReturnType<typeof credentialValidityProjection>
 }
 
 export interface SupplierCredentialRecognition {
@@ -74,6 +75,20 @@ export interface SupplierCredentialReviewProof {
   reviewedAt: string
   actorId: string | null
   note: string
+  /** 原 Native 历史凭证的稳定物理身份与归档副本时间；旧四字段凭证保持兼容。 */
+  historyIdentity?: { id: string, legacyId: string, archivedAt: string }
+}
+
+/** supplier 拥有问题事实；inbox 只引用稳定 problemId，已读单独归 notifications。 */
+export interface SupplierCredentialExpiryProblem {
+  id: string
+  supplierId: string
+  credentialId: string
+  expiresAt: string
+  severity: 'expiring' | 'expired'
+  firstSeenAt: string
+  lastSeenAt: string
+  resolvedAt: string | null
 }
 
 export interface SupplierCredentialAudit {
@@ -110,6 +125,9 @@ export interface SupplierCredentialSnapshot {
   businessDate: string
   status: SupplierCredentialStatus
   review: SupplierCredentialReviewProof | null
+  /** review 是最近历史凭证；是否仍适用由当前投影单独说明。 */
+  reviewCurrent?: boolean
+  reviewHistory?: SupplierCredentialReviewProof[]
   credentials: SupplierCredentialRecord[]
   requirements: SupplierCredentialRequirementRecord[]
   audits: SupplierCredentialAudit[]

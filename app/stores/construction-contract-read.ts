@@ -8,24 +8,11 @@ import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
 import { constructionContractProblemFromUnknown } from '~/lib/construction-contract/repository'
-
-function previous<T>(state: ReadState<T>): T | null {
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
-}
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readStateData as previous, readFailureState } from '~/lib/read-model/state'
 
 function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
-  const { problem } = constructionContractProblemFromUnknown(cause)
-  if (problem.code === 'forbidden')
-    return { kind: 'forbidden', problem }
-  if (problem.code === 'not-found')
-    return { kind: 'not-found', problem }
-  if (problem.code === 'relationship-mismatch')
-    return { kind: 'mismatch', problem }
-  return { kind: 'error', problem, previous: prior }
+  return readFailureState(constructionContractProblemFromUnknown(cause).problem, prior)
 }
 
 function sameFocus(
@@ -52,6 +39,14 @@ export const useConstructionContractReadStore = defineStore('construction-contra
   const detailQuery = shallowRef<ConstructionContractDetailQueryDTO | null>(null)
   let latestList = 0
   let latestDetail = 0
+  bindReadAuthority((problem) => {
+    latestList++
+    latestDetail++
+    listQuery.value = null
+    detailQuery.value = null
+    listState.value = readFailureState<ConstructionContractListPageDTO>(problem, null)
+    detailState.value = readFailureState<ConstructionContractDetailReadDTO>(problem, null)
+  })
 
   async function loadList(query: ConstructionContractListQueryDTO) {
     const request = ++latestList

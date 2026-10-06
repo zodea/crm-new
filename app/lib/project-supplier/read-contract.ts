@@ -6,6 +6,7 @@ import type {
   MoneyDTO,
   NavigationIntentDTO,
   ProblemDTO,
+  ReadMetaDTO,
 } from '../../types/read-model'
 import type { ApprovedAmountOrigin, ApprovedAmountState } from '../finance/approval-amount'
 import type { ProjectSupplierFileRepository } from './file-content'
@@ -222,6 +223,7 @@ export interface ProjectSupplierFileDTO {
 }
 
 export interface ProjectSupplierWorkbenchReadDTO {
+  meta: ReadMetaDTO
   dataOrigin: DataOriginDTO
   relation: { id: string, status: string, note: string }
   project: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'project' }

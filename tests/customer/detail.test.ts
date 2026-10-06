@@ -71,6 +71,50 @@ afterEach(() => {
 })
 
 describe('客户详情只读模型', () => {
+  it.each(['head', 'supplement', 'receipt'] as const)('实际 %s 金额未知时传递到对应项目、合计及余额，原记录和旧 changed 不变', async (source) => {
+    const mem = await createDb()
+    await seedCustomerFacts(mem)
+    await mem.execute('UPDATE contracts SET changed=9999999 WHERE id=\'contract_1\'')
+    if (source === 'head')
+      await mem.execute('UPDATE contracts SET amount=NULL WHERE id=\'contract_1\'')
+    else if (source === 'supplement')
+      await mem.execute('UPDATE contract_supplements SET amount=NULL WHERE id=\'supplement_1\'')
+    else
+      await mem.execute('UPDATE receipt_registrations SET amount=\'damaged-legacy-value\' WHERE id=\'receipt_1\'')
+    const originalContracts = await mem.select('SELECT * FROM contracts ORDER BY id')
+    const originalReceipts = await mem.select('SELECT * FROM receipt_registrations ORDER BY id')
+    const originalSupplements = await mem.select('SELECT * FROM contract_supplements ORDER BY id')
+    const detail = (await loadCustomerDetail(mem, 'customer_1'))!
+    const contract = detail.contracts.find(row => row.id === 'contract_1')!
+    expect(contract.changed).toBe(9999999)
+    expect(contract.effectiveAmount).toBe(source === 'receipt' ? 1050000 : null)
+    expect(contract.receiptAmount).toBe(source === 'receipt' ? null : 320000)
+    expect(contract.outstandingAmount).toBeNull()
+    expect(detail.summary.effectiveContractAmount).toBe(source === 'receipt' ? 1050000 : null)
+    expect(detail.summary.effectiveReceiptAmount).toBe(source === 'receipt' ? null : 320000)
+    expect(detail.summary.outstandingAmount).toBeNull()
+    expect(detail.projects.find(row => row.id === 'project_1')).toMatchObject({ effectiveContractAmount: source === 'receipt' ? 1050000 : null, effectiveReceiptAmount: source === 'receipt' ? null : 320000 })
+    expect(await mem.select('SELECT * FROM contracts ORDER BY id')).toEqual(originalContracts)
+    expect(await mem.select('SELECT * FROM receipt_registrations ORDER BY id')).toEqual(originalReceipts)
+    expect(await mem.select('SELECT * FROM contract_supplements ORDER BY id')).toEqual(originalSupplements)
+  })
+
+  it('完整读取的真零和未纳入草稿不受未知正文污染；主档和草稿旧证据仍可回读', async () => {
+    const mem = await createDb()
+    await seedCustomerFacts(mem)
+    await mem.execute('UPDATE contracts SET amount=0,changed=\'damaged-legacy-value\' WHERE id=\'contract_1\'')
+    await mem.execute('UPDATE contracts SET amount=NULL WHERE id=\'contract_draft\'')
+    await mem.execute('UPDATE contract_supplements SET amount=0 WHERE id=\'supplement_1\'')
+    await mem.execute('INSERT INTO contract_supplements(id,contract_id,amount,status) VALUES(\'supplement-draft\',\'contract_1\',NULL,\'draft\')')
+    await mem.execute('UPDATE receipt_registrations SET amount=0 WHERE id=\'receipt_1\'')
+    await mem.execute('UPDATE receipt_registrations SET amount=\'damaged-draft-value\' WHERE id=\'receipt_draft\'')
+    const detail = (await loadCustomerDetail(mem, 'customer_1'))!
+    expect(detail.contracts.find(row => row.id === 'contract_1')).toMatchObject({ amount: 0, changed: null, effectiveAmount: 0, receiptAmount: 0, outstandingAmount: 0 })
+    expect(detail.contracts.find(row => row.id === 'contract_draft')).toMatchObject({ amount: null, effectiveAmount: 0 })
+    expect(detail.receipts.find(row => row.id === 'receipt_draft')).toMatchObject({ amount: null, effectiveAmount: 0 })
+    expect(detail.summary).toMatchObject({ effectiveContractAmount: 0, effectiveReceiptAmount: 0, outstandingAmount: 0 })
+  })
+
   it('仅按真实外键汇总名下项目、施工合同和有效收款', async () => {
     const mem = await createDb()
     await seedCustomerFacts(mem)

@@ -100,6 +100,13 @@ async function loadOptions(keyword: string, generation: number) {
         return
       }
 
+      recentState.value = recents.items.value.map(item =>
+        fetched.find(option => option.id === item.id) ?? item,
+      )
+      const currentSelected = fetched.find(option => option.id === model.value)
+      if (currentSelected)
+        selectedOption.value = currentSelected
+
       results.value = fetched
       resultsKeyword.value = keyword
     })
@@ -397,6 +404,7 @@ watch(
               :value="option.id"
               :text-value="option.label"
               class="relative flex cursor-pointer select-none items-center rounded-[var(--radius-sm)] py-1.5 pl-7 pr-2 text-13px text-ink outline-none data-[highlighted]:bg-brand-soft data-[highlighted]:text-brand-deep"
+              @pointerdown.prevent
             >
               <ComboboxItemIndicator class="absolute left-2 inline-flex items-center">
                 <span class="i-lucide-check h-3.5 w-3.5 text-brand" aria-hidden="true" />
@@ -433,6 +441,7 @@ watch(
               :value="option.id"
               :text-value="option.label"
               class="relative flex cursor-pointer select-none items-center rounded-[var(--radius-sm)] py-1.5 pl-7 pr-2 text-13px text-ink outline-none data-[highlighted]:bg-brand-soft data-[highlighted]:text-brand-deep"
+              @pointerdown.prevent
             >
               <ComboboxItemIndicator class="absolute left-2 inline-flex items-center">
                 <span class="i-lucide-check h-3.5 w-3.5 text-brand" aria-hidden="true" />

@@ -8,12 +8,15 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/stores/supplier-persistent-command.test.ts](../../../tests/stores/supplier-persistent-command.test.ts) | 单元／服务／状态 | 分供方原提交恢复、后读失败及输入保全 |
+| [tests/supplier/native-review-history.test.ts](../../../tests/supplier/native-review-history.test.ts) | 单元／服务／状态 | Native 原件及人工核验不可变历史 |
 | [tests/db/supplier-labor-scope-migration.test.ts](../../../tests/db/supplier-labor-scope-migration.test.ts) | 单元／服务／状态 | 分供方可选劳务范围迁移 |
 | [tests/migration/supplier-credential-source.test.ts](../../../tests/migration/supplier-credential-source.test.ts) | 单元／服务／状态 | 分供方证照完整物理图来源 |
 | [tests/production/supplier-credential-pending.test.ts](../../../tests/production/supplier-credential-pending.test.ts) | 单元／服务／状态 | 证照原件失响应冷恢复只凭原键核对，正文不进浏览器持久层且不二次上传 |
 | [tests/production/supplier-pending.test.ts](../../../tests/production/supplier-pending.test.ts) | 单元／服务／状态 | 主档丢响应后只存原键，冷恢复先读原分供方，不重复创建 |
-| [tests/production/supplier-restart.test.ts](../../../tests/production/supplier-restart.test.ts) | 单元／服务／状态 | 真实公开服务重启后恢复原件、OCR候选/人工值及失响应原键，回滚/撤权/跨来源仍拒绝 |
+| [tests/production/supplier-restart.test.ts](../../../tests/production/supplier-restart.test.ts) | 单元／服务／状态 | 真实公开服务重启后恢复原件、OCR候选/人工值及失响应原键；真实财务空源及双读权证明实付零、排序和再次冷读，未接项目及合同仍未知，回滚/撤权/跨来源仍拒绝 |
 | [tests/production/supplier-storage.test.ts](../../../tests/production/supplier-storage.test.ts) | 单元／服务／状态 | 磁盘冷打开保留主档、原件、人工核验、原回执及导入指纹 |
+| [tests/production/supplier-business-facts.test.ts](../../../tests/production/supplier-business-facts.test.ts) | 实际 SQLite 及正式参与者 | 同事务读取 F3 实付、材采与 Other 有证小计；真实零、缺源、权限隔离及原申请删除后的确认现金保全 |
 | [tests/server/supplier-central-test-instance.test.ts](../../../tests/server/supplier-central-test-instance.test.ts) | 单元／服务／状态 | 分供方中央写入测试实例 |
 | [tests/server/supplier-fact-source.test.ts](../../../tests/server/supplier-fact-source.test.ts) | 单元／服务／状态 | 分供方跨领域事实投影 |
 | [tests/stores/supplier-central.test.ts](../../../tests/stores/supplier-central.test.ts) | 单元／服务／状态 | 分供方中央 stores |
@@ -52,7 +55,7 @@
 | [tests/components/SupplierCredentialOcrWorkflow.test.ts](../../../tests/components/SupplierCredentialOcrWorkflow.test.ts) | 组件（jsdom） | 中央 OCR 识别与人工确认工作流 |
 | [tests/components/SupplierCredentialScreen.test.ts](../../../tests/components/SupplierCredentialScreen.test.ts) | 组件（jsdom） | 中央分供方证照入口 |
 | [tests/components/SupplierCredentialTab.test.ts](../../../tests/components/SupplierCredentialTab.test.ts) | 组件（jsdom） | supplier credential tab |
-| [tests/components/SupplierDetailScreen.test.ts](../../../tests/components/SupplierDetailScreen.test.ts) | 组件（jsdom） | 分供方中央详情 |
+| [tests/components/SupplierDetailScreen.test.ts](../../../tests/components/SupplierDetailScreen.test.ts) | 组件（jsdom） | 分供方中央详情；材采可读而其他合同域不可用／无权／缺证时只显示已核事实与完整未知，禁止挂载缺源子区；统一可信合同及 demo 原边界 |
 | [tests/components/SupplierFactTable.test.ts](../../../tests/components/SupplierFactTable.test.ts) | 组件（jsdom） | 分供方合同事实类别 |
 | [tests/components/SupplierFormFields.test.ts](../../../tests/components/SupplierFormFields.test.ts) | 组件（jsdom） | 分供方表单资料辅助动作 |
 | [tests/components/SupplierListCredentialFilter.test.ts](../../../tests/components/SupplierListCredentialFilter.test.ts) | 组件（jsdom） | 分供方营业执照真实状态筛选 |
@@ -63,7 +66,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/issue-315-supplier-central-facts.spec.ts](../../../e2e/issue-315-supplier-central-facts.spec.ts) | Playwright E2E | Issue #315：分供方中央详情与四类真实事实 |
-| [e2e/production-supplier-storage.spec.ts](../../../e2e/production-supplier-storage.spec.ts) | Playwright E2E | 分供方主档、证照原件与人工核验失响应后独立重启，以原键恢复且不重复提交 |
+| [e2e/production-supplier-storage.spec.ts](../../../e2e/production-supplier-storage.spec.ts) | Playwright E2E | 分供方主档、证照原件与人工核验原键冷恢复；真实空财务零值及排序、材采真实空集合／缺其他域的部分金额与完整未知、零缺源请求／入口、未知项目筛选拒绝、原件和通知保全及五档布局 |
 | [e2e/supplier-credential-ocr-central.spec.ts](../../../e2e/supplier-credential-ocr-central.spec.ts) | Playwright E2E | 授权合成原件识别失败重试、稍后冷读、税号矛盾和陈旧确认保选择、重新识别保留确认 |
 | [e2e/supplier-credentials-central.spec.ts](../../../e2e/supplier-credentials-central.spec.ts) | Playwright E2E | 真实旧库完整图迁入、历史凭证回读、同原件撤回与缺正文不冒充齐全 |
 | [e2e/supplier-crud.spec.ts](../../../e2e/supplier-crud.spec.ts) | Playwright E2E | 两类正式分供方新建、显式编辑、冷回读与页签复用；中央行菜单仅提供只读入口，旧本地删除由数据库及通用主数据测试覆盖 |

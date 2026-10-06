@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { isTauri } from '@tauri-apps/api/core'
-import { useNow } from '@vueuse/core'
+import { useEventListener, useIntervalFn, useNow } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { SidebarTrigger, useSidebar } from '~/components/ui/sidebar'
 import {
@@ -8,16 +8,47 @@ import {
   stageDataVisibilitySwitch,
 } from '~/lib/data-visibility'
 import { routeTitle } from '~/lib/tabs/tab-title'
+import { formatShanghaiDateTime } from '~/lib/util/datetime'
 
 const route = useRoute()
 const notificationStore = useNotificationStore()
 const dataVisibilityStore = useDataVisibilityStore()
 const { unreadCount } = storeToRefs(notificationStore)
 const { includeDemo } = storeToRefs(dataVisibilityStore)
+const notificationsRepository = useNuxtApp().$repositories.notifications
+const systemToast = useToast()
+const showNotifications = shallowRef(false)
+onMounted(() => {
+  void notificationStore.initialize(notificationsRepository, (item) => {
+    const toastId = systemToast.push({
+      lane: 'system',
+      message: item.title,
+      description: `${item.summary} · ${formatShanghaiDateTime(item.occurredAt, '时间未知')}`,
+      onDismiss: () => notificationStore.dismissPresentation(item.eventId),
+      action: { label: '查看', onClick: async () => {
+        notificationStore.dismissPresentation(item.eventId)
+        const target = await notificationStore.openItem(item.eventId)
+        if (target)
+          await navigateTo(target)
+        else if (notificationStore.error)
+          showNotifications.value = true
+      } },
+    })
+    return () => systemToast.dismiss(toastId)
+  })
+})
+useIntervalFn(() => {
+  void notificationStore.refresh()
+}, 60_000)
+useEventListener('focus', () => {
+  void notificationStore.refresh()
+})
+watch(includeDemo, () => {
+  void notificationStore.refresh()
+})
 const { isMobile } = useSidebar()
 const { confirm, warning } = useKitUI()
 
-const showNotifications = shallowRef(false)
 const showDevTools = shallowRef(false)
 const switchingDataVisibility = shallowRef(false)
 const isDev = import.meta.dev

@@ -166,6 +166,17 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
     expect(resolveEntityLink(input)).toEqual(expected)
   })
 
+  it.each([
+    { entity: 'material-quotation', id: 'quote-actual-1', label: '实际独立报价', variant: 'detail', to: '/material/quotations/quote-actual-1?origin=real' },
+    { entity: 'settlement', id: 'other-actual-1', label: '实际原费用结算', variant: 'other_settlement', to: '/contract/other-settlement/other-actual-1?origin=real' },
+  ])('实际详情$entity保稳定ID及真实来源，错误来源和缺ID不能生成蓝链', ({ entity, id, label, variant, to }) => {
+    const intent = { kind: 'entity-detail', subject: { state: 'resolved', entity, id, label, no: null }, variant, view: null, filters: { dataOrigin: 'real' } }
+    expect(resolveNavigationTarget(intent)).toEqual({ state: 'resolved', label, to })
+    expect(resolveNavigationTarget({ ...intent, filters: { dataOrigin: 'demo' } })).toMatchObject({ state: 'error' })
+    expect(resolveNavigationTarget({ ...intent, filters: {} })).toMatchObject({ state: 'error' })
+    expect(resolveNavigationTarget({ ...intent, subject: { state: 'missing', entity, id: null, label, reason: 'not-recorded' } })).toMatchObject({ state: 'missing' })
+  })
+
   it('映射表只登记已实装详情页', () => {
     expect(registeredTargetKeys()).toEqual([
       'attendance:matrix',
@@ -181,6 +192,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'daywork:ledger',
       'delivery-record:detail',
       'invoice:detail',
+      'material-quotation:detail',
       'owner-document:acceptance',
       'owner-document:change',
       'owner-document:final-settlement',

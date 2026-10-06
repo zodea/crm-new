@@ -1,6 +1,9 @@
 import type { TestDb } from '../helpers/memory-db'
+import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readNativeConstructionManagementFee } from '~/lib/construction-contract/management-fee-storage'
 import {
   deleteF2Form,
   listContractFormAttachments,
@@ -9,11 +12,13 @@ import {
   loadF2Form,
 } from '~/lib/contract/forms'
 import { runMigrations } from '~/lib/db/migrations'
+import { loadFileRefContent } from '~/lib/forms/file-refs'
 import { useContractStore } from '~/stores/contract'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 let failFileInsert = false
+const OUR_SELECTED = { ourSignatoryId: 'our-contract', ourSignatoryVersion: '1' }
 
 vi.mock('~/lib/db/connection', () => ({
   execute: (sql: string, params?: unknown[]) => mem.execute(sql, params),
@@ -45,6 +50,9 @@ beforeEach(async () => {
   failFileInsert = false
   mem = await createMemoryDb()
   await runMigrations(mem)
+  const ownFacts = JSON.stringify({ name: '合同我方实际公司', taxNo: 'TEST-TAX', registeredAddress: null, legalRepresentative: null, verificationNote: '本测试独立核实主体事实', status: 'active' })
+  await mem.execute('INSERT INTO our_signatories VALUES(?,?,?,?,?)', ['our-contract', ownFacts, 1, '2026-10-04T00:00:00.000Z', '2026-10-04T00:00:00.000Z'])
+  await mem.execute('INSERT INTO our_signatory_history VALUES(?,?,?,?,?,?,?)', ['our-contract-v1', 'our-contract', 1, ownFacts, null, null, '2026-10-04T00:00:00.000Z'])
   setActivePinia(createPinia())
   await mem.execute(`
     INSERT INTO customers (id, name, status)
@@ -65,9 +73,156 @@ afterEach(() => {
 })
 
 describe('f2 合同与支出结算领域 action', () => {
+  it('总合同配置空与零读回、编辑撤销保留冻结历史，附件失败同事务回滚且供应商合同拒绝配置', async () => {
+    const store = useContractStore()
+    const base = { ...OUR_SELECTED, name: '管理费配置总合同', projectId: 'project-contract', customerId: 'customer-contract', content: '施工', signDate: '2026-10-05', amount: 5000 }
+    const first = await store.saveForm('construction', { ...base, managementFeeAmount: null, managementFeeBasis: '' }, 'save')
+    expect(await loadF2Form('construction', first.id)).toMatchObject({ amount: 5000, managementFeeAmount: null, managementFeeBasis: '' })
+    const zero = await store.saveForm('construction', { ...base, id: first.id, managementFeeAmount: 0, managementFeeBasis: '原合同第八条' }, 'save')
+    expect(await loadF2Form('construction', first.id)).toMatchObject({ managementFeeAmount: 0, managementFeeBasis: '原合同第八条' })
+    const second = await store.saveForm('construction', { ...base, id: first.id, managementFeeAmount: 1200, managementFeeBasis: '另行采用依据' }, 'save')
+    expect(await store.undoForm('construction', second.logId!)).toBe(true)
+    expect(await loadF2Form('construction', first.id)).toMatchObject({ amount: 5000, managementFeeAmount: 0, managementFeeBasis: '原合同第八条' })
+    expect((await readNativeConstructionManagementFee(mem, first.id)).history.map(row => row.amount)).toEqual([0, 1200])
+    const before = await mem.select('SELECT * FROM construction_management_fee_history ORDER BY version')
+    failFileInsert = true
+    await expect(store.saveForm('construction', { ...base, id: first.id, managementFeeAmount: 2400 }, 'save', { add: [{ fileName: '需原件', fileSize: 1, payloadBase64: 'YQ==' }] })).rejects.toThrow('附件写入失败')
+    expect(await mem.select('SELECT * FROM construction_management_fee_history ORDER BY version')).toEqual(before)
+    expect(await loadF2Form('construction', first.id)).toMatchObject({ managementFeeAmount: 0 })
+    failFileInsert = false
+    await expect(store.saveForm('material', { name: '供应商合同', managementFeeAmount: 0 }, 'draft')).rejects.toThrow('施工主合同')
+    expect(zero.id).toBe(first.id)
+  })
+  it('合同编辑撤回与占号同事务；后来别人采用旧号时原头/日志/历史全回滚，旧句柄不覆盖后来写入', async () => {
+    const store = useContractStore()
+    const base = { name: '原正式合同', no: 'RESTORE-A', projectId: 'project-contract', customerId: 'customer-contract', content: '原事实', signDate: '2026-10-04', amount: 1 }
+    const first = await store.saveForm('construction', base, 'submit')
+    const original = await loadF2Form('construction', first.id)
+    const edited = await store.saveForm('construction', { ...original!, no: 'RESTORE-B' }, 'submit')
+    await store.saveForm('company_expense', { name: '后来真实采用旧号', no: 'RESTORE-A', counterparty: '真实单位', signDate: '2026-10-04', amount: 2 }, 'submit')
+    const before = await mem.select('SELECT * FROM operation_logs ORDER BY rowid')
+    const evidence = await mem.select('SELECT * FROM contract_number_history ORDER BY id')
+    await expect(store.undoForm('construction', edited.logId!)).rejects.toThrow('其他正式主合同重复')
+    expect((await loadF2Form('construction', first.id))?.no).toBe('RESTORE-B')
+    expect(await mem.select('SELECT * FROM operation_logs ORDER BY rowid')).toEqual(before)
+    expect(await mem.select('SELECT * FROM contract_number_history ORDER BY id')).toEqual(evidence)
+    expect(await mem.select('SELECT number FROM contract_number_claims WHERE contract_id=?', [first.id])).toEqual([{ number: 'RESTORE-B' }])
+    const newer = await loadF2Form('construction', first.id)
+    const latest = await store.saveForm('construction', { ...newer!, content: '后来说明' }, 'submit')
+    expect(await store.undoForm('construction', edited.logId!)).toBe(false)
+    expect(await store.undoForm('construction', latest.logId!)).toBe(true)
+    expect((await loadF2Form('construction', first.id))?.content).toBe('原事实')
+    expect(await mem.select('SELECT number FROM contract_number_claims WHERE contract_id=?', [first.id])).toEqual([{ number: 'RESTORE-B' }])
+  })
+  it('真实零与未知头金额分别往返，主合同与协议未知不写回旧派生历史列', async () => {
+    const store = useContractStore()
+    const zero = await store.saveForm('construction', { ...OUR_SELECTED, name: '真实零头', projectId: 'project-contract', customerId: 'customer-contract', content: '零金额事实', signDate: '2026-10-04', amount: 0 }, 'submit')
+    expect((await loadF2Form('construction', zero.id))?.amount).toBe(0)
+    await mem.execute('UPDATE contracts SET changed=1234 WHERE id=?', [zero.id])
+    const prior = await loadF2Form('construction', zero.id)
+    await store.saveForm('construction', { ...prior!, amount: null }, 'draft')
+    expect((await loadF2Form('construction', zero.id))?.amount).toBeNull()
+    expect(store.byId(zero.id)?.changed).toBeNull()
+    expect(await mem.select('SELECT changed FROM contracts WHERE id=?', [zero.id])).toEqual([{ changed: 1234 }])
+    const company = await store.saveForm('company_expense', { ...OUR_SELECTED, name: '未知公司合同', amount: null }, 'draft')
+    expect((await loadF2Form('company_expense', company.id))?.amount).toBeNull()
+    const protocol = await store.saveForm('construction', { isSupplement: true, originalContractId: zero.id, name: '未知历史协议', amount: null }, 'draft')
+    expect((await loadContractSupplementForm(protocol.id))?.amount).toBeNull()
+    await store.saveForm('construction', { ...prior!, amount: null }, 'submit')
+    expect((await loadF2Form('construction', zero.id))!.amount).toBeNull()
+  })
+  it('五种主合同在同一真实事务查完整正式编号，草稿不占号且软删仍占号，协议独立不参加主号判断', async () => {
+    const store = useContractStore()
+    const first = await store.saveForm('construction', { ...OUR_SELECTED, no: 'ALL-KINDS', name: '原已成立主合同', projectId: 'project-contract', customerId: 'customer-contract', content: '原事实', signDate: '2026-10-04', amount: 1 }, 'submit')
+    for (const kind of ['subcontract', 'material', 'other_expense'] as const) {
+      const input = { ...OUR_SELECTED, no: 'ALL-KINDS', name: `重复${kind}`, projectId: 'project-contract', supplierId: 'supplier-contract', content: '待核实', signDate: '2026-10-04', amount: 1, ...(kind === 'material' ? { lineItems: [{ materialName: '真实材料', qty: 1, unit: '米', taxInclusiveUnitPrice: 1 }] } : {}) }
+      const savedDraft = await store.saveForm(kind, input, 'draft')
+      expect(savedDraft.warnings?.[0]).toContain('草稿编号')
+      await expect(store.saveForm(kind, input, 'submit')).rejects.toThrow('其他正式主合同重复')
+    }
+    await expect(store.saveForm('company_expense', { ...OUR_SELECTED, no: 'ALL-KINDS', name: '重复公司号', counterparty: '真实对方', signDate: '2026-10-04', amount: 1 }, 'submit')).rejects.toThrow('其他正式主合同重复')
+    const protocol = await store.saveForm('construction', { no: 'ALL-KINDS', isSupplement: true, originalContractId: first.id, name: '同父号协议', content: '协议原事实', signDate: '2026-10-04', amount: 1 }, 'submit')
+    expect((await loadContractSupplementForm(protocol.id))?.ourSignatorySnapshot?.name).toBe('合同我方实际公司')
+    await deleteF2Form('construction', first.id)
+    await expect(store.saveForm('company_expense', { ...OUR_SELECTED, no: 'ALL-KINDS', name: '试图复用软删号', counterparty: '真实对方', signDate: '2026-10-04', amount: 1 }, 'submit')).rejects.toThrow('其他正式主合同重复')
+    expect(await mem.select('SELECT number FROM contract_number_claims WHERE contract_id=?', [first.id])).toEqual([{ number: 'ALL-KINDS' }])
+    const emptyNo = await store.saveForm('company_expense', { ...OUR_SELECTED, no: '', name: '既定非必填编号', counterparty: '真实对方', signDate: '2026-10-04', amount: 0 }, 'submit')
+    expect((await loadF2Form('company_expense', emptyNo.id))?.amount).toBe(0)
+  })
+  it('native 材采整批来源与真实正文同事务，零字节与旧缺件区分且软删可恢复', async () => {
+    const store = useContractStore()
+    const bytes = Buffer.from('actual native material source')
+    const hash = createHash('sha256').update(bytes).digest('hex')
+    const draft = { name: '真实来源合同', projectId: 'project-contract', supplierId: 'supplier-contract', amount: 20, lineItems: [{ materialName: '方管', unit: '米', qty: 1, taxInclusiveUnitPrice: 20, source: { fileName: '材料.csv', sheetName: '材料', rowNumber: 2, sourceHash: hash, externalRef: null, priceUnit: '米', quantityUnitVerified: true } }] }
+    await expect(store.saveForm('material', draft, 'draft')).rejects.toThrow('实际原件')
+    expect(await mem.select('SELECT id FROM contracts WHERE name=\'真实来源合同\'')).toEqual([])
+    const saved = await store.saveForm('material', draft, 'draft', { add: [
+      { fileName: '材料.csv', fileSize: bytes.length, payloadBase64: bytes.toString('base64'), mimeType: 'text/csv' },
+      { fileName: 'empty.txt', fileSize: 0, payloadBase64: '', mimeType: 'text/plain' },
+      { fileName: 'missing.txt', fileSize: 0, filePath: 'D:/旧路径不作正文' },
+    ] })
+    const files = await listContractFormAttachments('contract', saved.id)
+    const empty = files.find(file => file.fileName === 'empty.txt')!
+    const missing = files.find(file => file.fileName === 'missing.txt')!
+    expect(await loadFileRefContent(empty)).toEqual({ bytes: new Uint8Array(), mimeType: 'text/plain' })
+    expect(await loadFileRefContent(missing)).toBeNull()
+    const form = await loadF2Form('material', saved.id)
+    await store.saveForm('material', form!, 'draft', { removeIds: [empty.id] })
+    expect(await loadFileRefContent(empty)).toBeNull()
+    expect(await mem.select('SELECT content FROM file_payloads WHERE file_ref_id=?', [empty.id])).toEqual([{ content: '' }])
+    await store.saveForm('material', form!, 'draft', { restoreIds: [empty.id] })
+    expect(await loadFileRefContent(empty)).toEqual({ bytes: new Uint8Array(), mimeType: 'text/plain' })
+  })
+  it('材采协议自有行冻结真实原行及来源时间，后来的原合同变更和软删不能覆盖', async () => {
+    const store = useContractStore()
+    const draft = { ...OUR_SELECTED, name: '原方管合同', projectId: 'project-contract', supplierId: 'supplier-contract', content: '原签约事实', signDate: '2026-10-04', amount: 1800, lineItems: [{ materialName: '方管', materialGrade: '304', unit: '米', qty: 100, taxInclusiveUnitPrice: 20 }], deductions: [{ name: '整单优惠', amount: 200, basis: '文书优惠' }] }
+    const main = await store.saveForm('material', draft, 'submit')
+    const original = (await mem.select<{ id: string, updated_at: string }>('SELECT id,updated_at FROM contract_line_items WHERE contract_id=?', [main.id]))[0]!
+    const protocol = await store.saveForm('material', {
+      ...OUR_SELECTED,
+      name: '原方管核增协议',
+      isSupplement: true,
+      originalContractId: main.id,
+      projectId: 'project-contract',
+      supplierId: 'supplier-contract',
+      content: '原行每米核增1元',
+      signDate: '2026-10-04',
+      amount: 100,
+      lineItems: [{ materialName: '方管', materialGrade: '304', unit: '米', qty: 100, taxInclusiveUnitPrice: 21, originalLineId: original.id, changeAmount: 100, changeBasis: '核增1×100' }],
+    }, 'submit')
+    const frozen = (await mem.select<{ original_line_snapshot: string, original_source_updated_at: string }>('SELECT original_line_snapshot,original_source_updated_at FROM contract_supplement_line_items WHERE supplement_id=?', [protocol.id]))[0]!
+    expect(JSON.parse(frozen.original_line_snapshot)).toMatchObject({ id: original.id, contract_id: main.id, tax_inclusive_unit_price: 20, material_grade: '304' })
+    expect(frozen.original_source_updated_at).toBe(original.updated_at)
+    await mem.execute('UPDATE contract_line_items SET tax_inclusive_unit_price=25,deleted_at=? WHERE id=?', ['2026-10-05T00:00:00.000Z', original.id])
+    const edit = await loadContractSupplementForm(protocol.id)
+    expect(edit?.lineItems).toMatchObject([{ originalLineId: original.id, taxInclusiveUnitPrice: 21, changeAmount: 100 }])
+    await store.saveForm('material', {
+      ...OUR_SELECTED,
+      ...edit!,
+      content: '后来补充说明',
+    }, 'save')
+    expect(await mem.select('SELECT original_line_snapshot,original_source_updated_at FROM contract_supplement_line_items WHERE supplement_id=?', [protocol.id])).toEqual([frozen])
+    expect(await mem.select('SELECT amount FROM contract_deductions WHERE contract_id=?', [main.id])).toEqual([{ amount: 200 }])
+  })
+
+  it('native本行税点NULL/真实0各自保存、读取与原行身份保全，头税更改不回填本行', async () => {
+    const store = useContractStore()
+    const saved = await store.saveForm('material', { ...OUR_SELECTED, name: '本行税点原合同', projectId: 'project-contract', supplierId: 'supplier-contract', content: '原资料', signDate: '2026-10-04', amount: 40, taxRate: 13, lineItems: [{ materialName: '未知税点方管', unit: '米', qty: 1, taxInclusiveUnitPrice: 20, applicableTaxRate: null }, { materialName: '真零税点方管', unit: '米', qty: 1, taxInclusiveUnitPrice: 20, applicableTaxRate: 0 }] }, 'submit')
+    const form = await loadF2Form('material', saved.id)
+    expect(form?.lineItems?.map(row => row.applicableTaxRate)).toEqual([null, 0])
+    const identities = form?.lineItems?.map(row => row.id)
+    await store.saveForm('material', { ...form!, taxRate: 9, note: '后来只改头税资料' }, 'save')
+    const after = await loadF2Form('material', saved.id)
+    expect(after?.lineItems?.map(row => row.id)).toEqual(identities)
+    expect(after?.lineItems?.map(row => row.applicableTaxRate)).toEqual([null, 0])
+    expect(after?.taxRate).toBe(9)
+    expect(await mem.select('SELECT applicable_tax_rate FROM contract_line_items WHERE contract_id=? ORDER BY sort_order', [saved.id])).toEqual([{ applicable_tax_rate: null }, { applicable_tax_rate: 0 }])
+  })
+
   it('六条表单经同一 Pinia store 保存真实 ID，并写入各自 canonical 实体', async () => {
     const store = useContractStore()
     const construction = await store.saveForm('construction', {
+      ...OUR_SELECTED,
       no: 'CON-STORE',
       name: '施工主合同',
       projectId: 'project-contract',
@@ -77,6 +232,7 @@ describe('f2 合同与支出结算领域 action', () => {
       amount: 1000,
     }, 'submit')
     const subcontract = await store.saveForm('subcontract', {
+      ...OUR_SELECTED,
       no: 'SUB-STORE',
       name: '劳务分包合同',
       projectId: 'project-contract',
@@ -87,6 +243,7 @@ describe('f2 合同与支出结算领域 action', () => {
       amount: 200,
     }, 'submit')
     const material = await store.saveForm('material', {
+      ...OUR_SELECTED,
       no: 'MAT-STORE',
       name: '材料采购合同',
       projectId: 'project-contract',
@@ -106,6 +263,7 @@ describe('f2 合同与支出结算领域 action', () => {
       }],
     }, 'submit')
     const otherExpense = await store.saveForm('other_expense', {
+      ...OUR_SELECTED,
       no: 'OTHER-STORE',
       name: '机械租赁合同',
       projectId: 'project-contract',
@@ -117,6 +275,7 @@ describe('f2 合同与支出结算领域 action', () => {
       paymentCycle: '月',
     }, 'submit')
     const companyExpense = await store.saveForm('company_expense', {
+      ...OUR_SELECTED,
       no: 'COMPANY-STORE',
       name: '办公软件合同',
       category: '软件',
@@ -211,6 +370,7 @@ describe('f2 合同与支出结算领域 action', () => {
   it('补充协议只写 contract_supplements，头、附件与操作日志同事务保存', async () => {
     const store = useContractStore()
     const original = await store.saveForm('construction', {
+      ...OUR_SELECTED,
       no: 'CON-ORIGINAL',
       name: '原施工合同',
       projectId: 'project-contract',
@@ -222,6 +382,7 @@ describe('f2 合同与支出结算领域 action', () => {
     const before = store.list.length
 
     const supplement = await store.saveForm('construction', {
+      ...OUR_SELECTED,
       isSupplement: true,
       originalContractId: original.id,
       no: 'SUP-001',
@@ -267,6 +428,7 @@ describe('f2 合同与支出结算领域 action', () => {
     }])
 
     await store.saveForm('construction', {
+      ...OUR_SELECTED,
       id: supplement.id,
       isSupplement: true,
       originalContractId: original.id,
@@ -295,6 +457,7 @@ describe('f2 合同与支出结算领域 action', () => {
       .toEqual([expect.objectContaining({ deletedAt: expect.any(String) })])
 
     await store.saveForm('construction', {
+      ...OUR_SELECTED,
       id: supplement.id,
       isSupplement: true,
       originalContractId: original.id,
@@ -314,6 +477,7 @@ describe('f2 合同与支出结算领域 action', () => {
   it('编辑材采、公司支出和结算后刷新完整回显，材采行支持删旧增新', async () => {
     const store = useContractStore()
     const material = await store.saveForm('material', {
+      ...OUR_SELECTED,
       name: '原材料合同',
       projectId: 'project-contract',
       supplierId: 'supplier-contract',
@@ -327,6 +491,7 @@ describe('f2 合同与支出结算领域 action', () => {
       }],
     }, 'submit')
     await store.saveForm('material', {
+      ...OUR_SELECTED,
       id: material.id,
       no: 'MAT-UPDATED',
       name: '更新材料合同',
@@ -367,12 +532,14 @@ describe('f2 合同与支出结算领域 action', () => {
     `, [material.id])).toEqual([{ material_name: '新材料' }])
 
     const company = await store.saveForm('company_expense', {
+      ...OUR_SELECTED,
       name: '公司支出原稿',
       counterparty: '服务商',
       signDate: '2026-07-01',
       amount: 10,
     }, 'submit')
     await store.saveForm('company_expense', {
+      ...OUR_SELECTED,
       id: company.id,
       no: 'COMPANY-UPDATED',
       name: '公司支出更新',
@@ -394,6 +561,7 @@ describe('f2 合同与支出结算领域 action', () => {
     })
 
     const other = await store.saveForm('other_expense', {
+      ...OUR_SELECTED,
       name: '结算源合同',
       projectId: 'project-contract',
       supplierId: 'supplier-contract',
@@ -434,6 +602,7 @@ describe('f2 合同与支出结算领域 action', () => {
   it('草稿允许不完整并可刷新回显；提交拒绝假 ID、关系错配、负数和材采勾稽差额', async () => {
     const store = useContractStore()
     const draft = await store.saveForm('material', {
+      ...OUR_SELECTED,
       name: '',
       amount: 0,
     }, 'draft')
@@ -444,6 +613,7 @@ describe('f2 合同与支出结算领域 action', () => {
       supplierId: null,
     })
     const incompleteLineDraft = await store.saveForm('material', {
+      ...OUR_SELECTED,
       name: '明细未填完的草稿',
       lineItems: [{
         materialName: '',
@@ -462,6 +632,7 @@ describe('f2 合同与支出结算领域 action', () => {
     })
 
     await expect(store.saveForm('construction', {
+      ...OUR_SELECTED,
       name: '假关系合同',
       projectId: 'project-contract',
       customerId: 'missing-customer',
@@ -470,6 +641,7 @@ describe('f2 合同与支出结算领域 action', () => {
       amount: 1,
     }, 'submit')).rejects.toThrow('甲方客户不存在或已删除')
     await expect(store.saveForm('other_expense', {
+      ...OUR_SELECTED,
       name: '假分供方合同',
       projectId: 'project-contract',
       supplierId: 'missing-supplier',
@@ -478,12 +650,14 @@ describe('f2 合同与支出结算领域 action', () => {
       amount: 1,
     }, 'submit')).rejects.toThrow('分供方不存在或已删除')
     await expect(store.saveForm('company_expense', {
+      ...OUR_SELECTED,
       name: '负数公司支出',
       counterparty: '对方单位',
       signDate: '2026-07-01',
       amount: -1,
     }, 'submit')).rejects.toThrow('合同金额不能为负数')
     await expect(store.saveForm('material', {
+      ...OUR_SELECTED,
       name: '金额不平材料合同',
       projectId: 'project-contract',
       supplierId: 'supplier-contract',
@@ -502,6 +676,7 @@ describe('f2 合同与支出结算领域 action', () => {
     const store = useContractStore()
     failFileInsert = true
     await expect(store.saveForm('material', {
+      ...OUR_SELECTED,
       no: 'MAT-ROLLBACK',
       name: '事务回滚材料合同',
       projectId: 'project-contract',
@@ -528,6 +703,7 @@ describe('f2 合同与支出结算领域 action', () => {
 
     failFileInsert = false
     const other = await store.saveForm('other_expense', {
+      ...OUR_SELECTED,
       name: '可结算合同',
       projectId: 'project-contract',
       supplierId: 'supplier-contract',
@@ -565,6 +741,7 @@ describe('f2 合同与支出结算领域 action', () => {
   it('合同存在有效结算时阻止删除，结算软删除后才允许删除合同', async () => {
     const store = useContractStore()
     const contract = await store.saveForm('other_expense', {
+      ...OUR_SELECTED,
       name: '有结算引用合同',
       projectId: 'project-contract',
       supplierId: 'supplier-contract',
@@ -599,6 +776,7 @@ describe('f2 合同与支出结算领域 action', () => {
   it('草稿合同不进入结算候选且不能被结算单引用', async () => {
     const store = useContractStore()
     const contract = await store.saveForm('other_expense', {
+      ...OUR_SELECTED,
       name: '仍为草稿的其他支出合同',
       projectId: 'project-contract',
       supplierId: 'supplier-contract',
@@ -622,6 +800,7 @@ describe('f2 合同与支出结算领域 action', () => {
   it('编辑态锁定合同类型与主从身份，错误路由不能改写既有实体', async () => {
     const store = useContractStore()
     const contract = await store.saveForm('construction', {
+      ...OUR_SELECTED,
       name: '类型锁定合同',
       projectId: 'project-contract',
       customerId: 'customer-contract',
@@ -629,12 +808,14 @@ describe('f2 合同与支出结算领域 action', () => {
 
     expect(await loadF2Form('material', contract.id)).toBeNull()
     await expect(store.saveForm('material', {
+      ...OUR_SELECTED,
       id: contract.id,
       name: '越权改类型',
       projectId: 'project-contract',
       supplierId: 'supplier-contract',
     }, 'draft')).rejects.toThrow('合同类型与当前编辑入口不一致')
     await expect(store.saveForm('construction', {
+      ...OUR_SELECTED,
       id: contract.id,
       isSupplement: true,
       originalContractId: contract.id,

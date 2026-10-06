@@ -1,7 +1,10 @@
 import type { CoreMigrationLocalSourceDependencies } from '~/lib/migration/core-local-source'
 import { describe, expect, it, vi } from 'vitest'
+import { adoptConstructionManagementFee, emptyConstructionManagementFee } from '~/lib/construction-contract/management-fee'
+import { persistNativeConstructionManagementFee } from '~/lib/construction-contract/management-fee-storage'
 import { LATEST_VERSION, runMigrations } from '~/lib/db/migrations'
 import { seedIfEmpty } from '~/lib/db/seed'
+import { materialQuotationSchemaDefinitions } from '~/lib/material-quotation/schema-upgrade'
 import {
   CORE_MIGRATION_CAPABILITY,
   CORE_MIGRATION_CONTRACT_VERSION,
@@ -16,6 +19,34 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  // 最新版本的替身包含已安装但尚无业务事实的独立报价 owner；未知查询仍拒绝。
+  if (sql.startsWith('SELECT type,name,sql FROM sqlite_schema WHERE name IN ('))
+    return materialQuotationSchemaDefinitions()
+  if (sql === 'SELECT revision FROM quotation_revision WHERE singleton=1')
+    return [{ revision: 0 }]
+  if (/^SELECT (?:\*|[\w,]+) FROM (?:material_quotations|material_quotation_lines|material_quotation_history|material_quotation_commands|material_quotation_resolutions|material_quotation_files|quotation_imports)(?: ORDER BY|$)/.test(sql)
+    || sql === 'SELECT id,owner_type,owner_id,file_name,file_path,file_size,mime_type,category,uploader,uploaded_at,deleted_at FROM file_refs WHERE owner_type=\'material_quotation\'') {
+    return []
+  }
+  // 当前 Native 图的主体目录真实存在，但本组存量合同尚未采用新目录。
+  if (new Set([
+    'SELECT * FROM our_signatories ORDER BY id',
+    'SELECT * FROM our_signatory_history ORDER BY signatory_id,version',
+    'SELECT * FROM our_signatory_commands ORDER BY scoped_id',
+    'SELECT * FROM our_signatory_resolutions ORDER BY scoped_id',
+    'SELECT * FROM contract_number_claims ORDER BY owner_domain,contract_id',
+    'SELECT * FROM contract_number_history ORDER BY id',
+  ]).has(sql)) {
+    return []
+  }
+  if (sql === 'SELECT * FROM our_signatory_revision WHERE singleton=1')
+    return [{ singleton: 1, revision: 0 }]
+  if (sql === 'SELECT id, supplier_id, decision, reviewed_at, note, actor_id, archived_at FROM supplier_credential_review_history ORDER BY id')
+    return []
+  if (sql === 'SELECT id,kind FROM contracts ORDER BY id' || sql === 'SELECT * FROM contracts WHERE kind = \'材采\' ORDER BY id' || sql === 'SELECT * FROM contract_line_items ORDER BY id' || sql === 'SELECT * FROM contract_supplement_line_items ORDER BY id' || sql === 'SELECT * FROM contract_deductions ORDER BY id'
+    || sql.includes('WHERE f.owner_type IN (\'contract\',\'contract_supplement\')') || sql.startsWith('SELECT * FROM operation_logs WHERE table_name IN (\'contracts\'')) {
+    return []
+  }
   if (sql === 'PRAGMA table_info(crews)')
     return ['id', 'name', 'default_pay_ratio', 'deleted_at'].map(name => ({ name }))
   // 本组旧库替身没有中央工资扩展表；其余未知查询仍应明确失败。
@@ -315,6 +346,23 @@ function dependencies(
 }
 
 describe('core migration local source', () => {
+  it('native总合同导出配置和全部采用历史，供应商合同不产生总合同配置属性', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      await seedIfEmpty(db)
+      const first = adoptConstructionManagementFee(emptyConstructionManagementFee(), { managementFeeAmount: 0, managementFeeBasis: '原主合同条款' }, { version: 'config-1', adoptedAt: '2026-10-05T00:00:00.000Z', contractVersion: 'native-version-1', actorId: null, commandId: null })
+      const second = adoptConstructionManagementFee(first, { managementFeeAmount: 1200, managementFeeBasis: '补充核实主合同原文' }, { version: 'config-2', adoptedAt: '2026-10-05T00:01:00.000Z', contractVersion: 'native-version-2', actorId: null, commandId: null })
+      await persistNativeConstructionManagementFee(db, 'con_demo_sg01', second)
+      const source = await createCoreMigrationLocalSource(dependencies({ select: async (sql, params) => sql.includes('FROM boq_change_orders change_order') ? [] : db.select(sql, params) })).readSource()
+      const contract = source.entities.construction_contracts.find(row => row.legacyId === 'con_demo_sg01')!
+      expect(contract.attributes).toMatchObject({ managementFeeAmount: 1200, managementFeeBasis: '补充核实主合同原文' })
+      expect(JSON.parse(String(contract.attributes?.managementFeeConfigurationJson))).toEqual(second)
+      for (const supplierContract of [...source.entities.material_contracts ?? [], ...source.entities.subcontract_contracts ?? []])
+        expect(supplierContract.attributes).not.toHaveProperty('managementFeeConfigurationJson')
+    }
+    finally { db.close() }
+  })
   it('aX03 从受保护旧库读取项目罚扣及独立抵扣，保留原始身份', async () => {
     const deps = dependencies({ select: async (sql: string) => {
       if (sql.includes('FROM penalty_records penalty'))
@@ -527,9 +575,9 @@ describe('core migration local source', () => {
       await seedIfEmpty(db)
 
       const result = await createCoreMigrationLocalSource(dependencies({
-        select: async sql => sql.includes('FROM boq_change_orders change_order')
+        select: async (sql, params) => sql.includes('FROM boq_change_orders change_order')
           ? []
-          : db.select(sql),
+          : db.select(sql, params),
       })).readSource()
       const constructionContract = result.entities.construction_contracts
         .find(row => row.legacyId === 'con_demo_sg01')
@@ -559,7 +607,7 @@ describe('core migration local source', () => {
       const original = JSON.stringify({ note: '仅保留旧工资原文，不补造中央确认依据' })
       await db.execute('INSERT INTO wage_statements(id,project_id,leader_worker_id,month,quantity_source,status,gross_amount,actual_amount,snapshot_json) VALUES(?,?,?,?,?,?,?,?,?)', ['legacy-payroll-statement', 'legacy-payroll-project', 'legacy-payroll-worker', '2026-08', 'field', 'released', 1000, 1000, original])
 
-      const result = await createCoreMigrationLocalSource(dependencies({ select: sql => db.select(sql) })).readSource()
+      const result = await createCoreMigrationLocalSource(dependencies({ select: (sql, params) => db.select(sql, params) })).readSource()
       expect(result.entities.payroll_projects).toHaveLength(1)
       const graph = JSON.parse(String(result.entities.payroll_projects[0]!.attributes!.payrollGraphJson))
       expect(graph).toMatchObject({ schemaVersion: 1, projectId: 'legacy-payroll-project', statements: [expect.objectContaining({ id: 'legacy-payroll-statement', gross_amount: 1000, actual_amount: 1000, snapshot_json: original })] })
@@ -707,6 +755,10 @@ describe('core migration local source', () => {
           '2026-08-24T10:00:00.000Z'
         )
       `)
+      await db.execute(`INSERT INTO file_refs(id,owner_type,owner_id,file_name,file_path,file_size,mime_type,category,uploader,uploaded_at,deleted_at)
+        VALUES ('construction-source-original','contract','contract-local-323','施工原件.pdf','C:/历史施工.pdf',1,'application/pdf','original','原经办人','2026-08-24T10:00:00.000Z',NULL),
+        ('subcontract-source-missing','contract','subcontract-local-327','缺件历史.pdf','C:/缺失历史.pdf',0,'application/pdf','original','旧经办人','2026-08-24T10:00:00.000Z','2026-08-25T10:00:00.000Z')`)
+      await db.execute(`INSERT INTO file_payloads(file_ref_id,encoding,content) VALUES ('construction-source-original','base64','YQ==')`)
       await db.execute(`INSERT INTO expenditure_settlements (id, no, name, biz_type, project_id, supplier_id, contract_id, settlement_type, total_amount, settlement_date, deduction_note, status)
         VALUES ('settlement-local-328', 'FBJS-328', '八月分包结算', '分包', 'project-local-323', 'supplier-local-327', 'subcontract-local-327', '过程结算', 28000, '2026-08-31', '合同扣款', 'confirmed')`)
       const [stored] = await db.select<{ created_at: string, updated_at: string }>(`
@@ -717,9 +769,13 @@ describe('core migration local source', () => {
       expect(stored?.created_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
 
       const migrationSource = await createCoreMigrationLocalSource(dependencies({
-        select: sql => db.select(sql),
+        select: (sql, params) => db.select(sql, params),
       })).readSource()
       const ownerDocument = migrationSource.entities.owner_documents[0]
+      const constructionFiles = JSON.parse(String(migrationSource.entities.construction_contracts.find(row => row.legacyId === 'contract-local-323')?.attributes?.attachmentsJson))
+      const subcontractFiles = JSON.parse(String(migrationSource.entities.subcontract_contracts.find(row => row.legacyId === 'subcontract-local-327')?.attributes?.attachmentsJson))
+      expect(constructionFiles).toEqual([expect.objectContaining({ id: 'construction-source-original', ownerId: 'contract-local-323', fileSize: 1, filePath: 'C:/历史施工.pdf', payloadEncoding: 'base64', payloadBase64: 'YQ==' })])
+      expect(subcontractFiles).toEqual([expect.objectContaining({ id: 'subcontract-source-missing', ownerId: 'subcontract-local-327', fileSize: 0, payloadEncoding: null, payloadBase64: null, deletedAt: '2026-08-25T10:00:00.000Z' })])
       expect(ownerDocument?.attributes).toMatchObject({
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/),
         updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/),
@@ -1004,6 +1060,7 @@ describe('core migration local source', () => {
       'projects',
       'construction_contracts',
       'subcontract_contracts',
+      'material_contracts',
       'auxiliary_contracts',
       'other_settlements',
       'other_settlement_sources',

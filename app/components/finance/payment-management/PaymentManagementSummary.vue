@@ -22,7 +22,8 @@ defineProps<{
     />
     <Metric
       label="已支付"
-      :value="summary.paidAmount"
+      :value="summary.paidAmount ?? '—'"
+      :status="summary.paidAmount === null ? '已支付金额尚未完整核实' : ''"
       money
       tone="ok"
       formula="Σ 已确认支付记录的申请分摊金额"

@@ -2,13 +2,16 @@
 import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useTimeoutFn } from '@vueuse/core'
+import ConstructionManagementFeeConfiguration from '~/components/contract/ConstructionManagementFeeConfiguration.vue'
+import ContractOriginalFilesPanel from '~/components/contract/ContractOriginalFilesPanel.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { useReceiptSourceReturn } from '~/composables/useReceiptSourceReturn'
-import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
+import { validateConstructionContractProjectReturnTo, validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { contractStatusTone } from '~/lib/contract/status'
 import { resolveCustomerRelationReturnOrigin } from '~/lib/customer/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { loadReceiptSourceOrigin } from '~/lib/receipt/return-context'
 import { yuan } from '~/lib/util/money'
 import { useConstructionContractReadStore } from '~/stores/construction-contract-read'
@@ -20,13 +23,14 @@ const restoreReceiptSource = useReceiptSourceReturn()
 const receiptReturnOrigin = computed(() => loadReceiptSourceOrigin(route.fullPath))
 const router = useRouter()
 const store = useConstructionContractReadStore()
+const readOriginal = useNuxtApp().$repositories.constructionContractRead.fileContent
 const visibilityStore = useDataVisibilityStore()
 const state = computed(() => store.detailState as ReadState<ConstructionContractDetailReadDTO>)
 const detail = computed(() => {
   const current = state.value
   if (current.kind === 'ready')
     return current.data
-  if ((current.kind === 'loading' || current.kind === 'error') && current.previous)
+  if ((current.kind === 'loading' || (current.kind === 'error' || current.kind === 'unavailable')) && current.previous)
     return current.previous
   return null
 })
@@ -92,11 +96,12 @@ const { start: startReturnExpiry, stop: stopReturnExpiry } = useTimeoutFn(
 )
 watch(customerReturnOrigin, origin => origin ? startReturnExpiry() : stopReturnExpiry(), { immediate: true })
 const customerReturnTo = computed(() => customerReturnOrigin.value?.returnTo ?? null)
-const returnTo = computed(() => customerReturnTo.value ?? ownerDocumentReturnTo.value
+const projectReturnTo = computed(() => validateConstructionContractProjectReturnTo(route.query.returnTo, detail.value?.contract.project.state === 'resolved' ? detail.value.contract.project.id : null, props.origin))
+const returnTo = computed(() => customerReturnTo.value ?? projectReturnTo.value ?? ownerDocumentReturnTo.value
   ?? validateConstructionContractReturnTo(route.query.returnTo, props.origin)
   ?? '/contract/construction')
-const backLabel = computed(() => customerReturnTo.value ? '返回客户详情' : ownerDocumentReturnTo.value ? '返回来源详情' : '返回施工合同列表')
-const canEdit = computed(() => detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('construction-contract:write'))
+const backLabel = computed(() => customerReturnTo.value ? '返回客户详情' : projectReturnTo.value ? '返回项目详情' : ownerDocumentReturnTo.value ? '返回来源详情' : '返回施工合同列表')
+const canEdit = computed(() => state.value.kind === 'ready' && detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('construction-contract:write'))
 const boqTo = computed(() => {
   const current = detail.value
   if (!current || current.dataOrigin !== 'real' || current.contract.project.state !== 'resolved')
@@ -142,7 +147,7 @@ const metrics = computed(() => {
     ['累计收款', amounts.received],
     ['按结算应收', amounts.bySettlementReceivable],
   ]
-  return rows.map(([label, value]) => ({ label, value: yuan(value) }))
+  return rows.map(([label, value]) => ({ label, value: yuan(value, '未知') }))
 })
 
 async function load() {
@@ -176,7 +181,7 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
       :back-to="returnTo"
       :back-label="backLabel"
       :state="shellState"
-      :state-title="stateTitle"
+      :state-title="readProblemTitle(problem, stateTitle)"
       :state-description="problem?.message ?? ''"
       :state-action-label="problem?.retryable ? '重新加载' : ''"
       @state-action="load"
@@ -201,7 +206,8 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
       </template>
 
       <div v-if="detail" class="space-y-3">
-        <StatePanel v-if="state.kind === 'error'" kind="error" title="刷新施工合同失败" :description="`${state.problem.message}；当前保留上一次成功读取的详情。`" :action-label="state.problem.retryable ? '重新加载' : ''" compact @action="load" />
+        <StatePanel v-if="detail.meta.sources.some(source => source.key === 'invoice-applications' && source.state !== 'readable')" kind="empty" title="开票金额暂不可核实" description="累计开票和开票未收金额显示未知；其他已核实的合同事实可继续查看。" compact />
+        <StatePanel v-if="(state.kind === 'error' || state.kind === 'unavailable')" kind="error" title="刷新施工合同失败" :description="`${state.problem.message}；当前保留上一次成功读取的详情。`" :action-label="state.problem.retryable ? '重新加载' : ''" compact @action="load" />
         <StatePanel v-if="loading" kind="loading" title="正在刷新施工合同" description="当前保留上一次成功读取的详情。" compact />
         <div class="panel min-w-0 overflow-hidden px-3">
           <SegTab v-model="activeTab" :tabs="tabs" />
@@ -210,6 +216,12 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
         <section v-if="activeTab === 'info'" class="panel p-4">
           <SectionHeader title="详细资料" />
           <div class="construction-contract-grid mt-3">
+            <div class="detail-row">
+              <span>乙方我方签约主体</span><strong data-testid="contract-frozen-signatory">{{ detail.contract.ourSignatorySnapshot?.name || '未核实' }}</strong>
+            </div>
+            <div v-if="detail.contract.legacyPartyA" class="detail-row">
+              <span>历史甲方原文</span><strong data-testid="contract-legacy-party">{{ detail.contract.legacyPartyA }}</strong>
+            </div>
             <div class="detail-row">
               <span>所属项目</span><NuxtLink v-if="target(detail.projectNavigation)" :to="target(detail.projectNavigation)!" class="text-brand hover:underline">
                 {{ detail.contract.project.state === 'resolved' ? detail.contract.project.label : '不可用' }}
@@ -256,12 +268,11 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
               <span v-else class="chip bg-surface-3 text-ink-soft">暂不可用</span>
             </div>
           </div>
-          <SectionHeader class="mt-5" title="合同文件" />
-          <ul v-if="detail.sections.files.length" class="mt-2 divide-y divide-line rounded border border-line">
-            <li v-for="file in detail.sections.files" :key="file.id" class="flex flex-wrap items-center justify-between gap-2 p-3 text-12px">
-              <span>{{ file.fileName }}</span><span class="text-ink-soft">{{ file.category }} · {{ file.fileSize }} B</span>
-            </li>
-          </ul><StatePanel v-else class="mt-2" kind="empty" title="暂无合同文件" compact />
+          <section class="mt-4 min-w-0 border-t border-line pt-4" aria-label="总合同管理费配置">
+            <SectionHeader title="总合同管理费配置" />
+            <ConstructionManagementFeeConfiguration class="mt-3" :configuration="detail.contract.managementFee" />
+          </section>
+          <ContractOriginalFilesPanel :owner-id="detail.contract.id" :origin="detail.dataOrigin" :source-version="detail.sourceVersion" :can-read="state.kind === 'ready' && detail.dataOrigin === origin && detail.capabilities.includes('construction-contract:read')" :files="detail.sections.files" :read-content="readOriginal" />
         </section>
 
         <section v-else-if="activeTab === 'supplements'" class="panel min-w-0 overflow-hidden p-4">

@@ -6,6 +6,7 @@ import type {
   NavigationIntentDTO,
   PageDTO,
   ProblemDTO,
+  ReadMetaDTO,
 } from '../../types/read-model'
 import type { PayrollHostSection } from './payroll-read'
 
@@ -31,7 +32,7 @@ export interface CrewSourceRow {
   itemCapabilities: string[]
   contactName: string
   contactPhone: string
-  defaultPayRatio: number
+  defaultPayRatio: number | null
   rentSubsidyEnabled: boolean
   rentSubsidyPrice: number | null
   mgmtFeeEnabled: boolean
@@ -114,7 +115,7 @@ export interface CrewWorkerProjectSourceRow {
   name: string
   code: string
   status: string
-  permission: 'allowed' | 'forbidden'
+  permission: 'allowed' | 'forbidden' | 'unavailable'
 }
 
 export interface CrewWorkerPenaltySourceRow {
@@ -142,7 +143,7 @@ export interface CrewListItemDTO {
   contactPhone: string
   memberCount: number
   activeMemberCount: number
-  projectCount: number
+  projectCount: number | null
   status: string
   updatedAt: ISODateTimeDTO
 }
@@ -153,7 +154,7 @@ export interface CrewListSummaryDTO {
   origins: Record<DataOriginDTO, { crewCount: number, workerCount: number }>
 }
 
-export type CrewListPageDTO = PageDTO<CrewListItemDTO, CrewListSummaryDTO>
+export type CrewListPageDTO = PageDTO<CrewListItemDTO, CrewListSummaryDTO> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO> }
 
 export interface CrewWorkerReadRepository {
   listCrews: (query: CrewListQueryDTO) => Promise<CrewListPageDTO>
@@ -173,6 +174,10 @@ export interface CrewWorkerRelationFactQueryDTO {
 }
 
 export interface CrewWorkerRelationFactIdentityDTO {
+  meta: ReadMetaDTO
+  asOf: ISODateTimeDTO
+  sourceVersion: string | null
+  capabilities: string[]
   kind: CrewWorkerRelationFactKindDTO
   id: string
   dataOrigin: DataOriginDTO
@@ -228,7 +233,7 @@ export interface WorkerListSummaryDTO {
   origins: Record<DataOriginDTO, { workerCount: number, activeWorkerCount: number }>
 }
 
-export type WorkerListPageDTO = PageDTO<WorkerListItemDTO, WorkerListSummaryDTO>
+export type WorkerListPageDTO = PageDTO<WorkerListItemDTO, WorkerListSummaryDTO> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO> }
 
 export interface CrewDetailQueryDTO {
   id: string
@@ -259,12 +264,12 @@ export interface CrewProjectDTO {
   projectStatus: string
   sources: CrewProjectSourceLabel[]
   activeMemberCount: number
-  assignmentCount: number
-  assignedUnitCount: number
-  completedStageCount: number
-  wageStatementCount: number
-  wageGrossAmount: string
-  releasedWageAmount: string
+  assignmentCount: number | null
+  assignedUnitCount: number | null
+  completedStageCount: number | null
+  wageStatementCount: number | null
+  wageGrossAmount: string | null
+  releasedWageAmount: string | null
 }
 
 export interface CrewPenaltyDTO {
@@ -281,6 +286,7 @@ export interface CrewPenaltyDTO {
 }
 
 export interface CrewDetailReadDTO {
+  meta: ReadMetaDTO
   payrollActual?: PayrollHostSection
   dataOrigin: DataOriginDTO
   crew: CrewSourceRow
@@ -290,12 +296,12 @@ export interface CrewDetailReadDTO {
   summary: {
     memberCount: number
     activeMemberCount: number
-    projectCount: number
-    assignedUnitCount: number
-    completedStageCount: number
-    wageStatementCount: number
-    releasedWageAmount: string
-    penaltyAmount: string
+    projectCount: number | null
+    assignedUnitCount: number | null
+    completedStageCount: number | null
+    wageStatementCount: number | null
+    releasedWageAmount: string | null
+    penaltyAmount: string | null
   }
   asOf: ISODateTimeDTO
   sourceVersion: string | null
@@ -377,6 +383,7 @@ export interface WorkerPenaltyDTO {
 }
 
 export interface WorkerDetailReadDTO {
+  meta: ReadMetaDTO
   payrollActual?: PayrollHostSection
   dataOrigin: DataOriginDTO
   worker: WorkerSourceRow & {
@@ -402,17 +409,17 @@ export interface WorkerDetailReadDTO {
   wageStatements: WorkerWageStatementDTO[]
   penalties: WorkerPenaltyDTO[]
   summary: {
-    projectCount: number
-    assignedUnitCount: number
-    completedStageCount: number
-    attendanceDays: number
-    attendanceHours: number
-    overtimeHours: number
-    confirmedDayworkUnits: number
-    releasedStatementCount: number
-    knownAllocatedAmount: string
-    missingAllocationCount: number
-    penaltyAmount: string
+    projectCount: number | null
+    assignedUnitCount: number | null
+    completedStageCount: number | null
+    attendanceDays: number | null
+    attendanceHours: number | null
+    overtimeHours: number | null
+    confirmedDayworkUnits: number | null
+    releasedStatementCount: number | null
+    knownAllocatedAmount: string | null
+    missingAllocationCount: number | null
+    penaltyAmount: string | null
   }
   asOf: ISODateTimeDTO
   sourceVersion: string | null

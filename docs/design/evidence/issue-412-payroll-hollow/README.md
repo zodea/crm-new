@@ -54,7 +54,7 @@ flowchart TD
 
 ## 持续保留的边界
 
-用户已明确每单人工确认新增未处理项，启动不跨单延续，旧已扣项不重扣、后来修复不自动退款；依据与新增真实算例见 [P6 已裁定范围](../../../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md#已裁定的逐单范围)。同一已采用记录改总数继续要求核实更正，不按金额猜部分采用。P7 继续负责批量资金与完整工作簿，生产保存、备份恢复和部署由 [实施票](../../../implementation/production-gate-work-breakdown.md) 承接。
+用户已明确每单人工确认新增未处理项，启动不跨单延续，旧已扣项不重扣、后来修复不自动退款；依据与新增真实算例见 [P6 已裁定范围](../../../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md#已裁定的逐单范围)。同一已采用记录改总数继续要求核实更正，不按金额猜部分采用。P7 继续负责批量资金与完整工作簿；生产保存、备份恢复和部署的现行边界见 [ARCHITECTURE](../../../rewrite/ARCHITECTURE.md#runtime-environments)，原调查与拆分见[固定 Git 定位](../../../rewrite/ARCHITECTURE.md#production-investigation-evidence)，实际上线由 [#471](https://github.com/zodea/crm-new/issues/471)另验。
 
 2026-09-22 裁定收尾仅新增验收测试及更新文档，未修改产品代码。精确 `npm test` 覆盖新增检查、原扣款和倒序补月3文件7项通过（14.38秒）；类型与精确 ESLint 通过，独立 Standards / Spec 无阻断。没有重复运行未改产品的完整套件或浏览器，也未新增 PDF。
 

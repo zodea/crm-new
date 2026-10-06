@@ -23,6 +23,7 @@ import {
 import { contractListFilterValues } from '~/lib/contract/list-filters'
 import { CONTRACT_STATUSES, contractStatusTone } from '~/lib/contract/status'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
 import { useConstructionContractReadStore } from '~/stores/construction-contract-read'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
@@ -36,7 +37,7 @@ const page = computed(() => {
   const current = state.value
   if (current.kind === 'ready' || current.kind === 'empty')
     return current.data
-  if ((current.kind === 'loading' || current.kind === 'error') && current.previous)
+  if ((current.kind === 'loading' || (current.kind === 'error' || current.kind === 'unavailable')) && current.previous)
     return current.previous
   return null
 })
@@ -96,9 +97,21 @@ watch(search, (value) => {
   rowNavigationPending.value = false
   void commitSearch(value)
 })
-watch(parsedQuery, (value) => {
-  if (value.query)
-    void store.loadList(value.query)
+let listLoadTicket = 0
+watch(parsedQuery, async (value) => {
+  const ticket = ++listLoadTicket
+  if (!value.query)
+    return
+  const requested = value.query
+  await store.loadList(requested)
+  if (ticket !== listLoadTicket || parsedQuery.value.query !== requested)
+    return
+  const current = state.value
+  if (current.kind !== 'ready' && current.kind !== 'empty')
+    return
+  const pagination = current.data.pagination
+  if (pagination.requestedPage === requested.page && pagination.pageSize === requested.pageSize && pagination.page !== requested.page)
+    patchQuery({ page: pagination.page })
 }, { immediate: true })
 
 function returnOrigin(row: ConstructionContractListPageDTO['items'][number], scrollTop = 0) {
@@ -211,7 +224,7 @@ useTabTitle('施工合同')
       <StatePanel v-if="parsedQuery.problem" kind="error" title="施工合同查询条件无效" :description="parsedQuery.problem.message" action-label="清除无效条件" @action="router.replace({ query: {} })" />
       <div v-else-if="page" class="relative min-w-0" :aria-busy="state.kind === 'loading'" data-testid="construction-contract-list-scroll">
         <span v-if="state.kind === 'loading'" role="status" class="pointer-events-none absolute right-3 top-1 z-1 rounded-sm bg-panel px-2 py-1 text-12px text-ink-soft">正在更新列表…</span>
-        <StatePanel v-if="state.kind === 'error'" kind="error" title="刷新施工合同失败" :description="`${state.problem.message}；当前保留上一次成功读取的列表。`" :action-label="state.problem.retryable ? '重试' : ''" compact @action="store.loadList(query)" />
+        <StatePanel v-if="(state.kind === 'error' || state.kind === 'unavailable')" kind="error" title="刷新施工合同失败" :description="`${state.problem.message}；当前保留上一次成功读取的列表。`" :action-label="state.problem.retryable ? '重试' : ''" compact @action="store.loadList(query)" />
         <StatePanel v-if="page.receiptsProblem" :kind="page.receiptsProblem.code === 'forbidden' ? 'forbidden' : 'error'" title="收款金额暂不可用" :description="page.receiptsProblem.message" :action-label="page.receiptsProblem.retryable ? '重新读取收款' : ''" compact @action="store.loadList(query)" />
         <KitTable :columns="columns" :data="page.items" :loading="false" :page="page.pagination" :page-size-options="[10, 20, 50, 100]" :empty="{ title: page.empty?.reason === 'no-filter-match' ? '没有符合当前筛选条件的合同' : '暂无施工合同', description: '可调整筛选条件，或新建正式施工合同。' }" row-key="rowKey" @page-change="({ page: nextPage, pageSize: nextSize }) => patchQuery({ page: nextPage, pageSize: nextSize })">
           <template #columnHeader="{ column }">
@@ -244,28 +257,28 @@ useTabTitle('施工合同')
             {{ row.actualCompletionDate || '未记录' }}
           </template>
           <template #changed="{ row }">
-            {{ yuan(Number(row.amounts.changed)) }}
+            {{ yuan(row.amounts.changed, '未知') }}
           </template>
           <template #settled="{ row }">
-            {{ yuan(Number(row.amounts.settled)) }}
+            {{ yuan(row.amounts.settled, '未知') }}
           </template>
           <template #invoiced="{ row }">
-            {{ yuan(Number(row.amounts.invoiced)) }}
+            {{ yuan(row.amounts.invoiced, '未知') }}
           </template>
           <template #received="{ row }">
-            {{ yuan(row.amounts.received) }}
+            {{ yuan(row.amounts.received, '未知') }}
           </template>
           <template #receivable="{ row }">
-            {{ yuan(row.amounts.bySettlementReceivable) }}
+            {{ yuan(row.amounts.bySettlementReceivable, '未知') }}
           </template>
           <template #unreceived="{ row }">
-            {{ yuan(row.amounts.invoicedUnreceived) }}
+            {{ yuan(row.amounts.invoicedUnreceived, '未知') }}
           </template>
         </KitTable>
       </div>
       <StatePanel v-else-if="state.kind === 'loading' || state.kind === 'idle'" kind="loading" title="正在读取施工合同" description="正在从中央读模型加载列表。" />
-      <StatePanel v-else-if="state.kind === 'forbidden'" kind="forbidden" title="无权查看施工合同" :description="state.problem.message" />
-      <StatePanel v-else kind="error" title="施工合同读取失败" :description="state.kind === 'error' ? state.problem.message : '中央列表暂不可用'" action-label="重新加载" @action="store.loadList(query)" />
+      <StatePanel v-else-if="state.kind === 'forbidden'" kind="forbidden" :title="readProblemTitle(state.problem, '无权查看施工合同')" :description="state.problem.message" />
+      <StatePanel v-else kind="error" title="施工合同读取失败" :description="(state.kind === 'error' || state.kind === 'unavailable') ? state.problem.message : '中央列表暂不可用'" action-label="重新加载" @action="store.loadList(query)" />
     </template>
   </ListShell>
 </template>

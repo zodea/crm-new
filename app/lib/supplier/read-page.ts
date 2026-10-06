@@ -1,4 +1,4 @@
-import type { EntityKindDTO, EntityRefDTO, MetricDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, MetricDTO, NavigationIntentDTO, ReadProjection } from '../../types/read-model'
 import type {
   SupplierContractSourceRow,
   SupplierDetailQueryDTO,
@@ -20,6 +20,7 @@ import type {
 import { isDataOriginDTO } from '../../types/read-model'
 import { isConfirmedExpenditureSettlement as confirmedSettlement, isEffectiveExpenditureContract as effectiveContract } from '../contract/effective-status'
 import { readApprovalAmount } from '../finance/approval-amount'
+import { parsePageQuery, resolvePagination } from '../read-model/pagination'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_NUMERIC_SOURCE, SUPPLIER_PAGE_SIZES, supplierProblem, SupplierRepositoryProblem } from './read-contract'
@@ -27,8 +28,11 @@ import { normalizeSupplierEnumSelection, parseSupplierColumnFilters } from './re
 
 interface BuildSupplierListPageInput {
   unavailableSources?: readonly SupplierFactSource[]
+  unavailableSourcesByOrigin?: Partial<Record<'real' | 'demo', readonly SupplierFactSource[]>>
   suppliers: readonly SupplierListSourceRow[]
   projectSuppliers: readonly SupplierProjectRelationSourceRow[]
+  /** The trusted runtime supplies current project permissions; pure legacy relationship fixtures may omit names. */
+  projects?: readonly SupplierProjectSourceRow[]
   contracts: readonly SupplierContractSourceRow[]
   paymentApplications: readonly SupplierPaymentApplicationSourceRow[]
   paymentRecords: readonly SupplierPaymentRecordSourceRow[]
@@ -42,6 +46,7 @@ interface BuildSupplierListPageInput {
 
 interface BuildSupplierDetailReadInput {
   unavailableSources?: readonly SupplierFactSource[]
+  incompleteContractSource?: boolean
   suppliers: readonly SupplierListSourceRow[]
   projects: readonly SupplierProjectSourceRow[]
   projectSuppliers: readonly SupplierProjectRelationSourceRow[]
@@ -61,14 +66,15 @@ function bool(value: unknown): boolean {
   return value === true || value === 'true'
 }
 
-function positiveInteger(value: unknown, fallback: number): number {
-  const parsed = Number(value)
-  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : fallback
+function listSourceUnavailable(input: BuildSupplierListPageInput, origin: 'real' | 'demo', source: SupplierFactSource) {
+  return (input.unavailableSourcesByOrigin?.[origin] ?? input.unavailableSources)?.includes(source) === true
 }
 
 export function parseSupplierListQuery(input: Record<string, unknown> | undefined): SupplierListQueryDTO {
   const sort = input?.sort ?? 'updated-desc'
-  const pageSize = positiveInteger(input?.pageSize, 10)
+  const { requestedPage, pageSize } = parsePageQuery(input ?? {}, () => {
+    throw new SupplierRepositoryProblem(supplierProblem('invalid-query', '分页参数无效'))
+  }, 10)
   const columnFilters = parseSupplierColumnFilters(input?.columnFilters)
   const categories = normalizeSupplierEnumSelection(input?.category)
   const credentialStatuses = normalizeSupplierEnumSelection(input?.credentialStatus)
@@ -82,7 +88,7 @@ export function parseSupplierListQuery(input: Record<string, unknown> | undefine
     category: categories.length ? categories : null,
     credentialStatus: credentialStatuses.length ? credentialStatuses : null,
     sort: sort as SupplierListQueryDTO['sort'],
-    page: positiveInteger(input?.page, 1),
+    page: requestedPage,
     pageSize: pageSize as SupplierPageSize,
     ...(columnFilters ? { columnFilters } : {}),
   }
@@ -102,20 +108,34 @@ export function parseSupplierDetailQuery(
   return { id, origin, includeDemo: bool(input?.includeDemo) }
 }
 
+function moneyFact(parts: readonly (number | null)[]) {
+  const known = parts.filter((part): part is number => part !== null)
+  return { value: sumKnown(parts), knownValue: known.length ? round2(known.reduce((sum, part) => sum + part, 0)) : null }
+}
+
 function moneyMetric(
-  value: number | null,
+  facts: readonly { value: number | null, knownValue: number | null }[] | null,
   entity: EntityKindDTO,
-  supplierId: string,
+  supplier: SupplierListSourceRow,
   asOf: string,
   drilldown = true,
 ): MetricDTO {
+  const missingCount = facts === null ? null : facts.filter(row => row.value === null).length
+  const knownValues = facts?.flatMap(row => row.knownValue === null ? [] : [row.knownValue]) ?? []
+  const knownValue = facts === null || (facts.length > 0 && knownValues.length === 0) ? null : round2(knownValues.reduce((sum, value) => sum + value, 0)).toFixed(2)
+  const complete = facts !== null && missingCount === 0
+  const variants: Partial<Record<EntityKindDTO, string>> = { 'contract': 'contracts', 'settlement': 'settlements', 'invoice': 'invoices', 'payment-record': 'payments' }
   return {
-    value: value === null ? null : value.toFixed(2),
+    value: complete ? knownValue : null,
+    knownValue,
     unit: 'CNY',
-    status: value === null ? 'partial' : 'complete',
-    missingSources: value === null ? [entity] : [],
+    quantityUnit: null,
+    status: complete ? 'complete' : 'partial',
+    missingSources: complete ? [] : [entity],
+    participatingCount: facts === null ? null : facts.length,
+    missingCount,
     asOf,
-    drilldown: drilldown ? { entity, filters: { supplierId } } : null,
+    drilldown: drilldown ? { kind: 'entity-subview', subject: resolvedRef('supplier', supplier.id, supplier.name, null), variant: variants[entity] ?? null, view: null, filters: { dataOrigin: supplier.dataOrigin } } : null,
   }
 }
 
@@ -154,18 +174,25 @@ function missingRef<const T extends Extract<EntityKindDTO, 'project' | 'contract
   return { state: 'missing', entity, id: null, label: null, reason: 'not-recorded' }
 }
 
+function unavailableRef<const T extends 'project' | 'contract'>(entity: T): Extract<EntityRefDTO, { state: 'unavailable' }> & { entity: T } {
+  return { state: 'unavailable', entity, id: null, label: null, reason: 'source-unavailable' }
+}
+
 function projectRef(
   id: string | null,
   projects: readonly SupplierProjectSourceRow[],
   origin: SupplierDetailQueryDTO['origin'],
+  unavailableSources?: readonly SupplierFactSource[],
 ): EntityRefDTO & { entity: 'project' } {
   if (!id)
     return missingRef('project')
+  if (unavailableSources?.includes('projects'))
+    return unavailableRef('project')
   const source = projects.find(row => row.id === id && row.dataOrigin === origin)
   if (!source)
     return missingRef('project')
   if (source.permission === 'forbidden') {
-    return { state: 'forbidden', entity: 'project', id, label: null, reason: 'permission-denied' }
+    return { state: 'forbidden', entity: 'project', id: null, label: null, reason: 'permission-denied' }
   }
   return resolvedRef('project', id, source.name, null) as EntityRefDTO & { entity: 'project' }
 }
@@ -174,10 +201,16 @@ function contractRef(
   id: string | null,
   contracts: readonly SupplierContractSourceRow[],
   origin: SupplierDetailQueryDTO['origin'],
+  unavailableSources?: readonly SupplierFactSource[],
+  incomplete = false,
 ): EntityRefDTO & { entity: 'contract' } {
   if (!id)
     return missingRef('contract')
+  if (unavailableSources?.includes('contracts'))
+    return unavailableRef('contract')
   const source = contracts.find(row => row.id === id && row.dataOrigin === origin)
+  if (!source && incomplete)
+    return unavailableRef('contract')
   return source
     ? resolvedRef('contract', source.id, source.name, source.no) as EntityRefDTO & { entity: 'contract' }
     : missingRef('contract')
@@ -186,7 +219,7 @@ function contractRef(
 function unavailable(reference: EntityRefDTO): NavigationIntentDTO {
   return {
     kind: 'unavailable',
-    reason: reference.state === 'forbidden' ? 'forbidden' : 'missing-id',
+    reason: reference.state === 'forbidden' ? 'forbidden' : reference.state === 'unavailable' ? 'not-connected' : 'missing-id',
   }
 }
 
@@ -216,17 +249,12 @@ function sumKnown(values: readonly (number | null)[]): number | null {
 }
 
 function paymentBySupplier(input: BuildSupplierListPageInput): Map<string, number> {
-  const confirmed = new Set(input.paymentRecords
+  const confirmed = new Map(input.paymentRecords
     .filter(row => row.confirmationStatus === 'confirmed')
-    .map(row => `${row.dataOrigin}:${row.id}`))
-  const applicationSupplier = new Map(input.paymentApplications
-    .filter(row => row.supplierId)
-    .map(row => [`${row.dataOrigin}:${row.id}`, row.supplierId!]))
+    .map(row => [`${row.dataOrigin}:${row.id}`, row.supplierId]))
   const totals = new Map<string, number>()
   for (const allocation of input.paymentAllocations) {
-    if (!confirmed.has(`${allocation.dataOrigin}:${allocation.paymentRecordId}`))
-      continue
-    const supplierId = applicationSupplier.get(`${allocation.dataOrigin}:${allocation.paymentApplicationId}`)
+    const supplierId = confirmed.get(`${allocation.dataOrigin}:${allocation.paymentRecordId}`)
     if (!supplierId)
       continue
     const key = `${allocation.dataOrigin}:${supplierId}`
@@ -235,7 +263,7 @@ function paymentBySupplier(input: BuildSupplierListPageInput): Map<string, numbe
   return totals
 }
 
-export function buildSupplierListPage(input: BuildSupplierListPageInput): SupplierListPageDTO {
+export function buildSupplierListPage(input: BuildSupplierListPageInput): ReadProjection<SupplierListPageDTO> {
   const query = input.query
   const allowedOrigins = query.includeDemo ? new Set(['real', 'demo']) : new Set(['real'])
   const normalizedSearch = query.search.trim().toLocaleLowerCase('zh-CN')
@@ -262,11 +290,11 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
           .filter(item => item.dataOrigin === row.dataOrigin && item.supplierId === row.id && confirmedSettlement(item.status))
           .map(item => item.totalAmount))
     return [`${row.dataOrigin}:${row.id}`, {
-      projectCount: input.unavailableSources?.includes('projects') ? null : relationIds.size,
-      contractAmount: input.unavailableSources?.includes('contracts') ? null : contractAmount,
-      cumulativeContractAmount: input.unavailableSources?.includes('contracts') ? null : contractAmount,
-      settlementAmount: input.unavailableSources?.includes('settlements') ? null : settlementAmount,
-      paymentAmount: input.unavailableSources?.includes('payments') ? null : paid.get(`${row.dataOrigin}:${row.id}`) ?? 0,
+      projectCount: listSourceUnavailable(input, row.dataOrigin, 'projects') || input.projects?.some(project => project.dataOrigin === row.dataOrigin && project.permission === 'forbidden' && relationIds.has(project.id)) ? null : relationIds.size,
+      contractAmount: listSourceUnavailable(input, row.dataOrigin, 'contracts') ? null : contractAmount,
+      cumulativeContractAmount: listSourceUnavailable(input, row.dataOrigin, 'contracts') ? null : contractAmount,
+      settlementAmount: listSourceUnavailable(input, row.dataOrigin, 'settlements') ? null : settlementAmount,
+      paymentAmount: listSourceUnavailable(input, row.dataOrigin, 'payments') ? null : paid.get(`${row.dataOrigin}:${row.id}`) ?? 0,
     }] as const
   }))
   const stats = (row: SupplierListSourceRow) => summaryById.get(`${row.dataOrigin}:${row.id}`)!
@@ -314,7 +342,7 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
     }
     return right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)
   })
-  const page = Math.min(query.page, Math.max(1, Math.ceil(filtered.length / query.pageSize)))
+  const { page } = resolvePagination(query.page, query.pageSize, filtered.length)
   const start = (page - 1) * query.pageSize
   const items = sorted.slice(start, start + query.pageSize).map((source) => {
     // 排序结果已经过权限脱敏；输出必须复用查询时的同一可见值。
@@ -361,8 +389,8 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   const origins = (['real', 'demo'] as const).reduce<SupplierListPageDTO['summary']['origins']>((result, origin) => {
     const rows = filtered.filter(row => row.dataOrigin === origin)
     const totals = {
-      contractAmount: input.unavailableSources?.includes('contracts') ? null : sumKnown(rows.map(row => stats(row).contractAmount)),
-      paymentAmount: input.unavailableSources?.includes('payments') ? null : sumKnown(rows.map(row => stats(row).paymentAmount)),
+      contractAmount: listSourceUnavailable(input, origin, 'contracts') ? null : sumKnown(rows.map(row => stats(row).contractAmount)),
+      paymentAmount: listSourceUnavailable(input, origin, 'payments') ? null : sumKnown(rows.map(row => stats(row).paymentAmount)),
     }
     result[origin] = {
       supplierCount: rows.length,
@@ -374,7 +402,7 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   return {
     items,
     ...(input.unavailableSources?.length ? { unavailableSources: [...input.unavailableSources] } : {}),
-    pagination: { page, pageSize: query.pageSize, total: filtered.length },
+    pagination: { requestedPage: query.page, page, pageSize: query.pageSize, total: filtered.length },
     summary: {
       categories: countBy('supplierCategory'),
       credentialStatuses: countBy('credentialStatus'),
@@ -390,7 +418,7 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   }
 }
 
-export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): SupplierDetailReadDTO {
+export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): ReadProjection<SupplierDetailReadDTO> {
   if (input.query.origin === 'demo' && !input.query.includeDemo) {
     throw new SupplierRepositoryProblem(supplierProblem('forbidden', '测试分供方未授权显示'))
   }
@@ -409,7 +437,7 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
     row.dataOrigin === input.query.origin && row.supplierId === source.id)
   const contractDTOs = contracts.map((row) => {
     const contract = resolvedRef('contract', row.id, row.name, row.no) as Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'contract' }
-    const project = projectRef(row.projectId, input.projects, input.query.origin)
+    const project = projectRef(row.projectId, input.projects, input.query.origin, input.unavailableSources)
     return {
       contract,
       navigation: contractSourceNavigation(contract, input.contracts, input.query.origin),
@@ -426,11 +454,13 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
     row.dataOrigin === input.query.origin && row.supplierId === source.id)
   const settlementDTOs = settlementSources.map((row) => {
     const settlement = resolvedRef('settlement', row.id, row.name, row.no) as Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'settlement' }
-    const project = projectRef(row.projectId, input.projects, input.query.origin)
-    const contract = contractRef(row.contractId, input.contracts, input.query.origin)
+    const project = projectRef(row.projectId, input.projects, input.query.origin, input.unavailableSources)
+    const contract = contractRef(row.contractId, input.contracts, input.query.origin, input.unavailableSources, input.incompleteContractSource)
     return {
       settlement,
-      navigation: { kind: 'unavailable', reason: 'missing-route' } as const,
+      navigation: row.navigationVariant === 'other_settlement'
+        ? { kind: 'entity-detail', subject: settlement, variant: 'other_settlement', view: null, filters: { dataOrigin: input.query.origin } } as const
+        : { kind: 'unavailable', reason: 'missing-route' } as const,
       project,
       projectNavigation: detailNavigation(project, { dataOrigin: input.query.origin }),
       contract,
@@ -445,8 +475,8 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
     row.dataOrigin === input.query.origin && row.supplierId === source.id && row.accountStatus === 'archived')
   const invoiceDTOs = invoiceSources.map((row) => {
     const invoice = resolvedRef('invoice', row.id, row.invoiceNumber, row.invoiceNumber) as Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'invoice' }
-    const project = projectRef(row.projectId, input.projects, input.query.origin)
-    const contract = contractRef(row.contractId, input.contracts, input.query.origin)
+    const project = projectRef(row.projectId, input.projects, input.query.origin, input.unavailableSources)
+    const contract = contractRef(row.contractId, input.contracts, input.query.origin, input.unavailableSources, input.incompleteContractSource)
     return {
       invoice,
       navigation: detailNavigation(invoice),
@@ -478,8 +508,8 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
   const paymentDTOs = paymentSources.map((row) => {
     const approval = readApprovalAmount(row.approvedAmount, row.approvedAmountOrigin)
     const application = resolvedRef('payment-application', row.id, row.name, row.no) as Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'payment-application' }
-    const project = projectRef(row.projectId, input.projects, input.query.origin)
-    const contract = contractRef(row.contractId, input.contracts, input.query.origin)
+    const project = projectRef(row.projectId, input.projects, input.query.origin, input.unavailableSources)
+    const contract = contractRef(row.contractId, input.contracts, input.query.origin, input.unavailableSources, input.incompleteContractSource)
     return {
       application,
       navigation: detailNavigation(application),
@@ -495,19 +525,22 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
       status: row.status,
     }
   })
-  const effectiveContracts = contractDTOs.filter(row => effectiveContract(row.status))
-  const contractAmount = sumKnown(effectiveContracts.map(row => row.effectiveAmount === null ? null : Number(row.effectiveAmount)))
+  const contractFacts = contracts.filter(row => effectiveContract(row.status)).map(row => moneyFact([row.amount, row.supplementAmount]))
+  const relatedProjectIds = new Set([...projectRelations.map(row => row.projectId), ...contracts.map(row => row.projectId)].filter(Boolean))
+  const projectCountRestricted = input.projects.some(row => row.dataOrigin === input.query.origin && row.permission === 'forbidden' && relatedProjectIds.has(row.id))
   const effectiveSettlements = settlementDTOs.filter(row => confirmedSettlement(row.status))
-  const settlementAmount = sumKnown(effectiveSettlements.map(row => row.totalAmount === null ? null : Number(row.totalAmount)))
-  const invoiceAmount = round2(invoiceDTOs.reduce((sum, row) => sum + Number(row.totalAmount), 0))
-  const paymentAmount = round2(paymentDTOs.reduce((sum, row) => sum + Number(row.actualPaidAmount), 0))
+  const settlementFacts = effectiveSettlements.map(row => moneyFact([row.totalAmount === null ? null : Number(row.totalAmount)]))
+  const invoiceFacts = invoiceDTOs.map(row => moneyFact([row.totalAmount === null ? null : Number(row.totalAmount)]))
+  // Cash qualification and identity belong to the actual confirmed record, including frozen allocations.
+  const paymentFacts = input.paymentRecords.filter(row => row.dataOrigin === input.query.origin && row.confirmationStatus === 'confirmed' && row.supplierId === source.id)
+    .map(row => moneyFact([input.paymentAllocations.filter(line => line.dataOrigin === input.query.origin && line.paymentRecordId === row.id).reduce((sum, line) => sum + line.allocatedAmount, 0)]))
 
   return {
     dataOrigin: input.query.origin,
     ...(input.unavailableSources?.length ? { unavailableSources: [...input.unavailableSources] } : {}),
     supplier: visibleSupplier(source, input.capabilities),
     projects: projectRelations.map((row) => {
-      const project = projectRef(row.projectId, input.projects, input.query.origin)
+      const project = projectRef(row.projectId, input.projects, input.query.origin, input.unavailableSources)
       return {
         relationId: row.id,
         project,
@@ -522,16 +555,16 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
     invoices: invoiceDTOs,
     payments: paymentDTOs,
     summary: {
-      projectCount: input.unavailableSources?.includes('projects') ? null : projectRelations.length,
+      projectCount: input.unavailableSources?.includes('projects') || projectCountRestricted ? null : projectRelations.length,
       contractCount: input.unavailableSources?.includes('contracts') ? null : contractDTOs.length,
       settlementCount: input.unavailableSources?.includes('settlements') ? null : settlementDTOs.length,
       invoiceCount: input.unavailableSources?.includes('invoices') ? null : invoiceDTOs.length,
       paymentCount: input.unavailableSources?.includes('payments') ? null : paymentDTOs.length,
-      contractAmount: moneyMetric(input.unavailableSources?.includes('contracts') ? null : contractAmount, 'contract', source.id, input.asOf),
-      settlementAmount: moneyMetric(input.unavailableSources?.includes('settlements') ? null : settlementAmount, 'settlement', source.id, input.asOf),
-      invoiceAmount: moneyMetric(input.unavailableSources?.includes('invoices') ? null : invoiceAmount, 'invoice', source.id, input.asOf),
-      paymentAmount: moneyMetric(input.unavailableSources?.includes('payments') ? null : paymentAmount, 'payment-record', source.id, input.asOf),
-      payableAmount: moneyMetric(contractAmount === null || input.unavailableSources?.some(source => source === 'contracts' || source === 'payments') ? null : round2(contractAmount - paymentAmount), 'payment-record', source.id, input.asOf, false),
+      contractAmount: moneyMetric(input.unavailableSources?.includes('contracts') ? null : contractFacts, 'contract', source, input.asOf),
+      settlementAmount: moneyMetric(input.unavailableSources?.includes('settlements') ? null : settlementFacts, 'settlement', source, input.asOf),
+      invoiceAmount: moneyMetric(input.unavailableSources?.includes('invoices') ? null : invoiceFacts, 'invoice', source, input.asOf),
+      paymentAmount: moneyMetric(input.unavailableSources?.includes('payments') ? null : paymentFacts, 'payment-record', source, input.asOf),
+      payableAmount: moneyMetric(input.unavailableSources?.some(source => source === 'contracts' || source === 'payments') ? null : [...contractFacts, ...paymentFacts.map(row => ({ value: row.value === null ? null : -row.value, knownValue: row.knownValue === null ? null : -row.knownValue }))], 'payment-record', source, input.asOf, false),
     },
     asOf: input.asOf,
     sourceVersion: input.sourceVersion,

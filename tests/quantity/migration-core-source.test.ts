@@ -14,7 +14,7 @@ function readSource() {
     isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: async () => LATEST_VERSION,
-    select: sql => memory.select(sql),
+    select: (sql, params) => memory.select(sql, params),
     closeDatabase: unused,
     loadProductionSnapshot: unused,
     readSnapshotSource: unused,

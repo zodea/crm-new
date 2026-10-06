@@ -21,6 +21,7 @@ defineProps<{
   categoryReadonly?: boolean
   readonly?: boolean
   pickerDescription?: string
+  canDownload?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +31,7 @@ const emit = defineEmits<{
   removePending: [localId: string]
   patchPending: [localId: string, patch: Partial<PendingFileRef>]
   updateNote: [value: string]
+  download: [id: string, trigger: HTMLElement]
 }>()
 
 function handleFiles(event: Event) {
@@ -55,7 +57,7 @@ function inputValue(event: Event): string {
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
       <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">桌面端保存可重新打开的本机路径</span>
+      <span class="mt-0.5 text-11px text-ink-faint">{{ pickerDescription ?? '选择附件并随资料一起保存' }}</span>
     </button>
     <label
       v-else-if="!readonly"
@@ -88,6 +90,16 @@ function inputValue(event: Event): string {
         <span class="min-w-0 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
         <span class="text-10px text-ink-faint">{{ file.category || '未分类' }}</span>
         <span v-if="file.deletedAt" class="text-10px text-danger">已删除</span>
+        <KitButton
+          v-if="canDownload && !file.deletedAt && !pendingRemoveIds.includes(file.id)"
+          type="button"
+          variant="ghost"
+          class="h-7 shrink-0 px-2 text-11px"
+          :aria-label="`下载原件 ${file.fileName}`"
+          @click="emit('download', file.id, $event.currentTarget as HTMLElement)"
+        >
+          下载原件
+        </KitButton>
         <KitButton
           v-if="!readonly"
           variant="ghost"

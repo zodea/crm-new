@@ -2,10 +2,12 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, extname, join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  asRoutes,
   buildCoverage,
   COVERAGE_PATH,
   COVERAGE_STATUSES,
   readCountsBlock,
+  readDesignFormRoutes,
   readDesignRegistry,
   renderCountsBlock,
 } from '../../scripts/design-coverage.mjs'
@@ -181,6 +183,35 @@ describe('design coverage contract', () => {
   it('keeps the generated coverage aligned with both live registries', () => {
     const committed = coverage()
     expect(buildCoverage(committed)).toEqual(committed)
+  })
+
+  it('resolves every covered landing point to a current PAGE or form registration', () => {
+    const registeredRoutes = new Set([
+      ...readDesignRegistry().pages.map(page => page.route),
+      ...readDesignFormRoutes().map(form => form.route),
+    ])
+    const invalidTargets = coverage().screenParity.filter((entry: { status: string }) => entry.status === 'covered').flatMap((entry: { appRoute: string, designRoute: string | string[] | null }) =>
+      asRoutes(entry.designRoute)
+        .filter(route => !registeredRoutes.has(route))
+        .map(route => `${entry.appRoute}: ${route}`))
+    expect(invalidTargets).toEqual([])
+  })
+
+  it.each([
+    ['/finance/payment/:id/detail', 'payApplyDetail', 'isPayApplyDetail', 'PayApplyDetailScreen', 'PayApplyDetailScreen.jsx'],
+    ['/settings/data-migration', 'dataMigration', 'isDataMigration', 'DataMigrationScreen', 'DataMigrationScreen.jsx'],
+    ['/subcontract/quantity/stages', 'quantityStages', 'isQuantityStages', 'QuantityStagesScreen', 'QuantityStagesScreen.jsx'],
+    ['/schedule/process-library/:id', 'processLibraryDetail', 'isProcessLibraryDetail', 'ScheduleProcessLibraryDetailScreen', 'ScheduleProcessLibraryDetailScreen.jsx'],
+  ])('maps %s to its registered and mounted design screen', (appRoute, route, flag, global, file) => {
+    const html = readFileSync(DESIGN_HTML_PATH, 'utf8')
+    const mapping = coverage().screenParity.find((entry: { appRoute: string }) => entry.appRoute === appRoute)
+    expect(mapping).toEqual({ appRoute, designRoute: route, status: 'covered' })
+    expect(readDesignRegistry().pages.some(page => page.route === route)).toBe(true)
+    expect(html).toContain(`${flag}: route === "${route}"`)
+    const mount = html.match(new RegExp(`<sc-if value="\\{\\{ ${flag} \\}\\}"[^>]*>[\\s\\S]*?<\\/sc-if>`))?.[0]
+    expect(mount, `${route} 的路由开关必须实际挂载屏幕`).toContain(`component-from-global-scope="${global}" from="./kit/${file}"`)
+    const source = readFileSync(join(PROJECT_ROOT, 'DC重构设计源码/kit', file), 'utf8')
+    expect(source).toContain(`window.${global} = ${global}`)
   })
 
   it('registers every screen that has no design landing point', () => {

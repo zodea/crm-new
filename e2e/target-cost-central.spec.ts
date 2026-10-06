@@ -10,6 +10,7 @@ import process from 'node:process'
 import { promisify } from 'node:util'
 import { expect, test } from '@playwright/test'
 import { decodeTargetCostRead, encodeTargetCostWire } from '../app/lib/target-cost/central-codec'
+import { createVerifiedSignatory, verifiedSignatoryAdoption } from './helpers/contract-signatory'
 
 test.use({ actionTimeout: 15_000 })
 async function capture(page: Page, info: TestInfo, name: string, focus?: string) {
@@ -158,11 +159,19 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     await page.goto(`/project/target-cost/form/${encodeURIComponent(f.b)}?origin=real&returnTo=${encodeURIComponent(workingDetail)}`)
     await page.locator('input[data-field="name"]').fill(`当前保留稿 ${f.runId}`)
     await updateHeader(page, f.b, '另一个合法经办窗口更正')
+    const rejected = page.waitForResponse(response => response.url().endsWith('/api/commands/target-costs') && response.request().method() === 'POST')
     await page.getByRole('button', { name: '保存', exact: true }).click()
+    const rejection = await rejected
+    const originalCommand = rejection.request().postDataJSON()
+    expect(rejection.status()).toBe(409)
+    expect(originalCommand).toMatchObject({ targetCostId: f.b, action: { draft: { name: `当前保留稿 ${f.runId}` } } })
+    expect(await rejection.json()).toMatchObject({ data: { code: 'stale-source', commandId: originalCommand.commandId, commandOutcome: 'not-applied' } })
     await expect(page.getByText(/来源.*变化|版本.*变化|资料.*变化/).first()).toBeVisible()
     await expect(page.locator('input[data-field="name"]')).toHaveValue(`当前保留稿 ${f.runId}`)
+    await expect(page.getByRole('status', { name: '目标成本原提交待核对', exact: true })).toHaveCount(0)
     await capture(page, info, 'stale-header-retained')
     await page.getByRole('button', { name: '重新核对资料', exact: true }).click()
+    await expect(page.getByRole('button', { name: '放弃修改并载入最新', exact: true })).toBeEnabled()
     await page.getByRole('button', { name: '放弃修改并载入最新', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: '放弃修改并载入', exact: true }).click()
     await expect(page.locator('input[data-field="name"]')).toHaveValue(`新预算 ${f.runId}`)
@@ -197,7 +206,9 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     expect(existingResponse.ok(), await existingResponse.text()).toBe(true)
     const existing = await existingResponse.json()
     if (!existing.items.length) {
-      const response = await page.request.post('/api/commands/subcontract-contracts', { data: { workspaceId: f.session.workspaceId, actorId: f.session.actorId, requiredCapability: 'subcontract-contract:write', commandId: randomUUID(), baseVersion: null, action: 'submit', attachments: {}, draft: { name: `预算实际来源 ${f.runId}`, projectId: f.projectId, supplierId: f.supplierId, subKind: '专业', content: '已定施工范围', signDate: '2026-09-01', amount: 1000 } } })
+      const ownId = await createVerifiedSignatory(page, `目标成本已核实签约主体 ${f.runId}`)
+      const adoption = await verifiedSignatoryAdoption(page, ownId)
+      const response = await page.request.post('/api/commands/subcontract-contracts', { data: { workspaceId: f.session.workspaceId, actorId: f.session.actorId, requiredCapability: 'subcontract-contract:write', commandId: randomUUID(), baseVersion: null, action: 'submit', attachments: {}, draft: { ...adoption, name: `预算实际来源 ${f.runId}`, projectId: f.projectId, supplierId: f.supplierId, subKind: '专业', content: '已定施工范围', signDate: '2026-09-01', amount: 1000 } } })
       expect(response.ok(), await response.text()).toBe(true)
     }
     await page.goto(detail)

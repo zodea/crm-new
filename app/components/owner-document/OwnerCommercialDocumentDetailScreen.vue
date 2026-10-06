@@ -12,6 +12,7 @@ import {
   resolveOwnerDocumentReturnContext,
 } from '~/lib/owner-document/return-context'
 import { isQuantityBasis, quantityBasisLabel } from '~/lib/quantity/basis'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import { useOwnerCommercialDocumentReadStore } from '~/stores/owner-commercial-document-read'
@@ -31,7 +32,7 @@ const detail = computed(() => {
   const current = state.value
   if (current.kind === 'ready')
     return current.data
-  if ((current.kind === 'loading' || current.kind === 'error') && current.previous)
+  if ((current.kind === 'loading' || (current.kind === 'error' || current.kind === 'unavailable')) && current.previous)
     return current.previous
   return null
 })
@@ -165,7 +166,7 @@ useTabTitle(() => detail.value?.document.name ?? `${meta.value.label}详情`)
       :back-to="returnContext.to"
       :back-label="`返回${meta.label}`"
       :state="shellState"
-      :state-title="stateTitle"
+      :state-title="readProblemTitle(problem, stateTitle)"
       :state-description="problem?.message ?? ''"
       :state-action-label="problem?.retryable ? '重新加载' : ''"
       @state-action="load"
@@ -190,7 +191,7 @@ useTabTitle(() => detail.value?.document.name ?? `${meta.value.label}详情`)
       </template>
 
       <div v-if="detail" class="space-y-3">
-        <StatePanel v-if="state.kind === 'error'" kind="error" :title="`刷新${meta.label}失败`" :description="`${state.problem.message}；当前保留上一次成功读取的详情。`" :action-label="state.problem.retryable ? '重新加载' : ''" compact @action="load" />
+        <StatePanel v-if="(state.kind === 'error' || state.kind === 'unavailable')" kind="error" :title="`刷新${meta.label}失败`" :description="`${state.problem.message}；当前保留上一次成功读取的详情。`" :action-label="state.problem.retryable ? '重新加载' : ''" compact @action="load" />
         <StatePanel v-if="loading" kind="loading" :title="`正在刷新${meta.label}`" description="当前保留上一次成功读取的详情。" compact />
 
         <section class="panel p-4" aria-labelledby="owner-document-basic-title">

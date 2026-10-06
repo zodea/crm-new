@@ -221,18 +221,13 @@ describe('运行参考文档与生成物一致性（非业务验收）', () => {
         appRoute: '/contract/boq/building-evidence',
         issue: '#445',
       }),
-      expect.objectContaining({
-        appRoute: '/finance/payment/:id/detail',
-        issue: '#305',
-      }),
-      expect.objectContaining({
-        appRoute: '/schedule/process-library/:id',
-        issue: '#443',
-      }),
-      expect.objectContaining({
-        appRoute: '/settings/data-migration',
-        issue: '#294',
-      }),
+      expect.objectContaining({ appRoute: '/contract/other-settlement/import', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('没有直接外部参考页或DC注册') }),
+      expect.objectContaining({ appRoute: '/material/quotations', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('DC实际注册尚无对应独立屏') }),
+      expect.objectContaining({ appRoute: '/material/quotations/:id', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('DC实际注册尚无对应独立屏') }),
+      expect.objectContaining({ appRoute: '/material/quotations/form/:id?', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('DC实际注册尚无对应独立屏') }),
+      expect.objectContaining({ appRoute: '/material/quotations/import', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('DC实际注册尚无对应独立屏') }),
+      expect.objectContaining({ appRoute: '/settings/our-signatories', designRoute: null, status: 'design-pending', reason: expect.stringContaining('DC 未注册') }),
+      expect.objectContaining({ appRoute: '/settings/our-signatories/form/:id?', designRoute: null, status: 'design-pending', reason: expect.stringContaining('DC 未注册') }),
       expect.objectContaining({
         appRoute: '/subcontract/daywork/form/:id',
         issue: '#412',
@@ -305,10 +300,6 @@ describe('运行参考文档与生成物一致性（非业务验收）', () => {
         appRoute: '/subcontract/quantity/:pid/:uid/hollow/new',
         issue: '#412',
       }),
-      expect.objectContaining({
-        appRoute: '/subcontract/quantity/stages',
-        issue: '#442',
-      }),
     ])
     expect(designIndex).toContain('[#292](https://github.com/zodea/crm-new/issues/292)')
     expect(designIndex).toContain('[#276](https://github.com/zodea/crm-new/issues/276)')
@@ -348,6 +339,20 @@ describe('运行参考文档与生成物一致性（非业务验收）', () => {
       expect(endpoint.implementationIssues.every(Number.isInteger), endpoint.page).toBe(true)
       expect(references.has(endpoint.referenceProfile), endpoint.page).toBe(true)
       expect(constraints.has(endpoint.constraints), endpoint.page).toBe(true)
+    }
+  })
+
+  it('保留我方主体目录与整页表单的真实注册，不捏造历史实施票或设计覆盖', () => {
+    const endpoints = buildRuntimeEvidenceLedger().endpoints
+    for (const route of ['/settings/our-signatories', '/settings/our-signatories/form/:id?']) {
+      const endpoint = endpoints.find(item => item.localRoute === route)!
+      expect(endpoint.domainCode).toBe('ocr-settings')
+      expect(endpoint.historicalImplementationIssues).toEqual([])
+      expect(endpoint.implementationIssues).toEqual([414])
+      expect(endpoint.evidenceGrade).not.toBe('direct')
+      const coverage = JSON.parse(readFileSync(COVERAGE_PATH, 'utf8')).screenParity.find((item: { appRoute: string }) => item.appRoute === route)
+      expect(coverage).toMatchObject({ status: 'design-pending', designRoute: null })
+      expect(coverage.reason).toContain('DC 未注册')
     }
   })
 

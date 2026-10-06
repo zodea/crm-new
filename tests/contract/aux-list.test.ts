@@ -2,6 +2,7 @@ import type { ContractAuxRow } from '~/lib/contract/aux-list'
 import { describe, expect, it } from 'vitest'
 import {
   CONTRACT_AUX_LIST_CONFIG,
+  contractAuxAmountTotal,
   contractAuxStatusTone,
   filterContractAuxRows,
 } from '~/lib/contract/aux-list'
@@ -44,6 +45,13 @@ const rows: ContractAuxRow[] = [
 ]
 
 describe('contract aux list configuration', () => {
+  it('合计仅在适用行金额全部已知时成立，空集合和真实零保留零', () => {
+    expect(contractAuxAmountTotal([])).toBe(0)
+    expect(contractAuxAmountTotal([{ ...rows[0]!, amount: 0 }])).toBe(0)
+    expect(contractAuxAmountTotal(rows)).toBe(180)
+    expect(contractAuxAmountTotal([...rows, { ...rows[0]!, id: 'unknown', amount: null }])).toBeNull()
+    expect(contractAuxAmountTotal([{ ...rows[0]!, amount: null }])).toBeNull()
+  })
   describe('supports OR within each selection and AND across fields while preserving route context', () => {
     const filters = { search: '', project: [], category: ['房租', '材料'], status: ['履约中', '待确认'] }
     it.each([

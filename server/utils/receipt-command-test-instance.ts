@@ -1,10 +1,13 @@
-import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { ReceiptCommand, ReceiptCommandResult, ReceiptRecord, ReceiptReferenceFacts } from '../../app/lib/receipt/contract'
 import type { BusinessSession } from './business-session'
+import type { CommandJournal } from './command-journal'
 import type { StoredReceipt } from './receipt-migration'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { RECEIPT_READ_CAPABILITY, RECEIPT_WRITE_CAPABILITY, receiptProblem } from '../../app/lib/receipt/contract'
 import { validateReceiptDraft } from '../../app/lib/receipt/domain'
+import { commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
+import { assertRetainedMigrationReferences } from './core-identity-migration'
 import { prepareReceiptAttachments, readReceiptAttachment } from './receipt-attachments'
 import { assertUniqueReceiptBankSerial } from './receipt-constraints'
 import { prepareReceiptMigration } from './receipt-migration'
@@ -15,19 +18,10 @@ interface Options {
   now?: () => string
 }
 
-interface State {
+interface State extends CommandJournal<ReceiptCommandResult> {
   records: Map<string, StoredReceipt>
-  commands: Map<string, { fingerprint: string, result: ReceiptCommandResult }>
   payloads: Map<string, string>
   version: number
-}
-
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value))
-    return value.map(canonical)
-  if (value !== null && typeof value === 'object')
-    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, entry]) => [key, canonical(entry)]))
-  return value
 }
 
 export function createReceiptCommandTestInstance(options: Options) {
@@ -38,7 +32,7 @@ export function createReceiptCommandTestInstance(options: Options) {
     const key = sessionId || 'default'
     let state = states.get(key)
     if (!state) {
-      state = { records: new Map(), commands: new Map(), payloads: new Map(), version: 0 }
+      state = { records: new Map(), commands: new Map(), commandFingerprints: new Map(), sealedCommands: new Set(), payloads: new Map(), version: 0 }
       states.set(key, state)
     }
     return state
@@ -50,6 +44,12 @@ export function createReceiptCommandTestInstance(options: Options) {
   }
 
   return {
+    assertMigrationRemoval(removed: readonly CoreMigrationServerEntityDTO[], sessionId?: string | null) {
+      assertRetainedMigrationReferences(removed, 'receipt_registrations', [...stateFor(sessionId).records.values()].map(row => ({
+        id: row.id,
+        references: [{ type: 'projects', id: row.draft.projectId }, { type: 'customers', id: row.draft.customerId }, { type: 'construction_contracts', id: row.draft.contractId }],
+      })), message => receiptProblem('conflict', message))
+    },
     reset(sessionId?: string | null) { states.delete(sessionId || 'default') },
     prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
       const state = stateFor(sessionId)
@@ -59,7 +59,6 @@ export function createReceiptCommandTestInstance(options: Options) {
           return
         state.records = prepared.records
         state.payloads = prepared.payloads
-        state.commands = new Map([...state.commands].filter(([, command]) => state.records.has(command.result.id)))
         state.version++
       }
     },
@@ -83,6 +82,7 @@ export function createReceiptCommandTestInstance(options: Options) {
       return readReceiptAttachment(record.attachments, state.payloads, fileId)
     },
     execute(request: ReceiptCommand, session: BusinessSession, sessionId?: string | null): ReceiptCommandResult {
+      request = structuredClone(request)
       authorize(session, RECEIPT_WRITE_CAPABILITY)
       if (request.origin !== 'real' || request.workspaceId !== session.workspaceId || request.actorId !== session.actorId
         || request.requiredCapability !== RECEIPT_WRITE_CAPABILITY) {
@@ -96,12 +96,9 @@ export function createReceiptCommandTestInstance(options: Options) {
         if (request.draft[field] || existing?.draft[field])
           authorize(session, capability)
       }
-      const fingerprint = createHash('sha256').update(JSON.stringify(canonical(request))).digest('hex')
-      const previous = state.commands.get(request.commandId)
+      const { key: commandKey, previous } = commandReplay(state, request, session, 'receipt', message => receiptProblem('conflict', message))
       if (previous) {
-        if (previous.fingerprint !== fingerprint)
-          throw receiptProblem('conflict', '同一命令编号不能提交不同内容，请重新发起保存')
-        return structuredClone(previous.result)
+        return previous
       }
       if (request.id && !existing)
         throw receiptProblem('not-found', '收款记录不存在或已删除')
@@ -136,8 +133,13 @@ export function createReceiptCommandTestInstance(options: Options) {
       state.payloads = attachments.payloads
       state.version++
       const result = { id, commandId: request.commandId, version: record.version, updatedAt: timestamp, attachmentIds: attachments.attachmentIds }
-      state.commands.set(request.commandId, { fingerprint, result })
+      state.commands.set(commandKey, structuredClone(result))
       return structuredClone(result)
+    },
+    resolve(commandId: string, session: BusinessSession, sessionId?: string | null) {
+      authorize(session, RECEIPT_WRITE_CAPABILITY)
+      parseResolveCommandBody({ commandId })
+      return resolveJournalCommand(stateFor(sessionId), commandId, session, 'receipt')
     },
   }
 }

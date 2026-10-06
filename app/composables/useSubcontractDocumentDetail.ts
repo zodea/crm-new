@@ -3,6 +3,7 @@ import { computed, onActivated, watch } from 'vue'
 import { ownerDocumentStatusIsEditable } from '~/lib/owner-document/forms'
 import { OWNER_DOCUMENT_META, ownerDocumentFormPath } from '~/lib/owner-document/page'
 import { loadOwnerDocumentReturnOrigin, resolveOwnerDocumentReturnContext } from '~/lib/owner-document/return-context'
+import { readProblemTitle } from '~/lib/read-model/state'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import { useOwnerCommercialDocumentReadStore } from '~/stores/owner-commercial-document-read'
 
@@ -15,7 +16,7 @@ export function useSubcontractDocumentDetail(props: { documentId: string, origin
     const current = store.detailState
     if (current.kind === 'ready' && current.data.document.kind === kind && current.data.document.id === props.documentId && current.data.dataOrigin === props.origin)
       return current.data
-    if ((current.kind === 'loading' || current.kind === 'error') && current.previous?.document.kind === kind && current.previous.document.id === props.documentId && current.previous.dataOrigin === props.origin)
+    if ((current.kind === 'loading' || (current.kind === 'error' || current.kind === 'unavailable')) && current.previous?.document.kind === kind && current.previous.document.id === props.documentId && current.previous.dataOrigin === props.origin)
       return current.previous
     return null
   })
@@ -32,7 +33,7 @@ export function useSubcontractDocumentDetail(props: { documentId: string, origin
       return 'not-found'
     return 'error'
   })
-  const stateTitle = computed(() => store.detailState.kind === 'mismatch'
+  const stateTitle = computed(() => readProblemTitle(problem.value, store.detailState.kind === 'mismatch'
     ? '单据来源或关系不匹配'
     : shellState.value === 'loading'
       ? `正在读取${meta.label}`
@@ -40,7 +41,7 @@ export function useSubcontractDocumentDetail(props: { documentId: string, origin
         ? `无权查看${meta.label}`
         : shellState.value === 'not-found'
           ? `${meta.label}不存在`
-          : `${meta.label}读取失败`)
+          : `${meta.label}读取失败`))
   const returnContext = computed(() => resolveOwnerDocumentReturnContext({
     kind,
     returnTo: route.query.returnTo,
@@ -52,7 +53,7 @@ export function useSubcontractDocumentDetail(props: { documentId: string, origin
   const backLabel = computed(() => returnContext.value.to.split('?')[0] === meta.listPath
     ? `返回${meta.label}列表`
     : '返回来源详情')
-  const canEdit = computed(() => detail.value?.dataOrigin === 'real'
+  const canEdit = computed(() => store.detailState.kind === 'ready' && detail.value?.dataOrigin === 'real'
     && detail.value.capabilities.includes('subcontract-document:write')
     && ownerDocumentStatusIsEditable(detail.value.document.status))
 

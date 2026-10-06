@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 type Scenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
@@ -24,8 +25,11 @@ async function chooseLookup(page: Page, label: string, option: string) {
 }
 
 async function createSubcontract(page: Page, name: string): Promise<string> {
+  const ownName = '此流程已核实我方签约主体'
+  const ownId = await createVerifiedSignatory(page, ownName)
   await page.goto('/contract/subcontract/form')
   await expect(page.getByRole('heading', { name: /新建 · 分包合同/ })).toBeVisible({ timeout: 20_000 })
+  await selectVerifiedSignatory(page, ownId, ownName)
   await page.getByLabel('合同名称 *').fill(name)
   await chooseLookup(page, '检索项目', '中央正式施工项目')
   await chooseLookup(page, '检索分供方', '中央正式劳务分供方')
@@ -103,6 +107,7 @@ async function createPaginationDrafts(
 test.describe('Issue #327：分包变洽签专属只读链', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const id = session(testInfo)
+    await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': id })
     await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': id })
     await reset(page.context().request, id, 'projects')
     await reset(page.context().request, id, 'subcontract-contracts')

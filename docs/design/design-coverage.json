@@ -1,17 +1,17 @@
 {
   "$schema": "本文件由 pnpm design:sync-coverage 生成；status 只允许 covered / design-pending / retired。",
   "counts": {
-    "designPageRoutes": 69,
+    "designPageRoutes": 73,
     "designFormRoutes": 40,
     "designNavGroups": 9,
-    "designNavLeaves": 50,
-    "designMountedScreens": 88,
-    "trackedPageFiles": 164,
+    "designNavLeaves": 51,
+    "designMountedScreens": 92,
+    "trackedPageFiles": 171,
     "devPageFiles": 5,
-    "appPageFiles": 159,
-    "appNavLeaves": 51,
-    "covered": 135,
-    "designPending": 24,
+    "appPageFiles": 166,
+    "appNavLeaves": 53,
+    "covered": 139,
+    "designPending": 27,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -210,6 +210,13 @@
       "status": "covered"
     },
     {
+      "appRoute": "/contract/other-settlement/import",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "Q-A03-02 将其他支出结算接入既有中央事务；实际新增原图迁入页没有直接外部参考页或DC注册，不借旧结算表单标记覆盖。",
+      "issue": "#411"
+    },
+    {
       "appRoute": "/contract/subcontract",
       "designRoute": "subContract",
       "status": "covered"
@@ -296,10 +303,8 @@
     },
     {
       "appRoute": "/finance/payment/:id/detail",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "本轮补齐的付款申请只读详情工作台，暂无一一对应的 DC 页面；沿用 EntityDetailShell 的详情骨架，并以用户提供的智能业务洞察侧栏为结构线索，先登记为待补设计。",
-      "issue": "#305"
+      "designRoute": "payApplyDetail",
+      "status": "covered"
     },
     {
       "appRoute": "/finance/payment/new",
@@ -400,6 +405,34 @@
       "appRoute": "/material/price",
       "designRoute": "price",
       "status": "covered"
+    },
+    {
+      "appRoute": "/material/quotations",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "Q-A02-03 新增独立报价及迁入入口，复用现行KitUI；DC实际注册尚无对应独立屏，保留待补设计，不借price屏登记为覆盖。",
+      "issue": "#411"
+    },
+    {
+      "appRoute": "/material/quotations/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "Q-A02-03 新增独立报价及迁入入口，复用现行KitUI；DC实际注册尚无对应独立屏，保留待补设计，不借price屏登记为覆盖。",
+      "issue": "#411"
+    },
+    {
+      "appRoute": "/material/quotations/form/:id?",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "Q-A02-03 新增独立报价及迁入入口，复用现行KitUI；DC实际注册尚无对应独立屏，保留待补设计，不借price屏登记为覆盖。",
+      "issue": "#411"
+    },
+    {
+      "appRoute": "/material/quotations/import",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "Q-A02-03 新增独立报价及迁入入口，复用现行KitUI；DC实际注册尚无对应独立屏，保留待补设计，不借price屏登记为覆盖。",
+      "issue": "#411"
     },
     {
       "appRoute": "/material/requisition",
@@ -664,10 +697,8 @@
     },
     {
       "appRoute": "/schedule/process-library/:id",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "#443 新增不可变工序库版本的独立只读详情；采用已有工序库列表/表单、Table 原语与 ADR 0018 的只读语义，当前没有一一对应的 DC 详情页，按本票五档实际视口验证。",
-      "issue": "#443"
+      "designRoute": "processLibraryDetail",
+      "status": "covered"
     },
     {
       "appRoute": "/schedule/process-library/form",
@@ -676,15 +707,27 @@
     },
     {
       "appRoute": "/settings/data-migration",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "核心身份迁移是 #294 新增的浏览器专属工作台；当前先以运行契约、四档视口和局部滚动证据验收，尚无一一对应的 DC 页面。",
-      "issue": "#294"
+      "designRoute": "dataMigration",
+      "status": "covered"
     },
     {
       "appRoute": "/settings/ocr",
       "designRoute": "ocrSettings",
       "status": "covered"
+    },
+    {
+      "appRoute": "/settings/our-signatories",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "我方签约主体目录新增真实设置入口，当前 DC 未注册对应独立设计屏；沿现行 DESIGN-SYSTEM 列表原语和页面职责实施，运行矩阵仅登记真实接线，设计与界面验收需独立核验。",
+      "issue": "#414"
+    },
+    {
+      "appRoute": "/settings/our-signatories/form/:id?",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "我方签约主体新增与固定记录编辑采用现行独立整页表单，当前 DC 未注册对应独立设计屏；沿 DESIGN-SYSTEM 表单原语实施，不继承合同表单的独立覆盖或运行验收结论。",
+      "issue": "#414"
     },
     {
       "appRoute": "/subcontract/:kind",
@@ -883,10 +926,8 @@
     },
     {
       "appRoute": "/subcontract/quantity/stages",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "阶段目录与报量映射为 #442 新增整页，当前无一一对应的 DC 页面；按既有实体表单原语实现，本地运行验收见 evidence/issue-442/README.md，不等于设计源码已覆盖。",
-      "issue": "#442"
+      "designRoute": "quantityStages",
+      "status": "covered"
     },
     {
       "appRoute": "/subcontract/quantity/template",
@@ -1065,6 +1106,13 @@
       "appLabel": "工资核算",
       "designLabel": "工资核算",
       "designPageTitle": "工资核算"
+    },
+    {
+      "key": "materialQuotation",
+      "appNavTo": "/material/quotations",
+      "appLabel": "材料报价",
+      "designLabel": null,
+      "designPageTitle": null
     },
     {
       "key": "matContract",
@@ -1284,11 +1332,18 @@
       "designPageTitle": "工人信息库"
     },
     {
+      "key": "ourSignatories",
+      "appNavTo": "/settings/our-signatories",
+      "appLabel": "我方签约主体",
+      "designLabel": null,
+      "designPageTitle": null
+    },
+    {
       "key": "dataMigration",
       "appNavTo": "/settings/data-migration",
       "appLabel": "本地数据迁移",
-      "designLabel": null,
-      "designPageTitle": null
+      "designLabel": "本地数据迁移",
+      "designPageTitle": "本地数据迁移"
     },
     {
       "key": "ocrSettings",

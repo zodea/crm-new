@@ -1,13 +1,16 @@
 import type { AuxiliaryContractAudit, AuxiliaryContractCommand, AuxiliaryContractDetail, AuxiliaryContractDraft, AuxiliaryContractDTO, AuxiliaryContractFact, AuxiliaryContractPage } from '../../app/lib/auxiliary-contract/contract'
 import type { ContractFormAttachment } from '../../app/lib/contract/forms'
-import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
 import { auxiliaryKind, auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { auxiliaryTaxExclusive, subtractAuxiliaryMoney, sumAuxiliaryFacts, sumAuxiliaryMoney } from '../../app/lib/auxiliary-contract/facts'
 import { decodeAuxiliaryCommand } from '../../app/lib/auxiliary-contract/validation'
 import { enumFilterValues, matchesEnumFilter } from '../../app/lib/kit/enum-filter'
+import { parsePageQuery, resolvePagination } from '../../app/lib/read-model/pagination'
 import { applyAuxiliaryAttachments } from './auxiliary-contract-attachments'
 import { migratedAuxiliaryContract } from './auxiliary-contract-migration'
+import { assertRetainedMigrationReferences } from './core-identity-migration'
+import { createReadMeta, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
 
 export interface AuxiliaryStoredContract {
   draft: AuxiliaryContractDraft & { id: string }
@@ -82,6 +85,14 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
       }, {}),
     }
   }
+  function readEvidence(session: BusinessSession, query: Record<string, unknown>, operation: string, asOf: string, origin: 'real' | 'demo' = 'real') {
+    const owned = [...records.values()].filter(row => row.workspaceId === session.workspaceId)
+    const sourceVersion = readSourceVersion('auxiliary-contracts', { records: owned, facts: owned.map(row => ({ id: row.draft.id, rows: relatedFacts(row) })), projects: [...projects], suppliers: [...suppliers] })
+    const scope = operation === 'auxiliary-contract:list'
+      ? { kind: query.kind, origin: 'real', search: String(query.search ?? '').trim(), category: enumFilterValues(query.category), status: enumFilterValues(query.status), projectId: query.projectId ?? query.project ?? null, supplierId: query.supplierId ?? query.supplier ?? null }
+      : { id: query.id, kind: query.kind, origin: 'real', includeDeleted: query.includeDeleted === 'true' }
+    return createReadMeta({ session, schemaVersion: 'auxiliary-contract-read-v2', operation, dataOrigin: origin, asOf, sources: [{ key: 'auxiliary-contracts', state: origin === 'real' ? 'readable' : 'not-requested', sourceVersion: origin === 'real' ? sourceVersion : null, asOf: origin === 'real' ? asOf : null }], coverage: origin === 'real' ? 'complete' : 'unknown', scope })
+  }
   return {
     supplierReadSource(workspaceId: string) {
       const scoped = [...records.values()].filter(row => row.workspaceId === workspaceId && row.draft.kind === 'other_expense')
@@ -94,11 +105,18 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
       authorize(session, 'read')
       return { projects: [...projects].map(([id, label]) => ({ id, label })), suppliers: [...suppliers].map(([id, label]) => ({ id, label })), contracts: [...records.values()].filter(row => row.workspaceId === session.workspaceId).map(row => ({ id: row.draft.id, kind: row.draft.kind, name: row.draft.name || '未命名合同', projectId: row.draft.projectId ?? null, supplierId: row.draft.supplierId ?? null, status: row.draft.status || '草稿', amount: row.draft.amount?.toFixed(2) ?? null, changedAmount: sumAuxiliaryMoney([row.draft.amount?.toFixed(2) ?? null, sumAuxiliaryFacts(relatedFacts(row), 'supplement')]) })) }
     },
+    assertMigrationRemoval(removed: readonly CoreMigrationServerEntityDTO[]) {
+      assertRetainedMigrationReferences(removed, 'auxiliary_contracts', [...records.values()].map(row => ({ id: row.draft.id, references: [{ type: 'projects', id: row.draft.projectId }, { type: 'suppliers', id: row.draft.supplierId }] })), message => auxiliaryProblem('conflict', message))
+    },
     prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO) {
       const batchId = snapshot.authority === 'central' ? snapshot.activeBatchId : null
       const entities = batchId ? snapshot.entities.filter(row => !row.deletedAt) : []
       const candidates = entities.filter(row => row.entityType === 'auxiliary_contracts').map(row => migratedAuxiliaryContract(row, batchId!))
       const ids = new Set(candidates.map(row => row.draft.id))
+      for (const [id, row] of records) {
+        if (row.migrationBatchId && (row.migrationBatchId !== batchId || !ids.has(id)) && row.version !== 1)
+          throw auxiliaryProblem('conflict', '迁入辅助合同已有后来修改或附件变更，不能回滚移除')
+      }
       const nextRecords = new Map([...records].filter(([id, row]) => !row.migrationBatchId || (row.migrationBatchId === batchId && ids.has(id))))
       for (const row of candidates) {
         if (!nextRecords.has(row.draft.id))
@@ -116,12 +134,6 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
         records = nextRecords
         projects = nextProjects
         suppliers = nextSuppliers
-        for (const [key, result] of replay) {
-          if (!records.has(result.id)) {
-            replay.delete(key)
-            fingerprints.delete(key)
-          }
-        }
       }
     },
     context(session: BusinessSession) {
@@ -134,7 +146,8 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
       if (auxiliaryKind(query.kind) !== stored.draft.kind || (query.origin && query.origin !== 'real'))
         throw auxiliaryProblem('relationship-mismatch', '合同类型或数据来源不匹配')
       const includeDeleted = query.includeDeleted === 'true' && session.capabilities.includes('auxiliary-contract:write')
-      return { contract: dto(stored), facts: structuredClone(relatedFacts(stored)), attachments: structuredClone(stored.attachments.filter(file => includeDeleted || !file.deletedAt)), capabilities: [...session.capabilities] }
+      const asOf = now()
+      return withReadMeta({ contract: dto(stored), facts: structuredClone(relatedFacts(stored)), attachments: structuredClone(stored.attachments.filter(file => includeDeleted || !file.deletedAt)) }, readEvidence(session, { ...query, id }, 'auxiliary-contract:detail', asOf))
     },
     list(query: Record<string, unknown>, session: BusinessSession): AuxiliaryContractPage {
       authorize(session, 'read')
@@ -143,17 +156,22 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
         throw auxiliaryProblem('invalid-query', '公司合同不接受项目或分供方筛选')
       if (query.origin && query.origin !== 'real' && query.origin !== 'demo')
         throw auxiliaryProblem('invalid-query', '数据来源无效')
+      if (query.origin === 'demo')
+        throw auxiliaryProblem('unavailable', '辅助合同测试来源尚未连接，无法确认记录或汇总。')
       const search = String(query.search ?? '').trim().toLocaleLowerCase('zh-CN')
       const items = [...records.values()].filter(row => row.workspaceId === session.workspaceId && row.draft.kind === kind && query.origin !== 'demo').filter(({ draft }) => (!search || [draft.name, draft.no, draft.counterparty, suppliers.get(draft.supplierId ?? '')].some(value => value?.toLocaleLowerCase('zh-CN').includes(search)))
         && matchesEnumFilter(draft.category, query.category)
         && matchesEnumFilter(draft.status, query.status)
         && (!(query.projectId || query.project) || draft.projectId === (query.projectId || query.project))
         && (!(query.supplierId || query.supplier) || draft.supplierId === (query.supplierId || query.supplier))).sort((a, b) => a.draft.id.localeCompare(b.draft.id)).map(dto)
-      const pageSize = [10, 20, 50, 100].includes(Number(query.pageSize)) ? Number(query.pageSize) : 20
-      const requestedPage = Number(query.page)
-      const page = Math.min(Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1, Math.max(1, Math.ceil(items.length / pageSize)))
+      const { requestedPage, pageSize } = parsePageQuery(query, () => {
+        throw auxiliaryProblem('invalid-query', '合同分页参数无效')
+      })
+      const pagination = resolvePagination(requestedPage, pageSize, items.length)
+      const { page } = pagination
       const filtered = ['search', 'projectId', 'supplierId', 'project', 'supplier'].some(key => query[key]) || enumFilterValues(query.category).length > 0 || enumFilterValues(query.status).length > 0
-      return { items: items.slice((page - 1) * pageSize, page * pageSize), pagination: { total: items.length, page, pageSize }, projectOptions: kind === 'other_expense' ? [...projects].map(([id, label]) => ({ id, label })) : [], empty: items.length ? null : { reason: filtered ? 'no-filter-match' : 'no-records', missingRelations: [] }, asOf: now(), sourceVersion: 'auxiliary-contract-v1', summary: { real: { count: items.length, amount: sumAuxiliaryMoney(items.map(row => row.amounts.contract)) }, demo: { count: 0, amount: '0.00' } }, capabilities: [...session.capabilities] }
+      const asOf = now()
+      return withOriginReadMeta({ items: items.slice((page - 1) * pageSize, page * pageSize), pagination, projectOptions: kind === 'other_expense' ? [...projects].map(([id, label]) => ({ id, label })) : [], empty: items.length ? null : { reason: filtered ? 'no-filter-match' : 'no-records', missingRelations: [] }, asOf, sourceVersion: null, summary: { real: { count: items.length, amount: sumAuxiliaryMoney(items.map(row => row.amounts.contract)) }, demo: { count: 0, amount: '0.00' } }, capabilities: [...session.capabilities] }, { real: readEvidence(session, query, 'auxiliary-contract:list', asOf), demo: readEvidence(session, query, 'auxiliary-contract:list', asOf, 'demo') })
     },
     async execute(request: AuxiliaryContractCommand, session: BusinessSession) {
       authorize(session, 'write')

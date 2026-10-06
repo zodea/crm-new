@@ -8,7 +8,10 @@ import type {
   CustomerReceiptDetailQueryDTO,
   CustomerReceiptDetailReadDTO,
 } from './read-contract'
-import { isDataOriginDTO, isEntityKindDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { isDataOriginDTO, isEntityKindDTO, isEntityRefDTO, isISODateDTO, isISODateTimeDTO, isUnavailableEntityNavigationDTO } from '../../types/read-model'
+import { hasConsistentOriginReadMeta, hasConsistentReadMeta } from '../read-model/meta'
+import { isPaginationDTO } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { serializeEnumSelection } from '../util/enum-selection'
 import { CUSTOMER_PAGE_SIZES, customerProblem, CustomerRepositoryProblem } from './read-contract'
 
@@ -29,15 +32,7 @@ function nullableDate(value: unknown): value is string | null {
 }
 
 function entityRef(value: unknown, kind?: EntityKindDTO): value is EntityRefDTO {
-  if (!object(value) || !isEntityKindDTO(value.entity) || (kind && value.entity !== kind))
-    return false
-  if (value.state === 'resolved')
-    return typeof value.id === 'string' && typeof value.label === 'string' && (value.no === null || typeof value.no === 'string')
-  if (value.state === 'missing')
-    return value.id === null && value.label === null && ['not-configured', 'not-recorded', 'not-applicable'].includes(String(value.reason))
-  if (value.state === 'forbidden')
-    return (value.id === null || typeof value.id === 'string') && value.label === null && value.reason === 'permission-denied'
-  return false
+  return isEntityRefDTO(value, kind)
 }
 
 function sameSubject(left: EntityRefDTO, right: Record<string, unknown>): boolean {
@@ -52,11 +47,11 @@ function navigationFor(value: unknown, reference: EntityRefDTO, origin?: unknown
   if (!object(value))
     return false
   if (reference.state !== 'resolved')
-    return value.kind === 'unavailable' && ['missing-id', 'forbidden'].includes(String(value.reason))
+    return isUnavailableEntityNavigationDTO(value, reference)
   return value.kind === 'entity-detail'
     && value.variant === 'detail'
     && value.view === null
-    && object(value.subject)
+    && isEntityRefDTO(value.subject)
     && sameSubject(reference, value.subject)
     && object(value.filters)
     && Object.values(value.filters).every(item => item === null || typeof item === 'string')
@@ -92,7 +87,7 @@ function listItem(value: unknown): boolean {
 function pageBase(value: unknown): value is Record<string, unknown> {
   return object(value)
     && object(value.pagination)
-    && Number.isSafeInteger(value.pagination.page) && Number(value.pagination.page) >= 1
+    && isPaginationDTO(value.pagination, Array.isArray(value.items) ? value.items.length : undefined)
     && CUSTOMER_PAGE_SIZES.includes(value.pagination.pageSize as CustomerPageSize)
     && Number.isSafeInteger(value.pagination.total) && Number(value.pagination.total) >= 0
     && (value.empty === null || (object(value.empty)
@@ -123,7 +118,7 @@ function invalid(message: string): never {
 }
 
 export function decodeCustomerListPage(value: unknown): CustomerListPageDTO {
-  if (!pageBase(value)
+  if (!hasConsistentOriginReadMeta(value, 'customer-read-v2') || !pageBase(value)
     || !Array.isArray(value.items) || !value.items.every(listItem)
     || !object(value.summary)
     || !Array.isArray(value.summary.statuses) || !value.summary.statuses.every(statusSummary)
@@ -144,10 +139,10 @@ function project(value: unknown, origin: unknown, contractsUnavailable = false, 
     && nullableDate(value.startDate) && nullableDate(value.plannedEnd)
     && (contractsUnavailable
       ? value.contractCount === null && value.effectiveContractAmount === null
-      : Number.isSafeInteger(value.contractCount) && Number(value.contractCount) >= 0 && money(value.effectiveContractAmount))
+      : Number.isSafeInteger(value.contractCount) && Number(value.contractCount) >= 0 && (value.effectiveContractAmount === null || money(value.effectiveContractAmount)))
     && (receiptsUnavailable
       ? value.receiptCount === null && value.effectiveReceiptAmount === null
-      : Number.isSafeInteger(value.receiptCount) && Number(value.receiptCount) >= 0 && money(value.effectiveReceiptAmount))
+      : Number.isSafeInteger(value.receiptCount) && Number(value.receiptCount) >= 0 && (value.effectiveReceiptAmount === null || money(value.effectiveReceiptAmount)))
 }
 
 function contract(value: unknown, origin: unknown, customerId: string, receiptsUnavailable = false): boolean {
@@ -159,10 +154,10 @@ function contract(value: unknown, origin: unknown, customerId: string, receiptsU
     && navigationCustomerId(value.navigation) === customerId
     && value.navigation.kind === 'entity-detail' && value.navigation.filters.contractKind === '施工'
     && navigationFor(value.projectNavigation, value.project, origin)
-    && money(value.effectiveAmount)
+    && (value.effectiveAmount === null || money(value.effectiveAmount))
     && (receiptsUnavailable
       ? value.receiptAmount === null && value.outstandingAmount === null
-      : value.receiptAmount === null ? value.outstandingAmount === null : money(value.receiptAmount) && money(value.outstandingAmount))
+      : value.receiptAmount === null ? value.outstandingAmount === null : money(value.receiptAmount) && (value.effectiveAmount === null ? value.outstandingAmount === null : money(value.outstandingAmount)))
     && nullableDate(value.signDate)
     && typeof value.status === 'string' && typeof value.isDraft === 'boolean'
 }
@@ -186,7 +181,7 @@ export function decodeCustomerDetailRead(value: unknown): CustomerDetailReadDTO 
   const customerId = object(value) && object(value.customer) && typeof value.customer.id === 'string'
     ? value.customer.id
     : null
-  if (!object(value) || !customerId || !isDataOriginDTO(value.dataOrigin) || !customer(value.customer, value.dataOrigin)
+  if (!object(value) || !hasConsistentReadMeta(value, 'customer-read-v2', value.dataOrigin) || !customerId || !isDataOriginDTO(value.dataOrigin) || !customer(value.customer, value.dataOrigin)
     || !Array.isArray(value.projects) || !value.projects.every(item => project(item, value.dataOrigin, value.contractsProblem !== undefined, value.receiptsProblem !== undefined))
     || !Array.isArray(value.contracts) || !value.contracts.every(item => contract(item, value.dataOrigin, customerId, value.receiptsProblem !== undefined))
     || !Array.isArray(value.receipts) || !value.receipts.every(item => receipt(item, value.dataOrigin, customerId))
@@ -201,11 +196,11 @@ export function decodeCustomerDetailRead(value: unknown): CustomerDetailReadDTO 
         || typeof value.receiptsProblem.retryable !== 'boolean'
         || value.receipts.length !== 0 || summary.receiptCount !== null
         || summary.draftReceiptCount !== null || summary.effectiveReceiptAmount !== null)
-      || (value.contractsProblem !== undefined || value.receiptsProblem !== undefined || summary.effectiveReceiptAmount === null
+      || (value.contractsProblem !== undefined || value.receiptsProblem !== undefined || summary.effectiveReceiptAmount === null || summary.effectiveContractAmount === null
         ? summary.outstandingAmount !== null
         : !money(summary.outstandingAmount))
       || (value.contractsProblem === undefined
-        ? summary.contractCount !== value.contracts.length || !money(summary.effectiveContractAmount)
+        ? summary.contractCount !== value.contracts.length || (value.contracts.some(item => object(item) && item.effectiveAmount === null) ? summary.effectiveContractAmount !== null : !money(summary.effectiveContractAmount))
         : !object(value.contractsProblem)
           || !['forbidden', 'unavailable'].includes(String(value.contractsProblem.code))
           || typeof value.contractsProblem.message !== 'string'
@@ -228,7 +223,7 @@ export function decodeCustomerDetailRead(value: unknown): CustomerDetailReadDTO 
 }
 
 export function decodeCustomerReceiptDetailRead(value: unknown): CustomerReceiptDetailReadDTO {
-  if (!object(value) || !isDataOriginDTO(value.dataOrigin)
+  if (!object(value) || !hasConsistentReadMeta(value, 'customer-read-v2', value.dataOrigin) || !isDataOriginDTO(value.dataOrigin)
     || !receipt(value.receipt, value.dataOrigin)
     || !entityRef(value.customer, 'customer') || value.customer.state !== 'resolved'
     || !object(value.receipt) || !object(value.receipt.navigation)
@@ -268,6 +263,9 @@ export function serializeCustomerReceiptDetailQuery(query: CustomerReceiptDetail
 export function customerProblemFromUnknown(cause: unknown): CustomerRepositoryProblem {
   if (cause instanceof CustomerRepositoryProblem)
     return cause
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new CustomerRepositoryProblem(remote, { cause })
   return new CustomerRepositoryProblem(customerProblem(
     'unavailable',
     '客户中央服务暂时不可用，请重试',

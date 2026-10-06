@@ -1,4 +1,4 @@
-import type { DataOriginDTO, EntityRefDTO, MoneyDTO, NavigationIntentDTO, PageDTO, ProblemDTO } from '../../types/read-model'
+import type { DataOriginDTO, EntityRefDTO, MoneyDTO, NavigationIntentDTO, PageDTO, ProblemDTO, ReadMetaDTO } from '../../types/read-model'
 import type { ContractFormAttachment, ContractFormAttachmentChanges, F2SaveAction } from '../contract/forms'
 
 export type AuxiliaryContractKind = 'other_expense' | 'company_expense'
@@ -83,12 +83,15 @@ export interface AuxiliaryContractDTO {
   version: string
 }
 export interface AuxiliaryContractDetail {
+  meta: ReadMetaDTO
+  asOf: string
+  sourceVersion: string | null
   contract: AuxiliaryContractDTO
   facts: AuxiliaryContractFact[]
   attachments: ContractFormAttachment[]
   capabilities: string[]
 }
-export type AuxiliaryContractPage = PageDTO<AuxiliaryContractDTO, Record<DataOriginDTO, { count: number, amount: MoneyDTO | null }>> & { projectOptions: Array<{ id: string, label: string }> }
+export type AuxiliaryContractPage = PageDTO<AuxiliaryContractDTO, Record<DataOriginDTO, { count: number, amount: MoneyDTO | null }>> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO>, projectOptions: Array<{ id: string, label: string }> }
 export class AuxiliaryContractProblem extends Error {
   constructor(public readonly problem: ProblemDTO) { super(problem.message) }
 }

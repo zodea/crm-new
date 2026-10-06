@@ -18,4 +18,19 @@ describe('预算空值与真实零', () => {
     }
     finally { db.close() }
   })
+
+  it('损坏的目标明细和空预算基准不变成零，实际已知金额仍不能证明剩余预算', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      await db.execute(`INSERT INTO projects(id,name) VALUES ('project','空预算')`)
+      await db.execute(`INSERT INTO target_costs(id,project_id,name,is_baseline,status,tax_inclusive_total) VALUES ('budget','project','预算',1,'submitted',NULL)`)
+      await db.execute(`INSERT INTO target_cost_items(id,target_cost_id,cost_category,amount) VALUES ('known','budget','材料',10),('broken','budget','材料','invalid')`)
+      const detail = (await loadTargetCostDetail(db, 'budget'))!
+      expect(detail.items.find(item => item.id === 'broken')?.amount).toBeNull()
+      expect(detail.categories.find(row => row.category === '材料')).toMatchObject({ targetAmount: null, settledAmount: 0, remainingAmount: null, metrics: { targetAmount: { knownValue: 10, status: 'partial' } } })
+      expect(detail.summary).toMatchObject({ itemTotal: null, remainingAmount: null, metrics: { targetAmount: { knownValue: 10, status: 'partial' }, remainingAmount: { knownValue: null } } })
+    }
+    finally { db.close() }
+  })
 })

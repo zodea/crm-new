@@ -270,17 +270,9 @@ describe('迁移机制：版本化顺序迁移', () => {
 describe('v41 发票导出设置', () => {
   it('从 v40 存量库升级时创建独立设置表', async () => {
     const db = await createMemoryDb()
-    await db.execute(`
-      CREATE TABLE schema_migrations (
-        version INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        applied_at TEXT DEFAULT (datetime('now'))
-      )
-    `)
-    await db.execute(`
-      INSERT INTO schema_migrations (version, name)
-      VALUES (40, 'monthly-statement-source-audit')
-    `)
+    // 真正的 v40 库包含既有业务图；只伪造版本号不能验证后续 ALTER 的保全。
+    await runMigrations(db, migrations.filter(migration => migration.version <= 40))
+    await db.execute('INSERT INTO contracts(id,kind,name,amount) VALUES(\'settings-preserved-contract\',\'材采\',\'既有合同\',123)')
 
     const result = await runMigrations(db)
 
@@ -291,6 +283,7 @@ describe('v41 发票导出设置', () => {
       'settings_json',
       'updated_at',
     ])
+    expect(await db.select('SELECT id,name,amount FROM contracts')).toEqual([{ id: 'settings-preserved-contract', name: '既有合同', amount: 123 }])
     db.close()
   })
 })

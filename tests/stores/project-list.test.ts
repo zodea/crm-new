@@ -3,7 +3,9 @@ import type { PageDTO, ProblemDTO } from '~/types/read-model'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProjectRepositoryProblem } from '~/lib/project/repository'
+import { attachOriginReadMeta } from '~/lib/read-model/meta'
 import { useProjectListStore } from '~/stores/project-list'
+import { publicReadMeta } from '../helpers/public-read-meta'
 
 const QUERY: ProjectListQueryDTO = {
   includeDemo: false,
@@ -20,9 +22,10 @@ const QUERY: ProjectListQueryDTO = {
   pageSize: 10,
 }
 
-const PAGE = {
+const fixtureMeta = (origin: 'real' | 'demo') => publicReadMeta({ schemaVersion: 'project-read-v2', dataOrigin: origin, asOf: '2026-08-15T00:00:00.000Z', sourceVersion: 'fixture-projects-v1', capabilities: ['project:list:read'], scope: { filters: QUERY.filters, search: QUERY.search }, requested: origin === 'real' })
+const PAGE = attachOriginReadMeta({
   items: [],
-  pagination: { page: 1, pageSize: 10, total: 0 },
+  pagination: { requestedPage: 1, page: 1, pageSize: 10, total: 0 },
   summary: {
     facets: { statuses: [], plannedEnds: [], managers: [], customers: [] },
     origins: {
@@ -34,7 +37,7 @@ const PAGE = {
   asOf: '2026-08-15T00:00:00.000Z',
   sourceVersion: 'test-v1',
   capabilities: ['project:list:read'],
-} as unknown as PageDTO<ProjectListItemDTO, ProjectListSummaryDTO>
+}, { real: fixtureMeta('real'), demo: fixtureMeta('demo') }) as unknown as PageDTO<ProjectListItemDTO, ProjectListSummaryDTO>
 
 describe('project list read state', () => {
   const list = vi.fn()
@@ -55,7 +58,7 @@ describe('project list read state', () => {
     const next = store.load(QUERY)
     expect(store.state).toMatchObject({ kind: 'loading', previous: null })
     await next
-    expect(store.state).toMatchObject({ kind: 'error', previous: null })
+    expect(store.state).toMatchObject({ kind: 'unavailable', previous: null, problem: { code: 'unavailable' } })
   })
 
   it('moves loading to a real empty state', async () => {
@@ -90,7 +93,7 @@ describe('project list read state', () => {
     const previous = 'data' in store.state ? store.state.data : null
     await store.load(QUERY)
 
-    expect(store.state).toEqual({ kind: 'error', problem, previous })
+    expect(store.state).toEqual({ kind: 'unavailable', problem, previous })
   })
 
   it('uses forbidden instead of an empty state and ignores stale requests', async () => {
@@ -122,20 +125,20 @@ describe('project list read state', () => {
   })
 
   it('reads every filtered page for export without truncating at the visible page', async () => {
-    const firstItems = Array.from({ length: 100 }, (_, index) => ({ project: { id: `p-${index}` } }))
-    const lastItem = { project: { id: 'p-100' } }
+    const firstItems = Array.from({ length: 100 }, (_, index) => ({ project: { id: `p-${index}` }, dataOrigin: 'real' }))
+    const lastItem = { project: { id: 'p-100' }, dataOrigin: 'real' }
     list
       .mockResolvedValueOnce({
         ...PAGE,
         items: firstItems,
         empty: null,
-        pagination: { page: 1, pageSize: 100, total: 101 },
+        pagination: { requestedPage: 1, page: 1, pageSize: 100, total: 101 },
       })
       .mockResolvedValueOnce({
         ...PAGE,
         items: [lastItem],
         empty: null,
-        pagination: { page: 2, pageSize: 100, total: 101 },
+        pagination: { requestedPage: 2, page: 2, pageSize: 100, total: 101 },
       })
     const store = useProjectListStore()
 

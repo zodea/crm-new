@@ -4,7 +4,8 @@ import { computed, defineComponent, h, KeepAlive, onActivated, onDeactivated, re
 import PaymentApplicationDetailScreen from '~/components/finance/PaymentApplicationDetailScreen.vue'
 
 const load = vi.hoisted(() => vi.fn())
-vi.mock('~/lib/finance/payment-detail', () => ({ loadPaymentApplicationDetail: load }))
+vi.mock('~/stores/finance', () => ({ useFinanceStore: () => ({ paymentApplicationDetail: load }) }))
+vi.mock('~/lib/read-model/authority', () => ({ bindReadAuthority: () => undefined }))
 vi.mock('~/composables/useProjectSupplierReturnContext', () => ({ useProjectSupplierReturnContext: () => null }))
 
 beforeEach(() => {
@@ -27,10 +28,30 @@ function detail(approvedAmount: number | null) {
     registrationAmount: approvedAmount === null ? 100 : 0,
     paidAmount: 0,
     invoiceAllocated: 0,
+    invoiceState: '先款后票',
     pendingInvoiceAmount: 100,
     insight: { attentionCount: 0 },
   }
 }
+
+it.each([
+  ['先款后票', 100, '100'],
+  ['先款后票', 0, '0'],
+  ['先款后票', null, '— 尚未核实'],
+  ['先票后款', 0, null],
+  ['无需发票', 0, null],
+] as const)('%s 的详情只显示对应待回票义务，真实零和未知状态不互换', async (invoiceState, pendingInvoiceAmount, expected) => {
+  load.mockResolvedValue({ ...detail(null), invoiceState, pendingInvoiceAmount })
+  const { wrapper } = mountCachedDetail()
+  await flushPromises()
+  if (expected === null)
+    expect(wrapper.text()).not.toContain('待回票：')
+  else
+    expect(wrapper.text()).toContain(`待回票：${expected}`)
+  expect(wrapper.text()).toContain('待支付：100')
+  expect(wrapper.text()).toContain('本期批复金额：— 未填写')
+  wrapper.unmount()
+})
 
 function mountCachedDetail() {
   const visible = shallowRef(true)

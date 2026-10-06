@@ -18,6 +18,8 @@ import {
 import ProjectListScreen from '~/components/project/ProjectListScreen.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { buildProjectListPage } from '~/lib/project/repository'
+import { withOriginReadMeta } from '../../server/utils/read-meta'
+import { projectSnapshotEvidence } from '../helpers/project-read-meta'
 
 const projects = [
   {
@@ -112,13 +114,14 @@ const defaultQuery: ProjectListQueryDTO = {
 }
 
 function projectPage(query: ProjectListQueryDTO = defaultQuery) {
-  return buildProjectListPage({
+  const input = {
     rows: allSourceRows,
     query,
     asOf: '2026-08-15T00:00:00.000Z',
     sourceVersion: 'component-test-v1',
     capabilities: ['project:list:read', 'project:write'],
-  })
+  }
+  return withOriginReadMeta(buildProjectListPage(input), projectSnapshotEvidence(input))
 }
 
 const TreeNavStub = defineComponent({
@@ -526,8 +529,8 @@ describe('project list screen', () => {
     })
     expect(screen.getAllByText('测试数据').length).toBeGreaterThanOrEqual(2)
     const summary = screen.getByLabelText('项目列表汇总')
-    expect(summary.textContent).toMatch(/正式数据\s*2 个/)
-    expect(summary.textContent).toMatch(/测试数据\s*1 个/)
+    expect(summary.textContent).toMatch(/正式数据当前筛选范围\s*2 个/)
+    expect(summary.textContent).toMatch(/测试数据当前筛选范围\s*1 个/)
   })
 
   it('搜索覆盖项目、客户和本地已有的项目经理、执行经理、施工员', async () => {
@@ -548,10 +551,11 @@ describe('project list screen', () => {
     render(ProjectListScreen, { global })
 
     const summary = screen.getByLabelText('项目列表汇总')
-    expect(summary.textContent).toMatch(/累计收入\s*—\s*收入缺失 1 个/)
-    expect(summary.textContent).toMatch(/预算总额\s*—\s*预算缺失 1 个/)
-    expect(summary.textContent).not.toContain('¥320,000.00')
-    expect(summary.textContent).not.toContain('¥800,000.00')
+    expect(summary.textContent).toMatch(/累计收入\s*未知（已知小计 ¥320,000.00）\s*收入缺失 1 个/)
+    expect(summary.textContent).toMatch(/预算总额\s*未知（已知小计 ¥800,000.00）\s*预算缺失 1 个/)
+    expect(summary.textContent).toContain('当前筛选范围')
+    expect(summary.textContent).not.toMatch(/累计收入\s*¥320,000.00/)
+    expect(summary.textContent).not.toMatch(/预算总额\s*¥800,000.00/)
   })
 
   it('交叉筛选无命中后仍在动态 facet 中保留全部已选条件', async () => {
@@ -573,5 +577,34 @@ describe('project list screen', () => {
       .toBe('王经理')
     expect(within(table).getByRole('columnheader', { name: '客户' }).dataset.checkedValues)
       .toBe('customer-1')
+  })
+  it('超出末页只采用本次读取的实际页，URL保留100条及原筛选上下文', async () => {
+    route.fullPath = '/project?page=9&pageSize=100&nav=project_context_001'
+    route.query = { page: '9', pageSize: '100', nav: 'project_context_001' }
+    render(ProjectListScreen, { global })
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith({ query: { page: '1', pageSize: '100', nav: 'project_context_001' } }))
+    expect(projectReadStore.load).toHaveBeenCalledWith(expect.objectContaining({ page: 9, pageSize: 100 }))
+    await waitFor(() => expect(projectReadStore.load).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 100 })))
+  })
+
+  it('目标已经切换时迟到分页结果不能改写新路径URL', async () => {
+    route.fullPath = '/project?page=9'
+    route.query = { page: '9' }
+    let release!: () => void
+    projectReadStore.load.mockImplementationOnce((query: ProjectListQueryDTO) => new Promise<void>((resolve) => {
+      release = () => {
+        projectReadStore.state = { kind: 'ready', data: projectPage(query) }
+        resolve()
+      }
+    }))
+    const view = render(ProjectListScreen, { global })
+    route.fullPath = '/base/customer?page=4'
+    route.path = '/base/customer'
+    route.query = { page: '4' }
+    release()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(routerReplace).not.toHaveBeenCalled()
+    view.unmount()
+    route.path = '/project'
   })
 })

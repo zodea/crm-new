@@ -6,10 +6,10 @@ Husky 由 `pnpm install` 的 `prepare` 启用；入口在 [`.husky/`](../../.hus
 
 | 时机 | 顺序与作用 |
 | --- | --- |
-| `pre-commit` | `git diff --cached --check` 检查新增冲突标记与空白；`git-hooks.mjs staged` 拦截暂存的临时目录、嵌套工作树和缓存；`pnpm exec lint-staged` 检查暂存代码 |
+| `pre-commit` | `git diff --cached --check` 检查新增冲突标记与空白；`git-hooks.mjs staged` 拦截暂存的临时目录、嵌套工作树和缓存；`pnpm exec lint-staged --concurrent=1` 逐批检查暂存代码 |
 | `commit-msg` | `pnpm exec commitlint --edit "$1"`，按 [commitlint.config.mjs](../../commitlint.config.mjs) 校验提交说明 |
 
-任一步失败即停止。暂存路径检查涵盖新增、修改、复制、重命名和类型变化，允许删除历史误入产物。[lint-staged 配置](../../.lintstagedrc) 无 `--fix`；失败后修具体文件再暂存。lint-staged 仍可能临时备份、还原部分暂存文件。提交钩子不运行类型检查或测试。
+任一步失败即停止。暂存路径检查涵盖新增、修改、复制、重命名和类型变化，允许删除历史误入产物。[lint-staged 配置](../../.lintstagedrc) 无 `--fix`；失败后修具体文件再暂存。Windows 命令长度分块后的各批次按同一配置串行执行，避免多个 ESLint 同时分配内存或生成 Nuxt 类型；检查文件和规则保持一致。lint-staged 仍可能临时备份、还原部分暂存文件。提交钩子不运行类型检查或测试。
 
 commitlint 继承官方 `config-conventional`，仅关闭 `subject-case` 以容纳中文混用专有名词；scope 可省略，类型须小写，说明非空。标准 merge/revert/fixup/squash 辅助消息遵循其默认忽略规则。具体校验看当前配置及[官方规则](https://commitlint.js.org/reference/rules.html)，中文含义由作者审阅。
 

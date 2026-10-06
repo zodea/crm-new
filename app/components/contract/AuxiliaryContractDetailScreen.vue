@@ -13,10 +13,7 @@ const detailRoot = useTemplateRef<HTMLElement>('detailRoot')
 const settlementNavigation = useOtherSettlementNavigation(detailRoot)
 const route = useRoute()
 const repository = useNuxtApp().$repositories.auxiliaryContracts
-const { data: detail, shellState, problem, load } = useAuxiliaryContractRead(() => repository.detail(props.contractId, { kind: props.kind, origin: route.query.origin ?? 'real' }), (data) => {
-  const missingRelations = [data.contract.project, data.contract.supplier].filter(ref => ref?.state === 'missing').map(ref => ref!.entity)
-  return missingRelations.length ? { kind: 'partial', data, missingRelations } : { kind: 'ready', data }
-})
+const { data: detail, shellState, problem, load } = useAuxiliaryContractRead(() => repository.detail(props.contractId, { kind: props.kind, origin: route.query.origin ?? 'real' }))
 const contract = computed(() => detail.value?.contract ?? null)
 const tabs = computed(() => [{ key: 'info', label: '详细资料' }, { key: 'invoice', label: '收票登记' }, { key: 'payment', label: '付款信息' }, ...(props.kind === 'other_expense' ? [{ key: 'settlement', label: '支出结算' }, { key: 'supplement', label: '增补合同' }] : [])])
 const activeTab = computed(() => tabs.value.some(tab => tab.key === route.query.tab) ? String(route.query.tab) : 'info')

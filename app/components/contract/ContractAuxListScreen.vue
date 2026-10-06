@@ -6,6 +6,7 @@ import type {
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import {
   CONTRACT_AUX_LIST_CONFIG,
+  contractAuxAmountTotal,
   contractAuxStatusTone,
   filterContractAuxRows,
 } from '~/lib/contract/aux-list'
@@ -66,7 +67,7 @@ const pageRows = computed(() =>
   paginate(filtered.value, currentPage.value, pageSize.value),
 )
 const summaryAmount = computed(() =>
-  filtered.value.reduce((total, row) => total + Number(row.amount || 0), 0),
+  contractAuxAmountTotal(filtered.value),
 )
 
 interface FilterOption {
@@ -372,7 +373,7 @@ onActivated(() => {
         <span>{{ config.countLabel }}：<strong class="text-ink">{{ filtered.length }}</strong></span>
         <span>
           {{ config.amountLabel }}：
-          <strong class="font-mono text-ink">{{ yuan(summaryAmount) }}</strong>
+          <strong class="font-mono text-ink">{{ yuan(summaryAmount, '未知（金额未齐）') }}</strong>
         </span>
         <button
           v-if="hasLocalFilters || contextFilters.length"

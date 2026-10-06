@@ -37,4 +37,4 @@
 
 ## 限制与后续
 
-验证覆盖受控进程终止和实际文件重开，没有声称完成物理断电、独立介质备份或全站生产上线。客户关联的项目、合同和收款尚未正式持久化时保持未知。备份、恢复、其余领域以及最终启用按 [PG 承接表](../../../implementation/production-gate-work-breakdown.md)继续。
+验证覆盖受控进程终止和实际文件重开，没有声称完成物理断电、独立介质备份或全站生产上线。客户关联的项目、合同和收款尚未正式持久化时保持未知。当前运行范围见 [ARCHITECTURE](../../../rewrite/ARCHITECTURE.md#runtime-environments)，原 PG 调查与探针见[固定 Git 定位](../../../rewrite/ARCHITECTURE.md#production-investigation-evidence)，备份及最终启用直接核对 [ADR 0021](../../../adr/0021-single-operator-windows-production-storage.md)与 [#471](https://github.com/zodea/crm-new/issues/471)。

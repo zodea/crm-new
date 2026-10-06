@@ -16,3 +16,14 @@ export function toNum(v: unknown): number | null {
 export function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
+
+/** Complete monetary inputs sum to a value; missing or invalid facts remain unknown. */
+export function sumKnownMoney(values: readonly (number | null)[]): number | null {
+  if (values.some(value => value === null || !Number.isFinite(value)))
+    return null
+  return round2(values.reduce<number>((sum, value) => sum + value!, 0))
+}
+
+export function subtractKnownMoney(left: number | null, right: number | null): number | null {
+  return left === null || right === null ? null : sumKnownMoney([left, -right])
+}

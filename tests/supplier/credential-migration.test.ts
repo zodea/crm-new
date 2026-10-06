@@ -37,6 +37,24 @@ function snapshot(graph = structuredClone(original)): CoreMigrationSnapshotDTO {
 const rollback: CoreMigrationSnapshotDTO = { authority: 'local', activeBatchId: null, entities: [] }
 
 describe('分供方证照迁移候选与恢复', () => {
+  it('v51历史图保全原身份、原文和未知操作者，同批重复接管不重建历史', () => {
+    const graph = structuredClone(original)
+    graph.schemaVersion = 2
+    graph.reviewHistory = [
+      { id: 'native-history-1', supplier_id: 'legacy-supplier', decision: 'rejected', reviewed_at: '2026-09-10T08:00:00.000Z', note: '早期真实退回原因', actor_id: null, archived_at: at },
+      { id: 'native-history-2', supplier_id: 'legacy-supplier', decision: 'qualified', reviewed_at: at, note: '旧人工凭证', actor_id: null, archived_at: at },
+    ]
+    const migrated = prepareSupplierCredentialMigration([], snapshot(graph), now).aggregates
+    expect(migrated[0]!.reviewHistory).toEqual([
+      expect.objectContaining({ note: '早期真实退回原因', actorId: null, historyIdentity: { id: expect.any(String), legacyId: 'native-history-1', archivedAt: at } }),
+      expect.objectContaining({ note: '旧人工凭证', actorId: null, historyIdentity: { id: expect.any(String), legacyId: 'native-history-2', archivedAt: at } }),
+    ])
+    expect(new Set(migrated[0]!.reviewHistory!.map(proof => proof.historyIdentity!.id)).size).toBe(2)
+    expect(prepareSupplierCredentialMigration(migrated, snapshot(graph), now)).toEqual({ aggregates: migrated, changed: false })
+    expect(prepareSupplierCredentialMigration(migrated, rollback, now)).toEqual({ aggregates: [], changed: true })
+    migrated[0]!.changedAfterMigration = true
+    expect(() => prepareSupplierCredentialMigration(migrated, rollback, now)).toThrow()
+  })
   it('完整 SQLite 图映射到唯一中央供应商并保原件字节、OCR 两份事实和未知人工操作者', () => {
     const result = prepareSupplierCredentialMigration([], snapshot(), now)
     expect(result.changed).toBe(true)
@@ -80,7 +98,10 @@ describe('分供方证照迁移候选与恢复', () => {
     if (kind === 'expired')
       graph.credentials[0]!.expires_at = '2026-09-11'
     const aggregate = prepareSupplierCredentialMigration([], snapshot(graph), now).aggregates[0]!
-    expect(aggregate.review).toBeNull()
+    if (kind === 'no-proof' || kind === 'rejected-no-note')
+      expect(aggregate.review).toBeNull()
+    else
+      expect(aggregate.review).toMatchObject({ decision: 'qualified', reviewedAt: at, note: '旧人工凭证' })
     expect(currentCredentialStatus(aggregate, now)).toBe(kind === 'no-proof' || kind === 'rejected-no-note' ? 'reviewing' : 'incomplete')
     if (kind === 'missing-payload')
       expect(aggregate.files[0]).toMatchObject({ payloadBase64: null, sha256: null })

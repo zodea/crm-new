@@ -15,6 +15,16 @@ function command(patch: Record<string, unknown> = {}) {
   return { ...session, requiredCapability: 'other-settlement:write', commandId: 'save-331', baseVersion: null, action: 'save', draft: { name: '九月检测结算', no: 'JS-331', projectId: 'p1', contractId: 'c1', totalAmount: 1060, taxRate: 6, settlementDate: '2026-09-06', settlementType: '过程结算' }, attachments: {}, ...patch }
 }
 describe('aX05 其他支出结算中央命令', () => {
+  it.each(['confirmed', '已确认'])('确认状态%s沿同一规则冻结、前期/累计与合同事实保真', async (status) => {
+    const prior: OtherSettlementStored = { id: 'historical-confirmed', version: 1, workspaceId: session.workspaceId, migrationBatchId: null, draft: { ...command().draft, supplierId: 's1', status, totalAmount: 100, settlementDate: '2026-09-01' }, attachments: [], facts: [], audit: { createdAt: null, updatedAt: null, createdBy: '真实原操作者', updatedBy: '真实原操作者', responsible: null, department: null } }
+    const current = { ...prior, id: 'current', draft: { ...prior.draft, status: 'draft', totalAmount: 20, settlementDate: '2026-09-06' } }
+    const service = createOtherSettlementInstance({ identities: () => ({ projects: [{ id: 'p1', label: '项目' }], suppliers: [{ id: 's1', label: '单位' }], contracts }), records: [prior, current] })
+    expect(service.detail(current.id, {}, session).settlement.amounts).toMatchObject({ prior: '100.00', cumulative: '100.00' })
+    expect(service.contractFacts('c1').find(row => row.id === prior.id)).toMatchObject({ status, amount: '100.00', effective: true })
+    const before = service.snapshot()
+    await expect(service.execute(command({ id: prior.id, baseVersion: '1', commandId: `cannot-edit-${status}` }), session)).rejects.toMatchObject({ problem: { code: 'conflict', message: '已确认结算不能修改' } })
+    expect(service.snapshot()).toEqual(before)
+  })
   it('状态多选作用于完整集合，与项目条件相交，兼容单值和空数组', () => {
     const records: OtherSettlementStored[] = ['draft', 'pending', 'confirmed'].map(status => ({
       id: status,

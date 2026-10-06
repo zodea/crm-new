@@ -7,25 +7,12 @@ import type {
 import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readStateData as previous, readFailureState } from '~/lib/read-model/state'
 import { subcontractContractUnavailable } from '~/lib/subcontract-contract/repository'
 
-function previous<T>(state: ReadState<T>): T | null {
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
-}
-
 function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
-  const { problem } = subcontractContractUnavailable(cause)
-  if (problem.code === 'forbidden')
-    return { kind: 'forbidden', problem }
-  if (problem.code === 'not-found')
-    return { kind: 'not-found', problem }
-  if (problem.code === 'relationship-mismatch')
-    return { kind: 'mismatch', problem }
-  return { kind: 'error', problem, previous: prior }
+  return readFailureState(subcontractContractUnavailable(cause).problem, prior)
 }
 
 function sameDetail(left: SubcontractContractDetailQueryDTO | null, right: SubcontractContractDetailQueryDTO) {
@@ -40,6 +27,14 @@ export const useSubcontractContractReadStore = defineStore('subcontract-contract
   const detailQuery = shallowRef<SubcontractContractDetailQueryDTO | null>(null)
   let latestList = 0
   let latestDetail = 0
+  bindReadAuthority((problem) => {
+    latestList++
+    latestDetail++
+    listQuery.value = null
+    detailQuery.value = null
+    listState.value = readFailureState<SubcontractContractListPageDTO>(problem, null)
+    detailState.value = readFailureState<SubcontractContractDetailReadDTO>(problem, null)
+  })
 
   async function loadList(query: SubcontractContractListQueryDTO) {
     const request = ++latestList

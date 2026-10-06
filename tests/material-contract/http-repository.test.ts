@@ -3,19 +3,70 @@ import { createHttpMaterialContractCommandRepository } from '~/lib/material-cont
 import { createHttpMaterialContractReadRepository } from '~/lib/material-contract/http-repository'
 import { decodeMaterialContractDetailRead, decodeMaterialContractListPage } from '~/lib/material-contract/read-decoder'
 import {
-  buildMaterialContractListPage,
   parseMaterialContractListQuery,
 } from '~/lib/material-contract/repository'
 import { createMaterialContractReadTestInstance } from '../../server/utils/material-contract-read-test-instance'
+import { buildMaterialContractListPage, materialOriginMeta } from '../helpers/material-read-meta'
 
 describe('材料采购合同中央 HTTP Repository', () => {
+  it('约定价使用固定只读路由、当前来源和取消信号，拒绝跨来源响应与演示越权', async () => {
+    const owner = createMaterialContractReadTestInstance(() => ['material-contract:read', 'demo:read'])
+    const response = owner.prices('demo')
+    const fetcher = vi.fn().mockResolvedValue(response)
+    const repository = createHttpMaterialContractReadRepository({ fetcher })
+    const controller = new AbortController()
+    const prices = await repository.prices!('demo', { signal: controller.signal })
+    expect(fetcher).toHaveBeenCalledWith('/api/read/material-contracts/prices', { query: { origin: 'demo' }, signal: controller.signal })
+    expect(prices.items.every(row => row.dataOrigin === 'demo' && row.applicableTaxRate === null)).toBe(true)
+    expect(prices.meta.dataOrigin).toBe('demo')
+    await expect(repository.prices!('real')).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    const denied = createMaterialContractReadTestInstance(() => ['material-contract:read'])
+    expect(() => denied.prices('demo')).toThrow('无测试合同')
+  })
+
+  it('结构合法的响应仍必须匹配本次分页和详情目标', async () => {
+    const read = createMaterialContractReadTestInstance(() => ['material-contract:read', 'demo:read'])
+    const repository = createHttpMaterialContractReadRepository({ fetcher: vi.fn().mockResolvedValue(read.list({ page: '1', pageSize: '10' })) })
+    await expect(repository.list(parseMaterialContractListQuery({ page: '2' }))).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    await expect(repository.list(parseMaterialContractListQuery({ pageSize: '20' }))).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
+    const details = createHttpMaterialContractReadRepository({ fetcher: vi.fn().mockResolvedValue(detail) })
+    await expect(details.get({ id: 'another-contract', origin: 'demo', includeDemo: true })).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
+    await expect(details.get({ id: 'con_demo_cg01', origin: 'real', includeDemo: false })).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
+  })
+  it('公共读取强制现行 metadata，拒绝旧契约、混身份来源和伪造扁平版本', () => {
+    const read = createMaterialContractReadTestInstance(() => ['material-contract:read', 'demo:read'])
+    const page = read.list({ includeDemo: 'true' })
+    expect(page.meta).toMatchObject({ schemaVersion: 'material-contract-read-v2', dataOrigin: 'real' })
+    expect(page.originMeta.demo.dataOrigin).toBe('demo')
+    expect(page.originMeta.demo.sourceVersion).not.toBe(page.originMeta.real.sourceVersion)
+    for (const mutate of [
+      (value: any) => { delete value.meta },
+      (value: any) => { value.meta.schemaVersion = 'material-contract-read-v1' },
+      (value: any) => { value.originMeta.demo.actorId = 'another-actor' },
+      (value: any) => { value.sourceVersion = 'stale-flat-version' },
+      (value: any) => { value.originMeta.demo.sources[0].state = 'forbidden' },
+    ]) {
+      const invalid = structuredClone(page)
+      mutate(invalid)
+      expect(() => decodeMaterialContractListPage(invalid)).toThrow()
+    }
+    const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
+    const invalid = structuredClone(detail)
+    invalid.meta.dataOrigin = 'real'
+    expect(() => decodeMaterialContractDetailRead(invalid)).toThrow()
+  })
+  it.each([401, 403])('真实 HTTP %s 即使损坏 Problem 正文也保留身份错误，不降为网络暂不可用', async (status) => {
+    const read = createHttpMaterialContractReadRepository({ fetcher: vi.fn().mockRejectedValue({ response: { status, _data: { data: { code: 'unavailable', fieldErrors: { name: '错误类型' } } } } }) })
+    await expect(read.list(parseMaterialContractListQuery({}))).rejects.toMatchObject({ problem: { code: status === 401 ? 'unauthenticated' : 'forbidden', retryable: false } })
+    const commands = createHttpMaterialContractCommandRepository({ fetcher: vi.fn().mockRejectedValue({ response: { status, _data: '坏正文' } }) })
+    await expect(commands.context()).rejects.toMatchObject({ problem: { code: status === 401 ? 'unauthenticated' : 'forbidden' } })
+  })
   it('序列化列表查询并解码中央响应', async () => {
     const page = buildMaterialContractListPage({
       contracts: [],
       query: parseMaterialContractListQuery({ page: '2', pageSize: '20' }),
-      asOf: '2026-08-24T00:00:00.000Z',
-      sourceVersion: 'v1',
-      capabilities: ['material-contract:read'],
+      originMeta: materialOriginMeta(['material-contract:read'], 'v1'),
     })
     const fetcher = vi.fn().mockResolvedValue(page)
     const repository = createHttpMaterialContractReadRepository({ fetcher })
@@ -45,7 +96,7 @@ describe('材料采购合同中央 HTTP Repository', () => {
   })
 
   function createMaterialContractNavigationReads() {
-    const read = createMaterialContractReadTestInstance(() => ['material-contract:read', 'demo:read'])
+    const read = createMaterialContractReadTestInstance(() => ['material-contract:read', 'demo:read', 'project:list:read', 'supplier:list:read'])
     const page = read.list({ includeDemo: 'true' })
     const invalidPage = structuredClone(page)
     const navigation = invalidPage.items[0]!.navigation

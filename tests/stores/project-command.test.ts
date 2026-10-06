@@ -181,4 +181,46 @@ describe('project command store', () => {
       draft: expect.objectContaining({ name: '我的修改' }),
     }))
   })
+  it('a读取迟到不能替换已经载入的B目标、版本或草稿', async () => {
+    let release!: (form: ProjectFormReadDTO) => void
+    repository.loadForm.mockImplementationOnce(() => new Promise<ProjectFormReadDTO>(resolve => release = resolve))
+      .mockResolvedValueOnce({ ...latestForm('9'), draft: { ...latestForm('9').draft, id: 'project-b' } })
+    const store = useProjectCommandStore()
+    const session = store.createSession()
+    const a = store.hydrate(session, 'project-1').catch(error => error)
+    await store.hydrate(session, 'project-b')
+    release(latestForm('2'))
+    expect(await a).toBeInstanceOf(Error)
+    expect(session.targetProjectId).toBe('project-b')
+    expect(session.baseVersion).toBe('9')
+    expect(session.activeLocalDraft).toBeNull()
+  })
+
+  it('离开页面使保存前的身份读取失效，保留原草稿但不执行命令', async () => {
+    let release!: (value: typeof context) => void
+    const store = useProjectCommandStore()
+    const session = store.createSession()
+    await store.hydrate(session, null)
+    repository.context.mockImplementationOnce(() => new Promise<typeof context>(resolve => release = resolve))
+    const saving = store.saveForm(session, { name: '原页面输入' }, 'draft').catch(error => error)
+    store.deactivate(session)
+    release(context)
+    expect(await saving).toBeInstanceOf(Error)
+    expect(repository.execute).not.toHaveBeenCalled()
+    expect([...values.values()].join('')).toContain('原页面输入')
+    expect(session.activeLocalDraft?.commandId).toBeTruthy()
+  })
+
+  it('重新激活读取新版只验原目标，不采用新版为本页基准；后来身份切换拒绝写入', async () => {
+    repository.loadForm.mockResolvedValueOnce(latestForm('4')).mockResolvedValueOnce(latestForm('8'))
+    const store = useProjectCommandStore()
+    const session = store.createSession()
+    await store.hydrate(session, 'project-1')
+    expect((await store.revalidate(session)).form?.version).toBe('8')
+    expect(session.baseVersion).toBe('4')
+    repository.context.mockResolvedValueOnce({ ...context, actorId: 'another-owner' })
+    await expect(store.revalidate(session)).rejects.toThrow('权限或来源已变化')
+    expect(session.baseVersion).toBe('4')
+    expect(repository.execute).not.toHaveBeenCalled()
+  })
 })

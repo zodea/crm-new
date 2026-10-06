@@ -34,9 +34,9 @@ function context(value: unknown): SubcontractContractCommandContextDTO {
 }
 
 function result(value: unknown): SubcontractContractCommandResultDTO {
-  if (!object(value) || typeof value.id !== 'string' || typeof value.commandId !== 'string'
-    || typeof value.version !== 'string' || !isISODateTimeDTO(value.updatedAt)
-    || !Array.isArray(value.attachmentIds) || !value.attachmentIds.every(id => typeof id === 'string')) {
+  if (!object(value) || typeof value.id !== 'string' || !value.id.trim() || typeof value.commandId !== 'string' || !value.commandId.trim()
+    || typeof value.version !== 'string' || !value.version.trim() || !isISODateTimeDTO(value.updatedAt)
+    || !Array.isArray(value.attachmentIds) || !value.attachmentIds.every(id => typeof id === 'string' && !!id.trim())) {
     return invalid('中央后台返回的分包合同命令结果无效')
   }
   return value as unknown as SubcontractContractCommandResultDTO
@@ -82,7 +82,28 @@ export function createHttpSubcontractContractCommandRepository(
         method: request.id ? 'PUT' : 'POST',
         body: request,
       }),
-      result,
+      (value) => {
+        const saved = result(value)
+        if (saved.commandId !== request.commandId || (request.id && saved.id !== request.id))
+          return invalid('中央后台返回了另一分包合同提交结果')
+        return saved
+      },
+    ),
+    resolve: commandId => readSubcontractContractHttp(
+      () => options.fetcher('/api/commands/subcontract-contracts/resolve', { method: 'POST', body: { commandId } }),
+      (value) => {
+        if (!object(value))
+          return invalid('中央后台返回的分包合同原提交核对结果无效')
+        if (value.outcome === 'applied') {
+          const original = result(value.result)
+          if (original.commandId !== commandId)
+            return invalid('中央后台返回了另一分包合同提交结果')
+          return { outcome: 'applied' as const, result: original }
+        }
+        if (value.outcome === 'not-applied' && value.commandId === commandId)
+          return { outcome: 'not-applied' as const, commandId }
+        return invalid('中央后台没有证明原分包合同提交结果')
+      },
     ),
   }
 }

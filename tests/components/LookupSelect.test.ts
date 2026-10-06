@@ -154,6 +154,84 @@ describe('lookupSelect public behavior', () => {
       .toBe('车陂项目')
   })
 
+  it.each([null, 'crew-existing'])('真实候选更名刷新近期和已选显示，保留未命中近期项及稳定 ID：%s', async (selectedId) => {
+    vi.useFakeTimers()
+    const storageKey = 'kit-lookup:workspace-default:real:worker-crews:recent'
+    localStorage.setItem(storageKey, JSON.stringify([
+      { id: 'crew-existing', label: '班组旧名称', hint: '旧工种' },
+      { id: 'crew-unmatched', label: '另一近期班组', hint: '木工' },
+    ]))
+    const fetchOptions = vi.fn(async () => [{ id: 'crew-existing', label: '班组现行名称', hint: '泥工' }])
+    const onUpdate = vi.fn()
+    render(LookupSelect, {
+      props: {
+        'fetch': fetchOptions,
+        'modelValue': selectedId,
+        'recentKey': 'worker-crews',
+        'placeholder': '检索班组',
+        'onUpdate:modelValue': onUpdate,
+      },
+    })
+    const input = screen.getByRole<HTMLInputElement>('combobox', { name: '检索班组' })
+    expect(input.value).toBe(selectedId ? '班组旧名称' : '')
+    await fireEvent.focus(input)
+    await fireEvent.update(input, '班组现行名称')
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    await nextTick()
+    expect(fetchOptions).toHaveBeenCalledWith('班组现行名称')
+    expect(onUpdate).not.toHaveBeenCalled()
+    const current = screen.getByRole('option', { name: /班组现行名称\s*泥工/ })
+    expect(screen.queryByRole('option', { name: /班组旧名称\s*旧工种/ })).toBeNull()
+    expect(screen.getByRole('option', { name: /另一近期班组\s*木工/ })).toBeTruthy()
+    await fireEvent.click(current)
+    expect(input.value).toBe('班组现行名称')
+    if (selectedId)
+      expect(onUpdate.mock.calls.every(([id]) => id === 'crew-existing')).toBe(true)
+    else
+      expect(onUpdate).toHaveBeenCalledWith('crew-existing')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual([
+      { id: 'crew-existing', label: '班组现行名称', hint: '泥工' },
+      { id: 'crew-unmatched', label: '另一近期班组', hint: '木工' },
+    ])
+  })
+
+  it('撤销当前选择来源后迟到同 ID 更名不能重写近期、输入或稳定选择', async () => {
+    vi.useFakeTimers()
+    const storageKey = 'kit-lookup:workspace-default:real:worker-crews:recent'
+    localStorage.setItem(storageKey, JSON.stringify([{ id: 'crew-existing', label: '原可见班组' }]))
+    let resolveOptions!: (options: Array<{ id: string, label: string }>) => void
+    const fetchOptions = vi.fn(() => new Promise<Array<{ id: string, label: string }>>((resolve) => {
+      resolveOptions = resolve
+    }))
+    const onUpdate = vi.fn()
+    const { rerender } = render(LookupSelect, {
+      props: {
+        'fetch': fetchOptions,
+        'modelValue': 'crew-existing',
+        'recentKey': 'worker-crews',
+        'placeholder': '检索班组',
+        'onUpdate:modelValue': onUpdate,
+      },
+    })
+    const input = screen.getByRole<HTMLInputElement>('combobox', { name: '检索班组' })
+    await fireEvent.focus(input)
+    await fireEvent.update(input, '核对更名')
+    await vi.advanceTimersByTimeAsync(300)
+    expect(fetchOptions).toHaveBeenCalledOnce()
+    await rerender({ disabledReason: '当前班组来源已无读取权限' })
+    resolveOptions([{ id: 'crew-existing', label: '迟到旧权限更名' }])
+    await flushPromises()
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(input.disabled).toBe(true)
+    expect(input.value).toBe('')
+    expect(screen.queryByRole('option', { name: '迟到旧权限更名' })).toBeNull()
+    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual([])
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
+
   it('最近选择使用 Pinia 已授权的工作区而不重读原始偏好', async () => {
     localStorage.setItem('ruihang:workspace-default:include-demo', 'true')
     const visibility = useDataVisibilityStore()

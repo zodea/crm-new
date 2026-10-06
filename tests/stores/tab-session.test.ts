@@ -2,6 +2,7 @@
 import type { TabDescriptor, TabRestoreValidator } from '~/lib/tabs/restoration-contract'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
 import { tabSessionStorageKey } from '~/lib/tabs/session-persistence'
 import { useTabSessionStore } from '~/stores/tab-session'
 import { useTabsStore } from '~/stores/tabs'
@@ -37,6 +38,7 @@ function initialize(validate: TabRestoreValidator = success) {
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
+  sessionStorage.clear()
 })
 
 describe('浏览器页签恢复接线', () => {
@@ -104,6 +106,26 @@ describe('浏览器页签恢复接线', () => {
     expect(stored().tabs).toEqual([])
   })
 
+  it.each([
+    ['/contract/construction/form', 'construction-contract', null],
+    ['/contract/material/form/contract-a?origin=real', 'material-contract', 'contract-a'],
+    ['/contract/subcontract/form/contract-b?origin=real', 'subcontract-contract', 'contract-b'],
+    ['/finance/receipt/new?origin=real', 'receipt', null],
+    ['/finance/receipt/form/receipt-a?origin=real', 'receipt', 'receipt-a'],
+  ] as const)('有效原编号刷新保留精确目标但不持久写态页签或正文：%s', async (path, family, targetId) => {
+    seed([descriptor('/project')])
+    const pending = { ...scope, family, targetId, action: 'save', commandId: 'pending-original' }
+    createCommandRecoveryStorage().remember(commandRecoveryKey(pending), pending)
+    const { session, tabs } = initialize(success)
+    expect(await session.startupPath(path, true)).toBe(path)
+    session.finishStartup(path)
+    expect(tabs.activeKey).toBe(path.split('?')[0])
+    expect(stored().tabs.map(tab => tab.key)).toEqual(['/project'])
+    expect(await session.startupPath(path.replace('origin=real', 'origin=demo'), true)).toBe(path.includes('origin=real') ? '/project' : path)
+    sessionStorage.clear()
+    expect(await session.startupPath(path, true)).toBe('/project')
+  })
+
   it('损坏值给可关闭迁移提示，当前身份不读取其他用户工作区', () => {
     localStorage.setItem(storageKey, '{broken')
     const { session } = initialize()
@@ -115,6 +137,60 @@ describe('浏览器页签恢复接线', () => {
     session.initialize({ scope: { ...scope, actorId: 'different' }, storage: localStorage, validate: success })
     expect(useTabsStore().tabs.map(tab => tab.key)).toEqual(['home'])
     expect(localStorage.getItem(storageKey)).toContain('/project')
+  })
+
+  it.each([
+    ['material-quotation-import', '/material/quotations/import?origin=real'],
+    ['other-settlement-import', '/contract/other-settlement/import?origin=real'],
+  ])('%s 刷新仅保留同身份原迁入编号，不保存正文或授予普通写态恢复', async (family, path) => {
+    seed([descriptor('/project')])
+    const pending = { ...scope, family, targetId: null, action: 'import', commandId: 'original-domain-import' }
+    const recovery = createCommandRecoveryStorage()
+    const key = commandRecoveryKey(pending)
+    recovery.remember(key, pending)
+    const { session } = initialize(success)
+    expect(await session.startupPath(path, true)).toBe(path)
+    session.finishStartup(path)
+    expect(stored().tabs.map(tab => tab.key)).toEqual(['/project'])
+    expect(JSON.parse(sessionStorage.getItem(key)!)).toEqual(pending)
+    expect(await session.startupPath(path.replace('origin=real', 'origin=demo'), true)).toBe('/project')
+    expect(await session.startupPath(`${path}&origin=real`, true)).toBe('/project')
+    recovery.clear(key, pending.commandId)
+    recovery.remember(key, { ...pending, action: 'delete' })
+    expect(await session.startupPath(path, true)).toBe('/project')
+    recovery.clear(key, pending.commandId)
+    recovery.remember(key, { ...pending, action: 'submit' })
+    expect(await session.startupPath(path, true)).toBe('/project')
+    sessionStorage.clear()
+    recovery.remember(commandRecoveryKey({ ...pending, actorId: 'other-actor' }), { ...pending, actorId: 'other-actor' })
+    expect(await session.startupPath(path, true)).toBe('/project')
+  })
+
+  it.each(['crew-worker-import', 'finance-import'])('维护页刷新只消费当前身份 %s 的原采用编号；两域相互独立且不保存文件正文', async (family) => {
+    seed([descriptor('/project')])
+    const path = '/settings/data-migration?origin=real'
+    const pending = { ...scope, family, targetId: null, action: 'adopt', commandId: `original-${family}` }
+    const commandStorage = family === 'crew-worker-import' ? localStorage : sessionStorage
+    const recovery = createCommandRecoveryStorage(() => commandStorage)
+    const key = commandRecoveryKey(pending)
+    recovery.remember(key, pending)
+    const { session } = initialize(success)
+    expect(await session.startupPath(path, true)).toBe(path)
+    session.finishStartup(path)
+    expect(stored().tabs.map(tab => tab.key)).toEqual(['/project'])
+    expect(JSON.parse(commandStorage.getItem(key)!)).toEqual(pending)
+    expect((family === 'crew-worker-import' ? sessionStorage : localStorage).getItem(key)).toBeNull()
+    for (const invalid of ['/settings/data-migration?origin=demo', '/settings/data-migration?origin=real&origin=real', '/settings/data-migration/unknown'])
+      expect(await session.startupPath(invalid, true)).toBe('/project')
+    recovery.clear(key, pending.commandId)
+    recovery.remember(key, { ...pending, action: 'submit' })
+    expect(await session.startupPath(path, true)).toBe('/project')
+    recovery.clear(key, pending.commandId)
+    recovery.remember(commandRecoveryKey({ ...pending, actorId: 'other-actor' }), { ...pending, actorId: 'other-actor' })
+    expect(await session.startupPath(path, true)).toBe('/project')
+    recovery.clear(commandRecoveryKey({ ...pending, actorId: 'other-actor' }), pending.commandId)
+    recovery.remember(commandRecoveryKey({ ...pending, family: 'other-domain' }), { ...pending, family: 'other-domain' })
+    expect(await session.startupPath(path, true)).toBe('/project')
   })
 
   it('恢复已满集合时为当前直接深链保留一个位置，仍不超过十五项', () => {

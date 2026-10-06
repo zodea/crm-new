@@ -28,6 +28,7 @@ interface PushOptions {
   description?: string
   duration?: number
   action?: ToastAction
+  onDismiss?: () => void
 }
 
 // 记住每条 toast 落在哪个泳道，供 update/dismiss 定向到同一 Toaster
@@ -49,8 +50,14 @@ function emit(opts: PushOptions): ToastId {
     // 已有图标/颜色/自动消失作反馈，不需要额外 ×
     closeButton: type === 'default',
     // 自动消失/手动关闭都清掉泳道记账，防 laneById 只增不减
-    onDismiss: (t: { id: ToastId }) => laneById.delete(t.id),
-    onAutoClose: (t: { id: ToastId }) => laneById.delete(t.id),
+    onDismiss: (t: { id: ToastId }) => {
+      laneById.delete(t.id)
+      opts.onDismiss?.()
+    },
+    onAutoClose: (t: { id: ToastId }) => {
+      laneById.delete(t.id)
+      opts.onDismiss?.()
+    },
   }
   let id: ToastId
   switch (type) {
@@ -190,6 +197,7 @@ function undo(
 
 export function useToast() {
   return {
+    push: emit,
     show,
     success,
     error,

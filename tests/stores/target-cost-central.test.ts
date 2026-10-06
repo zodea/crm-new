@@ -3,6 +3,7 @@ import type { TargetCostCommand, TargetCostFormRead, TargetCostListRead } from '
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { targetCostProblem } from '~/lib/target-cost/central-contract'
+import { createTargetCostRepository } from '~/lib/target-cost/central-repository'
 import { useTargetCostStore } from '~/stores/target-cost'
 import { useTargetCostListStore } from '~/stores/target-cost-list'
 
@@ -81,6 +82,44 @@ describe('预算固定页面快照与原提交恢复', () => {
     repo.execute.mockRejectedValueOnce(absent)
     await expect(store.recover(pending)).rejects.toThrow()
     expect(store.getPending(original)).toBeNull()
+  })
+  it.each([
+    { label: '原键明确未应用', status: 409, code: 'stale-source', sameKey: true, outcome: 'not-applied', retained: false },
+    { label: '其他编号的未应用证明', status: 409, code: 'stale-source', sameKey: false, outcome: 'not-applied', retained: true },
+    { label: '原键仍未知', status: 409, code: 'stale-source', sameKey: true, outcome: 'unknown', retained: true },
+    { label: '无证明的旧版本错误', status: 409, code: 'stale-source', sameKey: true, outcome: null, retained: true },
+    { label: '撤权不能证明未应用', status: 403, code: 'forbidden', sameKey: true, outcome: 'not-applied', retained: true },
+  ])('实际HTTP adapter：$label只按可信原键决定pending，不丢原输入', async ({ status, code, sameKey, outcome, retained }) => {
+    const fetcher = vi.fn(async (_url: string, options?: { body?: Record<string, unknown> }) => {
+      throw Object.assign(new Error('HTTP原提交拒绝'), { response: { status, _data: { data: {
+        code,
+        message: '原提交尚须核对',
+        retryable: false,
+        fieldErrors: {},
+        traceId: null,
+        commandId: sameKey ? options?.body?.commandId : 'other-command-key',
+        ...(outcome === null ? {} : { commandOutcome: outcome }),
+        privateBody: '传输额外字段不得成为公共问题',
+      } } } })
+    })
+    const repository = createTargetCostRepository(fetcher)
+    vi.stubGlobal('useNuxtApp', () => ({ $repositories: { targetCosts: repository } }))
+    const store = useTargetCostStore()
+    const original = read()
+    const draft = { name: '原未保存预算输入' }
+    const failure = await store.saveForm(original, draft, 'draft').catch(cause => cause)
+    const commandId = fetcher.mock.calls[0]![1]!.body!.commandId
+    expect(failure.problem.code).toBe(code)
+    expect(failure.problem).not.toHaveProperty('privateBody')
+    expect(draft).toEqual({ name: '原未保存预算输入' })
+    if (retained) {
+      expect(failure.problem).not.toHaveProperty('commandOutcome')
+      expect(store.getPending(original)).toMatchObject({ command: { commandId, action: { draft } }, state: 'unknown' })
+    }
+    else {
+      expect(failure.problem).toMatchObject({ commandId, commandOutcome: 'not-applied' })
+      expect(store.getPending(original)).toBeNull()
+    }
   })
   it('列表双来源迟到请求不覆盖新读，demo未授权不尝试本地适配', async () => {
     let resolve!: (value: unknown) => void

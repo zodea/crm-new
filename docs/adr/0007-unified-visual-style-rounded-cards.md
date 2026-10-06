@@ -11,4 +11,4 @@
 
 **权衡**：统一容器层级减少页面各自拼装；早期大圆角、卡片阴影和 pill 搜索框方案已被后续裁定替代，不再作为实施参数。
 
-**后果**：`DESIGN-SYSTEM.md` 与 `CRM-PATTERNS.md` 不再维护旧形状配方；具体尺寸、令牌和组件状态直接查 [ADR 0013](0013-align-all-ui-to-online-design.md) 与 [KitUI 组件规格](../design/kit-ui-component-specs.md)。
+**后果**：[DESIGN-SYSTEM](../rewrite/DESIGN-SYSTEM.md) 不维护旧形状配方；具体尺寸、令牌和组件状态直接查 [ADR 0013](0013-align-all-ui-to-online-design.md) 与 [KitUI 组件规格](../design/kit-ui-component-specs.md)。

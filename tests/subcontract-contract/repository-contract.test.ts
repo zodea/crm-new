@@ -6,9 +6,13 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSubcontractContractDetail,
   buildSubcontractContractListPage,
+  decodeSubcontractContractDetailRead,
+  decodeSubcontractContractListPage,
   parseSubcontractContractDetailQuery,
   parseSubcontractContractListQuery,
 } from '../../app/lib/subcontract-contract/repository'
+import { withOriginReadMeta, withReadMeta } from '../../server/utils/read-meta'
+import { publicReadMeta } from '../helpers/public-read-meta'
 
 const contract: SubcontractContractDetailSource = {
   dataOrigin: 'real',
@@ -69,6 +73,28 @@ const facts: SubcontractContractFactSources = {
 }
 
 describe('分包合同中央 Repository 契约', () => {
+  it('受限关联清空身份；列表和详情拒绝隐藏定位及失配导航，独立金额仍可读', () => {
+    const restricted = { ...contract, projectPermission: 'forbidden' as const, supplierPermission: 'forbidden' as const }
+    const input = { contracts: [restricted], facts, asOf: '2026-08-25T00:00:00.000Z', sourceVersion: 'privacy-v1', capabilities: ['subcontract-contract:read'] }
+    const evidence = { ...input, schemaVersion: 'subcontract-contract-read-v2', scope: { fixture: 'restricted-owner' }, requested: true }
+    const page = withOriginReadMeta(buildSubcontractContractListPage({ ...input, query: parseSubcontractContractListQuery({}) }), { real: publicReadMeta({ ...evidence, dataOrigin: 'real' }), demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }) })
+    const detail = withReadMeta(buildSubcontractContractDetail({ ...input, query: parseSubcontractContractDetailQuery(restricted.id, { origin: 'real' }) }), publicReadMeta({ ...evidence, dataOrigin: 'real' }))
+    const reference = { state: 'forbidden', entity: 'supplier', id: null, label: null, reason: 'permission-denied' }
+    expect(page.summary.projects).toEqual([])
+    expect(page.summary.suppliers).toEqual([])
+    expect(page.items[0]!.supplier).toEqual(reference)
+    expect(detail.contract.supplier).toEqual(reference)
+    expect(detail.contract.project.id).toBeNull()
+    expect(detail.contract.amounts.contract).toBe('1000.00')
+    expect(decodeSubcontractContractListPage(page).items[0]!.supplier.id).toBeNull()
+    expect(decodeSubcontractContractDetailRead(detail).contract.supplier.id).toBeNull()
+    for (const changed of [{ ...reference, id: 'restricted-identity' }, { ...reference, originalId: 'restricted-identity' }, { ...reference, label: '敏感旧名称' }]) {
+      expect(() => decodeSubcontractContractListPage({ ...page, items: [{ ...page.items[0], supplier: changed }] })).toThrow('无效')
+      expect(() => decodeSubcontractContractDetailRead({ ...detail, contract: { ...detail.contract, supplier: changed } })).toThrow('无效')
+    }
+    expect(() => decodeSubcontractContractDetailRead({ ...detail, supplierNavigation: { kind: 'unavailable', reason: 'forbidden', filters: { supplierId: 'restricted-identity' } } })).toThrow('无效')
+  })
+
   it('状态和类别各自 OR、字段之间 AND，分页和汇总共用筛选结果', () => {
     const contracts = [
       ...Array.from({ length: 12 }, (_, index) => ({ ...contract, id: `match-${index}`, status: index % 2 ? '草稿' : '履约中', subKind: index % 2 ? '劳务' : '专业' })),
@@ -234,5 +260,48 @@ describe('分包合同中央 Repository 契约', () => {
       origin: 'real',
       focusId: '\0',
     })).toThrowError(/查询参数无效/)
+  })
+})
+
+describe('分包合同未知金额连续投影', () => {
+  it.each(['supplements', 'settlements', 'invoices', 'paymentRecords'] as const)('有效 %s 未知沿对应应付链传播', (kind) => {
+    const current = structuredClone(facts)
+    current[kind][0]!.amount = null
+    const input = { contracts: [contract], facts: current, asOf: contract.updatedAt, sourceVersion: 'nullable-fixture', capabilities: [] }
+    const detail = buildSubcontractContractDetail({ ...input, query: parseSubcontractContractDetailQuery(contract.id, { origin: 'real' }) })
+    const expected = kind === 'supplements'
+      ? { changed: null, settled: '900.00', invoiced: '600.00', paid: '400.00', bySettlementPayable: '500.00', byInvoicePayable: '200.00' }
+      : kind === 'settlements'
+        ? { changed: '1100.00', settled: null, invoiced: '600.00', paid: '400.00', bySettlementPayable: null, byInvoicePayable: '200.00' }
+        : kind === 'invoices'
+          ? { changed: '1100.00', settled: '900.00', invoiced: null, paid: '400.00', bySettlementPayable: '500.00', byInvoicePayable: null }
+          : { changed: '1100.00', settled: '900.00', invoiced: '600.00', paid: null, bySettlementPayable: null, byInvoicePayable: null }
+    expect(detail.contract.amounts).toMatchObject(expected)
+    expect(detail.contract.amounts.contract).toBe('1000.00')
+    const page = buildSubcontractContractListPage({ ...input, query: parseSubcontractContractListQuery({}) })
+    expect(page.summary.origins.real).toEqual({ contractCount: 1, changedAmount: expected.changed, settledAmount: expected.settled, paidAmount: expected.paid })
+  })
+  it('未知主合同与有效空集合分别保持NULL和真实零，draft未知协议不纳入', () => {
+    const empty = Object.fromEntries(Object.keys(facts).map(key => [key, []])) as unknown as SubcontractContractFactSources
+    const read = (amount: number | null) => buildSubcontractContractDetail({ contracts: [{ ...contract, amount }], facts: empty, query: parseSubcontractContractDetailQuery(contract.id, { origin: 'real' }), asOf: contract.updatedAt, sourceVersion: 'nullable-fixture', capabilities: [] }).contract.amounts
+    expect(read(null)).toEqual({ contract: null, changed: null, settled: '0.00', invoiced: '0.00', paid: '0.00', bySettlementPayable: '0.00', byInvoicePayable: '0.00', completionSettlement: '0.00' })
+    expect(read(0)).toEqual({ contract: '0.00', changed: '0.00', settled: '0.00', invoiced: '0.00', paid: '0.00', bySettlementPayable: '0.00', byInvoicePayable: '0.00', completionSettlement: '0.00' })
+    empty.supplements = [{ ...facts.supplements[0]!, amount: null, status: 'draft' }]
+    expect(read(0).changed).toBe('0.00')
+  })
+})
+
+describe('subcontract 列表汇总公开边界', () => {
+  it('允许真实未知金额，拒绝把未知行汇总成零、畸形金额和错误总数', () => {
+    const query = parseSubcontractContractListQuery({})
+    const input = { contracts: [{ ...contract, amount: null }], facts, query, asOf: '2026-08-25T00:00:00.000Z', sourceVersion: 'unknown-owner-v1', capabilities: ['subcontract-contract:read'] }
+    const evidence = { ...input, schemaVersion: 'subcontract-contract-read-v2', scope: query, requested: true }
+    const page = withOriginReadMeta(buildSubcontractContractListPage(input), { real: publicReadMeta({ ...evidence, dataOrigin: 'real' }), demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }) })
+    expect(page.summary.origins.real.changedAmount).toBeNull()
+    expect(decodeSubcontractContractListPage(page).summary.origins.real.changedAmount).toBeNull()
+    for (const patch of [{ changedAmount: '0.00' }, { changedAmount: 'NaN' }, { changedAmount: 0 }, { contractCount: -1 }, { contractCount: 2 }]) {
+      const summary = { ...page.summary, origins: { ...page.summary.origins, real: { ...page.summary.origins.real, ...patch } } }
+      expect(() => decodeSubcontractContractListPage({ ...page, summary })).toThrow('无效')
+    }
   })
 })

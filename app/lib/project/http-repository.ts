@@ -6,10 +6,11 @@ import type {
   ProjectListQueryDTO,
   ProjectListRepository,
 } from './repository'
-import { isProblemCodeDTO } from '../../types/read-model'
+import { commandProblemFromHttpFailure, problemFromHttpFailure } from '../read-model/problem'
 import {
   decodeProjectDetailRead,
   decodeProjectListPage,
+  projectProblem,
   projectProblemFromUnknown,
   ProjectRepositoryProblem,
   serializeProjectDetailQuery,
@@ -31,38 +32,14 @@ interface HttpProjectRepositoryOptions {
   fetcher: ProjectHttpFetcher
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isFieldErrors(value: unknown): value is Record<string, string[]> {
-  return isObject(value)
-    && Object.values(value).every(errors =>
-      Array.isArray(errors) && errors.every(error => typeof error === 'string'),
-    )
-}
-
 function problemPayload(cause: unknown): ProblemDTO | null {
-  if (!isObject(cause))
-    return null
-  const response = isObject(cause.response) ? cause.response : null
-  const raw = response?._data ?? cause.data
-  if (!isObject(raw))
-    return null
-  const candidate = isObject(raw.data) ? raw.data : raw
-  if (!isProblemCodeDTO(candidate.code)
-    || typeof candidate.message !== 'string'
-    || typeof candidate.retryable !== 'boolean'
-    || !isFieldErrors(candidate.fieldErrors)
-    || !(candidate.traceId === null || typeof candidate.traceId === 'string')) {
-    return null
-  }
-  return candidate as unknown as ProblemDTO
+  return problemFromHttpFailure(cause)
 }
 
 export async function readProjectHttp<T>(
   request: () => Promise<unknown>,
   decode: (value: unknown) => T,
+  commandId?: string,
 ): Promise<T> {
   try {
     return decode(await request())
@@ -70,7 +47,7 @@ export async function readProjectHttp<T>(
   catch (cause) {
     if (cause instanceof ProjectRepositoryProblem)
       throw cause
-    const remoteProblem = problemPayload(cause)
+    const remoteProblem = commandId ? commandProblemFromHttpFailure(cause, commandId) : problemPayload(cause)
     if (remoteProblem)
       throw new ProjectRepositoryProblem(remoteProblem, { cause })
     throw projectProblemFromUnknown(cause)
@@ -86,7 +63,14 @@ export function createHttpProjectListRepository(
         () => options.fetcher('/api/read/projects', {
           query: serializeProjectListQuery(query),
         }),
-        decodeProjectListPage,
+        (value) => {
+          const page = decodeProjectListPage(value)
+          if (page.pagination.requestedPage !== query.page || page.pagination.pageSize !== query.pageSize
+            || (!query.includeDemo && page.items.some(item => item.dataOrigin === 'demo'))) {
+            throw new ProjectRepositoryProblem(projectProblem('relationship-mismatch', '项目响应与本次分页或来源不匹配'))
+          }
+          return page
+        },
       )
     },
     async get(query: ProjectDetailQueryDTO): Promise<ProjectDetailReadDTO> {
@@ -94,7 +78,12 @@ export function createHttpProjectListRepository(
         () => options.fetcher(`/api/read/projects/${encodeURIComponent(query.id)}`, {
           query: serializeProjectDetailQuery(query),
         }),
-        decodeProjectDetailRead,
+        (value) => {
+          const detail = decodeProjectDetailRead(value)
+          if (detail.item.project.id !== query.id || detail.item.dataOrigin !== query.origin)
+            throw new ProjectRepositoryProblem(projectProblem('relationship-mismatch', '项目响应与本次目标或来源不匹配'))
+          return detail
+        },
       )
     },
   }

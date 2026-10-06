@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
+import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, onActivated, onMounted, reactive, shallowRef, watch } from 'vue'
 import FinanceListScreen from '~/components/finance/FinanceListScreen.vue'
@@ -30,7 +31,7 @@ const TableStub = defineComponent({
 function mountList(component: typeof FinanceListScreen | typeof MaterialListScreen, kind: string) {
   return render(component, {
     props: { kind } as never,
-    global: { components: { KitTable: TableStub, ListFilterBar, SearchInput }, stubs: { TreeNav: true, SelectFilter: true, KitButton: { template: '<button><slot /></button>' } } },
+    global: { plugins: [createPinia()], components: { KitTable: TableStub, ListFilterBar, SearchInput }, stubs: { TreeNav: true, SelectFilter: true, KitButton: { template: '<button><slot /></button>' } } },
   })
 }
 

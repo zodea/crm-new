@@ -7,6 +7,7 @@ import { validateAuxiliaryDetailReturnTo } from '~/lib/auxiliary-contract/naviga
 import { validateMaterialContractDetailJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { validateProjectSupplierIdentityReturnTo } from '~/lib/project-supplier/return-context'
+import { readProblemTitle, readStateData, readStateProblem } from '~/lib/read-model/state'
 import {
   createSupplierDetailJourneyReturnOrigin,
   loadSupplierDetailJourneyReturnOrigin,
@@ -38,14 +39,15 @@ const activeTab = shallowRef<SupplierDetailTab>(validTab(route.query.tab))
 const subcontractChangeContextId = shallowRef(newSupplierDetailJourneyReturnContextId())
 const subcontractChangeAnchorId = 'supplier-subcontract-change-link'
 
-const detail = computed(() => {
-  const state = store.detailState
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
-})
+const detail = computed(() => readStateData(store.detailState))
+function metricEvidence(metric: MetricDTO | null): string | null {
+  if (!metric || metric.status === 'complete')
+    return null
+  if (metric.participatingCount === null)
+    return '来源未就绪，金额待核对'
+  const known = metric.knownValue === null ? '尚无可核对金额' : `已核对金额 ${yuan(metric.knownValue)}`
+  return metric.missingCount === null ? known : `${known} · ${metric.missingCount} 份记录金额未知`
+}
 const supplier = computed(() => detail.value?.supplier ?? null)
 const credentialLabel = computed(() => {
   const status = supplier.value?.credentialStatus
@@ -83,7 +85,7 @@ const backLabel = computed(() => auxiliaryReturnTo.value
           : projectSupplierReturnTo.value
             ? '返回项目分供方工作台'
             : '返回分供方列表')
-const problem = computed(() => 'problem' in store.detailState ? store.detailState.problem : null)
+const problem = computed(() => readStateProblem(store.detailState))
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)
     return 'ready'
@@ -135,15 +137,27 @@ const subcontractChangesTo = computed(() => {
 })
 const tabs = computed(() => [
   { key: 'overview', label: '详细资料' },
-  { key: 'projects', label: '合作项目', count: unavailable('projects') ? undefined : detail.value?.projects.length ?? 0 },
-  { key: 'contracts', label: '支出合同', count: unavailable('contracts') ? undefined : detail.value?.contracts.length ?? 0 },
-  { key: 'settlements', label: '支出结算', count: unavailable('settlements') ? undefined : detail.value?.settlements.length ?? 0 },
-  { key: 'invoices', label: '收票登记', count: unavailable('invoices') ? undefined : detail.value?.invoices.length ?? 0 },
-  { key: 'payments', label: '付款管理', count: unavailable('payments') ? undefined : detail.value?.payments.length ?? 0 },
+  { key: 'projects', label: '合作项目', count: detail.value?.summary.projectCount ?? undefined },
+  { key: 'contracts', label: '支出合同', count: detail.value?.summary.contractCount ?? undefined },
+  { key: 'settlements', label: '支出结算', count: detail.value?.summary.settlementCount ?? undefined },
+  { key: 'invoices', label: '收票登记', count: detail.value?.summary.invoiceCount ?? undefined },
+  { key: 'payments', label: '付款管理', count: detail.value?.summary.paymentCount ?? undefined },
 ])
 function unavailable(tab: SupplierDetailTab) {
   return tab !== 'overview' && detail.value?.unavailableSources?.includes(tab) === true
 }
+const contractSources = computed(() => detail.value?.meta?.sources ?? [])
+const readableMaterialContractSource = computed(() => contractSources.value.some(source => source.key === 'material-contracts' && source.state === 'readable'))
+const otherContractSourcesUnavailable = computed(() => {
+  const other = contractSources.value.find(source => source.key === 'other-contract-domains')
+  return Boolean((other && other.state !== 'readable')
+    || detail.value?.summary.contractAmount.missingSources.includes('other-contract-domains')
+    || (contractSources.value.some(source => source.key === 'material-contracts') && other?.state !== 'readable'))
+})
+const canReadAuxiliaryContractSource = computed(() => detail.value?.dataOrigin === 'real'
+  && !unavailable('contracts')
+  && contractSources.value.some(source => source.key === 'contracts' && source.state === 'readable')
+  && !otherContractSourcesUnavailable.value)
 const overviewMetadata = computed(() => supplier.value
   ? [
       { label: '分供方类别', value: supplier.value.supplierCategory },
@@ -281,7 +295,7 @@ onActivated(() => void load())
     :back-to="backTo"
     :back-label="backLabel"
     :state="shellState"
-    :state-title="shellState === 'not-found' ? '分供方不存在或已删除' : shellState === 'forbidden' ? '无权查看该分供方' : shellState === 'loading' ? '正在加载分供方详情' : '分供方详情加载失败'"
+    :state-title="readProblemTitle(problem, shellState === 'not-found' ? '分供方不存在或已删除' : shellState === 'forbidden' ? '无权查看该分供方' : shellState === 'loading' ? '正在加载分供方详情' : '分供方详情加载失败')"
     :state-description="problem?.message ?? ''"
     :state-action-label="problem?.retryable ? '重新加载' : ''"
     @state-action="load"
@@ -336,11 +350,16 @@ onActivated(() => void load())
       </nav>
     </template>
     <div v-if="supplier && detail" class="grid min-w-0 gap-2">
-      <StatePanel v-if="store.detailState.kind === 'error'" kind="error" title="刷新分供方详情失败" :description="store.detailState.problem.message" :action-label="store.detailState.problem.retryable ? '重新加载' : ''" compact @action="load" />
+      <StatePanel v-if="store.detailState.kind === 'error' || store.detailState.kind === 'unavailable'" kind="error" title="刷新分供方详情失败" :description="store.detailState.problem.message" :action-label="store.detailState.problem.retryable ? '重新加载' : ''" compact @action="load" />
       <SupplierDetailOverview v-if="activeTab === 'overview'" :supplier="supplier" />
       <section v-else class="min-w-0 bg-panel p-3" :aria-label="tabs.find(tab => tab.key === activeTab)?.label">
         <StatePanel v-if="unavailable(activeTab)" kind="empty" title="此项业务事实尚未接入" description="当前无法核对数量与金额，不能按零或没有记录理解。分供方主档及证照资料仍可查看。" compact />
-        <SupplierFactTable v-else :tab="activeTab" :projects="detail.projects" :contracts="detail.contracts" :settlements="detail.settlements" :invoices="detail.invoices" :payments="detail.payments" />
+        <template v-else>
+          <p v-if="activeTab === 'contracts' && readableMaterialContractSource && otherContractSourcesUnavailable" class="mb-3 break-words text-12px text-ink-soft" role="status" aria-label="合同来源范围">
+            已核对材料采购合同来源；其他合同来源当前不可读取，完整合同数量与金额仍待核实。
+          </p>
+          <SupplierFactTable :tab="activeTab" :projects="detail.projects" :contracts="detail.contracts" :settlements="detail.settlements" :invoices="detail.invoices" :payments="detail.payments" />
+        </template>
       </section>
     </div>
     <template v-if="supplier && detail" #aside>
@@ -360,11 +379,14 @@ onActivated(() => void load())
                 </button>
                 <span v-else class="text-14px font-600 tabular-nums text-ink">{{ row.value }}</span>
               </dd>
+              <p v-if="metricEvidence(row.metric)" class="m-0 w-full text-11px leading-relaxed text-ink-muted">
+                {{ metricEvidence(row.metric) }}
+              </p>
             </div>
           </dl>
         </section>
         <ReadOnlySection title="档案信息" :fields="recordFields" />
-        <AuxiliaryContractJourney v-if="detail.dataOrigin === 'real' && !unavailable('contracts')" :supplier-id="supplierId" />
+        <AuxiliaryContractJourney v-if="canReadAuxiliaryContractSource" :supplier-id="supplierId" />
       </div>
     </template>
   </EntityDetailShell>

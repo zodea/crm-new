@@ -10,6 +10,8 @@ import {
   isISODateTimeDTO,
 } from '../../types/read-model'
 import { isApprovalReadState } from '../finance/approval-amount'
+import { hasConsistentReadMeta } from '../read-model/meta'
+import { problemFromHttpFailure } from '../read-model/problem'
 import {
   projectSupplierProblem,
   ProjectSupplierRepositoryProblem,
@@ -159,8 +161,8 @@ function invalid(message: string): never {
   throw new ProjectSupplierRepositoryProblem(projectSupplierProblem('internal-error', message))
 }
 
-export function decodeProjectSupplierWorkbenchRead(value: unknown): ProjectSupplierWorkbenchReadDTO {
-  if (!object(value) || !isDataOriginDTO(value.dataOrigin)
+export function decodeProjectSupplierWorkbenchRead(value: unknown, expected?: ProjectSupplierWorkbenchQueryDTO): ProjectSupplierWorkbenchReadDTO {
+  if (!object(value) || !hasConsistentReadMeta(value, 'project-supplier-read-v2', value.dataOrigin) || !isDataOriginDTO(value.dataOrigin)
     || !stringFields(value.relation, ['id', 'status', 'note'])
     || !resolvedRef(value.project, 'project') || !detailNavigation(value.projectNavigation, value.project, value.dataOrigin)
     || !stringFields(value.projectProfile, ['status', 'developer', 'manager'])
@@ -182,6 +184,8 @@ export function decodeProjectSupplierWorkbenchRead(value: unknown): ProjectSuppl
     || !strings(value.capabilities)) {
     return invalid('中央后台返回的项目分供方工作台读模型无效')
   }
+  if (expected && (value.project.id !== expected.projectId || value.supplier.id !== expected.supplierId || value.dataOrigin !== expected.origin))
+    return invalid('工作台返回与本次项目、分供方或来源不一致')
   return value as unknown as ProjectSupplierWorkbenchReadDTO
 }
 
@@ -192,6 +196,9 @@ export function serializeProjectSupplierWorkbenchQuery(query: ProjectSupplierWor
 export function projectSupplierProblemFromUnknown(cause: unknown): ProjectSupplierRepositoryProblem {
   if (cause instanceof ProjectSupplierRepositoryProblem)
     return cause
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new ProjectSupplierRepositoryProblem(remote, { cause })
   return new ProjectSupplierRepositoryProblem(projectSupplierProblem(
     'unavailable',
     cause instanceof Error ? cause.message : '项目分供方中央读取服务暂时不可用',

@@ -10,6 +10,7 @@ interface Props {
   dirty: boolean
   closeAfterSave?: boolean
   loadingAction?: FormFooterAction | null
+  writeDisabled?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -17,6 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
   labels: () => ({}),
   closeAfterSave: false,
   loadingAction: null,
+  writeDisabled: false,
 })
 
 const emit = defineEmits<{
@@ -39,6 +41,7 @@ const visibleActions = computed(() =>
 
 function isDisabled(action: FormFooterAction) {
   return props.loadingAction !== null
+    || (action !== 'cancel' && props.writeDisabled)
     || (action === 'draft' && !props.dirty)
 }
 

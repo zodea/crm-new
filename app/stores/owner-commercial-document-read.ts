@@ -6,24 +6,11 @@ import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
 import { ownerCommercialDocumentProblemFromUnknown } from '~/lib/owner-document/central-repository'
-
-function previous<T>(state: ReadState<T>): T | null {
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
-}
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readStateData as previous, readFailureState } from '~/lib/read-model/state'
 
 function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
-  const { problem } = ownerCommercialDocumentProblemFromUnknown(cause)
-  if (problem.code === 'forbidden')
-    return { kind: 'forbidden', problem }
-  if (problem.code === 'not-found')
-    return { kind: 'not-found', problem }
-  if (problem.code === 'relationship-mismatch')
-    return { kind: 'mismatch', problem }
-  return { kind: 'error', problem, previous: prior }
+  return readFailureState(ownerCommercialDocumentProblemFromUnknown(cause).problem, prior)
 }
 
 function sameQuery(left: OwnerCommercialDocumentDetailQueryDTO | null, right: OwnerCommercialDocumentDetailQueryDTO) {
@@ -36,6 +23,11 @@ export const useOwnerCommercialDocumentReadStore = defineStore('owner-commercial
   const detailState = shallowRef<ReadState<OwnerCommercialDocumentDetailReadDTO>>({ kind: 'idle' })
   const detailQuery = shallowRef<OwnerCommercialDocumentDetailQueryDTO | null>(null)
   let latest = 0
+  bindReadAuthority((problem) => {
+    latest++
+    detailQuery.value = null
+    detailState.value = readFailureState<OwnerCommercialDocumentDetailReadDTO>(problem, null)
+  })
 
   async function loadDetail(query: OwnerCommercialDocumentDetailQueryDTO) {
     const request = ++latest

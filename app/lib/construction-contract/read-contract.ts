@@ -8,8 +8,11 @@ import type {
   PageDTO,
   ProblemDTO,
   RatioDTO,
+  ReadMetaDTO,
 } from '../../types/read-model'
 import type { ContractListFilter } from '../contract/list-filters'
+import type { OurSignatorySnapshot } from '../our-signatory/contract'
+import type { ConstructionManagementFeeConfiguration } from './management-fee'
 
 export const CONSTRUCTION_CONTRACT_PAGE_SIZES = [10, 20, 50, 100] as const
 export type ConstructionContractPageSize = typeof CONSTRUCTION_CONTRACT_PAGE_SIZES[number]
@@ -40,6 +43,9 @@ export interface ConstructionContractDetailQueryDTO {
 }
 
 export interface ConstructionContractDetailSource {
+  managementFee?: ConstructionManagementFeeConfiguration
+  ourSignatorySnapshot?: OurSignatorySnapshot | null
+  legacyPartyA?: string | null
   dataOrigin: DataOriginDTO
   id: string
   no: string
@@ -51,9 +57,9 @@ export interface ConstructionContractDetailSource {
   customerId: string | null
   customerName: string
   customerPermission: 'allowed' | 'forbidden'
-  amount: number
-  settledAmount: number
-  invoicedAmount: number
+  amount: number | null
+  settledAmount: number | null
+  invoicedAmount: number | null
   receivedAmount: number | null
   actualCompletionDate: ISODateDTO | null
   content: string
@@ -119,16 +125,19 @@ export interface ConstructionContractFactSources {
 }
 
 export interface ConstructionContractAmountsDTO {
-  contract: MoneyDTO
-  changed: MoneyDTO
-  settled: MoneyDTO
-  invoiced: MoneyDTO
+  contract: MoneyDTO | null
+  changed: MoneyDTO | null
+  settled: MoneyDTO | null
+  invoiced: MoneyDTO | null
   received: MoneyDTO | null
   bySettlementReceivable: MoneyDTO | null
   invoicedUnreceived: MoneyDTO | null
 }
 
 export interface ConstructionContractDTO {
+  managementFee: ConstructionManagementFeeConfiguration
+  ourSignatorySnapshot: OurSignatorySnapshot | null
+  legacyPartyA: string | null
   dataOrigin: DataOriginDTO
   id: string
   no: string
@@ -180,6 +189,7 @@ export interface ConstructionContractFileDTO {
 }
 
 export interface ConstructionContractDetailReadDTO {
+  meta: ReadMetaDTO
   receiptsProblem?: ProblemDTO
   dataOrigin: DataOriginDTO
   contract: ConstructionContractDTO
@@ -233,8 +243,8 @@ export interface ConstructionContractListSummaryDTO {
   statuses: Array<{ value: string, count: number }>
   origins: Record<DataOriginDTO, {
     contractCount: number
-    changedAmount: MoneyDTO
-    invoicedAmount: MoneyDTO
+    changedAmount: MoneyDTO | null
+    invoicedAmount: MoneyDTO | null
     receivedAmount: MoneyDTO | null
   }>
 }
@@ -242,11 +252,12 @@ export interface ConstructionContractListSummaryDTO {
 export type ConstructionContractListPageDTO = PageDTO<
   ConstructionContractListItemDTO,
   ConstructionContractListSummaryDTO
-> & { receiptsProblem?: ProblemDTO }
+> & { receiptsProblem?: ProblemDTO, meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO> }
 
 export interface ConstructionContractReadRepository {
   list: (query: ConstructionContractListQueryDTO) => Promise<ConstructionContractListPageDTO>
   get: (query: ConstructionContractDetailQueryDTO) => Promise<ConstructionContractDetailReadDTO>
+  fileContent: (id: string, fileId: string, origin: DataOriginDTO, options?: { signal?: AbortSignal }) => Promise<import('../forms/original-content').ContractOriginalContent>
 }
 
 export class ConstructionContractRepositoryProblem extends Error {

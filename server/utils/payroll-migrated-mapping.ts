@@ -222,7 +222,7 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[], h
     if (value.kind !== 'entity-detail' || !['quantity-unit', 'worker', 'crew'].includes(value.subject.entity))
       return invalid('原 A 来源导航种类无法映射')
     const table = value.subject.entity === 'quantity-unit' ? 'units' : value.subject.entity === 'worker' ? 'workers' : 'crews'
-    const subject = value.subject.state === 'resolved' ? { ...value.subject, id: id(table, value.subject.id) } : value.subject.state === 'forbidden' ? { ...value.subject, id: nullableId(table, value.subject.id) } : value.subject
+    const subject = value.subject.state === 'resolved' ? { ...value.subject, id: id(table, value.subject.id) } : value.subject
     const fields: Record<string, string> = { projectId: 'projects', stageId: 'construction_stages', itemId: 'items', completionId: 'unit_stage_completions' }
     const filters = Object.fromEntries(Object.entries(value.filters).map(([field, value]) => {
       if (field === 'dataOrigin')

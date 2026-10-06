@@ -1,4 +1,4 @@
-import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ReadProjection } from '../../types/read-model'
 import type {
   SubcontractContractDetailQueryDTO,
   SubcontractContractDetailReadDTO,
@@ -13,7 +13,9 @@ import type {
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
 import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
-import { round2 } from '../util/number'
+import { parsePageQuery, resolvePagination } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
+import { subtractKnownMoney, sumKnownMoney } from '../util/number'
 import { maskPhone } from '../util/privacy'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import {
@@ -44,11 +46,6 @@ function bool(value: unknown): boolean {
   return value === true || value === 'true'
 }
 
-function positiveInteger(value: unknown, fallback: number): number {
-  const parsed = Number(value)
-  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : fallback
-}
-
 function optional(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
@@ -64,7 +61,9 @@ function origin(value: unknown) {
 export function parseSubcontractContractListQuery(
   input: Record<string, unknown> | undefined,
 ): SubcontractContractListQueryDTO {
-  const pageSize = positiveInteger(input?.pageSize, 10)
+  const { requestedPage, pageSize } = parsePageQuery(input ?? {}, () => {
+    throw new SubcontractContractRepositoryProblem(subcontractContractProblem('invalid-query', '分页参数无效'))
+  }, 10)
   if (!SUBCONTRACT_CONTRACT_PAGE_SIZES.includes(pageSize as SubcontractContractPageSize))
     throw new SubcontractContractRepositoryProblem(subcontractContractProblem('invalid-query', '分包合同列表查询参数无效'))
   return {
@@ -75,7 +74,7 @@ export function parseSubcontractContractListQuery(
     supplierId: optional(input?.supplierId),
     status: parseContractListFilter(input?.status, () => new SubcontractContractRepositoryProblem(subcontractContractProblem('invalid-query', '合同筛选参数无效'))),
     subKind: parseContractListFilter(input?.subKind, () => new SubcontractContractRepositoryProblem(subcontractContractProblem('invalid-query', '合同筛选参数无效'))),
-    page: positiveInteger(input?.page, 1),
+    page: requestedPage,
     pageSize: pageSize as SubcontractContractPageSize,
   }
 }
@@ -95,8 +94,9 @@ export function parseSubcontractContractDetailQuery(
   return { id, origin: dataOrigin, includeDemo: bool(input?.includeDemo), focusId }
 }
 
-function money(value: number): string {
-  return round2(value).toFixed(2)
+function money(value: number | null): string | null {
+  const normalized = sumKnownMoney([value])
+  return normalized === null ? null : normalized.toFixed(2)
 }
 
 function ratio(value: number): string {
@@ -116,13 +116,15 @@ function entityRef<T extends 'project' | 'supplier'>(
   if (!id)
     return { state: 'missing', entity, id: null, label: null, reason: 'not-recorded' } as EntityRefDTO & { entity: T }
   if (permission === 'forbidden')
-    return { state: 'forbidden', entity, id, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
+    return { state: 'forbidden', entity, id: null, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
   return resolvedRef(entity, id, label, null) as EntityRefDTO & { entity: T }
 }
 
 function detailNavigation(reference: EntityRefDTO, dataOrigin: SubcontractContractDetailQueryDTO['origin']): NavigationIntentDTO {
   if (reference.state === 'forbidden')
     return { kind: 'unavailable', reason: 'forbidden' }
+  if (reference.state === 'unavailable')
+    return { kind: 'unavailable', reason: 'not-connected' }
   if (reference.state !== 'resolved')
     return { kind: 'unavailable', reason: 'missing-id' }
   return { kind: 'entity-detail', subject: reference, variant: 'detail', view: null, filters: { dataOrigin } }
@@ -143,18 +145,18 @@ function sameContract<T extends { dataOrigin: string, contractId: string | null 
 }
 
 function validFact(row: SubcontractContractFactSource): boolean {
-  return !['草稿', '无效', '作废', 'cancelled'].includes(row.status)
+  return !['draft', '草稿', '无效', '作废', 'cancelled'].includes(row.status)
 }
 
-function total(rows: readonly SubcontractContractFactSource[], source: SubcontractContractDetailSource, filter: (row: SubcontractContractFactSource) => boolean = validFact): number {
-  return round2(sameContract(rows, source).filter(filter).reduce((sum, row) => sum + (row.amount ?? 0), 0))
+function total(rows: readonly SubcontractContractFactSource[], source: SubcontractContractDetailSource, filter: (row: SubcontractContractFactSource) => boolean = validFact): number | null {
+  return sumKnownMoney(sameContract(rows, source).filter(filter).map(row => row.amount))
 }
 
 function amounts(source: SubcontractContractDetailSource, facts: SubcontractContractFactSources) {
   const settled = total(facts.settlements, source)
   const invoiced = total(facts.invoices, source, row => row.status === '已归档')
   const paid = total(facts.paymentRecords, source, row => ['已确认', 'confirmed'].includes(row.status))
-  const changed = round2(source.amount + total(facts.supplements, source))
+  const changed = sumKnownMoney([source.amount, total(facts.supplements, source)])
   const completionSettlement = total(facts.settlements, source, row => validFact(row) && row.settlementKind === 'completion')
   return {
     contract: money(source.amount),
@@ -162,13 +164,13 @@ function amounts(source: SubcontractContractDetailSource, facts: SubcontractCont
     settled: money(settled),
     invoiced: money(invoiced),
     paid: money(paid),
-    bySettlementPayable: money(settled - paid),
-    byInvoicePayable: money(invoiced - paid),
+    bySettlementPayable: money(subtractKnownMoney(settled, paid)),
+    byInvoicePayable: money(subtractKnownMoney(invoiced, paid)),
     completionSettlement: money(completionSettlement),
   }
 }
 
-export function buildSubcontractContractListPage(input: BuildListInput): SubcontractContractListPageDTO {
+export function buildSubcontractContractListPage(input: BuildListInput): ReadProjection<SubcontractContractListPageDTO> {
   const allowedOrigins = input.query.includeDemo ? new Set(['real', 'demo']) : new Set(['real'])
   const search = input.query.search.toLocaleLowerCase('zh-CN')
   const filtered = input.contracts
@@ -186,7 +188,8 @@ export function buildSubcontractContractListPage(input: BuildListInput): Subcont
       return !search || [row.name, row.no].some(value => value.toLocaleLowerCase('zh-CN').includes(search))
     })
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id))
-  const start = (input.query.page - 1) * input.query.pageSize
+  const { page } = resolvePagination(input.query.page, input.query.pageSize, filtered.length)
+  const start = (page - 1) * input.query.pageSize
   const items = filtered.slice(start, start + input.query.pageSize).map((source) => {
     const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)
     const supplier = entityRef('supplier', source.supplierId, source.supplierName, source.supplierPermission)
@@ -220,17 +223,26 @@ export function buildSubcontractContractListPage(input: BuildListInput): Subcont
     const rows = filtered.filter(row => row.dataOrigin === dataOrigin)
     return {
       contractCount: rows.length,
-      changedAmount: money(rows.reduce((sum, row) => sum + Number(amounts(row, input.facts).changed), 0)),
-      settledAmount: money(rows.reduce((sum, row) => sum + Number(amounts(row, input.facts).settled), 0)),
-      paidAmount: money(rows.reduce((sum, row) => sum + Number(amounts(row, input.facts).paid), 0)),
+      changedAmount: money(sumKnownMoney(rows.map((row) => {
+        const value = amounts(row, input.facts).changed
+        return value === null ? null : Number(value)
+      }))),
+      settledAmount: money(sumKnownMoney(rows.map((row) => {
+        const value = amounts(row, input.facts).settled
+        return value === null ? null : Number(value)
+      }))),
+      paidAmount: money(sumKnownMoney(rows.map((row) => {
+        const value = amounts(row, input.facts).paid
+        return value === null ? null : Number(value)
+      }))),
     }
   }
   return {
     items,
-    pagination: { page: input.query.page, pageSize: input.query.pageSize, total: filtered.length },
+    pagination: { requestedPage: input.query.page, page, pageSize: input.query.pageSize, total: filtered.length },
     summary: {
-      projects: option(row => row.projectId, row => row.projectName),
-      suppliers: option(row => row.supplierId, row => row.supplierName),
+      projects: option(row => row.projectPermission === 'allowed' ? row.projectId : null, row => row.projectName),
+      suppliers: option(row => row.supplierPermission === 'allowed' ? row.supplierId : null, row => row.supplierName),
       statuses: counted(row => row.status),
       subKinds: counted(row => row.subKind),
       origins: { real: originSummary('real'), demo: originSummary('demo') },
@@ -308,14 +320,14 @@ function mapFacts(
     id: row.id,
     no: row.no,
     name: row.name,
-    amount: row.amount == null ? null : money(row.amount),
+    amount: money(row.amount),
     date: row.date,
     status: row.status,
     navigation: factNavigation(row, source, kind, capabilities),
   }))
 }
 
-export function buildSubcontractContractDetail(input: BuildDetailInput): SubcontractContractDetailReadDTO {
+export function buildSubcontractContractDetail(input: BuildDetailInput): ReadProjection<SubcontractContractDetailReadDTO> {
   if (input.query.origin === 'demo' && !input.query.includeDemo)
     throw new SubcontractContractRepositoryProblem(subcontractContractProblem('forbidden', '测试分包合同未授权显示'))
   const source = input.contracts.find(row => row.id === input.query.id && row.dataOrigin === input.query.origin)
@@ -344,6 +356,8 @@ export function buildSubcontractContractDetail(input: BuildDetailInput): Subcont
   return {
     dataOrigin: source.dataOrigin,
     contract: {
+      ourSignatorySnapshot: source.ourSignatorySnapshot ? structuredClone(source.ourSignatorySnapshot) : null,
+      legacyPartyA: source.legacyPartyA ?? null,
       dataOrigin: source.dataOrigin,
       id: source.id,
       no: source.no,
@@ -400,5 +414,8 @@ export function buildSubcontractContractDetail(input: BuildDetailInput): Subcont
 export function subcontractContractProblemFromUnknown(cause: unknown): SubcontractContractRepositoryProblem {
   if (cause instanceof SubcontractContractRepositoryProblem)
     return cause
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new SubcontractContractRepositoryProblem(remote, { cause })
   return new SubcontractContractRepositoryProblem(subcontractContractProblem('internal-error', cause instanceof Error ? cause.message : '分包合同读取失败', true), { cause })
 }

@@ -872,7 +872,7 @@ describe('甲方商务单据受控中央迁移', () => {
       .toEqual(['central-contract_supplements-supplement-legacy-325'])
   })
 
-  it('确认后将既有甲方单据同步到同一正式命令源，回滚后撤销切换', async () => {
+  it('确认后同源保全甲方历史和后来单据，危险回滚整批拒绝且原图与回执不变', async () => {
     const commands = createOwnerCommercialDocumentCommandTestInstance()
     const core = createCoreMigrationTestInstance({
       createServerId: input => `central-${input.entityType}-${input.legacyId}`,
@@ -1127,7 +1127,7 @@ describe('甲方商务单据受控中央迁移', () => {
       'central-construction_contracts-contract-legacy-323',
       '2026-08',
     )).toMatchObject([{ id: 'boq-line-legacy-323', autoQty: 100 }])
-    await expect(commands.execute({
+    const savedReport = await commands.execute({
       workspaceId: session.workspaceId,
       actorId: session.actorId,
       requiredCapability: 'owner-document:write',
@@ -1138,13 +1138,22 @@ describe('甲方商务单据受控中央迁移', () => {
       baseVersion: reportForm.version,
       draft: reportForm.draft,
       attachments: { add: [], removeIds: [], restoreIds: [] },
-    }, session)).resolves.toMatchObject({ id: reportId, version: '2' })
+    }, session)
+    expect(savedReport).toMatchObject({ id: reportId, version: '2' })
 
-    await core.rollback({ ...envelope('rollback-323'), batchId: dryRun.batchId }, session)
-    expect(commands.rows().map(row => row.id)).toEqual(expect.arrayContaining([
-      firstChange.id,
-      nextPeriodReport.id,
-    ]))
-    expect(commands.rows().some(row => [changeId, reportId, acceptanceId, ownerPenaltyId].includes(row.id))).toBe(false)
+    const beforeSnapshot = core.snapshot(session)
+    const beforeRows = commands.rows()
+    const beforeVersion = commands.sourceVersion()
+    const beforeHistory = commands.form('owner_change', changeId, session)
+    const beforePenalty = commands.form('owner_penalty', ownerPenaltyId, session)
+    await expect(core.rollback({ ...envelope('rollback-323'), batchId: dryRun.batchId }, session)).rejects.toThrow(/后来|回执|更正|回滚/)
+    expect(core.snapshot(session)).toEqual(beforeSnapshot)
+    expect(commands.sourceVersion()).toBe(beforeVersion)
+    expect(commands.rows()).toEqual(beforeRows)
+    expect(commands.form('owner_change', changeId, session)).toEqual(beforeHistory)
+    expect(commands.form('owner_penalty', ownerPenaltyId, session)).toEqual(beforePenalty)
+    expect(commands.resolve(firstChange.commandId, 'owner_change', session)).toEqual({ outcome: 'applied', result: firstChange })
+    expect(commands.resolve(nextPeriodReport.commandId, 'owner_report', session)).toEqual({ outcome: 'applied', result: nextPeriodReport })
+    expect(commands.resolve(savedReport.commandId, 'owner_report', session)).toEqual({ outcome: 'applied', result: savedReport })
   })
 })

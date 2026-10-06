@@ -1,6 +1,6 @@
 # 文档分模块整理清单
 
-> 更新：2026-09-26。依据 9 月 25 日“精简根目录 Markdown 文档”聊天、当前工作区及随后只读复核。
+> 更新：2026-10-04。此文件保留尚未完成的整理范围和定位；已收口的 A01–A03 只链接现行权威，不重复保存业务规则与整理过程。
 >
 > 本清单供用户逐项选择整理；A01、A02 已按用户授权推进文档整理，各项完成边界仍按对应行理解。本文是临时整理材料，不定义业务规则，也不复制 Issue 的任务状态。
 
@@ -8,43 +8,11 @@
 
 ### 1.1 A01：旧设计指令已收口，运行对比另行核对
 
-| 对象 | 清理前的冲突 | 现行决定 | 本轮承接 |
-| --- | --- | --- | --- |
-| 顶栏 | DESIGN-TASTE 曾允许顶栏毛玻璃 | [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) | 旧例外已删除；[品味说明](../design/DESIGN-TASTE.md)嵌入整理前后规则图 |
-| 项目编辑 | 交互参考曾要求右侧 Drawer | [ADR 0014](../adr/0014-full-page-entity-forms.md) | [参考索引](../design/interaction-style-references.md)嵌入形态对照与流程图，只保留来源理由 |
-| 设计演示数据 | DESIGN-TASTE 曾要求取真实蓝本 | [ADR 0014](../adr/0014-full-page-entity-forms.md) / [0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) | [数据来源关系图](../design/DESIGN-TASTE.md#5-演示数据区分设计样例与正式事实)说明匿名设计样例与运行来源隔离；无数据库调整 |
-
-五变体用途和按钮反馈归 [KitUI](../design/kit-ui-component-specs.md)，稳定视觉原则归 [DESIGN-SYSTEM](../rewrite/DESIGN-SYSTEM.md)；移除重复数值表、完成状态副本及泛化的抽屉底栏/按钮打勾指令。两份参考文档保留独有理由与历史定位。与 AGENTS、文档、测试及指南四个入口的关系见[设计入口](../design/README.md#与协作文档测试和指南入口的关系)。
-
-本轮图片为规则重绘，流程图为已定边界说明。按用户指令暂缓红圈实时查看，尚未形成新的红圈 / CRM hover、点击或布局对比证据；文档整理不代表实现已复验。
+设计规则、令牌、组件和参考来源的现行职责统一见[设计入口](../design/README.md)。旧毛玻璃、实体编辑抽屉和真实资料作为演示样本等冲突指令已移除；旧品味文件已退役，独有理由和规则对照并入 [DESIGN-SYSTEM](../rewrite/DESIGN-SYSTEM.md#a01-history)；[公开参考](../design/interaction-style-references.md)只保留独有来源，不发第二套实施指令。规则示意不代替运行验收，历史整理过程通过 Git 查询。
 
 ### 1.2 A02：实体定义已归并，未决政策单列
 
-[DATABASE](../rewrite/DATABASE.md) 原 §2、§2.10、§10 的同实体字段、约束和迁移例外已原位归并；§2.10 只留表单覆盖与来源批次，计算集中到 §4。图为文档结构整理前后对照，不表示数据库已迁移。
-
-```mermaid
-flowchart TD
-  O["原 §2 / §2.10 / §10<br/>同一实体定义散落三处"] --> X["后文覆盖前文<br/>目标与实现混读"]
-  X --> E["归并到 §2<br/>字段 / 外键 / 约束"]
-  X --> C["归并到 §4<br/>跨实体计算"]
-  E --> S["分别标明目标、实现<br/>旧模型及迁移边界"]
-  C --> S
-```
-
-- B05 的请款差异已依据 [#439](https://github.com/zodea/crm-new/issues/439)与页面既定规则收口为批复金额，明确零、未填写和历史未知分开；含税收票使用 `total_amount`。公式和小图见 [§4.4](../rewrite/DATABASE.md#44-projectsupplier-汇总project-suppliermd)，不代表 B05 整个工作台整理完成。
-- 已确认物资目标（单一送货明细、Party 供货角色、计划头/行及整张冲销）与旧表分开，见[关系与流程小图](../rewrite/DATABASE.md#material-target)。保留打印迁移、原件、金额来源、工资冻结及恢复例外；目标关系尚未实现的部分没有写成已落地。
-- **PAY-08 本轮裁定（2026-10-02）：**历史未知批复先核实业务再确认；材料冲突先由填写人核实送货单，再查合同超量处理，正确时承接有依据的合同增额与本次实际应付，错误时查明实际应付，不只对数字做事。已确认沿合同依据→已确认结算→申请及累计批复核实→实付承接；核验记录及确认接线尚未实现，当前申请额兼容实现未改。目标、实现及小图见[付款实体](../rewrite/DATABASE.md#entity-payment-record)。
-- 合同主体、联系资料、头行勾稽及例外归[合同实体](../rewrite/DATABASE.md#contract-party-selection)，表单只保[录入入口与示意](../rewrite/pages/contract-forms.md#采购明细格式与导入核对)。本轮补答确认：数量与单位一起核对，Excel 错误全部修好再整批追加；补充协议只增额、保留材料变更及真实适用依据；合同外运费沿真实费用链单列归其他支出，垫款清偿不重复成本。逻辑定义已收口，物理接线与运行验收另标，不把源码现状当业务裁定。
-- 通用及未建档报价方的资料可收录，未核实关系留空，定义见[独立报价](../rewrite/DATABASE.md#quotation-target)。真实税额按主体和期间，迟开销项/迟到进项分别核实，项目保留归属及缺口，见[真实税来源](../rewrite/DATABASE.md#actual-tax-sources)；管理费主展示已核实实际成本并按来源展开，其他收款保留真实性质/付款人，见[管理费](../rewrite/DATABASE.md#management-fee-sources)及[收款](../rewrite/DATABASE.md#receipt-other-sources)。已定业务与实现缺口分开，本轮不开发新功能。
-
-| 本轮已读入口 | 与 A02 的关系 | 处理 |
-| --- | --- | --- |
-| [AGENTS.md](../../AGENTS.md) | 范围、证据、业务裁定、验证与 Git 边界 | 规则未变，不修改 |
-| [文档入口](../README.md) | DATABASE 负责实体/字段/关系/迁移，ADR 与页面按各自职责 | 归属未变，不修改 |
-| [测试入口](../testing/README.md) | 按受影响文档契约选择现有 unit 检查 | 不新增测试，不修改入口；静态通过不表示业务验收 |
-| [指南入口](../guides/README.md) | 用户操作与当前可用状态 | 已确认新录入目标，但尚未实现；不改当前可用操作指南 |
-
-本轮不修改运行页面；结构与流程图为规则示意，合同表单另嵌已有红圈历史截图并注明与阶段目标的差异。按逐项复核要求，逐列粘贴、跨单位报价、税点展示、运费归属和优惠扣减五张简易界面效果图共用可维护 HTML 图源；逐列粘贴区分代码重绘与已确认目标，单位换算与简洁的“含税单价＋税点”分列均已确认且尚待实现；[运费归属与金额核对](../rewrite/pages/contract-forms.md#运费归属与金额核对)已按用户裁定改为两份 4,400 元合同、各另收 600 元的完整例子：不含运费则合同外另计，已含同项运费且约定未变更则注明多收；不同运费条件的报价只作范围参考。[优惠扣减的明细表达](../rewrite/pages/contract-forms.md#优惠与扣减的明细表达)已确认：材料 5,000 元，单列优惠 -200 元，合计 4,800 元；请款样单仅用于表达参考，不移植其税率、比例或取整规则。合同头与自身明细须一致、实际采购可低于签约额已确认；不采用说明差额即放行或为对平自动改量价。未实时访问红圈，不把历史图中的入口写成已复验的交互。本次补答后的数量单位、真实税和管理费效果图也沿用该图源，均就近嵌入对应权威页面并注明规则示意。验证结果及尚未解决项以 A02 行记录为准。
+实体、字段、关系、迁移及计算统一见 [DATABASE](../rewrite/DATABASE.md)；公共读写协议分别见 [COMMANDS](../rewrite/COMMANDS.md) 和 [READ-MODELS](../rewrite/READ-MODELS.md)。已确认的业务取舍及实施缺口均留在直接权威章节，本清单不再复制规则、答复、测试数量或逐次整理过程。文档归并完成不表示数据库迁移、业务接线或生产验收完成。
 
 ### 1.3 大量重复：总流程复制了专题操作（B04 / B06）
 
@@ -100,12 +68,12 @@ flowchart TD
 
 | 编号 / 状态 | 优先级 | 模块及涉及文件 | 主要问题与建议动作 |
 | --- | --- | --- | --- |
-| A01 · 已完成 | 优先 | **设计原则与参考**<br>[DESIGN-TASTE.md](../design/DESIGN-TASTE.md) · [interaction-style-references.md](../design/interaction-style-references.md) · [design/README.md](../design/README.md) · [DESIGN-SYSTEM.md](../rewrite/DESIGN-SYSTEM.md) · [KitUI](../design/kit-ui-component-specs.md) | **文档范围已完成：**冲突指令回归 ADR 0013/0014，令牌直达样式源、组件行为归 KitUI、长期原则归 DESIGN-SYSTEM；参考文件保留来源与旧引用定位。两张规则图及职责、交互、数据来源图已嵌入。300 个本地链接及锚点检查、7 项运行参考文档契约测试、差异空白检查通过；图源已核对桌面与 390px。红圈实时对照按用户指令暂缓，不改代码或数据库。 |
-| A02 · 待核对（文档归并及本轮业务取舍完成，实施/验收缺口保留） | 优先 | **实体、字段与计算口径**<br>[DATABASE.md](../rewrite/DATABASE.md) | **承接：**§2.1—§2.9 按实体原位归并；§2.10 只留覆盖/历史批次；§4 集中计算，旧锚点保留。四个入口职责见 §1.2，均未强改；直接受影响的合同、材料、付款、收款及项目页面仅说明差异并直达定义。<br>**2026-10-02 续核及补答：**字段/主外键、草稿状态、排程唯一范围、BOQ 追溯、旧项目别名/供应商 JSON、未建字典及导入追溯表均分清来源；B05 保持批复金额和含税收票，不替换 §4.2 的不含税票额。PAY-08 原业务链、我方多主体、三种价格来源和报价可空关系已定；Excel 量/单位一起核对、全部修好再追加；协议只增额并保留明细变更；运费单列其他支出、清垫款不重复成本；管理费看实际成本按来源展开；其他收款保留真实付款人；真实税按主体期间并留迟票缺口，不拿项目票面差额冒充实际应纳。备用金申请不当实际拨付，完整现金缺源不补零。<br>**图示及验证：**实体/冲突小图就近嵌入，新增数量单位、真实税、管理费三张效果图沿既有 HTML 图源；原六图源码保留，另注明基线。已复验 2 个既有文档契约文件 11 项；本轮 8 份 Markdown 的 442 条本地出链与全仓 124 条 DATABASE 锚点入链检查通过；相关 29 张 Mermaid（DATABASE 24 张）的 1440/390px 渲染无溢出，本轮改图已检查可读性；新效果图桌面/390px、原六图源码保留、既有表内横滚/键盘聚焦及差异空白检查通过。此前 9 文件 52 个独立测试仅对应当时版本，不作为并行代码的新验收。<br>**未解决的实施与验收项：**主体主档/历史接线、报价录入与综合比较、材采文件导入/协议明细/减项、独立费用/清垫款关系、PAY-08 核验和确认、真实税及完整管理费/现金来源仍未完整实现或接管；不是本轮仍未答的业务选择。具体主体、地区和交易时期的真实财税适用事实仍须实际业务核验，不由本文件选税率。实现证据基线为 8756be2d；收尾出现的其他任务未提交代码仅登记源码差异，未修改/暂存或运行验收。未访问 CRM/红圈、生产接管或真实迁移；保留缺口，不笼统标全部完成。 |
-| A03 · 待整理 | 较高 | **架构、命令与读模型**<br>[ARCHITECTURE.md](../rewrite/ARCHITECTURE.md) · [COMMANDS.md](../rewrite/COMMANDS.md) · [READ-MODELS.md](../rewrite/READ-MODELS.md) | PG、AX、P1—P7 的阶段追加与现行契约交织；公共恢复和版本约束多处重述。<br>**方向：**分别保留架构边界、写动作、读投影职责；公共协议集中，各领域仅写差异和例外。保留 Issue 出处，压缩开发历程。架构入口上一轮已精简，仅随契约变化同步。 |
+| A01 · 文档范围已完成 | 优先 | **设计原则与参考**<br>[设计入口](../design/README.md) · [DESIGN-SYSTEM](../rewrite/DESIGN-SYSTEM.md) · [KitUI](../design/kit-ui-component-specs.md) | 现行职责见设计入口；旧品味文件已归并退役，独有规则图与理由见 DESIGN-SYSTEM；公开来源独立保留，运行对比另行验收。 |
+| A02 · 文档范围已完成 | 优先 | **实体、字段与计算口径**<br>[DATABASE](../rewrite/DATABASE.md) | 重复实体定义已归并，字段/关系与公式各有权威章节；目标、当前实现和迁移缺口在该文档中说明，不在清单重复。 |
+| A03 · 文档范围已完成 | 较高 | **架构、命令与读模型**<br>[ARCHITECTURE](../rewrite/ARCHITECTURE.md) · [COMMANDS](../rewrite/COMMANDS.md) · [READ-MODELS](../rewrite/READ-MODELS.md) | 已按用户确认原位重构；公共规则唯一、领域保留差异及历史证据，后续实施差距直达各文档的 implementation-gaps 章节。 |
 | A04 · 待整理 | 优先 | **界面实现状态**<br>[ui-implementation-status.md](../design/ui-implementation-status.md) · [design/README.md](../design/README.md) | 逐日期堆叠状态；#479 同时出现已完成和继续验收；仍有固定任务入口及无条件写回 Issue 的旧指令。<br>**方向：**核实所选版本后，每模块只留当前边界与证据入口；开发过程留固定版本证据。清掉旧操作指令，保留生成块；设计入口只指路。 |
 | A05 · 待整理 | 较高 | **ADR 及替代关系**<br>[adr/README.md](../adr/README.md) · [0007-unified-visual-style-rounded-cards.md](../adr/0007-unified-visual-style-rounded-cards.md) · [0011-redesign-application-shell.md](../adr/0011-redesign-application-shell.md) · [0019-delivery-export-source-preservation.md](../adr/0019-delivery-export-source-preservation.md) · [0004-export-interaction-model.md](../adr/0004-export-interaction-model.md) · [0013-align-all-ui-to-online-design.md](../adr/0013-align-all-ui-to-online-design.md) | 部分 ADR 已主要转引后续规则，仍维持独立入口；索引混入实现状态。<br>**方向：**0007 的独有原则/理由归 0013 或组件契约；0011 的独有外壳行为归公共契约；0019 的导出决策与原件规则分别归 0004、送货规格。完成承接、入链和恢复定位后才列删除候选。其他 ADR 有独立决策价值时保留。 |
-| A06 · 待整理 | 较高 | **组件、表单与通用交互**<br>[kit-ui-component-specs.md](../design/kit-ui-component-specs.md) · [CRM-PATTERNS.md](../rewrite/CRM-PATTERNS.md) · [0003-confirm-dialog-deletion-model.md](../adr/0003-confirm-dialog-deletion-model.md) · [0014-full-page-entity-forms.md](../adr/0014-full-page-entity-forms.md) · [0016-overlay-composition-contract.md](../adr/0016-overlay-composition-contract.md) | 组件正文夹旧待办、调用快照与批次状态；确认交互等在 ADR 和组件文档重复。<br>**方向：**ADR 保留取舍，KitUI 保留公开契约，通用业务模式归 CRM-PATTERNS，页面只留领域差异。核对失效原型引用；不因文档精简改变组件 API 或表单形态。 |
+| A06 · 待整理 | 较高 | **组件、表单与通用交互**<br>[kit-ui-component-specs.md](../design/kit-ui-component-specs.md) · [DESIGN-SYSTEM §8](../rewrite/DESIGN-SYSTEM.md#a01-business-patterns) · [0003-confirm-dialog-deletion-model.md](../adr/0003-confirm-dialog-deletion-model.md) · [0014-full-page-entity-forms.md](../adr/0014-full-page-entity-forms.md) · [0016-overlay-composition-contract.md](../adr/0016-overlay-composition-contract.md) | A01–A03 收尾已将旧 CRM-PATTERNS 的独有设计归入 DESIGN-SYSTEM；查询、写入和来源返回分别直达 READ-MODELS、COMMANDS、NAVIGATION，旧文件退役。<br>**方向：**继续核对组件正文的旧待办、调用快照与批次状态；ADR 保留取舍，KitUI 保留公开契约，页面只留领域差异，不因文档精简改变组件 API 或表单形态。 |
 | A07 · 待整理 | 较高 | **公共导航、消息、页签与列表**<br>[NAVIGATION.md](../rewrite/NAVIGATION.md) · [PUBLIC-SURFACES.md](../rewrite/PUBLIC-SURFACES.md) · [guides/routes.md](../guides/routes.md) · [guides/tabs-and-recovery.md](../guides/tabs-and-recovery.md) · [guides/list-search-and-filters.md](../guides/list-search-and-filters.md) | 导航契约含实施顺序和工资阶段进度；公共能力也另维护“已有/待补齐”。<br>**方向：**契约只定义目标、返回、恢复及消息行为；操作指南保留实际步骤和异常处理；开发进度回到对应任务。上一轮已整理页签指南，本项只核交叉重复与状态。 |
 | A08 · 待整理 | 后续 | **协作小文件与入口**<br>[domain.md](../agents/domain.md) · [triage-labels.md](../agents/triage-labels.md) · [issue-tracker.md](../agents/issue-tracker.md) · [skills-cheatsheet.md](../agents/skills-cheatsheet.md) · [agents/README.md](../agents/README.md) · [docs/README.md](../README.md) · [guides/README.md](../guides/README.md) | 来源映射和标签说明形成小型转引链；入口已精简，进一步收益有限。<br>**方向：**评估标签并入 Issue 规程、来源映射并入文档入口；保留独有术语使用约束，技能路由按实际可用能力精简。合并才删原文件并修直链。Git、CI、模块复核继续按独立任务保留。 |
 
@@ -134,7 +102,7 @@ flowchart TD
 | B17 · 待整理 | 较高 | **收款、往来、开票申请与报销**<br>[finance-receipt.md](../rewrite/pages/finance-receipt.md) · [finance-billing.md](../rewrite/pages/finance-billing.md) · [finance-reimbursement.md](../rewrite/pages/finance-reimbursement.md) · [guides/receipt-registration.md](../guides/receipt-registration.md) | 不同对象夹带共用保存规则及旧运行快照，容易误把历史缺口当当前状态。<br>**方向：**各对象继续独立；通用幂等/冲突说明直链命令契约，保留页面特有校验和操作。没有独立指南的对象不因本次盘点自动新增文件。 |
 | B18 · 待整理 | 后续 | **发票、开票因子与 Excel 兼容**<br>[finance-invoice.md](../rewrite/pages/finance-invoice.md) · [real-ticket-excel-reference.md](../rewrite/pages/real-ticket-excel-reference.md) · [guides/finance-invoice.md](../guides/finance-invoice.md) · [guides/invoice-factor.md](../guides/invoice-factor.md) | 真实票据研究位于 pages，易与现行规格混用；样本、导入兼容与因子工具需要分工。<br>**方向：**发票台账、开票申请和因子工具保持区别；兼容规则归已有规格，独有样本分析保留来源。样本研究无独有价值后才退役，不仅搬目录。 |
 | B19 · 待整理 | 较高 | **本机保存、备份与旧库迁移**<br>[guides/local-customer-storage.md](../guides/local-customer-storage.md) · [guides/local-project-storage.md](../guides/local-project-storage.md) · [guides/local-supplier-storage.md](../guides/local-supplier-storage.md) · [guides/local-process-library-storage.md](../guides/local-process-library-storage.md) · [guides/local-backup-and-restore.md](../guides/local-backup-and-restore.md) · [guides/local-data-migration.md](../guides/local-data-migration.md) | 多篇短指南重复环境、原提交核对和生产边界；各领域也有真实差异。<br>**方向：**公共运行配置归既有生产入口；领域保存差异可并入相应业务指南的环境章节。备份恢复、旧库身份迁移继续独立；逐项保留恢复条件、门禁和未接管范围。 |
-| B20 · 待整理 | 后续 | **经营汇总、迁移对账与生产承接**<br>[project-operating-summary-index.md](../prd/project-operating-summary-index.md) · [project-operating-summary-and-import.md](../prd/project-operating-summary-and-import.md) · [summary-field-catalog.md](../migration/summary-field-catalog.md) · [ruijing-workbook-mapping.md](../migration/ruijing-workbook-mapping.md) · [ruijing-data-quality-and-reconciliation.md](../migration/ruijing-data-quality-and-reconciliation.md) · [ruijing-acceptance.md](../migration/ruijing-acceptance.md) · [project-operating-summary-work-breakdown.md](../implementation/project-operating-summary-work-breakdown.md) · [production-gate-work-breakdown.md](../implementation/production-gate-work-breakdown.md) | 目标、公式、样本映射与实施入口多处交叉；部分入口已缩短，不能视作都需合并。<br>**方向：**数据契约维护通用计算；迁移材料分别维护字段映射、差异归因和验收。PRD 保留用户目标和未完义务；工作分解只保留必要承接，不能凭模块完成就清退生产关口。 |
+| B20 · 待整理 | 后续 | **经营汇总、迁移对账与生产承接**<br>[project-operating-summary-index.md](../prd/project-operating-summary-index.md) · [project-operating-summary-and-import.md](../prd/project-operating-summary-and-import.md) · [summary-field-catalog.md](../migration/summary-field-catalog.md) · [ruijing-workbook-mapping.md](../migration/ruijing-workbook-mapping.md) · [ruijing-data-quality-and-reconciliation.md](../migration/ruijing-data-quality-and-reconciliation.md) · [ruijing-acceptance.md](../migration/ruijing-acceptance.md) · [project-operating-summary-work-breakdown.md](../implementation/project-operating-summary-work-breakdown.md) | 目标、公式、样本映射与实施入口多处交叉；部分入口已缩短，不能视作都需合并。<br>**方向：**数据契约维护通用计算；迁移材料分别维护字段映射、差异归因和验收。PRD 保留用户目标和未完义务。生产公共边界已归 ARCHITECTURE、COMMANDS、READ-MODELS 与 ADR 0021；生产子票及原生依赖直接见 #416/#450–#471，历史调查与探针定位见 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#production-investigation-evidence)，不复建任务副本。 |
 
 ## 5. 历史材料、证据与检查工具
 
@@ -147,7 +115,7 @@ flowchart TD
 | C03 · 待整理 | 较高 | **验收证据及附件**<br>[evidence](../design/evidence/) · [guide-pdf-cleanup-2026-09-14.md](./guide-pdf-cleanup-2026-09-14.md) | 工资等证据组保存多轮渲染、回执和原始载体；可能重复，尚未完成逐附件去留核对。<br>**方向：**优先核对工资 C2、C1、费用、A、空鼓、目标成本组。按验证事件保留版本/场景/结果/限制及必要原件；对候选附件列精确路径、用途、引用及恢复来源。现有 PDF 清理记录仍承担恢复指针，先保留。 |
 | C04 · 待整理 | 后续 | **测试模块索引**<br>[testing/README.md](../testing/README.md) · [modules](../testing/modules/) | 28 个模块重复长导语；当前登记未发现漏项或重复，本次未发现专用生成器。<br>**方向：**共用归属和阅读规则只留 README，模块保留领域分组与定位价值。清理后核对全部登记路径、重复与漏项；不将测试名称索引当业务验收证明。 |
 | C05 · 待整理 | 较高 | **生成覆盖索引与运行审计**<br>[module-review-coverage.md](../design/module-review-coverage.md) · [module-review-coverage.json](../design/module-review-coverage.json) · [design-coverage.json](../design/design-coverage.json) · [runtime-evidence-ledger.json](../design/runtime-evidence-ledger.json) · [runtime-reference-audit.md](../design/runtime-reference-audit.md) · [runtime-visual-regression.md](../design/runtime-visual-regression.md) · [sync-module-review-coverage.mjs](../../scripts/sync-module-review-coverage.mjs) · [sync-design-coverage.mjs](../../scripts/sync-design-coverage.mjs) · [sync-runtime-evidence-ledger.mjs](../../scripts/sync-runtime-evidence-ledger.mjs) · [module-review-obligations.mjs](../../scripts/module-review-obligations.mjs) · [module-review.md](../agents/module-review.md) | 生成索引体量大；运行方法、参考采证与逐页验收有重复，直接删生成块会被覆盖。<br>**方向：**保留防遗漏、设计对应、参考证据的不同职责。确需压缩输出时从现有生成源/模板改，验证再生成一致性；逐页复核方法集中，其他位置直链。 |
-| C06 · 待整理 | 后续 | **研究、工具比较与流程方向**<br>[research/README.md](./README.md) · [kit-ui-primitives-wave2-prd.md](./kit-ui-primitives-wave2-prd.md) · [kitui-to-shadcn-migration.md](./kitui-to-shadcn-migration.md) · [schedule-dependency-editor-brief.md](./schedule-dependency-editor-brief.md) · [module-development-flows.md](./module-development-flows.md) · [antfu-starred-tooling-2026-09-24.md](./antfu-starred-tooling-2026-09-24.md) · [antfu-starred-testing-local-audit-2026-09-24.md](./antfu-starred-testing-local-audit-2026-09-24.md) · [invoice-recognition-app-port-plan.md](./invoice-recognition-app-port-plan.md) · [ocr-recognition-strategy.md](./ocr-recognition-strategy.md) · [ocr-ux-benchmark.md](./ocr-ux-benchmark.md) · [project-switcher-patterns.md](./project-switcher-patterns.md) · [browser-audit-2026-09-05.md](./browser-audit-2026-09-05.md) · [red-circle-ui-gap-2026-07-11.md](./red-circle-ui-gap-2026-07-11.md) | 历史稿仍复制 API、尺寸、验收及开发方向；工具比较包含易过期环境快照。<br>**方向：**逐专题保留独有观察、官方来源和取舍；采纳后的规则归现有权威，工具使用归测试入口。有价值的流程图就近归页面/指南。先核独有价值再合并或删除，不把候选工具写成强制要求。 |
+| C06 · 待整理 | 后续 | **研究、工具比较与流程方向**<br>[research/README.md](./README.md) · [kitui-to-shadcn-migration.md](./kitui-to-shadcn-migration.md) · [schedule-dependency-editor-brief.md](./schedule-dependency-editor-brief.md) · [module-development-flows.md](./module-development-flows.md) · [antfu-starred-tooling-2026-09-24.md](./antfu-starred-tooling-2026-09-24.md) · [antfu-starred-testing-local-audit-2026-09-24.md](./antfu-starred-testing-local-audit-2026-09-24.md) · [invoice-recognition-app-port-plan.md](./invoice-recognition-app-port-plan.md) · [ocr-recognition-strategy.md](./ocr-recognition-strategy.md) · [ocr-ux-benchmark.md](./ocr-ux-benchmark.md) · [project-switcher-patterns.md](./project-switcher-patterns.md) · [browser-audit-2026-09-05.md](./browser-audit-2026-09-05.md) · [red-circle-ui-gap-2026-07-11.md](./red-circle-ui-gap-2026-07-11.md) | 历史稿仍复制 API、尺寸、验收及开发方向；工具比较包含易过期环境快照。<br>**方向：**逐专题保留独有观察、官方来源和取舍；采纳后的规则归现有权威，工具使用归测试入口。有价值的流程图就近归页面/指南。先核独有价值再合并或删除，不把候选工具写成强制要求。 |
 | C07 · 待整理 | 后续 | **分支整合与交付流水**<br>[local-branch-integration-2026-09-05.md](./local-branch-integration-2026-09-05.md) · [local-branch-integration-2026-09-10.md](./local-branch-integration-2026-09-10.md) · [issue-tracker-audit-2026-07-06.md](./issue-tracker-audit-2026-07-06.md) · [completed-issue-delivery-2026-09-22.md](../design/evidence/completed-issue-delivery-2026-09-22.md) · [issue-412-decision-closeout.md](../design/evidence/issue-412-decision-closeout.md) | 存在领先数、测试计数、未推送状态和多轮过程叙述；部分文件仍承担冲突取舍与收尾来源。<br>**方向：**保留独有裁定、固定提交、恢复定位及未完义务；其余重复过程从工作树清退。不能把当时状态当当前状态，也不能因已完成整份删除。 |
 | C08 · 待整理 | 优先 | **断链与文档检查缺口**<br>[frontend.md](../design/evidence/issue-453-production-supplier/frontend.md) · [payroll-tickets/04-central-adjustments-and-actual-payments.md](./issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md) · [documentation-tooling.md](../testing/modules/documentation-tooling.md) · [git-hooks.mjs](../../scripts/git-hooks.mjs) · [.lintstagedrc](../../.lintstagedrc) · [pre-commit](../../.husky/pre-commit) | 本轮抽查发现 8 个文件目标缺失；已有专用契约测试不等于一般 Markdown 文件/锚点检查。<br>**方向：**先查缺失证据的提交或产物，恢复正确入口或明确不可取得；不得通过删链接伪称证据完整。若补长期检查，复用现有工具，区分历史原路径与阅读链接；钩子/测试行为变更另行审阅。 |
 

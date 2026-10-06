@@ -124,7 +124,7 @@ test.describe('Issue #436 普通收款中央全链', () => {
     expect(errors).toEqual([])
   })
 
-  test('无客户草稿保持空金额，明确零与网络失败重试保存同一记录', async ({ page }) => {
+  test('无客户草稿保持空金额，真实零与原提交未应用封存后的新命令保存', async ({ page }) => {
     test.setTimeout(90_000)
     const saved = await seedReceipt(page, 'SK-BLANK-436', true)
     await page.goto('/finance/receipt?search=SK-BLANK&page=1&pageSize=10')
@@ -146,12 +146,16 @@ test.describe('Issue #436 普通收款中央全链', () => {
       }
     })
     await page.getByRole('button', { name: '保存草稿', exact: true }).click()
-    await expect(page.getByRole('alert').filter({ hasText: '收款尚未保存' })).toBeVisible()
+    await expect(page.getByRole('status', { name: '原提交恢复' })).toContainText('原提交结果未知')
     await expect(page.getByRole('textbox', { name: '收款金额', exact: true })).toHaveValue('0')
+    await expect(page.getByRole('button', { name: '保存草稿', exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: '核对原提交', exact: true }).click()
+    await expect(page.getByRole('status', { name: '原提交恢复' })).toHaveCount(0)
+    expect(commands).toHaveLength(1)
     await page.getByRole('button', { name: '保存草稿', exact: true }).click()
     await expect(page.getByRole('textbox', { name: '收款金额', exact: true })).toHaveValue('0.00')
     expect(commands).toHaveLength(2)
-    expect(commands[0]).toBe(commands[1])
+    expect(commands[0]).not.toBe(commands[1])
     const record = await (await page.request.get(`/api/read/receipts/${saved.id}/record?origin=real`)).json()
     expect(record.record.draft.amount).toBe('0.00')
     await page.getByRole('button', { name: '返回来源页面', exact: true }).click()
@@ -195,6 +199,61 @@ test.describe('Issue #436 普通收款中央全链', () => {
     await page.getByRole('link', { name: '返回来源页面', exact: true }).click()
     await expect(page).toHaveURL(/#final-settlement-receipt-/)
     await expect(page.getByRole('link', { name: '查看收款', exact: true })).toBeFocused()
+  })
+
+  test('已应用但响应丢失的原编号跨刷新恢复，保存后读回失败只重读并保留输入', async ({ page }) => {
+    test.setTimeout(90_000)
+    const saved = await seedReceipt(page, 'SK-RECOVERY-A03')
+    await page.goto(`/finance/receipt/form/${saved.id}?origin=real`)
+    await page.getByRole('textbox', { name: '收款金额', exact: true }).fill('220.25')
+    const commands: string[] = []
+    await page.route('**/api/commands/receipts', async (route) => {
+      commands.push(route.request().postDataJSON().commandId)
+      await route.fetch()
+      await route.abort('failed')
+    })
+    await page.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(page.getByRole('status', { name: '原提交恢复' })).toContainText('原提交结果未知')
+    await expect(page.getByRole('textbox', { name: '收款金额', exact: true })).toHaveValue('220.25')
+    await expect(page.getByRole('button', { name: '保存', exact: true })).toHaveCount(0)
+    await page.reload()
+    await expect(page.getByRole('textbox', { name: '收款金额', exact: true })).toHaveValue('220.25')
+    await expect(page.getByRole('status', { name: '原提交恢复' })).toHaveCount(0)
+    expect(commands).toHaveLength(1)
+    await page.unroute('**/api/commands/receipts')
+    await page.route('**/api/commands/receipts', async (route) => {
+      commands.push(route.request().postDataJSON().commandId)
+      await route.continue()
+    })
+    let failRead = true
+    await page.route(`**/api/read/receipts/${saved.id}/record?**`, async (route) => {
+      if (failRead) {
+        await route.fulfill({ status: 503, json: { code: 'unavailable', message: '保存后读取暂不可用', retryable: true, fieldErrors: {}, traceId: null } })
+      }
+      else {
+        await route.continue()
+      }
+    })
+    await page.getByRole('textbox', { name: '收款金额', exact: true }).fill('330.50')
+    await page.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(page.getByRole('status', { name: '原提交恢复' })).toContainText('已保存待刷新')
+    await expect(page.getByRole('textbox', { name: '收款金额', exact: true })).toHaveValue('330.50')
+    await expect(page).toHaveURL(new RegExp(`/finance/receipt/form/${saved.id}`))
+    await expect(page.getByRole('button', { name: '重新读取已保存记录' })).toBeEnabled()
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expectNoPageOverflow(page, `收款恢复 ${width}`)
+      await page.getByRole('button', { name: '重新读取已保存记录' }).focus()
+      await expect(page.getByRole('button', { name: '重新读取已保存记录' })).toBeFocused()
+    }
+    failRead = false
+    await page.getByRole('button', { name: '重新读取已保存记录' }).press('Enter')
+    await expect(page.getByRole('status', { name: '原提交恢复' })).toHaveCount(0)
+    await expect(page.getByRole('textbox', { name: '收款金额', exact: true })).toHaveValue('330.50')
+    expect(commands).toHaveLength(2)
+    const record = await (await page.request.get(`/api/read/receipts/${saved.id}/record?origin=real`)).json()
+    expect(record.record.version).toBe('3')
+    expect(record.record.draft.amount).toBe('330.50')
   })
 
   test('演示收款单独累计、按演示身份读取且没有写入口', async ({ page }) => {

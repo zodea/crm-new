@@ -1,4 +1,4 @@
-import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ReadProjection } from '../../types/read-model'
 import type {
   MaterialContractDetailQueryDTO,
   MaterialContractDetailReadDTO,
@@ -10,6 +10,7 @@ import type {
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
 import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
+import { parsePageQuery, resolvePagination } from '../read-model/pagination'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import {
@@ -47,15 +48,12 @@ function dataOrigin(value: unknown) {
   throw new MaterialContractRepositoryProblem(materialContractProblem('invalid-query', '材料采购合同列表来源无效'))
 }
 
-function positiveInteger(value: unknown, fallback: number): number {
-  const parsed = Number(value)
-  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : fallback
-}
-
 export function parseMaterialContractListQuery(
   input: Record<string, unknown> | undefined,
 ): MaterialContractListQueryDTO {
-  const pageSize = positiveInteger(input?.pageSize, 10)
+  const { requestedPage, pageSize } = parsePageQuery(input ?? {}, () => {
+    throw new MaterialContractRepositoryProblem(materialContractProblem('invalid-query', '分页参数无效'))
+  }, 10)
   if (!MATERIAL_CONTRACT_PAGE_SIZES.includes(pageSize as MaterialContractPageSize)) {
     throw new MaterialContractRepositoryProblem(materialContractProblem(
       'invalid-query',
@@ -72,7 +70,7 @@ export function parseMaterialContractListQuery(
     projectId: optional(input?.projectId),
     supplierId: optional(input?.supplierId),
     status: parseContractListFilter(input?.status, () => new MaterialContractRepositoryProblem(materialContractProblem('invalid-query', '合同筛选参数无效'))),
-    page: positiveInteger(input?.page, 1),
+    page: requestedPage,
     pageSize: pageSize as MaterialContractPageSize,
   }
 }
@@ -88,7 +86,9 @@ export function parseMaterialContractDetailQuery(
       '材料采购合同详情查询参数无效',
     ))
   }
-  return { id, origin, includeDemo: bool(input?.includeDemo) }
+  if (input?.supplementId !== undefined && input.supplementId !== '' && (typeof input.supplementId !== 'string' || !/^[A-Z0-9][\w-]{2,79}$/i.test(input.supplementId)))
+    throw new MaterialContractRepositoryProblem(materialContractProblem('invalid-query', '补充协议身份无效'))
+  return { id, origin, includeDemo: bool(input?.includeDemo), ...(input?.supplementId ? { supplementId: String(input.supplementId) } : {}) }
 }
 
 function money(value: number): string {
@@ -107,12 +107,14 @@ function entityRef<T extends 'project' | 'supplier'>(
   entity: T,
   id: string | null,
   label: string,
-  referenceState: 'resolved' | 'forbidden' | 'missing-target',
+  referenceState: 'resolved' | 'forbidden' | 'missing-target' | 'unavailable',
 ): EntityRefDTO & { entity: T } {
   if (!id)
     return { state: 'missing', entity, id: null, label: null, reason: 'not-recorded' } as EntityRefDTO & { entity: T }
   if (referenceState === 'forbidden')
-    return { state: 'forbidden', entity, id, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
+    return { state: 'forbidden', entity, id: null, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
+  if (referenceState === 'unavailable')
+    return { state: 'unavailable', entity, id: null, label: null, reason: 'source-unavailable' } as EntityRefDTO & { entity: T }
   if (referenceState === 'missing-target')
     return { state: 'missing', entity, id: null, label: null, reason: 'not-configured' } as EntityRefDTO & { entity: T }
   return { state: 'resolved', entity, id, label, no: null } as EntityRefDTO & { entity: T }
@@ -124,6 +126,8 @@ function detailNavigation(
 ): NavigationIntentDTO {
   if (reference.state === 'forbidden')
     return { kind: 'unavailable', reason: 'forbidden' }
+  if (reference.state === 'unavailable')
+    return { kind: 'unavailable', reason: 'not-connected' }
   if (reference.state === 'missing' && reference.reason === 'not-configured')
     return { kind: 'unavailable', reason: 'unverified-target' }
   if (reference.state !== 'resolved')
@@ -160,18 +164,18 @@ function resolvedRef(
 
 function amounts(source: MaterialContractDetailSource) {
   return {
-    contract: money(source.amount),
-    changed: money(source.amount + source.supplementAmount),
-    settled: money(source.settledAmount),
-    invoiced: money(source.invoicedAmount),
-    paid: money(source.paidAmount),
-    payable: money(source.settledAmount - source.paidAmount),
+    contract: source.amount == null ? null : money(source.amount),
+    changed: source.amount == null || source.supplementAmount == null ? null : money(source.amount + source.supplementAmount),
+    settled: source.financialReadStatus === 'unavailable' ? null : money(source.settledAmount),
+    invoiced: source.financialReadStatus === 'unavailable' ? null : money(source.invoicedAmount),
+    paid: source.financialReadStatus === 'unavailable' ? null : money(source.paidAmount),
+    payable: source.financialReadStatus === 'unavailable' ? null : money(source.settledAmount - source.paidAmount),
   }
 }
 
 export function buildMaterialContractListPage(
   input: BuildMaterialContractListPageInput,
-): MaterialContractListPageDTO {
+): ReadProjection<MaterialContractListPageDTO> {
   const allowedOrigins = input.query.includeDemo
     ? new Set(['real', 'demo'])
     : new Set(['real'])
@@ -189,7 +193,8 @@ export function buildMaterialContractListPage(
       return !search || [row.name, row.no].some(value => value.toLocaleLowerCase('zh-CN').includes(search))
     })
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id))
-  const start = (input.query.page - 1) * input.query.pageSize
+  const { page } = resolvePagination(input.query.page, input.query.pageSize, filtered.length)
+  const start = (page - 1) * input.query.pageSize
   const items = filtered.slice(start, start + input.query.pageSize).map((source) => {
     const project = entityRef('project', source.projectId, source.projectName, source.projectReferenceState)
     const supplier = entityRef('supplier', source.supplierId, source.supplierName, source.supplierReferenceState)
@@ -214,9 +219,9 @@ export function buildMaterialContractListPage(
     const rows = filtered.filter(row => row.dataOrigin === origin)
     return {
       contractCount: rows.length,
-      changedAmount: money(rows.reduce((sum, row) => sum + row.amount + row.supplementAmount, 0)),
-      invoicedAmount: money(rows.reduce((sum, row) => sum + row.invoicedAmount, 0)),
-      paidAmount: money(rows.reduce((sum, row) => sum + row.paidAmount, 0)),
+      changedAmount: rows.some(row => row.amount == null || row.supplementAmount == null) ? null : money(rows.reduce((sum, row) => sum + row.amount! + row.supplementAmount!, 0)),
+      invoicedAmount: rows.some(row => row.financialReadStatus === 'unavailable') ? null : money(rows.reduce((sum, row) => sum + row.invoicedAmount, 0)),
+      paidAmount: rows.some(row => row.financialReadStatus === 'unavailable') ? null : money(rows.reduce((sum, row) => sum + row.paidAmount, 0)),
     }
   }
   const uniqueOptions = (
@@ -232,10 +237,10 @@ export function buildMaterialContractListPage(
     .map(value => ({ value, count: filtered.filter(row => row.status === value).length }))
   return {
     items,
-    pagination: { page: input.query.page, pageSize: input.query.pageSize, total: filtered.length },
+    pagination: { requestedPage: input.query.page, page, pageSize: input.query.pageSize, total: filtered.length },
     summary: {
-      projects: uniqueOptions(row => row.projectId, row => row.projectName),
-      suppliers: uniqueOptions(row => row.supplierId, row => row.supplierName),
+      projects: uniqueOptions(row => row.projectReferenceState === 'resolved' ? row.projectId : null, row => row.projectName),
+      suppliers: uniqueOptions(row => row.supplierReferenceState === 'resolved' ? row.supplierId : null, row => row.supplierName),
       statuses,
       origins: { real: originSummary('real'), demo: originSummary('demo') },
     },
@@ -250,7 +255,7 @@ export function buildMaterialContractListPage(
 
 export function buildMaterialContractDetail(
   input: BuildMaterialContractDetailInput,
-): MaterialContractDetailReadDTO {
+): ReadProjection<MaterialContractDetailReadDTO> {
   if (input.query.origin === 'demo' && !input.query.includeDemo) {
     throw new MaterialContractRepositoryProblem(materialContractProblem(
       'forbidden',
@@ -279,26 +284,68 @@ export function buildMaterialContractDetail(
   const sameContract = <T extends { dataOrigin: string, contractId: string | null }>(rows: readonly T[]) => rows
     .filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)
   const facts = input.facts
-  const lineItems = facts.lineItems
-    .filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)
+  if (input.query.supplementId) {
+    const supplement = (facts.supplements ?? []).find(row => row.id === input.query.supplementId && row.dataOrigin === source.dataOrigin)
+    if (!supplement)
+      throw new MaterialContractRepositoryProblem(materialContractProblem('not-found', '补充协议不存在或来源不可用'))
+    if (supplement.contractId !== source.id)
+      throw new MaterialContractRepositoryProblem(materialContractProblem('relationship-mismatch', '补充协议不属于当前材料主合同'))
+  }
+  const ownerLines = (ownerId: string, supplement = false) => facts.lineItems
+    .filter(row => row.dataOrigin === source.dataOrigin && row.contractId === ownerId)
     .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id))
     .map((row) => {
-      const amount = row.qty == null || row.taxInclusiveUnitPrice == null
-        ? null
-        : money(row.qty * row.taxInclusiveUnitPrice)
+      const amount = supplement && row.originalLineId
+        ? row.changeAmount == null ? null : money(row.changeAmount)
+        : row.qty == null || row.taxInclusiveUnitPrice == null
+          ? null
+          : money(row.qty * row.taxInclusiveUnitPrice)
       return {
         id: row.id,
         materialName: row.materialName,
         spec: row.spec,
+        materialGrade: row.materialGrade ?? '',
         brand: row.brand,
         unit: row.unit,
         qty: row.qty == null ? null : quantity(row.qty),
         unitPrice: row.taxInclusiveUnitPrice == null ? null : money(row.taxInclusiveUnitPrice),
+        applicableTaxRate: row.applicableTaxRate ?? null,
         amount,
         plannedArrivalDate: row.plannedArrivalDate,
         note: row.note,
+        originalLineId: row.originalLineId ?? null,
+        changeAmount: row.changeAmount == null ? null : money(row.changeAmount),
+        changeBasis: row.changeBasis ?? '',
+        source: row.source ? structuredClone(row.source) : null,
       }
     })
+  const ownerDeductions = (ownerId: string) => (facts.deductions ?? [])
+    .filter(row => row.dataOrigin === source.dataOrigin && row.ownerId === ownerId)
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id))
+    .map(row => ({ id: row.id, name: row.name, amount: row.amount == null ? null : money(-row.amount), basis: row.basis }))
+  const supplements = (facts.supplements ?? [])
+    .filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)
+    .map(row => ({
+      id: row.id,
+      contractId: row.contractId,
+      no: row.no,
+      name: row.name,
+      content: row.content,
+      amount: row.amount == null ? null : money(row.amount),
+      signDate: row.signDate,
+      status: row.status,
+      lineItems: ownerLines(row.id, true),
+      deductions: ownerDeductions(row.id),
+      ourSignatorySnapshot: row.ourSignatorySnapshot ? structuredClone(row.ourSignatorySnapshot) : null,
+      originalLineSnapshots: (row.originalLineSnapshots ?? []).map(snapshot => ({
+        originalLineId: snapshot.originalLineId,
+        parentVersion: snapshot.parentVersion,
+        ...(snapshot.sourceUpdatedAt ? { sourceUpdatedAt: snapshot.sourceUpdatedAt } : {}),
+        materialName: snapshot.line.materialName ?? '',
+        qty: snapshot.line.qty == null ? null : quantity(snapshot.line.qty),
+        unitPrice: snapshot.line.taxInclusiveUnitPrice == null ? null : money(snapshot.line.taxInclusiveUnitPrice),
+      })),
+    }))
   const mapFacts = (
     rows: readonly (typeof facts.materialRequisitions[number])[],
   ) => sameContract(rows).map(row => ({
@@ -343,7 +390,10 @@ export function buildMaterialContractDetail(
       project,
       supplier,
       amounts: amounts(source),
+      ...(source.financialReadStatus ? { financialReadStatus: source.financialReadStatus } : {}),
       content: source.content,
+      ourSignatorySnapshot: source.ourSignatorySnapshot ? structuredClone(source.ourSignatorySnapshot) : null,
+      legacyPartyA: source.legacyPartyA ?? null,
       invoiceType: source.invoiceType,
       contactName: source.contactName,
       contactPhone: canReadSensitive ? source.contactPhone : maskPhone(source.contactPhone),
@@ -370,7 +420,9 @@ export function buildMaterialContractDetail(
     projectNavigation: detailNavigation(project, source.dataOrigin),
     supplierNavigation: detailNavigation(supplier, source.dataOrigin),
     sections: {
-      lineItems,
+      lineItems: ownerLines(source.id),
+      deductions: ownerDeductions(source.id),
+      supplements,
       materials: {
         requisitions: mapFacts(facts.materialRequisitions),
         arrivals: mapFacts(facts.materialArrivals),
@@ -382,7 +434,7 @@ export function buildMaterialContractDetail(
       settlements: mapFacts(facts.settlements),
       penalties: mapFacts(facts.penalties),
       files: facts.files
-        .filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)
+        .filter(row => row.dataOrigin === source.dataOrigin && (row.contractId === source.id || supplements.some(supplement => supplement.id === row.contractId)))
         .map(row => ({
           id: row.id,
           fileName: row.fileName,
@@ -390,6 +442,7 @@ export function buildMaterialContractDetail(
           mimeType: row.mimeType,
           category: row.category,
           uploadedAt: row.uploadedAt,
+          ...(row.originalAvailable !== undefined ? { originalAvailable: row.originalAvailable, ownerId: row.contractId } : {}),
         })),
     },
     asOf: input.asOf,

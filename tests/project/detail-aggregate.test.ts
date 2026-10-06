@@ -2,31 +2,11 @@ import type { TestDb } from '../helpers/memory-db'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
-import {
-  loadArchivedInvoiceAggregates,
-  loadProjectDetailAggregates,
-} from '~/lib/project/detail-aggregate'
+import { loadArchivedInvoiceAggregates } from '~/lib/project/detail-aggregate'
 import { createMemoryDb } from '../helpers/memory-db'
 
-type SeedRow = Record<string, unknown>
-
-const TABLES = [
-  'customers',
-  'projects',
-  'suppliers',
-  'contracts',
-  'contract_supplements',
-  'invoices',
-  'owner_change_orders',
-  'invoice_applications',
-  'receipt_registrations',
-  'payment_applications',
-  'current_transactions',
-] as const
-
 async function insertSeed(db: TestDb, table: string) {
-  const url = new URL(`../../app/lib/db/seed/${table}.json`, import.meta.url)
-  const rows = JSON.parse(readFileSync(url, 'utf-8')) as SeedRow[]
+  const rows = JSON.parse(readFileSync(new URL(`../../app/lib/db/seed/${table}.json`, import.meta.url), 'utf-8')) as Record<string, unknown>[]
   for (const row of rows) {
     const columns = Object.keys(row)
     await db.execute(
@@ -36,241 +16,75 @@ async function insertSeed(db: TestDb, table: string) {
   }
 }
 
-describe('project detail SQL aggregates', () => {
-  it('普通收款按有效登记事实汇总，草稿、作废和软删不进入项目收款', async () => {
+describe('archived invoice project aggregates', () => {
+  it('preserves the archived invoice source and project range from the existing fixture', async () => {
     const db = await createMemoryDb()
     try {
       await runMigrations(db)
-      await db.execute(`INSERT INTO projects (id, name) VALUES ('receipt-project', '收款项目')`)
-      for (const [index, status] of ['draft', '草稿', 'void', '作废', '已作废'].entries()) {
-        await db.execute(`
-          INSERT INTO receipt_registrations (id, project_id, amount, status)
-          VALUES (?, 'receipt-project', 100, ?)
-        `, [`excluded-receipt-${index}`, status])
-      }
+      for (const table of ['customers', 'projects', 'suppliers', 'invoices'])
+        await insertSeed(db, table)
+      expect(await loadArchivedInvoiceAggregates(db)).toEqual([
+        { projectId: 'proj_demo_002', inputAmount: 10956.11, inputTax: 1423.89, archivedCount: 1 },
+      ])
+    }
+    finally { db.close() }
+  })
+
+  it('reads real SQLite null, corrupt text, zero and red-letter values independently by project and column', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      await db.execute(`INSERT INTO projects (id, name) VALUES ('known', '已知'), ('unknown', '未知'), ('text', '坏金额'), ('tax', '未知税额'), ('zero', '真实零')`)
       await db.execute(`
-        INSERT INTO receipt_registrations (id, project_id, amount, status, deleted_at)
+        INSERT INTO invoices (id, project_id, amount, tax_amount, account_status)
         VALUES
-          ('submitted-receipt', 'receipt-project', 50, 'submitted', NULL),
-          ('historical-receipt', 'receipt-project', 25, '', NULL),
-          ('received-receipt', 'receipt-project', 25, '已收款', NULL),
-          ('deleted-receipt', 'receipt-project', 200, 'submitted', '2026-10-02T00:00:00.000Z')
+          ('positive', 'known', 17.500001, 1, 'archived'),
+          ('red-letter', 'known', -2.5, -0.5, 'archived'),
+          ('unknown-known-row', 'unknown', 10, 2, 'archived'),
+          ('unknown-row', 'unknown', NULL, 1, 'archived'),
+          ('text-row', 'text', 'unknown-amount', 3, 'archived'),
+          ('tax-row', 'tax', 5, NULL, 'archived'),
+          ('zero-row', 'zero', 0, 0, 'archived')
       `)
-
-      const [aggregate] = await loadProjectDetailAggregates(db)
-
-      expect(aggregate).toMatchObject({
-        projectId: 'receipt-project',
-        projectReceipt: 100,
-        availableBalance: 100,
-      })
+      const rows = await loadArchivedInvoiceAggregates(db)
+      expect(rows.find(row => row.projectId === 'known')).toMatchObject({ projectId: 'known', inputTax: 0.5, archivedCount: 2 })
+      expect(rows.find(row => row.projectId === 'known')!.inputAmount).toBeCloseTo(15.000001, 12)
+      expect(rows.find(row => row.projectId === 'unknown')).toEqual({ projectId: 'unknown', inputAmount: null, inputTax: 3, archivedCount: 2 })
+      expect(rows.find(row => row.projectId === 'text')).toEqual({ projectId: 'text', inputAmount: null, inputTax: 3, archivedCount: 1 })
+      expect(rows.find(row => row.projectId === 'tax')).toEqual({ projectId: 'tax', inputAmount: 5, inputTax: null, archivedCount: 1 })
+      expect(rows.find(row => row.projectId === 'zero')).toEqual({ projectId: 'zero', inputAmount: 0, inputTax: 0, archivedCount: 1 })
+      expect(await db.select('SELECT amount, tax_amount FROM invoices WHERE id = ?', ['unknown-row'])).toEqual([{ amount: null, tax_amount: 1 }])
+      expect(await db.select('SELECT amount FROM invoices WHERE id = ?', ['text-row'])).toEqual([{ amount: 'unknown-amount' }])
+      expect(await db.select('SELECT amount FROM invoices WHERE id = ?', ['positive'])).toEqual([{ amount: 17.500001 }])
     }
-    finally {
-      db.close()
-    }
+    finally { db.close() }
   })
 
-  it('aggregates operation and output invoice values in SQLite', async () => {
+  it('excludes unarchived and soft-deleted facts and ancestors, restores original values, and keeps overflow unknown', async () => {
     const db = await createMemoryDb()
-    await runMigrations(db)
-    for (const table of TABLES)
-      await insertSeed(db, table)
-    await db.execute(`
-      INSERT INTO payment_records (
-        id, no, project_id, payee_name, payment_date, amount,
-        voucher_no, bank_serial_no, confirmation_status
-      )
-      VALUES (
-        'payment-project-aggregate', 'ZF-AGG', 'proj_demo_001', '项目收款方',
-        '2026-06-20', 4200000, 'V-AGG', 'BANK-AGG', 'needs_review'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO payment_record_application_allocations (
-        id, payment_record_id, payment_application_id, allocated_amount
-      )
-      VALUES (
-        'payment-project-aggregate-allocation',
-        'payment-project-aggregate',
-        'pa_mz0x1_0',
-        4200000
-      )
-    `)
-    await db.execute(`
-      UPDATE payment_records
-      SET confirmation_status = 'confirmed',
-          confirmed_by = '测试财务',
-          confirmed_at = '2026-06-20T09:00:00.000Z'
-      WHERE id = 'payment-project-aggregate'
-    `)
-
-    const rows = await loadProjectDetailAggregates(db)
-    const p1 = rows.find(row => row.projectId === 'proj_demo_001')!
-    expect(p1).toMatchObject({
-      mainContractAmount: 32388422,
-      supplementAmount: 320000,
-      ownerChangeAmount: 120520,
-      projectReceipt: 25367027,
-      paymentAmount: 4200000,
-      currentReceipt: 6100000,
-      currentPayment: 5950000,
-      outputAmount: 25663629,
-      outputTax: 2119015,
-    })
-
-    const archived = await loadArchivedInvoiceAggregates(db)
-    expect(archived).toEqual([
-      { projectId: 'proj_demo_002', inputAmount: 10956.11, inputTax: 1423.89, archivedCount: 1 },
-    ])
-  })
-
-  it('uses canonical contracts and supplements after F2 stops legacy writes', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
-    await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-canonical', 'canonical 客户')`)
-    await db.execute(`
-      INSERT INTO projects (id, name, customer_id)
-      VALUES ('project-canonical', 'canonical 项目', 'customer-canonical')
-    `)
-    await db.execute(`
-      INSERT INTO contracts (
-        id, no, name, kind, project_id, customer_id, amount, status
-      )
-      VALUES (
-        'contract-canonical', 'SG-CANONICAL', 'canonical 施工合同', '施工',
-        'project-canonical', 'customer-canonical', 100, '履约中'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO contract_supplements (
-        id, contract_id, name, amount, status
-      )
-      VALUES (
-        'supplement-canonical', 'contract-canonical', 'canonical 补充协议', 25, '有效'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO contracts (
-        id, no, name, kind, project_id, customer_id, amount, status
-      )
-      VALUES (
-        'contract-draft', 'SG-DRAFT', '草稿施工合同', '施工',
-        'project-canonical', 'customer-canonical', 900, 'draft'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO contract_supplements (
-        id, contract_id, name, amount, status
-      )
-      VALUES (
-        'supplement-on-draft-contract', 'contract-draft', '草稿合同下的有效协议', 125, '有效'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO contract_supplements (
-        id, contract_id, name, amount, status
-      )
-      VALUES (
-        'supplement-draft', 'contract-canonical', '草稿补充协议', 75, 'draft'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO receipt_registrations (
-        id, project_id, no, amount, status
-      )
-      VALUES (
-        'receipt-draft', 'project-canonical', 'SK-DRAFT', 800, 'draft'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO invoice_applications (
-        id, project_id, no, name, amount, tax_amount, status
-      )
-      VALUES (
-        'invoice-draft', 'project-canonical', 'KP-DRAFT', '草稿开票', 700, 63, 'draft'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO owner_change_orders (
-        id, project_id, change_no, tax_inc_amount, status
-      )
-      VALUES (
-        'change-submitted', 'project-canonical', 'BG-SUBMITTED', 600, 'submitted'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO owner_change_orders (
-        id, project_id, change_no, tax_inc_amount, approval_date, status
-      )
-      VALUES (
-        'change-approved', 'project-canonical', 'BG-APPROVED', 50, '2026-07-27', 'approved'
-      )
-    `)
-    await db.execute(`
-      INSERT INTO construction_contracts (
-        id, project_id, name, amount
-      )
-      VALUES (
-        'contract-legacy-after-stop', 'project-canonical', '停写后的旧合同', 900
-      )
-    `)
-    await db.execute(`
-      INSERT INTO supplement_agreements (
-        id, contract_id, name, amount
-      )
-      VALUES (
-        'supplement-legacy-after-stop', 'contract-legacy-after-stop', '停写后的旧补充协议', 75
-      )
-    `)
-
-    const [aggregate] = await loadProjectDetailAggregates(db)
-    expect(aggregate).toMatchObject({
-      projectId: 'project-canonical',
-      mainContractAmount: 100,
-      supplementAmount: 25,
-      ownerChangeAmount: 50,
-      changedContractAmount: 175,
-      projectReceipt: 0,
-      outputAmount: 0,
-      outputTax: 0,
-    })
-
-    await db.execute(`UPDATE contracts SET status = '履约中' WHERE id = 'contract-draft'`)
-    await db.execute(`UPDATE contract_supplements SET status = '有效' WHERE id = 'supplement-draft'`)
-    await db.execute(`UPDATE receipt_registrations SET status = 'submitted' WHERE id = 'receipt-draft'`)
-    await db.execute(`UPDATE invoice_applications SET status = '已审核' WHERE id = 'invoice-draft'`)
-    await db.execute(`UPDATE owner_change_orders SET status = 'approved' WHERE id = 'change-submitted'`)
-
-    const [afterConfirmation] = await loadProjectDetailAggregates(db)
-    expect(afterConfirmation).toMatchObject({
-      projectId: 'project-canonical',
-      mainContractAmount: 1000,
-      supplementAmount: 225,
-      ownerChangeAmount: 650,
-      changedContractAmount: 1875,
-      projectReceipt: 800,
-      outputAmount: 700,
-      outputTax: 63,
-    })
-
-    const deletedAt = '2026-07-27T00:00:00.000Z'
-    await db.execute(`UPDATE contracts SET deleted_at = ? WHERE id = 'contract-draft'`, [deletedAt])
-    await db.execute(`UPDATE contract_supplements SET deleted_at = ? WHERE id = 'supplement-on-draft-contract'`, [deletedAt])
-    await db.execute(`UPDATE contract_supplements SET deleted_at = ? WHERE id = 'supplement-draft'`, [deletedAt])
-    await db.execute(`UPDATE receipt_registrations SET deleted_at = ? WHERE id = 'receipt-draft'`, [deletedAt])
-    await db.execute(`UPDATE invoice_applications SET deleted_at = ? WHERE id = 'invoice-draft'`, [deletedAt])
-    await db.execute(`UPDATE owner_change_orders SET deleted_at = ? WHERE id = 'change-submitted'`, [deletedAt])
-
-    const [afterSoftDelete] = await loadProjectDetailAggregates(db)
-    expect(afterSoftDelete).toMatchObject({
-      projectId: 'project-canonical',
-      mainContractAmount: 100,
-      supplementAmount: 25,
-      ownerChangeAmount: 50,
-      changedContractAmount: 175,
-      projectReceipt: 0,
-      outputAmount: 0,
-      outputTax: 0,
-    })
+    try {
+      await runMigrations(db)
+      await db.execute(`INSERT INTO customers (id, name) VALUES ('customer', '客户')`)
+      await db.execute(`INSERT INTO projects (id, name, customer_id) VALUES ('project', '项目', 'customer'), ('overflow', '超范围', NULL)`)
+      await db.execute(`INSERT INTO suppliers (id, name) VALUES ('supplier', '分供方')`)
+      await db.execute(`
+        INSERT INTO invoices (id, project_id, supplier_id, amount, tax_amount, account_status, deleted_at)
+        VALUES
+          ('active', 'project', 'supplier', 100, 10, 'archived', NULL),
+          ('pending', 'project', NULL, NULL, NULL, 'none', NULL),
+          ('deleted', 'project', NULL, 900, 90, 'archived', '2026-10-05'),
+          ('overflow-one', 'overflow', NULL, 1e308, 0, 'archived', NULL),
+          ('overflow-two', 'overflow', NULL, 1e308, 0, 'archived', NULL)
+      `)
+      expect((await loadArchivedInvoiceAggregates(db)).find(row => row.projectId === 'project')).toEqual({ projectId: 'project', inputAmount: 100, inputTax: 10, archivedCount: 1 })
+      expect((await loadArchivedInvoiceAggregates(db)).find(row => row.projectId === 'overflow')).toEqual({ projectId: 'overflow', inputAmount: null, inputTax: 0, archivedCount: 2 })
+      for (const [table, id] of [['suppliers', 'supplier'], ['projects', 'project'], ['customers', 'customer']]) {
+        await db.execute(`UPDATE ${table} SET deleted_at = '2026-10-05' WHERE id = ?`, [id])
+        expect((await loadArchivedInvoiceAggregates(db)).some(row => row.projectId === 'project')).toBe(false)
+        await db.execute(`UPDATE ${table} SET deleted_at = NULL WHERE id = ?`, [id])
+        expect((await loadArchivedInvoiceAggregates(db)).find(row => row.projectId === 'project')).toMatchObject({ inputAmount: 100, inputTax: 10, archivedCount: 1 })
+      }
+    }
+    finally { db.close() }
   })
 })

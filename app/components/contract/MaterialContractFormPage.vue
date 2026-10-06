@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import type { F2SaveAction, ProjectContractFormDraft } from '~/lib/contract/forms'
+import type { ContractFormAttachmentDraft, ContractLineItemDraft, F2SaveAction, ProjectContractFormDraft } from '~/lib/contract/forms'
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import { useContractFormNavigation } from '~/composables/useContractFormNavigation'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { contractSupplierSelectionPatch, F2_FORM_META, f2FormDefaults } from '~/lib/contract/page'
+import { materialContractTotal, reconcileMaterialDraftIdentities } from '~/lib/material-contract/line-model'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/repository'
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { yuan } from '~/lib/util/money'
 import { MaterialContractCommandConflictError, useMaterialContractCommandStore } from '~/stores/material-contract-command'
 
 const route = useRoute()
@@ -19,8 +22,13 @@ const {
   pendingRemoveIds,
   pendingRestoreIds,
   desktopAttachmentPicker,
+  readingFiles,
+  invalidatePreparation,
+  appendDrafts: appendAttachmentDrafts,
   dirty: attachmentDirty,
   reset: resetAttachments,
+  capture: captureAttachments,
+  acknowledge: acknowledgeAttachments,
   clearPending: clearPendingAttachments,
   changes: attachmentChanges,
   handleFiles,
@@ -34,6 +42,7 @@ const routeId = computed(() => Array.isArray(route.params.id) ? route.params.id[
 const isEditing = computed(() => Boolean(routeId.value))
 const title = computed(() => `${isEditing.value ? '编辑' : '新建'} · 材料采购合同`)
 const draft = ref<ProjectContractFormDraft>(f2FormDefaults('material') as ProjectContractFormDraft)
+const total = computed(() => materialContractTotal(draft.value.lineItems ?? [], draft.value.deductions ?? [], draft.value.isSupplement === true))
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(true)
 const loadError = shallowRef('')
@@ -56,24 +65,70 @@ function lookup(rows: readonly { id: string, label: string }[], keyword: string)
 const fetchProjects = async (keyword: string) => lookup(context.value?.projects ?? [], keyword)
 const fetchSuppliers = async (keyword: string) => lookup(context.value?.suppliers ?? [], keyword)
 const emptyLookup = async (): Promise<LookupOption[]> => []
+const fetchOriginalContracts = async (keyword: string) => lookup(context.value?.originalContracts ?? [], keyword)
+const originalContract = computed(() => context.value?.originalContracts?.find(row => row.id === draft.value.originalContractId) ?? null)
+let pendingInputSnapshot: string | null = null
+let pendingSubmittedDraft: ProjectContractFormDraft | null = null
+let pendingAttachmentInput: ReturnType<typeof captureAttachments> | null = null
+const inputSnapshot = () => JSON.stringify({ draft: draft.value, attachments: attachmentChanges() })
 
 let initializeRequest = 0
+let authorityInvalidated = false
+let active = true
 
-async function initialize(targetId = routeId.value) {
+function invalidate(message: string) {
+  initializeRequest++
+  authorityInvalidated = true
+  store.invalidate(commandSession)
+  context.value = null
+  acknowledgeAttachments([], { add: [], removeIds: [], restoreIds: [] })
+  invalidatePreparation()
+  loading.value = false
+  loadingAction.value = null
+  loadError.value = message
+}
+bindReadAuthority(problem => invalidate(problem.message))
+onDeactivated(() => {
+  active = false
+  invalidate('页面已停用，请按当前身份重新核对合同。')
+})
+onBeforeUnmount(() => {
+  active = false
+  invalidate('页面已关闭。')
+})
+onActivated(() => {
+  if (!active) {
+    active = true
+    void initialize(routeId.value, true)
+  }
+})
+
+async function initialize(targetId = routeId.value, retainEditing = false) {
   const request = ++initializeRequest
+  const preserveInput = targetId === routeId.value && (retainEditing || (authorityInvalidated && (dirty.value || commandSession.pending !== null)))
   loading.value = true
   loadError.value = ''
   fieldErrors.value = {}
-  resetAttachments()
+  if (!preserveInput)
+    resetAttachments()
   try {
-    const hydrated = await store.hydrate(commandSession, targetId)
+    const hydrated = preserveInput ? await store.revalidate(commandSession) : await store.hydrate(commandSession, targetId)
     if (request !== initializeRequest)
       return
     context.value = hydrated.context
-    draft.value = hydrated.form?.draft ?? (f2FormDefaults('material') as ProjectContractFormDraft)
-    resetAttachments(hydrated.form?.attachments ?? [])
+    if (preserveInput) {
+      acknowledgeAttachments(hydrated.form?.attachments ?? [], { add: [], removeIds: [], restoreIds: [] })
+    }
+    else {
+      draft.value = hydrated.form?.draft ?? { ...(f2FormDefaults('material') as ProjectContractFormDraft), isSupplement: route.query.supplement === '1' }
+      if (!hydrated.form && draft.value.isSupplement && typeof route.query.originalContractId === 'string')
+        patchDraft({ originalContractId: route.query.originalContractId })
+      resetAttachments(hydrated.form?.attachments ?? [])
+    }
+    authorityInvalidated = false
     await nextTick()
-    savedSnapshot.value = JSON.stringify(draft.value)
+    if (!preserveInput)
+      savedSnapshot.value = JSON.stringify(draft.value)
   }
   catch (cause) {
     if (request !== initializeRequest)
@@ -87,6 +142,15 @@ async function initialize(targetId = routeId.value) {
 }
 
 function patchDraft(patch: Partial<ProjectContractFormDraft>) {
+  if (patch.lineItems)
+    patch = { ...patch, lineItems: patch.lineItems.map(row => ({ ...row, id: row.id ?? `draft-${crypto.randomUUID()}` })) }
+  if (patch.deductions)
+    patch = { ...patch, deductions: patch.deductions.map(row => ({ ...row, id: row.id ?? `draft-${crypto.randomUUID()}` })) }
+  if (patch.originalContractId !== undefined) {
+    const parent = context.value?.originalContracts?.find(row => row.id === patch.originalContractId)
+    const frozen = parent?.ourSignatorySnapshot ?? null
+    patch = { ...patch, projectId: parent?.projectId ?? null, supplierId: parent?.supplierId ?? null, ourSignatoryId: frozen?.id ?? null, ourSignatoryVersion: frozen?.version ?? null, ourSignatorySnapshot: frozen }
+  }
   draft.value = { ...draft.value, ...contractSupplierSelectionPatch(draft.value, patch, context.value?.suppliers ?? []) }
 }
 
@@ -94,6 +158,11 @@ function clearFieldError(field: string) {
   const next = { ...fieldErrors.value }
   delete next[field]
   fieldErrors.value = next
+}
+
+function appendImportedLines(lines: ContractLineItemDraft[], original: ContractFormAttachmentDraft) {
+  patchDraft({ lineItems: lines })
+  appendAttachmentDrafts([original])
 }
 
 function validateRequired() {
@@ -104,7 +173,10 @@ function validateRequired() {
     ['supplierId', '乙方分供方'],
     ['content', '合同内容简述'],
     ['signDate', '签约日期'],
+    ['ourSignatoryId', '我方签约主体'],
   ]
+  if (draft.value.isSupplement)
+    required.splice(1, 2, ['originalContractId', '原合同'])
   for (const [key, label] of required) {
     const value = draft.value[key]
     if (typeof value === 'string' ? !value.trim() : value == null)
@@ -121,6 +193,18 @@ async function save(action: FormFooterAction) {
     await leave()
     return
   }
+  if (loadingAction.value || commandSession.busy || commandSession.pending) {
+    warning(commandSession.pending ? '请先核对原提交后再保存新的内容' : '正在保存，请等待当前结果')
+    return
+  }
+  if (!active || loadError.value || !context.value) {
+    warning('请先按当前身份重新读取合同候选资料')
+    return
+  }
+  if (readingFiles.value) {
+    warning('附件原件正在读取，请完成后保存')
+    return
+  }
   const saveAction: F2SaveAction = action === 'draft' ? 'draft' : action === 'saveSubmit' ? 'submit' : 'save'
   if (saveAction !== 'draft' && !validateRequired())
     return
@@ -131,11 +215,36 @@ async function save(action: FormFooterAction) {
     return
   }
   loadingAction.value = action
+  pendingInputSnapshot = inputSnapshot()
+  // The command draft is a JSON payload; nested rows may still be Vue proxies.
+  pendingSubmittedDraft = JSON.parse(JSON.stringify(draft.value)) as ProjectContractFormDraft
+  pendingAttachmentInput = captureAttachments()
   try {
     const result = await store.saveForm(commandSession, draft.value, saveAction, attachmentChanges())
+    const retainedInput = result.retainedInput || inputSnapshot() !== pendingInputSnapshot
+    if (retainedInput) {
+      if (pendingAttachmentInput)
+        acknowledgeAttachments(result.form.attachments, pendingAttachmentInput)
+      draft.value = reconcileMaterialDraftIdentities(draft.value, pendingSubmittedDraft!, result.id, result)
+      savedSnapshot.value = JSON.stringify(result.form.draft)
+      success('原提交已保存并读回；后来的修改仍保留，请核对后保存')
+      pendingInputSnapshot = null
+      pendingSubmittedDraft = null
+      pendingAttachmentInput = null
+      return
+    }
+    draft.value = result.form.draft
+    resetAttachments(result.form.attachments)
     clearPendingAttachments()
+    pendingInputSnapshot = null
+    pendingSubmittedDraft = null
+    pendingAttachmentInput = null
     success(saveAction === 'draft' ? '草稿已保存' : '材料采购合同已保存')
     savedSnapshot.value = JSON.stringify(draft.value)
+    if ('warnings' in result && Array.isArray(result.warnings) && result.warnings.length) {
+      warning(String(result.warnings[0]))
+      return
+    }
     if (action === 'saveNew') {
       await openNew(() => initialize(null))
       return
@@ -143,8 +252,8 @@ async function save(action: FormFooterAction) {
     if (closeAfterSave.value) {
       closeCurrent()
       await navigateTo({
-        path: `/contract/${encodeURIComponent(result.id)}`,
-        query: { origin: 'real', contractKind: 'material', returnTo: returnTo.value },
+        path: `/contract/${encodeURIComponent(draft.value.isSupplement ? draft.value.originalContractId! : result.id)}`,
+        query: { origin: 'real', contractKind: 'material', returnTo: returnTo.value, ...(draft.value.isSupplement ? { tab: 'supplements', supplementId: result.id } : {}) },
       })
       return
     }
@@ -185,6 +294,42 @@ async function save(action: FormFooterAction) {
   }
 }
 
+async function recoverOriginal() {
+  if (commandSession.busy)
+    return
+  const before = inputSnapshot()
+  try {
+    const recovered = await store.recover(commandSession)
+    context.value = recovered.context
+    if (recovered.outcome === 'not-applied') {
+      pendingInputSnapshot = null
+      pendingSubmittedDraft = null
+      pendingAttachmentInput = null
+      warning('原提交已确认为未应用并封存；当前输入保留，可重新保存')
+      return
+    }
+    const laterInput = (pendingInputSnapshot !== null && before !== pendingInputSnapshot) || inputSnapshot() !== before
+    if (!laterInput) {
+      draft.value = recovered.form.draft
+      resetAttachments(recovered.form.attachments)
+      savedSnapshot.value = JSON.stringify(draft.value)
+    }
+    else {
+      if (pendingAttachmentInput)
+        acknowledgeAttachments(recovered.form.attachments, pendingAttachmentInput)
+      draft.value = pendingSubmittedDraft ? reconcileMaterialDraftIdentities(draft.value, pendingSubmittedDraft, recovered.result.id, recovered.result) : { ...draft.value, id: recovered.result.id }
+      savedSnapshot.value = JSON.stringify(recovered.form.draft)
+    }
+    pendingInputSnapshot = null
+    pendingSubmittedDraft = null
+    pendingAttachmentInput = null
+    success(laterInput ? '原提交已保存并读回；后来的修改继续保留' : '原提交已保存并读回')
+  }
+  catch (cause) {
+    error(cause instanceof Error ? cause.message : '原提交仍待核对，请保留原编号')
+  }
+}
+
 async function leave() {
   if (dirty.value && !await confirm({ variant: 'simple', title: '放弃修改', message: '当前表单还有未保存内容，确认离开？', confirmLabel: '放弃修改' }))
     return
@@ -200,8 +345,25 @@ useTabTitle(title)
 <template>
   <EntityFormShell :title="title" back-label="返回材料采购合同" :sections="F2_FORM_META.material.sections" :state="pageState" :state-title="loadError || '正在载入表单'" state-action-label="重新载入" @back="leave" @state-action="initialize">
     <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
-      <ContractFormFields kind="material" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="emptyLookup" :fetch-suppliers="fetchSuppliers" :fetch-original-contracts="emptyLookup" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError" />
-      <ContractLineItemsEditor ref="lineItemsEditor" :lines="draft.lineItems ?? []" @update="patchDraft({ lineItems: $event })" />
+      <section v-if="commandSession.pending" class="panel border border-warn p-3" role="status">
+        <strong>{{ commandSession.pending.result ? '原提交已保存待刷新' : '原提交结果待核对' }}</strong>
+        <p class="mt-1 text-12px">
+          原编号：{{ commandSession.pending.id }}。当前输入保留，核对后再保存新的内容。
+        </p>
+        <button type="button" class="btn-secondary mt-2" :disabled="commandSession.busy" @click="recoverOriginal">
+          {{ commandSession.pending.result ? '重试读取已保存合同' : '核对原提交' }}
+        </button>
+      </section>
+      <ContractFormFields kind="material" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="emptyLookup" :fetch-suppliers="fetchSuppliers" :fetch-original-contracts="fetchOriginalContracts" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError" />
+      <section v-if="draft.isSupplement && originalContract" class="panel p-3 text-12px" aria-label="原合同继承信息">
+        项目：{{ context?.projects.find(row => row.id === originalContract?.projectId)?.label ?? '未记录' }} · 分供方：{{ context?.suppliers.find(row => row.id === originalContract?.supplierId)?.label ?? '未记录' }}；归属由原合同继承。
+      </section>
+      <ContractLineItemsEditor ref="lineItemsEditor" :lines="draft.lineItems ?? []" :supplement="draft.isSupplement" :original-lines="originalContract?.lineItems ?? []" @update="patchDraft({ lineItems: $event })" />
+      <MaterialContractLineImport :key="`${routeId ?? 'new'}:${draft.isSupplement}`" :lines="draft.lineItems ?? []" @append="appendImportedLines" />
+      <ContractDeductionsEditor :deductions="draft.deductions ?? []" @update="patchDraft({ deductions: $event })" />
+      <p class="text-right text-13px" data-testid="material-contract-detail-total">
+        材料及减项合计：{{ total == null ? '待完善' : yuan(total) }}
+      </p>
       <ContractAttachmentSection :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :desktop-picker="desktopAttachmentPicker" :note="draft.note ?? ''" @pick-native="pickNativeFiles" @files="handleFiles" @toggle-existing="toggleExistingAttachment" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patchDraft({ note: $event })" />
       <FormFooter v-model="closeAfterSave" :dirty="dirty" close-after-save :loading-action="loadingAction" @action="save" />
     </form>

@@ -1,3 +1,4 @@
+import { resolveBusinessSession } from '../../utils/business-session'
 import { productionSession, throwProductionStorageError } from '../../utils/production-runtime'
 import { productionSupplierRuntime } from '../../utils/production-supplier-runtime'
 import { throwProjectReadError } from '../../utils/project-read-error'
@@ -8,7 +9,7 @@ export default defineEventHandler(async (event) => {
     const production = productionSupplierRuntime()
     if (production)
       return await production.suppliers.list(getQuery(event), productionSession(event))
-    return await supplierReadTestInstance.list(getQuery(event), getHeader(event, 'x-ruihang-test-session'))
+    return await supplierReadTestInstance.list(getQuery(event), getHeader(event, 'x-ruihang-test-session'), resolveBusinessSession(event))
   }
   catch (cause) {
     throwProductionStorageError(cause)

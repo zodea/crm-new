@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import { createError } from 'h3'
 import { requireProductionBusinessSession } from './production-auth'
 import { getProductionRuntimeConfig } from './production-config'
+import { FINANCE_CAPABILITIES } from './production-finance-access'
 
 export interface BusinessSession {
   workspaceId: string
@@ -13,6 +14,7 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
   workspaceId: 'workspace-default',
   actorId: 'actor-default',
   capabilities: Object.freeze([
+    ...FINANCE_CAPABILITIES,
     'payroll:read',
     'payroll:write',
     'target-cost:read',
@@ -49,6 +51,10 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
     'subcontract-document:write',
     'material-contract:read',
     'material-contract:write',
+    'material-quotation:read',
+    'material-quotation:write',
+    'our-signatory:read',
+    'our-signatory:write',
     'project-supplier:read',
     'project-supplier:write',
     'crew:list:read',

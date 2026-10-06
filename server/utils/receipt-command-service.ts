@@ -10,7 +10,7 @@ export function receiptReferenceFacts(sessionId?: string | null): ReceiptReferen
   return {
     projects: projectCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, name: row.name, customerId: row.customerId ?? null })),
     customers: customerCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, name: row.name })),
-    contracts: constructionContractCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, no: row.no, name: row.name, projectId: row.projectId, customerId: row.customerId, amount: Number.isFinite(row.amount) ? row.amount.toFixed(2) : null, status: row.status })),
+    contracts: constructionContractCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, no: row.no, name: row.name, projectId: row.projectId, customerId: row.customerId, amount: row.amount !== null && Number.isFinite(row.amount) ? row.amount.toFixed(2) : null, status: row.status })),
   }
 }
 

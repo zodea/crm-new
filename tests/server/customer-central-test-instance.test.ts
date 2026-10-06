@@ -35,7 +35,12 @@ describe('客户中央读写测试实例', () => {
       () => session.capabilities,
       id => commands.rows(id),
       id => commands.sourceVersion(id),
+      undefined,
+      undefined,
+      undefined,
+      () => session,
     )
+    const before = await reads.list({}, 'session-a')
     const request = {
       workspaceId: session.workspaceId,
       actorId: session.actorId,
@@ -56,6 +61,10 @@ describe('客户中央读写测试实例', () => {
 
     const first = await commands.execute(request, session, 'session-a')
     const duplicate = await commands.execute(request, session, 'session-a')
+    await expect(commands.execute({ ...request, draft: { ...request.draft, name: '异文客户' } }, session, 'session-a')).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(commands.resolve(request.commandId, session, 'session-a')).toEqual({ outcome: 'applied', result: first })
+    expect(commands.resolve('customer-unknown', session, 'session-a')).toEqual({ outcome: 'not-applied', commandId: 'customer-unknown' })
+    await expect(commands.execute({ ...request, commandId: 'customer-unknown' }, session, 'session-a')).rejects.toMatchObject({ problem: { code: 'conflict' } })
     const detail = await reads.detail('customer-real-1', {
       origin: 'real',
       includeDemo: 'false',
@@ -67,7 +76,12 @@ describe('客户中央读写测试实例', () => {
       name: '中央客户',
       dataOrigin: 'real',
     })
-    expect(detail.sourceVersion).toContain('customer-command-1')
+    expect(detail.meta).toMatchObject({ workspaceId: session.workspaceId, actorId: session.actorId, dataOrigin: 'real' })
+    const ownerSource = detail.meta.sources.find(source => source.key === 'customers')!
+    expect(ownerSource.state).toBe('readable')
+    expect(ownerSource.sourceVersion).not.toBeNull()
+    expect(ownerSource.sourceVersion).not.toBe(before.meta.sources.find(source => source.key === 'customers')!.sourceVersion)
+    expect(detail.customer.updatedAt).toBe('2026-08-23T01:00:00.000Z')
   })
 
   it('更新要求匹配 baseVersion，成功后版本递增且刷新同一 ID', async () => {

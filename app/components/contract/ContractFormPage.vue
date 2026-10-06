@@ -329,6 +329,13 @@ async function handleFooterAction(action: FormFooterAction) {
     clearPendingAttachments()
     fieldErrors.value = {}
 
+    if (result.warnings?.length) {
+      warning(result.warnings[0]!)
+      draft.value = { ...draft.value, id: result.id }
+      savedSnapshot.value = JSON.stringify(draft.value)
+      return
+    }
+
     if (action === 'saveNew') {
       allowLeave = true
       if (routeId.value)

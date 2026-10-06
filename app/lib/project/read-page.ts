@@ -1,4 +1,4 @@
-import type { DataOriginDTO, EmptyDTO, EntityRefDTO, MetricDTO, MoneyDTO } from '../../types/read-model'
+import type { DataOriginDTO, EmptyDTO, EntityRefDTO, MetricDTO, MoneyDTO, ReadProjection } from '../../types/read-model'
 import type {
   ProjectDetailQueryDTO,
   ProjectDetailReadDTO,
@@ -13,6 +13,9 @@ import type {
   ProjectSupplierReferenceSourceRow,
 } from './read-contract'
 import { isDataOriginDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { parsePageQuery, resolvePagination } from '../read-model/pagination'
+import { unavailableProjectConstructionManagementFees } from './construction-management-fee'
+import { projectManagementFees } from './management-fee'
 import {
   IMPORTED_PROJECT_STATUS,
   PROJECT_PAGE_SIZES,
@@ -27,13 +30,6 @@ function invalidQuery(message: string): never {
 
 function one(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value
-}
-
-function integer(value: unknown, label: string): number {
-  const parsed = Number(one(value))
-  if (!Number.isSafeInteger(parsed) || parsed < 1)
-    invalidQuery(`${label}必须是从 1 开始的整数`)
-  return parsed
 }
 
 function stringList(value: unknown, label: string): string[] {
@@ -68,8 +64,7 @@ export function parseProjectListQuery(input: Record<string, unknown> = {}): Proj
   const search = String(one(input.search) ?? '').trim()
   const statusValue = String(one(input.status) ?? '').trim()
   const sortValue = String(one(input.sort) ?? 'updated-desc')
-  const page = input.page == null ? 1 : integer(input.page, '页码')
-  const pageSizeValue = input.pageSize == null ? 10 : integer(input.pageSize, '每页条数')
+  const { requestedPage: page, pageSize: pageSizeValue } = parsePageQuery(input, () => invalidQuery('分页参数无效'), 10)
   if (!PROJECT_PAGE_SIZES.includes(pageSizeValue as ProjectPageSize))
     invalidQuery('每页条数只支持 10、20、50 或 100')
   if (sortValue !== 'updated-desc' && sortValue !== 'name-asc')
@@ -146,17 +141,19 @@ function roundMoney(value: number): MoneyDTO {
 function customerRef(
   id: string | null,
   label: string | null,
-  permission: 'allowed' | 'forbidden' = 'allowed',
+  permission: 'allowed' | 'forbidden' | 'unavailable' = 'allowed',
 ): EntityRefDTO & { entity: 'customer' } {
   if (permission === 'forbidden') {
     return {
       state: 'forbidden',
       entity: 'customer',
-      id,
+      id: null,
       label: null,
       reason: 'permission-denied',
     }
   }
+  if (permission === 'unavailable' && id)
+    return { state: 'unavailable', entity: 'customer', id: null, label: null, reason: 'source-unavailable' }
   if (!id) {
     return {
       state: 'missing',
@@ -188,11 +185,15 @@ function projectMetric(
 ): MetricDTO {
   return {
     value: value == null ? null : roundMoney(value),
+    knownValue: value == null ? null : roundMoney(value),
     unit: 'CNY',
+    quantityUnit: null,
     status: value == null ? 'pending' : 'complete',
     missingSources: value == null ? [source] : [],
+    participatingCount: value == null ? null : 1,
+    missingCount: value == null ? null : 0,
     asOf,
-    drilldown: { entity, filters: { projectId, dataOrigin } },
+    drilldown: { kind: 'entity-list', entity, variant: null, view: null, filters: { projectId, dataOrigin } },
   }
 }
 
@@ -211,11 +212,15 @@ function summaryMetric(
     : null
   return {
     value,
+    knownValue: rows.length > missingSources.length ? roundMoney(rows.reduce((total, row) => total + (row[field] ?? 0), 0)) : value,
     unit: 'CNY',
+    quantityUnit: null,
     status: rows.length === 0 ? 'undefined' : missingSources.length ? 'partial' : 'complete',
     missingSources,
+    participatingCount: rows.length,
+    missingCount: missingSources.length,
     asOf,
-    drilldown: { entity, filters: { dataOrigin } },
+    drilldown: { kind: 'entity-list', entity, variant: null, view: null, filters: { dataOrigin } },
   }
 }
 
@@ -234,7 +239,7 @@ function searchableValue(
   row: ProjectListSourceRow,
   field: typeof SEARCH_FIELDS[number],
 ): string {
-  if (field === 'customerName' && row.customerPermission === 'forbidden')
+  if (field === 'customerName' && row.customerPermission !== 'allowed')
     return ''
   return String(row[field] ?? '')
 }
@@ -268,7 +273,7 @@ function matchesColumnFilters(
   if (omit !== 'managers' && filters.managers.length && !filters.managers.includes(row.manager))
     return false
   if (omit !== 'customerIds' && filters.customerIds.length) {
-    if (row.customerPermission === 'forbidden'
+    if (row.customerPermission !== 'allowed'
       || !row.customerId
       || !filters.customerIds.includes(row.customerId)) {
       return false
@@ -395,7 +400,7 @@ export function buildProjectDetailRead(input: {
   materialContractAccess?: 'allowed' | 'forbidden' | 'unknown' | 'missing' | 'error'
   projectSupplierRelations?: readonly ProjectSupplierReferenceSourceRow[]
   projectSupplierAccess?: 'allowed' | 'forbidden' | 'error'
-}): ProjectDetailReadDTO {
+}): ReadProjection<ProjectDetailReadDTO> {
   validateProjectSourceRows(input.rows, input.asOf)
   if (input.query.origin === 'demo' && !input.query.includeDemo) {
     throw new ProjectRepositoryProblem(projectProblem(
@@ -438,7 +443,7 @@ export function buildProjectDetailRead(input: {
               supplier: {
                 state: 'forbidden',
                 entity: 'supplier',
-                id: relation.supplierId,
+                id: null,
                 label: null,
                 reason: 'permission-denied',
               },
@@ -479,15 +484,21 @@ export function buildProjectDetailRead(input: {
     : []
   return {
     item,
+    constructionManagementFees: unavailableProjectConstructionManagementFees(row.id, row.dataOrigin),
+    managementFees: projectManagementFees(row.id, row.dataOrigin, input.asOf),
     materialContracts: {
       count: {
         value: materialContractReady ? materialContractCount : null,
+        knownValue: materialContractReady ? materialContractCount : null,
         unit: 'count',
+        quantityUnit: null,
         status: materialContractReady ? 'complete' : 'pending',
         missingSources: materialContractReady ? [] : ['material-contracts'],
+        participatingCount: materialContractReady ? materialContractCount : null,
+        missingCount: materialContractReady ? 0 : null,
         asOf: input.asOf,
         drilldown: materialContractReady
-          ? { entity: 'contract', filters: { projectId: row.id, dataOrigin: row.dataOrigin, contractKind: '材采' } }
+          ? { kind: 'entity-list', entity: 'contract', variant: 'material', view: null, filters: { projectId: row.id, dataOrigin: row.dataOrigin } }
           : null,
       },
       navigation: materialContractReady
@@ -522,7 +533,7 @@ export function buildProjectListPage(input: {
   asOf: string
   sourceVersion: string | null
   capabilities?: readonly string[]
-}): ProjectListPageDTO {
+}): ReadProjection<ProjectListPageDTO> {
   validateProjectSourceRows(input.rows, input.asOf)
   const visibleRows = input.query.includeDemo
     ? input.rows
@@ -543,7 +554,8 @@ export function buildProjectListPage(input: {
       || a.dataOrigin.localeCompare(b.dataOrigin)
       || a.id.localeCompare(b.id)
   })
-  const offset = (input.query.page - 1) * input.query.pageSize
+  const { page } = resolvePagination(input.query.page, input.query.pageSize, filtered.length)
+  const offset = (page - 1) * input.query.pageSize
   const empty: EmptyDTO | null = filtered.length > 0
     ? null
     : {
@@ -570,7 +582,8 @@ export function buildProjectListPage(input: {
   return {
     items: sorted.slice(offset, offset + input.query.pageSize).map(row => buildProjectListItem(row, input.asOf)),
     pagination: {
-      page: input.query.page,
+      requestedPage: input.query.page,
+      page,
       pageSize: input.query.pageSize,
       total: filtered.length,
     },

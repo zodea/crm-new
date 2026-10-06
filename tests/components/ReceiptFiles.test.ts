@@ -28,9 +28,9 @@ describe('收款附件预览与下载生命周期', () => {
           },
           exportFile: exporter,
         })
-        return () => h('div')
+        return () => h('div', [h('button', { type: 'button' }, '原件触发按钮'), h('button', { type: 'button' }, '当前焦点')])
       },
-    }))
+    }), { attachTo: document.body })
     return { commands, saved, record, content, exporter, files, wrapper }
   }
 
@@ -63,6 +63,45 @@ describe('收款附件预览与下载生命周期', () => {
     record.value = { ...record.value, version: '2' }
     await Promise.resolve()
     expect(files.previewOpen.value).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('下载期间来源或版本切换，迟到正文不能交给导出器', async () => {
+    const { files, content, record, exporter, commands, wrapper } = fixture()
+    let resolveRead!: (value: ReceiptFileContent) => void
+    content.mockImplementationOnce(() => new Promise(resolve => resolveRead = resolve))
+    let exported: unknown = null
+    exporter.mockImplementationOnce(async (options: any) => {
+      exported = await options.data()
+      return { status: 'cancelled' as const }
+    })
+    const request = files.download(record.value.attachments[0]!)
+    await Promise.resolve()
+    record.value = { ...record.value, version: '2' }
+    resolveRead(commands.fileContent(record.value.id, record.value.attachments[0]!.id, session))
+    await request
+    expect(exported).toBeNull()
+    expect(files.busy.value).toBe('')
+    expect(files.problem.value).toBe('')
+    wrapper.unmount()
+  })
+
+  it('关闭预览回到同来源同版本的原按钮；来源变化不再夺走当前页面焦点', async () => {
+    const { files, record, wrapper } = fixture()
+    const [trigger, current] = wrapper.findAll('button').map(button => button.element as HTMLButtonElement)
+    trigger!.focus()
+    await files.preview(record.value.attachments[0]!)
+    current!.focus()
+    files.cancel()
+    const close = new Event('close-auto-focus', { cancelable: true })
+    files.restoreFocus(close)
+    expect(close.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(trigger)
+    await files.preview(record.value.attachments[0]!)
+    current!.focus()
+    record.value = { ...record.value, version: '2' }
+    files.restoreFocus(new Event('close-auto-focus', { cancelable: true }))
+    expect(document.activeElement).toBe(current)
     wrapper.unmount()
   })
 })

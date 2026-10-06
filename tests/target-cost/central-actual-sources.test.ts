@@ -145,4 +145,12 @@ describe('中央预算实际来源的金额完整度与身份', () => {
     expect(comparison.categories.find(row => row.category === '专业分包')?.remainingAmount).toMatchObject({ value: 800, knownValue: 800, status: 'complete' })
     expect(comparison.summary.remainingAmount).toMatchObject({ value: null, knownValue: null, status: 'pending' })
   })
+
+  it('目标明细未知时不把已知实际扣成负预算，已授权的完整空实际仍是真零', () => {
+    const facts = aggregateTargetCostActual('project-budget', [paymentSource({ id: 'settlements', metric: 'settledAmount', categories: ['材料'], rows: [] })])
+    const comparison = buildTargetCostComparison('budget-a', [{ id: 'unknown-item', category: '材料', itemName: '', unit: '', qty: null, unitPrice: null, amount: null, note: '', sortOrder: 0 }], facts)
+    expect(comparison.categories.find(row => row.category === '材料')).toMatchObject({ targetAmount: null, settledAmount: { value: 0, knownValue: 0, status: 'complete' }, remainingAmount: { value: null, knownValue: null, status: 'pending', missingSources: ['目标成本明细:pending'] } })
+    expect(comparison.summary.itemTotal).toBeNull()
+    expect(comparison.summary.remainingAmount.value).toBeNull()
+  })
 })

@@ -6,8 +6,12 @@ import type {
   MaterialContractListQueryDTO,
   MaterialContractPageSize,
 } from './read-contract'
-import { isDataOriginDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { isDataOriginDTO, isEntityRefDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
 import { serializeContractListFilter } from '../contract/list-filters'
+import { decodeOurSignatorySnapshot } from '../our-signatory/contract'
+import { hasConsistentOriginReadMeta, hasConsistentReadMeta } from '../read-model/meta'
+import { isPaginationDTO } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
 import {
   MATERIAL_CONTRACT_PAGE_SIZES,
   materialContractProblem,
@@ -16,6 +20,16 @@ import {
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+function signatorySnapshot(value: unknown): boolean {
+  if (value === null)
+    return true
+
+  try {
+    decodeOurSignatorySnapshot(value)
+    return true
+  }
+  catch { return false }
 }
 
 function strings(value: unknown): value is string[] {
@@ -50,7 +64,7 @@ function invalid(message: string): never {
 function pageBase(value: unknown): value is Record<string, unknown> {
   return object(value)
     && object(value.pagination)
-    && Number.isSafeInteger(value.pagination.page) && Number(value.pagination.page) >= 1
+    && isPaginationDTO(value.pagination, Array.isArray(value.items) ? value.items.length : undefined)
     && MATERIAL_CONTRACT_PAGE_SIZES.includes(value.pagination.pageSize as MaterialContractPageSize)
     && Number.isSafeInteger(value.pagination.total) && Number(value.pagination.total) >= 0
     && isISODateTimeDTO(value.asOf)
@@ -60,22 +74,12 @@ function pageBase(value: unknown): value is Record<string, unknown> {
 
 function amounts(value: unknown): boolean {
   return object(value)
-    && ['contract', 'changed', 'settled', 'invoiced', 'paid', 'payable'].every(key => money(value[key]))
+    && ['contract', 'changed'].every(key => value[key] === null || money(value[key]))
+    && ['settled', 'invoiced', 'paid', 'payable'].every(key => value[key] === null || money(value[key]))
 }
 
 function entityRef(value: unknown, entity: EntityKindDTO): boolean {
-  if (!object(value) || value.entity !== entity)
-    return false
-  if (value.state === 'resolved') {
-    return typeof value.id === 'string' && Boolean(value.id) && typeof value.label === 'string'
-      && (value.no === null || typeof value.no === 'string')
-  }
-  if (value.state === 'missing') {
-    return value.id === null && value.label === null
-      && ['not-configured', 'not-recorded', 'not-applicable'].includes(String(value.reason))
-  }
-  return value.state === 'forbidden' && value.label === null
-    && (value.id === null || typeof value.id === 'string') && value.reason === 'permission-denied'
+  return isEntityRefDTO(value, entity)
 }
 
 function resolvedNavigation(
@@ -105,7 +109,7 @@ function referenceNavigation(value: unknown, reference: unknown, origin: DataOri
     return false
   if (reference.state === 'resolved')
     return resolvedNavigation(value, reference.entity as EntityKindDTO, String(reference.id), origin)
-  return unavailableNavigation(value, reference.state === 'forbidden' ? 'forbidden' : 'missing-id')
+  return unavailableNavigation(value, reference.state === 'forbidden' ? 'forbidden' : reference.state === 'unavailable' ? 'not-connected' : reference.reason === 'not-configured' ? 'unverified-target' : 'missing-id')
 }
 
 function fact(value: unknown): boolean {
@@ -120,14 +124,47 @@ function fact(value: unknown): boolean {
   return unavailableNavigation(value.navigation, 'unverified-target')
 }
 
+function sourceEvidence(value: unknown): boolean {
+  return object(value) && ['fileName', 'sheetName', 'sourceHash', 'priceUnit'].every(key => typeof value[key] === 'string')
+    && Number.isSafeInteger(value.rowNumber) && Number(value.rowNumber) > 0
+    && (value.externalRef === null || typeof value.externalRef === 'string')
+    && typeof value.quantityUnitVerified === 'boolean'
+}
+
 function line(value: unknown): boolean {
   return object(value)
     && ['id', 'materialName', 'spec', 'brand', 'unit', 'note'].every(key => typeof value[key] === 'string')
     && typeof value.id === 'string' && Boolean(value.id)
     && (value.qty === null || quantity(value.qty))
     && (value.unitPrice === null || money(value.unitPrice))
+    && (value.applicableTaxRate === undefined || value.applicableTaxRate === null || (typeof value.applicableTaxRate === 'number' && Number.isFinite(value.applicableTaxRate) && value.applicableTaxRate >= 0))
     && (value.amount === null || money(value.amount))
     && (value.plannedArrivalDate === null || isISODateDTO(value.plannedArrivalDate))
+    && (value.materialGrade === undefined || typeof value.materialGrade === 'string')
+    && (value.originalLineId === undefined || value.originalLineId === null || typeof value.originalLineId === 'string')
+    && (value.changeAmount === undefined || value.changeAmount === null || money(value.changeAmount))
+    && (value.changeBasis === undefined || typeof value.changeBasis === 'string')
+    && (value.source === undefined || value.source === null || sourceEvidence(value.source))
+}
+
+function deduction(value: unknown): boolean {
+  return object(value) && ['id', 'name', 'basis'].every(key => typeof value[key] === 'string')
+    && Boolean(value.id) && (value.amount === null || (money(value.amount) && Number(value.amount) <= 0))
+}
+
+function supplement(value: unknown, parentId: string): boolean {
+  return object(value) && ['id', 'contractId', 'no', 'name', 'content', 'status'].every(key => typeof value[key] === 'string')
+    && value.contractId === parentId && Boolean(value.id)
+    && signatorySnapshot(value.ourSignatorySnapshot)
+    && (value.amount === null || (money(value.amount) && Number(value.amount) >= 0))
+    && (value.signDate === null || isISODateDTO(value.signDate))
+    && Array.isArray(value.lineItems) && value.lineItems.every(line)
+    && Array.isArray(value.deductions) && value.deductions.every(deduction)
+    && (value.originalLineSnapshots === undefined || (Array.isArray(value.originalLineSnapshots) && value.originalLineSnapshots.every(row => object(row)
+      && typeof row.originalLineId === 'string' && Boolean(row.originalLineId)
+      && ((Number.isSafeInteger(row.parentVersion) && Number(row.parentVersion) > 0) || (row.parentVersion === null && isISODateTimeDTO(row.sourceUpdatedAt)))
+      && (row.sourceUpdatedAt === undefined || isISODateTimeDTO(row.sourceUpdatedAt))
+      && typeof row.materialName === 'string' && (row.qty === null || quantity(row.qty)) && (row.unitPrice === null || money(row.unitPrice)))))
 }
 
 function file(value: unknown): boolean {
@@ -135,6 +172,8 @@ function file(value: unknown): boolean {
     && ['id', 'fileName', 'mimeType', 'category'].every(key => typeof value[key] === 'string')
     && Number.isSafeInteger(value.fileSize) && Number(value.fileSize) >= 0
     && (value.uploadedAt === null || isISODateTimeDTO(value.uploadedAt))
+    && (value.originalAvailable === undefined || typeof value.originalAvailable === 'boolean')
+    && (value.ownerId === undefined || (typeof value.ownerId === 'string' && Boolean(value.ownerId)))
 }
 
 function listItem(value: unknown): boolean {
@@ -157,11 +196,13 @@ function listItem(value: unknown): boolean {
 function originSummary(value: unknown): boolean {
   return object(value)
     && Number.isSafeInteger(value.contractCount) && Number(value.contractCount) >= 0
-    && ['changedAmount', 'invoicedAmount', 'paidAmount'].every(key => money(value[key]))
+    && (value.changedAmount === null || money(value.changedAmount))
+    && ['invoicedAmount', 'paidAmount'].every(key => value[key] === null || money(value[key]))
 }
 
 export function decodeMaterialContractListPage(value: unknown): MaterialContractListPageDTO {
   if (!pageBase(value)
+    || !hasConsistentOriginReadMeta(value, 'material-contract-read-v2')
     || !Array.isArray(value.items) || !value.items.every(listItem)
     || !object(value.summary)
     || !Array.isArray(value.summary.projects)
@@ -184,7 +225,10 @@ export function decodeMaterialContractDetailRead(value: unknown): MaterialContra
   const materials = sections && object(sections.materials) ? sections.materials : null
   if (!object(value)
     || !isDataOriginDTO(value.dataOrigin)
+    || !hasConsistentReadMeta(value, 'material-contract-read-v2', value.dataOrigin)
     || !contract
+    || !signatorySnapshot(contract.ourSignatorySnapshot)
+    || !(contract.legacyPartyA === null || typeof contract.legacyPartyA === 'string')
     || contract.dataOrigin !== value.dataOrigin
     || contract.kind !== '材采'
     || !['id', 'no', 'name', 'content', 'invoiceType', 'contactName', 'contactPhone', 'mainTerms', 'paymentTerms', 'brandQualityTerms', 'scheduleTerms', 'warrantyTerms', 'specialTerms', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note'].every(key => typeof contract[key] === 'string')
@@ -192,6 +236,7 @@ export function decodeMaterialContractDetailRead(value: unknown): MaterialContra
     || !entityRef(contract.project, 'project')
     || !entityRef(contract.supplier, 'supplier')
     || !amounts(contract.amounts)
+    || !(contract.financialReadStatus === undefined || contract.financialReadStatus === 'unavailable')
     || (contract.signDate !== null && !isISODateDTO(contract.signDate))
     || !(contract.taxRate === null || (typeof contract.taxRate === 'number' && Number.isFinite(contract.taxRate)))
     || !(contract.retentionRatio === null || ratio(contract.retentionRatio))
@@ -199,6 +244,8 @@ export function decodeMaterialContractDetailRead(value: unknown): MaterialContra
     || !(contract.retentionDays === null || (Number.isSafeInteger(contract.retentionDays) && Number(contract.retentionDays) >= 0))
     || !sections
     || !Array.isArray(sections.lineItems) || !sections.lineItems.every(line)
+    || (sections.deductions !== undefined && (!Array.isArray(sections.deductions) || !sections.deductions.every(deduction)))
+    || (sections.supplements !== undefined && (!Array.isArray(sections.supplements) || !sections.supplements.every(row => supplement(row, String(contract.id)))))
     || !materials
     || ![materials.requisitions, materials.arrivals, materials.directTransfers, materials.outbound, sections.invoices, sections.payments, sections.settlements, sections.penalties]
       .every(rows => Array.isArray(rows) && rows.every(fact))
@@ -227,12 +274,15 @@ export function serializeMaterialContractListQuery(query: MaterialContractListQu
 }
 
 export function serializeMaterialContractDetailQuery(query: MaterialContractDetailQueryDTO): Record<string, string> {
-  return { origin: query.origin, includeDemo: String(query.includeDemo) }
+  return { origin: query.origin, includeDemo: String(query.includeDemo), ...(query.supplementId ? { supplementId: query.supplementId } : {}) }
 }
 
 export function materialContractProblemFromUnknown(cause: unknown): MaterialContractRepositoryProblem {
   if (cause instanceof MaterialContractRepositoryProblem)
     return cause
+  const problem = problemFromHttpFailure(cause)
+  if (problem)
+    return new MaterialContractRepositoryProblem(problem, { cause })
   return new MaterialContractRepositoryProblem(
     materialContractProblem('unavailable', '材料采购合同中央服务暂时不可用，请重试', true),
     { cause },

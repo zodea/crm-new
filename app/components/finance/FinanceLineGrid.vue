@@ -8,10 +8,11 @@ import type {
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { KitTableColumn } from '~/lib/kit/table'
 import { useFullscreen } from '@vueuse/core'
-import { computed, shallowRef } from 'vue'
+import { computed, reactive, shallowRef, watch } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import KitTable from '~/components/ui/KitTable.vue'
 import LookupSelect from '~/components/ui/LookupSelect.vue'
+import { financeInputTextNumber, financeInputNumber as inputNumber } from '~/lib/finance/input-number'
 
 type GridKind = 'reimbursement' | 'settlement' | 'invoice' | 'payment'
 type GridLine
@@ -24,6 +25,8 @@ const props = defineProps<{
   kind: GridKind
   lines: GridLine[]
   fetchOptions?: (keyword: string) => Promise<LookupOption[]>
+  fetchCounterparties?: (keyword: string) => Promise<LookupOption[]>
+  fetchOriginalExpenses?: (keyword: string) => Promise<LookupOption[]>
   disabledReason?: string
   totalLabel: string
   empty: string
@@ -38,6 +41,33 @@ const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(root)
 const importing = shallowRef(false)
 const tsv = shallowRef('')
 
+const tableRows = shallowRef<Array<GridLine & { formRowKey: string }>>([])
+const displayFields = new WeakMap<GridLine, Set<string>>()
+watch(() => props.lines, (lines) => {
+  const keys = lines.map((line, index) => line.id ?? `draft-${index}`)
+  const previous = new Map(tableRows.value.map(row => [row.formRowKey, row]))
+  const next = lines.map((line, index) => {
+    const key = keys[index]!
+    const row = previous.get(key)
+    if (row) {
+      for (const field of displayFields.get(row) ?? []) {
+        if (!Object.hasOwn(line, field))
+          Reflect.deleteProperty(row, field)
+      }
+      Object.assign(row, line)
+      displayFields.set(row, new Set(Object.keys(line)))
+      return row
+    }
+    const created = reactive({ ...line, formRowKey: key })
+    displayFields.set(created, new Set(Object.keys(line)))
+    return created
+  })
+  // vxe reloads the entire body for a new data array. Updating existing display
+  // rows keeps the searchable picker and focused input mounted while editing.
+  if (next.length !== tableRows.value.length || next.some((row, index) => row !== tableRows.value[index]))
+    tableRows.value = next
+}, { immediate: true, deep: true })
+
 const sourceTitle = computed(() => ({
   reimbursement: '费用项目',
   settlement: '结算单',
@@ -48,7 +78,7 @@ const sourceTitle = computed(() => ({
 const columns = computed<KitTableColumn[]>(() => [
   { field: 'source', title: sourceTitle.value, minWidth: 240, slot: 'source' },
   ...(props.kind === 'reimbursement'
-    ? [{ field: 'date', title: '发生日期', width: 150, slot: 'date' } satisfies KitTableColumn]
+    ? [{ field: 'date', title: '发生日期', width: 150, slot: 'date' } satisfies KitTableColumn, { field: 'counterparty', title: '实际交易方', minWidth: 240, slot: 'counterparty' } satisfies KitTableColumn, { field: 'original', title: '清偿已记录垫款', minWidth: 240, slot: 'original' } satisfies KitTableColumn]
     : []),
   { field: 'amount', title: '金额', width: 160, align: 'right', slot: 'amount' },
   { field: 'note', title: '备注', minWidth: 180, slot: 'note' },
@@ -120,10 +150,6 @@ function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value
 }
 
-function inputNumber(event: Event): number {
-  return Number((event.target as HTMLInputElement).value) || 0
-}
-
 function importTsv() {
   const imported = tsv.value
     .split(/\r?\n/)
@@ -134,7 +160,7 @@ function importTsv() {
         return {
           expenseItem: source.trim(),
           expenseDate: dateOrAmount.trim(),
-          amount: Number(amountOrNote) || 0,
+          amount: financeInputTextNumber(amountOrNote),
           note: note.trim(),
         } as GridLine
       }
@@ -145,7 +171,7 @@ function importTsv() {
           : 'paymentApplicationId'
       return {
         [key]: source.trim() || null,
-        allocatedAmount: Number(dateOrAmount) || 0,
+        allocatedAmount: financeInputTextNumber(dateOrAmount),
         note: amountOrNote.trim(),
       } as GridLine
     })
@@ -194,7 +220,7 @@ function importTsv() {
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
-      <KitTable :style="{ minWidth: `${gridMinWidth}px` }" :columns="columns" :data="lines" :min-rows="3" :empty="empty">
+      <KitTable :style="{ minWidth: `${gridMinWidth}px` }" :columns="columns" :data="tableRows" row-key="formRowKey" :min-rows="3" :empty="empty">
         <template #source="{ row, rowIndex }">
           <input
             v-if="kind === 'reimbursement'"
@@ -212,6 +238,18 @@ function importTsv() {
             :placeholder="`选择${sourceTitle}`"
             @update:model-value="patchSource(rowIndex, $event)"
           />
+        </template>
+        <template #original="{ row, rowIndex }">
+          <LookupSelect v-if="fetchOriginalExpenses" :model-value="row.originalExpenseLineId" :fetch="fetchOriginalExpenses" placeholder="新费用留空；清偿选择原费用" @update:model-value="patch(rowIndex, { originalExpenseLineId: $event })" />
+          <p v-if="row.originalExpenseLineId" class="text-12px text-ink-soft">
+            原费用身份：{{ row.originalExpenseLineId }}
+          </p>
+        </template>
+        <template #counterparty="{ row, rowIndex }">
+          <LookupSelect v-if="fetchCounterparties" :model-value="row.counterpartySupplierId" :fetch="fetchCounterparties" placeholder="选择实际服务分供方" @update:model-value="patch(rowIndex, { counterpartySupplierId: $event })" />
+          <p v-if="row.counterpartyNameSnapshot" class="text-12px text-ink-soft">
+            采用时名称：{{ row.counterpartyNameSnapshot }}
+          </p>
         </template>
         <template #date="{ row, rowIndex }">
           <input

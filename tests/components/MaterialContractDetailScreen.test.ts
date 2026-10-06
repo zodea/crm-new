@@ -79,6 +79,7 @@ const common = {
     Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }} {{ value }}</span>' }),
     SectionHeader: defineComponent({ props: ['title'], template: '<h2>{{ title }}</h2>' }),
     MaterialContractFactTable: defineComponent({ props: ['rows', 'emptyLabel'], template: '<div>{{ rows.length ? rows[0].name : emptyLabel }}</div>' }),
+    ContractOriginalFilesPanel: defineComponent({ props: ['files', 'canRead'], template: '<section aria-label="合同原件附件"><span v-for="file in files" :key="file.id">{{ file.fileName }}</span></section>' }),
     NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
     StatePanel: defineComponent({ props: ['title', 'description'], template: '<div role="alert">{{ title }} {{ description }}</div>' }),
   } },
@@ -88,6 +89,7 @@ vi.stubGlobal('useRoute', () => route)
 vi.stubGlobal('useRouter', () => ({ replace }))
 vi.stubGlobal('useTabTitle', () => {})
 vi.stubGlobal('navigateTo', vi.fn())
+vi.stubGlobal('useNuxtApp', () => ({ $repositories: { materialContractRead: { fileContent: vi.fn().mockRejectedValue(new Error('历史缺原件')) } } }))
 
 describe('材料采购合同中央详情', () => {
   beforeEach(() => {
@@ -129,10 +131,11 @@ describe('材料采购合同中央详情', () => {
     }
   })
 
-  it('演示详情只读，七个页签写入 URL，并展示真实空态', async () => {
+  it('演示详情只读，稳定分区写入 URL，补充协议亦只读', async () => {
     render(MaterialContractDetailScreen, { props: { contractId: 'c1', origin: 'demo' }, ...common })
     expect(screen.queryByTestId('material-contract-edit')).toBeNull()
-    expect(screen.getAllByRole('tab')).toHaveLength(7)
+    // 旧数量断言保护完整分区；逐个核对名称而不是只增加固定数量。
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['详细信息', '采购明细 0', '补充协议 0', '材料管理', '发票登记 0', '付款信息 0', '支出结算 0', '项目扣罚 0'])
     await fireEvent.click(screen.getByRole('tab', { name: /发票登记/ }))
     expect(replace).toHaveBeenCalledWith({ query: { tab: 'invoices' } })
   })
@@ -152,7 +155,7 @@ describe('材料采购合同中央详情', () => {
         contract: {
           ...detail.contract,
           project: missing('project', 'not-configured'),
-          supplier: { state: 'forbidden', entity: 'supplier', id: 's1', label: null, reason: 'permission-denied' },
+          supplier: { state: 'forbidden', entity: 'supplier', id: null, label: null, reason: 'permission-denied' },
         },
         projectNavigation: { kind: 'unavailable', reason: 'unverified-target' },
         supplierNavigation: { kind: 'unavailable', reason: 'forbidden' },
@@ -162,6 +165,8 @@ describe('材料采购合同中央详情', () => {
     expect(screen.getByText('目标已不存在')).not.toBeNull()
     expect(screen.getByText('无权查看')).not.toBeNull()
     expect(screen.queryByRole('link', { name: '目标已不存在' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '无权查看' })).toBeNull()
+    expect(first.container.innerHTML).not.toContain('supplier/s1')
     first.unmount()
 
     store.detailState = {
@@ -178,12 +183,19 @@ describe('材料采购合同中央详情', () => {
 
   it('刷新失败时保留上一版中央详情并提供重试', () => {
     store.detailState = {
-      kind: 'error',
+      kind: 'unavailable',
       previous: detail,
       problem: { code: 'unavailable', message: '中央服务不可用', retryable: true, fieldErrors: {}, traceId: null },
     }
     render(MaterialContractDetailScreen, { props: { contractId: 'c1', origin: 'demo' }, ...common })
     expect(screen.getByText('瓷砖采购合同')).not.toBeNull()
     expect(screen.getByRole('alert').textContent).toContain('保留上一次成功读取的详情')
+  })
+  it('401不保留详情事实，明确提示登录失效', () => {
+    store.detailState = { kind: 'forbidden', problem: { code: 'unauthenticated', message: '请重新登录', retryable: false, fieldErrors: {}, traceId: null } }
+    const rendered = render(MaterialContractDetailScreen, { props: { contractId: 'c1', origin: 'demo' }, ...common })
+    expect(screen.queryByText('瓷砖采购合同')).toBeNull()
+    expect(rendered.container.querySelector('[state-title]')?.getAttribute('state-title')).toBe('登录已失效，请重新登录')
+    expect(screen.queryByRole('link', { name: '供应商一' })).toBeNull()
   })
 })

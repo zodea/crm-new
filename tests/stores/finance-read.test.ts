@@ -9,6 +9,18 @@ let mem: TestDb
 
 vi.mock('~/lib/db/connection', () => ({
   select: <T>(sql: string, params?: unknown[]) => mem.select<T>(sql, params),
+  withTransaction: async <T>(work: (tx: TestDb) => Promise<T>) => {
+    await mem.execute('BEGIN')
+    try {
+      const result = await work(mem)
+      await mem.execute('COMMIT')
+      return result
+    }
+    catch (cause) {
+      await mem.execute('ROLLBACK')
+      throw cause
+    }
+  },
 }))
 
 beforeEach(async () => {
@@ -54,6 +66,20 @@ afterEach(() => {
 })
 
 describe('finance read store', () => {
+  it('工人和分供方清单返回全部匹配的合法身份，不截断为固定前五十条或按姓名合并', async () => {
+    const workerIds = Array.from({ length: 61 }, (_, index) => `global-worker-${String(index).padStart(3, '0')}`)
+    const supplierIds = Array.from({ length: 61 }, (_, index) => `global-supplier-${String(index).padStart(3, '0')}`)
+    for (const id of workerIds)
+      await mem.execute('INSERT INTO workers(id,name,current_project_id) VALUES(?,?,?)', [id, '完整候选同名工人', 'project-1'])
+    for (const id of supplierIds)
+      await mem.execute('INSERT INTO suppliers(id,name) VALUES(?,?)', [id, '完整候选同名分供方'])
+    await mem.execute(`INSERT INTO workers(id,name,deleted_at) VALUES('deleted-worker','完整候选同名工人','2026-10-05')`)
+    await mem.execute(`INSERT INTO suppliers(id,name,deleted_at) VALUES('deleted-supplier','完整候选同名分供方','2026-10-05')`)
+    const store = useFinanceStore()
+    expect(await store.searchWorkers('完整候选')).toEqual(workerIds.map(id => ({ id, label: '完整候选同名工人' })))
+    expect(await store.searchSuppliers('完整候选')).toEqual(supplierIds.map(id => ({ id, label: '完整候选同名分供方' })))
+  })
+
   it('由 store 统一加载列表并解析真实关联名称', async () => {
     const store = useFinanceStore()
 

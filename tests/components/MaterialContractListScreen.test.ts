@@ -3,10 +3,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, nextTick, onActivated, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import MaterialContractListScreen from '~/components/contract/MaterialContractListScreen.vue'
+import { materialOriginMeta } from '../helpers/material-read-meta'
 
 const mocks = vi.hoisted(() => ({
   store: {
     listState: { kind: 'idle' } as any,
+    listQuery: null as any,
     loadList: vi.fn().mockResolvedValue(undefined),
   },
   visibility: { includeDemo: false },
@@ -46,7 +48,10 @@ const contract = {
 } as const
 
 function page(items: MaterialContractListPageDTO['items'] = [contract as any]): MaterialContractListPageDTO {
+  const originMeta = materialOriginMeta(['material-contract:read'], 'component-test-v1')
   return {
+    meta: originMeta.real,
+    originMeta,
     items,
     pagination: { page: 2, pageSize: 20, total: items.length ? 21 : 0 },
     summary: {
@@ -60,7 +65,7 @@ function page(items: MaterialContractListPageDTO['items'] = [contract as any]): 
     },
     empty: items.length ? null : { reason: 'no-filter-match', missingRelations: [] },
     asOf: '2026-08-24T00:00:00.000Z',
-    sourceVersion: 'component-test-v1',
+    sourceVersion: originMeta.real.sourceVersion,
     capabilities: ['material-contract:read'],
   }
 }
@@ -107,8 +112,10 @@ describe('材料采购合同列表返回上下文', () => {
     vi.setSystemTime(new Date('2026-09-24T08:00:00Z'))
     sessionStorage.clear()
     document.querySelectorAll('[data-shell-workspace]').forEach(item => item.remove())
-    mocks.store.loadList.mockClear()
+    mocks.store.loadList.mockReset().mockResolvedValue(undefined)
+    mocks.store.listQuery = null
     mocks.store.listState = { kind: 'ready', data: page() }
+    mocks.store = reactive(mocks.store)
     mocks.visibility.includeDemo = false
     replace.mockReset()
     setRoute('/contract/material?search=%E7%93%B7%E7%A0%96&projectId=project-1&origin=real&page=2&pageSize=20&returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal')
@@ -166,6 +173,42 @@ describe('材料采购合同列表返回上下文', () => {
       page: 2,
       pageSize: 20,
     }))
+  })
+
+  it('同代读取的实际末页回写地址并保留筛选；旧读取迟到不改新地址', async () => {
+    setRoute('/contract/material?origin=real&search=原筛选&page=99&pageSize=20')
+    let finish!: () => void
+    mocks.store.loadList.mockImplementationOnce((query: any) => new Promise<void>((resolve) => {
+      finish = () => {
+        const data = page()
+        data.pagination = { requestedPage: 99, page: 2, pageSize: 20, total: 21 }
+        mocks.store.listQuery = { ...query }
+        mocks.store.listState = { kind: 'ready', data }
+        resolve()
+      }
+    }))
+    const view = render(MaterialContractListScreen, { global })
+    finish()
+    await waitFor(() => expect(replace).toHaveBeenCalledWith({ query: { origin: 'real', search: '原筛选', page: '2', pageSize: '20' } }))
+    view.unmount()
+
+    replace.mockClear()
+    setRoute('/contract/material?origin=real&page=99&pageSize=20')
+    mocks.store.loadList.mockImplementationOnce((query: any) => new Promise<void>((resolve) => {
+      finish = () => {
+        const data = page()
+        data.pagination = { requestedPage: 99, page: 2, pageSize: 20, total: 21 }
+        mocks.store.listQuery = { ...query }
+        mocks.store.listState = { kind: 'ready', data }
+        resolve()
+      }
+    }))
+    render(MaterialContractListScreen, { global })
+    setRoute('/contract/material?origin=real&search=新的筛选&page=3&pageSize=20')
+    await nextTick()
+    finish()
+    await nextTick()
+    expect(replace).not.toHaveBeenCalled()
   })
 
   it('混合来源列表按所点击行记录真实来源，不从缺省查询猜测', async () => {

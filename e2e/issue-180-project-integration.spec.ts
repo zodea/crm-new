@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test'
 import { installProjectCentralFixture } from './helpers/project-central-fixture'
 import { expectLocalHorizontalScroll, expectNoPageOverflow, tabUntilFocused } from './helpers/responsive'
 
-// 旧经营汇总与只读来源穿透正向覆盖保留在 tests/project/detail-aggregate.test.ts、
-// tests/project/finance-facts.test.ts、tests/components/ProjectMetrics.test.ts。
+// 现行只读来源穿透与未知事实覆盖保留在 tests/components/ProjectDetailScreen.test.ts、
+// tests/production/finance-storage.test.ts；无入口的旧经营投影已清理。
 // 中央已接旅程由当前来源感知卡片进入；未接管领域不重建本地十页签。
 test('中央项目的材采、商务、工资与收款使用同一项目身份且来源不混合', async ({ page }) => {
   const fixture = await installProjectCentralFixture(page)

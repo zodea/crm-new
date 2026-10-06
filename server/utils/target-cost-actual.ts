@@ -5,6 +5,7 @@ import type { TargetCostDetailItem } from '../../app/lib/target-cost/detail'
 import type { NavigationIntentDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
+import { remainingCostAmount, sumCostAmounts } from '../../app/lib/project/cost-amounts'
 import { COST_CATEGORIES } from '../../app/lib/project/cost-control'
 import { round2 } from '../../app/lib/util/number'
 
@@ -103,10 +104,9 @@ function combine(metrics: TargetCostMetric[]): TargetCostMetric {
 export function buildTargetCostComparison(id: string, items: TargetCostDetailItem[], facts: TargetCostActualFacts) {
   const categories: TargetCostCategory[] = facts.categories.map((actual) => {
     const matching = items.filter(item => item.category === actual.category)
-    const targetAmount = round2(matching.reduce((sum, item) => sum + item.amount, 0))
-    const remainingAmount: TargetCostMetric = { ...actual.settledAmount, value: actual.settledAmount.value == null ? null : round2(targetAmount - actual.settledAmount.value), knownValue: null }
-    if (remainingAmount.value != null)
-      remainingAmount.knownValue = remainingAmount.value
+    const target = sumCostAmounts(matching.map(item => item.amount), '目标成本明细:pending')
+    const targetAmount = target.value
+    const remainingAmount = actual.settledAmount.status === 'not-applicable' ? { ...actual.settledAmount } : remainingCostAmount(target, actual.settledAmount)
     const subcontract = ['专业分包', '合同劳务'].includes(actual.category)
     const other = ['机械', '其他'].includes(actual.category)
     const navigation = (metric: TargetCostMetric, entity: 'contract' | 'settlement' | 'subcontract-document', variant: string | null): NavigationIntentDTO | null => metric.knownValue == null || !variant || !facts.projectId ? null : { kind: 'entity-list', entity, variant, view: null, filters: { projectId: facts.projectId, dataOrigin: 'real', costCategory: actual.category } }
@@ -120,11 +120,11 @@ export function buildTargetCostComparison(id: string, items: TargetCostDetailIte
       reimbursement: null,
     } }
   })
-  const itemTotal = round2(items.reduce((sum, item) => sum + item.amount, 0))
+  const target = sumCostAmounts(items.map(item => item.amount), '目标成本明细:pending')
+  const itemTotal = target.value
   const settledAmount = combine(categories.map(row => row.settledAmount))
   // 部分科目的余额不是项目的已知余额，必须先有完整实际成本才能扣减总预算。
-  const remaining = settledAmount.status === 'complete' && settledAmount.value != null ? round2(itemTotal - settledAmount.value) : null
-  const remainingAmount: TargetCostMetric = { value: remaining, knownValue: remaining, status: remaining != null ? 'complete' : settledAmount.status === 'not-applicable' ? 'not-applicable' : 'pending', missingSources: [...settledAmount.missingSources] }
+  const remainingAmount = settledAmount.status === 'not-applicable' ? { ...settledAmount } : remainingCostAmount(target, settledAmount)
   const summary: TargetCostSummary = { itemTotal, signedAmount: combine(categories.map(row => row.signedAmount)), settledAmount, paidAmount: combine(categories.map(row => row.paidAmount)), remainingAmount }
   return { categories, summary }
 }

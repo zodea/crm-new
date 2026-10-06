@@ -1,3 +1,4 @@
+import { resolveBusinessSession } from '../../../utils/business-session'
 import { productionSession, throwProductionStorageError } from '../../../utils/production-runtime'
 import { productionSupplierRuntime } from '../../../utils/production-supplier-runtime'
 import { throwProjectReadError } from '../../../utils/project-read-error'
@@ -12,6 +13,7 @@ export default defineEventHandler(async (event) => {
       getRouterParam(event, 'id') ?? '',
       getQuery(event),
       getHeader(event, 'x-ruihang-test-session'),
+      resolveBusinessSession(event),
     )
   }
   catch (cause) {

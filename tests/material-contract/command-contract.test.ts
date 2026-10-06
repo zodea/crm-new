@@ -82,6 +82,8 @@ describe('材料采购合同中央 command contract', () => {
       version: '1',
       updatedAt: '2026-08-24T01:00:00.000Z',
       attachmentIds: [],
+      lineIds: ['line-central-1'],
+      deductionIds: [],
     })
     expect(duplicate).toEqual(first)
     expect(instance.rows()).toHaveLength(1)
@@ -163,6 +165,7 @@ describe('材料采购合同中央 command contract', () => {
       suppliers: [{ id: 'supplier-1', name: '中央分供方' }],
     })
     await expect(instance.execute(request({
+      commandId: 'command-invalid-reference',
       action: 'draft',
       draft: { ...request().draft, projectId: 'missing-project', amount: -1 },
     }), SESSION)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })

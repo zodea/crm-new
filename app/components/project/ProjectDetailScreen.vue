@@ -4,6 +4,8 @@ import type { ProjectDetailReadDTO } from '~/lib/project/repository'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import ProjectConstructionManagementFees from '~/components/project/ProjectConstructionManagementFees.vue'
+import ProjectManagementFees from '~/components/project/ProjectManagementFees.vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
@@ -555,6 +557,9 @@ onActivated(() => {
     <AuxiliaryContractJourney v-if="item.dataOrigin === 'real'" :project-id="projectId" />
 
     <PayrollHostSection v-if="detail.payrollActual" :section="detail.payrollActual" :return-to="journeyReturnTo" @retry="loadProject" />
+
+    <ProjectConstructionManagementFees :configuration="detail.constructionManagementFees" :return-to="journeyReturnTo" />
+    <ProjectManagementFees :fees="detail.managementFees" :return-to="journeyReturnTo" @retry="loadProject" />
 
     <ProjectStorageActions v-if="hasLifecycle" :project-id="projectId" @state="deleted = $event" />
     <section class="panel flex min-w-0 flex-wrap items-center justify-between gap-3 p-4" aria-label="项目收款">

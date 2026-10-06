@@ -1,4 +1,4 @@
-import type { TargetCostContext, TargetCostDetailRead, TargetCostFormRead, TargetCostMetric } from './central-contract'
+import type { TargetCostContext, TargetCostDetailRead, TargetCostFormRead } from './central-contract'
 import { getDb } from '../db/connection'
 import { listFormAttachments, loadTargetCostForm } from '../master-data/forms'
 import { targetCostProblem } from './central-contract'
@@ -16,6 +16,5 @@ export async function localTargetCostDetail(context: TargetCostContext, id: stri
   const detail = await loadTargetCostDetail(await getDb(), id)
   if (!detail)
     throw targetCostProblem('not-found', '预算版本不存在')
-  const metric = (value: number): TargetCostMetric => ({ value, knownValue: value, status: 'complete', missingSources: [] })
-  return { context, targetCostId: id, deletedAt: null, files: (await localTargetCostForm(context, id)).files, history: [], actualSourceVersion: context.sourceVersion, view: { ...detail, categories: detail.categories.map(row => ({ ...row, signedAmount: metric(row.signedAmount), settledAmount: metric(row.settledAmount), paidAmount: metric(row.paidAmount), remainingAmount: metric(row.remainingAmount), sources: { contract: null, settlement: null, payment: null, reimbursement: null } })), summary: { ...detail.summary, signedAmount: metric(detail.summary.signedAmount), settledAmount: metric(detail.summary.settledAmount), paidAmount: metric(detail.summary.paidAmount), remainingAmount: metric(detail.summary.remainingAmount) } } }
+  return { context, targetCostId: id, deletedAt: null, files: (await localTargetCostForm(context, id)).files, history: [], actualSourceVersion: context.sourceVersion, view: { ...detail, categories: detail.categories.map(({ metrics, ...row }) => ({ ...row, signedAmount: metrics.signedAmount, settledAmount: metrics.settledAmount, paidAmount: metrics.paidAmount, remainingAmount: metrics.remainingAmount, sources: { contract: null, settlement: null, payment: null, reimbursement: null } })), summary: { itemTotal: detail.summary.itemTotal, signedAmount: detail.summary.metrics.signedAmount, settledAmount: detail.summary.metrics.settledAmount, paidAmount: detail.summary.metrics.paidAmount, remainingAmount: detail.summary.metrics.remainingAmount } } }
 }

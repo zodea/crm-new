@@ -5,6 +5,11 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { createError, deleteCookie, getCookie, getHeader, setCookie } from 'h3'
 import { getProductionRuntimeConfig } from './production-config'
+import { PRODUCTION_CREW_WORKER_CAPABILITIES } from './production-crew-worker-access'
+import { FINANCE_CAPABILITIES, FINANCE_IMPORT_CAPABILITY } from './production-finance-access'
+import { PRODUCTION_MATERIAL_CONTRACT_CAPABILITIES } from './production-material-contract-access'
+import { PRODUCTION_MATERIAL_QUOTATION_CAPABILITIES } from './production-material-quotation-access'
+import { PRODUCTION_OTHER_SETTLEMENT_CAPABILITIES } from './production-other-settlement-access'
 import { PRODUCTION_PROCESS_LIBRARY_CAPABILITIES } from './production-process-library-access'
 import { PRODUCTION_PROJECT_CAPABILITIES } from './production-project-access'
 import { PRODUCTION_SUPPLIER_CAPABILITIES } from './production-supplier-access'
@@ -12,7 +17,7 @@ import { PRODUCTION_SUPPLIER_CAPABILITIES } from './production-supplier-access'
 const COOKIE = 'ruihang_owner_session'
 const ABSOLUTE_MS = 8 * 60 * 60 * 1000
 const IDLE_MS = 30 * 60 * 1000
-const OWNER_CAPABILITIES = Object.freeze(['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', ...PRODUCTION_PROJECT_CAPABILITIES, ...PRODUCTION_PROCESS_LIBRARY_CAPABILITIES, ...PRODUCTION_SUPPLIER_CAPABILITIES])
+const OWNER_CAPABILITIES = Object.freeze([...new Set(['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', ...PRODUCTION_PROJECT_CAPABILITIES, ...PRODUCTION_PROCESS_LIBRARY_CAPABILITIES, ...PRODUCTION_SUPPLIER_CAPABILITIES, ...PRODUCTION_MATERIAL_CONTRACT_CAPABILITIES, ...PRODUCTION_MATERIAL_QUOTATION_CAPABILITIES, ...PRODUCTION_OTHER_SETTLEMENT_CAPABILITIES, ...FINANCE_CAPABILITIES, FINANCE_IMPORT_CAPABILITY, ...PRODUCTION_CREW_WORKER_CAPABILITIES, 'our-signatory:read', 'our-signatory:write'])])
 interface OwnerSession { configuration: string, created: number, used: number }
 // Authentication is intentionally revoked by a process restart; business receipts live on disk.
 const sessions = new Map<string, OwnerSession>()

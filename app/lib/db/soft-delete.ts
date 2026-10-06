@@ -1,8 +1,10 @@
 // 软删除 + 操作日志(#52)——纯函数,node 可测,驱动注入(与 migrations.ts 同模式)。
 // 权威口径:DATABASE.md §8(软删除/操作日志/撤回)+ ADR 0003(级联只标父级、查询按「祖先未删」过滤)。
 import type { MigrationDb } from './migrations'
+import { MATERIAL_QUOTATION_TABLES } from '~/lib/material-quotation/schema'
+import { OTHER_SETTLEMENT_TABLES } from '~/lib/other-settlement/schema'
 import { generateId } from '~/lib/util/id'
-import { assertIdentifier } from './migrations'
+import { assertIdentifier } from './schema-evidence'
 
 export type SoftDb = MigrationDb
 
@@ -124,6 +126,13 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   ],
   contract_supplements: [{ column: 'contract_id', table: 'contracts' }],
   contract_line_items: [{ column: 'contract_id', table: 'contracts' }],
+  contract_supplement_line_items: [
+    { column: 'supplement_id', table: 'contract_supplements' },
+  ],
+  contract_deductions: [
+    { column: 'contract_id', table: 'contracts' },
+    { column: 'supplement_id', table: 'contract_supplements' },
+  ],
   company_expense_contracts: [],
   expenditure_settlements: [
     { column: 'project_id', table: 'projects' },
@@ -310,7 +319,7 @@ export const BUSINESS_TABLES = Object.keys(PARENT_REFS)
 /** 物理存在(v1 基线遗留)但已废弃的表,禁止业务读写:ticket_registrations → invoices 单表(ADR-0001) */
 export const DEPRECATED_TABLES = ['ticket_registrations']
 
-/** 不参与通用软删除与操作日志的基础设施表；file_payloads 避免正文进入通用快照。 */
+/** 不参与通用软删除与操作日志；领域独占表只经所属 owner 修改，正文不进入通用快照。 */
 export const INFRA_TABLES = [
   'schema_migrations',
   'operation_logs',
@@ -321,8 +330,21 @@ export const INFRA_TABLES = [
   'invoice_export_settings',
   'ocr_settings',
   'supplier_credential_audits',
+  // 不可变人工凭证账本；供应商软删只改变入口可见性，不抹除历史。
+  'supplier_credential_review_history',
   'supplier_audits',
   'project_acceptance_lifecycle_events',
+  // 核实目录以停用保历史；占号、回执与墓碑不参与通用软删或撤回。
+  'our_signatory_revision',
+  'our_signatories',
+  'our_signatory_history',
+  'our_signatory_commands',
+  'our_signatory_resolutions',
+  'contract_number_claims',
+  'contract_number_history',
+  'construction_management_fee_history',
+  ...MATERIAL_QUOTATION_TABLES,
+  ...OTHER_SETTLEMENT_TABLES.filter(table => table !== 'expenditure_settlements'),
 ]
 
 function assertBusinessTable(table: string): void {

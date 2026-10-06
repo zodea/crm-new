@@ -8,6 +8,7 @@ import type {
   CoreMigrationSourceDTO,
   CoreMigrationSourceEntityDTO,
 } from '../../app/lib/migration/core-contract'
+import { decodeConstructionManagementFee, validateConstructionManagementFee } from '../../app/lib/construction-contract/management-fee'
 import { crewPayrollFeeAttributes } from '../../app/lib/crew-worker/payroll-fee-defaults'
 import {
   CORE_MIGRATION_CAPABILITY,
@@ -32,13 +33,16 @@ const ATTRIBUTE_KEYS_BY_ENTITY: Partial<Record<CoreMigrationEntityType, Readonly
   crews: new Set([...ATTRIBUTE_KEYS, 'defaultPayRatio', 'rentSubsidyEnabled', 'rentSubsidyPrice', 'mgmtFeeEnabled', 'mgmtFeePrice']),
   workers: new Set([...ATTRIBUTE_KEYS, 'dailyWage', ...WORKER_ROSTER_SOURCE_ATTRIBUTE_KEYS]),
   supplier_credentials: new Set(['graphJson']),
+  material_contracts: new Set(['materialGraphJson']),
+  contract_supplements: new Set([...ATTRIBUTE_KEYS, 'externalRef', 'materialGraphJson']),
   suppliers: new Set(['aliases', 'externalRef', 'uniqueCode', 'taxNo', 'businessType', 'supplierCategory', 'rating', 'legalRep', 'registeredCapital', 'registeredDate', 'address', 'taxpayerType', 'taxpayerVerificationStatus', 'taxpayerVerificationSource', 'taxpayerVerifiedAt', 'taxpayerVerificationNote', 'mainBusiness', 'laborScope', 'invoiceName', 'invoiceAddress', 'bank', 'bankAccount', 'phone', 'contact', 'contactPhone', 'contactTitle', 'note', 'approvalStatus', 'createdAt', 'updatedAt']),
   process_libraries: new Set(['graphJson']),
   quantity_projects: new Set(['graphJson']),
   wbs_projects: new Set(['graphJson']),
   target_cost_versions: new Set(['budgetGraphJson']),
   payroll_projects: new Set(['payrollGraphJson']),
-  construction_contracts: new Set([...ATTRIBUTE_KEYS, 'boqCatalogJson', 'monthlyQuantityFactsJson']),
+  construction_contracts: new Set([...ATTRIBUTE_KEYS, 'boqCatalogJson', 'monthlyQuantityFactsJson', 'attachmentsJson', 'legacyPartyA', 'ourSignatoryId', 'ourSignatorySnapshotJson', 'managementFeeAmount', 'managementFeeBasis', 'managementFeeConfigurationJson']),
+  subcontract_contracts: new Set([...ATTRIBUTE_KEYS, 'subKind', 'settlementStatus', 'clearanceStatus', 'attachmentsJson', 'legacyPartyA', 'ourSignatoryId', 'ourSignatorySnapshotJson']),
   receipt_registrations: new Set(['no', 'receiptDate', 'payerAccount', 'paymentMethod', 'acceptanceBillNo', 'billDueDate', 'periodNo', 'bankSerialNo', 'handler', 'reviewStatus', 'status', 'note', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'attachmentsJson']),
   delivery_records: new Set(['orderNo', 'deliveryDate', 'rawSiteText', 'fileName', 'ocrStatus', 'archived', 'printBatchId', 'printDisposition', 'printedAt', 'printExcludedAt', 'reviewFlag', 'note', 'createdAt', 'updatedAt', 'sourceState', 'sourceProblem', 'assetJson', 'allLinesJson', 'auditJson', 'legacyOriginalsJson']),
 }
@@ -163,6 +167,19 @@ function parseAttributes(value: unknown, label: string, entityType: CoreMigratio
   if (!isObject(value))
     invalid(`${label}必须是对象`)
   assertOnlyKeys(value, ATTRIBUTE_KEYS_BY_ENTITY[entityType] ?? ATTRIBUTE_KEYS, label)
+  if (entityType === 'construction_contracts') {
+    try {
+      validateConstructionManagementFee(value.managementFeeAmount ?? null, value.managementFeeBasis ?? '')
+      if (value.managementFeeConfigurationJson !== undefined) {
+        if (typeof value.managementFeeConfigurationJson !== 'string')
+          invalid(`${label}管理费冻结资料必须保留原 JSON 文本`)
+        const configuration = decodeConstructionManagementFee(JSON.parse(value.managementFeeConfigurationJson))
+        if (configuration.amount !== (value.managementFeeAmount ?? null) || configuration.basis !== (value.managementFeeBasis ?? ''))
+          invalid(`${label}管理费当前值与冻结依据不一致`)
+      }
+    }
+    catch (cause) { invalid(cause instanceof Error ? cause.message : `${label}管理费配置无效`) }
+  }
   if (entityType === 'crews') {
     try {
       crewPayrollFeeAttributes(value)
@@ -279,7 +296,7 @@ export function parseCoreMigrationSourceCommand(value: unknown): CoreMigrationSo
     invalid('source.entities 必须是对象')
   assertOnlyKeys(entityGroups, ENTITY_KEYS, 'source.entities')
 
-  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['auxiliary_contracts', 'other_settlements', 'other_settlement_sources', 'delivery_records', 'quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects', 'target_cost_versions', 'payroll_projects'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
+  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['material_contracts', 'auxiliary_contracts', 'other_settlements', 'other_settlement_sources', 'delivery_records', 'quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects', 'target_cost_versions', 'payroll_projects'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
     const rows = entityGroups[entityType]
     if (!Array.isArray(rows))
       invalid(`source.entities.${entityType}必须是数组`)

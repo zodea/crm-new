@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { installProjectCentralFixture, PROJECT_INPUTS } from './helpers/project-central-fixture'
 
 // 往来调拨、付款申请及确认支付的独立金额和来源正向覆盖：
-// tests/project/finance-facts.test.ts、tests/project/detail-aggregate.test.ts。
+// tests/production/finance-storage.test.ts、tests/finance/payment-detail.test.ts。
 // 中央详情当前只穿透已接管的收款，不读本地往来和支付明细。
 for (const input of PROJECT_INPUTS) {
   test(`${input.label}：收款中央入口保持项目身份，不混入本地往来与确认支付`, async ({ page }) => {

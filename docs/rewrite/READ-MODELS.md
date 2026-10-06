@@ -1,272 +1,275 @@
-# 前后端读模型与 DTO 语义基线
+# A03 读模型、DTO 与页面状态
 
-## PG-04 本机分供方读取（#453）
+<a id="前后端读模型与-dto-语义基线"></a>
 
-本机分供方列表、详情、表单和证照读取复用既有协议，事实只来自已登记 `supplier` 磁盘参与者。原件仍经证照专用接口校验当前读取权限、分供方→证照→文件归属、删除状态与 SHA-256；普通主档 DTO 不包含原件正文，退出或撤权后不能继续读原件。
+本文是 **A03 确认后的目标设计**，指导后续开发；不因旧文档、现有 DTO 或已合并代码而推定目标能力已实现。当前实现、待实施差异和历史证据集中在[实现差异](#implementation-gaps)。
 
-本切片尚未接管的项目、合同、结算、发票和付款通过可选 `unavailableSources` 明示缺口，相应计数/金额为 `null`。前端展示未知并停止不成立的下钻或金额筛选；不能返回假零、混用开发/演示记录或按名称猜关系。来源版本来自磁盘全域版本，证照的原始 OCR 候选、人工确认和审核凭证分别回读。
-
-原提交恢复沿 [COMMANDS](./COMMANDS.md#pg-04-本机分供方命令453) 的封存核对；原回执读回后才刷新目标，读回失败保留未知状态。当前能力不表示其他领域正式可用，也不放开首次真实业务写入。
-
-## PG-01 本机客户读取（#450）
-
-本机模式客户列表、详情和表单沿既有中央 DTO 回读磁盘权威；开发模式仍为验证实例。`/api/read/customers/:id/lifecycle` 返回稳定身份、名称、版本及删除时间；`/api/read/customers-deleted` 列出可恢复客户；`/api/read/customers/:id/audit` 仅返回审计身份、动作、命令和时间。`/api/read/customer-commands/:commandId` 返回本工作区/actor 的原结果或当前不存在，不能凭不存在自行宣告迟到写入已阻断，封存动作见 [COMMANDS](./COMMANDS.md#pg-01-本机客户命令450)。
-
-`/api/read/customers/:id/files/:fileId` 验证所属客户、删除状态、正文长度和 SHA-256 后以附件下载，禁缓存、禁止 MIME 嗅探，不接受任意磁盘路径。正式详情的项目/合同/收款源尚未接管时返回各领域 `unavailable`，计数/金额为未知，客户本身仍可读；不能返回假零或取开发/演示源补全。
-
-`/api/auth/status` 只报告运行模式、是否认证以及已登录时的 owner/到期时间，不续期；受保护业务读取才刷新空闲时间。`/api/production/status` 需认证，触发实际打开及写探测并返回 schema、用途和持久参与者。无配置、无法打开或未接管 API 都明确失败。后台白名单按已实现领域精确开放，拒绝演示及代理/测试头。运行权威见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。
-
-## 本机工序库读取（#463）
-
-本机模式 `GET /api/read/process-libraries` 与 `GET /api/read/process-libraries/:id` 沿既有 Repository/DTO 回读磁盘，需 `process-library:read`；只接 `real` 来源。空库返回空目录，不能填入演示模板。每个版本保留稳定 ID、完整工序顺序、阶段/分项定义、前置 key 与禁用状态，以及创建人和时间；后续版本不会修改旧版。目录修订和系列最高编号来自同一已核对状态。
-
-正式项目 WBS 尚未接管时 `usageCount=null`，页面明确“引用数量未知”，不得算作零。读取会核对版本、原命令和审计的完整关系，损坏、无权限和暂不可达分别拒绝，不能返回部分有效行或开发内存替代。持久参与者及升级见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)，已验收范围见 [#463 记录](../design/evidence/issue-463-production-process-library/README.md)。
-
-本文是浏览器业务页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 [`NAVIGATION.md`](./NAVIGATION.md) 裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
-
-当前实现已有九类中央主链：项目、客户、分供方、班组、工人、项目分供方、材料采购合同、施工合同与分包合同均经 Repository、HTTP adapter 和对应 `/api/read/*` operation 读取。合同 canonical 导航意图使用 `filters.contractKind`，Target Registry 映射为 `contractKind=material|construction|subcontract`；缺失 marker 的深链不会改道中央详情。演示夹具只有在 `includeDemo=true` 且会话拥有 `demo:read` 时可读，三类合同都按稳定来源、ID 和类型返回专属七组详情。#281 已联合验收客户、分供方、班组、工人、项目与项目分供方的中央身份往返；#317、#318、#320 与 #321 已分别闭合工作台、材采、施工与分包的 HTTP/Repository/受限返回链。旧 production SQLite 不再作为这些浏览器普通读 adapter。当前中央端为可重置测试实例，不是生产持久化库。
-
-## PG-03 本机项目读取（#452）
-
-本机模式 `/api/read/projects`、`/api/read/projects/:id`、`/api/read/projects/:id/form` 复用既有 DTO，由正式磁盘项目和客户投影。客户详情的项目分区在 `project:1` 参与者已就绪且有项目读取能力时，沿真实主/次客户外键回读；删除项目不出现在正常关系集合。未接管合同、收款、预算、工资和项目分供方时保持未知或不可用，不能填零、读取开发实例或借名称猜关系。
-
-双向关系在同一只读事务取得；项目详情来源版本同时包含客户修订，客户详情包含项目修订，关联改名、删除或恢复不能保留旧的来源版本。`asOf` 是本次一致读取时间，不能拿主实体上次修改时间充当关联事实的读取时点。
-
-`/api/read/projects/:id/lifecycle` 返回名称、版本、删除时间；`/api/read/projects-deleted` 是恢复入口；`/api/read/projects/:id/audit` 返回审计身份、原键、可信操作者、动作与时间。已删除项目详情可核对基础身份并恢复，但表单和原件下载拒绝；原件 `/api/read/projects/:id/files/:fileId` 重验 owner、删除状态、实际字节数与 SHA-256，按附件下载且禁缓存。客户恢复不隐式恢复项目，项目恢复也不改变独立附件删除事实。
-
-原键核对使用 [PG-03 命令](./COMMANDS.md#pg-03-本机项目命令452)，网络与权限失败不解释为未保存。完整参与者与一致备份清单见 [DATABASE](./DATABASE.md#pg-03-本机项目持久参与者452)。
+本文唯一维护公共 DTO、标量、Problem、分页一致性、权限、可空值、完整度和读状态。业务实体及公式见 [DATABASE](./DATABASE.md)，环境、模块 owner 和隔离见 [ARCHITECTURE](./ARCHITECTURE.md#data-ownership)，写信封、幂等、冲突和成功恢复见 [COMMANDS](./COMMANDS.md#command-envelope)，语义目标和返回上下文见 [NAVIGATION](./NAVIGATION.md)。领域章节仅保留差异和必要来源，不另定义公共协议。
 
 ## 1. 边界与分级
 
-每个页面族按以下分级标记：
+读接口返回当前授权范围内可证明的事实、版本和缺口。读取不保存输入、不核验资料、不占号、不发放、不归档；使用 POST 承载大型预览正文仍是只读操作。实体是否存在、关系是否可读、计算是否完整和允许哪些动作分别表达。
 
-- `A`：已有稳定 ID、SQLite 外键或确定性读模型，可直接成为后台读 DTO 基线。HTTP 未实现时由类型化本地 adapter 返回同一语义。
-- `B`：页面需要该字段或下钻，但 canonical 外键、身份或聚合来源尚未建立。DTO 必须保留显式缺口，关系落库前不得按名称、同项目、金额近似或文本用途猜接线。
-- `C`：文件、OCR、导入导出或桌面能力。继续走专用本地/Nitro adapter，不塞进通用业务列表接口；凭证、原始文件和私有地址不得进入普通 DTO。
+历史 A/B/C 分类仅用于理解旧接入证据：A 为已有稳定身份/事实，B 为 canonical 关系或来源缺口，C 为文件/OCR/导入导出专用边界。它们不是新的实现验收等级，也不证明某领域已正式可用。现行运行范围只见 [ARCHITECTURE](./ARCHITECTURE.md#runtime-environments)。
 
-`A` 不等于已经有在线接口，`B` 不等于可以先返回假数据，`C` 也不等于 Mock。三类都必须展示真实加载、空、错误和权限状态。
-
+<a id="shared-dto"></a>
 ## 2. 共享语义类型
 
-### 2.1 标量
+以下类型是目标语义示意，具体 operation 的可执行 schema 由所属领域维护。采用公共语义和 Problem 协议，领域 payload、变体及兼容 adapter 可以不同；不强迫所有领域使用相同字段，也不另建一套 HTTP 读取错误协议。升级须显式解码版本，旧载荷缺字段只有存在已确认的兼容含义时才归一；不能以默认值修复未知事实。
 
-```ts
+~~~ts
 type OpaqueIdDTO = string
 type BusinessCodeDTO = string
-type ISODateDTO = string       // YYYY-MM-DD
-type ISODateTimeDTO = string   // ISO-8601，带时区或明确为 UTC
-type YearMonthDTO = string     // YYYY-MM
-
-// JSON 传输固定使用十进制定点字符串；禁止科学计数法和货币符号。
-type MoneyDTO = string         // 例："1234.50"，固定两位小数
-type QuantityDTO = string      // 最多六位小数，保留 0 与 null 的区别
-type RatioDTO = string         // 0..1，最多六位小数
-
-type CountDTO = number         // 非负安全整数
-type BoolDTO = boolean
 type DataOriginDTO = 'real' | 'demo'
-```
+type ISODateDTO = string // YYYY-MM-DD，真实日历日期
+type ISODateTimeDTO = string // ISO-8601，明确时区或 UTC
+type YearMonthDTO = string // YYYY-MM
+type CountDTO = number // 非负安全整数
+type BoolDTO = boolean
 
-SQLite 现阶段仍按 `REAL` 保存多数金额，工资分配按整数分保存。SQLite adapter 在 DTO 边界统一 `round2` 并编码为 `MoneyDTO`；写 adapter 在领域事务内转换和勾稽。Vue 页面可以在展示 adapter 后使用 `number` 计算布局和格式化，但不得把格式化字符串、浮点绝对相等或 `Number(value) || 0` 带回领域判断。全库是否迁移为整数分不在本票决定。
+interface AuthorizedScopeDTO {
+  coverage: 'complete' | 'permission-filtered' | 'unknown'
+  fingerprint: string // 不透明范围标识，不泄漏受限记录
+}
+interface SourceEvidenceDTO {
+  key: string // 稳定来源 key
+  state: 'readable' | 'forbidden' | 'unavailable' | 'not-requested'
+  sourceVersion: string | null
+  asOf: ISODateTimeDTO | null
+}
+interface ReadMetaDTO {
+  schemaVersion: string
+  workspaceId: OpaqueIdDTO
+  actorId: OpaqueIdDTO
+  dataOrigin: DataOriginDTO
+  asOf: ISODateTimeDTO
+  sourceVersion: string | null // 本次实际组合来源的不透明版本
+  sources: SourceEvidenceDTO[]
+  authorizedScope: AuthorizedScopeDTO
+  capabilities: string[]
+}
+~~~
 
-编号、税号、银行账号、电话和外部键始终是字符串，保留前导零；计数才使用整数。日期缺失为 `null`，不是空日期或 `1970-01-01`。
+身份至少以工作区、来源、实体 kind 和稳定 ID 解释；记录、配置、新稿、冻结、原件各有自己的身份，不能互换。metadata 不代替实体 payload 的身份校验。decoder 校验目标、父链、variant、来源、当前会话、唯一关系和字段边界；不完整或串目标响应不得进入可信状态。原始证据 JSON 保留原文，与用于本代显示的类型化投影分开。
 
-枚举传 `DATABASE.md` 或页面蓝本已经定义的 canonical code。现有合同状态等字段若以中文值作为当前 canonical code，可以原值传输，但不得另用显示标签、颜色或按钮文案发明第二套身份；未来改为英文 code 时必须做显式版本迁移和双向 adapter，不能逐页临时翻译。
+authorizedScope 的 complete 表示已覆盖声明的请求业务范围，permission-filtered 表示仅当前可见子集，unknown 表示范围证明不足；它不代替来源可用性或计算完整度。各子区另声明自己的范围。授权可见小计即使计算 complete 也只能标“当前可见范围”，不能贴“全项目/企业总额”；不得输出受限记录的数量或以差额反推隐藏金额。
+
+sourceVersion 由真实参与来源组成，不能用客户端生成值、实体 updatedAt 或仅一个主表修订冒充组合来源。asOf 是本次一致读取时点；冻结/归档的业务时点在 payload 中另列。不能在未读某来源时声称它已完整。依赖版本在写动作中如何判定冲突由 [COMMANDS](./COMMANDS.md#version-and-dependency-checks) 裁定，版本变化本身不一律阻断业务。
+
+<a id="scalar-semantics"></a>
+### 2.1 标量
+
+~~~ts
+type DecimalDTO = string // 无科学计数法的十进制字符串
+type MoneyDTO = DecimalDTO
+type QuantityDTO = DecimalDTO
+type RateDTO = DecimalDTO
+type RatioDTO = DecimalDTO
+~~~
+
+金额、数量、费率、工时和比例在 DTO 中使用十进制字符串，不含千位符、货币符号或百分号。金额结果沿领域既定结算/舍入口径；工资最终金额按两位小数传输，页面加千位分隔显示。原单价、费率、工时和数量保留可证明精度，不能先舍入再乘；不新增数量统一六位上限，不把费率截成金额精度。比例的合法范围由指标定义，可能为负或超过 100%，不能通用限制成 0..1。计数是安全整数；金额按整数分分配的工资算法仍在领域内使用既定整数分。
+
+例如日薪 481 元、正常工时 8 小时、另计工时 2 小时：单价保留 `481 ÷ 8 = 60.125`，另计金额为 `120.25`，合计 `601.25`；不能先把单价舍入成 `60.13`，得到不同的 `601.26`。工资金额 DTO `"1234.50"` 在页面显示为 `1,234.50`，展示分隔符不进入保存值。
+
+当前 SQLite REAL、整数分和历史 JSON 是实现及证据，不因 DTO 改成字符串而完成存储迁移。adapter 将有限数值按其已证精度展开，例如 0.0000001；金额边界按领域规则处理，原 JSON/审计原文不递归重写。拒绝非有限数和非法数字字符串，不用浮点绝对相等或 Number(value) || 0 判断业务。
+
+编号、税号、银行账号、电话和外部键为字符串并保留前导零。缺失日期为 null；业务日与事件时间分开。证照按[上海业务日](#supplier-expiry-warnings)，排程 today 按其领域已确认的客户端运行日，不能偷换为部署服务器 UTC 日期。枚举传已确认 canonical code；当前中文 code 可以保留，显示标签、颜色和按钮不能成为身份，改 code 须显式迁移。
 
 ### 2.2 关系引用
 
-```ts
+~~~ts
 type EntityKindDTO
-  = 'project' | 'customer' | 'supplier' | 'crew' | 'worker'
+  = | 'project' | 'customer' | 'supplier' | 'crew' | 'worker'
     | 'contract' | 'settlement' | 'owner-document' | 'subcontract-document'
     | 'invoice-application' | 'invoice' | 'receipt' | 'current-transaction'
     | 'payment-application' | 'payment-record' | 'expense-reimbursement'
     | 'material' | 'material-document' | 'delivery-record' | 'warehouse'
-    | 'wage-statement' | 'attendance' | 'schedule-group' | 'schedule-task'
+    | 'wage-statement' | 'wage-adjustment' | 'wage-actual' | 'attendance' | 'daywork'
+    | 'schedule-group' | 'schedule-task' | 'process-library'
     | 'quantity-unit' | 'target-cost' | 'file'
 
-type EntityRefDTO =
-  | {
-      state: 'resolved'
-      entity: EntityKindDTO
-      id: OpaqueIdDTO
-      label: string
-      no: BusinessCodeDTO | null
-    }
-  | {
-      state: 'missing'
-      entity: EntityKindDTO
-      id: null
-      label: null
-      reason: 'not-configured' | 'not-recorded' | 'not-applicable'
-    }
-  | {
-      state: 'forbidden'
-      entity: EntityKindDTO
-      id: OpaqueIdDTO | null
-      label: null
-      reason: 'permission-denied'
-    }
-```
+type EntityRefDTO
+  = | { state: 'resolved', entity: EntityKindDTO, id: OpaqueIdDTO, label: string, no: BusinessCodeDTO | null }
+    | { state: 'missing', entity: EntityKindDTO, id: null, label: null, reason: 'not-configured' | 'not-recorded' | 'not-applicable' }
+    | { state: 'forbidden', entity: EntityKindDTO, id: null, label: null, reason: 'permission-denied' }
+    | { state: 'unavailable', entity: EntityKindDTO, id: null, label: null, reason: 'source-unavailable' }
+~~~
 
-DTO 不下发前端路由字符串。前端根据 `entity + id` 与 [`NAVIGATION.md`](./NAVIGATION.md) 的 `NavigationIntentDTO`，经 `app/lib/nav/target-registry.ts` 这一个 Target Registry 生成目标；甲方/分包/材料等多态单据必须再带 canonical variant，不能按名称或编号猜路由。项目列表行的意图还携带后台判定的 `filters.dataOrigin`，decoder 必须验证 subject、variant 与来源一致后才交给界面。无有效目标或无权限时显示普通文本/明确状态，不伪装蓝色链接。关系对象存在但其子集合为 0 条时返回 `state='resolved'` 和空数组，不能降格成 `missing`；聚合值为 0 时是否可点由明确 drilldown 决定，不由数值猜测。
+实体存在而子集合确为 0 条，引用仍 resolved；父关系未配置与整源故障分别表达。禁止按名称、同项目、用途文本、金额近似或历史路径猜关系。kind 是允许解释的词表，不代表仓库等每一种实体已经实施。
 
+DTO 不下发 Vue 路由字符串；语义目标使用 [NavigationIntentDTO](./NAVIGATION.md)，经唯一 Target Registry 解析。合同需 canonical contractKind，来源须与 subject 一致；无有效目标/权限则显示普通文本和原因。聚合是否可点由已验证 drilldown 决定，不由金额是否大于零决定。
+
+<a id="pagination-and-consistency"></a>
 ### 2.3 分页、筛选、排序与汇总
 
-```ts
-interface SortDTO {
-  field: string
-  direction: 'asc' | 'desc'
-}
-
+~~~ts
+interface SortDTO { field: string, direction: 'asc' | 'desc' }
 interface PaginationDTO {
-  page: number       // 从 1 开始
+  requestedPage: number // 合法请求页，从 1 开始
+  page: number // 实际页；越界回最后页，空结果为 1
   pageSize: number
-  total: CountDTO    // 同一筛选条件下的总行数
+  total: CountDTO // 当前授权且同筛选的总行数
 }
-
 interface EmptyDTO {
   reason: 'no-records' | 'no-filter-match' | 'missing-relation'
   missingRelations: EntityKindDTO[]
 }
-
 interface PageDTO<T, S = null> {
   items: T[]
   pagination: PaginationDTO
   summary: S
   empty: EmptyDTO | null
-  asOf: ISODateTimeDTO
-  sourceVersion: string | null
-  capabilities: string[]
+  meta: ReadMetaDTO
 }
-```
+~~~
 
-- 每个 operation 定义自己的强类型筛选键；项目、客户、分供方、合同、班组、工人等筛选只接收稳定 ID。
-- `pageSize` 先支持现有控件实际使用的 10、20、50、100；非法页码/排序字段返回参数错误，不静默换成其他字段。
-- 排序必须带稳定的 `id` 次序，避免翻页重复或漏行。状态 code、金额和日期按原始类型排序，不按中文标签或格式化文本排序。
-- `summary` 使用与 `items` 相同的完整筛选集，但在分页之前聚合；不能只汇总当前页。
-- `includeDemo` 默认 `false`，只改变读查询。开启时每行返回服务器判定的 `dataOrigin`，`summary.origins.real/demo` 分别计算数量、金额、完整度和缺失来源；不提供混合业务总额，也不让演示关系补齐正式关系。
-- 初始无业务记录用 `no-records`，有数据但筛选无命中用 `no-filter-match`，必需关系未配置导致无法查询用 `missing-relation`。
+每个 operation 定义强类型筛选、排序和列条件白名单、搜索字段及匹配方式，实体条件只收稳定 ID。搜索、列条件、工具栏条件和排序消费同一个查询；同字段枚举多选取并集，不同字段条件取交集，空选择表示不限，领域明确的兼容解码另按该领域处理。远程分页必须查询当前业务范围的完整集合，普通翻页每次到后台重读一页；仅已证明完整的本地小集合可在本地执行等价查询。同一响应的行、分页总数、汇总、facet 及相关来源须来自一致读取。汇总先按同一完整授权筛选集计算再分页，不以当前页求和。排序追加稳定来源和 ID 次序，按原日期、枚举 code、decimal 语义排序；未知值的位置由领域明确规定。
 
+API 拒绝非法页码/页大小/排序/筛选载荷并返回 invalid-query；前端可在恢复旧 URL/本地筛选时按公开白名单 normalize 后再发请求，不把非法请求解释为成功。页大小支持既有 10/20/50/100。合法页码超过末页自动回最后页，同时返回 requestedPage 与实际 page；空结果 page=1，并保留筛选。无业务数据、筛选无命中和缺必需关系分别说明。
+
+全量候选、导出和跨页分析不能拼接不同 sourceVersion 或授权范围的页。需完整集合的 operation 使用同一快照/一致读取证明；分页累计发现版本变化、缺页、重复身份、读取失败或权限变化时停止并重新读取，未完成前不能选择或输出为完整集合。普通分页不会承诺所有历史页永久同一快照。
+
+导出固定点击时的查询、排序和授权范围，默认输出该查询的完整匹配集合；领域支持勾选导出时另明确范围与数量，不把当前页切片当全部结果。筛选或排序变化回第 1 页，普通翻页和每页条数变化保留条件；刷新重读当前查询并由合法越界规则修正页码。来源返回后的查询恢复只见 [NAVIGATION](./NAVIGATION.md#21-返回上下文)，控件应用时机与中文输入处理只见 [DESIGN-SYSTEM](./DESIGN-SYSTEM.md)。
+
+例如每页 2 条，原排序为 `A、B、C、D`，第一页读取 `A、B` 后插入了排在最前的 `X`；普通第二页重读当前集合，得到 `B、C`，这是当前第二页的有效结果。若任务是收集完整候选或导出，则不能把两次结果拼成 `A、B、B、C`；应停止累计，重新取得能证明一致的完整集合。
+
+includeDemo 默认 false 且须服务端 demo:read；每行来源由后台确定。正式/演示的数量、金额、完整度分别汇总，不提供混合业务总额，不以演示补正式缺口。facet 在同一集合上保留其他条件、去掉自己的选中条件，不能来自当前页。
+
+<a id="read-status-and-completeness"></a>
 ### 2.4 可空值与聚合完整性
 
-```ts
-type CompletenessDTO
-  = 'complete' | 'partial' | 'pending' | 'not-applicable' | 'undefined'
+读取状态、计算完整度和授权范围是三个独立维度。ready 不代表全量可见或计算完整；permission-filtered 不等于计算 partial；父主档可读不代表子域可读。
 
+~~~ts
+type CompletenessDTO = 'complete' | 'partial' | 'pending' | 'not-applicable' | 'undefined'
 interface MetricDTO {
   value: MoneyDTO | QuantityDTO | RatioDTO | CountDTO | null
+  knownValue: MoneyDTO | QuantityDTO | RatioDTO | CountDTO | null
   unit: 'CNY' | 'quantity' | 'ratio' | 'count'
+  quantityUnit: string | null
   status: CompletenessDTO
   missingSources: string[]
+  participatingCount: CountDTO | null
+  missingCount: CountDTO | null
   asOf: ISODateTimeDTO
-  drilldown: {
-    entity: EntityKindDTO
-    filters: Record<string, string>
-  } | null
+  drilldown: NavigationIntentDTO | null
 }
-```
+type ReadState<T>
+  = | { kind: 'idle' }
+    | { kind: 'loading', previous: T | null }
+    | { kind: 'ready', data: T }
+    | { kind: 'empty', data: T, empty: EmptyDTO }
+    | { kind: 'forbidden', problem: ProblemDTO }
+    | { kind: 'not-found', problem: ProblemDTO }
+    | { kind: 'mismatch', problem: ProblemDTO }
+    | { kind: 'unavailable', problem: ProblemDTO, previous: T | null }
+    | { kind: 'error', problem: ProblemDTO, previous: T | null }
+~~~
 
-- `null` 表示事实缺失、尚不可算或该字段未知；`0` 只表示已知为零。
-- 付款批复读取同时返回可空金额和状态 `not-entered / known / legacy-unknown`，区分未填写、明确金额与历史含义待核验。付款详情、付款管理、分供方及项目分供方、其他结算关联源单使用相同语义；批复合计含未知时保持不完整，已确认银行实付独立聚合。来源标记、余额公式与历史操作兼容边界只见 [DATABASE §2.4 支付记录](./DATABASE.md#entity-payment-record)。
-- 成功读取且确实没有子记录返回 `[]`；未读取、无权限或父关系缺失不能返回假空数组。
-- 字段“不适用于该变体”应在变体 schema 中省略；字段适用但尚无事实必须显式返回 `null`。
-- 工程量三量各自保留缺失，现场量缺失必须保持 `null`；阶段/全户及月度合计按明确计量单位分别计算，只有所有参与行都有该量时才是 `complete`，不能用 `?? 0` 消除缺失。返回完整值、已知部分、参与项数、缺项数与缺单位标记；缺单位时完整值和已知部分均未知，部分缺量的已知部分不冒充完整合计。具体分组与全户去重见[工程量蓝本](./pages/subcontract-quantity.md#六详情与施工记录)。
-- 税负率、动态效益率等除法指标在分母为 0 或来源未取得时返回 `null + status`，不显示伪造 `0%`。
+- value 是所声明计算范围的完整值；无法完整计算为 null。knownValue 是可证明的已知部分，不冒充全量，也不把不可见记录数量/金额反推给用户。complete 可令 knownValue=value；比例等不能合法合并的“已知部分”仍为 null。
+- partial 表示参与来源中部分未知；pending 表示尚待取得/核验；not-applicable 表示不适用；undefined 表示定义无法产生数值，例如分母为 0。缺口要有来源原因，不能只给一个含混状态。
+- null 是适用字段未知或不可算，真实已知零才传零。变体不适用字段在该变体 schema 中省略；适用但未知字段显式 null。缺日期、数量、税点、人员分配不能补默认零。
+- 数组只有已成功读取且确无记录时才代表真实空。子域独立返回 ready/empty/forbidden/unavailable 等状态；旧 adapter 若保留 items=[] + 子域 Problem，必须先据 Problem 呈现，不能把该数组展示为“暂无”。
+- 授权集合的计数、行、汇总保持一致，标明 authorizedScope。受限单行排除且不提供占位身份/数量；整源无权/不可用时相关指标为 null，独立可读主档和其他分区仍可读。
+- 数量按明确单位分组，同单位且身份去重后聚合，三量分别保持缺失，不跨基准补值。返回参与/缺项数和已知小计；缺单位使对应完整值和已知部分均未知。工程量规则见[页面蓝本](./pages/subcontract-quantity.md#六详情与施工记录)。
+- 付款批复另带 not-entered / known / legacy-unknown，银行实付独立；业务来源/余额只见 [DATABASE 支付记录](./DATABASE.md#entity-payment-record)。合同金额录入的已确认空税率规则不能推广为票据、价格对比或真实税负的未知税率默认值。
 
+<a id="permissions-and-stale-data"></a>
 ### 2.5 错误、权限和并发
 
-```ts
+读取请求绑定当前 actor、工作区、目标、来源和读取代次。切换目标/来源、撤权、退出或失效后清除敏感事实和候选；最后异步等待后再次核验，迟到响应不得显示、下载或覆盖输入。同 cookie 多窗口是同一登录；新独立登录使旧登录失效，运行边界见 [ARCHITECTURE](./ARCHITECTURE.md#runtime-environments)。
+
+可在**同用户、同目标、同来源、同授权范围**保留上次读数据，并显著标明旧数据和读取失败/加载中。查询变化期间保留旧表格时，旧行、数量、汇总和 facet 仍属于旧查询，不能标成新查询成功；只有当前读取代次能一次发布新的完整响应。旧数据仅供查看，不能作为候选、新写依据或导出完整结果。权限/来源改变时不能沿用；冻结历史本身可独立通过本次授权读取，不能拿当前读失败把旧当前状态标成最新。当前输入与最小原命令恢复描述按 [COMMANDS](./COMMANDS.md#draft-lifecycle) 保留，不能以缓存事实代替原键恢复。
+
+<a id="problem-semantics"></a>
+#### 公共 Problem 与 HTTP 对应
+
+~~~ts
 interface ProblemDTO {
-  code:
-    | 'invalid-query' | 'forbidden' | 'not-found'
-    | 'relationship-mismatch' | 'validation-failed'
-    | 'stale-source' | 'conflict' | 'unavailable' | 'internal-error'
+  code: 'invalid-query' | 'unauthenticated' | 'forbidden' | 'not-found'
+    | 'relationship-mismatch' | 'validation-failed' | 'stale-source'
+    | 'conflict' | 'unavailable' | 'internal-error'
   message: string
   retryable: boolean
   fieldErrors: Record<string, string[]>
   traceId: string | null
 }
+~~~
 
-type ReadState<T> =
-  | { kind: 'idle' }
-  | { kind: 'loading', previous: T | null }
-  | { kind: 'ready', data: T }
-  | { kind: 'partial', data: T, missingRelations: EntityKindDTO[] }
-  | { kind: 'empty', data: T, empty: EmptyDTO }
-  | { kind: 'forbidden', problem: ProblemDTO }
-  | { kind: 'not-found', problem: ProblemDTO }
-  | { kind: 'mismatch', problem: ProblemDTO }
-  | { kind: 'error', problem: ProblemDTO, previous: T | null }
-```
+| HTTP | Problem code | 含义 |
+| --- | --- | --- |
+| 400 | invalid-query | 查询语法、白名单或载荷错误 |
+| 401 | unauthenticated | 未登录、登录到期或已被新登录替换 |
+| 403 | forbidden | 当前读取能力不足 |
+| 404 | not-found / relationship-mismatch | 实体不存在或父链错配；按授权避免存在性泄漏 |
+| 409 | conflict / stale-source | 领域写约束或依赖依据冲突 |
+| 422 | validation-failed | 领域字段校验失败 |
+| 503 | unavailable | 来源/服务暂不可用，可否重试以 retryable 为准 |
+| 500 | internal-error | 未分类故障，返回可追踪且不泄密的说明 |
 
-- 整个页面族无读取权限返回 `forbidden`，不返回 200 + 空列表。单个关系不可见使用 `EntityRefDTO.state='forbidden'`，并按权限策略隐藏 label。
-- 父实体不存在返回 `not-found`；路径中的项目/合同/户等身份不匹配返回 `relationship-mismatch`，不得按同名对象回退。
-- 本地加载错误和 HTTP 错误都归一为 `ProblemDTO`；页面保留重试入口和原筛选，不把错误当空态。
-- 需要源版本保护的工程量、工资、排程、OCR 校对和导入结果带 `sourceVersion`；陈旧提交返回 `stale-source`，不覆盖新事实。
-- HTTP adapter 使用 400 表示查询格式错误、403 表示无权限、404 表示不存在或错配、409 表示冲突/陈旧来源、422 表示字段校验失败、503 表示可重试不可用、500 表示未分类内部错误；SQLite adapter 映射到相同 `ProblemDTO.code`。
+HTTP adapter、领域 Repository 和显式本地 adapter 均映射此语义；网络失败可以生成本地 Problem，但不能伪造后台成功。页面保留合法筛选和适用重试入口，错误不降格为空。原命令结果查询的 not-found 不证明未应用；封存与恢复唯一见 [COMMANDS](./COMMANDS.md#idempotency-and-recovery)。
 
+<a id="domain-projections"></a>
 ## 3. 页面域的 DTO 映射
 
-下表按页面域索引读模型，不维护会漂移的路由数量，也不以路由数作为功能分母。当前对象、动态 kind、状态和公共能力由[复核基线](https://github.com/zodea/crm-new/issues/403)核对，并与 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 对应；字段细节只链接页面蓝本。
+下表覆盖整个 A03 页面域；稳定编码同时供证据账本和导航覆盖检查使用，中文名称不作为新实体身份；不以固定路由数量代替功能覆盖。业务字段、适用变体、公式和允许动作沿 A01/A02 已确认蓝本；读模型统一引用[公共 DTO](#shared-dto)。历史运行面复核见 [#403](https://github.com/zodea/crm-new/issues/403) 与[运行记录](../design/runtime-reference-audit.md)，当前接入另见[实现差异](#implementation-gaps)。
 
-| 代码 | 运行证据域 | 页面族与核心读形态 | 当前数据来源 | 分级与后台缺口 |
-| --- | --- | --- | --- | --- |
-| `home` | 首页 | 当前项目引用、排程分组/任务、计划与实际进度、空排程状态 | `projects`、施工进度读模型、首页聚合 | `A`；不增加参考站待办/公告等无本地路由模块，见 [`homepage-dashboard.md`](./pages/homepage-dashboard.md) |
-| `project` | 项目 | 项目列表/详情/表单；项目身份、客户关系、阶段、十个资料页签、经营 `MetricDTO` | 列表、只读详情与正式新增/编辑表单已走中央 HTTP；SQLite 迁移 adapter 读取 `projects`、`customers`、`receipt_registrations`、`target_costs` | `A+B`；列表与基础详情读切片已实现，经理/执行经理/设计/仓管等仍为名称文本，建立人员主数据 ID 前只显示不可下钻文本；管理费等未知指标保持 `pending`，见 [`project-info.md`](./pages/project-info.md) |
-| `master-data` | 基础主数据 | 客户、班组、工人列表/详情/表单；联系方式脱敏、项目/责任/考勤/工资/扣罚关系 | 客户中央 Repository；班组—工人中央 `CrewWorkerReadRepository` / `CrewWorkerCommandRepository`；Tauri 保留本地 SQLite adapter | `A+B`；客户与班组—工人浏览器链均按来源稳定 ID 读取和写回，missing、forbidden、来源错配分别呈现，测试数据只读。班组成员、当前项目、责任单元、工资单和扣罚可穿透；无个人工资分配不反推。班组合同、公司人员角色等缺稳定关系时不得用姓名拼接，见 [`base-customer.md`](./pages/base-customer.md)、[`base-crew.md`](./pages/base-crew.md)、[`base-worker.md`](./pages/base-worker.md) |
-| `supplier` | 分供方 | 分供方主数据、独立证照文件/审核页、资料状态、联系人/开户资料、跨项目合同/结算/收票/付款摘要 | 中央 Supplier Repository；既有证照/要求/审计专用边界；跨域事实聚合 | `A+B+C`；敏感字段按 capability 脱敏，资料状态与业务审批分开；查询、金额完整度和已接/未接来源见[分供方读取契约](#33-分供方列表查询与跨域事实)，字段与交互只见 [`base-supplier.md`](./pages/base-supplier.md) |
-| `project-supplier` | 项目分供方 | 项目×分供方详情、六类事实集合、合作文件与汇总；本地文件选择/分类草稿，确认后中央原子导入 | 中央 `ProjectSupplierReadRepository` 与导入命令；浏览器本地 adapter 只负责待导入文件选择、分类和正文读取 | `A+C`；#317 已闭合双 ID 关系校验、正式/演示六类事实 DTO 与 HTTP，#281 闭合正式分供方/合作关系/文件正文的中央原子写入与反向读回；#438 为合作档案 owner 接入惰性正文与摘要校验，按当前祖先/关系/权限读取，其他 owner 正文和终态结算写入仍未接入，见 [`project-supplier.md`](./pages/project-supplier.md) |
-| `core-contract` | 核心合同 | 三类合同列表/详情/表单、关联单据、材料明细、BOQ 文件/行/变更/月报量与汇总 | 材采、施工与分包分别经中央领域 Repository；BOQ 按 canonical `contracts` 及下游单据 | `A+B`；#318/#320/#321 分别闭合材采、施工、分包专属列表—七分区详情—正式中央写入—读回；#322 闭合施工/分包补充协议稳定聚焦、父子校验、正式迁移与列表来源恢复；演示须显式授权且只读，未闭合稳定目标返回 `unverified-target` |
-| `aux-contract` | 辅助合同与结算 | 公司/其他支出合同、其他支出结算的专属列表/只读详情/表单，以及材料结算列表和表单；项目/分供方/合同引用、金额链与状态 | 两类辅助合同与其他支出结算经各自中央 Repository；`expenditure_settlements`、真实分摊与独立中央源单 | `A+B`；#330 已闭合两类辅助合同中央链，#331 已闭合其他支出结算及奖罚/申请/支付源单往返；未知付款归属仍保持 null。没有业务明细实体的类型不得返回虚构 lineItems；材料结算—有效到货关系已定，#409 核验实际迁移与实现，见 [`contract-forms.md`](./pages/contract-forms.md) |
-| `owner-document` | 甲方单据 | 六类单据变体的专属列表、只读详情投影与表单；项目/施工合同/客户、金额、分视图附件与审计事件 | 甲方单据表、月报量、BOQ 变更、`project_acceptances`、`project_acceptance_lifecycle_events`、`owner_final_settlements`、`owner_penalties`、`contract_supplements`、`receipt_registrations` 和 `file_refs` | `A+B`；#323 已闭合甲方变洽签/月度报量，#324 已闭合验收/保修 canonical 双视图，#325 已闭合最终结算，#326 已闭合甲方罚扣专属只读详情、中央表单命令、真实联系单附件与施工合同来源往返。罚扣金额、联系单、事由、申诉说明与状态来自同一 canonical 事实，申诉说明不推导审批流，见 [`owner-documents.md`](./pages/owner-documents.md) |
-| `subcontract-document` | 分包单据 | 分包变更、分包结算、项目罚扣专属列表/详情投影/表单；合同/分供方/班组与抵扣关系 | 分包变洽签、分包结算与项目罚扣经中央 owner-document Repository；`penalty_records`、独立抵扣与整改事实 | `A+B`；#327 已闭合分包变洽签专属只读链；#328 已闭合分包结算的中央列表、详情、保存确认、附件与迁移，并恢复全局/项目/合同来源；#329 已闭合项目罚扣中央详情、抵扣/整改与审计。分包结算付款来源未接入或精确归属未知时仍保持 partial，不用表单记录冒充详情，见 [`owner-documents.md`](./pages/owner-documents.md) |
-| `material` | 自购材 | 下料、到货、领用、盘点列表/详情投影/表单；材料行、来源单据、库存与结算付款状态 | 乙供材头/行表、合同/项目/分供方外键 | `A+B`；warehouse 仍为文本，到货—归档、结算分摊、领用批次和调拨两端缺稳定 ID，必须返回 missing-relation，见 [`material-management.md`](./pages/material-management.md) |
-| `owner-material` | 甲供材 | 总控、下料、到货、领用、直入直出五类专属列表/详情投影/表单 | 五类甲供材实体、项目/客户/班组引用和三量派生 | `A+B`；供货单位不得冒用项目客户，总计划头/行、仓库、送货单和班组合同身份待建；无 seed 时返回真实 0 条，见 [`material-management.md`](./pages/material-management.md) |
-| `delivery` | 送货单闭环 | 处理区、归档库、当前/历史详情与整页表单；单头、材料行、归属、核对/归档/打印状态 | #441 中央逻辑记录、不可变原件与修订；旧 SQLite 仅迁移输入或显式 Tauri 适配 | `A+C`；浏览器经专用 Repository 读同一当前上下文与事实，正文按 owner/祖先/来源/当前权限懒读取并验长度和摘要；上传/OCR/打印保留专用 adapter。缺源不回落本地，见 [`material-delivery.md`](./pages/material-delivery.md) |
-| `material-price` | 材料价格 | 材料×规格×单位×分供方×项目×时间的价格事实、序列、对比和来源下钻 | 同一中央已归档送货行及当前材采合同的确定性聚合，无独立价格表 | `A`；项目、分供方、送货和完整材采合同分页共同组成同来源读取；任一来源失败不发布部分分析。缺原件、未确认或缺价格的行不参与，来源下钻保留 origin。reviewed/done 由 adapter 归一，不保存第二份价格，见 [`material-management.md`](./pages/material-management.md) |
-| `finance-income` | 收入财务 | 开票申请、普通收款专属列表/详情/整页表单、往来列表/详情投影；项目/客户、金额/税额、方向、状态、来源 | `invoice_applications`、`receipt_registrations`、`current_transactions` | 普通收款 `A+B`：#436 接通中央读写、完整迁移与附件正文；开票和往来仍按实际接入范围为 `A`，不得由收款通过推定完成。保证金/备用金无本地路由不扩张，见 [`finance-billing.md`](./pages/finance-billing.md)、[`finance-receipt.md`](./pages/finance-receipt.md) |
-| `finance-expense` | 支出财务 | 付款申请、付款管理、支付记录、费用报销列表/详情/表单；结算/发票/申请分摊、支付状态及付款申请只读洞察 | F3 头/行/分摊表和确认支付聚合 | `A+B`；项目/分供方/合同/来源 ID 必须进入读 DTO；付款洞察除当前源单外还含跨项目/跨供应商聚合，不能挂在单个项目 store；部门/经办人员身份和部分参考专属列无 canonical 来源时保持 null，见 [`finance-payment.md`](./pages/finance-payment.md)、[`finance-records.md`](./pages/finance-records.md)、[`finance-reimbursement.md`](./pages/finance-reimbursement.md) |
-| `invoice` | 发票台账 | 上传识别工作台、单票校对、归档台账与因子计算；票面字段、归属、状态、明细、置信度 | `invoices` 单表、明细/置信度 JSON、OCR 专用服务 | `A+C`；归档读模型可后台化，原件、Token、识别请求和打印能力走专用 adapter；`reviewStatus` 与 `accountStatus` 不能合并，见 [`finance-invoice.md`](./pages/finance-invoice.md) |
-| `quantity-payroll` | 工程量与工资 | 区域/模板/三量、责任/阶段完成、矩阵/户详情，工资单/成员/分配/行、考勤和 C2 签工 | 工程量、工资、考勤、签工实体及读模型 | `A+B`；现场量 null 不得汇总成 0；工资/考勤/签工无 seed 保持空；B 类合同/BOQ 清单直报工资已决议退役；仅保留 A/C1/C2 的既定现场工资来源，遗留入口/编码/数据隔离待逐项核验，不因补齐合同关系而重开，见 [`subcontract-quantity.md`](./pages/subcontract-quantity.md)、[`subcontract-payroll.md`](./pages/subcontract-payroll.md) |
-| `schedule-target-cost` | 项目进度成本 | WBS 分组/任务/依赖/楼层计划、标准库版本、合同绑定预览，目标成本列表/版本/科目与偏差指标 | 排程和目标成本读模型、工程量完成事实、合同/暂估快照 | `A`；排程以创建/绑定时 sourceVersion 和快照为准，目标/实际/已签/已付分别取真实源，不按用途文本归类，见 [`schedule-progress.md`](./pages/schedule-progress.md)、[`target-cost.md`](./pages/target-cost.md) |
-| `import-export` | 导入导出 | 实体映射候选、逐行错误、批次进度、导出配置、迁移对账与结果引用 | 本地 Excel/SQLite 快照 adapter、`import_batches/source_refs/reconciliation_issues` 与中央迁移快照 | `A+C`；审计元数据可后台化，文件解析/生成与整库备份保留本地 adapter；原始文件值和整库字节只进受控追溯，不进普通列表 DTO 或中央接口，见 [`boq-import.md`](./pages/boq-import.md)、[`real-ticket-excel-reference.md`](./pages/real-ticket-excel-reference.md)、[迁移指南](../guides/local-data-migration.md) |
-| `ocr-settings` | 系统设置 | OCR 非敏感能力、超时、只读阈值和保存结果 | 本机 `ocr_settings`、三个 Nitro OCR operation | `C`；Token、API 地址和模型私有配置永不返回前端；桌面静态构建不能假定 Nitro 永久在线，见 [`finance-invoice.md`](./pages/finance-invoice.md)、[`material-delivery.md`](./pages/material-delivery.md) |
+| 稳定编码 | 页面域 | 目标投影与领域差异 | 业务权威来源 |
+| --- | --- | --- | --- |
+| `home` | 首页 | 明确当前项目、WBS 分组/任务、计划/实际进度及空排程；无项目不选首项 | [首页](./pages/homepage-dashboard.md) |
+| `project` | 项目 | 稳定身份、主/次客户、阶段和独立十个资料分区；经营指标分别说明计算和授权范围，文本人员不猜 ID | [项目](./pages/project-info.md) |
+| `master-data` | 基础主数据 | 客户/班组/工人主档及独立关系；个人实发缺分配不从整单猜；工人 currentProject 不是删除祖先 | [客户](./pages/base-customer.md)、[班组](./pages/base-crew.md)、[工人](./pages/base-worker.md) |
+| `supplier` | 分供方 | 主档、资料核验与证照独立；敏感资料先授权再检索；合同/结算/收票/付款按各源解释 | [分供方](./pages/base-supplier.md) |
+| `project-supplier` | 项目分供方 | 项目×分供方双 ID、六类事实、合作档案；草稿文件分类与已提交事实分开 | [项目分供方](./pages/project-supplier.md) |
+| `core-contract` | 核心合同 | 材采/施工/分包独立变体、补充协议、BOQ、关联单据；原金额/有效补充/有效总额分别可空 | [合同](./pages/contract-forms.md)、[甲方单据](./pages/owner-documents.md) |
+| `aux-contract` | 辅助合同与结算 | 公司/其他支出合同与其他结算专属字段；不存在业务行实体时不虚构 lineItems | [合同](./pages/contract-forms.md) |
+| `owner-document` | 甲方单据 | 变洽签、月报、验收/保修、最终结算、罚扣及补充协议各自身份；双视图共用 canonical 事实 | [甲方单据](./pages/owner-documents.md) |
+| `subcontract-document` | 分包单据 | 分包变更、结算、项目罚扣专属金额/审批/审定价与抵扣整改；不复用甲方金额 | [单据](./pages/owner-documents.md) |
+| `material` | 自购材 | 下料、到货、领用、盘点及真实库存/结算；只读反向关系引用同一送货明细事实 | [材料](./pages/material-management.md) |
+| `owner-material` | 甲供材 | 总控计划头/行、下料、到货、领用、直入直出；供货 Party 不冒用项目客户，单据量基准不跨量补值 | [材料](./pages/material-management.md)、[DATABASE 物资关系](./DATABASE.md#已确认目标关系与迁移边界) |
+| `delivery` | 送货单闭环 | 处理/归档、当前/历史修订、整张有效性与原件；正文在专用边界读取 | [送货](./pages/material-delivery.md) |
+| `material-price` | 材料价格 | 询价报价、合同约定、实际送货分来源序列，不能以一份历史价覆盖其他来源 | [材料](./pages/material-management.md)、[价格投影](#price-comparison-projection) |
+| `finance-income` | 收入财务 | 开票申请、普通/其他收款和往来各自性质；真实付款人和现金来源不能因无新增路由丢失 | [开票](./pages/finance-billing.md)、[收款](./pages/finance-receipt.md)、[现金来源](./DATABASE.md#410-资金计算) |
+| `finance-expense` | 支出财务 | 申请、批复、支付、报销和分摊独立；未填/历史未知/真实零区分，工资实际区域独立 | [付款](./pages/finance-payment.md)、[记录](./pages/finance-records.md)、[报销](./pages/finance-reimbursement.md) |
+| `invoice` | 发票台账 | 识别候选/置信度、原始票面、人工核实、归属与归档独立；reviewStatus 与 accountStatus 分开 | [发票](./pages/finance-invoice.md) |
+| `quantity-payroll` | 工程量与工资 | 三量/模板/责任/完成、A/C1/C2、考勤、签工、原件冻结；B 历史隔离，缺量不补零 | [工程量](./pages/subcontract-quantity.md)、[工资](./pages/subcontract-payroll.md) |
+| `schedule-target-cost` | 项目进度成本 | WBS、标准版本、冻结楼层、绑定证据；预算/合同承诺/结算成本/实付独立 | [排程](./pages/schedule-progress.md)、[成本](./pages/target-cost.md) |
+| `import-export` | 导入导出 | 候选/行错误/批次/对账/映射/结果引用；原始文件和整库字节留专用追溯边界 | [BOQ 导入](./pages/boq-import.md)、[实票参考](./pages/real-ticket-excel-reference.md)、[迁移](../guides/local-data-migration.md) |
+| `ocr-settings` | 系统设置 | 沿历史保留稳定域编码；OCR 非敏感能力/超时/阈值与结果，私密 Token/地址不进 DTO；我方主体独立 catalog 提供真实资料、核实版本/历史、停用状态及可信读权限，合同显示采用时快照 | [架构](./ARCHITECTURE.md#our-signatories)、[主体物理归属](./DATABASE.md#our-signatory-storage)、[票据](./pages/finance-invoice.md) |
 
-### 3.1 当前实现落点
+### 主合同身份与同号核对
 
-后台接入时先在下列既有领域边界内增加 repository port，不创建全站万能 repository，也不让页面直接替换 Pinia：
+合同明确我方签约主体稳定 ID，并呈现签约快照；补充协议继承父合同主体和父号检索关系，自身仍有独立 ID。主体 owner 与设置边界只见 [ARCHITECTURE](./ARCHITECTURE.md#our-signatories)。
 
-| 页面域 | 当前 Pinia / 领域读模型落点 |
-| --- | --- |
-| 首页、项目 | 项目列表与来源感知基础详情：`app/stores/project-list.ts`、`app/lib/project/repository.ts`、`http-repository.ts`、`sqlite-repository.ts`、`server/api/read/projects.get.ts`、`server/api/read/projects/[id].get.ts`；首页项目目录与只读排程可用性：`app/stores/home-dashboard.ts`、`app/lib/home/project-source.ts`，来源边界见[首页蓝本](./pages/homepage-dashboard.md#3-数据与状态)；项目详情语义目标统一经 `app/lib/nav/target-registry.ts` 解析；正式项目表单与写入：`app/stores/project-command.ts`、`app/lib/project/command-contract.ts`、`command-http-repository.ts`、`server/api/read/projects/[id]/form.get.ts`、`server/api/commands/projects[/:id]`。详情尚未接入的页签仍在 `project-detail.ts`、`phase-task.ts` 与既有 `app/lib/project/` |
-| 客户、班组、工人、分供方 | 客户中央链位于 `app/lib/customer/`；分供方中央链位于 `app/lib/supplier/`；班组—工人中央链位于 `app/lib/crew-worker/`、`app/stores/crew-worker-read.ts`、`crew-worker-command.ts` 与 `server/api/read/crews*`、`server/api/read/workers*`、`server/api/commands/crews*`、`server/api/commands/workers*`。浏览器页面不得回退旧详情 store / SQLite；班组/工人关系只按同来源稳定 ID 汇总。Tauri 仍使用 `master-data-read.ts`、`crew-detail.ts`、`worker-detail.ts` 与本地附件边界。 |
-| 核心/辅助合同、BOQ、甲方/分包单据 | 材采、施工与分包浏览器中央读写分别位于 `app/lib/material-contract/`、`app/lib/construction-contract/`、`app/lib/subcontract-contract/`；两类辅助合同与其他支出结算分别位于 `app/lib/auxiliary-contract/`、`app/lib/other-settlement/`。五类甲方单据、分包变洽签、分包结算与项目罚扣共用 `app/lib/owner-document/central-*`、`app/stores/owner-commercial-document-read.ts`、`/api/read/owner-documents*` 与 `/api/commands/owner-documents*` 的中央边界，但以独立 kind、capability 和投影隔离。分包变洽签只从 canonical `subcontract_change_orders` 读取项目、分供方、分包合同、审批金额、变更面积、实际审定价、状态与签证单附件，并进入分包合同 `changes` 事实行；列表和项目卡片分别消费分包专属审批金额、实际审定价汇总，不复用甲方申报额或含税额字段。BOQ 物理事实仍由原领域存储；已迁移的八类 canonical 单据不再由浏览器日常读写本地 SQLite；`sub_settlement` 使用专属金额/证据投影，`project_penalty` 使用中央独立抵扣与整改审计。目标不存在或关系错配时不回退到其他本地记录。 |
-| 项目×分供方 | 中央读取：`app/stores/project-supplier-read.ts`、`app/lib/project-supplier/repository.ts`、`http-repository.ts`、`server/api/read/project-suppliers/[projectId]/[supplierId].get.ts`；项目详情同一 DTO 返回 ProjectSupplier 反向关系。导入只把文件选择、本地文件名分类留在专用 adapter；确认后的分供方、ProjectSupplier、文件元数据与正文经 `app/stores/project-supplier-command.ts`、`command-http-repository.ts`、`GET /api/read/project-suppliers/:projectId/import-context` 和 `POST /api/commands/project-suppliers/import` 一次性提交中央 |
-| 自购材、甲供材、送货归档、材料价格 | `app/stores/material.ts`、`delivery.ts`、`delivery-record.ts`；`app/lib/material/`、`delivery/` |
-| 收入/支出财务、发票 | `app/stores/finance.ts`、`payment-management.ts`、`invoice.ts`；`app/lib/finance/`、`invoice/` |
-| 付款洞察、应用消息 | `app/lib/finance/payment-detail.ts`、`app/components/finance/PaymentApplicationInsightPanel.vue`、`app/stores/notifications.ts`；当前静态通知只在服务端授权后的演示模式展示；正式消息源仍待接入，不能把演示通知当成后台业务事件 |
-| 工程量、工资、考勤、签工 | `app/stores/quantity.ts`、`payroll.ts`、`payroll-statement-detail.ts`、`attendance.ts`、`signed-daywork.ts`；`app/lib/quantity/`、`payroll/` |
-| 排程、标准库、目标成本 | `app/stores/schedule.ts`、`schedule-process-library.ts`、`target-cost-list.ts`、`target-cost-detail.ts`；`app/lib/schedule/`、`target-cost/` |
-| 导入、导出、OCR 设置 | `app/stores/export-workflows.ts`、`ocr-settings.ts` 及领域导入模块；`server/api/ocr/` 只承载 OCR 专用 operation |
+重复核对投影包含当前输入和命中合同的两侧公司、项目、种类、状态、原金额、有效补充额、有效总额。后三项逐项 nullable 并附来源/完整度，不能把未知当零或沿用别种金额；无权字段按公共权限规则保护。后台给出可证明的重复事实和稳定命中身份，不用名称或金额猜唯一性。草稿提醒、正式阻断、历史占号和自身排除规则只见 [COMMANDS](./COMMANDS.md#contract-number-uniqueness)。核对失败或命中不得清当前输入。
 
-这些文件是当前实现入口，不是网络 schema 权威；共享 DTO 仍只在本文定义，数据库列只在 `DATABASE.md` 定义。
+### 项目经营、税票与现金来源
 
-分包变洽签的来源页只有同时具备 `subcontract-document:read` 才生成专属详情目标。实际审定价汇总独立返回 nullable value 与 `complete|partial|missing` 完整度，不复用甲方审定金额，也不把缺失值折算为完整零值。
+经营投影提供定义、来源时间、已知部分与缺口，可追到实际源单。管理费主展示已核实实际成本并按来源展开，合同记取和实际收付分别列示；原件、费用行、工资个人分配和更正链不重复计成本。目标/承诺/结算/实付保留独立口径，不把暂估或申请当确认事实。
 
+真实税务按主体、期间和计税方法呈现应纳、申报、实缴及迟票缺口；项目票面差额仅是其本身指标。票据保留原票面字段和人工核实状态，含税收票使用 total_amount，DATABASE 既定不含税票额另保持原义。核实投影不能静默修改原发票或报价；具体业务公式引用 [DATABASE 经营事实来源](./DATABASE.md#operating-calculations)。
+
+项目现金投影纳入 A02 已确认的保证金、备用金、其他收款等真实来源及发生日/方向/付款人；备用金申请不是实拨。来源尚未实施保持未知并给缺口，不因没有独立页面而缩减现金范围。
+
+<a id="price-comparison-projection"></a>
+### 历史价格与当前价对比
+
+每条价格事实分别返回来源类型（询价报价/合同约定/实际送货）、原记录及行身份、业务日期、材料/规格/单位、报价方或供应方引用、项目范围、单价、税点及含税口径、当前有效状态和来源版本。未签报价仍能作为报价来源显示；报价方尚未核实稳定关系时引用可空，不按名称转成正式分供方。
+
+序列按来源展示，只有材料、规格、单位及税口径可核实相容时才计算差异；缺税点或单位时保留事实并解释不可比较，不能默认同税/同单位。当前有效合同价与旧送货价分别存在。降价提醒携带比较双方、差异依据和待协商状态，不作为覆盖旧行的动作；涨价、协商和真实更正的写规则只见 [COMMANDS](./COMMANDS.md#price-basis-and-corrections)。本节目标包括三类来源，当前送货/合同分析不能作为报价来源已实施的证明。
 ### 工程量中央读取与甲方月报（#442）
 
 浏览器正式工程量由专用中央 Repository 读取区域、模板、三量、阶段及报量映射、当前责任、阶段完成、照片和量差。请求绑定当前会话、项目、来源及权限；分页候选必须完整读取后才能成为选择或导出依据。同 ID 的演示与正式来源不能共享草稿或读取结果；离页及切换来源后的迟到响应必须丢弃。显式桌面 SQLite 适配和受控迁移输入保留独立边界，不作为浏览器读取失败的回退源。
 
 合同清单由中央施工合同与已签证变洽签提供稳定 BOQ 身份、有效量价与来源版本；工程量库仅保存外部身份索引，不复制一套合同量价。首次明确关联清单行才更新模板的认定合同量；后续普通编辑保持已有认定值，量差中的已签证增减量只计一次。合同量、暂估量、现场复核量各自允许 `null` 和显式 `0`，汇总同时返回已知小计和缺失项数，不跨基准补值。
 
-甲方月报按所选期次、户的有效模板及分项唯一报量阶段读取已完成事实。候选读取与申报使用同一中央来源；申报在工程量串行执行窗口内读取当前完成量、重验 BOQ 来源版本并冻结三量基准、自动量、申报量、有效单价与来源版本。草稿切换基准须确认清除旧手工量后全量重算；缺量未明确填写时保持待核对，已提交快照不随模板或清单的新版本漂移。实际证明范围见 [#442 验收证据](../design/evidence/issue-442/)；中央实例仍可重置，生产持久化归 #416。
+甲方月报按所选期次、户的有效模板及分项唯一报量阶段读取已完成事实。未提交预览使用当前已签证有效单价及真实来源版本，重算金额时保留手工申报量；已提交按原冻结的三量基准、自动量、申报量、有效价与来源版本读取，不随模板或 BOQ 新版本漂移。价变复算及提交依赖核对的写规则唯一见 [COMMANDS](./COMMANDS.md#version-and-dependency-checks)，不能把正常有效价变化显示为人工冲突。切换数量基准的既定确认/清旧手工量另保持原义；缺量未明确填写仍待核对。历史验证见 [#442 证据](../design/evidence/issue-442/)。
 
 活跃户的模板明细已经关联当前 BOQ、却没有可见同项目同工种报量映射时，自动取数与申报必须明确报错并引导先配置阶段，不返回一个可被解释为完整零量的空事实。未挂接实际户的候选模板不触发此阻断；映射有效但所选月份确无完成记录时仍为真实零。
 
 ### 标准工序库中央读取（#443）
 
-`GET /api/read/process-libraries` 与 `GET /api/read/process-libraries/:id` 读取同一授权工作区内的版本目录与指定不可变版本。列表、整页来源及 WBS 工序库候选沿同一 Repository 消费；正式空态不以演示模板填补，失败撤下旧来源事实和写入资格。目录带当前身份、能力、来源与同编码系列保存基准；已删除版本不作为可使用正文返回，但其版本号不能被重新分配。
+`GET /api/read/process-libraries` 与 `GET /api/read/process-libraries/:id` 读取同一授权工作区内的版本目录与指定不可变版本。列表、整页来源及 WBS 工序库候选沿同一 Repository 消费；正式空态不以演示模板填补，失败撤下候选和写入资格，旧只读数据仅按[公共旧数据规则](#permissions-and-stale-data)展示。目录带当前身份、能力、来源与同编码系列保存基准；已删除版本不作为可使用正文返回，但其版本号不能被重新分配。
 
 版本使用项目及数量读取当前中央 WBS，创建、迁入和合法移除后随事实更新；不可读取时保持 `null` 和未知说明，不能当作“尚未引用”。库名、库版本、工序 key 与前置禁用状态保持原身份；阶段码/分项码只解释全局定义，不从显示名猜某项目映射。本读取不生成排程完成事实。
 
@@ -294,23 +297,13 @@ type ReadState<T> =
 
 #### 智能业务洞察
 
-洞察以当前单据为上下文，但不等于单项目数据。参考侧栏同时包含当前合同付款、结算/发票勾稽和跨项目/跨供应商应付报表；打开侧栏可观察到“记录上下文 → 规则/报表定义 → 聚合结果”的分层读取。后台不复制参考站配置对象，而提供瑞航自己的稳定读模型：
+洞察有当前单据上下文和独立计算范围。挂载矩阵见 [PUBLIC-SURFACES](./PUBLIC-SURFACES.md)，导航只用 [NAVIGATION](./NAVIGATION.md)；参考 L2 标签和私有配置不是本地接口身份。
 
-```ts
-type InsightScopeLevelDTO =
-  | 'record'
-  | 'contract'
-  | 'project'
-  | 'supplier'
-  | 'cross-project'
-  | 'enterprise-visible'
-
-interface InsightScopeDTO {
-  level: InsightScopeLevelDTO
-  anchor: EntityRefDTO
-  visibility: 'complete' | 'permission-filtered' | 'unknown'
-}
-
+~~~ts
+type InsightScopeLevelDTO
+  = | 'record' | 'contract' | 'project' | 'supplier'
+    | 'cross-project' | 'enterprise-visible'
+interface InsightScopeDTO { level: InsightScopeLevelDTO, anchor: EntityRefDTO }
 interface InsightAvailabilityDTO {
   key: string
   metadataKey: string
@@ -318,9 +311,8 @@ interface InsightAvailabilityDTO {
   subject: EntityRefDTO
   availability: 'available' | 'unavailable' | 'forbidden'
   suiteVersion: string | null
-  asOf: string
+  meta: ReadMetaDTO
 }
-
 interface InsightCheckDTO {
   key: string
   ruleKey: string | null
@@ -331,7 +323,6 @@ interface InsightCheckDTO {
   summary: string
   metrics: MetricDTO[]
 }
-
 interface InsightReportDTO<Row> {
   key: string
   title: string
@@ -339,190 +330,89 @@ interface InsightReportDTO<Row> {
   columns: Array<{ key: string, label: string, valueType: 'text' | 'money' | 'count' | 'ratio' | 'entity-ref' }>
   rows: PageDTO<Row>
 }
-
 interface InsightSectionDTO<Row> {
   key: string
   kind: 'rule-checks' | 'current-metrics' | 'report'
   state: ReadState<InsightCheckDTO[] | MetricDTO[] | InsightReportDTO<Row>>
+  meta: ReadMetaDTO | null
 }
-
 interface InsightDTO<Row = Record<string, unknown>> {
   key: string
   subject: EntityRefDTO
   scope: InsightScopeDTO
-  attentionCount: number
+  attentionCount: CountDTO
   sections: InsightSectionDTO<Row>[]
-  asOf: string
-  sourceVersion: string | null
-  completeness: CompletenessDTO
+  meta: ReadMetaDTO
 }
-```
+~~~
 
-- `no-rule` 与 `passed` 不同：页面显示“无匹配规则”时不能算检查通过，也不能算业务失败。
-- 页面先用 `metadataKey + position + subject.id` 读取 `InsightAvailabilityDTO`；只有 `available` 才挂载入口并允许读取内容。`unavailable` 不能显示空洞察抽屉，`forbidden` 不能泄露规则或报表存在性以外的数据。
-- `permission-filtered` 与真正空表不同；跨项目报表只覆盖当前用户可见范围，汇总和行必须使用同一 capability 过滤。
-- `asOf` 是聚合统计时点，`sourceVersion` 是规则/报表定义或来源快照版本；两者都不能用组件挂载时间代替。
-- L2-7/L2-6 等参考标签只作为运行证据，不成为瑞航接口身份；本地使用稳定 `key`、维度和度量定义。
-- 当前 `PaymentApplicationInsightPanel` 的四类检查及“其他项目数量/已付总额”可作为 SQLite adapter 的首版来源；缺少的跨供应商行、规则版本和权限范围返回 `partial`，不得补静态行。
-- 缓存必须按作用域拆开：`record/contract` 指标以 `subject.id + sourceVersion` 为键并随付款单切换重算；`cross-project/enterprise-visible` 报表以 `report.key + 可见范围 + asOf + sourceVersion` 为键复用。不得把整个侧栏按项目或上一张付款单缓存，也不得为每张付款单重复获取同一全局报表。
+先按 metadataKey + position + subject 读取可用性，available 才挂载。无规则 no-rule 既不算通过也不算失败；规则结果、度量完整度和授权范围分别解释。跨项目/企业可见报表的行和汇总受同一权限过滤，不能宣称企业全量。每个子区有自己的读状态及 scope，未读、无权、不可用与真实空报表分开。
+
+<a id="insight-cache-identity"></a>
+记录指标缓存包含工作区、actor、origin、授权范围，以及 `subject.id + sourceVersion`；跨项目/企业可见报表另外包含 `report.key + visibility fingerprint + asOf + sourceVersion`。缓存按当前单据/合同指标与跨域报表拆层，不按整个项目复用上一付款单指标，不重复获取同一已证全局报表。页签数量、显示项目名和上一单据均不构成缓存身份；重新读取与旧数据展示沿[公共规则](#permissions-and-stale-data)，缓存不得增加读取能力。宿主开合与活动生命周期只见 [PUBLIC-SURFACES](./PUBLIC-SURFACES.md#52-后台活动约束)。当前面板及缺口集中见[实现差异](#implementation-gaps)。
 
 #### 全局通知与抄送事件
 
-全局 toast、顶栏未读角标和消息抽屉必须消费同一个事件读模型。通知点击的目标只返回实体身份和意图，前端通过 [`NAVIGATION.md`](./NAVIGATION.md) 的 target registry 解析；后端不发送 Vue 路由字符串。
+toast、顶栏未读数、inbox 消费同一稳定事件，传输可以用实时增量触发并以分页查询对账。通知投影包含 eventId、eventType、kind(todo/notice)、标题/摘要、受控 subject/actor、业务 result、occurredAt、readAt、语义 target 及目标解析状态。通知事件身份、业务问题状态和已读状态分开；证照的持续提醒扩展只见[证照预警](#supplier-expiry-warnings)。
 
-```ts
-interface NotificationDTO {
-  eventId: OpaqueIdDTO
-  eventType: string
-  kind: 'todo' | 'notice'
-  title: string
-  summary: string
-  subject: EntityRefDTO | null
-  actor: EntityRefDTO | null
-  result: 'pending' | 'approved' | 'rejected' | 'completed' | 'failed' | 'informational'
-  occurredAt: string
-  readAt: string | null
-  target: NavigationIntentDTO
-  permissionState: 'resolved' | 'forbidden' | 'missing'
-  deliveryState: 'queued' | 'delivered' | 'failed'
-}
+NotificationOpenResultDTO 返回 {eventId,readAt,target}；target 为 resolved(intent)、forbidden 或 missing 的受控结果。事件去重、toast 呈现、单条打开与全部已读的用户动作唯一见 [PUBLIC-SURFACES](./PUBLIC-SURFACES.md#4-全局审批与抄送消息)，写入仍经 [COMMANDS](./COMMANDS.md#idempotency-and-recovery)。读取接口不修改 readAt。
 
-interface NotificationOpenResultDTO {
-  eventId: OpaqueIdDTO
-  readAt: string
-  target:
-    | { state: 'resolved', intent: NavigationIntentDTO }
-    | { state: 'forbidden', subject: EntityRefDTO | null }
-    | { state: 'missing', subject: EntityRefDTO | null }
-}
-```
-
-- `NavigationIntentDTO` 以 [`NAVIGATION.md`](./NAVIGATION.md) 为唯一契约；通知 adapter 不返回前端路由字符串。
-- 同一 `eventId` 在 toast、未读数和消息抽屉中幂等；重复投递不能增加两次未读数。
-- toast 自动消失、手动关闭和打开消息抽屉都只改变呈现，不等于已读。
-- 用户激活单条消息时调用 `openNotification(eventId)`；adapter 在同一事务内按当前权限解析目标并首次写入 `readAt`，返回 `NotificationOpenResultDTO`。`forbidden` / `missing` 仍保留消息记录，重复打开保持幂等。
-- 目标 resolved 后的前端渲染失败不回滚 `readAt`；消息仍可从抽屉重试目标。全部已读只能由显式批量命令写入。
-- 目标无权限时仍可保留经过脱敏的消息事实，并将目标解析为 forbidden；不能删除消息或把它伪装成无目标。
-- `app/stores/notifications.ts` 当前静态样本只在授权后的演示模式可见，正式来源保持真实空态。后台事件接入时按来源隔离提供事件，不将样本作为正式运行 fallback；演示 fixture 的可见性仍服从 ADR 0020。
-- 参考刷新时可观察到持续实时通道，同时待办查询单独返回 `ccTotalCount`、`todoTotalCount`、`delayTodoTotalCount`、`totalCount` 和 `records`。当前证据不能把某条 toast 与具体传输帧强绑定，因此 DTO 保持传输无关；adapter 可用实时增量触发，再以分页查询对账未读数。
-
+目标失效/无权时可以保留经授权脱敏的事件事实，并明确解析问题，不伪装为正常可达。静态演示事件和真实来源隔离，不能补正式消息源。
 ### 3.3 分供方列表查询与跨域事实
 
 分供方列表、详情和表单预载沿同一 `dataOrigin + supplierId` 读取主档；新增 `laborScope` 进入同一读取和查询投影，旧载荷缺少该字段时归一为空文本。字段词义、持久化及界面列序分别只见 [CONTEXT.md](../../CONTEXT.md)、[DATABASE.md](./DATABASE.md) 和[页面蓝本](./pages/base-supplier.md)，不在此复制字段表。可执行类型与查询白名单位于 [`read-contract.ts`](../../app/lib/supplier/read-contract.ts)，边界解码位于 [`read-decoder.ts`](../../app/lib/supplier/read-decoder.ts)。
 
 - 查询保留原有关键词、类别、资料状态、排序、分页和来源开关；`columnFilters` 在 HTTP 查询参数中传 JSON，按 [`read-query.ts`](../../app/lib/supplier/read-query.ts) 归一。文本使用包含匹配，枚举允许单值或多值精确匹配（同字段 OR、跨字段 AND），数值范围包含两端；空条件不产生约束，未知字段、非法枚举载荷、非有限数值及反向区间返回 `invalid-query`。类别与资料状态兼容旧单值参数，多值使用 JSON 数组；详情返回保存同一语义。敏感列先按当前 capability 形成可见值，再参与关键词和列条件匹配，不允许通过筛选探测隐藏原值。
-- 搜索、列条件、排序、总数及金额汇总处理同一完整结果集后分页。枚举 facet 保留其他条件、仅去除自身选中条件，不能从当前页推算选项。分供方缺失或非法页码归一到第一页；合法页码超过结果末页时回到末页，空结果为第一页。数值排序把未知值放在末尾，以稳定身份处理同值；隐藏列不清除已生效条件，返回列表时保留同一查询语义。
+- 数值排序把未知值放在末尾，以稳定身份处理同值；隐藏列不清除已生效条件，返回列表时保留同一查询语义。分页、facet 和汇总只遵循[公共分页规则](#pagination-and-consistency)；前端恢复旧查询可 normalize，API 非法查询拒绝，不保留旧接口静默修正非法页码作为目标契约。
 - 列表合同金额、累计合同金额、累计结算金额及对应详情金额允许 `MoneyDTO | null`，不能在 decoder 或展示层把 `null` 变为 `0.00`。参与汇总的源金额缺失时，列表值及该来源汇总保持 `null`，详情 `MetricDTO` 返回 `value=null + status=partial + missingSources`，保留可用的源记录核对入口。只有已读取且确实为空的集合可以计算为零；草稿、失效记录和确认条件按[页面蓝本的金额口径](./pages/base-supplier.md#七跨项目只读汇总)执行，累计指标不另存为主档余额。
-- 当前中央测试实例通过 [`supplier-fact-source.ts`](../../server/utils/supplier-fact-source.ts) 组合各领域未分页读源：材料采购合同及其结算 feed、分包合同有效增补及中央 `sub_settlement`、其他支出合同有效增补及其他支出结算。关系仅按同来源的稳定分供方、项目和合同身份连接；有工作区/会话边界的来源保留原隔离，来源版本随组合读源返回。合同的 canonical kind 和导航意图不因中文类别显示而改写。
-- 接上读源不代表该领域全部业务事实已经迁入：正式材料结算 feed 当前尚无记录，正式发票及确认付款仍缺统一供应商归属/申请分摊来源；不能从合同旧累计字段、付款申请金额或其他票款摘要推造事实。当前已接来源及后续缺口继续由[页面蓝本](./pages/base-supplier.md)和[实现状态](../design/ui-implementation-status.md)维护，本段不宣称生产持久化已经完成。
+- 跨域事实由各自 owner 的原始读源组合，材料采购合同及结算、分包合同有效增补及 sub_settlement、其他支出合同及其他结算分别保留来源。关系按同来源稳定身份连接，合同 canonical kind 不随中文类别改变。已接和缺源状态见[实现差异](#implementation-gaps)。
+- 缺稳定分供方归属或申请分摊的发票/确认付款明确缺源；不能从合同旧累计字段、付款申请或其他票款摘要推造事实。指标不另存为主档余额。
+- 关联项目无权时，普通响应的 `id/label` 都为空；不能只隐藏名称而把稳定 ID 留在响应或导航中。项目/合同整源不可用且存在原关系时返回 `unavailable/source-unavailable` 和 `not-connected` 导航，与成功读取后查明未记录分开；生产者、decoder 与关系入口使用同一四态契约。
 - 营业执照使用 #446 中央证照专用文件来源。列表普通 DTO 只允许受控文件 ID 与状态，不能返回本地路径或正文；当前读取无权限或无法取得资料时返回 `unavailable`，计数为 `null`、ID 集合为空，不能等同于“未上传”。只有成功读取并查明无原件时才是 `missing`；非空真实正文引用才是 `available`。证照、主档详情和列表查询按同一业务日及当前凭证生成资料状态，再执行筛选与分页，不能从主档旧状态副本筛选。
 
 ### 3.4 分供方证照专用读取（#446）
 
-`GET /api/read/supplier-credentials/:supplierId` 要求明确 `origin`，返回当前稳定分供方、主档版本、证照事实版本、服务端会话与能力、上海业务日、资料状态、有效整体核验凭证、证照文件元数据、逐类别要求及可公开的专用审计。演示来源还必须显式 `includeDemo=true` 并具备后台 `demo:read`；返回只读能力，不能进入正式命令。当前原件与历史 OCR 正文仅在专用受控边界使用，不放入普通主档 DTO。
+`GET /api/read/supplier-credentials/:supplierId` 要求明确 `origin`，返回当前稳定分供方、主档版本、证照事实版本、服务端会话与能力、上海业务日、资料状态、历史人工核验凭证及独立当前资格、证照文件元数据、逐类别要求及可公开的专用审计。演示来源还必须显式 `includeDemo=true` 并具备后台 `demo:read`；返回只读能力，不能进入正式命令。当前原件与历史 OCR 正文仅在专用受控边界使用，不放入普通主档 DTO。当前资格投影遵循[证照预警](#supplier-expiry-warnings)，不删除历史 review。
 
 `GET /api/read/supplier-credentials/:supplierId/files/:fileId` 另携明确 `credentialId` 和来源，重验当前主档、活跃证照及对应文件的所有权。正文可用时返回原字节及 SHA-256，客户端在预览/下载前核对长度与摘要；只有历史元数据而无正文时明确 `missing-payload`。已删除证照、错父记录、错原件或无权均拒绝，文件名、旧路径和猜测 ID 不授予读取权。
 
 实际空集合、无原件、暂时不可用、无权、来源错配与记录失效分别表达；失败不降格为空态，正式读取不回旧浏览器 SQLite。专用 Repository 校验响应身份、字段和重复关系；页面请求绑定当前身份与读取代次，切换或取消后的迟到结果不显示、不下载、不覆盖输入。数据保全与状态依据见 [DATABASE](./DATABASE.md#分供方证照中央事实446)，写入与并发恢复见 [COMMANDS](./COMMANDS.md#分供方证照与人工核验命令446)。
 
-#447 在同一专用响应中返回当前识别快照、原始候选、置信度、待核对状态及独立的上次确认事实，供稍后核对和冷刷新恢复。正式来源且具备 `supplier:write` 时才额外提供用于人工比对的 `masterValues`，沿已有整页表单读取权限；普通列表与只读主档的敏感遮罩规则不变。可解析的历史待核对来源按旧字段原义投影，不能将旧 `uniqueCode` 静默解释为 `taxNo`；无法确认的旧格式与缺原件分别提示，不生成虚假确认入口。税务专用命令返回服务端核验五字段和提交版本，重新进入表单仍由同一中央主档读取。
+Native v51 的人工历史由专用 owner 查询回读，当前指针与归档副本按原证明去重；v47–50 旧图保持原格式，v51–54 的历史图附真实物理身份、归档时间及中央映射身份。不会从已过期资料状态猜测原人工通过或退回，也不填造旧核验人。一次本机中央事务内的主档状态、资料状态、来源版本和 `asOf` 共享同一时刻，上海跨日后的新读取换来源版本，原事实修订不因 GET 推进。
 
-## 4. 页面族响应最低字段
+Issue #447 在同一专用响应中返回当前识别快照、原始候选、置信度、待核对状态及独立的上次确认事实，供稍后核对和冷刷新恢复。正式来源且具备 `supplier:write` 时才额外提供用于人工比对的 `masterValues`，沿已有整页表单读取权限；普通列表与只读主档的敏感遮罩规则不变。可解析的历史待核对来源按旧字段原义投影，不能将旧 `uniqueCode` 静默解释为 `taxNo`；无法确认的旧格式与缺原件分别提示，不生成虚假确认入口。税务专用命令返回服务端核验五字段和提交版本，重新进入表单仍由同一中央主档读取。
 
-### 4.1 列表
+<a id="supplier-expiry-warnings"></a>
+### 分供方证照有效性与持续预警
 
-每条列表行至少包含：
+本节是 A03 证照时效和提醒的唯一权威。资料是否具备、人工核验历史、当前有效性及预警是不同事实：新资料仍待人工核验；旧 review 只证明历史人工动作，不能证明变更后的资料已核实。
 
-- `id`；有业务编号时包含字符串 `no`；名称与状态用未格式化值。
-- 所有可点击实体的 `EntityRefDTO`，而不只有 `projectName/supplierName`。
-- 所有可点击目标的 `NavigationIntentDTO`；后端只给语义和稳定筛选 ID，不给 route 字符串。
-- 该页面判断所需的日期、枚举、金额、数量、附件计数和更新时间。
-- 只读聚合使用 `MetricDTO` 或等价完整性结构；可下钻聚合必须给出稳定 filters。
-- `PageDTO` 的 pagination、同筛选 summary、empty、asOf、sourceVersion、capabilities。
+按 Asia/Shanghai 的业务日期，提前 **7 个自然日（含周末）**进入临期预警，即距到期 0..7 天；到期当天仍有效，次日才过期。原字段明确长期有效的证照按原长期规则处理，不产生虚假到期日期；本轮不新增 validFrom 生效门槛。坏/缺日期的展示保留未知与核对原因，不用日期默认值补齐，也不自行否定已有原件齐全或人工核验资格；未记录截止日期不新增失效门槛。
 
-### 4.2 详情
+目标投影逐证照返回业务日、原到期/长期字段、当前有效性（有效/临期/过期/未知）、预警原因和相关核验历史；主档列表、筛选、详情、资料页使用同一当前业务日投影。GET 只计算状态，不持久撤销原核验、不写审计；真正资料变更和人工核验经 [COMMANDS](./COMMANDS.md#分供方证照与人工核验命令446)。
 
-详情响应至少包含：
+临期/过期主动进入应用 inbox，提供当前问题状态、首次发现/最近核对时点、当前严重度和资料入口。事件按供应方、证照及同一问题身份去重；继续临期、转过期、续期或补齐后，问题状态随事实更新。readAt 仅表示消息已读，已读不能把持续资料问题变成已解决；问题解除保留可追溯事件。用户刷新时返回当前问题状态和真实来源版本，不以此前 toast 或已读状态代替时效计算。
 
-- `entity`：列表同一稳定 ID 和版本；不存在/错配使用明确问题码。
-- `summary`：关键字段与完整性，不复制可从 children 聚合的第二份可编辑余额。
-- `sections`：带稳定 `key` 的业务分区；每个分区含 `items`、`empty`、`asOf`，权限不可见不伪装 0 条。
-- `relations`：项目、客户、分供方、合同、班组、工人、来源单据等关系引用。
-- `files`：只返回文件元数据、capability 和受控 file id；不返回本地路径、认证 URL 或无授权 payload。
-- `capabilities`：查看、编辑、提交、审批、下载等分别声明；前端不从中文状态猜动作权限。
-
-### 4.3 表单预载与工作台
-
-- 表单预载将可编辑 draft、只读 lookup 和 sourceVersion 分开；只读名称不回写为外键。
-- 工作台共享同一实体/筛选上下文，分区状态不各自复制。队列项和详情都使用稳定 ID。
-- 上传、识别、核对、归档、确认支付、工资发放等是独立命令；读 DTO 只报告已持久化状态，不以 toast 或本地临时布尔值证明成功。
-- 项目新增/编辑的写命令、幂等键、乐观锁和失败本地草稿已由 [`COMMANDS.md`](./COMMANDS.md) 裁定；其他领域不得从这一实现自动推导通用 outbox 或合并策略。
-
-## 5. 本地 adapter 与后台迁移规则
-
-### 客户关联项目
-
-`CustomerDetailReadDTO.projects` 从中央项目原始事实快照投影，不经项目列表/详情的客户名称富化回调；客户列表本身不依赖项目聚合，避免两端递归。项目主读与客户投影共享命令、已确认迁移、测试会话、来源版本和服务可用性边界，未创建本地正式镜像或第二张关系表。
-
-`summary.projectCount` 等于可读 `projects.length`。受限单记录从集合排除；关联引用的 forbidden 身份置空。整个项目源无权/暂不可用时返回 `projectsProblem`（`forbidden` / `unavailable`），`projects=[]`、`projectCount=null`，前端须以问题状态解释，不能呈现空关系或真实 0；恢复后重新读取集合。DTO 解码验证数量、状态与集合一致。关系更正和匹配规则见[客户页面](./pages/base-customer.md#详情)。
-
-中央可重置内存实例的通过只证明本切片，生产持久化仍由 #416 验收。合同、收款等其他客户关联的正式写源接入不由项目切片的通过推定完成。
-
-### 客户关联施工合同
-
-#425 的 `CustomerDetailReadDTO.contracts` 复用施工合同中央主读事实，按合同自身客户 ID/来源投影；合同、有效补充协议和累计收款字段均来自该主读源，版本随合同命令及其既有事实来源变化。有效补充金额的状态判定与施工合同主读共享；客户有效额与合同变更后金额的区别见[客户页](./pages/base-customer.md#详情)。客户列表与客户原始身份 facts 不读取合同/项目聚合，避免候选、命令校验和客户详情互相递归。
-
-`summary.contractCount=contracts.length`；合同导航必须含同一 `dataOrigin`、`contractKind=施工` 与父 `customerId`，解码器拒绝来源/类型/客户错配。项目引用仍检查实际可读项目和合同源的关系权限。
-
-整个合同源无权/不可用返回 `contractsProblem`（`forbidden` / `unavailable`），`contracts=[]`，摘要合同数/有效合同额/待收差额与项目行合同数/有效合同额为 `null`，保持独立可读的客户和项目。解码验证问题态、未知值、集合及计数一致，不将失败转换为真实零。前端对合同页签给出明确反馈和适用重试；未接入的新收款写源不由本票推定完成。
-
-### 普通收款及客户关联来源
-
-#436 将普通收款接入单一中央命令事实源，取代 #426 依赖最终结算文档的临时投影边界。列表、详情、表单、客户关系、施工合同累计、项目收入和最终结算共用原始收款，按 `(dataOrigin, id)` 去重；没有最终结算的普通收款仍进入关系，多张结算不重复累计。原始 `facts` 不读取消费方的聚合，避免客户—合同—收款相互递归。读取版本随收款和合同事实变化，普通读取不导入正式样例。
-
-普通收款读取使用 `receipt:read`；详情按稳定 ID 与 `dataOrigin` 独立读取，客户上下文不是必需身份。项目、客户和合同引用分别复验对应读权，受限引用不返回 ID/名称，包含受限关联的记录撤下 `receipt:write`。列表分页和汇总使用同一完整筛选集，正式与演示分别汇总。金额缺失为 `null`，已知零为两位小数字符串；未知历史账号、分类与类型不从其他字段推断。字段展示及状态口径见[收款页面契约](./pages/finance-receipt.md)。
-
-整个来源无权/不可用时返回 `receiptsProblem`，收款集合为空；摘要收款数、草稿数、有效收款、待收差额，项目行收款数/金额，以及合同行累计收款/余额为 `null`，不得用其他摘要泄露受限金额。客户主数据、列表和其他可读关系仍可使用；收款详情返回同一问题，前端支持适用重试。解码同时检查问题状态、集合、计数和未知金额。
-
-施工合同、最终结算和项目收入对同一收款源故障同样返回未知金额与来源问题，保留独立可读主档。中央列表和详情重读时撤下旧事实，权限恢复后才再次显示。收款附件正文经当前记录、来源、归属和哈希校验，历史本机路径不暴露为读取入口。完整迁移仍经显式准备、确认与回滚接管；该可重置实例不构成 #416 的生产持久化证明。
-
-### 适配边界
-
-1. Pinia store 只依赖领域 repository port；SQLite adapter 与 HTTP adapter 返回同一 DTO 语义。页面不得直接拼 HTTP URL、SQL 或领域 route map。项目列表的搜索、阶段与表头筛选都进入强类型 Repository 查询，分页、汇总和导出读取同一完整筛选集；表头筛选选项来自全量服务端 facet，不从当前页反推。可点击目标统一交给 Target Registry，未登记目标保持不可达。
-2. 项目列表与来源感知基础详情已经使用中央 HTTP 读 adapter，正式项目表单使用中央命令 adapter；其非生产重置端点只接受显式测试请求，不是用户写接口。迁移页经 `/api/migrations/core/*` 获取预检、批次、问题、映射和中央快照；只有中央 `authority='central'` 且活动批次与本机持久标记一致时，已迁移项目与施工/分包合同才作为正式数据读回。其他页面域在通用业务 API 接入前继续使用 SQLite adapter；但任何已经接入中央的领域均不得借此绕过中央或回退读取旧 production；具体已接入范围见本文件当前落点与 ADR 0020。禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
-3. 按上表页面域逐个迁移读路径。同一页面切换 adapter 前，用相同确定性夹具验证列表、详情、空态、错误、权限、分页汇总和 sourceVersion 等价。
-4. 不做本地与在线静默双写。项目在线命令失败时只保留明确的本地草稿，不改正式投影、不自动回放；其他领域在全局决策前保持各自单一现有写路径。
-5. OCR、文件和 Excel adapter 与普通业务 DTO 分离。普通 DTO 只引用受控 file id；二进制上传/下载使用专用能力和短期授权，不保存私有地址。
-6. 后台首批可从 `A` 域读取 operation 开始：项目/主数据、合同、项目分供方、财务台账、工程量/排程。任何含 `B` 字段的页面先返回明确 missing/partial，再另票补 canonical 关系。
-
-## 6. 验收
-
-- 当前运行证据矩阵中的业务对象、动态 kind、页面状态及公共入口均有明确页面域归属；新增、删除或改域时同一工作单元更新相关映射，不沿用历史固定路由总数作为验收。
-- `id/no/外部键` 为字符串；金额为两位十进制定点字符串；日期为 ISO；布尔为 JSON boolean；枚举传稳定 code，不传样式类名或中文标签作为唯一身份。
-- 真实 0、未知 null、空集合、缺关系、无权限、加载失败和筛选无结果均可区分。
-- 汇总与列表使用同一筛选；分页排序稳定；关系只按 ID；错配与 not-found 不回退名称。
-- 当前无实体数据的页面保持真实空态；项目列表、语义目标、来源感知基础详情与新增/编辑命令，以及受控迁移的批次快照，由可重置中央实例证明 HTTP 链。其余后台未接入页面使用类型化 SQLite adapter，不引入 MockJS；所有已接入中央的领域除外，不能以 SQLite adapter 作为正式回退路径。
-- 本文件与 `DATABASE.md`、页面蓝本或实现冲突时先在对应 Issue 留证，再在同一工作单元消除冲突；不得静默让页面 DTO 成为第二份数据库 schema。
-
+本机服务运行时按上海业务日重新评估；停机/离线期间不能承诺后台实时提醒，启动后补算当前问题并对账事件。范围仅应用 inbox，不扩展邮件、系统通知或新外部发送通道。当前时效计算、纯读取与事件接入状态见[实现差异](#implementation-gaps)。
 ### AX02 分包结算
 
 `ownerCommercialDocumentRead` 的 `sub_settlement` 列表/详情使用专属 `SubcontractSettlementAmounts`，项目/合同/分供方与附件按真实 ID 读取。金额和空错权限语义见[页面蓝本](./pages/owner-documents.md#issue-328-分包结算中央只读链)，累计事实不复制到头记录。
 
-## AX04 辅助合同中央读面
+### AX04 辅助合同中央读面
 
-#330 的两类合同列表、专属只读详情、项目/分供方来源入口使用同一中央 Repository/HTTP。列表遵循 PageDTO，详情与空、部分关系、错误和权限状态遵循 ReadState；主链接不进入编辑。字段和金额口径仅见 [DATABASE](./DATABASE.md#ax04-辅助合同中央事实)，交互仅见 [页面蓝本](./pages/contract-forms.md#ax04-当前浏览器实现330)。
+两类辅助合同列表、专属只读详情、项目/分供方来源入口使用同一领域读事实，采用公共 PageDTO 和独立分区状态；主链接不进入编辑。字段和金额口径仅见 [DATABASE](./DATABASE.md#ax04-辅助合同中央事实)，交互及 #330 历史实现见 [页面蓝本](./pages/contract-forms.md#ax04-当前浏览器实现330)。
 
-## 目标成本中央读取（#412）
+### 目标成本中央读取（#412）
 
 预算使用 `/api/read/target-costs`、`/api/read/target-costs/form`、`/api/read/target-costs/:id` 及所属版本文件读取端点。Repository 校验来源、会话、目标身份、金额/数量边界及语义导航；浏览器正式读取失败不退回旧库。列表在同一完整授权结果集内筛选和分页；版本头表单和明细页各保存独立读取依据。
 
 预算读取权限与工程量权限分开。内部项目完整事实只用于复验身份及关联；公开项目 lookup 仍要求项目读取能力，不暴露内部目录。已授权预算可显示自身关联项目名称，项目及成本来源入口须核对目标能力并经 Target Registry 解析。来源返回使用受控项目、预算版本及 origin，不接受任意站内路径作为业务授权。
 
-详情只读取指定版本的科目、附件及明确归属的历史；实际成本按该版本项目读取当前已接管事实，并有独立来源指纹。预算头录入金额、正式合同承诺、结算成本与支付分别显示，历史版本不换成当前基线科目。完整度、已知部分、缺源及真实零的含义遵循本文件通用契约与 [DATABASE](./DATABASE.md#目标成本中央版本与完整接管412)，不得用未接入空集合伪造已知零。
+详情只读取指定版本的科目、附件及明确归属的历史；实际成本按该版本项目读取当前已接管事实，并有独立来源指纹。预算头录入金额、正式合同承诺、结算成本与支付分别显示，历史版本不换成当前基线科目。完整度、已知部分、缺源及真实零的含义引用[公共三维规则](#read-status-and-completeness)，业务来源引用 [DATABASE](./DATABASE.md#目标成本中央版本与完整接管412)。
 
 原件只通过所属预算和文件身份读取，正文验证真实长度及摘要；历史未知大小仍保持空值，缺件与损坏分别说明。读态、多页签、异常恢复和五档视口的验收以 [#412 预算证据](../design/evidence/issue-412-target-cost/README.md)为准。本节不表示完整工资、材料、财务来源或生产持久化已经通过。
 
-## 工资中央历史与独立来源读取（#412）
+### 工资中央历史与独立来源读取（#412）
 
 `/api/read/payroll`、`/api/read/payroll/:id` 和 `/api/read/payroll/sources` 分别提供台账、指定单据及指定项目的独立来源。Repository 固定 `workspaceId / actorId / origin / sourceVersion` 与 `payroll:read`，不借用工程量或排程权限。正式来源失败不回落本地；演示必须由后台授权且只读，同 ID 也与正式缓存隔离。读取结果不含可执行工资命令。
 
@@ -532,13 +422,13 @@ interface NotificationOpenResultDTO {
 
 独立来源提供主体配置、考勤、签工、可识别历史、月锁和签工占用。锁由工资状态及全体相关成员投影，不用正数金额、工时或明细行数替代成员存在性。B 类和缺证据的旧来源保持隔离，不给新核算、发放、输出或成本资格；接管只读本身不证明这些后续能力已完成。
 
-## A 工资草稿、配置与冻结输出读取（#412，P1）
+### A 工资草稿、配置与冻结输出读取（#412，P1）
 
 工资 Repository 扩展 `aForm / aConfig / aOutput`：`POST /api/read/payroll/a-form` 只读预览请求正文中的 `query + input`，避免完整草稿放入长 URL；`GET /api/read/payroll/a-config` 读取指定 `scope`；`GET /api/read/payroll/a-output` 按稳定 `statementId` 读取冻结输出。读取本身不保存草稿、改价或核对。P0 台账/历史与独立来源继续只读，不能由 A 的写能力反推全部工资来源可编辑。
 
 草稿预览返回固定上下文、完整成员、原施工事实、按工资价格拆分的明细、比例默认值出处、各金额完整度、逐项阻断及允许动作。新建使用独立 `draftKey` 并允许逐步填写，已存工资始终按路径身份读取；输入、当前读取结果和保存依据分别保留。配置读取绑定项目、月份、班组与负责人，返回首月配置、可证明班组比例、工资价格修订及历史，不以当前全局筛选替代原读取目标。
 
-新建尚未选择或明确清空项目、负责人、月份时仍可读取空预览及授权候选，保存保持阻断，不自动选取首项。项目候选由新建读取提供，不以历史工资台账是否已有记录决定首张工资可达性。缺损来源即使没有可核算行，也保留可证明的位置和原身份；只有目标项目、可见链及读取能力均通过时才提供原户链接，否则显示不可用原因。多户聚合行的每个来源保留自己的完成身份，返回后恢复对应楼层和焦点。
+新建尚未选择或明确清空项目、负责人、月份时仍可读取空预览及授权候选，保存保持阻断，不自动选取首项。项目候选由新建读取提供，不以历史工资台账是否已有记录决定首张工资可达性。缺损来源即使没有可核算行，也保留可证明的位置和原身份；只有目标项目、可见链及读取能力均通过时才提供原户链接，否则显示不可用原因。多户聚合行的每个来源保留自己的完成身份，返回后恢复对应楼层和焦点。responsibility assignment 和 copied_from 属原依据/审计关系，源软删不吞掉已证完成或复制件。
 
 数值传输沿既有金额定点字符串规范，数量及比例使用明确十进制字符串；领域和页面解码后保留 null 与真实零。金额同时声明完整、部分或未知及已知部分；缺来源不能伪装空集合。比例默认值明确区分上月月度单、主体配置、真实班组配置、结算默认、固定尾款及未配置，具体继承规则只见[工资页面](./pages/subcontract-payroll.md#工资核算)。
 
@@ -546,7 +436,7 @@ interface NotificationOpenResultDTO {
 
 P1 本地限定验收见[A 工资证据](../design/evidence/issue-412-payroll-a/README.md)；完整关系与存储规则见 [DATABASE](./DATABASE.md#a-工资中央来源配置与发放412)，写入见 [COMMANDS](./COMMANDS.md#a-工资中央命令412p1)。
 
-## 考勤矩阵、C1 草稿与配对输出读取（#412，P2）
+### 考勤矩阵、C1 草稿与配对输出读取（#412，P2）
 
 P2 通过工资 Repository 的 `attendanceMatrix / c1Form / c1Config / c1Output` 读取。对应 `GET /api/read/payroll/attendance`、`POST /api/read/payroll/c1-form`、`GET /api/read/payroll/c1-config`、`GET /api/read/payroll/c1-output`；矩阵与配置绑定项目、月份和班组，表单在正文中传入 `query + input`，输出固定工资 ID。仍使用 `payroll:read`，不因 C1 没有工程量或 quantity 权限而拒绝合格工人的考勤。
 
@@ -558,19 +448,19 @@ C1 草稿返回所选主体、全成员、逐日原事实、每人正常/加班�
 
 已证考勤来源链接使用真实 record ID，白名单筛选保留项目、月份、班组、工人和日期；返回身份仍是原工资稳定 ID 或独立草稿，不由 query 替换。原记录失效或权限不足时提供原因，不换成同名人员或其它考勤。
 
-通用工资详情读取 C1 时，已发明细及保存的原明细中的 `unitPrice` 按原有限费率传输并显示，例如 `60.125`；工资金额仍按两位小数字符串传输。该例外仅属于 C1 详情的两套明细，不放宽 A 单价或其他金额字段；原快照、原头及审计证据保持原文。
+通用工资详情读取 C1 时，已发明细及保存的原明细中的 `unitPrice` 按原有限费率传输并显示，例如 `60.125`；工资最终金额仍按两位小数字符串传输。这是费率与金额的字段差异，不新增对其他格式原费率/工时的截断；各领域既有合法边界保持，原快照、原头及审计证据保持原文。
 
 新 C1 冻结输出包含同一单据的工资表与逐日考勤表，两者共用原冻结姓名、工时、费率和全成员实分配，不在打印或下载时读取当前矩阵补数。详情与输出共用已采用来源和原发放回执核验；旧 C1 缺逐考勤原证据持续保留缺口。单据配对输出不等于后续整月或全周期工作簿。存储及资格见 [DATABASE](./DATABASE.md#c1-逐日考勤个人费率与冻结来源412p2)，命令见 [COMMANDS](./COMMANDS.md#考勤与-c1-工资中央命令412p2)。
 
-## 签工台账、C2 草稿与配对输出读取（#412，P3）
+### 签工台账、C2 草稿与配对输出读取（#412，P3）
 
-P3 已接入工资 Repository 的 `dayworkList / dayworkForm / c2Form / c2Config / c2Output`；限定验证见工资页面及本期验收。对应读取为 `GET /api/read/payroll/daywork`、`POST /api/read/payroll/daywork-form`、`POST /api/read/payroll/c2-form`、`GET /api/read/payroll/c2-config`、`GET /api/read/payroll/c2-output`。表单 POST 是只读预览，不产生写入；所有读取仍要求 `payroll:read`，不要求 quantity 权限或项目有工程量。
+签工台账与 C2 使用工资 Repository 的 dayworkList / dayworkForm / c2Form / c2Config / c2Output。对应读取为 GET /api/read/payroll/daywork、POST /api/read/payroll/daywork-form、POST /api/read/payroll/c2-form、GET /api/read/payroll/c2-config、GET /api/read/payroll/c2-output。该域独立使用 payroll:read，不要求 quantity 权限或项目有工程量。限定证据及生产缺口见[实现差异](#implementation-gaps)。
 
 签工台账范围含项目、月份、班组与独立签工状态多选，空项目/月返回原空范围及授权候选，不读全年或自动选首项。原事实按项目/月完整读取后再呈现筛选，日内冲突和领用检查不能被班组或状态筛选隐藏。每条记录分别表达原文、当前人员/班组显示、可编辑/可确认资格、诊断、逐条领用与月锁；原事实缺损、已删除、待确认、被占用和可用不合并成普通空态。
 
 原签工表单以路由 `recordId` 读取，查询筛选不替代实体归属；新稿才使用独立 `draftKey`。配置固定项目×负责人，返回原配置及同主体可识别历史、当前候选和不可写原因，空规则与 NULL 不用默认脚注替代。主体价、工数及原单价按有限精确小数保留，金额按既有两位小数字符串传输；原行及审计证据不递归转换。
 
-有限小数在 JSON 边界展开为十进制定点字符串，例如 `0.0000001`，不舍入成金额也不输出指数形式。C1/C2 共用费率转换及通用详情原单价遵守相同规则，读取和命令拒绝科学计数法字符串；存储的原始证据旁路保持原文。
+C1/C2 共用费率转换及通用详情原单价，原费率和工数传输引用[标量规则](#scalar-semantics)；存储的原始证据旁路保持原文。
 
 台账独立月份锁按当前项目、月份和全部真实工资成员投影，不依赖筛选后是否还有签工行。无签工或零分配成员、状态筛选为空时仍显示其真实锁；空项目/月不投影其他范围。表单自动重读刷新当前身份及资格但保留原稿的保存依据，用户明确重新核对才采用新版本；未知提交仍沿原编号核验。
 
@@ -580,7 +470,7 @@ C2 工资预览分开返回当前逐条事实与原单采用来源，另有服�
 
 完整已发 C2 输出仅从本单采用来源、专属冻结及原发放回执互证后生成：零星用工记录表与工资表使用同一原配置、逐条时段/工数/证明信息、当时姓名和实发分配。已发后当前档案或配置变化不重写输出；缺证据保持 unavailable 与原历史只读，不能用当前数据填成完整工资。本期配对表不包含考勤或完整月工作簿。
 
-## 工资更正历史与实际收付读取（#412，P4）
+### 工资更正历史与实际收付读取（#412，P4）
 
 工资 Repository 提供 `adjustmentForm / adjustmentDetail / adjustmentHistory / actualPaymentForm / actualPaymentDetail / actualReversalForm / actualLedger / releaseAdjustmentPreview`，分别对应 `/api/read/payroll/` 下 `adjustment-form / adjustment-detail / adjustment-history / actual-payment-form / actual-payment-detail / actual-reversal-form / actual-ledger / release-adjustments` 的 POST 只读接口。query 与固定 input 身份共同校验，preview 不写入业务事实。
 
@@ -592,7 +482,7 @@ C2 工资预览分开返回当前逐条事实与原单采用来源，另有服�
 
 预算在已有事务传入当前身份给内部工资 loader；班组/工人/项目 detail 嵌入目的范围的工资实际分区，避免页面再发另一套并行工资请求。目的读取权限和 `payroll:read` 同时核对，最后异步等待后再核验；个人缺分配不从整单或当前名册推份额。付款管理的工资收付为独立只读区域，不计入申请待付、银行流水或往来款。所有来源入口校验稳定关系并保留原预算版本、人员/项目及工资筛选返回。
 
-## A 工资费用与独立管理簿读取（#412，P5）
+### A 工资费用与独立管理簿读取（#412，P5）
 
 `POST /api/read/payroll/a-fee-config` 经 Repository 的 `aFeeConfig(query, scope)` 读取项目、班组、负责人、月份和用途簿。返回封闭上下文、保存版本、原默认三态、逐条费用及修订、管理簿、原责任与细格候选、分项语义、历史和分动作资格。未选项目保持空预览；未证名称不升级为墙砖/地砖语义。费用保存、新增管理关系和新建管理草稿各有原因，普通簿已发不一并禁掉另一个独立管理簿的合法操作。
 
@@ -602,11 +492,11 @@ C2 工资预览分开返回当前逐条事实与原单采用来源，另有服�
 
 迁入的费用、管理关系及负价使用原物理证明与明确 ID 映射生成受控类型投影，原 JSON 保持逐字不变。原链失效时停用对应证明，不缓存旧可用资格，也不从当前配置或同名人员补齐。P4 与跨域实际消费者读取同一 proven 工资集合，费用明细、负价行、个人分配和更正关系不再加一次成本。保存与物理模型见 [COMMANDS](./COMMANDS.md#a-工资费用与独立管理簿命令412p5)、[DATABASE](./DATABASE.md#a-工资费用独立管理簿与负价清单412p5)。
 
-## 户级空鼓和工资扣款读取（#412，P6）
+### 户级空鼓和工资扣款读取（#412，P6）
 
 工程量 Repository 的 `hollow` 经 `GET /api/read/quantity/hollow` 读取固定项目、户与来源。返回当前可记录目标、可证明的原检查、全部修订及整改、当前余量、逐条写资格和不可用诊断。创建目标依当前有效责任，已有检查保留检查时原责任；“暂无检查”与“明确检查零处”分别表达，破损证明不能变成空数组。
 
-原户提供独立 `/subcontract/quantity/:pid/:uid/hollow/new`、`hollow/:id` 和 `hollow/form/:id` 页面。来源意图校验真实项目/户/记录与权限；工资返回信息只恢复原单或新稿、分项与楼层位置，不能扩大查看资格或更换原实体。A 未保存输入以独立草稿身份保留，冷恢复必须重新取得当前预览，恢复缓存不能成为可信读取或核对凭证。
+原户提供独立 `/subcontract/quantity/:pid/:uid/hollow/new`、`hollow/:id` 和 `hollow/form/:id` 页面。来源意图校验真实项目/户/记录与权限；工资返回信息只恢复原单或新稿、分项与楼层位置，不能扩大查看资格或更换原实体。A 未保存输入在当前页面会话中以独立草稿身份保留；刷新后的恢复能力与中央业务草稿沿 [COMMANDS](./COMMANDS.md#draft-lifecycle)，不得承诺浏览器持久完整正文，缓存不能成为核对凭证。
 
 工资 Repository 的 `hollowConfig(query, config)` 经 `POST /api/read/payroll/hollow-config` 接收严格的 `{ query, config }` 只读正文；返回固定格式、项目、班组、负责人、月份及 A 用途簿下的有效配置、原修订、状态和保存资格。无分项修订时默认金额与出处一并说明；明确关闭、金额 0、金额缺失分别解码。项目和范围关系不符拒绝，不能借查询扩大配置范围。
 
@@ -620,7 +510,7 @@ A 的施工楼层按本簿在所选月及以前的已证完成事实，以楼栋
 
 P4 更正读取展示原采用位置与量价，预览差额时保留原签字金额；实际收付和后月已包含关系沿同一原更正链核对。工资迁入后的可读身份投影须由完整原件及明确映射证明，旧文字不升级为健康空鼓源。实施状态及操作见 [P6 指南](../guides/payroll-hollow.md)，实体和写入见 [DATABASE](./DATABASE.md#户级空鼓整改与工资采用412p6)、[COMMANDS](./COMMANDS.md#户级空鼓和人工扣款命令412p6)。
 
-## 批量工资预览与计划读取（#412，P7）
+### 批量工资预览与计划读取（#412，P7）
 
 Repository 的 `batchPreview` 经 `POST /api/read/payroll/batch-preview` 读取同项目同月且身份不重复的 A/C1/C2 原工资。每项返回格式、负责人、完整成员、当前状态、整数分可发额、空鼓整单约束、A 取整三态、核对依据摘要和阻断理由；C1/C2 的取整恒为不适用。批量核对不接收资金，批量发放必须明确非负安全整数分资金。未知余额、需重核、未核对、已发或来源缺损不能作为零权重继续。
 
@@ -630,7 +520,7 @@ Repository 的 `batchPreview` 经 `POST /api/read/payroll/batch-preview` 读取�
 
 `aRounding` 经 `GET /api/read/payroll/a-rounding` 返回固定 A 工资簿范围的全部追加修订、目标月有效修订及不可写原因。缺失、明确关闭和整百规则分别表达；后月修订不回写前月。
 
-## 工资正式编号与原件读取（#477）
+### 工资正式编号与原件读取（#477）
 
 Repository 的 `numbering(query, { projectId, statementId })` 经 `POST /api/read/payroll/numbering` 读取固定项目、可空原工资、项目序列、已出具元数据、可证明冻结文档及分动作资格。`statementId=null` 仅用于项目起点登记；它不能自动选择工资。正式编号 `issue.number` 始终为原字符串，`firstNumber / nextNumber` 仅是内部安全整数计数。编号缺失与已出具区分，预览不占号；未知旧号不从文件名、月份或当前行序推导。
 
@@ -638,7 +528,7 @@ Repository 的 `numbering(query, { projectId, statementId })` 经 `POST /api/rea
 
 迁入 DTO 只投影经原图和显式映射证明的当前身份；`issue.documentHash` 保留出具时原摘要，映射后的文档另在服务端核对，不改写原摘要来伪装一致。完整工资工作簿与月归档之后通过 [#479](https://github.com/zodea/crm-new/issues/479) 消费该接口，不凭工资权限扩读私密名册。页面流程见[正式出具指南](../guides/payroll-official-numbering.md)。
 
-## 工人私密资料与名册读取（#449）
+### 工人私密资料与名册读取（#449）
 
 `WorkerRosterRepository` 提供 `profile(workerId)`、`preview(scope)`、`archives(projectId)`、`archive(projectId,archiveId)` 和 `file(input)`；对应 `/api/read/worker-roster/profile|preview|archives|archive|file`。预览采用 POST 正文 `{projectId,statementIds,registeredOn}`，不接收手填成员范围。全部私密读取需要 `worker:sensitive:read`，预览和名册读取同时需要 `payroll:read`。响应为 private/no-store；普通工人列表和详情不因新增接口取消遮盖。
 
@@ -646,7 +536,7 @@ Repository 的 `numbering(query, { projectId, statementId })` 经 `POST /api/rea
 
 照片读取核对工人 owner、归档成员与该版照片引用、正文编码/长度/SHA-256；无归档参数只服务当前工人专门私密页面，仍须独立私密权限。客户端不提供路径，不以文件名判断归属。所有读取在最后异步等待后再次核验会话和权限，Repository 验证响应身份与选择范围。
 
-## 工资完整工作簿与保存目录读取（#479）
+### 工资完整工作簿与保存目录读取（#479）
 
 `PayrollRepository` 的 `workbookPreview(query,input)`、`workbookArchives(query,{projectId})`、`workbookArchive(query,{projectId,archiveId})` 对应 `POST /api/read/payroll/workbook-preview|workbook-archives|workbook-archive`。输入固定正式来源、项目、模式、唯一原工资集合及可空名册版本，不能靠当前分页或姓名隐式补选。负责人全周期只允许同一稳定请款簿；按月模式将所选原工资按月份分组。
 
@@ -658,10 +548,182 @@ HTTP 复用各工资格式与实际台账的十进制传输协议。Repository �
 
 经过服务端完整原图及映射证明的迁入目录/名册 DTO 可以附带 `migration: { originalId, originalContentHash }`。目录中的该摘要必须等于保留的原 `manifestHash`；名册的该摘要标识不含 context 的原归档正文。它说明原件与本代身份投影的关系，不是本代改写 JSON 的摘要，也不接受来源 JSON 自带的同名声明。私密下载仍核对本代项目、精确工资集合、名册版本/日期/来源版本及当前身份权限；目录固定的原名册摘要可以与经过证明的 `originalContentHash` 核对，不能因此绕开范围或撤权检查。
 
-## 本机备份保护状态（#451）
+### 本机备份保护状态（#451）
 
 `GET /api/production/backup/status` 经 `productionBackup` Repository 读取固定工作区、维护人、是否配置、主备份保护状态、最近成功主副本/离线副本、当前版本恢复证明、执行中与最近操作。中间件和 handler 均使用不续期身份核验，不能因为每分钟轮询使登录永不过期。来源 demo/all、未认证与身份失效拒绝。
 
 保护时点取一致副本数据时点，超过 24 小时为过期；非法或未来时点需核对，最近主备份失败保留原成功记录并明确失败。离线复制的完成时间与其数据时点分开保存，不能用刚复制的旧包刷新保护期限。恢复证明另外带 `current`，只在 schema 和完整参与者摘要相符时为 true；`releaseState` 固定等待最终验收。
 
-Pinia 保存当前读取与运行状态；暂时请求失败不把旧成功当作新确认。浏览器只持久化按工作区/维护人隔离的原命令最小描述，结果丢失时沿原键恢复，成功或明确失败后才清除；操作结果不能代替客户和原件的业务读取。模型、保留策略与配置见 [DATABASE](./DATABASE.md#pg-02-备份记录与隔离恢复证明451)和[指南](../guides/local-backup-and-restore.md)。
+Pinia 保存当前读取与运行状态；暂时请求失败不把旧成功当作新确认。备份命令最小描述与未知结果恢复遵循 [COMMANDS](./COMMANDS.md#idempotency-and-recovery)，操作回执不能代替客户、原件或恢复证明的业务读取。模型、保留策略与配置见 [DATABASE](./DATABASE.md#pg-02-备份记录与隔离恢复证明451)和[指南](../guides/local-backup-and-restore.md)。
+
+### 客户关联项目
+
+`CustomerDetailReadDTO.projects` 从中央项目原始事实快照投影，不经项目列表/详情的客户名称富化回调；客户列表本身不依赖项目聚合，避免两端递归。项目主读与客户投影共享命令、已确认迁移、测试会话、来源版本和服务可用性边界，未创建本地正式镜像或第二张关系表。
+
+`summary.projectCount` 等于可读 `projects.length`。受限单记录从集合排除；关联引用的 forbidden 身份置空。整个项目源无权/暂不可用时返回 `projectsProblem`（`forbidden` / `unavailable`），`projects=[]`、`projectCount=null`，前端须以问题状态解释，不能呈现空关系或真实 0；恢复后重新读取集合。DTO 解码验证数量、状态与集合一致。关系更正和匹配规则见[客户页面](./pages/base-customer.md#详情)。
+
+客户关联项目的实现及可读取来源见[实现差异](#implementation-gaps)，不从该分区通过推定其他关系源已接管。
+
+### 客户关联施工合同
+
+Issue #425 的 `CustomerDetailReadDTO.contracts` 复用施工合同中央主读事实，按合同自身客户 ID/来源投影；合同、有效补充协议和累计收款字段均来自该主读源，版本随合同命令及其既有事实来源变化。有效补充金额的状态判定与施工合同主读共享；客户有效额与合同变更后金额的区别见[客户页](./pages/base-customer.md#详情)。客户列表与客户原始身份 facts 不读取合同/项目聚合，避免候选、命令校验和客户详情互相递归。
+
+`summary.contractCount=contracts.length`；合同导航必须含同一 `dataOrigin`、`contractKind=施工` 与父 `customerId`，解码器拒绝来源/类型/客户错配。项目引用仍检查实际可读项目和合同源的关系权限。
+
+整个合同源无权/不可用返回 `contractsProblem`（`forbidden` / `unavailable`），`contracts=[]`，摘要合同数/有效合同额/待收差额与项目行合同数/有效合同额为 `null`，保持独立可读的客户和项目。解码验证问题态、未知值、集合及计数一致，不将失败转换为真实零。前端对合同页签给出明确反馈和适用重试；未接入的新收款写源不由本票推定完成。
+
+<a id="客户已有中央收款来源"></a>
+### 普通收款及客户关联来源
+
+Issue #436 将普通收款接入单一中央命令事实源，取代 #426 依赖最终结算文档的临时投影边界。列表、详情、表单、客户关系、施工合同累计、项目收入和最终结算共用原始收款，按 `(dataOrigin, id)` 去重；没有最终结算的普通收款仍进入关系，多张结算不重复累计。原始 `facts` 不读取消费方的聚合，避免客户—合同—收款相互递归。读取版本随收款和合同事实变化，普通读取不导入正式样例。
+
+普通收款读取使用 `receipt:read`；详情按稳定 ID 与 `dataOrigin` 独立读取，客户上下文不是必需身份。项目、客户和合同引用分别复验对应读权，受限引用不返回 ID/名称，包含受限关联的记录撤下 `receipt:write`。列表分页和汇总使用同一完整筛选集，正式与演示分别汇总。金额缺失为 `null`，已知零为两位小数字符串；未知历史账号、分类与类型不从其他字段推断。字段展示及状态口径见[收款页面契约](./pages/finance-receipt.md)。
+
+整个来源无权/不可用时返回 `receiptsProblem`，收款集合为空；摘要收款数、草稿数、有效收款、待收差额，项目行收款数/金额，以及合同行累计收款/余额为 `null`，不得用其他摘要泄露受限金额。客户主数据、列表和其他可读关系仍可使用；收款详情返回同一问题，前端支持适用重试。解码同时检查问题状态、集合、计数和未知金额。
+
+施工合同、最终结算和项目收入对同一收款源故障同样返回未知金额与来源问题，保留独立可读主档。旧读数据仅按[公共规则](#permissions-and-stale-data)展示，无权时清除敏感金额。收款附件正文经当前记录、来源、归属和哈希校验，历史本机路径不暴露为读取入口。迁移/恢复见 [COMMANDS](./COMMANDS.md#migration-and-rollback)，运行状态集中见[实现差异](#implementation-gaps)。
+
+## 4. 页面族响应最低字段
+
+### 4.1 列表
+
+每条列表行至少包含：
+
+- `id`；有业务编号时包含字符串 `no`；名称与状态用未格式化值。
+- 所有可点击实体的 `EntityRefDTO`，而不只有 `projectName/supplierName`。
+- 所有可点击目标的 `NavigationIntentDTO`；后端只给语义和稳定筛选 ID，不给 route 字符串。
+- 该页面判断所需的日期、枚举、金额、数量、附件计数和更新时间。
+- 只读聚合使用 `MetricDTO` 或等价完整性结构；可下钻聚合必须给出稳定 filters。
+- `PageDTO` 的 pagination、同筛选 summary、empty 和 meta；领域旧顶层字段由兼容 adapter 映射，不定义第二套公共含义。
+
+### 4.2 详情
+
+详情响应至少包含：
+
+- `entity`：列表同一稳定 ID 和版本；不存在/错配使用明确问题码。
+- `summary`：关键字段与完整性，不复制可从 children 聚合的第二份可编辑余额。
+- `sections`：带稳定 `key` 的独立分区，每区返回读状态、数据/空原因、来源证据、计算完整度和授权范围；不可用或无权不伪装 0 条。
+- `relations`：项目、客户、分供方、合同、班组、工人、来源单据等关系引用。
+- `files`：只返回文件元数据、capability 和受控 file id；不返回本地路径、认证 URL 或无授权 payload。
+- `capabilities`：查看、编辑、提交、审批、下载等分别声明；前端不从中文状态猜动作权限。
+
+### 4.3 表单预载与工作台
+
+- 表单预载将可编辑 draft、只读 lookup 和 sourceVersion 分开；只读名称不回写为外键。
+- 工作台共享同一实体/筛选上下文，分区状态不各自复制。队列项和详情都使用稳定 ID。
+- 上传、识别、核对、归档、确认支付、工资发放等是独立命令；读 DTO 只报告已持久化状态，不以 toast 或本地临时布尔值证明成功。
+- 原输入、当前预览和已采用保存依据分开；写后读取与输入清理直接遵循 [COMMANDS](./COMMANDS.md#success-receipt-and-readback)，读 DTO 不另外定义“保存成功”。
+
+## 5. 本地 adapter 与后台迁移规则
+
+### 适配边界
+
+领域 Repository 负责事实读取和边界解码，HTTP/显式本地 adapter 保持相同公共语义；UI 状态与领域 owner 的职责只见 [ARCHITECTURE](./ARCHITECTURE.md#module-responsibilities)。已接管领域禁止以旧 SQLite、演示或 Mock 补读取失败；当前接入清单见[实现差异](#implementation-gaps)。
+
+adapter 切换须用同一确定事实验证身份、列表/详情、三维状态、权限、分页汇总、decimal 精度和来源版本等价。候选/导出全量读取沿[公共分页规则](#pagination-and-consistency)，导航沿唯一 Target Registry。
+
+不以整理协议改变持久化归属、暗中双写或自动回放。来源切换、迁移对账和整批回滚只遵循 [COMMANDS](./COMMANDS.md#migration-and-rollback)；输入的内存生命周期、最小原键描述与已有中央业务草稿只见 [COMMANDS](./COMMANDS.md#draft-lifecycle)。
+
+文件/OCR/Excel 使用所属专用 adapter；普通 DTO 仅提供受控元数据和 file ID，二进制边界校验当前 owner、祖先、来源、权限、实际字节及 SHA-256，不输出本地路径或私密地址。文件缺件与完整性失败分别说明，不能从图标/文件名推定真实原件可用。
+
+<a id="implementation-gaps"></a>
+## 6. 实现差异与历史证据
+
+本节是实现状态索引，不改变上文目标。审阅起点为 main HEAD 31f8ec34293f7edca8cc732285073f044acb5b03，当前状态以工作区及本轮验证原位更新。测试实例/本机切片仅证明对应证据范围；#416/#471 最终正式使用关口未通过，不写成全站或首次真实业务已放行。环境和生产门禁只见 [ARCHITECTURE](./ARCHITECTURE.md#implementation-gaps)。
+
+<a id="31-当前实现落点"></a>
+### 当前实现入口
+
+| 当前领域入口 | 实现证据和边界 |
+| --- | --- |
+| 项目、客户、分供方 | app/lib/project、customer、supplier 的 Repository/HTTP/DTO；项目、客户、分供方浏览器主读已接中央，本机使用已登记磁盘参与者 |
+| 班组—工人 | app/lib/crew-worker、app/stores/crew-worker-read.ts 与 server/api/read/crews*、workers*；全局列表及成员候选跨页读取稳定身份，项目标签读取现有同源项目主档；原班组/项目变更后回读、原命令回执与历史冻结已有定向验证。显式 Tauri 仍有本地适配；正式持久接管及业务定义分别直达 ARCHITECTURE 与 [DATABASE](./DATABASE.md#global-worker-crew-directory) |
+| 核心/辅助合同、BOQ | app/lib/material-contract、construction-contract、subcontract-contract、auxiliary-contract、other-settlement；canonical kind 与补充协议按稳定父子关系读取 |
+| 甲方/分包单据 | app/lib/owner-document/central-*、owner-commercial-document-read.ts；独立 kind/capability/金额投影，sub_settlement 与 project_penalty 使用专属事实 |
+| 项目分供方 | app/lib/project-supplier、project-supplier-read.ts；双 ID 与六类事实，合作文件 owner 的实际正文校验已接，其他文件 owner 以实际实现为准 |
+| 送货/材料价格 | app/lib/delivery、material、material-quotation 与 app/stores/delivery-record.ts；送货、合同和独立报价按各实际 owner 组合原价及版本，缺源分别呈现；报价的归属和迁入范围直达 [DATABASE](./DATABASE.md#quotation-target) |
+| 普通收款/支出财务/票据 | 普通收款 app/lib/receipt 独立中央事实；F3 app/lib/finance 的往来、报销、申请、实付和开票申请由正式 finance 参与者读取，实际付款详情同事务关联已接结算与分摊；未登记的采购发票或合同来源仍分别不可用，不能以开票申请代替发票台账 |
+| 工程量/排程/标准库 | app/lib/quantity、schedule，中央 #442–#445 与本机标准库 #463；冻结依据与当前来源独立 |
+| 工资/目标成本 | app/lib/payroll、target-cost 与专属 read operation；#412 分阶段、#449/#477/#479 有独立证据，生产落盘不能从测试中央通过推定 |
+| 公共洞察/通知 | app/lib/finance/payment-detail.ts、PaymentApplicationInsightPanel.vue、app/stores/notifications.ts；分供方资料提醒已接本机持久公共通知 owner，其他未接领域保留真实缺口；静态样本只在服务端授权演示可见 |
+| 导入/导出/OCR/备份 | app/stores/export-workflows.ts、ocr-settings.ts、server/api/ocr 与 productionBackup；专用读取不授予全领域普通业务读取 |
+
+以上是查代码的入口，不是另一份网络 schema。历史核心链的 #281/#317–#331、普通收款 #436、文件 #438/#441 和工资/工程量阶段证据按所证明范围解读；已确认但未实施的 canonical 关系不能因代码缺失重新变成待答业务问题。
+
+<a id="f3-payment-verification-read"></a>
+### F3 历史付款核验读取
+
+原付款申请表单读取附只读 `paymentVerification`：`required`、`status`、原因及当前可用 `proof`。状态区分无需核验、缺核验、已核验、依据变化及不可用；实际资格、金额与历史保全只见 [DATABASE 的 PAY-08](./DATABASE.md#entity-payment-record)。证明包含原申请版本、原命令、可信核验人／时间、累计结论、真实源版本摘要和原件引用，不能将客户端同名字段作为写入的资格事实。
+
+GET 不生成核验、不改旧批复或旧余额、不增加现金。读取及当前资格复验遵守实际申请、结算、原费用、实付和原件权限；不可读来源不泄露旧证明正文。源版本改变只影响当前资格，旧核验仍保存在冻结历史。普通申请批复、真实现金与可核实 Other 结算余额按各自源投影，不把历史未知批复的 `NULL` 替成核验金额。界面提交、后读及恢复直接见 [COMMANDS](./COMMANDS.md#f3-finance-payment-verification)。
+
+<a id="historical-expense-clearance-read"></a>
+
+2026-10-05 已确认的[历史清偿承接](./DATABASE.md#historical-expense-clearance)由原费用表单的只读 `draft.clearanceVerification` 及 Other 原费用列表读取。`sources` 保留原费用版本、`clearanceSourceHash`、原清偿行及 `missingOriginalDocument / originalDocumentState`、冻结 `clearanceProofs`、明确 `clearanceLinks` 和逐 item 尚可关联的 `clearanceItemAvailability`；不把缺失原单显示成已找回。`qualification` 分开给出原记录处理份额、已核份额、已确认采用、已核重叠、新可采用额、旧义务及旧实际已付／未付；not-required / missing / verified / stale / unavailable 和原因沿业务依据解释，不能用其中一个余额冒充另一个。银行来源不足时旧已付／未付保持 null，不能从清偿行或文件推断。
+
+Other 表单及详情返回真实 `expenseAllocations / clearanceLinks`，只有本单实际采用行可用于追加关联。Native 财务预检的原件携 `ownerId / canDeclareMissingClearance`，大小允许真实 number 或 null；null 明示原大小未知，不提供任意补大小的路径。仅服务端精确允许的旧清偿 external-required 原单可声明缺失，其他原件继续按原边界读真字节。缺权限为 forbidden，实际来源未接为 unavailable；撤权不留旧证明正文或私密身份，过期响应不覆盖当前范围。GET 不保存核定、不补关系、不生成成本或现金，旧冻结证明按原版本保全；写入与原回执可靠后读见 [COMMANDS](./COMMANDS.md#historical-expense-clearance-command)。原费用核定、新旧份额合并、可靠后读及冷读取已完成限定正式流程验证；纸单整页、精确外部缺件声明和迁入组件的验证层次分别见 [DATABASE](./DATABASE.md#historical-expense-clearance)。
+
+### PG-01 本机客户读取（#450）
+
+当前本机客户列表/详情/表单、lifecycle、deleted、audit 与原命令结果查询回读磁盘参与者。文件按客户归属、删除状态、长度/SHA-256 校验，附件下载为 private/no-store 并禁止 MIME 嗅探；未接项目/合同/收款分别 unavailable，客户主档仍可读。运行和身份策略见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)，原结果 not-found 的处理由 [COMMANDS](./COMMANDS.md#pg-01-本机客户命令450) 保持封存保护。
+
+### PG-03 本机项目读取（#452）
+
+当前本机 project/customer 双向投影沿真实主/次客户外键，同一只读事务读取，已删项目不进入正常关系。lifecycle/deleted/audit 为核对恢复入口；已删除项目基础身份可核对，表单和文件拒绝。独立附件删除不随客户/项目恢复而改变。项目列表与详情已由实际同次事务组合项目和客户来源证明、可信会话及真实读取时点，HTTP 校验稳定身份、来源、原请求页和大小。金额不完整时界面明确显示未知、可证小计、缺失数量与当前筛选范围，不将授权可见范围称为企业全量。
+
+未接管合同/收款/预算/工资/项目分供方仍未知；没有开发/演示补源。原键读取见 [COMMANDS](./COMMANDS.md#pg-03-本机项目命令452)，持久清单见 [DATABASE](./DATABASE.md#pg-03-本机项目持久参与者452)。
+
+### PG-04 本机分供方读取（#453）
+
+当前本机主档、表单和证照来自 supplier 磁盘参与者。原件经专用接口核对分供方→证照→文件、删除状态和摘要，普通 DTO 不带正文；OCR 原候选、人工确认、审核分别回读。关联事实在同次正式事务核对各 owner、能力与源版本：F3 已确认支付按真实分摊归属，读取须同时具备申请和支付读取能力；原申请后来删除不抹掉已确认现金。材采有效合同与协议、Other 当前服务交易方结算分别提供有证小计与真实原单入口，不能把这些局部来源称为全部合同额或结算额。完整合作关系、采购发票及应付余额仍明确缺源；项目主档名称可读不证明 ProjectSupplier 合作关系已接入。原恢复见 [COMMANDS](./COMMANDS.md#pg-04-本机分供方命令453)。
+
+当前分供方普通列表/详情与正式通知已逐响应承接[可信读取证据](#shared-dto)。分供方列表的主档授权范围可完整，同时未接关联来源分别不可用；两者不互相覆盖。分供方合作金额返回可证小计、实际参与记录及缺金额记录数量；整项来源不可用时这些值均未知。列表响应必须对应原请求页与页大小，详情必须对应稳定身份和来源；只有仍属于当前查询的合法回读才能将实际末页写回 URL。通知跨页以同一 owner 版本、授权范围和事件身份完整对账，再允许原已读集合恢复。
+
+### 本机工序库读取（#463）
+
+当前 GET process-libraries 及指定版本回读磁盘，只接 real 且需要 process-library:read；完整顺序、阶段/分项、前置 key、禁用状态和创建证据保持不可变。核对版本、原命令和审计完整图后才返回，损坏图不截取有效行冒充完整。未接正式 WBS 时 usageCount=null。参与者见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)，限定证据见 [#463](../design/evidence/issue-463-production-process-library/README.md)。
+
+### 待实施及需验证差异
+
+| 目标 | 当前差异 / 后续验收依据 |
+| --- | --- |
+| 公共协议与三维状态 | 公共 ReadState 已退役 partial，401 与来源 unavailable 分别解码和失效清理。项目、客户、分供方、班组工人、施工/分包/材采/辅助合同、甲方单据、项目分供方及普通收款的普通列表/详情已接强制 metadata；通知沿其 owner 同样接线。Metric 的已知小计、缺项和范围已接项目及分供方主要出口，其他领域旧派生指标仍按实际来源逐项核验；独立子区读取失败不抹除可读本体，正式持久边界沿 ARCHITECTURE |
+| decimal 与可空 | 旧 number/REAL、局部 round2/默认零与固定六位限制须逐字段检查；保留原费率/工时/数量精度和历史原文，工资最终两位，不因协议整理改算法 |
+| 分页/查询 | 公共普通分页已返回 requestedPage 与实际末页，已接领域 HTTP 拒绝错页、大小或身份来源响应；API 非法查询拒绝，前端旧查询恢复仍可 normalize。项目导入、主档候选及班组成员候选已复用完整跨页来源与范围对账；现有未接该公共协议的专用导出仍需按各领域实际 owner 验证，不从列表通过推定其完成 |
+| 强一致来源 | 各主读/组合投影需有真实相关版本和同响应一致读取；项目列表组合客户版本等不足须补，不能用 updatedAt 或假版本证明完整 |
+| 报量 | 当前表单刷新 BOQ 已保 reportedQty，backend 使用当前有效 BOQ 价生成申报快照；新协议要保该已确认语义，不统一阻断每次价格版本变化 |
+| 主体和全域合同同号 | 系统设置独立 catalog 返回核实版本/原历史及可信 metadata；三核心合同显示采用快照/原主体文本，目录后来更名不替换旧事实。Native 全种类同库占号、中央正式材采占号已接；未接正式合同域不开放，历史未核实主体仍为 null，不按同名推定 |
+| 三类价格来源 | 独立报价、材采合同与实际送货各自读取当前 owner，逐项保留单位、税率、运费条件、日期和来源；缺条件不能加入可比候选。读取期间的旧送货分析仅供查阅，不参加本次比较、候选或导出；归档事实不被当前报价覆盖 |
+| 证照有效性 | 已按 7 天及上海业务日纯读取投影；跨日 GET 不改原件、人工核验凭证、版本、审计或原回执。真实关键资料写归档旧核验，当前有效性与历史核验分别返回；无效日历日期明确为未知，未填截止日仍沿既有规则 |
+| 主动提醒 | 本机中央 supplier 保存稳定到期问题，public notifications 持久事件、每 actor 已读及原命令；启动补算、每分钟检查、壳层分页对账与 system 提示已接。已读/关闭均不解除问题；失权、来源/actor切换撤回含名称的旧系统提示，来源不可用单独呈现；首次真实业务写入仍依生产门禁，其他未接领域不造通知 |
+| 财务和经营来源 | 正式分供方确认付款及其他支出结算已接同事务事实与真实分摊，部分合同和结算的有证小计不替代完整来源，采购发票仍缺源。项目管理费的总合同配置与实际成本分开；既有管理簿冻结用途和 P4 实际净额保留来源证明。普通工资排除，补退沿原单，空来源的零不代替完整总额。真实税主体期间与完整现金来源仍缺；定义只见 [DATABASE](./DATABASE.md#management-fee-sources)，限定接线见 [项目页](./pages/project-info.md#31-项目经营数据) |
+| Native 成本与原费用 | Native 原费用、明示清偿及收款采用快照保全；正式 F3 与 Other 持久参与者承接可核验无合同费用链，成本与实付各归原事实一次。具体身份与历史清偿核验边界只见 [DATABASE](./DATABASE.md#actual-counterparty-identities)。项目成本和预算比较保留合同/协议/目标空值及已知小计；未接完整 P4 实际源保持未知，不以工资头或部分实际算完整余额。正式领域接通不表示所有项目经营投影已接通 |
+| 保存后读回与输入 | 各领域可靠回执 + 同源同实体正式 readback 才自动清输入/待确认/关闭，已保存读失败只读重试；浏览器持久最小描述与中央草稿的差异按 COMMANDS 验收 |
+| 生产与私密输出 | 本机已放行接口和持久参与者不等于全域生产可用；工资完整文件、工人私密版本、原件摘要及最后授权重验沿各阶段证据，#471 未完成仍保持关口 |
+
+问题若是已确认目标与代码差异，列为待实施能力；若发现新的关键业务/架构决定，集中列新批次并暂停，不能替用户确认。Issue 的创建/修改/评论须依 AGENTS 取得明确授权，文档整理本身不自动授权写 Issue。
+
+<a id="6-验收"></a>
+## 7. 验收
+
+文档验收使用以下闭环，业务实现验收按后续工作单元完成：
+
+- 各页面域均有 owner 和业务权威出处，公共语义只保留一处；目标、当前、待实施和历史证据可区分，#471 未通过不宣称生产就绪。
+- 身份/编号为字符串；decimal 传输无指数与格式化符号；费率、工时、数量不提前截断；工资金额结果两位；null、真实零与历史未知可区分。
+- 同一例子同时说明读状态、计算完整度和授权范围；父可读/子空、无权、不可用分别成立，已知小计不冒充全量。
+- 每普通分页后台重读，单响应同筛选/授权/来源一致；非法查询拒绝，合法越界回最后页并附请求页，空结果仍保留筛选。
+- 跨页候选/导出出现版本/权限变化或完整性缺口即停止重读；旧数据明显标注且不能用于新写、候选或导出；换目标/来源/权限后的迟到响应丢弃。
+- 未提交报量按当前有效签证价复算并保手工量；已提交冻结不漂移；三价格源分开；证照 7 日临期、到期当天、长期字段和 GET 无业务副作用一致。
+- 原件、工资冻结、名册/工作簿范围及隐私重新授权可证明；回执/readback 与输入恢复只引用 COMMANDS，不把读取不存在当原写未应用。
+- 检查所有直接链接及旧锚点，领域例外不与公共规则矛盾；实现差异按已经完成的业务工作单元与其实际验证更新，不将测试实例通过写成生产放行。
+
+三个维度的最小示例：
+
+| 读状态 | 计算完整度 | 授权范围 | 呈现 |
+| --- | --- | --- | --- |
+| ready | complete | permission-filtered | 当前可见集合合计已知，明确仅可见范围，不能称企业总额 |
+| ready | partial | complete | 完整读取范围内缺一项金额，value=null，knownValue 为可证小计 |
+| 父 ready，子 unavailable | 父独立指标可 complete，依赖子源指标 pending/partial | 各分区独立声明 | 主档可读，子区显示来源失败，相关总额未知；不显示“暂无记录” |
+| 父 ready，子 forbidden | 依赖子源值未知 | 子区无当前读取权 | 主档继续可读，子域不泄漏身份、金额或隐藏行数 |
+| empty | complete | complete | 已查明无记录，可报告该范围真实零，仍保留筛选与分页信息 |
+| loading / error，保留 previous | 旧数据沿原完整度，不声明最新 | 同用户、目标、来源和授权范围 | 标明旧时点，仅查看；撤权/切源即清除，不能作为候选、新写或导出 |

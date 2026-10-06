@@ -70,10 +70,10 @@ describe('分包合同中央 command contract', () => {
       projects: [{ id: 'project-1', name: '中央项目' }],
       suppliers: [{ id: 'supplier-1', name: '中央劳务分供方' }],
     })
-    await expect(instance.execute(request({ draft: { ...request().draft, supplierId: 'supplier-missing' } }), SESSION))
+    await expect(instance.execute(request({ commandId: 'subcontract-invalid-supplier', draft: { ...request().draft, supplierId: 'supplier-missing' } }), SESSION))
       .rejects
       .toMatchObject({ problem: { code: 'validation-failed' } })
-    await expect(instance.execute(request({ draft: { ...request().draft, subKind: '材料' } }), SESSION))
+    await expect(instance.execute(request({ commandId: 'subcontract-invalid-kind', draft: { ...request().draft, subKind: '材料' } }), SESSION))
       .rejects
       .toMatchObject({ problem: { code: 'validation-failed' } })
     expect(() => parseSubcontractContractCommandRequest({
@@ -102,5 +102,16 @@ describe('分包合同中央 command contract', () => {
       baseVersion: '1',
       draft: { ...request().draft, id: 'subcontract-central-1', name: '过期合同' },
     }), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+  })
+
+  it('同键异文冲突，受控核对保留原回执并长期封存未应用键', async () => {
+    const instance = createSubcontractContractCommandTestInstance({ createId: () => 'subcontract-recovery', projects: [{ id: 'project-1', name: '项目' }], suppliers: [{ id: 'supplier-1', name: '分供方' }] })
+    const original = await instance.execute(request(), SESSION)
+    await expect(instance.execute(request({ draft: { ...request().draft, amount: 2000 } }), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(instance.resolve(original.commandId, SESSION)).toEqual({ outcome: 'applied', result: original })
+    expect(instance.resolve('subcontract-never-applied', SESSION)).toEqual({ outcome: 'not-applied', commandId: 'subcontract-never-applied' })
+    await expect(instance.execute(request({ commandId: 'subcontract-never-applied' }), SESSION)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(() => instance.resolve(original.commandId, { ...SESSION, capabilities: [] })).toThrow(/权限/)
+    expect(instance.form(original.id, SESSION)).toMatchObject({ version: '1', draft: { amount: 1000 } })
   })
 })

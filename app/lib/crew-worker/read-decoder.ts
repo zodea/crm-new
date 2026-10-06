@@ -1,3 +1,4 @@
+import type { EntityKindDTO } from '../../types/read-model'
 import type {
   CrewDetailQueryDTO,
   CrewDetailReadDTO,
@@ -10,7 +11,10 @@ import type {
   WorkerListPageDTO,
   WorkerListQueryDTO,
 } from './read-contract'
-import { isDataOriginDTO, isISODateTimeDTO } from '../../types/read-model'
+import { isDataOriginDTO, isEntityRefDTO, isISODateTimeDTO, isUnavailableEntityNavigationDTO } from '../../types/read-model'
+import { hasConsistentOriginReadMeta, hasConsistentReadMeta, isReadMetaDTO } from '../read-model/meta'
+import { isPaginationDTO } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { serializeEnumSelection } from '../util/enum-selection'
 import { decodePayrollHostSection } from './payroll-read'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from './read-contract'
@@ -28,26 +32,38 @@ function stringList(value: unknown): value is string[] {
 }
 
 function resolvedCrew(value: unknown): boolean {
-  return object(value) && value.state === 'resolved' && value.entity === 'crew'
-    && typeof value.id === 'string' && value.id.length > 0
-    && typeof value.label === 'string' && (value.no === null || typeof value.no === 'string')
+  return isEntityRefDTO(value, 'crew') && value.state === 'resolved'
 }
 
-function resolvedEntity(value: unknown, entity: string): boolean {
-  return object(value) && value.state === 'resolved' && value.entity === entity
-    && typeof value.id === 'string' && value.id.length > 0 && typeof value.label === 'string'
+function resolvedEntity(value: unknown, entity: EntityKindDTO): boolean {
+  return isEntityRefDTO(value, entity) && value.state === 'resolved'
 }
 
-function entityReference(value: unknown, entity: string): boolean {
-  return resolvedEntity(value, entity) || (object(value) && value.entity === entity
-    && ((value.state === 'missing' && value.id === null && value.label === null)
-      || (value.state === 'forbidden' && (value.id === null || typeof value.id === 'string') && value.label === null)))
+function entityReference(value: unknown, entity: EntityKindDTO): boolean {
+  return isEntityRefDTO(value, entity)
 }
 
 function navigation(value: unknown): boolean {
-  return object(value) && (value.kind === 'unavailable'
-    || (value.kind === 'entity-detail' && object(value.subject) && typeof value.variant === 'string'
+  return object(value) && ((value.kind === 'unavailable' && Object.keys(value).length === 2 && ['missing-id', 'missing-route', 'not-connected', 'forbidden', 'unverified-target', 'error'].includes(String(value.reason)))
+    || (value.kind === 'entity-detail' && isEntityRefDTO(value.subject) && value.subject.state === 'resolved' && typeof value.variant === 'string'
       && object(value.filters)))
+}
+
+function relationNavigation(value: unknown, reference: unknown, origin: unknown): boolean {
+  if (!isEntityRefDTO(reference))
+    return false
+  if (reference.state !== 'resolved')
+    return isUnavailableEntityNavigationDTO(value, reference)
+  return object(value) && navigation(value) && isEntityRefDTO(value.subject) && value.subject.state === 'resolved'
+    && value.subject.entity === reference.entity && value.subject.id === reference.id
+    && value.subject.label === reference.label && value.subject.no === reference.no
+    && object(value.filters) && value.filters.dataOrigin === origin
+}
+
+function projectRecord(value: unknown, navigationKey: 'navigation' | 'projectNavigation', origin: unknown): boolean {
+  return object(value) && isEntityRefDTO(value.project, 'project')
+    && relationNavigation(value[navigationKey], value.project, origin)
+    && (value.project.state === 'resolved' || ['code', 'status', 'projectCode', 'projectStatus'].every(key => !Object.hasOwn(value, key) || value[key] === ''))
 }
 
 function crewNavigation(value: unknown): boolean {
@@ -61,7 +77,7 @@ function crewListItem(value: unknown): boolean {
     && resolvedCrew(value.crew) && crewNavigation(value.navigation)
     && typeof value.trade === 'string' && typeof value.contactName === 'string'
     && typeof value.contactPhone === 'string' && count(value.memberCount)
-    && count(value.activeMemberCount) && count(value.projectCount)
+    && count(value.activeMemberCount) && (value.projectCount === null || count(value.projectCount))
     && typeof value.status === 'string' && isISODateTimeDTO(value.updatedAt)
 }
 
@@ -80,20 +96,16 @@ function crewSummary(value: unknown): boolean {
   })
 }
 
-function pagination(value: unknown): boolean {
-  return object(value) && count(value.page) && Number(value.page) >= 1
-    && count(value.pageSize) && Number(value.pageSize) >= 1 && count(value.total)
-}
-
 function emptyState(value: unknown): boolean {
   return value === null || (object(value)
     && ['no-records', 'no-filter-match', 'missing-relation'].includes(String(value.reason))
     && Array.isArray(value.missingRelations) && value.missingRelations.every(item => typeof item === 'string'))
 }
 
-export function decodeCrewListPage(value: unknown): CrewListPageDTO {
-  if (!object(value) || !Array.isArray(value.items) || !value.items.every(crewListItem)
-    || !pagination(value.pagination) || !crewSummary(value.summary) || !emptyState(value.empty)
+export function decodeCrewListPage(value: unknown, expected?: CrewListQueryDTO): CrewListPageDTO {
+  if (!object(value) || !hasConsistentOriginReadMeta(value, 'crew-worker-read-v2') || !Array.isArray(value.items) || !value.items.every(crewListItem)
+    || (expected !== undefined && (!object(value.pagination) || value.pagination.requestedPage !== expected.page || value.pagination.pageSize !== expected.pageSize || (!expected.includeDemo && value.items.some(item => object(item) && item.dataOrigin === 'demo'))))
+    || !isPaginationDTO(value.pagination, value.items.length) || !crewSummary(value.summary) || !emptyState(value.empty)
     || !isISODateTimeDTO(value.asOf) || !(value.sourceVersion === null || typeof value.sourceVersion === 'string')
     || !stringList(value.capabilities)) {
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '中央后台返回的班组列表无效'))
@@ -103,8 +115,8 @@ export function decodeCrewListPage(value: unknown): CrewListPageDTO {
 
 function workerListItem(value: unknown): boolean {
   return object(value) && isDataOriginDTO(value.dataOrigin) && resolvedEntity(value.worker, 'worker')
-    && navigation(value.navigation) && entityReference(value.crew, 'crew') && navigation(value.crewNavigation)
-    && entityReference(value.currentProject, 'project') && navigation(value.projectNavigation)
+    && navigation(value.navigation) && entityReference(value.crew, 'crew') && relationNavigation(value.crewNavigation, value.crew, value.dataOrigin)
+    && entityReference(value.currentProject, 'project') && relationNavigation(value.projectNavigation, value.currentProject, value.dataOrigin)
     && typeof value.trade === 'string' && typeof value.projectStatus === 'string'
     && typeof value.status === 'string' && typeof value.phone === 'string' && typeof value.idCard === 'string'
     && (value.entryDate === null || typeof value.entryDate === 'string')
@@ -122,9 +134,10 @@ function workerSummary(value: unknown): boolean {
   })
 }
 
-function decodePage<T>(value: unknown, item: (candidate: unknown) => boolean, summary: (candidate: unknown) => boolean, message: string): T {
-  if (!object(value) || !Array.isArray(value.items) || !value.items.every(item)
-    || !pagination(value.pagination) || !summary(value.summary) || !emptyState(value.empty)
+function decodePage<T>(value: unknown, item: (candidate: unknown) => boolean, summary: (candidate: unknown) => boolean, message: string, expected?: WorkerListQueryDTO): T {
+  if (!object(value) || !hasConsistentOriginReadMeta(value, 'crew-worker-read-v2') || !Array.isArray(value.items) || !value.items.every(item)
+    || (expected !== undefined && (!object(value.pagination) || value.pagination.requestedPage !== expected.page || value.pagination.pageSize !== expected.pageSize || (!expected.includeDemo && value.items.some(item => object(item) && item.dataOrigin === 'demo'))))
+    || !isPaginationDTO(value.pagination, value.items.length) || !summary(value.summary) || !emptyState(value.empty)
     || !isISODateTimeDTO(value.asOf) || !(value.sourceVersion === null || typeof value.sourceVersion === 'string')
     || !stringList(value.capabilities)) {
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', message))
@@ -132,43 +145,71 @@ function decodePage<T>(value: unknown, item: (candidate: unknown) => boolean, su
   return value as T
 }
 
-export function decodeWorkerListPage(value: unknown): WorkerListPageDTO {
-  return decodePage(value, workerListItem, workerSummary, '中央后台返回的工人列表无效')
+export function decodeWorkerListPage(value: unknown, expected?: WorkerListQueryDTO): WorkerListPageDTO {
+  return decodePage(value, workerListItem, workerSummary, '中央后台返回的工人列表无效', expected)
 }
 
 function detailEnvelope(value: unknown, entity: 'crew' | 'worker'): boolean {
-  return object(value) && isDataOriginDTO(value.dataOrigin) && object(value[entity])
+  return object(value) && hasConsistentReadMeta(value, 'crew-worker-read-v2', value.dataOrigin) && isDataOriginDTO(value.dataOrigin) && object(value[entity])
     && typeof (value[entity] as Record<string, unknown>).id === 'string'
-    && Array.isArray(value.projects) && Array.isArray(value.penalties) && object(value.summary)
+    && Array.isArray(value.projects) && value.projects.every(row => projectRecord(row, 'navigation', value.dataOrigin))
+    && Array.isArray(value.penalties) && value.penalties.every(row => projectRecord(row, 'projectNavigation', value.dataOrigin)) && object(value.summary)
     && isISODateTimeDTO(value.asOf) && (value.sourceVersion === null || typeof value.sourceVersion === 'string')
     && stringList(value.capabilities)
 }
 
-export function decodeCrewDetailRead(value: unknown): CrewDetailReadDTO {
-  if (!detailEnvelope(value, 'crew') || !Array.isArray((value as Record<string, unknown>).members))
+function detailSummary(value: unknown, entity: 'crew' | 'worker'): boolean {
+  if (!object(value) || !object(value.summary) || !isReadMetaDTO(value.meta, 'crew-worker-read-v2'))
+    return false
+  const summary = value.summary
+  const meta = value.meta
+  const unknown = (key: string) => meta.sources.some(source => source.key === key && source.state !== 'readable')
+  const counts = entity === 'crew'
+    ? ['projectCount', 'assignedUnitCount', 'completedStageCount', 'wageStatementCount']
+    : ['projectCount', 'assignedUnitCount', 'completedStageCount', 'attendanceDays', 'attendanceHours', 'overtimeHours', 'confirmedDayworkUnits', 'releasedStatementCount', 'missingAllocationCount']
+  const amounts = entity === 'crew' ? ['releasedWageAmount', 'penaltyAmount'] : ['knownAllocatedAmount', 'penaltyAmount']
+  const sourceFor = (key: string) => key === 'penaltyAmount' ? 'penalties' : ['projectCount', 'assignedUnitCount', 'completedStageCount'].includes(key) ? 'assignments' : 'wages'
+  return counts.every(key => (unknown(sourceFor(key)) && summary[key] === null) || count(summary[key]))
+    && amounts.every(key => (unknown(sourceFor(key)) && summary[key] === null) || (typeof summary[key] === 'string' && /^-?\d+(?:\.\d{1,2})?$/.test(summary[key])))
+    && (entity === 'worker' || (count(summary.memberCount) && count(summary.activeMemberCount)))
+}
+
+export function decodeCrewDetailRead(value: unknown, expected?: CrewDetailQueryDTO): CrewDetailReadDTO {
+  if (!detailEnvelope(value, 'crew') || !detailSummary(value, 'crew') || !object(value) || !object(value.crew) || (expected !== undefined && (value.crew.id !== expected.id || value.dataOrigin !== expected.origin)) || !Array.isArray(value.members)
+    || !value.members.every(member => object(member) && resolvedEntity(member.worker, 'worker')
+      && relationNavigation(member.navigation, member.worker, value.dataOrigin)
+      && isEntityRefDTO(member.currentProject, 'project') && relationNavigation(member.currentProjectNavigation, member.currentProject, value.dataOrigin)
+      && isEntityRefDTO(member.linkedWorker, 'worker') && relationNavigation(member.linkedWorkerNavigation, member.linkedWorker, value.dataOrigin))) {
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '中央后台返回的班组详情无效'))
-  const detail = value as CrewDetailReadDTO
+  }
+  const detail = value as unknown as CrewDetailReadDTO
   if (detail.payrollActual !== undefined && (detail.dataOrigin !== 'real' || (!detail.capabilities.includes('payroll:read') && detail.payrollActual.status !== 'forbidden')))
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '工资收付分区与来源授权不一致'))
   return detail.payrollActual === undefined ? detail : { ...detail, payrollActual: decodePayrollHostSection(detail.payrollActual, { kind: 'crew', id: detail.crew.id }) }
 }
 
-export function decodeWorkerDetailRead(value: unknown): WorkerDetailReadDTO {
-  if (!detailEnvelope(value, 'worker'))
+export function decodeWorkerDetailRead(value: unknown, expected?: WorkerDetailQueryDTO): WorkerDetailReadDTO {
+  if (!detailEnvelope(value, 'worker') || !detailSummary(value, 'worker') || !object(value) || !object(value.worker) || (expected !== undefined && (value.worker.id !== expected.id || value.dataOrigin !== expected.origin)))
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '中央后台返回的工人详情无效'))
   const detail = value as Record<string, unknown>
   if (!Array.isArray(detail.relatedWorkers) || !Array.isArray(detail.assignments)
-    || !Array.isArray(detail.wageStatements) || !Array.isArray(detail.attendance) || !Array.isArray(detail.daywork)) {
+    || !detail.relatedWorkers.every(row => object(row) && resolvedEntity(row.worker, 'worker') && relationNavigation(row.navigation, row.worker, detail.dataOrigin))
+    || !detail.assignments.every(row => projectRecord(row, 'projectNavigation', detail.dataOrigin) && object(row)
+      && isEntityRefDTO(row.project) && (row.project.state === 'resolved' ? navigation(row.navigation) : isUnavailableEntityNavigationDTO(row.navigation, row.project)))
+    || !Array.isArray(detail.wageStatements) || !detail.wageStatements.every(row => projectRecord(row, 'projectNavigation', detail.dataOrigin))
+    || !Array.isArray(detail.attendance) || !Array.isArray(detail.daywork)
+    || !object(detail.worker) || !(detail.worker.currentProjectId === null || (typeof detail.worker.currentProjectId === 'string'
+      && Array.isArray(detail.projects) && detail.projects.some(row => object(row) && isEntityRefDTO(row.project, 'project') && row.project.state === 'resolved' && row.project.id === (detail.worker as Record<string, unknown>).currentProjectId)))) {
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '中央后台返回的工人关系详情无效'))
   }
-  const result = value as WorkerDetailReadDTO
+  const result = value as unknown as WorkerDetailReadDTO
   if (result.payrollActual !== undefined && (result.dataOrigin !== 'real' || (!result.capabilities.includes('payroll:read') && result.payrollActual.status !== 'forbidden')))
     throw new CrewWorkerRepositoryProblem(crewWorkerProblem('internal-error', '工资收付分区与来源授权不一致'))
   return result.payrollActual === undefined ? result : { ...result, payrollActual: decodePayrollHostSection(result.payrollActual, { kind: 'worker', id: result.worker.id }) }
 }
 
-export function decodeCrewWorkerRelationFactIdentity(value: unknown): CrewWorkerRelationFactIdentityDTO {
-  if (!object(value) || !['assignment', 'wage', 'penalty'].includes(String(value.kind))
+export function decodeCrewWorkerRelationFactIdentity(value: unknown, expected?: CrewWorkerRelationFactQueryDTO): CrewWorkerRelationFactIdentityDTO {
+  if (!object(value) || !hasConsistentReadMeta(value, 'crew-worker-read-v2', value.dataOrigin) || (expected !== undefined && (value.id !== expected.id || value.kind !== expected.kind || value.dataOrigin !== expected.origin)) || !['assignment', 'wage', 'penalty'].includes(String(value.kind))
     || typeof value.id !== 'string' || !isDataOriginDTO(value.dataOrigin)
     || !(value.projectId === null || typeof value.projectId === 'string')
     || !Array.isArray(value.owners) || !value.owners.every(owner => object(owner)
@@ -215,5 +256,8 @@ export function serializeCrewWorkerRelationFactQuery(query: CrewWorkerRelationFa
 export function crewWorkerProblemFromUnknown(cause: unknown): CrewWorkerRepositoryProblem {
   if (cause instanceof CrewWorkerRepositoryProblem)
     return cause
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new CrewWorkerRepositoryProblem(remote, { cause })
   return new CrewWorkerRepositoryProblem(crewWorkerProblem('unavailable', '班组与工人中央服务暂时不可用，请重试', true), { cause })
 }

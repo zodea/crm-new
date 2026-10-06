@@ -4,7 +4,7 @@ import type {
   FormAttachmentDraft,
   ProjectFormDraft,
 } from '../../app/lib/master-data/forms'
-import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type {
   ProjectCommandRequestDTO,
   ProjectCommandResultDTO,
@@ -13,6 +13,7 @@ import type {
 import type { ProjectImportSource } from '../../app/lib/project/import'
 import type { ProjectListSourceRow } from '../../app/lib/project/repository'
 import type { BusinessSession } from './business-session'
+import type { CommandJournal } from './command-journal'
 import { randomUUID } from 'node:crypto'
 import {
   PROJECT_WRITE_CAPABILITY,
@@ -22,7 +23,8 @@ import {
   projectProblem,
   ProjectRepositoryProblem,
 } from '../../app/lib/project/repository'
-import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
+import { assertCommandUnsealed, commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
+import { assertRetainedMigrationReferences, migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 import {
   assertProjectCommandBusinessRules,
   decodeProjectCommandContent,
@@ -41,7 +43,7 @@ interface StoredProject {
   importResult?: ProjectCommandResultDTO
 }
 
-interface SessionState {
+interface SessionState extends CommandJournal<ProjectCommandResultDTO> {
   commands: Map<string, ProjectCommandResultDTO>
   projects: Map<string, StoredProject>
   sourceVersion: number
@@ -182,6 +184,8 @@ function importedStoredProject(row: ProjectListSourceRow): StoredProject {
 function cloneState(state: SessionState): SessionState {
   return {
     commands: new Map(state.commands),
+    commandFingerprints: new Map(state.commandFingerprints),
+    sealedCommands: new Set(state.sealedCommands),
     projects: new Map([...state.projects].map(([id, project]) => [id, {
       ...project,
       draft: { ...project.draft },
@@ -203,7 +207,7 @@ export function createProjectCommandTestInstance(
     const key = keyFor(sessionId)
     let state = states.get(key)
     if (!state) {
-      state = { commands: new Map(), projects: new Map(), sourceVersion: 0 }
+      state = { commands: new Map(), commandFingerprints: new Map(), sealedCommands: new Set(), projects: new Map(), sourceVersion: 0 }
       states.set(key, state)
     }
     return state
@@ -223,6 +227,12 @@ export function createProjectCommandTestInstance(
   }
 
   return {
+    assertMigrationRemoval(removed: readonly CoreMigrationServerEntityDTO[], sessionId?: string | null) {
+      assertRetainedMigrationReferences(removed, 'projects', [...stateFor(sessionId).projects.values()].map(row => ({
+        id: row.id,
+        references: [{ type: 'customers', id: row.draft.customerId }, { type: 'customers', id: row.draft.secondaryCustomerId }],
+      })), message => new ProjectRepositoryProblem(projectProblem('conflict', message)))
+    },
     prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
       const current = stateFor(sessionId)
       const records = migratedIdentityRecords(current.projects, snapshot, 'projects', entity => ({
@@ -232,7 +242,7 @@ export function createProjectCommandTestInstance(
         version: 1,
         updatedAt: migratedIdentityTimestamp(entity),
       }))
-      const candidate = { ...current, projects: records, sourceVersion: current.sourceVersion + (records === current.projects ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => records.has(result.id))) }
+      const candidate = { ...current, projects: records, sourceVersion: current.sourceVersion + (records === current.projects ? 0 : 1) }
       return () => states.set(keyFor(sessionId), candidate)
     },
     reset(sessionId?: string | null) {
@@ -301,8 +311,13 @@ export function createProjectCommandTestInstance(
       session: BusinessSession,
       sessionId?: string | null,
     ): Promise<ProjectCommandResultDTO> {
+      request = structuredClone(request)
       validateEnvelope(request, session)
-      const state = stateFor(sessionId)
+      let state = stateFor(sessionId)
+      const reject = (message: string) => new ProjectRepositoryProblem(projectProblem('conflict', message))
+      const { key: commandKey, previous: duplicate } = commandReplay(state, request, session, 'project', reject)
+      if (duplicate)
+        return duplicate
       let importSource: ProjectImportSource | undefined
       if (request.importSource) {
         try {
@@ -318,11 +333,10 @@ export function createProjectCommandTestInstance(
       if (imported) {
         if (imported.importSignature !== signature)
           throw new ProjectRepositoryProblem(projectProblem('conflict', `来源行或外部旧 ID 已导入项目 ${imported.id}，内容不同；请进入项目编辑页修改`))
-        return { ...imported.importResult!, attachmentIds: [...imported.importResult!.attachmentIds] }
+        const result = { ...imported.importResult!, commandId: request.commandId, attachmentIds: [...imported.importResult!.attachmentIds] }
+        state.commands.set(commandKey, structuredClone(result))
+        return result
       }
-      const duplicate = state.commands.get(request.commandId)
-      if (duplicate)
-        return { ...duplicate, attachmentIds: [...duplicate.attachmentIds] }
       const content = decodeProjectCommandContent(request.draft, request.attachments)
       assertProjectCommandBusinessRules(content.draft, request.action)
       if (importSource) {
@@ -330,8 +344,11 @@ export function createProjectCommandTestInstance(
           await options.validateImportCustomers(content.draft, session, sessionId)
         else
           await (await import('./project-import-customers')).assertProjectImportCustomers(content.draft, session, sessionId)
+        state = stateFor(sessionId)
+        validateEnvelope(request, session)
+        assertCommandUnsealed(state, commandKey, reject)
         // 关系重验期间可能有另一份相同命令完成；重新进入同步去重/提交段。
-        if (state.commands.has(request.commandId) || findImported()) {
+        if (state.commands.has(commandKey) || findImported()) {
           return this.execute(request, session, sessionId)
         }
       }
@@ -369,6 +386,7 @@ export function createProjectCommandTestInstance(
         ...(importSource ? { importSource: structuredClone(importSource), importSignature: signature } : {}),
         migrationBatchId: existing?.migrationBatchId ?? null,
       }
+      assertCommandUnsealed(state, commandKey, reject)
       state.projects.set(id, project)
       state.sourceVersion += 1
       const result: ProjectCommandResultDTO = {
@@ -380,10 +398,17 @@ export function createProjectCommandTestInstance(
           .filter(attachment => !attachment.deletedAt)
           .map(attachment => attachment.id),
       }
-      state.commands.set(request.commandId, result)
+      state.commands.set(commandKey, structuredClone(result))
       if (importSource)
         project.importResult = result
       return { ...result, attachmentIds: [...result.attachmentIds] }
+    },
+    resolve(commandId: string, session: BusinessSession, sessionId?: string | null) {
+      if (!session.capabilities.includes(PROJECT_WRITE_CAPABILITY))
+        throw forbidden('无项目原提交核对权限')
+      if (!(commandId.startsWith('project-excel:') && commandId.length <= 4096))
+        parseResolveCommandBody({ commandId })
+      return resolveJournalCommand(stateFor(sessionId), commandId, session, 'project')
     },
   }
 }

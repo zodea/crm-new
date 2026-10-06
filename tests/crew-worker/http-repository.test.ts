@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createHttpCrewWorkerReadRepository } from '~/lib/crew-worker/http-repository'
 import { CrewWorkerRepositoryProblem } from '~/lib/crew-worker/repository'
+import { withOriginReadMeta, withReadMeta } from '../../server/utils/read-meta'
+import { publicReadMeta } from '../helpers/public-read-meta'
 
 describe('班组—工人中央 HTTP Repository', () => {
   it('序列化班组列表查询并严格解码中央分页响应', async () => {
-    const fetcher = vi.fn(async () => ({
+    const evidence = { schemaVersion: 'crew-worker-read-v2', asOf: '2026-08-23T00:00:00.000Z', sourceVersion: 'crew-worker-v1', capabilities: ['crew:list:read'], scope: { fixture: 'crew-list' }, requested: true }
+    const fetcher = vi.fn(async () => withOriginReadMeta({
       items: [{
         dataOrigin: 'real',
         crew: { state: 'resolved', entity: 'crew', id: 'crew-1', label: '泥水一组', no: null },
@@ -24,7 +27,7 @@ describe('班组—工人中央 HTTP Repository', () => {
         status: 'submitted',
         updatedAt: '2026-08-20T00:00:00.000Z',
       }],
-      pagination: { page: 1, pageSize: 10, total: 1 },
+      pagination: { requestedPage: 1, page: 1, pageSize: 10, total: 1 },
       summary: {
         trades: [{ value: '泥工', label: '泥工', count: 1 }],
         statuses: [{ value: 'submitted', label: 'submitted', count: 1 }],
@@ -34,7 +37,7 @@ describe('班组—工人中央 HTTP Repository', () => {
       asOf: '2026-08-23T00:00:00.000Z',
       sourceVersion: 'crew-worker-v1',
       capabilities: ['crew:list:read'],
-    }))
+    }, { real: publicReadMeta({ ...evidence, dataOrigin: 'real' }), demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }) }))
     const repository = createHttpCrewWorkerReadRepository({ fetcher })
 
     const page = await repository.listCrews({
@@ -78,13 +81,14 @@ describe('班组—工人中央 HTTP Repository', () => {
   })
 
   it('读取关系事实的真实归属，不依赖地址中的 owner 猜测', async () => {
-    const fetcher = vi.fn(async () => ({
+    const evidence = { schemaVersion: 'crew-worker-read-v2', asOf: '2026-08-23T00:00:00.000Z', sourceVersion: 'wage-fixture-v1', capabilities: ['crew:list:read', 'worker:list:read', 'demo:read'], scope: { fixture: 'wage-identity' }, requested: true, dataOrigin: 'demo' as const }
+    const fetcher = vi.fn(async () => withReadMeta({
       kind: 'wage',
       id: 'wage-1',
       dataOrigin: 'demo',
       projectId: 'project-1',
       owners: [{ kind: 'crew', id: 'crew-1' }, { kind: 'worker', id: 'worker-1' }],
-    }))
+    }, publicReadMeta(evidence)))
     const repository = createHttpCrewWorkerReadRepository({ fetcher })
 
     await expect(repository.getRelationFactIdentity({ kind: 'wage', id: 'wage-1', origin: 'demo', includeDemo: true }))

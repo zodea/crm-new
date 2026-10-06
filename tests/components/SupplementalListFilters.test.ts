@@ -7,6 +7,8 @@ import InvoiceQueuePanel from '~/components/invoice/InvoiceQueuePanel.vue'
 import InvoiceWorkspaceScreen from '~/components/invoice/InvoiceWorkspaceScreen.vue'
 import NotificationDrawer from '~/components/shared/NotificationDrawer.vue'
 
+vi.mock('~/lib/read-model/authority', () => ({ bindReadAuthority: () => undefined }))
+
 vi.mock('~/composables/useOverlayStack', () => ({
   useOwnedOverlayLayerStyle: () => ({ zIndex: 81 }),
   useModalLayerRegistration: () => ({ layerStyle: { zIndex: 80 } }),
@@ -18,6 +20,23 @@ beforeEach(() => {
 })
 
 describe('补充列表的同字段多选', () => {
+  it('冷回读已无未读但原提交未知时仍有独立恢复入口，不能再发批量新意图', async () => {
+    const pending = ref({ commandId: 'notification-original', workspaceId: 'workspace-a', actorId: 'actor-a', action: 'mark-all-read', eventId: null })
+    const recoverPending = vi.fn(async () => {
+      pending.value = null as never
+    })
+    const markAllRead = vi.fn()
+    vi.stubGlobal('useDataVisibilityStore', () => ({ includeDemo: false }))
+    vi.stubGlobal('useNotificationStore', () => ({ items: ref([]), unreadCount: ref(0), loading: ref(false), error: ref(null), pending, evaluationUnavailable: ref(false), readState: ref({ kind: 'ready' }), markAllRead, recoverPending }))
+    render(NotificationDrawer, { props: { open: true } })
+    expect(await screen.findByText('消息均已读', { exact: true })).toBeTruthy()
+    expect((screen.getByRole('button', { name: '全部标记为已读', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+    await fireEvent.click(screen.getByRole('button', { name: '恢复原已读操作', exact: true }))
+    expect(recoverPending).toHaveBeenCalledOnce()
+    expect(markAllRead).not.toHaveBeenCalled()
+    await nextTick()
+    expect(screen.queryByRole('button', { name: '恢复原已读操作', exact: true })).toBeNull()
+  })
   it('通知类型取并集并与搜索取交集，切换主视图重置类型，过滤不改变未读', async () => {
     const items = ref([
       { id: 'a', kind: 'todo', type: 'invoice', title: '甲发票', description: '', read: false },
@@ -26,7 +45,9 @@ describe('补充列表的同字段多选', () => {
       { id: 'd', kind: 'notice', type: 'cert', title: '证照到期', description: '', read: false },
     ])
     const markAllRead = vi.fn()
-    vi.stubGlobal('useNotificationStore', () => ({ items, unreadCount: ref(3), markAllRead }))
+    // 此夹具验证演示集合的呈现过滤；来源授权显式提供，过滤仍不调用已读写入。
+    vi.stubGlobal('useDataVisibilityStore', () => ({ includeDemo: true }))
+    vi.stubGlobal('useNotificationStore', () => ({ items, unreadCount: ref(3), loading: ref(false), error: ref(null), pending: ref(null), evaluationUnavailable: ref(false), readState: ref({ kind: 'idle' }), markAllRead }))
     render(NotificationDrawer, { props: { open: true } })
     await fireEvent.click(await screen.findByRole('button', { name: '消息类型，已选 0 项' }))
     await fireEvent.click(screen.getByRole('checkbox', { name: '发票校对' }))
@@ -53,7 +74,7 @@ describe('补充列表的同字段多选', () => {
       { id: 'b', name: '甲付清', no: 'B', projectName: '', supplierName: '', bizType: '', dueAmount: 0, paymentStatus: '已付清' },
       { id: 'c', name: '乙超付', no: 'C', projectName: '', supplierName: '', bizType: '', dueAmount: 0, paymentStatus: '超额支付' },
     ])
-    vi.stubGlobal('usePaymentManagementStore', () => ({ rows, loading: ref(false), projectOptions: ref([]), load: vi.fn() }))
+    vi.stubGlobal('usePaymentManagementStore', () => ({ rows, loading: ref(false), hasSnapshot: ref(true), currentRead: ref(true), snapshotOrigin: ref('native'), projectOptions: ref([]), load: vi.fn() }))
     const Table = defineComponent({ props: ['rows'], setup: props => () => h('section', props.rows.map((row: { name: string }) => h('article', row.name))) })
     const Toolbar = defineComponent({ props: ['search'], emits: ['update:search'], setup: (_, { emit }) => () => h('input', { type: 'search', onInput: (event: Event) => emit('update:search', (event.target as HTMLInputElement).value) }) })
     render(PaymentManagementScreen, { global: { components: { PaymentManagementTable: Table, PaymentManagementToolbar: Toolbar }, stubs: { PaymentManagementSummary: true, PaymentPayrollSection: true, SegTab: true } } })

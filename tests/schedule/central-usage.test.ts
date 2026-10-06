@@ -11,6 +11,7 @@ import { quantityTestInstance } from '../../server/utils/quantity-runtime'
 import { scheduleCatalog, scheduleService } from '../../server/utils/schedule-runtime'
 import { projectScheduleLibraryUsage } from '../../server/utils/schedule-usage'
 import { supplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { prepareVerifiedSignatory } from '../helpers/verified-signatory'
 
 const scope = 'schedule-visible-usage-444'
 const session = resolveBusinessSession()
@@ -19,6 +20,7 @@ let libraryId = ''
 
 beforeEach(async () => {
   prepareConstructionContractChainIdentityFixtures(scope)
+  const adoption = await prepareVerifiedSignatory(scope, '排程引用验收已核实我方主体')
   const contract = await constructionContractCommandTestInstance.execute({
     ...session,
     commandId: 'visible-contract',
@@ -26,7 +28,7 @@ beforeEach(async () => {
     action: 'save',
     attachments: {},
     requiredCapability: 'construction-contract:write',
-    draft: { name: '排程来源合同', projectId: query.projectId, customerId: 'customer-real-320', content: '施工', signDate: '2026-09-12', amount: 100 },
+    draft: { ...adoption, name: '排程来源合同', projectId: query.projectId, customerId: 'customer-real-320', content: '施工', signDate: '2026-09-12', amount: 100 },
   }, session, scope)
   const library = processLibraryService.execute({
     workspaceId: session.workspaceId,

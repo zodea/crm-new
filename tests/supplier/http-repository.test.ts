@@ -4,12 +4,29 @@ import type {
 import { describe, expect, it, vi } from 'vitest'
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 import {
-  buildSupplierListPage,
   parseSupplierDetailQuery,
   parseSupplierListQuery,
 } from '~/lib/supplier/repository'
+import { createSupplierReadTestInstance } from '../../server/utils/supplier-read-test-instance'
+import { buildSupplierListPage } from '../helpers/supplier-read-meta'
 
 describe('分供方中央 HTTP Repository', () => {
+  it('拒绝串请求页、页大小、详情稳定身份和来源，合法越界仍保原请求页', async () => {
+    const query = parseSupplierListQuery({ page: 99, pageSize: 10 })
+    const page = buildSupplierListPage({ suppliers: [], projectSuppliers: [], contracts: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], query, asOf: '2026-08-23T00:00:00.000Z', sourceVersion: 'boundary-proof', capabilities: [] })
+    const fetcher = vi.fn().mockResolvedValue(page)
+    const repository = createHttpSupplierReadRepository({ fetcher })
+    await expect(repository.list(query)).resolves.toMatchObject({ pagination: { requestedPage: 99, page: 1 } })
+    for (const pagination of [{ ...page.pagination, requestedPage: 98 }, { ...page.pagination, pageSize: 20 }]) {
+      fetcher.mockResolvedValue({ ...page, pagination })
+      await expect(repository.list(query)).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
+    }
+    const detail = await createSupplierReadTestInstance(() => ['supplier:list:read', 'demo:read']).detail('sup_demo_004', { origin: 'demo', includeDemo: true })
+    fetcher.mockResolvedValue(detail)
+    await expect(repository.get({ id: 'sup_demo_004', origin: 'demo', includeDemo: true })).resolves.toMatchObject({ supplier: { id: 'sup_demo_004' } })
+    await expect(repository.get({ id: 'another-supplier', origin: 'demo', includeDemo: true })).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
+    await expect(repository.get({ id: 'sup_demo_004', origin: 'real', includeDemo: true })).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
+  })
   it('序列化列表与详情查询并解码中央响应', async () => {
     const page = buildSupplierListPage({
       suppliers: [],
@@ -18,7 +35,7 @@ describe('分供方中央 HTTP Repository', () => {
       paymentApplications: [],
       paymentRecords: [],
       paymentAllocations: [],
-      query: parseSupplierListQuery({}),
+      query: parseSupplierListQuery({ search: '五金', page: '2' }),
       asOf: '2026-08-23T00:00:00.000Z',
       sourceVersion: 'v1',
       capabilities: ['supplier:list:read'],

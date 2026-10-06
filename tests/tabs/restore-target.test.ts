@@ -3,6 +3,64 @@ import type { DomainRepositories } from '~/plugins/repositories'
 import { describe, expect, it, vi } from 'vitest'
 import { createTabRestoreValidator, inspectRestorableTabPath } from '~/lib/tabs/restore-target'
 
+it('创建恢复器与恢复客户不求值 Native 工资领域', async () => {
+  let loaded = 0
+  const payrollRead = vi.fn()
+  vi.resetModules()
+  vi.doMock('~/lib/payroll/platform-read', () => {
+    loaded++
+    return { loadPayrollDetailRead: payrollRead }
+  })
+  try {
+    const { createTabRestoreValidator: createRestore } = await import('~/lib/tabs/restore-target')
+    const get = vi.fn().mockResolvedValue({ customer: { id: 'customer-one', name: '当前客户' }, dataOrigin: 'real', capabilities: ['customer:list:read'], sourceVersion: 'customer-current' })
+    const restore = createRestore({ repositories: { customerRead: { get } } as unknown as DomainRepositories, capabilities: () => ['customer:list:read'], includeDemo: () => false })
+    expect(loaded).toBe(0)
+    await expect(restore(descriptor('/base/customer/customer-one?origin=real'))).resolves.toEqual({ state: 'resolved', fullPath: '/base/customer/customer-one?origin=real', title: '当前客户', sourceVersion: 'customer-current' })
+    expect(loaded).toBe(0)
+    expect(payrollRead).not.toHaveBeenCalled()
+    expect(get).toHaveBeenCalledOnce()
+  }
+  finally {
+    vi.doUnmock('~/lib/payroll/platform-read')
+    vi.resetModules()
+  }
+})
+
+it('等待工资领域加载时取消恢复，不访问 Native 或中央工资事实', async () => {
+  const payrollRead = vi.fn()
+  let enter!: () => void
+  let release!: () => void
+  const started = new Promise<void>((resolve) => {
+    enter = resolve
+  })
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  vi.resetModules()
+  vi.doMock('~/lib/payroll/platform-read', async () => {
+    enter()
+    await gate
+    return { loadPayrollDetailRead: payrollRead }
+  })
+  try {
+    const { createTabRestoreValidator: createRestore } = await import('~/lib/tabs/restore-target')
+    const restore = createRestore({ repositories: { payroll: {} } as DomainRepositories, capabilities: () => ['payroll:read'], includeDemo: () => false })
+    const controller = new AbortController()
+    const pending = restore(descriptor('/subcontract/payroll/wage-one?origin=real'), controller.signal)
+    await started
+    controller.abort()
+    release()
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    expect(payrollRead).not.toHaveBeenCalled()
+  }
+  finally {
+    release()
+    vi.doUnmock('~/lib/payroll/platform-read')
+    vi.resetModules()
+  }
+})
+
 function descriptor(fullPath: string): TabDescriptor {
   return { key: fullPath.split('?')[0]!, title: '旧名称', fullPath, origin: 'real', targetVersion: 1, sourceVersion: 'old-version', updatedAt: 1, closable: true }
 }
@@ -345,4 +403,15 @@ describe('页签恢复班组与工人的关联事实', () => {
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
     expect(read).not.toHaveBeenCalled()
   })
+})
+
+it('独立报价冷刷新使用实际只读仓储，失权、缺记录和写态均不能借旧名称恢复', async () => {
+  const path = '/material/quotations/quotation-1?origin=real'
+  const read = vi.fn().mockResolvedValue({ records: [{ id: 'quotation-1', draft: { partyName: '原报价方' } }], meta: { capabilities: ['material-quotation:read'], sourceVersion: 'quotation-v2' } })
+  expect(await validator('materialQuotations', 'list', read, ['material-quotation:read'])(descriptor(path))).toMatchObject({ state: 'resolved', title: '原报价方', sourceVersion: 'quotation-v2', fullPath: path })
+  expect(await validator('materialQuotations', 'list', read, [])(descriptor(path))).toMatchObject({ state: 'forbidden' })
+  expect(read).toHaveBeenCalledTimes(1)
+  read.mockResolvedValue({ records: [], meta: { capabilities: ['material-quotation:read'], sourceVersion: 'quotation-v3' } })
+  expect(await validator('materialQuotations', 'list', read, ['material-quotation:read'])(descriptor(path))).toMatchObject({ state: 'not-found' })
+  expect(inspectRestorableTabPath('/material/quotations/form/quotation-1?origin=real')).toBeNull()
 })

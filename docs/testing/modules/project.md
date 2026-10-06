@@ -8,19 +8,20 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/production/project-pending.test.ts](../../../tests/production/project-pending.test.ts) | 单元／服务／状态 | 成功后响应丢失保留原键，未明确采用已保存内容前不重复添加原件 |
+| [tests/server/project-customer-reference.test.ts](../../../tests/server/project-customer-reference.test.ts) | 单元／服务／状态 | 真实项目客户候选与权限降级 |
+| [tests/project/cost-amounts.test.ts](../../../tests/project/cost-amounts.test.ts) | 单元／服务／状态 | 可空金额归集与真实零 |
+| [tests/production/project-pending.test.ts](../../../tests/production/project-pending.test.ts) | 单元／服务／状态 | 未知结果禁止替换原提交；可靠回执与合法同项目回读共同清理，读取失败只读重试，身份变化及错误目标不解锁 |
 | [tests/production/project-storage.test.ts](../../../tests/production/project-storage.test.ts) | 单元／服务／状态 | 项目与原件同库冷回读，客户改名沿原 ID、未知指标不归零、删除恢复保留原件 |
 | [tests/project/acceptance-lifecycle.test.ts](../../../tests/project/acceptance-lifecycle.test.ts) | 单元／服务／状态 | project acceptance lifecycle read model |
 | [tests/project/archive.test.ts](../../../tests/project/archive.test.ts) | 单元／服务／状态 | 项目档案包导出（Issue #248） |
 | [tests/project/cost-control.test.ts](../../../tests/project/cost-control.test.ts) | 单元／服务／状态 | project cost control read model |
 | [tests/project/data-origin.test.ts](../../../tests/project/data-origin.test.ts) | 单元／服务／状态 | project data-origin boundary |
 | [tests/project/delivery-archive.test.ts](../../../tests/project/delivery-archive.test.ts) | 单元／服务／状态 | project delivery archive read model |
-| [tests/project/detail-aggregate.test.ts](../../../tests/project/detail-aggregate.test.ts) | 单元／服务／状态 | project detail SQL aggregates |
-| [tests/project/detail-summary.test.ts](../../../tests/project/detail-summary.test.ts) | 单元／服务／状态 | 项目详情经营数据（DATABASE.md §4.1） |
+| [tests/project/detail-aggregate.test.ts](../../../tests/project/detail-aggregate.test.ts) | 单元／服务／状态 | 现行归档发票的项目汇总，逐行未知／零／红字与祖先软删及恢复 |
 | [tests/project/expenditure-relations.test.ts](../../../tests/project/expenditure-relations.test.ts) | 单元／服务／状态 | project expenditure relation read model |
 | [tests/project/export.test.ts](../../../tests/project/export.test.ts) | 单元／服务／状态 | 项目台账导出行 |
-| [tests/project/finance-facts.test.ts](../../../tests/project/finance-facts.test.ts) | 单元／服务／状态 | project finance facts read model |
 | [tests/project/finance.test.ts](../../../tests/project/finance.test.ts) | 单元／服务／状态 | 项目列表金额列取值 |
+| [tests/project/management-fee.test.ts](../../../tests/project/management-fee.test.ts) | 单元／服务／状态 | 同库P5冻结归属及P4补退净额，普通工资排除，未知与零、权限与来源证明 |
 | [tests/project/formal-facts.test.ts](../../../tests/project/formal-facts.test.ts) | 单元／服务／状态 | project formal fact boundaries |
 | [tests/project/import-central.test.ts](../../../tests/project/import-central.test.ts) | 单元／服务／状态 | 项目 Excel → 实际存储 → 中央回读 |
 | [tests/project/import-command.test.ts](../../../tests/project/import-command.test.ts) | 单元／服务／状态 | 项目中央逐行导入命令 |
@@ -53,11 +54,15 @@
 | [tests/components/ProjectListScreen.test.ts](../../../tests/components/ProjectListScreen.test.ts) | 组件（jsdom） | project list screen |
 | [tests/components/ProjectListToolbar.test.ts](../../../tests/components/ProjectListToolbar.test.ts) | 组件（jsdom） | project list toolbar |
 | [tests/components/ProjectMasterDataFormFields.test.ts](../../../tests/components/ProjectMasterDataFormFields.test.ts) | 组件（jsdom） | 项目表单字段 |
-| [tests/components/ProjectMetrics.test.ts](../../../tests/components/ProjectMetrics.test.ts) | 组件（jsdom） | 项目详情真实聚合摘要 |
 | [tests/components/ProjectReturnLink.test.ts](../../../tests/components/ProjectReturnLink.test.ts) | 组件（jsdom） | project return link expiry |
-| [tests/components/ProjectSubTableSection.test.ts](../../../tests/components/ProjectSubTableSection.test.ts) | 组件（jsdom） | project subtable section read-only contract |
 | [tests/components/ProjectTaskFiles.test.ts](../../../tests/components/ProjectTaskFiles.test.ts) | 组件（jsdom） | project task files public behavior |
 | [tests/components/ProjectTimeline.test.ts](../../../tests/components/ProjectTimeline.test.ts) | 组件（jsdom） | 独立六阶段组件：任务展开、已确认／已上传／待上传编辑，统一保存与重开回读；当前中央详情未接管该组件 |
+
+## 真实浏览器组件
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/browser/ProjectManagementFees.test.ts](../../../tests/browser/ProjectManagementFees.test.ts) | Vitest Browser／Chromium | 五档视口管理费原净额与未知总额、原单链接、键盘展开及重读、撤权去除旧金额与链接，可证空源保留真实零 |
 
 ## Playwright E2E
 
@@ -87,3 +92,9 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/helpers/project-central-fixture.ts](../../../e2e/helpers/project-central-fixture.ts) | 辅助／夹具 | 每例统一浏览器与请求的隔离会话、关闭 demo、安装固定起点自然推进的时钟；通过项目命令创建筹备／施工输入并返回正式 ID、来源地址与中央回读 |
+
+## 浏览器组件
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/browser/NativeCostUnknown.test.ts](../../../tests/browser/NativeCostUnknown.test.ts) | 浏览器组件 | 五视口Native成本来源缺口、可证小计及键盘 |

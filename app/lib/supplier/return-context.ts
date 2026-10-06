@@ -63,7 +63,7 @@ export function supplierListNavigationStateFromQuery(query: Record<string, unkno
   }
 }
 
-export function createSupplierReturnTo(identity: string, state: SupplierListNavigationState): string {
+export function supplierListNavigationQuery(state: SupplierListNavigationState): Record<string, string> {
   const query = new URLSearchParams()
   if (state.search)
     query.set('search', state.search)
@@ -82,6 +82,11 @@ export function createSupplierReturnTo(identity: string, state: SupplierListNavi
   const columnFilters = parseSupplierColumnFilters(state.columnFilters)
   if (columnFilters)
     query.set('columnFilters', JSON.stringify(columnFilters))
+  return Object.fromEntries(query)
+}
+
+export function createSupplierReturnTo(identity: string, state: SupplierListNavigationState): string {
+  const query = new URLSearchParams(supplierListNavigationQuery(state))
   const anchor = `supplier-row-${encodeURIComponent(identity)}`
   return `${ROUTE}?${query.toString()}#${encodeURIComponent(anchor)}`
 }

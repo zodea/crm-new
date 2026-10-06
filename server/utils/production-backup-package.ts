@@ -3,7 +3,7 @@ import type { ProductionStorage } from './production-storage'
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { copyFile, lstat, mkdir, open, readdir, readFile, realpath, rename, rmdir } from 'node:fs/promises'
-import { isAbsolute, join, resolve } from 'node:path'
+import { isAbsolute, join, resolve, toNamespacedPath } from 'node:path'
 import process from 'node:process'
 import { DatabaseSync } from 'node:sqlite'
 import { backupDigest, backupInvalid, inspectProductionBackup } from './production-backup-manifest'
@@ -77,7 +77,7 @@ export async function createLocalBackup(storage: ProductionStorage, root: string
   const databasePath = join(directory, 'data.sqlite')
   await storage.backupTo(databasePath)
   // Only the new, completed snapshot changes journal mode. The live WAL database is untouched.
-  const standalone = new DatabaseSync(databasePath, { defensive: true })
+  const standalone = new DatabaseSync(toNamespacedPath(databasePath), { defensive: true })
   try {
     if (standalone.prepare('PRAGMA journal_mode=DELETE').get()?.journal_mode !== 'delete')
       backupInvalid('一致副本尚不能独立读取。')

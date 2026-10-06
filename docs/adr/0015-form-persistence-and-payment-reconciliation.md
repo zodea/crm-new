@@ -3,7 +3,7 @@
 > 状态：已采纳（2026-07-19，grill 定稿）
 > 影响：ADR 0014 整页表单、`DC重构设计源码/kit/forms/*.jsx`、`docs/rewrite/DATABASE.md`、`docs/rewrite/pages/finance-payment.md`、issue #116。
 
-> 后续适用边界：本 ADR 的字段与票款分摊原则继续有效；浏览器已迁移领域的保存权威由 [ADR 0020](./0020-browser-authority-and-demo-workspace-boundary.md)接管，不再要求向本地 SQLite 建立平行正式写入。下文“三类”等表述保留 2026-07-19 的决策范围，后续五类支出合同与工人工资例外以 [`DATABASE.md`](../rewrite/DATABASE.md) 和[付款页面契约](../rewrite/pages/finance-payment.md)为准。当前中央命令的实现及持久化证明边界见 [`COMMANDS.md`](../rewrite/COMMANDS.md)，不以本 ADR 的“默认持久化”原则代替实际保存验收。
+> 后续适用边界：本 ADR 保留 2026-07-19 的决策依据、原范围和示例；下文“三类”等表述不作为当前完整规则。现行字段、关系、票款计算及工人工资例外直接以 [`DATABASE.md`](../rewrite/DATABASE.md)为权威，公共保存、原子提交、回执和恢复以 [`COMMANDS.md`](../rewrite/COMMANDS.md)为权威；[付款页面契约](../rewrite/pages/finance-payment.md)只维护交互及领域操作。浏览器已迁移领域的数据归属按 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#read-write-boundaries)，[ADR 0020](./0020-browser-authority-and-demo-workspace-boundary.md)保留相应裁定依据，不向本地 SQLite 建立平行正式写入，也不以本 ADR 的“默认持久化”原则代替实际保存验收。
 
 ## 背景
 

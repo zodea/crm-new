@@ -16,7 +16,7 @@ const detail = computed(() => {
   const current = store.detailState
   if (current.kind === 'ready')
     return current.data
-  if ((current.kind === 'loading' || current.kind === 'error') && current.previous)
+  if ((current.kind === 'loading' || (current.kind === 'error' || current.kind === 'unavailable')) && current.previous)
     return current.previous
   return null
 })
@@ -135,7 +135,7 @@ useTabTitle(() => detail.value?.document.name ?? '分包变洽签详情')
 
       <div v-if="detail" class="space-y-3">
         <StatePanel
-          v-if="store.detailState.kind === 'error'"
+          v-if="(store.detailState.kind === 'error' || store.detailState.kind === 'unavailable')"
           kind="error"
           title="刷新分包变洽签失败"
           :description="`${store.detailState.problem.message}；当前保留上一次成功读取的详情。`"

@@ -16,6 +16,8 @@ import { computed, onMounted } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { isCoreMigrationBlockingIssue } from '~/lib/migration/core-contract'
 import { useCoreMigrationStore } from '~/stores/core-migration'
+import CrewWorkerMigrationPanel from './CrewWorkerMigrationPanel.vue'
+import FinanceMigrationPanel from './FinanceMigrationPanel.vue'
 import MigrationPreflightPanel from './MigrationPreflightPanel.vue'
 import MigrationReconciliationTable from './MigrationReconciliationTable.vue'
 import MigrationSwitchPanel from './MigrationSwitchPanel.vue'
@@ -33,6 +35,7 @@ const entityLabels: Record<CoreMigrationEntityType, string> = {
   projects: '项目',
   construction_contracts: '施工合同',
   subcontract_contracts: '分包合同',
+  material_contracts: '材料采购合同',
   contract_supplements: '补充协议',
   receipt_registrations: '收款登记',
   delivery_records: '送货归档、原件与修订',
@@ -164,6 +167,9 @@ onMounted(() => run(store.hydrate))
         按拓扑顺序迁移客户、分供方、班组、项目、工人和项目分供方关系。所有步骤都需要你明确确认，页面不会在启动时静默迁移。
       </p>
     </header>
+
+    <CrewWorkerMigrationPanel />
+    <FinanceMigrationPanel />
 
     <div
       v-if="nativeUnsupported"

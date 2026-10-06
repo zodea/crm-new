@@ -1,0 +1,4 @@
+import { MATERIAL_QUOTATION_SCHEMA, MATERIAL_QUOTATION_TABLES } from '../../app/lib/material-quotation/schema'
+
+export const PRODUCTION_MATERIAL_QUOTATION_TABLES = MATERIAL_QUOTATION_TABLES
+export const PRODUCTION_MATERIAL_QUOTATION_SCHEMA = `${MATERIAL_QUOTATION_SCHEMA}\nINSERT INTO production_participants VALUES('material-quotations',1);`

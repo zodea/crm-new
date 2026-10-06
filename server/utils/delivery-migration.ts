@@ -101,6 +101,9 @@ export function prepareDeliveryMigration(current: DeliveryState, snapshot: CoreM
   let changed = false
   for (const record of state.records.values()) {
     if (record.migrationBatchId && (record.migrationBatchId !== snapshot.activeBatchId || !incoming.has(record.id))) {
+      const baseline = state.revisions.get(record.id)?.find(revision => revision.action === 'migration')
+      if (!baseline || baseline.version !== record.version || [...state.commands.values()].some(command => command.result.id === record.id))
+        throw deliveryProblem('conflict', '迁入送货记录已有后来修改、打印或原件变更，不能回滚移除')
       state.records.delete(record.id)
       state.legacyOriginals.delete(record.id)
       state.revisions.delete(record.id)
@@ -144,7 +147,6 @@ export function prepareDeliveryMigration(current: DeliveryState, snapshot: CoreM
     const key = deliveryNaturalKey(record)
     record.naturalKeyDuplicate = !!key && [...state.records.values()].filter(other => !other.deletedAt && deliveryNaturalKey(other) === key).length > 1
   }
-  state.commands = new Map([...state.commands].filter(([, command]) => state.records.has(command.result.id)))
   if (changed)
     state.version++
   return { state, changed }

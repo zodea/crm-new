@@ -1,13 +1,13 @@
 import { visibleCond } from '../db/soft-delete'
 
 const CONFIRMED_SETTLEMENT_STATUSES: readonly string[] = ['confirmed', '已确认']
-const INEFFECTIVE_EXPENDITURE_CONTRACT_STATUSES: readonly string[] = ['draft', '草稿', '无效', '作废', 'cancelled']
+const INEFFECTIVE_EXPENDITURE_CONTRACT_STATUSES: readonly string[] = ['draft', '草稿', '无效', '作废', '已作废', 'cancelled']
 
 /** 固定领域枚举生成的 SQL 值列表，不接受外部输入。 */
 export const CONFIRMED_SETTLEMENT_SQL_VALUES = CONFIRMED_SETTLEMENT_STATUSES.map(status => `'${status}'`).join(', ')
 export const INEFFECTIVE_EXPENDITURE_CONTRACT_SQL_VALUES = INEFFECTIVE_EXPENDITURE_CONTRACT_STATUSES.map(status => `'${status}'`).join(', ')
 
-/** 支出合同保留全部状态供追溯，只有有效合同进入分供方金额汇总。 */
+/** 只筛有效签约和价格；已确认结算及实付款沿各自事实资格保留，不套合同状态。 */
 export function isEffectiveExpenditureContract(status: string): boolean {
   return !INEFFECTIVE_EXPENDITURE_CONTRACT_STATUSES.includes(status)
 }

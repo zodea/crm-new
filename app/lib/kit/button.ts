@@ -1,6 +1,6 @@
 export type KitButtonPhase = 'default' | 'loading' | 'success'
 
-// 五变体层级（DESIGN-TASTE §4.2）：secondary 缺省安静按钮 → primary 区块内主操作 → accent 每屏一枚章
+// 五变体层级（KitUI §06）：secondary 缺省安静按钮 → primary 区块内主操作 → accent 每屏一枚章
 export type KitButtonVariant = 'secondary' | 'primary' | 'accent' | 'ghost' | 'danger'
 
 // Kit 层叫 danger（业务语义），shadcn 底座叫 destructive——唯一需要换名的档位

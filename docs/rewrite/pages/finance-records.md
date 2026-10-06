@@ -1,7 +1,7 @@
 # 支付记录 — 银行实际支付 + 申请分摊
 
-> 表单蓝本：`payRecordForm`，领域规则以 ADR 0015 为准
-> 持久化权威：`DATABASE.md` 的 `payment_records` / `payment_record_application_allocations`
+> 表单蓝本：`payRecordForm`；[ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md)保留历史决策依据
+> 领域事实权威：[DATABASE 支付事实](../DATABASE.md#entity-payment-record)；公共写入与恢复：[COMMANDS](../COMMANDS.md#command-envelope)
 
 ## 定位
 
@@ -22,12 +22,9 @@
 
 ## 确认规则
 
-- 状态至少区分待识别、待核对、已确认。
-- 已确认前，金额、日期、收款方、银行流水和回单必须经人工核对。
-- `Σ 本次支付分摊金额 = 支付金额`；同一有效银行流水号不得重复。
-- 未确认支付不进入合同已付、付款申请累计已付、项目支出或资金余额。
+确认资格、分摊、流水号及现金计入规则统一见 [DATABASE 的支付事实与 PAY-08](../DATABASE.md#entity-payment-record)。本页分别呈现待识别、待核对和已确认的原支付记录；人工对照实际金额、日期、收款方、银行流水及回单后执行原确认动作，校验失败显示具体源单或金额原因，保留已输入草稿。
 
-历史未知批复的新增确认，已确认目标是先核实业务再确认，材料相关冲突先查送货单及合同超量处理；具体核验、单据承接与实现差距只在 [DATABASE 的 PAY-08](../DATABASE.md#entity-payment-record)维护。本页的既有确认规则不表示该目标门槛已经实现。
+关联历史未知批复的申请时，先在原[付款申请页面](./finance-payment.md#6-审批与支付)完成当前业务核验，再返回原支付记录确认。核验缺失、依据变化或真实来源未接通时不把草稿称为已确认现金；既有确认实付继续按原事实读取。写入、原命令核对和保存后读失败直接见 [COMMANDS](../COMMANDS.md#f3-finance-payment-verification)。
 
 ## 验收
 
@@ -41,4 +38,4 @@
 
 2026-08-13 的小规模本地样本中，通用列表仅展示项目、关联方、金额、日期和状态；[#413](https://github.com/zodea/crm-new/issues/413) 须按当前提交重新核实专属列表和中央接入，不能据历史记录宣称当前完整或仍未完成。专属读模型至少返回 `id/no/paymentDate/amount/paymentMethod/payeeName/payeeAccount/payeeBank/payeeBankAccount/createdBy/createdAt/confirmationStatus/source`，详情另返回 `applicationAllocations`；敏感账号按权限脱敏，不能用空字符串冒充完整账号。
 
-支付编号主链接进入只读详情，详情展示银行事实、OCR/手录来源、人工确认、回单和付款申请分摊；编辑或撤回确认使用显式动作。付款申请、项目与分供方链接只读取真实 ID，确认状态、唯一流水和分摊守恒继续以 ADR 0015 为权威。
+支付编号主链接进入只读详情，详情展示银行事实、OCR/手录来源、人工确认、回单和付款申请分摊；编辑或撤回确认使用显式动作。付款申请、项目与分供方链接只读取真实 ID，确认状态、唯一流水和分摊守恒直接沿 [DATABASE 支付事实](../DATABASE.md#entity-payment-record)。

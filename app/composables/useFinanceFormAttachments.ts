@@ -6,7 +6,8 @@ import type {
   FileRefRecord,
 } from '~/lib/forms/file-refs'
 import { isTauri } from '@tauri-apps/api/core'
-import { computed, readonly, shallowRef } from 'vue'
+import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
+import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
 
 export type PendingFinanceAttachment = FileRefDraft & { localId: string }
@@ -18,6 +19,15 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
   const pendingRemoveIds = shallowRef<string[]>([])
   const pendingRestoreIds = shallowRef<string[]>([])
   const desktopAttachmentPicker = shallowRef(isTauri())
+  const readingFiles = shallowRef(false)
+  let fileGeneration = 0
+
+  function invalidatePreparation() {
+    ++fileGeneration
+    readingFiles.value = false
+  }
+  watch(kind, invalidatePreparation, { flush: 'sync' })
+  onScopeDispose(invalidatePreparation)
 
   const dirty = computed(() =>
     pendingAttachments.value.length > 0
@@ -26,6 +36,7 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
   )
 
   function clearPending() {
+    invalidatePreparation()
     pendingAttachments.value = []
     pendingRemoveIds.value = []
     pendingRestoreIds.value = []
@@ -36,11 +47,34 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
     clearPending()
   }
 
-  function changes(): FileRefChanges {
+  function capture() {
+    return JSON.parse(JSON.stringify({ add: pendingAttachments.value, removeIds: pendingRemoveIds.value, restoreIds: pendingRestoreIds.value })) as { add: PendingFinanceAttachment[], removeIds: string[], restoreIds: string[] }
+  }
+
+  function acknowledge(files: FileRefRecord[], sent: ReturnType<typeof capture>, addedIds: readonly string[] = []) {
+    // Compare the user's current intent with the persisted state, including an undone
+    // removal/restoration while the write was pending.
+    const desired = new Map(attachments.value.map(file => [file.id, file.deletedAt
+      ? pendingRestoreIds.value.includes(file.id)
+      : !pendingRemoveIds.value.includes(file.id)]))
+    const submitted = new Map(sent.add.map(file => [file.localId, JSON.stringify(file)]))
+    for (const [index, file] of sent.add.entries()) {
+      const current = pendingAttachments.value.find(item => item.localId === file.localId)
+      const id = addedIds[index]
+      if (id)
+        desired.set(id, Boolean(current && JSON.stringify(current) === JSON.stringify(file)))
+    }
+    pendingAttachments.value = pendingAttachments.value.filter(file => submitted.get(file.localId) !== JSON.stringify(file))
+    pendingRemoveIds.value = files.filter(file => !file.deletedAt && desired.get(file.id) === false).map(file => file.id)
+    pendingRestoreIds.value = files.filter(file => file.deletedAt && desired.get(file.id) === true).map(file => file.id)
+    attachments.value = files
+  }
+
+  function changes(sent = capture()): FileRefChanges {
     return {
-      add: pendingAttachments.value.map(({ localId: _localId, ...file }) => file),
-      removeIds: pendingRemoveIds.value,
-      restoreIds: pendingRestoreIds.value,
+      add: sent.add.map(({ localId: _localId, ...file }) => file),
+      removeIds: [...sent.removeIds],
+      restoreIds: [...sent.restoreIds],
     }
   }
 
@@ -54,40 +88,59 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
       warning(`最多保留 ${max} 份附件，本次只加入前 ${available} 份`)
     pendingAttachments.value = [
       ...pendingAttachments.value,
-      ...files.slice(0, available).map((file, index) => ({
+      ...files.slice(0, available).map(file => ({
         ...file,
-        localId: `${file.filePath || file.fileName}-${Date.now()}-${index}`,
+        localId: crypto.randomUUID(),
         category: file.category || (kind.value === 'payment_record' ? '付款回单' : '业务附件'),
       })),
     ]
   }
 
-  function handleFiles(files: File[]) {
-    append(files.map(file => ({
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
-    })))
+  async function handleFiles(files: File[]) {
+    const generation = ++fileGeneration
+    readingFiles.value = true
+    try {
+      const drafts = await Promise.all(files.map(file => fileRefDraftFromFile(file)))
+      if (generation === fileGeneration)
+        append(drafts)
+    }
+    catch (cause) {
+      if (generation === fileGeneration)
+        error(`附件读取失败：${toErrorMessage(cause)}`)
+    }
+    finally {
+      if (generation === fileGeneration)
+        readingFiles.value = false
+    }
   }
 
   async function pickNativeFiles() {
+    const generation = ++fileGeneration
+    readingFiles.value = true
     try {
-      const [{ open }, { stat }, { basename }] = await Promise.all([
+      const [{ open }, { readFile }, { basename }] = await Promise.all([
         import('@tauri-apps/plugin-dialog'),
         import('@tauri-apps/plugin-fs'),
         import('@tauri-apps/api/path'),
       ])
       const selected = await open({ multiple: true, directory: false })
+      if (generation !== fileGeneration)
+        return
       const paths = selected == null ? [] : Array.isArray(selected) ? selected : [selected]
-      const files = await Promise.all(paths.map(async filePath => ({
-        fileName: await basename(filePath),
-        filePath,
-        fileSize: (await stat(filePath)).size,
-      })))
-      append(files)
+      const files = await Promise.all(paths.map(async (filePath) => {
+        const bytes = await readFile(filePath)
+        return { ...await fileRefDraftFromFile(new File([bytes], await basename(filePath))), filePath }
+      }))
+      if (generation === fileGeneration)
+        append(files)
     }
     catch (cause) {
-      error(`选择附件失败：${toErrorMessage(cause)}`)
+      if (generation === fileGeneration)
+        error(`选择附件失败：${toErrorMessage(cause)}`)
+    }
+    finally {
+      if (generation === fileGeneration)
+        readingFiles.value = false
     }
   }
 
@@ -124,6 +177,10 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
     pendingRestoreIds: readonly(pendingRestoreIds),
     desktopAttachmentPicker: readonly(desktopAttachmentPicker),
     dirty,
+    readingFiles: readonly(readingFiles),
+    invalidatePreparation,
+    capture,
+    acknowledge,
     reset,
     clearPending,
     changes,

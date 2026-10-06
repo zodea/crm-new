@@ -3,21 +3,27 @@ import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
 import { projectSupplierProblemFromUnknown } from '~/lib/project-supplier/repository'
-
-function previous(state: ReadState<ProjectSupplierWorkbenchReadDTO>) {
-  return state.kind === 'ready' || state.kind === 'empty' || state.kind === 'partial'
-    ? state.data
-    : state.kind === 'loading' || state.kind === 'error' ? state.previous : null
-}
+import { bindReadAuthority } from '~/lib/read-model/authority'
+import { readStateData as previous, readFailureState } from '~/lib/read-model/state'
 
 export const useProjectSupplierReadStore = defineStore('project-supplier-read', () => {
   const repository = useNuxtApp().$repositories.projectSupplierRead
   const state = shallowRef<ReadState<ProjectSupplierWorkbenchReadDTO>>({ kind: 'idle' })
   let latest = 0
+  let previousQuery: ProjectSupplierWorkbenchQueryDTO | null = null
+  bindReadAuthority((problem) => {
+    latest++
+    previousQuery = null
+    state.value = readFailureState<ProjectSupplierWorkbenchReadDTO>(problem, null)
+  })
 
   async function load(query: ProjectSupplierWorkbenchQueryDTO) {
     const request = ++latest
-    const prior = previous(state.value)
+    const prior = previousQuery?.projectId === query.projectId && previousQuery.supplierId === query.supplierId
+      && previousQuery.origin === query.origin && previousQuery.includeDemo === query.includeDemo
+      ? previous(state.value)
+      : null
+    previousQuery = { ...query }
     state.value = { kind: 'loading', previous: prior }
     try {
       const data = await repository.get(query)
@@ -32,14 +38,7 @@ export const useProjectSupplierReadStore = defineStore('project-supplier-read', 
       if (request !== latest)
         return
       const { problem } = projectSupplierProblemFromUnknown(cause)
-      if (problem.code === 'forbidden')
-        state.value = { kind: 'forbidden', problem }
-      else if (problem.code === 'not-found')
-        state.value = { kind: 'not-found', problem }
-      else if (problem.code === 'relationship-mismatch')
-        state.value = { kind: 'mismatch', problem }
-      else
-        state.value = { kind: 'error', problem, previous: prior }
+      state.value = readFailureState(problem, prior)
     }
   }
 

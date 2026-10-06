@@ -15,6 +15,7 @@ export interface DeliveryPriceLineInput {
   unit: string
   unitPrice: number | null
   amount: number | null
+  qty?: number | null
   /** 识别/导入后的当前单价是否已由人工确认。 */
   currentValueConfirmed: boolean
   originalOcrUnitPrice?: number | null
@@ -24,6 +25,8 @@ export interface DeliveryPriceLineInput {
 export interface DeliveryPriceRecordInput {
   dataOrigin?: 'real' | 'demo'
   id: string
+  version?: string
+  assetId?: string | null
   projectId: string
   supplierId: string | null
   orderNo: string
@@ -107,7 +110,7 @@ export interface MaterialContractInput {
   projectId: string
   name: string
   no: string
-  amount: number
+  amount: number | null
   signDate: string
 }
 
@@ -116,7 +119,7 @@ export interface SupplierContractDetail {
   id: string
   name: string
   no: string
-  amount: number
+  amount: number | null
   signDate: string
 }
 
@@ -127,7 +130,7 @@ export interface SupplierContractRow {
   projectId: string
   projectName: string
   contractCount: number
-  totalAmount: number
+  totalAmount: number | null
   contracts: SupplierContractDetail[]
 }
 
@@ -188,6 +191,21 @@ function isValidPrice(value: number | null): value is number {
   return value != null && Number.isFinite(value) && value > 0
 }
 
+export function hasConfirmedDeliveryPriceSource(record: DeliveryPriceRecordInput): boolean {
+  return record.archived && Boolean(record.supplierId) && Boolean(record.projectId)
+    && Boolean(record.deliveryDate.trim()) && record.reviewStatus === 'reviewed'
+    && (record.ocrStatus === 'done' || record.ocrStatus === 'reviewed')
+    && !record.naturalKeyDuplicate && record.currentValuesConfirmed && record.hasSourceFile
+}
+
+/** Zero is visible in an original-price projection; the established trend still requires positive samples. */
+export function hasConfirmedMaterialPriceLine(line: DeliveryPriceLineInput, includeZero = false): boolean {
+  const validPrice = isValidPrice(line.unitPrice) || (includeZero && line.unitPrice === 0)
+  return Boolean(line.id.trim()) && Boolean(normalizeText(line.materialName))
+    && Boolean(normalizeText(line.unit)) && !NON_MATERIAL_CHARGE.test(normalizeText(line.materialName))
+    && validPrice && line.amount != null && line.currentValueConfirmed
+}
+
 export function buildMaterialPriceCatalog(
   records: readonly DeliveryPriceRecordInput[],
   suppliers: readonly PricePartyInput[],
@@ -198,18 +216,7 @@ export function buildMaterialPriceCatalog(
   const byMaterial = new Map<string, MaterialPriceCatalogItem>()
 
   for (const record of records) {
-    if (
-      !record.archived
-      || !record.supplierId
-      || !record.projectId
-      || !record.deliveryDate.trim()
-      || record.reviewStatus !== 'reviewed'
-      // 识别工作区以 done 表示识别完成；归档库历史字段以 reviewed 表示人工核对终态。
-      || (record.ocrStatus !== 'done' && record.ocrStatus !== 'reviewed')
-      || record.naturalKeyDuplicate
-      || !record.currentValuesConfirmed
-      || !record.hasSourceFile
-    ) {
+    if (!hasConfirmedDeliveryPriceSource(record) || !record.supplierId) {
       continue
     }
     const supplierName = supplierNames.get(record.supplierId)
@@ -218,15 +225,7 @@ export function buildMaterialPriceCatalog(
 
     for (const line of record.lines) {
       const name = normalizeText(line.materialName)
-      if (
-        !line.id.trim()
-        || !name
-        || !normalizeText(line.unit)
-        || NON_MATERIAL_CHARGE.test(name)
-        || !isValidPrice(line.unitPrice)
-        || line.amount == null
-        || !line.currentValueConfirmed
-      ) {
+      if (!hasConfirmedMaterialPriceLine(line) || !isValidPrice(line.unitPrice)) {
         continue
       }
 
@@ -396,7 +395,9 @@ export function buildSupplierContractRows(
       contracts: [],
     }
     row.contractCount += 1
-    row.totalAmount += Number.isFinite(contract.amount) ? contract.amount : 0
+    row.totalAmount = row.totalAmount === null || contract.amount === null || !Number.isFinite(contract.amount)
+      ? null
+      : row.totalAmount + contract.amount
     row.contracts.push({
       id: contract.id,
       dataOrigin: contract.dataOrigin,

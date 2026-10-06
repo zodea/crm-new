@@ -1,10 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createReceiptRepository } from '../../app/lib/receipt/repository'
 import { createReceiptCommandTestInstance } from '../../server/utils/receipt-command-test-instance'
 import { createReceiptReadService } from '../../server/utils/receipt-read-service'
 import { command, draft, references, session } from './fixtures'
 
 describe('普通收款中央读模型与 Repository', () => {
+  it('原收款核对只上传原键，回执和未应用证明均严格匹配；未知结果继续保留恢复', async () => {
+    const result = { id: 'receipt-1', commandId: 'receipt-original', version: '1', updatedAt: '2026-10-04T00:00:00.000Z', attachmentIds: [] }
+    const fetcher = vi.fn().mockResolvedValue({ outcome: 'applied', result })
+    const repository = createReceiptRepository(fetcher)
+    await expect(repository.resolve('receipt-original')).resolves.toEqual({ outcome: 'applied', result })
+    expect(fetcher).toHaveBeenCalledWith('/api/commands/receipts/resolve', { method: 'POST', body: { commandId: 'receipt-original' } })
+    fetcher.mockResolvedValue({ outcome: 'not-applied', commandId: 'receipt-original' })
+    await expect(repository.resolve('receipt-original')).resolves.toEqual({ outcome: 'not-applied', commandId: 'receipt-original' })
+    for (const invalid of [{ outcome: 'not-applied', commandId: 'another-command' }, { outcome: 'unknown' }, { outcome: 'applied', result: { ...result, commandId: 'another-command' } }, { outcome: 'applied', result: { ...result, id: '' } }, { outcome: 'applied', result: { ...result, version: '' } }, { outcome: 'applied', result: { ...result, updatedAt: 'invalid' } }]) {
+      fetcher.mockResolvedValue(invalid)
+      await expect(repository.resolve('receipt-original')).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    }
+    fetcher.mockRejectedValue({ statusCode: 404 })
+    await expect(repository.resolve('receipt-original')).rejects.toBeDefined()
+  })
   it('repository 按本次来源查询拒绝串入的演示行、候选与累计，显式启用后才接收', async () => {
     const commands = createReceiptCommandTestInstance({ references: () => references })
     const saved = commands.execute(command(), session)

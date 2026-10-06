@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { validateConstructionContractDetailReturnTo, validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
+import { validateConstructionContractDetailReturnTo, validateConstructionContractProjectReturnTo, validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 
 describe('施工合同详情返回上下文', () => {
+  it('项目返回须匹配当前真实project稳定ID和来源，编辑保留同一受限项目来源', () => {
+    const project = '/project/project-1?origin=real'
+    expect(validateConstructionContractProjectReturnTo(project, 'project-1', 'real')).toBe(project)
+    expect(validateConstructionContractProjectReturnTo(project, 'project-2', 'real')).toBeNull()
+    expect(validateConstructionContractProjectReturnTo(project, 'project-1', 'demo')).toBeNull()
+    expect(validateConstructionContractProjectReturnTo(project, null, 'real')).toBeNull()
+    expect(validateConstructionContractProjectReturnTo('https://outside.invalid/project/project-1?origin=real', 'project-1', 'real')).toBeNull()
+    const detail = `/contract/main-1?origin=real&contractKind=construction&returnTo=${encodeURIComponent(project)}`
+    expect(validateConstructionContractDetailReturnTo(detail, 'real')).toBe(detail)
+  })
   it('显式编辑和保存往返保留合法页签、补充协议聚焦及列表来源', () => {
     const list = '/contract/construction?origin=real&noise=ignored&nav=origin_320_detail#construction-contract-row-real%3Acontract-1'
     const canonicalList = '/contract/construction?origin=real&nav=origin_320_detail#construction-contract-row-real%3Acontract-1'

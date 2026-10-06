@@ -60,12 +60,12 @@ flowchart LR
 interface ReferenceInsightRequest {
   metadata: { key: string }
   records: Array<{
-    record: { id: string; metadataKey: string }
+    record: { id: string, metadataKey: string }
     related: unknown[]
     treeRelated: unknown[]
   }>
   position: 'detail' | 'upsert'
-  approvalContext?: { processDefinitionId: string; activityId: string }
+  approvalContext?: { processDefinitionId: string, activityId: string }
 }
 
 interface ReferenceInsightResult {
@@ -96,18 +96,18 @@ interface ReferenceInsightResult {
 2. 当前业务层：合同付款情况、结算/发票情况。每组是可折叠指标区，不堆叠成多个大卡片。
 3. 跨域报表层：项目维度和分供方维度的应付管理表。表头固定，只有表格区域横向滚动；行的蓝色目标必须来自 `NavigationIntentDTO`，无稳定目标时整行保持普通文本。
 
-每层独立使用 `ReadState`：
+每层独立展示读取状态，并另外展示计算完整性与授权范围；三者的唯一契约见 [READ-MODELS](./READ-MODELS.md#read-status-and-completeness)。历史 `ReadState.partial` 已退役；现行 adapter 使用独立 `unavailable` 和 `unauthenticated` 问题码，计算 `partial` 及授权范围分别按该契约呈现：
 
 | 状态 | 呈现 |
 | --- | --- |
 | loading | 分区骨架，不清空其他已就绪层 |
-| ready + rows | 指标或表格；金额保留定点字符串语义 |
-| ready + empty | 保留分区标题和表头，说明无记录、无匹配规则或无当前关系 |
-| partial | 显示已授权范围及缺失说明；汇总与行使用同一权限范围 |
+| 成功读取且有数据 | 指标或表格；金额保留定点字符串语义 |
+| 成功读取且真实空集 | 保留分区标题和表头，说明无记录、无匹配规则或无当前关系 |
+| 就绪但计算不完整 / 授权范围受限 | 分别标明缺失来源与可见范围；已知小计不冒充完整总额，汇总与行使用同一权限范围 |
 | forbidden | 不泄露行数、金额或对象名称，只显示无权读取该分区 |
 | error | 仅该分区失败并可重试，不把整个详情改成错误页 |
 
-缓存必须拆层：当前单据/合同按 `subject.id + sourceVersion`；跨项目/企业可见报表按 `report.key + visibility fingerprint + asOf + sourceVersion`。页签多少、当前项目名称和上一张付款单都不能进入缓存身份。
+宿主按 [READ-MODELS 的分层缓存身份](./READ-MODELS.md#insight-cache-identity)消费当前单据/合同指标及跨项目报表；工作区、操作者、来源、授权范围和来源版本不由页签呈现状态替代。
 
 ## 4. 全局审批与抄送消息
 
@@ -132,7 +132,9 @@ flowchart LR
 - 导航渲染失败不回滚已读事实；保留消息和明确的“重试打开”即可。重复打开幂等，不重新增加未读数。
 - 抽屉的“全部已读”是显式批量命令；删除消息不属于首版服务器事件协议，现有前端删除按钮必须在迁移时移除或另行建立归档命令。
 - 实时通道只负责提示有变化；启动、断线重连和窗口重新获得焦点后均以分页事件流及服务器未读计数对账。SQLite adapter 与 HTTP adapter 使用相同 `eventId/readAt/permissionState` 语义。
-- `app/stores/notifications.ts` 当前静态样本只在服务端授权后的演示模式展示；正式来源在后台事件未接入时显示真实空态。事件接入后仍按来源隔离，演示 fixture 不得成为正式运行 fallback；可见性遵守 ADR 0020。
+- `app/stores/notifications.ts` 静态样本只在服务端授权后的演示模式展示。本机中央证照提醒通过正式事件 Repository、原子已读命令、启动与焦点分页对账进入壳层；其他运行环境或未接领域明确显示来源尚未就绪。演示 fixture 不得成为正式运行 fallback；可见性遵守 ADR 0020。
+
+证照主动预警复用此 inbox 宿主：supplier owner 保存稳定问题事实，public notifications owner 在同一中央库保存事件、每 actor 已读与原命令结果；壳层只建立一份对账及 system 提示。提示关闭时间只保存在本地最小呈现记录；已读提交、采用集合与原编号恢复直接遵循 [COMMANDS](./COMMANDS.md#notification-read-commands)。业务持续警告规则只在 [READ-MODELS](./READ-MODELS.md#supplier-expiry-warnings)维护，不由已读动作解除资料问题。
 
 ## 5. 业务页签、恢复与性能
 
@@ -142,6 +144,8 @@ flowchart LR
 - 横向溢出继续由前后翻页、滚轮横移、活动页签自动滚入视口和“当前页签数量”承担；达到上限只阻断新页签，已存在页签仍可复用。
 - 浏览器已按当前工作区与用户隔离持久化版本化 `TabDescriptor`，字段契约见 [`restoration-contract.ts`](../../app/lib/tabs/restoration-contract.ts)。只记录位置、来源、协议版本及已知源版本，不序列化 Vue 实例、请求、抽屉状态、表单草稿或页面数据。启动时只挂载活动页；其他恢复页签在首次激活时校验和加载。
 - 可恢复：列表、工作台、稳定 ID 的只读详情。默认不恢复 `/new`、`/form`、`/edit`、导入映射和未保存写态；这些页面必须先有独立草稿协议，不能靠浏览器刷新保存表单。
+- `/settings/our-signatories` 只恢复目录阅读入口，并重新核当前目录能力；其整页编辑以及班组/工人整页编辑仅在有合法最小原命令描述时保留精确启动 URL，用于核对原编号。未保存正文不加入页签 descriptor，统一原命令恢复规则见 [COMMANDS](./COMMANDS.md#idempotency-and-recovery)。
+- 已接公共原命令恢复的表单与领域迁入页，在具有合法最小原提交描述时保留精确启动地址，由所属 owner 核对原编号。实际 family、动作与身份契约只见 [COMMANDS](./COMMANDS.md#idempotency-and-recovery)；写态正文仍不进入 `TabDescriptor`，没有合法原编号时按普通写态回退。
 - 浏览器刷新恢复最近持久化的可恢复页签及活动项；若活动项不可恢复，则回退最近一个可恢复页签，再回首页。页签内“刷新当前页”只失效活动页缓存，保留页签集合、活动路由和其他页签状态。
 - 页签关闭、关闭其他、关闭右侧和关闭全部必须同步删除对应 descriptor 与缓存；恢复列表仍受 15 上限约束，超出的旧数据按 `updatedAt` 取最近 15 个并记录一次可诊断迁移结果。
 - 恢复使用显式阅读入口白名单；只读详情通过当前 Repository 核对稳定身份、canonical kind、来源、关系与能力，再交唯一 Target Registry。源版本变化以当前读取结果更新，未知版本保留未知；未接入读取的详情返回 `not-connected`，不借用旧实体或演示数据。
@@ -161,7 +165,7 @@ flowchart LR
 | 能力 | 已有基础 | 必须补齐 |
 | --- | --- | --- |
 | 洞察 | 付款详情已有真实 SQLite 派生的审批、结算、发票、支付四类检查 | 增加可用性 adapter、浮动入口、可关闭 Sheet、三层 DTO、跨项目/分供方表格、权限/版本/统计时点与分层缓存；付款界面实施归支出财务票 |
-| 消息 | 顶栏角标、响应式消息 Sheet、搜索/分类和 Pinia store 已有；样本已隔离到授权演示模式 | 建立正式事件 repository、传输无关 adapter、system toast 扇出、幂等对账及原子打开命令；目标统一走 target registry，演示不充当正式来源 |
+| 消息 | 本机证照事件 Repository、磁盘已读及原命令、启动补算、壳层分页幂等对账、system 提示与响应式 Sheet 已接；真实零/来源不可用和演示分别呈现；目标统一走 target registry | 其他审批/抄送领域事件和实时变化通道未接入，不能用已有样本宣称全域通知完成；首次真实写入仍依生产门禁 |
 | 页签 | 15 上限、同路径复用、KeepAlive、滚动翻页、批量关闭、活动页刷新，以及浏览器描述符恢复、写态排除、迁移与失败回退已实现（#435） | 缺失领域只读恢复入口、全域后台页暂停和 Tauri 恢复；本轮不改变上限 |
 
 在线正式写入权威已由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)裁定；命令、冲突和失败草稿以 [`COMMANDS.md`](./COMMANDS.md) 为准，通用离线 outbox 与自动回放仍不在范围内。旧决策票不再是等待重新选择写入权威的前置；当前缺口按[模块复核规程](../agents/module-review.md)形成具体实施票，不用随机数据、私有接口复制或第二套状态词汇填空。
@@ -169,6 +173,6 @@ flowchart LR
 ## 7. 验收覆盖
 
 - 单元：洞察挂载 resolver、可用/无配置/无权限/失败；缓存键；`eventId` 去重；原子打开；15 上限与恢复迁移。
-- 组件：浮动入口延迟出现；抽屉三层的 loading/empty/partial/forbidden/error；390/768/1024/1440px；蓝色行仅在目标 resolved 时可达；toast 关闭不已读；消息抽屉打开不批量已读。
+- 组件：浮动入口延迟出现；抽屉三层的加载/空/无权/错误及独立完整性、授权范围；390/768/1024/1440px；蓝色行仅在目标 resolved 时可达；toast 关闭不已读；消息抽屉打开不批量已读。
 - E2E：付款详情切换不串指标；材料合同与开票详情不误挂；实时事件只产生一份 toast/未读/抽屉记录；无权限目标保留消息；应用刷新与浏览器刷新语义不同；15 页签溢出、关闭和恢复；后台页无重复洞察/通知请求。
 - 数据：SQLite 与 HTTP fixture 对同一 DTO 做契约测试；空表、权限裁剪、规则版本变化、事件重投和断线对账均使用确定性 fixture，禁止 MockJS 与随机值。

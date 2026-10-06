@@ -52,7 +52,7 @@ export function createBoqBuildingRepository(fetcher: BoqBuildingFetcher) {
           invalid()
         }
         return structuredClone(value) as unknown as BoqBuildingResult
-      })
+      }, frozen.commandId)
     },
   }
 }

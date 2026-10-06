@@ -8,37 +8,37 @@
 - 路由由前端矩阵生成；后台只返回实体引用、语义化目标和筛选 ID，不返回 Vue 路由字符串。
 - 新增/编辑仍走独立整页表单；关系主链接优先进入只读详情。当前只有表单路由的对象标为“读写混用”，不能宣称隐藏详情已闭合。
 - `0`、空列表、缺关系、权限不可见和加载失败是不同状态。聚合值为 `0` 时，只要后端明确返回可用下钻目标，入口仍可进入真实空列表；不得用金额是否为零猜可点击性。
-- 本文覆盖 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 登记的业务页面域及应用壳公共入口；当前对象、动态 kind 与无独立路由的场景按[复核基线](https://github.com/zodea/crm-new/issues/403)核对。延续现有业务范围，不新增保证金、备用金及参考站独有统计模块。
+- 本文覆盖 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 登记的业务页面域及应用壳公共入口；当前对象、动态 kind 与无独立路由的场景按[复核基线](https://github.com/zodea/crm-new/issues/403)核对。A02 已确认的保证金、备用金等真实现金来源由 [DATABASE](./DATABASE.md#410-资金计算)维护，无独立路由不表示排除其业务事实；本文不据参考站菜单新增未经确认的页面或统计模块。
 
 ## 2. 导航意图合同
 
 `EntityRefDTO` 负责身份，`NavigationIntentDTO` 负责“去哪里看”。多态单据必须带 canonical `variant`；例如只有 `entity='material-document' + variant='arrival'` 才能选择到货详情，不能按编号前缀或名称猜类型。
 
 ```ts
-type NavigationIntentDTO =
+type NavigationIntentDTO
+  = | {
+    kind: 'entity-detail' | 'entity-subview' | 'source-record'
+    subject: EntityRefDTO
+    variant: string | null
+    view: string | null
+    filters: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
+  }
   | {
-      kind: 'entity-detail' | 'entity-subview' | 'source-record'
-      subject: EntityRefDTO
-      variant: string | null
-      view: string | null
-      filters: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
-    }
+    kind: 'entity-list'
+    entity: EntityKindDTO
+    variant: string | null
+    view: string | null
+    filters: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
+  }
   | {
-      kind: 'entity-list'
-      entity: EntityKindDTO
-      variant: string | null
-      view: string | null
-      filters: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
-    }
+    kind: 'same-route-overlay'
+    subject: EntityRefDTO
+    view: string
+  }
   | {
-      kind: 'same-route-overlay'
-      subject: EntityRefDTO
-      view: string
-    }
-  | {
-      kind: 'unavailable'
-      reason: 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target' | 'error'
-    }
+    kind: 'unavailable'
+    reason: 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target' | 'error'
+  }
 ```
 
 约束：
@@ -56,6 +56,8 @@ type NavigationIntentDTO =
 当前项目切片已经把 `resolved`、`missing`、`forbidden`、`not-connected`、`unverified-target` 和 `error` 分成稳定展示状态；未登记目标不会回退到 `/project` 或按名称猜路由。项目 ID 存在但 URL 来源不一致时显示 `relationship-mismatch`，不存在时显示 `not-found`，两者都不展示同名详情。#313 已补齐项目列表筛选、排序、页码、每页条数、应用页签、行锚点、滚动和焦点的 `returnTo` 往返合同；#289 的父级联合验收同时运行 #312 / #313，固定验证带完整来源 query 的稳定详情链接及键盘激活后的精确恢复。
 
 ### 2.1 返回上下文
+
+我方主体设置入口 `/settings/our-signatories` 为中央目录读取，具 `our-signatory:read` 才展示目录；新增/编辑使用 `/settings/our-signatories/form[/id]` 独立整页表单，保存能力为 `our-signatory:write`。合同选择中的“维护主体目录”进入该集中设置位置，主体名称不是导航 ID。独立 Native 缺一致目录 owner 时显示明确不可用并保原合同文本，职责见 [ARCHITECTURE](./ARCHITECTURE.md#our-signatories)。
 
 浏览器恢复与返回上下文使用同一站内安全边界；恢复前仍要重新核对当前记录，不能把历史 `returnTo` 当作授权。从当前有效业务入口重新打开与激活旧恢复页签的区分，以及恢复范围、启动次序、失效回退和后台约束，统一见 [PUBLIC-SURFACES §5](./PUBLIC-SURFACES.md#5-业务页签恢复与性能)。
 
@@ -79,6 +81,7 @@ interface NavigationOrigin {
 - 详情加载、空态、错误或无权限时仍保留合法返回上下文；不能依赖浏览器历史“碰巧还在”。
 - 页码和滚动位置属于本地应用页签状态，不进入后台 DTO。目标记录不存在或关系错配时显示明确问题，并允许返回原筛选位置。
 - 应用内部页签实例 ID 只隔离视图状态，不是业务实体 ID，也不得写入业务接口。
+- 从详情、编辑或导入返回时恢复来源的关键词、列/工具栏条件、排序、页码及可恢复滚动位置；保存成功后仍按该查询重新读取，不为显示新记录暗中清除条件。查询和合法越界的处理见 [READ-MODELS](./READ-MODELS.md#pagination-and-consistency)，保存后的清理与动作顺序见 [COMMANDS](./COMMANDS.md#success-receipt-and-readback)。
 
 #### 当前运行落点（#289 / #313）
 
@@ -111,7 +114,7 @@ interface NavigationOrigin {
 | `unverified-target/not-connected` | 普通文本并保留原因 | 不导航；取得直接证据或补齐 canonical 关系后再登记 |
 | 入口解析或目标读取失败 | 保留原文本与返回上下文 | 显示错误、重试和返回；不得降级成 0 条、未记录或新建表单 |
 
-可进入真实空列表的范围包括矩阵中已经登记并能用稳定 ID 过滤的项目合同/目标成本、项目详情金额页签、分供方合同/结算/收票/付款、项目×分供方六类事实、客户关系、合同来源单据、材料/财务/工资等已有列表目标。是否为 0 条由目标查询返回的 `PageDTO.empty` 决定，不由来源页先查数量。
+可进入真实空列表的范围包括矩阵中已经登记并能用稳定 ID 过滤的项目合同/目标成本、项目详情金额页签、分供方合同/结算/收票/付款、项目×分供方六类事实、客户关系、合同来源单据、材料/财务/工资等已有列表目标。是否为 0 条由目标查询的成功空结果决定，不由来源页先查数量；当前 `PageDTO.empty` 是既有 adapter 的表达，公共分页和状态语义只见 [READ-MODELS](./READ-MODELS.md#pagination-and-consistency)。
 
 暂时不可用的入口包括：只有姓名而没有人员 ID 的项目角色；没有 canonical 仓库、供货单位、到货—归档、结算分摊、领用批次或调拨两端关系的材料入口；没有稳定 focus 目标的补充协议；没有明确 `NavigationIntentDTO` 的洞察报表行；以及当前权限下未验证的参考目标。它们必须保留在矩阵差异中，不能用测试数据补成可点击关系。
 
@@ -124,7 +127,7 @@ interface NavigationOrigin {
 3. 与页面蓝本一致的扁平资料网格；字段本身不加彩色背景或层层卡片，未知值显示“—”，不拿测试值补齐。
 4. 已有真实关系的项目、客户、分供方、合同、班组、工人和来源单据；缺关系按 `EntityRefDTO` 原状态展示，不生成死链。
 5. 页面蓝本要求的页签、分区或专属表头。实体存在但某分区为 0 条时，详情仍是 `ready`，只让该分区显示紧凑空态；不把整个详情替换成大空框。
-6. 数据来源时点、完整度和 capability；没有真实事实的汇总保持 `null/pending/partial`，不显示静态成功数字。
+6. 数据来源时点、完整度和 capability；依赖事实缺失的完整汇总保持未知，读取状态、计算完整性与授权范围分别表达，见 [READ-MODELS](./READ-MODELS.md#read-status-and-completeness)。
 
 列表目标同样保留标题、来源条件、已实现筛选、专属列、汇总位置和分页。首次成功且 0 条使用 `no-records`；有数据但当前筛选无命中使用 `no-filter-match` 并提供“清除筛选”；缺必需父关系使用 `missing-relation`，不发送无约束查询。
 
@@ -229,7 +232,7 @@ interface NavigationOrigin {
 | `N-INVOICE` | `invoice` 收票/归档台账 | 发票号、项目、分供方、合同、付款申请 | 对应 ref resolved | `/finance/invoice/:id` 与项目/分供方/合同/付款详情 | 返回上传/校对/台账来源 | 部分；单表状态机正确，来源返回和关系 ID 仍需补齐 |
 | `N-SCHEDULE-QUANTITY` | `schedule-target-cost` 排程工序详情 | 工程量矩阵 | project/group/task/stage/item 稳定 ID | `/subcontract/quantity` + `project/group/buildings/task/stage/item`，名称与日期仅提示 | `/schedule?project=:pid&group=:gid&task=:tid` | 闭合 |
 | `N-QUANTITY-UNIT` | `quantity-payroll` 工程量矩阵 | 户施工详情 | project + unit ID resolved | `/subcontract/quantity/:pid/:uid`，带 `project/building/month/view/trade/assignee` | 原六项筛选 | 闭合 |
-| `N-PAYROLL-FLOW` | `quantity-payroll` 工资台账 | 新建草稿、考勤、工资详情 | 项目/月/班组及单据 ID resolved | `/subcontract/payroll/new`、`/subcontract/attendance`、`/subcontract/payroll/:id` | 返回 `project/month/crew/status` | P0 中央只读及 P1 A 写态/原来源往返已验证；C1 新写态正在 P2 实施，C2 随 P3 |
+| `N-PAYROLL-FLOW` | `quantity-payroll` 工资台账 | 新建草稿、考勤、工资详情 | 项目/月/班组及单据 ID resolved | `/subcontract/payroll/new`、`/subcontract/attendance`、`/subcontract/payroll/:id` | 返回 `project/month/crew/status` | P0–P7 已登记各格式中央验证边界；A/C1/C2 原来源、费用、更正、空鼓和批量往返沿[工资页面](./pages/subcontract-payroll.md)，实际接入与生产缺口只见 [READ-MODELS](./READ-MODELS.md#implementation-gaps)，不据旧阶段描述认定正式交付 |
 | `N-DAYWORK-FLOW` | `quantity-payroll` 考勤/工资台账 | C2 零星签工 | 项目/月/班组上下文 | `/subcontract/daywork` | 返回当前项目/月/班组与原工资状态；签工确认状态独立保存 | #433 本地往返及 P0 中央来源只读已验证；C2 日常签工/工资写态随 P3 验收 |
 | `N-TARGET-COST` | `schedule-target-cost` 目标成本列表/详情 | 名称、项目、已签合同额 | ref 或明确聚合目标 | `/project/target-cost/:id`、`/project/:id`；已签合同额进入当前版本合同聚合区 | 返回列表筛选/详情区块 | 部分；名称/项目闭合，金额聚合锚点待实现 |
 | `N-IMPORT-EXPORT` | `import-export` 映射/导出配置 | 返回来源、错误行源实体、生成结果 | 来源为站内 route key；文件 capability resolved | 返回调用页或受控文件预览 | 恢复调用页上下文 | 部分；不得把原始文件路径或私有 URL 当路由 |
@@ -257,7 +260,7 @@ interface NavigationOrigin {
 1. 在 #312 已建立的唯一前端 Target Registry 上继续登记班组、工人、付款申请、支付记录、目标成本、送货归档和工程量户；多态对象必须通过 variant 解析。项目详情目标已经接入，不再新增领域内 route map。
 2. 建立站内 `returnTo` 编解码/校验器，并让列表、详情、项目×分供方、工资/C2、材料和财务目标页按白名单消费 query。
 3. 先为甲方/分包/材料/辅助合同结算/普通财务对象补独立只读详情，再把主链接从编辑表单切走；编辑入口保持显式动作。
-4. 金额链接改为由 `MetricDTO.drilldown` 决定；值为 0 可以进入真实空表，`null`、missing、forbidden 和无目标继续退化。
+4. 金额链接由经核验的语义目标决定；当前 `MetricDTO.drilldown` 沿对应 adapter 读取。值为 0 可以进入真实空表；未知、missing、forbidden 和无目标不能猜接。标量及完整性统一引用 [READ-MODELS](./READ-MODELS.md#read-status-and-completeness)，本文不另定公共 DTO 外壳。
 5. 通知、洞察报表行和文件来源统一输出 `NavigationIntentDTO`，去掉 store 内业务 route 字符串；未知目标保持不可达而不是猜路径。
 6. 路由、目标、返回 query 或实体 variant 发生变化时，同一工作单元更新本文、[`READ-MODELS.md`](./READ-MODELS.md)、对应页面蓝本和验收测试。
 
@@ -275,7 +278,7 @@ interface NavigationOrigin {
 
 来源同时记录稳定业务行锚点（项目/合同/收款 ID）与目标实体类型/ID，同项目出现多行时恢复原点击行；原行消失或不可读时焦点落到关系区，不能误落同项目另一行。#425 将原项目视图记录扩展为项目/施工合同共用关系记录，仅保存视图状态。
 
-#424 沿唯一 Target Registry 的 `project:detail` 分支携带受限 `returnTo`。客户详情白名单增加 `relationContext`，与既有 `origin`、业务页签及成对列表返回上下文共存。进入项目前捕获当前客户来源、目标项目 ID、工作区纵滚与表格横滚，存入 30 分钟有效的会话返回记录；它只保存视图位置，不保存业务事实。
+Issue #424 沿唯一 Target Registry 的 `project:detail` 分支携带受限 `returnTo`。客户详情白名单增加 `relationContext`，与既有 `origin`、业务页签及成对列表返回上下文共存。进入项目前捕获当前客户来源、目标项目 ID、工作区纵滚与表格横滚，存入 30 分钟有效的会话返回记录；它只保存视图位置，不保存业务事实。
 
 项目详情有可读数据时，客户返回地址必须命中同来源的实际主/次客户 ID；携带 relationContext 时还须通过会话记录的目标、完整地址及有效期校验。首次项目读取失败、无权或不存在时，只有已经捕获且仍有效的同项目来源可提供“返回客户详情”，不接受任意形状正确的 URL。直接项目深链、外部地址、错配或过期来源返回规范 `/project`；旧无 relationContext 来源只在项目实际关系验证通过后返回客户。
 

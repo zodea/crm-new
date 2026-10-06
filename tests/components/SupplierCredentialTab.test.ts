@@ -24,6 +24,7 @@ function snapshot(credentials: SupplierCredential[] = []): SupplierDetailSnapsho
     contracts: [],
     payments: [],
     invoices: [],
+    reviewHistory: [],
     summary: {
       projectCount: 0,
       contractCount: 0,
@@ -187,6 +188,21 @@ afterEach(() => {
 })
 
 describe('supplier credential tab', () => {
+  it('native当前不再适用时仍呈现两次真实人工历史、原因与未知核验人', () => {
+    const value = snapshot()
+    value.reviewHistory = [
+      { decision: 'rejected', reviewedAt: '2026-09-10T08:00:00.000Z', note: '历史退回原文', actorId: null, historyIdentity: { id: 'stable-history-1', legacyId: 'native-history-1', archivedAt: '2026-09-12T08:00:00.000Z' } },
+      { decision: 'qualified', reviewedAt: '2026-09-12T08:00:00.000Z', note: '历史人工通过原文', actorId: null },
+    ]
+    setup(value, 'incomplete')
+    expect(screen.getByText(/历史凭证已保留/)).not.toBeNull()
+    expect(within(screen.getByText(/最近人工核验/)).getByText(/历史人工通过原文/)).not.toBeNull()
+    const history = screen.getByText('查看 2 次人工核验历史').closest('details')!
+    expect(within(history).getByText(/历史人工通过原文/)).not.toBeNull()
+    expect(within(history).getByText(/历史退回原文/)).not.toBeNull()
+    expect(screen.getAllByText(/历史核验人未知/).length).toBeGreaterThan(0)
+    expect((screen.getByRole('button', { name: '人工核验通过' }) as HTMLButtonElement).disabled).toBe(true)
+  })
   it('只有齐全待核验状态允许人工退回', () => {
     setup(snapshot(), 'qualified')
 

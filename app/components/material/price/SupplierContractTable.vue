@@ -5,7 +5,9 @@ defineProps<{
   rows: readonly SupplierContractRow[]
 }>()
 
-function money(value: number): string {
+function money(value: number | null): string {
+  if (value === null)
+    return '未记录'
   return `¥${value.toLocaleString('zh-CN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -20,7 +22,7 @@ function money(value: number): string {
         <h2 class="text-13px font-800 text-ink">
           相关厂家合作合同
         </h2>
-        <span class="text-11px text-ink-soft">按所选材料出现的厂家汇总材采合同</span>
+        <span class="text-11px text-ink-soft">厂家合作历史，可能包含其他材料；不代表所选材料签约关系</span>
       </div>
       <span class="text-11px text-ink-faint">{{ rows.length }} 个厂家/项目组合</span>
     </header>

@@ -28,7 +28,7 @@ async function savedInvoice(page: Page, number: string) {
   }
 }
 
-// 本地发票聚合正向保留在 invoice-archive/detail-summary/ProjectMetrics 测试；
+// 本地发票聚合正向保留在 invoice-archive 与 project/detail-aggregate 测试；
 // 当前中央项目详情不从未接管的本地发票推算税费或补出旧票税页签。
 async function switchAppTab(page: Page, name: string) {
   await page

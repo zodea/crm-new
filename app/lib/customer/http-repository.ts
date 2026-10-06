@@ -5,8 +5,9 @@ import type {
   CustomerReadRepository,
   CustomerReceiptDetailQueryDTO,
 } from './repository'
-import { isProblemCodeDTO } from '../../types/read-model'
+import { problemFromHttpFailure } from '../read-model/problem'
 import {
+  customerProblem,
   customerProblemFromUnknown,
   CustomerRepositoryProblem,
   decodeCustomerDetailRead,
@@ -25,22 +26,8 @@ export interface CustomerHttpFetchOptions {
 
 export type CustomerHttpFetcher = (url: string, options?: CustomerHttpFetchOptions) => Promise<unknown>
 
-function object(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function problemPayload(cause: unknown): ProblemDTO | null {
-  if (!object(cause))
-    return null
-  const response = object(cause.response) ? cause.response : null
-  const raw = response?._data ?? cause.data
-  const candidate = object(raw) && object(raw.data) ? raw.data : raw
-  if (!object(candidate) || !isProblemCodeDTO(candidate.code) || typeof candidate.message !== 'string'
-    || typeof candidate.retryable !== 'boolean' || !object(candidate.fieldErrors)
-    || !(candidate.traceId === null || typeof candidate.traceId === 'string')) {
-    return null
-  }
-  return candidate as unknown as ProblemDTO
+  return problemFromHttpFailure(cause)
 }
 
 export async function readCustomerHttp<T>(request: () => Promise<unknown>, decode: (value: unknown) => T): Promise<T> {
@@ -61,15 +48,32 @@ export function createHttpCustomerReadRepository(options: { fetcher: CustomerHtt
   return {
     list: (query: CustomerListQueryDTO) => readCustomerHttp(
       () => options.fetcher('/api/read/customers', { query: serializeCustomerListQuery(query) }),
-      decodeCustomerListPage,
+      (value) => {
+        const page = decodeCustomerListPage(value)
+        if (page.pagination.requestedPage !== query.page || page.pagination.pageSize !== query.pageSize
+          || (!query.includeDemo && page.items.some(item => item.dataOrigin === 'demo'))) {
+          throw new CustomerRepositoryProblem(customerProblem('relationship-mismatch', '客户响应与本次分页或来源不匹配'))
+        }
+        return page
+      },
     ),
     get: (query: CustomerDetailQueryDTO) => readCustomerHttp(
       () => options.fetcher(`/api/read/customers/${encodeURIComponent(query.id)}`, { query: serializeCustomerDetailQuery(query) }),
-      decodeCustomerDetailRead,
+      (value) => {
+        const detail = decodeCustomerDetailRead(value)
+        if (detail.customer.id !== query.id || detail.dataOrigin !== query.origin)
+          throw new CustomerRepositoryProblem(customerProblem('relationship-mismatch', '客户响应与本次目标或来源不匹配'))
+        return detail
+      },
     ),
     getReceipt: (query: CustomerReceiptDetailQueryDTO) => readCustomerHttp(
       () => options.fetcher(`/api/read/receipts/${encodeURIComponent(query.id)}`, { query: serializeCustomerReceiptDetailQuery(query) }),
-      decodeCustomerReceiptDetailRead,
+      (value) => {
+        const detail = decodeCustomerReceiptDetailRead(value)
+        if (detail.receipt.receipt.id !== query.id || detail.customer.id !== query.customerId || detail.dataOrigin !== query.origin)
+          throw new CustomerRepositoryProblem(customerProblem('relationship-mismatch', '收款响应与本次目标、父客户或来源不匹配'))
+        return detail
+      },
     ),
   }
 }

@@ -9,6 +9,7 @@ import { onBeforeRouteUpdate } from 'vue-router'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '~/components/ui/dialog'
 import EntityDetailShell from '~/components/ui/EntityDetailShell.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
+import { bindReadAuthority } from '~/lib/read-model/authority'
 import { assertSupplierCredentialUpload } from '~/lib/supplier/credential-files'
 import { emptySupplierCredentialForm } from '~/lib/supplier/credential-form'
 import { credentialContentBytes } from '~/lib/supplier/credential-repository'
@@ -58,9 +59,21 @@ watch(session.recoveryNotice, (notice) => {
 })
 const ocrWorkflow = shallowRef<InstanceType<typeof SupplierCredentialOcrWorkflow> | null>(null)
 const fileError = shallowRef('')
+bindReadAuthority(problem => session.invalidate(problem))
+let epoch = 0
+watch(errorCode, (code) => {
+  if (['unauthenticated', 'forbidden'].includes(code) || (code === 'unavailable' && !data.value)) {
+    ++epoch
+    previewBlob.value = null
+    previewName.value = ''
+    selectedRecord.value = null
+    selectedAudit.value = null
+    ocrRecordId.value = ''
+    fileError.value = ''
+  }
+})
 const downloadUrls = new Set<string>()
 let initialForm = ''
-let epoch = 0
 let deactivated = false
 let editorTrigger: HTMLElement | null = null
 let previewTrigger: HTMLElement | null = null
@@ -114,8 +127,8 @@ const backTo = computed(() => {
     query.set('returnTo', parent)
   return `/base/supplier/${encodeURIComponent(props.supplierId)}?${query.toString()}`
 })
-const shellState = computed(() => loading.value && !data.value ? 'loading' : data.value ? 'ready' : errorCode.value === 'forbidden' ? 'forbidden' : ['not-found', 'relationship-mismatch'].includes(errorCode.value) ? 'not-found' : 'error')
-const stateTitle = computed(() => errorCode.value === 'forbidden' ? '无权查看此来源的证照' : errorCode.value === 'relationship-mismatch' ? '证照来源或归属不匹配' : errorCode.value === 'not-found' ? '分供方不存在或已删除' : loading.value ? '正在加载证照原件' : '证照原件读取失败')
+const shellState = computed(() => loading.value && !data.value ? 'loading' : data.value ? 'ready' : ['unauthenticated', 'forbidden'].includes(errorCode.value) ? 'forbidden' : ['not-found', 'relationship-mismatch'].includes(errorCode.value) ? 'not-found' : 'error')
+const stateTitle = computed(() => errorCode.value === 'unauthenticated' ? '登录已失效，请重新登录' : errorCode.value === 'forbidden' ? '无权查看此来源的证照' : errorCode.value === 'relationship-mismatch' ? '证照来源或归属不匹配' : errorCode.value === 'not-found' ? '分供方不存在或已删除' : loading.value ? '正在加载证照原件' : '证照原件读取失败')
 useTabTitle(() => data.value ? `${data.value.supplierName} · 证照附件` : '分供方证照附件')
 
 async function load(focusTitle = false) {
@@ -370,7 +383,7 @@ onScopeDispose(() => {
       <p v-if="origin === 'demo'" class="m-0 text-12px text-ink-soft">
         测试证照只读，原件按当前测试身份读取。
       </p>
-      <SupplierCredentialReviewStatus :status="data.status" :review="data.review" :can-write="canWrite && !busy" @review="openEditor('review', undefined, undefined, $event)" />
+      <SupplierCredentialReviewStatus :status="data.status" :review="data.review" :review-current="data.reviewCurrent" :review-history="data.reviewHistory" :can-write="canWrite && !busy" @review="openEditor('review', undefined, undefined, $event)" />
       <SupplierCredentialRequirements :requirements="data.requirements" :can-write="canWrite && !busy" @edit="openEditor('requirement', undefined, $event)" />
       <p v-if="missing.length" class="m-0 border border-warn/30 bg-warn-soft p-3 text-12px leading-5 text-warn-ink" role="status">
         缺失或已过期的需提供资料：{{ missing.join('、') }}
@@ -396,7 +409,11 @@ onScopeDispose(() => {
   </EntityDetailShell>
   <SupplierCredentialEditor v-if="mode && active" :mode="mode" :value="form" :file-name="currentFileName" :busy="busy" :locked="pendingAction !== null" :error="editorError" :conflict="conflict" :unavailable="unavailableIntent" :recheck-summary="recheckSummary" @patch="patchForm" @file="selectedFile = $event" @submit="submit" @cancel="closeEditor" @recheck="recheck" />
   <SupplierCredentialOcrWorkflow v-if="ocrRecordId" :key="`${supplierId}:${origin}:${ocrRecordId}`" ref="ocrWorkflow" :session="session" :credential-id="ocrRecordId" :active="active" :recognize-on-open="ocrRecognizeOnOpen" @close="closeOcr" @busy="ocrPreparing = $event" />
-  <Dialog :open="Boolean(previewBlob) && active" @update:open="open => { if (!open) previewBlob = null }">
+  <Dialog
+    :open="Boolean(previewBlob) && active" @update:open="open => {
+      if (!open) previewBlob = null
+    }"
+  >
     <DialogContent :show-close="false" class="flex max-h-[90dvh] w-[min(64rem,calc(100vw-2rem))] flex-col p-4" @open-auto-focus="focusPreviewClose" @close-auto-focus="restorePreviewFocus">
       <div class="flex min-w-0 items-start gap-3">
         <DialogTitle class="min-w-0 flex-1 break-words">

@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { watch } from 'vue'
 import { supplierProblem, SupplierRepositoryProblem } from '~/lib/supplier/repository'
+import { useProductionAccessStore } from '~/stores/production-access'
 import { useSupplierCommandStore } from '~/stores/supplier-command'
 import { useSupplierReadStore } from '~/stores/supplier-read'
 
@@ -13,12 +14,14 @@ describe('分供方中央 stores', () => {
   const repositories = {
     supplierRead: { list: vi.fn(), get: vi.fn() },
     supplierCommands: { context: vi.fn(), loadForm: vi.fn(), execute: vi.fn(), importRow: vi.fn() },
+    productionAccess: { status: vi.fn() },
   }
 
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     uuid = 0
+    repositories.productionAccess.status.mockResolvedValue({ mode: 'development', authenticated: false })
     vi.stubGlobal('useNuxtApp', () => ({ $repositories: repositories }))
     vi.stubGlobal('crypto', { randomUUID: () => `supplier-command-${++uuid}` })
   })
@@ -44,7 +47,7 @@ describe('分供方中央 stores', () => {
     await store.loadDetail({ id: 'supplier-b', origin: 'real', includeDemo: false })
 
     expect(store.listState.kind).toBe('empty')
-    expect(store.detailState).toMatchObject({ kind: 'error', previous: null })
+    expect(store.detailState).toMatchObject({ kind: 'unavailable', previous: null })
   })
 
   it('命令使用会话身份和 baseVersion，并在响应丢失重试时复用 commandId', async () => {
@@ -71,6 +74,38 @@ describe('分供方中央 stores', () => {
     expect(repositories.supplierCommands.execute.mock.calls[0]?.[0].commandId)
       .toBe(repositories.supplierCommands.execute.mock.calls[1]?.[0].commandId)
     expect(store.latestWrite).toEqual({ id: 'supplier-1', version: '4' })
+  })
+
+  it('读取可用性和计算完整性分开，同查询来源不可用保快照，真实401即清敏感旧事实', async () => {
+    const page = { items: [{ supplier: { id: 'private-supplier', label: '私密名称' } }], empty: null } as SupplierListPageDTO
+    repositories.supplierRead.list.mockResolvedValueOnce(page)
+    const store = useSupplierReadStore()
+    await store.loadList(query)
+    repositories.supplierRead.list.mockRejectedValueOnce(new SupplierRepositoryProblem(supplierProblem('unavailable', '来源不可用', true)))
+    await store.loadList(query)
+    expect(store.listState).toMatchObject({ kind: 'unavailable', previous: page })
+    repositories.supplierRead.list.mockRejectedValueOnce({ statusCode: 401, data: { damaged: 'body' } })
+    await store.loadList(query)
+    expect(store.listState).toMatchObject({ kind: 'forbidden', problem: { code: 'unauthenticated' } })
+    expect(JSON.stringify(store.listState)).not.toContain('私密名称')
+    expect(JSON.stringify(store.listState)).not.toContain('private-supplier')
+  })
+
+  it('可信身份事件立即失效代次，旧读取迟到不能重新显示私密事实', async () => {
+    const store = useSupplierReadStore()
+    const access = useProductionAccessStore()
+    repositories.productionAccess.status.mockResolvedValue({ mode: 'production', authenticated: true, ownerId: 'owner-a', purpose: 'verification', expiresAt: '2026-10-04T10:00:00Z' })
+    await access.check()
+    let finish!: (page: SupplierListPageDTO) => void
+    repositories.supplierRead.list.mockReturnValueOnce(new Promise<SupplierListPageDTO>(resolve => finish = resolve))
+    const old = store.loadList(query)
+    repositories.productionAccess.status.mockResolvedValue({ mode: 'production', authenticated: false, purpose: 'verification' })
+    await access.check()
+    expect(store.listState).toMatchObject({ kind: 'forbidden', problem: { code: 'unauthenticated' } })
+    finish({ items: [{ supplier: { id: 'private-supplier', label: '旧身份私密名称' } }], empty: null } as SupplierListPageDTO)
+    await old
+    expect(store.listState).toMatchObject({ kind: 'forbidden', problem: { code: 'unauthenticated' } })
+    expect(JSON.stringify(store.$state)).not.toContain('旧身份私密名称')
   })
 
   it('同来源筛选保留快照，关闭测试数据时立即清除旧来源快照', async () => {

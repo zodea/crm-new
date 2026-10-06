@@ -27,7 +27,7 @@ export interface TargetCostMetric {
 export interface TargetCostCategory {
   id: string
   category: CostCategory
-  targetAmount: number
+  targetAmount: number | null
   targetLineCount: number
   signedAmount: TargetCostMetric
   settledAmount: TargetCostMetric
@@ -36,7 +36,7 @@ export interface TargetCostCategory {
   sources: Record<'contract' | 'settlement' | 'payment' | 'reimbursement', NavigationIntentDTO | null>
 }
 export interface TargetCostSummary {
-  itemTotal: number
+  itemTotal: number | null
   signedAmount: TargetCostMetric
   settledAmount: TargetCostMetric
   paidAmount: TargetCostMetric

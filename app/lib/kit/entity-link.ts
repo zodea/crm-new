@@ -1,5 +1,5 @@
 import type { NavigationTargetResolution } from '~/lib/nav/target-registry'
-import type { DataOriginDTO, NavigationIntentDTO } from '~/types/read-model'
+import type { DataOriginDTO, EntityRefDTO, NavigationIntentDTO } from '~/types/read-model'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 export type EntityLinkType
@@ -16,6 +16,16 @@ export type EntityLinkType
     | 'subcontract-document'
 
 export type EntityLinkResolution = NavigationTargetResolution | { state: 'empty', label: null }
+
+export function entityReferenceLabel(reference: EntityRefDTO): string {
+  if (reference.state === 'resolved')
+    return reference.label
+  if (reference.state === 'forbidden')
+    return '无权限'
+  if (reference.state === 'unavailable')
+    return '来源暂不可用'
+  return '未记录'
+}
 
 export function resolveEntityLink(input: {
   type: EntityLinkType

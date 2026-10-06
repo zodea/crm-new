@@ -4,11 +4,11 @@ import type {
 } from '~/lib/material-contract/repository'
 import { describe, expect, it } from 'vitest'
 import {
-  buildMaterialContractDetail,
-  buildMaterialContractListPage,
+  decodeMaterialContractDetailRead,
   parseMaterialContractDetailQuery,
   parseMaterialContractListQuery,
 } from '~/lib/material-contract/repository'
+import { buildMaterialContractDetail, buildMaterialContractListPage, materialOriginMeta, materialReadMeta } from '../helpers/material-read-meta'
 
 const AS_OF = '2026-08-24T00:00:00.000Z'
 
@@ -83,9 +83,7 @@ describe('材料采购合同中央 Repository contract', () => {
         detailSource({ id: 'excluded', status: '已结清' }),
       ],
       query: parseMaterialContractListQuery({ status: '["草稿","履约中"]' }),
-      asOf: AS_OF,
-      sourceVersion: 'multi-filter',
-      capabilities: [],
+      originMeta: materialOriginMeta([], 'multi-filter', AS_OF),
     })
     expect(page.items).toHaveLength(10)
     expect(page.pagination.total).toBe(12)
@@ -101,9 +99,7 @@ describe('材料采购合同中央 Repository contract', () => {
         origin: 'real',
         includeDemo: 'false',
       }),
-      asOf: AS_OF,
-      sourceVersion: 'material-contract-v1',
-      capabilities: ['material-contract:read', 'material-contract:write'],
+      meta: materialReadMeta(['material-contract:read', 'material-contract:write'], 'material-contract-v1', 'real', AS_OF),
     })
 
     expect(detail.contract).toMatchObject({
@@ -134,6 +130,8 @@ describe('材料采购合同中央 Repository contract', () => {
     })
     expect(detail.sections).toEqual({
       lineItems: [],
+      deductions: [],
+      supplements: [],
       materials: {
         requisitions: [],
         arrivals: [],
@@ -154,9 +152,7 @@ describe('材料采购合同中央 Repository contract', () => {
       contracts: [source],
       facts: emptyFacts(),
       query: parseMaterialContractDetailQuery(source.id, { origin: source.dataOrigin }),
-      asOf: AS_OF,
-      sourceVersion: 'material-contract-reference-states-v1',
-      capabilities: ['material-contract:read'],
+      meta: materialReadMeta(['material-contract:read'], 'material-contract-reference-states-v1', source.dataOrigin, AS_OF),
     })
 
     const missingId = read(detailSource({ projectId: null, projectName: '' }))
@@ -172,8 +168,11 @@ describe('材料采购合同中央 Repository contract', () => {
     expect(missingTarget.projectNavigation).toEqual({ kind: 'unavailable', reason: 'unverified-target' })
 
     const forbidden = read(detailSource({ supplierReferenceState: 'forbidden' }))
-    expect(forbidden.contract.supplier).toMatchObject({ state: 'forbidden', id: 'supplier-1' })
+    // 原断言保护隐藏名称和禁止跳转；无权引用也不能泄露稳定目标 ID。
+    expect(forbidden.contract.supplier).toMatchObject({ state: 'forbidden', id: null, label: null })
     expect(forbidden.supplierNavigation).toEqual({ kind: 'unavailable', reason: 'forbidden' })
+    expect(JSON.stringify(forbidden)).not.toContain('supplier-1')
+    expect(() => decodeMaterialContractDetailRead({ ...forbidden, contract: { ...forbidden.contract, supplier: { ...forbidden.contract.supplier, id: 'supplier-1' } } })).toThrow()
   })
 
   it('只按合同稳定 ID 汇总采购明细、物资、票款、结算、罚扣和文件', () => {
@@ -291,9 +290,7 @@ describe('材料采购合同中央 Repository contract', () => {
       contracts: [detailSource()],
       facts,
       query: parseMaterialContractDetailQuery('contract-material-1', { origin: 'real' }),
-      asOf: AS_OF,
-      sourceVersion: 'material-contract-v2',
-      capabilities: ['material-contract:read'],
+      meta: materialReadMeta(['material-contract:read'], 'material-contract-v2', 'real', AS_OF),
     })
 
     expect(detail.sections.lineItems[0]).toMatchObject({
@@ -349,9 +346,7 @@ describe('材料采购合同中央 Repository contract', () => {
         page: '1',
         pageSize: '10',
       }),
-      asOf: AS_OF,
-      sourceVersion: 'material-contract-list-v1',
-      capabilities: ['material-contract:read'],
+      originMeta: materialOriginMeta(['material-contract:read'], 'material-contract-list-v1', AS_OF),
     })
 
     expect(page.items).toHaveLength(1)
@@ -368,7 +363,7 @@ describe('材料采购合同中央 Repository contract', () => {
       supplier: { state: 'resolved', id: 'supplier-1' },
       amounts: { changed: '1100.00', invoiced: '0.00', paid: '0.00' },
     })
-    expect(page.pagination).toEqual({ page: 1, pageSize: 10, total: 1 })
+    expect(page.pagination).toEqual({ requestedPage: 1, page: 1, pageSize: 10, total: 1 })
     expect(page.summary.origins).toEqual({
       real: { contractCount: 1, changedAmount: '1100.00', invoicedAmount: '0.00', paidAmount: '0.00' },
       demo: { contractCount: 0, changedAmount: '0.00', invoicedAmount: '0.00', paidAmount: '0.00' },
@@ -379,9 +374,7 @@ describe('材料采购合同中央 Repository contract', () => {
     const page = buildMaterialContractListPage({
       contracts: [detailSource(), detailSource({ dataOrigin: 'demo' })],
       query: parseMaterialContractListQuery({ includeDemo: 'true' }),
-      asOf: AS_OF,
-      sourceVersion: 'material-contract-list-v2',
-      capabilities: ['material-contract:read'],
+      originMeta: materialOriginMeta(['material-contract:read'], 'material-contract-list-v2', AS_OF),
     })
 
     expect(page.items.map(row => row.rowKey).sort()).toEqual([

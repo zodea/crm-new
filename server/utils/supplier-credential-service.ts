@@ -6,9 +6,9 @@ import type { BusinessSession } from './business-session'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { credentialProblem, SUPPLIER_CREDENTIAL_READ_CAPABILITY, SUPPLIER_CREDENTIAL_WRITE_CAPABILITY } from '../../app/lib/supplier/credential-contract'
-import { automaticCredentialStatus, CREDENTIAL_MASTER_FIELDS, credentialRecords, credentialRequirements, credentialReviewBasis, currentCredentialStatus, normalizeCredentialValidity } from '../../app/lib/supplier/credential-domain'
+import { CREDENTIAL_MASTER_FIELDS, credentialRecords, credentialRequirements, credentialReviewBasis, credentialReviewHistory, currentCredentialStatus, invalidateCredentialReview, normalizeCredentialValidity } from '../../app/lib/supplier/credential-domain'
 import { assertSupplierCredentialFile, MAX_CREDENTIAL_FILE_BYTES } from '../../app/lib/supplier/credential-files'
-import { REQUIRED_SUPPLIER_CREDENTIALS, shanghaiBusinessDate, SUPPLIER_CREDENTIAL_CATEGORIES } from '../../app/lib/supplier/credentials'
+import { credentialValidityProjection, REQUIRED_SUPPLIER_CREDENTIALS, shanghaiBusinessDate, SUPPLIER_CREDENTIAL_CATEGORIES } from '../../app/lib/supplier/credentials'
 import { supplierCredentialRecognition } from './supplier-credential-recognition'
 
 export interface SupplierCredentialScope {
@@ -81,11 +81,13 @@ export function createSupplierCredentialService(ports: SupplierCredentialPorts, 
         asOf: timestamp,
         businessDate: shanghaiBusinessDate(new Date(timestamp)),
         status,
-        review: status === 'qualified' || status === 'rejected' ? structuredClone(aggregate.review) : null,
+        review: credentialReviewHistory(aggregate).at(-1) ?? null,
+        reviewCurrent: Boolean(aggregate.review && status === aggregate.review.decision),
+        reviewHistory: credentialReviewHistory(aggregate),
         credentials: credentialRecords(aggregate).map((record) => {
           const target = aggregate.credentials.find(row => row.id === record.id)!
           const file = aggregate.files.find(row => row.id === target.fileRefId && row.ownerId === target.id)
-          return { ...record, recognition: supplierCredentialRecognition(target, file) }
+          return { ...record, validity: credentialValidityProjection(record, new Date(timestamp)), recognition: supplierCredentialRecognition(target, file) }
         }),
         requirements: credentialRequirements(aggregate),
         audits: aggregate.audits.map(audit => ({ ...structuredClone(audit), canRestore: ['delete', 'credential_delete'].includes(audit.action) && audit.deletionToken !== null && aggregate.credentials.some(row => row.id === audit.credentialId && row.deletedAt !== null && row.deletionToken === audit.deletionToken) })),
@@ -180,6 +182,7 @@ export function createSupplierCredentialService(ports: SupplierCredentialPorts, 
             throw credentialProblem('validation-failed', '只有资料齐全待核验时才能人工通过或退回')
           if (!['qualified', 'rejected'].includes(command.draft.decision) || (command.draft.decision === 'rejected' && !command.draft.note.trim()))
             throw credentialProblem('validation-failed', '退回核验时必须填写原因')
+          invalidateCredentialReview(aggregate)
           aggregate.review = { decision: command.draft.decision, reviewedAt: timestamp, actorId: session.actorId, note: command.draft.note.trim() }
           aggregate.supplierAudits.push({ id: audit.id, action: 'credential_review', outcome: command.draft.decision, sourceCategory: 'manual_document', changedFields: ['credentialStatus'], notePresent: Boolean(command.draft.note.trim()), createdAt: timestamp, actorId: session.actorId })
         }
@@ -210,9 +213,7 @@ export function createSupplierCredentialService(ports: SupplierCredentialPorts, 
           audit.changedFields = ['deletedAt']
         }
         if (command.action !== 'review' && basis !== credentialReviewBasis(aggregate))
-          aggregate.review = null
-        if (automaticCredentialStatus(aggregate, new Date(timestamp)) === 'incomplete')
-          aggregate.review = null
+          invalidateCredentialReview(aggregate)
         if (command.action !== 'review')
           aggregate.audits.push(audit)
         aggregate.version++

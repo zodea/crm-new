@@ -13,6 +13,8 @@ defineProps<{
   fetchProjects: (keyword: string) => Promise<LookupOption[]>
   fetchCustomers: (keyword: string) => Promise<LookupOption[]>
   fetchSuppliers: (keyword: string) => Promise<LookupOption[]>
+  fetchWorkers?: (keyword: string) => Promise<LookupOption[]>
+  fetchOriginalExpenses?: (keyword: string) => Promise<LookupOption[]>
   fetchIncomeContracts: (keyword: string) => Promise<LookupOption[]>
   fetchExpenseContracts: (keyword: string) => Promise<LookupOption[]>
   fetchSettlements: (keyword: string) => Promise<LookupOption[]>
@@ -44,6 +46,9 @@ defineEmits<{
     :draft="draft"
     :field-errors="fieldErrors"
     :fetch-projects="fetchProjects"
+    :fetch-workers="fetchWorkers"
+    :fetch-original-expenses="fetchOriginalExpenses"
+    :fetch-suppliers="fetchSuppliers"
     @patch="$emit('patch', $event)"
     @clear-error="$emit('clearError', $event)"
   />
@@ -54,6 +59,7 @@ defineEmits<{
     :field-errors="fieldErrors"
     :fetch-projects="fetchProjects"
     :fetch-suppliers="fetchSuppliers"
+    :fetch-workers="fetchWorkers"
     :fetch-expense-contracts="fetchExpenseContracts"
     :fetch-settlements="fetchSettlements"
     :fetch-invoices="fetchInvoices"

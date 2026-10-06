@@ -80,4 +80,67 @@ describe('税务核验编辑稿和主档基准', () => {
     expect(state.begin()).toContain('保存当前税号')
     expect(execute).not.toHaveBeenCalled()
   })
+  it.each(['save', 'recheck'] as const)('迟到 A 的 %s finally 不解除 B 的提交锁或接受重复点击', async (operation) => {
+    const { state, execute, read, target, apply } = setup()
+    state.begin()
+    let finishA!: (value: any) => void
+    let finishB!: (value: SupplierTaxpayerResult) => void
+    if (operation === 'save') {
+      execute.mockImplementationOnce(() => new Promise((resolve) => {
+        finishA = resolve
+      }))
+    }
+    else {
+      read.mockImplementationOnce(() => new Promise((resolve) => {
+        finishA = resolve
+      }))
+    }
+    const awaitingA = operation === 'save' ? state.save() : state.recheck()
+    expect(state.busy.value).toBe(true)
+    state.deactivate()
+    expect(state.busy.value).toBe(false)
+    target.supplierId = 'supplier-b'
+    target.draft.taxNo = target.saved.taxNo = 'TAX-B'
+    state.activate()
+    expect(state.begin()).toBe('')
+    execute.mockImplementationOnce(() => new Promise((resolve) => {
+      finishB = resolve
+    }))
+    const savingB = state.save()
+    const calls = execute.mock.calls.length
+    finishA(operation === 'save' ? result : { draft: { id: 'supplier-a', taxNo: 'TAX-A' }, version: '9' })
+    await awaitingA
+    expect(state.busy.value).toBe(true)
+    expect(state.canSubmit.value).toBe(false)
+    expect(state.taxNo.value).toBe('TAX-B')
+    expect(await state.save()).toBe(false)
+    expect(execute).toHaveBeenCalledTimes(calls)
+    expect(apply).not.toHaveBeenCalled()
+    finishB({ ...result, supplierId: 'supplier-b' })
+    await savingB
+    expect(state.busy.value).toBe(false)
+    expect(apply).toHaveBeenCalledOnce()
+  })
+
+  it('停用即时保留原未知命令锁，不删除原编号或迟到改写下一代状态', async () => {
+    const { state, execute, setPending } = setup()
+    state.begin()
+    const pending = { commandId: 'original-taxpayer-command', supplierId: 'supplier-a' } as SupplierTaxpayerCommand
+    let finish!: (value: SupplierTaxpayerResult) => void
+    execute.mockImplementationOnce(() => new Promise((resolve) => {
+      finish = resolve
+    }))
+    const saving = state.save()
+    setPending(pending)
+    state.deactivate()
+    expect(state.locked.value).toBe(true)
+    expect(state.busy.value).toBe(false)
+    expect(state.close()).toBe(false)
+    finish(result)
+    await saving
+    expect(state.locked.value).toBe(true)
+    state.activate()
+    expect(state.begin()).toBe('')
+    expect(state.locked.value).toBe(true)
+  })
 })

@@ -12,13 +12,11 @@ import type { ContractKind } from '~/lib/contract/status'
 import type { LookupOption } from '~/lib/kit/lookup'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
-import { deleteF2Form, saveF2Form } from '~/lib/contract/forms'
-import { db } from '~/lib/db/client'
+import { deleteF2Form, saveF2Form, undoF2Form } from '~/lib/contract/forms'
 import { select } from '~/lib/db/connection'
 import {
   hiddenCtesFor,
   selectVisibleSql,
-  undoOperation,
   visibleCond,
 } from '~/lib/db/soft-delete'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
@@ -38,9 +36,9 @@ export interface Contract {
   supplierId: string | null
   supplierName: string
   /** 含税合同金额 */
-  amount: number
+  amount: number | null
   /** 变更后合同金额 */
-  changed: number
+  changed: number | null
   /** 累计结算 */
   settled: number
   /** 累计收票(施工=累计开票) */
@@ -99,8 +97,8 @@ function rowToContract(row: Record<string, unknown>): Contract {
     customerName: (row.customer_name ?? '') as string,
     supplierId: (row.supplier_id ?? null) as string | null,
     supplierName: (row.supplier_name ?? '') as string,
-    amount: toMoney(row.amount),
-    changed: toMoney(row.changed),
+    amount: row.amount == null ? null : toMoney(row.amount),
+    changed: row.changed == null ? null : toMoney(row.changed),
     settled: toMoney(row.settled),
     invoiced: toMoney(row.invoiced),
     paid: toMoney(row.paid),
@@ -165,7 +163,11 @@ export const useContractStore = defineStore('contract', () => {
                project.name AS project_name,
                COALESCE(customer.name, '') AS customer_name,
                COALESCE(supplier.name, '') AS supplier_name,
-               contract.amount
+               CASE WHEN contract.amount IS NULL OR EXISTS (
+                 SELECT 1 FROM contract_supplements supplement
+                 WHERE supplement.contract_id=contract.id AND ${visibleCond('contract_supplements', 'supplement')}
+                 AND supplement.status NOT IN ('draft','草稿') AND supplement.amount IS NULL
+               ) THEN NULL ELSE contract.amount
                + COALESCE((
                    SELECT SUM(supplement.amount)
                    FROM contract_supplements AS supplement
@@ -186,7 +188,7 @@ export const useContractStore = defineStore('contract', () => {
                        )
                    ), 0)
                    ELSE 0
-                 END AS changed,
+                 END END AS changed,
                CASE WHEN contract.kind = '施工'
                  THEN COALESCE((
                    SELECT SUM(COALESCE(
@@ -342,7 +344,7 @@ export const useContractStore = defineStore('contract', () => {
       id: string
       name: string
       no: string
-      amount: number
+      amount: number | null
     }>(selectVisibleSql('contracts', `
       AND kind = ?
       AND project_id = ?
@@ -359,7 +361,7 @@ export const useContractStore = defineStore('contract', () => {
     return rows.map(row => ({
       id: row.id,
       label: row.name,
-      hint: `${row.no} · ${Number(row.amount).toFixed(2)}`,
+      hint: `${row.no} · ${row.amount === null ? '金额未知' : Number(row.amount).toFixed(2)}`,
     }))
   }
 
@@ -405,7 +407,7 @@ export const useContractStore = defineStore('contract', () => {
           category: string
           counterparty: string
           service_period: string
-          amount: number
+          amount: number | null
           sign_date: string
           status: string
         }>(selectVisibleSql('company_expense_contracts', 'ORDER BY created_at DESC'))
@@ -422,7 +424,7 @@ export const useContractStore = defineStore('contract', () => {
           category: row.category,
           counterparty: row.counterparty,
           period: row.service_period,
-          amount: Number(row.amount),
+          amount: row.amount === null ? null : Number(row.amount),
           date: row.sign_date,
           status: row.status,
         }))
@@ -508,7 +510,7 @@ export const useContractStore = defineStore('contract', () => {
   }
 
   async function undoForm(kind: F2FormKind, logId: string) {
-    const restored = await undoOperation(db, logId)
+    const restored = await undoF2Form(kind, logId)
     await refreshAfterMutation(kind)
     return restored
   }

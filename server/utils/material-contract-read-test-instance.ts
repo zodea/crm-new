@@ -7,6 +7,7 @@ import type {
 import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import suppliersSeed from '../../app/lib/db/seed/suppliers.json'
+import { buildContractPriceFacts } from '../../app/lib/material-contract/price-facts'
 import {
   buildMaterialContractDetail,
   buildMaterialContractListPage,
@@ -15,8 +16,11 @@ import {
   parseMaterialContractDetailQuery,
   parseMaterialContractListQuery,
 } from '../../app/lib/material-contract/repository'
+import { resolveBusinessSession } from './business-session'
+import { commandFingerprint } from './command-journal'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { materialContractCommandTestInstance } from './material-contract-command-test-instance'
+import { createReadMeta, readQueryScope, withOriginReadMeta, withReadMeta } from './read-meta'
 
 export type MaterialContractReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -97,6 +101,7 @@ const demoFacts: MaterialContractFactSources = {
   penalties: [document('penalty-demo-318', 'FK-2026-0318', '包装破损扣罚', 2000, '2026-02-05', '已确认')],
   files: [{ dataOrigin: 'demo', id: 'file-demo-318', contractId: 'con_demo_cg01', fileName: '瓷砖采购合同扫描件.pdf', fileSize: 2048, mimeType: 'application/pdf', category: '合同', uploadedAt: '2026-01-16T00:00:00.000Z' }],
 }
+const demoVersion = `material-demo-${commandFingerprint({ contracts: demoContracts, facts: demoFacts })}`
 
 function problem(code: 'forbidden' | 'unavailable', message: string, retryable = false) {
   return new MaterialContractRepositoryProblem({
@@ -107,6 +112,7 @@ function problem(code: 'forbidden' | 'unavailable', message: string, retryable =
 
 export function createMaterialContractReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[] = id => demoWorkspaceTestInstance.capabilities(id),
+  resolveSession = resolveBusinessSession,
 ) {
   const scenarios = new Map<string, MaterialContractReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -123,10 +129,12 @@ export function createMaterialContractReadTestInstance(
     const formalRows = materialContractCommandTestInstance.rows(sessionId)
     const formalFacts = materialContractCommandTestInstance.facts(sessionId)
     return {
-      contracts: scenario === 'empty' ? formalRows : [...formalRows, ...demoContracts],
+      contracts: (scenario === 'empty' ? formalRows : [...formalRows, ...demoContracts]).map(row => ({ ...row, projectReferenceState: capabilities.includes('project:list:read') ? row.projectReferenceState : 'forbidden' as const, supplierReferenceState: capabilities.includes('supplier:list:read') ? row.supplierReferenceState : 'forbidden' as const })),
       facts: scenario === 'empty'
         ? formalFacts
         : {
+            deductions: [...(formalFacts.deductions ?? [])],
+            supplements: [...(formalFacts.supplements ?? [])],
             lineItems: [...formalFacts.lineItems, ...demoFacts.lineItems],
             materialRequisitions: [...formalFacts.materialRequisitions, ...demoFacts.materialRequisitions],
             materialArrivals: [...formalFacts.materialArrivals, ...demoFacts.materialArrivals],
@@ -139,11 +147,34 @@ export function createMaterialContractReadTestInstance(
             files: [...formalFacts.files, ...demoFacts.files],
           },
       capabilities,
+      session: { ...resolveSession(), capabilities },
       sourceVersion: materialContractCommandTestInstance.sourceVersion(sessionId),
     }
   }
 
+  function metadata(data: ReturnType<typeof context>, origin: 'real' | 'demo', requested: boolean, operation: string, scope: unknown) {
+    const readable = requested && (origin === 'real' || data.capabilities.includes('demo:read'))
+    const state = requested ? readable ? 'readable' as const : 'forbidden' as const : 'not-requested' as const
+    return createReadMeta({ session: data.session, schemaVersion: operation === 'material-contract:prices' ? 'material-contract-prices-v1' : 'material-contract-read-v2', operation, dataOrigin: origin, asOf: FIXED_AS_OF, coverage: readable ? 'complete' : 'unknown', scope, sources: [...(origin === 'demo'
+      ? [{ key: 'material-demo', state, sourceVersion: readable ? demoVersion : null, asOf: readable ? FIXED_AS_OF : null }]
+      : [
+          { key: 'material-contracts', state, sourceVersion: readable ? data.sourceVersion : null, asOf: readable ? FIXED_AS_OF : null },
+          { key: 'material-finance', state: 'unavailable' as const, sourceVersion: null, asOf: null },
+        ]), ...(['project', 'supplier'] as const).map((entity) => {
+      const canRead = readable && data.capabilities.includes(`${entity}:list:read`)
+      return { key: `material-${entity}-references`, state: !requested ? 'not-requested' as const : canRead ? 'readable' as const : 'forbidden' as const, sourceVersion: canRead ? origin === 'demo' ? demoVersion : data.sourceVersion : null, asOf: canRead ? FIXED_AS_OF : null }
+    })] })
+  }
+
   return {
+    prices(origin: 'real' | 'demo', sessionId?: string | null) {
+      const data = context(sessionId)
+      if (origin === 'demo' && !data.capabilities.includes('demo:read'))
+        throw problem('forbidden', '无测试合同约定价查看权限')
+      const meta = metadata(data, origin, true, 'material-contract:prices', { origin })
+      const items = buildContractPriceFacts(data.contracts.filter(row => row.dataOrigin === origin), data.facts)
+      return withReadMeta({ ...meta, dataOrigin: origin, items }, meta)
+    },
     reset(scenario: MaterialContractReadTestScenario, sessionId?: string | null) {
       if (scenario === 'ready')
         scenarios.delete(keyFor(sessionId))
@@ -153,20 +184,26 @@ export function createMaterialContractReadTestInstance(
     list(input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const parsed = parseMaterialContractListQuery(input)
-      return buildMaterialContractListPage({
+      const originMeta = {
+        real: metadata(data, 'real', parsed.origin !== 'demo', 'material-contract:list', readQueryScope(parsed as unknown as Record<string, unknown>)),
+        demo: metadata(data, 'demo', parsed.includeDemo && parsed.origin !== 'real', 'material-contract:list', readQueryScope(parsed as unknown as Record<string, unknown>)),
+      }
+      const meta = originMeta[parsed.origin ?? 'real']
+      return withOriginReadMeta(buildMaterialContractListPage({
         ...data,
         query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') },
-        asOf: FIXED_AS_OF,
-      })
+        ...meta,
+      }), originMeta, parsed.origin ?? 'real')
     },
     detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const parsed = parseMaterialContractDetailQuery(id, input)
-      return buildMaterialContractDetail({
+      const meta = metadata(data, parsed.origin, true, 'material-contract:detail', parsed)
+      return withReadMeta(buildMaterialContractDetail({
         ...data,
         query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') },
-        asOf: FIXED_AS_OF,
-      })
+        ...meta,
+      }), meta)
     },
   }
 }

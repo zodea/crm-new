@@ -18,7 +18,8 @@ const route = reactive({ path: '/finance/receipt/form/receipt-a', fullPath: '/fi
 const context = vi.fn()
 const detail = vi.fn()
 const execute = vi.fn()
-const feedback = { success: vi.fn(), error: vi.fn(), confirm: vi.fn(async () => true) }
+const resolve = vi.fn()
+const feedback = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), confirm: vi.fn(async () => true) }
 
 function open() {
   return render(ReceiptFormScreen, { global: {
@@ -40,7 +41,13 @@ describe('收款整页表单读写边界', () => {
     context.mockReset().mockImplementation(async () => read.context(session))
     detail.mockReset().mockImplementation(async (id: string) => read.detail(id, { origin: 'real' }, session))
     execute.mockReset().mockImplementation(async (request: ReceiptCommand) => commands.execute(request, session))
-    actions = createReceiptCommandActions(() => ({ context, detail, execute }))
+    resolve.mockReset().mockImplementation(async (id: string) => commands.resolve(id, session))
+    const values = new Map<string, string>()
+    actions = createReceiptCommandActions(() => ({ context, detail, execute, resolve }), () => ({
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => { values.set(key, value) },
+      removeItem: (key) => { values.delete(key) },
+    }))
     vi.stubGlobal('useRoute', () => route)
     vi.stubGlobal('useTabsStore', () => ({ close: vi.fn() }))
     vi.stubGlobal('useTabTitle', vi.fn())
@@ -60,7 +67,7 @@ describe('收款整页表单读写边界', () => {
     expect((screen.getByRole('textbox', { name: '收款金额' }) as HTMLInputElement).value).toBe('120.35')
   })
 
-  it('网络保存失败保留输入，原内容重试复用同一命令并带正确版本', async () => {
+  it('网络结果未知保留输入；先封存原编号，确认未应用后再保存且保留原版本', async () => {
     open()
     await flushPromises()
     await fireEvent.update(screen.getByRole('textbox', { name: '收款金额' }), '220.25')
@@ -69,10 +76,17 @@ describe('收款整页表单读写边界', () => {
     await fireEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
     await flushPromises()
     expect((screen.getByRole('textbox', { name: '收款金额' }) as HTMLInputElement).value).toBe('220.25')
-    expect(screen.getByRole('alert').textContent).toContain('暂时不能保存')
+    expect(screen.getByRole('status').textContent).toContain('原提交结果未知')
+    expect(screen.queryByRole('button', { name: '保存', exact: true })).toBeNull()
+    const original = execute.mock.calls[0]![0].commandId
+    await fireEvent.click(screen.getByRole('button', { name: '核对原提交' }))
+    await flushPromises()
+    expect(resolve).toHaveBeenCalledWith(original)
+    expect(execute).toHaveBeenCalledTimes(1)
     await fireEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
     await flushPromises()
-    expect(execute.mock.calls[1]![0]).toMatchObject({ id: 'receipt-a', baseVersion: '1', draft: { amount: '220.25' }, commandId: execute.mock.calls[0]![0].commandId })
+    expect(execute.mock.calls[1]![0]).toMatchObject({ id: 'receipt-a', baseVersion: '1', draft: { amount: '220.25' } })
+    expect(execute.mock.calls[1]![0].commandId).not.toBe(original)
     expect(feedback.success).toHaveBeenCalledWith('收款已保存')
   })
 
@@ -83,12 +97,14 @@ describe('收款整页表单读写边界', () => {
     detail.mockRejectedValueOnce(receiptProblem('unavailable', '详情重读失败'))
     await fireEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
     await flushPromises()
-    expect(feedback.success).toHaveBeenCalledWith('收款已保存')
-    expect(feedback.error).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert').textContent).toContain('详情重读失败')
-    await fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
+    expect(feedback.success).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toContain('已保存待刷新')
+    expect(screen.queryByRole('button', { name: '保存', exact: true })).toBeNull()
+    expect(navigateTo).not.toHaveBeenCalled()
+    await fireEvent.click(screen.getByRole('button', { name: '重新读取已保存记录' }))
     await flushPromises()
     expect(execute).toHaveBeenCalledTimes(1)
+    expect(resolve).not.toHaveBeenCalled()
     expect((screen.getByRole('textbox', { name: '收款金额' }) as HTMLInputElement).value).toBe('120.35')
   })
 
@@ -103,6 +119,7 @@ describe('收款整页表单读写边界', () => {
     active.value = true
     await flushPromises()
     expect(screen.getByRole('alert').textContent).toContain('关联权限已撤销')
+    expect(screen.queryByRole('textbox', { name: '收款金额' })).toBeNull()
     expect(screen.queryByRole('button', { name: '保存', exact: true })).toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
     await flushPromises()

@@ -1,10 +1,12 @@
 import type { ReceiptContext, ReceiptDetail, ReceiptPage, ReceiptRecord, ReceiptReferenceFacts } from '../../app/lib/receipt/contract'
-import type { DataOriginDTO, EntityKindDTO, EntityRefDTO } from '../../app/types/read-model'
+import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, SourceEvidenceDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
 import type { createReceiptCommandTestInstance } from './receipt-command-test-instance'
 import { financeStatusLabel } from '../../app/lib/finance/status'
+import { parsePageQuery, resolvePagination } from '../../app/lib/read-model/pagination'
 import { RECEIPT_READ_CAPABILITY, receiptProblem } from '../../app/lib/receipt/contract'
 import { effectiveReceiptAmount } from '../../app/lib/receipt/effective'
+import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
 
 interface Options {
   commands: ReturnType<typeof createReceiptCommandTestInstance>
@@ -50,7 +52,16 @@ export function createReceiptReadService(options: Options) {
     const demo = includeDemo && allowed(session, 'demo:read') ? options.demoRecords?.() ?? [] : []
     return { records: [...formal.rows, ...demo].filter(row => !query.origin || row.dataOrigin === query.origin), sourceVersion: formal.sourceVersion }
   }
-  function detail(record: ReceiptRecord, all: ReceiptRecord[], session: BusinessSession, sessionId?: string | null): ReceiptDetail {
+  function evidence(session: BusinessSession, origin: DataOriginDTO, query: object, operation: string, asOf: string, sessionId?: string | null, requested = true) {
+    const facts = requested ? (origin === 'real' ? options.references(sessionId) : options.demoReferences?.() ?? { projects: [], customers: [], contracts: [] }) : null
+    const sources: SourceEvidenceDTO[] = [{ key: 'receipts', state: requested ? 'readable' as const : 'not-requested' as const, sourceVersion: requested ? (origin === 'real' ? options.commands.facts(sessionId).sourceVersion : readSourceVersion('demo-receipts', options.demoRecords?.() ?? [])) : null, asOf: requested ? asOf : null }]
+    for (const [key, capability] of [['projects', 'project:list:read'], ['customers', 'customer:list:read'], ['contracts', 'construction-contract:read']] as const) {
+      const readable = requested && allowed(session, capability)
+      sources.push({ key: `receipt-${key}-references`, state: readable ? 'readable' : requested ? 'forbidden' : 'not-requested', sourceVersion: readable ? readSourceVersion(`receipt-${key}-references`, facts![key]) : null, asOf: readable ? asOf : null } as typeof sources[number])
+    }
+    return createReadMeta({ session, schemaVersion: 'receipt-read-v2', operation, dataOrigin: origin, asOf, sources, coverage: requested ? 'complete' : 'unknown', scope: { query: readQueryScope(query), testSession: sessionId ?? null } })
+  }
+  function detail(record: ReceiptRecord, all: ReceiptRecord[], session: BusinessSession, sessionId?: string | null, asOf = options.now?.() ?? new Date().toISOString()): ReceiptDetail {
     const facts = references(session, sessionId, record.dataOrigin)
     const project = reference('project', record.draft.projectId, facts.projects, allowed(session, 'project:list:read'))
     const customer = reference('customer', record.draft.customerId, facts.customers, allowed(session, 'customer:list:read'))
@@ -61,7 +72,8 @@ export function createReceiptReadService(options: Options) {
     const { id, dataOrigin, draft, version, attachments, createdAt, updatedAt, createdBy, updatedBy } = record
     const hasRestrictedRelation = [project, customer, contract].some(reference => reference.state === 'forbidden')
     const visibleDraft = { ...draft, projectId: project.state === 'forbidden' ? null : draft.projectId, customerId: customer.state === 'forbidden' ? null : draft.customerId, contractId: contract.state === 'forbidden' ? null : draft.contractId }
-    return {
+    const capabilities = record.dataOrigin === 'demo' || hasRestrictedRelation ? session.capabilities.filter(cap => cap !== 'receipt:write') : [...session.capabilities]
+    return withReadMeta({
       record: structuredClone({ id, dataOrigin, draft: visibleDraft, version, attachments: attachments.map(file => ({ ...file, filePath: '' })), createdAt, updatedAt, createdBy, updatedBy }),
       category: null,
       receiptType: null,
@@ -69,10 +81,7 @@ export function createReceiptReadService(options: Options) {
       customer,
       contract,
       amounts: { contractOriginal: contractAmount, contractChange: null, contract: contractAmount, cumulativeReceipt, cumulativeReceiptExcludingCurrent: contract.state === 'resolved' ? effectiveReceiptAmount(all.filter(row => row.dataOrigin === record.dataOrigin && row.draft.contractId === record.draft.contractId && row.id !== record.id)) : null, receiptRatio, invoicedUnreceived: null },
-      capabilities: record.dataOrigin === 'demo' || hasRestrictedRelation ? session.capabilities.filter(cap => cap !== 'receipt:write') : [...session.capabilities],
-      asOf: options.now?.() ?? new Date().toISOString(),
-      sourceVersion: options.commands.facts(sessionId).sourceVersion,
-    }
+    }, evidence({ ...session, capabilities }, record.dataOrigin, { id: record.id, origin: record.dataOrigin }, 'receipt:detail', asOf, sessionId))
   }
   return {
     facts(session: BusinessSession, sessionId?: string | null) {
@@ -103,20 +112,23 @@ export function createReceiptReadService(options: Options) {
         && (!query.status || financeStatusLabel(row.draft.status) === financeStatusLabel(String(query.status)))
         && (!search || [row.draft.no, row.draft.note, facts[row.dataOrigin].projects.find(item => item.id === row.draft.projectId)?.name, facts[row.dataOrigin].customers.find(item => item.id === row.draft.customerId)?.name].some(text => text?.toLocaleLowerCase('zh-CN').includes(search))))
         .sort((a, b) => b.draft.receiptDate.localeCompare(a.draft.receiptDate) || b.id.localeCompare(a.id))
-      const pageSize = [10, 20, 50, 100].includes(Number(query.pageSize)) ? Number(query.pageSize) : 20
-      const maxPage = Math.max(1, Math.ceil(filtered.length / pageSize))
-      const page = Number.isSafeInteger(Number(query.page)) ? Math.min(maxPage, Math.max(1, Number(query.page))) : 1
+      const { requestedPage, pageSize } = parsePageQuery(query, () => {
+        throw receiptProblem('invalid-query', '收款分页参数无效')
+      })
+      const pagination = resolvePagination(requestedPage, pageSize, filtered.length)
+      const { page } = pagination
       const originSummary = (origin: 'real' | 'demo') => {
         const records = filtered.filter(record => record.dataOrigin === origin)
         return { count: records.length, effectiveAmount: effectiveReceiptAmount(records) }
       }
-      return {
-        items: filtered.slice((page - 1) * pageSize, page * pageSize).map(row => detail(row, source.records, session, sessionId)),
-        pagination: { page, pageSize, total: filtered.length },
+      const asOf = options.now?.() ?? new Date().toISOString()
+      const requested = (origin: DataOriginDTO) => (!query.origin || query.origin === origin) && (origin === 'real' || ((query.includeDemo === true || query.includeDemo === 'true') && allowed(session, 'demo:read')))
+      return withOriginReadMeta({
+        items: filtered.slice((page - 1) * pageSize, page * pageSize).map(row => detail(row, source.records, session, sessionId, asOf)),
+        pagination,
         summary: { origins: { real: originSummary('real'), demo: originSummary('demo') } },
         projectOptions: (['real', 'demo'] as const).filter(origin => (!query.origin || query.origin === origin) && (origin === 'real' || ((query.includeDemo === true || query.includeDemo === 'true') && allowed(session, 'demo:read')))).flatMap(origin => facts[origin].projects.map(({ id, name }) => ({ id, name, dataOrigin: origin }))),
-        capabilities: [...session.capabilities],
-      }
+      }, { real: evidence(session, 'real', query, 'receipt:list', asOf, sessionId, requested('real')), demo: evidence(session, 'demo', query, 'receipt:list', asOf, sessionId, requested('demo')) }, query.origin === 'demo' ? 'demo' : 'real')
     },
   }
 }

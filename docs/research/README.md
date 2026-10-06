@@ -11,7 +11,6 @@
 | [`local-branch-integration-2026-09-05.md`](./local-branch-integration-2026-09-05.md) | 旧分支整合时点的依据与分支头，非当前分支状态 | 当前 Git 历史及后续整合记录 |
 | [`module-development-flows.md`](./module-development-flows.md) | 全局及八模块流程方向，不代表完成 | [页面蓝本](../rewrite/pages/) |
 | [`kitui-to-shadcn-migration.md`](./kitui-to-shadcn-migration.md) | 已执行迁移的映射与取舍 | [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md) |
-| [`kit-ui-primitives-wave2-prd.md`](./kit-ui-primitives-wave2-prd.md) | 第二波原语历史需求 | [组件契约](../design/kit-ui-component-specs.md) |
 | [`schedule-dependency-editor-brief.md`](./schedule-dependency-editor-brief.md) | 排程依赖编辑器历史设计 | [排程页面](../rewrite/pages/schedule-progress.md)、[ADR 0018](../adr/0018-versioned-schedule-process-library.md) |
 | [`browser-audit-2026-09-05.md`](./browser-audit-2026-09-05.md) | 浏览器审计与复现入口 | [实现状态](../design/ui-implementation-status.md)及对应领域规格 |
 | [`red-circle-ui-gap-2026-07-11.md`](./red-circle-ui-gap-2026-07-11.md) | 红圈结构与交互走查 | [设计依据](../design/README.md)及对应页面规格 |

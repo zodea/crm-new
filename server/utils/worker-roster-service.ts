@@ -1,6 +1,6 @@
 import type { WorkerSourceRow } from '../../app/lib/crew-worker/read-contract'
 import type { TransactionDb } from '../../app/lib/db/coordinator'
-import type { WorkerPrivateProfile, WorkerRosterArchive, WorkerRosterArchiveSummary, WorkerRosterCommand, WorkerRosterCommandResult, WorkerRosterContext, WorkerRosterMember, WorkerRosterPreview, WorkerRosterResolution, WorkerRosterScope } from '../../app/lib/worker-roster/contract'
+import type { WorkerPhotoAsset, WorkerPhotoUpload, WorkerPrivateProfile, WorkerRosterArchive, WorkerRosterArchiveSummary, WorkerRosterCommand, WorkerRosterCommandResult, WorkerRosterContext, WorkerRosterMember, WorkerRosterPreview, WorkerRosterResolution, WorkerRosterScope } from '../../app/lib/worker-roster/contract'
 import type { BusinessSession } from './business-session'
 import { randomUUID } from 'node:crypto'
 import { logOperation } from '../../app/lib/db/soft-delete'
@@ -18,6 +18,13 @@ export interface WorkerRosterServiceOptions {
   transaction: <T>(work: (db: TransactionDb) => Promise<T>, sessionId?: string | null) => Promise<T>
   statements: (db: TransactionDb, scope: WorkerRosterScope, sessionId?: string | null) => Promise<WorkerRosterStatement[]>
   now?: () => string
+  schemaInitialized?: boolean
+  originals?: {
+    assets: (db: TransactionDb, workerId: string) => Promise<WorkerPhotoAsset[]>
+    insert: (db: TransactionDb, workerId: string, upload: WorkerPhotoUpload, actorId: string, createdAt: string) => Promise<string>
+    payload: (db: TransactionDb, workerId: string, assetId: string) => Promise<string>
+  }
+  audit?: (db: TransactionDb, input: { command: WorkerRosterCommand, result: WorkerRosterCommandResult, actor: BusinessSession, timestamp: string }) => Promise<void>
 }
 const PHOTO_FIELDS = [['portrait', 'portraitId'], ['bank-card', 'bankCardId']] as const
 function context(session: BusinessSession): WorkerRosterContext {
@@ -40,12 +47,14 @@ function siteStatus(worker: WorkerSourceRow, scope: WorkerRosterScope): WorkerRo
 }
 export function createWorkerRosterService(options: WorkerRosterServiceOptions) {
   const now = options.now ?? (() => new Date().toISOString())
+  const originals = options.originals ?? { assets: workerRosterAssets, insert: insertWorkerPhoto, payload: readWorkerAssetPayload }
   async function run<T>(required: string[], sessionId: string | null | undefined, work: (db: TransactionDb, session: BusinessSession, source: WorkerRosterSource) => Promise<T>): Promise<T> {
     return options.transaction(async (db) => {
       const session = structuredClone(options.session(sessionId))
       authorize(session, required)
       const source = structuredClone(await options.source(sessionId))
-      await initializeWorkerRosterSchema(db)
+      if (!options.schemaInitialized)
+        await initializeWorkerRosterSchema(db)
       const result = await work(db, session, source)
       if (rosterHash(await options.source(sessionId)) !== rosterHash(source))
         return rosterProblem('stale-source', '读取期间工人资料已变化，请重新核对')
@@ -63,7 +72,7 @@ export function createWorkerRosterService(options: WorkerRosterServiceOptions) {
     if (!worker)
       return rosterProblem('not-found', '当前工人资料不可读取')
     const current = await currentWorkerPrivate(db, workerId)
-    const assets = await workerRosterAssets(db, workerId)
+    const assets = await originals.assets(db, workerId)
     return { context: context(session), worker: structuredClone(worker), ...current, assets, sourceVersion: rosterHash({ worker, current, assets }), diagnostics: [] }
   }
   async function preview(db: TransactionDb, session: BusinessSession, source: WorkerRosterSource, input: WorkerRosterScope, sessionId?: string | null): Promise<WorkerRosterPreview> {
@@ -183,10 +192,10 @@ export function createWorkerRosterService(options: WorkerRosterServiceOptions) {
         const asset = allowed.find(row => row.id === input.assetId && row.workerId === input.workerId)
         if (!asset || asset.state !== 'available')
           return rosterProblem('not-found', '该照片不在当前授权的工人或名册范围内')
-        const current = (await workerRosterAssets(db, input.workerId)).find(row => row.id === input.assetId)
+        const current = (await originals.assets(db, input.workerId)).find(row => row.id === input.assetId)
         if (!current || rosterHash(current) !== rosterHash(Object.fromEntries(Object.entries(asset).filter(([key]) => key !== 'purpose'))))
           return rosterProblem('unavailable', '归档照片原件与固定版本不一致')
-        return { asset, payloadBase64: await readWorkerAssetPayload(db, input.workerId, input.assetId) }
+        return { asset, payloadBase64: await originals.payload(db, input.workerId, input.assetId) }
       })
     },
     execute(raw: unknown, sessionId?: string | null): Promise<WorkerRosterCommandResult> {
@@ -212,13 +221,13 @@ export function createWorkerRosterService(options: WorkerRosterServiceOptions) {
           for (const [purpose, field] of PHOTO_FIELDS) {
             const upload = command.uploads[purpose]
             if (upload) {
-              values[field] = await insertWorkerPhoto(db, command.workerId, upload, session.actorId, timestamp)
+              values[field] = await originals.insert(db, command.workerId, upload, session.actorId, timestamp)
             }
             else if (values[field]) {
               const asset = read.assets.find(row => row.id === values[field])
               if (!asset || asset.workerId !== command.workerId || asset.state !== 'available')
                 return rosterProblem('validation-failed', '所选照片不存在、缺正文或不属于当前工人')
-              photoBytes({ ...asset, fileSize: asset.fileSize ?? -1, payloadBase64: await readWorkerAssetPayload(db, command.workerId, asset.id) })
+              photoBytes({ ...asset, fileSize: asset.fileSize ?? -1, payloadBase64: await originals.payload(db, command.workerId, asset.id) })
             }
           }
           const revision = read.revision + 1
@@ -237,7 +246,10 @@ export function createWorkerRosterService(options: WorkerRosterServiceOptions) {
           result = { commandId: command.commandId, workerId: null, archiveId: document.id, revision }
         }
         await db.execute('INSERT INTO worker_roster_receipts(command_id,workspace_id,actor_id,fingerprint,result_json,worker_id,archive_id) VALUES (?,?,?,?,?,?,?)', [command.commandId, session.workspaceId, session.actorId, fingerprint, JSON.stringify(result), result.workerId, result.archiveId])
-        await logOperation(db, { table: command.action === 'archive' ? 'worker_roster_archives' : 'worker_roster_profile_versions', recordId: result.archiveId ?? result.workerId!, action: 'create', after: { revision: result.revision }, operator: session.actorId })
+        if (options.audit)
+          await options.audit(db, { command, result, actor: session, timestamp })
+        else
+          await logOperation(db, { table: command.action === 'archive' ? 'worker_roster_archives' : 'worker_roster_profile_versions', recordId: result.archiveId ?? result.workerId!, action: 'create', after: { revision: result.revision }, operator: session.actorId })
         return result
       })
     },

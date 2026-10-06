@@ -74,6 +74,9 @@ function staticKind(route) {
 function routeVariants(endpoint, registry) {
   const route = endpoint.localRoute
   const modes = baseMode(endpoint) === null ? ['new', 'edit'] : [baseMode(endpoint)]
+  if (route.startsWith('/material/quotations')) {
+    return modes.map(mode => ({ kind: 'material-quotation', variant: 'default', mode, hosts: ['browser'], routePattern: route.includes(':id?') ? route.replace('/:id?', mode === 'new' ? '' : '/:id') : route, condition: '真实报价 owner 与已认证工作区；Native 缺可信身份时明确不可用，不借 HTTP 身份写入本地' }))
+  }
   if (route.includes(':kind')) {
     const scope = route.split('/')[1]
     return registry.ownerKinds.filter(item => item.scope === scope).flatMap((item) => {

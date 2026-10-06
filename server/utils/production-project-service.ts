@@ -9,9 +9,11 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { decodeProjectImportSource } from '../../app/lib/project/import'
 import { buildProjectDetailRead, buildProjectListPage, parseProjectDetailQuery, parseProjectListQuery } from '../../app/lib/project/repository'
+import { readMaterialContractProjectFacts } from './production-material-contract-service'
 import { projectFailure as fail, normalizedProject, projectAttachment, projectDraft, projectListRow } from './production-project-record'
 import { parseProductionProjectRequest, productionProjectCommandId, productionProjectId } from './production-project-request'
 import { assertProjectCommandBusinessRules, deriveProjectApprovalStatus } from './project-command-domain'
+import { createReadMeta, readQueryScope, withOriginReadMeta, withReadMeta } from './read-meta'
 
 type ProductionSession = () => BusinessSession
 export const PROJECT_ORIGINAL_MAX_BYTES = 10 * 1024 * 1024
@@ -260,7 +262,17 @@ export function createProductionProjectService(storage: ProductionStorage) {
         const rows = await tx.select<ProjectRow>('SELECT * FROM projects WHERE deleted_at IS NULL')
         const [revision] = await tx.select<{ revision: number }>('SELECT revision FROM project_revision')
         const customers = await names(tx, actor)
-        return buildProjectListPage({ rows: rows.map(row => projectListRow(row, customers, actor.capabilities.includes('customer:list:read'))), query, asOf: new Date().toISOString(), sourceVersion: `production-project:${revision!.revision}`, capabilities: [...actor.capabilities] })
+        const asOf = new Date().toISOString()
+        const customerRevision = actor.capabilities.includes('customer:list:read') ? (await tx.select<{ revision: number }>('SELECT revision FROM customer_revision'))[0]!.revision : null
+        const common = { session: actor, schemaVersion: 'project-read-v2', operation: 'project:list', asOf, scope: readQueryScope(query) }
+        const real = createReadMeta({ ...common, dataOrigin: 'real', coverage: 'complete', sources: [
+          { key: 'projects', state: 'readable', sourceVersion: `projects:${revision!.revision}`, asOf },
+          customerRevision === null ? { key: 'customers', state: 'forbidden', sourceVersion: null, asOf: null } : { key: 'customers', state: 'readable', sourceVersion: `customers:${customerRevision}`, asOf },
+          { key: 'receipts', state: 'not-requested', sourceVersion: null, asOf: null },
+          { key: 'target-costs', state: 'not-requested', sourceVersion: null, asOf: null },
+        ] })
+        const demo = createReadMeta({ ...common, dataOrigin: 'demo', coverage: 'unknown', sources: [{ key: 'projects', state: 'not-requested', sourceVersion: null, asOf: null }] })
+        return withOriginReadMeta(buildProjectListPage({ rows: rows.map(row => projectListRow(row, customers, actor.capabilities.includes('customer:list:read'))), query, asOf, sourceVersion: real.sourceVersion, capabilities: real.capabilities }), { real, demo })
       })
     },
     detail(id: string, input: Record<string, unknown>, session: ProductionSession) {
@@ -269,8 +281,18 @@ export function createProductionProjectService(storage: ProductionStorage) {
         if (query.origin !== 'real' || query.includeDemo)
           fail('forbidden', '正式磁盘项目不接受测试来源。')
         const row = await stored(tx, id)
-        const [customerRevision] = await tx.select<{ revision: number }>('SELECT revision FROM customer_revision')
-        return buildProjectDetailRead({ rows: [projectListRow(row, await names(tx, actor), actor.capabilities.includes('customer:list:read'))], query, materialContractAccess: 'unknown', projectSupplierAccess: 'error', asOf: new Date().toISOString(), sourceVersion: `production-project:${row.version}:customer:${customerRevision!.revision}`, capabilities: [...actor.capabilities] })
+        const customerRevision = actor.capabilities.includes('customer:list:read') ? (await tx.select<{ revision: number }>('SELECT revision FROM customer_revision'))[0]!.revision : null
+        const asOf = new Date().toISOString()
+        const materialFacts = await readMaterialContractProjectFacts(tx, actor, id, asOf)
+        const meta = createReadMeta({ session: actor, schemaVersion: 'project-read-v2', operation: 'project:detail', dataOrigin: 'real', asOf, coverage: 'complete', scope: query, sources: [
+          { key: 'projects', state: 'readable', sourceVersion: `project:${row.version}`, asOf },
+          customerRevision === null ? { key: 'customers', state: 'forbidden', sourceVersion: null, asOf: null } : { key: 'customers', state: 'readable', sourceVersion: `customers:${customerRevision}`, asOf },
+          materialFacts.source,
+          { key: 'project-suppliers', state: 'unavailable', sourceVersion: null, asOf: null },
+          { key: 'receipts', state: 'not-requested', sourceVersion: null, asOf: null },
+          { key: 'target-costs', state: 'not-requested', sourceVersion: null, asOf: null },
+        ] })
+        return withReadMeta(buildProjectDetailRead({ rows: [projectListRow(row, await names(tx, actor), actor.capabilities.includes('customer:list:read'))], query, materialContractCount: materialFacts.count, materialContractAccess: materialFacts.source.state === 'readable' ? 'allowed' : materialFacts.source.state === 'forbidden' ? 'forbidden' : 'unknown', projectSupplierAccess: 'error', asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), meta)
       })
     },
     file(projectId: string, fileId: string, session: ProductionSession) {

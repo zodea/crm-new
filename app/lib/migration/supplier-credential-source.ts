@@ -15,12 +15,13 @@ export const SUPPLIER_CREDENTIAL_MIGRATION_COLUMNS = {
   payloads: ['file_ref_id', 'encoding', 'content'],
   credentialAudits: ['id', 'supplier_id', 'credential_id', 'action', 'category_before', 'category_after', 'changed_fields', 'valid_from_before', 'valid_from_after', 'expires_at_before', 'expires_at_after', 'long_term_before', 'long_term_after', 'confidence', 'created_at'],
   supplierAudits: ['id', 'supplier_id', 'action', 'outcome', 'source_category', 'changed_fields', 'note_present', 'created_at'],
+  reviewHistory: ['id', 'supplier_id', 'decision', 'reviewed_at', 'note', 'actor_id', 'archived_at'],
 } as const
 
 export type SupplierCredentialMigrationPart = keyof typeof SUPPLIER_CREDENTIAL_MIGRATION_COLUMNS
 export type SupplierCredentialMigrationRow = Record<string, string | number | null>
 export interface SupplierCredentialMigrationGraph {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   supplier: SupplierCredentialMigrationRow
   credentials: SupplierCredentialMigrationRow[]
   requirements: SupplierCredentialMigrationRow[]
@@ -28,12 +29,13 @@ export interface SupplierCredentialMigrationGraph {
   payloads: SupplierCredentialMigrationRow[]
   credentialAudits: SupplierCredentialMigrationRow[]
   supplierAudits: SupplierCredentialMigrationRow[]
+  reviewHistory?: SupplierCredentialMigrationRow[]
 }
 
 const parts = ['credentials', 'requirements', 'files', 'payloads', 'credentialAudits', 'supplierAudits'] as const
-const tables = { supplier: 'suppliers', credentials: 'supplier_credentials', requirements: 'supplier_credential_requirements', files: 'file_refs', payloads: 'file_payloads', credentialAudits: 'supplier_credential_audits', supplierAudits: 'supplier_audits' } as const
+const tables = { supplier: 'suppliers', credentials: 'supplier_credentials', requirements: 'supplier_credential_requirements', files: 'file_refs', payloads: 'file_payloads', credentialAudits: 'supplier_credential_audits', supplierAudits: 'supplier_audits', reviewHistory: 'supplier_credential_review_history' } as const
 const numeric = new Set(['registered_capital', 'ocr_confidence', 'long_term', 'file_size', 'long_term_before', 'long_term_after', 'confidence', 'note_present'])
-const dates = new Set(['created_at', 'updated_at', 'deleted_at', 'credential_reviewed_at', 'taxpayer_verified_at', 'verified_at', 'added_at', 'ocr_confirmed_at', 'uploaded_at'])
+const dates = new Set(['created_at', 'updated_at', 'deleted_at', 'credential_reviewed_at', 'taxpayer_verified_at', 'verified_at', 'added_at', 'ocr_confirmed_at', 'uploaded_at', 'reviewed_at', 'archived_at'])
 const auditFields = new Set<string>([
   ...SUPPLIER_CREDENTIAL_MIGRATION_COLUMNS.supplier,
   ...SUPPLIER_CREDENTIAL_MIGRATION_COLUMNS.credentials,
@@ -137,12 +139,12 @@ export function supplierCredentialMigrationBytes(file: SupplierCredentialMigrati
 
 /** 包括软删历史在内的完整图验证；原始 OCR 与人工确认正文原字节保留。 */
 export function parseSupplierCredentialMigrationGraph(value: unknown, legacySupplierId?: string): SupplierCredentialMigrationGraph {
-  if (!object(value) || value.schemaVersion !== 1 || Object.keys(value).some(key => !['schemaVersion', 'supplier', ...parts].includes(key)))
+  if (!object(value) || (value.schemaVersion !== 1 && value.schemaVersion !== 2) || Object.keys(value).some(key => !['schemaVersion', 'supplier', ...parts, ...(value.schemaVersion === 2 ? ['reviewHistory'] : [])].includes(key)))
     return invalid('完整图结构或版本无效')
   const supplier = row('supplier', value.supplier)
   if (!String(supplier.name ?? '').trim() || (legacySupplierId !== undefined && supplier.id !== legacySupplierId))
     invalid('分供方身份或名称无效')
-  const graph: SupplierCredentialMigrationGraph = { schemaVersion: 1, supplier, credentials: [], requirements: [], files: [], payloads: [], credentialAudits: [], supplierAudits: [] }
+  const graph: SupplierCredentialMigrationGraph = { schemaVersion: value.schemaVersion as 1 | 2, supplier, credentials: [], requirements: [], files: [], payloads: [], credentialAudits: [], supplierAudits: [] }
   for (const part of parts) {
     if (!Array.isArray(value[part]))
       invalid(`${tables[part]}必须完整提供数组`)
@@ -156,6 +158,22 @@ export function parseSupplierCredentialMigrationGraph(value: unknown, legacySupp
       if (['credentials', 'requirements', 'credentialAudits', 'supplierAudits'].includes(part) && parsed.supplier_id !== supplier.id)
         invalid(`${tables[part]}分供方归属错配`)
       return parsed
+    })
+  }
+  if (value.schemaVersion === 2) {
+    if (!Array.isArray(value.reviewHistory))
+      invalid('历史人工核验必须完整提供数组')
+    const ids = new Set<string>()
+    graph.reviewHistory = (value.reviewHistory as unknown[]).map((entry) => {
+      const proof = row('reviewHistory', entry)
+      if (ids.has(String(proof.id)) || proof.supplier_id !== supplier.id)
+        invalid('历史人工核验身份重复或分供方归属错配')
+      ids.add(String(proof.id))
+      if (!['qualified', 'rejected'].includes(String(proof.decision)) || !proof.reviewed_at || !proof.archived_at
+        || typeof proof.note !== 'string' || (proof.decision === 'rejected' && !proof.note.trim())) {
+        invalid('历史人工核验凭证或备注无效')
+      }
+      return proof
     })
   }
   const credentials = new Map(graph.credentials.map(entry => [entry.id, entry]))
@@ -246,7 +264,8 @@ export function parseSupplierCredentialMigrationGraph(value: unknown, legacySupp
 
 /** 只在受保护的本地快照读取全部物理图，包含软删除父记录。 */
 export async function readSupplierCredentialMigrationGraphs(db: Pick<SoftDb, 'select'>, schemaVersion = 49): Promise<CoreMigrationSourceEntityDTO[]> {
-  if (![47, 48, 49].includes(schemaVersion))
+  // v50/v52 材采、v53 合同主体、v54 原费用引用及 v55 两物料行税点、v56 财务身份列均不改变供应商图；v51 历史以 graph v2 完整承接。
+  if (![47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60].includes(schemaVersion))
     invalid('不支持该旧数据库版本，请先完成既有数据库升级')
   const all = {} as Record<SupplierCredentialMigrationPart, SupplierCredentialMigrationRow[]>
   for (const part of ['supplier', ...parts] as const) {
@@ -254,6 +273,8 @@ export async function readSupplierCredentialMigrationGraphs(db: Pick<SoftDb, 'se
     const columns = SUPPLIER_CREDENTIAL_MIGRATION_COLUMNS[part].map(column => part === 'supplier' && schemaVersion === 47 && column === 'labor_scope' ? '\'\' AS labor_scope' : column)
     all[part] = await db.select<SupplierCredentialMigrationRow>(`SELECT ${columns.join(', ')} FROM ${tables[part]}${where} ORDER BY ${part === 'payloads' ? 'file_ref_id' : 'id'}`)
   }
+  if (schemaVersion >= 51)
+    all.reviewHistory = await db.select<SupplierCredentialMigrationRow>(`SELECT ${SUPPLIER_CREDENTIAL_MIGRATION_COLUMNS.reviewHistory.join(', ')} FROM ${tables.reviewHistory} ORDER BY id`)
   const suppliers = new Set(all.supplier.map(entry => entry.id))
   const credentials = new Map(all.credentials.map(entry => [entry.id, entry.supplier_id]))
   const files = new Map(all.files.map(entry => [entry.id, credentials.get(entry.owner_id)]))
@@ -264,13 +285,18 @@ export async function readSupplierCredentialMigrationGraphs(db: Pick<SoftDb, 'se
         invalid(`${tables[part]}缺少可解释的分供方祖先`)
     }
   }
+  for (const proof of all.reviewHistory ?? []) {
+    if (!suppliers.has(proof.supplier_id))
+      invalid('历史人工核验缺少可解释的分供方祖先')
+  }
   if (suppliers.size !== all.supplier.length)
     invalid('分供方稳定身份重复')
   return all.supplier.map((supplier) => {
     const graph = parseSupplierCredentialMigrationGraph({
-      schemaVersion: 1,
+      schemaVersion: schemaVersion >= 51 ? 2 : 1,
       supplier,
       ...Object.fromEntries(parts.map(part => [part, all[part].filter(entry => (part === 'files' ? credentials.get(entry.owner_id) : part === 'payloads' ? files.get(entry.file_ref_id) : entry.supplier_id) === supplier.id)])),
+      ...(schemaVersion >= 51 ? { reviewHistory: all.reviewHistory.filter(row => row.supplier_id === supplier.id) } : {}),
     }, String(supplier.id))
     return { legacyId: String(supplier.id), name: String(supplier.name), deletedAt: graph.supplier.deleted_at as string | null, references: { supplierId: String(supplier.id) }, attributes: { graphJson: JSON.stringify(graph) } }
   })

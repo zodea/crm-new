@@ -10,6 +10,29 @@ export type CountDTO = number
 export const DATA_ORIGINS = ['real', 'demo'] as const
 export type DataOriginDTO = typeof DATA_ORIGINS[number]
 
+export interface AuthorizedScopeDTO {
+  coverage: 'complete' | 'permission-filtered' | 'unknown'
+  fingerprint: string
+}
+export interface SourceEvidenceDTO {
+  key: string
+  state: 'readable' | 'forbidden' | 'unavailable' | 'not-requested'
+  sourceVersion: string | null
+  asOf: ISODateTimeDTO | null
+}
+export interface ReadMetaDTO {
+  schemaVersion: string
+  workspaceId: OpaqueIdDTO
+  actorId: OpaqueIdDTO
+  dataOrigin: DataOriginDTO
+  asOf: ISODateTimeDTO
+  sourceVersion: string | null
+  sources: SourceEvidenceDTO[]
+  authorizedScope: AuthorizedScopeDTO
+  capabilities: string[]
+}
+export type ReadProjection<T> = Omit<T, 'meta' | 'originMeta'>
+
 const DATA_ORIGIN_SET: ReadonlySet<string> = new Set(DATA_ORIGINS)
 
 export function isDataOriginDTO(value: unknown): value is DataOriginDTO {
@@ -57,6 +80,7 @@ export const ENTITY_KINDS = [
   'expense-reimbursement',
   'material',
   'material-document',
+  'material-quotation',
   'delivery-record',
   'warehouse',
   'wage-statement',
@@ -98,10 +122,36 @@ export type EntityRefDTO
   | {
     state: 'forbidden'
     entity: EntityKindDTO
-    id: OpaqueIdDTO | null
+    id: null
     label: null
     reason: 'permission-denied'
   }
+  | {
+    state: 'unavailable'
+    entity: EntityKindDTO
+    id: null
+    label: null
+    reason: 'source-unavailable'
+  }
+
+/** 公共引用不允许额外定位字段；受限/不可用身份必须完全置空。 */
+export function isEntityRefDTO(value: unknown, expectedEntity?: EntityKindDTO): value is EntityRefDTO {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return false
+  const ref = value as Record<string, unknown>
+  if (!isEntityKindDTO(ref.entity) || (expectedEntity !== undefined && ref.entity !== expectedEntity))
+    return false
+  const keys = ref.state === 'resolved' ? ['state', 'entity', 'id', 'label', 'no'] : ['state', 'entity', 'id', 'label', 'reason']
+  if (Object.keys(ref).length !== keys.length || !keys.every(key => Object.hasOwn(ref, key)))
+    return false
+  if (ref.state === 'resolved')
+    return typeof ref.id === 'string' && !!ref.id.trim() && typeof ref.label === 'string' && (ref.no === null || typeof ref.no === 'string')
+  if (ref.id !== null || ref.label !== null)
+    return false
+  return (ref.state === 'missing' && ['not-configured', 'not-recorded', 'not-applicable'].includes(String(ref.reason)))
+    || (ref.state === 'forbidden' && ref.reason === 'permission-denied')
+    || (ref.state === 'unavailable' && ref.reason === 'source-unavailable')
+}
 
 export type NavigationUnavailableReasonDTO
   = 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target' | 'error'
@@ -135,7 +185,34 @@ export type NavigationIntentDTO
       reason: NavigationUnavailableReasonDTO
     }
 
+/** 非可解析引用的导航只携带状态，不能附加 subject、filters 或目标身份。 */
+export function isUnavailableEntityNavigationDTO(value: unknown, reference: EntityRefDTO): boolean {
+  if (reference.state === 'resolved' || typeof value !== 'object' || value === null || Array.isArray(value))
+    return false
+  const navigation = value as Record<string, unknown>
+  const reason = reference.state === 'forbidden' ? 'forbidden' : reference.state === 'unavailable' ? 'not-connected' : 'missing-id'
+  return Object.keys(navigation).length === 2 && navigation.kind === 'unavailable' && navigation.reason === reason
+}
+
+export function isNavigationIntentDTO(value: unknown): value is NavigationIntentDTO {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return false
+  const intent = value as Record<string, unknown>
+  if (intent.kind === 'unavailable')
+    return Object.keys(intent).length === 2 && ['missing-id', 'missing-route', 'not-connected', 'forbidden', 'unverified-target', 'error'].includes(String(intent.reason))
+  if (intent.kind === 'same-route-overlay')
+    return Object.keys(intent).length === 3 && isEntityRefDTO(intent.subject) && intent.subject.state === 'resolved' && typeof intent.view === 'string' && !!intent.view
+  if (!['entity-list', 'entity-detail', 'entity-subview', 'source-record'].includes(String(intent.kind))
+    || Object.keys(intent).length !== 5 || !(intent.variant === null || typeof intent.variant === 'string')
+    || !(intent.view === null || typeof intent.view === 'string') || typeof intent.filters !== 'object' || intent.filters === null || Array.isArray(intent.filters)
+    || !Object.values(intent.filters).every(filter => filter === null || typeof filter === 'string')) {
+    return false
+  }
+  return intent.kind === 'entity-list' ? isEntityKindDTO(intent.entity) : isEntityRefDTO(intent.subject) && intent.subject.state === 'resolved'
+}
+
 export interface PaginationDTO {
+  requestedPage: number
   page: number
   pageSize: number
   total: CountDTO
@@ -161,18 +238,20 @@ export type CompletenessDTO
 
 export interface MetricDTO {
   value: MoneyDTO | QuantityDTO | RatioDTO | CountDTO | null
+  knownValue: MoneyDTO | QuantityDTO | RatioDTO | CountDTO | null
   unit: 'CNY' | 'quantity' | 'ratio' | 'count'
+  quantityUnit: string | null
   status: CompletenessDTO
   missingSources: string[]
+  participatingCount: CountDTO | null
+  missingCount: CountDTO | null
   asOf: ISODateTimeDTO
-  drilldown: {
-    entity: EntityKindDTO
-    filters: Record<string, string>
-  } | null
+  drilldown: NavigationIntentDTO | null
 }
 
 export const PROBLEM_CODES = [
   'invalid-query',
+  'unauthenticated',
   'forbidden',
   'not-found',
   'relationship-mismatch',
@@ -203,9 +282,9 @@ export type ReadState<T>
   = { kind: 'idle' }
     | { kind: 'loading', previous: T | null }
     | { kind: 'ready', data: T }
-    | { kind: 'partial', data: T, missingRelations: EntityKindDTO[] }
     | { kind: 'empty', data: T, empty: EmptyDTO }
     | { kind: 'forbidden', problem: ProblemDTO }
     | { kind: 'not-found', problem: ProblemDTO }
     | { kind: 'mismatch', problem: ProblemDTO }
+    | { kind: 'unavailable', problem: ProblemDTO, previous: T | null }
     | { kind: 'error', problem: ProblemDTO, previous: T | null }

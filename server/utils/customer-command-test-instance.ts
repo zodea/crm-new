@@ -12,9 +12,11 @@ import type {
 } from '../../app/lib/master-data/forms'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
+import type { CommandJournal } from './command-journal'
 import { randomUUID } from 'node:crypto'
 import { CUSTOMER_WRITE_CAPABILITY } from '../../app/lib/customer/command-contract'
 import { customerProblem, CustomerRepositoryProblem } from '../../app/lib/customer/repository'
+import { commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
 import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 
 interface StoredCustomer {
@@ -26,7 +28,7 @@ interface StoredCustomer {
   updatedAt: string
 }
 
-interface SessionState {
+interface SessionState extends CommandJournal<CustomerCommandResultDTO> {
   commands: Map<string, CustomerCommandResultDTO>
   customers: Map<string, StoredCustomer>
   sourceVersion: number
@@ -121,7 +123,7 @@ export function createCustomerCommandTestInstance(options: Options = {}) {
     const key = keyFor(sessionId)
     let state = states.get(key)
     if (!state) {
-      state = { commands: new Map(), customers: new Map(), sourceVersion: 0 }
+      state = { commands: new Map(), commandFingerprints: new Map(), sealedCommands: new Set(), customers: new Map(), sourceVersion: 0 }
       states.set(key, state)
     }
     return state
@@ -146,7 +148,7 @@ export function createCustomerCommandTestInstance(options: Options = {}) {
         version: 1,
         updatedAt: migratedIdentityTimestamp(entity),
       }))
-      const candidate = { ...current, customers: records, sourceVersion: current.sourceVersion + (records === current.customers ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => records.has(result.id))) }
+      const candidate = { ...current, customers: records, sourceVersion: current.sourceVersion + (records === current.customers ? 0 : 1) }
       return () => states.set(keyFor(sessionId), candidate)
     },
     reset(sessionId?: string | null) {
@@ -172,9 +174,10 @@ export function createCustomerCommandTestInstance(options: Options = {}) {
       }
     },
     async execute(request: CustomerCommandRequestDTO, session: BusinessSession, sessionId?: string | null): Promise<CustomerCommandResultDTO> {
+      request = structuredClone(request)
       assertEnvelope(request, session)
       const state = stateFor(sessionId)
-      const duplicate = state.commands.get(request.commandId)
+      const { key: commandKey, previous: duplicate } = commandReplay(state, request, session, 'customer', message => failure('conflict', message))
       if (duplicate)
         return { ...duplicate, attachmentIds: [...duplicate.attachmentIds] }
       const draft = cleanDraft(request.draft)
@@ -224,8 +227,14 @@ export function createCustomerCommandTestInstance(options: Options = {}) {
         updatedAt: timestamp,
         attachmentIds: stored.attachments.filter(file => !file.deletedAt).map(file => file.id),
       }
-      state.commands.set(request.commandId, result)
+      state.commands.set(commandKey, structuredClone(result))
       return { ...result, attachmentIds: [...result.attachmentIds] }
+    },
+    resolve(commandId: string, session: BusinessSession, sessionId?: string | null) {
+      if (!session.capabilities.includes(CUSTOMER_WRITE_CAPABILITY))
+        throw failure('forbidden', '无客户原提交核对权限')
+      parseResolveCommandBody({ commandId })
+      return resolveJournalCommand(stateFor(sessionId), commandId, session, 'customer')
     },
   }
 }

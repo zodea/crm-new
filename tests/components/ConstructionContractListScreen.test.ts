@@ -43,7 +43,7 @@ function listPage(): ConstructionContractListPageDTO {
       status: '履约中',
       updatedAt: '2026-09-01T00:00:00.000Z',
     }],
-    pagination: { page: 1, pageSize: 10, total: 1 },
+    pagination: { requestedPage: 1, page: 1, pageSize: 10, total: 1 },
     summary: {
       projects: [{ id: 'project-1', label: '项目甲' }],
       customers: [{ id: 'customer-1', label: '客户甲' }],
@@ -168,5 +168,49 @@ describe('施工合同列表连续工作面', () => {
     store.loadList.mockClear()
     await fireEvent.click(screen.getByRole('button', { name: '重试' }))
     expect(store.loadList).toHaveBeenCalledWith(expect.objectContaining({ page: 1, pageSize: 10, includeDemo: false }))
+  })
+
+  it('来源暂不可用保留原授权事实，登录失效立即清屏并显示重新登录提示', async () => {
+    const previous = listPage()
+    previous.capabilities = ['construction-contract:read']
+    listState.value = { kind: 'unavailable', previous, problem: constructionContractProblem('unavailable', '合同来源暂不可用', true) }
+    renderList()
+    expect(screen.getByRole('alert', { name: '刷新施工合同失败' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: '示例施工合同' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: '新建施工合同' })).toBeNull()
+
+    listState.value = { kind: 'forbidden', problem: constructionContractProblem('unauthenticated', '登录已失效', false) }
+    await nextTick()
+    expect(screen.getByText('登录已失效，请重新登录')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: '示例施工合同' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '新建施工合同' })).toBeNull()
+  })
+
+  it('确认越界页已收敛后回写实际页码，保持筛选条件', async () => {
+    route.query = { page: '99', search: '施工', projectId: 'project-1' }
+    const page = listPage()
+    page.pagination.requestedPage = 99
+    listState.value = { kind: 'ready', data: page }
+    renderList()
+    await waitFor(() => expect(replace).toHaveBeenCalledWith({ query: { search: '施工', projectId: 'project-1' } }))
+  })
+
+  it('旧越界读取迟到时不能回写新查询的页码或筛选', async () => {
+    route.query = { page: '99', search: '旧条件' }
+    let finishOld!: () => void
+    store.loadList.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      finishOld = resolve
+    }))
+    renderList()
+    route.query = { page: '3', search: '新条件', projectId: 'project-2' }
+    await nextTick()
+    const old = listPage()
+    old.pagination.requestedPage = 99
+    listState.value = { kind: 'ready', data: old }
+    finishOld()
+    await nextTick()
+    await nextTick()
+    expect(replace).not.toHaveBeenCalled()
+    expect(route.query).toEqual({ page: '3', search: '新条件', projectId: 'project-2' })
   })
 })

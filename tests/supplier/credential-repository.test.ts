@@ -52,12 +52,20 @@ describe('中央证照 Repository', () => {
     const missing = { ...original(), state: 'missing', reason: 'missing-payload' }
     const repository = createSupplierCredentialRepository(vi.fn().mockResolvedValue(missing))
     expect((await repository.file(query)).state).toBe('missing')
-    const forbidden = createSupplierCredentialRepository(vi.fn().mockRejectedValue({ data: { code: 'forbidden', message: '无权读取原件' } }))
+    const forbidden = createSupplierCredentialRepository(vi.fn().mockRejectedValue({ statusCode: 403, data: { code: 'forbidden', message: '无权读取原件', retryable: false, fieldErrors: {}, traceId: null } }))
     await expect(forbidden.file(query)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
   })
   it('命令回包必须对应本次请求和删除目标', async () => {
     const command: SupplierCredentialCommand = { action: 'delete', credentialId: 'credential-a', commandId: 'command-a', supplierId: 'supplier-a', origin: 'real', workspaceId: 'w', actorId: 'a', requiredCapability: 'supplier-credential:write', baseSupplierVersion: 's1', baseCredentialVersion: 'c1' }
     const repository = createSupplierCredentialRepository(vi.fn().mockResolvedValue({ commandId: 'other', supplierId: 'supplier-a', credentialId: 'credential-a', auditId: null, deletionToken: null, supplierVersion: 's2', credentialVersion: 'c2' }))
     await expect(repository.execute(command)).rejects.toThrow('不完整或归属不匹配')
+  })
+
+  it('真实401即使正文损坏或伪称未应用，也保持登录失效，不释放原识别命令', async () => {
+    const command: SupplierCredentialCommand = { action: 'ocr-recognize', credentialId: 'credential-a', commandId: 'recognize-a', supplierId: 'supplier-a', origin: 'real', workspaceId: 'w', actorId: 'a', requiredCapability: 'supplier-credential:write', baseSupplierVersion: 's1', baseCredentialVersion: 'c1', options: {} }
+    const repository = createSupplierCredentialRepository(vi.fn().mockRejectedValue({ statusCode: 401, data: { code: 'unavailable', message: '伪未应用', retryable: true, fieldErrors: {}, traceId: null, commandId: command.commandId, commandOutcome: 'not-applied' } }))
+    await expect(repository.execute(command)).rejects.toMatchObject({ problem: { code: 'unauthenticated' } })
+    await expect(repository.execute(command)).rejects.not.toBeInstanceOf(SupplierCredentialNotAppliedProblem)
+    await expect(repository.file(query)).rejects.toMatchObject({ problem: { code: 'unauthenticated' } })
   })
 })

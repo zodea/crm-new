@@ -76,7 +76,7 @@
 
 界面状态分为四类，不能互相替代：
 
-用户本轮补充的“减少常驻解释文字，低频说明通过问号/小浮窗提示”同样进入 [#404](https://github.com/zodea/crm-new/issues/404)。目标规则见 [CRM 界面模式](../rewrite/CRM-PATTERNS.md)，当前各页仍待按内容与运行交互逐项迁移；文档已定稿不表示常驻文案已清理。
+用户本轮补充的“减少常驻解释文字，低频说明通过问号/小浮窗提示”同样进入 [#404](https://github.com/zodea/crm-new/issues/404)。目标规则见 [DESIGN-SYSTEM 信息显隐](../rewrite/DESIGN-SYSTEM.md#a01-interface-information)，当前各页仍待按内容与运行交互逐项迁移；文档已定稿不表示常驻文案已清理。
 
 - **未实现**：设计稿存在可达界面，但 Nuxt 没有对应路由/入口，或路由正文是待实现占位。
 - **已搭但未闭环**：路由和主要结构存在，但中央权威、领域专属只读行为、真实关系或运行证据仍由当前实施票承接。
@@ -92,19 +92,19 @@
 <!-- design-coverage:begin -->
 | 口径 | 数量 |
 | --- | ---: |
-| 设计稿 PAGE 路由 | 69 |
+| 设计稿 PAGE 路由 | 73 |
 | 设计稿整页表单路由 | 40 |
-| 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 164 |
+| 设计稿侧栏分组 / 叶子 | 9 / 51 |
+| 实现页面文件（含 dev） | 171 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 159 |
-| 实现侧栏叶子 | 51 |
-| 已覆盖 | 135 |
-| 待补设计（实现有、设计稿没有） | 24 |
+| 实现生产路由（排除 dev） | 166 |
+| 实现侧栏叶子 | 53 |
+| 已覆盖 | 139 |
+| 待补设计（实现有、设计稿没有） | 27 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
-实现侧栏当前有 51 个叶子，设计稿为 50 个；新增的“本地数据迁移”属于下方显式登记的 `design-pending`，由 #294 的运行契约与四档视口证据暂时裁定，不把缺失设计静默算作覆盖。
+侧栏集合按上表和生成 JSON 核对；当前 DC 已加入“本地数据迁移”叶子，不能沿旧快照将它继续登记为缺设计。设计覆盖只表示实际源码有对应落点，不能代替运行或业务验收。
 
 ## 3. 两向设计缺口
 
@@ -118,10 +118,10 @@
 
 | 生产路由 | 当前设计状态 | 本轮复核承接 |
 | --- | --- | --- |
-| `/finance/payment/:id/detail` | `design-pending` | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
-| `/settings/data-migration` | `design-pending` | [#414](https://github.com/zodea/crm-new/issues/414) |
-| `/subcontract/quantity/stages` | `design-pending`；本地运行已验收 | [#442](https://github.com/zodea/crm-new/issues/442) |
-| `/schedule/process-library/:id` | `design-pending`；采用既有工序库与表格原语 | [#443](https://github.com/zodea/crm-new/issues/443) |
+| `/finance/payment/:id/detail` | `payApplyDetail`；已注册并挂载 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
+| `/settings/data-migration` | `dataMigration`；已注册并挂载 | [#414](https://github.com/zodea/crm-new/issues/414) |
+| `/subcontract/quantity/stages` | `quantityStages`；已注册并挂载，原运行证据保留 | [#442](https://github.com/zodea/crm-new/issues/442) |
+| `/schedule/process-library/:id` | `processLibraryDetail`；已注册并挂载 | [#443](https://github.com/zodea/crm-new/issues/443) |
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和只读详情动作。
 
@@ -138,20 +138,20 @@
 | 分供方 | 4 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 项目分供方 | 2 | [#408](https://github.com/zodea/crm-new/issues/408) |
 | 核心合同 | 13 | [#409](https://github.com/zodea/crm-new/issues/409) |
-| 辅助合同与结算 | 15 | [#409](https://github.com/zodea/crm-new/issues/409) |
+| 辅助合同与结算 | 16 | [#409](https://github.com/zodea/crm-new/issues/409) |
 | 甲方单据 | 4 | [#410](https://github.com/zodea/crm-new/issues/410) |
 | 分包单据 | 8 | [#410](https://github.com/zodea/crm-new/issues/410) |
 | 自购材 | 12 | [#411](https://github.com/zodea/crm-new/issues/411) |
 | 甲供材 | 15 | [#411](https://github.com/zodea/crm-new/issues/411) |
 | 送货单闭环 | 4 | [#411](https://github.com/zodea/crm-new/issues/411) |
-| 材料价格 | 1 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 材料价格 | 5 | [#411](https://github.com/zodea/crm-new/issues/411) |
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 工程量与工资 | 28 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
+| 系统设置 | 3 | [#414](https://github.com/zodea/crm-new/issues/414) |
 <!-- implementation-frontier:end -->
 
 基础主数据仍由父规格统一承接；客户列表—只读详情—显式编辑子链已由 [#314](https://github.com/zodea/crm-new/issues/314) 闭合，分供方中央列表—详情—显式编辑及合同/结算/归档发票/确认付款四类事实子链已由 [#315](https://github.com/zodea/crm-new/issues/315) 闭合，班组—工人中央列表—详情—显式编辑及项目/责任/工资/扣罚稳定 ID 关系链已由 [#316](https://github.com/zodea/crm-new/issues/316) 闭合，班组详情现支持添加既有正式工人、确认转组和移出成员，只更新当前班组归属；操作说明见 [班组与工人指南](../guides/crew-worker-records.md)。项目×分供方六类事实工作台已由 [#317](https://github.com/zodea/crm-new/issues/317) 闭合。[#281](https://github.com/zodea/crm-new/issues/281) 已完成四条子链的父级联合验收，补齐客户→项目和工作台→项目/分供方的同源受限返回，并将项目详情反向关系、导入确认、导入后工作台与分供方编辑读回收敛到同一中央身份链；父规格其他页面域不因此提前标为完成。
@@ -182,7 +182,7 @@
 1. 更新设计稿可达界面或 Nuxt 路由；
 2. 运行 `node scripts/sync-design-coverage.mjs` 与 `node scripts/sync-runtime-evidence-ledger.mjs`；
 3. 更新受影响页面蓝本/ADR（若业务或架构规格变化）；
-4. 将提交、测试和运行证据写回当前 GitHub Issue。
+4. 证据留在实际验收入口；获得明确 Issue 写入授权后，再将提交、测试和运行反馈写回对应 Issue。
 
 不要手改生成块，也不要再创建按反馈轮或会话命名的第二份状态表。
 

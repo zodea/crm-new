@@ -6,6 +6,9 @@ import {
   ProjectSupplierRepositoryProblem,
 } from '~/lib/project-supplier/repository'
 
+import { withReadMeta } from '../../server/utils/read-meta'
+import { publicReadMeta } from '../helpers/public-read-meta'
+
 const asOf = '2026-08-24T00:00:00.000Z'
 
 it.each([[null, 'user-entry', 'not-entered', null], [0, 'legacy', 'legacy-unknown', null], [0, 'user-entry', 'known', '0.00']] as const)('工作台请款保留空批复和历史未知，明确零不污染已支付事实：输入案例 %#', (amount, origin, state, expected) => {
@@ -13,7 +16,8 @@ it.each([[null, 'user-entry', 'not-entered', null], [0, 'legacy', 'legacy-unknow
   const result = buildProjectSupplierWorkbenchRead({ ...input, claims: input.claims.map(row => ({ ...row, approvedAmount: amount, approvedAmountOrigin: origin })), query: parseProjectSupplierWorkbenchQuery('project-1', 'supplier-1', { origin: 'demo', includeDemo: 'true' }), asOf, sourceVersion: 'approval', capabilities: ['project-supplier:read', 'demo:read'] })
   expect(result.claims[0]).toMatchObject({ approvedAmount: expected, approvedAmountState: state })
   expect(result.summary).toMatchObject({ claimedTotal: expected, paidTotal: '55.00' })
-  expect(decodeProjectSupplierWorkbenchRead(result)).toEqual(result)
+  const dto = withReadMeta(result, publicReadMeta({ schemaVersion: 'project-supplier-read-v2', dataOrigin: result.dataOrigin, asOf, sourceVersion: result.sourceVersion, capabilities: result.capabilities, scope: { projectId: 'project-1', supplierId: 'supplier-1', origin: 'demo' }, requested: true }))
+  expect(decodeProjectSupplierWorkbenchRead(dto)).toEqual(dto)
 })
 
 function source() {
@@ -120,7 +124,7 @@ function source() {
 describe('项目×分供方中央 Repository 契约', () => {
   it('无效合同和未确认结算保留追溯行，但不抬高有效汇总', () => {
     const facts = source()
-    facts.contracts = ['draft', '草稿', 'cancelled', '作废', '无效', 'approved'].map((status, index) => ({
+    facts.contracts = ['draft', '草稿', 'cancelled', '作废', '已作废', '无效', 'approved'].map((status, index) => ({
       ...facts.contracts[0],
       id: `contract-${index}`,
       status,
@@ -138,7 +142,7 @@ describe('项目×分供方中央 Repository 契约', () => {
       capabilities: ['project-supplier:read', 'demo:read'],
     })
     expect(detail.summary).toMatchObject({ contractTotal: '120.00', settlementTotal: '100.00', balance: '65.00' })
-    expect(detail.counts).toMatchObject({ contracts: 6, settlements: 5 })
+    expect(detail.counts).toMatchObject({ contracts: 7, settlements: 5 })
     expect(detail.contracts.map(row => row.status)).toEqual(facts.contracts.map(row => row.status))
     expect(detail.settlements.map(row => row.status)).toEqual(facts.settlements.map(row => row.status))
   })

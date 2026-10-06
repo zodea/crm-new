@@ -1,4 +1,4 @@
-import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ReadMetaDTO } from '../../types/read-model'
 import type {
   SupplierDetailQueryDTO,
   SupplierDetailReadDTO,
@@ -9,11 +9,18 @@ import type {
 import {
   isDataOriginDTO,
   isEntityKindDTO,
+  isEntityRefDTO,
   isISODateDTO,
   isISODateTimeDTO,
 } from '../../types/read-model'
 import { isApprovalReadState } from '../finance/approval-amount'
+import { hasConsistentOriginReadMeta, hasConsistentReadMeta, isReadMetaDTO } from '../read-model/meta'
+import { isMetricDTO } from '../read-model/metric'
+import { isPaginationDTO } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
 import {
+  SUPPLIER_DETAIL_READ_SCHEMA,
+  SUPPLIER_LIST_READ_SCHEMA,
   SUPPLIER_PAGE_SIZES,
   supplierProblem,
   SupplierRepositoryProblem,
@@ -45,15 +52,7 @@ function nullableDate(value: unknown): value is string | null {
 }
 
 function entityRef(value: unknown, kind?: EntityKindDTO): value is EntityRefDTO {
-  if (!object(value) || !isEntityKindDTO(value.entity) || (kind && value.entity !== kind))
-    return false
-  if (value.state === 'resolved')
-    return typeof value.id === 'string' && typeof value.label === 'string' && (value.no === null || typeof value.no === 'string')
-  if (value.state === 'missing')
-    return value.id === null && value.label === null && ['not-configured', 'not-recorded', 'not-applicable'].includes(String(value.reason))
-  if (value.state === 'forbidden')
-    return (value.id === null || typeof value.id === 'string') && value.label === null && value.reason === 'permission-denied'
-  return false
+  return isEntityRefDTO(value, kind)
 }
 
 function sameSubject(left: EntityRefDTO, right: Record<string, unknown>): boolean {
@@ -93,9 +92,10 @@ function navigation(
     ? 'forbidden'
     : reference.state === 'missing'
       ? 'missing-id'
-      : expectation.unavailableReason
+      : reference.state === 'unavailable' ? 'not-connected' : expectation.unavailableReason
   if (unavailableReason) {
     return value.kind === 'unavailable'
+      && Object.keys(value).sort().join(',') === 'kind,reason'
       && value.reason === unavailableReason
       && UNAVAILABLE_REASONS.has(String(value.reason))
   }
@@ -104,7 +104,7 @@ function navigation(
     && value.kind === (expectation.kind ?? 'entity-detail')
     && value.variant === (expectation.variant ?? 'detail')
     && value.view === (expectation.view ?? null)
-    && object(value.subject)
+    && entityRef(value.subject)
     && sameSubject(reference, value.subject)
     && exactFilters(value.filters, filters)
 }
@@ -112,7 +112,7 @@ function navigation(
 function pageBase(value: unknown): value is Record<string, unknown> {
   return object(value)
     && object(value.pagination)
-    && Number.isSafeInteger(value.pagination.page) && Number(value.pagination.page) >= 1
+    && isPaginationDTO(value.pagination, Array.isArray(value.items) ? value.items.length : undefined)
     && SUPPLIER_PAGE_SIZES.includes(value.pagination.pageSize as SupplierPageSize)
     && Number.isSafeInteger(value.pagination.total) && Number(value.pagination.total) >= 0
     && (value.empty === null || (object(value.empty)
@@ -164,8 +164,13 @@ function invalid(message: string): never {
   throw new SupplierRepositoryProblem(supplierProblem('internal-error', message))
 }
 
+function sourceReadable(meta: ReadMetaDTO, key: string): boolean {
+  return (meta.sources.find(source => source.key === key)
+    ?? (meta.dataOrigin === 'demo' ? meta.sources.find(source => source.key === 'demo-supplier-fixtures') : undefined))?.state === 'readable'
+}
+
 export function decodeSupplierListPage(value: unknown): SupplierListPageDTO {
-  if (!pageBase(value) || !unavailableSources(value.unavailableSources) || !Array.isArray(value.items) || !value.items.every(listItem)
+  if (!pageBase(value) || !hasConsistentOriginReadMeta(value, SUPPLIER_LIST_READ_SCHEMA) || !unavailableSources(value.unavailableSources) || !Array.isArray(value.items) || !value.items.every(listItem)
     || !object(value.summary)
     || !Array.isArray(value.summary.categories) || !value.summary.categories.every(summaryCount)
     || !Array.isArray(value.summary.credentialStatuses) || !value.summary.credentialStatuses.every(summaryCount)
@@ -174,6 +179,25 @@ export function decodeSupplierListPage(value: unknown): SupplierListPageDTO {
     return invalid('中央后台返回的分供方列表读模型无效')
   }
   const page = value as unknown as SupplierListPageDTO
+  for (const item of page.items) {
+    const meta = page.originMeta[item.dataOrigin]
+    if (!sourceReadable(meta, 'suppliers')
+      || (!sourceReadable(meta, 'projects') && item.projectCount !== null)
+      || (!sourceReadable(meta, 'contracts') && (item.contractAmount !== null || item.cumulativeContractAmount !== null))
+      || (!sourceReadable(meta, 'settlements') && item.settlementAmount !== null)
+      || (!sourceReadable(meta, 'payments') && item.paymentAmount !== null)) {
+      return invalid('分供方列表数据与实际来源证据不一致')
+    }
+  }
+  for (const origin of ['real', 'demo'] as const) {
+    const meta = page.originMeta[origin]
+    const summary = page.summary.origins[origin]
+    if ((!sourceReadable(meta, 'suppliers') && summary.supplierCount !== 0)
+      || (!sourceReadable(meta, 'contracts') && summary.contractAmount !== null && summary.supplierCount > 0)
+      || (!sourceReadable(meta, 'payments') && summary.paymentAmount !== null && summary.supplierCount > 0)) {
+      return invalid('分供方来源汇总与实际来源证据不一致')
+    }
+  }
   return {
     ...page,
     items: page.items.map(item => ({
@@ -203,13 +227,14 @@ function supplier(value: unknown, origin: unknown): boolean {
       && isISODateTimeDTO(value.updatedAt)
 }
 
-function metric(value: unknown, supplierId: string): boolean {
-  return object(value) && nullableMoney(value.value) && value.unit === 'CNY'
-    && ['complete', 'partial', 'pending', 'not-applicable', 'undefined'].includes(String(value.status))
-    && (value.value !== null || value.status !== 'complete')
-    && strings(value.missingSources) && isISODateTimeDTO(value.asOf)
-    && (value.drilldown === null || (object(value.drilldown) && isEntityKindDTO(value.drilldown.entity)
-      && object(value.drilldown.filters) && value.drilldown.filters.supplierId === supplierId))
+function metric(value: unknown, supplierId: string, origin: unknown, field: string, asOf: unknown): boolean {
+  const variants: Record<string, string> = { contractAmount: 'contracts', settlementAmount: 'settlements', invoiceAmount: 'invoices', paymentAmount: 'payments' }
+  return isMetricDTO(value) && value.unit === 'CNY' && value.asOf === asOf
+    && (field === 'payableAmount'
+      ? value.drilldown === null
+      : value.drilldown?.kind === 'entity-subview'
+        && value.drilldown.subject.state === 'resolved' && value.drilldown.subject.entity === 'supplier' && value.drilldown.subject.id === supplierId
+        && value.drilldown.variant === variants[field] && value.drilldown.view === null && exactFilters(value.drilldown.filters, { dataOrigin: String(origin) }))
 }
 
 function navigationFilter(value: unknown, key: string, expected: string): boolean {
@@ -250,9 +275,13 @@ function contract(value: unknown, origin: unknown): boolean {
     && typeof value.status === 'string' && typeof value.isDraft === 'boolean'
 }
 
-function settlement(value: unknown, origin: unknown): boolean {
+function settlement(value: unknown, origin: unknown, meta: unknown): boolean {
+  const otherTarget = object(value) && object(value.navigation) && value.navigation.variant === 'other_settlement'
+  const actualOtherSource = isReadMetaDTO(meta) && meta.capabilities.includes('other-settlement:read') && sourceReadable(meta, 'other-settlements')
   return object(value) && entityRef(value.settlement, 'settlement') && value.settlement.state === 'resolved'
-    && navigation(value.navigation, value.settlement, { unavailableReason: 'missing-route' })
+    && (otherTarget
+      ? actualOtherSource && origin === 'real' && navigation(value.navigation, value.settlement, { variant: 'other_settlement', filters: { dataOrigin: 'real' } })
+      : navigation(value.navigation, value.settlement, { unavailableReason: 'missing-route' }))
     && entityRef(value.project, 'project') && navigation(value.projectNavigation, value.project, { filters: { dataOrigin: String(origin) } })
     && entityRef(value.contract, 'contract') && contractNavigation(value.contractNavigation, value.contract, origin)
     && typeof value.settlementType === 'string' && nullableMoney(value.totalAmount) && nullableDate(value.settlementDate)
@@ -281,21 +310,48 @@ function payment(value: unknown, origin: unknown): boolean {
 export function decodeSupplierDetailRead(value: unknown): SupplierDetailReadDTO {
   const supplierId = object(value) && object(value.supplier) && typeof value.supplier.id === 'string' ? value.supplier.id : null
   const summary = object(value) && object(value.summary) ? value.summary : null
-  if (!object(value) || !unavailableSources(value.unavailableSources) || !supplierId || !isDataOriginDTO(value.dataOrigin) || !supplier(value.supplier, value.dataOrigin)
+  if (!object(value) || !hasConsistentReadMeta(value, SUPPLIER_DETAIL_READ_SCHEMA, value.dataOrigin) || !unavailableSources(value.unavailableSources) || !supplierId || !isDataOriginDTO(value.dataOrigin) || !supplier(value.supplier, value.dataOrigin)
     || !Array.isArray(value.projects) || !value.projects.every(item => project(item, value.dataOrigin, supplierId))
     || !Array.isArray(value.contracts) || !value.contracts.every(item => contract(item, value.dataOrigin))
-    || !Array.isArray(value.settlements) || !value.settlements.every(item => settlement(item, value.dataOrigin))
+    || !Array.isArray(value.settlements) || !value.settlements.every(item => settlement(item, value.dataOrigin, value.meta))
     || !Array.isArray(value.invoices) || !value.invoices.every(item => invoice(item, value.dataOrigin))
     || !Array.isArray(value.payments) || !value.payments.every(item => payment(item, value.dataOrigin))
     || !summary || !['projectCount', 'contractCount', 'settlementCount', 'invoiceCount', 'paymentCount']
     .every(field => summary[field] === null || (Number.isSafeInteger(summary[field]) && Number(summary[field]) >= 0))
     || !['contractAmount', 'settlementAmount', 'invoiceAmount', 'paymentAmount', 'payableAmount']
-      .every(field => metric(summary[field], supplierId))
+      .every(field => metric(summary[field], supplierId, value.dataOrigin, field, value.asOf))
       || !isISODateTimeDTO(value.asOf) || (value.sourceVersion !== null && typeof value.sourceVersion !== 'string')
       || !strings(value.capabilities)) {
     return invalid('中央后台返回的分供方详情读模型无效')
   }
   const detail = value as unknown as SupplierDetailReadDTO
+  if (!sourceReadable(detail.meta, 'suppliers'))
+    return invalid('分供方主档缺少实际可读来源证据')
+  for (const [source, count, metricName] of [
+    ['projects', 'projectCount', null],
+    ['contracts', 'contractCount', 'contractAmount'],
+    ['settlements', 'settlementCount', 'settlementAmount'],
+    ['invoices', 'invoiceCount', 'invoiceAmount'],
+    ['payments', 'paymentCount', 'paymentAmount'],
+  ] as const) {
+    if (!sourceReadable(detail.meta, source)) {
+      const amount = metricName === null ? null : detail.summary[metricName]
+      if (detail.summary[count] !== null || (amount && (amount.value !== null || amount.knownValue !== null || amount.participatingCount !== null || amount.missingCount !== null)))
+        return invalid('不可读关联来源不能携带金额或隐藏计数')
+      if (source !== 'projects' && detail[source].length > 0)
+        return invalid('不可读关联来源不能携带业务记录')
+    }
+  }
+  const related = [...detail.contracts, ...detail.settlements, ...detail.invoices, ...detail.payments]
+  if ((!sourceReadable(detail.meta, 'projects') && [...detail.projects, ...related].some(row => row.project.state === 'resolved'))
+    || (!sourceReadable(detail.meta, 'contracts') && [...detail.settlements, ...detail.invoices, ...detail.payments].some(row => row.contract.state === 'resolved'))) {
+    return invalid('不可读关联来源不能泄露目标身份')
+  }
+  const payable = detail.summary.payableAmount
+  if ((!sourceReadable(detail.meta, 'contracts') || !sourceReadable(detail.meta, 'payments'))
+    && (payable.value !== null || payable.knownValue !== null || payable.participatingCount !== null || payable.missingCount !== null)) {
+    return invalid('应付金额缺少实际参与来源证据')
+  }
   return { ...detail, supplier: { ...detail.supplier, laborScope: detail.supplier.laborScope ?? '' } }
 }
 
@@ -320,5 +376,8 @@ export function serializeSupplierDetailQuery(query: SupplierDetailQueryDTO): Rec
 export function supplierProblemFromUnknown(cause: unknown): SupplierRepositoryProblem {
   if (cause instanceof SupplierRepositoryProblem)
     return cause
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new SupplierRepositoryProblem(remote, { cause })
   return new SupplierRepositoryProblem(supplierProblem('unavailable', '分供方中央服务暂时不可用，请重试', true), { cause })
 }

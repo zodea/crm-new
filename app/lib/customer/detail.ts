@@ -1,7 +1,8 @@
 import type { MigrationDb } from '~/lib/db/migrations'
 import { hiddenCtes, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
-import { effectiveAmount, isDraftStatus, nonDraftStatusSql } from '~/lib/project/formal-facts'
+import { isDraftStatus, nonDraftStatusSql } from '~/lib/project/formal-facts'
 import { parseJsonColumn } from '~/lib/util/json'
+import { subtractKnownMoney, sumKnownMoney } from '~/lib/util/number'
 
 export interface CustomerDetailMaster {
   id: string
@@ -30,9 +31,9 @@ export interface CustomerProjectSummary {
   plannedEnd: string
   manager: string
   contractCount: number
-  effectiveContractAmount: number
+  effectiveContractAmount: number | null
   receiptCount: number
-  effectiveReceiptAmount: number
+  effectiveReceiptAmount: number | null
 }
 
 export interface CustomerContractSummary {
@@ -41,11 +42,11 @@ export interface CustomerContractSummary {
   name: string
   projectId: string | null
   projectName: string
-  amount: number
-  changed: number
-  effectiveAmount: number
-  receiptAmount: number
-  outstandingAmount: number
+  amount: number | null
+  changed: number | null
+  effectiveAmount: number | null
+  receiptAmount: number | null
+  outstandingAmount: number | null
   signDate: string
   status: string
   isDraft: boolean
@@ -60,8 +61,8 @@ export interface CustomerReceiptSummary {
   contractId: string | null
   contractName: string
   payerAccount: string
-  amount: number
-  effectiveAmount: number
+  amount: number | null
+  effectiveAmount: number | null
   paymentMethod: string
   status: string
   isDraft: boolean
@@ -70,10 +71,10 @@ export interface CustomerReceiptSummary {
 export interface CustomerDetailSummary {
   projectCount: number
   contractCount: number
-  effectiveContractAmount: number
+  effectiveContractAmount: number | null
   receiptCount: number
-  effectiveReceiptAmount: number
-  outstandingAmount: number
+  effectiveReceiptAmount: number | null
+  outstandingAmount: number | null
   draftReceiptCount: number
 }
 
@@ -94,9 +95,11 @@ function nullableText(value: unknown): string | null {
   return result || null
 }
 
-function numberValue(value: unknown): number {
-  const result = Number(value ?? 0)
-  return Number.isFinite(result) ? result : 0
+function numberValue(value: unknown): number | null {
+  if ((typeof value !== 'number' && typeof value !== 'string') || (typeof value === 'string' && !value.trim()))
+    return null
+  const result = Number(value)
+  return Number.isFinite(result) ? result : null
 }
 
 function toCustomer(row: Record<string, unknown>): CustomerDetailMaster {
@@ -167,11 +170,11 @@ export async function loadCustomerDetail(
        ORDER BY NULLIF(receipt.receipt_date, '') DESC, receipt.created_at DESC`,
       [customerId],
     ),
-    db.select<{ contract_id: string, amount: number }>(
+    db.select<{ contract_id: string, amount: unknown }>(
       `${hiddenCtes('contract_supplements')}
        SELECT
          supplement.contract_id,
-         COALESCE(SUM(supplement.amount), 0) AS amount
+         supplement.amount
        FROM contract_supplements AS supplement
        JOIN contracts AS contract ON contract.id = supplement.contract_id
        LEFT JOIN projects AS project ON project.id = contract.project_id
@@ -183,7 +186,7 @@ export async function loadCustomerDetail(
            contract.customer_id = ?
            OR (contract.customer_id IS NULL AND project.customer_id = ?)
          )
-       GROUP BY supplement.contract_id`,
+       ORDER BY supplement.contract_id, supplement.id`,
       [customerId, customerId],
     ),
   ])
@@ -201,29 +204,29 @@ export async function loadCustomerDetail(
       contractName: text(row.contract_name),
       payerAccount: text(row.payer_account),
       amount,
-      effectiveAmount: effectiveAmount(amount, status),
+      effectiveAmount: isDraftStatus(status) ? 0 : amount,
       paymentMethod: text(row.payment_method),
       status,
       isDraft: isDraftStatus(status),
     }
   })
 
-  const receiptsByContract = new Map<string, number>()
-  const supplementsByContract = new Map(
-    supplementRows.map(row => [row.contract_id, numberValue(row.amount)]),
-  )
-  const receiptFactsByProject = new Map<string, { count: number, amount: number }>()
+  const receiptsByContract = new Map<string, Array<number | null>>()
+  const supplementsByContract = new Map<string, Array<number | null>>()
+  for (const row of supplementRows)
+    supplementsByContract.set(row.contract_id, [...(supplementsByContract.get(row.contract_id) ?? []), numberValue(row.amount)])
+  const receiptFactsByProject = new Map<string, { count: number, amounts: Array<number | null> }>()
   for (const receipt of receipts) {
     if (receipt.contractId) {
       receiptsByContract.set(
         receipt.contractId,
-        (receiptsByContract.get(receipt.contractId) ?? 0) + receipt.effectiveAmount,
+        [...(receiptsByContract.get(receipt.contractId) ?? []), receipt.effectiveAmount],
       )
     }
     if (receipt.projectId) {
-      const fact = receiptFactsByProject.get(receipt.projectId) ?? { count: 0, amount: 0 }
+      const fact = receiptFactsByProject.get(receipt.projectId) ?? { count: 0, amounts: [] }
       fact.count += 1
-      fact.amount += receipt.effectiveAmount
+      fact.amounts.push(receipt.effectiveAmount)
       receiptFactsByProject.set(receipt.projectId, fact)
     }
   }
@@ -232,11 +235,8 @@ export async function loadCustomerDetail(
     const status = text(row.status)
     const amount = numberValue(row.amount)
     const changed = numberValue(row.changed)
-    const formalAmount = effectiveAmount(
-      amount + (supplementsByContract.get(text(row.id)) ?? 0),
-      status,
-    )
-    const receiptAmount = receiptsByContract.get(text(row.id)) ?? 0
+    const formalAmount = isDraftStatus(status) ? 0 : sumKnownMoney([amount, ...(supplementsByContract.get(text(row.id)) ?? [])])
+    const receiptAmount = sumKnownMoney(receiptsByContract.get(text(row.id)) ?? [])
     return {
       id: text(row.id),
       no: text(row.no),
@@ -247,27 +247,27 @@ export async function loadCustomerDetail(
       changed,
       effectiveAmount: formalAmount,
       receiptAmount,
-      outstandingAmount: formalAmount - receiptAmount,
+      outstandingAmount: subtractKnownMoney(formalAmount, receiptAmount),
       signDate: text(row.sign_date),
       status,
       isDraft: isDraftStatus(status),
     }
   })
 
-  const contractFactsByProject = new Map<string, { count: number, amount: number }>()
+  const contractFactsByProject = new Map<string, { count: number, amounts: Array<number | null> }>()
   for (const contract of contracts) {
     if (!contract.projectId)
       continue
-    const fact = contractFactsByProject.get(contract.projectId) ?? { count: 0, amount: 0 }
+    const fact = contractFactsByProject.get(contract.projectId) ?? { count: 0, amounts: [] }
     fact.count += 1
-    fact.amount += contract.effectiveAmount
+    fact.amounts.push(contract.effectiveAmount)
     contractFactsByProject.set(contract.projectId, fact)
   }
 
   const projects: CustomerProjectSummary[] = projectRows.map((row) => {
     const id = text(row.id)
-    const contractFact = contractFactsByProject.get(id) ?? { count: 0, amount: 0 }
-    const receiptFact = receiptFactsByProject.get(id) ?? { count: 0, amount: 0 }
+    const contractFact = contractFactsByProject.get(id) ?? { count: 0, amounts: [] }
+    const receiptFact = receiptFactsByProject.get(id) ?? { count: 0, amounts: [] }
     return {
       id,
       name: text(row.name),
@@ -278,14 +278,14 @@ export async function loadCustomerDetail(
       plannedEnd: text(row.planned_end),
       manager: text(row.manager),
       contractCount: contractFact.count,
-      effectiveContractAmount: contractFact.amount,
+      effectiveContractAmount: sumKnownMoney(contractFact.amounts),
       receiptCount: receiptFact.count,
-      effectiveReceiptAmount: receiptFact.amount,
+      effectiveReceiptAmount: sumKnownMoney(receiptFact.amounts),
     }
   })
 
-  const effectiveContractAmount = contracts.reduce((sum, row) => sum + row.effectiveAmount, 0)
-  const effectiveReceiptAmount = receipts.reduce((sum, row) => sum + row.effectiveAmount, 0)
+  const effectiveContractAmount = sumKnownMoney(contracts.map(row => row.effectiveAmount))
+  const effectiveReceiptAmount = sumKnownMoney(receipts.map(row => row.effectiveAmount))
 
   return {
     customer: toCustomer(customerRow),
@@ -298,7 +298,7 @@ export async function loadCustomerDetail(
       effectiveContractAmount,
       receiptCount: receipts.length,
       effectiveReceiptAmount,
-      outstandingAmount: effectiveContractAmount - effectiveReceiptAmount,
+      outstandingAmount: subtractKnownMoney(effectiveContractAmount, effectiveReceiptAmount),
       draftReceiptCount: receipts.filter(row => row.isDraft).length,
     },
   }

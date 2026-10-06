@@ -130,7 +130,7 @@ describe('分包合同受控中央迁移', () => {
     })
 
     const detail = read.detail('subcontract-central-327', { origin: 'real' })
-    expect(detail.sourceVersion).toContain('owner-document-command-7')
+    expect(detail.meta.sources).toContainEqual(expect.objectContaining({ key: 'subcontract-documents', state: 'readable', sourceVersion: 'owner-document-command-7' }))
     expect(detail.sections.changes).toContainEqual(expect.objectContaining({
       id: 'sub-change-central-327',
       no: 'FB-BQ-327',

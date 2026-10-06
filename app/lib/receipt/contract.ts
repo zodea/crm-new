@@ -1,4 +1,4 @@
-import type { DataOriginDTO, EntityRefDTO, MoneyDTO, ProblemDTO } from '../../types/read-model'
+import type { DataOriginDTO, EntityRefDTO, MoneyDTO, ProblemDTO, ReadMetaDTO } from '../../types/read-model'
 import type { FileRefChanges, FileRefRecord } from '../forms/file-refs'
 
 export const RECEIPT_READ_CAPABILITY = 'receipt:read' as const
@@ -88,6 +88,7 @@ export interface ReceiptContext extends ReceiptReferenceFacts {
   capabilities: readonly string[]
 }
 export interface ReceiptDetail {
+  meta: ReadMetaDTO
   record: ReceiptRecord
   category: null
   receiptType: null
@@ -98,11 +99,15 @@ export interface ReceiptDetail {
   contractProblem?: ProblemDTO
   capabilities: readonly string[]
   asOf: string
-  sourceVersion: string
+  sourceVersion: string | null
 }
 export interface ReceiptPage {
+  meta: ReadMetaDTO
+  originMeta: Record<DataOriginDTO, ReadMetaDTO>
+  asOf: string
+  sourceVersion: string | null
   items: ReceiptDetail[]
-  pagination: { page: number, pageSize: number, total: number }
+  pagination: { requestedPage: number, page: number, pageSize: number, total: number }
   summary: { origins: Record<DataOriginDTO, { count: number, effectiveAmount: MoneyDTO | null }> }
   projectOptions: Array<{ id: string, name: string, dataOrigin: DataOriginDTO }>
   capabilities: readonly string[]

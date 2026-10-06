@@ -1,4 +1,4 @@
-import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 
 export interface PreparedCoreMigration {
   /** 先完成同步领域校验，再连续切换事实；调用方须在同一同步段更新 authority。 */
@@ -8,6 +8,8 @@ export interface PreparedCoreMigration {
 
 export interface CoreMigrationSynchronousSource {
   prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => () => void
+  /** 必须包含软删除和历史事实，防止回滚制造孤立引用。 */
+  assertMigrationRemoval?: (removed: readonly CoreMigrationServerEntityDTO[]) => void
 }
 
 export interface CoreMigrationAsynchronousSource {
@@ -19,6 +21,7 @@ export async function prepareCoreMigrationCommandSources(
   snapshot: CoreMigrationSnapshotDTO,
   sources: readonly CoreMigrationSynchronousSource[],
   asynchronousSources: readonly CoreMigrationAsynchronousSource[] = [],
+  previousSnapshot?: CoreMigrationSnapshotDTO,
 ): Promise<PreparedCoreMigration> {
   const prepared: PreparedCoreMigration[] = []
   let finished = false
@@ -38,6 +41,10 @@ export async function prepareCoreMigrationCommandSources(
       commit() {
         if (finished)
           return
+        const retained = new Set(snapshot.entities.map(row => `${row.entityType}:${row.id}`))
+        const removed = (previousSnapshot?.entities ?? []).filter(row => !retained.has(`${row.entityType}:${row.id}`))
+        for (const source of sources)
+          source.assertMigrationRemoval?.(removed)
         const commits = sources.map(source => source.prepareMigrationSnapshot(snapshot))
         finished = true
         for (const commit of commits)

@@ -92,4 +92,51 @@ describe('打开导入映射页签', () => {
       fullPath: '/import/mapping/demo-supplier',
     }))
   })
+
+  it('仅创建通用入口不加载导入领域，首次执行仍复用原登记与工作流结果', async () => {
+    const push = vi.fn().mockResolvedValue(undefined)
+    const tabsStore = useTabsStore()
+    vi.stubGlobal('useRouter', () => ({ push }))
+    vi.stubGlobal('useTabsStore', () => tabsStore)
+    vi.stubGlobal('useToast', () => ({ warning: vi.fn() }))
+    let loaded = 0
+    let enter!: () => void
+    let release!: () => void
+    const started = new Promise<void>((resolve) => {
+      enter = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    vi.resetModules()
+    vi.doMock('~/lib/kit/import-entities', async (original) => {
+      loaded++
+      enter()
+      await gate
+      return await original()
+    })
+    try {
+      const { useImportMappingTab: createImportTab } = await import('~/composables/useImportMappingTab')
+      const open = createImportTab()
+      expect(loaded, '通用壳取得原语时不应求值所有导入领域').toBe(0)
+      const options = { entity: 'demo-supplier' }
+      const pending = open(options)
+      await started
+      options.entity = 'unknown-entity'
+      release()
+      await expect(pending).resolves.toEqual({ status: 'opened', fullPath: '/import/mapping/demo-supplier' })
+      expect(loaded).toBe(1)
+      expect(push).toHaveBeenCalledWith('/import/mapping/demo-supplier')
+      const unknown = { entity: 'unknown-entity' }
+      const rejected = open(unknown)
+      unknown.entity = 'demo-supplier'
+      await expect(rejected).rejects.toThrow('未登记的导入实体：unknown-entity')
+      expect(loaded).toBe(1)
+    }
+    finally {
+      release()
+      vi.doUnmock('~/lib/kit/import-entities')
+      vi.resetModules()
+    }
+  })
 })

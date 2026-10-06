@@ -8,6 +8,7 @@ const props = defineProps<{
   facts: OtherSettlementFact[] | null
   kind: OtherSettlementFact['kind']
   selectedId?: string
+  unavailableReason?: string | null
 }>()
 const emit = defineEmits<{
   select: [
@@ -25,8 +26,8 @@ const label = computed(() => ({ penalty: '奖罚抵扣', application: '付款申
 <template>
   <section class="panel min-w-0 p-4">
     <SectionHeader :title="label" />
-    <StatePanel v-if="facts === null" kind="empty" title="关联事实不可用" description="未记录完整事实或稳定关系已失效，无法判定为零。" compact />
-    <template v-else>
+    <StatePanel v-if="facts === null || unavailableReason" kind="empty" title="关联事实不可用" :description="unavailableReason || '未记录完整事实或稳定关系已失效，无法判定为零。'" compact />
+    <template v-if="facts !== null && (!unavailableReason || rows.length)">
       <div role="region" :aria-label="`${label}表`" tabindex="0" class="mt-3 min-w-0 overflow-x-auto">
         <table class="w-full min-w-180 border-collapse text-left text-13px">
           <thead class="bg-surface-2 text-ink-soft">
@@ -42,7 +43,7 @@ const label = computed(() => ({ penalty: '奖罚抵扣', application: '付款申
                 {{ row.no || '未记录' }}
               </td><td>{{ row.name || '未记录' }}</td><td>{{ row.date || '未记录' }}</td><td class="font-mono">
                 {{ auxiliaryMoney(row.attribution === 'exact' ? row.amount : null) }}
-              </td><td>{{ row.status === 'executed' ? '已执行' : financeStatusLabel(row.status) }}</td><td>{{ isEffectiveSettlementFact(row) ? row.attribution === 'exact' ? '按真实关联' : '缺少结算级分摊' : '无效事实不计入' }}</td><td>
+              </td><td>{{ row.status === 'executed' ? '已执行' : financeStatusLabel(row.status) }}</td><td>{{ row.unavailableReason || (isEffectiveSettlementFact(row) ? row.attribution === 'exact' ? '按真实关联' : '缺少结算级分摊' : '无效事实不计入') }}</td><td>
                 <button :id="`fact-${row.id}`" type="button" class="cursor-pointer border-0 bg-transparent text-brand underline" @click="emit('select', row.id)">
                   查看关联事实
                 </button>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FileRefRecord } from '~/lib/forms/file-refs'
 import type { OcrRecognitionResult } from '~/lib/recognize/engine'
+import type { SupplierCredentialReviewProof, SupplierCredentialStatus } from '~/lib/supplier/credential-contract'
 import type {
   CredentialOcrFieldChoice,
   CredentialOcrFieldKey,
@@ -28,10 +29,10 @@ import {
   shanghaiBusinessDate,
   SUPPLIER_CREDENTIAL_CATEGORIES,
 } from '~/lib/supplier/detail'
-import { CREDENTIAL_STATUS_LABEL } from '~/lib/supplier/status'
 import { formatShanghaiDateTime } from '~/lib/util/datetime'
 import { toErrorMessage } from '~/lib/util/error'
 import SupplierCredentialOcrReview from './SupplierCredentialOcrReview.vue'
+import SupplierCredentialReviewStatus from './SupplierCredentialReviewStatus.vue'
 
 const props = defineProps<{
   supplierId: string
@@ -70,6 +71,9 @@ const pendingOcrFiles = shallowRef<PendingOcrFile[]>([])
 const ocrReturnFocusElement = shallowRef<HTMLElement | null>(null)
 
 const supplier = computed(() => supplierStore.byId(props.supplierId))
+const reviewHistory = computed(() => {
+  return [...(props.snapshot.reviewHistory ?? [])] as SupplierCredentialReviewProof[]
+})
 const credentials = computed(() => [...props.snapshot.credentials])
 const requirementCategories = computed(() =>
   SUPPLIER_CREDENTIAL_CATEGORIES.filter(category =>
@@ -631,54 +635,14 @@ function ocrReviewLabel(credential: SupplierCredential): string {
 
 <template>
   <div class="flex min-w-0 flex-col gap-4">
-    <section class="panel grid gap-3 p-4" aria-labelledby="credential-status-title">
-      <div class="flex flex-wrap items-start gap-3">
-        <div class="mr-auto">
-          <h3 id="credential-status-title" class="text-13px font-700 text-ink">
-            资料核验状态
-          </h3>
-          <p class="mt-1 text-11px text-ink-faint">
-            文件齐全只会进入待核验；合格与退回必须由人工产生。
-          </p>
-        </div>
-        <span
-          class="chip"
-          :class="supplier?.credentialStatus === 'qualified'
-            ? 'chip-ok'
-            : supplier?.credentialStatus === 'rejected'
-              ? 'chip-danger'
-              : supplier?.credentialStatus === 'reviewing'
-                ? 'chip-brand'
-                : 'chip-warn'"
-        >
-          {{ CREDENTIAL_STATUS_LABEL[supplier?.credentialStatus ?? 'incomplete'] }}
-        </span>
-      </div>
-      <p v-if="supplier?.credentialReviewedAt" class="text-11px text-ink-soft">
-        最近人工核验：{{ formatDateTime(supplier.credentialReviewedAt) }}
-        <span v-if="supplier.credentialReviewNote"> · {{ supplier.credentialReviewNote }}</span>
-      </p>
-      <div class="flex flex-wrap justify-end gap-2">
-        <button
-          type="button"
-          class="btn-secondary"
-          :disabled="supplier?.credentialStatus !== 'reviewing'"
-          title="仅齐全待核验状态可以人工退回"
-          @click="reviewCredentials('rejected')"
-        >
-          退回整改
-        </button>
-        <button
-          type="button"
-          class="btn-primary"
-          :disabled="supplier?.credentialStatus !== 'reviewing'"
-          title="仅齐全待核验状态可以人工通过"
-          @click="reviewCredentials('qualified')"
-        >
-          人工核验通过
-        </button>
-      </div>
-    </section>
+    <SupplierCredentialReviewStatus
+      :status="(supplier?.credentialStatus ?? 'incomplete') as SupplierCredentialStatus"
+      :review="reviewHistory.at(-1) ?? null"
+      :review-current="!!supplier?.credentialReviewedAt && reviewHistory.at(-1)?.reviewedAt === supplier.credentialReviewedAt && reviewHistory.at(-1)?.decision === supplier.credentialStatus"
+      :review-history="reviewHistory"
+      :can-write="true"
+      @review="reviewCredentials"
+    />
 
     <section class="panel p-4" aria-labelledby="credential-requirement-title">
       <h3 id="credential-requirement-title" class="text-13px font-700 text-ink">

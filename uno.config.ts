@@ -196,7 +196,7 @@ export default defineConfig({
     'panel-hover': 'transition-[border-color,background-color] duration-[var(--dur-fast)] hover:border-brand hover:bg-surface-2',
     'section-heading': 'min-h-8 flex items-center gap-2 border-y border-line bg-surface-2 px-3',
 
-    // 按钮：五变体层级语言（权威源 DESIGN-TASTE §4.2，#109）。
+    // 按钮：五变体层级语言（KitUI §06；历史定位 DESIGN-SYSTEM#a01-history，#109）。
     // 缺省 = btn-secondary 安静按钮；实心蓝只属于 btn-accent（每屏 ≤1 枚核心 CTA）；
     // btn-danger = 静默红（破坏性防护在确认弹窗，ADR 0003）；hover 平面变色、active scale(0.97)。
     // btn-look-* 是五变体外观的唯一定义处：shadcn Button 的 cva 变体表（ui/button/index.ts）

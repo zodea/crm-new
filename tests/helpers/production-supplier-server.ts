@@ -36,6 +36,10 @@ async function start() {
   router.post('/api/commands/suppliers/:id/taxpayer-verification', (await import('../../server/api/commands/suppliers/[id]/taxpayer-verification.post')).default)
   router.post('/api/commands/supplier-credentials', (await import('../../server/api/commands/supplier-credentials.post')).default)
   router.post('/api/commands/supplier-resolve', (await import('../../server/api/commands/supplier-resolve.post')).default)
+  router.get('/api/read/notifications', (await import('../../server/api/read/notifications.get')).default)
+  router.post('/api/commands/notifications', (await import('../../server/api/commands/notifications.post')).default)
+  // Same startup catch-up used by the Nitro plugin, with the real production owner and storage.
+  await (await import('../../server/utils/production-notification-runtime')).productionNotificationRuntime()?.notifications.scheduled()
   app.use(router)
   createServer(toNodeListener(app)).listen(Number(process.env.NITRO_PORT), '127.0.0.1')
 }

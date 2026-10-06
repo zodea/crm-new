@@ -4,7 +4,7 @@ import { cva } from 'class-variance-authority'
 
 export { default as Button } from './Button.vue'
 
-// 五变体层级语言（权威源 DESIGN-TASTE §4.2，#109）：
+// 五变体层级语言（权威源 KitUI §06，#109）：
 // 缺省 = secondary 描边白底安静按钮；实心蓝只属于 accent（每屏 ≤1 枚核心 CTA）；
 // destructive = 静默红（破坏性防护在确认弹窗，ADR 0003，按钮不必嘶吼）。
 // 五变体外观唯一源 = uno.config.ts 的 btn-look-* shortcuts（本文件被 UnoCSS 扫描，直接引用即可生成），

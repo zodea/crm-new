@@ -273,6 +273,8 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
   await page.getByRole('button', { name: '撤回本次删除', exact: true }).click()
   await page.getByRole('dialog', { name: '撤回本次删除' }).getByRole('button', { name: '确认撤回' }).click()
   expect((await snapshot()).status).toBe('reviewing')
+  expect(await snapshot()).toMatchObject({ reviewCurrent: false, review: { note: supplierInput.reviewNote }, reviewHistory: [expect.objectContaining({ decision: 'qualified', note: supplierInput.reviewNote })] })
+  await expect(page.getByText('历史凭证已保留；当前资料或有效期已变化，不能据此认定当前资料已核验。', { exact: true })).toBeVisible()
   expect((await snapshot()).credentials.find(row => row.id === original.id)?.file?.id).toBe(original.file!.id)
   await evidence(page, info, '07-restored-original-requires-review')
   await page.getByRole('link', { name: '返回分供方详情' }).click()

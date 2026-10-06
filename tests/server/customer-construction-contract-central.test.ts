@@ -1,6 +1,8 @@
 import type { ProjectContractFormDraft } from '~/lib/contract/forms'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { encodePayrollHostSection } from '~/lib/crew-worker/payroll-read'
 import { decodeCustomerDetailRead } from '~/lib/customer/repository'
+import { decodeProjectDetailRead } from '~/lib/project/repository'
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { prepareConstructionContractChainIdentityFixtures } from '../../server/utils/construction-contract-chain-test-fixture'
 import { constructionContractCommandTestInstance as commands } from '../../server/utils/construction-contract-command-test-instance'
@@ -10,21 +12,24 @@ import { customerReadTestInstance as reads } from '../../server/utils/customer-r
 import { projectCommandTestInstance } from '../../server/utils/project-command-test-instance'
 import { projectReadTestInstance as projects } from '../../server/utils/project-read-test-instance'
 import { supplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { prepareVerifiedSignatory } from '../helpers/verified-signatory'
 
 const session = resolveBusinessSession()
 const scope = 'customer-construction-contract-425'
+let adoption: Pick<ProjectContractFormDraft, 'ourSignatoryId' | 'ourSignatoryVersion' | 'ourSignatorySnapshot'>
 let sequence = 0
 const envelope = () => ({ ...session, commandId: `cc-${++sequence}`, baseVersion: null, action: 'save' as const, attachments: {} })
 function save(draft: ProjectContractFormDraft = {}) {
   return commands.execute({
     ...envelope(),
     requiredCapability: 'construction-contract:write',
-    draft: { name: '合成施工合同', projectId: 'project-real-320', customerId: 'customer-real-320', content: '合成施工', signDate: '2026-09-09', amount: 123400, ...draft },
+    draft: { ...adoption, name: '合成施工合同', projectId: 'project-real-320', customerId: 'customer-real-320', content: '合成施工', signDate: '2026-09-09', amount: 123400, ...draft },
   }, session, scope)
 }
 const detail = async (id = 'customer-real-320', origin = 'real', sessionId = scope) => decodeCustomerDetailRead(await reads.detail(id, { origin, includeDemo: String(origin === 'demo') }, sessionId))
 
-beforeEach(() => {
+beforeEach(async () => {
+  adoption = await prepareVerifiedSignatory(scope, '此用例已核实我方公司425')
   prepareConstructionContractChainIdentityFixtures(scope)
   prepareConstructionContractChainIdentityFixtures('other-contract-425')
 })
@@ -42,6 +47,32 @@ afterEach(() => {
 })
 
 describe('正式施工合同保存→客户中央回读', () => {
+  it('同项目各总合同配置以稳定ID独立投影，变更刷新来源但不生成管理费实际成本或现金', async () => {
+    const first = await save({ managementFeeAmount: 0, managementFeeBasis: '合同明确不记取' })
+    const second = await save({ managementFeeAmount: null, managementFeeBasis: '金额尚未明确' })
+    const readProject = async () => {
+      const raw = await projects.detail('project-real-320', { origin: 'real', includeDemo: 'false' }, scope)
+      return decodeProjectDetailRead({ ...raw, payrollActual: raw.payrollActual && encodePayrollHostSection(raw.payrollActual) })
+    }
+    const read = await readProject()
+    expect(read.constructionManagementFees.state).toBe('complete')
+    expect(read.constructionManagementFees.contracts.map(row => [row.id, row.configuration.amount]).sort()).toEqual([[first.id, 0], [second.id, null]].sort())
+    const actual = structuredClone(read.managementFees)
+    const version = read.constructionManagementFees.sourceVersion
+    await commands.execute({ ...envelope(), id: first.id, baseVersion: first.version, requiredCapability: 'construction-contract:write', draft: { ...commands.form(first.id, session, scope).draft, managementFeeAmount: 1200, managementFeeBasis: '改用条款' } }, session, scope)
+    const changed = await readProject()
+    expect(changed.constructionManagementFees.sourceVersion).not.toBe(version)
+    expect(changed.constructionManagementFees.contracts.find(row => row.id === first.id)?.configuration.history.map(row => row.amount)).toEqual([0, 1200])
+    const { asOf: _beforeTime, ...beforeCost } = actual.actualCost
+    const { asOf: _afterTime, ...afterCost } = changed.managementFees.actualCost
+    expect(afterCost).toEqual(beforeCost)
+    expect(changed.managementFees.sources.map(({ key, actualCost: { asOf: _time, ...cost }, rows }) => [key, cost, rows])).toEqual(actual.sources.map(({ key, actualCost: { asOf: _time, ...cost }, rows }) => [key, cost, rows]))
+    expect(changed.managementFees.actualCost.value).toBeNull()
+    expect((await contracts.detail(first.id, { origin: 'real', includeDemo: 'false' }, scope)).contract.amounts.contract).toBe('123400.00')
+    const missingProof = structuredClone(changed)
+    missingProof.meta.sources = missingProof.meta.sources.filter(row => row.key !== 'construction-management-fee-configurations')
+    expect(() => decodeProjectDetailRead(missingProof)).toThrow('独立来源授权或证明')
+  })
   it.each([
     { action: 'draft', inputStatus: '履约中', expectedStatus: '草稿' },
     { action: 'submit', inputStatus: '草稿', expectedStatus: '审批中' },
@@ -51,7 +82,7 @@ describe('正式施工合同保存→客户中央回读', () => {
       ...envelope(),
       action: input.action,
       requiredCapability: 'construction-contract:write',
-      draft: { name: '状态回读施工合同', projectId: 'project-real-320', customerId: 'customer-real-320', content: '合成施工', signDate: '2026-09-09', amount: 113, status: input.inputStatus },
+      draft: { ...adoption, name: '状态回读施工合同', projectId: 'project-real-320', customerId: 'customer-real-320', content: '合成施工', signDate: '2026-09-09', amount: 113, status: input.inputStatus },
     }, session, scope)
     expect(commands.form(result.id, session, scope).draft.status).toBe(input.expectedStatus)
     const read = await contracts.detail(result.id, { origin: 'real', includeDemo: 'false' }, scope)

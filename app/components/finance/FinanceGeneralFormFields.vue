@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { FinancePageDraft } from '~/lib/finance/page'
 import type { LookupOption } from '~/lib/kit/lookup'
-import { computed } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
+import { financeDraftMoney, financeInputNumber as inputNumber } from '~/lib/finance/input-number'
 import FinanceLineGrid from './FinanceLineGrid.vue'
 
 const props = defineProps<{
@@ -9,6 +10,9 @@ const props = defineProps<{
   draft: FinancePageDraft
   fieldErrors?: Record<string, string>
   fetchProjects: (keyword: string) => Promise<LookupOption[]>
+  fetchWorkers?: (keyword: string) => Promise<LookupOption[]>
+  fetchOriginalExpenses?: (keyword: string) => Promise<LookupOption[]>
+  fetchSuppliers: (keyword: string) => Promise<LookupOption[]>
 }>()
 
 const emit = defineEmits<{
@@ -16,6 +20,16 @@ const emit = defineEmits<{
   clearError: [field: string]
 }>()
 
+const selectedApplicantKind = shallowRef<'worker' | 'supplier' | null>(null)
+watch(() => `${props.kind}:${props.draft.id ?? 'new'}`, () => {
+  selectedApplicantKind.value = null
+})
+const applicantKind = computed(() => selectedApplicantKind.value ?? (props.draft.applicantSupplierId ? 'supplier' : 'worker'))
+const APPLICANT_KIND_OPTIONS = [{ key: 'worker', label: '工人清单' }, { key: 'supplier', label: '分供方清单' }]
+function changeApplicantKind(value: string | null | undefined) {
+  selectedApplicantKind.value = value === 'supplier' ? 'supplier' : 'worker'
+  emit('patch', { applicantWorkerId: null, applicantSupplierId: null, applicantNameSnapshot: null })
+}
 const PAYMENT_METHOD_OPTIONS = ['银行转账', '承兑汇票', '现金', '其他']
   .map(value => ({ key: value, label: value }))
 const DIRECTION_OPTIONS = [
@@ -23,7 +37,7 @@ const DIRECTION_OPTIONS = [
   { key: 'payment', label: '付款' },
 ]
 const reimbursementTotal = computed(() =>
-  (props.draft.lines ?? []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0),
+  (props.draft.lines ?? []).reduce((sum, line) => sum + (line.amount == null ? Number.NaN : Number(line.amount)), 0),
 )
 
 function patch(field: keyof FinancePageDraft, value: unknown) {
@@ -38,10 +52,6 @@ function updateLines(lines: unknown[]) {
 
 function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value
-}
-
-function inputNumber(event: Event): number {
-  return Number((event.target as HTMLInputElement).value) || 0
 }
 
 function fieldClass(field: string) {
@@ -68,11 +78,17 @@ function fieldClass(field: string) {
           <LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" recent-key="finance-current-project" placeholder="检索项目" @update:model-value="patch('projectId', $event)" />
           <span v-if="fieldErrors?.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
         </div>
-        <label class="field-block">
-          <span class="field-label">往来方 *</span>
-          <input :value="draft.counterparty" class="field-input w-full" :class="[fieldClass('counterparty')]" data-testid="finance-name" @input="patch('counterparty', inputValue($event))">
-          <span v-if="fieldErrors?.counterparty" class="field-error">{{ fieldErrors.counterparty }}</span>
-        </label>
+        <div class="field-block" :class="fieldClass('supplierId')">
+          <span class="field-label">往来分供方 *</span>
+          <LookupSelect :model-value="draft.supplierId" :fetch="fetchSuppliers" recent-key="finance-current-supplier" placeholder="选择分供方（个人临时金也在此建档）" @update:model-value="patch('supplierId', $event)" />
+          <p v-if="draft.counterpartyNameSnapshot" class="text-12px text-ink-soft">
+            采用时名称：{{ draft.counterpartyNameSnapshot }}
+          </p>
+          <p v-if="draft.counterparty" class="text-12px text-ink-soft">
+            原往来方文字：{{ draft.counterparty }}
+          </p>
+          <span v-if="fieldErrors?.supplierId" class="field-error">{{ fieldErrors.supplierId }}</span>
+        </div>
         <label class="field-block form-span-full">
           <span class="field-label">款项性质</span>
           <input :value="draft.purpose" class="field-input w-full" @input="patch('purpose', inputValue($event))">
@@ -116,11 +132,19 @@ function fieldClass(field: string) {
           <span class="field-label">报销单号</span>
           <input :value="draft.no" class="field-input w-full font-mono" data-testid="finance-no" @input="patch('no', inputValue($event))">
         </label>
-        <label class="field-block">
-          <span class="field-label">报销人 *</span>
-          <input :value="draft.applicant" class="field-input w-full" :class="[fieldClass('applicant')]" data-testid="finance-name" @input="patch('applicant', inputValue($event))">
-          <span v-if="fieldErrors?.applicant" class="field-error">{{ fieldErrors.applicant }}</span>
-        </label>
+        <div class="field-block">
+          <span class="field-label">报销／垫付身份 *</span>
+          <SelectFilter :model-value="applicantKind" :options="APPLICANT_KIND_OPTIONS" full-width aria-label="报销身份类型" @update:model-value="changeApplicantKind" />
+          <LookupSelect v-if="applicantKind === 'worker' && fetchWorkers" :model-value="draft.applicantWorkerId" :fetch="fetchWorkers" recent-key="finance-reimbursement-worker" placeholder="从全局工人清单选择" @update:model-value="patch('applicantWorkerId', $event)" />
+          <LookupSelect v-else-if="applicantKind === 'supplier'" :model-value="draft.applicantSupplierId" :fetch="fetchSuppliers" recent-key="finance-reimbursement-applicant-supplier" placeholder="选择垫付分供方" @update:model-value="patch('applicantSupplierId', $event)" />
+          <p v-if="draft.applicantNameSnapshot" class="text-12px text-ink-soft">
+            采用时姓名：{{ draft.applicantNameSnapshot }}
+          </p>
+          <p v-if="draft.applicant" class="text-12px text-ink-soft">
+            原报销人文字：{{ draft.applicant }}
+          </p>
+          <span v-if="fieldErrors?.applicantWorkerId" class="field-error">{{ fieldErrors.applicantWorkerId }}</span>
+        </div>
         <div class="field-block">
           <span class="field-label">归属项目（可空=公司开支）</span>
           <LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" recent-key="finance-reimbursement-project" placeholder="留空表示公司开支" @update:model-value="patch('projectId', $event)" />
@@ -151,7 +175,9 @@ function fieldClass(field: string) {
       <FinanceLineGrid
         kind="reimbursement"
         :lines="draft.lines ?? []"
-        :total-label="`合计 ¥ ${reimbursementTotal.toFixed(2)}`"
+        :fetch-counterparties="fetchSuppliers"
+        :fetch-original-expenses="fetchOriginalExpenses"
+        :total-label="`合计 ¥ ${financeDraftMoney(reimbursementTotal)}`"
         empty="暂无明细，请新增一行"
         @update="updateLines"
       />

@@ -8,6 +8,11 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/server/crew-worker-resolve-http.test.ts](../../../tests/server/crew-worker-resolve-http.test.ts) | 单元／服务／状态 | 班组工人HTTP原命令核对及结果封存 |
+| [tests/server/crew-worker-read-meta.test.ts](../../../tests/server/crew-worker-read-meta.test.ts) | 单元／服务／状态 | 全局工人、班组及项目主档的真实来源证明 |
+| [tests/stores/crew-form-revalidation.test.ts](../../../tests/stores/crew-form-revalidation.test.ts) | 单元／服务／状态 | 班组表单同目标后读与来源切换 |
+| [tests/stores/crew-worker-persistent-command.test.ts](../../../tests/stores/crew-worker-persistent-command.test.ts) | 单元／服务／状态 | 班组工人原提交、成员最小上下文与独立跨刷新恢复 |
+| [tests/crew-worker/reference-privacy.test.ts](../../../tests/crew-worker/reference-privacy.test.ts) | 单元／服务／状态 | 工人目录与项目来源权限独立 |
 | [tests/crew-worker/command-http-repository.test.ts](../../../tests/crew-worker/command-http-repository.test.ts) | 单元／服务／状态 | 班组—工人中央 command HTTP Repository |
 | [tests/crew-worker/http-repository.test.ts](../../../tests/crew-worker/http-repository.test.ts) | 单元／服务／状态 | 班组—工人中央 HTTP Repository |
 | [tests/crew-worker/member-management.test.ts](../../../tests/crew-worker/member-management.test.ts) | 单元／服务／状态 | 班组成员关系命令 |
@@ -27,9 +32,11 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/components/CrewWorkerCentralListScreen.test.ts](../../../tests/components/CrewWorkerCentralListScreen.test.ts) | 组件（jsdom） | 全局目录合法旧快照及不可用反馈 |
+| [tests/components/CrewWorkerMigrationPanel.test.ts](../../../tests/components/CrewWorkerMigrationPanel.test.ts) | 组件（jsdom） | 完整来源选择、明示映射、原键恢复及身份失效隔离 |
 | [tests/components/CrewDetailSections.test.ts](../../../tests/components/CrewDetailSections.test.ts) | 组件（jsdom） | 班组详情关系区块 |
 | [tests/components/CrewFormFields.test.ts](../../../tests/components/CrewFormFields.test.ts) | 组件（jsdom） | 班组表单领域字段 |
-| [tests/components/CrewMemberSection.test.ts](../../../tests/components/CrewMemberSection.test.ts) | 组件（jsdom） | 班组成员管理区 |
+| [tests/components/CrewMemberSection.test.ts](../../../tests/components/CrewMemberSection.test.ts) | 组件（jsdom） | 班组成员管理及候选排除后的原提交恢复、撤权清理 |
 | [tests/components/CrewWorkerCentralDetailScreen.test.ts](../../../tests/components/CrewWorkerCentralDetailScreen.test.ts) | 组件（jsdom） | 班组—工人中央详情 |
 | [tests/components/WorkerDetailSections.test.ts](../../../tests/components/WorkerDetailSections.test.ts) | 组件（jsdom） | 工人详情独立区块 |
 | [tests/components/WorkerPrivateProfileState.test.ts](../../../tests/components/WorkerPrivateProfileState.test.ts) | 组件（jsdom） | 换工人后的迟到读取不能显示另一人的实名字段 |
@@ -40,6 +47,14 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/crew-detail.spec.ts](../../../e2e/crew-detail.spec.ts) | Playwright E2E | Issue #194：班组详情 |
-| [e2e/issue-316-crew-worker-central-chain.spec.ts](../../../e2e/issue-316-crew-worker-central-chain.spec.ts) | Playwright E2E | Issue #316：班组—工人中央关系链 |
+| [e2e/issue-316-crew-worker-central-chain.spec.ts](../../../e2e/issue-316-crew-worker-central-chain.spec.ts) | Playwright E2E | 班组—工人跨项目身份、整页及成员原命令恢复、五档布局／局部滚动／焦点 |
 | [e2e/worker-detail.spec.ts](../../../e2e/worker-detail.spec.ts) | Playwright E2E | Issue #194：工人详情 |
 | [e2e/worker-roster-archive.spec.ts](../../../e2e/worker-roster-archive.spec.ts) | Playwright E2E | 工人整页维护、工资成员归档、冷回读、真实照片 ZIP 与权限撤销 |
+| [e2e/production-crew-worker-storage.spec.ts](../../../e2e/production-crew-worker-storage.spec.ts) | Playwright E2E | 真磁盘全局工人班组整页新建／编辑、跨项目选择同一稳定工人、候选改名刷新、私密银行资料与历史保全、明确 Native 原图迁入、实名原件、五档视口及冷读 |
+
+## 辅助文件与配置（非独立测试）
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/helpers/crew-worker-native-source.ts](../../../tests/helpers/crew-worker-native-source.ts) | 辅助／夹具 | 带原始私密字段、原件、冻结名册和回执的真实合成 Native 来源 |
+| [e2e/helpers/crew-worker-production-fixture.ts](../../../e2e/helpers/crew-worker-production-fixture.ts) | 辅助／夹具 | 使用实际正式服务创建目录及跨项目测试关系 |

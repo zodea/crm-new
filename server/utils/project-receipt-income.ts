@@ -1,4 +1,5 @@
 import type { ProjectListSourceRow } from '../../app/lib/project/read-contract'
+import type { SourceEvidenceDTO } from '../../app/types/read-model'
 import { effectiveReceiptAmount } from '../../app/lib/receipt/effective'
 import { receiptProblemFromUnknown } from '../../app/lib/receipt/repository'
 import { receiptReadTestInstance } from './receipt-read-test-instance'
@@ -7,7 +8,7 @@ import { receiptReadTestInstance } from './receipt-read-test-instance'
 export function projectReceiptIncome(rows: readonly ProjectListSourceRow[], sessionId?: string | null) {
   try {
     const source = receiptReadTestInstance.facts(sessionId)
-    return { sourceVersion: source.sourceVersion, asOf: source.asOf, rows: rows.map((row) => {
+    return { source: { key: 'receipts', state: 'readable', sourceVersion: source.sourceVersion, asOf: new Date().toISOString() } as SourceEvidenceDTO, sourceVersion: source.sourceVersion, asOf: source.asOf, rows: rows.map((row) => {
       if (row.dataOrigin !== 'real')
         return row
       const amount = effectiveReceiptAmount(source.rows.filter(receipt => receipt.dataOrigin === row.dataOrigin && receipt.draft.projectId === row.id))
@@ -16,6 +17,6 @@ export function projectReceiptIncome(rows: readonly ProjectListSourceRow[], sess
   }
   catch (cause) {
     const code = receiptProblemFromUnknown(cause).problem.code
-    return { sourceVersion: `receipt-${code}`, rows: rows.map(row => row.dataOrigin === 'real' ? { ...row, income: null, incomeMissingSource: `receipt-registrations:${code}` } : row) }
+    return { source: { key: 'receipts', state: code === 'forbidden' ? 'forbidden' : 'unavailable', sourceVersion: null, asOf: null } as SourceEvidenceDTO, rows: rows.map(row => row.dataOrigin === 'real' ? { ...row, income: null, incomeMissingSource: `receipt-registrations:${code}` } : row) }
   }
 }

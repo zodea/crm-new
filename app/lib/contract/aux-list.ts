@@ -20,7 +20,7 @@ export interface ContractAuxRow {
   category: string
   counterparty: string
   period: string
-  amount: number
+  amount: number | null
   date: string
   status: string
 }
@@ -133,6 +133,12 @@ export const CONTRACT_AUX_LIST_CONFIG: Record<ContractAuxListKind, ContractAuxLi
 
 function normalized(value: unknown): string {
   return String(value ?? '').trim().toLocaleLowerCase('zh-CN')
+}
+
+export function contractAuxAmountTotal(rows: readonly ContractAuxRow[]): number | null {
+  return rows.some(row => row.amount === null)
+    ? null
+    : rows.reduce((total, row) => total + row.amount!, 0)
 }
 
 export function filterContractAuxRows(

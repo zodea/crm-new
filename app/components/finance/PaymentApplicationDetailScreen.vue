@@ -2,21 +2,30 @@
 import type {
   PaymentApplicationDetail,
 } from '~/lib/finance/payment-detail'
+import { onBeforeUnmount } from 'vue'
 import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
 import { approvalAmountLabel } from '~/lib/finance/approval-amount'
-import { loadPaymentApplicationDetail } from '~/lib/finance/payment-detail'
 import { financeStatusLabel } from '~/lib/finance/status'
+import { bindReadAuthority } from '~/lib/read-model/authority'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
+import { useFinanceStore } from '~/stores/finance'
 
 const route = useRoute()
+const finance = useFinanceStore()
 const detail = shallowRef<PaymentApplicationDetail | null>(null)
 const errorMessage = shallowRef('')
 const settledId = shallowRef('')
 let requestVersion = 0
 let active = true
-
 const applicationId = computed(() => String(route.params.id ?? ''))
+bindReadAuthority((problem) => {
+  ++requestVersion
+  detail.value = null
+  errorMessage.value = problem.message
+  settledId.value = applicationId.value
+})
+
 const projectSupplierReturn = useProjectSupplierReturnContext(
   () => detail.value?.projectId,
   () => detail.value?.supplierId,
@@ -59,7 +68,7 @@ async function load() {
   errorMessage.value = ''
   settledId.value = ''
   try {
-    const next = await loadPaymentApplicationDetail(id)
+    const next = await finance.paymentApplicationDetail(id)
     if (currentRequest !== requestVersion)
       return
     detail.value = next
@@ -93,6 +102,9 @@ function createPayment() {
     query.supplierId = current.supplierId
   void navigateTo({ path: '/finance/records/new', query })
 }
+function sourceLabel(value?: string): string {
+  return value === 'frozen' ? '历史冻结依据；当前来源尚未核实' : value === 'forbidden' ? '当前身份无来源读取权限' : value === 'unavailable' ? '当前真实来源待核验' : ''
+}
 
 watch(applicationId, () => {
   if (active)
@@ -101,6 +113,10 @@ watch(applicationId, () => {
 onDeactivated(() => {
   active = false
   requestVersion += 1
+})
+onBeforeUnmount(() => {
+  active = false
+  ++requestVersion
 })
 onActivated(() => {
   if (!active) {
@@ -143,10 +159,10 @@ onActivated(() => {
       <KitButton v-if="detail?.projectId" variant="secondary" @click="navigateTo(`/project/${detail.projectId}`)">
         <span class="i-lucide-building-2 mr-1" aria-hidden="true" />查看项目
       </KitButton>
-      <KitButton v-if="detail && detail.registrationAmount > 0" variant="secondary" data-testid="payment-application-create-payment" @click="createPayment">
+      <KitButton v-if="detail && detail.registrationAmount > 0 && detail.canRegisterPayment !== false" variant="secondary" data-testid="payment-application-create-payment" @click="createPayment">
         <span class="i-lucide-banknote-arrow-up mr-1" aria-hidden="true" />登记支付
       </KitButton>
-      <KitButton variant="primary" data-testid="payment-application-edit" @click="openEdit">
+      <KitButton v-if="detail?.canEdit !== false" variant="primary" data-testid="payment-application-edit" @click="openEdit">
         <span class="i-lucide-square-pen mr-1" aria-hidden="true" />编辑申请
       </KitButton>
     </template>
@@ -158,7 +174,7 @@ onActivated(() => {
         <Metric label="已确认支付" :value="detail.paidAmount" :money="true" tone="ok" />
         <Metric label="待支付" :value="detail.unpaidAmount ?? '—'" :money="true" :status="detail.unpaidAmount === null ? '历史批复待核验' : ''" :tone="detail.unpaidAmount === null ? undefined : detail.unpaidAmount ? 'danger' : 'ok'" />
         <Metric label="已关联发票" :value="detail.invoiceAllocated" :money="true" />
-        <Metric label="待回票" :value="detail.pendingInvoiceAmount" :money="true" :tone="detail.pendingInvoiceAmount ? 'danger' : 'ok'" />
+        <Metric v-if="detail.invoiceState === '先款后票'" label="待回票" :value="detail.pendingInvoiceAmount ?? '—'" :money="detail.pendingInvoiceAmount !== null" :tone="detail.pendingInvoiceAmount === null ? undefined : detail.pendingInvoiceAmount > 0 ? 'danger' : 'ok'" :status="detail.pendingInvoiceAmount === null ? '尚未核实' : undefined" />
       </MetricGrid>
     </template>
 
@@ -176,10 +192,10 @@ onActivated(() => {
           </div>
           <div class="info-cell">
             <dt class="text-11px text-ink-faint">
-              收款单位
+              实际收款对象
             </dt>
             <dd class="mt-1 text-12px font-700 text-ink">
-              {{ detail.supplierName || '公司付款' }}
+              {{ detail.supplierName || '旧姓名待核验' }}
             </dd>
           </div>
           <div class="info-cell">
@@ -203,24 +219,28 @@ onActivated(() => {
 
       <section v-if="detail.contractId" class="panel mb-4 overflow-hidden" aria-labelledby="payment-application-contract-title">
         <SectionHeader id="payment-application-contract-title" title="合同付款情况" />
+        <p v-if="sourceLabel(detail.contractSourceState)" class="px-4 py-2 text-12px text-ink-soft">
+          {{ sourceLabel(detail.contractSourceState) }}；累计结算与支付金额保留待核验状态。
+        </p>
         <div class="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-4">
           <div class="info-cell">
             <span class="text-11px text-ink-faint">关联合同</span>
-            <NuxtLink :to="`/contract/${detail.contractId}`" class="mt-1 block truncate text-12px text-brand hover:underline">
+            <NuxtLink v-if="!detail.contractSourceState || detail.contractTarget" :to="detail.contractTarget || `/contract/${detail.contractId}`" class="mt-1 block truncate text-12px text-brand hover:underline">
               {{ detail.contractNo || detail.contractName || '查看合同' }}
             </NuxtLink>
+            <span v-else class="mt-1 block break-words text-12px">{{ detail.contractNo || detail.contractName || detail.contractId }}</span>
           </div>
           <div class="info-cell">
             <span class="text-11px text-ink-faint">合同金额</span>
-            <strong class="mt-1 block font-mono text-12px text-ink">{{ yuan(detail.contractAmount) }}</strong>
+            <strong class="mt-1 block font-mono text-12px text-ink">{{ detail.contractAmount === null ? '待核验' : yuan(detail.contractAmount) }}</strong>
           </div>
           <div class="info-cell">
             <span class="text-11px text-ink-faint">累计已结算</span>
-            <strong class="mt-1 block font-mono text-12px text-ink">{{ yuan(detail.contractSettledAmount) }}</strong>
+            <strong class="mt-1 block font-mono text-12px text-ink">{{ detail.contractSettledAmount === null ? '待核验' : yuan(detail.contractSettledAmount) }}</strong>
           </div>
           <div class="info-cell">
             <span class="text-11px text-ink-faint">本次申请后付款额</span>
-            <strong class="mt-1 block font-mono text-12px text-brand">{{ yuan(detail.contractPaidAmount + detail.applyAmount) }}</strong>
+            <strong class="mt-1 block font-mono text-12px text-brand">{{ detail.contractPaidAmount === null ? '待核验' : yuan(detail.contractPaidAmount + detail.applyAmount) }}</strong>
           </div>
         </div>
       </section>
@@ -233,16 +253,19 @@ onActivated(() => {
             <tbody>
               <tr v-for="row in detail.settlements" :key="row.id">
                 <td class="font-600 text-ink">
-                  {{ row.no || row.name || '未编号结算' }}
+                  <NuxtLink v-if="row.sourceState === 'readable'" :to="`/contract/other-settlement/${row.id}?origin=real`" class="text-brand hover:underline">
+                    {{ row.no || row.name || row.id }}
+                  </NuxtLink>
+                  <span v-else>{{ row.no || row.name || row.id }}</span>
                 </td>
                 <td>{{ date(row.settlementDate) }}</td>
                 <td class="font-mono">
-                  {{ yuan(row.totalAmount) }}
+                  {{ row.totalAmount === null ? '来源待核验' : yuan(row.totalAmount) }}
                 </td>
                 <td class="font-mono text-brand">
                   {{ yuan(row.allocatedAmount) }}
                 </td>
-                <td>{{ row.status || '—' }}</td>
+                <td>{{ sourceLabel(row.sourceState) || row.status || '—' }}</td>
               </tr>
             </tbody>
           </table>
@@ -260,13 +283,14 @@ onActivated(() => {
             <tbody>
               <tr v-for="row in detail.invoices" :key="row.id">
                 <td>
-                  <NuxtLink :to="`/finance/invoice/${row.id}`" class="text-brand hover:underline">
+                  <NuxtLink v-if="!row.sourceState || row.sourceState === 'readable'" :to="`/finance/invoice/${row.id}`" class="text-brand hover:underline">
                     {{ row.invoiceNumber || '未编号发票' }}
                   </NuxtLink>
+                  <span v-else>{{ row.invoiceNumber || row.id }}</span>
                 </td>
                 <td>{{ date(row.invoiceDate) }}</td>
                 <td class="font-mono">
-                  {{ yuan(row.totalAmount) }}
+                  {{ sourceLabel(row.sourceState) || yuan(row.totalAmount) }}
                 </td>
                 <td class="font-mono text-brand">
                   {{ yuan(row.allocatedAmount) }}
@@ -276,7 +300,7 @@ onActivated(() => {
           </table>
         </div>
         <p v-else class="px-4 py-5 text-12px text-ink-faint">
-          {{ detail.invoiceState === '无需发票' ? '本申请无需发票。' : `暂无发票分摊，待回票 ${yuan(detail.pendingInvoiceAmount)}。` }}
+          {{ detail.invoiceState === '无需发票' ? '本申请无需发票。' : detail.invoiceState === '先款后票' ? `暂无发票分摊，待回票 ${detail.pendingInvoiceAmount === null ? '尚未核实' : yuan(detail.pendingInvoiceAmount)}。` : detail.invoiceState === '先票后款' ? '暂无发票分摊。' : '回票类型尚未核实，请核对原记录。' }}
         </p>
       </section>
 
@@ -305,7 +329,7 @@ onActivated(() => {
           </table>
         </div>
         <p v-else class="px-4 py-5 text-12px text-ink-faint">
-          暂无支付记录，可从右上角“登记支付”开始。
+          {{ detail.paymentSourceState === 'forbidden' ? '当前身份无支付明细读取权限，不能据此判断没有支付记录。' : '暂无支付记录，可从右上角“登记支付”开始。' }}
         </p>
       </section>
     </template>

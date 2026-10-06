@@ -47,7 +47,7 @@ describe('kitButton 状态', () => {
   })
 })
 
-describe('kitButton 变体映射（DESIGN-TASTE §4.2 五变体，#109）', () => {
+describe('kitButton 变体映射（KitUI §06 五变体，#109）', () => {
   it('缺省为 secondary 安静按钮，不再是实心蓝', () => {
     expect(resolveKitButtonVariant()).toBe('secondary')
   })

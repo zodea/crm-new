@@ -10,10 +10,10 @@ export interface TestDb extends MigrationDb {
 let sqlJsPromise: ReturnType<typeof initSqlJs> | null = null
 
 /** node 环境的 sql.js 内存库，形状与 connection.ts 的 DbDriver 对齐 */
-export async function createMemoryDb(): Promise<TestDb> {
+export async function createMemoryDb(bytes?: Uint8Array): Promise<TestDb> {
   sqlJsPromise ??= initSqlJs()
   const SQL = await sqlJsPromise
-  const conn = new SQL.Database()
+  const conn = new SQL.Database(bytes)
   return {
     async execute(sql, params = []) {
       conn.run(sql, params as never[])

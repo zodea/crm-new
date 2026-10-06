@@ -99,6 +99,24 @@ describe('formFooter public behavior', () => {
       .toBe(true)
   })
 
+  it('disables every write during original-command recovery and keeps cancel available', async () => {
+    const onAction = vi.fn()
+    const rendered = render(FormFooter, { props: { dirty: true, writeDisabled: true, onAction } })
+    for (const label of ['保存草稿', '保存并新建', '保存并提交', '保存']) {
+      const button = screen.getByRole<HTMLButtonElement>('button', { name: label, exact: true })
+      expect(button.disabled).toBe(true)
+      await fireEvent.click(button)
+    }
+    expect(onAction).not.toHaveBeenCalled()
+    const cancel = screen.getByRole<HTMLButtonElement>('button', { name: '取消' })
+    expect(cancel.disabled).toBe(false)
+    await fireEvent.click(cancel)
+    expect(onAction.mock.calls).toEqual([['cancel']])
+    await rendered.rerender({ writeDisabled: false })
+    await fireEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
+    expect(onAction.mock.calls).toEqual([['cancel'], ['save']])
+  })
+
   it('does not trigger native form submit for action-driven buttons', async () => {
     const onAction = vi.fn()
     const onSubmit = vi.fn()

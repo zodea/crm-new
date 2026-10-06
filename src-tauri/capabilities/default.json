@@ -10,6 +10,8 @@
     "core:resources:allow-close",
     "dialog:allow-open",
     "fs:allow-exists",
+    "fs:allow-stat",
+    "fs:allow-read-file",
     "fs:allow-mkdir",
     "fs:allow-open",
     "fs:allow-write",

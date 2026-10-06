@@ -19,7 +19,7 @@ function readSource(db: Awaited<ReturnType<typeof createMemoryDb>>) {
     isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: async () => LATEST_VERSION,
-    select: sql => db.select(sql),
+    select: (sql, params) => db.select(sql, params),
     closeDatabase: unused,
     loadProductionSnapshot: unused,
     readSnapshotSource: unused,
@@ -36,8 +36,8 @@ function readSource(db: Awaited<ReturnType<typeof createMemoryDb>>) {
 }
 
 afterEach(async () => {
-  await coreMigrationTestInstance.reset(session.workspaceId)
   receiptCommandTestInstance.reset()
+  await coreMigrationTestInstance.reset(session.workspaceId)
 })
 
 describe('普通收款完整受控迁移', () => {
@@ -58,7 +58,7 @@ describe('普通收款完整受控迁移', () => {
       db.close()
     }
   })
-  it('从真实旧库携带全部字段和附件正文，经确认进入同一命令源；中央更正不被同步覆盖，回滚保留独立新单', async () => {
+  it('真实旧库完整迁入；重复确认保留更正，危险回滚保全独立新单、原件与回执', async () => {
     const db = await createMemoryDb()
     try {
       await runMigrations(db)
@@ -118,13 +118,17 @@ describe('普通收款完整受控迁移', () => {
       expect(record.draft.projectId).not.toBe('old-project-436')
       expect(receiptCommandTestInstance.fileContent(record.id, 'receipt-file-436', session)).toMatchObject({ payloadBase64: '5pS25qy+' })
       const save = { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'receipt:write' as const, origin: 'real' as const, action: 'save' as const, attachments: {}, draft: { ...record.draft, note: '中央更正' } }
-      receiptCommandTestInstance.execute({ ...save, commandId: 'receipt-edit', id: record.id, baseVersion: record.version }, session)
+      const edited = receiptCommandTestInstance.execute({ ...save, commandId: 'receipt-edit', id: record.id, baseVersion: record.version }, session)
       await coreMigrationTestInstance.confirm({ ...envelope('receipt-confirm-again'), batchId: batch.batchId }, session)
       expect(receiptCommandTestInstance.form(record.id, session).draft.note).toBe('中央更正')
       const independent = receiptCommandTestInstance.execute({ ...save, commandId: 'receipt-new', baseVersion: null, draft: { ...save.draft, bankSerialNo: '' } }, session)
-      await coreMigrationTestInstance.rollback({ ...envelope('receipt-rollback'), batchId: batch.batchId }, session)
-      expect(receiptCommandTestInstance.facts().rows.map(row => row.id)).toEqual([independent.id])
-      expect(() => receiptCommandTestInstance.fileContent(record.id, 'receipt-file-436', session)).toThrow(/不存在/)
+      const beforeRollback = coreMigrationTestInstance.snapshot(session)
+      await expect(coreMigrationTestInstance.rollback({ ...envelope('receipt-rollback'), batchId: batch.batchId }, session)).rejects.toThrow(/后来修改|仍引用迁入/)
+      expect(coreMigrationTestInstance.snapshot(session)).toEqual(beforeRollback)
+      expect(receiptCommandTestInstance.form(record.id, session)).toMatchObject({ version: edited.version, draft: { note: '中央更正' } })
+      expect(receiptCommandTestInstance.facts().rows.map(row => row.id)).toContain(independent.id)
+      expect(receiptCommandTestInstance.fileContent(record.id, 'receipt-file-436', session).payloadBase64).toBe('5pS25qy+')
+      expect(receiptCommandTestInstance.resolve(edited.commandId, session)).toEqual({ outcome: 'applied', result: edited })
     }
     finally {
       db.close()

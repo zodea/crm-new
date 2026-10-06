@@ -86,6 +86,9 @@ useTabTitle(() => '其他支出结算')
       <KitButton v-if="canWrite" variant="primary" @click="navigateTo({ path: `${OTHER_SETTLEMENT_PATH}/form`, query: { contractId: route.query.contractId, returnTo: route.fullPath } })">
         新建结算
       </KitButton>
+      <NuxtLink v-if="canWrite && page?.capabilities.includes('core:migration:write')" :to="`${OTHER_SETTLEMENT_PATH}/import`" class="text-13px text-brand underline">
+        原结算历史迁入
+      </NuxtLink>
     </header>
     <NuxtLink v-if="validateAuxiliaryReturnTo(route.query.returnTo)" :to="validateAuxiliaryReturnTo(route.query.returnTo)!" class="text-13px text-brand">
       返回来源

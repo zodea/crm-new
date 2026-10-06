@@ -1,4 +1,4 @@
-import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ProblemDTO } from '../../types/read-model'
+import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ProblemDTO, ReadProjection } from '../../types/read-model'
 import type {
   CustomerContractDTO,
   CustomerContractSourceRow,
@@ -18,7 +18,9 @@ import type {
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
 import { ownerFinalSettlementReceiptIsActive } from '../owner-document/central-repository'
+import { parsePageQuery, resolvePagination } from '../read-model/pagination'
 import { normalizeEnumSelection } from '../util/enum-selection'
+import { subtractKnownMoney, sumKnownMoney } from '../util/number'
 import { CUSTOMER_PAGE_SIZES, customerProblem, CustomerRepositoryProblem } from './read-contract'
 
 interface BuildCustomerListPageOptions {
@@ -51,19 +53,13 @@ function one(value: unknown): string | undefined {
   return undefined
 }
 
-function positiveInteger(value: unknown, fallback: number): number {
-  const raw = one(value)
-  if (!raw || !/^\d+$/.test(raw))
-    return fallback
-  const parsed = Number(raw)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
-}
-
 export function parseCustomerListQuery(
   input: Record<string, unknown> | undefined,
 ): CustomerListQueryDTO {
   const sort = one(input?.sort)
-  const pageSize = positiveInteger(input?.pageSize, 10)
+  const { requestedPage, pageSize } = parsePageQuery(input ?? {}, () => {
+    throw new CustomerRepositoryProblem(customerProblem('invalid-query', '分页参数无效'))
+  }, 10)
   if (!CUSTOMER_PAGE_SIZES.includes(pageSize as CustomerPageSize)) {
     throw new CustomerRepositoryProblem(customerProblem(
       'invalid-query',
@@ -85,7 +81,7 @@ export function parseCustomerListQuery(
     sort: allowedSorts.has(sort as CustomerListSort)
       ? sort as CustomerListSort
       : 'updated-desc',
-    page: positiveInteger(input?.page, 1),
+    page: requestedPage,
     pageSize: pageSize as CustomerPageSize,
   }
 }
@@ -166,7 +162,7 @@ function toListItem(row: CustomerListSourceRow): CustomerListItemDTO {
 
 export function buildCustomerListPage(
   options: BuildCustomerListPageOptions,
-): CustomerListPageDTO {
+): ReadProjection<CustomerListPageDTO> {
   const visibleByOrigin = options.rows.filter(row =>
     row.dataOrigin === 'real' || options.query.includeDemo,
   )
@@ -189,7 +185,7 @@ export function buildCustomerListPage(
       return right.name.localeCompare(left.name, 'zh-CN') || left.id.localeCompare(right.id)
     return right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)
   })
-  const page = Math.min(options.query.page, Math.max(1, Math.ceil(filtered.length / options.query.pageSize)))
+  const { page } = resolvePagination(options.query.page, options.query.pageSize, filtered.length)
   const start = (page - 1) * options.query.pageSize
   const statusCounts = new Map<string, number>()
   for (const row of candidates)
@@ -200,6 +196,7 @@ export function buildCustomerListPage(
   return {
     items: sorted.slice(start, start + options.query.pageSize).map(toListItem),
     pagination: {
+      requestedPage: options.query.page,
       page,
       pageSize: options.query.pageSize,
       total: sorted.length,
@@ -225,8 +222,9 @@ export function buildCustomerListPage(
   }
 }
 
-function money(value: number): string {
-  return (Number.isFinite(value) ? value : 0).toFixed(2)
+function money(value: number | null): string | null {
+  const known = sumKnownMoney([value])
+  return known === null ? null : known.toFixed(2)
 }
 
 function isDraft(status: string): boolean {
@@ -294,7 +292,7 @@ function refAndNavigation(
 
 export function buildCustomerDetailRead(
   options: BuildCustomerDetailReadOptions,
-): CustomerDetailReadDTO {
+): ReadProjection<CustomerDetailReadDTO> {
   if (options.query.origin === 'demo' && !options.query.includeDemo) {
     throw new CustomerRepositoryProblem(customerProblem(
       'forbidden',
@@ -338,14 +336,14 @@ export function buildCustomerDetailRead(
       .filter(row => row.dataOrigin === customer.dataOrigin)
       .map(row => [row.id, row.name]),
   )
-  const contractsByProject = new Map<string, { count: number, amount: number }>()
+  const contractsByProject = new Map<string, { count: number, amount: number | null }>()
   for (const row of contractRows) {
     if (!row.projectId)
       continue
     const fact = contractsByProject.get(row.projectId) ?? { count: 0, amount: 0 }
     fact.count += 1
     if (!isDraft(row.status))
-      fact.amount += row.amount + row.supplementAmount
+      fact.amount = sumKnownMoney([fact.amount, row.amount, row.supplementAmount])
     contractsByProject.set(row.projectId, fact)
   }
   const receiptsByProject = new Map<string, { count: number, amount: number | null }>()
@@ -391,7 +389,7 @@ export function buildCustomerDetailRead(
           { customerId: customer.id },
         )
     const contractRef = resolvedRef('contract', row.id, row.name, row.no || null)
-    const effectiveAmount = isDraft(row.status) ? 0 : row.amount + row.supplementAmount
+    const effectiveAmount = isDraft(row.status) ? 0 : sumKnownMoney([row.amount, row.supplementAmount])
     return {
       contract: contractRef as CustomerContractDTO['contract'],
       navigation: detailIntent(contractRef, row.dataOrigin, { contractKind: '施工', customerId: customer.id }),
@@ -399,7 +397,7 @@ export function buildCustomerDetailRead(
       projectNavigation: project.navigation,
       effectiveAmount: money(effectiveAmount),
       receiptAmount: options.receiptsProblem || row.receiptAmount === null ? null : money(row.receiptAmount),
-      outstandingAmount: options.receiptsProblem || row.receiptAmount === null ? null : money(effectiveAmount - row.receiptAmount),
+      outstandingAmount: options.receiptsProblem || row.receiptAmount === null ? null : money(subtractKnownMoney(effectiveAmount, row.receiptAmount)),
       signDate: row.signDate,
       status: row.status,
       isDraft: isDraft(row.status),
@@ -446,10 +444,7 @@ export function buildCustomerDetailRead(
       isDraft: isDraft(row.status),
     }
   })
-  const effectiveContractAmount = contracts.reduce(
-    (sum, row) => sum + Number(row.effectiveAmount),
-    0,
-  )
+  const effectiveContractAmount = sumKnownMoney(contracts.map(row => row.effectiveAmount === null ? null : Number(row.effectiveAmount)))
   const effectiveReceiptAmount = receipts.some(row => row.effectiveAmount === null)
     ? null
     : receipts.reduce(
@@ -471,7 +466,7 @@ export function buildCustomerDetailRead(
       effectiveContractAmount: options.contractsProblem ? null : money(effectiveContractAmount),
       receiptCount: options.receiptsProblem ? null : receipts.length,
       effectiveReceiptAmount: options.receiptsProblem || effectiveReceiptAmount === null ? null : money(effectiveReceiptAmount),
-      outstandingAmount: options.contractsProblem || options.receiptsProblem || effectiveReceiptAmount === null ? null : money(effectiveContractAmount - effectiveReceiptAmount),
+      outstandingAmount: options.contractsProblem || options.receiptsProblem || effectiveReceiptAmount === null ? null : money(subtractKnownMoney(effectiveContractAmount, effectiveReceiptAmount)),
       draftReceiptCount: options.receiptsProblem ? null : receipts.filter(row => row.isDraft).length,
     },
     asOf: options.asOf,

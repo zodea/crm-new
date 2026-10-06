@@ -26,6 +26,7 @@ vi.mock('~/lib/db/connection', () => ({
 beforeEach(async () => {
   db = await createMemoryDb()
   await runMigrations(db)
+  await db.execute('INSERT INTO suppliers(id,name) VALUES(\'supplier-payment-approval\',\'独立批复校验收款方\')')
   setActivePinia(createPinia())
 })
 afterEach(() => db.close())
@@ -61,12 +62,13 @@ describe('付款批复输入意图', () => {
   it.each([
     { id: 'zero', value: 0, origin: 'user-entry', canPay: false },
     { id: 'empty', value: null, origin: 'user-entry', canPay: true },
-    { id: 'legacy', value: 0, origin: 'legacy', canPay: true },
+    { id: 'legacy', value: 0, origin: 'legacy', canPay: false },
     { id: 'known', value: 80, origin: 'user-entry', canPay: true },
   ] as const)('批复 $id 的支付结果为 $canPay', async ({ id, value, origin, canPay }) => {
     const store = useFinanceStore()
-    await db.execute('INSERT INTO payment_applications (id, apply_amount, approved_amount, approved_amount_origin) VALUES (?, 100, ?, ?)', [id, value, origin])
+    await db.execute('INSERT INTO payment_applications (id, supplier_id, apply_amount, approved_amount, approved_amount_origin) VALUES (?, \'supplier-payment-approval\', 100, ?, ?)', [id, value, origin])
     const draft = {
+      supplierId: 'supplier-payment-approval',
       amount: 30,
       paymentDate: '2026-09-11',
       payeeName: '收款方',
@@ -76,13 +78,33 @@ describe('付款批复输入意图', () => {
       applicationAllocations: [{ paymentApplicationId: id, allocatedAmount: 30 }],
     }
     if (!canPay) {
-      await expect(store.saveForm('payment_record', draft, 'confirm')).rejects.toThrow('超过付款申请可付金额')
+      await expect(store.saveForm('payment_record', draft, 'confirm')).rejects.toThrow(id === 'legacy' ? '历史批复未知需先' : '超过付款申请可付金额')
+      expect(await db.select('SELECT id FROM payment_records')).toEqual([])
+      expect(await store.loadOne('payment_application', id)).toMatchObject({ approvedAmount: value, approvedAmountOrigin: origin, paidAmount: 0 })
+      if (id === 'legacy') {
+        const saved = await store.saveForm('payment_record', draft, 'draft')
+        expect(await store.loadOne('payment_record', saved.id)).toMatchObject({ amount: 30, confirmationStatus: 'draft' })
+      }
       return
     }
     const saved = await store.saveForm('payment_record', draft, 'confirm')
     expect(await store.loadOne('payment_record', saved.id)).toMatchObject({ amount: 30, confirmationStatus: 'confirmed' })
     expect(await store.loadOne('payment_application', id)).toMatchObject({ approvedAmount: value, approvedAmountOrigin: origin, paidAmount: 30 })
     await expect(store.saveForm('payment_record', { ...draft, amount: 71, applicationAllocations: [{ paymentApplicationId: id, allocatedAmount: 71 }] }, 'confirm')).rejects.toThrow('超过付款申请可付金额')
+  })
+  it.each([null, 0, 80])('原历史未知改成明确输入 %s 也不能跳过真实业务核验，回单原件草稿仍保留', async (value) => {
+    const store = useFinanceStore()
+    await db.execute('INSERT INTO payment_applications(id,supplier_id,apply_amount,approved_amount,approved_amount_origin) VALUES(\'legacy-edit-proof\',\'supplier-payment-approval\',100,0,\'legacy\')')
+    const original = await store.loadOne('payment_application', 'legacy-edit-proof')
+    await store.saveForm('payment_application', { ...original, approvedAmount: value, approvedAmountEdit: { value } }, 'draft')
+    expect(await store.loadOne('payment_application', 'legacy-edit-proof')).toMatchObject({ approvedAmount: value, approvedAmountOrigin: 'user-entry', paymentVerification: { required: true } })
+    const payment = { supplierId: 'supplier-payment-approval', amount: 30, paymentDate: '2026-10-05', payeeName: '实际收款方', voucherNo: 'LEGACY-DRAFT', bankSerialNo: 'LEGACY-DRAFT', confirmedBy: '输入姓名不能替代可信核验', applicationAllocations: [{ paymentApplicationId: 'legacy-edit-proof', allocatedAmount: 30 }] }
+    const saved = await store.saveForm('payment_record', payment, 'draft', { add: [{ fileName: '真实回单.bin', fileSize: 4, mimeType: 'application/octet-stream', payloadBase64: 'AAqA/w==' }] })
+    await expect(store.saveForm('payment_record', { ...payment, id: saved.id }, 'confirm')).rejects.toThrow('历史批复未知需先')
+    expect(await store.loadOne('payment_record', saved.id)).toMatchObject({ amount: 30, confirmationStatus: 'draft' })
+    expect(await db.select('SELECT allocated_amount FROM payment_record_application_allocations WHERE payment_record_id=?', [saved.id])).toEqual([{ allocated_amount: 30 }])
+    expect(await db.select('SELECT content FROM file_payloads WHERE file_ref_id=?', [saved.attachmentIds[0]])).toEqual([{ content: 'AAqA/w==' }])
+    expect(await db.select('SELECT id FROM payment_records WHERE confirmation_status=\'confirmed\'')).toEqual([])
   })
   it.each([
     { approvedAmount: undefined, expectedAmount: null },

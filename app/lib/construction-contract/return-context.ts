@@ -1,6 +1,7 @@
 import type { ContractListFilter } from '../contract/list-filters'
 import type { DataOriginDTO } from '~/types/read-model'
 import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
+import { validateProjectJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 import { parseContractListFilter, serializeContractListFilter } from '../contract/list-filters'
@@ -114,6 +115,19 @@ export function validateConstructionContractReturnTo(input: unknown, expectedOri
   }
 }
 
+export function validateConstructionContractProjectReturnTo(input: unknown, projectId: string | null, origin: DataOriginDTO): string | null {
+  if (!projectId || !isStableRouteIdentity(projectId))
+    return null
+  const validated = validateProjectJourneyReturnTo(input, origin)
+  if (!validated)
+    return null
+  try {
+    const url = new URL(validated, 'https://ruihang.invalid')
+    return decodeURIComponent(url.pathname.slice('/project/'.length)) === projectId ? validated : null
+  }
+  catch { return null }
+}
+
 export function validateConstructionContractDetailReturnTo(input: unknown, expectedOrigin?: unknown): string | null {
   if (typeof input !== 'string' || !input.startsWith('/') || input.startsWith('//') || input.includes('\\'))
     return null
@@ -141,7 +155,7 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
       return null
     const returnTo = url.searchParams.get('returnTo')
     const validatedListReturnTo = returnTo
-      ? validateConstructionContractReturnTo(returnTo, origin) ?? validateCustomerDetailReturnTo(returnTo, origin)
+      ? validateConstructionContractReturnTo(returnTo, origin) ?? validateCustomerDetailReturnTo(returnTo, origin) ?? validateProjectJourneyReturnTo(returnTo, origin)
       : null
     if (returnTo && !validatedListReturnTo)
       return null

@@ -15,6 +15,7 @@ import {
   validateMaterialContractReturnTo,
 } from '~/lib/material-contract/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { readProblemTitle, readStateData, readStateProblem } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import { useMaterialContractReadStore } from '~/stores/material-contract-read'
@@ -23,22 +24,21 @@ const props = defineProps<{ contractId: string, origin: DataOriginDTO }>()
 const route = useRoute()
 const router = useRouter()
 const store = useMaterialContractReadStore()
+const repository = useNuxtApp().$repositories.materialContractRead
 const visibilityStore = useDataVisibilityStore()
 const supplierFactContextId = ref(newMaterialContractReturnContextId())
 
 const state = computed(() => store.detailState as ReadState<MaterialContractDetailReadDTO>)
-const detail = computed(() => {
-  const current = state.value
-  if (current.kind === 'ready')
-    return current.data
-  if ((current.kind === 'loading' || current.kind === 'error') && current.previous)
-    return current.previous
-  return null
-})
+const detail = computed(() => readStateData(state.value))
 const loading = computed(() => state.value.kind === 'loading')
+const canReadOriginals = computed(() => state.value.kind === 'ready' && state.value.data.dataOrigin === 'real' && state.value.data.capabilities.includes('material-contract:read'))
+function ownerFiles(ownerId: string) {
+  return (detail.value?.sections.files ?? []).filter(file => (file.ownerId ?? detail.value?.contract.id) === ownerId).map(file => ({ ...file, uploadedAt: file.uploadedAt ?? '' }))
+}
 const tabs = computed(() => [
   { key: 'info', label: '详细信息' },
   { key: 'lines', label: `采购明细 ${detail.value?.sections.lineItems.length ?? 0}` },
+  { key: 'supplements', label: `补充协议 ${detail.value?.sections.supplements?.length ?? 0}` },
   { key: 'materials', label: '材料管理' },
   { key: 'invoices', label: `发票登记 ${detail.value?.sections.invoices.length ?? 0}` },
   { key: 'payments', label: `付款信息 ${detail.value?.sections.payments.length ?? 0}` },
@@ -51,7 +51,7 @@ const activeTab = computed({
   set: value => void router.replace({ query: { ...route.query, tab: value === 'info' ? undefined : value } }),
 })
 const returnTo = computed(() => validateMaterialContractReturnTo(route.query.returnTo, props.origin) ?? '/contract/material')
-const canEdit = computed(() => detail.value?.dataOrigin === 'real'
+const canEdit = computed(() => state.value.kind === 'ready' && detail.value?.dataOrigin === 'real'
   && detail.value.capabilities.includes('material-contract:write'))
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)
@@ -64,10 +64,10 @@ const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-f
     return 'not-found'
   return 'error'
 })
-const problem = computed(() => 'problem' in state.value ? state.value.problem : null)
-const stateTitle = computed(() => state.value.kind === 'mismatch'
+const problem = computed(() => readStateProblem(state.value))
+const stateTitle = computed(() => readProblemTitle(problem.value, state.value.kind === 'mismatch'
   ? '合同来源或类别不匹配'
-  : shellState.value === 'loading' ? '正在读取材料采购合同' : shellState.value === 'forbidden' ? '无权查看该材料采购合同' : shellState.value === 'not-found' ? '未找到材料采购合同' : '材料采购合同读取失败')
+  : shellState.value === 'loading' ? '正在读取材料采购合同' : shellState.value === 'forbidden' ? '无权查看该材料采购合同' : shellState.value === 'not-found' ? '未找到材料采购合同' : '材料采购合同读取失败'))
 
 function target(intent: NavigationIntentDTO): string | null {
   const result = resolveNavigationTarget(intent)
@@ -156,7 +156,7 @@ const metrics = computed(() => {
   const amounts = detail.value?.contract.amounts
   if (!amounts)
     return []
-  const rows: Array<[string, string]> = [
+  const rows: Array<[string, string | null]> = [
     ['合同金额', amounts.contract],
     ['变更后金额', amounts.changed],
     ['累计结算', amounts.settled],
@@ -164,7 +164,7 @@ const metrics = computed(() => {
     ['累计支付', amounts.paid],
     ['应付余额', amounts.payable],
   ]
-  return rows.map(([label, value]) => ({ label, value: yuan(Number(value)) }))
+  return rows.map(([label, value]) => ({ label, value: value == null ? '待核实' : yuan(Number(value)) }))
 })
 
 async function load() {
@@ -172,8 +172,14 @@ async function load() {
     id: props.contractId,
     origin: props.origin,
     includeDemo: props.origin === 'demo' && visibilityStore.includeDemo,
+    ...(typeof route.query.supplementId === 'string' ? { supplementId: route.query.supplementId } : {}),
   })
   if (store.detailState.kind === 'ready') {
+    if (typeof route.query.supplementId === 'string') {
+      await nextTick()
+      document.getElementById(`material-contract-supplement-${route.query.supplementId}`)?.focus({ preventScroll: true })
+      return
+    }
     const restored = await restoreSupplierFactOrigin()
     if (!restored) {
       await nextTick()
@@ -187,6 +193,10 @@ function edit() {
     path: `/contract/material/form/${encodeURIComponent(props.contractId)}`,
     query: { origin: 'real', contractKind: 'material', returnTo: route.fullPath },
   })
+}
+
+function supplementForm(id?: string) {
+  void navigateTo({ path: id ? `/contract/material/form/${encodeURIComponent(id)}` : '/contract/material/form', query: { origin: 'real', returnTo: route.fullPath, ...(id ? {} : { supplement: '1', originalContractId: props.contractId }) } })
 }
 
 function factSection(title: string, rows: readonly MaterialContractFactDTO[], emptyLabel: string) {
@@ -205,7 +215,7 @@ const materialSections = computed(() => {
   ]
 })
 
-watch(() => [props.contractId, props.origin], () => void load(), { immediate: true })
+watch(() => [props.contractId, props.origin, route.query.supplementId], () => void load(), { immediate: true })
 onActivated(() => void load())
 useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
 </script>
@@ -237,6 +247,9 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
         <button v-if="canEdit" type="button" class="btn-secondary" data-testid="material-contract-edit" @click="edit">
           编辑合同
         </button>
+        <button v-if="canEdit" type="button" class="btn-secondary" @click="supplementForm()">
+          新增补充协议
+        </button>
       </template>
       <template #summary>
         <MetricGrid v-if="detail" :cols="6">
@@ -245,8 +258,9 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
       </template>
 
       <div v-if="detail" class="space-y-3">
+        <StatePanel v-if="detail.contract.financialReadStatus === 'unavailable'" kind="error" title="关联财务来源尚未就绪" description="结算、收票、支付及应付显示待核实，不能作为真实零值使用。" compact />
         <StatePanel
-          v-if="state.kind === 'error'"
+          v-if="state.kind === 'error' || state.kind === 'unavailable'"
           kind="error"
           title="刷新材料采购合同失败"
           :description="`${state.problem.message}；当前保留上一次成功读取的详情。`"
@@ -291,6 +305,12 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
               <span>签约日期</span><strong>{{ detail.contract.signDate || '—' }}</strong>
             </div>
             <div class="detail-row">
+              <span>甲方（我方签约快照）</span><strong>{{ detail.contract.ourSignatorySnapshot?.name ?? '未核实' }}<small v-if="detail.contract.ourSignatorySnapshot" class="ml-2 font-400 text-ink-soft">核实版本 {{ detail.contract.ourSignatorySnapshot.version }}</small></strong>
+            </div>
+            <div v-if="detail.contract.legacyPartyA" class="detail-row">
+              <span>历史主体原文</span><strong>{{ detail.contract.legacyPartyA }}</strong>
+            </div>
+            <div class="detail-row">
               <span>发票类型</span><strong>{{ detail.contract.invoiceType || '—' }}</strong>
             </div>
             <div class="detail-row">
@@ -318,15 +338,7 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
               <span>质保条款</span><strong>{{ detail.contract.warrantyTerms || '—' }}</strong>
             </div>
           </div>
-          <SectionHeader class="mt-5" title="合同文件" />
-          <ul v-if="detail.sections.files.length" class="mt-2 divide-y divide-line rounded border border-line">
-            <li v-for="file in detail.sections.files" :key="file.id" class="flex flex-wrap items-center justify-between gap-2 p-3 text-12px">
-              <span>{{ file.fileName }}</span><span class="text-ink-soft">{{ file.category }} · {{ file.fileSize }} B</span>
-            </li>
-          </ul>
-          <p v-else class="p-6 text-center text-13px text-ink-soft">
-            暂无合同文件
-          </p>
+          <ContractOriginalFilesPanel :owner-id="detail.contract.id" :origin="detail.dataOrigin" :source-version="detail.sourceVersion" :can-read="canReadOriginals" :files="ownerFiles(detail.contract.id)" :read-content="repository.fileContent" />
         </section>
 
         <section v-else-if="activeTab === 'lines'" class="panel min-w-0 overflow-hidden p-4">
@@ -335,7 +347,7 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
             <table v-if="detail.sections.lineItems.length" class="material-fact-table">
               <thead>
                 <tr>
-                  <th>物资名称</th><th>规格</th><th>品牌</th><th>单位</th><th class="text-right">
+                  <th>物资名称</th><th>规格</th><th>材质</th><th>品牌</th><th>单位</th><th class="text-right">
                     数量
                   </th><th class="text-right">
                     含税单价
@@ -346,7 +358,7 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
               </thead>
               <tbody>
                 <tr v-for="row in detail.sections.lineItems" :key="row.id">
-                  <td>{{ row.materialName }}</td><td>{{ row.spec || '—' }}</td><td>{{ row.brand || '—' }}</td><td>{{ row.unit || '—' }}</td><td class="text-right">
+                  <td>{{ row.materialName }}</td><td>{{ row.spec || '—' }}</td><td>{{ row.materialGrade || '未记录' }}</td><td>{{ row.brand || '—' }}</td><td>{{ row.unit || '—' }}</td><td class="text-right">
                     {{ row.qty ?? '—' }}
                   </td><td class="text-right">
                     {{ row.unitPrice == null ? '—' : yuan(Number(row.unitPrice)) }}
@@ -356,10 +368,54 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
                 </tr>
               </tbody>
             </table>
+            <table v-if="detail.sections.deductions?.length" class="material-fact-table mt-3" aria-label="合同优惠与扣减">
+              <thead><tr><th>减项名称</th><th>扣减金额</th><th>依据</th></tr></thead><tbody>
+                <tr v-for="row in detail.sections.deductions" :key="row.id">
+                  <td>{{ row.name }}</td><td>{{ row.amount == null ? '待填' : yuan(Number(row.amount)) }}</td><td>{{ row.basis }}</td>
+                </tr>
+              </tbody>
+            </table>
             <p v-else class="p-8 text-center text-13px text-ink-soft">
               暂无采购明细
             </p>
           </div>
+        </section>
+
+        <section v-else-if="activeTab === 'supplements'" class="space-y-3" aria-label="材料补充协议">
+          <article v-for="supplement in detail.sections.supplements ?? []" :id="`material-contract-supplement-${supplement.id}`" :key="supplement.id" tabindex="-1" class="panel min-w-0 overflow-hidden p-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="mr-auto text-14px font-700">
+                {{ supplement.name }} · {{ supplement.no || '编号未填写' }}
+              </h2><span>{{ supplement.amount == null ? '增额未记录' : `本次增额 ${yuan(Number(supplement.amount))}` }}</span><button v-if="canEdit" type="button" class="btn-secondary" @click="supplementForm(supplement.id)">
+                编辑协议
+              </button>
+            </div>
+            <p class="mt-2 text-12px">
+              {{ supplement.signDate || '日期未记录' }} · {{ supplement.status }} · {{ supplement.content }}
+            </p>
+            <p class="mt-2 text-12px">
+              协议我方签约快照：{{ supplement.ourSignatorySnapshot?.name ?? '历史未核实' }}<span v-if="supplement.ourSignatorySnapshot"> · 核实版本 {{ supplement.ourSignatorySnapshot.version }}</span>
+            </p>
+            <div class="material-fact-scroll mt-3">
+              <table class="material-fact-table">
+                <thead><tr><th>材料</th><th>规格</th><th>材质</th><th>单位</th><th>数量</th><th>实际含税单价</th><th>本次增额</th><th>原行身份</th><th>依据</th></tr></thead><tbody>
+                  <tr v-for="row in supplement.lineItems" :key="row.id">
+                    <td>{{ row.materialName }}</td><td>{{ row.spec }}</td><td>{{ row.materialGrade || '未记录' }}</td><td>{{ row.unit }}</td><td>{{ row.qty ?? '—' }}</td><td>{{ row.unitPrice == null ? '—' : yuan(Number(row.unitPrice)) }}</td><td>{{ row.amount == null ? '待核实' : yuan(Number(row.amount)) }}</td><td>{{ row.originalLineId ?? '新增材料' }}</td><td>{{ row.changeBasis || row.note }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-for="row in supplement.deductions" :key="row.id" class="mt-2 text-12px">
+              {{ row.name }}：{{ row.amount == null ? '待填' : yuan(Number(row.amount)) }}；{{ row.basis }}
+            </p>
+            <p v-for="snapshot in supplement.originalLineSnapshots ?? []" :key="snapshot.originalLineId" class="mt-2 text-12px text-ink-soft">
+              原签约依据（{{ snapshot.parentVersion == null ? `来源更新于 ${snapshot.sourceUpdatedAt}` : `版本 ${snapshot.parentVersion}` }}）：{{ snapshot.materialName }} · {{ snapshot.qty ?? '未知数量' }} · {{ snapshot.unitPrice == null ? '未知单价' : yuan(Number(snapshot.unitPrice)) }} · {{ snapshot.originalLineId }}
+            </p>
+            <ContractOriginalFilesPanel :owner-id="supplement.id" :origin="detail.dataOrigin" :source-version="detail.sourceVersion" :can-read="canReadOriginals" :files="ownerFiles(supplement.id)" :read-content="repository.fileContent" />
+          </article>
+          <p v-if="!detail.sections.supplements?.length" class="panel p-8 text-center text-13px text-ink-soft">
+            暂无材料补充协议
+          </p>
         </section>
 
         <section v-else-if="activeTab === 'materials'" class="space-y-3">

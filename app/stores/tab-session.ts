@@ -4,6 +4,7 @@ import type { TabSessionDiagnostic, TabSessionScope, TabSessionSnapshot } from '
 import { useStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { effectScope, onScopeDispose, shallowRef, watch } from 'vue'
+import { commandRecoveryKey, commandRecoveryRouteTargets, commandRecoveryStorageForFamily } from '~/lib/forms/command-recovery'
 import { isQuantityHollowWorkPath } from '~/lib/quantity/hollow-navigation'
 import { TAB_TARGET_VERSION } from '~/lib/tabs/restoration-contract'
 import { createTabSessionRestorer } from '~/lib/tabs/restore-session'
@@ -184,6 +185,20 @@ export const useTabSessionStore = defineStore('tab-session', () => {
     // 原键/字段由空鼓页面在当前身份下重读；这里只保留用户正在刷新的精确工作地址。
     if (browserReload && isQuantityHollowWorkPath(fullPath))
       return fullPath
+    if (browserReload) {
+      for (const target of commandRecoveryRouteTargets(fullPath)) {
+        const descriptor = commandRecoveryStorageForFamily(target.family).read(commandRecoveryKey({ ...snapshot.scope, ...target }))
+        const permitted = descriptor && (['material-quotation-import', 'other-settlement-import'].includes(descriptor.family)
+          ? descriptor.action === 'import'
+          : ['crew-worker-import', 'finance-import'].includes(descriptor.family)
+              ? descriptor.action === 'adopt'
+              : ['draft', 'save', 'submit'].includes(descriptor.action)
+                || (descriptor.family === 'finance-payment-record' && ['confirm', 'unconfirm'].includes(descriptor.action)))
+        if (permitted) {
+          return fullPath
+        }
+      }
+    }
     if (fullPath === '/' || (browserReload && !inspectRestorableTabPath(fullPath)))
       return resolve(snapshot.activeKey)
     return browserReload ? restorePath(fullPath) : fullPath

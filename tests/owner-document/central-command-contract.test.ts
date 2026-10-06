@@ -222,6 +222,10 @@ describe('甲方商务单据中央命令契约', () => {
 
     const saved = await commands.execute(request, subcontractSession)
     await expect(commands.execute(request, subcontractSession)).resolves.toEqual(saved)
+    await expect(commands.execute({ ...request, draft: { ...request.draft, name: '异文变洽签' } }, subcontractSession)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(commands.resolve(saved.commandId, 'sub_change', subcontractSession)).toEqual({ outcome: 'applied', result: saved })
+    expect(commands.resolve('owner-never-applied', 'sub_change', subcontractSession)).toEqual({ outcome: 'not-applied', commandId: 'owner-never-applied' })
+    await expect(commands.execute({ ...request, commandId: 'owner-never-applied' }, subcontractSession)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     expect(commands.rows().filter(row => row.kind === 'sub_change')).toHaveLength(1)
     expect(commands.form('sub_change', saved.id, subcontractSession)).toMatchObject({
       kind: 'sub_change',

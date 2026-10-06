@@ -4,6 +4,7 @@ import type { FileRefRecord } from '~/lib/forms/file-refs'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import type { ReceiptContext, ReceiptDraft } from '~/lib/receipt/contract'
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onScopeDispose, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import CommandRecoveryPanel from '~/components/shared/CommandRecoveryPanel.vue'
 import FileRefAttachmentSection from '~/components/shared/FileRefAttachmentSection.vue'
 import EntityFormShell from '~/components/ui/EntityFormShell.vue'
 import FormFooter from '~/components/ui/FormFooter.vue'
@@ -45,10 +46,11 @@ const loadingAction = shallowRef<FormFooterAction | null>(null)
 const readingFiles = shallowRef(false)
 const closeAfter = ref(true)
 const initialized = shallowRef(false)
+let submitted: { draft: ReceiptDraft, add: PendingFileRef[], removeIds: string[], restoreIds: string[] } | null = null
 const formRef = useTemplateRef<HTMLFormElement>('formRef')
 const title = computed(() => `${session.targetId || initialId ? '编辑' : '新建'} · 收款登记`)
 const dirty = computed(() => initialized.value && (JSON.stringify(draft.value) !== savedSnapshot.value || pending.value.length > 0 || removeIds.value.length > 0 || restoreIds.value.length > 0))
-const writable = computed(() => session.canWrite && !loading.value && !readingFiles.value && !loadError.value)
+const writable = computed(() => session.canWrite && !session.pending && !loading.value && !readingFiles.value && !loadError.value)
 const footerActions = computed<FormFooterAction[]>(() => writable.value ? ['cancel', 'draft', 'saveNew', 'saveSubmit', 'save'] : ['cancel'])
 let allowLeave = false
 let fileGeneration = 0
@@ -97,6 +99,7 @@ async function initialize(id = session.targetId ?? initialId) {
     clearAttachments()
     savedSnapshot.value = JSON.stringify(draft.value)
     initialized.value = true
+    submitted = null
     fieldErrors.value = {}
     saveError.value = ''
     conflict.value = null
@@ -128,6 +131,7 @@ async function resume() {
     if (current === readGeneration) {
       resumeFailed = true
       loadError.value = receiptProblemFromUnknown(cause).problem.message
+      context.value = null
     }
   }
   finally {
@@ -168,9 +172,9 @@ function toggleFile(id: string) {
   selected.value = selected.value.includes(id) ? selected.value.filter(value => value !== id) : [...selected.value, id]
 }
 async function mayLeave() {
-  if (allowLeave || !dirty.value)
+  if (allowLeave || !(dirty.value || session.pending))
     return true
-  return kit.confirm({ variant: 'simple', title: '放弃修改', message: '当前收款还有未保存内容，确认放弃？', confirmLabel: '放弃修改' })
+  return kit.confirm({ variant: 'simple', title: '离开收款表单', message: session.pending ? '原提交仍需核对；原编号会保留，离开将丢失本页输入。确认离开？' : '当前收款还有未保存内容，确认放弃？', confirmLabel: '确认离开' })
 }
 async function leave() {
   if (!await mayLeave())
@@ -199,6 +203,51 @@ function keepLocalChanges() {
   }
   catch (cause) { saveError.value = receiptProblemFromUnknown(cause).problem.message }
 }
+function acknowledge(detail: NonNullable<Awaited<ReturnType<typeof store.saveForm>>['detail']>) {
+  attachments.value = detail.record.attachments
+  if (!submitted)
+    return
+  const sent = new Map(submitted.add.map(file => [file.localId, JSON.stringify(file)]))
+  pending.value = pending.value.filter(file => sent.get(file.localId) !== JSON.stringify(file))
+  removeIds.value = removeIds.value.filter(id => !submitted!.removeIds.includes(id))
+  restoreIds.value = restoreIds.value.filter(id => !submitted!.restoreIds.includes(id))
+  savedSnapshot.value = JSON.stringify(submitted.draft)
+  submitted = null
+}
+async function recover() {
+  try {
+    const value = await store.recover(session)
+    context.value = value.context
+    loadError.value = ''
+    saveError.value = ''
+    conflict.value = null
+    if (value.outcome === 'not-applied') {
+      if (!initialized.value) {
+        draft.value = value.detail?.record.draft ?? emptyReceiptDraft()
+        attachments.value = value.detail?.record.attachments ?? []
+        savedSnapshot.value = JSON.stringify(draft.value)
+        initialized.value = true
+      }
+      submitted = null
+      kit.success('原提交已确认未应用；本页输入已保留，可以重新保存')
+      return
+    }
+    if (submitted) {
+      acknowledge(value.detail!)
+    }
+    else if (!initialized.value) {
+      draft.value = value.detail!.record.draft
+      attachments.value = value.detail!.record.attachments
+      savedSnapshot.value = JSON.stringify(draft.value)
+      initialized.value = true
+    }
+    kit.success('原提交已确认保存；请核对本页内容后继续')
+  }
+  catch (cause) {
+    saveError.value = receiptProblemFromUnknown(cause).problem.message
+    kit.error(saveError.value)
+  }
+}
 async function save(action: FormFooterAction) {
   if (action === 'cancel')
     return leave()
@@ -213,10 +262,15 @@ async function save(action: FormFooterAction) {
     const validated = validateReceiptDraft({ ...draft.value, amount: normalized === '' ? null : normalized }, saveAction, context.value)
     loadingAction.value = action
     saveError.value = ''
+    submitted = JSON.parse(JSON.stringify({ draft: draft.value, add: pending.value, removeIds: removeIds.value, restoreIds: restoreIds.value }))
     const result = await store.saveForm(session, validated, saveAction, { add: pending.value.map(({ localId: _localId, ...file }) => file), removeIds: removeIds.value, restoreIds: restoreIds.value })
-    savedSnapshot.value = JSON.stringify(draft.value)
-    clearAttachments()
+    const retainedInput = result.retainedInput || JSON.stringify(draft.value) !== JSON.stringify(submitted!.draft)
+    acknowledge(result.detail)
     kit.success(saveAction === 'draft' ? '草稿已保存' : saveAction === 'submit' ? '收款已保存并提交' : '收款已保存')
+    if (retainedInput || dirty.value) {
+      kit.warning('原提交已确认保存，后续输入已保留；请核对后继续编辑')
+      return
+    }
     if (!formActive)
       return
     if (action === 'saveNew') {
@@ -232,13 +286,16 @@ async function save(action: FormFooterAction) {
       await navigateTo(returnTo.value)
     }
     else {
-      // 保存结果已经确认。重读失败只阻止继续编辑，不重发刚成功的命令。
+      // 同一记录已读回；没有后续输入时才切换到正式编辑路由。
       if (!initialId) {
         allowLeave = true
         await navigateTo(receiptFormPath(result.id, returnTo.value), { replace: true })
       }
       else {
-        await initialize(result.id)
+        if (result.detail.record.version === result.version) {
+          draft.value = result.detail.record.draft
+          savedSnapshot.value = JSON.stringify(draft.value)
+        }
       }
     }
   }
@@ -247,8 +304,10 @@ async function save(action: FormFooterAction) {
     const problem = receiptProblemFromUnknown(cause).problem
     fieldErrors.value = problem.fieldErrors
     saveError.value = problem.message
-    if (problem.code === 'forbidden')
+    if (problem.code === 'forbidden') {
       session.canWrite = false
+      context.value = null
+    }
     if (conflict.value?.latest && !conflict.value.latest.capabilities.includes('receipt:write'))
       session.canWrite = false
     kit.error(problem.message)
@@ -288,15 +347,16 @@ onScopeDispose(() => {
 </script>
 
 <template>
-  <EntityFormShell :title="title" subtitle="甲方客户向我方支付的收款登记" back-label="返回来源页面" :sections="[{ key: 'basic', label: '基本信息' }, { key: 'amount', label: '金额与方式' }, { key: 'contract', label: '合同情况' }, { key: 'attachments', label: '附件与备注' }]" :state="loading ? 'loading' : loadError ? 'error' : 'ready'" :state-description="loadError" state-action-label="重新读取" @back="leave" @state-action="reload">
+  <EntityFormShell :title="title" subtitle="甲方客户向我方支付的收款登记" back-label="返回来源页面" :sections="[{ key: 'basic', label: '基本信息' }, { key: 'amount', label: '金额与方式' }, { key: 'contract', label: '合同情况' }, { key: 'attachments', label: '附件与备注' }]" :state="loading ? 'loading' : loadError && !session.pending ? 'error' : 'ready'" :state-description="loadError" state-action-label="重新读取" @back="leave" @state-action="reload">
     <template #status>
       <KitStatusTag :tone="financeStatusTone(draft.status)">
         {{ financeStatusLabel(draft.status) }}
       </KitStatusTag>
     </template>
+    <CommandRecoveryPanel v-if="session.pending" class="mb-4" :command-id="session.pending.id" :saved="Boolean(session.pending.result)" :busy="session.busy" @recover="recover" />
     <form v-if="context" ref="formRef" class="grid min-w-0 gap-4" aria-label="收款登记表单" @submit.prevent>
       <StatePanel v-if="!session.canWrite" kind="forbidden" title="当前收款不可编辑" description="收款或关联记录的权限不足，请重新读取当前权限。" action-label="重新读取" compact @action="reload" />
-      <StatePanel v-if="saveError" kind="error" title="收款尚未保存" :description="saveError" action-label="读取服务器最新版" compact @action="reload" />
+      <StatePanel v-if="saveError && !session.pending" kind="error" title="收款尚未确认保存" :description="saveError" action-label="读取服务器最新版" compact @action="reload" />
       <section v-if="conflict" class="panel grid gap-3 p-4" aria-label="收款版本冲突">
         <p class="m-0 text-12px text-ink-soft">
           {{ conflict.latest ? `服务器版本 ${conflict.latest.record.version} 已读回。本页输入尚未覆盖服务器。` : '最新版本暂未读回，本页输入已保留，请重新读取后核对。' }}

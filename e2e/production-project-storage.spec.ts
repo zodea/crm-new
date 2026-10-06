@@ -17,7 +17,7 @@ test.use({ actionTimeout: 15_000, navigationTimeout: 30_000 })
 test('公开项目保存、原件、Excel 回执与客户关联跨独立进程重启', async ({ page }, testInfo) => {
   test.setTimeout(180_000)
   const root = resolve('.')
-  const base = resolve('.codex-tmp/issue-452-browser')
+  const base = resolve('.tmp/a01-a03-production/project')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const portProbe = createServer().listen(0, '127.0.0.1')

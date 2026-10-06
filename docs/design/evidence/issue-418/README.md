@@ -16,7 +16,7 @@
 - 资金和材料表单复用公共壳，最多两列字段，宽容器且有足够分区时显示导航；保留校验、脏状态和保存动作。合同字段继承同一列数规则。
 - 指标网格尾行空余部分保持白底；列表使用不截获滚动祖先的裁剪；表单分区导航仅定位当前实例，避免同名分区串页。
 
-详细结构只看 [组件规格](../../kit-ui-component-specs.md)、[CRM 模式](../../../rewrite/CRM-PATTERNS.md) 和[分供方页面](../../../rewrite/pages/base-supplier.md)，不在此复制字段合同。
+详细结构只看 [组件规格](../../kit-ui-component-specs.md)、[公共页面结构](../../../rewrite/DESIGN-SYSTEM.md#a01-business-patterns) 和[分供方页面](../../../rewrite/pages/base-supplier.md)，不在此复制字段合同；原 CRM-PATTERNS 的历史内容由 Git 定位。
 
 ## 验证证据
 

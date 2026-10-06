@@ -13,3 +13,10 @@
 | [tests/browser/setup.ts](../../../tests/browser/setup.ts) | 测试环境初始化 | 真实浏览器组件测试初始化 |
 | [tests/components/setup.ts](../../../tests/components/setup.ts) | 测试环境初始化 | jsdom 测试清理与浏览器 API 替身 |
 | [tests/helpers/memory-db.ts](../../../tests/helpers/memory-db.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
+| [tests/helpers/material-read-meta.ts](../../../tests/helpers/material-read-meta.ts) | 辅助／夹具（非独立测试） | 材采来源与真实元数据夹具 |
+| [tests/helpers/notification-read-meta.ts](../../../tests/helpers/notification-read-meta.ts) | 辅助／夹具（非独立测试） | 通知来源元数据夹具 |
+| [tests/helpers/supplier-read-meta.ts](../../../tests/helpers/supplier-read-meta.ts) | 辅助／夹具（非独立测试） | 分供方来源与权限夹具 |
+| [tests/helpers/public-read-meta.ts](../../../tests/helpers/public-read-meta.ts) | 辅助／夹具（非独立测试） | 跨领域公共读取协议夹具 |
+| [tests/helpers/project-read-meta.ts](../../../tests/helpers/project-read-meta.ts) | 辅助／夹具（非独立测试） | 项目及真实客户参考来源夹具 |
+| [tests/helpers/verified-signatory.ts](../../../tests/helpers/verified-signatory.ts) | 辅助／夹具（非独立测试） | 在同一隔离SQL目录明确创建并读取主体采用事实 |
+| [e2e/helpers/contract-signatory.ts](../../../e2e/helpers/contract-signatory.ts) | 辅助／夹具（非独立测试） | 端到端实际主体创建、选择与冻结采用准备 |

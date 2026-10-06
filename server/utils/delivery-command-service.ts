@@ -1,11 +1,12 @@
 import type { DeliveryCentralRecord, DeliveryCommand, DeliveryCommandResult, DeliveryContext, DeliveryDraft, DeliveryFileContent, DeliveryList, DeliveryReferenceFacts, DeliveryRevision, DeliveryRevisionAction, DeliverySourceUpload } from '../../app/lib/delivery-record/contract'
-import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
 import { createHash, randomUUID } from 'node:crypto'
 import { DELIVERY_READ_CAPABILITY, DELIVERY_WRITE_CAPABILITY, deliveryProblem } from '../../app/lib/delivery-record/contract'
 import { normalizeDeliveryDraft } from '../../app/lib/delivery-record/domain'
 import { deliveryNaturalKey } from '../../app/lib/delivery/review'
 import { resolveBusinessSession } from './business-session'
+import { assertRetainedMigrationReferences } from './core-identity-migration'
 import { readDeliveryAsset, validateDeliverySource } from './delivery-assets'
 import { prepareDeliveryMigration } from './delivery-migration'
 
@@ -121,6 +122,10 @@ export function createDeliveryCommandService(options: Options) {
   }
 
   const service = {
+    assertMigrationRemoval(removed: readonly CoreMigrationServerEntityDTO[], sessionId?: string | null) {
+      const session = resolveBusinessSession()
+      assertRetainedMigrationReferences(removed, 'delivery_records', [...stateFor(session, sessionId).records.values()].map(row => ({ id: row.id, references: [{ type: 'projects', id: row.projectId }, { type: 'suppliers', id: row.supplierId }] })), message => deliveryProblem('conflict', message))
+    },
     prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
       const session = resolveBusinessSession()
       const prepared = prepareDeliveryMigration(stateFor(session, sessionId), snapshot)

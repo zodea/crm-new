@@ -1,222 +1,14 @@
-import type { ApprovedAmountOrigin, ApprovedAmountState } from './approval-amount'
-import type { InvoiceState } from './forms'
+import type { ApprovedAmountOrigin } from './approval-amount'
+import type { PaymentApplicationDetail } from './payment-detail-model'
 import { CONFIRMED_SETTLEMENT_SQL_VALUES } from '~/lib/contract/effective-status'
-import { select } from '~/lib/db/connection'
+import { withTransaction } from '~/lib/db/connection'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
 import { approvalPaymentCap, paymentConfirmationCap, readApprovalAmount } from './approval-amount'
+import { pendingInvoiceAmountForRead } from './domain'
+import { verifiedPaymentDetailAmount as amount, buildPaymentApplicationInsight, roundPaymentDetailMoney as roundMoney } from './payment-detail-model'
+import { verifiedFinanceSum } from './persistent-rows'
 
-const EPSILON = 0.0001
-
-export type PaymentInsightLevel = 'ok' | 'info' | 'warn' | 'danger'
-
-export interface PaymentApplicationInsightInput {
-  status: string
-  bizType: string
-  invoiceState: InvoiceState | string
-  applyAmount: number
-  approvedAmount: number | null
-  approvedAmountOrigin?: ApprovedAmountOrigin
-  settlementAllocated: number
-  invoiceAllocated: number
-  paidAmount: number
-}
-
-export interface PaymentApplicationInsightCheck {
-  key: 'approval' | 'settlement' | 'invoice' | 'payment'
-  title: string
-  level: PaymentInsightLevel
-  summary: string
-  detail: string
-}
-
-export interface PaymentApplicationInsight {
-  attentionCount: number
-  checks: PaymentApplicationInsightCheck[]
-}
-
-export interface PaymentApplicationSettlementDetail {
-  id: string
-  no: string
-  name: string
-  totalAmount: number
-  settlementDate: string
-  status: string
-  allocatedAmount: number
-  note: string
-}
-
-export interface PaymentApplicationInvoiceDetail {
-  id: string
-  invoiceNumber: string
-  invoiceDate: string
-  totalAmount: number
-  allocatedAmount: number
-  note: string
-}
-
-export interface PaymentApplicationPaymentDetail {
-  id: string
-  no: string
-  payeeName: string
-  paymentDate: string
-  amount: number
-  confirmationStatus: string
-  allocatedAmount: number
-  voucherNo: string
-}
-
-export interface PaymentApplicationDetail {
-  id: string
-  no: string
-  name: string
-  bizType: string
-  projectId: string | null
-  projectName: string
-  supplierId: string | null
-  supplierName: string
-  contractId: string | null
-  contractNo: string
-  contractName: string
-  contractAmount: number
-  contractSettledAmount: number
-  contractPaidAmount: number
-  costName: string
-  applyAmount: number
-  applyDate: string
-  applicant: string
-  invoiceState: InvoiceState | string
-  payContent: string
-  prepayDeduct: number
-  prepayNote: string
-  approvedAmount: number | null
-  approvedAmountState: ApprovedAmountState
-  approvalNote: string
-  status: string
-  note: string
-  externalRef: string
-  createdAt: string
-  updatedAt: string
-  settlementAllocated: number
-  settlementDifference: number
-  invoiceAllocated: number
-  invoiceDifference: number
-  pendingInvoiceAmount: number
-  paidAmount: number
-  unpaidAmount: number | null
-  registrationAmount: number
-  supplierOtherProjectCount: number
-  supplierOtherProjectPaidAmount: number
-  settlements: PaymentApplicationSettlementDetail[]
-  invoices: PaymentApplicationInvoiceDetail[]
-  payments: PaymentApplicationPaymentDetail[]
-  insight: PaymentApplicationInsight
-}
-
-function amount(value: unknown): number {
-  const normalized = Number(value)
-  return Number.isFinite(normalized) ? normalized : 0
-}
-
-function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100
-}
-
-function displayAmount(value: number): string {
-  return `¥${value.toFixed(2)}`
-}
-
-function isContractPayment(bizType: string): boolean {
-  return bizType.startsWith('有合同-')
-}
-
-function isSubmitted(status: string): boolean {
-  return ['submitted', 'approved', '已提交', '已审批', '已批复'].includes(status)
-}
-
-export function buildPaymentApplicationInsight(
-  input: PaymentApplicationInsightInput,
-): PaymentApplicationInsight {
-  const applyAmount = Math.max(amount(input.applyAmount), 0)
-  const settlementAllocated = Math.max(amount(input.settlementAllocated), 0)
-  const invoiceAllocated = Math.max(amount(input.invoiceAllocated), 0)
-  const paidAmount = Math.max(amount(input.paidAmount), 0)
-  const settlementDifference = Math.max(applyAmount - settlementAllocated, 0)
-  const pendingInvoiceAmount = Math.max(applyAmount - invoiceAllocated, 0)
-  const paymentCap = approvalPaymentCap(applyAmount, input.approvedAmount, input.approvedAmountOrigin)
-  const unpaidAmount = paymentCap === null ? null : Math.max(paymentCap - paidAmount, 0)
-
-  const checks: PaymentApplicationInsightCheck[] = [
-    {
-      key: 'approval',
-      title: '申请流程',
-      level: isSubmitted(input.status) ? 'ok' : 'warn',
-      summary: isSubmitted(input.status) ? '已提交' : '尚未提交',
-      detail: isSubmitted(input.status)
-        ? '当前记录已进入业务处理阶段。系统暂不伪造审批人和审批时间。'
-        : '保存草稿不会进入后续付款处理，请先补齐必填项并保存并提交。',
-    },
-    {
-      key: 'settlement',
-      title: '结算勾稽',
-      level: !isContractPayment(input.bizType) || settlementDifference <= EPSILON ? 'ok' : 'danger',
-      summary: !isContractPayment(input.bizType)
-        ? '该类型无需关联结算'
-        : settlementDifference <= EPSILON
-          ? '已完全匹配'
-          : `差额 ${displayAmount(settlementDifference)}`,
-      detail: !isContractPayment(input.bizType)
-        ? '当前业务类型不以支出结算单作为提交前置条件。'
-        : settlementDifference <= EPSILON
-          ? `已关联 ${displayAmount(settlementAllocated)}，与申请金额一致。`
-          : `已关联 ${displayAmount(settlementAllocated)}，还缺少 ${displayAmount(settlementDifference)}；提交前必须补齐真实结算分摊。`,
-    },
-    {
-      key: 'invoice',
-      title: '发票勾稽',
-      level: input.invoiceState === '无需发票'
-        ? invoiceAllocated <= EPSILON ? 'ok' : 'danger'
-        : pendingInvoiceAmount <= EPSILON ? 'ok' : 'warn',
-      summary: input.invoiceState === '无需发票'
-        ? invoiceAllocated <= EPSILON ? '无需发票' : '误挂发票'
-        : pendingInvoiceAmount <= EPSILON ? '已完全关联' : `待回票 ${displayAmount(pendingInvoiceAmount)}`,
-      detail: input.invoiceState === '无需发票'
-        ? invoiceAllocated <= EPSILON
-          ? '当前申请明确无需发票，未发现有效发票分摊。'
-          : '当前申请标记为无需发票，但仍存在有效发票分摊，请先解除关联。'
-        : pendingInvoiceAmount <= EPSILON
-          ? `已关联 ${displayAmount(invoiceAllocated)} 发票金额。`
-          : `当前回票类型允许后补发票，仍有 ${displayAmount(pendingInvoiceAmount)} 未关联。`,
-    },
-    paymentCap === null
-      ? {
-          key: 'payment',
-          title: '支付结果',
-          level: 'warn',
-          summary: '历史批复待核验',
-          detail: `已确认支付 ${displayAmount(paidAmount)}。历史批复金额的含义尚不明确，暂不能据此判断余额或是否付清。`,
-        }
-      : {
-          key: 'payment',
-          title: '支付结果',
-          level: paidAmount > paymentCap + EPSILON
-            ? 'danger'
-            : (unpaidAmount ?? 0) > EPSILON ? 'info' : 'ok',
-          summary: paidAmount > paymentCap + EPSILON
-            ? '已付超出可付金额'
-            : (unpaidAmount ?? 0) > EPSILON ? `待支付 ${displayAmount(unpaidAmount ?? 0)}` : '已付清',
-          detail: paidAmount > paymentCap + EPSILON
-            ? `已确认支付 ${displayAmount(paidAmount)}，超过当前可付上限 ${displayAmount(paymentCap)}。`
-            : (unpaidAmount ?? 0) > EPSILON
-                ? `已确认支付 ${displayAmount(paidAmount)}，当前可付上限为 ${displayAmount(paymentCap)}。`
-                : `已确认支付 ${displayAmount(paidAmount)}，当前申请已完成支付。`,
-        },
-  ]
-
-  return {
-    attentionCount: checks.filter(check => check.level === 'warn' || check.level === 'danger').length,
-    checks,
-  }
-}
+export * from './payment-detail-model'
 
 interface PaymentApplicationHeaderRow extends Record<string, unknown> {
   id: string
@@ -226,13 +18,12 @@ interface PaymentApplicationHeaderRow extends Record<string, unknown> {
   project_id: string | null
   project_name: string | null
   supplier_id: string | null
+  worker_id: string | null
   supplier_name: string | null
   contract_id: string | null
   contract_no: string | null
   contract_name: string | null
   contract_amount: number | null
-  contract_settled_amount: number | null
-  contract_paid_amount: number | null
   cost_name: string
   apply_amount: number
   apply_date: string
@@ -249,11 +40,7 @@ interface PaymentApplicationHeaderRow extends Record<string, unknown> {
   external_ref: string
   created_at: string
   updated_at: string
-  settlement_allocated: number
-  invoice_allocated: number
-  paid_amount: number
   supplier_other_project_count: number
-  supplier_other_project_paid_amount: number
 }
 
 const DETAIL_TABLES = [
@@ -272,7 +59,8 @@ const DETAIL_TABLES = [
 export async function loadPaymentApplicationDetail(
   id: string,
 ): Promise<PaymentApplicationDetail | null> {
-  const [header] = await select<PaymentApplicationHeaderRow>(`
+  return withTransaction(async ({ select }) => {
+    const [header] = await select<PaymentApplicationHeaderRow>(`
     ${hiddenCtesFor(...DETAIL_TABLES)}
     SELECT
       application.id,
@@ -282,27 +70,12 @@ export async function loadPaymentApplicationDetail(
       application.project_id,
       project.name AS project_name,
       application.supplier_id,
-      supplier.name AS supplier_name,
+      application.worker_id,
+      COALESCE(NULLIF(application.payee_name_snapshot,''),supplier.name,worker.name) AS supplier_name,
       application.contract_id,
       contract.no AS contract_no,
       contract.name AS contract_name,
       contract.amount AS contract_amount,
-      COALESCE((
-        SELECT SUM(settlement.total_amount)
-        FROM expenditure_settlements AS settlement
-        WHERE settlement.contract_id = application.contract_id
-          AND ${visibleCond('expenditure_settlements', 'settlement')}
-          AND settlement.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})
-      ), 0) AS contract_settled_amount,
-      COALESCE((
-        SELECT SUM(recordAllocation.allocated_amount)
-        FROM payment_record_application_allocations AS recordAllocation
-        JOIN payment_records AS record ON record.id = recordAllocation.payment_record_id
-        WHERE recordAllocation.payment_application_id = application.id
-          AND ${visibleCond('payment_record_application_allocations', 'recordAllocation')}
-          AND ${visibleCond('payment_records', 'record')}
-          AND record.confirmation_status = 'confirmed'
-      ), 0) AS contract_paid_amount,
       application.cost_name,
       application.apply_amount,
       application.apply_date,
@@ -320,62 +93,58 @@ export async function loadPaymentApplicationDetail(
       application.created_at,
       application.updated_at,
       COALESCE((
-        SELECT SUM(allocation.allocated_amount)
-        FROM payment_application_settlement_allocations AS allocation
-        WHERE allocation.payment_application_id = application.id
-          AND ${visibleCond('payment_application_settlement_allocations', 'allocation')}
-      ), 0) AS settlement_allocated,
-      COALESCE((
-        SELECT SUM(allocation.allocated_amount)
-        FROM payment_application_invoice_allocations AS allocation
-        WHERE allocation.payment_application_id = application.id
-          AND ${visibleCond('payment_application_invoice_allocations', 'allocation')}
-      ), 0) AS invoice_allocated,
-      COALESCE((
-        SELECT SUM(allocation.allocated_amount)
-        FROM payment_record_application_allocations AS allocation
-        JOIN payment_records AS record ON record.id = allocation.payment_record_id
-        WHERE allocation.payment_application_id = application.id
-          AND ${visibleCond('payment_record_application_allocations', 'allocation')}
-          AND ${visibleCond('payment_records', 'record')}
-          AND record.confirmation_status = 'confirmed'
-      ), 0) AS paid_amount,
-      COALESCE((
         SELECT COUNT(DISTINCT otherApplication.project_id)
         FROM payment_applications AS otherApplication
-        WHERE otherApplication.supplier_id = application.supplier_id
+        WHERE otherApplication.supplier_id IS application.supplier_id
+          AND otherApplication.worker_id IS application.worker_id
+          AND (application.supplier_id IS NOT NULL OR application.worker_id IS NOT NULL)
           AND otherApplication.id <> application.id
           AND otherApplication.project_id IS NOT NULL
           AND ${visibleCond('payment_applications', 'otherApplication')}
           AND (application.project_id IS NULL OR otherApplication.project_id <> application.project_id)
-      ), 0) AS supplier_other_project_count,
-      COALESCE((
-        SELECT SUM(recordAllocation.allocated_amount)
-        FROM payment_applications AS otherApplication
-        JOIN payment_record_application_allocations AS recordAllocation
-          ON recordAllocation.payment_application_id = otherApplication.id
-        JOIN payment_records AS record ON record.id = recordAllocation.payment_record_id
-        WHERE otherApplication.supplier_id = application.supplier_id
-          AND otherApplication.id <> application.id
-          AND ${visibleCond('payment_applications', 'otherApplication')}
-          AND ${visibleCond('payment_record_application_allocations', 'recordAllocation')}
-          AND ${visibleCond('payment_records', 'record')}
-          AND record.confirmation_status = 'confirmed'
-          AND (application.project_id IS NULL OR otherApplication.project_id <> application.project_id)
-      ), 0) AS supplier_other_project_paid_amount
+      ), 0) AS supplier_other_project_count
     FROM payment_applications AS application
     LEFT JOIN projects AS project ON project.id = application.project_id
     LEFT JOIN suppliers AS supplier ON supplier.id = application.supplier_id
+    LEFT JOIN workers AS worker ON worker.id=application.worker_id
     LEFT JOIN contracts AS contract ON contract.id = application.contract_id
     WHERE ${visibleCond('payment_applications', 'application')}
       AND application.id = ?
   `, [id])
 
-  if (!header)
-    return null
+    if (!header)
+      return null
 
-  const [settlements, invoices, payments] = await Promise.all([
-    select<Record<string, unknown>>(`
+    const sources = await select<{ source: string, value: unknown, payment_amount: unknown }>(`
+    ${hiddenCtesFor(...DETAIL_TABLES)}
+    SELECT 'contract-settled' AS source,settlement.total_amount AS value,NULL AS payment_amount
+      FROM expenditure_settlements AS settlement
+      WHERE settlement.contract_id=? AND ${visibleCond('expenditure_settlements', 'settlement')}
+        AND settlement.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})
+    UNION ALL SELECT 'settlement',allocation.allocated_amount,NULL FROM payment_application_settlement_allocations AS allocation
+      WHERE allocation.payment_application_id=? AND ${visibleCond('payment_application_settlement_allocations', 'allocation')}
+    UNION ALL SELECT 'invoice',allocation.allocated_amount,NULL FROM payment_application_invoice_allocations AS allocation
+      WHERE allocation.payment_application_id=? AND ${visibleCond('payment_application_invoice_allocations', 'allocation')}
+    UNION ALL SELECT 'paid',allocation.allocated_amount,record.amount FROM payment_record_application_allocations AS allocation
+      JOIN payment_records AS record ON record.id=allocation.payment_record_id
+      WHERE allocation.payment_application_id=? AND ${visibleCond('payment_record_application_allocations', 'allocation')}
+        AND ${visibleCond('payment_records', 'record')} AND record.confirmation_status='confirmed'
+    UNION ALL SELECT 'other-paid',recordAllocation.allocated_amount,record.amount FROM payment_applications AS otherApplication
+      JOIN payment_record_application_allocations AS recordAllocation ON recordAllocation.payment_application_id=otherApplication.id
+      JOIN payment_records AS record ON record.id=recordAllocation.payment_record_id
+      WHERE otherApplication.supplier_id IS ? AND otherApplication.worker_id IS ? AND otherApplication.id<>?
+        AND (otherApplication.supplier_id IS NOT NULL OR otherApplication.worker_id IS NOT NULL)
+        AND ${visibleCond('payment_applications', 'otherApplication')}
+        AND ${visibleCond('payment_record_application_allocations', 'recordAllocation')}
+        AND ${visibleCond('payment_records', 'record')} AND record.confirmation_status='confirmed'
+        AND (? IS NULL OR otherApplication.project_id<>?)
+  `, [header.contract_id, id, id, id, header.supplier_id, header.worker_id, id, header.project_id, header.project_id])
+    sources.forEach(row => verifiedFinanceSum([row.value]))
+    sources.filter(row => row.source === 'paid' || row.source === 'other-paid').forEach(row => verifiedFinanceSum([row.payment_amount]))
+    const sum = (source: string) => verifiedFinanceSum(sources.filter(row => row.source === source).map(row => row.value))
+
+    const [settlements, invoices, payments] = await Promise.all([
+      select<Record<string, unknown>>(`
       ${hiddenCtesFor(...DETAIL_TABLES)}
       SELECT
         settlement.id,
@@ -393,7 +162,7 @@ export async function loadPaymentApplicationDetail(
         AND ${visibleCond('expenditure_settlements', 'settlement')}
       ORDER BY settlement.settlement_date DESC, settlement.created_at DESC
     `, [id]),
-    select<Record<string, unknown>>(`
+      select<Record<string, unknown>>(`
       ${hiddenCtesFor(...DETAIL_TABLES)}
       SELECT
         invoice.id,
@@ -409,7 +178,7 @@ export async function loadPaymentApplicationDetail(
         AND ${visibleCond('invoices', 'invoice')}
       ORDER BY invoice.invoice_date DESC, invoice.created_at DESC
     `, [id]),
-    select<Record<string, unknown>>(`
+      select<Record<string, unknown>>(`
       ${hiddenCtesFor(...DETAIL_TABLES)}
       SELECT
         record.id,
@@ -427,101 +196,103 @@ export async function loadPaymentApplicationDetail(
         AND ${visibleCond('payment_records', 'record')}
       ORDER BY record.payment_date DESC, record.created_at DESC
     `, [id]),
-  ])
+    ])
 
-  const applyAmount = amount(header.apply_amount)
-  const approval = readApprovalAmount(header.approved_amount, header.approved_amount_origin)
-  const settlementAllocated = amount(header.settlement_allocated)
-  const invoiceAllocated = amount(header.invoice_allocated)
-  const paidAmount = amount(header.paid_amount)
-  const settlementDifference = roundMoney(Math.max(applyAmount - settlementAllocated, 0))
-  const invoiceDifference = roundMoney(Math.max(applyAmount - invoiceAllocated, 0))
-  const pendingInvoiceAmount = header.invoice_state === '无需发票'
-    ? 0
-    : invoiceDifference
-  const paymentCap = approvalPaymentCap(applyAmount, header.approved_amount, header.approved_amount_origin)
-  const unpaidAmount = paymentCap === null ? null : roundMoney(Math.max(paymentCap - paidAmount, 0))
-  const insight = buildPaymentApplicationInsight({
-    status: String(header.status ?? ''),
-    bizType: String(header.biz_type ?? ''),
-    invoiceState: String(header.invoice_state ?? ''),
-    applyAmount,
-    approvedAmount: header.approved_amount,
-    approvedAmountOrigin: header.approved_amount_origin,
-    settlementAllocated,
-    invoiceAllocated,
-    paidAmount,
+    const applyAmount = amount(header.apply_amount)
+    const approval = readApprovalAmount(header.approved_amount, header.approved_amount_origin)
+    const settlementAllocated = sum('settlement')
+    const invoiceAllocated = sum('invoice')
+    const paidAmount = sum('paid')
+    const settlementDifference = roundMoney(Math.max(applyAmount - settlementAllocated, 0))
+    const invoiceDifference = roundMoney(Math.max(applyAmount - invoiceAllocated, 0))
+    const pendingInvoiceAmount = pendingInvoiceAmountForRead(header.invoice_state, applyAmount, invoiceAllocated)
+    const paymentCap = approvalPaymentCap(applyAmount, header.approved_amount, header.approved_amount_origin)
+    const unpaidAmount = paymentCap === null ? null : roundMoney(Math.max(paymentCap - paidAmount, 0))
+    const insight = buildPaymentApplicationInsight({
+      status: String(header.status ?? ''),
+      bizType: String(header.biz_type ?? ''),
+      workerId: header.worker_id,
+      hasSettlementAllocations: settlements.length > 0,
+      invoiceState: String(header.invoice_state ?? ''),
+      applyAmount,
+      approvedAmount: header.approved_amount,
+      approvedAmountOrigin: header.approved_amount_origin,
+      settlementAllocated,
+      invoiceAllocated,
+      paidAmount,
+    })
+
+    return {
+      id: String(header.id),
+      no: String(header.no ?? ''),
+      name: String(header.name ?? ''),
+      bizType: String(header.biz_type ?? ''),
+      projectId: header.project_id ? String(header.project_id) : null,
+      projectName: String(header.project_name ?? ''),
+      supplierId: header.supplier_id ? String(header.supplier_id) : null,
+      workerId: header.worker_id,
+      supplierName: String(header.supplier_name ?? ''),
+      contractId: header.contract_id ? String(header.contract_id) : null,
+      contractNo: String(header.contract_no ?? ''),
+      contractName: String(header.contract_name ?? ''),
+      contractAmount: header.contract_amount === null ? null : amount(header.contract_amount),
+      contractSettledAmount: sum('contract-settled'),
+      contractPaidAmount: paidAmount,
+      costName: String(header.cost_name ?? ''),
+      applyAmount,
+      applyDate: String(header.apply_date ?? ''),
+      applicant: String(header.applicant ?? ''),
+      invoiceState: String(header.invoice_state ?? ''),
+      payContent: String(header.pay_content ?? ''),
+      prepayDeduct: amount(header.prepay_deduct),
+      prepayNote: String(header.prepay_note ?? ''),
+      approvedAmount: approval.amount,
+      approvedAmountState: approval.state,
+      approvalNote: String(header.approval_note ?? ''),
+      status: String(header.status ?? ''),
+      note: String(header.note ?? ''),
+      externalRef: String(header.external_ref ?? ''),
+      createdAt: String(header.created_at ?? ''),
+      updatedAt: String(header.updated_at ?? ''),
+      settlementAllocated,
+      settlementDifference,
+      invoiceAllocated,
+      invoiceDifference,
+      pendingInvoiceAmount,
+      paidAmount,
+      unpaidAmount,
+      registrationAmount: roundMoney(Math.max(paymentConfirmationCap(applyAmount, header.approved_amount, header.approved_amount_origin) - paidAmount, 0)),
+      supplierOtherProjectCount: header.supplier_id || header.worker_id ? amount(header.supplier_other_project_count) : null,
+      supplierOtherProjectPaidAmount: header.supplier_id || header.worker_id ? sum('other-paid') : null,
+      settlements: settlements.map(row => ({
+        id: String(row.id),
+        no: String(row.no ?? ''),
+        name: String(row.name ?? ''),
+        totalAmount: amount(row.total_amount),
+        settlementDate: String(row.settlement_date ?? ''),
+        status: String(row.status ?? ''),
+        allocatedAmount: amount(row.allocated_amount),
+        note: String(row.note ?? ''),
+      })),
+      invoices: invoices.map(row => ({
+        id: String(row.id),
+        invoiceNumber: String(row.invoice_number ?? ''),
+        invoiceDate: String(row.invoice_date ?? ''),
+        totalAmount: amount(row.total_amount),
+        allocatedAmount: amount(row.allocated_amount),
+        note: String(row.note ?? ''),
+      })),
+      payments: payments.map(row => ({
+        id: String(row.id),
+        no: String(row.no ?? ''),
+        payeeName: String(row.payee_name ?? ''),
+        paymentDate: String(row.payment_date ?? ''),
+        amount: amount(row.amount),
+        confirmationStatus: String(row.confirmation_status ?? ''),
+        allocatedAmount: amount(row.allocated_amount),
+        voucherNo: String(row.voucher_no ?? ''),
+      })),
+      insight,
+    }
   })
-
-  return {
-    id: String(header.id),
-    no: String(header.no ?? ''),
-    name: String(header.name ?? ''),
-    bizType: String(header.biz_type ?? ''),
-    projectId: header.project_id ? String(header.project_id) : null,
-    projectName: String(header.project_name ?? ''),
-    supplierId: header.supplier_id ? String(header.supplier_id) : null,
-    supplierName: String(header.supplier_name ?? ''),
-    contractId: header.contract_id ? String(header.contract_id) : null,
-    contractNo: String(header.contract_no ?? ''),
-    contractName: String(header.contract_name ?? ''),
-    contractAmount: amount(header.contract_amount),
-    contractSettledAmount: amount(header.contract_settled_amount),
-    contractPaidAmount: amount(header.contract_paid_amount),
-    costName: String(header.cost_name ?? ''),
-    applyAmount,
-    applyDate: String(header.apply_date ?? ''),
-    applicant: String(header.applicant ?? ''),
-    invoiceState: String(header.invoice_state ?? ''),
-    payContent: String(header.pay_content ?? ''),
-    prepayDeduct: amount(header.prepay_deduct),
-    prepayNote: String(header.prepay_note ?? ''),
-    approvedAmount: approval.amount,
-    approvedAmountState: approval.state,
-    approvalNote: String(header.approval_note ?? ''),
-    status: String(header.status ?? ''),
-    note: String(header.note ?? ''),
-    externalRef: String(header.external_ref ?? ''),
-    createdAt: String(header.created_at ?? ''),
-    updatedAt: String(header.updated_at ?? ''),
-    settlementAllocated,
-    settlementDifference,
-    invoiceAllocated,
-    invoiceDifference,
-    pendingInvoiceAmount,
-    paidAmount,
-    unpaidAmount,
-    registrationAmount: roundMoney(Math.max(paymentConfirmationCap(applyAmount, header.approved_amount, header.approved_amount_origin) - paidAmount, 0)),
-    supplierOtherProjectCount: amount(header.supplier_other_project_count),
-    supplierOtherProjectPaidAmount: amount(header.supplier_other_project_paid_amount),
-    settlements: settlements.map(row => ({
-      id: String(row.id),
-      no: String(row.no ?? ''),
-      name: String(row.name ?? ''),
-      totalAmount: amount(row.total_amount),
-      settlementDate: String(row.settlement_date ?? ''),
-      status: String(row.status ?? ''),
-      allocatedAmount: amount(row.allocated_amount),
-      note: String(row.note ?? ''),
-    })),
-    invoices: invoices.map(row => ({
-      id: String(row.id),
-      invoiceNumber: String(row.invoice_number ?? ''),
-      invoiceDate: String(row.invoice_date ?? ''),
-      totalAmount: amount(row.total_amount),
-      allocatedAmount: amount(row.allocated_amount),
-      note: String(row.note ?? ''),
-    })),
-    payments: payments.map(row => ({
-      id: String(row.id),
-      no: String(row.no ?? ''),
-      payeeName: String(row.payee_name ?? ''),
-      paymentDate: String(row.payment_date ?? ''),
-      amount: amount(row.amount),
-      confirmationStatus: String(row.confirmation_status ?? ''),
-      allocatedAmount: amount(row.allocated_amount),
-      voucherNo: String(row.voucher_no ?? ''),
-    })),
-    insight,
-  }
 }

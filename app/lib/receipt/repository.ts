@@ -1,10 +1,14 @@
-import type { DataOriginDTO, ProblemDTO } from '../../types/read-model'
+import type { DataOriginDTO } from '../../types/read-model'
+import type { CommandResolution } from '../forms/command-recovery'
 import type { ReceiptCommand, ReceiptCommandResult, ReceiptContext, ReceiptDetail, ReceiptFileContent, ReceiptPage, ReceiptRecord } from './contract'
-import { isDataOriginDTO, isISODateDTO, isProblemCodeDTO } from '../../types/read-model'
+import { isDataOriginDTO, isEntityRefDTO, isISODateDTO, isISODateTimeDTO, isProblemCodeDTO } from '../../types/read-model'
 import { isCoreMigrationMoney } from '../migration/core-contract'
+import { hasConsistentOriginReadMeta, hasConsistentReadMeta, isReadMetaDTO } from '../read-model/meta'
+import { isPaginationDTO, parsePageQuery } from '../read-model/pagination'
+import { problemFromHttpFailure } from '../read-model/problem'
 import { emptyReceiptDraft, receiptProblem, ReceiptRepositoryProblem } from './contract'
 
-export type ReceiptFetcher = (url: string, options?: { method?: 'POST', body?: ReceiptCommand, query?: Record<string, unknown>, signal?: AbortSignal }) => Promise<unknown>
+export type ReceiptFetcher = (url: string, options?: { method?: 'POST', body?: ReceiptCommand | { commandId: string }, query?: Record<string, unknown>, signal?: AbortSignal }) => Promise<unknown>
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -20,10 +24,9 @@ function nullableMoney(value: unknown) {
 export function receiptProblemFromUnknown(cause: unknown): ReceiptRepositoryProblem {
   if (cause instanceof ReceiptRepositoryProblem)
     return cause
-  const raw = cause as { data?: { data?: ProblemDTO } & Partial<ProblemDTO> }
-  const problem = raw?.data?.data ?? raw?.data
-  if (problem && isProblemCodeDTO(problem.code) && typeof problem.message === 'string')
-    return new ReceiptRepositoryProblem({ code: problem.code, message: problem.message, retryable: problem.retryable === true, fieldErrors: problem.fieldErrors ?? {}, traceId: problem.traceId ?? null })
+  const remote = problemFromHttpFailure(cause)
+  if (remote)
+    return new ReceiptRepositoryProblem(remote)
   return receiptProblem('unavailable', '收款服务暂时不可用，请重试', {}, true)
 }
 function record(value: unknown): asserts value is ReceiptRecord {
@@ -43,20 +46,22 @@ function record(value: unknown): asserts value is ReceiptRecord {
   }
 }
 function detail(value: unknown): asserts value is ReceiptDetail {
-  if (!object(value) || !object(value.amounts) || !strings(value.capabilities) || typeof value.asOf !== 'string' || typeof value.sourceVersion !== 'string')
+  if (!object(value) || !hasConsistentReadMeta(value, 'receipt-read-v2') || !object(value.amounts) || !strings(value.capabilities) || typeof value.asOf !== 'string' || !(value.sourceVersion === null || typeof value.sourceVersion === 'string'))
     invalid()
   record(value.record)
+  if (!isReadMetaDTO(value.meta) || value.meta.dataOrigin !== value.record.dataOrigin)
+    invalid()
   if (value.category !== null || value.receiptType !== null)
     invalid()
   for (const [key, entity] of [['project', 'project'], ['customer', 'customer'], ['contract', 'contract']] as const) {
     const ref = value[key]
-    if (!object(ref) || ref.entity !== entity || !['resolved', 'missing', 'forbidden'].includes(String(ref.state)))
+    if (!isEntityRefDTO(ref, entity))
       invalid()
     if (ref.state === 'resolved' && (ref.id !== value.record.draft[`${key}Id`] || typeof ref.label !== 'string'))
       invalid()
     if (ref.state !== 'resolved' && (ref.label !== null || ref.id !== null))
       invalid()
-    if (ref.state === 'forbidden' && value.record.draft[`${key}Id`] !== null)
+    if (['forbidden', 'unavailable'].includes(ref.state) && value.record.draft[`${key}Id`] !== null)
       invalid()
   }
   if (value.contractProblem !== undefined && (!object(value.contractProblem) || !isProblemCodeDTO(value.contractProblem.code) || typeof value.contractProblem.message !== 'string'))
@@ -83,12 +88,18 @@ export function createReceiptRepository(fetcher: ReceiptFetcher) {
     list: (query: Record<string, unknown>) => request('/api/read/receipts', { query }, (value) => {
       const acceptsOrigin = (origin: DataOriginDTO) => (!query.origin || query.origin === origin)
         && (origin === 'real' || query.includeDemo === true || query.includeDemo === 'true')
-      if (!object(value) || !Array.isArray(value.items) || !object(value.pagination) || !object(value.summary) || !Array.isArray(value.projectOptions) || !strings(value.capabilities))
+      const { requestedPage, pageSize } = parsePageQuery(query, () => {
+        throw receiptProblem('invalid-query', '收款分页参数无效')
+      })
+      if (!object(value) || !hasConsistentOriginReadMeta(value, 'receipt-read-v2') || !Array.isArray(value.items) || !object(value.pagination) || !object(value.summary) || !Array.isArray(value.projectOptions) || !strings(value.capabilities))
         invalid()
       value.items.forEach(detail)
-      if (!(value.items as ReceiptDetail[]).every(row => acceptsOrigin(row.record.dataOrigin)))
+      if (!isReadMetaDTO(value.meta))
         invalid()
-      if (!['total', 'page', 'pageSize'].every(key => Number.isSafeInteger((value.pagination as Record<string, unknown>)[key])) || !object(value.summary.origins)
+      const meta = value.meta
+      if (!(value.items as ReceiptDetail[]).every(row => acceptsOrigin(row.record.dataOrigin) && row.meta.dataOrigin === row.record.dataOrigin && row.meta.workspaceId === meta.workspaceId && row.meta.actorId === meta.actorId))
+        invalid()
+      if (!isPaginationDTO(value.pagination, value.items.length) || value.pagination.requestedPage !== requestedPage || value.pagination.pageSize !== pageSize || !object(value.summary.origins)
         || !['real', 'demo'].every((origin) => {
           const summary = (value.summary as Record<string, unknown>).origins as Record<string, unknown>
           const row = summary[origin]
@@ -113,9 +124,23 @@ export function createReceiptRepository(fetcher: ReceiptFetcher) {
       return value as unknown as ReceiptContext
     }),
     execute: (body: ReceiptCommand) => request('/api/commands/receipts', { method: 'POST', body }, (value) => {
-      if (!object(value) || typeof value.id !== 'string' || !value.id || typeof value.version !== 'string' || typeof value.updatedAt !== 'string' || value.commandId !== body.commandId || !strings(value.attachmentIds) || (body.id && value.id !== body.id))
+      if (!object(value) || typeof value.id !== 'string' || !value.id.trim() || typeof value.version !== 'string' || !value.version.trim() || !isISODateTimeDTO(value.updatedAt) || value.commandId !== body.commandId || !strings(value.attachmentIds) || value.attachmentIds.some(id => !id.trim()) || (body.id && value.id !== body.id))
         invalid()
       return value as unknown as ReceiptCommandResult
+    }),
+    resolve: (commandId: string): Promise<CommandResolution<ReceiptCommandResult>> => request('/api/commands/receipts/resolve', { method: 'POST', body: { commandId } }, (value) => {
+      if (!object(value))
+        return invalid()
+      if (value.outcome === 'not-applied' && value.commandId === commandId)
+        return { outcome: 'not-applied', commandId }
+      if (value.outcome !== 'applied' || !object(value.result))
+        return invalid()
+      const result = value.result
+      if (result.commandId !== commandId || typeof result.id !== 'string' || !result.id
+        || typeof result.version !== 'string' || !result.version.trim() || !isISODateTimeDTO(result.updatedAt) || !strings(result.attachmentIds) || result.attachmentIds.some(id => !id.trim())) {
+        return invalid()
+      }
+      return { outcome: 'applied', result: result as unknown as ReceiptCommandResult }
     }),
     fileContent: (id: string, fileId: string, origin: DataOriginDTO, options?: { signal?: AbortSignal }) => request(`/api/read/receipts/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}`, { query: { origin }, signal: options?.signal }, async (value) => {
       if (!object(value) || !['payloadBase64', 'mimeType', 'fileName'].every(key => typeof value[key] === 'string')

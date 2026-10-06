@@ -15,6 +15,12 @@ beforeEach(() => {
     removeItem: (key: string) => values.delete(key),
     setItem: (key: string, value: string) => values.set(key, value),
   })
+  const recovery = new Map<string, string>()
+  vi.stubGlobal('sessionStorage', {
+    getItem: (key: string) => recovery.get(key) ?? null,
+    removeItem: (key: string) => recovery.delete(key),
+    setItem: (key: string, value: string) => recovery.set(key, value),
+  })
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -25,7 +31,7 @@ describe.each([
 ] as const)('%s 多页签编辑', (kind, useStore, repositoryKey) => {
   it('打开两个主档后，保存前一个只更新自己的记录和版本', async () => {
     const repository = {
-      context: async () => ({ workspaceId: 'w', actorId: 'u', capabilities: ['customer:write'] }),
+      context: async () => ({ workspaceId: 'w', actorId: 'u', capabilities: [repositoryKey === 'supplierCommands' ? 'supplier:write' : repositoryKey === 'projectCommands' ? 'project:write' : 'customer:write'] }),
       loadForm: async (id: string) => ({ draft: { id, name: id }, attachments: [], version: id === 'a' ? '2' : '9', updatedAt: '' }),
       execute: vi.fn(async (request: { id: string, commandId: string }) => ({ id: request.id, commandId: request.commandId, version: '10', attachmentIds: [] })),
     }
@@ -45,14 +51,20 @@ describe.each([
 
 describe.each(['crew', 'worker'] as const)('%s 多页签编辑', (kind) => {
   it('同一类型的两个表单分别提交自己的目标和版本', async () => {
-    const load = async (id: string) => ({ draft: { id, name: id }, version: id === 'a' ? '2' : '9' })
-    const execute = vi.fn(async (request: { id: string }) => ({ id: request.id, version: '10', attachmentIds: [] }))
+    const versions = new Map([['a', '2'], ['b', '9']])
+    const load = async (id: string) => ({ draft: { id, name: id }, attachments: [], version: versions.get(id)!, updatedAt: '2026-10-04T00:00:00.000Z' })
+    const execute = vi.fn(async (request: { id: string, commandId: string }) => {
+      versions.set(request.id, '10')
+      return { id: request.id, commandId: request.commandId, version: '10', updatedAt: '2026-10-04T00:00:00.000Z', attachmentIds: [] }
+    })
     vi.stubGlobal('useNuxtApp', () => ({ $repositories: { crewWorkerCommands: {
-      context: async () => ({ workspaceId: 'w', actorId: 'u' }),
+      context: async () => ({ workspaceId: 'w', actorId: 'u', capabilities: ['crew:write', 'worker:write'] }),
       loadCrewForm: load,
       loadWorkerForm: load,
       executeCrew: execute,
       executeWorker: execute,
+      resolveCrew: async (commandId: string) => ({ outcome: 'not-applied', commandId }),
+      resolveWorker: async (commandId: string) => ({ outcome: 'not-applied', commandId }),
     } } }))
     const store = useCrewWorkerCommandStore()
     const first = store.createSession()

@@ -6,22 +6,7 @@
 
 ## 表单与抽屉：如何理解旧参考
 
-旧“编辑项目使用右侧 Drawer”建议不再适用；实体表单形态遵循 [ADR 0014](../adr/0014-full-page-entity-forms.md)，轻量弹窗和速览边界查 [KitUI §02 / §05](./kit-ui-component-specs.md)。
-
-![旧项目编辑抽屉建议与整页实体表单规则的重绘对照](./assets/a01-entity-form-rule-comparison.png)
-
-*规则重绘：比较旧文档建议与已采纳规则，不是红圈或本地应用的运行截图，也不证明对应功能已实现。*
-
-```mermaid
-flowchart TD
-  T["当前任务"] --> E["实体新增 / 编辑"]
-  T --> L["行级明细 / 轻量操作"]
-  T --> R["只读速览"]
-  E --> A["ADR 0014<br/>独立路由 · 整页 · 页签"]
-  L --> B["适用的行内编辑 / 弹窗<br/>ADR 0014 · KitUI §02"]
-  R --> C["KitUI §05<br/>通用速览 / openDrawer API 延期"]
-  N["通知中心专用抽屉"] --> X["按 KitUI §05 保留领域动作<br/>不作为纯只读速览示例"]
-```
+旧“编辑项目使用右侧 Drawer”建议的理由与规则重绘已归 [DESIGN-SYSTEM 历史对照](../rewrite/DESIGN-SYSTEM.md#a01-history)；现行实体形态直接遵循 [ADR 0014](../adr/0014-full-page-entity-forms.md)，轻量弹窗、速览与通知例外直达 [KitUI §02 / §05](./kit-ui-component-specs.md)。本页只保留下列外部来源与当时采纳理由。
 
 ## 公开来源与历史取舍
 

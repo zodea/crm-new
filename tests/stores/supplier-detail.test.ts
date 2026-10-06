@@ -10,7 +10,7 @@ let mem: TestDb
 let failCredentialStatusUpdate = false
 let failRefreshAfterCommit = false
 let refreshReadsFail = false
-let connectionSelectCount = 0
+let connectionSelectSql: string[] = []
 let transactionCount = 0
 
 vi.mock('~/lib/db/connection', () => ({
@@ -20,7 +20,7 @@ vi.mock('~/lib/db/connection', () => ({
     return mem.execute(sql, params)
   },
   select: async (sql: string, params?: unknown[]) => {
-    connectionSelectCount += 1
+    connectionSelectSql.push(sql)
     if (refreshReadsFail)
       throw new Error('模拟缓存刷新失败')
     return mem.select(sql, params)
@@ -55,7 +55,7 @@ beforeEach(async () => {
   failCredentialStatusUpdate = false
   failRefreshAfterCommit = false
   refreshReadsFail = false
-  connectionSelectCount = 0
+  connectionSelectSql = []
   transactionCount = 0
   mem = await createMemoryDb()
   await runMigrations(mem)
@@ -249,7 +249,10 @@ describe('supplier detail store', () => {
     expect(store.isLoading('s1')).toBe(true)
     await Promise.all([first, second])
 
-    expect(connectionSelectCount).toBe(6)
+    // 原固定六条查询保护重叠加载去重；列表资格投影也纯读取后，按快照 owner 的查询验证去重。
+    expect(connectionSelectSql.filter(sql => sql.includes('FROM supplier_credentials sc'))).toHaveLength(1)
+    expect(connectionSelectSql.filter(sql => sql.includes('FROM supplier_credential_requirements AS requirement'))).toHaveLength(1)
+    expect(transactionCount).toBe(0)
     expect(store.isLoading('s1')).toBe(false)
     expect(store.hasSnapshot('s1')).toBe(true)
   })
@@ -936,7 +939,7 @@ describe('supplier detail store', () => {
     expect(supplierStore.byId('s1')?.credentialStatus).toBe('qualified')
   })
 
-  it('列表 load 跨上海业务日使已过期的 qualified 失效，未到期时保留', async () => {
+  it('列表 load 跨上海日仅派生当前失效，保留人工凭证和磁盘事实', async () => {
     const detailStore = useSupplierDetailStore()
     const supplierStore = useSupplierStore()
     await detailStore.load('s1')
@@ -960,12 +963,14 @@ describe('supplier detail store', () => {
 
     await supplierStore.load('2026-07-30')
     expect(supplierStore.byId('s1')?.credentialStatus).toBe('qualified')
+    const original = await mem.select('SELECT * FROM suppliers WHERE id=\'s1\'')
     await supplierStore.load('2026-07-31')
     expect(supplierStore.byId('s1')).toMatchObject({
       credentialStatus: 'incomplete',
-      credentialReviewedAt: null,
-      credentialReviewNote: '',
+      credentialReviewedAt: '2026-07-30T08:00:00.000Z',
+      credentialReviewNote: '当日有效',
     })
+    expect(await mem.select('SELECT * FROM suppliers WHERE id=\'s1\'')).toEqual(original)
   })
 
   it('列表 load 会让跨日过期的自动 reviewing 降为 incomplete', async () => {
@@ -1000,7 +1005,7 @@ describe('supplier detail store', () => {
     })
   })
 
-  it('人工退回在必需文件过期或正文丢失后自动降为 incomplete', async () => {
+  it('人工退回在必需文件过期或正文丢失后只读派生incomplete，历史原因保全', async () => {
     const detailStore = useSupplierDetailStore()
     const supplierStore = useSupplierStore()
     await detailStore.load('s1')
@@ -1022,8 +1027,8 @@ describe('supplier detail store', () => {
     await supplierStore.load('2026-07-31')
     expect(supplierStore.byId('s1')).toMatchObject({
       credentialStatus: 'incomplete',
-      credentialReviewedAt: null,
-      credentialReviewNote: '',
+      credentialReviewedAt: expect.any(String),
+      credentialReviewNote: '内容需整改',
     })
 
     await mem.execute(`
@@ -1041,8 +1046,8 @@ describe('supplier detail store', () => {
     await detailStore.load('s1')
     expect(supplierStore.byId('s1')).toMatchObject({
       credentialStatus: 'incomplete',
-      credentialReviewedAt: null,
-      credentialReviewNote: '',
+      credentialReviewedAt: '2026-07-31T08:00:00.000Z',
+      credentialReviewNote: '内容需整改',
     })
   })
 

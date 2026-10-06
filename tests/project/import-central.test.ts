@@ -39,7 +39,7 @@ describe('项目 Excel → 实际存储 → 中央回读', () => {
     const session = { workspaceId: 'import-408', actorId: 'actor-408', capabilities: ['project:write', 'project:list:read', 'customer:write', 'customer:list:read'] }
     const customerCommands = createCustomerCommandTestInstance({ createId: () => 'customer-import-408' })
     await customerCommands.execute({ ...session, requiredCapability: 'customer:write', commandId: 'customer-408', baseVersion: null, action: 'save', draft: { name: '导入复现甲方408', contact: '合成联系人408' }, attachments: {} }, session)
-    const customerReads = createCustomerReadTestInstance(() => session.capabilities, id => customerCommands.rows(id))
+    const customerReads = createCustomerReadTestInstance(() => session.capabilities, id => customerCommands.rows(id), id => customerCommands.sourceVersion(id), undefined, undefined, undefined, () => session)
     const commands = createProjectCommandTestInstance({ createId: () => 'project-import-408', validateImportCustomers: async (draft) => {
       expect((await customerReads.list({ includeDemo: 'false' })).items.map(item => item.customer.id)).toContain(draft.customerId)
     } })

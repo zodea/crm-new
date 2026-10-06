@@ -1,4 +1,5 @@
 import type { OwnerCommercialDocumentSource } from '../../app/lib/owner-document/central-repository'
+import type { DataOriginDTO } from '../../app/types/read-model'
 import { SUBCONTRACT_CHANGE_READ_CAPABILITY } from '../../app/lib/owner-document/central-command-contract'
 import {
   buildOwnerCommercialDocumentDetail,
@@ -8,13 +9,14 @@ import {
   parseOwnerCommercialDocumentDetailQuery,
   parseOwnerCommercialDocumentListQuery,
 } from '../../app/lib/owner-document/central-repository'
+import { resolveBusinessSession } from './business-session'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from './owner-commercial-document-fixtures'
+import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
 
 export type OwnerCommercialDocumentReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
-const FIXED_AS_OF = '2026-08-25T00:00:00.000Z'
 const demoDocuments: OwnerCommercialDocumentSource[] = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.map((row, index) => {
   const suffix = `-demo-${index + 1}`
   return {
@@ -69,9 +71,14 @@ export function createOwnerCommercialDocumentReadTestInstance(
     }
   }
 
+  function metadata(data: ReturnType<typeof context>, query: Record<string, unknown>, operation: string, dataOrigin: DataOriginDTO, asOf: string, sessionId?: string | null) {
+    const requested = (query.origin === undefined || query.origin === null || query.origin === dataOrigin) && (dataOrigin === 'real' || query.includeDemo === true)
+    return createReadMeta({ session: { ...resolveBusinessSession(), capabilities: data.capabilities }, schemaVersion: 'owner-document-read-v2', operation, dataOrigin, asOf, coverage: requested ? 'complete' : 'unknown', scope: { query: readQueryScope(query), testSession: sessionId ?? null }, sources: [{ key: 'owner-documents', state: requested ? 'readable' : 'not-requested', sourceVersion: requested ? readSourceVersion('owner-documents', { documents: data.documents.filter(row => row.dataOrigin === dataOrigin), revision: data.sourceVersion }) : null, asOf: requested ? asOf : null }] })
+  }
+
   return {
     facts(kind: string, sessionId?: string | null) {
-      return { ...context(kind, sessionId), asOf: FIXED_AS_OF }
+      return { ...context(kind, sessionId), asOf: new Date().toISOString() }
     },
     reset(scenario: OwnerCommercialDocumentReadTestScenario, sessionId?: string | null) {
       if (scenario === 'ready')
@@ -82,20 +89,24 @@ export function createOwnerCommercialDocumentReadTestInstance(
     list(kind: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const parsed = parseOwnerCommercialDocumentListQuery(kind, input)
       const data = context(parsed.kind, sessionId)
-      return buildOwnerCommercialDocumentListPage({
+      const query = { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') }
+      const asOf = new Date().toISOString()
+      return withOriginReadMeta(buildOwnerCommercialDocumentListPage({
         ...data,
-        query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') },
-        asOf: FIXED_AS_OF,
-      })
+        query,
+        asOf,
+      }), { real: metadata(data, query, 'owner-document:list', 'real', asOf, sessionId), demo: metadata(data, query, 'owner-document:list', 'demo', asOf, sessionId) }, query.origin ?? 'real')
     },
     detail(kind: string, id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const parsed = parseOwnerCommercialDocumentDetailQuery(kind, id, input)
       const data = context(parsed.kind, sessionId)
-      return buildOwnerCommercialDocumentDetail({
+      const query = { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') }
+      const asOf = new Date().toISOString()
+      return withReadMeta(buildOwnerCommercialDocumentDetail({
         ...data,
-        query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') },
-        asOf: FIXED_AS_OF,
-      })
+        query,
+        asOf,
+      }), metadata(data, query, 'owner-document:detail', query.origin, asOf, sessionId))
     },
   }
 }

@@ -814,7 +814,7 @@ describe('甲方商务单据中央读取契约', () => {
       }),
     })
 
-    expect(page.pagination).toEqual({ page: 6, pageSize: 20, total: 120 })
+    expect(page.pagination).toEqual({ requestedPage: 6, page: 6, pageSize: 20, total: 120 })
     expect(page.items).toHaveLength(20)
     expect(page.summary.documentTypes).toEqual(expect.arrayContaining([
       expect.objectContaining({ value: 'change_negotiation', count: 120 }),
@@ -835,7 +835,7 @@ describe('甲方商务单据中央读取契约', () => {
     expect(() => buildOwnerCommercialDocumentDetail(input)).toThrow(expected)
   })
 
-  it('被禁止的关系只显示禁止态，不泄露项目名称', () => {
+  it('被禁止的关系只显示禁止态，不泄露项目身份或名称', () => {
     const detail = buildOwnerCommercialDocumentDetail({
       ...base,
       documents: [{ ...change, projectPermission: 'forbidden' }],
@@ -845,10 +845,26 @@ describe('甲方商务单据中央读取契约', () => {
     expect(detail.document.project).toEqual({
       state: 'forbidden',
       entity: 'project',
-      id: 'project-real-323',
+      id: null,
       label: null,
       reason: 'permission-denied',
     })
     expect(detail.projectNavigation).toEqual({ kind: 'unavailable', reason: 'forbidden' })
+    expect(JSON.stringify(detail.document.project)).not.toContain('project-real-323')
+  })
+
+  it('受限主档身份不经筛选项、关联名搜索或外键筛选重新泄漏，单据独立金额保留', () => {
+    const input = { ...base, documents: [{ ...change, projectPermission: 'forbidden' as const, contractPermission: 'forbidden' as const }] }
+    const page = buildOwnerCommercialDocumentListPage({ ...input, query: parseOwnerCommercialDocumentListQuery('owner_change', {}) })
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0]!.project.id).toBeNull()
+    expect(page.items[0]!.contract.id).toBeNull()
+    expect(page.summary.projects).toEqual([])
+    expect(page.summary.contracts).toEqual([])
+    expect(JSON.stringify(page)).not.toContain('project-real-323')
+    expect(JSON.stringify(page)).not.toContain('contract-real-323')
+    expect(page.summary.origins.real.taxInclusiveAmount).toBe('520.00')
+    for (const query of [{ search: '瑞航商务中心' }, { projectId: 'project-real-323' }, { contractId: 'contract-real-323' }])
+      expect(buildOwnerCommercialDocumentListPage({ ...input, query: parseOwnerCommercialDocumentListQuery('owner_change', query) }).items).toEqual([])
   })
 })

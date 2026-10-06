@@ -7,6 +7,7 @@ import {
   newCustomerReturnContextId,
   saveCustomerRelationReturnOrigin,
 } from '~/lib/customer/return-context'
+import { entityReferenceLabel } from '~/lib/kit/entity-link'
 import { KIT_TABLE_VIEW_KEY } from '~/lib/kit/table-view'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
@@ -25,7 +26,7 @@ const contextId = newCustomerReturnContextId()
 const relationReturnTo = computed(() => ['project', 'contract', 'receipt'].includes(props.reference.entity) && props.reference.state === 'resolved'
   ? customerRelationReturnTo(props.returnTo, contextId)
   : null)
-const resolution = computed(() => resolveNavigationTarget(props.navigation, {
+const resolution = computed(() => resolveNavigationTarget(props.reference.state === 'resolved' ? props.navigation : { kind: 'entity-detail', subject: props.reference, variant: 'detail', view: null, filters: {} }, {
   returnTo: relationReturnTo.value ?? props.returnTo,
   returnContextId: props.returnContext,
 }))
@@ -62,6 +63,6 @@ function capture() {
     {{ resolution.label }}
   </NuxtLink>
   <span v-else :data-target-state="resolution.state" :title="resolution.message" class="text-ink-faint">
-    {{ reference.state === 'forbidden' ? '无权限' : reference.state === 'missing' ? '未记录' : reference.label }}
+    {{ entityReferenceLabel(reference) }}
   </span>
 </template>

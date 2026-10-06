@@ -4,6 +4,7 @@ import type { CrewWorkerCommandRepository } from '~/lib/crew-worker/command-cont
 import type { CrewWorkerReadRepository } from '~/lib/crew-worker/repository'
 import type { CustomerCommandRepository } from '~/lib/customer/command-contract'
 import type { CustomerReadRepository } from '~/lib/customer/repository'
+import type { FinanceRepository } from '~/lib/finance/central-contract'
 import type { MaterialContractCommandRepository } from '~/lib/material-contract/command-contract'
 import type { MaterialContractReadRepository } from '~/lib/material-contract/repository'
 import type { CoreMigrationRepository } from '~/lib/migration/core-http-repository'
@@ -27,9 +28,12 @@ import { createHttpCustomerCommandRepository } from '~/lib/customer/command-http
 import { createHttpCustomerReadRepository } from '~/lib/customer/http-repository'
 import { createCustomerProductionRepository } from '~/lib/customer/production-repository'
 import { createDeliveryRepository } from '~/lib/delivery-record/repository'
+import { createFinanceRepository } from '~/lib/finance/http-repository'
 import { createHttpMaterialContractCommandRepository } from '~/lib/material-contract/command-http-repository'
 import { createHttpMaterialContractReadRepository } from '~/lib/material-contract/http-repository'
+import { createQuotationHttpRepository } from '~/lib/material-quotation/http-repository'
 import { createHttpCoreMigrationRepository } from '~/lib/migration/core-http-repository'
+import { createNotificationRepository } from '~/lib/notifications/repository'
 import { createOtherSettlementRepository } from '~/lib/other-settlement/repository'
 import {
   createHttpOwnerCommercialDocumentCommandRepository,
@@ -56,6 +60,9 @@ import { createTargetCostRepository } from '~/lib/target-cost/central-repository
 import { createWorkerRosterRepository } from '~/lib/worker-roster/repository'
 
 export interface DomainRepositories {
+  finance: FinanceRepository
+  materialQuotations: ReturnType<typeof createQuotationHttpRepository>
+  notifications: ReturnType<typeof createNotificationRepository>
   productionBackup: ReturnType<typeof createProductionBackupRepository>
   productionAccess: ReturnType<typeof createProductionAccessRepository>
   customerProduction: ReturnType<typeof createCustomerProductionRepository>
@@ -101,6 +108,9 @@ const repositoryFileFetch = $fetch as unknown as (url: string, options: { respon
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    finance: createFinanceRepository((url, options) => repositoryFetch(url, { ...options, retry: 0 })),
+    materialQuotations: createQuotationHttpRepository((url, options) => repositoryFetch(url, { ...options, retry: 0 })),
+    notifications: createNotificationRepository((url, options) => repositoryFetch(url, { ...options, retry: 0 })),
     productionBackup: createProductionBackupRepository((url, options) => repositoryFetch(url, { ...options, timeout: options ? 120_000 : 10_000, retry: 0 })),
     productionAccess: createProductionAccessRepository((url, options) => repositoryFetch(url, { ...options, timeout: 10_000, retry: 0 })),
     customerProduction: createCustomerProductionRepository((url, options) => repositoryFetch(url, options), url => repositoryFileFetch(url, { responseType: 'blob' })),

@@ -7,7 +7,7 @@ import type {
 import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
 import type { ProjectLocalDraft } from '~/lib/project/local-draft'
 import { defineStore } from 'pinia'
-import { readonly, shallowRef } from 'vue'
+import { readonly, shallowReactive, shallowRef } from 'vue'
 import { PROJECT_WRITE_CAPABILITY } from '~/lib/project/command-contract'
 import { createProjectRowImporter } from '~/lib/project/import-command'
 import {
@@ -50,7 +50,7 @@ export const useProjectCommandStore = defineStore('project-command', () => {
   const persistent = useProjectPersistentCommandStore()
   const access = useProductionAccessStore()
   function createSession() {
-    return { targetProjectId: null as string | null, baseVersion: null as string | null, activeLocalDraft: null as ProjectLocalDraft | null, storesOriginals: false, persistent: persistent.createSession() }
+    return shallowReactive({ targetProjectId: null as string | null, baseVersion: null as string | null, activeLocalDraft: null as ProjectLocalDraft | null, storesOriginals: false, loadGeneration: 0, authority: null as { workspaceId: string, actorId: string } | null, persistent: persistent.createSession() })
   }
   type CommandSession = ReturnType<typeof createSession>
 
@@ -76,7 +76,33 @@ export const useProjectCommandStore = defineStore('project-command', () => {
     return saved
   }
 
+  function deactivate(session: CommandSession) {
+    session.loadGeneration++
+    persistent.deactivate(session.persistent)
+  }
+  async function revalidate(session: CommandSession) {
+    if (session.storesOriginals)
+      return persistent.revalidate(session.persistent)
+    const generation = session.loadGeneration
+    const target = session.targetProjectId
+    const context = await repository().context()
+    const current = () => generation === session.loadGeneration && target === session.targetProjectId && !session.storesOriginals
+    if (!current() || !context.capabilities.includes(PROJECT_WRITE_CAPABILITY) || context.capabilities.includes('project:original:write')
+      || (session.authority && (context.workspaceId !== session.authority.workspaceId || context.actorId !== session.authority.actorId))) {
+      throw new Error('原项目表单权限或来源已变化，请保留输入。')
+    }
+    const form = target ? await repository().loadForm(target) : null
+    if (!current() || (form && form.draft.id !== target))
+      throw new Error('重新读取与原项目目标不一致。')
+    session.authority = { workspaceId: context.workspaceId, actorId: context.actorId }
+    return { form, context }
+  }
   async function hydrate(session: CommandSession, id: string | null): Promise<HydratedProjectCommandForm> {
+    const generation = ++session.loadGeneration
+    const assertCurrent = () => {
+      if (generation !== session.loadGeneration)
+        throw new Error('此读取不属于当前项目页面。')
+    }
     session.storesOriginals = access.status?.mode === 'production'
     if (session.storesOriginals)
       return persistent.hydrate(session.persistent, id)
@@ -86,8 +112,10 @@ export const useProjectCommandStore = defineStore('project-command', () => {
     let latest: ProjectFormReadDTO | null = null
     try {
       latest = id ? await repository().loadForm(id) : null
+      assertCurrent()
     }
     catch (cause) {
+      assertCurrent()
       const problem = projectProblemFromUnknown(cause)
       if (!local || problem.problem.code !== 'unavailable')
         throw problem
@@ -121,6 +149,7 @@ export const useProjectCommandStore = defineStore('project-command', () => {
     }
     if (session.activeLocalDraft)
       clearProjectLocalDraft(session.activeLocalDraft.draftId)
+    session.loadGeneration++
     session.targetProjectId = null
     session.baseVersion = null
     session.activeLocalDraft = null
@@ -160,6 +189,11 @@ export const useProjectCommandStore = defineStore('project-command', () => {
       latestWrite.value = { id: result.id, version: session.persistent.baseVersion! }
       return result
     }
+    const generation = session.loadGeneration
+    const assertCurrent = () => {
+      if (generation !== session.loadGeneration || session.storesOriginals)
+        throw new Error('原项目页面已变化，请保留原草稿并回原页面核对。')
+    }
     const id = session.targetProjectId ?? draft.id ?? null
     const local = saveProjectLocalDraft({
       targetProjectId: id,
@@ -172,6 +206,12 @@ export const useProjectCommandStore = defineStore('project-command', () => {
     session.activeLocalDraft = local
     try {
       const context = await repository().context()
+      assertCurrent()
+      if (!context.capabilities.includes(PROJECT_WRITE_CAPABILITY) || context.capabilities.includes('project:original:write')
+        || (session.authority && (context.workspaceId !== session.authority.workspaceId || context.actorId !== session.authority.actorId))) {
+        throw new Error('原项目表单权限或来源已变化，请保留原草稿。')
+      }
+      session.authority = { workspaceId: context.workspaceId, actorId: context.actorId }
       const result = await repository().execute({
         ...(id ? { id } : {}),
         workspaceId: context.workspaceId,
@@ -183,6 +223,7 @@ export const useProjectCommandStore = defineStore('project-command', () => {
         draft: local.draft,
         attachments: local.attachments,
       })
+      assertCurrent()
       clearProjectLocalDraft(local.draftId)
       session.activeLocalDraft = null
       session.targetProjectId = result.id
@@ -198,6 +239,7 @@ export const useProjectCommandStore = defineStore('project-command', () => {
       const problem = projectProblemFromUnknown(cause)
       if (problem.problem.code === 'conflict' && id) {
         const latest = await repository().loadForm(id)
+        assertCurrent()
         throw new ProjectCommandConflictError(latest, local)
       }
       if (problem.problem.code === 'unavailable')
@@ -211,6 +253,12 @@ export const useProjectCommandStore = defineStore('project-command', () => {
       latestWrite.value = { id: current.id, version: current.version }
     },
     pendingForms: persistent.pendingForms,
+    async recover(session: CommandSession) {
+      const recovered = await persistent.recover(session.persistent)
+      if (recovered.outcome === 'applied')
+        latestWrite.value = { id: recovered.result.id, version: recovered.result.version }
+      return recovered
+    },
     downloadOriginal: persistent.downloadOriginal,
     prepareImportRow,
     validateImportRow,
@@ -218,6 +266,8 @@ export const useProjectCommandStore = defineStore('project-command', () => {
     latestWrite: readonly(latestWrite),
     createSession,
     hydrate,
+    revalidate,
+    deactivate,
     saveForm,
     startNewProject,
     rebase,

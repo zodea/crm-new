@@ -7,6 +7,7 @@ import type {
   CrewWorkerWageSourceRow,
   WorkerSourceRow,
 } from '../../app/lib/crew-worker/repository'
+import type { DataOriginDTO, SourceEvidenceDTO } from '../../app/types/read-model'
 import { unavailablePayrollHostSection } from '../../app/lib/crew-worker/payroll-read'
 import {
   buildCrewDetailRead,
@@ -23,13 +24,16 @@ import {
 import crewsSeed from '../../app/lib/db/seed/crews.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import workersSeed from '../../app/lib/db/seed/workers.json'
+import { isDataOriginDTO } from '../../app/types/read-model'
+import { resolveBusinessSession } from './business-session'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { projectReadTestInstance } from './project-read-test-instance'
+import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
 
 export type CrewWorkerReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
-const FIXED_AS_OF = '2026-08-23T00:00:00.000Z'
 const SOURCE_VERSION = 'crew-worker-read-fixture-v1'
 
 const demoCrews: CrewSourceRow[] = crewsSeed.map(row => ({
@@ -160,6 +164,15 @@ export function createCrewWorkerReadTestInstance(
   resolveFormalWorkers: (sessionId?: string | null) => readonly WorkerSourceRow[] = id => crewWorkerCommandTestInstance.workerRows(id),
   resolveFormalSourceVersion: (sessionId?: string | null) => string = id => crewWorkerCommandTestInstance.sourceVersion(id),
   resolvePayrollActual: (scope: PayrollHostScope, sessionId?: string | null) => Promise<PayrollHostSection | undefined> = async () => undefined,
+  resolveFormalProjects: (sessionId?: string | null) => { rows: readonly CrewWorkerProjectSourceRow[], source: SourceEvidenceDTO }
+    = (sessionId) => {
+      if (projectReadTestInstance.currentScenario(sessionId) === 'forbidden')
+        throw Object.assign(new Error('项目来源无查看权限'), { problem: { code: 'forbidden' } })
+      const snapshot = projectReadTestInstance.identities(sessionId)
+      const readable = snapshot.capabilities.includes('project:list:read')
+      const rows = snapshot.rows.filter(row => row.dataOrigin === 'real').map(row => ({ dataOrigin: row.dataOrigin, id: row.id, name: readable ? row.name : '', code: readable ? row.code : '', status: readable ? row.status : '', permission: readable ? 'allowed' as const : 'forbidden' as const }))
+      return { rows, source: { key: 'projects', state: readable ? 'readable' : 'forbidden', sourceVersion: readable ? snapshot.sourceVersion : null, asOf: readable ? snapshot.asOf : null } }
+    },
 ) {
   const scenarios = new Map<string, CrewWorkerReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -175,16 +188,28 @@ export function createCrewWorkerReadTestInstance(
       throw problem('forbidden', '无班组或工人查看权限')
     const ready = scenario === 'ready'
     const documents = ownerCommercialDocumentCommandTestInstance.rows(sessionId).filter(row => row.kind === 'project_penalty')
+    const formalWorkers = ready ? [...resolveFormalWorkers(sessionId)] : []
+    let projectFacts: ReturnType<typeof resolveFormalProjects>
+    try {
+      projectFacts = resolveFormalProjects(sessionId)
+      if (!capabilities.includes('project:list:read'))
+        projectFacts = { rows: projectFacts.rows.map(row => ({ ...row, name: '', code: '', status: '', permission: 'forbidden' })), source: { key: 'projects', state: 'forbidden', sourceVersion: null, asOf: null } }
+    }
+    catch (cause) {
+      const state = cause instanceof Error && 'problem' in cause && (cause as { problem: { code?: string } }).problem.code === 'forbidden' ? 'forbidden' as const : 'unavailable' as const
+      projectFacts = { rows: [...new Set(formalWorkers.flatMap(row => row.currentProjectId ? [row.currentProjectId] : []))].map(id => ({ id, dataOrigin: 'real', name: '', code: '', status: '', permission: state })), source: { key: 'projects', state, sourceVersion: null, asOf: null } }
+    }
     const projectPenalties: CrewWorkerPenaltySourceRow[] = documents.map(row => ({ dataOrigin: row.dataOrigin, id: row.id, no: row.no, crewId: row.crewId ?? null, workerId: null, responsibleWorkerId: null, projectId: row.projectId, source: 'project', location: '', reason: row.name, amount: row.amount, penaltyDate: row.applicationDate, status: row.status }))
     return {
       capabilities,
       crews: ready ? [...resolveFormalCrews(sessionId), ...demoCrews] : [],
-      workers: ready ? [...resolveFormalWorkers(sessionId), ...demoWorkers] : [],
-      projects: ready ? [...new Map(documents.filter(row => row.projectId).map(row => [row.projectId!, { id: row.projectId!, name: row.projectName, code: '', status: '', permission: 'allowed' as const, dataOrigin: row.dataOrigin }])).values(), ...demoProjects] : [],
+      workers: ready ? [...formalWorkers, ...demoWorkers] : [],
+      projects: ready ? [...projectFacts.rows, ...demoProjects] : [],
+      projectSource: projectFacts.source,
       assignments: ready ? demoAssignments : [],
       wages: ready ? demoWages : [],
       penalties: ready ? [...projectPenalties, ...demoPenalties] : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${ownerCommercialDocumentCommandTestInstance.sourceVersion(sessionId)}`,
+      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${ownerCommercialDocumentCommandTestInstance.sourceVersion(sessionId)}:${readSourceVersion('worker-projects', projectFacts.rows)}`,
     }
   }
 
@@ -193,8 +218,7 @@ export function createCrewWorkerReadTestInstance(
       throw problem('forbidden', '无测试数据查看权限')
   }
 
-  async function relationFactIdentity(kind: string, id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
-    const data = context(sessionId)
+  function relationFactIdentityProjection(kind: string, id: string, input: Record<string, unknown> | undefined, sessionId?: string | null, data = context(sessionId)) {
     const origin = input?.origin
     const includeDemo = input?.includeDemo === true || input?.includeDemo === 'true'
     if (origin !== 'real' && origin !== 'demo')
@@ -258,6 +282,18 @@ export function createCrewWorkerReadTestInstance(
     ))
   }
 
+  function metadata(data: ReturnType<typeof context>, query: object, operation: string, dataOrigin: DataOriginDTO, asOf: string, sessionId?: string | null, payroll?: { attempted: true, section: PayrollHostSection | undefined }) {
+    const includeDemo = 'includeDemo' in query && (query.includeDemo === true || query.includeDemo === 'true')
+    const requested = dataOrigin === 'real' || includeDemo
+    const snapshot = Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'capabilities' && key !== 'projectSource').map(([key, value]) => [key, Array.isArray(value) ? value.filter(row => typeof row === 'object' && row !== null && 'dataOrigin' in row && row.dataOrigin === dataOrigin) : value]))
+    const sources: SourceEvidenceDTO[] = [{ key: 'crew-workers', state: requested ? 'readable' : 'not-requested', sourceVersion: requested ? readSourceVersion('crew-workers', snapshot) : null, asOf: requested ? asOf : null }, dataOrigin === 'real' ? data.projectSource : { key: 'projects', state: requested ? 'readable' : 'not-requested', sourceVersion: requested ? readSourceVersion('demo-worker-projects', demoProjects) : null, asOf: requested ? asOf : null }]
+    if (payroll) {
+      const state = payroll.section?.status === 'forbidden' ? 'forbidden' : !payroll.section || payroll.section.status === 'unavailable' ? 'unavailable' : 'readable'
+      sources.push({ key: 'payroll-actual', state, sourceVersion: state === 'readable' ? payroll.section!.sourceVersion : null, asOf: state === 'readable' ? asOf : null })
+    }
+    return createReadMeta({ session: { ...resolveBusinessSession(), capabilities: data.capabilities }, schemaVersion: 'crew-worker-read-v2', operation, dataOrigin, asOf, sources, coverage: requested ? 'complete' : 'unknown', scope: { query: readQueryScope(query), testSession: sessionId ?? null } })
+  }
+
   return {
     facts(sessionId?: string | null) {
       const data = context(sessionId)
@@ -273,49 +309,56 @@ export function createCrewWorkerReadTestInstance(
       const data = context(sessionId)
       const query = parseCrewListQuery(input)
       assertDemo(query.includeDemo, data.capabilities)
-      return buildCrewListPage({ ...data, query, asOf: FIXED_AS_OF })
+      const asOf = new Date().toISOString()
+      return withOriginReadMeta(buildCrewListPage({ ...data, query, asOf }), { real: metadata(data, query, 'crew:list', 'real', asOf, sessionId), demo: metadata(data, query, 'crew:list', 'demo', asOf, sessionId) })
     },
     async crewDetail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const query = parseCrewDetailQuery(id, input)
       assertDemo(query.includeDemo, data.capabilities)
-      const detail = buildCrewDetailRead({ ...data, query, asOf: FIXED_AS_OF })
+      const asOf = new Date().toISOString()
+      const detail = buildCrewDetailRead({ ...data, query, asOf })
       if (query.origin === 'demo')
-        return detail
+        return withReadMeta(detail, metadata(data, query, 'crew:detail', query.origin, asOf, sessionId))
       const payrollActual = data.capabilities.includes('payroll:read')
         ? await resolvePayrollActual({ kind: 'crew', id: query.id }, sessionId)
         : unavailablePayrollHostSection({ kind: 'crew', id: query.id }, 'forbidden', '无工资收付查看权限')
       const latest = context(sessionId)
       if (data.sourceVersion !== latest.sourceVersion || JSON.stringify(data.capabilities) !== JSON.stringify(latest.capabilities))
         throw problem('unavailable', '读取期间班组档案或权限已变化，请重新读取', true)
-      if (!payrollActual)
-        return detail
-      return { ...detail, payrollActual, sourceVersion: `${detail.sourceVersion}+payroll:${payrollActual?.sourceVersion ?? 'unavailable'}` }
+      return withReadMeta(payrollActual ? { ...detail, payrollActual } : detail, metadata(data, query, 'crew:detail', query.origin, asOf, sessionId, { attempted: true, section: payrollActual }))
     },
     async listWorkers(input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const query = parseWorkerListQuery(input)
       assertDemo(query.includeDemo, data.capabilities)
-      return buildWorkerListPage({ ...data, query, asOf: FIXED_AS_OF })
+      const asOf = new Date().toISOString()
+      return withOriginReadMeta(buildWorkerListPage({ ...data, query, asOf }), { real: metadata(data, query, 'worker:list', 'real', asOf, sessionId), demo: metadata(data, query, 'worker:list', 'demo', asOf, sessionId) })
     },
     async workerDetail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
       const query = parseWorkerDetailQuery(id, input)
       assertDemo(query.includeDemo, data.capabilities)
-      const detail = buildWorkerDetailRead({ ...data, query, asOf: FIXED_AS_OF })
+      const asOf = new Date().toISOString()
+      const detail = buildWorkerDetailRead({ ...data, query, asOf })
       if (query.origin === 'demo')
-        return detail
+        return withReadMeta(detail, metadata(data, query, 'worker:detail', query.origin, asOf, sessionId))
       const payrollActual = data.capabilities.includes('payroll:read')
         ? await resolvePayrollActual({ kind: 'worker', id: query.id }, sessionId)
         : unavailablePayrollHostSection({ kind: 'worker', id: query.id }, 'forbidden', '无工资收付查看权限')
       const latest = context(sessionId)
       if (data.sourceVersion !== latest.sourceVersion || JSON.stringify(data.capabilities) !== JSON.stringify(latest.capabilities))
         throw problem('unavailable', '读取期间工人档案或权限已变化，请重新读取', true)
-      if (!payrollActual)
-        return detail
-      return { ...detail, payrollActual, sourceVersion: `${detail.sourceVersion}+payroll:${payrollActual?.sourceVersion ?? 'unavailable'}` }
+      return withReadMeta(payrollActual ? { ...detail, payrollActual } : detail, metadata(data, query, 'worker:detail', query.origin, asOf, sessionId, { attempted: true, section: payrollActual }))
     },
-    relationFactIdentity,
+    async relationFactIdentity(kind: string, id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
+      const data = context(sessionId)
+      const projection = relationFactIdentityProjection(kind, id, input, sessionId, data)
+      if (!isDataOriginDTO(projection.dataOrigin))
+        throw problem('unavailable', '关系事实来源发生变化，请重新读取', true)
+      const asOf = new Date().toISOString()
+      return withReadMeta(projection, metadata(data, { kind, id, ...input }, 'crew-worker:relation-fact', projection.dataOrigin, asOf, sessionId))
+    },
   }
 }
 
