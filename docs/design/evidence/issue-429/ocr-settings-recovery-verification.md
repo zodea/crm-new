@@ -1,5 +1,7 @@
 # OCR 设置失败恢复验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-429)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-10。Issue：[#429](https://github.com/zodea/crm-new/issues/429)，承接 #414。实施基线 `84c4e5ec`，本记录随修复提交。
 
 ## 复现与结果
@@ -21,10 +23,10 @@
 
 | 视口 | 读取失败与键盘重试 |
 | --- | --- |
-| 390px | [截图](./ocr-settings-recovery-390.png) |
-| 768px | [截图](./ocr-settings-recovery-768.png) |
-| 1024px | [截图](./ocr-settings-recovery-1024.png) |
-| 1280px | [截图](./ocr-settings-recovery-1280.png) |
-| 1440px | [截图](./ocr-settings-recovery-1440.png) |
+| 390px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-429/ocr-settings-recovery-390.png) |
+| 768px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-429/ocr-settings-recovery-768.png) |
+| 1024px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-429/ocr-settings-recovery-1024.png) |
+| 1280px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-429/ocr-settings-recovery-1280.png) |
+| 1440px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-429/ocr-settings-recovery-1440.png) |
 
 本项沿用现有本机 OCR 参数保存边界，不代表 OCR 真实样本准确率、#414 全模块或 #416 生产持久化已完成。无新依赖、远端推送或 GitHub Actions。

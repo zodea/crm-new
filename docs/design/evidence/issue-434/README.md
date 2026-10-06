@@ -1,5 +1,7 @@
 # #434 首页中央项目与施工进度来源验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-10。范围：[实施票 #434](https://github.com/zodea/crm-new/issues/434)，归属 [#414](https://github.com/zodea/crm-new/issues/414)，排程接入边界继续由 #412 承接。
 
 本记录只证明此次首页项目目录、来源感知只读入口和返回流程。项目、排程数据规则以[首页蓝本](../../../rewrite/pages/homepage-dashboard.md)为准；来源持久化边界沿用 ADR 0020。本次未打开或修改外部参考站，采用既有首页/DC 与公共组件契约，不提升外部参考证据等级。
@@ -41,13 +43,13 @@
 
 | 宽度 | 首页 | 只读施工进度来源 |
 | --- | --- | --- |
-| 390 | [首页](home-390.png) | [来源页](source-390.png) |
-| 768 | [首页](home-768.png) | [来源页](source-768.png) |
-| 1024 | [首页](home-1024.png) | [来源页](source-1024.png) |
-| 1293 | [首页](home-1293.png) | [来源页](source-1293.png) |
-| 1440 | [首页](home-1440.png) | [来源页](source-1440.png) |
+| 390 | [首页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/home-390.png) | [来源页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/source-390.png) |
+| 768 | [首页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/home-768.png) | [来源页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/source-768.png) |
+| 1024 | [首页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/home-1024.png) | [来源页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/source-1024.png) |
+| 1293 | [首页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/home-1293.png) | [来源页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/source-1293.png) |
+| 1440 | [首页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/home-1440.png) | [来源页](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/source-1440.png) |
 
-补充：[390px 当前项目关系失效](home-relationship-mismatch-390.png)，仅含合成项目与测试接口错误。
+补充：[390px 当前项目关系失效](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-434/home-relationship-mismatch-390.png)，仅含合成项目与测试接口错误。
 
 ## 剩余边界
 

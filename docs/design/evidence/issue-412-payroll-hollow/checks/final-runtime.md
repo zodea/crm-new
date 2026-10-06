@@ -15,7 +15,7 @@
 
 ## 图像和产品输出
 
-第 15 轮 E2E 生成 85 张 PNG，Root 实际逐张查看补正直接涉及的 10 张五档图：`manual-450-gross-550` 与 `original-adoption-correction-150` 各 390、768、1024、1280、1440。第 16 轮 E2E 生成 90 张 PNG，Root 另实际查看 `released-current-zero-with-frozen-original` 的五档 5 张，确认冻结与当前整改/改价并列。完整观察见 [Root 逐图记录](./root/visual-review.md)。
+第 15 轮 E2E 生成 85 张 PNG，Root 实际逐张查看补正直接涉及的 10 张五档图：`manual-450-gross-550` 与 `original-adoption-correction-150` 各 390、768、1024、1280、1440。第 16 轮 E2E 生成 90 张 PNG，Root 另实际查看 `released-current-zero-with-frozen-original` 的五档 5 张，确认冻结与当前整改/改价并列。完整观察见 [Root 逐图记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-hollow/checks/root/visual-review.md)。
 
 第 14 轮由 Root/A/C 分组查看其余状态和打印页，第 15/16 轮真实 E2E 重新执行全链断言；这里没有把“生成了图片”等同于“人工看过图片”。归档保留最终 15 张补图、实际 XLSX、断言 JSON 和第 14 轮必要页图。浏览器临时 PDF 不作为交付物。
 

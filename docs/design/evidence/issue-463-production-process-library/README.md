@@ -1,6 +1,8 @@
 # #463 全局工序库本机持久化验收
 
-2026-09-22，基于 #450 冻结版本 `87fc4ac3`。本记录只覆盖 #463：沿既有工序库协议接本机磁盘权威，不改页面设计、工序业务规则或 WBS 创建协议。后续已合入 #450 的正式主线作为 PR 前置。共享接缝检查点为 `fa7f655d`、`4a6adada`；详情见[存储检查](./checks/storage.md)。
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-463-production-process-library)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
+2026-09-22，基于 #450 冻结版本 `87fc4ac3`。本记录只覆盖 #463：沿既有工序库协议接本机磁盘权威，不改页面设计、工序业务规则或 WBS 创建协议。后续已合入 #450 的正式主线作为 PR 前置。共享接缝检查点为 `fa7f655d`、`4a6adada`；详情见[存储检查](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-463-production-process-library/checks/storage.md)。
 
 ## 本次结果
 

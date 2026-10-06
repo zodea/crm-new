@@ -51,9 +51,9 @@ schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`
 | `process_library_command_receipts` | 原命令ID、工作区/操作者、版本ID、完整命令JSON/指纹和原结果 |
 | `process_library_audits` | 原版本、原命令、操作者、创建动作、完整版本事实和时间 |
 
-所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态见下节 #451，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力。
+所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态见下节 #451，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。[共享检查点](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力。
 
-工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 的使用投影尚未接通，引用数量为未知。存量中央迁入与 WBS 生产接管不由此切片证明。验证见 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](../design/evidence/issue-463-production-process-library/checks/storage.md)。
+工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 的使用投影尚未接通，引用数量为未知。存量中央迁入与 WBS 生产接管不由此切片证明。验证见 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-463-production-process-library/checks/storage.md)。
 
 ## PG-04 本机分供方持久参与者（#453）
 
@@ -1782,7 +1782,7 @@ P4 新 V2 更正追加同簿费用依据，保留原费项、组件及负价行�
 
 ### 户级空鼓、整改与工资采用（#412，P6）
 
-P6 在既有工程量和工资中央事务中增加以下追加事实。五张来源表与三张工资表均不保存可编辑余额，也不使用 `deleted_at` 隐藏已处理的来源。当前实施与验收进度独立见 [P6 实施票](../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)，不代表 #416 生产部署完成。
+P6 在既有工程量和工资中央事务中增加以下追加事实。五张来源表与三张工资表均不保存可编辑余额，也不使用 `deleted_at` 隐藏已处理的来源。限定实现与验收范围见 [P6 验收记录](../design/evidence/issue-412-payroll-hollow/README.md)，不代表 #416 生产部署完成。
 
 | 表 | 事实与字段 |
 | --- | --- |

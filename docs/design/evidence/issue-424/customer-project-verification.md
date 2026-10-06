@@ -1,5 +1,7 @@
 # #424 客户关联项目中央回读与往返验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-424)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 核对日期：2026-09-09。承接 [#407](https://github.com/zodea/crm-new/issues/407) / [#408](https://github.com/zodea/crm-new/issues/408)，唯一实施子票为 [#424](https://github.com/zodea/crm-new/issues/424)。基线 `3edab0c47d1125a025c52bfad3d3aa9722ab8d64` 已在当前分支；复用 #423 的 Excel 导入，不重做导入或整合其他分支。#398 只核实已有复用。
 
 ## 事实与失败复现
@@ -36,11 +38,11 @@
 
 五张截图逐张检查，均为本地隔离合成数据；不是新增的外部登录参考证据：
 
-- [390px](./customer-project-390.png)
-- [768px](./customer-project-768.png)
-- [1024px](./customer-project-1024.png)
-- [参考 1280px](./customer-project-1280.png)
-- [1440px](./customer-project-1440.png)
+- [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-424/customer-project-390.png)
+- [768px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-424/customer-project-768.png)
+- [1024px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-424/customer-project-1024.png)
+- [参考 1280px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-424/customer-project-1280.png)
+- [1440px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-424/customer-project-1440.png)
 
 ## 剩余边界与下一切片
 

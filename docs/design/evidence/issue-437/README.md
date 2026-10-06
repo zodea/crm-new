@@ -1,5 +1,7 @@
 # #437 发票 Excel 分组边框验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-437)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-11。实施票：[#437](https://github.com/zodea/crm-new/issues/437)，承接 [#406](https://github.com/zodea/crm-new/issues/406) 的独立切片。当前规则见[发票页面蓝本](../../../rewrite/pages/finance-invoice.md#台账-xlsx-边框配置437)与 [ADR 0004](../../../adr/0004-export-interaction-model.md)。继承决定：[旧 #255 定稿](https://github.com/zodea/crm-new/issues/255#issuecomment-5248369759)、[同屏预览与默认保存](https://github.com/zodea/crm-new/issues/255#issuecomment-5248859741)、[SQLite 持久化修正](https://github.com/zodea/crm-new/issues/255#issuecomment-5251153378)。
 
 ## 本次完成与证据
@@ -15,7 +17,7 @@
 
 - `preview-{width}.png`：表格预览与页面边界。
 - `header-{width}.png` / `data-{width}.png`：整组四边居中可见及键盘焦点；显示的是五档测试草稿。
-- [invalid-color.png](./invalid-color.png)：无效颜色在固定操作区提示。
+- [invalid-color.png](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-437/invalid-color.png)：无效颜色在固定操作区提示。
 - [invoice-borders.xlsx](./invoice-borders.xlsx)：另一条完整保存/刷新/导出旅程下载的真实文件，使用不同线型与颜色。
 - [workbook-readback.json](./workbook-readback.json)：该文件 SHA-256、单元格样式索引、边框索引及四边原始 XML 值。
 - [使用指南](../../../guides/finance-invoice.md)及[四页 Markdown 指南](../../../guides/finance-invoice.md)。

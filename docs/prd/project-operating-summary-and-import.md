@@ -4,7 +4,7 @@
 > 首个验收数据集：车陂商业大楼项目
 > 关联：ADR 0015、`CONTEXT.md`、`docs/rewrite/DATABASE.md`
 
-本 PRD 保留经营与迁移需求，当前复核和实施按 [#402](https://github.com/zodea/crm-new/issues/402) 及[承接入口](../implementation/project-operating-summary-work-breakdown.md)。下列成功标准不表示已经实现；已接管实体遵守 ADR 0020 中央权威，生产持久化与部署独立验收。
+本 PRD 保留经营与迁移需求，当前复核和实施直接按 [#402](https://github.com/zodea/crm-new/issues/402)及对应模块票，实际能力与运行环境见 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#implementation-gaps)。下列成功标准不表示已经实现；已接管实体遵守现行中央权威，生产持久化与部署独立验收。
 
 ## 1. 目标
 
@@ -52,22 +52,11 @@
 
 ### R-01 支出合同五类
 
-系统报告维度固定为：
-
-1. 专业分包；
-2. 合同劳务；
-3. 材料；
-4. 机械；
-5. 其他。
-
-项目当前 `contracts.kind/sub_kind` 仍可用于界面分组，但必须提供稳定的 `cost_category` 作为经营汇总维度。禁止继续使用“劳务/专业分包 → 人工”的旧映射。
+报告分类、稳定成本维度与禁止混用口径只在 [DATABASE §4.8](../rewrite/DATABASE.md#48-动态成本与合同付款)维护。产品输出须能按对应分类定位源合同，历史 Excel 细类和未分类状态保留在[工作簿映射](../migration/ruijing-workbook-mapping.md)，不据本 PRD 的旧实现字段描述另建分类。
 
 ### R-02 主合同与补充协议
 
-- 一个支出合同可有多份补充协议；
-- 主合同金额与补充协议金额分别保存；
-- 经营口径的合同额为主合同加有效补充协议，不通过重复合同号和名称猜测；
-- Excel 的同合同号多行迁移时，必须先确认主记录，其余记录迁为补充协议或标记待人工确认。
+主合同、补充协议的稳定关系、独立金额及生效边界只见 [DATABASE 的 Canonical 合同与补充协议](../rewrite/DATABASE.md#canonical-合同与补充协议)和[合同页面](../rewrite/pages/core-contracts.md)。产品需能分辨原合同与协议并下钻；指定样本中重复合同号的原行核实方法见[工作簿映射](../migration/ruijing-workbook-mapping.md)，不能把重复名称当作迁移关系。
 
 ### R-03 合同、结算、付款分离
 
@@ -147,7 +136,7 @@
 
 ## 8. 实施切片
 
-下列是能力覆盖清单，当前哪些已实现、哪些需修正及依赖顺序由[实施承接入口](../implementation/project-operating-summary-work-breakdown.md)指向的模块票确认，不按历史列表重新排开发。
+下列是能力覆盖清单，当前哪些已实现、哪些需修正及依赖顺序由 [#402](https://github.com/zodea/crm-new/issues/402)对应模块票及当前实际代码确认，不按历史列表重新排开发。
 
 1. 修正合同分类与补充协议模型；
 2. 增加支付记录—付款申请多对多分摊并迁移旧已付字段；

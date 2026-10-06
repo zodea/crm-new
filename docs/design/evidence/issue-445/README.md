@@ -1,5 +1,7 @@
 # #445 内部暂估绑定施工合同
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 > 本地限定切片已完成，证据随本工作单元独立提交；未推送或部署。2026-09-12 已重新查询 [#445 当前正文与评论](https://github.com/zodea/crm-new/issues/445)，无新增业务决定，2026-09-13 完成最终整体验证。实施基线为 `ab056768ebf17dd3a2713bb6bc0df37dbb118ba6`；前置 [#444 中央 WBS](../issue-444/README.md) 已独立提交并完成本地验收。本票不代表生产持久化或部署完成。
 
 ## 正常绑定与异常返回
@@ -96,27 +98,27 @@ flowchart TD
 
 ## 使用指南
 
-[排程指南 V2.9](../../../guides/project-start-and-schedule.md)和[迁移指南 V2.4](../../../guides/local-data-migration.md)已经更新，正式 PDF 共 15 页完成逐页检查。页面图、版本、最终 PDF SHA-256 及核验范围见 [PDF 验收记录](pdf/README.md)。
+[排程指南 V2.9](../../../guides/project-start-and-schedule.md)和[迁移指南 V2.4](../../../guides/local-data-migration.md)已经更新，正式 PDF 共 15 页完成逐页检查。页面图、版本、最终 PDF SHA-256 及核验范围见 [PDF 验收记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/pdf/README.md)。
 
 ## 交互效果图
 
-每种状态都有 390 / 768 / 1024 / 1280 / 1440px 原图。下表给出代表图；全部 65 张图的实际宽高、逐图 SHA-256、来源轮次及审图分工见 [浏览器证据清单](browser/manifest.json)。数量表下部和横滚画面使用 720px 高度，其余主要页面为 960px；不把首屏截图当作页面所有内容。
+每种状态都有 390 / 768 / 1024 / 1280 / 1440px 原图。下表给出代表图；全部 65 张图的实际宽高、逐图 SHA-256、来源轮次及审图分工见 [浏览器证据清单](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/manifest.json)。数量表下部和横滚画面使用 720px 高度，其余主要页面为 960px；不把首屏截图当作页面所有内容。
 
 | 场景 | 实际结果 | 代表图 |
 | --- | --- | --- |
-| 旧绑定历史 | 保留真实绑定，缺比较明确提示，不补造 | [390px](browser/legacy-bound-readonly-390.png) |
-| 楼栋缺覆盖 | 阻止确认并保留选择，指出原来源修正入口 | [390px](browser/coverage-blocked-frozen-390.png) |
-| 原清单楼栋更正 | 同一确认导入行维护楼栋及理由后返回 | [768px](browser/building-evidence-draft-768.png) |
-| 冻结差异下部 | 8/null、真实零及单位分别核对，确认按钮可达 | [1440px](browser/comparison-lower-and-confirm-1440.png) |
-| 横滚后的来源列 | 只在表格内横滚，完整说明及来源入口可达 | [390px](browser/comparison-horizontal-sources-390.png) |
-| 陈旧预览 | 显示原合同名称，保留选择并要求重新核对 | [390px](browser/stale-preview-retained-390.png) |
-| 失响应恢复 | 显示保留的合同及原提交恢复入口 | [768px](browser/unknown-command-retained-768.png) |
-| 新绑定冷读 | 回读绑定时保存的比较、经办身份和时间 | [1440px](browser/bound-cold-read-1440.png) |
-| 已绑定差异下部 | 可继续核查冻结依据，不能重复绑定 | [390px](browser/bound-differences-lower-390.png) |
-| 绑定清单来源 | 只读原稳定行，可打开绑定时原楼层计划 | [768px](browser/contract-source-readonly-768.png) |
-| 原冻结楼层 | 只读同一工序与楼层，冻结量及原计划保留 | [390px](browser/original-floor-readonly-390.png) |
-| 签证新增 | 明确只读原因，不能直接更正基准楼栋 | [768px](browser/signed-addition-readonly-768.png) |
-| 四条来源及长说明 | 键盘到第四条并打开精确原行，长说明可滚至末尾 | [390px](browser/multiple-sources-long-reasons-390.png) |
+| 旧绑定历史 | 保留真实绑定，缺比较明确提示，不补造 | [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/legacy-bound-readonly-390.png) |
+| 楼栋缺覆盖 | 阻止确认并保留选择，指出原来源修正入口 | [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/coverage-blocked-frozen-390.png) |
+| 原清单楼栋更正 | 同一确认导入行维护楼栋及理由后返回 | [768px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/building-evidence-draft-768.png) |
+| 冻结差异下部 | 8/null、真实零及单位分别核对，确认按钮可达 | [1440px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/comparison-lower-and-confirm-1440.png) |
+| 横滚后的来源列 | 只在表格内横滚，完整说明及来源入口可达 | [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/comparison-horizontal-sources-390.png) |
+| 陈旧预览 | 显示原合同名称，保留选择并要求重新核对 | [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/stale-preview-retained-390.png) |
+| 失响应恢复 | 显示保留的合同及原提交恢复入口 | [768px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/unknown-command-retained-768.png) |
+| 新绑定冷读 | 回读绑定时保存的比较、经办身份和时间 | [1440px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/bound-cold-read-1440.png) |
+| 已绑定差异下部 | 可继续核查冻结依据，不能重复绑定 | [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/bound-differences-lower-390.png) |
+| 绑定清单来源 | 只读原稳定行，可打开绑定时原楼层计划 | [768px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/contract-source-readonly-768.png) |
+| 原冻结楼层 | 只读同一工序与楼层，冻结量及原计划保留 | [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/original-floor-readonly-390.png) |
+| 签证新增 | 明确只读原因，不能直接更正基准楼栋 | [768px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/signed-addition-readonly-768.png) |
+| 四条来源及长说明 | 键盘到第四条并打开精确原行，长说明可滚至末尾 | [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-445/browser/multiple-sources-long-reasons-390.png) |
 
 前 12 类共 60 张来自实际合成迁入来源及公开命令的 `release-verified` 轮；最后 5 张是通过真实页面、Repository 解码、Pinia 与 VXE 的明确读取夹具微验，未执行迁入或写命令，不能作为真实四行迁入证据。
 

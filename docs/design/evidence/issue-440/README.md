@@ -1,5 +1,7 @@
 # #440 工程量合计与台账导出验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-440)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-11。规格：[#440](https://github.com/zodea/crm-new/issues/440)，父票 [#412](https://github.com/zodea/crm-new/issues/412)。
 
 代码基线为本地 `1b07e035f5277292bab94452a1aceeac5060388e` 上冻结的本票差异，最终独立提交与集成结果由 Issue 评论绑定。浏览器运行时其他并行切片的运行源码暂停修改。
@@ -33,7 +35,7 @@
 | 来源返回与下载 | 从实际户详情返回工程量矩阵，点击“导出台账”，接收真实浏览器下载后保存并回读。目录选择能力在测试中禁用，采用既有标准浏览器下载，不声称人工操作过系统目录。 |
 | Excel 内容 | 三个工作表齐全；月度只有泥水完成的平方米/米两行，未承担报量的共用阶段没有重复带量。平方米合同量为数字 0，现场量为空、缺 1 项、已知部分 12，米现场量为数字 8。 |
 
-截图：[390](./totals-390.png)、[768](./totals-768.png)、[1024](./totals-1024.png)、[1280](./totals-1280.png)、[1440](./totals-1440.png)，均逐张查看。截图聚焦合计及说明浮层，页面在纵向滚动后的当前位置；不将局部滚动截图冒称整页布局全貌。
+截图：[390](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-440/totals-390.png)、[768](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-440/totals-768.png)、[1024](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-440/totals-1024.png)、[1280](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-440/totals-1280.png)、[1440](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-440/totals-1440.png)，均逐张查看。截图聚焦合计及说明浮层，页面在纵向滚动后的当前位置；不将局部滚动截图冒称整页布局全貌。
 
 实际下载文件：[工程量台账](./quantity-ledger.xlsx)；独立文件回读记录：[JSON](./workbook-readback.json)。
 

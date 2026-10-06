@@ -1,23 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
 import { buildModuleReviewCoverage } from '../../scripts/module-review-coverage.mjs'
 
 const productCommit = 'a2f117f52dffe3d7867f4ff82a1d62be372b0c2b'
 const evidence = 'docs/design/evidence/issue-412-payroll-batch-workbooks/README.md'
-const reportDirectory = 'docs/research/issue-review-2026-09-11'
-
-interface ReportRow {
-  number: number
-  status: string
-  solved: string[]
-  remaining: string[]
-  evidence: string[]
-  questions: string[]
-  screens: Array<{ title: string }>
-}
-
 describe('p7 limited delivery registration', () => {
   it('binds batch and workbook obligations to the fixed product while leaving roster and production open', () => {
     const coverage = buildModuleReviewCoverage()
@@ -38,34 +25,26 @@ describe('p7 limited delivery registration', () => {
     expect(byId('WAGE-12').remaining).toContain('#467')
   })
 
-  it('keeps #412 partial and records P7 results without dropping the seven business questions', () => {
-    const rows: ReportRow[] = JSON.parse(readFileSync(`${reportDirectory}/rows-business.json`, 'utf8'))
-    const row = rows.find(item => item.number === 412)!
-    const dom = new JSDOM(readFileSync(`${reportDirectory}/index.html`, 'utf8'))
-    try {
-      const embedded: ReportRow[] = JSON.parse(dom.window.document.querySelector('#review-data')!.textContent!)
-      expect(embedded.find(item => item.number === 412)).toEqual(expect.objectContaining(row))
-      expect(row.status).toBe('partial')
-      expect(row.solved.join('\n')).toContain(productCommit)
-      expect(row.solved.join('\n')).toContain('793文件4339项')
-      expect(row.remaining.join('\n')).toContain('P7自动尾差')
-      expect(row.remaining.join('\n')).toContain('#416')
-      expect(row.questions).toHaveLength(7)
-      expect(row.questions[4]).toContain('P7 资金建议')
-      expect(row.questions[5]).toContain('P7 工资编号')
-      expect(row.questions[6]).toContain('P7 完整名册')
-      expect(row.screens.some(item => item.title.startsWith('P7批次资金'))).toBe(true)
-      expect(row.screens.some(item => item.title.startsWith('P7完整工作簿'))).toBe(true)
-      expect(row.evidence).toContain(evidence)
-      for (const path of row.evidence.filter(item => item.includes('payroll-batch-workbooks')))
-        expect(existsSync(resolve(path))).toBe(true)
-      const summary = readFileSync(`${reportDirectory}/README.md`, 'utf8').split(/\r?\n/).find(line => line.startsWith('| [#412 '))!
-      expect(summary).toContain(productCommit)
-      expect(summary).toContain('部分完成')
-      expect(summary).toContain('P7自动尾差')
-    }
-    finally {
-      dom.window.close()
-    }
+  it('protects the confirmed batch, reconciliation and private archive rules in the current authorities', () => {
+    const page = readFileSync('docs/rewrite/pages/subcontract-payroll.md', 'utf8')
+    const commands = readFileSync('docs/rewrite/COMMANDS.md', 'utf8')
+    const reads = readFileSync('docs/rewrite/READ-MODELS.md', 'utf8')
+    const database = readFileSync('docs/rewrite/DATABASE.md', 'utf8')
+
+    expect(page).toContain('333.34/333.33/333.33')
+    expect(page).toContain('整单600、普通400、资金700时建议600/100')
+    expect(page).toContain('同余按稳定簿身份、原工资 ID 决定')
+    expect(page).toContain('未知结果只能按同一原键恢复')
+    expect(commands).toContain('只创建不可变计划')
+    expect(commands).toContain('先保存完整原格式命令，暂缓项不准备')
+    expect(commands).toContain('归档不发工资、取号或记收付')
+    expect(page).toContain('A 周期公式应付采用最新合法累计口径，不把逐月累计重复相加')
+    expect(page).toContain('公式应付为本月各张原单本次核算合计')
+    expect(reads).toContain('worker:sensitive:read')
+    expect(reads).toContain('工资权限可阅读及下载工资部分，完整实名附件需重新单独授权')
+    expect(database).toContain('之后真实补退只进入新目录版本')
+    expect(database).toContain('生产落盘由 #467 承接')
+    for (const path of [evidence, 'docs/guides/payroll-complete-workbook.md'])
+      expect(existsSync(resolve(path))).toBe(true)
   })
 })

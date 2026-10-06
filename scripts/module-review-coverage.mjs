@@ -224,7 +224,7 @@ export function buildModuleReviewCoverage() {
   for (const obligation of REVIEW_OBLIGATIONS) {
     for (const reference of [...obligation.sources, ...obligation.evidence.map(item => item.reference)]) {
       if (!reference.startsWith('https://'))
-        sourceText(reference)
+        sourceText(reference.split('#')[0])
     }
   }
   return {

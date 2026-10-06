@@ -1,30 +1,11 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
 import { buildModuleReviewCoverage } from '../../scripts/module-review-coverage.mjs'
 
 const productCommit = 'edc03faba20e0c5c665b7fc2011e2a4120d8428f'
 const evidence = 'docs/design/evidence/issue-412-payroll-hollow/README.md'
 const hollowCases = ['C-D6CAD39409A2', 'C-1785D3BD0ACB', 'C-646DC1829859']
-const reportDirectory = 'docs/research/issue-review-2026-09-11'
-
-interface ReportNode {
-  id: string
-  title: string
-  lines: string[]
-}
-interface ReportRow {
-  number: number
-  status: string
-  solved: string[]
-  remaining: string[]
-  evidence: string[]
-  questions: string[]
-  screens: Array<{ title: string }>
-  graph: { nodes: ReportNode[], edges: unknown[] }
-}
-
 describe('p6 limited delivery registration', () => {
   it('preserves the fixed P6 evidence after the later P7 registration', () => {
     const coverage = buildModuleReviewCoverage()
@@ -54,41 +35,24 @@ describe('p6 limited delivery registration', () => {
     })
   })
 
-  it('keeps #412 partial, renders P6 evidence and preserves the seven real business questions', () => {
-    const rows: ReportRow[] = JSON.parse(readFileSync(`${reportDirectory}/rows-business.json`, 'utf8'))
-    const row = rows.find(item => item.number === 412)!
-    const dom = new JSDOM(readFileSync(`${reportDirectory}/index.html`, 'utf8'))
-    try {
-      const embedded: ReportRow[] = JSON.parse(dom.window.document.querySelector('#review-data')!.textContent!)
-      const rendered = embedded.find(item => item.number === 412)!
-      const sourceRows: ReportRow[] = readdirSync(reportDirectory).filter(name => /^rows-.+\.json$/.test(name)).flatMap(name => JSON.parse(readFileSync(`${reportDirectory}/${name}`, 'utf8')))
-      expect([...embedded].sort((a, b) => a.number - b.number)).toEqual(sourceRows.sort((a, b) => a.number - b.number))
-      expect(new Set(embedded.map(item => item.number)).size).toBe(sourceRows.length)
-      expect(row.status).toBe('partial')
-      expect(rendered).toEqual(expect.objectContaining(row))
-      expect(row.solved.join('\n')).toContain(productCommit)
-      expect(row.solved.join('\n')).toContain('782文件4312项')
-      expect(row.remaining.join('\n')).toContain('P7')
-      expect(row.remaining.join('\n')).toContain('grill')
-      expect(row.questions).toHaveLength(7)
-      expect(row.questions[3]).toContain('P6 空鼓')
-      expect(row.evidence).toContain(evidence)
-      expect(row.screens.some(item => item.title.startsWith('P6户级空鼓'))).toBe(true)
-      expect(row.graph.nodes.length).toBeGreaterThan(0)
-      expect(row.graph.edges.length).toBeGreaterThan(0)
-      expect(new Set(row.graph.nodes.map(node => node.id)).size).toBe(row.graph.nodes.length)
-      expect(row.graph.nodes.find(item => item.id === 'a')!.lines).toContain('独立管理簿 / 负价；户级空鼓人工扣款')
-      expect(row.graph.nodes.find(item => item.id === 'end')!.title).toContain('P7')
-      expect(row.graph.nodes.find(item => item.id === 'end')!.lines).toContain('批量资金、完整工作簿与名册继续实施')
-      for (const path of row.evidence.filter(item => item.includes('payroll-hollow')))
-        expect(existsSync(resolve(path))).toBe(true)
-      const summary = readFileSync(`${reportDirectory}/README.md`, 'utf8').split(/\r?\n/).find(line => line.startsWith('| [#412 '))!
-      expect(summary).toContain(productCommit)
-      expect(summary).toContain('部分完成')
-      expect(summary).toContain('P7')
-    }
-    finally {
-      dom.window.close()
-    }
+  it('preserves the confirmed manual deduction and frozen-history rules without reviving the old questionnaire', () => {
+    const page = readFileSync('docs/rewrite/pages/subcontract-payroll.md', 'utf8')
+    const commands = readFileSync('docs/rewrite/COMMANDS.md', 'utf8')
+    const reads = readFileSync('docs/rewrite/READ-MODELS.md', 'utf8')
+
+    expect(page).toContain('每单由经办人确认新增未处理项，启动不跨单继承')
+    expect(page).toContain('原15处已扣、尚余5处未修、本月另有独立新增2处时，只在本单人工启动新增2处')
+    expect(page).toContain('已采用记录后来修订总数需要核实更正，不能猜成新增检查')
+    expect(commands).toContain('完整正扣款恰抵可领额可明确实发 0')
+    expect(commands).toContain('已处理源不因后月/整改/退款/改名再开放')
+    expect(reads).toContain('“暂无检查”与“明确检查零处”分别表达')
+    expect(reads).toContain('当前读取失败时保留冻结区并明确失败')
+    expect(reads).toContain('不以当前行重算原工资')
+
+    const hollowObligation = buildModuleReviewCoverage().obligations.find(item => item.id === 'WAGE-15')!
+    expect(hollowObligation.remaining).toContain('新增2处')
+    expect(hollowObligation.remaining).toContain('#467')
+    for (const path of [evidence, 'docs/guides/payroll-hollow.md'])
+      expect(existsSync(resolve(path))).toBe(true)
   })
 })

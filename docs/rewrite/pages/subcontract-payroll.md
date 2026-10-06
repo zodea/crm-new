@@ -102,7 +102,7 @@ P2 已接通中央考勤矩阵、个人费率整页、C1 草稿/核对/实发及
 
 ## 四、本轮复核与既定排除
 
-[#412](https://github.com/zodea/crm-new/issues/412) 逐项验证 A / C1 / C2 的来源、精度、防双计、来源变更重核、已发锁定、更正与回读。P4 中央独立更正已接通，始终保留原已发快照。#117 已定的费用由 P5 承接，户级空鼓扣款、批量资金建议及完整工作簿分别由 P6/P7 继续，不因前期子链验收而取消；逐期范围见[工资承接规格](../../research/issue-review-2026-09-11/payroll-central-spec-draft.md#纵向分期与依赖)。
+[#412](https://github.com/zodea/crm-new/issues/412) 逐项验证 A / C1 / C2 的来源、精度、防双计、来源变更重核、已发锁定、更正与回读。P4 中央独立更正已接通，始终保留原已发快照；费用、空鼓、批量及完整工作簿的现行范围分别见本页对应章节，不因早期子链验收取消后续义务。旧调查与分期准备票通过[固定 Git 来源](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11)追溯，不作为当前排期或待问清单；实际运行与生产边界见 [ARCHITECTURE](../ARCHITECTURE.md#implementation-gaps)。
 
 B 类退役不重开选型；施工 BOQ 仍是合同收入清单，不得按合同或名称猜工人工资责任。完整审批、人员账号权限和后台扩张沿用总图排除；正式持久化、备份与部署走后置上线门。
 

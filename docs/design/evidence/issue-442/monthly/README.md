@@ -24,12 +24,12 @@
 
 2026-09-12 补拍的实际月报表单测试 1/1 通过（用例 24.3 秒、整轮 38.3 秒），包含附件保存说明和经办人详情回读。七张图已逐张查看：确认框动画完成，窄屏滚到申报量列；五档宽度未出现页面横溢，保存与申报操作可达。以下均为本地合成数据的实际运行截图。
 
-- [390px：缺量保留空申报](monthly-missing-390.png)
-- [768px：缺量与待核对金额](monthly-missing-768.png)
-- [1024px：表内横滚](monthly-missing-1024.png)
-- [1280px：表单与报量明细](monthly-missing-1280.png)
-- [1440px：表单与报量明细](monthly-missing-1440.png)
-- [更换基准：保留原稿或确认重算](monthly-basis-confirm.png)
-- [已申报：312 元及原始来源快照](monthly-submitted-snapshot.png)
+- [390px：缺量保留空申报](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/monthly/monthly-missing-390.png)
+- [768px：缺量与待核对金额](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/monthly/monthly-missing-768.png)
+- [1024px：表内横滚](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/monthly/monthly-missing-1024.png)
+- [1280px：表单与报量明细](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/monthly/monthly-missing-1280.png)
+- [1440px：表单与报量明细](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/monthly/monthly-missing-1440.png)
+- [更换基准：保留原稿或确认重算](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/monthly/monthly-basis-confirm.png)
+- [已申报：312 元及原始来源快照](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/monthly/monthly-submitted-snapshot.png)
 
 本节仅完成清单关联与月报切片的实际验收；整个 #442 的全量检查和独立提交仍以本票后续交付证据为准。

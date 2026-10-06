@@ -1,8 +1,0 @@
-
-Running 1 test using 1 worker
-
-(node:37256) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  ok 1 [chromium] › e2e\payroll-adjustments-central.spec.ts:25:1 › 原工资独立更正、真退40、后月处理60与跨页同源冷读 (1.2m)
-
-  1 passed (1.2m)

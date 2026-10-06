@@ -20,7 +20,7 @@ gh issue edit <number> --repo zodea/crm-new --add-label "<标签>"
 gh issue close <number> --repo zodea/crm-new
 ```
 
-获授权后再执行对应写操作。多行正文使用仓库外临时 UTF-8 文件与 `--body-file`，用后删除；关闭前回写实际完成证据。
+获授权后再执行对应写操作。多行正文使用当前项目专属 `.tmp` 目录中的临时 UTF-8 文件与 `--body-file`，按项目临时文件规则清理；关闭前回写实际完成证据。
 
 ## 每次提交的 show-me 图解
 

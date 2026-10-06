@@ -1,7 +1,7 @@
 # OCR 引擎：PaddleOCR-VL 单模型，本地自托管为主、云端官方 API 显式启用
 
 > 状态：**已采纳**（2026-07-05 草案；2026-07-06 用户逐条重新拍板确认；2026-07-16 用户授权先接官方线上 API，用真实样本评估识别质量）
-> 详细论证见 `docs/research/ocr-recognition-strategy.md`；工程移植见 `docs/research/invoice-recognition-app-port-plan.md`。
+> 当时的详细论证见[固定历史策略](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/ocr-recognition-strategy.md)，工程移植依据见[固定历史调查](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/invoice-recognition-app-port-plan.md)。两份旧稿不定义当前接口、凭证存储或页面规则。
 > 本版**取代**初版的"三层多引擎（PP-OCRv6 + 本地文本LLM + 独立视觉LLM）"方案——收敛为单一 PaddleOCR-VL。
 
 > 后续边界：本文保留当时的引擎选择、硬件与样本评估，版本“最新”、性能比较和本地后端设想均按该时点阅读，不作为当前运行可用性证明。本文只裁定 OCR 路径，不能用其中“财务数据默认全本地”的历史描述覆盖后来 [ADR 0020](./0020-browser-authority-and-demo-workspace-boundary.md)的浏览器中央业务权威。当前 OCR/文件能力按[文件流程复核](https://github.com/zodea/crm-new/issues/406)验证，实际部署由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接；既有云端显式启用、凭证只留服务端和人工核对边界继续有效。

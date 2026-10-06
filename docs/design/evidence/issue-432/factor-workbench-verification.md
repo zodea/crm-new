@@ -1,5 +1,7 @@
 # 开票因子与税额工具验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-432)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-10。Issue：[#432](https://github.com/zodea/crm-new/issues/432)，承接 #414 与 #431 的 FACTOR-01～04。实施基线 `cb63ec2c`，本记录随修复提交。
 
 ## 权威与修复范围
@@ -23,10 +25,10 @@
 
 | 视口 | 当前实现 |
 | --- | --- |
-| 390px | [截图](./factor-workbench-390.png) |
-| 768px | [截图](./factor-workbench-768.png) |
-| 1024px | [截图](./factor-workbench-1024.png) |
-| 1280px | [截图](./factor-workbench-1280.png) |
-| 1440px | [截图](./factor-workbench-1440.png) |
+| 390px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-432/factor-workbench-390.png) |
+| 768px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-432/factor-workbench-768.png) |
+| 1024px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-432/factor-workbench-1024.png) |
+| 1280px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-432/factor-workbench-1280.png) |
+| 1440px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-432/factor-workbench-1440.png) |
 
 本次仅覆盖本地计算工具及配置恢复，不生成正式业务记录，也不代表 #414 的其他设置/首页工作或 #416 生产能力完成。未推送、未运行 GitHub Actions。

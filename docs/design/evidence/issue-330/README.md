@@ -1,5 +1,7 @@
 # AX04 辅助合同验证记录
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-330)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 固定基点：`67d12ec947ba374fc4d5c01d7a02119e9bb2f04a`（#329 / PR #400）。规格：[#330](https://github.com/zodea/crm-new/issues/330)、[#295](https://github.com/zodea/crm-new/issues/295)、[#292](https://github.com/zodea/crm-new/issues/292)。开工重新核对 #315、#313 均已关闭，隔离分支未包含本地 main 的其他工作。
 
 ## 只读参考

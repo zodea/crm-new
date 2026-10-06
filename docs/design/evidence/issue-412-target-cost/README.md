@@ -1,5 +1,7 @@
 # #412：目标成本预算中央链验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-target-cost)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 > 本地限定预算切片已独立提交：`b64d52240cb4d229dc5458b4009d5a16a982bc3c`，精确 231 文件。开工基线 `59d5c735414e04b90e2cba7f2f750b6151e697bc`。2026-09-13 重读开放 #412 正文及评论；预算单独规格仍为本地审阅稿，本目录不代表已经创建或领取了新的子 Issue。母票其余范围继续开放。
 
 本单元覆盖预算列表、整页版本头、科目明细、唯一基线、附件、软删除恢复及完整存量接管。现行业务依据为[目标成本页面](../../../rewrite/pages/target-cost.md)、[数据模型](../../../rewrite/DATABASE.md)和 [#412](https://github.com/zodea/crm-new/issues/412)。完整工资、材料和财务成本来源继续由母票及对应领域承接；生产关口属于 #416。
@@ -109,7 +111,7 @@ flowchart LR
 
 主旅程覆盖缺项目草稿、独立税价、七科目增删调序、原件下载、历史缺件、A/B 保稿、关闭取消、版本冲突、已应用但响应丢失后的同键恢复、来源与项目往返、唯一基线、删除取消和删除恢复。补拍只读取同一合成实例：增加表格下半/右滚、改进历史取景，并在两处样式修复后复验受影响画面，不再写入业务资料。
 
-正式交互图位于 [browser](./browser/manifest.json)：**70/70 张逐张通过**，覆盖 390/768/1024/1280/1440px；Root 检查 35 张，独立 Standards 代理 25 张，UI 作者检查 10 张补充滚动图。每张的来源轮次、说明、检查者和 SHA-256 都在清单中；[滚动验证](./browser/scroll-verification.json)与[筛选边界](./browser/filter-bounds.json)保留实际测量。原件只读/下载使用合成文件，不读取用户数据库或原用户目录。
+正式交互图位于 [browser](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-target-cost/browser/manifest.json)：**70/70 张逐张通过**，覆盖 390/768/1024/1280/1440px；Root 检查 35 张，独立 Standards 代理 25 张，UI 作者检查 10 张补充滚动图。每张的来源轮次、说明、检查者和 SHA-256 都在清单中；[滚动验证](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-target-cost/browser/scroll-verification.json)与[筛选边界](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-target-cost/browser/filter-bounds.json)保留实际测量。原件只读/下载使用合成文件，不读取用户数据库或原用户目录。
 
 | 范围 | 本轮状态 | 需要的结果 |
 | --- | --- | --- |
@@ -122,7 +124,7 @@ flowchart LR
 | 实际来源完整性 | 限定来源通过 | 已知部分、真实零、无权和未知分别可见，余额不伪造；完整工资、材料和财务链未接齐 |
 | 五档视口与键盘 | 本轮通过 | 70 张原图，表格局部滚动、焦点及浮层可用 |
 | 独立复核和全套检查 | 本轮通过 | Standards/Spec 均 0；类型、109 文件规范及构建通过；最终完整 npm test 为 589 文件、3628 项通过（221.60 秒） |
-| 指南及 PDF | 本轮通过 | [预算 V1.0](../../../guides/target-cost.md)、排程 V2.10、迁移 V2.5；[19 页逐页检查](./pdf/README.md) |
+| 指南及 PDF | 本轮通过 | [预算 V1.0](../../../guides/target-cost.md)、排程 V2.10、迁移 V2.5；[19 页逐页检查](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-target-cost/pdf/README.md) |
 
 最终完整测试于 2026-09-13 02:05:26 启动，589 文件、3628 项全部通过（221.60 秒）。源码冻结后类型检查和构建均 exit 0，109 个明确代码文件 ESLint 为 0 errors / 0 warnings；正常 Git 提交钩子再次完成类型检查与相同 589 文件、3628 项测试（02:15:58 启动，210.35 秒）。提交后无遗留已跟踪改动。工资待开发稿及旧工作树没有混入此提交。
 

@@ -26283,9 +26283,9 @@
         "C-FBC35074E915",
         "C-8E3938597EF8"
       ],
-      "status": "ready",
+      "status": "partial",
       "evidence": [],
-      "remaining": "普通付款表单尚未闭合中央写入、幂等、冲突、权限和刷新；不能用详情中央只读或本地测试证明完成。"
+      "remaining": "F3 五类事实已接同一中央事务、磁盘参与者、原件、原命令及可靠后读；无合同费用关联沿原费用身份承接。全部合同类型的外域结算来源、完整跨域守恒及正式上线仍分别验收，不用已接 F3 范围代验未接来源。"
     },
     {
       "id": "PAY-06",
@@ -26327,15 +26327,17 @@
         "C-FBC35074E915",
         "C-8E3938597EF8"
       ],
-      "status": "ready",
+      "status": "partial",
       "evidence": [],
-      "remaining": "新值可空与零不回退、旧值不可推断及来源标记可直接实施；不得从历史状态或整表保存猜测批复。"
+      "remaining": "F3 已保存新批复可空与明确零、原输入来源及迁入原值；旧 legacy 零保持含义未知，整表保存不升级来源。实际跨域来源与全域正式交付继续独立验收。"
     },
     {
       "id": "PAY-08",
       "label": "历史批复零值含义不明时的新付款确认策略",
       "sources": [
-        "https://github.com/zodea/crm-new/issues/413#issuecomment-5616431545"
+        "https://github.com/zodea/crm-new/issues/413#issuecomment-5616431545",
+        "docs/rewrite/DATABASE.md#entity-payment-record",
+        "docs/rewrite/COMMANDS.md#f3-finance-payment-verification"
       ],
       "ownerIssue": 413,
       "caseIds": [
@@ -26344,9 +26346,9 @@
         "C-FBC35074E915",
         "C-8E3938597EF8"
       ],
-      "status": "needs-decision",
+      "status": "partial",
       "evidence": [],
-      "remaining": "$grill 已登记：补核批复后确认，或带异常继续确认的限额与责任；保留已发生支付事实，不以技术选择代替业务决定。"
+      "remaining": "已确认并接通限定 F3 核验：历史批复含义未知时，先保存可证明的实际应付与累计可付上限，再确认新支付；原 legacy 零、未知批复与既有现金、回执不改写。依据失效或实际来源未接仍阻止新确认，全部外域及正式全域验收不由此升级。"
     },
     {
       "id": "FACTOR-01",
@@ -27840,7 +27842,7 @@
       "sources": [
         "https://github.com/zodea/crm-new/issues/117",
         "https://github.com/zodea/crm-new/issues/117#issuecomment-5018392493",
-        "docs/research/issue-review-2026-09-11/payroll-central-spec-draft.md"
+        "https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/payroll-central-spec-draft.md"
       ],
       "ownerIssue": 412,
       "caseIds": [

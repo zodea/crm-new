@@ -23,11 +23,11 @@
 
 | 视口 | 实际截图 |
 | --- | --- |
-| 390px | [移动宽度](./quantity-import-390.png) |
-| 768px | [窄桌面宽度](./quantity-import-768.png) |
-| 1024px | [桌面宽度](./quantity-import-1024.png) |
-| 1280px | [桌面宽度](./quantity-import-1280.png) |
-| 1440px | [桌面宽度](./quantity-import-1440.png) |
+| 390px | [移动宽度](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/import/quantity-import-390.png) |
+| 768px | [窄桌面宽度](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/import/quantity-import-768.png) |
+| 1024px | [桌面宽度](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/import/quantity-import-1024.png) |
+| 1280px | [桌面宽度](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/import/quantity-import-1280.png) |
+| 1440px | [桌面宽度](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-442/import/quantity-import-1440.png) |
 
 实际失败曾揭示共享 CSV 读取器把 ISO 日期改成另一种格式；已修读取层保留字面值，并通过 UTF-8、GBK 及 XLSX 格式兼容反例。测试夹具的项目编码、异步导入完成等待和浏览器下载适配也已分别纠正，产品的项目身份、严格日期及缺照规则保持有效。
 

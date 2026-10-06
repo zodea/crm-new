@@ -1,6 +1,6 @@
 # 户级空鼓、整改与工资扣款
 
-> P6 限定功能和页面验收已通过并随 [PR #448](https://github.com/zodea/crm-new/pull/448) 合并；范围见 [P6 实施票](../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)。正式保存与部署按 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#runtime-environments)及 [#471](https://github.com/zodea/crm-new/issues/471)另验。本指南以 Markdown 交付。
+> P6 限定功能和页面验收已通过并随 [PR #448](https://github.com/zodea/crm-new/pull/448) 合并；范围见 [P6 限定验收记录](../design/evidence/issue-412-payroll-hollow/README.md)。正式保存与部署按 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#runtime-environments)及 [#471](https://github.com/zodea/crm-new/issues/471)另验。本指南以 Markdown 交付。
 
 空鼓先在原户记录，工资页读取同一记录。现场检查或整改本身不扣工资；经办人需要在具体工资单明确开始扣款。项目罚扣仍按原流程办理。
 

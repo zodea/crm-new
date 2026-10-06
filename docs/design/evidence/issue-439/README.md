@@ -1,5 +1,7 @@
 # #439 付款批复金额语义验证
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-439)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 本目录记录 [#439](https://github.com/zodea/crm-new/issues/439) 在 `09704b7d` 后共享工作区的本地验证。提交前证据不等于远端交付或生产验收；最终提交范围及完整钩子结果由该工作单元提交记录固定。数据均为隔离的合成样例，未读取或修订真实用户账套。
 
 ## 规则和交付边界
@@ -26,7 +28,7 @@ PAY-07 只保留旧金额并添加来源，不推测 v21/v22 压缩零的原意�
 
 ## 独立发现的页签恢复断点
 
-保存后回列表整页重载，再从真实表格名称行打开已经存在的未恢复付款详情，会被旧恢复状态阻断。这在限定 KitTable 的真实点击下仍复现，不能仅归因于同名定位。截图为 [tab-restore-reopen-blocked.png](./tab-restore-reopen-blocked.png)，已在 [#435 留证](https://github.com/zodea/crm-new/issues/435#issuecomment-5623599959)。
+保存后回列表整页重载，再从真实表格名称行打开已经存在的未恢复付款详情，会被旧恢复状态阻断。这在限定 KitTable 的真实点击下仍复现，不能仅归因于同名定位。截图为 [tab-restore-reopen-blocked.png](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-439/tab-restore-reopen-blocked.png)，已在 [#435 留证](https://github.com/zodea/crm-new/issues/435#issuecomment-5623599959)。
 
 该已定技术缺口由 #435 下一独立工作单元修复，不转为业务 grill。#439 最终金额持久化验收先通过可见“关闭未恢复详情页签→从列表重新打开”核对，未放开未接入详情的自动恢复，也未把该恢复断点标为通过。
 

@@ -1,5 +1,7 @@
 # #426 客户收款中央来源验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-426)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 - 日期：2026-09-10；实施基线：`6ba156e96e89498f0394032656386a82e042d08c`。
 - 任务：[实施票 #426](https://github.com/zodea/crm-new/issues/426)，承接 #407/#413/#405。
 - 视觉沿用客户详情现有构图与通用组件；本次增加独立收款来源问题态、未知金额与统一收款状态标签。
@@ -22,11 +24,11 @@
 
 | 视口 | 证据 |
 | --- | --- |
-| 390 | [截图](customer-receipts-390.png) |
-| 768 | [截图](customer-receipts-768.png) |
-| 1024 | [截图](customer-receipts-1024.png) |
-| 1280 | [截图](customer-receipts-1280.png) |
-| 1440 | [截图](customer-receipts-1440.png) |
+| 390 | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-426/customer-receipts-390.png) |
+| 768 | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-426/customer-receipts-768.png) |
+| 1024 | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-426/customer-receipts-1024.png) |
+| 1280 | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-426/customer-receipts-1280.png) |
+| 1440 | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-426/customer-receipts-1440.png) |
 
 ## 范围边界
 

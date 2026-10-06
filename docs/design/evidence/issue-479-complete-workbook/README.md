@@ -1,5 +1,7 @@
 # #479 完整工资目录与两种归档验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-479-complete-workbook)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 范围为 [#479](https://github.com/zodea/crm-new/issues/479)。共同前置固定在 `0673dc44c5a3f1545df4d4901f79aef37255867b`（#477 正式编号、#478 冻结位置）；沿用已验收 #449 名册、月度对账与跨月实际投影，不改变现金算法。当前工作树的后续整合验证在本记录中追加，不能据已有局部结果声称生产可用。
 
 ## 交付边界
@@ -25,7 +27,7 @@
 
 重新打开真实 XLSX/ZIP：全周期962/950/差额12；8月481/480/差额1，9月481/470/差额11。两月文件保留考勤原表，负责人及零成员均在名册，两个照片正文与原上传逐字节一致。随后更改今天的照片关联，关闭重开仍下载同一目录JSON与旧照片；撤回私密能力后整包停止、旧目录下载状态清空。浏览器无未捕获页面错误。文件路径、ZIP摘要和两页打印文字见[实际文件检查](./checks/browser-files.json)。
 
-五档实际截图已逐张检查：[390](./screens/workbook-390.png)、[768](./screens/workbook-768.png)、[1024](./screens/workbook-1024.png)、[1280](./screens/workbook-1280.png)、[1440](./screens/workbook-1440.png)。同时核实 document 和工作区壳均无横向溢出，目录表独立聚焦并能用方向键横滚。两种保存/下载区：[全周期](./screens/cycle-downloads-1440.png)、[项目按月](./screens/month-downloads-1440.png)。
+五档实际截图已逐张检查：[390](./screens/workbook-390.png)、[768](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-479-complete-workbook/screens/workbook-768.png)、[1024](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-479-complete-workbook/screens/workbook-1024.png)、[1280](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-479-complete-workbook/screens/workbook-1280.png)、[1440](./screens/workbook-1440.png)。同时核实 document 和工作区壳均无横向溢出，目录表独立聚焦并能用方向键横滚。两种保存/下载区：[全周期](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-479-complete-workbook/screens/cycle-downloads-1440.png)、[项目按月](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-479-complete-workbook/screens/month-downloads-1440.png)。
 
 截图检查实际发现历史版本格子撑宽窄屏，补单列可收缩网格和局部最小宽度后通过；真实ZIP检查发现长项目名加摘要被通用路径限制截掉扩展名，先建失败用例，再为完整摘要与.xlsx后缀保留长度，实际文件回读通过。
 

@@ -1,5 +1,7 @@
 # #435 浏览器页签恢复验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-435)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-11。范围：[实施票 #435](https://github.com/zodea/crm-new/issues/435)，公共行为归 [#404](https://github.com/zodea/crm-new/issues/404)。规范统一见 [PUBLIC-SURFACES §5](../../../rewrite/PUBLIC-SURFACES.md#5-业务页签恢复与性能)及 [NAVIGATION](../../../rewrite/NAVIGATION.md)。
 
 ## 环境与范围
@@ -31,7 +33,7 @@
 - [使用指南](../../../guides/tabs-and-recovery.md)与 `output/pdf/瑞航CRM_页签与页面恢复使用指南.pdf` 同步生成，PDF 共 3 页，已逐页渲染检查。
 - Standards 与 Spec 分别由独立代理只读复核，初轮及运行修正补审均无 P1/P2；类型与全量单测同时由独立提交钩子复验。
 
-同 key 旧恢复问题拦截业务列表重新打开的后续独立补修，见[重新打开证据](./reopen/README.md)；不将后续结果合并为本次固定提交的通过范围。
+同 key 旧恢复问题拦截业务列表重新打开的后续独立补修，见[重新打开证据](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-435/reopen/README.md)；不将后续结果合并为本次固定提交的通过范围。
 
 ## 当前画面
 
@@ -39,13 +41,13 @@
 
 | 宽度 | 恢复 15 个业务页签 |
 | --- | --- |
-| 390 | [画面](tabs-restored-390.png) |
-| 768 | [画面](tabs-restored-768.png) |
-| 1024 | [画面](tabs-restored-1024.png) |
-| 1280 | [画面](tabs-restored-1280.png) |
-| 1440 | [画面](tabs-restored-1440.png) |
+| 390 | [画面](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-435/tabs-restored-390.png) |
+| 768 | [画面](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-435/tabs-restored-768.png) |
+| 1024 | [画面](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-435/tabs-restored-1024.png) |
+| 1280 | [画面](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-435/tabs-restored-1280.png) |
+| 1440 | [画面](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-435/tabs-restored-1440.png) |
 
-[390px 撤权回退与重试入口](tabs-forbidden-390.png)保留问题页签和明确操作；不展示存储中的旧记录名称。
+[390px 撤权回退与重试入口](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-435/tabs-forbidden-390.png)保留问题页签和明确操作；不展示存储中的旧记录名称。
 
 ## 剩余边界
 

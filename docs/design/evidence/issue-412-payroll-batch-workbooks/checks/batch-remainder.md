@@ -14,7 +14,7 @@
 金额为0的建议默认暂缓，改变资金会清除旧金额草稿后重新采用新建议；相同资金的合法手工修改仍保留。界面说明整单优先、比例到分及可突破整百，并显示真实余额原因。来源未知继续按未知显示，不以0替换。
 
 - 真实 Chromium 旅程 `e2e/payroll-batch-remainder.spec.ts` 通过（场景19.4秒、总37.1秒）：从原基础事实迁入后经公开HTTP分别建价、建单、明确取整与核对；资金0默认暂缓，关闭重开改资金1000后自动得到333.33/333.33/333.34，无手工补尾差；固定计划并依次执行三份，最终台账及实际账均精确1000。
-- 390/768/1024/1280/1440均无页面横滚，弹窗不超视口，键盘焦点保持窗内。实际目检[390宽](../screenshots/batch-remainder-390.png)和[1440宽](../screenshots/batch-remainder-1440.png)：金额、政策说明与固定计划/关闭按钮可读，窄屏内容在弹窗内部滚动。仅保留这两张必要证据，其余运行输出清理。
+- 390/768/1024/1280/1440均无页面横滚，弹窗不超视口，键盘焦点保持窗内。实际目检[390宽](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-batch-workbooks/screenshots/batch-remainder-390.png)和[1440宽](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-batch-workbooks/screenshots/batch-remainder-1440.png)：金额、政策说明与固定计划/关闭按钮可读，窄屏内容在弹窗内部滚动。仅保留这两张必要证据，其余运行输出清理。
 - 联验发现既有P7 decoder 将固定计划的确认编号与后续准备/执行编号混同，首次执行即报“批量工资计划回读不完整”。已在 [#412](https://github.com/zodea/crm-new/issues/412#issuecomment-5770098357)先留证，新增真实HTTP用例先失败后修复：确认检查原确认编号和项目/月，准备/执行检查原planId，均绑定工作区/操作者/来源。错误planId、actor及workspace仍拒绝；最终上述浏览器完整发放通过。
 - 最终精确ESLint、`pnpm typecheck`、`git diff --check`通过。冻结代码的完整 `npm test -- --maxWorkers=4` 于2026-09-22通过：794文件、4355项，用时596.36秒，退出码0。按单工作树窗口执行，避免并行全量争用。
 - 非作者双轴审查通过：Standards确认金额纯模块、中央稳定簿身份、Repository/Pinia边界、零建议暂缓和资金改动恢复；Spec确认整单优先、比例尾分、真实A整百配置下允许333.34发放、仍遵守每单上限及真实HTTP逐单回读。

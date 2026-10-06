@@ -1,10 +1,12 @@
 # #412 P2：逐日考勤至 C1 实际发放与配对输出
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 > 2026-09-14，P2 本地限定验收通过。固定比较基线为 `579d9383357fffd2bd87e727dbc21b903a7cb69c`；最终输入与检查见 [verification.json](./verification.json)。本页不代表全部工资、线上部署或生产保存已完成。
 
-产品与正式证据提交为 `fd0a7b6b4ab58eb177eea1db86a069067be92a4a`，正常提交钩子再次通过 654 文件 / 3866 项，112 个代码内容身份与提交一致，见[提交回执](./commit-receipt.json)。693 个专用临时文件及此前 15 份重复证据已送入回收站，可恢复；正式产物保留，见[清理记录](./cleanup-record.json)。
+产品与正式证据提交为 `fd0a7b6b4ab58eb177eea1db86a069067be92a4a`，正常提交钩子再次通过 654 文件 / 3866 项，112 个代码内容身份与提交一致，见[提交回执](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/commit-receipt.json)。693 个专用临时文件及此前 15 份重复证据已送入回收站，可恢复；正式产物保留，见[清理记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/cleanup-record.json)。
 
-本期承接[本地 P2 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/02-central-c1-attendance.md)。业务口径以[工资页面](../../../rewrite/pages/subcontract-payroll.md)、[数据库](../../../rewrite/DATABASE.md)与[命令](../../../rewrite/COMMANDS.md)为准；P1 的通过结果不替代本期 C1 验收。
+本期承接[本地 P2 实施票](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/payroll-tickets/02-central-c1-attendance.md)。业务口径以[工资页面](../../../rewrite/pages/subcontract-payroll.md)、[数据库](../../../rewrite/DATABASE.md)与[命令](../../../rewrite/COMMANDS.md)为准；P1 的通过结果不替代本期 C1 验收。
 
 ## 本期流程
 
@@ -61,18 +63,18 @@ flowchart TD
 
 主流程实际走通真实迁入、无工程量项目考勤、个人费率、核算 1,041 元、实发 900 元及 550/350/0 分配、原键恢复和配对输出。最终 `npm test` 为 **654 文件 / 3866 项通过**；类型、112 个代码文件规范检查及构建通过；本轮真实浏览器 **14/14 通过**。三项目检发现均已修复并在最终运行复验。
 
-正式证据包含 **125 张实际交互图**，覆盖 390/768/1024/1280/1440px：主流程 85、历史及权限只读 20、恢复 15、普通配置名称就绪补图 5。三位复核者逐张检查全部原图；主流程最早三张普通配置图仅证明标签读取过渡态，名称完整状态以补图为准。另有实际配对 PDF 2 页及两份使用指南 13 页逐页目检，分别计数，不冒充额外交互图。
+当次正式证据包含 **125 张实际交互图**，覆盖 390/768/1024/1280/1440px：主流程 85、历史及权限只读 20、恢复 15、普通配置名称就绪补图 5。三位复核者逐张检查全部原图；最早三张配置图仅证明 Lookup 标签读取过渡态，已清退，保留同实例[名称就绪后的配置补图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/browser/saved-personal-config-scope-390.png)及其他独有编辑、焦点和滚动图。实际配对产品打印 2 页继续保留；旧使用指南 13 页渲染通过固定 Git 查阅。该数量不改写为本次剩余文件数。
 
 - [工资打印页](./browser/c1-paired-page-1.png)、[考勤打印页](./browser/c1-paired-page-2.png)与[实际下载的 Excel](./browser/c1-wage-and-attendance.xlsx)：两张工作表已重新读取，费率、原工时、实发及零分配核实。
-- [主流程记录](./browser/journey-verification.json)、[浏览器检查](./checks/browser.log)与[完整测试](./checks/npm-test.log)。
-- [独立 Spec 复核](./checks/spec/review.md)与[独立 Standards 复核](./checks/standards/review.md)：当前范围无未决阻断；保留真实失败到修复的记录。
+- [主流程记录](./browser/journey-verification.json)、[浏览器检查](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/checks/browser.log)与[完整测试](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/checks/npm-test.log)。
+- [独立 Spec 复核](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/checks/spec/review.md)与[独立 Standards 复核](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/checks/standards/review.md)：当前范围无未决阻断；保留真实失败到修复的记录。
 
-2026-09-14，旧配对打印 PDF 样本已按用户要求移入 Windows 回收站；当前阅读使用上述两张页图和 Markdown，原始清单中的路径及哈希保留为历史证据。恢复来源见[清理记录](../../../research/guide-pdf-cleanup-2026-09-14.md)。
-- [逐项验收证据索引](./checks/README.md)保留各作者及独立审查的实际范围，原临时路径可通过图片映射找到正式副本。
-- [最终证据摘要](./verification.json)及[逐文件指纹](./file-manifest.json)固定本期输入和正式产物。
+2026-09-14，旧配对打印 PDF 样本已按用户要求移入 Windows 回收站；当前阅读使用上述两张页图和 Markdown，原始清单中的路径及哈希保留为历史证据。恢复来源见[清理记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/guide-pdf-cleanup-2026-09-14.md)。
+- [逐项验收证据索引](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/checks/README.md)保留各作者及独立审查的实际范围，原临时路径可通过图片映射找到正式副本。
+- [最终证据摘要](./verification.json)及[逐文件指纹](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-c1/file-manifest.json)固定本期输入和正式产物。
 
 本期运行证据只来自本地隔离中央验证实例。P2 为已接通且通过本地切片验收，不以源码接线、组件模拟或旧期结果替代真实运行，更不提升生产等级。
 
 ## 后续边界
 
-P3 新签工/C2、P4 补退及完整成本消费者、P5 房补管理费、P6 空鼓、P7 批量建议及完整工作簿继续独立实施；已记录的业务取舍留在各票 `$grill`。逐 Issue 流程与完整总图由[交互报告](../../../research/issue-review-2026-09-11/index.html#issue-412)统一展示。
+P3 新签工/C2、P4 补退及完整成本消费者、P5 房补管理费、P6 空鼓、P7 批量建议及完整工作簿继续独立实施；已记录的业务取舍留在各票 `$grill`。逐 Issue 流程与完整总图由[交互报告](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/index.html)统一展示。

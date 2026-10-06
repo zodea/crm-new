@@ -1,5 +1,7 @@
 # 工资退役入口、考勤来源与筛选往返验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-10。实施票：[#433](https://github.com/zodea/crm-new/issues/433)，承接 [#412](https://github.com/zodea/crm-new/issues/412)。本记录随修复提交；最终固定提交的类型、全量回归与独立复核以 Issue 回执为准。
 
 ## 权威与本次范围
@@ -25,12 +27,12 @@
 
 | 视口 | 工资明细局部区域 | 签工来源范围 |
 | --- | --- | --- |
-| 390px | [工资表](./c1-lines-390.png) | [签工](./daywork-390.png) |
-| 768px | [工资表](./c1-lines-768.png) | [签工](./daywork-768.png) |
-| 1024px | [工资表](./c1-lines-1024.png) | [签工](./daywork-1024.png) |
-| 1280px | [工资表](./c1-lines-1280.png) | [签工](./daywork-1280.png) |
-| 1440px | [工资表](./c1-lines-1440.png) | [签工](./daywork-1440.png) |
+| 390px | [工资表](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/c1-lines-390.png) | [签工](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/daywork-390.png) |
+| 768px | [工资表](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/c1-lines-768.png) | [签工](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/daywork-768.png) |
+| 1024px | [工资表](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/c1-lines-1024.png) | [签工](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/daywork-1024.png) |
+| 1280px | [工资表](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/c1-lines-1280.png) | [签工](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/daywork-1280.png) |
+| 1440px | [工资表](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/c1-lines-1440.png) | [签工](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/daywork-1440.png) |
 
-另见 C1 来源摘要：[390px](./c1-detail-390.png)、[1440px](./c1-detail-1440.png)；[历史 B 只读提示与原金额](./legacy-b-390.png)。截图由应用内部滚动区的不同位置采集，窄屏宽表通过自身横滚查看完整金额。
+另见 C1 来源摘要：[390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/c1-detail-390.png)、[1440px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/c1-lines-1440.png)；[历史 B 只读提示与原金额](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-433/legacy-b-390.png)。截图由应用内部滚动区的不同位置采集，窄屏宽表通过自身横滚查看完整金额。
 
 所有业务值都是独立浏览器测试上下文内的确定性 SQLite 夹具，没有写入用户实际数据库。本次不包含工资域中央化、历史 B 金额迁移/成本重分类、已发工资调整或冲销，不代表 #412 全模块或生产持久化验收完成。

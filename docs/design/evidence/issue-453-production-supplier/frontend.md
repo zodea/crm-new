@@ -26,12 +26,8 @@
 
 页面在 390 / 768 / 1024 / 1280 / 1440px 检查文档无横溢，原件下载操作可在页面内滚动到达。上传弹窗键盘取消后焦点回到上传按钮，证照页返回同一分供方详情。浏览器没有未处理异常。
 
-最终机器回执见[浏览器结果](./browser.json)。截图只保留必要的 390px 与 1440px 两档：
+以上为当时的操作与结果摘要。当前工作树、固定 `c16869fcbf954dddd46143839afe5790f3828f1a` 目录及可见 Git 历史均没有当时提到的 `browser.json` 和六张 `screens/` 图片（列表、合同事实、证照恢复各 390px / 1440px）。这些机器回执和画面缺少可取回的原件，不能作为本轮可独立复核的证据，也不生成不存在的历史链接。
 
-| 页面 | 窄屏 | 桌面 |
-| --- | --- | --- |
-| 未接入的列表数值与正常主档 | [390px](./screens/unavailable-list-390.png) | [1440px](./screens/unavailable-list-1440.png) |
-| 未接入的合同事实 | [390px](./screens/unavailable-facts-390.png) | [1440px](./screens/unavailable-facts-1440.png) |
-| 原证照恢复及原件操作 | [390px](./screens/recovered-credential-390.png) | [1440px](./screens/recovered-credential-1440.png) |
+现行常驻流程为 [production-supplier-storage.spec.ts](../../../../e2e/production-supplier-storage.spec.ts)。原件、冷恢复与其他限定验证见[上层验收摘要](./README.md)；本次仅修正证据定位，没有重跑本页历史浏览器或补造截图。
 
 未生成指南 PDF。合成原件只用于运行验证，不作为业务资料交付；普通临时截图、日志和下载副本在证据归档后清理，数据库不纳入清理或 Git。

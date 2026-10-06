@@ -1,6 +1,6 @@
 # 房补、其他补贴与独立管理费
 
-> P5 已完成本地限定功能验收。当前适用浏览器中央验证实例；正式保存与部署仍由 #416 验收。验收范围见 [P5 实施票](../research/issue-review-2026-09-11/payroll-tickets/05-central-housing-and-management-fees.md)。本指南以 Markdown 交付。
+> P5 已完成本地限定功能验收。当前适用浏览器中央验证实例；正式保存与部署仍由 #416 验收。验收范围见 [P5 限定验收记录](../design/evidence/issue-412-payroll-fees/README.md)。本指南以 Markdown 交付。
 
 本流程沿用 [A 工资的核对和实际发放](./payroll-attendance.md)。普通施工工资可以配置多条补贴；管理费使用管理人自己的独立请款簿，各自计算此前已领。管理人也领取普通工资时，两本单据仍分别核对。
 

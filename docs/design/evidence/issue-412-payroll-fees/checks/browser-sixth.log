@@ -1,8 +1,0 @@
-
-Running 1 test using 1 worker
-
-(node:10704) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  ok 1 [chromium] › e2e\payroll-fees-central.spec.ts:80:1 › 多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出 (1.1m)
-
-  1 passed (1.1m)

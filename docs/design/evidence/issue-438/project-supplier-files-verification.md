@@ -1,5 +1,7 @@
 # #438 合作档案原件验收记录
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-438)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-11。规格：[#438](https://github.com/zodea/crm-new/issues/438)，父票 [#408](https://github.com/zodea/crm-new/issues/408)，文件能力协作 [#406](https://github.com/zodea/crm-new/issues/406)。
 
 本记录对应 `main` 基线 `39c56dc84d10d8d759119022ca9d7deaf91d0c62` 上冻结的 #438 工作区切片；测试运行时 #436/#439/#440 的运行源码暂停写入。提交前记录不冒称固定提交已验收，最终提交 SHA 与集成检查由 Issue 交付评论绑定。页面和字段规则仍以[项目分供方蓝本](../../../rewrite/pages/project-supplier.md#文件区)为准。
@@ -16,11 +18,11 @@
 | 中央与本地同 ID 冲突 | 在本地业务快照安装同 fileId、owner、文件名但内容为 `LOCAL` 的文件；刷新后的中央下载仍是原始 PDF。正文入口不调用本地文件加载链。 |
 | 同名不同文件及原始 ZIP | 实际选择三份文件并下载 ZIP，两份同名 PDF 分别保留原字节，第二份追加 `(2)`；原始 ZIP 附件作为完整文件保留，不展开。逐个检查包内原件与清单 SHA-256 相符。 |
 | 当前身份和权限 | HTTP 实测错误项目、分供方、关系、ownerType、ownerId、origin 与其他测试会话均不得取得正文；上传后撤销当前项目权限返回 403，删除当前项目返回 404，不使用导入副本。 |
-| 摘要失败与重试 | 注入错误 SHA-256 后，ZIP 动作明确失败并保留选择；去除故障后同一选择可以成功下载。[故障状态](./hash-failure.png)。 |
+| 摘要失败与重试 | 注入错误 SHA-256 后，ZIP 动作明确失败并保留选择；去除故障后同一选择可以成功下载。[故障状态](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-438/hash-failure.png)。 |
 | 慢响应保存 | 正文端点延迟 6.5 秒；保存目录 port 入口检查真实 `navigator.userActivation.isActive`，随后验证写入字节。等待仅使用 console 事件，不用 DOM 轮询续激活。修复后激活为 true，写入与输入相同。目录 port 为可观察测试替身，未声称人工选择过操作系统目录。 |
 | 视口和焦点 | 390/768/1024/1280/1440 × 900，根页面无横向溢出，合作文件动作随宽度换行，ZIP 按钮可聚焦。五张截图均逐张检查；没有提升外部参考证据等级。 |
 
-截图：[390](./files-390.png)、[768](./files-768.png)、[1024](./files-1024.png)、[1280](./files-1280.png)、[1440](./files-1440.png)。截图中的成功消息分别来自先前的单份下载和 ZIP 下载。
+截图：[390](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-438/files-390.png)、[768](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-438/files-768.png)、[1024](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-438/files-1024.png)、[1280](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-438/files-1280.png)、[1440](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-438/files-1440.png)。截图中的成功消息分别来自先前的单份下载和 ZIP 下载。
 
 ## 失败复现与定向回归
 

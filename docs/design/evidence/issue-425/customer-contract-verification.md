@@ -1,5 +1,7 @@
 # #425 客户施工合同中央回读与详情往返验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-425)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 核对日期：2026-09-09。承接 [#407](https://github.com/zodea/crm-new/issues/407) / [#409](https://github.com/zodea/crm-new/issues/409)，实施票为 [#425](https://github.com/zodea/crm-new/issues/425)，已原生挂在 #407 下并向 #409 交叉回写。基线为本地 #424 提交 `e2410088c31161ad6f00a6755a3d35ccbbd20f2a`，已确认当前分支包含。未重做项目 Excel 导入及项目关联实现。
 
 ## 事实调查与真实失败复现
@@ -36,11 +38,11 @@
 
 五张截图已逐张检查，均为本地隔离合成数据；1280px 采用既有参考视口，未新增外部登录运行参考。外部客户详情权限受限的证据边界仍保留。
 
-- [390px](./customer-contract-390.png)
-- [768px](./customer-contract-768.png)
-- [1024px](./customer-contract-1024.png)
-- [参考 1280px](./customer-contract-1280.png)
-- [1440px](./customer-contract-1440.png)
+- [390px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-425/customer-contract-390.png)
+- [768px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-425/customer-contract-768.png)
+- [1024px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-425/customer-contract-1024.png)
+- [参考 1280px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-425/customer-contract-1280.png)
+- [1440px](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-425/customer-contract-1440.png)
 
 ## 双轴复核
 

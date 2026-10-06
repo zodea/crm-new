@@ -245,13 +245,33 @@ describe('module review coverage', () => {
     }
   })
 
-  it('retains unfulfilled OCR samples, central payments and global migration', () => {
+  it('retains unfulfilled OCR and migration while preserving confirmed F3 payment rules and remaining delivery boundaries', () => {
     const coverage = buildModuleReviewCoverage()
     const at = (id: string) => coverage.obligations.find(item => item.id === id)!
     expect(at('OCR-06').status).toBe('partial')
-    expect(at('PAY-05').status).toBe('ready')
+    expect(at('PAY-05').status).toBe('partial')
     expect(at('MIG-07').status).toBe('partial')
-    expect(at('PAY-08').status).toBe('needs-decision')
+    expect(at('PAY-07').status).toBe('partial')
+    expect(at('PAY-08').status).toBe('partial')
+    expect(at('PAY-05').remaining).toContain('全部合同类型的外域结算来源')
+    expect(at('PAY-07').remaining).toContain('旧 legacy 零保持含义未知')
+    expect(at('PAY-08').sources).toContain('docs/rewrite/DATABASE.md#entity-payment-record')
+    expect(at('PAY-08').sources).toContain('docs/rewrite/COMMANDS.md#f3-finance-payment-verification')
+    expect(at('PAY-08').remaining).toContain('实际应付与累计可付上限')
+    expect(at('PAY-08').remaining).toContain('依据失效或实际来源未接仍阻止新确认')
+    expect(at('PAY-08').remaining).not.toContain('$grill')
+    const paymentRules = readFileSync('docs/rewrite/DATABASE.md', 'utf8')
+    const paymentCommands = readFileSync('docs/rewrite/COMMANDS.md', 'utf8')
+    expect(paymentRules).toContain('<a id="entity-payment-record"></a>')
+    expect(paymentCommands).toContain('<a id="f3-finance-payment-verification"></a>')
+    expect(paymentRules).toContain('先核实业务再确认新支付')
+    expect(paymentRules).toContain('原存储零仍保留')
+    expect(paymentRules).toContain('现行可核验范围为已接通的无合同原费用与已确认 Other 结算链')
+    expect(paymentRules).toContain('实际 owner 不完整时明确不可用，保留草稿和旧现金')
+    for (const id of ['PAY-05', 'PAY-07', 'PAY-08']) {
+      for (const caseId of at(id).caseIds)
+        expect(coverage.cases.find(item => item.id === caseId)!.acceptance.production).toBe('not-verified')
+    }
     const ocrCase = coverage.cases.find(item => item.obligationIds?.includes('OCR-04'))!
     expect(ocrCase.acceptance.frontend).not.toBe('passed')
   })

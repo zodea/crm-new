@@ -1,6 +1,6 @@
 # 睿璟数据质量、逻辑差异与责任归因
 
-> 样本调查基于 2026-07-24 的 `main@09971b01`。本文件记录差异来源，表中的旧实现问题不是当前缺陷清单；当前复核由 [#402](https://github.com/zodea/crm-new/issues/402) 及[实施承接入口](../implementation/project-operating-summary-work-breakdown.md)组织，并按选定提交验证。
+> 样本调查基于 2026-07-24 的 `main@09971b01`。本文件记录差异来源，表中的旧实现问题不是当前缺陷清单；当前复核直接由 [#402](https://github.com/zodea/crm-new/issues/402)对应模块组织，并按选定提交及 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#implementation-gaps)中的实际运行边界验证。
 
 ## 1. 归因类别
 

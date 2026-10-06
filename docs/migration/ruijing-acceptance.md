@@ -1,6 +1,6 @@
 # 睿璟迁移与通用经营汇总验收清单
 
-> 本清单保存原始样本对账标准，复核基线由 [#403](https://github.com/zodea/crm-new/issues/403) 确定；未勾选不表示当前代码全部未实现。验收时记录提交、环境、来源与结果，执行顺序见[当前承接入口](../implementation/project-operating-summary-work-breakdown.md)。样本数值不得硬编码到产品或提交真实凭证。
+> 本清单保存原始样本对账标准，复核基线由 [#403](https://github.com/zodea/crm-new/issues/403) 确定；未勾选不表示当前代码全部未实现。验收时记录提交、环境、来源与结果，当前任务直接核对 [#402](https://github.com/zodea/crm-new/issues/402)对应模块及 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#implementation-gaps)。样本数值不得硬编码到产品或提交真实凭证。
 
 ## 1. Schema 与迁移
 

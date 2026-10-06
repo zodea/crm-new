@@ -1,6 +1,6 @@
 # 工资更正与实际收付
 
-> 本指南的操作已通过 P4 本地中央实例验收；适用范围和证据见 [P4 实施票](../research/issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)。正式生产保存仍由 #416 验收。
+> 本指南的操作已通过 P4 本地中央实例验收；适用范围和证据见 [P4 限定验收记录](../design/evidence/issue-412-payroll-adjustments/README.md)。正式生产保存仍由 #416 验收。
 
 原工资怎样核算和发放，见[工资与考勤工作台](./payroll-attendance.md)。本流程处理已发 A、C1、C2 工资的核算错误及其后续收付，保留原工资、原成员和原签收金额。
 

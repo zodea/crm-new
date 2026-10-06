@@ -1,5 +1,7 @@
 # 迁移回滚待恢复验收
 
+> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-430)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
+
 日期：2026-09-10。Issue：[#430](https://github.com/zodea/crm-new/issues/430)，承接 #414。实施基线 `d1432c3e`，本记录随修复提交。
 
 ## 已修问题
@@ -24,10 +26,10 @@
 
 | 视口 | 待恢复与历史证据 |
 | --- | --- |
-| 390px | [截图](./migration-recovery-390.png) |
-| 768px | [截图](./migration-recovery-768.png) |
-| 1024px | [截图](./migration-recovery-1024.png) |
-| 1280px | [截图](./migration-recovery-1280.png) |
-| 1440px | [截图](./migration-recovery-1440.png) |
+| 390px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-430/migration-recovery-390.png) |
+| 768px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-430/migration-recovery-768.png) |
+| 1024px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-430/migration-recovery-1024.png) |
+| 1280px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-430/migration-recovery-1280.png) |
+| 1440px | [截图](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-430/migration-recovery-1440.png) |
 
 本次仅修复现有浏览器迁移的状态与恢复保护，不扩大迁移实体，不代表 #372/#415 全域验收或 #416 生产存储/恢复目标已满足。未推送、未运行 GitHub Actions，未操作真实用户数据库。

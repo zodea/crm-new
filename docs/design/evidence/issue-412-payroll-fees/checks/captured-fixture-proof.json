@@ -1,9 +1,0 @@
-{
-  "sourceRun": "browser-second",
-  "sourcePath": ".tmp/remaining-issues-20260910/payroll-p5-central/root/browser-second/payroll-fees-central-多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出-chromium/fee-config-http.json",
-  "sourceSha256": "6f5ae3e13d188f68d4a99ce6c22209db5394c60c60140d70a65965fb1b441194",
-  "fixture": "tests/fixtures/payroll/fees-config-captured.json",
-  "fixtureSha256": "66e1135698c9fffa7e7596e65e0ff4fbafb54bf5f1081b9e749e2a650e580929",
-  "semanticEqual": true,
-  "difference": "测试夹具补齐末尾换行，JSON 值与原 HTTP 响应相同"
-}
