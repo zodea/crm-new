@@ -51,7 +51,7 @@ it.each(Array.from(['0.8', -0.1, 1.1]).map(input1 => ({ input1 })))('真实 SQLi
 
     const altered = structuredClone(request)
     altered.source.entities.crews[0]!.attributes = { defaultPayRatio: invalid }
-    expect(() => parseCoreMigrationSourceCommand(altered)).toThrow()
+    expect(() => parseCoreMigrationSourceCommand(altered)).toThrow('crews[0].attributes.defaultPayRatio必须是 0 至 1 的比例或 null')
   }
   finally { db.close() }
 })

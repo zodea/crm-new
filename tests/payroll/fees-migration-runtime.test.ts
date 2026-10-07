@@ -38,7 +38,7 @@ it.each(['unchanged', 'fee-zero', 'book-soft-delete', 'scope-damaged', 'statemen
       expect(Object.values(await read()).every(rows => rows.length === 0)).toBe(true)
     }
     else {
-      await expect(rollback()).rejects.toThrow()
+      await expect(rollback()).rejects.toThrow('工资迁移：迁入后工资或来源已有日常变更；恢复会丢失当前事实，已整批拒绝')
       expect(await read()).toEqual(before)
       expect(coreMigrationTestInstance.snapshot(f.session).authority).toBe('central')
     }
@@ -60,7 +60,7 @@ it('缓存不能掩盖原管理工资新增负价子行；费用JSON引用覆盖
       const extra = { ...row, id: 'unproven-added-negative', revision: 2, quantity: 0, signed_amount_fen: 0 }
       await tx.execute(`INSERT INTO payroll_a_negative_lines(${Object.keys(extra).join(',')}) VALUES(${Object.keys(extra).map(() => '?').join(',')})`, Object.values(extra))
     })
-    await expect(f.service.aOutput({ origin: 'real' }, f.managedId)).rejects.toThrow()
+    await expect(f.service.aOutput({ origin: 'real' }, f.managedId)).rejects.toThrow('迁入工资 payroll_a_negative_lines 的原成员、分配或处理集合已变化，不能沿用原证明')
   }
   finally { await f.original.close() }
 })
@@ -94,7 +94,7 @@ it('迁入后管理配置只用映射原责任，后月延续负价与已领，�
     const repeated = await f.instance.prepareMigrationSnapshot(coreMigrationTestInstance.snapshot(f.session))
     repeated.commit()
     expect((await f.service.aOutput({ origin: 'real' }, id)).state).toBe('available')
-    await expect(coreMigrationTestInstance.rollback({ ...f.envelope('fees-after-new-rollback'), batchId: f.batch.batchId }, f.session)).rejects.toThrow()
+    await expect(coreMigrationTestInstance.rollback({ ...f.envelope('fees-after-new-rollback'), batchId: f.batch.batchId }, f.session)).rejects.toThrow('工资迁移：新增 A 类原证据结构不可确认，不能安全撤回来源')
     expect((await f.service.aOutput({ origin: 'real' }, id)).state).toBe('available')
   }
   finally { await f.original.close() }

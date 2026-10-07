@@ -30,7 +30,7 @@ it.each([{ projectId: '', month: '', crewId: null }, { month: '', crewId: null }
     expect(read.records).toEqual([])
     expect(read.options.projects.map(p => p.id)).toEqual(['p', 'other-project'])
     expect(read.context.readonly).toBe(false)
-    await expect(f.service.dayworkList({ origin: 'real' }, { ...f.scope, month: '2026-13' })).rejects.toThrow()
+    await expect(f.service.dayworkList({ origin: 'real' }, { ...f.scope, month: '2026-13' })).rejects.toThrow('签工范围无效')
     expect((await f.ledger()).options.workers.map(w => w.id)).toEqual(['w', 'member', 'zero', 'unknown'])
   }
   finally { await f.close() }

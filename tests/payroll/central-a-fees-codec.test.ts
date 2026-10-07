@@ -63,7 +63,7 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
   it.each(configCorruptions)('%s 必须拒绝为坏响应', (_label, corrupt) => {
     const value = structuredClone(config)
     corrupt(value)
-    expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(value), { origin: 'real' }, config.scope)).toThrow()
+    expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(value), { origin: 'real' }, config.scope)).toThrow('工资费用提交或读取内容无效')
   })
   const feeCorruptions: Array<[string, (value: PayrollAFeesFrozenDocument['fees']) => void]> = [
     ['费用原量事实缺字段', v => Object.assign(v.lines[0]!.components[0]!, { fact: {} })],
@@ -76,14 +76,14 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
   it.each(feeCorruptions)('表单和冻结输出拒绝：%s', (_label, corrupt) => {
     const read = structuredClone(form)
     corrupt(read.fees!)
-    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: read.statementId! })).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: read.statementId! })).toThrow('工资费用用途或读取依据不完整')
     const output = { context: { ...form.context, readonly: true }, statementId: document.id, state: 'available', document: structuredClone(document), reasons: [] }
     corrupt(output.document.fees)
-    expect(() => decodePayrollARead(encodePayrollAWire(output), 'output', { origin: 'real' }, document.id)).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(output), 'output', { origin: 'real' }, document.id)).toThrow('工资核算数据不完整')
   })
   it('用途未证分支也验证此前已领、负价稿和费用阻断', () => {
     const read = { ...structuredClone(form), book: null, fees: null, bookProof: { state: 'unproven', book: null, reasons: ['原用途不可证'] }, bookEligibility: { canSave: false, canCheck: false, canRelease: false, reasons: ['原用途不可证'] }, previousBookPayments: [null] }
-    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: form.statementId! })).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: form.statementId! })).toThrow('工资费用用途或读取依据不完整')
   })
   it.each(Array.from(([
     r => Object.assign(r.fees!.management!.book, { managerWorkerId: 42 }),
@@ -100,7 +100,7 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
 
     const value = structuredClone(managementForm)
     corrupt(value)
-    expect(() => decode(value)).toThrow()
+    expect(() => decode(value)).toThrow('工资费用用途或读取依据不完整')
   })
   function createFeeCommandReceipt() {
     const command = fixture.feeCommand(config, { kind: 'save-a-fees', baseVersion: config.baseVersion, fees: [], remove: [] })
@@ -111,23 +111,16 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
     return { command, result, value }
   }
 
-  it('费用回执也不能缺失继承字段或错配原单', () => {
+  it('完整且与原命令一致的费用回执可以解码', () => {
     createFeeCommandReceipt()
   })
 
   it.each([
-    { case: 'value / command', prepare: ({ command, value }: ReturnType<typeof createFeeCommandReceipt>) => {
-      return { input: value, argument2: command } as const
-    } },
-    { case: '{ ...result, statementId: \'other\' } / { ...command, statementId: \'original\' }', prepare: ({ command, result }: ReturnType<typeof createFeeCommandReceipt>) => {
-      const value = structuredClone(result)
-      Reflect.deleteProperty(value, 'subjectConfigId')
-      return { input: { ...result, statementId: 'other' }, argument2: { ...command, statementId: 'original' } } as const
-    } },
-  ])('费用回执也不能缺失继承字段或错配原单 / decodePayrollAFeesResult：$case', ({ prepare }) => {
-    const fixture = createFeeCommandReceipt()
-    const { input, argument2 } = prepare(fixture)
-    expect(() => decodePayrollAFeesResult(input, argument2)).toThrow()
+    { label: '缺失继承字段 subjectConfigId', prepare: ({ command, value }: ReturnType<typeof createFeeCommandReceipt>) => ({ input: value, argument2: command }), reason: '费用资料字段缺失或包含不支持的字段' },
+    { label: '回执原单与命令错配', prepare: ({ command, result }: ReturnType<typeof createFeeCommandReceipt>) => ({ input: { ...result, statementId: 'other' }, argument2: { ...command, statementId: 'original' } }), reason: '工资费用提交或读取内容无效' },
+  ])('费用回执拒绝$label', ({ prepare, reason }) => {
+    const { input, argument2 } = prepare(createFeeCommandReceipt())
+    expect(() => decodePayrollAFeesResult(input, argument2)).toThrow(reason)
   })
   it('原负价证据失效仍能读取真实不可用诊断，不能用于冻结输出', async () => {
     const old = managementForm.fees!.negativeLines[0]!
@@ -138,6 +131,6 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
     expect(read.bookEligibility.canCheck).toBe(false)
     expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, target)).not.toThrow()
     const invalidOutput = { context: { ...read.context, readonly: true }, statementId: document.id, state: 'available', document: { ...document, book: read.book, fees: read.fees }, reasons: [] }
-    expect(() => decodePayrollARead(encodePayrollAWire(invalidOutput), 'output', { origin: 'real' }, document.id)).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(invalidOutput), 'output', { origin: 'real' }, document.id)).toThrow('工资核算数据不完整')
   })
 })

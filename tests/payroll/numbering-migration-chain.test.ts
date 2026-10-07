@@ -37,14 +37,14 @@ it('迁入 A 冻结工资正式出具后连续两次完整迁入，保留原号/
               // 原 JSON 和已映射 SQL 身份不能按本代命令直读；只有完整原图证明能授权绕过重复解析。
               const rows = await tx.select<Record<string, unknown>>('SELECT * FROM payroll_command_receipts WHERE action LIKE \'numbering-%\'')
               const onlyNumbering = { execute: tx.execute.bind(tx), select: async <T>(sql: string): Promise<T[]> => /FROM payroll_command_receipts\b/.test(sql) ? rows as T[] : [] }
-              await expect(payrollAMigrationReferences(onlyNumbering)).rejects.toThrow()
+              await expect(payrollAMigrationReferences(onlyNumbering)).rejects.toThrow('原编号回执或身份损坏，请核对原提交，不能重新占号')
               await expect(payrollAMigrationReferences(payrollIndependentReferenceReader(onlyNumbering, inherited))).resolves.toEqual(new Set())
               const references = await payrollNumberingMigrationReferences(tx, proof.numbering.receipts)
               expect(references.has(JSON.stringify(['projects', thirdInput.projectId]))).toBe(true)
               expect(references.has(JSON.stringify(['wage_statements', thirdInput.statementId]))).toBe(true)
             })
             await third.instance.withWorkspaceTransaction(tx => tx.execute('UPDATE payroll_official_issues SET document_hash=? WHERE statement_id=?', ['f'.repeat(64), thirdInput.statementId]))
-            await expect(third.reloadPayroll().numbering({ origin: 'real' }, thirdInput)).rejects.toThrow()
+            await expect(third.reloadPayroll().numbering({ origin: 'real' }, thirdInput)).rejects.toThrow(/^迁入工资 payroll_official_issues\/\S+ 的原行或证据已缺损，不能继续计算剩余$/)
           }
           finally { await third.close() }
         }

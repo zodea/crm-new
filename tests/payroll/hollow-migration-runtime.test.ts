@@ -118,7 +118,7 @@ it.each(['C1', 'C2'] as const)('%s真实原检查与550实发迁入，原签字�
     read = await f.service.c1Form({ origin: 'real' }, { statementId: nextStatement })
     await f.service.executeC1(command(read, { kind: 'release-c1', release: { actualAmount: 1000, allocations: [{ workerId: draft.leaderWorkerId, amount: 1000 }] } }))
     expect((await f.service.c1Output({ origin: 'real' }, nextStatement)).state).toBe('available')
-    await expect(f.rollback()).rejects.toThrow()
+    await expect(f.rollback()).rejects.toThrow(/^工资迁移：独立工资配置、来源、回执或历史仍引用待撤身份 A: \["projects","\S+"\]，已在删除前整批拒绝$/)
   }
   const cloned = await cloneQuantityHollowSnapshot(await f.instance.exportSnapshotBytes())
   try {

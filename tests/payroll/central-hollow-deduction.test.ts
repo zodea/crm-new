@@ -66,7 +66,7 @@ describe('真实户记录到工资扣款', () => {
       input.hollow.current.rows.push(structuredClone(input.hollow.current.rows[0]!))
     else
       input.hollow.current.rows[0]!.fact.location.projectId = 'other-project'
-    expect(() => decodePayrollARead(input, 'form', { origin: 'real' }, { statementId })).toThrow()
+    expect(() => decodePayrollARead(input, 'form', { origin: 'real' }, { statementId })).toThrow('A工资的空鼓读取、目标或净额不一致')
   }, 30_000)
 
   it('配置逐分项保留零价、关闭与缺价，原修订和配置回执不互相覆盖', async () => {

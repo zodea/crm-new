@@ -24,7 +24,7 @@ describe('p5 已发费用完整性与管理主体', () => {
       expect.soft(next.totals.grossAmount.value).toBeNull()
       expect.soft(next.eligibility.canSaveDraft).toBe(false)
       expect.soft(hasPayrollAFeesForm(next) && next.fees?.negativeLines.some(n => n.id === 'rogue-revision')).toBe(false)
-      await expect(m.start('2026-09')).rejects.toThrow()
+      await expect(m.start('2026-09')).rejects.toThrow('此前实际发放金额存在历史缺口，不能作为零继续核算')
     }
     finally { await f.close() }
   })
@@ -52,7 +52,7 @@ describe('p5 已发费用完整性与管理主体', () => {
       const draft = { ...read.draft, crewId: null }
       const edited = await f.service.aForm({ origin: 'real' }, { statementId: first.statementId!, draft })
       expect.soft(edited.eligibility.canSaveDraft).toBe(false)
-      await expect(f.service.execute(f.command(edited, { kind: 'save-a-draft', draft }))).rejects.toThrow()
+      await expect(f.service.execute(f.command(edited, { kind: 'save-a-draft', draft }))).rejects.toThrow('管理草稿须保留原费用主体班组，不能切换后继续发放')
       await f.release(first.statementId!, 100)
       expect((await f.service.aOutput({ origin: 'real' }, first.statementId!)).state).toBe('available')
     }
@@ -72,7 +72,7 @@ describe('p5 已发费用完整性与管理主体', () => {
       expect.soft(next.totals.previouslyPaid.value).toBeNull()
       expect.soft(next.totals.grossAmount.value).toBeNull()
       expect.soft(next.eligibility.canSaveDraft).toBe(false)
-      await expect(m.start('2026-09')).rejects.toThrow()
+      await expect(m.start('2026-09')).rejects.toThrow('此前实际发放金额存在历史缺口，不能作为零继续核算')
     }
     finally { await f.close() }
   })

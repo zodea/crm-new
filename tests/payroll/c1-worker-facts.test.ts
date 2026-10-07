@@ -42,7 +42,7 @@ it.each(Array.from(['481', -1, Number.POSITIVE_INFINITY]).map(input1 => ({ input
 
     const altered = structuredClone(request)
     altered.source.entities.workers[0]!.attributes = { dailyWage: invalid }
-    expect(() => parseCoreMigrationSourceCommand(altered)).toThrow()
+    expect(() => parseCoreMigrationSourceCommand(altered)).toThrow('workers[0].attributes.dailyWage必须是非负日薪或 null')
   }
   finally { db.close() }
 })

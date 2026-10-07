@@ -99,7 +99,7 @@ it.each(['w', 'other'])('退款、软删原单及重建completion均不释放原
     expect(read.facts.every(fact => fact.completionId === 'fee-completion-recreated')).toBe(true)
     expect(read.blockers).toContainEqual(expect.objectContaining({ code: 'management-already-owned' }))
     expect(read.eligibility.canSaveDraft).toBe(false)
-    await expect(replacement.start()).rejects.toThrow()
+    await expect(replacement.start()).rejects.toThrow('原施工责任已有其他管理簿领取，换管理人或重建单据不能再次领取')
     expect(await f.db.select('SELECT * FROM payroll_a_management_ownership ORDER BY id')).toEqual(before)
     expect(await f.service.aOutput({ origin: 'real' }, first.statementId!)).toMatchObject({ state: 'available', document: output.document })
     const sameBook = await f.form(sameBookInput, 'same-book-after-refund')

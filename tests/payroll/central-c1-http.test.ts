@@ -56,8 +56,8 @@ it.each(Array.from(['lines', 'stored'] as const).map(input1 => ({ input1 })))('�
     expect(withoutMonth.scope.month).toBe('')
     expect(withoutMonth.options.crews.map(crew => crew.id)).toEqual(['crew'])
     expect(withoutMonth).toMatchObject({ workers: [], records: [], locks: [] })
-    await expect(repo.attendanceMatrix({ origin: 'real' }, { projectId: 'p', month: '2026-13', crewId: null })).rejects.toThrow()
-    await expect(repo.executeAttendance(f.attendanceCommand(withoutMonth, { workerId: 'w', crewId: 'crew', workDate: '2026-08-01', hours: 8, overtimeHours: 0, workContent: '', note: '' }))).rejects.toThrow()
+    await expect(repo.attendanceMatrix({ origin: 'real' }, { projectId: 'p', month: '2026-13', crewId: null })).rejects.toThrow('考勤范围无效')
+    await expect(repo.executeAttendance(f.attendanceCommand(withoutMonth, { workerId: 'w', crewId: 'crew', workDate: '2026-08-01', hours: 8, overtimeHours: 0, workContent: '', note: '' }))).rejects.toThrow('考勤范围无效')
     const empty = await repo.attendanceMatrix({ origin: 'real' }, { projectId: '', month: '2026-08', crewId: null })
     expect(empty.options.projects).toHaveLength(2)
     expect(empty.records).toEqual([])
@@ -87,10 +87,10 @@ it.each(Array.from(['lines', 'stored'] as const).map(input1 => ({ input1 })))('�
     const malformed = structuredClone(releasedWire) as { statement: { lines: { amount: string }[], stored: { lines: { amount: string }[] } } }
     const lines = section === 'lines' ? malformed.statement.lines : malformed.statement.stored.lines
     lines[0]!.amount = '451.541'
-    expect(() => decodePayrollRead(malformed, 'detail', { origin: 'real' }, saved.statementId!)).toThrow()
+    expect(() => decodePayrollRead(malformed, 'detail', { origin: 'real' }, saved.statementId!)).toThrow('工资数值传输格式不完整')
     const otherFormat = structuredClone(releasedWire) as { statement: { formatFamily: string } }
     otherFormat.statement.formatFamily = 'A'
-    expect(() => decodePayrollRead(otherFormat, 'detail', { origin: 'real' }, saved.statementId!)).toThrow()
+    expect(() => decodePayrollRead(otherFormat, 'detail', { origin: 'real' }, saved.statementId!)).toThrow('工资数值传输格式不完整')
     const output = await repo.c1Output({ origin: 'real' }, saved.statementId!)
     expect(output.state).toBe('available')
     if (output.state === 'available') {

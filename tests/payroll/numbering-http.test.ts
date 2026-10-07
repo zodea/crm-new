@@ -46,7 +46,7 @@ it('真实HTTP读取冻结金额、初始化、正式出具及失响应原键恢
     await repo.executeNumbering(numberingCommand(initial, 'http-number-start', { kind: 'initialize', nextNumber: 128, evidenceNote: '旧纸号已核实127' }))
     const command = numberingCommand(await read(), 'http-official-128', { kind: 'issue' })
     loseResponse = true
-    await expect(repo.executeNumbering(command)).rejects.toThrow()
+    await expect(repo.executeNumbering(command)).rejects.toThrow('项目读取服务暂时不可用，请重试')
     const recovered = await repo.executeNumbering(command)
     expect(recovered.issue?.number).toBe('128')
     expect(await read()).toMatchObject({ settings: { nextNumber: 129 }, issue: recovered.issue, document: { actualAmount: 525 }, eligibility: { canDownload: true } })

@@ -30,7 +30,7 @@ it('项目、原班组及个人冷读同一1000实发与退40，更正不另计�
     const encoded = encodePayrollHostSection(worker)
     expect(encoded).toMatchObject({ netAmount: { value: '960.00' }, rows: [expect.objectContaining({ scopedAmount: { value: '1000.00', knownValue: '1000.00', state: 'known', reasons: [] } }), expect.anything()] })
     expect(decodePayrollHostSection(encoded, { kind: 'worker', id: 'w' })).toEqual(worker)
-    expect(() => decodePayrollHostSection(encoded, { kind: 'worker', id: 'zero' })).toThrow()
+    expect(() => decodePayrollHostSection(encoded, { kind: 'worker', id: 'zero' })).toThrow('工资收付分区与原档案、实际来源或金额不一致，请重新读取')
   }
   finally { await f.close() }
 })
@@ -64,7 +64,7 @@ it('整单可证、个人分配缺损分别显示；同稳定实发去重，不�
     expect(worker.rows[0]!.fact.signedAmount.value).toBe(1000)
     expect(worker.netAmount.value).toBeNull()
     expect(worker.netAmount.state).toBe('unknown')
-    expect(() => decodePayrollHostSection(encodePayrollHostSection({ ...worker, netAmount: { value: 1000, knownValue: 1000, state: 'known', reasons: [] } }), worker.scope)).toThrow()
+    expect(() => decodePayrollHostSection(encodePayrollHostSection({ ...worker, netAmount: { value: 1000, knownValue: 1000, state: 'known', reasons: [] } }), worker.scope)).toThrow('工资收付分区与原档案、实际来源或金额不一致，请重新读取')
   }
   finally { await f.close() }
 })

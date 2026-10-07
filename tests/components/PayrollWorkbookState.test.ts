@@ -114,6 +114,11 @@ it('下载重新读取失败清除旧目录，页面停用后的迟到保存不�
   wrapper.unmount()
 })
 
+const finalReadRejection = {
+  identity: '保存目录或当前身份已变化，下载已停止',
+  hash: '保存目录或当前身份已变化，下载已停止',
+  private: '工人私密资料读取权限已失效，下载已停止',
+} as const
 it.each(['identity', 'hash', 'private'] as const)('文件最终读取遇到 %s 变化时拒绝返回文件并清除旧目录', async (change) => {
   const plain = vi.spyOn(workbookOutput, 'createPayrollSavedWorkbook').mockReturnValue({ data: new Uint8Array([1]), defaultName: 'test.xlsx', mimeType: 'application/octet-stream' })
   const zipped = vi.spyOn(workbookOutput, 'createPayrollSavedArchive').mockResolvedValue({ data: new Uint8Array([1]), defaultName: 'test.zip', mimeType: 'application/zip' })
@@ -131,8 +136,8 @@ it.each(['identity', 'hash', 'private'] as const)('文件最终读取遇到 %s �
     repository.workbookArchive.mockResolvedValueOnce(archive).mockResolvedValueOnce(final)
     await ui.download(change === 'private' ? 'private-zip' : 'xlsx')
     expect(ui.opened.value).toBeNull()
-    expect(ui.error.value).toMatch(/身份|私密/)
-    await expect(exportFile.mock.results.at(-1)!.value).rejects.toThrow()
+    expect(ui.error.value).toContain(finalReadRejection[change])
+    await expect(exportFile.mock.results.at(-1)!.value).rejects.toThrow(finalReadRejection[change])
   }
   finally {
     wrapper.unmount()

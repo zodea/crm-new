@@ -115,7 +115,7 @@ describe('c2 独立公开服务反例：原关系、最后窗口与完整冻结'
     const read = await f.service.dayworkForm({ origin: 'real' }, { recordId: saved.recordId })
     const command = f.dayworkCommand(read, { kind: 'save-daywork', record: { ...f.record, workerId: 'zero', workDate: '2026-08-02' } })
     const before = await databaseFacts(f)
-    await expect(f.service.executeDaywork(command)).rejects.toThrow()
+    await expect(f.service.executeDaywork(command)).rejects.toThrow('原或目标月份已有考勤链或已发工资，不能移动或修改签工')
     expect(await databaseFacts(f)).toEqual(before)
   })
 
@@ -158,8 +158,8 @@ describe('c2 独立公开服务反例：原关系、最后窗口与完整冻结'
     const originalRead = await f.service.dayworkForm({ origin: 'real' }, { recordId })
     const move = f.dayworkCommand(originalRead, { kind: 'save-daywork', record: { ...f.record, workerId: 'member', workDate: '2026-09-01' } })
     const before = await databaseFacts(f)
-    await expect(f.service.executeDaywork(zeroCommand)).rejects.toThrow()
-    await expect(f.service.executeDaywork(move)).rejects.toThrow()
+    await expect(f.service.executeDaywork(zeroCommand)).rejects.toThrow('原或目标月份已有考勤链或已发工资，不能移动或修改签工')
+    await expect(f.service.executeDaywork(move)).rejects.toThrow('该人员月份已有考勤链或已发工资，原签工不可修改')
     expect(await databaseFacts(f)).toEqual(before)
   })
 
@@ -210,7 +210,7 @@ describe('c2 独立公开服务反例：原关系、最后窗口与完整冻结'
     expect(latest.eligibility.canSaveDraft).toBe(false)
     expect(latest.facts.find(record => record.id === daywork.recordId)).toMatchObject({ availability: 'occupied', occupations: expect.arrayContaining([expect.objectContaining({ statementId: heads[0]!.id })]) })
     const before = await databaseFacts(f)
-    await expect(f.service.executeC2(f.c2Command(latest, { kind: 'save-c2-draft', draft: { ...f.draft, leaderWorkerId: loser } }))).rejects.toThrow()
+    await expect(f.service.executeC2(f.c2Command(latest, { kind: 'save-c2-draft', draft: { ...f.draft, leaderWorkerId: loser } }))).rejects.toThrow('原签工已被其他工资领用，当前没有可用来源')
     expect(await databaseFacts(f)).toEqual(before)
   })
 

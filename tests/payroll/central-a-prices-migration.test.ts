@@ -94,10 +94,10 @@ it.each([
     const priceId = makePriceId(price.priceId)
     await expect(second.service.execute(command(updated, { ...action, prices: [{ ...action.prices[0]!, priceId }] }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
     const wrongRevisionId = price.id.replace(':payroll_a_price_revisions:', ':wage_statements:')
-    expect(() => decodePayrollARead(encodePayrollAWire({ ...config, prices: [{ ...price, id: wrongRevisionId }] }), 'config', { origin: 'real' }, scope)).toThrow()
-    expect(() => decodePayrollARead(encodePayrollAWire({ ...config, prices: [{ ...price, priceId: wrongRevisionId }] }), 'config', { origin: 'real' }, scope)).toThrow()
-    expect(() => decodePayrollARead(encodePayrollAWire({ ...read, lines: read.lines.map(line => ({ ...line, priceRevisionIds: [wrongRevisionId] })) }), 'form', { origin: 'real' }, { statementId })).toThrow()
-    expect(() => decodePayrollAResult({ ...result, priceRevisionIds: [wrongRevisionId] }, submitted)).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire({ ...config, prices: [{ ...price, id: wrongRevisionId }] }), 'config', { origin: 'real' }, scope)).toThrow('工资核算数据不完整')
+    expect(() => decodePayrollARead(encodePayrollAWire({ ...config, prices: [{ ...price, priceId: wrongRevisionId }] }), 'config', { origin: 'real' }, scope)).toThrow('工资核算数据不完整')
+    expect(() => decodePayrollARead(encodePayrollAWire({ ...read, lines: read.lines.map(line => ({ ...line, priceRevisionIds: [wrongRevisionId] })) }), 'form', { origin: 'real' }, { statementId })).toThrow('工资核算数据不完整')
+    expect(() => decodePayrollAResult({ ...result, priceRevisionIds: [wrongRevisionId] }, submitted)).toThrow('工资提交回执与原目标不一致')
   }
   finally { cloned.close() }
 }, 30_000)

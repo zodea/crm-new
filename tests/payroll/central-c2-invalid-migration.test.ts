@@ -12,6 +12,10 @@ afterEach(async () => {
   await coreMigrationTestInstance.reset(resolveBusinessSession().workspaceId)
 })
 
+const saveRejection = {
+  'disabled': '主体配置的价格、规则、启用状态或真实班组不可用于核算',
+  'null-rate': '该项目负责人尚无唯一有效 C2 主体配置',
+} as const
 it.each(['disabled', 'null-rate'] as const)('真实迁入%s主体配置保原值，已有confirmed签工仍不能建可发工资', async (kind) => {
   const db = await createMigratedMemoryDb()
   try {
@@ -40,7 +44,7 @@ it.each(['disabled', 'null-rate'] as const)('真实迁入%s主体配置保原值
     const command: PayrollC2Command = { commandId: `invalid-save-${kind}`, workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: 'real', requiredCapability: 'payroll:write', sourceVersion: read.context.sourceVersion, projectId: imported.projectId, statementId: null, draftKey: read.draftKey, configScope: null, configId: null, action: { kind: 'save-c2-draft', draft } }
     const snapshot = () => quantityTestInstance.withWorkspaceTransaction(async tx => ({ heads: await tx.select('SELECT * FROM wage_statements ORDER BY id'), receipts: await tx.select('SELECT * FROM payroll_command_receipts ORDER BY command_id'), logs: await tx.select('SELECT * FROM operation_logs ORDER BY id'), revision: await tx.select('SELECT * FROM payroll_revision') }))
     const before = await snapshot()
-    await expect(payrollService.executeC2(command)).rejects.toThrow()
+    await expect(payrollService.executeC2(command)).rejects.toThrow(saveRejection[kind])
     expect(await snapshot()).toEqual(before)
     expect((await payrollService.c2Config({ origin: 'real' }, config.scope)).config).toEqual(config.config)
   }

@@ -28,6 +28,10 @@ describe('p5 移除追加原文墓碑，不要求失效来源重新取得计价�
     finally { await f.close() }
   })
 
+  const feeRejection = {
+    'ordinary-unit': '费用分项、单位或细分范围不一致',
+    'management-scope': '管理费用须属于当前有效管理簿与管理人',
+  } as const
   it.each(['ordinary-unit', 'management-scope'] as const)('费用来源变化 %s 后仍能移除，新增修改继续拒绝', async (change) => {
     const f = await createPayrollAFeesFixture()
     try {
@@ -41,7 +45,7 @@ describe('p5 移除追加原文墓碑，不要求失效来源重新取得计价�
       else await f.db.execute('UPDATE unit_assignments SET deleted_at=\'2026-08-06\' WHERE id=\'fee-assignment\'')
       const read = await f.feeConfig(book)
       const item = f.fee({ bookPurpose: old.bookPurpose, managementBookId: old.managementBookId, kind: old.kind, name: old.name, unitPrice: old.unitPrice, unit: old.unit, basis: old.basis, effectiveMonth: old.effectiveMonth, adoptedDefault: old.adoptedDefault, feeId: old.feeId, baseRevisionId: old.id })
-      await expect(f.service.executeFees(f.feeCommand(read, { kind: 'save-a-fees', baseVersion: read.baseVersion, fees: [item], remove: [] }))).rejects.toThrow()
+      await expect(f.service.executeFees(f.feeCommand(read, { kind: 'save-a-fees', baseVersion: read.baseVersion, fees: [item], remove: [] }))).rejects.toThrow(feeRejection[change])
       const command = f.feeCommand(read, { kind: 'save-a-fees', baseVersion: read.baseVersion, fees: [], remove: [{ feeId: old.feeId, baseRevisionId: old.id }] })
       const result = await f.service.executeFees(command)
       expect(await f.service.executeFees(command)).toEqual(result)
@@ -52,6 +56,11 @@ describe('p5 移除追加原文墓碑，不要求失效来源重新取得计价�
     finally { await f.close() }
   })
 
+  const negativeRejection = {
+    'unit': '负价数量的单位与所选原分项范围不一致',
+    'scope': '负价依据超出原管理范围或已失效',
+    'actual-ref': '负价所引用实际事实未获证明或不属于本项目',
+  } as const
   it.each(['unit', 'scope', 'actual-ref'] as const)('负价依据 %s 失效后保原全文移除，不重新采用失效依据', async (change) => {
     const f = await createPayrollAFeesFixture()
     try {
@@ -82,7 +91,7 @@ describe('p5 移除追加原文墓碑，不要求失效来源重新取得计价�
         await f.db.execute('UPDATE unit_assignment_scopes SET deleted_at=\'2026-08-06\' WHERE id=\'fee-scope-shower\'')
       else await f.db.execute('UPDATE wage_statements SET snapshot_json=\'{}\' WHERE id=?', [actualRef!.statementId])
       const read = await form()
-      await expect(f.service.executeFees(f.feeCommand(read, { kind: 'save-a-negative-lines', baseVersion: read.context.sourceVersion, lines: [line], remove: [] }))).rejects.toThrow()
+      await expect(f.service.executeFees(f.feeCommand(read, { kind: 'save-a-negative-lines', baseVersion: read.context.sourceVersion, lines: [line], remove: [] }))).rejects.toThrow(negativeRejection[change])
       const command = f.feeCommand(read, { kind: 'save-a-negative-lines', baseVersion: read.context.sourceVersion, lines: [], remove: [{ lineId: String(physical!.line_id), baseRevisionId: String(physical!.id) }] })
       const result = await f.service.executeFees(command)
       expect(await f.service.executeFees(command)).toEqual(result)

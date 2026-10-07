@@ -31,7 +31,7 @@ it('纯时工项目无需工程量，逐人工资与未舍入的默认加班价�
 it('没有记录不能造空单，真实零可以保存核对但不能发放，缺个人标准保持未知', async () => {
   const f = await createPayrollC1ServiceFixture()
   try {
-    await expect(f.service.executeC1(f.command(await f.form(), { kind: 'save-c1-draft', draft: f.draft }))).rejects.toThrow()
+    await expect(f.service.executeC1(f.command(await f.form(), { kind: 'save-c1-draft', draft: f.draft }))).rejects.toThrow('所选成员当月没有真实考勤，不能生成空工资')
     await f.attendance({ hours: 0, overtimeHours: 0 })
     const read = await f.form()
     expect(read.totals.grossAmount.value).toBe(0)

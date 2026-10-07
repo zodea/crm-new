@@ -22,9 +22,9 @@ it('费用原稿成功后仍等待可信同目标后读，空修订列表不能�
   await store.saveFees(read, [draft], [])
   const original = store.getPending(read)!
   expect(original.state).toBe('awaiting-read')
-  expect(() => store.acknowledge(original, read)).toThrow()
+  expect(() => store.acknowledge(original, read)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   const missing = await store.loadConfig({ origin: 'real' }, read.scope)
-  expect(() => store.acknowledge(original, missing)).toThrow()
+  expect(() => store.acknowledge(original, missing)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   repository.aFeeConfig.mockResolvedValueOnce({ ...feeConfigRead('after'), fees: [{ ...draft, id: 'saved-fee', feeId: 'fee', projectId: 'project', crewId: 'crew', leaderWorkerId: 'worker', revision: 1, removed: false, operatorId: 'actor', createdAt: '2026-09-14' }] })
   const fresh = await store.loadConfig({ origin: 'real' }, read.scope)
   store.acknowledge(original, fresh)
@@ -39,7 +39,7 @@ it('unknown冷恢复使用原费用命令，禁止后来的输入覆盖同目标
   setActivePinia(createPinia())
   store = usePayrollAFeesStore()
   expect(store.getPending(read)).toEqual(original)
-  expect(() => store.saveFees(feeConfigRead('newer'), [], [])).toThrow()
+  expect(() => store.saveFees(feeConfigRead('newer'), [], [])).toThrow('请先核对本份费用的原提交结果')
   await store.recover(original)
   expect(repository.executeFees.mock.calls.at(-1)![0]).toEqual(original.command)
 })
@@ -53,7 +53,7 @@ it('相同负责人另一管理簿的后读不能解除原管理行提交', asyn
   const original = store.getPending(read)!
   repository.aForm.mockResolvedValueOnce({ ...read, book: { bookPurpose: 'management', managementBookId: 'book-second' } })
   const foreign = await store.loadForm({ origin: 'real' }, read.statementId!)
-  expect(() => store.acknowledge(original, foreign)).toThrow()
+  expect(() => store.acknowledge(original, foreign)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   expect(store.getPending(read)?.state).toBe('awaiting-read')
 })
 it('移除负价以明确的移除修订后读完成，不要求原行继续存在于核算清单', async () => {
@@ -65,7 +65,7 @@ it('移除负价以明确的移除修订后读完成，不要求原行继续存�
   await store.saveNegativeLines(read, [], [{ lineId: 'negative-line', baseRevisionId: 'negative-revision' }])
   const operation = store.getPending(read)!
   const missing = await store.loadForm({ origin: 'real' }, read.statementId!)
-  expect(() => store.acknowledge(operation, missing)).toThrow()
+  expect(() => store.acknowledge(operation, missing)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   const { baseRevisionId: _base, ...values } = negativeDraft()
   repository.aForm.mockResolvedValueOnce({ ...read, negativeLineRevisions: [{ ...values, id: 'removed-revision', lineId: 'negative-line', statementId: read.statementId!, projectId: 'project', managementBookId: 'book-first', managementRevisionId: 'management-revision', revision: 2, signedAmountFen: -60000, removed: true, operatorId: 'actor', createdAt: '2026-09-14' }] })
   const fresh = await store.loadForm({ origin: 'real' }, read.statementId!)

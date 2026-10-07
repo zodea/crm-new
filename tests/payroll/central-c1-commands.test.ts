@@ -9,17 +9,17 @@ async function checked(f: Awaited<ReturnType<typeof createPayrollC1ServiceFixtur
   return f.service.c1Form({ origin: 'real' }, { statementId: id })
 }
 it.each([
-  [{ workerId: 'w', amount: 550 }, { workerId: 'member', amount: 350 }],
-  [{ workerId: 'w', amount: 550.01 }, { workerId: 'member', amount: 350 }, { workerId: 'zero', amount: 0 }],
-  [{ workerId: 'w', amount: 550 }, { workerId: 'w', amount: 550 }, { workerId: 'zero', amount: 0 }],
-].map(allocations => ({ allocations })))('核算与实发分离，拒绝非法全成员分配：%#', async ({ allocations }) => {
+  { label: '漏填成员', allocations: [{ workerId: 'w', amount: 550 }, { workerId: 'member', amount: 350 }], reason: '组内分配必须包含负责人和全部成员，未分配成员请填 0' },
+  { label: '分配合计不等于实发', allocations: [{ workerId: 'w', amount: 550.01 }, { workerId: 'member', amount: 350 }, { workerId: 'zero', amount: 0 }], reason: '成员分配合计必须等于实际发放金额' },
+  { label: '同一成员重复分配', allocations: [{ workerId: 'w', amount: 550 }, { workerId: 'w', amount: 550 }, { workerId: 'zero', amount: 0 }], reason: '同一成员不能重复分配实际发放金额' },
+])('核算与实发分离，C1 发放拒绝$label', async ({ allocations, reason }) => {
   const f = await createPayrollC1ServiceFixture()
   try {
     await f.attendance()
     await f.attendance({ workerId: 'member', hours: 7.5, overtimeHours: 0 })
     const read = await checked(f)
     const release = { actualAmount: 900, allocations: [{ workerId: 'w', amount: 550 }, { workerId: 'member', amount: 350 }, { workerId: 'zero', amount: 0 }] }
-    await expect(f.service.executeC1(f.command(read, { kind: 'release-c1', release: { ...release, allocations } }))).rejects.toThrow()
+    await expect(f.service.executeC1(f.command(read, { kind: 'release-c1', release: { ...release, allocations } }))).rejects.toThrow(reason)
     const command = f.command(read, { kind: 'release-c1', release })
     const result = await f.service.executeC1(command)
     expect(await f.service.executeC1(command)).toEqual(result)

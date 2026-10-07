@@ -112,14 +112,14 @@ describe('工资 P0 中央读取事务', () => {
   it('严格读范围及 wire 校验不会把错误来源或 number 金额当成有效响应', async () => {
     const f = await fixture()
     const valid = await f.service.list({ origin: 'real' })
-    expect(() => decodePayrollRead({ ...valid, context: { ...valid.context, origin: 'demo' } }, 'list', { origin: 'real' })).toThrow()
+    expect(() => decodePayrollRead({ ...valid, context: { ...valid.context, origin: 'demo' } }, 'list', { origin: 'real' })).toThrow('工资读取内容或范围不完整')
   })
 
   it.each([
-    { case: '{ month: \'2026-13\' }', input: { month: '2026-13' } },
-    { case: '{ projectId: \' \' }', input: { projectId: ' ' } },
-    { case: '{ actorId: \'forged\' }', input: { actorId: 'forged' } },
-  ])('严格读范围及 wire 校验不会把错误来源或 number 金额当成有效响应 / parsePayrollQuery：$case', ({ input }) => {
-    expect(() => parsePayrollQuery(input)).toThrow()
+    { label: '月份 13', input: { month: '2026-13' }, reason: '工资月份必须是有效年月' },
+    { label: '空白项目', input: { projectId: ' ' }, reason: '工资项目或班组身份无效' },
+    { label: '夹带伪造操作人', input: { actorId: 'forged' }, reason: '工资读取含不支持的范围字段' },
+  ])('工资读取范围拒绝$label', ({ input, reason }) => {
+    expect(() => parsePayrollQuery(input)).toThrow(reason)
   })
 })

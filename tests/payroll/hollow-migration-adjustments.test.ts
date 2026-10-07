@@ -102,7 +102,7 @@ it('迁入后600更正确认与后月实发50再导出，原前缀版本及确�
         expect(output.document.hollow?.previousProcessed[0]?.effectiveAmount.value).toBe(600)
         expect(output.document.hollow?.previousProcessed[0]?.adjustmentIds).toEqual([second.id('payroll_adjustments', correction.adjustmentId!)])
         await second.instance.withWorkspaceTransaction(tx => tx.execute('DELETE FROM payroll_command_receipts WHERE command_id=?', [second.id('payroll_command_receipts', 'migrated-rate40-confirm')]))
-        await expect(second.reloadPayroll().aOutput({ origin: 'real' }, statementId)).rejects.toThrow()
+        await expect(second.reloadPayroll().aOutput({ origin: 'real' }, statementId)).rejects.toThrow(/^迁入工资 payroll_command_receipts\/\S+:migrated-rate40-confirm 的原行或证据已缺损，不能继续计算剩余$/)
       }
       finally { await second.close() }
     }

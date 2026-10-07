@@ -179,7 +179,7 @@ it.each(['A', 'C1', 'C2'] as const)('迁入后原 %s 冻结表保持原内容、
         if (invalid.document?.formatFamily !== 'C2')
           throw new Error('C2 document required')
         change(invalid.document)
-        expect(() => decodePayrollC2Read(encodePayrollC2Wire(invalid), 'output', query, statementId)).toThrow()
+        expect(() => decodePayrollC2Read(encodePayrollC2Wire(invalid), 'output', query, statementId)).toThrow('C2 读取或提交内容不完整')
       }
       reject((document) => {
         document.identityMapping = undefined

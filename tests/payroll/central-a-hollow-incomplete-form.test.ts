@@ -33,7 +33,7 @@ it.each([
     const input = { statementId: null, draftKey: read.draftKey!, draft: read.draft }
     // 尚未选全的分支不能冒充完整主体，或被响应中的可启动标记提升权限。
     const forged = makeForged(read, f)
-    expect(() => decodePayrollARead(encodePayrollAWire(forged), 'form', { origin: 'real' }, input)).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(forged), 'form', { origin: 'real' }, input)).toThrow('A工资的空鼓读取、目标或净额不一致')
   }
   finally {
     await f.close()

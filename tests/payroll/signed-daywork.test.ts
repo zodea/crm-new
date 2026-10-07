@@ -389,7 +389,7 @@ describe('c2 signed daywork source', () => {
       sourceVersion: firstSource.sourceVersion,
       sourceUpdatedAt: firstSource.sourceUpdatedAt,
       sourceRecordIds: [recordId],
-    })).rejects.toThrow()
+    })).rejects.toThrow('存在已归属其他工资单的签工记录，不能重复计薪')
   })
 
   it('rechecks C2 with the current configured rate and snapshots the rule', async () => {

@@ -8,7 +8,7 @@ it('正式单份Excel实际包含原号、原工资与冻结金额，重复输�
   const f = await createPayrollNumberingFixture()
   try {
     const initial = await f.read()
-    expect(() => createPayrollOfficialWorkbook(initial)).toThrow()
+    expect(() => createPayrollOfficialWorkbook(initial)).toThrow('尚未读回这份工资的正式出具记录，不能生成正式文件')
     await f.initialize()
     await f.issue()
     const read = await f.read()

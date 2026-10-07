@@ -12,7 +12,7 @@ it.each(Array.from([null, 0, 350.125, 0.0000001, 1e21, Number.MIN_VALUE, Number.
 })
 
 it.each(Array.from(['1e-7', '1E+21', '3.5e2']).map(input => ({ input })))('签工C2有限数精确展开十进制定点，null与零保真，科学计数传输不能进入读取或命令：输入组合 2 案例 %#', ({ input: unitRate }) => {
-  expect(() => transformPayrollC2Wire({ unitRate }, true)).toThrow()
+  expect(() => transformPayrollC2Wire({ unitRate }, true)).toThrow('签工工数、主体单价或金额传输格式无效')
 })
 
 describe('同一规范适用于已共享的C1有限费率，原缺值与到分金额不放宽', () => {
@@ -30,7 +30,7 @@ it.each([
   { case: '{ overtimeRate: \'1e-7\' } / true', input: { overtimeRate: '1e-7' }, argument2: true },
   { case: '{ amount: \'350.125\' } / true', input: { amount: '350.125' }, argument2: true },
 ])('同一规范适用于已共享的C1有限费率，原缺值与到分金额不放宽 / transformPayrollC1Wire：$case', ({ input, argument2 }) => {
-  expect(() => transformPayrollC1Wire(input, argument2)).toThrow()
+  expect(() => transformPayrollC1Wire(input, argument2)).toThrow('工时、费率或金额传输格式无效')
 })
 
 it('公开读取拒绝错项目签工和错负责人配置，坏原日期仍保留原文', async () => {
@@ -40,12 +40,12 @@ it('公开读取拒绝错项目签工和错负责人配置，坏原日期仍保�
     const list = await f.ledger()
     const wrongList = structuredClone(list)
     wrongList.records[0]!.projectId = 'other-project'
-    expect(() => decodePayrollDayworkRead(encodePayrollDayworkWire(wrongList), 'list', { origin: 'real' }, f.scope)).toThrow()
+    expect(() => decodePayrollDayworkRead(encodePayrollDayworkWire(wrongList), 'list', { origin: 'real' }, f.scope)).toThrow('签工读取或提交内容不完整')
     await f.service.executeC2(f.c2Command(await f.c2Config(), { kind: 'save-c2-config', config: { crewId: 'crew', unitRate: 350.125, ruleText: '' } }))
     const config = await f.c2Config()
     const wrongConfig = structuredClone(config)
     wrongConfig.config!.leaderWorkerId = 'member'
-    expect(() => decodePayrollC2Read(encodePayrollC2Wire(wrongConfig), 'config', { origin: 'real' }, config.scope)).toThrow()
+    expect(() => decodePayrollC2Read(encodePayrollC2Wire(wrongConfig), 'config', { origin: 'real' }, config.scope)).toThrow('C2 读取或提交内容不完整')
     await f.db.execute('UPDATE signed_daywork_records SET work_date=\'旧日无法辨认\'')
     const bad = await f.ledger()
     expect(decodePayrollDayworkRead(encodePayrollDayworkWire(bad), 'list', { origin: 'real' }, f.scope)).toEqual(bad)
@@ -58,12 +58,12 @@ it('真实命令结果不能改原记录或伪造物理领用，未知正文不�
   try {
     const command = f.dayworkCommand(await f.dayworkForm(), { kind: 'save-daywork', record: f.record })
     const result = await f.service.executeDaywork(command)
-    expect(() => decodePayrollDayworkResult({ ...result, workerId: 'member' }, command)).toThrow()
+    expect(() => decodePayrollDayworkResult({ ...result, workerId: 'member' }, command)).toThrow('签工回执与原提交或记录不一致')
     const configCommand = f.c2Command(await f.c2Config(), { kind: 'save-c2-config', config: { crewId: 'crew', unitRate: 350.125, ruleText: '' } })
     const configResult = await f.service.executeC2(configCommand)
-    expect(() => decodePayrollC2Result({ ...configResult, dayworkRecordIds: [result.recordId], dayworkLinkIds: ['fake-link'] }, configCommand)).toThrow()
-    expect(() => parsePayrollC2Command(encodePayrollC2Wire({ ...configCommand, sourceRecordIds: [result.recordId] }))).toThrow()
-    expect(() => encodePayrollC2Wire({ actualAmount: 500.001 })).toThrow()
+    expect(() => decodePayrollC2Result({ ...configResult, dayworkRecordIds: [result.recordId], dayworkLinkIds: ['fake-link'] }, configCommand)).toThrow('C2 回执的原签工与物理关联不完整')
+    expect(() => parsePayrollC2Command(encodePayrollC2Wire({ ...configCommand, sourceRecordIds: [result.recordId] }))).toThrow('请求包含不支持的字段')
+    expect(() => encodePayrollC2Wire({ actualAmount: 500.001 })).toThrow('金额须为到分数值，签工工数与主体单价须为有限数值或明确空值')
   }
   finally { await f.close() }
 })

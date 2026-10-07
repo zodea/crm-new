@@ -23,7 +23,7 @@ it('同一个原单元格按项目/人/日保稿恢复，切班组不丢原键�
   const store = useAttendanceCentralStore()
   const record = { workerId: 'w', crewId: 'crew', workDate: '2026-08-01', hours: 7.51, overtimeHours: 0, workContent: '原内容', note: '' }
   repo.executeAttendance.mockRejectedValueOnce(new Error('断线'))
-  await expect(store.saveRecord(read(), record)).rejects.toThrow()
+  await expect(store.saveRecord(read(), record)).rejects.toThrow('断线')
   record.hours = 8
   const original = store.getAttendancePending(read(), 'w', record.workDate)!
   expect(original.command.action.record.hours).toBe(7.51)
@@ -46,15 +46,15 @@ it('考勤原操作只在原范围冷读并核对回执物理记录后解除，�
   const old = await store.loadMatrix({ origin: 'real' }, matrix.scope)
   await store.saveRecord(matrix, record)
   const pending = store.getAttendancePending(matrix, 'w', record.workDate)!
-  expect(() => store.acknowledgeAttendance(pending, old)).toThrow()
+  expect(() => store.acknowledgeAttendance(pending, old)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   const otherCrew = await store.loadMatrix({ origin: 'real' }, { ...matrix.scope, crewId: 'crew' })
-  expect(() => store.acknowledgeAttendance(pending, otherCrew)).toThrow()
+  expect(() => store.acknowledgeAttendance(pending, otherCrew)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   repo.attendanceMatrix.mockResolvedValueOnce({ ...matrix, records: [c1AttendanceFact({ id: 'attendance', workDate: '2026-08-02' })] })
   const otherDay = await store.loadMatrix({ origin: 'real' }, matrix.scope)
-  expect(() => store.acknowledgeAttendance(pending, otherDay)).toThrow()
+  expect(() => store.acknowledgeAttendance(pending, otherDay)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   repo.attendanceMatrix.mockResolvedValueOnce(matrix)
   const missing = await store.loadMatrix({ origin: 'real' }, matrix.scope)
-  expect(() => store.acknowledgeAttendance(pending, missing)).toThrow()
+  expect(() => store.acknowledgeAttendance(pending, missing)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   const refreshed = await store.loadMatrix({ origin: 'real' }, matrix.scope)
   expect(store.getAttendancePending(matrix, 'w', record.workDate)?.command).toEqual(pending.command)
   store.acknowledgeAttendance(pending, refreshed)
