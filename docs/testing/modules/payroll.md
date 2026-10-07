@@ -1,3 +1,9 @@
+| [tests/components/PayrollC1C2SourceReturn.test.ts](../../../tests/components/PayrollC1C2SourceReturn.test.ts) | 组件（jsdom） | C1/C2 来源（考勤／签工）返回验证 |
+| [tests/components/PayrollC1C2Completion.test.ts](../../../tests/components/PayrollC1C2Completion.test.ts) | 组件（jsdom） | C1/C2 回执后的同目标状态读取（需重核细分说明仅 C2 已实现） |
+| [tests/components/PayrollC1C2ReleasedEvidence.test.ts](../../../tests/components/PayrollC1C2ReleasedEvidence.test.ts) | 组件（jsdom） | C1/C2 已发工资只在真实冻结输出可用后显示配对成功 |
+| [tests/components/PayrollC1C2DetailPrecision.test.ts](../../../tests/components/PayrollC1C2DetailPrecision.test.ts) | 组件（jsdom） | C1/C2 详情保留原单价精度，金额到分，未知价不补零 |
+| [tests/components/PayrollC1C2Release.test.ts](../../../tests/components/PayrollC1C2Release.test.ts) | 组件（jsdom） | C1/C2 实际发放确认：零成员保全与少一分不确认 |
+| [tests/components/PayrollC1C2Form.test.ts](../../../tests/components/PayrollC1C2Form.test.ts) | 组件（jsdom） | C1/C2 页面固定草稿：draftKey 切换与负责人班组采用 |
 # 工资、考勤与点工
 
 [返回测试模块索引](../README.md)
@@ -120,7 +126,7 @@
 | [tests/payroll/central-batch-http.test.ts](../../../tests/payroll/central-batch-http.test.ts) | 单元／服务／状态 | batch HTTP/Repository roundtrip binds preview, identity and immutable plan while rejecting altered commands |
 | [tests/payroll/central-batch-preview.test.ts](../../../tests/payroll/central-batch-preview.test.ts) | 单元／服务／状态 | central payroll batch preview and immutable confirmation |
 | [tests/payroll/central-batch-remainder-execution.test.ts](../../../tests/payroll/central-batch-remainder-execution.test.ts) | 单元／服务／状态 | 冷读稳定簿身份分出333.34/333.33/333.33，三份原工资实际合计1000且不重复发放 |
-| [tests/payroll/central-batch-schema.test.ts](../../../tests/payroll/central-batch-schema.test.ts) | 单元／服务／状态 | central payroll batch schema |
+| [tests/payroll/central-batch-schema.test.ts](../../../tests/payroll/central-batch-schema.test.ts) | 单元／服务／状态 | 批次协调表：同计划仅一个已准备尝试、命令编号唯一、只收真实来源；A 取整修订簿别约束 |
 
 ## 正式编号与工资簿
 

@@ -5,10 +5,13 @@ import PayrollEvidenceTable from '~/components/payroll/PayrollEvidenceTable.vue'
 import { payrollDetailFixture } from '../helpers/payroll-central-read-fixture'
 
 afterEach(() => vi.unstubAllGlobals())
-it('c2 详情及保存的明细保留350.125原工价，金额仍到分，未知价不补零', async () => {
+it.each([
+  { family: 'C1', priceLabel: '时薪', line: { itemName: '正常工时', unit: '小时', unitPrice: 60.125 }, rounded: '60.13' },
+  { family: 'C2', priceLabel: '工价', line: { itemName: '零星签工', unit: '工', unitPrice: 350.125 }, rounded: '350.13' },
+] as const)('$family 详情及保存的明细保留 $line.unitPrice 原$priceLabel，金额仍到分，未知价不补零', async ({ family, line: priced, rounded }) => {
   const read = payrollDetailFixture()
-  read.statement.formatFamily = 'C2'
-  const line = { ...read.statement.lines[0]!, itemName: '零星签工', unit: '工', quantity: 8, unitPrice: 350.125, amount: 481 }
+  read.statement.formatFamily = family
+  const line = { ...read.statement.lines[0]!, ...priced, quantity: 8, amount: 481 }
   read.statement.lines = [line, { ...line, id: 'missing-price', unitPrice: null, amount: null }]
   read.statement.stored.lines = [line]
   vi.stubGlobal('useRoute', () => ({ fullPath: '/subcontract/payroll/wage-a?origin=real', params: { id: 'wage-a' }, query: { origin: 'real' } }))
@@ -16,6 +19,7 @@ it('c2 详情及保存的明细保留350.125原工价，金额仍到分，未知
   vi.stubGlobal('useDataVisibilityStore', () => ({ includeDemo: false }))
   vi.stubGlobal('useTabTitle', vi.fn())
   const view = mount(CentralPayrollDetailScreen, { global: { components: { PayrollEvidenceTable }, stubs: {
+    PayrollC1StatementWorkspace: true,
     PayrollC2StatementWorkspace: true,
     PayrollAStatementWorkspace: true,
     PayrollReadNotice: true,
@@ -32,8 +36,8 @@ it('c2 详情及保存的明细保留350.125原工价，金额仍到分，未知
   await flushPromises()
   for (const label of ['工资明细', '保存的明细历史']) {
     const table = view.get(`[aria-label="${label}"] table`)
-    expect(table.text()).toContain('350.125')
-    expect(table.text()).not.toContain('350.13')
+    expect(table.text()).toContain(String(priced.unitPrice))
+    expect(table.text()).not.toContain(rounded)
     expect(table.text()).toContain('¥481.00')
   }
   const unknown = view.get('[aria-label="工资明细"] table').findAll('tr')[1]!

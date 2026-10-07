@@ -33,6 +33,25 @@ it.each([
   finally { await f.close() }
 })
 
+// subcontract-payroll.md 规则 8：本次应发为 0 或实际发放超过本次应发时禁止发放。
+it('c1 实发超过当月应发或无空鼓抵扣的零额发放被拒绝，恰好等于应发可以发放', async () => {
+  const f = await createPayrollC1ServiceFixture()
+  try {
+    await f.attendance()
+    await f.attendance({ workerId: 'member', hours: 7.5, overtimeHours: 0 })
+    const read = await checked(f)
+    expect(read.totals.grossAmount.value).toBe(1051.25)
+    const release = (actualAmount: number) => f.command(read, { kind: 'release-c1', release: { actualAmount, allocations: [{ workerId: 'w', amount: actualAmount }, { workerId: 'member', amount: 0 }, { workerId: 'zero', amount: 0 }] } })
+    const rejection = 'C1 需重新核对完整，实际金额须到分且不超过当月应发；零额仅适用于明确启动并完整抵扣的空鼓处理'
+
+    await expect(f.service.executeC1(release(1051.26))).rejects.toThrow(rejection)
+    await expect(f.service.executeC1(release(0))).rejects.toThrow(rejection)
+    expect(await f.db.select('SELECT actual_amount FROM wage_statements')).toEqual([{ actual_amount: null }])
+    expect((await f.service.executeC1(release(1051.25))).outcome).toBe('released')
+  }
+  finally { await f.close() }
+})
+
 it('两簿先核对后只能一份实发，第二份持久需重核；改单来源和标准也同事务标记', async () => {
   const f = await createPayrollC1ServiceFixture()
   try {

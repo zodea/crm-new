@@ -53,4 +53,24 @@ describe('中央 A 配置、核对与冻结发放事务', () => {
     await f.db.execute('DELETE FROM payroll_command_receipts WHERE command_id=?', [release.commandId])
     await assertUnproven()
   })
+
+  // subcontract-payroll.md 规则 8：本次应发为 0 或实际发放超过本次应发时禁止发放。
+  it('实发超过本次应发或无空鼓抵扣的零额发放被拒绝，恰好等于应发可以发放', async () => {
+    const f = await createPayrollAServiceFixture()
+    closers.push(f.close)
+    const config = await f.config()
+    await f.db.execute('INSERT INTO items(id,project_id,code,name,trade,unit) VALUES(\'item\',\'p\',\'WALL\',\'墙砖\',\'泥工\',\'㎡\')')
+    await f.service.execute(f.command(config, { kind: 'save-a-prices', prices: [{ priceId: null, itemId: 'item', unit: '㎡', mode: 'baseline', workerId: null, effectiveMonth: '2026-08', unitPrice: 200, scope: { kind: 'project' } }] }))
+    const saved = await f.service.execute(f.command(await f.form(), { kind: 'save-a-draft', draft: f.draft }))
+    const read = () => f.service.aForm({ origin: 'real' }, { statementId: saved.statementId! })
+    await f.service.execute(f.command(await read(), { kind: 'check-a' }))
+    const checked = await read()
+    expect(checked.totals.grossAmount.value).toBe(1280)
+    const release = (actualAmount: number) => f.command(checked, { kind: 'release-a', release: { actualAmount, allocations: [{ workerId: 'w', amount: actualAmount }, { workerId: 'zero', amount: 0 }] } })
+
+    await expect(f.service.execute(release(1280.01))).rejects.toThrow('实际发放不能超过事务内重新核算的本次应发')
+    await expect(f.service.execute(release(0))).rejects.toThrow('实际发放须为正数并精确到分')
+    expect(await f.db.select('SELECT status FROM wage_statements WHERE id=?', [saved.statementId])).toEqual([{ status: 'checked' }])
+    expect((await f.service.execute(release(1280))).outcome).toBe('released')
+  })
 })

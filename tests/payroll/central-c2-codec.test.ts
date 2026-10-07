@@ -1,5 +1,5 @@
 import type { PayrollC2FrozenDocument } from '~/lib/payroll/central-c2-contract'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { decodePayrollC2Read, decodePayrollC2Result, encodePayrollC2Wire, isPayrollC2FrozenDocument, parsePayrollC2Command } from '~/lib/payroll/central-c2-codec'
 import { decodePayrollDayworkRead, decodePayrollDayworkResult, encodePayrollDayworkWire } from '~/lib/payroll/central-daywork-codec'
 import { transformPayrollC1Wire, transformPayrollC2Wire } from '~/lib/payroll/central-payroll-wire'
@@ -68,24 +68,36 @@ it('真实命令结果不能改原记录或伪造物理领用，未知正文不�
   finally { await f.close() }
 })
 
-it.each([
-  (copy: PayrollC2FrozenDocument) => { copy.daywork[0]!.workDate = '2026-09-01' },
-  (copy: PayrollC2FrozenDocument) => { copy.daywork[0]!.witness = '' },
-  (copy: PayrollC2FrozenDocument) => { copy.daywork[0]!.crewId = null },
-  (copy: PayrollC2FrozenDocument) => { copy.daywork[0]!.original.note = '假原文' },
-  (copy: PayrollC2FrozenDocument) => { copy.allocations = copy.allocations.filter(a => a.workerId !== 'zero') },
-])('真实释放冻结验证原日期、证明、班组、原行和零成员：%#', async (mutate) => {
-  const f = await createPayrollC2ServiceFixture()
-  try {
-    const checked = await createCheckedPayrollC2(f)
-    await f.service.executeC2(f.c2Command(checked, { kind: 'release-c2', release: { actualAmount: 500, allocations: [{ workerId: 'w', amount: 350 }, { workerId: 'member', amount: 150 }, { workerId: 'zero', amount: 0 }] } }))
-    const read = await f.service.c2Output({ origin: 'real' }, checked.statementId!)
-    if (read.state !== 'available')
-      throw new Error('真实健康释放必须有冻结')
-    expect(isPayrollC2FrozenDocument(read.document)).toBe(true)
-    const copy = structuredClone(read.document)
+describe('真实发放后的 C2 冻结文档', () => {
+  let frozen: PayrollC2FrozenDocument
+  beforeAll(async () => {
+    const f = await createPayrollC2ServiceFixture()
+    try {
+      const checked = await createCheckedPayrollC2(f)
+      await f.service.executeC2(f.c2Command(checked, { kind: 'release-c2', release: { actualAmount: 500, allocations: [{ workerId: 'w', amount: 350 }, { workerId: 'member', amount: 150 }, { workerId: 'zero', amount: 0 }] } }))
+      const read = await f.service.c2Output({ origin: 'real' }, checked.statementId!)
+      if (read.state !== 'available')
+        throw new Error('真实健康释放必须有冻结')
+      frozen = read.document
+    }
+    finally { await f.close() }
+  })
+
+  it('完整冻结文档通过校验', () => {
+    expect(isPayrollC2FrozenDocument(frozen)).toBe(true)
+  })
+
+  it.each([
+    { label: '签工日期改到其他月份', mutate: (copy: PayrollC2FrozenDocument) => { copy.daywork[0]!.workDate = '2026-09-01' } },
+    { label: '证明人被清空', mutate: (copy: PayrollC2FrozenDocument) => { copy.daywork[0]!.witness = '' } },
+    { label: '签工班组被清空', mutate: (copy: PayrollC2FrozenDocument) => { copy.daywork[0]!.crewId = null } },
+    { label: '原行正文被改写', mutate: (copy: PayrollC2FrozenDocument) => { copy.daywork[0]!.original.note = '假原文' } },
+    { label: '零分配成员被删除', mutate: (copy: PayrollC2FrozenDocument) => { copy.allocations = copy.allocations.filter(a => a.workerId !== 'zero') } },
+    { label: '期间档不是按月', mutate: (copy: PayrollC2FrozenDocument) => { (copy as { periodKind: string }).periodKind = 'cumulative' } },
+    { label: '发放比例不是 1', mutate: (copy: PayrollC2FrozenDocument) => { (copy as { payRatio: number }).payRatio = 0.8 } },
+  ])('拒绝$label', ({ mutate }) => {
+    const copy = structuredClone(frozen)
     mutate(copy)
     expect(isPayrollC2FrozenDocument(copy)).toBe(false)
-  }
-  finally { await f.close() }
+  })
 })
