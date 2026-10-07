@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { migrations, runMigrations } from '~/lib/db/migrations'
 import { editDeliveryAmountLine } from '~/lib/delivery/review'
 import { useDeliveryRecordStore } from '~/stores/delivery-record'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 let mem: TestDb
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
@@ -46,8 +46,7 @@ vi.mock('~/lib/db/connection', () => ({
 beforeEach(async () => {
   failTransactionSql = null
   transactionQueue = Promise.resolve()
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`INSERT INTO projects (id, name) VALUES ('p1', '合和新城')`)
   await mem.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '广州市大板东建材有限公司')`)
   setActivePinia(createPinia())
@@ -55,8 +54,7 @@ beforeEach(async () => {
 
 describe('送货单 pass-1：版本化持久化', () => {
   it('冷启动后具备送货单头、明细表与必需字段', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     const tables = await listTables(db)
     expect(tables).toContain('delivery_records')
@@ -133,8 +131,7 @@ describe('送货单 pass-1：版本化持久化', () => {
   })
 
   it('新建底层记录默认留在待识别处理区，不自动冒充已归档', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO projects (id, name) VALUES ('p-default', '默认值项目')`)
     await db.execute(`INSERT INTO delivery_records (id, project_id) VALUES ('del-default', 'p-default')`)
 

@@ -1,16 +1,14 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { readQuantityCentralPhoto, validateQuantityPhoto } from '~/lib/quantity/central-photo'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let memory: TestDb
 const query = { projectId: 'project', unitId: 'unit', completionId: 'done', photoId: 'photo' }
 const photo = { fileName: '验收照片.png', mimeType: 'image/png', fileSize: 3, contentBase64: 'AQID' }
 
 beforeEach(async () => {
-  memory = await createMemoryDb()
-  await runMigrations(memory)
+  memory = await createMigratedMemoryDb()
   await memory.execute('INSERT INTO projects (id, name) VALUES (\'project\', \'中央项目\'), (\'other\', \'外项目\')')
   await memory.execute('INSERT INTO buildings (id, project_id, code, name) VALUES (\'building\', \'project\', \'B\', \'1栋\')')
   await memory.execute('INSERT INTO floors (id, building_id, code, name) VALUES (\'floor\', \'building\', \'F\', \'1层\')')

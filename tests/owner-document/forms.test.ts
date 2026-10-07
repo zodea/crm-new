@@ -2,7 +2,6 @@ import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadMonthlyQuantities } from '~/lib/boq/monthly'
-import { runMigrations } from '~/lib/db/migrations'
 import {
   listOwnerDocumentAttachments,
   listOwnerDocumentBoqLines,
@@ -13,7 +12,7 @@ import {
   ownerDocumentStatusIsEditable,
 } from '~/lib/owner-document/forms'
 import { useOwnerDocumentStore } from '~/stores/owner-document'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -40,8 +39,7 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   setActivePinia(createPinia())
   await mem.execute(`
     INSERT INTO customers (id, name, status)

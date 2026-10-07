@@ -4,8 +4,7 @@ import {
   contractStages,
   loadContractDetailSnapshot,
 } from '~/lib/contract/detail'
-import { runMigrations } from '~/lib/db/migrations'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -14,8 +13,7 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`INSERT INTO customers (id, name) VALUES ('customer-a', '甲方客户')`)
   await mem.execute(`
     INSERT INTO projects (id, name, customer_id)

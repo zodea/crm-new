@@ -6,7 +6,7 @@ import { coreMigrationTestInstance } from '../../server/utils/core-migration-tes
 import { payrollC2ReceiptReferences } from '../../server/utils/payroll-c2-migration-references'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { importPayrollC2MigrationSource, seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
 
 const session = resolveBusinessSession()
@@ -24,7 +24,7 @@ function databaseFacts() {
 }
 
 it('独立反例：原签工跨项目及人员移动后仅余可靠回执，仍在恢复删除前保护原行；去掉该回执才可准备', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC2MigrationSource(db)
     await db.execute('INSERT INTO projects(id,name) VALUES (?,?)', ['c2-destination', '签工目标工程'])

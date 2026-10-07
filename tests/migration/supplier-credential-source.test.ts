@@ -1,9 +1,8 @@
 import type { TestDb } from '../helpers/memory-db'
 import { Buffer } from 'node:buffer'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { parseSupplierCredentialMigrationGraph, readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes, supplierCredentialMasterDraft } from '~/lib/migration/supplier-credential-source'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const at = '2026-09-12 08:00:00'
 const pdf = Buffer.from('%PDF-1.7\nlegacy credential').toString('base64')
@@ -13,8 +12,7 @@ describe('分供方证照完整物理图来源', () => {
   afterEach(() => db?.close())
 
   async function setup() {
-    db = await createMemoryDb()
-    await runMigrations(db)
+    db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO suppliers (id, name, unique_code, tax_no, credential_status, credential_reviewed_at, credential_review_note,
       taxpayer_verification_status, taxpayer_verification_source, taxpayer_verified_at, taxpayer_verification_note, created_at, updated_at)
       VALUES ('old-supplier', '旧分供方', 'INTERNAL-123456789012345678', 'TAX-ORIGINAL', 'qualified', ?, '原人工备注', 'confirmed_general', '人工官网查询', ?, '历史核验备注', ?, ?)`, [at, at, at, at])

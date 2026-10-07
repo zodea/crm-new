@@ -5,7 +5,7 @@ import {
   migrations,
   runMigrations,
 } from '~/lib/db/migrations'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 const F3_MIGRATION_VERSION = 22
 const f3Migrations = migrations.filter(
@@ -38,8 +38,7 @@ async function seedReferences(db: MigrationDb) {
 
 describe('v22 F3 资金表单与票款分摊迁移', () => {
   it('冷启动建立目标表、约束、真实外键和索引', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     expect(LATEST_VERSION).toBeGreaterThanOrEqual(F3_MIGRATION_VERSION)
     const tables = await listTables(db)
@@ -302,8 +301,7 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
   })
 
   it('数据库拒绝负分摊、重复银行流水和跨申请超票额', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await seedReferences(db)
     await db.execute(`
       INSERT INTO payment_applications (

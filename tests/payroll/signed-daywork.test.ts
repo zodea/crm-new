@@ -1,6 +1,6 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { migrations, runMigrations } from '~/lib/db/migrations'
+import { migrations } from '~/lib/db/migrations'
 import { upsertAttendanceRecord } from '~/lib/payroll/attendance'
 import {
   listSignedDayworkRecords,
@@ -14,13 +14,12 @@ import {
   loadWageStatement,
   releaseWageStatement,
 } from '~/lib/payroll/statements'
-import { createMemoryDb, listTables } from '../helpers/memory-db'
+import { createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 let db: TestDb
 
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await db.execute(`INSERT INTO projects (id, name, code) VALUES ('project-c2', '签工项目', 'C2')`)
   await db.execute(`INSERT INTO crews (id, name, trade) VALUES ('crew-c2', '零星用工班', '杂工')`)
   await db.execute(`

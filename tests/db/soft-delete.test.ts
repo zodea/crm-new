@@ -21,7 +21,7 @@ import {
   visibleCond,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 interface OpLogRow {
   id: string
@@ -42,8 +42,7 @@ async function logsFor(db: MigrationDb, table: string, recordId: string): Promis
 
 /** 建库到最新版本并插入一条项目 */
 async function dbWithProject(id = 'p1', name = '合和新城') {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   await db.execute(`INSERT INTO projects (id, name) VALUES (?, ?)`, [id, name])
   return db
 }
@@ -69,8 +68,7 @@ async function dbWithQuantityGraph() {
 
 describe('v2 迁移:全业务表 deleted_at + operation_logs', () => {
   it('冷启动:全部业务表含 deleted_at 列,并建有软删部分索引', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     const indexes = (await db.select<{ name: string }>(
       `SELECT name FROM sqlite_master WHERE type = 'index'`,
     )).map(r => r.name)
@@ -83,8 +81,7 @@ describe('v2 迁移:全业务表 deleted_at + operation_logs', () => {
   })
 
   it('operation_logs 表建立,含快照与操作人列', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     expect(await listTables(db)).toContain('operation_logs')
     const cols = await columnNames(db, 'operation_logs')
     for (const c of ['id', 'table_name', 'record_id', 'action', 'before_data', 'after_data', 'operator', 'created_at']) {
@@ -115,8 +112,7 @@ describe('v2 迁移:全业务表 deleted_at + operation_logs', () => {
 
 describe('父引用图与 schema 漂移校验', () => {
   it('schema 全部表 = 业务表 ∪ 废弃表 ∪ 基建表;每条父引用的列与父表真实存在', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     const tables = await listTables(db)
     // schema 里每张表都必须有归属:业务表(登记进 PARENT_REFS)/ 废弃表 / 基建表
@@ -213,8 +209,7 @@ async function selectVisible(db: MigrationDb, table: string, orderBy = ''): Prom
 
 describe('可见性:软删过滤 + 祖先过滤(ADR 0003)', () => {
   it('软删除后列表不可见;restore 后恢复原位(排序不变)', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO projects (id, name, created_at) VALUES ('p1', '一号', '2026-01-01'), ('p2', '二号', '2026-02-01'), ('p3', '三号', '2026-03-01')`)
 
     await softDelete(db, 'projects', 'p2')
@@ -428,8 +423,7 @@ describe('可见性:软删过滤 + 祖先过滤(ADR 0003)', () => {
   })
 
   it('客户祖先过滤:删除客户后关联项目隐藏，恢复客户后项目重现', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO customers (id, name) VALUES ('c1', '建设单位'), ('c9', '无关客户')`)
     await db.execute(`INSERT INTO projects (id, name, customer_id) VALUES ('p1', '关联项目', 'c1'), ('p9', '无关项目', 'c9')`)
 
@@ -523,8 +517,7 @@ describe('写路径包装:logCreate / withUpdateLog', () => {
   })
 
   it('supplier 与 supplier_credentials 的通用日志兜底只保留安全字段', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`
       INSERT INTO suppliers (id, name, tax_no, bank_account)
       VALUES ('sensitive-supplier', '敏感分供方', 'SECRET-TAX', 'SECRET-ACCOUNT')
@@ -760,8 +753,7 @@ describe('createSoftDeleteActions:store 软删三连工厂', () => {
 
 describe('downstreamImpact:通用下游杀伤统计(#89 由 stores/project.ts 内联上移)', () => {
   it('suppliers 建父 + 若干可见子,按可见集计数,只含 n>0 的项', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '华东建材')`)
     await db.execute(`INSERT INTO invoices (id, supplier_id, invoice_number) VALUES ('inv1', 's1', 'FP001'), ('inv2', 's1', 'FP002')`)
     await db.execute(`INSERT INTO supplier_credentials (id, supplier_id, category) VALUES ('c1', 's1', '营业执照')`)
@@ -789,8 +781,7 @@ describe('downstreamImpact:通用下游杀伤统计(#89 由 stores/project.ts �
   })
 
   it('无下游数据返回空数组(驱动 UI 走 simple 删除)', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '孤家寡人')`)
     expect(await downstreamImpact(db, 'suppliers', 's1')).toEqual([])
     db.close()
@@ -806,8 +797,7 @@ describe('downstreamImpact:通用下游杀伤统计(#89 由 stores/project.ts �
   })
 
   it('客户删除影响按真实外键统计关联项目', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO customers (id, name) VALUES ('c1', '建设单位')`)
     await db.execute(`INSERT INTO projects (id, name, customer_id) VALUES ('p1', '一期', 'c1'), ('p2', '二期', 'c1')`)
     const impact = await downstreamImpact(db, 'customers', 'c1')

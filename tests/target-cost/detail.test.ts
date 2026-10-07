@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadTargetCostDetail } from '~/lib/target-cost/detail'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('target cost detail read model', () => {
   it('uses the selected version items while comparing formal project cost facts', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-target', '预算客户')`)
     await db.execute(`
       INSERT INTO projects (id, code, name, customer_id)
@@ -115,8 +113,7 @@ describe('target cost detail read model', () => {
   })
 
   it('returns null for missing or soft-deleted versions', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`
       INSERT INTO target_costs (id, name, status, deleted_at)
       VALUES ('target-deleted', '已删除版本', 'draft', '2026-07-29')

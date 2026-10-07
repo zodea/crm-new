@@ -4,7 +4,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { loadPayrollC2ConfigFacts, loadPayrollDayworkFacts, loadPayrollDayworkRecord } from '../../server/utils/payroll-daywork-facts'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { importPayrollC2MigrationSource, seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
 
 afterEach(async () => {
@@ -13,7 +13,7 @@ afterEach(async () => {
 })
 
 it('逐签工事实保留原组、状态、相邻半工与同更新时间的原文变化', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const { dayworkIds } = await seedPayrollC2MigrationSource(db)
     await initializePayrollSchema(db)
@@ -33,7 +33,7 @@ it('逐签工事实保留原组、状态、相邻半工与同更新时间的原�
 })
 
 it('公开迁入的隔离原组保完整证据及映射，不能补造可写签工ID', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const { dayworkIds } = await seedPayrollC2MigrationSource(db)
     await db.execute('PRAGMA foreign_keys=OFF')
@@ -49,7 +49,7 @@ it('公开迁入的隔离原组保完整证据及映射，不能补造可写签�
 })
 
 it('坏原值不转成可用数值，未知原列/零/NULL保留；空月拒绝，坏日期不因月筛选消失', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const { dayworkIds, configId } = await seedPayrollC2MigrationSource(db)
     await initializePayrollSchema(db)

@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js'
 import type { MigrationDb } from '~/lib/db/migrations'
 import initSqlJs from 'sql.js'
+import { runMigrations } from '~/lib/db/migrations'
 
 export interface TestDb extends MigrationDb {
   raw: Database
@@ -8,6 +9,28 @@ export interface TestDb extends MigrationDb {
 }
 
 let sqlJsPromise: ReturnType<typeof initSqlJs> | null = null
+let migrated: Promise<{ bytes: Uint8Array, foreignKeys: number }> | null = null
+
+/**
+ * 已跑完默认全量迁移的内存库：每个 worker 只迁移一次，之后克隆字节。
+ * 与 createMemoryDb + runMigrations 等价（含种子与外键开关）；需要空库或旧版本迁移的用例仍用 createMemoryDb。
+ */
+export async function createMigratedMemoryDb(): Promise<TestDb> {
+  migrated ??= (async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      // 外键开关是连接状态，export 会重开连接而丢失，须在导出前记录。
+      const [{ foreign_keys: foreignKeys }] = await db.select<{ foreign_keys: number }>('PRAGMA foreign_keys') as [{ foreign_keys: number }]
+      return { bytes: db.raw.export(), foreignKeys }
+    }
+    finally { db.close() }
+  })()
+  const { bytes, foreignKeys } = await migrated
+  const db = await createMemoryDb(bytes)
+  await db.execute(`PRAGMA foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`)
+  return db
+}
 
 /** node 环境的 sql.js 内存库，形状与 connection.ts 的 DbDriver 对齐 */
 export async function createMemoryDb(bytes?: Uint8Array): Promise<TestDb> {

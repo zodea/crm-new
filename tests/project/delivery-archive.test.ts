@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadProjectDeliveryArchive } from '~/lib/project/delivery-archive'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('project delivery archive read model', () => {
   it('中央来源采用当前稳定身份与原件状态，错误读取或混源不回落本机 SQL', async () => {
@@ -15,8 +14,7 @@ describe('project delivery archive read model', () => {
     await expect(loadProjectDeliveryArchive(source)).rejects.toThrow('来源')
   })
   it('only aggregates archived delivery records and their visible source lines', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-delivery', '到货客户')`)
     await db.execute(`
       INSERT INTO projects (id, name, customer_id)

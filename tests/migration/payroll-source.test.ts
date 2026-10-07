@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { payrollOriginalSnapshot, seedPayrollMigrationSource, seedReleasedPayrollMigrationSource } from '../helpers/payroll-migration-source'
 
 it('公开旧库读取包含八表、独立未领用来源和冻结原文，不因没有工资漏项目', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedPayrollMigrationSource(db)
     const entities = (source.entities as Record<string, Array<{ legacyId: string, attributes: Record<string, unknown> }>>).payroll_projects
@@ -25,7 +25,7 @@ it('公开旧库读取包含八表、独立未领用来源和冻结原文，不�
 })
 
 it('真实核对两次再发放的完整 C2 原图保冻结姓名费率和零成员，不追随当前更正', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const seeded = await seedReleasedPayrollMigrationSource(db)
     const graph = JSON.parse(String(seeded.source.entities.payroll_projects![0]!.attributes!.payrollGraphJson))

@@ -6,7 +6,7 @@ import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migrati
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { loadPayrollAQuantityFacts } from '../../server/utils/payroll-quantity-facts'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
@@ -18,7 +18,7 @@ afterEach(async () => {
 })
 
 it.each(['deleted-config', 'receipt', 'price-scope', 'price-audit', 'source-fact', 'released-zero', 'unrelated'] as const)('公开迁入后的 A 类独立事实保护危险恢复，重复迁入不动原件：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     const source = await readQuantityCoreSource(db)

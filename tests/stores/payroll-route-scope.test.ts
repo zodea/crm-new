@@ -1,11 +1,10 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { useAttendanceStore } from '~/stores/attendance'
 import { usePayrollStore } from '~/stores/payroll'
 import { useSignedDayworkStore } from '~/stores/signed-daywork'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 
@@ -14,8 +13,7 @@ vi.mock('~/lib/db/connection', () => ({ getDb: () => Promise.resolve(db), withTr
 
 beforeEach(async () => {
   setActivePinia(createPinia())
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await db.execute('INSERT INTO projects (id, name, code) VALUES (\'project-a\', \'A 项目\', \'PA\')')
   await db.execute('INSERT INTO crews (id, name, trade) VALUES (\'crew-a\', \'真实班组\', \'泥水工\')')
   await db.execute('INSERT INTO workers (id, crew_id, name, trade, current_project_id) VALUES (\'worker-a\', \'crew-a\', \'真实工人\', \'泥水工\', \'project-a\')')

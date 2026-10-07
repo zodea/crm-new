@@ -3,20 +3,18 @@ import type { TargetCostProjectSource } from '../../server/utils/target-cost-ser
 import type { TargetCostAction, TargetCostCommand, TargetCostFormRead } from '~/lib/target-cost/central-contract'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { decodeTargetCostRead, encodeTargetCostWire, parseTargetCostCommand } from '~/lib/target-cost/central-codec'
 import { createTargetCostRepository } from '~/lib/target-cost/central-repository'
 import { aggregateTargetCostActual } from '../../server/utils/target-cost-actual'
 import { createTargetCostService } from '../../server/utils/target-cost-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => {
   await Promise.all(closers.splice(0).map(close => close()))
 })
 async function fixture() {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   const coordinator = createDbCoordinator(async () => db)
   closers.push(() => coordinator.close())
   let session: BusinessSession = { workspaceId: 'w', actorId: 'a', capabilities: ['target-cost:read', 'target-cost:write'] }

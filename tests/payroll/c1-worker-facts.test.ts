@@ -4,12 +4,12 @@ import { WORKER_WRITE_CAPABILITY } from '../../app/lib/crew-worker/command-contr
 import { CORE_MIGRATION_CAPABILITY } from '../../app/lib/migration/core-contract'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { createCrewWorkerCommandTestInstance } from '../../server/utils/crew-worker-command-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollC1Source } from '../helpers/payroll-c1-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
 it.each(Array.from(['481', -1, Number.POSITIVE_INFINITY]).map(input1 => ({ input1 })))('真实工人日薪经受控网络保 NULL/0/481，旧缺字段不补价且重复迁入保日常更正：输入案例 %#', async ({ input1: invalid }) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedPayrollC1Source(db)
     expect(source.entities.workers.map(row => [row.legacyId, row.attributes?.dailyWage])).toEqual([['c1-null', null], ['c1-worker', 481], ['c1-zero', 0]])
@@ -48,7 +48,7 @@ it.each(Array.from(['481', -1, Number.POSITIVE_INFINITY]).map(input1 => ({ input
 })
 
 it.each(['not-a-number', -1])('原 SQLite 非法日薪不能在导出时变成 NULL/0：%s', async (invalid) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC1Source(db)
     await db.execute('UPDATE workers SET daily_wage=? WHERE id=\'c1-worker\'', [invalid])

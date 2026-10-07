@@ -2,12 +2,12 @@ import { expect, it } from 'vitest'
 import { parsePayrollProjectGraph, readPayrollProjectMigrationGraphs } from '../../app/lib/migration/payroll-source'
 import { initializePayrollAFeesSchema, PAYROLL_A_FEES_MIGRATION_TABLES } from '../../app/lib/payroll/central-a-fees-schema'
 import { initializePayrollAdjustmentSchema } from '../../app/lib/payroll/central-adjustment-schema'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 import { createPayrollAdjustmentFixture } from '../helpers/payroll-adjustment-service-fixture'
 
 it('费用图使用outer v3和独立fees v1，原v1/v2保持封闭白名单', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     await initializePayrollAdjustmentSchema(db)

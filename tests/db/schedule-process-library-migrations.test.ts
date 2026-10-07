@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { migrations, runMigrations } from '~/lib/db/migrations'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 const PROCESS_LIBRARY_MIGRATION_VERSION = 27
 const PREDECESSOR_MIGRATION_VERSION = 34
@@ -66,8 +66,7 @@ describe('标准工序库与内部暂估排程迁移', () => {
   })
 
   it('数据库拒绝合同依据与合同外键互相矛盾', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO projects (id, name) VALUES ('p1', '规则项目')`)
     await db.execute(`INSERT INTO contracts (id, project_id, kind, name)
       VALUES ('c1', 'p1', '施工', '施工合同')`)

@@ -6,7 +6,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMemoryDb, createMigratedMemoryDb } from '../helpers/memory-db'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 import { seedTargetCostMigrationSource } from '../helpers/target-cost-migration-source'
 
@@ -66,7 +66,7 @@ it.each(['untouched', 'independent-project', 'deleted-independent-project', 'his
 })
 
 it('项目迁入没有预算图时，日常独立预算仍会阻止项目恢复', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedTargetCostMigrationSource(db)
     await db.execute('DELETE FROM operation_logs')
@@ -88,7 +88,7 @@ it('项目迁入没有预算图时，日常独立预算仍会阻止项目恢复'
 })
 
 it.each(['duplicate-baseline', 'wrong-project', 'orphan-item', 'broken-payload'] as const)('试跑阻断完整预算来源错误：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedTargetCostMigrationSource(db)
     const entity = source.entities.target_cost_versions![kind === 'duplicate-baseline' ? 1 : 0]!

@@ -4,7 +4,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { importPayrollC2MigrationSource, seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
 
 afterEach(async () => {
@@ -13,7 +13,7 @@ afterEach(async () => {
 })
 
 it.each(['disabled', 'null-rate'] as const)('真实迁入%s主体配置保原值，已有confirmed签工仍不能建可发工资', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const { configId } = await seedPayrollC2MigrationSource(db)
     // 仅测试源库重现历史可空字段；新写入接口始终禁止生成缺价配置。

@@ -9,7 +9,7 @@ import { coreMigrationTestInstance } from '../../server/utils/core-migration-tes
 import { payrollC2MigrationReferences, payrollC2ReceiptReferences } from '../../server/utils/payroll-c2-migration-references'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { importPayrollC2MigrationSource, seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
@@ -20,7 +20,7 @@ afterEach(async () => {
 })
 
 it('另一项目真实 C2 核对来源保留时，可单独准备恢复未被引用的原项目', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC2MigrationSource(db)
     await db.execute('INSERT INTO projects(id,name) VALUES (\'unrelated-project\',\'另一个工程\')')
@@ -138,7 +138,7 @@ it.each(['source-table', 'source-audit-before', 'source-audit-after', 'frozen-so
 })
 
 it.each(['same-worker', 'unrelated-worker'] as const)('同库候选与日常独立签工共用互斥，真实零考勤不扩到无关人：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC2MigrationSource(db)
     const imported = await importPayrollC2MigrationSource(db)
@@ -169,7 +169,7 @@ it.each(['same-worker', 'unrelated-worker'] as const)('同库候选与日常独�
   finally { db.close() }
 })
 async function importedSource() {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC2MigrationSource(db)
     return await importPayrollC2MigrationSource(db)

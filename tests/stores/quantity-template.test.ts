@@ -1,7 +1,6 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { softDelete } from '~/lib/db/soft-delete'
 import {
   blankQuantityTemplateDraft,
@@ -9,7 +8,7 @@ import {
   editableQuantityTemplateDraft,
 } from '~/lib/quantity/template'
 import { useNativeQuantityStore as useQuantityStore } from '~/stores/quantity-native'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 let failNextSelect = false
@@ -45,8 +44,7 @@ beforeEach(async () => {
   failNextSelect = false
   delayedSelectProjectId = ''
   delayedSelectGate = null
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`INSERT INTO projects (id, name, code) VALUES ('p1', '项目一', 'P1'), ('p2', '项目二', 'P2')`)
   await mem.execute(
     `INSERT INTO items (id, project_id, code, name, trade, unit)

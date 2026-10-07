@@ -8,6 +8,8 @@ import { initializeScheduleSchema } from '../../app/lib/schedule/central-schema'
 import { initializeQuantityHollowMigrationEvidence } from './quantity-hollow-migration'
 
 let runtime: ReturnType<typeof initSqlJs> | null = null
+// 初始化结果只取决于迁移与结构初始化代码；同进程复用其字节，避免每次重置重放全部 ALTER。
+let initialized: Promise<Uint8Array> | null = null
 
 function driverFor(database: () => Database): DbDriver {
   return {
@@ -107,18 +109,27 @@ export async function createQuantityDatabase() {
     })
   }
   const SQL = await runtime
-  let connection = new SQL.Database()
+  if (!initialized) {
+    initialized = (async () => {
+      const template = new SQL.Database()
+      const driver = driverFor(() => template)
+      try {
+        await runMigrations(driver)
+        await initializeExternalBoqReferences(driver)
+        await initializeScheduleReferences(driver)
+        await initializeQuantityHollowMigrationEvidence(driver)
+        return template.export()
+      }
+      finally { template.close() }
+    })()
+    void initialized.catch(() => {
+      initialized = null
+    })
+  }
+  let connection = new SQL.Database(await initialized)
   const driver = driverFor(() => connection)
-  try {
-    await runMigrations(driver)
-    await initializeExternalBoqReferences(driver)
-    await initializeScheduleReferences(driver)
-    await initializeQuantityHollowMigrationEvidence(driver)
-  }
-  catch (cause) {
-    await driver.close()
-    throw cause
-  }
+  // 外键开关属于连接状态，不随字节保存；与初始化结束时的连接保持一致。
+  connection.run('PRAGMA foreign_keys = ON')
   return {
     ...driver,
     exportSnapshotBytes(): Uint8Array {

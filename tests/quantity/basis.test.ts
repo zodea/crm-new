@@ -1,6 +1,5 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import {
   assertQuantityBasis,
   isQuantityBasis,
@@ -8,13 +7,12 @@ import {
   QUANTITY_BASIS_OPTIONS,
   quantityBasisLabel,
 } from '~/lib/quantity/basis'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
 
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
 })
 
 afterEach(() => db.close())

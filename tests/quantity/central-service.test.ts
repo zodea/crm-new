@@ -2,10 +2,9 @@ import type { TestDb } from '../helpers/memory-db'
 import type { QuantityCommand } from '~/lib/quantity/central-contract'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { createQuantityService } from '~/lib/quantity/central-service'
 import { blankQuantityTemplateDraft, borrowedQuantityTemplateDraft, editableQuantityTemplateDraft } from '~/lib/quantity/template'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let memory: TestDb
 const context = { workspaceId: 'workspace-default', actorId: 'actor-default', capabilities: ['quantity:read', 'quantity:write', 'project:list:read'] }
@@ -25,8 +24,7 @@ async function save(service: ReturnType<typeof currentService>, action: Quantity
 }
 
 beforeEach(async () => {
-  memory = await createMemoryDb()
-  await runMigrations(memory)
+  memory = await createMigratedMemoryDb()
 })
 afterEach(() => memory.close())
 

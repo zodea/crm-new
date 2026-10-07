@@ -1,11 +1,10 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { createDefaultOcrRecognitionSettings } from '~/lib/ocr/settings'
 import { useInvoiceStore } from '~/stores/invoice'
 import { useOcrSettingsStore } from '~/stores/ocr-settings'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -61,8 +60,7 @@ const MARKDOWN = `
 `
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   setActivePinia(createPinia())
 })
 

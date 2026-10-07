@@ -4,12 +4,12 @@ import { CREW_WRITE_CAPABILITY } from '../../app/lib/crew-worker/command-contrac
 import { CORE_MIGRATION_CAPABILITY } from '../../app/lib/migration/core-contract'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { createCrewWorkerCommandTestInstance } from '../../server/utils/crew-worker-command-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
 it.each(Array.from(['0.8', -0.1, 1.1]).map(input1 => ({ input1 })))('真实 SQLite 的原比例经网络来源保留 0 与 0.8，旧缺字段不变成表单默认 0.95：输入案例 %#', async ({ input1: invalid }) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     const source = await readQuantityCoreSource(db)

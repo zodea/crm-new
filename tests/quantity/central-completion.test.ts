@@ -2,11 +2,10 @@ import type { TestDb } from '../helpers/memory-db'
 import type { QuantityCommand } from '~/lib/quantity/central-contract'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { decodeQuantityCommand } from '~/lib/quantity/central-command-decoder'
 import { createQuantityService } from '~/lib/quantity/central-service'
 import { decodeQuantityBatchPlan, decodeQuantityCompletion, decodeQuantityWorkspace } from '~/lib/quantity/central-workspace-decoder'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let memory: TestDb
 const context = { workspaceId: 'workspace', actorId: 'actor', capabilities: ['project:list:read', 'quantity:read', 'quantity:write', 'crew:list:read', 'worker:list:read'] }
@@ -14,8 +13,7 @@ const query = { projectId: 'project', origin: 'real' as const, includeDemo: fals
 const photo = { fileName: '验收.png', mimeType: 'image/png', fileSize: 3, contentBase64: 'AQID' }
 
 beforeEach(async () => {
-  memory = await createMemoryDb()
-  await runMigrations(memory)
+  memory = await createMigratedMemoryDb()
   await memory.execute('INSERT INTO projects (id, name) VALUES (\'project\', \'正式项目\')')
   await memory.execute('INSERT INTO buildings (id, project_id, code, name) VALUES (\'building\', \'project\', \'B\', \'1栋\')')
   await memory.execute('INSERT INTO floors (id, building_id, code, name) VALUES (\'floor\', \'building\', \'F\', \'1层\')')

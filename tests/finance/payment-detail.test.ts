@@ -1,12 +1,11 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { getPaymentApplicationSummary, getProjectConfirmedPaymentTotal } from '~/lib/finance/forms'
 import {
   buildPaymentApplicationInsight,
   loadPaymentApplicationDetail,
 } from '~/lib/finance/payment-detail'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -27,8 +26,7 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 async function prepare(settlementStatus = '已确认') {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`
     INSERT INTO projects (id, name, approval_status)
     VALUES ('detail-project', '详情项目', 'submitted'), ('other-project', '其他项目', 'submitted')
