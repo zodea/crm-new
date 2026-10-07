@@ -1,5 +1,5 @@
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
-import { expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { WORKER_WRITE_CAPABILITY } from '../../app/lib/crew-worker/command-contract'
 import { CORE_MIGRATION_CAPABILITY } from '../../app/lib/migration/core-contract'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
@@ -8,12 +8,19 @@ import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollC1Source } from '../helpers/payroll-c1-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
-it.each(Array.from(['481', -1, Number.POSITIVE_INFINITY]).map(input1 => ({ input1 })))('真实工人日薪经受控网络保 NULL/0/481，旧缺字段不补价且重复迁入保日常更正：输入案例 %#', async ({ input1: invalid }) => {
-  const db = await createMigratedMemoryDb()
-  try {
-    const source = await seedPayrollC1Source(db)
+describe('工人日薪经迁入来源保真', () => {
+  let db: Awaited<ReturnType<typeof createMigratedMemoryDb>>
+  let source: Awaited<ReturnType<typeof seedPayrollC1Source>>
+  let request: { workspaceId: string, actorId: string, requiredCapability: string, commandId: string, source: typeof source, backup: null }
+  beforeAll(async () => {
+    db = await createMigratedMemoryDb()
+    source = await seedPayrollC1Source(db)
+    request = { workspaceId: 'workspace-default', actorId: 'actor-default', requiredCapability: CORE_MIGRATION_CAPABILITY, commandId: 'worker-wage-source', source, backup: null }
+  })
+  afterAll(() => db.close())
+
+  it('真实工人日薪经受控网络保 NULL/0/481，旧缺字段不补价且重复迁入保日常更正', async () => {
     expect(source.entities.workers.map(row => [row.legacyId, row.attributes?.dailyWage])).toEqual([['c1-null', null], ['c1-worker', 481], ['c1-zero', 0]])
-    const request = { workspaceId: 'workspace-default', actorId: 'actor-default', requiredCapability: CORE_MIGRATION_CAPABILITY, commandId: 'worker-wage-source', source, backup: null }
     expect(parseCoreMigrationSourceCommand(JSON.parse(JSON.stringify(request))).source).toEqual(source)
     const oldPackage = structuredClone(request)
     delete oldPackage.source.entities.workers[0]!.attributes
@@ -39,12 +46,13 @@ it.each(Array.from(['481', -1, Number.POSITIVE_INFINITY]).map(input1 => ({ input
     expect(changed.rows.find(row => row.workerId === 'c1-missing')).toMatchObject({ dailyWage: 0, dailyWageState: 'value' })
     owner.prepareMigrationSnapshot(snapshot)()
     expect(owner.payrollWorkerFacts()).toEqual(changed)
+  })
 
+  it.each(['481', -1, Number.POSITIVE_INFINITY])('来源日薪 %s 不是非负数值时拒绝整批来源', (invalid) => {
     const altered = structuredClone(request)
     altered.source.entities.workers[0]!.attributes = { dailyWage: invalid }
     expect(() => parseCoreMigrationSourceCommand(altered)).toThrow('workers[0].attributes.dailyWage必须是非负日薪或 null')
-  }
-  finally { db.close() }
+  })
 })
 
 it.each(['not-a-number', -1])('原 SQLite 非法日薪不能在导出时变成 NULL/0：%s', async (invalid) => {

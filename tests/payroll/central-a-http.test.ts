@@ -1,7 +1,7 @@
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import * as h3 from 'h3'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import { createPayrollRepository } from '~/lib/payroll/central-repository'
 import { createPayrollAServiceFixture } from '../helpers/payroll-a-service-fixture'
@@ -10,47 +10,56 @@ const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof c
 vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
   return runtime.service
 } }))
-afterEach(() => vi.unstubAllGlobals())
-it.each(Array.from([{ projectId: '', month: '2026-08', crewId: null }, { projectId: '', leaderWorkerId: '', month: '', memberWorkerIds: [] }]).flatMap(input1 => Array.from([
-  { projectId: 'unknown-project', month: '2026-08' },
-  { projectId: 'unknown-project', month: '2026-08', book: { bookPurpose: 'ordinary' as const, managementBookId: null } },
-  { projectId: '', month: '', book: { bookPurpose: 'management' as const, managementBookId: 'selected-management' } },
-]).map(input2 => ({ input1, input2 }))))('a HTTP/Repository往返保数量精度、明确零与固定目标，拒绝客户端伪造来源和未知动作：输入案例 %#', async ({ input1: emptyDraft, input2: invalidDraft }) => {
-  const f = await createPayrollAServiceFixture()
-  runtime.service = f.service
-  for (const name of ['defineEventHandler', 'getQuery', 'getHeader', 'readBody', 'createError'] as const)
-    vi.stubGlobal(name, h3[name])
-  const app = h3.createApp()
-  const router = h3.createRouter()
-  router.post('/api/read/payroll/a-form', (await import('../../server/api/read/payroll/a-form.post')).default)
-  router.get('/api/read/payroll/a-config', (await import('../../server/api/read/payroll/a-config.get')).default)
-  router.get('/api/read/payroll/a-output', (await import('../../server/api/read/payroll/a-output.get')).default)
-  router.post('/api/commands/payroll-a', (await import('../../server/api/commands/payroll-a.post')).default)
-  app.use(router)
-  const server = createServer(h3.toNodeListener(app))
-  server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
-  const address = server.address()
-  if (!address || typeof address === 'string')
-    throw new Error('HTTP地址不可用')
-  const base = `http://127.0.0.1:${address.port}`
+describe('a HTTP/Repository 往返', () => {
+  let f: Awaited<ReturnType<typeof createPayrollAServiceFixture>>
+  let server: ReturnType<typeof createServer>
+  let base: string
+  let repo: ReturnType<typeof createPayrollRepository>
   const wire: unknown[] = []
-  const repo = createPayrollRepository(async (path, options) => {
-    const url = new URL(path, base)
-    for (const [key, value] of Object.entries(options?.query ?? {})) {
-      if (value !== undefined)
-        url.searchParams.set(key, String(value))
-    }
-    const response = await fetch(url, { method: options?.method ?? 'GET', headers: { 'content-type': 'application/json' }, ...(options?.body ? { body: JSON.stringify(options.body) } : {}) })
-    const result = await response.json()
-    wire.push(result)
-    if (!response.ok)
-      throw Object.assign(new Error('工资请求失败'), { data: result.data ?? result })
-    return result
+  beforeAll(async () => {
+    f = await createPayrollAServiceFixture()
+    runtime.service = f.service
+    for (const name of ['defineEventHandler', 'getQuery', 'getHeader', 'readBody', 'createError'] as const)
+      vi.stubGlobal(name, h3[name])
+    const app = h3.createApp()
+    const router = h3.createRouter()
+    router.post('/api/read/payroll/a-form', (await import('../../server/api/read/payroll/a-form.post')).default)
+    router.get('/api/read/payroll/a-config', (await import('../../server/api/read/payroll/a-config.get')).default)
+    router.get('/api/read/payroll/a-output', (await import('../../server/api/read/payroll/a-output.get')).default)
+    router.post('/api/commands/payroll-a', (await import('../../server/api/commands/payroll-a.post')).default)
+    app.use(router)
+    server = createServer(h3.toNodeListener(app))
+    server.listen(0, '127.0.0.1')
+    await once(server, 'listening')
+    const address = server.address()
+    if (!address || typeof address === 'string')
+      throw new Error('HTTP地址不可用')
+    base = `http://127.0.0.1:${address.port}`
+    repo = createPayrollRepository(async (path, options) => {
+      const url = new URL(path, base)
+      for (const [key, value] of Object.entries(options?.query ?? {})) {
+        if (value !== undefined)
+          url.searchParams.set(key, String(value))
+      }
+      const response = await fetch(url, { method: options?.method ?? 'GET', headers: { 'content-type': 'application/json' }, ...(options?.body ? { body: JSON.stringify(options.body) } : {}) })
+      const result = await response.json()
+      wire.push(result)
+      if (!response.ok)
+        throw Object.assign(new Error('工资请求失败'), { data: result.data ?? result })
+      return result
+    })
   })
-  try {
-    // 台账直接新建，以及清空选择后重新预览，必须能读取候选而不是先被请求校验挡住。
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    await f.close()
+    vi.unstubAllGlobals()
+  })
 
+  // 台账直接新建，以及清空选择后重新预览，必须能读取候选而不是先被请求校验挡住。
+  it.each([
+    { label: '台账直接新建', emptyDraft: { projectId: '', month: '2026-08', crewId: null } },
+    { label: '清空全部选择', emptyDraft: { projectId: '', leaderWorkerId: '', month: '', memberWorkerIds: [] } },
+  ])('$label 时仍能读取候选，空草稿不能保存', async ({ emptyDraft }) => {
     const initial = await repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'empty-form', draft: emptyDraft })
     expect(initial.draft.projectId).toBe('')
     expect(initial.options.projects.map(project => project.id)).toEqual(['p'])
@@ -59,8 +68,14 @@ it.each(Array.from([{ projectId: '', month: '2026-08', crewId: null }, { project
     expect(initial.eligibility.canSaveDraft).toBe(false)
     expect(initial.blockers).toContainEqual(expect.objectContaining({ code: 'project-unavailable' }))
     await expect(repo.execute(f.command(initial, { kind: 'save-a-draft', draft: { ...f.draft, projectId: '', leaderWorkerId: '' } }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
-    // 项目失效或清空选择时保留用途草稿，返回明确未知的费用依据，供页面继续修正选择。
+  })
 
+  // 项目失效或清空选择时保留用途草稿，返回明确未知的费用依据，供页面继续修正选择。
+  it.each([
+    { label: '未知项目', invalidDraft: { projectId: 'unknown-project', month: '2026-08' } },
+    { label: '未知项目且指定普通簿', invalidDraft: { projectId: 'unknown-project', month: '2026-08', book: { bookPurpose: 'ordinary' as const, managementBookId: null } } },
+    { label: '清空项目但保留管理簿用途', invalidDraft: { projectId: '', month: '', book: { bookPurpose: 'management' as const, managementBookId: 'selected-management' } } },
+  ])('$label 时保留用途草稿并返回明确未知的费用依据', async ({ invalidDraft }) => {
     const invalidProject = await repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'invalid-project', draft: invalidDraft })
     expect(invalidProject.draft.projectId).toBe(invalidDraft.projectId)
     expect(invalidProject.draft.book).toEqual(invalidDraft.book ?? { bookPurpose: 'ordinary', managementBookId: null })
@@ -74,6 +89,9 @@ it.each(Array.from([{ projectId: '', month: '2026-08', crewId: null }, { project
     expect(invalidProject.fees).toBeNull()
     expect(invalidProject.bookEligibility).toMatchObject({ canSave: false, canCheck: false, canRelease: false })
     expect(Object.values(invalidProject.totals).every(amount => amount.state === 'unknown' && amount.value === null && amount.reasons.length > 0)).toBe(true)
+  })
+
+  it('往返保数量精度、明确零与固定目标，拒绝客户端伪造来源和未知动作', async () => {
     await expect(repo.aForm({ origin: 'real' }, { statementId: null, draftKey: 'invalid-identity', draft: { projectId: 'invalid project' } })).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
     expect(await f.db.select('SELECT * FROM wage_statements')).toEqual([])
     const scope = { projectId: 'p', month: '2026-08', crewId: 'crew', leaderWorkerId: 'w' }
@@ -97,9 +115,5 @@ it.each(Array.from([{ projectId: '', month: '2026-08', crewId: null }, { project
     f.setSession({ workspaceId: 'work', actorId: 'actor', capabilities: ['payroll:read'] })
     expect((await repo.aForm({ origin: 'real' }, input)).context.readonly).toBe(true)
     await expect(repo.execute(f.command(form, { kind: 'save-a-draft', draft: f.draft }))).rejects.toMatchObject({ problem: { code: 'forbidden' } })
-  }
-  finally {
-    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
-    await f.close()
-  }
+  })
 })
