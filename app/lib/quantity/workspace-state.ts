@@ -1,4 +1,5 @@
 import type { ProblemDTO } from '../../types/read-model'
+import type { CommandRecoveryDescriptor, CommandResolution } from '../forms/command-recovery'
 import type { QuantityCommand, QuantityCommandResult, QuantityContext, QuantityReadQuery, QuantityReadResult } from './central-contract'
 
 import { computed, readonly, shallowRef } from 'vue'
@@ -10,6 +11,13 @@ export interface QuantityWorkspaceDependencies<T extends { projectId: string }, 
   read: (query: Q) => Promise<QuantityReadResult<T>>
   context: () => Promise<QuantityContext>
   execute: (command: WorkspaceCommand<A>) => Promise<QuantityCommandResult>
+  recovery?: {
+    enabled: () => boolean
+    find: (query: Q, context: QuantityContext) => CommandRecoveryDescriptor[]
+    remember: (command: QuantityCommand) => CommandRecoveryDescriptor
+    clear: (descriptor: CommandRecoveryDescriptor) => void
+    resolve: (descriptor: CommandRecoveryDescriptor) => Promise<CommandResolution<QuantityCommandResult>>
+  }
 }
 
 /** Pinia 持有已读来源和命令身份，整页组件保留尚未提交的字段草稿。 */
@@ -22,10 +30,12 @@ export function createQuantityWorkspaceState<T extends { projectId: string }, Q 
   const loading = shallowRef(false)
   const saving = shallowRef(false)
   const problem = shallowRef<ProblemDTO | null>(null)
+  const pendingOperations = shallowRef<CommandRecoveryDescriptor[]>([])
+  const applied = new Set<string>()
   let generation = 0
   let identityGeneration = 0
   let pending: { id: string, fingerprint: string } | null = null
-  const canWrite = computed(() => Boolean(workspace.value && baseVersion.value && scope.value?.origin === 'real'
+  const canWrite = computed(() => Boolean(!pendingOperations.value.length && workspace.value && baseVersion.value && scope.value?.origin === 'real'
     && context.value?.capabilities.includes(QUANTITY_WRITE_CAPABILITY) && capabilities.value.includes(QUANTITY_WRITE_CAPABILITY)))
 
   function cancel() {
@@ -45,12 +55,26 @@ export function createQuantityWorkspaceState<T extends { projectId: string }, Q 
     baseVersion.value = null
     context.value = null
     capabilities.value = []
-    pending = null
+    if (!dependencies.recovery?.enabled())
+      pending = null
+    pendingOperations.value = []
     problem.value = null
     loading.value = true
     saving.value = false
     try {
-      const [response, identity] = await Promise.all([dependencies.read(request), dependencies.context()])
+      let identity: QuantityContext
+      let response: QuantityReadResult<T>
+      if (dependencies.recovery?.enabled()) {
+        identity = await dependencies.context()
+        if (current !== generation)
+          return null
+        context.value = identity
+        pendingOperations.value = request.origin === 'real' ? dependencies.recovery.find(request, identity) : []
+        response = await dependencies.read(request)
+      }
+      else {
+        [response, identity] = await Promise.all([dependencies.read(request), dependencies.context()])
+      }
       if (current !== generation)
         return null
       if (response.data.projectId !== request.projectId || response.dataOrigin !== request.origin)
@@ -60,6 +84,13 @@ export function createQuantityWorkspaceState<T extends { projectId: string }, Q 
       if (identityRequest === identityGeneration)
         context.value = identity
       capabilities.value = response.capabilities
+      if (dependencies.recovery?.enabled()) {
+        for (const descriptor of pendingOperations.value.filter(descriptor => applied.has(descriptor.commandId))) {
+          dependencies.recovery.clear(descriptor)
+          applied.delete(descriptor.commandId)
+        }
+        pendingOperations.value = request.origin === 'real' ? dependencies.recovery.find(request, identity) : []
+      }
       return response.data
     }
     catch (cause) {
@@ -98,6 +129,8 @@ export function createQuantityWorkspaceState<T extends { projectId: string }, Q 
   }
 
   async function execute(action: A) {
+    if (pendingOperations.value.length)
+      throw quantityProblem('conflict', '原工程量提交尚未核对，不能改用输入或另发新编号')
     if (!canWrite.value || !scope.value || !context.value || !baseVersion.value)
       throw quantityProblem('forbidden', '请成功读取有写入权限的正式项目后再保存工程量')
     if (saving.value)
@@ -116,10 +149,15 @@ export function createQuantityWorkspaceState<T extends { projectId: string }, Q 
     if (pending?.fingerprint !== fingerprint)
       pending = { id: crypto.randomUUID(), fingerprint }
     const commandId = pending.id
+    const command = { ...body, commandId }
+    if (dependencies.recovery?.enabled())
+      pendingOperations.value = [dependencies.recovery.remember(command)]
     saving.value = true
     problem.value = null
     try {
-      const result = await dependencies.execute({ ...body, commandId })
+      const result = await dependencies.execute(command)
+      if (dependencies.recovery?.enabled())
+        applied.add(commandId)
       if (current !== generation)
         return null
       baseVersion.value = result.sourceVersion
@@ -141,5 +179,35 @@ export function createQuantityWorkspaceState<T extends { projectId: string }, Q 
     }
   }
 
-  return { workspace: readonly(workspace), scope: readonly(scope), baseVersion: readonly(baseVersion), loading: readonly(loading), saving: readonly(saving), problem: readonly(problem), canWrite, load, revalidate, execute, cancel }
+  async function recover(descriptor = pendingOperations.value[0]) {
+    if (!descriptor || !dependencies.recovery?.enabled() || !scope.value || scope.value.origin !== 'real' || descriptor.scopeId !== scope.value.projectId)
+      throw quantityProblem('forbidden', '请回到原正式项目与工作面核对原提交')
+    const current = generation
+    const request = { ...scope.value }
+    const identity = await dependencies.context()
+    if (current !== generation)
+      throw quantityProblem('forbidden', '工程量来源已经切换，请回到原工作面核对')
+    if (identity.workspaceId !== descriptor.workspaceId || identity.actorId !== descriptor.actorId)
+      throw quantityProblem('forbidden', '当前身份与原工程量提交不同')
+    const result = await dependencies.recovery.resolve(descriptor)
+    if (current !== generation)
+      throw quantityProblem('forbidden', '核对期间工程量来源已经切换，原定位已保留')
+    if (result.outcome === 'applied') {
+      if (result.result.commandId !== descriptor.commandId)
+        throw quantityProblem('unavailable', '原工程量恢复结果编号不同，请保留原定位')
+      applied.add(descriptor.commandId)
+      await load(request)
+    }
+    else {
+      if (result.outcome !== 'not-applied' || result.commandId !== descriptor.commandId)
+        throw quantityProblem('unavailable', '原工程量未应用结果无法核对')
+      dependencies.recovery.clear(descriptor)
+      pendingOperations.value = dependencies.recovery.find(request, identity)
+      pending = null
+      await load(request)
+    }
+    return result
+  }
+
+  return { workspace: readonly(workspace), scope: readonly(scope), baseVersion: readonly(baseVersion), loading: readonly(loading), saving: readonly(saving), problem: readonly(problem), pendingOperations: readonly(pendingOperations), canWrite, load, revalidate, execute, recover, cancel }
 }

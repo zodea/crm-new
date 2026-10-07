@@ -108,6 +108,7 @@ export interface PayrollListRead { context: PayrollContext, rows: PayrollStateme
 export interface PayrollDetailRead { context: PayrollContext, statement: PayrollStatementDetail, history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
 export interface PayrollSourcesRead { context: PayrollContext, projectId: string, configs: PayrollConfig[], attendance: PayrollAttendance[], daywork: PayrollDaywork[], locks: PayrollSourceLock[], diagnostics: PayrollDiagnostic[], history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
 export interface PayrollRepository extends PayrollARepository, PayrollARoundingRepository, PayrollAFeesRepository, PayrollAttendanceRepository, PayrollBatchRepository, PayrollC1Repository, PayrollC2Repository, PayrollDayworkRepository, PayrollAdjustmentRepository, PayrollActualRepository, PayrollHollowRepository, PayrollNumberingRepository, PayrollWorkbookRepository {
+  resolveCommand?: (descriptor: import('../forms/command-recovery').CommandRecoveryDescriptor) => Promise<{ outcome: 'applied', command: object, result: unknown } | { outcome: 'not-applied', commandId: string }>
   list: (query: PayrollQuery) => Promise<PayrollListRead>
   detail: (query: PayrollQuery, id: string) => Promise<PayrollDetailRead>
   sources: (query: PayrollQuery & { projectId: string }) => Promise<PayrollSourcesRead>

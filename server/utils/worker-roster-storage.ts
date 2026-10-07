@@ -4,6 +4,9 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { EMPTY_WORKER_PRIVATE, rosterProblem } from '../../app/lib/worker-roster/contract'
 import { parsePrivateValues, rosterCanonical } from '../../app/lib/worker-roster/validation'
+import { validatedWorkerPhotoBytes as photoBytes } from './worker-photo-bytes'
+
+export { validatedWorkerPhotoBytes as photoBytes } from './worker-photo-bytes'
 
 export function rosterHash(value: unknown) {
   return createHash('sha256').update(rosterCanonical(value)).digest('hex')
@@ -19,14 +22,6 @@ export async function initializeWorkerRosterSchema(db: TransactionDb) {
   for (const sql of WORKER_ROSTER_SCHEMA_STATEMENTS)
     await db.execute(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))
 }
-export function photoBytes(photo: WorkerPhotoUpload): Buffer {
-  const bytes = Buffer.from(photo.payloadBase64, 'base64')
-  const png = bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-  const jpeg = bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
-  if (!bytes.length || bytes.length > 20 * 1024 * 1024 || bytes.length !== photo.fileSize || bytes.toString('base64') !== photo.payloadBase64 || !((png && photo.mimeType === 'image/png' && /\.png$/i.test(photo.fileName)) || (jpeg && photo.mimeType === 'image/jpeg' && /\.jpe?g$/i.test(photo.fileName))))
-    return rosterProblem('validation-failed', '照片正文、大小和 PNG/JPEG 类型不一致')
-  return bytes
-}
 export async function currentWorkerPrivate(db: TransactionDb, workerId: string): Promise<{ revision: number, values: WorkerPrivateValues }> {
   const [row] = await db.select<{ revision: number, values_json: string }>('SELECT revision,values_json FROM worker_roster_profile_versions WHERE worker_id=? ORDER BY revision DESC LIMIT 1', [workerId])
   if (!row)
@@ -39,6 +34,8 @@ export async function currentWorkerPrivate(db: TransactionDb, workerId: string):
   }
 }
 export async function workerRosterAssets(db: TransactionDb, workerId: string): Promise<WorkerPhotoAsset[]> {
+  if ((await db.select('SELECT name FROM sqlite_schema WHERE type=\'table\' AND name=\'production_metadata\'')).length)
+    return (await import('./production-worker-originals')).productionWorkerOriginals.assets(db, workerId)
   const rows = await db.select<{ id: string, worker_id: string, file_name: string, mime_type: string, file_size: number | null, sha256: string | null, created_at: string, legacy_category: string | null, content: string | null, encoding: string | null }>(`SELECT asset.*,file.file_name,file.mime_type,file.file_size,payload.content,payload.encoding FROM worker_roster_assets asset JOIN file_refs file ON file.id=asset.file_ref_id AND file.owner_type='worker' AND file.owner_id=asset.worker_id LEFT JOIN file_payloads payload ON payload.file_ref_id=file.id WHERE asset.worker_id=? AND asset.legacy_deleted_at IS NULL ORDER BY asset.created_at,asset.id`, [workerId])
   return rows.map((row) => {
     let actualSize = row.file_size

@@ -39,12 +39,12 @@ export interface BoqLineView {
   trade: string
   itemName: string
   unit: string
-  baseQty: number
-  baseUnitPrice: number
-  baseAmount: number
-  effectiveQty: number
-  effectiveUnitPrice: number
-  effectiveAmount: number
+  baseQty: number | null
+  baseUnitPrice: number | null
+  baseAmount: number | null
+  effectiveQty: number | null
+  effectiveUnitPrice: number | null
+  effectiveAmount: number | null
   approvedChangeAmount: number
   traceKey: string
   sourceSheet: string
@@ -89,7 +89,7 @@ export interface BoqChangeOrderView {
   statusNote: string
   directiveNo: string
   directiveType: '' | 'issued' | 'changed' | 'supplemented'
-  totalAmount: number
+  totalAmount: number | null
   approvedAt: string | null
   ledgerId: string | null
   attachmentCount: number
@@ -130,12 +130,13 @@ export interface BoqMonthlyStatementSummary {
 
 export interface BoqWorkspaceSummary {
   lineCount: number
-  baseAmount: number
-  approvedChangeAmount: number
-  effectiveAmount: number
+  baseAmount: number | null
+  approvedChangeAmount: number | null
+  effectiveAmount: number | null
 }
 
 export interface BoqWorkspace {
+  monthlySourceState?: 'readable' | 'unavailable'
   projectId: string
   projectName: string
   contractId: string
@@ -272,7 +273,7 @@ function nullableNumber(value: unknown): number | null {
   return value == null ? null : numberValue(value)
 }
 
-function buildCatalog(lines: readonly BoqLineView[]): BoqCatalogSection[] {
+export function buildCatalog(lines: readonly BoqLineView[]): BoqCatalogSection[] {
   const sections = new Map<string, Map<string, Map<string, string[]>>>()
   for (const line of lines) {
     const sectionName = line.section || '未分部'
@@ -523,10 +524,9 @@ export async function loadBoqWorkspace(
   const approvedChangeAmount = round2(changeRows
     .filter(change => change.status === 'approved')
     .reduce((total, change) => total + numberValue(change.total_amount), 0))
-  const baseAmount = round2(lines
-    .filter(line => line.boqFileId != null)
-    .reduce((total, line) => total + line.baseAmount, 0))
-  const effectiveAmount = round2(lines.reduce((total, line) => total + line.effectiveAmount, 0))
+  const originalLines = lines.filter(line => line.boqFileId != null)
+  const baseAmount = originalLines.some(line => line.baseAmount === null) ? null : round2(originalLines.reduce((total, line) => total + line.baseAmount!, 0))
+  const effectiveAmount = lines.some(line => line.effectiveAmount === null) ? null : round2(lines.reduce((total, line) => total + line.effectiveAmount!, 0))
   const attachmentsByOrder = new Map<string, BoqAttachmentView[]>()
   for (const attachment of attachmentRows) {
     const bucket = attachmentsByOrder.get(attachment.owner_id) ?? []

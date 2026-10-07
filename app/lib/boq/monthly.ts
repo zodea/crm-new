@@ -219,9 +219,11 @@ async function buildStatementRows(
     const line = lineById.get(quantity.boq_line_id)
     if (!line)
       return []
+    if (line.effectiveUnitPrice === null)
+      throw new Error(`合同单价未知：${line.itemName}；不能补零生成报量`)
     const autoQty = numberValue(quantity.auto_qty)
     return [{
-      line,
+      line: { ...line, effectiveUnitPrice: line.effectiveUnitPrice },
       autoQty,
       missingCount: numberValue(quantity.missing_count),
       sourceUpdatedAt: quantity.source_updated_at,

@@ -204,9 +204,9 @@ onScopeDispose(() => {
       <label>排序<select v-model="sort" class="field-input ml-2" aria-label="预算排序"><option value="updated-desc">最近更新</option><option value="name-asc">版本名</option></select></label>
       <label class="flex items-center gap-2"><input v-model="deleted" type="checkbox" class="accent-brand">查看已删除版本</label>
     </div>
-    <TargetCostCommandState :error="error" :pending="!!pending" :busy="loading || saving" @recover="recover()" @recheck="load" />
-    <section v-for="operation in pendingOperations.filter(item => item.command.commandId !== pending?.command.commandId)" :key="operation.command.commandId" class="panel p-3 text-12px" aria-label="预算未决操作">
-      <p>「{{ rows.find(row => row.id === operation.command.targetCostId)?.name || '未填写版本名' }}」仍有一次提交结果待核对。</p>
+    <TargetCostCommandState :error="error" :pending="!!pending" :busy="loading || saving" :applied="pending?.state === 'applied'" @recover="recover()" @recheck="load" />
+    <section v-for="operation in pendingOperations.filter(item => item.descriptor.commandId !== pending?.descriptor.commandId)" :key="operation.descriptor.commandId" class="panel p-3 text-12px" aria-label="预算未决操作">
+      <p>「{{ rows.find(row => row.id === operation.descriptor.targetId)?.name || '未填写版本名' }}」仍有一次提交结果待核对。</p>
       <KitButton class="mt-2" :disabled="loading || saving" @click="recover(operation)">
         核对并恢复原提交
       </KitButton>

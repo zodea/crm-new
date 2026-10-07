@@ -129,6 +129,7 @@ describe('scheduleContractBindingScreen', () => {
     store.readBinding.mockReset().mockRejectedValue(new Error('当前身份无法读取中央绑定资料'))
     vi.stubGlobal('useRouter', () => ({ push }))
     vi.stubGlobal('useScheduleStore', () => store)
+    vi.stubGlobal('useState', (_key: string, init: () => Record<string, string>) => shallowRef(init()))
     vi.stubGlobal('useKitUI', () => ({
       confirm,
       error: toastError,

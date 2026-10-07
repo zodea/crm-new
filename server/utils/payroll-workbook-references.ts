@@ -4,6 +4,7 @@ import type { PayrollWorkbookArchive } from '../../app/lib/payroll/central-workb
 import type { WorkerRosterArchive } from '../../app/lib/worker-roster/contract'
 import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
+import { hasProductionPayrollSchema } from '../../app/lib/payroll/central-schema'
 import { createPayrollAdjustmentReferenceCollector } from './payroll-adjustment-migration-references'
 import { createPayrollFeesReferenceCollector } from './payroll-fees-migration-references'
 import { createPayrollHollowReferenceCollector } from './payroll-hollow-migration-references'
@@ -65,6 +66,10 @@ export function collectWorkbookReferences(archive: Pick<PayrollWorkbookArchive, 
           add('items', line.itemId)
           line.priceRevisionIds.forEach(id => add('payroll_a_price_revisions', id))
           for (const fact of line.facts) {
+            if (fact.productionUpstream) {
+              add('construction_contract_records', fact.productionUpstream.mainContractId)
+              add('boq_lines', fact.productionUpstream.boqLineId)
+            }
             for (const [field, table] of Object.entries({ workerId: 'workers', crewId: 'crews', completionId: 'unit_stage_completions', assignmentId: 'unit_assignments', stageId: 'construction_stages', stageItemId: 'construction_stage_items', unitId: 'units', floorId: 'floors', buildingId: 'buildings', templateId: 'house_type_templates', templateLineId: 'house_type_template_items', roomId: 'rooms', itemId: 'items' }) as Array<[keyof typeof fact, string]>)
               add(table, fact[field] as string | null)
             fact.assignmentScopeIds.forEach(id => add('unit_assignment_scopes', id))
@@ -119,6 +124,31 @@ export function collectWorkbookReferences(archive: Pick<PayrollWorkbookArchive, 
 /** Asset and file identities can differ after migration; resolve the owning row in the same transaction. */
 export async function completeWorkbookReferences(db: TransactionDb, archive: PayrollWorkbookArchive, rosterArchive?: WorkerRosterArchive): Promise<PayrollWorkbookReference[]> {
   const refs = collectWorkbookReferences(archive, rosterArchive)
+  if (!archive.migration && await hasProductionPayrollSchema(db)) {
+    // New formal directories also freeze the physical evidence behind their closed DTOs.
+    // Imported directories retain their original reference/proof contract without rewriting it.
+    for (const statementId of archive.input.statementIds) {
+      for (const tableName of ['wage_statement_lines', 'wage_statement_members', 'wage_statement_allocations', 'wage_statement_daywork_records']) {
+        const rows = await db.select<{ id: string }>(`SELECT id FROM ${tableName} WHERE statement_id=?`, [statementId])
+        rows.forEach(row => refs.push({ tableName, recordId: row.id }))
+      }
+      for (const tableName of ['payroll_a_statement_sources', 'payroll_c1_statement_sources', 'payroll_c2_statement_sources']) {
+        if ((await db.select(`SELECT statement_id FROM ${tableName} WHERE statement_id=?`, [statementId])).length)
+          refs.push({ tableName, recordId: statementId })
+      }
+      for (const row of await db.select<{ command_id: string }>('SELECT command_id FROM payroll_command_receipts WHERE statement_id=?', [statementId]))
+        refs.push({ tableName: 'payroll_command_receipts', recordId: row.command_id })
+      for (const row of await db.select<{ id: string, plan_id: string }>('SELECT id,plan_id FROM payroll_batch_attempts WHERE json_extract(command_json,\'$.statementId\')=?', [statementId])) {
+        refs.push({ tableName: 'payroll_batch_attempts', recordId: row.id }, { tableName: 'payroll_batch_plans', recordId: row.plan_id })
+        for (const receipt of await db.select<{ command_id: string }>('SELECT command_id FROM payroll_batch_command_receipts WHERE plan_id=?', [row.plan_id]))
+          refs.push({ tableName: 'payroll_batch_command_receipts', recordId: receipt.command_id })
+      }
+    }
+    for (const event of refs.filter(ref => ref.tableName === 'payroll_actual_events')) {
+      for (const row of await db.select<{ id: string }>('SELECT id FROM payroll_actual_allocations WHERE event_id=?', [event.recordId]))
+        refs.push({ tableName: 'payroll_actual_allocations', recordId: row.id })
+    }
+  }
   for (const member of rosterArchive?.members ?? []) {
     for (const photo of member.photos) {
       const [row] = await db.select<{ file_ref_id: string, sha256: string }>('SELECT asset.file_ref_id,asset.sha256 FROM worker_roster_assets asset JOIN file_refs file ON file.id=asset.file_ref_id AND file.owner_type=\'worker\' AND file.owner_id=asset.worker_id WHERE asset.id=? AND asset.worker_id=?', [photo.id, member.workerId])

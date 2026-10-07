@@ -181,7 +181,7 @@ function sameContract<T extends { dataOrigin: string, contractId: string | null 
   return rows.filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)
 }
 
-export function constructionContractSupplementAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number | null {
+export function constructionContractSupplementAmount(source: ConstructionContractDetailSource, facts: Pick<ConstructionContractFactSources, 'supplements'>): number | null {
   return sumKnownMoney(sameContract(facts.supplements, source).filter(activeSupplement).map(row => row.amount))
 }
 

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-defineProps<{ error: string, pending: boolean, busy: boolean }>()
+withDefaults(defineProps<{ error: string, pending: boolean, busy: boolean, applied?: boolean }>(), { applied: false })
 defineEmits<{ recover: [], recheck: [] }>()
 </script>
 
 <template>
   <section v-if="pending" class="panel grid gap-2 p-4 text-12px" role="status" aria-label="目标成本原提交待核对">
-    <p>上次提交结果尚未确认，原输入与附件已保留。请先核对原提交，再继续修改。</p>
+    <p>{{ applied ? '预算已经保存，授权读取尚未完成。请只重试读取，不重新发送。' : '上次提交结果尚未确认，请先按原编号核对。' }}正文与附件在当前页面保留，刷新后只保留原编号。</p>
     <div class="flex flex-wrap gap-2">
       <KitButton type="button" variant="primary" :disabled="busy" @click="$emit('recover')">
-        核对原提交
+        {{ applied ? '只重试读取' : '核对原提交' }}
       </KitButton>
       <KitButton type="button" variant="secondary" :disabled="busy" @click="$emit('recheck')">
         重新核对权限与资料

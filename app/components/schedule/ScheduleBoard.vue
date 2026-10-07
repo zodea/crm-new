@@ -2,14 +2,15 @@
 import type { ScheduleGroupView, ScheduleProjectView, ScheduleTaskView } from '~/lib/schedule/read-model'
 import ScheduleTimeline from '~/components/schedule/ScheduleTimeline.vue'
 
-defineProps<{
+withDefaults(defineProps<{
   snapshot: ScheduleProjectView
   today: string
   highlightedGroupId?: string
   readonly?: boolean
   origin?: 'real' | 'demo'
   returnContext?: Record<string, unknown>
-}>()
+  contractBindingAvailable?: boolean
+}>(), { contractBindingAvailable: true })
 
 const emit = defineEmits<{
   selectTask: [task: ScheduleTaskView]
@@ -41,6 +42,7 @@ const emit = defineEmits<{
       :readonly="readonly"
       :origin="origin"
       :return-context="returnContext"
+      :contract-binding-available="contractBindingAvailable"
       @select-task="emit('selectTask', $event)"
       @add-task="emit('addTask', $event)"
       @reschedule-task="emit('rescheduleTask', $event)"

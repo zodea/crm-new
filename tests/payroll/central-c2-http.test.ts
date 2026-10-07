@@ -7,9 +7,7 @@ import { createPayrollC2ServiceFixture } from '../helpers/payroll-c2-service-fix
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollC2ServiceFixture>>['service'] | null }))
 vi.mock('../../server/utils/payroll-runtime', () => ({
-  get payrollService() {
-    return runtime.service
-  },
+  payrollServiceForEvent: () => runtime.service,
 }))
 afterEach(() => vi.unstubAllGlobals())
 it.each(Array.from([[0.0000001, '0.0000001'], [1e21, '1000000000000000000000'], [350.125, '350.125']] as const).map(input1 => ({ input1 })))('真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发放及冻结，价保原精度而金额到分：输入案例 %#', async ({ input1: [unitRate, expected] }) => {

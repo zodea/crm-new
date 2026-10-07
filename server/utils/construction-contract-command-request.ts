@@ -23,6 +23,7 @@ export function parseConstructionContractCommandRequest(
   target: { kind: 'create' } | { kind: 'update', routeId: string },
 ): ConstructionContractCommandRequestDTO {
   if (!object(value) || !object(value.draft) || !object(value.attachments)
+    || Object.keys(value).some(key => !['id', 'workspaceId', 'actorId', 'requiredCapability', 'commandId', 'baseVersion', 'action', 'draft', 'attachments'].includes(key))
     || typeof value.workspaceId !== 'string' || typeof value.actorId !== 'string'
     || value.requiredCapability !== CONSTRUCTION_CONTRACT_WRITE_CAPABILITY
     || typeof value.commandId !== 'string'

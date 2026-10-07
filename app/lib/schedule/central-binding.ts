@@ -2,14 +2,22 @@ import type { TransactionDb } from '../db/coordinator'
 import type { QuantityBoqLine } from '../quantity/central-boq'
 import type { ScheduleBindingItem, ScheduleBindingPreview, ScheduleBindingRead, ScheduleBindingRecord, ScheduleBindingResult } from './central-binding-contract'
 import type { ScheduleReadContext } from './central-contract'
-import { fetchRowById, hiddenCtesFor, logOperation, selectVisibleSql, visibleCond } from '../db/soft-delete'
+import { fetchRowById, logOperation, hiddenCtesFor as nativeHiddenCtesFor, visibleCond as nativeVisibleCond, selectVisibleSql } from '../db/soft-delete'
 import { quantityMeasureTotal } from '../quantity/totals'
-import { resolveScheduleBuildingReference } from './building-reference'
+import { resolveScheduleBoqBuildingReference } from './building-reference'
 import { decodeScheduleBindingRead } from './central-binding-decoder'
 import { scheduleProblem } from './central-contract'
 import { SCHEDULE_CONTRACT_BIND_OPERATOR } from './contract-binding'
 import { loadBoqLinesByItem } from './engine'
 import { loadScheduleContracts } from './read-model'
+
+/** Native keeps its existing SQL adapters; formal owners supply transaction-local true sources. */
+export interface ScheduleBindingAdapters {
+  visibility?: Pick<typeof import('../db/soft-delete'), 'hiddenCtesFor' | 'visibleCond' | 'selectVisibleSql'>
+  contract?: (db: TransactionDb, projectId: string, id: string) => Promise<{ id: string, no: string, name: string } | null>
+  contracts?: typeof loadScheduleContracts
+  boqLinesByItem?: typeof loadBoqLinesByItem
+}
 
 interface GroupRow { id: string, name: string, project_id: string, scope_basis: 'contract' | 'provisional' | null, contract_id: string | null, contract_bound_at: string | null }
 interface FrozenFloor { id: string, item_id: string, floor_id: string, provisional_qty: number | null, code: string, name: string, snapshot_json: string | null, legacy_missing: number | null }
@@ -40,7 +48,8 @@ function validFrozenSnapshot(snapshot: unknown): snapshot is { unit: string, sou
     : snapshot[key] === value)
 }
 
-async function frozenItems(db: TransactionDb, groupId: string): Promise<FrozenItem[]> {
+async function frozenItems(db: TransactionDb, groupId: string, adapters: ScheduleBindingAdapters): Promise<FrozenItem[]> {
+  const { hiddenCtesFor, visibleCond } = adapters.visibility ?? { hiddenCtesFor: nativeHiddenCtesFor, visibleCond: nativeVisibleCond }
   const floors = await db.select<FrozenFloor>(`${hiddenCtesFor('schedule_task_floor_plans')}
     SELECT plan.id, plan.item_id, plan.floor_id, plan.provisional_qty, item.code, item.name, evidence.snapshot_json, evidence.legacy_missing
     FROM schedule_task_floor_plans plan JOIN schedule_tasks task ON task.id = plan.task_id
@@ -98,23 +107,24 @@ async function frozenItems(db: TransactionDb, groupId: string): Promise<FrozenIt
   return [...groups.values()]
 }
 
-async function preview(db: TransactionDb, group: GroupRow, contractId: string, boq: readonly QuantityBoqLine[]): Promise<ScheduleBindingPreview> {
-  const [contract] = await db.select<{ id: string, no: string, name: string }>(selectVisibleSql('contracts', 'AND id = ? AND project_id = ? AND kind = \'施工\''), [contractId, group.project_id])
+async function preview(db: TransactionDb, group: GroupRow, contractId: string, boq: readonly QuantityBoqLine[], adapters: ScheduleBindingAdapters): Promise<ScheduleBindingPreview> {
+  const selectVisible = adapters.visibility?.selectVisibleSql ?? selectVisibleSql
+  const contract = adapters.contract ? await adapters.contract(db, group.project_id, contractId) : (await db.select<{ id: string, no: string, name: string }>(selectVisible('contracts', 'AND id = ? AND project_id = ? AND kind = \'施工\''), [contractId, group.project_id]))[0]
   if (!contract)
     throw scheduleProblem('relationship-mismatch', '施工合同不存在、已隐藏或不属于当前项目')
-  const buildings = await db.select<{ id: string, code: string, name: string }>(selectVisibleSql('buildings', 'AND project_id = ? ORDER BY sort_order, code, id'), [group.project_id])
-  const relations = await db.select<{ building_id: string }>(selectVisibleSql('schedule_group_buildings', 'AND group_id = ? ORDER BY sort_order, id'), [group.id])
+  const buildings = await db.select<{ id: string, code: string, name: string }>(selectVisible('buildings', 'AND project_id = ? ORDER BY sort_order, code, id'), [group.project_id])
+  const relations = await db.select<{ building_id: string }>(selectVisible('schedule_group_buildings', 'AND group_id = ? ORDER BY sort_order, id'), [group.id])
   const ids = new Set(relations.map(row => row.building_id))
-  const lines = boq.filter(row => row.contractId === contractId).map(row => ({ ...row, resolvedBuilding: resolveScheduleBuildingReference(buildings, row.building) }))
+  const lines = boq.filter(row => row.contractId === contractId).map(row => ({ ...row, resolvedBuilding: resolveScheduleBoqBuildingReference(buildings, row) }))
   const coverage = buildings.map((row) => {
     const count = lines.filter(line => line.resolvedBuilding?.id === row.id).length
     return { id: row.id, code: row.code, name: row.name, contractLineCount: count, covered: count > 0 }
   })
   const selected = coverage.filter(row => ids.has(row.id))
   const extra = coverage.filter(row => !ids.has(row.id) && row.covered)
-  const frozen = await frozenItems(db, group.id)
-  const currentItems = await db.select<{ id: string, code: string, name: string }>(selectVisibleSql('items', 'AND project_id = ?'), [group.project_id])
-  const mappings = await loadBoqLinesByItem(db, group.project_id, contractId, [...new Set([...frozen.map(row => row.id), ...currentItems.map(row => row.id)])])
+  const frozen = await frozenItems(db, group.id, adapters)
+  const currentItems = await db.select<{ id: string, code: string, name: string }>(selectVisible('items', 'AND project_id = ?'), [group.project_id])
+  const mappings = await (adapters.boqLinesByItem ?? loadBoqLinesByItem)(db, group.project_id, contractId, [...new Set([...frozen.map(row => row.id), ...currentItems.map(row => row.id)])], [...ids])
   const scopeLines = lines.filter(row => row.resolvedBuilding && ids.has(row.resolvedBuilding.id))
   for (const current of currentItems) {
     if (frozen.some(row => row.id === current.id))
@@ -169,12 +179,13 @@ async function preview(db: TransactionDb, group: GroupRow, contractId: string, b
   return { groupId: group.id, groupName: group.name, projectId: group.project_id, contractId, contractNo: contract.no, contractName: contract.name, buildings: selected, extraContractBuildings: extra, items, blockers, warnings, canBind: !blockers.length }
 }
 
-export async function readScheduleBinding(db: TransactionDb, context: ScheduleReadContext, projectId: string, groupId: string, contractId: string, boq: readonly QuantityBoqLine[]): Promise<ScheduleBindingRead> {
-  const [group] = await db.select<GroupRow>(selectVisibleSql('schedule_groups', 'AND id = ? AND project_id = ?'), [groupId, projectId])
+export async function readScheduleBinding(db: TransactionDb, context: ScheduleReadContext, projectId: string, groupId: string, contractId: string, boq: readonly QuantityBoqLine[], adapters: ScheduleBindingAdapters = {}): Promise<ScheduleBindingRead> {
+  const selectVisible = adapters.visibility?.selectVisibleSql ?? selectVisibleSql
+  const [group] = await db.select<GroupRow>(selectVisible('schedule_groups', 'AND id = ? AND project_id = ?'), [groupId, projectId])
   if (!group)
     throw scheduleProblem('not-found', '楼栋分组不存在、已隐藏或不属于当前项目')
   const scopeBasis = group.scope_basis ?? (group.contract_id ? 'contract' : 'provisional')
-  const contracts = await loadScheduleContracts(db, projectId)
+  const contracts = await (adapters.contracts ?? loadScheduleContracts)(db, projectId)
   const result = { ...context, group: { id: group.id, name: group.name, projectId, scopeBasis, contractId: group.contract_id }, contracts }
   if (group.contract_id) {
     if (contractId && contractId !== group.contract_id)
@@ -200,11 +211,11 @@ export async function readScheduleBinding(db: TransactionDb, context: ScheduleRe
   }
   if (scopeBasis !== 'provisional')
     throw scheduleProblem('relationship-mismatch', '分组绑定依据不完整，请先核对迁入历史')
-  return { ...result, state: 'unbound', binding: null, preview: contractId ? await preview(db, group, contractId, boq) : null }
+  return { ...result, state: 'unbound', binding: null, preview: contractId ? await preview(db, group, contractId, boq, adapters) : null }
 }
 
-export async function bindCentralScheduleContract(db: TransactionDb, context: ScheduleReadContext, projectId: string, groupId: string, contractId: string, boq: readonly QuantityBoqLine[]): Promise<ScheduleBindingResult> {
-  const read = await readScheduleBinding(db, context, projectId, groupId, contractId, boq)
+export async function bindCentralScheduleContract(db: TransactionDb, context: ScheduleReadContext, projectId: string, groupId: string, contractId: string, boq: readonly QuantityBoqLine[], adapters: ScheduleBindingAdapters = {}): Promise<ScheduleBindingResult> {
+  const read = await readScheduleBinding(db, context, projectId, groupId, contractId, boq, adapters)
   if (read.state === 'bound')
     throw scheduleProblem('conflict', '该分组已经绑定施工合同，请重新读取既有结果')
   if (!read.preview?.canBind)

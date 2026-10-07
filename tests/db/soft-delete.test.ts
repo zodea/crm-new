@@ -5,6 +5,7 @@ import { migrations, runMigrations } from '~/lib/db/migrations'
 import {
   BUSINESS_TABLES,
   createSoftDeleteActions,
+  createVisibilitySql,
   DEPRECATED_TABLES,
   downstreamImpact,
   fetchRowById,
@@ -22,6 +23,21 @@ import {
   withUpdateLog,
 } from '~/lib/db/soft-delete'
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+
+it('显式owner可见图复用祖先和自引用算法，不改Native全局父链或为未接上游建表', () => {
+  const native = hiddenCtes('schedule_tasks')
+  const parents = { ...PARENT_REFS, schedule_groups: PARENT_REFS.schedule_groups!.filter(ref => ref.table !== 'contracts') }
+  const formal = createVisibilitySql(parents)
+  expect(formal.hiddenCtes('schedule_tasks')).not.toContain('hidden_contracts')
+  expect(formal.hiddenCtes('schedule_tasks')).toContain('hidden_schedule_tasks')
+  expect(formal.hiddenCtes('schedule_tasks')).toContain('c."parent_id" = h.id')
+  expect(formal.hiddenCtes('schedule_tasks')).toContain('hidden_projects')
+  expect(formal.visibleCond('schedule_tasks', 'task')).toContain('task."group_id" NOT IN (SELECT id FROM hidden_schedule_groups)')
+  expect(hiddenCtes('schedule_tasks')).toBe(native)
+  expect(native).toContain('hidden_contracts')
+  expect(() => createVisibilitySql({ 'unsafe; SQL': [] })).toThrow()
+  expect(() => createVisibilitySql({ child: [{ column: 'parent_id', table: 'unregistered' }] })).toThrow('未登记')
+})
 
 interface OpLogRow {
   id: string

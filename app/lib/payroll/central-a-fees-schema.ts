@@ -1,4 +1,5 @@
 import type { TransactionDb } from '../db/coordinator'
+import { hasProductionPayrollSchema } from './central-schema'
 
 /**
  * B 迁移扩展 fees:{schemaVersion:1,tables:{...}} 的唯一白名单。
@@ -36,6 +37,8 @@ export function payrollAFeesPrimaryKey(table: PayrollAFeesMigrationTable): strin
  * project/owner/revision 同源、范围非空、JSON 白名单、分精度及权限由同事务命令严格验证。
  */
 export async function initializePayrollAFeesSchema(tx: TransactionDb) {
+  if (await hasProductionPayrollSchema(tx))
+    return
   await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_a_management_books (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),

@@ -9,6 +9,7 @@ export interface FinanceExpenseReference {
   amount: number
   version: string
   sourceRevision: string
+  consumptionVersion?: string
   clearedAmount: number
   expenseItem: string
   serviceSupplierId: string

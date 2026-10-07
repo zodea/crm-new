@@ -7,6 +7,18 @@
   const TH = { padding: "11px 14px", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", textAlign: "left", whiteSpace: "nowrap", background: "var(--surface-2)" };
   const TD = { padding: "11px 14px", fontSize: 13, verticalAlign: "middle" };
   const wmeta = (id) => (window.WORKER_META && window.WORKER_META[id]) || { trade: "普工", safety: true, family: null, certExp: 0 };
+  // 普通详情敏感字段脱敏（对齐 app/lib/util/privacy.ts maskMiddle：保留前缀/后缀，中间 ****）；
+  // 完整实名、银行与照片只在「私密资料与照片」整页（workerPrivate，需 worker:sensitive:read）展示。
+  const maskMiddle = (value, prefix, suffix) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    if (text.length <= 2) return "*".repeat(text.length);
+    const pre = Math.min(prefix, text.length - 2);
+    const suf = Math.min(suffix, text.length - pre - 1);
+    return text.slice(0, pre) + " **** " + text.slice(-suf);
+  };
+  const maskPhone = (v) => maskMiddle(v, 3, 4);
+  const maskIdentifier = (v) => maskMiddle(v, 4, 4);
 
   function InfoGrid({ title, fields }) {
     return (
@@ -164,9 +176,10 @@
     // 2026-07-18 表单补全轮：编辑改整页表单（kit/forms/BaseForms.jsx workerForm，5 分区含银行/紧急联系人/证书附件）
     const editWorker = () => navigate("workerForm", { id: w.id });
 
+    const openPrivate = () => navigate("workerPrivate", { id: w.id });
+
+    // 证件照 / 银行卡照属于私密资料，须在私密整页按用途明确关联（#449），不再作为普通证书类别上传或展示。
     const certs = [
-      { category: "身份证", subType: "", file: "身份证.jpg", expiry: null, added: "2024-08-15" },
-      { category: "银行卡", subType: "", file: "银行卡.jpg", expiry: null, added: "2024-08-15" },
       { category: "安全培训合格证", subType: "", file: "安全培训证.pdf", expiry: "2026-12-20", added: "2025-01-10" },
     ];
     if (m.trade === "水电工" || m.certExp > 0) certs.push({ category: "特种作业操作证", subType: m.trade === "水电工" ? "电工" : "高空", file: "特种作业证.pdf", expiry: "2026-07-15", added: "2024-09-01" });
@@ -195,8 +208,8 @@
         {tab === "info" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <InfoGrid title="个人信息" fields={[
-              ["姓名", w.name], ["性别", "男"], ["身份证号", w.idCard, true],
-              ["联系电话", w.phone, true], ["籍贯", "广东 / 梅州"], ["紧急联系人", "—"],
+              ["姓名", w.name], ["性别", "男"], ["身份证号", maskIdentifier(w.idCard), true],
+              ["联系电话", maskPhone(w.phone), true], ["籍贯", "广东 / 梅州"], ["紧急联系人", "—"],
               ["工种", m.trade], ["技能等级", "中级"], ["参考日工资", "¥280"],
               ["所属班组", w.team], ["当前项目", w.project], ["在场状态", w.onSite ? "在场" : "已退场"],
               ["进场日期", w.entryDate, true], ["退场日期", w.exitDate || "—", true], ["来源", "手动录入"],
@@ -222,7 +235,12 @@
             <div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>证书档案</span>
-                <Button size="sm" variant="primary" icon="upload" onClick={() => UI().formModal({ title: "上传证书", fields: [{ key: "cat", label: "证书类别", type: "select", options: ["身份证", "银行卡", "安全培训合格证", "特种作业操作证"], full: true }, { key: "expiry", label: "有效期（选填）" }, { key: "file", label: "选择文件", placeholder: "点击选择…" }], saveText: "上传", onSave: () => UI().toast("已上传证书", "ok") })}>上传证书</Button>
+                <Button size="sm" variant="primary" icon="upload" onClick={() => UI().formModal({ title: "上传证书", fields: [{ key: "cat", label: "证书类别", type: "select", options: ["安全培训合格证", "特种作业操作证"], full: true }, { key: "expiry", label: "有效期（选填）" }, { key: "file", label: "选择文件", placeholder: "点击选择…" }], saveText: "上传", onSave: () => UI().toast("已上传证书", "ok") })}>上传证书</Button>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--ink-faint)", marginBottom: 8 }}>
+                证件照与银行卡照属于私密资料，请在
+                <button type="button" onClick={openPrivate} style={{ border: 0, background: "transparent", padding: "0 2px", color: "var(--brand)", cursor: "pointer", fontSize: 12 }}>私密资料与照片</button>
+                中按用途明确关联；旧附件不按文件名推断用途。
               </div>
               <Panel padding={0} style={{ overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -275,7 +293,11 @@
               <div style={{ fontSize: 18, fontWeight: 800 }}>{w.name}</div>
               <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>{m.trade} · {w.team}</div>
             </div>
-            <div style={{ marginLeft: "auto" }}><Button variant="primary" icon="square-pen" onClick={editWorker}>编辑</Button></div>
+            {/* 对齐实现 CrewWorkerCentralDetailScreen：正式档案且具 worker:sensitive:read 才显示私密入口（次按钮，位于编辑前） */}
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button icon="lock" onClick={openPrivate}>私密资料与照片</Button>
+              <Button variant="primary" icon="square-pen" onClick={editWorker}>编辑</Button>
+            </div>
           </div>
           <div style={{ display: "flex" }}>
             <SummaryCell label="工种" value={m.trade} />

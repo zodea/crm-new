@@ -36,7 +36,7 @@ describe('预算真实 HTTP 路由与事务边界', () => {
     const post = (body: unknown) => fetch(`${base}/api/commands/target-costs`, { method: 'POST', headers, body: JSON.stringify(body) })
     try {
       const read = await (await get('/api/read/target-costs/form?origin=real&draftKey=first')).json()
-      const command = { ...read.context, requiredCapability: 'target-cost:write', commandId: 'first-http', targetCostId: null, draftKey: 'first', action: { kind: 'save-header', saveAction: 'draft', draft: { name: '预算草稿', contractRevenue: null, plannedProfit: '0.00' }, files: { add: [{ fileName: '预算.xlsx', fileSize: 3, mimeType: 'application/octet-stream', payloadBase64: 'YWJj' }] } } }
+      const command = { workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: read.context.origin, sourceVersion: read.context.sourceVersion, requiredCapability: 'target-cost:write', commandId: 'first-http', targetCostId: null, draftKey: 'first', action: { kind: 'save-header', saveAction: 'draft', draft: { name: '预算草稿', contractRevenue: null, plannedProfit: '0.00' }, files: { add: [{ fileName: '预算.xlsx', fileSize: 3, mimeType: 'application/octet-stream', payloadBase64: 'YWJj' }] } } }
       const response = await post(command)
       expect(response.status).toBe(200)
       const result = await response.json()
@@ -48,10 +48,20 @@ describe('预算真实 HTTP 路由与事务边界', () => {
       expect(file.content).toMatchObject({ targetCostId: result.id, state: 'available', payloadBase64: 'YWJj' })
       expect((await get(`/api/read/target-costs/not-the-owner/files/${result.attachmentIds[0]}?origin=real`)).status).toBe(404)
       expect((await post({ ...command, commandId: 'bad-numeric', action: { ...command.action, draft: { plannedProfit: 0 } } })).status).toBe(422)
+      for (const body of [
+        { ...command, commandId: 'unknown-envelope', capabilities: ['target-cost:write'] },
+        { ...command, commandId: 'unknown-action', action: { ...command.action, force: true } },
+        { ...command, commandId: 'unknown-draft', action: { ...command.action, draft: { ...command.action.draft, privateOwnerCopy: 'must-reject' } } },
+      ]) {
+        expect((await post(body)).status).toBe(422)
+      }
       expect((await post({ ...command, commandId: 'demo-write', origin: 'demo' })).status).toBe(403)
       expect((await (await get('/api/read/target-costs?origin=real')).json()).rows).toHaveLength(1)
       const rejected: TargetCostCommand = {
-        ...read.context,
+        workspaceId: read.context.workspaceId,
+        actorId: read.context.actorId,
+        origin: read.context.origin,
+        sourceVersion: read.context.sourceVersion,
         requiredCapability: 'target-cost:write',
         commandId: 'stale-original-http-key',
         targetCostId: result.id,

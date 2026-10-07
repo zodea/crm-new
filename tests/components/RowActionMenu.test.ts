@@ -47,4 +47,16 @@ describe('row action menu', () => {
     expect(menu.getAttribute('data-state')).toBe('closed')
     await waitFor(() => expect(document.activeElement).toBe(trigger))
   })
+
+  it('空动作保留明确说明，禁用动作不会发出选择', async () => {
+    const view = render(RowActionMenu, { props: { label: '预算版本操作', items: [] } })
+    await fireEvent.click(screen.getByRole('button', { name: '预算版本操作' }))
+    expect(screen.getByText('无可用操作')).not.toBeNull()
+    expect(screen.queryByRole('menuitem')).toBeNull()
+    await view.rerender({ items: [{ key: 'edit', label: '编辑冻结历史', disabled: true }] })
+    const action = screen.getByRole('menuitem', { name: '编辑冻结历史' })
+    expect(action.getAttribute('data-disabled')).not.toBeNull()
+    await fireEvent.click(action)
+    expect(view.emitted().select).toBeUndefined()
+  })
 })

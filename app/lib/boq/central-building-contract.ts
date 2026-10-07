@@ -16,9 +16,10 @@ export interface BoqLineSource {
   confirmed: boolean
 }
 
-export interface BoqBuildingOption { id: string, code: string, name: string }
+export interface BoqBuildingOption { id: string, code: string, name: string, version?: string }
 export interface BoqBuildingEvidence { quantityVersion: string, buildings: BoqBuildingOption[] }
 export interface BoqBuildingLine {
+  version?: string
   id: string
   itemName: string
   unit: string
@@ -47,6 +48,7 @@ export interface BoqBuildingAudit {
   source: BoqLineSource
 }
 export interface BoqBuildingContext extends BoqBuildingQuery {
+  contractVersion?: string
   workspaceId: string
   actorId: string
   contractName: string
@@ -57,6 +59,9 @@ export interface BoqBuildingContext extends BoqBuildingQuery {
   audit: BoqBuildingAudit[]
 }
 export interface BoqBuildingCommand extends BoqBuildingQuery {
+  lineVersion?: string
+  buildingVersion?: string
+  contractVersion?: string
   commandId: string
   workspaceId: string
   actorId: string

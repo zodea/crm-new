@@ -321,6 +321,13 @@
         <Panel padding={14} style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Icon name="info" size={15} color="var(--brand)" />
           <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>选择项目 → 班组资金瀑布 → 请款簿总表（负责人制）→ 核对两步流与 A4 单据（格式族 A/B/C1/C2）</span>
+          {/* 独立整页入口（对齐 CentralPayrollScreen 头部：工资配置 / 工资来源 / 完整工作簿 / 实名名册归档） */}
+          <span style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button size="sm" onClick={() => navigate("payrollConfig", {})}>工资配置</Button>
+            <Button size="sm" onClick={() => navigate("payrollSources", {})}>查看工资来源</Button>
+            <Button size="sm" onClick={() => navigate("payrollWorkbooks", {})}>完整工作簿</Button>
+            <Button size="sm" onClick={() => navigate("payrollRoster", {})}>实名名册归档</Button>
+          </span>
         </Panel>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${narrow ? 2 : 4}, 1fr)`, gap: 16 }}>
           {data.projects.map(p => {
@@ -577,6 +584,9 @@
               {!timeLike && <Button size="sm" icon="circle-check" disabled={!draftRows.length} onClick={batchCheck}>批量核对（{draftRows.length}）</Button>}
               <Button size="sm" variant="primary" icon="banknote" disabled={!releasableRows.length} onClick={batchRelease}>批量发放（{releasableRows.length}）</Button>
               <Button size="sm" icon="download" onClick={() => UI().toast("正在导出 Excel（请款簿 × " + rows.length + " 本，含清单/工资表/考勤表）…")}>导出 Excel</Button>
+              <Button size="sm" onClick={() => navigate("payrollConfig", { project: selProject, crew: selCrew, month })}>工资配置</Button>
+              <Button size="sm" onClick={() => navigate("payrollSources", { project: selProject, crew: selCrew, month })}>查看工资来源</Button>
+              <Button size="sm" onClick={() => navigate("payrollWorkbooks", { project: selProject })}>完整工作簿</Button>
             </span>
           </div>
 

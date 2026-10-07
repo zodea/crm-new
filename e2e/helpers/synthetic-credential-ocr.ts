@@ -75,7 +75,7 @@ export async function startSyntheticCredentialApplication(pdf: Buffer, outputDir
   await new Promise<void>(resolve => probe.close(() => resolve()))
   const origin = `http://127.0.0.1:${port}`
   // Windows 生成的类型相对路径须与项目同盘；独立目录同时避开主服务的 .nuxt。
-  const buildDir = resolve('.codex-tmp', 'credential-ocr', randomUUID(), 'build')
+  const buildDir = resolve('.tmp/legacy-test-artifacts', 'credential-ocr', randomUUID(), 'build')
   await writeFile(resolve(directory, 'nuxt.config.ts'), `export default { buildDir: ${JSON.stringify(buildDir)}, devtools: { enabled: false } }`, 'utf8')
   const child = spawn(process.execPath, [resolve('node_modules/nuxt/bin/nuxt.mjs'), 'dev', '--host', '127.0.0.1', '--port', String(port), '--no-fork', '--extends', directory, '--dotenv', resolve(directory, 'synthetic-only.env')], {
     cwd: resolve('.'),

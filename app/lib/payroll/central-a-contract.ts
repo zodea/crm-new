@@ -50,6 +50,8 @@ export interface PayrollAQuantityFact {
   workerName: string | null
   crewName: string | null
   sourceFingerprint: string
+  /** Adopted formal upstream references; no contract price enters the independent wage price track. */
+  productionUpstream?: { boqLineId: string, mainContractId: string, qualificationVersion: string, sourceSha256: string | null }
 }
 
 /** 缺定位链仍报告；无法证明属于哪位原执行主体时不能由前端筛掉。 */

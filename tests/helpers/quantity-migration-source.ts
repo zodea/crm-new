@@ -28,7 +28,7 @@ export function readQuantityCoreSource(db: TestDb) {
 }
 
 /** 全部十五张量域表均来自真实 SQLite；清单具备真实文件祖先。 */
-export async function seedQuantityMigrationSource(db: TestDb) {
+export async function seedQuantityNativeRows(db: TestDb) {
   await runMigrations(db)
   const statements = [
     'INSERT INTO customers (id,name) VALUES (\'q-customer\',\'迁入甲方\')',
@@ -64,5 +64,9 @@ export async function seedQuantityMigrationSource(db: TestDb) {
     JSON.stringify(completion),
     '历史经办人',
   ])
+}
+
+export async function seedQuantityMigrationSource(db: TestDb) {
+  await seedQuantityNativeRows(db)
   return readQuantityCoreSource(db)
 }

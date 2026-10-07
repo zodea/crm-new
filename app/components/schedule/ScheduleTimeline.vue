@@ -63,10 +63,12 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   origin?: 'real' | 'demo'
   returnContext?: Record<string, unknown>
+  contractBindingAvailable?: boolean
 }>(), {
   mode: 'workspace',
   highlightedGroupId: '',
   highlightedTaskId: '',
+  contractBindingAvailable: true,
 })
 
 const emit = defineEmits<{
@@ -641,7 +643,7 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                 <template v-if="item.value.kind === 'group' && item.value.group.scopeBasis === 'provisional'">
                   <span class="pending-contract-chip">待绑定合同</span>
                   <NuxtLink
-                    v-if="mode === 'workspace' && !readonly && (desktop || origin !== 'demo')"
+                    v-if="mode === 'workspace' && !readonly && (desktop || origin !== 'demo') && contractBindingAvailable !== false"
                     :to="desktop ? `/schedule/${item.value.group.projectId}/bind/${item.value.group.id}` : buildScheduleBindingLocation(item.value.group.projectId, item.value.group.id, origin ?? 'real', returnContext)"
                     class="binding-entry"
                     aria-label="绑定施工合同"
@@ -650,6 +652,9 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                     <span class="i-lucide-link-2" aria-hidden="true" />
                     <span>绑定</span>
                   </NuxtLink>
+                  <button v-else-if="mode === 'workspace' && !readonly && !desktop && origin === 'real' && contractBindingAvailable === false" type="button" class="binding-entry" aria-label="绑定施工合同" disabled title="正式施工合同与BOQ来源尚未接齐，新的绑定等待范围决定">
+                    绑定
+                  </button>
                 </template>
                 <NuxtLink
                   v-if="mode === 'workspace' && !desktop && origin !== 'demo' && item.value.kind === 'group' && item.value.group.contractId"

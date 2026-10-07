@@ -6,6 +6,7 @@ import type {
 } from './command-contract'
 import type { SubcontractContractHttpFetcher } from './http-repository'
 import { isISODateTimeDTO } from '../../types/read-model'
+import { decodeConstructionMainSelection } from '../construction-scope/contract'
 import {
   decodeSubcontractContractAttachment,
   decodeSubcontractContractDraft,
@@ -21,13 +22,24 @@ function object(value: unknown): value is Record<string, unknown> {
 function invalid(message: string): never {
   throw new SubcontractContractRepositoryProblem(subcontractContractProblem('internal-error', message))
 }
+function mainOption(value: unknown): boolean {
+  if (!object(value) || typeof value.name !== 'string' || typeof value.no !== 'string' || typeof value.projectName !== 'string')
+    return false
+  try {
+    decodeConstructionMainSelection({ id: value.id, projectId: value.projectId, basis: value.basis })
+    return true
+  }
+  catch { return false }
+}
 
 function context(value: unknown): SubcontractContractCommandContextDTO {
   if (!object(value) || typeof value.workspaceId !== 'string' || typeof value.actorId !== 'string'
     || !Array.isArray(value.capabilities) || !Array.isArray(value.projects) || !Array.isArray(value.suppliers)
     || !value.suppliers.every(row => object(row) && typeof row.id === 'string' && typeof row.label === 'string'
       && (row.contactName === undefined || typeof row.contactName === 'string')
-      && (row.contactPhone === undefined || typeof row.contactPhone === 'string'))) {
+      && (row.contactPhone === undefined || typeof row.contactPhone === 'string'))
+    || !value.projects.every(row => object(row) && typeof row.id === 'string' && typeof row.label === 'string')
+    || (value.constructionMains !== undefined && (!Array.isArray(value.constructionMains) || !value.constructionMains.every(mainOption)))) {
     return invalid('中央后台返回的分包合同业务会话无效')
   }
   return value as unknown as SubcontractContractCommandContextDTO
@@ -54,6 +66,7 @@ function form(value: unknown, id: string): SubcontractContractFormReadDTO {
       attachments: value.attachments.map(row => decodeSubcontractContractAttachment(row, id)),
       version: value.version,
       updatedAt: value.updatedAt,
+      ...(value.constructionMain !== undefined ? { constructionMain: value.constructionMain === null ? null : decodeConstructionMainSelection(value.constructionMain) } : {}),
     }
   }
   catch (cause) {

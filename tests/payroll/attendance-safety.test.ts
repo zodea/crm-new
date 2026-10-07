@@ -70,14 +70,14 @@ describe('attendance write boundary', () => {
     })).toEqual([])
   })
 
-  it('rejects a worker whose current project conflicts with the selected project', async () => {
-    await expect(upsertAttendanceRecord(db, {
-      projectId: 'project-b',
-      crewId: 'crew-a',
-      workerId: 'worker-a',
-      workDate: '2026-07-03',
-      hours: 8,
-    })).rejects.toThrow('该工人不属于当前项目')
+  it('explicitly reuses the global worker in another project while preserving the master assignment and original project records', async () => {
+    const before = await db.select('SELECT * FROM workers WHERE id=?', ['worker-a'])
+    const first = await upsertAttendanceRecord(db, { projectId: 'project-a', crewId: 'crew-a', workerId: 'worker-a', workDate: '2026-07-03', hours: 7 })
+    const second = await upsertAttendanceRecord(db, { projectId: 'project-b', crewId: 'crew-a', workerId: 'worker-a', workDate: '2026-07-03', hours: 8 })
+    expect(second).not.toBe(first)
+    expect(await db.select('SELECT * FROM workers WHERE id=?', ['worker-a'])).toEqual(before)
+    expect(await listAttendanceRecords(db, { projectId: 'project-a', month: '2026-07' })).toEqual([expect.objectContaining({ id: first, projectId: 'project-a', workerId: 'worker-a', hours: 7 })])
+    expect(await listAttendanceRecords(db, { projectId: 'project-b', month: '2026-07' })).toEqual([expect.objectContaining({ id: second, projectId: 'project-b', workerId: 'worker-a', hours: 8 })])
   })
 
   it('rejects deleted workers, projects, and profile crews', async () => {
@@ -118,18 +118,13 @@ describe('attendance write boundary', () => {
     })).rejects.toThrow('档案班组不存在或已停用')
   })
 
-  it('rejects an unassigned worker until current project or site responsibility is configured', async () => {
-    await expect(upsertAttendanceRecord(db, {
-      projectId: 'project-a',
-      workerId: 'worker-b',
-      workDate: '2026-07-05',
-      hours: 8,
-    })).rejects.toThrow('不属于当前项目')
-
-    expect(await listAttendanceRecords(db, {
-      projectId: 'project-a',
-      month: '2026-07',
-      crewId: 'crew-b',
-    })).toEqual([])
+  it('a global worker with no current project can create an explicit real attendance relation without invented site responsibility', async () => {
+    const before = await db.select('SELECT * FROM workers WHERE id=?', ['worker-b'])
+    const saved = await upsertAttendanceRecord(db, { projectId: 'project-a', crewId: 'crew-b', workerId: 'worker-b', workDate: '2026-07-05', hours: 8 })
+    expect(await listAttendanceRecords(db, { projectId: 'project-a', month: '2026-07', crewId: 'crew-b' })).toEqual([expect.objectContaining({ id: saved, workerId: 'worker-b', projectId: 'project-a' })])
+    expect(await db.select('SELECT * FROM workers WHERE id=?', ['worker-b'])).toEqual(before)
+    expect(await db.select('SELECT * FROM unit_assignments')).toEqual([])
+    await expect(upsertAttendanceRecord(db, { projectId: 'project-a', crewId: 'crew-a', workerId: 'worker-b', workDate: '2026-07-05', hours: 8 })).rejects.toThrow('所选班组与工人档案归属不一致')
+    expect((await listAttendanceRecords(db, { projectId: 'project-a', month: '2026-07', crewId: 'crew-b' }))[0]?.hours).toBe(8)
   })
 })

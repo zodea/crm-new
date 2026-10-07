@@ -4,8 +4,13 @@ import type { TabSessionDiagnostic, TabSessionScope, TabSessionSnapshot } from '
 import { useStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { effectScope, onScopeDispose, shallowRef, watch } from 'vue'
+import { readBoqRecoveryForRoute, readBoqSourceImportRecoveryForRoute } from '~/lib/boq/command-recovery'
+import { readConstructionScopeStartupDescriptors } from '~/lib/construction-scope/startup-recovery'
 import { commandRecoveryKey, commandRecoveryRouteTargets, commandRecoveryStorageForFamily } from '~/lib/forms/command-recovery'
+import { readPayrollStartupDescriptors } from '~/lib/payroll/startup-recovery'
+import { readQuantityRecoveryForRoute } from '~/lib/quantity/command-recovery'
 import { isQuantityHollowWorkPath } from '~/lib/quantity/hollow-navigation'
+import { SCHEDULE_COMMAND_RECOVERY_ACTIONS } from '~/lib/schedule/command-recovery'
 import { TAB_TARGET_VERSION } from '~/lib/tabs/restoration-contract'
 import { createTabSessionRestorer } from '~/lib/tabs/restore-session'
 import { inspectRestorableTabPath } from '~/lib/tabs/restore-target'
@@ -20,6 +25,7 @@ interface InitializeOptions {
   storage: Storage
   validate: TabRestoreValidator
 }
+const scheduleRecoveryActions: ReadonlySet<string> = new Set(SCHEDULE_COMMAND_RECOVERY_ACTIONS)
 
 export const useTabSessionStore = defineStore('tab-session', () => {
   const tabs = useTabsStore()
@@ -186,14 +192,31 @@ export const useTabSessionStore = defineStore('tab-session', () => {
     if (browserReload && isQuantityHollowWorkPath(fullPath))
       return fullPath
     if (browserReload) {
+      if (readConstructionScopeStartupDescriptors(fullPath, snapshot.scope, globalThis.sessionStorage).length)
+        return fullPath
+      if (readBoqRecoveryForRoute(fullPath, snapshot.scope, globalThis.sessionStorage).length)
+        return fullPath
+      if (readBoqSourceImportRecoveryForRoute(fullPath, snapshot.scope, globalThis.sessionStorage).length)
+        return fullPath
+      if (readPayrollStartupDescriptors(fullPath, snapshot.scope, globalThis.sessionStorage).length)
+        return fullPath
+      if (readQuantityRecoveryForRoute(fullPath, snapshot.scope, globalThis.sessionStorage).length)
+        return fullPath
       for (const target of commandRecoveryRouteTargets(fullPath)) {
         const descriptor = commandRecoveryStorageForFamily(target.family).read(commandRecoveryKey({ ...snapshot.scope, ...target }))
         const permitted = descriptor && (['material-quotation-import', 'other-settlement-import'].includes(descriptor.family)
           ? descriptor.action === 'import'
-          : ['crew-worker-import', 'finance-import'].includes(descriptor.family)
+          : ['crew-worker-import', 'finance-import', 'payroll-import'].includes(descriptor.family)
               ? descriptor.action === 'adopt'
-              : ['draft', 'save', 'submit'].includes(descriptor.action)
-                || (descriptor.family === 'finance-payment-record' && ['confirm', 'unconfirm'].includes(descriptor.action)))
+              : ['target-cost-import', 'schedule-import', 'construction-contract-import', 'subcontract-contract-import', 'auxiliary-contract-import'].includes(descriptor.family)
+                  ? ['adopt', 'restore'].includes(descriptor.action)
+                  : descriptor.family === 'schedule'
+                    ? scheduleRecoveryActions.has(descriptor.action)
+                    : descriptor.family === 'target-cost'
+                      ? ['save-header', 'save-items', 'delete', 'restore'].includes(descriptor.action)
+                      : ['draft', 'save', 'submit'].includes(descriptor.action)
+                        || (descriptor.family === 'other-settlement' && descriptor.targetId !== null && descriptor.action === 'confirm')
+                        || (descriptor.family === 'finance-payment-record' && ['confirm', 'unconfirm'].includes(descriptor.action)))
         if (permitted) {
           return fullPath
         }

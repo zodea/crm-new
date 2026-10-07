@@ -18,6 +18,24 @@ function fail(message: string): never {
 }
 let runtime: ReturnType<typeof initSqlJs> | null = null
 
+/** Scan once: grouped Base64 repetition can overflow the regexp stack on a complete database. */
+function validBase64Layout(value: string): boolean {
+  if (!value.length || value.length % 4 !== 0)
+    return false
+  let end = value.length
+  if (value.endsWith('=')) {
+    end--
+    if (value[end - 1] === '=')
+      end--
+  }
+  for (let index = 0; index < end; index++) {
+    const code = value.charCodeAt(index)
+    if (!((code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 43 || code === 47))
+      return false
+  }
+  return true
+}
+
 /**
  * Reads the supplied complete SQLite bytes, rather than trusting a client graph or hash.
  * Callers authorize before opening. The source is never migrated, seeded or persisted.
@@ -29,8 +47,7 @@ export async function withVerifiedMigrationSnapshot<T>(
 ): Promise<T> {
   if (!source || typeof source !== 'object' || Array.isArray(source) || Object.keys(source).sort().join(',') !== 'payloadBase64,sha256'
     || typeof source.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(source.sha256)
-    || typeof source.payloadBase64 !== 'string' || !source.payloadBase64.length || source.payloadBase64.length % 4 !== 0
-    || !/^(?:[A-Z0-9+/]{4})*(?:[A-Z0-9+/]{2}==|[A-Z0-9+/]{3}=)?$/i.test(source.payloadBase64)) {
+    || typeof source.payloadBase64 !== 'string' || !validBase64Layout(source.payloadBase64)) {
     return fail('迁入来源必须提供完整 SQLite 字节及其 SHA-256。')
   }
   const bytes = Buffer.from(source.payloadBase64, 'base64')

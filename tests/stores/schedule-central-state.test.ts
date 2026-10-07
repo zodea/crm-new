@@ -6,15 +6,17 @@ import { scheduleProblem } from '~/lib/schedule/central-contract'
 import { useScheduleStore } from '~/stores/schedule'
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
-const mocks = vi.hoisted(() => ({ execute: vi.fn(), select: vi.fn(), read: vi.fn(), save: vi.fn(), binding: vi.fn() }))
+const mocks = vi.hoisted(() => ({ execute: vi.fn(), select: vi.fn(), read: vi.fn(), save: vi.fn(), binding: vi.fn(), resolve: vi.fn() }))
 vi.mock('~/lib/db/connection', () => ({ execute: mocks.execute, select: mocks.select, withTransaction: vi.fn() }))
 function read(projectId = 'p', version = 'v1'): ScheduleRead {
   return { workspaceId: 'workspace', actorId: 'actor', origin: 'real', sourceVersion: version, capabilities: ['schedule:read', 'schedule:write'], snapshot: { id: projectId, name: projectId, code: projectId, groups: [], dependencies: [], disabledDependencies: [], plannedStart: null, plannedFinish: null, actualProgress: 0, plannedProgress: 0, deviationDays: 0 }, contracts: [], buildings: [], buildingCoverage: [], history: { logs: [], removedTasks: [], migrationEvidence: [] } }
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  const storage = new Map<string, string>()
+  vi.stubGlobal('sessionStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) })
   setActivePinia(createPinia())
-  vi.stubGlobal('useNuxtApp', () => ({ $repositories: { schedule: { read: mocks.read, execute: mocks.save, binding: mocks.binding }, processLibraries: {} } }))
+  vi.stubGlobal('useNuxtApp', () => ({ $repositories: { schedule: { read: mocks.read, execute: mocks.save, binding: mocks.binding, resolve: mocks.resolve }, processLibraries: {} } }))
   mocks.read.mockImplementation(async query => read(query.projectId))
 })
 
@@ -31,11 +33,12 @@ describe('中央绑定固定预览与原提交恢复', () => {
     await store.loadProject('p')
     mocks.save.mockRejectedValueOnce(scheduleProblem('unavailable', '响应中断'))
     await expect(store.confirmBinding(preview)).rejects.toThrow('响应中断')
-    const original = JSON.parse(JSON.stringify(store.pendingCommand))
+    const original = JSON.parse(JSON.stringify(store.pendingCommand?.command))
     expect(original).toMatchObject({ sourceVersion: 'preview-version', action: { kind: 'bind-contract', groupId: 'g', contractId: 'c' } })
-    mocks.save.mockImplementationOnce(async command => ({ commandId: command.commandId, projectId: 'p', sourceVersion: 'done', value: {} }))
+    mocks.resolve.mockResolvedValueOnce({ outcome: 'applied', result: { commandId: original.commandId, projectId: 'p', sourceVersion: 'done', value: {} } })
     await store.recoverPending()
-    expect(mocks.save.mock.calls[1]![0]).toEqual(original)
+    expect(mocks.save).toHaveBeenCalledTimes(1)
+    expect(mocks.resolve).toHaveBeenCalledWith({ commandId: original.commandId, workspaceId: original.workspaceId, actorId: original.actorId, family: 'schedule', targetId: 'p', action: 'bind-contract' })
     expect(mocks.select).not.toHaveBeenCalled()
   })
   it('切换同项目分组或关闭页面后，旧确认及迟到预览不能重开旧目标', async () => {
@@ -77,16 +80,17 @@ describe('浏览器中央 WBS 项目会话与失响应恢复', () => {
     await store.loadProject('p')
     mocks.save.mockRejectedValueOnce(scheduleProblem('unavailable', '响应中断'))
     await expect(store.setBaseline('p')).rejects.toThrow('响应中断')
-    const original = JSON.parse(JSON.stringify(store.pendingCommand!)) as ScheduleCommand
+    const original = JSON.parse(JSON.stringify(store.pendingCommand!.command)) as ScheduleCommand
     await expect(store.setBaseline('p')).rejects.toThrow('原提交')
     mocks.read.mockRejectedValueOnce(scheduleProblem('forbidden', '权限暂不可用'))
     await expect(store.recheck()).rejects.toThrow()
-    expect(store.pendingCommand?.commandId).toBe(original.commandId)
+    expect(store.pendingCommand?.descriptor.commandId).toBe(original.commandId)
     expect(store.canWrite).toBe(false)
     await store.recheck()
-    mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'p', sourceVersion: 'v2', value: ['log'] }))
+    mocks.resolve.mockResolvedValueOnce({ outcome: 'applied', result: { commandId: original.commandId, projectId: 'p', sourceVersion: 'v2', value: ['log'] } })
     await store.recoverPending()
-    expect(mocks.save.mock.calls[1]![0]).toEqual(original)
+    expect(mocks.save).toHaveBeenCalledTimes(1)
+    expect(mocks.resolve.mock.calls[0]![0]).toEqual({ commandId: original.commandId, workspaceId: original.workspaceId, actorId: original.actorId, family: 'schedule', targetId: 'p', action: 'set-baseline' })
     expect(store.pendingCommand).toBeNull()
   })
   it('旧项目基线确认不能作用于新项目；已写成功但回读失败仍保原命令', async () => {
@@ -98,20 +102,23 @@ describe('浏览器中央 WBS 项目会话与失响应恢复', () => {
     mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'new', sourceVersion: 'v2', value: [] }))
     mocks.read.mockRejectedValueOnce(scheduleProblem('forbidden', '读回无权'))
     await expect(store.setBaseline('new')).rejects.toThrow()
-    expect(store.pendingCommand?.projectId).toBe('new')
+    expect(store.pendingCommand?.descriptor.targetId).toBe('new')
+    expect(store.pendingCommand?.state).toBe('applied')
+    mocks.read.mockResolvedValueOnce(read('new', 'v2'))
+    await store.recoverPending()
+    expect(mocks.save).toHaveBeenCalledTimes(1)
+    expect(mocks.resolve).not.toHaveBeenCalled()
   })
   it('失响应后恢复遇通用陈旧来源不能释放原ID，只有匹配未应用证明才释放', async () => {
     const store = useScheduleStore()
     await store.loadProject('p')
     mocks.save.mockRejectedValueOnce(scheduleProblem('unavailable', 'lost'))
     await expect(store.setBaseline('p')).rejects.toThrow()
-    const id = store.pendingCommand!.commandId
-    mocks.save.mockRejectedValueOnce(scheduleProblem('stale-source', '来源回查变化'))
+    const id = store.pendingCommand!.descriptor.commandId
+    mocks.resolve.mockRejectedValueOnce(scheduleProblem('stale-source', '来源回查变化'))
     await expect(store.recoverPending()).rejects.toThrow()
-    expect(store.pendingCommand!.commandId).toBe(id)
-    const rejected = scheduleProblem('stale-source', '原提交明确未应用')
-    Object.assign(rejected.problem, { commandId: id, commandOutcome: 'not-applied' })
-    mocks.save.mockRejectedValueOnce(rejected)
+    expect(store.pendingCommand!.descriptor.commandId).toBe(id)
+    mocks.resolve.mockResolvedValueOnce({ outcome: 'not-applied', commandId: id })
     await expect(store.recoverPending()).rejects.toThrow()
     expect(store.pendingCommand).toBeNull()
   })

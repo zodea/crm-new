@@ -367,6 +367,7 @@ function updateLine(payload: LineUpdate) {
       break
     case 'boqLineId':
       line.boqLineId = payload.value
+      line.boqBindingVersion = boqLines.value.find(row => row.id === payload.value)?.bindingVersion
       break
     case 'contractQty':
       line.contractQty = payload.value
@@ -585,6 +586,7 @@ useTabTitle(() => selectedTemplate.value
 </script>
 
 <template>
+  <QuantityCommandRecovery surface="templates" :project-id="projectId" />
   <EntityFormShell
     data-testid="quantity-template-form"
     title="户型模板与三量"

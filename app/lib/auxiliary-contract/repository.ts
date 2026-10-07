@@ -1,14 +1,19 @@
-import type { AuxiliaryContractCommand, AuxiliaryContractDetail, AuxiliaryContractPage } from './contract'
+import type { ConstructionMainOption } from '../construction-scope/contract'
+import type { CommandResolution } from '../forms/command-recovery'
+import type { OurSignatoryRecord } from '../our-signatory/contract'
+import type { AuxiliaryContractCommand, AuxiliaryContractDetail, AuxiliaryContractKind, AuxiliaryContractPage, AuxiliaryImportCommand, AuxiliaryImportPreview, AuxiliaryImportResult } from './contract'
 import { isEntityRefDTO, isISODateTimeDTO } from '../../types/read-model'
+import { decodeContractOriginalContent } from '../forms/original-content'
 import { isCoreMigrationMoney } from '../migration/core-contract'
 import { hasConsistentOriginReadMeta, hasConsistentReadMeta } from '../read-model/meta'
 import { isPaginationDTO, parsePageQuery } from '../read-model/pagination'
 import { problemFromHttpFailure } from '../read-model/problem'
 import { AuxiliaryContractProblem, auxiliaryProblem } from './contract'
 
-export interface AuxiliaryContractContext { workspaceId: string, actorId: string, capabilities: readonly string[], projects: Array<{ id: string, label: string }>, suppliers: Array<{ id: string, label: string }> }
-export interface AuxiliaryContractResult { id: string, commandId: string, version: string }
-export type AuxiliaryFetcher = (url: string, options?: { method?: 'POST', body?: AuxiliaryContractCommand, query?: Record<string, unknown> }) => Promise<unknown>
+export interface AuxiliaryContractContext { workspaceId: string, actorId: string, capabilities: readonly string[], projects: Array<{ id: string, label: string }>, suppliers: Array<{ id: string, label: string }>, constructionMains?: ConstructionMainOption[], ourSignatories?: OurSignatoryRecord[] }
+export interface AuxiliaryContractResult { id: string, commandId: string, version: string, updatedAt: string, attachmentIds: string[] }
+export type AuxiliaryFetcher = (url: string, options?: { method?: 'POST', body?: unknown, query?: Record<string, unknown> }) => Promise<unknown>
+export interface AuxiliaryContractFormRead { draft: AuxiliaryContractCommand['draft'] & { id: string }, version: string, updatedAt: string, attachments: AuxiliaryContractDetail['attachments'], constructionMain: AuxiliaryContractDetail['constructionMain'] }
 export function auxiliaryProblemFromUnknown(cause: unknown): AuxiliaryContractProblem {
   if (cause instanceof AuxiliaryContractProblem)
     return cause
@@ -57,15 +62,25 @@ function validateContract(value: unknown) {
   }
 }
 export function createAuxiliaryContractRepository(fetcher: AuxiliaryFetcher) {
-  async function read<T>(url: string, options: Parameters<AuxiliaryFetcher>[1], decode: (value: unknown) => T): Promise<T> {
+  async function read<T>(url: string, options: Parameters<AuxiliaryFetcher>[1], decode: (value: unknown) => T): Promise<Awaited<T>> {
     try {
-      return decode(await fetcher(url, options))
+      return await decode(await fetcher(url, options))
     }
     catch (cause) {
       throw auxiliaryProblemFromUnknown(cause)
     }
   }
-  return {
+  function result(value: unknown, commandId: string) {
+    if (!object(value) || typeof value.id !== 'string' || typeof value.version !== 'string' || !/^[1-9]\d*$/.test(value.version) || value.commandId !== commandId || !isISODateTimeDTO(value.updatedAt) || !Array.isArray(value.attachmentIds) || !value.attachmentIds.every(id => typeof id === 'string') || new Set(value.attachmentIds).size !== value.attachmentIds.length)
+      return invalid()
+    return value as unknown as AuxiliaryContractResult
+  }
+  function imported(value: unknown, commandId?: string) {
+    if (!object(value) || typeof value.importId !== 'string' || typeof value.sourceSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sourceSha256) || typeof value.commandId !== 'string' || (commandId && value.commandId !== commandId) || !Array.isArray(value.ids) || !value.ids.every(id => typeof id === 'string') || !Array.isArray(value.supplementIds) || !value.supplementIds.every(id => typeof id === 'string'))
+      return invalid()
+    return value as unknown as AuxiliaryImportResult
+  }
+  const repository = {
     list: (query: Record<string, unknown>) => read('/api/read/auxiliary-contracts', { query }, (value) => {
       const { requestedPage, pageSize } = parsePageQuery(query, () => {
         throw auxiliaryProblem('invalid-query', '合同分页参数无效')
@@ -91,7 +106,8 @@ export function createAuxiliaryContractRepository(fetcher: AuxiliaryFetcher) {
       const contract = value.contract
       if (!value.facts.every(fact => object(fact) && fact.contractId === id && fact.contractKind === contract.kind && fact.dataOrigin === contract.dataOrigin && ['invoice', 'payment', 'settlement', 'supplement'].includes(String(fact.kind)) && typeof fact.id === 'string' && typeof fact.effective === 'boolean' && (fact.amount === null || isCoreMigrationMoney(fact.amount))))
         invalid()
-      if (!value.attachments.every(file => object(file) && file.ownerId === id && file.ownerType === (contract.kind === 'company_expense' ? 'company_expense_contract' : 'contract') && typeof file.id === 'string' && typeof file.fileName === 'string' && Number.isSafeInteger(file.fileSize) && file.filePath === ''))
+      const supplementIds = new Set(value.facts.filter(fact => object(fact) && fact.kind === 'supplement').map(fact => fact.id))
+      if (!value.attachments.every(file => object(file) && ((file.ownerId === id && file.ownerType === (contract.kind === 'company_expense' ? 'company_expense_contract' : 'contract')) || (file.ownerType === 'contract_supplement' && supplementIds.has(file.ownerId))) && typeof file.id === 'string' && typeof file.fileName === 'string' && Number.isSafeInteger(file.fileSize) && file.filePath === ''))
         invalid()
       return value as unknown as AuxiliaryContractDetail
     }),
@@ -102,10 +118,32 @@ export function createAuxiliaryContractRepository(fetcher: AuxiliaryFetcher) {
       }
       return value as unknown as AuxiliaryContractContext
     }),
-    execute: (body: AuxiliaryContractCommand) => read('/api/commands/auxiliary-contracts', { method: 'POST', body }, (value) => {
-      if (!object(value) || typeof value.id !== 'string' || typeof value.version !== 'string' || value.commandId !== body.commandId)
+    execute: (body: AuxiliaryContractCommand) => read('/api/commands/auxiliary-contracts', { method: 'POST', body }, value => result(value, body.commandId)),
+    resolve: (descriptor: { commandId: string, workspaceId: string, actorId: string, action: 'save' | 'adopt' | 'restore', scopeId: string }): Promise<CommandResolution<AuxiliaryContractResult | AuxiliaryImportResult>> => read('/api/commands/auxiliary-contracts/resolve', { method: 'POST', body: descriptor }, (value) => {
+      if (!object(value))
         return invalid()
-      return value as unknown as AuxiliaryContractResult
+      if (value.outcome === 'not-applied' && value.commandId === descriptor.commandId)
+        return { outcome: 'not-applied', commandId: descriptor.commandId }
+      if (value.outcome !== 'applied')
+        return invalid()
+      return { outcome: 'applied', result: descriptor.action === 'save' ? result(value.result, descriptor.commandId) : imported(value.result, descriptor.commandId) }
     }),
+    fileContent: (id: string, fileId: string) => read(`/api/read/auxiliary-contracts/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}`, { query: { origin: 'real' } }, value => decodeContractOriginalContent(value, { ownerId: id, fileId, origin: 'real' }, invalid)),
+    importState: () => read('/api/read/auxiliary-contracts/import', undefined, (value) => {
+      if (!object(value) || !object(value.context) || !Array.isArray(value.sources) || !value.sources.every(row => object(row) && typeof row.importId === 'string' && typeof row.sourceSha256 === 'string' && typeof row.importedAt === 'string' && typeof row.restored === 'boolean' && Array.isArray(row.ids) && Array.isArray(row.supplementIds)))
+        return invalid()
+      return value as unknown as { context: AuxiliaryContractContext, sources: Array<{ importId: string, sourceSha256: string, importedAt: string, restored: boolean, ids: string[], supplementIds: string[] }> }
+    }),
+    preflight: (body: AuxiliaryImportCommand) => read('/api/commands/auxiliary-contracts/import', { method: 'POST', body: { mode: 'preflight', request: body } }, (value) => {
+      if (!object(value) || value.sourceSha256 !== body.source.sha256 || !Array.isArray(value.contracts) || !Array.isArray(value.references) || !Array.isArray(value.requiredOriginals))
+        return invalid()
+      return value as unknown as AuxiliaryImportPreview
+    }),
+    adopt: (body: AuxiliaryImportCommand) => read('/api/commands/auxiliary-contracts/import', { method: 'POST', body: { mode: 'adopt', request: body } }, value => imported(value, body.commandId)),
+    restoreImport: (body: { commandId: string, workspaceId: string, actorId: string, importId: string }) => read('/api/commands/auxiliary-contracts/restore-import', { method: 'POST', body }, value => imported(value, body.commandId)),
   }
+  return { ...repository, loadForm: async (id: string, kind: AuxiliaryContractKind): Promise<AuxiliaryContractFormRead> => {
+    const detail = await repository.detail(id, { kind, origin: 'real', includeDeleted: 'true' })
+    return { draft: { ...detail.contract.draft, id }, version: detail.contract.version, updatedAt: detail.contract.audit.updatedAt ?? detail.asOf, attachments: detail.attachments.filter(file => file.ownerId === id), constructionMain: detail.constructionMain ?? null }
+  } }
 }

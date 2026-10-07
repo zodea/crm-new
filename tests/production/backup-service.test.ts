@@ -5,7 +5,7 @@ import { createProductionBackupService } from '../../server/utils/production-bac
 import { createProductionStorage } from '../../server/utils/production-storage'
 
 async function fixture() {
-  const base = resolve('.codex-tmp/issue-451-tests')
+  const base = resolve('.tmp/opt02-backup-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/service-`)
   const locations = Object.fromEntries(['source', 'staging', 'nas', 'offline', 'restore'].map(name => [name, join(directory, name)]))
@@ -44,7 +44,7 @@ it('计划补跑、原键回执、介质失败保上份、离线时点和隔离�
     expect(failed.latest?.packageId).toBe(first!.packageId)
     expect(await service.scheduled()).toBeNull()
     await rename(`${f.config.primaryDirectory}-disconnected`, f.config.primaryDirectory)
-    expect(await readFile(join(f.config.primaryDirectory, first!.packageId!, 'data.sqlite'))).toEqual(original)
+    expect((await readFile(join(f.config.primaryDirectory, first!.packageId!, 'data.sqlite'))).equals(original)).toBe(true)
     await f.storage.close()
     const cold = createProductionStorage({ ...f.identity, directory: f.locations.source! })
     try {

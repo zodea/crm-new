@@ -8,7 +8,7 @@ export interface ScheduleHistoryLog {
   action: string
   beforeJson: string | null
   afterJson: string | null
-  operator: string
+  operator: string | null
   createdAt: string
 }
 export interface ScheduleRemovedTask {
@@ -40,7 +40,7 @@ export interface ScheduleHistory {
 }
 
 /** 调用者先授权本项目；按真实项目祖先连接，不能仅凭日志 operator 或同名对象归属。 */
-export async function loadScheduleHistory(db: TransactionDb, projectId: string): Promise<ScheduleHistory> {
+export async function loadScheduleHistory(db: TransactionDb, projectId: string, visibility: Pick<typeof import('../db/soft-delete'), 'hiddenCtesFor'> = { hiddenCtesFor }): Promise<ScheduleHistory> {
   const logs = await db.select<ScheduleHistoryLog>(`SELECT log.id, log.table_name AS tableName, log.record_id AS recordId,
       log.action, log.before_data AS beforeJson, log.after_data AS afterJson, log.operator, log.created_at AS createdAt
     FROM operation_logs log
@@ -51,7 +51,7 @@ export async function loadScheduleHistory(db: TransactionDb, projectId: string):
        OR (log.table_name = 'task_dependencies' AND EXISTS (SELECT 1 FROM task_dependencies d JOIN schedule_tasks t ON t.id = d.succ_id WHERE d.id = log.record_id AND t.project_id = ?))
        OR (log.table_name = 'schedule_task_floor_plans' AND EXISTS (SELECT 1 FROM schedule_task_floor_plans f JOIN schedule_tasks t ON t.id = f.task_id WHERE f.id = log.record_id AND t.project_id = ?))
     ORDER BY log.created_at, log.id`, Array.from({ length: 6 }).fill(projectId))
-  const removedTasks = await db.select<ScheduleRemovedTask>(`${hiddenCtesFor('schedule_tasks')}
+  const removedTasks = await db.select<ScheduleRemovedTask>(`${visibility.hiddenCtesFor('schedule_tasks')}
     SELECT t.id, t.group_id AS groupId, t.name, t.deleted_at AS deletedAt,
       t.planned_start AS plannedStart, t.planned_finish AS plannedFinish,
       t.baseline_start AS baselineStart, t.baseline_finish AS baselineFinish,

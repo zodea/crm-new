@@ -47,7 +47,7 @@ interface CustomerOption {
   name: string
 }
 
-interface StoredContract {
+export interface StoredConstructionContract {
   managementFee: ConstructionManagementFeeConfiguration
   id: string
   draft: ProjectContractFormDraft & { id: string }
@@ -58,6 +58,13 @@ interface StoredContract {
   updatedAt: string
   actualCompletionDate: string | null
   migrationBatchId: string | null
+}
+type StoredContract = StoredConstructionContract
+export interface ConstructionContractOwnerSnapshot {
+  schemaVersion: 1
+  sourceVersion: number
+  contracts: StoredConstructionContract[]
+  supplements: ConstructionContractFactSources['supplements']
 }
 
 interface SessionState extends CommandJournal<ConstructionContractCommandResultDTO> {
@@ -205,7 +212,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
     return state.referenceCustomers.get(id) ?? state.migratedCustomers.get(id)
   }
 
-  function validate(state: SessionState, draft: ProjectContractFormDraft, action: ConstructionContractCommandRequestDTO['action']) {
+  function validate(state: SessionState, draft: ProjectContractFormDraft, action: ConstructionContractCommandRequestDTO['action'], existing: StoredContract | null = null) {
     const fieldErrors: Record<string, string[]> = {}
     try {
       validateConstructionManagementFee(draft.managementFeeAmount ?? null, draft.managementFeeBasis ?? '')
@@ -248,7 +255,8 @@ export function createConstructionContractCommandTestInstance(options: Options =
       throw failure('validation-failed', '项目不存在或来源不可用', { projectId: ['项目不存在'] })
     if (text(draft.customerId) && !customerFor(state, text(draft.customerId)))
       throw failure('validation-failed', '客户不存在或来源不可用', { customerId: ['客户不存在'] })
-    if (project && text(draft.customerId) && project.customerId !== text(draft.customerId))
+    const preservedPair = existing && text(existing.draft.projectId) === text(draft.projectId) && text(existing.draft.customerId) === text(draft.customerId)
+    if (project && text(draft.customerId) && project.customerId !== text(draft.customerId) && !preservedPair)
       throw failure('validation-failed', '项目与甲方客户关系不匹配', { customerId: ['必须选择项目当前客户'] })
   }
 
@@ -328,6 +336,31 @@ export function createConstructionContractCommandTestInstance(options: Options =
   }
 
   const instance = {
+    /** A transaction-local formal owner adopts current records without importing or synchronizing masters. */
+    importState(snapshot: ConstructionContractOwnerSnapshot) {
+      if (snapshot.schemaVersion !== 1 || !Number.isSafeInteger(snapshot.sourceVersion) || snapshot.sourceVersion < 0 || new Set(snapshot.contracts.map(row => row.id)).size !== snapshot.contracts.length)
+        throw failure('unavailable', '施工合同当前owner快照身份或版本无效')
+      const state = stateFor()
+      for (const row of snapshot.contracts) {
+        if (!row.id || row.draft.id !== row.id || !Number.isSafeInteger(row.version) || row.version < 1 || !Number.isFinite(Date.parse(row.createdAt)) || !Number.isFinite(Date.parse(row.updatedAt)) || !(row.originals instanceof Map))
+          throw failure('unavailable', '施工合同原身份、时间、版本或原件目录无效')
+        decodeConstructionManagementFee(row.managementFee)
+        for (const file of row.attachments) {
+          if (file.ownerType !== 'contract' || file.ownerId !== row.id || !file.id)
+            throw failure('unavailable', '施工合同附件串了原归属')
+          const body = row.originals.get(file.id)
+          if (body && (body.bytes.length !== file.fileSize || contractOriginalDigest(body.bytes) !== body.sha256 || file.sha256 !== body.sha256))
+            throw failure('unavailable', '施工合同原件正文与摘要不一致')
+        }
+      }
+      state.contracts = new Map(structuredClone(snapshot.contracts).map(row => [row.id, row]))
+      state.migratedSupplements = structuredClone(snapshot.supplements)
+      state.sourceVersion = snapshot.sourceVersion
+    },
+    exportState(): ConstructionContractOwnerSnapshot {
+      const state = stateFor()
+      return { schemaVersion: 1, sourceVersion: state.sourceVersion, contracts: structuredClone([...state.contracts.values()]), supplements: structuredClone(state.migratedSupplements) }
+    },
     formContext(sessionId?: string | null) {
       const state = stateFor(sessionId)
       return {
@@ -366,7 +399,10 @@ export function createConstructionContractCommandTestInstance(options: Options =
             mimeType: file.mimeType,
             category: file.category,
             uploadedAt: file.uploadedAt,
-          }))),
+          }))).concat(state.migratedSupplements.flatMap((supplement) => {
+          const files = (supplement as ConstructionContractFactSources['supplements'][number] & { attachments?: ContractFormAttachment[] }).attachments ?? []
+          return files.filter(file => file.deletedAt === null).map(file => ({ dataOrigin: 'real' as const, id: file.id, contractId: supplement.contractId!, fileName: file.fileName, fileSize: file.fileSize, mimeType: file.mimeType, category: file.category, uploadedAt: file.uploadedAt }))
+        })),
       }
     },
     sourceVersion(sessionId?: string | null) {
@@ -599,7 +635,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
         throw failure('validation-failed', '新建施工合同不能带 baseVersion')
       if (existing && request.baseVersion !== String(existing.version))
         throw failure('conflict', '施工合同已被其他操作更新，请先处理最新版本')
-      validate(state, request.draft, request.action)
+      validate(state, request.draft, request.action, existing)
       let candidate = request.draft
       if (options.resolveSignatory) {
         const snapshot = await options.resolveSignatory(candidate, existing, request.action !== 'draft', session, sessionId)
@@ -612,7 +648,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
           return structuredClone(completed)
         if (existing && state.contracts.get(existing.id) !== existing)
           throw failure('conflict', '合同在核对签约主体期间已变化，请保留输入并核对版本')
-        validate(state, candidate, request.action)
+        validate(state, candidate, request.action, existing)
       }
       const timestamp = now()
       const managementFee = adoptConstructionManagementFee(existing?.managementFee ?? emptyConstructionManagementFee(), candidate, { version: randomUUID(), contractVersion: String((existing?.version ?? 0) + 1), adoptedAt: timestamp, actorId: session.actorId, commandId: request.commandId })

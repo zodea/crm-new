@@ -57,6 +57,22 @@ import { quantityMeasureTotal } from '../quantity/totals'
 
 type ScheduleDb = TransactionDb
 
+/** Formal owners supply actual source reads; the existing Native adapter keeps its original defaults. */
+export interface ScheduleEngineAdapters {
+  actorId?: string
+  undo?: typeof undoOperation
+  visibility?: Pick<typeof import('../db/soft-delete'), 'hiddenCtesFor' | 'visibleCond' | 'selectVisibleSql'>
+  libraries?: typeof loadScheduleProcessLibraries
+  libraryTasks?: typeof loadScheduleProcessLibraryTasks
+  catalog?: typeof loadScheduleCatalog
+  buildings?: typeof loadScheduleBuildings
+  contracts?: typeof loadScheduleContracts
+  buildingCoverage?: typeof loadScheduleBuildingCoverage
+  contractReference?: (db: ScheduleDb, projectId: string, contractId: string) => Promise<{ id: string } | null>
+  boqLinesByItem?: typeof loadBoqLinesByItem
+  project?: typeof loadScheduleProject
+}
+
 export interface CreateScheduleGroupDraft {
   librarySourceVersion?: string
   projectId: string
@@ -100,12 +116,13 @@ export interface SaveScheduleTaskPlanDraft {
 }
 
 interface IdCodeRow { id: string, code: string, completion_mode?: 'unit' | 'manual', trade?: string }
-interface BoqLineRow {
+export interface BoqLineRow {
   id: string
   item_id: string
   building: string
   unit_type: string
   floor_zone: string
+  declaredBuildingId?: string | null
 }
 interface FloorRow {
   id: string
@@ -239,8 +256,11 @@ function applicableFloors(line: BoqLineRow, floors: readonly FloorRow[]): FloorR
   const unitType = line.unit_type.trim().toLocaleLowerCase('zh-CN')
   const floorZone = line.floor_zone.trim().toLocaleLowerCase('zh-CN')
   return floors.filter((floor) => {
+    if (line.declaredBuildingId && floor.building_id !== line.declaredBuildingId)
+      return false
     if (
-      building
+      !line.declaredBuildingId
+      && building
       && floor.building_code.toLocaleLowerCase('zh-CN') !== building
       && floor.building_name.toLocaleLowerCase('zh-CN') !== building
     ) {
@@ -365,6 +385,7 @@ export async function loadBoqLinesByItem(
   projectId: string,
   contractId: string,
   itemIds: readonly string[],
+  _buildingIds?: readonly string[],
 ): Promise<Map<string, BoqLineRow[]>> {
   const uniqueItemIds = [...new Set(itemIds)]
   if (!contractId || !uniqueItemIds.length)
@@ -391,7 +412,18 @@ export async function loadBoqLinesByItem(
   return linesByItem
 }
 
-export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: (tx: ScheduleDb) => Promise<T>) => Promise<T>, shallowRef: <T>(value: T) => { value: T } = value => ({ value })) {
+export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: (tx: ScheduleDb) => Promise<T>) => Promise<T>, shallowRef: <T>(value: T) => { value: T } = value => ({ value }), adapters: ScheduleEngineAdapters = {}) {
+  const createLog = (tx: ScheduleDb, table: string, id: string, operator = adapters.actorId ?? '') => logCreate(tx, table, id, operator)
+  const updateLog = (tx: ScheduleDb, table: string, id: string, mutate: () => Promise<void>, operator = adapters.actorId ?? '') => withUpdateLog(tx, table, id, mutate, operator)
+  const deleteLog = (tx: ScheduleDb, table: string, id: string, operator = adapters.actorId ?? '') => softDelete(tx, table, id, operator)
+  const restoreLog = (tx: ScheduleDb, table: string, id: string, operator = adapters.actorId ?? '') => restoreRecord(tx, table, id, operator)
+  const visibility = adapters.visibility
+  const hidden = visibility?.hiddenCtesFor ?? hiddenCtesFor
+  const visible = visibility?.visibleCond ?? visibleCond
+  const selectVisible = visibility?.selectVisibleSql ?? selectVisibleSql
+  const readLibraries = adapters.libraries ?? loadScheduleProcessLibraries
+  const readLibraryTasks = adapters.libraryTasks ?? loadScheduleProcessLibraryTasks
+  const readBuildings = adapters.buildings ?? loadScheduleBuildings
   const readonly = <T>(value: T) => value
   const expandedGroupIdsByProject = shallowRef<Record<string, string[]>>({})
   const catalog = shallowRef<ScheduleCatalogProject[]>([])
@@ -419,7 +451,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
   }
 
   async function loadCatalog() {
-    catalog.value = await loadScheduleCatalog(db)
+    catalog.value = await (adapters.catalog ?? loadScheduleCatalog)(db)
   }
 
   async function loadBuildings(projectId: string, contractId = '') {
@@ -429,11 +461,11 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
       return
     }
     if (!contractId) {
-      buildings.value = await loadScheduleBuildings(db, projectId)
+      buildings.value = await readBuildings(db, projectId)
       buildingCoverage.value = []
       return
     }
-    buildingCoverage.value = await loadScheduleBuildingCoverage(db, projectId, contractId)
+    buildingCoverage.value = await (adapters.buildingCoverage ?? loadScheduleBuildingCoverage)(db, projectId, contractId)
     buildings.value = buildingCoverage.value
       .filter(building => building.inContract && !building.scheduled)
       .map(({ id, projectId: rowProjectId, code, name }) => ({
@@ -445,7 +477,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
   }
 
   async function loadContracts(projectId: string) {
-    contracts.value = projectId ? await loadScheduleContracts(db, projectId) : []
+    contracts.value = projectId ? await (adapters.contracts ?? loadScheduleContracts)(db, projectId) : []
   }
 
   async function previewProvisionalScope(
@@ -461,7 +493,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
           unit_count: number
           typed_unit_count: number
         }>(
-          `${hiddenCtesFor('floors', 'units', 'house_type_templates')}
+          `${hidden('floors', 'units', 'house_type_templates')}
            SELECT floor_row.building_id,
                   COUNT(DISTINCT floor_row.id) AS floor_count,
                   COUNT(DISTINCT unit_row.id) AS unit_count,
@@ -471,11 +503,11 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
            FROM floors floor_row
            LEFT JOIN units unit_row
              ON unit_row.floor_id = floor_row.id
-            AND ${visibleCond('units', 'unit_row')}
+            AND ${visible('units', 'unit_row')}
            LEFT JOIN house_type_templates template
              ON template.id = unit_row.house_type_template_id
-            AND ${visibleCond('house_type_templates', 'template')}
-           WHERE ${visibleCond('floors', 'floor_row')}
+            AND ${visible('house_type_templates', 'template')}
+           WHERE ${visible('floors', 'floor_row')}
              AND floor_row.building_id IN (${uniqueBuildingIds.map(() => '?').join(', ')})
            GROUP BY floor_row.building_id`,
           uniqueBuildingIds,
@@ -524,14 +556,14 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
 
   async function loadProcessLibraries() {
     const generation = ++processLibraryRequestGeneration
-    const loaded = await loadScheduleProcessLibraries(db)
+    const loaded = await readLibraries(db)
     if (generation === processLibraryRequestGeneration)
       processLibraries.value = loaded
   }
 
   async function loadProcessLibraryTasks(libraryId: string) {
     const generation = ++processTaskRequestGeneration
-    const loaded = await loadScheduleProcessLibraryTasks(db, libraryId)
+    const loaded = await readLibraryTasks(db, libraryId)
     if (generation !== processTaskRequestGeneration)
       return []
     processTasks.value = loaded
@@ -573,7 +605,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
     loading.value = true
     error.value = ''
     try {
-      const result = projectId ? await loadScheduleProject(db, projectId, today) : null
+      const result = projectId ? await (adapters.project ?? loadScheduleProject)(db, projectId, today) : null
       if (request === latestRequest)
         snapshot.value = result
     }
@@ -619,13 +651,13 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
     error.value = ''
     try {
       await withTransaction(async (tx) => {
-        const libraries = await loadScheduleProcessLibraries(tx)
+        const libraries = await readLibraries(tx)
         const processLibrary = draft.processLibraryId
           ? libraries.find(row => row.id === draft.processLibraryId)
           : libraries.find(row => row.isDefault) ?? libraries[0]
         if (!processLibrary)
           throw new Error('标准工序库无效或已停用')
-        const libraryTasks = await loadScheduleProcessLibraryTasks(tx, processLibrary.id)
+        const libraryTasks = await readLibraryTasks(tx, processLibrary.id)
         const libraryTaskByKey = new Map(libraryTasks.map(task => [task.key, task]))
         const templates = plannedRows.map((row) => {
           const template = libraryTaskByKey.get(row.key)
@@ -635,7 +667,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
         })
 
         const contractId = scopeBasis === 'contract' ? draft.contractId! : ''
-        const buildings = (await loadScheduleBuildings(tx, draft.projectId, contractId))
+        const buildings = (await readBuildings(tx, draft.projectId, contractId))
           .filter(building => buildingIds.includes(building.id))
         if (buildings.length !== buildingIds.length) {
           throw new Error(scopeBasis === 'contract'
@@ -644,10 +676,12 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
         }
 
         if (scopeBasis === 'contract') {
-          const [contract] = await tx.select<{ id: string }>(
-            selectVisibleSql('contracts', `AND id = ? AND project_id = ? AND kind = '施工'`),
-            [contractId, draft.projectId],
-          )
+          const contract = adapters.contractReference
+            ? await adapters.contractReference(tx, draft.projectId, contractId)
+            : (await tx.select<{ id: string }>(
+                selectVisible('contracts', `AND id = ? AND project_id = ? AND kind = '施工'`),
+                [contractId, draft.projectId],
+              ))[0]
           if (!contract)
             throw new Error('施工合同无效、已删除或不属于当前项目')
         }
@@ -656,13 +690,13 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
         const itemCodes = templates.flatMap(({ template }) => template.itemCodes)
         const stages = stageCodes.length
           ? await tx.select<IdCodeRow>(
-              selectVisibleSql('construction_stages', `AND project_id = ? AND code IN (${stageCodes.map(() => '?').join(', ')})`),
+              selectVisible('construction_stages', `AND project_id = ? AND code IN (${stageCodes.map(() => '?').join(', ')})`),
               [draft.projectId, ...stageCodes],
             )
           : []
         const items = itemCodes.length
           ? await tx.select<IdCodeRow>(
-              selectVisibleSql('items', `AND project_id = ? AND code IN (${itemCodes.map(() => '?').join(', ')})`),
+              selectVisible('items', `AND project_id = ? AND code IN (${itemCodes.map(() => '?').join(', ')})`),
               [draft.projectId, ...itemCodes],
             )
           : []
@@ -674,11 +708,12 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
           throw new Error(`工序模板映射未就绪：${missingStage ?? missingItem}`)
         for (const { template } of templates)
           await validateEffectiveStageMapping(tx, stages.find(row => row.code === template.stageCode), template.itemCodes.map(code => itemByCode.get(code)!))
-        const boqLinesByItem = await loadBoqLinesByItem(
+        const boqLinesByItem = await (adapters.boqLinesByItem ?? loadBoqLinesByItem)(
           tx,
           draft.projectId,
           contractId,
           [...itemByCode.values()],
+          buildingIds,
         )
         const floors = await loadFloorsByBuildings(tx, buildingIds)
         if (scopeBasis === 'provisional') {
@@ -737,7 +772,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
             Number(order?.next_order) || 10,
           ],
         )
-        await logCreate(tx, 'schedule_groups', groupId)
+        await createLog(tx, 'schedule_groups', groupId)
 
         for (const [index, buildingId] of buildingIds.entries()) {
           const id = generateId('schedule_group_building')
@@ -746,7 +781,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
              VALUES (?, ?, ?, ?)`,
             [id, groupId, buildingId, (index + 1) * 10],
           )
-          await logCreate(tx, 'schedule_group_buildings', id)
+          await createLog(tx, 'schedule_group_buildings', id)
         }
 
         const enabledTaskKeys = new Set(templates.map(({ row }) => row.key))
@@ -865,14 +900,14 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
               row.plannedFinish,
               hasQuantity ? 1 : 0,
               hasQuantity ? null : 0,
-              stageId,
+              hasQuantity ? stageId : null,
               (index + 1) * 10,
               template.id,
               processLibrary.version,
               templateSnapshot,
             ],
           )
-          await logCreate(tx, 'schedule_tasks', taskId)
+          await createLog(tx, 'schedule_tasks', taskId)
 
           for (const itemCode of template.itemCodes) {
             const mapId = generateId('schedule_task_item')
@@ -884,7 +919,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
                VALUES (?, ?, ?, ?)`,
               [mapId, taskId, itemId, boqLineId],
             )
-            await logCreate(tx, 'task_item_map', mapId)
+            await createLog(tx, 'task_item_map', mapId)
             for (const boqLine of boqLines) {
               const lineFloors = applicableFloors(boqLine, floors)
               if (lineFloors.length) {
@@ -917,7 +952,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
                   plan.sortOrder,
                 ],
               )
-              await logCreate(tx, 'schedule_task_floor_plans', planId)
+              await createLog(tx, 'schedule_task_floor_plans', planId)
               if ((await tx.select('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'schedule_floor_quantity_snapshots\'')).length)
                 await tx.execute('INSERT INTO schedule_floor_quantity_snapshots (id, project_id, snapshot_json, legacy_missing) VALUES (?, ?, ?, 0)', [planId, draft.projectId, JSON.stringify(plan.quantitySnapshot)])
             }
@@ -947,9 +982,9 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
                 calendarDays(predecessor.plannedFinish, successor.plannedStart),
               ],
             )
-            await logCreate(tx, 'task_dependencies', dependencyId)
+            await createLog(tx, 'task_dependencies', dependencyId)
             if (resolvedPredecessorDisabledByKey.get(row.key)) {
-              await softDelete(
+              await deleteLog(
                 tx,
                 'task_dependencies',
                 dependencyId,
@@ -990,7 +1025,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
     patch: UpdateScheduleTaskPatch,
   ) {
     const { manualProgress, plannedStart, plannedFinish } = validatedTaskPatch(current, patch)
-    const taskLogId = await withUpdateLog(tx, 'schedule_tasks', current.id, () => tx.execute(
+    const taskLogId = await updateLog(tx, 'schedule_tasks', current.id, () => tx.execute(
       `UPDATE schedule_tasks
        SET planned_start = ?, planned_finish = ?, duration_days = ?, manual_progress = ?, updated_at = datetime('now')
        WHERE id = ?`,
@@ -1002,6 +1037,8 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
         current.id,
       ],
     ))
+    if (plannedStart === current.plannedStart && plannedFinish === current.plannedFinish)
+      return taskLogId
     const plansBySource = new Map<string, typeof current.floorPlans>()
     for (const plan of current.floorPlans) {
       const sourceKey = plan.boqLineId ?? `item:${plan.itemId}`
@@ -1016,7 +1053,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
         if (plan.isManual)
           continue
         const window = floorPlanWindow(plannedStart, plannedFinish, index, orderedPlans.length)
-        await withUpdateLog(tx, 'schedule_task_floor_plans', plan.id, () => tx.execute(
+        await updateLog(tx, 'schedule_task_floor_plans', plan.id, () => tx.execute(
           `UPDATE schedule_task_floor_plans
            SET planned_start = ?, planned_finish = ?, updated_at = datetime('now')
            WHERE id = ?`,
@@ -1059,7 +1096,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
       ) {
         continue
       }
-      const logId = await withUpdateLog(tx, 'schedule_task_floor_plans', patch.id, () => tx.execute(
+      const logId = await updateLog(tx, 'schedule_task_floor_plans', patch.id, () => tx.execute(
         `UPDATE schedule_task_floor_plans
          SET planned_start = ?,
              planned_finish = ?,
@@ -1110,7 +1147,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
   ) {
     const normalizedLag = normalizeDependencyLag(lagDays)
     if (current) {
-      return withUpdateLog(tx, 'task_dependencies', current.id, () => tx.execute(
+      return updateLog(tx, 'task_dependencies', current.id, () => tx.execute(
         `UPDATE task_dependencies
          SET pred_id = ?, dependency_type = 'FS', lag_days = ?, updated_at = datetime('now')
          WHERE id = ?`,
@@ -1123,7 +1160,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
        VALUES (?, ?, ?, 'FS', ?)`,
       [dependencyId, predecessorId, successorId, normalizedLag],
     )
-    return logCreate(tx, 'task_dependencies', dependencyId)
+    return createLog(tx, 'task_dependencies', dependencyId)
   }
 
   async function updateTask(
@@ -1255,7 +1292,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
             const [created] = await tx.select<{ id: string }>('SELECT id FROM task_dependencies WHERE succ_id = ? AND deleted_at IS NULL', [taskId])
             targetId = created!.id
           }
-          await softDelete(tx, 'task_dependencies', targetId, SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR)
+          await deleteLog(tx, 'task_dependencies', targetId, SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR)
         }
         return { taskLogId, floorPlanLogIds, dependencyLogId }
       })
@@ -1318,7 +1355,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
         const taskLogId = await persistTaskPatch(tx, current, patch)
         const disabledDependencyLogIds: string[] = []
         for (const dependencyId of expectedIds) {
-          const logId = await softDelete(
+          const logId = await deleteLog(
             tx,
             'task_dependencies',
             dependencyId,
@@ -1344,7 +1381,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
     const successor = snapshot.value?.groups
       .flatMap(group => group.tasks)
       .find(task => task.id === current.succId)
-    const logId = await softDelete(
+    const logId = await deleteLog(
       db,
       'task_dependencies',
       dependencyId,
@@ -1380,7 +1417,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
 
     saving.value = true
     try {
-      const logId = await restoreRecord(
+      const logId = await restoreLog(
         db,
         'task_dependencies',
         dependencyId,
@@ -1401,7 +1438,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
     const logIds: string[] = []
     await withTransaction(async (tx) => {
       for (const task of tasks) {
-        const logId = await withUpdateLog(tx, 'schedule_tasks', task.id, () => tx.execute(
+        const logId = await updateLog(tx, 'schedule_tasks', task.id, () => tx.execute(
           `UPDATE schedule_tasks
            SET baseline_start = planned_start,
                baseline_finish = planned_finish,
@@ -1424,7 +1461,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
   ) {
     const group = snapshot.value?.groups.find(candidate => candidate.id === groupId)
     const template = group
-      ? (await loadScheduleProcessLibraryTasks(db, group.processLibraryId))
+      ? (await readLibraryTasks(db, group.processLibraryId))
           .find(candidate => candidate.key === draft.templateKey)
       : undefined
     if (!group || !template)
@@ -1434,7 +1471,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
     await withTransaction(async (tx) => {
       const [stage] = template.stageCode
         ? await tx.select<IdCodeRow>(
-            selectVisibleSql('construction_stages', 'AND project_id = ? AND code = ?'),
+            selectVisible('construction_stages', 'AND project_id = ? AND code = ?'),
             [group.projectId, template.stageCode],
           )
         : []
@@ -1442,7 +1479,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
         throw new Error(`工序阶段未就绪：${template.stageCode}`)
       const items = template.itemCodes.length
         ? await tx.select<IdCodeRow>(
-            selectVisibleSql('items', `AND project_id = ? AND code IN (${template.itemCodes.map(() => '?').join(', ')})`),
+            selectVisible('items', `AND project_id = ? AND code IN (${template.itemCodes.map(() => '?').join(', ')})`),
             [group.projectId, ...template.itemCodes],
           )
         : []
@@ -1450,16 +1487,17 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
         throw new Error('工序分项映射未就绪')
       const itemByCode = new Map(items.map(item => [item.code, item.id]))
       await validateEffectiveStageMapping(tx, stage, [...itemByCode.values()])
-      const boqLinesByItem = await loadBoqLinesByItem(
+      const boqLinesByItem = await (adapters.boqLinesByItem ?? loadBoqLinesByItem)(
         tx,
         group.projectId,
         group.contractId,
         [...itemByCode.values()],
+        group.buildingIds,
       )
       const floors = await loadFloorsByBuildings(tx, group.buildingIds)
       if (group.scopeBasis === 'contract') {
-        const [contract] = await tx.select<{ id: string }>(selectVisibleSql('contracts', 'AND id = ? AND project_id = ? AND kind = \'施工\''), [group.contractId, group.projectId])
-        const coverage = await loadScheduleBuildingCoverage(tx, group.projectId, group.contractId)
+        const contract = adapters.contractReference ? await adapters.contractReference(tx, group.projectId, group.contractId) : (await tx.select<{ id: string }>(selectVisible('contracts', 'AND id = ? AND project_id = ? AND kind = \'施工\''), [group.contractId, group.projectId]))[0]
+        const coverage = await (adapters.buildingCoverage ?? loadScheduleBuildingCoverage)(tx, group.projectId, group.contractId)
         if (!contract || group.buildingIds.some(id => !coverage.some(row => row.id === id && row.inContract)))
           throw new Error('分组的当前施工合同或逐栋显式清单范围已失效')
         validateContractFloorCoverage(group.buildingIds.map((id, index) => ({ id, name: group.buildingNames[index] ?? id })), [template], itemByCode, boqLinesByItem, floors)
@@ -1528,7 +1566,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
           plannedFinish,
           stage && stage.completion_mode !== 'manual' ? 1 : 0,
           stage && stage.completion_mode !== 'manual' ? null : 0,
-          stage?.id ?? null,
+          stage && stage.completion_mode !== 'manual' ? stage.id : null,
           sortOrder,
           template.id,
           template.libraryVersion,
@@ -1550,7 +1588,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
           }),
         ],
       )
-      await logCreate(tx, 'schedule_tasks', taskId)
+      await createLog(tx, 'schedule_tasks', taskId)
       for (const itemCode of template.itemCodes) {
         const mapId = generateId('schedule_task_item')
         const itemId = itemByCode.get(itemCode)!
@@ -1560,7 +1598,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
           `INSERT INTO task_item_map (id, task_id, item_id, boq_line_id) VALUES (?, ?, ?, ?)`,
           [mapId, taskId, itemId, boqLineId],
         )
-        await logCreate(tx, 'task_item_map', mapId)
+        await createLog(tx, 'task_item_map', mapId)
         for (const boqLine of boqLines) {
           const lineFloors = applicableFloors(boqLine, floors)
           if (lineFloors.length) {
@@ -1593,7 +1631,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
               plan.sortOrder,
             ],
           )
-          await logCreate(tx, 'schedule_task_floor_plans', planId)
+          await createLog(tx, 'schedule_task_floor_plans', planId)
           if ((await tx.select('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'schedule_floor_quantity_snapshots\'')).length)
             await tx.execute('INSERT INTO schedule_floor_quantity_snapshots (id, project_id, snapshot_json, legacy_missing) VALUES (?, ?, ?, 0)', [planId, group.projectId, JSON.stringify(plan.quantitySnapshot)])
         }
@@ -1605,7 +1643,7 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
            VALUES (?, ?, ?, 'FS', ?)`,
           [dependencyId, lastTask.id, taskId, calendarDays(lastTask.plannedFinish, draft.plannedStart)],
         )
-        await logCreate(tx, 'task_dependencies', dependencyId)
+        await createLog(tx, 'task_dependencies', dependencyId)
       }
     })
     await loadProject(group.projectId, today)
@@ -1616,15 +1654,18 @@ export function createScheduleEngine(db: ScheduleDb, withTransaction: <T>(work: 
     const task = snapshot.value?.groups.flatMap(group => group.tasks).find(candidate => candidate.id === taskId)
     if (!task)
       return null
-    const logId = await softDelete(db, 'schedule_tasks', taskId)
+    const logId = await deleteLog(db, 'schedule_tasks', taskId)
     await loadProject(task.projectId, today)
     return logId
   }
 
   async function undo(logIds: readonly string[], today = activeToday) {
     await withTransaction(async (tx) => {
-      for (const logId of [...logIds].reverse())
-        await undoOperation(tx, logId)
+      for (const logId of [...logIds].reverse()) {
+        const applied = await (adapters.undo ?? undoOperation)(tx, logId)
+        if (adapters.undo && !applied)
+          throw new Error('历史动作之后已有新事实，整次撤销拒绝，请保留历史核对')
+      }
     })
     await reload(activeProjectId, today)
   }

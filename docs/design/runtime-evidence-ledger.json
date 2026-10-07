@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 171,
+    "trackedPageFiles": 172,
     "devPageFiles": 5,
-    "productionRoutes": 166,
+    "productionRoutes": 167,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 166,
-    "referenceEndpoints": 166,
+    "evidenceEndpointRecords": 167,
+    "referenceEndpoints": 167,
     "referenceProfiles": 50,
     "usedReferenceProfiles": 44,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
     "localAuthorityRoutes": 43,
     "historicalEvidenceRoutes": 35,
-    "unverifiedTargetRoutes": 16,
-    "designCoveredRoutes": 139,
-    "designPendingRoutes": 27
+    "unverifiedTargetRoutes": 17,
+    "designCoveredRoutes": 166,
+    "designPendingRoutes": 1
   },
   "domains": [
     {
@@ -232,7 +232,7 @@
     {
       "code": "quantity-payroll",
       "domain": "工程量与工资",
-      "routeCount": 28,
+      "routeCount": 29,
       "implementationIssues": [
         412
       ],
@@ -5278,6 +5278,37 @@
         "routeKey": "/subcontract/quantity/:pid/:uid/hollow/:id"
       },
       "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-46D46F2E15ED",
+      "page": "app/pages/subcontract/quantity/import.vue",
+      "localRoute": "/subcontract/quantity/import",
+      "domainCode": "quantity-payroll",
+      "template": "特殊工具",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-TOOL-PENDING",
+      "referenceEndpointId": "unverified-46D46F2E15ED",
+      "referenceEndpointLabel": "目标端点未验证：/subcontract/quantity/import",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/import"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/quantity/import"
+      },
+      "constraints": "C-TOOL"
     },
     {
       "evidenceRecordId": "E-015E1904AFBB",

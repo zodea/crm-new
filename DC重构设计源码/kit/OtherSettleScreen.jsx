@@ -55,7 +55,17 @@
       newDefaults: () => ({ status: "待确认", amount: 0 }),
       tableMinWidth: 1380,
     };
-    return <ELS meta={meta} params={params} navigate={navigate} />;
+    // 完整原库迁入入口（Q-A03-02，实现端列表头「原结算历史迁入」，需结算写入 + 迁入权限）
+    const nav = navigate || (window.DC && window.DC.navigate);
+    const { Button } = window.DesignSystem_e3d871 || {};
+    return (
+      <div style={{ display: "grid", gap: 8, minWidth: 0 }}>
+        {Button && <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button size="sm" icon="database-backup" onClick={() => nav && nav("otherSettleImport", {})}>原结算历史迁入</Button>
+        </div>}
+        <ELS meta={meta} params={params} navigate={navigate} />
+      </div>
+    );
   }
 
   window.OtherSettleScreen = OtherSettleScreen;

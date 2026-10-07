@@ -21,3 +21,6 @@ export async function loadPayrollBudgetActual(db: TransactionDb, projectId: stri
   }
   return (['settledAmount', 'paidAmount'] as const).map(metric => ({ id: '工资实际收付', version, metric, categories: ['工人工资'], status, rows }))
 }
+
+/** The production budget consumes this same read-only signed actual fact set in its held transaction. */
+export { loadPayrollBudgetActual as readProductionPayrollBudgetActual }

@@ -1,6 +1,8 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { BusinessSession } from './business-session'
+import { createHash } from 'node:crypto'
 import { financeFailure } from '../../app/lib/finance/central-contract'
+import { expenseConsumptionFingerprint } from '../../app/lib/finance/clearance-verification'
 import { readVerifiedOriginalExpense } from '../../app/lib/finance/expense-reference'
 import { readExpenseClearanceSource } from './production-finance-clearance'
 
@@ -21,7 +23,11 @@ export async function readOriginalExpenseReference(tx: TransactionDb, actor: Bus
   const source = (await tx.select<{ revision: number }>('SELECT revision FROM finance_revision WHERE singleton=1'))[0]
   if (!version || !source || !Number.isSafeInteger(version.version) || version.version < 1 || !Number.isSafeInteger(source.revision) || source.revision < 0)
     financeFailure('unavailable', '原费用正式记录版本或来源版本缺失。')
-  return readExpenseClearanceSource(tx, actor, { ...expense, version: String(version.version), sourceRevision: `finance-${source.revision}` })
+  const current = await readExpenseClearanceSource(tx, actor, { ...expense, version: String(version.version), sourceRevision: `finance-${source.revision}` })
+  // Metadata versions and old frozen proofs remain literal. New adoption gates
+  // only the selected original identity/amount and the eligibility it consumes.
+  const consumptionVersion = `expense-consumption-v1:${createHash('sha256').update(expenseConsumptionFingerprint(current)).digest('hex')}`
+  return { ...current, consumptionVersion }
 }
 export async function listOriginalExpenseReferences(tx: TransactionDb, actor: BusinessSession, projectId?: string | null) {
   await authorize(tx, actor)

@@ -5,19 +5,22 @@ import type { MaterialContractOwnerSnapshot, StoredMaterialContract } from './ma
 import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
 import { isDeepStrictEqual } from 'node:util'
+import { FinanceRepositoryProblem } from '../../app/lib/finance/central-contract'
 import { buildContractPriceFacts } from '../../app/lib/material-contract/price-facts'
 import { buildMaterialContractDetail, buildMaterialContractListPage, materialContractProblem, MaterialContractRepositoryProblem, parseMaterialContractDetailQuery, parseMaterialContractListQuery } from '../../app/lib/material-contract/repository'
 import { OurSignatoryRepositoryProblem } from '../../app/lib/our-signatory/contract'
 import { contractNumberConflict, recordContractNumber } from '../../app/lib/our-signatory/number-registry'
 import { readOurSignatories, resolveContractSignatory } from '../../app/lib/our-signatory/storage'
-import { validateMaterialContractIdentities } from './contract-identity-evidence'
 import { parseMaterialContractCommandRequest } from './material-contract-command-request'
 import { createMaterialContractCommandTestInstance } from './material-contract-command-test-instance'
 import { materialOriginalBytes, materialOriginalDigest } from './material-contract-original'
+import { appendProductionConstructionScopeBinding } from './production-construction-scope-command'
+import { readProductionConstructionMainOptions, readProductionConstructionScopeLink, readProductionConstructionScopeMainFact } from './production-construction-scope-record'
+import { loadProductionMaterialContractState as load } from './production-material-contract-record'
 import { createReadMeta, readQueryScope, withOriginReadMeta, withReadMeta } from './read-meta'
 
 type Session = () => BusinessSession
-function fail(code: 'forbidden' | 'validation-failed' | 'unavailable', message: string): never {
+function fail(code: 'forbidden' | 'validation-failed' | 'conflict' | 'unavailable', message: string): never {
   throw new MaterialContractRepositoryProblem(materialContractProblem(code, message))
 }
 function scopedKey(key: string, actor: BusinessSession): string {
@@ -25,47 +28,6 @@ function scopedKey(key: string, actor: BusinessSession): string {
   if (!Array.isArray(parts) || parts.length !== 4 || parts[0] !== actor.workspaceId || parts[1] !== actor.actorId || parts[2] !== 'material-contract' || typeof parts[3] !== 'string' || !parts[3])
     return fail('unavailable', '材采持久命令作用域与正式身份不一致。')
   return parts[3]
-}
-
-async function load(tx: TransactionDb, actor: BusinessSession): Promise<MaterialContractOwnerSnapshot> {
-  const records = await tx.select<{ id: string, parent_id: string | null, project_id: string | null, supplier_id: string | null, record_json: string }>('SELECT * FROM material_contract_records')
-  const commands = await tx.select<{ scoped_id: string, command_id: string, fingerprint: string, request_json: string, result_json: string | null }>('SELECT * FROM material_contract_commands')
-  const sealed = await tx.select<{ scoped_id: string }>('SELECT scoped_id FROM material_contract_resolutions')
-  const revisions = await tx.select<{ revision: number }>('SELECT revision FROM material_contract_revision WHERE singleton=1')
-  const contracts = records.map((record) => {
-    const row = JSON.parse(record.record_json) as StoredMaterialContract
-    if (row.id !== record.id || (row.draft.isSupplement ? row.draft.originalContractId : null) !== record.parent_id || (row.draft.projectId ?? null) !== record.project_id || (row.draft.supplierId ?? null) !== record.supplier_id)
-      fail('unavailable', '材采持久关系列与记录证据不一致，停止读取。')
-    return row
-  })
-  await validateMaterialContractIdentities(tx, contracts)
-  for (const contract of contracts) {
-    for (const attachment of contract.attachments) {
-      if (!attachment.sha256)
-        continue
-      const rows = await tx.select<{ owner_type: string, owner_id: string, file_name: string, file_size: number, mime_type: string, deleted_at: string | null, content: Uint8Array, sha256: string }>('SELECT f.*,p.content,p.sha256 FROM file_refs f LEFT JOIN file_payloads p ON p.file_ref_id=f.id WHERE f.id=?', [attachment.id])
-      const row = rows[0]
-      if (!row || row.owner_type !== attachment.ownerType || row.owner_id !== contract.id || row.file_name !== attachment.fileName || row.file_size !== attachment.fileSize || row.mime_type !== attachment.mimeType
-        || row.deleted_at !== attachment.deletedAt || !(row.content instanceof Uint8Array) || row.content.length !== attachment.fileSize || row.sha256 !== attachment.sha256 || materialOriginalDigest(row.content) !== attachment.sha256) {
-        fail('unavailable', '材采原件正文、归属或摘要损坏；不能把已存原件当作历史缺件。')
-      }
-    }
-  }
-  for (const row of commands) {
-    if (scopedKey(row.scoped_id, actor) !== row.command_id)
-      fail('unavailable', '材采持久回执身份不一致。')
-  }
-  for (const row of sealed)
-    scopedKey(row.scoped_id, actor)
-  return {
-    schemaVersion: 1,
-    sourceVersion: revisions[0]?.revision ?? fail('unavailable', '材采持久版本记录缺失。'),
-    contracts,
-    commands: commands.flatMap(row => row.result_json == null ? [] : [[row.scoped_id, JSON.parse(row.result_json)] as MaterialContractOwnerSnapshot['commands'][number]]),
-    commandFingerprints: commands.map(row => [row.scoped_id, row.fingerprint]),
-    requestEvidence: commands.map(row => [row.scoped_id, JSON.parse(row.request_json)]),
-    sealedCommands: sealed.map(row => row.scoped_id),
-  }
 }
 
 /** Called by another owner only inside its existing trusted, consistent transaction. */
@@ -88,7 +50,7 @@ export async function readMaterialContractSupplierFacts(tx: TransactionDb, actor
   return { records: supplierId === undefined ? snapshot.contracts : snapshot.contracts.filter(row => row.draft.supplierId === supplierId), source: { key: 'material-contracts', state: 'readable', sourceVersion: owner.sourceVersion(), asOf } }
 }
 
-async function save(tx: TransactionDb, before: MaterialContractOwnerSnapshot, after: MaterialContractOwnerSnapshot, actor: BusinessSession) {
+async function save(tx: TransactionDb, before: MaterialContractOwnerSnapshot, after: MaterialContractOwnerSnapshot, actor: BusinessSession, deferredCommandId?: string) {
   if (before.contracts.some(row => !after.contracts.some(current => current.id === row.id)) || before.commands.some(([key]) => !after.commands.some(([current]) => current === key)) || before.sealedCommands.some(key => !after.sealedCommands.includes(key)))
     fail('unavailable', '不能删除材采合同历史、原回执或封存记录。')
   for (const row of after.contracts) {
@@ -135,7 +97,8 @@ async function save(tx: TransactionDb, before: MaterialContractOwnerSnapshot, af
     const result = resultByKey.get(key) ?? null
     if (oldRequest && (!isDeepStrictEqual(oldRequest, request) || (oldResult && !isDeepStrictEqual(oldResult, result))))
       fail('unavailable', '材采原提交证据和回执不可覆盖。')
-    await tx.execute(`INSERT INTO material_contract_commands VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(scoped_id) DO UPDATE SET result_json=excluded.result_json,contract_id=excluded.contract_id`, [key, scopedKey(key, actor), actor.workspaceId, actor.actorId, fingerprintByKey.get(key), JSON.stringify(request), result ? JSON.stringify(result) : null, result?.id ?? null])
+    const published = result?.commandId === deferredCommandId ? null : result
+    await tx.execute(`INSERT INTO material_contract_commands VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(scoped_id) DO UPDATE SET result_json=excluded.result_json,contract_id=excluded.contract_id`, [key, scopedKey(key, actor), actor.workspaceId, actor.actorId, fingerprintByKey.get(key), JSON.stringify(request), published ? JSON.stringify(published) : null, published?.id ?? null])
   }
   for (const key of after.sealedCommands) {
     if (!before.sealedCommands.includes(key))
@@ -152,7 +115,7 @@ export function createProductionMaterialContractService(storage: ProductionStora
       fail('forbidden', '当前会话无此工作区的材料采购合同权限。')
     return actor
   }
-  async function run<T>(session: Session, write: boolean, operation: (service: ReturnType<typeof createMaterialContractCommandTestInstance>, actor: BusinessSession, tx: TransactionDb) => T | Promise<T>): Promise<T> {
+  async function run<T>(session: Session, write: boolean, operation: (service: ReturnType<typeof createMaterialContractCommandTestInstance>, actor: BusinessSession, tx: TransactionDb, before: MaterialContractOwnerSnapshot) => T | Promise<T>, afterPersist?: (tx: TransactionDb, actor: BusinessSession, result: T, before: MaterialContractOwnerSnapshot) => Promise<void>, deferredCommandId?: string): Promise<T> {
     const actor = authorize(session, write)
     if (write)
       storage.assertBusinessWrite()
@@ -174,7 +137,31 @@ export function createProductionMaterialContractService(storage: ProductionStora
             throw new MaterialContractRepositoryProblem(cause.problem)
           throw cause
         }
-      }, numberConflict: (number, id) => contractNumberConflict(tx, 'material-contracts', id, number) })
+      }, numberConflict: (number, id) => contractNumberConflict(tx, 'material-contracts', id, number), validateDependencies: async (request, candidate, existing) => {
+        if (!existing && !request.constructionMain)
+          fail('validation-failed', '新建材料采购合同必须搜索并选择实际工程对应的施工主合同。')
+        if (request.constructionMain && request.constructionMain.projectId !== candidate.projectId)
+          fail('validation-failed', '所选工程与合同项目不一致，不能按同名或首份合同替代。')
+        const sourceId = candidate.isSupplement ? candidate.originalContractId : existing?.id
+        const prior = sourceId ? await readProductionConstructionScopeLink(tx, { domain: 'material-contract', id: sourceId }) : null
+        if (request.constructionMain && prior?.mainId !== request.constructionMain.id) {
+          try {
+            const main = await readProductionConstructionScopeMainFact(tx, actor, request.constructionMain.id)
+            if (!main.eligible || main.projectId !== candidate.projectId || main.basis !== request.constructionMain.basis)
+              fail('conflict', '所选施工主合同的有效状态或项目依据已变化，请重新读取工程候选。')
+          }
+          catch (cause) {
+            if (cause instanceof FinanceRepositoryProblem)
+              throw new MaterialContractRepositoryProblem(cause.problem)
+            throw cause
+          }
+        }
+        if (sourceId) {
+          const history = await tx.select<{ project_id: string }>('SELECT project_id FROM construction_scope_history WHERE source_domain=? AND source_id=? AND main_id IS NOT NULL', ['material-contract', sourceId])
+          if (history.some(row => row.project_id !== candidate.projectId))
+            fail('validation-failed', '合同已有施工归属历史，不能通过普通编辑跨项目移动并破坏原关联。')
+        }
+      } })
       try {
         service.importState(before)
       }
@@ -182,7 +169,7 @@ export function createProductionMaterialContractService(storage: ProductionStora
       let result: T | undefined
       let rejected: MaterialContractRepositoryProblem | undefined
       try {
-        result = await operation(service, actor, tx)
+        result = await operation(service, actor, tx, before)
       }
       catch (cause) {
         // 业务拒绝仍固定原规范请求；数据库故障、撤权和未知失败继续撤回整个事务。
@@ -191,12 +178,19 @@ export function createProductionMaterialContractService(storage: ProductionStora
         rejected = cause
       }
       const after = service.exportState()
+      const deferred = deferredCommandId && !before.commands.some(([, receipt]) => receipt.commandId === deferredCommandId)
+        ? after.commands.find(([, receipt]) => receipt.commandId === deferredCommandId)
+        : undefined
       if (!isDeepStrictEqual(before, after)) {
         if (!write)
           fail('unavailable', '材采只读投影改变持久事实，停止操作。')
         storage.assertBusinessWrite()
-        await save(tx, before, after, actor)
+        await save(tx, before, after, actor, deferred?.[1].commandId)
       }
+      if (!rejected && result !== undefined && afterPersist)
+        await afterPersist(tx, actor, result, before)
+      if (deferred)
+        await tx.execute('UPDATE material_contract_commands SET result_json=?,contract_id=? WHERE scoped_id=? AND result_json IS NULL', [JSON.stringify(deferred[1]), deferred[1].id, deferred[0]])
       if (!isDeepStrictEqual(authorize(session, write), actor))
         fail('forbidden', '操作期间会话或权限改变，本次事务已撤回。')
       return { result, rejected }
@@ -236,20 +230,51 @@ export function createProductionMaterialContractService(storage: ProductionStora
       const request = parseMaterialContractCommandRequest(body, id ? { kind: 'update', routeId: id } : { kind: 'create' })
       for (const file of request.attachments.add ?? [])
         materialOriginalBytes(file, true)
-      return run(session, true, (service, actor) => service.execute(request, actor))
+      return run(session, true, (service, actor) => service.execute(request, actor), async (tx, actor, result, before) => {
+        if (!request.constructionMain || before.commands.some(([, row]) => row.commandId === request.commandId))
+          return
+        const sourceId = request.draft.isSupplement ? request.draft.originalContractId : result.id
+        if (!sourceId)
+          fail('validation-failed', '原协议必须有真实父合同归属。')
+        const prior = await readProductionConstructionScopeLink(tx, { domain: 'material-contract', id: sourceId })
+        if (prior?.mainId && prior.mainId !== request.constructionMain.id)
+          fail('validation-failed', '已关联原合同的施工归属不能随新协议或普通编辑更换，请核对原关联。')
+        if (prior?.mainId === request.constructionMain.id)
+          return
+        try {
+          await appendProductionConstructionScopeBinding(tx, actor, { source: { domain: 'material-contract', id: sourceId }, main: request.constructionMain, original: { family: 'material-contract', commandId: request.commandId } })
+        }
+        catch (cause) {
+          if (cause instanceof FinanceRepositoryProblem)
+            throw new MaterialContractRepositoryProblem(cause.problem)
+          throw cause
+        }
+      }, request.commandId)
     },
     resolve(commandId: string, session: Session) {
       return run(session, true, (service, actor) => service.resolve(commandId, actor))
     },
     form(id: string, session: Session) {
-      return run(session, false, (service, actor) => service.form(id, actor))
+      return run(session, false, async (service, actor, tx) => {
+        const form = service.form(id, actor)
+        if (!actor.capabilities.includes('construction-scope:read'))
+          return form
+        const target = form.draft.isSupplement ? form.draft.originalContractId : id
+        const relation = target ? await readProductionConstructionScopeLink(tx, { domain: 'material-contract', id: target }) : null
+        return { ...form, constructionMain: relation?.mainId && relation.mainBasis ? { id: relation.mainId, projectId: relation.projectId, basis: relation.mainBasis } : null }
+      })
     },
     context(session: Session) {
       return run(session, false, async (service, actor, tx) => {
         if (!actor.capabilities.includes('material-contract:write'))
           fail('forbidden', '无材料采购合同表单操作权限。')
         const context = service.formContext()
-        return { workspaceId: actor.workspaceId, actorId: actor.actorId, capabilities: [...actor.capabilities], projects: context.projects.map(row => ({ id: row.id, label: row.name })), suppliers: context.suppliers.map(row => ({ id: row.id, label: row.name })), originalContracts: context.originalContracts, ourSignatories: actor.capabilities.includes('our-signatory:read') ? (await readOurSignatories(tx)).records : [] }
+        const originalContracts = []
+        for (const row of context.originalContracts) {
+          const relation = actor.capabilities.includes('construction-scope:read') ? await readProductionConstructionScopeLink(tx, { domain: 'material-contract', id: row.id }) : null
+          originalContracts.push({ ...row, constructionMain: relation?.mainId && relation.mainBasis ? { id: relation.mainId, projectId: relation.projectId, basis: relation.mainBasis } : null })
+        }
+        return { workspaceId: actor.workspaceId, actorId: actor.actorId, capabilities: [...actor.capabilities], projects: context.projects.map(row => ({ id: row.id, label: row.name })), suppliers: context.suppliers.map(row => ({ id: row.id, label: row.name })), originalContracts, ourSignatories: actor.capabilities.includes('our-signatory:read') ? (await readOurSignatories(tx)).records : [], constructionMains: actor.capabilities.includes('construction-contract:read') && actor.capabilities.includes('project:list:read') ? await readProductionConstructionMainOptions(tx, actor) : [] }
       })
     },
     list(input: Record<string, unknown>, session: Session) {

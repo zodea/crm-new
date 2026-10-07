@@ -7,9 +7,7 @@ import { createPayrollRepository } from '~/lib/payroll/central-repository'
 import { createPayrollAServiceFixture } from '../helpers/payroll-a-service-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollAServiceFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 it.each(Array.from([{ projectId: '', month: '2026-08', crewId: null }, { projectId: '', leaderWorkerId: '', month: '', memberWorkerIds: [] }]).flatMap(input1 => Array.from([
   { projectId: 'unknown-project', month: '2026-08' },

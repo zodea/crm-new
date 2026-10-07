@@ -1,10 +1,15 @@
 import { resolveBusinessSession } from '../../utils/business-session'
+import { productionSession, throwProductionStorageError } from '../../utils/production-runtime'
+import { productionSubcontractContractRuntime } from '../../utils/production-subcontract-contract-runtime'
 import { throwProjectReadError } from '../../utils/project-read-error'
 import { parseSubcontractContractCommandRequest } from '../../utils/subcontract-contract-command-request'
 import { subcontractContractCommandTestInstance } from '../../utils/subcontract-contract-command-test-instance'
 
 export default defineEventHandler(async (event) => {
   try {
+    const formal = productionSubcontractContractRuntime()
+    if (formal)
+      return await formal.contracts.execute(await readBody(event), productionSession(event))
     return await subcontractContractCommandTestInstance.execute(
       parseSubcontractContractCommandRequest(await readBody(event), { kind: 'create' }),
       resolveBusinessSession(),
@@ -12,6 +17,7 @@ export default defineEventHandler(async (event) => {
     )
   }
   catch (cause) {
+    throwProductionStorageError(cause)
     throwProjectReadError(cause)
   }
 })

@@ -56,7 +56,7 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
         ratio.value = value.draft.payRatio ?? null
       }
       const operation = store.getAPending(value)
-      if (operation?.command.action.kind === 'release-a' && !releaseOpen.value) {
+      if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'release-a' && !releaseOpen.value) {
         releaseRead.value = matching.value ?? value
         releaseDraft.value = operation.command.action.release
         releaseOpen.value = true

@@ -1,7 +1,19 @@
 import type { TransactionDb } from '../db/coordinator'
 
+/** Production schemas are applied by the shared numbered upgrade, never by a read. */
+export async function hasProductionPayrollSchema(tx: TransactionDb): Promise<boolean> {
+  if (!(await tx.select('SELECT name FROM sqlite_schema WHERE type=\'table\' AND name=\'production_metadata\'')).length)
+    return false
+  const [participant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'payroll\'')
+  if (participant?.schema_version !== 1)
+    throw new Error('正式工资参与者版本尚未接通；不能读取时创建空工资表。')
+  return true
+}
+
 /** 工资事实复用原八表；本表仅维护中央版本与不可变迁入证据。 */
 export async function initializePayrollSchema(tx: TransactionDb) {
+  if (await hasProductionPayrollSchema(tx))
+    return
   await tx.execute('CREATE TABLE IF NOT EXISTS payroll_revision (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), revision INTEGER NOT NULL)')
   await tx.execute('INSERT OR IGNORE INTO payroll_revision(singleton, revision) VALUES (1, 0)')
   await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_migration_evidence (

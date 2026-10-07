@@ -63,7 +63,7 @@ watch(current, (value) => {
     needsRecheck.value = dirty.value
   }
   const operation = store.getPending(value)
-  if (operation?.command.action.kind === 'save-hollow-policies') {
+  if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'save-hollow-policies') {
     const originals = operation.command.action.policies.map(fromDraft)
     rows.value = [...rows.value.filter(row => !originals.some(original => original.itemId === row.itemId)), ...originals]
     needsRecheck.value = false

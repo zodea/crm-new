@@ -35,6 +35,7 @@ useTabTitle(() => record.value ? `${record.value.location.unitName} 空鼓记录
 </script>
 
 <template>
+  <QuantityHollowCommandRecovery :project-id="projectId" :unit-id="unitId" @recovered="ui.load" />
   <div ref="section" class="grid min-w-0 gap-4">
     <header class="panel flex min-w-0 flex-wrap items-center justify-between gap-3 p-4">
       <div class="grid min-w-0 gap-2">

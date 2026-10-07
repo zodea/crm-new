@@ -27,11 +27,11 @@ export interface FormRecoveryAdapter {
 }
 
 /** The form owns its target and input. A receipt confirms a write; a subsequent authorized read confirms cleanup. */
-export function createFormCommandActions<C extends CommandContext, Capability extends string, D extends { id?: string }, A extends string, Files, Read extends CommandFormRead<D>>(options: {
+export function createFormCommandActions<C extends CommandContext, Capability extends string, D extends { id?: string }, A extends string, Files, Read extends CommandFormRead<D>, Extra extends object = object>(options: {
   repository: () => {
     context: () => Promise<C>
     loadForm: (id: string) => Promise<Read>
-    execute: (request: CommandContent<D, A, Files> & { workspaceId: string, actorId: string, requiredCapability: Capability, commandId: string }) => Promise<CommandResult>
+    execute: (request: CommandContent<D, A, Files> & Extra & { workspaceId: string, actorId: string, requiredCapability: Capability, commandId: string }) => Promise<CommandResult>
     resolve: (commandId: string) => Promise<CommandResolution<CommandResult>>
   }
   capability: Capability
@@ -215,7 +215,7 @@ export function createFormCommandActions<C extends CommandContext, Capability ex
         session.busy = false
     }
   }
-  async function saveForm(session: FormSession<C>, draft: D, action: A, attachments: Files = {} as Files) {
+  async function saveForm(session: FormSession<C>, draft: D, action: A, attachments: Files = {} as Files, extra?: Extra) {
     if (!session.context || (draft.id && draft.id !== session.targetId))
       throw new Error('当前表单与写入目标不一致，请重新载入后保存。')
     if (session.busy)
@@ -225,7 +225,7 @@ export function createFormCommandActions<C extends CommandContext, Capability ex
     const generation = session.generation
     const id = session.targetId
     const originalContext = session.context
-    const content: CommandContent<D, A, Files> = JSON.parse(JSON.stringify({ ...(id ? { id } : {}), baseVersion: session.baseVersion, action, draft: { ...draft, ...(id ? { id } : {}) }, attachments }))
+    const content: CommandContent<D, A, Files> & Extra = JSON.parse(JSON.stringify({ ...extra, ...(id ? { id } : {}), baseVersion: session.baseVersion, action, draft: { ...draft, ...(id ? { id } : {}) }, attachments }))
     const fingerprint = JSON.stringify(content)
     const commandId = crypto.randomUUID()
     const descriptor = { commandId, workspaceId: originalContext.workspaceId, actorId: originalContext.actorId, family, targetId: id, action }
@@ -246,7 +246,7 @@ export function createFormCommandActions<C extends CommandContext, Capability ex
       if (session.generation === generation)
         latestWrite.value = { id: result.id, version: result.version }
       const read = await readApplied(session, saved, generation)
-      const retainedInput = JSON.stringify({ ...(id ? { id } : {}), baseVersion: content.baseVersion, action, draft: { ...draft, ...(id ? { id } : {}) }, attachments }) !== fingerprint
+      const retainedInput = JSON.stringify({ ...extra, ...(id ? { id } : {}), baseVersion: content.baseVersion, action, draft: { ...draft, ...(id ? { id } : {}) }, attachments }) !== fingerprint
       return { ...result, form: read.form, readbackConfirmed: true as const, retainedInput }
     }
     catch (cause) {

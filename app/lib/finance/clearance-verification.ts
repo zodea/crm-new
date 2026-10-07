@@ -101,6 +101,20 @@ export interface ExpenseClearanceSourceDTO extends FinanceExpenseReference {
   clearanceLinks: ExpenseClearanceLink[]
   clearanceItemAvailability: Array<{ verificationId: string, itemId: string, amountRemaining: number | null }>
 }
+
+/** Only fields used by a new original-expense adoption; old proofs keep their own full graphs. */
+export function expenseConsumptionFingerprint(source: ExpenseClearanceSourceDTO): string {
+  const q = source.qualification
+  const parts = { id: source.id, headerId: source.headerId, projectId: source.projectId, amount: source.amount, expenseItem: source.expenseItem, serviceSupplierId: source.serviceSupplierId, serviceSupplierNameSnapshot: source.serviceSupplierNameSnapshot, applicantWorkerId: source.applicantWorkerId, applicantSupplierId: source.applicantSupplierId, applicantNameSnapshot: source.applicantNameSnapshot, clearedAmount: source.clearedAmount, qualification: { state: q.state, verificationId: q.verificationId, verifiedHandledAmount: q.verifiedHandledAmount, confirmedOtherAdoptedAmount: q.confirmedOtherAdoptedAmount, verifiedOverlapAmount: q.verifiedOverlapAmount, newAdoptableAmount: q.newAdoptableAmount }, proofs: source.clearanceProofs.map(proof => ({ id: proof.id, items: proof.items })), links: source.clearanceLinks, availability: source.clearanceItemAvailability }
+  function canonical(value: unknown): string {
+    if (Array.isArray(value))
+      return `[${value.map(canonical).join(',')}]`
+    if (value !== null && typeof value === 'object')
+      return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(Reflect.get(value, key))}`).join(',')}}`
+    return JSON.stringify(value) ?? 'null'
+  }
+  return canonical(parts)
+}
 export interface ExpenseClearanceVerificationState {
   status: ExpenseClearanceQualification['state']
   message: string

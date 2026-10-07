@@ -5,11 +5,12 @@ import type { ProjectRow } from './production-project-record'
 import type { ProductionStorage } from './production-storage'
 import { randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
-import { unavailablePayrollHostSection } from '../../app/lib/crew-worker/payroll-read'
 import { buildCrewDetailRead, buildCrewListPage, buildWorkerDetailRead, buildWorkerListPage, parseCrewDetailQuery, parseCrewListQuery, parseWorkerDetailQuery, parseWorkerListQuery } from '../../app/lib/crew-worker/read-page'
 import { parseCrewCommandRequest, parseWorkerCommandRequest } from './crew-worker-command-request'
 import { createCrewWorkerCommandService } from './crew-worker-command-service'
+import { loadPayrollHostSection } from './crew-worker-payroll-read'
 import { productionCrewWorkerFailure as fail, loadProductionCrewWorkers, saveProductionCrewWorkers } from './production-crew-worker-record'
+import { productionPayrollStatements } from './production-payroll-service'
 import { projectDraft } from './production-project-record'
 import { productionWorkerOriginals } from './production-worker-originals'
 import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
@@ -82,7 +83,7 @@ export function createProductionCrewWorkerService(storage: ProductionStorage, op
         return { workers: current.workerRows(), projects: actor.capabilities.includes('project:list:read') ? await tx.select<{ id: string, name: string }>('SELECT id,name FROM projects WHERE deleted_at IS NULL ORDER BY id') : [] }
       },
       transaction: work => work(tx),
-      statements: async (_db: TransactionDb, _scope: WorkerRosterScope) => fail('unavailable', '正式工资冻结成员来源尚未接通，不能以空工资生成名册。'),
+      statements: (db: TransactionDb, scope: WorkerRosterScope) => productionPayrollStatements(db, scope),
       audit: async (db, input) => {
         const entityId = input.result.workerId ?? input.result.archiveId!
         const [profile] = input.result.workerId ? await db.select<{ values_json: string }>('SELECT values_json FROM worker_roster_profile_versions WHERE worker_id=? AND revision=?', [input.result.workerId, input.result.revision]) : []
@@ -130,7 +131,7 @@ export function createProductionCrewWorkerService(storage: ProductionStorage, op
         const projection = buildCrewDetailRead({ ...source, query, asOf: timestamp })
         projection.summary = { ...projection.summary, projectCount: null, assignedUnitCount: null, completedStageCount: null, wageStatementCount: null, releasedWageAmount: null, penaltyAmount: null }
         projection.projects = projection.projects.map(project => ({ ...project, assignmentCount: null, assignedUnitCount: null, completedStageCount: null, wageStatementCount: null, wageGrossAmount: null, releasedWageAmount: null }))
-        return withReadMeta({ ...projection, payrollActual: unavailablePayrollHostSection({ kind: 'crew', id }, actor.capabilities.includes('payroll:read') ? 'unavailable' : 'forbidden', '正式工资实际收付来源尚未接通。') }, metadata(actor, domain, timestamp, 'crew:detail', 'real', query, readSourceVersion('projects', source.projects)))
+        return withReadMeta({ ...projection, payrollActual: await loadPayrollHostSection(tx, { kind: 'crew', id }, actor) }, metadata(actor, domain, timestamp, 'crew:detail', 'real', query, readSourceVersion('projects', source.projects)))
       })
     },
     workerDetail(id: string, input: Record<string, unknown>, session: Session) {
@@ -140,7 +141,7 @@ export function createProductionCrewWorkerService(storage: ProductionStorage, op
         const source = await context(tx, domain, actor)
         const projection = buildWorkerDetailRead({ ...source, query, asOf: timestamp })
         projection.summary = Object.fromEntries(Object.keys(projection.summary).map(key => [key, null])) as typeof projection.summary
-        return withReadMeta({ ...projection, payrollActual: unavailablePayrollHostSection({ kind: 'worker', id }, actor.capabilities.includes('payroll:read') ? 'unavailable' : 'forbidden', '正式工资实际收付来源尚未接通。') }, metadata(actor, domain, timestamp, 'worker:detail', 'real', query, readSourceVersion('projects', source.projects)))
+        return withReadMeta({ ...projection, payrollActual: await loadPayrollHostSection(tx, { kind: 'worker', id }, actor) }, metadata(actor, domain, timestamp, 'worker:detail', 'real', query, readSourceVersion('projects', source.projects)))
       })
     },
     relationFact() { return fail('unavailable', '正式工程量、工资或扣罚关系 owner 尚未接通。') },

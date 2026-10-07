@@ -13,6 +13,7 @@ import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { generateId } from '../../app/lib/util/id'
 import { loadPayrollAttendanceFacts } from './payroll-attendance-facts'
 import { loadPayrollC1Options, payrollC1WorkerNavigation } from './payroll-c1-options'
+import { assertPayrollDependencies, payrollDependencyVersion } from './payroll-dependency-version'
 
 const hash = (v: unknown) => createHash('sha256').update(payrollCanonical(v)).digest('hex')
 export async function markPayrollC1Recheck(db: TransactionDb, projectId: string, month: string, workerIds: string[], actor: string, onwards = false) {
@@ -56,7 +57,18 @@ export function createPayrollAttendanceService(run: PayrollRun, options: Payroll
         worker.reasons.push('该人员当月已有签工链或已发工资，考勤不可再改')
       }
     }
-    return { context: { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion: `${base.sourceVersion}+attendance:${hash({ scope, facts, workers, locks })}` }, scope, options: { projects: catalog.projects, crews: catalog.crews }, workers, records, locks, diagnostics, evidence: facts.evidence }
+    const sourceVersion = base.sourceVersion === 'payroll-consumption-v1'
+      ? payrollDependencyVersion('attendance', {
+          schemaVersion: 1,
+          scope: hash(scope),
+          view: hash({ scope, facts, workers, locks, catalog, capabilities: base.capabilities }),
+          common: hash({ projectAvailable: source.projects.some(project => project.id === scope.projectId), crewAvailable: scope.crewId === null || source.crews.some(crew => crew.id === scope.crewId) }),
+          people: Object.fromEntries(workers.map(worker => [worker.id, hash({ id: worker.id, name: worker.name, crewId: worker.crewId, eligible: worker.eligible, historical: worker.historical })])),
+          records: Object.fromEntries([...new Set(facts.rows.map(row => payrollCanonical([row.workerId, row.workDate])))].map(key => [key, hash(facts.rows.filter(row => payrollCanonical([row.workerId, row.workDate]) === key))])),
+          locks: Object.fromEntries(workers.map(worker => [worker.id, hash(locks.filter(lock => lock.workerId === worker.id))])),
+        })
+      : `${base.sourceVersion}+attendance:${hash({ scope, facts, workers, locks })}`
+    return { context: { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion }, scope, options: { projects: catalog.projects, crews: catalog.crews }, workers, records, locks, diagnostics, evidence: facts.evidence }
   }
   return {
     attendanceMatrix: (query: PayrollQuery, scope: PayrollAttendanceScope, sessionId?: string | null) => run(query, sessionId, (db, context, source) => matrix(db, context, source, scope)),
@@ -76,9 +88,8 @@ export function createPayrollAttendanceService(run: PayrollRun, options: Payroll
           }
           absent = true
           const read = await matrix(db, context, source, command.scope)
-          if (read.context.sourceVersion !== command.sourceVersion)
-            throw payrollProblem('stale-source', '考勤来源已变化，请保留输入重新读取')
           const record = command.action.record
+          assertPayrollDependencies(command.sourceVersion, read.context.sourceVersion, [record.workerId], [payrollCanonical([record.workerId, record.workDate])])
           const worker = read.workers.find(w => w.id === record.workerId)
           const current = source.workers.find(w => w.id === record.workerId)
           if (!worker?.eligible || !current || !source.projects.some(p => p.id === command.projectId) || (record.crewId !== null && record.crewId !== current.crewId) || (command.scope.crewId !== null && command.scope.crewId !== current.crewId))
@@ -95,7 +106,7 @@ export function createPayrollAttendanceService(run: PayrollRun, options: Payroll
           const result: PayrollAttendanceCommandResult = { commandId: command.commandId, projectId: command.projectId, recordId, workerId: record.workerId, workDate: record.workDate, sourceVersion: `payroll:${await payrollRevision(db)}`, outcome: 'saved', logIds }
           await db.execute('INSERT INTO payroll_command_receipts(command_id,actor_id,project_id,statement_id,config_scope_json,action,fingerprint,result_json,command_json) VALUES(?,?,?,NULL,NULL,?,?,?,?)', [command.commandId, context.actorId, command.projectId, command.action.kind, fingerprint, JSON.stringify(result), payrollCanonical(command)])
           return result
-        }, true)
+        }, true, command)
       }
       catch (cause) {
         if (absent && cause instanceof ProjectRepositoryProblem)

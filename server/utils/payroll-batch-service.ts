@@ -217,6 +217,8 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
 
   async function planFromRow(db: TransactionDb, context: PayrollContext, row: Record<string, unknown>): Promise<PayrollBatchPlanRead> {
     const stored = JSON.parse(String(row.plan_json)) as StoredPlan
+    if (hash(stored) !== row.plan_hash || stored.planId !== row.id || stored.projectId !== row.project_id || stored.month !== row.month || stored.purpose !== row.purpose || stored.schemaVersion !== row.schema_version)
+      throw payrollProblem('unavailable', '批量工资原计划、稳定身份或摘要无法核实')
     const attempts = await db.select<{ item_id: string, attempt_no: number, execute_command_id: string, state: PayrollBatchPlanRead['outcomes'][number]['attemptState'] }>('SELECT item_id,attempt_no,execute_command_id,state FROM payroll_batch_attempts WHERE plan_id=? ORDER BY item_id,attempt_no DESC', [row.id])
     const [prepared] = String(row.state) === 'prepared' ? attempts.filter(attempt => attempt.state === 'prepared') : []
     const preparedExecuteCommandId = prepared?.execute_command_id ?? null
@@ -278,7 +280,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
         throw payrollProblem('stale-source', '批量工资计划版本已变化，请重新读取')
       if (plan.state !== 'ready' || plan.nextItemIndex >= plan.items.length)
         throw payrollProblem('conflict', '批量工资计划当前没有可准备的原单')
-      if (await payrollRevision(db) !== plan.expectedPayrollRevision)
+      if (!context.sourceVersion.startsWith('payroll-consumption-v1') && await payrollRevision(db) !== plan.expectedPayrollRevision)
         throw payrollProblem('stale-source', '工资账修订已变化，批量计划须重新核对')
       const item = plan.items[plan.nextItemIndex]!
       if (item.decision.kind === 'defer')
@@ -361,7 +363,7 @@ export function createPayrollBatchService(run: PayrollRun, readers: BatchReaders
       const expectedOutcome = plan.purpose === 'check' ? 'checked' : 'released'
       const state = result.outcome === expectedOutcome ? expectedOutcome : 'needs-recheck'
       await db.execute('UPDATE payroll_batch_attempts SET state=?,after_payroll_revision=?,result_json=?,finished_at=? WHERE id=?', [state, revision, payrollCanonical(result), new Date().toISOString(), attempt.id])
-      if (state === 'needs-recheck' || revision !== Number(attempt.before_payroll_revision) + 1) {
+      if (state === 'needs-recheck' || (!context.sourceVersion.startsWith('payroll-consumption-v1') && revision !== Number(attempt.before_payroll_revision) + 1)) {
         await db.execute('UPDATE payroll_batch_plans SET state=\'needs-recheck\',expected_payroll_revision=?,revision=revision+1 WHERE id=?', [revision, plan.planId])
       }
       else {

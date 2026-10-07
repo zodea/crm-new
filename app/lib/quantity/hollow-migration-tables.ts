@@ -4,7 +4,7 @@ import { QUANTITY_HOLLOW_COLUMNS, QUANTITY_HOLLOW_TABLES } from './central-hollo
 import { emptyQuantityHollowTables, hollowMigrationInvalid, parseQuantityHollowTables } from './hollow-migration-graph'
 
 /** 全无仍为旧库；部分升级或未知列不可静默忽略。读取保持所有原 JSON 字节。 */
-export async function readQuantityHollowTables(db: Pick<SoftDb, 'select'>): Promise<QuantityHollowTables | null> {
+export async function readQuantityHollowTables(db: Pick<SoftDb, 'select'>, options: { captureUnknownColumns?: boolean } = {}): Promise<QuantityHollowTables | null> {
   const schema = await db.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')
   const names = new Set(schema.map(row => row.name))
   const present = QUANTITY_HOLLOW_TABLES.filter(table => names.has(table))
@@ -16,7 +16,7 @@ export async function readQuantityHollowTables(db: Pick<SoftDb, 'select'>): Prom
   for (const table of QUANTITY_HOLLOW_TABLES) {
     const columns = await db.select<{ name: string }>(`PRAGMA table_info(${table})`)
     const expected: readonly string[] = QUANTITY_HOLLOW_COLUMNS[table]
-    if (columns.length !== expected.length || columns.some(column => !expected.includes(column.name)))
+    if (expected.some(column => !columns.some(actual => actual.name === column)) || (!options.captureUnknownColumns && (columns.length !== expected.length || columns.some(column => !expected.includes(column.name)))))
       hollowMigrationInvalid(`${table}的物理列不符合冻结合同`)
     tables[table] = await db.select<QuantityHollowRow>(`SELECT ${expected.join(', ')} FROM ${table} ORDER BY id`)
   }

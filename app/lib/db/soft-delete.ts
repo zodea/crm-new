@@ -347,33 +347,36 @@ export const INFRA_TABLES = [
   ...OTHER_SETTLEMENT_TABLES.filter(table => table !== 'expenditure_settlements'),
 ]
 
-function assertBusinessTable(table: string): void {
-  if (!(table in PARENT_REFS)) {
+export type VisibilityParentGraph = Readonly<Record<string, readonly ParentRef[]>>
+
+function assertBusinessTable(table: string, parents: VisibilityParentGraph = PARENT_REFS): void {
+  if (!(table in parents)) {
     throw new Error(`[db] 未登记的业务表: ${table}`)
   }
 }
 
-function isSelfRef(table: string): boolean {
-  return (PARENT_REFS[table] ?? []).some(ref => ref.table === table)
+function isSelfRef(table: string, parents: VisibilityParentGraph): boolean {
+  return (parents[table] ?? []).some(ref => ref.table === table)
 }
 
 /**
  * 查询 table 需要的隐藏集 CTE 表清单:祖先闭包(父先于子),
  * 自引用表(如 suppliers)含自身——其 CTE 用递归项覆盖任意深度。
  */
-function cteTables(table: string): string[] {
-  assertBusinessTable(table)
+function cteTables(table: string, parents: VisibilityParentGraph): string[] {
+  assertBusinessTable(table, parents)
   const ordered: string[] = []
   const visited = new Set<string>()
   function visit(t: string, isRoot: boolean): void {
+    assertBusinessTable(t, parents)
     if (visited.has(t))
       return
     visited.add(t)
-    for (const ref of PARENT_REFS[t]!) {
+    for (const ref of parents[t]!) {
       if (ref.table !== t)
         visit(ref.table, false)
     }
-    if (!isRoot || isSelfRef(t))
+    if (!isRoot || isSelfRef(t, parents))
       ordered.push(t)
   }
   visit(table, true)
@@ -386,10 +389,14 @@ function cteTables(table: string): string[] {
  *   `${hiddenCtes(t)} SELECT * FROM t WHERE ${visibleCond(t)}`
  */
 export function hiddenCtesFor(...roots: string[]): string {
+  return hiddenCtesForGraph(PARENT_REFS, roots)
+}
+
+function hiddenCtesForGraph(parents: VisibilityParentGraph, roots: string[]): string {
   const tables: string[] = []
   const seen = new Set<string>()
   for (const root of roots) {
-    for (const table of cteTables(root)) {
+    for (const table of cteTables(root, parents)) {
       if (seen.has(table))
         continue
       seen.add(table)
@@ -403,7 +410,7 @@ export function hiddenCtesFor(...roots: string[]): string {
     const arms = [`SELECT id FROM "${t}" WHERE deleted_at IS NOT NULL`]
     // SQLite 要求递归项位于全部非递归项之后。schedule_tasks 同时拥有项目/分组/阶段
     // 父级与 parent_id 自引用，不能沿用登记顺序直接拼接，否则会报 circular reference。
-    const refs = [...PARENT_REFS[t]!].sort((left, right) => (
+    const refs = [...parents[t]!].sort((left, right) => (
       Number(left.table === t) - Number(right.table === t)
     ))
     for (const ref of refs) {
@@ -423,10 +430,14 @@ export function hiddenCtes(table: string): string {
  * 一条记录被隐藏 = 自身被删 OR 其任一祖先被删(ADR 0003)。
  */
 export function visibleCond(table: string, alias = table): string {
-  assertBusinessTable(table)
+  return visibleCondForGraph(PARENT_REFS, table, alias)
+}
+
+function visibleCondForGraph(parents: VisibilityParentGraph, table: string, alias: string): string {
+  assertBusinessTable(table, parents)
   assertIdentifier(alias)
   const parts = [`${alias}.deleted_at IS NULL`]
-  for (const ref of PARENT_REFS[table]!) {
+  for (const ref of parents[table]!) {
     parts.push(
       `(${alias}."${ref.column}" IS NULL OR ${alias}."${ref.column}" NOT IN (SELECT id FROM hidden_${ref.table}))`,
     )
@@ -440,6 +451,23 @@ export function visibleCond(table: string, alias = table): string {
  */
 export function selectVisibleSql(table: string, tail = ''): string {
   return `${hiddenCtes(table)} SELECT * FROM "${table}" WHERE ${visibleCond(table)} ${tail}`.trim()
+}
+
+/** The same ancestor algorithm for an explicitly registered owner graph; Native defaults stay unchanged. */
+export function createVisibilitySql(parents: VisibilityParentGraph) {
+  for (const [table, refs] of Object.entries(parents)) {
+    assertIdentifier(table)
+    for (const ref of refs) {
+      assertIdentifier(ref.column)
+      assertIdentifier(ref.table)
+      assertBusinessTable(ref.table, parents)
+    }
+  }
+  const hiddenCtesFor = (...roots: string[]) => hiddenCtesForGraph(parents, roots)
+  const hiddenCtes = (table: string) => hiddenCtesFor(table)
+  const visibleCond = (table: string, alias = table) => visibleCondForGraph(parents, table, alias)
+  const selectVisibleSql = (table: string, tail = '') => `${hiddenCtes(table)} SELECT * FROM "${table}" WHERE ${visibleCond(table)} ${tail}`.trim()
+  return { hiddenCtesFor, hiddenCtes, visibleCond, selectVisibleSql }
 }
 
 export async function fetchRowById(

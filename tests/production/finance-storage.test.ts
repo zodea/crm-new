@@ -15,11 +15,14 @@ import { usePaymentManagementStore } from '../../app/stores/payment-management'
 import { useProductionAccessStore } from '../../app/stores/production-access'
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { copyBackupPackage, createLocalBackup, readBackupPackage, restoreBackupIsolated } from '../../server/utils/production-backup-package'
+import { createProductionConstructionContractService } from '../../server/utils/production-construction-contract-service'
+import { readProductionConstructionScopeMainFact } from '../../server/utils/production-construction-scope-record'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { readOriginalExpenseReference } from '../../server/utils/production-finance-expense-references'
 import { validateFinanceJournal } from '../../server/utils/production-finance-journal'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { readMigrationReference } from '../../server/utils/production-migration-references'
+import { createProductionOurSignatoryService } from '../../server/utils/production-our-signatory-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
@@ -40,6 +43,15 @@ async function fixture() {
   const service = createProductionFinanceService(storage)
   const request = (kind: FinanceCommand['kind'], commandId: string, draft: FinanceCommand['draft'], action: FinanceCommand['action'] = 'submit'): FinanceCommand => ({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: `${FINANCE_FAMILIES[kind]}:write`, commandId, kind, baseVersion: null, action, attachments: {}, draft })
   return { storage, options, actor, session, customer, project, supplier, service, request }
+}
+
+async function engineering(f: Awaited<ReturnType<typeof fixture>>) {
+  f.actor.capabilities.push('our-signatory:read', 'our-signatory:write', 'construction-contract:read', 'construction-contract:write', 'construction-scope:read', 'construction-scope:write')
+  const identity = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId }
+  const signatory = await createProductionOurSignatoryService(f.storage).execute({ ...identity, commandId: 'finance-real-our-signatory', requiredCapability: 'our-signatory:write', baseVersion: null, draft: { name: '费用实际我方', taxNo: 'FINANCE-REAL-SIGNATORY', registeredAddress: null, legalRepresentative: null, verificationNote: '真实费用工程核验', status: 'active' } }, f.session)
+  const head = await createProductionConstructionContractService(f.storage).execute({ ...identity, commandId: 'finance-real-construction-main', requiredCapability: 'construction-contract:write', baseVersion: null, action: 'save', draft: { name: '费用实际施工工程', projectId: f.project.id, customerId: f.customer.id, content: '真实业务费用工程范围', signDate: '2026-10-05', status: '履约中', amount: null, taxRate: 0, ourSignatoryId: signatory.id, ourSignatoryVersion: signatory.version }, attachments: {} }, f.session)
+  const main = await f.storage.withTransaction(tx => readProductionConstructionScopeMainFact(tx, f.actor, head.id))
+  return { id: main.id, projectId: f.project.id, basis: main.basis }
 }
 
 async function nativeSource(targetVersion?: number) {
@@ -464,9 +476,10 @@ it('真实完整SQLite中未来未核验版本999不能由通用文件完整性�
 it('真实正式磁盘同费用只计一次，实际现金仅人工确认支付；回执原文冷重开与同键重放不重复写入', async () => {
   const f = await fixture()
   try {
-    const expense = await f.service.execute(f.request('reimbursement', 'finance-original-cost', { applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '已核实独立费用', counterpartySupplierId: f.supplier.id, amount: 40 }] }, 'save'), f.session)
+    const constructionMain = await engineering(f)
+    const expense = await f.service.execute(f.request('reimbursement', 'finance-original-cost', { projectId: f.project.id, constructionMain, applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '已核实独立费用', counterpartySupplierId: f.supplier.id, amount: 40 }] }, 'save'), f.session)
     const source = await f.service.form('reimbursement', expense.id, f.session)
-    const clearance = await f.service.execute(f.request('reimbursement', 'finance-clearance', { applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', lines: [{ expenseItem: '只清偿原垫款', amount: 10, originalExpenseLineId: source.draft.lines[0]!.id }] }), f.session)
+    const clearance = await f.service.execute(f.request('reimbursement', 'finance-clearance', { projectId: f.project.id, applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', lines: [{ expenseItem: '只清偿原垫款', amount: 10, originalExpenseLineId: source.draft.lines[0]!.id }] }), f.session)
     expect((await f.service.form('reimbursement', clearance.id, f.session)).draft.lines).toMatchObject([{ originalExpenseLineId: source.draft.lines[0]!.id, counterpartySupplierId: f.supplier.id }])
     expect(await f.storage.select('SELECT SUM(line.amount) AS amount FROM expense_reimbursement_lines line JOIN expense_reimbursements head ON head.id=line.reimbursement_id WHERE head.status=\'confirmed\' AND line.original_expense_line_id IS NULL')).toEqual([{ amount: 40 }])
     const application = await f.service.execute(f.request('payment_application', 'finance-company-application', { name: '真实公司付款申请', bizType: '公司付款', supplierId: f.supplier.id, applyAmount: 10, applyDate: '2026-10-05', applicant: '合成财务', invoiceState: '无需发票' }), f.session)
@@ -489,15 +502,16 @@ it('真实正式磁盘同费用只计一次，实际现金仅人工确认支付�
 it('真实正式库原清偿缺金额时额度读取与新清偿明确unavailable，保原事实而不是按SUM零放行', async () => {
   const f = await fixture()
   try {
-    const original = await f.service.execute(f.request('reimbursement', 'finance-sum-original', { applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '实际原费用', counterpartySupplierId: f.supplier.id, amount: 40 }] }, 'save'), f.session)
+    const constructionMain = await engineering(f)
+    const original = await f.service.execute(f.request('reimbursement', 'finance-sum-original', { projectId: f.project.id, constructionMain, applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '实际原费用', counterpartySupplierId: f.supplier.id, amount: 40 }] }, 'save'), f.session)
     const sourceId = (await f.service.form('reimbursement', original.id, f.session)).draft.lines[0]!.id!
     expect(await f.storage.withTransaction(tx => readOriginalExpenseReference(tx, f.actor, sourceId))).toMatchObject({ amount: 40, clearedAmount: 0 })
-    const clearance = await f.service.execute(f.request('reimbursement', 'finance-sum-clearance', { applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '原清偿', originalExpenseLineId: sourceId, amount: 10 }] }, 'save'), f.session)
+    const clearance = await f.service.execute(f.request('reimbursement', 'finance-sum-clearance', { projectId: f.project.id, applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '原清偿', originalExpenseLineId: sourceId, amount: 10 }] }, 'save'), f.session)
     const clearanceId = (await f.service.form('reimbursement', clearance.id, f.session)).draft.lines[0]!.id!
     await f.storage.execute(`UPDATE expense_reimbursement_lines SET amount='unknown' WHERE id=?`, [clearanceId])
     const before = await f.storage.select('SELECT * FROM expense_reimbursement_lines ORDER BY id')
     await expect(f.storage.withTransaction(tx => readOriginalExpenseReference(tx, f.actor, sourceId))).rejects.toMatchObject({ problem: { code: 'unavailable' } })
-    await expect(f.service.execute(f.request('reimbursement', 'finance-sum-forbidden-clearance', { applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', lines: [{ expenseItem: '不能把未知已清偿当零', originalExpenseLineId: sourceId, amount: 40 }] }), f.session)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    await expect(f.service.execute(f.request('reimbursement', 'finance-sum-forbidden-clearance', { projectId: f.project.id, applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', lines: [{ expenseItem: '不能把未知已清偿当零', originalExpenseLineId: sourceId, amount: 40 }] }), f.session)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
     expect(await f.storage.select('SELECT * FROM expense_reimbursement_lines ORDER BY id')).toEqual(before)
     expect(await f.storage.select('SELECT COUNT(*) AS n FROM payment_records')).toEqual([{ n: 0 }])
     await f.storage.close()

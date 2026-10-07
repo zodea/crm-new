@@ -51,7 +51,7 @@ export function usePayrollC1Config(additionalGuard: () => boolean | Promise<bool
       drafts.value = value.rates.map(rate => ({ workerId: rate.workerId, dailyWage: rate.configuredDailyWage, overtimeRate: rate.configuredOvertimeRate }))
       original.value = JSON.stringify(drafts.value)
       const operation = store.getC1Pending(value)
-      if (operation?.command.action.kind === 'save-c1-rates')
+      if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'save-c1-rates')
         drafts.value = drafts.value.map(draft => operation.command.action.kind === 'save-c1-rates' ? operation.command.action.rates.find(row => row.workerId === draft.workerId) || draft : draft)
     }
   }, { immediate: true })

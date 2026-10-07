@@ -19,7 +19,9 @@ withDefaults(defineProps<{
     :style="{ marginBottom: `${mb}px` }"
   >
     <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" />
-    <span class="shrink-0 text-[13px] font-700 text-ink"><slot>{{ title }}</slot></span>
+    <h2 class="m-0 shrink-0 text-[13px] font-700 text-ink">
+      <slot>{{ title }}</slot>
+    </h2>
     <span v-if="subtitle" class="min-w-0 truncate text-[11px] text-ink-faint" :title="subtitle">{{ subtitle }}</span>
     <span v-if="$slots.extra" class="ml-auto"><slot name="extra" /></span>
   </div>

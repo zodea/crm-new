@@ -44,8 +44,9 @@ describe('中央预算列表同路由状态', () => {
     expect(route.query).toMatchObject({ page: '2', search: 'B', status: ['draft'] })
     wrapper.unmount()
   })
-  it('冷读目录找到已删除版本的未知原提交，恢复完全原键正文', async () => {
-    const operation: TargetCostPending = { state: 'unknown', command: { commandId: 'original-key', workspaceId: 'w', actorId: 'a', origin: 'real', requiredCapability: 'target-cost:write', sourceVersion: 'old', targetCostId: 'A', action: { kind: 'delete' } } }
+  it('冷读已删除版本只持最小原编号，没有正文仍显示原目标并按原编号核对', async () => {
+    load.mockResolvedValue({ ...read, rows: read.rows.map(row => row.id === 'A' ? { ...row, deletedAt: '2026-10-07T00:00:00.000Z' } : row) })
+    const operation: TargetCostPending = { state: 'unknown', command: null, descriptor: { commandId: 'original-key', workspaceId: 'w', actorId: 'a', family: 'target-cost', targetId: 'A', action: 'delete' } }
     pending.value = [operation]
     const wrapper = render()
     await flushPromises()
@@ -53,6 +54,8 @@ describe('中央预算列表同路由状态', () => {
     await wrapper.get('[aria-label="预算未决操作"] button').trigger('click')
     await flushPromises()
     expect(recover).toHaveBeenCalledWith(operation)
+    expect(recover.mock.calls[0]![0].descriptor).toMatchObject({ commandId: 'original-key', targetId: 'A', action: 'delete' })
+    expect(recover.mock.calls[0]![0].command).toBeNull()
     expect(load).toHaveBeenCalledTimes(2)
     wrapper.unmount()
   })

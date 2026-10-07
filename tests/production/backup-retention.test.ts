@@ -7,7 +7,7 @@ import { pruneProductionBackups } from '../../server/utils/production-backup-ret
 import { createProductionStorage } from '../../server/utils/production-storage'
 
 it.each(Array.from([0, 1, 3]).map(input1 => ({ input1 })))('只清理有成功回执且完整的到期包，保留最后成功/基线及混入未知文件的包：输入案例 %#', async ({ input1: index }) => {
-  const base = resolve('.codex-tmp/issue-451-tests')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-451-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/retention-`)
   const source = join(directory, 'source')

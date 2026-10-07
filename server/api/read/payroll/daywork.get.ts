@@ -1,11 +1,12 @@
 import { parsePayrollQuery } from '../../../../app/lib/payroll/central-codec'
 import { payrollProblem } from '../../../../app/lib/payroll/central-contract'
 import { encodePayrollDayworkWire, parsePayrollDayworkScope } from '../../../../app/lib/payroll/central-daywork-codec'
-import { payrollService } from '../../../utils/payroll-runtime'
+import { payrollServiceForEvent } from '../../../utils/payroll-runtime'
 import { throwQuantityError } from '../../../utils/quantity-error'
 
 export default defineEventHandler(async (event) => {
   try {
+    const payrollService = payrollServiceForEvent(event)
     const { scope, ...query } = getQuery(event)
     if (typeof scope !== 'string')
       throw payrollProblem('invalid-query', '签工缺少固定范围')
