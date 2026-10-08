@@ -21,6 +21,7 @@ export interface QuantityHollowServiceOptions extends QuantityHollowProofOptions
   session: (sessionId?: string | null) => QuantityContext
   projects: (sessionId?: string | null) => readonly QuantityHollowProject[] | Promise<readonly QuantityHollowProject[]>
   people: (sessionId?: string | null) => readonly QuantityPersonSource[] | Promise<readonly QuantityPersonSource[]>
+  authoritativeMasters?: boolean
   transaction: <T>(work: (tx: TransactionDb, context: QuantityContext) => Promise<T>, sessionId?: string | null) => Promise<T>
 }
 function requireContext(context: QuantityContext, write: boolean) {
@@ -54,8 +55,10 @@ export function createQuantityHollowService(options: QuantityHollowServiceOption
         throw quantityProblem('not-found', '当前可读项目中没有所选空鼓项目')
       const people = structuredClone(await options.people(sessionId))
       await initializeQuantityHollowSchema(tx)
-      await tx.execute('INSERT INTO projects(id,name,code) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,code=excluded.code,deleted_at=NULL', [project.id, project.name, project.code])
-      await synchronizeQuantityPeople(tx, context, async () => people)
+      if (!options.authoritativeMasters) {
+        await tx.execute('INSERT INTO projects(id,name,code) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,code=excluded.code,deleted_at=NULL', [project.id, project.name, project.code])
+        await synchronizeQuantityPeople(tx, context, async () => people)
+      }
       const result = await work(tx, context)
       const currentProject = (await options.projects(sessionId)).find(row => row.id === query.projectId && row.dataOrigin === 'real')
       if (!hollowEqual(project, currentProject ?? null) || !hollowEqual(people, await options.people(sessionId)))

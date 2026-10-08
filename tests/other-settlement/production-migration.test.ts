@@ -15,6 +15,7 @@ import { createProductionOtherSettlementMigration, validateOtherSettlementImport
 import { createProductionOtherSettlementService, listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { adoptHistoricalExpenseFixture } from '../helpers/other-settlement-pay08-source'
 
 async function fixture() {
   const root = resolve('.tmp/a02-material-tests')
@@ -121,7 +122,7 @@ it.each([{ existingAmount: 0, deleted: false, retained: false, alias: false }, {
   try {
     f.actor.capabilities.push('finance-reimbursement:read', 'finance-reimbursement:write', 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'finance-payment-record:write')
     const finance = createProductionFinanceService(f.storage, { references: (tx, actor) => ({ expenditure_settlements: id => readProductionOtherSettlementReference(tx, actor, id), settlementCandidates: () => listProductionOtherSettlementReferences(tx, actor) }) })
-    const expense = await finance.execute({ workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'finance-reimbursement:write', commandId: 'actual-modern-expense', kind: 'reimbursement', baseVersion: null, action: 'save', attachments: {}, draft: { applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '现代原费用', counterpartySupplierId: f.supplier.id, amount: 100 }] } }, f.session)
+    const expense = await adoptHistoricalExpenseFixture(f.storage, f.actor, { directory: f.directory, serviceId: f.supplier.id, payeeId: f.supplier.id, serviceName: '实际服务主档', payeeName: '实际服务主档', prefix: 'modern-native-original' })
     const expenseForm = await finance.form('reimbursement', expense.id, f.session)
     const current = await f.storage.withTransaction(tx => readOriginalExpenseReference(tx, f.actor, expenseForm.draft.lines[0]!.id))
     const owner = createProductionOtherSettlementService(f.storage)

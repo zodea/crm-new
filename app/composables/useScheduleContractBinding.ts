@@ -1,7 +1,6 @@
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { ScheduleBindingRead } from '~/lib/schedule/central-binding-contract'
 import type { DataOriginDTO } from '~/types/read-model'
-import { useSessionStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { buildBoqBuildingEvidenceLocation } from '~/lib/schedule/binding-navigation'
@@ -21,7 +20,7 @@ export function useScheduleContractBinding(props: { projectId: string, groupId: 
   const confirming = shallowRef(false)
   const error = shallowRef('')
   const active = shallowRef(true)
-  const drafts = useSessionStorage<Record<string, string>>('ruihang:schedule-binding-drafts-v1', {})
+  const drafts = useState<Record<string, string>>('schedule-binding-drafts', () => ({}))
   const formKey = deriveKey(route.fullPath)
   let sequence = 0
   let started = false
@@ -172,16 +171,16 @@ export function useScheduleContractBinding(props: { projectId: string, groupId: 
 
   async function recover() {
     const value = read.value
-    const command = store.pendingCommand
-    if (!value || !command || busy.value)
+    const descriptor = store.pendingCommand?.descriptor
+    if (!value || !descriptor || busy.value)
       return
     const target = targetKey()
     const request = sequence
     try {
-      await store.recoverPending()
+      const result = await store.recoverPending()
       if (!sameTarget(target, request))
         return
-      if (command.action.kind === 'bind-contract' && command.action.groupId === value.group.id && command.projectId === value.group.projectId && command.origin === value.origin && command.workspaceId === value.workspaceId && command.actorId === value.actorId)
+      if (descriptor.action === 'bind-contract' && descriptor.targetId === value.group.projectId && descriptor.workspaceId === value.workspaceId && descriptor.actorId === value.actorId && result && typeof result === 'object' && 'groupId' in result && result.groupId === value.group.id)
         await finish(value)
       else
         await load(selectedContractId.value)

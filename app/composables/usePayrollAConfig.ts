@@ -107,9 +107,9 @@ export function usePayrollAConfig(additionalGuard: () => boolean | Promise<boole
       else {
         adopt(value)
         const operation = store.getAPending(value)
-        if (operation?.command.action.kind === 'save-a-subject-config')
+        if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'save-a-subject-config')
           subject.value = clone(operation.command.action.config)
-        else if (operation?.command.action.kind === 'save-a-prices')
+        else if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'save-a-prices')
           prices.value = clone(operation.command.action.prices)
       }
     }

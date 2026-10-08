@@ -3,7 +3,7 @@ import type { WorkerPhotoAsset, WorkerPhotoUpload } from '../../app/lib/worker-r
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { rosterProblem } from '../../app/lib/worker-roster/contract'
-import { photoBytes } from './worker-roster-storage'
+import { validatedWorkerPhotoBytes as photoBytes } from './worker-photo-bytes'
 
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 interface PhysicalAsset {

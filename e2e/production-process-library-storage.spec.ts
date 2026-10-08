@@ -13,7 +13,7 @@ import { expect, test } from '@playwright/test'
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '需先构建，在专属合成目录验证，不连接用户数据')
 test('正式工序库完整页面保存、独立进程冷重开、原键和旧版本保持一致', async ({ page }, info) => {
   test.setTimeout(120_000)
-  const base = resolve('.codex-tmp/issue-463-browser')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-463-browser')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const probe = createServer().listen(0, '127.0.0.1')

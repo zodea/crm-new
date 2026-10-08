@@ -1,6 +1,7 @@
 import type { TransactionDb } from '../db/coordinator'
 import type { OtherSettlementResult, OtherSettlementStored } from './contract'
 import { auxiliaryProblem } from '../auxiliary-contract/contract'
+import { expenseConsumptionFingerprint, isExpenseClearanceSourceDTO } from '../finance/clearance-verification'
 import { contractOriginalPayloadDigest } from '../forms/original-content'
 import { decodeOtherSettlementCommand, decodeOtherSettlementDraft } from './validation'
 
@@ -88,10 +89,22 @@ export async function readOtherSettlementStored(tx: TransactionDb, identity: {
         return fail('结算头文本索引与冻结正文不一致')
     }
     const allocations = await tx.select<Record<string, unknown>>('SELECT * FROM expenditure_settlement_expense_allocations WHERE settlement_id=? AND deleted_at IS NULL ORDER BY id', [record.id])
+    for (const line of allocations) {
+      const input = draft.originalExpenses?.find(input => input.originalExpenseLineId === line.original_expense_line_id)
+      if (!input?.consumptionVersion)
+        continue
+      const source: unknown = JSON.parse(String(line.frozen_json))
+      if (!isExpenseClearanceSourceDTO(source) || source.consumptionVersion !== input.consumptionVersion)
+        return fail('结算实际消费依据与冻结原费用不一致')
+      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(expenseConsumptionFingerprint(source)))
+      const digest = [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+      if (input.consumptionVersion !== `expense-consumption-v1:${digest}`)
+        return fail('结算冻结原费用的实际消费摘要损坏')
+    }
     if (allocations.length !== (draft.originalExpenses?.length ?? 0) || allocations.some((line) => {
       const input = draft.originalExpenses?.find(input => input.originalExpenseLineId === line.original_expense_line_id)
       const source = JSON.parse(String(line.frozen_json))
-      return !input || input.sourceVersion !== line.source_version || input.sourceRevision !== line.source_revision || input.amount !== line.allocated_amount || source.id !== input.originalExpenseLineId || source.version !== input.sourceVersion || source.sourceRevision !== input.sourceRevision || (source.projectId ?? null) !== (draft.projectId ?? null) || source.applicantWorkerId !== (draft.payeeWorkerId ?? null) || source.applicantSupplierId !== (draft.payeeSupplierId ?? null) || source.applicantNameSnapshot !== draft.payeeNameSnapshot
+      return !input || input.sourceVersion !== line.source_version || input.sourceRevision !== line.source_revision || input.amount !== line.allocated_amount || source.id !== input.originalExpenseLineId || (input.consumptionVersion ? source.consumptionVersion !== input.consumptionVersion : source.version !== input.sourceVersion || source.sourceRevision !== input.sourceRevision) || (source.projectId ?? null) !== (draft.projectId ?? null) || source.applicantWorkerId !== (draft.payeeWorkerId ?? null) || source.applicantSupplierId !== (draft.payeeSupplierId ?? null) || source.applicantNameSnapshot !== draft.payeeNameSnapshot
     })) {
       return fail('结算原费用采用行与冻结来源不一致')
     }

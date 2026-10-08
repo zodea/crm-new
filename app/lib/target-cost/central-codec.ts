@@ -1,6 +1,6 @@
 import type { TargetCostCommand, TargetCostCommandResult, TargetCostDetailRead, TargetCostFileRead, TargetCostFormRead, TargetCostListRead, TargetCostQuery } from './central-contract'
 import { isDataOriginDTO } from '../../types/read-model'
-import { TARGET_COST_MONEY_FIELDS, targetCostProblem } from './central-contract'
+import { TARGET_COST_DRAFT_KEYS, TARGET_COST_MONEY_FIELDS, targetCostProblem } from './central-contract'
 import { parseBudgetFileChanges } from './central-files'
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -108,7 +108,7 @@ export function decodeTargetCostRead<T extends TargetCostListRead | TargetCostFo
   }
   return value as unknown as T
 }
-export function decodeTargetCostResult(value: unknown, command: TargetCostCommand): TargetCostCommandResult {
+export function decodeTargetCostResult(value: unknown, command: Pick<TargetCostCommand, 'commandId' | 'targetCostId'>): TargetCostCommandResult {
   if (!object(value) || value.commandId !== command.commandId || !text(value.id) || (command.targetCostId && value.id !== command.targetCostId) || !text(value.sourceVersion) || !strings(value.logIds) || !strings(value.attachmentIds) || !strings(value.affectedVersionIds) || !value.affectedVersionIds.includes(value.id))
     fail('预算提交回执与原目标不一致')
   return value as unknown as TargetCostCommandResult
@@ -123,11 +123,11 @@ export function parseTargetCostCommand(input: unknown): TargetCostCommand {
   const invalid = () => {
     throw targetCostProblem('validation-failed', '预算提交内容格式无效')
   }
-  if (!object(input) || !['commandId', 'workspaceId', 'actorId', 'sourceVersion'].every(key => typeof input[key] === 'string' && String(input[key]).trim()) || !nullableText(input.targetCostId) || !isDataOriginDTO(input.origin) || input.requiredCapability !== 'target-cost:write' || !object(input.action))
+  if (!object(input) || Object.keys(input).some(key => !['commandId', 'workspaceId', 'actorId', 'sourceVersion', 'targetCostId', 'origin', 'requiredCapability', 'draftKey', 'action'].includes(key)) || !['commandId', 'workspaceId', 'actorId', 'sourceVersion'].every(key => typeof input[key] === 'string' && String(input[key]).trim()) || !nullableText(input.targetCostId) || !isDataOriginDTO(input.origin) || input.requiredCapability !== 'target-cost:write' || !object(input.action))
     return invalid()
   const action = input.action
   if (action.kind === 'save-header') {
-    if (!object(action.draft) || !['draft', 'save', 'submit'].includes(String(action.saveAction)) || (action.draft.isBaseline !== undefined && typeof action.draft.isBaseline !== 'boolean') || (action.draft.projectId != null && typeof action.draft.projectId !== 'string'))
+    if (Object.keys(action).some(key => !['kind', 'draft', 'saveAction', 'files'].includes(key)) || !object(action.draft) || Object.keys(action.draft).some(key => !TARGET_COST_DRAFT_KEYS.includes(key as typeof TARGET_COST_DRAFT_KEYS[number])) || !['draft', 'save', 'submit'].includes(String(action.saveAction)) || (action.draft.isBaseline !== undefined && typeof action.draft.isBaseline !== 'boolean') || (action.draft.projectId != null && typeof action.draft.projectId !== 'string'))
       return invalid()
     for (const key of ['id', 'name', 'note', 'status']) {
       if (action.draft[key] != null && typeof action.draft[key] !== 'string')
@@ -137,10 +137,13 @@ export function parseTargetCostCommand(input: unknown): TargetCostCommand {
       parseBudgetFileChanges(action.files)
   }
   else if (action.kind === 'save-items') {
-    if (!Array.isArray(action.items) || !action.items.every(item => object(item) && ['id', 'category', 'itemName', 'unit', 'note'].every(key => item[key] == null || typeof item[key] === 'string')))
+    if (Object.keys(action).some(key => !['kind', 'items'].includes(key)) || !Array.isArray(action.items) || !action.items.every(item => object(item) && Object.keys(item).every(key => ['id', 'category', 'itemName', 'unit', 'qty', 'unitPrice', 'amount', 'note', 'sortOrder'].includes(key)) && ['id', 'category', 'itemName', 'unit', 'note'].every(key => item[key] == null || typeof item[key] === 'string')))
       return invalid()
   }
   else if (!['delete', 'restore'].includes(String(action.kind))) {
+    return invalid()
+  }
+  else if (Object.keys(action).some(key => key !== 'kind')) {
     return invalid()
   }
   if (input.draftKey !== undefined && !text(input.draftKey))

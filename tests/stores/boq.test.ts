@@ -7,6 +7,7 @@ import { useBoqStore } from '~/stores/boq'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
+vi.mock('~/stores/production-access', () => ({ useProductionAccessStore: () => ({ status: { mode: 'development', authenticated: false } }) }))
 
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => db.execute(sql, params),

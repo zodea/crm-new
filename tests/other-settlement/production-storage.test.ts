@@ -10,6 +10,7 @@ import { createProductionFinanceService } from '../../server/utils/production-fi
 import { createProductionOtherSettlementService, listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { installConstructionEngineeringFixture } from '../helpers/production-construction-scope-fixture'
 
 async function fixture(workerPayee = false) {
   const root = resolve('.tmp/a02-material-tests')
@@ -18,6 +19,7 @@ async function fixture(workerPayee = false) {
   const storage = createProductionStorage({ directory, workspaceId: 'other-workspace', ownerId: 'other-owner', purpose: 'verification' })
   const actor = { workspaceId: 'other-workspace', actorId: 'other-owner', capabilities: ['other-settlement:read', 'other-settlement:write', 'supplier:list:read', 'supplier:write', 'finance-reimbursement:read', 'finance-reimbursement:write', 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'finance-payment-record:write'] }
   const session = () => structuredClone(actor)
+  const engineering = await installConstructionEngineeringFixture(storage, actor, 'other-engineering')
   const supplierService = createProductionSupplierService(storage)
   const supplier = await supplierService.execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier:write', commandId: 'create-service-supplier', baseVersion: null, action: 'save', attachments: {}, draft: { name: '实际服务交易方', supplierCategory: '其他', contact: '合成人' } }, session)
   const payee = await supplierService.execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier:write', commandId: 'create-payee-supplier', baseVersion: null, action: 'save', attachments: {}, draft: { name: '实际垫付人', supplierCategory: '其他', contact: '合成人' } }, session)
@@ -28,11 +30,11 @@ async function fixture(workerPayee = false) {
     const person = await readWorkerReference(tx, current, id)
     return person ? { id: person.id, name: person.name, deleted_at: null, status: 'active' } : null
   }, expenditure_settlements: id => readProductionOtherSettlementReference(tx, current, id), settlementCandidates: () => listProductionOtherSettlementReferences(tx, current) }) })
-  const expense = await finance.execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'finance-reimbursement:write', commandId: 'source-original-expense', kind: 'reimbursement', baseVersion: null, action: 'save', attachments: {}, draft: { applicantSupplierId: worker ? null : payee.id, applicantWorkerId: worker?.id ?? null, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '实际公司无合同费用', counterpartySupplierId: supplier.id, amount: 100 }] } }, session)
+  const expense = await finance.execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'finance-reimbursement:write', commandId: 'source-original-expense', kind: 'reimbursement', baseVersion: null, action: 'save', attachments: {}, draft: { projectId: engineering.project.id, constructionMain: engineering.constructionMain, applicantSupplierId: worker ? null : payee.id, applicantWorkerId: worker?.id ?? null, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '实际项目无合同费用', counterpartySupplierId: supplier.id, amount: 100 }] } }, session)
   const owner = createProductionOtherSettlementService(storage)
   const source = (await owner.expenses(session)).items[0]!
-  const request: OtherSettlementCommand = { workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'other-settlement:write', commandId: 'other-original-command', baseVersion: null, action: 'submit', attachments: { add: [{ fileName: '原结算.txt', fileSize: 3, mimeType: 'text/plain', payloadBase64: 'YWJj' }] }, draft: { name: '实际无合同费用结算', projectId: null, contractId: null, totalAmount: 70, taxRate: null, settlementDate: '2026-10-05', originalExpenses: [{ originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, amount: 70 }] } }
-  return { storage, actor, session, owner, finance, supplier, payee, worker, source, expense, request }
+  const request: OtherSettlementCommand = { workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'other-settlement:write', commandId: 'other-original-command', baseVersion: null, action: 'submit', attachments: { add: [{ fileName: '原结算.txt', fileSize: 3, mimeType: 'text/plain', payloadBase64: 'YWJj' }] }, draft: { name: '实际无合同费用结算', projectId: engineering.project.id, contractId: null, totalAmount: 70, taxRate: null, settlementDate: '2026-10-05', originalExpenses: [{ originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, amount: 70 }] } }
+  return { storage, actor, session, owner, finance, supplier, payee, worker, source, expense, request, project: engineering.project }
 }
 describe('同一真实持久存储无合同费用结算', () => {
   it.each([false, true])('原费用→结算→实际%s收款人申请→确认支付，同owner冷开只记一次成本与现金', { timeout: 15000 }, async (workerPayee) => {
@@ -43,10 +45,10 @@ describe('同一真实持久存储无合同费用结算', () => {
       const supplierId = f.worker ? null : f.payee.id
       const workerId = f.worker?.id ?? null
       const actualName = f.worker ? '实际垫付工人' : '实际垫付人'
-      const applicationRequest = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'finance-payment-application:write', commandId: 'actual-chain-application', kind: 'payment_application' as const, baseVersion: null, action: 'submit' as const, attachments: {}, draft: { name: '真实原费用付款申请', bizType: '公司付款', supplierId, workerId, applyAmount: 70, applyDate: '2026-10-05', applicant: '合成财务', invoiceState: '无需发票' as const, settlementAllocations: [{ settlementId: saved.id, allocatedAmount: 70 }] } }
+      const applicationRequest = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'finance-payment-application:write', commandId: 'actual-chain-application', kind: 'payment_application' as const, baseVersion: null, action: 'submit' as const, attachments: {}, draft: { name: '真实原费用付款申请', projectId: f.project.id, bizType: '项目费用', supplierId, workerId, applyAmount: 70, applyDate: '2026-10-05', applicant: '合成财务', invoiceState: '无需发票' as const, settlementAllocations: [{ settlementId: saved.id, allocatedAmount: 70 }] } }
       const application = await f.finance.execute(applicationRequest, f.session)
       expect(await f.finance.execute(applicationRequest, f.session)).toEqual(application)
-      const paymentRequest = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'finance-payment-record:write', commandId: 'actual-chain-payment', kind: 'payment_record' as const, baseVersion: null, action: 'confirm' as const, attachments: {}, draft: { supplierId, workerId, payeeName: actualName, amount: 30, paymentDate: '2026-10-05', voucherNo: 'SYNTHETIC-CHAIN-VOUCHER', bankSerialNo: 'SYNTHETIC-CHAIN-BANK', confirmedBy: '合成财务', applicationAllocations: [{ paymentApplicationId: application.id, allocatedAmount: 30 }] } }
+      const paymentRequest = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'finance-payment-record:write', commandId: 'actual-chain-payment', kind: 'payment_record' as const, baseVersion: null, action: 'confirm' as const, attachments: {}, draft: { projectId: f.project.id, supplierId, workerId, payeeName: actualName, amount: 30, paymentDate: '2026-10-05', voucherNo: 'SYNTHETIC-CHAIN-VOUCHER', bankSerialNo: 'SYNTHETIC-CHAIN-BANK', confirmedBy: '合成财务', applicationAllocations: [{ paymentApplicationId: application.id, allocatedAmount: 30 }] } }
       const payment = await f.finance.execute(paymentRequest, f.session)
       await f.storage.close()
       expect(await f.finance.execute(paymentRequest, f.session)).toEqual(payment)
@@ -92,7 +94,7 @@ describe('同一真实持久存储无合同费用结算', () => {
       const saved = await f.owner.execute(f.request, f.session)
       expect(await f.owner.execute(f.request, f.session)).toEqual(saved)
       const detail = await f.owner.detail(saved.id, { origin: 'real' }, f.session)
-      expect(detail.settlement.draft).toMatchObject({ projectId: null, contractId: null, supplierId: f.supplier.id, payeeSupplierId: f.payee.id, payeeWorkerId: null, payeeNameSnapshot: '实际垫付人', totalAmount: 70, taxRate: null, status: 'pending' })
+      expect(detail.settlement.draft).toMatchObject({ projectId: f.project.id, contractId: null, supplierId: f.supplier.id, payeeSupplierId: f.payee.id, payeeWorkerId: null, payeeNameSnapshot: '实际垫付人', totalAmount: 70, taxRate: null, status: 'pending' })
       expect(detail.settlement.amounts).toMatchObject({ total: '70.00', deductions: '0.00', net: '70.00', applied: '0.00', paid: '0.00', taxExclusive: null, tax: null })
       const confirm = await f.owner.execute({ ...f.request, id: saved.id, baseVersion: '1', commandId: 'other-confirm', action: 'confirm', attachments: {} }, f.session)
       await f.storage.close()

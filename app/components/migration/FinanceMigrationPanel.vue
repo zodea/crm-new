@@ -14,7 +14,7 @@ const repository = createFinanceMigrationRepository((url, options) => {
   const body = options?.body
   if (body !== undefined && (body === null || typeof body !== 'object' || Array.isArray(body)))
     throw new Error('财务迁入提交格式无效。')
-  return $fetch<unknown>(url, { ...options, body, retry: 0 })
+  return $fetch<unknown, string>(url, { ...options, body, retry: 0 })
 })
 const recovery = createCommandRecoveryStorage(() => sessionStorage)
 const state = shallowRef<FinanceMigrationState | null>(null)

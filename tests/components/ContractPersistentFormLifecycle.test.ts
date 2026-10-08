@@ -25,8 +25,6 @@ function deferred<T>() {
 const components = {
   EntityFormShell: defineComponent({ props: ['title'], setup: (props, { slots }) => () => h('main', [h('h1', props.title), slots.default?.()]) }),
   ContractFormFields: defineComponent({ props: ['draft'], setup: props => () => h('input', { 'aria-label': '合同名称', 'value': props.draft.name }) }),
-  ContractAttachmentSection: true,
-  CommandRecoveryPanel: true,
   FormFooter: defineComponent({ emits: ['action'], setup: (_props, { emit }) => () => h('button', { onClick: () => emit('action', 'draft') }, '保存草稿') }),
 }
 
@@ -39,14 +37,19 @@ describe.each([{ kind: 'construction' as const, component: ConstructionForm }, {
   }
   beforeEach(() => {
     route = reactive({ params: { id: 'A' }, query: { origin: 'real' }, fullPath: `/contract/${kind}/form/A` })
-    session = shallowReactive({ generation: 0, context: null, pending: null, busy: false })
+    session = shallowReactive({ generation: 0, targetId: null, baseVersion: null, authority: null, context: null, pending: null, busy: false })
     mocks.toast.mockReset()
     mocks.close.mockReset()
     mocks.currentStore = {
       createSession: () => session,
       hydrate: vi.fn(async (_session: unknown, id: string) => {
         session.generation++
-        return { form: form(id), context: { workspaceId: 'w', actorId: 'a', capabilities: [`${kind}-contract:write`], projects: [], customers: [], suppliers: [] } }
+        const context = { workspaceId: 'w', actorId: 'a', capabilities: [`${kind}-contract:write`], projects: [], customers: [], suppliers: [] }
+        session.targetId = id
+        session.baseVersion = '1'
+        session.authority = { workspaceId: context.workspaceId, actorId: context.actorId }
+        session.context = context
+        return { form: form(id), context }
       }),
       invalidate: vi.fn(() => {
         session.generation++
@@ -68,7 +71,7 @@ describe.each([{ kind: 'construction' as const, component: ConstructionForm }, {
   it('旧目标迟到的hydrate不能替换新目标，读取失败也不能泄露旧提示', async () => {
     const old = deferred<any>()
     mocks.currentStore.hydrate.mockImplementationOnce(() => old.promise)
-    render(component, { global: { components } })
+    render(component, { global: { components, stubs: { ContractAttachmentSection: true, CommandRecoveryPanel: true } } })
     route.params.id = 'B'
     route.fullPath = `/contract/${kind}/form/B`
     await waitFor(() => expect((screen.getByLabelText('合同名称') as HTMLInputElement).value).toBe('合同B'))
@@ -81,9 +84,10 @@ describe.each([{ kind: 'construction' as const, component: ConstructionForm }, {
   it('保存结果未知时切换目标，迟到失败不改变新页；卸载仍保留原恢复编号', async () => {
     const saving = deferred<any>()
     mocks.currentStore.saveForm.mockImplementation(() => saving.promise)
-    const view = render(component, { global: { components } })
+    const view = render(component, { global: { components, stubs: { ContractAttachmentSection: true, CommandRecoveryPanel: true } } })
     await waitFor(() => expect((screen.getByLabelText('合同名称') as HTMLInputElement).value).toBe('合同A'))
     await fireEvent.click(screen.getByText('保存草稿'))
+    expect(mocks.currentStore.saveForm).toHaveBeenCalledOnce()
     route.params.id = 'B'
     route.fullPath = `/contract/${kind}/form/B`
     await waitFor(() => expect((screen.getByLabelText('合同名称') as HTMLInputElement).value).toBe('合同B'))

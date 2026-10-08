@@ -39,6 +39,10 @@ function productionPageSamples(): Array<[file: string, routePath: string]> {
 }
 
 describe('导出配置页签文案', () => {
+  it('工程量迁入入口保留独立标题', () => {
+    expect(routeTitle('/subcontract/quantity/import')).toBe('工程量原库接管')
+    expect(routeSubtitle('/subcontract/quantity/import')).toBe('原库预检 · 人工映射 · 原件与恢复')
+  })
   it('动态工作流路由使用统一页签标题', () => {
     expect(routeTitle('/export/config/export-1')).toBe('导出配置')
   })

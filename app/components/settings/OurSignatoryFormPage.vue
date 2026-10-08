@@ -11,7 +11,7 @@ import { bindReadAuthority } from '~/lib/read-model/authority'
 const route = useRoute()
 const router = useRouter()
 const kit = useKitUI()
-const repository = createOurSignatoryRepository((url, options) => $fetch<unknown>(url, { ...options, retry: 0 }))
+const repository = createOurSignatoryRepository((url, options) => $fetch<unknown, string>(url, { ...options, retry: 0 }))
 const latestConflict = shallowRef<Awaited<ReturnType<typeof repository.loadForm>> | null>(null)
 const actions = createFormCommandActions({
   repository: () => repository,

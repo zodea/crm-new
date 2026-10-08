@@ -16,11 +16,16 @@ import { computed, onMounted } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { isCoreMigrationBlockingIssue } from '~/lib/migration/core-contract'
 import { useCoreMigrationStore } from '~/stores/core-migration'
+import BudgetMigrationPanel from './BudgetMigrationPanel.vue'
+import ConstructionMigrationPanel from './ConstructionMigrationPanel.vue'
 import CrewWorkerMigrationPanel from './CrewWorkerMigrationPanel.vue'
 import FinanceMigrationPanel from './FinanceMigrationPanel.vue'
 import MigrationPreflightPanel from './MigrationPreflightPanel.vue'
 import MigrationReconciliationTable from './MigrationReconciliationTable.vue'
 import MigrationSwitchPanel from './MigrationSwitchPanel.vue'
+import PayrollMigrationPanel from './PayrollMigrationPanel.vue'
+import SubcontractMigrationPanel from './SubcontractMigrationPanel.vue'
+import WbsMigrationPanel from './WbsMigrationPanel.vue'
 
 const store = useCoreMigrationStore()
 const nativeUnsupported = isTauri()
@@ -170,6 +175,11 @@ onMounted(() => run(store.hydrate))
 
     <CrewWorkerMigrationPanel />
     <FinanceMigrationPanel />
+    <BudgetMigrationPanel />
+    <ConstructionMigrationPanel />
+    <SubcontractMigrationPanel />
+    <PayrollMigrationPanel />
+    <WbsMigrationPanel />
 
     <div
       v-if="nativeUnsupported"

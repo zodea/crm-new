@@ -3,8 +3,9 @@ import type { QuantityBoqSource, QuantityBoqWorkspace } from './central-boq'
 import type { QuantityBatchReadQuery, QuantityCommand, QuantityCommandResult, QuantityContext, QuantityReadQuery, QuantityReadResult, QuantityRegionAction, QuantityUnitReadQuery } from './central-contract'
 import type { QuantityMonthlyBoqFact, QuantityMonthlyReadQuery } from './central-monthly'
 import type { QuantityPeopleSource } from './central-people'
-import type { QuantityPhotoIdentity } from './central-photo'
+import type { QuantityPhotoContent, QuantityPhotoIdentity } from './central-photo'
 import type { QuantityDatabase } from './central-transaction'
+import type { QuantityCompletionPhotoDraft } from './completion'
 import type { QuantityRegionWorkspace } from './region'
 import type { QuantityTemplateWorkspace } from './template'
 import { loadQuantityAssignmentWorkspace } from './assignment'
@@ -17,6 +18,7 @@ import { persistQuantityImport, validateQuantityImportParent } from './central-i
 import { loadQuantityMonthlyBoqFacts } from './central-monthly'
 import { synchronizeQuantityPeople } from './central-people'
 import { readQuantityCentralPhoto } from './central-photo'
+import { ensureQuantityExternalReferences } from './central-reference'
 import { loadQuantityStageWorkspace, parseQuantityStageAction, persistQuantityStageAction, validateQuantityStageParent } from './central-stages'
 import { parseQuantityTemplateAction, persistQuantityTemplateAction, validateQuantityTemplateParent } from './central-template-action'
 import { quantityTransaction } from './central-transaction'
@@ -33,6 +35,27 @@ interface QuantityCurrentProject {
   code: string
 }
 
+export type QuantityConsumption = 'region' | 'templates' | 'stages' | 'assignments' | 'workspace' | 'completion' | 'batch' | 'photo' | 'schedule' | 'monthly' | 'variance'
+
+export function quantityCommandConsumption(command: QuantityCommand): QuantityConsumption {
+  const kind = command.action.kind
+  if (['create-building', 'create-floor', 'create-unit'].includes(kind))
+    return 'region'
+  if (['save-template', 'delete-template', 'undo-template'].includes(kind))
+    return 'templates'
+  if (['save-stage', 'set-reporting-stage'].includes(kind))
+    return 'stages'
+  if (kind === 'save-assignments')
+    return 'assignments'
+  if (kind === 'save-completion')
+    return 'completion'
+  if (kind === 'save-completion-batch')
+    return 'batch'
+  if (kind === 'import-row')
+    return command.action.target === 'template' ? 'templates' : command.action.target === 'assignment' ? 'assignments' : 'completion'
+  return 'workspace'
+}
+
 interface Options {
   workspaceId: string
   database: QuantityDatabase
@@ -40,6 +63,17 @@ interface Options {
   projects?: (context: QuantityContext) => Promise<readonly QuantityCurrentProject[]>
   people?: QuantityPeopleSource
   boq?: QuantityBoqSource
+  /** Registered production participants read the existing owner; only test adapters mirror identities. */
+  authoritativeMasters?: boolean
+  planVisibility?: NonNullable<Parameters<typeof loadQuantityCompletionWorkspace>[3]>['planVisibility']
+  sourceVersion?: (db: TransactionDb, projectId: string, scope: QuantityReadQuery | QuantityCommand, consumption: QuantityConsumption) => Promise<string>
+  validateSourceVersion?: (db: TransactionDb, command: QuantityCommand) => Promise<void>
+  commands?: {
+    replay: (db: TransactionDb, command: QuantityCommand, fingerprint: string) => Promise<QuantityCommandResult | null>
+    complete: (db: TransactionDb, command: QuantityCommand, fingerprint: string, saved: Omit<QuantityCommandResult, 'commandId' | 'sourceVersion'>) => Promise<QuantityCommandResult>
+  }
+  writeOriginal?: (db: TransactionDb, fileId: string, photo: QuantityCompletionPhotoDraft) => Promise<void>
+  readPhoto?: (db: TransactionDb, scope: QuantityReadQuery & QuantityPhotoIdentity) => Promise<QuantityPhotoContent>
 }
 
 function text(value: unknown, label: string): string {
@@ -93,8 +127,8 @@ export function createQuantityService(options: Options) {
     return pending
   }
 
-  function version(projectId: string): string {
-    return `quantity:${projectId}:${revisions.get(projectId) ?? 0}`
+  function version(db: TransactionDb, projectId: string, scope: QuantityReadQuery | QuantityCommand, consumption: QuantityConsumption): Promise<string> {
+    return options.sourceVersion ? options.sourceVersion(db, projectId, scope, consumption) : Promise.resolve(`quantity:${projectId}:${revisions.get(projectId) ?? 0}`)
   }
 
   async function authorize(projectId: string, origin: string, context: QuantityContext, write: boolean) {
@@ -115,6 +149,8 @@ export function createQuantityService(options: Options) {
   }
 
   async function projectMirror(db: TransactionDb, project: QuantityCurrentProject) {
+    if (options.authoritativeMasters)
+      return
     await db.execute(
       `INSERT INTO projects (id, name, code) VALUES (?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET name = excluded.name, code = excluded.code, deleted_at = NULL`,
@@ -122,17 +158,27 @@ export function createQuantityService(options: Options) {
     )
   }
 
-  function read<T>(query: QuantityReadQuery, context: QuantityContext, load: (db: TransactionDb, projectId: string) => Promise<T>, needsPeople = false): Promise<QuantityReadResult<T>> {
+  async function people(db: TransactionDb, context: QuantityContext, source = options.people) {
+    if (!options.authoritativeMasters)
+      return synchronizeQuantityPeople(db, context, source)
+    if (!context.capabilities.includes('crew:list:read') || !context.capabilities.includes('worker:list:read'))
+      throw quantityProblem('forbidden', '当前无权读取工程量所需的班组和工人资料')
+    if (!source)
+      throw quantityProblem('unavailable', '正式责任主档尚未接通')
+    await source(context)
+  }
+
+  function read<T>(query: QuantityReadQuery, context: QuantityContext, load: (db: TransactionDb, projectId: string) => Promise<T>, needsPeople = false, consumption: QuantityConsumption = 'workspace'): Promise<QuantityReadResult<T>> {
     const scope = { ...query }
     return serial(async () => {
       const project = await authorize(scope.projectId, scope.origin, context, false)
-      const data = await quantityTransaction(options.database, async (db) => {
+      const result = await quantityTransaction(options.database, async (db) => {
         await projectMirror(db, project)
         if (needsPeople)
-          await synchronizeQuantityPeople(db, context, options.people)
-        return load(db, project.id)
+          await people(db, context)
+        return { data: await load(db, project.id), sourceVersion: await version(db, project.id, scope, consumption) }
       })
-      return { data, dataOrigin: 'real', sourceVersion: version(project.id), asOf: new Date().toISOString(), capabilities: [...context.capabilities] }
+      return { ...result, dataOrigin: 'real', asOf: new Date().toISOString(), capabilities: [...context.capabilities] }
     })
   }
 
@@ -155,7 +201,7 @@ export function createQuantityService(options: Options) {
         const project = await authorize(scope.projectId, scope.origin, context, false)
         return quantityTransaction(options.database, async (db) => {
           await projectMirror(db, project)
-          return consume(db, version(project.id))
+          return consume(db, await version(db, project.id, scope, 'schedule'))
         })
       })
     },
@@ -167,7 +213,7 @@ export function createQuantityService(options: Options) {
         const source = await currentBoq(project.id, context)
         const facts = await quantityTransaction(options.database, async (db) => {
           await projectMirror(db, project)
-          return loadQuantityMonthlyBoqFacts(db, project.id, source.lines, `${version(project.id)}+${source.sourceVersion}:${scope.basis ?? 'field'}`, scope.basis)
+          return loadQuantityMonthlyBoqFacts(db, project.id, source.lines, `${await version(db, project.id, scope, 'monthly')}+${source.sourceVersion}:${scope.basis ?? 'field'}`, scope.basis)
         })
         if ((await currentBoq(project.id, context)).sourceVersion !== source.sourceVersion)
           throw quantityProblem('stale-source', '施工合同清单已变化，请重新读取月度工程量')
@@ -179,7 +225,7 @@ export function createQuantityService(options: Options) {
       return read(scope, context, async (db, projectId) => {
         const source = await currentBoq(projectId, context)
         return { projectId, facts: await loadQuantityVarianceFacts(db, projectId, source.lines), boqSourceVersion: source.sourceVersion }
-      })
+      }, false, 'variance')
     },
     boq(query: QuantityReadQuery, context: QuantityContext): Promise<QuantityReadResult<QuantityBoqWorkspace>> {
       const scope = { ...query }
@@ -200,31 +246,31 @@ export function createQuantityService(options: Options) {
       }
     },
     stages(query: QuantityReadQuery, context: QuantityContext) {
-      return read(query, context, loadQuantityStageWorkspace)
+      return read(query, context, loadQuantityStageWorkspace, false, 'stages')
     },
     assignments(query: QuantityReadQuery, context: QuantityContext) {
-      return read(query, context, loadQuantityAssignmentWorkspace, true)
+      return read(query, context, loadQuantityAssignmentWorkspace, true, 'assignments')
     },
     workspace(query: QuantityReadQuery, context: QuantityContext) {
       return read(query, context, loadQuantityCentralWorkspace, true)
     },
     completion(query: QuantityUnitReadQuery, context: QuantityContext) {
       const unitId = query.unitId
-      return read(query, context, (db, projectId) => loadQuantityCompletionWorkspace(db, projectId, unitId), true)
+      return read(query, context, (db, projectId) => loadQuantityCompletionWorkspace(db, projectId, unitId, { planVisibility: options.planVisibility }), true, 'completion')
     },
     batchPlan(query: QuantityBatchReadQuery, context: QuantityContext) {
       const scope = structuredClone(query)
-      return read(scope, context, (db, projectId) => loadQuantityBatchCompletionPlan(db, projectId, scope), true)
+      return read(scope, context, (db, projectId) => loadQuantityBatchCompletionPlan(db, projectId, scope), true, 'batch')
     },
     photo(query: QuantityReadQuery & QuantityPhotoIdentity, context: QuantityContext) {
       const scope = { ...query }
-      return read(scope, context, db => readQuantityCentralPhoto(db, scope))
+      return read(scope, context, db => options.readPhoto ? options.readPhoto(db, scope) : readQuantityCentralPhoto(db, scope), false, 'photo')
     },
     templates(query: QuantityReadQuery, context: QuantityContext): Promise<QuantityReadResult<QuantityTemplateWorkspace>> {
-      return read(query, context, loadQuantityTemplateWorkspace)
+      return read(query, context, loadQuantityTemplateWorkspace, false, 'templates')
     },
     region(query: QuantityReadQuery, context: QuantityContext): Promise<QuantityReadResult<QuantityRegionWorkspace>> {
-      return read(query, context, loadQuantityRegionWorkspace)
+      return read(query, context, loadQuantityRegionWorkspace, false, 'region')
     },
     execute(input: QuantityCommand, context: QuantityContext): Promise<QuantityCommandResult> {
       const command = structuredClone(input)
@@ -255,10 +301,15 @@ export function createQuantityService(options: Options) {
         const fingerprint = JSON.stringify([command.workspaceId, command.actorId, command.projectId, command.origin, command.baseVersion, action])
         const outcome = await quantityTransaction(options.database, async (db) => {
           await projectMirror(db, project)
+          if (options.commands) {
+            const replay = await options.commands.replay(db, command, fingerprint)
+            if (replay)
+              return { kind: 'cached' as const, result: replay }
+          }
           if (importAction) {
             if (importAction.target !== 'template') {
               const source = options.people
-              await synchronizeQuantityPeople(db, context, source && (async (scope) => {
+              await people(db, context, source && (async (scope) => {
                 const rows = await source(scope)
                 if (importAction.target === 'assignment')
                   resolveQuantityImportAssignee(rows.filter(row => row.dataOrigin === 'real'), importAction.row)
@@ -271,11 +322,11 @@ export function createQuantityService(options: Options) {
             await validateQuantityStageParent(db, project.id, stageAction)
           }
           else if (completionAction) {
-            await synchronizeQuantityPeople(db, context, options.people)
-            await validateQuantityCompletionParent(db, project.id, completionAction)
+            await people(db, context)
+            await validateQuantityCompletionParent(db, project.id, completionAction, { planVisibility: options.planVisibility })
           }
           else if (assignmentAction) {
-            await synchronizeQuantityPeople(db, context, options.people)
+            await people(db, context)
             await validateQuantityAssignmentParent(db, project.id, assignmentAction)
           }
           else if (templateAction) {
@@ -290,29 +341,39 @@ export function createQuantityService(options: Options) {
               throw quantityProblem('conflict', '相同命令标识已用于不同内容')
             return { kind: 'cached' as const, result: cached.result }
           }
-          if (command.baseVersion !== version(command.projectId))
+          if (options.validateSourceVersion)
+            await options.validateSourceVersion(db, command)
+          else if (command.baseVersion !== await version(db, command.projectId, command, quantityCommandConsumption(command)))
             throw quantityProblem('stale-source', '工程量已发生变化，请重新读取后核对再保存')
           const [before] = await db.select<{ sequence: number }>('SELECT COALESCE(MAX(rowid), 0) AS sequence FROM operation_logs')
-          const boqSource = templateAction?.kind === 'save-template' && templateAction.draft.lines.some(line => typeof line.boqLineId === 'string')
+          let needsCurrentBoq = templateAction?.kind === 'save-template' && templateAction.draft.lines.some(line => typeof line.boqLineId === 'string')
+          if (needsCurrentBoq && options.authoritativeMasters && templateAction?.kind === 'save-template') {
+            needsCurrentBoq = false
+            for (const line of templateAction.draft.lines) {
+              if (typeof line.boqLineId !== 'string')
+                continue
+              const [existing] = line.id ? await db.select<{ boq_line_id: string | null }>('SELECT boq_line_id FROM house_type_template_items WHERE id=?', [line.id]) : []
+              if (!existing || existing.boq_line_id !== line.boqLineId)
+                needsCurrentBoq = true
+            }
+          }
+          const boqSource = needsCurrentBoq
             ? await currentBoq(project.id, context)
             : undefined
           if (boqSource) {
             const selected = new Set(templateAction?.kind === 'save-template' ? templateAction.draft.lines.map(line => line.boqLineId) : [])
-            for (const line of boqSource.lines.filter(line => selected.has(line.id))) {
-              const [existing] = await db.select<{ project_id: string, contract_id: string }>('SELECT project_id, contract_id FROM quantity_boq_references WHERE id = ?', [line.id])
-              if (existing && (existing.project_id !== project.id || existing.contract_id !== line.contractId))
-                throw quantityProblem('relationship-mismatch', '清单身份已关联其他项目或施工合同')
-              await db.execute('INSERT INTO quantity_boq_references (id, project_id, contract_id) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING', [line.id, project.id, line.contractId])
-            }
+            await ensureQuantityExternalReferences(db, { lines: boqSource.lines.filter(line => selected.has(line.id)).map(line => ({ id: line.id, projectId: project.id, contractId: line.contractId })) }, (message) => {
+              throw quantityProblem('relationship-mismatch', message)
+            })
           }
           const saved: Omit<QuantityCommandResult, 'commandId' | 'sourceVersion'> = importAction
-            ? await persistQuantityImport(db, project.id, importAction, context.actorId)
+            ? await persistQuantityImport(db, project.id, importAction, context.actorId, { planVisibility: options.planVisibility, writeOriginal: options.writeOriginal })
             : archiveAction
               ? await persistQuantityArchive(db, project.id, archiveAction)
               : stageAction
                 ? await persistQuantityStageAction(db, project.id, stageAction)
                 : completionAction
-                  ? await persistQuantityCompletionAction(db, completionAction, context.actorId)
+                  ? await persistQuantityCompletionAction(db, completionAction, context.actorId, { writeOriginal: options.writeOriginal, planVisibility: options.planVisibility })
                   : assignmentAction
                     ? await persistQuantityAssignmentAction(db, assignmentAction)
                     : templateAction
@@ -321,13 +382,15 @@ export function createQuantityService(options: Options) {
           if (boqSource && (await currentBoq(project.id, context)).sourceVersion !== boqSource.sourceVersion)
             throw quantityProblem('stale-source', '施工合同清单已变化，请重新核对关联后保存')
           await db.execute('UPDATE operation_logs SET operator = ? WHERE rowid > ?', [context.actorId, before?.sequence ?? 0])
+          if (options.commands)
+            return { kind: 'cached' as const, result: await options.commands.complete(db, command, fingerprint, saved) }
           return { kind: 'saved' as const, ...saved }
         })
         if (outcome.kind === 'cached')
           return structuredClone(outcome.result)
         revisions.set(project.id, (revisions.get(project.id) ?? 0) + 1)
         const { kind: _kind, ...saved } = outcome
-        const result: QuantityCommandResult = { ...saved, commandId: command.commandId, sourceVersion: version(project.id) }
+        const result: QuantityCommandResult = { ...saved, commandId: command.commandId, sourceVersion: `quantity:${project.id}:${revisions.get(project.id) ?? 0}` }
         commands.set(command.commandId, { projectId: project.id, fingerprint, result })
         return structuredClone(result)
       })

@@ -52,11 +52,11 @@ export function parseQuantityCompletionAction(value: unknown): QuantityCompletio
   return { kind: 'save-completion-batch', draft: structuredClone(draft) as unknown as QuantityBatchCompletionDraft }
 }
 
-export async function validateQuantityCompletionParent(db: TransactionDb, projectId: string, action: QuantityCompletionAction) {
+export async function validateQuantityCompletionParent(db: TransactionDb, projectId: string, action: QuantityCompletionAction, options: NonNullable<Parameters<typeof loadQuantityCompletionWorkspace>[3]> = {}) {
   if (action.draft.projectId !== projectId)
     throw quantityProblem('relationship-mismatch', '完成草稿不属于当前项目')
   if (action.kind === 'save-completion') {
-    const workspace = await loadQuantityCompletionWorkspace(db, projectId, action.draft.unitId)
+    const workspace = await loadQuantityCompletionWorkspace(db, projectId, action.draft.unitId, options)
     if (!workspace.stages.some(row => row.id === action.draft.stageId))
       throw quantityProblem('relationship-mismatch', '该阶段不是当前户的适用或历史阶段')
   }
@@ -67,9 +67,9 @@ export async function validateQuantityCompletionParent(db: TransactionDb, projec
   }
 }
 
-export async function persistQuantityCompletionAction(db: TransactionDb, action: QuantityCompletionAction, actorId: string) {
+export async function persistQuantityCompletionAction(db: TransactionDb, action: QuantityCompletionAction, actorId: string, options: Parameters<typeof persistQuantityStageCompletion>[2] = {}) {
   if (action.kind === 'save-completion') {
-    const completion = await persistQuantityStageCompletion(db, action.draft, { uploader: actorId })
+    const completion = await persistQuantityStageCompletion(db, action.draft, { ...options, uploader: actorId })
     return { id: completion.completionId, logIds: completion.logIds, completion }
   }
   const batch = await persistQuantityBatchCompletion(db, action.draft)

@@ -104,6 +104,7 @@ interface Options {
   resolveSuppliers?: (sessionId?: string | null) => readonly ReferenceOption[]
   resolveSignatory?: (draft: ProjectContractFormDraft, existing: StoredMaterialContract | null, required: boolean, session: BusinessSession, sessionId?: string | null) => Promise<import('../../app/lib/our-signatory/contract').OurSignatorySnapshot | null>
   numberConflict?: (number: string, id: string | null) => Promise<boolean>
+  validateDependencies?: (request: MaterialContractCommandRequestDTO, candidate: ProjectContractFormDraft, existing: StoredMaterialContract | null) => Promise<void>
 }
 
 function text(value: unknown): string {
@@ -815,6 +816,7 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
         throw failure('validation-failed', '补充协议不能改归其他原合同')
       const parent = request.draft.isSupplement && request.draft.originalContractId ? state.contracts.get(request.draft.originalContractId) : null
       let candidate = parent ? { ...request.draft, projectId: parent.draft.projectId, supplierId: parent.draft.supplierId } : request.draft
+      await options.validateDependencies?.(request, candidate, existing)
       validate(candidate, request.action, sessionId)
       if (parent) {
         const frozen = existing ? existing.draft.ourSignatorySnapshot ?? null : parent.draft.ourSignatorySnapshot ?? null

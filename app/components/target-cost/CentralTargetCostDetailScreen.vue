@@ -56,7 +56,7 @@ watch(activeTab, (tab) => {
     <template #summary>
       <CentralTargetCostSummary v-if="view" :view="view" />
     </template>
-    <TargetCostCommandState :error="error" :pending="!!pending" :busy="busy" @recover="ui.recover" @recheck="ui.load(true)" />
+    <TargetCostCommandState :error="error" :pending="!!pending" :busy="busy" :applied="pending?.state === 'applied'" @recover="ui.recover" @recheck="ui.load(true)" />
     <section v-if="latest" class="panel my-3 grid gap-2 p-3 text-12px" aria-label="科目最新资料核对">
       <p>已读取最新版本；科目草稿与原保存依据保持不变。{{ latest.context.sourceVersion !== current?.context.sourceVersion ? '预算版本已变化。' : '预算来源版本未变化。' }}</p>
       <KitButton type="button" class="justify-self-start" variant="secondary" :disabled="busy || !!pending" @click="ui.replaceWithLatest">

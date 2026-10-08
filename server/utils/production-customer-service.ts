@@ -8,6 +8,7 @@ import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { buildCustomerDetailRead, buildCustomerListPage, customerProblem, parseCustomerDetailQuery, parseCustomerListQuery } from '../../app/lib/customer/repository'
+import { readProductionConstructionDirectoryProjection } from './production-construction-contract-sources'
 import { CUSTOMER_FIELDS, customerAttachment, customerDraft, customerListRow, customerFailure as fail, normalizedCustomer } from './production-customer-record'
 import { parseProductionCustomerRequest, productionCustomerId } from './production-customer-request'
 import { productionCustomerProjects } from './production-project-relations'
@@ -235,13 +236,15 @@ export function createProductionCustomerService(storage: ProductionStorage) {
         const projectsProblem = projects === null ? actor.capabilities.includes('project:list:read') ? notReady : customerProblem('forbidden', '当前会话没有项目读取权限。') : undefined
         const projectRevision = projects === null ? null : (await tx.select<{ revision: number }>('SELECT revision FROM project_revision'))[0]!.revision
         const asOf = new Date().toISOString()
+        const construction = await readProductionConstructionDirectoryProjection(tx, actor, asOf)
+        const contractsProblem = construction.contracts === null ? construction.source.state === 'forbidden' ? customerProblem('forbidden', '当前会话没有施工主合同读取权限。') : notReady : undefined
         const meta = createReadMeta({ session: actor, schemaVersion: 'customer-read-v2', operation: 'customer:detail', dataOrigin: 'real', asOf, coverage: 'complete', scope: query, sources: [
           { key: 'customers', state: 'readable', sourceVersion: `customer:${row.version}`, asOf },
           projectsProblem ? { key: 'projects', state: projectsProblem.code === 'forbidden' ? 'forbidden' : 'unavailable', sourceVersion: null, asOf: null } : { key: 'projects', state: 'readable', sourceVersion: `projects:${projectRevision}`, asOf },
-          { key: 'construction-contracts', state: 'unavailable', sourceVersion: null, asOf: null },
+          construction.source,
           { key: 'receipts', state: 'unavailable', sourceVersion: null, asOf: null },
         ] })
-        return withReadMeta(buildCustomerDetailRead({ customers: [customerListRow(row)], projects: projects ?? [], contracts: [], receipts: [], query, ...(projectsProblem ? { projectsProblem } : {}), contractsProblem: notReady, receiptsProblem: notReady, asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), meta)
+        return withReadMeta(buildCustomerDetailRead({ customers: [customerListRow(row)], projects: projects ?? [], contracts: construction.contracts ?? [], receipts: [], query, ...(projectsProblem ? { projectsProblem } : {}), ...(contractsProblem ? { contractsProblem } : {}), receiptsProblem: notReady, asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), meta)
       })
     },
     file(customerId: string, fileId: string, session: ProductionSession) {

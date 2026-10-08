@@ -115,7 +115,7 @@ export function usePayrollC1Form() {
           draft.value = payrollDraft(value.draft)
           original.value = JSON.stringify(draft.value)
           const operation = store.getC1Pending(value)
-          if (operation?.command.action.kind === 'save-c1-draft') {
+          if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'save-c1-draft') {
             draft.value = clone(operation.command.action.draft)
           }
         }

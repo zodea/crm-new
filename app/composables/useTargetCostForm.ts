@@ -9,6 +9,7 @@ import { useTargetCostFiles } from '~/composables/useTargetCostFiles'
 import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 import { deriveKey } from '~/lib/tabs/tab-machine'
+import { targetCostEditableDraft } from '~/lib/target-cost/central-domain'
 import { TARGET_COST_LIST_PATH, targetCostOrigin, targetCostReturnTo } from '~/lib/target-cost/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
@@ -84,7 +85,7 @@ export function useTargetCostForm() {
     restoreIds.value = []
     original.value = snapshot()
     if (command?.action.kind === 'save-header') {
-      draft.value = clone(command.action.draft)
+      draft.value = targetCostEditableDraft(clone(command.action.draft))
       pendingFiles.value = (command.action.files?.add ?? []).map((file, index) => ({ ...file, localId: `restored-${index}` }))
       removeIds.value = [...command.action.files?.removeIds ?? []]
       restoreIds.value = [...command.action.files?.restoreIds ?? []]
@@ -231,7 +232,7 @@ export function useTargetCostForm() {
     error.value = ''
     try {
       const result = await store.recover(operation)
-      if (sameTarget(requested, request) && (value.targetCostId ? result.id === value.targetCostId : operation.command.draftKey === value.draftKey))
+      if (sameTarget(requested, request) && (value.targetCostId ? result.id === value.targetCostId : operation.descriptor.scopeId === value.draftKey))
         await finish(value, result.id)
     }
     catch (cause) {

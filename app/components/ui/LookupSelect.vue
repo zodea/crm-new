@@ -71,7 +71,7 @@ const recentState = props.recentKey
   : shallowRef<LookupOption[]>([])
 const recents = recentStore(recentState)
 
-const recentIds = computed(() => new Set(recents.items.value.map(item => item.id)))
+const recentIds = computed(() => new Set(props.recentKey ? recents.items.value.map(item => item.id) : []))
 const visibleResults = computed(() =>
   resultsKeyword.value === query.value ? results.value : [],
 )

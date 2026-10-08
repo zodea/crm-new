@@ -22,8 +22,8 @@ export function parseBoqBuildingQuery(value: unknown): BoqBuildingQuery {
 }
 export function parseBoqBuildingCommand(value: unknown): BoqBuildingCommand {
   const raw = object(value)
-  const allowed = new Set(['projectId', 'contractId', 'origin', 'commandId', 'workspaceId', 'actorId', 'requiredCapability', 'sourceVersion', 'lineId', 'buildingId', 'reason'])
+  const allowed = new Set(['projectId', 'contractId', 'origin', 'commandId', 'workspaceId', 'actorId', 'requiredCapability', 'sourceVersion', 'lineId', 'buildingId', 'reason', 'lineVersion', 'buildingVersion', 'contractVersion'])
   if (Object.keys(raw).some(key => !allowed.has(key)) || raw.requiredCapability !== 'owner-document:write')
     invalid('本命令只允许更正清单楼栋，不能修改量价或来源资格')
-  return { ...parseBoqBuildingQuery(raw), requiredCapability: 'owner-document:write', commandId: text(raw.commandId, '提交编号'), workspaceId: text(raw.workspaceId, '工作区'), actorId: text(raw.actorId, '操作人'), sourceVersion: text(raw.sourceVersion, '原始版本'), lineId: text(raw.lineId, '清单行'), buildingId: text(raw.buildingId, '楼栋'), reason: text(raw.reason, '更正依据') }
+  return { ...parseBoqBuildingQuery(raw), requiredCapability: 'owner-document:write', commandId: text(raw.commandId, '提交编号'), workspaceId: text(raw.workspaceId, '工作区'), actorId: text(raw.actorId, '操作人'), sourceVersion: text(raw.sourceVersion, '原始版本'), lineId: text(raw.lineId, '清单行'), buildingId: text(raw.buildingId, '楼栋'), reason: text(raw.reason, '更正依据'), ...(raw.lineVersion !== undefined ? { lineVersion: text(raw.lineVersion, '原行消费版本'), buildingVersion: text(raw.buildingVersion, '所选楼栋版本'), contractVersion: text(raw.contractVersion, '实际施工资格版本') } : {}) }
 }

@@ -45,7 +45,7 @@ beforeEach(() => {
   confirm.mockReset()
   exportFile.mockReset()
   scheduleStore.loadProject.mockReset()
-  for (const [name, value] of Object.entries({ computed, shallowRef, watch, onMounted, useRoute: () => route, useRouter: () => router, useQuantityStore: () => store, useScheduleStore: () => scheduleStore, useKitUI: () => ({ confirm, exportFile, error: vi.fn(), success: vi.fn(), warning: vi.fn() }) }))
+  for (const [name, value] of Object.entries({ computed, shallowRef, watch, onMounted, useRoute: () => route, useRouter: () => router, useQuantityStore: () => store, useScheduleStore: () => scheduleStore, useProductionAccessStore: () => ({ status: { mode: 'production' } }), useKitUI: () => ({ confirm, exportFile, error: vi.fn(), success: vi.fn(), warning: vi.fn() }) }))
     vi.stubGlobal(name, value)
 })
 afterEach(() => {

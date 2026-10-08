@@ -1,6 +1,7 @@
 import type { ConstructionContractCommandRequestDTO } from '../../app/lib/construction-contract/command-contract'
 import type { ContractFormAttachmentDraft } from '../../app/lib/contract/forms'
 import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO, CoreMigrationSourceDTO } from '../../app/lib/migration/core-contract'
+import type { BusinessSession } from '../../server/utils/business-session'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { once } from 'node:events'
@@ -11,13 +12,17 @@ import { CORE_MIGRATION_CAPABILITY, CORE_MIGRATION_CONTRACT_VERSION, CORE_MIGRAT
 import { createConstructionContractCommandTestInstance } from '../../server/utils/construction-contract-command-test-instance'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
+import { createProductionConstructionContractService } from '../../server/utils/production-construction-contract-service'
+import { createProductionStorage, ProductionStorageProblem } from '../../server/utils/production-storage'
 import { createSubcontractContractCommandTestInstance } from '../../server/utils/subcontract-contract-command-test-instance'
+import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
 
 type Domain = 'construction' | 'subcontract'
 const timestamp = '2026-10-04T08:00:00.000Z'
 const body = Buffer.from('%PDF-1.7\nOriginal contract fixture\n%%EOF')
 const original: ContractFormAttachmentDraft = { fileName: '合同原件.pdf', fileSize: body.length, mimeType: 'application/pdf', payloadBase64: body.toString('base64') }
 const empty: ContractFormAttachmentDraft = { fileName: '真实空文件.txt', fileSize: 0, mimeType: 'text/plain', payloadBase64: '' }
+let httpActor: BusinessSession
 
 function originalFixture(domain: Domain, attachmentIds?: string[]) {
   let id = 0
@@ -178,63 +183,104 @@ describe.each(['construction', 'subcontract'] as const)('%s 合同原件完整 o
 })
 
 it.each(['construction', 'subcontract'] as const)('%s 真实HTTP提交、原件读取、删除恢复与正式门禁', async (domain) => {
-  const f = originalFixture(domain)
-  let actor = f.actor
-  let production = false
+  const f = await createSubcontractFixture()
+  let storage = f.storage
+  const formal = () => domain === 'construction' ? createProductionConstructionContractService(storage) : f.service
+  let owner = formal()
+  httpActor = f.session()
+  let unavailable = false
   vi.stubGlobal('createError', createError)
   vi.stubGlobal('defineEventHandler', defineEventHandler)
   vi.stubGlobal('getHeader', getHeader)
   vi.stubGlobal('getQuery', getQuery)
   vi.stubGlobal('getRouterParam', getRouterParam)
   vi.stubGlobal('readBody', readBody)
-  vi.doMock('../../server/utils/business-session', () => ({ resolveBusinessSession: () => actor }))
-  vi.doMock('../../server/utils/production-config', async importOriginal => ({ ...await importOriginal<typeof import('../../server/utils/production-config')>(), getProductionRuntimeConfig: () => production ? { workspaceId: actor.workspaceId } : null }))
-  const ownerModule = domain === 'construction' ? '../../server/utils/construction-contract-command-test-instance' : '../../server/utils/subcontract-contract-command-test-instance'
-  vi.doMock(ownerModule, () => domain === 'construction' ? { constructionContractCommandTestInstance: f.service } : { subcontractContractCommandTestInstance: f.service })
+  vi.doMock('../../server/utils/production-auth', async importOriginal => ({ ...await importOriginal<typeof import('../../server/utils/production-auth')>(), requireProductionBusinessSession: () => httpActor }))
+  vi.doMock('../../server/utils/production-runtime', async importOriginal => ({ ...await importOriginal<typeof import('../../server/utils/production-runtime')>(), productionSession: () => () => httpActor }))
+  const runtimeModule = domain === 'construction' ? '../../server/utils/production-construction-contract-runtime' : '../../server/utils/production-subcontract-contract-runtime'
+  const actualRuntime = () => {
+    if (unavailable)
+      throw new ProductionStorageProblem('实际正式合同owner尚未就绪；不读取开发原件')
+    return { storage, contracts: owner }
+  }
+  vi.doMock(runtimeModule, () => domain === 'construction' ? { productionConstructionContractRuntime: actualRuntime } : { productionSubcontractContractRuntime: actualRuntime })
   const create = domain === 'construction' ? (await import('../../server/api/commands/construction-contracts.post')).default : (await import('../../server/api/commands/subcontract-contracts.post')).default
   const update = domain === 'construction' ? (await import('../../server/api/commands/construction-contracts/[id].put')).default : (await import('../../server/api/commands/subcontract-contracts/[id].put')).default
   const read = domain === 'construction' ? (await import('../../server/api/read/construction-contracts/[id]/files/[fileId].get')).default : (await import('../../server/api/read/subcontract-contracts/[id]/files/[fileId].get')).default
-  const router = createRouter().post('/contracts', create).put('/contracts/:id', update).get('/contracts/:id/files/:fileId', read)
-  const app = createApp({ debug: false }).use(router)
+  const access = (await import('../../server/middleware/production-access')).default
+  const unreadyDocuments = (await import('../../server/api/read/owner-documents/[kind].get')).default
+  const devDocumentOwner = (await import('../../server/utils/owner-commercial-document-read-test-instance')).ownerCommercialDocumentReadTestInstance
+  const devRead = vi.spyOn(devDocumentOwner, 'list')
+  const ownerModule = domain === 'construction' ? await import('../../server/utils/construction-contract-command-test-instance') : await import('../../server/utils/subcontract-contract-command-test-instance')
+  const devOwner = 'constructionContractCommandTestInstance' in ownerModule ? ownerModule.constructionContractCommandTestInstance : ownerModule.subcontractContractCommandTestInstance
+  const devFile = vi.spyOn(devOwner, 'readFileContent')
+  const root = `/api/commands/${domain}-contracts`
+  const files = `/api/read/${domain}-contracts/:id/files/:fileId`
+  const router = createRouter().post(root, create).put(`${root}/:id`, update).get(files, read).get('/api/read/owner-documents/:kind', unreadyDocuments)
+  const app = createApp({ debug: false }).use(access).use(router)
   const server = createServer(toNodeListener(app)).listen(0, '127.0.0.1')
   await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  const send = (path: string, command: ConstructionContractCommandRequestDTO, method = 'POST') => fetch(`${origin}${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...command, requiredCapability: `${domain}-contract:write` }) })
+  vi.stubEnv('CRM_RUN_MODE', 'production')
+  vi.stubEnv('CRM_DATA_DIRECTORY', f.options.directory)
+  vi.stubEnv('CRM_WORKSPACE_ID', f.options.workspaceId)
+  vi.stubEnv('CRM_OWNER_ID', f.options.ownerId)
+  vi.stubEnv('CRM_DATA_PURPOSE', 'verification')
+  vi.stubEnv('CRM_PUBLIC_ORIGIN', origin)
+  vi.stubEnv('CRM_ACCESS_CODE_HASH', `scrypt$${'a'.repeat(32)}$${'a'.repeat(128)}`)
+  vi.stubEnv('NITRO_HOST', '127.0.0.1')
+  const request = (overrides: Partial<Pick<ConstructionContractCommandRequestDTO, 'id' | 'commandId' | 'baseVersion' | 'draft' | 'attachments'>> = {}) => domain === 'construction'
+    ? { commandId: 'construction-http-create', workspaceId: f.options.workspaceId, actorId: f.options.ownerId, requiredCapability: 'construction-contract:write', baseVersion: null, action: 'save', draft: { name: 'HTTP正式主合同', no: 'HTTP-C21', projectId: f.project.id, customerId: f.customer.id, amount: 0, content: '真实正式原件范围', signDate: '2026-10-07', ourSignatoryId: f.signatory.id, ourSignatoryVersion: f.signatory.version, managementFeeAmount: 0, managementFeeBasis: '明确零' }, attachments: {}, ...overrides }
+    : f.command(overrides)
+  const send = (path: string, command: unknown, method = 'POST') => fetch(`${origin}${path}`, { method, headers: { 'Content-Type': 'application/json', 'Origin': origin }, body: JSON.stringify(command) })
   try {
-    const submitted = await send('/contracts', f.request({ attachments: { add: [original, empty] } }))
+    const submitted = await send(root, request({ attachments: { add: [original, empty] } }))
     expect(submitted.status).toBe(200)
     const saved = await submitted.json() as { id: string, version: string, attachmentIds: string[] }
-    const filePath = `/contracts/${saved.id}/files/${saved.attachmentIds[0]}?origin=real`
+    const filePath = `/api/read/${domain}-contracts/${saved.id}/files/${saved.attachmentIds[0]}?origin=real`
     const result = await fetch(`${origin}${filePath}`)
     expect(result.status).toBe(200)
     expect(result.headers.get('cache-control')).toBe('private, no-store')
     expect(await result.json()).toMatchObject({ ownerId: saved.id, fileId: saved.attachmentIds[0], payloadBase64: original.payloadBase64, sha256: 'f2b59b85ccc162ba3a4cb41ed108b42c83925a08cbab43fb4ab20637752f0a67' })
-    expect((await fetch(`${origin}/contracts/${saved.id}/files/${saved.attachmentIds[1]}?origin=real`)).status).toBe(200)
+    expect((await fetch(`${origin}/api/read/${domain}-contracts/${saved.id}/files/${saved.attachmentIds[1]}?origin=real`)).status).toBe(200)
     expect((await fetch(`${origin}${filePath.replace('origin=real', 'origin=demo')}`)).status).toBe(403)
     expect((await fetch(`${origin}${filePath.replace(saved.id, 'another-owner')}`)).status).toBe(404)
-    actor = { ...f.actor, capabilities: [`${domain}-contract:read`] }
+    httpActor = { ...f.session(), capabilities: [`${domain}-contract:read`] }
     expect((await fetch(`${origin}${filePath}`)).status).toBe(200)
-    actor = { ...f.actor, capabilities: [] }
+    httpActor = { ...f.session(), capabilities: [] }
     expect((await fetch(`${origin}${filePath}`)).status).toBe(403)
-    actor = f.actor
-    const removed = await send(`/contracts/${saved.id}`, f.request({ id: saved.id, baseVersion: saved.version, commandId: `${domain}-http-remove`, attachments: { removeIds: [saved.attachmentIds[0]!] } }), 'PUT')
+    httpActor = f.session()
+    const baseForm = await owner.form(saved.id, () => httpActor)
+    const removed = await send(`${root}/${saved.id}`, request({ id: saved.id, baseVersion: saved.version, commandId: `${domain}-http-remove`, draft: baseForm.draft, attachments: { removeIds: [saved.attachmentIds[0]!] } }), 'PUT')
     expect(removed.status).toBe(200)
     expect((await fetch(`${origin}${filePath}`)).status).toBe(404)
     const removedReceipt = await removed.json() as { version: string }
-    const restored = await send(`/contracts/${saved.id}`, f.request({ id: saved.id, baseVersion: removedReceipt.version, commandId: `${domain}-http-restore`, attachments: { restoreIds: [saved.attachmentIds[0]!] } }), 'PUT')
+    const restored = await send(`${root}/${saved.id}`, request({ id: saved.id, baseVersion: removedReceipt.version, commandId: `${domain}-http-restore`, draft: baseForm.draft, attachments: { restoreIds: [saved.attachmentIds[0]!] } }), 'PUT')
     expect(restored.status).toBe(200)
     expect((await (await fetch(`${origin}${filePath}`)).json()).payloadBase64).toBe(original.payloadBase64)
-    const rejected = await send(`/contracts/${saved.id}`, f.request({ id: saved.id, baseVersion: '3', commandId: `${domain}-http-bad-bytes`, attachments: { add: [{ ...original, payloadBase64: 'YQ' }] } }), 'PUT')
+    const rejected = await send(`${root}/${saved.id}`, request({ id: saved.id, baseVersion: '3', commandId: `${domain}-http-bad-bytes`, draft: baseForm.draft, attachments: { add: [{ ...original, payloadBase64: 'YQ' }] } }), 'PUT')
     expect(rejected.status).toBe(422)
-    expect(f.service.form(saved.id, f.actor).version).toBe('3')
-    production = true
+    expect((await owner.form(saved.id, () => httpActor)).version).toBe('3')
+    await storage.close()
+    storage = createProductionStorage(f.options)
+    owner = domain === 'construction' ? createProductionConstructionContractService(storage) : (await import('../../server/utils/production-subcontract-contract-service')).createProductionSubcontractContractService(storage)
+    expect((await (await fetch(`${origin}${filePath}`)).json()).payloadBase64).toBe(original.payloadBase64)
+    expect((await owner.form(saved.id, () => httpActor)).version).toBe('3')
+    expect((await fetch(`${origin}/api/read/owner-documents/owner_report?origin=real`)).status).toBe(503)
+    expect(devRead).not.toHaveBeenCalled()
+    unavailable = true
     expect((await fetch(`${origin}${filePath}`)).status).toBe(503)
+    expect(devFile).not.toHaveBeenCalled()
   }
   finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
-    vi.doUnmock(ownerModule)
-    vi.doUnmock('../../server/utils/business-session')
-    vi.doUnmock('../../server/utils/production-config')
+    await storage.close()
+    devRead.mockRestore()
+    devFile.mockRestore()
+    vi.doUnmock(runtimeModule)
+    vi.doUnmock('../../server/utils/production-runtime')
+    vi.doUnmock('../../server/utils/production-auth')
+    vi.unstubAllEnvs()
     vi.unstubAllGlobals()
   }
 })

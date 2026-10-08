@@ -2,10 +2,11 @@
 import type { QuantityHollowCommand, QuantityHollowRead } from '../../app/lib/quantity/central-hollow-contract'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { useProductionAccessStore } from '~/stores/production-access'
 import { useQuantityHollowStore } from '~/stores/quantity-hollow'
 import { hollowIdentity, hollowInput, hollowQuery, hollowRead, hollowRecord, hollowResult, hollowTarget } from '../helpers/quantity-hollow-ui-fixture'
 
-const repository = { hollow: vi.fn(), execute: vi.fn() }
+const repository = { hollow: vi.fn(), execute: vi.fn(), resolve: vi.fn() }
 const context = vi.fn()
 const create = { kind: 'create-hollow-inspection' as const, target: hollowTarget, input: hollowInput }
 beforeEach(() => {
@@ -15,7 +16,7 @@ beforeEach(() => {
   context.mockResolvedValue(structuredClone(hollowIdentity))
   repository.hollow.mockImplementation(async () => hollowRead())
   repository.execute.mockImplementation(async command => hollowResult(command))
-  vi.stubGlobal('useNuxtApp', () => ({ $repositories: { quantity: repository, projectCommands: { context } } }))
+  vi.stubGlobal('useNuxtApp', () => ({ $repositories: { quantity: repository, projectCommands: { context }, productionAccess: { status: async () => ({ mode: 'production', authenticated: true, ...hollowIdentity }) } } }))
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -117,4 +118,40 @@ it('无法可靠保存原命令时不发送，错目标回执保留未知状态'
   repository.execute.mockImplementationOnce(async (command: QuantityHollowCommand) => ({ ...hollowResult(command), commandId: 'another-command' }))
   await expect(store.submit(read, create)).rejects.toThrow()
   expect(store.getPending(read)?.state).toBe('unknown')
+})
+
+it('正式空鼓仅持久最小定位；冷恢复查原编号，读取失败与撤权保留标记，原正文不进浏览器存储', async () => {
+  await useProductionAccessStore().check()
+  let store = useQuantityHollowStore()
+  const read = await store.load(hollowQuery)
+  store.rememberDraft('formal-draft', { fields: { target: JSON.stringify(hollowTarget), inspectedOn: hollowInput.inspectedOn, rectifiedOn: '', count: '19', note: '正式私密原备注', reason: '' }, baseline: '', sourceVersion: read.sourceVersion, revisionId: null })
+  repository.execute.mockRejectedValueOnce(new Error('原结果未知'))
+  await expect(store.submit(read, create)).rejects.toThrow()
+  const original = store.getPending(read)!
+  const entries = Object.entries(sessionStorage)
+  expect(entries).toEqual([[expect.stringContaining('crm:form-command:v1:quantity:'), expect.any(String)]])
+  const descriptor = JSON.parse(entries[0]![1])
+  expect(Object.keys(descriptor).sort()).toEqual(['action', 'actorId', 'commandId', 'family', 'scopeId', 'targetId', 'workspaceId'])
+  expect(JSON.stringify(entries)).not.toContain(hollowInput.note)
+  expect(JSON.stringify(entries)).not.toContain('正式私密原备注')
+  setActivePinia(createPinia())
+  await useProductionAccessStore().check()
+  store = useQuantityHollowStore()
+  await store.load(hollowQuery)
+  expect(store.getDraft('formal-draft')).toBeNull()
+  expect(store.pendingDescriptors).toEqual([descriptor])
+  await expect(store.submit(await store.load(hollowQuery), create)).rejects.toThrow('原空鼓提交')
+  expect(repository.execute).toHaveBeenCalledTimes(1)
+  context.mockResolvedValueOnce({ ...hollowIdentity, actorId: 'another-actor' })
+  await expect(store.recoverDescriptor(descriptor, hollowQuery)).rejects.toThrow()
+  expect(repository.resolve).not.toHaveBeenCalled()
+  repository.resolve.mockResolvedValue({ outcome: 'applied', result: hollowResult(original.command) })
+  repository.hollow.mockRejectedValueOnce(new Error('保存后读取失败'))
+  await expect(store.recoverDescriptor(descriptor, hollowQuery)).rejects.toThrow()
+  expect(sessionStorage.getItem(entries[0]![0])).toBe(entries[0]![1])
+  repository.hollow.mockResolvedValueOnce(hollowRead([hollowRecord(original.command)]))
+  await store.recoverDescriptor(descriptor, hollowQuery)
+  expect(repository.resolve.mock.calls.map(row => row[0])).toEqual([descriptor, descriptor])
+  expect(sessionStorage.getItem(entries[0]![0])).toBeNull()
+  expect(store.pendingDescriptors).toEqual([])
 })

@@ -43,6 +43,8 @@ function sourceVersion(read: PayrollC2FormRead, locks: unknown) {
 export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceOptions) {
   async function form(db: TransactionDb, base: PayrollWritableContext, source: PayrollIdentitySource, input: PayrollC2FormInput): Promise<PayrollC2FormRead> {
     const row = input.statementId ? await head(db, input.statementId) : null
+    if (base.sourceVersion === 'payroll-consumption-v1')
+      base = { ...base, sourceVersion: `${base.sourceVersion}+head:${hash(row)}` }
     if (row?.status === 'released') {
       const migrated = payrollMigratedC2Form(await loadPayrollMigratedProof(db, String(row.project_id)), base, String(row.id))
       if (migrated) {
@@ -265,7 +267,7 @@ export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceO
           decodePayrollC2Result(result, command)
           await db.execute('INSERT INTO payroll_command_receipts(command_id,actor_id,project_id,statement_id,config_scope_json,action,fingerprint,result_json,command_json) VALUES(?,?,?,?,?,?,?,?,?)', [command.commandId, context.actorId, command.projectId, result.statementId, command.configScope === null ? null : payrollCanonical(command.configScope), command.action.kind, fingerprint, JSON.stringify(result), payrollCanonical(command)])
           return result
-        }, true)
+        }, true, command)
       }
       catch (cause) {
         if (absent && cause instanceof ProjectRepositoryProblem)

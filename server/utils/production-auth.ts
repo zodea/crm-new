@@ -4,20 +4,29 @@ import type { ProductionRuntimeConfig } from './production-config'
 import { Buffer } from 'node:buffer'
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { createError, deleteCookie, getCookie, getHeader, setCookie } from 'h3'
+import { PRODUCTION_AUXILIARY_CONTRACT_CAPABILITIES } from './production-auxiliary-contract-schema'
+import { PRODUCTION_BOQ_CAPABILITIES } from './production-boq-access'
 import { getProductionRuntimeConfig } from './production-config'
+import { PRODUCTION_CONSTRUCTION_CONTRACT_CAPABILITIES } from './production-construction-contract-access'
+import { PRODUCTION_CONSTRUCTION_SCOPE_CAPABILITIES } from './production-construction-scope-access'
 import { PRODUCTION_CREW_WORKER_CAPABILITIES } from './production-crew-worker-access'
 import { FINANCE_CAPABILITIES, FINANCE_IMPORT_CAPABILITY } from './production-finance-access'
 import { PRODUCTION_MATERIAL_CONTRACT_CAPABILITIES } from './production-material-contract-access'
 import { PRODUCTION_MATERIAL_QUOTATION_CAPABILITIES } from './production-material-quotation-access'
 import { PRODUCTION_OTHER_SETTLEMENT_CAPABILITIES } from './production-other-settlement-access'
+import { PRODUCTION_PAYROLL_CAPABILITIES } from './production-payroll-access'
 import { PRODUCTION_PROCESS_LIBRARY_CAPABILITIES } from './production-process-library-access'
 import { PRODUCTION_PROJECT_CAPABILITIES } from './production-project-access'
+import { PRODUCTION_QUANTITY_CAPABILITIES } from './production-quantity-access'
+import { PRODUCTION_SUBCONTRACT_CONTRACT_CAPABILITIES } from './production-subcontract-contract-access'
 import { PRODUCTION_SUPPLIER_CAPABILITIES } from './production-supplier-access'
+import { PRODUCTION_TARGET_COST_CAPABILITIES } from './production-target-cost-access'
+import { PRODUCTION_WBS_CAPABILITIES } from './production-wbs-access'
 
 const COOKIE = 'ruihang_owner_session'
 const ABSOLUTE_MS = 8 * 60 * 60 * 1000
 const IDLE_MS = 30 * 60 * 1000
-const OWNER_CAPABILITIES = Object.freeze([...new Set(['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', ...PRODUCTION_PROJECT_CAPABILITIES, ...PRODUCTION_PROCESS_LIBRARY_CAPABILITIES, ...PRODUCTION_SUPPLIER_CAPABILITIES, ...PRODUCTION_MATERIAL_CONTRACT_CAPABILITIES, ...PRODUCTION_MATERIAL_QUOTATION_CAPABILITIES, ...PRODUCTION_OTHER_SETTLEMENT_CAPABILITIES, ...FINANCE_CAPABILITIES, FINANCE_IMPORT_CAPABILITY, ...PRODUCTION_CREW_WORKER_CAPABILITIES, 'our-signatory:read', 'our-signatory:write'])])
+const OWNER_CAPABILITIES = Object.freeze([...new Set(['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', ...PRODUCTION_PROJECT_CAPABILITIES, ...PRODUCTION_PROCESS_LIBRARY_CAPABILITIES, ...PRODUCTION_SUPPLIER_CAPABILITIES, ...PRODUCTION_MATERIAL_CONTRACT_CAPABILITIES, ...PRODUCTION_MATERIAL_QUOTATION_CAPABILITIES, ...PRODUCTION_OTHER_SETTLEMENT_CAPABILITIES, ...FINANCE_CAPABILITIES, FINANCE_IMPORT_CAPABILITY, ...PRODUCTION_CREW_WORKER_CAPABILITIES, ...PRODUCTION_TARGET_COST_CAPABILITIES, ...PRODUCTION_PAYROLL_CAPABILITIES, ...PRODUCTION_QUANTITY_CAPABILITIES, ...PRODUCTION_WBS_CAPABILITIES, ...PRODUCTION_CONSTRUCTION_CONTRACT_CAPABILITIES, ...PRODUCTION_BOQ_CAPABILITIES, ...PRODUCTION_CONSTRUCTION_SCOPE_CAPABILITIES, ...PRODUCTION_SUBCONTRACT_CONTRACT_CAPABILITIES, ...PRODUCTION_AUXILIARY_CONTRACT_CAPABILITIES, 'our-signatory:read', 'our-signatory:write'])])
 interface OwnerSession { configuration: string, created: number, used: number }
 // Authentication is intentionally revoked by a process restart; business receipts live on disk.
 const sessions = new Map<string, OwnerSession>()

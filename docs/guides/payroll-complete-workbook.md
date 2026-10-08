@@ -1,6 +1,6 @@
 # 完整工资工作簿与按月归档
 
-本指南对应 [#479](https://github.com/zodea/crm-new/issues/479) 的浏览器中央验证版本。验收结果见[实际页面与文件记录](../design/evidence/issue-479-complete-workbook/README.md)；生产持久化另由 #467 承接。
+本指南沿用 [#479](https://github.com/zodea/crm-new/issues/479) 的页面与输出规则；OPT-02 已接入正式磁盘保存及独立进程冷恢复。目录读取原冻结工资、真实补退和原正式号，关联固定名册版本及共享照片原件，不增加工资、成本或现金事实。历史页面及文件验收见[实际记录](../design/evidence/issue-479-complete-workbook/README.md)。
 
 ## 选择工资与实名版本
 

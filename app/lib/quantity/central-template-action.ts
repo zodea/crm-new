@@ -37,7 +37,7 @@ function templateDraft(value: unknown): value is QuantityTemplateDraft {
       && strings(row, ['key', 'code', 'name', 'section', 'trade', 'unit']) && Number.isFinite(row.sortOrder))
     && Array.isArray(value.lines) && value.lines.every(row => object(row)
       && strings(row, ['key', 'roomKey', 'itemId', 'fieldFormula', 'note']) && nullableStrings(row, ['id'])
-      && optionalStrings(row, ['sourceLineId', 'sourceRoomId', 'sourceItemId', 'boqLineId']) && Number.isFinite(row.sortOrder)
+      && optionalStrings(row, ['sourceLineId', 'sourceRoomId', 'sourceItemId', 'boqLineId', 'boqBindingVersion']) && Number.isFinite(row.sortOrder)
       && (row.boqLineId == null || (typeof row.boqLineId === 'string' && Boolean(row.boqLineId.trim())))
       && ['recognizedContractQty', 'contractQty', 'provisionalQty', 'fieldQty'].every(key => quantity(row[key])))
 }

@@ -4,6 +4,7 @@ import type { PayrollMigrationPart, PayrollMigrationRow, PayrollProjectGraph } f
 import type { PayrollDiagnostic, PayrollIdentityMapping } from '../../app/lib/payroll/central-contract'
 import type { PayrollNumberingDocument } from '../../app/lib/payroll/central-numbering-contract'
 import type { PayrollExclusionGraph } from '../../app/lib/payroll/central-source-locks'
+import type { QuantityHollowMigrationGraph } from '../../app/lib/quantity/hollow-migration-contract'
 import type { QuantityMigrationIdentity } from '../../app/lib/quantity/migration-mapping'
 import { createHash } from 'node:crypto'
 import { PAYROLL_CENTRAL_MIGRATION_TABLES, payrollCentralPrimaryKey } from '../../app/lib/migration/payroll-central-source'
@@ -16,7 +17,8 @@ import { loadPayrollGraph } from '../../app/lib/payroll/central-read'
 import { advancePayrollRevision, initializePayrollSchema } from '../../app/lib/payroll/central-schema'
 import { payrollDayworkOccupationsFromGraph, payrollSourceExclusionsFromGraph } from '../../app/lib/payroll/central-source-locks'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
-import { parseQuantityMigrationGraph } from '../../app/lib/quantity/migration-graph'
+import { QUANTITY_HOLLOW_TABLES } from '../../app/lib/quantity/central-hollow-schema'
+import { parseQuantityMigrationGraph, QUANTITY_MIGRATION_TABLES } from '../../app/lib/quantity/migration-graph'
 import { payrollAMigrationReferences } from './payroll-a-migration-references'
 import { loadPayrollAReleasedWithMigration } from './payroll-a-released-with-migration'
 import { payrollAdjustmentMigrationReferences } from './payroll-adjustment-migration-references'
@@ -82,7 +84,12 @@ function rowProblem(part: PayrollMigrationPart, row: PayrollMigrationRow): strin
 }
 
 /** 原图保留全文；仅对已证明的当前行关系建中央映射。不能从指纹反推 A/C1 旧来源。 */
-export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current: ReadonlyMap<string, ImportedPayrollProject>, quantityIdentities: readonly (QuantityMigrationIdentity & { projectId: string })[] = []) {
+export interface PayrollAdoptedQuantityIdentity { table: string, legacyId: string, id: string, projectId: string }
+export interface PayrollAdoptedQuantityProject { namespace: string, legacyProjectId: string, projectId: string, hollow: QuantityHollowMigrationGraph | null }
+export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current: ReadonlyMap<string, ImportedPayrollProject>, quantityIdentities: readonly PayrollAdoptedQuantityIdentity[] = [], adoptedWorkerAssets: readonly PayrollIdentityMapping[] = [], adoptedQuantityProjects: readonly PayrollAdoptedQuantityProject[] = []) {
+  const allowedQuantityTables = new Set<string>([...QUANTITY_MIGRATION_TABLES, ...QUANTITY_HOLLOW_TABLES])
+  if (quantityIdentities.some(identity => !allowedQuantityTables.has(identity.table) || !identity.id || !identity.legacyId || !identity.projectId))
+    throw new Error('工资迁入只能消费既有工程量 owner 确认的真实原节点')
   const batchId = snapshot.authority === 'central' ? snapshot.activeBatchId : null
   const entities = batchId ? snapshot.entities.filter(row => row.entityType === 'payroll_projects') : []
   const removed = [...current.values()].filter(row => row.batchId !== batchId || !entities.some(entity => entity.id === row.entityId))
@@ -237,8 +244,9 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
     if (source.deductions) {
       const quantityEntity = snapshot.entities.find(row => row.entityType === 'quantity_projects' && row.references.projectId === project.id && row.legacyId === source.projectId)
       const quantitySource = quantityEntity ? parseQuantityMigrationGraph(JSON.parse(String(quantityEntity.attributes.graphJson)), source.projectId) : null
+      const adopted = adoptedQuantityProjects.find(row => row.projectId === project.id && row.legacyProjectId === source.projectId)
       graph.schemaVersion = 4
-      graph.deductions = mapPayrollHollowMigrationGraph(source.deductions, entity.id, mapping, quantityEntity && quantitySource?.version === 2 ? { namespace: quantityEntity.id, original: quantitySource.hollow } : undefined)
+      graph.deductions = mapPayrollHollowMigrationGraph(source.deductions, entity.id, mapping, quantityEntity && quantitySource?.version === 2 ? { namespace: quantityEntity.id, original: quantitySource.hollow } : adopted?.hollow ? { namespace: adopted.namespace, original: adopted.hollow } : undefined)
     }
     if (source.numbering) {
       graph.schemaVersion = 5
@@ -247,7 +255,7 @@ export function planPayrollMigration(snapshot: CoreMigrationSnapshotDTO, current
     if (source.publication) {
       for (const worker of snapshot.entities.filter(row => row.entityType === 'workers')) {
         for (const identity of workerModernAssetMappings(worker))
-          mapping.set(key(identity.tableName, identity.legacyId), identity)
+          mapping.set(key(identity.tableName, identity.legacyId), adoptedWorkerAssets.find(adopted => adopted.tableName === identity.tableName && adopted.legacyId === identity.legacyId) ?? identity)
       }
       graph.schemaVersion = 6
       graph.publication = mapPayrollPublicationGraph(source.publication, entity.id, mapping, source.deductions?.quantity)
@@ -478,7 +486,7 @@ async function assertIncomingSources(db: TransactionDb, plan: ReturnType<typeof 
   }
 }
 
-export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<typeof planPayrollMigration>) {
+export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<typeof planPayrollMigration>, options: { mastersAlreadyAdopted?: boolean } = {}) {
   for (const incoming of plan.incoming) {
     if (incoming.source.deductions)
       await withPayrollMigratedSource(incoming.source, source => provePayrollHollowMigrationSource(source, incoming.source))
@@ -507,7 +515,7 @@ export async function applyPayrollMigration(db: TransactionDb, plan: ReturnType<
     await db.execute('DELETE FROM payroll_migration_evidence WHERE entity_id = ?', [previous.entityId])
   }
   for (const next of plan.incoming) {
-    for (const type of ['projects', 'crews', 'workers'] as const) {
+    for (const type of options.mastersAlreadyAdopted ? [] : ['projects', 'crews', 'workers'] as const) {
       for (const row of plan.references.filter(row => row.entityType === type))
         await db.execute(`INSERT INTO ${type}(id,name,deleted_at) VALUES (?,?,?) ON CONFLICT(id) DO NOTHING`, [row.id, row.name, row.deletedAt])
     }

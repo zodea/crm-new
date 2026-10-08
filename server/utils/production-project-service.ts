@@ -9,6 +9,7 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { decodeProjectImportSource } from '../../app/lib/project/import'
 import { buildProjectDetailRead, buildProjectListPage, parseProjectDetailQuery, parseProjectListQuery } from '../../app/lib/project/repository'
+import { readProductionConstructionDirectoryProjection } from './production-construction-contract-sources'
 import { readMaterialContractProjectFacts } from './production-material-contract-service'
 import { projectFailure as fail, normalizedProject, projectAttachment, projectDraft, projectListRow } from './production-project-record'
 import { parseProductionProjectRequest, productionProjectCommandId, productionProjectId } from './production-project-request'
@@ -284,15 +285,18 @@ export function createProductionProjectService(storage: ProductionStorage) {
         const customerRevision = actor.capabilities.includes('customer:list:read') ? (await tx.select<{ revision: number }>('SELECT revision FROM customer_revision'))[0]!.revision : null
         const asOf = new Date().toISOString()
         const materialFacts = await readMaterialContractProjectFacts(tx, actor, id, asOf)
+        const construction = await readProductionConstructionDirectoryProjection(tx, actor, asOf, id)
         const meta = createReadMeta({ session: actor, schemaVersion: 'project-read-v2', operation: 'project:detail', dataOrigin: 'real', asOf, coverage: 'complete', scope: query, sources: [
           { key: 'projects', state: 'readable', sourceVersion: `project:${row.version}`, asOf },
           customerRevision === null ? { key: 'customers', state: 'forbidden', sourceVersion: null, asOf: null } : { key: 'customers', state: 'readable', sourceVersion: `customers:${customerRevision}`, asOf },
           materialFacts.source,
+          construction.source,
+          { ...construction.source, key: 'construction-management-fee-configurations' },
           { key: 'project-suppliers', state: 'unavailable', sourceVersion: null, asOf: null },
           { key: 'receipts', state: 'not-requested', sourceVersion: null, asOf: null },
           { key: 'target-costs', state: 'not-requested', sourceVersion: null, asOf: null },
         ] })
-        return withReadMeta(buildProjectDetailRead({ rows: [projectListRow(row, await names(tx, actor), actor.capabilities.includes('customer:list:read'))], query, materialContractCount: materialFacts.count, materialContractAccess: materialFacts.source.state === 'readable' ? 'allowed' : materialFacts.source.state === 'forbidden' ? 'forbidden' : 'unknown', projectSupplierAccess: 'error', asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), meta)
+        return withReadMeta({ ...buildProjectDetailRead({ rows: [projectListRow(row, await names(tx, actor), actor.capabilities.includes('customer:list:read'))], query, materialContractCount: materialFacts.count, materialContractAccess: materialFacts.source.state === 'readable' ? 'allowed' : materialFacts.source.state === 'forbidden' ? 'forbidden' : 'unknown', projectSupplierAccess: 'error', asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), ...(construction.configuration ? { constructionManagementFees: construction.configuration } : {}) }, meta)
       })
     },
     file(projectId: string, fileId: string, session: ProductionSession) {

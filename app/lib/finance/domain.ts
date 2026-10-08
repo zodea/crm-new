@@ -1,3 +1,4 @@
+import type { ConstructionMainSelection } from '../construction-scope/contract'
 import type { ApprovedAmountEdit, ApprovedAmountOrigin } from './approval-amount'
 import type { ExpenseClearanceVerificationEdit, ExpenseClearanceVerificationState } from './clearance-verification'
 import type { PaymentVerificationEdit, PaymentVerificationState } from './payment-verification'
@@ -113,9 +114,12 @@ export interface ReimbursementLineDraft {
   expenseDate?: string
   amount?: number | null
   note?: string
+  constructionMain?: ConstructionMainSelection
+  constructionScopeVersion?: string
 }
 
 export interface ExpenseReimbursementFormDraft {
+  constructionMain?: ConstructionMainSelection
   clearanceVerificationEdit?: ExpenseClearanceVerificationEdit
   clearanceVerification?: ExpenseClearanceVerificationState
   clearanceAttachmentsOnly?: true
@@ -230,6 +234,7 @@ export interface F3SaveResult {
   id: string
   logId: string | null
   attachmentIds: string[]
+  expenseLineIdentities?: Array<{ inputIndex: number, id: string }>
 }
 
 export interface PaymentApplicationSummary {
@@ -733,7 +738,7 @@ async function saveReimbursement(
   tx: FinanceDomainTx,
   draft: ExpenseReimbursementFormDraft,
   action: F3SaveAction,
-): Promise<{ id: string, logId: string | null }> {
+): Promise<{ id: string, logId: string | null, expenseLineIds: Array<string | null> }> {
   const existing = await activeRow<Record<string, unknown>>(tx, 'expense_reimbursements', draft.id)
   const inputLines = draft.lines ?? []
   const adoptingNewExpense = action !== 'draft' && (!existing || existing.status === 'draft')
@@ -753,14 +758,19 @@ async function saveReimbursement(
   if (action !== 'draft' && (!existing || existing.status === 'draft') && !applicant.workerId && !applicant.supplierId)
     throw new Error('新增报销请明确选择工人或分供方身份，不能按姓名猜关联')
   await assertOptionalReference(tx, 'projects', draft.projectId, '项目')
+  const lineIndexes: number[] = []
   const lines = action === 'draft'
     ? inputLines.filter((line, index) => {
         const amount = Number(line.amount)
         if (!Number.isFinite(amount) || amount < 0)
           positiveMoney(`第 ${index + 1} 行金额`, line.amount)
+        if (amount > 0)
+          lineIndexes.push(index)
         return amount > 0
       })
     : inputLines
+  if (action !== 'draft')
+    lineIndexes.push(...inputLines.map((_, index) => index))
   const clearanceBySource = new Map<string, number>()
   const sourceParties = new Map<string, { supplierId: string | null, nameSnapshot: string | null }>()
   for (const [index, line] of lines.entries()) {
@@ -852,6 +862,7 @@ async function saveReimbursement(
   `, [id])
   const ownedLineIds = new Set(currentLines.map(line => line.id))
   const adoptedLineIds = new Set<string>()
+  const expenseLineIds: Array<string | null> = inputLines.map(() => null)
   for (const [index, line] of lines.entries()) {
     const existingId = nullableId(line.id)
     if (existingId && !ownedLineIds.has(existingId))
@@ -859,6 +870,7 @@ async function saveReimbursement(
     if (existingId && adoptedLineIds.has(existingId))
       throw new Error('同一费用明细不能重复采用，请使用复制新增')
     const lineId = existingId ?? generateId('expense_line')
+    expenseLineIds[lineIndexes[index]!] = lineId
     adoptedLineIds.add(lineId)
     const previous = existingId ? (await tx.select<Record<string, unknown>>('SELECT * FROM expense_reimbursement_lines WHERE id = ?', [existingId]))[0] : null
     const sourceParty = line.originalExpenseLineId ? sourceParties.get(line.originalExpenseLineId) : undefined
@@ -902,7 +914,7 @@ async function saveReimbursement(
     if (!adoptedLineIds.has(line.id))
       await softDelete(tx, 'expense_reimbursement_lines', line.id)
   }
-  return { id, logId }
+  return { id, logId, expenseLineIds }
 }
 
 export function needsSettlementAllocation(bizType: string, hasAllocations = false, workerId?: string | null): boolean {
@@ -1436,14 +1448,14 @@ export async function saveFinanceFormInTransaction(
   draft: F3FormDraft,
   action: F3SaveAction,
   tx: FinanceDomainTx,
-): Promise<{ id: string, logId: string | null }> {
+): Promise<{ id: string, logId: string | null, expenseLineIds?: Array<string | null> }> {
   if (('clearanceVerificationEdit' in draft && draft.clearanceVerificationEdit) || ('clearanceAttachmentsOnly' in draft && draft.clearanceAttachmentsOnly))
     throw new FinanceAmountSourceError('此运行来源尚无可信旧清偿核定身份，请使用已认证正式工作区；原记录与原件保留。')
   if ('verificationEdit' in draft && draft.verificationEdit)
     throw new FinanceAmountSourceError('此运行来源尚无可信业务核验身份，请使用已认证中央付款申请核验；输入与原件继续保留。')
   if (action === 'confirm' && kind !== 'payment_record')
     throw new Error('只有支付记录支持确认动作')
-  let result: { id: string, logId: string | null }
+  let result: { id: string, logId: string | null, expenseLineIds?: Array<string | null> }
   switch (kind) {
     case 'receipt':
       result = await saveReceipt(tx, draft as ReceiptFormDraft, action)

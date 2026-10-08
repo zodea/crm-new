@@ -55,7 +55,9 @@ const filteredLines = computed(() => {
   })
 })
 
-function decimal(value: number): string {
+function decimal(value: number | null): string {
+  if (value === null)
+    return '未记录'
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 3 }).format(value)
 }
 </script>
@@ -85,7 +87,7 @@ function decimal(value: number): string {
       </template>
       <template #unitPrice="{ row }">
         <div class="text-right font-mono tabular-nums">
-          ¥{{ decimal(row.effectiveUnitPrice) }}
+          {{ row.effectiveUnitPrice === null ? '未记录' : `¥${decimal(row.effectiveUnitPrice)}` }}
           <span v-if="row.effectiveUnitPrice !== row.baseUnitPrice" class="ml-1 text-10px text-brand">
             (原 {{ decimal(row.baseUnitPrice) }})
           </span>
@@ -94,7 +96,7 @@ function decimal(value: number): string {
       <template #source="{ row }">
         <div class="min-w-0 py-1">
           <div class="truncate text-12px text-ink" :title="row.traceKey">
-            {{ row.traceKey || `变更新增 · ${row.changeOrderId}` }}
+            {{ row.traceKey || (row.changeOrderId ? `变更新增 · ${row.changeOrderId}` : row.boqFileId ? '原清单 · 来源行未记录' : '来源未记录') }}
           </div>
           <div class="mt-0.5 flex items-center gap-1">
             <span v-if="row.manuallyCorrected" class="chip-warn">已人工修正</span>

@@ -163,12 +163,8 @@ async function validateParticipant(
   `, [input.projectId])
   if (!project)
     throw new Error('项目不存在或已停用')
-  if (
-    row.current_project_id !== input.projectId
-    && !row.has_project_responsibility
-  ) {
-    throw new Error('签工人员不属于当前项目')
-  }
+  // An explicit authorized project/person selection creates this record's project relation.
+  // current_project_id describes the master assignment and does not truncate global identities.
   const requestedCrewId = input.crewId?.trim() || null
   if (requestedCrewId && requestedCrewId !== row.crew_id)
     throw new Error('所选班组与签工人员档案归属不一致')

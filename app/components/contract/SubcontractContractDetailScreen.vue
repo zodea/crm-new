@@ -81,6 +81,8 @@ const metrics = computed(() => {
   ]
   return rows.map(([label, value]) => ({ label, value: yuan(value, '未知') }))
 })
+const documentGap = computed(() => detail.value?.dataOrigin === 'real'
+  && detail.value.meta.sources.some(source => source.key === 'subcontract-documents' && source.state !== 'readable'))
 
 function target(intent: NavigationIntentDTO): string | null {
   const result = resolveNavigationTarget(intent)
@@ -122,6 +124,7 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
       </template>
       <div v-if="detail" class="space-y-3">
         <StatePanel v-if="(state.kind === 'error' || state.kind === 'unavailable')" kind="error" title="刷新分包合同失败" :description="`${state.problem.message}；当前保留上一次成功读取的详情。`" compact />
+        <StatePanel v-if="documentGap" kind="empty" title="分包后续单据来源待核" description="主合同、补充协议和原件已读取；分包变洽签、结算及其完整单据目录尚未取得可用来源，相关金额保持未知。请按原单据核对。" compact />
         <div class="panel min-w-0 overflow-hidden px-3">
           <SegTab v-model="activeTab" :tabs="tabs" />
         </div>

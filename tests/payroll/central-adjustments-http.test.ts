@@ -8,9 +8,7 @@ import { createPayrollRepository } from '~/lib/payroll/central-repository'
 import { createPayrollAdjustmentFixture } from '../helpers/payroll-adjustment-service-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollAdjustmentFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 
 it('真实 HTTP 完成独立更正、退40及错记冲销，所有有符号实额以到分十进制传输', async () => {

@@ -7,9 +7,7 @@ import { createPayrollRepository } from '~/lib/payroll/central-repository'
 import { createPayrollC1ServiceFixture } from '../helpers/payroll-c1-service-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollC1ServiceFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 it.each(Array.from(['lines', 'stored'] as const).map(input1 => ({ input1 })))('真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率：输入案例 %#', async ({ input1: section }) => {
   const f = await createPayrollC1ServiceFixture()

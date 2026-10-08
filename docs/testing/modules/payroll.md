@@ -77,6 +77,13 @@
 | [tests/stores/payroll-race.test.ts](../../../tests/stores/payroll-race.test.ts) | 单元／服务／状态 | payroll store latest-wins |
 | [tests/stores/payroll-route-scope.test.ts](../../../tests/stores/payroll-route-scope.test.ts) | 单元／服务／状态 | 工资三入口按实际选项恢复来源范围 |
 | [tests/tabs/payroll-restore.test.ts](../../../tests/tabs/payroll-restore.test.ts) | 单元／服务／状态 | 工资只读页签恢复 |
+| [tests/components/PayrollMigrationPanel.test.ts](../../../tests/components/PayrollMigrationPanel.test.ts) | 组件（jsdom） | 完整工资来源预检、确认及原编号恢复 |
+| [tests/payroll/central-a-consumed-dependencies.test.ts](../../../tests/payroll/central-a-consumed-dependencies.test.ts) | 单元／服务／状态 | A 工资实际消费依赖与无关来源变化隔离 |
+| [tests/payroll/coordination-source.test.ts](../../../tests/payroll/coordination-source.test.ts) | 单元／服务／状态 | P7 原协调来源与失败状态保全 |
+| [tests/payroll/source-publication-privacy.test.ts](../../../tests/payroll/source-publication-privacy.test.ts) | 单元／服务／状态 | 工资发布目录与名册照片来源隐私 |
+| [tests/stores/payroll-production-pending.test.ts](../../../tests/stores/payroll-production-pending.test.ts) | 单元／服务／状态 | 工资正式来源原键及后读恢复 |
+| [tests/tabs/payroll-production-startup.test.ts](../../../tests/tabs/payroll-production-startup.test.ts) | 单元／服务／状态 | 工资启动恢复不扩大来源或实体范围 |
+
 
 ## 空鼓扣款与零额发放
 
@@ -340,3 +347,7 @@
 | [tests/helpers/payroll-numbering-fixture.ts](../../../tests/helpers/payroll-numbering-fixture.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/payroll-workbook-fixture.ts](../../../tests/helpers/payroll-workbook-fixture.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/payroll/tsconfig.json](../../../tests/payroll/tsconfig.json) | 测试类型配置 | 仅纳入配置列出的 3 个已复核测试及其依赖；不是全部工资测试类型覆盖 |
+| [tests/helpers/production-payroll-a-cold.ts](../../../tests/helpers/production-payroll-a-cold.ts) | 辅助／夹具 | A 工资实际发放及原号冷进程读取 |
+| [tests/helpers/production-payroll-a-upstream-fixture.ts](../../../tests/helpers/production-payroll-a-upstream-fixture.ts) | 辅助／夹具 | 真实 BOQ、工程量完成与工资独立价格夹具 |
+| [tests/helpers/production-payroll-cold-process.ts](../../../tests/helpers/production-payroll-cold-process.ts) | 辅助／夹具 | 完整工资独立进程读取入口 |
+| [tests/helpers/production-payroll-history-cold-process.ts](../../../tests/helpers/production-payroll-history-cold-process.ts) | 辅助／夹具 | A/C1/C2、P4–P7 与完整目录历史冷读取 |

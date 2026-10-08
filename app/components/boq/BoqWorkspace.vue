@@ -5,6 +5,7 @@ import type {
 } from '~/lib/boq/change'
 import type { MonthlyStatementView } from '~/lib/boq/monthly'
 import type { BoqAttachmentView, BoqChangeOrderView, BoqLineView } from '~/lib/boq/read-model'
+import type { ExportFileOptions } from '~/lib/kit/export'
 import type { QuantityBasis } from '~/lib/quantity/basis'
 import type { BoqAttachmentDraft } from '~/stores/boq'
 import { createBoqWorkbookExport, createMonthlyStatementExport } from '~/lib/boq/export'
@@ -17,6 +18,13 @@ type BoqTab = 'lines' | 'changes' | 'monthly'
 const route = useRoute()
 const router = useRouter()
 const store = useBoqStore()
+const access = useProductionAccessStore()
+const downloads = new Set<AbortController>()
+function cancelDownloads() {
+  for (const download of downloads)
+    download.abort()
+  downloads.clear()
+}
 const {
   confirm,
   error: toastError,
@@ -32,6 +40,9 @@ const activeTab = shallowRef<BoqTab>('lines')
 const treeScope = shallowRef('all')
 const search = shallowRef('')
 const initialized = shallowRef(false)
+watch(() => [projectId.value, contractId.value, access.status?.mode, access.status?.authenticated, access.status?.mode === 'production' ? access.status.ownerId : undefined], cancelDownloads)
+onDeactivated(cancelDownloads)
+onBeforeUnmount(cancelDownloads)
 const requestedTargetUnavailable = shallowRef(false)
 const focusId = computed(() => typeof route.query.focus === 'string' ? route.query.focus : null)
 
@@ -50,7 +61,7 @@ const contractOptions = computed(() => (selectedProject.value?.contracts ?? []).
 const tabs = computed(() => [
   { key: 'lines', label: '合同清单', count: store.workspace?.summary.lineCount ?? 0 },
   { key: 'changes', label: '变更单', count: store.workspace?.changes.length ?? 0 },
-  { key: 'monthly', label: '月度报量', count: store.workspace?.monthlyStatements.length ?? 0 },
+  { key: 'monthly', label: '月度报量', count: store.workspace?.monthlySourceState === 'unavailable' ? null : store.workspace?.monthlyStatements.length ?? 0 },
 ])
 
 function queryTab(value: unknown): BoqTab {
@@ -349,11 +360,23 @@ async function attachChange(payload: { orderId: string, draft: BoqAttachmentDraf
 
 async function downloadAttachment(attachment: BoqAttachmentView) {
   try {
-    await exportFile(await store.loadAttachmentFile(attachment.id))
+    await downloadActual({ defaultName: attachment.fileName, mimeType: attachment.mimeType, data: async () => {
+      const file = await store.loadAttachmentFile(attachment.id)
+      return typeof file.data === 'function' ? file.data() : file.data
+    } })
   }
   catch (cause) {
     toastError(toErrorMessage(cause))
   }
+}
+
+async function downloadActual(options: ExportFileOptions) {
+  const download = new AbortController()
+  downloads.add(download)
+  try {
+    return await exportFile({ ...options, signal: download.signal })
+  }
+  finally { downloads.delete(download) }
 }
 
 async function removeAttachment(attachment: BoqAttachmentView) {
@@ -420,6 +443,13 @@ async function exportAll() {
   }
 }
 
+async function downloadOriginal(ownerId: string, fileRefId: string, fileName: string) {
+  try {
+    await downloadActual({ defaultName: fileName, data: async () => (await store.loadOriginalFile(ownerId, fileRefId)).data })
+  }
+  catch (cause) { toastError(toErrorMessage(cause)) }
+}
+
 async function exportMonthly(statement: MonthlyStatementView) {
   if (!store.workspace)
     return
@@ -439,6 +469,7 @@ onMounted(initialize)
 </script>
 
 <template>
+  <CommandRecoveryPanel v-for="descriptor in store.pending" :key="descriptor.commandId" :command-id="descriptor.commandId" :saved="store.savedCommands.includes(descriptor.commandId)" :busy="store.saving" @recover="store.recover(descriptor)" />
   <div class="boq-workspace min-w-0 space-y-4">
     <section data-testid="boq-workspace-header" class="boq-header panel px-3 py-2">
       <div class="boq-header__main">
@@ -520,6 +551,19 @@ onMounted(initialize)
       <SegTab v-model="activeTab" :tabs="tabs" />
     </section>
 
+    <section v-if="store.originalFiles.length" class="panel min-w-0 space-y-2 p-3" aria-label="清单完整原件">
+      <p class="text-12px font-700 text-ink">
+        清单完整原件
+      </p>
+      <div v-for="file in store.originalFiles" :key="file.id" class="flex min-w-0 flex-wrap items-center gap-2 text-12px">
+        <span class="min-w-0 flex-1 break-words">{{ file.fileName }} · {{ file.formatClass === 'E' ? '独立分项单价库' : '施工清单' }}</span>
+        <span v-if="file.bodyState === 'metadata-only'" class="text-ink-faint">原件不可用 · 原历史仅有描述</span>
+        <KitButton v-else variant="secondary" :disabled="store.saving" :aria-label="`下载完整原件${file.fileName}`" @click="downloadOriginal(file.id, file.fileRefId, file.fileName)">
+          下载原件
+        </KitButton>
+      </div>
+    </section>
+
     <StatePanel
       v-if="(!initialized || store.loading) && !store.workspace"
       kind="loading"
@@ -598,8 +642,9 @@ onMounted(initialize)
       @remove-attachment="removeAttachment"
     />
 
+    <StatePanel v-else-if="activeTab === 'monthly' && store.workspace?.monthlySourceState === 'unavailable'" kind="empty" title="甲方报量源单尚未正式接通" description="当前施工清单与有效变洽签已可核对，月报量不从本地或空集合补造。" />
     <BoqMonthlyWorkspace
-      v-else
+      v-else-if="store.workspace"
       :workspace="store.workspace"
       :statement="store.monthlyStatement"
       :busy="store.saving"

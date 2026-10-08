@@ -8,7 +8,7 @@ import { createProductionCustomerService } from '../../server/utils/production-c
 import { createProductionStorage } from '../../server/utils/production-storage'
 
 it('清单来自实际一致副本，覆盖客户原件/审计/回执，字节坏损或未知表拒绝', async () => {
-  const base = resolve('.codex-tmp/issue-451-tests')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-451-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/manifest-`)
   const identity = { workspaceId: 'backup-workspace', ownerId: 'backup-owner', purpose: 'verification' as const }

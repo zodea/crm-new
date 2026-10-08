@@ -29,7 +29,7 @@ it.each(['2026-13', '2026-00', '2026-8', '2026-08-01', ' '].flatMap(month => [
   finally { await f.close() }
 })
 
-it.each(Array.from([{ workDate: '2026-02-30' }, { hours: -1 }, { hours: Number.NaN }, { hours: Infinity }, { hours: 23, overtimeHours: 2 }, { workerId: 'outside' }, { crewId: 'next-crew' }]).map(input1 => ({ input1 })))('同日重存保持稳定原行与审计；非法日期工时和串项目班组拒绝且库不变：输入案例 %#', async ({ input1: change }) => {
+it.each(Array.from([{ workDate: '2026-02-30' }, { hours: -1 }, { hours: Number.NaN }, { hours: Infinity }, { hours: 23, overtimeHours: 2 }, { workerId: 'missing-authorized-identity' }, { crewId: 'next-crew' }]).map(input1 => ({ input1 })))('同日重存保持稳定原行与审计；非法日期工时和串项目班组拒绝且库不变：输入案例 %#', async ({ input1: change }) => {
   const f = await createPayrollC1ServiceFixture()
   try {
     const first = await f.attendance({ hours: 7.51, overtimeHours: 0 })

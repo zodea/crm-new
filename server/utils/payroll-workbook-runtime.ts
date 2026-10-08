@@ -1,7 +1,9 @@
+import type { H3Event } from 'h3'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { payrollRuntimeOptions, payrollSession } from './payroll-runtime'
 import { createPayrollService } from './payroll-service'
 import { createPayrollWorkbookService } from './payroll-workbook-service'
+import { productionPayrollRuntime } from './production-payroll-runtime'
 import { quantityTestInstance } from './quantity-runtime'
 import { WorkspaceTransactionSessionChanged } from './quantity-test-instance'
 import { workerRosterRuntimeOptions } from './worker-roster-runtime'
@@ -22,3 +24,6 @@ export const payrollWorkbookService = createPayrollWorkbookService({
     }
   },
 })
+export function payrollWorkbookServiceForEvent(event: H3Event) {
+  return productionPayrollRuntime(event)?.workbook ?? payrollWorkbookService
+}

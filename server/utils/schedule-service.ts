@@ -33,7 +33,7 @@ function authorize(context: BusinessSession, write = false) {
   if (!context.capabilities.includes('schedule:read') || (write && !context.capabilities.includes('schedule:write')))
     throw scheduleProblem('forbidden', '当前身份无排程读取或维护权限')
 }
-async function executeEngine(engine: ReturnType<typeof createScheduleEngine>, action: ScheduleAction, projectId: string): Promise<unknown> {
+export async function executeScheduleEngineAction(engine: ReturnType<typeof createScheduleEngine>, action: ScheduleAction, projectId: string): Promise<unknown> {
   switch (action.kind) {
     case 'create-group':
       if (action.draft.projectId !== projectId)
@@ -60,6 +60,55 @@ async function executeEngine(engine: ReturnType<typeof createScheduleEngine>, ac
     case 'remove-task': return engine.removeTask(action.taskId)
     case 'undo': return engine.undo(action.logIds)
     case 'bind-contract': throw scheduleProblem('validation-failed', '合同绑定必须经过中央来源核验')
+  }
+}
+
+export async function assertScheduleUndoScope(db: TransactionDb, command: ScheduleCommand, visibility: Pick<typeof import('../../app/lib/db/soft-delete'), 'hiddenCtesFor' | 'visibleCond' | 'selectVisibleSql'> = { hiddenCtesFor, visibleCond, selectVisibleSql }) {
+  const { hiddenCtesFor, visibleCond, selectVisibleSql } = visibility
+  if (command.action.kind === 'undo') {
+    for (const id of command.action.logIds) {
+      const [log] = await db.select<{ table_name: string, record_id: string, operator: string }>('SELECT table_name, record_id, operator FROM operation_logs WHERE id = ?', [id])
+      if (!log || !['schedule_groups', 'schedule_group_buildings', 'schedule_tasks', 'task_item_map', 'task_dependencies', 'schedule_task_floor_plans'].includes(log.table_name))
+        throw scheduleProblem('relationship-mismatch', '撤销记录不属于排程')
+      if (log.operator === SCHEDULE_CONTRACT_BIND_OPERATOR)
+        throw scheduleProblem('validation-failed', '合同绑定是既有依据，不支持通过普通撤销解绑或换绑')
+      const relation = log.table_name === 'schedule_tasks' || log.table_name === 'schedule_groups'
+        ? `SELECT project_id FROM ${log.table_name} WHERE id = ?`
+        : log.table_name === 'schedule_group_buildings'
+          ? 'SELECT g.project_id FROM schedule_group_buildings r JOIN schedule_groups g ON g.id = r.group_id WHERE r.id = ?'
+          : log.table_name === 'task_dependencies'
+            ? 'SELECT t.project_id FROM task_dependencies r JOIN schedule_tasks t ON t.id = r.succ_id WHERE r.id = ?'
+            : `SELECT t.project_id FROM ${log.table_name} r JOIN schedule_tasks t ON t.id = r.task_id WHERE r.id = ?`
+      const [owner] = await db.select<{ project_id: string }>(relation, [log.record_id])
+      if (owner?.project_id !== command.projectId)
+        throw scheduleProblem('relationship-mismatch', '撤销记录不属于当前项目')
+      if (log.table_name === 'schedule_tasks') {
+        // 自身可能正等待撤销删除；其语义父级仍须全部处于当前可见范围。
+        const task = await fetchRowById(db, 'schedule_tasks', log.record_id)
+        for (const parent of PARENT_REFS.schedule_tasks!) {
+          const parentId = task?.[parent.column]
+          if (parentId != null && !(await db.select(selectVisibleSql(parent.table, 'AND id = ?'), [parentId]))[0])
+            throw scheduleProblem('validation-failed', '该历史任务的上级范围已隐藏，不能通过普通撤销修改')
+        }
+      }
+      const groupRelation = log.table_name === 'schedule_groups'
+        ? 'SELECT id AS group_id FROM schedule_groups WHERE id = ?'
+        : log.table_name === 'schedule_group_buildings'
+          ? 'SELECT group_id FROM schedule_group_buildings WHERE id = ?'
+          : log.table_name === 'schedule_tasks'
+            ? 'SELECT group_id FROM schedule_tasks WHERE id = ?'
+            : log.table_name === 'task_dependencies'
+              ? `${hiddenCtesFor('schedule_tasks')} SELECT task.group_id FROM task_dependencies edge JOIN schedule_tasks task ON task.id IN (edge.pred_id, edge.succ_id) WHERE edge.id = ? AND ${visibleCond('schedule_tasks', 'task')}`
+              : `${hiddenCtesFor('schedule_tasks')} SELECT task.group_id FROM ${log.table_name} row JOIN schedule_tasks task ON task.id = row.task_id WHERE row.id = ? AND ${visibleCond('schedule_tasks', 'task')}`
+      const groupOwners = await db.select<{ group_id: string | null }>(groupRelation, [log.record_id])
+      if (groupOwners.length !== (log.table_name === 'task_dependencies' ? 2 : 1))
+        throw scheduleProblem('validation-failed', '该历史记录没有当前可维护的任务范围，请在历史记录中核对')
+      for (const groupOwner of groupOwners) {
+        const [activeGroup] = groupOwner.group_id ? await db.select(selectVisibleSql('schedule_groups', 'AND id = ? AND project_id = ?'), [groupOwner.group_id, command.projectId]) : []
+        if (!activeGroup)
+          throw scheduleProblem('validation-failed', '该历史记录不在当前有效分组中，不能通过普通撤销修改')
+      }
+    }
   }
 }
 
@@ -157,56 +206,12 @@ export function createScheduleService(options: Options) {
             throw scheduleProblem('stale-source', '所选工序库版本已变化')
         }
         // 通用撤销只接受本项目 WBS 动作的日志，不能越过中央领域边界。
-        if (command.action.kind === 'undo') {
-          for (const id of command.action.logIds) {
-            const [log] = await db.select<{ table_name: string, record_id: string, operator: string }>('SELECT table_name, record_id, operator FROM operation_logs WHERE id = ?', [id])
-            if (!log || !['schedule_groups', 'schedule_group_buildings', 'schedule_tasks', 'task_item_map', 'task_dependencies', 'schedule_task_floor_plans'].includes(log.table_name))
-              throw scheduleProblem('relationship-mismatch', '撤销记录不属于排程')
-            if (log.operator === SCHEDULE_CONTRACT_BIND_OPERATOR)
-              throw scheduleProblem('validation-failed', '合同绑定是既有依据，不支持通过普通撤销解绑或换绑')
-            const relation = log.table_name === 'schedule_tasks' || log.table_name === 'schedule_groups'
-              ? `SELECT project_id FROM ${log.table_name} WHERE id = ?`
-              : log.table_name === 'schedule_group_buildings'
-                ? 'SELECT g.project_id FROM schedule_group_buildings r JOIN schedule_groups g ON g.id = r.group_id WHERE r.id = ?'
-                : log.table_name === 'task_dependencies'
-                  ? 'SELECT t.project_id FROM task_dependencies r JOIN schedule_tasks t ON t.id = r.succ_id WHERE r.id = ?'
-                  : `SELECT t.project_id FROM ${log.table_name} r JOIN schedule_tasks t ON t.id = r.task_id WHERE r.id = ?`
-            const [owner] = await db.select<{ project_id: string }>(relation, [log.record_id])
-            if (owner?.project_id !== command.projectId)
-              throw scheduleProblem('relationship-mismatch', '撤销记录不属于当前项目')
-            if (log.table_name === 'schedule_tasks') {
-              // 自身可能正等待撤销删除；其语义父级仍须全部处于当前可见范围。
-              const task = await fetchRowById(db, 'schedule_tasks', log.record_id)
-              for (const parent of PARENT_REFS.schedule_tasks!) {
-                const parentId = task?.[parent.column]
-                if (parentId != null && !(await db.select(selectVisibleSql(parent.table, 'AND id = ?'), [parentId]))[0])
-                  throw scheduleProblem('validation-failed', '该历史任务的上级范围已隐藏，不能通过普通撤销修改')
-              }
-            }
-            const groupRelation = log.table_name === 'schedule_groups'
-              ? 'SELECT id AS group_id FROM schedule_groups WHERE id = ?'
-              : log.table_name === 'schedule_group_buildings'
-                ? 'SELECT group_id FROM schedule_group_buildings WHERE id = ?'
-                : log.table_name === 'schedule_tasks'
-                  ? 'SELECT group_id FROM schedule_tasks WHERE id = ?'
-                  : log.table_name === 'task_dependencies'
-                    ? `${hiddenCtesFor('schedule_tasks')} SELECT task.group_id FROM task_dependencies edge JOIN schedule_tasks task ON task.id IN (edge.pred_id, edge.succ_id) WHERE edge.id = ? AND ${visibleCond('schedule_tasks', 'task')}`
-                    : `${hiddenCtesFor('schedule_tasks')} SELECT task.group_id FROM ${log.table_name} row JOIN schedule_tasks task ON task.id = row.task_id WHERE row.id = ? AND ${visibleCond('schedule_tasks', 'task')}`
-            const groupOwners = await db.select<{ group_id: string | null }>(groupRelation, [log.record_id])
-            if (groupOwners.length !== (log.table_name === 'task_dependencies' ? 2 : 1))
-              throw scheduleProblem('validation-failed', '该历史记录没有当前可维护的任务范围，请在历史记录中核对')
-            for (const groupOwner of groupOwners) {
-              const [activeGroup] = groupOwner.group_id ? await db.select(selectVisibleSql('schedule_groups', 'AND id = ? AND project_id = ?'), [groupOwner.group_id, command.projectId]) : []
-              if (!activeGroup)
-                throw scheduleProblem('validation-failed', '该历史记录不在当前有效分组中，不能通过普通撤销修改')
-            }
-          }
-        }
+        await assertScheduleUndoScope(db, command)
         let value: unknown
         try {
           value = command.action.kind === 'bind-contract'
             ? await bindCentralScheduleContract(db, { ...context, origin: 'real', sourceVersion }, command.projectId, command.action.groupId, command.action.contractId, sources.boq.lines)
-            : await executeEngine(engine, command.action, command.projectId)
+            : await executeScheduleEngineAction(engine, command.action, command.projectId)
           await assertScheduleDependencyGraph(db, command.projectId)
         }
         catch (cause) {

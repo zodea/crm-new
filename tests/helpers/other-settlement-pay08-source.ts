@@ -1,9 +1,13 @@
+import type { BusinessSession } from '../../server/utils/business-session'
+import type { ProductionStorage } from '../../server/utils/production-storage'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { migrations, runMigrations } from '../../app/lib/db/migrations'
+import { CENTRAL_FINANCE_KINDS, FINANCE_FAMILIES } from '../../app/lib/finance/central-contract'
 import { readVerifiedOriginalExpense } from '../../app/lib/finance/expense-reference'
+import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createMemoryDb } from './memory-db'
 
 /** A complete old Native owner, including the original legacy approval and already confirmed cash. */
@@ -61,4 +65,47 @@ export async function createOtherSettlementPay08Source(directory: string) {
   finally {
     native.close()
   }
+}
+
+/** Historical E only: complete genuine Native bytes, no current creation shortcut or extra cash/settlement. */
+export async function adoptHistoricalExpenseFixture(storage: ProductionStorage, actor: BusinessSession, options: { directory: string, serviceId: string, payeeId: string, serviceName: string, payeeName: string, prefix?: string, original?: boolean }) {
+  const prefix = options.prefix ?? 'historical-expense'
+  const sameParty = options.serviceId === options.payeeId
+  const ids = { service: `${prefix}-service`, payee: sameParty ? `${prefix}-service` : `${prefix}-payee`, expense: `${prefix}-head`, line: `${prefix}-line`, file: `${prefix}-file` }
+  const db = await createMemoryDb()
+  let source
+  try {
+    await runMigrations(db, migrations.filter(row => row.version <= 60))
+    await db.execute('PRAGMA foreign_keys=ON')
+    await db.execute('INSERT INTO suppliers(id,name) VALUES(?,?)', [ids.service, options.serviceName])
+    if (!sameParty)
+      await db.execute('INSERT INTO suppliers(id,name) VALUES(?,?)', [ids.payee, options.payeeName])
+    await db.execute('INSERT INTO expense_reimbursements(id,applicant,applicant_supplier_id,applicant_name_snapshot,reimbursement_date,status) VALUES(?,?,?,?,?,\'confirmed\')', [ids.expense, options.payeeName, ids.payee, options.payeeName, '2026-10-05'])
+    await db.execute('INSERT INTO expense_reimbursement_lines(id,reimbursement_id,expense_item,amount,counterparty_supplier_id,counterparty_name_snapshot) VALUES(?,?,?,100,?,?)', [ids.line, ids.expense, '历史真实原费用100', ids.service, options.serviceName])
+    if (options.original) {
+      await db.execute('INSERT INTO file_refs(id,owner_type,owner_id,file_name,file_size,mime_type,uploader,uploaded_at) VALUES(?,?,?,?,?,?,?,?)', [ids.file, 'expense_reimbursement', ids.expense, '原費真实证据.bin', 4, 'application/octet-stream', '原上传人', '2026-10-05T01:00:00.000Z'])
+      await db.execute('INSERT INTO file_payloads(file_ref_id,encoding,content) VALUES(?,\'base64\',?)', [ids.file, 'AAqA/w=='])
+    }
+    const bytes = Buffer.from(db.raw.export())
+    await mkdir(options.directory, { recursive: true })
+    await writeFile(join(options.directory, `${prefix}.sqlite`), bytes)
+    source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
+  }
+  finally { db.close() }
+  for (const capability of ['core:migration:write', ...CENTRAL_FINANCE_KINDS.flatMap(kind => [`${FINANCE_FAMILIES[kind]}:read`, `${FINANCE_FAMILIES[kind]}:write`])]) {
+    if (!actor.capabilities.includes(capability))
+      actor.capabilities.push(capability)
+  }
+  const session = () => structuredClone(actor)
+  const finance = createProductionFinanceService(storage)
+  const identity = { workspaceId: actor.workspaceId, actorId: actor.actorId }
+  const preview = await finance.preflightSnapshot({ ...identity, source }, session)
+  const bindings = [{ legacyId: ids.service, targetId: options.serviceId }, ...(!sameParty ? [{ legacyId: ids.payee, targetId: options.payeeId }] : [])]
+  const mappings = bindings.map((binding) => {
+    const candidate = preview.candidates.find(row => row.entityType === 'suppliers' && row.serverId === binding.targetId)!
+    return { entityType: 'suppliers' as const, ...binding, version: candidate.version, sourceVersion: candidate.sourceVersion, reason: '完整历史原费无项目，真实服务方和垫付身份逐项核实；不新造工程或现金' }
+  })
+  await finance.importSnapshot({ ...identity, commandId: `${prefix}-adopt`, source, mappings }, session)
+  const form = await finance.form('reimbursement', ids.expense, session)
+  return { id: ids.expense, version: form.version, attachmentIds: form.attachments.map(file => file.id), lineId: ids.line, ids, source }
 }

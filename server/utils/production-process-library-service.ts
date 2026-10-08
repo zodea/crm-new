@@ -1,4 +1,5 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
+import type { ProcessLibrarySummary, ProcessLibraryVersion } from '../../app/lib/schedule/process-library-contract'
 import type { DataOriginDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
 import type { ProcessLibraryState } from './process-library-service'
@@ -8,9 +9,17 @@ import { PROCESS_LIBRARY_READ_CAPABILITY, PROCESS_LIBRARY_WRITE_CAPABILITY, proc
 import { parseProcessLibraryCommand } from './process-library-request'
 import { createProcessLibraryService, processLibraryCanonical } from './process-library-service'
 import { processLibraryDigest, readProductionProcessLibraryState } from './production-process-library-record'
+import { productionWbsLibraryUsage } from './production-wbs-library-usage'
 
 type Session = () => BusinessSession
 export function createProductionProcessLibraryService(storage: ProductionStorage) {
+  async function withUsage<T extends ProcessLibrarySummary | ProcessLibraryVersion>(tx: TransactionDb, actor: BusinessSession, versions: T[]): Promise<T[]> {
+    const usage = await productionWbsLibraryUsage(tx, actor)
+    return versions.map((version) => {
+      const projects = usage?.get(version.id) ?? []
+      return { ...version, usageCount: usage ? projects.reduce((sum, project) => sum + project.groupCount, 0) : null, usageProjects: projects }
+    })
+  }
   function authorize(session: Session, write: boolean) {
     const actor = session()
     if (actor.workspaceId !== storage.identity.workspaceId || actor.actorId !== storage.identity.actorId
@@ -34,8 +43,11 @@ export function createProductionProcessLibraryService(storage: ProductionStorage
     })
   }
   return {
-    catalog: (origin: DataOriginDTO, session: Session) => run(origin, session, false, async (_tx, actor, state) => createProcessLibraryService({ state }).catalog(origin, actor)),
-    detail: (id: string, origin: DataOriginDTO, session: Session) => run(origin, session, false, async (_tx, actor, state) => createProcessLibraryService({ state }).detail(id, origin, actor)),
+    catalog: (origin: DataOriginDTO, session: Session) => run(origin, session, false, async (tx, actor, state) => {
+      const catalog = createProcessLibraryService({ state }).catalog(origin, actor)
+      return { ...catalog, libraries: await withUsage(tx, actor, catalog.libraries) }
+    }),
+    detail: (id: string, origin: DataOriginDTO, session: Session) => run(origin, session, false, async (tx, actor, state) => (await withUsage(tx, actor, [createProcessLibraryService({ state }).detail(id, origin, actor)]))[0]!),
     execute(input: unknown, session: Session) {
       const command = parseProcessLibraryCommand(input)
       return run(command.origin, session, true, async (tx, actor, state) => {

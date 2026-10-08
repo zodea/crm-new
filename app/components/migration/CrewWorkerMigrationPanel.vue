@@ -92,7 +92,7 @@ async function load(epoch = generation) {
     return
   let fresh: State
   try {
-    const data = await $fetch<State>('/api/read/crew-worker/import')
+    const data = await $fetch<State, string>('/api/read/crew-worker/import')
     assertCurrent(epoch)
     fresh = verifyState(data)
   }
@@ -180,7 +180,7 @@ async function preflight(epoch = generation) {
   assertCurrent(epoch)
   if (!state.value || pending.value)
     return
-  const read = await $fetch<CrewWorkerImportPreview>('/api/commands/crew-worker/import', { method: 'POST', body: { workspaceId: state.value.context.workspaceId, actorId: state.value.context.actorId, commandId: `cw-preflight-${crypto.randomUUID()}`, action: 'preflight', source: captured.source, referenceMappings: captured.mappings } })
+  const read = await $fetch<CrewWorkerImportPreview, string>('/api/commands/crew-worker/import', { method: 'POST', body: { workspaceId: state.value.context.workspaceId, actorId: state.value.context.actorId, commandId: `cw-preflight-${crypto.randomUUID()}`, action: 'preflight', source: captured.source, referenceMappings: captured.mappings } })
   assertCurrent(epoch)
   preview.value = verifyPreview(read, captured.source.sha256)
 }
@@ -196,7 +196,7 @@ async function adopt(epoch = generation) {
   recovery.remember(commandRecoveryKey(descriptor), descriptor)
   pending.value = descriptor
   // The full source, project mappings, private fields and receipt body never enter recovery storage.
-  const saved = await $fetch<CrewWorkerImportResult>('/api/commands/crew-worker/import', { method: 'POST', body: { workspaceId: descriptor.workspaceId, actorId: descriptor.actorId, commandId: descriptor.commandId, action: 'adopt', source: captured.source, referenceMappings: captured.mappings } })
+  const saved = await $fetch<CrewWorkerImportResult, string>('/api/commands/crew-worker/import', { method: 'POST', body: { workspaceId: descriptor.workspaceId, actorId: descriptor.actorId, commandId: descriptor.commandId, action: 'adopt', source: captured.source, referenceMappings: captured.mappings } })
   assertCurrent(epoch)
   knownProof = { descriptor, result: verifyResult(saved, descriptor.commandId, captured.source.sha256) }
   await readBack(descriptor, knownProof.result, epoch)
@@ -223,7 +223,7 @@ async function recover(epoch = generation) {
     await readBack(descriptor, knownProof.result, epoch)
     return
   }
-  const resolution = await $fetch<CrewWorkerImportResolution>('/api/commands/crew-worker/import/resolve', { method: 'POST', body: { commandId: descriptor.commandId } })
+  const resolution = await $fetch<CrewWorkerImportResolution, string>('/api/commands/crew-worker/import/resolve', { method: 'POST', body: { commandId: descriptor.commandId } })
   assertCurrent(epoch)
   if (resolution.outcome === 'applied') {
     knownProof = { descriptor, result: verifyResult(resolution.result, descriptor.commandId) }

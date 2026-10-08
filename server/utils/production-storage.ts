@@ -1,5 +1,6 @@
 import type { SQLInputValue } from 'node:sqlite'
 import type { DbDriver } from '../../app/lib/db/coordinator'
+import { Buffer } from 'node:buffer'
 import { constants } from 'node:fs'
 import { access, lstat, open, realpath } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve, toNamespacedPath } from 'node:path'
@@ -189,10 +190,10 @@ async function openDriver(options: ProductionStorageOptions): Promise<DbDriver> 
         if (sql === 'BEGIN')
           connection.exec('BEGIN IMMEDIATE')
         else if (params)
-          connection.prepare(sql).run(...params as SQLInputValue[])
+          connection.prepare(sql).run(...params.map(value => value instanceof Uint8Array ? Buffer.from(value) : value) as SQLInputValue[])
         else connection.exec(sql)
       },
-      async select<T>(sql: string, params: unknown[] = []) { return connection.prepare(sql).all(...params as SQLInputValue[]) as T[] },
+      async select<T>(sql: string, params: unknown[] = []) { return connection.prepare(sql).all(...params.map(value => value instanceof Uint8Array ? Buffer.from(value) : value) as SQLInputValue[]) as T[] },
       backupTo: destination => backupTo(connection, path, destination),
       async close() { connection.close() },
     }

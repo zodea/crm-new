@@ -8,9 +8,7 @@ import { createPayrollRepository } from '../../app/lib/payroll/central-repositor
 import { createPayrollHollowFixture } from '../helpers/payroll-hollow-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollHollowFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 
 type HollowFixture = Awaited<ReturnType<typeof createPayrollHollowFixture>>

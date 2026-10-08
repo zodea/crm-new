@@ -65,8 +65,11 @@ it.each([12, null])('真实Native仅指定C外部原单缺失size=%s，保原met
     const physical = await f.storage.select('SELECT file_size,file_path FROM file_refs WHERE id=?', [f.fileId])
     expect(physical).toEqual(size === null ? [] : [{ file_size: size, file_path: f.originalPath }])
     const backup = join(f.directory, 'synthetic-clearance-backup.sqlite')
+    const metadata = (await f.storage.select<{ schema_version: number }>('SELECT schema_version FROM production_metadata WHERE singleton=1'))[0]!
     await f.storage.backupTo(backup)
-    expect((await inspectProductionBackup(backup)).schemaVersion).toBe(14)
+    const inventory = await inspectProductionBackup(backup)
+    expect(inventory.schemaVersion).toBe(metadata.schema_version)
+    expect(inventory.participants.finance!.tables).toContain('finance_expense_clearance_verifications')
     await f.storage.close()
     expect((await owner.expenses(f.session)).items[0]!.clearances[0]!.declaredMissingOriginals![0]!.fileSize).toBe(size)
   }

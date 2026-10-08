@@ -33,16 +33,21 @@ export function createQuantityRowImporter(dependencies: Dependencies) {
       throw quantityProblem('validation-failed', `项目编码「${row.projectCode}」${matches.length ? '不唯一' : '不在当前可读正式项目中'}，请先核对项目目录`)
     const projectId = matches[0]!.id
     const query = { projectId, origin: 'real' as const, includeDemo: false }
-    const region = await dependencies.quantity.region(query)
-    const unitId = target === 'template' ? null : resolveQuantityImportUnit(region.data, row)
+    const region = target === 'template' ? null : await dependencies.quantity.region(query)
+    const unitId = region ? resolveQuantityImportUnit(region.data, row) : null
     let assignee = null
-    let baseVersion = region.sourceVersion
+    let baseVersion = target === 'template' ? (await dependencies.quantity.templates(query)).sourceVersion : region!.sourceVersion
     if (target === 'assignment') {
       const workspace = await dependencies.quantity.assignments(query)
-      if (workspace.sourceVersion !== baseVersion)
-        throw quantityProblem('stale-source', '读取责任候选时工程量已变化，请重新核对文件行')
+      const before = region!.data.units.find(unit => unit.id === unitId)
+      const after = workspace.data.units.find(unit => unit.id === unitId)
+      if (!before || !after || before.floorId !== after.floorId || before.templateId !== after.templateId)
+        throw quantityProblem('stale-source', '读取责任候选时原目标户已变化，请重新核对文件行')
       assignee = resolveQuantityImportAssignee(workspace.data.assignees, row)
       baseVersion = workspace.sourceVersion
+    }
+    else if (target === 'completion') {
+      baseVersion = (await dependencies.quantity.completion({ ...query, unitId: unitId! })).sourceVersion
     }
     return { workspaceId: context.workspaceId, actorId: context.actorId, requiredCapability: 'quantity:write', commandId: crypto.randomUUID(), baseVersion, origin: 'real', projectId, action: { kind: 'import-row', target, row, unitId, assignee } }
   }

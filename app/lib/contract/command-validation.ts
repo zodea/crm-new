@@ -173,7 +173,7 @@ export function decodeContractAttachmentChanges(value: unknown, options: DecodeO
 export function decodeContractAttachment(value: unknown, ownerId: string, options: DecodeOptions): ContractFormAttachment {
   if (object(value) && value.sha256 !== undefined && (typeof value.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sha256)))
     return options.fail('原件摘要无效')
-  if (!object(value) || typeof value.id !== 'string' || !value.id || !['contract', ...(options.allowLineItems ? ['contract_supplement'] : [])].includes(String(value.ownerType)) || value.ownerId !== ownerId || typeof value.fileName !== 'string' || typeof value.filePath !== 'string' || !finiteNumber(value.fileSize) || value.fileSize < 0 || typeof value.mimeType !== 'string' || typeof value.category !== 'string' || typeof value.uploader !== 'string' || !isISODateTimeDTO(value.uploadedAt) || !(value.deletedAt === null || isISODateTimeDTO(value.deletedAt)))
+  if (!object(value) || typeof value.id !== 'string' || !value.id || !['contract', ...(options.allowLineItems ? ['contract_supplement'] : [])].includes(String(value.ownerType)) || value.ownerId !== ownerId || typeof value.fileName !== 'string' || typeof value.filePath !== 'string' || !finiteNumber(value.fileSize) || value.fileSize < 0 || typeof value.mimeType !== 'string' || typeof value.category !== 'string' || typeof value.uploader !== 'string' || !(value.uploadedAt === null || isISODateTimeDTO(value.uploadedAt)) || !(value.deletedAt === null || isISODateTimeDTO(value.deletedAt)))
     return options.fail(`${options.entityLabel}附件无效`)
   return { ...value } as unknown as ContractFormAttachment
 }

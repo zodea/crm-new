@@ -1,3 +1,5 @@
+import { scheduleRecoveryTarget } from '../schedule/command-recovery'
+
 export interface CommandRecoveryDescriptor {
   commandId: string
   workspaceId: string
@@ -12,8 +14,14 @@ export type CommandResolution<R> = { outcome: 'applied', result: R } | { outcome
 export type RecoveryStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 /** Scope and identity only: drafts, originals and receipt bodies stay in page memory. */
-export function commandRecoveryKey(scope: Pick<CommandRecoveryDescriptor, 'workspaceId' | 'actorId' | 'family' | 'targetId'>) {
-  return `crm:form-command:v1:${[scope.family, scope.workspaceId, scope.actorId, scope.targetId ?? 'new'].map(encodeURIComponent).join(':')}`
+export function commandRecoveryKey(scope: Pick<CommandRecoveryDescriptor, 'workspaceId' | 'actorId' | 'family' | 'targetId' | 'scopeId'>) {
+  const key = `crm:form-command:v1:${[scope.family, scope.workspaceId, scope.actorId, scope.targetId ?? 'new'].map(encodeURIComponent).join(':')}`
+  // Independent drafts explicitly separate their scope; ordinary entity IDs already name their owner.
+  if (scope.family === 'target-cost' && scope.targetId === null && scope.scopeId)
+    return `${key}:draft:${encodeURIComponent(scope.scopeId)}`
+  if (scope.family === 'auxiliary-contract' && scope.targetId === null && scope.scopeId)
+    return `${key}:kind:${encodeURIComponent(scope.scopeId)}`
+  return key
 }
 
 export function createCommandRecoveryStorage(storage: () => RecoveryStorage = () => (globalThis as unknown as { sessionStorage: RecoveryStorage }).sessionStorage) {
@@ -85,17 +93,32 @@ function recoveryUrl(fullPath: string): URL | null {
 }
 
 /** A refresh can keep the exact original command route without restoring a write tab or its body. */
-export function commandRecoveryFormTarget(fullPath: string): Pick<CommandRecoveryDescriptor, 'family' | 'targetId'> | null {
+export function commandRecoveryFormTarget(fullPath: string): Pick<CommandRecoveryDescriptor, 'family' | 'targetId' | 'scopeId'> | null {
   const url = recoveryUrl(fullPath)
   if (!url)
     return null
+  const schedule = scheduleRecoveryTarget(fullPath)
+  if (schedule)
+    return schedule
   try {
     if (url.pathname === '/material/quotations/import')
       return { family: 'material-quotation-import', targetId: null }
     if (url.pathname === '/contract/other-settlement/import')
       return { family: 'other-settlement-import', targetId: null }
+    const budget = /^\/project\/target-cost\/(?:form(?:\/([^/]+))?|([^/]+))$/.exec(url.pathname)
+    if (budget) {
+      const encoded = budget[1] ?? budget[2]
+      const targetId = encoded ? decodeURIComponent(encoded) : null
+      const validId = (value: string) => Boolean(value.trim()) && !/[\s/\\?#]/.test(value) && ![...value].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+      if ((targetId !== null && !validId(targetId)) || url.searchParams.getAll('draftKey').length > 1)
+        return null
+      const scopeId = targetId === null ? url.searchParams.get('draftKey') : null
+      if (scopeId !== null && !validId(scopeId))
+        return null
+      return { family: 'target-cost', targetId, ...(scopeId ? { scopeId } : {}) }
+    }
     const receipt = /^\/finance\/receipt\/(?:new|form\/([^/]+))$/.exec(url.pathname)
-    const contract = /^\/contract\/(construction|subcontract|material)\/form(?:\/([^/]+))?$/.exec(url.pathname)
+    const contract = /^\/contract\/(construction|subcontract|material|other-expense|company-expense|other-settlement)\/form(?:\/([^/]+))?$/.exec(url.pathname)
     const master = /^\/base\/(crew|worker)\/form(?:\/([^/]+))?$/.exec(url.pathname)
     const signatory = /^\/settings\/our-signatories\/form(?:\/([^/]+))?$/.exec(url.pathname)
     const quotation = /^\/material\/quotations\/form(?:\/([^/]+))?$/.exec(url.pathname)
@@ -113,18 +136,24 @@ export function commandRecoveryFormTarget(fullPath: string): Pick<CommandRecover
       records: 'finance-payment-record',
       billing: 'finance-invoice-application',
     }
+    if (contract && ['other-expense', 'company-expense'].includes(contract[1]!))
+      return { family: 'auxiliary-contract', targetId, scopeId: contract[1]!.replace('-', '_') }
+    if (contract?.[1] === 'other-settlement')
+      return { family: 'other-settlement', targetId }
     return { family: receipt ? 'receipt' : contract ? `${contract[1]}-contract` : master ? master[1]! : signatory ? 'our-signatory' : quotation ? 'material-quotation' : financeFamilies[finance![1]!]!, targetId }
   }
   catch { return null }
 }
 
 /** A single maintenance page hosts independent domain commands; each retains only its own original key. */
-export function commandRecoveryRouteTargets(fullPath: string): Array<Pick<CommandRecoveryDescriptor, 'family' | 'targetId'>> {
+export function commandRecoveryRouteTargets(fullPath: string): Array<Pick<CommandRecoveryDescriptor, 'family' | 'targetId' | 'scopeId'>> {
   const form = commandRecoveryFormTarget(fullPath)
   if (form)
     return [form]
   const url = recoveryUrl(fullPath)
   if (url?.pathname === '/settings/data-migration')
-    return [{ family: 'crew-worker-import', targetId: null }, { family: 'finance-import', targetId: null }]
+    return [{ family: 'crew-worker-import', targetId: null }, { family: 'finance-import', targetId: null }, { family: 'target-cost-import', targetId: null }, { family: 'payroll-import', targetId: null }, { family: 'schedule-import', targetId: null }, { family: 'construction-contract-import', targetId: null }, { family: 'subcontract-contract-import', targetId: null }]
+  if (url && /^\/contract\/(?:other-expense|company-expense)$/.test(url.pathname))
+    return [{ family: 'auxiliary-contract-import', targetId: null }]
   return []
 }

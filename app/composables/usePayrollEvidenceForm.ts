@@ -11,7 +11,7 @@ import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
 
-interface Pending { command: PayrollAdjustmentCommand, state: 'sending' | 'unknown' | 'awaiting-read' }
+interface Pending { restoredFromDescriptor?: boolean, command: PayrollAdjustmentCommand, state: 'sending' | 'unknown' | 'awaiting-read' }
 interface FormRead<D> { context: PayrollWritableContext, draft: D }
 
 /** 三种独立事实共用保稿/原键/后读流程；每种领域仍由自己的封闭读取和命令判断资格。 */
@@ -116,7 +116,7 @@ export function usePayrollEvidenceForm<D, R extends FormRead<D>>(options: {
           original.value = JSON.stringify(value.draft)
         const operation = options.pending(value)
         if (operation)
-          draft.value = clone(options.restoredDraft(operation, value))
+          draft.value = clone(operation.restoredFromDescriptor ? value.draft : options.restoredDraft(operation, value))
       }
       adoptedTarget.value = requested
     }

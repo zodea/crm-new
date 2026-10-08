@@ -1,4 +1,5 @@
-import type { SubcontractContractFormReadDTO } from '~/lib/subcontract-contract/command-contract'
+import type { ConstructionMainSelection } from '~/lib/construction-scope/contract'
+import type { SubcontractContractCommandContextDTO, SubcontractContractFormReadDTO } from '~/lib/subcontract-contract/command-contract'
 import { defineStore } from 'pinia'
 import { createContractCommandActions } from '~/lib/contract/command-session'
 import { SUBCONTRACT_CONTRACT_WRITE_CAPABILITY } from '~/lib/subcontract-contract/command-contract'
@@ -11,7 +12,7 @@ export class SubcontractContractCommandConflictError extends Error {
   }
 }
 
-export const useSubcontractContractCommandStore = defineStore('subcontract-contract-command', () => createContractCommandActions({
+export const useSubcontractContractCommandStore = defineStore('subcontract-contract-command', () => createContractCommandActions<SubcontractContractCommandContextDTO, typeof SUBCONTRACT_CONTRACT_WRITE_CAPABILITY, { constructionMain?: ConstructionMainSelection }, SubcontractContractFormReadDTO>({
   repository: () => useNuxtApp().$repositories.subcontractContractCommands,
   capability: SUBCONTRACT_CONTRACT_WRITE_CAPABILITY,
   problemFromUnknown: subcontractContractUnavailable,
