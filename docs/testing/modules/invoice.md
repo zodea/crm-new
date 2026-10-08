@@ -14,6 +14,7 @@
 | [tests/invoice/excel.test.ts](../../../tests/invoice/excel.test.ts) | 单元／服务／状态 | 发票台账 Excel 导出 |
 | [tests/invoice/ledger-nodes.test.ts](../../../tests/invoice/ledger-nodes.test.ts) | 单元／服务／状态 | 台账树键与 query 预筛（specs §07：预筛不进页签身份） |
 | [tests/invoice/print-layout.test.ts](../../../tests/invoice/print-layout.test.ts) | 单元／服务／状态 | 发票打印排版与打印资格：无原件、识别、确认、重复、金额逐项拒绝原因 |
+| [tests/invoice/recognition-changes.test.ts](../../../tests/invoice/recognition-changes.test.ts) | 单元／服务／状态 | 重新识别覆盖前后的字段差异：人工值被覆盖、清空、补出均列出，长票号按文本比较 |
 | [tests/invoice/recognize.test.ts](../../../tests/invoice/recognize.test.ts) | 单元／服务／状态 | confidenceTier:置信度分档(边框色/角标/✓确认 依据) |
 | [tests/invoice/status.test.ts](../../../tests/invoice/status.test.ts) | 单元／服务／状态 | invoiceDocStatus:单一权威的状态优先级 |
 | [tests/recognize/invoice-engine.test.ts](../../../tests/recognize/invoice-engine.test.ts) | 单元／服务／状态 | recognizeInvoice |
@@ -29,7 +30,7 @@
 | --- | --- | --- |
 | [tests/components/FactorSolverState.test.ts](../../../tests/components/FactorSolverState.test.ts) | 组件（jsdom） | 因子工具保存配置兼容 |
 | [tests/components/FactorTaxCalculator.test.ts](../../../tests/components/FactorTaxCalculator.test.ts) | 组件（jsdom） | 共用金额税额栏 |
-| [tests/components/InvoiceEditPage.test.ts](../../../tests/components/InvoiceEditPage.test.ts) | 组件（jsdom） | 发票编辑页重新识别 |
+| [tests/components/InvoiceEditPage.test.ts](../../../tests/components/InvoiceEditPage.test.ts) | 组件（jsdom） | 编辑页重新识别：成功覆盖、失败保留输入，覆盖未保存修改时逐项提醒变动 |
 | [tests/components/InvoicePrintLayout.test.ts](../../../tests/components/InvoicePrintLayout.test.ts) | 组件（jsdom） | 打印面板：无原件的 Excel 发票不可勾选、列出未打印清单，打印只提交有原件的票 |
 | [tests/components/InvoiceExportPreview.test.ts](../../../tests/components/InvoiceExportPreview.test.ts) | 组件（jsdom） | 发票导出预览样式草稿 |
 
@@ -42,7 +43,7 @@
 | [e2e/invoice-ledger-print-mode.spec.ts](../../../e2e/invoice-ledger-print-mode.spec.ts) | Playwright E2E | 发票台账打印入口：进入双栏选择、打印确认并返回台账 |
 | [e2e/invoice-print-layout.spec.ts](../../../e2e/invoice-print-layout.spec.ts) | Playwright E2E | 发票打印排版：1/2/4 张、勾选合计、旋转、打印确认与计数持久化 |
 | [e2e/invoice-project-linkage.spec.ts](../../../e2e/invoice-project-linkage.spec.ts) | Playwright E2E | 发票全旅程：识别归档后三处联动，改项目后迁移，再转个人开支隔离 |
-| [e2e/issue-398-invoice-rerecognition.spec.ts](../../../e2e/issue-398-invoice-rerecognition.spec.ts) | Playwright E2E | 编辑页重新识别后保存新字段，四档视口可操作 |
+| [e2e/issue-398-invoice-rerecognition.spec.ts](../../../e2e/issue-398-invoice-rerecognition.spec.ts) | Playwright E2E | 工作台与编辑页重新识别覆盖字段并逐项提醒变动，保存新字段，四档视口可操作 |
 
 ## 辅助文件与配置（非独立测试）
 
