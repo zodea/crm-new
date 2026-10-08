@@ -233,7 +233,7 @@
 
     if (window.KitTable) {
       return <window.KitTable toolbar={toolbar} columns={cols.map((c) => ({ width: 120, ...c }))} rows={shown}
-        pageSize={10} minRows={minRows != null ? minRows : 5} sum={sum ? { label: sum.label, value: sumValue } : undefined}
+        pageSize={10} sum={sum ? { label: sum.label, value: sumValue } : undefined}
         tableMinWidth={Math.max(640, cols.length * 130)} footerLeft={"共 " + shown.length + " 条"} empty="暂无数据" />;
     }
     return <Panel padding={16} style={{ color: "var(--ink-soft)" }}>表格组件加载中…</Panel>;

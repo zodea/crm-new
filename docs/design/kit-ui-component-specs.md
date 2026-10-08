@@ -536,6 +536,17 @@ flowchart LR
 - 非分页小表可用 `filterable: true` 从当前行推导筛选项；受控分页必须传显式 `KitFilterOption[]`，选项来自后台完整快照 facet，不能从当前页反推。
 - `remoteFilter` 开启后，`KitTable` 不在当前页本地过滤，只发出包含全部列条件的 `filter-change`；调用方负责把条件交给 Repository 并回填新页。动态 facet 通过 vxe `setFilter` 同步，`KitFilterOption.checked` 表示受控选中态，刷新 facet 后不得丢失当前条件。
 
+**设计稿外观与 vxe-table 映射（2026-10-07 评审 V-01 / V-02 / V-07）**：设计稿 `kit/KitTable.jsx` 只表达视觉；实现一律落在 vxe-table / vxe-pc-ui 现成能力上，不自造表格行为。
+
+| 外观 | vxe-table 落点 |
+| --- | --- |
+| 有几行画几行，不补空行；无数据只留表头 + 居中空态（从未建档 / 筛选无结果文案与动作分开） | 默认行为；空态用 `#empty` 插槽，内容同第 09 节 |
+| 数字右对齐、等宽数字，不换等宽字体 | 列 `align: 'right'` + 单元格 `font-variant-numeric: tabular-nums` |
+| 业务汇总行 | `show-footer` + `footer-method` |
+| 加载用贴合表格的骨架 | `loading` + 加载插槽 |
+| 列设置 / 刷新 / 导入导出 | `vxe-toolbar`（`custom` 等）或 `KitToolbarPopover`，由 ListShell 承载 |
+| 分页与每页条数 | `vxe-pager` |
+
 **可操作表头（公共原语已实现，调用页继续验收，2026-09-08）**：
 
 - 每页按[逐页对应规则](../rewrite/DESIGN-SYSTEM.md#a01-list-mapping)完整对应适用参考列；通用表格不自行删列、猜字段或替领域决定默认顺序。表头、名称列和状态列需作为逐页对照点。

@@ -973,6 +973,11 @@
               <Button size="sm" icon="undo-2" onClick={() => { P.backToDraft(book.id, month); UI().toast("已退回草稿"); }}>退回草稿</Button>
             </>)}
             {step === "check" && !future && <Button size="sm" icon="arrow-right" onClick={() => setStep("a4")}>查看 A4 单</Button>}
+            {/* 独立整页入口（对齐 PayrollAStatementWorkspace / CentralPayrollDetailScreen）：草稿编辑、工资配置、本月来源、已发正式出具；B 历史不开放 */}
+            {!isB && draft && !future && <Button size="sm" onClick={() => navigate("payrollForm", { id: book.id + "@" + month, format: isMgr ? "A" : book.family, ...(isMgr ? { management: "1" } : {}), project: book.project, crew: book.crew, month })}>编辑工资草稿</Button>}
+            {!isB && !sealed && !future && <Button size="sm" onClick={() => navigate("payrollConfig", { format: isMgr ? "A" : book.family, project: book.project, crew: book.crew, month, leader: book.leader })}>工资配置</Button>}
+            <Button size="sm" onClick={() => navigate("payrollSources", { project: book.project, crew: book.crew, month })}>查看本月来源</Button>
+            {!isB && sealed && <Button size="sm" onClick={() => navigate("payrollIssue", { id: book.id + "@" + month, book: book.id, project: book.project, crew: book.crew, month, leader: book.leader, format: isMgr ? "A" : book.family })}>预览 / 正式出具</Button>}
             {step === "a4" && (<>
               <Button size="sm" icon="pencil" onClick={() => setStep("check")}>返回核对</Button>
               <Button size="sm" variant="primary" icon="printer" onClick={() => window.print()}>打印（每 sheet 一页）</Button>

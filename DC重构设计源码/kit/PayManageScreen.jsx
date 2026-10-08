@@ -164,7 +164,7 @@
 
         {/* 分页表格（KitTable 自带分页条，同实现端 10 条/页） */}
         <KitTable
-          columns={columns} rows={shown} pageSize={10} minRows={10} tableMinWidth={1560}
+          columns={columns} rows={shown} pageSize={10} tableMinWidth={1560}
           empty={(
             <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <b style={{ fontSize: 14, color: "var(--ink)" }}>当前范围没有付款申请</b>

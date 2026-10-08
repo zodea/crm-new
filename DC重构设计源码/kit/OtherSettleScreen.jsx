@@ -54,6 +54,8 @@
       },
       newDefaults: () => ({ status: "待确认", amount: 0 }),
       tableMinWidth: 1380,
+      // 完整原库迁入入口（Q-A03-02，实现端列表头「原结算历史迁入」，需结算写入 + 迁入权限）
+      more: [{ key: "import-native", label: "原结算历史迁入", icon: "database-backup", onSelect: () => { const nav = navigate || (window.DC && window.DC.navigate); if (nav) nav("otherSettleImport", {}); } }],
     };
     return <ELS meta={meta} params={params} navigate={navigate} />;
   }

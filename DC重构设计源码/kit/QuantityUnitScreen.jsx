@@ -7,6 +7,7 @@
 // 业务逻辑照搬原 QuantityScreenV2 UnitModal：勾完成需上一道工序已传验收照片；量到房间、完成勾到户（CONTEXT.md）
 // 编辑经 window.QTY_UNIT_STATE 写穿（key=栋|层|户|工种:分项），返回矩阵页保持一致；刷新恢复初始 mock。
 // 2026-07-19 反馈轮：指派复选树(班组分组可下钻)/验收照片按分项可配/房间行默认收起/左导航 sticky 修复
+// 2026-10 #412 P6：页尾加「空鼓检查与整改」分区（HollowSection），入口进 hollowForm / hollowDetail 独立整页。
 (function () {
   const { Button, Panel, StatusChip, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {} };
@@ -414,8 +415,41 @@
               </div>
             </div>
           </Panel>
+
+          {/* 空鼓检查与整改（#412 P6）：入口进独立整页 hollowForm / 详情 hollowDetail，对应 QuantityHollowSection.vue */}
+          <HollowSection building={building} floor={floor} unit={unit} navigate={navigate} />
         </div>
       </div>
+    );
+  }
+
+  // —— 户级空鼓分区（领域专用）：列出原户空鼓记录，入口进独立整页；数据来自 HollowDetailScreen.jsx 播种的 window.HollowDemo ——
+  function HollowSection({ building, floor, unit, navigate }) {
+    const KA = window.KitAtoms || {};
+    const H = window.HollowDemo;
+    if (!H) return null;
+    const slot = H.forUnit(building, floor, unit);
+    const records = slot.records.map((r) => H.view(r));
+    const linkBtn = { border: 0, background: "transparent", color: "var(--brand-deep)", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0, justifySelf: "start" };
+    return (
+      <Panel padding={16} style={{ display: "grid", gap: 12, minWidth: 0 }}>
+        {KA.SectionHeader ? <KA.SectionHeader mb={0}
+          extra={slot.targets.length ? <Button variant="primary" icon="plus" onClick={() => navigate("hollowForm", { building, floor, unit })}>记录空鼓检查</Button> : null}>空鼓检查与整改</KA.SectionHeader> : null}
+        <div style={{ fontSize: 12, lineHeight: 1.6, color: "var(--ink-soft)" }}>检查归原户、分项和原责任。整改追加销记，不删除原记录，也不自动生成工资扣款或退款。</div>
+        {!records.length && slot.targets.length ? <div role="status" style={{ fontSize: 12 }}>暂未排查：当前原责任下尚无空鼓检查记录。</div> : null}
+        {!records.length && !slot.targets.length && !slot.unavailable.length ? <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>当前没有可用的原责任检查范围。</div> : null}
+        {slot.unavailable.map((d, i) => <div key={i} role="alert" style={{ fontSize: 12, color: "var(--warn-ink)", overflowWrap: "anywhere" }}>{d.message}</div>)}
+        {records.map((r) => (
+          <div key={r.id} style={{ display: "grid", gap: 6, border: "1px solid var(--line)", borderRadius: 8, padding: 12, fontSize: 12, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, overflowWrap: "anywhere" }}>{r.target.locationLabel} · {r.target.originalParty.name}</div>
+            <div>
+              {r.inspection.inspectedOn} · 检查 {r.inspection.count} 处 · 已整改 {r.rectified} 处 ·{" "}
+              <b style={{ color: r.remaining ? "var(--warn-ink)" : "var(--ok-ink)" }}>未整改 {r.remaining} 处</b>
+            </div>
+            <button type="button" style={linkBtn} onClick={() => navigate("hollowDetail", { building, floor, unit, id: r.id })}>查看检查与整改</button>
+          </div>
+        ))}
+      </Panel>
     );
   }
 
