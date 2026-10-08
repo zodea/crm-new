@@ -81,8 +81,13 @@ describe('历史我方签约采用证据', () => {
     }
     expect(contractMigratedSignatory(entity, fail)).toEqual({ legacyPartyA: entity.attributes.legacyPartyA, ourSignatoryId: snapshot.id, ourSignatoryVersion: '2', ourSignatorySnapshot: snapshot })
     expect(contractMigratedSignatory({ attributes: { legacyPartyA: '旧主体' } } as any, fail)).toMatchObject({ legacyPartyA: '旧主体', ourSignatorySnapshot: null, ourSignatoryId: null })
-    for (const patch of [{ ourSignatoryId: 'other' }, { ourSignatorySnapshotJson: 'null' }, { ourSignatorySnapshotJson: '{bad' }])
-      expect(() => contractMigratedSignatory({ ...entity, attributes: { ...entity.attributes, ...patch } }, fail)).toThrow()
+    for (const { patch, reason } of [
+      { patch: { ourSignatoryId: 'other' }, reason: '迁入合同签约主体编号与当时采用快照不一致' },
+      { patch: { ourSignatorySnapshotJson: 'null' }, reason: '迁入合同签约主体编号缺少当时采用快照，不能自动补当前目录' },
+      { patch: { ourSignatorySnapshotJson: '{bad' }, reason: '迁入合同采用的签约主体快照损坏，不能推断或覆盖原资料' },
+      { patch: { ourSignatorySnapshotJson: JSON.stringify({ ...snapshot, version: 2 }) }, reason: '迁入合同签约主体快照或身份损坏，不能改变历史采用事实' },
+    ])
+      expect(() => contractMigratedSignatory({ ...entity, attributes: { ...entity.attributes, ...patch } }, fail)).toThrow(reason)
   })
 
   it.each([52, 53])('真实 sqlite-v%i 经公开请求解析、整图确认保留原主体文本及当时快照', async (version) => {
