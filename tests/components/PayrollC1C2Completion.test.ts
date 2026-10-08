@@ -19,7 +19,7 @@ let ui!: StatementUi
 describe.each([
   { format: 'C1', useStatement: usePayrollC1Statement as typeof usePayrollC1Statement | typeof usePayrollC2Statement, form: c1Form as () => object, frozen: c1Frozen as () => object, store: ['usePayrollC1Store', { loadC1Form: load, loadC1Output: output, releaseC1: release, recoverC1: release, getC1Pending: pending('release-c1'), acknowledgeC1: acknowledge }] },
   { format: 'C2', useStatement: usePayrollC2Statement as typeof usePayrollC1Statement | typeof usePayrollC2Statement, form: c2Form as () => object, frozen: c2Frozen as () => object, store: ['usePayrollC2Store', { loadC2Form: load, loadC2Output: output, releaseC2: release, recoverC2: release, getC2Pending: pending('release-c2'), acknowledgeC2: acknowledge }] },
-] as const)('$format 回执后的同目标状态读取', ({ format, useStatement, form, frozen, store: [storeName, store] }) => {
+] as const)('$format 回执后的同目标状态读取', ({ useStatement, form, frozen, store: [storeName, store] }) => {
   beforeEach(() => {
     vi.clearAllMocks()
     changed.mockReset()
@@ -60,8 +60,7 @@ describe.each([
     expect(acknowledge).not.toHaveBeenCalled()
     view.unmount()
   })
-  // C1（及 A）尚未区分“原回执需重核”与“当前已重核”，仍统一提示请先重新核对；实现缺口登记于 #497，补齐后去掉 runIf。
-  it.runIf(format === 'C2')('原发放回执为需重核而当前已经另窗重核，分别说明原结果与当前状态并保原分配', async () => {
+  it('原发放回执为需重核而当前已经另窗重核，分别说明原结果与当前状态并保原分配', async () => {
     const view = harness()
     await flushPromises()
     release.mockResolvedValue({ commandId: 'cmd', statementId: 'wage', projectId: 'p', outcome: 'needs-recheck', sourceVersion: 'v2', logIds: [] })

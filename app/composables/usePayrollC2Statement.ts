@@ -2,6 +2,7 @@ import type { PayrollC2FormRead, PayrollC2OutputRead, PayrollC2ReleaseDraft, Pay
 import type { PayrollReleaseAdjustmentApplication } from '~/lib/payroll/central-release-adjustment-contract'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { c2ReleaseDefault as payrollReleaseDefault } from '~/lib/payroll/c2-presentation'
+import { payrollNeedsRecheckMessage } from '~/lib/payroll/release-recheck-message'
 import { toErrorMessage } from '~/lib/util/error'
 
 export function usePayrollC2Statement(options: { id: () => string, origin: () => 'real' | 'demo', changed: () => void }) {
@@ -98,19 +99,10 @@ export function usePayrollC2Statement(options: { id: () => string, origin: () =>
     if (result.outcome === 'released')
       releaseDraft.value = null
     options.changed()
-    if (result.outcome === 'needs-recheck') {
-      const currentState = matching.value.status === 'released'
-        ? '当前记录随后已发放，本页保持只读。'
-        : matching.value.needsRecheck
-          ? '当前记录仍需重核，请先重新核对。'
-          : matching.value.status === 'checked'
-            ? '当前记录随后已重新核对，请核对当前状态后再决定发放。'
-            : '当前记录随后已有更新，请核对当前状态后再继续。'
-      error.value = `原发放提交因签工或主体配置变化未执行，原实发输入仍保留。${currentState}`
-    }
-    else {
+    if (result.outcome === 'needs-recheck')
+      error.value = payrollNeedsRecheckMessage('签工或主体配置', matching.value)
+    else
       kit.success(result.outcome === 'released' ? '实际发放已保存，工资资料已冻结。' : '工资核对结果已保存。')
-    }
   }
   async function execute(kind: 'check' | 'release', release?: PayrollC2ReleaseDraft) {
     const value = kind === 'release' ? releaseRead.value : matching.value
