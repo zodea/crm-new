@@ -11,6 +11,7 @@ import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { Invoice } from '~/stores/invoice'
 import { createInvoiceLedgerXlsxFromRows, INVOICE_XLSX_MIME, invoiceLedgerRows } from '~/lib/invoice/excel'
 import { ledgerNodeFromQuery, projectGroupKeyFromNode, projectTreeNodeKey } from '~/lib/invoice/ledger-nodes'
+import { checkPrintableInvoice } from '~/lib/invoice/print-layout'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 import { yuan } from '~/lib/util/money'
@@ -138,7 +139,8 @@ const tableFilteredRows = computed(() => {
   })
 })
 
-const printableRows = computed(() => tableFilteredRows.value.filter(canCheck))
+// 打印资格统一由 checkPrintableInvoice 判断；无原件等不能打印的行仍进入打印面板，由面板逐张说明未打印原因。
+const printRows = computed(() => tableFilteredRows.value)
 
 function openExportPreview() {
   if (!tableFilteredRows.value.length) {
@@ -151,12 +153,15 @@ function openExportPreview() {
 }
 
 function openPrint() {
-  if (!printableRows.value.length) {
-    warning('当前筛选下没有可打印的扫描发票')
+  const firstPrintable = printRows.value.find(row => checkPrintableInvoice(row).ok)
+  if (!firstPrintable) {
+    warning(printRows.value.length
+      ? `当前筛选下的 ${printRows.value.length} 张发票都不能打印（如 Excel 导入的发票没有原件），请先关联原件或调整筛选`
+      : '当前筛选下没有可打印的发票')
     return
   }
   pendingPrint.value = null
-  printSelectedId.value = printableRows.value[0]?.id ?? null
+  printSelectedId.value = firstPrintable.id
   printMode.value = true
 }
 
@@ -344,7 +349,7 @@ onMounted(() => {
     <InvoicePrintLayout
       v-if="printMode"
       v-model:selected-id="printSelectedId"
-      :invoices="printableRows"
+      :invoices="printRows"
       :print-confirmation="pendingPrint"
       full-page
       @print="handlePrint"

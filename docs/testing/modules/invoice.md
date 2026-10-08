@@ -13,7 +13,7 @@
 | [tests/invoice/batch-pass.test.ts](../../../tests/invoice/batch-pass.test.ts) | 单元／服务／状态 | isAllGreen:全绿判定(建议通过标记与批量通过入围条件) |
 | [tests/invoice/excel.test.ts](../../../tests/invoice/excel.test.ts) | 单元／服务／状态 | 发票台账 Excel 导出 |
 | [tests/invoice/ledger-nodes.test.ts](../../../tests/invoice/ledger-nodes.test.ts) | 单元／服务／状态 | 台账树键与 query 预筛（specs §07：预筛不进页签身份） |
-| [tests/invoice/print-layout.test.ts](../../../tests/invoice/print-layout.test.ts) | 单元／服务／状态 | 发票打印排版 |
+| [tests/invoice/print-layout.test.ts](../../../tests/invoice/print-layout.test.ts) | 单元／服务／状态 | 发票打印排版与打印资格：无原件、识别、确认、重复、金额逐项拒绝原因 |
 | [tests/invoice/recognize.test.ts](../../../tests/invoice/recognize.test.ts) | 单元／服务／状态 | confidenceTier:置信度分档(边框色/角标/✓确认 依据) |
 | [tests/invoice/status.test.ts](../../../tests/invoice/status.test.ts) | 单元／服务／状态 | invoiceDocStatus:单一权威的状态优先级 |
 | [tests/recognize/invoice-engine.test.ts](../../../tests/recognize/invoice-engine.test.ts) | 单元／服务／状态 | recognizeInvoice |
@@ -30,6 +30,7 @@
 | [tests/components/FactorSolverState.test.ts](../../../tests/components/FactorSolverState.test.ts) | 组件（jsdom） | 因子工具保存配置兼容 |
 | [tests/components/FactorTaxCalculator.test.ts](../../../tests/components/FactorTaxCalculator.test.ts) | 组件（jsdom） | 共用金额税额栏 |
 | [tests/components/InvoiceEditPage.test.ts](../../../tests/components/InvoiceEditPage.test.ts) | 组件（jsdom） | 发票编辑页重新识别 |
+| [tests/components/InvoicePrintLayout.test.ts](../../../tests/components/InvoicePrintLayout.test.ts) | 组件（jsdom） | 打印面板：无原件的 Excel 发票不可勾选、列出未打印清单，打印只提交有原件的票 |
 | [tests/components/InvoiceExportPreview.test.ts](../../../tests/components/InvoiceExportPreview.test.ts) | 组件（jsdom） | 发票导出预览样式草稿 |
 
 ## Playwright E2E
