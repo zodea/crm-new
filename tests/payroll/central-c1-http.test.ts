@@ -9,7 +9,7 @@ import { createPayrollC1ServiceFixture } from '../helpers/payroll-c1-service-fix
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollC1ServiceFixture>>['service'] | null }))
 vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
-it.each(Array.from(['lines', 'stored'] as const).map(input1 => ({ input1 })))('真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率：输入案例 %#', async ({ input1: section }) => {
+it('真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率', async () => {
   const f = await createPayrollC1ServiceFixture()
   runtime.service = f.service
   for (const name of ['defineEventHandler', 'getQuery', 'getHeader', 'getRouterParam', 'readBody', 'createError'] as const) vi.stubGlobal(name, h3[name])
@@ -82,10 +82,12 @@ it.each(Array.from(['lines', 'stored'] as const).map(input1 => ({ input1 })))('�
     await repo.executeC1(f.command(await read(), { kind: 'release-c1', release: { actualAmount: 500, allocations: [{ workerId: 'w', amount: 500 }, { workerId: 'member', amount: 0 }, { workerId: 'zero', amount: 0 }] } }))
     const releasedWire = await detail('released')
 
-    const malformed = structuredClone(releasedWire) as { statement: { lines: { amount: string }[], stored: { lines: { amount: string }[] } } }
-    const lines = section === 'lines' ? malformed.statement.lines : malformed.statement.stored.lines
-    lines[0]!.amount = '451.541'
-    expect(() => decodePayrollRead(malformed, 'detail', { origin: 'real' }, saved.statementId!)).toThrow('工资数值传输格式不完整')
+    for (const section of ['lines', 'stored'] as const) {
+      const malformed = structuredClone(releasedWire) as { statement: { lines: { amount: string }[], stored: { lines: { amount: string }[] } } }
+      const lines = section === 'lines' ? malformed.statement.lines : malformed.statement.stored.lines
+      lines[0]!.amount = '451.541'
+      expect(() => decodePayrollRead(malformed, 'detail', { origin: 'real' }, saved.statementId!), section).toThrow('工资数值传输格式不完整')
+    }
     const otherFormat = structuredClone(releasedWire) as { statement: { formatFamily: string } }
     otherFormat.statement.formatFamily = 'A'
     expect(() => decodePayrollRead(otherFormat, 'detail', { origin: 'real' }, saved.statementId!)).toThrow('工资数值传输格式不完整')
