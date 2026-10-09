@@ -22,7 +22,7 @@
 | [tests/stores/invoice-archive.test.ts](../../../tests/stores/invoice-archive.test.ts) | 单元／服务／状态 | invoice store 归档来源留痕 |
 | [tests/stores/invoice-preferences.test.ts](../../../tests/stores/invoice-preferences.test.ts) | 单元／服务／状态 | invoice store 导出样式偏好 |
 | [tests/stores/invoice-printing.test.ts](../../../tests/stores/invoice-printing.test.ts) | 单元／服务／状态 | invoice store 打印计数 |
-| [tests/stores/invoice-recognition.test.ts](../../../tests/stores/invoice-recognition.test.ts) | 单元／服务／状态 | invoice store 真实识别管线 |
+| [tests/stores/invoice-recognition.test.ts](../../../tests/stores/invoice-recognition.test.ts) | 单元／服务／状态 | invoice store 真实识别管线；重新识别后归档审计保留首次识别与完整修订链路 |
 
 ## 组件（jsdom）
 
