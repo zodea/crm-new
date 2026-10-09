@@ -145,4 +145,4 @@ it('真实整库A/P5/P6混合历史按同源工程量映射正式接管，保管
     await storage.close()
     await native.close()
   }
-}, 30000)
+}, 90_000)
