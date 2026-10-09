@@ -59,6 +59,22 @@ it('项目与原件同库冷回读，客户改名沿原 ID、未知指标不归�
   finally { await f.storage.close() }
 })
 
+it('客户被有效项目引用时拒绝删除并列出影响范围，项目删除后才可删除客户', async () => {
+  const f = await fixture()
+  try {
+    const customers = createProductionCustomerService(f.storage)
+    const saved = await f.service.execute(f.command, f.session)
+    const customerDelete = { id: f.customer.id, workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'customer:write' as const, commandId: 'customer-delete-blocked', baseVersion: f.customer.version, action: 'delete' as const }
+    await expect(customers.executeLifecycle(customerDelete, f.session)).rejects.toMatchObject({ problem: { code: 'conflict', message: '客户仍被项目 1 个引用，不能删除；请先处理这些记录。' } })
+    expect(await customers.deleted(f.session)).toEqual([])
+
+    await f.service.executeLifecycle({ id: saved.id, workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'project:write', commandId: 'project-delete', baseVersion: saved.version, action: 'delete' }, f.session)
+    const deleted = await customers.executeLifecycle({ ...customerDelete, commandId: 'customer-delete' }, f.session)
+    expect(deleted.version).toBe(String(Number(f.customer.version) + 1))
+  }
+  finally { await f.storage.close() }
+})
+
 it('excel 来源及旧 ID 防重跨冷开和并发保留；异文、交叉来源身份均拒绝', async () => {
   const f = await fixture()
   try {

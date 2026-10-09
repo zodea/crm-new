@@ -54,6 +54,24 @@ async function stored(tx: TransactionDb, id: string): Promise<CustomerRow> {
   customerDraft(row)
   return row
 }
+/** 直接引用客户的有效业务记录；所属参与者尚未安装时跳过。收付款经项目间接关联，项目在用即阻止。 */
+const CUSTOMER_REFERENCES = [
+  { table: 'projects', label: '项目', unit: '个', where: '(customer_id=? OR secondary_customer_id=?)', params: 2 },
+  { table: 'construction_contract_records', label: '施工合同', unit: '份', where: 'customer_id=?', params: 1 },
+  { table: 'invoice_applications', label: '开票申请', unit: '张', where: 'customer_id=?', params: 1 },
+] as const
+async function activeCustomerReferences(tx: TransactionDb, id: string): Promise<string[]> {
+  const installed = new Set((await tx.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')).map(row => row.name))
+  const found: string[] = []
+  for (const ref of CUSTOMER_REFERENCES) {
+    if (!installed.has(ref.table))
+      continue
+    const [row] = await tx.select<{ n: number }>(`SELECT COUNT(*) AS n FROM ${ref.table} WHERE deleted_at IS NULL AND ${ref.where}`, Array.from({ length: ref.params }).fill(id))
+    if (row && row.n > 0)
+      found.push(`${ref.label} ${row.n} ${ref.unit}`)
+  }
+  return found
+}
 async function attachments(tx: TransactionDb, id: string) {
   return (await tx.select<Record<string, unknown>>('SELECT * FROM file_refs WHERE owner_type=\'customer\' AND owner_id=? ORDER BY uploaded_at,id', [id])).map(customerAttachment)
 }
@@ -157,6 +175,11 @@ export function createProductionCustomerService(storage: ProductionStorage) {
         const previous = await stored(tx, request.id)
         if (request.baseVersion !== String(previous.version) || (request.action === 'delete' ? !!previous.deleted_at : !previous.deleted_at))
           fail('conflict', '客户状态或版本已变化，请重新核对。')
+        if (request.action === 'delete') {
+          const references = await activeCustomerReferences(tx, request.id)
+          if (references.length)
+            fail('conflict', `客户仍被${references.join('、')}引用，不能删除；请先处理这些记录。`)
+        }
         const now = new Date().toISOString()
         const deletedAt = request.action === 'delete' ? now : null
         const version = previous.version + 1
