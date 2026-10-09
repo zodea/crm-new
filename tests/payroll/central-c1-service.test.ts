@@ -5,7 +5,8 @@ it('纯时工项目无需工程量，逐人工资与未舍入的默认加班价�
   const f = await createPayrollC1ServiceFixture()
   try {
     expect((await f.matrix()).workers.map(w => w.id)).toEqual(expect.arrayContaining(['w', 'member', 'zero']))
-    expect((await f.matrix()).workers.map(w => w.id)).not.toContain('outside')
+    expect((await f.matrix()).workers.map(w => w.id)).toContain('outside')
+    expect((await f.form({ leaderWorkerId: 'outside', memberWorkerIds: ['outside'] }, 'global-candidate-without-facts')).eligibility.canSaveDraft).toBe(false)
     expect((await f.form()).eligibility.canSaveDraft).toBe(false)
     await f.attendance()
     await f.attendance({ workerId: 'member', workDate: '2026-08-02', hours: 7.5, overtimeHours: 0 })

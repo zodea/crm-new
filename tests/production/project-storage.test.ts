@@ -7,7 +7,7 @@ import { createProductionProjectService } from '../../server/utils/production-pr
 import { createProductionStorage } from '../../server/utils/production-storage'
 
 async function fixture() {
-  const base = resolve('.codex-tmp/issue-452-tests')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-452-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/project-`)
   const options = { directory, workspaceId: 'project-workspace', ownerId: 'project-owner', purpose: 'verification' as const }

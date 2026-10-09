@@ -18,6 +18,11 @@
     const ymd = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const rand3 = () => String(Math.floor(Math.random() * 900) + 100);
     const byName = (rows, name) => rows.find((x) => x.name === name);
+    // 单号查重：同集合内已有相同编号（编辑时排除自身）→ 返回说明，保存校验判为错误
+    const uniqueNo = (coll, row, label) => (v) => {
+      const dup = A.rows(coll).find((x) => x.no && String(x.no).trim() === String(v).trim() && (!row || x.id !== row.id));
+      return dup ? label + "「" + v + "」已存在（" + (dup.name || dup.id) + "）" : null;
+    };
 
     // ============ 三类合同共用 builder（红圈支出合同实拍：基本信息/合同金额/合同条款/质保金/开票方 + 材采明细网格 + 附件备注） ============
     const KIND_CFG = {
@@ -38,10 +43,25 @@
       const sName = (id) => { const s = A.get("suppliers", id); return s ? s.name : (id || ""); };
       const cuName = (id) => { const c = customers.find((x) => x.id === id); return c ? c.name : (id || ""); };
       // 无税金额 = 含税金额 ÷ (1 + 税率)；税额 = 含税 − 无税（税率取自 select「9%」等）
-      const excOf = (v) => { const a = num(v.amount); const r = parseFloat(v.taxRate) / 100 || 0; return a ? a / (1 + r) : 0; };
+      const rateOf = (v) => (parseFloat(v.taxRate) / 100 || 0);
+      const excOf = (v) => { const a = num(v.amount); return a ? a / (1 + rateOf(v)) : null; };
+      // 税额 / 无税金额：不能为负、不能超过含税合同金额（手动改写时同样校验）
+      const withinAmount = (label) => (val, v) => {
+        const x = num(val), a = num(v.amount);
+        if (x < 0) return label + "不能为负数";
+        if (a && x > a) return label + "不能超过含税合同金额";
+        return null;
+      };
+      // 签约日期：不晚于今天；分包 / 材采不早于同项目施工合同（主合同）签约日期
+      const today = new Date().toISOString().slice(0, 10);
+      const mainContractOf = (v) => {
+        if (kind === "施工") return null;
+        const p = byName(projects, v.projectId) || A.get("projects", v.projectId);
+        return p ? A.rows("contracts").find((c) => c.kind === "施工" && c.projectId === p.id && c.signDate) : null;
+      };
       const defs = [
         // ① 基本信息
-        { key: "no", label: "合同编号", form: { section: "基本信息", placeholder: "留空自动生成",
+        { key: "no", label: "合同编号", form: { section: "基本信息", placeholder: "留空自动生成", unique: uniqueNo("contracts", row, "合同编号"),
           hint: "格式 RJ-项目-类别-年月序号，如 RJ-HHXC-" + cfg.code + "-2026001" } },
         { key: "name", label: "合同名称", form: { required: true,
           placeholder: kind === "材采" ? "如 合和新城铝单板采购合同" : kind === "分包" ? "如 泥水班组劳务分包合同" : "如 合和新城施工总承包合同" } },
@@ -56,18 +76,22 @@
         kind === "分包" && { key: "subKind", label: "分包类别", form: { type: "select", options: ["劳务", "专业"] } },
         { key: "isSupplement", label: "是否补充协议", form: { type: "select", options: ["否", "是-补充协议"] } },
         { key: "content", label: "合同内容简述", form: { required: true, placeholder: "如 铝单板供货" } },
-        { key: "signDate", label: "签约日期", form: { type: "date", required: true } },
+        { key: "signDate", label: "签约日期", form: { type: "date", required: true, max: today, maxLabel: "不能晚于今天",
+          min: (v) => { const m = mainContractOf(v); return m ? m.signDate : undefined; },
+          minLabel: kind === "施工" ? undefined : "同项目施工合同签约日期" } },
         { key: "status", label: "合同状态", form: { type: "select", options: ["草稿", "履约中", "已签订", "已结算", "已结清"] } },
         { key: "invoiceType", label: "发票类型", form: { type: "select", options: ["增值税专用发票", "增值税普通发票"] } },
         { key: "contact", label: "履约联系人", form: {} },
         { key: "contactPhone", label: "联系方式", form: { placeholder: "手机号或座机" } },
         // ② 合同金额
         { key: "amount", label: "含税合同金额", money: true, form: { section: "合同金额", type: "number", required: true, suffix: "元" } },
-        { key: "taxRate", label: "税率", form: { type: "select", options: ["13%", "9%", "6%", "3%", "1%"] } },
-        { key: "_exc", label: "无税金额", form: { type: "readonly", hint: "无税金额 = 含税金额 ÷ (1 + 税率)",
-          compute: (v) => { const e = excOf(v); return e ? fmt(e) : ""; } } },
-        { key: "_tax", label: "税额", form: { type: "readonly",
-          compute: (v) => { const a = num(v.amount); return a ? fmt(a - excOf(v)) : ""; } } },
+        { key: "taxRate", label: "税率", form: { type: "number", suffix: "%", decimals: null,
+          toLabel: (val) => (val == null ? "" : String(val).replace("%", "")), toValue: (val) => (val === "" ? "" : String(val).replace("%", "") + "%"),
+          check: (val) => (num(val) < 0 || num(val) > 100 ? "税率应在 0–100 之间" : null) } },
+        { key: "taxAmount", label: "税额", money: true, form: { type: "number", suffix: "元", resetOn: ["taxRate"], check: withinAmount("税额"),
+          auto: (v) => { const a = num(v.amount), e = excOf(v); return a && e != null ? a - e : null; } } },
+        { key: "amountExTax", label: "无税金额", money: true, form: { type: "number", suffix: "元", resetOn: ["taxRate"], check: withinAmount("无税金额"),
+          auto: (v) => excOf(v) } },
         { key: "changed", label: "变更后合同金额", money: true, form: { type: "number", suffix: "元", hint: "由变更单驱动，演示可直填" } },
         { key: "_settled", label: "累计结算", form: { type: "readonly", hint: "编辑时显示，新建为 —",
           compute: () => (row ? fmt(row.settled || 0) : "—") } },
@@ -116,7 +140,7 @@
         coerce: (vals) => KF.coerce(defs, vals),
         newDefaults: () => Object.assign(
           { kind: kind, settled: 0, invoiced: 0, paid: 0, doc: cfg.doc,
-            status: "履约中", isSupplement: "否", taxRate: cfg.taxRate, invoiceType: "增值税专用发票",
+            status: "履约中", isSupplement: "否", taxRate: cfg.taxRate.replace("%", ""), invoiceType: "增值税专用发票",
             no: "RJ-" + cfg.code + "-" + ymd().slice(0, 6) + "-" + rand3() },
           kind === "施工" ? { supplierId: null } : null,
           kind === "分包" ? { subKind: "劳务" } : null
@@ -134,7 +158,7 @@
     KF.registerForm("companyExpForm", { title: "公司支出合同", subtitle: "公司层面 · 房租/软件/其他", listRoute: "companyExp" }, (params) => {
       const row = params.id ? A.get("companyExps", params.id) : null;
       const defs = [
-        { key: "no", label: "合同编号", form: { section: "基本信息", placeholder: "留空自动生成（GS-YYYYMMDD-序号）" } },
+        { key: "no", label: "合同编号", form: { section: "基本信息", placeholder: "留空自动生成（GS-YYYYMMDD-序号）", unique: uniqueNo("companyExps", row, "合同编号") } },
         { key: "name", label: "合同名称", form: { required: true, placeholder: "如 公司办公室租赁合同" } },
         { key: "category", label: "类别", form: { type: "select", options: ["房租", "软件", "其他"] } },
         { key: "counterparty", label: "对方单位", form: { required: true } },
@@ -161,7 +185,7 @@
       const projects = A.rows("projects");
       const pName = (id) => { const p = A.get("projects", id); return p ? p.name : (id || ""); };
       const defs = [
-        { key: "no", label: "合同编号", form: { section: "基本信息", placeholder: "留空自动生成（QT-YYYYMMDD-序号）" } },
+        { key: "no", label: "合同编号", form: { section: "基本信息", placeholder: "留空自动生成（QT-YYYYMMDD-序号）", unique: uniqueNo("otherExps", row, "合同编号") } },
         { key: "name", label: "合同名称", form: { required: true, placeholder: "如 合和新城塔吊租赁合同" } },
         { key: "projectId", label: "项目名称", form: { type: "lookup", required: true, options: projects.map((p) => p.name),
           toLabel: (id) => pName(id), toValue: (name) => { const p = byName(projects, name); return p ? p.id : name; } } },
@@ -198,7 +222,7 @@
       };
       const pickedContract = (vals) => byName(otherExps, vals.contractId);
       const defs = [
-        { key: "no", label: "结算单号", form: { section: "基本信息", placeholder: "留空自动生成（QTJS-YYYYMMDD-序号）" } },
+        { key: "no", label: "结算单号", form: { section: "基本信息", placeholder: "留空自动生成（QTJS-YYYYMMDD-序号）", unique: uniqueNo("otherSettles", row, "结算单号") } },
         { key: "name", label: "结算名称", form: { required: true, placeholder: "如 塔吊租赁 6 月结算" } },
         { key: "projectId", label: "项目名称", form: { type: "lookup", required: true, options: projects.map((p) => p.name),
           toLabel: (id) => pName(id), toValue: (name) => { const p = byName(projects, name); return p ? p.id : name; } } },

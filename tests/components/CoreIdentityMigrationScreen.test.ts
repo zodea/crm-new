@@ -3,6 +3,11 @@ import { createPinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CoreIdentityMigrationScreen from '~/components/migration/CoreIdentityMigrationScreen.vue'
 
+vi.mock('~/composables/useKitUI', async (importOriginal) => {
+  const original = await importOriginal<typeof import('~/composables/useKitUI')>()
+  return { ...original, useKitUI: () => ({ confirm: original.confirm }) }
+})
+
 const migrationStore = vi.hoisted(() => ({
   phase: 'idle',
   busy: false,
@@ -41,6 +46,11 @@ function batch(overrides: Record<string, unknown> = {}) {
 
 describe('核心身份迁移整页流程', () => {
   beforeEach(() => {
+    vi.stubGlobal('$fetch', vi.fn(async (url: string) => {
+      if (url === '/api/read/target-costs/import')
+        return { context: { workspaceId: 'component-workspace', actorId: 'component-owner', capabilities: ['target-cost:read', 'target-cost:import'] }, sources: [] }
+      throw new Error('此组件场景没有授权该领域读取')
+    }))
     Object.assign(migrationStore, {
       phase: 'idle',
       busy: false,
@@ -66,7 +76,10 @@ describe('核心身份迁移整页流程', () => {
     }
   })
 
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
 
   it('初次进入只恢复既有迁移状态，不静默启动迁移', async () => {
     render(CoreIdentityMigrationScreen, { global: { plugins: [createPinia()] } })

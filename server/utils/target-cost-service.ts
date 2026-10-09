@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import { fetchRowById, hiddenCtesFor, restoreRecord, selectVisibleSql, softDelete, visibleCond } from '../../app/lib/db/soft-delete'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { targetCostProblem } from '../../app/lib/target-cost/central-contract'
-import { persistTargetCostHeader } from '../../app/lib/target-cost/central-domain'
+import { persistTargetCostHeader, targetCostEditableDraft } from '../../app/lib/target-cost/central-domain'
 import { loadTargetCostHistory } from '../../app/lib/target-cost/central-history'
 import { advanceTargetCostRevision, initializeTargetCostSchema, targetCostRevision } from '../../app/lib/target-cost/central-schema'
 import { targetCostHeaderFromRow, targetCostItemFromRow } from '../../app/lib/target-cost/detail'
@@ -92,7 +92,7 @@ export function createTargetCostService(options: TargetCostServiceOptions) {
       return run(query, sessionId, false, async (db, context, source) => {
         const row = id ? await requireHead(db, id, source, true) : null
         const header = row ? targetCostHeaderFromRow(row) : null
-        return { context, targetCostId: id, draftKey: id ? null : draftKey ?? null, draft: header ? { ...header } : {}, deletedAt: row?.deleted_at == null ? null : String(row.deleted_at), files: id ? await loadBudgetFiles(db, id) : [], projects: source.options ?? source.projects, projectOptionsStatus: source.optionsStatus ?? source.status }
+        return { context, targetCostId: id, draftKey: id ? null : draftKey ?? null, draft: header ? targetCostEditableDraft(header) : {}, deletedAt: row?.deleted_at == null ? null : String(row.deleted_at), files: id ? await loadBudgetFiles(db, id) : [], projects: source.options ?? source.projects, projectOptionsStatus: source.optionsStatus ?? source.status }
       })
     },
     detail(query: TargetCostQuery, id: string, sessionId?: string | null): Promise<TargetCostDetailRead> {
@@ -113,6 +113,20 @@ export function createTargetCostService(options: TargetCostServiceOptions) {
         return { context, content: await readBudgetFileContent(db, id, fileId) }
       })
     },
+    resolve(input: { commandId: string, workspaceId: string, actorId: string }, sessionId?: string | null) {
+      return run({ origin: 'real' }, sessionId, true, async (db, context) => {
+        if (input.workspaceId !== context.workspaceId || input.actorId !== context.actorId || !/^[a-z0-9][\w-]{2,79}$/i.test(input.commandId))
+          throw targetCostProblem('forbidden', '原预算编号与当前身份不匹配')
+        const receipt = (await db.select<{ actor_id: string, result_json: string }>('SELECT * FROM target_cost_command_receipts WHERE command_id=?', [input.commandId]))[0]
+        if (receipt) {
+          if (receipt.actor_id !== context.actorId)
+            throw targetCostProblem('forbidden', '原预算编号属于其他身份')
+          return { outcome: 'applied' as const, result: JSON.parse(receipt.result_json) as TargetCostCommandResult }
+        }
+        await db.execute('INSERT OR IGNORE INTO target_cost_command_resolutions VALUES (?,?)', [input.commandId, context.actorId])
+        return { outcome: 'not-applied' as const, commandId: input.commandId }
+      })
+    },
     async execute(command: TargetCostCommand, sessionId?: string | null): Promise<TargetCostCommandResult> {
       let confirmedAbsent = false
       try {
@@ -127,6 +141,8 @@ export function createTargetCostService(options: TargetCostServiceOptions) {
             return JSON.parse(receipt.result_json) as TargetCostCommandResult
           }
           confirmedAbsent = true
+          if ((await db.select('SELECT command_id FROM target_cost_command_resolutions WHERE command_id=?', [command.commandId]))[0])
+            throw targetCostProblem('conflict', '原预算编号已封存，迟到请求不能再提交')
           if (!command.commandId || !command.sourceVersion || command.sourceVersion !== context.sourceVersion)
             throw targetCostProblem('stale-source', '预算版本或项目来源已变化，请保留草稿并重新核对')
           const action = command.action

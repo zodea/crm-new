@@ -1,11 +1,16 @@
-import type { ScheduleCatalog, ScheduleReadQuery } from '../../app/lib/schedule/central-contract'
+import type { H3Event } from 'h3'
+import type { ScheduleCatalog, ScheduleCommand, ScheduleReadQuery } from '../../app/lib/schedule/central-contract'
 import { createHash } from 'node:crypto'
+import { getHeader } from 'h3'
 import { scheduleProblem } from '../../app/lib/schedule/central-contract'
 import { resolveBusinessSession } from './business-session'
 import { constructionContractReadTestInstance } from './construction-contract-read-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 import { processLibraryService } from './process-library-runtime'
+import { productionRuntime, productionSession } from './production-runtime'
+import { createProductionWbsMigration } from './production-wbs-migration'
+import { createProductionWbsService } from './production-wbs-service'
 import { projectReadTestInstance } from './project-read-test-instance'
 import { quantityTestInstance } from './quantity-runtime'
 import { createScheduleService } from './schedule-service'
@@ -44,4 +49,53 @@ export async function scheduleCatalog(origin: 'real' | 'demo', includeDemo: bool
     return { id: row.id, name: row.name, code: row.code ?? '', status: row.status ?? '', groupCount, origin }
   }))
   return { ...context, origin, capabilities: context.capabilities.filter(capability => origin === 'real' || capability !== 'schedule:write'), sourceVersion: facts.sourceVersion, projects }
+}
+
+const formalWbs = new WeakMap<object, ReturnType<typeof createProductionWbsService>>()
+const formalImports = new WeakMap<object, ReturnType<typeof createProductionWbsMigration>>()
+/** Select the real disk owner before any development fixture/session reads. */
+export function scheduleApi(event: H3Event) {
+  const runtime = productionRuntime()
+  if (runtime) {
+    let service = formalWbs.get(runtime.storage)
+    if (!service) {
+      service = createProductionWbsService(runtime.storage)
+      formalWbs.set(runtime.storage, service)
+    }
+    const session = productionSession(event)
+    let migration = formalImports.get(runtime.storage)
+    if (!migration) {
+      migration = createProductionWbsMigration(runtime.storage)
+      formalImports.set(runtime.storage, migration)
+    }
+    return {
+      catalog: (origin: 'real' | 'demo', includeDemo: boolean) => service.catalog(origin, includeDemo, session),
+      read: (query: ScheduleReadQuery, contractId = '') => service.read(query, contractId, session),
+      scope: (query: ScheduleReadQuery, buildings: string[]) => service.scope(query, buildings, session),
+      binding: (query: ScheduleReadQuery, groupId: string, contractId = '') => service!.binding(query, groupId, contractId, session),
+      execute: (command: ScheduleCommand) => service.execute(command, session),
+      resolve: (input: unknown) => service.resolve(input, session),
+      importState: () => migration.state(session),
+      importPreflight: (input: unknown) => migration.preflight(input, session),
+      importAdopt: (input: unknown) => migration.adopt(input, session),
+      importRestore: (input: unknown) => migration.restore(input, session),
+      importResolve: (input: unknown) => migration.resolve(input, session),
+      files: (projectId: string) => migration.files(projectId, session),
+    }
+  }
+  const sessionId = getHeader(event, 'x-ruihang-test-session')
+  return {
+    catalog: (origin: 'real' | 'demo', includeDemo: boolean) => scheduleCatalog(origin, includeDemo, sessionId),
+    read: (query: ScheduleReadQuery, contractId = '') => scheduleService.read(query, contractId, sessionId),
+    scope: (query: ScheduleReadQuery, buildings: string[]) => scheduleService.scope(query, buildings, sessionId),
+    binding: (query: ScheduleReadQuery, groupId: string, contractId = '') => scheduleService.binding(query, groupId, contractId, sessionId),
+    execute: (command: ScheduleCommand) => scheduleService.execute(command, sessionId),
+    resolve: (_input: unknown): never => { throw scheduleProblem('unavailable', '开发排程没有正式原意图恢复证明，请保留原提交') },
+    importState: (): never => { throw scheduleProblem('unavailable', '正式WBS接管需要真实磁盘来源') },
+    importPreflight: (_input: unknown): never => { throw scheduleProblem('unavailable', '正式WBS接管需要真实磁盘来源') },
+    importAdopt: (_input: unknown): never => { throw scheduleProblem('unavailable', '正式WBS接管需要真实磁盘来源') },
+    importRestore: (_input: unknown): never => { throw scheduleProblem('unavailable', '正式WBS恢复需要真实磁盘来源') },
+    importResolve: (_input: unknown): never => { throw scheduleProblem('unavailable', '正式WBS恢复需要真实磁盘来源') },
+    files: (_projectId: string): never => { throw scheduleProblem('unavailable', '正式WBS原件需要真实磁盘来源') },
+  }
 }

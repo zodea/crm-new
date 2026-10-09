@@ -126,6 +126,14 @@ export interface ScheduleProjectView {
   deviationDays: number
 }
 
+export interface ScheduleReadModelOptions {
+  visibility?: Pick<typeof import('../db/soft-delete'), 'hiddenCtesFor' | 'visibleCond' | 'selectVisibleSql'>
+  /** An unavailable external owner is not an empty BOQ source. Frozen IDs remain in the WBS view. */
+  boqAvailable?: boolean
+  /** Formal BOQ labels are projected from its owner, without joining Native physical columns. */
+  boqLineNames?: ReadonlyMap<string, string>
+}
+
 interface ProjectRow { id: string, name: string, code: string | null, status: string | null }
 interface BuildingRow { id: string, project_id: string, code: string, name: string }
 interface GroupRow {
@@ -351,16 +359,20 @@ export async function loadScheduleProject(
   db: Pick<SoftDb, 'select'>,
   projectId: string,
   today: string,
+  options: ScheduleReadModelOptions = {},
 ): Promise<ScheduleProjectView | null> {
+  const hidden = options.visibility?.hiddenCtesFor ?? hiddenCtesFor
+  const visible = options.visibility?.visibleCond ?? visibleCond
+  const selectVisible = options.visibility?.selectVisibleSql ?? selectVisibleSql
   const [project] = await db.select<ProjectRow>(
-    selectVisibleSql('projects', 'AND id = ?'),
+    selectVisible('projects', 'AND id = ?'),
     [projectId],
   )
   if (!project)
     return null
 
   const groups = await db.select<GroupRow>(
-    selectVisibleSql('schedule_groups', 'AND project_id = ? ORDER BY sort_order, created_at, id'),
+    selectVisible('schedule_groups', 'AND project_id = ? ORDER BY sort_order, created_at, id'),
     [projectId],
   )
   const groupIds = groups.map(group => group.id)
@@ -381,17 +393,17 @@ export async function loadScheduleProject(
   }
   const placeholders = groupIds.map(() => '?').join(', ')
   const buildingRows = await db.select<GroupBuildingRow>(
-    `${hiddenCtesFor('schedule_group_buildings')}
+    `${hidden('schedule_group_buildings')}
      SELECT sgb.group_id, sgb.building_id, b.name AS building_name
      FROM schedule_group_buildings sgb
      JOIN buildings b ON b.id = sgb.building_id
-     WHERE ${visibleCond('schedule_group_buildings', 'sgb')}
+     WHERE ${visible('schedule_group_buildings', 'sgb')}
        AND sgb.group_id IN (${placeholders})
      ORDER BY sgb.sort_order, b.sort_order, b.code, b.id`,
     groupIds,
   )
   const tasks = await db.select<TaskRow>(
-    selectVisibleSql('schedule_tasks', `AND project_id = ? AND group_id IN (${placeholders})
+    selectVisible('schedule_tasks', `AND project_id = ? AND group_id IN (${placeholders})
       ORDER BY group_id, sort_order, created_at, id`),
     [projectId, ...groupIds],
   )
@@ -399,11 +411,11 @@ export async function loadScheduleProject(
   const taskPlaceholders = taskIds.map(() => '?').join(', ')
   const itemRows = taskIds.length
     ? await db.select<TaskItemRow>(
-        `${hiddenCtesFor('task_item_map')}
+        `${hidden('task_item_map')}
          SELECT tim.task_id, tim.item_id, tim.boq_line_id, i.name AS item_name
          FROM task_item_map tim
          JOIN items i ON i.id = tim.item_id
-         WHERE ${visibleCond('task_item_map', 'tim')}
+         WHERE ${visible('task_item_map', 'tim')}
            AND tim.task_id IN (${taskPlaceholders})
          ORDER BY i.sort_order, i.code, i.id`,
         taskIds,
@@ -411,7 +423,7 @@ export async function loadScheduleProject(
     : []
   const floorPlanRows = taskIds.length
     ? await db.select<FloorPlanRow>(
-        `${hiddenCtesFor('schedule_task_floor_plans')}
+        `${hidden('schedule_task_floor_plans')}
          SELECT plan.id,
                 plan.task_id,
                 plan.floor_id,
@@ -421,7 +433,7 @@ export async function loadScheduleProject(
                 plan.boq_line_id,
                 plan.source_basis,
                 plan.provisional_qty,
-                COALESCE(boq_line.item_name, item.name) AS item_name,
+                ${options.boqAvailable === false ? 'item.name' : 'COALESCE(boq_line.item_name, item.name)'} AS item_name,
                 plan.planned_start,
                 plan.planned_finish,
                 plan.is_manual,
@@ -431,8 +443,8 @@ export async function loadScheduleProject(
          JOIN floors floor_row ON floor_row.id = plan.floor_id
          JOIN buildings building ON building.id = floor_row.building_id
          JOIN items item ON item.id = plan.item_id
-         LEFT JOIN boq_lines boq_line ON boq_line.id = plan.boq_line_id
-         WHERE ${visibleCond('schedule_task_floor_plans', 'plan')}
+         ${options.boqAvailable === false ? '' : 'LEFT JOIN boq_lines boq_line ON boq_line.id = plan.boq_line_id'}
+         WHERE ${visible('schedule_task_floor_plans', 'plan')}
            AND plan.task_id IN (${taskPlaceholders})
          ORDER BY plan.task_id,
                   plan.sort_order,
@@ -445,7 +457,7 @@ export async function loadScheduleProject(
     : []
   const dependencyRows = taskIds.length
     ? await db.select<DependencyRow>(
-        selectVisibleSql('task_dependencies', `AND pred_id IN (${taskPlaceholders}) AND succ_id IN (${taskPlaceholders})
+        selectVisible('task_dependencies', `AND pred_id IN (${taskPlaceholders}) AND succ_id IN (${taskPlaceholders})
           ORDER BY created_at, id`),
         [...taskIds, ...taskIds],
       )
@@ -495,7 +507,7 @@ export async function loadScheduleProject(
       boqLineId: row.boq_line_id,
       sourceBasis: row.source_basis,
       provisionalQty: row.provisional_qty == null ? null : Number(row.provisional_qty),
-      itemName: row.item_name,
+      itemName: row.boq_line_id ? options.boqLineNames?.get(row.boq_line_id) ?? row.item_name : row.item_name,
       plannedStart: row.planned_start,
       plannedFinish: row.planned_finish,
       isManual: Boolean(row.is_manual),

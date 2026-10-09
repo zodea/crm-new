@@ -18,12 +18,12 @@ const { attachments, pendingAttachments, pendingRemoveIds, pendingRestoreIds, de
         <p class="m-0 break-all">
           {{ session.pending.result ? '已保存待刷新，只重试读取' : '提交结果未知，请先核对原编号' }} · {{ session.pending.id }}
         </p>
-        <KitButton class="mt-2" :disabled="session.busy" @click="recover">
+        <KitButton type="button" class="mt-2" :disabled="session.busy" @click="recover">
           核对原提交
         </KitButton>
       </div>
       <div v-if="latestConflict" class="rounded border border-line p-3 text-13px">
-        <p>服务器版本 {{ latestConflict.version }}；当前输入已保留。</p><KitButton :disabled="Boolean(session.pending)" @click="adoptLatest">
+        <p>服务器版本 {{ latestConflict.version }}；当前输入已保留。</p><KitButton type="button" :disabled="Boolean(session.pending)" @click="adoptLatest">
           核对后采用最新版本
         </KitButton>
       </div>

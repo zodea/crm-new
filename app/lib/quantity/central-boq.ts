@@ -2,6 +2,11 @@ import type { QuantityContext } from './central-contract'
 
 /** 原始认可量和已批调量分别提供，调用方不得重复叠加。 */
 export interface QuantityBoqLine {
+  /** Formal binding consumes this original quantity and actual owner qualification. */
+  bindingVersion?: string
+  qualificationVersion?: string
+  eligible?: boolean
+  declaredBuildingId?: string
   unitType?: string | null
   floorZone?: string | null
   id: string

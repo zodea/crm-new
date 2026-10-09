@@ -93,7 +93,7 @@ export function createPayrollHollowService(run: PayrollRun, forms: Partial<Recor
           result.logIds = (await db.select<{ id: string }>('SELECT id FROM operation_logs WHERE rowid>? ORDER BY rowid', [before?.value ?? 0])).map(row => row.id)
           await db.execute('INSERT INTO payroll_command_receipts(command_id,actor_id,project_id,statement_id,config_scope_json,action,fingerprint,result_json,command_json) VALUES(?,?,?,?,?,?,?,?,?)', [command.commandId, command.actorId, command.projectId, result.statementId, command.config === null ? null : payrollCanonical(command.config), command.action.kind, payrollHollowHash(command), payrollCanonical(result), payrollCanonical(command)])
           return result
-        }, true)
+        }, true, command)
       }
       catch (cause) {
         if (absent && cause instanceof ProjectRepositoryProblem)

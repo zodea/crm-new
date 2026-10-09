@@ -12,7 +12,7 @@ const store = useDayworkCentralStore()
 const kit = useKitUI()
 const basis = shallowRef(props.read)
 const pending = computed(() => store.getDayworkPending(basis.value))
-const command = pending.value?.command
+const command = pending.value?.restoredFromDescriptor ? null : pending.value?.command
 const initial = command?.action.kind === 'confirm-daywork' ? command.action.confirmation : { witness: props.read.record?.witness ?? '', confirmedOn: props.read.record?.confirmedOn ?? '' }
 const draft = ref({ ...initial })
 const original = JSON.stringify(initial)

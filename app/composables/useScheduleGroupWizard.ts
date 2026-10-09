@@ -3,7 +3,6 @@ import type {
   ScheduleProvisionalBuildingPreview,
   ScheduleProvisionalScopePreview,
 } from '~/stores/schedule'
-import { useSessionStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from 'vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { formatQuantityValue } from '~/lib/quantity/format'
@@ -34,11 +33,14 @@ interface ScheduleWizardDraft {
 }
 
 type WizardStep = 1 | 2 | 3
+const regionDraftMemory = new WeakMap<object, Map<string, ScheduleWizardDraft>>()
 
 export function useScheduleGroupWizard() {
   const route = useRoute()
   const router = useRouter()
   const store = useScheduleStore()
+  const regionDrafts = regionDraftMemory.get(store) ?? new Map<string, ScheduleWizardDraft>()
+  regionDraftMemory.set(store, regionDrafts)
   const { confirm, error, success, warning } = useKitUI()
   const projectId = shallowRef('')
   const contractId = shallowRef('')
@@ -62,7 +64,7 @@ export function useScheduleGroupWizard() {
   const confirming = shallowRef(false)
   const draftNotice = shallowRef('')
   const canWrite = computed(() => store.canWrite && !store.pendingCommand && !confirming.value)
-  const savedDrafts = useSessionStorage<Record<string, ScheduleWizardDraft>>('ruihang:schedule-region-drafts', {})
+  const savedDrafts = shallowRef<Record<string, ScheduleWizardDraft>>(Object.fromEntries(regionDrafts))
   const libraryReturnTo = computed(() => projectId.value ? `/schedule/new?${new URLSearchParams({ project: projectId.value, origin: libraryOrigin.value ?? 'real' })}` : null)
   const provisionalPreview = shallowRef<ScheduleProvisionalScopePreview | null>(null)
 
@@ -496,8 +498,11 @@ export function useScheduleGroupWizard() {
     return { projectId: projectId.value, contractId: contractId.value, scopeBasis: scopeBasis.value, processLibraryId: processLibraryId.value, name: name.value, startDate: startDate.value, overlapMode: overlapMode.value, buildingIds: [...buildingIds.value], tasks: tasks.value.map(task => ({ ...task })) }
   }
   function saveDraftForRegion() {
-    if (projectId.value)
-      savedDrafts.value = { ...savedDrafts.value, [draftStorageKey(projectId.value)]: snapshotDraft() }
+    if (projectId.value) {
+      const key = draftStorageKey(projectId.value)
+      regionDrafts.set(key, snapshotDraft())
+      savedDrafts.value = Object.fromEntries(regionDrafts)
+    }
   }
   function readRegionDraft(id: string): ScheduleWizardDraft | null {
     if (route.query.resume !== 'region')
@@ -509,6 +514,7 @@ export function useScheduleGroupWizard() {
     const copy = { ...savedDrafts.value }
     delete copy[draftStorageKey(id)]
     savedDrafts.value = copy
+    regionDrafts.delete(draftStorageKey(id))
   }
 
   function toggleAllTasks(enabled: boolean) {
@@ -589,6 +595,22 @@ export function useScheduleGroupWizard() {
     initialized.value = false
     loadError.value = ''
     try {
+      const legacy = sessionStorage.getItem('ruihang:schedule-region-drafts')
+      if (legacy !== null) {
+        const rows = JSON.parse(legacy)
+        if (!rows || typeof rows !== 'object' || Array.isArray(rows))
+          throw new Error('旧区域返回草稿损坏，已保留原存储供核对')
+        for (const [key, value] of Object.entries(rows)) {
+          const draft = value as ScheduleWizardDraft
+          if (!draft || typeof draft.projectId !== 'string' || !Array.isArray(draft.tasks) || !Array.isArray(draft.buildingIds))
+            throw new Error('旧区域返回草稿无法完整核验，已保留原存储')
+          regionDrafts.set(key, structuredClone(draft))
+        }
+        savedDrafts.value = Object.fromEntries(regionDrafts)
+        sessionStorage.removeItem('ruihang:schedule-region-drafts')
+        if (sessionStorage.getItem('ruihang:schedule-region-drafts') !== null)
+          throw new Error('旧区域草稿尚未可靠迁到当前页面内存')
+      }
       if (!libraryOrigin.value)
         throw new Error('排程来源无效，请从当前项目重新打开')
       store.setOrigin(libraryOrigin.value)

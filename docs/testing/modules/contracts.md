@@ -128,9 +128,32 @@
 | [tests/server/contract-read-meta.test.ts](../../../tests/server/contract-read-meta.test.ts) | 单元／服务／状态 | 核心合同与商务来源的读取时点、版本及相关源完整性 |
 | [tests/contract/native-contract-prices.test.ts](../../../tests/contract/native-contract-prices.test.ts) | 单元／服务／状态 | Native 行税点、真实零、双表原子迁移及冷重开 |
 | [tests/contract/construction-subcontract-signatory.test.ts](../../../tests/contract/construction-subcontract-signatory.test.ts) | 单元／服务／状态 | 施工与分包实际主体采用、历史快照及原键 |
+| [tests/boq/production-recovery.test.ts](../../../tests/boq/production-recovery.test.ts) | 单元／服务／状态 | BOQ 普通命令与整源迁入各自的最小原编号恢复 |
+| [tests/stores/boq-production-pending.test.ts](../../../tests/stores/boq-production-pending.test.ts) | 单元／服务／状态 | 清单失响应、原键核对及后读失败保全 |
+| [tests/tabs/construction-scope-startup.test.ts](../../../tests/tabs/construction-scope-startup.test.ts) | 单元／服务／状态 | 工程关联启动只恢复同身份原目标和动作 |
+
 
 ## 组件（jsdom）
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/components/ContractPersistentFormLifecycle.test.ts](../../../tests/components/ContractPersistentFormLifecycle.test.ts) | 组件（jsdom） | 合同表单原提交、后读失败及后来输入隔离 |
+| [tests/components/ConstructionScopeSelector.test.ts](../../../tests/components/ConstructionScopeSelector.test.ts) | 组件（jsdom） | 真实工程候选、原编号、后读及来源权限变化 |
+| [tests/components/ContractSignatoryField.test.ts](../../../tests/components/ContractSignatoryField.test.ts) | 组件（jsdom） | 核实签约主体动态搜索及原文书采用快照 |
+| [tests/components/SubcontractMigrationPanel.test.ts](../../../tests/components/SubcontractMigrationPanel.test.ts) | 组件（jsdom） | 完整分包源预检、确认及原批次恢复入口 |
+
+
+
+## 辅助文件与配置（非独立测试）
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/helpers/production-auxiliary-cold.ts](../../../tests/helpers/production-auxiliary-cold.ts) | 辅助／夹具 | 辅助合同独立 Node 冷恢复调用入口 |
+| [tests/helpers/production-boq-cold.ts](../../../tests/helpers/production-boq-cold.ts) | 辅助／夹具 | BOQ 独立 Node 原件与原编号读取入口 |
+| [tests/helpers/production-boq-fixture.ts](../../../tests/helpers/production-boq-fixture.ts) | 辅助／夹具 | 同库正式主档与 BOQ 原图夹具 |
+| [tests/helpers/production-construction-cold.ts](../../../tests/helpers/production-construction-cold.ts) | 辅助／夹具 | 施工合同独立 Node 原件及回执读取入口 |
+| [tests/helpers/production-construction-scope-cold.ts](../../../tests/helpers/production-construction-scope-cold.ts) | 辅助／夹具 | 工程关系独立 Node 恢复入口 |
+| [tests/helpers/production-construction-scope-fixture.ts](../../../tests/helpers/production-construction-scope-fixture.ts) | 辅助／夹具 | 同项目多主合同与唯一原费用事实夹具 |
+| [tests/helpers/production-subcontract-cold.ts](../../../tests/helpers/production-subcontract-cold.ts) | 辅助／夹具 | 分包普通命令及完整来源采用冷进程入口 |
+| [tests/helpers/production-subcontract-fixture.ts](../../../tests/helpers/production-subcontract-fixture.ts) | 辅助／夹具 | 正式主档、实际工程与分包单元夹具 |
+| [tests/helpers/production-subcontract-native.ts](../../../tests/helpers/production-subcontract-native.ts) | 辅助／夹具 | 完整分包 Native 原图、原件及未知元数据夹具 |

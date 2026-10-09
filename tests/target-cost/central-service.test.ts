@@ -25,7 +25,7 @@ async function fixture() {
     return structuredClone(source)
   }, actual: async id => aggregateTargetCostActual(id, []), transaction: work => coordinator.withTransaction(tx => work(tx, { ...session })) })
   let counter = 0
-  const command = (read: TargetCostFormRead, action: TargetCostAction): TargetCostCommand => ({ commandId: `c${++counter}`, ...read.context, requiredCapability: 'target-cost:write', targetCostId: read.targetCostId, draftKey: read.draftKey ?? undefined, action })
+  const command = (read: TargetCostFormRead, action: TargetCostAction): TargetCostCommand => ({ commandId: `c${++counter}`, workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: read.context.origin, sourceVersion: read.context.sourceVersion, requiredCapability: 'target-cost:write', targetCostId: read.targetCostId, draftKey: read.draftKey ?? undefined, action })
   const create = async (name = '', baseline = false, projectId?: string) => service.execute(command(await service.form({ origin: 'real' }, null, `draft-${++counter}`), { kind: 'save-header', draft: { name, isBaseline: baseline, projectId, plannedProfit: 0 }, saveAction: 'draft' }))
   return { db, service, command, create, setSource: (next: TargetCostProjectSource) => {
     source = next

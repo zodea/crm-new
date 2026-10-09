@@ -57,16 +57,16 @@
 
     const body = (() => {
       if (tab === "contract") return (
-        <window.KitTable columns={contractCols} rows={sgContracts} minRows={6} pageSize={8} tableMinWidth={780}
+        <window.KitTable columns={contractCols} rows={sgContracts} pageSize={8} tableMinWidth={780}
           sum={[{ label: "施工合同额合计", value: contractSum }, { label: "累计收款合计", value: receiptSum }]}
           empty="该客户暂无施工合同" />
       );
       if (tab === "receipt") return (
-        <window.KitTable columns={receiptCols} rows={receipts} minRows={6} pageSize={8} tableMinWidth={700}
+        <window.KitTable columns={receiptCols} rows={receipts} pageSize={8} tableMinWidth={700}
           sum={[{ label: "累计收款", value: receiptSum }]} empty="该客户暂无收款登记" />
       );
       return (
-        <window.KitTable columns={projCols} rows={custProjects} minRows={6} pageSize={8} tableMinWidth={620}
+        <window.KitTable columns={projCols} rows={custProjects} pageSize={8} tableMinWidth={620}
           empty="该客户暂无在册项目" />
       );
     })();

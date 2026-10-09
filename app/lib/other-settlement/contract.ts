@@ -9,6 +9,7 @@ export interface OtherSettlementExpenseInput {
   originalExpenseLineId: string
   sourceVersion: string
   sourceRevision: string
+  consumptionVersion?: string
   amount: number | null
   clearanceAllocations?: ExpenseClearanceAllocationInput[]
 }

@@ -6,9 +6,7 @@ import { createPayrollRepository } from '../../app/lib/payroll/central-repositor
 import { createPayrollWorkbookFixture } from '../helpers/payroll-workbook-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollWorkbookFixture>>['archive'] | null }))
-vi.mock('../../server/utils/payroll-workbook-runtime', () => ({ get payrollWorkbookService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-workbook-runtime', () => ({ payrollWorkbookServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 
 it('真实HTTP预览、归档、列表、冷读取及失响应核对往返，并拒绝多余请求字段', async () => {

@@ -85,7 +85,7 @@ export function createPayrollARoundingService(run: PayrollRun) {
         const result: PayrollARoundingCommandResult = { schemaVersion: 1, commandId: command.commandId, revision: saved, sourceVersion: `payroll:${await payrollRevision(db)}` }
         await db.execute('INSERT INTO payroll_command_receipts(command_id,actor_id,project_id,statement_id,config_scope_json,action,fingerprint,result_json,command_json) VALUES(?,?,?,?,?,?,?,?,?)', [command.commandId, context.actorId, command.scope.projectId, null, payrollCanonical(command.scope), command.action.kind, fingerprint, payrollCanonical(result), payrollCanonical(command)])
         return result
-      }, true)
+      }, true, command)
     },
   }
 }

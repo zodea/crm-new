@@ -35,7 +35,7 @@ it.each([
   { label: '工时非数', change: { hours: Number.NaN }, reason: '金额须精确到分，工时与费率须为有限数值或明确空值' },
   { label: '工时无穷大', change: { hours: Infinity }, reason: '金额须精确到分，工时与费率须为有限数值或明确空值' },
   { label: '工时加加班超过 24 小时', change: { hours: 23, overtimeHours: 2 }, reason: '考勤日期、工时或固定范围无效' },
-  { label: '工人不属于本项目', change: { workerId: 'outside' }, reason: '考勤工人不属于当前项目与班组' },
+  { label: '工人无授权身份', change: { workerId: 'missing-authorized-identity' }, reason: '考勤工人不属于当前项目与班组' },
   { label: '串用其他班组', change: { crewId: 'next-crew' }, reason: '考勤工人不属于当前项目与班组' },
 ])('同日重存保持稳定原行与审计；$label 被拒绝且库不变', async ({ change, reason }) => {
   const f = await createPayrollC1ServiceFixture()

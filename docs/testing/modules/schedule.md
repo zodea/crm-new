@@ -89,3 +89,5 @@
 | [tests/helpers/production-process-library-process.ts](../../../tests/helpers/production-process-library-process.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/production-process-library-server.ts](../../../tests/helpers/production-process-library-server.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/wbs-migration-source.ts](../../../tests/helpers/wbs-migration-source.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
+| [tests/helpers/production-wbs-cold.ts](../../../tests/helpers/production-wbs-cold.ts) | 辅助／夹具 | WBS 原计划、原绑定与命令冷进程读取 |
+| [tests/helpers/production-wbs-upstream-fixture.ts](../../../tests/helpers/production-wbs-upstream-fixture.ts) | 辅助／夹具 | 实际主合同、清单及工序库依赖夹具 |

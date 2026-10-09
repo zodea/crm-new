@@ -16,7 +16,7 @@ function footer(action: 'cancel' | 'draft' | 'save' | 'saveNew' | 'saveSubmit') 
 
 <template>
   <EntityFormShell :title="title" subtitle="草稿可保留缺项目与空金额；版本头和科目明细分别保存。" back-label="返回目标成本" :sections="[{ key: 'basic', label: '基本信息' }, { key: 'amount', label: '金额基准' }, { key: 'attachments', label: '预算附件' }, { key: 'note', label: '备注' }]" :state="!matchingRead ? loading ? 'loading' : 'error' : 'ready'" state-title="预算版本载入失败" :state-description="error" state-action-label="重新加载" @back="ui.leave" @state-action="ui.load()">
-    <TargetCostCommandState :error="error" :pending="!!pending" :busy="busy" @recover="ui.recover" @recheck="ui.load(true)" />
+    <TargetCostCommandState :error="error" :pending="!!pending" :busy="busy" :applied="pending?.state === 'applied'" @recover="ui.recover" @recheck="ui.load(true)" />
     <section v-if="latest" class="panel my-3 grid gap-2 p-3 text-12px" aria-label="预算最新资料核对">
       <p>已读取最新资料，当前草稿仍按原保存依据保留。{{ latest.context.sourceVersion !== read?.context.sourceVersion ? '资料版本已发生变化。' : '当前来源版本没有变化。' }}</p>
       <KitButton type="button" variant="secondary" class="justify-self-start" :disabled="busy || !!pending" @click="ui.replaceWithLatest">

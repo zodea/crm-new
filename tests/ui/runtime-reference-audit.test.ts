@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { asRoutes, DESIGN_HTML_PATH, readDesignFormRoutes, readDesignRegistry } from '../../scripts/design-coverage.mjs'
 import {
   buildRuntimeEvidenceLedger,
   IMPLEMENTATION_FRONTIER_BLOCK_BEGIN,
@@ -212,95 +213,42 @@ describe('运行参考文档与生成物一致性（非业务验收）', () => {
     expect(status).toContain('`/finance/payment/:id/detail`')
     expect(status).not.toMatch(/\| 已闭环 \|/)
 
-    expect(designPending).toEqual([
-      expect.objectContaining({
-        appRoute: '/base/worker/private/:id',
-        issue: '#449',
-      }),
-      expect.objectContaining({
-        appRoute: '/contract/boq/building-evidence',
-        issue: '#445',
-      }),
-      expect.objectContaining({ appRoute: '/contract/other-settlement/import', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('没有直接外部参考页或DC注册') }),
-      expect.objectContaining({ appRoute: '/material/quotations', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('DC实际注册尚无对应独立屏') }),
-      expect.objectContaining({ appRoute: '/material/quotations/:id', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('DC实际注册尚无对应独立屏') }),
-      expect.objectContaining({ appRoute: '/material/quotations/form/:id?', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('DC实际注册尚无对应独立屏') }),
-      expect.objectContaining({ appRoute: '/material/quotations/import', designRoute: null, status: 'design-pending', issue: '#411', reason: expect.stringContaining('DC实际注册尚无对应独立屏') }),
-      expect.objectContaining({ appRoute: '/settings/our-signatories', designRoute: null, status: 'design-pending', reason: expect.stringContaining('DC 未注册') }),
-      expect.objectContaining({ appRoute: '/settings/our-signatories/form/:id?', designRoute: null, status: 'design-pending', reason: expect.stringContaining('DC 未注册') }),
-      expect.objectContaining({
-        appRoute: '/subcontract/daywork/form/:id',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/daywork/new',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/adjustments/:id',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/adjustments/form/:id',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/adjustments/new',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/config',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/form/:id',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/issue/:id',
-        issue: '#477',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/payments',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/payments/:id',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/payments/new',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/payments/reversal/new',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/roster',
-        issue: '#449',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/sources',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/payroll/workbooks',
-        issue: '#479',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/quantity/:pid/:uid/hollow/:id',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/quantity/:pid/:uid/hollow/form/:id',
-        issue: '#412',
-      }),
-      expect.objectContaining({
-        appRoute: '/subcontract/quantity/:pid/:uid/hollow/new',
-        issue: '#412',
-      }),
-    ])
+    const registry = readDesignRegistry()
+    const forms = readDesignFormRoutes()
+    const html = readFileSync(DESIGN_HTML_PATH, 'utf8')
+    const registered = new Set([...registry.pages.map(page => page.route), ...forms.map(form => form.route)])
+    for (const entry of coverage.screenParity) {
+      if (entry.status === 'covered') {
+        expect(asRoutes(entry.designRoute).length, entry.appRoute).toBeGreaterThan(0)
+        for (const route of asRoutes(entry.designRoute)) {
+          expect(registered.has(route), `${entry.appRoute}: ${route}`).toBe(true)
+          if (!forms.some(form => form.route === route)) {
+            expect(route).toMatch(/^[A-Z]\w*$/i)
+            const flags = [...html.matchAll(new RegExp(`(\\w+):[^\\n]*route\\s*===\\s*"${route}"`, 'g'))].map(match => match[1])
+            const mounts = flags.flatMap(flag => [...html.matchAll(new RegExp(`<sc-if value="\\{\\{ ${flag} \\}\\}"[^>]*>[\\s\\S]*?<\\/sc-if>`, 'g'))].map(match => match[0]))
+            expect(mounts.some(mount => mount.includes('component-from-global-scope="')), `${entry.appRoute}: ${route} 必须由实际路由开关挂载`).toBe(true)
+          }
+        }
+      }
+    }
+    for (const entry of designPending) {
+      expect(entry.designRoute, entry.appRoute).toBeNull()
+      expect(entry.reason?.trim(), entry.appRoute).toBeTruthy()
+      expect(entry.issue, entry.appRoute).toMatch(/^#\d+$/)
+    }
+    // A PAGE label alone cannot supply a screen: verify the real imported export and form source.
+    for (const screen of registry.screens) {
+      const source = readFileSync(join(PROJECT_ROOT, 'DC重构设计源码', screen.file), 'utf8')
+      const exported = [...source.matchAll(new RegExp(`window\\.${screen.global}\\s*=\\s*(function\\b|[A-Za-z_$][\\w$]*)`, 'g'))].at(-1)?.[1]
+      expect(exported, screen.file).toBeTruthy()
+      if (exported !== 'function')
+        expect(source, screen.file).toMatch(new RegExp(`function\\s+${exported}\\s*\\(`))
+      expect(html, screen.file).toContain(`component-from-global-scope="${screen.global}" from="./${screen.file}"`)
+    }
+    for (const form of forms) {
+      const source = readFileSync(join(PROJECT_ROOT, 'DC重构设计源码', form.definedIn), 'utf8')
+      expect(source, form.route).toContain(`registerForm("${form.route}"`)
+    }
     expect(designIndex).toContain('[#292](https://github.com/zodea/crm-new/issues/292)')
     expect(designIndex).toContain('[#276](https://github.com/zodea/crm-new/issues/276)')
     expect(designIndex).toContain('](./ui-implementation-status.md)')
@@ -351,8 +299,14 @@ describe('运行参考文档与生成物一致性（非业务验收）', () => {
       expect(endpoint.implementationIssues).toEqual([414])
       expect(endpoint.evidenceGrade).not.toBe('direct')
       const coverage = JSON.parse(readFileSync(COVERAGE_PATH, 'utf8')).screenParity.find((item: { appRoute: string }) => item.appRoute === route)
-      expect(coverage).toMatchObject({ status: 'design-pending', designRoute: null })
-      expect(coverage.reason).toContain('DC 未注册')
+      const component = route.endsWith('/form/:id?') ? 'OurSignatoryFormScreen' : 'OurSignatoryScreen'
+      const designRoute = route.endsWith('/form/:id?') ? 'ourSignatoryForm' : 'ourSignatory'
+      expect(coverage).toMatchObject({ status: 'covered', designRoute })
+      const design = readFileSync(join(PROJECT_ROOT, `DC重构设计源码/kit/${component}.jsx`), 'utf8')
+      expect(design).toContain(`window.${component} = ${component}`)
+      const registry = readFileSync(join(PROJECT_ROOT, 'DC重构设计源码/app.dc.html'), 'utf8')
+      expect(registry).toContain(`component-from-global-scope="${component}"`)
+      expect(registry).toContain(`route === "${designRoute}"`)
     }
   })
 

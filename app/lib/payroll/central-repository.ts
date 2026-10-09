@@ -27,6 +27,16 @@ import { createPayrollWorkbookRepository } from './workbook-repository'
 export function createPayrollRepository(fetcher: ProjectHttpFetcher): PayrollRepository {
   const adjustmentRead = <T extends PayrollAdjustmentRead>(kind: PayrollAdjustmentReadKind, query: PayrollQuery, input: unknown, target = input): Promise<T> => readProjectHttp(() => fetcher(`/api/read/payroll/${kind}`, { method: 'POST', body: { query, input: encodePayrollAdjustmentWire(input) } }), value => decodePayrollAdjustmentRead<T>(value, kind, query, target))
   return {
+    resolveCommand: descriptor => readProjectHttp(() => fetcher('/api/commands/payroll-resolve', { method: 'POST', body: descriptor }), (value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        throw new Error('原工资恢复结果格式无法核实')
+      const result = value as Record<string, unknown>
+      if (result.outcome === 'not-applied' && result.commandId === descriptor.commandId && Object.keys(result).sort().join(',') === 'commandId,outcome')
+        return { outcome: 'not-applied' as const, commandId: descriptor.commandId }
+      if (result.outcome === 'applied' && result.command && typeof result.command === 'object' && !Array.isArray(result.command) && Object.keys(result).sort().join(',') === 'command,outcome,result')
+        return { outcome: 'applied' as const, command: result.command, result: result.result }
+      throw new Error('原工资恢复结果与原编号不匹配')
+    }, descriptor.commandId),
     ...createPayrollWorkbookRepository(fetcher),
     numbering: (query, input) => readProjectHttp(() => fetcher('/api/read/payroll/numbering', { method: 'POST', body: { query, input } }), value => decodePayrollNumberingRead(value, query, input)),
     executeNumbering: command => readProjectHttp(() => fetcher('/api/commands/payroll-numbering', { method: 'POST', body: command as unknown as Record<string, unknown> }), value => decodePayrollNumberingResult(value, command), command.commandId),

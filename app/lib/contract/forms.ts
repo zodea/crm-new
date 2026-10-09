@@ -68,7 +68,7 @@ export interface ContractFormAttachment {
   mimeType: string
   category: string
   uploader: string
-  uploadedAt: string
+  uploadedAt: string | null
   deletedAt: string | null
   sha256?: string
 }
@@ -1003,7 +1003,7 @@ export async function saveF2Form(
   })
 }
 
-function mapProjectContractRow(row: Record<string, unknown>) {
+export function mapProjectContractRow(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     no: (row.no ?? '') as string,

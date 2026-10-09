@@ -166,6 +166,7 @@ onScopeDispose(closePhoto)
 </script>
 
 <template>
+  <QuantityCommandRecovery surface="completion" :project-id="projectId" />
   <div ref="detailElement" class="quantity-unit-detail flex min-w-0 flex-col gap-4">
     <p v-if="origin === null" class="panel p-4 text-danger" role="alert">
       工程量来源无效，请从项目列表重新打开。

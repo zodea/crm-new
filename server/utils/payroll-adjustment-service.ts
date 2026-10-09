@@ -122,7 +122,7 @@ export function createPayrollAdjustmentService(run: PayrollRun) {
           const result: PayrollAdjustmentCommandResult = { commandId: command.commandId, projectId: command.projectId, originalStatementId: read.original.statementId, adjustmentId, actualEventId: null, applicationIds: [], outcome: snapshot ? 'confirmed' : 'saved', sourceVersion: `payroll:${await payrollRevision(tx)}`, logIds: [logId] }
           await tx.execute('INSERT INTO payroll_command_receipts(command_id,actor_id,project_id,statement_id,action,fingerprint,result_json,command_json) VALUES(?,?,?,?,?,?,?,?)', [command.commandId, context.actorId, command.projectId, read.original.statementId, command.action.kind, fingerprint, payrollCanonical(result), payrollCanonical(command)])
           return result
-        }, true)
+        }, true, command)
       }
       catch (cause) {
         if (absent && cause instanceof ProjectRepositoryProblem)

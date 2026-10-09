@@ -24,7 +24,8 @@ const { read, selectedLine, lineId, buildingId, reason, loading, error, canEdit,
         </p>
       </div>
     </header>
-    <ScheduleCommandRecovery v-if="store.pendingCommand" :busy="busy" @recover="recover" @recheck="recheck" />
+    <CommandRecoveryPanel v-if="read?.contractVersion && store.pendingCommand" :command-id="store.pendingCommand.commandId" :saved="store.knownSaved" :busy="busy" @recover="recover" />
+    <ScheduleCommandRecovery v-else-if="store.pendingCommand" :busy="busy" @recover="recover" @recheck="recheck" />
     <StatePanel v-if="loading && !read" kind="loading" title="正在核对合同清单来源" compact />
     <div v-if="error" class="panel grid gap-2 border-danger/30 bg-danger-soft p-3 text-12px text-danger-ink" role="alert">
       <p>{{ error }}</p><button type="button" class="btn-secondary justify-self-start" :disabled="busy" @click="recheck">

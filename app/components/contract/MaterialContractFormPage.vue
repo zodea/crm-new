@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { ConstructionMainSelection } from '~/lib/construction-scope/contract'
 import type { ContractFormAttachmentDraft, ContractLineItemDraft, F2SaveAction, ProjectContractFormDraft } from '~/lib/contract/forms'
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
+import ConstructionScopeSelector from '~/components/contract/ConstructionScopeSelector.vue'
 import { useContractFormNavigation } from '~/composables/useContractFormNavigation'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { contractSupplierSelectionPatch, F2_FORM_META, f2FormDefaults } from '~/lib/contract/page'
@@ -42,6 +44,8 @@ const routeId = computed(() => Array.isArray(route.params.id) ? route.params.id[
 const isEditing = computed(() => Boolean(routeId.value))
 const title = computed(() => `${isEditing.value ? '编辑' : '新建'} · 材料采购合同`)
 const draft = ref<ProjectContractFormDraft>(f2FormDefaults('material') as ProjectContractFormDraft)
+const constructionMain = shallowRef<ConstructionMainSelection | null>(null)
+const savedConstructionMain = shallowRef('null')
 const total = computed(() => materialContractTotal(draft.value.lineItems ?? [], draft.value.deductions ?? [], draft.value.isSupplement === true))
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(true)
@@ -52,7 +56,7 @@ const savedSnapshot = shallowRef('')
 const context = shallowRef<Awaited<ReturnType<typeof store.hydrate>>['context'] | null>(null)
 const lineItemsEditor = useTemplateRef<{ validate: () => { row: number, key: string }[], $el: HTMLElement }>('lineItemsEditor')
 
-const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value || attachmentDirty.value)
+const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value || JSON.stringify(constructionMain.value) !== savedConstructionMain.value || attachmentDirty.value)
 const pageState = computed(() => loading.value ? 'loading' : loadError.value ? 'error' : 'ready')
 const returnTo = computed(() => typeof route.query.returnTo === 'string' && route.query.returnTo.startsWith('/contract/')
   ? route.query.returnTo
@@ -67,14 +71,32 @@ const fetchSuppliers = async (keyword: string) => lookup(context.value?.supplier
 const emptyLookup = async (): Promise<LookupOption[]> => []
 const fetchOriginalContracts = async (keyword: string) => lookup(context.value?.originalContracts ?? [], keyword)
 const originalContract = computed(() => context.value?.originalContracts?.find(row => row.id === draft.value.originalContractId) ?? null)
+let active = true
 let pendingInputSnapshot: string | null = null
 let pendingSubmittedDraft: ProjectContractFormDraft | null = null
 let pendingAttachmentInput: ReturnType<typeof captureAttachments> | null = null
-const inputSnapshot = () => JSON.stringify({ draft: draft.value, attachments: attachmentChanges() })
+const inputSnapshot = () => JSON.stringify({ draft: draft.value, constructionMain: constructionMain.value, attachments: attachmentChanges() })
+async function fetchEngineering(keyword: string): Promise<LookupOption[]> {
+  const needle = keyword.trim().toLocaleLowerCase('zh-CN')
+  const options = (context.value?.constructionMains ?? [])
+    .filter(row => !draft.value.isSupplement || !originalContract.value || row.projectId === originalContract.value.projectId)
+    .map(row => ({ id: row.id, label: [row.projectName, row.no, row.name].filter(Boolean).join(' · ') }))
+  return options.filter(row => !needle || row.id === keyword || row.label.toLocaleLowerCase('zh-CN').includes(needle))
+}
+function selectEngineering(id: string | null) {
+  if (!active || loading.value || loadError.value || !context.value || commandSession.pending)
+    return
+  const selected = context.value?.constructionMains?.find(row => row.id === id)
+  if (id && !selected)
+    return
+  if (draft.value.isSupplement && originalContract.value && selected?.projectId !== originalContract.value.projectId)
+    return
+  constructionMain.value = selected ? { id: selected.id, projectId: selected.projectId, basis: selected.basis } : null
+  patchDraft({ projectId: selected?.projectId ?? null })
+}
 
 let initializeRequest = 0
 let authorityInvalidated = false
-let active = true
 
 function invalidate(message: string) {
   initializeRequest++
@@ -121,6 +143,7 @@ async function initialize(targetId = routeId.value, retainEditing = false) {
     }
     else {
       draft.value = hydrated.form?.draft ?? { ...(f2FormDefaults('material') as ProjectContractFormDraft), isSupplement: route.query.supplement === '1' }
+      constructionMain.value = hydrated.form?.constructionMain ?? null
       if (!hydrated.form && draft.value.isSupplement && typeof route.query.originalContractId === 'string')
         patchDraft({ originalContractId: route.query.originalContractId })
       resetAttachments(hydrated.form?.attachments ?? [])
@@ -129,6 +152,8 @@ async function initialize(targetId = routeId.value, retainEditing = false) {
     await nextTick()
     if (!preserveInput)
       savedSnapshot.value = JSON.stringify(draft.value)
+    if (!preserveInput)
+      savedConstructionMain.value = JSON.stringify(constructionMain.value)
   }
   catch (cause) {
     if (request !== initializeRequest)
@@ -148,6 +173,7 @@ function patchDraft(patch: Partial<ProjectContractFormDraft>) {
     patch = { ...patch, deductions: patch.deductions.map(row => ({ ...row, id: row.id ?? `draft-${crypto.randomUUID()}` })) }
   if (patch.originalContractId !== undefined) {
     const parent = context.value?.originalContracts?.find(row => row.id === patch.originalContractId)
+    constructionMain.value = parent?.constructionMain ?? null
     const frozen = parent?.ourSignatorySnapshot ?? null
     patch = { ...patch, projectId: parent?.projectId ?? null, supplierId: parent?.supplierId ?? null, ourSignatoryId: frozen?.id ?? null, ourSignatoryVersion: frozen?.version ?? null, ourSignatorySnapshot: frozen }
   }
@@ -206,6 +232,10 @@ async function save(action: FormFooterAction) {
     return
   }
   const saveAction: F2SaveAction = action === 'draft' ? 'draft' : action === 'saveSubmit' ? 'submit' : 'save'
+  if (!draft.value.id && !constructionMain.value) {
+    warning('新建时必须搜索并选择实际工程对应的施工主合同')
+    return
+  }
   if (saveAction !== 'draft' && !validateRequired())
     return
   if (saveAction === 'submit' && (lineItemsEditor.value?.validate().length ?? 0) > 0) {
@@ -220,13 +250,14 @@ async function save(action: FormFooterAction) {
   pendingSubmittedDraft = JSON.parse(JSON.stringify(draft.value)) as ProjectContractFormDraft
   pendingAttachmentInput = captureAttachments()
   try {
-    const result = await store.saveForm(commandSession, draft.value, saveAction, attachmentChanges())
+    const result = await store.saveForm(commandSession, draft.value, saveAction, attachmentChanges(), constructionMain.value ? { constructionMain: constructionMain.value } : undefined)
     const retainedInput = result.retainedInput || inputSnapshot() !== pendingInputSnapshot
     if (retainedInput) {
       if (pendingAttachmentInput)
         acknowledgeAttachments(result.form.attachments, pendingAttachmentInput)
       draft.value = reconcileMaterialDraftIdentities(draft.value, pendingSubmittedDraft!, result.id, result)
       savedSnapshot.value = JSON.stringify(result.form.draft)
+      savedConstructionMain.value = JSON.stringify(result.form.constructionMain ?? null)
       success('原提交已保存并读回；后来的修改仍保留，请核对后保存')
       pendingInputSnapshot = null
       pendingSubmittedDraft = null
@@ -234,6 +265,8 @@ async function save(action: FormFooterAction) {
       return
     }
     draft.value = result.form.draft
+    constructionMain.value = result.form.constructionMain ?? constructionMain.value
+    savedConstructionMain.value = JSON.stringify(constructionMain.value)
     resetAttachments(result.form.attachments)
     clearPendingAttachments()
     pendingInputSnapshot = null
@@ -276,6 +309,8 @@ async function save(action: FormFooterAction) {
       store.adoptConflictVersion(commandSession, cause.latest)
       if (reload) {
         draft.value = cause.latest.draft
+        constructionMain.value = cause.latest.constructionMain ?? null
+        savedConstructionMain.value = JSON.stringify(constructionMain.value)
         resetAttachments(cause.latest.attachments)
         savedSnapshot.value = JSON.stringify(draft.value)
       }
@@ -311,6 +346,7 @@ async function recoverOriginal() {
     const laterInput = (pendingInputSnapshot !== null && before !== pendingInputSnapshot) || inputSnapshot() !== before
     if (!laterInput) {
       draft.value = recovered.form.draft
+      constructionMain.value = recovered.form.constructionMain ?? null
       resetAttachments(recovered.form.attachments)
       savedSnapshot.value = JSON.stringify(draft.value)
     }
@@ -320,6 +356,7 @@ async function recoverOriginal() {
       draft.value = pendingSubmittedDraft ? reconcileMaterialDraftIdentities(draft.value, pendingSubmittedDraft, recovered.result.id, recovered.result) : { ...draft.value, id: recovered.result.id }
       savedSnapshot.value = JSON.stringify(recovered.form.draft)
     }
+    savedConstructionMain.value = JSON.stringify(recovered.form.constructionMain ?? null)
     pendingInputSnapshot = null
     pendingSubmittedDraft = null
     pendingAttachmentInput = null
@@ -345,6 +382,7 @@ useTabTitle(title)
 <template>
   <EntityFormShell :title="title" back-label="返回材料采购合同" :sections="F2_FORM_META.material.sections" :state="pageState" :state-title="loadError || '正在载入表单'" state-action-label="重新载入" @back="leave" @state-action="initialize">
     <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
+      <ConstructionScopeSelector v-if="draft.id && context?.capabilities.includes('construction-scope:read') && (!draft.isSupplement || draft.originalContractId)" :source="{ domain: 'material-contract', id: draft.isSupplement ? draft.originalContractId! : draft.id }" :disabled-reason="draft.isSupplement ? '补充协议继承原材料主合同归属，请在原主合同维护。' : dirty || commandSession.pending || commandSession.busy ? '请先保存并可靠读取材料合同，再核对施工归属。' : undefined" />
       <section v-if="commandSession.pending" class="panel border border-warn p-3" role="status">
         <strong>{{ commandSession.pending.result ? '原提交已保存待刷新' : '原提交结果待核对' }}</strong>
         <p class="mt-1 text-12px">
@@ -354,10 +392,21 @@ useTabTitle(title)
           {{ commandSession.pending.result ? '重试读取已保存合同' : '核对原提交' }}
         </button>
       </section>
-      <ContractFormFields kind="material" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="emptyLookup" :fetch-suppliers="fetchSuppliers" :fetch-original-contracts="fetchOriginalContracts" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError" />
+      <ContractFormFields kind="material" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="emptyLookup" :fetch-suppliers="fetchSuppliers" :fetch-original-contracts="fetchOriginalContracts" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError">
+        <template v-if="!draft.id" #project-field>
+          <label class="field-block">
+            <span class="field-label">工程名称 *</span>
+            <LookupSelect :model-value="constructionMain?.id ?? null" :fetch="fetchEngineering" :disabled-reason="commandSession.pending ? '请先核对原提交' : undefined" placeholder="搜索工程及施工主合同" @update:model-value="selectEngineering" />
+          </label>
+        </template>
+      </ContractFormFields>
       <section v-if="draft.isSupplement && originalContract" class="panel p-3 text-12px" aria-label="原合同继承信息">
         项目：{{ context?.projects.find(row => row.id === originalContract?.projectId)?.label ?? '未记录' }} · 分供方：{{ context?.suppliers.find(row => row.id === originalContract?.supplierId)?.label ?? '未记录' }}；归属由原合同继承。
       </section>
+      <label v-if="!draft.id && draft.isSupplement" class="field-block panel p-4">
+        <span class="field-label">工程名称 *</span>
+        <LookupSelect :model-value="constructionMain?.id ?? null" :fetch="fetchEngineering" :disabled-reason="commandSession.pending ? '请先核对原提交' : originalContract?.constructionMain ? '继承原合同工程' : undefined" placeholder="搜索原合同工程对应的施工主合同" @update:model-value="selectEngineering" />
+      </label>
       <ContractLineItemsEditor ref="lineItemsEditor" :lines="draft.lineItems ?? []" :supplement="draft.isSupplement" :original-lines="originalContract?.lineItems ?? []" @update="patchDraft({ lineItems: $event })" />
       <MaterialContractLineImport :key="`${routeId ?? 'new'}:${draft.isSupplement}`" :lines="draft.lineItems ?? []" @append="appendImportedLines" />
       <ContractDeductionsEditor :deductions="draft.deductions ?? []" @update="patchDraft({ deductions: $event })" />

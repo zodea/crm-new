@@ -259,6 +259,8 @@
           <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
             {view === "project" && <KA.SelectFilter label="项目" value={proj} minWidth={150}
               options={[{ key: "", label: "全部项目" }].concat(PROJ_ROWS.map((r) => r.project).filter((p, i, a) => a.indexOf(p) === i).map((p) => ({ key: p, label: p })))} onChange={setProj} />}
+            {/* 独立报价入口（Q-A02-03）：报价清单为独立屏 quotation，不在本屏内维护报价 */}
+            <Button icon="file-text" onClick={() => nav && nav("quotation", {})}>报价清单</Button>
             <Button icon="download" onClick={() => UI().toast("正在导出当前视图 Excel…")}>导出 Excel</Button>
           </div>
         </Panel>

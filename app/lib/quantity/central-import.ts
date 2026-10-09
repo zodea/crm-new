@@ -24,7 +24,7 @@ export async function validateQuantityImportParent(db: TransactionDb, projectId:
   }
 }
 
-export async function persistQuantityImport(db: TransactionDb, projectId: string, action: QuantityImportAction, actorId: string): Promise<Omit<QuantityCommandResult, 'commandId' | 'sourceVersion'>> {
+export async function persistQuantityImport(db: TransactionDb, projectId: string, action: QuantityImportAction, actorId: string, options: NonNullable<Parameters<typeof persistQuantityCompletionAction>[3]> = {}): Promise<Omit<QuantityCommandResult, 'commandId' | 'sourceVersion'>> {
   if (action.target === 'template') {
     const command = { kind: 'save-template' as const, draft: await buildQuantityTemplateImportDraft(db, projectId, action.row) }
     await validateQuantityTemplateParent(db, projectId, command)
@@ -35,11 +35,11 @@ export async function persistQuantityImport(db: TransactionDb, projectId: string
     await validateQuantityAssignmentParent(db, projectId, command)
     return persistQuantityAssignmentAction(db, command)
   }
-  const command = { kind: 'save-completion' as const, draft: await buildQuantityCompletionImportDraft(db, projectId, action.unitId!, action.row) }
+  const command = { kind: 'save-completion' as const, draft: await buildQuantityCompletionImportDraft(db, projectId, action.unitId!, action.row, options) }
   parseQuantityCompletionAction(command)
-  await validateQuantityCompletionParent(db, projectId, command)
+  await validateQuantityCompletionParent(db, projectId, command, options)
   try {
-    return await persistQuantityCompletionAction(db, command, actorId)
+    return await persistQuantityCompletionAction(db, command, actorId, options)
   }
   catch (cause) {
     if (cause instanceof Error && /照片|责任/.test(cause.message))

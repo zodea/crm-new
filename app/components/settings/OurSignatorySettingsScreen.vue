@@ -9,7 +9,7 @@ const error = ref('')
 const loading = ref(false)
 let generation = 0
 let active = true
-const repository = createOurSignatoryRepository((url, options) => $fetch<unknown>(url, { ...options, retry: 0 }))
+const repository = createOurSignatoryRepository((url, options) => $fetch<unknown, string>(url, { ...options, retry: 0 }))
 function invalidate() {
   generation++
   data.value = null

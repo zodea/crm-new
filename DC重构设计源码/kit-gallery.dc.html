@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>瑞航 CRM · 组件展示</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/styles.css">
+  <script src="https://unpkg.com/lucide@1.27.0"></script>
+  <script src="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/_ds_bundle.js"></script>
+  <script src="kit/data.js"></script>
+  <style>
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-sans); }
+    :focus-visible { outline:2px solid var(--brand); outline-offset:1px; }
+  </style>
+</helmet>
+
+<!-- 组件展示页（2026-10-07 评审 C-01 / C-02）：与 app.dc.html 同一运行时与 kit 源码，只演示不注册业务路由 -->
+<sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+  <x-import component-from-global-scope="KitUIScreen" from="./kit/KitUI.jsx" hint-size="0,0"></x-import>
+</sc-if>
+<sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+  <x-import component-from-global-scope="KitAtomsScreen" from="./kit/KitAtoms.jsx" hint-size="0,0"></x-import>
+</sc-if>
+<sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+  <x-import component-from-global-scope="AppDataScreen" from="./kit/AppData.jsx" hint-size="0,0"></x-import>
+</sc-if>
+<sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+  <x-import component-from-global-scope="KitTableScreen" from="./kit/KitTable.jsx" hint-size="0,0"></x-import>
+</sc-if>
+<sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+  <x-import component-from-global-scope="KitControlsPreload" from="./kit/KitControls.jsx" hint-size="0,0"></x-import>
+</sc-if>
+<sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+  <x-import component-from-global-scope="ListShellPreload" from="./kit/ListShell.jsx" hint-size="0,0"></x-import>
+</sc-if>
+<x-import component-from-global-scope="KitGalleryScreen" from="./kit/KitGalleryScreen.jsx" hint-size="100%,1200px"></x-import>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

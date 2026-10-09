@@ -536,6 +536,17 @@ flowchart LR
 - 非分页小表可用 `filterable: true` 从当前行推导筛选项；受控分页必须传显式 `KitFilterOption[]`，选项来自后台完整快照 facet，不能从当前页反推。
 - `remoteFilter` 开启后，`KitTable` 不在当前页本地过滤，只发出包含全部列条件的 `filter-change`；调用方负责把条件交给 Repository 并回填新页。动态 facet 通过 vxe `setFilter` 同步，`KitFilterOption.checked` 表示受控选中态，刷新 facet 后不得丢失当前条件。
 
+**设计稿外观与 vxe-table 映射（2026-10-07 评审 V-01 / V-02 / V-07）**：设计稿 `kit/KitTable.jsx` 只表达视觉；实现一律落在 vxe-table / vxe-pc-ui 现成能力上，不自造表格行为。
+
+| 外观 | vxe-table 落点 |
+| --- | --- |
+| 有几行画几行，不补空行；无数据只留表头 + 居中空态（从未建档 / 筛选无结果文案与动作分开） | 默认行为；空态用 `#empty` 插槽，内容同第 09 节 |
+| 数字右对齐、等宽数字，不换等宽字体 | 列 `align: 'right'` + 单元格 `font-variant-numeric: tabular-nums` |
+| 业务汇总行 | `show-footer` + `footer-method` |
+| 加载用贴合表格的骨架 | `loading` + 加载插槽 |
+| 列设置 / 刷新 / 导入导出 | `vxe-toolbar`（`custom` 等）或 `KitToolbarPopover`，由 ListShell 承载 |
+| 分页与每页条数 | `vxe-pager` |
+
 **可操作表头（公共原语已实现，调用页继续验收，2026-09-08）**：
 
 - 每页按[逐页对应规则](../rewrite/DESIGN-SYSTEM.md#a01-list-mapping)完整对应适用参考列；通用表格不自行删列、猜字段或替领域决定默认顺序。表头、名称列和状态列需作为逐页对照点。
@@ -645,3 +656,37 @@ const columns: KitTableColumn[] = [{
 - **不干扰原任务**：帮助按钮不能嵌套在另一个按钮或输入控件中；点问号只打开说明，不触发行选择、表头排序、筛选、菜单提交或表单提交。展开说明不清空输入、不确认候选、不切换当前选项，不为说明拦截原输入/菜单的常规键盘事件。
 - **布局与层级**：浮层靠近触发点，避开主操作和正在输入的区域；随可用空间调整位置，长内容在浮层自身滚动，窄屏不得越出视口或带来页面横滚。嵌套于 Dialog/Sheet 的说明属于相应交互子树并遵守现行浮层层级，不穿到背景页或遮住关闭入口；悬停目标移出可视区域后不留下悬空说明。
 - **验收**：在参考视口与 390 / 768 / 1024 / 1280–1440px，分别运行 hover、键盘 focus/Enter/Space/Esc 和触摸打开/关闭；核对长内容、滚动、浮层边缘、嵌套菜单/输入，以及必要反馈未被隐藏。开发页通过只证明原语；所有列表、详情、表单与工作台的具体说明内容和默认信息密度仍须逐页验收。
+
+---
+
+<a id="issue-496-shared-primitives"></a>
+
+## 18 · #496 共享指标与行操作原语（OPT-10 联动）
+
+`Metric` 与 `StatCard` 展示的业务类别相同，均由调用方提供指标名称与数值；金额、计数、比例或未知事实不构成另一份指标模型。两者的差异是密排格位与独立卡片、字号、公式与来源说明、点击筛选或金额穿透，因此使用一份可变内核，保留各自现有调用接口。
+
+| 能力 | DC 设计源码 | Vue 生产界面 |
+| --- | --- | --- |
+| 共享指标内核 | `_ds_bundle.js` 的 `StatCard` 提供 `standalone/grid`；`KitAtoms.Metric` 为无 Hook 适配工厂 | `StatCard.vue` 提供同两种变体；`Metric.vue` 保留原 props 并转接 |
+| 独立卡片 | 保留原 `tone/clickable/onClick/style`、独立边框与大号值；点击使用 `type=button` | 保留 `icon/color/suffix/money/clickable` 与原点击事件；不会提交表单 |
+| 密排指标格 | 保留 `formula/tone/big` 和原值，可承载状态、截止与缺失来源；网格采用单线分隔 | 保留 `formula/tone/big/money/to/status/cutoff/missingSources`；公式复用既有 `ContextHelp`，不另建说明底座 |
+| 行操作菜单 | 外部纯工厂创建内部组件；Hook 由 React 渲染。现有 ReactDOM Portal 承载固定定位浮层、边缘避让、局部滚动、方向键/Home/End、Esc/Tab、安全退出与焦点返回 | 继续使用 reka-ui DropdownMenu 的 Portal、碰撞与焦点机制；复用其 Arrow，空动作说明与浮层自身滚动 |
+| 分区标题 | `SectionHeader` 保留品牌竖条与右侧扩展，标题使用 `h2` | 同样保留原 title/subtitle/插槽与视觉层级，使用 `h2` |
+
+两种指标变体都不读取领域 store、不重算工资或成本，不以缺失来源替代已有数值，不把未知改为零。Vue 的 Metric 金额仍使用原货币前缀，StatCard 仍沿原无前缀显示；零额/无目标穿透退化、负额穿透及原负号格式继续遵守第 07 节和已有金额格式化契约。来源状态、权限、过滤和正式事实由领域模块决定。
+
+菜单保留全部调用方动作及禁用语义，触发器为紧凑无边框省略号，浮层消费瑞航面板、描边、阴影与小圆角令牌，并以小箭头关联触发器。空动作显示“无可用操作”，不能造出业务动作。DC 的有状态内部组件不允许由业务屏直接执行；函数式工厂只返回 React 元素。Vue 继续 SFC / Composition API 与现有 reka-ui，不直接调用组件 setup。
+
+本轮仅联动指标、行菜单、标题及其必要网格接缝。Vue 已有 SearchInput、SegTab、StatePanel 和浮层底座继续复用；其他 #496 缺陷及全量界面对标不因此视为完成。原语五档运行验收入口为 `tests/browser/SharedMetricAndMenu.test.ts` 与 `e2e/kit-shared-primitives-dc.spec.ts`，覆盖函数式条件调用、原值/点击、局部溢出、禁用项、键盘、焦点与视口；领域页面及生产冷恢复仍按各工作单元另验，不能由原语验收代替。
+
+<a id="issue-496-decisions"></a>
+
+### 本轮已确认决定（2026-10-07）
+
+| 稳定编号 | 用户明确答复与采用边界 |
+| --- | --- |
+| Q-496-01 | 两卡类别无区别则合为单组件，有区别则体现为可变组件。实码核对确认业务类别相同、呈现与动作不同，采用上节共享可变内核并保原接口。 |
+| Q-496-02 | 行菜单需要保留，改善效果到红圈参考方向。保留菜单和全部原动作；本地 `红圈系统/03-项目信息/列表-行操作菜单.png` 仅为 2026-07-02 的历史视觉线索，包含真实资料，不入库、不上传，不当作当前运行或内部操作证据。 |
+| Q-496-03 | 保持函数式方向，统一开发函数规范。DC 外部无 Hook 纯工厂、内部按 React 官方组件渲染；Vue 按既定 Composition API，不改变框架调用约定。 |
+
+现行三个答复优先于 #496 正文中尚未更新的待问文字，不重复提问。负金额货币符号位置不依赖本轮接管，保持已有输出；没有据旧 Issue 改全站金额格式。React 的工厂与组件边界依据 [组件与 Hook 调用规则](https://react.dev/reference/rules/react-calls-components-and-hooks)及 [createElement](https://react.dev/reference/react/createElement)，Vue 菜单扩展按 [reka-ui DropdownMenu](https://reka-ui.com/docs/components/dropdown-menu) 公开 API。

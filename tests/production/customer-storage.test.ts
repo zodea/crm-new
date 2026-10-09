@@ -7,7 +7,7 @@ import { createProductionCustomerService } from '../../server/utils/production-c
 import { createProductionStorage } from '../../server/utils/production-storage'
 
 it('客户含原件保存后冷打开读回同一身份、审计和回执，同键异文不能新增', async () => {
-  const base = resolve('.codex-tmp/issue-450-tests')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-450-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/customer-`)
   const options = { directory, workspaceId: 'isolated-workspace', ownerId: 'isolated-owner', purpose: 'verification' as const }

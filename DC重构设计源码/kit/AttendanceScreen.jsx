@@ -40,6 +40,9 @@
             <div style={{ flex: 1 }} />
             {StatusChip ? <StatusChip tone="warn">{WORKERS.filter((w) => w.locked).length + " 人已封锁"}</StatusChip> : null}
             {Button ? <Button variant="secondary" onClick={() => navigate("payroll")}>回工资核算</Button> : null}
+            {/* 独立整页入口（对齐 CentralAttendanceScreen「新建 C1 工资」与工资来源只读页） */}
+            {Button ? <Button variant="secondary" onClick={() => navigate("payrollSources", { tab: "attendance" })}>查看工资来源</Button> : null}
+            {Button ? <Button variant="secondary" onClick={() => navigate("payrollForm", { format: "C1" })}>新建 C1 工资</Button> : null}
             {Button ? <Button variant="primary" onClick={() => UI.toast("本月考勤已保存", "ok")}>保存考勤</Button> : null}
           </div>
           <div style={{ borderTop: "1px solid var(--line)", padding: "8px 14px", background: "var(--surface-2)", fontSize: 12, color: "var(--ink-soft)" }}>

@@ -130,7 +130,7 @@
     );
     if (!window.KitTable) return <Panel padding={16} style={{ color: "var(--ink-soft)" }}>表格组件加载中…</Panel>;
     return <window.KitTable toolbar={toolbar} columns={columns.map((c) => ({ width: 120, ...c }))} rows={rows}
-      pageSize={10} minRows={5} sum={sum} tableMinWidth={Math.max(640, columns.length * 130)}
+      pageSize={10} sum={sum} tableMinWidth={Math.max(640, columns.length * 130)}
       onRowClick={(r) => onJump("row", r)} footerLeft={"共 " + rows.length + " 条"} empty="暂无数据" />;
   }
 

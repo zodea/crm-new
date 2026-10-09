@@ -1,7 +1,7 @@
 import { scheduleProblem } from '../../../../app/lib/schedule/central-contract'
 import { throwProjectReadError } from '../../../utils/project-read-error'
 import { parseScheduleRead } from '../../../utils/schedule-request'
-import { scheduleService } from '../../../utils/schedule-runtime'
+import { scheduleApi } from '../../../utils/schedule-runtime'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
       || (query.contractId !== undefined && typeof query.contractId !== 'string')) {
       throw scheduleProblem('invalid-query', '绑定预览的分组或施工合同身份无效')
     }
-    return await scheduleService.binding(parseScheduleRead(query), query.groupId, query.contractId as string | undefined, getHeader(event, 'x-ruihang-test-session'))
+    return await scheduleApi(event).binding(parseScheduleRead(query), query.groupId, query.contractId as string | undefined)
   }
   catch (cause) { throwProjectReadError(cause) }
 })

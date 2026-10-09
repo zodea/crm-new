@@ -21,6 +21,7 @@ import { buildScheduleReturnLocation, parseScheduleDrillContext, scheduleSourceQ
 import { toErrorMessage } from '~/lib/util/error'
 
 const store = useQuantityStore()
+const productionAccess = useProductionAccessStore()
 const scheduleStore = useScheduleStore()
 const route = useRoute()
 const router = useRouter()
@@ -457,7 +458,13 @@ watch(() => [route.query.project, route.query.origin, route.query.from, route.qu
 </script>
 
 <template>
+  <QuantityCommandRecovery surface="matrix" :project-id="projectId" />
+  <QuantityCommandRecovery surface="assignments" :project-id="projectId" />
+  <QuantityCommandRecovery surface="batch" :project-id="projectId" />
   <div class="quantity-screen flex min-w-0 flex-col gap-4">
+    <NuxtLink v-if="productionAccess.status?.mode === 'production'" to="/subcontract/quantity/import" class="self-start text-12px text-brand">
+      工程量原库接管
+    </NuxtLink>
     <QuantityToolbar
       v-if="store.catalog.length"
       v-model:project-id="projectSelection"

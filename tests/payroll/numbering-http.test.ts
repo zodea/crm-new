@@ -6,9 +6,7 @@ import { createPayrollRepository } from '../../app/lib/payroll/central-repositor
 import { createPayrollNumberingFixture, numberingCommand } from '../helpers/payroll-numbering-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollNumberingFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 it('真实HTTP读取冻结金额、初始化、正式出具及失响应原键恢复完整往返', async () => {
   const f = await createPayrollNumberingFixture()

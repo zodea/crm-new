@@ -1,3 +1,4 @@
+import type { ConstructionMainOption, ConstructionMainSelection } from '../construction-scope/contract'
 import type {
   ContractFormAttachment,
   ContractFormAttachmentChanges,
@@ -17,7 +18,8 @@ export interface MaterialContractCommandContextDTO {
   projects: Array<{ id: string, label: string }>
   suppliers: ContractSupplierOption[]
   ourSignatories?: OurSignatoryRecord[]
-  originalContracts?: Array<{ id: string, no: string, label: string, projectId: string | null, supplierId: string | null, lineItems: ContractLineItemDraft[], ourSignatorySnapshot?: OurSignatorySnapshot | null }>
+  constructionMains?: ConstructionMainOption[]
+  originalContracts?: Array<{ id: string, no: string, label: string, projectId: string | null, supplierId: string | null, lineItems: ContractLineItemDraft[], ourSignatorySnapshot?: OurSignatorySnapshot | null, constructionMain?: ConstructionMainSelection | null }>
 }
 
 export interface MaterialContractCommandRequestDTO {
@@ -30,6 +32,7 @@ export interface MaterialContractCommandRequestDTO {
   action: F2SaveAction
   draft: ProjectContractFormDraft
   attachments: ContractFormAttachmentChanges
+  constructionMain?: ConstructionMainSelection
 }
 
 export interface MaterialContractCommandResultDTO {
@@ -49,6 +52,7 @@ export interface MaterialContractFormReadDTO {
   attachments: ContractFormAttachment[]
   version: string
   updatedAt: string
+  constructionMain?: ConstructionMainSelection | null
 }
 
 export type MaterialContractCommandResolutionDTO

@@ -35,6 +35,7 @@ useTabTitle(title)
 </script>
 
 <template>
+  <QuantityHollowCommandRecovery :project-id="projectId" :unit-id="unitId" @recovered="ui.load" />
   <EntityFormShell :title="title" subtitle="记录真实户、分项和原责任下的检查；后续修订与整改均保留原记录。" back-label="返回原户记录" :sections="[{ key: 'responsibility', label: '原位置与责任' }, { key: 'inspection', label: '检查内容' }, { key: 'evidence', label: '依据与说明' }]" :state="read ? 'ready' : loading ? 'loading' : 'error'" state-title="原户检查资料未能读取" :state-description="error" state-action-label="重新读取原户" @back="cancel" @state-action="ui.load">
     <QuantityHollowCommandState ref="errorPanel" :pending="!!pending" :awaiting-read="pending?.state === 'awaiting-read'" :busy="busy" :error="error" @recover="ui.recover" @refresh="ui.load" />
     <QuantityHollowPendingSummary v-if="pendingElsewhere && pending && read" :action="pending.command.action" :read="read" />

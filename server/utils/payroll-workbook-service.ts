@@ -26,6 +26,7 @@ export interface PayrollWorkbookServiceOptions {
   payroll: (db: TransactionDb, sessionId?: string | null) => PayrollWorkbookReaders['payroll']
   roster: (db: TransactionDb, sessionId?: string | null) => ReturnType<PayrollWorkbookReaders['roster']>
   now?: () => string
+  beforeWrite?: () => void
 }
 interface Receipt { command_id: string, workspace_id: string, actor_id: string, project_id: string, fingerprint: string, command_json: string | null, result_json: string | null, archive_id: string | null }
 function authorize(session: BusinessSession, write: boolean) {
@@ -49,7 +50,7 @@ function receiptResult(row: Receipt): PayrollWorkbookResult {
   }
   catch { throw payrollProblem('unavailable', '原输出目录回执损坏，不能重复归档') }
 }
-async function readArchive(db: TransactionDb, session: BusinessSession, projectId: string, archiveId: string): Promise<PayrollWorkbookArchive> {
+export async function readPayrollWorkbookArchive(db: TransactionDb, session: BusinessSession, projectId: string, archiveId: string): Promise<PayrollWorkbookArchive> {
   const migrated = await readMigratedPayrollWorkbookArchive(db, projectId, archiveId)
   if (migrated) {
     const current = { ...migrated, context: context(session, migrated.sourceVersion) }
@@ -80,6 +81,8 @@ async function readArchive(db: TransactionDb, session: BusinessSession, projectI
 }
 export function createPayrollWorkbookService(options: PayrollWorkbookServiceOptions) {
   async function run<T>(write: boolean, sessionId: string | null | undefined, work: (db: TransactionDb, session: BusinessSession, readers: PayrollWorkbookReaders) => Promise<T>) {
+    if (write)
+      options.beforeWrite?.()
     return options.transaction(async (db) => {
       const session = structuredClone(options.session(sessionId))
       authorize(session, write)
@@ -107,7 +110,7 @@ export function createPayrollWorkbookService(options: PayrollWorkbookServiceOpti
       queryScope(query, input.projectId)
       if (!isStableRouteIdentity(input.archiveId))
         throw payrollProblem('validation-failed', '输出目录身份无效')
-      return run(false, sessionId, (db, session) => readArchive(db, session, input.projectId, input.archiveId))
+      return run(false, sessionId, (db, session) => readPayrollWorkbookArchive(db, session, input.projectId, input.archiveId))
     },
     workbookArchives(query: PayrollQuery, input: { projectId: string }, sessionId?: string | null): Promise<PayrollWorkbookArchiveSummary[]> {
       queryScope(query, input.projectId)
@@ -115,7 +118,7 @@ export function createPayrollWorkbookService(options: PayrollWorkbookServiceOpti
         const rows = await db.select<{ id: string }>('SELECT id FROM payroll_workbook_archives WHERE project_id=? ORDER BY created_at DESC,version DESC,id', [input.projectId])
         const result: PayrollWorkbookArchiveSummary[] = []
         for (const row of rows) {
-          const value = await readArchive(db, session, input.projectId, row.id)
+          const value = await readPayrollWorkbookArchive(db, session, input.projectId, row.id)
           result.push({ id: value.id, version: value.version, mode: value.input.mode, projectId: value.input.projectId, statementIds: value.input.statementIds, createdAt: value.createdAt, completeness: value.completeness, rosterRef: value.rosterRef })
         }
         return result
@@ -131,7 +134,7 @@ export function createPayrollWorkbookService(options: PayrollWorkbookServiceOpti
           if (prior.fingerprint !== workbookHash(command))
             throw payrollProblem('conflict', '原提交已经确认未执行或正文不同，不能另建输出目录')
           const result = receiptResult(prior)
-          await readArchive(db, session, command.input.projectId, result.archiveId)
+          await readPayrollWorkbookArchive(db, session, command.input.projectId, result.archiveId)
           return result
         }
         const preview = await previewPayrollWorkbook(readers, command.input)
@@ -164,7 +167,7 @@ export function createPayrollWorkbookService(options: PayrollWorkbookServiceOpti
           if (row.fingerprint === 'cancelled')
             return { state: 'not-applied' }
           const result = receiptResult(row)
-          await readArchive(db, session, projectId, result.archiveId)
+          await readPayrollWorkbookArchive(db, session, projectId, result.archiveId)
           return { state: 'applied', result }
         }
         await db.execute('INSERT INTO payroll_workbook_receipts(command_id,workspace_id,actor_id,project_id,fingerprint) VALUES (?,?,?,?,\'cancelled\')', [commandId, session.workspaceId, session.actorId, projectId])

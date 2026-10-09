@@ -1,9 +1,17 @@
-import { render } from '@testing-library/vue'
+import { render, waitFor } from '@testing-library/vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, defineComponent, onBeforeUnmount, shallowRef } from 'vue'
+import { computed, defineComponent, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { useAuxiliaryContractForm } from '~/composables/useAuxiliaryContractForm'
 import { useAuxiliaryContractRead } from '~/composables/useAuxiliaryContractRead'
+import { useContractFormAttachments } from '~/composables/useContractFormAttachments'
 import { AuxiliaryContractProblem } from '~/lib/auxiliary-contract/contract'
+import { createAuxiliaryContractRepository } from '~/lib/auxiliary-contract/repository'
+import { decodeAuxiliaryCommand } from '~/lib/auxiliary-contract/validation'
+import { useAuxiliaryContractCommandStore } from '~/stores/auxiliary-contract-command'
+import { createAuxiliaryContractTestInstance } from '../../server/utils/auxiliary-contract-test-instance'
+
+vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
 
 beforeEach(() => setActivePinia(createPinia()))
 afterEach(() => vi.unstubAllGlobals())
@@ -79,4 +87,69 @@ describe('辅助合同列表快照', () => {
     await loading
     expect(result.data.value).toEqual({ id: 'second' })
   })
+})
+
+it('auxiliary整页表单实际save回执后GET失败，恢复保后来文本与本次之外附件，采用真实ID与状态且只读不重写', async () => {
+  const actor = { workspaceId: 'component-aux-workspace', actorId: 'component-aux-owner', capabilities: ['auxiliary-contract:read', 'auxiliary-contract:write'] }
+  const server = createAuxiliaryContractTestInstance({ createId: () => 'actual-aux-saved-target', now: () => '2026-10-07T10:00:00.000Z' })
+  let readsFail = true
+  let writes = 0
+  let resolves = 0
+  const repository = createAuxiliaryContractRepository(async (url, options) => {
+    if (url.endsWith('/context'))
+      return server.context(actor)
+    if (url.endsWith('/resolve')) {
+      resolves++
+      throw new Error('Known receipt recovery must only read its actual target')
+    }
+    if (options?.method === 'POST') {
+      writes++
+      return server.execute(decodeAuxiliaryCommand(options.body), actor)
+    }
+    if (readsFail) {
+      readsFail = false
+      throw new Error('Actual saved-target GET failed')
+    }
+    return server.detail('actual-aux-saved-target', options?.query ?? {}, actor)
+  })
+  const values = new Map<string, string>()
+  vi.stubGlobal('sessionStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => {
+    values.set(key, value)
+  }, removeItem: (key: string) => {
+    values.delete(key)
+  } })
+  for (const [name, value] of Object.entries({ computed, ref, shallowRef, watch, onBeforeUnmount, nextTick }))
+    vi.stubGlobal(name, value)
+  vi.stubGlobal('useRoute', () => ({ params: {}, query: {}, fullPath: '/contract/company-expense/form' }))
+  vi.stubGlobal('useNuxtApp', () => ({ $repositories: { auxiliaryContracts: repository } }))
+  vi.stubGlobal('useAuxiliaryContractCommandStore', useAuxiliaryContractCommandStore)
+  vi.stubGlobal('useContractFormAttachments', useContractFormAttachments)
+  const navigate = vi.fn()
+  vi.stubGlobal('navigateTo', navigate)
+  vi.stubGlobal('useTabTitle', vi.fn())
+  vi.stubGlobal('useKitUI', () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), confirm: async () => false }))
+  let form!: ReturnType<typeof useAuxiliaryContractForm>
+  render(defineComponent({ setup() {
+    form = useAuxiliaryContractForm(() => 'company_expense')
+    return () => null
+  } }))
+  await waitFor(() => expect(form.loading.value).toBe(false))
+  form.patch({ name: '原提交合同', amount: 0 })
+  form.files.appendDrafts([{ fileName: '原提交附件.txt', fileSize: 3, payloadBase64: 'YWJj' }])
+  await form.save('draft')
+  expect(form.pending.value).toBe(true)
+  expect(writes).toBe(1)
+  form.draft.value = { ...form.draft.value, name: '后来输入仍保留', note: '不覆盖后来备注' }
+  form.files.appendDrafts([{ fileName: '后来另一个附件.txt', fileSize: 3, payloadBase64: 'ZGVm' }])
+  await form.recover()
+  expect(form.draft.value).toMatchObject({ id: 'actual-aux-saved-target', name: '后来输入仍保留', note: '不覆盖后来备注', status: '草稿' })
+  expect(form.files.pendingAttachments.value.map(file => file.fileName)).toEqual(['后来另一个附件.txt'])
+  expect(form.files.attachments.value).toHaveLength(1)
+  expect(form.files.attachments.value[0]).toMatchObject({ ownerId: 'actual-aux-saved-target', fileName: '原提交附件.txt' })
+  expect(form.dirty.value).toBe(true)
+  expect(form.pending.value).toBe(false)
+  expect(writes).toBe(1)
+  expect(resolves).toBe(0)
+  expect(navigate).not.toHaveBeenCalled()
+  expect(values.size).toBe(0)
 })

@@ -1,10 +1,11 @@
+import type { CommandRecoveryDescriptor, CommandResolution } from '../forms/command-recovery'
 import type { ScheduleCatalog, ScheduleCommand, ScheduleCommandResult, ScheduleRead, ScheduleReadContext, ScheduleReadQuery, ScheduleScopeRead } from './central-contract'
 import { readProjectHttp } from '../project/http-repository'
 import { decodeScheduleBindingRead } from './central-binding-decoder'
 import { scheduleProblem } from './central-contract'
 import { calendarDays } from './planning'
 
-export type ScheduleFetcher = (url: string, options?: { method?: 'POST', query?: Record<string, unknown>, body?: ScheduleCommand, signal?: AbortSignal }) => Promise<unknown>
+export type ScheduleFetcher = (url: string, options?: { method?: 'POST', query?: Record<string, unknown>, body?: ScheduleCommand | CommandRecoveryDescriptor, signal?: AbortSignal }) => Promise<unknown>
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -101,6 +102,21 @@ export function createScheduleRepository(fetcher: ScheduleFetcher) {
         if (!object(value) || value.commandId !== frozen.commandId || value.projectId !== frozen.projectId || typeof value.sourceVersion !== 'string' || !value.sourceVersion || !('value' in value))
           invalid()
         return structuredClone(value) as unknown as ScheduleCommandResult
+      })
+    },
+    resolve(descriptor: CommandRecoveryDescriptor): Promise<CommandResolution<ScheduleCommandResult>> {
+      const frozen = structuredClone(descriptor)
+      return readProjectHttp(() => fetcher('/api/commands/schedule/resolve', { method: 'POST', body: frozen }), (value) => {
+        if (!object(value) || (value.outcome !== 'applied' && value.outcome !== 'not-applied'))
+          invalid()
+        if (value.outcome === 'not-applied') {
+          if (value.commandId !== frozen.commandId)
+            invalid()
+        }
+        else if (!object(value.result) || value.result.commandId !== frozen.commandId || value.result.projectId !== frozen.targetId || typeof value.result.sourceVersion !== 'string' || !('value' in value.result)) {
+          invalid()
+        }
+        return structuredClone(value) as unknown as CommandResolution<ScheduleCommandResult>
       })
     },
   }

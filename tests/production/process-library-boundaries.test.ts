@@ -5,7 +5,7 @@ import { createProductionProcessLibraryService } from '../../server/utils/produc
 import { createProductionStorage } from '../../server/utils/production-storage'
 
 it('工序库提交期间撤权完整回滚，已存原件证据损坏后明确拒绝读取和再保存', async () => {
-  const base = resolve('.codex-tmp/issue-463-tests')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-463-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/boundary-`)
   const storage = createProductionStorage({ directory, workspaceId: 'boundary-workspace', ownerId: 'boundary-owner', purpose: 'verification' })

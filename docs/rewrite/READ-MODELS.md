@@ -283,6 +283,8 @@ HTTP adapter、领域 Repository 和显式本地 adapter 均映射此语义；�
 
 暂估预览分别返回有效范围、已知小计和缺失情况，按单位汇总；楼层读取保留冻结来源、人工计划和已有合同绑定历史，当前模板或失效 BOQ 不覆盖历史快照。排程、矩阵及户详情往返使用同一来源链并保留有效筛选；冷刷新或关系失效时重验稳定身份，不扩大成全部范围。写入与迁移见 [COMMANDS](./COMMANDS.md#中央-wbs-命令444) 及 [DATABASE](./DATABASE.md#中央-wbs-事实与整图接管444)，实际验证见 [#444 证据](../design/evidence/issue-444/README.md)。
 
+本机正式读取来自同一 `wbs`、`quantity`、项目和不可变工序库 owner；内部暂估与冻结楼层按真实零、缺量及单位分别返回，当前模板不回填历史。合同候选和新绑定来源明确不可用，历史合同/BOQ ID 仅用于追溯，不能冒充现行主档。原文件读取核对分组或任务的真实项目归属、来源路径、原字节与摘要；缺件和坏件分别处理。迁入读取保留已恢复批次及原回执，恢复不删除原件或审计。正式接入范围以 [ARCHITECTURE](./ARCHITECTURE.md#opt-02-scope-decision)为准，不由开发首页或历史中央证据扩大。
+
 ### 中央暂估绑定与楼栋证据读取（#445）
 
 `GET /api/read/schedule/binding` 使用当前项目、分组、合同选择与来源，返回未绑定预览或已绑定的真实记录。预览按显式楼栋与稳定分项关系读取当前合同清单，逐栋区分覆盖、缺覆盖与额外范围；暂估依据来自已有楼层冻结快照，不读取当前模板回填。分项按单位分别呈现合同量、冻结暂估量、完整度和可计算差异；缺量保留已知部分，真实零仍是确定值。
@@ -411,6 +413,8 @@ Issue #447 在同一专用响应中返回当前识别快照、原始候选、置
 详情只读取指定版本的科目、附件及明确归属的历史；实际成本按该版本项目读取当前已接管事实，并有独立来源指纹。预算头录入金额、正式合同承诺、结算成本与支付分别显示，历史版本不换成当前基线科目。完整度、已知部分、缺源及真实零的含义引用[公共三维规则](#read-status-and-completeness)，业务来源引用 [DATABASE](./DATABASE.md#目标成本中央版本与完整接管412)。
 
 原件只通过所属预算和文件身份读取，正文验证真实长度及摘要；历史未知大小仍保持空值，缺件与损坏分别说明。读态、多页签、异常恢复和五档视口的验收以 [#412 预算证据](../design/evidence/issue-412-target-cost/README.md)为准。本节不表示完整工资、材料、财务来源或生产持久化已经通过。
+
+正式预算从同一磁盘 owner 读取并核对原版本图、原件正文及来源证据；GET 不初始化 schema 或同步项目。实际成本只消费已接正式 owner，未接来源有独立缺口，保已知部分和真实零；其版本不抬高版本头或科目草稿基准。限定迁入目录仅公开来源定位、对账及恢复状态，不向普通预算读面返回完整原库字节或跨域私密来源正文。
 
 ### 工资中央历史与独立来源读取（#412）
 
@@ -639,6 +643,7 @@ adapter 切换须用同一确定事实验证身份、列表/详情、三维状�
 | 项目、客户、分供方 | app/lib/project、customer、supplier 的 Repository/HTTP/DTO；项目、客户、分供方浏览器主读已接中央，本机使用已登记磁盘参与者 |
 | 班组—工人 | app/lib/crew-worker、app/stores/crew-worker-read.ts 与 server/api/read/crews*、workers*；全局列表及成员候选跨页读取稳定身份，项目标签读取现有同源项目主档；原班组/项目变更后回读、原命令回执与历史冻结已有定向验证。显式 Tauri 仍有本地适配；正式持久接管及业务定义分别直达 ARCHITECTURE 与 [DATABASE](./DATABASE.md#global-worker-crew-directory) |
 | 核心/辅助合同、BOQ | app/lib/material-contract、construction-contract、subcontract-contract、auxiliary-contract、other-settlement；canonical kind 与补充协议按稳定父子关系读取 |
+| 施工主合同开支来源 | `GET /api/read/construction-scope/spending` 按实际项目和可选主合同读取；原材采、分包、其他支出合同承诺及唯一原费用分别从自己的持久 owner 派生，已知部分与完整值分开，未接或无权的发票／结算／支付来源明确缺口。工资返回项目范围的原实际事实，归集边界直达 [已答决定](./ARCHITECTURE.md#opt-02-scope-decision) |
 | 甲方/分包单据 | app/lib/owner-document/central-*、owner-commercial-document-read.ts；独立 kind/capability/金额投影，sub_settlement 与 project_penalty 使用专属事实 |
 | 项目分供方 | app/lib/project-supplier、project-supplier-read.ts；双 ID 与六类事实，合作文件 owner 的实际正文校验已接，其他文件 owner 以实际实现为准 |
 | 送货/材料价格 | app/lib/delivery、material、material-quotation 与 app/stores/delivery-record.ts；送货、合同和独立报价按各实际 owner 组合原价及版本，缺源分别呈现；报价的归属和迁入范围直达 [DATABASE](./DATABASE.md#quotation-target) |
@@ -665,13 +670,13 @@ Other 表单及详情返回真实 `expenseAllocations / clearanceLinks`，只有
 
 ### PG-01 本机客户读取（#450）
 
-当前本机客户列表/详情/表单、lifecycle、deleted、audit 与原命令结果查询回读磁盘参与者。文件按客户归属、删除状态、长度/SHA-256 校验，附件下载为 private/no-store 并禁止 MIME 嗅探；未接项目/合同/收款分别 unavailable，客户主档仍可读。运行和身份策略见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)，原结果 not-found 的处理由 [COMMANDS](./COMMANDS.md#pg-01-本机客户命令450) 保持封存保护。
+当前本机客户列表/详情/表单、lifecycle、deleted、audit 与原命令结果查询回读磁盘参与者。文件按客户归属、删除状态、长度/SHA-256 校验，附件下载为 private/no-store 并禁止 MIME 嗅探；项目和施工主合同由同次事务读取已登记 owner，合同与有效补充协议保可空金额，未接普通收款仍 unavailable。缺合同权限为 forbidden，不能把缺源显示成零。运行和身份策略见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)，原结果 not-found 的处理由 [COMMANDS](./COMMANDS.md#pg-01-本机客户命令450) 保持封存保护。
 
 ### PG-03 本机项目读取（#452）
 
 当前本机 project/customer 双向投影沿真实主/次客户外键，同一只读事务读取，已删项目不进入正常关系。lifecycle/deleted/audit 为核对恢复入口；已删除项目基础身份可核对，表单和文件拒绝。独立附件删除不随客户/项目恢复而改变。项目列表与详情已由实际同次事务组合项目和客户来源证明、可信会话及真实读取时点，HTTP 校验稳定身份、来源、原请求页和大小。金额不完整时界面明确显示未知、可证小计、缺失数量与当前筛选范围，不将授权可见范围称为企业全量。
 
-未接管合同/收款/预算/工资/项目分供方仍未知；没有开发/演示补源。原键读取见 [COMMANDS](./COMMANDS.md#pg-03-本机项目命令452)，持久清单见 [DATABASE](./DATABASE.md#pg-03-本机项目持久参与者452)。
+施工主合同管理费配置从同次事务的正式施工 owner 读取，每份合同保独立配置及冻结证明，配置不算实际成本。项目菜单可新建施工主合同；施工详情和项目开支面板从原合同、费用和真实实付关系只读归集，单份关联及项目工资范围沿 [OPT-02 已答决定](./ARCHITECTURE.md#opt-02-scope-decision)。基页未接的普通收款、预算与工资综合指标、项目分供方仍未知；面板的有证小计不把这些来源称为完整经营总额，没有开发/演示补源。原键读取见 [COMMANDS](./COMMANDS.md#pg-03-本机项目命令452)，持久清单见 [DATABASE](./DATABASE.md#pg-03-本机项目持久参与者452)。
 
 ### PG-04 本机分供方读取（#453）
 
@@ -681,7 +686,7 @@ Other 表单及详情返回真实 `expenseAllocations / clearanceLinks`，只有
 
 ### 本机工序库读取（#463）
 
-当前 GET process-libraries 及指定版本回读磁盘，只接 real 且需要 process-library:read；完整顺序、阶段/分项、前置 key、禁用状态和创建证据保持不可变。核对版本、原命令和审计完整图后才返回，损坏图不截取有效行冒充完整。未接正式 WBS 时 usageCount=null。参与者见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)，限定证据见 [#463](../design/evidence/issue-463-production-process-library/README.md)。
+当前 GET process-libraries 及指定版本回读磁盘，只接 real 且需要 process-library:read；完整顺序、阶段/分项、前置 key、禁用状态和创建证据保持不可变。核对版本、原命令和审计完整图后才返回，损坏图不截取有效行冒充完整。同事务 WBS 使用投影包含真实项目和组数；权限不足或参与者未接时 usageCount=null，已证实无引用才为0，投影不改不可变库正文。参与者见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)，限定证据见 [#463](../design/evidence/issue-463-production-process-library/README.md)。
 
 ### 待实施及需验证差异
 

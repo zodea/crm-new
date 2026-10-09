@@ -22,6 +22,7 @@
 //   summary(rows) → [{label,value}] 底部业务汇总行        newDefaults() 新增行隐藏字段（kind/subKind 等）
 //   importOpts {targetFields,sourceCols,fileName,rowCount}  onRowOpen(row) 行点击（一般=打开详情）
 //   rowActions(row) [{key,label,icon?,onSelect,disabled?}] 已声明的领域行操作；提供时替代默认编辑/删除。
+//   more [{key,label,icon,onSelect}] 工具条「⋯ 更多」里的领域动作（如原库迁入），导出 Excel 固定追加在末尾
 //   pageSize / tableMinWidth 透传 KitTable
 (function () {
   if (window.EntityListScreen) { window.EntityListPreload = window.EntityListPreload || function () { return null; }; return; }
@@ -30,9 +31,8 @@
 
   function EntityListScreen({ meta, params, navigate }) {
     const { Button, IconButton, Icon } = window.DesignSystem_e3d871 || {};
-    const KA = window.KitAtoms || {};
     const A = window.APP;
-    if (!A || !window.KitTable || !KA.SegTab) return null;
+    if (!A || !window.KitTable || !window.ListShell) return null;
     A.use();
     // 整页表单路由（grill 决议 2026-07-18 #3）：meta.formRoute 存在时新建/编辑跳整页表单页签；
     // meta.typeSelect 存在时新建先弹类型选择（三段式第一段）。navigate 优先取 prop，兜底 window.DC。
@@ -207,7 +207,7 @@
 
     // —— 列 = meta 列（应用显隐）+ 操作列 ——
     const cols = meta.columns.filter((c) => !hidden[c.key]).concat([{
-      key: "_ops", label: "操作", width: 92, align: "center", noForm: true,
+      key: "_ops", label: "操作", width: 92, align: "center", noForm: true, fixed: "right", resizable: false,
       render: (v, r) => (
         <span style={{ display: "inline-flex", gap: 4 }} onClick={(e) => e.stopPropagation()}>
           {meta.rowActions ? meta.rowActions(r).map(action => <IconButton key={action.key} icon={action.icon || "ellipsis"} title={action.label} disabled={action.disabled} onClick={action.onSelect} />) : <>
@@ -221,66 +221,41 @@
     // 穿透进入时切到「全部」视图（预筛已圈定范围，业务态默认视图会再砍一刀反而看不全）
     React.useEffect(() => { if (paramPre && views.some((v) => v.key === "all")) setView("all"); }, [paramFp]);  // eslint-disable-line
 
-    const toolbar = (
-      <div style={{ borderBottom: "1px solid var(--line)" }}>
-        <div style={{ padding: "12px 16px 10px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 14, fontWeight: 800 }}>{meta.title}
-            <span style={{ marginLeft: 6, color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>({shown.length})</span>
-          </span>
-          {paramActive && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--brand-soft)", color: "var(--brand-deep)",
-              border: "1px solid rgba(57,118,198,0.25)", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
-              {paramPre.label}
-              <button type="button" title="移除该筛选" onClick={() => setParamOffAt(paramFp)}
-                style={{ border: 0, background: "transparent", cursor: "pointer", color: "inherit", padding: 0, fontSize: 13, lineHeight: 1 }}>×</button>
-            </span>
-          )}
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <KA.SearchInput value={q} onChange={setQ} placeholder={"搜索" + meta.title} width={190} />
-            {(meta.filters || []).map((f) => (
-              <KA.SelectFilter key={f.key} label={f.label} options={f.options} value={filterVals[f.key] || "all"}
-                onChange={(val) => setFilterVals((s) => ({ ...s, [f.key]: val }))} />
-            ))}
-            <IconButton icon="settings-2" title="列设置" onClick={doColumns} />
-          </div>
-        </div>
-        <div style={{ padding: "0 16px", display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {views.length > 0 && <KA.SegTab tabs={views.map((v) => ({ key: v.key, label: v.label, count: (v.filter ? navRows.filter(v.filter) : navRows).length }))} active={view} onChange={setView} />}
-          </div>
-          <div style={{ display: "flex", gap: 8, padding: "0 0 8px", flex: "none" }}>
-            <Button size="sm" icon="upload" onClick={doImport}>导入</Button>
-            <Button size="sm" icon="download" onClick={doExport}>导出</Button>
-            <Button size="sm" variant="primary" icon="plus" onClick={addRow}>新建</Button>
-          </div>
-        </div>
-      </div>
-    );
-
-    const table = (
-      <window.KitTable toolbar={toolbar} columns={cols.map((c) => ({ width: 120, ...c }))} rows={shown}
-        pageSize={meta.pageSize || 10} minRows={10}
-        sum={meta.summary ? meta.summary(shown) : undefined}
-        tableMinWidth={meta.tableMinWidth != null ? meta.tableMinWidth : Math.max(720, cols.length * 128)}
-        onRowClick={(meta.onRowOpen || (meta.statusKey && meta.formRoute)) ? (r) => {
-          // 草稿行整行点击直接进整页表单续填（草稿三入口③，决议 8c）；普通行走原 onRowOpen
-          if (meta.statusKey && meta.formRoute && nav && r[meta.statusKey] === "草稿") return nav(meta.formRoute, { id: r.id });
-          if (meta.onRowOpen) meta.onRowOpen(r);
-        } : undefined}
-        footerLeft={"共 " + shown.length + " 条"} empty="暂无数据" />
-    );
-
-    if (!meta.leftNav) return table;
+    // 工具条 / 左树统一交给 ListShell（红圈列表模板，V-04 / V-06 / C-05）
+    const shellFilters = (meta.filters || []).map((f) => ({
+      key: f.key, label: f.label,
+      options: (f.options || []).filter((o) => o.key !== "all").map((o) => ({ value: o.key, label: o.label })),
+      value: filterVals[f.key] && filterVals[f.key] !== "all" ? filterVals[f.key] : "",
+      onChange: (val) => setFilterVals((s) => ({ ...s, [f.key]: val || "all" })),
+    }));
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "216px minmax(0,1fr)", gap: 16, alignItems: "start" }}>
-        {/* 左树 sticky：应用滚动在 document 层，116 = 吸顶 header(64)+页签栏(40)+呼吸位（2026-07-19 反馈轮） */}
-        <div style={{ position: "sticky", top: 116, alignSelf: "start", maxHeight: "calc(100vh - 132px)", overflowY: "auto" }}>
-          <KA.TreeNav title={meta.leftNav.title} active={navKey} onChange={setNavKey}
-            items={meta.leftNav.items.map((it) => ({ key: it.key, label: it.label, icon: it.icon,
-              count: (it.filter ? baseRows.filter(it.filter) : baseRows).length }))} />
-        </div>
-        {table}
-      </div>
+      <window.ListShell
+        title={meta.title} count={shown.length}
+        views={views.map((v) => ({ key: v.key, label: v.label, count: (v.filter ? navRows.filter(v.filter) : navRows).length }))}
+        view={view} onView={setView}
+        chips={paramActive ? [{ key: "preset", label: paramPre.label, onRemove: () => setParamOffAt(paramFp) }] : []}
+        search={q} onSearch={setQ} searchPlaceholder={"搜索" + meta.title}
+        filters={shellFilters}
+        onRefresh={() => UI().toast("已刷新「" + meta.title + "」", "ok")}
+        onColumns={doColumns}
+        onImport={doImport} onCreate={addRow}
+        more={(meta.more || []).concat([{ key: "export", label: "导出 Excel", icon: "download", onSelect: doExport }])}
+        tree={meta.leftNav ? { title: meta.leftNav.title, active: navKey, onChange: setNavKey,
+          items: meta.leftNav.items.map((it) => ({ key: it.key, label: it.label, count: (it.filter ? baseRows.filter(it.filter) : baseRows).length })) } : null}
+        renderTable={(toolbar) => (
+          <window.KitTable toolbar={toolbar} columns={cols.map((c) => ({ width: 120, ...c }))} rows={shown} height="fill"
+            pageSize={meta.pageSize || 20}
+            sum={meta.summary ? meta.summary(shown) : undefined}
+            tableMinWidth={meta.tableMinWidth != null ? meta.tableMinWidth : Math.max(720, cols.length * 128)}
+            onRowClick={(meta.onRowOpen || (meta.statusKey && meta.formRoute)) ? (r) => {
+              // 草稿行整行点击直接进整页表单续填（草稿三入口③，决议 8c）；普通行走原 onRowOpen
+              if (meta.statusKey && meta.formRoute && nav && r[meta.statusKey] === "草稿") return nav(meta.formRoute, { id: r.id });
+              if (meta.onRowOpen) meta.onRowOpen(r);
+            } : undefined}
+            empty={(q || shellFilters.some((f) => f.value) || paramActive)
+              ? { title: "没有符合条件的" + meta.title, description: "调整或清除筛选条件后再试", icon: "search-x" }
+              : { title: "还没有" + meta.title, description: "点击右上角「新建」录入第一条，或从 Excel 导入" }} />
+        )} />
     );
   }
 

@@ -25,7 +25,7 @@
     const fields = [["申请编号", row.no], ["项目", project ? project.name : row.projectId ? "来源待核验" : "公司付款"], ["收款单位", supplier && supplier.name], ["申请人", row.applicant], ["申请日期", row.applyDate], ["业务类型", row.bizType], ["成本分类", row.costName], ["回票类型", row.invoiceState], ["付款内容", row.payContent]];
     const table = (title, rows, columns, empty) => <section>
       <KA.SectionHeader>{title}</KA.SectionHeader>
-      <Table label={title} rows={rows || []} columns={columns} minRows={3} empty={empty} />
+      <Table label={title} rows={rows || []} columns={columns} empty={empty} />
     </section>;
     return <Shell title={row.name || "付款申请详情"} code={row.no} onBack={back} chips={window.stdStatusChip(row.status)}
       headerExtra={state !== "readonly" && <Button icon="square-pen" onClick={() => navigate("payApplyForm", { id: row.id })}>编辑申请</Button>}

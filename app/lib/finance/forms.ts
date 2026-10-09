@@ -15,7 +15,8 @@ export async function saveFinanceForm(kind: F3FormKind, draft: F3FormDraft, acti
     throw new Error('浏览器收款请通过中央收款表单保存')
   return withTransaction(async (tx) => {
     const saved = await saveFinanceFormInTransaction(kind, draft, action, tx)
-    return { ...saved, attachmentIds: await applyFileRefChanges(tx, FINANCE_OWNER_TYPE[kind], saved.id, attachments) }
+    const { expenseLineIds: _expenseLineIds, ...result } = saved
+    return { ...result, attachmentIds: await applyFileRefChanges(tx, FINANCE_OWNER_TYPE[kind], saved.id, attachments) }
   })
 }
 export async function loadFinanceForm<K extends F3FormKind>(kind: K, id: string, db: Pick<TransactionDb, 'select'> = { select }): Promise<FinanceFormRecordMap[K] | null> {

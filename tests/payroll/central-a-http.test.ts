@@ -7,9 +7,7 @@ import { createPayrollRepository } from '~/lib/payroll/central-repository'
 import { createPayrollAServiceFixture } from '../helpers/payroll-a-service-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollAServiceFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 describe('a HTTP/Repository 往返', () => {
   let f: Awaited<ReturnType<typeof createPayrollAServiceFixture>>
   let server: ReturnType<typeof createServer>

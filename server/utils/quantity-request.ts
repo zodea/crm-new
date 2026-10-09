@@ -44,14 +44,75 @@ export function parseQuantityPhotoReadQuery(value: unknown): QuantityReadQuery &
 }
 
 export function parseQuantityCommand(value: unknown): QuantityCommand {
+  closedQuantityRequest(value, ['workspaceId', 'actorId', 'requiredCapability', 'commandId', 'baseVersion', 'origin', 'projectId', 'action'])
   if (object(value) && object(value.action) && isQuantityHollowActionKind(value.action.kind))
     return parseQuantityHollowCommand(value)
   if (!object(value) || !['workspaceId', 'actorId', 'commandId', 'projectId', 'baseVersion'].every(key => typeof value[key] === 'string' && String(value[key]).trim())
     || value.requiredCapability !== 'quantity:write' || value.origin !== 'real' || !object(value.action)) {
     throw quantityProblem('validation-failed', '工程量命令身份、版本或动作格式无效')
   }
+  const action = value.action
+  const draftKeys: Record<string, string[]> = {
+    'create-building': ['code', 'name'],
+    'create-floor': ['code', 'name'],
+    'create-unit': ['code', 'name', 'templateId'],
+    'save-template': ['id', 'projectId', 'code', 'name', 'copiedFromTemplateId', 'sortOrder', 'expectedUpdatedAt', 'rooms', 'newItems', 'lines', 'allowArchivedEdit'],
+    'save-stage': ['id', 'code', 'name', 'trade', 'completionMode', 'sortOrder', 'itemIds'],
+    'save-assignments': ['projectId', 'trade', 'assigneeKind', 'assigneeId', 'unitIds', 'expectedAssignments', 'scopes', 'note', 'allowReplacement', 'allowArchivedEdit'],
+    'save-completion': ['projectId', 'unitId', 'stageId', 'status', 'completedAt', 'note', 'photos', 'expectedCompletionId', 'expectedCompletionFingerprint', 'expectedAssignmentId', 'allowArchivedEdit'],
+    'save-completion-batch': ['projectId', 'trade', 'completedAt', 'note', 'items', 'allowArchivedEdit'],
+  }
+  const actionKeys: Record<string, string[]> = {
+    'create-building': ['kind', 'draft'],
+    'create-floor': ['kind', 'buildingId', 'draft'],
+    'create-unit': ['kind', 'floorId', 'draft'],
+    'save-template': ['kind', 'draft'],
+    'delete-template': ['kind', 'templateId', 'allowArchivedEdit'],
+    'undo-template': ['kind', 'logIds', 'allowArchivedEdit'],
+    'save-stage': ['kind', 'draft', 'allowArchivedEdit'],
+    'set-reporting-stage': ['kind', 'itemId', 'stageId', 'allowArchivedEdit'],
+    'save-assignments': ['kind', 'draft'],
+    'save-completion': ['kind', 'draft'],
+    'save-completion-batch': ['kind', 'draft'],
+    'set-archived': ['kind', 'archived'],
+    'import-row': ['kind', 'target', 'row', 'unitId', 'assignee'],
+  }
+  const kind = String(action.kind)
+  if (!Object.hasOwn(actionKeys, kind))
+    throw quantityProblem('validation-failed', '工程量命令动作尚未定义')
+  closedQuantityRequest(action, actionKeys[kind]!)
+  if (Object.hasOwn(draftKeys, kind))
+    closedQuantityRequest(action.draft, draftKeys[kind]!)
+  if (object(action.draft)) {
+    const draft = action.draft
+    if (kind === 'save-template') {
+      closedQuantityRows(draft.rooms, ['key', 'id', 'sourceRoomId', 'code', 'name', 'kind', 'sortOrder'])
+      closedQuantityRows(draft.newItems, ['key', 'code', 'name', 'section', 'trade', 'unit', 'sortOrder'])
+      closedQuantityRows(draft.lines, ['key', 'id', 'sourceLineId', 'sourceRoomId', 'sourceItemId', 'boqLineId', 'boqBindingVersion', 'roomKey', 'itemId', 'recognizedContractQty', 'contractQty', 'provisionalQty', 'fieldFormula', 'fieldQty', 'note', 'sortOrder'])
+    }
+    if (kind === 'save-assignments') {
+      closedQuantityRows(draft.expectedAssignments, ['unitId', 'assignmentId', 'fingerprint'])
+      closedQuantityRows(draft.scopes, ['unitId', 'roomId', 'itemId'])
+    }
+    if (kind === 'save-completion')
+      closedQuantityRows(draft.photos, ['fileName', 'mimeType', 'fileSize', 'contentBase64'])
+    if (kind === 'save-completion-batch')
+      closedQuantityRows(draft.items, ['unitId', 'stageId', 'expectedCompletionId', 'expectedCompletionFingerprint', 'expectedAssignmentId'])
+  }
+  if (kind === 'import-row' && action.assignee !== null)
+    closedQuantityRequest(action.assignee, ['kind', 'id'])
   // 各动作的完整草稿及当前父关系由中央服务在同一事务边界内验证。
   return structuredClone(value) as unknown as QuantityCommand
+}
+
+function closedQuantityRequest(value: unknown, keys: readonly string[]) {
+  if (!object(value) || Object.keys(value).some(key => !keys.includes(key)))
+    throw quantityProblem('validation-failed', '工程量请求包含未定义字段，请保留原输入重新核对')
+}
+function closedQuantityRows(value: unknown, keys: readonly string[]) {
+  if (!Array.isArray(value))
+    throw quantityProblem('validation-failed', '工程量明细必须是已定义的记录集合')
+  for (const row of value) closedQuantityRequest(row, keys)
 }
 
 export function parseQuantityHollowReadQuery(value: unknown): QuantityUnitReadQuery {

@@ -161,12 +161,14 @@ export async function loadQuantityVarianceFacts(
   centralBoq?: readonly QuantityBoqLine[],
 ): Promise<QuantityVarianceFact[]> {
   let facts = await db.select<QuantityVarianceFactRow>(
-    `${hiddenCtesFor(
-      'units',
-      'house_type_template_items',
-      'boq_lines',
-      'boq_change_lines',
-    )}
+    `${centralBoq
+      ? hiddenCtesFor('units', 'house_type_template_items')
+      : hiddenCtesFor(
+          'units',
+          'house_type_template_items',
+          'boq_lines',
+          'boq_change_lines',
+        )}
      SELECT u.id AS unit_id,
             hti.id AS template_item_id,
             b.id AS building_id,
@@ -183,10 +185,10 @@ export async function loadQuantityVarianceFacts(
             hti.provisional_qty,
             hti.field_qty,
             ${centralBoq ? 'hti.boq_line_id' : 'boq.id'} AS boq_line_id,
-            boq.building AS boq_building,
-            boq.unit_price AS base_unit_price,
+            ${centralBoq ? 'NULL' : 'boq.building'} AS boq_building,
+            ${centralBoq ? 'NULL' : 'boq.unit_price'} AS base_unit_price,
             hti.updated_at AS template_item_updated_at,
-            boq.updated_at AS boq_line_updated_at
+            ${centralBoq ? 'NULL' : 'boq.updated_at'} AS boq_line_updated_at
      FROM units u
      JOIN floors f ON f.id = u.floor_id
      JOIN buildings b ON b.id = f.building_id
@@ -194,17 +196,19 @@ export async function loadQuantityVarianceFacts(
      JOIN rooms r ON r.template_id = u.house_type_template_id
      JOIN house_type_template_items hti ON hti.room_id = r.id
      JOIN items i ON i.id = hti.item_id
-     LEFT JOIN boq_lines boq
+     ${centralBoq
+        ? ''
+        : `LEFT JOIN boq_lines boq
        ON boq.id = hti.boq_line_id
       AND boq.project_id = ?
-      AND ${visibleCond('boq_lines', 'boq')}
+      AND ${visibleCond('boq_lines', 'boq')}`}
      WHERE ${visibleCond('units', 'u')}
        AND ${visibleCond('house_type_template_items', 'hti')}
        AND b.project_id = ?
        AND ht.project_id = ?
        AND i.project_id = ?
      ORDER BY b.sort_order, b.code, b.id, i.sort_order, i.code, i.id, u.sort_order, u.id, hti.sort_order, hti.id`,
-    [projectId, projectId, projectId, projectId],
+    centralBoq ? [projectId, projectId, projectId] : [projectId, projectId, projectId, projectId],
   )
 
   if (centralBoq) {

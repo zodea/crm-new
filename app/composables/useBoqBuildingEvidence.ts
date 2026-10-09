@@ -197,7 +197,8 @@ export function useBoqBuildingEvidence() {
     try {
       await store.recover()
       if (sameTarget(current, request)) {
-        if (command.projectId === value.projectId && command.contractId === value.contractId && command.origin === value.origin && command.workspaceId === value.workspaceId && command.actorId === value.actorId && command.lineId === lineId.value)
+        const matching = 'family' in command ? command.scopeId === `${value.projectId}:${value.contractId}` && command.targetId === lineId.value && command.workspaceId === value.workspaceId && command.actorId === value.actorId : command.projectId === value.projectId && command.contractId === value.contractId && command.origin === value.origin && command.workspaceId === value.workspaceId && command.actorId === value.actorId && command.lineId === lineId.value
+        if (matching)
           await finish(value)
         else
           await load()

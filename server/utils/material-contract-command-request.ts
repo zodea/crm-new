@@ -1,4 +1,5 @@
 import type { MaterialContractCommandRequestDTO } from '../../app/lib/material-contract/command-contract'
+import { decodeConstructionMainSelection } from '../../app/lib/construction-scope/contract'
 import { MATERIAL_CONTRACT_WRITE_CAPABILITY } from '../../app/lib/material-contract/command-contract'
 import {
   decodeMaterialContractAttachmentChanges,
@@ -20,7 +21,7 @@ export function parseMaterialContractCommandRequest(
   target: { kind: 'create' } | { kind: 'update', routeId: string },
 ): MaterialContractCommandRequestDTO {
   if (!object(value) || !object(value.draft) || !object(value.attachments)
-    || Object.keys(value).some(key => !['id', 'workspaceId', 'actorId', 'requiredCapability', 'commandId', 'baseVersion', 'action', 'draft', 'attachments'].includes(key))
+    || Object.keys(value).some(key => !['id', 'workspaceId', 'actorId', 'requiredCapability', 'commandId', 'baseVersion', 'action', 'draft', 'attachments', 'constructionMain'].includes(key))
     || typeof value.workspaceId !== 'string' || typeof value.actorId !== 'string'
     || value.requiredCapability !== MATERIAL_CONTRACT_WRITE_CAPABILITY
     || typeof value.commandId !== 'string'
@@ -46,6 +47,7 @@ export function parseMaterialContractCommandRequest(
       action: value.action as MaterialContractCommandRequestDTO['action'],
       draft: decodeMaterialContractDraft(value.draft),
       attachments: decodeMaterialContractAttachmentChanges(value.attachments),
+      ...(value.constructionMain !== undefined ? { constructionMain: decodeConstructionMainSelection(value.constructionMain) } : {}),
     }
   }
   catch (cause) {

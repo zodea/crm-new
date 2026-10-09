@@ -28,14 +28,16 @@ export function decodeOtherSettlementDraft(input: unknown): OtherSettlementDraft
     if (!Array.isArray(raw.originalExpenses) || raw.originalExpenses.length > 1000)
       throw auxiliaryProblem('validation-failed', '原费用采用必须来自真实费用行')
     draft.originalExpenses = raw.originalExpenses.map((line) => {
-      if (!line || typeof line !== 'object' || Array.isArray(line) || Object.keys(line).some(key => !['amount', 'originalExpenseLineId', 'sourceRevision', 'sourceVersion', 'clearanceAllocations'].includes(key))
+      if (!line || typeof line !== 'object' || Array.isArray(line) || Object.keys(line).some(key => !['amount', 'originalExpenseLineId', 'sourceRevision', 'sourceVersion', 'consumptionVersion', 'clearanceAllocations'].includes(key))
         || ['originalExpenseLineId', 'sourceVersion', 'sourceRevision'].some(key => typeof line[key] !== 'string' || !line[key].trim())
         || !(line.amount === null || (typeof line.amount === 'number' && Number.isFinite(line.amount) && line.amount >= 0 && line.amount <= 1e12 && Math.abs(line.amount * 100 - Math.round(line.amount * 100)) < 0.001))) {
         throw auxiliaryProblem('validation-failed', '原费用行身份、来源版本或采用金额无效')
       }
+      if (line.consumptionVersion !== undefined && (typeof line.consumptionVersion !== 'string' || !/^expense-consumption-v1:[a-f0-9]{64}$/.test(line.consumptionVersion)))
+        throw auxiliaryProblem('validation-failed', '原费用实际消费依据无效')
       if (line.clearanceAllocations !== undefined && (!Array.isArray(line.clearanceAllocations) || line.clearanceAllocations.length > 1000 || !line.clearanceAllocations.every(isExpenseClearanceAllocationInput) || new Set(line.clearanceAllocations.map((item: { itemId: string }) => item.itemId)).size !== line.clearanceAllocations.length))
         throw auxiliaryProblem('validation-failed', '旧份额采用必须明确选择真实核定份额，不能重复或猜关联。')
-      return { originalExpenseLineId: line.originalExpenseLineId, sourceVersion: line.sourceVersion, sourceRevision: line.sourceRevision, amount: line.amount, ...(line.clearanceAllocations ? { clearanceAllocations: line.clearanceAllocations } : {}) }
+      return { originalExpenseLineId: line.originalExpenseLineId, sourceVersion: line.sourceVersion, sourceRevision: line.sourceRevision, amount: line.amount, ...(line.consumptionVersion ? { consumptionVersion: line.consumptionVersion } : {}), ...(line.clearanceAllocations ? { clearanceAllocations: line.clearanceAllocations } : {}) }
     })
     if (new Set(draft.originalExpenses.map(line => line.originalExpenseLineId)).size !== draft.originalExpenses.length)
       throw auxiliaryProblem('validation-failed', '同一原费用行不可重复采用')

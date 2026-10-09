@@ -52,7 +52,7 @@ export function usePayrollC2Statement(options: { id: () => string, origin: () =>
         latest.value = null
       }
       const operation = store.getC2Pending(value)
-      if (operation?.command.action.kind === 'release-c2' && !releaseOpen.value) {
+      if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'release-c2' && !releaseOpen.value) {
         releaseRead.value = matching.value ?? value
         releaseDraft.value = operation.command.action.release
         releaseOpen.value = true

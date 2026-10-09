@@ -7,6 +7,7 @@ import { createProductionFinanceService } from '../../server/utils/production-fi
 import { createProductionOtherSettlementService, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { adoptHistoricalExpenseFixture } from '../helpers/other-settlement-pay08-source'
 
 async function fixture(existingAmount?: number, missingRecord = false) {
   const root = resolve('.tmp/a02-clearance-tests')
@@ -20,7 +21,7 @@ async function fixture(existingAmount?: number, missingRecord = false) {
   const service = await supplier.execute({ ...identity, requiredCapability: 'supplier:write', commandId: 'clearance-service-party', baseVersion: null, action: 'save', attachments: {}, draft: { name: '实际服务方', supplierCategory: '其他', contact: '合成服务方' } }, session)
   const payee = await supplier.execute({ ...identity, requiredCapability: 'supplier:write', commandId: 'clearance-advance-party', baseVersion: null, action: 'save', attachments: {}, draft: { name: '实际垫付收款方', supplierCategory: '其他', contact: '合成收款方' } }, session)
   const finance = createProductionFinanceService(storage, { references: (tx, current) => ({ expenditure_settlements: id => readProductionOtherSettlementReference(tx, current, id) }) })
-  const expense = await finance.execute({ ...identity, kind: 'reimbursement', requiredCapability: 'finance-reimbursement:write', commandId: 'clearance-original-cost', baseVersion: null, action: 'save', attachments: {}, draft: { applicantSupplierId: payee.id, status: 'confirmed', reimbursementDate: '2026-10-05', lines: [{ expenseItem: '真实原费用100', amount: 100, counterpartySupplierId: service.id }] } }, session)
+  const expense = await adoptHistoricalExpenseFixture(storage, actor, { directory, serviceId: service.id, payeeId: payee.id, serviceName: '实际服务方', payeeName: '实际垫付收款方', prefix: 'clearance-historical-original' })
   const original = (await finance.form('reimbursement', expense.id, session)).draft.lines[0]!.id!
   const owner = createProductionOtherSettlementService(storage)
   let existing: { id: string, version: string } | null = null

@@ -320,7 +320,7 @@ export async function importQuantityCompletionRow(db: SoftDb, row: Record<string
   await persistQuantityStageCompletion(db, { ...await buildQuantityCompletionImportDraft(db, projectId, unitId, row), allowMissingPhotos: true })
 }
 
-export async function buildQuantityCompletionImportDraft(db: SoftDb, projectId: string, unitId: string, row: Record<string, unknown>): Promise<Omit<QuantityCompletionDraft, 'allowMissingPhotos'>> {
+export async function buildQuantityCompletionImportDraft(db: SoftDb, projectId: string, unitId: string, row: Record<string, unknown>, options: NonNullable<Parameters<typeof loadQuantityCompletionWorkspace>[3]> = {}): Promise<Omit<QuantityCompletionDraft, 'allowMissingPhotos'>> {
   const stageCode = str(row, 'stageCode')
   if (!stageCode)
     throw new Error('缺少阶段编码')
@@ -336,7 +336,7 @@ export async function buildQuantityCompletionImportDraft(db: SoftDb, projectId: 
   if (!completedAt)
     throw new Error('缺少完成日期')
 
-  const workspace = await loadQuantityCompletionWorkspace(db, projectId, unitId)
+  const workspace = await loadQuantityCompletionWorkspace(db, projectId, unitId, options)
   const stage = workspace.stages.find(candidate => candidate.code === stageCode)
   if (!stage)
     throw new Error(`工序阶段「${stageCode}」不存在或不支持按户完成`)

@@ -12,6 +12,12 @@ import { readQuantityHollowTables } from '../../app/lib/quantity/hollow-migratio
 
 export async function initializeQuantityHollowMigrationEvidence(tx: TransactionDb): Promise<void> {
   await initializeQuantityHollowSchema(tx)
+  const registered = await tx.select('SELECT name FROM sqlite_master WHERE type=\'table\' AND name=\'production_participants\'')
+  if (registered.length) {
+    if (!(await tx.select('SELECT name FROM sqlite_master WHERE type=\'table\' AND name=?', [QUANTITY_HOLLOW_EVIDENCE_TABLE])).length)
+      throw quantityProblem('unavailable', '正式空鼓证据表缺少已登记连续升级')
+    return
+  }
   await tx.execute(`CREATE TABLE IF NOT EXISTS ${QUANTITY_HOLLOW_EVIDENCE_TABLE} (
     entity_id TEXT PRIMARY KEY, project_id TEXT NOT NULL UNIQUE, batch_id TEXT NOT NULL,
     source_package_json TEXT NOT NULL, source_fingerprint TEXT NOT NULL, mapped_package_json TEXT NOT NULL,

@@ -1,4 +1,5 @@
 import type { MoneyDTO, ProblemDTO, ReadMetaDTO } from '../../types/read-model'
+import type { ConstructionScopeResult } from '../construction-scope/contract'
 import type { CommandResolution } from '../forms/command-recovery'
 import type { FileRefChanges, FileRefRecord } from '../forms/file-refs'
 import type { LookupOption } from '../kit/lookup'
@@ -65,7 +66,7 @@ export interface FinanceCommand {
   draft: F3FormDraft
   attachments: FileRefChanges
 }
-export interface FinanceCommandResult { id: string, commandId: string, version: string, updatedAt: string, attachmentIds: string[], logId: string | null, paymentVerificationSha256?: string, clearanceVerificationSha256?: string, clearanceVerificationId?: string }
+export interface FinanceCommandResult { id: string, commandId: string, version: string, updatedAt: string, attachmentIds: string[], logId: string | null, paymentVerificationSha256?: string, clearanceVerificationSha256?: string, clearanceVerificationId?: string, constructionScopeLinks?: ConstructionScopeResult[], expenseLineIdentities?: Array<{ inputIndex: number, id: string }> }
 export interface FinanceFormData<K extends CentralFinanceKind = CentralFinanceKind> {
   draft: FinanceFormRecordMap[K]
   attachments: Array<FileRefRecord & { sha256: string | null }>
@@ -73,14 +74,14 @@ export interface FinanceFormData<K extends CentralFinanceKind = CentralFinanceKi
   updatedAt: string
 }
 export interface FinanceFormRead<K extends CentralFinanceKind = CentralFinanceKind> extends FinanceFormData<K>, FinanceContext {}
-export type FinanceLookupKind = 'projects' | 'customers' | 'suppliers' | 'workers' | 'contracts' | 'settlements' | 'invoices' | 'original-expenses' | 'payment-applications'
+export type FinanceLookupKind = 'projects' | 'customers' | 'suppliers' | 'workers' | 'contracts' | 'settlements' | 'invoices' | 'original-expenses' | 'payment-applications' | 'construction-mains'
 export interface FinanceLookupQuery { kind: FinanceLookupKind, keyword: string, projectId?: string | null, supplierId?: string | null, workerId?: string | null, contractId?: string | null, excludeId?: string, contractKinds?: string[], paymentBizType?: string }
 export function normalizeFinanceLookup(value: unknown): FinanceLookupQuery {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     financeFailure('validation-failed', '财务候选查询无效。')
   const query = value as Record<string, unknown>
   if (Object.keys(query).some(key => !['kind', 'keyword', 'projectId', 'supplierId', 'workerId', 'contractId', 'excludeId', 'contractKinds', 'paymentBizType'].includes(key))
-    || !['projects', 'customers', 'suppliers', 'workers', 'contracts', 'settlements', 'invoices', 'original-expenses', 'payment-applications'].includes(String(query.kind))
+    || !['projects', 'customers', 'suppliers', 'workers', 'contracts', 'settlements', 'invoices', 'original-expenses', 'payment-applications', 'construction-mains'].includes(String(query.kind))
     || (query.keyword !== undefined && (typeof query.keyword !== 'string' || query.keyword.length > 200))) {
     financeFailure('validation-failed', '财务候选查询包含不支持的范围。')
   }

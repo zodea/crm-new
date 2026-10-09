@@ -1,13 +1,17 @@
+import type { CommandRecoveryDescriptor } from '~/lib/forms/command-recovery'
 import type { QuantityContext, QuantityUnitReadQuery } from '~/lib/quantity/central-contract'
 import type { QuantityHollowAction, QuantityHollowCommand, QuantityHollowCommandResult, QuantityHollowRead } from '~/lib/quantity/central-hollow-contract'
 import { useSessionStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
-import { computed, shallowRef, toRaw } from 'vue'
+import { computed, readonly, shallowRef, toRaw } from 'vue'
+import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
 import { quantityProblem } from '~/lib/quantity/central-contract'
 import { decodeQuantityHollowCommand, quantityHollowReceiptObserved } from '~/lib/quantity/central-hollow-codec'
 import { parseQuantityHollowCommand } from '~/lib/quantity/central-hollow-validation'
 import { quantityProblemFromUnknown } from '~/lib/quantity/central-repository'
+import { quantityRecoveryDescriptor, readQuantityRecoveryForRoute } from '~/lib/quantity/command-recovery'
 import { generateId } from '~/lib/util/id'
+import { useProductionAccessStore } from '~/stores/production-access'
 
 interface StoredOperation {
   unitId: string
@@ -37,8 +41,24 @@ const readKey = (read: QuantityHollowRead) => serialize([read.context.workspaceI
 /** 每户独立原提交槽位；回执和后读核对前绝不因换页或重新读取清空。 */
 export const useQuantityHollowStore = defineStore('quantity-hollow', () => {
   const repositories = useNuxtApp().$repositories
-  const operations = useSessionStorage<Record<string, StoredOperation>>(storageKey, {}, { flush: 'sync', writeDefaults: false, onError: () => {} })
-  const drafts = useSessionStorage<Record<string, QuantityHollowDraftCache>>('quantity-hollow-drafts-v1', {}, { flush: 'sync', writeDefaults: false, onError: () => {} })
+  const access = useProductionAccessStore()
+  const formal = computed(() => access.status?.mode === 'production')
+  const legacyOperations = useSessionStorage<Record<string, StoredOperation>>(storageKey, {}, { flush: 'sync', writeDefaults: false, onError: () => {} })
+  const legacyDrafts = useSessionStorage<Record<string, QuantityHollowDraftCache>>('quantity-hollow-drafts-v1', {}, { flush: 'sync', writeDefaults: false, onError: () => {} })
+  const memoryOperations = shallowRef<Record<string, StoredOperation>>({})
+  const memoryDrafts = shallowRef<Record<string, QuantityHollowDraftCache>>({})
+  const operations = computed({ get: () => formal.value ? memoryOperations.value : legacyOperations.value, set: (value) => {
+    if (formal.value)
+      memoryOperations.value = value
+    else legacyOperations.value = value
+  } })
+  const drafts = computed({ get: () => formal.value ? memoryDrafts.value : legacyDrafts.value, set: (value) => {
+    if (formal.value)
+      memoryDrafts.value = value
+    else legacyDrafts.value = value
+  } })
+  const markerCodec = createCommandRecoveryStorage()
+  const pendingDescriptors = shallowRef<CommandRecoveryDescriptor[]>([])
   const active = shallowRef(new Set<string>())
   const identity = shallowRef<QuantityContext | null>(null)
   const reads = new WeakMap<object, { content: string, receipts: Set<string> }>()
@@ -69,6 +89,26 @@ export const useQuantityHollowStore = defineStore('quantity-hollow', () => {
     drafts.value = next
   }
   function persist(next: Record<string, StoredOperation>) {
+    if (formal.value) {
+      for (const entry of Object.values(next)) {
+        const descriptor = quantityRecoveryDescriptor(entry.command)
+        const key = commandRecoveryKey(descriptor)
+        const previous = markerCodec.read(key)
+        if (previous && serialize(previous) !== serialize(descriptor))
+          throw quantityProblem('conflict', '原空鼓最小定位已变化，请先核对')
+        if (!previous)
+          markerCodec.remember(key, descriptor)
+      }
+      for (const entry of Object.values(operations.value)) {
+        if (!next[operationKey(entry)]) {
+          const descriptor = quantityRecoveryDescriptor(entry.command)
+          markerCodec.clear(commandRecoveryKey(descriptor), descriptor.commandId)
+        }
+      }
+      memoryOperations.value = next
+      pendingDescriptors.value = pendingDescriptors.value.filter(row => !Object.values(operations.value).some(entry => entry.command.commandId === row.commandId))
+      return
+    }
     try {
       const before = window.sessionStorage.getItem(storageKey)
       if (before !== null && serialize(JSON.parse(before)) !== serialize(operations.value))
@@ -106,6 +146,12 @@ export const useQuantityHollowStore = defineStore('quantity-hollow', () => {
     if (!sameIdentity(context, read.context) || read.data.projectId !== query.projectId || read.data.unitId !== query.unitId || read.dataOrigin !== query.origin || serialize([...context.capabilities].sort()) !== serialize([...read.context.capabilities].sort()))
       throw quantityProblem('relationship-mismatch', '空鼓读取的身份、权限或原户与当前页面不一致')
     reads.set(toRaw(read), { content: serialize(read), receipts })
+    if (formal.value && read.dataOrigin === 'real') {
+      const base = `/subcontract/quantity/${encodeURIComponent(query.projectId)}/${encodeURIComponent(query.unitId)}`
+      const paths = [base, ...read.data.records.map(row => `${base}/hollow/${encodeURIComponent(row.recordId)}`)]
+      const markers = paths.flatMap(path => readQuantityRecoveryForRoute(path, context, sessionStorage)).filter(row => row.targetId?.startsWith('hollow:'))
+      pendingDescriptors.value = markers.filter((row, index, all) => all.findIndex(other => other.commandId === row.commandId) === index)
+    }
     return read
   }
   function originalEntry(original: Pick<QuantityHollowPending, 'unitId' | 'command'>) {
@@ -147,6 +193,8 @@ export const useQuantityHollowStore = defineStore('quantity-hollow', () => {
       throw quantityProblem('forbidden', '请先读取当前有写入权限的正式原户')
     if (stored(readKey(read)))
       throw quantityProblem('conflict', '请先核对原空鼓提交，再保存新的输入')
+    if (formal.value && pendingDescriptors.value.length)
+      throw quantityProblem('conflict', '刷新前的原空鼓提交尚未核对，不能改用新编号')
     const eligible = action.kind === 'create-hollow-inspection'
       ? read.data.targets.find(value => serialize(value.target) === serialize(action.target))?.create.allowed
       : read.data.records.find(value => value.recordId === action.recordId)?.eligibility[action.kind === 'revise-hollow-inspection' ? 'revise' : 'rectify'].allowed
@@ -163,6 +211,30 @@ export const useQuantityHollowStore = defineStore('quantity-hollow', () => {
       throw quantityProblem('forbidden', '当前身份不能核对这份原空鼓提交')
     return send(entry)
   }
+  async function recoverDescriptor(descriptor: CommandRecoveryDescriptor, query: QuantityUnitReadQuery) {
+    if (!formal.value || query.origin !== 'real' || !pendingDescriptors.value.some(row => serialize(row) === serialize(descriptor)) || descriptor.scopeId !== query.projectId || !sameIdentity(await currentIdentity(), descriptor, true))
+      throw quantityProblem('forbidden', '请回到原正式户与身份核对')
+    const resolution = await repositories.quantity.resolve(descriptor)
+    if (resolution.outcome === 'applied') {
+      const receipt = resolution.result.hollow
+      if (!receipt || receipt.kind !== descriptor.action || receipt.unitId !== query.unitId)
+        throw quantityProblem('unavailable', '原空鼓回执不是当前户或动作')
+      const read = await load(query)
+      const record = read.data.records.find(row => row.recordId === receipt.recordId)
+      const observed = descriptor.action === 'rectify-hollow-inspection'
+        ? record?.rectifications.some(row => row.id === receipt.rectificationId && row.commandId === descriptor.commandId && row.actorId === descriptor.actorId && row.logId === receipt.logId)
+        : record?.revisions.some(row => row.revisionId === receipt.revisionId && row.commandId === descriptor.commandId && row.actorId === descriptor.actorId && row.logId === receipt.logId)
+      if (!observed)
+        throw quantityProblem('unavailable', '原空鼓结果尚未从同一户完整读回')
+    }
+    else if (resolution.commandId !== descriptor.commandId) {
+      throw quantityProblem('unavailable', '原未应用结果编号不同')
+    }
+    markerCodec.clear(commandRecoveryKey(descriptor), descriptor.commandId)
+    memoryOperations.value = Object.fromEntries(Object.entries(memoryOperations.value).filter(([, row]) => row.command.commandId !== descriptor.commandId))
+    pendingDescriptors.value = pendingDescriptors.value.filter(row => row.commandId !== descriptor.commandId)
+    return resolution
+  }
   function acknowledge(original: Pick<QuantityHollowPending, 'unitId' | 'command'>, read: QuantityHollowRead) {
     const entry = originalEntry(original)
     const evidence = reads.get(toRaw(read))
@@ -173,5 +245,6 @@ export const useQuantityHollowStore = defineStore('quantity-hollow', () => {
     }
     clear(entry)
   }
-  return { load, getPending, submit, recover, acknowledge, getDraft, rememberDraft, discardDraft, saving: computed(() => active.value.size > 0) }
+  const coldPendingDescriptors = computed(() => pendingDescriptors.value.filter(row => !Object.values(memoryOperations.value).some(entry => entry.command.commandId === row.commandId)))
+  return { load, getPending, submit, recover, recoverDescriptor, pendingDescriptors: readonly(coldPendingDescriptors), acknowledge, getDraft, rememberDraft, discardDraft, saving: computed(() => active.value.size > 0) }
 })

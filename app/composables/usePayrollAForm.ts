@@ -146,7 +146,7 @@ export function usePayrollAForm() {
           }
         }
         const operation = store.getAPending(value)
-        if (operation?.command.action.kind === 'save-a-draft') {
+        if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'save-a-draft') {
           draft.value = clone(operation.command.action.draft)
           ratioExplicit.value = true
         }

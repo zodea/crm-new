@@ -23,6 +23,9 @@ const { store, cancel, projectId, contractId, scopeBasis, processLibraryId, name
     </header>
 
     <ScheduleCommandRecovery v-if="store.pendingCommand" :busy="store.saving" @recover="recoverPending" @recheck="recheck" />
+    <p v-if="store.contractSourceState === 'unavailable'" class="panel p-3 text-12px text-ink-soft" role="status">
+      {{ store.contractSourceMessage }}
+    </p>
     <p v-if="draftNotice" class="panel p-3 text-12px text-warning" role="status">
       {{ draftNotice }}
     </p>
@@ -101,7 +104,7 @@ const { store, cancel, projectId, contractId, scopeBasis, processLibraryId, name
             </legend>
             <div class="mt-1 grid gap-2 sm:grid-cols-2">
               <label class="scope-option" :class="scopeBasis === 'contract' && 'is-active'">
-                <input v-model="scopeBasis" type="radio" value="contract" class="accent-[var(--brand)]">
+                <input v-model="scopeBasis" type="radio" value="contract" class="accent-[var(--brand)]" :disabled="store.contractSourceState === 'unavailable'">
                 <span><b>合同清单</b><small>按已确认清单控范围</small></span>
               </label>
               <label class="scope-option" :class="scopeBasis === 'provisional' && 'is-active'">
