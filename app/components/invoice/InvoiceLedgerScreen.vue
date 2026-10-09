@@ -246,11 +246,6 @@ function onLedgerFilterChange(payload: { filters: { field: string, values: unkno
   columnFilters.value = Object.fromEntries(payload.filters.map(filter => [filter.field, filter.values]))
 }
 
-/** excel 导入票无扫描件：不可勾选（勾选服务于打印/导出原件） */
-function canCheck(row: Invoice) {
-  return row.source !== 'excel'
-}
-
 // ── 勾选浮出合计（#69：平时无常驻汇总）──
 const checkedRows = shallowRef<Invoice[]>([])
 const checkedTotal = computed(() => checkedRows.value.reduce((s, inv) => s + inv.totalAmount, 0))
@@ -381,7 +376,6 @@ onMounted(() => {
             :columns="columns"
             :data="rows"
             :loading="store.loading"
-            :check-method="canCheck"
             empty="该归属下暂无发票。"
             @checkbox-change="(list: Invoice[]) => checkedRows = list"
             @filter-change="onLedgerFilterChange"

@@ -70,6 +70,9 @@ test('发票台账打印：Excel 导入的发票没有原件不进入打印，�
     }
   })
   await page.reload()
+  // 台账勾选只用于合计，Excel 行同样可勾（#499）；打印面板仍单独拦截
+  await page.locator('.vxe-table--header .vxe-cell--checkbox').first().click()
+  await expect(page.locator('span', { hasText: '已选' })).toHaveText(/已选\s*2\s*张 · 合计\s*¥?226\.00/)
   await page.getByRole('button', { name: '打印 PDF', exact: true }).click()
 
   const list = page.getByRole('complementary', { name: '待打印发票列表' })

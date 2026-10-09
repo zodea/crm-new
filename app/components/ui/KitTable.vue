@@ -50,7 +50,7 @@ const {
   empty?: string | KitTableEmptyState
   /** true = 列头筛选不在本地过滤,只 emit filter-change,由调用方对全量数据过滤(配受控分页)。 */
   remoteFilter?: boolean
-  /** checkbox 列的行级可勾判定(如 excel 来源票无扫描件不可勾);缺省全部可勾。 */
+  /** checkbox 列的行级可勾判定;缺省全部可勾。 */
   checkMethod?: (row: T) => boolean
   /** 是否允许列宽拖拽；固定操作列仍由列契约默认禁拖。 */
   resizable?: boolean

@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | [e2e/factor-solver.spec.ts](../../../e2e/factor-solver.spec.ts) | Playwright E2E | 精确因子组合工作台 |
 | [e2e/invoice-export-borders.spec.ts](../../../e2e/invoice-export-borders.spec.ts) | Playwright E2E | Issue #437 发票 Excel 分组边框 |
-| [e2e/invoice-ledger-print-mode.spec.ts](../../../e2e/invoice-ledger-print-mode.spec.ts) | Playwright E2E | 发票台账打印入口：进入双栏选择、打印确认并返回台账 |
+| [e2e/invoice-ledger-print-mode.spec.ts](../../../e2e/invoice-ledger-print-mode.spec.ts) | Playwright E2E | 发票台账打印入口：Excel 行可在台账勾选合计但不进入打印，进入双栏选择、打印确认并返回台账 |
 | [e2e/invoice-print-layout.spec.ts](../../../e2e/invoice-print-layout.spec.ts) | Playwright E2E | 发票打印排版：1/2/4 张、勾选合计、旋转、打印确认与计数持久化 |
 | [e2e/invoice-project-linkage.spec.ts](../../../e2e/invoice-project-linkage.spec.ts) | Playwright E2E | 发票全旅程：识别归档后三处联动，改项目后迁移，再转个人开支隔离 |
 | [e2e/issue-398-invoice-rerecognition.spec.ts](../../../e2e/issue-398-invoice-rerecognition.spec.ts) | Playwright E2E | 工作台与编辑页重新识别覆盖字段并逐项提醒变动，保存新字段，四档视口可操作 |
