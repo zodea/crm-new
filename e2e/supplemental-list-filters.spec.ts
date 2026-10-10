@@ -78,7 +78,7 @@ for (const width of [390, 1440]) {
     await page.goto('/material/price?origin=real')
     await choose('按官方材料大类筛选', 0, ['1. 黑色及有色金属材料', '6. 装饰装修材料'])
     await expect(page.getByRole('heading', { name: '选择材料', exact: true })).toBeVisible()
-    expect(await page.getByRole('option', { selected: true }).count()).toBe(1)
+    await expect(page.getByRole('listbox', { name: '可分析材料', exact: true }).getByRole('option', { selected: true })).toHaveCount(1)
 
     await installQuantityProductionFixture(page, { totals: true })
     await page.getByRole('button', { name: '量差总表', exact: true }).click()
