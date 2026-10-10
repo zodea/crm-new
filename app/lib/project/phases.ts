@@ -1,5 +1,4 @@
 export type PhaseTaskStatus = 'pending' | 'uploaded' | 'confirmed'
-export type PhaseCardStatus = 'done' | 'active' | 'pending'
 
 export interface PhaseTaskData {
   id: string
@@ -56,58 +55,3 @@ export const PROJECT_PHASES: readonly PhaseDefinition[] = [
   },
   { name: '保修', tasks: [] },
 ]
-
-export interface PhaseView {
-  index: number
-  name: string
-  tasks: PhaseTaskData[]
-  total: number
-  done: number
-  status: PhaseCardStatus
-}
-
-export function createDefaultPhaseTasks(projectId: string): PhaseTaskData[] {
-  return PROJECT_PHASES.flatMap((phase, phaseIndex) => phase.tasks.map((task, taskIndex) => ({
-    id: '',
-    projectId,
-    phaseIndex,
-    taskIndex,
-    ...task,
-    status: 'pending' as const,
-  })))
-}
-
-export function normalizePhaseTasks(
-  projectId: string,
-  tasks: readonly PhaseTaskData[],
-): PhaseTaskData[] {
-  return PROJECT_PHASES.flatMap((_, phaseIndex) => tasks
-    .filter(task => task.phaseIndex === phaseIndex)
-    .map((task, taskIndex) => ({ ...task, projectId, phaseIndex, taskIndex })))
-}
-
-export function derivePhaseViews(tasks: readonly PhaseTaskData[]): PhaseView[] {
-  const grouped = PROJECT_PHASES.map((phase, index) => ({
-    index,
-    name: phase.name,
-    tasks: tasks.filter(task => task.phaseIndex === index),
-  }))
-  const firstIncomplete = grouped.findIndex(group =>
-    group.tasks.length === 0 || group.tasks.some(task => task.status === 'pending'),
-  )
-
-  return grouped.map((group) => {
-    const done = group.tasks.filter(task => task.status !== 'pending').length
-    const total = group.tasks.length
-    return {
-      ...group,
-      total,
-      done,
-      status: total > 0 && done === total
-        ? 'done'
-        : group.index === firstIncomplete
-          ? 'active'
-          : 'pending',
-    }
-  })
-}

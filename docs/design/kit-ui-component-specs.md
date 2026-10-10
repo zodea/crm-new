@@ -604,8 +604,6 @@ const columns: KitTableColumn[] = [{
 - 连续变体统一外边框和表格衔接，内部 `KitTable` 去掉重复左右/底边、圆角和阴影；表头与数据行密度继续遵守第 12 节。
 - 工具与筛选允许有序换行，主内容保持 `min-width:0`；宽表只在表格自身横滚，不能通过隐藏外溢来裁掉必要内容或主操作。
 
-**嵌入式筛选条**：`app/components/shared/ListFilterBar.vue` 的 `embedded` 变体去掉独立 panel，首层为 `heading`、搜索及 `actions`，次层为原筛选与数量。保留 `query` 双向值、`filters/total/filtered` props 和 `filterChange` 事件，不复制领域筛选状态。
-
 **本批范围**：[#418](https://github.com/zodea/crm-new/issues/418) 已接入共用财务/物资列表及施工合同、分供方、项目、材料采购合同列表。领域列、查询、服务端或本地分页、来源、刷新和能力判断均保留在 Screen；此处只声明布局接入，逐页运行证据和剩余差异看[运行审计](./runtime-reference-audit.md)。
 
 ---

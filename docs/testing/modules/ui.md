@@ -126,7 +126,6 @@
 | [tests/components/KitTableVisualStates.test.ts](../../../tests/components/KitTableVisualStates.test.ts) | 组件（jsdom） | kitTable visual states |
 | [tests/components/KitTypeSelectDialog.test.ts](../../../tests/components/KitTypeSelectDialog.test.ts) | 组件（jsdom） | kitTypeSelectDialog public contract |
 | [tests/components/KitUIHost.type-select.test.ts](../../../tests/components/KitUIHost.type-select.test.ts) | 组件（jsdom） | kitUIHost typeSelect integration |
-| [tests/components/ListFilterBar.test.ts](../../../tests/components/ListFilterBar.test.ts) | 组件（jsdom） | 列表筛选栏 |
 | [tests/components/ListShell.test.ts](../../../tests/components/ListShell.test.ts) | 组件（jsdom） | list shell |
 | [tests/components/LookupSelect.test.ts](../../../tests/components/LookupSelect.test.ts) | 组件（jsdom） | lookupSelect public behavior |
 | [tests/components/RowActionMenu.test.ts](../../../tests/components/RowActionMenu.test.ts) | 组件（jsdom） | row action menu |

@@ -45,7 +45,6 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-175-cost-control.spec.ts](../../../e2e/issue-175-cost-control.spec.ts) | Playwright E2E | 成本预算按正式源单展示分类控制且不再使用占位卡 |
 | [e2e/target-cost-central.spec.ts](../../../e2e/target-cost-central.spec.ts) | Playwright E2E | 预算真实迁入、版本头与科目整份保存、原件、固定版本及来源往返 |
 | [e2e/target-cost-detail.spec.ts](../../../e2e/target-cost-detail.spec.ts) | Playwright E2E | Issue #191：目标成本详情 |
 | [e2e/target-cost-management.spec.ts](../../../e2e/target-cost-management.spec.ts) | Playwright E2E | Issue #191：目标成本列表与科目维护 |
