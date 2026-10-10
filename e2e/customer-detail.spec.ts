@@ -66,32 +66,33 @@ test.beforeEach(async ({ page }) => {
 })
 
 test.describe('Issue #194：客户详情', () => {
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 展示真实客户关系且页面不横向溢出`, async ({ page }) => {
-      await page.setViewportSize({ width, height: HEIGHTS[width] })
-      await page.goto(`${customerPath()}?origin=${CUSTOMER_INPUT.origin}`)
+  test('展示真实客户关系，键盘下钻往返恢复焦点，各宽度页面不横向溢出', async ({ page }) => {
+    await page.goto(`${customerPath()}?origin=${CUSTOMER_INPUT.origin}`)
 
-      const shell = page.locator('[data-ui="entity-detail-shell"]')
-      await expect(shell.getByRole('heading', { name: CUSTOMER_INPUT.name }))
-        .toBeVisible({ timeout: 30_000 })
-      await expect(shell.getByText('测试客户只读')).toBeVisible()
-      await expect(shell.getByRole('tab', { name: /名下项目/ })).toBeVisible()
-      const project = shell.getByRole('link', { name: RELATION_INPUT.project.name, exact: true })
-      const target = await expectRelationTarget(page, project, RELATION_INPUT.project)
-      await project.focus()
-      await project.press('Enter')
-      await expect(page).toHaveURL(target.href)
-      await expect(page.getByRole('heading', { name: RELATION_INPUT.project.name, exact: true })).toBeVisible()
-      await page.reload()
-      const back = page.getByRole('link', { name: '返回客户详情', exact: true })
-      await expect(back).toHaveAttribute('href', target.searchParams.get('returnTo')!)
-      await back.press('Enter')
-      await expect(page).toHaveURL(new URL(target.searchParams.get('returnTo')!, target).href)
+    const shell = page.locator('[data-ui="entity-detail-shell"]')
+    await expect(shell.getByRole('heading', { name: CUSTOMER_INPUT.name }))
+      .toBeVisible({ timeout: 30_000 })
+    await expect(shell.getByText('测试客户只读')).toBeVisible()
+    await expect(shell.getByRole('tab', { name: /名下项目/ })).toBeVisible()
+    const project = shell.getByRole('link', { name: RELATION_INPUT.project.name, exact: true })
+    const target = await expectRelationTarget(page, project, RELATION_INPUT.project)
+    await project.focus()
+    await project.press('Enter')
+    await expect(page).toHaveURL(target.href)
+    await expect(page.getByRole('heading', { name: RELATION_INPUT.project.name, exact: true })).toBeVisible()
+    await page.reload()
+    const back = page.getByRole('link', { name: '返回客户详情', exact: true })
+    await expect(back).toHaveAttribute('href', target.searchParams.get('returnTo')!)
+    await back.press('Enter')
+    await expect(page).toHaveURL(new URL(target.searchParams.get('returnTo')!, target).href)
+    await expect(shell.getByRole('heading', { name: CUSTOMER_INPUT.name })).toBeVisible()
+    await expect(project).toBeFocused()
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: HEIGHTS[width] })
       await expect(shell.getByRole('heading', { name: CUSTOMER_INPUT.name })).toBeVisible()
-      await expect(project).toBeFocused()
       await expectNoPageOverflow(page, `客户详情 @ ${width}px`)
-    })
-  }
+    }
+  })
 
   test('窄窗切换施工合同和收款后仍由表格局部横滚并保留下钻', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })

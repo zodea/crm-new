@@ -91,28 +91,28 @@ test.describe('KitTable 公共表格规格', () => {
     await expectDocumentDoesNotOverflow(page)
   })
 
-  for (const viewport of [
-    { width: 390, height: 844 },
-    { width: 768, height: 900 },
-    { width: 1024, height: 900 },
-    { width: 1280, height: 900 },
-    { width: 1440, height: 1000 },
-  ] as const) {
-    test(`${viewport.width}px 宽表只在自身容器横滚`, async ({ page }) => {
+  test('宽表在各宽度只在自身容器横滚', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/dev/kit-table')
+    await page.waitForLoadState('networkidle')
+
+    const table = page.locator('[data-ui="kit-table"]').first()
+    const vxeTable = table.locator('.vxe-table').first()
+    const scrollX = table.locator('.vxe-table--scroll-x-wrapper').first()
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 768, height: 900 },
+      { width: 1024, height: 900 },
+      { width: 1280, height: 900 },
+      { width: 1440, height: 1000 },
+    ] as const) {
       await page.setViewportSize(viewport)
-      await page.goto('/dev/kit-table')
-      await page.waitForLoadState('networkidle')
-
-      const table = page.locator('[data-ui="kit-table"]').first()
-      const vxeTable = table.locator('.vxe-table').first()
-      const scrollX = table.locator('.vxe-table--scroll-x-wrapper').first()
       await expect(scrollX).toBeVisible()
-
-      const tableBox = await vxeTable.boundingBox()
-      const scrollBox = await scrollX.boundingBox()
-      expect(scrollBox!.x).toBeGreaterThanOrEqual(tableBox!.x)
-      expect(scrollBox!.x + scrollBox!.width).toBeLessThanOrEqual(tableBox!.x + tableBox!.width + 1)
+      await expect.poll(async () => {
+        const [tableBox, scrollBox] = await Promise.all([vxeTable.boundingBox(), scrollX.boundingBox()])
+        return scrollBox!.x >= tableBox!.x && scrollBox!.x + scrollBox!.width <= tableBox!.x + tableBox!.width + 1
+      }, `${viewport.width}px 横滚条应位于表格容器内`).toBe(true)
       await expectDocumentDoesNotOverflow(page)
-    })
-  }
+    }
+  })
 })

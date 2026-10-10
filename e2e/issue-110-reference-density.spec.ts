@@ -79,18 +79,19 @@ test.describe('Issues #110/#183 reference density and token contract', () => {
     })
   }
 
-  for (const width of [390, 768, 1024, 1280, 1440]) {
-    test(`search controls retain compact geometry at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 })
-      await page.goto('/project')
-      await expect(page.locator('[data-shell-workspace]')).toBeVisible()
+  test('search controls retain compact geometry at every width', async ({ page }) => {
+    await page.goto('/project')
+    await expect(page.locator('[data-shell-workspace]')).toBeVisible()
 
-      const searchStyle = await visualStyle(page.getByRole('searchbox', { name: /搜索项目/ }))
-      expect(searchStyle.borderRadius).toBeLessThanOrEqual(4)
-      expect(searchStyle.height).toBeLessThanOrEqual(32)
+    const search = page.getByRole('searchbox', { name: /搜索项目/ })
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      const searchStyle = await visualStyle(search)
+      expect(searchStyle.borderRadius, `${width}px`).toBeLessThanOrEqual(4)
+      expect(searchStyle.height, `${width}px`).toBeLessThanOrEqual(32)
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-      expect(overflow).toBeLessThanOrEqual(1)
-    })
-  }
+      expect(overflow, `${width}px`).toBeLessThanOrEqual(1)
+    }
+  })
 })

@@ -351,23 +351,22 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
     })
   }
 
-  for (const [index, viewport] of VIEWPORTS.entries()) {
-    const { width } = viewport
-    test(`${width}px 迁移页只由对账表自身承载横向滚动`, async ({ page }) => {
+  test('迁移页各宽度只由对账表自身承载横向滚动', async ({ page }) => {
+    await page.goto('/settings/data-migration')
+    await expect(page.getByTestId('core-migration-page').getByRole('heading', { name: '本地数据迁移' }))
+      .toBeVisible()
+    await installProductionSnapshot(page, await legacyProductionSnapshot(MIGRATION_INPUTS[0], { withSoftDeletedSupplier: true }))
+    await reloadMigrationPage(page)
+    await migrationCommand(page, '运行预检', '/api/migrations/core/preflight')
+    await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '创建不可变备份' }).click()
+    const dryRun = await migrationCommand(page, '执行 dry-run', '/api/migrations/core/dry-run')
+    expect(await dryRun.json()).toMatchObject({ status: 'dry-run' })
+    await expectSoftDeletedGraphs(page)
+    const reconciliationScroll = page.getByTestId('migration-reconciliation-scroll')
+    for (const viewport of VIEWPORTS) {
+      const { width } = viewport
       await page.setViewportSize(viewport)
-      await page.goto('/settings/data-migration')
-      await expect(page.getByTestId('core-migration-page').getByRole('heading', { name: '本地数据迁移' }))
-        .toBeVisible()
-      const input = MIGRATION_INPUTS[index % MIGRATION_INPUTS.length]!
-      await installProductionSnapshot(page, await legacyProductionSnapshot(input, { withSoftDeletedSupplier: true }))
-      await reloadMigrationPage(page)
-      await migrationCommand(page, '运行预检', '/api/migrations/core/preflight')
-      await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
-      await page.getByRole('button', { name: '创建不可变备份' }).click()
-      const dryRun = await migrationCommand(page, '执行 dry-run', '/api/migrations/core/dry-run')
-      expect(await dryRun.json()).toMatchObject({ status: 'dry-run' })
-      await expectSoftDeletedGraphs(page)
-      const reconciliationScroll = page.getByTestId('migration-reconciliation-scroll')
       await expect(reconciliationScroll).toBeVisible()
       await expectLocalHorizontalScroll(reconciliationScroll, `${width}px 迁移对账表`)
       await reconciliationScroll.evaluate((element) => {
@@ -375,8 +374,8 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
       })
       expect(await reconciliationScroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
       await expectNoPageOverflow(page, `#294 核心身份迁移 @ ${width}px`)
-    })
-  }
+    }
+  })
 
   test('中央回滚后本地恢复失败时保留原批次并允许键盘重试', async ({ page }) => {
     test.setTimeout(120_000)

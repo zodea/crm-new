@@ -120,20 +120,19 @@ test.describe('Issue #325：甲方最终结算专属只读链', () => {
     await expect(mismatch).toContainText('甲方商务单据类型与地址不匹配')
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 详情无页面级横滚，来源表可键盘聚焦并局部滚动`, async ({ page }) => {
+  test('详情在各宽度无页面级横滚，来源表可键盘聚焦并在窄屏局部滚动', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/owner/final-settlement/final-settlement-real-325?origin=real')
+    await expect(page.getByTestId('owner-final-settlement-detail')).toBeVisible({ timeout: 20_000 })
+    const scroll = page.getByRole('region', { name: '最终结算来源单据，可横向滚动查看完整列' })
+    await scroll.focus()
+    await expect(scroll).toBeFocused()
+    await expectLocalHorizontalScroll(scroll, '#325 来源表 @ 390px')
+    await page.keyboard.press('ArrowRight')
+    await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/owner/final-settlement/final-settlement-real-325?origin=real')
-      await expect(page.getByTestId('owner-final-settlement-detail')).toBeVisible({ timeout: 20_000 })
       await expectNoPageOverflow(page, `#325 最终结算详情 @ ${width}px`)
-      const scroll = page.getByRole('region', { name: '最终结算来源单据，可横向滚动查看完整列' })
-      await scroll.focus()
-      await expect(scroll).toBeFocused()
-      if (width === 390) {
-        await expectLocalHorizontalScroll(scroll, '#325 来源表 @ 390px')
-        await page.keyboard.press('ArrowRight')
-        await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
-      }
-    })
-  }
+    }
+  })
 })

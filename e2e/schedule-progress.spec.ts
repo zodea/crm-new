@@ -122,13 +122,14 @@ test('甘特拖动冲突取消不写入，确认只置灰冲突依赖，右缘�
   await expectNoPageOverflow(page, '甘特调期')
 })
 
-for (const width of RESPONSIVE_WIDTHS) {
-  test(`${width}px 正式 WBS 与甘特操作可达，页面不横滚`, async ({ page }) => {
-    const fixture = await installScheduleProductionFixture(page)
+test('正式 WBS 与甘特操作在各宽度可达，页面不横滚', async ({ page }) => {
+  const fixture = await installScheduleProductionFixture(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(fixture.scheduleUrl)
+  const toggle = page.getByRole('button', { name: '甘特', exact: true })
+  for (const width of RESPONSIVE_WIDTHS) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-    await page.goto(fixture.scheduleUrl)
     await expect(page.getByTestId('schedule-scroll')).toBeVisible()
-    const toggle = page.getByRole('button', { name: '甘特', exact: true })
     if (await toggle.isVisible()) {
       await toggle.click()
       await expect(page.getByText('8月', { exact: true }).first()).toBeVisible()
@@ -136,8 +137,8 @@ for (const width of RESPONSIVE_WIDTHS) {
     }
     await expect(page.getByRole('button', { name: '放线及新建墙体', exact: true })).toBeVisible()
     await expectNoPageOverflow(page, `${width}px 正式施工进度`)
-  })
-}
+  }
+})
 
 for (const plan of [{ start: '2026-08-01', finish: '2026-08-02' }, { start: '2028-02-29', finish: '2028-03-01' }]) {
   test(`三步暂估建组保留范围、工序和日期并生成正式回执：${plan.start}`, async ({ page }) => {

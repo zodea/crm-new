@@ -330,35 +330,45 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await expectDocumentDoesNotOverflow(page)
   })
 
-  for (const viewport of [
-    { width: 390, height: 844 },
-    { width: 768, height: 900 },
-    { width: 1024, height: 900 },
-    { width: 1280, height: 900 },
-    { width: 1440, height: 1000 },
-  ] as const) {
-    test(`${viewport.width}px 清单/变更/报量全部可达且页面不横滚`, async ({ page, boq }) => {
+  test('清单/变更/报量在各宽度全部可达且页面不横滚', async ({ page, boq }) => {
+    const viewports = [
+      { width: 390, height: 844 },
+      { width: 768, height: 900 },
+      { width: 1024, height: 900 },
+      { width: 1280, height: 900 },
+      { width: 1440, height: 1000 },
+    ] as const
+    await page.goto('/contract/boq')
+    await page.waitForLoadState('networkidle')
+
+    await page.getByRole('tab', { name: /变更单/ }).click()
+    const changeTable = page.locator('.boq-change-table')
+    const changeActionHeader = changeTable.getByRole('columnheader', { name: '操作', exact: true }).last()
+    await expect(changeActionHeader.locator('.vxe-cell--col-resizable')).toHaveCount(0)
+    for (const viewport of viewports) {
       await page.setViewportSize(viewport)
-      await page.goto('/contract/boq')
-      await page.waitForLoadState('networkidle')
+      await expect(page.getByRole('tab', { name: /合同清单/ }), `${viewport.width}px`).toBeVisible()
+      await expect(page.getByRole('button', { name: '新建变更单', exact: true }), `${viewport.width}px`).toBeVisible()
+      await expect(changeActionHeader, `${viewport.width}px`).toBeVisible()
+      await expect.poll(async () => (await changeActionHeader.boundingBox())?.width ?? Infinity, { message: `${viewport.width}px` }).toBeLessThanOrEqual(58)
+      await expect(changeTable.getByRole('button', { name: /变更单操作/ }).last(), `${viewport.width}px`).toBeVisible()
+    }
 
-      await expect(page.getByRole('tab', { name: /合同清单/ })).toBeVisible()
-      await page.getByRole('tab', { name: /变更单/ }).click()
-      await expect(page.getByRole('button', { name: '新建变更单', exact: true })).toBeVisible()
-      const changeTable = page.locator('.boq-change-table')
-      const changeActionHeader = changeTable.getByRole('columnheader', { name: '操作', exact: true }).last()
-      await expect(changeActionHeader).toBeVisible()
-      expect((await changeActionHeader.boundingBox())?.width).toBeLessThanOrEqual(58)
-      await expect(changeActionHeader.locator('.vxe-cell--col-resizable')).toHaveCount(0)
-      await expect(changeTable.getByRole('button', { name: /变更单操作/ }).last()).toBeVisible()
-      await page.getByRole('tab', { name: /月度报量/ }).click()
-      await expect(page.getByText('自动汇总 + 手调留痕', { exact: true })).toBeVisible()
+    await page.getByRole('tab', { name: /月度报量/ }).click()
+    await expect(page.getByText('自动汇总 + 手调留痕', { exact: true })).toBeVisible()
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport)
       await expectDocumentDoesNotOverflow(page)
+    }
 
-      await page.goto(`/contract/boq/import?project=${boq.projectId}&contract=${boq.contractId}`)
-      await page.waitForLoadState('networkidle')
-      await expect(page.getByRole('heading', { name: '合同清单拆表' })).toBeVisible()
+    await page.goto(`/contract/boq/import?project=${boq.projectId}&contract=${boq.contractId}`)
+    await page.waitForLoadState('networkidle')
+    const importHeading = page.getByRole('heading', { name: '合同清单拆表' })
+    await expect(importHeading).toBeVisible()
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport)
+      await expect(importHeading, `${viewport.width}px`).toBeVisible()
       await expectDocumentDoesNotOverflow(page)
-    })
-  }
+    }
+  })
 })

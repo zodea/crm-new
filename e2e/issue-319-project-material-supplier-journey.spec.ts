@@ -100,19 +100,22 @@ test.describe('Issue #319：项目—材采合同—分供方旅程', () => {
     await expect(page.getByRole('link', { name: '查看材料采购合同（3）' })).toBeVisible()
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 全旅程无页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/project/proj_demo_001?origin=demo')
-      await expect(page.getByRole('heading', { name: '合和新城' })).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#319 项目详情 @ ${width}px`)
-      await page.getByRole('link', { name: /查看材料采购合同/ }).click()
-      await expectNoPageOverflow(page, `#319 材采列表 @ ${width}px`)
-      await page.getByRole('link', { name: '瓷砖采购合同', exact: true }).click()
-      await expectNoPageOverflow(page, `#319 材采详情 @ ${width}px`)
-      await page.getByRole('link', { name: '查看分供方合同事实' }).click()
-      await expect(page.getByRole('tab', { name: /支出合同/ })).toBeVisible()
-      await expectNoPageOverflow(page, `#319 分供方事实 @ ${width}px`)
-    })
-  }
+  test('全旅程在各宽度无页面级横滚', async ({ page }) => {
+    const expectNoOverflowAcrossWidths = async (label: string) => {
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+        await expectNoPageOverflow(page, `#319 ${label} @ ${width}px`)
+      }
+    }
+    await page.goto('/project/proj_demo_001?origin=demo')
+    await expect(page.getByRole('heading', { name: '合和新城' })).toBeVisible({ timeout: 20_000 })
+    await expectNoOverflowAcrossWidths('项目详情')
+    await page.getByRole('link', { name: /查看材料采购合同/ }).click()
+    await expectNoOverflowAcrossWidths('材采列表')
+    await page.getByRole('link', { name: '瓷砖采购合同', exact: true }).click()
+    await expectNoOverflowAcrossWidths('材采详情')
+    await page.getByRole('link', { name: '查看分供方合同事实' }).click()
+    await expect(page.getByRole('tab', { name: /支出合同/ })).toBeVisible()
+    await expectNoOverflowAcrossWidths('分供方事实')
+  })
 })

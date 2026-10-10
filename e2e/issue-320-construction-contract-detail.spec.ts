@@ -129,17 +129,20 @@ test.describe('Issue #320：施工合同专属中央详情', () => {
     await expect(page.getByTestId('contract-frozen-signatory')).toHaveText(ownName)
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 列表与七分区详情无页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/contract/construction?search=合和新城')
-      await expect(page.getByTestId('construction-contract-list')).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#320 施工合同列表 @ ${width}px`)
-      await page.getByRole('link', { name: '合和新城施工总承包合同', exact: true }).click()
-      await expect(page.getByTestId('construction-contract-detail')).toBeVisible()
-      await expectNoPageOverflow(page, `#320 施工合同详情 @ ${width}px`)
-      await page.getByRole('tab', { name: '验收结算' }).click()
-      await expectNoPageOverflow(page, `#320 施工合同验收结算 @ ${width}px`)
-    })
-  }
+  test('列表与七分区详情在各宽度无页面级横滚', async ({ page }) => {
+    const expectNoOverflowAcrossWidths = async (label: string) => {
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+        await expectNoPageOverflow(page, `#320 ${label} @ ${width}px`)
+      }
+    }
+    await page.goto('/contract/construction?search=合和新城')
+    await expect(page.getByTestId('construction-contract-list')).toBeVisible({ timeout: 20_000 })
+    await expectNoOverflowAcrossWidths('施工合同列表')
+    await page.getByRole('link', { name: '合和新城施工总承包合同', exact: true }).click()
+    await expect(page.getByTestId('construction-contract-detail')).toBeVisible()
+    await expectNoOverflowAcrossWidths('施工合同详情')
+    await page.getByRole('tab', { name: '验收结算' }).click()
+    await expectNoOverflowAcrossWidths('施工合同验收结算')
+  })
 })

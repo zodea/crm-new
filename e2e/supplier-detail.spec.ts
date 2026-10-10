@@ -156,17 +156,18 @@ for (const tabCase of [
   })
 }
 
-for (const width of RESPONSIVE_WIDTHS) {
-  test(`${width}px 正式分供方证照表只在自身区域横向滚动`, async ({ page }) => {
+test('正式分供方证照表在各宽度只在自身区域横向滚动', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const id = await createSupplier(page)
+  await page.goto(`/base/supplier/credential/${id}?origin=real`)
+  const table = page.getByLabel('证照原件表，可横向滚动')
+  await expect(table).toBeVisible()
+  for (const width of RESPONSIVE_WIDTHS) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-    const id = await createSupplier(page)
-    await page.goto(`/base/supplier/credential/${id}?origin=real`)
-    const table = page.getByLabel('证照原件表，可横向滚动')
-    await expect(table).toBeVisible()
     if (width <= 768)
       await expectLocalHorizontalScroll(table, `${width}px 分供方证照表`)
     else
       await expect(table).toHaveCSS('overflow-x', 'auto')
     await expectNoPageOverflow(page, `${width}px 分供方证照页`)
-  })
-}
+  }
+})

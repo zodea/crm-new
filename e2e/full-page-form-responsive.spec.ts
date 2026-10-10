@@ -109,19 +109,18 @@ test.describe('#112 R3-B 整页表单增量验收', () => {
   test.beforeEach(async ({ page }) => {
     await installProjectCentralFixture(page)
   })
-  for (const width of [390, 768, 1024, 1280, 1440]) {
-    for (const form of REPRESENTATIVE_FORMS) {
-      test(`${form.title}在 ${width}px 下可由字段自然 Tab 到取消与主操作`, async ({ page }) => {
+  for (const form of REPRESENTATIVE_FORMS) {
+    test(`${form.title}在各宽度下可由字段自然 Tab 到取消与主操作`, async ({ page }) => {
+      await openRepresentativeForm(page, form)
+      for (const width of [390, 768, 1024, 1280, 1440]) {
         await page.setViewportSize({
           width,
           height: width === 390 ? 844 : 900,
         })
-
-        await openRepresentativeForm(page, form)
         await expectNoPageOverflow(page, `${form.path} @ ${width}px`)
         await expectFieldToActionsKeyboardPath(page, form)
-      })
-    }
+      }
+    })
   }
 
   for (const input of ['合成未保存输入甲', '合成未保存输入乙']) {

@@ -62,15 +62,15 @@ test.describe('Issue #283：甲方六类单据专属只读详情与双视图', (
     await expect.poll(() => workspace.evaluate(element => element.scrollTop)).toBe(penaltyScrollTop)
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 六类项目入口无页面级横滚`, async ({ page }) => {
+  test('六类项目入口在各宽度无页面级横滚', async ({ page }) => {
+    await page.goto('/project/project-real-320?origin=real')
+    const journey = page.getByRole('region', { name: '项目商务单据' })
+    await expect(journey.getByRole('link')).toHaveCount(9, { timeout: 20_000 })
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/project/project-real-320?origin=real')
-      const journey = page.getByRole('region', { name: '项目商务单据' })
-      await expect(journey.getByRole('link')).toHaveCount(9, { timeout: 20_000 })
       for (const name of ['甲方变洽签', '月度报量', '竣工验收', '保修管理', '最终结算', '甲方罚扣'])
-        await expect(journey.getByRole('link', { name: new RegExp(name) })).toBeVisible()
+        await expect(journey.getByRole('link', { name: new RegExp(name) }), `${name} @ ${width}px`).toBeVisible()
       await expectNoPageOverflow(page, `#283 项目甲方六类入口 @ ${width}px`)
-    })
-  }
+    }
+  })
 })

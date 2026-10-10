@@ -84,17 +84,17 @@ async function expectRecordTarget(page: Page, registry: RegistryRecord) {
 for (const input of INPUTS) {
   test.describe(`Issue #194：客户、班组、工人列表 · ${input.label}`, () => {
     test.use({ input })
-    for (const viewport of VIEWPORTS) {
-      test(`${viewport.width}px 三类正式档案保持紧凑工具栏和页面级无横滚`, async ({ page, registries }) => {
-        await page.setViewportSize(viewport)
-        for (const registry of registries) {
-          await page.goto(`/base/${registry.kind}`)
-          await expect(page.getByRole('heading', { name: registry.heading, exact: true })).toBeVisible()
-          await expectRecordTarget(page, registry)
+    test('三类正式档案在各宽度保持紧凑工具栏和页面级无横滚', async ({ page, registries }) => {
+      for (const registry of registries) {
+        await page.goto(`/base/${registry.kind}`)
+        await expect(page.getByRole('heading', { name: registry.heading, exact: true })).toBeVisible()
+        await expectRecordTarget(page, registry)
+        for (const viewport of VIEWPORTS) {
+          await page.setViewportSize(viewport)
           await expectNoPageOverflow(page, `${registry.heading} @ ${viewport.width}px`)
         }
-      })
-    }
+      }
+    })
 
     test('窄窗表格各自在局部承载横向滚动', async ({ page, registries }) => {
       await page.setViewportSize(VIEWPORTS[0])

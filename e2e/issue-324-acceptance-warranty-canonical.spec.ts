@@ -113,22 +113,25 @@ test.describe('Issue #324：验收—保修 canonical 双视图', () => {
     await expect(page.getByTestId('owner-acceptance-process')).toHaveCount(0)
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 双视图无页面级横滚，密集列表只在自身区域滚动`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/owner/acceptance?origin=real&variant=warranty')
-      const table = page.locator('[data-ui="owner-document-table"]')
-      await expect(table).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#324 保修列表 @ ${width}px`)
-      if (width === 390)
-        await expectLocalHorizontalScroll(table, '#324 保修列表 @ 390px')
+  test('双视图在各宽度无页面级横滚，密集列表只在自身区域滚动', async ({ page }) => {
+    const expectNoOverflowAcrossWidths = async (label: string) => {
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+        await expectNoPageOverflow(page, `#324 ${label} @ ${width}px`)
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/owner/acceptance?origin=real&variant=warranty')
+    const table = page.locator('[data-ui="owner-document-table"]')
+    await expect(table).toBeVisible({ timeout: 20_000 })
+    await expectLocalHorizontalScroll(table, '#324 保修列表 @ 390px')
+    await expectNoOverflowAcrossWidths('保修列表')
 
-      await page.goto('/owner/acceptance/acceptance-real-324?origin=real&variant=acceptance')
-      await expect(page.getByTestId('owner-acceptance-detail')).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#324 验收详情 @ ${width}px`)
-      await page.getByRole('button', { name: '保修到期确认' }).click()
-      await expect(page.getByTestId('warranty-variant-facts')).toBeVisible()
-      await expectNoPageOverflow(page, `#324 保修详情 @ ${width}px`)
-    })
-  }
+    await page.goto('/owner/acceptance/acceptance-real-324?origin=real&variant=acceptance')
+    await expect(page.getByTestId('owner-acceptance-detail')).toBeVisible({ timeout: 20_000 })
+    await expectNoOverflowAcrossWidths('验收详情')
+    await page.getByRole('button', { name: '保修到期确认' }).click()
+    await expect(page.getByTestId('warranty-variant-facts')).toBeVisible()
+    await expectNoOverflowAcrossWidths('保修详情')
+  })
 })

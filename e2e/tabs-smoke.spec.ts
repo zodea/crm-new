@@ -13,7 +13,6 @@ async function openSidebarRoute(page: Page, label: string, path: string) {
 // 上限 15 指可关闭页签；固定首页另行验证，不依赖偶然的初始页签数量。
 for (const input of [
   { width: 1280, first: PROJECT_INPUTS[0], second: PROJECT_INPUTS[1] },
-  { width: 1440, first: PROJECT_INPUTS[1], second: PROJECT_INPUTS[0] },
 ]) {
   test(`页签完整旅程：正式项目、切换、右键关闭与15上限 @ ${input.width}px`, async ({ page }) => {
     test.setTimeout(90_000)

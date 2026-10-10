@@ -159,21 +159,25 @@ test.describe('AX02 分包结算中央只读链', () => {
     await expect(page.getByRole('heading', { name: '已补充名称的结算草稿' })).toBeVisible({ timeout: 20_000 })
   })
 
-  for (const width of [...RESPONSIVE_WIDTHS, 666, 1293]) {
-    test(`${width}px 列表与详情、局部滚动与键盘焦点`, async ({ page }) => {
+  test('列表与详情在各宽度无页面级横滚，局部滚动与键盘焦点', async ({ page }) => {
+    const widths = [...RESPONSIVE_WIDTHS, 666, 1293]
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.goto('/subcontract/settlement?status=confirmed')
+    const table = page.locator('[data-ui="owner-document-table"]')
+    await expect(table).toBeVisible()
+    await expect(page.getByRole('link', { name: 'FBJS-2026-328', exact: true })).toBeVisible()
+    await table.focus()
+    await expect(table).toBeFocused()
+    await expectLocalHorizontalScroll(table, 'AX02 settlement list')
+    for (const width of widths) {
       await page.setViewportSize({ width, height: 900 })
-      await page.goto('/subcontract/settlement?status=confirmed')
-      const table = page.locator('[data-ui="owner-document-table"]')
-      await expect(table).toBeVisible()
-      await expect(page.getByRole('link', { name: 'FBJS-2026-328', exact: true })).toBeVisible()
-      await table.focus()
-      await expect(table).toBeFocused()
       await expectNoPageOverflow(page, `AX02 list ${width}`)
-      if (width === 390)
-        await expectLocalHorizontalScroll(table, 'AX02 settlement list')
-      await page.goto('/subcontract/settlement/sub-settlement-real-328?origin=real')
-      await expect(page.getByRole('heading', { name: '中央正式八月分包结算' })).toBeVisible()
+    }
+    await page.goto('/subcontract/settlement/sub-settlement-real-328?origin=real')
+    await expect(page.getByRole('heading', { name: '中央正式八月分包结算' })).toBeVisible()
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: 900 })
       await expectNoPageOverflow(page, `AX02 detail ${width}`)
-    })
-  }
+    }
+  })
 })
