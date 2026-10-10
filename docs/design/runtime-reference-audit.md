@@ -29,11 +29,11 @@
 - Issue #328–#331 经 PR #399/#400/#401/#417 合入，当前源码包含其成果；#418–#421 及多选、刷新修复仅在当前分支本地完成，复用各自实际验收入口。
 - 此次基线核对时，#398 的 `82dd2debbbcc020a68070182fcbfe0f002926faf` 尚未整合。2026-09-10 按用户后续授权，将该分支与含 #425 的本地 main 整合；历史审计保留为非权威证据，冲突裁定及本次重新验证见[本地整合记录](../research/local-branch-integration-2026-09-10.md)。远程分支未更新，中央内存验证不代表 #416 完成。
 - 现有三个 `.worktrees/issue-329`、`issue-330`、`issue-331` 保留。工作树存在不等于任务进行中，以对应 PR、提交和当前改动分别核对。
-- 机器账本保留路由级历史证据编号及等级。`implementationIssues` 现指当前复核责任，`historicalImplementationIssues` 单独保留历史来源；导入/导出归 #406，迁移页归 #414，材料结算归 #409，不能按相邻菜单误归物资模块。
+- 路由级历史证据编号及等级保留在下方矩阵；导入/导出归 #406，迁移页归 #414，材料结算归 #409，不能按相邻菜单误归物资模块。
 
 下表是已核对源码的展开规则，尚不构成全部子表或运行环境已验收的清单。各项继续由对应模块逐场景采证；父路由的直接证据不自动赋给未观察的子视图。
 
-这些规则现已落实为 [全模块复核覆盖索引](./module-review-coverage.md)及同名 JSON：动态注册、当前挂载子视图和宿主适配器分别展开；逐场景状态及动作仍由模块票继续细化。项目旧 `ProjectSubTables` 根组件没有挂载入口，相关旧子表与专属读取已清理；当前项目详情为资料分组、九项甲方/分包单据入口及材料合同/合作关系区。索引里的待核验状态不覆盖本登记册原有证据等级。
+逐场景状态及动作由模块票继续细化。项目旧 `ProjectSubTables` 根组件没有挂载入口，相关旧子表与专属读取已清理；当前项目详情为资料分组、九项甲方/分包单据入口及材料合同/合作关系区。索引里的待核验状态不覆盖本登记册原有证据等级。
 
 | 路由或入口 | 已核实展开事实 | 源码入口 / 承接 |
 | --- | --- | --- |
@@ -180,42 +180,7 @@
 
 “待核对”是明确的证据状态，不代表页面已与参考站一致。业务实施票完成只读采集后，应在同一提交把证据档案升级为直接证据，并把对应差异改成已验证结论。矩阵中的票号是形成当前页面基础的历史票，不表示它仍是当前前沿；当前票由上方生成账本按页面域统一给出。
 
-账本由 `node scripts/sync-runtime-evidence-ledger.mjs` 从页面文件、本矩阵、证据档案、[`READ-MODELS.md`](../rewrite/READ-MODELS.md) 和 [`design-coverage.json`](./design-coverage.json) 同步生成。每行是一个本地生产端点与具体参考视图的唯一映射，使用不受排序影响的 `evidenceRecordId` / `referenceEndpointId` 计数；被多个路由复用的聚合档案必须先拆成明确目标视图，未知目标只能登记为历史未记录或未验证。完整的证据等级、观测日期或缺失原因、权限状态和当前实施票见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。布局、状态和跳转叙述只保留在本矩阵，生成物用 `routeKey` 回指，不复制第二份状态快照。
-
-<!-- runtime-evidence-summary:begin -->
-| 可重算口径 | 数量 |
-| --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 172 / 5 / 167 |
-| 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 167 / 167 |
-| 参考证据档案 / 被路由使用 | 50 / 44 |
-| 直接 / 邻近 / 本地权威 | 54 / 18 / 43 |
-| 历史证据 / 未验证目标 | 35 / 17 |
-| 设计已覆盖 / 待补设计 | 166 / 1 |
-
-| 页面域 | 路由数 | 当前复核承接 |
-| --- | ---: | --- |
-| 首页 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
-| 项目 | 3 | [#408](https://github.com/zodea/crm-new/issues/408) |
-| 基础主数据 | 10 | [#407](https://github.com/zodea/crm-new/issues/407) |
-| 分供方 | 4 | [#407](https://github.com/zodea/crm-new/issues/407) |
-| 项目分供方 | 2 | [#408](https://github.com/zodea/crm-new/issues/408) |
-| 核心合同 | 13 | [#409](https://github.com/zodea/crm-new/issues/409) |
-| 辅助合同与结算 | 16 | [#409](https://github.com/zodea/crm-new/issues/409) |
-| 甲方单据 | 4 | [#410](https://github.com/zodea/crm-new/issues/410) |
-| 分包单据 | 8 | [#410](https://github.com/zodea/crm-new/issues/410) |
-| 自购材 | 12 | [#411](https://github.com/zodea/crm-new/issues/411) |
-| 甲供材 | 15 | [#411](https://github.com/zodea/crm-new/issues/411) |
-| 送货单闭环 | 4 | [#411](https://github.com/zodea/crm-new/issues/411) |
-| 材料价格 | 5 | [#411](https://github.com/zodea/crm-new/issues/411) |
-| 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
-| 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
-| 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 29 | [#412](https://github.com/zodea/crm-new/issues/412) |
-| 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
-| 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 系统设置 | 3 | [#414](https://github.com/zodea/crm-new/issues/414) |
-<!-- runtime-evidence-summary:end -->
+本矩阵手工维护：页面增删、证据等级或差异结论变化时，在同一提交更新对应行。
 
 | Page | Route | 业务域 | 模板 | 历史基础票 | 参考证据 | 布局差异 | 状态与跳转结论 | 业务约束 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

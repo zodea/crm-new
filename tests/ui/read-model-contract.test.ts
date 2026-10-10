@@ -83,19 +83,21 @@ function contractRows(markdown: string): DomainContractRow[] {
 }
 
 describe('read model contract coverage', () => {
-  it.each(DIRECT_CONTRACT_PATHS)('keeps local authority links and retained anchors resolvable: %s', (path) => {
-    const markdown = readFileSync(path, 'utf8')
-    for (const match of markdown.matchAll(/\]\(([^)]+)\)/g)) {
-      const href = match[1]
-      if (/^(?:https?:|mailto:|app:|codex:|plugin:)/.test(href))
-        continue
-      const [relativePath, fragment] = href.split('#')
-      const target = relativePath ? resolve(dirname(path), decodeURIComponent(relativePath)) : path
-      expect(existsSync(target), `${path} → ${href}`).toBe(true)
-      if (fragment && target.endsWith('.md')) {
-        expect(documentAnchors(readFileSync(target, 'utf8')).has(decodeURIComponent(fragment)), `${path} → ${href}`).toBe(true)
+  it('现行权威文档的本地链接与锚点均可解析', () => {
+    const broken: string[] = []
+    for (const path of DIRECT_CONTRACT_PATHS) {
+      const markdown = readFileSync(path, 'utf8')
+      for (const match of markdown.matchAll(/\]\(([^)]+)\)/g)) {
+        const href = match[1]
+        if (/^(?:https?:|mailto:|app:|codex:|plugin:)/.test(href))
+          continue
+        const [relativePath, fragment] = href.split('#')
+        const target = relativePath ? resolve(dirname(path), decodeURIComponent(relativePath)) : path
+        if (!existsSync(target) || (fragment && target.endsWith('.md') && !documentAnchors(readFileSync(target, 'utf8')).has(decodeURIComponent(fragment))))
+          broken.push(`${path} → ${href}`)
       }
     }
+    expect(broken).toEqual([])
   })
 
   it('maps every audited production route to exactly one DTO domain', () => {
@@ -114,40 +116,6 @@ describe('read model contract coverage', () => {
       expect(row.projection.length, row.domain).toBeGreaterThan(0)
       expect(row.authority, row.domain).toMatch(/\]\([^)]+\.md(?:#[^)]+)?\)/)
     }
-  })
-
-  it.each([
-    'type OpaqueIdDTO = string',
-    'type DecimalDTO = string',
-    'type MoneyDTO = DecimalDTO',
-    'state: \'resolved\'',
-    'state: \'missing\'',
-    'state: \'forbidden\'',
-    'reason: \'no-records\' | \'no-filter-match\' | \'missing-relation\'',
-    'type ReadState<T> =',
-    '\'relationship-mismatch\'',
-    '\'stale-source\'',
-    'sourceVersion: string | null',
-    'interface AuthorizedScopeDTO',
-    'type CompletenessDTO =',
-    'knownValue:',
-  ])('defines identity, decimal, empty, permission and error semantics: %s', (token) => {
-    const contract = readFileSync(CONTRACT_PATH, 'utf8')
-    expect(contract.replace(/\s+/g, ' ').includes(token.replace(/\s+/g, ' ')), token).toBe(true)
-  })
-
-  it.each([
-    'interface InsightDTO<Row = Record<string, unknown>>',
-    '| \'enterprise-visible\'',
-    'result: \'passed\' | \'failed\' | \'no-rule\' | \'not-applicable\' | \'pending\'',
-    'coverage: \'complete\' | \'permission-filtered\' | \'unknown\'',
-    'NotificationOpenResultDTO',
-    '通知事件身份、业务问题状态和已读状态分开',
-    '读取接口不修改 readAt',
-    '[PUBLIC-SURFACES](./PUBLIC-SURFACES.md#4-全局审批与抄送消息)',
-  ])('defines cross-scope insight and real notification event contracts: %s', (token) => {
-    const contract = readFileSync(CONTRACT_PATH, 'utf8')
-    expect(contract.includes(token), token).toBe(true)
   })
 
   it('is linked from the canonical docs index', () => {

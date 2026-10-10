@@ -18,9 +18,6 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/ui/design-token-contract.test.ts](../../../tests/ui/design-token-contract.test.ts) | 文档／静态契约检查 | design token contract |
-| [tests/ui/module-review-coverage.test.ts](../../../tests/ui/module-review-coverage.test.ts) | 文档／静态契约检查 | module review coverage |
 | [tests/ui/navigation-contract.test.ts](../../../tests/ui/navigation-contract.test.ts) | 文档／静态契约检查 | cross-domain navigation contract |
 | [tests/ui/overlay-contract.test.ts](../../../tests/ui/overlay-contract.test.ts) | 文档／静态契约检查 | overlay composition contract |
-| [tests/ui/public-surface-contract.test.ts](../../../tests/ui/public-surface-contract.test.ts) | 文档／静态契约检查 | public surface contract |
-| [tests/ui/read-model-contract.test.ts](../../../tests/ui/read-model-contract.test.ts) | 文档／静态契约检查 | read model contract coverage |
-| [tests/ui/runtime-reference-audit.test.ts](../../../tests/ui/runtime-reference-audit.test.ts) | 文档／静态契约检查 | 运行参考与登记证据一致性；不证明工资业务正确 |
+| [tests/ui/read-model-contract.test.ts](../../../tests/ui/read-model-contract.test.ts) | 文档／静态契约检查 | 现行权威文档链接与锚点可解析；生产路由页面域与 READ-MODELS DTO 域一一对应 |

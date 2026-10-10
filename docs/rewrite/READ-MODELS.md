@@ -212,7 +212,7 @@ HTTP adapter、领域 Repository 和显式本地 adapter 均映射此语义；�
 <a id="domain-projections"></a>
 ## 3. 页面域的 DTO 映射
 
-下表覆盖整个 A03 页面域；稳定编码同时供证据账本和导航覆盖检查使用，中文名称不作为新实体身份；不以固定路由数量代替功能覆盖。业务字段、适用变体、公式和允许动作沿 A01/A02 已确认蓝本；读模型统一引用[公共 DTO](#shared-dto)。历史运行面复核见 [#403](https://github.com/zodea/crm-new/issues/403) 与[运行记录](../design/runtime-reference-audit.md)，当前接入另见[实现差异](#implementation-gaps)。
+下表覆盖整个 A03 页面域；稳定编码供运行参考矩阵和导航覆盖检查使用，中文名称不作为新实体身份；不以固定路由数量代替功能覆盖。业务字段、适用变体、公式和允许动作沿 A01/A02 已确认蓝本；读模型统一引用[公共 DTO](#shared-dto)。历史运行面复核见 [#403](https://github.com/zodea/crm-new/issues/403) 与[运行记录](../design/runtime-reference-audit.md)，当前接入另见[实现差异](#implementation-gaps)。
 
 | 稳定编码 | 页面域 | 目标投影与领域差异 | 业务权威来源 |
 | --- | --- | --- | --- |
