@@ -52,7 +52,7 @@ test.describe('Issue #440 工程量三量合计与真实导出', () => {
     }
   })
 
-  test('五档视口分单位合计、共用分项去重与缺量说明键盘往返', async ({ page }, testInfo) => {
+  test('五档视口分单位合计、共用分项去重与缺量说明键盘往返', async ({ page }) => {
     test.setTimeout(120_000)
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
@@ -76,7 +76,6 @@ test.describe('Issue #440 工程量三量合计与真实导出', () => {
       expect(bounds).not.toBeNull()
       expect(bounds!.x).toBeGreaterThanOrEqual(0)
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width)
-      await page.screenshot({ path: testInfo.outputPath(`totals-${width}.png`), fullPage: true })
       await page.keyboard.press('Escape')
       await expect(popover).toBeHidden()
       await expect(help).toBeFocused()

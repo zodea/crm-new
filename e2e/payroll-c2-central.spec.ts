@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import * as XLSX from 'xlsx'
@@ -12,7 +12,7 @@ function urlIdentity(value: string) {
 async function expectSameLocation(page: Page, expected: string) {
   await expect.poll(() => urlIdentity(page.url())).toEqual(urlIdentity(expected))
 }
-async function capture(page: Page, info: TestInfo, name: string, selector?: string, horizontal = false) {
+async function capture(page: Page, name: string, selector?: string, horizontal = false) {
   await expect(page.locator('[data-sonner-toast]:visible')).toHaveCount(0, { timeout: 15000 })
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
@@ -20,9 +20,8 @@ async function capture(page: Page, info: TestInfo, name: string, selector?: stri
       await page.locator(selector).first().evaluate(node => node.scrollIntoView({ block: 'center' }))
     if (horizontal && selector)
       await page.locator(selector).first().evaluate(node => node.scrollLeft = node.scrollWidth - node.clientWidth)
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
+    await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
   }
   await page.setViewportSize({ width: 1440, height: 960 })
 }
@@ -61,11 +60,11 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   await page.goto('/subcontract/daywork?origin=real')
   await expect(page.getByRole('combobox', { name: '签工筛选项目', exact: true })).toBeVisible({ timeout: 30000 })
   await expect(page.getByText('请选择项目和月份，查看该范围的签工；不会自动选择其他项目。')).toBeVisible()
-  await capture(page, info, 'empty-daywork-ledger')
+  await capture(page, 'empty-daywork-ledger')
   const first = await saveRecord(page, ledger, '签工负责人', '2026-08-01', '1', false)
   const row = page.locator(`[data-daywork-id="${first}"]`)
   await expect(row).toContainText('待确认')
-  await capture(page, info, 'draft-unconfirmed-record')
+  await capture(page, 'draft-unconfirmed-record')
   await row.getByRole('button', { name: '人工确认', exact: true }).click()
   const confirmation = page.getByRole('dialog')
   await confirmation.getByRole('button', { name: '关闭', exact: true }).click()
@@ -75,7 +74,7 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   await row.getByRole('button', { name: '人工确认', exact: true }).click()
   await confirmation.getByLabel('确认签工证明人', { exact: true }).fill('现场证明甲')
   await confirmation.getByLabel('人工确认日期', { exact: true }).fill('2026-08-05')
-  await capture(page, info, 'manual-daywork-confirmation', '[role="dialog"]')
+  await capture(page, 'manual-daywork-confirmation', '[role="dialog"]')
   await confirmation.getByRole('button', { name: '确认签工', exact: true }).click()
   await expect(confirmation).toHaveCount(0)
   await expect(row).toContainText('已确认')
@@ -95,8 +94,8 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   await page.keyboard.press('Tab')
   await expect(row.getByRole('link', { name: '编辑签工', exact: true })).toBeFocused()
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-  await capture(page, info, 'confirmed-whole-half-records')
-  await capture(page, info, 'confirmed-records-tail', '[aria-label="签工记录表横向滚动"]', true)
+  await capture(page, 'confirmed-whole-half-records')
+  await capture(page, 'confirmed-records-tail', '[aria-label="签工记录表横向滚动"]', true)
   await page.getByRole('link', { name: '新建 C2 工资草稿', exact: true }).click()
   await expect(page.getByRole('heading', { name: '新建 C2 工资草稿', exact: true })).toBeVisible()
   const draftPath = page.url()
@@ -110,8 +109,8 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   await page.getByLabel('确认规则', { exact: true }).fill('由现场证明人核实实际施工内容；不自动扣款。')
   await expect(page.getByRole('combobox', { name: 'C2 配置负责人', exact: true })).toHaveValue('签工负责人')
   await expect(page.getByRole('combobox', { name: 'C2 配置项目', exact: true })).toHaveValue(/^C2 无工程量验收 /)
-  await capture(page, info, 'subject-unit-rate-config')
-  await capture(page, info, 'subject-rule-config-tail', '#section-config')
+  await capture(page, 'subject-unit-rate-config')
+  await capture(page, 'subject-rule-config-tail', '#section-config')
   await page.getByRole('button', { name: '保存主体配置', exact: true }).click()
   await expect(page.getByRole('button', { name: '保存主体配置', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: '返回', exact: true }).click()
@@ -119,10 +118,10 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   await page.getByRole('button', { name: '核对签工与主体配置', exact: true }).click()
   await expect(page.getByRole('region', { name: 'C2工资签工与主体标准', exact: true })).toContainText('525.00')
   await expect(page.getByRole('button', { name: '保存工资草稿', exact: true })).toBeEnabled()
-  await capture(page, info, 'c2-draft-source')
-  await capture(page, info, 'c2-draft-source-lines', '#section-source > .overflow-x-auto')
-  await capture(page, info, 'c2-draft-source-values', '#section-source > .overflow-x-auto', true)
-  await capture(page, info, 'c2-draft-source-tail', '#section-source details')
+  await capture(page, 'c2-draft-source')
+  await capture(page, 'c2-draft-source-lines', '#section-source > .overflow-x-auto')
+  await capture(page, 'c2-draft-source-values', '#section-source > .overflow-x-auto', true)
+  await capture(page, 'c2-draft-source-tail', '#section-source details')
   const saving = page.waitForResponse(response => response.url().endsWith('/api/commands/payroll-c2') && response.request().method() === 'POST')
   await page.getByRole('button', { name: '保存工资草稿', exact: true }).click()
   const saved = await saving
@@ -132,7 +131,7 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   const workspace = page.getByRole('region', { name: 'C2工资核对与发放', exact: true })
   await workspace.getByRole('button', { name: '核对签工', exact: true }).click()
   await expect(workspace.getByRole('button', { name: '确认实际发放', exact: true })).toBeEnabled()
-  await capture(page, info, 'checked-signature-sources')
+  await capture(page, 'checked-signature-sources')
   await workspace.getByRole('link', { name: '查看原签工', exact: true }).first().click()
   await expect(page.getByRole('link', { name: '返回原工资', exact: true })).toBeVisible()
   const sourcePath = page.url()
@@ -150,7 +149,7 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   await dialog.getByLabel('签工负责人收款金额', { exact: true }).fill('350')
   await dialog.getByLabel('签工成员收款金额', { exact: true }).fill('149.99')
   await expect(dialog.getByRole('button', { name: '确认实际发放', exact: true })).toBeDisabled()
-  await capture(page, info, 'allocation-cent-error', '[role="dialog"]')
+  await capture(page, 'allocation-cent-error', '[role="dialog"]')
   await dialog.getByLabel('签工成员收款金额', { exact: true }).fill('150')
   await expect(dialog.getByLabel('无签工零收款成员收款金额', { exact: true })).toHaveValue('0')
   let original = ''
@@ -167,7 +166,7 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   })
   await dialog.getByRole('button', { name: '确认实际发放', exact: true }).click()
   await expect(dialog.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
-  await capture(page, info, 'unknown-original-allocation', '[role="dialog"]')
+  await capture(page, 'unknown-original-allocation', '[role="dialog"]')
   const replay = page.waitForRequest(request => request.url().endsWith('/api/commands/payroll-c2') && request.postDataJSON()?.commandId === original)
   await dialog.getByRole('button', { name: '核对原提交', exact: true }).click()
   await replay
@@ -183,7 +182,7 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   expect(frozen.document).toMatchObject({ grossAmount: 525, actualAmount: 500 })
   expect(frozen.document.allocations.map(row => row.amount).sort((a, b) => a - b)).toEqual([0, 150, 350])
   expect(frozen.document.daywork.map(row => row.id).sort()).toEqual([first, half].sort())
-  await capture(page, info, 'released-paired-output')
+  await capture(page, 'released-paired-output')
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: '下载工资与签工表', exact: true }).click()
   const file = await downloading
@@ -212,8 +211,8 @@ test('独立签工、人工确认、主体规则、C2核算实发与原键配对
   await page.emulateMedia({ media: 'screen' })
   await page.goto(ledger)
   await expect(page.locator(`[data-daywork-id="${first}"]`).getByRole('link', { name: '编辑签工' })).toHaveCount(0)
-  await capture(page, info, 'released-daywork-readonly')
+  await capture(page, 'released-daywork-readonly')
   await expect(page.getByRole('region', { name: '签工与工资月份占用', exact: true })).toContainText('无签工零收款成员')
-  await capture(page, info, 'zero-member-month-lock', '[aria-label="签工与工资月份占用"]')
+  await capture(page, 'zero-member-month-lock', '[aria-label="签工与工资月份占用"]')
   await writeFile(info.outputPath('verification.json'), JSON.stringify({ ...f, statementId, originalCommand: original, actual: 500, gross: 525, dayworkIds: [first, half], realWorkbookRead: true, printedPdf: true, widths: [390, 768, 1024, 1280, 1440] }, null, 2))
 })

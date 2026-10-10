@@ -27,11 +27,11 @@ async function choose(page: Page, label: string, name: string | RegExp) {
   await page.getByRole('option', { name }).click()
 }
 
-async function capture(page: Page, info: TestInfo, name: string, widths = [390, 768, 1024, 1280, 1440]) {
+async function capture(page: Page, name: string, widths = [390, 768, 1024, 1280, 1440]) {
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 12_000 })
   for (const width of widths) {
     await page.setViewportSize({ width, height: 960 })
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
     for (const dialog of await page.locator('[role="dialog"]:visible').all())
       await expect(dialog).toHaveCSS('opacity', '1')
     for (const control of await page.locator('[data-schedule-wizard-step="1"] input, [data-schedule-wizard-step="1"] [role="combobox"]').all()) {
@@ -39,7 +39,6 @@ async function capture(page: Page, info: TestInfo, name: string, widths = [390, 
       expect(bounds, '第一步表单控件应有可见边界').not.toBeNull()
       expect(bounds!.x + bounds!.width, '第一步表单控件不得被屏幕右侧裁切').toBeLessThanOrEqual(width)
     }
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
   }
 }
 
@@ -90,17 +89,16 @@ test('中央合同三步建组、冻结历史、任务调整与基线在五档�
   await page.getByRole('radio', { name: /合同清单/ }).check()
   await expect(page.getByRole('checkbox', { name: /合同待建二栋/ })).toBeVisible()
   await expect(page.getByRole('checkbox', { name: /合同待建二栋/ })).toBeChecked()
-  await capture(page, info, 'contract-step1')
+  await capture(page, 'contract-step1')
   await page.getByRole('button', { name: '下一步：选择工序' }).click()
   await choose(page, '标准工序库', new RegExp(fixture.libraryName))
   await page.getByLabel('计划开始', { exact: true }).fill('2026-09-12')
   await expect(page.getByRole('checkbox', { name: '启用原腻子工序' })).toBeChecked()
-  await capture(page, info, 'contract-step2')
+  await capture(page, 'contract-step2')
   await page.getByRole('button', { name: '下一步：预览排程' }).click()
-  await capture(page, info, 'contract-step3')
+  await capture(page, 'contract-step3')
   await page.setViewportSize({ width: 390, height: 960 })
   await page.getByRole('button', { name: '生成排程', exact: true }).scrollIntoViewIfNeeded()
-  await page.screenshot({ path: info.outputPath('contract-step3-lower-390.png'), fullPage: true, animations: 'disabled' })
   await page.setViewportSize({ width: 1440, height: 960 })
   await page.getByRole('button', { name: '生成排程', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '生成排程', exact: true }).click()
@@ -153,7 +151,7 @@ test('中央合同三步建组、冻结历史、任务调整与基线在五档�
   await page.getByRole('button', { name: '手工任务', exact: true }).click()
   await manual.getByRole('button', { name: '设置依赖' }).click()
   await expect(dependency.getByText('已禁用的冲突关系')).toBeVisible()
-  await capture(page, info, 'dependency-recovery')
+  await capture(page, 'dependency-recovery')
   await dependency.getByRole('button', { name: '恢复关系' }).last().click()
   await expect.poll(async () => (await fixture.read()).snapshot.dependencies.length).toBe(1)
   await dependency.getByRole('button', { name: '移除依赖', exact: true }).click()
@@ -184,16 +182,16 @@ test('中央合同三步建组、冻结历史、任务调整与基线在五档�
   expect(usage.usageProjects).toContainEqual(expect.objectContaining({ id: fixture.projectId, groupCount: 2 }))
   await page.reload()
   await expect(page.getByRole('button', { name: '原腻子工序', exact: true })).toBeVisible()
-  await capture(page, info, 'central-wbs')
+  await capture(page, 'central-wbs')
   await page.goto(`${scheduleUrl}&boqLine=${encodeURIComponent(readded.boqLineIds[0]!)}`)
   await expect(page.getByRole('dialog', { name: '工序详情 · 原腻子工序' })).toContainText('合同待建二栋')
-  await capture(page, info, 'boq-floor-source')
+  await capture(page, 'boq-floor-source')
   await page.goto(`/schedule?project=${fixture.projectId}&origin=real&task=deleted-task`)
   await expect(page.getByText(/来源工序或清单分项已失效/).first()).toBeVisible()
   expect(errors).toEqual([])
 })
 
-test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身份往返', async ({ page }, info) => {
+test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身份往返', async ({ page }) => {
   test.setTimeout(180_000)
   const fixture = await installQuantityProductionFixture(page)
   const quantityItems = (await fixture.read('templates')).data.items
@@ -240,7 +238,7 @@ test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身�
   await page.getByRole('button', { name: '生成排程', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '生成排程', exact: true }).click()
   await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
-  await capture(page, info, 'pending-command')
+  await capture(page, 'pending-command')
   await page.getByRole('button', { name: '核对原提交', exact: true }).click()
   await expect(page).toHaveURL(/\/schedule\?.*group=/)
   expect(submissions).toHaveLength(2)
@@ -276,7 +274,7 @@ test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身�
     expect(new URL(page.url()).searchParams.get(key)).toBe(matrix.searchParams.get(key))
   await page.getByRole('link', { name: '返回该工序' }).click()
   await expect(page.getByRole('dialog', { name: '工序详情 · 泥水施工' })).toBeVisible()
-  await capture(page, info, 'task-quantity-frozen')
+  await capture(page, 'task-quantity-frozen')
   const complete = async (stageId: string, status: 'completed' | 'draft') => {
     const current = (await fixture.read('completion', { unitId: fixture.units['201']! })).data.stages.find((row: { id: string }) => row.id === stageId)
     const contentBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1cAAAAASUVORK5CYII='
@@ -300,7 +298,7 @@ test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身�
   await expect(page.getByRole('link', { name: '返回首页该工序' })).toBeVisible()
   await page.getByRole('link', { name: '返回首页该工序' }).click()
   await expect(page).toHaveURL(new RegExp(`\\/\\?.*project=${fixture.projectId}`))
-  await capture(page, info, 'home-central-readonly')
+  await capture(page, 'home-central-readonly')
   const overviewLink = page.getByRole('link', { name: '打开施工进度' })
   const restoreKeys = ['project', 'origin', 'group', 'task', 'stage', 'item', 'buildings', 'month', 'view', 'trade', 'assignee']
   const href = new URL((await overviewLink.getAttribute('href'))!, page.url())
@@ -313,7 +311,7 @@ test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身�
   await expect(page.getByText('施工进度只读查看')).toBeVisible()
   for (const key of restoreKeys)
     expect(new URL(page.url()).searchParams.get(key), `施工进度冷刷${key}`).toBe(matrix.searchParams.get(key))
-  await capture(page, info, 'home-source-readonly')
+  await capture(page, 'home-source-readonly')
   await page.getByRole('link', { name: '返回首页项目' }).click()
   await expect(page).toHaveURL(/\/\?/)
   await page.reload()
@@ -322,7 +320,7 @@ test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身�
     expect(new URL(page.url()).searchParams.get(key), `首页冷刷${key}`).toBe(matrix.searchParams.get(key))
 })
 
-test('缺区域整页补齐、逐栋阻塞及零与缺量按单位核对并保留工序草稿', async ({ page }, info) => {
+test('缺区域整页补齐、逐栋阻塞及零与缺量按单位核对并保留工序草稿', async ({ page }) => {
   test.setTimeout(120_000)
   await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `schedule-region-${randomUUID()}` })
   const raw = await (await page.request.get('/api/read/business-session')).json()
@@ -354,7 +352,7 @@ test('缺区域整页补齐、逐栋阻塞及零与缺量按单位核对并保�
   await page.getByLabel('分组名称').fill('区域往返保留的分组')
   await page.getByRole('radio', { name: /内部暂估/ }).check()
   await expect(page.getByText(/当前项目尚未维护可用楼栋/)).toBeVisible()
-  await capture(page, info, 'no-region')
+  await capture(page, 'no-region')
   await page.getByRole('link', { name: '配置楼栋、楼层与户' }).click()
   const region = page.getByTestId('quantity-region-form')
   await region.getByLabel('楼栋编码', { exact: true }).fill('B1')
@@ -373,7 +371,7 @@ test('缺区域整页补齐、逐栋阻塞及零与缺量按单位核对并保�
   await region.getByLabel('楼栋编码', { exact: true }).fill('B2')
   await region.getByPlaceholder('如 1栋', { exact: true }).fill('缺楼层二栋')
   await region.getByRole('button', { name: '新增楼栋', exact: true }).click()
-  await capture(page, info, 'region-configuration')
+  await capture(page, 'region-configuration')
   await page.getByRole('button', { name: '返回新建排程' }).click()
   await expect(page.getByLabel('分组名称')).toHaveValue('区域往返保留的分组')
   await expect(page.getByText(/8 ㎡，缺 1 项.*0 m/)).toBeVisible()
@@ -392,7 +390,7 @@ test('缺区域整页补齐、逐栋阻塞及零与缺量按单位核对并保�
   await page.getByRole('dialog', { name: '放弃新建排程？' }).getByRole('button', { name: '取消', exact: true }).click()
   await expect(page.getByLabel('面积施工默认工期')).toHaveValue('7')
   await page.getByRole('button', { name: '下一步：预览排程' }).click()
-  await capture(page, info, 'provisional-zero-missing-preview')
+  await capture(page, 'provisional-zero-missing-preview')
   await page.getByRole('button', { name: '生成排程', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '生成排程', exact: true }).click()
   await expect(page).toHaveURL(/\/schedule\?.*group=/)

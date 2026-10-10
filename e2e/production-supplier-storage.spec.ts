@@ -81,8 +81,6 @@ test('分供方主档、证照原件与人工核验失响应后独立重启，�
         await expect(originalDownload).toBeVisible()
       }
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-      if ([390, 1440].includes(width))
-        await page.screenshot({ path: info.outputPath(`${state}-${width}.png`), fullPage: true })
     }
   }
   try {

@@ -147,8 +147,6 @@ test.describe('AX04 辅助合同只读与编辑', () => {
       for (const width of RESPONSIVE_WIDTHS) {
         const capture = async (state: string) => {
           await expectNoPageOverflow(page, `${kind} ${state} ${width}`)
-          if (process.env.RUIHANG_CAPTURE_EVIDENCE === '1')
-            await page.screenshot({ path: `${evidence}/${kind}-${state}-${width}.png` })
         }
         await page.setViewportSize({ width, height: 900 })
         await page.goto(`/contract/${kind}`)
@@ -310,7 +308,7 @@ test('正式 Auxiliary 新建公司合同失响应后仅核对同原号，唯一
   })
 })
 
-test('正式 Auxiliary 整页真实工程动态选择及重开，完整两类Native原图/补链/原件同次采用和危险整批恢复', async ({ page }, info) => {
+test('正式 Auxiliary 整页真实工程动态选择及重开，完整两类Native原图/补链/原件同次采用和危险整批恢复', async ({ page }) => {
   test.setTimeout(180000)
   await withFormalAuxiliary(page, async ({ origin, directory, request }) => {
     const base = { workspaceId: 'auxiliary-browser', actorId: 'auxiliary-owner', baseVersion: null, action: 'save', attachments: {} }
@@ -375,8 +373,6 @@ test('正式 Auxiliary 整页真实工程动态选择及重开，完整两类Nat
       await cancel.click()
       await page.getByRole('dialog').getByRole('button', { name: '放弃修改', exact: true }).click()
       await expect(page.getByTestId('auxiliary-detail')).toBeVisible()
-      if (width === 390 || width === 1440)
-        await page.screenshot({ path: info.outputPath(`auxiliary-detail-${width}.png`), fullPage: true })
     }
     const native = await createMemoryDb()
     await runMigrations(native)

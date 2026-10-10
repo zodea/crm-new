@@ -12,7 +12,7 @@
 | jsdom 组件 | Vitest、Vue Test Utils、Testing Library：`pnpm test:components` | [component 项目](../../vitest.config.ts)；部分用例使用 `vitest-axe` 检查无障碍规则 |
 | 单元与 jsdom 组件合并 | `pnpm test` | 仅以上两个项目 |
 | 真实浏览器组件行为 | Vitest Browser、Playwright provider、`vitest-browser-vue`：`pnpm test:browser` | [独立配置](../../vitest.browser.config.ts)，Chromium 多视口 |
-| 跨页面流程 | Playwright：`pnpm test:e2e`；精确文件用 `pnpm exec playwright test <files...>` | [E2E 配置](../../playwright.config.ts)，排除专用视觉矩阵；其他 E2E 仍可含截图断言 |
+| 跨页面流程 | Playwright：`pnpm test:e2e`；精确文件用 `pnpm exec playwright test <files...>` | [E2E 配置](../../playwright.config.ts)，排除专用视觉矩阵；默认 E2E 不写存档截图 |
 | 专用视觉矩阵 | Playwright：`pnpm test:visual` | [视觉配置](../../playwright.visual.config.ts)，固定 Windows/Chromium 与隔离演示服务 |
 | 桌面 Rust | `cargo test --manifest-path src-tauri/Cargo.toml --locked` | 需要 Rust／Tauri 本机构建环境 |
 | 应用类型 | `pnpm typecheck` | Nuxt 项目类型；不覆盖普通测试、E2E 和测试配置的整体类型检查 |
@@ -106,6 +106,9 @@ E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库
 ```
 
 - 每个案例都相同的正向断言单独写一案，案例表只断言各案例之间的差异。
+- E2E 视口：业务断言只在一档宽度跑一次；布局（溢出、局部滚动、入口可见）在同一用例内循环 `RESPONSIVE_WIDTHS` 检查，不按"页面 × 宽度"生成用例。
+- E2E 不写存档截图：失败时 Playwright 自动截图；需要像素比对的放进视觉配置用 `toHaveScreenshot`。不得向仓库已跟踪目录写文件。
+- 只断言"某入口不存在"的过渡契约合并到一个用例，并在注释写明承接的 Issue。
 
 ### 命名
 

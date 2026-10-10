@@ -6,7 +6,7 @@ import { blankQuantityTemplateDraft } from '../app/lib/quantity/template'
 
 test.use({ actionTimeout: 15_000 })
 
-test('中央责任、缺照草稿、照片完成和责任替换保留历史，批量软卡逐项回读', async ({ page }, testInfo) => {
+test('中央责任、缺照草稿、照片完成和责任替换保留历史，批量软卡逐项回读', async ({ page }) => {
   test.setTimeout(180_000)
   const headers = { 'x-ruihang-test-session': `quantity-completion-ui-${randomUUID()}` }
   await page.context().setExtraHTTPHeaders(headers)
@@ -57,7 +57,6 @@ test('中央责任、缺照草稿、照片完成和责任替换保留历史，�
       await expect(focus).toBeFocused()
       await focus.click({ trial: true })
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
-      await page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`), animations: 'disabled' })
     }
   }
   await page.goto(matrixUrl)

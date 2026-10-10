@@ -3,7 +3,7 @@ import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ actionTimeout: 15_000 })
 
-test('旧详情恢复失败后，五档业务列表和直接链接均可主动重新打开', async ({ page }, testInfo) => {
+test('旧详情恢复失败后，五档业务列表和直接链接均可主动重新打开', async ({ page }) => {
   test.setTimeout(120_000)
   const name = '页签恢复重开样例'
   const errors: string[] = []
@@ -33,8 +33,6 @@ test('旧详情恢复失败后，五档业务列表和直接链接均可主动�
     await expect(page.locator('[data-tab-restore-status] [role="alert"]')).toContainText('该详情的只读恢复尚未接入')
     await expect(page).toHaveURL(/\/finance\/payment$/)
     await expectNoPageOverflow(page, `恢复失败提示 ${width}`)
-    if (width === 390)
-      await page.screenshot({ path: testInfo.outputPath('reopen-problem-390.png'), fullPage: true, animations: 'disabled' })
     await row.scrollIntoViewIfNeeded()
     await row.focus()
     await expect(row).toBeFocused()
@@ -45,7 +43,6 @@ test('旧详情恢复失败后，五档业务列表和直接链接均可主动�
     await expect(tab).toHaveCount(1)
     await expect(tab.locator('[data-tab-trigger]')).toHaveAttribute('aria-current', 'page')
     await expectNoPageOverflow(page, `列表重新打开 ${width}`)
-    await page.screenshot({ path: testInfo.outputPath(`reopened-${width}.png`), fullPage: true, animations: 'disabled' })
   }
 
   await page.getByRole('link', { name: '返回付款申请', exact: true }).click()

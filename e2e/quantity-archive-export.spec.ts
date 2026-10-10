@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import * as XLSX from 'xlsx'
 import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
-test('中央矩阵归档取消、确认及解除回读一致，分类导出保留目录和施工记录原值', async ({ page }, testInfo) => {
+test('中央矩阵归档取消、确认及解除回读一致，分类导出保留目录和施工记录原值', async ({ page }) => {
   test.setTimeout(120_000)
   const fixture = await installQuantityProductionFixture(page, { totals: true })
   await page.getByRole('button', { name: '归档矩阵', exact: true }).click()
@@ -18,7 +18,6 @@ test('中央矩阵归档取消、确认及解除回读一致，分类导出保�
   await page.getByRole('button', { name: '解除归档', exact: true }).click()
   const unarchive = page.getByRole('dialog', { name: '解除矩阵归档', exact: true })
   await expect(unarchive).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('unarchive-confirm.png'), animations: 'disabled' })
   await unarchive.getByRole('button', { name: '解除归档', exact: true }).click()
   await expect.poll(async () => (await fixture.read('region')).data.matrixArchivedAt).toBeNull()
 
@@ -56,7 +55,6 @@ test('中央矩阵归档取消、确认及解除回读一致，分类导出保�
   await expect(page.getByLabel('一级目录字段')).toHaveValue('buildingName')
   await expect(page.getByLabel('二级目录字段')).toHaveValue('trade')
   await expect(page.getByRole('status')).toContainText('1栋/泥水工/2层-201户.xlsx')
-  await page.screenshot({ path: testInfo.outputPath('category-export.png'), animations: 'disabled' })
   await page.getByRole('button', { name: '开始导出', exact: true }).click()
   await expect(page).toHaveURL(/\/subcontract\/quantity\?/)
   const state = await page.evaluate(() => (window as unknown as { quantityCategoryExportTest: { pickerCalls: number, writes: { path: string, bytes: number[], closed: boolean }[] } }).quantityCategoryExportTest)

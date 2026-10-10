@@ -201,8 +201,6 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
           await page.setViewportSize({ width, height: 900 })
           await expectNoPageOverflow(page, `${path} ${width}px`)
         }
-        if (path === '/project')
-          await page.screenshot({ path: testInfo.outputPath('a01-project-status-1440.png') })
       })
     }
     expect(errors).toEqual([])
@@ -294,8 +292,6 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
       await expect(cell(0, 'unit')).toBeFocused()
       await page.keyboard.press('Tab')
       await expect(cell(0, 'qty')).toBeFocused()
-      if (width === 390 || width === 1440)
-        await page.screenshot({ path: testInfo.outputPath(`a02-form-${width}.png`) })
     }
 
     await page.getByLabel('合同名称 *').fill('A02 列粘贴合同')

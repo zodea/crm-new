@@ -18,7 +18,7 @@ const lists = [
   { path: '/finance/payment', label: '付款申请' },
 ]
 
-test('Issue #419：十五类单据列表均保留紧凑工具与真实可操作表头', async ({ page }, testInfo) => {
+test('Issue #419：十五类单据列表均保留紧凑工具与真实可操作表头', async ({ page }) => {
   test.setTimeout(120_000)
   await page.setViewportSize({ width: 1440, height: 900 })
   const errors: string[] = []
@@ -54,13 +54,11 @@ test('Issue #419：十五类单据列表均保留紧凑工具与真实可操作�
     await expect(page.getByRole('group', { name: '状态', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440)
-    if (list.path === '/material/arrival' || list.path === '/finance/payment')
-      await page.screenshot({ path: testInfo.outputPath(`${list.path.includes('material') ? 'material' : 'finance'}-list-1440.png`) })
   }
   expect(errors).toEqual([])
 })
 
-test('Issue #419：材料和资金列表在390、768、1024px保留局部滚动与筛选焦点', async ({ page }, testInfo) => {
+test('Issue #419：材料和资金列表在390、768、1024px保留局部滚动与筛选焦点', async ({ page }) => {
   test.setTimeout(90_000)
   for (const path of ['/material/arrival', '/finance/payment']) {
     for (const width of [390, 768, 1024]) {
@@ -75,8 +73,6 @@ test('Issue #419：材料和资金列表在390、768、1024px保留局部滚动�
       await expect(page.getByRole('group', { name: '项目', exact: true })).toBeInViewport()
       await page.keyboard.press('Escape')
       await expect(filter).toBeFocused()
-      if (width === 390)
-        await page.screenshot({ path: testInfo.outputPath(`${path.includes('material') ? 'material' : 'finance'}-list-390.png`) })
     }
   }
 })

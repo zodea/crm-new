@@ -22,7 +22,7 @@ export interface PayrollFeesBoundaryInput {
 const widths = [390, 768, 1024, 1280, 1440] as const
 
 /** 接在主旅程真实发放/输出成功之后；只保存一份新公司代管关系。 */
-export async function payrollFeesBoundaries(page: Page, info: TestInfo, input: PayrollFeesBoundaryInput) {
+export async function payrollFeesBoundaries(page: Page, input: PayrollFeesBoundaryInput) {
   const { repository, query, ordinary, management, bookId } = input
   const month = input.month ?? '2026-09'
   const subject = ({ projectId, crewId, leaderWorkerId }: ProjectSubject) => ({ projectId, crewId, leaderWorkerId, month })
@@ -46,11 +46,10 @@ export async function payrollFeesBoundaries(page: Page, info: TestInfo, input: P
       await expect(section).toBeInViewport()
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
       await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
-      await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: false, animations: 'disabled' })
       // 从当前表格的真实滚动容器检查右侧，不把整页横向溢出当成密集表格滚动。
       const tables = section.locator('[data-ui="kit-table"]')
       let localScrollers = 0
-      for (const [index, table] of (await tables.all()).entries()) {
+      for (const table of await tables.all()) {
         const moved = await table.evaluate((node) => {
           const scrolls = [...node.querySelectorAll<HTMLElement>('*')].filter(element => /auto|scroll/.test(getComputedStyle(element).overflowX) && element.scrollWidth > element.clientWidth && element.clientWidth > 0)
           for (const element of scrolls)
@@ -61,7 +60,6 @@ export async function payrollFeesBoundaries(page: Page, info: TestInfo, input: P
           expect(position.left).toBeGreaterThan(0)
         if (moved.length) {
           localScrollers += moved.length
-          await table.screenshot({ path: info.outputPath(`${name}-table-${index}-right-${width}.png`), animations: 'disabled' })
           await table.evaluate(node => node.querySelectorAll<HTMLElement>('*').forEach(element => element.scrollLeft = 0))
         }
       }
@@ -209,10 +207,9 @@ export async function payrollFeesBoundaries(page: Page, info: TestInfo, input: P
 export async function payrollFeesReadableTables(page: Page, info: TestInfo, input: { kind: 'negative' | 'same-person-list' }) {
   const measurements: Array<Record<string, unknown>> = []
   const shell = page.locator('.shell-workspace')
-  async function screenshot(name: string, width: number) {
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await expect.poll(() => shell.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: false, animations: 'disabled' })
+  async function expectNoOverflow(name: string, width: number) {
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
+    await expect.poll(() => shell.evaluate(node => node.scrollWidth <= node.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
   }
   // Range 只采集真实非空文本，避免把 td/包装元素的行框误作文字未换行证据。
   async function singleLine(cell: Locator) {
@@ -261,7 +258,7 @@ export async function payrollFeesReadableTables(page: Page, info: TestInfo, inpu
       await region.focus()
       await expect(region).toBeFocused()
       const amountLines = [await singleLine(cells.nth(3)), await singleLine(cells.nth(4))]
-      await screenshot('negative-readable-left-focus', width)
+      await expectNoOverflow('negative-readable-left-focus', width)
       if (width === 390) {
         await region.evaluate((node) => {
           const columns = node.querySelectorAll('tbody tr:first-child td')
@@ -279,7 +276,7 @@ export async function payrollFeesReadableTables(page: Page, info: TestInfo, inpu
             return bounds.left >= left - 1 && bounds.right <= right + 1
           })
         })).toBe(true)
-        await screenshot('negative-readable-amount-columns', width)
+        await expectNoOverflow('negative-readable-amount-columns', width)
         await region.evaluate(node => node.scrollLeft = 0)
         await expect.poll(() => region.evaluate(node => node.scrollLeft)).toBe(0)
       }
@@ -292,7 +289,7 @@ export async function payrollFeesReadableTables(page: Page, info: TestInfo, inpu
       }
       await region.evaluate(node => node.scrollLeft = node.scrollWidth - node.clientWidth)
       await expect.poll(() => region.evaluate(node => Math.abs(node.scrollWidth - node.clientWidth - node.scrollLeft))).toBeLessThanOrEqual(1)
-      await screenshot('negative-readable-right', width)
+      await expectNoOverflow('negative-readable-right', width)
 
       // tabindex=0 的表格区下一个键盘目标就是长理由区，不给测试临时注入可聚焦属性。
       await region.focus()
@@ -320,7 +317,7 @@ export async function payrollFeesReadableTables(page: Page, info: TestInfo, inpu
         }, paragraph)
         expect(tail.visible, JSON.stringify(tail)).toBe(true)
         await expect(reason).toBeFocused()
-        await screenshot(name, width)
+        await expectNoOverflow(name, width)
         return tail
       }
       const reasonTail = await captureTail(0, 'negative-readable-reason-tail')
@@ -352,7 +349,7 @@ export async function payrollFeesReadableTables(page: Page, info: TestInfo, inpu
         return { text: node.textContent, top: rect.top, bottom: rect.bottom, withinWorkspace: rect.top >= workspace.top && rect.bottom <= workspace.bottom && rect.top >= 0 && rect.bottom <= innerHeight }
       }))
       expect(visibleRows.every(row => row.withinWorkspace), JSON.stringify(visibleRows)).toBe(true)
-      await screenshot('same-person-readable-left-two-rows', width)
+      await expectNoOverflow('same-person-readable-left-two-rows', width)
       // 按实际表头 colid 找列；仅移动 vxe 实体横滚，不能靠滚整个页面或裁掉固定月列。
       await body.evaluate((node, id) => {
         const cell = [...node.querySelectorAll<HTMLElement>('tbody td')].find(cell => cell.getAttribute('colid') === id)!
@@ -370,7 +367,7 @@ export async function payrollFeesReadableTables(page: Page, info: TestInfo, inpu
         return rect.left >= viewport.left + fixed - 1 && rect.right <= viewport.right + 1
       }))).toBe(true)
       const amounts = [await singleLine(actualCells.nth(0)), await singleLine(actualCells.nth(1))]
-      await screenshot('same-person-readable-actual-two-rows', width)
+      await expectNoOverflow('same-person-readable-actual-two-rows', width)
       measurements.push({ width, visibleRows, amounts, horizontal: await body.evaluate(node => ({ left: node.scrollLeft, maximum: node.scrollWidth - node.clientWidth })) })
     }
   }

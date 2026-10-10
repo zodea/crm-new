@@ -12,7 +12,7 @@ async function inlineStyles(url: URL): Promise<string> {
 }
 
 for (const width of [390, 768, 1024, 1280, 1440]) {
-  test(`DC 共享指标与函数式行菜单在 ${width}px 保全键盘、边缘与原动作`, async ({ page }, info) => {
+  test(`DC 共享指标与函数式行菜单在 ${width}px 保全键盘、边缘与原动作`, async ({ page }) => {
     test.setTimeout(60_000)
     await page.setViewportSize({ width, height: 900 })
     const errors: string[] = []
@@ -84,7 +84,6 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     expect(box!.x + box!.width).toBeLessThanOrEqual(width)
     expect(box!.y).toBeGreaterThanOrEqual(0)
     expect(box!.y + box!.height).toBeLessThanOrEqual(900)
-    await page.screenshot({ path: info.outputPath(`dc-row-menu-${width}.png`) })
     await page.keyboard.press('Enter')
     await expect(menu).toBeHidden()
     await expect(trigger).toBeFocused()

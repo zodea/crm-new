@@ -1,5 +1,4 @@
 import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
 import process from 'node:process'
 import { expect, test } from '@playwright/test'
 
@@ -227,7 +226,6 @@ test.describe('精确因子组合工作台', () => {
       const screenshotDir = process.env.CRM_EVIDENCE_DIR
       if (screenshotDir) {
         mkdirSync(screenshotDir, { recursive: true })
-        await page.screenshot({ path: join(screenshotDir, `factor-workbench-${width}.png`), fullPage: true })
       }
     }
     const help = page.getByRole('button', { name: '查看因子求解说明' })

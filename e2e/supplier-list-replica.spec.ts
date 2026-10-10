@@ -68,7 +68,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 for (const width of RESPONSIVE_WIDTHS) {
-  test(`${width}px：完整列、紧凑标签、表格内滚动及可访问工具`, async ({ page }, testInfo) => {
+  test(`${width}px：完整列、紧凑标签、表格内滚动及可访问工具`, async ({ page }) => {
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     await page.setViewportSize({ width, height: 900 })
@@ -101,7 +101,6 @@ for (const width of RESPONSIVE_WIDTHS) {
     await scroller.evaluate(el => el.scrollLeft = 0)
     await expectNoPageOverflow(page, `${width}px 设置浮层`)
     expect(errors).toEqual([])
-    await page.screenshot({ path: testInfo.outputPath(`supplier-list-${width}.png`), fullPage: false })
   })
 }
 

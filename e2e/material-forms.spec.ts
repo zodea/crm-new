@@ -1,6 +1,5 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import {
   installMaterialProductionFixture,
@@ -102,19 +101,6 @@ async function openMaterialCreate(page: Page, listPath: string) {
   await expect(page).toHaveURL(listPath)
   await page.getByTestId('create-material-form').click()
   await expect(page).toHaveURL(`${listPath}/new`)
-}
-
-async function captureVisual(
-  page: Page,
-  testInfo: TestInfo,
-  name: string,
-) {
-  if (process.env.CAPTURE_F4_VISUALS !== '1')
-    return
-  await page.screenshot({
-    path: testInfo.outputPath(`${name}.png`),
-    fullPage: true,
-  })
 }
 
 test.describe('F4 物资领域整页表单', () => {
@@ -312,7 +298,7 @@ test.describe('F4 物资领域整页表单', () => {
   })
 
   for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 十二条整页表单在响应式验收矩阵中无页面级横向溢出`, async ({ page }, testInfo) => {
+    test(`${width}px 十二条整页表单在响应式验收矩阵中无页面级横向溢出`, async ({ page }) => {
       test.setTimeout(90_000)
       const fixture = fixtures.get(page)!
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
@@ -326,7 +312,6 @@ test.describe('F4 物资领域整页表单', () => {
       }
       await page.goto('/material/arrival/new')
       await expect(page.getByRole('heading', { name: '新建 · 材料到货' })).toBeVisible()
-      await captureVisual(page, testInfo, `material-arrival-${width}`)
     })
   }
 })

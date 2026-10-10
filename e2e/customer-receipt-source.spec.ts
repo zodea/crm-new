@@ -1,6 +1,5 @@
 import type { Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow } from './helpers/responsive'
 
@@ -116,8 +115,6 @@ for (const input of SOURCE_CASES) {
         expect(moved).toBeGreaterThan(0)
         await scroll.evaluate(element => element.scrollLeft = 0)
       }
-      if (process.env.CRM_EVIDENCE_DIR)
-        await page.screenshot({ path: `${process.env.CRM_EVIDENCE_DIR}/customer-receipts-${width}.png`, fullPage: true })
     }
   })
 }

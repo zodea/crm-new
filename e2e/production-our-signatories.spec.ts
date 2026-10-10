@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '先构建，再运行独立本机合成库；不连接开发或用户数据')
-test('主体整页维护、实际选择与冻结、原命令恢复、占号和重启读取使用真实中央库', async ({ page }, testInfo) => {
+test('主体整页维护、实际选择与冻结、原命令恢复、占号和重启读取使用真实中央库', async ({ page }) => {
   test.setTimeout(180000)
   const root = resolve('.')
   const base = resolve('.tmp/a02-material-e2e/production')
@@ -184,7 +184,6 @@ test('主体整页维护、实际选择与冻结、原命令恢复、占号和�
     await expect(page.getByLabel('主体核实历史')).toContainText('版本 1 · 合成真实签约公司原名')
     await expect(page.getByLabel('主体核实历史')).toContainText('版本 2 · 后来目录核实更名')
     expect(pageErrors).toEqual([])
-    await page.screenshot({ path: testInfo.outputPath('signatory-cold-history.png'), fullPage: true })
   }
   finally {
     await stop()

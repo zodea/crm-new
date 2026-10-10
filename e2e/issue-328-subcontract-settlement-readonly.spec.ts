@@ -160,7 +160,7 @@ test.describe('AX02 分包结算中央只读链', () => {
   })
 
   for (const width of [...RESPONSIVE_WIDTHS, 666, 1293]) {
-    test(`${width}px 列表与详情、局部滚动与键盘焦点`, async ({ page }, info) => {
+    test(`${width}px 列表与详情、局部滚动与键盘焦点`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/subcontract/settlement?status=confirmed')
       const table = page.locator('[data-ui="owner-document-table"]')
@@ -174,7 +174,6 @@ test.describe('AX02 分包结算中央只读链', () => {
       await page.goto('/subcontract/settlement/sub-settlement-real-328?origin=real')
       await expect(page.getByRole('heading', { name: '中央正式八月分包结算' })).toBeVisible()
       await expectNoPageOverflow(page, `AX02 detail ${width}`)
-      await page.screenshot({ path: info.outputPath(`settlement-detail-${width}.png`) })
     })
   }
 })

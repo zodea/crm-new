@@ -88,7 +88,7 @@ test.describe('Issue #439 批复空值与明确零', () => {
     await expect(page.getByRole('group', { name: '待支付', exact: true })).toContainText('¥100.00')
   })
 
-  test('历史零保持待核验与已付事实，取消不确认来源；五档视口可核对和编辑', async ({ page }, testInfo) => {
+  test('历史零保持待核验与已付事实，取消不确认来源；五档视口可核对和编辑', async ({ page }) => {
     test.setTimeout(150_000)
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
@@ -112,7 +112,6 @@ test.describe('Issue #439 批复空值与明确零', () => {
       const edit = page.getByTestId('payment-application-edit')
       await edit.focus()
       await expect(edit).toBeFocused()
-      await page.screenshot({ path: testInfo.outputPath(`approval-detail-${width}.png`), fullPage: true })
       await edit.press('Enter')
       const approval = page.getByRole('spinbutton', { name: '本期批复金额', exact: true })
       await approval.scrollIntoViewIfNeeded()
@@ -120,7 +119,6 @@ test.describe('Issue #439 批复空值与明确零', () => {
       await expect(approval).toBeFocused()
       await expect(approval).toHaveValue('0')
       await expectNoPageOverflow(page, `批复表单 ${width}`)
-      await page.screenshot({ path: testInfo.outputPath(`approval-form-${width}.png`), fullPage: true })
       await page.getByRole('button', { name: '返回付款申请', exact: true }).click()
       await openApplicationFromList(page, '历史批复核验样例')
     }
@@ -128,7 +126,6 @@ test.describe('Issue #439 批复空值与明确零', () => {
     await expect(page.getByText('历史批复核验样例', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('group', { name: '批复金额', exact: true })).toContainText('合计不完整')
     await expect(page.getByRole('group', { name: '应付余额', exact: true })).toContainText('合计不完整')
-    await page.screenshot({ path: testInfo.outputPath('approval-management.png'), fullPage: true })
     expect(errors).toEqual([])
   })
 })

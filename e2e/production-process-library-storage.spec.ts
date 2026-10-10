@@ -112,8 +112,6 @@ test('正式工序库完整页面保存、独立进程冷重开、原键和旧�
     for (const width of [390, 768, 1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-      if ([390, 1440].includes(width))
-        await page.screenshot({ path: info.outputPath(`library-${width}.png`), fullPage: true })
     }
     const catalog = await (await page.request.get(`${origin}/api/read/process-libraries?origin=real`)).json()
     expect(catalog.seriesVersions).toEqual({ 'LOCAL-463': 2 })

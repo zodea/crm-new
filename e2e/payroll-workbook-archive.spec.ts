@@ -109,7 +109,6 @@ test('现代完整工资图经实际快照公开迁入后，两种历史目录�
     proof.push({ mode: summary.mode, originalId: original.id, mappedId: archive.id, manifestHash: archive.manifestHash, rosterRef: archive.rosterRef, formalNumbers: archive.issues.map(row => row.number), zipSha256: createHash('sha256').update(bytes).digest('hex'), files: files.map(file => file.name) })
   }
   await page.getByRole('region', { name: '已保存目录下载', exact: true }).scrollIntoViewIfNeeded()
-  await page.screenshot({ path: info.outputPath('migrated-directory.png'), animations: 'disabled' })
   await writeFile(info.outputPath('migration-files.json'), JSON.stringify({ ...imported, proof }, null, 2))
   expect(errors).toEqual([])
 })
@@ -199,10 +198,8 @@ test('两月工资从正式出具到两种固定目录、实际名册照片文�
       node.scrollTop = 0
       node.scrollLeft = 0
     })
-    await page.screenshot({ path: info.outputPath(`workbook-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await page.getByRole('region', { name: '已保存目录下载', exact: true }).scrollIntoViewIfNeeded()
-  await page.screenshot({ path: info.outputPath('cycle-downloads-1440.png'), animations: 'disabled' })
   const plain = XLSX.read(await download(page, info, '下载工资 XLSX', 'cycle-public.xlsx'))
   expect(plain.SheetNames).not.toContain('实名名册')
   expect(XLSX.utils.sheet_to_json(plain.Sheets.目录!)).toHaveLength(2)
@@ -219,7 +216,6 @@ test('两月工资从正式出具到两种固定目录、实际名册照片文�
   await page.getByRole('button', { name: '保存当前目录版本', exact: true }).click()
   await expect(page.getByRole('region', { name: '已保存目录下载', exact: true })).toBeVisible()
   await page.getByRole('region', { name: '已保存目录下载', exact: true }).scrollIntoViewIfNeeded()
-  await page.screenshot({ path: info.outputPath('month-downloads-1440.png'), animations: 'disabled' })
   const month = unzip(await download(page, info, '下载工资、名册与照片 ZIP', 'month-private.zip'))
   for (const [period, actual] of [['2026-08', 480], ['2026-09', 470]] as const) {
     const workbook = XLSX.read(month.find(file => file.name.startsWith(`${period}/`) && file.name.endsWith('.xlsx'))!.data)

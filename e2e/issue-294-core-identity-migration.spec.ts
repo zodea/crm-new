@@ -1,7 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { CoreMigrationBatchDTO, CoreMigrationEntityType, CoreMigrationSnapshotDTO } from '../app/lib/migration/core-contract'
 import { mkdir } from 'node:fs/promises'
-import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import { LATEST_VERSION, migrations, runMigrations } from '../app/lib/db/migrations'
 import { createMemoryDb } from '../tests/helpers/memory-db'
@@ -434,7 +433,6 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
       await expectNoPageOverflow(page, `迁移回滚待恢复 @ ${width}px`)
       if (process.env.CRM_EVIDENCE_DIR) {
         await mkdir(process.env.CRM_EVIDENCE_DIR, { recursive: true })
-        await page.screenshot({ path: path.join(process.env.CRM_EVIDENCE_DIR, `migration-recovery-${width}.png`) })
       }
     }
     await rollback.focus()

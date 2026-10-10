@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 for (const width of [390, 1440]) {
-  test(`${width}px 补充列表多选浮层可达且保持主视图`, async ({ page }, testInfo) => {
+  test(`${width}px 补充列表多选浮层可达且保持主视图`, async ({ page }) => {
     test.setTimeout(120_000)
     await page.setViewportSize({ width, height: 900 })
     const errors: string[] = []
@@ -23,8 +23,6 @@ for (const width of [390, 1440]) {
       await expect(popover.getByRole('button', { name: '全选', exact: true })).toBeVisible()
       for (const name of options)
         await popover.getByRole('checkbox', { name, exact: true }).check()
-      if (label === '消息类型' || label === '分部')
-        await page.screenshot({ path: testInfo.outputPath(`${label === '消息类型' ? 'notification' : 'quantity'}-multi-filter-${width}.png`) })
       await popover.getByRole('button', { name: '应用', exact: true }).click()
       const selected = page.getByRole('button', { name: `${label}，已选 ${count + options.length} 项`, exact: true })
       await expect(selected).toBeVisible()

@@ -81,7 +81,6 @@ test('发票台账打印：Excel 导入的发票没有原件不进入打印，�
   await expect(page.getByTestId('invoice-print-summary')).toContainText('已勾 1 张')
   await expect(page.getByTestId('invoice-print-skipped')).toContainText('1 张发票不会打印')
   await expect(page.getByTestId('invoice-print-skipped')).toContainText('26442000000000000602：Excel 导入的发票没有原件，不能打印')
-  await page.screenshot({ path: 'test-results/invoice-print-skipped.png' })
 
   await page.getByRole('button', { name: '打印选中', exact: true }).click()
   await expect(page.getByRole('dialog', { name: '确认打印结果' })).toContainText('本次打印：1 张发票')

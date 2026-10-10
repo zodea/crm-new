@@ -144,7 +144,6 @@ for (const input of CUSTOMER_INPUTS) {
         })
         expect(scrollLeft).toBeGreaterThan(0)
         await expect.poll(() => table.evaluate(element => element.scrollLeft)).toBe(scrollLeft)
-        await page.screenshot({ path: `.cache/customer-project-slice/customer-project-${width}.png` })
         await link.press('Enter')
         await expect(page.getByRole('heading', { name: named('Excel关联项目424'), exact: true })).toBeVisible()
         await expectNoPageOverflow(page, `关联项目详情 @ ${width}`)

@@ -186,7 +186,6 @@ for (const input of CUSTOMER_INPUTS) {
             }
           }))
           await info.attach('failed-browser-dom', { contentType: 'application/json', body: JSON.stringify(dom) })
-          await page.screenshot({ path: info.outputPath('failed-final-page.png'), timeout: 5000 })
         }
         catch (cause) {
           await info.attach('failed-browser-dom-error', { contentType: 'text/plain', body: String(cause) })
@@ -371,8 +370,6 @@ for (const input of CUSTOMER_INPUTS) {
         const dialog = page.getByRole('dialog')
         await expect(dialog.locator('iframe')).toHaveAttribute('src', /^blob:/)
         await expectOverlayAboveShell(dialog, `施工合同原件预览 ${width}`)
-        if (width === 390 || width === 1440)
-          await page.screenshot({ path: info.outputPath(`construction-original-${width}.png`), fullPage: true, animations: 'disabled' })
         await dialog.press('Escape')
         await expect(preview).toBeFocused()
       }
@@ -463,7 +460,6 @@ for (const input of CUSTOMER_INPUTS) {
             expect(scrollLeft).toBeGreaterThan(0)
           await expect(link, '未操作的合同链接不应自动聚焦').not.toBeFocused()
           await expect.poll(() => link.evaluate(element => element.matches(':hover')), { message: '普通页面截图不应带入鼠标悬停状态' }).toBe(false)
-          await matrixPage.screenshot({ path: info.outputPath(`customer-contract-${width}.png`) })
           phase = '键盘打开原合同'
           await link.focus()
           await expect(link).toBeFocused()
@@ -494,7 +490,6 @@ for (const input of CUSTOMER_INPUTS) {
             const dom = await captureDiagnostic(() => matrixPage.evaluate(() => ({ readyState: document.readyState, title: document.title, text: document.body?.textContent ?? null, html: document.documentElement.outerHTML })))
             const observed = browserDiagnostics.get(matrixPage)
             await info.attach(`customer-contract-${width}-diagnostic`, { contentType: 'application/json', body: JSON.stringify({ width, phase, url: matrixPage.url(), dom, browser: observed, actualApiFailures: observed?.requests.filter(request => request.url.includes('/api/') && (request.failure || (request.status !== undefined && request.status >= 400))) }) })
-            await matrixPage.screenshot({ path: info.outputPath(`failed-customer-contract-${width}.png`), timeout: 5000 })
           }
           catch (diagnosticError) {
             await info.attach(`customer-contract-${width}-diagnostic-error`, { contentType: 'application/json', body: JSON.stringify({ width, phase, url: matrixPage.url(), browser: browserDiagnostics.get(matrixPage), diagnosticError: String(diagnosticError) }) })

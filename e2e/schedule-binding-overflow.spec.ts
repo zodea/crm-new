@@ -3,7 +3,7 @@ import type { ScheduleBindingRead } from '../app/lib/schedule/central-binding-co
 import { expect, test } from '@playwright/test'
 
 /** 明确的组件读取夹具：用于实际VXE单元格布局，不代表四条来源已通过迁入。 */
-test('组件读取夹具：四条稳定清单来源与完整长说明可键盘滚动并进入第四行', async ({ page }, info) => {
+test('组件读取夹具：四条稳定清单来源与完整长说明可键盘滚动并进入第四行', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   const total = { value: 12, knownValue: 12, missingCount: 0, sourceCount: 4, unitMissing: false, completeness: 'complete' as const }
@@ -39,7 +39,6 @@ test('组件读取夹具：四条稳定清单来源与完整长说明可键盘�
     })
     await expect(fourth).toBeInViewport()
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`multiple-sources-long-reasons-${width}.png`), animations: 'disabled' })
   }
   await fourth.click()
   await expect(page).toHaveURL(url => url.pathname === '/contract/boq/building-evidence' && url.searchParams.get('line') === 'line4' && url.searchParams.get('project') === preview.projectId && url.searchParams.get('contract') === preview.contractId)

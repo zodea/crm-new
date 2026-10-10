@@ -78,7 +78,6 @@ for (const domain of ['material', 'construction', 'subcontract'] as const) {
       await page.keyboard.press('Escape')
       await expect(trigger).toBeFocused()
     }
-    await page.screenshot({ path: testInfo.outputPath(`${domain}-multifilter-1440.png`), fullPage: true })
     await page.reload()
     await expect(list.getByRole('button', { name: '筛选状态，已选 2 项' })).toBeVisible()
     await expect(row).toBeVisible()

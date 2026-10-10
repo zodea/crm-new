@@ -18,7 +18,7 @@ test.afterEach(async ({ page }, testInfo) => {
 })
 
 for (const width of [390, 768, 1024, 1280, 1440]) {
-  test(`${width}px 中央新项目空排程只读查看并返回同一身份`, async ({ page }, testInfo) => {
+  test(`${width}px 中央新项目空排程只读查看并返回同一身份`, async ({ page }) => {
     await page.setViewportSize({ width, height: 960 })
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
@@ -50,14 +50,12 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await expect(empty).toContainText('已读取对应项目排程，当前没有楼栋分组。此入口仅提供只读查看。')
     await expect(page.getByTestId('home-schedule-scroll')).toHaveCount(0)
     await expectNoPageOverflow(page, `${width}px 首页`)
-    await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true })
     await page.getByRole('link', { name: '打开施工进度', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/schedule\\?project=${id}&origin=real&from=home`))
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
     await expect(page.getByRole('status', { name: '当前项目还没有施工排程' })).toBeVisible()
     await expect(page.getByRole('link', { name: '新建楼栋分组' })).toHaveCount(0)
     await expectNoPageOverflow(page, `${width}px 来源查看`)
-    await page.screenshot({ path: testInfo.outputPath(`source-${width}.png`), fullPage: true })
     await page.getByRole('link', { name: '返回首页项目' }).click()
     await expect(page).toHaveURL(new RegExp(`project=${id}&origin=real`))
     await expect(page.getByTestId('project-switcher-trigger')).toContainText(name)
@@ -74,7 +72,7 @@ test('删除或来源不匹配的深链不借用首个本地项目', async ({ pa
   await expect(page).toHaveURL(/project=proj_demo_001&origin=real/)
 })
 
-test('缓存首页当前项目关系失效后撤下旧事实与查看入口', async ({ page }, testInfo) => {
+test('缓存首页当前项目关系失效后撤下旧事实与查看入口', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 960 })
   await page.goto('/project/form')
   const name = '首页来源关系验证项目'
@@ -99,7 +97,6 @@ test('缓存首页当前项目关系失效后撤下旧事实与查看入口', as
   await expect(page.getByRole('status', { name: `${name}还没有施工排程` })).toHaveCount(0)
   await expect(page.getByRole('link', { name: '打开施工进度', exact: true })).toHaveCount(0)
   await expectNoPageOverflow(page, '390px 当前项目关系失效')
-  await page.screenshot({ path: testInfo.outputPath('home-relationship-mismatch-390.png'), fullPage: true })
 })
 
 test('离开缓存首页后，迟到的项目读取不污染项目列表地址', async ({ page }) => {

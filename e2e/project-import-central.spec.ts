@@ -253,7 +253,7 @@ test('导入期间取消只完成当前行，重新上传原文件恢复剩余�
 })
 
 for (const width of [390, 768, 1024, 1280, 1440]) {
-  test(`${width}px 上传映射预览失败表局部横滚、键盘焦点与取消`, async ({ page }, info) => {
+  test(`${width}px 上传映射预览失败表局部横滚、键盘焦点与取消`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/import/mapping/project')
     await expectNoPageOverflow(page, '上传')
@@ -266,7 +266,6 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: '开始导入', exact: true }).click()
     await expect(page.getByRole('region', { name: '项目行级拒绝清单' })).toBeVisible()
     await expectNoPageOverflow(page, `失败 ${width}`)
-    await page.screenshot({ path: info.outputPath(`viewport-${width}.png`), fullPage: true })
     await page.getByRole('button', { name: '返回项目列表', exact: true }).click()
     await expect(page).toHaveURL(/\/project$/)
     expect(await centralRows(page)).toHaveLength(0)

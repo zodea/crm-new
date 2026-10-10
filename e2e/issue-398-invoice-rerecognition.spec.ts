@@ -40,7 +40,6 @@ test('工作台与编辑页重新识别覆盖字段并逐项提醒变动，保�
   // 这段 OCR 文本识别不出供应商：人工更正被空的识别结果覆盖，正是需要提醒的情况。
   await expect(workspaceChanges).toContainText('供应商：人工更正供应商 → （空）')
   await expect(workspaceChanges).toContainText('价税合计：113 → 226')
-  await page.screenshot({ path: 'test-results/invoice-rerecognition-workspace.png' })
   await page.getByRole('button', { name: '关闭识别变动提醒' }).click()
   await expect(workspaceChanges).toBeHidden()
 
@@ -59,7 +58,6 @@ test('工作台与编辑页重新识别覆盖字段并逐项提醒变动，保�
   const editChanges = page.getByTestId('invoice-recognition-changes')
   await expect(editChanges).toContainText('重新识别覆盖了 1 项与识别前不同的内容')
   await expect(editChanges).toContainText('供应商：编辑页人工供应商 → （空）')
-  await page.screenshot({ path: 'test-results/invoice-rerecognition-edit.png' })
   for (const width of RESPONSIVE_WIDTHS) {
     await page.setViewportSize({ width, height: 900 })
     await expectNoPageOverflow(page, `发票重新识别 @ ${width}px`)
