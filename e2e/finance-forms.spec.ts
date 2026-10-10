@@ -160,16 +160,16 @@ test.describe('F3 中央收款、来源写入门禁与资金表单布局', () =>
     }
   }
 
-  for (const width of [...RESPONSIVE_WIDTHS, 1280].sort((a, b) => a - b)) {
-    for (const form of FORM_ROUTES) {
-      test(`${form.title} @ ${width}px：无页面级横向溢出`, async ({ page }) => {
+  for (const form of FORM_ROUTES) {
+    test(`${form.title}：各宽度无页面级横向溢出`, async ({ page }) => {
+      await page.goto(form.path)
+      if (form.path === '/finance/payment/new')
+        await expectFinanceSourceGate(page, SOURCE_REASONS.production)
+      await expect(page.getByRole('heading', { name: form.title })).toBeVisible()
+      for (const width of [...RESPONSIVE_WIDTHS, 1280].sort((a, b) => a - b)) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-        await page.goto(form.path)
-        if (form.path === '/finance/payment/new')
-          await expectFinanceSourceGate(page, SOURCE_REASONS.production)
-        await expect(page.getByRole('heading', { name: form.title })).toBeVisible()
         await expectNoPageOverflow(page, `${form.path} @ ${width}px`)
-      })
-    }
+      }
+    })
   }
 })
