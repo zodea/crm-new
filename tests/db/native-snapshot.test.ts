@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { createNativeMigrationSnapshot, inspectNativeMigrationSnapshot } from '~/lib/db/native-snapshot'
+import { inspectNativeMigrationSnapshot } from '~/lib/db/native-snapshot'
 import { createMemoryDb } from '../helpers/memory-db'
 
 vi.mock('~/lib/db/connection', () => ({ backupNativeDatabase: vi.fn() }))
@@ -37,6 +37,5 @@ describe('桌面完整 SQLite 迁移快照', () => {
     const orphanBytes = orphan.raw.export()
     orphan.close()
     await expect(inspectNativeMigrationSnapshot(orphanBytes, open)).rejects.toThrow('失效外键')
-    await expect(createNativeMigrationSnapshot()).rejects.toThrow('桌面端')
   })
 })

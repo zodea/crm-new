@@ -7,7 +7,7 @@ import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/co
 import { useProductionAccessStore } from '~/stores/production-access'
 
 const host = vi.hoisted(() => ({ native: false, exportSnapshot: vi.fn(), inspect: vi.fn() }))
-vi.mock('~/lib/db/native-snapshot', () => ({ createNativeMigrationSnapshot: host.exportSnapshot, inspectNativeMigrationSnapshot: host.inspect }))
+vi.mock('~/lib/db/native-snapshot', () => ({ inspectNativeMigrationSnapshot: host.inspect }))
 const fetch = vi.fn()
 const context = { workspaceId: 'migration-workspace', actorId: 'migration-owner', capabilities: ['core:migration:write', 'worker:sensitive:read', 'worker:list:read', 'crew:list:read'] }
 const sourceSha = 'a'.repeat(64)

@@ -21,7 +21,6 @@
 | [tests/project/formal-facts.test.ts](../../../tests/project/formal-facts.test.ts) | 单元／服务／状态 | project formal fact boundaries |
 | [tests/project/import-central.test.ts](../../../tests/project/import-central.test.ts) | 单元／服务／状态 | 项目 Excel → 实际存储 → 中央回读 |
 | [tests/project/import-command.test.ts](../../../tests/project/import-command.test.ts) | 单元／服务／状态 | 项目中央逐行导入命令 |
-| [tests/project/list.test.ts](../../../tests/project/list.test.ts) | 单元／服务／状态 | 项目列表筛选 |
 | [tests/project/phase-task-files.test.ts](../../../tests/project/phase-task-files.test.ts) | 单元／服务／状态 | phase task file references |
 | [tests/project/project-command-http-repository.test.ts](../../../tests/project/project-command-http-repository.test.ts) | 单元／服务／状态 | project command HTTP repository |
 | [tests/project/project-detail-boundary.test.ts](../../../tests/project/project-detail-boundary.test.ts) | 单元／服务／状态 | project detail data-origin boundary |

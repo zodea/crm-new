@@ -1,4 +1,4 @@
-import type { PayrollBatchCommand, PayrollBatchConfirmCommand, PayrollBatchConfirmInput, PayrollBatchDecision, PayrollBatchPlanRead, PayrollBatchPreviewInput, PayrollBatchPreviewItem, PayrollBatchPreviewRead } from './central-batch-service-contract'
+import type { PayrollBatchCommand, PayrollBatchConfirmInput, PayrollBatchDecision, PayrollBatchPlanRead, PayrollBatchPreviewInput, PayrollBatchPreviewItem, PayrollBatchPreviewRead } from './central-batch-service-contract'
 import type { PayrollQuery } from './central-contract'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { payrollProblem } from './central-contract'
@@ -76,13 +76,6 @@ export function parsePayrollBatchCommand(value: unknown): PayrollBatchCommand {
   if (!validConfirm && !validPrepare && !validExecute)
     fail('批量工资确认提交不完整')
   return value as unknown as PayrollBatchCommand
-}
-
-export function parsePayrollBatchConfirmCommand(value: unknown): PayrollBatchConfirmCommand {
-  const command = parsePayrollBatchCommand(value)
-  if (command.action.kind !== 'confirm-batch')
-    fail('批量工资确认动作无效')
-  return command as PayrollBatchConfirmCommand
 }
 function context(value: unknown, query: PayrollQuery): boolean {
   return object(value) && value.origin === query.origin && typeof value.workspaceId === 'string' && typeof value.actorId === 'string'

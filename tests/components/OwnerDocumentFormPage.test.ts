@@ -227,20 +227,12 @@ describe('甲方与分包单据整页表单状态', () => {
     }))
     vi.stubGlobal('useOwnerDocumentLifecycle', () => ({
       loading: ref(false),
-      penaltyDeductions: ref([]),
-      deductionSettlementId: ref(null),
-      deductionAmount: ref(0),
-      deductionNote: ref(''),
       auditMode: ref(false),
       canApproveChange: ref(false),
-      canDeductPenalty: ref(false),
       acceptanceAction: ref(null),
-      refreshDeductions: vi.fn().mockResolvedValue(undefined),
-      fetchSettlements: vi.fn().mockResolvedValue([]),
       approveChange: vi.fn(),
       moveAcceptance: vi.fn(),
       auditReport: vi.fn(),
-      deductPenalty: vi.fn(),
     }))
   })
 

@@ -6,7 +6,6 @@ import {
   createInvoiceImportTemplateXlsx,
   createInvoiceLedgerXlsx,
   getInvoiceImportSourceMeta,
-  invoiceImportReview,
   invoiceLedgerRows,
   parseInvoiceWorkbookForMapping,
   readInvoiceWorkbookStyleReadback,
@@ -291,8 +290,8 @@ describe('发票 Excel 导入/回读来源证据', () => {
     ], ['000000000000000002'])
 
     expect(duplicated).toHaveLength(3)
-    expect(invoiceImportReview(duplicated[rowIndex]!).reasons).toEqual(exact ? expected : expect.arrayContaining(expected))
-    expect(invoiceImportReview(duplicated[1]!).row).toHaveProperty('invoiceNumber')
+    expect(getInvoiceImportSourceMeta(duplicated[rowIndex]!)?.reviewReasons).toEqual(exact ? expected : expect.arrayContaining(expected))
+    expect(duplicated[1]!).toHaveProperty('invoiceNumber')
   })
 
   it('导出台账再次读取时只产生业务行，合计行作为来源元数据保留', async () => {

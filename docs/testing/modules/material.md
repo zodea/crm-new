@@ -15,7 +15,6 @@
 | [tests/material-quotation/storage.test.ts](../../../tests/material-quotation/storage.test.ts) | 单元／服务／状态 | 报价实际磁盘归属、原件、冻结版本、权限切换、版本冲突与冷恢复 |
 | [tests/material-quotation/command-session.test.ts](../../../tests/material-quotation/command-session.test.ts) | 单元／服务／状态 | 报价失响应沿原编号核验，保留后来输入，保存后回读失败不重复写入 |
 | [tests/material-quotation/http-repository.test.ts](../../../tests/material-quotation/http-repository.test.ts) | 单元／服务／状态 | 报价读取身份、来源、权限、回执与原件契约 |
-| [tests/material-quotation/price-facts.test.ts](../../../tests/material-quotation/price-facts.test.ts) | 单元／服务／状态 | 冻结报价各历史价格点、来源与原行追溯，不回写原合同或送货价 |
 | [tests/material-contract/price-facts.test.ts](../../../tests/material-contract/price-facts.test.ts) | 单元／服务／状态 | 原合同价格、税点未知及有依据的单位换算 |
 | [tests/db/f4-material-migrations.test.ts](../../../tests/db/f4-material-migrations.test.ts) | 单元／服务／状态 | v23 F4 物资表单与库存事实迁移 |
 | [tests/material/forms.test.ts](../../../tests/material/forms.test.ts) | 单元／服务／状态 | f4 物资事实、派生库存与甲供材总控 |

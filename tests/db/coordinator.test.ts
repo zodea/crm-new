@@ -204,19 +204,4 @@ describe('桌面数据库连接协调器', () => {
     await later
     expect(events.at(-1)).toBe('select:AFTER_BACKUP')
   })
-
-  it('显式恢复备份不初始化或升级原库，既有初始化失败后仍可保全来源', async () => {
-    const load = vi.fn(async (): Promise<DbDriver> => {
-      throw new Error('业务结构升级失败')
-    })
-    const backup = vi.fn(async (_destination: string) => undefined)
-    const coordinator = createDbCoordinator(load, { backupWithoutDriver: backup })
-    await coordinator.backupTo('before-upgrade.sqlite')
-    expect(load).not.toHaveBeenCalled()
-    expect(backup).toHaveBeenCalledWith('before-upgrade.sqlite')
-    await expect(coordinator.getDb()).rejects.toThrow('业务结构升级失败')
-    await coordinator.backupTo('failed-upgrade-source.sqlite')
-    expect(load).toHaveBeenCalledTimes(1)
-    expect(backup).toHaveBeenLastCalledWith('failed-upgrade-source.sqlite')
-  })
 })

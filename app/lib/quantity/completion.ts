@@ -490,31 +490,6 @@ export async function loadQuantityCompletionWorkspace(
   }
 }
 
-/**
- * 惰性读取验收照片正文（file_payloads 独立存放，列表只带元数据）。
- * 仍按可见口径校验 file_ref 与所属完成事实：任一方或业务祖先隐藏后都不提供正文。
- */
-export async function loadQuantityPhotoDataUrl(db: SoftDb, photoId: string): Promise<string> {
-  const [row] = await db.select<{ mime_type: string, encoding: string, content: string }>(
-    `${hiddenCtes('unit_stage_completions')}
-     SELECT fr.mime_type, fp.encoding, fp.content
-     FROM file_refs fr
-     JOIN file_payloads fp ON fp.file_ref_id = fr.id
-     JOIN unit_stage_completions usc ON usc.id = fr.owner_id
-     WHERE fr.id = ?
-       AND fr.owner_type = 'unit_stage_completion'
-       AND fr.category = 'acceptance_photo'
-       AND fr.deleted_at IS NULL
-       AND ${visibleCond('unit_stage_completions', 'usc')}`,
-    [photoId],
-  )
-  if (!row)
-    throw new Error('验收照片不存在或已删除')
-  if (row.encoding !== 'base64')
-    throw new Error('验收照片编码不受支持')
-  return `data:${row.mime_type || 'image/jpeg'};base64,${row.content}`
-}
-
 export async function persistQuantityStageCompletion(
   db: SoftDb,
   draft: QuantityCompletionDraft,

@@ -7,7 +7,6 @@ import { readNativeConstructionManagementFee } from '~/lib/construction-contract
 import {
   deleteF2Form,
   listContractFormAttachments,
-  listExpenditureSettlementOptions,
   loadContractSupplementForm,
   loadF2Form,
 } from '~/lib/contract/forms'
@@ -670,7 +669,7 @@ describe('f2 合同与支出结算领域 action', () => {
     }, 'submit')).rejects.toThrow('材采明细含税汇总与合同头金额不一致')
   })
 
-  it('附件失败回滚头表、明细和操作日志，结算 lookup 只返回真实可选源单', async () => {
+  it('附件失败回滚头表、明细和操作日志', async () => {
     const store = useContractStore()
     failFileInsert = true
     await expect(store.saveForm('material', {
@@ -698,42 +697,6 @@ describe('f2 合同与支出结算领域 action', () => {
       FROM contract_line_items
       WHERE material_name = '瓷砖'
     `)).toEqual([{ total: 0 }])
-
-    failFileInsert = false
-    const other = await store.saveForm('other_expense', {
-      ...OUR_SELECTED,
-      name: '可结算合同',
-      projectId: 'project-contract',
-      supplierId: 'supplier-contract',
-      otherExpenseKind: '其他',
-      content: '服务',
-      signDate: '2026-07-01',
-      amount: 100,
-    }, 'submit')
-    const settlement = await store.saveForm('other_settlement', {
-      name: '可选结算',
-      projectId: 'project-contract',
-      contractId: other.id,
-      totalAmount: 80,
-      settlementDate: '2026-07-20',
-    }, 'submit')
-    await store.saveForm('other_settlement', {
-      name: '',
-    }, 'draft')
-
-    expect(await listExpenditureSettlementOptions({
-      projectId: 'project-contract',
-      contractId: other.id,
-    })).toEqual([])
-    await mem.execute('UPDATE expenditure_settlements SET status = ? WHERE id = ?', ['confirmed', settlement.id])
-    expect(await listExpenditureSettlementOptions({
-      projectId: 'project-contract',
-      contractId: other.id,
-    })).toEqual([{
-      id: settlement.id,
-      label: '可选结算',
-      hint: '80.00',
-    }])
   })
 
   it('合同存在有效结算时阻止删除，结算软删除后才允许删除合同', async () => {

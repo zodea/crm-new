@@ -1,14 +1,6 @@
 import type { BrowserSqliteDatabase } from './sqljs'
 import { openBrowserSqlite } from './sqljs'
 
-export interface NativeMigrationSnapshot {
-  path: string
-  bytes: Uint8Array
-  sha256: string
-  createdAt: string
-  schemaVersion: number
-}
-
 /** A snapshot is inspected without migrating, seeding or changing the source. */
 export async function inspectNativeMigrationSnapshot(
   bytes: Uint8Array,
@@ -41,8 +33,4 @@ export async function inspectNativeMigrationSnapshot(
     return { schemaVersion, sha256: [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('') }
   }
   finally { db.close() }
-}
-
-export async function createNativeMigrationSnapshot(): Promise<NativeMigrationSnapshot | null> {
-  throw new Error('请在桌面端导出当前 SQLite 的一致快照。')
 }

@@ -36,7 +36,3 @@ export const SCHEDULE_TASK_TEMPLATES: readonly ScheduleTaskTemplate[] = [
   { key: 'sanitary-hardware', name: '五金洁具安装', durationDays: 20, trade: '水电工', color: '#f59e0b', itemCodes: [] },
   { key: 'cleaning', name: '开荒保洁', durationDays: 8, trade: '杂工', color: '#9ca3af', itemCodes: [] },
 ]
-
-export const SCHEDULE_TEMPLATE_BY_KEY = new Map(
-  SCHEDULE_TASK_TEMPLATES.map(template => [template.key, template]),
-)

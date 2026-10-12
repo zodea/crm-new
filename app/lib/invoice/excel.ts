@@ -128,12 +128,6 @@ export interface InvoiceImportWorkbook extends RawImportWorkbook {
   sheets: InvoiceImportSheet[]
 }
 
-export interface InvoiceImportReview {
-  row: Record<string, unknown>
-  sourceRow: number | null
-  reasons: readonly string[]
-}
-
 export const MONEY_FORMAT = '0.00_);[Red]\\(0.00\\)'
 export const DATE_FORMAT = 'yyyy"年"m"月"d"日";@'
 const TEXT_FORMAT = '@'
@@ -1235,15 +1229,6 @@ export function annotateInvoiceImportRows(
     })
     return nextRow
   })
-}
-
-export function invoiceImportReview(row: Record<string, unknown>): InvoiceImportReview {
-  const meta = getInvoiceImportSourceMeta(row)
-  return {
-    row,
-    sourceRow: meta?.sourceRow ?? null,
-    reasons: meta?.reviewReasons ?? [],
-  }
 }
 
 export function invoiceLedgerRows(invoices: readonly Invoice[]): InvoiceLedgerExportRow[] {

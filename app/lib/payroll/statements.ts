@@ -1572,13 +1572,6 @@ export async function buildWageDraftSource(
   }
 }
 
-export async function buildWageDraftLines(
-  db: PayrollDb,
-  input: WageDraftBuildInput,
-): Promise<WageStatementLineInput[]> {
-  return (await buildWageDraftSource(db, input)).lines
-}
-
 export async function loadCurrentWageSourceAudit(
   db: PayrollDb,
   statement: WageStatement,

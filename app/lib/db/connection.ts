@@ -79,7 +79,7 @@ async function initializeDb(): Promise<DbDriver> {
   }
 }
 
-const coordinator = createDbCoordinator(initializeDb, {})
+const coordinator = createDbCoordinator(initializeDb)
 
 export async function getDb(): Promise<DbDriver> {
   return coordinator.getDb()

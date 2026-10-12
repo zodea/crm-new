@@ -16,14 +16,10 @@ export type TransactionDb = Pick<DbDriver, 'execute' | 'select'>
 /**
  * 把惰性数据库驱动收口成单初始化、单连接队列。
  *
- * tauri-plugin-sql 的 SQLite 后端是 SQLx Pool；分开发出的 BEGIN / SQL / COMMIT
- * 不会天然绑定同一连接。这里保证应用从冷启动起最多只有一个底层调用在途，事务回调
- * 再独占整个队列，因而同一组语句会稳定复用池中的唯一活动连接且不会被其他 store 穿插。
+ * 分开发出的 BEGIN / SQL / COMMIT 不会天然互斥。这里保证从冷启动起最多只有一个底层
+ * 调用在途，事务回调再独占整个队列，因而同一组语句不会被其他调用方穿插。
  */
-export function createDbCoordinator(load: () => Promise<DbDriver>, maintenance: {
-  /** Explicit source backup can run before a business initializer upgrades its schema. */
-  backupWithoutDriver?: (destination: string) => Promise<void>
-} = {}) {
+export function createDbCoordinator(load: () => Promise<DbDriver>) {
   let driver: DbDriver | null = null
   let initializing: Promise<DbDriver> | null = null
   let queue: Promise<void> = Promise.resolve()
@@ -79,14 +75,6 @@ export function createDbCoordinator(load: () => Promise<DbDriver>, maintenance: 
 
   async function backupTo(destination: string): Promise<void> {
     return runExclusive(async () => {
-      if (maintenance.backupWithoutDriver && !driver) {
-        // Wait for an already-running initializer, including its failure cleanup.
-        // Exporting a recovery snapshot must not retry a failed schema upgrade.
-        if (initializing)
-          await initializing.catch(() => undefined)
-        if (!driver)
-          return maintenance.backupWithoutDriver(destination)
-      }
       const raw = await rawDriver()
       if (!raw.backupTo)
         throw new Error('当前数据库驱动不支持一致磁盘备份。')

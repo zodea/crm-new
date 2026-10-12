@@ -156,7 +156,6 @@ const {
   auditMode,
   canApproveChange,
   acceptanceAction,
-  refreshDeductions,
   approveChange,
   moveAcceptance,
   auditReport,
@@ -389,13 +388,11 @@ async function initialize() {
     if (!id) {
       draft.value = ownerDocumentDefaults(props.kind)
       resetAttachments()
-      await refreshDeductions()
     }
     else {
       const [record, files] = await Promise.all([
         store.loadOne(props.kind, id),
         store.loadAttachments(props.kind, id, true),
-        refreshDeductions(id),
       ])
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
