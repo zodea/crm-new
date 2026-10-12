@@ -372,7 +372,7 @@ onScopeDispose(() => {
       </section>
       <ReceiptFormFields :draft="draft" :context="context" :field-errors="fieldErrors" :readonly="!writable || Boolean(loadingAction)" @patch="patch" />
       <ReceiptContractSummary :key="session.baseVersion ?? 'new'" :contract-id="draft.contractId" />
-      <FileRefAttachmentSection :attachments="attachments" :pending-attachments="pending" :pending-remove-ids="removeIds" :pending-restore-ids="restoreIds" :desktop-picker="false" :note="draft.note" :readonly="!writable || Boolean(loadingAction)" picker-description="文件正文与收款一起保存，保存后可预览和下载" @files="selectFiles" @toggle-existing="toggleFile" @remove-pending="pending = pending.filter(file => file.localId !== $event)" @patch-pending="(id, value) => pending = pending.map(file => file.localId === id ? { ...file, ...value } : file)" @update-note="patch({ note: $event })" />
+      <FileRefAttachmentSection :attachments="attachments" :pending-attachments="pending" :pending-remove-ids="removeIds" :pending-restore-ids="restoreIds" :note="draft.note" :readonly="!writable || Boolean(loadingAction)" picker-description="文件正文与收款一起保存，保存后可预览和下载" @files="selectFiles" @toggle-existing="toggleFile" @remove-pending="pending = pending.filter(file => file.localId !== $event)" @patch-pending="(id, value) => pending = pending.map(file => file.localId === id ? { ...file, ...value } : file)" @update-note="patch({ note: $event })" />
       <p v-if="readingFiles" role="status" class="text-12px text-ink-faint">
         正在读取附件正文，请稍候…
       </p>

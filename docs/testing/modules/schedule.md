@@ -39,8 +39,6 @@
 | [tests/stores/process-library-central-state.test.ts](../../../tests/stores/process-library-central-state.test.ts) | 单元／服务／状态 | 中央工序库公开状态 |
 | [tests/stores/schedule-central-library-source.test.ts](../../../tests/stores/schedule-central-library-source.test.ts) | 单元／服务／状态 | 浏览器 WBS 的工序库来源接管 |
 | [tests/stores/schedule-central-state.test.ts](../../../tests/stores/schedule-central-state.test.ts) | 单元／服务／状态 | 中央绑定固定预览与原提交恢复 |
-| [tests/stores/schedule-process-library-race.test.ts](../../../tests/stores/schedule-process-library-race.test.ts) | 单元／服务／状态 | 工序库快速切换 |
-| [tests/stores/schedule.test.ts](../../../tests/stores/schedule.test.ts) | 单元／服务／状态 | schedule store：排程唯一 action 写路径 |
 | [tests/tabs/process-library-restore.test.ts](../../../tests/tabs/process-library-restore.test.ts) | 单元／服务／状态 | 中央工序库只读详情恢复 |
 
 ## 组件（jsdom）

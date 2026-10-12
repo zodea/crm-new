@@ -74,7 +74,7 @@ async function refresh() {
       contractRepository ? readDeliveryMaterialContracts(contractRepository, origin, request.signal) : Promise.resolve([]),
       central
         ? contractRepository?.prices ? contractRepository.prices(origin, { signal: request.signal }).then(result => result.items) : Promise.resolve(null)
-        : deliveryStore.mode === 'native' ? import('~/lib/db/connection').then(async db => (await import('~/lib/material-contract/native-prices')).readNativeContractPrices(db)) : Promise.resolve(null),
+        : Promise.resolve(null),
       origin === 'real' ? quotationRepository.list() : Promise.resolve(null),
     ] as const)
     if (!active || owner !== generation || request.signal.aborted)

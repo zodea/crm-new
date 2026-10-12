@@ -8,7 +8,6 @@ async function unused(): Promise<never> {
 
 export function readQuantityCoreSource(db: TestDb) {
   return createCoreMigrationLocalSource({
-    isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: async () => LATEST_VERSION,
     select: (sql, params) => db.select(sql, params),

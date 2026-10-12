@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useScheduleStore } from '~/stores/schedule'
 
 const runtime = vi.hoisted(() => ({ demo: false, list: vi.fn(), detail: vi.fn(), select: vi.fn(), transaction: vi.fn() }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/stores/data-visibility', () => ({ useDataVisibilityStore: () => ({ get includeDemo() {
   return runtime.demo
 } }) }))

@@ -15,7 +15,6 @@ import { f3FormDefaults } from '~/lib/finance/page'
 const readers = vi.hoisted(() => ({ form: vi.fn(), files: vi.fn(), content: vi.fn() }))
 vi.mock('~/lib/finance/forms', () => ({ loadFinanceForm: readers.form, listFinanceFormAttachments: readers.files }))
 vi.mock('~/lib/forms/file-refs', async original => ({ ...await original<object>(), loadFileRefContent: readers.content }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))
 const route = Vue.reactive({ params: {} as Record<string, string>, query: {}, fullPath: '/finance/reimbursement/new' })

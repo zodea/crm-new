@@ -5,7 +5,6 @@ import type {
   FileRefDraft,
   FileRefRecord,
 } from '~/lib/forms/file-refs'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
 import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
@@ -18,7 +17,6 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
   const pendingAttachments = shallowRef<PendingFinanceAttachment[]>([])
   const pendingRemoveIds = shallowRef<string[]>([])
   const pendingRestoreIds = shallowRef<string[]>([])
-  const desktopAttachmentPicker = shallowRef(isTauri())
   const readingFiles = shallowRef(false)
   let fileGeneration = 0
 
@@ -114,36 +112,6 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
     }
   }
 
-  async function pickNativeFiles() {
-    const generation = ++fileGeneration
-    readingFiles.value = true
-    try {
-      const [{ open }, { readFile }, { basename }] = await Promise.all([
-        import('@tauri-apps/plugin-dialog'),
-        import('@tauri-apps/plugin-fs'),
-        import('@tauri-apps/api/path'),
-      ])
-      const selected = await open({ multiple: true, directory: false })
-      if (generation !== fileGeneration)
-        return
-      const paths = selected == null ? [] : Array.isArray(selected) ? selected : [selected]
-      const files = await Promise.all(paths.map(async (filePath) => {
-        const bytes = await readFile(filePath)
-        return { ...await fileRefDraftFromFile(new File([bytes], await basename(filePath))), filePath }
-      }))
-      if (generation === fileGeneration)
-        append(files)
-    }
-    catch (cause) {
-      if (generation === fileGeneration)
-        error(`选择附件失败：${toErrorMessage(cause)}`)
-    }
-    finally {
-      if (generation === fileGeneration)
-        readingFiles.value = false
-    }
-  }
-
   function toggleExisting(id: string) {
     const attachment = attachments.value.find(file => file.id === id)
     if (attachment?.deletedAt) {
@@ -175,7 +143,6 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
     pendingAttachments: readonly(pendingAttachments),
     pendingRemoveIds: readonly(pendingRemoveIds),
     pendingRestoreIds: readonly(pendingRestoreIds),
-    desktopAttachmentPicker: readonly(desktopAttachmentPicker),
     dirty,
     readingFiles: readonly(readingFiles),
     invalidatePreparation,
@@ -185,7 +152,6 @@ export function useFinanceFormAttachments(kind: Ref<F3FormKind>) {
     clearPending,
     changes,
     handleFiles,
-    pickNativeFiles,
     toggleExisting,
     removePending,
     patchPending,

@@ -53,7 +53,6 @@
 | [tests/components/PayrollCentralRead.test.ts](../../../tests/components/PayrollCentralRead.test.ts) | 组件（jsdom） | 工资中央只读资料 |
 | [tests/components/PayrollFeeEditors.test.ts](../../../tests/components/PayrollFeeEditors.test.ts) | 组件（jsdom） | 没有工程量读取权限仍可选择工资基数，不能凭格子ID造原户链接 |
 | [tests/components/PayrollHostSection.test.ts](../../../tests/components/PayrollHostSection.test.ts) | 组件（jsdom） | 个人0与整单1000分列，来源链接保原档案查询，表可获得键盘焦点 |
-| [tests/components/PayrollNavigation.test.ts](../../../tests/components/PayrollNavigation.test.ts) | 组件（jsdom） | 工资跨页筛选恢复 |
 | [tests/components/PayrollStatementDetailTables.test.ts](../../../tests/components/PayrollStatementDetailTables.test.ts) | 组件（jsdom） | payroll statement dedicated detail tables |
 | [tests/components/PayrollStatementTable.test.ts](../../../tests/components/PayrollStatementTable.test.ts) | 组件（jsdom） | 工资单列表刷新 |
 | [tests/components/PayrollWorkbench.test.ts](../../../tests/components/PayrollWorkbench.test.ts) | 组件（jsdom） | payroll workbench components |
@@ -75,8 +74,6 @@
 | [tests/payroll/subject-facts.test.ts](../../../tests/payroll/subject-facts.test.ts) | 单元／服务／状态 | 真实 SQLite 的原比例经网络来源保留 0 与 0.8，旧缺字段不变成表单默认 0.95 |
 | [tests/payroll/workbench.test.ts](../../../tests/payroll/workbench.test.ts) | 单元／服务／状态 | payroll statement lifecycle |
 | [tests/stores/payroll-central.test.ts](../../../tests/stores/payroll-central.test.ts) | 单元／服务／状态 | 正式读取四入口只经 Repository，任一失败都不回退本地库 |
-| [tests/stores/payroll-race.test.ts](../../../tests/stores/payroll-race.test.ts) | 单元／服务／状态 | payroll store latest-wins |
-| [tests/stores/payroll-route-scope.test.ts](../../../tests/stores/payroll-route-scope.test.ts) | 单元／服务／状态 | 工资三入口按实际选项恢复来源范围 |
 | [tests/tabs/payroll-restore.test.ts](../../../tests/tabs/payroll-restore.test.ts) | 单元／服务／状态 | 工资只读页签恢复 |
 | [tests/components/PayrollMigrationPanel.test.ts](../../../tests/components/PayrollMigrationPanel.test.ts) | 组件（jsdom） | 完整工资来源预检、确认及原编号恢复 |
 | [tests/payroll/central-a-consumed-dependencies.test.ts](../../../tests/payroll/central-a-consumed-dependencies.test.ts) | 单元／服务／状态 | A 工资实际消费依赖与无关来源变化隔离 |
@@ -229,7 +226,6 @@
 | [e2e/payroll-c1-recovery.spec.ts](../../../e2e/payroll-c1-recovery.spec.ts) | Playwright E2E | 原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取 |
 | [tests/components/AttendanceCentralRace.test.ts](../../../tests/components/AttendanceCentralRace.test.ts) | 组件（jsdom） | 中央考勤原格保存边界 |
 | [tests/components/AttendanceCentralState.test.ts](../../../tests/components/AttendanceCentralState.test.ts) | 组件（jsdom） | 中央考勤矩阵精度 |
-| [tests/components/AttendanceWorkbench.test.ts](../../../tests/components/AttendanceWorkbench.test.ts) | 组件（jsdom） | attendance workbench components |
 | [tests/components/PayrollAttendanceCell.test.ts](../../../tests/components/PayrollAttendanceCell.test.ts) | 组件（jsdom） | 中央原单元格输入 |
 | [tests/components/PayrollC1C2Completion.test.ts](../../../tests/components/PayrollC1C2Completion.test.ts) | 组件（jsdom） | C1/C2 回执后的同目标状态读取，需重核时分别说明原结果与当前状态 |
 | [tests/components/PayrollC1Config.test.ts](../../../tests/components/PayrollC1Config.test.ts) | 组件（jsdom） | c1 每人标准输入 |
@@ -291,7 +287,6 @@
 | [tests/payroll/signed-daywork.test.ts](../../../tests/payroll/signed-daywork.test.ts) | 单元／服务／状态 | c2 signed daywork source |
 | [tests/stores/daywork-central.test.ts](../../../tests/stores/daywork-central.test.ts) | 单元／服务／状态 | 原保存成功后冷读失败仍保原键，随后同ID合法移项目改人改日也能确认原成功并提示后续变化 |
 | [tests/stores/payroll-c2-central.test.ts](../../../tests/stores/payroll-c2-central.test.ts) | 单元／服务／状态 | 真实C2发放丢响应冷实例按原键恢复，只有原表单与available冻结的可信后读能解除 |
-| [tests/stores/signed-daywork-race.test.ts](../../../tests/stores/signed-daywork-race.test.ts) | 单元／服务／状态 | 桌面签工读取范围与竞态 |
 
 ## 辅助文件与配置（非独立测试）
 

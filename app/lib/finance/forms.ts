@@ -3,7 +3,6 @@ import type { TransactionDb } from '~/lib/db/coordinator'
 import type { FileRefChanges, FileRefRecord } from '~/lib/forms/file-refs'
 import { select, withTransaction } from '~/lib/db/connection'
 import { applyFileRefChanges, listFileRefs } from '~/lib/forms/file-refs'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { deleteFinanceFormInTransaction, loadFinanceForm as domainLoad, getPaymentApplicationSummary as domainSummary, FINANCE_OWNER_TYPE, saveFinanceFormInTransaction, unconfirmPaymentRecordInTransaction } from './domain'
 import { verifiedFinanceSum } from './persistent-rows'
 
@@ -11,7 +10,7 @@ export * from './domain'
 
 /** Native facade; the production owner imports the transaction-only domain. */
 export async function saveFinanceForm(kind: F3FormKind, draft: F3FormDraft, action: F3SaveAction, attachments: FileRefChanges = {}): Promise<F3SaveResult> {
-  if (kind === 'receipt' && 'window' in globalThis && !isDesktopRuntime())
+  if (kind === 'receipt' && 'window' in globalThis)
     throw new Error('浏览器收款请通过中央收款表单保存')
   return withTransaction(async (tx) => {
     const saved = await saveFinanceFormInTransaction(kind, draft, action, tx)

@@ -11,7 +11,6 @@ async function unused(): Promise<never> {
 }
 function readSource() {
   return createCoreMigrationLocalSource({
-    isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: async () => LATEST_VERSION,
     select: (sql, params) => memory.select(sql, params),

@@ -10,7 +10,6 @@
 | --- | --- | --- |
 | [tests/migration/target-cost-source.test.ts](../../../tests/migration/target-cost-source.test.ts) | 单元／服务／状态 | 受控来源按预算版本保存完整图，项目无工程量、无项目草稿、旧空分项名及缺原件均保真 |
 | [tests/stores/target-cost-central.test.ts](../../../tests/stores/target-cost-central.test.ts) | 单元／服务／状态 | 预算固定页面快照与原提交恢复 |
-| [tests/stores/target-cost-list-refresh.test.ts](../../../tests/stores/target-cost-list-refresh.test.ts) | 单元／服务／状态 | 首次失败不能伪造快照，成功空结果刷新保留快照，失败仍可辨认 |
 | [tests/stores/target-cost-pending-storage.test.ts](../../../tests/stores/target-cost-pending-storage.test.ts) | 单元／服务／状态 | 原附件提交不能可靠保存时阻断发送，恢复存储后可用原草稿重试 |
 | [tests/tabs/target-cost-restore.test.ts](../../../tests/tabs/target-cost-restore.test.ts) | 单元／服务／状态 | 演示冷恢复先核服务端授权，再用同一隔离只读adapter，不误打正式详情 |
 | [tests/target-cost/central-actual-sources.test.ts](../../../tests/target-cost/central-actual-sources.test.ts) | 单元／服务／状态 | 中央预算实际来源的金额完整度与身份 |
@@ -36,7 +35,6 @@
 | [tests/components/TargetCostCentralList.test.ts](../../../tests/components/TargetCostCentralList.test.ts) | 组件（jsdom） | 中央预算列表同路由状态 |
 | [tests/components/TargetCostCentralUiState.test.ts](../../../tests/components/TargetCostCentralUiState.test.ts) | 组件（jsdom） | 中央预算版本头独立草稿 |
 | [tests/components/TargetCostDetail.test.ts](../../../tests/components/TargetCostDetail.test.ts) | 组件（jsdom） | target cost detail presentation |
-| [tests/components/TargetCostDetailLeaveGuard.test.ts](../../../tests/components/TargetCostDetailLeaveGuard.test.ts) | 组件（jsdom） | 目标成本科目草稿离开保护 |
 | [tests/components/TargetCostFiles.test.ts](../../../tests/components/TargetCostFiles.test.ts) | 组件（jsdom） | 下载具有真实原件且旧大小未知的附件，并继续校验原始字节摘要 |
 | [tests/components/TargetCostItemEditor.test.ts](../../../tests/components/TargetCostItemEditor.test.ts) | 组件（jsdom） | target cost item editor |
 | [tests/components/TargetCostReadPresentation.test.ts](../../../tests/components/TargetCostReadPresentation.test.ts) | 组件（jsdom） | 预算原值和受控回程 |

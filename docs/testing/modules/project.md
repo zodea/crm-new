@@ -83,4 +83,3 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/browser/NativeCostUnknown.test.ts](../../../tests/browser/NativeCostUnknown.test.ts) | 浏览器组件 | 五视口Native成本来源缺口、可证小计及键盘 |

@@ -3,7 +3,6 @@ import type { ScheduleBindingRead, ScheduleBindingResult } from '~/lib/schedule/
 import type { ScheduleAction, ScheduleCommand, ScheduleCommandResult, SchedulePending, ScheduleRead, ScheduleReadContext } from '~/lib/schedule/central-contract'
 import type { ScheduleHistory } from '~/lib/schedule/history'
 import type { DataOriginDTO } from '~/types/read-model'
-import { isTauri } from '@tauri-apps/api/core'
 import { useSessionStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, readonly, shallowRef } from 'vue'
@@ -68,7 +67,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   const expanded = useSessionStorage<Record<string, string[]>>('schedule-wbs-expanded-groups-v2', {})
   const pendingCommand = computed<SchedulePending | null>(() => {
     void recoveryRevision.value
-    if (isTauri() || !context.value || origin.value !== 'real' || !scopeProjectId.value)
+    if (!context.value || origin.value !== 'real' || !scopeProjectId.value)
       return null
     const key = commandRecoveryKey(recoveryScope())
     const descriptor = recovery.read(key)
@@ -83,7 +82,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     if (context.value)
       editingBaselines.set(taskId, structuredClone({ workspaceId: context.value.workspaceId, actorId: context.value.actorId, origin: context.value.origin, capabilities: [...context.value.capabilities], sourceVersion: context.value.sourceVersion }))
   }
-  const canWrite = computed(() => isTauri() || (origin.value === 'real' && capabilities.value.includes('schedule:write')))
+  const canWrite = computed(() => origin.value === 'real' && capabilities.value.includes('schedule:write'))
   let today = toLocalDateInputValue()
   let generation = 0
   let catalogGeneration = 0
@@ -128,11 +127,6 @@ export const useScheduleStore = defineStore('schedule', () => {
     contractSourceMessage.value = read.contractSourceMessage ?? ''
   }
   async function loadCatalog() {
-    if (isTauri()) {
-      await local.loadCatalog()
-      catalog.value = local.catalog.value.map(row => ({ ...row, origin: 'real' }))
-      return
-    }
     adoptLegacy()
     const request = ++catalogGeneration
     const includeDemo = useDataVisibilityStore().includeDemo
@@ -143,8 +137,6 @@ export const useScheduleStore = defineStore('schedule', () => {
       context.value = results[0]!
   }
   async function loadProject(projectId: string, currentDay = toLocalDateInputValue(), selectedOrigin: DataOriginDTO = origin.value) {
-    if (isTauri())
-      return local.loadProject(projectId, currentDay)
     setOrigin(selectedOrigin)
     adoptLegacy()
     const request = ++generation
@@ -198,8 +190,6 @@ export const useScheduleStore = defineStore('schedule', () => {
     }
   }
   async function loadContracts(projectId: string, selectedOrigin: DataOriginDTO = origin.value) {
-    if (isTauri())
-      return local.loadContracts(projectId)
     if (scopeProjectId.value !== projectId || origin.value !== selectedOrigin || !context.value) {
       await loadProject(projectId, today, selectedOrigin)
     }
@@ -211,8 +201,6 @@ export const useScheduleStore = defineStore('schedule', () => {
     }
   }
   async function loadBuildings(projectId: string, contractId = '', selectedOrigin: DataOriginDTO = origin.value) {
-    if (isTauri())
-      return local.loadBuildings(projectId, contractId)
     if (scopeProjectId.value !== projectId || origin.value !== selectedOrigin || !context.value)
       await loadProject(projectId, today, selectedOrigin)
     const key = scopeKey.value
@@ -225,8 +213,6 @@ export const useScheduleStore = defineStore('schedule', () => {
     }
   }
   async function previewProvisionalScope(buildingIds: readonly string[]) {
-    if (isTauri())
-      return local.previewProvisionalScope(buildingIds)
     const key = scopeKey.value
     const read = await repositories().schedule.scope(query(), buildingIds)
     if (key !== scopeKey.value)
@@ -240,8 +226,6 @@ export const useScheduleStore = defineStore('schedule', () => {
     return read.preview
   }
   async function loadProcessLibraries() {
-    if (isTauri())
-      return local.loadProcessLibraries()
     const request = ++libraryGeneration
     const selected = origin.value
     const loaded = await repositories().processLibraries.list(selected)
@@ -253,7 +237,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     bindingTarget = null
   }
   async function readBinding(projectId: string, groupId: string, contractId = '', selectedOrigin: DataOriginDTO = 'real'): Promise<ScheduleBindingRead> {
-    if (isTauri() || selectedOrigin !== 'real')
+    if (selectedOrigin !== 'real')
       throw scheduleProblem('forbidden', '中央绑定仅用于真实来源，桌面与演示保持各自读取边界')
     setOrigin(selectedOrigin)
     const request = ++bindingGeneration
@@ -282,8 +266,6 @@ export const useScheduleStore = defineStore('schedule', () => {
     return submit<ScheduleBindingResult>({ kind: 'bind-contract', groupId: read.group.id, contractId: read.preview.contractId }, read)
   }
   async function loadProcessLibraryTasks(libraryId: string) {
-    if (isTauri())
-      return local.loadProcessLibraryTasks(libraryId)
     const request = ++taskGeneration
     const selected = origin.value
     try {
@@ -456,25 +438,23 @@ export const useScheduleStore = defineStore('schedule', () => {
     confirmBinding,
     cancelBindingRead,
     recheck,
-    createGroup: (...args: Parameters<Engine['createGroup']>) => isTauri() ? local.createGroup(...args) : submit<Awaited<ReturnType<Engine['createGroup']>>>({ kind: 'create-group', draft: args[0] }),
-    updateTask: (...args: Parameters<Engine['updateTask']>) => isTauri() ? local.updateTask(...args) : submit<Awaited<ReturnType<Engine['updateTask']>>>({ kind: 'update-task', taskId: args[0], patch: args[1] }),
-    updateFloorPlans: (...args: Parameters<Engine['updateFloorPlans']>) => isTauri() ? local.updateFloorPlans(...args) : submit<Awaited<ReturnType<Engine['updateFloorPlans']>>>({ kind: 'update-floors', taskId: args[0], patches: [...args[1]] }),
-    updateDependency: (...args: Parameters<Engine['updateDependency']>) => isTauri() ? local.updateDependency(...args) : submit<Awaited<ReturnType<Engine['updateDependency']>>>({ kind: 'update-dependency', successorId: args[0], predecessorId: args[1], lagDays: args[2] }),
-    saveTaskPlan: (...args: Parameters<Engine['saveTaskPlan']>) => isTauri() ? local.saveTaskPlan(...args) : submit<Awaited<ReturnType<Engine['saveTaskPlan']>>>({ kind: 'save-task-plan', taskId: args[0], draft: args[1] }),
-    rescheduleTask: (...args: Parameters<Engine['rescheduleTask']>) => isTauri() ? local.rescheduleTask(...args) : submit<Awaited<ReturnType<Engine['rescheduleTask']>>>({ kind: 'reschedule-task', taskId: args[0], patch: args[1], dependencyIdsToDisable: [...args[2]] }),
-    removeDependency: (...args: Parameters<Engine['removeDependency']>) => isTauri() ? local.removeDependency(...args) : submit<Awaited<ReturnType<Engine['removeDependency']>>>({ kind: 'remove-dependency', dependencyId: args[0] }),
-    restoreDependency: (...args: Parameters<Engine['restoreDependency']>) => isTauri() ? local.restoreDependency(...args) : submit<Awaited<ReturnType<Engine['restoreDependency']>>>({ kind: 'restore-dependency', dependencyId: args[0] }),
+    createGroup: (...args: Parameters<Engine['createGroup']>) => submit<Awaited<ReturnType<Engine['createGroup']>>>({ kind: 'create-group', draft: args[0] }),
+    updateTask: (...args: Parameters<Engine['updateTask']>) => submit<Awaited<ReturnType<Engine['updateTask']>>>({ kind: 'update-task', taskId: args[0], patch: args[1] }),
+    updateFloorPlans: (...args: Parameters<Engine['updateFloorPlans']>) => submit<Awaited<ReturnType<Engine['updateFloorPlans']>>>({ kind: 'update-floors', taskId: args[0], patches: [...args[1]] }),
+    updateDependency: (...args: Parameters<Engine['updateDependency']>) => submit<Awaited<ReturnType<Engine['updateDependency']>>>({ kind: 'update-dependency', successorId: args[0], predecessorId: args[1], lagDays: args[2] }),
+    saveTaskPlan: (...args: Parameters<Engine['saveTaskPlan']>) => submit<Awaited<ReturnType<Engine['saveTaskPlan']>>>({ kind: 'save-task-plan', taskId: args[0], draft: args[1] }),
+    rescheduleTask: (...args: Parameters<Engine['rescheduleTask']>) => submit<Awaited<ReturnType<Engine['rescheduleTask']>>>({ kind: 'reschedule-task', taskId: args[0], patch: args[1], dependencyIdsToDisable: [...args[2]] }),
+    removeDependency: (...args: Parameters<Engine['removeDependency']>) => submit<Awaited<ReturnType<Engine['removeDependency']>>>({ kind: 'remove-dependency', dependencyId: args[0] }),
+    restoreDependency: (...args: Parameters<Engine['restoreDependency']>) => submit<Awaited<ReturnType<Engine['restoreDependency']>>>({ kind: 'restore-dependency', dependencyId: args[0] }),
     setBaseline: (...args: Parameters<Engine['setBaseline']>) => {
-      if (isTauri())
-        return local.setBaseline(...args)
       if (args[0] !== scopeProjectId.value)
         return Promise.reject(scheduleProblem('stale-source', '项目已变化，请重新确认基线'))
       return submit<Awaited<ReturnType<Engine['setBaseline']>>>({ kind: 'set-baseline' })
     },
-    addTask: (...args: Parameters<Engine['addTask']>) => isTauri() ? local.addTask(...args) : submit<Awaited<ReturnType<Engine['addTask']>>>({ kind: 'add-task', groupId: args[0], draft: args[1] }),
-    removeTask: (...args: Parameters<Engine['removeTask']>) => isTauri() ? local.removeTask(...args) : submit<Awaited<ReturnType<Engine['removeTask']>>>({ kind: 'remove-task', taskId: args[0] }),
-    undo: (...args: Parameters<Engine['undo']>) => isTauri() ? local.undo(...args) : submit<Awaited<ReturnType<Engine['undo']>>>({ kind: 'undo', logIds: [...args[0]] }),
-    previewContractBinding: (...args: Parameters<Engine['previewContractBinding']>) => isTauri() ? local.previewContractBinding(...args) : Promise.reject(blockedBinding()),
-    bindContract: (...args: Parameters<Engine['bindContract']>) => isTauri() ? local.bindContract(...args) : Promise.reject(blockedBinding()),
+    addTask: (...args: Parameters<Engine['addTask']>) => submit<Awaited<ReturnType<Engine['addTask']>>>({ kind: 'add-task', groupId: args[0], draft: args[1] }),
+    removeTask: (...args: Parameters<Engine['removeTask']>) => submit<Awaited<ReturnType<Engine['removeTask']>>>({ kind: 'remove-task', taskId: args[0] }),
+    undo: (...args: Parameters<Engine['undo']>) => submit<Awaited<ReturnType<Engine['undo']>>>({ kind: 'undo', logIds: [...args[0]] }),
+    previewContractBinding: () => Promise.reject(blockedBinding()),
+    bindContract: () => Promise.reject(blockedBinding()),
   }
 })

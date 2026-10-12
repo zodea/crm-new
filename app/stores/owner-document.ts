@@ -16,7 +16,6 @@ import type {
   OwnerReportAuditDraft,
 } from '~/lib/owner-document/forms'
 import type { QuantityBasis } from '~/lib/quantity/basis'
-import { isTauri } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { SUBCONTRACT_CHANGE_WRITE_CAPABILITY } from '~/lib/owner-document/central-command-contract'
@@ -54,7 +53,7 @@ import { ownerDocumentListRecordFromCentral } from '~/lib/owner-document/list'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
-  const usesCentralBrowser = import.meta.client && !isTauri()
+  const usesCentralBrowser = import.meta.client
   const isCentralKind = (kind: OwnerDocumentKind): kind is OwnerCommercialDocumentKind =>
     kind === 'owner_change' || kind === 'owner_report'
     || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty'

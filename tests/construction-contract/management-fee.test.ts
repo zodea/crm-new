@@ -9,7 +9,6 @@ import { adoptConstructionManagementFee, decodeConstructionManagementFee, emptyC
 import { ensureConstructionManagementFeeSchema, persistNativeConstructionManagementFee, readNativeConstructionManagementFee } from '~/lib/construction-contract/management-fee-storage'
 import { migrations, runMigrations } from '~/lib/db/migrations'
 import { decodeMaterialContractDraft } from '~/lib/material-contract/command-validation'
-import { readNativeProjectConstructionManagementFees } from '~/lib/project/native-construction-management-fee'
 import { createConstructionContractCommandTestInstance } from '../../server/utils/construction-contract-command-test-instance'
 import { createMemoryDb } from '../helpers/memory-db'
 
@@ -95,8 +94,6 @@ describe('总合同管理费配置与真实成本独立', () => {
       await expect(db.execute('UPDATE construction_management_fee_history SET amount=123 WHERE version=?', ['1'])).rejects.toThrow('不能修改')
       await expect(db.execute('DELETE FROM construction_management_fee_history WHERE version=?', ['1'])).rejects.toThrow('不能删除')
       await expect(persistNativeConstructionManagementFee(db, 'old', { ...restored, history: restored.history.map(row => row.version === '2' ? { ...row, amount: 123 } : row) })).rejects.toThrow('采用证据不一致')
-      const project = await readNativeProjectConstructionManagementFees(db, 'p', at)
-      expect(project.contracts.map(row => [row.id, row.configuration.amount])).toEqual([['old', 0]])
       expect(await db.select('SELECT amount FROM contracts WHERE id=?', ['old'])).toEqual([{ amount: 0 }])
       expect(await db.select('SELECT * FROM file_refs')).toEqual(originals)
       expect(await db.select('SELECT content FROM file_payloads')).toEqual([{ content: 'YQ==' }])

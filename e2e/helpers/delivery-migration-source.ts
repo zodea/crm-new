@@ -31,7 +31,6 @@ async function prepare() {
     await db.execute(`INSERT INTO project_aliases(id,project_id,alias) VALUES('alias-441','http-delivery-project-441','旧别名保留')`)
     await db.execute(`INSERT INTO operation_logs(id,table_name,record_id,action,before_data,operator) VALUES('audit-441','delivery_records','http-delivery-source','update','旧审计无法解析','历史经办')`)
     const source = await createCoreMigrationLocalSource({
-      isNative: () => false,
       isDemoActive: () => false,
       currentSchemaVersion: async () => LATEST_VERSION,
       select: sql => db.select(sql),

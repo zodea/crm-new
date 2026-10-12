@@ -9,7 +9,6 @@ import { useTabSessionStore } from '~/stores/tab-session'
 import { useTabsStore } from '~/stores/tabs'
 
 const { validate } = vi.hoisted(() => ({ validate: vi.fn<TabRestoreValidator>() }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/lib/tabs/restore-target', async original => ({
   ...await original<typeof import('~/lib/tabs/restore-target')>(),
   createTabRestoreValidator: () => validate,

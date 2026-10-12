@@ -30,7 +30,6 @@ import {
   validateOwnerDocumentDetailReturnTo,
   validateOwnerDocumentJourneyReturnTo,
 } from '~/lib/owner-document/return-context'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { isQuantityBasis } from '~/lib/quantity/basis'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
@@ -71,13 +70,11 @@ const {
   pendingAttachments,
   pendingRemoveIds,
   pendingRestoreIds,
-  desktopAttachmentPicker,
   dirty: attachmentsDirty,
   reset: resetAttachments,
   clearPending: clearPendingAttachments,
   changes: attachmentChanges,
   handleFiles,
-  pickNativeFiles,
   toggleExisting: toggleExistingAttachment,
   removePending,
   patchPending,
@@ -156,20 +153,13 @@ const title = computed(() =>
 useTabTitle(title)
 const {
   loading: lifecycleLoading,
-  penaltyDeductions,
-  deductionSettlementId,
-  deductionAmount,
-  deductionNote,
   auditMode,
   canApproveChange,
-  canDeductPenalty,
   acceptanceAction,
   refreshDeductions,
-  fetchSettlements,
   approveChange,
   moveAcceptance,
   auditReport,
-  deductPenalty,
 } = useOwnerDocumentLifecycle({
   kind: () => props.kind,
   draft,
@@ -200,22 +190,7 @@ const footerLabels = computed(() => ({
   saveSubmit: meta.value.postLabel,
   save: '保存附件',
 }))
-const desktopPenaltyActions = isDesktopRuntime()
-const sections = computed(() => {
-  if (
-    props.kind !== 'project_penalty'
-    || !desktopPenaltyActions
-    || (!canDeductPenalty.value && penaltyDeductions.value.length === 0)
-  ) {
-    return meta.value.sections
-  }
-  const attachments = meta.value.sections.find(section => section.key === 'attachments')
-  return [
-    ...meta.value.sections.filter(section => section.key !== 'attachments'),
-    { key: 'deduction', label: '结算抵扣' },
-    ...(attachments ? [attachments] : []),
-  ]
-})
+const sections = computed(() => meta.value.sections)
 const pageState = computed(() => {
   if (loading.value)
     return 'loading'
@@ -292,7 +267,7 @@ const refreshBoqLines = useDebounceFn(async () => {
       projectId,
       contractId,
       props.kind === 'owner_report' ? String(draft.value.periodNo ?? '') : '',
-      props.kind === 'owner_report' && !isDesktopRuntime() && isQuantityBasis(draft.value.quantityBasis) ? draft.value.quantityBasis : undefined,
+      props.kind === 'owner_report' && isQuantityBasis(draft.value.quantityBasis) ? draft.value.quantityBasis : undefined,
     )
     if (!pageActive || sequence !== boqSequence || identity !== boqIdentity() || route.fullPath !== pageFullPath)
       return
@@ -751,7 +726,7 @@ onActivated(() => {
         :field-errors="fieldErrors"
         :eligible-contract-count="eligibleContractCount"
         :readonly="!editable"
-        :quantity-basis-editable="!isDesktopRuntime() && kind === 'owner_report'"
+        :quantity-basis-editable="kind === 'owner_report'"
         :fetch-projects="fetchProjects"
         :fetch-suppliers="fetchSuppliers"
         :fetch-contracts="fetchContracts"
@@ -772,62 +747,16 @@ onActivated(() => {
         @clear-error="clearFieldError('lines')"
       />
 
-      <section
-        v-if="desktopPenaltyActions && kind === 'project_penalty' && (canDeductPenalty || penaltyDeductions.length)"
-        id="section-deduction"
-        class="panel scroll-mt-4 p-4"
-      >
-        <SectionHeader title="结算抵扣" />
-        <div v-if="canDeductPenalty" class="form-fields-grid mt-3">
-          <div class="field-block">
-            <span class="field-label">分包结算 *</span>
-            <LookupSelect
-              v-model="deductionSettlementId"
-              :fetch="fetchSettlements"
-              recent-key="project-penalty-settlement"
-              placeholder="检索可抵扣的分包结算"
-            />
-          </div>
-          <label class="field-block">
-            <span class="field-label">本次抵扣金额 *</span>
-            <input v-model.number="deductionAmount" type="number" min="0.01" step="0.01" class="field-input w-full font-mono">
-          </label>
-          <label class="field-block form-span-full">
-            <span class="field-label">抵扣说明</span>
-            <textarea v-model="deductionNote" rows="2" class="field-input w-full" />
-          </label>
-          <div class="form-span-full flex justify-end">
-            <KitButton :loading="lifecycleLoading" @click="deductPenalty">
-              <span class="i-lucide-circle-minus mr-1" aria-hidden="true" />执行结算抵扣
-            </KitButton>
-          </div>
-        </div>
-        <div v-if="penaltyDeductions.length" class="mt-4 grid gap-2">
-          <div
-            v-for="item in penaltyDeductions"
-            :key="item.id"
-            class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[var(--radius-control)] border border-line bg-surface-2 px-3 py-2 text-12px"
-          >
-            <strong class="text-ink">{{ item.settlementNo }} · {{ item.settlementName }}</strong>
-            <span class="font-mono font-700 text-danger">-¥{{ item.amount.toFixed(2) }}</span>
-            <span class="text-ink-faint">{{ item.note || '无说明' }}</span>
-            <span class="ml-auto text-ink-faint">{{ item.createdAt }}</span>
-          </div>
-        </div>
-      </section>
-
       <FileRefAttachmentSection
         :attachments="visibleAttachments"
         :pending-attachments="pendingAttachments"
         :pending-remove-ids="pendingRemoveIds"
         :pending-restore-ids="pendingRestoreIds"
-        :desktop-picker="desktopAttachmentPicker"
         picker-description="附件随当前单据保存，保存成功后可在详情中查看和下载"
         :note="String(draft.note ?? '')"
         :note-readonly="!editable"
         :category-readonly="kind === 'acceptance'"
         :readonly="attachmentsReadonly"
-        @pick-native="pickNativeFiles"
         @files="handleFiles"
         @toggle-existing="toggleExistingAttachment"
         @remove-pending="removePending"

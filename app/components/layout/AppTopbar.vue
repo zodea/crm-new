@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { isTauri } from '@tauri-apps/api/core'
 import { useEventListener, useIntervalFn, useNow } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { SidebarTrigger, useSidebar } from '~/components/ui/sidebar'
@@ -52,7 +51,7 @@ const { confirm, warning } = useKitUI()
 const showDevTools = shallowRef(false)
 const switchingDataVisibility = shallowRef(false)
 const isDev = import.meta.dev
-const demoToggleAvailable = !isTauri()
+const demoToggleAvailable = true
 const now = useNow({ interval: 60_000 })
 
 const pageTitle = computed(() => routeTitle(route.path) || '瑞航 CRM')

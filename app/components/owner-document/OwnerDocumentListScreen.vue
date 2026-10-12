@@ -30,7 +30,6 @@ import {
   validateOwnerDocumentJourneyReturnTo,
   validateOwnerDocumentListReturnTo,
 } from '~/lib/owner-document/return-context'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { enumSelectionFromQuery, serializeEnumSelection } from '~/lib/util/enum-selection'
 import { yuan } from '~/lib/util/money'
 
@@ -59,10 +58,9 @@ const config = computed(() => {
 })
 const loading = computed(() => store.listLoadingFor(props.kind))
 const loadError = computed(() => store.listError(props.kind))
-const centralReadOnly = computed(() => !isDesktopRuntime()
-  && (props.kind === 'owner_change' || props.kind === 'owner_report'
-    || props.kind === 'acceptance' || props.kind === 'final_settlement' || props.kind === 'owner_penalty'
-    || props.kind === 'sub_change' || props.kind === 'sub_settlement' || props.kind === 'project_penalty'))
+const centralReadOnly = computed(() => props.kind === 'owner_change' || props.kind === 'owner_report'
+  || props.kind === 'acceptance' || props.kind === 'final_settlement' || props.kind === 'owner_penalty'
+  || props.kind === 'sub_change' || props.kind === 'sub_settlement' || props.kind === 'project_penalty')
 const centralKind = computed(() => props.kind as OwnerCommercialDocumentKind)
 const hasSnapshot = computed(() => store.hasListSnapshot(props.kind, centralReadOnly.value && props.kind === 'acceptance' ? acceptanceVariant.value : null))
 const rows = computed(() => hasSnapshot.value ? store.recordsFor(props.kind) : [])

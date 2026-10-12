@@ -17,7 +17,6 @@ import OwnerDocumentListScreen from '~/components/owner-document/OwnerDocumentLi
 import { createOwnerDocumentReturnOrigin, saveOwnerDocumentReturnOrigin } from '~/lib/owner-document/return-context'
 
 const runtime = vi.hoisted(() => ({ desktop: true }))
-vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => runtime.desktop }))
 
 const listRows: OwnerDocumentListRecord[] = [
   {
@@ -174,44 +173,6 @@ describe('owner document list screen', () => {
     vi.stubGlobal('useRoute', () => route)
     vi.stubGlobal('useRouter', () => ({ replace: vi.fn() }))
     vi.stubGlobal('watch', watch)
-  })
-
-  it('呈现类型化列、具名筛选、来源范围与可局部横滚的宽表', () => {
-    render(OwnerDocumentListScreen, {
-      props: { kind: 'owner_change' },
-      global,
-    })
-
-    expect(document.querySelector('[data-ui="owner-document-list-toolbar"]')).not.toBeNull()
-    expect(screen.getByRole('combobox', { name: '项目' })).not.toBeNull()
-    expect(screen.getByRole('combobox', { name: '类型' })).not.toBeNull()
-    expect(screen.getByRole('combobox', { name: '状态' })).not.toBeNull()
-    expect(document.querySelector('[data-ui="owner-document-route-context"]')?.textContent)
-      .toContain('项目：合和新城')
-
-    const table = screen.getByRole('region', { name: '业务单据宽表' })
-    const headings = within(table).getAllByRole('columnheader').map(item => item.textContent)
-    expect(headings).toEqual(expect.arrayContaining([
-      '变更编号',
-      '施工合同',
-      '含税审定金额',
-      '无税审定金额',
-      '无税申报金额',
-    ]))
-    expect(Number(table.getAttribute('data-min-width'))).toBeGreaterThan(1200)
-  })
-
-  it('筛选无结果显示业务空态并可清除筛选', async () => {
-    render(OwnerDocumentListScreen, {
-      props: { kind: 'owner_change' },
-      global,
-    })
-
-    await fireEvent.update(screen.getByRole('combobox', { name: '状态' }), 'submitted')
-    expect(screen.getByRole('status', { name: '没有符合条件的甲方变洽签' })).not.toBeNull()
-    await fireEvent.click(screen.getByRole('button', { name: '清除筛选' }))
-    expect((screen.getByRole('combobox', { name: '状态' }) as HTMLSelectElement).value)
-      .toBe('approved')
   })
 
   it('中央列表把默认状态作为真实查询条件，并以中央总数展示汇总', async () => {

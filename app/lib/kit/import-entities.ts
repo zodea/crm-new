@@ -1,7 +1,6 @@
 import type { ImportTemplateField } from './import-mapping'
 import type { Invoice } from '~/stores/invoice'
 import { getInvoiceImportSourceMeta, invoiceNaturalKey } from '~/lib/invoice/excel'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import {
   QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
   QUANTITY_COMPLETION_IMPORT_FIELDS,
@@ -20,16 +19,8 @@ async function runQuantityImport(
   row: Record<string, unknown>,
   handler: 'importQuantityTemplateRow' | 'importQuantityAssignmentRow' | 'importQuantityCompletionRow',
 ): Promise<void> {
-  if (!isDesktopRuntime()) {
-    const targets = { importQuantityTemplateRow: 'template', importQuantityAssignmentRow: 'assignment', importQuantityCompletionRow: 'completion' } as const
-    await useBrowserQuantityStore().importRow(targets[handler], row)
-    return
-  }
-  const [{ withTransaction }, quantityImport] = await Promise.all([
-    import('~/lib/db/connection'),
-    import('~/lib/quantity/import'),
-  ])
-  await withTransaction(tx => quantityImport[handler](tx, row))
+  const targets = { importQuantityTemplateRow: 'template', importQuantityAssignmentRow: 'assignment', importQuantityCompletionRow: 'completion' } as const
+  await useBrowserQuantityStore().importRow(targets[handler], row)
 }
 
 // 导入实体注册表（ADR 0005「实体触发、模板隐含」）：

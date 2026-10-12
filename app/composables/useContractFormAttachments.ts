@@ -3,7 +3,6 @@ import type {
   ContractFormAttachmentChanges,
   ContractFormAttachmentDraft,
 } from '~/lib/contract/forms'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, readonly, shallowRef } from 'vue'
 import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
@@ -18,7 +17,6 @@ export function useContractFormAttachments() {
   const pendingAttachments = shallowRef<PendingContractAttachment[]>([])
   const pendingRemoveIds = shallowRef<string[]>([])
   const pendingRestoreIds = shallowRef<string[]>([])
-  const desktopAttachmentPicker = shallowRef(isTauri())
   const readingFiles = shallowRef(false)
   let fileGeneration = 0
 
@@ -99,38 +97,6 @@ export function useContractFormAttachments() {
     }
   }
 
-  async function pickNativeFiles() {
-    const generation = ++fileGeneration
-    readingFiles.value = true
-    try {
-      const [{ open }, { stat, readFile }, { basename }] = await Promise.all([
-        import('@tauri-apps/plugin-dialog'),
-        import('@tauri-apps/plugin-fs'),
-        import('@tauri-apps/api/path'),
-      ])
-      const selected = await open({ multiple: true, directory: false })
-      const paths = selected == null
-        ? []
-        : Array.isArray(selected) ? selected : [selected]
-      const files = await Promise.all(paths.map(async (filePath) => {
-        if ((await stat(filePath)).size > 10 * 1024 * 1024)
-          throw new Error('合同原件单份不能超过 10 MiB')
-        const bytes = await readFile(filePath)
-        return { ...await fileRefDraftFromFile(new File([bytes], await basename(filePath))), filePath }
-      }))
-      if (generation === fileGeneration)
-        appendDrafts(files)
-    }
-    catch (cause) {
-      if (generation === fileGeneration)
-        error(`选择附件失败：${toErrorMessage(cause)}`)
-    }
-    finally {
-      if (generation === fileGeneration)
-        readingFiles.value = false
-    }
-  }
-
   function removePending(localId: string) {
     pendingAttachments.value = pendingAttachments.value.filter(file => file.localId !== localId)
   }
@@ -162,7 +128,6 @@ export function useContractFormAttachments() {
     pendingAttachments: readonly(pendingAttachments),
     pendingRemoveIds: readonly(pendingRemoveIds),
     pendingRestoreIds: readonly(pendingRestoreIds),
-    desktopAttachmentPicker: readonly(desktopAttachmentPicker),
     readingFiles: readonly(readingFiles),
     dirty,
     invalidatePreparation,
@@ -173,7 +138,6 @@ export function useContractFormAttachments() {
     changes,
     appendDrafts,
     handleFiles,
-    pickNativeFiles,
     removePending,
     patchPending,
     toggleExisting,

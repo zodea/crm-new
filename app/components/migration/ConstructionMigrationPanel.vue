@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ConstructionImportCommand, ConstructionImportPreview, ConstructionImportResult } from '~/lib/construction-contract/import-contract'
 import type { CommandRecoveryDescriptor } from '~/lib/forms/command-recovery'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { useKitUI } from '~/composables/useKitUI'
@@ -13,7 +12,6 @@ import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
 
 interface State { context: { workspaceId: string, actorId: string, capabilities: string[] }, sources: Array<{ importId: string, sourceSha256: string, ids: string[], supplementIds: string[], importedAt: string, restored: boolean }> }
-const native = isTauri()
 const state = shallowRef<State | null>(null)
 const source = shallowRef<ConstructionImportCommand['source'] | null>(null)
 const preview = shallowRef<ConstructionImportPreview | null>(null)
@@ -171,8 +169,9 @@ async function restore(importId: string) {
   })
 }
 onMounted(() => {
-  if (!native)
-    void run(async (epoch) => { await load(epoch) })
+  void run(async (epoch) => {
+    await load(epoch)
+  })
 })
 </script>
 
@@ -184,47 +183,43 @@ onMounted(() => {
     <p class="mt-2 text-12px text-ink-soft">
       选择完整 SQLite 原库，明确对应已有正式项目、甲方及原我方核实版本，补齐路径签约原件。原主合同、补充协议、管理费配置、原件和历史一并保留。
     </p>
-    <p v-if="native" class="mt-3 text-12px text-warn-ink">
-      请从已配置的本机正式浏览器入口接管。
+
+    <p v-if="error" role="alert" class="mt-3 break-words text-12px text-danger">
+      {{ error }}
     </p>
-    <template v-else>
-      <p v-if="error" role="alert" class="mt-3 break-words text-12px text-danger">
-        {{ error }}
+    <KitButton v-if="!state" class="mt-3" :disabled="busy" @click="run(async epoch => { await load(epoch) })">
+      重新读取施工接管权限
+    </KitButton>
+    <template v-if="state">
+      <label class="mt-4 block text-12px">施工 SQLite 原库<input type="file" accept=".sqlite,.db,.sqlite3" class="mt-2 block w-full" :disabled="busy || !!pending" @change="choose"></label>
+      <p v-if="name" class="mt-2 break-words text-12px">
+        {{ name }}
       </p>
-      <KitButton v-if="!state" class="mt-3" :disabled="busy" @click="run(async epoch => { await load(epoch) })">
-        重新读取施工接管权限
-      </KitButton>
-      <template v-if="state">
-        <label class="mt-4 block text-12px">施工 SQLite 原库<input type="file" accept=".sqlite,.db,.sqlite3" class="mt-2 block w-full" :disabled="busy || !!pending" @change="choose"></label>
-        <p v-if="name" class="mt-2 break-words text-12px">
-          {{ name }}
-        </p>
-        <div v-if="preview" class="mt-4 grid min-w-0 gap-3 text-12px">
-          <p>原库包含 {{ preview.contracts.length }} 份施工主合同；已删除原图、未知扩展和历史空值保留。</p>
-          <label v-for="row in preview.references" :key="refKey(row)" class="grid min-w-0 gap-2">{{ labels[row.kind] }}：{{ row.label }}（{{ row.id }}）<select v-model="selection[refKey(row)]" class="field-input w-full" :disabled="busy || !!pending"><option value="">明确选择已有正式身份</option><option v-for="candidate in row.candidates" :key="`${candidate.id}:${candidate.version}`" :value="JSON.stringify([candidate.id, candidate.version])">{{ candidate.label }} · V{{ candidate.version }}（{{ candidate.id }}）{{ candidate.deletedAt ? ' · 已删除，仅保历史关联' : '' }}</option></select><span v-if="!row.candidates.length" class="text-warn-ink">没有逐字段核实的原版本，请保留原库核对，不补用当前资料。</span></label>
-          <label v-for="file in preview.requiredOriginals" :key="file.id" class="grid gap-2">补齐原件：{{ file.name }}<input type="file" :disabled="busy || !!pending" @change="original(file.id, $event)"></label>
-          <KitButton class="justify-self-start" :disabled="!canAdopt" @click="adopt">
-            核对并接管施工主补图
+      <div v-if="preview" class="mt-4 grid min-w-0 gap-3 text-12px">
+        <p>原库包含 {{ preview.contracts.length }} 份施工主合同；已删除原图、未知扩展和历史空值保留。</p>
+        <label v-for="row in preview.references" :key="refKey(row)" class="grid min-w-0 gap-2">{{ labels[row.kind] }}：{{ row.label }}（{{ row.id }}）<select v-model="selection[refKey(row)]" class="field-input w-full" :disabled="busy || !!pending"><option value="">明确选择已有正式身份</option><option v-for="candidate in row.candidates" :key="`${candidate.id}:${candidate.version}`" :value="JSON.stringify([candidate.id, candidate.version])">{{ candidate.label }} · V{{ candidate.version }}（{{ candidate.id }}）{{ candidate.deletedAt ? ' · 已删除，仅保历史关联' : '' }}</option></select><span v-if="!row.candidates.length" class="text-warn-ink">没有逐字段核实的原版本，请保留原库核对，不补用当前资料。</span></label>
+        <label v-for="file in preview.requiredOriginals" :key="file.id" class="grid gap-2">补齐原件：{{ file.name }}<input type="file" :disabled="busy || !!pending" @change="original(file.id, $event)"></label>
+        <KitButton class="justify-self-start" :disabled="!canAdopt" @click="adopt">
+          核对并接管施工主补图
+        </KitButton>
+      </div>
+      <div v-if="pending" class="mt-4 text-12px">
+        <p>原采用结果待核对；保留原编号核对结果，刷新后请按该编号恢复。</p><KitButton class="mt-2" :disabled="busy" @click="recover">
+          核对原施工接管提交
+        </KitButton>
+      </div>
+      <p v-if="result" class="mt-3 text-12px text-ok">
+        {{ result.restored ? '本批已归档，原图、原件与历史仍保留。' : '施工主补图已接管并可靠读取。' }}
+      </p>
+      <ul class="mt-4 grid min-w-0 gap-3 text-12px">
+        <li v-for="item in state.sources" :key="item.importId" class="min-w-0 border-t border-line pt-3">
+          <p class="break-words">
+            {{ item.importedAt }} · {{ item.ids.length }} 份主合同 · {{ item.supplementIds.length }} 份协议 · {{ item.restored ? '已恢复' : '已接管' }}
+          </p><KitButton v-if="!item.restored" class="mt-2" variant="secondary" :disabled="busy || !!pending" @click="restore(item.importId)">
+            核对并恢复本批施工图
           </KitButton>
-        </div>
-        <div v-if="pending" class="mt-4 text-12px">
-          <p>原采用结果待核对；保留原编号核对结果，刷新后请按该编号恢复。</p><KitButton class="mt-2" :disabled="busy" @click="recover">
-            核对原施工接管提交
-          </KitButton>
-        </div>
-        <p v-if="result" class="mt-3 text-12px text-ok">
-          {{ result.restored ? '本批已归档，原图、原件与历史仍保留。' : '施工主补图已接管并可靠读取。' }}
-        </p>
-        <ul class="mt-4 grid min-w-0 gap-3 text-12px">
-          <li v-for="item in state.sources" :key="item.importId" class="min-w-0 border-t border-line pt-3">
-            <p class="break-words">
-              {{ item.importedAt }} · {{ item.ids.length }} 份主合同 · {{ item.supplementIds.length }} 份协议 · {{ item.restored ? '已恢复' : '已接管' }}
-            </p><KitButton v-if="!item.restored" class="mt-2" variant="secondary" :disabled="busy || !!pending" @click="restore(item.importId)">
-              核对并恢复本批施工图
-            </KitButton>
-          </li>
-        </ul>
-      </template>
+        </li>
+      </ul>
     </template>
   </section>
 </template>

@@ -1,6 +1,4 @@
 import type { BrowserSqliteDatabase } from './sqljs'
-import { isTauri } from '@tauri-apps/api/core'
-import { backupNativeDatabase } from './connection'
 import { openBrowserSqlite } from './sqljs'
 
 export interface NativeMigrationSnapshot {
@@ -46,28 +44,5 @@ export async function inspectNativeMigrationSnapshot(
 }
 
 export async function createNativeMigrationSnapshot(): Promise<NativeMigrationSnapshot | null> {
-  if (!isTauri())
-    throw new Error('请在桌面端导出当前 SQLite 的一致快照。')
-  const [{ open }, { join }, { stat, readFile }] = await Promise.all([
-    import('@tauri-apps/plugin-dialog'),
-    import('@tauri-apps/api/path'),
-    import('@tauri-apps/plugin-fs'),
-  ])
-  const selected = await open({ directory: true, multiple: false, recursive: false, title: '选择迁移快照保存目录' })
-  if (typeof selected !== 'string')
-    return null
-  const createdAt = new Date().toISOString()
-  const path = await join(selected, `crm-migration-${createdAt.replace(/[:.]/g, '-')}-${crypto.randomUUID()}.sqlite`)
-  await backupNativeDatabase(path)
-  const before = await stat(path)
-  if (!before.isFile || !Number.isSafeInteger(before.size) || before.size < 100)
-    throw new Error(`快照文件不可核验，请保留原数据库和 ${path}。`)
-  const bytes = await readFile(path)
-  const after = await stat(path)
-  if (!after.isFile || bytes.length !== before.size || after.size !== before.size
-    || after.mtime?.getTime() !== before.mtime?.getTime()) {
-    throw new Error(`快照在读取期间发生变化，请保留原数据库和 ${path}。`)
-  }
-  const inspected = await inspectNativeMigrationSnapshot(bytes)
-  return { path, bytes, createdAt, ...inspected }
+  throw new Error('请在桌面端导出当前 SQLite 的一致快照。')
 }

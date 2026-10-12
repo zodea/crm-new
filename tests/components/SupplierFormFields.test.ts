@@ -5,7 +5,6 @@ import { defineComponent, reactive } from 'vue'
 import SupplierFormFields from '~/components/master-data/SupplierFormFields.vue'
 
 const runtime = vi.hoisted(() => ({ desktop: true }))
-vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => runtime.desktop }))
 
 const recordTaxpayerVerification = vi.fn()
 const formModal = vi.fn()
@@ -92,54 +91,6 @@ describe('分供方表单资料辅助动作', () => {
     await fireEvent.update(invoiceAddress, '广州市独立开票地址')
     expect(draft.invoiceAddress).toBe('广州市独立开票地址')
     expect(draft.address).toBe('广州市测试区一号')
-  })
-
-  it('官网未查到时保存为未核验，不自动认定小规模纳税人', async () => {
-    formModal.mockResolvedValueOnce({
-      status: '官网未查到，保持未核验',
-      taxpayerType: '小规模纳税人',
-      note: '未查询到记录',
-    })
-    const draft = renderFields({ taxpayerType: '小规模纳税人' })
-
-    await fireEvent.click(screen.getByRole('button', { name: '记录人工核验' }))
-
-    expect(recordTaxpayerVerification).toHaveBeenCalledWith({
-      supplierId: 'supplier-1',
-      status: 'not_found',
-      taxpayerType: '未核验',
-      source: 'https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx',
-      note: '未查询到记录',
-    })
-    expect(draft.taxpayerType).toBe('未核验')
-    expect(draft.taxpayerVerificationStatus).toBe('not_found')
-    expect(draft.taxpayerVerificationSource).toBe(
-      'https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx',
-    )
-    expect(draft.taxpayerVerifiedAt).toBe('2026-07-30T16:20:30.000Z')
-    expect(draft.taxpayerVerificationNote).toBe('未查询到记录')
-    expect(await screen.findByText('官网未查到，保持未核验')).not.toBeNull()
-    expect(screen.getByText('来源：广东省电子税务局')).not.toBeNull()
-    expect(screen.queryByText('未查询到记录')).toBeNull()
-    await fireEvent.click(screen.getByRole('button', { name: '查看纳税人类型说明' }))
-    expect(await screen.findByText('未查询到记录')).not.toBeNull()
-  })
-
-  it('其他官方资料人工确认不会伪记为广东税务官网来源', async () => {
-    formModal.mockResolvedValueOnce({
-      status: '其他官方资料人工确认',
-      taxpayerType: '小规模纳税人',
-      note: '依据主管税务机关盖章资料',
-    })
-    renderFields()
-
-    await fireEvent.click(screen.getByRole('button', { name: '记录人工核验' }))
-
-    expect(recordTaxpayerVerification).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'manually_confirmed',
-      taxpayerType: '小规模纳税人',
-      source: '其他官方资料',
-    }))
   })
 
   it('刷新载入保留状态与来源，时间和备注可按需查看', async () => {

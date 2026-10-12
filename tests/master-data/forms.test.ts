@@ -21,18 +21,11 @@ import {
   saveTargetCostForm,
   saveWorkerForm,
 } from '~/lib/master-data/forms'
-import { useCrewStore } from '~/stores/crew'
-import { useCustomerStore } from '~/stores/customer'
-import { useProjectStore } from '~/stores/project'
-import { useSupplierStore } from '~/stores/supplier'
-import { useTargetCostStore } from '~/stores/target-cost'
-import { useWorkerStore } from '~/stores/worker'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 let failFileInsert = false
 // 本文件验证保留的桌面 SQLite 表单边界；浏览器预算另测中央 Repository。
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 
 vi.mock('~/lib/db/connection', () => ({
   execute: (sql: string, params?: unknown[]) => mem.execute(sql, params),
@@ -83,62 +76,6 @@ afterEach(() => {
 })
 
 describe('f1 整页表单领域 action', () => {
-  it('六类 Pinia store 都通过统一 action 保存并刷新响应式状态', async () => {
-    const supplierStore = useSupplierStore()
-    const customerStore = useCustomerStore()
-    const crewStore = useCrewStore()
-    const workerStore = useWorkerStore()
-    const projectStore = useProjectStore()
-    const targetCostStore = useTargetCostStore()
-
-    const supplier = await supplierStore.saveForm({
-      name: 'Store 分供方',
-      supplierCategory: '材料供应商',
-      contact: '联系人',
-    }, 'submit')
-    const customer = await customerStore.save({
-      name: 'Store 客户',
-      contact: '联系人',
-    }, 'submit')
-    const crew = await crewStore.save({
-      name: 'Store 班组',
-      trade: '泥水',
-      contactName: '班组长',
-      contactPhone: '13800138000',
-    }, 'submit')
-    const worker = await workerStore.save({
-      name: 'Store 工人',
-      phone: '13800138001',
-      bankName: '建设银行',
-      bankAccount: '62270001',
-      trade: '泥水',
-      crewId: crew.id,
-      currentProjectId: 'project-ref',
-    }, 'submit')
-    const project = await projectStore.saveForm({
-      name: 'Store 项目',
-      customerId: customer.id,
-      manager: '项目经理',
-    }, 'submit')
-    const targetCost = await targetCostStore.save({
-      name: 'Store 目标成本',
-      projectId: project.id,
-    }, 'submit')
-
-    expect(supplierStore.byId(supplier.id)?.name).toBe('Store 分供方')
-    expect(customerStore.current?.name).toBe('Store 客户')
-    expect(crewStore.current?.name).toBe('Store 班组')
-    expect(workerStore.current?.name).toBe('Store 工人')
-    expect(projectStore.byId(project.id)?.customerId).toBe(customer.id)
-    expect(targetCostStore.current?.projectId).toBe(project.id)
-    expect(customerStore.revision).toBe(1)
-    expect(crewStore.revision).toBe(1)
-    expect(workerStore.revision).toBe(1)
-    expect(targetCostStore.revision).toBe(1)
-    expect(worker.id).toBeTruthy()
-    expect(targetCost.id).toBeTruthy()
-  })
-
   it('草稿跳过提交必填校验，六类头表都能保存后重新载入', async () => {
     const supplier = await saveSupplierForm({
       name: '',

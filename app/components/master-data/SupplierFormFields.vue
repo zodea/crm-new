@@ -4,7 +4,6 @@ import { useClipboard } from '@vueuse/core'
 import { computed, useId } from 'vue'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { openExternalUrl } from '~/lib/platform/external-url'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { GUANGDONG_TAX_QUERY_URL } from '~/lib/supplier/taxpayer-verification'
 import { formatShanghaiDateTime } from '~/lib/util/datetime'
@@ -20,9 +19,8 @@ const emit = defineEmits<{
 }>()
 
 const draft = defineModel<SupplierFormDraft>({ required: true })
-const detailStore = isDesktopRuntime() ? useSupplierDetailStore() : null
 const { copy, isSupported: clipboardSupported } = useClipboard()
-const { error, formModal, success, warning } = useKitUI()
+const { error, success, warning } = useKitUI()
 const taxNoInputId = useId()
 const taxpayerTypeInputId = useId()
 const invoiceAddressInputId = useId()
@@ -86,85 +84,8 @@ async function openTaxQuery() {
   }
 }
 
-async function recordTaxpayerVerification() {
-  if (!detailStore) {
-    emit('verifyTaxpayer')
-    return
-  }
-  if (!draft.value.id) {
-    warning('请先保存分供方，再记录官网核验结果')
-    return
-  }
-  const values = await formModal({
-    title: '记录纳税人核验结果',
-    subtitle: '验证码和查询由用户在广东省电子税务局完成；“未查到”不会自动认定为小规模纳税人。',
-    saveText: '保存核验记录',
-    fields: [
-      {
-        key: 'status',
-        label: '核验结果',
-        type: 'select',
-        value: '已确认一般纳税人',
-        options: [
-          '已确认一般纳税人',
-          '官网未查到，保持未核验',
-          '其他官方资料人工确认',
-        ],
-        required: true,
-      },
-      {
-        key: 'taxpayerType',
-        label: '人工确认类型',
-        type: 'select',
-        value: draft.value.taxpayerType || '未核验',
-        options: ['未核验', '一般纳税人', '小规模纳税人'],
-      },
-      {
-        key: 'note',
-        label: '核验备注',
-        type: 'textarea',
-        value: '',
-        placeholder: '可记录查询范围、材料来源或未查到原因',
-      },
-    ],
-  })
-  if (!values)
-    return
-
-  const statusLabel = String(values.status)
-  const status = statusLabel === '已确认一般纳税人'
-    ? 'confirmed_general'
-    : statusLabel === '官网未查到，保持未核验'
-      ? 'not_found'
-      : 'manually_confirmed'
-  const selectedTaxpayerType = String(values.taxpayerType) as '未核验' | '一般纳税人' | '小规模纳税人'
-  const taxpayerType = status === 'confirmed_general'
-    ? '一般纳税人'
-    : status === 'not_found'
-      ? '未核验'
-      : selectedTaxpayerType
-  const verificationSource = status === 'manually_confirmed'
-    ? '其他官方资料'
-    : GUANGDONG_TAX_QUERY_URL
-  const verificationNote = String(values.note ?? '').trim()
-  try {
-    const result = await detailStore.recordTaxpayerVerification({
-      supplierId: draft.value.id,
-      status,
-      taxpayerType,
-      source: verificationSource,
-      note: verificationNote,
-    })
-    draft.value.taxpayerType = result.taxpayerType
-    draft.value.taxpayerVerificationStatus = result.status
-    draft.value.taxpayerVerificationSource = result.source
-    draft.value.taxpayerVerifiedAt = result.verifiedAt
-    draft.value.taxpayerVerificationNote = result.note
-    success('纳税人核验记录已保存')
-  }
-  catch (cause) {
-    error(`核验记录保存失败：${toErrorMessage(cause)}`)
-  }
+function recordTaxpayerVerification() {
+  emit('verifyTaxpayer')
 }
 
 function copyRegisteredAddress() {

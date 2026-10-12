@@ -28,7 +28,6 @@
 | [tests/db/seed-data.test.ts](../../../tests/db/seed-data.test.ts) | 单元／服务／状态 | seed 数据:结构与 schema 对齐 |
 | [tests/db/soft-delete.test.ts](../../../tests/db/soft-delete.test.ts) | 单元／服务／状态 | v2 迁移:全业务表 deleted_at + operation_logs |
 | [tests/kit/money.test.ts](../../../tests/kit/money.test.ts) | 单元／服务／状态 | 金额格式化：formatMoney |
-| [tests/kit/tauri-security.test.ts](../../../tests/kit/tauri-security.test.ts) | 单元／服务／状态 | tauri 桌面壳安全边界 |
 | [tests/server/business-session.test.ts](../../../tests/server/business-session.test.ts) | 单元／服务／状态 | default business session boundary |
 | [tests/server/demo-workspace-test-instance.test.ts](../../../tests/server/demo-workspace-test-instance.test.ts) | 单元／服务／状态 | global demo workspace capability boundary |
 | [tests/stores/data-visibility.test.ts](../../../tests/stores/data-visibility.test.ts) | 单元／服务／状态 | global data visibility preference |
@@ -59,11 +58,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [src-tauri/tests/database_pool.rs](../../../src-tauri/tests/database_pool.rs) | Rust 集成测试 | 桌面数据库池集成测试 |
-| [src-tauri/tests/database_snapshot.rs](../../../src-tauri/tests/database_snapshot.rs) | Rust 集成测试 | WAL 已提交事实、未提交排除、冷打开、原件与冻结历史、拒绝覆盖和失败输出保全 |
 
 ## Rust 内联单元测试
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [src-tauri/src/lib.rs](../../../src-tauri/src/lib.rs) | Rust 内联单元测试 | #[cfg(test)] 内的外链允许列表测试；本文件同时包含生产代码 |

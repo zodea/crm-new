@@ -1,6 +1,5 @@
 import type { DbDriver, TransactionDb } from './coordinator'
 
-import { invoke, isTauri } from '@tauri-apps/api/core'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import {
   loadBrowserDatabase,
@@ -14,27 +13,6 @@ import {
   localDataWorkspace,
 } from './data-workspace'
 import { openBrowserSqlite } from './sqljs'
-
-async function createTauriDriver(): Promise<DbDriver> {
-  const { default: Database } = await import('@tauri-apps/plugin-sql')
-  const databaseUrl = 'sqlite:crm.db'
-  await invoke('prepare_app_database')
-  const conn = Database.get(databaseUrl)
-  return {
-    async execute(sql, params = []) {
-      await conn.execute(sql, params as any[])
-    },
-    async select<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-      return conn.select(sql, params as any[])
-    },
-    async close() {
-      await conn.close(databaseUrl)
-    },
-    async backupTo(destination) {
-      await invoke('backup_app_database', { destination })
-    },
-  }
-}
 
 async function createSqlJsDriver(snapshotKey: 'production' | 'demo'): Promise<DbDriver> {
   const snapshot = await loadBrowserDatabase(snapshotKey)
@@ -65,17 +43,14 @@ async function createSqlJsDriver(snapshotKey: 'production' | 'demo'): Promise<Db
 }
 
 async function initializeDb(): Promise<DbDriver> {
-  const native = isTauri()
   // 启动插件已完成唯一一次服务端授权；DB 只消费 Pinia 的已决策结果。
-  const includeDemo = !native && useDataVisibilityStore().includeDemo
-  const legacyProductionReadOnly = !native && !includeDemo
+  const includeDemo = useDataVisibilityStore().includeDemo
+  const legacyProductionReadOnly = !includeDemo
     ? await loadLegacyProductionReadOnly()
     : false
   const workspace = localDataWorkspace(includeDemo, legacyProductionReadOnly)
   // 桌面端必须使用持久化 SQLite；原生驱动失败时显式报错，不能静默退回内存库。
-  const db = native
-    ? await createTauriDriver()
-    : await createSqlJsDriver(workspace.snapshotKey)
+  const db = await createSqlJsDriver(workspace.snapshotKey)
 
   try {
     const { runMigrations } = await import('./migrations')
@@ -104,14 +79,7 @@ async function initializeDb(): Promise<DbDriver> {
   }
 }
 
-const coordinator = createDbCoordinator(initializeDb, {
-  async backupWithoutDriver(destination) {
-    if (!isTauri())
-      throw new Error('一致磁盘备份仅支持当前桌面 SQLite。')
-    await invoke('prepare_app_database')
-    await invoke('backup_app_database', { destination })
-  },
-})
+const coordinator = createDbCoordinator(initializeDb, {})
 
 export async function getDb(): Promise<DbDriver> {
   return coordinator.getDb()
@@ -127,13 +95,6 @@ export async function select<T>(sql: string, params?: unknown[]): Promise<T[]> {
 
 export async function withTransaction<T>(work: (tx: TransactionDb) => Promise<T>): Promise<T> {
   return coordinator.withTransaction(work)
-}
-
-/** Takes the same exclusive queue as writes; never copies a live SQLite file. */
-export async function backupNativeDatabase(destination: string): Promise<void> {
-  if (!isTauri())
-    throw new Error('一致磁盘备份仅支持当前桌面 SQLite。')
-  return coordinator.backupTo(destination)
 }
 
 /**

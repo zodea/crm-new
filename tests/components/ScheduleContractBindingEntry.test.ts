@@ -7,7 +7,6 @@ import ScheduleBoard from '~/components/schedule/ScheduleBoard.vue'
 import ScheduleTimeline from '~/components/schedule/ScheduleTimeline.vue'
 
 const isDesktopRuntime = vi.hoisted(() => vi.fn())
-vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime }))
 
 vi.stubGlobal('computed', computed)
 vi.stubGlobal('shallowRef', shallowRef)

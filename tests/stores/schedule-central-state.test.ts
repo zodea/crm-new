@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { scheduleProblem } from '~/lib/schedule/central-contract'
 import { useScheduleStore } from '~/stores/schedule'
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 const mocks = vi.hoisted(() => ({ execute: vi.fn(), select: vi.fn(), read: vi.fn(), save: vi.fn(), binding: vi.fn(), resolve: vi.fn() }))
 vi.mock('~/lib/db/connection', () => ({ execute: mocks.execute, select: mocks.select, withTransaction: vi.fn() }))
 function read(projectId = 'p', version = 'v1'): ScheduleRead {

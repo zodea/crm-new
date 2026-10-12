@@ -6,7 +6,6 @@ import { usePayrollStatementDetailStore } from '~/stores/payroll-statement-detai
 import { useSignedDayworkStore } from '~/stores/signed-daywork'
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), sources: vi.fn(), getDb: vi.fn(), transaction: vi.fn(), includeDemo: false }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/lib/db/connection', () => ({ getDb: mocks.getDb, withTransaction: mocks.transaction }))
 vi.mock('~/stores/data-visibility', () => ({ useDataVisibilityStore: () => ({ includeDemo: mocks.includeDemo }) }))
 beforeEach(() => {

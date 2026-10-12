@@ -11,7 +11,6 @@ import type {
   CoreMigrationEntityType,
   CoreMigrationIssueMetric,
 } from '~/lib/migration/core-contract'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, onMounted } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { isCoreMigrationBlockingIssue } from '~/lib/migration/core-contract'
@@ -28,7 +27,6 @@ import SubcontractMigrationPanel from './SubcontractMigrationPanel.vue'
 import WbsMigrationPanel from './WbsMigrationPanel.vue'
 
 const store = useCoreMigrationStore()
-const nativeUnsupported = isTauri()
 
 const entityLabels: Record<CoreMigrationEntityType, string> = {
   auxiliary_contracts: '其他支出与公司支出合同',
@@ -182,14 +180,6 @@ onMounted(() => run(store.hydrate))
     <WbsMigrationPanel />
 
     <div
-      v-if="nativeUnsupported"
-      class="border border-warn/35 bg-warn/8 px-4 py-3 text-13px leading-5 text-ink"
-      role="status"
-    >
-      本地快照迁移首版仅支持浏览器工作区；Tauri 桌面端不会读取或修改 IndexedDB 备份。
-    </div>
-
-    <div
       v-if="store.lastError"
       class="border border-danger/35 bg-danger/6 px-4 py-3 text-13px leading-5 text-danger"
       role="alert"
@@ -206,7 +196,7 @@ onMounted(() => run(store.hydrate))
       :mode="store.source?.mode ?? '浏览器正式快照'"
       :checks="checks"
       :backup="backupDisplay"
-      :preflight-disabled="nativeUnsupported || store.busy || store.preparationBlocked"
+      :preflight-disabled="store.busy || store.preparationBlocked"
       :create-backup-disabled="store.busy || store.preparationBlocked || !store.preflightResult || Boolean(store.backup)"
       @preflight="run(store.preflight)"
       @create-backup="run(store.createBackup)"

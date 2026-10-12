@@ -21,7 +21,6 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/components/MasterDataCapabilityFields.test.ts](../../../tests/components/MasterDataCapabilityFields.test.ts) | 组件（jsdom） | master data capability fields |
-| [tests/components/MasterDataRegistryList.test.ts](../../../tests/components/MasterDataRegistryList.test.ts) | 组件（jsdom） | master data registry list |
 
 ## Playwright E2E
 

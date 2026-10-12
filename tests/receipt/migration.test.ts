@@ -16,7 +16,6 @@ async function unused(): Promise<never> {
 
 function readSource(db: Awaited<ReturnType<typeof createMemoryDb>>) {
   return createCoreMigrationLocalSource({
-    isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: async () => LATEST_VERSION,
     select: (sql, params) => db.select(sql, params),

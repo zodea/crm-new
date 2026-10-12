@@ -4,7 +4,6 @@ import { createNativeMigrationSnapshot, inspectNativeMigrationSnapshot } from '~
 import { createMemoryDb } from '../helpers/memory-db'
 
 vi.mock('~/lib/db/connection', () => ({ backupNativeDatabase: vi.fn() }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 
 async function open(bytes: Uint8Array) {
   return (await createMemoryDb(bytes)).raw

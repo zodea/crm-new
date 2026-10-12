@@ -1,5 +1,4 @@
 import type { OtherSettlementCommand, OtherSettlementContext, OtherSettlementDetail, OtherSettlementDTO, OtherSettlementPage, OtherSettlementSourceDocument } from './contract'
-import { isTauri } from '@tauri-apps/api/core'
 import { isEntityRefDTO } from '../../types/read-model'
 import { auxiliaryProblem } from '../auxiliary-contract/contract'
 import { auxiliaryProblemFromUnknown } from '../auxiliary-contract/repository'
@@ -54,8 +53,6 @@ function dto(value: unknown): asserts value is OtherSettlementDTO {
 export function createOtherSettlementRepository(fetcher: OtherSettlementFetcher) {
   async function read<T>(url: string, options: Parameters<OtherSettlementFetcher>[1], decode: (value: unknown) => T | Promise<T>): Promise<T> {
     try {
-      if (isTauri())
-        throw auxiliaryProblem('unavailable', '当前 Native 尚无可信中央结算身份；请保留本地历史，在正式浏览器工作区核验与迁入')
       const value = await fetcher(url, options)
       if (options?.method !== 'POST' && !url.includes('/files/') && !hasConsistentReadMeta(value, 'other-settlement-read-v1', 'real'))
         invalid()
