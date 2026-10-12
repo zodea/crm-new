@@ -12,7 +12,7 @@
 
 - **模型版本**：默认 **PaddleOCR-VL-1.6**（最新，0.9B，含发票/边框表与手写强化；与源项目 `ocr-vl.js` 已用的版本一致）；1.5 为已验证稳定回退。全系同为 0.9B，无尺寸取舍。
 - **部署（主）= 本地自托管，首选 `llama.cpp`**（2026-07-06 定：Windows 为主 + Mac 需可用，取跨平台通吃的后端）：Windows 走 CUDA 构建（RTX 4060 8GB 跑 0.9B 富余），Mac 走 Metal 构建，同一套 GGUF 模型文件、同一个本地 server 协议，前端零分支。**MLX-VLM 降为 Mac 专属可选加速**（<14B 比 llama.cpp 快 20–87%，仅当 Mac 侧成为常用环境再启用）。Apache-2.0、数据 100% 不出机器、可离线、零泄漏。0.9B 极轻，硬件门槛远低于 7B 级模型。
-- **部署（显式启用的评估/联网模式）= PaddleOCR 官方 API**：2026-07-16 起先接官方异步 job API（`PaddleOCR-VL-1.6`），用于真实样本质量评估和本地运行时就绪前的识别。真实票据会上传至百度服务，必须由用户明确启用并自行配置 Access Token；不做静默上传或自动回退。浏览器只调用同源 Nitro 代理，Token 仅由服务端环境变量读取。当前该模式用于浏览器 dev 验收；Tauri 静态包没有 Nitro，若后续把云端定为桌面生产能力，需另立工作项实现 Tauri 后端代理或受控远端代理。
+- **部署（显式启用的评估/联网模式）= PaddleOCR 官方 API**：2026-07-16 起先接官方异步 job API（`PaddleOCR-VL-1.6`），用于真实样本质量评估和本地运行时就绪前的识别。真实票据会上传至百度服务，必须由用户明确启用并自行配置 Access Token；不做静默上传或自动回退。浏览器只调用同源 Nitro 代理，Token 仅由服务端环境变量读取。当前该模式用于浏览器 dev 验收；若后续把云端定为生产能力，需另立工作项实现受控远端代理。
 - **结构化**：规则正则（A）为主（VL 的干净 Markdown/表格让正则更稳）；本地文本 LLM（Ollama qwen2.5）降为**可选的极个别怪版式兜底**，默认不启用、不常驻。
 - **统一识别接口** `recognizeDocument(file) → { markdownPages, pages[{ layoutRegions }], engine, model, jobId }`；发票/送货单分别在本地纯解析器中把 Markdown 转成领域字段，引擎（本地 VL / 云端 VL）切换不渗透到页面和 store。
 - **坐标/高亮**：PaddleOCR-VL 输出版面区域（layout regions），支撑"点字段↔高亮原图"（块级）；参考实现 `CHEN010325/paddleocr-local` 已展示原图对齐可视化。

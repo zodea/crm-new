@@ -641,7 +641,7 @@ adapter 切换须用同一确定事实验证身份、列表/详情、三维状�
 | 当前领域入口 | 实现证据和边界 |
 | --- | --- |
 | 项目、客户、分供方 | app/lib/project、customer、supplier 的 Repository/HTTP/DTO；项目、客户、分供方浏览器主读已接中央，本机使用已登记磁盘参与者 |
-| 班组—工人 | app/lib/crew-worker、app/stores/crew-worker-read.ts 与 server/api/read/crews*、workers*；全局列表及成员候选跨页读取稳定身份，项目标签读取现有同源项目主档；原班组/项目变更后回读、原命令回执与历史冻结已有定向验证。显式 Tauri 仍有本地适配；正式持久接管及业务定义分别直达 ARCHITECTURE 与 [DATABASE](./DATABASE.md#global-worker-crew-directory) |
+| 班组—工人 | app/lib/crew-worker、app/stores/crew-worker-read.ts 与 server/api/read/crews*、workers*；全局列表及成员候选跨页读取稳定身份，项目标签读取现有同源项目主档；原班组/项目变更后回读、原命令回执与历史冻结已有定向验证。正式持久接管及业务定义分别直达 ARCHITECTURE 与 [DATABASE](./DATABASE.md#global-worker-crew-directory) |
 | 核心/辅助合同、BOQ | app/lib/material-contract、construction-contract、subcontract-contract、auxiliary-contract、other-settlement；canonical kind 与补充协议按稳定父子关系读取 |
 | 施工主合同开支来源 | `GET /api/read/construction-scope/spending` 按实际项目和可选主合同读取；原材采、分包、其他支出合同承诺及唯一原费用分别从自己的持久 owner 派生，已知部分与完整值分开，未接或无权的发票／结算／支付来源明确缺口。工资返回项目范围的原实际事实，归集边界直达 [已答决定](./ARCHITECTURE.md#opt-02-scope-decision) |
 | 甲方/分包单据 | app/lib/owner-document/central-*、owner-commercial-document-read.ts；独立 kind/capability/金额投影，sub_settlement 与 project_penalty 使用专属事实 |
