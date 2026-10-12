@@ -159,13 +159,3 @@ export function normalizeSupplierImportRow(row: Record<string, unknown>): Partia
 
   return data
 }
-
-/** 仅用于新增导入；重导更新不能套默认值，否则会覆盖未映射的既有资料。 */
-export function withSupplierImportCreateDefaults(data: Partial<Supplier>): Partial<Supplier> {
-  return {
-    aliases: [],
-    supplierCategory: '其他',
-    credentialStatus: 'incomplete',
-    ...data,
-  }
-}
