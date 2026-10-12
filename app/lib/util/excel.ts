@@ -215,20 +215,6 @@ function hasMojibake(sheet: RawImportSheet): boolean {
 }
 
 /**
- * 为导入映射解析 Excel/CSV：返回原始表头与按表头键入的数据行，
- * 不做任何字段映射（映射在 KitUI 导入页签里由用户完成，见 ADR 0005）。
- */
-export async function parseSheetForMapping(file: File | ArrayBuffer): Promise<RawImportSheet> {
-  const workbook = await parseWorkbookForMapping(file)
-  const sheet = workbook.sheets[0]
-  if (!sheet)
-    throw new Error('文件中没有工作表')
-  if (!sheet.columns.length)
-    throw new Error('未能从文件读取到表头')
-  return sheet
-}
-
-/**
  * 解析工作簿的全部 sheet，并为每个 sheet 自动识别表头行。
  * 多 sheet 票据导入由专用上传步骤选择目标 sheet；通用导入仍使用第一张 sheet。
  */

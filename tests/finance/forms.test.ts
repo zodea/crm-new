@@ -1,12 +1,12 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { withTransaction } from '~/lib/db/connection'
 import { financeFileHash, verifyFinanceAttachments } from '~/lib/finance/attachment-proof'
+import { deleteFinanceFormInTransaction } from '~/lib/finance/domain'
 import { readVerifiedOriginalExpense } from '~/lib/finance/expense-reference'
 import {
-  deleteFinanceForm,
   getPaymentApplicationSummary,
-  getProjectConfirmedPaymentTotal,
   listFinanceFormAttachments,
   loadFinanceForm,
   unconfirmPaymentRecord,
@@ -51,6 +51,16 @@ vi.mock('~/lib/db/connection', () => ({
     }
   },
 }))
+
+/** 项目已确认现金合计：与付款汇总同口径，未知值不按零汇总。 */
+async function confirmedPaymentTotal(projectId: string) {
+  const rows = await mem.select<{ amount: unknown }>('SELECT amount FROM payment_records WHERE project_id=? AND confirmation_status=\'confirmed\' AND deleted_at IS NULL', [projectId])
+  return verifiedFinanceSum(rows.map(row => row.amount))
+}
+
+function deleteFinanceForm(kind: Parameters<typeof deleteFinanceFormInTransaction>[0], id: string) {
+  return withTransaction(tx => deleteFinanceFormInTransaction(kind, id, tx))
+}
 
 beforeEach(async () => {
   failFileInsert = false
@@ -909,7 +919,7 @@ describe('支付事实确认与撤回', () => {
     await mem.execute('UPDATE payment_applications SET deleted_at=\'2026-10-05T01:00:00.000Z\' WHERE id=?', [application.id])
     await expect(store.saveForm('payment_application', { ...input, name: '不能重占旧结算', applyAmount: 70, settlementAllocations: [{ settlementId: 'settlement-finance', allocatedAmount: 70 }], invoiceAllocations: [] }, 'draft')).rejects.toThrow('余款资格尚未核实')
     await expect(store.saveForm('payment_application', { ...input, name: '不能重占旧发票', bizType: '预付款', applyAmount: 70, settlementAllocations: [], invoiceAllocations: [{ invoiceId: 'invoice-finance-a', allocatedAmount: 70 }] }, 'draft')).rejects.toThrow('余款资格尚未核实')
-    expect(await getProjectConfirmedPaymentTotal('project-finance')).toBe(30)
+    expect(await confirmedPaymentTotal('project-finance')).toBe(30)
     expect(await mem.select('SELECT * FROM payment_record_application_allocations')).toEqual(frozen)
     expect(await mem.select('SELECT * FROM payment_application_settlement_allocations')).toEqual(sourceRows)
     expect(await mem.select('SELECT * FROM operation_logs ORDER BY id')).toEqual(audits)
@@ -959,7 +969,7 @@ describe('支付事实确认与撤回', () => {
       }],
     }, 'confirm')
     expect((await getPaymentApplicationSummary(application.id)).paidAmount).toBe(100)
-    expect(await getProjectConfirmedPaymentTotal('project-finance')).toBe(0)
+    expect(await confirmedPaymentTotal('project-finance')).toBe(0)
     const [confirmationLog] = await mem.select<{
       before_data: string
       after_data: string

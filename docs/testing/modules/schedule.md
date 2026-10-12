@@ -32,7 +32,7 @@
 | [tests/schedule/process-library-repository.test.ts](../../../tests/schedule/process-library-repository.test.ts) | 单元／服务／状态 | 工序库公开 HTTP Repository |
 | [tests/schedule/process-library-request.test.ts](../../../tests/schedule/process-library-request.test.ts) | 单元／服务／状态 | 工序库公开命令解析 |
 | [tests/schedule/process-library-test-reset.test.ts](../../../tests/schedule/process-library-test-reset.test.ts) | 单元／服务／状态 | 工序库测试重置端点 |
-| [tests/schedule/process-library-write.test.ts](../../../tests/schedule/process-library-write.test.ts) | 单元／服务／状态 | 标准工序库版本维护 |
+| [tests/schedule/process-library-domain.test.ts](../../../tests/schedule/process-library-domain.test.ts) | 单元／服务／状态 | 标准工序库前置关系校验 |
 | [tests/schedule/read-model.test.ts](../../../tests/schedule/read-model.test.ts) | 单元／服务／状态 | 排程 read model |
 | [tests/schedule/wbs-controlled-migration.test.ts](../../../tests/schedule/wbs-controlled-migration.test.ts) | 单元／服务／状态 | 完整 SQLite 图经确认原子迁入，绑定历史/软禁用/无组任务/冻结8与人工楼层均可读；重复确认保日常更正 |
 | [tests/server/wbs-migration.test.ts](../../../tests/server/wbs-migration.test.ts) | 单元／服务／状态 | wBS 写后 SQL 冲突丢弃已准备工程量候选，失败后队列可继续读取与保存 |

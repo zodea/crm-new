@@ -1445,19 +1445,6 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
   }
 }
 
-export interface CoreMigrationCommandSource {
-  prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => () => void
-}
-
-export function synchronizeCoreMigrationCommandSources(
-  snapshot: CoreMigrationSnapshotDTO,
-  sources: readonly CoreMigrationCommandSource[],
-): void {
-  const commits = sources.map(source => source.prepareMigrationSnapshot(snapshot))
-  for (const commit of commits)
-    commit()
-}
-
 const commandSources = [
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => processLibraryService.prepareMigrationSnapshot(snapshot, processLibrarySession()) },
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => auxiliaryContractInstance().prepareMigrationSnapshot(snapshot), assertMigrationRemoval: (removed: readonly CoreMigrationServerEntityDTO[]) => auxiliaryContractInstance().assertMigrationRemoval(removed) },

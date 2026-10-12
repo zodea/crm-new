@@ -1408,10 +1408,3 @@ export function createInvoiceLedgerXlsxFromRows(
   XLSX.utils.book_append_sheet(workbook, worksheet, '发票台账')
   return writeWorkbook(workbook, config)
 }
-
-export function createInvoiceLedgerXlsx(
-  invoices: readonly Invoice[],
-  styleConfig: InvoiceXlsxStyleConfig = {},
-): ExportData {
-  return createInvoiceLedgerXlsxFromRows(invoiceLedgerRows(invoices), styleConfig)
-}

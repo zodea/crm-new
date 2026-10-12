@@ -320,12 +320,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     return pending.value ? executeReal(pending.value.action, pending.value.eventId) : undefined
   }
 
-  function markRead(id: string) {
-    if (!dataVisibilityStore.includeDemo)
-      return executeReal('open', id)
-    demoItems.value = demoItems.value.map(item => item.id === id ? { ...item, read: true } : item)
-  }
-
   function markAllRead() {
     if (!dataVisibilityStore.includeDemo)
       return executeReal('mark-all-read', null)
@@ -345,7 +339,7 @@ export const useNotificationStore = defineStore('notifications', () => {
       return undefined
     if (!dataVisibilityStore.includeDemo)
       return executeReal('open', id)
-    markRead(id)
+    demoItems.value = demoItems.value.map(current => current.id === id ? { ...current, read: true } : current)
     return item.route
   }
 
@@ -361,7 +355,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     initialize,
     dismissPresentation,
     recoverPending,
-    markRead,
     markAllRead,
     remove,
     openItem,

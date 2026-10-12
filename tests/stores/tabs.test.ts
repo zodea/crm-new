@@ -80,7 +80,7 @@ describe('页签缓存失效', () => {
     expect(store.invalidatedKeys).toEqual(['/b'])
   })
 
-  it('软刷新只更新当前页签缓存键并记录失效项', () => {
+  it('软刷新只更新当前页签缓存键并记录失效项', async () => {
     const store = useTabsStore()
     store.open({ fullPath: '/project', title: '项目列表' })
     store.open({ fullPath: '/base/supplier', title: '分供方' })
@@ -88,7 +88,7 @@ describe('页签缓存失效', () => {
     const projectKey = store.pageCacheKey('/project')
     const supplierKey = store.pageCacheKey('/base/supplier')
 
-    store.refreshActive()
+    await store.requestRefresh()
 
     expect(store.pageCacheKey('/project')).toBe(projectKey)
     expect(store.pageCacheKey('/base/supplier')).not.toBe(supplierKey)
@@ -107,23 +107,23 @@ describe('页签缓存失效', () => {
     expect(store.pageCacheKey('/project')).not.toBe(before)
   })
 
-  it('批量关闭会一次失效所有被移除页签', () => {
+  it('批量关闭会一次失效所有被移除页签', async () => {
     const store = useTabsStore()
     store.open({ fullPath: '/project', title: '项目列表' })
     store.open({ fullPath: '/base/supplier', title: '分供方' })
     store.open({ fullPath: '/finance/ledger', title: '发票台账' })
 
-    store.closeOther('/project')
+    await store.requestCloseOther('/project')
 
     expect(store.invalidatedKeys).toEqual(['/base/supplier', '/finance/ledger'])
   })
 
-  it('缓存边界完成卸载后可逐批确认失效项', () => {
+  it('缓存边界完成卸载后可逐批确认失效项', async () => {
     const store = useTabsStore()
     store.open({ fullPath: '/project', title: '项目列表' })
-    store.refreshActive()
+    await store.requestRefresh()
     store.open({ fullPath: '/base/supplier', title: '分供方' })
-    store.refreshActive()
+    await store.requestRefresh()
 
     expect(store.invalidatedKeys).toEqual(['/project', '/base/supplier'])
     store.acknowledgeInvalidations(['/project'])

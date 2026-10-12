@@ -1,16 +1,46 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { softDelete } from '~/lib/db/soft-delete'
-import { loadQuantityAssignmentWorkspace } from '~/lib/quantity/assignment'
+import { loadQuantityAssignmentWorkspace, persistQuantityAssignments } from '~/lib/quantity/assignment'
+import { persistQuantityStageCompletion } from '~/lib/quantity/completion'
 import {
-  importQuantityAssignmentRow,
-  importQuantityCompletionRow,
-  importQuantityTemplateRow,
+  buildQuantityAssignmentImportDraft,
+  buildQuantityCompletionImportDraft,
+  buildQuantityTemplateImportDraft,
   precheckQuantityLegacyRow,
 } from '~/lib/quantity/import'
+import { persistQuantityTemplate } from '~/lib/quantity/template'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
+
+type Row = Record<string, unknown>
+const text = (row: Row, key: string) => String(row[key] ?? '')
+async function projectIdOf(row: Row) {
+  const [project] = await mem.select<{ id: string }>('SELECT id FROM projects WHERE deleted_at IS NULL AND code = ?', [text(row, 'projectCode')])
+  return project!.id
+}
+async function unitIdOf(projectId: string, row: Row) {
+  const [unit] = await mem.select<{ id: string }>(`SELECT u.id FROM units u
+    JOIN floors f ON f.id = u.floor_id
+    JOIN buildings b ON b.id = f.building_id
+    WHERE u.deleted_at IS NULL AND f.deleted_at IS NULL AND b.deleted_at IS NULL
+      AND b.project_id = ? AND b.code = ? AND f.code = ? AND u.code = ?`, [projectId, text(row, 'buildingCode'), text(row, 'floorCode'), text(row, 'unitCode')])
+  return unit!.id
+}
+
+/** 逐行导入的草稿构造与持久组合，与中央导入共用同一组 build/persist。 */
+async function importQuantityTemplateRow(db: TestDb, row: Row) {
+  await persistQuantityTemplate(db, await buildQuantityTemplateImportDraft(db, await projectIdOf(row), row))
+}
+async function importQuantityAssignmentRow(db: TestDb, row: Row) {
+  const projectId = await projectIdOf(row)
+  await persistQuantityAssignments(db, await buildQuantityAssignmentImportDraft(db, projectId, await unitIdOf(projectId, row), row))
+}
+async function importQuantityCompletionRow(db: TestDb, row: Row) {
+  const projectId = await projectIdOf(row)
+  await persistQuantityStageCompletion(db, { ...await buildQuantityCompletionImportDraft(db, projectId, await unitIdOf(projectId, row), row), allowMissingPhotos: true })
+}
 
 beforeEach(async () => {
   mem = await createMigratedMemoryDb()

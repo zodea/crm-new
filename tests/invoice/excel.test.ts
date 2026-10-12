@@ -4,13 +4,18 @@ import * as XLSX from 'xlsx'
 import {
   annotateInvoiceImportRows,
   createInvoiceImportTemplateXlsx,
-  createInvoiceLedgerXlsx,
+  createInvoiceLedgerXlsxFromRows,
   getInvoiceImportSourceMeta,
   invoiceLedgerRows,
   parseInvoiceWorkbookForMapping,
   readInvoiceWorkbookStyleReadback,
 } from '~/lib/invoice/excel'
 import { createSyntheticInvoiceWorkbook } from '../fixtures/invoice-workbook'
+
+/** 与发票台账页一致：先投影台账行，再写 XLSX。 */
+function ledgerXlsx(invoices: readonly Invoice[], style?: Parameters<typeof createInvoiceLedgerXlsxFromRows>[1]) {
+  return createInvoiceLedgerXlsxFromRows(invoiceLedgerRows(invoices), style)
+}
 
 function invoice(overrides: Partial<Invoice> = {}): Invoice {
   return {
@@ -75,7 +80,7 @@ describe('发票台账 Excel 导出', () => {
       right: { style: 'none', color: 'FF8899AA' },
     }
     const style = { border, headerBorder, dataBorder, mergeRepeatedValues: false }
-    const bytes = createInvoiceLedgerXlsx([invoice(), invoice({ id: 'second' })], style)
+    const bytes = ledgerXlsx([invoice(), invoice({ id: 'second' })], style)
     const readback = await readInvoiceWorkbookStyleReadback(bytes)
     const cells = readback.sheets[0]!.cells
     expect(readback.issues).toEqual([])
@@ -113,7 +118,7 @@ describe('发票台账 Excel 导出', () => {
       source: 'Excel 导入',
     })
 
-    const workbook = XLSX.read(createInvoiceLedgerXlsx(rows), { type: 'array', cellNF: true })
+    const workbook = XLSX.read(ledgerXlsx(rows), { type: 'array', cellNF: true })
     const worksheet = workbook.Sheets['发票台账']!
 
     expect(worksheet.A1?.v).toBe('发票台账')
@@ -128,7 +133,7 @@ describe('发票台账 Excel 导出', () => {
   })
 
   it('把导出样式设置写入实际 XLSX，并按设置关闭合并', async () => {
-    const bytes = createInvoiceLedgerXlsx([
+    const bytes = ledgerXlsx([
       invoice(),
       invoice({ id: 'inv-test-2', invoiceNumber: '87654321', totalAmount: 20 }),
     ], {
@@ -295,7 +300,7 @@ describe('发票 Excel 导入/回读来源证据', () => {
   })
 
   it('导出台账再次读取时只产生业务行，合计行作为来源元数据保留', async () => {
-    const bytes = createInvoiceLedgerXlsx([
+    const bytes = ledgerXlsx([
       invoice({ invoiceNumber: '000000000000000021', totalAmount: 10 }),
       invoice({ id: 'inv-test-2', invoiceNumber: '000000000000000022', totalAmount: 20 }),
     ])
@@ -311,7 +316,7 @@ describe('发票 Excel 导入/回读来源证据', () => {
   })
 
   it('导出后重新读取仍保留实际 XLSX 样式、行列尺寸、冻结和合并关系', async () => {
-    const bytes = createInvoiceLedgerXlsx([
+    const bytes = ledgerXlsx([
       invoice({ invoiceNumber: '000000000000000021', totalAmount: 10 }),
       invoice({ id: 'inv-test-2', invoiceNumber: '000000000000000022', totalAmount: 20 }),
     ])

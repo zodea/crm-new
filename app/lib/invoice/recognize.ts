@@ -76,21 +76,6 @@ export function isRecognizableFile(fileName: string): boolean {
   return RECOGNIZABLE_FILE_RE.test(fileName)
 }
 
-/** 逐字段置信度的字段名全集（与 Invoice 字段名一致，供表单按 key 取数） */
-export const CONFIDENCE_FIELD_KEYS = [
-  'invoiceType',
-  'invoiceNumber',
-  'invoiceDate',
-  'buyer',
-  'buyerTaxNo',
-  'seller',
-  'sellerTaxNo',
-  'amount',
-  'taxAmount',
-  'totalAmount',
-  'taxRate',
-] as const
-
 /**
  * 真实发票识别：上传原始文件到同源代理，由 PaddleOCR-VL 产出版面 Markdown，再进入本地可测试解析器。
  * 项目提示仍保持原始文本，不在识别层强绑项目主数据；字段确认和归档继续由领域 store 负责。

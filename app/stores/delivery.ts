@@ -731,7 +731,6 @@ export const useDeliveryStore = defineStore('delivery', () => {
     recognitionProgress: readonly(recognitionProgress),
     pendingFiles,
     duplicates: visibleDuplicates,
-    pendingPrintFiles,
     stats,
     byId,
     uploadFilesDetailed,
