@@ -1,6 +1,5 @@
 import type { PayrollDayworkCommand } from '../../app/lib/payroll/central-daywork-contract'
 import { afterEach, expect, it } from 'vitest'
-import { upsertC2SubjectConfig } from '../../app/lib/payroll/daywork'
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { payrollC2ReceiptReferences } from '../../server/utils/payroll-c2-migration-references'
@@ -30,7 +29,7 @@ it('独立反例：原签工跨项目及人员移动后仅余可靠回执，仍�
     await db.execute('INSERT INTO projects(id,name) VALUES (?,?)', ['c2-destination', '签工目标工程'])
     await db.execute('INSERT INTO crews(id,name) VALUES (?,?)', ['c2-destination-crew', '目标班组'])
     await db.execute('INSERT INTO workers(id,name,crew_id,current_project_id) VALUES (?,?,?,?)', ['c2-destination-worker', '目标人员', 'c2-destination-crew', 'c2-destination'])
-    await upsertC2SubjectConfig(db, { projectId: 'c2-destination', crewId: 'c2-destination-crew', leaderWorkerId: 'c2-destination-worker', unitRate: 360, ruleText: '' })
+    await db.execute('INSERT INTO payroll_subject_configs(id,project_id,crew_id,leader_worker_id,format_family,unit_rate,rule_text) VALUES (?,?,?,?,\'C2\',?,\'\')', ['c2-destination-config', 'c2-destination', 'c2-destination-crew', 'c2-destination-worker', 360])
     const imported = await importPayrollC2MigrationSource(db)
     const mapped = (type: string, legacyId: string) => imported.batch.mappings.find(row => row.entityType === type && row.legacyId === legacyId)!.serverId
     const originalProjectId = mapped('projects', 'c2-project')

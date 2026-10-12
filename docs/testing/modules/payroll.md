@@ -63,12 +63,8 @@
 | [tests/payroll/central-read.test.ts](../../../tests/payroll/central-read.test.ts) | 单元／服务／状态 | 工资中央完整历史读取 |
 | [tests/payroll/central-service.test.ts](../../../tests/payroll/central-service.test.ts) | 单元／服务／状态 | 工资 P0 中央读取事务 |
 | [tests/payroll/controlled-migration.test.ts](../../../tests/payroll/controlled-migration.test.ts) | 单元／服务／状态 | 公开迁入后同库冷读原八表与不可变证据，重复确认保留日常更正 |
-| [tests/payroll/detail.test.ts](../../../tests/payroll/detail.test.ts) | 单元／服务／状态 | payroll statement detail read model |
 | [tests/payroll/navigation.test.ts](../../../tests/payroll/navigation.test.ts) | 单元／服务／状态 | payroll navigation state |
-| [tests/payroll/release-safety.test.ts](../../../tests/payroll/release-safety.test.ts) | 单元／服务／状态 | wage release safety |
-| [tests/payroll/retired-format.test.ts](../../../tests/payroll/retired-format.test.ts) | 单元／服务／状态 | 退役 B 工资保留历史原值并拒绝写入 |
 | [tests/payroll/subject-facts.test.ts](../../../tests/payroll/subject-facts.test.ts) | 单元／服务／状态 | 真实 SQLite 的原比例经网络来源保留 0 与 0.8，旧缺字段不变成表单默认 0.95 |
-| [tests/payroll/workbench.test.ts](../../../tests/payroll/workbench.test.ts) | 单元／服务／状态 | payroll statement lifecycle |
 | [tests/stores/payroll-central.test.ts](../../../tests/stores/payroll-central.test.ts) | 单元／服务／状态 | 正式读取四入口只经 Repository，任一失败都不回退本地库 |
 | [tests/tabs/payroll-restore.test.ts](../../../tests/tabs/payroll-restore.test.ts) | 单元／服务／状态 | 工资只读页签恢复 |
 | [tests/components/PayrollMigrationPanel.test.ts](../../../tests/components/PayrollMigrationPanel.test.ts) | 组件（jsdom） | 完整工资来源预检、确认及原编号恢复 |
@@ -115,7 +111,6 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/payroll-batch-remainder.spec.ts](../../../e2e/payroll-batch-remainder.spec.ts) | Playwright E2E | 真实三张工资从0暂缓到自动分完1000，五档视口及逐单冷读不超发 |
-| [tests/payroll/allocations.test.ts](../../../tests/payroll/allocations.test.ts) | 单元／服务／状态 | wage statement member allocations |
 | [tests/payroll/central-batch-format-execution.test.ts](../../../tests/payroll/central-batch-format-execution.test.ts) | 单元／服务／状态 | persists and executes the original C1 command before completing a one-item plan |
 | [tests/payroll/central-batch-funding.test.ts](../../../tests/payroll/central-batch-funding.test.ts) | 单元／服务／状态 | central payroll batch funding |
 | [tests/payroll/central-batch-http.test.ts](../../../tests/payroll/central-batch-http.test.ts) | 单元／服务／状态 | batch HTTP/Repository roundtrip binds preview, identity and immutable plan while rejecting altered commands |
@@ -233,7 +228,6 @@
 | [tests/components/PayrollC1C2ReleasedEvidence.test.ts](../../../tests/components/PayrollC1C2ReleasedEvidence.test.ts) | 组件（jsdom） | C1/C2 已发工资只在真实冻结输出可用后显示配对成功 |
 | [tests/components/PayrollC1C2SourceReturn.test.ts](../../../tests/components/PayrollC1C2SourceReturn.test.ts) | 组件（jsdom） | C1/C2 来源（考勤／签工）返回验证 |
 | [tests/payroll/attendance-facts.test.ts](../../../tests/payroll/attendance-facts.test.ts) | 单元／服务／状态 | 逐日事实保原组、7.51小数和真零，坏未来日期不消失且软删原行仍可读 |
-| [tests/payroll/attendance-safety.test.ts](../../../tests/payroll/attendance-safety.test.ts) | 单元／服务／状态 | attendance write boundary |
 | [tests/payroll/c1-b-independent-review.test.ts](../../../tests/payroll/c1-b-independent-review.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
 | [tests/payroll/c1-export.test.ts](../../../tests/payroll/c1-export.test.ts) | 单元／服务／状态 | c1 真正配对工作簿 |
 | [tests/payroll/c1-migration-protection.test.ts](../../../tests/payroll/c1-migration-protection.test.ts) | 单元／服务／状态 | 迟到的迁入考勤不能越过同库独立待确认签工占用，失败前后整批不变 |
@@ -279,7 +273,6 @@
 | [tests/payroll/central-c2-service.test.ts](../../../tests/payroll/central-c2-service.test.ts) | 单元／服务／状态 | c2主体按项目与负责人保存正价和明确空规则，不要求月份或工程量，原配置可冷读 |
 | [tests/payroll/central-daywork-service.test.ts](../../../tests/payroll/central-daywork-service.test.ts) | 单元／服务／状态 | 没有工程量的直接用工项目可读签工候选，未选择月份保空台账且非法非空月拒绝 |
 | [tests/payroll/daywork-facts.test.ts](../../../tests/payroll/daywork-facts.test.ts) | 单元／服务／状态 | 逐签工事实保留原组、状态、相邻半工与同更新时间的原文变化 |
-| [tests/payroll/signed-daywork.test.ts](../../../tests/payroll/signed-daywork.test.ts) | 单元／服务／状态 | c2 signed daywork source |
 | [tests/stores/daywork-central.test.ts](../../../tests/stores/daywork-central.test.ts) | 单元／服务／状态 | 原保存成功后冷读失败仍保原键，随后同ID合法移项目改人改日也能确认原成功并提示后续变化 |
 | [tests/stores/payroll-c2-central.test.ts](../../../tests/stores/payroll-c2-central.test.ts) | 单元／服务／状态 | 真实C2发放丢响应冷实例按原键恢复，只有原表单与available冻结的可信后读能解除 |
 
