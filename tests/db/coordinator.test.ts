@@ -27,7 +27,7 @@ function driverWithLog(events: string[]): DbDriver {
   }
 }
 
-describe('桌面数据库连接协调器', () => {
+describe('数据库连接协调器', () => {
   it('并发冷启动只初始化一次，失败后允许下一次重试', async () => {
     const firstAttempt = deferred<DbDriver>()
     const driver = driverWithLog([])

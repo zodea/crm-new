@@ -9,7 +9,7 @@ import {
 } from '~/lib/quantity/import'
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
 import { round2 } from '~/lib/util/number'
-import { useBrowserQuantityStore } from '~/stores/quantity-browser'
+import { useQuantityStore } from '~/stores/quantity'
 import { MATERIAL_CONTRACT_LINE_IMPORT_FIELDS } from '../material-contract/import'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
@@ -18,7 +18,7 @@ async function runQuantityImport(
   row: Record<string, unknown>,
   target: 'template' | 'assignment' | 'completion',
 ): Promise<void> {
-  await useBrowserQuantityStore().importRow(target, row)
+  await useQuantityStore().importRow(target, row)
 }
 
 // 导入实体注册表（ADR 0005「实体触发、模板隐含」）：

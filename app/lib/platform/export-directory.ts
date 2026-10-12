@@ -58,7 +58,7 @@ async function browserFileExists(
   catch (error) {
     if (hasErrorName(error, 'NotFoundError'))
       return false
-    // 同名项是子目录时按「名字已被占用」处理，与 Tauri exists 的行为对齐。
+    // 同名项是子目录时按「名字已被占用」处理。
     if (hasErrorName(error, 'TypeMismatchError'))
       return true
     throw error
@@ -131,7 +131,7 @@ export async function pickExportDirectory(
   options: PickExportDirectoryOptions = {},
 ): Promise<ExportDirectoryTarget | null> {
   if (typeof window === 'undefined' || typeof document === 'undefined')
-    throw new Error('导出只能在浏览器或桌面端运行')
+    throw new Error('导出只能在浏览器中运行')
 
   const picker = (window as DirectoryPickerWindow).showDirectoryPicker
   return picker ? await pickBrowserDirectory(picker.bind(window), options) : browserDownloadTarget()

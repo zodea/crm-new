@@ -13,9 +13,8 @@ const props = defineProps<{
   records?: readonly DeliveryPriceRecordInput[] | null
   suppliers?: readonly PricePartyInput[]
   projects?: readonly PricePartyInput[]
-  native?: boolean
 }>()
-const allRows = computed(() => buildMaterialSourcePriceFacts({ quotations: props.read, contracts: props.contractRows, deliveries: props.records, suppliers: props.suppliers, nativeContracts: props.native }))
+const allRows = computed(() => buildMaterialSourcePriceFacts({ quotations: props.read, contracts: props.contractRows, deliveries: props.records, suppliers: props.suppliers }))
 const search = ref('')
 const projectId = ref('')
 const supplierSelection = ref('')

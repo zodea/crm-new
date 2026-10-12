@@ -32,7 +32,6 @@ export function buildMaterialSourcePriceFacts(input: {
   contracts?: readonly ContractPriceFact[] | null
   deliveries?: readonly DeliveryPriceRecordInput[] | null
   suppliers?: readonly PricePartyInput[]
-  nativeContracts?: boolean
 }): MaterialSourcePriceFact[] {
   const quotes = input.quotations
     ? quotationPriceFacts(input.quotations).map((fact): MaterialSourcePriceFact => ({
@@ -64,7 +63,7 @@ export function buildMaterialSourcePriceFacts(input: {
     lineId: fact.lineId,
     version: null,
     date: fact.date,
-    sourceLink: contractPriceSourceLink(fact, input.nativeContracts),
+    sourceLink: contractPriceSourceLink(fact),
     sourceLabel: fact.contractName || fact.contractNo || '合同原行',
     partyName: fact.supplierName ?? '目录名称未读取',
     supplierId: fact.supplierId,

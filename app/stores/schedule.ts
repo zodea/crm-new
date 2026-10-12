@@ -238,7 +238,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   }
   async function readBinding(projectId: string, groupId: string, contractId = '', selectedOrigin: DataOriginDTO = 'real'): Promise<ScheduleBindingRead> {
     if (selectedOrigin !== 'real')
-      throw scheduleProblem('forbidden', '中央绑定仅用于真实来源，桌面与演示保持各自读取边界')
+      throw scheduleProblem('forbidden', '中央绑定仅用于真实来源，演示保持各自读取边界')
     setOrigin(selectedOrigin)
     const request = ++bindingGeneration
     generation += 1

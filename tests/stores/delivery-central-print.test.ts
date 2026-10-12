@@ -15,7 +15,7 @@ const bytes = new TextEncoder().encode('%PDF-1.7\ncomplete original\n%%EOF')
 const original = { assetId: 'asset', fileName: '完整原件.pdf', mimeType: 'application/pdf', fileSize: bytes.length, sha256: 'hash', bytes }
 beforeEach(() => {
   setActivePinia(createPinia())
-  runtime.archive = reactive({ mode: 'central', origin: 'real', list: [record('a'), record('b')], pendingPrintRecords: [record('a'), record('b')], load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn().mockResolvedValue(original) })
+  runtime.archive = reactive({ origin: 'real', list: [record('a'), record('b')], pendingPrintRecords: [record('a'), record('b')], load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn().mockResolvedValue(original) })
 })
 
 describe('中央送货打印原件', () => {

@@ -7,7 +7,7 @@ import { createHomeProjectSource } from '~/lib/home/project-source'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 
 export const useHomeDashboardStore = defineStore('home-dashboard', () => {
-  const source = createHomeProjectSource({ projects: useNuxtApp().$repositories.projectList, schedule: useNuxtApp().$repositories.schedule, localDb: { select }, desktop: false })
+  const source = createHomeProjectSource({ projects: useNuxtApp().$repositories.projectList, schedule: useNuxtApp().$repositories.schedule, localDb: { select } })
   const catalog = shallowRef<HomeProjectReference[]>([])
   const loading = shallowRef(false)
   let catalogRequest = 0

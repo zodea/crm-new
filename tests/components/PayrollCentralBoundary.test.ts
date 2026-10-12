@@ -24,7 +24,7 @@ beforeEach(() => {
   for (const name of ['usePayrollStore', 'useAttendanceStore', 'useSignedDayworkStore', 'usePayrollStatementDetailStore'])
     vi.stubGlobal(name, legacy)
 })
-describe('工资浏览器与桌面入口边界', () => {
+describe('工资浏览器入口边界', () => {
   it.each(cases)('$central 通过对应中央入口，不启动旧本地读写或输出', ({ component, central, native }) => {
     const wrapper = mount(component, { global: { stubs: { [central]: { template: '<div data-central>工资资料已接管</div>' }, [native]: { template: '<div data-native />' } } } })
     expect(wrapper.find('[data-central]').exists()).toBe(true)

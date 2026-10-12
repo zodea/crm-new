@@ -318,7 +318,7 @@ async function openUnitDetail(cell: QuantityMatrixCell) {
   })
 }
 
-// 日常三类映射使用当前来源；旧合一行预检只保留在显式桌面适配。
+// 日常三类映射使用当前来源；旧合一行只做迁移预检，不写入。
 const IMPORT_TARGETS = [
   { label: '户型模板量', entity: 'quantity-template' },
   { label: '责任配置', entity: 'quantity-assignment' },

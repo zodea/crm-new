@@ -76,7 +76,7 @@
 | [tests/components/QuantityHollowFormState.test.ts](../../../tests/components/QuantityHollowFormState.test.ts) | 组件（jsdom） | 未知保存完整字段冷恢复，核对原提交后才进入真实记录详情 |
 | [tests/components/QuantityHollowHistory.test.ts](../../../tests/components/QuantityHollowHistory.test.ts) | 组件（jsdom） | 当前19减4显示15，原检查与整改的日期处数分别可读 |
 | [tests/components/QuantityHollowRectification.test.ts](../../../tests/components/QuantityHollowRectification.test.ts) | 组件（jsdom） | 真实公开来源 19 处取消小确认保输入，确认整改 4 处后仍保原检查且余 15 |
-| [tests/components/QuantityHollowRuntime.test.ts](../../../tests/components/QuantityHollowRuntime.test.ts) | 组件（jsdom） | 桌面原户深链不挂载三类中央空鼓页面，浏览器仍由原页读取权限 |
+| [tests/components/QuantityHollowRuntime.test.ts](../../../tests/components/QuantityHollowRuntime.test.ts) | 组件（jsdom） | 户深链挂载中央空鼓页面并由原页读取权限 |
 | [tests/components/QuantityScreenCentral.test.ts](../../../tests/components/QuantityScreenCentral.test.ts) | 组件（jsdom） | 正式工程量矩阵来源与入口 |
 | [tests/components/QuantityStageFields.test.ts](../../../tests/components/QuantityStageFields.test.ts) | 组件（jsdom） | 阶段整页字段 |
 | [tests/components/QuantityStageFormPage.test.ts](../../../tests/components/QuantityStageFormPage.test.ts) | 组件（jsdom） | 施工阶段配置整页 |

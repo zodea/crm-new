@@ -222,7 +222,7 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     selectedFileId.value = id
     selectedDocumentId.value = store.byId(id)?.docs[0]?.id ?? null
     const file = store.byId(id)
-    if (file?.printDisposition === 'pending' && (archive.mode === 'central' || !previewFiles.has(id))) {
+    if (file?.printDisposition === 'pending') {
       previewFiles.delete(id)
       const controller = new AbortController()
       selectionRead = controller
@@ -595,10 +595,6 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
       }
       if (!active || generation !== scopeGeneration)
         return
-      try {
-        await references.rememberProjectAlias(input.projectId, input.siteText)
-      }
-      catch { warning('送货单已归档，但本地项目别名未保存') }
       ensureSelection()
     }
     catch {

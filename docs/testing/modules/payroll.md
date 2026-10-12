@@ -49,7 +49,7 @@
 | [e2e/payroll-frozen-location.spec.ts](../../../e2e/payroll-frozen-location.spec.ts) | Playwright E2E | 真实冻结楼层范围在预览、XLSX及分页打印一致，不补断层或改原金额 |
 | [e2e/payroll-statement-detail.spec.ts](../../../e2e/payroll-statement-detail.spec.ts) | Playwright E2E | 工资历史详情的失效边界 |
 | [tests/components/PaymentPayrollSection.test.ts](../../../tests/components/PaymentPayrollSection.test.ts) | 组件（jsdom） | 关联工资：付款页中的工资区块 |
-| [tests/components/PayrollCentralBoundary.test.ts](../../../tests/components/PayrollCentralBoundary.test.ts) | 组件（jsdom） | 工资浏览器与桌面入口边界 |
+| [tests/components/PayrollCentralBoundary.test.ts](../../../tests/components/PayrollCentralBoundary.test.ts) | 组件（jsdom） | 工资浏览器入口边界 |
 | [tests/components/PayrollCentralRead.test.ts](../../../tests/components/PayrollCentralRead.test.ts) | 组件（jsdom） | 工资中央只读资料 |
 | [tests/components/PayrollFeeEditors.test.ts](../../../tests/components/PayrollFeeEditors.test.ts) | 组件（jsdom） | 没有工程量读取权限仍可选择工资基数，不能凭格子ID造原户链接 |
 | [tests/components/PayrollHostSection.test.ts](../../../tests/components/PayrollHostSection.test.ts) | 组件（jsdom） | 个人0与整单1000分列，来源链接保原档案查询，表可获得键盘焦点 |

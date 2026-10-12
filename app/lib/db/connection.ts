@@ -49,7 +49,6 @@ async function initializeDb(): Promise<DbDriver> {
     ? await loadLegacyProductionReadOnly()
     : false
   const workspace = localDataWorkspace(includeDemo, legacyProductionReadOnly)
-  // 桌面端必须使用持久化 SQLite；原生驱动失败时显式报错，不能静默退回内存库。
   const db = await createSqlJsDriver(workspace.snapshotKey)
 
   try {

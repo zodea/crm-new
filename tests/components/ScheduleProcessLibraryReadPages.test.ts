@@ -123,12 +123,12 @@ describe('工序库中央只读页面', () => {
     expect(screen.getByText('当前身份无法读取引用情况')).not.toBeNull()
   })
 
-  it('桌面旧适配没有中央投影字段时仍可正常展示版本', async () => {
-    const nativeDetail = { id: 'old', code: 'native', name: '桌面本地库', version: 1, description: '', isDefault: false, taskCount: 0, usageCount: 2, tasks: [] }
+  it('中央详情未附带引用项目投影时仍可正常展示版本与引用数', async () => {
+    const detail = { id: 'old', code: 'legacy', name: '历史工序库', version: 1, dataOrigin: 'real', description: '', isDefault: false, taskCount: 0, usageCount: 2, tasks: [] }
     vi.stubGlobal('useRoute', () => ({ params: { id: 'old' }, query: { origin: 'real' } }))
-    vi.stubGlobal('useScheduleProcessLibraryStore', () => ({ origin: 'real', canWrite: true, loadDetail: vi.fn().mockResolvedValue(nativeDetail) }))
+    vi.stubGlobal('useScheduleProcessLibraryStore', () => ({ origin: 'real', canWrite: true, loadDetail: vi.fn().mockResolvedValue(detail) }))
     render(ScheduleProcessLibraryDetail, { global: { components: { NuxtLink: Link }, stubs: { KitTable: Table } } })
-    await screen.findByRole('heading', { name: '桌面本地库 · v1' })
+    await screen.findByRole('heading', { name: '历史工序库 · v1' })
     expect(screen.getByText('已被 2 个排程引用')).not.toBeNull()
     expect(screen.queryByRole('region', { name: '引用项目' })).toBeNull()
   })

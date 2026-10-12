@@ -5,8 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, shallowRef } from 'vue'
 import ScheduleContractBindingScreen from '~/components/schedule/ScheduleContractBindingScreen.vue'
 
-const isDesktopRuntime = vi.hoisted(() => vi.fn())
-
 const LookupSelectStub = defineComponent({
   props: {
     modelValue: {
@@ -116,7 +114,6 @@ const store = {
 
 describe('scheduleContractBindingScreen', () => {
   beforeEach(() => {
-    isDesktopRuntime.mockReset().mockReturnValue(true)
     push.mockReset()
     confirm.mockReset().mockResolvedValue(true)
     success.mockReset()
@@ -141,7 +138,6 @@ describe('scheduleContractBindingScreen', () => {
   })
 
   it('浏览器中央绑定读取失败时明确报错，不回退读取或调用本地绑定', async () => {
-    isDesktopRuntime.mockReturnValue(false)
     vi.stubGlobal('useRoute', () => ({ fullPath: '/schedule/project-1/bind/group-1?origin=real', query: { origin: 'real' } }))
     vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, close: vi.fn() }))
     render(ScheduleContractBindingScreen, {

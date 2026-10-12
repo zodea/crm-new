@@ -2035,7 +2035,7 @@ END;
 
 可见性父链刻意排除两项审计引用：`house_type_templates.copied_from_template_id` 只是一次性复制来源，删除来源不隐藏复制件；`unit_stage_completions.assignment_id` 只是完成时责任，软删旧责任不隐藏完成事实。
 
-`#442` 浏览器中央工程量适配中的 `quantity_boq_references` 仅存 `id + project_id + contract_id` 外部身份索引，模板行的 BOQ 外键指向此索引；量价与已签证增减仍读取中央施工合同/变洽签。该索引不是第二份 BOQ 业务表，也不改变显式桌面 SQLite 的物理 schema。迁移使用完整数据库候选准备，在外键、祖先及跨域对账通过后原子切换；月报自动完成量与有效 BOQ 来源在同一串行窗口重验后固化，具体读写契约见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442) 与 [COMMANDS](./COMMANDS.md#工程量中央命令与迁移接管442)。
+`#442` 浏览器中央工程量适配中的 `quantity_boq_references` 仅存 `id + project_id + contract_id` 外部身份索引，模板行的 BOQ 外键指向此索引；量价与已签证增减仍读取中央施工合同/变洽签。该索引不是第二份 BOQ 业务表，也不改变迁移来源 SQLite 的物理 schema。迁移使用完整数据库候选准备，在外键、祖先及跨域对账通过后原子切换；月报自动完成量与有效 BOQ 来源在同一串行窗口重验后固化，具体读写契约见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442) 与 [COMMANDS](./COMMANDS.md#工程量中央命令与迁移接管442)。
 
 ### 工资完整工作簿保存目录（#479）
 

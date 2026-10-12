@@ -350,7 +350,7 @@ describe('迁移机制：存量表 ALTER 补列', () => {
 
   it('v4 升级路径：存量库遗留的 account_status=\'confirmed\' 回填为 \'none\'，不从台账口径凭空消失', async () => {
     // 只跑到 v3，模拟本 PR 落地前已跑过旧版 confirmInvoice()（写 account_status='confirmed'）的存量库
-    // （该 app 走 Tauri 持久化 sqlite 文件，非纯内存，升级前的历史值必须被迁移正确处理）
+    // （存量库为持久化 sqlite 文件，非纯内存，升级前的历史值必须被迁移正确处理）
     const db = await createMemoryDb()
     await runMigrations(db, migrations.filter(m => m.version <= 3))
     await db.execute(

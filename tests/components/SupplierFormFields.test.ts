@@ -4,8 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
 import SupplierFormFields from '~/components/master-data/SupplierFormFields.vue'
 
-const runtime = vi.hoisted(() => ({ desktop: true }))
-
 const recordTaxpayerVerification = vi.fn()
 const formModal = vi.fn()
 const success = vi.fn()
@@ -57,7 +55,6 @@ function renderFields(overrides: Partial<SupplierFormDraft> = {}) {
 describe('分供方表单资料辅助动作', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    runtime.desktop = true
     recordTaxpayerVerification.mockImplementation(async (input: {
       status: string
       taxpayerType: string
@@ -73,7 +70,6 @@ describe('分供方表单资料辅助动作', () => {
   })
 
   it('浏览器只向整页父级发核验意图，不调用旧本地存储或全局表单弹窗', async () => {
-    runtime.desktop = false
     renderFields()
     await fireEvent.click(screen.getByRole('button', { name: '记录人工核验' }))
     expect(verifyCentral).toHaveBeenCalledOnce()

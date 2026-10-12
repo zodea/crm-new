@@ -90,12 +90,8 @@ export interface DeliveryRecordSourceFile {
   bytes: Uint8Array
 }
 
-const useCentralDeliveryRecordStore = defineStore('delivery-record-central', () => {
+export const useDeliveryRecordStore = defineStore('delivery-record-central', () => {
   const repositories = useNuxtApp().$repositories
   const visibility = useDataVisibilityStore()
   return createDeliveryRecordState(repositories.deliveries, () => visibility.includeDemo ? 'demo' : 'real')
 })
-
-export function useDeliveryRecordStore() {
-  return useCentralDeliveryRecordStore()
-}
