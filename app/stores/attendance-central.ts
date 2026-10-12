@@ -25,7 +25,6 @@ export const useAttendanceCentralStore = defineStore('attendance-central', () =>
     pending.acknowledge(original, [refreshed], result => refreshed.context.workspaceId === command.workspaceId && refreshed.context.actorId === command.actorId && refreshed.context.origin === command.origin && !refreshed.context.readonly && refreshed.context.capabilities.includes('payroll:write') && payrollCanonical(refreshed.scope) === payrollCanonical(command.scope) && refreshed.records.some(record => record.id === result.recordId && record.projectId === command.projectId && record.workerId === result.workerId && record.workDate === result.workDate))
   }
   return {
-    attendanceSaving: pending.saving,
     loadMatrix: (query: PayrollQuery, scope: PayrollAttendanceScope) => pending.read(() => repository().attendanceMatrix(query, scope)),
     saveRecord,
     getAttendancePending: (read: PayrollAttendanceMatrixRead, workerId: string, workDate: string) => pending.get(key(read.context.workspaceId, read.context.actorId, read.context.origin, read.scope.projectId, workerId, workDate)),

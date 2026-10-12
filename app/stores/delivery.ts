@@ -327,10 +327,6 @@ export const useDeliveryStore = defineStore('delivery', () => {
     return { ids, acceptedFiles, duplicates: skipped }
   }
 
-  async function uploadFiles(uploadedFiles: File[]): Promise<string[]> {
-    return (await uploadFilesDetailed(uploadedFiles)).ids
-  }
-
   function confirmDuplicate(id: string): boolean {
     const duplicate = visibleDuplicates.value.find(item => item.id === id)
     if (!duplicate)
@@ -730,47 +726,14 @@ export const useDeliveryStore = defineStore('delivery', () => {
     removeFile(fileId)
   }
 
-  function incompleteReasons(file: DeliveryFile): string[] {
-    const reasons: string[] = []
-    if (file.intakeDecision === 'pending')
-      reasons.push(file.intakeReason || '待人工判断是否为材料送货单')
-    if (file.intakeDecision === 'non-material')
-      reasons.push('非材料/待处理')
-    if (file.ocrStatus === 'failed')
-      reasons.push('识别失败')
-    if (file.ocrStatus === 'done' && !file.supplierText)
-      reasons.push('缺 OCR 分供方，归档前必须人工选择或新增')
-    if (file.ocrStatus === 'done' && !file.docs.length)
-      reasons.push('无可核对单据')
-    for (const doc of file.docs) {
-      if (!doc.deliveryDate)
-        reasons.push('缺日期')
-      if (!doc.orderNo && doc.docType !== '收据')
-        reasons.push('缺单号')
-      if (!doc.items.length)
-        reasons.push('0 明细行')
-      if (doc.items.some(item => !item.name.trim() || !item.unit.trim() || item.qty == null || item.qty <= 0))
-        reasons.push('明细需确认名称、单位和非零数量')
-      if (doc.items.some(item => item.unitPrice == null || item.amount == null))
-        reasons.push('价格待补录')
-      if (doc.quality !== 'normal')
-        reasons.push('手写/低质量，待人工核对')
-      if (doc.note.includes('金额') || doc.note.includes('合计'))
-        reasons.push('金额待复核')
-    }
-    return [...new Set(reasons)]
-  }
-
   return {
     files: visibleFiles,
     recognitionProgress: readonly(recognitionProgress),
     pendingFiles,
     duplicates: visibleDuplicates,
-    pendingIntakeFiles,
     pendingPrintFiles,
     stats,
     byId,
-    uploadFiles,
     uploadFilesDetailed,
     confirmDuplicate,
     loadDuplicateFile,
@@ -784,6 +747,5 @@ export const useDeliveryStore = defineStore('delivery', () => {
     loadFileForPrint,
     excludeFileFromPrint,
     confirmFilePrintReceipt,
-    incompleteReasons,
   }
 })

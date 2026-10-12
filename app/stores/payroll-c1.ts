@@ -46,7 +46,6 @@ export const usePayrollC1Store = defineStore('payroll-c1-central', () => {
     })
   }
   return {
-    c1Saving: pending.saving,
     loadC1Form: (q: PayrollQuery, input: PayrollC1FormInput) => input.draft === undefined ? pending.read(() => repository().c1Form(q, input)) : repository().c1Form(q, input),
     loadC1Config: (q: PayrollQuery, scope: PayrollC1ConfigScope) => pending.read(() => repository().c1Config(q, scope)),
     loadC1Output: (q: PayrollQuery, id: string) => pending.read(() => repository().c1Output(q, id)),

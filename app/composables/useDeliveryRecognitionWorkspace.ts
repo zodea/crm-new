@@ -797,7 +797,6 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     aliasSaving,
     retrySupplierAlias,
     selectedFileId,
-    selectedDocumentId,
     selectedFile,
     selectedDocument,
     previewUrl,

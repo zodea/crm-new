@@ -4,9 +4,6 @@ import { payrollProblem } from './central-contract'
 import { loadPayrollHistory } from './central-history'
 import { loadPayrollGraph, payrollEvidence, payrollListRows, payrollSources, readPayrollStatement } from './central-read'
 
-export function requirePayrollNative() {
-  throw payrollProblem('forbidden', '工资、考勤及签工当前已接中央只读，新增、核对和发放尚未开放')
-}
 async function localContext(repo: PayrollRepository, query: PayrollQuery): Promise<PayrollContext> {
   if (query.origin !== 'demo' || !query.includeDemo)
     throw payrollProblem('forbidden', '正式工资不能回退本地读取')

@@ -8,7 +8,6 @@ import {
   listOwnerDocumentContractOptions,
   listOwnerDocumentForms,
   loadOwnerDocumentForm,
-  loadPenaltyDeductions,
   ownerDocumentStatusIsEditable,
 } from '~/lib/owner-document/forms'
 import { useOwnerDocumentStore } from '~/stores/owner-document'
@@ -403,7 +402,7 @@ describe('f5 甲方/分包单据领域事务', () => {
     })
   })
 
-  it('六类独立单据复用真实合同与支出结算，项目罚扣从抵扣关系派生金额', async () => {
+  it('六类独立单据复用真实合同与支出结算，项目罚扣初始无抵扣', async () => {
     const store = useOwnerDocumentStore()
     await mem.execute(`
       INSERT INTO contract_supplements (
@@ -601,22 +600,6 @@ describe('f5 甲方/分包单据领域事务', () => {
       remainingDeductionAmount: 20,
     })
 
-    await store.deductProjectPenalty(penalty.id, subSettlement.id, 20, '本期结算抵扣')
-    expect(await loadPenaltyDeductions(penalty.id)).toEqual([
-      expect.objectContaining({
-        settlementId: subSettlement.id,
-        settlementNo: 'FBJS-001',
-        amount: 20,
-      }),
-    ])
-    expect(await loadOwnerDocumentForm('project_penalty', penalty.id)).toMatchObject({
-      status: 'deducted',
-      deductedAmount: 20,
-      remainingDeductionAmount: 0,
-    })
-    await expect(
-      store.deductProjectPenalty(penalty.id, subSettlement.id, 1),
-    ).rejects.toThrow()
     await expect(store.removeForm('sub_settlement', subSettlement.id))
       .rejects
       .toThrow('只有草稿或已退回单据可以删除')

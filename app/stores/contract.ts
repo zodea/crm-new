@@ -268,11 +268,6 @@ export const useContractStore = defineStore('contract', () => {
     return list.value.find(c => c.id === id)
   }
 
-  /** kind 切片(三列表/项目详情子表共用):施工 | 分包 | 材采 */
-  function byKind(kind: ContractKind) {
-    return list.value.filter(c => c.kind === kind)
-  }
-
   function auxByKind(kind: ContractAuxListKind) {
     return auxLists.value[kind] ?? []
   }
@@ -524,7 +519,6 @@ export const useContractStore = defineStore('contract', () => {
     load,
     loadAux,
     byId,
-    byKind,
     auxByKind,
     auxLoadingFor,
     auxError,
