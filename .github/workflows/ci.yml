@@ -18,11 +18,6 @@ on:
         required: true
         default: false
         type: boolean
-      run_rust:
-        description: Run Tauri Rust tests
-        required: true
-        default: false
-        type: boolean
       base_sha:
         description: Previous validated batch SHA used as lint diff base; defaults to HEAD^
         required: false
@@ -195,25 +190,3 @@ jobs:
           path: test-results/visual/
           if-no-files-found: ignore
           retention-days: 7
-
-  rust:
-    name: rust
-    if: ${{ inputs.run_rust }}
-    runs-on: windows-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-
-      - name: Set up stable Rust
-        shell: pwsh
-        run: |
-          rustup set auto-self-update disable
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-
-      - name: Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked

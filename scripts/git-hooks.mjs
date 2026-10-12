@@ -10,7 +10,6 @@ export function isTemporaryPath(path) {
     || /^\.(?:claude\/worktrees|codex\/(?:cache|logs|sessions))(?:\/|$)/i.test(path)
     || /(?:^|\/)(?:node_modules|\.output|\.data|\.nuxt|\.nitro|\.cache|dist|\.pnpm-store|\.npm|\.vite|\.vitest|__pycache__|\.pytest_cache|\.ruff_cache)(?:\/|$)/i.test(path)
     || /(?:^|\/)(?:\.eslintcache|\.stylelintcache)$|\.(?:tsbuildinfo|py[cod])$/i.test(path)
-    || /^src-tauri\/(?:target|gen)(?:\/|$)/i.test(path)
 }
 
 export function checkStagedPaths(paths) {

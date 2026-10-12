@@ -23,7 +23,6 @@ E2E 默认传 `e2e_targets` 指定相关 Playwright 文件；跨域基础设施�
 | `quality` | diff 范围 ESLint、Nuxt 类型检查、Vitest 单元/jsdom 组件、静态生成 | JS/TS/Vue、依赖、框架或测试配置 |
 | `e2e` | Playwright 行为测试 | 跨页面流程、路由/状态/持久化、上传下载、焦点/浮层/拖拽 |
 | `visual` | Windows/Chromium 专用视觉矩阵 | 布局、令牌、响应式、表格密度、页面外壳和截图断言 |
-| `rust` | Windows 下 Cargo 测试 | Tauri 桌面命令、Rust 数据层和 Cargo 配置 |
 
 按影响组合套件；全部远端套件仅用于跨层基础设施、依赖大升级或发布总验收。纯文档通常不需要远端 CI。现有 CI 没有独立浏览器组件或普通测试整体类型检查任务，其本地入口与覆盖范围见 [测试入口](../testing/README.md)。
 
