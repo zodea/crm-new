@@ -49,7 +49,6 @@
 | [tests/components/ScheduleBindingReview.test.ts](../../../tests/components/ScheduleBindingReview.test.ts) | 组件（jsdom） | 冻结差异展示 |
 | [tests/components/ScheduleCentralUiState.test.ts](../../../tests/components/ScheduleCentralUiState.test.ts) | 组件（jsdom） | 中央排程界面目标与草稿边界 |
 | [tests/components/ScheduleContractBindingEntry.test.ts](../../../tests/components/ScheduleContractBindingEntry.test.ts) | 组件（jsdom） | 内部暂估排程绑定入口 |
-| [tests/components/ScheduleContractBindingReview.test.ts](../../../tests/components/ScheduleContractBindingReview.test.ts) | 组件（jsdom） | scheduleContractBindingReview |
 | [tests/components/ScheduleContractBindingRoute.test.ts](../../../tests/components/ScheduleContractBindingRoute.test.ts) | 组件（jsdom） | 施工排程合同绑定路由 |
 | [tests/components/ScheduleContractBindingScreen.test.ts](../../../tests/components/ScheduleContractBindingScreen.test.ts) | 组件（jsdom） | scheduleContractBindingScreen |
 | [tests/components/ScheduleDependencyDialog.test.ts](../../../tests/components/ScheduleDependencyDialog.test.ts) | 组件（jsdom） | schedule dependency dialog |

@@ -2623,7 +2623,7 @@ flowchart TD
 | 累计已付 | 按分供方连接已确认 `payment_records` 与 `payment_record_application_allocations` 求和 |
 | 应付余额 | 合同总额 − 累计已付 |
 
-金额聚合与关系计数分别过滤。当前中央[分供方读面](../../app/lib/supplier/read-page.ts)及[项目分供方读面](../../app/lib/project-supplier/read-page.ts)排除草稿（`draft/草稿`）、失效（`无效/作废/cancelled`）和软删合同，纳入有效补充协议；详情中的可追溯合同/关系列表不因此只剩金额纳入项。旧 [SQLite 列表 store](../../app/stores/supplier.ts)及[详情 store](../../app/stores/supplier-detail.ts)的已知合同金额聚合已对齐此口径，共用[有效状态与补充协议查询](../../app/lib/contract/effective-status.ts)；[store 回归](../../tests/stores/supplier-detail.test.ts)覆盖失效及草稿排除、有效补充协议、列表与详情金额一致，并验证合同计数与合作项目范围保留。旧路径未因此退役，也不改变中央读写边界。
+金额聚合与关系计数分别过滤。当前中央[分供方读面](../../app/lib/supplier/read-page.ts)及[项目分供方读面](../../app/lib/project-supplier/read-page.ts)排除草稿（`draft/草稿`）、失效（`无效/作废/cancelled`）和软删合同，纳入有效补充协议；详情中的可追溯合同/关系列表不因此只剩金额纳入项。旧 [SQLite 列表 store](../../app/stores/supplier.ts)的已知合同金额聚合已对齐此口径，共用[有效状态与补充协议查询](../../app/lib/contract/effective-status.ts)；旧详情 store 已随桌面端退役删除，不改变中央读写边界。
 
 ### 4.4 ProjectSupplier 汇总（project-supplier.md）
 

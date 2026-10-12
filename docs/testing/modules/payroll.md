@@ -53,9 +53,6 @@
 | [tests/components/PayrollCentralRead.test.ts](../../../tests/components/PayrollCentralRead.test.ts) | 组件（jsdom） | 工资中央只读资料 |
 | [tests/components/PayrollFeeEditors.test.ts](../../../tests/components/PayrollFeeEditors.test.ts) | 组件（jsdom） | 没有工程量读取权限仍可选择工资基数，不能凭格子ID造原户链接 |
 | [tests/components/PayrollHostSection.test.ts](../../../tests/components/PayrollHostSection.test.ts) | 组件（jsdom） | 个人0与整单1000分列，来源链接保原档案查询，表可获得键盘焦点 |
-| [tests/components/PayrollStatementDetailTables.test.ts](../../../tests/components/PayrollStatementDetailTables.test.ts) | 组件（jsdom） | payroll statement dedicated detail tables |
-| [tests/components/PayrollStatementTable.test.ts](../../../tests/components/PayrollStatementTable.test.ts) | 组件（jsdom） | 工资单列表刷新 |
-| [tests/components/PayrollWorkbench.test.ts](../../../tests/components/PayrollWorkbench.test.ts) | 组件（jsdom） | payroll workbench components |
 | [tests/migration/payroll-central-source.test.ts](../../../tests/migration/payroll-central-source.test.ts) | 单元／服务／状态 | 中央工资只剩原审计的损坏旧库仍运输有项目归属的原文，不因当前表为空静默丢失 |
 | [tests/migration/payroll-source.test.ts](../../../tests/migration/payroll-source.test.ts) | 单元／服务／状态 | 公开旧库读取包含八表、独立未领用来源和冻结原文，不因没有工资漏项目 |
 | [tests/payroll/central-history-integrity.test.ts](../../../tests/payroll/central-history-integrity.test.ts) | 单元／服务／状态 | 工资中央历史原值与冻结完整性 |
@@ -67,7 +64,6 @@
 | [tests/payroll/central-service.test.ts](../../../tests/payroll/central-service.test.ts) | 单元／服务／状态 | 工资 P0 中央读取事务 |
 | [tests/payroll/controlled-migration.test.ts](../../../tests/payroll/controlled-migration.test.ts) | 单元／服务／状态 | 公开迁入后同库冷读原八表与不可变证据，重复确认保留日常更正 |
 | [tests/payroll/detail.test.ts](../../../tests/payroll/detail.test.ts) | 单元／服务／状态 | payroll statement detail read model |
-| [tests/payroll/export.test.ts](../../../tests/payroll/export.test.ts) | 单元／服务／状态 | 工资已发放快照导出 |
 | [tests/payroll/navigation.test.ts](../../../tests/payroll/navigation.test.ts) | 单元／服务／状态 | payroll navigation state |
 | [tests/payroll/release-safety.test.ts](../../../tests/payroll/release-safety.test.ts) | 单元／服务／状态 | wage release safety |
 | [tests/payroll/retired-format.test.ts](../../../tests/payroll/retired-format.test.ts) | 单元／服务／状态 | 退役 B 工资保留历史原值并拒绝写入 |
@@ -269,7 +265,6 @@
 | [tests/components/PayrollC2SpecIndependent.test.ts](../../../tests/components/PayrollC2SpecIndependent.test.ts) | 组件（jsdom） | 独立规格反例：重新读取已撤写权的同一签工，保留本地草稿但停止可编辑与提交 |
 | [tests/components/PayrollDayworkConfirmation.test.ts](../../../tests/components/PayrollDayworkConfirmation.test.ts) | 组件（jsdom） | 修改证明后取消关闭，或 KeepAlive 隐藏再显示，仍保同一原格证明输入 |
 | [tests/components/PayrollDayworkForm.test.ts](../../../tests/components/PayrollDayworkForm.test.ts) | 组件（jsdom） | 保存并确认依据实际状态提示，不将 saved 回执误说为待确认 |
-| [tests/components/SignedDaywork.test.ts](../../../tests/components/SignedDaywork.test.ts) | 组件（jsdom） | signed daywork components |
 | [tests/payroll/c2-b-independent.test.ts](../../../tests/payroll/c2-b-independent.test.ts) | 单元／服务／状态 | 独立反例：原签工跨项目及人员移动后仅余可靠回执，仍在恢复删除前保护原行；去掉该回执才可准备 |
 | [tests/payroll/c2-migration-protection.test.ts](../../../tests/payroll/c2-migration-protection.test.ts) | 单元／服务／状态 | 另一项目真实 C2 核对来源保留时，可单独准备恢复未被引用的原项目 |
 | [tests/payroll/c2-navigation.test.ts](../../../tests/payroll/c2-navigation.test.ts) | 单元／服务／状态 | c2 原签工导航 |

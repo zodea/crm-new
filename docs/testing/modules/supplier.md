@@ -21,7 +21,6 @@
 | [tests/server/supplier-fact-source.test.ts](../../../tests/server/supplier-fact-source.test.ts) | 单元／服务／状态 | 分供方跨领域事实投影 |
 | [tests/stores/supplier-central.test.ts](../../../tests/stores/supplier-central.test.ts) | 单元／服务／状态 | 分供方中央 stores |
 | [tests/stores/supplier-credential-state.test.ts](../../../tests/stores/supplier-credential-state.test.ts) | 单元／服务／状态 | 中央证照会话所有权和原提交恢复 |
-| [tests/stores/supplier-detail.test.ts](../../../tests/stores/supplier-detail.test.ts) | 单元／服务／状态 | supplier detail store |
 | [tests/stores/supplier-taxpayer.test.ts](../../../tests/stores/supplier-taxpayer.test.ts) | 单元／服务／状态 | 每表单税务提交身份 |
 | [tests/supplier/credential-central.test.ts](../../../tests/supplier/credential-central.test.ts) | 单元／服务／状态 | 中央证照与主档同一事务旅程 |
 | [tests/supplier/credential-core-integration.test.ts](../../../tests/supplier/credential-core-integration.test.ts) | 单元／服务／状态 | 证照与中央迁移协调器完整接缝 |
@@ -52,7 +51,6 @@
 | [tests/components/SupplierCredentialOcrReview.test.ts](../../../tests/components/SupplierCredentialOcrReview.test.ts) | 组件（jsdom） | supplier credential OCR review |
 | [tests/components/SupplierCredentialOcrWorkflow.test.ts](../../../tests/components/SupplierCredentialOcrWorkflow.test.ts) | 组件（jsdom） | 中央 OCR 识别与人工确认工作流 |
 | [tests/components/SupplierCredentialScreen.test.ts](../../../tests/components/SupplierCredentialScreen.test.ts) | 组件（jsdom） | 中央分供方证照入口 |
-| [tests/components/SupplierCredentialTab.test.ts](../../../tests/components/SupplierCredentialTab.test.ts) | 组件（jsdom） | supplier credential tab |
 | [tests/components/SupplierDetailScreen.test.ts](../../../tests/components/SupplierDetailScreen.test.ts) | 组件（jsdom） | 分供方中央详情；材采可读而其他合同域不可用／无权／缺证时只显示已核事实与完整未知，禁止挂载缺源子区；统一可信合同及 demo 原边界 |
 | [tests/components/SupplierFactTable.test.ts](../../../tests/components/SupplierFactTable.test.ts) | 组件（jsdom） | 分供方合同事实类别 |
 | [tests/components/SupplierFormFields.test.ts](../../../tests/components/SupplierFormFields.test.ts) | 组件（jsdom） | 分供方表单资料辅助动作 |
