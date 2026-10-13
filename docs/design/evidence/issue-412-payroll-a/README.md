@@ -81,6 +81,6 @@ flowchart TD
 
 C1/C2、独立更正与实际补退、房补管理费、空鼓扣款、批量资金建议和完整工作簿仍继续 P2–P7；#416 保留生产保存、备份与部署关口。各期可用范围见[总规格](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-central-spec-draft.md)，当前总图及逐 Issue 图见[交互报告](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/index.html#issue-412)。
 
-2026-09-13 10:27 已重新获取远端：13 个实际远端分支均为本地 HEAD 祖先，开放 PR 与未解决冲突为空。本地领先线上主分支 166 个提交、落后 0；包含本期功能提交，尚未推送。具体整合和原工作树边界见[分支记录](../../../research/local-branch-integration-2026-09-10.md)。
+2026-09-13 10:27 已重新获取远端：13 个实际远端分支均为本地 HEAD 祖先，开放 PR 与未解决冲突为空。本地领先线上主分支 166 个提交、落后 0；包含本期功能提交，尚未推送。具体整合和原工作树边界见[分支记录](https://github.com/zodea/crm-new/blob/212a1cb5/docs/research/local-branch-integration-2026-09-10.md)。
 
 正常提交及代码核对见[提交凭据](./commit-receipt.json)。三个浏览器JSON产物在正常格式化中只补末尾换行；唯一清单同时保存原摘要与当前归档摘要，原业务内容逐值相同。
