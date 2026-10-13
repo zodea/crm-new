@@ -2,7 +2,7 @@
 
 固定基线：`e344a5444cd52bfeb65e78b031912d5241666fc0`。`git log <base>..HEAD` 为空；本轮为工作树增量，以 `git diff <base> -- <明确路径>` 配合新增未跟踪文件全文读取。未运行全量、构建或提交。
 
-规格：`docs/research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md`，以及该票承接的 P4/P5 已定冻结、实际收付与同源防重扣边界。按 code-review-matt 两轴独立记录；Root/A 另做并行复核，不重复创建审查代理。
+规格：[`docs/research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md`](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)，以及该票承接的 P4/P5 已定冻结、实际收付与同源防重扣边界。按 code-review-matt 两轴独立记录；Root/A 另做并行复核，不重复创建审查代理。
 
 范围：A 的 quantity hollow 五表合同、来源捕获/三个命令/原件回放、C1/C2 source V2 与 native 发放/输出、`central-hollow-processed-{original,proof}.ts`、A 单价 provider 接入和 `payroll-migrated-prices.ts`；Root 的 `payroll-hollow-{read,config,service,processed}.ts`、扣款金额组合、P4 更正/后月关联与新增 HTTP 入口。
 

@@ -2,7 +2,7 @@
 
 2026-09-22 收尾补充：[跨月实际补退范围验收](checks/month-scope.md)，修复一次补退涉及不同原工资时各月重复全额计入的问题。
 
-P4 的浏览器完整旅程、定向业务回归、完整测试、类型、构建及独立复核已通过，已独立提交 `74f831f7da0dc37f7ec031279223649a6f32fbee`。比较基线为 `c5caede8d55f117ededcff7354ce2b1af1872d90`；[实施票](../../../research/issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)列出精确范围。P3 已完成，不重复作为本期交付。
+P4 的浏览器完整旅程、定向业务回归、完整测试、类型、构建及独立复核已通过，已独立提交 `74f831f7da0dc37f7ec031279223649a6f32fbee`。比较基线为 `c5caede8d55f117ededcff7354ce2b1af1872d90`；[实施票](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)列出精确范围。P3 已完成，不重复作为本期交付。
 
 操作说明以 [Markdown 指南](../../../guides/payroll-adjustments.md)为准。按用户 2026-09-14 的要求，本期不另生成指南 PDF；产品自身 Excel / 打印仍使用真实页面与文件核对。
 

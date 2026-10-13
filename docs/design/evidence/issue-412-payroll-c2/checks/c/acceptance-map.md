@@ -1,6 +1,6 @@
 # P3 C2 验收覆盖映射（收口中的事实记录）
 
-记录者：`/root/wbs_central_backend`，本期 C 界面作者。固定比较基线 `4738be98730955cd63832c8df04fc6f1d855caff`。本表是逐条证据定位，不是对本人代码的独立审查，也不修改或提前勾选正式票。对应本地票 [13 组 AC](D:/crm本地项目开发/docs/research/issue-review-2026-09-11/payroll-tickets/03-central-c2-daywork.md:122)。2026-09-14 编制；四项精确运行缺口已交 Root 独立补验，最后视觉轮另行绑定实际图片身份。
+记录者：`/root/wbs_central_backend`，本期 C 界面作者。固定比较基线 `4738be98730955cd63832c8df04fc6f1d855caff`。本表是逐条证据定位，不是对本人代码的独立审查，也不修改或提前勾选正式票。对应本地票 [13 组 AC](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/03-central-c2-daywork.md#L122)。2026-09-14 编制；四项精确运行缺口已交 Root 独立补验，最后视觉轮另行绑定实际图片身份。
 
 ## 证据层级与本轮身份
 
