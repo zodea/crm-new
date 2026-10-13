@@ -1,6 +1,6 @@
 # 户级空鼓、整改与工资扣款
 
-> P6 沿用[原已确认规则](../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)。OPT-02 将空鼓检查、整改、工资采用、历史起点与更正引用纳入正式工资图保全。A 的新采用仍待真实上游范围明确；部署边界见 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#runtime-environments)。
+> 规则见[工资页面第七节](../rewrite/pages/subcontract-payroll.md#七空鼓列示与人工扣款p6)。OPT-02 将空鼓检查、整改、工资采用、历史起点与更正引用纳入正式工资图保全。A 的新采用仍待真实上游范围明确；部署边界见 [ARCHITECTURE](../rewrite/ARCHITECTURE.md#runtime-environments)。
 
 空鼓先在原户记录，工资页读取同一记录。现场检查或整改本身不扣工资；经办人需要在具体工资单明确开始扣款。项目罚扣仍按原流程办理。
 

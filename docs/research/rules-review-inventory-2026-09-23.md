@@ -38,9 +38,9 @@ flowchart LR
 | 状态矛盾 | [工程量规格](../rewrite/pages/subcontract-quantity.md)称 P6 尚在验收，[工资规格](../rewrite/pages/subcontract-payroll.md)称已随 PR #448 合并 | A04 / B08 / B09：核实版本与环境，清除跨模块状态副本 |
 | 历史转引过多 | [历史审阅目录](./issue-review-2026-09-11/)同时保留规格、实施票、JSON、HTML 与回执 | C01 / C02：有效内容回到现有权威，独有历史理由保留来源 |
 | 生成器和测试绑定 | [工资登记测试](../../tests/ui/payroll-p6-registration.test.ts)固定检查旧报告结构/状态，覆盖索引来自生成器 | C02 / C05：从源数据和模板调整，保留必要验证 |
-| 证据目标缺失 | [分供方验收](../design/evidence/issue-453-production-supplier/frontend.md)链接的结果文件及 6 张截图缺失；[P4 实施票](./issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)链接的提交日志缺失 | C08：查恢复来源或标明不可取得，不以删链接掩盖缺失 |
+| 证据目标缺失 | [分供方验收](../design/evidence/issue-453-production-supplier/frontend.md)链接的结果文件及 6 张截图缺失 | C08：查恢复来源或标明不可取得，不以删链接掩盖缺失 |
 
-8 个缺失目标是局部核对结果，不是全仓断链总数。以下清单是整理方向，不代表所有文件已逐段复核或附件可直接删除。
+7 个缺失目标是局部核对结果，不是全仓断链总数。以下清单是整理方向，不代表所有文件已逐段复核或附件可直接删除。
 
 ## 2. 逐项推进方式
 
@@ -117,7 +117,7 @@ flowchart TD
 | C05 · 待整理 | 较高 | **生成覆盖索引与运行审计**<br>[module-review-coverage.md](../design/module-review-coverage.md) · [module-review-coverage.json](../design/module-review-coverage.json) · [design-coverage.json](../design/design-coverage.json) · [runtime-evidence-ledger.json](../design/runtime-evidence-ledger.json) · [runtime-reference-audit.md](../design/runtime-reference-audit.md) · [runtime-visual-regression.md](../design/runtime-visual-regression.md) · [sync-module-review-coverage.mjs](../../scripts/sync-module-review-coverage.mjs) · [sync-design-coverage.mjs](../../scripts/sync-design-coverage.mjs) · [sync-runtime-evidence-ledger.mjs](../../scripts/sync-runtime-evidence-ledger.mjs) · [module-review-obligations.mjs](../../scripts/module-review-obligations.mjs) · [module-review.md](../agents/module-review.md) | 生成索引体量大；运行方法、参考采证与逐页验收有重复，直接删生成块会被覆盖。<br>**方向：**保留防遗漏、设计对应、参考证据的不同职责。确需压缩输出时从现有生成源/模板改，验证再生成一致性；逐页复核方法集中，其他位置直链。 |
 | C06 · 已迁出 | — | **研究、工具比较与流程方向** | 由 [#502](https://github.com/zodea/crm-new/issues/502) 承接，范围、问题与进度以该票为准。 |
 | C07 · 已迁出 | — | **分支整合与交付流水** | 由 [#502](https://github.com/zodea/crm-new/issues/502) 承接，范围、问题与进度以该票为准。 |
-| C08 · 待整理 | 优先 | **断链与文档检查缺口**<br>[frontend.md](../design/evidence/issue-453-production-supplier/frontend.md) · [payroll-tickets/04-central-adjustments-and-actual-payments.md](./issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md) · [documentation-tooling.md](../testing/modules/documentation-tooling.md) · [git-hooks.mjs](../../scripts/git-hooks.mjs) · [.lintstagedrc](../../.lintstagedrc) · [pre-commit](../../.husky/pre-commit) | 本轮抽查发现 8 个文件目标缺失；已有专用契约测试不等于一般 Markdown 文件/锚点检查。<br>**方向：**先查缺失证据的提交或产物，恢复正确入口或明确不可取得；不得通过删链接伪称证据完整。若补长期检查，复用现有工具，区分历史原路径与阅读链接；钩子/测试行为变更另行审阅。 |
+| C08 · 检查已补 | 优先 | **断链**<br>[frontend.md](../design/evidence/issue-453-production-supplier/frontend.md) | 链接检查已由 `pnpm check:links` 与提交钩子承接（[#502](https://github.com/zodea/crm-new/issues/502)）。剩余分供方验收 7 个结果文件缺失：查恢复来源或标明不可取得，不以删链接掩盖。 |
 
 ## 6. 暂时保留及配套承接位置
 
