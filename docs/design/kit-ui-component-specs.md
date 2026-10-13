@@ -1,6 +1,6 @@
 # KitUI 交互原语组件规格（可落地模板）
 
-> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal/typeSelect 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文定义现行结构、状态与行为；具体调用签名须与公共 API 一致，发现差异先核对官方用法与实际调用；改变契约或底层方案须经用户确认，Issue 写入另需授权。历史迁移映射见 [KitUI → shadcn-vue](../research/kitui-to-shadcn-migration.md)。
+> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal/typeSelect 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文定义现行结构、状态与行为；具体调用签名须与公共 API 一致，发现差异先核对官方用法与实际调用；改变契约或底层方案须经用户确认，Issue 写入另需授权。
 
 把已定交互方向转成组件规格：结构锚点、变体/状态、配色令牌、行为规则和调用签名。视觉与响应式裁定见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)；[交互参考目录](./interaction-style-references.md) 只保留来源，不要求对已经采纳的方向重新选型。
 
@@ -313,7 +313,7 @@ flowchart LR
 
 ## 08 · 项目切换器 `project-switcher` ✅ 已定案（2026-07-22）
 
-> 公开产品调研与来源见 [头部项目切换器公开产品模式调研](../research/project-switcher-patterns.md)。本节是实施与设计稿补图的权威组件规格。
+> 公开产品来源与未采用模式见[交互参考 · 项目切换器](./interaction-style-references.md#项目切换器)。本节是实施与设计稿补图的权威组件规格。
 
 **用途**：在施工进度、首页、项目驾驶舱等项目上下文界面切换当前项目。项目数量从 1、3、12 到更多时始终使用同一个 `ProjectSwitcher`，不按数量维护多种皮肤。
 
