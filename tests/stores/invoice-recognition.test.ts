@@ -159,6 +159,80 @@ describe('invoice store 真实识别管线', () => {
     expect(reloadedStore.recognitionError(id!)).toContain('原文件')
   })
 
+  // 用户 2026-10-13 确认：重新识别结果先作草稿，数据库保持识别前的值，直到用户保存并二次确认。
+  it('重新识别只返回草稿，不写库也不产生操作日志；已识别票不能再走直接写库的首次识别路径', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(ocrResponse(MARKDOWN))
+      .mockResolvedValueOnce(ocrResponse(MARKDOWN.replace('¥678.04', '¥800.00')))
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useInvoiceStore()
+    const [id] = await store.uploadInvoices([new File(['x'], '草稿票据.pdf')])
+    expect(await store.startRecognition(id!)).toBe(true)
+    await store.correctField(id!, 'totalAmount', 700)
+    await store.confirmInvoice(id!)
+    const logCount = async () => (await mem.select<{ n: number }>(`SELECT COUNT(*) AS n FROM operation_logs WHERE record_id = ?`, [id]))[0]!.n
+    const logsBefore = await logCount()
+
+    expect(await store.startRecognition(id!)).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    const draft = await store.recognizeDraft(id!)
+    expect(draft).toMatchObject({ totalAmount: 800, invoiceNumber: '26442000000008248621' })
+    expect(store.byId(id!)).toMatchObject({ totalAmount: 700, reviewStatus: 'reviewed', ocrStatus: 'done' })
+    expect(await logCount()).toBe(logsBefore)
+    const [row] = await mem.select<{ total_amount: number, review_status: string }>('SELECT total_amount, review_status FROM invoices WHERE id = ?', [id])
+    expect(row).toEqual({ total_amount: 700, review_status: 'reviewed' })
+  })
+
+  it('重新识别失败时不产生草稿，保留已识别状态与当前值', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(ocrResponse(MARKDOWN))
+      .mockResolvedValueOnce(ocrResponse('', 503)))
+    const store = useInvoiceStore()
+    const [id] = await store.uploadInvoices([new File(['x'], '失败重识别.pdf')])
+    expect(await store.startRecognition(id!)).toBe(true)
+
+    expect(await store.recognizeDraft(id!)).toBeNull()
+    expect(store.byId(id!)).toMatchObject({ ocrStatus: 'done', totalAmount: 678.04 })
+    expect(store.recognitionError(id!)).toContain('在线 OCR 暂时不可用')
+  })
+
+  it('重新识别草稿保持守卫：已归档、同票在飞与缺原文件均拒绝，且不能保存到已归档票', async () => {
+    let release!: () => void
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(ocrResponse(MARKDOWN))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => {
+        release = () => resolve(ocrResponse(MARKDOWN))
+      })))
+    const store = useInvoiceStore()
+    const [id] = await store.uploadInvoices([new File(['x'], '守卫票据.pdf')])
+    expect(await store.startRecognition(id!)).toBe(true)
+
+    const first = store.recognizeDraft(id!)
+    await vi.waitFor(() => expect(store.recognitionProgress[id!]).toBeDefined())
+    expect(await store.recognizeDraft(id!)).toBeNull()
+    release()
+    const draft = await first
+    expect(draft).not.toBeNull()
+
+    await store.confirmInvoice(id!)
+    await expect(store.archiveInvoice(id!, 'personal')).resolves.toEqual({ ok: true })
+    expect(await store.recognizeDraft(id!)).toBeNull()
+    await expect(store.saveRecognitionDraft(id!, draft!, {})).rejects.toThrow('已归档')
+
+    setActivePinia(createPinia())
+    const reloaded = useInvoiceStore()
+    await reloaded.load()
+    const [other] = await reloaded.uploadInvoices([new File(['y'], '刷新后.pdf')])
+    await mem.execute(`UPDATE invoices SET ocr_status = 'done' WHERE id = ?`, [other])
+    setActivePinia(createPinia())
+    const fresh = useInvoiceStore()
+    await fresh.load()
+    expect(await fresh.recognizeDraft(other!)).toBeNull()
+    expect(fresh.recognitionError(other!)).toContain('原文件')
+    expect(fresh.byId(other!)?.ocrStatus).toBe('done')
+  })
+
   it('重新识别覆盖人工值后，归档审计保留首次识别与完整修订链路', async () => {
     const secondRecognition = MARKDOWN.replace('¥678.04', '¥800.00')
     vi.stubGlobal('fetch', vi.fn<typeof fetch>()
@@ -169,9 +243,13 @@ describe('invoice store 真实识别管线', () => {
 
     expect(await store.startRecognition(id!)).toBe(true)
     await store.correctField(id!, 'totalAmount', 700)
-    expect(await store.startRecognition(id!)).toBe(true)
-    expect(store.byId(id!)?.totalAmount).toBe(800)
-    await store.correctField(id!, 'totalAmount', 810)
+    await store.confirmInvoice(id!)
+    const draft = await store.recognizeDraft(id!)
+    expect(draft?.totalAmount).toBe(800)
+    expect(store.byId(id!)?.totalAmount).toBe(700)
+    // 保存确认后：识别结果以识别操作人记一次，草稿上的人工修改再以人工记一次；识别后回到待校对。
+    expect(await store.saveRecognitionDraft(id!, draft!, { totalAmount: 810 })).toBeTruthy()
+    expect(store.byId(id!)).toMatchObject({ totalAmount: 810, reviewStatus: 'unreviewed' })
     await store.confirmInvoice(id!)
     await expect(store.archiveInvoice(id!, 'personal')).resolves.toEqual({ ok: true })
 
