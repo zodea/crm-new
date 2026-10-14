@@ -4,9 +4,11 @@ import type { RecognizedInvoiceFields } from '~/lib/invoice/recognize'
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import type { Invoice } from '~/stores/invoice'
 import { onBeforeRouteLeave } from 'vue-router'
+import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { isAllGreen, resolveAttribution } from '~/lib/invoice/batch-pass'
 import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges, invoiceRecognitionMarks, invoiceRecognitionSaveMessage } from '~/lib/invoice/recognition-changes'
+import { invoiceRegionHighlights } from '~/lib/invoice/recognition-regions'
 import { confidenceTier, isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
 import { invoiceDocStatus } from '~/lib/invoice/status'
 
@@ -72,6 +74,23 @@ const draftMarks = computed(() => draft.value && draftValues.value
   : {})
 /** 右栏校对表单展示值：选中票有草稿时显示草稿 */
 const draftSelected = computed(() => !!draft.value && draft.value.id === selectedInvoice.value?.id)
+
+// 原图比对：变动字段在中栏原图上框出（区域来自本次识别结果，只在草稿内存中）；聚焦/悬停字段或变动条目时强调。
+const regionTarget = useInvoiceRegionTarget()
+const draftRegions = computed(() => {
+  const current = draft.value
+  const file = current && draftSelected.value ? store.recognitionFile(current.id) : undefined
+  if (!current || !file)
+    return undefined
+  const { groups, unlocated } = invoiceRegionHighlights(INVOICE_RECOGNITION_FIELDS, draftMarks.value, current.recognized.fieldRegions)
+  return { file, groups, unlocated, activeKey: regionTarget.active.value }
+})
+const draftLocatedKeys = computed(() => draftRegions.value?.groups.flatMap(group => group.keys))
+const draftUnlocatedKeys = computed(() => draftRegions.value?.unlocated.map(field => field.key))
+watch(draft, (next, previous) => {
+  if (next?.id !== previous?.id || next?.recognized !== previous?.recognized)
+    regionTarget.reset()
+})
 
 async function confirmSelected() {
   if (!selectedId.value || !await saveDraftIfAny())
@@ -518,6 +537,7 @@ onMounted(() => {
           v-if="workspaceMode === 'review'"
           :invoice="selectedInvoice"
           :preview-url="selectedId ? previewUrls.get(selectedId) : undefined"
+          :regions="draftRegions"
         />
         <InvoicePrintLayout
           v-else
@@ -547,14 +567,20 @@ onMounted(() => {
                 class="mb-3"
                 :changes="draftChanges"
                 save-label="保存识别结果"
+                :unlocated-keys="draftUnlocatedKeys"
                 @discard="confirmDiscardDraft()"
                 @save="handleSaveDraft"
+                @locate="regionTarget.locate"
+                @preview="regionTarget.preview"
               />
               <InvoiceReviewForm
                 :invoice="draftSelected && draftValues ? draftValues : selectedInvoice"
                 :draft="draftSelected"
                 :marks="draftSelected ? draftMarks : undefined"
+                :located-keys="draftLocatedKeys"
                 @edit="editDraft"
+                @locate="regionTarget.locate"
+                @preview="regionTarget.preview"
                 @confirm="confirmSelected"
                 @archive="archiveSelected"
                 @discard="handleDiscard"

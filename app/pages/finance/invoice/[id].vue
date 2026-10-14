@@ -9,8 +9,10 @@ import type { RecognizedInvoiceFields } from '~/lib/invoice/recognize'
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import type { Invoice } from '~/stores/invoice'
 import { onBeforeRouteLeave } from 'vue-router'
+import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges, invoiceRecognitionMarks, invoiceRecognitionSaveMessage } from '~/lib/invoice/recognition-changes'
+import { invoiceRegionHighlights } from '~/lib/invoice/recognition-regions'
 import { invoiceDocStatus } from '~/lib/invoice/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { round2 } from '~/lib/util/number'
@@ -115,6 +117,31 @@ const recognitionChanges = computed(() => recognitionDraft.value
 const recognitionMarks = computed(() => recognitionDraft.value
   ? invoiceRecognitionMarks(INVOICE_RECOGNITION_FIELDS, recognitionDraft.value.before, recognitionDraft.value.applied, form.value)
   : {})
+
+// 原图比对：草稿期间且原文件仍在上传会话中时，左栏改为原文件预览并框出变动字段（区域来自本次识别结果，
+// 只在内存中）；否则保持示意图。聚焦/悬停字段或变动条目时强调对应区域。
+const regionTarget = useInvoiceRegionTarget()
+const draftRegions = computed(() => {
+  const pending = recognitionDraft.value
+  const file = pending ? store.recognitionFile(id.value) : undefined
+  if (!pending || !file)
+    return undefined
+  const { groups, unlocated } = invoiceRegionHighlights(INVOICE_RECOGNITION_FIELDS, recognitionMarks.value, pending.recognized.fieldRegions)
+  return groups.length || unlocated.length ? { file, groups, unlocated } : undefined
+})
+const draftLocatedKeys = computed(() => draftRegions.value?.groups.flatMap(group => group.keys))
+const draftUnlocatedKeys = computed(() => draftRegions.value?.unlocated.map(field => field.key))
+watch(() => recognitionDraft.value?.recognized, () => regionTarget.reset())
+
+function onFieldFocus(key: string) {
+  if (recognitionMarks.value[key])
+    regionTarget.locate(key)
+}
+
+function onFieldHover(key: string, hovering: boolean) {
+  if (recognitionMarks.value[key])
+    regionTarget.preview(hovering ? key : null)
+}
 
 // ── 关页签回台账（设计稿行为：删/存后回台账）──
 // 删除、保存成功后调用方已处理草稿，直接关；返回按钮经离开保护。
@@ -339,7 +366,16 @@ onMounted(() => {
         <div class="border-b border-line bg-surface-2 px-3 py-2 text-12px font-700 text-ink-soft">
           发票原件 · {{ invoice.fileName || '无扫描件' }}
         </div>
-        <div class="grid flex-1 place-items-center bg-surface-sink p-6">
+        <div v-if="draftRegions" class="invoice-edit-regions flex flex-col bg-surface-sink p-3">
+          <InvoiceRegionViewer
+            class="min-h-0 flex-1"
+            :file="draftRegions.file"
+            :groups="draftRegions.groups"
+            :unlocated="draftRegions.unlocated"
+            :active-key="regionTarget.active.value"
+          />
+        </div>
+        <div v-else class="grid flex-1 place-items-center bg-surface-sink p-6">
           <div class="w-full max-w-[560px]">
             <InvoicePreviewSvg :invoice="invoice" />
           </div>
@@ -374,7 +410,7 @@ onMounted(() => {
           <div v-for="d in FIELDS" :key="d.key" :class="{ 'invoice-edit-fields__full': d.full }">
             <div class="flex items-center gap-1">
               <label class="field-label" :for="`invoice-${id}-${d.key}`">{{ d.label }}</label>
-              <InvoiceRecognitionFieldMark v-if="recognitionMarks[d.key]" :id="markId(d.key)" :mark="recognitionMarks[d.key]!" />
+              <InvoiceRecognitionFieldMark v-if="recognitionMarks[d.key]" :id="markId(d.key)" :mark="recognitionMarks[d.key]!" :located="draftLocatedKeys ? draftLocatedKeys.includes(d.key) : undefined" />
             </div>
             <select
               v-if="d.type === 'select'"
@@ -384,6 +420,9 @@ onMounted(() => {
               class="field-input w-full"
               :class="recognitionMarks[d.key] ? 'border-warn! bg-warn-soft!' : ''"
               :aria-describedby="recognitionMarks[d.key] ? markId(d.key) : undefined"
+              @focus="onFieldFocus(d.key)"
+              @mouseenter="onFieldHover(d.key, true)"
+              @mouseleave="onFieldHover(d.key, false)"
             >
               <option v-for="o in d.options" :key="o" :value="o">
                 {{ o }}
@@ -411,6 +450,9 @@ onMounted(() => {
               :class="[d.mono ? 'font-mono' : '', recognitionMarks[d.key] ? 'border-warn! bg-warn-soft!' : '']"
               :aria-describedby="recognitionMarks[d.key] ? markId(d.key) : undefined"
               :type="d.type === 'number' ? 'number' : d.type === 'date' ? 'date' : 'text'"
+              @focus="onFieldFocus(d.key)"
+              @mouseenter="onFieldHover(d.key, true)"
+              @mouseleave="onFieldHover(d.key, false)"
             >
           </div>
         </div>
@@ -486,7 +528,10 @@ onMounted(() => {
           v-if="recognitionDraft"
           class="mt-1"
           :changes="recognitionChanges"
+          :unlocated-keys="draftUnlocatedKeys"
           @discard="discardRecognition"
+          @locate="regionTarget.locate"
+          @preview="regionTarget.preview"
         />
 
         <!-- 动作：删除 ｜ 重新识别 + 保存 -->
@@ -525,6 +570,11 @@ onMounted(() => {
 
 .invoice-edit-fields__full {
   grid-column: 1 / -1;
+}
+
+/* 原图比对区给定高度，原图在自身区域内滚动，不撑高整页 */
+.invoice-edit-regions {
+  height: min(75vh, 880px);
 }
 
 @container (min-width: 64rem) {

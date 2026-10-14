@@ -1,18 +1,40 @@
 <script setup lang="ts">
+import type { InvoiceRecognitionField } from '~/lib/invoice/recognition-changes'
+import type { InvoiceRegionHighlightGroup } from '~/lib/invoice/recognition-regions'
 import type { Invoice } from '~/stores/invoice'
 
-defineProps<{
+const props = defineProps<{
   invoice?: Invoice
   previewUrl?: string
+  /** 重新识别草稿的原图比对：有识别变动字段且原文件在会话中时，改用可叠加区域框的预览 */
+  regions?: {
+    file: File
+    groups: readonly InvoiceRegionHighlightGroup[]
+    unlocated: readonly InvoiceRecognitionField[]
+    activeKey: string | null
+  }
 }>()
+
+const showRegions = computed(() => !!props.regions && (props.regions.groups.length > 0 || props.regions.unlocated.length > 0))
 </script>
 
 <template>
-  <section class="h-full min-w-0 w-full overflow-y-auto border border-line rounded-[var(--radius-card)] bg-surface-sink p-4 shadow-[var(--shadow-card)]">
+  <section
+    class="h-full min-w-0 w-full border border-line rounded-[var(--radius-card)] bg-surface-sink p-4 shadow-[var(--shadow-card)]"
+    :class="showRegions ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'"
+  >
     <div class="mb-3 text-12px font-700 text-ink-soft">
       发票原图
     </div>
-    <div class="mx-auto border border-line rounded-[var(--radius-card)] bg-panel p-4 shadow-[var(--shadow-card)]" style="aspect-ratio: 1/1.4142; max-width: 560px">
+    <InvoiceRegionViewer
+      v-if="showRegions && regions"
+      class="min-h-0 flex-1"
+      :file="regions.file"
+      :groups="regions.groups"
+      :unlocated="regions.unlocated"
+      :active-key="regions.activeKey"
+    />
+    <div v-else class="mx-auto border border-line rounded-[var(--radius-card)] bg-panel p-4 shadow-[var(--shadow-card)]" style="aspect-ratio: 1/1.4142; max-width: 560px">
       <object
         v-if="previewUrl"
         :data="previewUrl"

@@ -565,6 +565,11 @@ export const useInvoiceStore = defineStore('invoice', () => {
     return logId != null
   }
 
+  /** 上传会话中保留的原文件（只读）：重新识别草稿在原图上框出变动字段时用于预览；不在会话中返回 undefined。 */
+  function recognitionFile(id: string): File | undefined {
+    return recognitionFiles.get(id)
+  }
+
   /**
    * 重新识别（仅已识别票）：只返回识别结果作为草稿，不写库、不落日志；守卫同首次识别。
    * @returns 识别结果；null = 被守卫拒绝、缺少原文件或引擎失败（错误见 recognitionError）
@@ -861,5 +866,5 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), invoiceExportStyle: readonly(invoiceExportStyle), invoiceExportStyleLoaded: readonly(invoiceExportStyleLoaded), recognitionProgress: readonly(recognitionProgress), recognitionError, load, loadInvoiceExportStyle, saveInvoiceExportStyle, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, recognizeDraft, saveRecognitionDraft, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, loadInvoiceArchiveAudit, batchPass, recordPrinted, remove, restore, undo }
+  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), invoiceExportStyle: readonly(invoiceExportStyle), invoiceExportStyleLoaded: readonly(invoiceExportStyleLoaded), recognitionProgress: readonly(recognitionProgress), recognitionError, load, loadInvoiceExportStyle, saveInvoiceExportStyle, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, recognizeDraft, recognitionFile, saveRecognitionDraft, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, loadInvoiceArchiveAudit, batchPass, recordPrinted, remove, restore, undo }
 })

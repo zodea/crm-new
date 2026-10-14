@@ -57,4 +57,18 @@ describe('识别校对表单的重新识别草稿模式', () => {
     expect(document.getElementById(total.getAttribute('aria-describedby')!)?.textContent).toContain('已人工修改')
     expect(view.getByLabelText('单据编号').getAttribute('aria-describedby')).toBeNull()
   })
+
+  it('聚焦/悬停有识别标记的字段时通知父级在原图强调，角标读屏说明是否在原图框出', async () => {
+    const view = mount({ draft: true, marks: { seller: { mark: 'recognized', before: '原供应商' }, totalAmount: { mark: 'recognized', before: '113' } }, locatedKeys: ['seller'] })
+    const seller = view.getByLabelText('供应商')
+    await fireEvent.focus(seller)
+    await fireEvent.mouseEnter(view.getByLabelText('价税合计'))
+    await fireEvent.mouseLeave(view.getByLabelText('价税合计'))
+    await fireEvent.focus(view.getByLabelText('单据编号'))
+    expect(view.emitted('locate')).toEqual([['seller']])
+    expect(view.emitted('preview')).toEqual([['totalAmount'], [null]])
+    expect(document.getElementById(seller.getAttribute('aria-describedby')!)?.textContent).toContain('原图已框出')
+    const total = view.getByLabelText('价税合计')
+    expect(document.getElementById(total.getAttribute('aria-describedby')!)?.textContent).toContain('原图未定位')
+  })
 })

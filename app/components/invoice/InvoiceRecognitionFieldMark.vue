@@ -6,6 +6,8 @@ import { INVOICE_RECOGNITION_MARK_LABEL } from '~/lib/invoice/recognition-change
 defineProps<{
   id: string
   mark: InvoiceRecognitionFieldMark
+  /** 原图比对可用时：该字段是否在原图上框出（undefined = 不在比对中，不播报） */
+  located?: boolean
 }>()
 </script>
 
@@ -18,6 +20,6 @@ defineProps<{
   >
     <span :class="mark.mark === 'edited' ? 'i-lucide-pencil' : 'i-lucide-refresh-cw'" class="text-11px" aria-hidden="true" />
     {{ INVOICE_RECOGNITION_MARK_LABEL[mark.mark] }}
-    <span class="sr-only">，识别前：{{ mark.before || '（空）' }}</span>
+    <span class="sr-only">，识别前：{{ mark.before || '（空）' }}<template v-if="located !== undefined">{{ located ? '，原图已框出' : '，原图未定位' }}</template></span>
   </span>
 </template>
