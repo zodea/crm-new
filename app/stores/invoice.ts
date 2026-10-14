@@ -6,6 +6,7 @@ import type {
 } from '~/lib/invoice/archive'
 import type { InvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
 import type { InvoiceExportSettingsDatabase } from '~/lib/invoice/preferences'
+import type { InvoiceFieldRegions } from '~/lib/invoice/recognition-regions'
 import type { InvoiceItem, RecognizedInvoiceFields } from '~/lib/invoice/recognize'
 import type { ArchivedInvoiceAggregate } from '~/lib/project/detail-aggregate'
 import { defineStore } from 'pinia'
@@ -268,8 +269,11 @@ export const useInvoiceStore = defineStore('invoice', () => {
   /** 识别进度 {发票id: 0~100}——仅识别期间存在，完成即删（左栏「识别中 N%」的数据源） */
   const recognitionProgress = ref<Record<string, number>>({})
   const recognitionErrors = ref<Record<string, string>>({})
-  /** 原文件不进入响应式代理；删除或归档后仅保留 10 秒撤回窗口。 */
-  const recognitionFiles = useSessionFileCache(10_000, clearRecognitionError)
+  /**
+   * 原文件不进入响应式代理；删除或归档后仅保留 10 秒撤回窗口。最近一次写入的识别结果的字段区域
+   * 附在原文件上（点字段定位原图用），随原文件一并释放，不入库、不进日志。
+   */
+  const recognitionFiles = useSessionFileCache<InvoiceFieldRegions>(10_000, clearRecognitionError)
 
   function recognitionError(id: string): string {
     return recognitionErrors.value[id] ?? ''
@@ -560,14 +564,21 @@ export const useInvoiceStore = defineStore('invoice', () => {
       ocrStatus: 'done',
       reviewStatus: 'unreviewed',
     }, INVOICE_RECOGNITION_LOG_OPERATOR)
-    if (logId)
+    if (logId) {
       clearRecognitionError(id)
+      recognitionFiles.setMeta(id, r.fieldRegions)
+    }
     return logId != null
   }
 
-  /** 上传会话中保留的原文件（只读）：重新识别草稿在原图上框出变动字段时用于预览；不在会话中返回 undefined。 */
+  /** 上传会话中保留的原文件（只读，可被 computed 追踪）：原图预览与区域框用；不在会话中返回 undefined。 */
   function recognitionFile(id: string): File | undefined {
     return recognitionFiles.get(id)
+  }
+
+  /** 已写入的识别结果在原图上的字段区域（首次识别或已保存的重新识别）；原文件不在会话中即为 undefined。 */
+  function recognitionRegions(id: string): InvoiceFieldRegions | undefined {
+    return recognitionFiles.getMeta(id)
   }
 
   /**
@@ -605,8 +616,10 @@ export const useInvoiceStore = defineStore('invoice', () => {
         return recognitionLogId
       })
       await load()
-      if (logId)
+      if (logId) {
         clearRecognitionError(id)
+        recognitionFiles.setMeta(id, recognized.fieldRegions)
+      }
       return logId
     })
   }
@@ -866,5 +879,5 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), invoiceExportStyle: readonly(invoiceExportStyle), invoiceExportStyleLoaded: readonly(invoiceExportStyleLoaded), recognitionProgress: readonly(recognitionProgress), recognitionError, load, loadInvoiceExportStyle, saveInvoiceExportStyle, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, recognizeDraft, recognitionFile, saveRecognitionDraft, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, loadInvoiceArchiveAudit, batchPass, recordPrinted, remove, restore, undo }
+  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), invoiceExportStyle: readonly(invoiceExportStyle), invoiceExportStyleLoaded: readonly(invoiceExportStyleLoaded), recognitionProgress: readonly(recognitionProgress), recognitionError, load, loadInvoiceExportStyle, saveInvoiceExportStyle, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, recognizeDraft, recognitionFile, recognitionRegions, saveRecognitionDraft, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, loadInvoiceArchiveAudit, batchPass, recordPrinted, remove, restore, undo }
 })

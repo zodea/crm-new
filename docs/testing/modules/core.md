@@ -16,7 +16,7 @@
 | [tests/read-model/metric.test.ts](../../../tests/read-model/metric.test.ts) | 单元／服务／状态 | 真实零、未知、可证小计与精度 |
 | [tests/read-model/pagination.test.ts](../../../tests/read-model/pagination.test.ts) | 单元／服务／状态 | 稳定分页、合法大小与跨页完整性 |
 | [tests/util/read-model-state.test.ts](../../../tests/util/read-model-state.test.ts) | 单元／服务／状态 | 公开读取状态、来源失效与合法旧投影 |
-| [tests/composables/session-file-cache.test.ts](../../../tests/composables/session-file-cache.test.ts) | 单元／服务／状态 | 会话原文件生命周期 |
+| [tests/composables/session-file-cache.test.ts](../../../tests/composables/session-file-cache.test.ts) | 单元／服务／状态 | 会话原文件生命周期；附带会话数据随原文件释放，读取可被 computed 追踪 |
 | [tests/db/browser-storage.test.ts](../../../tests/db/browser-storage.test.ts) | 单元／服务／状态 | browser database migration backup |
 | [tests/db/coordinator.test.ts](../../../tests/db/coordinator.test.ts) | 单元／服务／状态 | 桌面数据库连接协调器 |
 | [tests/db/connection.test.ts](../../../tests/db/connection.test.ts) | 单元／服务／状态 | 实际数据库入口按需初始化、并发共用连接、条件种子、只读锁、失败关闭重试及初始化前一致备份 |

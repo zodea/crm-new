@@ -46,6 +46,18 @@ function ocrResponse(markdown: string, status = 200): Response {
   }), { headers: { 'content-type': 'application/json' } })
 }
 
+/** 带版面块坐标的识别结果：整段票面落在一个块里（坐标按 1000×700 页面）。 */
+function ocrLayoutResponse(markdown: string, bbox = [0, 0, 1000, 700]): Response {
+  return new Response(JSON.stringify({
+    engine: 'paddleocr-official-api',
+    model: 'PaddleOCR-VL-1.6',
+    jobId: 'job_store_layout',
+    pages: [{ pageIndex: 0, markdown, prunedResult: { width: 1000, height: 700 }, layoutRegions: [{ block_label: 'text', block_bbox: bbox, block_content: markdown }] }],
+    markdownPages: [markdown],
+    dataInfo: { numPages: 1 },
+  }), { headers: { 'content-type': 'application/json' } })
+}
+
 const MARKDOWN = `
 电子发票（普通发票）
 发票号码：26442000000008248621
@@ -261,5 +273,51 @@ describe('invoice store 真实识别管线', () => {
       expect.objectContaining({ from: 800, to: 810, reason: '人工校对' }),
     ])
     expect(audit?.currentValues).toMatchObject({ totalAmount: 810 })
+  })
+
+  // 用户 2026-10-14 确认：首次识别也保留字段区域供点字段定位，只在会话内存中，生命周期与原文件一致。
+  it('首次识别的字段区域随原文件留在会话中：不入库不进日志，删除后撤回窗口结束、刷新即失效', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async () => ocrLayoutResponse(MARKDOWN)))
+    const store = useInvoiceStore()
+    const [id, other] = await store.uploadInvoices([new File(['x'], '定位票据.pdf'), new File(['y'], '刷新票据.pdf')])
+    expect(store.recognitionRegions(id!)).toBeUndefined()
+    expect(await store.startRecognition(id!)).toBe(true)
+    expect(store.recognitionRegions(id!)?.invoiceNumber).toEqual({ pageIndex: 0, blockLabel: 'text', box: { x: 0, y: 0, width: 1, height: 1 } })
+    const [row] = await mem.select<Record<string, unknown>>('SELECT * FROM invoices WHERE id = ?', [id])
+    const logs = await mem.select<{ after_data: string }>('SELECT after_data FROM operation_logs WHERE record_id = ?', [id])
+    expect(JSON.stringify(row)).not.toContain('block')
+    expect(logs.map(log => log.after_data).join('')).not.toMatch(/fieldRegions|block/)
+
+    const logId = await store.remove(id!)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(store.recognitionRegions(id!)).toBeDefined()
+    await store.undo(logId!)
+    expect(store.recognitionRegions(id!)).toBeDefined()
+    await store.remove(id!)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(store.recognitionFile(id!)).toBeUndefined()
+    expect(store.recognitionRegions(id!)).toBeUndefined()
+
+    expect(await store.startRecognition(other!)).toBe(true)
+    setActivePinia(createPinia())
+    const reloaded = useInvoiceStore()
+    await reloaded.load()
+    expect(reloaded.recognitionRegions(other!)).toBeUndefined()
+  })
+
+  it('保存重新识别草稿后，点字段定位改用本次保存的识别区域', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(ocrLayoutResponse(MARKDOWN))
+      .mockResolvedValueOnce(ocrLayoutResponse(MARKDOWN, [100, 70, 900, 630])))
+    const store = useInvoiceStore()
+    const [id] = await store.uploadInvoices([new File(['x'], '草稿区域.pdf')])
+    expect(await store.startRecognition(id!)).toBe(true)
+    const first = store.recognitionRegions(id!)
+    const draft = await store.recognizeDraft(id!)
+    // 草稿未保存时仍是首次识别的区域
+    expect(store.recognitionRegions(id!)).toBe(first)
+    expect(await store.saveRecognitionDraft(id!, draft!, {})).toBeTruthy()
+    expect(store.recognitionRegions(id!)?.invoiceNumber?.box).toEqual({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 })
   })
 })

@@ -8,7 +8,7 @@ import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { isAllGreen, resolveAttribution } from '~/lib/invoice/batch-pass'
 import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges, invoiceRecognitionMarks, invoiceRecognitionSaveMessage } from '~/lib/invoice/recognition-changes'
-import { invoiceRegionHighlights } from '~/lib/invoice/recognition-regions'
+import { invoiceRegionFocus, invoiceRegionHighlights } from '~/lib/invoice/recognition-regions'
 import { confidenceTier, isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
 import { invoiceDocStatus } from '~/lib/invoice/status'
 
@@ -75,15 +75,27 @@ const draftMarks = computed(() => draft.value && draftValues.value
 /** 右栏校对表单展示值：选中票有草稿时显示草稿 */
 const draftSelected = computed(() => !!draft.value && draft.value.id === selectedInvoice.value?.id)
 
-// 原图比对：变动字段在中栏原图上框出（区域来自本次识别结果，只在草稿内存中）；聚焦/悬停字段或变动条目时强调。
+// 中栏原图：选中票的原文件仍在上传会话中时统一用预览器显示（可缩放、旋转，PDF 逐页）；不在会话中如实说明。
+const selectedFile = computed(() => selectedId.value ? store.recognitionFile(selectedId.value) : undefined)
+// 区域框（区域只在内存中，原文件失效即随之失效）：重新识别草稿常驻框出变动字段（比对）；
+// 否则已识别票用最近写入的识别区域做点字段定位——聚焦/悬停字段时只框该字段，失焦撤回。
 const regionTarget = useInvoiceRegionTarget()
 const draftRegions = computed(() => {
   const current = draft.value
-  const file = current && draftSelected.value ? store.recognitionFile(current.id) : undefined
-  if (!current || !file)
+  if (!current || !draftSelected.value || !selectedFile.value)
     return undefined
   const { groups, unlocated } = invoiceRegionHighlights(INVOICE_RECOGNITION_FIELDS, draftMarks.value, current.recognized.fieldRegions)
-  return { file, groups, unlocated, activeKey: regionTarget.active.value }
+  return groups.length || unlocated.length ? { mode: 'compare' as const, groups, unlocated, activeKey: regionTarget.active.value } : undefined
+})
+const focusRegions = computed(() => {
+  const invoice = selectedInvoice.value
+  const regions = invoice && !draftSelected.value && invoice.ocrStatus === 'done' && selectedFile.value
+    ? store.recognitionRegions(invoice.id)
+    : undefined
+  if (!regions)
+    return undefined
+  const { groups, unlocated } = invoiceRegionFocus(INVOICE_RECOGNITION_FIELDS, regions, regionTarget.active.value)
+  return { mode: 'focus' as const, groups, unlocated, activeKey: regionTarget.active.value, locatedKeys: Object.keys(regions) }
 })
 const draftLocatedKeys = computed(() => draftRegions.value?.groups.flatMap(group => group.keys))
 const draftUnlocatedKeys = computed(() => draftRegions.value?.unlocated.map(field => field.key))
@@ -91,6 +103,7 @@ watch(draft, (next, previous) => {
   if (next?.id !== previous?.id || next?.recognized !== previous?.recognized)
     regionTarget.reset()
 })
+watch(selectedId, () => regionTarget.reset())
 
 async function confirmSelected() {
   if (!selectedId.value || !await saveDraftIfAny())
@@ -136,7 +149,6 @@ async function archiveSelected() {
 // ── #60 上传双入口（按钮 useFileDialog + 全页拖拽 useDropZone）→ 桩识别队列 ──
 
 const pageRef = useTemplateRef<HTMLElement>('pageRef')
-const previewUrls = shallowReactive(new Map<string, string>())
 
 // reset: true = 每次打开自动清空已选文件，允许重复选择同一文件
 const { open: openFilePicker, onChange: onFilesPicked } = useFileDialog({
@@ -170,11 +182,6 @@ async function handleUpload(files: File[] | FileList | null) {
   // 先建行并立刻选中第一张（识别进度就地可见）；识别完成后不再回头改选中，
   // 避免用户批量期间点开别的票校对时被抢走上下文
   const ids = await store.uploadInvoices(picked)
-  ids.forEach((id, index) => {
-    const file = picked[index]
-    if (file)
-      previewUrls.set(id, URL.createObjectURL(file))
-  })
   // 有未保存的识别结果时不抢走当前选中（切换须先保存或放弃）
   if (!draft.value)
     selectedId.value = ids[0]!
@@ -477,11 +484,6 @@ watch(visibleWorkspaceRows, (rows) => {
     selectedId.value = rows[0]?.inv.id ?? null
 }, { immediate: true })
 
-onScopeDispose(() => {
-  for (const url of previewUrls.values())
-    URL.revokeObjectURL(url)
-})
-
 onMounted(() => {
   store.load()
   projectStore.load()
@@ -536,8 +538,8 @@ onMounted(() => {
         <InvoiceOriginalPanel
           v-if="workspaceMode === 'review'"
           :invoice="selectedInvoice"
-          :preview-url="selectedId ? previewUrls.get(selectedId) : undefined"
-          :regions="draftRegions"
+          :file="selectedFile"
+          :regions="draftRegions ?? focusRegions"
         />
         <InvoicePrintLayout
           v-else
@@ -578,9 +580,11 @@ onMounted(() => {
                 :draft="draftSelected"
                 :marks="draftSelected ? draftMarks : undefined"
                 :located-keys="draftLocatedKeys"
+                :focus-located-keys="focusRegions?.locatedKeys"
                 @edit="editDraft"
                 @locate="regionTarget.locate"
                 @preview="regionTarget.preview"
+                @release="regionTarget.release"
                 @confirm="confirmSelected"
                 @archive="archiveSelected"
                 @discard="handleDiscard"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 发票编辑页签（#71）：左原图 + 右完整字段集（与识别校对一致）+ 货物明细 +
+// 发票编辑页签（#71）：左原件（上传会话中的原文件；不在会话中如实说明）+ 右完整字段集（与识别校对一致）+ 货物明细 +
 // 重新识别 + 删除（软删 + 10 秒撤回 + 关页签）/ 保存（关页签回台账）。
 // 字段走本地缓冲、保存一次提交（区别于工作台 correctField 即时落库）——
 // 归档后保存前的 simple 二次确认（ADR 0003）在提交口拦截。
@@ -12,7 +12,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges, invoiceRecognitionMarks, invoiceRecognitionSaveMessage } from '~/lib/invoice/recognition-changes'
-import { invoiceRegionHighlights } from '~/lib/invoice/recognition-regions'
+import { invoiceRegionFocus, invoiceRegionHighlights } from '~/lib/invoice/recognition-regions'
 import { invoiceDocStatus } from '~/lib/invoice/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { round2 } from '~/lib/util/number'
@@ -118,28 +118,64 @@ const recognitionMarks = computed(() => recognitionDraft.value
   ? invoiceRecognitionMarks(INVOICE_RECOGNITION_FIELDS, recognitionDraft.value.before, recognitionDraft.value.applied, form.value)
   : {})
 
-// 原图比对：草稿期间且原文件仍在上传会话中时，左栏改为原文件预览并框出变动字段（区域来自本次识别结果，
-// 只在内存中）；否则保持示意图。聚焦/悬停字段或变动条目时强调对应区域。
+// 左栏原件：原文件仍在上传会话中时显示真实原件（可缩放、旋转，PDF 逐页），否则如实说明不在会话中。
+// 区域框只在内存中、随原文件失效：重新识别草稿常驻框出变动字段（比对）；否则已识别票用最近写入的
+// 识别区域做点字段定位——聚焦/悬停识别字段时只框该字段，失焦撤回。
+const originalFile = computed(() => store.recognitionFile(id.value))
+const RECOGNITION_KEYS = new Set(INVOICE_RECOGNITION_FIELDS.map(field => field.key))
 const regionTarget = useInvoiceRegionTarget()
 const draftRegions = computed(() => {
   const pending = recognitionDraft.value
-  const file = pending ? store.recognitionFile(id.value) : undefined
-  if (!pending || !file)
+  if (!pending || !originalFile.value)
     return undefined
   const { groups, unlocated } = invoiceRegionHighlights(INVOICE_RECOGNITION_FIELDS, recognitionMarks.value, pending.recognized.fieldRegions)
-  return groups.length || unlocated.length ? { file, groups, unlocated } : undefined
+  return groups.length || unlocated.length ? { mode: 'compare' as const, groups, unlocated } : undefined
 })
+const focusRegions = computed(() => {
+  const regions = !recognitionDraft.value && invoice.value?.ocrStatus === 'done' && originalFile.value
+    ? store.recognitionRegions(id.value)
+    : undefined
+  if (!regions)
+    return undefined
+  const { groups, unlocated } = invoiceRegionFocus(INVOICE_RECOGNITION_FIELDS, regions, regionTarget.active.value)
+  return { mode: 'focus' as const, groups, unlocated, locatedKeys: Object.keys(regions) }
+})
+const viewerRegions = computed(() => draftRegions.value ?? focusRegions.value)
 const draftLocatedKeys = computed(() => draftRegions.value?.groups.flatMap(group => group.keys))
 const draftUnlocatedKeys = computed(() => draftRegions.value?.unlocated.map(field => field.key))
 watch(() => recognitionDraft.value?.recognized, () => regionTarget.reset())
 
-function onFieldFocus(key: string) {
+/** 点字段定位下该字段是否参与（识别字段才有原图区域） */
+function focusLocatable(key: string) {
+  return !!focusRegions.value && RECOGNITION_KEYS.has(key)
+}
+
+function regionHintId(key: string) {
+  return `invoice-${id.value}-${key}-region-hint`
+}
+
+function focusUnlocated(key: string) {
+  return focusLocatable(key) && !focusRegions.value!.locatedKeys.includes(key)
+}
+
+function describedBy(key: string) {
   if (recognitionMarks.value[key])
+    return markId(key)
+  return focusUnlocated(key) ? regionHintId(key) : undefined
+}
+
+function onFieldFocus(key: string) {
+  if (recognitionMarks.value[key] || focusLocatable(key))
     regionTarget.locate(key)
 }
 
+function onFieldBlur(key: string) {
+  if (focusLocatable(key))
+    regionTarget.release(key)
+}
+
 function onFieldHover(key: string, hovering: boolean) {
-  if (recognitionMarks.value[key])
+  if (recognitionMarks.value[key] || focusLocatable(key))
     regionTarget.preview(hovering ? key : null)
 }
 
@@ -366,19 +402,18 @@ onMounted(() => {
         <div class="border-b border-line bg-surface-2 px-3 py-2 text-12px font-700 text-ink-soft">
           发票原件 · {{ invoice.fileName || '无扫描件' }}
         </div>
-        <div v-if="draftRegions" class="invoice-edit-regions flex flex-col bg-surface-sink p-3">
+        <div v-if="originalFile" class="invoice-edit-regions flex flex-col bg-surface-sink p-3">
           <InvoiceRegionViewer
             class="min-h-0 flex-1"
-            :file="draftRegions.file"
-            :groups="draftRegions.groups"
-            :unlocated="draftRegions.unlocated"
+            :file="originalFile"
+            :mode="viewerRegions?.mode"
+            :groups="viewerRegions?.groups"
+            :unlocated="viewerRegions?.unlocated"
             :active-key="regionTarget.active.value"
           />
         </div>
         <div v-else class="grid flex-1 place-items-center bg-surface-sink p-6">
-          <div class="w-full max-w-[560px]">
-            <InvoicePreviewSvg :invoice="invoice" />
-          </div>
+          <InvoiceOriginalMissing :invoice="invoice" />
         </div>
       </div>
 
@@ -411,6 +446,7 @@ onMounted(() => {
             <div class="flex items-center gap-1">
               <label class="field-label" :for="`invoice-${id}-${d.key}`">{{ d.label }}</label>
               <InvoiceRecognitionFieldMark v-if="recognitionMarks[d.key]" :id="markId(d.key)" :mark="recognitionMarks[d.key]!" :located="draftLocatedKeys ? draftLocatedKeys.includes(d.key) : undefined" />
+              <span v-if="focusUnlocated(d.key)" :id="regionHintId(d.key)" class="sr-only">原图未定位</span>
             </div>
             <select
               v-if="d.type === 'select'"
@@ -419,8 +455,9 @@ onMounted(() => {
               :disabled="isRecognizing"
               class="field-input w-full"
               :class="recognitionMarks[d.key] ? 'border-warn! bg-warn-soft!' : ''"
-              :aria-describedby="recognitionMarks[d.key] ? markId(d.key) : undefined"
+              :aria-describedby="describedBy(d.key)"
               @focus="onFieldFocus(d.key)"
+              @blur="onFieldBlur(d.key)"
               @mouseenter="onFieldHover(d.key, true)"
               @mouseleave="onFieldHover(d.key, false)"
             >
@@ -448,9 +485,10 @@ onMounted(() => {
               :disabled="isRecognizing"
               class="field-input w-full"
               :class="[d.mono ? 'font-mono' : '', recognitionMarks[d.key] ? 'border-warn! bg-warn-soft!' : '']"
-              :aria-describedby="recognitionMarks[d.key] ? markId(d.key) : undefined"
+              :aria-describedby="describedBy(d.key)"
               :type="d.type === 'number' ? 'number' : d.type === 'date' ? 'date' : 'text'"
               @focus="onFieldFocus(d.key)"
+              @blur="onFieldBlur(d.key)"
               @mouseenter="onFieldHover(d.key, true)"
               @mouseleave="onFieldHover(d.key, false)"
             >
@@ -572,7 +610,7 @@ onMounted(() => {
   grid-column: 1 / -1;
 }
 
-/* 原图比对区给定高度，原图在自身区域内滚动，不撑高整页 */
+/* 原件预览区给定高度，原图在自身区域内滚动，不撑高整页 */
 .invoice-edit-regions {
   height: min(75vh, 880px);
 }

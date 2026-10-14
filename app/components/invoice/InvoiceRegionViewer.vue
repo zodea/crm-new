@@ -7,14 +7,17 @@ import { computed, nextTick, onScopeDispose, shallowRef, toRef, useTemplateRef, 
 import { renderPdfPreviewPages } from '~/lib/invoice/pdf-preview'
 import { rotatedFrame, rotateNormalizedBox } from '~/lib/invoice/recognition-regions'
 
-// 重新识别草稿的原图比对：在原文件上用警示框标出识别变动字段所在的版面块（块级，不是字段级），
-// 框带字段名标签；activeKey 对应的框强调并滚进视野。缩放、旋转、页码都由同一份 0~1 坐标换算，框随之同步。
-const props = defineProps<{
+// 发票原图预览（工作台中栏、编辑页左栏共用）：PDF 逐页渲染、图片直出，可缩放、左右旋转，不修改原件。
+// 可叠加识别区域框（块级，不是字段级）：compare = 重新识别草稿常驻标出变动字段；focus = 首次识别只框当前
+// 聚焦/悬停的字段。activeKey 对应的框强调并在原图区域内滚进视野。缩放、旋转、页码都由同一份 0~1 坐标换算。
+const props = withDefaults(defineProps<{
   file: File
-  groups: readonly InvoiceRegionHighlightGroup[]
-  unlocated: readonly InvoiceRecognitionField[]
+  /** 区域叠加方式；缺省为普通预览 */
+  mode?: 'compare' | 'focus'
+  groups?: readonly InvoiceRegionHighlightGroup[]
+  unlocated?: readonly InvoiceRecognitionField[]
   activeKey?: string | null
-}>()
+}>(), { mode: undefined, groups: () => [], unlocated: () => [], activeKey: null })
 
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const
 const zoomIndex = shallowRef(2)
@@ -24,33 +27,43 @@ const rotation = shallowRef<PreviewRotation>(0)
 const isPdf = computed(() => props.file.type === 'application/pdf' || /\.pdf$/i.test(props.file.name))
 const imageUrl = useObjectUrl(computed(() => isPdf.value ? undefined : props.file))
 const imageSize = shallowRef<{ width: number, height: number } | null>(null)
+const imageFailed = shallowRef(false)
 const pdfPages = shallowRef<PdfPreviewPage[]>([])
+const pdfTotalPages = shallowRef(0)
 const pdfState = shallowRef<'idle' | 'loading' | 'failed'>('idle')
+/** 重试计数：PDF 重新渲染、图片重新挂载 */
+const reloadToken = shallowRef(0)
 
 function revokePdfPages() {
   pdfPages.value.forEach(page => URL.revokeObjectURL(page.url))
   pdfPages.value = []
+  pdfTotalPages.value = 0
 }
 
-watch(() => props.file, async (file, _, onCleanup) => {
+watch(() => props.file, () => {
+  rotation.value = 0
+})
+
+watch([() => props.file, reloadToken], async ([file], _, onCleanup) => {
   let cancelled = false
   onCleanup(() => {
     cancelled = true
   })
   revokePdfPages()
   imageSize.value = null
-  rotation.value = 0
+  imageFailed.value = false
   if (!isPdf.value)
     return
   pdfState.value = 'loading'
   try {
-    const pages = await renderPdfPreviewPages(file)
+    const result = await renderPdfPreviewPages(file)
     if (cancelled) {
-      pages.forEach(page => URL.revokeObjectURL(page.url))
+      result.pages.forEach(page => URL.revokeObjectURL(page.url))
       return
     }
-    pdfPages.value = pages
-    pdfState.value = pages.length ? 'idle' : 'failed'
+    pdfPages.value = result.pages
+    pdfTotalPages.value = result.totalPages
+    pdfState.value = result.pages.length ? 'idle' : 'failed'
   }
   catch {
     if (!cancelled)
@@ -58,6 +71,18 @@ watch(() => props.file, async (file, _, onCleanup) => {
   }
 }, { immediate: true })
 onScopeDispose(revokePdfPages)
+
+const failure = computed(() => {
+  if (isPdf.value && pdfState.value === 'failed')
+    return 'PDF 无法在此渲染（文件可能已损坏、加密或不是有效的 PDF）'
+  if (!isPdf.value && imageFailed.value)
+    return '图片无法显示（文件可能已损坏或不是浏览器可解码的图片格式）'
+  return null
+})
+
+function reload() {
+  reloadToken.value++
+}
 
 function onImageLoad(event: Event) {
   const image = event.target as HTMLImageElement
@@ -68,6 +93,8 @@ function onImageLoad(event: Event) {
 /** 未取到原始尺寸前按 A4 竖版比例占位，框仍按百分比定位。 */
 const A4 = { width: 1, height: Math.SQRT2 }
 const pages = computed(() => {
+  if (failure.value)
+    return []
   const list = isPdf.value
     ? pdfPages.value.map(page => ({ pageIndex: page.pageIndex, url: page.url, size: { width: page.width, height: page.height }, natural: true }))
     : imageUrl.value ? [{ pageIndex: 0, url: imageUrl.value, size: imageSize.value ?? A4, natural: !!imageSize.value }] : []
@@ -84,6 +111,10 @@ const pages = computed(() => {
   }))
 })
 const pageCount = computed(() => pages.value.length)
+/** PDF 超过预览页数上限：如实提示未显示的页，不静默截断 */
+const hiddenPages = computed(() => isPdf.value && pdfPages.value.length && pdfTotalPages.value > pdfPages.value.length
+  ? { shown: pdfPages.value.length, total: pdfTotalPages.value }
+  : null)
 
 /** 框所在页超出已渲染页数（PDF 只渲染前若干页）时归入未定位，不悬空。 */
 const renderedPageIndexes = computed(() => new Set(pages.value.map(page => page.pageIndex)))
@@ -105,6 +136,13 @@ const activeUnlocated = computed(() => {
   return group && pageCount.value > 0 && !renderedPageIndexes.value.has(group.pageIndex)
     ? group.labels[group.keys.indexOf(key)] ?? null
     : null
+})
+
+/** 点字段定位：当前字段已在原图框出时的字段名 */
+const activeLocated = computed(() => {
+  const key = props.activeKey
+  const group = key ? props.groups.find(candidate => candidate.keys.includes(key) && renderedPageIndexes.value.has(candidate.pageIndex)) : undefined
+  return group && key ? group.labels[group.keys.indexOf(key)] ?? null : null
 })
 
 function percent(value: number) {
@@ -144,10 +182,13 @@ watch(scrollerWidth, (width, previous) => {
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-col gap-2" data-testid="invoice-region-viewer" aria-label="发票原图识别变动比对">
+  <section class="flex min-h-0 flex-col gap-2" data-testid="invoice-region-viewer" :aria-label="mode === 'compare' ? '发票原图识别变动比对' : '发票原图预览'">
     <div class="flex flex-wrap items-center gap-1.5">
-      <span class="i-lucide-scan-search text-13px text-warn-ink" aria-hidden="true" />
-      <span class="text-12px font-700 text-ink">原图比对</span>
+      <template v-if="mode === 'compare'">
+        <span class="i-lucide-scan-search text-13px text-warn-ink" aria-hidden="true" />
+        <span class="text-12px font-700 text-ink">原图比对</span>
+      </template>
+      <span v-else-if="isPdf && pdfTotalPages" class="text-11px text-ink-soft">共 {{ pdfTotalPages }} 页</span>
       <span class="flex-1" />
       <div class="flex items-center gap-1" role="group" aria-label="原图缩放与旋转">
         <button type="button" class="icon-btn h-7 w-7" aria-label="缩小原图" title="缩小" :disabled="zoomIndex === 0" @click="zoomIndex--">
@@ -168,21 +209,42 @@ watch(scrollerWidth, (width, previous) => {
       </div>
     </div>
 
-    <div class="space-y-1 text-11px text-ink-soft" data-testid="invoice-region-legend">
-      <p v-if="locatedLabels.length">
-        <span class="inline-block h-2.5 w-3.5 border-2 border-warn align-middle" aria-hidden="true" />
-        已框出：{{ locatedLabels.join('、') }}（框住识别出该值的整块版面区域，非逐字定位）
-      </p>
-      <p v-if="unlocatedLabels.length" class="text-warn-ink">
-        <span class="i-lucide-circle-help mr-0.5 align-middle text-11px" aria-hidden="true" />
-        原图未定位：{{ unlocatedLabels.join('、') }}
-      </p>
+    <div v-if="mode" class="space-y-1 text-11px text-ink-soft" data-testid="invoice-region-legend">
+      <template v-if="mode === 'compare'">
+        <p v-if="locatedLabels.length">
+          <span class="inline-block h-2.5 w-3.5 border-2 border-warn align-middle" aria-hidden="true" />
+          已框出：{{ locatedLabels.join('、') }}（框住识别出该值的整块版面区域，非逐字定位）
+        </p>
+        <p v-if="unlocatedLabels.length" class="text-warn-ink">
+          <span class="i-lucide-circle-help mr-0.5 align-middle text-11px" aria-hidden="true" />
+          原图未定位：{{ unlocatedLabels.join('、') }}
+        </p>
+      </template>
+      <template v-else>
+        <p v-if="activeUnlocated" class="text-warn-ink">
+          <span class="i-lucide-circle-help mr-0.5 align-middle text-11px" aria-hidden="true" />
+          {{ activeUnlocated }}：原图未定位
+        </p>
+        <p v-else-if="activeLocated">
+          <span class="i-lucide-crosshair mr-0.5 align-middle text-11px text-warn-ink" aria-hidden="true" />
+          已定位：{{ activeLocated }}（框住识别出该值的整块版面区域，非逐字定位）
+        </p>
+        <p v-else>
+          <span class="i-lucide-crosshair mr-0.5 align-middle text-11px" aria-hidden="true" />
+          聚焦或悬停字段输入框，在原图上框出该字段所在区域
+        </p>
+      </template>
       <p class="sr-only" aria-live="polite">
         <template v-if="activeUnlocated">
           {{ activeUnlocated }}：原图未定位
         </template>
       </p>
     </div>
+
+    <p v-if="hiddenPages" class="text-11px text-warn-ink" data-testid="invoice-preview-page-limit">
+      <span class="i-lucide-files mr-0.5 align-middle text-11px" aria-hidden="true" />
+      共 {{ hiddenPages.total }} 页，仅显示前 {{ hiddenPages.shown }} 页，第 {{ hiddenPages.shown + 1 }}–{{ hiddenPages.total }} 页未显示；需核对请用 PDF 阅读器打开原件
+    </p>
 
     <div
       ref="scroller"
@@ -193,8 +255,12 @@ watch(scrollerWidth, (width, previous) => {
       <div v-if="isPdf && pdfState === 'loading'" class="py-10 text-center text-12px text-ink-faint">
         <span class="i-lucide-loader-circle mx-auto mb-2 block animate-spin text-18px" aria-hidden="true" />正在渲染 PDF…
       </div>
-      <div v-else-if="isPdf && pdfState === 'failed'" class="py-10 text-center text-12px text-warn-ink">
-        PDF 无法在此渲染，原图未定位
+      <div v-else-if="failure" class="flex flex-col items-center gap-2 py-10 text-center text-12px text-warn-ink" role="alert">
+        <span class="i-lucide-file-warning text-18px" aria-hidden="true" />
+        <p>{{ failure }}，原文件未改动{{ mode ? '；原图未定位' : '' }}</p>
+        <button type="button" class="btn-secondary" @click="reload">
+          <span class="i-lucide-refresh-cw mr-1 text-12px" aria-hidden="true" />重新加载原图
+        </button>
       </div>
       <div class="flex flex-col items-center gap-3">
         <div
@@ -205,12 +271,14 @@ watch(scrollerWidth, (width, previous) => {
           :data-page-index="page.pageIndex"
         >
           <img
+            :key="`${page.url}:${reloadToken}`"
             :src="page.url"
             :alt="pageCount > 1 ? `${file.name} 第 ${page.pageIndex + 1} 页` : file.name"
             class="absolute left-1/2 top-1/2 max-w-none select-none"
             :style="{ width: `${page.frame.imageWidth}%`, height: `${page.frame.imageHeight}%`, transform: `translate(-50%, -50%) rotate(${rotation}deg)` }"
             draggable="false"
             @load="onImageLoad"
+            @error="imageFailed = true"
           >
           <span v-if="pageCount > 1" class="absolute right-1 top-1 rounded-[var(--radius-sm)] bg-ink px-1 text-10px text-white" aria-hidden="true">
             {{ page.pageIndex + 1 }} / {{ pageCount }}

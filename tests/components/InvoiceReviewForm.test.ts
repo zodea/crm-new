@@ -71,4 +71,33 @@ describe('识别校对表单的重新识别草稿模式', () => {
     const total = view.getByLabelText('价税合计')
     expect(document.getElementById(total.getAttribute('aria-describedby')!)?.textContent).toContain('原图未定位')
   })
+
+  // 用户 2026-10-14 确认：首次识别也能点字段定位原图；离开焦点即撤框，定位不到在读屏中说明。
+  it('首次识别点字段定位：聚焦/悬停任一识别字段都通知父级，失焦撤回；定位不到的字段读屏说明“原图未定位”', async () => {
+    const view = mount({ focusLocatedKeys: ['invoiceNumber', 'totalAmount'] })
+    const number = view.getByLabelText('单据编号')
+    const seller = view.getByLabelText('供应商')
+    await fireEvent.focus(number)
+    await fireEvent.blur(number)
+    await fireEvent.focus(seller)
+    await fireEvent.mouseEnter(view.getByLabelText('价税合计'))
+    await fireEvent.mouseLeave(view.getByLabelText('价税合计'))
+    // 对应项目不是识别字段，不参与定位
+    await fireEvent.focus(view.getByLabelText('对应项目'))
+    expect(view.emitted('locate')).toEqual([['invoiceNumber'], ['seller']])
+    expect(view.emitted('release')).toEqual([['invoiceNumber']])
+    expect(view.emitted('preview')).toEqual([['totalAmount'], [null]])
+
+    expect(number.getAttribute('aria-describedby')).toBeNull()
+    expect(document.getElementById(seller.getAttribute('aria-describedby')!)?.textContent).toBe('原图未定位')
+    expect(view.queryAllByTestId('invoice-recognition-field-mark')).toHaveLength(0)
+  })
+
+  it('没有点字段定位时（原文件不在会话中）聚焦字段不通知父级', async () => {
+    const view = mount({})
+    await fireEvent.focus(view.getByLabelText('单据编号'))
+    await fireEvent.blur(view.getByLabelText('单据编号'))
+    expect(view.emitted('locate')).toBeUndefined()
+    expect(view.emitted('release')).toBeUndefined()
+  })
 })
