@@ -12,6 +12,51 @@ function storedInvoice(page: Page) {
   })
 }
 
+// 合成票面：文字位置与下方 OCR 版面块坐标一致（1000×700 像素），便于目测框是否对位。
+const OCR_PAGE = { width: 1000, height: 700 }
+function ocrBlocks(markdown: string) {
+  const lines = markdown.split('\n')
+  return [
+    { block_label: 'text', block_bbox: [560, 40, 960, 120], block_content: lines.slice(1, 3).join('\n') },
+    { block_label: 'text', block_bbox: [40, 180, 960, 300], block_content: lines.slice(3, 5).join('\n') },
+    { block_label: 'text', block_bbox: [40, 520, 960, 640], block_content: lines.slice(5).join('\n') },
+  ]
+}
+
+async function syntheticInvoicePng(page: Page) {
+  const dataUrl = await page.evaluate(({ width, height }) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#fff'
+    context.fillRect(0, 0, width, height)
+    context.fillStyle = '#333'
+    context.font = '28px sans-serif'
+    context.fillText('电子发票（普通发票）', 340, 30)
+    context.font = '22px sans-serif'
+    const rows: Array<[string, number, number]> = [
+      ['发票号码：26442000000000000398', 570, 70],
+      ['开票日期：2026年09月05日', 570, 105],
+      ['购买方名称：瑞航建设', 50, 220],
+      ['销售方名称：审计回归供应商', 50, 270],
+      ['合计 ¥100.00 ¥13.00', 50, 560],
+      ['价税合计（小写）¥113.00', 50, 615],
+    ]
+    for (const [text, x, y] of rows)
+      context.fillText(text, x, y)
+    context.strokeStyle = '#999'
+    context.strokeRect(20, 160, 960, 500)
+    return canvas.toDataURL('image/png')
+  }, OCR_PAGE)
+  return Buffer.from(dataUrl.split(',')[1]!, 'base64')
+}
+
+/** 原图上某块的框（data-fields 为落在该块的变动字段 key，以空格分隔）。 */
+function regionBox(page: Page, fields: string) {
+  return page.locator(`[data-testid="invoice-region-box"][data-fields="${fields}"]`)
+}
+
 // 用户 2026-10-13 确认：重新识别结果先作草稿不写库，变动字段高亮，保存/确认须二次确认列出变动，离开按离开保护处理。
 test('工作台与编辑页重新识别先作草稿：高亮变动、保存二次确认、取消不写库，1440 与 390 视口可用键盘操作', async ({ page }) => {
   let attempt = 0
@@ -30,18 +75,21 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
       engine: 'paddleocr-official-api',
       model: 'PaddleOCR-VL-1.6',
       jobId: `audit-${attempt}`,
-      pages: [{ pageIndex: 0, markdown, prunedResult: {}, layoutRegions: [] }],
+      pages: [{ pageIndex: 0, markdown, prunedResult: OCR_PAGE, layoutRegions: ocrBlocks(markdown) }],
       markdownPages: [markdown],
       dataInfo: { numPages: 1 },
     }) })
   })
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/finance/invoice')
+  const invoicePng = await syntheticInvoicePng(page)
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: '上传发票', exact: true }).click()
-  await (await chooser).setFiles({ name: 'audit-398.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') })
+  await (await chooser).setFiles({ name: 'audit-398.png', mimeType: 'image/png', buffer: invoicePng })
   const number = page.getByLabel('单据编号', { exact: true })
   await expect(number).toHaveValue('26442000000000000398')
+  // 首次识别直接写入，没有可对照的原值，不显示原图比对框。
+  await expect(page.getByTestId('invoice-region-viewer')).toHaveCount(0)
 
   // 工作台：人工更正即时落库后重新识别，结果只进表单。
   await page.getByLabel('供应商', { exact: true }).fill('人工更正供应商')
@@ -54,7 +102,44 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(workspaceChanges).toContainText('供应商：人工更正供应商 → （空）')
   await expect(workspaceChanges).toContainText('价税合计：113 → 226')
   expect(await storedInvoice(page)).toMatchObject({ number: '26442000000000000398', total: 113, seller: '人工更正供应商' })
-  await expect(number).toHaveAccessibleDescription(/识别变动.*识别前：26442000000000000398/)
+  await expect(number).toHaveAccessibleDescription(/识别变动.*识别前：26442000000000000398.*原图已框出/)
+
+  // 原图比对（用户 2026-10-14）：变动字段按块框出并带字段名；识别为空的供应商定位不到，如实说明。
+  const viewer = page.getByTestId('invoice-region-viewer')
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(2)
+  await expect(regionBox(page, 'invoiceNumber')).toContainText('单据编号')
+  await expect(regionBox(page, 'totalAmount taxAmount')).toContainText('价税合计、税额')
+  await expect(page.getByTestId('invoice-region-legend')).toContainText('原图未定位：供应商')
+  await expect(page.getByLabel('供应商', { exact: true })).toHaveAccessibleDescription(/原图未定位/)
+  const changeItems = workspaceChanges.getByTestId('invoice-recognition-change-item')
+  await expect(changeItems.filter({ hasText: '供应商' })).toContainText('原图未定位')
+  // 聚焦字段：对应框强调并滚进原图视野；键盘 Tab 到变动条目同样切换强调。
+  await page.getByLabel('价税合计', { exact: true }).focus()
+  await expect(regionBox(page, 'totalAmount taxAmount')).toHaveAttribute('data-active', 'true')
+  await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'false')
+  await expectInViewport(regionBox(page, 'totalAmount taxAmount'), '工作台强调框 @ 1440px')
+  await page.screenshot({ path: '.tmp/invoice-image/workspace-1440.png' })
+  await changeItems.first().focus()
+  await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
+  await page.keyboard.press('Tab')
+  await expect(changeItems.nth(1)).toBeFocused()
+  await expect(viewer.locator('[data-testid="invoice-region-box"][data-active="true"]')).toHaveCount(0)
+  await page.keyboard.press('Tab')
+  await expect(changeItems.nth(2)).toBeFocused()
+  await expect(regionBox(page, 'totalAmount taxAmount')).toHaveAttribute('data-active', 'true')
+  // 缩放与旋转：框由同一份坐标换算，仍框住同一块。
+  await viewer.getByRole('button', { name: '放大原图' }).click()
+  await viewer.getByRole('button', { name: '原图向右旋转' }).click()
+  await expectInViewport(regionBox(page, 'totalAmount taxAmount'), '工作台旋转后强调框 @ 1440px')
+  await viewer.getByRole('button', { name: '原图向左旋转' }).click()
+  await viewer.getByRole('button', { name: '恢复 100% 缩放' }).click()
+  // 390：切到“原件”面板仍能看到最近聚焦字段的强调框。
+  await page.setViewportSize({ width: 390, height: 900 })
+  await page.getByRole('tab', { name: '原件', exact: true }).click()
+  await expect(regionBox(page, 'totalAmount taxAmount')).toHaveAttribute('data-active', 'true')
+  await expectInViewport(regionBox(page, 'totalAmount taxAmount'), '工作台强调框 @ 390px')
+  await expectNoPageOverflow(page, '工作台原图比对 @ 390px')
+  await page.setViewportSize({ width: 1440, height: 900 })
 
   // 草稿上再手改：角标改为“已人工修改”，仍不写库。
   const total = page.getByLabel('价税合计', { exact: true })
@@ -125,6 +210,20 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(editChanges).toContainText('供应商：编辑页人工供应商 → （空）')
   await expect(number).toHaveAccessibleDescription(/识别前：26442000000000000399/)
   expect(await storedInvoice(page)).toMatchObject({ number: '26442000000000000399', total: 230 })
+  // 编辑页左栏改为原文件并框出变动字段；聚焦字段强调对应框。
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect(page.getByTestId('invoice-region-box')).toHaveCount(2)
+    await page.getByLabel('税额', { exact: true }).focus()
+    await expect(regionBox(page, 'totalAmount taxAmount')).toHaveAttribute('data-active', 'true')
+    await page.getByTestId('invoice-region-viewer').scrollIntoViewIfNeeded()
+    await expectInViewport(regionBox(page, 'totalAmount taxAmount'), `编辑页强调框 @ ${width}px`)
+    if (width === 1440)
+      await page.screenshot({ path: '.tmp/invoice-image/edit-1440.png' })
+    await page.getByLabel('单据编号', { exact: true }).focus()
+    await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
 
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 })

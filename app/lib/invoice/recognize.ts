@@ -3,8 +3,11 @@
 // 只换此处的实现绑定，不改任何调用方。桩识别按文件名哈希确定性产出 mock 字段：
 // 同一文件名重复识别结果一致（可测、可复现演示，日期也从 seed 派生不读时钟），
 // 金额满足两位小数铁律(amount+tax=total)。
+import type { InvoiceFieldRegions } from '~/lib/invoice/recognition-regions'
 import type { RecognizeDocumentOptions } from '~/lib/recognize/engine'
 import { promiseTimeout } from '@vueuse/core'
+import { INVOICE_RECOGNITION_FIELDS } from '~/lib/invoice/recognition-changes'
+import { locateInvoiceFieldRegions } from '~/lib/invoice/recognition-regions'
 import { OcrRecognitionError, recognizeDocument } from '~/lib/recognize/engine'
 import { buildInvoiceFieldConfidence, parseInvoiceText } from '~/lib/recognize/invoice-parse'
 import { round2 } from '~/lib/util/number'
@@ -37,6 +40,11 @@ export interface RecognizedInvoiceFields {
   items: InvoiceItem[]
   fieldConfidence: Record<string, number>
   ocrConfidence: number
+  /**
+   * 字段在原图上的块级区域（本次识别结果的版面块，见 recognition-regions）。只在内存中随草稿使用：
+   * 写库走 INVOICE_COLUMNS 列映射，不含此项，也不进操作日志。
+   */
+  fieldRegions?: InvoiceFieldRegions
 }
 
 export interface RecognizeOptions {
@@ -237,7 +245,7 @@ export async function recognizeInvoice(
     ? round2(confidenceValues.reduce((sum, value) => sum + value, 0) / confidenceValues.length)
     : 0
 
-  return {
+  const fields = {
     invoiceType: parsed.invoiceType,
     invoiceNumber: parsed.invoiceNumber,
     invoiceDate: parsed.invoiceDate,
@@ -254,4 +262,5 @@ export async function recognizeInvoice(
     fieldConfidence,
     ocrConfidence,
   }
+  return { ...fields, fieldRegions: locateInvoiceFieldRegions(cloud.pages, fields, INVOICE_RECOGNITION_FIELDS) }
 }

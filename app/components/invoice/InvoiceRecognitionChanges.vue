@@ -6,11 +6,17 @@ defineProps<{
   changes: readonly InvoiceRecognitionChange[]
   /** 提供时在提醒内显示保存按钮（工作台没有独立保存按钮）；整页编辑沿用页面的保存。 */
   saveLabel?: string
+  /** 原图比对可用时传入定位不到的字段 key；条目可聚焦/悬停以在原图上强调对应区域 */
+  unlocatedKeys?: readonly string[]
 }>()
 
 const emit = defineEmits<{
   discard: []
   save: []
+  /** 聚焦或点击条目：原图强调该字段并保持 */
+  locate: [key: string]
+  /** 悬停条目：临时强调，离开为 null */
+  preview: [key: string | null]
 }>()
 </script>
 
@@ -27,8 +33,28 @@ const emit = defineEmits<{
     </p>
     <ul v-if="changes.length" class="mt-1.5 space-y-1">
       <li v-for="change in changes" :key="change.key" class="break-all">
-        <span class="font-600">{{ change.label }}</span>：<span class="line-through opacity-75">{{ change.before || '（空）' }}</span>
-        → <span class="font-600">{{ change.after || '（空）' }}</span>
+        <button
+          v-if="unlocatedKeys"
+          type="button"
+          class="w-full cursor-pointer rounded-[var(--radius-sm)] border-0 bg-transparent px-1 py-0.5 text-left text-inherit hover:bg-panel focus-visible:bg-panel"
+          :title="unlocatedKeys.includes(change.key) ? '原图未定位' : '在原图上定位'"
+          data-testid="invoice-recognition-change-item"
+          @focus="emit('locate', change.key)"
+          @click="emit('locate', change.key)"
+          @mouseenter="emit('preview', change.key)"
+          @mouseleave="emit('preview', null)"
+        >
+          <span class="font-600">{{ change.label }}</span>：<span class="line-through opacity-75">{{ change.before || '（空）' }}</span>
+          → <span class="font-600">{{ change.after || '（空）' }}</span>
+          <span v-if="unlocatedKeys.includes(change.key)" class="ml-1 whitespace-nowrap rounded-[var(--radius-sm)] border border-warn/50 px-1 text-10px font-600">原图未定位</span>
+          <template v-else>
+            <span class="i-lucide-crosshair ml-1 align-middle text-11px" aria-hidden="true" /><span class="sr-only">，原图已框出</span>
+          </template>
+        </button>
+        <template v-else>
+          <span class="font-600">{{ change.label }}</span>：<span class="line-through opacity-75">{{ change.before || '（空）' }}</span>
+          → <span class="font-600">{{ change.after || '（空）' }}</span>
+        </template>
       </li>
     </ul>
     <div class="mt-2 flex flex-wrap justify-end gap-2">

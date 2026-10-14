@@ -16,6 +16,8 @@ const props = defineProps<{
   invoice: Invoice
   draft?: boolean
   marks?: Readonly<Record<string, InvoiceRecognitionFieldMark>>
+  /** 原图比对可用时：已在原图框出的字段 key（角标读屏说明“原图已框出 / 原图未定位”） */
+  locatedKeys?: readonly string[]
 }>()
 
 const emit = defineEmits<{
@@ -24,6 +26,10 @@ const emit = defineEmits<{
   discard: []
   rerecognize: []
   edit: [patch: Partial<Invoice>]
+  /** 聚焦有识别标记的字段：原图强调对应区域并保持 */
+  locate: [key: string]
+  /** 悬停有识别标记的字段：临时强调，离开为 null */
+  preview: [key: string | null]
 }>()
 
 const store = useInvoiceStore()
@@ -155,6 +161,16 @@ function fieldInputId(field: FieldDef) {
   return `invoice-review-${props.invoice.id}-${field.key}`
 }
 
+function onFieldFocus(f: FieldDef) {
+  if (props.marks?.[f.key])
+    emit('locate', f.key)
+}
+
+function onFieldHover(f: FieldDef, hovering: boolean) {
+  if (props.marks?.[f.key])
+    emit('preview', hovering ? f.key : null)
+}
+
 // 货物明细默认折叠
 const showItems = shallowRef(false)
 </script>
@@ -169,7 +185,7 @@ const showItems = shallowRef(false)
       >
         <label :for="fieldInputId(f)" class="field-label flex items-center gap-1">
           <span>{{ f.label }}</span>
-          <InvoiceRecognitionFieldMark v-if="marks?.[f.key]" :id="markId(f)" :mark="marks[f.key]!" />
+          <InvoiceRecognitionFieldMark v-if="marks?.[f.key]" :id="markId(f)" :mark="marks[f.key]!" :located="locatedKeys ? locatedKeys.includes(f.key) : undefined" />
           <span class="flex-1" />
           <span
             v-if="tiers[f.key]"
@@ -199,6 +215,9 @@ const showItems = shallowRef(false)
           class="field-input w-full"
           :class="inputClass(f)"
           @change="onFieldChange(f, $event)"
+          @focus="onFieldFocus(f)"
+          @mouseenter="onFieldHover(f, true)"
+          @mouseleave="onFieldHover(f, false)"
         >
           <option v-for="o in f.options" :key="o" :value="o">
             {{ o }}
@@ -216,6 +235,9 @@ const showItems = shallowRef(false)
           :class="[inputClass(f), f.mono ? 'font-mono' : '']"
           :step="f.type === 'number' ? '0.01' : undefined"
           @change="onFieldChange(f, $event)"
+          @focus="onFieldFocus(f)"
+          @mouseenter="onFieldHover(f, true)"
+          @mouseleave="onFieldHover(f, false)"
         >
       </div>
       <datalist id="review-project-names">
