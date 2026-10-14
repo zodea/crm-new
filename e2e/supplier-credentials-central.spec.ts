@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import type { SupplierCredentialSnapshot } from '../app/lib/supplier/credential-contract'
 import { Buffer } from 'node:buffer'
 import { execFile } from 'node:child_process'
@@ -27,7 +27,7 @@ const migratedSuppliers = [
 ]
 test.use({ actionTimeout: 15_000, navigationTimeout: 30_000 })
 const pdf = Buffer.from(cooperationPdfFixture('Synthetic credential 446'))
-async function evidence(page: Page, info: TestInfo, state: string) {
+async function evidence(page: Page, state: string) {
   await page.mouse.move(1, 1)
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 15_000 })
   for (const width of widths) {
@@ -56,10 +56,8 @@ async function evidence(page: Page, info: TestInfo, state: string) {
         return Math.max(Math.abs(header.left - cell.left), Math.abs(header.right - cell.right))
       }).toBeLessThanOrEqual(2)
     }
-    await page.screenshot({ path: info.outputPath(`${state}-${width}.png`), fullPage: true, animations: 'disabled' })
     if (width <= 1024 && /^(?:04|05|07|09|10|11)-/.test(state)) {
       await page.getByLabel('证照原件表，可横向滚动', { exact: true }).scrollIntoViewIfNeeded()
-      await page.screenshot({ path: info.outputPath(`${state}-originals-${width}.png`), fullPage: true, animations: 'disabled' })
       await page.locator('[data-shell-workspace]').evaluate(element => element.scrollTo({ top: 0 }))
     }
   }
@@ -117,7 +115,7 @@ test.describe('历史证照完整迁入', () => {
     await expect(page.getByRole('heading', { name: '完整迁入证照分供方 · 证照附件' })).toBeVisible()
     await page.reload()
     await expect(page.getByText('迁入前已逐件人工核对')).toBeVisible()
-    await evidence(page, info, '09-migrated-manual-proof-and-ocr-history')
+    await evidence(page, '09-migrated-manual-proof-and-ocr-history')
     const deletion = initial.audits.find(row => row.canRestore)!
     await page.getByRole('button', { name: '撤回本次删除', exact: true }).click()
     const restore = page.getByRole('dialog', { name: '撤回本次删除' })
@@ -129,18 +127,18 @@ test.describe('历史证照完整迁入', () => {
     const file = await (await request.get(`/api/read/supplier-credentials/${full.supplier.id}/files/${original.file!.id}?origin=real&credentialId=${original.id}`)).json()
     expect(file.state).toBe('available')
     expect(Buffer.from(file.payloadBase64, 'base64')).toEqual(pdf)
-    await evidence(page, info, '10-migrated-deletion-restores-same-original')
+    await evidence(page, '10-migrated-deletion-restores-same-original')
     const rollback = await request.post(`/api/migrations/core/${batch.batchId}/rollback`, { data: { ...envelope('credential-http-rollback'), batchId: batch.batchId } })
     expect(rollback.status()).toBe(409)
     expect((await read(full.supplier.id)).credentials).toHaveLength(4)
     await page.goto(`/base/supplier/credential/${missing.supplier.id}?origin=real`)
     await expect(page.getByText(/缺少正文，请重新上传/)).toBeVisible()
     await expect(page.getByRole('button', { name: '人工核验通过', exact: true })).toBeDisabled()
-    await evidence(page, info, '11-legacy-path-is-not-a-readable-original')
+    await evidence(page, '11-legacy-path-is-not-a-readable-original')
   })
 })
 
-test('中央建档、原件上传与恢复提交、人工核验、冷刷新及原件删除撤回', async ({ page, credentialSession: sessionId }, info) => {
+test('中央建档、原件上传与恢复提交、人工核验、冷刷新及原件删除撤回', async ({ page, credentialSession: sessionId }) => {
   test.setTimeout(300_000)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -161,7 +159,7 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
   await page.getByRole('link', { name, exact: true }).first().click()
   await page.getByRole('link', { name: '证照附件', exact: true }).click()
   await expect(page.getByRole('button', { name: '上传原件', exact: true })).toBeVisible()
-  await evidence(page, info, '01-empty-current-supplier')
+  await evidence(page, '01-empty-current-supplier')
   const snapshot = async (): Promise<SupplierCredentialSnapshot> => {
     const response = await page.request.get(`/api/read/supplier-credentials/${supplierId}?origin=real`, { headers: { 'x-ruihang-test-session': sessionId } })
     expect(response.ok(), await response.text()).toBe(true)
@@ -175,7 +173,7 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
     await editor.getByLabel('选择原件').setInputFiles({ name: `${category}－仅用于隔离验收的超长文件名称与中文原件.pdf`, mimeType: 'application/pdf', buffer: pdf })
     await editor.getByRole('combobox', { name: /^证照类别/ }).selectOption(category)
     if (input.captureDialog) {
-      await evidence(page, info, '02-original-upload-dialog')
+      await evidence(page, '02-original-upload-dialog')
       await page.keyboard.press('Tab')
       expect(await editor.evaluate(element => element.contains(document.activeElement))).toBe(true)
     }
@@ -194,7 +192,7 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
     await editor.getByRole('button', { name: '保存原件', exact: true }).click()
     if (input.loseResponse) {
       await expect(editor.getByRole('button', { name: '恢复原提交' })).toBeVisible()
-      await evidence(page, info, '03-lost-response-retained-draft')
+      await evidence(page, '03-lost-response-retained-draft')
       await editor.getByRole('button', { name: '恢复原提交' }).click()
       await page.unroute('**/api/commands/supplier-credentials')
     }
@@ -203,7 +201,7 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
   expect(new Set(commandIds).size).toBe(1)
   expect((await snapshot()).credentials).toHaveLength(uploads.length)
   await expect(page.getByRole('button', { name: '人工核验通过', exact: true })).toBeEnabled()
-  await evidence(page, info, '04-complete-awaiting-review')
+  await evidence(page, '04-complete-awaiting-review')
   await page.getByRole('button', { name: '人工核验通过', exact: true }).click()
   const review = page.getByRole('dialog', { name: '人工核验通过' })
   await review.getByLabel('核验备注（选填）').fill(supplierInput.reviewNote)
@@ -213,7 +211,7 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
   await expect(page.getByText(supplierInput.reviewNote)).toBeVisible()
   const qualified = await snapshot()
   expect(qualified.status).toBe('qualified')
-  await evidence(page, info, '05-qualified-after-cold-refresh')
+  await evidence(page, '05-qualified-after-cold-refresh')
   const original = qualified.credentials.find(row => row.category === uploads[0]!.category)!
   await page.getByRole('button', { name: `下载 ${original.file!.fileName}`, exact: true }).scrollIntoViewIfNeeded()
   const download = page.waitForEvent('download')
@@ -261,7 +259,7 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
   const imagePreview = page.getByRole('dialog', { name: '合成资料原件.png', exact: true })
   await expect(imagePreview.getByAltText('合成资料原件.png')).toHaveJSProperty('naturalWidth', 720)
   await expect(imagePreview.getByRole('button', { name: '关闭', exact: true })).toBeFocused()
-  await evidence(page, info, '06-controlled-original-preview')
+  await evidence(page, '06-controlled-original-preview')
   await page.keyboard.press('Escape')
   await expect(imagePreview).toHaveCount(0)
   await expect(page.getByRole('button', { name: '预览 合成资料原件.png', exact: true })).toBeFocused()
@@ -276,13 +274,13 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
   expect(await snapshot()).toMatchObject({ reviewCurrent: false, review: { note: supplierInput.reviewNote }, reviewHistory: [expect.objectContaining({ decision: 'qualified', note: supplierInput.reviewNote })] })
   await expect(page.getByText('历史凭证已保留；当前资料或有效期已变化，不能据此认定当前资料已核验。', { exact: true })).toBeVisible()
   expect((await snapshot()).credentials.find(row => row.id === original.id)?.file?.id).toBe(original.file!.id)
-  await evidence(page, info, '07-restored-original-requires-review')
+  await evidence(page, '07-restored-original-requires-review')
   await page.getByRole('link', { name: '返回分供方详情' }).click()
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
   await page.getByRole('link', { name: '返回分供方列表' }).click()
   await expect(page.getByPlaceholder('搜索关键词…')).toHaveValue(supplierInput.search)
   await expect(page.getByRole('link', { name, exact: true }).first()).toBeFocused()
-  await evidence(page, info, '08-list-same-status-and-original-count')
+  await evidence(page, '08-list-same-status-and-original-count')
   await page.getByRole('button', { name: '筛选营业执照', exact: true }).click()
   const filter = page.getByRole('dialog', { name: '筛选营业执照', exact: true })
   await filter.getByRole('checkbox', { name: '缺少原件', exact: true }).check()
@@ -293,6 +291,6 @@ test('中央建档、原件上传与恢复提交、人工核验、冷刷新及�
   await filter.getByRole('checkbox', { name: '有原件', exact: true }).check()
   await filter.getByRole('button', { name: '应用', exact: true }).click()
   await expect(page.getByRole('link', { name, exact: true }).first()).toBeVisible()
-  await evidence(page, info, '12-business-license-filter-uses-current-originals')
+  await evidence(page, '12-business-license-filter-uses-current-originals')
   expect(errors).toEqual([])
 })

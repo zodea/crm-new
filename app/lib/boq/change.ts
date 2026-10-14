@@ -108,6 +108,8 @@ function nextTargetState(
   calculation: import('./change-calculation').CalculatedBoqChangeLine,
 ): BoqLineView {
   if (operation === 'qty') {
+    if (target.effectiveQty === null)
+      throw new Error('当前合同工程量未知，不能补零调整')
     return {
       ...target,
       effectiveQty: target.effectiveQty + (calculation.deltaQty ?? 0),
@@ -600,7 +602,7 @@ export async function reviseApprovedBoqChangeOrder(
       logIds.push(resultLogId)
   }
   else if (line.operation === 'qty') {
-    if (!target)
+    if (!target || target.effectiveQty === null || target.effectiveUnitPrice === null)
       throw new Error('调量签证缺少目标清单行')
     const nextDelta = requiredBoqFinite(draft.line.deltaQty ?? line.delta_qty, '调整工程量')
     const effectiveQtyWithoutOrder = target.effectiveQty - Number(line.delta_qty ?? 0)
@@ -612,7 +614,7 @@ export async function reviseApprovedBoqChangeOrder(
     totalAmount = round2(nextDelta * target.effectiveUnitPrice)
   }
   else {
-    if (!target || !line.boq_line_id)
+    if (!target || target.effectiveQty === null || !line.boq_line_id)
       throw new Error('调价签证缺少目标清单行')
     const nextPrice = requiredBoqFinite(draft.line.newUnitPrice ?? line.new_unit_price, '调整后合同单价')
     if (nextPrice < 0)

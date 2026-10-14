@@ -34,34 +34,38 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
     }
   })
 
-  for (const width of [...RESPONSIVE_WIDTHS, 1280]) {
-    test(`列表在 ${width}px 使用单行工具栏、紧凑局部滚动表格和底部分页`, async ({ page }) => {
+  test('列表在各宽度使用单行工具栏、紧凑局部滚动表格和底部分页', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/base/supplier')
+
+    const toolbar = page.locator('[data-ui="supplier-list-toolbar"]')
+    await expect(toolbar).toBeVisible({ timeout: 15_000 })
+    await expect(toolbar).toHaveCSS('overflow-x', 'visible')
+    const table = page.locator('[data-ui="supplier-list-table"]')
+    await expect(table).toBeVisible()
+    for (const input of SUPPLIER_INPUTS) {
+      await expect(table.getByText(input.maskedTax, { exact: true })).toBeVisible()
+      await expect(table.getByText(input.maskedPhone, { exact: true })).toBeVisible()
+    }
+    for (const input of SUPPLIER_INPUTS)
+      await expect(table.getByRole('link', { name: input.name, exact: true })).toBeVisible()
+    await expect(table.getByText(/共 \d+ 条/)).toBeVisible()
+
+    const importButton = toolbar.getByRole('button', { name: /导入分供方/ })
+    for (const width of [...RESPONSIVE_WIDTHS, 1280]) {
       await page.setViewportSize({
         width,
         height: width === 390 ? 844 : 900,
       })
-      await page.goto('/base/supplier')
-
-      const toolbar = page.locator('[data-ui="supplier-list-toolbar"]')
-      await expect(toolbar).toBeVisible({ timeout: 15_000 })
-      await expect(toolbar).toHaveCSS('overflow-x', 'visible')
       await expect(toolbar.locator('[data-ui="supplier-list-toolbar-row"]')).toHaveCSS('flex-wrap', width < 768 ? 'wrap' : 'nowrap')
       await expect(toolbar.getByRole('searchbox', { name: '搜索关键词…' })).toBeVisible()
       await expect(toolbar.getByRole('button', { name: '刷新' })).toBeVisible()
       await expect(toolbar.getByRole('button', { name: '排序', exact: true })).toBeVisible()
       await expect(toolbar.getByRole('button', { name: '筛选', exact: true })).toBeVisible()
       await expect(toolbar.getByRole('button', { name: '列设置' })).toBeVisible()
-      const importButton = toolbar.getByRole('button', { name: /导入分供方/ })
       await importButton.scrollIntoViewIfNeeded()
       await expect(importButton).toBeVisible()
       await expect(toolbar.getByRole('button', { name: '新增分供方' })).toBeVisible()
-
-      const table = page.locator('[data-ui="supplier-list-table"]')
-      await expect(table).toBeVisible()
-      for (const input of SUPPLIER_INPUTS) {
-        await expect(table.getByText(input.maskedTax, { exact: true })).toBeVisible()
-        await expect(table.getByText(input.maskedPhone, { exact: true })).toBeVisible()
-      }
       const headerHeight = await table.locator('.vxe-header--column').first().evaluate(element => element.getBoundingClientRect().height)
       expect(headerHeight).toBeGreaterThanOrEqual(32)
       expect(headerHeight).toBeLessThanOrEqual(44)
@@ -70,12 +74,9 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
         table.locator('.vxe-table--main-wrapper .vxe-table--body-inner-wrapper'),
         `${width}px 分供方表格`,
       )
-      for (const input of SUPPLIER_INPUTS)
-        await expect(table.getByRole('link', { name: input.name, exact: true })).toBeVisible()
-      await expect(table.getByText(/共 \d+ 条/)).toBeVisible()
       await expectNoPageOverflow(page, `${width}px 分供方列表`)
-    })
-  }
+    }
+  })
 
   test('新建先选七类，取消留在列表，确认后进入带默认类别的整页表单', async ({ page }) => {
     await page.goto('/base/supplier')
@@ -164,24 +165,25 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
     }
   })
 
-  for (const width of [...RESPONSIVE_WIDTHS, 1280]) {
-    test(`短表单在 ${width}px 保持内容滚动、字段可读与底部操作可达`, async ({ page }) => {
+  test('短表单在各宽度保持内容滚动、字段可读与底部操作可达', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/base/supplier/form?category=材料供应商')
+
+    const shell = page.locator('[data-ui="entity-form-shell"]')
+    const content = shell.locator('[data-ui="supplier-form-scroll"]')
+    const footer = shell.getByRole('group', { name: '表单操作' })
+    const company = page.getByLabel('公司全称 *')
+    const alias = page.getByLabel('简称/别名')
+    for (const width of [...RESPONSIVE_WIDTHS, 1280]) {
       await page.setViewportSize({
         width,
         height: width === 390 ? 844 : 900,
       })
-      await page.goto('/base/supplier/form?category=材料供应商')
-
-      const shell = page.locator('[data-ui="entity-form-shell"]')
-      const content = shell.locator('[data-ui="supplier-form-scroll"]')
-      const footer = shell.getByRole('group', { name: '表单操作' })
       await expect(shell.getByRole('navigation', { name: '表单分区' })).toHaveCount(0)
       await expect(content).toHaveCSS('overflow-y', 'auto')
       await expect(footer).toHaveCSS('position', 'sticky')
       await expect(footer).toBeInViewport()
 
-      const company = page.getByLabel('公司全称 *')
-      const alias = page.getByLabel('简称/别名')
       const positions = await Promise.all([company, alias].map(field =>
         field.evaluate((element) => {
           const rect = element.getBoundingClientRect()
@@ -189,15 +191,15 @@ test.describe('Issue #193/#206：分供方直接参考布局', () => {
         }),
       ))
       if (width >= 768) {
-        expect(positions[0]!.top).toBe(positions[1]!.top)
+        expect(positions[0]!.top, `${width}px 公司全称与别名同行`).toBe(positions[1]!.top)
         expect(positions[0]!.left).toBeLessThan(positions[1]!.left)
       }
       else {
-        expect(positions[0]!.top).toBeLessThan(positions[1]!.top)
+        expect(positions[0]!.top, `${width}px 公司全称与别名分行`).toBeLessThan(positions[1]!.top)
       }
       await expectNoPageOverflow(page, `${width}px 分供方短表单`)
-    })
-  }
+    }
+  })
 
   test('200% 等效宽度仍为单列表单且底部操作可达', async ({ page }) => {
     await page.setViewportSize(EQUIVALENT_200_PERCENT_VIEWPORT)

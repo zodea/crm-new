@@ -6,7 +6,7 @@ import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migrati
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollC1Source } from '../helpers/payroll-c1-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
@@ -25,7 +25,7 @@ function readAll() {
 }
 
 it.each(['frozen-lines', 'frozen-leader', 'frozen-month', 'deleted-source-link', 'invalid-date-source'] as const)('迟到迁入来源互斥复用全部原证据，不能越过后来真实考勤：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC1Source(db)
     await db.execute('DELETE FROM attendance_records')

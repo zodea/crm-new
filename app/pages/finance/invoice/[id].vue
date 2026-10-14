@@ -4,8 +4,10 @@
 // 字段走本地缓冲、保存一次提交（区别于工作台 correctField 即时落库）——
 // 归档后保存前的 simple 二次确认（ADR 0003）在提交口拦截。
 // 同票复用页签由 tab-machine 同路由同参数复用保证；页签标题「发票·尾8位」useTabTitle 回填。
+import type { InvoiceRecognitionChange } from '~/lib/invoice/recognition-changes'
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import type { Invoice } from '~/stores/invoice'
+import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges } from '~/lib/invoice/recognition-changes'
 import { invoiceDocStatus } from '~/lib/invoice/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { round2 } from '~/lib/util/number'
@@ -193,16 +195,23 @@ async function del() {
   closeTabToLedger()
 }
 
+/** 重新识别可覆盖当前字段（含未保存的修改），覆盖后逐项提醒变化。 */
+const recognitionChanges = shallowRef<InvoiceRecognitionChange[]>([])
+
 async function rerecognize() {
   const inv = invoice.value
   if (!inv)
     return
+  // 首次识别没有可对照的原值；只有已识别过的票才比较覆盖前后的差异。
+  const before = inv.ocrStatus === 'done' ? { ...form.value } : null
+  recognitionChanges.value = []
   const succeeded = await store.startRecognition(inv.id)
   if (inv.id !== id.value)
     return
   if (succeeded) {
     resetForm()
-    success('识别完成，字段已刷新')
+    recognitionChanges.value = before ? invoiceRecognitionChanges(INVOICE_RECOGNITION_FIELDS, before, form.value) : []
+    success(recognitionChanges.value.length ? `识别完成，${recognitionChanges.value.length} 项与识别前不同，请核对` : '识别完成，字段已刷新')
   }
   else {
     error(store.recognitionError(inv.id) || '未完成重新识别，已保留当前输入')
@@ -383,6 +392,13 @@ onMounted(() => {
             无明细行。
           </div>
         </div>
+
+        <InvoiceRecognitionChanges
+          v-if="recognitionChanges.length"
+          class="mt-1"
+          :changes="recognitionChanges"
+          @dismiss="recognitionChanges = []"
+        />
 
         <!-- 动作：删除 ｜ 重新识别 + 保存 -->
         <div class="mt-1 flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-3">

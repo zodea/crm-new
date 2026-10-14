@@ -10,14 +10,13 @@ test.beforeEach(async ({ page }) => {
   await page.waitForLoadState('networkidle')
 })
 
-test('Issue #419：外壳保持深色侧栏与清晰可读的全站导航尺寸', async ({ page }, testInfo) => {
+test('Issue #419：外壳保持深色侧栏与清晰可读的全站导航尺寸', async ({ page }) => {
   const sidebar = page.locator('[data-sidebar="sidebar"]').first()
   const topbar = page.locator('[data-shell-topbar], main > header').first()
   const tabbar = page.locator('[data-shell-tabbar], main > div:has(> nav[aria-label="已打开页面"])').first()
   const workspace = page.locator('[data-shell-workspace], main > div:nth-of-type(2)').first()
 
   await expect(sidebar).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('shell-home.png'), fullPage: true })
 
   const metrics = await Promise.all([sidebar, topbar, tabbar, workspace].map(async (locator) => {
     return locator.evaluate((element) => {
@@ -159,7 +158,7 @@ test('Issue #111：通知中心入口保持可用', async ({ page }) => {
   await expect(drawer).toBeHidden()
 })
 
-test('Issue #111：三个业务屏不产生整页横向穿透', async ({ page }, testInfo) => {
+test('Issue #111：三个业务屏不产生整页横向穿透', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
 
@@ -176,7 +175,6 @@ test('Issue #111：三个业务屏不产生整页横向穿透', async ({ page },
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       await page.evaluate(() => window.innerWidth),
     )
-    await page.screenshot({ path: testInfo.outputPath(sample.screenshot), fullPage: true })
   }
 
   expect(pageErrors).toEqual([])

@@ -85,8 +85,8 @@ it('公开发放的 A 类更正：归属、范围与价格完整映射，正文�
     expect(nested.source.adjustmentReconciliation!.rawBasis.source.facts[0]!.unitId).toBe(central('units', 'u'))
     expect(nested.source.adjustmentReconciliation!.effectiveBasis.components[0]!.quantity).toBe(9)
     expect(JSON.stringify(detail)).toBe(raw)
-    expect(() => createPayrollMigratedMapper(mappings.filter(m => m.tableName !== 'rooms')).record(detail.adjustment)).toThrow()
-    expect(() => createPayrollMigratedMapper([...mappings, { ...mappings[0]!, centralId: 'conflicting' }])).toThrow()
+    expect(() => createPayrollMigratedMapper(mappings.filter(m => m.tableName !== 'rooms')).record(detail.adjustment)).toThrow('迁入工资身份映射不可用：rooms/r 缺少明确目标')
+    expect(() => createPayrollMigratedMapper([...mappings, { ...mappings[0]!, centralId: 'conflicting' }])).toThrow('迁入工资身份映射不可用：同一原身份有冲突目标')
   }
   finally { await f.close() }
 })
@@ -143,7 +143,7 @@ it('公开发放的 C2 实际退款再冲销：快照和事实完整映射，指
     expect(snapshot.applications[0]!.originalApplicationId).toBe(central('payroll_adjustment_applications', (detail.snapshot as typeof snapshot).applications[0]!.originalApplicationId))
     expect(snapshot.commandId).toBe(central('payroll_command_receipts', 'mapper-reverse-command'))
     expect(JSON.stringify(detail)).toBe(raw)
-    expect(() => createPayrollMigratedMapper(mappings.map(m => m.tableName === 'payroll_actual_events' ? { ...m, centralId: null } : m)).fact(detail.fact)).toThrow()
+    expect(() => createPayrollMigratedMapper(mappings.map(m => m.tableName === 'payroll_actual_events' ? { ...m, centralId: null } : m)).fact(detail.fact)).toThrow(/^迁入工资身份映射不可用：payroll_actual_events\/\S+ 缺少明确目标$/)
   }
   finally { await f.close() }
 })

@@ -44,13 +44,14 @@ test.describe('Issue #171：Sheet、通知抽屉与项目切换器', () => {
     await expect(trigger).toBeFocused()
   })
 
-  for (const width of [390, 768]) {
-    test(`${width}px 移动侧栏使用语义层级、滚动锁与焦点返回`, async ({ page }) => {
-      await openHome(page, width)
-      const trigger = page.getByRole('button', { name: '切换侧边栏' })
+  test('390/768px 移动侧栏使用语义层级、滚动锁与焦点返回', async ({ page }) => {
+    await openHome(page, 390)
+    const trigger = page.getByRole('button', { name: '切换侧边栏' })
+    const sheet = page.getByRole('dialog', { name: '导航菜单' })
+    for (const width of [390, 768]) {
+      await page.setViewportSize({ width, height: 844 })
       await trigger.click()
 
-      const sheet = page.getByRole('dialog', { name: '导航菜单' })
       await expect(sheet).toBeVisible()
       await expectWorkspaceLocked(page)
       await expect(sheet).toHaveAttribute('data-overlay-surface', '')
@@ -59,8 +60,8 @@ test.describe('Issue #171：Sheet、通知抽屉与项目切换器', () => {
       await page.keyboard.press('Escape')
       await expect(sheet).toBeHidden()
       await expect(trigger).toBeFocused()
-    })
-  }
+    }
+  })
 
   for (const width of [390, 768, 1024, 1280, 1440]) {
     test(`${width}px 项目切换器打开、选择并把焦点还给触发器`, async ({ page }) => {

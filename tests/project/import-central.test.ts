@@ -3,7 +3,6 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as XLSX from 'xlsx'
 import { useImportRunner } from '~/composables/useImportRunner'
-import { runMigrations } from '~/lib/db/migrations'
 import { getImportEntity } from '~/lib/kit/import-entities'
 import { autoMatchColumns, buildImportRows } from '~/lib/kit/import-mapping'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
@@ -15,7 +14,7 @@ import { createCustomerCommandTestInstance } from '../../server/utils/customer-c
 import { createCustomerReadTestInstance } from '../../server/utils/customer-read-test-instance'
 import { createProjectCommandTestInstance } from '../../server/utils/project-command-test-instance'
 import { createProjectReadTestInstance } from '../../server/utils/project-read-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let local: TestDb
 vi.mock('~/lib/db/connection', () => ({
@@ -30,8 +29,7 @@ afterEach(() => {
 
 describe('项目 Excel → 实际存储 → 中央回读', () => {
   it('同一合成身份经真实解析与实体入口导入后，中央列表和详情能回读，本地不产生正式项目', async () => {
-    local = await createMemoryDb()
-    await runMigrations(local)
+    local = await createMigratedMemoryDb()
     await local.execute('INSERT INTO customers (id, name) VALUES (?, ?)', ['customer-import-408', '导入复现甲方408'])
     setActivePinia(createPinia())
     vi.stubGlobal('useProjectStore', useProjectStore)

@@ -31,11 +31,11 @@ it('浏览器真实 HTTP 响应保留中文原房间迁入身份，读取与管�
 it.each(['%XX', '%E4%B8', '%e4%b8%89', 'https://outside.invalid/%E4%B8%89'])('真实响应中的非标准迁入编码仍被拒绝：%s', (suffix) => {
   const raw = structuredClone(captured)
   raw.cellOptions[1]!.roomId = suffix.startsWith('https:') ? suffix : `core-quantity_projects-f0ee60ca6ba460c3cc78ad09:rooms:room-${suffix}`
-  expect(() => decodePayrollAFeeConfigRead(raw, { origin: 'real' }, { ...raw.scope, book: { bookPurpose: 'ordinary', managementBookId: null } })).toThrow()
+  expect(() => decodePayrollAFeeConfigRead(raw, { origin: 'real' }, { ...raw.scope, book: { bookPurpose: 'ordinary', managementBookId: null } })).toThrow('工资费用提交或读取内容无效')
 })
 
 it.each((['other-namespace:rooms:room-%E4%B8%89', 'core-quantity_projects-f0ee60ca6ba460c3cc78ad09:items:room-%E4%B8%89']).map(input => ({ input })))('编码相同也不接受伪造迁入命名空间或跨表身份：输入案例 %#', ({ input: roomId }) => {
   const raw = structuredClone(captured)
   raw.cellOptions[1]!.roomId = roomId
-  expect(() => decodePayrollAFeeConfigRead(raw, { origin: 'real' }, { ...raw.scope, book: { bookPurpose: 'ordinary', managementBookId: null } })).toThrow()
+  expect(() => decodePayrollAFeeConfigRead(raw, { origin: 'real' }, { ...raw.scope, book: { bookPurpose: 'ordinary', managementBookId: null } })).toThrow('工资费用提交或读取内容无效')
 })

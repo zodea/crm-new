@@ -27,7 +27,7 @@ it.each([1, 2, 3])('空鼓扣款图保留 v4，旧版本 %i 仍只接受原封�
   expect(parsePayrollProjectGraph(current).schemaVersion).toBe(4)
   const legacy = [original, { ...original, schemaVersion: 2, central }, { ...original, schemaVersion: 3, central, fees }].find(value => value.schemaVersion === legacyVersion)!
   expect(parsePayrollProjectGraph(legacy).schemaVersion).toBe(legacyVersion)
-  expect(() => parsePayrollProjectGraph({ ...legacy, deductions })).toThrow()
-  expect(() => parsePayrollProjectGraph({ ...current, deductions: { ...deductions, quantity: undefined } })).toThrow()
-  expect(() => parsePayrollProjectGraph({ ...current, deductions: { ...deductions, tables: { ...deductions.tables, unexpected: [] } } })).toThrow()
+  expect(() => parsePayrollProjectGraph({ ...legacy, deductions })).toThrow('工资迁移：完整项目图身份或结构无效')
+  expect(() => parsePayrollProjectGraph({ ...current, deductions: { ...deductions, quantity: undefined } })).toThrow('工程量迁移空鼓原件：子图必须具备五表、扁平原件、映射及逐行归属')
+  expect(() => parsePayrollProjectGraph({ ...current, deductions: { ...deductions, tables: { ...deductions.tables, unexpected: [] } } })).toThrow('工资迁移：空鼓扣款原图必须完整提供三表且不得带未知表')
 })

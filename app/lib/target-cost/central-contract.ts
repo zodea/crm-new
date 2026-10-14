@@ -1,4 +1,5 @@
 import type { CompletenessDTO, DataOriginDTO, MoneyDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { CommandRecoveryDescriptor, CommandResolution } from '../forms/command-recovery'
 import type { MasterDataSaveAction, TargetCostFormDraft } from '../master-data/forms'
 import type { CostCategory } from '../project/cost-control'
 import type { BudgetFileChanges, BudgetFileContentDTO, BudgetFileDTO } from './central-files'
@@ -95,17 +96,19 @@ export interface TargetCostCommandResult {
   affectedVersionIds: string[]
 }
 export interface TargetCostFileRead { context: TargetCostContext, content: BudgetFileContentDTO }
-export interface TargetCostPending { command: TargetCostCommand, state: 'sending' | 'unknown' }
+export interface TargetCostPending { command: TargetCostCommand | null, descriptor: CommandRecoveryDescriptor, state: 'sending' | 'unknown' | 'applied' }
 export interface TargetCostRepository {
   list: (query: TargetCostQuery) => Promise<TargetCostListRead>
   form: (query: TargetCostQuery, id: string | null, draftKey?: string) => Promise<TargetCostFormRead>
   detail: (query: TargetCostQuery, id: string) => Promise<TargetCostDetailRead>
   file: (query: TargetCostQuery, id: string, fileId: string) => Promise<TargetCostFileRead>
   execute: (command: TargetCostCommand) => Promise<TargetCostCommandResult>
+  resolve: (descriptor: Pick<CommandRecoveryDescriptor, 'commandId' | 'workspaceId' | 'actorId'>) => Promise<CommandResolution<TargetCostCommandResult>>
 }
 
 /** Wire 金额使用 MoneyDTO；Repository 在已验证边界转换为页面 number|null。 */
 export const TARGET_COST_MONEY_FIELDS = ['contractRevenue', 'plannedProfit', 'signedContractSum', 'taxInclusiveTotal', 'taxExclusiveTotal', 'taxAmount'] as const
+export const TARGET_COST_DRAFT_KEYS = ['id', 'projectId', 'name', 'isBaseline', ...TARGET_COST_MONEY_FIELDS, 'note', 'status'] as const
 type HeaderMoneyKey = typeof TARGET_COST_MONEY_FIELDS[number]
 type MoneyRecord<T> = Omit<T, HeaderMoneyKey> & { [K in Extract<HeaderMoneyKey, keyof T>]: MoneyDTO | null }
 export type TargetCostListDTO = Omit<TargetCostListRead, 'rows'> & { rows: MoneyRecord<TargetCostListRow>[] }

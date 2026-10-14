@@ -42,7 +42,7 @@ export function usePayrollC2Config(additionalGuard: () => boolean | Promise<bool
     draft.value = clone(saved?.draft ?? value.draft)
     original.value = saved?.original ?? JSON.stringify(draft.value)
     const operation = store.getC2Pending(value)
-    if (!saved && operation?.command.action.kind === 'save-c2-config')
+    if (!saved && !operation?.restoredFromDescriptor && operation?.command.action.kind === 'save-c2-config')
       draft.value = clone(operation.command.action.config)
   }, { immediate: true })
   const busy = computed(() => ui.loading.value || working.value)

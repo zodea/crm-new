@@ -332,14 +332,19 @@ Object.assign(__ds_scope, { Panel });
 // components/core/StatCard.jsx
 try { (() => {
 /**
- * StatCard — 统计卡（发票统计行 / 工人汇总）。
- * label 小灰字 + 大号数字；tone 给数字上色（warn/ok/brand）。
- * clickable=true 时升级为可跳转卡片（hover 蓝框升起）。
+ * StatCard — 独立卡片与密排指标格共用的可变内核。
+ * 两种布局保留原字号/边框/公式及点击合同，不读取或推算业务值。
  */
 function StatCard({
   label,
   value,
   tone = "default",
+  variant = "standalone",
+  formula,
+  big = false,
+  status,
+  cutoff,
+  missingSources,
   clickable = false,
   onClick,
   style = {}
@@ -348,34 +353,35 @@ function StatCard({
     default: "var(--ink)",
     brand: "var(--brand)",
     ok: "var(--ok)",
+    danger: "var(--danger-ink)",
     warn: "var(--warn-ink)",
     soft: "var(--ink-soft)"
   };
-  return React.createElement(__ds_scope.Panel, {
-    padding: 16,
-    hover: clickable,
-    as: clickable ? "button" : "div",
+  const grid = variant === "grid";
+  const contents = [React.createElement("div", {
+    key: "label", style: { display: "flex", alignItems: "center", gap: 4,
+      fontSize: grid ? 11 : 12, fontWeight: grid ? 600 : 700,
+      color: grid ? "var(--ink-faint)" : "var(--ink-soft)" }
+  }, React.createElement("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, label),
+    formula && React.createElement("span", { title: formula, role: "note", tabIndex: clickable ? undefined : 0,
+      "aria-label": label + "说明：" + formula, style: { display: "inline-flex", cursor: "help" } },
+      React.createElement(__ds_scope.Icon, { name: "info", size: 11, color: "var(--ink-faint)" }))),
+    React.createElement("div", { key: "value", title: typeof value === "string" ? value : undefined,
+      style: { marginTop: grid ? 5 : 4, fontSize: grid ? big ? 17.5 : 13.5 : 24,
+        fontWeight: grid ? big ? 800 : 700 : 800, lineHeight: grid ? 1.25 : 1.1,
+        fontFamily: "var(--font-mono)", whiteSpace: "nowrap", letterSpacing: grid ? "-0.015em" : undefined,
+        color: grid && tone === "ok" ? "var(--ok-ink)" : tones[tone] || tones.default } }, value),
+    (status || cutoff || missingSources) && React.createElement("dl", { key: "source", style: { margin: "8px 0 0", paddingTop: 8, borderTop: "1px solid var(--line)", fontSize: 10, color: "var(--ink-faint)" } },
+      [["状态", status], ["汇总截止", cutoff], ["缺失来源", missingSources]].filter((entry) => entry[1]).map(([name, text]) =>
+        React.createElement("div", { key: name, style: { display: "flex", gap: 4, minWidth: 0 } },
+          React.createElement("dt", null, name), React.createElement("dd", { style: { margin: 0, overflowWrap: "anywhere" } }, text))))];
+  if (grid) return React.createElement("div", { role: "group", "aria-label": label,
+    style: { padding: "12px 14px", minWidth: 0, background: "var(--panel)", ...style } }, contents);
+  return React.createElement(__ds_scope.Panel, { padding: 16, hover: clickable,
+    as: clickable ? "button" : "div", type: clickable ? "button" : undefined,
+    "aria-description": clickable ? formula : undefined,
     onClick: clickable ? onClick : undefined,
-    style: {
-      textAlign: "left",
-      cursor: clickable ? "pointer" : "default",
-      ...style
-    }
-  }, React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: "var(--ink-soft)"
-    }
-  }, label), React.createElement("div", {
-    style: {
-      marginTop: 4,
-      fontSize: 24,
-      fontWeight: 800,
-      lineHeight: 1.1,
-      color: tones[tone] || tones.default
-    }
-  }, value));
+    style: { textAlign: "left", cursor: clickable ? "pointer" : "default", ...style } }, contents);
 }
 Object.assign(__ds_scope, { StatCard });
 })(); } catch (e) { __ds_ns.__errors.push({ path: "components/core/StatCard.jsx", error: String((e && e.message) || e) }); }

@@ -132,13 +132,17 @@ it('异步写入期间操作者撤权时整单回滚，恢复权限后原键安�
   expect(await f.db.select('SELECT * FROM payroll_official_issues')).toHaveLength(0)
   expect((await f.service.executeNumbering(command)).issue?.number).toBe('128')
 })
-it.each([{ input: { projectId: 'other-project' } }, { context: { capabilities: [] } }, { document: { id: 'unrelated' } }])('读写codec拒绝错误原单、项目、权限：%j', async (patch) => {
+it.each([
+  { label: '错误项目', patch: { input: { projectId: 'other-project' } }, reason: '正式编号读取不完整或与所选范围不一致' },
+  { label: '缺少权限', patch: { context: { capabilities: [] } }, reason: '正式编号读取不完整或与所选范围不一致' },
+  { label: '错误原单', patch: { document: { id: 'unrelated' } }, reason: '正式出具的冻结工资与所选身份不一致' },
+] as Array<{ label: string, patch: { input?: Record<string, unknown>, context?: Record<string, unknown>, document?: Record<string, unknown> }, reason: string }>)('读写 codec 拒绝$label', async ({ patch, reason }) => {
   const f = await createPayrollNumberingFixture()
   closers.push(f.close)
   const read = await f.read()
   expect(decodePayrollNumberingRead(encodePayrollNumberingRead(read), { origin: 'real' }, f.input)).toEqual(read)
   const changed = { ...read, input: { ...f.input, ...patch.input }, context: { ...read.context, ...patch.context }, document: patch.document ? { ...read.document, ...patch.document } : read.document }
-  expect(() => decodePayrollNumberingRead(changed, { origin: 'real' }, f.input)).toThrow()
+  expect(() => decodePayrollNumberingRead(changed, { origin: 'real' }, f.input)).toThrow(reason)
 })
 
 it.each(Array.from([0, -1, 1.2, Number.MAX_SAFE_INTEGER]).map(input => ({ input })))('读写codec拒绝错误原单、项目、权限和越界起点：输入组合 1 案例 %#', async ({ input: value }) => {
@@ -146,5 +150,5 @@ it.each(Array.from([0, -1, 1.2, Number.MAX_SAFE_INTEGER]).map(input => ({ input 
   closers.push(f.close)
   const read = await f.read()
   expect(decodePayrollNumberingRead(encodePayrollNumberingRead(read), { origin: 'real' }, f.input)).toEqual(read)
-  expect(() => parsePayrollNumberingCommand(numberingCommand(read, 'invalid-init', { kind: 'initialize', nextNumber: value, evidenceNote: '依据' }))).toThrow()
+  expect(() => parsePayrollNumberingCommand(numberingCommand(read, 'invalid-init', { kind: 'initialize', nextNumber: value, evidenceNote: '依据' }))).toThrow('请明确下一张正式编号及旧纸号核对依据')
 })

@@ -20,6 +20,7 @@ import { loadPayrollAttendanceFacts } from './payroll-attendance-facts'
 import { markPayrollC1Recheck } from './payroll-attendance-service'
 import { loadPayrollC1Options } from './payroll-c1-options'
 import { loadPayrollC1ReleasedWithMigration } from './payroll-c-released-with-migration'
+import { assertPayrollDependencies, payrollDependencyVersion } from './payroll-dependency-version'
 import { readPayrollHollowCurrentForSnapshot, readPayrollHollowInTransaction } from './payroll-hollow-read'
 import { payrollMigratedC1Form } from './payroll-migrated-form'
 import { loadPayrollMigratedProof } from './payroll-migrated-proof'
@@ -46,12 +47,14 @@ async function rates(db: TransactionDb, source: PayrollIdentitySource, projectId
     const configuredOvertimeRate = config?.overtime_rate == null ? null : Number(config.overtime_rate)
     const dailyWage = profileDailyWage ?? configuredDailyWage
     const overtimeRate = configuredOvertimeRate ?? (dailyWage === null ? null : dailyWage / 8)
-    return { workerId, workerName: worker?.name ?? null, profileDailyWage, configuredDailyWage, configuredOvertimeRate, dailyWage, dailyWageSource: profileDailyWage !== null ? 'worker-profile' : configuredDailyWage !== null ? 'payroll-config' : 'missing', overtimeRate, overtimeRateSource: configuredOvertimeRate !== null ? 'payroll-config' : dailyWage !== null ? 'daily-divided-eight' : 'missing', configId: config ? String(config.id) : null, revision: config ? Number(config.revision) : null, effectiveMonth: config ? String(config.effective_month) : null, sourceVersion: hash({ worker: worker ? { id: worker.id, name: worker.name, crewId: worker.crewId, currentProjectId: worker.currentProjectId ?? null, dailyWage: worker.dailyWage ?? null, dailyWageState: worker.dailyWageState ?? 'missing', sourceVersion: worker.sourceVersion ?? null } : null, config: config ?? null }) }
+    return { workerId, workerName: worker?.name ?? null, profileDailyWage, configuredDailyWage, configuredOvertimeRate, dailyWage, dailyWageSource: profileDailyWage !== null ? 'worker-profile' : configuredDailyWage !== null ? 'payroll-config' : 'missing', overtimeRate, overtimeRateSource: configuredOvertimeRate !== null ? 'payroll-config' : dailyWage !== null ? 'daily-divided-eight' : 'missing', configId: config ? String(config.id) : null, revision: config ? Number(config.revision) : null, effectiveMonth: config ? String(config.effective_month) : null, sourceVersion: hash({ worker: worker ? { id: worker.id, name: worker.name, crewId: worker.crewId, dailyWage: worker.dailyWage ?? null, dailyWageState: worker.dailyWageState ?? 'missing' } : null, config: config ?? null }) }
   })
 }
 export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceOptions) {
   async function form(db: TransactionDb, base: PayrollC1Context, source: PayrollIdentitySource, input: PayrollC1FormInput): Promise<PayrollC1FormRead> {
     const row = input.statementId ? await head(db, input.statementId) : null
+    if (base.sourceVersion === 'payroll-consumption-v1')
+      base = { ...base, sourceVersion: `${base.sourceVersion}+head:${hash(row)}` }
     if (row?.status === 'released') {
       const migrated = payrollMigratedC1Form(await loadPayrollMigratedProof(db, String(row.project_id)), base, String(row.id))
       if (migrated) {
@@ -181,7 +184,21 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
       catch { return null }
     }
     const history = logs.filter(row => catalog.workers.some(w => w.id === row.worker_id)).map(row => ({ id: String(row.id), tableName: String(row.table_name), recordId: String(row.record_id), operation: String(row.action), operatedAt: String(row.created_at), operator: row.operator === null ? null : String(row.operator), beforeData: parsed(row.before_data), afterData: parsed(row.after_data), beforeRaw: typeof row.before_data === 'string' ? row.before_data : null, afterRaw: typeof row.after_data === 'string' ? row.after_data : null }))
-    return { context: { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion: `${base.sourceVersion}+c1-config:${hash({ scope, values, workers: catalog.workers, locks })}` }, scope, options: catalog, rates: values, readonlyReasons, history }
+    const sourceVersion = base.sourceVersion === 'payroll-consumption-v1'
+      ? payrollDependencyVersion('c1-config', {
+          schemaVersion: 1,
+          scope: hash(scope),
+          view: hash({ scope, values, catalog, locks, capabilities: base.capabilities }),
+          common: hash({ projectAvailable: source.projects.some(project => project.id === scope.projectId), crewAvailable: scope.crewId === null || source.crews.some(crew => crew.id === scope.crewId) }),
+          people: Object.fromEntries(catalog.workers.map(worker => [worker.id, hash({ worker: { id: worker.id, name: worker.name, crewId: worker.crewId, eligible: worker.eligible }, rate: (() => {
+            const { workerName: _name, sourceVersion: _version, ...basis } = values.find(rate => rate.workerId === worker.id)!
+            return basis
+          })() })])),
+          records: {},
+          locks: Object.fromEntries(catalog.workers.map(worker => [worker.id, hash(locks.filter(lock => lock.workerId === worker.id))])),
+        })
+      : `${base.sourceVersion}+c1-config:${hash({ scope, values, workers: catalog.workers, locks })}`
+    return { context: { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion }, scope, options: catalog, rates: values, readonlyReasons, history }
   }
   return {
     c1FormInTransaction: form,
@@ -215,8 +232,7 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
           const action = command.action
           if (action.kind === 'save-c1-rates') {
             const read = await config(db, context, source, command.configScope!)
-            if (read.context.sourceVersion !== command.sourceVersion)
-              throw payrollProblem('stale-source', '个人工资标准或来源已变化，请保留输入重新读取')
+            assertPayrollDependencies(command.sourceVersion, read.context.sourceVersion, action.rates.map(rate => rate.workerId))
             if (read.readonlyReasons.length || new Set(action.rates.map(r => r.workerId)).size !== action.rates.length)
               throw payrollProblem('validation-failed', '个人工资配置不可写或成员重复')
             for (const rate of action.rates) {
@@ -268,7 +284,7 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
           result.logIds = (await db.select<{ id: string }>('SELECT id FROM operation_logs WHERE rowid>? ORDER BY rowid', [start?.value ?? 0])).map(r => r.id)
           await db.execute('INSERT INTO payroll_command_receipts(command_id,actor_id,project_id,statement_id,config_scope_json,action,fingerprint,result_json,command_json) VALUES(?,?,?,?,?,?,?,?,?)', [command.commandId, context.actorId, command.projectId, result.statementId, command.configScope === null ? null : payrollCanonical(command.configScope), action.kind, fingerprint, JSON.stringify(result), payrollCanonical(command)])
           return result
-        }, true)
+        }, true, command)
       }
       catch (cause) {
         if (absent && cause instanceof ProjectRepositoryProblem)

@@ -93,24 +93,24 @@ test.describe('Issue #187：统一整页表单壳', () => {
     })
   }
 
-  for (const width of VIEWPORT_WIDTHS) {
-    test(`分区、字段与吸底动作在 ${width}px 保持可达`, async ({ page }) => {
+  test('分区、字段与吸底动作在各宽度保持可达', async ({ page }) => {
+    await page.goto('/base/supplier/form')
+
+    const shell = page.locator('[data-ui="entity-form-shell"]')
+    await expect(shell).toBeVisible()
+    const footer = shell.getByRole('group', { name: '表单操作' })
+    const sections = shell.getByRole('navigation', { name: '表单分区' })
+    for (const width of VIEWPORT_WIDTHS) {
       await page.setViewportSize({
         width,
         height: width === 390 ? 844 : 900,
       })
-      await page.goto('/base/supplier/form')
-
-      const shell = page.locator('[data-ui="entity-form-shell"]')
-      await expect(shell).toBeVisible()
-      const footer = shell.getByRole('group', { name: '表单操作' })
       await expect(footer).toHaveCSS('position', 'sticky')
       await expect(footer).toBeInViewport()
-      const sections = shell.getByRole('navigation', { name: '表单分区' })
       await expect(sections).toBeHidden()
       await expectNoPageOverflow(page, `统一表单壳 @ ${width}px`)
-    })
-  }
+    }
+  })
 
   test('200% 等效宽度与页签切换保值，放弃确认关闭后归还焦点', async ({ page }) => {
     await page.setViewportSize(EQUIVALENT_200_PERCENT_VIEWPORT)

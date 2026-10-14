@@ -1,9 +1,8 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadQuantityStageWorkspace, parseQuantityStageAction, persistQuantityStageAction, validateQuantityStageParent } from '~/lib/quantity/central-stages'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let memory: TestDb
 let database: ReturnType<typeof createDbCoordinator>
@@ -26,8 +25,7 @@ async function save(value: unknown) {
 }
 
 beforeEach(async () => {
-  memory = await createMemoryDb()
-  await runMigrations(memory)
+  memory = await createMigratedMemoryDb()
   database = createDbCoordinator(async () => ({ ...memory, close: async () => memory.close() }))
   await memory.execute('INSERT INTO projects (id, code, name) VALUES (?, \'STAGE\', \'当前中央项目\'), (\'other-project\', \'OTHER\', \'其他项目\')', [projectId])
   await memory.execute(`INSERT INTO items (id, project_id, code, name, trade, unit) VALUES

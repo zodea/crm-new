@@ -23,12 +23,14 @@ export interface AuxiliaryStoredContract {
   settlementStatus: string | null
   clearanceStatus: string | null
 }
+export interface AuxiliaryOwnerSnapshot { schemaVersion: 1, sourceVersion: number, contracts: AuxiliaryStoredContract[] }
 interface Option { id: string, name: string }
 interface Options { createId?: () => string, now?: () => string, projects?: Option[], suppliers?: Option[], facts?: AuxiliaryContractFact[], identities?: () => { projects: Option[], suppliers: Option[] }, settlements?: (contractId: string) => AuxiliaryContractFact[] }
 
 export function createAuxiliaryContractTestInstance(options: Options = {}) {
   let records = new Map<string, AuxiliaryStoredContract>()
-  const replay = new Map<string, { id: string, version: string, commandId: string }>()
+  let revision = 0
+  const replay = new Map<string, { id: string, version: string, commandId: string, updatedAt: string, attachmentIds: string[] }>()
   const fingerprints = new Map<string, string>()
   const createId = options.createId ?? (() => crypto.randomUUID())
   const now = options.now ?? (() => new Date().toISOString())
@@ -94,6 +96,13 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
     return createReadMeta({ session, schemaVersion: 'auxiliary-contract-read-v2', operation, dataOrigin: origin, asOf, sources: [{ key: 'auxiliary-contracts', state: origin === 'real' ? 'readable' : 'not-requested', sourceVersion: origin === 'real' ? sourceVersion : null, asOf: origin === 'real' ? asOf : null }], coverage: origin === 'real' ? 'complete' : 'unknown', scope })
   }
   return {
+    exportState(): AuxiliaryOwnerSnapshot { return structuredClone({ schemaVersion: 1, sourceVersion: revision, contracts: [...records.values()] }) },
+    importState(state: AuxiliaryOwnerSnapshot) {
+      if (state.schemaVersion !== 1 || !Number.isSafeInteger(state.sourceVersion) || state.sourceVersion < 0 || new Set(state.contracts.map(row => row.draft.id)).size !== state.contracts.length)
+        throw auxiliaryProblem('unavailable', '辅助合同持久快照身份或版本损坏')
+      records = new Map(structuredClone(state.contracts).map(row => [row.draft.id, row]))
+      revision = state.sourceVersion
+    },
     supplierReadSource(workspaceId: string) {
       const scoped = [...records.values()].filter(row => row.workspaceId === workspaceId && row.draft.kind === 'other_expense')
       return {
@@ -214,7 +223,8 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
       const attachments = applyAuxiliaryAttachments(existing?.attachments ?? [], request.attachments, { id, kind: draft.kind, actorId: session.actorId, timestamp })
       const stored: AuxiliaryStoredContract = { draft, audit, version: (existing?.version ?? 0) + 1, attachments, workspaceId: session.workspaceId, migrationBatchId: existing?.migrationBatchId ?? null, facts: existing?.facts ?? [], settlementStatus: existing?.settlementStatus ?? null, clearanceStatus: existing?.clearanceStatus ?? null }
       records.set(id, stored)
-      const result = { id, version: String(stored.version), commandId: request.commandId }
+      revision++
+      const result = { id, version: String(stored.version), commandId: request.commandId, updatedAt: timestamp, attachmentIds: attachments.filter(file => !file.deletedAt).map(file => file.id) }
       replay.set(replayKey, result)
       fingerprints.set(replayKey, fingerprint)
       return result

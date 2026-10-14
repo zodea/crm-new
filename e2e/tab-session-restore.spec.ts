@@ -81,7 +81,7 @@ test('合法编码身份恢复成唯一目标，不留下重复页签', async ({
   await expect(page.locator('[data-tab-key="/project/proj_demo_001"]')).toHaveCount(1)
 })
 
-test('十五页签五档视口可翻动与键盘操作，软刷新保留集合', async ({ page }, testInfo) => {
+test('十五页签五档视口可翻动与键盘操作，软刷新保留集合', async ({ page }) => {
   const factor = '/finance/invoice/factor'
   await page.addInitScript(({ key, value }) => localStorage.setItem(key, JSON.stringify(value)), {
     key,
@@ -107,14 +107,13 @@ test('十五页签五档视口可翻动与键盘操作，软刷新保留集合',
     await page.keyboard.press('Escape')
     await expect(active).toBeFocused()
     await expectNoPageOverflow(page, `${width}px 恢复页签`)
-    await page.screenshot({ path: testInfo.outputPath(`tabs-restored-${width}.png`), fullPage: true })
   }
   await page.getByRole('button', { name: '刷新当前页', exact: true }).click()
   await expect(page).toHaveURL(factor)
   await expect(tabs.locator('[data-shell-tab]')).toHaveCount(16)
 })
 
-test('后台恢复详情首次激活才读取，撤权回退后可重试或关闭', async ({ page }, testInfo) => {
+test('后台恢复详情首次激活才读取，撤权回退后可重试或关闭', async ({ page }) => {
   const target = '/project/proj_demo_001?origin=demo'
   const factor = '/finance/invoice/factor'
   let detailReads = 0
@@ -136,7 +135,6 @@ test('后台恢复详情首次激活才读取，撤权回退后可重试或关�
   await expect(page).toHaveURL(factor)
   expect(detailReads).toBe(1)
   await expectNoPageOverflow(page, '恢复权限问题态')
-  await page.screenshot({ path: testInfo.outputPath('tabs-forbidden-390.png'), fullPage: true })
   await page.unroute('**/api/read/projects/proj_demo_001?*')
   await page.getByRole('button', { name: '重试恢复', exact: true }).click()
   await expect(page).toHaveURL(target)

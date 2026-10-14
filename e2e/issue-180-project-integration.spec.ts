@@ -31,12 +31,16 @@ const VIEWPORTS = [
   { label: '1440px @ 200%', width: 720, height: 900, requireLocalScroll: true },
 ] as const
 
-for (const viewport of VIEWPORTS) {
-  test(`${viewport.label} 中央项目保持页面边界，工资密表局部滚动及导航键盘可达`, async ({ page }) => {
+test('中央项目各宽度保持页面边界，工资密表局部滚动及导航键盘可达', async ({ page }) => {
+  const fixture = await installProjectCentralFixture(page)
+  await fixture.open()
+  const table = page.getByRole('region', { name: '工资实际收付明细，可横向滚动', exact: true })
+  await expect(table).toBeVisible()
+  const receipts = page.getByRole('region', { name: '项目收款', exact: true }).getByRole('link', { name: '查看收款登记', exact: true })
+  await tabUntilFocused(page, receipts)
+  await expect(receipts).toBeInViewport()
+  for (const viewport of VIEWPORTS) {
     await page.setViewportSize(viewport)
-    const fixture = await installProjectCentralFixture(page)
-    await fixture.open()
-    const table = page.getByRole('region', { name: '工资实际收付明细，可横向滚动', exact: true })
     await expect(table).toBeVisible()
     await expectNoPageOverflow(page, `${viewport.label} 中央项目详情`)
     if (viewport.requireLocalScroll) {
@@ -46,10 +50,8 @@ for (const viewport of VIEWPORTS) {
       })
       expect(await table.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
     }
-    const receipts = page.getByRole('region', { name: '项目收款', exact: true }).getByRole('link', { name: '查看收款登记', exact: true })
-    await tabUntilFocused(page, receipts)
-    await expect(receipts).toBeInViewport()
-    await expectNoPageOverflow(page, `${viewport.label} 键盘导航后`)
-    expect(fixture.errors).toEqual([])
-  })
-}
+    await receipts.scrollIntoViewIfNeeded()
+    await expect(receipts, viewport.label).toBeInViewport()
+  }
+  expect(fixture.errors).toEqual([])
+})

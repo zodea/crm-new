@@ -24,10 +24,14 @@ afterEach(async () => {
   await quantityTestInstance.reset()
   await coreMigrationTestInstance.reset(session.workspaceId)
 })
-async function migrate(source: CoreMigrationSourceDTO, bytes: Uint8Array) {
+async function dryRun(source: CoreMigrationSourceDTO, bytes: Uint8Array) {
   const snapshotSha256 = createHash('sha256').update(bytes).digest('hex')
   await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('publication-preflight'), source, backup: null }), session)
   const batch = await coreMigrationTestInstance.dryRun(parseCoreMigrationSourceCommand({ ...envelope('publication-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${snapshotSha256}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256, byteLength: bytes.length, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }), session)
+  return batch
+}
+async function migrate(source: CoreMigrationSourceDTO, bytes: Uint8Array) {
+  const batch = await dryRun(source, bytes)
   expect(batch.issues.filter(row => row.metricKey === 'apply-failed')).toEqual([])
   await coreMigrationTestInstance.importBatch({ ...envelope('publication-import'), batchId: batch.batchId }, session)
   await coreMigrationTestInstance.confirm({ ...envelope('publication-confirm'), batchId: batch.batchId }, session)
@@ -101,6 +105,12 @@ it('真实工资正式128号、固定名册六张原件与保存目录一起迁�
   finally { await f.close() }
 }, 30_000)
 
+const rollbackRejection = {
+  'photo-bytes': '工人原件正文或元数据已有变更，不能恢复删除',
+  // 被改写的工人随运行生成的身份而定，旧版与新版名册迁移各自校验资料版本，两条拒绝原因等价。
+  'private-version': /^(?:迁入工人资料版本已被改写|工人实名资料迁移：原工人迁入资料已被改写)，不能恢复删除$/,
+  'proof-registry': '固定目录、名册或原件已有独立引用或被改写，危险恢复已整批拒绝',
+} as const
 it.each(['photo-bytes', 'private-version', 'proof-registry'] as const)('迁入后 %s 被改写时读取或危险恢复拒绝且整库不变', async (kind) => {
   const f = await createPayrollWorkbookFixture()
   try {
@@ -117,10 +127,10 @@ it.each(['photo-bytes', 'private-version', 'proof-registry'] as const)('迁入�
     })
     if (kind === 'proof-registry') {
       const [row] = await quantityTestInstance.withWorkspaceTransaction(tx => tx.select<{ id: string }>('SELECT id FROM payroll_workbook_archives WHERE project_id=?', [projectId]))
-      await expect(payrollWorkbookService.workbookArchive({ origin: 'real' }, { projectId, archiveId: row!.id })).rejects.toBeDefined()
+      await expect(payrollWorkbookService.workbookArchive({ origin: 'real' }, { projectId, archiveId: row!.id })).rejects.toThrow('固定目录与名册的迁入关系或原件证明不完整，不能部分接管')
     }
     const before = workbookHash(Array.from(await quantityTestInstance.exportSnapshotBytes()))
-    await expect(coreMigrationTestInstance.rollback({ ...envelope(`tampered-${kind}-rollback`), batchId: batch.batchId }, session)).rejects.toBeDefined()
+    await expect(coreMigrationTestInstance.rollback({ ...envelope(`tampered-${kind}-rollback`), batchId: batch.batchId }, session)).rejects.toThrow(rollbackRejection[kind])
     expect(workbookHash(Array.from(await quantityTestInstance.exportSnapshotBytes()))).toBe(before)
   }
   finally { await f.close() }
@@ -141,7 +151,7 @@ it('迁入后独立保存的目录保留零成员引用，危险恢复失败不�
     const zero = batch.mappings.find(row => row.entityType === 'workers' && row.legacyId === 'zero')!.serverId
     expect(refs.some(row => row.record_id === zero)).toBe(true)
     const before = workbookHash(Array.from(await quantityTestInstance.exportSnapshotBytes()))
-    await expect(coreMigrationTestInstance.rollback({ ...envelope('blocked-directory-rollback'), batchId: batch.batchId }, session)).rejects.toBeDefined()
+    await expect(coreMigrationTestInstance.rollback({ ...envelope('blocked-directory-rollback'), batchId: batch.batchId }, session)).rejects.toThrow('固定目录、名册或原件已有独立引用或被改写，危险恢复已整批拒绝')
     expect(workbookHash(Array.from(await quantityTestInstance.exportSnapshotBytes()))).toBe(before)
     expect((await payrollWorkbookService.workbookArchive({ origin: 'real' }, { projectId, archiveId: saved.archiveId })).groups[0]!.entries[0]!.document.actualAmount).toBe(525)
   }
@@ -183,7 +193,10 @@ it.each(['roster-command', 'roster-reference', 'actual-fact', 'actual-omitted'] 
       const result = { ...JSON.parse(receipt!.result_json), manifestHash: archive.manifestHash }
       await f.db.execute('UPDATE payroll_workbook_receipts SET command_json=?,fingerprint=?,result_json=? WHERE archive_id=?', [JSON.stringify(command), workbookHash(command), JSON.stringify(result), saved.archiveId])
     }
-    await expect(migrate(await readQuantityCoreSource(f.db), f.db.raw.export())).rejects.toBeDefined()
+    const batch = await dryRun(await readQuantityCoreSource(f.db), f.db.raw.export())
+    expect(batch.issues.filter(row => row.metricKey === 'apply-failed')).toEqual([
+      expect.objectContaining({ entityType: 'payroll_projects', field: 'payrollGraphJson', attribution: 'source', reason: '固定目录或名册的原件、回执、映射证明不一致' }),
+    ])
     expect(coreMigrationTestInstance.snapshot(session).authority).toBe('local')
   }
   finally { await f.close() }

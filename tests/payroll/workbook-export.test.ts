@@ -111,10 +111,10 @@ describe('固定工资目录的真实文件组合', () => {
     expect(manifest.migrationNotice).toContain('原始归档')
     const wrongScope = structuredClone(f.roster)
     wrongScope.scope.projectId = 'another-project'
-    await expect(assertPayrollWorkbookRoster(f.archive, wrongScope)).rejects.toThrow()
+    await expect(assertPayrollWorkbookRoster(f.archive, wrongScope)).rejects.toThrow('名册权限、固定版本或原工资范围不一致，下载已停止')
     const invalidProof = structuredClone(f.roster)
     invalidProof.migration!.originalContentHash = 'invalid'
-    await expect(assertPayrollWorkbookRoster(f.archive, invalidProof)).rejects.toThrow()
+    await expect(assertPayrollWorkbookRoster(f.archive, invalidProof)).rejects.toThrow('名册服务响应不完整或归属不符，请重新读取')
     const unproven = structuredClone(f.roster)
     delete unproven.migration
     await expect(assertPayrollWorkbookRoster(f.archive, unproven)).rejects.toThrow('摘要')

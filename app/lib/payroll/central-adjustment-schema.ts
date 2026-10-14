@@ -1,6 +1,9 @@
 import type { TransactionDb } from '../db/coordinator'
+import { hasProductionPayrollSchema } from './central-schema'
 
 export async function initializePayrollAdjustmentSchema(tx: TransactionDb) {
+  if (await hasProductionPayrollSchema(tx))
+    return
   await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_adjustments (
     id TEXT PRIMARY KEY, root_adjustment_id TEXT NOT NULL, corrects_adjustment_id TEXT,
     original_statement_id TEXT NOT NULL REFERENCES wage_statements(id), project_id TEXT NOT NULL REFERENCES projects(id),

@@ -52,3 +52,38 @@ for (const input of [
     expect(pageErrors, '台账打印入口不应产生客户端运行错误').toEqual([])
   })
 }
+
+test('发票台账打印：Excel 导入的发票没有原件不进入打印，面板列出未打印清单', async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  await page.addInitScript(() => {
+    window.print = () => {}
+  })
+  await page.clock.setFixedTime(new Date('2026-09-11T04:00:00.000Z'))
+  await page.goto('/finance/ledger')
+  await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible()
+  await updateProductionSnapshot(page, (database) => {
+    database.run('DELETE FROM invoices')
+    for (const [id, number, source] of [['print-scan', '26442000000000000601', 'scan'], ['print-excel', '26442000000000000602', 'excel']]) {
+      database.run(`INSERT INTO invoices (id, invoice_number, invoice_date, seller, invoice_type, total_amount, owner_kind, account_status, review_status, ocr_status, source)
+      VALUES (?, ?, '2026-09-11', '合成打印供方', '增值税普通发票', 113, 'personal', 'archived', 'reviewed', 'done', ?)`, [id, number, source])
+    }
+  })
+  await page.reload()
+  // 台账勾选只用于合计，Excel 行同样可勾（#499）；打印面板仍单独拦截
+  await page.locator('.vxe-table--header .vxe-cell--checkbox').first().click()
+  await expect(page.locator('span', { hasText: '已选' })).toHaveText(/已选\s*2\s*张 · 合计\s*¥?226\.00/)
+  await page.getByRole('button', { name: '打印 PDF', exact: true }).click()
+
+  const list = page.getByRole('complementary', { name: '待打印发票列表' })
+  await expect(list.getByRole('checkbox', { name: '勾选发票 26442000000000000602' })).toBeDisabled()
+  await expect(list).toContainText('Excel 导入的发票没有原件，不能打印')
+  await expect(page.getByTestId('invoice-print-summary')).toContainText('已勾 1 张')
+  await expect(page.getByTestId('invoice-print-skipped')).toContainText('1 张发票不会打印')
+  await expect(page.getByTestId('invoice-print-skipped')).toContainText('26442000000000000602：Excel 导入的发票没有原件，不能打印')
+
+  await page.getByRole('button', { name: '打印选中', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '确认打印结果' })).toContainText('本次打印：1 张发票')
+  await expect(page.getByRole('dialog', { name: '确认打印结果' })).toContainText('另有 1 张未打印')
+  expect(pageErrors, '台账打印入口不应产生客户端运行错误').toEqual([])
+})

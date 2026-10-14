@@ -2,16 +2,14 @@ import type { TransactionDb } from '~/lib/db/coordinator'
 import type { QuantityCommand, QuantityContext } from '~/lib/quantity/central-contract'
 import type { QuantityHollowAction, QuantityHollowRead } from '~/lib/quantity/central-hollow-contract'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { createQuantityService } from '~/lib/quantity/central-service'
 import { blankQuantityTemplateDraft } from '~/lib/quantity/template'
 import { createQuantityHollowService } from '../../server/utils/quantity-hollow-service'
-import { createMemoryDb } from './memory-db'
+import { createMigratedMemoryDb } from './memory-db'
 
 /** 所有位置、模板和原责任由真实公开 quantity 命令建立。 */
 export async function createQuantityHollowFixture() {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   const coordinator = createDbCoordinator(async () => db)
   let session: QuantityContext = { workspaceId: 'hollow-work', actorId: 'hollow-actor', capabilities: ['quantity:read', 'quantity:write', 'project:list:read', 'crew:list:read', 'worker:list:read'] }
   const projects = [{ id: 'hollow-project', name: '检查项目', code: 'H', dataOrigin: 'real' as const }]

@@ -5,12 +5,13 @@ import type { BusinessSession } from './business-session'
 import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
-import { CONFIRMED_SETTLEMENT_SQL_VALUES } from '../../app/lib/contract/effective-status'
+import { CONFIRMED_SETTLEMENT_SQL_VALUES, isEffectiveExpenditureContract } from '../../app/lib/contract/effective-status'
 import { FinanceRepositoryProblem } from '../../app/lib/finance/central-contract'
 import { contractOriginalPayloadDigest } from '../../app/lib/forms/original-content'
 import { decodeOtherSettlementResult, otherSettlementFingerprint, otherSettlementKey, readOtherSettlementStored, validateOtherSettlementJournal } from '../../app/lib/other-settlement/storage'
 import { decodeOtherSettlementCommand } from '../../app/lib/other-settlement/validation'
 import { createOtherSettlementInstance } from './other-settlement-instance'
+import { readAuxiliaryContractScopeFacts } from './production-auxiliary-contract-record'
 import { listWorkerReferences } from './production-crew-worker-references'
 import { appendClearanceLink, readClearanceLinks, validateExpenseClearanceJournal } from './production-finance-clearance'
 import { listOriginalExpenseReferences, readOriginalExpenseReference } from './production-finance-expense-references'
@@ -35,8 +36,15 @@ async function identities(tx: TransactionDb, actor: BusinessSession): Promise<Pi
       }>('SELECT id,json_extract(draft_json,\'$.name\') AS label FROM suppliers WHERE COALESCE(json_extract(draft_json,\'$.deletedAt\'),\'\')=\'\' ORDER BY label,id')
     : []
   const workers = actor.capabilities.includes('worker:list:read') ? (await listWorkerReferences(tx, actor)).map(row => ({ id: row.id, label: row.name })) : []
-  // Auxiliary contracts retain their existing Native/development owner. No test-map contract is borrowed into production.
-  return { projects, suppliers, workers, contracts: [] }
+  let contracts: OtherSettlementContext['contracts'] = []
+  if (actor.capabilities.includes('auxiliary-contract:read')) {
+    const participant = (await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'auxiliary-contract\''))[0]
+    if (participant?.schema_version === 1) {
+      const facts = await readAuxiliaryContractScopeFacts(tx, actor)
+      contracts = facts.filter(row => row.eligible && isEffectiveExpenditureContract(row.status) && projects.some(project => project.id === row.projectId) && suppliers.some(supplier => supplier.id === row.supplierId)).map(row => ({ id: row.id, kind: 'other_expense', name: row.name, projectId: row.projectId, supplierId: row.supplierId, status: row.status, amount: row.amount === null ? null : row.amount.toFixed(2), changedAmount: row.amount === null || row.supplementAmount === null ? null : (row.amount + row.supplementAmount).toFixed(2) }))
+    }
+  }
+  return { projects, suppliers, workers, contracts }
 }
 async function actualFacts(tx: TransactionDb, record: OtherSettlementStored, actor: BusinessSession): Promise<{
   facts: OtherSettlementFact[] | null
@@ -44,7 +52,7 @@ async function actualFacts(tx: TransactionDb, record: OtherSettlementStored, act
   qualificationUnavailableReason?: string
   unavailableFactKinds?: OtherSettlementFact['kind'][]
 }> {
-  if (!record.draft.originalExpenses?.length || record.draft.contractId)
+  if (!record.draft.originalExpenses?.length && !record.draft.contractId)
     return { facts: record.facts, sources: [] }
   const participant = await tx.select('SELECT domain FROM production_participants WHERE domain=\'finance\' AND schema_version=1')
   if (!participant.length)
@@ -55,7 +63,7 @@ async function actualFacts(tx: TransactionDb, record: OtherSettlementStored, act
   const serviceIds = new Set<string>()
   let qualificationUnavailableReason: string | undefined
   const unavailableFactKinds = new Set<OtherSettlementFact['kind']>()
-  for (const adopted of record.draft.originalExpenses) {
+  for (const adopted of record.draft.contractId ? [] : record.draft.originalExpenses ?? []) {
     const allocation = (await tx.select<{ id: string, frozen_json: string }>('SELECT id,frozen_json FROM expenditure_settlement_expense_allocations WHERE settlement_id=? AND original_expense_line_id=? AND deleted_at IS NULL', [record.id, adopted.originalExpenseLineId]))[0]
     if (!allocation)
       return { facts: null, sources: [] }
@@ -93,7 +101,7 @@ async function actualFacts(tx: TransactionDb, record: OtherSettlementStored, act
         : '同一原费用的已确认采用合计超过真实原费用上限，当前新申请资格不可用；原结算、历史回执及实际现金继续保留'
     }
   }
-  if ((serviceIds.size === 1 ? [...serviceIds][0] : null) !== (record.draft.supplierId ?? null))
+  if (!record.draft.contractId && (serviceIds.size === 1 ? [...serviceIds][0] : null) !== (record.draft.supplierId ?? null))
     return { facts: null, sources: [] }
   const rows = await tx.select<Record<string, unknown>>('SELECT a.*,l.id AS allocation_id,l.allocated_amount,l.deleted_at AS allocation_deleted_at FROM payment_application_settlement_allocations l JOIN payment_applications a ON a.id=l.payment_application_id WHERE l.settlement_id=? ORDER BY a.id,l.id', [record.id])
   const evidence = imports.find(item => item.graph.tables.expenditure_settlements.some((head: { id: string }) => head.id === record.id))
@@ -110,7 +118,8 @@ async function actualFacts(tx: TransactionDb, record: OtherSettlementStored, act
   const sources: OtherSettlementSourceDocument[] = []
   const currentRows = rows.filter(row => row.allocation_deleted_at === null || !rows.some(other => other.id === row.id && other.allocation_deleted_at === null))
   for (const row of currentRows) {
-    const valid = row.project_id === (record.draft.projectId ?? null) && row.contract_id === (record.draft.contractId ?? null) && row.supplier_id === (record.draft.payeeSupplierId ?? null) && row.worker_id === (record.draft.payeeWorkerId ?? null)
+    const payeeSupplierId = record.draft.payeeSupplierId ?? (record.draft.contractId && !record.draft.payeeWorkerId ? record.draft.supplierId ?? null : null)
+    const valid = row.project_id === (record.draft.projectId ?? null) && row.contract_id === (record.draft.contractId ?? null) && row.supplier_id === payeeSupplierId && row.worker_id === (record.draft.payeeWorkerId ?? null)
     const active = valid && row.deleted_at === null && row.allocation_deleted_at === null && ['submitted', 'approved', 'paying', 'paid'].includes(String(row.status))
     const amount = typeof row.allocated_amount === 'number' && Number.isFinite(row.allocated_amount) ? row.allocated_amount.toFixed(2) : null
     const all = await tx.select<{
@@ -195,7 +204,8 @@ async function envelope<T extends object>(tx: TransactionDb, actor: BusinessSess
   }>('SELECT revision FROM finance_revision WHERE singleton=1'))[0]
   const asOf = new Date().toISOString()
   const readable = ['finance-reimbursement:read', 'finance-payment-application:read', 'finance-payment-record:read'].every(capability => actor.capabilities.includes(capability))
-  return withReadMeta(value, createReadMeta({ session: actor, schemaVersion: 'other-settlement-read-v1', operation: `other-settlement:${operation}`, dataOrigin: 'real', asOf, coverage: 'complete', scope, sources: [{ key: 'other-settlements', state: 'readable', sourceVersion: `other-settlement-${revision}`, asOf }, { key: 'finance', state: readable ? finance ? 'readable' : 'unavailable' : 'forbidden', sourceVersion: readable && finance ? `finance-${finance.revision}` : null, asOf: readable && finance ? asOf : null }] }))
+  const auxiliary = actor.capabilities.includes('auxiliary-contract:read') && (await tx.select('SELECT domain FROM production_participants WHERE domain=\'auxiliary-contract\' AND schema_version=1')).length ? (await tx.select<{ revision: number }>('SELECT revision FROM auxiliary_contract_revision WHERE singleton=1'))[0] : null
+  return withReadMeta(value, createReadMeta({ session: actor, schemaVersion: 'other-settlement-read-v1', operation: `other-settlement:${operation}`, dataOrigin: 'real', asOf, coverage: 'complete', scope, sources: [{ key: 'other-settlements', state: 'readable', sourceVersion: `other-settlement-${revision}`, asOf }, { key: 'finance', state: readable ? finance ? 'readable' : 'unavailable' : 'forbidden', sourceVersion: readable && finance ? `finance-${finance.revision}` : null, asOf: readable && finance ? asOf : null }, { key: 'auxiliary-contracts', state: !actor.capabilities.includes('auxiliary-contract:read') ? 'forbidden' : auxiliary ? 'readable' : 'unavailable', sourceVersion: auxiliary ? `auxiliary-contract-${auxiliary.revision}` : null, asOf: auxiliary ? asOf : null }] }))
 }
 export function createProductionOtherSettlementService(storage: ProductionStorage) {
   function authorize(session: Session, write: boolean) {

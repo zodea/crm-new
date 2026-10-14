@@ -2,12 +2,12 @@ import { expect, it } from 'vitest'
 import { parsePayrollProjectGraph, readPayrollProjectMigrationGraphs } from '../../app/lib/migration/payroll-source'
 import { initializePayrollAFeesSchema, PAYROLL_A_FEES_MIGRATION_TABLES } from '../../app/lib/payroll/central-a-fees-schema'
 import { initializePayrollAdjustmentSchema } from '../../app/lib/payroll/central-adjustment-schema'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 import { createPayrollAdjustmentFixture } from '../helpers/payroll-adjustment-service-fixture'
 
 it('费用图使用outer v3和独立fees v1，原v1/v2保持封闭白名单', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     await initializePayrollAdjustmentSchema(db)
@@ -19,14 +19,14 @@ it('费用图使用outer v3和独立fees v1，原v1/v2保持封闭白名单', as
     expect(graph.fees!.schemaVersion).toBe(1)
     expect(Object.keys(graph.fees!.tables)).toEqual(PAYROLL_A_FEES_MIGRATION_TABLES)
     expect(graph.fees!.tables.payroll_a_management_books[0]).toMatchObject({ id: 'book-original', manager_worker_id: 'pa-worker-old', deleted_at: null })
-    expect(() => parsePayrollProjectGraph({ ...graph, schemaVersion: 2 })).toThrow()
+    expect(() => parsePayrollProjectGraph({ ...graph, schemaVersion: 2 })).toThrow('工资迁移：完整项目图身份或结构无效')
     const { fees: _fees, ...v2 } = graph
     expect(parsePayrollProjectGraph({ ...v2, schemaVersion: 2 }).schemaVersion).toBe(2)
-    expect(() => parsePayrollProjectGraph({ ...graph, fees: { ...graph.fees, schemaVersion: 2 } })).toThrow()
-    expect(() => parsePayrollProjectGraph({ ...graph, fees: { ...graph.fees, tables: { ...graph.fees!.tables, unexpected: [] } } })).toThrow()
+    expect(() => parsePayrollProjectGraph({ ...graph, fees: { ...graph.fees, schemaVersion: 2 } })).toThrow('工资迁移：费用原图结构无效')
+    expect(() => parsePayrollProjectGraph({ ...graph, fees: { ...graph.fees, tables: { ...graph.fees!.tables, unexpected: [] } } })).toThrow('工资迁移：费用原图结构无效')
     const incomplete = structuredClone(graph)
     delete (incomplete.fees!.tables as Record<string, unknown>).payroll_a_management_ownership
-    expect(() => parsePayrollProjectGraph(incomplete)).toThrow()
+    expect(() => parsePayrollProjectGraph(incomplete)).toThrow('工资迁移：费用原图缺少 payroll_a_management_ownership')
   }
   finally { db.close() }
 })

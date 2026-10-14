@@ -3,6 +3,8 @@ import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtes, hiddenCtesFor, logCreate, selectVisibleSql, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
 
+export interface QuantityCompletionReadOptions { planVisibility?: { hiddenCtesFor: typeof hiddenCtesFor, visibleCond: typeof visibleCond } }
+
 export interface QuantityCompletionUnit {
   id: string
   code: string
@@ -219,6 +221,7 @@ export async function loadQuantityCompletionWorkspace(
   db: SoftDb,
   projectId: string,
   unitId: string,
+  options: QuantityCompletionReadOptions = {},
 ): Promise<QuantityCompletionWorkspace> {
   const [project] = await db.select<ProjectRow>(
     `${selectVisibleSql('projects')} AND id = ?`,
@@ -250,15 +253,16 @@ export async function loadQuantityCompletionWorkspace(
   if (!unit)
     throw new Error('户不存在、已删除或不属于当前项目')
 
+  const planVisibility = options.planVisibility ?? { hiddenCtesFor, visibleCond }
   const [planWindowRow] = await db.select<PlanWindowRow>(
-    `${hiddenCtesFor('schedule_group_buildings', 'schedule_tasks')}
+    `${planVisibility.hiddenCtesFor('schedule_group_buildings', 'schedule_tasks')}
      SELECT MIN(st.planned_start) AS planned_start,
             MAX(st.planned_finish) AS planned_finish
      FROM schedule_group_buildings sgb
      JOIN schedule_groups sg ON sg.id = sgb.group_id
      JOIN schedule_tasks st ON st.group_id = sg.id
-     WHERE ${visibleCond('schedule_group_buildings', 'sgb')}
-       AND ${visibleCond('schedule_tasks', 'st')}
+     WHERE ${planVisibility.visibleCond('schedule_group_buildings', 'sgb')}
+       AND ${planVisibility.visibleCond('schedule_tasks', 'st')}
        AND sgb.building_id = ?
        AND sg.project_id = ?
        AND st.project_id = ?`,
@@ -514,7 +518,7 @@ export async function loadQuantityPhotoDataUrl(db: SoftDb, photoId: string): Pro
 export async function persistQuantityStageCompletion(
   db: SoftDb,
   draft: QuantityCompletionDraft,
-  options: { uploader?: string } = {},
+  options: QuantityCompletionReadOptions & { uploader?: string, writeOriginal?: (db: SoftDb, fileId: string, photo: QuantityCompletionPhotoDraft) => Promise<void> } = {},
 ): Promise<QuantityCompletionWriteResult> {
   const projectId = draft.projectId.trim()
   const unitId = draft.unitId.trim()
@@ -529,7 +533,7 @@ export async function persistQuantityStageCompletion(
   }
 
   // 在同一 transaction 内重新加载并校验全部事实，确认弹窗与真正提交之间不会 TOCTOU 覆盖。
-  const workspace = await loadQuantityCompletionWorkspace(db, projectId, unitId)
+  const workspace = await loadQuantityCompletionWorkspace(db, projectId, unitId, options)
   const stage = workspace.stages.find(candidate => candidate.id === stageId)
   if (!stage)
     throw new Error('工序阶段不属于当前项目或不支持按户完成')
@@ -625,10 +629,15 @@ export async function persistQuantityStageCompletion(
       '验收照片未能记录操作日志',
     ))
     // 正文独立存放（v10 file_payloads），不进通用软删快照。
-    await db.execute(
-      `INSERT INTO file_payloads (file_ref_id, encoding, content) VALUES (?, 'base64', ?)`,
-      [photoId, photo.contentBase64],
-    )
+    if (options.writeOriginal) {
+      await options.writeOriginal(db, photoId, photo)
+    }
+    else {
+      await db.execute(
+        `INSERT INTO file_payloads (file_ref_id, encoding, content) VALUES (?, 'base64', ?)`,
+        [photoId, photo.contentBase64],
+      )
+    }
     photoIds.push(photoId)
   }
 

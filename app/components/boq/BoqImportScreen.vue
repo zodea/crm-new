@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import type { BoqFormatClass, BoqImportRow } from '~/lib/boq/import'
+import type { BoqOriginalInput } from '~/lib/boq/production-contract'
+import { readBoqSourceImportRecoveryForRoute } from '~/lib/boq/command-recovery'
 import { toErrorMessage } from '~/lib/util/error'
 
 const route = useRoute()
 const router = useRouter()
 const store = useBoqStore()
+const formal = useProductionBoqStore()
 const { error: toastError, success } = useKitUI()
 const projectId = shallowRef('')
 const contractId = shallowRef('')
 const initialized = shallowRef(false)
+const inputKind = shallowRef<'workbook' | 'sqlite'>('workbook')
 
 const projects = computed(() => store.catalog.map(project => ({
   id: project.id,
@@ -24,17 +28,22 @@ const contracts = computed(() => (selectedProject.value?.contracts ?? []).map(co
 async function initialize() {
   try {
     await store.loadCatalog()
+    if (store.production && formal.directory && readBoqSourceImportRecoveryForRoute(route.fullPath, formal.directory, sessionStorage).length)
+      inputKind.value = 'sqlite'
     const preferredProject = store.catalog.find(project => project.id === route.query.project)
       ?? store.catalog[0]
     projectId.value = preferredProject?.id ?? ''
     contractId.value = preferredProject?.contracts.find(contract => contract.id === route.query.contract)?.id
-      ?? preferredProject?.contracts[0]?.id
+      ?? (store.production ? '' : preferredProject?.contracts[0]?.id)
       ?? ''
+    if (store.production && projectId.value && contractId.value)
+      await store.loadWorkspace(projectId.value, contractId.value)
   }
   catch (cause) {
     toastError(toErrorMessage(cause))
   }
   finally {
+    await nextTick()
     initialized.value = true
   }
 }
@@ -42,22 +51,36 @@ async function initialize() {
 watch(projectId, (next, previous) => {
   if (!initialized.value || !next || next === previous)
     return
-  contractId.value = store.catalog.find(project => project.id === next)?.contracts[0]?.id ?? ''
+  contractId.value = store.production ? '' : store.catalog.find(project => project.id === next)?.contracts[0]?.id ?? ''
+})
+watch([projectId, contractId], async ([project, contract]) => {
+  if (initialized.value && store.production && project && contract) {
+    try {
+      await store.loadWorkspace(project, contract)
+    }
+    catch (cause) { toastError(toErrorMessage(cause)) }
+  }
 })
 
 async function importRows(payload: {
   fileName: string
   formatClass: BoqFormatClass
   rows: readonly BoqImportRow[]
+  original: BoqOriginalInput
 }) {
+  const project = projectId.value
+  const contract = contractId.value
   try {
     const result = await store.importWorkbook({
-      projectId: projectId.value,
-      contractId: contractId.value,
+      projectId: project,
+      contractId: contract,
       fileName: payload.fileName,
       formatClass: payload.formatClass,
       rows: payload.rows,
+      original: payload.original,
     })
+    if (projectId.value !== project || contractId.value !== contract)
+      return
     success(result.unitPriceCount
       ? `已导入分项单价库 ${result.unitPriceCount} 行，不计入合同工程量`
       : `已导入 ${result.lineCount} 行，${result.linkedTemplateLineCount} 行已回接户型工程量`)
@@ -75,6 +98,7 @@ onMounted(initialize)
 </script>
 
 <template>
+  <CommandRecoveryPanel v-for="descriptor in store.pending" :key="descriptor.commandId" :command-id="descriptor.commandId" :saved="store.savedCommands.includes(descriptor.commandId)" :busy="store.saving" @recover="store.recover(descriptor)" />
   <div class="min-w-0 space-y-4">
     <section class="panel p-4">
       <div class="flex flex-wrap items-start gap-3">
@@ -109,8 +133,18 @@ onMounted(initialize)
       </div>
     </section>
 
+    <div v-if="store.production" class="flex flex-wrap gap-2" role="group" aria-label="选择清单来源">
+      <KitButton :variant="inputKind === 'workbook' ? 'primary' : 'secondary'" @click="inputKind = 'workbook'">
+        上传原清单工作簿
+      </KitButton>
+      <KitButton :variant="inputKind === 'sqlite' ? 'primary' : 'secondary'" @click="inputKind = 'sqlite'">
+        原 SQLite 完整图迁入
+      </KitButton>
+    </div>
+    <BoqSourceImport v-if="store.production && inputKind === 'sqlite'" />
+
     <BoqImportWizard
-      v-if="initialized && projectId && contractId"
+      v-else-if="initialized && projectId && contractId"
       :project-id="projectId"
       :contract-id="contractId"
       :busy="store.saving"

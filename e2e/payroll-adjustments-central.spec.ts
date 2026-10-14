@@ -9,15 +9,14 @@ const browserErrors: string[] = []
 test.afterEach(async ({ page }, info) => {
   await writeFile(info.outputPath('browser-errors.json'), JSON.stringify({ page: page.url(), errors: browserErrors }, null, 2))
 })
-async function capture(page: Page, info: TestInfo, name: string, selector?: string) {
+async function capture(page: Page, name: string, selector?: string) {
   await expect(page.locator('[data-sonner-toast]:visible')).toHaveCount(0, { timeout: 15000 })
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
     if (selector)
       await page.locator(selector).first().evaluate(node => node.scrollIntoView({ block: 'center' }))
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
+    await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
   }
   await page.setViewportSize({ width: 1440, height: 960 })
 }
@@ -45,7 +44,7 @@ test('原工资独立更正、真退40、后月处理60与跨页同源冷读', a
   await expect(sourceTable).toBeFocused()
   await page.keyboard.press('ArrowRight')
   await expect.poll(() => sourceTable.evaluate(node => node.scrollLeft)).toBeGreaterThan(0)
-  await capture(page, info, 'correction-full-page', '#section-reason')
+  await capture(page, 'correction-full-page', '#section-reason')
   await page.getByRole('button', { name: '保存更正草稿', exact: true }).click()
   await page.getByRole('link', { name: '编辑并确认更正', exact: true }).click()
   await page.getByRole('button', { name: '确认核算更正', exact: true }).click()
@@ -58,7 +57,7 @@ test('原工资独立更正、真退40、后月处理60与跨页同源冷读', a
   await expect(page.getByRole('region', { name: '原更正链当前余额' })).toContainText('-100.00')
   const adjustmentId = decodeURIComponent(new URL(page.url()).pathname.split('/').at(-1)!)
   expect((await f.repository.actualLedger(f.query, { projectId: f.projectId })).netAmount.value).toBe(1000)
-  await capture(page, info, 'confirmed-correction-no-cash')
+  await capture(page, 'confirmed-correction-no-cash')
   await verifyOutput(page, info, 'correction', '原主体单价记录错误', '本次有符号差额', -100)
   await page.getByRole('link', { name: '登记实际补发或退款', exact: true }).click()
   await page.getByLabel('真实发生日期', { exact: true }).fill('2026-08-05')
@@ -67,7 +66,7 @@ test('原工资独立更正、真退40、后月处理60与跨页同源冷读', a
   await page.getByLabel('签工负责人本次收付金额', { exact: true }).fill('-40')
   await page.getByLabel(`${adjustmentId}本次处理额`, { exact: true }).fill('-40')
   await page.getByRole('button', { name: '核对本次金额与剩余', exact: true }).click()
-  await capture(page, info, 'refund-full-page', '#section-application')
+  await capture(page, 'refund-full-page', '#section-application')
   let originalCommand = ''
   await page.route('**/api/commands/payroll-adjustment', async (route) => {
     if (!originalCommand && route.request().postDataJSON()?.action.kind === 'confirm-actual-payment') {
@@ -84,14 +83,14 @@ test('原工资独立更正、真退40、后月处理60与跨页同源冷读', a
   await dialog.getByRole('button', { name: '确认并保存记录', exact: true }).click()
   await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
   await expect(page.getByRole('alert', { name: '工资提交核对', exact: true })).toBeFocused()
-  await capture(page, info, 'refund-unknown-keeps-original')
+  await capture(page, 'refund-unknown-keeps-original')
   const replaying = page.waitForRequest(request => request.url().endsWith('/api/commands/payroll-adjustment'))
   await page.getByRole('button', { name: '核对原提交', exact: true }).click()
   expect((await replaying).postDataJSON().commandId).toBe(originalCommand)
   await expect(page.getByRole('button', { name: '下载确认记录', exact: true })).toBeVisible()
   expect((await f.repository.actualLedger(f.query, { projectId: f.projectId })).netAmount.value).toBe(960)
   await verifyOutput(page, info, 'refund', '负责人已实际退回40元', '有符号登记金额', -40)
-  await capture(page, info, 'actual-refund-confirmation')
+  await capture(page, 'actual-refund-confirmation')
   const refundId = decodeURIComponent(new URL(page.url()).pathname.split('/').at(-1)!)
   const laterId = await f.checked('2026-09')
   await page.goto(`/subcontract/payroll/${encodeURIComponent(laterId)}?origin=real`)
@@ -102,7 +101,7 @@ test('原工资独立更正、真退40、后月处理60与跨页同源冷读', a
   await dialog.getByLabel('实际发放总额', { exact: true }).fill('940')
   await dialog.getByLabel('签工负责人收款金额', { exact: true }).fill('940')
   await expect(dialog).toContainText('-60.00')
-  await capture(page, info, 'later-release-940-with-60', '[role="dialog"]')
+  await capture(page, 'later-release-940-with-60', '[role="dialog"]')
   await dialog.getByRole('button', { name: '确认实际发放', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   expect((await f.repository.actualLedger(f.query, { projectId: f.projectId })).netAmount.value).toBe(1900)
@@ -111,15 +110,15 @@ test('原工资独立更正、真退40、后月处理60与跨页同源冷读', a
   const ledger = `/subcontract/payroll/payments?${new URLSearchParams({ origin: 'real', project: f.projectId, returnTo: sourcePath })}`
   await page.goto(ledger)
   await expect(page.getByRole('heading', { name: '工资实际收付', exact: true })).toBeVisible()
-  await capture(page, info, 'net-1900-ledger')
+  await capture(page, 'net-1900-ledger')
   for (const [kind, id] of [['worker', f.workerId], ['crew', f.crewId], ['project', f.projectId]]) {
     await page.goto(`${kind === 'project' ? '/project' : `/base/${kind}`}/${encodeURIComponent(id!)}?origin=real`)
     await expect(page.getByTestId('payroll-host-net')).toContainText('1,900.00')
-    await capture(page, info, `${kind}-same-actual`, '[data-testid="payroll-host-section"]')
+    await capture(page, `${kind}-same-actual`, '[data-testid="payroll-host-section"]')
   }
-  await verifyPaymentAndReversal(page, info, f, refundId)
-  await verifyBudgetReturn(page, info, f)
-  await verifyCorrectionLabelAndColdProject(page, info, f)
+  await verifyPaymentAndReversal(page, f, refundId)
+  await verifyBudgetReturn(page, f)
+  await verifyCorrectionLabelAndColdProject(page, f)
   expect(browserErrors.filter(error => error !== 'POST /api/commands/payroll-adjustment: net::ERR_FAILED' && !error.endsWith(': net::ERR_ABORTED'))).toEqual([])
   await writeFile(info.outputPath('verification.json'), JSON.stringify({ statementId: f.statementId, laterId, adjustmentId, originalCommand, projectId: f.projectId, originalSignature: 1000, refund: -40, laterActual: 940, net: 1900, remaining: 0, widths: [390, 768, 1024, 1280, 1440] }, null, 2))
 })
@@ -138,20 +137,19 @@ async function verifyOutput(page: Page, info: TestInfo, name: string, note: stri
   expect(factRows).toContainEqual([amountLabel, amount])
   await page.emulateMedia({ media: 'print' })
   await expect(page.locator('[data-payroll-confirmation-print]').getByRole('row', { includeHidden: true }).filter({ hasText: amountLabel })).toContainText(String(amount))
-  await page.screenshot({ path: info.outputPath(`${name}-print-preview.png`), fullPage: true })
   // 仅生成有界产品验收临时文件供逐页核查，不另交付指南 PDF。
   await page.pdf({ path: info.outputPath(`${name}-print.pdf`), format: 'A4', printBackground: true, margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' } })
   await page.emulateMedia({ media: 'screen' })
 }
 
-async function verifyPaymentAndReversal(page: Page, info: TestInfo, f: Awaited<ReturnType<typeof payrollAdjustmentWorkspace>>, refundId: string) {
+async function verifyPaymentAndReversal(page: Page, f: Awaited<ReturnType<typeof payrollAdjustmentWorkspace>>, refundId: string) {
   const payment = `/finance/payment-management?${new URLSearchParams({ origin: 'real', payrollProject: f.projectId })}`
   await page.goto(payment)
   const wages = page.getByRole('region', { name: '工资收付独立来源', exact: true })
   await expect(wages).toContainText('1,900.00')
   await page.reload()
   await expect(wages).toContainText('1,900.00')
-  await capture(page, info, 'payment-readonly-cold-project', '[aria-label="工资收付独立来源"]')
+  await capture(page, 'payment-readonly-cold-project', '[aria-label="工资收付独立来源"]')
   await page.getByRole('link', { name: '打开工资实际收付', exact: true }).click()
   await expect(page.getByRole('heading', { name: '工资实际收付', exact: true })).toBeVisible()
   await page.getByRole('link', { name: '实际退款', exact: true }).click()
@@ -169,7 +167,7 @@ async function verifyPaymentAndReversal(page: Page, info: TestInfo, f: Awaited<R
     await page.getByLabel(correcting ? '纠正原冲销的核对依据' : '确认未发生的核对依据', { exact: true }).fill(correcting ? '复核原退款40实际发生，前次冲销误记，引用冲销追加纠错' : '依据财务核对暂认定原退款40未实际发生，保留原记录')
     await page.getByRole('checkbox').check()
     await page.getByRole('button', { name: '核对错记事实与处理关系', exact: true }).click()
-    await capture(page, info, correcting ? 'reversal-correction-full-page' : 'recording-reversal-full-page', '#section-proof')
+    await capture(page, correcting ? 'reversal-correction-full-page' : 'recording-reversal-full-page', '#section-proof')
     const confirm = page.getByRole('button', { name: correcting ? '确认冲销纠错' : '确认错记冲销', exact: true })
     await confirm.click()
     await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
@@ -178,11 +176,11 @@ async function verifyPaymentAndReversal(page: Page, info: TestInfo, f: Awaited<R
     await page.getByRole('dialog').getByRole('button', { name: '确认并保存记录', exact: true }).click()
     await expect(page.getByRole('heading', { name: '工资错记冲销详情', exact: true })).toBeVisible()
     expect((await f.repository.actualLedger(f.query, { projectId: f.projectId })).netAmount.value).toBe(correcting ? 1900 : 1940)
-    await capture(page, info, correcting ? 'reversal-corrected-confirmation' : 'reversal-confirmation')
+    await capture(page, correcting ? 'reversal-corrected-confirmation' : 'reversal-confirmation')
   }
 }
 
-async function verifyCorrectionLabelAndColdProject(page: Page, info: TestInfo, f: Awaited<ReturnType<typeof payrollAdjustmentWorkspace>>) {
+async function verifyCorrectionLabelAndColdProject(page: Page, f: Awaited<ReturnType<typeof payrollAdjustmentWorkspace>>) {
   const ledger = await f.repository.actualLedger(f.query, { projectId: f.projectId })
   expect(ledger.netAmount.value).toBe(1900)
   const reversal = ledger.rows.find(row => row.kind === 'recording-reversal')!
@@ -194,22 +192,22 @@ async function verifyCorrectionLabelAndColdProject(page: Page, info: TestInfo, f
   await expect(page.getByLabel('确认未发生的核对依据', { exact: true })).toHaveCount(0)
   await expect(page.getByText('请记录纠正原冲销的具名核查依据', { exact: true })).toBeVisible()
   await expect(page.getByText('请记录为什么确认这笔原收付未真实发生的具名核查依据', { exact: true })).toHaveCount(0)
-  await capture(page, info, 'reversal-correction-label-final', '#section-proof')
+  await capture(page, 'reversal-correction-label-final', '#section-proof')
   await page.goto(`/subcontract/payroll/payments?${new URLSearchParams({ origin: 'real', project: f.projectId })}`)
   await page.reload()
   await expect(page.getByRole('combobox')).toHaveValue(/^C2 无工程量验收 /)
   await expect(page.getByRole('region', { name: '工资实际收付', exact: true })).toContainText('1,900.00')
-  await capture(page, info, 'ledger-project-resolved-final')
+  await capture(page, 'ledger-project-resolved-final')
 }
 
-async function verifyBudgetReturn(page: Page, info: TestInfo, f: Awaited<ReturnType<typeof payrollAdjustmentWorkspace>>) {
+async function verifyBudgetReturn(page: Page, f: Awaited<ReturnType<typeof payrollAdjustmentWorkspace>>) {
   const id = await f.createBudget()
   const path = `/project/target-cost/${encodeURIComponent(id)}?origin=real`
   await page.goto(path)
   await page.getByRole('tab', { name: '成本对比 (7)', exact: true }).click()
   await expect(page.getByLabel('工人工资 动态成本来源', { exact: true })).toContainText('1,900.00')
   await expect(page.getByLabel('工人工资 支付来源', { exact: true })).toContainText('1,900.00')
-  await capture(page, info, 'budget-same-actual', '[aria-label="目标成本来源完整性对比"]')
+  await capture(page, 'budget-same-actual', '[aria-label="目标成本来源完整性对比"]')
   const actualLink = page.getByRole('link', { name: '查看工资实际收付', exact: true })
   const returnPath = new URL((await actualLink.getAttribute('href'))!, page.url()).searchParams.get('budgetReturnTo')
   expect(returnPath).toBeTruthy()

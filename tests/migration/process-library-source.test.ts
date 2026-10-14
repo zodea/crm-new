@@ -1,8 +1,7 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { parseProcessLibraryMigrationGraph, readProcessLibraryMigrationGraphs } from '~/lib/migration/process-library-source'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const at = '2026-09-12 08:00:00'
 function rows() {
@@ -23,8 +22,7 @@ describe('工序库物理源导出', () => {
   afterEach(() => db?.close())
 
   it('读取真实 v49 SQLite，保全软删头/任务、前置禁用、原始映射与时间', async () => {
-    db = await createMemoryDb()
-    await runMigrations(db)
+    db = await createMigratedMemoryDb()
     await db.execute('UPDATE schedule_process_libraries SET deleted_at = ?, sort_order = 73, updated_at = ?', [at, at])
     const [task] = await db.select<{ id: string }>('SELECT id FROM schedule_process_library_tasks WHERE predecessor_task_key IS NOT NULL ORDER BY id LIMIT 1')
     await db.execute('UPDATE schedule_process_library_tasks SET deleted_at = ?, predecessor_disabled = 1, item_codes_json = ?, updated_at = ? WHERE id = ?', [at, '["原分项", "item-a"]', at, task!.id])

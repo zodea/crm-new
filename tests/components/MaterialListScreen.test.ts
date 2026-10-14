@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, onActivated, onMounted, shallowRef, watch } from 'vue'
 import MaterialListScreen from '~/components/material/MaterialListScreen.vue'
-import ListFilterBar from '~/components/shared/ListFilterBar.vue'
 import SearchInput from '~/components/ui/SearchInput.vue'
 
 const navigateTo = vi.fn()
@@ -54,7 +53,6 @@ function renderList() {
       components: {
         KitTable: KitTableStub,
         KitButton: defineComponent({ template: '<button><slot /></button>' }),
-        ListFilterBar,
         SearchInput,
       },
     },

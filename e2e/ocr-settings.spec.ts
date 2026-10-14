@@ -15,26 +15,26 @@ test.describe('Issue #204：OCR 设置', () => {
     await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
     await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
   })
-  for (const width of VIEWPORT_WIDTHS) {
-    test(`${width}px 展示紧凑纵向工作台且只开放真实参数`, async ({ page }) => {
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
-      await page.goto('/settings/ocr')
+  test('展示紧凑纵向工作台且只开放真实参数，各宽度无页面溢出', async ({ page }) => {
+    await page.goto('/settings/ocr')
 
-      const settings = page.getByTestId('ocr-settings-page')
-      await expect(settings.getByRole('heading', { name: 'OCR 设置', exact: true }))
-        .toBeVisible({ timeout: 15_000 })
-      await expect(settings.getByText(/Token 仅在 Nitro 服务端环境变量中保存/)).toBeVisible()
-      await expect(settings.getByText('PaddleOCR-VL-1.6')).toBeVisible()
-      await expect(settings.getByText('清单拆表', { exact: true })).toBeVisible()
-      await expect(settings.getByTestId('ocr-document-table').getByRole('row').filter({ hasText: '清单拆表' })).toContainText('未接入')
-      await expect(settings.getByRole('checkbox', { name: '文档方向识别' })).toBeChecked()
-      await expect(settings.getByRole('checkbox', { name: '图表识别' })).not.toBeChecked()
-      await expect(settings.getByLabel('建议通过阈值')).toBeDisabled()
-      await expect(settings.getByText(/尚未接入全局判读/)).toBeVisible()
-      await expect(settings.locator('input[type="password"]')).toHaveCount(0)
+    const settings = page.getByTestId('ocr-settings-page')
+    await expect(settings.getByRole('heading', { name: 'OCR 设置', exact: true }))
+      .toBeVisible({ timeout: 15_000 })
+    await expect(settings.getByText(/Token 仅在 Nitro 服务端环境变量中保存/)).toBeVisible()
+    await expect(settings.getByText('PaddleOCR-VL-1.6')).toBeVisible()
+    await expect(settings.getByText('清单拆表', { exact: true })).toBeVisible()
+    await expect(settings.getByTestId('ocr-document-table').getByRole('row').filter({ hasText: '清单拆表' })).toContainText('未接入')
+    await expect(settings.getByRole('checkbox', { name: '文档方向识别' })).toBeChecked()
+    await expect(settings.getByRole('checkbox', { name: '图表识别' })).not.toBeChecked()
+    await expect(settings.getByLabel('建议通过阈值')).toBeDisabled()
+    await expect(settings.getByText(/尚未接入全局判读/)).toBeVisible()
+    await expect(settings.locator('input[type="password"]')).toHaveCount(0)
+    for (const width of VIEWPORT_WIDTHS) {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
       await expectNoPageOverflow(page, `OCR 设置 @ ${width}px`)
-    })
-  }
+    }
+  })
 
   for (const input of [
     { label: '关闭方向并开启图表', orientation: false, chart: true },

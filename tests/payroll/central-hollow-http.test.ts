@@ -7,9 +7,7 @@ import { createPayrollRepository } from '../../app/lib/payroll/central-repositor
 import { createPayrollHollowFixture } from '../helpers/payroll-hollow-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollHollowFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 
 it.each(Array.from([null, [], 'real']).map(input1 => ({ input1 })))('真实HTTP配置、启动及冻结沿Repository同源往返，非法范围和客户端自报扣款不写入：输入案例 %#', async ({ input1: query }) => {

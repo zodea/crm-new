@@ -1,16 +1,19 @@
 import type { AuxiliaryContractCommand, AuxiliaryContractDraft } from './contract'
 import { isISODateDTO } from '../../types/read-model'
+import { decodeOurSignatorySnapshot } from '../our-signatory/contract'
 import { AUXILIARY_CATEGORIES, auxiliaryKind, auxiliaryProblem } from './contract'
 
-const TEXT_FIELDS = ['id', 'no', 'name', 'projectId', 'supplierId', 'category', 'counterparty', 'partyA', 'signDate', 'servicePeriod', 'invoiceType', 'paymentCycle', 'mainTerms', 'status', 'note'] as const
+const TEXT_FIELDS = ['id', 'no', 'name', 'projectId', 'supplierId', 'category', 'counterparty', 'partyA', 'ourSignatoryId', 'ourSignatoryVersion', 'signDate', 'servicePeriod', 'invoiceType', 'paymentCycle', 'mainTerms', 'content', 'contactName', 'contactPhone', 'status', 'note'] as const
 export function decodeAuxiliaryDraft(value: unknown): AuxiliaryContractDraft {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw auxiliaryProblem('validation-failed', '合同资料格式不正确')
   const raw = value as Record<string, unknown>
   const kind = auxiliaryKind(raw.kind)
-  if (Object.keys(raw).some(key => ![...TEXT_FIELDS, 'kind', 'amount', 'taxRate'].includes(key)))
+  if (Object.keys(raw).some(key => ![...TEXT_FIELDS, 'kind', 'amount', 'taxRate', 'ourSignatorySnapshot'].includes(key)))
     throw auxiliaryProblem('validation-failed', '辅助合同不接受额外关系或合同明细')
   const draft: AuxiliaryContractDraft = { kind }
+  if (raw.ourSignatorySnapshot != null)
+    draft.ourSignatorySnapshot = decodeOurSignatorySnapshot(raw.ourSignatorySnapshot)
   for (const field of TEXT_FIELDS) {
     const entry = raw[field]
     if (entry == null)

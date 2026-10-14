@@ -5,7 +5,7 @@ import {
   migrations,
   runMigrations,
 } from '~/lib/db/migrations'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 const F5_MIGRATION_VERSION = 24
 
@@ -53,8 +53,7 @@ async function seedReferences(db: MigrationDb) {
 
 describe('v24 F5 甲方/分包单据迁移', () => {
   it('冷启动建立目标表、扩展列、真实外键和抵扣关系索引', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     expect(LATEST_VERSION).toBeGreaterThanOrEqual(F5_MIGRATION_VERSION)
     const tables = await listTables(db)
@@ -217,8 +216,7 @@ describe('v24 F5 甲方/分包单据迁移', () => {
   })
 
   it('数据库拒绝无效单据类型、负罚扣金额和重复抵扣关系', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await seedReferences(db)
 
     await expect(db.execute(`

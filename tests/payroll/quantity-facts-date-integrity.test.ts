@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest'
 import { loadPayrollAQuantityFacts } from '../../server/utils/payroll-quantity-facts'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 
 it.each(['2026-13-01', '2026-09-31'])('无效完成日期 %s 不能被当成未来有效事实而静默排除', async (invalidDate) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     await db.execute('UPDATE unit_stage_completions SET completed_at=? WHERE id=?', [invalidDate, 'pa-done-old'])

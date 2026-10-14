@@ -1,7 +1,10 @@
 import type { TransactionDb } from '../db/coordinator'
+import { hasProductionPayrollSchema } from './central-schema'
 
 /** A 取整是按稳定请款簿追加的显式修订；缺记录与明确关闭保持不同。 */
 export async function initializePayrollARoundingSchema(tx: TransactionDb): Promise<void> {
+  if (await hasProductionPayrollSchema(tx))
+    return
   await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_a_rounding_revisions (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),

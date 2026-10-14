@@ -30,11 +30,11 @@ function display(key: string, value: unknown): string {
 function title(log: ScheduleHistoryLog) {
   if (log.operator === 'schedule:bind-contract')
     return '绑定施工合同'
-  if (log.operator.includes('conflict'))
+  if (log.operator?.includes('conflict'))
     return '调期冲突，停用关系'
-  if (log.operator.includes('restore'))
+  if (log.operator?.includes('restore'))
     return '恢复关系'
-  if (log.operator.includes('baseline'))
+  if (log.operator?.includes('baseline'))
     return '保存计划基线'
   const action = log.action === 'create' ? '新增' : log.action === 'delete' ? '移除' : '修改'
   return `${action}${titles[log.tableName] ?? '计划记录'}`

@@ -1,4 +1,5 @@
 import type { ScheduleBindingRead } from '~/lib/schedule/central-binding-contract'
+import type { SchedulePending } from '~/lib/schedule/central-contract'
 import { cleanup, render, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -26,7 +27,7 @@ function fixture(keepAlive = false) {
   const store = reactive({
     sourceVersion: 'arbitrary-global',
     saving: false,
-    pendingCommand: null as { action: { kind: string, groupId: string }, commandId: string } | null,
+    pendingCommand: null as SchedulePending | null,
     readBinding: vi.fn(async (project: string, group: string, contract = '') => readValue(project, group, contract)),
     confirmBinding: vi.fn().mockResolvedValue({ groupId: 'g' }),
     recoverPending: vi.fn().mockResolvedValue({ groupId: 'g' }),
@@ -40,6 +41,7 @@ function fixture(keepAlive = false) {
   vi.stubGlobal('useScheduleStore', () => store)
   vi.stubGlobal('useKitUI', () => kit)
   vi.stubGlobal('useTabsStore', () => tabs)
+  vi.stubGlobal('useState', (_key: string, init: () => Record<string, string>) => shallowRef(init()))
   let ui!: ReturnType<typeof useScheduleContractBinding>
   const component = defineComponent({ setup() {
     ui = useScheduleContractBinding(props)
@@ -60,6 +62,35 @@ afterEach(() => {
 })
 
 describe('中央绑定表单状态边界', () => {
+  it('选择只保应用内存，旧浏览器选择不读不删；descriptor空正文冷恢复仍核原号后读', async () => {
+    const key = 'ruihang:schedule-binding-drafts-v1'
+    const old = JSON.stringify({ '["w","a","real","p","g"]': 'c' })
+    window.sessionStorage.setItem(key, old)
+    const { ui, store, router } = fixture()
+    await waitFor(() => expect(ui.read.value).not.toBeNull())
+    expect(ui.selectedContractId.value).toBe('')
+    await ui.selectContract('c')
+    expect(window.sessionStorage.getItem(key)).toBe(old)
+    store.pendingCommand = { descriptor: { family: 'schedule', action: 'bind-contract', targetId: 'p', commandId: 'original-cold-id', workspaceId: 'w', actorId: 'a' }, command: null, state: 'unknown' }
+    await ui.recover()
+    expect(store.recoverPending).toHaveBeenCalledOnce()
+    expect(store.confirmBinding).not.toHaveBeenCalled()
+    expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ path: '/schedule', query: expect.objectContaining({ project: 'p', group: 'g' }) }))
+    expect(window.sessionStorage.getItem(key)).toBe(old)
+  })
+
+  it('同项目另一分组的原绑定回执不得关闭当前表单或假认当前分组已绑定', async () => {
+    const { ui, store, router, tabs } = fixture()
+    await waitFor(() => expect(ui.read.value).not.toBeNull())
+    store.pendingCommand = { descriptor: { family: 'schedule', action: 'bind-contract', targetId: 'p', commandId: 'another-group-original-id', workspaceId: 'w', actorId: 'a' }, command: null, state: 'unknown' }
+    store.recoverPending.mockResolvedValueOnce({ groupId: 'g2' })
+    await ui.recover()
+    expect(store.recoverPending).toHaveBeenCalledOnce()
+    expect(router.push).not.toHaveBeenCalled()
+    expect(tabs.close).not.toHaveBeenCalled()
+    expect(ui.read.value?.group.id).toBe('g')
+  })
+
   it('keepAlive确认等待切走再返回，清临时确认忙态并保留原提交', async () => {
     const { ui, store, kit, visible } = fixture(true)
     await waitFor(() => expect(ui.read.value).not.toBeNull())
@@ -70,7 +101,7 @@ describe('中央绑定表单状态边界', () => {
     }))
     const binding = ui.bind()
     expect(ui.confirming.value).toBe(true)
-    store.pendingCommand = { action: { kind: 'bind-contract', groupId: 'g' }, commandId: 'original-id' }
+    store.pendingCommand = { descriptor: { family: 'schedule', action: 'bind-contract', targetId: 'p', commandId: 'original-id', workspaceId: 'w', actorId: 'a' }, command: null, state: 'unknown' }
     visible.value = false
     await nextTick()
     release(false)
@@ -80,7 +111,7 @@ describe('中央绑定表单状态边界', () => {
     await waitFor(() => expect(ui.busy.value).toBe(false))
     expect(ui.confirming.value).toBe(false)
     expect(ui.busy.value).toBe(false)
-    expect(store.pendingCommand.commandId).toBe('original-id')
+    expect(store.pendingCommand.descriptor.commandId).toBe('original-id')
   })
   it('旁路读取抬高全局版本也只提交原预览，成功关闭原表单并保完整返回筛选', async () => {
     const { ui, store, router, tabs } = fixture()
@@ -149,11 +180,11 @@ describe('中央绑定表单状态边界', () => {
     release()
     await save
     expect(tabs.close).not.toHaveBeenCalled()
-    store.pendingCommand = { action: { kind: 'bind-contract', groupId: 'g' }, commandId: 'original-id' }
+    store.pendingCommand = { descriptor: { family: 'schedule', action: 'bind-contract', targetId: 'p', commandId: 'original-id', workspaceId: 'w', actorId: 'a' }, command: null, state: 'unknown' }
     expect(await ui.mayLeave()).toBe(false)
     await ui.selectContract('c')
     expect(ui.selectedContractId.value).toBe('')
-    expect(store.pendingCommand.commandId).toBe('original-id')
+    expect(store.pendingCommand.descriptor.commandId).toBe('original-id')
   })
   it('资料重读失败后旧预览不能再确认，原合同选择仍可修正', async () => {
     const { ui, store } = fixture()

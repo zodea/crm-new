@@ -1,5 +1,6 @@
 import type { CentralFinanceKind, FinanceCommand } from '../../app/lib/finance/central-contract'
 import { createHash } from 'node:crypto'
+import { decodeConstructionMainSelection } from '../../app/lib/construction-scope/contract'
 import { CENTRAL_FINANCE_KINDS, FINANCE_FAMILIES, financeFailure } from '../../app/lib/finance/central-contract'
 import { isExpenseClearanceVerificationEdit } from '../../app/lib/finance/clearance-verification'
 import { isPaymentVerificationEdit } from '../../app/lib/finance/payment-verification'
@@ -55,6 +56,20 @@ export function parseFinanceCommand(value: unknown): FinanceCommand {
   if (['unconfirm', 'delete'].includes(String(body.action)) && !body.id)
     financeFailure('validation-failed', '此操作缺少已存在财务记录的稳定编号。')
   const draft = body.draft as Record<string, unknown>
+  try {
+    if (draft.constructionMain !== undefined) {
+      if (kind !== 'reimbursement')
+        financeFailure('validation-failed', '工程归属选择只适用实际原费用。')
+      decodeConstructionMainSelection(draft.constructionMain)
+    }
+    if (kind === 'reimbursement' && Array.isArray(draft.lines)) {
+      for (const line of draft.lines) {
+        if (line && typeof line === 'object' && line.constructionMain !== undefined)
+          decodeConstructionMainSelection(line.constructionMain)
+      }
+    }
+  }
+  catch { financeFailure('validation-failed', '工程名称必须搜索并选择真实施工主合同，不接受自由文本或未知依据。') }
   if (draft.clearanceVerificationEdit !== undefined && (kind !== 'reimbursement' || body.action !== 'save' || !body.id || !isExpenseClearanceVerificationEdit(draft.clearanceVerificationEdit) || Object.keys(draft).some(key => !['id', 'clearanceVerificationEdit'].includes(key)) || Object.values(body.attachments).some(value => !Array.isArray(value) || value.length > 0)))
     financeFailure('validation-failed', '旧清偿核定只采用已保存的原费用及原件，不能混入正文或附件变更。')
   if (draft.clearanceAttachmentsOnly !== undefined && (draft.clearanceAttachmentsOnly !== true || kind !== 'reimbursement' || body.action !== 'save' || !body.id || Object.keys(draft).some(key => !['id', 'clearanceAttachmentsOnly'].includes(key)) || Object.keys(body.attachments).some(key => !['add'].includes(key))))

@@ -168,7 +168,7 @@ export function createPayrollDayworkService(run: PayrollRun, options: PayrollSer
           decodePayrollDayworkResult(result, command)
           await db.execute('INSERT INTO payroll_command_receipts(command_id,actor_id,project_id,statement_id,config_scope_json,action,fingerprint,result_json,command_json) VALUES(?,?,?,NULL,NULL,?,?,?,?)', [command.commandId, context.actorId, command.projectId, command.action.kind, fingerprint, JSON.stringify(result), payrollCanonical(command)])
           return result
-        }, true)
+        }, true, command)
       }
       catch (cause) {
         if (absent && cause instanceof ProjectRepositoryProblem)

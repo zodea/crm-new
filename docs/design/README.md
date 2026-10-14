@@ -64,9 +64,8 @@ DC重构设计源码/
 
 缺一一对应 DC 页面的路由统一登记在 [`design-coverage.json`](./design-coverage.json)，数量见[实现状态生成表](./ui-implementation-status.md#2-当前总数)。当前工作区已注册并挂载付款详情 `payApplyDetail`、数据迁移 `dataMigration`、施工阶段配置 `quantityStages` 和工序库版本详情 `processLibraryDetail`，覆盖映射按其实际 PAGE、路由开关与 x-import 登记。DC 源码的并行改动属于既有工作区成果，本轮只同步索引；设计落点不提升页面业务、运行或生产验收等级。付款、迁移、阶段与工序库的历史实施来源分别保留 #305/#294、#442、#443；当前复核范围仍按对应领域规格。此前施工进度「前后置依赖设置」已由 #244 合入设计源码，[补图 brief](../research/schedule-dependency-editor-brief.md) 保留为历史研究。
 
-当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据和差异看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。
+当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据和差异看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)。
 
-动态单据、导入阶段、当前挂载的页签/子表和 browser/Tauri 读写差异，进入 [全模块复核覆盖索引](./module-review-coverage.md)；其 [JSON](./module-review-coverage.json) 为派生清单。它与路由证据账本分别记录“需要核验哪些面”和“已有何种参考证据”，不以生成行数宣告功能完成。
 
 运行态视觉与公共交互回归的覆盖矩阵、更新方式和数据脱敏边界见 [`runtime-visual-regression.md`](./runtime-visual-regression.md)。页面切片完成时必须同时更新对应模板样本与真实页面基线。
 
@@ -74,7 +73,7 @@ DC重构设计源码/
 
 排程中央链分别查 [#443 工序库版本](./evidence/issue-443/README.md) 与 [#444 WBS、阶段往返及旧图接管](./evidence/issue-444/README.md) 的流程图、实际交互和验收记录。新增暂估绑定由 #445 接通；各切片不代替成本、工资或生产部署验收。
 
-工资完整接管及中央历史只读的流程、实际交互与指南见 [#412 工资接管记录](./evidence/issue-412-payroll-history/README.md)。新增独立工资来源页保留 `design-pending`，其依据为工资页面规格及 DC 通用原语；只读切片与后续 A/C1/C2 核算、发放和完整工作簿分别验收。
+工资完整接管及中央历史只读的流程、实际交互与指南见 [#412 工资接管记录](./evidence/issue-412-payroll-history/README.md)。工资来源及相关独立屏已按当前 DC 注册纳入设计覆盖，落点见 [`design-coverage.json`](./design-coverage.json)。设计覆盖只说明屏幕存在；只读切片、A/C1/C2 核算、发放和完整工作簿仍分别验收。
 
 ## 文档放置规则
 

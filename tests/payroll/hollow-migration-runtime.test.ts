@@ -17,7 +17,7 @@ afterEach(async () => {
   await Promise.all(closers.splice(0).map(close => close()))
 })
 
-it.each((PAYROLL_HOLLOW_DEDUCTION_TABLES).map(input => ({ input })))('真实原检查19整改4与工资550整体迁入，公开冻结输出和后月已处理450保留：输入案例 %#', async ({ input: table }) => {
+it('真实原检查19整改4与工资550整体迁入，公开冻结输出和后月已处理450保留，回滚清空全部空鼓扣款表', async () => {
   const original = await createPayrollHollowFixture()
   closers.push(original.close)
   let read = await original.form()
@@ -51,7 +51,8 @@ it.each((PAYROLL_HOLLOW_DEDUCTION_TABLES).map(input => ({ input })))('真实原�
   repeated.commit()
   expect((await f.reloadPayroll().aOutput({ origin: 'real' }, mappedStatement)).state).toBe('available')
   await f.rollback()
-  expect(await f.instance.withWorkspaceTransaction(tx => tx.select(`SELECT * FROM ${table}`))).toEqual([])
+  for (const table of PAYROLL_HOLLOW_DEDUCTION_TABLES)
+    expect(await f.instance.withWorkspaceTransaction(tx => tx.select(`SELECT * FROM ${table}`)), table).toEqual([])
 }, 30_000)
 
 it.each(['C1', 'C2'] as const)('%s真实原检查与550实发迁入，原签字事实和受控身份同时保留', async (format) => {
@@ -118,7 +119,7 @@ it.each(['C1', 'C2'] as const)('%s真实原检查与550实发迁入，原签字�
     read = await f.service.c1Form({ origin: 'real' }, { statementId: nextStatement })
     await f.service.executeC1(command(read, { kind: 'release-c1', release: { actualAmount: 1000, allocations: [{ workerId: draft.leaderWorkerId, amount: 1000 }] } }))
     expect((await f.service.c1Output({ origin: 'real' }, nextStatement)).state).toBe('available')
-    await expect(f.rollback()).rejects.toThrow()
+    await expect(f.rollback()).rejects.toThrow(/^工资迁移：独立工资配置、来源、回执或历史仍引用待撤身份 A: \["projects","\S+"\]，已在删除前整批拒绝$/)
   }
   const cloned = await cloneQuantityHollowSnapshot(await f.instance.exportSnapshotBytes())
   try {

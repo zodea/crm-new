@@ -4,7 +4,6 @@ import { defineComponent, h, KeepAlive, reactive, shallowRef } from 'vue'
 import CentralPayrollDetailScreen from '~/components/payroll/CentralPayrollDetailScreen.vue'
 import CentralPayrollScreen from '~/components/payroll/CentralPayrollScreen.vue'
 import CentralPayrollSourcesScreen from '~/components/payroll/CentralPayrollSourcesScreen.vue'
-import CentralPayrollUnavailableScreen from '~/components/payroll/CentralPayrollUnavailableScreen.vue'
 import PayrollEvidenceTable from '~/components/payroll/PayrollEvidenceTable.vue'
 import PayrollReadDiagnostics from '~/components/payroll/PayrollReadDiagnostics.vue'
 import PayrollReadFilters from '~/components/payroll/PayrollReadFilters.vue'
@@ -180,7 +179,7 @@ describe('工资中央只读资料', () => {
     expect(wrapper.text()).not.toContain('正在读取')
     wrapper.unmount()
   })
-  it('已缓存台账响应真实query筛选变化；建单深链仅显示停用说明', async () => {
+  it('已缓存台账响应真实query筛选变化', async () => {
     const wrapper = mount(CentralPayrollScreen, { global: { components, stubs } })
     await flushPromises()
     expect(wrapper.text()).toContain('快照原姓名')
@@ -192,12 +191,6 @@ describe('工资中央只读资料', () => {
     expect(wrapper.text()).toContain('快照原姓名')
     expect(wrapper.find('[aria-label="工资状态，已选 0 项"]').exists()).toBe(true)
     wrapper.unmount()
-    listRead.mockClear()
-    const blocked = mount(CentralPayrollUnavailableScreen, { global: { components, stubs } })
-    expect(blocked.text()).toContain('工资建单暂未开放')
-    expect(listRead).not.toHaveBeenCalled()
-    expect(blocked.find('input').exists()).toBe(false)
-    blocked.unmount()
   })
   it('多个工资状态同字段OR、班组跨字段AND，选A后B仍可改选', async () => {
     const value = payrollListFixture()

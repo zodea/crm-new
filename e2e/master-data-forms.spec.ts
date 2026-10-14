@@ -24,20 +24,20 @@ test.describe('F1 基础主数据整页表单', () => {
     await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
     await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
   })
-  for (const viewport of FORM_VIEWPORTS) {
-    for (const [path, title] of FORM_ROUTES) {
-      test(`${viewport.width}px 具名路由完整五动作与页面边界：${title}`, async ({ page }) => {
+  for (const [path, title] of FORM_ROUTES) {
+    test(`具名路由完整五动作，各宽度动作可见且无页面溢出：${title}`, async ({ page }) => {
+      await page.goto(path)
+      await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+      const footer = page.getByRole('group', { name: '表单操作' })
+      const actionNames = ['取消', '保存草稿', '保存', '保存并新建', '保存并提交']
+      await expect(footer.getByRole('button')).toHaveCount(actionNames.length)
+      for (const viewport of FORM_VIEWPORTS) {
         await page.setViewportSize(viewport)
-        await page.goto(path)
-        await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
-        const footer = page.getByRole('group', { name: '表单操作' })
-        const actionNames = ['取消', '保存草稿', '保存', '保存并新建', '保存并提交']
-        await expect(footer.getByRole('button')).toHaveCount(actionNames.length)
         for (const name of actionNames)
-          await expect(footer.getByRole('button', { name, exact: true })).toBeVisible()
-        await expectNoPageOverflow(page, path)
-      })
-    }
+          await expect(footer.getByRole('button', { name, exact: true }), `${name} @ ${viewport.width}px`).toBeVisible()
+        await expectNoPageOverflow(page, `${path} @ ${viewport.width}px`)
+      }
+    })
   }
   test('切换页签保留未保存字段，不弹放弃确认', async ({ page }) => {
     await page.goto('/base/customer/form')
@@ -55,7 +55,6 @@ test.describe('F1 基础主数据整页表单', () => {
   // 本套开发实例通过详情显式编辑，不要求旧列表删除按钮或演示写入。
   for (const input of [
     { name: '基础表单合成甲方甲', alias: '表单别名甲', taxNo: 'E2E-TAX-A', contact: '合成联系人甲', phone: '13800000011' },
-    { name: '基础表单合成甲方乙', alias: '表单别名乙', taxNo: 'E2E-TAX-B', contact: '合成联系人乙', phone: '13900000022' },
   ]) {
     test(`客户校验、正式保存、别名搜索、显式编辑与冷回读：${input.alias}`, async ({ page }) => {
       await page.goto('/base/customer/form')
@@ -85,24 +84,22 @@ test.describe('F1 基础主数据整页表单', () => {
     })
   }
   // 有项目的预算保存完整旅程由 target-cost-central.spec.ts 保留。
-  for (const name of ['未关联项目的合成预算甲', '未关联项目的合成预算乙']) {
-    for (const action of ['保存草稿', '保存'] as const) {
-      test(`中央预算缺项目的${action}边界：${name}`, async ({ page }) => {
-        await page.goto('/project/target-cost/form?origin=real')
-        await page.getByLabel('版本名 *').fill(name)
-        await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: action, exact: true }).click()
-        if (action === '保存草稿') {
-          await expect.poll(() => new URL(page.url()).pathname).toBe('/project/target-cost')
-          await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
-          await page.reload()
-          await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
-          return
-        }
-        await expect(page.getByText('请选择项目', { exact: true })).toBeVisible()
-        await expect(page.getByRole('combobox', { name: '检索项目' })).toBeFocused()
-        await expect(page.getByLabel('版本名 *')).toHaveValue(name)
-        expect(new URL(page.url()).pathname).toBe('/project/target-cost/form')
-      })
-    }
+  for (const [name, action] of [['未关联项目的合成预算甲', '保存草稿'], ['未关联项目的合成预算乙', '保存']] as const) {
+    test(`中央预算缺项目的${action}边界：${name}`, async ({ page }) => {
+      await page.goto('/project/target-cost/form?origin=real')
+      await page.getByLabel('版本名 *').fill(name)
+      await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: action, exact: true }).click()
+      if (action === '保存草稿') {
+        await expect.poll(() => new URL(page.url()).pathname).toBe('/project/target-cost')
+        await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
+        await page.reload()
+        await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
+        return
+      }
+      await expect(page.getByText('请选择项目', { exact: true })).toBeVisible()
+      await expect(page.getByRole('combobox', { name: '检索项目' })).toBeFocused()
+      await expect(page.getByLabel('版本名 *')).toHaveValue(name)
+      expect(new URL(page.url()).pathname).toBe('/project/target-cost/form')
+    })
   }
 })

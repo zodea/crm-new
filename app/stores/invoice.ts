@@ -276,12 +276,11 @@ export const useInvoiceStore = defineStore('invoice', () => {
       before: parseOperationSnapshot(log.before_data),
       after: parseOperationSnapshot(log.after_data),
     }))
-    const explicitRecognitionIndexes = snapshots.flatMap((log, index) =>
-      log.operator === INVOICE_RECOGNITION_LOG_OPERATOR ? [index] : [],
-    )
-    const recognizedIndex = explicitRecognitionIndexes.at(-1) ?? snapshots.findIndex(log =>
-      log.after?.ocr_status === 'done' && log.before?.ocr_status !== 'done',
-    )
+    // 原始 OCR 取首次识别；其后的人工修订与重新识别覆盖按时间全部留痕（#500）
+    const firstExplicitRecognition = snapshots.findIndex(log => log.operator === INVOICE_RECOGNITION_LOG_OPERATOR)
+    const recognizedIndex = firstExplicitRecognition >= 0
+      ? firstExplicitRecognition
+      : snapshots.findIndex(log => log.after?.ocr_status === 'done' && log.before?.ocr_status !== 'done')
     const recognized = recognizedIndex >= 0 ? snapshots[recognizedIndex]?.after ?? null : null
     const sourceKind: InvoiceArchiveProvenance['sourceKind'] = invoice.source === 'excel'
       ? 'excel'
@@ -291,15 +290,14 @@ export const useInvoiceStore = defineStore('invoice', () => {
     const revisions = recognizedIndex < 0
       ? []
       : snapshots.slice(recognizedIndex + 1).flatMap((log) => {
-          if (log.operator === INVOICE_RECOGNITION_LOG_OPERATOR)
-            return []
           if (!log.before || !log.after)
             return []
+          const reason = log.operator === INVOICE_RECOGNITION_LOG_OPERATOR ? '重新识别' : '人工校对'
           return ARCHIVE_PROVENANCE_FIELDS.flatMap(([field, column]) => {
             const from = provenanceFieldValue(log.before!, column)
             const to = provenanceFieldValue(log.after!, column)
             return valuesDiffer(from, to)
-              ? [{ field, from, to, reason: '人工校对', at: log.created_at }]
+              ? [{ field, from, to, reason, at: log.created_at }]
               : []
           })
         })

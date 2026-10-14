@@ -1,16 +1,14 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { createDefaultInvoiceXlsxStyleConfig, createInvoiceLedgerXlsxFromRows, readInvoiceWorkbookStyleReadback } from '~/lib/invoice/excel'
 import { useInvoiceStore } from '~/stores/invoice'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   setActivePinia(createPinia())
 })
 

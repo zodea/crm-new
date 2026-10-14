@@ -29,7 +29,7 @@ it.each(Array.from([{ origin: 'demo' }, { includeDemo: true }, { capabilities: [
   const server = createServer(toNodeListener(app)).listen(0, '127.0.0.1')
   await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  const base = resolve('.codex-tmp/issue-450-tests')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-450-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/http-`)
   const code = 'http-boundary-synthetic-code'

@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest'
 import { parseBudgetVersionGraph } from '../../app/lib/migration/target-cost-source'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 import { seedTargetCostMigrationSource } from '../helpers/target-cost-migration-source'
 
 it('受控来源按预算版本保存完整图，项目无工程量、无项目草稿、旧空分项名及缺原件均保真', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedTargetCostMigrationSource(db)
     const versions = source.entities.target_cost_versions
@@ -27,7 +27,7 @@ it('受控来源按预算版本保存完整图，项目无工程量、无项目�
 })
 
 it.each(['is_baseline', 'created_at', 'note'])('完整来源不能以空 %s 绕过原表非空约束', async (field) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedTargetCostMigrationSource(db)
     const graph = JSON.parse(String(source.entities.target_cost_versions![0]!.attributes!.budgetGraphJson))
@@ -38,7 +38,7 @@ it.each(['is_baseline', 'created_at', 'note'])('完整来源不能以空 %s 绕�
 })
 
 it('合法旧附件空元数据和可识别但已缺实体的文件日志保持原样', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedTargetCostMigrationSource(db)
     await db.execute('UPDATE file_refs SET file_size = NULL, uploaded_at = NULL, file_name = NULL WHERE id = ?', ['budget-original'])

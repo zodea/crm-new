@@ -44,7 +44,7 @@ export function parsePayrollHollowMigrationGraph(value: unknown): PayrollHollowM
 }
 
 /** 三表不存在仍保持旧外层；部分升级、缺列或未知列不可默许为无扣款。 */
-export async function readPayrollHollowDeductionTables(db: Pick<SoftDb, 'select'>): Promise<PayrollHollowMigrationGraph['tables'] | undefined> {
+export async function readPayrollHollowDeductionTables(db: Pick<SoftDb, 'select'>, options: { captureUnknownColumns?: boolean } = {}): Promise<PayrollHollowMigrationGraph['tables'] | undefined> {
   const names = new Set((await db.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')).map(row => row.name))
   if (!PAYROLL_HOLLOW_DEDUCTION_TABLES.some(table => names.has(table)))
     return undefined
@@ -54,7 +54,7 @@ export async function readPayrollHollowDeductionTables(db: Pick<SoftDb, 'select'
       invalid(`缺少 ${table}，不能部分导出`)
     const columns = await db.select<{ name: string }>(`PRAGMA table_info(${table})`)
     const expected: readonly string[] = PAYROLL_HOLLOW_DEDUCTION_COLUMNS[table]
-    if (columns.length !== expected.length || columns.some(column => !expected.includes(column.name)))
+    if (expected.some(column => !columns.some(found => found.name === column)) || (!options.captureUnknownColumns && columns.some(column => !expected.includes(column.name))))
       invalid(`${table}原字段不完整或包含未知列`)
     tables[table] = await db.select<PayrollMigrationRow>(`SELECT ${expected.join(',')} FROM ${table} ORDER BY rowid`)
   }

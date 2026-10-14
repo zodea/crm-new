@@ -63,7 +63,7 @@ it('个人标准保存后原项目失效，只有空标准和只读原因的冷�
   // 与真实 config 服务在 source.projects 不含原项目时一致：保 scope，项目不可用且无工资事实。
   repository.c1Config.mockResolvedValueOnce({ ...original, options: { projects: [], crews: [], workers: [] }, rates: [], readonlyReasons: ['当前工资项目不可用'] })
   const unavailable = await store.loadC1Config({ origin: 'real' }, scope)
-  expect(() => store.acknowledgeC1(pending, unavailable)).toThrow()
+  expect(() => store.acknowledgeC1(pending, unavailable)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   expect(store.getC1Pending(original)?.command).toEqual(pending.command)
 })
 
@@ -79,10 +79,10 @@ it('冷恢复考勤只能由本实例原身份真实后读确认，拷贝 DTO �
   expect(cold.getAttendancePending(matrix, 'w', record.workDate)).toEqual(original)
   repository.attendanceMatrix.mockResolvedValueOnce({ ...matrix, context: { ...matrix.context, readonly: true, capabilities: ['payroll:read'] } })
   const readonly = await cold.loadMatrix({ origin: 'real' }, matrix.scope)
-  expect(() => cold.acknowledgeAttendance(original, readonly)).toThrow()
+  expect(() => cold.acknowledgeAttendance(original, readonly)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   repository.attendanceMatrix.mockResolvedValueOnce(c1Matrix())
   const refreshed = await cold.loadMatrix({ origin: 'real' }, matrix.scope)
-  expect(() => cold.acknowledgeAttendance(original, structuredClone(refreshed))).toThrow()
+  expect(() => cold.acknowledgeAttendance(original, structuredClone(refreshed))).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   expect(cold.getAttendancePending(matrix, 'w', record.workDate)?.command).toEqual(original.command)
   cold.acknowledgeAttendance(original, refreshed)
   expect(cold.getAttendancePending(matrix, 'w', record.workDate)).toBeNull()

@@ -1,11 +1,11 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import * as XLSX from 'xlsx'
 import { preparePayrollC1Fixture as fixture, payrollC1Repository as repository } from './helpers/payroll-c1-workspace'
 
 test.use({ actionTimeout: 15000 })
-async function capture(page: Page, info: TestInfo, name: string, selector?: string, horizontal?: 'last-day' | 'totals' | 'normal-totals' | 'source-values') {
+async function capture(page: Page, name: string, selector?: string, horizontal?: 'last-day' | 'totals' | 'normal-totals' | 'source-values') {
   await expect(page.locator('[data-sonner-toast]:visible')).toHaveCount(0, { timeout: 15000 })
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
@@ -50,7 +50,6 @@ async function capture(page: Page, info: TestInfo, name: string, selector?: stri
     }
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
     await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await page.setViewportSize({ width: 1440, height: 960 })
 }
@@ -75,19 +74,19 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   await page.goto('/subcontract/payroll/new?origin=real&format=C1&month=2026-08')
   await expect(page.getByRole('combobox', { name: '工资项目', exact: true })).toBeVisible({ timeout: 30000 })
   await expect(page.getByRole('button', { name: '保存工资草稿', exact: true })).toBeDisabled()
-  await capture(page, info, 'empty-project-form')
+  await capture(page, 'empty-project-form')
   await page.goto(matrixPath)
   await expect(page.getByRole('region', { name: '月度考勤矩阵', exact: true })).toBeVisible({ timeout: 30000 })
   const initial = await repo.attendanceMatrix(query, { projectId: f.project, month: '2026-08', crewId: f.crew })
   expect(initial.records).toHaveLength(0)
-  await capture(page, info, 'empty-no-quantity-matrix')
+  await capture(page, 'empty-no-quantity-matrix')
   await cell(page, '日薪481负责人', '2026-08-01', '8', '2')
   await cell(page, '日薪480工人', '2026-08-02', '7.51', '0')
   await expect(page.getByRole('button', { name: '日薪480工人 2026-08-02 考勤', exact: true })).toContainText('7.51')
-  await capture(page, info, 'saved-precision-matrix')
-  await capture(page, info, 'month-last-day-scroll', '[data-ui="attendance-grid-scroll"]', 'last-day')
-  await capture(page, info, 'month-totals-scroll', '[data-ui="attendance-grid-scroll"]', 'totals')
-  await capture(page, info, 'month-normal-totals', '[data-ui="attendance-grid-scroll"]', 'normal-totals')
+  await capture(page, 'saved-precision-matrix')
+  await capture(page, 'month-last-day-scroll', '[data-ui="attendance-grid-scroll"]', 'last-day')
+  await capture(page, 'month-totals-scroll', '[data-ui="attendance-grid-scroll"]', 'totals')
+  await capture(page, 'month-normal-totals', '[data-ui="attendance-grid-scroll"]', 'normal-totals')
   await cell(page, '日薪480工人', '2026-08-02', '7.5', '0')
   await page.getByRole('link', { name: '新建 C1 工资', exact: true }).click()
   await expect(page.getByRole('heading', { name: '新建 C1 工资草稿', exact: true })).toBeVisible()
@@ -104,8 +103,8 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   await page.getByLabel('日薪481负责人加班价', { exact: true }).fill('55')
   await expect(page.getByRole('combobox', { name: '配置项目', exact: true })).toHaveValue(/^C1 无工程量验收 /)
   await expect(page.getByRole('combobox', { name: '配置班组', exact: true })).toHaveValue('计时班组')
-  await capture(page, info, 'independent-overtime-config')
-  await capture(page, info, 'independent-overtime-config-tail', '#section-rates > article:last-child')
+  await capture(page, 'independent-overtime-config')
+  await capture(page, 'independent-overtime-config-tail', '#section-rates > article:last-child')
   await expect(page.getByRole('button', { name: '保存个人标准', exact: true })).toBeInViewport()
   await page.getByRole('button', { name: '保存个人标准', exact: true }).click()
   await expect(page.getByRole('button', { name: '保存个人标准', exact: true })).toBeDisabled()
@@ -113,10 +112,10 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   await expect(page.getByRole('heading', { name: '新建 C1 工资草稿', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '核对考勤与个人标准', exact: true }).click()
   await expect(page.getByRole('region', { name: 'C1工资考勤与个人标准', exact: true })).toContainText('1,041.00')
-  await capture(page, info, 'c1-draft-source')
-  await capture(page, info, 'c1-draft-source-lines', '#section-source > .overflow-x-auto')
-  await capture(page, info, 'c1-draft-source-values', '#section-source > .overflow-x-auto', 'source-values')
-  await capture(page, info, 'c1-draft-source-tail', '#section-source details')
+  await capture(page, 'c1-draft-source')
+  await capture(page, 'c1-draft-source-lines', '#section-source > .overflow-x-auto')
+  await capture(page, 'c1-draft-source-values', '#section-source > .overflow-x-auto', 'source-values')
+  await capture(page, 'c1-draft-source-tail', '#section-source details')
   const saving = page.waitForResponse(response => response.url().endsWith('/api/commands/payroll-c1') && response.request().method() === 'POST')
   await page.getByRole('button', { name: '保存工资草稿', exact: true }).click()
   const saved = await saving
@@ -126,7 +125,7 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   const workspace = page.getByRole('region', { name: 'C1工资核对与发放', exact: true })
   await workspace.getByRole('button', { name: '核对考勤', exact: true }).click()
   await expect(workspace.getByRole('button', { name: '确认实际发放', exact: true })).toBeEnabled()
-  await capture(page, info, 'checked-attendance')
+  await capture(page, 'checked-attendance')
   await page.getByRole('link', { name: '查看原考勤', exact: true }).first().click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.getByRole('dialog').getByLabel('施工内容', { exact: true }).fill('只改施工内容，合计不变')
@@ -142,7 +141,7 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   await dialog.getByLabel('日薪481负责人收款金额', { exact: true }).fill('550')
   await dialog.getByLabel('日薪480工人收款金额', { exact: true }).fill('349.99')
   await expect(dialog.getByRole('button', { name: '确认实际发放', exact: true })).toBeDisabled()
-  await capture(page, info, 'allocation-cent-error', '[role="dialog"]')
+  await capture(page, 'allocation-cent-error', '[role="dialog"]')
   await dialog.getByLabel('日薪480工人收款金额', { exact: true }).fill('350')
   await expect(dialog.getByLabel('无考勤零收款成员收款金额', { exact: true })).toHaveValue('0')
   let original = ''
@@ -159,7 +158,7 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   })
   await dialog.getByRole('button', { name: '确认实际发放', exact: true }).click()
   await expect(dialog.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
-  await capture(page, info, 'unknown-original-allocation', '[role="dialog"]')
+  await capture(page, 'unknown-original-allocation', '[role="dialog"]')
   const replay = page.waitForRequest(request => request.url().endsWith('/api/commands/payroll-c1') && request.postDataJSON()?.commandId === original)
   await dialog.getByRole('button', { name: '核对原提交', exact: true }).click()
   await replay
@@ -179,7 +178,7 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   expect(detail.statement.lines.find(row => row.workerId === f.leader && row.itemName === '正常工时')).toMatchObject({ unitPrice: 60.125, amount: 481 })
   expect(detail.statement.stored.lines.find(row => row.workerId === f.leader && row.itemName === '正常工时')).toMatchObject({ unitPrice: 60.125, amount: 481 })
   await expect(page.locator('[aria-label="工资明细"]').getByRole('cell', { name: '60.125', exact: true }).first()).toBeVisible()
-  await capture(page, info, 'released-paired-output')
+  await capture(page, 'released-paired-output')
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: '下载工资与考勤表', exact: true }).click()
   const file = await downloading
@@ -211,6 +210,6 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   await page.getByRole('button', { name: '无考勤零收款成员 2026-08-31 考勤', exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText('已被签工或已发工资占用')
   await expect(page.getByRole('dialog').getByRole('button', { name: '保存考勤', exact: true })).toHaveCount(0)
-  await capture(page, info, 'zero-member-month-lock', '[role="dialog"]')
+  await capture(page, 'zero-member-month-lock', '[role="dialog"]')
   await writeFile(info.outputPath('verification.json'), JSON.stringify({ ...f, statementId, originalCommand: original, actual: 900, gross: 1041, realWorkbookRead: true, printedPdf: true, widths: [390, 768, 1024, 1280, 1440] }, null, 2))
 })

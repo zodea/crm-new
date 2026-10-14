@@ -49,13 +49,13 @@ it('新增签工以原草稿键完成，预览、拷贝修改的读取和其他�
     const original = store.getDayworkPending(empty)!
     expect(original.command.draftKey).toBe('stable-new-draft')
     const preview = await store.loadDayworkForm({ origin: 'real' }, { recordId: result.recordId, draft: {} })
-    expect(() => store.acknowledgeDaywork(original, preview)).toThrow()
+    expect(() => store.acknowledgeDaywork(original, preview)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
     const another = await f.daywork({ workerId: 'member' })
     const wrong = await store.loadDayworkForm({ origin: 'real' }, { recordId: another.recordId })
-    expect(() => store.acknowledgeDaywork(original, wrong)).toThrow()
+    expect(() => store.acknowledgeDaywork(original, wrong)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
     const changed = await store.loadDayworkForm({ origin: 'real' }, { recordId: result.recordId })
     changed.record!.note = '本地伪造的后读'
-    expect(() => store.acknowledgeDaywork(original, changed)).toThrow()
+    expect(() => store.acknowledgeDaywork(original, changed)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
     const good = await store.loadDayworkForm({ origin: 'real' }, { recordId: result.recordId })
     expect(store.acknowledgeDaywork(original, good)).toEqual({ changedSinceCommand: false })
     expect(store.getDayworkPending(empty)).toBeNull()

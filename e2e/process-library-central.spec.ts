@@ -17,7 +17,7 @@ test.afterEach(async ({ request }) => {
   const core = await request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
   expect(core.ok(), await core.text()).toBe(true)
 })
-async function evidence(page: Page, info: import('@playwright/test').TestInfo, state: string) {
+async function evidence(page: Page, state: string) {
   for (const width of widths) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 960 })
     await page.evaluate(async () => {
@@ -25,8 +25,7 @@ async function evidence(page: Page, info: import('@playwright/test').TestInfo, s
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     })
     const dimensions = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }))
-    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client)
-    await page.screenshot({ path: info.outputPath(`${state}-${width}.png`), fullPage: true, animations: 'disabled' })
+    expect(dimensions.scroll, `${state} @ ${width}px`).toBeLessThanOrEqual(dimensions.client)
   }
 }
 
@@ -62,20 +61,20 @@ test('真实 SQLite 迁入、从任意旧版保存下一版、冷刷新与冲突
   await page.goto('/schedule/process-library?origin=real')
   await expect(page.getByRole('heading', { name: '标准工序库', exact: true }).last()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(MIGRATION_INPUT.expectedUsageLabel, { exact: true }).first()).toBeVisible()
-  await evidence(page, info, '01-library-list')
+  await evidence(page, '01-library-list')
   const group = page.locator('section').filter({ has: page.getByRole('heading', { name: '装饰施工标准工序', exact: true }) })
   await group.getByRole('link', { name: '查看版本' }).click()
   await expect(page.getByRole('heading', { name: '装饰施工标准工序 · v1', exact: true })).toBeVisible()
-  await evidence(page, info, '02-immutable-old-version')
+  await evidence(page, '02-immutable-old-version')
   await page.getByRole('link', { name: '基于此版本新建', exact: true }).click()
   await expect(page.getByRole('heading', { name: '基于旧版新建版本', exact: true })).toBeVisible()
   await expect(page.getByLabel('工序库编码 *')).toBeDisabled()
   await expect(page.getByRole('grid', { name: '标准工序模板甘特' })).toBeVisible()
-  await evidence(page, info, '03-full-page-version-form')
+  await evidence(page, '03-full-page-version-form')
   await page.getByRole('button', { name: '上移基层施工', exact: true }).click()
   const reorder = page.getByRole('dialog', { name: /本次调整会冲突/ })
   await expect(reorder).toBeVisible()
-  await evidence(page, info, '04-reorder-conflict')
+  await evidence(page, '04-reorder-conflict')
   await expect(reorder.getByText('现场交接（task-0）')).toBeVisible()
   await expect(reorder.getByText('基层施工（task-1）')).toBeVisible()
   await reorder.getByRole('button', { name: '取消调整', exact: true }).press('Enter')
@@ -110,7 +109,7 @@ test('真实 SQLite 迁入、从任意旧版保存下一版、冷刷新与冲突
   await page.reload()
   await expect(page.getByRole('heading', { name: '装饰施工标准工序 · v3', exact: true })).toBeVisible()
   await expect(page.getByText('已置灰保留')).toBeVisible()
-  await evidence(page, info, '05-saved-version-cold-refresh')
+  await evidence(page, '05-saved-version-cold-refresh')
   expect(await (await request.get(oldPath)).json()).toEqual(original)
   const afterRetry = await (await request.get('/api/read/process-libraries?origin=real')).json()
   expect(afterRetry.libraries.filter((row: { code: string }) => row.code === 'HTTP-443').map((row: { version: number }) => row.version).sort()).toEqual([1, 3])
@@ -137,7 +136,7 @@ test('真实 SQLite 迁入、从任意旧版保存下一版、冷刷新与冲突
   await page.getByRole('button', { name: '重新核对当前版本系列', exact: true }).click()
   const review = page.getByRole('dialog', { name: '重新核对当前版本系列', exact: true })
   await expect(review).toBeVisible()
-  await evidence(page, info, '06-version-conflict-review')
+  await evidence(page, '06-version-conflict-review')
   await review.getByRole('button', { name: '取消', exact: true }).press('Enter')
   await expect(page.getByRole('button', { name: '保存为新版本', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: '重新核对当前版本系列', exact: true }).click()
@@ -157,7 +156,7 @@ test('真实 SQLite 迁入、从任意旧版保存下一版、冷刷新与冲突
   expect(pageErrors).toEqual([])
 })
 
-test('已有建组入口往返中央工序库后保留调用页步骤和人工工期', async ({ page }, info) => {
+test('已有建组入口往返中央工序库后保留调用页步骤和人工工期', async ({ page }) => {
   test.setTimeout(150_000)
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
@@ -180,7 +179,7 @@ test('已有建组入口往返中央工序库后保留调用页步骤和人工�
   await page.getByRole('option', { name: `${CALLER_INPUT.libraryName} · v1 · 1 道`, exact: true }).click()
   await expect(page.getByLabel(`${CALLER_INPUT.taskName}默认工期`)).toHaveValue(CALLER_INPUT.duration)
   await page.getByLabel(`${CALLER_INPUT.taskName}默认工期`).fill(CALLER_INPUT.editedDuration)
-  await evidence(page, info, '07-caller-draft-before')
+  await evidence(page, '07-caller-draft-before')
   await page.getByRole('link', { name: '维护标准工序库 →', exact: true }).click()
   await expect(page.getByRole('link', { name: '返回新建楼栋分组', exact: true })).toBeVisible()
   const group = page.locator('section').filter({ has: page.getByRole('heading', { name: CALLER_INPUT.libraryName, exact: true }) })
@@ -202,13 +201,13 @@ test('已有建组入口往返中央工序库后保留调用页步骤和人工�
   await page.getByRole('combobox', { name: '标准工序库', exact: true }).click()
   await expect(page.getByRole('option', { name: `${CALLER_INPUT.libraryName} · v2 · 1 道`, exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
-  await evidence(page, info, '08-caller-draft-returned')
+  await evidence(page, '08-caller-draft-returned')
   await page.getByRole('button', { name: '上一步', exact: true }).click()
   await expect(page.getByLabel('分组名称', { exact: true })).toHaveValue(CALLER_INPUT.groupName)
   expect(pageErrors).toEqual([])
 })
 
-test('同源列表往返刷新保留表格横滚，网络失败后重试恢复写入', async ({ page, request }, info) => {
+test('同源列表往返刷新保留表格横滚，网络失败后重试恢复写入', async ({ page, request }) => {
   test.setTimeout(120_000)
   const session = await (await request.get('/api/read/business-session')).json()
   const created = await request.post('/api/commands/process-libraries', {
@@ -258,7 +257,6 @@ test('同源列表往返刷新保留表格横滚，网络失败后重试恢复�
     expect(await table.evaluate((element, original) => element === original, retainedTable)).toBe(true)
     expect(await scroll.evaluate(element => element.scrollLeft)).toBe(scrollLeft)
     await expect(page.getByRole('link', { name: '基于此版本新建', exact: true })).toHaveCount(0)
-    await page.screenshot({ path: info.outputPath('09-same-origin-refresh-pending-390.png'), animations: 'disabled' })
   }
   finally {
     releaseRead()
@@ -267,11 +265,9 @@ test('同源列表往返刷新保留表格横滚，网络失败后重试恢复�
   await expect(table).toBeVisible()
   expect(await scroll.evaluate(element => element.scrollLeft)).toBe(scrollLeft)
   await expect(page.getByRole('link', { name: '基于此版本新建', exact: true })).toHaveCount(0)
-  await page.screenshot({ path: info.outputPath('10-same-origin-refresh-failed-390.png'), animations: 'disabled' })
   await page.unroute('**/api/read/process-libraries?origin=real')
   await page.getByRole('button', { name: '重试刷新', exact: true }).click()
   await expect(page.getByRole('link', { name: '基于此版本新建', exact: true })).toBeVisible()
   expect(await table.evaluate((element, original) => element === original, retainedTable)).toBe(true)
   expect(await scroll.evaluate(element => element.scrollLeft)).toBe(scrollLeft)
-  await page.screenshot({ path: info.outputPath('11-same-origin-refresh-recovered-390.png'), animations: 'disabled' })
 })

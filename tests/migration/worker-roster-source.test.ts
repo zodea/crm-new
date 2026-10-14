@@ -5,7 +5,7 @@ import { demoWorkspaceTestInstance } from '../../server/utils/demo-workspace-tes
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
 import { workerRosterService } from '../../server/utils/worker-roster-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { importPayrollC2MigrationSource, seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
@@ -17,7 +17,7 @@ afterEach(async () => {
 })
 async function fixture() {
   vi.spyOn(demoWorkspaceTestInstance, 'capabilities').mockImplementation(() => [...resolveBusinessSession().capabilities, 'worker:sensitive:read'])
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC2MigrationSource(db)
     await db.execute('UPDATE workers SET gender=?,hometown=?,id_card=?,bank_name=?,bank_account=?,entry_date=?,exit_date=? WHERE id=?', ['女', '广东', '440000199001010001', '测试银行', '6222000000000001', '2026-07-01', '2026-08-20', 'c2-worker'])

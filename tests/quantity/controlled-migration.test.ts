@@ -6,7 +6,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { readQuantityCoreSource, seedQuantityMigrationSource } from '../helpers/quantity-migration-source'
 
 const session = resolveBusinessSession()
@@ -34,7 +34,7 @@ afterEach(async () => {
 })
 
 it('历史照片缺正文只登记明确提示，元数据照实迁入且读正文报告缺失', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedQuantityMigrationSource(db)
     await db.execute('DELETE FROM file_payloads WHERE file_ref_id = ?', ['q-photo'])
@@ -55,7 +55,7 @@ it('历史照片缺正文只登记明确提示，元数据照实迁入且读正�
 })
 
 it('真实十五表来源经解析、确认进入中央读写，三量空零与照片保留，更正不被重复同步覆盖', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedQuantityMigrationSource(db)
     const batch = await dryRun(source)
@@ -90,7 +90,7 @@ it('真实十五表来源经解析、确认进入中央读写，三量空零与�
 })
 
 it('dry-run 已发现量域内部的缺失责任身份，不等实际确认才失败', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedQuantityMigrationSource(db)
     const entity = source.entities.quantity_projects![0]!

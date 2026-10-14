@@ -1,4 +1,5 @@
 import type { SubcontractContractCommandRequestDTO } from '../../app/lib/subcontract-contract/command-contract'
+import { decodeConstructionMainSelection } from '../../app/lib/construction-scope/contract'
 import { SUBCONTRACT_CONTRACT_WRITE_CAPABILITY } from '../../app/lib/subcontract-contract/command-contract'
 import {
   decodeSubcontractContractAttachmentChanges,
@@ -23,6 +24,7 @@ export function parseSubcontractContractCommandRequest(
   target: { kind: 'create' } | { kind: 'update', routeId: string },
 ): SubcontractContractCommandRequestDTO {
   if (!object(value) || !object(value.draft) || !object(value.attachments)
+    || Object.keys(value).some(key => !['id', 'workspaceId', 'actorId', 'requiredCapability', 'commandId', 'baseVersion', 'action', 'draft', 'attachments', 'constructionMain'].includes(key))
     || typeof value.workspaceId !== 'string' || typeof value.actorId !== 'string'
     || value.requiredCapability !== SUBCONTRACT_CONTRACT_WRITE_CAPABILITY
     || typeof value.commandId !== 'string' || !value.commandId.trim()
@@ -48,10 +50,11 @@ export function parseSubcontractContractCommandRequest(
       action: value.action as SubcontractContractCommandRequestDTO['action'],
       draft: decodeSubcontractContractDraft(value.draft),
       attachments: decodeSubcontractContractAttachmentChanges(value.attachments),
+      ...(value.constructionMain !== undefined ? { constructionMain: decodeConstructionMainSelection(value.constructionMain) } : {}),
     }
   }
   catch (cause) {
-    if (cause instanceof SubcontractContractCommandValidationError)
+    if (cause instanceof SubcontractContractCommandValidationError || (value.constructionMain !== undefined && cause instanceof Error))
       return invalid(cause.message)
     throw cause
   }

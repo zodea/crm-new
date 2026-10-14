@@ -18,7 +18,6 @@
 | [tests/project-supplier/return-context.test.ts](../../../tests/project-supplier/return-context.test.ts) | 单元／服务／状态 | 项目×分供方受限来源上下文 |
 | [tests/project-supplier/source-target-policy.test.ts](../../../tests/project-supplier/source-target-policy.test.ts) | 单元／服务／状态 | 项目分供方源单目标策略 |
 | [tests/server/project-supplier-central-test-instance.test.ts](../../../tests/server/project-supplier-central-test-instance.test.ts) | 单元／服务／状态 | 项目×分供方中央读取测试实例 |
-| [tests/stores/project-supplier-import.test.ts](../../../tests/stores/project-supplier-import.test.ts) | 单元／服务／状态 | 项目分供方文件导入事务 |
 
 ## 组件（jsdom）
 

@@ -18,10 +18,10 @@ describe('payroll navigation state', () => {
   })
 
   it.each([
-    { case: '{} / { status: \'released\' }', input: {}, argument2: { status: 'released' }, expected: 'released' },
-    { case: '{ status: \'checked\' } / { status: [\'released\'] }', input: { status: 'checked' }, argument2: { status: ['released'] }, expected: 'checked' },
-  ])('多状态往返保留并清除空选，不影响旧单值URL / payrollFiltersFromQuery：$case', ({ input, argument2, expected }) => {
-    expect(payrollFiltersFromQuery(input, argument2).status).toBe(expected)
+    { label: 'URL 无状态时采用默认状态', query: {}, defaults: { status: 'released' }, expected: 'released' },
+    { label: '旧单值状态 URL 优先于默认多选', query: { status: 'checked' }, defaults: { status: ['released'] }, expected: 'checked' },
+  ])('$label', ({ query, defaults, expected }) => {
+    expect(payrollFiltersFromQuery(query, defaults).status).toBe(expected)
   })
   it('restores only supported filters from route query', () => {
     expect(payrollFiltersFromQuery({

@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 import { createProductionStorage } from '../../server/utils/production-storage'
 
 async function fixture() {
-  const base = resolve('.codex-tmp/issue-450-tests')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-450-tests')
   await mkdir(base, { recursive: true })
   return { directory: await mkdtemp(`${base}/boundary-`), workspaceId: 'isolated-workspace', ownerId: 'isolated-owner', purpose: 'verification' as const }
 }

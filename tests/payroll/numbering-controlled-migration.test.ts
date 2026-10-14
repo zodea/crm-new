@@ -37,7 +37,7 @@ it('正式旧号和起点随完整原图迁入，原单再次出具不增号，�
     const graph = parsePayrollProjectGraph(JSON.parse(String(source.entities.payroll_projects!.find(row => row.legacyId === 'p')!.attributes!.payrollGraphJson)))
     expect(graph.schemaVersion).toBe(5)
     expect(graph.numbering!.tables.payroll_official_issues[0]).toMatchObject({ official_number: '128', statement_id: original.input.statementId, document_hash: issued.issue!.documentHash })
-    expect(() => parsePayrollProjectGraph({ ...graph, schemaVersion: 4 })).toThrow()
+    expect(() => parsePayrollProjectGraph({ ...graph, schemaVersion: 4 })).toThrow('工资迁移：完整项目图身份或结构无效')
     expect(parsePayrollProjectGraph(oldGraph)).toEqual(oldGraph)
     const batch = await prepare(original.db, source)
     expect(batch.issues.filter(row => row.metricKey === 'apply-failed')).toEqual([])

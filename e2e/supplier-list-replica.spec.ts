@@ -67,43 +67,46 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-for (const width of RESPONSIVE_WIDTHS) {
-  test(`${width}px：完整列、紧凑标签、表格内滚动及可访问工具`, async ({ page }, testInfo) => {
-    const errors: string[] = []
-    page.on('pageerror', error => errors.push(error.message))
+test('完整列、紧凑标签、表格内滚动及可访问工具在各宽度可用', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/base/supplier?sort=name-asc')
+  const list = page.locator('.supplier-reference-list')
+  await expect(list.getByRole('heading', { name: '全部分供方' })).toBeVisible()
+  await expect(list.getByRole('link', { name: '界面对照供应商01', exact: true })).toBeVisible()
+  await expect(list.getByRole('combobox', { name: '每页条数' })).toHaveValue('20')
+  for (const tone of ['warn', 'brand', 'ok', 'danger'])
+    await expect(list.locator(`[data-ui="status-tag"][data-tone="${tone}"]`).first()).toHaveCSS('border-radius', '2px')
+  const scroller = list.locator('.vxe-table--main-wrapper .vxe-table--body-inner-wrapper')
+  for (const width of RESPONSIVE_WIDTHS) {
     await page.setViewportSize({ width, height: 900 })
-    await page.goto('/base/supplier?sort=name-asc')
-    const list = page.locator('.supplier-reference-list')
-    await expect(list.getByRole('heading', { name: '全部分供方' })).toBeVisible()
-    await expect(list.getByRole('link', { name: '界面对照供应商01', exact: true })).toBeVisible()
     await expect(list.getByRole('button', { name: '筛选分供方名称', exact: true })).toBeVisible()
     await expect(list.getByRole('button', { name: '排序', exact: true })).toBeVisible()
     await expect(list.getByRole('button', { name: '列设置', exact: true })).toBeVisible()
     await expect(list.getByRole('button', { name: '新增分供方' })).toBeVisible()
-    await expect(list.getByRole('combobox', { name: '每页条数' })).toHaveValue('20')
-    for (const tone of ['warn', 'brand', 'ok', 'danger'])
-      await expect(list.locator(`[data-ui="status-tag"][data-tone="${tone}"]`).first()).toHaveCSS('border-radius', '2px')
-    const scroller = list.locator('.vxe-table--main-wrapper .vxe-table--body-inner-wrapper')
     await expect.poll(() => scroller.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true)
     await scroller.evaluate(el => el.scrollLeft = el.scrollWidth)
     await expect(list.getByRole('button', { name: '筛选确认实付', exact: true })).toBeVisible()
     await expectNoPageOverflow(page, `${width}px 完整分供方宽表`)
-    await list.getByRole('button', { name: '列设置', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: '列设置', exact: true })
-    await expect(settings.getByRole('checkbox', { name: '劳务承包范围', exact: true })).toBeChecked()
-    await settings.getByRole('checkbox', { name: '劳务承包范围', exact: true }).uncheck()
-    await page.keyboard.press('Escape')
-    await expect(list.getByRole('button', { name: '列设置', exact: true })).toBeFocused()
-    await expect(list.getByRole('button', { name: '筛选劳务承包范围', exact: true })).toHaveCount(0)
-    await list.getByRole('button', { name: '列设置', exact: true }).click()
-    await settings.getByRole('button', { name: '恢复默认' }).click()
-    await page.keyboard.press('Escape')
     await scroller.evaluate(el => el.scrollLeft = 0)
+  }
+  await list.getByRole('button', { name: '列设置', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: '列设置', exact: true })
+  await expect(settings.getByRole('checkbox', { name: '劳务承包范围', exact: true })).toBeChecked()
+  await settings.getByRole('checkbox', { name: '劳务承包范围', exact: true }).uncheck()
+  await page.keyboard.press('Escape')
+  await expect(list.getByRole('button', { name: '列设置', exact: true })).toBeFocused()
+  await expect(list.getByRole('button', { name: '筛选劳务承包范围', exact: true })).toHaveCount(0)
+  await list.getByRole('button', { name: '列设置', exact: true }).click()
+  await settings.getByRole('button', { name: '恢复默认' }).click()
+  await page.keyboard.press('Escape')
+  await scroller.evaluate(el => el.scrollLeft = 0)
+  for (const width of RESPONSIVE_WIDTHS) {
+    await page.setViewportSize({ width, height: 900 })
     await expectNoPageOverflow(page, `${width}px 设置浮层`)
-    expect(errors).toEqual([])
-    await page.screenshot({ path: testInfo.outputPath(`supplier-list-${width}.png`), fullPage: false })
-  })
-}
+  }
+  expect(errors).toEqual([])
+})
 
 test('搜索与列头条件都筛全量记录，分页、工具筛选与清空同步', async ({ page }) => {
   await page.goto('/base/supplier?sort=name-asc')

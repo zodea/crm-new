@@ -109,49 +109,54 @@ test.describe('Issue #185：项目页面状态与恢复旅程', () => {
     await expect(page.locator('.vxe-body--row').first()).toBeVisible()
   })
 
-  for (const width of VIEWPORT_WIDTHS) {
-    test(`列表筛选空态可通过键盘清除并恢复 @ ${width}px`, async ({ page }) => {
+  test('列表筛选空态可通过键盘清除并恢复，各宽度入口可达', async ({ page }) => {
+    await page.goto('/project')
+    await page.waitForLoadState('networkidle')
+
+    const search = page.getByRole('searchbox', { name: '搜索项目、客户、经理…' })
+    await expect(search).toBeVisible({ timeout: 15_000 })
+    await search.fill('__no_matching_project__')
+
+    const empty = page.getByRole('status', { name: '没有符合条件的项目' })
+    await expect(empty).toBeVisible()
+    await expect(empty).toContainText('可清除搜索、状态和表头筛选后查看全部项目。')
+
+    const clear = empty.getByRole('button', { name: '清除筛选' })
+    for (const width of VIEWPORT_WIDTHS) {
       await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
-      await page.goto('/project')
-      await page.waitForLoadState('networkidle')
-
-      const search = page.getByRole('searchbox', { name: '搜索项目、客户、经理…' })
-      await expect(search).toBeVisible({ timeout: 15_000 })
-      await search.fill('__no_matching_project__')
-
-      const empty = page.getByRole('status', { name: '没有符合条件的项目' })
-      await expect(empty).toBeVisible()
-      await expect(empty).toContainText('可清除搜索、状态和表头筛选后查看全部项目。')
-
-      const clear = empty.getByRole('button', { name: '清除筛选' })
       await expectInViewport(clear, `项目列表空态主操作 @ ${width}px`)
-      await clear.focus()
-      await expect(clear).toBeFocused()
-      await page.keyboard.press('Enter')
+    }
+    await clear.focus()
+    await expect(clear).toBeFocused()
+    await page.keyboard.press('Enter')
 
-      await expect(search).toHaveValue('')
-      await expect(page.locator('.vxe-body--row').first()).toBeVisible()
-      await expectNoPageOverflow(page, `项目列表恢复态 @ ${width}px`)
-    })
-
-    test(`详情缺失态可通过键盘返回列表 @ ${width}px`, async ({ page }) => {
+    await expect(search).toHaveValue('')
+    await expect(page.locator('.vxe-body--row').first()).toBeVisible()
+    for (const width of VIEWPORT_WIDTHS) {
       await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
-      await page.goto('/project/__missing_project__?origin=real')
-      await page.waitForLoadState('networkidle')
+      await expectNoPageOverflow(page, `项目列表恢复态 @ ${width}px`)
+    }
+  })
 
-      const empty = page.getByRole('status', { name: '项目不存在或当前来源不可见' })
-      await expect(empty).toBeVisible()
-      await expect(empty).toContainText('请确认测试数据开关与来源后返回项目列表重试。')
+  test('详情缺失态可通过键盘返回列表，各宽度入口可达', async ({ page }) => {
+    await page.goto('/project/__missing_project__?origin=real')
+    await page.waitForLoadState('networkidle')
 
-      const back = empty.getByRole('link', { name: '返回项目列表' })
+    const empty = page.getByRole('status', { name: '项目不存在或当前来源不可见' })
+    await expect(empty).toBeVisible()
+    await expect(empty).toContainText('请确认测试数据开关与来源后返回项目列表重试。')
+
+    const back = empty.getByRole('link', { name: '返回项目列表' })
+    for (const width of VIEWPORT_WIDTHS) {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
       await expectInViewport(back, `项目详情缺失态返回入口 @ ${width}px`)
-      await back.focus()
-      await expect(back).toBeFocused()
-      await page.keyboard.press('Enter')
-
-      await expect(page).toHaveURL(/\/project$/)
-      await expect(page.getByRole('heading', { name: '项目列表', exact: true })).toBeVisible()
       await expectNoPageOverflow(page, `项目详情缺失态 @ ${width}px`)
-    })
-  }
+    }
+    await back.focus()
+    await expect(back).toBeFocused()
+    await page.keyboard.press('Enter')
+
+    await expect(page).toHaveURL(/\/project$/)
+    await expect(page.getByRole('heading', { name: '项目列表', exact: true })).toBeVisible()
+  })
 })

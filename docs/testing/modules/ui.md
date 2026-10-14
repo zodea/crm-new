@@ -30,6 +30,7 @@
 | --- | --- | --- |
 | [tests/browser/ResponsiveControls.test.ts](../../../tests/browser/ResponsiveControls.test.ts) | 真实浏览器组件 | 五档视口验证弹窗、搜索栏、项目工具栏与排程控件的宽度、局部滚动及操作可达性；共享 Dialog 默认关闭按钮通过真实 Tab/Shift+Tab 检查非 hover 的可见焦点及 Escape 返回入口 |
 | [tests/browser/ContextHelp.test.ts](../../../tests/browser/ContextHelp.test.ts) | 浏览器组件行为 | 就近帮助的真实浏览器交互 |
+| [tests/browser/SharedMetricAndMenu.test.ts](../../../tests/browser/SharedMetricAndMenu.test.ts) | 真实浏览器组件 | 共享指标原值/未知来源、公式键盘、行菜单 Portal、五档视口及焦点返回 |
 | [tests/browser/KitMultiSelectFilter.test.ts](../../../tests/browser/KitMultiSelectFilter.test.ts) | 浏览器组件行为 | 多选筛选器的真实浏览器交互 |
 
 ## 视觉基线（非独立测试）
@@ -125,10 +126,10 @@
 | [tests/components/KitTableVisualStates.test.ts](../../../tests/components/KitTableVisualStates.test.ts) | 组件（jsdom） | kitTable visual states |
 | [tests/components/KitTypeSelectDialog.test.ts](../../../tests/components/KitTypeSelectDialog.test.ts) | 组件（jsdom） | kitTypeSelectDialog public contract |
 | [tests/components/KitUIHost.type-select.test.ts](../../../tests/components/KitUIHost.type-select.test.ts) | 组件（jsdom） | kitUIHost typeSelect integration |
-| [tests/components/ListFilterBar.test.ts](../../../tests/components/ListFilterBar.test.ts) | 组件（jsdom） | 列表筛选栏 |
 | [tests/components/ListShell.test.ts](../../../tests/components/ListShell.test.ts) | 组件（jsdom） | list shell |
 | [tests/components/LookupSelect.test.ts](../../../tests/components/LookupSelect.test.ts) | 组件（jsdom） | lookupSelect public behavior |
 | [tests/components/RowActionMenu.test.ts](../../../tests/components/RowActionMenu.test.ts) | 组件（jsdom） | row action menu |
+| [tests/components/SharedMetricCard.test.ts](../../../tests/components/SharedMetricCard.test.ts) | 组件（jsdom） | Metric/StatCard 保接口适配、真实零与未知来源、负额穿透、点击筛选及分区标题 |
 | [tests/components/StatePanel.test.ts](../../../tests/components/StatePanel.test.ts) | 组件（jsdom） | statePanel |
 | [tests/components/UiAtoms.test.ts](../../../tests/components/UiAtoms.test.ts) | 组件（jsdom） | ui atom public contracts |
 
@@ -155,6 +156,7 @@
 | [e2e/kit-table-responsive.spec.ts](../../../e2e/kit-table-responsive.spec.ts) | Playwright E2E | KitTable 公共表格规格 |
 | [e2e/kit-type-select.spec.ts](../../../e2e/kit-type-select.spec.ts) | Playwright E2E | KitUI typeSelect：8 类付款申请、键盘确定与取消返回值 |
 | [e2e/kit-ui-keyboard.spec.ts](../../../e2e/kit-ui-keyboard.spec.ts) | Playwright E2E | KitUI real-browser keyboard contracts |
+| [e2e/kit-shared-primitives-dc.spec.ts](../../../e2e/kit-shared-primitives-dc.spec.ts) | Playwright E2E | DC 真实公共源码、条件函数调用、共享指标、菜单键盘/焦点/局部裁切与五档视口 |
 | [e2e/kit-ui-motion.spec.ts](../../../e2e/kit-ui-motion.spec.ts) | Playwright E2E | KitUI 浮层几何稳定性 |
 | [e2e/lookup-select.spec.ts](../../../e2e/lookup-select.spec.ts) | Playwright E2E | LookupSelect 检索下拉原语 |
 | [e2e/responsive-primitives.spec.ts](../../../e2e/responsive-primitives.spec.ts) | Playwright E2E | Issue #112 R1：共享响应式原语 |

@@ -3,11 +3,12 @@ import { payrollProblem } from '../../../../app/lib/payroll/central-contract'
 import { numberingExact, numberingObject } from '../../../../app/lib/payroll/central-numbering-codec'
 import { encodePayrollWorkbookRead } from '../../../../app/lib/payroll/workbook-codec'
 import { parsePayrollWorkbookInput } from '../../../../app/lib/payroll/workbook-validation'
-import { payrollWorkbookService } from '../../../utils/payroll-workbook-runtime'
+import { payrollWorkbookServiceForEvent } from '../../../utils/payroll-workbook-runtime'
 import { throwQuantityError } from '../../../utils/quantity-error'
 
 export default defineEventHandler(async (event) => {
   try {
+    const payrollWorkbookService = payrollWorkbookServiceForEvent(event)
     const body: unknown = await readBody(event)
     if (!numberingObject(body) || !numberingExact(body, ['query', 'input']) || !numberingObject(body.query))
       throw payrollProblem('invalid-query', '工资输出目录读取格式无效')

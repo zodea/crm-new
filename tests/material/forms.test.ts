@@ -1,7 +1,6 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import {
   getMaterialStockSummary,
   getOwnerMaterialSummary,
@@ -9,7 +8,7 @@ import {
   loadMaterialForm,
 } from '~/lib/material/forms'
 import { useMaterialStore } from '~/stores/material'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 let failFileInsert = false
@@ -42,8 +41,7 @@ vi.mock('~/lib/db/connection', () => ({
 
 beforeEach(async () => {
   failFileInsert = false
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   setActivePinia(createPinia())
   await mem.execute(`
     INSERT INTO customers (id, name, status)

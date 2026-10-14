@@ -38,7 +38,7 @@ describe('空鼓工资提交的封闭边界', () => {
   ])('单处价格保留0、明确空及原精度，不接受指数wire或数值wire / parsePayrollHollowCommand：$case', ({ prepare }) => {
     const fixture = createInvalidPolicyPriceWire()
     const { input } = prepare(fixture)
-    expect(() => parsePayrollHollowCommand(input)).toThrow()
+    expect(() => parsePayrollHollowCommand(input)).toThrow('空鼓扣款金额或单处价格的传输格式无效')
   })
 
   it.each(Array.from([0, null, 0.00000001, 30]).map(input => ({ input })))('单处价格保留0、明确空及原精度，不接受指数wire或数值wire：输入组合 1 案例 %#', ({ input: amount }) => {
@@ -75,7 +75,7 @@ describe('空鼓工资提交的封闭边界', () => {
   ])('明确关闭保留false，missing不等于false或默认价 / parsePayrollHollowCommand：$case', ({ prepare }) => {
     const fixture = createDisabledPolicyWire()
     const { input } = prepare(fixture)
-    expect(() => parsePayrollHollowCommand(input)).toThrow()
+    expect(() => parsePayrollHollowCommand(input)).toThrow('扣款配置须绑定原请款主体和项目，分项不可重复')
   })
 
   describe('只对已保存原单启动，不接客户端总额、处数或自由来源', () => {
@@ -88,14 +88,14 @@ describe('空鼓工资提交的封闭边界', () => {
       { case: '{ ...command, target: { statementId: null, draftKey: \'unsaved-1\' } }', input: { ...command, target: { statementId: null, draftKey: 'unsaved-1' } } },
       { case: '{ ...command, target: { statementId: \'wage-1\' } }', input: { ...command, target: { statementId: 'wage-1' } } },
     ])('parsePayrollHollowCommand：$case', ({ input }) => {
-      expect(() => parsePayrollHollowCommand(structuredClone(input))).toThrow()
+      expect(() => parsePayrollHollowCommand(structuredClone(input))).toThrow('请先保存工资草稿，再对这张单明确开始扣款')
     })
   })
 
   it.each(Array.from([{ amount: '450.00' }, { count: 15 }, { recordIds: ['record-1'] }]).map(input => ({ input })))('只对已保存原单启动，不接客户端总额、处数或自由来源：输入组合 1 案例 %#', ({ input: extra }) => {
     const command = startCommand()
     expect(parsePayrollHollowCommand(encodePayrollHollowWire(command))).toEqual(command)
-    expect(() => parsePayrollHollowCommand({ ...command, action: { ...command.action, ...extra } })).toThrow()
+    expect(() => parsePayrollHollowCommand({ ...command, action: { ...command.action, ...extra } })).toThrow('空鼓扣款资料不完整或包含不支持的内容')
   })
 
   function createPolicyScopeCommand() {
@@ -127,13 +127,19 @@ describe('空鼓工资提交的封闭边界', () => {
   ])('配置原项目、原价格前序及格式用途不能串用 / parsePayrollHollowCommand：$case', ({ prepare }) => {
     const fixture = createPolicyScopeCommand()
     const { input } = prepare(fixture)
-    expect(() => parsePayrollHollowCommand(input)).toThrow()
+    expect(() => parsePayrollHollowCommand(input)).toThrow('扣款配置须绑定原请款主体和项目，分项不可重复')
   })
 
-  it.each(([{ statementId: 'wage-2' }, { startId: null }, { policyRevisionIds: ['policy-2'] }, { logIds: ['log-1', 'log-1'] }, { amount: 450 }]).map(input => ({ input })))('启动回执必须绑定原单、准确启动记录与日志集合：输入案例 %#', ({ input: invalid }) => {
+  it.each([
+    { label: '错配原单', invalid: { statementId: 'wage-2' }, reason: '扣款启动回执缺少原单或准确启动记录' },
+    { label: '缺启动记录', invalid: { startId: null }, reason: '扣款启动回执缺少原单或准确启动记录' },
+    { label: '多出配置修订', invalid: { policyRevisionIds: ['policy-2'] }, reason: '扣款启动回执缺少原单或准确启动记录' },
+    { label: '日志重复', invalid: { logIds: ['log-1', 'log-1'] }, reason: '扣款提交回执与原命令不匹配' },
+    { label: '夹带金额字段', invalid: { amount: 450 }, reason: '空鼓扣款资料不完整或包含不支持的内容' },
+  ])('启动回执必须绑定原单、准确启动记录与日志集合：拒绝$label', ({ invalid, reason }) => {
     const command = startCommand()
     const receipt = { commandId: command.commandId, projectId: command.projectId, statementId: 'wage-1', startId: 'start-1', policyRevisionIds: [], sourceVersion: 'payroll:hollow:v2', outcome: 'started', logIds: ['log-1'] }
     expect(decodePayrollHollowResult(receipt, command).startId).toBe('start-1')
-    expect(() => decodePayrollHollowResult({ ...receipt, ...invalid }, command)).toThrow()
+    expect(() => decodePayrollHollowResult({ ...receipt, ...invalid }, command)).toThrow(reason)
   })
 })

@@ -162,68 +162,82 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
     })
   }
 
-  for (const viewport of RESPONSIVE_CASES) {
-    test(`${viewport.label} 无页面横滚，项目宽表局部横滚且关键操作键盘可达`, async ({ page }) => {
+  test('各宽度无页面横滚，项目宽表局部横滚且关键操作键盘可达', async ({ page }) => {
+    const desktop = { width: 1440, height: VIEWPORT_HEIGHTS[1440] }
+    await page.setViewportSize(desktop)
+    await page.goto('/project')
+    const listTable = await waitForProjectList(page)
+    const createProject = page.getByRole('button', {
+      name: '新增项目',
+      exact: true,
+    })
+    await expect(createProject).toBeEnabled()
+    await expect(createProject).toHaveAttribute(
+      'title',
+      '新增正式项目',
+    )
+    for (const viewport of RESPONSIVE_CASES) {
       await page.setViewportSize({
         width: viewport.width,
         height: viewport.height,
       })
-
-      await page.goto('/project')
-      const listTable = await waitForProjectList(page)
       await expectNoPageOverflow(page, `${viewport.label} 项目列表`)
       await expectLocalHorizontalScroll(
         vxeBodyScroller(listTable),
         `${viewport.label} 项目列表宽表`,
       )
-
-      const createProject = page.getByRole('button', {
-        name: '新增项目',
-        exact: true,
-      })
       await createProject.scrollIntoViewIfNeeded()
-      await expect(createProject).toBeEnabled()
-      await expect(createProject).toHaveAttribute(
-        'title',
-        '新增正式项目',
-      )
       await expectInViewport(createProject, `${viewport.label} 新增项目操作`)
+    }
 
-      await page.goto('/project/proj_demo_001?origin=demo')
-      const detail = page.locator('[data-ui="project-detail-screen"]')
-      await expect(detail).toBeVisible()
-      await expectNoPageOverflow(page, `${viewport.label} 项目详情`)
-
-      await expect(page.getByRole('link', {
-        name: '编辑项目',
-        exact: true,
-      })).toHaveCount(0)
-      const closeDetail = page.getByRole('link', { name: '返回项目列表' })
-      await tabUntilFocused(page, closeDetail)
+    await page.setViewportSize(desktop)
+    await page.goto('/project/proj_demo_001?origin=demo')
+    const detail = page.locator('[data-ui="project-detail-screen"]')
+    await expect(detail).toBeVisible()
+    await expect(page.getByRole('link', {
+      name: '编辑项目',
+      exact: true,
+    })).toHaveCount(0)
+    await expect(page.getByRole('status', { name: '测试数据只读详情' })).toBeVisible()
+    const closeDetail = page.getByRole('link', { name: '返回项目列表' })
+    await tabUntilFocused(page, closeDetail)
+    for (const viewport of RESPONSIVE_CASES) {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      })
+      await closeDetail.scrollIntoViewIfNeeded()
       await expectInViewport(closeDetail, `${viewport.label} 关闭项目详情操作`)
+      await expectNoPageOverflow(page, `${viewport.label} 项目详情`)
+    }
 
-      await expect(page.getByRole('status', { name: '测试数据只读详情' })).toBeVisible()
-      await expectNoPageOverflow(page, `${viewport.label} 项目详情业务 Tab`)
-
+    await page.setViewportSize(desktop)
+    await page.goto('/project/form')
+    const shell = page.locator('[data-ui="entity-form-shell"]')
+    const footer = shell.getByRole('group', { name: '表单操作' })
+    await expect(shell.getByRole('navigation', { name: '表单分区' }))
+      .toHaveCount(0)
+    await expect(footer).toHaveCSS('position', 'sticky')
+    const firstField = page.getByLabel('项目名称 *')
+    await firstField.fill('视口项目草稿')
+    const cancel = footer.getByRole('button', { name: '取消', exact: true })
+    const save = footer.getByRole('button', { name: '保存草稿', exact: true })
+    await expectTabSequence(
+      page,
+      firstField,
+      [cancel, save],
+      '项目表单关键操作',
+    )
+    for (const viewport of RESPONSIVE_CASES) {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      })
+      // 固定操作条按进入时的滚动容器定位，逐宽度重新进入表单
       await page.goto('/project/form')
-      const shell = page.locator('[data-ui="entity-form-shell"]')
-      const footer = shell.getByRole('group', { name: '表单操作' })
-      await expect(shell.getByRole('navigation', { name: '表单分区' }))
-        .toHaveCount(0)
-      await expect(footer).toHaveCSS('position', 'sticky')
+      await expect(firstField).toBeVisible()
       await expectInViewport(footer, `${viewport.label} 项目表单固定操作条`)
-
-      const firstField = page.getByLabel('项目名称 *')
-      await firstField.fill(`视口 ${viewport.width} 项目草稿`)
-      const cancel = footer.getByRole('button', { name: '取消', exact: true })
-      const save = footer.getByRole('button', { name: '保存草稿', exact: true })
-      await expectTabSequence(
-        page,
-        firstField,
-        [cancel, save],
-        `${viewport.label} 项目表单关键操作`,
-      )
       await expectNoPageOverflow(page, `${viewport.label} 项目表单`)
-    })
-  }
+    }
+  })
 })

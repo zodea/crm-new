@@ -2,11 +2,11 @@ import { expect, it } from 'vitest'
 import { initializePayrollSchema } from '../../app/lib/payroll/central-schema'
 import { loadPayrollDayworkOccupations, loadPayrollSourceExclusions, payrollDayworkOccupationsFromGraph, payrollSourceExclusionsFromGraph } from '../../app/lib/payroll/central-source-locks'
 import { buildWageDraftSource, createWageStatementDraft } from '../../app/lib/payroll/statements'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
 
 it('他单未发逐条领用可见，但不制造同格式整月编辑锁；已发软删头与关联仍占用', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const { dayworkIds, configId } = await seedPayrollC2MigrationSource(db)
     await initializePayrollSchema(db)

@@ -19,13 +19,15 @@ export function contractMigratedSignatory(entity: CoreMigrationServerEntityDTO, 
       return fail('迁入合同签约主体编号缺少当时采用快照，不能自动补当前目录')
     return { legacyPartyA, ourSignatoryId: null, ourSignatoryVersion: null, ourSignatorySnapshot: null }
   }
+  let snapshot: ReturnType<typeof decodeOurSignatorySnapshot>
   try {
-    const snapshot = decodeOurSignatorySnapshot(value)
-    if (snapshot.id !== id)
-      return fail('迁入合同签约主体编号与当时采用快照不一致')
-    return { legacyPartyA, ourSignatoryId: snapshot.id, ourSignatoryVersion: snapshot.version, ourSignatorySnapshot: snapshot }
+    snapshot = decodeOurSignatorySnapshot(value)
   }
   catch {
     return fail('迁入合同签约主体快照或身份损坏，不能改变历史采用事实')
   }
+  // 编号核对放在解码之外，避免 fail 抛出的具体原因被上面的 catch 改写。
+  if (snapshot.id !== id)
+    return fail('迁入合同签约主体编号与当时采用快照不一致')
+  return { legacyPartyA, ourSignatoryId: snapshot.id, ourSignatoryVersion: snapshot.version, ourSignatorySnapshot: snapshot }
 }

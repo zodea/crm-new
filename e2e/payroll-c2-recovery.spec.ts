@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import type { PayrollDayworkCommand, PayrollDayworkFormRead, PayrollDayworkRecordDraft } from '../app/lib/payroll/central-daywork-contract'
 import { randomUUID } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
@@ -6,13 +6,12 @@ import { expect, test } from '@playwright/test'
 import { payrollC2Workspace } from './helpers/payroll-c2-workspace'
 
 test.use({ actionTimeout: 15000 })
-async function evidence(page: Page, info: TestInfo, name: string, selector?: string) {
+async function evidence(page: Page, name: string, selector?: string) {
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
     if (selector)
       await page.locator(selector).first().scrollIntoViewIfNeeded()
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
   }
 }
 function saveCommand(read: PayrollDayworkFormRead, record: PayrollDayworkRecordDraft): PayrollDayworkCommand {
@@ -54,8 +53,8 @@ test('新签工失响应后冷页按原编号保存一次，日期和正文不�
   await page.getByRole('button', { name: '保存待确认', exact: true }).click()
   await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
   await expect(page.getByLabel('施工内容', { exact: true })).toHaveValue('冷页后仍保存原半工和长施工内容，不重复登记')
-  await evidence(page, info, 'daywork-unknown-keeps-input')
-  await evidence(page, info, 'daywork-unknown-form-actions', 'button:has-text("保存待确认")')
+  await evidence(page, 'daywork-unknown-keeps-input')
+  await evidence(page, 'daywork-unknown-form-actions', 'button:has-text("保存待确认")')
   page.once('dialog', dialog => dialog.accept())
   await page.reload()
   await page.goto(url)
@@ -63,7 +62,7 @@ test('新签工失响应后冷页按原编号保存一次，日期和正文不�
   await expect(page.getByLabel('用工日期', { exact: true })).toHaveValue('2026-10-03')
   await expect(page.getByLabel('用工数', { exact: true })).toHaveValue('0.5')
   await expect(page.getByLabel('施工内容', { exact: true })).toHaveValue('冷页后仍保存原半工和长施工内容，不重复登记')
-  await evidence(page, info, 'daywork-cold-original-pending')
+  await evidence(page, 'daywork-cold-original-pending')
   const replay = page.waitForRequest(request => request.url().endsWith('/api/commands/payroll-daywork'))
   await page.getByRole('button', { name: '核对原提交', exact: true }).click()
   expect((await replay).postDataJSON()).toEqual(original)
@@ -98,9 +97,9 @@ test('原签工保存成功但冷读失败，后来合法修改后仍可确认�
   await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: '工资提交核对', exact: true }).or(page.locator('[aria-label="工资提交核对"]'))).toContainText('提交已保存，等待读取原结果')
   await expect(page.getByLabel('施工内容', { exact: true })).toHaveValue('本窗口原提交的施工内容')
-  await evidence(page, info, 'daywork-success-read-failure')
-  await evidence(page, info, 'daywork-success-read-failure-status', '[aria-label="工资提交核对"]')
-  await evidence(page, info, 'daywork-success-read-failure-actions', 'button:has-text("保存待确认")')
+  await evidence(page, 'daywork-success-read-failure')
+  await evidence(page, 'daywork-success-read-failure-status', '[aria-label="工资提交核对"]')
+  await evidence(page, 'daywork-success-read-failure-actions', 'button:has-text("保存待确认")')
   // 独立公开 HTTP 命令模拟另一窗口合法更正，不改数据库或伪造后读结果。
   const current = await repository.dayworkForm({ origin: 'real' }, { recordId: created.recordId })
   expect(current.record?.workContent).toBe('本窗口原提交的施工内容')
@@ -116,11 +115,11 @@ test('原签工保存成功但冷读失败，后来合法修改后仍可确认�
   await expect(page.getByLabel('用工日期', { exact: true })).toHaveValue('2026-11-03')
   await expect(page.getByLabel('施工内容', { exact: true })).toHaveValue('本窗口原提交的施工内容')
   await expect(page.getByRole('button', { name: '保存待确认', exact: true })).toBeDisabled()
-  await evidence(page, info, 'daywork-original-ack-after-later-change')
+  await evidence(page, 'daywork-original-ack-after-later-change')
   await page.getByText('查看当前原记录', { exact: true }).click()
   await expect(page.getByRole('region', { name: '原提交后续更新', exact: true })).toContainText('另一窗口后来核实的当前事实')
-  await evidence(page, info, 'daywork-original-ack-current-expanded', '[aria-label="原提交后续更新"]')
-  await evidence(page, info, 'daywork-original-ack-retained-content', '[data-field="workContent"]')
+  await evidence(page, 'daywork-original-ack-current-expanded', '[aria-label="原提交后续更新"]')
+  await evidence(page, 'daywork-original-ack-retained-content', '[data-field="workContent"]')
   const after = await repository.dayworkForm({ origin: 'real' }, { recordId: created.recordId })
   expect(after.record).toMatchObject({ workDate: '2026-11-04', workContent: '另一窗口后来核实的当前事实' })
   await writeFile(info.outputPath('daywork-later-change-result.json'), JSON.stringify({ original, originalRecordId: created.recordId, currentRecord: after.record, pendingCleared: true, oldInputRetained: true }, null, 2))
@@ -155,7 +154,7 @@ test('C2 主体配置保存失响应后冷页仍按原键核对，明确空规�
   await expect(page.getByLabel('确认规则', { exact: true })).toHaveValue('')
   await expect(page.locator('#section-scope')).toContainText(project.name!)
   await expect(page.locator('#section-scope')).toContainText('签工负责人')
-  await evidence(page, info, 'c2-config-cold-original-pending')
+  await evidence(page, 'c2-config-cold-original-pending')
   const replay = page.waitForRequest(request => request.url().endsWith('/api/commands/payroll-c2'))
   await page.getByRole('button', { name: '核对原提交', exact: true }).click()
   expect((await replay).postDataJSON()).toEqual(original)
@@ -206,7 +205,7 @@ test('签工切换月份后迟到的旧读取不覆盖当前记录或两类状�
     const query = new URL(page.url()).searchParams
     expect(JSON.parse(query.get('status')!)).toEqual(['draft', 'checked'])
     expect(JSON.parse(query.get('dayworkStatus')!)).toEqual(['draft'])
-    await evidence(page, info, 'daywork-late-read-current-month')
+    await evidence(page, 'daywork-late-read-current-month')
   }
   finally {
     releaseOld()

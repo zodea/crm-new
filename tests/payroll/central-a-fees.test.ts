@@ -16,12 +16,12 @@ describe('p5 公开配置与现场量费用核算', () => {
       expect(() => decodePayrollARead(encodePayrollAWire(form), 'form', { origin: 'real' }, input)).not.toThrow()
       const broken = structuredClone(form) as unknown as Record<string, unknown>
       delete broken.bookProof
-      expect(() => decodePayrollARead(encodePayrollAWire(broken), 'form', { origin: 'real' }, input)).toThrow()
+      expect(() => decodePayrollARead(encodePayrollAWire(broken), 'form', { origin: 'real' }, input)).toThrow('工资费用用途或读取依据不完整')
       const config = await f.feeConfig()
       expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(config), { origin: 'real' }, config.scope)).not.toThrow()
       const poisoned = structuredClone(config)
       Object.assign(poisoned.fees[0]!, { unitPrice: 'free' })
-      expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(poisoned), { origin: 'real' }, config.scope)).toThrow()
+      expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(poisoned), { origin: 'real' }, config.scope)).toThrow('工资数值必须明确或保留为空')
     }
     finally { await f.close() }
   })

@@ -8,7 +8,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollMigrationSource, seedReleasedPayrollMigrationSource } from '../helpers/payroll-migration-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
@@ -42,7 +42,7 @@ it('公开迁入后经真实 HTTP/Repository 读冻结姓名、零分配、完�
       throw Object.assign(new Error('工资 HTTP 请求失败'), { data: result.data ?? result })
     return result
   })
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     expect((await repo.list({ origin: 'real' })).rows).toEqual([])
     const healthy = await seedReleasedPayrollMigrationSource(db)

@@ -4,7 +4,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { importPayrollC2MigrationSource, seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
 
 afterEach(async () => {
@@ -12,8 +12,12 @@ afterEach(async () => {
   await coreMigrationTestInstance.reset(resolveBusinessSession().workspaceId)
 })
 
+const saveRejection = {
+  'disabled': '主体配置的价格、规则、启用状态或真实班组不可用于核算',
+  'null-rate': '该项目负责人尚无唯一有效 C2 主体配置',
+} as const
 it.each(['disabled', 'null-rate'] as const)('真实迁入%s主体配置保原值，已有confirmed签工仍不能建可发工资', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const { configId } = await seedPayrollC2MigrationSource(db)
     // 仅测试源库重现历史可空字段；新写入接口始终禁止生成缺价配置。
@@ -40,7 +44,7 @@ it.each(['disabled', 'null-rate'] as const)('真实迁入%s主体配置保原值
     const command: PayrollC2Command = { commandId: `invalid-save-${kind}`, workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: 'real', requiredCapability: 'payroll:write', sourceVersion: read.context.sourceVersion, projectId: imported.projectId, statementId: null, draftKey: read.draftKey, configScope: null, configId: null, action: { kind: 'save-c2-draft', draft } }
     const snapshot = () => quantityTestInstance.withWorkspaceTransaction(async tx => ({ heads: await tx.select('SELECT * FROM wage_statements ORDER BY id'), receipts: await tx.select('SELECT * FROM payroll_command_receipts ORDER BY command_id'), logs: await tx.select('SELECT * FROM operation_logs ORDER BY id'), revision: await tx.select('SELECT * FROM payroll_revision') }))
     const before = await snapshot()
-    await expect(payrollService.executeC2(command)).rejects.toThrow()
+    await expect(payrollService.executeC2(command)).rejects.toThrow(saveRejection[kind])
     expect(await snapshot()).toEqual(before)
     expect((await payrollService.c2Config({ origin: 'real' }, config.scope)).config).toEqual(config.config)
   }

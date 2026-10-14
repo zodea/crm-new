@@ -274,17 +274,24 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
     await expect(page.getByRole('status', { name: '客户列表加载失败' })).toContainText('无客户查看权限')
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 客户列表—详情—表单不产生页面级横滚`, async ({ page }) => {
+  test('客户列表—详情—表单在各宽度不产生页面级横滚', async ({ page }) => {
+    await createFormalCustomer(page, '响应式客户')
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await createFormalCustomer(page, `响应式客户 ${width}`)
       await expectNoPageOverflow(page, `#314 客户详情 @ ${width}px`)
-      await page.getByRole('link', { name: '编辑客户' }).click()
-      await expect(page.getByRole('heading', { name: '编辑 · 客户' })).toBeVisible()
+    }
+    await page.getByRole('link', { name: '编辑客户' }).click()
+    await expect(page.getByRole('heading', { name: '编辑 · 客户' })).toBeVisible()
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       await expectNoPageOverflow(page, `#314 客户表单 @ ${width}px`)
-      await page.getByRole('button', { name: '取消' }).click()
-      await page.getByRole('link', { name: '返回客户列表' }).click()
+    }
+    await page.getByRole('button', { name: '取消' }).click()
+    await page.getByRole('link', { name: '返回客户列表' }).click()
+    await expect(page.getByRole('heading', { name: '客户档案' })).toBeVisible()
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       await expectNoPageOverflow(page, `#314 客户列表 @ ${width}px`)
-    })
-  }
+    }
+  })
 })

@@ -1,7 +1,6 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
 
@@ -84,14 +83,4 @@ test.describe('Issue #312：项目 Target Registry', () => {
       .toBeVisible()
     await expect(page.getByRole('heading', { name: '合和新城', exact: true })).toHaveCount(0)
   })
-
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 详情目标不产生页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/project/proj_demo_001?origin=demo')
-      await expect(page.getByRole('heading', { name: '合和新城', exact: true }))
-        .toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#312 项目详情目标 @ ${width}px`)
-    })
-  }
 })

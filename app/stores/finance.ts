@@ -451,6 +451,11 @@ export const useFinanceStore = defineStore('finance', () => {
   }
 
   const searchProjects = (keyword: string, kind?: F3FormKind) => searchLookup('projects', keyword, kind)
+  async function searchConstructionMains(keyword: string, projectId?: string | null) {
+    if (!isCentral('reimbursement'))
+      throw new Error('当前来源不能搜索真实工程与施工主合同；原资料继续保留。')
+    return (await centralRead('reimbursement', () => repository().lookup('reimbursement', { kind: 'construction-mains', keyword, ...(projectId ? { projectId } : {}) }))).items
+  }
   const searchCustomers = (keyword: string, kind?: F3FormKind) => searchLookup('customers', keyword, kind)
   const searchSuppliers = (keyword: string, kind?: F3FormKind) => searchLookup('suppliers', keyword, kind)
   const searchWorkers = (keyword: string, kind?: F3FormKind) => searchLookup('workers', keyword, kind)
@@ -666,6 +671,7 @@ export const useFinanceStore = defineStore('finance', () => {
     loadOne,
     loadList,
     searchProjects,
+    searchConstructionMains,
     searchCustomers,
     searchSuppliers,
     searchWorkers,

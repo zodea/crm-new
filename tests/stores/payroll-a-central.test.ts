@@ -48,15 +48,15 @@ it('固定页面读不被另一读抬高基准，失响应保原身份/原金额
 it('只有本命令明确未应用才释放，通用stale、撤权或损坏回读保原键', async () => {
   const store = usePayrollAStore()
   repo.execute.mockRejectedValueOnce(new Error('断线'))
-  await expect(store.checkA(read())).rejects.toThrow()
+  await expect(store.checkA(read())).rejects.toThrow('断线')
   const pending = store.getAPending(read())!
   repo.execute.mockRejectedValueOnce(payrollProblem('stale-source', '回查失败'))
-  await expect(store.recoverA(pending)).rejects.toThrow()
+  await expect(store.recoverA(pending)).rejects.toThrow('回查失败')
   expect(store.getAPending(read())?.command.commandId).toBe(pending.command.commandId)
   const absent = payrollProblem('validation-failed', '确实未写入')
   Object.assign(absent.problem, { commandId: pending.command.commandId, commandOutcome: 'not-applied' })
   repo.execute.mockRejectedValueOnce(absent)
-  await expect(store.recoverA(pending)).rejects.toThrow()
+  await expect(store.recoverA(pending)).rejects.toThrow('确实未写入')
   expect(store.getAPending(read())).toBeNull()
 })
 it('存储无法持久保存原提交时不发送且保留原输入', async () => {

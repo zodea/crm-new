@@ -9,7 +9,7 @@ import { coreMigrationTestInstance } from '../../server/utils/core-migration-tes
 import { loadPayrollAQuantityFacts } from '../../server/utils/payroll-quantity-facts'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
@@ -21,7 +21,7 @@ afterEach(async () => {
 })
 
 async function importedSource() {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     const source = await readQuantityCoreSource(db)

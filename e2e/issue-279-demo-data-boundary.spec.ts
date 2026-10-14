@@ -172,12 +172,12 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     expect(status).toBe(403)
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 开关与来源汇总不产生页面级横滚`, async ({ page }) => {
+  test('开关与来源汇总在各宽度不产生页面级横滚', async ({ page }) => {
+    await openProductionOnlyList(page)
+    await includeDemo(page)
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await openProductionOnlyList(page)
-      await includeDemo(page)
       await expectNoPageOverflow(page, `#279 测试数据开关 @ ${width}px`)
-    })
-  }
+    }
+  })
 })

@@ -7,6 +7,8 @@ import { expect, it, vi } from 'vitest'
 import { softDelete } from '../../app/lib/db/soft-delete'
 import { FINANCE_CAPABILITIES, FINANCE_FAMILIES } from '../../app/lib/finance/central-contract'
 import { decodeSupplierDetailRead, decodeSupplierListPage } from '../../app/lib/supplier/read-decoder'
+import { createProductionConstructionContractService } from '../../server/utils/production-construction-contract-service'
+import { readProductionConstructionScopeMainFact } from '../../server/utils/production-construction-scope-record'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { financeRecordSnapshot, validateFinanceJournal } from '../../server/utils/production-finance-journal'
 import { financeCommandFingerprint } from '../../server/utils/production-finance-request'
@@ -44,7 +46,17 @@ async function fixture() {
   async function confirm(record: { id: string, version: string }) {
     return finance.execute({ ...request('payment_record', `confirm-${record.id}`, { ...(await finance.form('payment_record', record.id, session)).draft, confirmedBy: '真实确认人' }, 'confirm'), id: record.id, baseVersion: record.version }, session)
   }
-  return { storage, options, actor, session, owner, finance, first, second, project, request, application, payment, confirm }
+  async function engineering(prefix: string) {
+    for (const capability of ['our-signatory:read', 'our-signatory:write', 'construction-contract:read', 'construction-contract:write', 'construction-scope:read', 'construction-scope:write']) {
+      if (!actor.capabilities.includes(capability))
+        actor.capabilities.push(capability)
+    }
+    const signatory = await createProductionOurSignatoryService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'our-signatory:write', commandId: `${prefix}-own-party`, baseVersion: null, draft: { name: '真实签约主体', taxNo: `${prefix}-TAX`, registeredAddress: null, legalRepresentative: null, verificationNote: '真实工程身份核验', status: 'active' } }, session)
+    const main = await createProductionConstructionContractService(storage).execute({ ...baseCommand, commandId: `${prefix}-upstream-main`, requiredCapability: 'construction-contract:write', draft: { name: '实际施工主合同', projectId: project.id, customerId: customer.id, ourSignatoryId: signatory.id, ourSignatoryVersion: signatory.version, content: '真实业务工程', signDate: '2026-10-05', amount: null } }, session)
+    const fact = await storage.withTransaction(tx => readProductionConstructionScopeMainFact(tx, actor, main.id))
+    return { signatory, constructionMain: { id: main.id, projectId: project.id, basis: fact.basis } }
+  }
+  return { storage, options, actor, session, owner, finance, first, second, project, request, application, payment, confirm, engineering }
 }
 
 it('实际SQLite付款确认前为真实零，确认后只按原收款方分摊；冷重启保原版本且所有GET只读', async () => {
@@ -203,9 +215,9 @@ it('材采主合同与有效协议只计一次可证小计；作废排除签约�
   const f = await fixture()
   try {
     f.actor.capabilities.push('material-contract:write', 'our-signatory:read', 'our-signatory:write')
-    const signatory = await createProductionOurSignatoryService(f.storage).execute({ workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'our-signatory:write', commandId: 'create-own-party', baseVersion: null, draft: { name: '真实签约主体', taxNo: 'SYNTHETIC-TAX', registeredAddress: null, legalRepresentative: null, verificationNote: '真实核验依据', status: 'active' } }, f.session)
+    const { signatory, constructionMain } = await f.engineering('supplier-material')
     const owner = createProductionMaterialContractService(f.storage)
-    const command: MaterialContractCommandRequestDTO = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'material-contract:write', commandId: 'create-material-main', baseVersion: null, action: 'submit', attachments: {}, draft: { name: '主合同80元', projectId: f.project.id, supplierId: f.first.id, ourSignatoryId: signatory.id, ourSignatoryVersion: signatory.version, signDate: '2026-10-05', content: '原签约依据', amount: 80, lineItems: [{ materialName: '实际材料', unit: '米', qty: 1, taxInclusiveUnitPrice: 100 }], deductions: [{ name: '约定减项', amount: 20, basis: '合同原依据' }] } }
+    const command: MaterialContractCommandRequestDTO = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'material-contract:write', commandId: 'create-material-main', baseVersion: null, action: 'submit', constructionMain, attachments: {}, draft: { name: '主合同80元', projectId: f.project.id, supplierId: f.first.id, ourSignatoryId: signatory.id, ourSignatoryVersion: signatory.version, signDate: '2026-10-05', content: '原签约依据', amount: 80, lineItems: [{ materialName: '实际材料', unit: '米', qty: 1, taxInclusiveUnitPrice: 100 }], deductions: [{ name: '约定减项', amount: 20, basis: '合同原依据' }] } }
     const main = await owner.execute(command, f.session)
     const protocol = await owner.execute({ ...command, commandId: 'create-material-protocol', draft: { ...command.draft, name: '协议20元', isSupplement: true, originalContractId: main.id, amount: 20, deductions: [], lineItems: [{ materialName: '增补材料', unit: '米', qty: 1, taxInclusiveUnitPrice: 20 }] } }, f.session)
     const detail = decodeSupplierDetailRead(await f.owner.detail(f.first.id, {}, f.session))
@@ -236,7 +248,8 @@ it('材采主合同与有效协议只计一次可证小计；作废排除签约�
 it('other仅显示实际服务supplier的当前结算，可证小计保零和未知，原件与冻结历史不制造完整总额', async () => {
   const f = await fixture()
   try {
-    await f.finance.execute(f.request('reimbursement', 'source-expense', { projectId: f.project.id, applicantSupplierId: f.second.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '服务方与垫付方不同', counterpartySupplierId: f.first.id, amount: 100 }] }, 'save'), f.session)
+    const { constructionMain } = await f.engineering('supplier-other')
+    await f.finance.execute(f.request('reimbursement', 'source-expense', { projectId: f.project.id, constructionMain, applicantSupplierId: f.second.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '服务方与垫付方不同', counterpartySupplierId: f.first.id, amount: 100 }] }, 'save'), f.session)
     const other = createProductionOtherSettlementService(f.storage)
     const source = (await other.expenses(f.session)).items[0]!
     const request: OtherSettlementCommand = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'other-settlement:write', commandId: 'actual-settlement', baseVersion: null, action: 'submit', attachments: { add: [{ fileName: '真实结算原件.txt', fileSize: 3, mimeType: 'text/plain', payloadBase64: 'YWJj' }] }, draft: { name: '真实服务方原费用结算', projectId: f.project.id, contractId: null, totalAmount: 70, taxRate: null, settlementDate: '2026-10-05', originalExpenses: [{ originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, amount: 70 }] } }

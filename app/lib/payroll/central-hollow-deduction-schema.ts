@@ -1,4 +1,5 @@
 import type { TransactionDb } from '../db/coordinator'
+import { hasProductionPayrollSchema } from './central-schema'
 
 /** 外层工资graph新版本的 deductions 子图；旧central/fees名单和原文保持原合同。 */
 export const PAYROLL_HOLLOW_DEDUCTION_COLUMNS = {
@@ -17,6 +18,8 @@ export const PAYROLL_HOLLOW_DEDUCTION_SCHEMA_VERSION = 1 as const
  * 全部记录不可变追加，无deleted_at，也不通过业务页面物理删除。源恢复保护另走候选库。
  */
 export async function initializePayrollHollowDeductionSchema(tx: TransactionDb) {
+  if (await hasProductionPayrollSchema(tx))
+    return
   await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_hollow_policy_revisions (
     id TEXT PRIMARY KEY, policy_id TEXT NOT NULL,
     project_id TEXT NOT NULL REFERENCES projects(id),

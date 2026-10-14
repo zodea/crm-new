@@ -12,6 +12,7 @@ import type {
   SubcontractContractPageSize,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { isEffectiveExpenditureContract } from '../contract/effective-status'
 import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
 import { parsePageQuery, resolvePagination } from '../read-model/pagination'
 import { problemFromHttpFailure } from '../read-model/problem'
@@ -145,7 +146,7 @@ function sameContract<T extends { dataOrigin: string, contractId: string | null 
 }
 
 function validFact(row: SubcontractContractFactSource): boolean {
-  return !['draft', '草稿', '无效', '作废', 'cancelled'].includes(row.status)
+  return isEffectiveExpenditureContract(row.status)
 }
 
 function total(rows: readonly SubcontractContractFactSource[], source: SubcontractContractDetailSource, filter: (row: SubcontractContractFactSource) => boolean = validFact): number | null {

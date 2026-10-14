@@ -122,12 +122,8 @@ export async function upsertAttendanceRecord(db: PayrollDb, input: AttendanceInp
   if (!project)
     throw new Error('项目不存在')
 
-  if (
-    worker.current_project_id !== input.projectId
-    && !worker.has_project_responsibility
-  ) {
-    throw new Error('该工人不属于当前项目')
-  }
+  // An explicit authorized project/person selection creates this record's project relation.
+  // current_project_id describes the master assignment and does not truncate global identities.
   if (!worker.crew_is_active)
     throw new Error('该工人的档案班组不存在或已停用')
 

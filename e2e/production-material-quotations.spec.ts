@@ -12,7 +12,7 @@ import { createQuotationMigrationSource } from './helpers/quotation-migration-so
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '使用全新正式构建与隔离合成库，不连接开发或用户数据')
-test('真实生产报价整页、原件、冻结版本、未知回执恢复、冲突与冷开五档验收', async ({ page }, testInfo) => {
+test('真实生产报价整页、原件、冻结版本、未知回执恢复、冲突与冷开五档验收', async ({ page }) => {
   test.setTimeout(180000)
   const base = resolve('.tmp/a02-material-e2e/quotation-production')
   await mkdir(base, { recursive: true })
@@ -374,7 +374,6 @@ test('真实生产报价整页、原件、冻结版本、未知回执恢复、�
     const importedOriginal = await page.request.get(`${origin}/api/read/material-quotations/${source.id}/files/${source.fileId}?version=1`)
     expect((await importedOriginal.json()).payloadBase64).toBe('YWJj')
     expect(errors).toEqual([])
-    await page.screenshot({ path: testInfo.outputPath('quotation-cold-history.png'), fullPage: true })
   }
   finally {
     await stop()

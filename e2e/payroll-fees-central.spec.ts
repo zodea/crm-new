@@ -6,15 +6,14 @@ import { payrollFeesBoundaries, payrollFeesReadableTables } from './helpers/payr
 import { payrollFeesWorkspace } from './helpers/payroll-fees-workspace'
 
 test.use({ actionTimeout: 15000 })
-async function capture(page: Page, info: TestInfo, name: string, selector?: string) {
+async function capture(page: Page, name: string, selector?: string) {
   await expect(page.locator('[data-sonner-toast]:visible')).toHaveCount(0, { timeout: 15000 })
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
     if (selector)
       await page.locator(selector).first().evaluate(node => node.scrollIntoView({ block: 'center' }))
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
+    await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
   }
   await page.setViewportSize({ width: 1440, height: 960 })
 }
@@ -93,7 +92,7 @@ test('多条补贴与独立管理簿：明确配置、未知提交恢复、520�
   await first.getByLabel('房补分类确认依据', { exact: true }).fill('经办核对项目原分项，所选墙砖和地砖为明确房补适用项；其余分项未采用。')
   await first.getByRole('button', { name: '确认所选房补分项并采用 1.30 元/㎡', exact: true }).click()
   await feeRow(page, '独立墙砖补贴', ['墙砖'], 0.2, 'subsidy')
-  await capture(page, info, 'two-fees-explicit-scope', '#section-fees')
+  await capture(page, 'two-fees-explicit-scope', '#section-fees')
   let originalCommand = ''
   await page.route('**/api/commands/payroll-a-fees', async (route) => {
     if (!originalCommand && route.request().postDataJSON()?.action.kind === 'save-a-fees') {
@@ -109,7 +108,7 @@ test('多条补贴与独立管理簿：明确配置、未知提交恢复、520�
   await page.getByRole('button', { name: '保存费用配置', exact: true }).click()
   const pending = page.getByRole('alert', { name: '工资提交核对', exact: true })
   await expect(pending).toBeFocused()
-  await capture(page, info, 'fees-unknown-preserves-command', '[aria-label="工资提交核对"]')
+  await capture(page, 'fees-unknown-preserves-command', '[aria-label="工资提交核对"]')
   const replay = page.waitForRequest(request => request.url().endsWith('/api/commands/payroll-a-fees') && request.postDataJSON().commandId === originalCommand)
   await pending.getByRole('button', { name: '核对原提交', exact: true }).click()
   await replay
@@ -118,7 +117,7 @@ test('多条补贴与独立管理簿：明确配置、未知提交恢复、520�
   const ordinaryId = await ordinary.saveOrdinary()
   await page.goto(`/subcontract/payroll/${encodeURIComponent(ordinaryId)}?origin=real`)
   await expect(page.getByText('3,815.00', { exact: false }).first()).toBeVisible()
-  await capture(page, info, 'ordinary-work-and-215-fees', '[aria-label="A工资处理"]')
+  await capture(page, 'ordinary-work-and-215-fees', '[aria-label="A工资处理"]')
   await release(page, ordinaryId, 3815)
   await output(page, info, 'ordinary-3815', 3815, null)
   const management = await f.project('fee-management')
@@ -132,7 +131,7 @@ test('多条补贴与独立管理簿：明确配置、未知提交恢复、520�
   await editor.getByLabel('管理关系确认依据', { exact: true }).fill('明确管理一栋原施工责任。管理人自己的普通工资另簿核对；未完工淋浴板仍保原责任，后续可录明负价依据。')
   const responsibility = editor.getByRole('checkbox').first()
   await responsibility.check()
-  await capture(page, info, 'management-original-responsibility', '#section-management')
+  await capture(page, 'management-original-responsibility', '#section-management')
   await page.getByRole('button', { name: '保存管理关系', exact: true }).click()
   await expect(editor).toHaveCount(0)
   const config = await f.repository.aFeeConfig(f.query, { projectId: management.projectId, crewId: management.crewId, leaderWorkerId: management.leaderWorkerId, month: management.month, book: { bookPurpose: 'ordinary', managementBookId: null } })
@@ -161,7 +160,7 @@ test('多条补贴与独立管理簿：明确配置、未知提交恢复、520�
   await negative.getByLabel('代付事由', { exact: true }).fill('原施工范围中的30套淋浴板尚未收尾。经办按已经明确的管理责任核对代付清单，本行只影响管理费清单组成，未伪造该处完成，也未新增第三方实际付款。长事由末行须完整显示。')
   await negative.getByLabel('代付确认依据', { exact: true }).fill('管理人与经办共同确认：30套、每套负20元，共负600元。原责任仍保留；本管理簿先减清单，再按80%核算，扣此前实际已领200，得到520。')
   await selectShower(negative)
-  await capture(page, info, 'negative-uncompleted-source', '#section-negative')
+  await capture(page, 'negative-uncompleted-source', '#section-negative')
   await page.getByRole('button', { name: '保存负价清单', exact: true }).click()
   await expect(page.getByText('管理清单已保存，请重新核对本单后发放。', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '新增负价代付行', exact: true })).toBeEnabled()
@@ -171,16 +170,16 @@ test('多条补贴与独立管理簿：明确配置、未知提交恢复、520�
   expect(read.totals.grossAmount.value).toBe(520)
   expect(read.totals.previouslyPaid.value).toBe(200)
   await page.goto(`/subcontract/payroll/${encodeURIComponent(secondManagement)}?origin=real`)
-  await capture(page, info, 'management-520-calculation', '[aria-label="A工资处理"]')
+  await capture(page, 'management-520-calculation', '[aria-label="A工资处理"]')
   await release(page, secondManagement, 520)
-  await capture(page, info, 'management-frozen-520', '[aria-label="冻结工资输出"]')
+  await capture(page, 'management-frozen-520', '[aria-label="冻结工资输出"]')
   const negativeDisplay = await payrollFeesReadableTables(page, info, { kind: 'negative' })
   await output(page, info, 'management-520', 520, -600)
   await page.goto(`/subcontract/payroll?${new URLSearchParams({ origin: 'real', project: management.projectId, month: '2026-07' })}`)
   await expect(page.getByText('独立管理费簿', { exact: true }).first()).toBeVisible()
-  await capture(page, info, 'same-person-two-books')
+  await capture(page, 'same-person-two-books')
   const booksDisplay = await payrollFeesReadableTables(page, info, { kind: 'same-person-list' })
-  const boundaries = await payrollFeesBoundaries(page, info, {
+  const boundaries = await payrollFeesBoundaries(page, {
     repository: f.repository,
     query: f.query,
     ordinary: { projectId: ordinary.projectId, crewId: ordinary.crewId, leaderWorkerId: ordinary.leaderWorkerId },

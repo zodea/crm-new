@@ -64,7 +64,7 @@ export function useTargetCostDetail() {
       original = saved.original
       latest.value = value
     }
-    else if (operation?.command.action.kind === 'save-items') {
+    else if (operation?.command?.action.kind === 'save-items') {
       editing.value = true
       itemDrafts.value = clone(operation.command.action.items)
       original = JSON.stringify(value.view.items)

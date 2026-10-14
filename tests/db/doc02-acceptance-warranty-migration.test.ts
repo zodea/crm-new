@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { migrations, runMigrations } from '~/lib/db/migrations'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 describe('v44 验收—保修 canonical 生命周期迁移', () => {
   it('只扩展 project_acceptances 并建立独立审计表，不创建第二张保修业务表', async () => {
@@ -54,8 +54,7 @@ describe('v44 验收—保修 canonical 生命周期迁移', () => {
   })
 
   it('审计表拒绝重复状态事实和跨记录引用', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO project_acceptances (id, status) VALUES ('acceptance-324', 'submitted')`)
     await db.execute(`
       INSERT INTO project_acceptance_lifecycle_events (

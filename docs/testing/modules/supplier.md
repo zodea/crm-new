@@ -33,11 +33,9 @@
 | [tests/supplier/credential-request.test.ts](../../../tests/supplier/credential-request.test.ts) | 单元／服务／状态 | 证照 HTTP 请求边界 |
 | [tests/supplier/credentials.test.ts](../../../tests/supplier/credentials.test.ts) | 单元／服务／状态 | 分供方证照规则 |
 | [tests/supplier/detail.test.ts](../../../tests/supplier/detail.test.ts) | 单元／服务／状态 | 分供方详情纯聚合 |
-| [tests/supplier/export.test.ts](../../../tests/supplier/export.test.ts) | 单元／服务／状态 | 分供方台账导出行 |
 | [tests/supplier/http-repository.test.ts](../../../tests/supplier/http-repository.test.ts) | 单元／服务／状态 | 分供方中央 HTTP Repository |
 | [tests/supplier/import-command.test.ts](../../../tests/supplier/import-command.test.ts) | 单元／服务／状态 | 分供方中央逐行导入 |
 | [tests/supplier/import.test.ts](../../../tests/supplier/import.test.ts) | 单元／服务／状态 | 分供方导入行归一 |
-| [tests/supplier/list.test.ts](../../../tests/supplier/list.test.ts) | 单元／服务／状态 | 分供方列表筛选 |
 | [tests/supplier/repository-contract.test.ts](../../../tests/supplier/repository-contract.test.ts) | 单元／服务／状态 | 分供方中央 Repository contract |
 | [tests/supplier/return-context.test.ts](../../../tests/supplier/return-context.test.ts) | 单元／服务／状态 | 分供方列表返回上下文 |
 | [tests/supplier/status.test.ts](../../../tests/supplier/status.test.ts) | 单元／服务／状态 | 分供方类别 |
@@ -71,7 +69,7 @@
 | [e2e/supplier-credentials-central.spec.ts](../../../e2e/supplier-credentials-central.spec.ts) | Playwright E2E | 真实旧库完整图迁入、历史凭证回读、同原件撤回与缺正文不冒充齐全 |
 | [e2e/supplier-crud.spec.ts](../../../e2e/supplier-crud.spec.ts) | Playwright E2E | 两类正式分供方新建、显式编辑、冷回读与页签复用；中央行菜单仅提供只读入口，旧本地删除由数据库及通用主数据测试覆盖 |
 | [e2e/supplier-detail.spec.ts](../../../e2e/supplier-detail.spec.ts) | Playwright E2E | 分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双页联动 |
-| [e2e/supplier-export.spec.ts](../../../e2e/supplier-export.spec.ts) | Playwright E2E | 两类正式主档 × 五档视口核对中央导出尚未接入的边界；实际 XLSX 内容和分类目录由 supplier/export 参数表覆盖 |
+| [e2e/supplier-export.spec.ts](../../../e2e/supplier-export.spec.ts) | Playwright E2E | 过渡契约：中央分供方列表不显示未接入的导出（#406/#407） |
 | [e2e/supplier-import.spec.ts](../../../e2e/supplier-import.spec.ts) | Playwright E2E | 中央导入：信用代码和唯一识别码独立映射，同外部旧 ID 重导更新并保留未映射资料 |
 | [e2e/supplier-list-replica.spec.ts](../../../e2e/supplier-list-replica.spec.ts) | Playwright E2E | ${width}px：完整列、紧凑标签、表格内滚动及可访问工具 |
 | [e2e/supplier-multifilter.spec.ts](../../../e2e/supplier-multifilter.spec.ts) | Playwright E2E | ${width}px 固定枚举复选与表头联动，返回链接保留组合且清空恢复全量 |

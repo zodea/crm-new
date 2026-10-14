@@ -3,20 +3,18 @@ import type { TargetCostProjectSource } from '../../server/utils/target-cost-ser
 import type { TargetCostAction, TargetCostCommand, TargetCostFormRead } from '~/lib/target-cost/central-contract'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { decodeTargetCostRead, encodeTargetCostWire, parseTargetCostCommand } from '~/lib/target-cost/central-codec'
 import { createTargetCostRepository } from '~/lib/target-cost/central-repository'
 import { aggregateTargetCostActual } from '../../server/utils/target-cost-actual'
 import { createTargetCostService } from '../../server/utils/target-cost-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => {
   await Promise.all(closers.splice(0).map(close => close()))
 })
 async function fixture() {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   const coordinator = createDbCoordinator(async () => db)
   closers.push(() => coordinator.close())
   let session: BusinessSession = { workspaceId: 'w', actorId: 'a', capabilities: ['target-cost:read', 'target-cost:write'] }
@@ -27,7 +25,7 @@ async function fixture() {
     return structuredClone(source)
   }, actual: async id => aggregateTargetCostActual(id, []), transaction: work => coordinator.withTransaction(tx => work(tx, { ...session })) })
   let counter = 0
-  const command = (read: TargetCostFormRead, action: TargetCostAction): TargetCostCommand => ({ commandId: `c${++counter}`, ...read.context, requiredCapability: 'target-cost:write', targetCostId: read.targetCostId, draftKey: read.draftKey ?? undefined, action })
+  const command = (read: TargetCostFormRead, action: TargetCostAction): TargetCostCommand => ({ commandId: `c${++counter}`, workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: read.context.origin, sourceVersion: read.context.sourceVersion, requiredCapability: 'target-cost:write', targetCostId: read.targetCostId, draftKey: read.draftKey ?? undefined, action })
   const create = async (name = '', baseline = false, projectId?: string) => service.execute(command(await service.form({ origin: 'real' }, null, `draft-${++counter}`), { kind: 'save-header', draft: { name, isBaseline: baseline, projectId, plannedProfit: 0 }, saveAction: 'draft' }))
   return { db, service, command, create, setSource: (next: TargetCostProjectSource) => {
     source = next

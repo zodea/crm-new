@@ -36,7 +36,7 @@ function expenseChange(id: string, checked: boolean) {
   const source = candidates.value.find(row => row.id === id)
   if (!source)
     return
-  const originalExpenses = checked ? [...(props.draft.originalExpenses ?? []), { originalExpenseLineId: id, sourceVersion: source.version, sourceRevision: source.sourceRevision, amount: source.qualification.newAdoptableAmount }] : (props.draft.originalExpenses ?? []).filter(row => row.originalExpenseLineId !== id)
+  const originalExpenses = checked ? [...(props.draft.originalExpenses ?? []), { originalExpenseLineId: id, sourceVersion: source.version, sourceRevision: source.sourceRevision, ...(source.consumptionVersion ? { consumptionVersion: source.consumptionVersion } : {}), amount: source.qualification.newAdoptableAmount }] : (props.draft.originalExpenses ?? []).filter(row => row.originalExpenseLineId !== id)
   const first = candidates.value.find(row => row.id === originalExpenses[0]?.originalExpenseLineId)
   emit('patch', { originalExpenses, totalAmount: originalExpenses.some(row => row.amount === null) ? null : originalExpenses.reduce((sum, row) => sum + Math.round(row.amount! * 100), 0) / 100, payeeWorkerId: first?.applicantWorkerId ?? null, payeeSupplierId: first?.applicantSupplierId ?? null, payeeNameSnapshot: first?.applicantNameSnapshot ?? null })
 }
@@ -74,7 +74,7 @@ function input(key: typeof fields[number]['key'], event: Event) {
       <div class="min-w-0">
         <label class="mb-2 block text-13px">{{ mode === 'contract' ? '项目 *' : '项目（留空为公司归属）' }}</label>
         <LookupSelect v-model="project" field="projectId" :invalid="Boolean(errors.projectId)" description-id="settlement-project-error" :fetch="fetchProjects" placeholder="检索项目" />
-        <KitButton v-if="mode === 'expense' && draft.projectId" class="mt-2" @click="emit('patch', { projectId: null })">
+        <KitButton v-if="mode === 'expense' && draft.projectId" type="button" class="mt-2" @click="emit('patch', { projectId: null })">
           采用公司归属
         </KitButton>
         <p v-if="errors.projectId" id="settlement-project-error" class="text-12px text-danger">
@@ -119,7 +119,7 @@ function input(key: typeof fields[number]['key'], event: Event) {
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h3 class="m-0 text-14px">
           已确认原费用
-        </h3><KitButton @click="emit('reloadExpenses')">
+        </h3><KitButton type="button" @click="emit('reloadExpenses')">
           重新核对原费用来源
         </KitButton>
       </div>

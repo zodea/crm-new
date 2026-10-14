@@ -1,18 +1,29 @@
 import { CONTRACT_NUMBER_SCHEMA, CONTRACT_NUMBER_TABLES, OUR_SIGNATORY_SCHEMA, OUR_SIGNATORY_TABLES } from '../../app/lib/our-signatory/schema'
+import { PRODUCTION_AUXILIARY_CONTRACT_SCHEMA, PRODUCTION_AUXILIARY_CONTRACT_TABLES } from './production-auxiliary-contract-schema'
 import { PRODUCTION_BACKUP_SCHEMA, PRODUCTION_BACKUP_TABLES } from './production-backup-schema'
+import { PRODUCTION_BOQ_IMPORT_SCHEMA, PRODUCTION_BOQ_IMPORT_TABLES, PRODUCTION_BOQ_SCHEMA, PRODUCTION_BOQ_TABLES } from './production-boq-schema'
+import { PRODUCTION_CONSTRUCTION_CONTRACT_SCHEMA, PRODUCTION_CONSTRUCTION_CONTRACT_TABLES, PRODUCTION_CONSTRUCTION_IMPORT_SCHEMA, PRODUCTION_CONSTRUCTION_IMPORT_TABLES } from './production-construction-contract-schema'
+import { PRODUCTION_CONSTRUCTION_SCOPE_CONTRACT_UPGRADE, PRODUCTION_CONSTRUCTION_SCOPE_SCHEMA, PRODUCTION_CONSTRUCTION_SCOPE_TABLES } from './production-construction-scope-schema'
 import { PRODUCTION_CREW_WORKER_SCHEMA, PRODUCTION_CREW_WORKER_TABLES } from './production-crew-worker-schema'
 import { PRODUCTION_FINANCE_CLEARANCE_SCHEMA, PRODUCTION_FINANCE_CLEARANCE_TABLES, PRODUCTION_OTHER_CLEARANCE_SCHEMA, PRODUCTION_OTHER_CLEARANCE_TABLES } from './production-finance-clearance-schema'
 import { PRODUCTION_FINANCE_SCHEMA, PRODUCTION_FINANCE_TABLES } from './production-finance-schema'
 import { PRODUCTION_FINANCE_VERIFICATION_SCHEMA, PRODUCTION_FINANCE_VERIFICATION_TABLES } from './production-finance-verification-schema'
+import { PRODUCTION_MASTER_READ_SCHEMA } from './production-master-read-schema'
 import { PRODUCTION_MATERIAL_CONTRACT_SCHEMA, PRODUCTION_MATERIAL_CONTRACT_TABLES } from './production-material-contract-schema'
 import { PRODUCTION_MATERIAL_QUOTATION_SCHEMA, PRODUCTION_MATERIAL_QUOTATION_TABLES } from './production-material-quotation-schema'
 import { PRODUCTION_NOTIFICATION_SCHEMA, PRODUCTION_NOTIFICATION_TABLES } from './production-notification-schema'
 import { PRODUCTION_OTHER_SETTLEMENT_SCHEMA, PRODUCTION_OTHER_SETTLEMENT_TABLES } from './production-other-settlement-schema'
+import { PRODUCTION_PAYROLL_SCHEMA, PRODUCTION_PAYROLL_TABLES } from './production-payroll-schema'
 import { PRODUCTION_PROCESS_LIBRARY_SCHEMA, PRODUCTION_PROCESS_LIBRARY_TABLES } from './production-process-library-schema'
 import { PRODUCTION_PROJECT_SCHEMA, PRODUCTION_PROJECT_TABLES } from './production-project-schema'
+import { PRODUCTION_QUANTITY_INTENT_SCHEMA, PRODUCTION_QUANTITY_INTENT_TABLES } from './production-quantity-intent-schema'
+import { PRODUCTION_QUANTITY_SCHEMA, PRODUCTION_QUANTITY_TABLES } from './production-quantity-schema'
+import { PRODUCTION_SUBCONTRACT_CONTRACT_SCHEMA, PRODUCTION_SUBCONTRACT_CONTRACT_TABLES } from './production-subcontract-contract-schema'
 import { PRODUCTION_SUPPLIER_SCHEMA, PRODUCTION_SUPPLIER_TABLES } from './production-supplier-schema'
+import { PRODUCTION_TARGET_COST_SCHEMA, PRODUCTION_TARGET_COST_TABLES } from './production-target-cost-schema'
+import { PRODUCTION_WBS_SCHEMA, PRODUCTION_WBS_TABLES } from './production-wbs-schema'
 
-export const PRODUCTION_STORAGE_VERSION = 14
+export const PRODUCTION_STORAGE_VERSION = 28
 /** Append a new numbered upgrade when a domain lands; never rewrite an applied step. */
 export const PRODUCTION_STORAGE_UPGRADES = [
   { from: 1, to: 2, sql: PRODUCTION_PROCESS_LIBRARY_SCHEMA, participants: { 'process-library': { schemaVersion: 1, tables: PRODUCTION_PROCESS_LIBRARY_TABLES } } },
@@ -51,6 +62,20 @@ export const PRODUCTION_STORAGE_UPGRADES = [
     'finance': { schemaVersion: 1, tables: [...PRODUCTION_FINANCE_TABLES, ...PRODUCTION_FINANCE_VERIFICATION_TABLES, ...PRODUCTION_FINANCE_CLEARANCE_TABLES] },
     'other-settlements': { schemaVersion: 1, tables: [...PRODUCTION_OTHER_SETTLEMENT_TABLES, ...PRODUCTION_OTHER_CLEARANCE_TABLES] },
   } },
+  { from: 14, to: 15, sql: PRODUCTION_MASTER_READ_SCHEMA, participants: {} },
+  { from: 15, to: 16, sql: PRODUCTION_TARGET_COST_SCHEMA, participants: { 'target-cost': { schemaVersion: 1, tables: PRODUCTION_TARGET_COST_TABLES } } },
+  { from: 16, to: 17, sql: PRODUCTION_QUANTITY_SCHEMA, participants: { quantity: { schemaVersion: 1, tables: PRODUCTION_QUANTITY_TABLES } } },
+  { from: 17, to: 18, sql: PRODUCTION_PAYROLL_SCHEMA, participants: { payroll: { schemaVersion: 1, tables: PRODUCTION_PAYROLL_TABLES } } },
+  { from: 18, to: 19, sql: PRODUCTION_QUANTITY_INTENT_SCHEMA, participants: { quantity: { schemaVersion: 1, tables: [...PRODUCTION_QUANTITY_TABLES, ...PRODUCTION_QUANTITY_INTENT_TABLES] } } },
+  { from: 19, to: 20, sql: PRODUCTION_WBS_SCHEMA, participants: { wbs: { schemaVersion: 1, tables: PRODUCTION_WBS_TABLES } } },
+  { from: 20, to: 21, sql: PRODUCTION_CONSTRUCTION_CONTRACT_SCHEMA, participants: { 'construction-contracts': { schemaVersion: 1, tables: PRODUCTION_CONSTRUCTION_CONTRACT_TABLES } } },
+  { from: 21, to: 22, sql: PRODUCTION_BOQ_SCHEMA, participants: { boq: { schemaVersion: 1, tables: PRODUCTION_BOQ_TABLES } } },
+  { from: 22, to: 23, sql: PRODUCTION_CONSTRUCTION_IMPORT_SCHEMA, participants: { 'construction-contracts': { schemaVersion: 1, tables: [...PRODUCTION_CONSTRUCTION_CONTRACT_TABLES, ...PRODUCTION_CONSTRUCTION_IMPORT_TABLES] } } },
+  { from: 23, to: 24, sql: PRODUCTION_CONSTRUCTION_SCOPE_SCHEMA, participants: { 'construction-scope': { schemaVersion: 1, tables: PRODUCTION_CONSTRUCTION_SCOPE_TABLES } } },
+  { from: 24, to: 25, sql: PRODUCTION_BOQ_IMPORT_SCHEMA, participants: { boq: { schemaVersion: 1, tables: [...PRODUCTION_BOQ_TABLES, ...PRODUCTION_BOQ_IMPORT_TABLES] } } },
+  { from: 25, to: 26, sql: PRODUCTION_SUBCONTRACT_CONTRACT_SCHEMA, participants: { 'subcontract-contracts': { schemaVersion: 1, tables: PRODUCTION_SUBCONTRACT_CONTRACT_TABLES } } },
+  { from: 26, to: 27, sql: PRODUCTION_CONSTRUCTION_SCOPE_CONTRACT_UPGRADE, participants: { 'construction-scope': { schemaVersion: 2, tables: PRODUCTION_CONSTRUCTION_SCOPE_TABLES } } },
+  { from: 27, to: 28, sql: PRODUCTION_AUXILIARY_CONTRACT_SCHEMA, participants: { 'auxiliary-contract': { schemaVersion: 1, tables: PRODUCTION_AUXILIARY_CONTRACT_TABLES } } },
 ] as const
 
 export function productionStorageManifest(version = PRODUCTION_STORAGE_VERSION) {

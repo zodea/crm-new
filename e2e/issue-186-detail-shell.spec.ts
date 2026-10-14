@@ -51,44 +51,48 @@ test.describe('Issue #186：统一实体详情壳', () => {
     })
   }
 
-  for (const width of VIEWPORT_WIDTHS) {
-    test(`长标题、业务页签与右栏在 ${width}px 保持可用`, async ({ page }) => {
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
-      await page.goto('/dev/detail-shell')
+  test('长标题、业务页签与右栏在各宽度保持可用', async ({ page }) => {
+    await page.goto('/dev/detail-shell')
 
-      const shell = page.locator('[data-ui="entity-detail-shell"]')
-      const body = shell.locator('[data-ui="entity-detail-body"]')
-      const heading = shell.getByRole('heading', {
-        name: '华南区域机电设备与建筑辅材长期战略合作分供方有限公司',
-      })
+    const shell = page.locator('[data-ui="entity-detail-shell"]')
+    const body = shell.locator('[data-ui="entity-detail-body"]')
+    const heading = shell.getByRole('heading', {
+      name: '华南区域机电设备与建筑辅材长期战略合作分供方有限公司',
+    })
+    await expect(heading).toBeVisible()
+
+    const tabs = page.getByRole('navigation', { name: '详情壳业务页签' })
+    const firstTab = tabs.getByRole('tab', { name: '合同与结算事实 2', exact: true })
+    await firstTab.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(tabs.getByRole('tab', { name: '跨项目收票与税额明细 1', exact: true }))
+      .toHaveAttribute('aria-selected', 'true')
+
+    for (const width of VIEWPORT_WIDTHS) {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
       await expect(heading).toBeVisible()
       await expect(shell.getByRole('complementary', { name: '文件与动态' })).toBeVisible()
 
-      const columnCount = await body.evaluate(element =>
+      await expect.poll(() => body.evaluate(element =>
         getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
-      )
-      expect(columnCount).toBe(width >= 1280 ? 2 : 1)
-
-      const tabs = page.getByRole('navigation', { name: '详情壳业务页签' })
-      const firstTab = tabs.getByRole('tab', { name: '合同与结算事实 2', exact: true })
-      await firstTab.focus()
-      await page.keyboard.press('ArrowRight')
-      await expect(tabs.getByRole('tab', { name: '跨项目收票与税额明细 1', exact: true }))
-        .toHaveAttribute('aria-selected', 'true')
+      ), { message: `${width}px` }).toBe(width >= 1280 ? 2 : 1)
 
       await expectNoPageOverflow(page, `详情壳 @ ${width}px`)
+    }
 
-      await page.goto('/base/supplier/sup_demo_004?origin=demo')
-      const realShell = page.locator('[data-ui="entity-detail-shell"]')
-      await expect(realShell.getByRole('heading', { name: '穗建五金机电经营部' }))
-        .toBeVisible()
-      const factTabs = page.getByRole('navigation', { name: '分供方业务事实' }).getByRole('tab')
-      await expect(factTabs).toHaveText([/^\s*详细资料\s*$/, /^\s*合作项目\s*(?:\d+\s*)?$/, /^\s*支出合同\s*(?:\d+\s*)?$/, /^\s*支出结算\s*(?:\d+\s*)?$/, /^\s*收票登记\s*(?:\d+\s*)?$/, /^\s*付款管理\s*(?:\d+\s*)?$/])
-      await expect(page.getByTestId('supplier-summary')).toContainText('累计合同金额')
-      await expect(page.getByTestId('supplier-summary')).toContainText('¥261,250.00')
+    await page.goto('/base/supplier/sup_demo_004?origin=demo')
+    const realShell = page.locator('[data-ui="entity-detail-shell"]')
+    await expect(realShell.getByRole('heading', { name: '穗建五金机电经营部' }))
+      .toBeVisible()
+    const factTabs = page.getByRole('navigation', { name: '分供方业务事实' }).getByRole('tab')
+    await expect(factTabs).toHaveText([/^\s*详细资料\s*$/, /^\s*合作项目\s*(?:\d+\s*)?$/, /^\s*支出合同\s*(?:\d+\s*)?$/, /^\s*支出结算\s*(?:\d+\s*)?$/, /^\s*收票登记\s*(?:\d+\s*)?$/, /^\s*付款管理\s*(?:\d+\s*)?$/])
+    await expect(page.getByTestId('supplier-summary')).toContainText('累计合同金额')
+    await expect(page.getByTestId('supplier-summary')).toContainText('¥261,250.00')
+    for (const width of VIEWPORT_WIDTHS) {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
       await expectNoPageOverflow(page, `真实分供方详情 @ ${width}px`)
-    })
-  }
+    }
+  })
 
   test('窄窗键盘顺序稳定且密集子表只在自身区域横滚', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })

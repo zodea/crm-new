@@ -48,7 +48,6 @@ test('跨月退款范围金额、个人未知说明与完整详情往返', async
       await page.keyboard.press('ArrowRight')
       await expect.poll(() => scroll.evaluate(node => node.scrollLeft)).toBeGreaterThan(0)
     }
-    await page.screenshot({ path: info.outputPath(`month-scope-${width}.png`), fullPage: true })
   }
   await page.reload()
   await expect(section).toContainText('960.00')

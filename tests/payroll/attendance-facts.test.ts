@@ -7,7 +7,7 @@ import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migrati
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { loadPayrollAttendanceFacts } from '../../server/utils/payroll-attendance-facts'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollC1Source } from '../helpers/payroll-c1-source'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 
@@ -18,7 +18,7 @@ afterEach(async () => {
 })
 
 it('逐日事实保原组、7.51小数和真零，坏未来日期不消失且软删原行仍可读', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC1Source(db)
     await initializePayrollSchema(db)
@@ -43,7 +43,7 @@ it('逐日事实保原组、7.51小数和真零，坏未来日期不消失且软
 })
 
 it('公开迁入隔离旧考勤仍可定位原图，已知工人保映射但不造可写考勤ID', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC1Source(db)
     await db.execute('PRAGMA foreign_keys=OFF')

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { InvoicePrintRequest } from '~/lib/invoice/print-layout'
+import type { InvoiceRecognitionChange } from '~/lib/invoice/recognition-changes'
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import { isAllGreen, resolveAttribution } from '~/lib/invoice/batch-pass'
+import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges } from '~/lib/invoice/recognition-changes'
 import { confidenceTier, isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
 import { invoiceDocStatus } from '~/lib/invoice/status'
 
@@ -150,16 +152,29 @@ async function handleBatchRecognize() {
   await runRecognition(store.recognizeMany(ids), `批量识别 ${ids.length} 张`, ids)
 }
 
+/** 重新识别覆盖已识别字段后的逐项变化；只对发起识别的那张票显示。 */
+const recognitionChanges = shallowRef<{ id: string, changes: InvoiceRecognitionChange[] } | null>(null)
+
 async function handleRerecognize() {
-  if (!selectedId.value)
+  const id = selectedId.value
+  if (!id)
     return
-  const ok = await promise(store.startRecognition(selectedId.value), {
+  const current = store.byId(id)
+  // 校对字段即时落库，store 中的当前值就是用户识别前看到的值；首次识别没有可对照的原值。
+  const before = current?.ocrStatus === 'done' ? { ...current } : null
+  recognitionChanges.value = null
+  const ok = await promise(store.startRecognition(id), {
     loading: '重新识别中…',
     success: result => result ? '识别完成，请校对' : '识别未完成',
     error: () => '识别失败',
   })
-  if (!ok)
-    warning(store.recognitionError(selectedId.value) || '无法重新识别：该票已归档或正在识别中')
+  if (!ok) {
+    warning(store.recognitionError(id) || '无法重新识别：该票已归档或正在识别中')
+    return
+  }
+  const after = store.byId(id)
+  const changes = before && after ? invoiceRecognitionChanges(INVOICE_RECOGNITION_FIELDS, before, after) : []
+  recognitionChanges.value = changes.length ? { id, changes } : null
 }
 
 // ── 批量通过(#63)：全绿票(建议通过池)一次放行——有归属的确认+归档,缺归属的排除并列清单 ──
@@ -403,6 +418,12 @@ onMounted(() => {
               <span class="text-brand font-600">识别中 {{ store.recognitionProgress[selectedInvoice.id] }}%</span>
             </div>
             <div v-else-if="selectedInvoice.ocrStatus === 'done'" class="p-3">
+              <InvoiceRecognitionChanges
+                v-if="recognitionChanges?.id === selectedInvoice.id"
+                class="mb-3"
+                :changes="recognitionChanges.changes"
+                @dismiss="recognitionChanges = null"
+              />
               <InvoiceReviewForm
                 :invoice="selectedInvoice"
                 @confirm="confirmSelected"

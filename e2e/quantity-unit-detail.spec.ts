@@ -86,16 +86,16 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
       .toBe(matrixUrl.searchParams.get('project'))
   })
 
-  for (const width of viewports) {
-    test(`${width}px 页面无横滚，量明细仅自身局部横滚`, async ({ page }) => {
-      await installQuantityProductionFixture(page, { detailedStages: true })
-      await expect(page.getByRole('button', { name: new RegExp(`^${unit.floor}，${unit.name}；`) })).toBeVisible()
-      const cell = page.getByRole('button', { name: new RegExp(`^${unit.floor}，${unit.name}；`) })
-      await cell.focus()
-      await cell.press('Enter')
-      await page.getByRole('button', { name: `详情 ${unit.name}` }).click()
-      await expect(page.getByRole('heading', { name: new RegExp(`${unit.building} ${unit.floor} ${unit.name}`) })).toBeVisible()
+  test('页面在各宽度无横滚，量明细仅自身局部横滚', async ({ page }) => {
+    await installQuantityProductionFixture(page, { detailedStages: true })
+    await expect(page.getByRole('button', { name: new RegExp(`^${unit.floor}，${unit.name}；`) })).toBeVisible()
+    const cell = page.getByRole('button', { name: new RegExp(`^${unit.floor}，${unit.name}；`) })
+    await cell.focus()
+    await cell.press('Enter')
+    await page.getByRole('button', { name: `详情 ${unit.name}` }).click()
+    await expect(page.getByRole('heading', { name: new RegExp(`${unit.building} ${unit.floor} ${unit.name}`) })).toBeVisible()
 
+    for (const width of viewports) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 960 })
       await documentDoesNotOverflow(page)
 
@@ -106,9 +106,9 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
       ))
       if (width === 390)
         expect(scrollableTables).toBeGreaterThan(0)
-      await expect(page.getByRole('region', { name: '全户合计' })).toBeVisible()
-    })
-  }
+    }
+    await expect(page.getByRole('region', { name: '全户合计' })).toBeVisible()
+  })
   for (const input of draftCases) {
     test(`缺照片软卡取消时保留输入，确认后按原日期和备注保存草稿：${input.label}`, async ({ page }) => {
       test.setTimeout(60_000)

@@ -3,6 +3,7 @@ import type { PayrollReleaseAdjustmentApplication } from '~/lib/payroll/central-
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { payrollReleaseDefault } from '~/lib/payroll/a-presentation'
 import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
+import { payrollNeedsRecheckMessage } from '~/lib/payroll/release-recheck-message'
 import { toErrorMessage } from '~/lib/util/error'
 import { usePayrollAFeesStore } from '~/stores/payroll-a-fees'
 
@@ -56,7 +57,7 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
         ratio.value = value.draft.payRatio ?? null
       }
       const operation = store.getAPending(value)
-      if (operation?.command.action.kind === 'release-a' && !releaseOpen.value) {
+      if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'release-a' && !releaseOpen.value) {
         releaseRead.value = matching.value ?? value
         releaseDraft.value = operation.command.action.release
         releaseOpen.value = true
@@ -104,7 +105,7 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
       releaseDraft.value = null
     options.changed()
     if (result.outcome === 'needs-recheck')
-      error.value = '来源或此前已付已经变化，已保存为需重核。原实发输入仍保留，请先重新核对。'
+      error.value = payrollNeedsRecheckMessage('来源或此前已付', matching.value)
     else
       kit.success(result.outcome === 'released' ? '实际发放已保存，工资资料已冻结。' : '工资核对结果已保存。')
   }

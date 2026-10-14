@@ -1,10 +1,14 @@
 import { parseTargetCostCommand } from '../../../app/lib/target-cost/central-codec'
+import { throwProductionStorageError } from '../../utils/production-runtime'
 import { throwQuantityError } from '../../utils/quantity-error'
-import { targetCostService } from '../../utils/target-cost-runtime'
+import { targetCostApi } from '../../utils/target-cost-runtime'
 
 export default defineEventHandler(async (event) => {
   try {
-    return await targetCostService.execute(parseTargetCostCommand(await readBody(event)), getHeader(event, 'x-ruihang-test-session'))
+    return await targetCostApi(event).budget.execute(parseTargetCostCommand(await readBody(event)))
   }
-  catch (cause) { throwQuantityError(cause) }
+  catch (cause) {
+    throwProductionStorageError(cause)
+    throwQuantityError(cause)
+  }
 })

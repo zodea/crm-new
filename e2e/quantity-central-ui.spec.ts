@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 
 test.use({ actionTimeout: 15_000 })
 
-test('新项目经真实整页建立模板清单关联和区域，刷新与五档保持正式来源及未知量', async ({ page }, testInfo) => {
+test('新项目经真实整页建立模板清单关联和区域，刷新与五档保持正式来源及未知量', async ({ page }) => {
   test.setTimeout(180_000)
   const headers = { 'x-ruihang-test-session': `quantity-ui-${randomUUID()}` }
   await page.context().setExtraHTTPHeaders(headers)
@@ -41,7 +41,6 @@ test('新项目经真实整页建立模板清单关联和区域，刷新与五�
       if (name === 'template')
         expect((await page.getByRole('combobox', { name: '录入来源', exact: true }).boundingBox())?.width).toBeGreaterThanOrEqual(100)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
-      await page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`), animations: 'disabled' })
     }
   }
 

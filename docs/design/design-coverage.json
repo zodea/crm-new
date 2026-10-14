@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 53,
     "designMountedScreens": 122,
-    "trackedPageFiles": 171,
+    "trackedPageFiles": 172,
     "devPageFiles": 5,
-    "appPageFiles": 166,
+    "appPageFiles": 167,
     "appNavLeaves": 53,
     "covered": 166,
-    "designPending": 0,
+    "designPending": 1,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -864,6 +864,13 @@
       "appRoute": "/subcontract/quantity/:pid/:uid/hollow/new",
       "designRoute": "hollowForm",
       "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/quantity/import",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "完整 SQLite 领域迁入是本轮正式接管的独立工具；现有 DC 未注册对应预检、人工映射、原件和整批恢复屏，暂依现行迁入规格与 KitUI 原语。",
+      "issue": "#416"
     },
     {
       "appRoute": "/subcontract/quantity/region",

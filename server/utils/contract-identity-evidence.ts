@@ -2,12 +2,43 @@ import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { StoredMaterialContract } from './material-contract-command-test-instance'
 import { isDeepStrictEqual } from 'node:util'
 import { decodeOurSignatorySnapshot, signatoryProblem } from '../../app/lib/our-signatory/contract'
+import { validateProductionAuxiliaryState } from './production-auxiliary-contract-record'
+import { readProductionConstructionState } from './production-construction-contract-record'
+import { readProductionSubcontractState } from './production-subcontract-contract-record'
 
 /** All persisted records and immutable versions participate, independently of page visibility. */
 export async function validateMaterialContractIdentities(tx: TransactionDb, records: readonly StoredMaterialContract[]) {
   const claims = await tx.select<{ owner_domain: string, contract_id: string, number: string, version: string, claimed_at: string }>('SELECT * FROM contract_number_claims')
   const numberHistory = await tx.select<{ id: string, owner_domain: string, contract_id: string, number: string, version: string, occurred_at: string, reason: string }>('SELECT * FROM contract_number_history')
+  const registered = (await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'construction-contracts\''))[0]
+  if (registered) {
+    if (registered.schema_version !== 1)
+      return signatoryProblem('unavailable', '施工合同编号来源版本不兼容')
+    const [identity] = await tx.select<{ workspace_id: string, owner_id: string }>('SELECT workspace_id,owner_id FROM production_metadata WHERE singleton=1')
+    if (!identity)
+      return signatoryProblem('unavailable', '跨合同编号核验缺可信工作区')
+    // The foreign owner proves every current claim and historical version in this same transaction.
+    await readProductionConstructionState(tx, { workspaceId: identity.workspace_id, actorId: identity.owner_id })
+  }
+  const subcontractRegistered = (await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'subcontract-contracts\''))[0]
+  if (subcontractRegistered) {
+    if (subcontractRegistered.schema_version !== 1)
+      return signatoryProblem('unavailable', '分包合同编号来源版本不兼容')
+    const [identity] = await tx.select<{ workspace_id: string, owner_id: string }>('SELECT workspace_id,owner_id FROM production_metadata WHERE singleton=1')
+    if (!identity)
+      return signatoryProblem('unavailable', '分包合同编号核验缺可信工作区')
+    await readProductionSubcontractState(tx, { workspaceId: identity.workspace_id, actorId: identity.owner_id })
+  }
   const main = records.filter(record => !record.draft.isSupplement)
+  const auxiliaryRegistered = (await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'auxiliary-contract\''))[0]
+  if (auxiliaryRegistered) {
+    if (auxiliaryRegistered.schema_version !== 1)
+      return signatoryProblem('unavailable', '辅助合同编号来源版本不兼容')
+    const [identity] = await tx.select<{ workspace_id: string, owner_id: string }>('SELECT workspace_id,owner_id FROM production_metadata WHERE singleton=1')
+    if (!identity)
+      return signatoryProblem('unavailable', '辅助合同编号核验缺可信工作区')
+    await validateProductionAuxiliaryState(tx, { workspaceId: identity.workspace_id, actorId: identity.owner_id })
+  }
   const versions = (record: StoredMaterialContract) => [...record.history, record].sort((a, b) => b.version - a.version)
   for (const record of records) {
     for (const version of versions(record)) {
@@ -39,10 +70,22 @@ export async function validateMaterialContractIdentities(tx: TransactionDb, reco
     }
   }
   for (const claim of claims) {
+    if (claim.owner_domain === 'construction-contracts' && registered)
+      continue
+    if (claim.owner_domain === 'subcontract-contracts' && subcontractRegistered)
+      continue
+    if (claim.owner_domain === 'auxiliary-contract' && auxiliaryRegistered)
+      continue
     if (claim.owner_domain !== 'material-contracts' || !main.some(row => row.id === claim.contract_id))
       return signatoryProblem('unavailable', '编号登记存在尚未接管的领域或孤立身份')
   }
   for (const history of numberHistory) {
+    if (history.owner_domain === 'construction-contracts' && registered)
+      continue
+    if (history.owner_domain === 'subcontract-contracts' && subcontractRegistered)
+      continue
+    if (history.owner_domain === 'auxiliary-contract' && auxiliaryRegistered)
+      continue
     const record = main.find(row => row.id === history.contract_id)
     if (history.owner_domain !== 'material-contracts' || !record || !versions(record).some(version => String(version.version) === history.version)
       || history.id !== `material-${history.contract_id}-v${history.version}` || !['upgrade-evidence', 'upgrade-history', 'formal-fact', 'draft-evidence'].includes(history.reason)) {

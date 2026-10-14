@@ -31,7 +31,7 @@ async function choose(page: Page, label: string, name: string | RegExp) {
   await page.getByRole('combobox', { name: label, exact: true }).click()
   await page.getByRole('option', { name }).click()
 }
-async function capture(page: Page, info: TestInfo, name: string, detail: 'lower' | 'horizontal' | null = null) {
+async function capture(page: Page, name: string, detail: 'lower' | 'horizontal' | null = null) {
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 12_000 })
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: detail ? 720 : 960 })
@@ -54,7 +54,6 @@ async function capture(page: Page, info: TestInfo, name: string, detail: 'lower'
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
     for (const dialog of await page.locator('[role="dialog"]:visible').all())
       await expect(dialog).toHaveCSS('opacity', '1')
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
   }
 }
 async function fixture(page: Page, info: TestInfo) {
@@ -186,12 +185,12 @@ async function exerciseExceptions(page: Page, info: TestInfo, data: Awaited<Retu
   const confirmButton = page.getByRole('button', { name: '确认绑定合同', exact: true })
   if (!exceptionResume) {
     await expect(confirmButton).toBeDisabled()
-    await capture(page, info, 'coverage-blocked-frozen')
+    await capture(page, 'coverage-blocked-frozen')
     await page.getByRole('button', { name: '补齐合同楼栋证据' }).click()
     await choose(page, '合同清单行', /腻子.*原量 12.*已确认导入/)
     await choose(page, '实际覆盖楼栋', new RegExp(`异常恢复验收栋 ${run}`))
     await page.getByRole('textbox', { name: '更正理由' }).fill(`已确认合成原件所列腻子属于验收栋 ${run}`)
-    await capture(page, info, 'building-evidence-draft')
+    await capture(page, 'building-evidence-draft')
     await page.getByRole('button', { name: '保存楼栋证据', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: '保存楼栋证据', exact: true }).click()
     await expect(page).toHaveURL(/\/bind\//)
@@ -201,8 +200,8 @@ async function exerciseExceptions(page: Page, info: TestInfo, data: Awaited<Retu
   }
   await expect(confirmButton).toBeEnabled()
   await confirmButton.scrollIntoViewIfNeeded()
-  await capture(page, info, 'comparison-lower-and-confirm', 'lower')
-  await capture(page, info, 'comparison-horizontal-sources', 'horizontal')
+  await capture(page, 'comparison-lower-and-confirm', 'lower')
+  await capture(page, 'comparison-horizontal-sources', 'horizontal')
   await confirmButton.click()
   const cancelButton = page.getByRole('dialog').getByRole('button', { name: '取消', exact: true })
   await cancelButton.focus()
@@ -226,7 +225,7 @@ async function exerciseExceptions(page: Page, info: TestInfo, data: Awaited<Retu
   await page.unroute('**/api/commands/schedule')
   await expect(confirmButton).toBeDisabled()
   await page.locator('.binding-screen').getByRole('heading', { name: '绑定施工合同', exact: true }).scrollIntoViewIfNeeded()
-  await capture(page, info, 'stale-preview-retained')
+  await capture(page, 'stale-preview-retained')
   expect((await data.read()).snapshot.groups.find(row => row.id === groupId)!.scopeBasis).toBe('provisional')
   await page.getByRole('button', { name: '重新核对资料', exact: true }).click()
   await expect(confirmButton).toBeEnabled()
@@ -251,7 +250,7 @@ async function exerciseExceptions(page: Page, info: TestInfo, data: Awaited<Retu
   await expect(recover).toBeEnabled()
   await expect(page.getByLabel('已选施工合同', { exact: true })).toHaveText('迁入合同')
   await recover.scrollIntoViewIfNeeded()
-  await capture(page, info, 'unknown-command-retained')
+  await capture(page, 'unknown-command-retained')
   await recover.focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(url => url.pathname === '/schedule' && url.searchParams.get('group') === groupId)
@@ -272,7 +271,7 @@ async function exerciseExceptions(page: Page, info: TestInfo, data: Awaited<Retu
   await choose(page, '合同清单行', new RegExp(`已签新增只读 ${run}`))
   await expect(page.getByText(/已签证变更新增行不可直接更正/)).toBeVisible()
   await expect(page.getByRole('button', { name: '保存楼栋证据', exact: true })).toHaveCount(0)
-  await capture(page, info, 'signed-addition-readonly')
+  await capture(page, 'signed-addition-readonly')
 }
 
 test('暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷读及原楼层来源五档闭环', async ({ page }, info) => {
@@ -286,7 +285,7 @@ test('暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷�
   await page.goto(`/schedule/${data.projectId}/bind/${oldGroup.id}?origin=real`)
   await expect(page.getByRole('heading', { name: '施工合同绑定依据' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/旧来源没有保存绑定时的完整差异/)).toBeVisible()
-  await capture(page, info, 'legacy-bound-readonly')
+  await capture(page, 'legacy-bound-readonly')
 
   let createdGroupId = process.env.SCHEDULE_BINDING_RESUME_GROUP
   if (!createdGroupId) {
@@ -317,7 +316,7 @@ test('暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷�
     await expect(page.getByRole('heading', { name: '必须先处理' })).toBeVisible()
     await expect(page.getByRole('button', { name: '确认绑定合同', exact: true })).toBeDisabled()
     await expect(page.getByText('已知 8 · 缺 1 项', { exact: true })).toBeVisible()
-    await capture(page, info, 'coverage-blocked-frozen')
+    await capture(page, 'coverage-blocked-frozen')
     await page.getByRole('button', { name: '补齐合同楼栋证据' }).click()
     await expect(page.getByRole('heading', { name: '更正楼栋证据' })).toBeVisible()
     for (const name of ['腻子', '真零踢脚线', '按米核对管线']) {
@@ -325,7 +324,7 @@ test('暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷�
       await choose(page, '实际覆盖楼栋', /合同待建二栋/)
       await page.getByRole('textbox', { name: '更正理由' }).fill(`合成原件清单所列${name}属于二栋`)
       if (name === '腻子')
-        await capture(page, info, 'building-evidence-draft')
+        await capture(page, 'building-evidence-draft')
       await page.getByRole('button', { name: '保存楼栋证据', exact: true }).click()
       await page.getByRole('dialog').getByRole('button', { name: '保存楼栋证据', exact: true }).click()
       await expect(page).toHaveURL(/\/bind\//)
@@ -334,7 +333,7 @@ test('暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷�
         await page.getByRole('button', { name: '查看清单来源 1', exact: true }).last().click()
     }
     await expect(page.getByRole('button', { name: '确认绑定合同', exact: true })).toBeEnabled()
-    await capture(page, info, 'ready-to-bind')
+    await capture(page, 'ready-to-bind')
     await page.getByRole('button', { name: '确认绑定合同', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
     expect((await data.read()).snapshot.groups.find(row => row.id === group.id)!.scopeBasis).toBe('provisional')
@@ -349,18 +348,18 @@ test('暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷�
   await page.goto(bindingUrl)
   await expect(page.getByRole('heading', { name: '施工合同绑定依据' })).toBeVisible()
   await expect(page.getByRole('button', { name: '确认绑定合同', exact: true })).toHaveCount(0)
-  await capture(page, info, 'bound-cold-read')
+  await capture(page, 'bound-cold-read')
   await page.getByRole('heading', { name: '分项与数量差异', exact: true }).scrollIntoViewIfNeeded()
-  await capture(page, info, 'bound-differences-lower', 'lower')
+  await capture(page, 'bound-differences-lower', 'lower')
   await page.getByRole('button', { name: '查看清单来源 1', exact: true }).first().click()
   await expect(page.getByRole('heading', { name: '合同清单来源', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '保存楼栋证据', exact: true })).toHaveCount(0)
-  await capture(page, info, 'contract-source-readonly')
+  await capture(page, 'contract-source-readonly')
   await page.getByRole('link', { name: '查看原楼层计划 1', exact: true }).click()
   await expect(page.getByRole('dialog', { name: /工序详情/ })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('dialog', { name: /工序详情/ })).toBeVisible()
-  await capture(page, info, 'original-floor-readonly')
+  await capture(page, 'original-floor-readonly')
   await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
   await page.getByRole('link', { name: '返回合同清单来源' }).click()
   await expect(page.getByRole('heading', { name: '合同清单来源', exact: true })).toBeVisible()

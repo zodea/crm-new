@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { ProjectContractFormDraft } from '~/lib/contract/forms'
+import type { LookupOption } from '~/lib/kit/lookup'
 import type { OurSignatoryRecord } from '~/lib/our-signatory/contract'
+import { onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef } from 'vue'
+import LookupSelect from '~/components/ui/LookupSelect.vue'
 import { signatorySnapshot } from '~/lib/our-signatory/contract'
 import { createOurSignatoryRepository } from '~/lib/our-signatory/http-repository'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
@@ -22,7 +25,7 @@ const message = shallowRef('')
 const loading = ref(false)
 let generation = 0
 let active = true
-const repository = createOurSignatoryRepository((url, options) => $fetch<unknown>(url, { ...options, retry: 0 }))
+const repository = createOurSignatoryRepository((url, options) => $fetch<unknown, string>(url, { ...options, retry: 0 }))
 function invalidate() {
   generation++
   rows.value = []
@@ -52,11 +55,21 @@ async function load() {
       loading.value = false
   }
 }
-function select(event: Event) {
+async function fetchSignatories(keyword: string): Promise<LookupOption[]> {
+  const needle = keyword.trim().toLocaleLowerCase('zh-CN')
+  const options = rows.value.map(row => ({ id: row.id, label: row.draft.name, hint: row.draft.taxNo ?? undefined }))
+  const snapshot = props.draft.ourSignatorySnapshot
+  if (snapshot && !options.some(row => row.id === snapshot.id))
+    options.push({ id: snapshot.id, label: snapshot.name, hint: '合同原快照' })
+  return options.filter(row => !needle || row.id === keyword || row.label.toLocaleLowerCase('zh-CN').includes(needle))
+}
+function select(value: string | null) {
   if (!active || loading.value || message.value || props.supplement)
     return
-  const row = rows.value.find(row => row.id === (event.target as HTMLSelectElement).value)
-  if (row && props.draft.ourSignatorySnapshot?.id === row.id)
+  if (value && props.draft.ourSignatorySnapshot?.id === value)
+    return
+  const row = rows.value.find(row => row.id === value)
+  if (value && !row)
     return
   if (!row) {
     emit('patch', { ourSignatoryId: null, ourSignatoryVersion: null, ourSignatorySnapshot: null })
@@ -84,17 +97,7 @@ onActivated(() => {
 <template>
   <div class="field-block form-span-full">
     <label class="field-label" :for="`our-signatory-${label}`">{{ label }}{{ supplement ? '（继承原合同）' : isDesktopRuntime() ? '' : ' *' }}</label>
-    <select v-if="!supplement" :id="`our-signatory-${label}`" class="field-input w-full" :value="draft.ourSignatoryId ?? ''" :disabled="loading || Boolean(message)" :aria-invalid="Boolean(error)" data-testid="contract-our-signatory" @change="select">
-      <option value="">
-        选择已核实的真实主体
-      </option>
-      <option v-if="draft.ourSignatoryId && !rows.some(row => row.id === draft.ourSignatoryId)" :value="draft.ourSignatoryId">
-        {{ draft.ourSignatorySnapshot?.name }}（合同原快照）
-      </option>
-      <option v-for="row in rows" :key="row.id" :value="row.id">
-        {{ row.draft.name }}
-      </option>
-    </select>
+    <LookupSelect v-if="!supplement" :field="`our-signatory-${label}`" :model-value="draft.ourSignatoryId ?? null" :fetch="fetchSignatories" :disabled-reason="loading ? '正在读取主体目录' : message || undefined" :invalid="Boolean(error)" placeholder="搜索已核实的签约主体" data-testid="contract-our-signatory" @update:model-value="select" />
     <p v-if="draft.ourSignatorySnapshot" class="m-0 text-12px text-ink-soft" data-testid="contract-our-signatory-snapshot">
       文书采用：{{ draft.ourSignatorySnapshot.name }} · 核实版本 {{ draft.ourSignatorySnapshot.version }}<span v-if="draft.ourSignatorySnapshot.taxNo"> · 税号 {{ draft.ourSignatorySnapshot.taxNo }}</span>
     </p>

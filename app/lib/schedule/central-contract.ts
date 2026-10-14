@@ -1,4 +1,5 @@
 import type { DataOriginDTO } from '../../types/read-model'
+import type { CommandRecoveryDescriptor } from '../forms/command-recovery'
 import type { AddScheduleTaskDraft, CreateScheduleGroupDraft, SaveScheduleTaskPlanDraft, ScheduleProvisionalScopePreview, UpdateScheduleFloorPlanPatch, UpdateScheduleTaskPatch } from './engine'
 import type { ScheduleHistory } from './history'
 import type { ScheduleBuildingCoverage, ScheduleBuildingOption, ScheduleCatalogProject, ScheduleContractOption, ScheduleProjectView } from './read-model'
@@ -15,6 +16,8 @@ export interface ScheduleReadContext {
   sourceVersion: string
 }
 export interface ScheduleRead extends ScheduleReadContext {
+  contractSourceState?: 'available' | 'unavailable'
+  contractSourceMessage?: string
   history: ScheduleHistory
   snapshot: ScheduleProjectView
   contracts: ScheduleContractOption[]
@@ -45,6 +48,7 @@ export interface ScheduleCommand {
   action: ScheduleAction
 }
 export interface ScheduleCommandResult { commandId: string, projectId: string, sourceVersion: string, value: unknown }
+export interface SchedulePending { descriptor: CommandRecoveryDescriptor, command: ScheduleCommand | null, state: 'sending' | 'applied' | 'unknown' }
 export interface ScheduleScopeRead extends ScheduleReadContext { preview: ScheduleProvisionalScopePreview }
 export function scheduleProblem(code: Parameters<typeof projectProblem>[0], message: string) {
   return new ProjectRepositoryProblem(projectProblem(code, message))

@@ -5,13 +5,13 @@ import { scheduleProblem } from './central-contract'
 import { dependencyConflicts, dependencyWouldCycle, normalizeDependencyLag } from './planning'
 
 /** 撤销也必须保持完整活跃图合法，不能借历史日志绕开恢复入口。 */
-export async function assertScheduleDependencyGraph(db: TransactionDb, projectId: string) {
-  const rows = await db.select<ScheduleDependencyInput & { predProject: string, succProject: string, predGroup: string, succGroup: string }>(`${hiddenCtesFor('task_dependencies')}
+export async function assertScheduleDependencyGraph(db: TransactionDb, projectId: string, visibility: Pick<typeof import('../db/soft-delete'), 'hiddenCtesFor' | 'visibleCond' | 'selectVisibleSql'> = { hiddenCtesFor, visibleCond, selectVisibleSql }) {
+  const rows = await db.select<ScheduleDependencyInput & { predProject: string, succProject: string, predGroup: string, succGroup: string }>(`${visibility.hiddenCtesFor('task_dependencies')}
     SELECT d.id, d.pred_id AS predId, d.succ_id AS succId, d.dependency_type AS dependencyType, d.lag_days AS lagDays,
       p.project_id AS predProject, s.project_id AS succProject, p.group_id AS predGroup, s.group_id AS succGroup
     FROM task_dependencies d JOIN schedule_tasks p ON p.id = d.pred_id JOIN schedule_tasks s ON s.id = d.succ_id
       JOIN schedule_groups pg ON pg.id = p.group_id JOIN schedule_groups sg ON sg.id = s.group_id
-    WHERE ${visibleCond('task_dependencies', 'd')}
+    WHERE ${visibility.visibleCond('task_dependencies', 'd')}
       AND (p.project_id = ? OR s.project_id = ?)`, [projectId, projectId])
   const successors = new Set<string>()
   for (const row of rows) {
@@ -22,7 +22,7 @@ export async function assertScheduleDependencyGraph(db: TransactionDb, projectId
     if (dependencyWouldCycle(rows, { predecessorId: row.predId, successorId: row.succId, excludeDependencyId: row.id }))
       throw scheduleProblem('validation-failed', '当前动作会造成循环依赖，未作更改')
   }
-  const taskRows = await db.select<{ id: string, name: string, planned_start: string, planned_finish: string }>(selectVisibleSql('schedule_tasks', 'AND project_id = ?'), [projectId])
+  const taskRows = await db.select<{ id: string, name: string, planned_start: string, planned_finish: string }>(visibility.selectVisibleSql('schedule_tasks', 'AND project_id = ?'), [projectId])
   const tasks: ScheduleDependencyTask[] = taskRows.map(row => ({ id: row.id, name: row.name, plannedStart: row.planned_start, plannedFinish: row.planned_finish }))
   if (dependencyConflicts(tasks, rows).length)
     throw scheduleProblem('validation-failed', '当前动作会恢复与计划日期冲突的依赖，请先核对计划')

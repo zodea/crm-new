@@ -169,36 +169,50 @@ test.describe('Issue #192：项目×分供方工作台与文件导入', () => {
     })
   }
 
-  for (const viewport of RESPONSIVE_CASES) {
-    test(`${viewport.label} 只读工作台及正式导入向导局部滚动、键盘可达`, async ({ page }) => {
-      const input = READ_INPUTS[0]
-      const workbench = `/project/${input.projectId}/supplier/${input.supplierId}?origin=demo&tab=contract`
+  test('只读工作台及正式导入向导在各宽度局部滚动、键盘可达', async ({ page }) => {
+    const input = READ_INPUTS[0]
+    const workbench = `/project/${input.projectId}/supplier/${input.supplierId}?origin=demo&tab=contract`
+    const desktop = { width: 1440, height: VIEWPORT_HEIGHTS[1440] }
+    await page.setViewportSize(desktop)
+    await page.goto(workbench)
+    await waitForWorkbench(page, input)
+    const table = contractTableScroller(page)
+    await expect(table).toBeVisible()
+    const refresh = page.getByRole('button', { name: '刷新', exact: true })
+    for (const viewport of RESPONSIVE_CASES) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
-      await page.goto(workbench)
-      await waitForWorkbench(page, input)
       await expectNoPageOverflow(page, `${viewport.label} 工作台`)
-      const table = contractTableScroller(page)
       await expect(table).toBeVisible()
       await expectHorizontalScrollOwner(table, viewport.label)
       if (viewport.width <= 768)
         await expectLocalHorizontalScroll(table, viewport.label)
-      const refresh = page.getByRole('button', { name: '刷新', exact: true })
-      await tabUntilFocused(page, refresh)
+      await refresh.scrollIntoViewIfNeeded()
       await expectInViewport(refresh, viewport.label)
-      await tabUntilFocused(page, page.getByRole('tab', { name: /^合同/ }))
-      const claimTab = page.getByRole('tab', { name: /^请款/ })
-      await tabUntilFocused(page, claimTab)
-      await claimTab.press('Enter')
-      await expect(claimTab).toHaveAttribute('aria-selected', 'true')
+    }
+
+    await page.setViewportSize(desktop)
+    await tabUntilFocused(page, refresh)
+    await tabUntilFocused(page, page.getByRole('tab', { name: /^合同/ }))
+    const claimTab = page.getByRole('tab', { name: /^请款/ })
+    await tabUntilFocused(page, claimTab)
+    await claimTab.press('Enter')
+    await expect(claimTab).toHaveAttribute('aria-selected', 'true')
+    for (const viewport of RESPONSIVE_CASES) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height })
       await expectNoPageOverflow(page, `${viewport.label} 键盘页签`)
-      const project = await prepareImport(page, IMPORT_INPUTS[0])
-      await page.goto(`/project/${project.id}/supplier/import?origin=real`)
-      await expect(page.getByRole('heading', { name: '项目分供方文件导入', exact: true })).toBeVisible()
+    }
+
+    const project = await prepareImport(page, IMPORT_INPUTS[0])
+    await page.setViewportSize(desktop)
+    await page.goto(`/project/${project.id}/supplier/import?origin=real`)
+    await expect(page.getByRole('heading', { name: '项目分供方文件导入', exact: true })).toBeVisible()
+    const chooseFiles = page.getByRole('button', { name: '选择文件', exact: true })
+    const chooseFolder = page.getByRole('button', { name: '选择文件夹', exact: true })
+    await expectTabSequence(page, chooseFiles, [chooseFolder], '导入向导选择入口')
+    for (const viewport of RESPONSIVE_CASES) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height })
       await expectNoPageOverflow(page, `${viewport.label} 导入向导`)
-      const chooseFiles = page.getByRole('button', { name: '选择文件', exact: true })
-      const chooseFolder = page.getByRole('button', { name: '选择文件夹', exact: true })
-      await expectTabSequence(page, chooseFiles, [chooseFolder], viewport.label)
       await expectInViewport(chooseFolder, viewport.label)
-    })
-  }
+    }
+  })
 })

@@ -92,7 +92,6 @@ async function capture(page: Page, info: TestInfo, name: string, selector?: stri
       }))
       expect(controlsInside).toBe(true)
     }
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await page.setViewportSize({ width: 1440, height: 960 })
 }

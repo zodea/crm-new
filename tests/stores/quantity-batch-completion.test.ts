@@ -1,13 +1,12 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import {
   loadQuantityBatchCompletionPlan,
   persistQuantityBatchCompletion,
 } from '~/lib/quantity/batch-completion'
 import { useNativeQuantityStore as useQuantityStore } from '~/stores/quantity-native'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -29,8 +28,7 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`INSERT INTO projects (id, name, code) VALUES ('p1', '项目一', 'P1')`)
   await mem.execute(`INSERT INTO buildings (id, project_id, code, name, sort_order) VALUES
     ('b1', 'p1', '1', '1栋', 10)`)

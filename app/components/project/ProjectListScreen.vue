@@ -7,6 +7,7 @@ import type { MetricDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import RowActionMenu from '~/components/ui/RowActionMenu.vue'
 import { useProjectListReturnContext } from '~/composables/useProjectListReturnContext'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { projectLedgerRows } from '~/lib/project/export'
@@ -102,6 +103,11 @@ const createDisabledReason = computed(() =>
     ? undefined
     : '无项目写入权限',
 )
+function newConstructionContract(projectId: string) {
+  if (!readPage.value?.capabilities.includes('construction-contract:write'))
+    return
+  return router.push({ path: '/contract/construction/form', query: { origin: 'real', projectId, returnTo: `/project/${encodeURIComponent(projectId)}?origin=real` } })
+}
 
 const importedPhases = computed(() =>
   Object.keys(statusCounts.value)
@@ -654,6 +660,7 @@ onDeactivated(() => {
               >
                 <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
               </button>
+              <RowActionMenu :label="`${row.name}项目操作`" :items="[{ key: 'construction', label: '新建施工主合同', icon: 'i-lucide-file-plus', disabled: row.dataOrigin !== 'real' || !readPage?.capabilities.includes('construction-contract:write') }]" @select="key => key === 'construction' && newConstructionContract(row.id)" />
             </div>
           </template>
         </KitTable>

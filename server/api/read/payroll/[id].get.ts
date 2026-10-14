@@ -1,11 +1,12 @@
 import { encodePayrollWire, parsePayrollQuery } from '../../../../app/lib/payroll/central-codec'
 import { payrollProblem } from '../../../../app/lib/payroll/central-contract'
 import { isStableRouteIdentity } from '../../../../app/lib/util/stable-route-identity'
-import { payrollService } from '../../../utils/payroll-runtime'
+import { payrollServiceForEvent } from '../../../utils/payroll-runtime'
 import { throwQuantityError } from '../../../utils/quantity-error'
 
 export default defineEventHandler(async (event) => {
   try {
+    const payrollService = payrollServiceForEvent(event)
     const id = getRouterParam(event, 'id')
     if (!isStableRouteIdentity(id))
       throw payrollProblem('invalid-query', '工资单身份无效')

@@ -6,7 +6,9 @@ import { loadPayrollBudgetActual } from '../../server/utils/payroll-actual-budge
 import { aggregateTargetCostActual } from '../../server/utils/target-cost-actual'
 import { createPayrollAFeeAdjustmentFixture } from '../helpers/payroll-a-fee-adjustment-fixture'
 
-it.each(Array.from([['project', 'p'], ['crew', 'crew'], ['worker', 'w']] as const).map(input1 => ({ input1 })))('真实普通工资1000和含负价管理工资500经预算、项目、班组、个人、付款入口均只计1500：输入案例 %#', async ({ input1: [kind, id] }) => {
+const HOSTS = [['project', 'p'], ['crew', 'crew'], ['worker', 'w']] as const
+
+it('真实普通工资1000和含负价管理工资500经预算、项目、班组、个人、付款入口均只计1500', async () => {
   const f = await createPayrollAFeeAdjustmentFixture()
   const session: BusinessSession = { workspaceId: 'work', actorId: 'actor', capabilities: ['payroll:read', 'target-cost:read', 'project:list:read', 'crew:list:read', 'worker:list:read'] }
   try {
@@ -35,10 +37,12 @@ it.each(Array.from([['project', 'p'], ['crew', 'crew'], ['worker', 'w']] as cons
       expect(payments.netAmount.value).toBe(amount)
       expect(payments.rows).toHaveLength(count)
 
-      const section = await loadPayrollHostSection(f.db, { kind, id }, session)
-      expect(section.netAmount.value, kind).toBe(amount)
-      expect(section.rows).toHaveLength(count)
-      expect(section.rows.map(r => r.fact.identity).sort()).toEqual(payments.rows.map(r => r.identity).sort())
+      for (const [kind, id] of HOSTS) {
+        const section = await loadPayrollHostSection(f.db, { kind, id }, session)
+        expect(section.netAmount.value, kind).toBe(amount)
+        expect(section.rows, kind).toHaveLength(count)
+        expect(section.rows.map(r => r.fact.identity).sort(), kind).toEqual(payments.rows.map(r => r.identity).sort())
+      }
       const sources = await loadPayrollBudgetActual(f.db, 'p', session)
       const budget = aggregateTargetCostActual('p', sources).categories.find(c => c.category === '工人工资')!
       expect(budget).toMatchObject({ paidAmount: { value: amount, status: 'complete' }, settledAmount: { value: amount, status: 'complete' }, signedAmount: { status: 'not-applicable' } })

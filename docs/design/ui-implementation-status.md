@@ -72,7 +72,6 @@
 
 材料采购合同列表 #422 已补齐现有中央金额投影、稳定关系入口和按来源分开的完整筛选汇总；列表/详情金额、错误恢复、权限清除、五档视口与既有项目—合同—分供方路径见[本批验收](./evidence/issue-422/README.md)。这是明确切片的前台和跨模块回归结论；独立合同状态、其他工具、桌面及生产持久化继续保留原边界。
 
-本轮需要逐项复核的 route + kind + 页面/子视图 + 运行环境进入 [覆盖索引](./module-review-coverage.md)。索引明确区分实际挂载、空占位、模拟导入、只预检和正式存储未接入；未附新验收证据的条目保持待核验，数量不纳入完成率。
 
 界面状态分为四类，不能互相替代：
 
@@ -83,7 +82,7 @@
 - **当前已实现**：运行代码、数据/迁移、用户路径和测试同时满足当前 open 规格；页面能打开或历史 Issue 已关闭都不够。
 - **待补设计**（`design-pending`）：实现路由存在，但没有当前设计权威落点。
 
-页面文件、dev 路由、生产路由与设计覆盖只以下方生成表为准；不要在叙述段落另写一套手工数字。运行证据与 20 个页面域的同源核对见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。
+页面文件、dev 路由、生产路由与设计覆盖只以下方生成表为准；不要在叙述段落另写一套手工数字。运行证据逐路由记录在 [`runtime-reference-audit.md`](./runtime-reference-audit.md#5-生产路由矩阵)。
 
 ## 2. 当前总数
 
@@ -95,12 +94,12 @@
 | 设计稿 PAGE 路由 | 97 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 53 |
-| 实现页面文件（含 dev） | 171 |
+| 实现页面文件（含 dev） | 172 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 166 |
+| 实现生产路由（排除 dev） | 167 |
 | 实现侧栏叶子 | 53 |
 | 已覆盖 | 166 |
-| 待补设计（实现有、设计稿没有） | 0 |
+| 待补设计（实现有、设计稿没有） | 1 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
@@ -148,7 +147,7 @@
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 28 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 工程量与工资 | 29 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 3 | [#414](https://github.com/zodea/crm-new/issues/414) |
@@ -171,8 +170,8 @@
 ## 5. 证据状态边界
 
 - 历史完成票只证明相应页面基础的来源；因替代而关闭的票不证明实现完成。两者均不能推导本轮前台复验或生产上线已经通过。
-- 历史证据和 `unverified-target` 保持各自等级，数量以生成账本为准；没有新的安全直接证据不得升级。
-- `direct`、`adjacent`、`local-authority`、权限状态和观测日期逐端点记录在生成账本；叙述结论只留在 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，生成 JSON 只保存结构化键与权威源引用。
+- 历史证据和 `unverified-target` 保持各自等级；没有新的安全直接证据不得升级。
+- `direct`、`adjacent`、`local-authority`、权限状态和观测日期逐路由记录在 [`runtime-reference-audit.md`](./runtime-reference-audit.md) 的生产路由矩阵。
 - 当前已实现数量不在本轮提前汇总；每张实施票关闭时按其真实路由范围更新，避免把“路由存在”再次统计成“业务闭环”。
 
 ## 6. 维护方式
@@ -180,7 +179,7 @@
 界面、路由、页面域、证据等级或实施状态变化时，同一提交：
 
 1. 更新设计稿可达界面或 Nuxt 路由；
-2. 运行 `node scripts/sync-design-coverage.mjs` 与 `node scripts/sync-runtime-evidence-ledger.mjs`；
+2. 运行 `node scripts/sync-design-coverage.mjs`，并手工更新运行参考矩阵中受影响的行；
 3. 更新受影响页面蓝本/ADR（若业务或架构规格变化）；
 4. 证据留在实际验收入口；获得明确 Issue 写入授权后，再将提交、测试和运行反馈写回对应 Issue。
 

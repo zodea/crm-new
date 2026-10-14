@@ -46,7 +46,8 @@ export interface PayrollIdentitySource {
 export interface PayrollServiceOptions {
   session: (sessionId?: string | null) => BusinessSession
   identities: (sessionId?: string | null) => PayrollIdentitySource | Promise<PayrollIdentitySource>
-  transaction: <T>(work: (db: TransactionDb, context: BusinessSession) => Promise<T>, sessionId?: string | null) => Promise<T>
+  transaction: <T>(work: (db: TransactionDb, context: BusinessSession) => Promise<T>, sessionId?: string | null, command?: object) => Promise<T>
+  schemaInitialized?: boolean
   quantityFacts?: (db: TransactionDb, query: PayrollAQuantityQuery) => Promise<PayrollAQuantityFacts>
   hollowFacts?: (db: TransactionDb, query: QuantityHollowFactsQuery) => Promise<QuantityHollowFacts>
   hollowProjection?: PayrollHollowProjectionProvider
@@ -56,7 +57,7 @@ export interface PayrollServiceOptions {
   dayworkRecord?: (db: TransactionDb, recordId: string) => Promise<PayrollDayworkRecordFacts>
   c2ConfigFacts?: (db: TransactionDb, scope: PayrollC2ConfigScope) => Promise<PayrollC2ConfigFacts>
 }
-export type PayrollRun = <T>(query: PayrollQuery, sessionId: string | null | undefined, read: (db: TransactionDb, context: PayrollContext, source: PayrollIdentitySource) => Promise<T>, write?: boolean) => Promise<T>
+export type PayrollRun = <T>(query: PayrollQuery, sessionId: string | null | undefined, read: (db: TransactionDb, context: PayrollContext, source: PayrollIdentitySource) => Promise<T>, write?: boolean, command?: object) => Promise<T>
 function hash(value: unknown) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
@@ -65,6 +66,58 @@ function authorize(session: BusinessSession, write = false) {
     throw payrollProblem('forbidden', '当前身份没有工资读取权限')
   if (write && !session.capabilities.includes('payroll:write'))
     throw payrollProblem('forbidden', '当前身份没有工资写入权限')
+}
+function publicPayrollResult<T>(result: T, actor: BusinessSession, enforceDirectory: boolean): T {
+  const sensitive = actor.capabilities.includes('worker:sensitive:read')
+  const visit = (value: unknown): unknown => {
+    if (Array.isArray(value))
+      return value.map(visit)
+    if (!value || typeof value !== 'object')
+      return value
+    const record = value as Record<string, unknown>
+    const next = Object.fromEntries(Object.entries(record).map(([key, child]) => [key, visit(child)]))
+    if (enforceDirectory && record.options && typeof record.options === 'object') {
+      const options = next.options as Record<string, unknown>
+      const availability: Record<string, string> = {}
+      for (const [field, capability] of [['projects', 'project:list:read'], ['crews', 'crew:list:read'], ['workers', 'worker:list:read']]) {
+        if (!Array.isArray(options[field!]))
+          continue
+        availability[field!] = actor.capabilities.includes(capability!) ? 'readable' : 'forbidden'
+        if (!actor.capabilities.includes(capability!))
+          options[field!] = []
+      }
+      options.availability = availability
+      if (Array.isArray(record.workers) && Array.isArray(record.records) && !actor.capabilities.includes('worker:list:read')) {
+        availability.workers = 'forbidden'
+        const related = new Set((record.records as Array<{ workerId: string }>).map(row => row.workerId))
+        next.workers = (next.workers as Array<Record<string, unknown>>).filter(worker => related.has(String(worker.id))).map(worker => ({ ...worker, name: null, eligible: false, historical: true, source: null, reasons: ['当前人员目录受限；原考勤事实和身份仍保留'] }))
+        if (next.context && typeof next.context === 'object')
+          (next.context as Record<string, unknown>).readonly = true
+      }
+    }
+    if (!sensitive && record.entityId && record.source && typeof record.source === 'object') {
+      const source = structuredClone(record.source) as Record<string, unknown>
+      const publication = source.publication as { schemaVersion: unknown, tables?: Record<string, unknown>, origins?: unknown[] } | undefined
+      if (publication) {
+        source.publication = { schemaVersion: publication.schemaVersion, privateRosterState: 'forbidden', reason: '固定实名名册正文须从原版本入口另行核验工人私密资料权限', tables: Object.fromEntries(Object.entries(publication.tables ?? {}).map(([table, rows]) => [table, table.startsWith('worker_roster_') ? { state: 'forbidden' } : rows])), origins: publication.origins?.map((origin) => {
+          const row = origin as Record<string, unknown>
+          return row.tableName === 'worker_roster_archives' ? { tableName: row.tableName, recordId: row.recordId, proofHash: row.proofHash, state: 'forbidden' } : row
+        }) }
+      }
+      const deductions = source.deductions as Record<string, unknown> | undefined
+      if (deductions?.proof)
+        deductions.proof = { state: 'forbidden', reason: '完整祖先来源包包含固定私密原资料，普通工资读取只消费服务器已核实的采用证明' }
+      if (Array.isArray(source.logs)) {
+        source.logs = source.logs.map((log) => {
+          const row = log as Record<string, unknown>
+          return String(row.table_name).startsWith('worker_roster_') ? { ...row, before_data: null, after_data: null, privateState: 'forbidden' } : row
+        })
+      }
+      next.source = source
+    }
+    return next
+  }
+  return visit(result) as T
 }
 async function synchronizeIdentities(db: TransactionDb, source: PayrollIdentitySource) {
   for (const [table, rows] of [['projects', source.projects], ['crews', source.crews], ['workers', source.workers]] as const) {
@@ -86,27 +139,29 @@ async function synchronizeIdentities(db: TransactionDb, source: PayrollIdentityS
 }
 /** P0 只读域：会话、中央身份、工资事实与迁移候选共用工作区串行事务。 */
 export function createPayrollService(options: PayrollServiceOptions) {
-  async function run<T>(query: PayrollQuery, sessionId: string | null | undefined, read: (db: TransactionDb, context: PayrollContext, source: PayrollIdentitySource) => Promise<T>, write = false): Promise<T> {
+  async function run<T>(query: PayrollQuery, sessionId: string | null | undefined, read: (db: TransactionDb, context: PayrollContext, source: PayrollIdentitySource) => Promise<T>, write = false, command?: object): Promise<T> {
     if (query.origin !== 'real')
       throw payrollProblem('forbidden', '演示工资只经授权后的隔离只读适配器读取')
     return options.transaction(async (db) => {
       const session = structuredClone(options.session(sessionId))
       authorize(session, write)
       const source = structuredClone(await options.identities(sessionId))
-      await initializePayrollSchema(db)
-      await initializePayrollAFeesSchema(db)
-      await initializePayrollARoundingSchema(db)
-      await initializePayrollBatchSchema(db)
-      if (options.hollowFacts)
-        await initializePayrollHollowDeductionSchema(db)
-      await synchronizeIdentities(db, source)
+      if (!options.schemaInitialized) {
+        await initializePayrollSchema(db)
+        await initializePayrollAFeesSchema(db)
+        await initializePayrollARoundingSchema(db)
+        await initializePayrollBatchSchema(db)
+        if (options.hollowFacts)
+          await initializePayrollHollowDeductionSchema(db)
+        await synchronizeIdentities(db, source)
+      }
       if (query.projectId && !source.projects.some(project => project.id === query.projectId)) {
         const recorded = await db.select<{ project_id: string }>(`SELECT project_id FROM wage_statements UNION SELECT project_id FROM payroll_subject_configs
           UNION SELECT project_id FROM attendance_records UNION SELECT project_id FROM signed_daywork_records UNION SELECT project_id FROM payroll_migration_evidence`)
         if (!recorded.some(row => row.project_id === query.projectId))
           throw payrollProblem('not-found', '指定工资项目不存在，请从原来源重新核对')
       }
-      const context: PayrollContext = { ...session, readonly: true, origin: 'real', sourceVersion: `payroll:${await payrollRevision(db)}+identities:${hash(source)}` }
+      const context: PayrollContext = { ...session, readonly: true, origin: 'real', sourceVersion: options.schemaInitialized ? 'payroll-consumption-v1' : `payroll:${await payrollRevision(db)}+identities:${hash(source)}` }
       const result = await read(db, context, source)
       const latestSource = await options.identities(sessionId)
       if (hash(latestSource) !== hash(source))
@@ -115,8 +170,8 @@ export function createPayrollService(options: PayrollServiceOptions) {
       authorize(latest, write)
       if (latest.workspaceId !== session.workspaceId || latest.actorId !== session.actorId || hash([...latest.capabilities].sort()) !== hash([...session.capabilities].sort()))
         throw payrollProblem('forbidden', '读取期间工作区、身份或权限已变化')
-      return result
-    }, sessionId)
+      return publicPayrollResult(result, session, options.schemaInitialized === true)
+    }, sessionId, command)
   }
   const adjustments = createPayrollAdjustmentService(run)
   const { aFormInTransaction, ...aService } = createPayrollAService(run, options)

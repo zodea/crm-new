@@ -1,3 +1,4 @@
+import type { H3Event } from 'h3'
 import type { PayrollServiceOptions } from './payroll-service'
 import { createHash } from 'node:crypto'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
@@ -9,6 +10,7 @@ import { loadPayrollAManagementScopeFacts } from './payroll-management-scope-fac
 import { loadPayrollMigratedHollow } from './payroll-migrated-hollow'
 import { loadPayrollAQuantityFacts } from './payroll-quantity-facts'
 import { createPayrollService } from './payroll-service'
+import { productionPayrollRuntime } from './production-payroll-runtime'
 import { projectReadTestInstance } from './project-read-test-instance'
 import { loadQuantityHollowFacts } from './quantity-hollow-facts'
 import { loadQuantityHollowMigratedProof } from './quantity-hollow-migrated-proof'
@@ -41,6 +43,9 @@ export const payrollRuntimeOptions: PayrollServiceOptions = { session: payrollSe
   }
 } }
 export const payrollService = createPayrollService(payrollRuntimeOptions)
+export function payrollServiceForEvent(event: H3Event) {
+  return productionPayrollRuntime(event)?.payroll ?? payrollService
+}
 export function payrollDemoContext(includeDemo: boolean, sessionId?: string | null) {
   const session = payrollSession(sessionId)
   if (!includeDemo || !session.capabilities.includes('demo:read') || !session.capabilities.includes('payroll:read'))

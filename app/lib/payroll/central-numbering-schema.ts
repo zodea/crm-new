@@ -1,4 +1,5 @@
 import type { TransactionDb } from '../db/coordinator'
+import { hasProductionPayrollSchema } from './central-schema'
 
 export const PAYROLL_NUMBERING_COLUMNS = {
   payroll_numbering_settings: ['id', 'project_id', 'first_number', 'next_number', 'evidence_note', 'initialized_at', 'operator_id'],
@@ -9,6 +10,8 @@ export const PAYROLL_NUMBERING_TABLES = Object.keys(PAYROLL_NUMBERING_COLUMNS) a
 
 /** 只保存原工资的正式出具身份；不另存或重算工资金额。 */
 export async function initializePayrollNumberingSchema(db: TransactionDb) {
+  if (await hasProductionPayrollSchema(db))
+    return
   await db.execute(`CREATE TABLE IF NOT EXISTS payroll_numbering_settings (
     id TEXT PRIMARY KEY, project_id TEXT NOT NULL UNIQUE REFERENCES projects(id),
     first_number INTEGER NOT NULL CHECK(first_number>0), next_number INTEGER NOT NULL CHECK(next_number>=first_number),

@@ -1,14 +1,12 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { applyFileRefChanges } from '~/lib/forms/file-refs'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
 
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await db.execute(`
     INSERT INTO projects (id, name, code)
     VALUES ('project-files', '文件测试项目', 'FILE-001')

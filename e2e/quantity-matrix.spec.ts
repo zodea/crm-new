@@ -149,13 +149,14 @@ test.describe('Issue #103 Slice 2：只读工程量矩阵', () => {
     await expect(dialog.getByRole('status')).toContainText('存草稿 · 缺验收照片')
   })
 
-  for (const width of viewports) {
-    test(`${width}px 页面不横滚且矩阵可在自身区域滚动`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 960 })
-      await installQuantityProductionFixture(page, { detailedStages: true })
+  test('页面在各宽度不横滚且矩阵可在自身区域滚动', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await installQuantityProductionFixture(page, { detailedStages: true })
 
-      const scroller = page.getByTestId('quantity-matrix-scroll')
-      await expect(scroller).toBeVisible()
+    const scroller = page.getByTestId('quantity-matrix-scroll')
+    await expect(scroller).toBeVisible()
+    for (const width of viewports) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 960 })
       const metrics = await scroller.evaluate((element) => {
         const style = getComputedStyle(element)
         return {
@@ -170,8 +171,8 @@ test.describe('Issue #103 Slice 2：只读工程量矩阵', () => {
         expect(metrics.scroll).toBeGreaterThanOrEqual(metrics.client)
       expect(metrics.overflowX).toMatch(/auto|scroll/)
       await documentDoesNotOverflow(page)
-    })
-  }
+    }
+  })
   test('量差总表读取真实三量并在窄屏浮层内局部横滚', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await installQuantityProductionFixture(page, { detailedStages: true })

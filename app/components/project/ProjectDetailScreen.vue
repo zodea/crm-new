@@ -4,6 +4,7 @@ import type { ProjectDetailReadDTO } from '~/lib/project/repository'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import ConstructionSpendingPanel from '~/components/contract/ConstructionSpendingPanel.vue'
 import ProjectConstructionManagementFees from '~/components/project/ProjectConstructionManagementFees.vue'
 import ProjectManagementFees from '~/components/project/ProjectManagementFees.vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
@@ -560,6 +561,7 @@ onActivated(() => {
 
     <ProjectConstructionManagementFees :configuration="detail.constructionManagementFees" :return-to="journeyReturnTo" />
     <ProjectManagementFees :fees="detail.managementFees" :return-to="journeyReturnTo" @retry="loadProject" />
+    <ConstructionSpendingPanel v-if="item.dataOrigin === 'real' && detail.capabilities.includes('construction-scope:read')" class="panel min-w-0 overflow-hidden p-4" :project-id="projectId" />
 
     <ProjectStorageActions v-if="hasLifecycle" :project-id="projectId" @state="deleted = $event" />
     <section class="panel flex min-w-0 flex-wrap items-center justify-between gap-3 p-4" aria-label="项目收款">

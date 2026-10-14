@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import type { Buffer } from 'node:buffer'
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
@@ -7,13 +7,12 @@ import * as XLSX from 'xlsx'
 import { PHOTO, preparePayrollRosterWorkspace } from './helpers/payroll-roster-workspace'
 
 test.use({ actionTimeout: 15000 })
-async function capture(page: Page, info: TestInfo, name: string) {
+async function capture(page: Page, name: string) {
   await expect(page.locator('[data-sonner-toast]:visible')).toHaveCount(0, { timeout: 15000 })
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
+    await expect.poll(() => page.locator('.shell-workspace').evaluate(node => node.scrollWidth <= node.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
   }
 }
 function unzip(bytes: Buffer) {
@@ -53,11 +52,10 @@ test('工人整页维护、工资成员归档、冷回读、真实照片 ZIP 与
   await page.reload()
   await expect(page.getByLabel('签订情况', { exact: true })).toHaveValue('true')
   await expect(page.getByLabel('签订日期', { exact: true })).toHaveValue('2026-08-01')
-  await capture(page, info, 'worker-private')
+  await capture(page, 'worker-private')
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 960 })
     await page.locator('#section-photos').scrollIntoViewIfNeeded()
-    await page.screenshot({ path: info.outputPath(`worker-photos-${width}.png`), animations: 'disabled' })
   }
   await page.goto(`/subcontract/payroll/roster?origin=real&project=${f.projectId}`)
   await page.getByLabel(`选择工资 ${f.statementId}`, { exact: true }).check()
@@ -78,7 +76,7 @@ test('工人整页维护、工资成员归档、冷回读、真实照片 ZIP 与
   await expect(page.getByText('已归档版本 1', { exact: true })).toBeVisible()
   expect(await f.roster.archives(f.projectId)).toHaveLength(1)
   await expect(table).toContainText('6222000000001234')
-  await capture(page, info, 'roster-archive')
+  await capture(page, 'roster-archive')
   const scroll = page.getByLabel('实名名册横向滚动区域')
   await scroll.focus()
   await page.keyboard.press('ArrowRight')

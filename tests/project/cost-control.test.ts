@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import { loadProjectCostControl } from '~/lib/project/cost-control'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMemoryDb, createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('project cost control read model', () => {
   it('uses the submitted baseline and formal source facts without mixing drafts or categories', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-cost', '成本客户')`)
     await db.execute(`
       INSERT INTO projects (id, name, customer_id)

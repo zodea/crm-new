@@ -1,10 +1,14 @@
 import { encodeTargetCostWire, parseTargetCostQuery } from '../../../../app/lib/target-cost/central-codec'
+import { throwProductionStorageError } from '../../../utils/production-runtime'
 import { throwQuantityError } from '../../../utils/quantity-error'
-import { targetCostService } from '../../../utils/target-cost-runtime'
+import { targetCostApi } from '../../../utils/target-cost-runtime'
 
 export default defineEventHandler(async (event) => {
   try {
-    return encodeTargetCostWire(await targetCostService.detail(parseTargetCostQuery(getQuery(event)), getRouterParam(event, 'id') ?? '', getHeader(event, 'x-ruihang-test-session')))
+    return encodeTargetCostWire(await targetCostApi(event).budget.detail(parseTargetCostQuery(getQuery(event)), getRouterParam(event, 'id') ?? ''))
   }
-  catch (cause) { throwQuantityError(cause) }
+  catch (cause) {
+    throwProductionStorageError(cause)
+    throwQuantityError(cause)
+  }
 })

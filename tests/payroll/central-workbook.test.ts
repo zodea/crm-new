@@ -81,7 +81,7 @@ it('固定照片正文摘要损坏时不创建新目录；预览后权限或名�
     const preview = await f.preview()
     const photo = roster.members[0]!.photos[0]!
     await f.db.execute('UPDATE file_payloads SET content=? WHERE file_ref_id=(SELECT file_ref_id FROM worker_roster_assets WHERE id=?)', ['YWJj', photo.id])
-    await expect(f.archive.executeWorkbook(f.command(preview))).rejects.toThrow()
+    await expect(f.archive.executeWorkbook(f.command(preview))).rejects.toThrow('工人原件正文与摘要不一致，请核对来源')
     expect(await f.db.select('SELECT id FROM payroll_workbook_archives')).toHaveLength(0)
   }
   finally { await f.close() }
@@ -115,16 +115,17 @@ it('真实已发C2沿正式128号保存目录，缺名册只标部分，不改52
   finally { await f.close() }
 })
 
-it.each(([
-  (copy) => { copy.groups[0].key = '2026-01' },
-  (copy) => { copy.groups[0].actualLedger.scope.originalStatementIds = ['unselected-original'] },
-  (copy) => { copy.groups[0].entries[0].document.actualAmount = 525 },
-  (copy) => { copy.groups[0].entries[0].row.projectId = 'other-project' },
-  (copy) => { copy.roster = { id: 'unrelated-roster' } },
-  (copy) => { copy.privateWorkers = [{ idCard: 'injected' }] },
-  (copy) => { copy.context.sourceVersion = 'different-preview' },
-  (copy) => { copy.groups.push(structuredClone(copy.groups[0])) },
-]) as Array<(copy: Record<string, any>) => void>)('读取协议拒绝错月分组、跨单实际账、假名册摘要、浮点金额与私密字段注入：输入案例 %#', async (corrupt) => {
+const outputScopeMismatch = '工资输出目录读取不完整或与固定范围不一致'
+it.each([
+  { label: '错月分组', corrupt: (copy) => { copy.groups[0].key = '2026-01' }, reason: outputScopeMismatch },
+  { label: '跨单实际账', corrupt: (copy) => { copy.groups[0].actualLedger.scope.originalStatementIds = ['unselected-original'] }, reason: outputScopeMismatch },
+  { label: '金额改为裸数值', corrupt: (copy) => { copy.groups[0].entries[0].document.actualAmount = 525 }, reason: '签工工数、主体单价或金额传输格式无效' },
+  { label: '跨项目工资行', corrupt: (copy) => { copy.groups[0].entries[0].row.projectId = 'other-project' }, reason: '工资读取内容或范围不完整' },
+  { label: '假名册摘要', corrupt: (copy) => { copy.roster = { id: 'unrelated-roster' } }, reason: outputScopeMismatch },
+  { label: '注入私密字段', corrupt: (copy) => { copy.privateWorkers = [{ idCard: 'injected' }] }, reason: outputScopeMismatch },
+  { label: '来源版本不一致', corrupt: (copy) => { copy.context.sourceVersion = 'different-preview' }, reason: outputScopeMismatch },
+  { label: '重复分组', corrupt: (copy) => { copy.groups.push(structuredClone(copy.groups[0])) }, reason: outputScopeMismatch },
+] as Array<{ label: string, corrupt: (copy: Record<string, any>) => void, reason: string }>)('读取协议拒绝$label', async ({ corrupt, reason }) => {
   const f = await fixture()
   try {
     const read = await f.preview()
@@ -132,7 +133,7 @@ it.each(([
 
     const copy = structuredClone(wire)
     corrupt(copy)
-    expect(() => decodePayrollWorkbookRead(copy, 'preview', { origin: 'real' }, f.input)).toThrow()
+    expect(() => decodePayrollWorkbookRead(copy, 'preview', { origin: 'real' }, f.input)).toThrow(reason)
   }
   finally { await f.close() }
 })

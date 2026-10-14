@@ -1,17 +1,16 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { payrollC1Repository, payrollC1Workspace, preparePayrollC1Fixture } from './helpers/payroll-c1-workspace'
 
 test.use({ actionTimeout: 15_000 })
 
-async function capture(page: Page, info: TestInfo, name: string, selector?: string) {
+async function capture(page: Page, name: string, selector?: string) {
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
     if (selector)
       await page.locator(selector).scrollIntoViewIfNeeded()
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
   }
 }
 
@@ -40,10 +39,10 @@ test('旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出
   for (const button of await page.getByRole('button', { name: '确认实际发放', exact: true }).all())
     await expect(button).toBeDisabled()
   await expect(page.getByRole('button', { name: '下载工资与考勤表', exact: true })).toHaveCount(0)
-  await capture(page, info, 'legacy-c1-missing-snapshot', '[aria-label="发放快照证据"]')
+  await capture(page, 'legacy-c1-missing-snapshot', '[aria-label="发放快照证据"]')
   await page.getByText('查看原表与关系历史', { exact: true }).click()
   await expect(page.locator('[aria-label="原工资头业务记录"]')).toContainText('100.00')
-  await capture(page, info, 'legacy-c1-original-amount', '[aria-label="原工资头业务记录"]')
+  await capture(page, 'legacy-c1-original-amount', '[aria-label="原工资头业务记录"]')
   const output = await repository.c1Output({ origin: 'real' }, legacy!.id)
   expect(output.state).toBe('unavailable')
   expect(await repository.detail({ origin: 'real' }, legacy!.id)).toEqual(before)
@@ -62,7 +61,7 @@ test('C1来源拒权时不沿旧读取开放保存，恢复读取仍保原范围
   await page.goto(`/subcontract/payroll/new?${new URLSearchParams({ format: 'C1', origin: 'real', project: project.id, month: '2026-09', crew: leader.crewId || '', draftKey: 'c1-denied-original-draft' })}`)
   await expect(page.getByText('验收：当前身份没有工资读取权限', { exact: false })).toBeVisible()
   await expect(page.getByRole('button', { name: '保存工资草稿', exact: true }).and(page.locator(':enabled'))).toHaveCount(0)
-  await capture(page, info, 'c1-denied-read-retains-scope')
+  await capture(page, 'c1-denied-read-retains-scope')
   expect(new URL(page.url()).searchParams.get('project')).toBe(project.id)
   expect(new URL(page.url()).searchParams.get('draftKey')).toBe('c1-denied-original-draft')
   await page.unroute('**/api/read/payroll/c1-form')
@@ -72,7 +71,7 @@ test('C1来源拒权时不沿旧读取开放保存，恢复读取仍保原范围
   expect(writes).toEqual([])
 })
 
-test('显式演示C1新建保持不可写，不替换成正式空草稿', async ({ page }, info) => {
+test('显式演示C1新建保持不可写，不替换成正式空草稿', async ({ page }) => {
   const writes: string[] = []
   page.on('request', (request) => {
     if (request.url().includes('/api/commands/'))
@@ -82,6 +81,6 @@ test('显式演示C1新建保持不可写，不替换成正式空草稿', async 
   await expect(page.getByText('请选择正式工资来源，从台账进入有效的 C1 工资草稿。', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '保存工资草稿', exact: true }).and(page.locator(':enabled'))).toHaveCount(0)
   expect(new URL(page.url()).searchParams.get('origin')).toBe('demo')
-  await capture(page, info, 'c1-demo-write-unavailable')
+  await capture(page, 'c1-demo-write-unavailable')
   expect(writes).toEqual([])
 })

@@ -1,11 +1,10 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { createDefaultOcrRecognitionSettings } from '~/lib/ocr/settings'
 import { useInvoiceStore } from '~/stores/invoice'
 import { useOcrSettingsStore } from '~/stores/ocr-settings'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -61,8 +60,7 @@ const MARKDOWN = `
 `
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   setActivePinia(createPinia())
 })
 
@@ -161,7 +159,7 @@ describe('invoice store 真实识别管线', () => {
     expect(reloadedStore.recognitionError(id!)).toContain('原文件')
   })
 
-  it('二次机器识别覆盖原始 OCR 基线，归档只把最后识别后的人工修改记为修订', async () => {
+  it('重新识别覆盖人工值后，归档审计保留首次识别与完整修订链路', async () => {
     const secondRecognition = MARKDOWN.replace('¥678.04', '¥800.00')
     vi.stubGlobal('fetch', vi.fn<typeof fetch>()
       .mockResolvedValueOnce(ocrResponse(MARKDOWN))
@@ -178,9 +176,12 @@ describe('invoice store 真实识别管线', () => {
     await expect(store.archiveInvoice(id!, 'personal')).resolves.toEqual({ ok: true })
 
     const audit = await store.loadInvoiceArchiveAudit(id!)
-    expect(audit?.provenance.originalOcr).toMatchObject({ totalAmount: 800 })
+    expect(audit?.provenance.originalOcr).toMatchObject({ totalAmount: 678.04 })
     expect(audit?.provenance.revisions.filter(item => item.field === 'totalAmount')).toEqual([
+      expect.objectContaining({ from: 678.04, to: 700, reason: '人工校对' }),
+      expect.objectContaining({ from: 700, to: 800, reason: '重新识别' }),
       expect.objectContaining({ from: 800, to: 810, reason: '人工校对' }),
     ])
+    expect(audit?.currentValues).toMatchObject({ totalAmount: 810 })
   })
 })

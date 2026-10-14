@@ -12,6 +12,7 @@
   if (window.KitAtoms) { window.KitAtomsScreen = window.KitAtomsScreen || function () { return null; }; return; }
   const DS = () => window.DesignSystem_e3d871 || {};
   const h = React.createElement;
+  const ROW_MENU_LAYER = 10001; // DC KitUI 模态层（10000）之上的所属行操作面板。
 
   // —— 下拉筛选：label + 原生 select + 自绘 chevron（options: [{key,label}]）——
   function SelectFilter({ label, options, value, onChange, minWidth = 132 }) {
@@ -61,27 +62,23 @@
   function SectionHeader({ children, extra, mb = 12 }) {
     return h("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: mb } },
       h("span", { style: { width: 4, height: 16, borderRadius: 2, background: "var(--brand)", flex: "none" } }),
-      h("span", { style: { fontSize: 15, fontWeight: 800 } }, children),
+      h("h2", { style: { margin: 0, fontSize: 15, fontWeight: 800 } }, children),
       extra && h("span", { style: { marginLeft: "auto" } }, extra)
     );
   }
 
   // —— 指标格（label+ⓘ公式+大数字；两位小数完整展示，禁省略号）——
-  function Metric({ label, value, formula, tone, big }) {
-    const { Icon } = DS();
-    const color = tone === "ok" ? "var(--ok-ink)" : tone === "danger" ? "var(--danger-ink)" : tone === "brand" ? "var(--brand)" : "var(--ink)";
-    return h("div", { style: { padding: "12px 14px", minWidth: 0 } },
-      h("div", { style: { display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--ink-faint)", fontWeight: 600 } },
-        h("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, label),
-        formula && Icon && h("span", { title: formula, style: { cursor: "help", display: "inline-flex" } }, h(Icon, { name: "info", size: 11, color: "var(--ink-faint)" }))),
-      h("div", { title: typeof value === "string" ? value : undefined, style: { marginTop: 5, fontSize: big ? 17.5 : 13.5, fontWeight: big ? 800 : 700, fontFamily: "var(--font-mono)", color, lineHeight: 1.25, whiteSpace: "nowrap", letterSpacing: "-0.015em" } }, value)
-    );
+  function Metric({ label, value, formula, tone, big, status, cutoff, missingSources }) {
+    // 外部是无 Hook 的纯工厂；两卡共用 StatCard 的可变内核。
+    const { StatCard } = DS();
+    return StatCard ? h(StatCard, { label, value, formula, tone, big, status, cutoff, missingSources, variant: "grid" }) : h("div", null, label, "：", value);
   }
 
   // —— 指标网格：cols 为宽屏上限，窄容器自动降列（ADR 0013）——
   function MetricGrid({ children, cols = 5 }) {
-    return h("div", { style: { display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, max(160px, calc(100% / ${cols} - 1px))), 1fr))`, gap: 0, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", overflow: "hidden" } },
-      ...React.Children.map(children, (c) => h("div", { style: { background: "var(--panel)", minWidth: 0, border: "1px solid var(--line)" } }, c)));
+    const count = Math.max(1, Math.trunc(cols));
+    return h("div", { style: { display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, max(160px, calc((100% - ${count - 1}px) / ${count}))), 1fr))`, gap: 1, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", overflow: "hidden" } },
+      React.Children.map(children, (c) => h("div", { style: { background: "var(--panel)", minWidth: 0, boxShadow: "0 0 0 1px var(--line)" } }, c)));
   }
 
   // —— 实体蓝链（批A 底座件①）：全站实体名一律蓝色可点，type→route 映射只写这一处 ——
@@ -183,29 +180,133 @@
 
   // —— 行操作下拉菜单（items: [{key,label,danger,disabled,onSelect}]）——
   // 表格操作列统一「纯图标触发 + 下拉」，不把多个文字按钮平铺进窄列。
-  function RowActionMenu({ items, label = "更多操作" }) {
+  // 工厂可被条件或函数式调用；Hook 始终由 React 调用内部组件，不能挂到调用者。
+  function RowActionMenu(props) {
+    return h(RowActionMenuView, props);
+  }
+  function RowActionMenuView({ items, label = "更多操作" }) {
     const { Icon } = DS();
     const [open, setOpen] = React.useState(false);
-    return h("div", { style: { position: "relative", display: "inline-flex" } },
+    const [position, setPosition] = React.useState(null);
+    const [triggerFocused, setTriggerFocused] = React.useState(false);
+    const [triggerHovered, setTriggerHovered] = React.useState(false);
+    const [focusedKey, setFocusedKey] = React.useState(null);
+    const [hoveredKey, setHoveredKey] = React.useState(null);
+    const trigger = React.useRef(null);
+    const menu = React.useRef(null);
+    const firstFocus = React.useRef("first");
+    const id = React.useId();
+    const close = (focus = true) => {
+      setOpen(false);
+      if (focus && trigger.current && trigger.current.isConnected) trigger.current.focus();
+    };
+    const enabled = () => menu.current ? Array.from(menu.current.querySelectorAll("[role=menuitem]:not(:disabled)")) : [];
+    const focusItem = (edge) => {
+      const nodes = enabled();
+      (nodes.length ? nodes[edge === "last" ? nodes.length - 1 : 0] : menu.current)?.focus();
+    };
+    const show = (edge = "first") => {
+      firstFocus.current = edge;
+      setPosition(null);
+      setOpen(true);
+    };
+    React.useLayoutEffect(() => {
+      if (!open) return;
+      const update = () => {
+        const anchor = trigger.current;
+        const panel = menu.current;
+        if (!anchor || !panel || !anchor.isConnected) return close(false);
+        const rect = anchor.getBoundingClientRect();
+        if (rect.bottom <= 0 || rect.top >= window.innerHeight || rect.right <= 0 || rect.left >= window.innerWidth) return close(false);
+        const width = Math.min(panel.offsetWidth || 148, Math.max(0, window.innerWidth - 24));
+        const height = (panel.querySelector("[data-menu-scroll]") || panel).scrollHeight + 2;
+        const below = window.innerHeight - rect.bottom - 18;
+        const above = rect.top - 18;
+        const side = height > below && above > below ? "top" : "bottom";
+        const available = Math.max(1, side === "top" ? above : below);
+        const visibleHeight = Math.min(height, available);
+        const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
+        const top = side === "top" ? Math.max(12, rect.top - visibleHeight - 6) : rect.bottom + 6;
+        setPosition({ left, top, maxHeight: available, width, side, arrowLeft: Math.max(8, Math.min(rect.left + rect.width / 2 - left - 5, width - 18)) });
+      };
+      update();
+      const outside = (event) => {
+        if (!menu.current?.contains(event.target) && !trigger.current?.contains(event.target)) close(false);
+      };
+      document.addEventListener("pointerdown", outside, true);
+      document.addEventListener("scroll", update, true);
+      window.addEventListener("resize", update);
+      return () => {
+        document.removeEventListener("pointerdown", outside, true);
+        document.removeEventListener("scroll", update, true);
+        window.removeEventListener("resize", update);
+      };
+    }, [open]);
+    React.useLayoutEffect(() => {
+      if (open && position) focusItem(firstFocus.current);
+    }, [open, !!position]);
+    const keyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault(); event.stopPropagation(); close(); return;
+      }
+      if (event.key === "Tab") { close(); return; }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const nodes = enabled();
+      if (!nodes.length) return;
+      const current = nodes.indexOf(document.activeElement);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? nodes.length - 1
+        : (current + (event.key === "ArrowDown" ? 1 : -1) + nodes.length) % nodes.length;
+      nodes[next].focus();
+    };
+    const panel = open && h("div", {
+      ref: menu, id, role: "menu", "aria-label": label, tabIndex: -1,
+      "data-side": position?.side || "bottom", className: "dc-row-menu", onKeyDown: keyDown,
+      onClick: event => event.stopPropagation(),
+      style: { position: "fixed", left: position?.left || 12, top: position?.top || 12,
+        visibility: position ? "visible" : "hidden", zIndex: ROW_MENU_LAYER, width: position?.width || 148,
+        maxWidth: "calc(100vw - 24px)", borderRadius: "var(--radius-card)",
+        background: "var(--panel)", border: "1px solid var(--line)", boxShadow: "var(--shadow-pop)", outline: "none" }
+    },
+      h("span", { "aria-hidden": true, style: { position: "absolute", width: 8, height: 8,
+        left: position?.arrowLeft || 10, top: position?.side === "top" ? undefined : -5,
+        bottom: position?.side === "top" ? -5 : undefined,
+        background: "var(--panel)", borderTop: position?.side === "top" ? undefined : "1px solid var(--line)",
+        borderLeft: position?.side === "top" ? undefined : "1px solid var(--line)",
+        borderRight: position?.side === "top" ? "1px solid var(--line)" : undefined,
+        borderBottom: position?.side === "top" ? "1px solid var(--line)" : undefined, transform: "rotate(45deg)" } }),
+      h("div", { "data-menu-scroll": true, style: { padding: 4, maxHeight: position?.maxHeight || "calc(100dvh - 24px)", overflowY: "auto", overscrollBehavior: "contain" } },
+        !items.length && h("p", { style: { margin: 0, padding: "7px 10px", color: "var(--ink-faint)", fontSize: 12 } }, "无可用操作"),
+        items.map(it => h("button", {
+          key: it.key, role: "menuitem", type: "button", tabIndex: -1, disabled: !!it.disabled,
+          onClick: () => { close(); it.onSelect && it.onSelect(); },
+          onFocus: () => setFocusedKey(it.key), onBlur: () => setFocusedKey(null),
+          onMouseEnter: () => { if (!it.disabled) setHoveredKey(it.key); }, onMouseLeave: () => setHoveredKey(null),
+          className: "dc-row-menu-item",
+          style: { display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", border: 0, padding: "7px 10px",
+            fontSize: 12, borderRadius: "var(--radius-sm)", background: focusedKey === it.key || hoveredKey === it.key ? "var(--surface-2)" : "transparent",
+            outline: focusedKey === it.key ? "2px solid var(--brand)" : "none", outlineOffset: -2,
+            cursor: it.disabled ? "not-allowed" : "pointer",
+            color: it.disabled ? "var(--ink-faint)" : it.danger ? "var(--danger-ink)" : "var(--ink)" }
+        }, it.icon && Icon && h(Icon, { name: it.icon, size: 14 }), it.label))));
+    return h(React.Fragment, null,
       h("button", {
-        type: "button", "aria-haspopup": "menu", "aria-expanded": open ? "true" : "false", title: label,
-        onClick: () => setOpen(v => !v), onBlur: () => setTimeout(() => setOpen(false), 120),
-        style: { display: "grid", placeItems: "center", width: 26, height: 26, cursor: "pointer",
-          border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--panel)",
+        ref: trigger, type: "button", "aria-label": label, "aria-haspopup": "menu", "aria-expanded": open ? "true" : "false", "aria-controls": open ? id : undefined, title: label,
+        className: "dc-row-menu-trigger",
+        onFocus: () => setTriggerFocused(true), onBlur: () => setTriggerFocused(false),
+        onMouseEnter: () => setTriggerHovered(true), onMouseLeave: () => setTriggerHovered(false),
+        onClick: event => { event.stopPropagation(); if (open) close(); else show(); },
+        onKeyDown: event => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault(); event.stopPropagation(); show(event.key === "ArrowUp" ? "last" : "first");
+          }
+        },
+        style: { display: "inline-grid", placeItems: "center", width: 28, height: 28, cursor: "pointer",
+          border: 0, borderRadius: "var(--radius-sm)", background: open || triggerHovered ? "var(--surface-2)" : "transparent",
+          outline: triggerFocused ? "2px solid var(--brand)" : undefined, outlineOffset: 2,
           color: "var(--ink-soft)" } },
         Icon ? h(Icon, { name: "ellipsis", size: 14 }) : "···"),
-      open && h("div", { role: "menu",
-        style: { position: "absolute", right: 0, top: 30, zIndex: 9000, minWidth: 148, padding: 4,
-          background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card)",
-          boxShadow: "var(--shadow-pop)" } },
-        ...items.map(it => h("button", {
-          key: it.key, role: "menuitem", type: "button", disabled: !!it.disabled,
-          onClick: () => { setOpen(false); it.onSelect && it.onSelect(); },
-          style: { display: "block", width: "100%", textAlign: "left", border: 0, padding: "7px 10px",
-            fontSize: 13, borderRadius: "var(--radius-sm)", background: "transparent",
-            cursor: it.disabled ? "not-allowed" : "pointer",
-            color: it.disabled ? "var(--ink-faint)" : it.danger ? "var(--danger-ink)" : "var(--ink)" } },
-          it.label))));
+      panel && ReactDOM.createPortal(panel, document.body));
   }
 
   window.KitAtoms = { SelectFilter, SegTab, SearchInput, SectionHeader, Metric, MetricGrid, TreeNav, EntityLink, MoneyLink, StatePanel, RowActionMenu };

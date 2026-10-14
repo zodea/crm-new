@@ -11,10 +11,9 @@ import {
   loadContractSupplementForm,
   loadF2Form,
 } from '~/lib/contract/forms'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadFileRefContent } from '~/lib/forms/file-refs'
 import { useContractStore } from '~/stores/contract'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 let failFileInsert = false
@@ -48,8 +47,7 @@ vi.mock('~/lib/db/connection', () => ({
 
 beforeEach(async () => {
   failFileInsert = false
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   const ownFacts = JSON.stringify({ name: '合同我方实际公司', taxNo: 'TEST-TAX', registeredAddress: null, legalRepresentative: null, verificationNote: '本测试独立核实主体事实', status: 'active' })
   await mem.execute('INSERT INTO our_signatories VALUES(?,?,?,?,?)', ['our-contract', ownFacts, 1, '2026-10-04T00:00:00.000Z', '2026-10-04T00:00:00.000Z'])
   await mem.execute('INSERT INTO our_signatory_history VALUES(?,?,?,?,?,?,?)', ['our-contract-v1', 'our-contract', 1, ownFacts, null, null, '2026-10-04T00:00:00.000Z'])

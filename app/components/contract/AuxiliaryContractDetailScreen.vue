@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AuxiliaryContractKind } from '~/lib/auxiliary-contract/contract'
 import type { EntityRefDTO } from '~/types/read-model'
+import ContractOriginalFilesPanel from '~/components/contract/ContractOriginalFilesPanel.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { AUXILIARY_LABELS, auxiliaryListPath } from '~/lib/auxiliary-contract/contract'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
@@ -19,7 +20,7 @@ const tabs = computed(() => [{ key: 'info', label: '详细资料' }, { key: 'inv
 const activeTab = computed(() => tabs.value.some(tab => tab.key === route.query.tab) ? String(route.query.tab) : 'info')
 const facts = computed(() => detail.value?.facts.filter(row => row.kind === activeTab.value) ?? [])
 const emptyFactLabels: Record<string, string> = { invoice: '暂无收票记录', payment: '暂无支付记录', settlement: '暂无支出结算', supplement: '暂无增补合同' }
-const noFacts = computed(() => emptyFactLabels[activeTab.value] ?? '')
+const noFacts = computed(() => detail.value?.unavailableFactKinds?.includes(activeTab.value as 'invoice' | 'payment' | 'settlement' | 'supplement') ? '此真实来源尚不可核验，金额未知；不能将空集合当作零。' : emptyFactLabels[activeTab.value] ?? '')
 const backTo = computed(() => validateAuxiliaryReturnTo(route.query.returnTo, route.query.origin ?? 'real') ?? auxiliaryListPath(props.kind))
 const metrics = computed(() => contract.value
   ? [
@@ -74,13 +75,18 @@ useTabTitle(() => contract.value?.draft.name || AUXILIARY_LABELS[props.kind])
         </div>
       </template>
       <div v-if="detail && contract" class="min-w-0" data-testid="auxiliary-detail">
+        <p v-for="message in detail.diagnostics ?? []" :key="message" role="status" class="rounded border border-warn/30 p-3 text-12px text-warn">
+          {{ message }}
+        </p>
         <nav class="mb-3 flex flex-wrap gap-1 border-b border-line" aria-label="合同详情页签">
           <button v-for="tab in tabs" :key="tab.key" class="cursor-pointer border-0 border-b-2 bg-transparent px-4 py-2 text-13px" :class="activeTab === tab.key ? 'border-brand font-700 text-brand' : 'border-transparent text-ink-soft'" :aria-current="activeTab === tab.key ? 'page' : undefined" @click="selectTab(tab.key)">
             {{ tab.label }}
           </button>
         </nav>
         <template v-if="activeTab === 'info'">
+          <ConstructionScopeSelector v-if="kind === 'other_expense' && detail.capabilities.includes('construction-scope:read')" :source="{ domain: 'auxiliary-contract', id: contractId }" @saved="load" />
           <AuxiliaryContractInfo :contract="contract" :attachments="detail.attachments" :project-to="relation(contract.project)" :supplier-to="relation(contract.supplier)" />
+          <ContractOriginalFilesPanel :owner-id="contractId" origin="real" :source-version="detail.sourceVersion" :can-read="shellState === 'ready' && detail.capabilities.includes('auxiliary-contract:read')" :files="detail.attachments" :read-content="repository.fileContent" />
         </template>
         <section v-else class="panel min-w-0 p-3">
           <div v-if="activeTab === 'settlement' && kind === 'other_expense'" class="mb-3 flex flex-wrap gap-3">

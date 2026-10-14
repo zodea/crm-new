@@ -32,6 +32,7 @@ describe('发票打印排版', () => {
   it('没有勾选时仍返回稳定的空排版摘要', () => {
     expect(buildPrintLayout(invoices, new Set(), 2, {})).toEqual({
       pages: [],
+      skipped: [],
       selectedCount: 0,
       pageCount: 0,
       totalAmount: 0,
@@ -55,28 +56,32 @@ describe('发票打印排版', () => {
     expect(normalizePrintRotation(input)).toBe(expected)
   })
 
-  it('#257 打印队列只接收识别完成、人工确认且未重复排除的当前值', () => {
-    expect(checkPrintableInvoice({
-      id: 'confirmed',
-      totalAmount: 100,
-      printRotation: 0,
-      ocrStatus: 'done',
-      reviewStatus: 'reviewed',
-      dupStatus: 'normal',
-    })).toEqual({ ok: true })
-    expect(checkPrintableInvoice({
-      id: 'unreviewed',
-      totalAmount: 100,
-      printRotation: 0,
-      ocrStatus: 'done',
-      reviewStatus: 'unreviewed',
-      dupStatus: 'normal',
-    }).ok).toBe(false)
+  const ready = { totalAmount: 100, printRotation: 0, ocrStatus: 'done', reviewStatus: 'reviewed', dupStatus: 'normal', source: 'scan' }
 
+  it('#257 识别完成、人工确认、未重复且有原件的票可以打印', () => {
+    expect(checkPrintableInvoice({ id: 'confirmed', ...ready })).toEqual({ ok: true })
+  })
+
+  it.each([
+    { label: 'Excel 导入且没有原件', patch: { source: 'excel' }, reason: 'Excel 导入的发票没有原件，不能打印' },
+    { label: '识别失败', patch: { ocrStatus: 'failed' }, reason: '识别尚未完成，不能进入打印队列' },
+    { label: '尚未人工确认', patch: { reviewStatus: 'unreviewed' }, reason: '当前字段尚未完成人工确认，不能进入打印队列' },
+    { label: '重复票已排除', patch: { dupStatus: 'duplicate' }, reason: '重复票据已排除，不能进入打印队列' },
+    { label: '价税合计为 0', patch: { totalAmount: 0 }, reason: '价税合计缺失或金额异常，不能进入打印队列' },
+    { label: '价税合计为负', patch: { totalAmount: -0.01 }, reason: '价税合计缺失或金额异常，不能进入打印队列' },
+  ])('#257 $label 时不进入打印队列', ({ patch, reason }) => {
+    expect(checkPrintableInvoice({ id: 'blocked', ...ready, ...patch })).toEqual({ ok: false, reason })
+  })
+
+  it('已勾选但不能打印的票不进入排版，并逐张列出原因供提醒', () => {
+    const excel = { id: 'excel-row', ...ready, source: 'excel' }
     const layout = buildPrintLayout([
-      { ...invoices[0]!, ocrStatus: 'done', reviewStatus: 'reviewed', dupStatus: 'normal' },
-      { ...invoices[1]!, ocrStatus: 'failed', reviewStatus: 'reviewed', dupStatus: 'normal' },
-    ], new Set(['inv-1', 'inv-2']), 2, {})
+      { id: 'inv-1', ...ready },
+      excel,
+      { id: 'not-selected', ...ready, source: 'excel' },
+    ], new Set(['inv-1', 'excel-row']), 2, {})
     expect(layout.pages.flat().map(slot => slot.invoice.id)).toEqual(['inv-1'])
+    expect(layout.skipped).toEqual([{ invoice: excel, reason: 'Excel 导入的发票没有原件，不能打印' }])
+    expect(layout.selectedCount).toBe(1)
   })
 })

@@ -2,6 +2,7 @@ import type { PayrollC1FormRead, PayrollC1OutputRead, PayrollC1ReleaseDraft, Pay
 import type { PayrollReleaseAdjustmentApplication } from '~/lib/payroll/central-release-adjustment-contract'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { c1ReleaseDefault as payrollReleaseDefault } from '~/lib/payroll/c1-presentation'
+import { payrollNeedsRecheckMessage } from '~/lib/payroll/release-recheck-message'
 import { toErrorMessage } from '~/lib/util/error'
 
 export function usePayrollC1Statement(options: { id: () => string, origin: () => 'real' | 'demo', changed: () => void }) {
@@ -51,7 +52,7 @@ export function usePayrollC1Statement(options: { id: () => string, origin: () =>
         latest.value = null
       }
       const operation = store.getC1Pending(value)
-      if (operation?.command.action.kind === 'release-c1' && !releaseOpen.value) {
+      if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'release-c1' && !releaseOpen.value) {
         releaseRead.value = matching.value ?? value
         releaseDraft.value = operation.command.action.release
         releaseOpen.value = true
@@ -99,7 +100,7 @@ export function usePayrollC1Statement(options: { id: () => string, origin: () =>
       releaseDraft.value = null
     options.changed()
     if (result.outcome === 'needs-recheck')
-      error.value = '考勤或个人标准已经变化，已保存为需重核。原实发输入仍保留，请先重新核对。'
+      error.value = payrollNeedsRecheckMessage('考勤或个人标准', matching.value)
     else
       kit.success(result.outcome === 'released' ? '实际发放已保存，工资资料已冻结。' : '工资核对结果已保存。')
   }

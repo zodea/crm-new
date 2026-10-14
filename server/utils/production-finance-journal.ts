@@ -1,6 +1,7 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { CentralFinanceKind } from '../../app/lib/finance/central-contract'
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { CENTRAL_FINANCE_KINDS, financeFailure } from '../../app/lib/finance/central-contract'
 import { FINANCE_OWNER_TYPE, FINANCE_TABLE_BY_KIND } from '../../app/lib/finance/domain'
 import { validateFinanceExpenseReferenceGuards } from '../../app/lib/finance/expense-references'
@@ -105,6 +106,40 @@ export async function validateFinanceJournal(db: Pick<TransactionDb, 'select'>, 
       return invalid()
     }
     const snapshot = parse(history.snapshot_json)
+    if (result.expenseLineIdentities !== undefined) {
+      const submitted = 'lines' in request.draft ? request.draft.lines : undefined
+      const frozen = object(snapshot.relations) ? snapshot.relations.expense_reimbursement_lines : undefined
+      if (request.kind !== 'reimbursement' || !Array.isArray(result.expenseLineIdentities) || !Array.isArray(submitted) || !Array.isArray(frozen))
+        return invalid()
+      const expected = submitted.flatMap((line, inputIndex) => request.action === 'draft' && Number(line.amount) === 0 ? [] : [inputIndex])
+      if (result.expenseLineIdentities.length !== expected.length || new Set(result.expenseLineIdentities.map(row => row.id)).size !== expected.length)
+        return invalid()
+      for (const [index, row] of result.expenseLineIdentities.entries()) {
+        if (!object(row) || typeof row.inputIndex !== 'number' || row.inputIndex !== expected[index] || typeof row.id !== 'string' || !frozen.some(line => object(line) && line.id === row.id && line.reimbursement_id === result.id && line.sort_order === index)
+          || (submitted[row.inputIndex]?.id && submitted[row.inputIndex]?.id !== row.id)) {
+          return invalid()
+        }
+      }
+    }
+    if (result.constructionScopeLinks !== undefined) {
+      if (request.kind !== 'reimbursement' || !Array.isArray(result.constructionScopeLinks))
+        return invalid()
+      const consumed = new Set<string>()
+      for (const saved of result.constructionScopeLinks) {
+        if (!object(saved) || typeof saved.commandId !== 'string' || !object(saved.relation) || saved.relation.domain !== 'original-expense' || consumed.has(saved.commandId))
+          return invalid()
+        consumed.add(saved.commandId)
+        const intent = (await db.select<Row>('SELECT * FROM construction_scope_intents WHERE command_id=?', [saved.commandId]))[0]
+        const receipt = (await db.select<Row>('SELECT * FROM construction_scope_receipts WHERE command_id=?', [saved.commandId]))[0]
+        if (!intent || !receipt || intent.workspace_id !== request.workspaceId || intent.actor_id !== request.actorId || receipt.workspace_id !== request.workspaceId || receipt.actor_id !== request.actorId || !isDeepStrictEqual(parse(receipt.result_json), saved))
+          return invalid()
+        const child = parse(intent.request_json)
+        if (!object(child.originalSourceCommand) || child.originalSourceCommand.family !== 'finance-reimbursement' || child.originalSourceCommand.commandId !== request.commandId || !object(child.source)
+          || child.source.domain !== 'original-expense' || child.source.id !== saved.relation.sourceId || child.projectId !== saved.relation.projectId || child.mainId !== saved.relation.mainId) {
+          return invalid()
+        }
+      }
+    }
     const snapshotFiles = snapshot.files
     if (!object(snapshot.head) || snapshot.head.id !== result.id || !Array.isArray(snapshotFiles)
       || result.attachmentIds.some(id => !snapshotFiles.some((file: unknown) => object(file) && file.id === id && file.owner_id === result.id))) {

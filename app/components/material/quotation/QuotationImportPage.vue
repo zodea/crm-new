@@ -14,7 +14,7 @@ import { bindReadAuthority } from '~/lib/read-model/authority'
 
 const router = useRouter()
 const kit = useKitUI()
-const repository = createQuotationImportRepository((url, options) => $fetch<unknown>(url, { ...options, retry: 0 }))
+const repository = createQuotationImportRepository((url, options) => $fetch<unknown, string>(url, { ...options, retry: 0 }))
 const recovery = createCommandRecoveryStorage()
 const context = shallowRef<Awaited<ReturnType<typeof repository.context>> | null>(null)
 const graph = shallowRef<QuotationGraph | null>(null)

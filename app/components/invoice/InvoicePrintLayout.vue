@@ -83,6 +83,9 @@ watch(
 )
 
 const currentSlots = computed(() => previewLayout.value.pages[currentPage.value - 1] ?? [])
+/** 列表中不能打印的票及原因；打印时会被跳过，须在面板中明确列出。 */
+const unprintableReasons = computed(() => new Map(previewLayout.value.skipped.map(item => [item.invoice.id, item.reason])))
+const skippedInvoices = computed(() => layout.value.skipped)
 const allSelected = computed({
   get: () => props.invoices.length > 0 && selectedIds.value.size === props.invoices.length,
   set: (checked: boolean) => {
@@ -180,14 +183,16 @@ useEventListener(() => document, 'click', () => {
         >
           <input
             type="checkbox"
-            :checked="selectedIds.has(invoice.id)"
+            :checked="selectedIds.has(invoice.id) && !unprintableReasons.has(invoice.id)"
+            :disabled="unprintableReasons.has(invoice.id)"
             :aria-label="`勾选发票 ${invoice.invoiceNumber || invoice.fileName}`"
             @click.stop
             @change="toggleInvoice(invoice.id, ($event.target as HTMLInputElement).checked)"
           >
           <span class="min-w-0 flex-1">
             <span class="block truncate font-mono text-12px text-brand-deep">{{ invoice.invoiceNumber || invoice.fileName || '未编号发票' }}</span>
-            <span class="mt-0.5 block truncate text-11px text-ink-soft">{{ invoice.seller || '未填写供应商' }}</span>
+            <span v-if="unprintableReasons.has(invoice.id)" class="mt-0.5 block text-11px text-warn-ink">{{ unprintableReasons.get(invoice.id) }}</span>
+            <span v-else class="mt-0.5 block truncate text-11px text-ink-soft">{{ invoice.seller || '未填写供应商' }}</span>
           </span>
           <span class="shrink-0 font-mono text-11px text-ink">{{ yuan(invoice.totalAmount) }}</span>
         </div>
@@ -298,6 +303,21 @@ useEventListener(() => document, 'click', () => {
           已勾 {{ layout.selectedCount }} 张 · {{ layout.pageCount }} 页 A4 · 金额合计 {{ yuan(layout.totalAmount) }}
         </div>
         <div
+          v-if="skippedInvoices.length"
+          data-testid="invoice-print-skipped"
+          role="status"
+          class="mb-2 border border-warn/35 rounded-[var(--radius-btn)] bg-warn-soft p-2 text-11px text-warn-ink"
+        >
+          <p class="font-700">
+            {{ skippedInvoices.length }} 张发票不会打印：
+          </p>
+          <ul class="mt-1 max-h-24 overflow-auto">
+            <li v-for="item in skippedInvoices" :key="item.invoice.id" class="truncate">
+              {{ item.invoice.invoiceNumber || item.invoice.fileName || '未编号发票' }}：{{ item.reason }}
+            </li>
+          </ul>
+        </div>
+        <div
           v-if="printConfirmation"
           class="mb-2 border border-warn/35 rounded-[var(--radius-btn)] bg-warn-soft p-3 text-11px text-warn-ink"
           role="dialog"
@@ -308,6 +328,9 @@ useEventListener(() => document, 'click', () => {
           </p>
           <p class="mt-1">
             本次打印：{{ printConfirmation.ids.length }} 张发票 · {{ printConfirmation.pageCount }} 页 A4 · 金额合计 {{ yuan(printConfirmation.totalAmount) }}
+          </p>
+          <p v-if="skippedInvoices.length" class="mt-1">
+            另有 {{ skippedInvoices.length }} 张未打印，见上方清单；确认后只登记本次实际打印的发票。
           </p>
           <div class="mt-2 flex flex-wrap gap-2">
             <button type="button" class="btn-primary px-3 py-1.5" aria-label="已打印" @click="emit('confirmPrint')">

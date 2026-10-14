@@ -6,13 +6,16 @@ import type {
   BoqImportRow,
   BoqParsedWorkbook,
 } from '~/lib/boq/import'
+import type { BoqOriginalInput } from '~/lib/boq/production-contract'
 import type { KitTableColumn } from '~/lib/kit/table'
 import { useDropZone, useFileDialog, useStepper } from '@vueuse/core'
+import { computed, onBeforeUnmount, shallowRef, useTemplateRef } from 'vue'
 import {
   autoMapBoqColumns,
   buildBoqImportRows,
   parseBoqWorkbook,
 } from '~/lib/boq/import'
+import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
 
 const props = defineProps<{
@@ -26,6 +29,7 @@ const emit = defineEmits<{
     fileName: string
     formatClass: BoqFormatClass
     rows: readonly BoqImportRow[]
+    original: BoqOriginalInput
   }]
 }>()
 
@@ -33,6 +37,8 @@ const { error: toastError } = useKitUI()
 const stepper = useStepper(['upload', 'confirm', 'preview'] as const, 'upload')
 const dropZoneRef = useTemplateRef<HTMLElement>('dropZoneRef')
 const parsed = shallowRef<BoqParsedWorkbook | null>(null)
+const original = shallowRef<BoqOriginalInput | null>(null)
+let fileGeneration = 0
 const selectedSheetName = shallowRef('')
 const mappings = shallowRef<Record<string, BoqColumnMapping>>({})
 const previewRows = ref<BoqImportRow[]>([])
@@ -124,11 +130,21 @@ const { onChange, open: openFileDialog } = useFileDialog({
 })
 
 async function handleFile(file: File) {
+  const current = ++fileGeneration
+  original.value = null
   parsing.value = true
   parseError.value = ''
   mappingError.value = ''
   try {
-    const result = parseBoqWorkbook(await file.arrayBuffer(), file.name)
+    const bytes = await file.arrayBuffer()
+    const result = parseBoqWorkbook(bytes, file.name)
+    const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(value => value.toString(16).padStart(2, '0')).join('')
+    const payload = await fileRefDraftFromFile(file)
+    if (current !== fileGeneration)
+      return
+    if (!payload.payloadBase64)
+      throw new Error('原清单正文尚未完整读取')
+    original.value = { fileName: file.name, mimeType: file.type || 'application/octet-stream', fileSize: file.size, sha256, payloadBase64: payload.payloadBase64 }
     parsed.value = result
     selectedSheetName.value = result.sheets[0]?.name ?? ''
     mappings.value = Object.fromEntries(result.sheets.map(sheet => [
@@ -141,14 +157,21 @@ async function handleFile(file: File) {
     stepper.goTo('upload')
   }
   catch (cause) {
+    if (current !== fileGeneration)
+      return
     parsed.value = null
     parseError.value = toErrorMessage(cause)
     toastError(parseError.value)
   }
   finally {
-    parsing.value = false
+    if (current === fileGeneration)
+      parsing.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  fileGeneration++
+})
 
 onChange((files) => {
   const file = files?.[0]
@@ -217,12 +240,25 @@ function finalizedRows(): BoqImportRow[] {
     if (qty == null || unitPrice == null)
       throw new Error(`第 ${row.sourceRow} 行单套量与合同单价必填`)
     return {
-      ...row,
+      section: row.section,
+      trade: row.trade,
+      itemCode: row.itemCode,
+      itemName: row.itemName,
+      unit: row.unit,
       qty,
       unitPrice,
+      building: row.building,
+      unitType: row.unitType,
       multiplier: optionalEditedNumber(row.multiplier, `第 ${row.sourceRow} 行套数`),
       totalQty: optionalEditedNumber(row.totalQty, `第 ${row.sourceRow} 行清单总量`),
       amount: Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100,
+      room: row.room,
+      floorZone: row.floorZone,
+      spec: row.spec,
+      taxRate: row.taxRate,
+      ownerSupplied: row.ownerSupplied,
+      sourceSheet: row.sourceSheet,
+      sourceRow: row.sourceRow,
     }
   })
 }
@@ -280,7 +316,7 @@ function buildPreview() {
 }
 
 function confirmImport() {
-  if (!parsed.value || !props.projectId || !props.contractId)
+  if (!parsed.value || !original.value || !props.projectId || !props.contractId)
     return
   if (!includedPreviewRows.value.length) {
     toastError('请至少保留一行入库')
@@ -295,6 +331,7 @@ function confirmImport() {
       fileName: parsed.value.fileName,
       formatClass: parsed.value.formatClass,
       rows: finalizedRows(),
+      original: original.value,
     })
   }
   catch (cause) {

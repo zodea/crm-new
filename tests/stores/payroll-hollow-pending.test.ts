@@ -35,7 +35,7 @@ it('扣款配置未知回复冷重建仍保原编号、开关、明确零和生�
   let store = usePayrollHollowStore()
   const value = await store.loadConfig({ origin: 'real' }, config)
   repository.executeHollow.mockRejectedValueOnce(new Error('回复丢失'))
-  await expect(store.savePolicies(value, [{ ...policy, unitAmount: 0 }])).rejects.toThrow()
+  await expect(store.savePolicies(value, [{ ...policy, unitAmount: 0 }])).rejects.toThrow('回复丢失')
   const original = store.getPending(value)!
   setActivePinia(createPinia())
   store = usePayrollHollowStore()
@@ -56,10 +56,10 @@ it('只有可信提交后原修订读能清原配置，伪造读与提交前迟�
   const original = store.getPending(value)!
   const response = confirmed(original.command)
   resolve(response)
-  expect(() => store.acknowledge(original, structuredClone(response))).toThrow()
-  expect(() => store.acknowledge(original, response)).toThrow()
+  expect(() => store.acknowledge(original, structuredClone(response))).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
+  expect(() => store.acknowledge(original, response)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   await early
-  expect(() => store.acknowledge(original, response)).toThrow()
+  expect(() => store.acknowledge(original, response)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
   repository.hollowConfig.mockResolvedValueOnce(structuredClone(response))
   const fresh = await store.loadConfig({ origin: 'real' }, config)
   store.acknowledge(original, fresh)
@@ -70,12 +70,12 @@ it('重新核对先验证当前身份及写权，撤权不能重放但不清原�
   const store = usePayrollHollowStore()
   const value = await store.loadConfig({ origin: 'real' }, config)
   repository.executeHollow.mockRejectedValueOnce(new Error('回复丢失'))
-  await expect(store.savePolicies(value, [policy])).rejects.toThrow()
+  await expect(store.savePolicies(value, [policy])).rejects.toThrow('回复丢失')
   const original = store.getPending(value)!
   identity.mockResolvedValueOnce({ ...context, actorId: 'other' })
-  await expect(store.recover(original)).rejects.toThrow()
+  await expect(store.recover(original)).rejects.toThrow('当前身份或权限不能处理这份原空鼓扣款提交')
   identity.mockResolvedValueOnce({ ...context, capabilities: ['payroll:read'] })
-  await expect(store.recover(original)).rejects.toThrow()
+  await expect(store.recover(original)).rejects.toThrow('当前身份或权限不能处理这份原空鼓扣款提交')
   expect(repository.executeHollow).toHaveBeenCalledTimes(1)
   expect(store.getPending(value)).toEqual(original)
 })

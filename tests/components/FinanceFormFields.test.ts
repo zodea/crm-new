@@ -1,7 +1,11 @@
-import { mount } from '@vue/test-utils'
+import type { ConstructionMainSelection } from '~/lib/construction-scope/contract'
+import type { ReimbursementLineDraft } from '~/lib/finance/domain'
+import type { LookupOption } from '~/lib/kit/lookup'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import FinanceFormFields from '~/components/finance/FinanceFormFields.vue'
+import { applyFinanceLineIdentities, captureFinanceInput, captureFinanceLineIdentities, forgetFinanceLineIdentity } from '~/lib/finance/input-snapshot'
 
 const SectionHeader = defineComponent({
   props: { title: { type: String, default: '' } },
@@ -59,6 +63,7 @@ const KitTable = defineComponent({
         <slot name="source" :row="row" :row-index="rowIndex" />
         <slot name="counterparty" :row="row" :row-index="rowIndex" />
         <slot name="original" :row="row" :row-index="rowIndex" />
+        <slot name="constructionMain" :row="row" :row-index="rowIndex" />
         <slot name="date" :row="row" :row-index="rowIndex" />
         <slot name="amount" :row="row" :row-index="rowIndex" />
         <slot name="note" :row="row" :row-index="rowIndex" />
@@ -94,12 +99,14 @@ it('批复临时负数保持表单可编辑并提示修正，不能因读取金�
 function mountFields(
   kind: 'payment_application' | 'payment_record' | 'reimbursement',
   draft: Record<string, unknown>,
+  fetchConstructionMains?: (keyword: string) => Promise<Array<LookupOption & { constructionMain: ConstructionMainSelection }>>,
 ) {
   return mount(FinanceFormFields, {
     props: {
       kind,
       draft,
       fetchProjects: fetchLookup,
+      fetchConstructionMains,
       fetchCustomers: fetchLookup,
       fetchSuppliers: fetchLookup,
       fetchWorkers: fetchLookup,
@@ -126,6 +133,57 @@ function mountFields(
 }
 
 describe('financeFormFields real-ID and detail-grid flow', () => {
+  it('原producer输入索引对内存行身份回填真实ID，后来编辑/重排保留，复制/新行不盗用且私有token不进发送稿', () => {
+    const lines: ReimbursementLineDraft[] = [{ expenseItem: '重复同名', amount: 25 }, { expenseItem: '重复同名', amount: 35 }]
+    const submitted = captureFinanceLineIdentities(lines)
+    expect(Reflect.ownKeys(captureFinanceInput(lines)[0]!)).toEqual(['expenseItem', 'amount'])
+    const copied = { ...lines[1]!, amount: 45 }
+    forgetFinanceLineIdentity(copied)
+    const current: ReimbursementLineDraft[] = [{ ...lines[1]!, amount: 36 }, copied, { ...lines[0]!, note: '后来编辑' }, { expenseItem: '新行', amount: 15 }]
+    const result = applyFinanceLineIdentities(current, submitted, [{ inputIndex: 0, id: 'actual-row-a' }, { inputIndex: 1, id: 'actual-row-b' }], [{ id: 'actual-row-a' }, { id: 'actual-row-b' }])
+    expect(result.map(line => line.id)).toEqual(['actual-row-b', undefined, 'actual-row-a', undefined])
+    expect(result.map(line => line.amount)).toEqual([36, 45, 25, 15])
+    expect(applyFinanceLineIdentities([current[0]!], submitted, [{ inputIndex: 0, id: 'actual-row-a' }, { inputIndex: 1, id: 'actual-row-b' }], [{ id: 'actual-row-a' }, { id: 'actual-row-b' }]).map(line => line.id)).toEqual(['actual-row-b'])
+    expect(() => applyFinanceLineIdentities(current, submitted, [{ inputIndex: 0, id: 'unknown-row' }], [])).toThrow('尚未可靠读取')
+  })
+  it('新费用以真实工程/Main选择取得项目，每一新原费用行可明确另一份同工程Main；历史及清偿不补造新关系', async () => {
+    const main = { id: 'lookup-real-id', projectId: 'actual-project-id', basis: 'actual-main-basis' }
+    const fetchMains = vi.fn(async () => [{ id: main.id, label: '实际工程 · 施工合同甲', constructionMain: main }])
+    const wrapper = mountFields('reimbursement', { lines: [{ expenseItem: '新原费用', amount: 25 }] }, fetchMains)
+    await wrapper.get('[data-placeholder="搜索工程名称、施工合同名称或编号"]').trigger('click')
+    await flushPromises()
+    expect(fetchMains).toHaveBeenLastCalledWith(main.id)
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ constructionMain: main, projectId: main.projectId })
+    await wrapper.get('[data-placeholder="新原费用必选实际工程与施工合同"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ lines: [{ expenseItem: '新原费用', amount: 25, constructionMain: main }] })
+    await wrapper.setProps({ draft: { id: 'original-head', projectId: main.projectId, lines: [{ id: 'original-line', expenseItem: '历史原费用', amount: 25 }, { originalExpenseLineId: 'original-source', expenseItem: '真实清偿', amount: 5 }] } })
+    expect(wrapper.find('[data-placeholder="搜索工程名称、施工合同名称或编号"]').exists()).toBe(false)
+    expect(wrapper.find('[data-placeholder="新原费用必选实际工程与施工合同"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('沿原费用')
+  })
+
+  it('工程资格二次读取未返回时切换费用表单，不将旧工程结果写入新的原单', async () => {
+    let complete!: (rows: Array<LookupOption & { constructionMain: ConstructionMainSelection }>) => void
+    const fetchMains = vi.fn(() => new Promise<Array<LookupOption & { constructionMain: ConstructionMainSelection }>>(resolve => complete = resolve))
+    const wrapper = mountFields('reimbursement', { lines: [] }, fetchMains)
+    await wrapper.get('[data-placeholder="搜索工程名称、施工合同名称或编号"]').trigger('click')
+    await wrapper.setProps({ draft: { id: 'another-original-head', projectId: 'another-project', lines: [] } })
+    complete([{ id: 'lookup-real-id', label: '旧工程', constructionMain: { id: 'lookup-real-id', projectId: 'old-project', basis: 'old-main-basis' } }])
+    await flushPromises()
+    expect(wrapper.emitted('patch') ?? []).toEqual([])
+  })
+  it('行工程资格读取未返回时移除原行，结果不写入同位置的另一费用行', async () => {
+    let complete!: (rows: Array<LookupOption & { constructionMain: ConstructionMainSelection }>) => void
+    const fetchMains = vi.fn(() => new Promise<Array<LookupOption & { constructionMain: ConstructionMainSelection }>>(resolve => complete = resolve))
+    const wrapper = mountFields('reimbursement', { id: 'actual-head', lines: [{ expenseItem: '被移除原行', amount: 25 }] }, fetchMains)
+    await wrapper.get('[data-placeholder="新原费用必选实际工程与施工合同"]').trigger('click')
+    await wrapper.setProps({ draft: { id: 'actual-head', lines: [{ expenseItem: '同位置另一费用', amount: 30 }] } })
+    complete([{ id: 'lookup-real-id', label: '旧工程', constructionMain: { id: 'lookup-real-id', projectId: 'old-project', basis: 'old-main-basis' } }])
+    await flushPromises()
+    expect(wrapper.emitted('patch') ?? []).toEqual([])
+    expect(wrapper.get('[data-testid="reimbursement-item-0"]').element).toHaveProperty('value', '同位置另一费用')
+  })
   it('切换垫付身份后保留选择种类与历史原文，其他字段补录不会退回工人种类', async () => {
     const draft = { applicant: '原报销人文字', applicantWorkerId: null, applicantSupplierId: null, lines: [] }
     const wrapper = mountFields('reimbursement', draft)

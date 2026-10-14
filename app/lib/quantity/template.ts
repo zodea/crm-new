@@ -86,6 +86,8 @@ export interface QuantityTemplateLineDraft {
   sourceItemId?: string | null
   /** undefined 保留原关联，null 明确解除；字符串为当前项目的稳定清单身份。 */
   boqLineId?: string | null
+  /** Current owner proof for a newly selected source; frozen existing links remain independent. */
+  boqBindingVersion?: string
   roomKey: string
   /** 既有 item.id，或 newItems 中的 client key。 */
   itemId: string

@@ -62,6 +62,9 @@
 | [tests/stores/quantity.test.ts](../../../tests/stores/quantity.test.ts) | 单元／服务／状态 | quantity store |
 | [tests/tabs/quantity-hollow-restore.test.ts](../../../tests/tabs/quantity-hollow-restore.test.ts) | 单元／服务／状态 | 真实原户空鼓冷恢复分别核验户、记录和历史修订并保工资原稿返回 |
 | [tests/tabs/quantity-restore.test.ts](../../../tests/tabs/quantity-restore.test.ts) | 单元／服务／状态 | 中央工程量户详情只读恢复 |
+| [tests/quantity/command-recovery.test.ts](../../../tests/quantity/command-recovery.test.ts) | 单元／服务／状态 | 工程量最小原编号及准确目标恢复 |
+| [tests/quantity/migration-identity.test.ts](../../../tests/quantity/migration-identity.test.ts) | 单元／服务／状态 | 工程量源映射身份与历史图隔离 |
+
 
 ## 视觉基线（非独立测试）
 
@@ -119,3 +122,5 @@
 | [tests/helpers/quantity-hollow-migration-fixture.ts](../../../tests/helpers/quantity-hollow-migration-fixture.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/quantity-hollow-ui-fixture.ts](../../../tests/helpers/quantity-hollow-ui-fixture.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/quantity-migration-source.ts](../../../tests/helpers/quantity-migration-source.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
+| [tests/helpers/production-quantity-cold-process.ts](../../../tests/helpers/production-quantity-cold-process.ts) | 辅助／夹具 | 工程量日常图独立进程读取入口 |
+| [tests/helpers/production-quantity-import-cold-process.ts](../../../tests/helpers/production-quantity-import-cold-process.ts) | 辅助／夹具 | 完整工程量采用与恢复冷进程入口 |

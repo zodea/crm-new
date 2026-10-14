@@ -169,7 +169,6 @@ test.describe('AX03 项目罚扣真实结算抵扣', () => {
       await page.keyboard.press('Escape')
       await expect(dialog).toHaveCount(0)
       await expect(trigger).toBeFocused()
-      await page.screenshot({ path: `docs/design/evidence/issue-329/penalty-${width}.png`, fullPage: true })
     }
     await page.getByRole('table', { name: '抵扣历史' }).getByRole('link', { name: 'AX03 真实结算' }).first().click()
     await expect(page.getByRole('group', { name: '奖罚抵扣' })).toContainText('1,000.00')

@@ -85,34 +85,37 @@ test.describe('Issue #197：甲方、分包单据与项目罚扣', () => {
     await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `owner-form-${randomUUID()}` })
     await page.clock.install({ time: new Date('2026-09-12T04:00:00.000Z') })
   })
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`八类列表和表单在 ${width}px 使用真实标题且无页面级横向溢出`, async ({ page }) => {
-      test.setTimeout(300_000)
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
+  test('八类列表和表单使用真实标题，各宽度无页面级横向溢出', async ({ page }) => {
+    test.setTimeout(300_000)
 
-      for (const document of DOCUMENTS) {
-        await page.goto(document.listPath)
-        const toolbar = page.locator('[data-ui="owner-document-list-toolbar"]')
-        await expect(toolbar.getByRole('heading', { name: document.title, exact: true }))
-          .toBeVisible({ timeout: 60_000 })
-        await expect(toolbar.getByRole('searchbox')).toBeVisible()
-        await expect(toolbar.getByRole('combobox', { name: '项目' })).toBeVisible()
-        await expect(toolbar.getByRole('button', { name: /^状态，已选/ })).toBeVisible()
-        if (document.typeLabel)
-          await expect(toolbar.getByRole('button', { name: new RegExp(`^${document.typeLabel}，已选`) })).toBeVisible()
-        else
-          await expect(toolbar.getByRole('button', { name: /^类型，已选/ })).toHaveCount(0)
+    for (const document of DOCUMENTS) {
+      await page.goto(document.listPath)
+      const toolbar = page.locator('[data-ui="owner-document-list-toolbar"]')
+      await expect(toolbar.getByRole('heading', { name: document.title, exact: true }))
+        .toBeVisible({ timeout: 60_000 })
+      await expect(toolbar.getByRole('searchbox')).toBeVisible()
+      await expect(toolbar.getByRole('combobox', { name: '项目' })).toBeVisible()
+      await expect(toolbar.getByRole('button', { name: /^状态，已选/ })).toBeVisible()
+      if (document.typeLabel)
+        await expect(toolbar.getByRole('button', { name: new RegExp(`^${document.typeLabel}，已选`) })).toBeVisible()
+      else
+        await expect(toolbar.getByRole('button', { name: /^类型，已选/ })).toHaveCount(0)
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
         await expect(toolbar.getByRole('button', { name: `新建${document.title}` })).toBeVisible()
         await expectNoPageOverflow(page, `${document.listPath} @ ${width}px`)
+      }
 
-        await page.goto(document.newPath)
-        await expect(page.getByRole('heading', { name: `新建 · ${document.title}`, exact: true })).toBeVisible({
-          timeout: 60_000,
-        })
+      await page.goto(document.newPath)
+      await expect(page.getByRole('heading', { name: `新建 · ${document.title}`, exact: true })).toBeVisible({
+        timeout: 60_000,
+      })
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
         await expectNoPageOverflow(page, `${document.newPath} @ ${width}px`)
       }
-    })
-  }
+    }
+  })
 
   test('来源 query 可见且可单独清除，状态筛选和无结果空态可恢复', async ({ page }) => {
     const fixture = await installOwnerBoqFixture(page)

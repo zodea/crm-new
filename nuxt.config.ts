@@ -7,7 +7,8 @@ export default defineNuxtConfig({
 
   nitro: {
     // sql.js 按运行时路径加载 WASM；显式携带现有依赖，构建后无需手工补文件。
-    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'] },
+    // xlsx 整包内联：外置时 Windows 开发态会把 dist/cpexcel.js 写成裸盘符路径，ESM 加载失败。
+    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'], inline: [/[\\/]xlsx[\\/]/] },
   },
 
   runtimeConfig: {

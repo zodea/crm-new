@@ -9,17 +9,17 @@ async function checked(f: Awaited<ReturnType<typeof createPayrollC1ServiceFixtur
   return f.service.c1Form({ origin: 'real' }, { statementId: id })
 }
 it.each([
-  [{ workerId: 'w', amount: 550 }, { workerId: 'member', amount: 350 }],
-  [{ workerId: 'w', amount: 550.01 }, { workerId: 'member', amount: 350 }, { workerId: 'zero', amount: 0 }],
-  [{ workerId: 'w', amount: 550 }, { workerId: 'w', amount: 550 }, { workerId: 'zero', amount: 0 }],
-].map(allocations => ({ allocations })))('核算与实发分离，拒绝非法全成员分配：%#', async ({ allocations }) => {
+  { label: '漏填成员', allocations: [{ workerId: 'w', amount: 550 }, { workerId: 'member', amount: 350 }], reason: '组内分配必须包含负责人和全部成员，未分配成员请填 0' },
+  { label: '分配合计不等于实发', allocations: [{ workerId: 'w', amount: 550.01 }, { workerId: 'member', amount: 350 }, { workerId: 'zero', amount: 0 }], reason: '成员分配合计必须等于实际发放金额' },
+  { label: '同一成员重复分配', allocations: [{ workerId: 'w', amount: 550 }, { workerId: 'w', amount: 550 }, { workerId: 'zero', amount: 0 }], reason: '同一成员不能重复分配实际发放金额' },
+])('核算与实发分离，C1 发放拒绝$label', async ({ allocations, reason }) => {
   const f = await createPayrollC1ServiceFixture()
   try {
     await f.attendance()
     await f.attendance({ workerId: 'member', hours: 7.5, overtimeHours: 0 })
     const read = await checked(f)
     const release = { actualAmount: 900, allocations: [{ workerId: 'w', amount: 550 }, { workerId: 'member', amount: 350 }, { workerId: 'zero', amount: 0 }] }
-    await expect(f.service.executeC1(f.command(read, { kind: 'release-c1', release: { ...release, allocations } }))).rejects.toThrow()
+    await expect(f.service.executeC1(f.command(read, { kind: 'release-c1', release: { ...release, allocations } }))).rejects.toThrow(reason)
     const command = f.command(read, { kind: 'release-c1', release })
     const result = await f.service.executeC1(command)
     expect(await f.service.executeC1(command)).toEqual(result)
@@ -29,6 +29,25 @@ it.each([
     expect((await f.service.detail({ origin: 'real' }, read.statementId!)).statement.snapshot.state).toBe('complete')
     expect((await f.service.detail({ origin: 'real' }, read.statementId!)).statement.diagnostics.some(d => d.code === 'source-unproven')).toBe(false)
     await expect(f.service.executeC1(f.command(await f.service.c1Form({ origin: 'real' }, { statementId: read.statementId! }), { kind: 'check-c1' }))).rejects.toThrow('只可阅读')
+  }
+  finally { await f.close() }
+})
+
+// subcontract-payroll.md 规则 8：本次应发为 0 或实际发放超过本次应发时禁止发放。
+it('c1 实发超过当月应发或无空鼓抵扣的零额发放被拒绝，恰好等于应发可以发放', async () => {
+  const f = await createPayrollC1ServiceFixture()
+  try {
+    await f.attendance()
+    await f.attendance({ workerId: 'member', hours: 7.5, overtimeHours: 0 })
+    const read = await checked(f)
+    expect(read.totals.grossAmount.value).toBe(1051.25)
+    const release = (actualAmount: number) => f.command(read, { kind: 'release-c1', release: { actualAmount, allocations: [{ workerId: 'w', amount: actualAmount }, { workerId: 'member', amount: 0 }, { workerId: 'zero', amount: 0 }] } })
+    const rejection = 'C1 需重新核对完整，实际金额须到分且不超过当月应发；零额仅适用于明确启动并完整抵扣的空鼓处理'
+
+    await expect(f.service.executeC1(release(1051.26))).rejects.toThrow(rejection)
+    await expect(f.service.executeC1(release(0))).rejects.toThrow(rejection)
+    expect(await f.db.select('SELECT actual_amount FROM wage_statements')).toEqual([{ actual_amount: null }])
+    expect((await f.service.executeC1(release(1051.25))).outcome).toBe('released')
   }
   finally { await f.close() }
 })

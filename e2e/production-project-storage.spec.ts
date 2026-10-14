@@ -118,8 +118,6 @@ test('公开项目保存、原件、Excel 回执与客户关联跨独立进程�
     for (const width of [390, 768, 1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && (!document.querySelector('.shell-workspace') || document.querySelector('.shell-workspace')!.scrollWidth <= document.querySelector('.shell-workspace')!.clientWidth))).toBe(true)
-      if ([390, 1440].includes(width))
-        await page.screenshot({ path: testInfo.outputPath(`project-form-${width}.png`), fullPage: true })
     }
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: '下载原件 项目原件.txt' }).click()

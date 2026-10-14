@@ -179,19 +179,21 @@ function inputChecked(event: Event): boolean {
         </label>
 
         <template v-else>
-          <label class="field-block">
-            <span class="field-label">项目 *</span>
-            <LookupSelect
-              :model-value="draft.projectId"
-              :fetch="fetchProjects"
-              :invalid="Boolean(fieldErrors.projectId)"
-              :description-id="errorDescriptionId('projectId')"
-              :recent-key="`contract-project-${kind}`"
-              placeholder="检索项目"
-              @update:model-value="patch('projectId', $event)"
-            />
-            <span v-if="fieldErrors.projectId" :id="errorId('projectId')" class="field-error">{{ fieldErrors.projectId }}</span>
-          </label>
+          <slot name="project-field">
+            <label class="field-block">
+              <span class="field-label">项目 *</span>
+              <LookupSelect
+                :model-value="draft.projectId"
+                :fetch="fetchProjects"
+                :invalid="Boolean(fieldErrors.projectId)"
+                :description-id="errorDescriptionId('projectId')"
+                :recent-key="`contract-project-${kind}`"
+                placeholder="检索项目"
+                @update:model-value="patch('projectId', $event)"
+              />
+              <span v-if="fieldErrors.projectId" :id="errorId('projectId')" class="field-error">{{ fieldErrors.projectId }}</span>
+            </label>
+          </slot>
           <label v-if="kind === 'construction'" class="field-block">
             <span class="field-label">甲方（客户） *</span>
             <LookupSelect

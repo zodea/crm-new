@@ -26,6 +26,7 @@ const records = computed(() => (current.value?.data.records ?? []).map((record) 
 </script>
 
 <template>
+  <QuantityHollowCommandRecovery :project-id="projectId" :unit-id="unitId" :origin="origin" @recovered="ui.load" />
   <section id="section-hollow" class="panel grid min-w-0 gap-4 p-4" aria-label="户级空鼓检查与整改">
     <div class="flex min-w-0 flex-wrap items-center justify-between gap-3">
       <SectionHeader title="空鼓检查与整改" :mb="0" /><NuxtLink v-if="create" :to="create" class="btn-primary">

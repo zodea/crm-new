@@ -2,9 +2,8 @@ import type { BusinessSession } from '../../server/utils/business-session'
 import type { PayrollIdentitySource, PayrollServiceOptions } from '../../server/utils/payroll-service'
 import type { PayrollAAction, PayrollACommand, PayrollACommandRead, PayrollADraft, PayrollAQuantityFact, PayrollAQuantityFacts } from '~/lib/payroll/central-a-contract'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { createPayrollService } from '../../server/utils/payroll-service'
-import { createMemoryDb } from './memory-db'
+import { createMigratedMemoryDb } from './memory-db'
 
 export function payrollAFact(overrides: Partial<PayrollAQuantityFact> = {}): PayrollAQuantityFact {
   return { ownershipKey: 'p:u:assignment:r:item', completionId: 'completed', assignmentId: 'assignment', stageId: 'stage', stageItemId: 'stage-item', unitId: 'u', floorId: 'floor', buildingId: 'building', templateId: 'template', templateLineId: 'template-line', roomId: 'r', itemId: 'item', completedAt: '2026-08-05', workerId: 'w', crewId: null, assignmentScopeIds: ['scope'], scopeKind: 'selected', scopeRows: [{ id: 'scope', roomId: 'r', itemId: 'item', deletedAt: null }], unit: '㎡', fieldQty: 8, fieldFormula: '2*4', buildingName: '一栋', floorName: '一层', unitName: '101', templateName: '甲户型', roomName: '客厅', itemName: '墙砖', workerName: '负责人', crewName: null, sourceFingerprint: 'cell-1', ...overrides }
@@ -12,8 +11,7 @@ export function payrollAFact(overrides: Partial<PayrollAQuantityFact> = {}): Pay
 
 /** 公共 service 的真实 SQL 夹具；Root 可修改 facts/identity/真实已发原行建立独立金额反例。 */
 export async function createPayrollAServiceFixture(options: Pick<PayrollServiceOptions, 'quantityFacts' | 'managementScopeFacts'> = {}) {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   const coordinator = createDbCoordinator(async () => ({
     execute: (sql, params) => db.execute(sql, params),
     select: <T>(sql: string, params?: unknown[]) => db.select<T>(sql, params),

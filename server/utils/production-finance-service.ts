@@ -1,5 +1,6 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { CentralFinanceKind, FinanceCommandResult, FinanceFormData, FinanceLookupQuery, FinanceReadScope } from '../../app/lib/finance/central-contract'
+import type { ExpenseReimbursementFormDraft } from '../../app/lib/finance/forms'
 import type { FinanceMigrationResult } from '../../app/lib/finance/migration-contract'
 import type { FinanceDomainTx } from '../../app/lib/finance/reference'
 import type { FileRefChanges, FileRefRecord } from '../../app/lib/forms/file-refs'
@@ -10,6 +11,7 @@ import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
+import { decodeConstructionMainSelection } from '../../app/lib/construction-scope/contract'
 import { isConfirmedExpenditureSettlement } from '../../app/lib/contract/effective-status'
 import { logCreate, restoreRecord, softDelete } from '../../app/lib/db/soft-delete'
 import { financeFailure as fail, FINANCE_FAMILIES, FINANCE_READ_SCHEMA, FinanceRepositoryProblem, normalizeFinanceLookup } from '../../app/lib/finance/central-contract'
@@ -17,6 +19,8 @@ import { deleteFinanceFormInTransaction, expenseContractMatchesPaymentType, FINA
 import { FinanceAmountSourceError, hasVerifiedFinanceNumbers, verifiedFinanceSum } from '../../app/lib/finance/persistent-rows'
 import { decimalNumber } from '../../app/lib/read-model/decimal'
 import { withVerifiedMigrationSnapshot } from './migration-snapshot'
+import { appendProductionConstructionScopeBinding } from './production-construction-scope-command'
+import { readProductionConstructionMainOptions, readProductionConstructionScopeLink } from './production-construction-scope-record'
 import { createExpenseClearanceVerification, expenseClearanceVerificationState, validateExpenseClearanceJournal } from './production-finance-clearance'
 import { financeRecordSnapshot, validateFinanceJournal } from './production-finance-journal'
 import { authorizeFinanceImport, importNativeFinance, previewNativeFinance, readNativeFinanceSource } from './production-finance-migration'
@@ -90,6 +94,41 @@ async function form<K extends CentralFinanceKind>(tx: FinanceDomainTx, kind: K, 
   const version = (await tx.select<VersionRow>('SELECT version,updated_at FROM finance_versions WHERE kind=? AND id=?', [kind, id]))[0]
   if (!draft)
     fail('not-found', '财务记录不存在或已删除，请从列表重新进入。')
+  if (kind === 'reimbursement') {
+    const expense = draft as ExpenseReimbursementFormDraft
+    const mains = new Map<string, NonNullable<ExpenseReimbursementFormDraft['constructionMain']>>()
+    for (const line of expense.lines ?? []) {
+      if (!line.id || line.originalExpenseLineId)
+        continue
+      const relation = await readProductionConstructionScopeLink(tx, { domain: 'original-expense', id: line.id })
+      if (relation?.mainId && relation.mainBasis) {
+        line.constructionMain = { id: relation.mainId, projectId: relation.projectId, basis: relation.mainBasis }
+        line.constructionScopeVersion = relation.version
+        mains.set(relation.mainId, line.constructionMain)
+      }
+    }
+    if (mains.size === 1) {
+      expense.constructionMain = [...mains.values()][0]
+    }
+    else if (!(expense.lines ?? []).length && version) {
+      // A zero-only draft has no original expense row to bind. Its explicit
+      // engineering choice remains in the actual original source command.
+      const original = (await tx.select<{ request_json: string, result_json: string, fingerprint: string }>(`SELECT c.request_json,c.result_json,c.fingerprint FROM finance_history h JOIN finance_commands c ON c.command_id=h.command_id
+        WHERE h.kind='reimbursement' AND h.id=? AND h.version=? AND c.workspace_id=? AND c.actor_id=?`, [id, version.version, actor.workspaceId, actor.actorId]))[0]
+      if (original) {
+        const request = parseFinanceCommand(JSON.parse(original.request_json))
+        const result = commandResult(original.result_json, request.commandId, 'reimbursement', id)
+        if (request.kind !== 'reimbursement' || result.version !== String(version.version) || financeCommandFingerprint(request) !== original.fingerprint)
+          fail('unavailable', '原费用工程选择与同次冻结提交不一致，请核对备份。')
+        if ('constructionMain' in request.draft && request.draft.constructionMain) {
+          const main = decodeConstructionMainSelection(request.draft.constructionMain)
+          if (main.projectId !== expense.projectId)
+            fail('unavailable', '原费用工程选择与冻结实际项目不一致。')
+          expense.constructionMain = main
+        }
+      }
+    }
+  }
   if (!version || !Number.isSafeInteger(version.version) || version.version < 1 || !Number.isFinite(Date.parse(version.updated_at)))
     fail('unavailable', '财务稳定版本依据缺失，不能继续编辑。')
   if (kind === 'payment_application')
@@ -119,7 +158,7 @@ const referenceSources = [
   ['material-contracts', 'material-contracts', 'material-contract:read', 'material_contract_revision'],
   ['construction-contracts', 'construction-contracts', 'construction-contract:read', 'construction_contract_revision'],
   ['subcontract-contracts', 'subcontract-contracts', 'subcontract-contract:read', 'subcontract_contract_revision'],
-  ['auxiliary-contracts', 'auxiliary-contracts', 'auxiliary-contract:read', 'auxiliary_contract_revision'],
+  ['auxiliary-contracts', 'auxiliary-contract', 'auxiliary-contract:read', 'auxiliary_contract_revision'],
   ['expenditure-settlements', 'other-settlements', 'other-settlement:read', 'other_settlement_revision'],
   ['invoices', 'invoices', 'finance-invoice:read', 'invoice_revision'],
 ] as const
@@ -200,7 +239,13 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
         if ((request.id && (!version || request.baseVersion !== String(version.version))) || (!request.id && request.baseVersion !== null))
           fail('conflict', '财务记录已更新或编辑版本缺失，请保留输入并读取最新版本。')
         const beforeLog = (await tx.select<{ sequence: number }>('SELECT COALESCE(MAX(rowid),0) AS sequence FROM operation_logs'))[0]!.sequence
-        let saved: { id: string, logId: string | null }
+        let saved: { id: string, logId: string | null, expenseLineIds?: Array<string | null> }
+        const reimbursement = request.kind === 'reimbursement' && !('clearanceVerificationEdit' in request.draft) && !('clearanceAttachmentsOnly' in request.draft) ? request.draft as ExpenseReimbursementFormDraft : null
+        const newOriginalLines = (reimbursement?.lines ?? []).flatMap((line, index) => !line.id && !line.originalExpenseLineId ? [{ line, index, main: line.constructionMain ?? reimbursement?.constructionMain }] : [])
+        if (newOriginalLines.length && newOriginalLines.some(row => !row.main))
+          fail('validation-failed', '新建原费用明细必须搜索并选择实际工程对应的施工主合同。')
+        if (newOriginalLines.some(row => row.main?.projectId !== reimbursement?.projectId))
+          fail('validation-failed', '本单费用明细必须属于同一实际工程；跨工程费用请分单记录。')
         const verificationEdit = 'verificationEdit' in request.draft ? request.draft.verificationEdit : undefined
         const clearanceEdit = 'clearanceVerificationEdit' in request.draft ? request.draft.clearanceVerificationEdit : undefined
         const clearanceAttachmentsOnly = 'clearanceAttachmentsOnly' in request.draft && request.draft.clearanceAttachmentsOnly === true
@@ -233,7 +278,20 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
         await tx.execute('UPDATE operation_logs SET operator=? WHERE rowid>?', [actor.actorId, beforeLog])
         await tx.execute('UPDATE finance_revision SET revision=revision+1 WHERE singleton=1')
         await tx.execute('INSERT INTO finance_history VALUES(?,?,?,?,?,?,?)', [request.kind, saved.id, next, request.commandId, actor.actorId, updatedAt, JSON.stringify(await financeRecordSnapshot(tx, request.kind, saved.id))])
-        const result: FinanceCommandResult = { ...saved, commandId: request.commandId, version: String(next), updatedAt, attachmentIds, ...(paymentVerification ? { paymentVerificationSha256: financeCommandFingerprint(paymentVerification) } : {}), ...(clearanceVerification ? { clearanceVerificationSha256: financeCommandFingerprint(clearanceVerification), clearanceVerificationId: clearanceVerification.id } : {}) }
+        const constructionScopeLinks = []
+        for (const row of newOriginalLines) {
+          const id = saved.expenseLineIds?.[row.index]
+          // The original draft owner deliberately omits zero-valued rows. They
+          // have no stable expense identity and must not create a second fact.
+          if (!id && request.action === 'draft' && Number(row.line.amount) === 0)
+            continue
+          if (!id || !row.main)
+            fail('unavailable', '原费用命令没有返回本行真实稳定编号，工程归属与费用整批撤回。')
+          constructionScopeLinks.push(await appendProductionConstructionScopeBinding(tx, actor, { source: { domain: 'original-expense', id }, main: row.main, original: { family: 'finance-reimbursement', commandId: request.commandId } }))
+        }
+        const { expenseLineIds: _expenseLineIds, ...sourceResult } = saved
+        const expenseLineIdentities = saved.expenseLineIds?.flatMap((id, inputIndex) => id ? [{ inputIndex, id }] : [])
+        const result: FinanceCommandResult = { ...sourceResult, commandId: request.commandId, version: String(next), updatedAt, attachmentIds, ...(expenseLineIdentities ? { expenseLineIdentities } : {}), ...(constructionScopeLinks.length ? { constructionScopeLinks } : {}), ...(paymentVerification ? { paymentVerificationSha256: financeCommandFingerprint(paymentVerification) } : {}), ...(clearanceVerification ? { clearanceVerificationSha256: financeCommandFingerprint(clearanceVerification), clearanceVerificationId: clearanceVerification.id } : {}) }
         await tx.execute('UPDATE finance_commands SET result_json=? WHERE command_id=?', [JSON.stringify(result), request.commandId])
         await validateExpenseClearanceJournal(tx, actor)
         await tx.execute('RELEASE finance_operation')
@@ -405,6 +463,9 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
         if (!source.length && query.contractKinds?.some(value => value !== '材采') && !owners.contractCandidates)
           fail('unavailable', '所需正式合同候选来源尚未接通。')
         rows = source.map(row => ({ id: String(row.id), label: String(row.name ?? ''), hint: String(row.no ?? row.id) }))
+      }
+      else if (query.kind === 'construction-mains') {
+        rows = (await readProductionConstructionMainOptions(tx, actor)).filter(main => !query.projectId || main.projectId === query.projectId).map(main => ({ id: main.id, label: `${main.projectName} · ${main.name}${main.no ? ` / ${main.no}` : ''}`, hint: main.no, constructionMain: { id: main.id, projectId: main.projectId, basis: main.basis } }))
       }
       else if (query.kind === 'settlements') {
         if (!actor.capabilities.includes('other-settlement:read'))

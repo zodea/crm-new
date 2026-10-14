@@ -63,7 +63,6 @@ test('真实冻结楼层范围在预览、XLSX及分页打印一致，不补断�
       await expect.poll(() => table.evaluate(node => node.scrollLeft)).toBeGreaterThan(0)
     }
     await frozen.getByRole('heading', { name: '原冻结施工范围', exact: true }).scrollIntoViewIfNeeded()
-    await page.screenshot({ path: info.outputPath(`location-${width}.png`), fullPage: true })
   }
   const download = page.waitForEvent('download')
   await frozen.getByRole('button', { name: '下载冻结工资表', exact: true }).click()

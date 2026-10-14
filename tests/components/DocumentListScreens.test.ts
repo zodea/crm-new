@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, onActivated, onMounted, reactive, shallowRef, watch } from 'vue'
 import FinanceListScreen from '~/components/finance/FinanceListScreen.vue'
 import MaterialListScreen from '~/components/material/MaterialListScreen.vue'
-import ListFilterBar from '~/components/shared/ListFilterBar.vue'
 import SearchInput from '~/components/ui/SearchInput.vue'
 import { F3_FORM_META } from '~/lib/finance/page'
 import { MATERIAL_FORM_META } from '~/lib/material/page'
@@ -31,7 +30,7 @@ const TableStub = defineComponent({
 function mountList(component: typeof FinanceListScreen | typeof MaterialListScreen, kind: string) {
   return render(component, {
     props: { kind } as never,
-    global: { plugins: [createPinia()], components: { KitTable: TableStub, ListFilterBar, SearchInput }, stubs: { TreeNav: true, SelectFilter: true, KitButton: { template: '<button><slot /></button>' } } },
+    global: { plugins: [createPinia()], components: { KitTable: TableStub, SearchInput }, stubs: { TreeNav: true, SelectFilter: true, KitButton: { template: '<button><slot /></button>' } } },
   })
 }
 

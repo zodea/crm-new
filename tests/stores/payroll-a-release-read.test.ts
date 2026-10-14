@@ -95,15 +95,15 @@ it.each([
     const output = await store.loadAOutput({ origin: 'real' }, statementId)
     expect(refreshed).toMatchObject({ status: 'released', context: { readonly: false } })
     expect(output).toMatchObject({ state: 'available', context: { readonly: true }, document: { actualAmount } })
-    expect(() => store.acknowledgeA(original, before, output)).toThrow()
-    expect(() => store.acknowledgeA(original, refreshed, structuredClone(output))).toThrow()
+    expect(() => store.acknowledgeA(original, before, output)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
+    expect(() => store.acknowledgeA(original, refreshed, structuredClone(output))).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
 
     if (corrupt && output.state === 'available') {
       const invalid = corrupt(output)
 
       const mock = vi.spyOn(repository, 'aOutput').mockResolvedValueOnce(invalid)
       const read = await store.loadAOutput({ origin: 'real' }, statementId)
-      expect(() => store.acknowledgeA(original, refreshed, read)).toThrow()
+      expect(() => store.acknowledgeA(original, refreshed, read)).toThrow('原目标尚未完整读取确认，请保留原输入并重试核对')
       expect(store.getAPending(before)?.state).toBe('awaiting-read')
       mock.mockRestore()
     }

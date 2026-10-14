@@ -8,6 +8,7 @@ import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { buildCustomerDetailRead, buildCustomerListPage, customerProblem, parseCustomerDetailQuery, parseCustomerListQuery } from '../../app/lib/customer/repository'
+import { readProductionConstructionDirectoryProjection } from './production-construction-contract-sources'
 import { CUSTOMER_FIELDS, customerAttachment, customerDraft, customerListRow, customerFailure as fail, normalizedCustomer } from './production-customer-record'
 import { parseProductionCustomerRequest, productionCustomerId } from './production-customer-request'
 import { productionCustomerProjects } from './production-project-relations'
@@ -52,6 +53,24 @@ async function stored(tx: TransactionDb, id: string): Promise<CustomerRow> {
     fail('not-found', '客户不存在，请从客户列表重新进入。')
   customerDraft(row)
   return row
+}
+/** 直接引用客户的有效业务记录；所属参与者尚未安装时跳过。收付款经项目间接关联，项目在用即阻止。 */
+const CUSTOMER_REFERENCES = [
+  { table: 'projects', label: '项目', unit: '个', where: '(customer_id=? OR secondary_customer_id=?)', params: 2 },
+  { table: 'construction_contract_records', label: '施工合同', unit: '份', where: 'customer_id=?', params: 1 },
+  { table: 'invoice_applications', label: '开票申请', unit: '张', where: 'customer_id=?', params: 1 },
+] as const
+async function activeCustomerReferences(tx: TransactionDb, id: string): Promise<string[]> {
+  const installed = new Set((await tx.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')).map(row => row.name))
+  const found: string[] = []
+  for (const ref of CUSTOMER_REFERENCES) {
+    if (!installed.has(ref.table))
+      continue
+    const [row] = await tx.select<{ n: number }>(`SELECT COUNT(*) AS n FROM ${ref.table} WHERE deleted_at IS NULL AND ${ref.where}`, Array.from({ length: ref.params }).fill(id))
+    if (row && row.n > 0)
+      found.push(`${ref.label} ${row.n} ${ref.unit}`)
+  }
+  return found
 }
 async function attachments(tx: TransactionDb, id: string) {
   return (await tx.select<Record<string, unknown>>('SELECT * FROM file_refs WHERE owner_type=\'customer\' AND owner_id=? ORDER BY uploaded_at,id', [id])).map(customerAttachment)
@@ -156,6 +175,11 @@ export function createProductionCustomerService(storage: ProductionStorage) {
         const previous = await stored(tx, request.id)
         if (request.baseVersion !== String(previous.version) || (request.action === 'delete' ? !!previous.deleted_at : !previous.deleted_at))
           fail('conflict', '客户状态或版本已变化，请重新核对。')
+        if (request.action === 'delete') {
+          const references = await activeCustomerReferences(tx, request.id)
+          if (references.length)
+            fail('conflict', `客户仍被${references.join('、')}引用，不能删除；请先处理这些记录。`)
+        }
         const now = new Date().toISOString()
         const deletedAt = request.action === 'delete' ? now : null
         const version = previous.version + 1
@@ -235,13 +259,15 @@ export function createProductionCustomerService(storage: ProductionStorage) {
         const projectsProblem = projects === null ? actor.capabilities.includes('project:list:read') ? notReady : customerProblem('forbidden', '当前会话没有项目读取权限。') : undefined
         const projectRevision = projects === null ? null : (await tx.select<{ revision: number }>('SELECT revision FROM project_revision'))[0]!.revision
         const asOf = new Date().toISOString()
+        const construction = await readProductionConstructionDirectoryProjection(tx, actor, asOf)
+        const contractsProblem = construction.contracts === null ? construction.source.state === 'forbidden' ? customerProblem('forbidden', '当前会话没有施工主合同读取权限。') : notReady : undefined
         const meta = createReadMeta({ session: actor, schemaVersion: 'customer-read-v2', operation: 'customer:detail', dataOrigin: 'real', asOf, coverage: 'complete', scope: query, sources: [
           { key: 'customers', state: 'readable', sourceVersion: `customer:${row.version}`, asOf },
           projectsProblem ? { key: 'projects', state: projectsProblem.code === 'forbidden' ? 'forbidden' : 'unavailable', sourceVersion: null, asOf: null } : { key: 'projects', state: 'readable', sourceVersion: `projects:${projectRevision}`, asOf },
-          { key: 'construction-contracts', state: 'unavailable', sourceVersion: null, asOf: null },
+          construction.source,
           { key: 'receipts', state: 'unavailable', sourceVersion: null, asOf: null },
         ] })
-        return withReadMeta(buildCustomerDetailRead({ customers: [customerListRow(row)], projects: projects ?? [], contracts: [], receipts: [], query, ...(projectsProblem ? { projectsProblem } : {}), contractsProblem: notReady, receiptsProblem: notReady, asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), meta)
+        return withReadMeta(buildCustomerDetailRead({ customers: [customerListRow(row)], projects: projects ?? [], contracts: construction.contracts ?? [], receipts: [], query, ...(projectsProblem ? { projectsProblem } : {}), ...(contractsProblem ? { contractsProblem } : {}), receiptsProblem: notReady, asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), meta)
       })
     },
     file(customerId: string, fileId: string, session: ProductionSession) {

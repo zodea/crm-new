@@ -10,7 +10,7 @@ import { createOtherSettlementImportRepository } from '~/lib/other-settlement/im
 import { otherSettlementFingerprint } from '~/lib/other-settlement/storage'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 
-const repository = createOtherSettlementImportRepository((url, options) => $fetch<unknown>(url, { ...options, retry: 0 }))
+const repository = createOtherSettlementImportRepository((url, options) => $fetch<unknown, string>(url, { ...options, retry: 0 }))
 const business = useNuxtApp().$repositories.otherSettlements
 const recovery = createCommandRecoveryStorage()
 const kit = useKitUI()

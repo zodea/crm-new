@@ -89,7 +89,7 @@ test('当前清单、中央完工与甲方月报经真实 HTTP 联通，三量�
   expect(await read(`/api/commands/owner-documents/owner_report/${report.id}/form`, {})).toEqual(before)
 })
 
-test('月报实际表单切换基准可取消或重算，缺量保留待核对，五档视口提交后冻结快照', async ({ page, request }, testInfo) => {
+test('月报实际表单切换基准可取消或重算，缺量保留待核对，五档视口提交后冻结快照', async ({ page, request }) => {
   test.setTimeout(150_000)
   const { headers, boq, monthlyQuery, template, read, execute } = await setupMonthly(request)
   await page.setExtraHTTPHeaders(headers)
@@ -130,7 +130,6 @@ test('月报实际表单切换基准可取消或重算，缺量保留待核对�
     if (width <= 768)
       await expectLocalHorizontalScroll(page.getByTestId('owner-document-line-scroll'), `甲方报量明细 @ ${width}px`)
     await quantity.scrollIntoViewIfNeeded()
-    await page.screenshot({ path: testInfo.outputPath(`monthly-missing-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await basis.focus()
   await page.keyboard.press('Enter')
@@ -138,7 +137,6 @@ test('月报实际表单切换基准可取消或重算，缺量保留待核对�
   await expect(confirmation).toBeVisible()
   await confirmation.getByRole('button', { name: '确认重算' }).focus()
   await expect(confirmation.getByRole('button', { name: '确认重算' })).toBeFocused()
-  await page.screenshot({ path: testInfo.outputPath('monthly-basis-confirm.png'), fullPage: true, animations: 'disabled' })
   await page.keyboard.press('Enter')
   await expect(quantity).toHaveValue('6')
   const submitted = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents')
@@ -162,5 +160,4 @@ test('月报实际表单切换基准可取消或重算，缺量保留待核对�
   await expect(page.getByTestId('owner-commercial-document-detail')).toContainText('月报合成经办')
   await page.reload()
   await expect(page.getByRole('group', { name: '申报金额', exact: true })).toContainText('312.00')
-  await page.screenshot({ path: testInfo.outputPath('monthly-submitted-snapshot.png'), fullPage: true, animations: 'disabled' })
 })

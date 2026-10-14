@@ -234,6 +234,7 @@ useTabTitle(() => workspace.value
 </script>
 
 <template>
+  <QuantityCommandRecovery surface="region" :project-id="projectId" />
   <EntityFormShell
     data-testid="quantity-region-form"
     title="项目区域配置"
