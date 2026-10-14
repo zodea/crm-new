@@ -3,7 +3,10 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import InvoiceRecognitionChanges from '~/components/invoice/InvoiceRecognitionChanges.vue'
+import InvoiceRecognitionFieldMark from '~/components/invoice/InvoiceRecognitionFieldMark.vue'
 import InvoiceEditPage from '~/pages/finance/invoice/[id].vue'
+
+vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
 
 beforeEach(() => {
   for (const [name, value] of Object.entries({ computed, onMounted, ref, shallowRef, watch }))
@@ -11,76 +14,156 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-function mountEditPage(recognized: Record<string, unknown>) {
-  const invoice = ref({ id: 'i1', invoiceNumber: 'OLD', invoiceDate: '2026-09-05', seller: '供应商', buyer: '', buyerTaxNo: '', sellerTaxNo: '', invoiceType: '', taxRate: '', projectName: '', remark: '', totalAmount: 113, taxAmount: 13, ownerKind: 'personal', accountStatus: 'none', ocrStatus: 'done', reviewStatus: 'unreviewed', dupStatus: 'normal', items: [] })
+function mountEditPage(recognized: Record<string, unknown>, ocrStatus = 'done') {
+  const invoice = ref({ id: 'i1', invoiceNumber: 'OLD', invoiceDate: '2026-09-05', seller: '供应商', buyer: '', buyerTaxNo: '', sellerTaxNo: '', invoiceType: '', taxRate: '', projectName: '', remark: '', totalAmount: 113, taxAmount: 13, ownerKind: 'personal', accountStatus: 'none', ocrStatus, reviewStatus: 'reviewed', dupStatus: 'normal', items: [] })
+  const result = { ...invoice.value, ...recognized }
   let finish!: (success: boolean) => void
   const progress = ref<Record<string, number>>({})
-  const kit = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), confirm: vi.fn(), undoToast: vi.fn() }
+  const kit = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), confirm: vi.fn().mockResolvedValue(true), undoToast: vi.fn() }
+  const guards: Array<() => boolean | Promise<boolean>> = []
+  const run = async () => {
+    progress.value.i1 = 0
+    const success = await new Promise<boolean>((resolve) => {
+      finish = resolve
+    })
+    delete progress.value.i1
+    return success
+  }
   const store = {
     list: [invoice.value],
     byId: () => invoice.value,
     get recognitionProgress() { return progress.value },
     recognitionError: () => '识别失败',
     startRecognition: vi.fn(async () => {
-      progress.value.i1 = 0
-      const success = await new Promise<boolean>((resolve) => {
-        finish = resolve
-      })
+      const success = await run()
       if (success)
-        invoice.value = { ...invoice.value, ...recognized }
-      delete progress.value.i1
+        invoice.value = { ...invoice.value, ...recognized, ocrStatus: 'done' }
       return success
     }),
+    recognizeDraft: vi.fn(async () => (await run()) ? result : null),
+    saveRecognitionDraft: vi.fn().mockResolvedValue('log'),
     update: vi.fn().mockResolvedValue('saved'),
   }
   vi.stubGlobal('useRoute', () => ({ fullPath: '/finance/invoice/i1', params: { id: 'i1' } }))
   vi.stubGlobal('useRouter', () => ({ push: vi.fn() }))
   vi.stubGlobal('useInvoiceStore', () => store)
   vi.stubGlobal('useProjectStore', () => ({ list: [] }))
-  vi.stubGlobal('useTabsStore', () => ({ close: vi.fn(), registerCloseGuard: () => () => {} }))
+  vi.stubGlobal('useTabsStore', () => ({ close: vi.fn(), registerCloseGuard: (_key: string, guard: () => boolean | Promise<boolean>) => {
+    guards.push(guard)
+    return () => {}
+  } }))
   vi.stubGlobal('useTabTitle', vi.fn())
   vi.stubGlobal('useKitUI', () => kit)
-  const view = render(InvoiceEditPage, { global: { components: { InvoiceRecognitionChanges }, stubs: ['InvoicePreviewSvg', 'NuxtLink'] } })
+  const view = render(InvoiceEditPage, { global: { components: { InvoiceRecognitionChanges, InvoiceRecognitionFieldMark }, stubs: ['InvoicePreviewSvg', 'NuxtLink'] } })
   const recognize = async (success: boolean) => {
     await fireEvent.click(view.getByRole('button', { name: '重新识别' }))
     finish(success)
     await flushPromises()
   }
-  return { view, store, kit, recognize }
+  const save = async () => {
+    await fireEvent.click(view.getByRole('button', { name: '保存', exact: true }))
+    await flushPromises()
+  }
+  return { view, store, kit, recognize, save, guards }
 }
 
-describe('发票编辑页重新识别', () => {
-  it.each([
-    { label: '识别成功时用识别结果覆盖字段', succeeded: true },
-    { label: '识别失败时保留当前输入', succeeded: false },
-  ])('$label', async ({ succeeded }) => {
-    const { view, store, recognize } = mountEditPage({ invoiceNumber: 'NEW', totalAmount: 226, taxAmount: 26 })
-    await recognize(succeeded)
-    expect(view.container.querySelector('input')?.value).toBe(succeeded ? 'NEW' : 'OLD')
-    await fireEvent.click(view.getByRole('button', { name: '保存', exact: true }))
-    expect(store.update).toHaveBeenCalledWith('i1', expect.objectContaining({ invoiceNumber: succeeded ? 'NEW' : 'OLD', totalAmount: succeeded ? 226 : 113 }))
+describe('发票编辑页重新识别（草稿）', () => {
+  // 用户 2026-10-13 确认：重识别结果先作草稿，数据库保持识别前的值，保存须二次确认并列出变动。
+  it('识别成功只填进表单不写库；保存先二次确认列出变动，取消不写库且草稿与高亮保留', async () => {
+    const { view, store, kit, recognize, save } = mountEditPage({ invoiceNumber: 'NEW', totalAmount: 226, taxAmount: 26 })
+    await recognize(true)
+    expect(view.getByLabelText('单据编号')).toHaveProperty('value', 'NEW')
+    expect(store.update).not.toHaveBeenCalled()
+    expect(store.saveRecognitionDraft).not.toHaveBeenCalled()
+
+    kit.confirm.mockResolvedValueOnce(false)
+    await save()
+    expect(kit.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: '保存重新识别结果',
+      message: expect.stringContaining('· 单据编号：OLD → NEW'),
+    }))
+    expect(kit.confirm.mock.calls[0]![0].message).toContain('· 价税合计：113 → 226')
+    expect(store.saveRecognitionDraft).not.toHaveBeenCalled()
+    expect(store.update).not.toHaveBeenCalled()
+    expect(view.getByLabelText('单据编号')).toHaveProperty('value', 'NEW')
+    expect(view.getAllByTestId('invoice-recognition-field-mark')).toHaveLength(3)
+
+    await save()
+    expect(store.saveRecognitionDraft).toHaveBeenCalledWith('i1', expect.objectContaining({ invoiceNumber: 'NEW' }), expect.objectContaining({ invoiceNumber: 'NEW', totalAmount: 226, amount: 200 }))
+    expect(store.update).not.toHaveBeenCalled()
+    expect(kit.success).toHaveBeenLastCalledWith('已保存重新识别结果')
   })
 
-  // 用户 2026-10-08 确认：重识别可以覆盖人工稿，但覆盖后的值与识别前不同时须提醒，并能看到哪些字段有变动。
-  it('覆盖了未保存的人工修改时逐项提醒变动，关闭后提醒消失', async () => {
-    const { view, kit, recognize } = mountEditPage({ seller: '识别供应商', totalAmount: 226 })
+  it('识别失败时保留当前输入、不产生草稿，保存按普通修改直接提交', async () => {
+    const { view, store, kit, recognize, save } = mountEditPage({ invoiceNumber: 'NEW' })
+    await recognize(false)
+    expect(view.getByLabelText('单据编号')).toHaveProperty('value', 'OLD')
+    expect(view.queryByTestId('invoice-recognition-changes')).toBeNull()
+    expect(kit.error).toHaveBeenCalledWith('识别失败')
+    await save()
+    expect(kit.confirm).not.toHaveBeenCalled()
+    expect(store.update).toHaveBeenCalledWith('i1', expect.objectContaining({ invoiceNumber: 'OLD', totalAmount: 113 }))
+  })
+
+  it('变动字段输入框带角标与读屏原值；识别后再手改的字段改标“已人工修改”', async () => {
+    const { view, recognize } = mountEditPage({ seller: '识别供应商', totalAmount: 226 })
     await fireEvent.update(view.getByDisplayValue('供应商'), '人工更正供应商')
     await recognize(true)
 
     const changes = view.getByTestId('invoice-recognition-changes')
-    expect(changes.textContent).toContain('重新识别覆盖了 2 项与识别前不同的内容')
+    expect(changes.textContent).toContain('重新识别结果未保存：2 项与识别前不同')
     expect(changes.textContent).toContain('供应商：人工更正供应商 → 识别供应商')
     expect(changes.textContent).toContain('价税合计：113 → 226')
-    expect(kit.success).toHaveBeenCalledWith('识别完成，2 项与识别前不同，请核对')
+    const seller = view.getByLabelText('供应商')
+    const mark = document.getElementById(seller.getAttribute('aria-describedby')!)
+    expect(mark?.textContent).toContain('识别变动')
+    expect(mark?.textContent).toContain('识别前：人工更正供应商')
+    expect(seller.className).toContain('border-warn!')
+    expect(view.getByLabelText('单据编号').getAttribute('aria-describedby')).toBeNull()
 
-    await fireEvent.click(view.getByRole('button', { name: '关闭识别变动提醒' }))
-    expect(view.queryByTestId('invoice-recognition-changes')).toBeNull()
+    await fireEvent.update(seller, '再次人工')
+    expect(document.getElementById(seller.getAttribute('aria-describedby')!)?.textContent).toContain('已人工修改')
+    expect(changes.textContent).toContain('供应商：人工更正供应商 → 再次人工')
   })
 
-  it('识别结果与当前值一致时不显示变动提醒', async () => {
-    const { view, kit, recognize } = mountEditPage({})
+  it('放弃识别结果恢复识别前的表单（含未保存的手工修改），之后保存不再确认', async () => {
+    const { view, store, kit, recognize, save } = mountEditPage({ seller: '识别供应商' })
+    await fireEvent.update(view.getByDisplayValue('供应商'), '人工更正供应商')
     await recognize(true)
+    await fireEvent.click(view.getByRole('button', { name: '放弃识别结果' }))
+    expect(view.getByLabelText('供应商')).toHaveProperty('value', '人工更正供应商')
     expect(view.queryByTestId('invoice-recognition-changes')).toBeNull()
-    expect(kit.success).toHaveBeenCalledWith('识别完成，字段已刷新')
+    expect(view.queryAllByTestId('invoice-recognition-field-mark')).toHaveLength(0)
+    await save()
+    expect(kit.confirm).not.toHaveBeenCalled()
+    expect(store.update).toHaveBeenCalledWith('i1', expect.objectContaining({ seller: '人工更正供应商' }))
+  })
+
+  it('未保存的识别草稿走离开保护：关页签/离开须确认放弃，取消则留下', async () => {
+    const { kit, recognize, guards } = mountEditPage({ seller: '识别供应商' })
+    expect(await guards[0]!()).toBe(true)
+    await recognize(true)
+    kit.confirm.mockResolvedValueOnce(false)
+    expect(await guards[0]!()).toBe(false)
+    expect(kit.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ title: '放弃识别结果' }))
+  })
+
+  it('识别结果与当前值一致时也作草稿，提示一致且保存仍须确认', async () => {
+    const { view, kit, store, recognize, save } = mountEditPage({})
+    await recognize(true)
+    expect(view.getByTestId('invoice-recognition-changes').textContent).toContain('票面字段与识别前一致')
+    expect(kit.success).toHaveBeenCalledWith('识别完成，字段与识别前一致，保存后回到待校对')
+    await save()
+    expect(kit.confirm.mock.calls[0]![0].message).toContain('与识别前的票面字段一致')
+    expect(store.saveRecognitionDraft).toHaveBeenCalled()
+  })
+
+  it('未识别过的票首次识别仍直接写入并刷新表单', async () => {
+    const { view, store, recognize } = mountEditPage({ invoiceNumber: 'NEW' }, 'failed')
+    await recognize(true)
+    expect(store.startRecognition).toHaveBeenCalled()
+    expect(store.recognizeDraft).not.toHaveBeenCalled()
+    expect(view.getByLabelText('单据编号')).toHaveProperty('value', 'NEW')
+    expect(view.queryByTestId('invoice-recognition-changes')).toBeNull()
   })
 })
