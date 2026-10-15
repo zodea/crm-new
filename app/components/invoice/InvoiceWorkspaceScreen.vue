@@ -78,8 +78,23 @@ const draftSelected = computed(() => !!draft.value && draft.value.id === selecte
 // 中栏原图：选中票的原文件仍在上传会话中时统一用预览器显示（可缩放、旋转，PDF 逐页）；不在会话中如实说明。
 const selectedFile = computed(() => selectedId.value ? store.recognitionFile(selectedId.value) : undefined)
 // 区域框（区域只在内存中，原文件失效即随之失效）：重新识别草稿常驻框出变动字段（比对）；
-// 否则已识别票用最近写入的识别区域做点字段定位——聚焦/悬停字段时只框该字段，失焦撤回。
-const regionTarget = useInvoiceRegionTarget()
+// 否则已识别票用最近写入的识别区域做点字段定位——聚焦/悬停字段时只框该字段，失焦撤回；
+// 窄屏切到“原件”面板（失焦由切面板引起）时保留最近一次定位，切回“校对”后按新焦点更新。
+const selectedRegions = computed(() => {
+  const invoice = selectedInvoice.value
+  return invoice && !draftSelected.value && invoice.ocrStatus === 'done' && selectedFile.value
+    ? store.recognitionRegions(invoice.id)
+    : undefined
+})
+// 只认“校对 → 原件”的分段切换：宽屏三栏不显示分段，activePane 仅随打印排版跳到原件，不应恢复已撤的框。
+// 同步更新：分段在 mousedown 即切换，输入框随后才失焦，release 须已能看到切换结果。
+const sourceFromReview = shallowRef(false)
+watch(activePane, (pane, previous) => {
+  sourceFromReview.value = pane === 'source' && previous === 'review'
+}, { flush: 'sync' })
+const regionTarget = useInvoiceRegionTarget({
+  revealLast: () => sourceFromReview.value && !!selectedRegions.value && workspaceMode.value === 'review',
+})
 const draftRegions = computed(() => {
   const current = draft.value
   if (!current || !draftSelected.value || !selectedFile.value)
@@ -88,10 +103,7 @@ const draftRegions = computed(() => {
   return groups.length || unlocated.length ? { mode: 'compare' as const, groups, unlocated, activeKey: regionTarget.active.value } : undefined
 })
 const focusRegions = computed(() => {
-  const invoice = selectedInvoice.value
-  const regions = invoice && !draftSelected.value && invoice.ocrStatus === 'done' && selectedFile.value
-    ? store.recognitionRegions(invoice.id)
-    : undefined
+  const regions = selectedRegions.value
   if (!regions)
     return undefined
   const { groups, unlocated } = invoiceRegionFocus(INVOICE_RECOGNITION_FIELDS, regions, regionTarget.active.value)
