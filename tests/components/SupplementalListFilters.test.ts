@@ -104,6 +104,8 @@ describe('补充列表的同字段多选', () => {
     vi.stubGlobal('useKitUI', () => ({}))
     vi.stubGlobal('useFileDialog', () => ({ open: vi.fn(), onChange: vi.fn() }))
     vi.stubGlobal('useDropZone', () => ({ isOverDropZone: ref(false) }))
+    vi.stubGlobal('useRoute', () => ({ fullPath: '/finance/invoice' }))
+    vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {} }))
     const Workbench = defineComponent({ setup: (_, { slots }) => () => h('div', slots.queue?.()) })
     render(InvoiceWorkspaceScreen, { global: { components: { InvoiceQueuePanel, AdaptiveWorkbench: Workbench }, stubs: { InvoiceWorkspaceToolbar: true, InvoiceManualEntryDialog: true, InvoicePrintDocument: true, InvoiceOriginalPanel: true, InvoicePrintLayout: true, InvoiceReviewForm: true } } })
     const queueRows = () => screen.getAllByRole('button', { name: /^选择发票 / })
