@@ -85,17 +85,13 @@ export function compareContractPrice(fact: ContractPriceFact, conversion?: Contr
   return { original: fact, ...convertOriginalPrice({ unit: fact.unit, quantity: fact.quantity, unitPrice: fact.taxInclusiveUnitPrice }, conversion) }
 }
 
-export function contractPriceSourceLink(row: ContractPriceFact, native = false) {
-  if (native && row.parentContractId)
-    return `/contract/material/form/${encodeURIComponent(row.contractId)}?supplement=1`
+export function contractPriceSourceLink(row: ContractPriceFact) {
   const query = new URLSearchParams()
-  if (!native) {
-    query.set('contractKind', 'material')
-    query.set('origin', row.dataOrigin)
-  }
+  query.set('contractKind', 'material')
+  query.set('origin', row.dataOrigin)
   if (row.parentContractId) {
     query.set('tab', 'supplements')
     query.set('supplementId', row.contractId)
   }
-  return `/contract/${encodeURIComponent(row.parentContractId ?? row.contractId)}${query.size ? `?${query}` : ''}`
+  return `/contract/${encodeURIComponent(row.parentContractId ?? row.contractId)}?${query}`
 }

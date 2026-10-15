@@ -14,7 +14,6 @@ import type { PayrollNumberingRepository } from './central-numbering-contract'
 import type { PayrollWorkbookRepository } from './central-workbook-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../project/repository'
 
-export const PAYROLL_READ_CAPABILITY = 'payroll:read' as const
 export type PayrollJson = null | boolean | number | string | PayrollJson[] | { [key: string]: PayrollJson }
 export interface PayrollJsonObject { [key: string]: PayrollJson }
 export interface PayrollQuery { origin: DataOriginDTO, includeDemo?: boolean, projectId?: string, month?: string, crewId?: string }

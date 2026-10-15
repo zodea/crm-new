@@ -10,7 +10,6 @@ import {
   loadLegacyProductionReadOnly,
   restoreBrowserDatabaseBackup,
   saveBrowserDatabase,
-  saveLegacyProductionReadOnly,
 } from '~/lib/db/browser-storage'
 
 type Listener = (event: Event) => void
@@ -186,14 +185,6 @@ describe('browser database migration backup', () => {
       snapshotSha256: 'b'.repeat(64),
       snapshot: new Uint8Array([1, 2, 3]),
     })).rejects.toMatchObject({ code: 'backup-integrity-failed' })
-  })
-
-  it('persists the legacy production read-only cutover independently from snapshots', async () => {
-    await expect(loadLegacyProductionReadOnly()).resolves.toBe(false)
-    await saveLegacyProductionReadOnly(true)
-    await expect(loadLegacyProductionReadOnly()).resolves.toBe(true)
-    await saveLegacyProductionReadOnly(false)
-    await expect(loadLegacyProductionReadOnly()).resolves.toBe(false)
   })
 
   it('persists and clears the active migration marker atomically with the legacy lock', async () => {

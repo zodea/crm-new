@@ -1,12 +1,9 @@
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { ScheduleContractBindingPreview } from '~/lib/schedule/contract-binding'
-import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
+import { fireEvent, render, screen } from '@testing-library/vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, shallowRef } from 'vue'
 import ScheduleContractBindingScreen from '~/components/schedule/ScheduleContractBindingScreen.vue'
-
-const isDesktopRuntime = vi.hoisted(() => vi.fn())
-vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime }))
 
 const LookupSelectStub = defineComponent({
   props: {
@@ -117,7 +114,6 @@ const store = {
 
 describe('scheduleContractBindingScreen', () => {
   beforeEach(() => {
-    isDesktopRuntime.mockReset().mockReturnValue(true)
     push.mockReset()
     confirm.mockReset().mockResolvedValue(true)
     success.mockReset()
@@ -141,72 +137,7 @@ describe('scheduleContractBindingScreen', () => {
     vi.unstubAllGlobals()
   })
 
-  it('桌面旧适配只检索当前项目施工合同，预览后确认绑定并返回原分组', async () => {
-    render(ScheduleContractBindingScreen, {
-      props: {
-        projectId: 'project-1',
-        groupId: 'group-1',
-      },
-      global: {
-        components: {
-          LookupSelect: LookupSelectStub,
-          ScheduleContractBindingReview: ReviewStub,
-        },
-      },
-    })
-
-    await waitFor(() => expect(store.loadProject).toHaveBeenCalledWith('project-1'))
-    expect(store.loadContracts).toHaveBeenCalledWith('project-1')
-
-    const search = await screen.findByRole('textbox', { name: '搜索合同名称或编号' })
-    await fireEvent.update(search, 'SG-001')
-    expect(screen.getByRole('button', { name: /施工总承包合同 SG-001/ })).not.toBeNull()
-    expect(screen.queryByRole('button', { name: /机电施工合同/ })).toBeNull()
-
-    await fireEvent.click(screen.getByRole('button', { name: /施工总承包合同 SG-001/ }))
-    await waitFor(() =>
-      expect(store.previewContractBinding).toHaveBeenCalledWith('group-1', 'contract-1'),
-    )
-    expect(screen.getByText('施工总承包合同')).not.toBeNull()
-
-    await fireEvent.click(screen.getByRole('button', { name: '确认绑定合同' }))
-    await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
-      title: '绑定施工合同「施工总承包合同」？',
-      confirmLabel: '确认绑定',
-    })))
-    expect(store.bindContract).toHaveBeenCalledWith('group-1', 'contract-1')
-    expect(success).toHaveBeenCalledWith('施工合同已绑定')
-    expect(push).toHaveBeenCalledWith({
-      path: '/schedule/project-1',
-      query: { group: 'group-1' },
-    })
-  })
-
-  it('桌面旧适配单份合同预览失败时保留检索入口供重新选择', async () => {
-    store.previewContractBinding.mockRejectedValueOnce(new Error('合同清单尚未拆表'))
-    render(ScheduleContractBindingScreen, {
-      props: {
-        projectId: 'project-1',
-        groupId: 'group-1',
-      },
-      global: {
-        components: {
-          LookupSelect: LookupSelectStub,
-          ScheduleContractBindingReview: ReviewStub,
-        },
-      },
-    })
-
-    const search = await screen.findByRole('textbox', { name: '搜索合同名称或编号' })
-    await fireEvent.update(search, 'SG-001')
-    await fireEvent.click(screen.getByRole('button', { name: /施工总承包合同 SG-001/ }))
-
-    expect((await screen.findByRole('alert')).textContent).toContain('合同清单尚未拆表')
-    expect(screen.getByRole('textbox', { name: '搜索合同名称或编号' })).not.toBeNull()
-  })
-
   it('浏览器中央绑定读取失败时明确报错，不回退读取或调用本地绑定', async () => {
-    isDesktopRuntime.mockReturnValue(false)
     vi.stubGlobal('useRoute', () => ({ fullPath: '/schedule/project-1/bind/group-1?origin=real', query: { origin: 'real' } }))
     vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, close: vi.fn() }))
     render(ScheduleContractBindingScreen, {

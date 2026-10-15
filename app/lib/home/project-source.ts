@@ -5,7 +5,7 @@ import type { ScheduleProjectView } from '~/lib/schedule/read-model'
 import type { DataOriginDTO } from '~/types/read-model'
 import { listAllProjects } from '~/lib/project/list-all'
 import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
-import { loadScheduleCatalog, loadScheduleProject } from '~/lib/schedule/read-model'
+import { loadScheduleProject } from '~/lib/schedule/read-model'
 
 export interface HomeProjectReference {
   key: string
@@ -31,12 +31,9 @@ function reference(row: ProjectListItemDTO): HomeProjectReference {
   return { key: homeProjectKey(row.project.id, row.dataOrigin), id: row.project.id, origin: row.dataOrigin, name: row.project.label, code: row.code, status: row.status }
 }
 
-export function createHomeProjectSource(options: { projects: ProjectListRepository, localDb: Pick<SoftDb, 'select'>, desktop?: boolean, schedule?: ReturnType<typeof createScheduleRepository> }) {
+export function createHomeProjectSource(options: { projects: ProjectListRepository, localDb: Pick<SoftDb, 'select'>, schedule?: ReturnType<typeof createScheduleRepository> }) {
   return {
     async catalog(includeDemo: boolean): Promise<HomeProjectReference[]> {
-      if (options.desktop) {
-        return (await loadScheduleCatalog(options.localDb)).map(row => ({ ...row, key: homeProjectKey(row.id, 'real'), origin: 'real' }))
-      }
       const rows = await listAllProjects(options.projects, {
         includeDemo,
         search: '',
@@ -49,21 +46,19 @@ export function createHomeProjectSource(options: { projects: ProjectListReposito
       return rows.map(reference)
     },
     async read(query: ProjectDetailQueryDTO, today: string): Promise<HomeProjectScheduleRead> {
-      if (query.origin === 'demo' && (!query.includeDemo || options.desktop))
+      if (query.origin === 'demo' && !query.includeDemo)
         throw new ProjectRepositoryProblem(projectProblem('forbidden', '测试项目未开启或当前环境不支持'))
-      const project = options.desktop
-        ? (await this.catalog(false)).find(row => row.id === query.id)
-        : reference((await options.projects.get(query)).item)
+      const project = reference((await options.projects.get(query)).item)
       if (!project)
         throw new ProjectRepositoryProblem(projectProblem('not-found', '项目不存在或已删除'))
-      if (!options.desktop && query.origin === 'real') {
+      if (query.origin === 'real') {
         if (options.schedule) {
           const read = await options.schedule.read({ projectId: query.id, origin: query.origin, includeDemo: query.includeDemo, today })
           return { project, availability: read.snapshot.groups.length ? 'ready' : 'empty', snapshot: read.snapshot, reason: '' }
         }
         return { project, availability: 'not-connected', snapshot: null, reason: '该项目的中央排程来源尚未接入，计划与实际进度未知。当前不会读取旧本地项目或演示排程补齐。' }
       }
-      if (!options.desktop && query.origin === 'demo' && options.schedule) {
+      if (query.origin === 'demo' && options.schedule) {
         const catalog = await options.schedule.catalog('demo', query.includeDemo)
         if (!catalog.projects.some(row => row.id === query.id))
           throw new ProjectRepositoryProblem(projectProblem('not-found', '当前演示项目不存在或已删除'))

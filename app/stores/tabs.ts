@@ -4,9 +4,7 @@ import type { Tab } from '~/lib/tabs/tab-machine'
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 import {
-  closeAll,
   closeOthers,
-  closeRight,
   closeTab,
   deriveKey,
   initialTabsState,
@@ -126,23 +124,6 @@ export const useTabsStore = defineStore('tabs', () => {
     applyClose(() => closeTab(state.value, key))
   }
 
-  function closeOther(key: string) {
-    applyClose(() => closeOthers(state.value, key))
-  }
-
-  function closeToRight(key: string) {
-    applyClose(() => closeRight(state.value, key))
-  }
-
-  function closeEvery() {
-    applyClose(() => closeAll())
-  }
-
-  /** 切换当前页签组件 key；外层 KeepAlive include 会据 invalidatedKeys 定向卸载旧实例。 */
-  function refreshActive() {
-    invalidate([activeKey.value])
-  }
-
   function acknowledgeInvalidations(keys: string[]) {
     const completed = new Set(keys)
     invalidatedKeys.value = invalidatedKeys.value.filter(key => !completed.has(key))
@@ -202,10 +183,6 @@ export const useTabsStore = defineStore('tabs', () => {
     open,
     activate,
     close,
-    closeOther,
-    closeToRight,
-    closeEvery,
-    refreshActive,
     registerCloseGuard,
     requestClose,
     requestCloseOther,

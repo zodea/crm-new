@@ -3,19 +3,16 @@ import type {
   FileRefDraft,
   FileRefRecord,
 } from '~/lib/forms/file-refs'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, readonly, shallowRef } from 'vue'
-import { toErrorMessage } from '~/lib/util/error'
 
 export type PendingOwnerDocumentAttachment = FileRefDraft & { localId: string }
 
 export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () => string } = {}) {
-  const { warning, error } = useKitUI()
+  const { warning } = useKitUI()
   const attachments = shallowRef<FileRefRecord[]>([])
   const pendingAttachments = shallowRef<PendingOwnerDocumentAttachment[]>([])
   const pendingRemoveIds = shallowRef<string[]>([])
   const pendingRestoreIds = shallowRef<string[]>([])
-  const desktopAttachmentPicker = shallowRef(isTauri())
 
   const dirty = computed(() =>
     pendingAttachments.value.length > 0
@@ -67,27 +64,6 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
     })))
   }
 
-  async function pickNativeFiles() {
-    try {
-      const [{ open }, { stat }, { basename }] = await Promise.all([
-        import('@tauri-apps/plugin-dialog'),
-        import('@tauri-apps/plugin-fs'),
-        import('@tauri-apps/api/path'),
-      ])
-      const selected = await open({ multiple: true, directory: false })
-      const paths = selected == null ? [] : Array.isArray(selected) ? selected : [selected]
-      const files = await Promise.all(paths.map(async filePath => ({
-        fileName: await basename(filePath),
-        filePath,
-        fileSize: (await stat(filePath)).size,
-      })))
-      append(files)
-    }
-    catch (cause) {
-      error(`选择附件失败：${toErrorMessage(cause)}`)
-    }
-  }
-
   function toggleExisting(id: string) {
     const attachment = attachments.value.find(file => file.id === id)
     if (attachment?.deletedAt) {
@@ -119,13 +95,11 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
     pendingAttachments: readonly(pendingAttachments),
     pendingRemoveIds: readonly(pendingRemoveIds),
     pendingRestoreIds: readonly(pendingRestoreIds),
-    desktopAttachmentPicker: readonly(desktopAttachmentPicker),
     dirty,
     reset,
     clearPending,
     changes,
     handleFiles,
-    pickNativeFiles,
     toggleExisting,
     removePending,
     patchPending,

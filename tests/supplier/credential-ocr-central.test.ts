@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { describe, expect, it } from 'vitest'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 import { createSupplierCredentialOcrService } from '../../server/utils/supplier-credential-ocr-service'
 import { createSupplierCredentialService } from '../../server/utils/supplier-credential-service'
 
@@ -8,7 +8,7 @@ const session = { workspaceId: 'ocr', actorId: 'reviewer', capabilities: ['suppl
 const result = { engine: 'paddleocr-official-api' as const, model: 'PaddleOCR-VL-1.6' as const, jobId: 'synthetic', pages: [], markdownPages: ['营业执照\n统一社会信用代码：913100001234567890\n公司名称：识别公司'], dataInfo: {} }
 
 async function setup(recognize = async () => result) {
-  const commands = createSupplierCommandTestInstance()
+  const commands = createSupplierCommandService()
   const created = await commands.execute({ action: 'save', commandId: 'create', requiredCapability: 'supplier:write', workspaceId: 'ocr', actorId: 'reviewer', baseVersion: null, attachments: {}, draft: { name: '当前公司', supplierCategory: '其他', contact: '联系人', uniqueCode: 'INTERNAL-ONLY' } }, session)
   const ports = { read: commands.readCredentialScope, transact: commands.transactCredentialScope }
   const credentials = createSupplierCredentialService(ports)

@@ -3,7 +3,6 @@ import type { PayrollDayworkCommand } from '../../app/lib/payroll/central-daywor
 import { createHash } from 'node:crypto'
 import { afterEach, expect, it } from 'vitest'
 import { payrollCanonical } from '../../app/lib/payroll/central-command-shared'
-import { saveSignedDayworkRecord, upsertC2SubjectConfig } from '../../app/lib/payroll/daywork'
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { payrollC2MigrationReferences, payrollC2ReceiptReferences } from '../../server/utils/payroll-c2-migration-references'
@@ -26,8 +25,8 @@ it('另一项目真实 C2 核对来源保留时，可单独准备恢复未被引
     await db.execute('INSERT INTO projects(id,name) VALUES (\'unrelated-project\',\'另一个工程\')')
     await db.execute('INSERT INTO crews(id,name) VALUES (\'unrelated-crew\',\'另一班组\')')
     await db.execute('INSERT INTO workers(id,name,crew_id,current_project_id) VALUES (\'unrelated-worker\',\'另一负责人\',\'unrelated-crew\',\'unrelated-project\')')
-    await upsertC2SubjectConfig(db, { projectId: 'unrelated-project', crewId: 'unrelated-crew', leaderWorkerId: 'unrelated-worker', unitRate: 350, ruleText: '' })
-    await saveSignedDayworkRecord(db, { projectId: 'unrelated-project', crewId: 'unrelated-crew', workerId: 'unrelated-worker', workDate: '2026-08-01', workContent: '另一项目零星签工', startTime: '08:00', endTime: '12:00', laborUnits: 0.5, witness: '证明人', confirmedOn: '2026-08-02', status: 'confirmed' })
+    await db.execute('INSERT INTO payroll_subject_configs(id,project_id,crew_id,leader_worker_id,format_family,unit_rate,rule_text) VALUES (?,?,?,?,\'C2\',?,\'\')', ['unrelated-config', 'unrelated-project', 'unrelated-crew', 'unrelated-worker', 350])
+    await db.execute('INSERT INTO signed_daywork_records(id,project_id,crew_id,worker_id,work_date,work_content,start_time,end_time,labor_units,witness,confirmed_on,status) VALUES (\'unrelated-daywork\',\'unrelated-project\',\'unrelated-crew\',\'unrelated-worker\',\'2026-08-01\',\'另一项目零星签工\',\'08:00\',\'12:00\',0.5,\'证明人\',\'2026-08-02\',\'confirmed\')')
     const { batch } = await importPayrollC2MigrationSource(db)
     const projectId = batch.mappings.find(row => row.entityType === 'projects' && row.legacyId === 'unrelated-project')!.serverId
     const leaderWorkerId = batch.mappings.find(row => row.entityType === 'workers' && row.legacyId === 'unrelated-worker')!.serverId

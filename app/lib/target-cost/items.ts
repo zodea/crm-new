@@ -1,6 +1,5 @@
 import type { TransactionDb } from '~/lib/db/coordinator'
 import type { CostCategory } from '~/lib/project/cost-control'
-import { withTransaction } from '~/lib/db/connection'
 import { logCreate, selectVisibleSql, softDelete, withUpdateLog } from '~/lib/db/soft-delete'
 import { COST_CATEGORIES } from '~/lib/project/cost-control'
 import { generateId } from '~/lib/util/id'
@@ -86,9 +85,6 @@ async function assertActiveTargetCost(tx: TransactionDb, targetCostId: string): 
   }>(selectVisibleSql('target_costs', 'AND id = ?'), [targetCostId])
   if (!rows[0])
     throw new Error('目标成本版本不存在或已删除')
-}
-export async function saveTargetCostItems(targetCostId: string, drafts: readonly TargetCostItemDraft[]): Promise<void> {
-  await withTransaction(tx => persistTargetCostItems(tx, targetCostId, drafts))
 }
 export async function persistTargetCostItems(tx: TransactionDb, targetCostId: string, drafts: readonly TargetCostItemDraft[], operator = ''): Promise<void> {
   const items = normalizeTargetCostItems(drafts)

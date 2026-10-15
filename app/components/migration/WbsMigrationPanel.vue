@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { CommandRecoveryDescriptor } from '~/lib/forms/command-recovery'
 import type { WbsImportCommand, WbsImportPreview, WbsImportResult } from '~/lib/schedule/import-contract'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { useKitUI } from '~/composables/useKitUI'
@@ -13,7 +12,6 @@ import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
 
 interface State { context: { workspaceId: string, actorId: string, capabilities: string[] }, sources: Array<{ importId: string, sourceSha256: string, projectIds: string[], groupIds: string[], taskIds: string[], importedAt: string, restored: boolean }> }
-const native = isTauri()
 const state = shallowRef<State | null>(null)
 const source = shallowRef<WbsImportCommand['source'] | null>(null)
 const preview = shallowRef<WbsImportPreview | null>(null)
@@ -200,8 +198,9 @@ async function readOriginals(projectId: string) {
   })
 }
 onMounted(() => {
-  if (!native)
-    void run(async (epoch) => { await readState(epoch) })
+  void run(async (epoch) => {
+    await readState(epoch)
+  })
 })
 </script>
 
@@ -213,57 +212,53 @@ onMounted(() => {
     <p class="mt-2 text-12px text-ink-soft">
       选择完整 SQLite 原库，明确对应正式项目、原区域与不可变工序库版本。原任务、依赖、基线、楼层计划、已删除历史及原件一并保留。历史合同依据保留；新的合同范围与绑定等待正式上游接齐。
     </p>
-    <p v-if="native" class="mt-3 text-12px text-warn-ink">
-      请从已配置的本机正式浏览器入口接管。
+
+    <p v-if="error" role="alert" class="mt-3 break-words text-12px text-danger">
+      {{ error }}
     </p>
-    <template v-else>
-      <p v-if="error" role="alert" class="mt-3 break-words text-12px text-danger">
-        {{ error }}
+    <KitButton v-if="!state" class="mt-3" :disabled="busy" @click="run(async epoch => { await readState(epoch) })">
+      重新读取WBS接管权限
+    </KitButton>
+    <template v-if="state">
+      <label class="mt-4 block text-12px">WBS SQLite 原库<input type="file" accept=".sqlite,.db,.sqlite3" class="mt-2 block w-full" :disabled="busy || !!pending" @change="choose"></label>
+      <p v-if="sourceName" class="mt-2 break-words text-12px">
+        {{ sourceName }}
       </p>
-      <KitButton v-if="!state" class="mt-3" :disabled="busy" @click="run(async epoch => { await readState(epoch) })">
-        重新读取WBS接管权限
-      </KitButton>
-      <template v-if="state">
-        <label class="mt-4 block text-12px">WBS SQLite 原库<input type="file" accept=".sqlite,.db,.sqlite3" class="mt-2 block w-full" :disabled="busy || !!pending" @change="choose"></label>
-        <p v-if="sourceName" class="mt-2 break-words text-12px">
-          {{ sourceName }}
-        </p>
-        <div v-if="preview" class="mt-4 grid min-w-0 gap-3 text-12px">
-          <p>原库包含 {{ preview.projects.length }} 个排程项目；缺少原冻结量详情会明确保留为未知。</p>
-          <label v-for="row in preview.references" :key="referenceKey(row)" class="grid min-w-0 gap-2">{{ referenceLabels[row.table] }} · {{ row.name }}（{{ row.id }}）<select v-model="selected[referenceKey(row)]" class="field-input w-full" :disabled="busy || !!pending"><option value="">明确选择正式范围</option><option v-for="candidate in row.candidates" :key="candidate.id" :value="candidate.id">{{ candidate.name }}（{{ candidate.id }}）{{ candidate.deletedAt ? ' · 已删除，仅保历史关联' : '' }}</option></select></label>
-          <label v-for="row in preview.libraries" :key="row.id" class="grid min-w-0 gap-2">原工序库：{{ row.name }} · V{{ row.version }}<select v-model="selectedLibraries[row.id]" class="field-input w-full" :disabled="busy || !!pending"><option value="">明确选择已核验版本</option><option v-for="candidate in row.candidates" :key="candidate.id" :value="candidate.id">{{ candidate.name }} · V{{ candidate.version }}（{{ candidate.id }}）</option></select><span v-if="!row.candidates.length" class="text-warn-ink">正式目录没有逐字段吻合的原版本。保留原库，在工序库核对完整版本后重新预检；历史证据不能替代上游。</span></label>
-          <label v-for="file in preview.requiredOriginals" :key="file.id" class="grid gap-2">补齐原件：{{ file.name }}<input type="file" :disabled="busy || !!pending" @change="original(file.id, $event)"></label>
-          <KitButton class="justify-self-start" :disabled="!canAdopt" @click="adopt">
-            核对并接管WBS
-          </KitButton>
-        </div>
-        <div v-if="pending" class="mt-4 text-12px">
-          <p>原提交结果待核对；刷新后只凭原编号读取结果。</p><KitButton class="mt-2" :disabled="busy" @click="recover">
-            核对原WBS接管提交
-          </KitButton>
-        </div>
-        <p v-if="result" class="mt-3 text-12px text-ok">
-          {{ result.restored ? '原批次已归档，原图与原件证据保留。' : 'WBS接管已核对，可从施工进度读取。' }}
-        </p>
-        <ul class="mt-4 grid min-w-0 gap-3 text-12px">
-          <li v-for="item in state.sources" :key="item.importId" class="min-w-0 border-t border-line pt-3">
-            <p class="break-words">
-              {{ item.importedAt }} · {{ item.groupIds.length }} 组 · {{ item.taskIds.length }} 个任务 · {{ item.restored ? '已恢复' : '已接管' }}
-            </p><div class="mt-2 flex flex-wrap gap-2">
-              <KitButton v-if="!item.restored" variant="secondary" :disabled="busy || !!pending" @click="restore(item.importId)">
-                核对并恢复本批WBS
-              </KitButton><KitButton v-for="id in item.projectIds" :key="id" variant="secondary" :disabled="busy" @click="readOriginals(id)">
-                读取原件列表
-              </KitButton>
-            </div>
-          </li>
-        </ul>
-        <ul class="mt-3 grid gap-2 text-12px">
-          <li v-for="file in files" :key="file.id">
-            <a v-if="file.url" :href="file.url" :download="file.name" class="text-brand underline">{{ file.name || file.id }} · 下载保留的原件</a><span v-else>{{ file.name || file.id }} · 原来源没有正文，缺件证据保留</span>
-          </li>
-        </ul>
-      </template>
+      <div v-if="preview" class="mt-4 grid min-w-0 gap-3 text-12px">
+        <p>原库包含 {{ preview.projects.length }} 个排程项目；缺少原冻结量详情会明确保留为未知。</p>
+        <label v-for="row in preview.references" :key="referenceKey(row)" class="grid min-w-0 gap-2">{{ referenceLabels[row.table] }} · {{ row.name }}（{{ row.id }}）<select v-model="selected[referenceKey(row)]" class="field-input w-full" :disabled="busy || !!pending"><option value="">明确选择正式范围</option><option v-for="candidate in row.candidates" :key="candidate.id" :value="candidate.id">{{ candidate.name }}（{{ candidate.id }}）{{ candidate.deletedAt ? ' · 已删除，仅保历史关联' : '' }}</option></select></label>
+        <label v-for="row in preview.libraries" :key="row.id" class="grid min-w-0 gap-2">原工序库：{{ row.name }} · V{{ row.version }}<select v-model="selectedLibraries[row.id]" class="field-input w-full" :disabled="busy || !!pending"><option value="">明确选择已核验版本</option><option v-for="candidate in row.candidates" :key="candidate.id" :value="candidate.id">{{ candidate.name }} · V{{ candidate.version }}（{{ candidate.id }}）</option></select><span v-if="!row.candidates.length" class="text-warn-ink">正式目录没有逐字段吻合的原版本。保留原库，在工序库核对完整版本后重新预检；历史证据不能替代上游。</span></label>
+        <label v-for="file in preview.requiredOriginals" :key="file.id" class="grid gap-2">补齐原件：{{ file.name }}<input type="file" :disabled="busy || !!pending" @change="original(file.id, $event)"></label>
+        <KitButton class="justify-self-start" :disabled="!canAdopt" @click="adopt">
+          核对并接管WBS
+        </KitButton>
+      </div>
+      <div v-if="pending" class="mt-4 text-12px">
+        <p>原提交结果待核对；刷新后只凭原编号读取结果。</p><KitButton class="mt-2" :disabled="busy" @click="recover">
+          核对原WBS接管提交
+        </KitButton>
+      </div>
+      <p v-if="result" class="mt-3 text-12px text-ok">
+        {{ result.restored ? '原批次已归档，原图与原件证据保留。' : 'WBS接管已核对，可从施工进度读取。' }}
+      </p>
+      <ul class="mt-4 grid min-w-0 gap-3 text-12px">
+        <li v-for="item in state.sources" :key="item.importId" class="min-w-0 border-t border-line pt-3">
+          <p class="break-words">
+            {{ item.importedAt }} · {{ item.groupIds.length }} 组 · {{ item.taskIds.length }} 个任务 · {{ item.restored ? '已恢复' : '已接管' }}
+          </p><div class="mt-2 flex flex-wrap gap-2">
+            <KitButton v-if="!item.restored" variant="secondary" :disabled="busy || !!pending" @click="restore(item.importId)">
+              核对并恢复本批WBS
+            </KitButton><KitButton v-for="id in item.projectIds" :key="id" variant="secondary" :disabled="busy" @click="readOriginals(id)">
+              读取原件列表
+            </KitButton>
+          </div>
+        </li>
+      </ul>
+      <ul class="mt-3 grid gap-2 text-12px">
+        <li v-for="file in files" :key="file.id">
+          <a v-if="file.url" :href="file.url" :download="file.name" class="text-brand underline">{{ file.name || file.id }} · 下载保留的原件</a><span v-else>{{ file.name || file.id }} · 原来源没有正文，缺件证据保留</span>
+        </li>
+      </ul>
     </template>
   </section>
 </template>

@@ -7,7 +7,6 @@ import { createTargetCostRepository } from '~/lib/target-cost/central-repository
 import { useTargetCostStore } from '~/stores/target-cost'
 import { useTargetCostListStore } from '~/stores/target-cost-list'
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 const local = vi.hoisted(() => ({ getDb: vi.fn(), select: vi.fn(), withTransaction: vi.fn() }))
 vi.mock('~/lib/db/connection', () => local)
 const repo = { list: vi.fn(), form: vi.fn(), execute: vi.fn(), resolve: vi.fn() }

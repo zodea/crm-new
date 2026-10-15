@@ -7,7 +7,6 @@ import tabSessionPlugin from '~/plugins/tab-session.client'
 vi.hoisted(() => {
   vi.stubGlobal('defineNuxtPlugin', (value: unknown) => value)
 })
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()

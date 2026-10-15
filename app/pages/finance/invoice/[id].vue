@@ -3,11 +3,16 @@
 // 重新识别 + 删除（软删 + 10 秒撤回 + 关页签）/ 保存（关页签回台账）。
 // 字段走本地缓冲、保存一次提交（区别于工作台 correctField 即时落库）——
 // 归档后保存前的 simple 二次确认（ADR 0003）在提交口拦截。
+// 重新识别结果只作草稿填进缓冲，保存前二次确认列出变动；未保存的识别草稿离开/关页签须确认放弃。
 // 同票复用页签由 tab-machine 同路由同参数复用保证；页签标题「发票·尾8位」useTabTitle 回填。
-import type { InvoiceRecognitionChange } from '~/lib/invoice/recognition-changes'
+import type { RecognizedInvoiceFields } from '~/lib/invoice/recognize'
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import type { Invoice } from '~/stores/invoice'
-import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges } from '~/lib/invoice/recognition-changes'
+import { onBeforeRouteLeave } from 'vue-router'
+import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
+import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges, invoiceRecognitionMarks, invoiceRecognitionSaveMessage } from '~/lib/invoice/recognition-changes'
+import { invoiceRegionHighlights } from '~/lib/invoice/recognition-regions'
 import { invoiceDocStatus } from '~/lib/invoice/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { round2 } from '~/lib/util/number'
@@ -95,10 +100,61 @@ const docChip = computed(() => {
 })
 const showItems = shallowRef(false)
 
+// ── 重新识别草稿（用户 2026-10-13 确认）：识别结果只填进表单缓冲，数据库保持识别前的值，
+// 保存时二次确认列出变动；放弃则恢复识别前的表单。首次识别（未识别/失败票）仍直接写库。
+interface RecognitionDraft {
+  /** 识别前用户看到的表单（含当时未保存的手工修改）；多次重识别保留最早一份 */
+  before: FormShape
+  recognized: RecognizedInvoiceFields
+  /** 识别结果套进表单后的值，用于判断其后的人工修改 */
+  applied: FormShape
+  ownerKind: Invoice['ownerKind']
+}
+const recognitionDraft = shallowRef<RecognitionDraft | null>(null)
+const recognitionChanges = computed(() => recognitionDraft.value
+  ? invoiceRecognitionChanges(INVOICE_RECOGNITION_FIELDS, recognitionDraft.value.before, form.value)
+  : [])
+const recognitionMarks = computed(() => recognitionDraft.value
+  ? invoiceRecognitionMarks(INVOICE_RECOGNITION_FIELDS, recognitionDraft.value.before, recognitionDraft.value.applied, form.value)
+  : {})
+
+// 原图比对：草稿期间且原文件仍在上传会话中时，左栏改为原文件预览并框出变动字段（区域来自本次识别结果，
+// 只在内存中）；否则保持示意图。聚焦/悬停字段或变动条目时强调对应区域。
+const regionTarget = useInvoiceRegionTarget()
+const draftRegions = computed(() => {
+  const pending = recognitionDraft.value
+  const file = pending ? store.recognitionFile(id.value) : undefined
+  if (!pending || !file)
+    return undefined
+  const { groups, unlocated } = invoiceRegionHighlights(INVOICE_RECOGNITION_FIELDS, recognitionMarks.value, pending.recognized.fieldRegions)
+  return groups.length || unlocated.length ? { file, groups, unlocated } : undefined
+})
+const draftLocatedKeys = computed(() => draftRegions.value?.groups.flatMap(group => group.keys))
+const draftUnlocatedKeys = computed(() => draftRegions.value?.unlocated.map(field => field.key))
+watch(() => recognitionDraft.value?.recognized, () => regionTarget.reset())
+
+function onFieldFocus(key: string) {
+  if (recognitionMarks.value[key])
+    regionTarget.locate(key)
+}
+
+function onFieldHover(key: string, hovering: boolean) {
+  if (recognitionMarks.value[key])
+    regionTarget.preview(hovering ? key : null)
+}
+
 // ── 关页签回台账（设计稿行为：删/存后回台账）──
+// 删除、保存成功后调用方已处理草稿，直接关；返回按钮经离开保护。
+let allowLeave = false
 function closeTabToLedger() {
+  allowLeave = true
   tabsStore.close(deriveKey(route.fullPath))
   router.push('/finance/ledger')
+}
+
+async function backToLedger() {
+  if (await canLeave())
+    closeTabToLedger()
 }
 
 // ── 保存：diff 缓冲 → 一次提交；归档后先 simple 二次确认 ──
@@ -147,7 +203,18 @@ async function save() {
     patch.projectName = ''
   }
 
-  if (isArchived.value) {
+  const pendingDraft = recognitionDraft.value
+  if (pendingDraft) {
+    const ok = await confirm({
+      variant: 'simple',
+      title: '保存重新识别结果',
+      message: invoiceRecognitionSaveMessage(recognitionChanges.value),
+      confirmLabel: '确认保存',
+    })
+    if (!ok || recognitionDraft.value !== pendingDraft)
+      return
+  }
+  else if (isArchived.value) {
     const ok = await confirm({
       variant: 'simple',
       title: '修改已归档发票',
@@ -160,12 +227,16 @@ async function save() {
 
   // store.update 是全列覆写：必须以最新行为底合并 patch，否则未编辑列（accountStatus 等）会被冲掉
   try {
-    const saved = await store.update(inv.id, { ...store.byId(inv.id), ...patch })
+    // 识别草稿：先以识别操作人写识别结果，再把表单上的人工值以人工写一次（#500 审计区分）
+    const saved = pendingDraft
+      ? await store.saveRecognitionDraft(inv.id, pendingDraft.recognized, patch)
+      : await store.update(inv.id, { ...store.byId(inv.id), ...patch })
     if (!saved) {
       error('保存失败：发票不存在或已删除')
       return
     }
-    success('已保存修改')
+    recognitionDraft.value = null
+    success(pendingDraft ? '已保存重新识别结果' : '已保存修改')
     closeTabToLedger()
   }
   catch (cause) {
@@ -192,31 +263,70 @@ async function del() {
     return
   }
   undoToast(`已删除发票「${tail8(inv.invoiceNumber)}」`, () => store.undo(logId))
+  recognitionDraft.value = null
   closeTabToLedger()
 }
 
-/** 重新识别可覆盖当前字段（含未保存的修改），覆盖后逐项提醒变化。 */
-const recognitionChanges = shallowRef<InvoiceRecognitionChange[]>([])
+function markId(key: string) {
+  return `invoice-${id.value}-${key}-recognition-mark`
+}
 
 async function rerecognize() {
   const inv = invoice.value
   if (!inv)
     return
-  // 首次识别没有可对照的原值；只有已识别过的票才比较覆盖前后的差异。
-  const before = inv.ocrStatus === 'done' ? { ...form.value } : null
-  recognitionChanges.value = []
-  const succeeded = await store.startRecognition(inv.id)
+  if (inv.ocrStatus !== 'done') {
+    const succeeded = await store.startRecognition(inv.id)
+    if (inv.id !== id.value)
+      return
+    if (succeeded) {
+      resetForm()
+      success('识别完成，字段已刷新')
+    }
+    else {
+      error(store.recognitionError(inv.id) || '未完成识别，已保留当前输入')
+    }
+    return
+  }
+  const before = recognitionDraft.value?.before ?? { ...form.value }
+  const recognized = await store.recognizeDraft(inv.id)
   if (inv.id !== id.value)
     return
-  if (succeeded) {
-    resetForm()
-    recognitionChanges.value = before ? invoiceRecognitionChanges(INVOICE_RECOGNITION_FIELDS, before, form.value) : []
-    success(recognitionChanges.value.length ? `识别完成，${recognitionChanges.value.length} 项与识别前不同，请核对` : '识别完成，字段已刷新')
-  }
-  else {
+  if (!recognized) {
     error(store.recognitionError(inv.id) || '未完成重新识别，已保留当前输入')
+    return
   }
+  const applied = { ...form.value }
+  for (const { key } of INVOICE_RECOGNITION_FIELDS)
+    applied[key] = recognized[key as keyof RecognizedInvoiceFields] as string | number
+  form.value = { ...applied }
+  recognitionDraft.value = { before, recognized, applied, ownerKind: ownerKind.value }
+  const count = recognitionChanges.value.length
+  success(count ? `识别完成，${count} 项与识别前不同，未保存，请核对后保存` : '识别完成，字段与识别前一致，保存后回到待校对')
 }
+
+/** 放弃识别草稿：表单恢复识别前的值（含当时未保存的手工修改）。 */
+function discardRecognition() {
+  const pending = recognitionDraft.value
+  if (!pending)
+    return
+  form.value = { ...pending.before }
+  ownerKind.value = pending.ownerKind
+  recognitionDraft.value = null
+}
+
+async function canLeave() {
+  if (allowLeave || !recognitionDraft.value)
+    return true
+  return confirm({
+    variant: 'simple',
+    title: '放弃识别结果',
+    message: '重新识别结果尚未保存，确认放弃并离开？',
+    confirmLabel: '放弃识别结果',
+  })
+}
+useTabCloseGuard(canLeave)
+onBeforeRouteLeave(canLeave)
 
 onMounted(() => {
   if (!store.list.length)
@@ -237,7 +347,7 @@ onMounted(() => {
   <div v-else class="invoice-edit-screen flex flex-col gap-3">
     <!-- 顶条：返回 + 号码/卖方 + 状态 -->
     <div class="panel flex flex-wrap items-center gap-3 p-3">
-      <button class="btn-secondary" @click="closeTabToLedger">
+      <button class="btn-secondary" @click="backToLedger">
         <span class="i-lucide-arrow-left mr-1 text-13px" aria-hidden="true" />返回台账
       </button>
       <div class="min-w-0 flex flex-wrap items-baseline gap-2">
@@ -256,7 +366,16 @@ onMounted(() => {
         <div class="border-b border-line bg-surface-2 px-3 py-2 text-12px font-700 text-ink-soft">
           发票原件 · {{ invoice.fileName || '无扫描件' }}
         </div>
-        <div class="grid flex-1 place-items-center bg-surface-sink p-6">
+        <div v-if="draftRegions" class="invoice-edit-regions flex flex-col bg-surface-sink p-3">
+          <InvoiceRegionViewer
+            class="min-h-0 flex-1"
+            :file="draftRegions.file"
+            :groups="draftRegions.groups"
+            :unlocated="draftRegions.unlocated"
+            :active-key="regionTarget.active.value"
+          />
+        </div>
+        <div v-else class="grid flex-1 place-items-center bg-surface-sink p-6">
           <div class="w-full max-w-[560px]">
             <InvoicePreviewSvg :invoice="invoice" />
           </div>
@@ -289,13 +408,21 @@ onMounted(() => {
 
         <div class="invoice-edit-fields grid gap-x-3 gap-y-2.5">
           <div v-for="d in FIELDS" :key="d.key" :class="{ 'invoice-edit-fields__full': d.full }">
-            <label class="field-label" :for="`invoice-${id}-${d.key}`">{{ d.label }}</label>
+            <div class="flex items-center gap-1">
+              <label class="field-label" :for="`invoice-${id}-${d.key}`">{{ d.label }}</label>
+              <InvoiceRecognitionFieldMark v-if="recognitionMarks[d.key]" :id="markId(d.key)" :mark="recognitionMarks[d.key]!" :located="draftLocatedKeys ? draftLocatedKeys.includes(d.key) : undefined" />
+            </div>
             <select
               v-if="d.type === 'select'"
               :id="`invoice-${id}-${d.key}`"
               v-model="form[d.key]"
               :disabled="isRecognizing"
               class="field-input w-full"
+              :class="recognitionMarks[d.key] ? 'border-warn! bg-warn-soft!' : ''"
+              :aria-describedby="recognitionMarks[d.key] ? markId(d.key) : undefined"
+              @focus="onFieldFocus(d.key)"
+              @mouseenter="onFieldHover(d.key, true)"
+              @mouseleave="onFieldHover(d.key, false)"
             >
               <option v-for="o in d.options" :key="o" :value="o">
                 {{ o }}
@@ -320,8 +447,12 @@ onMounted(() => {
               v-model="form[d.key]"
               :disabled="isRecognizing"
               class="field-input w-full"
-              :class="d.mono ? 'font-mono' : ''"
+              :class="[d.mono ? 'font-mono' : '', recognitionMarks[d.key] ? 'border-warn! bg-warn-soft!' : '']"
+              :aria-describedby="recognitionMarks[d.key] ? markId(d.key) : undefined"
               :type="d.type === 'number' ? 'number' : d.type === 'date' ? 'date' : 'text'"
+              @focus="onFieldFocus(d.key)"
+              @mouseenter="onFieldHover(d.key, true)"
+              @mouseleave="onFieldHover(d.key, false)"
             >
           </div>
         </div>
@@ -394,10 +525,13 @@ onMounted(() => {
         </div>
 
         <InvoiceRecognitionChanges
-          v-if="recognitionChanges.length"
+          v-if="recognitionDraft"
           class="mt-1"
           :changes="recognitionChanges"
-          @dismiss="recognitionChanges = []"
+          :unlocated-keys="draftUnlocatedKeys"
+          @discard="discardRecognition"
+          @locate="regionTarget.locate"
+          @preview="regionTarget.preview"
         />
 
         <!-- 动作：删除 ｜ 重新识别 + 保存 -->
@@ -436,6 +570,11 @@ onMounted(() => {
 
 .invoice-edit-fields__full {
   grid-column: 1 / -1;
+}
+
+/* 原图比对区给定高度，原图在自身区域内滚动，不撑高整页 */
+.invoice-edit-regions {
+  height: min(75vh, 880px);
 }
 
 @container (min-width: 64rem) {

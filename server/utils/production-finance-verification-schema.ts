@@ -1,4 +1,3 @@
-export const PRODUCTION_FINANCE_VERIFICATION_STORAGE_VERSION = 13
 export const PRODUCTION_FINANCE_VERIFICATION_TABLES = ['finance_payment_verifications'] as const
 /** Additive upgrade: original application text, cash, allocations and old frozen history remain untouched. */
 export const PRODUCTION_FINANCE_VERIFICATION_SCHEMA = `

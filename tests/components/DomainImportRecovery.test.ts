@@ -15,7 +15,6 @@ import { createOtherSettlementRepository } from '~/lib/other-settlement/reposito
 import { useProductionAccessStore } from '~/stores/production-access'
 import { createReadMeta, withReadMeta } from '../../server/utils/read-meta'
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 enableAutoUnmount(afterEach)

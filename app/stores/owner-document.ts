@@ -3,7 +3,6 @@ import type { OwnerCommercialDocumentCommandRequestDTO } from '~/lib/owner-docum
 import type {
   OwnerAcceptanceViewVariant,
   OwnerCommercialDocumentKind,
-  OwnerCommercialDocumentListPageDTO,
   OwnerCommercialDocumentListQueryDTO,
   OwnerCommercialDocumentListSummaryDTO,
 } from '~/lib/owner-document/central-repository'
@@ -16,7 +15,6 @@ import type {
   OwnerReportAuditDraft,
 } from '~/lib/owner-document/forms'
 import type { QuantityBasis } from '~/lib/quantity/basis'
-import { isTauri } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { SUBCONTRACT_CHANGE_WRITE_CAPABILITY } from '~/lib/owner-document/central-command-contract'
@@ -34,17 +32,14 @@ import {
 import {
   approveOwnerChange,
   auditOwnerReport,
-  deductProjectPenalty,
   deleteOwnerDocumentForm,
   listOwnerDocumentAttachments,
   listOwnerDocumentBasicOptions,
   listOwnerDocumentBoqLines,
   listOwnerDocumentContractOptions,
   listOwnerDocumentForms,
-  listOwnerDocumentSettlementOptions,
   loadOwnerDocumentContractSummary,
   loadOwnerDocumentForm,
-  loadPenaltyDeductions,
   restoreOwnerDocumentForm,
   saveOwnerDocumentForm,
   transitionAcceptance,
@@ -54,7 +49,7 @@ import { ownerDocumentListRecordFromCentral } from '~/lib/owner-document/list'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
-  const usesCentralBrowser = import.meta.client && !isTauri()
+  const usesCentralBrowser = import.meta.client
   const isCentralKind = (kind: OwnerDocumentKind): kind is OwnerCommercialDocumentKind =>
     kind === 'owner_change' || kind === 'owner_report'
     || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty'
@@ -105,7 +100,6 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const listLoadSequence: Partial<Record<OwnerDocumentKind, number>> = {}
   const listSources = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
   const centralPagination = shallowRef<Partial<Record<OwnerCommercialDocumentKind, { requestedPage: number, page: number, pageSize: number, total: number }>>>({})
-  const centralReads = shallowRef<Partial<Record<OwnerCommercialDocumentKind, OwnerCommercialDocumentListPageDTO>>>({})
   const centralQueryScopes = new Map<OwnerDocumentKind, string>()
   const centralSummaries = shallowRef<Partial<Record<OwnerCommercialDocumentKind, OwnerCommercialDocumentListSummaryDTO>>>({})
   const centralCapabilities = shallowRef<Partial<Record<OwnerCommercialDocumentKind, string[]>>>({})
@@ -119,7 +113,6 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   function clearListSnapshot(kind: OwnerDocumentKind) {
     records.value = { ...records.value, [kind]: undefined }
     if (isCentralKind(kind)) {
-      centralReads.value = { ...centralReads.value, [kind]: undefined }
       centralPagination.value = { ...centralPagination.value, [kind]: undefined }
       centralSummaries.value = { ...centralSummaries.value, [kind]: undefined }
       centralCapabilities.value = { ...centralCapabilities.value, [kind]: [] }
@@ -179,7 +172,6 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
         ? centralPage.items.map(ownerDocumentListRecordFromCentral)
         : await listOwnerDocumentForms(kind)
       if (centralPage && isCentralKind(kind) && listLoadSequence[kind] === sequence) {
-        centralReads.value = { ...centralReads.value, [kind]: centralPage }
         centralPagination.value = { ...centralPagination.value, [kind]: centralPage.pagination }
         centralSummaries.value = { ...centralSummaries.value, [kind]: centralPage.summary }
         centralCapabilities.value = { ...centralCapabilities.value, [kind]: [...centralPage.capabilities] }
@@ -221,10 +213,6 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
 
   function centralPageFor(kind: OwnerCommercialDocumentKind) {
     return centralPagination.value[kind] ?? { requestedPage: 1, page: 1, pageSize: 20, total: 0 }
-  }
-
-  function centralReadFor(kind: OwnerCommercialDocumentKind) {
-    return centralReads.value[kind] ?? null
   }
 
   function centralSummaryFor(kind: OwnerCommercialDocumentKind) {
@@ -273,14 +261,6 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     if (usesCentralBrowser)
       return centralRepositories().ownerCommercialDocumentCommands.boqLines(projectId, contractId, periodNo, quantityBasis)
     return listOwnerDocumentBoqLines(projectId, contractId, periodNo)
-  }
-
-  async function loadDeductions(penaltyId: string) {
-    if (usesCentralBrowser) {
-      const detail = await centralRepositories().ownerCommercialDocumentRead.get({ kind: 'project_penalty', id: penaltyId, origin: 'real', includeDemo: false })
-      return (detail.penaltyDeductions ?? []).map(row => ({ ...row, amount: Number(row.amount), settlementNo: '', createdAt: row.occurredAt }))
-    }
-    return loadPenaltyDeductions(penaltyId)
   }
 
   async function loadContractSummary(
@@ -343,26 +323,6 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
         .map(option => ({ id: option.id, label: option.label, hint: option.hint }))
     }
     return listOwnerDocumentContractOptions(projectId, side, supplierId, keyword)
-  }
-
-  async function loadSettlementOptions(
-    projectId: string,
-    supplierId: string,
-    contractId: string,
-    keyword: string,
-  ) {
-    if (usesCentralBrowser) {
-      const context = await centralContext('sub_settlement')
-      return (context.settlements ?? []).filter(row => Boolean(contractId || supplierId) && row.projectId === projectId
-        && (!supplierId || row.supplierId === supplierId) && (!contractId || row.contractId === contractId)
-        && (!keyword || row.label.includes(keyword))).map(row => ({ id: row.id, label: row.label }))
-    }
-    return listOwnerDocumentSettlementOptions(
-      projectId,
-      supplierId,
-      contractId,
-      keyword,
-    )
   }
 
   async function saveForm(
@@ -498,36 +458,6 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return result
   }
 
-  async function deductPenalty(
-    penaltyId: string,
-    settlementId: string,
-    amount: number,
-    note = '',
-    draft?: OwnerDocumentDraft,
-  ) {
-    loading.value = true
-    try {
-      if (usesCentralBrowser) {
-        if (!draft)
-          throw new Error('罚扣版本已丢失，请重新读取')
-        const settlement = await centralRepositories().ownerCommercialDocumentRead.get({ kind: 'sub_settlement', id: settlementId, origin: 'real', includeDemo: false })
-        const baseVersion = centralBaseVersion(draft)
-        const values = { action: 'deduct-penalty', settlementId, settlementVersion: settlement.document.version, amount, note }
-        const commandId = ownerDocumentCommandId(draft, { kind: 'project_penalty', id: penaltyId, baseVersion, ...values })
-        const result = await centralCommand('project_penalty', penaltyId, baseVersion, values, commandId)
-        advanceOwnerDocumentFormVersion(draft, result.version)
-        completeOwnerDocumentCommandIntent(draft, commandId)
-      }
-      else {
-        await deductProjectPenalty(penaltyId, settlementId, amount, note)
-      }
-      await refreshAfterMutation('project_penalty')
-    }
-    finally {
-      loading.value = false
-    }
-  }
-
   async function removeForm(kind: OwnerDocumentKind, id: string) {
     if (usesCentralBrowser && isCentralKind(kind)) {
       const form = await centralForm(kind, id)
@@ -591,23 +521,19 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     listLoadingFor,
     listError,
     centralPageFor,
-    centralReadFor,
     centralSummaryFor,
     centralCapabilitiesFor,
     centralEmptyReasonFor,
     loadOne,
     loadAttachments,
     loadBoqLines,
-    loadDeductions,
     loadContractSummary,
     loadBasicOptions,
     loadContractOptions,
-    loadSettlementOptions,
     saveForm,
     approveOwnerChange: approveChange,
     auditOwnerReport: auditReport,
     transitionAcceptance: moveAcceptance,
-    deductProjectPenalty: deductPenalty,
     removeForm,
     restoreForm,
     saveAttachments,

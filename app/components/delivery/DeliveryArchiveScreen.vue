@@ -11,16 +11,12 @@ import { toLocalDateInputValue } from '~/lib/util/local-date'
 import { yuan } from '~/lib/util/money'
 
 const store = useDeliveryRecordStore()
-const central = store.mode === 'central'
-const projectStore = central ? null : useProjectStore()
-const supplierStore = central ? null : useSupplierStore()
-const contractStore = central ? null : useContractStore()
-const contractRepository = central ? useNuxtApp().$repositories.materialContractRead : null
+const contractRepository = useNuxtApp().$repositories.materialContractRead
 const contractFacts = shallowRef<readonly MaterialContractInput[]>([])
 const contractReadError = shallowRef('')
 let contractReadController: AbortController | null = null
 const { confirm, error, exportFile, warning, undoToast } = useKitUI()
-const ready = shallowRef(!central)
+const ready = shallowRef(false)
 const readError = shallowRef('')
 const reading = shallowRef(false)
 const deleting = shallowRef('')
@@ -28,8 +24,8 @@ let generation = 0
 let active = true
 let exportController: AbortController | null = null
 const records = computed(() => ready.value && active ? store.list : [])
-const projects = computed(() => ready.value ? central ? store.context?.projects ?? [] : projectStore?.list ?? [] : [])
-const canWrite = computed(() => ready.value && active && (!central || store.canWrite))
+const projects = computed(() => ready.value ? store.context?.projects ?? [] : [])
+const canWrite = computed(() => ready.value && active && store.canWrite)
 
 const search = shallowRef('')
 const dateFrom = shallowRef('')
@@ -41,21 +37,21 @@ const convertImagesToPdf = shallowRef(false)
 const exportingArchive = shallowRef(false)
 
 function projectName(id: string): string {
-  return central ? store.context?.projects.find(row => row.id === id)?.name ?? records.value.find(row => row.projectId === id)?.projectName ?? '未知项目' : projectStore?.byId(id)?.name ?? '未知项目'
+  return store.context?.projects.find(row => row.id === id)?.name ?? records.value.find(row => row.projectId === id)?.projectName ?? '未知项目'
 }
 
 function supplierName(id: string | null): string {
   if (!id)
     return '未区分分供方'
-  return central ? store.context?.suppliers.find(row => row.id === id)?.name ?? records.value.find(row => row.supplierId === id)?.supplierName ?? '未知分供方' : supplierStore?.byId(id)?.name ?? '未知分供方'
+  return store.context?.suppliers.find(row => row.id === id)?.name ?? records.value.find(row => row.supplierId === id)?.supplierName ?? '未知分供方'
 }
 
 function entityPath(prefix: string, id = '') {
-  return `${prefix}${id ? `/${encodeURIComponent(id)}` : ''}${central ? `?origin=${store.origin}` : ''}`
+  return `${prefix}${id ? `/${encodeURIComponent(id)}` : ''}?origin=${store.origin}`
 }
 
 function supplierContractDate(projectId: string, supplierId: string): string {
-  return (central ? contractFacts.value : contractStore?.list ?? [])
+  return contractFacts.value
     .filter(contract => contract.kind === '材采'
       && contract.projectId === projectId
       && contract.supplierId === supplierId
@@ -149,7 +145,6 @@ async function exportArchive() {
   const selected = filtered.value.map(record => ({ ...record, lines: record.lines.map(line => ({ ...line })) }))
   const projectNames = new Map(selected.map(record => [record.projectId, projectName(record.projectId)]))
   const supplierNames = new Map(selected.map(record => [record.supplierId, supplierName(record.supplierId)]))
-  const convertImages = convertImagesToPdf.value
   const ensureActive = () => {
     if (controller.signal.aborted || owner !== generation || !active)
       throw new DOMException('原件包导出已取消', 'AbortError')
@@ -163,9 +158,9 @@ async function exportArchive() {
           projectName: id => projectNames.get(id) ?? '未知项目',
           supplierName: id => supplierNames.get(id) ?? '未区分分供方',
         }, {
-          convertImagesToPdf: convertImages,
+          convertImagesToPdf: false,
           signal: controller.signal,
-          loadSource: record => store.loadSourceFile(record.id, { signal: controller.signal, ...(central ? { assetId: record.assetId ?? null } : {}) }),
+          loadSource: record => store.loadSourceFile(record.id, { signal: controller.signal, ...(({ assetId: record.assetId ?? null })) }),
         })
         ensureActive()
         missingCount = result.missingRecordIds.length
@@ -262,16 +257,14 @@ async function refresh() {
   contractFacts.value = []
   contractReadError.value = ''
   try {
-    const contractTask = contractRepository
-      ? readDeliveryMaterialContracts(contractRepository, store.origin, controller.signal).then((facts) => {
-          if (owner === generation && active)
-            contractFacts.value = facts
-        }).catch((cause) => {
-          if (owner === generation && active && !controller.signal.aborted)
-            contractReadError.value = cause instanceof Error ? cause.message : '合同日期暂不可读取'
-        })
-      : Promise.resolve()
-    await Promise.all([store.load(), projectStore?.load(), supplierStore?.load(), contractStore?.load(), contractTask])
+    const contractTask = readDeliveryMaterialContracts(contractRepository, store.origin, controller.signal).then((facts) => {
+      if (owner === generation && active)
+        contractFacts.value = facts
+    }).catch((cause) => {
+      if (owner === generation && active && !controller.signal.aborted)
+        contractReadError.value = cause instanceof Error ? cause.message : '合同日期暂不可读取'
+    })
+    await Promise.all([store.load(), contractTask])
     if (owner === generation && active)
       ready.value = true
   }

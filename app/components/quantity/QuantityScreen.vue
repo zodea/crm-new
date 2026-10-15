@@ -6,7 +6,6 @@ import type { DataOriginDTO } from '~/types/read-model'
 import { onActivated, onDeactivated } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { payrollSourceQuery } from '~/lib/payroll/a-navigation'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { createQuantityCategoryExport, createQuantityLedgerExport } from '~/lib/quantity/export'
 import {
   ALL_QUANTITY_FILTER,
@@ -319,7 +318,7 @@ async function openUnitDetail(cell: QuantityMatrixCell) {
   })
 }
 
-// 日常三类映射使用当前来源；旧合一行预检只保留在显式桌面适配。
+// 日常三类映射使用当前来源；旧合一行只做迁移预检，不写入。
 const IMPORT_TARGETS = [
   { label: '户型模板量', entity: 'quantity-template' },
   { label: '责任配置', entity: 'quantity-assignment' },
@@ -332,10 +331,10 @@ async function importData() {
     warning('请先读取具有写入权限的正式工程量项目，再开始导入。')
     return
   }
-  const targets = isDesktopRuntime() ? IMPORT_TARGETS : IMPORT_TARGETS.filter(target => target.entity !== 'quantity-legacy-precheck')
+  const targets = IMPORT_TARGETS.filter(target => target.entity !== 'quantity-legacy-precheck')
   const values = await formModal({
     title: '工程量导入',
-    subtitle: isDesktopRuntime() ? '选择导入目标后进入映射页签；旧合一行只做迁移预检，不会写入。' : '按文件中的项目编码核对正式项目；责任须唯一匹配。缺少验收照片的记录请明确填 draft，稍后到户详情补齐。',
+    subtitle: '按文件中的项目编码核对正式项目；责任须唯一匹配。缺少验收照片的记录请明确填 draft，稍后到户详情补齐。',
     saveText: '进入映射',
     fields: [{
       key: 'target',
@@ -499,7 +498,7 @@ watch(() => [route.query.project, route.query.origin, route.query.from, route.qu
     />
 
     <PayrollASourceReturn v-if="snapshot && route.query.payrollReturnTo" kind="quantity-project" :source-id="projectId" :project-id="projectId" :origin="origin" />
-    <PayrollACreateFromQuantity v-if="snapshot && !isDesktopRuntime() && !route.query.payrollReturnTo" :project-id="projectId" :origin="origin" :month="month" :return-to="quantityMatrixReturnPath(buildQuantityFilterQuery({ project: projectId, building: buildingId, month, view: viewMode, trade, assignee: assigneeKey, origin }))" />
+    <PayrollACreateFromQuantity v-if="snapshot && !route.query.payrollReturnTo" :project-id="projectId" :origin="origin" :month="month" :return-to="quantityMatrixReturnPath(buildQuantityFilterQuery({ project: projectId, building: buildingId, month, view: viewMode, trade, assignee: assigneeKey, origin }))" />
     <p v-if="origin === 'demo'" class="panel px-4 py-3 text-12px text-ink-soft" role="status">
       演示工程量只读。切换正式项目后可按权限配置模板、阶段和施工记录。
     </p>

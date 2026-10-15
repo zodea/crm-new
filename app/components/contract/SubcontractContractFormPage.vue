@@ -23,7 +23,6 @@ const {
   pendingAttachments,
   pendingRemoveIds,
   pendingRestoreIds,
-  desktopAttachmentPicker,
   readingFiles,
   invalidatePreparation,
   dirty: attachmentDirty,
@@ -32,7 +31,6 @@ const {
   acknowledge: acknowledgeAttachments,
   changes: attachmentChanges,
   handleFiles,
-  pickNativeFiles,
   removePending,
   patchPending,
   toggleExisting: toggleExistingAttachment,
@@ -351,7 +349,7 @@ useTabTitle(title)
           </p>
         </template>
       </ContractFormFields>
-      <ContractAttachmentSection :files-disabled="commandSession.busy || Boolean(commandSession.pending) || readingFiles" :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :desktop-picker="desktopAttachmentPicker" :note="draft.note ?? ''" @pick-native="pickNativeFiles" @files="handleFiles" @toggle-existing="toggleExistingAttachment" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patchDraft({ note: $event })" />
+      <ContractAttachmentSection :files-disabled="commandSession.busy || Boolean(commandSession.pending) || readingFiles" :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :note="draft.note ?? ''" @files="handleFiles" @toggle-existing="toggleExistingAttachment" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patchDraft({ note: $event })" />
       <FormFooter v-model="closeAfterSave" :actions="footerActions" :dirty="dirty" close-after-save :loading-action="loadingAction" :write-disabled="Boolean(commandSession.pending || readingFiles || pageState !== 'ready')" @action="save" />
     </form>
   </EntityFormShell>

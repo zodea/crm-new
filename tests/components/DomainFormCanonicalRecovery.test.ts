@@ -23,7 +23,6 @@ import { wrapTabRouteComponents } from '~/lib/tabs/page-cache'
 import { useProductionAccessStore } from '~/stores/production-access'
 import { useTabsStore } from '~/stores/tabs'
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 enableAutoUnmount(afterEach)
 beforeEach(() => {

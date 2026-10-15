@@ -167,31 +167,6 @@ export async function listFileRefs(
   }))
 }
 
-export async function listFileRefsByOwnerType(
-  ownerType: string,
-): Promise<FileRefRecord[]> {
-  const rows = await select<Record<string, unknown>>(`
-    SELECT *
-    FROM file_refs
-    WHERE owner_type = ?
-      AND deleted_at IS NULL
-    ORDER BY uploaded_at DESC, id DESC
-  `, [ownerType])
-  return rows.map(row => ({
-    id: String(row.id),
-    ownerType: String(row.owner_type),
-    ownerId: String(row.owner_id),
-    fileName: String(row.file_name ?? ''),
-    filePath: String(row.file_path ?? ''),
-    fileSize: Number(row.file_size) || 0,
-    mimeType: String(row.mime_type ?? ''),
-    category: String(row.category ?? ''),
-    uploader: String(row.uploader ?? ''),
-    uploadedAt: String(row.uploaded_at ?? ''),
-    deletedAt: null,
-  }))
-}
-
 export async function loadFileRefContent(
   file: Pick<FileRefRecord, 'id' | 'ownerType' | 'ownerId'>,
 ): Promise<FileRefContent | null> {

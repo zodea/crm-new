@@ -6,7 +6,7 @@
 >
 > 数据模型：[`DATABASE.md`](../DATABASE.md)
 >
-> 状态：全局工人、班组主档及私密资料、照片已接正式持久 owner；桌面一致快照可在现有数据迁移页按实际项目映射显式采用本域。历史名册及原回执保全。正式工资、工程量、扣罚 owner 未接来源显示未知，不用开发实例替代；开发验证链保留。运行边界见 [ARCHITECTURE](../ARCHITECTURE.md#implementation-gaps)，主档规则见 [DATABASE](../DATABASE.md#global-worker-crew-directory)。Tauri 保留本地路径。
+> 状态：全局工人、班组主档及私密资料、照片已接正式持久 owner；旧桌面一致快照可在现有数据迁移页按实际项目映射显式采用本域。历史名册及原回执保全。正式工资、工程量、扣罚 owner 未接来源显示未知，不用开发实例替代；开发验证链保留。运行边界见 [ARCHITECTURE](../ARCHITECTURE.md#implementation-gaps)，主档规则见 [DATABASE](../DATABASE.md#global-worker-crew-directory)。Tauri 保留本地路径。
 
 ## 定位
 
@@ -25,7 +25,7 @@
 - 详情按 `(dataOrigin,id)` 定位；测试工人只读，正式/测试班组、项目和事实不得跨来源拼接。
 - 所属班组、当前项目、责任单元、工资单、扣罚单和关联人员一律使用稳定 ID；同名实体保持独立。
 - 列表进入详情时携搜索、工种、排序、页码和来源行的安全 `returnTo`；工人与班组互跳，以及项目、责任单元、工资单、扣罚单下钻，均可返回原详情。
-- 普通证书附件边界尚未接入时不回退本地附件；私密资料明确用途的照片使用实际中央原件存储。Tauri 继续使用现有 SQLite 和 `file_refs`。
+- 普通证书附件边界尚未接入时不回退本地附件；私密资料明确用途的照片使用实际中央原件存储。
 - `#449` 的私密整页通过 `WorkerRosterRepository` 维护劳动合同事实和明确用途的证件照、银行卡照，原件复用中央 `file_refs/file_payloads`。普通证书附件没有因此获得自动识别用途或任意路径读取能力。
 - 私密整页和已有工人完整编辑表单要求 `worker:sensitive:read`；维护还要求 `worker:write`。普通列表/详情继续脱敏，默认工资权限不隐含私密资料权限。无权限时整页说明原因，不返回完整字段。
 - 工资名册只按同项目已发 A/C1/C2 的原冻结成员创建有独立登记日期的不可变版本；姓名、资料、劳动合同和照片均固定，并保留缺口。补充版本不是原工资发放时的原件。操作见 [Markdown 指南](../../guides/worker-roster-archive.md)。

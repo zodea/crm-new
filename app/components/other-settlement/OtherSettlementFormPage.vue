@@ -2,7 +2,7 @@
 import OtherSettlementClearanceBindingSection from './OtherSettlementClearanceBindingSection.vue'
 
 const { draft, context, title, files, loading, loadError, saveError, errors, loadingAction, closeAfterSave, dirty, ordinaryDirty, bindingInput, expenseAllocations, saveClearanceLink, selectedContract, fetchProjects, fetchContracts, patch, initialize, leave, save, expenses, expenseError, reloadExpenses, session, recover, canSave, frozen, latestConflict, adoptLatest } = useOtherSettlementForm()
-const { attachments, pendingAttachments, pendingRemoveIds, pendingRestoreIds, desktopAttachmentPicker, handleFiles, pickNativeFiles, toggleExisting, removePending, patchPending } = files
+const { attachments, pendingAttachments, pendingRemoveIds, pendingRestoreIds, handleFiles, toggleExisting, removePending, patchPending } = files
 </script>
 
 <template>
@@ -32,7 +32,7 @@ const { attachments, pendingAttachments, pendingRemoveIds, pendingRestoreIds, de
       </fieldset>
       <OtherSettlementClearanceBindingSection v-if="!loadError && !draft.contractId" v-model="bindingInput" :draft="draft" :expenses="expenses" :targets="expenseAllocations" :confirmed="frozen" :disabled="session.busy || !!session.pending || loading || !context?.capabilities.includes('other-settlement:write')" :unsaved="ordinaryDirty" @patch="patch" @link="saveClearanceLink" />
       <fieldset :disabled="frozen" class="m-0 min-w-0 border-0 p-0">
-        <ContractAttachmentSection :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :desktop-picker="desktopAttachmentPicker" :note="draft.note ?? ''" @files="handleFiles" @pick-native="pickNativeFiles" @toggle-existing="toggleExisting" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patch({ note: $event })" />
+        <ContractAttachmentSection :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :note="draft.note ?? ''" @files="handleFiles" @toggle-existing="toggleExisting" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patch({ note: $event })" />
       </fieldset>
     </form>
     <template #footer>

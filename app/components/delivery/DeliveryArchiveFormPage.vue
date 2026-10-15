@@ -29,7 +29,6 @@ const route = useRoute()
 const ownPageKey = deriveKey(route.fullPath)
 const ownsPage = () => deriveKey(route.fullPath) === ownPageKey
 const store = useDeliveryRecordStore()
-const materialStore = store.mode === 'central' ? null : useMaterialStore()
 const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
 
@@ -63,10 +62,8 @@ let loadedIdentity = ''
 
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value || !!revisionReason.value)
 
-const writable = computed(() => store.mode !== 'central' || store.canWrite)
+const writable = computed(() => store.canWrite)
 async function fetchReferences(kind: 'projects' | 'suppliers', keyword: string) {
-  if (materialStore)
-    return kind === 'projects' ? materialStore.searchProjects(keyword) : materialStore.searchSuppliers(keyword)
   const query = keyword.trim().toLocaleLowerCase('zh-CN')
   return (store.context?.[kind] ?? [])
     .filter(row => row.name.toLocaleLowerCase('zh-CN').includes(query))
@@ -114,10 +111,9 @@ async function initialize(resetDraft = false) {
   loading.value = true
   loadError.value = ''
   try {
-    if (store.mode === 'central' && route.query?.origin && route.query.origin !== origin)
+    if (route.query?.origin && route.query.origin !== origin)
       throw new Error('页面来源与当前来源不一致，请返回当前来源的归档库')
-    if (store.mode === 'central' || requestedId)
-      await store.load()
+    await store.load()
     if (!active || !ownsPage() || request !== initialization || requestedId !== recordId.value || origin !== store.origin)
       return
     if (!requestedId) {
@@ -364,7 +360,7 @@ async function save() {
     await initialize(true)
   }
   catch (cause) {
-    if (applicable() && store.mode === 'central' && cause instanceof ProjectRepositoryProblem && cause.problem.code === 'conflict') {
+    if (applicable() && cause instanceof ProjectRepositoryProblem && cause.problem.code === 'conflict') {
       versionConflict.value = true
       reviewedRecord.value = undefined
     }
@@ -378,7 +374,7 @@ async function save() {
 }
 
 function withOrigin(path: string): string {
-  return store.mode === 'central' ? `${path}?origin=${store.origin}` : path
+  return (`${path}?origin=${store.origin}`)
 }
 
 async function handleFooterAction(action: FormFooterAction) {

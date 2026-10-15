@@ -7,7 +7,6 @@ import type {
 } from '~/lib/master-data/forms'
 import { readonly, shallowRef } from 'vue'
 import {
-  assessMasterDataDeletion,
   deleteMasterDataRecord,
   listFormAttachments,
   restoreMasterDataRecord,
@@ -75,12 +74,6 @@ export function createMasterDataFormState<T extends { id?: string }>(
     return logId
   }
 
-  async function assessDeletion(id: string) {
-    if (ownerType !== 'customer' && ownerType !== 'crew' && ownerType !== 'worker')
-      return { blockedReason: '', impact: [] }
-    return assessMasterDataDeletion(ownerType, id)
-  }
-
   async function restore(id: string) {
     const logId = await restoreMasterDataRecord(ownerType, id)
     await load(id)
@@ -102,7 +95,6 @@ export function createMasterDataFormState<T extends { id?: string }>(
     revision: readonly(revision),
     load,
     save,
-    assessDeletion,
     remove,
     restore,
     clear,

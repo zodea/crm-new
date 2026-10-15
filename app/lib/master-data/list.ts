@@ -1,7 +1,6 @@
 import type { KitTableColumn } from '~/lib/kit/table'
 import type {
   MasterDataListKind,
-  MasterDataListRow,
 } from '~/stores/master-data-read'
 
 export type MasterDataListSort = 'updated-desc' | 'name-asc' | 'name-desc'
@@ -25,12 +24,6 @@ export interface MasterDataListProfile {
   columns: KitTableColumn[]
   filters: MasterDataListFilterDefinition[]
   searchPlaceholder: string
-}
-
-export interface MasterDataListFilters {
-  search: string
-  sort: MasterDataListSort
-  values: Partial<Record<MasterDataListFilterField, MasterDataFilterValue>>
 }
 
 export interface MasterDataFilterOption {
@@ -115,75 +108,6 @@ export const MASTER_DATA_LIST_PROFILES: Record<MasterDataRegistryKind, MasterDat
   },
 }
 
-export function initialMasterDataFilterValues(
-  profile: MasterDataListProfile,
-): Partial<Record<MasterDataListFilterField, MasterDataFilterValue>> {
-  return Object.fromEntries(profile.filters.map(filter => [filter.field, []]))
-}
-
 export function masterDataSelectedValues(value: MasterDataFilterValue | undefined): string[] {
   return [...new Set((Array.isArray(value) ? value : [value]).filter((item): item is string => Boolean(item) && item !== 'all'))]
-}
-
-function comparable(value: unknown): string {
-  if (Array.isArray(value))
-    return value.map(item => comparable(item)).join(' ')
-  return value == null ? '' : String(value)
-}
-
-function collatorCompare(left: unknown, right: unknown): number {
-  return comparable(left).localeCompare(comparable(right), 'zh-CN')
-}
-
-export function masterDataFilterOptions(
-  rows: readonly MasterDataListRow[],
-  field?: MasterDataListFilterField,
-): MasterDataFilterOption[] {
-  if (!field)
-    return []
-  return [...new Set(rows.flatMap((row) => {
-    const value = row[field]
-    return (Array.isArray(value) ? value : [value])
-      .map(item => comparable(item).trim())
-      .filter(Boolean)
-  }))]
-    .sort((left, right) => left.localeCompare(right, 'zh-CN'))
-    .map(value => ({
-      key: value,
-      label: field === 'status' ? masterDataStatusLabel(value) : value,
-    }))
-}
-
-export function filterAndSortMasterDataRows(
-  rows: readonly MasterDataListRow[],
-  profile: MasterDataListProfile,
-  filters: MasterDataListFilters,
-): MasterDataListRow[] {
-  const keyword = filters.search.trim().toLocaleLowerCase('zh-CN')
-  const filtered = rows.filter((row) => {
-    if (keyword && !Object.values(row).some(value =>
-      comparable(value).toLocaleLowerCase('zh-CN').includes(keyword),
-    )) {
-      return false
-    }
-    for (const definition of profile.filters) {
-      const selected = masterDataSelectedValues(filters.values[definition.field])
-      if (!selected.length)
-        continue
-      const raw = row[definition.field]
-      const values = Array.isArray(raw) ? raw.map(item => comparable(item)) : [comparable(raw)]
-      if (!selected.some(value => values.includes(value)))
-        return false
-    }
-    return true
-  })
-
-  return [...filtered].sort((left, right) => {
-    if (filters.sort === 'name-asc')
-      return collatorCompare(left.name, right.name)
-    if (filters.sort === 'name-desc')
-      return collatorCompare(right.name, left.name)
-    return collatorCompare(right.updatedAt, left.updatedAt)
-      || collatorCompare(left.name, right.name)
-  })
 }

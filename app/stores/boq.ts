@@ -9,7 +9,6 @@ import type { BoqOriginalInput } from '~/lib/boq/production-contract'
 import type { BoqCatalogProject, BoqWorkspace } from '~/lib/boq/read-model'
 import type { ExportFileOptions } from '~/lib/kit/export'
 import type { QuantityBasis } from '~/lib/quantity/basis'
-import { isTauri } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { computed, readonly, shallowRef, watch } from 'vue'
 import {
@@ -61,7 +60,7 @@ export interface BoqAttachmentDraft {
 export const useBoqStore = defineStore('boq', () => {
   const access = useProductionAccessStore()
   const central = useProductionBoqStore()
-  const formal = computed(() => access.status?.mode === 'production' || (!isTauri() && access.status?.mode !== 'development'))
+  const formal = computed(() => access.status?.mode === 'production' || (access.status?.mode !== 'development'))
   watch(() => [access.status?.mode, access.status?.mode === 'production' ? access.status.ownerId : undefined, access.status?.authenticated], () => central.clearWorkspace())
   const formalWorkspace = computed(() => {
     const source = central.workspace

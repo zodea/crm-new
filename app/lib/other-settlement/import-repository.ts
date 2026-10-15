@@ -1,6 +1,5 @@
 import type { ReadMetaDTO } from '../../types/read-model'
 import type { OtherSettlementMigrationMapping, OtherSettlementMigrationRequest, OtherSettlementMigrationResult } from './migration-contract'
-import { isTauri } from '@tauri-apps/api/core'
 import { auxiliaryProblem } from '../auxiliary-contract/contract'
 import { auxiliaryProblemFromUnknown } from '../auxiliary-contract/repository'
 import { hasConsistentReadMeta, isReadMetaDTO } from '../read-model/meta'
@@ -35,8 +34,6 @@ export function decodeOtherSettlementImportResult(value: unknown): OtherSettleme
 export function createOtherSettlementImportRepository(fetcher: (url: string, options?: object) => Promise<unknown>) {
   async function read<T>(url: string, options: object | undefined, decode: (value: unknown) => T) {
     try {
-      if (isTauri())
-        throw auxiliaryProblem('unavailable', '当前 Native 尚无可信中央迁入身份；请保留完整本地原库，在正式浏览器工作区核验')
       return decode(await fetcher(url, options))
     }
     catch (cause) {

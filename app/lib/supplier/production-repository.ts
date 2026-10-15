@@ -15,9 +15,6 @@ function object(value: unknown): value is Record<string, unknown> {
 function invalid(): never {
   throw credentialProblem('unavailable', '原分供方提交的身份或回执无效，请保留原编号重新核对。')
 }
-export function supplierResultId(result: SupplierPersistentResult) {
-  return 'id' in result ? result.id : result.supplierId
-}
 export function createSupplierProductionRepository(fetcher: SupplierHttpFetcher) {
   return {
     resolve: (commandId: string) => readSupplierHttp(() => fetcher('/api/commands/supplier-resolve', { method: 'POST', body: { commandId } }), (value): SupplierCommandResolution => {

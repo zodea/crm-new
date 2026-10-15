@@ -112,7 +112,6 @@ describe('历史我方签约采用证据', () => {
         throw new Error('本例只读显式 SQLite 来源')
       }
       const source = await createCoreMigrationLocalSource({
-        isNative: () => false,
         isDemoActive: () => false,
         currentSchemaVersion: async () => version,
         select: sql => db.select(sql),

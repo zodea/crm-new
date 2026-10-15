@@ -6,7 +6,6 @@ import { onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef
 import LookupSelect from '~/components/ui/LookupSelect.vue'
 import { signatorySnapshot } from '~/lib/our-signatory/contract'
 import { createOurSignatoryRepository } from '~/lib/our-signatory/http-repository'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 
 const props = defineProps<{
@@ -35,10 +34,7 @@ function invalidate() {
 bindReadAuthority(invalidate)
 async function load() {
   const current = ++generation
-  if (isDesktopRuntime()) {
-    message.value = '此独立桌面路径尚未接入一致主体目录；保留历史原文，请使用已开放的中央入口核实。'
-    return
-  }
+
   loading.value = true
   message.value = ''
   try {
@@ -96,7 +92,7 @@ onActivated(() => {
 
 <template>
   <div class="field-block form-span-full">
-    <label class="field-label" :for="`our-signatory-${label}`">{{ label }}{{ supplement ? '（继承原合同）' : isDesktopRuntime() ? '' : ' *' }}</label>
+    <label class="field-label" :for="`our-signatory-${label}`">{{ label }}{{ supplement ? '（继承原合同）' : ' *' }}</label>
     <LookupSelect v-if="!supplement" :field="`our-signatory-${label}`" :model-value="draft.ourSignatoryId ?? null" :fetch="fetchSignatories" :disabled-reason="loading ? '正在读取主体目录' : message || undefined" :invalid="Boolean(error)" placeholder="搜索已核实的签约主体" data-testid="contract-our-signatory" @update:model-value="select" />
     <p v-if="draft.ourSignatorySnapshot" class="m-0 text-12px text-ink-soft" data-testid="contract-our-signatory-snapshot">
       文书采用：{{ draft.ourSignatorySnapshot.name }} · 核实版本 {{ draft.ourSignatorySnapshot.version }}<span v-if="draft.ourSignatorySnapshot.taxNo"> · 税号 {{ draft.ourSignatorySnapshot.taxNo }}</span>
@@ -113,7 +109,7 @@ onActivated(() => {
         重新读取
       </button>
     </p>
-    <NuxtLink v-if="!supplement && !isDesktopRuntime()" to="/settings/our-signatories" class="text-12px text-brand">
+    <NuxtLink v-if="!supplement" to="/settings/our-signatories" class="text-12px text-brand">
       维护我方签约主体
     </NuxtLink>
   </div>

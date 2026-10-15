@@ -1,7 +1,6 @@
 import type { ImportTemplateField } from './import-mapping'
 import type { Invoice } from '~/stores/invoice'
 import { getInvoiceImportSourceMeta, invoiceNaturalKey } from '~/lib/invoice/excel'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import {
   QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
   QUANTITY_COMPLETION_IMPORT_FIELDS,
@@ -10,26 +9,16 @@ import {
 } from '~/lib/quantity/import'
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
 import { round2 } from '~/lib/util/number'
-import { useBrowserQuantityStore } from '~/stores/quantity-browser'
+import { useQuantityStore } from '~/stores/quantity'
 import { MATERIAL_CONTRACT_LINE_IMPORT_FIELDS } from '../material-contract/import'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
-// 工程量三类目标（#103 切片 6B）：逐行复用领域唯一写路径，行内自带项目编码定位归属；
-// connection 依赖 Tauri 运行时，因此在 importRow 内动态加载，保持本文件纯 node 可解析。
+// 工程量三类目标（#103 切片 6B）：逐行交给工程量中央导入，行内自带项目编码定位归属。
 async function runQuantityImport(
   row: Record<string, unknown>,
-  handler: 'importQuantityTemplateRow' | 'importQuantityAssignmentRow' | 'importQuantityCompletionRow',
+  target: 'template' | 'assignment' | 'completion',
 ): Promise<void> {
-  if (!isDesktopRuntime()) {
-    const targets = { importQuantityTemplateRow: 'template', importQuantityAssignmentRow: 'assignment', importQuantityCompletionRow: 'completion' } as const
-    await useBrowserQuantityStore().importRow(targets[handler], row)
-    return
-  }
-  const [{ withTransaction }, quantityImport] = await Promise.all([
-    import('~/lib/db/connection'),
-    import('~/lib/quantity/import'),
-  ])
-  await withTransaction(tx => quantityImport[handler](tx, row))
+  await useQuantityStore().importRow(target, row)
 }
 
 // 导入实体注册表（ADR 0005「实体触发、模板隐含」）：
@@ -309,19 +298,19 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
     key: 'quantity-template',
     label: '工程量·户型模板量',
     fields: QUANTITY_TEMPLATE_IMPORT_FIELDS,
-    importRow: row => runQuantityImport(row, 'importQuantityTemplateRow'),
+    importRow: row => runQuantityImport(row, 'template'),
   },
   'quantity-assignment': {
     key: 'quantity-assignment',
     label: '工程量·责任配置',
     fields: QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
-    importRow: row => runQuantityImport(row, 'importQuantityAssignmentRow'),
+    importRow: row => runQuantityImport(row, 'assignment'),
   },
   'quantity-completion': {
     key: 'quantity-completion',
     label: '工程量·阶段完成',
     fields: QUANTITY_COMPLETION_IMPORT_FIELDS,
-    importRow: row => runQuantityImport(row, 'importQuantityCompletionRow'),
+    importRow: row => runQuantityImport(row, 'completion'),
   },
   'quantity-legacy-precheck': {
     key: 'quantity-legacy-precheck',

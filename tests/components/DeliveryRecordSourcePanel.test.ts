@@ -40,7 +40,6 @@ beforeEach(() => {
     picker.picked = callback
   } }))
   vi.stubGlobal('useDeliveryRecordStore', () => ({
-    mode: 'central',
     canWrite: true,
     sourceVersion: '1',
     byId: () => ({ version: '3' }),

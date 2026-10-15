@@ -16,9 +16,6 @@ import {
 import OwnerDocumentListScreen from '~/components/owner-document/OwnerDocumentListScreen.vue'
 import { createOwnerDocumentReturnOrigin, saveOwnerDocumentReturnOrigin } from '~/lib/owner-document/return-context'
 
-const runtime = vi.hoisted(() => ({ desktop: true }))
-vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => runtime.desktop }))
-
 const listRows: OwnerDocumentListRecord[] = [
   {
     id: 'change-1',
@@ -137,7 +134,6 @@ const global = {
 
 describe('owner document list screen', () => {
   beforeEach(() => {
-    runtime.desktop = true
     activeRows = listRows
     centralEmptyReason = null
     centralSummary = null
@@ -176,46 +172,7 @@ describe('owner document list screen', () => {
     vi.stubGlobal('watch', watch)
   })
 
-  it('呈现类型化列、具名筛选、来源范围与可局部横滚的宽表', () => {
-    render(OwnerDocumentListScreen, {
-      props: { kind: 'owner_change' },
-      global,
-    })
-
-    expect(document.querySelector('[data-ui="owner-document-list-toolbar"]')).not.toBeNull()
-    expect(screen.getByRole('combobox', { name: '项目' })).not.toBeNull()
-    expect(screen.getByRole('combobox', { name: '类型' })).not.toBeNull()
-    expect(screen.getByRole('combobox', { name: '状态' })).not.toBeNull()
-    expect(document.querySelector('[data-ui="owner-document-route-context"]')?.textContent)
-      .toContain('项目：合和新城')
-
-    const table = screen.getByRole('region', { name: '业务单据宽表' })
-    const headings = within(table).getAllByRole('columnheader').map(item => item.textContent)
-    expect(headings).toEqual(expect.arrayContaining([
-      '变更编号',
-      '施工合同',
-      '含税审定金额',
-      '无税审定金额',
-      '无税申报金额',
-    ]))
-    expect(Number(table.getAttribute('data-min-width'))).toBeGreaterThan(1200)
-  })
-
-  it('筛选无结果显示业务空态并可清除筛选', async () => {
-    render(OwnerDocumentListScreen, {
-      props: { kind: 'owner_change' },
-      global,
-    })
-
-    await fireEvent.update(screen.getByRole('combobox', { name: '状态' }), 'submitted')
-    expect(screen.getByRole('status', { name: '没有符合条件的甲方变洽签' })).not.toBeNull()
-    await fireEvent.click(screen.getByRole('button', { name: '清除筛选' }))
-    expect((screen.getByRole('combobox', { name: '状态' }) as HTMLSelectElement).value)
-      .toBe('approved')
-  })
-
   it('中央列表把默认状态作为真实查询条件，并以中央总数展示汇总', async () => {
-    runtime.desktop = false
     route.query = {}
     render(OwnerDocumentListScreen, {
       props: { kind: 'owner_change' },
@@ -233,7 +190,6 @@ describe('owner document list screen', () => {
   })
 
   it('中央第二页改筛选只请求一次，等待结果时保留旧页行且不显示加载遮罩', async () => {
-    runtime.desktop = false
     route.query = {}
     const snapshot = shallowRef(listRows)
     const pending = shallowRef(false)
@@ -280,7 +236,6 @@ describe('owner document list screen', () => {
   })
 
   it('中央列表的全部状态计数来自状态分面总和，而非当前状态筛选结果数', () => {
-    runtime.desktop = false
     route.query = {}
     centralSummary = {
       projects: [],
@@ -324,7 +279,6 @@ describe('owner document list screen', () => {
   })
 
   it('中央默认状态零命中时清除为全部状态，不重复查询同一默认状态', async () => {
-    runtime.desktop = false
     activeRows = []
     centralEmptyReason = 'no-filter-match'
     route.query = {}
@@ -343,7 +297,6 @@ describe('owner document list screen', () => {
     { label: '上一查询仍有旧行', previousRows: listRows },
     { label: '首次查询尚无行', previousRows: [] },
   ])('返回来源在$label时等待读取完成，再聚焦本实例中的行', async ({ previousRows }) => {
-    runtime.desktop = false
     const now = Date.parse('2026-10-03T04:00:00Z')
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
     const origin = createOwnerDocumentReturnOrigin({
@@ -426,7 +379,6 @@ describe('owner document list screen', () => {
       expected: { projectId: null, contractId: null, supplierId: null, search: '', status: 'approved', documentType: null, page: 1, pageSize: 20 },
     },
   ])('中央同路径复用应用$label，不沿用旧来源条件', async ({ query, expected }) => {
-    runtime.desktop = false
     const currentRoute = reactive({ path: '/owner/change', query: { projectId: 'project-old', search: '旧来源搜索', status: 'approved', page: '2', pageSize: '10' } as Record<string, string> })
     const replace = vi.fn(async (target: { query: Record<string, string> }) => {
       await nextTick()
@@ -450,7 +402,6 @@ describe('owner document list screen', () => {
     { source: 'supplierId', previous: 'supplier-1', next: 'supplier-2', kind: 'owner_change', status: 'approved', expected: { projectId: null, contractId: null, supplierId: 'supplier-2', variant: null } },
     { source: 'variant', previous: 'acceptance', next: 'warranty', kind: 'acceptance', status: 'all', expected: { projectId: null, contractId: null, supplierId: null, variant: 'warranty' } },
   ] as const)('同路径只改变 $source 时仍保留明确来源页码', async ({ source, previous, next, kind, status, expected }) => {
-    runtime.desktop = false
     const currentRoute = reactive({ path: kind === 'acceptance' ? '/owner/acceptance' : '/owner/change', query: { [source]: previous, page: '3', pageSize: '20', status } as Record<string, string> })
     const replace = vi.fn(async (target: { query: Record<string, string> }) => {
       await nextTick()
@@ -474,7 +425,6 @@ describe('owner document list screen', () => {
     { source: 'contractId', value: 'contract-1', label: '合同' },
     { source: 'supplierId', value: 'supplier-1', label: '分供方' },
   ])('主动清除单个$label来源从第一页开始并保留其他筛选', async ({ source, value }) => {
-    runtime.desktop = false
     centralPagination.value = { page: 3, pageSize: 50, total: 150 }
     loadKind.mockImplementation(async (_kind, query) => {
       await nextTick()
@@ -509,7 +459,6 @@ describe('owner document list screen', () => {
     { previous: 'acceptance', next: 'warranty', page: 3, pageSize: 50, status: 'expired' },
     { previous: 'warranty', next: 'acceptance', page: 4, pageSize: 10, status: 'accepted' },
   ] as const)('同路径返回从 $previous 到 $next 时保留来源分页和 $status 状态', async ({ previous, next, page, pageSize, status }) => {
-    runtime.desktop = false
     const currentRoute = reactive({ path: '/owner/acceptance', query: { variant: previous, status: 'all', page: '2' } as Record<string, string> })
     vi.stubGlobal('useRoute', () => currentRoute)
     render(OwnerDocumentListScreen, { props: { kind: 'acceptance' }, global })
@@ -529,7 +478,6 @@ describe('owner document list screen', () => {
     { label: '分供方', source: { supplierId: 'supplier-clear' } },
     { label: '组合来源', source: { projectId: 'project-clear', contractId: 'contract-clear', supplierId: 'supplier-clear' } },
   ])('中央空态清除$label条件后，普通筛选同步不能写回旧来源', async ({ source }) => {
-    runtime.desktop = false
     activeRows = []
     centralEmptyReason = 'no-filter-match'
     const currentRoute = reactive({ path: '/owner/change', query: { ...source, search: '无匹配受控搜索', status: 'approved' } as Record<string, string> })
@@ -561,7 +509,6 @@ describe('owner document list screen', () => {
   })
 
   it('验收与保修列表从同一 canonical 查询切换专属列和 variant', async () => {
-    runtime.desktop = false
     route.path = '/owner/acceptance'
     route.query = { variant: 'warranty' }
     activeRows = [{
@@ -617,7 +564,6 @@ describe('owner document list screen', () => {
   })
 
   it('甲方罚扣主编号链接进入专属只读详情并保留列表返回上下文', async () => {
-    runtime.desktop = false
     route.path = '/owner/penalty'
     route.query = {}
     activeRows = [{
@@ -650,7 +596,6 @@ describe('owner document list screen', () => {
   })
 
   it('分包变洽签全局列表使用中央只读链、专属权限与稳定关系', async () => {
-    runtime.desktop = false
     route.path = '/subcontract/change'
     route.query = { supplier: 'supplier-327' }
     centralCapabilities = ['subcontract-document:read', 'subcontract-document:write']

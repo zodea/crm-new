@@ -38,7 +38,6 @@ import {
   formDefaults,
   formRequiredFields,
 } from '~/lib/master-data/page'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { projectOriginal } from '~/lib/project/original'
 import { collectReadPages } from '~/lib/read-model/collection'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
@@ -66,11 +65,6 @@ const props = withDefaults(defineProps<{
 })
 
 const route = useRoute()
-const supplierStore = useSupplierStore()
-const customerStore = useCustomerStore()
-const crewStore = useCrewStore()
-const workerStore = useWorkerStore()
-const projectStore = useProjectStore()
 const projectCommandStore = useProjectCommandStore()
 const customerCommandStore = () => useCustomerCommandStore()
 const supplierCommandStore = () => useSupplierCommandStore()
@@ -175,7 +169,6 @@ const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
 const hydrated = shallowRef(false)
-const desktopAttachmentPicker = shallowRef(false)
 const localDraftNotice = shallowRef('')
 const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | SupplierFormReadDTO | CrewFormReadDTO | WorkerFormReadDTO | null>(null)
 const customerAlreadyApplied = shallowRef(false)
@@ -185,7 +178,7 @@ const formalSession = computed(() => customerSession?.storesOriginals
     ? projectSession.persistent
     : supplierSession?.persistent
       ? supplierSession.formal
-      : crewWorkerSession && (props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime() ? crewWorkerCommandStore().formSession(crewWorkerSession, props.kind) : null)
+      : crewWorkerSession && (props.kind === 'crew' || props.kind === 'worker') ? crewWorkerCommandStore().formSession(crewWorkerSession, props.kind) : null)
 const pendingOriginal = computed(() => formalSession.value?.pending ?? null)
 const heldSubmission = shallowRef<{ draft: MasterDataPageDraft, files: PendingMasterDataAttachment[], changes: FormAttachmentChanges } | null>(null)
 const formElement = useTemplateRef<HTMLFormElement>('formElement')
@@ -208,7 +201,7 @@ const dirty = computed(() => hydrated.value && (
 ))
 
 const taxpayerEditor = createTaxpayerEditorState({
-  target: () => ({ supplierId: supplierSession?.targetSupplierId ?? null, origin: route.query.origin && route.query.origin !== 'real' ? 'demo' : 'real', version: supplierSession?.baseVersion ?? null, draft: draft.value, saved: savedSnapshot.value ? JSON.parse(savedSnapshot.value) : {}, enabled: props.kind === 'supplier' && !isDesktopRuntime() && hydrated.value && !loadingAction.value }),
+  target: () => ({ supplierId: supplierSession?.targetSupplierId ?? null, origin: route.query.origin && route.query.origin !== 'real' ? 'demo' : 'real', version: supplierSession?.baseVersion ?? null, draft: draft.value, saved: savedSnapshot.value ? JSON.parse(savedSnapshot.value) : {}, enabled: props.kind === 'supplier' && hydrated.value && !loadingAction.value }),
   pending: () => supplierSession?.pendingTaxpayerCommand ?? null,
   execute: (input, current) => supplierCommandStore().recordTaxpayerVerification(supplierSession!, input, current),
   read: id => useNuxtApp().$repositories.supplierCommands.loadForm(id),
@@ -227,7 +220,7 @@ const taxpayerEditor = createTaxpayerEditorState({
 })
 
 // 浏览器预算有独立中央表单；不启动此页的本地记录、附件或保存流程。
-const centralTargetCost = props.kind === 'target_cost' && !isDesktopRuntime()
+const centralTargetCost = props.kind === 'target_cost'
 let taxpayerTrigger: HTMLElement | null = null
 async function openTaxpayerEditor() {
   taxpayerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -264,7 +257,7 @@ const usesSupplierCredentialFlow = computed(() =>
   meta.value.attachmentMode === 'supplierCredential',
 )
 const usesCentralCrewWorkerFlow = computed(() =>
-  !isDesktopRuntime() && (props.kind === 'crew' || props.kind === 'worker'),
+  props.kind === 'crew' || props.kind === 'worker',
 )
 const shellSections = computed(() =>
   props.hideSections || meta.value.hideSectionNav ? [] : sections.value,
@@ -287,14 +280,14 @@ const shellStateTitle = computed(() =>
 )
 
 async function fetchCustomers(keyword: string) {
-  if (isDesktopRuntime() || props.kind !== 'project')
+  if (props.kind !== 'project')
     return readStore.searchCustomers(keyword)
   const view = captureView()
   const collection = await collectReadPages<CustomerListPageDTO>({ load: page => useNuxtApp().$repositories.customerRead.list({ includeDemo: false, search: keyword, status: null, sort: 'name-asc', page, pageSize: 100 }), identity: item => `${item.dataOrigin}:${item.customer.id}`, isCurrent: () => isCurrentView(view) })
   return collection.items.filter(item => item.dataOrigin === 'real' && item.status !== 'inactive').map(item => ({ id: item.customer.id, label: item.customer.label }))
 }
 async function fetchProjects(keyword: string) {
-  if (isDesktopRuntime() || props.kind !== 'worker')
+  if (props.kind !== 'worker')
     return readStore.searchProjects(keyword)
   const view = captureView()
   const collection = await collectReadPages<ProjectListPageDTO>({ load: page => useNuxtApp().$repositories.projectList.list({
@@ -309,7 +302,7 @@ async function fetchProjects(keyword: string) {
   return collection.items.map(item => ({ id: item.project.id, label: item.project.label, hint: item.code }))
 }
 async function fetchCrews(keyword: string) {
-  if (isDesktopRuntime() || props.kind !== 'worker')
+  if (props.kind !== 'worker')
     return readStore.searchCrews(keyword)
   const view = captureView()
   const collection = await collectReadPages<CrewListPageDTO>({ load: page => useNuxtApp().$repositories.crewWorkerRead.listCrews({
@@ -365,14 +358,9 @@ async function initialize(retainInput = false) {
     loading.value = true
     loadError.value = ''
     try {
-      if (!isDesktopRuntime() && route.query.origin && route.query.origin !== 'real')
+      if (route.query.origin && route.query.origin !== 'real')
         throw new Error('请恢复原真实来源后继续编辑；本页输入仍保留。')
-      if (isDesktopRuntime()) {
-        const record = routeId.value ? await loadRecord(routeId.value) : null
-        if (routeId.value && !record)
-          throw new Error('原记录不存在或已删除；本页输入仍保留。')
-      }
-      else if (props.kind === 'project') {
+      if (props.kind === 'project') {
         await projectCommandStore.revalidate(projectSession)
       }
       else if (props.kind === 'customer') {
@@ -410,9 +398,9 @@ async function initialize(retainInput = false) {
   customerAlreadyApplied.value = false
   let shouldFocus = false
   try {
-    if (!isDesktopRuntime() && (props.kind === 'customer' || props.kind === 'project' || props.kind === 'supplier') && route.query.origin && route.query.origin !== 'real')
+    if ((props.kind === 'customer' || props.kind === 'project' || props.kind === 'supplier') && route.query.origin && route.query.origin !== 'real')
       throw new Error('正式表单只能读取真实来源，请恢复原来源后继续。')
-    if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier' || props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime()) {
+    if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier' || props.kind === 'crew' || props.kind === 'worker')) {
       const central = props.kind === 'project'
         ? await projectCommandStore.hydrate(projectSession, routeId.value ?? null)
         : props.kind === 'customer'
@@ -560,25 +548,15 @@ function attachmentChanges(): FormAttachmentChanges {
 async function saveThroughStore(action: MasterDataSaveAction) {
   switch (props.kind) {
     case 'supplier':
-      return isDesktopRuntime()
-        ? supplierStore.saveForm(draft.value, action, attachmentChanges())
-        : supplierCommandStore().saveForm(supplierSession!, draft.value, action, attachmentChanges())
+      return supplierCommandStore().saveForm(supplierSession!, draft.value, action, attachmentChanges())
     case 'customer':
-      return isDesktopRuntime()
-        ? customerStore.save(draft.value, action, attachmentChanges())
-        : customerCommandStore().saveForm(customerSession!, draft.value, action, attachmentChanges())
+      return customerCommandStore().saveForm(customerSession!, draft.value, action, attachmentChanges())
     case 'crew':
-      return isDesktopRuntime()
-        ? crewStore.save(draft.value, action, attachmentChanges())
-        : crewWorkerCommandStore().saveCrew(crewWorkerSession!, draft.value, action, attachmentChanges())
+      return crewWorkerCommandStore().saveCrew(crewWorkerSession!, draft.value, action, attachmentChanges())
     case 'worker':
-      return isDesktopRuntime()
-        ? workerStore.save(draft.value, action, attachmentChanges())
-        : crewWorkerCommandStore().saveWorker(crewWorkerSession!, draft.value, action, attachmentChanges())
+      return crewWorkerCommandStore().saveWorker(crewWorkerSession!, draft.value, action, attachmentChanges())
     case 'project':
-      return isDesktopRuntime()
-        ? projectStore.saveForm(draft.value, action, attachmentChanges())
-        : projectCommandStore.saveForm(projectSession, draft.value, action, attachmentChanges())
+      return projectCommandStore.saveForm(projectSession, draft.value, action, attachmentChanges())
     case 'target_cost':
       return targetCostStore.save(draft.value, action, attachmentChanges())
   }
@@ -641,13 +619,13 @@ async function handleFooterAction(action: FormFooterAction) {
     fieldErrors.value = {}
 
     if (action === 'saveNew') {
-      if (props.kind === 'project' && !isDesktopRuntime())
+      if (props.kind === 'project')
         projectCommandStore.startNewProject(projectSession)
-      if (props.kind === 'customer' && !isDesktopRuntime())
+      if (props.kind === 'customer')
         customerCommandStore().startNewCustomer(customerSession!)
-      if (props.kind === 'supplier' && !isDesktopRuntime())
+      if (props.kind === 'supplier')
         supplierCommandStore().startNewSupplier(supplierSession!)
-      if ((props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime())
+      if ((props.kind === 'crew' || props.kind === 'worker'))
         crewWorkerCommandStore().startNew(crewWorkerSession!, props.kind)
       allowLeave = true
       if (route.path === meta.value.newPath) {
@@ -935,32 +913,6 @@ async function downloadCustomerOriginal(file: FormAttachment) {
   }
 }
 
-async function pickNativeFiles() {
-  const view = captureView()
-  try {
-    const [{ open }, { stat }, { basename }] = await Promise.all([
-      import('@tauri-apps/plugin-dialog'),
-      import('@tauri-apps/plugin-fs'),
-      import('@tauri-apps/api/path'),
-    ])
-    const selected = await open({ multiple: true, directory: false })
-    const paths = selected == null
-      ? []
-      : Array.isArray(selected) ? selected : [selected]
-    const files = await Promise.all(paths.map(async filePath => ({
-      fileName: await basename(filePath),
-      filePath,
-      fileSize: (await stat(filePath)).size,
-    })))
-    if (isCurrentView(view))
-      appendPendingAttachments(files)
-  }
-  catch (cause) {
-    if (isCurrentView(view))
-      error(`选择附件失败：${toErrorMessage(cause)}`)
-  }
-}
-
 function removePending(localId: string) {
   pendingAttachments.value = pendingAttachments.value.filter(file =>
     file.localId !== localId,
@@ -1024,7 +976,6 @@ if (!centralTargetCost) {
 onMounted(() => {
   if (centralTargetCost)
     return
-  desktopAttachmentPicker.value = isDesktopRuntime()
   void initialize()
 })
 
@@ -1062,7 +1013,7 @@ watch(routeSupplierCategory, () => {
     void initialize()
 })
 watch(() => [routeId.value, route.query.origin], () => {
-  if (isDesktopRuntime() || (props.kind !== 'customer' && props.kind !== 'project' && props.kind !== 'supplier' && props.kind !== 'crew' && props.kind !== 'worker'))
+  if ((props.kind !== 'customer' && props.kind !== 'project' && props.kind !== 'supplier' && props.kind !== 'crew' && props.kind !== 'worker'))
     return
   const session = formalSession.value
   if (session) {
@@ -1154,7 +1105,6 @@ watch(() => [routeId.value, route.query.origin], () => {
       <MasterDataAttachmentSection
         v-if="!usesSupplierCredentialFlow && !usesCentralCrewWorkerFlow"
         :title="attachmentTitle"
-        :desktop-picker="desktopAttachmentPicker"
         :stores-originals="storesOriginals"
         :original-description="kind === 'project' ? '原件随项目一同保存，重启后可下载；单份不超过 10 MiB' : undefined"
         :attachments="attachments"
@@ -1162,7 +1112,6 @@ watch(() => [routeId.value, route.query.origin], () => {
         :pending-remove-ids="pendingRemoveIds"
         :pending-restore-ids="pendingRestoreIds"
         :files-disabled="Boolean(loadingAction || pendingOriginal || preparingOriginals)"
-        @pick-native="pickNativeFiles"
         @files="handleFiles"
         @download="downloadCustomerOriginal"
         @toggle-existing="toggleExistingAttachment"

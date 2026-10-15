@@ -18,8 +18,7 @@ function layerStyle(offset: number): OverlayLayerStyle {
 const useOverlayStackState = createGlobalState(() => {
   const modalIds = shallowRef<readonly symbol[]>([])
 
-  const activeModalCount = computed(() => modalIds.value.length)
-  const hasActiveModal = computed(() => activeModalCount.value > 0)
+  const hasActiveModal = computed(() => modalIds.value.length > 0)
 
   function setModalOpen(id: symbol, open: boolean) {
     const index = modalIds.value.indexOf(id)
@@ -37,7 +36,6 @@ const useOverlayStackState = createGlobalState(() => {
   }
 
   return {
-    activeModalCount,
     hasActiveModal,
     modalLayerOffset,
     setModalOpen,
@@ -45,9 +43,8 @@ const useOverlayStackState = createGlobalState(() => {
 })
 
 export function useOverlayStack() {
-  const { activeModalCount, hasActiveModal } = useOverlayStackState()
+  const { hasActiveModal } = useOverlayStackState()
   return {
-    activeModalCount,
     hasActiveModal,
   }
 }

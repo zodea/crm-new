@@ -190,7 +190,7 @@ interface NavigationOrigin {
 
 | 键 | 来源域 / 页面 | 可点击字段或动作 | 可点击条件 | 目标与携带上下文 | 返回语义 | 当前状态 / 后端要求 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `N-HOME-SCHEDULE` | `home` `/` | 当前项目施工进度 | `project.id + dataOrigin` resolved | 浏览器 `/schedule?project=:projectId&origin=:dataOrigin&from=home`；工序再带 `group/task`；桌面保留原路径 | 返回首页恢复项目、来源与工序 | 来源感知只读往返闭合；排程可用性与未接入边界见[首页蓝本](./pages/homepage-dashboard.md#3-数据与状态) |
+| `N-HOME-SCHEDULE` | `home` `/` | 当前项目施工进度 | `project.id + dataOrigin` resolved | 浏览器 `/schedule?project=:projectId&origin=:dataOrigin&from=home`；工序再带 `group/task` | 返回首页恢复项目、来源与工序 | 来源感知只读往返闭合；排程可用性与未接入边界见[首页蓝本](./pages/homepage-dashboard.md#3-数据与状态) |
 | `N-PROJECT-NAME` | `project` `/project` | 项目名称 | `project.id` resolved | `/project/:id?origin=:dataOrigin`，路径由唯一 Target Registry 解析 | 返回项目列表原阶段/搜索/排序/列筛选/页码/每页条数/应用页签/滚动/焦点 | 闭合；语义 DTO、来源校验、深链刷新与 #313 完整返回上下文已实现 |
 | `N-PROJECT-INCOME` | `project` `/project` | 累计收入合同金额 | `MetricDTO.drilldown` 非空，金额可为 0 | `/contract/construction?project=:id` | 返回项目列表原上下文 | 部分；本地目标存在，列表金额仍是文本 |
 | `N-PROJECT-BUDGET` | `project` `/project` | 预算总额 | 同上 | `/project/target-cost?project=:id` | 返回项目列表原上下文 | 部分；目标成本列表需消费项目 query |

@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { quantityUnitReturnPath, readQuantityOrigin } from '~/lib/quantity/navigation'
 import { isDataOriginDTO } from '~/types/read-model'
 
 // 薄路由（#103 切片 6A）：参数身份已冻结为 pid=项目 id、uid=户 id（见 ADR 0010 / handoff 决策门）。
 const route = useRoute()
-const native = isDesktopRuntime()
 const hollowPage = computed(() => /^\/subcontract\/quantity\/[^/]+\/[^/]+\/hollow\//.test(route.path))
 
 const projectId = computed(() => String(route.params.pid ?? ''))
@@ -24,10 +22,7 @@ const returnTo = computed(() => centralContext.value
 </script>
 
 <template>
-  <section v-if="hollowPage && native" class="panel m-4 p-4 text-12px leading-6" role="status">
-    当前桌面端尚未接入空鼓检查与整改，请在浏览器中处理。
-  </section>
-  <NuxtPage v-else-if="hollowPage" />
+  <NuxtPage v-if="hollowPage" />
   <CrewWorkerRelationFactDetailScreen
     v-else-if="centralContext"
     fact-kind="assignment"

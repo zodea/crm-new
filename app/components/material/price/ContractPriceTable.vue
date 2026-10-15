@@ -4,7 +4,7 @@ import { computed, shallowRef, watch } from 'vue'
 import { compareContractPrice, contractPriceSourceLink } from '~/lib/material-contract/price-facts'
 import { normalizeMaterialIdentityText } from '~/lib/material/price-analysis'
 
-const props = defineProps<{ rows: readonly ContractPriceFact[], native?: boolean }>()
+const props = defineProps<{ rows: readonly ContractPriceFact[] }>()
 const search = shallowRef('')
 const selected = shallowRef('')
 const targetUnit = shallowRef('')
@@ -35,7 +35,7 @@ function money(value: number | null) {
   return value === null ? '—' : `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`
 }
 function link(row: ContractPriceFact) {
-  return contractPriceSourceLink(row, props.native)
+  return contractPriceSourceLink(row)
 }
 </script>
 

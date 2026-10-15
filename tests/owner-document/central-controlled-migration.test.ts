@@ -1,4 +1,4 @@
-import type { CoreMigrationSourceDTO } from '~/lib/migration/core-contract'
+import type { CoreMigrationSnapshotDTO, CoreMigrationSourceDTO } from '~/lib/migration/core-contract'
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import {
@@ -10,12 +10,19 @@ import {
 } from '~/lib/migration/core-contract'
 import { buildOwnerCommercialDocumentDetail, parseOwnerCommercialDocumentDetailQuery } from '~/lib/owner-document/central-repository'
 import { createConstructionContractCommandTestInstance } from '../../server/utils/construction-contract-command-test-instance'
-import {
-  createCoreMigrationTestInstance,
-  synchronizeCoreMigrationCommandSources,
-} from '../../server/utils/core-migration-test-instance'
+import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
 import { createSubcontractContractCommandTestInstance } from '../../server/utils/subcontract-contract-command-test-instance'
+
+/** 先让全部命令源完成快照准备，再统一提交，任何一方准备失败都不留下部分切换。 */
+function synchronizeCoreMigrationCommandSources(
+  snapshot: CoreMigrationSnapshotDTO,
+  sources: readonly { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => () => void }[],
+): void {
+  const commits = sources.map(source => source.prepareMigrationSnapshot(snapshot))
+  for (const commit of commits)
+    commit()
+}
 
 const session = {
   workspaceId: 'workspace-migration-323',

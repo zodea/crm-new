@@ -23,7 +23,6 @@ const {
   pendingAttachments,
   pendingRemoveIds,
   pendingRestoreIds,
-  desktopAttachmentPicker,
   readingFiles,
   invalidatePreparation,
   appendDrafts: appendAttachmentDrafts,
@@ -34,7 +33,6 @@ const {
   clearPending: clearPendingAttachments,
   changes: attachmentChanges,
   handleFiles,
-  pickNativeFiles,
   removePending,
   patchPending,
   toggleExisting: toggleExistingAttachment,
@@ -413,7 +411,7 @@ useTabTitle(title)
       <p class="text-right text-13px" data-testid="material-contract-detail-total">
         材料及减项合计：{{ total == null ? '待完善' : yuan(total) }}
       </p>
-      <ContractAttachmentSection :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :desktop-picker="desktopAttachmentPicker" :note="draft.note ?? ''" @pick-native="pickNativeFiles" @files="handleFiles" @toggle-existing="toggleExistingAttachment" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patchDraft({ note: $event })" />
+      <ContractAttachmentSection :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :note="draft.note ?? ''" @files="handleFiles" @toggle-existing="toggleExistingAttachment" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patchDraft({ note: $event })" />
       <FormFooter v-model="closeAfterSave" :dirty="dirty" close-after-save :loading-action="loadingAction" @action="save" />
     </form>
   </EntityFormShell>

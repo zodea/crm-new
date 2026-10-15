@@ -21,7 +21,6 @@ async function prepare() {
       }
     }
     const source = await createCoreMigrationLocalSource({
-      isNative: () => false,
       isDemoActive: () => false,
       currentSchemaVersion: async () => LATEST_VERSION,
       select: sql => db.select(sql),

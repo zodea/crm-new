@@ -259,7 +259,7 @@ HTTP adapter、领域 Repository 和显式本地 adapter 均映射此语义；�
 序列按来源展示，只有材料、规格、单位及税口径可核实相容时才计算差异；缺税点或单位时保留事实并解释不可比较，不能默认同税/同单位。当前有效合同价与旧送货价分别存在。降价提醒携带比较双方、差异依据和待协商状态，不作为覆盖旧行的动作；涨价、协商和真实更正的写规则只见 [COMMANDS](./COMMANDS.md#price-basis-and-corrections)。本节目标包括三类来源，当前送货/合同分析不能作为报价来源已实施的证明。
 ### 工程量中央读取与甲方月报（#442）
 
-浏览器正式工程量由专用中央 Repository 读取区域、模板、三量、阶段及报量映射、当前责任、阶段完成、照片和量差。请求绑定当前会话、项目、来源及权限；分页候选必须完整读取后才能成为选择或导出依据。同 ID 的演示与正式来源不能共享草稿或读取结果；离页及切换来源后的迟到响应必须丢弃。显式桌面 SQLite 适配和受控迁移输入保留独立边界，不作为浏览器读取失败的回退源。
+浏览器正式工程量由专用中央 Repository 读取区域、模板、三量、阶段及报量映射、当前责任、阶段完成、照片和量差。请求绑定当前会话、项目、来源及权限；分页候选必须完整读取后才能成为选择或导出依据。同 ID 的演示与正式来源不能共享草稿或读取结果；离页及切换来源后的迟到响应必须丢弃。受控迁移输入保留独立边界，不作为浏览器读取失败的回退源。
 
 合同清单由中央施工合同与已签证变洽签提供稳定 BOQ 身份、有效量价与来源版本；工程量库仅保存外部身份索引，不复制一套合同量价。首次明确关联清单行才更新模板的认定合同量；后续普通编辑保持已有认定值，量差中的已签证增减量只计一次。合同量、暂估量、现场复核量各自允许 `null` 和显式 `0`，汇总同时返回已知小计和缺失项数，不跨基准补值。
 
@@ -641,7 +641,7 @@ adapter 切换须用同一确定事实验证身份、列表/详情、三维状�
 | 当前领域入口 | 实现证据和边界 |
 | --- | --- |
 | 项目、客户、分供方 | app/lib/project、customer、supplier 的 Repository/HTTP/DTO；项目、客户、分供方浏览器主读已接中央，本机使用已登记磁盘参与者 |
-| 班组—工人 | app/lib/crew-worker、app/stores/crew-worker-read.ts 与 server/api/read/crews*、workers*；全局列表及成员候选跨页读取稳定身份，项目标签读取现有同源项目主档；原班组/项目变更后回读、原命令回执与历史冻结已有定向验证。显式 Tauri 仍有本地适配；正式持久接管及业务定义分别直达 ARCHITECTURE 与 [DATABASE](./DATABASE.md#global-worker-crew-directory) |
+| 班组—工人 | app/lib/crew-worker、app/stores/crew-worker-read.ts 与 server/api/read/crews*、workers*；全局列表及成员候选跨页读取稳定身份，项目标签读取现有同源项目主档；原班组/项目变更后回读、原命令回执与历史冻结已有定向验证。正式持久接管及业务定义分别直达 ARCHITECTURE 与 [DATABASE](./DATABASE.md#global-worker-crew-directory) |
 | 核心/辅助合同、BOQ | app/lib/material-contract、construction-contract、subcontract-contract、auxiliary-contract、other-settlement；canonical kind 与补充协议按稳定父子关系读取 |
 | 施工主合同开支来源 | `GET /api/read/construction-scope/spending` 按实际项目和可选主合同读取；原材采、分包、其他支出合同承诺及唯一原费用分别从自己的持久 owner 派生，已知部分与完整值分开，未接或无权的发票／结算／支付来源明确缺口。工资返回项目范围的原实际事实，归集边界直达 [已答决定](./ARCHITECTURE.md#opt-02-scope-decision) |
 | 甲方/分包单据 | app/lib/owner-document/central-*、owner-commercial-document-read.ts；独立 kind/capability/金额投影，sub_settlement 与 project_penalty 使用专属事实 |
