@@ -13,6 +13,7 @@ import { createProductionWbsMigration } from '../../server/utils/production-wbs-
 import { createProductionWbsService } from '../../server/utils/production-wbs-service'
 import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 import { createWbsActualBoqFixture } from '../helpers/production-wbs-upstream-fixture'
 
 const close: Array<() => Promise<void>> = []
@@ -24,7 +25,7 @@ async function fixture() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/wbs-`)
   const options = { directory, workspaceId: 'wbs-workspace', ownerId: 'wbs-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   close.push(() => storage.close())
   let actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['schedule:read', 'schedule:write', 'schedule:import', 'project:list:read', 'project:write', 'process-library:read', 'process-library:write'] }
   const session = () => structuredClone(actor)

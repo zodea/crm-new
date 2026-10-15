@@ -4,14 +4,14 @@ import { resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture() {
   const base = resolve('.tmp/legacy-test-artifacts/issue-452-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/project-`)
   const options = { directory, workspaceId: 'project-workspace', ownerId: 'project-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['project:list:read', 'project:write', 'customer:list:read', 'customer:write'] }
   const session = () => structuredClone(actor)
   const customer = await createProductionCustomerService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'customer:write', commandId: 'customer-create', baseVersion: null, action: 'save', draft: { name: '正式客户', contact: '负责人' }, attachments: {} }, session)

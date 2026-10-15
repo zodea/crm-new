@@ -4,12 +4,12 @@ import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { budgetBytesDigest } from '../../server/utils/production-target-cost-files'
 import { createProductionBudgetMigration } from '../../server/utils/production-target-cost-migration'
 import { createProductionTargetCostService } from '../../server/utils/production-target-cost-service'
 import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -20,7 +20,7 @@ async function fixture() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/budget-`)
   const options = { directory, workspaceId: 'budget-workspace', ownerId: 'budget-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   closers.push(() => storage.close())
   let actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['target-cost:read', 'target-cost:write', 'target-cost:import', 'project:list:read', 'project:write'] }
   const session = () => structuredClone(actor)

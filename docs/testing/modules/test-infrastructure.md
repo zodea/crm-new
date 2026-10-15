@@ -14,6 +14,7 @@
 | [tests/components/setup.ts](../../../tests/components/setup.ts) | 测试环境初始化 | jsdom 测试清理与浏览器 API 替身 |
 | [tests/global-setup.ts](../../../tests/global-setup.ts) | 测试环境初始化 | unit 全局准备：冷进程入口预打包、迁移后内存库快照 |
 | [tests/helpers/cold-process.ts](../../../tests/helpers/cold-process.ts) | 辅助／夹具（非独立测试） | 以独立 Node 进程启动预打包的冷恢复与服务入口 |
+| [tests/helpers/production-storage-seed.ts](../../../tests/helpers/production-storage-seed.ts) | 辅助／夹具（非独立测试） | 新建空目录复制同身份正式库种子后打开 |
 | [tests/helpers/memory-db.ts](../../../tests/helpers/memory-db.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/material-read-meta.ts](../../../tests/helpers/material-read-meta.ts) | 辅助／夹具（非独立测试） | 材采来源与真实元数据夹具 |
 | [tests/helpers/notification-read-meta.ts](../../../tests/helpers/notification-read-meta.ts) | 辅助／夹具（非独立测试） | 通知来源元数据夹具 |

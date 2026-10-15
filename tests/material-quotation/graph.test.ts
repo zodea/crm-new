@@ -15,8 +15,8 @@ import { createProductionMaterialQuotationOwner } from '../../server/utils/mater
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture(related = false, sameIdentity = false) {
   const root = resolve('.tmp/a02-material-tests')
@@ -46,7 +46,7 @@ async function fixture(related = false, sameIdentity = false) {
   const graphHash = await quotationGraphHash(graph)
   const targetDirectory = join(directory, 'target')
   await mkdir(targetDirectory)
-  const target = createProductionStorage({ directory: targetDirectory, workspaceId: 'central-quote-workspace', ownerId: 'central-quote-owner', purpose: 'verification' })
+  const target = await createSeededProductionStorage({ directory: targetDirectory, workspaceId: 'central-quote-workspace', ownerId: 'central-quote-owner', purpose: 'verification' })
   const actor = { workspaceId: 'central-quote-workspace', actorId: 'central-quote-owner', capabilities: ['material-quotation:read', 'material-quotation:write', 'core:migration:write', 'project:list:read', 'supplier:list:read', 'project:write', 'supplier:write', 'customer:list:read', 'customer:write'] }
   const owner = createProductionMaterialQuotationOwner(target)
   const bytes = await readFile(join(directory, 'synthetic-source.sqlite'))

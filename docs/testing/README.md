@@ -29,9 +29,9 @@
 | 缓存 | 位置 | 失效方式 | 清除 |
 | --- | --- | --- | --- |
 | 模块转译（Vitest 实验特性 `experimental.fsModuleCache`） | `.tmp/vitest-cache/` | Vitest 按文件内容、配置与依赖版本自动判定 | `pnpm exec vitest --clearCache`（同时清除结果缓存），或删除目录 |
-| 冷进程入口预打包、默认全量迁移后的内存库快照（[全局准备](../../tests/global-setup.ts)） | `.tmp/vitest-fixtures/` | 入口及迁移链依赖的源码内容哈希、esbuild/sql.js/Node 版本任一变化即整批重建 | 删除目录 |
+| 冷进程入口预打包、默认全量迁移后的内存库快照（[全局准备](../../tests/global-setup.ts)），以及按身份缓存的正式库种子 | `.tmp/vitest-fixtures/` | 入口及迁移链依赖的源码内容哈希、esbuild/sql.js/Node 版本任一变化即整批重建；种子库随正式库建库源码、结构与升级 SQL 换键 | 删除目录 |
 
-过期风险：转译缓存是实验特性，改动 Vite 插件、别名或升级依赖后若出现无法解释的旧行为，先清除再复现；预打包把 `node_modules` 中的包留作外部依赖、运行时现读，不计入内容键。两类缓存都不保存任何测试数据库或业务状态。
+过期风险：转译缓存是实验特性，改动 Vite 插件、别名或升级依赖后若出现无法解释的旧行为，先清除再复现；预打包把 `node_modules` 中的包留作外部依赖、运行时现读，不计入内容键。缓存只含转译产物、迁移后空库与建库后空库，不保存任何用例写入的数据或业务状态。
 
 E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库，每案独占重置、接管和回读旅程。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。
 
@@ -131,6 +131,7 @@ E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库
 ### 数据、资源与时间
 
 - 需要已迁移的内存库时用 [`createMigratedMemoryDb()`](../../tests/helpers/memory-db.ts)（整次运行由全局准备迁移一次并按迁移源码哈希缓存快照，各用例克隆）；只有验证迁移本身、空库或指定旧版本时，才用 `createMemoryDb()` 加 `runMigrations`。
+- 正式库夹具在新建的空数据目录上用 [`createSeededProductionStorage()`](../../tests/helpers/production-storage-seed.ts)（复制同身份种子库后打开，仍走完整打开校验）；验证建库、升级、结构或空目录行为的用例直接用 `createProductionStorage()`。
 - 冷恢复与独立服务进程用 [`runColdProcess` / `spawnColdProcess`](../../tests/helpers/cold-process.ts) 启动预打包入口，新入口登记到[全局准备](../../tests/global-setup.ts)的 `COLD_ENTRIES`；子进程仍须独立启动并从磁盘重开数据库，不得复用测试进程内存状态。
 - 每个打开的库都要在 `afterEach` 或 `finally` 中 `close()`；`vi.stubGlobal`、`vi.spyOn`、`vi.useFakeTimers` 在同一文件的 `afterEach` 中恢复。
 - 写入旅程由每个案例创建正式主档，或安装隔离的受控迁移来源，并使用回执 ID；演示记录只用于明确授权的只读场景。

@@ -6,16 +6,16 @@ import { readProductionConstructionScopeMainFact } from '../../server/utils/prod
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionOurSignatoryService } from '../../server/utils/production-our-signatory-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSubcontractContractService } from '../../server/utils/production-subcontract-contract-service'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from './production-storage-seed'
 
 export async function createSubcontractFixture() {
   const base = resolve('.tmp/opt-02/subcontract-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/subcontract-`)
   const options = { directory, workspaceId: 'subcontract-workspace', ownerId: 'subcontract-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   let actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['subcontract-contract:read', 'subcontract-contract:write', 'subcontract-contract:import', 'construction-scope:read', 'construction-scope:write', 'construction-contract:read', 'construction-contract:write', 'project:list:read', 'project:write', 'customer:list:read', 'customer:write', 'supplier:list:read', 'supplier:write', 'our-signatory:read', 'our-signatory:write'] }
   const session = () => structuredClone(actor)
   const baseCommand = { workspaceId: actor.workspaceId, actorId: actor.actorId, baseVersion: null, action: 'save', attachments: {} }

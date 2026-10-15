@@ -13,9 +13,9 @@ import { readOriginalExpenseReference } from '../../server/utils/production-fina
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementMigration, validateOtherSettlementImportEvidence } from '../../server/utils/production-other-settlement-migration'
 import { createProductionOtherSettlementService, listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { adoptHistoricalExpenseFixture } from '../helpers/other-settlement-pay08-source'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture() {
   const root = resolve('.tmp/a02-material-tests')
@@ -45,7 +45,7 @@ ${OTHER_SETTLEMENT_SCHEMA}`)
   const source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
   const targetPath = join(directory, 'target')
   await mkdir(targetPath)
-  const storage = createProductionStorage({ directory: targetPath, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory: targetPath, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' })
   const session = () => structuredClone(actor)
   const supplier = await createProductionSupplierService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier:write', commandId: 'actual-service', action: 'save', baseVersion: null, draft: { name: '实际服务主档', supplierCategory: '其他', contact: '合成人' }, attachments: {} }, session)
   const migration = createProductionOtherSettlementMigration(storage)

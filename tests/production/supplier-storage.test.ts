@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { expect, it, vi } from 'vitest'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 const actor = { workspaceId: 'supplier-disk-test', actorId: 'synthetic-owner', capabilities: ['supplier:list:read', 'supplier:write', 'supplier-credential:read', 'supplier-credential:write'] }
 const session = () => actor
@@ -14,7 +15,7 @@ async function setup() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/storage-`)
   const options = { directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const service = createProductionSupplierService(storage)
   const created = await service.execute(command, session)
   return { options, storage, service, created }

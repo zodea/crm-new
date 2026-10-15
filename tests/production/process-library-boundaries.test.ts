@@ -2,13 +2,13 @@ import { mkdir, mkdtemp } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import { createProductionProcessLibraryService } from '../../server/utils/production-process-library-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 it('工序库提交期间撤权完整回滚，已存原件证据损坏后明确拒绝读取和再保存', async () => {
   const base = resolve('.tmp/legacy-test-artifacts/issue-463-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/boundary-`)
-  const storage = createProductionStorage({ directory, workspaceId: 'boundary-workspace', ownerId: 'boundary-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'boundary-workspace', ownerId: 'boundary-owner', purpose: 'verification' })
   const service = createProductionProcessLibraryService(storage)
   const authorized = () => ({ workspaceId: 'boundary-workspace', actorId: 'boundary-owner', capabilities: ['process-library:read', 'process-library:write'] })
   const command = { action: 'create-version', commandId: 'boundary-command', workspaceId: 'boundary-workspace', actorId: 'boundary-owner', origin: 'real', requiredCapability: 'process-library:write', baseVersion: 0, sourceVersion: null, draft: { sourceLibraryId: null, code: 'BOUNDARY', name: '完整事务', description: '', tasks: [{ key: 'one', name: '一项完整工序', durationDays: 3, trade: '', color: '#123456', stageCode: '', itemCodes: [], predecessorKey: null, predecessorDisabled: false }] } }

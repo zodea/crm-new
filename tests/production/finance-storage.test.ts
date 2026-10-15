@@ -27,13 +27,14 @@ import { createProductionProjectService } from '../../server/utils/production-pr
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { createMemoryDb } from '../helpers/memory-db'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture() {
   const base = resolve('.tmp/a01-finance-production')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const options = { directory, workspaceId: 'finance-disk-workspace', ownerId: 'finance-disk-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['customer:list:read', 'customer:write', 'project:list:read', 'project:write', 'supplier:list:read', 'supplier:write', ...Object.values(FINANCE_FAMILIES).flatMap(family => [`${family}:read`, `${family}:write`])] }
   const session = () => structuredClone(actor)
   const baseCommand = { workspaceId: actor.workspaceId, actorId: actor.actorId, baseVersion: null, action: 'save', attachments: {} }

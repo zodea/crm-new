@@ -18,6 +18,7 @@ import { createProductionStorage } from '../../server/utils/production-storage'
 import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { constructionScopeCommand, createConstructionScopeFixture } from '../helpers/production-construction-scope-fixture'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -28,7 +29,7 @@ async function fixture() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/construction-`)
   const options = { directory, workspaceId: 'construction-workspace', ownerId: 'construction-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   closers.push(() => storage.close())
   let actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['construction-contract:read', 'construction-contract:write', 'construction-contract:import', 'project:list:read', 'project:write', 'customer:list:read', 'customer:write', 'our-signatory:read', 'our-signatory:write', 'material-contract:read', 'material-contract:write', 'supplier:list:read'] }
   const session = () => structuredClone(actor)

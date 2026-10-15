@@ -15,14 +15,14 @@ import { createProductionOurSignatoryService } from '../../server/utils/producti
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionQuantityService } from '../../server/utils/production-quantity-service'
 import { validateProductionQuantityState } from '../../server/utils/production-quantity-validation'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { runColdProcess } from '../helpers/cold-process'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 it('真实Node原上游master+完整BOQbytes同盘读写，原号重放/原件保全/false0与E独立源', async () => {
   const base = resolve('.tmp/opt02-boq')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/node-smoke-`)
-  const storage = createProductionStorage({ directory, workspaceId: 'boq-workspace', ownerId: 'boq-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'boq-workspace', ownerId: 'boq-owner', purpose: 'verification' })
   const actor = { workspaceId: 'boq-workspace', actorId: 'boq-owner', capabilities: ['customer:list:read', 'customer:write', 'project:list:read', 'project:write', 'construction-contract:read', 'construction-contract:write', 'our-signatory:read', 'our-signatory:write', 'boq:read', 'boq:write', 'owner-document:read', 'owner-document:write'] }
   const session = () => structuredClone(actor)
   try {

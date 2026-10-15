@@ -6,6 +6,7 @@ import { inspectProductionBackup } from '../../server/utils/production-backup-ma
 import { createProductionNotificationService } from '../../server/utils/production-notification-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 const actor = { workspaceId: 'notification-workspace', actorId: 'notification-owner', capabilities: ['supplier:list:read', 'supplier:write', 'supplier-credential:read', 'supplier-credential:write'] }
 const session = () => actor
@@ -15,7 +16,7 @@ async function setup() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/storage-`)
   const options = { directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   let timestamp = '2026-10-03T00:00:00.000Z'
   const now = () => timestamp
   const suppliers = createProductionSupplierService(storage, { now })

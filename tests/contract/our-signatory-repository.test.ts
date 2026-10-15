@@ -5,7 +5,7 @@ import { commandRecoveryFormTarget } from '~/lib/forms/command-recovery'
 import { createOurSignatoryRepository, decodeOurSignatoryList } from '~/lib/our-signatory/http-repository'
 import { inspectRestorableTabPath } from '~/lib/tabs/restore-target'
 import { createProductionOurSignatoryService } from '../../server/utils/production-our-signatory-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 const draft = { name: '真实核实主体的合成样本', taxNo: null, registeredAddress: '原核实地址', legalRepresentative: null, verificationNote: '原文书依据', status: 'active' as const }
 it('只登记真实设置/主档/报价原命令精确路由，恢复定位不开放写页签或正文持久化', () => {
@@ -36,7 +36,7 @@ async function fixture() {
   const base = resolve('.tmp/a02-material-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/signatory-http-`)
-  const storage = createProductionStorage({ directory, workspaceId: 'own-http-workspace', ownerId: 'own-http-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'own-http-workspace', ownerId: 'own-http-owner', purpose: 'verification' })
   const actor = { workspaceId: 'own-http-workspace', actorId: 'own-http-owner', capabilities: ['our-signatory:read', 'our-signatory:write'] }
   const service = createProductionOurSignatoryService(storage)
   const request = { workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'our-signatory:write' as const, commandId: 'create-our-http', baseVersion: null, draft }

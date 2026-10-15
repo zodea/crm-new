@@ -3,15 +3,15 @@ import { mkdir, mkdtemp } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { expect, it } from 'vitest'
 import { createProductionQuantityService, productionQuantityInTransaction, quantityRecoveryDescriptor } from '../../server/utils/production-quantity-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { runColdProcess } from '../helpers/cold-process'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture() {
   const base = resolve('.tmp/opt02-quantity-production')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const options = { directory, workspaceId: 'quantity-workspace', ownerId: 'quantity-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['quantity:read', 'quantity:write', 'worker:list:read', 'crew:list:read', 'project:list:read'] }
   const now = '2026-10-07T08:00:00.000Z'
   await storage.withTransaction(async (db) => {

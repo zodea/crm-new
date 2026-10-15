@@ -13,11 +13,11 @@ import { createProductionPayrollImport } from '../../server/utils/production-pay
 import { createProductionPayrollService } from '../../server/utils/production-payroll-service'
 import { validateProductionPayrollState } from '../../server/utils/production-payroll-validation'
 import { createProductionQuantityImport, readProductionQuantityImportedIdentities } from '../../server/utils/production-quantity-migration'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { loadQuantityHollowFacts } from '../../server/utils/quantity-hollow-facts'
 import { createQuantityHollowService } from '../../server/utils/quantity-hollow-service'
 import { runColdProcess } from '../helpers/cold-process'
 import { createPayrollAFeeAdjustmentFixture } from '../helpers/payroll-a-fee-adjustment-fixture'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 it('真实整库A/P5/P6混合历史按同源工程量映射正式接管，保管理更正退款、原价格配置、空鼓整改、正式号和完整原目录，独立冷进程不开放新A来源', async () => {
   const native = await createPayrollAFeeAdjustmentFixture()
@@ -29,7 +29,7 @@ it('真实整库A/P5/P6混合历史按同源工程量映射正式接管，保管
   const directory = await mkdtemp(`${base}/synthetic-`)
   const actor = { workspaceId: 'history-workspace', actorId: 'history-owner', capabilities: [...nativeActor.capabilities, 'core:migration:write', 'worker:sensitive:read'] }
   const options = { directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   try {
     await native.prices()
     await native.saveFees([native.fee()])

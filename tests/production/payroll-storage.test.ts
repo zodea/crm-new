@@ -16,13 +16,14 @@ import { validateProductionPayrollState } from '../../server/utils/production-pa
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { runColdProcess } from '../helpers/cold-process'
 import { createPayrollC1ServiceFixture } from '../helpers/payroll-c1-service-fixture'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture() {
   const base = resolve('.tmp/opt02-payroll-production')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const options = { directory, workspaceId: 'payroll-workspace', ownerId: 'payroll-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['payroll:read', 'payroll:write', 'worker:list:read', 'crew:list:read', 'project:list:read'] }
   const now = '2026-10-07T08:00:00.000Z'
   await storage.withTransaction(async (db) => {

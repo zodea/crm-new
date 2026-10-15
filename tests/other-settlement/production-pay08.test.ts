@@ -7,16 +7,16 @@ import { FINANCE_FAMILIES } from '../../app/lib/finance/central-contract'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementMigration } from '../../server/utils/production-other-settlement-migration'
 import { createProductionOtherSettlementService, listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { createOtherSettlementPay08Source } from '../helpers/other-settlement-pay08-source'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture() {
   const root = resolve('.tmp/a02-material-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'other-pay08-'))
   const native = await createOtherSettlementPay08Source(join(directory, 'native-source'))
-  const storage = createProductionStorage({ directory, workspaceId: 'other-pay08-workspace', ownerId: 'other-pay08-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'other-pay08-workspace', ownerId: 'other-pay08-owner', purpose: 'verification' })
   const actor = { workspaceId: 'other-pay08-workspace', actorId: 'other-pay08-owner', capabilities: ['other-settlement:read', 'other-settlement:write', 'supplier:list:read', 'supplier:write', 'core:migration:write', ...Object.values(FINANCE_FAMILIES).flatMap(family => [`${family}:read`, `${family}:write`])] }
   const session = () => structuredClone(actor)
   const supplierOwner = createProductionSupplierService(storage)

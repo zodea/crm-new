@@ -19,12 +19,13 @@ import { createProductionProjectService } from '../../server/utils/production-pr
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 it('真实完整SQLite同SHA施工→清单/E/有效变化原图；保SQL扩展/原JSON/原件/缺件，不复制私密整库', async () => {
   const base = resolve('.tmp/opt02-boq')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/migration-`)
-  const storage = createProductionStorage({ directory, workspaceId: 'boq-migration-workspace', ownerId: 'boq-migration-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'boq-migration-workspace', ownerId: 'boq-migration-owner', purpose: 'verification' })
   const actor = { workspaceId: 'boq-migration-workspace', actorId: 'boq-migration-owner', capabilities: ['boq:read', 'boq:write', 'boq:import', 'owner-document:read', 'owner-document:write', 'core:migration:write', 'construction-contract:read', 'construction-contract:write', 'construction-contract:import', 'customer:list:read', 'customer:write', 'project:list:read', 'project:write'] }
   const session = () => structuredClone(actor)
   const native = await createMigratedMemoryDb()
