@@ -2,6 +2,7 @@ import { fireEvent, render } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
+import InvoiceOriginalMissing from '~/components/invoice/InvoiceOriginalMissing.vue'
 import InvoiceRecognitionChanges from '~/components/invoice/InvoiceRecognitionChanges.vue'
 import InvoiceRecognitionFieldMark from '~/components/invoice/InvoiceRecognitionFieldMark.vue'
 import InvoiceRegionViewer from '~/components/invoice/InvoiceRegionViewer.vue'
@@ -15,7 +16,9 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-function mountEditPage(recognized: Record<string, unknown>, ocrStatus = 'done', file?: File) {
+function mountEditPage(recognized: Record<string, unknown>, ocrStatus = 'done', file?: File, initialRegions?: Record<string, unknown>) {
+  // 会话中已写入识别结果的字段区域（首次识别后由 store 附在原文件上）
+  let sessionRegions = file ? initialRegions : undefined
   const invoice = ref({ id: 'i1', invoiceNumber: 'OLD', invoiceDate: '2026-09-05', seller: '供应商', buyer: '', buyerTaxNo: '', sellerTaxNo: '', invoiceType: '', taxRate: '', projectName: '', remark: '', totalAmount: 113, taxAmount: 13, ownerKind: 'personal', accountStatus: 'none', ocrStatus, reviewStatus: 'reviewed', dupStatus: 'normal', items: [] })
   const result = { ...invoice.value, ...recognized }
   let finish!: (success: boolean) => void
@@ -37,14 +40,17 @@ function mountEditPage(recognized: Record<string, unknown>, ocrStatus = 'done', 
     recognitionError: () => '识别失败',
     startRecognition: vi.fn(async () => {
       const success = await run()
-      if (success)
+      if (success) {
         invoice.value = { ...invoice.value, ...recognized, ocrStatus: 'done' }
+        sessionRegions = file ? recognized.fieldRegions as Record<string, unknown> | undefined : undefined
+      }
       return success
     }),
     recognizeDraft: vi.fn(async () => (await run()) ? result : null),
     saveRecognitionDraft: vi.fn().mockResolvedValue('log'),
     update: vi.fn().mockResolvedValue('saved'),
     recognitionFile: vi.fn(() => file),
+    recognitionRegions: vi.fn(() => sessionRegions),
   }
   vi.stubGlobal('useRoute', () => ({ fullPath: '/finance/invoice/i1', params: { id: 'i1' } }))
   vi.stubGlobal('useRouter', () => ({ push: vi.fn() }))
@@ -56,7 +62,7 @@ function mountEditPage(recognized: Record<string, unknown>, ocrStatus = 'done', 
   } }))
   vi.stubGlobal('useTabTitle', vi.fn())
   vi.stubGlobal('useKitUI', () => kit)
-  const view = render(InvoiceEditPage, { global: { components: { InvoiceRecognitionChanges, InvoiceRecognitionFieldMark, InvoiceRegionViewer }, stubs: ['InvoicePreviewSvg', 'NuxtLink'] } })
+  const view = render(InvoiceEditPage, { global: { components: { InvoiceOriginalMissing, InvoiceRecognitionChanges, InvoiceRecognitionFieldMark, InvoiceRegionViewer }, stubs: ['NuxtLink'] } })
   const recognize = async (success: boolean) => {
     await fireEvent.click(view.getByRole('button', { name: '重新识别' }))
     finish(success)
@@ -169,7 +175,7 @@ describe('发票编辑页重新识别（草稿）', () => {
     expect(view.queryByTestId('invoice-recognition-changes')).toBeNull()
   })
 
-  describe('原图比对（识别区域只在草稿内存中）', () => {
+  describe('原图预览、比对与点字段定位（识别区域只在会话内存中）', () => {
     const regions = {
       invoiceNumber: { pageIndex: 0, blockLabel: 'text', box: { x: 0.5, y: 0.1, width: 0.4, height: 0.1 } },
       totalAmount: { pageIndex: 0, blockLabel: 'text', box: { x: 0.05, y: 0.8, width: 0.9, height: 0.1 } },
@@ -181,7 +187,9 @@ describe('发票编辑页重新识别（草稿）', () => {
 
     it('原文件在会话中时左栏改为原图：变动字段框出并带字段名，定位不到的说明“原图未定位”，读屏同步说明', async () => {
       const { view, recognize } = mountEditPage({ invoiceNumber: 'NEW', totalAmount: 226, taxAmount: 26, fieldRegions: regions }, 'done', file)
-      expect(view.queryByTestId('invoice-region-viewer')).toBeNull()
+      // 草稿前：原件平时预览，没有任何框
+      expect(view.getByTestId('invoice-region-viewer')).toBeTruthy()
+      expect(view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
       await recognize(true)
       const boxes = view.getAllByTestId('invoice-region-box')
       expect(boxes.map(box => box.textContent?.trim())).toEqual(['单据编号', '价税合计'])
@@ -218,17 +226,71 @@ describe('发票编辑页重新识别（草稿）', () => {
       expect(numberBox.style.top).toBe('50%')
     })
 
-    it('原文件不在会话中或放弃草稿后回到示意图，不显示框', async () => {
+    // 用户 2026-10-14 确认：编辑页平时也显示真实原件；原件不在会话中如实说明，不用示意图冒充。
+    it('原文件在会话中时平时显示原件；不在会话中说明“原件不在本次会话中”，不显示示意图', async () => {
       const withoutFile = mountEditPage({ invoiceNumber: 'NEW', fieldRegions: regions })
+      expect(withoutFile.view.queryByTestId('invoice-region-viewer')).toBeNull()
+      expect(withoutFile.view.getByTestId('invoice-original-missing').textContent).toContain('原件不在本次会话中')
+      expect(withoutFile.view.getByTestId('invoice-original-missing').textContent).toContain('继续识别需要重新上传')
+      expect(withoutFile.view.queryByRole('img', { name: /发票示意图/ })).toBeNull()
       await withoutFile.recognize(true)
       expect(withoutFile.view.queryByTestId('invoice-region-viewer')).toBeNull()
+      expect(withoutFile.view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
       withoutFile.view.unmount()
 
       const { view, recognize } = mountEditPage({ invoiceNumber: 'NEW', fieldRegions: regions }, 'done', file)
+      expect(view.getByRole('img', { name: 'audit.png' })).toBeTruthy()
+      expect(view.queryByTestId('invoice-original-missing')).toBeNull()
+      expect(view.queryByTestId('invoice-region-legend')).toBeNull()
       await recognize(true)
-      expect(view.getByTestId('invoice-region-viewer')).toBeTruthy()
+      expect(view.getAllByTestId('invoice-region-box')).toHaveLength(1)
+      // 放弃草稿：原件仍在，比对框撤下
       await fireEvent.click(view.getByRole('button', { name: '放弃识别结果' }))
-      expect(view.queryByTestId('invoice-region-viewer')).toBeNull()
+      expect(view.getByTestId('invoice-region-viewer')).toBeTruthy()
+      expect(view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
+    })
+
+    it('首次识别后聚焦字段临时框出所在块，失焦撤回；定位不到的字段读屏与原图说明“原图未定位”', async () => {
+      const { view, recognize } = mountEditPage({ invoiceNumber: 'NEW', totalAmount: 226, fieldRegions: regions }, 'failed', file)
+      expect(view.queryByTestId('invoice-region-legend')).toBeNull()
+      await recognize(true)
+      expect(view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
+      expect(view.getByTestId('invoice-region-legend').textContent).toContain('聚焦或悬停字段输入框')
+
+      const number = view.getByLabelText('单据编号')
+      await fireEvent.focus(number)
+      const boxes = view.getAllByTestId('invoice-region-box')
+      expect(boxes.map(box => [box.dataset.fields, box.dataset.active])).toEqual([['invoiceNumber', 'true']])
+      expect(boxes[0]!.style.left).toBe('50%')
+      await fireEvent.blur(number)
+      expect(view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
+
+      const total = view.getByLabelText('价税合计')
+      await fireEvent.mouseEnter(total)
+      expect(view.getAllByTestId('invoice-region-box').map(box => box.dataset.fields)).toEqual(['totalAmount'])
+      await fireEvent.mouseLeave(total)
+      expect(view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
+
+      const seller = view.getByLabelText('供应商')
+      expect(document.getElementById(seller.getAttribute('aria-describedby')!)?.textContent).toBe('原图未定位')
+      expect(number.getAttribute('aria-describedby')).toBeNull()
+      await fireEvent.focus(seller)
+      expect(view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
+      expect(view.getByTestId('invoice-region-legend').textContent).toContain('供应商：原图未定位')
+      // 对应项目不是识别字段，不参与定位
+      expect(view.getByLabelText('对应项目').getAttribute('aria-describedby')).toBeNull()
+    })
+
+    it('重新识别草稿期间回到比对：变动框常驻，失焦不撤框', async () => {
+      const { view, recognize } = mountEditPage({ invoiceNumber: 'NEW', fieldRegions: regions }, 'done', file, regions)
+      await fireEvent.focus(view.getByLabelText('价税合计'))
+      expect(view.getAllByTestId('invoice-region-box').map(box => box.dataset.fields)).toEqual(['totalAmount'])
+      await recognize(true)
+      const number = view.getByLabelText('单据编号')
+      await fireEvent.focus(number)
+      await fireEvent.blur(number)
+      expect(view.getAllByTestId('invoice-region-box').map(box => [box.dataset.fields, box.dataset.active])).toEqual([['invoiceNumber', 'true']])
+      expect(view.getByText('原图比对')).toBeTruthy()
     })
   })
 })

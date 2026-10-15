@@ -1,7 +1,7 @@
-// 识别变动字段 → 发票原图区域（用户 2026-10-14 需求）。纯函数，vitest 直接断言。
+// 识别字段 → 发票原图区域（用户 2026-10-14 需求：重新识别比对与首次识别点字段定位）。纯函数，vitest 直接断言。
 // 坐标唯一来源是本次 PaddleOCR-VL 结果的版面块（prunedResult.parsing_res_list 的 block_bbox），
 // 精度只到块：字段值在哪个块的文本里出现，就框住整块；块内没有字段级坐标，不推算、不造框。
-// 区域只随重新识别草稿存在内存中，不入库。
+// 区域只在内存中：重新识别随草稿，首次识别随上传会话中的原文件，都不入库。
 import type { InvoiceRecognitionField, InvoiceRecognitionFieldMark } from './recognition-changes'
 import type { OcrRecognitionPage } from '~/lib/recognize/engine'
 
@@ -291,4 +291,22 @@ export function invoiceRegionHighlights(
     }
   }
   return { groups: [...groups.values()], unlocated }
+}
+
+/**
+ * 首次识别的点字段定位：只给当前聚焦 / 悬停的字段造一个强调框（不常驻，同块其他字段不连带标注）；
+ * 定位不到的识别字段单列，聚焦时说明“原图未定位”。
+ */
+export function invoiceRegionFocus(
+  fields: readonly InvoiceRecognitionField[],
+  regions: InvoiceFieldRegions | undefined,
+  activeKey: string | null | undefined,
+) {
+  const unlocated = fields.filter(field => !regions?.[field.key])
+  const active = activeKey ? fields.find(field => field.key === activeKey) : undefined
+  const region = active ? regions?.[active.key] : undefined
+  const groups: InvoiceRegionHighlightGroup[] = active && region
+    ? [{ id: `focus:${active.key}`, pageIndex: region.pageIndex, box: region.box, keys: [active.key], labels: [active.label] }]
+    : []
+  return { groups, unlocated }
 }

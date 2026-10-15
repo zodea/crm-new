@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { expectInViewport, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
+import { expectInViewport, expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 /** 读当前库内值（store 每次写后都从库重载，与库一致）。 */
 function storedInvoice(page: Page) {
@@ -52,6 +52,25 @@ async function syntheticInvoicePng(page: Page) {
   return Buffer.from(dataUrl.split(',')[1]!, 'base64')
 }
 
+/** 原图预览：放大后原图只在自身区域内横向/纵向滚动，滚轮不带动整页；最后恢复 100%。 */
+async function expectViewerLocalScroll(page: Page, context: string) {
+  const viewer = page.getByTestId('invoice-region-viewer')
+  const scroller = viewer.locator('[aria-label="发票原图，可滚动查看"]')
+  await viewer.getByRole('button', { name: '放大原图' }).click()
+  await viewer.getByRole('button', { name: '放大原图' }).click()
+  await viewer.getByRole('button', { name: '放大原图' }).click()
+  await expect(viewer.getByRole('button', { name: '恢复 100% 缩放' })).toHaveText('200%')
+  await expectLocalHorizontalScroll(scroller, `${context} 原图放大`)
+  const pageScroll = await page.evaluate(() => [window.scrollX, window.scrollY])
+  await scroller.evaluate(element => element.scrollTo({ top: 0, left: 0 }))
+  await scroller.hover()
+  await page.mouse.wheel(0, 120)
+  await expect.poll(() => scroller.evaluate(element => element.scrollTop), { message: `${context} 原图区域自身滚动` }).toBeGreaterThan(0)
+  expect(await page.evaluate(() => [window.scrollX, window.scrollY]), `${context} 原图滚动不带动整页`).toEqual(pageScroll)
+  await expectNoPageOverflow(page, `${context} 原图放大`)
+  await viewer.getByRole('button', { name: '恢复 100% 缩放' }).click()
+}
+
 /** 原图上某块的框（data-fields 为落在该块的变动字段 key，以空格分隔）。 */
 function regionBox(page: Page, fields: string) {
   return page.locator(`[data-testid="invoice-region-box"][data-fields="${fields}"]`)
@@ -59,6 +78,8 @@ function regionBox(page: Page, fields: string) {
 
 // 用户 2026-10-13 确认：重新识别结果先作草稿不写库，变动字段高亮，保存/确认须二次确认列出变动，离开按离开保护处理。
 test('工作台与编辑页重新识别先作草稿：高亮变动、保存二次确认、取消不写库，1440 与 390 视口可用键盘操作', async ({ page }) => {
+  // 覆盖工作台、编辑页的普通预览、点字段定位、比对与会话失效全链路，单测耗时较长
+  test.setTimeout(120_000)
   let attempt = 0
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -88,8 +109,61 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await (await chooser).setFiles({ name: 'audit-398.png', mimeType: 'image/png', buffer: invoicePng })
   const number = page.getByLabel('单据编号', { exact: true })
   await expect(number).toHaveValue('26442000000000000398')
-  // 首次识别直接写入，没有可对照的原值，不显示原图比对框。
-  await expect(page.getByTestId('invoice-region-viewer')).toHaveCount(0)
+  // 用户 2026-10-14 确认：中栏平时也用同一预览器显示原件（不再用浏览器 <object>）；首次识别无比对框。
+  const viewer = page.getByTestId('invoice-region-viewer')
+  await expect(viewer).toHaveAccessibleName('发票原图预览')
+  await expect(viewer.getByRole('img', { name: 'audit-398.png' })).toBeVisible()
+  await expect(page.locator('object')).toHaveCount(0)
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
+  await expect(viewer.getByText('原图比对')).toHaveCount(0)
+  await page.screenshot({ path: '.tmp/invoice-preview/workspace-preview-1440.png', animations: 'disabled' })
+  // 普通预览：键盘操作缩放与左右旋转，页面画框随之换算。
+  const firstPage = viewer.locator('[data-page-index="0"]')
+  const zoomIn = viewer.getByRole('button', { name: '放大原图' })
+  await zoomIn.focus()
+  await page.keyboard.press('Enter')
+  await expect(viewer.getByRole('button', { name: '恢复 100% 缩放' })).toHaveText('125%')
+  await expect(firstPage).toHaveAttribute('style', /width: 125%/)
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Tab')
+  await expect(viewer.getByRole('button', { name: '原图向右旋转' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(viewer.getByRole('img', { name: 'audit-398.png' })).toHaveAttribute('style', /rotate\(90deg\)/)
+  await expect.poll(async () => {
+    const box = await firstPage.boundingBox()
+    return box ? box.height > box.width : false
+  }, { message: '旋转 90° 后横版票面变为竖向画框' }).toBe(true)
+  await viewer.getByRole('button', { name: '原图向左旋转' }).click()
+  await expect(viewer.getByRole('img', { name: 'audit-398.png' })).toHaveAttribute('style', /rotate\(0deg\)/)
+  await viewer.getByRole('button', { name: '恢复 100% 缩放' }).click()
+  await expectViewerLocalScroll(page, '工作台普通预览 @ 1440px')
+  for (const width of RESPONSIVE_WIDTHS) {
+    await page.setViewportSize({ width, height: 900 })
+    if (width === 390)
+      await page.getByRole('tab', { name: '原件', exact: true }).click()
+    await expect(viewer.getByRole('img', { name: 'audit-398.png' })).toBeVisible()
+    await expectNoPageOverflow(page, `工作台普通预览 @ ${width}px`)
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+
+  // 首次识别点字段定位：聚焦字段时原图框出所在块并滚进视野，失焦撤框；定位不到的字段如实说明。
+  await number.focus()
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(1)
+  await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
+  await expect(regionBox(page, 'invoiceNumber')).toContainText('单据编号')
+  await expectInViewport(regionBox(page, 'invoiceNumber'), '首次识别强调框 @ 1440px')
+  await page.screenshot({ path: '.tmp/invoice-preview/first-focus-1440.png', animations: 'disabled' })
+  await page.keyboard.press('Tab')
+  await expect(page.getByLabel('开票日期', { exact: true })).toBeFocused()
+  await expect(regionBox(page, 'invoiceDate')).toHaveAttribute('data-active', 'true')
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(1)
+  await page.getByLabel('购买方税号', { exact: true }).focus()
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
+  await expect(page.getByTestId('invoice-region-legend')).toContainText('购买方税号：原图未定位')
+  await expect(page.getByLabel('购买方税号', { exact: true })).toHaveAccessibleDescription('原图未定位')
+  await page.getByLabel('购买方税号', { exact: true }).blur()
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
+  await expect(page.getByTestId('invoice-region-legend')).toContainText('聚焦或悬停字段输入框')
 
   // 工作台：人工更正即时落库后重新识别，结果只进表单。
   await page.getByLabel('供应商', { exact: true }).fill('人工更正供应商')
@@ -105,7 +179,7 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(number).toHaveAccessibleDescription(/识别变动.*识别前：26442000000000000398.*原图已框出/)
 
   // 原图比对（用户 2026-10-14）：变动字段按块框出并带字段名；识别为空的供应商定位不到，如实说明。
-  const viewer = page.getByTestId('invoice-region-viewer')
+  await expect(viewer).toHaveAccessibleName('发票原图识别变动比对')
   await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(2)
   await expect(regionBox(page, 'invoiceNumber')).toContainText('单据编号')
   await expect(regionBox(page, 'totalAmount taxAmount')).toContainText('价税合计、税额')
@@ -118,7 +192,7 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(regionBox(page, 'totalAmount taxAmount')).toHaveAttribute('data-active', 'true')
   await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'false')
   await expectInViewport(regionBox(page, 'totalAmount taxAmount'), '工作台强调框 @ 1440px')
-  await page.screenshot({ path: '.tmp/invoice-image/workspace-1440.png' })
+  await page.screenshot({ path: '.tmp/invoice-preview/workspace-compare-1440.png' })
   await changeItems.first().focus()
   await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
   await page.keyboard.press('Tab')
@@ -200,6 +274,25 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
     const invoice = store.list.find((row: { fileName: string }) => row.fileName === 'audit-398.png')
     await app.config.globalProperties.$router.push(`/finance/invoice/${invoice.id}`)
   })
+  // 用户 2026-10-14 确认：编辑页左栏平时也显示真实原件；保存过的识别区域支持点字段定位，失焦撤框。
+  await expect(viewer.getByRole('img', { name: 'audit-398.png' })).toBeVisible()
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
+  await expect(page.getByRole('img', { name: /发票示意图/ })).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.screenshot({ path: '.tmp/invoice-preview/edit-original-1440.png', animations: 'disabled' })
+  await expectViewerLocalScroll(page, '编辑页原件 @ 1440px')
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    await number.focus()
+    await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
+    await viewer.scrollIntoViewIfNeeded()
+    await expectInViewport(regionBox(page, 'invoiceNumber'), `编辑页首次识别强调框 @ ${width}px`)
+    await number.blur()
+    await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
+    await expectNoPageOverflow(page, `编辑页原件 @ ${width}px`)
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+
   // 编辑页：未保存的人工修改也进入对比，识别结果只填进表单。
   await page.getByLabel('供应商', { exact: true }).fill('编辑页人工供应商')
   await page.getByRole('button', { name: '重新识别', exact: true }).click()
@@ -219,7 +312,7 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
     await page.getByTestId('invoice-region-viewer').scrollIntoViewIfNeeded()
     await expectInViewport(regionBox(page, 'totalAmount taxAmount'), `编辑页强调框 @ ${width}px`)
     if (width === 1440)
-      await page.screenshot({ path: '.tmp/invoice-image/edit-1440.png' })
+      await page.screenshot({ path: '.tmp/invoice-preview/edit-compare-1440.png' })
     await page.getByLabel('单据编号', { exact: true }).focus()
     await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
   }
@@ -249,5 +342,26 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await page.getByRole('dialog').getByRole('button', { name: '确认保存' }).click()
   await expect(page).toHaveURL(/\/finance\/ledger$/)
   expect(await storedInvoice(page)).toEqual({ number: '26442000000000000400', total: 339, seller: '', review: 'unreviewed' })
+
+  // 刷新后原文件与识别区域随会话失效：工作台与编辑页如实说明“原件不在本次会话中”，不显示示意图或框。
+  const invoiceId = await page.evaluate(() => {
+    const app = (document.querySelector('#__nuxt') as any).__vue_app__
+    return app.config.globalProperties.$pinia._s.get('invoice').list.find((row: { fileName: string }) => row.fileName === 'audit-398.png').id as string
+  })
+  await page.goto('/finance/invoice')
+  await page.getByText('audit-398.png').first().click()
+  await expect(number).toHaveValue('26442000000000000400')
+  const missing = page.getByTestId('invoice-original-missing')
+  await expect(missing).toContainText('原件不在本次会话中')
+  await expect(missing).toContainText('继续识别需要重新上传')
+  await expect(page.getByTestId('invoice-region-viewer')).toHaveCount(0)
+  await page.goto(`/finance/invoice/${invoiceId}`)
+  await expect(missing).toContainText('原件不在本次会话中')
+  await expect(page.getByTestId('invoice-region-viewer')).toHaveCount(0)
+  await expect(page.getByRole('img', { name: /发票示意图/ })).toHaveCount(0)
+  for (const width of RESPONSIVE_WIDTHS) {
+    await page.setViewportSize({ width, height: 900 })
+    await expectNoPageOverflow(page, `编辑页原件不在会话中 @ ${width}px`)
+  }
   expect(errors).toEqual([])
 })

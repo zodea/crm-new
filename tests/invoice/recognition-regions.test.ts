@@ -1,6 +1,6 @@
 import type { OcrRecognitionPage } from '~/lib/recognize/engine'
 import { describe, expect, it } from 'vitest'
-import { invoiceRegionHighlights, locateInvoiceFieldRegions, rotatedFrame, rotateNormalizedBox } from '~/lib/invoice/recognition-regions'
+import { invoiceRegionFocus, invoiceRegionHighlights, locateInvoiceFieldRegions, rotatedFrame, rotateNormalizedBox } from '~/lib/invoice/recognition-regions'
 
 const fields = [
   { key: 'invoiceNumber', label: '单据编号' },
@@ -129,5 +129,32 @@ describe('识别变动的原图高亮清单', () => {
   it('没有标记（首次识别 / 无变动）时没有任何框', () => {
     expect(invoiceRegionHighlights(fields, {}, { invoiceNumber: { pageIndex: 0, blockLabel: 'text', box: { x: 0, y: 0, width: 1, height: 1 } } }))
       .toEqual({ groups: [], unlocated: [] })
+  })
+})
+
+describe('首次识别的点字段定位', () => {
+  const regions = {
+    invoiceNumber: { pageIndex: 0, blockLabel: 'text', box: { x: 0.6, y: 0.04, width: 0.38, height: 0.12 } },
+    invoiceDate: { pageIndex: 0, blockLabel: 'text', box: { x: 0.6, y: 0.04, width: 0.38, height: 0.12 } },
+    totalAmount: { pageIndex: 1, blockLabel: 'table', box: { x: 0.02, y: 0.8, width: 0.96, height: 0.12 } },
+  }
+
+  it('没有聚焦字段时不常驻任何框；定位不到的字段全部单列', () => {
+    const result = invoiceRegionFocus(fields, regions, null)
+    expect(result.groups).toEqual([])
+    expect(result.unlocated.map(field => field.key)).toEqual(['buyer', 'seller', 'sellerTaxNo', 'taxAmount', 'taxRate'])
+  })
+
+  it('只框出聚焦字段所在块，标签只写该字段（同块其他字段不连带）', () => {
+    expect(invoiceRegionFocus(fields, regions, 'invoiceDate').groups).toEqual([
+      { id: 'focus:invoiceDate', pageIndex: 0, box: regions.invoiceDate.box, keys: ['invoiceDate'], labels: ['开票日期'] },
+    ])
+    expect(invoiceRegionFocus(fields, regions, 'totalAmount').groups[0]).toMatchObject({ pageIndex: 1, keys: ['totalAmount'] })
+  })
+
+  it('聚焦定位不到或不属于识别字段的输入框时不造框', () => {
+    expect(invoiceRegionFocus(fields, regions, 'seller').groups).toEqual([])
+    expect(invoiceRegionFocus(fields, regions, 'projectName').groups).toEqual([])
+    expect(invoiceRegionFocus(fields, undefined, 'invoiceNumber')).toEqual({ groups: [], unlocated: fields })
   })
 })
