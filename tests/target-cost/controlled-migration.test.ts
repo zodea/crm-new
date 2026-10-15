@@ -6,7 +6,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb, createMigratedMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 import { seedTargetCostMigrationSource } from '../helpers/target-cost-migration-source'
 
@@ -23,7 +23,7 @@ afterEach(async () => {
 })
 
 it.each(['untouched', 'independent-project', 'deleted-independent-project', 'historical-project', 'independent-item', 'receipt'] as const)('恢复预算迁入时保护可解释来源：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const batch = await prepare(await seedTargetCostMigrationSource(db))
     await coreMigrationTestInstance.importBatch({ ...envelope('budget-import'), batchId: batch.batchId }, session)
@@ -115,7 +115,7 @@ it.each(['duplicate-baseline', 'wrong-project', 'orphan-item', 'broken-payload']
 })
 
 it('正式迁入完整预算版本，空项目/旧空分项名/零/删除历史/缺原件保真，重复确认保日常更正', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const batch = await prepare(await seedTargetCostMigrationSource(db))
     expect(batch.issues.filter(row => row.metricKey === 'apply-failed')).toEqual([])

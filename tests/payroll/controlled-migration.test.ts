@@ -8,7 +8,7 @@ import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migrati
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb, createMigratedMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { payrollOriginalSnapshot, seedPayrollMigrationSource, seedReleasedPayrollMigrationSource } from '../helpers/payroll-migration-source'
 import { readQuantityCoreSource, seedQuantityMigrationSource } from '../helpers/quantity-migration-source'
 
@@ -84,7 +84,7 @@ it.each(['missing', 'cross-project'] as const)('旧缺关系行与坏快照可�
 })
 
 it.each(['untouched', 'daily-change', 'deleted-independent', 'zero-member', 'unclaimed-daywork', 'independent-audit', 'batch-plan'] as const)('危险恢复在删除前保护工资完整关系并保持全域不变：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const batch = await confirm(await seedPayrollMigrationSource(db))
     const ids = await quantityTestInstance.withWorkspaceTransaction(async tx => ({
@@ -139,7 +139,7 @@ it.each(['untouched', 'daily-change', 'deleted-independent', 'zero-member', 'unc
 })
 
 it('公开迁入后同库冷读原八表与不可变证据，重复确认保留日常更正', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const batch = await confirm(await seedPayrollMigrationSource(db))
     const read = () => quantityTestInstance.withWorkspaceTransaction(async tx => ({

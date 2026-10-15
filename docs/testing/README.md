@@ -22,6 +22,17 @@
 
 `pnpm test` 不包含浏览器组件、E2E 或视觉矩阵。浏览器组件、工资测试类型、循环依赖与依赖重复检查目前也未接入推送钩子和 CI，涉及这些文件时须单独选择对应本地入口。钩子实际执行范围见 [Git 工作流](../agents/git-workflow.md)，远端套件见 [CI 使用规则](../agents/ci-usage.md)。
 
+### Vitest 本地缓存
+
+`pnpm test`、`test:unit`、`test:components` 在已忽略的 `.tmp/` 下保留两类缓存，跨次运行复用：
+
+| 缓存 | 位置 | 失效方式 | 清除 |
+| --- | --- | --- | --- |
+| 模块转译（Vitest 实验特性 `experimental.fsModuleCache`） | `.tmp/vitest-cache/` | Vitest 按文件内容、配置与依赖版本自动判定 | `pnpm exec vitest --clearCache`（同时清除结果缓存），或删除目录 |
+| 冷进程入口预打包、默认全量迁移后的内存库快照（[全局准备](../../tests/global-setup.ts)） | `.tmp/vitest-fixtures/` | 入口及迁移链依赖的源码内容哈希、esbuild/sql.js/Node 版本任一变化即整批重建 | 删除目录 |
+
+过期风险：转译缓存是实验特性，改动 Vite 插件、别名或升级依赖后若出现无法解释的旧行为，先清除再复现；预打包把 `node_modules` 中的包留作外部依赖、运行时现读，不计入内容键。两类缓存都不保存任何测试数据库或业务状态。
+
 E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库，每案独占重置、接管和回读旅程。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。
 
 ## 模块入口
@@ -119,7 +130,8 @@ E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库
 
 ### 数据、资源与时间
 
-- 需要已迁移的内存库时用 [`createMigratedMemoryDb()`](../../tests/helpers/memory-db.ts)（每个 worker 只迁移一次，之后克隆）；只有验证迁移本身、空库或指定旧版本时，才用 `createMemoryDb()` 加 `runMigrations`。
+- 需要已迁移的内存库时用 [`createMigratedMemoryDb()`](../../tests/helpers/memory-db.ts)（整次运行由全局准备迁移一次并按迁移源码哈希缓存快照，各用例克隆）；只有验证迁移本身、空库或指定旧版本时，才用 `createMemoryDb()` 加 `runMigrations`。
+- 冷恢复与独立服务进程用 [`runColdProcess` / `spawnColdProcess`](../../tests/helpers/cold-process.ts) 启动预打包入口，新入口登记到[全局准备](../../tests/global-setup.ts)的 `COLD_ENTRIES`；子进程仍须独立启动并从磁盘重开数据库，不得复用测试进程内存状态。
 - 每个打开的库都要在 `afterEach` 或 `finally` 中 `close()`；`vi.stubGlobal`、`vi.spyOn`、`vi.useFakeTimers` 在同一文件的 `afterEach` 中恢复。
 - 写入旅程由每个案例创建正式主档，或安装隔离的受控迁移来源，并使用回执 ID；演示记录只用于明确授权的只读场景。
 - 涉及当前时间时使用受控时钟或已有的时间注入；等待以页面状态、响应或时钟事件为准，不用固定延时。

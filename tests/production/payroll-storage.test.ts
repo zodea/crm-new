@@ -2,11 +2,9 @@ import type { PayrollC1Action, PayrollC1CommandRead } from '../../app/lib/payrol
 import type { PayrollC2Action, PayrollC2CommandRead } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollDayworkRecordDraft } from '../../app/lib/payroll/central-daywork-contract'
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 import { payrollCommandRecoveryScope } from '../../app/lib/payroll/command-recovery-scope'
 
@@ -16,6 +14,7 @@ import { createProductionPayrollImport } from '../../server/utils/production-pay
 import { createProductionPayrollService } from '../../server/utils/production-payroll-service'
 import { validateProductionPayrollState } from '../../server/utils/production-payroll-validation'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { runColdProcess } from '../helpers/cold-process'
 import { createPayrollC1ServiceFixture } from '../helpers/payroll-c1-service-fixture'
 
 async function fixture() {
@@ -122,7 +121,7 @@ it('正式C2签工、P7原执行、P4真实补退、正式编号、固定名册�
     const descriptor = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, family: 'payroll', commandId: refundCommand.commandId, targetId: null, action: refundCommand.action.kind, scopeId: payrollCommandRecoveryScope(refundCommand) }
     await expect(f.owner.resolve({ ...descriptor, scopeId: payrollCommandRecoveryScope({ ...refundCommand, target: { ...paymentTarget, draftKey: 'another-book' } }) }, () => f.actor)).rejects.toThrow('范围')
     await f.storage.close()
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-payroll-cold-process.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_PAYROLL_COLD_DIRECTORY: f.options.directory, CRM_PAYROLL_COLD_DESCRIPTOR: JSON.stringify(descriptor), CRM_PAYROLL_COLD_CHAIN: JSON.stringify({ projectId: f.scope.projectId, statementId: saved.statementId, archiveId: archived.archiveId, rosterId: roster.archiveId, planId: plan.planId }) } })
+    const child = await runColdProcess('production-payroll-cold-process', [], { env: { ...process.env, CRM_PAYROLL_COLD_DIRECTORY: f.options.directory, CRM_PAYROLL_COLD_DESCRIPTOR: JSON.stringify(descriptor), CRM_PAYROLL_COLD_CHAIN: JSON.stringify({ projectId: f.scope.projectId, statementId: saved.statementId, archiveId: archived.archiveId, rosterId: roster.archiveId, planId: plan.planId }) } })
     expect(JSON.parse(child.stdout)).toMatchObject({ recovered: { outcome: 'applied', result: refund }, chain: { netAmount: 960, statement: { actualAmount: 1000 }, plan: { state: 'complete' }, directory: { id: archived.archiveId }, roster: { id: roster.archiveId } } })
   }
   finally { await f.storage.close() }
@@ -243,7 +242,7 @@ it('实际C1发放、零成员、冻结配对、原键及明确封存同盘冷�
     expect((restrictedMatrix.options as typeof restrictedMatrix.options & { availability: { workers: string } }).availability.workers).toBe('forbidden')
     expect(restrictedMatrix.context.readonly).toBe(true)
     await f.storage.close()
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-payroll-cold-process.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_PAYROLL_COLD_DIRECTORY: f.options.directory, CRM_PAYROLL_COLD_DESCRIPTOR: JSON.stringify({ workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, family: 'payroll', commandId: original.commandId, targetId: original.statementId, action: original.action.kind }) } })
+    const child = await runColdProcess('production-payroll-cold-process', [], { env: { ...process.env, CRM_PAYROLL_COLD_DIRECTORY: f.options.directory, CRM_PAYROLL_COLD_DESCRIPTOR: JSON.stringify({ workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, family: 'payroll', commandId: original.commandId, targetId: original.statementId, action: original.action.kind }) } })
     expect(JSON.parse(child.stdout)).toMatchObject({ recovered: { outcome: 'applied', result }, output: { state: 'available' } })
     const coldStorage = createProductionStorage(f.options)
     try {

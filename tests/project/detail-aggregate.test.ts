@@ -1,9 +1,8 @@
 import type { TestDb } from '../helpers/memory-db'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadArchivedInvoiceAggregates } from '~/lib/project/detail-aggregate'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 async function insertSeed(db: TestDb, table: string) {
   const rows = JSON.parse(readFileSync(new URL(`../../app/lib/db/seed/${table}.json`, import.meta.url), 'utf-8')) as Record<string, unknown>[]
@@ -18,9 +17,8 @@ async function insertSeed(db: TestDb, table: string) {
 
 describe('archived invoice project aggregates', () => {
   it('preserves the archived invoice source and project range from the existing fixture', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       for (const table of ['customers', 'projects', 'suppliers', 'invoices'])
         await insertSeed(db, table)
       expect(await loadArchivedInvoiceAggregates(db)).toEqual([
@@ -31,9 +29,8 @@ describe('archived invoice project aggregates', () => {
   })
 
   it('reads real SQLite null, corrupt text, zero and red-letter values independently by project and column', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute(`INSERT INTO projects (id, name) VALUES ('known', '已知'), ('unknown', '未知'), ('text', '坏金额'), ('tax', '未知税额'), ('zero', '真实零')`)
       await db.execute(`
         INSERT INTO invoices (id, project_id, amount, tax_amount, account_status)
@@ -61,9 +58,8 @@ describe('archived invoice project aggregates', () => {
   })
 
   it('excludes unarchived and soft-deleted facts and ancestors, restores original values, and keeps overflow unknown', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute(`INSERT INTO customers (id, name) VALUES ('customer', '客户')`)
       await db.execute(`INSERT INTO projects (id, name, customer_id) VALUES ('project', '项目', 'customer'), ('overflow', '超范围', NULL)`)
       await db.execute(`INSERT INTO suppliers (id, name) VALUES ('supplier', '分供方')`)

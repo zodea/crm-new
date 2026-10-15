@@ -1,11 +1,8 @@
 import type { BoqCommand } from '../../app/lib/boq/production-contract'
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import process from 'node:process'
-import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
 import { ensureQuantityExternalReferences } from '../../app/lib/quantity/central-reference'
@@ -19,6 +16,7 @@ import { createProductionProjectService } from '../../server/utils/production-pr
 import { createProductionQuantityService } from '../../server/utils/production-quantity-service'
 import { validateProductionQuantityState } from '../../server/utils/production-quantity-validation'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { runColdProcess } from '../helpers/cold-process'
 
 it('真实Node原上游master+完整BOQbytes同盘读写，原号重放/原件保全/false0与E独立源', async () => {
   const base = resolve('.tmp/opt02-boq')
@@ -194,7 +192,7 @@ it('真实Node原上游master+完整BOQbytes同盘读写，原号重放/原件�
     await mkdir(coldDirectory)
     await storage.backupTo(resolve(coldDirectory, 'ruihang.sqlite'))
     const output = resolve(directory, 'cold-daily.json')
-    await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-boq-cold.ts'), coldDirectory, JSON.stringify(actor), JSON.stringify(scope), JSON.stringify(productionBoqRecoveryDescriptor(restoreCommand)), output], { windowsHide: true })
+    await runColdProcess('production-boq-cold', [coldDirectory, JSON.stringify(actor), JSON.stringify(scope), JSON.stringify(productionBoqRecoveryDescriptor(restoreCommand)), output])
     const cold = JSON.parse(await readFile(output, 'utf8'))
     expect(cold.resolution).toEqual({ outcome: 'applied', result: restoredAttachment })
     expect(cold.downloaded).toContainEqual({ ownerId: changeId, fileId: attachedFile.id, sha256: attachedFile.sha256, bytes: attachment.length })

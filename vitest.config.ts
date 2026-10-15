@@ -11,6 +11,11 @@ export default defineConfig({
     },
   },
   test: {
+    experimental: {
+      // 跨次运行复用模块转译结果；位置与清除办法见 docs/testing/README.md。
+      fsModuleCache: true,
+      fsModuleCachePath: '.tmp/vitest-cache',
+    },
     projects: [
       {
         extends: true,
@@ -20,6 +25,7 @@ export default defineConfig({
           // 服务与迁入用例在真实内存库上走完整链路，满负载并行时单例可达数秒；默认 5s 会随机超时。
           testTimeout: 15_000,
           hookTimeout: 30_000,
+          globalSetup: ['./tests/global-setup.ts'],
           include: ['tests/**/*.test.ts'],
           exclude: ['tests/components/**/*.test.ts', 'tests/browser/**/*.test.ts'],
         },

@@ -1,11 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { payrollSourceContext } from '~/lib/payroll/a-navigation'
 import { mapQuantityMigrationGraph } from '~/lib/quantity/migration-mapping'
 import { readQuantityMigrationGraphs } from '~/lib/quantity/migration-source'
 import { inspectRestorableTabPath } from '~/lib/tabs/restore-target'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 interface MappedSource { unitId: string, stageId: string, itemId: string, completionId: string }
 const back = '/subcontract/payroll/config?origin=real&project=project-a&month=2026-09&leader=manager&managementBookId=book-a&focus=fee-a'
@@ -13,9 +12,8 @@ let mapped: MappedSource
 
 /** 旧身份先通过真实 SQLite 和完整量域关系校验，再使用生产迁移映射。 */
 async function migratedSource(): Promise<MappedSource> {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
-    await runMigrations(db)
     const seeds: Array<[string, (string | number)[]]> = [
       ['INSERT INTO projects (id,name) VALUES (?,?)', ['p', '量项目']],
       ['INSERT INTO buildings (id,project_id,code,name) VALUES (?,?,?,?)', ['b', 'p', 'B', '栋']],

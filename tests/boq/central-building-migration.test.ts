@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest'
 import { createBoqBuildingFixture } from '../helpers/boq-building-fixture'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedWbsMigrationSource } from '../helpers/wbs-migration-source'
 
 it('受控 SQLite 导出保留已确认原始 BOQ 行文件、追踪行与来源资格', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedWbsMigrationSource(db)
     const catalog = JSON.parse(String(source.entities.construction_contracts[0]!.attributes!.boqCatalogJson))

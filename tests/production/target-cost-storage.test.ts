@@ -1,18 +1,15 @@
 import type { TargetCostAction, TargetCostCommand, TargetCostFormRead } from '../../app/lib/target-cost/central-contract'
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import process from 'node:process'
-import { promisify } from 'node:util'
 import { afterEach, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { budgetBytesDigest } from '../../server/utils/production-target-cost-files'
 import { createProductionBudgetMigration } from '../../server/utils/production-target-cost-migration'
 import { createProductionTargetCostService } from '../../server/utils/production-target-cost-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { runColdProcess } from '../helpers/cold-process'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -37,8 +34,7 @@ async function fixture() {
   } }
 }
 async function nativeSource(external = false) {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   await db.execute('INSERT INTO projects(id,name) VALUES (\'legacy-budget-project\',\'原预算项目\')')
   await db.execute('ALTER TABLE target_costs ADD COLUMN unknown_extension TEXT')
   await db.execute('ALTER TABLE target_costs ADD COLUMN integer_extension INTEGER')
@@ -82,7 +78,7 @@ it('预算头、科目、原件与原编号在独立进程冷恢复；GET不建�
   await expect(f.service.execute({ ...request, commandId: 'budget-not-applied' }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
   await f.storage.close()
   const output = resolve(f.directory, 'cold-result.json')
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-target-cost-cold.ts'), f.directory, saved.id, request.commandId, saved.attachmentIds[0]!, output], { windowsHide: true })
+  await runColdProcess('production-target-cost-cold', [f.directory, saved.id, request.commandId, saved.attachmentIds[0]!, output])
   const restored = JSON.parse(await readFile(output, 'utf8'))
   expect(restored.header).toMatchObject({ name: '原冷恢复预算', taxInclusiveTotal: null, taxAmount: 0 })
   expect(restored.items).toMatchObject([{ qty: null, unitPrice: 0, amount: 0 }])

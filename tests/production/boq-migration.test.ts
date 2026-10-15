@@ -1,17 +1,13 @@
 import type { BoqSourceImportCommand } from '../../app/lib/boq/import-contract'
 import type { ConstructionImportCommand } from '../../app/lib/construction-contract/import-contract'
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import process from 'node:process'
-import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
 import { approveBoqChangeOrder, createBoqChangeOrder, transitionBoqChangeOrder } from '../../app/lib/boq/change'
 import { productionBoqWorkspaceProjection } from '../../app/lib/boq/production-projection'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { readProductionBoqImportedIdentities } from '../../server/utils/production-boq-import-evidence'
 import { createProductionBoqMigration } from '../../server/utils/production-boq-migration'
@@ -21,7 +17,8 @@ import { createProductionConstructionMigration } from '../../server/utils/produc
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
-import { createMemoryDb } from '../helpers/memory-db'
+import { runColdProcess } from '../helpers/cold-process'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 it('真实完整SQLite同SHA施工→清单/E/有效变化原图；保SQL扩展/原JSON/原件/缺件，不复制私密整库', async () => {
   const base = resolve('.tmp/opt02-boq')
@@ -30,11 +27,10 @@ it('真实完整SQLite同SHA施工→清单/E/有效变化原图；保SQL扩展/
   const storage = createProductionStorage({ directory, workspaceId: 'boq-migration-workspace', ownerId: 'boq-migration-owner', purpose: 'verification' })
   const actor = { workspaceId: 'boq-migration-workspace', actorId: 'boq-migration-owner', capabilities: ['boq:read', 'boq:write', 'boq:import', 'owner-document:read', 'owner-document:write', 'core:migration:write', 'construction-contract:read', 'construction-contract:write', 'construction-contract:import', 'customer:list:read', 'customer:write', 'project:list:read', 'project:write'] }
   const session = () => structuredClone(actor)
-  const native = await createMemoryDb()
+  const native = await createMigratedMemoryDb()
   try {
     const customer = await createProductionCustomerService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: 'boq-migration-customer', requiredCapability: 'customer:write', baseVersion: null, action: 'draft', draft: { name: '原清单正式甲方' }, attachments: {} }, session)
     const project = await createProductionProjectService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: 'boq-migration-project', requiredCapability: 'project:write', baseVersion: null, action: 'draft', draft: { name: '原清单正式项目', customerId: customer.id }, attachments: {} }, session)
-    await runMigrations(native)
     await native.execute('INSERT INTO customers(id,name) VALUES(\'legacy-boq-customer\',\'原甲方\')')
     await native.execute('INSERT INTO projects(id,name,customer_id) VALUES(\'legacy-boq-project\',\'原项目\',\'legacy-boq-customer\')')
     await native.execute('INSERT INTO contracts(id,no,name,kind,project_id,customer_id,amount,status,content,sign_date) VALUES(\'legacy-boq-head\',\'LEGACY-MAIN\',\'原施工主合同\',\'施工\',\'legacy-boq-project\',\'legacy-boq-customer\',NULL,\'已签订\',\'原施工范围\',\'2026-09-01\')')
@@ -153,7 +149,7 @@ it('真实完整SQLite同SHA施工→清单/E/有效变化原图；保SQL扩展/
     finally { await danger.close() }
     await storage.close()
     const output = resolve(directory, 'cold-adopt.json')
-    await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-boq-cold.ts'), directory, JSON.stringify(actor), JSON.stringify({ projectId: project.id, contractId: 'legacy-boq-head', origin: 'real' }), JSON.stringify({ workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: command.commandId, family: 'boq-import', action: 'adopt', targetId: source.sha256, scopeId: source.sha256 }), output], { windowsHide: true })
+    await runColdProcess('production-boq-cold', [directory, JSON.stringify(actor), JSON.stringify({ projectId: project.id, contractId: 'legacy-boq-head', origin: 'real' }), JSON.stringify({ workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: command.commandId, family: 'boq-import', action: 'adopt', targetId: source.sha256, scopeId: source.sha256 }), output])
     const cold = JSON.parse(await readFile(output, 'utf8'))
     expect(cold.resolution).toEqual({ outcome: 'applied', result: adopted })
     expect(cold.workspace.lines).toEqual(read.lines)

@@ -1,11 +1,10 @@
 import type { QuantityCommand, QuantityRegionAction } from '../../app/lib/quantity/central-contract'
-import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 import { createProductionQuantityService, productionQuantityInTransaction, quantityRecoveryDescriptor } from '../../server/utils/production-quantity-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { runColdProcess } from '../helpers/cold-process'
 
 async function fixture() {
   const base = resolve('.tmp/opt02-quantity-production')
@@ -44,7 +43,7 @@ it('正式工程量读取不发DDL或同步/复活任何主档，区域写入保
     expect(await f.service.execute(original)).toEqual(saved)
     expect((await f.service.region(f.query)).data.buildings).toEqual(expect.arrayContaining([expect.objectContaining({ id: saved.id, name: '原楼栋' })]))
     await f.storage.close()
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-quantity-cold-process.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_QUANTITY_COLD_DIRECTORY: f.options.directory, CRM_QUANTITY_COLD_DESCRIPTOR: JSON.stringify(quantityRecoveryDescriptor(original)) } })
+    const child = await runColdProcess('production-quantity-cold-process', [], { env: { ...process.env, CRM_QUANTITY_COLD_DIRECTORY: f.options.directory, CRM_QUANTITY_COLD_DESCRIPTOR: JSON.stringify(quantityRecoveryDescriptor(original)) } })
     expect(JSON.parse(child.stdout)).toMatchObject({ recovered: { outcome: 'applied', result: saved }, buildings: [expect.objectContaining({ id: saved.id })] })
   }
   finally { await f.storage.close() }

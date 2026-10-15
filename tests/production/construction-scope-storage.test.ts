@@ -1,9 +1,6 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { CommandRecoveryDescriptor } from '../../app/lib/forms/command-recovery'
-import { execFile } from 'node:child_process'
-import { resolve } from 'node:path'
 import process from 'node:process'
-import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 import { constructionScopeSourceKey } from '../../app/lib/construction-scope/contract'
 import { createConstructionScopeRepository } from '../../app/lib/construction-scope/repository'
@@ -20,6 +17,7 @@ import { createProductionFinanceService } from '../../server/utils/production-fi
 import { createProductionOtherSettlementService, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
 import { createProductionPayrollService } from '../../server/utils/production-payroll-service'
 import { createProductionSubcontractContractService } from '../../server/utils/production-subcontract-contract-service'
+import { runColdProcess } from '../helpers/cold-process'
 import { constructionScopeCommand, createConstructionScopeFixture } from '../helpers/production-construction-scope-fixture'
 
 it('真实新材采草稿原子关联Main由独立历史读投影显示，HTTP互证身份，撤Main读权不泄名称且不计承诺', async () => {
@@ -131,7 +129,7 @@ it('新F3原明细与每行真实Main由同一个原finance命令原子保存，
     await f.storage.close()
     expect(await f.finance.resolve('reimbursement', command.commandId, f.session)).toEqual({ outcome: 'applied', result })
     expect((await f.finance.form('reimbursement', result.id, f.session)).draft.lines.every(row => row.constructionScopeVersion === '1')).toBe(true)
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-construction-scope-cold.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_CONSTRUCTION_SCOPE_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptors: [], finance: [{ commandId: command.commandId, id: result.id }] }) } })
+    const child = await runColdProcess('production-construction-scope-cold', [], { env: { ...process.env, CRM_CONSTRUCTION_SCOPE_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptors: [], finance: [{ commandId: command.commandId, id: result.id }] }) } })
     const cold = JSON.parse(child.stdout).finance[0]
     expect(cold.resolved).toEqual({ outcome: 'applied', result })
     expect(cold.form.draft).toEqual(form.draft)
@@ -317,7 +315,7 @@ it('真实其他支出合同同tx关联后进入Other候选和承诺，公司头
     const descriptor = { commandId: original.commandId, workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, family: 'construction-scope', action: 'bind', targetId: constructionScopeSourceKey(source), scopeId: saved.id }
     await expect(f.scope.resolve({ ...descriptor, scopeId: f.expense.id }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await f.storage.close()
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-construction-scope-cold.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_CONSTRUCTION_SCOPE_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptors: [descriptor] }) } })
+    const child = await runColdProcess('production-construction-scope-cold', [], { env: { ...process.env, CRM_CONSTRUCTION_SCOPE_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptors: [descriptor] }) } })
     expect(JSON.parse(child.stdout).results).toEqual([{ outcome: 'applied', result: linked }])
     await f.storage.withTransaction(validateProductionConstructionScopeState)
     f.actor.capabilities = f.actor.capabilities.filter(cap => cap !== 'auxiliary-contract:read')
@@ -467,7 +465,7 @@ it('原事实和回执同事务回滚；独立进程只恢复原回执，intent-
     await expect(f.scope.resolve(descriptors[0]!, f.session)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
     f.actor.capabilities = priorCaps
     await f.storage.close()
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-construction-scope-cold.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_CONSTRUCTION_SCOPE_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptors }) } })
+    const child = await runColdProcess('production-construction-scope-cold', [], { env: { ...process.env, CRM_CONSTRUCTION_SCOPE_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptors }) } })
     expect(JSON.parse(child.stdout).results).toEqual([{ outcome: 'applied', result: saved }, { outcome: 'not-applied', commandId: failed.commandId }])
     await expect(f.scope.execute(failed, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await expect(f.scope.execute({ ...request, mainId: f.secondMain.id }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })

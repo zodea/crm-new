@@ -64,6 +64,7 @@
     "@vitest/browser-playwright": "4.1.10",
     "@vue/test-utils": "2.4.11",
     "dpdm": "4.3.0",
+    "esbuild": "0.28.1",
     "eslint": "^10.6.0",
     "husky": "^9.1.7",
     "jsdom": "29.1.1",

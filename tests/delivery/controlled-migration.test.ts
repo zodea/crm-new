@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { LATEST_VERSION, runMigrations } from '~/lib/db/migrations'
+import { LATEST_VERSION } from '~/lib/db/migrations'
 import { CORE_MIGRATION_CAPABILITY } from '~/lib/migration/core-contract'
 import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-source'
 import { resolveBusinessSession } from '../../server/utils/business-session'
@@ -7,7 +7,7 @@ import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migrati
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createDeliveryCommandService } from '../../server/utils/delivery-command-service'
 import { deliveryCommandTestInstance } from '../../server/utils/delivery-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const session = resolveBusinessSession()
 async function unused(): Promise<never> {
@@ -20,9 +20,8 @@ afterEach(async () => {
 
 describe('送货完整受控迁移', () => {
   it('读取真实 SQLite 迁移源时明确拒绝没有单头的材料、原件和审计，不冒称零记录完成', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute('PRAGMA foreign_keys = OFF')
       await db.execute('INSERT INTO delivery_lines(id,delivery_record_id,material_name,unit,qty) VALUES(\'orphan-line\',\'lost-head\',\'材料\',\'吨\',1)')
       await db.execute('INSERT INTO file_refs(id,owner_type,owner_id,file_name,file_size,mime_type,category) VALUES(\'orphan-source\',\'delivery_record\',\'lost-head\',\'原件.pdf\',12,\'application/pdf\',\'source\')')
@@ -53,9 +52,8 @@ describe('送货完整受控迁移', () => {
   })
 
   it('完整迁入原件、历史与打印状态；安全回滚可撤回，后续修订后回滚严格保全', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute('INSERT INTO projects(id,name) VALUES(\'delivery-old-project\',\'迁入项目\')')
       await db.execute('INSERT INTO suppliers(id,name) VALUES(\'delivery-old-supplier\',\'迁入分供方\')')
       await db.execute('INSERT INTO delivery_records(id,project_id,supplier_id,order_no,delivery_date,archived,stored,ocr_status,print_batch_id,print_disposition) VALUES(\'delivery-old\',\'delivery-old-project\',\'delivery-old-supplier\',\'OLD-441\',\'2026-09-11\',1,1,\'reviewed\',\'physical-upload\',\'printed\')')

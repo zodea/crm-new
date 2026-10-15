@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadProjectCostControl } from '~/lib/project/cost-control'
-import { createMemoryDb, createMigratedMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('project cost control read model', () => {
   it('uses the submitted baseline and formal source facts without mixing drafts or categories', async () => {
@@ -252,9 +251,8 @@ describe('project cost control read model', () => {
   })
 
   it('unknown contract and supplement amounts retain independently known money without inventing a baseline or wage total', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute(`INSERT INTO projects(id,name) VALUES ('project-null','空金额项目')`)
       await db.execute(`INSERT INTO contracts(id,kind,cost_category,project_id,amount,status) VALUES
         ('missing-head','材采','材料','project-null',NULL,'履约中'),
@@ -274,9 +272,8 @@ describe('project cost control read model', () => {
   })
 
   it('counts an original expense once while retaining adopted and withdrawn clearance references as separate historical evidence', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute(`INSERT INTO projects(id,name) VALUES ('project-expense','原费用项目')`)
       await db.execute(`INSERT INTO expense_reimbursements(id,project_id,applicant,status) VALUES
         ('expense-owner','project-expense','旧申请人原文','confirmed'),
