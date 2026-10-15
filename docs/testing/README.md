@@ -8,9 +8,9 @@
 
 | 用途 | 工具与入口 | 范围 |
 | --- | --- | --- |
-| 单元、服务、状态及静态契约 | Vitest：`pnpm test:unit` | [unit 项目](../../vitest.config.ts)，排除组件与浏览器目录 |
+| 单元、服务、状态及静态契约 | Vitest：`pnpm test:unit` | [unit 与 unit-heavy 项目](../../vitest.config.ts)，排除组件与浏览器目录；冷进程、整库迁入与正式库读写等重夹具文件归 unit-heavy，在其余项目之后以半数逻辑核并发运行 |
 | jsdom 组件 | Vitest、Vue Test Utils、Testing Library：`pnpm test:components` | [component 项目](../../vitest.config.ts)；部分用例使用 `vitest-axe` 检查无障碍规则 |
-| 单元与 jsdom 组件合并 | `pnpm test` | 仅以上两个项目 |
+| 单元与 jsdom 组件合并 | `pnpm test` | 仅以上 unit、unit-heavy、component 三个项目 |
 | 真实浏览器组件行为 | Vitest Browser、Playwright provider、`vitest-browser-vue`：`pnpm test:browser` | [独立配置](../../vitest.browser.config.ts)，Chromium 多视口 |
 | 跨页面流程 | Playwright：`pnpm test:e2e`；精确文件用 `pnpm exec playwright test <files...>` | [E2E 配置](../../playwright.config.ts)，排除专用视觉矩阵；默认 E2E 不写存档截图 |
 | 专用视觉矩阵 | Playwright：`pnpm test:visual` | [视觉配置](../../playwright.visual.config.ts)，固定 Windows/Chromium 与隔离演示服务 |
@@ -136,5 +136,5 @@ E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库
 - 每个打开的库都要在 `afterEach` 或 `finally` 中 `close()`；`vi.stubGlobal`、`vi.spyOn`、`vi.useFakeTimers` 在同一文件的 `afterEach` 中恢复。
 - 写入旅程由每个案例创建正式主档，或安装隔离的受控迁移来源，并使用回执 ID；演示记录只用于明确授权的只读场景。
 - 涉及当前时间时使用受控时钟或已有的时间注入；等待以页面状态、响应或时钟事件为准，不用固定延时。
-- 单条用例应在默认并发下数秒内完成；重夹具改为复用快照，不靠调大超时来掩盖。
+- 单条用例应在默认并发下数秒内完成；重夹具改为复用快照，不靠调大超时来掩盖。新增冷进程、整库迁入或正式库读写文件时，确认其路径落入 [`HEAVY_UNIT_TESTS`](../../vitest.config.ts)，不能归类时补登记。
 - 布局、滚动与焦点在真实浏览器中验证；[浏览器组件配置](../../vitest.browser.config.ts)会预扫全部组件的 UnoCSS 样式。
