@@ -7,9 +7,10 @@ import { createPayrollService } from '../../server/utils/payroll-service'
 import { loadQuantityHollowFacts } from '../../server/utils/quantity-hollow-facts'
 import { loadQuantityHollowMigratedProof } from '../../server/utils/quantity-hollow-migrated-proof'
 import { createPayrollHollowFixture } from './payroll-hollow-fixture'
-import { importQuantityHollowFixture } from './quantity-hollow-migration-fixture'
+import { cloneQuantityHollowSnapshot, importQuantityHollowFixture } from './quantity-hollow-migration-fixture'
 
-export async function createReleasedPayrollHollowMigrationFixture() {
+/** 原生库上造出已发放的空鼓 A 类工资（含扣款配置、开工、核算与发放回执）。 */
+async function releasePayrollHollowOriginal() {
   const original = await createPayrollHollowFixture()
   try {
     const query = { scope: { projectId: original.draft.projectId, crewId: null, leaderWorkerId: original.draft.leaderWorkerId, formatFamily: 'A' as const, book: original.draft.book! }, month: original.draft.month }
@@ -24,15 +25,58 @@ export async function createReleasedPayrollHollowMigrationFixture() {
     await original.service.execute(original.command(read, { kind: 'check-a' }))
     read = await original.service.aForm({ origin: 'real' }, { statementId })
     await original.service.execute(original.command(read, { kind: 'release-a', release: { actualAmount: 550, allocations: [{ workerId: original.draft.leaderWorkerId, amount: 550 }] } }))
-    const f = await importPayrollHollowFixture(original.db, original.identities)
-    return { ...f, original, statementId: f.id('wage_statements', statementId), originalStatementId: statementId, close: async () => {
-      await f.close()
-      await original.close()
-    } }
+    return { original, statementId }
   }
   catch (cause) {
     await original.close()
     throw cause
+  }
+}
+type ReleasedPayrollHollowOriginal = Awaited<ReturnType<typeof releasePayrollHollowOriginal>>
+
+async function importReleasedPayrollHollow({ original, statementId }: ReleasedPayrollHollowOriginal, native: TestDb) {
+  const f = await importPayrollHollowFixture(native, original.identities)
+  return { ...f, original, statementId: f.id('wage_statements', statementId), originalStatementId: statementId }
+}
+
+export async function createReleasedPayrollHollowMigrationFixture() {
+  const released = await releasePayrollHollowOriginal()
+  try {
+    const f = await importReleasedPayrollHollow(released, released.original.db)
+    return { ...f, close: async () => {
+      await f.close()
+      await released.original.close()
+    } }
+  }
+  catch (cause) {
+    await released.original.close()
+    throw cause
+  }
+}
+
+/**
+ * 原库只造一次（放在 beforeAll）；每次 migrate() 克隆原库字节，再走真实公开 preflight/import/confirm 迁入，
+ * 各案例的目标库与来源副本互不共享。案例不得改动 original。
+ */
+export async function createReleasedPayrollHollowSource() {
+  const released = await releasePayrollHollowOriginal()
+  const bytes = released.original.db.raw.export()
+  return {
+    async migrate() {
+      const native = await cloneQuantityHollowSnapshot(bytes)
+      try {
+        const f = await importReleasedPayrollHollow(released, native)
+        return { ...f, close: async () => {
+          await f.close()
+          native.close()
+        } }
+      }
+      catch (cause) {
+        native.close()
+        throw cause
+      }
+    },
+    close: () => released.original.close(),
   }
 }
 
