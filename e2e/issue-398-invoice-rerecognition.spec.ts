@@ -165,6 +165,37 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
   await expect(page.getByTestId('invoice-region-legend')).toContainText('聚焦或悬停字段输入框')
 
+  // 用户 2026-10-15 确认：390 分段下切面板导致的失焦保留最近一次定位，切到“原件”仍框出并滚进视野；
+  // 切回“校对”重新聚焦别的字段后按新焦点更新。键盘与指针切换分段都适用。
+  await page.setViewportSize({ width: 390, height: 900 })
+  const reviewTab = page.getByRole('tab', { name: '校对', exact: true })
+  await reviewTab.click()
+  await number.focus()
+  await reviewTab.focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(page.getByRole('tab', { name: '原件', exact: true })).toBeFocused()
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(1)
+  await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
+  await expectInViewport(regionBox(page, 'invoiceNumber'), '切到原件面板后首次识别强调框 @ 390px')
+  await expectNoPageOverflow(page, '切到原件面板点字段定位 @ 390px')
+  await page.screenshot({ path: '.tmp/invoice-preview/first-focus-pane-390.png', animations: 'disabled' })
+  await page.keyboard.press('ArrowRight')
+  await expect(reviewTab).toBeFocused()
+  await page.getByLabel('开票日期', { exact: true }).focus()
+  await page.getByRole('tab', { name: '原件', exact: true }).click()
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(1)
+  await expect(regionBox(page, 'invoiceDate')).toHaveAttribute('data-active', 'true')
+  await expectInViewport(regionBox(page, 'invoiceDate'), '重新聚焦后切到原件面板 @ 390px')
+  await page.keyboard.press('ArrowRight')
+  await expect(reviewTab).toBeFocused()
+  // 1440 回归：失焦即撤框
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
+  await number.focus()
+  await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
+  await number.blur()
+  await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
+
   // 工作台：人工更正即时落库后重新识别，结果只进表单。
   await page.getByLabel('供应商', { exact: true }).fill('人工更正供应商')
   await page.getByLabel('供应商', { exact: true }).blur()

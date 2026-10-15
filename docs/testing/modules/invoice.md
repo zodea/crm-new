@@ -8,6 +8,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/composables/useInvoiceRegionTarget.test.ts](../../../tests/composables/useInvoiceRegionTarget.test.ts) | 单元／服务／状态 | 原图强调目标：宽屏失焦撤框、悬停临时覆盖；窄屏切到原件面板恢复最近一次定位（含先换面板后失焦），切回后按新焦点更新，reset 不恢复旧定位 |
 | [tests/db/invoice-ledger.test.ts](../../../tests/db/invoice-ledger.test.ts) | 单元／服务／状态 | checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.4「核对完成是归档唯一前置」) |
 | [tests/finance/factor-combination.test.ts](../../../tests/finance/factor-combination.test.ts) | 单元／服务／状态 | solveFactorCombinations：精确整数组合 |
 | [tests/invoice/batch-pass.test.ts](../../../tests/invoice/batch-pass.test.ts) | 单元／服务／状态 | isAllGreen:全绿判定(建议通过标记与批量通过入围条件) |
@@ -46,7 +47,7 @@
 | [e2e/invoice-ledger-print-mode.spec.ts](../../../e2e/invoice-ledger-print-mode.spec.ts) | Playwright E2E | 发票台账打印入口：Excel 行可在台账勾选合计但不进入打印，进入双栏选择、打印确认并返回台账 |
 | [e2e/invoice-print-layout.spec.ts](../../../e2e/invoice-print-layout.spec.ts) | Playwright E2E | 发票打印排版：1/2/4 张、勾选合计、旋转、打印确认与计数持久化 |
 | [e2e/invoice-project-linkage.spec.ts](../../../e2e/invoice-project-linkage.spec.ts) | Playwright E2E | 发票全旅程：识别归档后三处联动，改项目后迁移，再转个人开支隔离 |
-| [e2e/issue-398-invoice-rerecognition.spec.ts](../../../e2e/issue-398-invoice-rerecognition.spec.ts) | Playwright E2E | 工作台与编辑页重新识别先作草稿：高亮变动、保存/确认二次确认、取消不写库、离开保护，原图比对框可见、聚焦字段与键盘 Tab 变动条目时强调、缩放旋转后仍可见；工作台与编辑页平时原件预览（键盘缩放旋转、放大后局部滚动不带动整页），首次识别聚焦字段强调框与失焦撤框，刷新后“原件不在本次会话中”；1440 与 390 视口键盘焦点，四档视口不横滚 |
+| [e2e/issue-398-invoice-rerecognition.spec.ts](../../../e2e/issue-398-invoice-rerecognition.spec.ts) | Playwright E2E | 工作台与编辑页重新识别先作草稿：高亮变动、保存/确认二次确认、取消不写库、离开保护，原图比对框可见、聚焦字段与键盘 Tab 变动条目时强调、缩放旋转后仍可见；工作台与编辑页平时原件预览（键盘缩放旋转、放大后局部滚动不带动整页），首次识别聚焦字段强调框与失焦撤框（390 下切到原件面板保留最近一次定位、重新聚焦后更新，1440 失焦撤框），刷新后“原件不在本次会话中”；1440 与 390 视口键盘焦点，四档视口不横滚 |
 
 ## 辅助文件与配置（非独立测试）
 
