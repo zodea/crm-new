@@ -62,7 +62,7 @@ DC重构设计源码/
 
 ## 当前设计覆盖与待补设计
 
-缺一一对应 DC 页面的路由统一登记在 [`design-coverage.json`](./design-coverage.json)，数量见[实现状态生成表](./ui-implementation-status.md#2-当前总数)。当前工作区已注册并挂载付款详情 `payApplyDetail`、数据迁移 `dataMigration`、施工阶段配置 `quantityStages` 和工序库版本详情 `processLibraryDetail`，覆盖映射按其实际 PAGE、路由开关与 x-import 登记。DC 源码的并行改动属于既有工作区成果，本轮只同步索引；设计落点不提升页面业务、运行或生产验收等级。付款、迁移、阶段与工序库的历史实施来源分别保留 #305/#294、#442、#443；当前复核范围仍按对应领域规格。此前施工进度「前后置依赖设置」已由 #244 合入设计源码，[补图 brief](../research/schedule-dependency-editor-brief.md) 保留为历史研究。
+缺一一对应 DC 页面的路由统一登记在 [`design-coverage.json`](./design-coverage.json)，数量见[实现状态生成表](./ui-implementation-status.md#2-当前总数)。当前工作区已注册并挂载付款详情 `payApplyDetail`、数据迁移 `dataMigration`、施工阶段配置 `quantityStages` 和工序库版本详情 `processLibraryDetail`，覆盖映射按其实际 PAGE、路由开关与 x-import 登记。DC 源码的并行改动属于既有工作区成果，本轮只同步索引；设计落点不提升页面业务、运行或生产验收等级。付款、迁移、阶段与工序库的历史实施来源分别保留 #305/#294、#442、#443；当前复核范围仍按对应领域规格。此前施工进度「前后置依赖设置」已由 #244 合入设计源码。
 
 当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据和差异看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)。
 

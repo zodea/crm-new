@@ -11,7 +11,7 @@ import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttribut
 import { prepareCoreMigrationCommandSources } from '../../server/utils/core-migration-preparation'
 import { parseCoreMigrationBatchCommand, parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 import { createSupplierCredentialService } from '../../server/utils/supplier-credential-service'
 import { createMemoryDb } from '../helpers/memory-db'
 
@@ -71,7 +71,7 @@ function batchCommand(commandId: string, batchId: string) {
 }
 function fixture(others: CoreMigrationSynchronousSource[] = []) {
   let sequence = 0
-  const suppliers = createSupplierCommandTestInstance({ now: () => at, createId: () => `new-supplier-${++sequence}` })
+  const suppliers = createSupplierCommandService({ now: () => at, createId: () => `new-supplier-${++sequence}` })
   const credentials = createSupplierCredentialService({ read: suppliers.readCredentialScope, transact: suppliers.transactCredentialScope }, { now: () => at, createId: () => `new-credential-${++sequence}` })
   const core = createCoreMigrationTestInstance({
     now: () => at,

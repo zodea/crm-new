@@ -598,7 +598,7 @@ async function demoImportMapping() {
           ⑥ exportFile — 单文件直接保存（ADR 0004）
         </h2>
         <p class="text-12px text-ink-soft mb-3">
-          桌面端打开系统目录选择器并真实写盘；支持目录访问 API 的浏览器写入所选文件夹，其他浏览器降级到浏览器下载文件夹。取消时静默结束。
+          支持目录访问 API 的浏览器写入所选文件夹，其他浏览器降级到浏览器下载文件夹。取消时静默结束。
         </p>
         <button class="btn-secondary" @click="demoDirectExport">
           直接保存演示文件

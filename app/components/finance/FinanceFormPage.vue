@@ -50,7 +50,6 @@ const {
   pendingAttachments,
   pendingRemoveIds,
   pendingRestoreIds,
-  desktopAttachmentPicker,
   dirty: attachmentDirty,
   reset: resetAttachments,
   capture: captureAttachments,
@@ -59,7 +58,6 @@ const {
   readingFiles,
   changes: attachmentChanges,
   handleFiles,
-  pickNativeFiles,
   toggleExisting: toggleExistingAttachment,
   removePending,
   patchPending,
@@ -1029,12 +1027,10 @@ onMounted(() => {
           :pending-attachments="pendingAttachments"
           :pending-remove-ids="pendingRemoveIds"
           :pending-restore-ids="pendingRestoreIds"
-          :desktop-picker="desktopAttachmentPicker"
           can-download
           picker-description="读取真实文件正文，与本次资料一起保存；旧元数据不补造原件"
           :title="kind === 'payment_record' ? '付款回单与备注' : '附件与备注'"
           :note="draft.note ?? ''"
-          @pick-native="pickNativeFiles"
           @files="handleFiles"
           @toggle-existing="toggleAttachment"
           @remove-pending="removePending"

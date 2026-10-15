@@ -43,13 +43,11 @@ const {
   pendingAttachments,
   pendingRemoveIds,
   pendingRestoreIds,
-  desktopAttachmentPicker,
   dirty: attachmentDirty,
   reset: resetAttachments,
   clearPending: clearPendingAttachments,
   changes: attachmentChanges,
   handleFiles,
-  pickNativeFiles,
   removePending,
   patchPending,
   toggleExisting: toggleExistingAttachment,
@@ -450,9 +448,7 @@ onMounted(() => void initialize())
         :pending-attachments="pendingAttachments"
         :pending-remove-ids="pendingRemoveIds"
         :pending-restore-ids="pendingRestoreIds"
-        :desktop-picker="desktopAttachmentPicker"
         :note="draft.note ?? ''"
-        @pick-native="pickNativeFiles"
         @files="handleFiles"
         @toggle-existing="toggleExistingAttachment"
         @remove-pending="removePending"

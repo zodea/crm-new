@@ -474,7 +474,7 @@ export const useInvoiceStore = defineStore('invoice', () => {
   // ── 字段级写路径（校对表单）──
   // 全行覆写 + 事件时刻快照会互相回滚（编辑后同一手势点另一字段的✓，后落地者以旧快照胜出）：
   // 改为「串行写队列 + 出队时刻取最新行」——合并发生在队列执行时，前一笔写的 load() 已完成，
-  // 快照必然新鲜；Tauri sqlite 真异步驱动下同样成立。
+  // 快照必然新鲜。
   let writeChain: Promise<unknown> = Promise.resolve()
   function enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
     const p = writeChain.then(fn)

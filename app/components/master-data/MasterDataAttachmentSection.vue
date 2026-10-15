@@ -10,7 +10,6 @@ export interface PendingMasterDataAttachment extends FormAttachmentDraft {
 
 defineProps<{
   title: string
-  desktopPicker: boolean
   storesOriginals?: boolean
   originalDescription?: string
   attachments: FormAttachment[]
@@ -21,7 +20,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  pickNative: []
   files: [files: File[]]
   download: [file: FormAttachment]
   toggleExisting: [id: string]
@@ -43,19 +41,9 @@ function inputValue(event: Event) {
 <template>
   <section id="section-attachments" class="panel scroll-mt-4 p-4">
     <SectionHeader :title="title" />
-    <button
-      v-if="desktopPicker"
-      type="button"
-      :disabled="filesDisabled"
-      class="flex min-h-24 w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
-      @click="emit('pickNative')"
-    >
-      <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
-      <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">保存可重新打开的本机文件路径，文件引用独立写入 file_refs</span>
-    </button>
+
     <label
-      v-else
+
       class="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />

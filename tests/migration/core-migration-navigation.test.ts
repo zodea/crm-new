@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { activeNavKey, NAV_TREE } from '~/lib/nav/nav-tree'
-import { routeSubtitle, routeTitle } from '~/lib/tabs/tab-title'
+import { routeTitle } from '~/lib/tabs/tab-title'
 
 describe('核心身份迁移入口', () => {
   it('从设置侧栏进入独立迁移页并保持激活态与页签标题', () => {
@@ -14,6 +14,5 @@ describe('核心身份迁移入口', () => {
     })
     expect(activeNavKey('/settings/data-migration')).toBe('dataMigration')
     expect(routeTitle('/settings/data-migration')).toBe('本地数据迁移')
-    expect(routeSubtitle('/settings/data-migration')).toBe('预检 · 备份 · 对账 · 切换')
   })
 })

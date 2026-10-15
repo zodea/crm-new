@@ -15,7 +15,6 @@ import { useProductionAccessStore } from '~/stores/production-access'
 
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 const route = { params: { id: 'pay08-current-application' }, query: {}, fullPath: '/finance/payment/pay08-current-application' }
 const bytes = new Uint8Array([0, 10, 128, 255])
 const sha = createHash('sha256').update(bytes).digest('hex')

@@ -4,7 +4,7 @@
 
 ## PG-01 本机客户持久参与者（#450）
 
-`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite`，由独立正式 schema 版本 1 引导；当前版本及逐域升级见下方共享存储清单。不把旧浏览器/Tauri schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
+`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite`，由独立正式 schema 版本 1 引导；当前版本及逐域升级见下方共享存储清单。不把旧浏览器、旧桌面 schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
 
 | 同库参与者 | 不可遗漏的事实 |
 | --- | --- |
@@ -94,9 +94,9 @@ v27→v28 接入 `auxiliary-contract:1`，保留其他支出合同和独立公�
 
 保留策略只接受同库成功回执对应的完整包，以北京时间日/月选择，保留最新及基线；未知内容、链接、不完整包和损坏包不自动清理。未来领域接管须同时更新共享清单、原件 owner 校验和恢复验收，不能把本票客户切片升级为所有尚未接管领域已可恢复。配置及操作见[使用指南](../guides/local-backup-and-restore.md)。
 
-> 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
+> 本文件是现有 SQLite 迁移来源（旧桌面一致快照 / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 
-当前落地事实（#279、#294、#320、#321）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。Tauri 不消费浏览器演示偏好，仍只连接原有 `sqlite:crm.db`。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份与 canonical 施工/分包合同的一次性分类、ID 映射、导入、对账和回滚使用同一受控迁移；其余领域仍由后续迁移票完成。
+当前落地事实（#279、#294、#320、#321）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份与 canonical 施工/分包合同的一次性分类、ID 映射、导入、对账和回滚使用同一受控迁移；其余领域仍由后续迁移票完成。
 
 当前落地事实（#293）：浏览器的正式项目新增/编辑已改由中央命令分配不透明 `projects.id`、记录递增 `version` 并生成最终更新时间。网络失败时的 `project-draft-*` 只是浏览器暂存意图，不是 `projects.id`、不得作外键。详细信封、幂等与冲突语义见 [`COMMANDS.md`](./COMMANDS.md)。
 
@@ -281,7 +281,7 @@ suppliers += (
 
 #### 分供方证照中央事实（#446）
 
-浏览器证照以中央 `(dataOrigin, supplierId)` 为唯一所有者，主档、列表与证照页共用当前资料状态和原件投影。证照专用领域保存稳定证照身份、文件关系与正文、类别要求、有效期、整体人工凭证、原始及已确认 OCR 事实和专用审计；普通主档附件集合仍为空。#447 在 #446 保全历史的基础上接通日常 OCR 识别与人工回填，上传和迁移均不自动重新识别。Tauri 历史 schema 与本地适配不被中央接管改写。
+浏览器证照以中央 `(dataOrigin, supplierId)` 为唯一所有者，主档、列表与证照页共用当前资料状态和原件投影。证照专用领域保存稳定证照身份、文件关系与正文、类别要求、有效期、整体人工凭证、原始及已确认 OCR 事实和专用审计；普通主档附件集合仍为空。#447 在 #446 保全历史的基础上接通日常 OCR 识别与人工回填，上传和迁移均不自动重新识别。旧桌面历史 schema 不被中央接管改写。
 
 资料状态从当前有效必需原件、类别要求及上海业务日期派生；人工结论只在整体凭证仍有效时保留。中央主档关键字段真实变化和影响必需资料的命令与凭证失效原子协调，字段范围及可见行为只见[分供方蓝本](./pages/base-supplier.md#credentialstatus-流转)。无关可选资料、无变化的要求值或普通非关键字段不误撤销结论；普通表单与导入不能伪造人工态。
 
@@ -1794,7 +1794,9 @@ P4 新 V2 更正追加同簿费用依据，保留原费项、组件及负价行�
 
 ### 户级空鼓、整改与工资采用（#412，P6）
 
-P6 在既有工程量和工资中央事务中增加以下追加事实。五张来源表与三张工资表均不保存可编辑余额，也不使用 `deleted_at` 隐藏已处理的来源。当前实施与验收进度独立见 [P6 实施票](../research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)，不代表 #416 生产部署完成。
+P6 在既有工程量和工资中央事务中增加以下追加事实。五张来源表与三张工资表均不保存可编辑余额，也不使用 `deleted_at` 隐藏已处理的来源。户级空鼓检查是工资扣款、整改销记和维修统计共同消费的唯一记录，不另建第二份空鼓台账。
+
+**已定待开发：整改处理方式与维修统计。** 每次整改销记须记录处理方式：换砖或注空鼓胶，`quantity_hollow_rectifications` 追加处理方式字段（`tile_replacement` / `hollow_glue`）。已有整改记录的方式为未知，不按默认值回填。维修单价由经办人直接填入，不从工资空鼓扣款单价或合同价推导；未填单价时金额显示为未知，不按零计。维修成本界面按项目、楼栋、分项和处理方式汇总整改处数、单价与金额。
 
 | 表 | 事实与字段 |
 | --- | --- |
@@ -2035,7 +2037,7 @@ END;
 
 可见性父链刻意排除两项审计引用：`house_type_templates.copied_from_template_id` 只是一次性复制来源，删除来源不隐藏复制件；`unit_stage_completions.assignment_id` 只是完成时责任，软删旧责任不隐藏完成事实。
 
-`#442` 浏览器中央工程量适配中的 `quantity_boq_references` 仅存 `id + project_id + contract_id` 外部身份索引，模板行的 BOQ 外键指向此索引；量价与已签证增减仍读取中央施工合同/变洽签。该索引不是第二份 BOQ 业务表，也不改变显式桌面 SQLite 的物理 schema。迁移使用完整数据库候选准备，在外键、祖先及跨域对账通过后原子切换；月报自动完成量与有效 BOQ 来源在同一串行窗口重验后固化，具体读写契约见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442) 与 [COMMANDS](./COMMANDS.md#工程量中央命令与迁移接管442)。
+`#442` 浏览器中央工程量适配中的 `quantity_boq_references` 仅存 `id + project_id + contract_id` 外部身份索引，模板行的 BOQ 外键指向此索引；量价与已签证增减仍读取中央施工合同/变洽签。该索引不是第二份 BOQ 业务表，也不改变迁移来源 SQLite 的物理 schema。迁移使用完整数据库候选准备，在外键、祖先及跨域对账通过后原子切换；月报自动完成量与有效 BOQ 来源在同一串行窗口重验后固化，具体读写契约见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442) 与 [COMMANDS](./COMMANDS.md#工程量中央命令与迁移接管442)。
 
 ### 工资完整工作簿保存目录（#479）
 
@@ -2447,7 +2449,7 @@ interface FileRef {
   ownerType: string // 多态类型标识
   ownerId: string // 关联实体的 id
   fileName: string
-  filePath: string // 可选：Tauri 本地相对路径
+  filePath: string // 可选：旧桌面本地相对路径（仅历史数据）
   fileSize: number
   mimeType: string // 原件 MIME，用于图片/PDF 预览
   category: string // 文件分类（合同/送货单/发票/证照/其他）
@@ -2465,7 +2467,7 @@ interface FilePayload {
 #### 送货单原件持久化约束
 
 - `#441` 的浏览器送货头、材料行、打印状态、修订和原件由同一中央领域保存；Repository/HTTP/command 是当前浏览器入口，失败不回落旧 SQLite。当前服务是可重置中央验证实例，尚不声明生产重启持久化或云端上线；部署边界见 ADR 0020。
-- 旧 `delivery_records` / `delivery_lines` / `file_refs(category=source)` / `file_payloads` 保留为受控迁移输入及显式 Tauri 适配。它们的旧本地归档行为不再是已接管浏览器的日常正式写源。
+- 旧 `delivery_records` / `delivery_lines` / `file_refs(category=source)` / `file_payloads` 保留为受控迁移输入。它们的旧本地归档行为不再是已接管浏览器的日常正式写源。
 - 上传批次与不可变资产分别保留稳定 ID。资产保存文件名、MIME、真实长度、完整字节、SHA-256、建立者和时间；同一明确批次且字节一致才复用资产。逻辑送货保存稳定 ID、当前项目/分供方、资产引用、结构化版本和唯一材料行事实。一份资产可供多条逻辑送货显式引用。
 - 新归档和人工修订必须选择当前有效项目、分供方并人工填写日期；缺失分供方、日期的历史记录保持原缺失与待核验，不能匹配同名主档或补当天日期。历史核对标记只有在当前必需事实完整时才有效；缺价格经人工确认可归档并标记价格待补录。
 - 结构化修订保存版本、原因、服务端操作者/时间和前后变化；业务字段编辑不改变原件字节。补传/替换建立新资产与修订引用，旧资产保留。列表和结构化审计不含正文，当前及历史正文均按需重验当前权限、逻辑 owner、来源和可证实祖先。
@@ -2623,7 +2625,7 @@ flowchart TD
 | 累计已付 | 按分供方连接已确认 `payment_records` 与 `payment_record_application_allocations` 求和 |
 | 应付余额 | 合同总额 − 累计已付 |
 
-金额聚合与关系计数分别过滤。当前中央[分供方读面](../../app/lib/supplier/read-page.ts)及[项目分供方读面](../../app/lib/project-supplier/read-page.ts)排除草稿（`draft/草稿`）、失效（`无效/作废/cancelled`）和软删合同，纳入有效补充协议；详情中的可追溯合同/关系列表不因此只剩金额纳入项。旧 [SQLite 列表 store](../../app/stores/supplier.ts)及[详情 store](../../app/stores/supplier-detail.ts)的已知合同金额聚合已对齐此口径，共用[有效状态与补充协议查询](../../app/lib/contract/effective-status.ts)；[store 回归](../../tests/stores/supplier-detail.test.ts)覆盖失效及草稿排除、有效补充协议、列表与详情金额一致，并验证合同计数与合作项目范围保留。旧路径未因此退役，也不改变中央读写边界。
+金额聚合与关系计数分别过滤。当前中央[分供方读面](../../app/lib/supplier/read-page.ts)及[项目分供方读面](../../app/lib/project-supplier/read-page.ts)排除草稿（`draft/草稿`）、失效（`无效/作废/cancelled`）和软删合同，纳入有效补充协议；详情中的可追溯合同/关系列表不因此只剩金额纳入项。旧 [SQLite 列表 store](../../app/stores/supplier.ts)的已知合同金额聚合已对齐此口径，共用[有效状态与补充协议查询](../../app/lib/contract/effective-status.ts)；旧详情 store 已随桌面端退役删除，不改变中央读写边界。
 
 ### 4.4 ProjectSupplier 汇总（project-supplier.md）
 

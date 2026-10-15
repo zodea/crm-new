@@ -6,7 +6,7 @@
 
 范围：A 已冻结 manifest 39 文件中的领域/API/Repository/store 核心；B 原迁入五个反例由另一位独立复核与作者处理，不重复列为本轮发现。C 尚未最终冻结，只记录与公开 store 问题直接相关的调用接缝；完整 UI/输出复核待 Root 给定冻结范围继续。
 
-规格：本地 `docs/research/issue-review-2026-09-11/payroll-tickets/02-central-c1-attendance.md` 承接 #412；已读取 AGENTS、issue-tracker、工资权威页、COMMANDS/READ-MODELS/DATABASE 对应 P2 内容。应用 `code-review-matt` 的独立 Spec 轴，不将 Standards 判断混入。测试新增前读取 vitest 技能。
+规格：本地 [`docs/research/issue-review-2026-09-11/payroll-tickets/02-central-c1-attendance.md`](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/02-central-c1-attendance.md) 承接 #412；已读取 AGENTS、issue-tracker、工资权威页、COMMANDS/READ-MODELS/DATABASE 对应 P2 内容。应用 `code-review-matt` 的独立 Spec 轴，不将 Standards 判断混入。测试新增前读取 vitest 技能。
 
 ## 发现 S1（P1）：成功回执之后冷读失败，原命令已被清除
 

@@ -1,8 +1,6 @@
 import type { TransactionDb } from '~/lib/db/coordinator'
-import type { ConfirmImpact } from '~/lib/kit/confirm'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
-  downstreamImpact as downstreamImpactCounts,
   logCreate,
   restoreRecord,
   selectVisibleSql,
@@ -234,22 +232,6 @@ const MASTER_DATA_TABLES: Record<MasterDataOwnerType, string> = {
   target_cost: 'target_costs',
 }
 
-const MASTER_DATA_IMPACT_LABELS: Record<string, string> = {
-  attendance_records: '考勤记录',
-  invoice_applications: '开票申请',
-  penalty_records: '扣罚记录',
-  payroll_subject_configs: '工资主体配置',
-  projects: '项目',
-  receipt_registrations: '收款记录',
-  signed_daywork_records: '签工记录',
-  unit_assignments: '工程量责任',
-  wage_statement_allocations: '工资分配',
-  wage_statement_lines: '工资明细',
-  wage_statement_members: '工资成员',
-  wage_statements: '工资单',
-  workers: '工人',
-}
-
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -282,12 +264,6 @@ function assertNonNegative(label: string, value: unknown): void {
   const number = nullableNumber(value)
   if (number != null && number < 0)
     throw new Error(`${label}不能为负数`)
-}
-
-function assertRatio(label: string, value: unknown): void {
-  const number = nullableNumber(value)
-  if (number != null && (number < 0 || number > 1))
-    throw new Error(`${label}必须在 0 到 1 之间`)
 }
 
 async function assertActiveReference(
@@ -386,242 +362,6 @@ async function assertAttachmentOwner(
   `, [attachmentId, ownerType, ownerId])
   if (!rows[0])
     throw new Error('附件不存在或不属于当前记录')
-}
-
-async function persistForm(
-  config: PersistConfig,
-  sourceId: string | undefined,
-  values: Record<string, unknown>,
-  action: MasterDataSaveAction,
-  options: PersistOptions = {},
-): Promise<FormSaveResult> {
-  return withTransaction(tx => persistFormInExistingTransaction(
-    tx,
-    config,
-    sourceId,
-    values,
-    action,
-    options,
-  ))
-}
-
-export async function saveSupplierForm(
-  draft: SupplierFormDraft,
-  action: MasterDataSaveAction,
-  attachments?: FormAttachmentChanges,
-): Promise<FormSaveResult> {
-  if (action !== 'draft') {
-    requireFields([
-      ['公司全称', draft.name],
-      ['分供方类别', draft.supplierCategory],
-      ['主要联系人', draft.contact],
-    ])
-  }
-  assertNonNegative('注册资金', draft.registeredCapital)
-
-  return persistForm({
-    ownerType: 'supplier',
-    table: 'suppliers',
-    idPrefix: 'sup',
-    lifecycleColumn: 'approval_status',
-  }, draft.id, {
-    name: text(draft.name),
-    aliases: JSON.stringify(draft.aliases ?? []),
-    external_ref: text(draft.externalRef),
-    unique_code: text(draft.uniqueCode),
-    tax_no: text(draft.taxNo),
-    business_type: text(draft.businessType),
-    supplier_category: text(draft.supplierCategory),
-    rating: text(draft.rating),
-    legal_rep: text(draft.legalRep),
-    registered_capital: nullableNumber(draft.registeredCapital),
-    registered_date: text(draft.registeredDate),
-    address: text(draft.address),
-    taxpayer_type: text(draft.taxpayerType),
-    main_business: rawText(draft.mainBusiness),
-    ...(draft.laborScope !== undefined ? { labor_scope: rawText(draft.laborScope) } : {}),
-    invoice_name: text(draft.invoiceName),
-    invoice_address: text(draft.invoiceAddress),
-    bank: text(draft.bank),
-    bank_account: text(draft.bankAccount),
-    phone: text(draft.phone),
-    contact: text(draft.contact),
-    contact_phone: text(draft.contactPhone),
-    contact_title: text(draft.contactTitle),
-    note: rawText(draft.note),
-  }, action, { attachments })
-}
-
-export async function saveCustomerForm(
-  draft: CustomerFormDraft,
-  action: MasterDataSaveAction,
-  attachments?: FormAttachmentChanges,
-): Promise<FormSaveResult> {
-  if (action !== 'draft') {
-    requireFields([
-      ['客户名称', draft.name],
-      ['联系人', draft.contact],
-    ])
-  }
-
-  const taxNo = text(draft.taxNo)
-  return persistForm({
-    ownerType: 'customer',
-    table: 'customers',
-    idPrefix: 'customer',
-    lifecycleColumn: 'status',
-  }, draft.id, {
-    name: text(draft.name),
-    aliases: JSON.stringify(draft.aliases ?? []),
-    tax_no: taxNo,
-    legal_rep: text(draft.legalRep),
-    registered_address: text(draft.registeredAddress),
-    invoice_name: text(draft.invoiceName),
-    bank: text(draft.bank),
-    bank_account: text(draft.bankAccount),
-    contact: text(draft.contact),
-    contact_phone: text(draft.contactPhone),
-    note: rawText(draft.note),
-  }, action, {
-    attachments,
-    beforePersist: async (tx, id) => {
-      if (!taxNo)
-        return
-      const [duplicate] = await tx.select<{ name: string }>(`
-        SELECT name
-        FROM customers
-        WHERE tax_no = ?
-          AND id <> ?
-          AND deleted_at IS NULL
-        LIMIT 1
-      `, [taxNo, id])
-      if (duplicate)
-        throw new Error(`统一社会信用代码已被客户「${duplicate.name}」使用`)
-    },
-  })
-}
-
-export async function saveCrewForm(
-  draft: CrewFormDraft,
-  action: MasterDataSaveAction,
-  attachments?: FormAttachmentChanges,
-): Promise<FormSaveResult> {
-  if (action !== 'draft') {
-    requireFields([
-      ['班组名称', draft.name],
-      ['工种', draft.trade],
-      ['负责人', draft.contactName],
-      ['联系电话', draft.contactPhone],
-    ])
-  }
-  assertRatio('默认发放比例', draft.defaultPayRatio)
-  assertNonNegative('房租补贴单价', draft.rentSubsidyPrice)
-  assertNonNegative('管理提成单价', draft.mgmtFeePrice)
-  if (action !== 'draft' && draft.rentSubsidyEnabled && nullableNumber(draft.rentSubsidyPrice) == null)
-    throw new Error('房租补贴单价：为必填项（共 1 处）')
-  if (action !== 'draft' && draft.mgmtFeeEnabled && nullableNumber(draft.mgmtFeePrice) == null)
-    throw new Error('管理提成单价：为必填项（共 1 处）')
-  const capabilities = effectiveMasterDataCapabilities(
-    draft.trade,
-    draft.capabilityTrades ?? [],
-    draft.capabilityItems ?? [],
-  )
-
-  return persistForm({
-    ownerType: 'crew',
-    table: 'crews',
-    idPrefix: 'crew',
-    lifecycleColumn: 'status',
-  }, draft.id, {
-    name: text(draft.name),
-    trade: text(draft.trade),
-    trade_capabilities: JSON.stringify(capabilities.trades),
-    item_capabilities: JSON.stringify(capabilities.itemNames),
-    contact_name: text(draft.contactName),
-    contact_phone: text(draft.contactPhone),
-    default_pay_ratio: nullableNumber(draft.defaultPayRatio) ?? 0.95,
-    rent_subsidy_enabled: draft.rentSubsidyEnabled ? 1 : 0,
-    rent_subsidy_price: nullableNumber(draft.rentSubsidyPrice),
-    mgmt_fee_enabled: draft.mgmtFeeEnabled ? 1 : 0,
-    mgmt_fee_price: nullableNumber(draft.mgmtFeePrice),
-    assignment_level: draft.assignmentLevel ?? 'crew',
-    note: rawText(draft.note),
-  }, action, {
-    attachments,
-    beforePersist: async (tx, id) => {
-      const name = text(draft.name)
-      if (!name)
-        return
-      const duplicate = await tx.select<{ id: string }>(`
-        SELECT id
-        FROM crews
-        WHERE name = ? AND id <> ? AND deleted_at IS NULL
-        LIMIT 1
-      `, [name, id])
-      if (duplicate[0])
-        throw new Error('班组名称已存在')
-    },
-  })
-}
-
-export async function saveWorkerForm(
-  draft: WorkerFormDraft,
-  action: MasterDataSaveAction,
-  attachments?: FormAttachmentChanges,
-): Promise<FormSaveResult> {
-  if (action !== 'draft') {
-    requireFields([
-      ['姓名', draft.name],
-      ['联系电话', draft.phone],
-      ['开户银行', draft.bankName],
-      ['银行卡号', draft.bankAccount],
-      ['工种', draft.trade],
-    ])
-  }
-  assertNonNegative('参考日工资', draft.dailyWage)
-  const capabilities = effectiveMasterDataCapabilities(
-    draft.trade,
-    draft.capabilityTrades ?? [],
-    draft.capabilityItems ?? [],
-  )
-
-  return withTransaction(async (tx) => {
-    if (action !== 'draft' || draft.crewId)
-      await assertActiveReference(tx, 'crews', draft.crewId, '所属班组')
-    if (action !== 'draft' || draft.currentProjectId)
-      await assertActiveReference(tx, 'projects', draft.currentProjectId, '当前项目')
-
-    return persistFormInExistingTransaction(tx, {
-      ownerType: 'worker',
-      table: 'workers',
-      idPrefix: 'worker',
-      lifecycleColumn: 'status',
-    }, draft.id, {
-      crew_id: nullableText(draft.crewId),
-      name: text(draft.name),
-      gender: text(draft.gender),
-      id_card: text(draft.idCard),
-      phone: text(draft.phone),
-      hometown: text(draft.hometown),
-      emergency_contact: text(draft.emergencyContact),
-      emergency_phone: text(draft.emergencyPhone),
-      trade: text(draft.trade),
-      trade_capabilities: JSON.stringify(capabilities.trades),
-      item_capabilities: JSON.stringify(capabilities.itemNames),
-      skill_level: text(draft.skillLevel),
-      daily_wage: nullableNumber(draft.dailyWage),
-      current_project_id: nullableText(draft.currentProjectId),
-      family_group_id: nullableText(draft.familyGroupId),
-      project_status: draft.projectStatus ?? '在场',
-      entry_date: text(draft.entryDate),
-      exit_date: text(draft.exitDate),
-      safety_education: draft.safetyEducation ? 1 : 0,
-      bank_name: text(draft.bankName),
-      bank_account: text(draft.bankAccount),
-      bank_code: text(draft.bankCode),
-      note: rawText(draft.note),
-    }, action, { attachments })
-  })
 }
 
 export async function saveProjectForm(
@@ -1075,28 +815,6 @@ export async function listFormAttachments(
   }))
 }
 
-export async function removeFormAttachment(
-  ownerType: MasterDataOwnerType,
-  ownerId: string,
-  attachmentId: string,
-): Promise<string | null> {
-  return withTransaction(async (tx) => {
-    await assertAttachmentOwner(tx, ownerType, ownerId, attachmentId)
-    return softDelete(tx, 'file_refs', attachmentId)
-  })
-}
-
-export async function restoreFormAttachment(
-  ownerType: MasterDataOwnerType,
-  ownerId: string,
-  attachmentId: string,
-): Promise<string | null> {
-  return withTransaction(async (tx) => {
-    await assertAttachmentOwner(tx, ownerType, ownerId, attachmentId)
-    return restoreRecord(tx, 'file_refs', attachmentId)
-  })
-}
-
 export async function deleteMasterDataRecord(
   ownerType: MasterDataOwnerType,
   id: string,
@@ -1202,33 +920,4 @@ async function masterDataDeleteBlockReason(
   }
 
   return ''
-}
-
-export interface MasterDataDeleteAssessment {
-  blockedReason: string
-  impact: ConfirmImpact[]
-}
-
-export async function assessMasterDataDeletion(
-  ownerType: MasterDataRegistryOwnerType,
-  id: string,
-): Promise<MasterDataDeleteAssessment> {
-  return withTransaction(async (tx) => {
-    const blockedReason = await masterDataDeleteBlockReason(tx, ownerType, id)
-    if (blockedReason)
-      return { blockedReason, impact: [] }
-
-    const counts = await downstreamImpactCounts(
-      tx,
-      MASTER_DATA_TABLES[ownerType],
-      id,
-    )
-    return {
-      blockedReason: '',
-      impact: counts.map(item => ({
-        label: MASTER_DATA_IMPACT_LABELS[item.table] ?? item.table,
-        n: item.n,
-      })),
-    }
-  })
 }

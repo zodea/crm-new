@@ -23,9 +23,6 @@ const warning = vi.fn()
 const error = vi.fn()
 const load = vi.fn()
 const byId = vi.fn()
-const searchProjects = vi.fn()
-const searchSuppliers = vi.fn()
-const materialStore = vi.fn()
 const scope = reactive({ origin: 'real', canWrite: true })
 
 const LookupSelectStub = defineComponent({
@@ -137,9 +134,6 @@ describe('送货单手工归档确认门禁', () => {
     error.mockReset()
     load.mockReset().mockResolvedValue(undefined)
     byId.mockReset()
-    searchProjects.mockReset().mockResolvedValue([{ id: 'wrong-local-project', name: '同名本地项目' }])
-    searchSuppliers.mockReset().mockResolvedValue([{ id: 'wrong-local-supplier', name: '同名本地分供方' }])
-    materialStore.mockReset().mockReturnValue({ searchProjects, searchSuppliers })
 
     vi.stubGlobal('computed', computed)
     vi.stubGlobal('nextTick', nextTick)
@@ -150,11 +144,9 @@ describe('送货单手工归档确认门禁', () => {
     vi.stubGlobal('navigateTo', vi.fn())
     vi.stubGlobal('useTabTitle', vi.fn())
     vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, tabs: [], close: vi.fn(), open: vi.fn() }))
-    vi.stubGlobal('useMaterialStore', materialStore)
     vi.stubGlobal('useDeliveryRecordStore', () => ({
       add,
       update,
-      mode: 'central',
       get origin() { return scope.origin },
       get canWrite() { return scope.canWrite },
       context: { projects: [{ id: 'p1', name: '中央项目' }], suppliers: [{ id: 's1', name: '中央分供方' }] },
@@ -281,9 +273,6 @@ describe('送货单手工归档确认门禁', () => {
     await fireEvent.click(screen.getByRole('button', { name: '保存送货单' }))
     await flushPromises()
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p1', supplierId: 's1' }))
-    expect(materialStore).not.toHaveBeenCalled()
-    expect(searchProjects).not.toHaveBeenCalled()
-    expect(searchSuppliers).not.toHaveBeenCalled()
   })
 
   it('未选择分供方时不提交，即使材料与日期均完整', async () => {
@@ -336,7 +325,6 @@ describe('送货单手工归档确认门禁', () => {
     await flushPromises()
     expect(screen.getByRole('alert').textContent).toContain('没有送货读取权限')
     expect(screen.queryByRole('button', { name: '保存送货单' })).toBeNull()
-    expect(materialStore).not.toHaveBeenCalled()
   })
 
   it('版本冲突后可保稿重读当前字段与明细，取消不抬版本，明确核对后才按新版本重试', async () => {

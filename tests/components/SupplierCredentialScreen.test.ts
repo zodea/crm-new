@@ -7,7 +7,6 @@ const readStore = vi.hoisted(() => ({
   detailState: { kind: 'ready', data: { supplier: { id: 'supplier-a', name: '合成分供方 A' } } },
   loadDetail: vi.fn(),
 }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/stores/supplier-read', () => ({ useSupplierReadStore: () => readStore }))
 
 afterEach(() => {

@@ -1,17 +1,10 @@
-import type { TestDb } from '../helpers/memory-db'
-import type { ProjectListRepository, ProjectListSourceRow } from '~/lib/project/repository'
+import type { ProjectListRepository } from '~/lib/project/repository'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
-import { ProjectRepositoryProblem } from '~/lib/project/repository'
-import { createSqliteProjectListRepository } from '~/lib/project/sqlite-repository'
 import {
   createProjectReadTestInstance,
-  PROJECT_READ_FIXTURE,
 } from '../../server/utils/project-read-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
-import { projectSnapshotEvidence } from '../helpers/project-read-meta'
 
-const NOW = '2026-08-15T00:00:00.000Z'
 const QUERY = {
   includeDemo: true,
   search: '',
@@ -25,106 +18,6 @@ const QUERY = {
   sort: 'updated-desc' as const,
   page: 1,
   pageSize: 10 as const,
-}
-
-async function seedProjectFixture(db: TestDb, rows: readonly ProjectListSourceRow[]) {
-  await db.execute(`
-    CREATE TABLE projects (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      contract_name TEXT NOT NULL,
-      code TEXT NOT NULL,
-      address TEXT NOT NULL,
-      region TEXT NOT NULL,
-      contract_amount REAL,
-      operation_type TEXT NOT NULL,
-      start_date TEXT,
-      planned_end TEXT,
-      actual_end TEXT,
-      planned_duration REAL,
-      status TEXT NOT NULL,
-      manager TEXT NOT NULL,
-      exec_manager TEXT NOT NULL,
-      builder TEXT NOT NULL,
-      customer_id TEXT,
-      secondary_customer_id TEXT,
-      contractor TEXT NOT NULL,
-      risk_level TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      deleted_at TEXT
-    )
-  `)
-  await db.execute('CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, deleted_at TEXT)')
-  await db.execute(`
-    CREATE TABLE receipt_registrations (
-      id TEXT PRIMARY KEY,
-      project_id TEXT,
-      amount REAL NOT NULL,
-      status TEXT NOT NULL,
-      deleted_at TEXT
-    )
-  `)
-  await db.execute(`
-    CREATE TABLE target_costs (
-      id TEXT PRIMARY KEY,
-      project_id TEXT,
-      tax_inclusive_total REAL,
-      is_baseline INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      deleted_at TEXT
-    )
-  `)
-  const customers = new Map<string, string>()
-  for (const row of rows) {
-    if (row.customerId && row.customerName)
-      customers.set(row.customerId, row.customerName)
-    if (row.secondaryCustomerId && row.secondaryCustomerName)
-      customers.set(row.secondaryCustomerId, row.secondaryCustomerName)
-  }
-  for (const [id, name] of customers)
-    await db.execute('INSERT INTO customers (id, name, deleted_at) VALUES (?, ?, NULL)', [id, name])
-  for (const row of rows) {
-    await db.execute(
-      `INSERT INTO projects VALUES (${Array.from({ length: 22 }).fill('?').join(', ')})`,
-      [
-        row.id,
-        row.name,
-        row.contractName,
-        row.code,
-        row.address,
-        row.region,
-        row.contractAmount,
-        row.operationType,
-        row.startDate,
-        row.plannedEnd,
-        row.actualEnd,
-        row.plannedDuration,
-        row.status,
-        row.manager,
-        row.execManager,
-        row.builder,
-        row.customerId,
-        row.secondaryCustomerId,
-        row.contractor,
-        row.riskLevel,
-        row.updatedAt,
-        null,
-      ],
-    )
-    if (row.income != null) {
-      await db.execute(
-        'INSERT INTO receipt_registrations VALUES (?, ?, ?, ?, NULL)',
-        [`receipt-${row.id}`, row.id, row.income, 'confirmed'],
-      )
-    }
-    if (row.budget != null) {
-      await db.execute(
-        'INSERT INTO target_costs VALUES (?, ?, ?, 1, ?, ?, NULL)',
-        [`target-${row.id}`, row.id, row.budget, 'submitted', row.updatedAt],
-      )
-    }
-  }
 }
 
 function contract(repository: () => Promise<ProjectListRepository>) {
@@ -377,79 +270,6 @@ describe('project repository contract', () => {
 
       await expect(repo.list(QUERY)).rejects.toMatchObject({
         problem: { code: 'unavailable', retryable: true },
-      })
-    })
-  })
-
-  describe('sQLite migration-source adapter', () => {
-    let db: TestDb
-
-    beforeEach(async () => {
-      db = await createMemoryDb()
-      await seedProjectFixture(db, PROJECT_READ_FIXTURE)
-    })
-
-    contract(async () => createSqliteProjectListRepository({
-      gateway: db,
-      readEvidence: projectSnapshotEvidence,
-      canViewDemo: true,
-      dataOrigin: 'demo',
-      canReadCustomer: id => id !== 'customer_demo_003',
-      now: () => NOW,
-
-    }))
-
-    it('uses the same whole-page permission problem as HTTP', async () => {
-      const repo = createSqliteProjectListRepository({
-        gateway: db,
-        readEvidence: projectSnapshotEvidence,
-
-        canViewDemo: true,
-        dataOrigin: 'demo',
-        canReadProjects: false,
-        now: () => NOW,
-
-      })
-
-      await expect(repo.list(QUERY)).rejects.toBeInstanceOf(ProjectRepositoryProblem)
-      await expect(repo.list(QUERY)).rejects.toMatchObject({
-        problem: { code: 'forbidden', retryable: false },
-      })
-    })
-
-    it('hides both primary and secondary customer labels without customer capability', async () => {
-      const repo = createSqliteProjectListRepository({
-        gateway: db,
-        readEvidence: projectSnapshotEvidence,
-
-        canViewDemo: true,
-        dataOrigin: 'demo',
-        canReadCustomers: false,
-        now: () => NOW,
-
-      })
-
-      const page = await repo.list(QUERY)
-      for (const item of page.items) {
-        if (item.customer.state !== 'missing')
-          expect(item.customer).toMatchObject({ state: 'forbidden', label: null })
-        if (item.secondaryCustomer.state !== 'missing')
-          expect(item.secondaryCustomer).toMatchObject({ state: 'forbidden', label: null })
-      }
-    })
-
-    it('rejects a non-ISO SQLite snapshot timestamp', async () => {
-      const repo = createSqliteProjectListRepository({
-        gateway: db,
-        readEvidence: projectSnapshotEvidence,
-
-        canViewDemo: true,
-        dataOrigin: 'demo',
-        now: () => 'tomorrow',
-      })
-
-      await expect(repo.list(QUERY)).rejects.toMatchObject({
-        problem: { code: 'internal-error' },
       })
     })
   })

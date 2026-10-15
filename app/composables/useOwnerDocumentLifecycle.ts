@@ -4,7 +4,6 @@ import type {
   AcceptanceLifecycleTarget,
   OwnerDocumentDraft,
   OwnerDocumentKind,
-  PenaltyDeductionView,
 } from '~/lib/owner-document/forms'
 import { computed, shallowRef, toValue } from 'vue'
 import { ownerDocumentLocalDate } from '~/lib/owner-document/page'
@@ -26,10 +25,6 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
   const store = useOwnerDocumentStore()
   const { confirm, success, warning, error } = useKitUI()
   const loading = shallowRef(false)
-  const penaltyDeductions = shallowRef<PenaltyDeductionView[]>([])
-  const deductionSettlementId = shallowRef<string | null>(null)
-  const deductionAmount = shallowRef<number | null>(null)
-  const deductionNote = shallowRef('')
 
   const kind = computed(() => toValue(options.kind))
   const status = computed(() => String(options.draft.value.status ?? 'draft'))
@@ -38,15 +33,6 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
   )
   const canApproveChange = computed(() =>
     kind.value === 'owner_change' && status.value === 'submitted',
-  )
-  const canDeductPenalty = computed(() =>
-    kind.value === 'project_penalty'
-    && ['pending', 'repairing', 'repaired_self', 'repaired_other'].includes(status.value)
-    && Number(
-      options.draft.value.remainingDeductionAmount
-      ?? options.draft.value.amount
-      ?? 0,
-    ) > 0,
   )
   const acceptanceAction = computed<{
     label: string
@@ -78,26 +64,6 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
     }
     return null
   })
-
-  async function refreshDeductions(id?: string) {
-    penaltyDeductions.value = id && kind.value === 'project_penalty'
-      ? await store.loadDeductions(id)
-      : []
-  }
-
-  async function fetchSettlements(keyword: string) {
-    const projectId = typeof options.draft.value.projectId === 'string'
-      ? options.draft.value.projectId
-      : ''
-    if (!projectId)
-      return []
-    return store.loadSettlementOptions(
-      projectId,
-      String(options.draft.value.supplierId ?? ''),
-      String(options.draft.value.contractId ?? ''),
-      keyword,
-    )
-  }
 
   async function approveChange() {
     const id = options.routeId.value
@@ -249,62 +215,13 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
     }
   }
 
-  async function deductPenalty() {
-    const id = options.routeId.value
-    if (!id || !deductionSettlementId.value || !(Number(deductionAmount.value) > 0)) {
-      warning('请选择结算单并填写大于 0 的抵扣金额')
-      return
-    }
-    const accepted = await confirm({
-      variant: 'cascade',
-      title: '确认结算抵扣',
-      message: `将在所选分包结算中抵扣 ¥${Number(deductionAmount.value).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}，并保存独立抵扣关系。`,
-      requireTyping: String(options.draft.value.no ?? options.label.value),
-      impact: [
-        { label: '项目罚扣记录', n: 1 },
-        { label: '分包结算抵扣', n: 1 },
-      ],
-      confirmLabel: '执行抵扣',
-    })
-    if (!accepted)
-      return
-    loading.value = true
-    try {
-      await store.deductProjectPenalty(
-        id,
-        deductionSettlementId.value,
-        Number(deductionAmount.value),
-        deductionNote.value,
-      )
-      success('项目罚扣已写入结算抵扣')
-      deductionSettlementId.value = null
-      deductionAmount.value = null
-      deductionNote.value = ''
-      await options.refresh()
-    }
-    catch (cause) {
-      error(`抵扣失败：${toErrorMessage(cause)}`)
-    }
-    finally {
-      loading.value = false
-    }
-  }
-
   return {
     loading,
-    penaltyDeductions,
-    deductionSettlementId,
-    deductionAmount,
-    deductionNote,
     auditMode,
     canApproveChange,
-    canDeductPenalty,
     acceptanceAction,
-    refreshDeductions,
-    fetchSettlements,
     approveChange,
     moveAcceptance,
     auditReport,
-    deductPenalty,
   }
 }

@@ -13,7 +13,7 @@ function setup() {
     return 'saved-record'
   })
   const delivery = reactive({ files, duplicates: [], byId: (id: string) => delivery.files.find(file => file.id === id), loadPendingPrintQueue: vi.fn().mockResolvedValue(undefined), loadFileForPrint: vi.fn().mockResolvedValue(new File(['%PDF-1.7\noriginal'], '原件.pdf', { type: 'application/pdf' })), confirmFilePrintReceipt: vi.fn().mockResolvedValue(undefined), excludeFileFromPrint: vi.fn().mockResolvedValue(undefined), archiveDocument })
-  const central = reactive({ mode: 'central', origin: 'real', canWrite: true, load: vi.fn().mockResolvedValue(undefined), context: { projects: [{ id: 'p', name: '中央项目', dataOrigin: 'real' }], suppliers: [{ id: 's', name: '中央分供方', dataOrigin: 'real', aliases: [] }] }, list: [] })
+  const central = reactive({ origin: 'real', canWrite: true, load: vi.fn().mockResolvedValue(undefined), context: { projects: [{ id: 'p', name: '中央项目', dataOrigin: 'real' }], suppliers: [{ id: 's', name: '中央分供方', dataOrigin: 'real', aliases: [] }] }, list: [] })
   const commands = { createSession: vi.fn(() => ({})), hydrate: vi.fn(async (_session, id: string) => ({ draft: { id, name: '中央分供方', aliases: [] } })), saveForm: vi.fn(async () => {
     sequence.push('alias')
     return { id: 's' }

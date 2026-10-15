@@ -32,15 +32,13 @@
 | [tests/schedule/process-library-repository.test.ts](../../../tests/schedule/process-library-repository.test.ts) | 单元／服务／状态 | 工序库公开 HTTP Repository |
 | [tests/schedule/process-library-request.test.ts](../../../tests/schedule/process-library-request.test.ts) | 单元／服务／状态 | 工序库公开命令解析 |
 | [tests/schedule/process-library-test-reset.test.ts](../../../tests/schedule/process-library-test-reset.test.ts) | 单元／服务／状态 | 工序库测试重置端点 |
-| [tests/schedule/process-library-write.test.ts](../../../tests/schedule/process-library-write.test.ts) | 单元／服务／状态 | 标准工序库版本维护 |
+| [tests/schedule/process-library-domain.test.ts](../../../tests/schedule/process-library-domain.test.ts) | 单元／服务／状态 | 标准工序库前置关系校验 |
 | [tests/schedule/read-model.test.ts](../../../tests/schedule/read-model.test.ts) | 单元／服务／状态 | 排程 read model |
 | [tests/schedule/wbs-controlled-migration.test.ts](../../../tests/schedule/wbs-controlled-migration.test.ts) | 单元／服务／状态 | 完整 SQLite 图经确认原子迁入，绑定历史/软禁用/无组任务/冻结8与人工楼层均可读；重复确认保日常更正 |
 | [tests/server/wbs-migration.test.ts](../../../tests/server/wbs-migration.test.ts) | 单元／服务／状态 | wBS 写后 SQL 冲突丢弃已准备工程量候选，失败后队列可继续读取与保存 |
 | [tests/stores/process-library-central-state.test.ts](../../../tests/stores/process-library-central-state.test.ts) | 单元／服务／状态 | 中央工序库公开状态 |
 | [tests/stores/schedule-central-library-source.test.ts](../../../tests/stores/schedule-central-library-source.test.ts) | 单元／服务／状态 | 浏览器 WBS 的工序库来源接管 |
 | [tests/stores/schedule-central-state.test.ts](../../../tests/stores/schedule-central-state.test.ts) | 单元／服务／状态 | 中央绑定固定预览与原提交恢复 |
-| [tests/stores/schedule-process-library-race.test.ts](../../../tests/stores/schedule-process-library-race.test.ts) | 单元／服务／状态 | 工序库快速切换 |
-| [tests/stores/schedule.test.ts](../../../tests/stores/schedule.test.ts) | 单元／服务／状态 | schedule store：排程唯一 action 写路径 |
 | [tests/tabs/process-library-restore.test.ts](../../../tests/tabs/process-library-restore.test.ts) | 单元／服务／状态 | 中央工序库只读详情恢复 |
 
 ## 组件（jsdom）
@@ -51,7 +49,6 @@
 | [tests/components/ScheduleBindingReview.test.ts](../../../tests/components/ScheduleBindingReview.test.ts) | 组件（jsdom） | 冻结差异展示 |
 | [tests/components/ScheduleCentralUiState.test.ts](../../../tests/components/ScheduleCentralUiState.test.ts) | 组件（jsdom） | 中央排程界面目标与草稿边界 |
 | [tests/components/ScheduleContractBindingEntry.test.ts](../../../tests/components/ScheduleContractBindingEntry.test.ts) | 组件（jsdom） | 内部暂估排程绑定入口 |
-| [tests/components/ScheduleContractBindingReview.test.ts](../../../tests/components/ScheduleContractBindingReview.test.ts) | 组件（jsdom） | scheduleContractBindingReview |
 | [tests/components/ScheduleContractBindingRoute.test.ts](../../../tests/components/ScheduleContractBindingRoute.test.ts) | 组件（jsdom） | 施工排程合同绑定路由 |
 | [tests/components/ScheduleContractBindingScreen.test.ts](../../../tests/components/ScheduleContractBindingScreen.test.ts) | 组件（jsdom） | scheduleContractBindingScreen |
 | [tests/components/ScheduleDependencyDialog.test.ts](../../../tests/components/ScheduleDependencyDialog.test.ts) | 组件（jsdom） | schedule dependency dialog |

@@ -22,10 +22,8 @@
 | [tests/db/capability-migrations.test.ts](../../../tests/db/capability-migrations.test.ts) | 单元／服务／状态 | v26 班组/工人能力迁移 |
 | [tests/migration/worker-roster-source.test.ts](../../../tests/migration/worker-roster-source.test.ts) | 单元／服务／状态 | 完整实名字段及原件从旧库接管，缺正文和未知用途不猜；重复接管保日常版本，危险恢复拒绝 |
 | [tests/server/crew-worker-central-test-instance.test.ts](../../../tests/server/crew-worker-central-test-instance.test.ts) | 单元／服务／状态 | 班组—工人中央 command 测试实例 |
-| [tests/stores/crew-detail.test.ts](../../../tests/stores/crew-detail.test.ts) | 单元／服务／状态 | crew detail store |
 | [tests/stores/crew-worker-membership.test.ts](../../../tests/stores/crew-worker-membership.test.ts) | 单元／服务／状态 | 班组成员关系 command store |
 | [tests/tabs/worker-roster-restore.test.ts](../../../tests/tabs/worker-roster-restore.test.ts) | 单元／服务／状态 | 私密资料与名册冷恢复只保存阅读身份并拒绝演示或缺来源 |
-| [tests/worker/detail.test.ts](../../../tests/worker/detail.test.ts) | 单元／服务／状态 | 工人详情只读模型 |
 | [tests/worker/roster-service.test.ts](../../../tests/worker/roster-service.test.ts) | 单元／服务／状态 | 工人 owner 私密资料与有日期名册归档 |
 
 ## 组件（jsdom）
@@ -34,11 +32,9 @@
 | --- | --- | --- |
 | [tests/components/CrewWorkerCentralListScreen.test.ts](../../../tests/components/CrewWorkerCentralListScreen.test.ts) | 组件（jsdom） | 全局目录合法旧快照及不可用反馈 |
 | [tests/components/CrewWorkerMigrationPanel.test.ts](../../../tests/components/CrewWorkerMigrationPanel.test.ts) | 组件（jsdom） | 完整来源选择、明示映射、原键恢复及身份失效隔离 |
-| [tests/components/CrewDetailSections.test.ts](../../../tests/components/CrewDetailSections.test.ts) | 组件（jsdom） | 班组详情关系区块 |
 | [tests/components/CrewFormFields.test.ts](../../../tests/components/CrewFormFields.test.ts) | 组件（jsdom） | 班组表单领域字段 |
 | [tests/components/CrewMemberSection.test.ts](../../../tests/components/CrewMemberSection.test.ts) | 组件（jsdom） | 班组成员管理及候选排除后的原提交恢复、撤权清理 |
 | [tests/components/CrewWorkerCentralDetailScreen.test.ts](../../../tests/components/CrewWorkerCentralDetailScreen.test.ts) | 组件（jsdom） | 班组—工人中央详情 |
-| [tests/components/WorkerDetailSections.test.ts](../../../tests/components/WorkerDetailSections.test.ts) | 组件（jsdom） | 工人详情独立区块 |
 | [tests/components/WorkerPrivateProfileState.test.ts](../../../tests/components/WorkerPrivateProfileState.test.ts) | 组件（jsdom） | 换工人后的迟到读取不能显示另一人的实名字段 |
 | [tests/components/WorkerRosterArchiveState.test.ts](../../../tests/components/WorkerRosterArchiveState.test.ts) | 组件（jsdom） | 切换项目后的迟到预览不能显示前一个项目的私密名册 |
 

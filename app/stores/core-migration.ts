@@ -197,10 +197,6 @@ export function createCoreMigrationStoreDefinition(
       return result
     }
 
-    async function refreshSnapshot(): Promise<CoreMigrationSnapshotDTO> {
-      return run(refreshSnapshotDirect)
-    }
-
     async function hydrate(): Promise<CoreMigrationSnapshotDTO> {
       return run(async () => {
         const [marker, pendingMarker, snapshot] = await Promise.all([
@@ -516,7 +512,6 @@ export function createCoreMigrationStoreDefinition(
       importBatch,
       confirmSwitch,
       rollback,
-      refreshSnapshot,
       hydrate,
     }
   })

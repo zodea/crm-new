@@ -5,7 +5,6 @@ import type { ScheduleHistory } from './history'
 import type { ScheduleBuildingCoverage, ScheduleBuildingOption, ScheduleCatalogProject, ScheduleContractOption, ScheduleProjectView } from './read-model'
 import { projectProblem, ProjectRepositoryProblem } from '../project/repository'
 
-export const SCHEDULE_READ_CAPABILITY = 'schedule:read' as const
 export const SCHEDULE_WRITE_CAPABILITY = 'schedule:write' as const
 export interface ScheduleReadQuery { projectId: string, origin: DataOriginDTO, includeDemo: boolean, today?: string }
 export interface ScheduleReadContext {

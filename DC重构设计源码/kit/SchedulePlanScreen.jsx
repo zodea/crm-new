@@ -27,7 +27,7 @@
       whiteSpace: "nowrap", textOverflow: "ellipsis", height: "100%" }}>{children}</div>
   );
 
-  // ── 依赖模型（#244 回填生产形态；规格见 docs/design/schedule-dependency-editor-brief.md）──
+  // ── 依赖模型（#244 回填生产形态；规格见 docs/rewrite/pages/schedule-progress.md）──
   // 显式关系存在工序上：t.dep = { predId, lag, disabled?, disabledReason?, disabledAt? }
   // 首期固定 FS（完成→开始），一道后续工序只编辑一条前置依赖。
   const addDays = (S, s, n) => new Date(S.D(s).getTime() + n * 86400000).toISOString().slice(0, 10);

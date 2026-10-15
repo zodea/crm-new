@@ -14,7 +14,6 @@ export type QuantityHollowTable = keyof typeof QUANTITY_HOLLOW_COLUMNS
 export type QuantityHollowRow = Record<string, string | number | null>
 export type QuantityHollowTables = Record<QuantityHollowTable, QuantityHollowRow[]>
 export const QUANTITY_HOLLOW_TABLES = Object.keys(QUANTITY_HOLLOW_COLUMNS) as QuantityHollowTable[]
-export const QUANTITY_HOLLOW_PRIMARY_KEYS = Object.fromEntries(QUANTITY_HOLLOW_TABLES.map(table => [table, 'id'])) as Record<QuantityHollowTable, 'id'>
 
 /** 首次原责任采集的固定字段；不保存工资或联系方式。 */
 export const QUANTITY_HOLLOW_RESPONSIBILITY_COLUMNS = {

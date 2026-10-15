@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 
 const props = defineProps<{ projectId: string, originalStatementId?: string, origin?: 'real' | 'demo', returnTo: string }>()
 const store = usePayrollAdjustmentsStore()
 const { current, loading, error, load } = usePayrollRead(() => JSON.stringify([props.projectId, props.originalStatementId, props.origin]), async () => {
-  if (isDesktopRuntime() || props.origin === 'demo')
+  if (props.origin === 'demo')
     throw new Error('当前来源不提供正式工资实际收付，请阅读原工资历史。')
   if (!isStableRouteIdentity(props.projectId))
     throw new Error('请选择明确项目后读取工资实际收付。')

@@ -43,17 +43,3 @@ export async function writeSupplierAudit(
   )
   return id
 }
-
-export function taxpayerAuditSourceCategory(
-  status: string,
-  source: string | null | undefined,
-): string {
-  if (status === 'not_checked')
-    return 'none'
-  if (status === 'manually_confirmed')
-    return 'manual_document'
-  const normalized = source?.trim().toLowerCase() ?? ''
-  if (/https?:\/\//.test(normalized) || normalized.includes('税务'))
-    return 'official_website'
-  return normalized ? 'external_reference' : 'unspecified'
-}

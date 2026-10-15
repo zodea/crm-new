@@ -3,7 +3,7 @@
 > 路由：`/base/crew` · `/base/crew/form/:id?` · `/base/crew/:id`
 > 页面：`pages/base/crew/index.vue` · `pages/base/crew/form/[[id]].vue` · `pages/base/crew/[id].vue`
 > 表单蓝本：`crewForm`（ADR 0014）
-> 状态：正式全局主档及成员关系维护已接中央持久 owner，显式迁入保留稳定 ID、历史与原件；未接工资、工程量和扣罚来源显示未知。开发验证链及 Tauri 本地路径保留。运行边界见 [ARCHITECTURE](../ARCHITECTURE.md#implementation-gaps)，共享主档见 [DATABASE](../DATABASE.md#global-worker-crew-directory)。
+> 状态：正式全局主档及成员关系维护已接中央持久 owner，显式迁入保留稳定 ID、历史与原件；未接工资、工程量和扣罚来源显示未知。开发验证链保留。运行边界见 [ARCHITECTURE](../ARCHITECTURE.md#implementation-gaps)，共享主档见 [DATABASE](../DATABASE.md#global-worker-crew-directory)。
 
 ## 定位
 
@@ -28,7 +28,7 @@
 - 成员、项目、工程量责任、工资与扣罚以稳定 ID 聚合；名称只用于展示，不能用于匹配。
 - 正式班组且账号具备 `worker:write` 时，详情可修改现有正式工人的 `workers.crew_id`；测试数据只读，操作不得新增重复工人或删除工资历史。
 - 列表进入详情时携搜索、工种、排序、页码和来源行的安全 `returnTo`；班组与工人互跳，以及项目和扣罚事实下钻，均可返回原详情。
-- 浏览器中央附件边界尚未接入时显示明确说明，不把本地 `file_refs` 当作中央正式附件。Tauri 仍按本页既有 SQLite/附件事务运行。
+- 浏览器中央附件边界尚未接入时显示明确说明，不把本地 `file_refs` 当作中央正式附件。
 
 ## 一、当前数据口径
 
@@ -80,7 +80,7 @@
 
 ## 三、新增 / 编辑 `/base/crew/form/:id?`
 
-班组使用统一整页表单壳，字段、校验与保存 action 仍由班组领域负责。浏览器正式保存经中央命令信封、服务端分配 ID、幂等 `commandId` 与 `baseVersion` 乐观锁完成；Tauri 仍走本地领域事务。
+班组使用统一整页表单壳，字段、校验与保存 action 仍由班组领域负责。浏览器正式保存经中央命令信封、服务端分配 ID、幂等 `commandId` 与 `baseVersion` 乐观锁完成。
 
 | 分区 | 字段 | 规则 |
 |---|---|---|

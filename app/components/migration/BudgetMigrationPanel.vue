@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { CommandRecoveryDescriptor } from '~/lib/forms/command-recovery'
 import type { BudgetImportCommand, BudgetImportPreview, BudgetImportResult } from '~/lib/target-cost/import-contract'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { useKitUI } from '~/composables/useKitUI'
@@ -16,7 +15,6 @@ interface State {
   context: { workspaceId: string, actorId: string, capabilities: string[] }
   sources: Array<{ importId: string, sourceSha256: string, ids: string[], importedAt: string, restored: boolean }>
 }
-const native = isTauri()
 const state = shallowRef<State | null>(null)
 const source = shallowRef<BudgetImportCommand['source'] | null>(null)
 const preview = shallowRef<BudgetImportPreview | null>(null)
@@ -174,8 +172,9 @@ async function restore(importId: string) {
   })
 }
 onMounted(() => {
-  if (!native)
-    void run(async (epoch) => { await readState(epoch) })
+  void run(async (epoch) => {
+    await readState(epoch)
+  })
 })
 </script>
 
@@ -187,47 +186,43 @@ onMounted(() => {
     <p class="mt-2 text-12px text-ink-soft">
       选择完整 SQLite 原库，明确映射项目并补齐路径原件。预算、科目、原件和历史一起接管；已接管后继续从目标成本维护。
     </p>
-    <p v-if="native" class="mt-3 text-12px text-warn-ink">
-      请从已配置的本机正式浏览器入口接管预算。
+
+    <p v-if="error" role="alert" class="mt-3 break-words text-12px text-danger">
+      {{ error }}
     </p>
-    <template v-else>
-      <p v-if="error" role="alert" class="mt-3 break-words text-12px text-danger">
-        {{ error }}
+    <KitButton v-if="!state" class="mt-3" :disabled="busy" @click="run(async epoch => { await readState(epoch) })">
+      重新读取接管权限
+    </KitButton>
+    <template v-if="state">
+      <label class="mt-4 block text-12px">预算 SQLite 原库<input type="file" accept=".sqlite,.db,.sqlite3" class="mt-2 block w-full" :disabled="busy || !!pending" @change="choose"></label>
+      <p v-if="sourceName" class="mt-2 break-words text-12px">
+        {{ sourceName }}
       </p>
-      <KitButton v-if="!state" class="mt-3" :disabled="busy" @click="run(async epoch => { await readState(epoch) })">
-        重新读取接管权限
-      </KitButton>
-      <template v-if="state">
-        <label class="mt-4 block text-12px">预算 SQLite 原库<input type="file" accept=".sqlite,.db,.sqlite3" class="mt-2 block w-full" :disabled="busy || !!pending" @change="choose"></label>
-        <p v-if="sourceName" class="mt-2 break-words text-12px">
-          {{ sourceName }}
-        </p>
-        <div v-if="preview" class="mt-4 grid min-w-0 gap-3 text-12px">
-          <p>原库包含 {{ preview.versions.length }} 个预算版本；历史空值、已删除明细和未知扩展一并保留。</p>
-          <label v-for="reference in preview.references" :key="reference.id" class="grid min-w-0 gap-2">原项目：{{ reference.name }}（{{ reference.id }}）<select v-model="selected[reference.id]" class="field-input w-full" :disabled="busy || !!pending"><option value="">明确选择正式项目</option><option v-for="project in preview.projects" :key="project.id" :value="project.id">{{ project.name }}（{{ project.id }}）{{ project.deletedAt ? ' · 已删除，仅保历史关联' : '' }}</option></select></label>
-          <label v-for="file in preview.requiredOriginals" :key="file.id" class="grid gap-2">补齐原件：{{ file.name }}<input type="file" :disabled="busy || !!pending" @change="original(file.id, $event)"></label>
-          <KitButton class="justify-self-start" :disabled="!canAdopt" @click="adopt">
-            核对并接管预算
+      <div v-if="preview" class="mt-4 grid min-w-0 gap-3 text-12px">
+        <p>原库包含 {{ preview.versions.length }} 个预算版本；历史空值、已删除明细和未知扩展一并保留。</p>
+        <label v-for="reference in preview.references" :key="reference.id" class="grid min-w-0 gap-2">原项目：{{ reference.name }}（{{ reference.id }}）<select v-model="selected[reference.id]" class="field-input w-full" :disabled="busy || !!pending"><option value="">明确选择正式项目</option><option v-for="project in preview.projects" :key="project.id" :value="project.id">{{ project.name }}（{{ project.id }}）{{ project.deletedAt ? ' · 已删除，仅保历史关联' : '' }}</option></select></label>
+        <label v-for="file in preview.requiredOriginals" :key="file.id" class="grid gap-2">补齐原件：{{ file.name }}<input type="file" :disabled="busy || !!pending" @change="original(file.id, $event)"></label>
+        <KitButton class="justify-self-start" :disabled="!canAdopt" @click="adopt">
+          核对并接管预算
+        </KitButton>
+      </div>
+      <div v-if="pending" class="mt-4 text-12px">
+        <p>原提交结果待核对；正文保留在当前页面，刷新后只按原编号查询。</p><KitButton class="mt-2" :disabled="busy" @click="recover">
+          核对原预算提交
+        </KitButton>
+      </div>
+      <p v-if="result" class="mt-3 text-12px text-ok">
+        {{ result.restored ? '原批次已恢复，原库证据仍保留。' : '预算接管已核对，可从目标成本列表读取。' }}
+      </p>
+      <ul class="mt-4 grid min-w-0 gap-3 text-12px">
+        <li v-for="item in state.sources" :key="item.importId" class="min-w-0 border-t border-line pt-3">
+          <p class="break-words">
+            {{ item.importedAt }} · {{ item.ids.length }} 个版本 · {{ item.restored ? '已恢复' : '已接管' }}
+          </p><KitButton v-if="!item.restored" class="mt-2" variant="secondary" :disabled="busy || !!pending" @click="restore(item.importId)">
+            核对并恢复本批预算
           </KitButton>
-        </div>
-        <div v-if="pending" class="mt-4 text-12px">
-          <p>原提交结果待核对；正文保留在当前页面，刷新后只按原编号查询。</p><KitButton class="mt-2" :disabled="busy" @click="recover">
-            核对原预算提交
-          </KitButton>
-        </div>
-        <p v-if="result" class="mt-3 text-12px text-ok">
-          {{ result.restored ? '原批次已恢复，原库证据仍保留。' : '预算接管已核对，可从目标成本列表读取。' }}
-        </p>
-        <ul class="mt-4 grid min-w-0 gap-3 text-12px">
-          <li v-for="item in state.sources" :key="item.importId" class="min-w-0 border-t border-line pt-3">
-            <p class="break-words">
-              {{ item.importedAt }} · {{ item.ids.length }} 个版本 · {{ item.restored ? '已恢复' : '已接管' }}
-            </p><KitButton v-if="!item.restored" class="mt-2" variant="secondary" :disabled="busy || !!pending" @click="restore(item.importId)">
-              核对并恢复本批预算
-            </KitButton>
-          </li>
-        </ul>
-      </template>
+        </li>
+      </ul>
     </template>
   </section>
 </template>

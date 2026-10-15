@@ -1,6 +1,6 @@
 # P1 A 工资独立代码审查
 
-> 固定基线 `1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3`。本期尚待独立提交及提交钩子，审查覆盖基线以来工作区改动及 A/B/C 所有权清单中的未跟踪新源码。验收规格为[本地 P1 票](../../../research/issue-review-2026-09-11/payroll-tickets/01-central-a-payroll.md)。最终 Standards / Spec 均为 0 项未解决；以下保留各轮失败复现与当时进展，末节记录最终结果。
+> 固定基线 `1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3`。本期尚待独立提交及提交钩子，审查覆盖基线以来工作区改动及 A/B/C 所有权清单中的未跟踪新源码。验收规格为[本地 P1 票](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/01-central-a-payroll.md)。最终 Standards / Spec 均为 0 项未解决；以下保留各轮失败复现与当时进展，末节记录最终结果。
 
 ## Standards
 

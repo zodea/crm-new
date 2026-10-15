@@ -43,7 +43,7 @@ flowchart LR
 | 开发验证实例 | 可重置内存/测试存储；确定性场景用于接口和交互验证 | `dataOrigin='real'` 只是来源身份，不证明生产持久化；测试 reset 不是业务操作 |
 | 演示来源 | 独立确定性数据，仅供显式授权的只读展示 | 可见性开关与后台 `demo:read` 同时满足；不能进入正式命令、正式合计或外键候选 |
 | 浏览器旧库 | sql.js/IndexedDB 来源快照、受控迁移输入与历史演示适配 | 已接管领域普通读写阻断；不作为中央失败、空库或权限失败的回退源 |
-| Tauri 2 桌面路径 | 现有 SQLite、文件与 dialog adapter | 历史/独立运行路径。浏览器验证不能证明其正式交付；不扩大本期生产范围 |
+| 历史桌面库 | 已退役（2026-10）的 Tauri 版本留下的 SQLite 一致快照 | 只作为受控迁移输入；桌面应用代码与依赖已移除，不再运行或维护 |
 
 数据库不放在 NAS 或同步盘上运行。备份、RPO/RTO、原件容量、启动、故障与恢复要求以 ADR 0021 为唯一方案出处；参与者清单与存储版本见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)。实际正式可用仍须通过 [#471 上线验收](https://github.com/zodea/crm-new/issues/471)。
 
@@ -53,7 +53,7 @@ flowchart LR
 
 `workspaceId`、`actorId` 与 capability 来自服务端会话，客户端不能自报。登录切换不重建业务身份，也不删除原命令事实。会话失效后的敏感投影清理以 [READ-MODELS](./READ-MODELS.md#permissions-and-stale-data)为准。此决定不引入多人协作、完整账号/RBAC、多租户、公网或离线写入。
 
-OCR 凭证只在 Nitro 非公开运行配置使用，不能进入 public config、日志或浏览器持久化。桌面静态构建不假定 Nitro 永远可达，边界沿 [ADR 0006](../adr/0006-ocr-paddleocr-vl-single-model.md)。
+OCR 凭证只在 Nitro 非公开运行配置使用，不能进入 public config、日志或浏览器持久化，边界沿 [ADR 0006](../adr/0006-ocr-paddleocr-vl-single-model.md)。
 
 ## 2. 技术栈
 
@@ -63,10 +63,10 @@ OCR 凭证只在 Nitro 非公开运行配置使用，不能进入 public config�
 | 共享状态 | Pinia；局部和功能实例状态按生命周期选择组件、composable 或 context |
 | 服务端 | Nitro HTTP、领域读写模块、可信会话与 capability 校验 |
 | 正式持久化目标 | ADR 0021 固定运行时的 `node:sqlite`；同库事务和原件 |
-| 历史适配 | 浏览器 sql.js/IndexedDB、Tauri SQLite/tauri-plugin-sql |
+| 历史适配 | 浏览器 sql.js/IndexedDB |
 | 样式与交互 | UnoCSS、项目令牌、reka-ui/shadcn-vue 结构、vue-sonner、VueUse |
 | 表格 | vxe-table，经适用的项目组件封装 |
-| 验证 | Vitest、Vue Test Utils、Playwright；桌面专属能力另行验收 |
+| 验证 | Vitest、Vue Test Utils、Playwright |
 | 包管理 | pnpm，精确版本以 `package.json#packageManager` 为准 |
 
 依赖版本只以 [package.json](../../package.json) 为当前事实，选型决定以 ADR 为准。本轮文档设计不授权换技术栈、增加生产依赖或另建数据库服务。
@@ -90,7 +90,6 @@ app/
 ├─ stores/                 需统一管理的共享状态与领域 actions
 ├─ types/、workers/        共享类型、重计算或文件处理
 server/                    读模型、命令、会话、存储、原件、迁移与 OCR
-src-tauri/                 桌面壳、权限与打包
 tests/、e2e/               单元/组件与用户旅程验证
 DC重构设计源码/            设计运行态；不是业务生产源码
 ```
@@ -161,7 +160,7 @@ DC重构设计源码/            设计运行态；不是业务生产源码
 
 这是独立的**逻辑主档与设置职责**。中央设置入口 `/settings/our-signatories` 与独立整页表单已注册，使用当前中央 owner 的真实工作区/操作者和 `our-signatory:read/write` 能力；物理主档、核实历史、快照及迁移字段只见 [DATABASE](./DATABASE.md#our-signatory-storage)。开发环境使用明确的临时 SQL owner，本机正式环境使用同一 `ruihang.sqlite` 参与者，不能借开发实例宣称生产耐久。旧主体文本仍须人工核实，不自动猜映射。
 
-独立 Native/Tauri 不扩大本期生产范围。当前没有一致可信的本地目录 workspace/actor owner，不能借 HTTP 会话冒充本地身份或把远端目录当作本地事实。中央目录维护与新选择在该路径明确不可用；Native 合同可空金额、原主体文本、已有真实采用快照及同库编号兼容仍保全，后续 Native 接入须先明确一致 owner。已登记目录不扩大员工/垫付人或其他真实交易方的身份职责。
+桌面端（Tauri）已于 2026-10 退役，应用代码、依赖与 CI 任务均已移除；旧桌面 SQLite 一致快照仍可按 [本地数据迁移指南](../guides/local-data-migration.md) 作为受控迁移输入。已登记目录不扩大员工/垫付人或其他真实交易方的身份职责。
 
 <a id="read-write-boundaries"></a>
 
@@ -261,7 +260,7 @@ flowchart TD
 1. 通过领域接口验证真实身份、授权、失败语义及原子提交；读写 adapters 共享同一契约。
 2. 重启后原命令、原件和审计可核实；重复原键不重复付款、发放、扣款或导入。进程退出测试不替代物理断电验收。
 3. 验证正式/演示隔离、源切换、独立表单实例、相关依据变化和真实冻结事实；不以 mock 或页面回读声称生产验收。
-4. 界面验证主要视口、键盘、焦点、滚动、浮层及 ADR 0013 的缩放范围；桌面专属文件/权限另行验证。
+4. 界面验证主要视口、键盘、焦点、滚动、浮层及 ADR 0013 的缩放范围。
 5. 备份恢复覆盖实际交付参与者、原件、回执与接管状态，再评估 ADR 0021 的 RPO/RTO。
 
 文档契约、代码行为、真实界面及持久恢复分别验收；单元或开发实例通过，只证明其实际执行范围，不替代未登记领域和整机正式交付。

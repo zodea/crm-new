@@ -2,7 +2,7 @@ import type { ContractPriceFact } from '~/lib/material-contract/price-facts'
 import { expect, it } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
-import { defineComponent, h, shallowRef } from 'vue'
+import { defineComponent, h } from 'vue'
 import ContractPriceTable from '~/components/material/price/ContractPriceTable.vue'
 
 it('真实约定价表在五档视口保未知税点/真零、依据门禁、原价、源链接和键盘局部滚动', async () => {
@@ -47,14 +47,11 @@ it('真实约定价表在五档视口保未知税点/真零、依据门禁、原
   }
 })
 
-it('协议价格真实追溯到中央父合同协议页签；Native沿实际协议原ID读取表单', async () => {
+it('协议价格真实追溯到中央父合同协议页签', async () => {
   const protocol: ContractPriceFact = { dataOrigin: 'real', contractId: 'protocol-actual', lineId: 'line-actual', parentContractId: 'parent-actual', contractName: '真实补充协议', contractNo: 'BC-01', supplierId: null, supplierName: null, projectId: null, projectName: null, date: null, materialName: '协议原材料', spec: '', materialGrade: '', unit: '米', quantity: 1, taxInclusiveUnitPrice: 0, applicableTaxRate: null }
-  const target = shallowRef(false)
-  await render(defineComponent({ setup: () => () => h(ContractPriceTable, { rows: [protocol], native: target.value }) }), {
+  await render(defineComponent({ setup: () => () => h(ContractPriceTable, { rows: [protocol] }) }), {
     global: { components: { NuxtLink: defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: props.to }, slots.default?.()) }) } },
   })
   const source = page.getByRole('link', { name: '真实补充协议' })
   await expect.element(source).toHaveAttribute('href', '/contract/parent-actual?contractKind=material&origin=real&tab=supplements&supplementId=protocol-actual')
-  target.value = true
-  await expect.element(source).toHaveAttribute('href', '/contract/material/form/protocol-actual?supplement=1')
 })

@@ -56,7 +56,6 @@
 | [tests/components/ContractFormFields.test.ts](../../../tests/components/ContractFormFields.test.ts) | 组件（jsdom） | contractFormFields lookup data flow |
 | [tests/components/ContractFormPage.test.ts](../../../tests/components/ContractFormPage.test.ts) | 组件（jsdom） | 辅助合同整页表单状态 |
 | [tests/components/ContractLineItemsEditor.test.ts](../../../tests/components/ContractLineItemsEditor.test.ts) | 组件（jsdom） | contractLineItemsEditor |
-| [tests/components/ContractListToolbar.test.ts](../../../tests/components/ContractListToolbar.test.ts) | 组件（jsdom） | contract list toolbar |
 | [tests/contract/central-list-filters.test.ts](../../../tests/contract/central-list-filters.test.ts) | 单元／服务／状态 | 合同中央列表固定条件多选 |
 | [tests/contract/command-sessions.test.ts](../../../tests/contract/command-sessions.test.ts) | 单元／服务／状态 | 未知结果沿原键核对、未应用受控封存；回执及合法后读共同清理，输入和原保存基准保留，跨目标迟到结果隔离 |
 | [tests/contract/original-content.test.ts](../../../tests/contract/original-content.test.ts) | 单元／服务／状态 | 原件公开DTO核所有者、来源、规范Base64、长度与SHA256；真实零字节保留 |
@@ -126,7 +125,6 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/server/contract-read-meta.test.ts](../../../tests/server/contract-read-meta.test.ts) | 单元／服务／状态 | 核心合同与商务来源的读取时点、版本及相关源完整性 |
-| [tests/contract/native-contract-prices.test.ts](../../../tests/contract/native-contract-prices.test.ts) | 单元／服务／状态 | Native 行税点、真实零、双表原子迁移及冷重开 |
 | [tests/contract/construction-subcontract-signatory.test.ts](../../../tests/contract/construction-subcontract-signatory.test.ts) | 单元／服务／状态 | 施工与分包实际主体采用、历史快照及原键 |
 | [tests/boq/production-recovery.test.ts](../../../tests/boq/production-recovery.test.ts) | 单元／服务／状态 | BOQ 普通命令与整源迁入各自的最小原编号恢复 |
 | [tests/stores/boq-production-pending.test.ts](../../../tests/stores/boq-production-pending.test.ts) | 单元／服务／状态 | 清单失响应、原键核对及后读失败保全 |

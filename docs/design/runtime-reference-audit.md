@@ -27,7 +27,7 @@
 本轮固定源码为 `ec392bd602200c8da343b626b5a21c8215b4884d`，工作分支 `codex/ui-reference-layout`；远端 main 与本地 origin/main 均为 `4292291d2a99c94052a6eab743036b149bfa9634`。版本、原生依赖和领取状态的核验见 [#403 开工记录](https://github.com/zodea/crm-new/issues/403#issuecomment-5586540379)。
 
 - Issue #328–#331 经 PR #399/#400/#401/#417 合入，当前源码包含其成果；#418–#421 及多选、刷新修复仅在当前分支本地完成，复用各自实际验收入口。
-- 此次基线核对时，#398 的 `82dd2debbbcc020a68070182fcbfe0f002926faf` 尚未整合。2026-09-10 按用户后续授权，将该分支与含 #425 的本地 main 整合；历史审计保留为非权威证据，冲突裁定及本次重新验证见[本地整合记录](../research/local-branch-integration-2026-09-10.md)。远程分支未更新，中央内存验证不代表 #416 完成。
+- 此次基线核对时，#398 的 `82dd2debbbcc020a68070182fcbfe0f002926faf` 尚未整合。2026-09-10 按用户后续授权，将该分支与含 #425 的本地 main 整合；历史审计保留为非权威证据，冲突裁定及本次重新验证见[本地整合记录](https://github.com/zodea/crm-new/blob/212a1cb5/docs/research/local-branch-integration-2026-09-10.md)。远程分支未更新，中央内存验证不代表 #416 完成。
 - 现有三个 `.worktrees/issue-329`、`issue-330`、`issue-331` 保留。工作树存在不等于任务进行中，以对应 PR、提交和当前改动分别核对。
 - 路由级历史证据编号及等级保留在下方矩阵；导入/导出归 #406，迁移页归 #414，材料结算归 #409，不能按相邻菜单误归物资模块。
 
@@ -108,13 +108,13 @@
 | --- | --- | --- | --- | --- |
 | `R-QUANTITY-HOLLOW-LOCAL` | 本地权威；无独立对应参考页 | 原户空鼓检查新增、修订与详情整页 | 390、768、1024、1280、1440px 独立验收；P6 正在收尾 | 依据 #412 空鼓检查与人工扣款规则、工程量和工资页面、DC 通用原语及 ADR 0014；检查原责任、修订与整改历史分别呈现，不继承相邻户详情或工资台账的参考证据等级。 |
 | `R-OTHER-SETTLEMENT-LIVE-331` | 直接证据，只读已核验 | 项目其他合同 → 其他支出结算列表及名称只读详情 | 2026-09-06；1293×1051 | 紧凑表格与专属金额列，详情摘要、页签及分区资料；未触发任何写入或文件动作，不保留真实值；本地四档视口合成证据见 `evidence/issue-331/README.md` |
-| `R-LIST-PRIOR` | 历史结构记录，未验证只读 | 业务列表；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | `docs/research/red-circle-ui-gap-2026-07-11.md` §2；仅作列表密度、筛选区、工具栏与分页的采集线索，必须按本轮协议重新观察 |
+| `R-LIST-PRIOR` | 历史结构记录，未验证只读 | 业务列表；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 2026-07-11 红圈走查线索：视图切换、左侧分类树、服务端汇总行、部门含下级开关、列头筛选、20 条/页与跳页；仅作列表密度、筛选区、工具栏与分页的采集线索，必须按本轮协议重新观察 |
 | `R-FORM-PRIOR` | 历史结构记录，未验证只读 | 新增/编辑表单；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §1 与 ADR 0014；旧记录包含保存、取消关闭等行为结论，本轮不采信这些交互，也不再点击相关入口 |
 | `R-DETAIL-PRIOR` | 历史结构记录，未验证只读 | 业务详情；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §3；仅作结构线索，字段、动作和进入路径都必须通过明确只读入口重新确认 |
 | `R-WORKBENCH-PRIOR` | 历史结构记录，未验证只读 | 数据工作台/矩阵；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §2–§3；仅作密度、分栏和局部滚动线索，业务操作保持本地契约并等待重新观察 |
 | `R-TOOL-PENDING` | 待补采 | 导入、导出、OCR、换算或价格工具；具体参考路径未知 | 首次安全观察目标 1440×900；实现仍复核四档视口 | 没有可安全确认的目标页证据；不得点击上传、下载、导出或任何可能立即生效的控件，先保留本地行为 |
 | `R-STAGE-PENDING` | 新增整页待验 | `/subcontract/quantity/stages`；阶段目录、分项关联与显式报量选择 | 待验证 390、768、1024、1280、1440px | #442 按 ADR 0010 与实体整页表单原语实施，当前未取得完整运行验收；相邻工程量页面的历史观察不提升本页证据等级。 |
-| `R-PAYROLL-SOURCES-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/sources` | 独立运行证据见工资接管记录，不继承旧空台账观察 | 按工资页面规格及 DC 通用原语呈现配置、考勤、签工和月锁；当前浏览器中央只读，Tauri 显式说明边界。[当前接管证据](./evidence/issue-412-payroll-history/README.md)与后续日常核算分别验收。 |
+| `R-PAYROLL-SOURCES-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/sources` | 独立运行证据见工资接管记录，不继承旧空台账观察 | 按工资页面规格及 DC 通用原语呈现配置、考勤、签工和月锁；当前浏览器中央只读。[当前接管证据](./evidence/issue-412-payroll-history/README.md)与后续日常核算分别验收。 |
 | `R-WORKER-ROSTER-LOCAL` | 本地权威；无独立对应参考页 | `/base/worker/private/:id`、`/subcontract/payroll/roster` | 新整页按 390、768、1024、1280、1440px 单独验收 | 依据 #449 已定独立私密权限、劳动合同与两类照片、带日期不可变名册规则，沿 DC 工人/工资构图与整页原语；不声称已观察外部名册页，不继承工资金额或生产验收。 |
 | `R-PAYROLL-WORKBOOK-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/workbooks` | 390、768、1024、1280、1440px 与两种完整文件分别验收 | 依据 #479 固定目录、正式号和独立名册版本的已定规则，沿 DC 工资构图与整页原语；不继承外部台账观察，不提升生产持久化结论。 |
 | `R-PAYROLL-NUMBERING-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/issue/:id` | 390、768、1024、1280、1440px 与实际文件单独验收 | 依据 #477 已定旧纸号起点、原子占号和冻结原件规则，沿 DC 工资构图与整页原语；[本地验收](./evidence/issue-477-official-numbering/README.md)不代表观察了外部目标或生产持久化完成。 |
@@ -186,21 +186,21 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `app/pages/contract/other-expense/[id].vue` | `/contract/other-expense/:id` | 辅助合同与结算 | 详情 | #330 | R-AUX-CONTRACT-LIVE-330 | 参考摘要、详细资料与票款/结算页签，瑞航品牌；未知审批轨迹不仿造 | 中央只读详情，显式整页编辑；项目与分供方稳定 ID、来源 query/页签/焦点往返 | C-DENSE |
 | `app/pages/contract/company-expense/[id].vue` | `/contract/company-expense/:id` | 辅助合同与结算 | 详情 | #330 | R-AUX-CONTRACT-DC | 公司详情未观察；按公司专属列表字段与 contractDetail 原语派生，无项目区块 | 中央专属税务、票款、附件元数据与审计；只读详情与编辑分路由 | C-DENSE |
-| `app/pages/base/crew/[id].vue` | `/base/crew/:id` | 基础主数据 | 详情 | #316 | R-ENGINEERING-FLOW-LOCAL | #316 已以本地中央测试接缝复核统一详情壳、真实成员/项目工程量/工资/扣罚聚合、稳定 ID 下钻、安全返回与四档无整页横滚 | 浏览器只读中央 Repository；电话脱敏；正式/测试来源隔离；无事实分别空态；Tauri 保留本地路径 | C-DENSE |
-| `app/pages/base/crew/form/[[id]].vue` | `/base/crew/form/:id?` | 基础主数据 | 整页表单 | #316 | R-FORM-PRIOR | #316 已完成浏览器中央表单预载、幂等命令、乐观锁、返回详情和中央班组校验 | 中央附件未接入时不回退本地；Tauri 仍写 `crews` 与班组附件；不恢复不存在的班组项目单价关系 | C-FORM |
+| `app/pages/base/crew/[id].vue` | `/base/crew/:id` | 基础主数据 | 详情 | #316 | R-ENGINEERING-FLOW-LOCAL | #316 已以本地中央测试接缝复核统一详情壳、真实成员/项目工程量/工资/扣罚聚合、稳定 ID 下钻、安全返回与四档无整页横滚 | 浏览器只读中央 Repository；电话脱敏；正式/测试来源隔离；无事实分别空态 | C-DENSE |
+| `app/pages/base/crew/form/[[id]].vue` | `/base/crew/form/:id?` | 基础主数据 | 整页表单 | #316 | R-FORM-PRIOR | #316 已完成浏览器中央表单预载、幂等命令、乐观锁、返回详情和中央班组校验 | 中央附件未接入时不回退本地；不恢复不存在的班组项目单价关系 | C-FORM |
 | `app/pages/base/crew/index.vue` | `/base/crew` | 基础主数据 | 列表 | #316 | R-LIST-PRIOR | #316 已完成中央正式/测试隔离、真实人数/项目数、筛选、安全回程与四档局部横滚回归 | 浏览器无本地删除/快捷编辑；名称按稳定 ID 下钻；电话脱敏 | C-DENSE |
 | `app/pages/base/customer/[id].vue` | `/base/customer/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | #194 已完成客户主数据、名下项目、施工合同与收款台账的只读聚合、页签深链及四档回归 | 方向键切换页签；只按真实外键下钻，不从名称或合同金额推算收款 | C-DENSE |
 | `app/pages/base/customer/form/[[id]].vue` | `/base/customer/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页表单返回详情、联系人输入语义及统一社会信用代码冲突反馈 | 保存仍走客户领域 action；敏感字段只在编辑流程维护 | C-FORM |
 | `app/pages/base/customer/index.vue` | `/base/customer` | 基础主数据 | 列表 | #194 | R-CUSTOMER-LIST-LIVE | 参考已确认无空左树、单行工具栏、紧凑宽表和分页；当前账号无可见客户，字段仍按本地真实模型收敛为名称/简称/税号/联系人/状态，不复制参考私有列 | 名称进入本地真实详情；税号与电话脱敏；参考详情受权限限制，不能据此更改本地外键、删除或表单契约 | C-DENSE |
 | `app/pages/base/supplier/[id].vue` | `/base/supplier/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #193 已按统一详情壳完成长名称、脱敏摘要、6 页签、可追溯汇总、分类文件区与四档布局回归；#319 再按直接证据闭合材采合同到合同/结算/收票/付款事实页签及原合同返回 | 蓝色聚合值按真实外键进入对应事实；目标无记录显示真实空态，灰色值不伪装入口。材采来源只接受稳定分供方 ID、同来源与安全合同返回地址；参考审批、评论、供应商层级和写动作仍不推断 | C-BASE |
-| `app/pages/base/supplier/credential/[id].vue` | `/base/supplier/credential/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #315 拆出独立证照整页，#446 接入中央原件、资料要求及人工核验，#447 接入候选人工核对；继续复用参考详情文件区的构图证据及已有 OCR 组件，不外推参考站上传或审核动作 | 正式身份消费专用中央原件和审计，测试身份经授权只读；稍后核对和冷刷新保留当前身份及来源，陈旧确认保留选择，返回原详情和列表；Tauri 保留既有适配 | C-BASE |
+| `app/pages/base/supplier/credential/[id].vue` | `/base/supplier/credential/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #315 拆出独立证照整页，#446 接入中央原件、资料要求及人工核验，#447 接入候选人工核对；继续复用参考详情文件区的构图证据及已有 OCR 组件，不外推参考站上传或审核动作 | 正式身份消费专用中央原件和审计，测试身份经授权只读；稍后核对和冷刷新保留当前身份及来源，陈旧确认保留选择，返回原详情和列表 | C-BASE |
 | `app/pages/base/supplier/form/[[id]].vue` | `/base/supplier/form/:id?` | 分供方 | 整页表单 | #193 | R-FORM-LIVE | #193 已确认短表单无空左栏、两列字段网格、内容滚动、固定底部操作和统一七类选择；主数据保存后进入真实证照流程 | 普通附件不伪装证照；`approvalStatus` 不展示，证照原件、OCR 与人工核验统一在详情维护 | C-FORM |
 | `app/pages/base/supplier/index.vue` | `/base/supplier` | 分供方 | 列表 | #193 | R-SUPPLIER-LIST-LIVE | #193 已完成无空左树、单行工具栏、真实项目/欠款/资料筛选、聚合列、固定操作列、局部横滚和列表汇总回归 | 行级关联写入真实 ProjectSupplier；税号与电话脱敏；上级供应商和参考站未授权业务动作不引入 | C-DENSE |
 | `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #316 | R-ENGINEERING-FLOW-LOCAL | #316 已以本地中央测试接缝复核班组/项目/责任单元/工资单/扣罚与关联人员稳定 ID 链、隐私、未知工资分配和四档回归 | 身份/联系/银行信息脱敏；正式/测试来源隔离；工资分配缺失显示“历史未记录”，不反推金额 | C-DENSE |
-| `app/pages/base/worker/private/[id].vue` | `/base/worker/private/:id` | 基础主数据 | 整页表单 | #449 | R-WORKER-ROSTER-LOCAL | 工人私密资料、劳动合同与两类照片的独立整页，明确权限不足和缺正文 | 中央 owner、版本冲突与原提交核对；普通详情保持脱敏，Tauri 不支持 | C-FORM |
-| `app/pages/subcontract/payroll/roster.vue` | `/subcontract/payroll/roster` | 工程量与工资 | 整页表单 | #449 | R-WORKER-ROSTER-LOCAL | 同项目已发冻结成员名册预览、独立日期归档与版本下载 | 独立私密权限、缺口保留、原件固定摘要、表内横滚；Tauri 不支持 | C-FORM |
-| `app/pages/subcontract/payroll/workbooks.vue` | `/subcontract/payroll/workbooks` | 工程量与工资 | 整页表单 | #479 | R-PAYROLL-WORKBOOK-LOCAL | 明确工资范围、编号和独立名册版本，保存固定目录后下载全周期或按月归档 | 私密正文独立授权、保存时点冻结、原键恢复与局部横滚；Tauri 不支持 | C-FORM |
-| `app/pages/subcontract/payroll/issue/[id].vue` | `/subcontract/payroll/issue/:id` | 工程量与工资 | 整页表单 | #477 | R-PAYROLL-NUMBERING-LOCAL | 固定原工资预览、人工起点登记、明确正式出具与同号单份输出 | 中央工资权限、原键核对、同号冷恢复、表内横滚；Tauri 不支持 | C-FORM |
+| `app/pages/base/worker/private/[id].vue` | `/base/worker/private/:id` | 基础主数据 | 整页表单 | #449 | R-WORKER-ROSTER-LOCAL | 工人私密资料、劳动合同与两类照片的独立整页，明确权限不足和缺正文 | 中央 owner、版本冲突与原提交核对；普通详情保持脱敏 | C-FORM |
+| `app/pages/subcontract/payroll/roster.vue` | `/subcontract/payroll/roster` | 工程量与工资 | 整页表单 | #449 | R-WORKER-ROSTER-LOCAL | 同项目已发冻结成员名册预览、独立日期归档与版本下载 | 独立私密权限、缺口保留、原件固定摘要、表内横滚 | C-FORM |
+| `app/pages/subcontract/payroll/workbooks.vue` | `/subcontract/payroll/workbooks` | 工程量与工资 | 整页表单 | #479 | R-PAYROLL-WORKBOOK-LOCAL | 明确工资范围、编号和独立名册版本，保存固定目录后下载全周期或按月归档 | 私密正文独立授权、保存时点冻结、原键恢复与局部横滚 | C-FORM |
+| `app/pages/subcontract/payroll/issue/[id].vue` | `/subcontract/payroll/issue/:id` | 工程量与工资 | 整页表单 | #477 | R-PAYROLL-NUMBERING-LOCAL | 固定原工资预览、人工起点登记、明确正式出具与同号单份输出 | 中央工资权限、原键核对、同号冷恢复、表内横滚 | C-FORM |
 | `app/pages/base/worker/form/[[id]].vue` | `/base/worker/form/:id?` | 基础主数据 | 整页表单 | #316 | R-FORM-PRIOR | #316 已完成浏览器中央表单预载、中央班组/项目选择、幂等命令、乐观锁和返回详情 | 班组与当前项目只保存同来源稳定 ID；中央附件未接入时不回退本地 | C-FORM |
 | `app/pages/base/worker/index.vue` | `/base/worker` | 基础主数据 | 列表 | #316 | R-LIST-PRIOR | #316 已完成中央来源隔离、班组/项目/档案/在场/安全教育展示、筛选、安全回程与四档局部横滚回归 | 电话和身份证脱敏；浏览器无本地删除/快捷编辑；键盘链接按稳定 ID 进入详情 | C-DENSE |
 | `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-CONTRACT-DETAIL-LIVE | #318 闭合材采中央七页签；#320/#321 闭合施工/分包专属七分区；#322 以真实浏览器证明两类补充协议 canonical 聚焦、键盘焦点、目标不存在/父子错配和列表来源恢复，并复核 390/768/1024/1440px 无页面级横滚 | 只有 `dataOrigin` 加对应 `contractKind` 进入各类中央读模型；补充协议还必须用稳定 `focusId` 命中当前主合同；正式来源显式编辑，演示只读；未核验事实目标保持文本 | C-BASE |
@@ -245,7 +245,7 @@
 | `app/pages/finance/payment-management/index.vue` | `/finance/payment-management` | 支出财务 | 工作台 | #203 | R-FINANCE-FLOW-LIVE | 本地已是独立工作台且运行有 2 条已批复申请；参考默认按支付状态分段，并额外展示合同、付款内容、来源单据/业务类型、所属部门和剩余待支付 | 只读核对批复与已确认支付；申请/项目/分供方/合同/来源单据可下钻，登记支付仍跳整页支付记录，来源字段无 canonical ID 时保持“未接”而非猜文本路由 | C-DENSE |
 | `app/pages/finance/receipt/[id].vue` | `/finance/receipt/:id` | 收入财务 | 详情 | #436 | R-FINANCE-FLOW-LIVE | 浏览器按收款自身 ID 与当前来源读取；客户、合同、项目、最终结算保持各自返回位置；附件支持正文预览与下载 | [本切片证据](./evidence/issue-436/README.md)；来源错配/缺失/无权限分别呈现，生产持久化仍属 #416 | C-DENSE |
 | `app/pages/finance/receipt/form/[id].vue` | `/finance/receipt/form/:id` | 收入财务 | 整页表单 | #436 | R-FORM-PRIOR | 浏览器显式整页编辑接入中央命令与附件正文，失败保留输入；五档及来源恢复见本切片证据 | 保存动作与已知缺项只按[页面契约](../rewrite/pages/finance-receipt.md)，不推断参考系统写行为 | C-FORM |
-| `app/pages/finance/receipt/index.vue` | `/finance/receipt` | 收入财务 | 列表 | #436 | R-FINANCE-FLOW-LIVE | 浏览器已接专属中央列表、来源分别累计及关系下钻；无原始事实的分类/类型显示未记录 | [本切片证据](./evidence/issue-436/README.md)；宽表仅区域横滚，Tauri 原适配边界保持 ADR 0020 | C-DENSE |
+| `app/pages/finance/receipt/index.vue` | `/finance/receipt` | 收入财务 | 列表 | #436 | R-FINANCE-FLOW-LIVE | 浏览器已接专属中央列表、来源分别累计及关系下钻；无原始事实的分类/类型显示未记录 | [本切片证据](./evidence/issue-436/README.md)；宽表仅区域横滚 | C-DENSE |
 | `app/pages/finance/receipt/new.vue` | `/finance/receipt/new` | 收入财务 | 整页表单 | #436 | R-FORM-PRIOR | 浏览器整页新建、空草稿、提交、附件及首错焦点已接入；使用既有表单参考与 Kit 原语 | 写入生命周期只按[页面契约](../rewrite/pages/finance-receipt.md)，真实验证见本切片证据 | C-FORM |
 | `app/pages/finance/records/[id].vue` | `/finance/records/:id` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/records/index.vue` | `/finance/records` | 支出财务 | 列表 | #203 | R-FINANCE-FLOW-LIVE | 参考空表仍明确支付编号/日期/金额/方式、收款账户/开户行/账号和创建审计；当前本地有 3 条已确认支付但继续使用通用列表，未展示银行凭证身份 | 编号先进入只读详情，付款申请分摊和收款方下钻按真实 ID；银行流水唯一性、人工确认和 OCR 来源继续以 ADR 0015 为准 | C-DENSE |
@@ -320,21 +320,21 @@
 | `app/pages/settings/ocr.vue` | `/settings/ocr` | 系统设置 | 工作台 | #204 | R-OCR-STUDIO-SOURCE | 采用参考项目的单页纵向区块、紧凑密度和底部恢复/保存反馈；字段与能力只按 ADR 0006 的 PaddleOCR-VL 单模型契约实现，不照搬传统 PP-OCRv6 参数 | 当前路由已可达；7 项 VL 文档能力和有界请求/轮询超时保存到本机 SQLite，并真实进入发票、送货单识别请求。Token、API 地址和模型仍由服务端私有配置持有，不提供假保存 | C-TOOL |
 | `app/pages/settings/our-signatories/index.vue` | `/settings/our-signatories` | 系统设置 | 列表 | — | R-TOOL-PENDING | 我方签约主体是当前已确认的独立设置职责；未取得对应外部参考运行证据，不借 OCR 设置页观察扩大证据 | 真实中央目录、核实版本及停用状态；独立 Native 未接一致目录 owner 明确不可用。当前源码注册不等于设计覆盖或运行验收 | C-DENSE |
 | `app/pages/settings/our-signatories/form/[[id]].vue` | `/settings/our-signatories/form/:id?` | 系统设置 | 整页表单 | — | R-FORM-PRIOR | 复用现行整页表单、统一反馈和原命令恢复；没有另起浮层实体编辑或第二套设计规则 | 中央同库保存资料、不可变核实历史和原回执；合同采用版本快照，目录更名或停用不修改旧合同。当前源码注册不提升外部参考证据 | C-FORM |
-| `app/pages/settings/data-migration.vue` | `/settings/data-migration` | 导入导出 | 工作台 | #294 | R-TOOL-PENDING | 按本地迁移契约使用纵向步骤、预检/备份/对账/切换分区和表内横向滚动；外部参考站没有可安全观察的一一对应迁移页 | 仅浏览器正式工作区可执行；后台权威校验拓扑、整库摘要、映射、实际写入对账和回滚窗口，Tauri 明确不可用；备份字节不上传 | C-TOOL |
+| `app/pages/settings/data-migration.vue` | `/settings/data-migration` | 导入导出 | 工作台 | #294 | R-TOOL-PENDING | 按本地迁移契约使用纵向步骤、预检/备份/对账/切换分区和表内横向滚动；外部参考站没有可安全观察的一一对应迁移页 | 仅浏览器正式工作区可执行；后台权威校验拓扑、整库摘要、映射、实际写入对账和回滚窗口；备份字节不上传 | C-TOOL |
 | `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 详情 | #328 | R-SUB-SETTLEMENT-LIVE-328 | #327 按 DC 分包变洽签字段与本地只读详情蓝本交付 change 专属详情；#328 settlement 现为专属只读详情，编辑使用独立 form 路由 | 分包变洽签及分包结算分别展示专属金额、真实项目/分供方/合同、状态与附件，列表/项目/合同来源可恢复；缺失、无权、错配与重试分态，不补造审批流 | C-FORM |
 | `app/pages/subcontract/[kind]/form/[id].vue` | `/subcontract/:kind/form/:id` | 分包单据 | 整页表单 | #328 | R-SUB-DOC-DC | 分包变洽签及分包结算只读详情的显式编辑路由复用 DC 专属字段分区和固定底栏 | 只允许正式可编辑状态进入；保存、提交和取消返回原详情，项目、分供方、分包合同与附件只走中央命令 | C-FORM |
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-SUB-DOCUMENTS-LIVE | 参考分包变洽签与分包结算分别保留合同金额/申报审定链和奖罚/申请支付余额链；当前本地真实项目/合同/分供方来源正确但列表投影较窄 | 金额与余额只做真实聚合，不保存副本；空列表仍保留专属列，编号/名称先进入只读详情并恢复项目/合同/分供方及本地筛选 | C-DENSE |
 | `app/pages/subcontract/[kind]/new.vue` | `/subcontract/:kind/new` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 新建页按动态类型显示真实标题、来源、金额、备注和附件分区，不使用通用占位标题或虚构明细 | 项目、合同和分供方只选择真实关联记录；草稿、上报和确认沿用本地状态校验 | C-FORM |
 | `app/pages/subcontract/attendance.vue` | `/subcontract/attendance` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目/月/班组 query 可恢复真实名册，当前无考勤时仍展示 0 人日/0 工时和当月实际天数矩阵；390–1440px 根无横滚、矩阵局部横滚 | 返回工资和进入 C2 可保留项目/月/班组/工资状态；只写 `attendance_records`，C2 人员与 C1 已发月份锁定 | C-DENSE |
 | `app/pages/subcontract/daywork/index.vue` | `/subcontract/daywork` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 保留原台账的历史观察；后续 #433 来源往返及 P3 中央接管分别以对应限定验收为准，路由文件改为目录入口不升级参考证据 | 必须复用工资筛选上下文；签工与考勤同月互斥、已发月份冻结、只有已确认记录进入工资的规则不变 | C-DENSE |
-| `app/pages/subcontract/daywork/new.vue` | `/subcontract/daywork/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-DAYWORK-LOCAL | 独立登记日期、时段、整工/半工与原施工内容；证明信息及明确确认另行呈现，P3 实施中 | 固定 draftKey，失败保原输入；待确认不计薪，人工确认不自动罚扣；Tauri 不挂载中央表单 | C-FORM |
+| `app/pages/subcontract/daywork/new.vue` | `/subcontract/daywork/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-DAYWORK-LOCAL | 独立登记日期、时段、整工/半工与原施工内容；证明信息及明确确认另行呈现，P3 实施中 | 固定 draftKey，失败保原输入；待确认不计薪，人工确认不自动罚扣 | C-FORM |
 | `app/pages/subcontract/daywork/form/[id].vue` | `/subcontract/daywork/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-DAYWORK-LOCAL | 按稳定原记录读取及显式编辑；当前事实、旧稿和原提交后续更新分开，P3 实施中 | 旧新关系共同核验；已发不能移动原来源，后来合法修改不使可靠原提交永久无法确认，失败保稿 | C-FORM |
 | `app/pages/subcontract/payroll/[id].vue` | `/subcontract/payroll/:id` | 工程量与工资 | 详情 | #198 | R-ENGINEERING-FLOW-LOCAL | 不存在 ID 能显示真实 not-found；当前运行种子无工资单，released 冻结详情只能由既有测试证明 | 详情入口和返回需携项目/月/班组/状态；当前 `back-to` 固定工资根路由会丢筛选。只展示真实外键与 released 快照 | C-DENSE |
 | `app/pages/subcontract/payroll/index.vue` | `/subcontract/payroll` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目/月/班组/状态筛选、0 单据汇总、空表头和建单/考勤/C2 入口均由运行态确认；没有工资种子时不补成功单据 | 列表→建单→列表与列表↔考勤已保留 query；详情和 C2 仍需补齐。A/C1/C2 可用，B 因无合同责任外键继续禁用 | C-DENSE |
 | `app/pages/subcontract/payroll/new.vue` | `/subcontract/payroll/new` | 工程量与工资 | 整页表单 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目、月份、班组按来源 query 正确预填，负责人只取当前真实责任范围；B 在界面禁用 | 取消/成功按原筛选返回；不触发保存也能观察完整字段。页面、store 和服务继续多层阻止 B 类伪建单 | C-FORM |
-| `app/pages/subcontract/payroll/config.vue` | `/subcontract/payroll/config` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-A-LOCAL | 工资主体首月比例、按生效月的基准价和个人例外使用独立整页；无独立外部目标页，当前正在实施 | 主体身份与价格范围明确，空值不默认零；保存后回原草稿复验来源，Tauri 显式说明边界，实际运行另行验收 | C-FORM |
+| `app/pages/subcontract/payroll/config.vue` | `/subcontract/payroll/config` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-A-LOCAL | 工资主体首月比例、按生效月的基准价和个人例外使用独立整页；无独立外部目标页，当前正在实施 | 主体身份与价格范围明确，空值不默认零；保存后回原草稿复验来源，实际运行另行验收 | C-FORM |
 | `app/pages/subcontract/payroll/form/[id].vue` | `/subcontract/payroll/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-A-LOCAL | 固定 A 单据的资料、现场完成来源与单价、备注分区，按 DC 工资蓝本及整页表单原语实施 | 编辑身份来自路径，来源 query 只恢复上下文；已发不可编辑，未保存离开及来源变化保留输入并明确重核，实际运行另行验收 | C-FORM |
-| `app/pages/subcontract/payroll/sources.vue` | `/subcontract/payroll/sources` | 工程量与工资 | 工作台 | #412 | R-PAYROLL-SOURCES-LOCAL | 新增中央来源只读页；配置、考勤、签工和月锁四视图，逐屏验收见接管证据，不继承旧空台账观察 | 项目/月/班组与来源返回显式保留；无工资头仍可读取独立来源，Tauri 不挂中央来源组件 | C-DENSE |
+| `app/pages/subcontract/payroll/sources.vue` | `/subcontract/payroll/sources` | 工程量与工资 | 工作台 | #412 | R-PAYROLL-SOURCES-LOCAL | 新增中央来源只读页；配置、考勤、签工和月锁四视图，逐屏验收见接管证据，不继承旧空台账观察 | 项目/月/班组与来源返回显式保留；无工资头仍可读取独立来源 | C-DENSE |
 | `app/pages/subcontract/payroll/adjustments/new.vue` | `/subcontract/payroll/adjustments/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 原已发单、新旧核算依据、原因与具名核对依据使用独立整页；无对应外部参考页 | 固定原单与 draftKey，保存更正不产生现金；失败保稿，桌面不允许更正写入，原来源返回受控 | C-FORM |
 | `app/pages/subcontract/payroll/adjustments/form/[id].vue` | `/subcontract/payroll/adjustments/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 固定更正编号的编辑与确认整页；原签名实发、当前核算差额分区 | 前序变化重核，未知结果恢复原提交；已确认只追加引用纠错，不覆盖旧确认，桌面不允许写入 | C-FORM |
 | `app/pages/subcontract/payroll/adjustments/[id].vue` | `/subcontract/payroll/adjustments/:id` | 工程量与工资 | 详情 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 本次确认差额、确认者、新旧依据、前序引用与原链当前余额分区；独立确认记录输出 | 原单、原更正、实际补退及以后工资处理按稳定身份下钻；原签名金额保持原文，缺证明不重算 | C-DENSE |

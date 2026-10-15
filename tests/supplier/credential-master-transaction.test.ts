@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 
 const session = { workspaceId: 'atomic', actorId: 'reviewer', capabilities: ['supplier:write', 'supplier:list:read'] }
 
 describe('证照与主档共同事务', () => {
   it('同次提交更新主档字段，重复税号失败不会留下证照确认事实', async () => {
-    const instance = createSupplierCommandTestInstance()
+    const instance = createSupplierCommandService()
     const create = (commandId: string, taxNo: string) => instance.execute({ action: 'save', commandId, requiredCapability: 'supplier:write', workspaceId: 'atomic', actorId: 'reviewer', baseVersion: null, attachments: {}, draft: { name: commandId, supplierCategory: '其他', contact: '测试联系人', taxNo } }, session)
     const first = await create('first', 'TAX-A')
     await create('second', 'TAX-B')

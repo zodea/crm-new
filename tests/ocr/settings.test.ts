@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { activeNavKey, NAV_TREE } from '~/lib/nav/nav-tree'
 import { fetchOcrRuntimeStatus, OCR_DOCUMENT_SUPPORT } from '~/lib/ocr/settings'
-import { routeSubtitle, routeTitle } from '~/lib/tabs/tab-title'
+import { routeTitle } from '~/lib/tabs/tab-title'
 
 describe('ocr 设置运行状态', () => {
   it('只读取服务端脱敏状态，不要求或返回 Token 值', async () => {
@@ -56,6 +56,5 @@ describe('ocr 设置路由入口', () => {
     expect(item?.to).toBe('/settings/ocr')
     expect(activeNavKey('/settings/ocr')).toBe('ocrSettings')
     expect(routeTitle('/settings/ocr')).toBe('OCR 设置')
-    expect(routeSubtitle('/settings/ocr')).toBe('引擎状态 · 单据接入 · 参数边界')
   })
 })

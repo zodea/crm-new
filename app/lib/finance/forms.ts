@@ -3,15 +3,13 @@ import type { TransactionDb } from '~/lib/db/coordinator'
 import type { FileRefChanges, FileRefRecord } from '~/lib/forms/file-refs'
 import { select, withTransaction } from '~/lib/db/connection'
 import { applyFileRefChanges, listFileRefs } from '~/lib/forms/file-refs'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
-import { deleteFinanceFormInTransaction, loadFinanceForm as domainLoad, getPaymentApplicationSummary as domainSummary, FINANCE_OWNER_TYPE, saveFinanceFormInTransaction, unconfirmPaymentRecordInTransaction } from './domain'
-import { verifiedFinanceSum } from './persistent-rows'
+import { loadFinanceForm as domainLoad, getPaymentApplicationSummary as domainSummary, FINANCE_OWNER_TYPE, saveFinanceFormInTransaction, unconfirmPaymentRecordInTransaction } from './domain'
 
 export * from './domain'
 
 /** Native facade; the production owner imports the transaction-only domain. */
 export async function saveFinanceForm(kind: F3FormKind, draft: F3FormDraft, action: F3SaveAction, attachments: FileRefChanges = {}): Promise<F3SaveResult> {
-  if (kind === 'receipt' && 'window' in globalThis && !isDesktopRuntime())
+  if (kind === 'receipt' && 'window' in globalThis)
     throw new Error('浏览器收款请通过中央收款表单保存')
   return withTransaction(async (tx) => {
     const saved = await saveFinanceFormInTransaction(kind, draft, action, tx)
@@ -30,11 +28,4 @@ export function listFinanceFormAttachments(kind: F3FormKind, id: string, include
 }
 export async function unconfirmPaymentRecord(id: string): Promise<void> {
   await withTransaction(tx => unconfirmPaymentRecordInTransaction(id, tx))
-}
-export function deleteFinanceForm(kind: F3FormKind, id: string): Promise<string | null> {
-  return withTransaction(tx => deleteFinanceFormInTransaction(kind, id, tx))
-}
-export async function getProjectConfirmedPaymentTotal(projectId: string): Promise<number> {
-  const rows = await select<{ amount: unknown }>('SELECT amount FROM payment_records WHERE project_id=? AND confirmation_status=\'confirmed\' AND deleted_at IS NULL', [projectId])
-  return verifiedFinanceSum(rows.map(row => row.amount))
 }

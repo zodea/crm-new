@@ -7,7 +7,6 @@ import { approvalPaymentCap, readApprovalAmount } from '~/lib/finance/approval-a
 import { financeFailure } from '~/lib/finance/central-contract'
 import { pendingInvoiceAmountForRead } from '~/lib/finance/domain'
 import { verifiedFinanceSum } from '~/lib/finance/persistent-rows'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import { useFinanceStore } from '~/stores/finance'
@@ -214,7 +213,7 @@ export const usePaymentManagementStore = defineStore('payment-management', () =>
     loading.value = true
     currentRead.value = false
     const token = generation
-    const origin = 'window' in globalThis && !isDesktopRuntime() && !visibility.includeDemo ? 'central' : visibility.includeDemo ? 'demo' : 'native'
+    const origin = 'window' in globalThis && !visibility.includeDemo ? 'central' : visibility.includeDemo ? 'demo' : 'native'
     async function readNative() {
       return withTransaction(async ({ select }) => {
         const source = await select<PaymentManagementDbRow>(`

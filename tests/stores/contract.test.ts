@@ -147,30 +147,6 @@ describe('contract store:唯一写路径 action 闭环', () => {
     expect(store.byId(id)?.changed).toBe(160)
   })
 
-  it('byKind:施工/分包/材采三类切片互不串台', async () => {
-    const store = useContractStore()
-    await store.saveForm('construction', {
-      name: 'A',
-      projectId: 'p1',
-      customerId: 'customer-1',
-    }, 'draft')
-    await store.saveForm('subcontract', {
-      name: 'B',
-      subKind: '劳务',
-      projectId: 'p1',
-      supplierId: 'supplier-1',
-    }, 'draft')
-    await store.saveForm('material', {
-      name: 'C',
-      projectId: 'p1',
-      supplierId: 'supplier-1',
-    }, 'draft')
-    expect(store.byKind('分包').map(c => c.name)).toEqual(['B'])
-    expect(store.byKind('分包')[0]!.subKind).toBe('劳务')
-    expect(store.byKind('施工').map(c => c.name)).toEqual(['A'])
-    expect(store.byKind('材采').map(c => c.name)).toEqual(['C'])
-  })
-
   it('lookup actions return real IDs and keep settlement contracts project-scoped', async () => {
     const store = useContractStore()
     await mem.execute(`INSERT INTO customers (id, name) VALUES ('customer-2', '第二客户')`)

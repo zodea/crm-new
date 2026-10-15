@@ -1,5 +1,3 @@
-export const PRODUCTION_AUXILIARY_CONTRACT_DOMAIN = 'auxiliary-contract'
-export const PRODUCTION_AUXILIARY_CONTRACT_DOMAIN_VERSION = 1
 export const PRODUCTION_AUXILIARY_CONTRACT_CAPABILITIES = ['auxiliary-contract:read', 'auxiliary-contract:write', 'auxiliary-contract:import'] as const
 export const PRODUCTION_AUXILIARY_CONTRACT_TABLES = ['auxiliary_contract_revision', 'auxiliary_contract_records', 'auxiliary_contract_supplements', 'auxiliary_contract_versions', 'auxiliary_contract_files', 'auxiliary_contract_intents', 'auxiliary_contract_receipts', 'auxiliary_contract_resolutions', 'auxiliary_contract_imports', 'auxiliary_contract_import_restores'] as const
 export const PRODUCTION_AUXILIARY_CONTRACT_SCHEMA = `

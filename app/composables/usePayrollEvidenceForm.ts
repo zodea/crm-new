@@ -5,7 +5,6 @@ import { computed, nextTick, onActivated, onDeactivated, onScopeDispose, shallow
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { payrollActualLocation, payrollAdjustmentLocation, payrollAdjustmentReturn } from '~/lib/payroll/adjustment-navigation'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
@@ -54,7 +53,7 @@ export function usePayrollEvidenceForm<D, R extends FormRead<D>>(options: {
   const busy = computed(() => loading.value || saving.value)
   const writable = computed(() => {
     const authority = latest.value ?? matching.value
-    return !!matching.value && !!authority && origin.value === 'real' && !isDesktopRuntime() && !authority.context.readonly && authority.context.capabilities.includes('payroll:write') && !busy.value && !pending.value && !readFailed.value
+    return !!matching.value && !!authority && origin.value === 'real' && !authority.context.readonly && authority.context.capabilities.includes('payroll:write') && !busy.value && !pending.value && !readFailed.value
   })
   const editable = computed(() => writable.value && options.canEdit((latest.value ?? matching.value)!))
   const dirty = computed(() => !!matching.value && JSON.stringify(draft.value) !== original.value)
@@ -88,7 +87,7 @@ export function usePayrollEvidenceForm<D, R extends FormRead<D>>(options: {
     error.value = ''
     readFailed.value = false
     try {
-      if (origin.value !== 'real' || isDesktopRuntime())
+      if (origin.value !== 'real')
         throw new Error('本页需要从浏览器正式工资记录进入；当前来源仅可阅读原工资资料。')
       if (route.path.endsWith('/new') && route.query.draftKey !== draftKey.value)
         await router.replace({ path: route.path, query: { ...route.query, draftKey: draftKey.value, origin: 'real' } })

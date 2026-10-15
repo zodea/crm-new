@@ -57,7 +57,6 @@ describe('暂存路径保护', () => {
     'scripts/__pycache__/helper.pyc',
     '.eslintcache',
     'app.tsbuildinfo',
-    'src-tauri/target/debug/app.exe',
   ])('阻止误暂存的产物 %s', (path) => {
     expect(() => checkStagedPaths([path])).toThrow('不能提交')
   })

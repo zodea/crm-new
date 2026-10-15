@@ -44,7 +44,6 @@ export const usePayrollAdjustmentsStore = defineStore('payroll-adjustments-centr
     })
   }
   return {
-    adjustmentSaving: pending.saving,
     loadAdjustmentForm: (query: PayrollQuery, input: PayrollAdjustmentFormInput) => repository().adjustmentForm(query, input),
     loadAdjustmentDetail: (query: PayrollQuery, adjustmentId: string) => pending.read(() => repository().adjustmentDetail(query, adjustmentId)),
     loadAdjustmentHistory: (query: PayrollQuery, originalStatementId: string) => repository().adjustmentHistory(query, originalStatementId),

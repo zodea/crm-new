@@ -12,7 +12,7 @@
 | [tests/project/cost-amounts.test.ts](../../../tests/project/cost-amounts.test.ts) | 单元／服务／状态 | 可空金额归集与真实零 |
 | [tests/production/project-pending.test.ts](../../../tests/production/project-pending.test.ts) | 单元／服务／状态 | 未知结果禁止替换原提交；可靠回执与合法同项目回读共同清理，读取失败只读重试，身份变化及错误目标不解锁 |
 | [tests/production/project-storage.test.ts](../../../tests/production/project-storage.test.ts) | 单元／服务／状态 | 项目与原件同库冷回读，客户改名沿原 ID、未知指标不归零、删除恢复保留原件；客户被有效项目引用时拒绝删除 |
-| [tests/project/archive.test.ts](../../../tests/project/archive.test.ts) | 单元／服务／状态 | 项目档案包导出（Issue #248） |
+| [tests/project/archive.test.ts](../../../tests/project/archive.test.ts) | 单元／服务／状态 | 档案路径清洗与稳定 ZIP 打包 |
 | [tests/project/cost-control.test.ts](../../../tests/project/cost-control.test.ts) | 单元／服务／状态 | project cost control read model |
 | [tests/project/data-origin.test.ts](../../../tests/project/data-origin.test.ts) | 单元／服务／状态 | project data-origin boundary |
 | [tests/project/detail-aggregate.test.ts](../../../tests/project/detail-aggregate.test.ts) | 单元／服务／状态 | 现行归档发票的项目汇总，逐行未知／零／红字与祖先软删及恢复 |
@@ -21,7 +21,6 @@
 | [tests/project/formal-facts.test.ts](../../../tests/project/formal-facts.test.ts) | 单元／服务／状态 | project formal fact boundaries |
 | [tests/project/import-central.test.ts](../../../tests/project/import-central.test.ts) | 单元／服务／状态 | 项目 Excel → 实际存储 → 中央回读 |
 | [tests/project/import-command.test.ts](../../../tests/project/import-command.test.ts) | 单元／服务／状态 | 项目中央逐行导入命令 |
-| [tests/project/list.test.ts](../../../tests/project/list.test.ts) | 单元／服务／状态 | 项目列表筛选 |
 | [tests/project/phase-task-files.test.ts](../../../tests/project/phase-task-files.test.ts) | 单元／服务／状态 | phase task file references |
 | [tests/project/project-command-http-repository.test.ts](../../../tests/project/project-command-http-repository.test.ts) | 单元／服务／状态 | project command HTTP repository |
 | [tests/project/project-detail-boundary.test.ts](../../../tests/project/project-detail-boundary.test.ts) | 单元／服务／状态 | project detail data-origin boundary |
@@ -83,4 +82,3 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/browser/NativeCostUnknown.test.ts](../../../tests/browser/NativeCostUnknown.test.ts) | 浏览器组件 | 五视口Native成本来源缺口、可证小计及键盘 |

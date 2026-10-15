@@ -2,7 +2,7 @@
 
 > 2026-09-14，P3 已通过本地限定验收。固定比较基线为 P2 最终登记 `4738be98730955cd63832c8df04fc6f1d855caff`，其产品为 `fd0a7b6b4ab58eb177eea1db86a069067be92a4a`。C2 签工与核算实发在本地中央验证实例已可用；本期不代表完整工资、生产保存或部署完成。提交状态另以提交回执为准。
 
-本期承接 [P3 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/03-central-c2-daywork.md)，业务以[工资页面](../../../rewrite/pages/subcontract-payroll.md)、[命令](../../../rewrite/COMMANDS.md)及[数据模型](../../../rewrite/DATABASE.md)为准。
+本期承接 [P3 实施票](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/03-central-c2-daywork.md)，业务以[工资页面](../../../rewrite/pages/subcontract-payroll.md)、[命令](../../../rewrite/COMMANDS.md)及[数据模型](../../../rewrite/DATABASE.md)为准。
 
 产品已独立提交为 `f39d8106579ea09cd1335119701ba6105cd22846`，正常提交钩子再次通过规范、类型及682文件/3964项测试。产品提交当时112项源码身份保持不变。钩子仅整理12份证据JSON格式，原始清单仍保留提交前摘要，精确原件与提交后对应见[格式记录](checks/commit-normalization.json)；两者解析内容相同。产品提交事实见[提交回执](commit-receipt.md)；后置覆盖断言与HTTP单例时限已另行改变，分轮结果和最终验证见[后置登记](checks/closeout/README.md)，不倒改原始清单。
 
@@ -74,4 +74,4 @@ flowchart TD
 
 2026-09-14，旧两页及十页打印 PDF 样本已按用户要求移入 Windows 回收站；当前阅读使用上述逐页说明及 12 张页图，原始清单中的路径及哈希保留为历史证据。恢复来源见[清理记录](../../../research/guide-pdf-cleanup-2026-09-14.md)。
 
-逐 Issue 和完整总图统一进入[交互审阅报告](../../../research/issue-review-2026-09-11/index.html#issue-412)。P4 更正与完整成本、P5–P7 费用和工作簿、#416 生产关口继续分别承接。C2 本期没有新增业务 `$grill`。
+逐 Issue 和完整总图统一进入[交互审阅报告](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/index.html#issue-412)。P4 更正与完整成本、P5–P7 费用和工作簿、#416 生产关口继续分别承接。C2 本期没有新增业务 `$grill`。

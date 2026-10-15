@@ -50,7 +50,7 @@ describe('aX05 结算迁移来源', () => {
       expect.objectContaining({ id: 'app-allocation', kind: 'application', amount: '800.00' }),
       expect.objectContaining({ sourceId: 'payment', parentId: 'application', kind: 'payment', amount: '300.00', attribution: 'exact' }),
     ]))
-    const source = await createCoreMigrationLocalSource({ isNative: () => false, isDemoActive: () => false, currentSchemaVersion: async () => 47, select: sql => db.select(sql) } as Parameters<typeof createCoreMigrationLocalSource>[0]).readSource()
+    const source = await createCoreMigrationLocalSource({ isDemoActive: () => false, currentSchemaVersion: async () => 47, select: sql => db.select(sql) } as Parameters<typeof createCoreMigrationLocalSource>[0]).readSource()
     expect(source.entities.owner_documents).toContainEqual(expect.objectContaining({ legacyId: 'penalty' }))
     const session = { workspaceId: 'workspace-default', actorId: 'actor-default', capabilities: [CORE_MIGRATION_CAPABILITY, 'auxiliary-contract:read', 'auxiliary-contract:write', 'other-settlement:read', 'other-settlement:write'] }
     const contracts = createAuxiliaryContractTestInstance()

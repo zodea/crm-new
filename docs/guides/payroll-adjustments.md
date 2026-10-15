@@ -1,6 +1,6 @@
 # 工资更正与实际收付
 
-> 本指南沿用 [P4 已确认规则](../research/issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)。OPT-02 接入正式磁盘、原编号恢复与冷读；核算更正仍只产生待处理差额，真实补退另行确认，原签名与实际原发放均保留。
+> 规则见[工资页面第六节](../rewrite/pages/subcontract-payroll.md#六独立更正与实际收付p4)。OPT-02 接入正式磁盘、原编号恢复与冷读；核算更正仍只产生待处理差额，真实补退另行确认，原签名与实际原发放均保留。
 
 原工资怎样核算和发放，见[工资与考勤工作台](./payroll-attendance.md)。本流程处理已发 A、C1、C2 工资的核算错误及其后续收付，保留原工资、原成员和原签收金额。
 

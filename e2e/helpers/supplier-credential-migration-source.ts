@@ -44,7 +44,6 @@ async function prepare() {
     await db.execute(`INSERT INTO supplier_credentials (id, supplier_id, category, file_name, file_path, added_at)
       VALUES ('http-credential-446-path-only', 'http-supplier-446-missing', '营业执照', '只有旧路径.pdf', 'C:/legacy-446/unavailable.pdf', ?)`, [at])
     const source = await createCoreMigrationLocalSource({
-      isNative: () => false,
       isDemoActive: () => false,
       currentSchemaVersion: async () => LATEST_VERSION,
       select: (sql, params) => db.select(sql, params),

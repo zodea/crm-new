@@ -14,7 +14,6 @@ defineProps<{
   pendingAttachments: ReadonlyArray<Readonly<PendingFileRef>>
   pendingRemoveIds: readonly string[]
   pendingRestoreIds: readonly string[]
-  desktopPicker: boolean
   title?: string
   note: string
   noteReadonly?: boolean
@@ -25,7 +24,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  pickNative: []
   files: [files: File[]]
   toggleExisting: [id: string]
   removePending: [localId: string]
@@ -48,24 +46,14 @@ function inputValue(event: Event): string {
 <template>
   <section id="section-attachments" class="panel scroll-mt-4 p-4">
     <SectionHeader :title="title ?? '附件与备注'" />
-    <button
-      v-if="!readonly && desktopPicker"
-      type="button"
-      class="mt-3 flex min-h-24 w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
-      data-testid="finance-attachment-picker"
-      @click="emit('pickNative')"
-    >
-      <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
-      <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">{{ pickerDescription ?? '选择附件并随资料一起保存' }}</span>
-    </button>
+
     <label
-      v-else-if="!readonly"
+      v-if="!readonly"
       class="mt-3 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
       <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">{{ pickerDescription ?? '浏览器保存文件元数据；桌面应用保存真实路径' }}</span>
+      <span class="mt-0.5 text-11px text-ink-faint">{{ pickerDescription ?? '浏览器保存文件元数据' }}</span>
       <input
         type="file"
         multiple

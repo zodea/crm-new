@@ -8,7 +8,6 @@ import type { TargetCostItemDraft } from './items'
 import type { TargetCostListRow } from './list'
 import { projectProblem, ProjectRepositoryProblem } from '../project/repository'
 
-export const TARGET_COST_READ_CAPABILITY = 'target-cost:read' as const
 export const TARGET_COST_WRITE_CAPABILITY = 'target-cost:write' as const
 export interface TargetCostQuery { origin: DataOriginDTO, includeDemo?: boolean }
 export interface TargetCostContext {

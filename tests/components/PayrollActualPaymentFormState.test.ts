@@ -6,7 +6,6 @@ import { usePayrollActualPaymentForm } from '~/composables/usePayrollActualPayme
 import { knownPayrollSigned, payrollAdjustmentFormRead, payrollAdjustmentOriginal } from '../helpers/payroll-adjustment-ui-fixture'
 
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))
-vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => false }))
 const route = reactive({ path: '/subcontract/payroll/payments/new', fullPath: '/subcontract/payroll/payments/new?origin=real&draftKey=payment-draft&adjustmentId=adjustment', params: {}, query: { origin: 'real', draftKey: 'payment-draft', adjustmentId: 'adjustment' } })
 const load = vi.fn()
 const confirm = vi.fn()

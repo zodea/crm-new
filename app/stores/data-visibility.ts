@@ -15,10 +15,6 @@ export const useDataVisibilityStore = defineStore('data-visibility', () => {
   const initialized = shallowRef(false)
   const includeDemo = computed(() => initialized.value && authorized.value && preference.value)
 
-  function commitPreference(next: boolean) {
-    preference.value = next && authorized.value
-  }
-
   async function initialize(
     authorize: () => Promise<boolean> = requestDemoWorkspaceAuthorization,
   ) {
@@ -56,7 +52,6 @@ export const useDataVisibilityStore = defineStore('data-visibility', () => {
     initialized,
     initialize,
     authorizeDemo,
-    commitPreference,
     reset,
   }
 })

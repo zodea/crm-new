@@ -105,24 +105,10 @@ vi.stubGlobal('useKitUI', () => ({
   undoToast: vi.fn(),
   error: vi.fn(),
 }))
-vi.stubGlobal('useDeliveryRecordStore', () => ({
-  loading: false,
-  byId: (id: string) => id === record.id ? record : undefined,
-  load: vi.fn().mockResolvedValue(undefined),
-  remove: vi.fn(),
-  undo: vi.fn(),
-}))
-vi.stubGlobal('useProjectStore', () => ({
-  byId: () => ({ id: 'project-1', name: '合和新城' }),
-  load: vi.fn().mockResolvedValue(undefined),
-}))
-vi.stubGlobal('useSupplierStore', () => ({
-  byId: () => ({ id: 'supplier-1', name: '广州建材有限公司' }),
-  load: vi.fn().mockResolvedValue(undefined),
-}))
 
 describe('deliveryRecordDetailScreen', () => {
   it('显示真实已归档和独立打印状态，不把归档冒充入库资格', async () => {
+    central()
     render(DeliveryRecordDetailScreen, { global })
     await flushPromises()
 
@@ -143,18 +129,14 @@ describe('deliveryRecordDetailScreen', () => {
 
   function central() {
     const load = vi.fn().mockResolvedValue(undefined)
-    const store = reactive({ mode: 'central', origin: 'real', canWrite: true, loading: false, load, byId: () => ({ ...record, version: '2', dataOrigin: 'real', projectName: '中央项目', supplierName: '中央分供方' }), remove: vi.fn(), undo: vi.fn() })
-    const project = vi.fn(() => ({ byId: () => ({ name: '同名本地项目' }), load: vi.fn() }))
-    const supplier = vi.fn(() => ({ byId: () => ({ name: '同名本地分供方' }), load: vi.fn() }))
+    const store = reactive({ origin: 'real', canWrite: true, loading: false, load, byId: () => ({ ...record, version: '2', dataOrigin: 'real', projectName: '中央项目', supplierName: '中央分供方' }), remove: vi.fn(), undo: vi.fn() })
     vi.stubGlobal('useDeliveryRecordStore', () => store)
-    vi.stubGlobal('useProjectStore', project)
-    vi.stubGlobal('useSupplierStore', supplier)
     vi.stubGlobal('useRoute', () => ({ params: { id: record.id }, query: {} }))
-    return { store, load, project, supplier }
+    return { store, load }
   }
 
-  it('中央详情读取当前名称和权限，不调用本地主档，读失败撤旧事实并可重试', async () => {
-    const { load, project, supplier } = central()
+  it('中央详情读取当前名称和权限，读失败撤旧事实并可重试', async () => {
+    const { load } = central()
     load.mockRejectedValueOnce(new Error('无当前关联分供方读取权限'))
     render(DeliveryRecordDetailScreen, { global })
     await flushPromises()
@@ -165,8 +147,6 @@ describe('deliveryRecordDetailScreen', () => {
     await flushPromises()
     expect(screen.getByRole('link', { name: '中央项目' }).getAttribute('href')).toContain('origin=real')
     expect(screen.getByRole('link', { name: '中央分供方' })).toBeTruthy()
-    expect(project).not.toHaveBeenCalled()
-    expect(supplier).not.toHaveBeenCalled()
   })
 
   it('缓存详情返回同一记录重验权限，挂起和失败时没有旧金额或编辑动作', async () => {

@@ -16,7 +16,6 @@ describe('甲方月度报量审定生命周期', () => {
     vi.stubGlobal('useOwnerDocumentStore', () => ({
       auditOwnerReport,
       transitionAcceptance,
-      loadDeductions: vi.fn().mockResolvedValue([]),
     }))
     vi.stubGlobal('useKitUI', () => ({
       confirm,

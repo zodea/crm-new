@@ -216,33 +216,23 @@ describe('甲方与分包单据整页表单状态', () => {
       pendingAttachments: ref([]),
       pendingRemoveIds: ref([]),
       pendingRestoreIds: ref([]),
-      desktopAttachmentPicker: false,
       dirty: ref(false),
       reset: vi.fn(),
       clearPending: vi.fn(),
       changes: () => ({ add: [], removeIds: [], restoreIds: [] }),
       handleFiles: vi.fn(),
-      pickNativeFiles: vi.fn(),
       toggleExisting: vi.fn(),
       removePending: vi.fn(),
       patchPending: vi.fn(),
     }))
     vi.stubGlobal('useOwnerDocumentLifecycle', () => ({
       loading: ref(false),
-      penaltyDeductions: ref([]),
-      deductionSettlementId: ref(null),
-      deductionAmount: ref(0),
-      deductionNote: ref(''),
       auditMode: ref(false),
       canApproveChange: ref(false),
-      canDeductPenalty: ref(false),
       acceptanceAction: ref(null),
-      refreshDeductions: vi.fn().mockResolvedValue(undefined),
-      fetchSettlements: vi.fn().mockResolvedValue([]),
       approveChange: vi.fn(),
       moveAcceptance: vi.fn(),
       auditReport: vi.fn(),
-      deductPenalty: vi.fn(),
     }))
   })
 

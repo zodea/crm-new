@@ -7,7 +7,6 @@ import { parseConstructionContractDetailQuery } from '~/lib/construction-contrac
 import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { payrollReadQuery, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { readRestoredCrewWorkerFact } from './restore-crew-worker'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
@@ -83,7 +82,7 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
     return restoreProblem('forbidden')
   const common = { capability, variant: 'detail' }
   if (family === 'material-quotation') {
-    if (origin !== 'real' || isDesktopRuntime())
+    if (origin !== 'real')
       return restoreProblem('not-connected')
     const dto = await repos.materialQuotations.list()
     checkRestoreAbort(options.signal)
