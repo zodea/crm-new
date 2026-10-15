@@ -33,7 +33,14 @@
 
 过期风险：转译缓存是实验特性，改动 Vite 插件、别名或升级依赖后若出现无法解释的旧行为，先清除再复现；预打包把 `node_modules` 中的包留作外部依赖、运行时现读，不计入内容键。缓存只含转译产物、迁移后空库与建库后空库，不保存任何用例写入的数据或业务状态。
 
-E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库，每案独占重置、接管和回读旅程。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。
+E2E 分三个项目（[E2E 配置](../../playwright.config.ts)）：
+
+| 项目 | 范围 | 服务与并发 |
+| --- | --- | --- |
+| `chromium`、`chromium-b` | 中央 spec 按文件名排序后交替分组 | 各连一个独立 dev server（默认端口 3100、3102，可用 `PLAYWRIGHT_PORT`、`PLAYWRIGHT_PORT_B` 改；第二个用 `.tmp/e2e-nuxt-b` 作构建与 Vite 缓存目录），组内 1 个 worker |
+| `production` | `production-*.spec.ts` | 各 spec 自启 `.output/server/index.mjs`、空闲端口与 mkdtemp 数据目录，3 个 worker；须先 `pnpm build` 并设 `CRM_PRODUCTION_ACCEPTANCE=1`，否则跳过；只选本项目时不启动 dev server |
+
+迁入验收会重置所在 dev server 的默认中央仓库，每案独占重置、接管和回读旅程，因此中央组内只用一个 worker；两组的中央仓库在各自进程内存中，互不可见；截图基线两组共用 `chromium` 文件名。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。设置 `PLAYWRIGHT_BASE_URL` 连接外部服务时只保留单个中央项目、1 个 worker。命令行选项目时用 `--project=<名称>`：`--project <名称>` 会把后面的文件路径也当作项目名。
 
 ## 模块入口
 
