@@ -6,7 +6,7 @@ import {
 } from '~/lib/project-supplier/repository'
 import { assertProjectSupplierWriteCapability } from '../../server/utils/project-supplier-command-request'
 import { createProjectSupplierCommandTestInstance } from '../../server/utils/project-supplier-command-test-instance'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 
 const session = {
   workspaceId: 'workspace-281',
@@ -46,7 +46,7 @@ const context = {
 describe('项目分供方中央导入命令', () => {
   it('原子创建正式分供方、合作关系与文件元数据，重复 commandId 不重复写入', async () => {
     let sequence = 0
-    const suppliers = createSupplierCommandTestInstance()
+    const suppliers = createSupplierCommandService()
     const removed: Array<{ ids: string[], sessionId?: string | null }> = []
     const instance = createProjectSupplierCommandTestInstance({
       createId: prefix => `${prefix}-${++sequence}`,

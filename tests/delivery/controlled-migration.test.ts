@@ -28,7 +28,6 @@ describe('送货完整受控迁移', () => {
       await db.execute('INSERT INTO file_refs(id,owner_type,owner_id,file_name,file_size,mime_type,category) VALUES(\'orphan-source\',\'delivery_record\',\'lost-head\',\'原件.pdf\',12,\'application/pdf\',\'source\')')
       await db.execute('INSERT INTO operation_logs(id,table_name,record_id,action) VALUES(\'orphan-audit\',\'delivery_records\',\'lost-head\',\'update\')')
       const reader = createCoreMigrationLocalSource({
-        isNative: () => false,
         isDemoActive: () => false,
         currentSchemaVersion: async () => LATEST_VERSION,
         select: (sql, params) => db.select(sql, params),
@@ -74,7 +73,6 @@ describe('送货完整受控迁移', () => {
       await db.execute('INSERT INTO file_payloads(file_ref_id,encoding,content) VALUES(\'delivery-file-retired\',\'base64\',?)', [payload])
       await db.execute('INSERT INTO operation_logs(id,table_name,record_id,action,before_data,operator) VALUES(\'delivery-audit-old\',\'delivery_records\',\'delivery-old\',\'update\',\'unparseable legacy snapshot\',\'旧经办\')')
       const source = await createCoreMigrationLocalSource({
-        isNative: () => false,
         isDemoActive: () => false,
         currentSchemaVersion: async () => LATEST_VERSION,
         select: (sql, params) => db.select(sql, params),

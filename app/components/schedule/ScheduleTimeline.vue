@@ -5,7 +5,6 @@ import { useNow } from '@vueuse/core'
 import { TreeItem, TreeRoot } from 'reka-ui'
 import { computed, shallowRef, watch } from 'vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { buildScheduleBindingLocation } from '~/lib/schedule/binding-navigation'
 import {
   calendarDays,
@@ -84,7 +83,6 @@ const emit = defineEmits<{
 const ROW_HEIGHT = 34
 
 const scheduleStore = useScheduleStore()
-const desktop = isDesktopRuntime()
 const memoryKey = computed(() => `${props.origin ?? 'real'}:${props.snapshot.id}`)
 const mobileView = shallowRef<MobileView>('wbs')
 const systemNow = useNow({ interval: 60_000 })
@@ -643,8 +641,8 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                 <template v-if="item.value.kind === 'group' && item.value.group.scopeBasis === 'provisional'">
                   <span class="pending-contract-chip">待绑定合同</span>
                   <NuxtLink
-                    v-if="mode === 'workspace' && !readonly && (desktop || origin !== 'demo') && contractBindingAvailable !== false"
-                    :to="desktop ? `/schedule/${item.value.group.projectId}/bind/${item.value.group.id}` : buildScheduleBindingLocation(item.value.group.projectId, item.value.group.id, origin ?? 'real', returnContext)"
+                    v-if="mode === 'workspace' && !readonly && (origin !== 'demo') && contractBindingAvailable !== false"
+                    :to="buildScheduleBindingLocation(item.value.group.projectId, item.value.group.id, origin ?? 'real', returnContext)"
                     class="binding-entry"
                     aria-label="绑定施工合同"
                     @click.stop
@@ -652,12 +650,12 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                     <span class="i-lucide-link-2" aria-hidden="true" />
                     <span>绑定</span>
                   </NuxtLink>
-                  <button v-else-if="mode === 'workspace' && !readonly && !desktop && origin === 'real' && contractBindingAvailable === false" type="button" class="binding-entry" aria-label="绑定施工合同" disabled title="正式施工合同与BOQ来源尚未接齐，新的绑定等待范围决定">
+                  <button v-else-if="mode === 'workspace' && !readonly && origin === 'real' && contractBindingAvailable === false" type="button" class="binding-entry" aria-label="绑定施工合同" disabled title="正式施工合同与BOQ来源尚未接齐，新的绑定等待范围决定">
                     绑定
                   </button>
                 </template>
                 <NuxtLink
-                  v-if="mode === 'workspace' && !desktop && origin !== 'demo' && item.value.kind === 'group' && item.value.group.contractId"
+                  v-if="mode === 'workspace' && origin !== 'demo' && item.value.kind === 'group' && item.value.group.contractId"
                   :to="buildScheduleBindingLocation(item.value.group.projectId, item.value.group.id, origin ?? 'real', returnContext)"
                   class="binding-entry"
                   aria-label="查看合同依据"

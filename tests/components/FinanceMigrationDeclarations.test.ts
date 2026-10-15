@@ -7,7 +7,6 @@ import FinanceMigrationPanel from '~/components/migration/FinanceMigrationPanel.
 import { CENTRAL_FINANCE_KINDS, FINANCE_CAPABILITIES, FINANCE_IMPORT_CAPABILITY } from '~/lib/finance/central-contract'
 import { createReadMeta, withReadMeta } from '../../server/utils/read-meta'
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/lib/db/native-snapshot', () => ({ inspectNativeMigrationSnapshot: async (bytes: Uint8Array) => ({ sha256: createHash('sha256').update(bytes).digest('hex'), schemaVersion: 60 }) }))
 const actor = { workspaceId: 'migration-workspace', actorId: 'migration-owner', capabilities: [FINANCE_IMPORT_CAPABILITY, ...FINANCE_CAPABILITIES] }
 function envelope(operation: 'migration' | 'preflight', body: object) {

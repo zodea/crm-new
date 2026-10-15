@@ -3,7 +3,6 @@ import type { FormAttachmentChanges, MasterDataSaveAction, TargetCostFormDraft }
 import type { TargetCostAction, TargetCostCommand, TargetCostCommandResult, TargetCostDetailRead, TargetCostFormRead, TargetCostListRead, TargetCostPending } from '~/lib/target-cost/central-contract'
 import type { BudgetFileChanges } from '~/lib/target-cost/central-files'
 import type { DataOriginDTO } from '~/types/read-model'
-import { isTauri } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
@@ -149,8 +148,6 @@ export const useTargetCostStore = defineStore('target-cost', () => {
     return send(command)
   }
   async function loadForm(id: string | null, origin: DataOriginDTO = 'real', draftKey?: string): Promise<TargetCostFormRead> {
-    if (isTauri())
-      return localTargetCostForm({ workspaceId: 'tauri', actorId: 'local', origin: 'real', sourceVersion: 'local', capabilities: ['target-cost:read', 'target-cost:write'] }, id, draftKey)
     adoptLegacyPending()
     if (origin === 'demo') {
       const authorized = await repositories().list({ origin, includeDemo: useDataVisibilityStore().includeDemo })
@@ -182,8 +179,7 @@ export const useTargetCostStore = defineStore('target-cost', () => {
     finally { active.value = new Set([...active.value].filter(id => id !== descriptor.commandId)) }
   }
   function nativeOnly() {
-    if (!isTauri())
-      throw targetCostProblem('forbidden', '正式浏览器预算必须从中央版本读取后提交')
+    throw targetCostProblem('forbidden', '正式浏览器预算必须从中央版本读取后提交')
   }
   function remove(read: Read): Promise<TargetCostCommandResult>
   function remove(id: string): ReturnType<typeof local.remove>

@@ -4,7 +4,6 @@ import type { HomeProjectReference, HomeProjectScheduleRead } from '~/lib/home/p
 import type { ScheduleTaskView } from '~/lib/schedule/read-model'
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, watch } from 'vue'
 import { summarizeHomeScheduleCoverage } from '~/lib/home/dashboard'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 import { buildQuantityDrillLocation, scheduleFilterQuery, scheduleReturnContextQuery } from '~/lib/schedule/navigation'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -16,7 +15,6 @@ const router = useRouter()
 const store = useHomeDashboardStore()
 const visibility = useDataVisibilityStore()
 const { error: toastError, warning } = useKitUI()
-const desktop = isDesktopRuntime()
 const today = toLocalDateInputValue()
 const current = shallowRef<HomeProjectScheduleRead | null>(null)
 const initialized = shallowRef(false)
@@ -27,7 +25,7 @@ const failedProject = shallowRef<HomeProjectReference | null>(null)
 let latestRequest = 0
 let wasDeactivated = false
 
-const includeDemo = computed(() => !desktop && visibility.includeDemo)
+const includeDemo = computed(() => visibility.includeDemo)
 const projectOptions = computed(() => store.catalog.map(project => ({
   id: project.key,
   name: project.name,
@@ -72,7 +70,7 @@ function routeProject() {
 }
 
 async function syncRoute(project: HomeProjectReference) {
-  const origin = desktop ? '' : project.origin
+  const origin = project.origin
   if (queryText(route.query.project) === project.id && queryText(route.query.origin) === origin)
     return
   await router.replace({ query: { ...route.query, project: project.id, origin: origin || undefined, group: undefined, task: undefined } })
@@ -168,7 +166,7 @@ function selectTask(task: ScheduleTaskView) {
     warning(`「${task.name}」为手动填报工序，首页仅提供只读查看`)
     return
   }
-  void router.push(buildQuantityDrillLocation('home', group, task, desktop ? undefined : current.value?.project.origin, scheduleFilterQuery(route.query)))
+  void router.push(buildQuantityDrillLocation('home', group, task, current.value?.project.origin, scheduleFilterQuery(route.query)))
 }
 
 watch(() => [route.query.project, route.query.origin], () => {
@@ -228,7 +226,7 @@ onActivated(() => {
       :today="today"
       :selected-project-id="current?.project.id"
       :selected-project-name="current?.project.name"
-      :selected-origin="desktop ? undefined : current?.project.origin"
+      :selected-origin="(current?.project.origin)"
       :source-description="current?.reason"
       :error-description="error"
       :coverage-title="coverage.title"

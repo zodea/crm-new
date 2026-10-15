@@ -5,21 +5,17 @@ import { useDeliveryReferences } from '~/composables/useDeliveryReferences'
 
 function setup() {
   const load = vi.fn().mockResolvedValue(undefined)
-  const central = reactive({ mode: 'central', origin: 'real', canWrite: true, load, context: { projects: [{ id: 'p', name: '中央项目', dataOrigin: 'real' }], suppliers: [{ id: 's', name: '中央分供方', dataOrigin: 'real', aliases: ['简称'] }] }, list: [{ projectId: 'p', rawSiteText: '北门', dataOrigin: 'real', currentValuesConfirmed: true, archived: true }] })
-  const locals = vi.fn(() => ({ list: [{ id: 'local', name: '中央项目', aliases: [] }], load: vi.fn(), byId: vi.fn() }))
+  const central = reactive({ origin: 'real', canWrite: true, load, context: { projects: [{ id: 'p', name: '中央项目', dataOrigin: 'real' }], suppliers: [{ id: 's', name: '中央分供方', dataOrigin: 'real', aliases: ['简称'] }] }, list: [{ projectId: 'p', rawSiteText: '北门', dataOrigin: 'real', currentValuesConfirmed: true, archived: true }] })
   const draft = { id: 's', name: '中央分供方', aliases: ['简称'], contactName: '既有经办' }
   const commands = { createSession: vi.fn(() => ({ baseVersion: 'v3' })), hydrate: vi.fn().mockResolvedValue({ draft }), saveForm: vi.fn().mockResolvedValue({ id: 's' }) }
   vi.stubGlobal('useDeliveryRecordStore', () => central)
-  vi.stubGlobal('useProjectStore', locals)
-  vi.stubGlobal('useProjectAliasStore', locals)
-  vi.stubGlobal('useSupplierStore', locals)
   vi.stubGlobal('useSupplierCommandStore', () => commands)
   let api!: ReturnType<typeof useDeliveryReferences>
   const view = mount(defineComponent({ setup() {
     api = useDeliveryReferences()
     return () => h('div')
   } }))
-  return { view, api, central, locals, load, commands, draft }
+  return { view, api, central, load, commands, draft }
 }
 afterEach(() => vi.unstubAllGlobals())
 
@@ -39,12 +35,11 @@ describe('送货处理区中央资料与独立别名保存', () => {
     view.unmount()
   })
   it('只从当前中央资料和人工确认送货派生候选，读取失败立即撤下候选', async () => {
-    const { api, locals, load, view } = setup()
+    const { api, load, view } = setup()
     await flushPromises()
     expect(api.projects.value).toEqual([{ id: 'p', name: '中央项目', dataOrigin: 'real' }])
     expect(api.projectCandidates.value).toEqual([{ id: 'p', name: '中央项目', aliases: ['北门'] }])
     expect(api.suppliers.value[0]?.aliases).toEqual(['简称'])
-    expect(locals).not.toHaveBeenCalled()
     load.mockRejectedValueOnce(new Error('当前中央权限已撤销'))
     await api.reload()
     expect(api.projects.value).toEqual([])

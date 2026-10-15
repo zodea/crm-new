@@ -15,7 +15,7 @@ const bytes = new TextEncoder().encode('%PDF-1.7\ncomplete original\n%%EOF')
 const original = { assetId: 'asset', fileName: '完整原件.pdf', mimeType: 'application/pdf', fileSize: bytes.length, sha256: 'hash', bytes }
 beforeEach(() => {
   setActivePinia(createPinia())
-  runtime.archive = reactive({ mode: 'central', origin: 'real', list: [record('a'), record('b')], pendingPrintRecords: [record('a'), record('b')], load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn().mockResolvedValue(original) })
+  runtime.archive = reactive({ origin: 'real', list: [record('a'), record('b')], pendingPrintRecords: [record('a'), record('b')], load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn().mockResolvedValue(original) })
 })
 
 describe('中央送货打印原件', () => {
@@ -41,8 +41,8 @@ describe('中央送货打印原件', () => {
   it('共用原件每个逻辑 owner 都重验，第二次打开不借第一次缓存绕过撤权', async () => {
     const store = useDeliveryStore()
     await store.loadPendingPrintQueue()
-    expect(store.pendingPrintFiles).toHaveLength(1)
-    const id = store.pendingPrintFiles[0]!.id
+    expect(store.files.filter(file => file.printDisposition === 'pending')).toHaveLength(1)
+    const id = store.files.filter(file => file.printDisposition === 'pending')[0]!.id
     expect([...new Uint8Array(await (await store.loadFileForPrint(id)).arrayBuffer())]).toEqual([...bytes])
     expect(runtime.archive.loadSourceFile).toHaveBeenCalledTimes(2)
     runtime.archive.loadSourceFile.mockRejectedValueOnce(new Error('权限已撤销'))
@@ -54,15 +54,15 @@ describe('中央送货打印原件', () => {
     runtime.archive.list = runtime.archive.pendingPrintRecords
     const store = useDeliveryStore()
     await store.loadPendingPrintQueue()
-    expect(store.pendingPrintFiles).toHaveLength(3)
-    const missing = store.pendingPrintFiles.find(file => file.archivedRecordIds.includes('missing'))!
+    expect(store.files.filter(file => file.printDisposition === 'pending')).toHaveLength(3)
+    const missing = store.files.filter(file => file.printDisposition === 'pending').find(file => file.archivedRecordIds.includes('missing'))!
     await expect(store.loadFileForPrint(missing.id)).rejects.toThrow('原件')
   })
 
   it('刷新移除已排除的队列，来源切换立即隐藏旧事实，迟到正文不得返回', async () => {
     const store = useDeliveryStore()
     await store.loadPendingPrintQueue()
-    const id = store.pendingPrintFiles[0]!.id
+    const id = store.files.filter(file => file.printDisposition === 'pending')[0]!.id
     let finish!: (value: typeof original) => void
     runtime.archive.loadSourceFile.mockImplementationOnce(() => new Promise(resolve => finish = resolve))
     const opening = store.loadFileForPrint(id)
@@ -74,6 +74,6 @@ describe('中央送货打印原件', () => {
     runtime.archive.origin = 'real'
     runtime.archive.pendingPrintRecords = []
     await store.loadPendingPrintQueue()
-    expect(store.pendingPrintFiles).toEqual([])
+    expect(store.files.filter(file => file.printDisposition === 'pending')).toEqual([])
   })
 })

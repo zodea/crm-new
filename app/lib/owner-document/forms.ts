@@ -123,17 +123,6 @@ export interface OwnerReportAuditDraft {
   }>
 }
 
-export interface PenaltyDeductionView {
-  id: string
-  penaltyId: string
-  settlementId: string
-  settlementNo: string
-  settlementName: string
-  amount: number
-  note: string
-  createdAt: string
-}
-
 export interface OwnerDocumentContractSummary {
   contractAmount: number
   priorSettlementAmount: number
@@ -1384,48 +1373,6 @@ export async function listOwnerDocumentContractOptions(
   }))
 }
 
-export async function listOwnerDocumentSettlementOptions(
-  projectId: string,
-  supplierId: string,
-  contractId: string,
-  keyword: string,
-): Promise<OwnerDocumentLookupOption[]> {
-  if (!projectId)
-    return []
-  const pattern = `%${keyword.trim()}%`
-  const rows = await select<{
-    id: string
-    no: string
-    name: string
-    total_amount: number
-  }>(`
-    SELECT id, no, name, total_amount
-    FROM expenditure_settlements
-    WHERE deleted_at IS NULL
-      AND biz_type = '分包'
-      AND status = 'confirmed'
-      AND project_id = ?
-      AND (? = '' OR supplier_id = ?)
-      AND (? = '' OR contract_id = ?)
-      AND (no LIKE ? OR name LIKE ?)
-    ORDER BY settlement_date DESC, created_at DESC
-    LIMIT 50
-  `, [
-    projectId,
-    supplierId,
-    supplierId,
-    contractId,
-    contractId,
-    pattern,
-    pattern,
-  ])
-  return rows.map(row => ({
-    id: row.id,
-    label: row.name || row.no,
-    hint: `${row.no || '未编号'} · ¥${numberValue(row.total_amount).toLocaleString('zh-CN')}`,
-  }))
-}
-
 export async function loadOwnerDocumentForm(
   kind: OwnerDocumentKind,
   id: string,
@@ -2160,111 +2107,4 @@ export async function auditOwnerReport(
       WHERE id = ?
     `, [auditedTotal, id]))
   })
-}
-
-export async function deductProjectPenalty(
-  penaltyId: string,
-  settlementId: string,
-  amount: number,
-  note = '',
-): Promise<void> {
-  await withTransaction(async (tx) => {
-    if (!Number.isFinite(amount) || amount <= 0)
-      throw new Error('抵扣金额必须大于 0')
-    const [penalty] = await tx.select<{
-      amount: number
-      contract_id: string | null
-      projectId: string
-      status: string
-      supplier_id: string | null
-    }>(`
-      SELECT amount, contract_id, projectId, status, supplier_id
-      FROM penalty_records
-      WHERE id = ? AND deleted_at IS NULL
-    `, [penaltyId])
-    if (!penalty)
-      throw new Error('项目罚扣不存在或已删除')
-    if (penalty.status === 'draft')
-      throw new Error('草稿罚扣不能执行结算抵扣')
-    const [settlement] = await tx.select<{
-      biz_type: string
-      contract_id: string | null
-      project_id: string | null
-      status: string
-      supplier_id: string | null
-      total_amount: number
-    }>(`
-      SELECT project_id, supplier_id, contract_id, total_amount, biz_type, status
-      FROM expenditure_settlements
-      WHERE id = ? AND deleted_at IS NULL
-    `, [settlementId])
-    if (!settlement)
-      throw new Error('支出结算不存在或已删除')
-    if (settlement.biz_type !== '分包' || settlement.status !== 'confirmed')
-      throw new Error('项目罚扣只能抵扣已确认分包结算')
-    if (settlement.project_id !== penalty.projectId)
-      throw new Error('罚扣与支出结算不属于同一项目')
-    if (penalty.supplier_id && settlement.supplier_id !== penalty.supplier_id)
-      throw new Error('罚扣与支出结算的分供方不一致')
-    if (penalty.contract_id && settlement.contract_id !== penalty.contract_id)
-      throw new Error('罚扣与支出结算的合同不一致')
-    const [penaltyTotal] = await tx.select<{ amount: number }>(`
-      SELECT COALESCE(SUM(amount), 0) AS amount
-      FROM penalty_settlement_deductions
-      WHERE penalty_id = ? AND deleted_at IS NULL
-    `, [penaltyId])
-    if (numberValue(penaltyTotal?.amount) + amount > numberValue(penalty.amount) + 0.0001)
-      throw new Error('抵扣金额超过罚扣剩余金额')
-    const [settlementTotal] = await tx.select<{ amount: number }>(`
-      SELECT COALESCE(SUM(amount), 0) AS amount
-      FROM penalty_settlement_deductions
-      WHERE settlement_id = ? AND deleted_at IS NULL
-    `, [settlementId])
-    if (numberValue(settlementTotal?.amount) + amount > numberValue(settlement.total_amount) + 0.0001)
-      throw new Error('抵扣金额超过支出结算可抵扣金额')
-    const deductionId = generateId('penalty_deduction')
-    await tx.execute(`
-      INSERT INTO penalty_settlement_deductions (
-        id, penalty_id, settlement_id, amount, note
-      )
-      VALUES (?, ?, ?, ?, ?)
-    `, [deductionId, penaltyId, settlementId, amount, note.trim()])
-    await logCreate(tx, 'penalty_settlement_deductions', deductionId)
-    const nextTotal = round2(numberValue(penaltyTotal?.amount) + amount)
-    await withUpdateLog(tx, 'penalty_records', penaltyId, () => tx.execute(`
-      UPDATE penalty_records
-      SET status = ?, deductedAt = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `, [
-      nextTotal >= numberValue(penalty.amount) ? 'deducted' : 'pending',
-      nextTotal >= numberValue(penalty.amount) ? new Date().toISOString() : null,
-      penaltyId,
-    ]))
-  })
-}
-
-export async function loadPenaltyDeductions(
-  penaltyId: string,
-): Promise<PenaltyDeductionView[]> {
-  const rows = await select<Record<string, unknown>>(`
-    SELECT deduction.*, settlement.no AS settlement_no,
-           settlement.name AS settlement_name
-    FROM penalty_settlement_deductions deduction
-    JOIN expenditure_settlements settlement
-      ON settlement.id = deduction.settlement_id
-     AND settlement.deleted_at IS NULL
-    WHERE deduction.penalty_id = ?
-      AND deduction.deleted_at IS NULL
-    ORDER BY deduction.created_at DESC, deduction.id DESC
-  `, [penaltyId])
-  return rows.map(row => ({
-    id: text(row.id),
-    penaltyId: text(row.penalty_id),
-    settlementId: text(row.settlement_id),
-    settlementNo: text(row.settlement_no),
-    settlementName: text(row.settlement_name),
-    amount: numberValue(row.amount),
-    note: text(row.note),
-    createdAt: text(row.created_at),
-  }))
 }

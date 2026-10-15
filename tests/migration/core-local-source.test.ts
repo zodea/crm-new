@@ -315,7 +315,6 @@ function dependencies(
   overrides: Partial<CoreMigrationLocalSourceDependencies> = {},
 ): CoreMigrationLocalSourceDependencies {
   return {
-    isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: vi.fn().mockResolvedValue(LATEST_VERSION),
     select: vi.fn(async (sql: string) => sourceRows(sql)),
@@ -909,16 +908,6 @@ describe('core migration local source', () => {
       code: 'demo-source-not-allowed',
     })
     expect(deps.select).not.toHaveBeenCalled()
-  })
-
-  it('tauri 桌面端不读取浏览器 IndexedDB 迁移源', async () => {
-    const deps = dependencies({ isNative: () => true })
-    const source = createCoreMigrationLocalSource(deps)
-
-    await expect(source.readSource()).rejects.toMatchObject({ code: 'browser-only' })
-    await expect(source.createBackup('a'.repeat(64))).rejects.toMatchObject({ code: 'browser-only' })
-    expect(deps.select).not.toHaveBeenCalled()
-    expect(deps.loadProductionSnapshot).not.toHaveBeenCalled()
   })
 
   it('flushes the production connection before creating an immutable backup', async () => {

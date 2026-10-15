@@ -19,7 +19,6 @@ import {
   selectVisibleSql,
   visibleCond,
 } from '~/lib/db/soft-delete'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 
 export interface Contract {
   id: string
@@ -269,11 +268,6 @@ export const useContractStore = defineStore('contract', () => {
     return list.value.find(c => c.id === id)
   }
 
-  /** kind 切片(三列表/项目详情子表共用):施工 | 分包 | 材采 */
-  function byKind(kind: ContractKind) {
-    return list.value.filter(c => c.kind === kind)
-  }
-
   function auxByKind(kind: ContractAuxListKind) {
     return auxLists.value[kind] ?? []
   }
@@ -374,7 +368,7 @@ export const useContractStore = defineStore('contract', () => {
     auxErrors.value = { ...auxErrors.value, [kind]: '' }
     try {
       let rows: ContractAuxRow[]
-      if ((kind === 'other_expense' || kind === 'company_expense') && typeof window !== 'undefined' && !isDesktopRuntime())
+      if ((kind === 'other_expense' || kind === 'company_expense') && typeof window !== 'undefined')
         throw new Error('浏览器辅助合同只从中央 Repository 读取')
       if (kind === 'other_expense') {
         rows = await select<ContractAuxRow>(`
@@ -525,7 +519,6 @@ export const useContractStore = defineStore('contract', () => {
     load,
     loadAux,
     byId,
-    byKind,
     auxByKind,
     auxLoadingFor,
     auxError,

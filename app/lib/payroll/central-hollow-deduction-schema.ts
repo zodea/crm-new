@@ -10,7 +10,6 @@ export const PAYROLL_HOLLOW_DEDUCTION_COLUMNS = {
 
 export type PayrollHollowDeductionTable = keyof typeof PAYROLL_HOLLOW_DEDUCTION_COLUMNS
 export const PAYROLL_HOLLOW_DEDUCTION_TABLES = Object.keys(PAYROLL_HOLLOW_DEDUCTION_COLUMNS) as PayrollHollowDeductionTable[]
-export const PAYROLL_HOLLOW_DEDUCTION_SCHEMA_VERSION = 1 as const
 
 /**
  * JSON原文分别为PolicyRevision、Start、Adoption，均严格逐字段与SQL及命令回执交叉证明。

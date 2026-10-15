@@ -2,7 +2,6 @@ import type {
   CustomerDetailReadDTO,
   CustomerListPageDTO,
   CustomerListQueryDTO,
-  CustomerReceiptDetailReadDTO,
 } from '~/lib/customer/repository'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +21,7 @@ const query: CustomerListQueryDTO = {
 describe('客户中央 stores', () => {
   let uuid = 0
   const repositories = {
-    customerRead: { list: vi.fn(), get: vi.fn(), getReceipt: vi.fn() },
+    customerRead: { list: vi.fn(), get: vi.fn() },
     customerCommands: { context: vi.fn(), loadForm: vi.fn(), execute: vi.fn() },
   }
 
@@ -56,24 +55,17 @@ describe('客户中央 stores', () => {
     expect(store.detailState.kind).toBe('ready')
   })
 
-  it('跨实体加载失败时不在新地址下泄露上一条客户或收款详情', async () => {
+  it('跨实体加载失败时不在新地址下泄露上一条客户详情', async () => {
     const customerA = { customer: { id: 'customer-a' } } as CustomerDetailReadDTO
-    const receiptA = { receipt: { receipt: { id: 'receipt-a' } } } as CustomerReceiptDetailReadDTO
     repositories.customerRead.get
       .mockResolvedValueOnce(customerA)
       .mockRejectedValueOnce(new CustomerRepositoryProblem(customerProblem('unavailable', '客户 B 加载失败', true)))
-    repositories.customerRead.getReceipt
-      .mockResolvedValueOnce(receiptA)
-      .mockRejectedValueOnce(new CustomerRepositoryProblem(customerProblem('unavailable', '收款 B 加载失败', true)))
     const store = useCustomerReadStore()
 
     await store.loadDetail({ id: 'customer-a', origin: 'real', includeDemo: false })
     await store.loadDetail({ id: 'customer-b', origin: 'real', includeDemo: false })
-    await store.loadReceipt({ id: 'receipt-a', customerId: 'customer-a', origin: 'demo', includeDemo: true })
-    await store.loadReceipt({ id: 'receipt-b', customerId: 'customer-b', origin: 'demo', includeDemo: true })
 
     expect(store.detailState).toMatchObject({ kind: 'unavailable', previous: null })
-    expect(store.receiptState).toMatchObject({ kind: 'unavailable', previous: null })
   })
 
   it('命令使用会话身份和服务端版本，并记录最新写入供读模型刷新', async () => {

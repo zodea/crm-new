@@ -12,7 +12,6 @@ import { migrations, runMigrations } from '~/lib/db/migrations'
 import { openBrowserSqlite } from '~/lib/db/sqljs'
 import { useProductionAccessStore } from '~/stores/production-access'
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 // The browser reads actual SQLite bytes; Native export is outside this component path.
 vi.mock('~/lib/db/connection', () => ({ backupNativeDatabase: vi.fn() }))
 

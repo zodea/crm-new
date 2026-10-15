@@ -48,7 +48,6 @@
 | [tests/components/FinanceListScreen.test.ts](../../../tests/components/FinanceListScreen.test.ts) | 组件（jsdom） | 原收款来源、工具栏及分页筛选，未知合计与只读重读 |
 | [tests/components/PaymentApplicationInsightPanel.test.ts](../../../tests/components/PaymentApplicationInsightPanel.test.ts) | 组件（jsdom） | 付款申请洞察说明 |
 | [tests/components/PaymentApprovalReturn.test.ts](../../../tests/components/PaymentApprovalReturn.test.ts) | 组件（jsdom） | 编辑保存后返回同 ID 缓存详情，批复和余额读取最新值；对应回票指标、真实零及未知显示 |
-| [tests/components/PaymentManagementRefresh.test.ts](../../../tests/components/PaymentManagementRefresh.test.ts) | 组件（jsdom） | 付款管理快照刷新 |
 | [tests/components/PaymentManagementToolbar.test.ts](../../../tests/components/PaymentManagementToolbar.test.ts) | 组件（jsdom） | payment management toolbar |
 | [tests/components/ReceiptDetailScreen.test.ts](../../../tests/components/ReceiptDetailScreen.test.ts) | 组件（jsdom） | 收款只读详情的当前来源 |
 | [tests/components/ReceiptFiles.test.ts](../../../tests/components/ReceiptFiles.test.ts) | 组件（jsdom） | 收款附件预览与下载生命周期 |
@@ -62,7 +61,6 @@
 | [tests/browser/FinanceOriginalRecovery.test.ts](../../../tests/browser/FinanceOriginalRecovery.test.ts) | 实际 Vue 页面与浏览器文件操作 | 五档布局、下载原字节、已保存后读回失败不重放与焦点恢复；隔离 Repository 不证明生产接管 |
 | [tests/browser/components/FinanceMigration.browser.test.ts](../../../tests/browser/components/FinanceMigration.browser.test.ts) | 实际迁入 Vue 页面与 Chromium | 真实 Native SQLite 文件、显式关系与原件补齐、原编号未知及只读恢复、失权迟到隔离、五档布局与键盘；生产迁入持久化另由实际磁盘测试验证 |
 | [tests/browser/FinancePartySelection.test.ts](../../../tests/browser/FinancePartySelection.test.ts) | 实际 Vue 字段、LookupSelect 与 Vxe 表格 | 工人／分供方明示选择、原费用引用、键鼠及清空焦点、依赖禁用和表内横滚；数据库写入另由领域测试验证 |
-| [tests/browser/FinanceNativeFlows.test.ts](../../../tests/browser/FinanceNativeFlows.test.ts) | 实际 Vue 表单、Vxe 表格与隔离 SQLite | Native 独立表单草稿、公司报销明细与原件、付款分摊及人工支付确认；不证明正式 F3 接管 |
 
 ## Playwright E2E
 

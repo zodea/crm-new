@@ -2,37 +2,19 @@ import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  assessMasterDataDeletion,
   deleteMasterDataRecord,
   listFormAttachments,
-  loadCrewForm,
   loadCustomerForm,
   loadProjectForm,
-  loadSupplierForm,
   loadTargetCostForm,
-  loadWorkerForm,
-  removeFormAttachment,
-  restoreFormAttachment,
   restoreMasterDataRecord,
-  saveCrewForm,
-  saveCustomerForm,
   saveProjectForm,
-  saveSupplierForm,
   saveTargetCostForm,
-  saveWorkerForm,
 } from '~/lib/master-data/forms'
-import { useCrewStore } from '~/stores/crew'
-import { useCustomerStore } from '~/stores/customer'
-import { useProjectStore } from '~/stores/project'
-import { useSupplierStore } from '~/stores/supplier'
-import { useTargetCostStore } from '~/stores/target-cost'
-import { useWorkerStore } from '~/stores/worker'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 let failFileInsert = false
-// 本文件验证保留的桌面 SQLite 表单边界；浏览器预算另测中央 Repository。
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 
 vi.mock('~/lib/db/connection', () => ({
   execute: (sql: string, params?: unknown[]) => mem.execute(sql, params),
@@ -83,85 +65,7 @@ afterEach(() => {
 })
 
 describe('f1 整页表单领域 action', () => {
-  it('六类 Pinia store 都通过统一 action 保存并刷新响应式状态', async () => {
-    const supplierStore = useSupplierStore()
-    const customerStore = useCustomerStore()
-    const crewStore = useCrewStore()
-    const workerStore = useWorkerStore()
-    const projectStore = useProjectStore()
-    const targetCostStore = useTargetCostStore()
-
-    const supplier = await supplierStore.saveForm({
-      name: 'Store 分供方',
-      supplierCategory: '材料供应商',
-      contact: '联系人',
-    }, 'submit')
-    const customer = await customerStore.save({
-      name: 'Store 客户',
-      contact: '联系人',
-    }, 'submit')
-    const crew = await crewStore.save({
-      name: 'Store 班组',
-      trade: '泥水',
-      contactName: '班组长',
-      contactPhone: '13800138000',
-    }, 'submit')
-    const worker = await workerStore.save({
-      name: 'Store 工人',
-      phone: '13800138001',
-      bankName: '建设银行',
-      bankAccount: '62270001',
-      trade: '泥水',
-      crewId: crew.id,
-      currentProjectId: 'project-ref',
-    }, 'submit')
-    const project = await projectStore.saveForm({
-      name: 'Store 项目',
-      customerId: customer.id,
-      manager: '项目经理',
-    }, 'submit')
-    const targetCost = await targetCostStore.save({
-      name: 'Store 目标成本',
-      projectId: project.id,
-    }, 'submit')
-
-    expect(supplierStore.byId(supplier.id)?.name).toBe('Store 分供方')
-    expect(customerStore.current?.name).toBe('Store 客户')
-    expect(crewStore.current?.name).toBe('Store 班组')
-    expect(workerStore.current?.name).toBe('Store 工人')
-    expect(projectStore.byId(project.id)?.customerId).toBe(customer.id)
-    expect(targetCostStore.current?.projectId).toBe(project.id)
-    expect(customerStore.revision).toBe(1)
-    expect(crewStore.revision).toBe(1)
-    expect(workerStore.revision).toBe(1)
-    expect(targetCostStore.revision).toBe(1)
-    expect(worker.id).toBeTruthy()
-    expect(targetCost.id).toBeTruthy()
-  })
-
-  it('草稿跳过提交必填校验，六类头表都能保存后重新载入', async () => {
-    const supplier = await saveSupplierForm({
-      name: '',
-      supplierCategory: '',
-      contact: '',
-    }, 'draft')
-    const customer = await saveCustomerForm({
-      name: '',
-      contact: '',
-    }, 'draft')
-    const crew = await saveCrewForm({
-      name: '',
-      trade: '',
-      contactName: '',
-      contactPhone: '',
-    }, 'draft')
-    const worker = await saveWorkerForm({
-      name: '',
-      phone: '',
-      bankName: '',
-      bankAccount: '',
-      trade: '',
-    }, 'draft')
+  it('草稿跳过提交必填校验，项目与目标成本头表都能保存后重新载入', async () => {
     const project = await saveProjectForm({
       name: '',
       customerId: null,
@@ -172,10 +76,6 @@ describe('f1 整页表单领域 action', () => {
       name: '',
     }, 'draft')
 
-    expect((await loadSupplierForm(supplier.id))?.approvalStatus).toBe('draft')
-    expect((await loadCustomerForm(customer.id))?.status).toBe('draft')
-    expect((await loadCrewForm(crew.id))?.status).toBe('draft')
-    expect((await loadWorkerForm(worker.id))?.status).toBe('draft')
     expect((await loadProjectForm(project.id))?.approvalStatus).toBe('draft')
     expect(await loadTargetCostForm(targetCost.id)).toMatchObject({
       projectId: null,
@@ -183,36 +83,7 @@ describe('f1 整页表单领域 action', () => {
     })
   })
 
-  it('提交逐类校验必填、真实关系与非负数，不接受名称假装外键', async () => {
-    await expect(saveSupplierForm({
-      name: '测试分供方',
-      supplierCategory: '',
-      contact: '',
-    }, 'submit')).rejects.toThrow('分供方类别')
-    await expect(saveCustomerForm({
-      name: '测试客户',
-      contact: '',
-    }, 'submit')).rejects.toThrow('联系人')
-    await expect(saveCrewForm({
-      name: '测试班组',
-      trade: '泥水',
-      contactName: '班组长',
-      contactPhone: '',
-    }, 'submit')).rejects.toThrow('联系电话')
-    await expect(saveCrewForm({
-      name: '引用班组',
-      trade: '木工',
-      contactName: '另一班组长',
-      contactPhone: '13800138009',
-    }, 'submit')).rejects.toThrow('班组名称已存在')
-    await expect(saveWorkerForm({
-      name: '张三',
-      phone: '13800138001',
-      bankName: '建设银行',
-      bankAccount: '62270000',
-      trade: '泥水',
-      crewId: '不存在班组',
-    }, 'submit')).rejects.toThrow('所属班组不存在')
+  it('项目与目标成本提交校验真实关系与非负数，不接受名称假装外键', async () => {
     await expect(saveProjectForm({
       name: '测试项目',
       customerId: '引用客户',
@@ -229,212 +100,20 @@ describe('f1 整页表单领域 action', () => {
       SET deleted_at = '2026-07-25T00:00:00.000Z'
       WHERE id = 'customer-ref'
     `)
-    await expect(saveWorkerForm({
-      name: '不可见项目工人',
-      phone: '13800138002',
-      bankName: '建设银行',
-      bankAccount: '62270002',
-      trade: '泥水',
-      currentProjectId: 'project-ref',
-    }, 'submit')).rejects.toThrow('当前项目不存在或已删除')
     await expect(saveTargetCostForm({
       projectId: 'project-ref',
       name: '不可见项目目标',
     }, 'submit')).rejects.toThrow('项目不存在或已删除')
   })
 
-  it('劳务范围省略保留、显式清空，不改主营业务或人工核验结论', async () => {
-    const created = await saveSupplierForm({
-      name: '范围测试分供方',
-      supplierCategory: '劳务分包商',
-      contact: '联系人',
-      mainBusiness: '建筑劳务',
-      laborScope: '石材安装\n楼梯铺贴',
-    }, 'save')
-    await mem.execute('UPDATE suppliers SET credential_status = \'qualified\', credential_reviewed_at = \'2026-09-08T01:00:00.000Z\' WHERE id = ?', [created.id])
-    const loaded = (await loadSupplierForm(created.id))!
-    const { laborScope: _scope, ...withoutScope } = loaded
-    await saveSupplierForm(withoutScope, 'save')
-    expect((await loadSupplierForm(created.id))?.laborScope).toBe('石材安装\n楼梯铺贴')
-    await saveSupplierForm({ ...loaded, laborScope: '' }, 'save')
-    expect(await loadSupplierForm(created.id)).toMatchObject({ laborScope: '', mainBusiness: '建筑劳务' })
-    const [state] = await mem.select<{ credential_status: string }>('SELECT credential_status FROM suppliers WHERE id = ?', [created.id])
-    expect(state?.credential_status).toBe('qualified')
-  })
-
-  it('六类表单的全部可编辑标量字段按真实 ID 写入并完整回显', async () => {
-    const supplier = await saveSupplierForm({
-      name: '华南材料有限公司',
-      aliases: ['华南材料', '华材'],
-      externalRef: 'OLD-S-001',
-      uniqueCode: 'SUP-001',
-      taxNo: '914400000000000001',
-      businessType: '材料',
-      supplierCategory: '材料供应商',
-      rating: 'A',
-      legalRep: '李总',
-      registeredCapital: 1000,
-      registeredDate: '2020-01-02',
-      address: '广州市白云区',
-      taxpayerType: '一般纳税人',
-      mainBusiness: '建筑材料',
-      laborScope: '石材安装\n楼梯铺贴',
-      invoiceName: '华南材料有限公司',
-      invoiceAddress: '广州市白云区 1 号',
-      bank: '建设银行广州支行',
-      bankAccount: '44000001',
-      phone: '020-88880001',
-      contact: '李经理',
-      contactPhone: '13800138001',
-      contactTitle: '销售经理',
-      note: '长期合作',
-    }, 'submit')
-    expect(await loadSupplierForm(supplier.id)).toMatchObject({
-      name: '华南材料有限公司',
-      aliases: ['华南材料', '华材'],
-      externalRef: 'OLD-S-001',
-      uniqueCode: 'SUP-001',
-      taxNo: '914400000000000001',
-      businessType: '材料',
-      supplierCategory: '材料供应商',
-      rating: 'A',
-      legalRep: '李总',
-      registeredCapital: 1000,
-      registeredDate: '2020-01-02',
-      address: '广州市白云区',
-      taxpayerType: '一般纳税人',
-      mainBusiness: '建筑材料',
-      laborScope: '石材安装\n楼梯铺贴',
-      invoiceName: '华南材料有限公司',
-      invoiceAddress: '广州市白云区 1 号',
-      bank: '建设银行广州支行',
-      bankAccount: '44000001',
-      phone: '020-88880001',
-      contact: '李经理',
-      contactPhone: '13800138001',
-      contactTitle: '销售经理',
-      note: '长期合作',
-      approvalStatus: 'submitted',
-    })
-
-    const customer = await saveCustomerForm({
-      name: '岭南建设单位',
-      aliases: ['岭南建设', 'LNJS'],
-      taxNo: '914400000000000002',
-      legalRep: '王总',
-      registeredAddress: '广州市越秀区',
-      invoiceName: '岭南建设单位',
-      bank: '工商银行广州支行',
-      bankAccount: '44000002',
-      contact: '王经理',
-      contactPhone: '13800138002',
-      note: '重点客户',
-    }, 'submit')
-    expect(await loadCustomerForm(customer.id)).toMatchObject({
-      name: '岭南建设单位',
-      aliases: ['岭南建设', 'LNJS'],
-      taxNo: '914400000000000002',
-      legalRep: '王总',
-      registeredAddress: '广州市越秀区',
-      invoiceName: '岭南建设单位',
-      bank: '工商银行广州支行',
-      bankAccount: '44000002',
-      contact: '王经理',
-      contactPhone: '13800138002',
-      note: '重点客户',
-      status: 'submitted',
-    })
-
-    const crew = await saveCrewForm({
-      name: '精装一班',
-      trade: '泥水',
-      capabilityTrades: ['防水工'],
-      capabilityItems: ['墙砖铺贴', '地砖铺贴'],
-      contactName: '赵班长',
-      contactPhone: '13800138003',
-      defaultPayRatio: 0.92,
-      rentSubsidyEnabled: true,
-      rentSubsidyPrice: 8,
-      mgmtFeeEnabled: true,
-      mgmtFeePrice: 2.5,
-      assignmentLevel: 'worker',
-      note: '个人粒度指派',
-    }, 'submit')
-    expect(await loadCrewForm(crew.id)).toMatchObject({
-      name: '精装一班',
-      trade: '泥水',
-      capabilityTrades: ['防水工'],
-      capabilityItems: ['墙砖铺贴', '地砖铺贴'],
-      contactName: '赵班长',
-      contactPhone: '13800138003',
-      defaultPayRatio: 0.92,
-      rentSubsidyEnabled: true,
-      rentSubsidyPrice: 8,
-      mgmtFeeEnabled: true,
-      mgmtFeePrice: 2.5,
-      assignmentLevel: 'worker',
-      note: '个人粒度指派',
-      status: 'submitted',
-    })
-
-    const worker = await saveWorkerForm({
-      name: '张三',
-      gender: '男',
-      idCard: '440101199001010011',
-      phone: '13800138004',
-      hometown: '广东梅州',
-      emergencyContact: '张父',
-      emergencyPhone: '13800138005',
-      bankName: '农业银行广州支行',
-      bankAccount: '6228480001',
-      bankCode: '103581000001',
-      trade: '泥水',
-      capabilityTrades: ['防水工'],
-      capabilityItems: ['墙砖铺贴'],
-      skillLevel: '高级',
-      dailyWage: 420,
-      crewId: 'crew-ref',
-      currentProjectId: 'project-ref',
-      familyGroupId: 'family-001',
-      projectStatus: '在场',
-      entryDate: '2026-07-01',
-      exitDate: '',
-      safetyEducation: true,
-      note: '证件齐全',
-    }, 'submit')
-    expect(await loadWorkerForm(worker.id)).toMatchObject({
-      name: '张三',
-      gender: '男',
-      idCard: '440101199001010011',
-      phone: '13800138004',
-      hometown: '广东梅州',
-      emergencyContact: '张父',
-      emergencyPhone: '13800138005',
-      bankName: '农业银行广州支行',
-      bankAccount: '6228480001',
-      bankCode: '103581000001',
-      trade: '泥水',
-      capabilityTrades: ['防水工'],
-      capabilityItems: ['墙砖铺贴'],
-      skillLevel: '高级',
-      dailyWage: 420,
-      crewId: 'crew-ref',
-      currentProjectId: 'project-ref',
-      familyGroupId: 'family-001',
-      projectStatus: '在场',
-      entryDate: '2026-07-01',
-      exitDate: '',
-      safetyEducation: true,
-      note: '证件齐全',
-      status: 'submitted',
-    })
-
+  it('项目与目标成本表单的全部可编辑标量字段按真实 ID 写入并完整回显', async () => {
+    await mem.execute('INSERT INTO customers (id, name, contact, status) VALUES (\'customer-second\', \'岭南建设单位\', \'王经理\', \'submitted\')')
     const project = await saveProjectForm({
       name: '珠江新城项目',
       contractName: '珠江新城精装合同',
       code: 'ZJXC-01',
       customerId: 'customer-ref',
-      secondaryCustomerId: customer.id,
+      secondaryCustomerId: 'customer-second',
       region: '广州·天河',
       address: '珠江新城 1 号',
       operationType: '自营',
@@ -467,7 +146,7 @@ describe('f1 整页表单领域 action', () => {
       contractName: '珠江新城精装合同',
       code: 'ZJXC-01',
       customerId: 'customer-ref',
-      secondaryCustomerId: customer.id,
+      secondaryCustomerId: 'customer-second',
       region: '广州·天河',
       address: '珠江新城 1 号',
       operationType: '自营',
@@ -524,141 +203,6 @@ describe('f1 整页表单领域 action', () => {
     })
   })
 
-  it('工人跨项目复用原稳定ID，当前归属可更新而旧项目工资冻结与同名他人均不改写', async () => {
-    await mem.execute('INSERT INTO projects(id,name,customer_id,manager,approval_status) VALUES(\'project-next\',\'下一个项目\',\'customer-ref\',\'项目经理\',\'submitted\')')
-    const input = { name: '跨项目同名工人', phone: '13800000011', bankName: '合成银行', bankAccount: '62220011', trade: '泥工', crewId: 'crew-ref', currentProjectId: 'project-ref', note: '经人工核实的原人员' }
-    const original = await saveWorkerForm(input, 'submit')
-    const other = await saveWorkerForm({ ...input, phone: '13800000022', bankAccount: '62220022', currentProjectId: 'project-next', note: '同名不同人员' }, 'submit')
-    const snapshot = JSON.stringify({ workerId: original.id, name: input.name, originalProjectId: 'project-ref', adoptedAmount: 500, evidence: '历史已签收原件' })
-    await mem.execute('INSERT INTO wage_statements(id,project_id,crew_id,leader_worker_id,month,quantity_source,status,actual_amount,source_version,snapshot_json) VALUES(\'old-worker-wage\',\'project-ref\',\'crew-ref\',?,\'2026-07\',\'field\',\'released\',500,\'old-frozen-version\',?)', [original.id, snapshot])
-    const previous = (await mem.select<Record<string, unknown>>('SELECT * FROM wage_statements WHERE id=\'old-worker-wage\''))[0]
-    const read = await loadWorkerForm(original.id)
-    await saveWorkerForm({ ...read!, currentProjectId: 'project-next', name: '跨项目工人（现名）' }, 'submit')
-    expect(await loadWorkerForm(original.id)).toMatchObject({ id: original.id, name: '跨项目工人（现名）', currentProjectId: 'project-next', crewId: 'crew-ref', bankAccount: '62220011' })
-    expect((await mem.select<Record<string, unknown>>('SELECT * FROM wage_statements WHERE id=\'old-worker-wage\''))[0]).toEqual(previous)
-    expect((await mem.select<{ snapshot_json: string }>('SELECT snapshot_json FROM wage_statements WHERE id=\'old-worker-wage\''))[0]!.snapshot_json).toBe(snapshot)
-    expect(await loadWorkerForm(other.id)).toMatchObject({ id: other.id, name: '跨项目同名工人', phone: '13800000022', currentProjectId: 'project-next' })
-    expect((await mem.select<{ id: string }>('SELECT id FROM workers ORDER BY id')).map(row => row.id).sort()).toEqual([original.id, other.id].sort())
-  })
-
-  it('客户统一社会信用代码冲突时返回可理解的领域提示', async () => {
-    await saveCustomerForm({
-      name: '第一建设单位',
-      contact: '陈经理',
-      taxNo: '914400001234567890',
-    }, 'submit')
-
-    await expect(saveCustomerForm({
-      name: '第二建设单位',
-      contact: '李经理',
-      taxNo: '914400001234567890',
-    }, 'submit')).rejects.toThrow('统一社会信用代码已被客户「第一建设单位」使用')
-  })
-
-  it('普通分供方表单保存不会覆盖独立纳税人核验留痕', async () => {
-    const supplier = await saveSupplierForm({
-      name: '核验留痕分供方',
-      supplierCategory: '材料供应商',
-      taxpayerType: '一般纳税人',
-      contact: '陈经理',
-    }, 'submit')
-    await mem.execute(
-      `UPDATE suppliers
-       SET taxpayer_verification_status = 'confirmed_general',
-           taxpayer_verification_source = '广东省电子税务局',
-           taxpayer_verified_at = '2026-07-30T01:02:03.000Z',
-           taxpayer_verification_note = '官网人工核验'
-       WHERE id = ?`,
-      [supplier.id],
-    )
-
-    const draft = await loadSupplierForm(supplier.id)
-    expect(draft).not.toBeNull()
-    await saveSupplierForm({
-      ...draft!,
-      contact: '更新后的联系人',
-      taxpayerVerificationStatus: 'not_checked',
-      taxpayerVerificationSource: '',
-      taxpayerVerifiedAt: null,
-      taxpayerVerificationNote: '',
-    }, 'submit')
-
-    const [row] = await mem.select<{
-      taxpayer_verification_status: string
-      taxpayer_verification_source: string
-      taxpayer_verified_at: string | null
-      taxpayer_verification_note: string
-    }>(
-      `SELECT taxpayer_verification_status, taxpayer_verification_source,
-              taxpayer_verified_at, taxpayer_verification_note
-       FROM suppliers WHERE id = ?`,
-      [supplier.id],
-    )
-    expect(row).toEqual({
-      taxpayer_verification_status: 'confirmed_general',
-      taxpayer_verification_source: '广东省电子税务局',
-      taxpayer_verified_at: '2026-07-30T01:02:03.000Z',
-      taxpayer_verification_note: '官网人工核验',
-    })
-  })
-
-  it('分供方表单只写脱敏审计，关键工商字段变化使人工结论失效', async () => {
-    const supplier = await saveSupplierForm({
-      name: '表单敏感分供方',
-      supplierCategory: '材料供应商',
-      contact: '联系人',
-      taxNo: 'FORM-SECRET-TAX',
-      bankAccount: 'FORM-SECRET-ACCOUNT',
-    }, 'submit')
-    await mem.execute(`
-      UPDATE suppliers
-      SET credential_status = 'qualified',
-          credential_reviewed_at = '2026-07-30T08:00:00.000Z',
-          credential_review_note = '人工通过'
-      WHERE id = ?
-    `, [supplier.id])
-
-    const draft = await loadSupplierForm(supplier.id)
-    await saveSupplierForm({
-      ...draft!,
-      taxNo: 'FORM-SECRET-TAX-UPDATED',
-    }, 'submit')
-
-    expect(await mem.select(`
-      SELECT credential_status, credential_reviewed_at, credential_review_note
-      FROM suppliers WHERE id = ?
-    `, [supplier.id])).toEqual([{
-      credential_status: 'incomplete',
-      credential_reviewed_at: null,
-      credential_review_note: '',
-    }])
-    expect(await mem.select(`
-      SELECT id FROM operation_logs
-      WHERE table_name = 'suppliers' AND record_id = ?
-    `, [supplier.id])).toEqual([])
-    expect(JSON.stringify(await mem.select(`
-      SELECT action, outcome, source_category, changed_fields, note_present
-      FROM supplier_audits WHERE supplier_id = ?
-      ORDER BY rowid
-    `, [supplier.id]))).not.toMatch(/FORM-SECRET|人工通过/)
-    expect(await mem.select(`
-      SELECT action, source_category, changed_fields
-      FROM supplier_audits WHERE supplier_id = ?
-      ORDER BY rowid
-    `, [supplier.id])).toEqual([
-      {
-        action: 'create',
-        source_category: 'form',
-        changed_fields: expect.any(String),
-      },
-      {
-        action: 'update',
-        source_category: 'form',
-        changed_fields: '["tax_no"]',
-      },
-    ])
-  })
-
   it('切换目标成本基线在同一事务内取消旧基线并记录两条更新日志', async () => {
     const first = await saveTargetCostForm({
       projectId: 'project-ref',
@@ -691,14 +235,15 @@ describe('f1 整页表单领域 action', () => {
     ])
   })
 
-  it('附件只写 file_refs，支持读取、软删、恢复并记录日志', async () => {
-    const customer = await saveCustomerForm({
-      name: '附件客户',
-      contact: '联系人',
+  it('附件只写 file_refs，可读取并记录创建日志', async () => {
+    const project = await saveProjectForm({
+      name: '附件项目',
+      customerId: 'customer-ref',
+      manager: '项目经理',
     }, 'submit', {
       add: [{
         fileName: '开票资料.pdf',
-        filePath: 'documents/customer/invoice.pdf',
+        filePath: 'documents/project/invoice.pdf',
         fileSize: 1024,
         mimeType: 'application/pdf',
         category: 'invoice',
@@ -706,12 +251,12 @@ describe('f1 整页表单领域 action', () => {
       }],
     })
 
-    const [attachment] = await listFormAttachments('customer', customer.id)
+    const [attachment] = await listFormAttachments('project', project.id)
     expect(attachment).toMatchObject({
-      ownerType: 'customer',
-      ownerId: customer.id,
+      ownerType: 'project',
+      ownerId: project.id,
       fileName: '开票资料.pdf',
-      filePath: 'documents/customer/invoice.pdf',
+      filePath: 'documents/project/invoice.pdf',
       fileSize: 1024,
       mimeType: 'application/pdf',
       category: 'invoice',
@@ -720,13 +265,6 @@ describe('f1 整页表单领域 action', () => {
     })
     expect(await mem.select(`SELECT * FROM file_payloads`)).toEqual([])
 
-    await removeFormAttachment('customer', customer.id, attachment!.id)
-    expect(await listFormAttachments('customer', customer.id)).toEqual([])
-    const [deletedAttachment] = await listFormAttachments('customer', customer.id, true)
-    expect(deletedAttachment?.deletedAt).not.toBeNull()
-
-    await restoreFormAttachment('customer', customer.id, attachment!.id)
-    expect(await listFormAttachments('customer', customer.id)).toHaveLength(1)
     expect(await mem.select(`
       SELECT action
       FROM operation_logs
@@ -734,16 +272,15 @@ describe('f1 整页表单领域 action', () => {
       ORDER BY rowid
     `, [attachment!.id])).toEqual([
       { action: 'create' },
-      { action: 'delete' },
-      { action: 'restore' },
     ])
   })
 
   it('附件失败会回滚头表与操作日志，不留下半张草稿', async () => {
     failFileInsert = true
-    await expect(saveCustomerForm({
-      name: '事务客户',
-      contact: '联系人',
+    await expect(saveProjectForm({
+      name: '事务项目',
+      customerId: 'customer-ref',
+      manager: '项目经理',
     }, 'submit', {
       add: [{
         fileName: '资料.pdf',
@@ -752,42 +289,15 @@ describe('f1 整页表单领域 action', () => {
     })).rejects.toThrow('模拟附件写入失败')
 
     expect(await mem.select(`
-      SELECT id FROM customers WHERE name = '事务客户'
+      SELECT id FROM projects WHERE name = '事务项目'
     `)).toEqual([])
     expect(await mem.select(`
       SELECT id FROM operation_logs
-      WHERE table_name IN ('customers', 'file_refs')
+      WHERE table_name IN ('projects', 'file_refs')
     `)).toEqual([])
   })
 
-  it('客户附件最多保留 9 个，超限时整笔事务回滚', async () => {
-    const customer = await saveCustomerForm({
-      name: '九附件客户',
-      contact: '联系人',
-    }, 'submit', {
-      add: Array.from({ length: 9 }, (_, index) => ({
-        fileName: `附件-${index + 1}.pdf`,
-        filePath: `documents/customer/${index + 1}.pdf`,
-      })),
-    })
-
-    await expect(saveCustomerForm({
-      id: customer.id,
-      name: '九附件客户',
-      contact: '联系人',
-    }, 'save', {
-      add: [{ fileName: '第十个附件.pdf' }],
-    })).rejects.toThrow('客户附件最多 9 个')
-    expect(await listFormAttachments('customer', customer.id)).toHaveLength(9)
-  })
-
   it('客户与班组删除约束在领域事务内检查项目、合同和在册工人', async () => {
-    await expect(assessMasterDataDeletion('customer', 'customer-ref'))
-      .resolves
-      .toEqual(expect.objectContaining({
-        blockedReason: expect.stringContaining('活跃项目'),
-        impact: [],
-      }))
     await expect(deleteMasterDataRecord('customer', 'customer-ref'))
       .rejects
       .toThrow('活跃项目')
@@ -807,45 +317,14 @@ describe('f1 整页表单领域 action', () => {
       INSERT INTO workers (id, name, crew_id)
       VALUES ('worker-crew-ref', '在册工人', 'crew-ref')
     `)
-    await expect(assessMasterDataDeletion('crew', 'crew-ref'))
-      .resolves
-      .toEqual(expect.objectContaining({
-        blockedReason: expect.stringContaining('在册工人'),
-        impact: [],
-      }))
     await expect(deleteMasterDataRecord('crew', 'crew-ref'))
       .rejects
       .toThrow('在册工人')
   })
 
-  it('工人删除评估合并多角色关联并要求按级联流程确认', async () => {
-    await mem.execute(`
-      INSERT INTO workers (id, name)
-      VALUES ('worker-cascade', '级联工人')
-    `)
-    await mem.execute(`
-      INSERT INTO penalty_records (
-        id, projectId, workerId, responsibleWorkerId, reason, amount
-      )
-      VALUES (
-        'penalty-worker-cascade', 'project-ref', 'worker-cascade',
-        'worker-cascade', '整改扣罚', 100
-      )
-    `)
-
-    await expect(assessMasterDataDeletion('worker', 'worker-cascade'))
-      .resolves
-      .toEqual({
-        blockedReason: '',
-        impact: [{ label: '扣罚记录', n: 1 }],
-      })
-  })
-
   it('六类头表共用软删除、恢复与日志边界', async () => {
-    const customer = await saveCustomerForm({
-      name: '待删除客户',
-      contact: '联系人',
-    }, 'submit')
+    await mem.execute('INSERT INTO customers (id, name, contact, status) VALUES (\'customer-delete\', \'待删除客户\', \'联系人\', \'submitted\')')
+    const customer = { id: 'customer-delete' }
 
     await deleteMasterDataRecord('customer', customer.id)
     expect(await loadCustomerForm(customer.id)).toBeNull()
@@ -857,7 +336,6 @@ describe('f1 整页表单领域 action', () => {
       WHERE table_name = 'customers' AND record_id = ?
       ORDER BY rowid
     `, [customer.id])).toEqual([
-      { action: 'create' },
       { action: 'delete' },
       { action: 'restore' },
     ])

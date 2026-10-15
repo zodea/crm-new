@@ -72,7 +72,7 @@ describe('浏览器页签恢复接线', () => {
     tabs.close('/base/supplier')
     expect(session.problems).toEqual([])
     expect(stored().tabs.map(tab => tab.key)).toEqual(['/project'])
-    tabs.closeEvery()
+    await tabs.requestCloseEvery()
     expect(stored()).toMatchObject({ tabs: [], activeKey: 'home' })
   })
 
@@ -86,7 +86,7 @@ describe('浏览器页签恢复接线', () => {
     expect(await session.startupPath('/project/new', true)).toBe('/base/customer')
     tabs.open({ fullPath: '/project', title: '项目' })
     const before = stored()
-    tabs.refreshActive()
+    await tabs.requestRefresh()
     expect(stored()).toEqual(before)
   })
 

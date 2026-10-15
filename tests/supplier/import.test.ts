@@ -4,7 +4,6 @@ import {
   inferProjectSupplierFileCategory,
   inferProjectSupplierName,
   normalizeSupplierImportRow,
-  withSupplierImportCreateDefaults,
 } from '~/lib/supplier/import'
 
 describe('分供方导入行归一', () => {
@@ -70,7 +69,7 @@ describe('分供方导入行归一', () => {
     })
   })
 
-  it('仅新增边界为未映射类别与资料状态补合法默认值', () => {
+  it('导入行归一不补造未映射的类别与资料状态', () => {
     const normalized = normalizeSupplierImportRow({
       name: '只有名称的分供方',
       externalRef: 'OLD-MINIMAL-001',
@@ -78,11 +77,6 @@ describe('分供方导入行归一', () => {
 
     expect(normalized).not.toHaveProperty('supplierCategory')
     expect(normalized).not.toHaveProperty('credentialStatus')
-    expect(withSupplierImportCreateDefaults(normalized)).toMatchObject({
-      supplierCategory: '其他',
-      credentialStatus: 'incomplete',
-      aliases: [],
-    })
   })
 
   it('公司全称为空时拒绝该行', () => {

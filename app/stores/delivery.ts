@@ -148,7 +148,7 @@ async function fileHash(file: File): Promise<string> {
     const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes)
     return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
   }
-  // 仅用于不支持 Web Crypto 的开发宿主；正常浏览器和 Tauri 均走 SHA-256。
+  // 仅用于不支持 Web Crypto 的开发宿主；正常浏览器走 SHA-256。
   const view = new Uint8Array(bytes)
   let hash = 2166136261
   for (const byte of view)
@@ -175,8 +175,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
   const archiveScope = useDeliveryRecordStore()
   const files = shallowRef<DeliveryFile[]>([])
   const duplicates = shallowRef<DeliveryDuplicate[]>([])
-  const visibleFiles = computed(() => files.value.filter(file => archiveScope.mode !== 'central' || file.dataOrigin === archiveScope.origin))
-  const visibleDuplicates = computed(() => duplicates.value.filter(file => archiveScope.mode !== 'central' || file.dataOrigin === archiveScope.origin))
+  const visibleFiles = computed(() => files.value.filter(file => file.dataOrigin === archiveScope.origin))
+  const visibleDuplicates = computed(() => duplicates.value.filter(file => file.dataOrigin === archiveScope.origin))
   const recognitionProgress = reactive<Record<string, number>>({})
   const sourceFiles = new Map<string, File>()
   const duplicateSourceFiles = new Map<string, File>()
@@ -249,9 +249,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
     }
     catch (cause) {
       assertOrigin()
-      if (recordStore.mode === 'central')
-        throw cause
-      // 未接管的本机适配保留会话内上传；中央必须完成当前归档读取。
+      throw cause
     }
 
     for (const file of uploadedFiles) {
@@ -327,10 +325,6 @@ export const useDeliveryStore = defineStore('delivery', () => {
     return { ids, acceptedFiles, duplicates: skipped }
   }
 
-  async function uploadFiles(uploadedFiles: File[]): Promise<string[]> {
-    return (await uploadFilesDetailed(uploadedFiles)).ids
-  }
-
   function confirmDuplicate(id: string): boolean {
     const duplicate = visibleDuplicates.value.find(item => item.id === id)
     if (!duplicate)
@@ -351,7 +345,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
       return null
     const representative = byId(duplicate.representativeFileId)
     const recordIds = duplicate.archivedRecordIds.length ? duplicate.archivedRecordIds : representative?.archivedRecordIds ?? []
-    if (archiveScope.mode === 'central' && recordIds.length) {
+    if (recordIds.length) {
       const origin = archiveScope.origin
       const assertCurrent = () => {
         if (origin !== archiveScope.origin || !visibleDuplicates.value.some(item => item.id === id))
@@ -614,14 +608,11 @@ export const useDeliveryStore = defineStore('delivery', () => {
   async function loadPendingPrintQueue(): Promise<void> {
     const recordStore = useDeliveryRecordStore()
     const origin = recordStore.origin
-    const central = recordStore.mode === 'central'
-    if (central) {
-      for (const file of visibleFiles.value) {
-        if (!file.docs.length && file.archivedRecordIds.length)
-          sourceFiles.delete(file.id)
-      }
-      files.value = files.value.filter(file => file.dataOrigin !== origin || file.docs.length > 0 || !file.archivedRecordIds.length)
+    for (const file of visibleFiles.value) {
+      if (!file.docs.length && file.archivedRecordIds.length)
+        sourceFiles.delete(file.id)
     }
+    files.value = files.value.filter(file => file.dataOrigin !== origin || file.docs.length > 0 || !file.archivedRecordIds.length)
     await recordStore.load()
     if (origin !== recordStore.origin)
       throw new DOMException('送货来源已变化，待打印读取已取消', 'AbortError')
@@ -630,7 +621,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
     for (const record of recordStore.pendingPrintRecords) {
       if (representedRecordIds.has(record.id))
         continue
-      const groupKey = central ? JSON.stringify([origin, record.assetId ? 'asset' : 'missing', record.assetId ?? record.id]) : record.printBatchId
+      const groupKey = (JSON.stringify([origin, record.assetId ? 'asset' : 'missing', record.assetId ?? record.id]))
       const group = groups.get(groupKey) ?? []
       group.push(record)
       groups.set(groupKey, group)
@@ -668,50 +659,34 @@ export const useDeliveryStore = defineStore('delivery', () => {
     if (!file || file.printDisposition !== 'pending')
       throw new Error('待打印送货单不存在')
     const recordStore = useDeliveryRecordStore()
-    if (recordStore.mode === 'central') {
-      const origin = recordStore.origin
-      const assertActive = () => {
-        if (origin !== recordStore.origin || options?.signal?.aborted)
-          throw new DOMException('送货来源已变化或原件读取已取消', 'AbortError')
-      }
-      assertActive()
-      await recordStore.load()
-      assertActive()
-      let original: DeliveryRecordSourceFile | null = null
-      let assetId: string | null = null
-      for (const id of file.archivedRecordIds) {
-        const record = recordStore.list.find(row => row.id === id && row.dataOrigin === origin)
-        if (!record || record.printDisposition !== 'pending')
-          throw new Error('待打印记录已变化，请重新读取队列')
-        if (!record.assetId || !record.hasSourceFile)
-          throw new Error('该送货单未保存原件，无法打开打印')
-        const source = await recordStore.loadSourceFile(id, { ...options, assetId: record.assetId })
-        assertActive()
-        if (!source)
-          throw new Error('该送货单缺少原件，请重新读取')
-        if (original && (assetId !== record.assetId || original.fileName !== source.fileName || original.mimeType !== source.mimeType || original.bytes.length !== source.bytes.length || original.bytes.some((byte, index) => byte !== source.bytes[index])))
-          throw new Error('待打印记录的原件已分开或发生冲突，请重新读取队列')
-        original = source
-        assetId = record.assetId
-      }
-      if (!original)
-        throw new Error('待打印送货单缺少归档原件')
-      return new File([Uint8Array.from(original.bytes)], original.fileName, { type: original.mimeType })
+    const origin = recordStore.origin
+    const assertActive = () => {
+      if (origin !== recordStore.origin || options?.signal?.aborted)
+        throw new DOMException('送货来源已变化或原件读取已取消', 'AbortError')
     }
-    const sessionSource = sourceFiles.get(fileId)
-    if (sessionSource)
-      return sessionSource
-    const recordId = file.archivedRecordIds[0]
-    if (!recordId)
-      throw new Error('待打印送货单缺少归档记录')
-    const source = await useDeliveryRecordStore().loadSourceFile(recordId)
-    if (!source)
-      throw new Error('该送货单未保存原件，无法打开打印')
-    const restored = new File([Uint8Array.from(source.bytes)], source.fileName || file.name, {
-      type: source.mimeType || 'application/octet-stream',
-    })
-    sourceFiles.set(fileId, restored)
-    return restored
+    assertActive()
+    await recordStore.load()
+    assertActive()
+    let original: DeliveryRecordSourceFile | null = null
+    let assetId: string | null = null
+    for (const id of file.archivedRecordIds) {
+      const record = recordStore.list.find(row => row.id === id && row.dataOrigin === origin)
+      if (!record || record.printDisposition !== 'pending')
+        throw new Error('待打印记录已变化，请重新读取队列')
+      if (!record.assetId || !record.hasSourceFile)
+        throw new Error('该送货单未保存原件，无法打开打印')
+      const source = await recordStore.loadSourceFile(id, { ...options, assetId: record.assetId })
+      assertActive()
+      if (!source)
+        throw new Error('该送货单缺少原件，请重新读取')
+      if (original && (assetId !== record.assetId || original.fileName !== source.fileName || original.mimeType !== source.mimeType || original.bytes.length !== source.bytes.length || original.bytes.some((byte, index) => byte !== source.bytes[index])))
+        throw new Error('待打印记录的原件已分开或发生冲突，请重新读取队列')
+      original = source
+      assetId = record.assetId
+    }
+    if (!original)
+      throw new Error('待打印送货单缺少归档原件')
+    return new File([Uint8Array.from(original.bytes)], original.fileName, { type: original.mimeType })
   }
 
   async function excludeFileFromPrint(fileId: string): Promise<void> {
@@ -730,47 +705,13 @@ export const useDeliveryStore = defineStore('delivery', () => {
     removeFile(fileId)
   }
 
-  function incompleteReasons(file: DeliveryFile): string[] {
-    const reasons: string[] = []
-    if (file.intakeDecision === 'pending')
-      reasons.push(file.intakeReason || '待人工判断是否为材料送货单')
-    if (file.intakeDecision === 'non-material')
-      reasons.push('非材料/待处理')
-    if (file.ocrStatus === 'failed')
-      reasons.push('识别失败')
-    if (file.ocrStatus === 'done' && !file.supplierText)
-      reasons.push('缺 OCR 分供方，归档前必须人工选择或新增')
-    if (file.ocrStatus === 'done' && !file.docs.length)
-      reasons.push('无可核对单据')
-    for (const doc of file.docs) {
-      if (!doc.deliveryDate)
-        reasons.push('缺日期')
-      if (!doc.orderNo && doc.docType !== '收据')
-        reasons.push('缺单号')
-      if (!doc.items.length)
-        reasons.push('0 明细行')
-      if (doc.items.some(item => !item.name.trim() || !item.unit.trim() || item.qty == null || item.qty <= 0))
-        reasons.push('明细需确认名称、单位和非零数量')
-      if (doc.items.some(item => item.unitPrice == null || item.amount == null))
-        reasons.push('价格待补录')
-      if (doc.quality !== 'normal')
-        reasons.push('手写/低质量，待人工核对')
-      if (doc.note.includes('金额') || doc.note.includes('合计'))
-        reasons.push('金额待复核')
-    }
-    return [...new Set(reasons)]
-  }
-
   return {
     files: visibleFiles,
     recognitionProgress: readonly(recognitionProgress),
     pendingFiles,
     duplicates: visibleDuplicates,
-    pendingIntakeFiles,
-    pendingPrintFiles,
     stats,
     byId,
-    uploadFiles,
     uploadFilesDetailed,
     confirmDuplicate,
     loadDuplicateFile,
@@ -784,6 +725,5 @@ export const useDeliveryStore = defineStore('delivery', () => {
     loadFileForPrint,
     excludeFileFromPrint,
     confirmFilePrintReceipt,
-    incompleteReasons,
   }
 })

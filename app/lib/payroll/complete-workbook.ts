@@ -7,7 +7,6 @@ import type { PayrollC2FrozenDocument } from './central-c2-contract'
 import type { PayrollStatementRow } from './central-contract'
 import type { PayrollWorkbookArchive } from './central-workbook-contract'
 import * as XLSX from 'xlsx'
-import { createZip } from '../project/archive'
 import { createPayrollAWorkbook } from './a-export'
 import { createPayrollC1Workbook } from './c1-export'
 import { createPayrollC2Workbook } from './c2-export'
@@ -22,7 +21,6 @@ export interface PayrollWorkbookGap { statementId: string, month: string, format
 export type PayrollWorkbookPublication = Pick<PayrollWorkbookArchive, 'id' | 'version' | 'createdAt' | 'manifestHash' | 'issues' | 'rosterRef' | 'deliveryGaps'>
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-const ZIP_MIME = 'application/zip'
 const numberStatus = '未正式出具（须在正式编号页面核对出具）'
 const rosterStatus = '未选择独立有日期的名册归档版本'
 
@@ -218,8 +216,4 @@ export function createPayrollMonthlyArchiveFiles(projectName: string, groups: Pa
     files.push({ path: `${safeSegment(group.key)}/${output.defaultName}`, data: bytes(output.data), mimeType: XLSX_MIME })
   }
   return files
-}
-
-export function createPayrollMonthlyArchive(projectName: string, groups: PayrollWorkbookGroup[], gaps: PayrollWorkbookGap[], publication?: PayrollWorkbookPublication): ExportFileOptions {
-  return { data: createZip(createPayrollMonthlyArchiveFiles(projectName, groups, gaps, publication)), defaultName: `${safeSegment(projectName)}-按月工资归档-${publication?.manifestHash ?? '未正式出具'}.zip`, mimeType: ZIP_MIME }
 }

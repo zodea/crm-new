@@ -5,7 +5,6 @@ import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { createFormCommandActions } from '~/lib/forms/command-session'
 import { OurSignatoryRepositoryProblem } from '~/lib/our-signatory/contract'
 import { createOurSignatoryRepository } from '~/lib/our-signatory/http-repository'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 
 const route = useRoute()
@@ -56,8 +55,6 @@ async function initialize(retain = false) {
   loading.value = true
   error.value = ''
   try {
-    if (isDesktopRuntime())
-      throw new Error('此独立桌面路径尚未接入一致主体目录，请使用已开放的中央入口。')
     const data = retain ? await actions.revalidate(session) : await actions.hydrate(session, id.value)
     if (current !== generation || !active)
       return

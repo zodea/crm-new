@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { CommandRecoveryDescriptor } from '~/lib/forms/command-recovery'
 import { computed, shallowRef } from 'vue'
-import { useBrowserQuantityStore } from '~/stores/quantity-browser'
+import { useQuantityStore } from '~/stores/quantity'
 
 const props = defineProps<{ surface: 'matrix' | 'templates' | 'region' | 'assignments' | 'completion' | 'batch' | 'stages', projectId: string }>()
 const access = useProductionAccessStore()
-const quantity = useBrowserQuantityStore()
+const quantity = useQuantityStore()
 const stages = useQuantityStageStore()
 const busy = shallowRef(false)
 const problem = shallowRef('')

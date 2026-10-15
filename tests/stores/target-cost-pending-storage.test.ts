@@ -6,7 +6,6 @@ import { computed } from 'vue'
 import { commandRecoveryKey } from '~/lib/forms/command-recovery'
 import { useTargetCostStore } from '~/stores/target-cost'
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 const repo = { execute: vi.fn(), form: vi.fn(), resolve: vi.fn() }
 const read: TargetCostFormRead = { context: { workspaceId: 'workspace', actorId: 'actor', origin: 'real', sourceVersion: 'budget:1+projects:p', capabilities: ['target-cost:read', 'target-cost:write'] }, targetCostId: null, draftKey: 'draft', draft: {}, deletedAt: null, files: [], projects: [], projectOptionsStatus: 'available' }
 const receipt = (command: TargetCostCommand) => ({ commandId: command.commandId, id: 'saved-id', sourceVersion: 'budget:2+projects:p', attachmentIds: [], affectedVersionIds: ['saved-id'], logIds: [] })

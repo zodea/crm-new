@@ -1,5 +1,4 @@
 import type { ExportDirectoryTarget } from '~/lib/kit/export'
-import { isTauri } from '@tauri-apps/api/core'
 import { appendCollisionSuffix } from '~/lib/kit/export'
 
 interface BrowserWritableFile {
@@ -48,78 +47,6 @@ function relativePathSegments(relativePath: string): string[] {
   return segments
 }
 
-async function pickTauriDirectory(
-  options: PickExportDirectoryOptions,
-): Promise<ExportDirectoryTarget | null> {
-  const [{ open: openDialog }, { exists, mkdir, open: openFile }, { join }] = await Promise.all([
-    import('@tauri-apps/plugin-dialog'),
-    import('@tauri-apps/plugin-fs'),
-    import('@tauri-apps/api/path'),
-  ])
-  const selection = await openDialog({
-    directory: true,
-    multiple: false,
-    recursive: options.recursive ?? false,
-  })
-  const directory = Array.isArray(selection) ? selection[0] : selection
-  if (!directory)
-    return null
-
-  const ensuredDirectories = new Set<string>()
-
-  return {
-    displayPath: directory,
-    supportsSubdirectories: true,
-    async writeFile(relativePath, data) {
-      const segments = relativePathSegments(relativePath)
-      const parentSegments = segments.slice(0, -1)
-      const fileName = segments.at(-1)!
-      if (parentSegments.length) {
-        if (!options.recursive)
-          throw new Error('当前目录权限不允许创建导出子目录')
-        const parentKey = parentSegments.join('/')
-        if (!ensuredDirectories.has(parentKey)) {
-          await mkdir(await join(directory, ...parentSegments), { recursive: true })
-          ensuredDirectories.add(parentKey)
-        }
-      }
-
-      // createNew 原子占位：同名文件已存在时换下一个序号，绝不覆盖既有文件。
-      for (let sequence = 1; ; sequence++) {
-        const filePath = await join(
-          directory,
-          ...parentSegments,
-          candidateFileName(fileName, sequence),
-        )
-
-        let file
-        try {
-          file = await openFile(filePath, { write: true, createNew: true })
-        }
-        catch (error) {
-          // exists 自身失败时保留 open 的原始错误，避免掩盖真实失败原因。
-          let alreadyExists = false
-          try {
-            alreadyExists = await exists(filePath)
-          }
-          catch {}
-          if (alreadyExists)
-            continue
-          throw error
-        }
-
-        try {
-          await file.write(data)
-        }
-        finally {
-          await file.close()
-        }
-        return
-      }
-    },
-  }
-}
-
 async function browserFileExists(
   directory: BrowserDirectoryHandle,
   name: string,
@@ -131,7 +58,7 @@ async function browserFileExists(
   catch (error) {
     if (hasErrorName(error, 'NotFoundError'))
       return false
-    // 同名项是子目录时按「名字已被占用」处理，与 Tauri exists 的行为对齐。
+    // 同名项是子目录时按「名字已被占用」处理。
     if (hasErrorName(error, 'TypeMismatchError'))
       return true
     throw error
@@ -203,11 +130,8 @@ function browserDownloadTarget(): ExportDirectoryTarget {
 export async function pickExportDirectory(
   options: PickExportDirectoryOptions = {},
 ): Promise<ExportDirectoryTarget | null> {
-  if (isTauri())
-    return await pickTauriDirectory(options)
-
   if (typeof window === 'undefined' || typeof document === 'undefined')
-    throw new Error('导出只能在浏览器或桌面端运行')
+    throw new Error('导出只能在浏览器中运行')
 
   const picker = (window as DirectoryPickerWindow).showDirectoryPicker
   return picker ? await pickBrowserDirectory(picker.bind(window), options) : browserDownloadTarget()

@@ -1,6 +1,6 @@
 # 本机分供方保存与原提交核对
 
-本指南对应 [#453](https://github.com/zodea/crm-new/issues/453) 的本机磁盘路径，使用方法沿用[分供方档案](./supplier-records.md)与[证照资料核验](./supplier-credential-review.md)。当前已用隔离合成数据验证独立进程重启；首次真实业务写入仍需通过 [ADR 0021 的备份门禁](../adr/0021-single-operator-windows-production-storage.md#备份与恢复)及 [#471 上线验收](https://github.com/zodea/crm-new/issues/471)。可重置验证实例与 Tauri 旧本地库仍有各自边界，不能用它们替代本机正式数据。
+本指南对应 [#453](https://github.com/zodea/crm-new/issues/453) 的本机磁盘路径，使用方法沿用[分供方档案](./supplier-records.md)与[证照资料核验](./supplier-credential-review.md)。当前已用隔离合成数据验证独立进程重启；首次真实业务写入仍需通过 [ADR 0021 的备份门禁](../adr/0021-single-operator-windows-production-storage.md#备份与恢复)及 [#471 上线验收](https://github.com/zodea/crm-new/issues/471)。可重置验证实例仍有各自边界，不能用它们替代本机正式数据。
 
 ## 当前已可用
 

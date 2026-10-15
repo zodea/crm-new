@@ -1,14 +1,14 @@
 import type { SupplierTaxpayerCommand } from '~/lib/supplier/taxpayer-verification'
 import { describe, expect, it } from 'vitest'
 import { GUANGDONG_TAX_QUERY_URL, preserveTaxpayerVerification } from '~/lib/supplier/taxpayer-verification'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 import { parseSupplierTaxpayerCommand } from '../../server/utils/supplier-taxpayer-request'
 import { createSupplierTaxpayerService } from '../../server/utils/supplier-taxpayer-service'
 
 const session = { workspaceId: 'taxpayer-workspace', actorId: 'taxpayer-actor', capabilities: ['supplier:write', 'supplier:list:read'] }
 
 async function setup() {
-  const instance = createSupplierCommandTestInstance({ createId: () => 'supplier-taxpayer' })
+  const instance = createSupplierCommandService({ createId: () => 'supplier-taxpayer' })
   const created = await instance.execute({ ...session, requiredCapability: 'supplier:write', commandId: 'create', baseVersion: null, action: 'save', attachments: {}, draft: { name: '合成税务分供方', supplierCategory: '其他', contact: '合成人员', taxNo: 'TAX-A', taxpayerType: '未核验', note: '原主档备注' } }, session)
   const service = createSupplierTaxpayerService({ transact: instance.transactCredentialScope }, { now: () => '2026-09-12T12:00:00.000Z', createId: () => 'taxpayer-audit' })
   const command = (): SupplierTaxpayerCommand => ({ supplierId: created.id, origin: 'real', workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'supplier:write', commandId: 'taxpayer-command', baseSupplierVersion: instance.form(created.id, session).version, expectedTaxNo: 'TAX-A', draft: { status: 'not_found', taxpayerType: '小规模纳税人', note: '合成官网未查到记录' } })
@@ -21,7 +21,7 @@ describe('人工税务核验中央边界', () => {
     expect(preserveTaxpayerVerification(historical, { ...historical, taxNo: ' TAX-A ', note: '只改主档备注', taxpayerVerificationSource: '来稿伪来源', taxpayerVerifiedAt: null, taxpayerVerificationNote: '' })).toEqual({ ...historical, taxNo: ' TAX-A ', note: '只改主档备注' })
   })
   it('普通主档保存不能伪造人工核验时间和凭证', async () => {
-    const instance = createSupplierCommandTestInstance({ createId: () => 'supplier-taxpayer' })
+    const instance = createSupplierCommandService({ createId: () => 'supplier-taxpayer' })
     const created = await instance.execute({ ...session, requiredCapability: 'supplier:write', commandId: 'create', baseVersion: null, action: 'save', attachments: {}, draft: {
       name: '合成税务分供方',
       supplierCategory: '其他',

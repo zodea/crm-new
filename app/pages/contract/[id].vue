@@ -10,20 +10,18 @@ import {
   contractStatusTone,
   kindLabels,
 } from '~/lib/contract/status'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { yuan } from '~/lib/util/money'
 import { maskPhone } from '~/lib/util/privacy'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()
-const desktop = isDesktopRuntime()
-const materialOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'material' && isDataOriginDTO(route.query.origin)
+const materialOrigin = computed<DataOriginDTO | null>(() => route.query.contractKind === 'material' && isDataOriginDTO(route.query.origin)
   ? route.query.origin
   : null)
-const constructionOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'construction' && isDataOriginDTO(route.query.origin)
+const constructionOrigin = computed<DataOriginDTO | null>(() => route.query.contractKind === 'construction' && isDataOriginDTO(route.query.origin)
   ? route.query.origin
   : null)
-const subcontractOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'subcontract' && isDataOriginDTO(route.query.origin)
+const subcontractOrigin = computed<DataOriginDTO | null>(() => route.query.contractKind === 'subcontract' && isDataOriginDTO(route.query.origin)
   ? route.query.origin
   : null)
 const contractStore = useContractStore()

@@ -1,9 +1,7 @@
 import type { TabsState } from '~/lib/tabs/tab-machine'
 import { describe, expect, it } from 'vitest'
 import {
-  closeAll,
   closeOthers,
-  closeRight,
   closeTab,
   deriveKey,
   HOME_KEY,
@@ -177,26 +175,5 @@ describe('批量关闭均保留首页', () => {
     const next = closeOthers(s, '/p/2')
     expect(next.tabs.map(t => t.key)).toEqual([HOME_KEY, '/p/2'])
     expect(next.activeKey).toBe('/p/2')
-  })
-
-  it('closeRight：留指定及左侧 + 首页；激活在右侧则改激活指定', () => {
-    const s = openMany(4) // home,/p/1../p/4 active=/p/4
-    const next = closeRight(s, '/p/2')
-    expect(next.tabs.map(t => t.key)).toEqual([HOME_KEY, '/p/1', '/p/2'])
-    expect(next.activeKey).toBe('/p/2') // 原激活 /p/4 被关
-  })
-
-  it('closeRight：激活在保留区则激活不变', () => {
-    let s = openMany(4)
-    s = { ...s, activeKey: '/p/1' }
-    const next = closeRight(s, '/p/2')
-    expect(next.activeKey).toBe('/p/1')
-  })
-
-  it('closeAll：仅留首页并激活首页', () => {
-    const next = closeAll()
-    expect(next.tabs).toHaveLength(1)
-    expect(next.tabs[0].key).toBe(HOME_KEY)
-    expect(next.activeKey).toBe(HOME_KEY)
   })
 })

@@ -52,8 +52,3 @@ const round2 = (n: number) => Math.round(n * 100) / 100
 export function contractBalance(c: { settled: number | null, paid: number | null }): number {
   return round2((c.settled ?? 0) - (c.paid ?? 0))
 }
-
-/** 底部汇总段：对可见行集求和（round2 防浮点尾差）。泛型不加 Record 约束——interface 无隐式 index signature，约束了反而拒收 Contract[]。 */
-export function sumField<T>(rows: readonly T[], field: keyof T): number {
-  return round2(rows.reduce((s, r) => s + (Number(r[field]) || 0), 0))
-}

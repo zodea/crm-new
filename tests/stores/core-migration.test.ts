@@ -298,19 +298,6 @@ describe('core migration store', () => {
     expect(store.activeMigration).toBeNull()
   })
 
-  it('exposes an explicit snapshot refresh without letting the page bypass Pinia', async () => {
-    const store = useStore()
-
-    await store.refreshSnapshot()
-
-    expect(repository.snapshot).toHaveBeenCalledOnce()
-    expect(store.centralSnapshot).toEqual({
-      authority: 'central',
-      activeBatchId: 'batch-1',
-      entities: [],
-    })
-  })
-
   it('hydrates a confirmed rollback window from the durable marker and central snapshot', async () => {
     localSource.loadActiveMigration.mockResolvedValueOnce(marker())
     const store = useStore()

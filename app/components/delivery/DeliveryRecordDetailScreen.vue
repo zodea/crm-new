@@ -5,8 +5,6 @@ import { yuan } from '~/lib/util/money'
 
 const route = useRoute()
 const store = useDeliveryRecordStore()
-const projectStore = store.mode === 'central' ? null : useProjectStore()
-const supplierStore = store.mode === 'central' ? null : useSupplierStore()
 const { confirm, undoToast, error } = useKitUI()
 
 const recordId = computed(() => String(route.params.id))
@@ -15,13 +13,13 @@ const loadError = shallowRef('')
 const deleting = shallowRef(false)
 const requestedOrigin = computed(() => route.query?.origin ?? 'real')
 const record = computed(() => loaded.value && !loadError.value ? store.byId(recordId.value) : undefined)
-const projectName = computed(() => store.mode === 'central' ? record.value?.projectName : record.value && projectStore?.byId(record.value.projectId)?.name)
-const supplierName = computed(() => store.mode === 'central' ? record.value?.supplierName : record.value?.supplierId && supplierStore?.byId(record.value.supplierId)?.name)
-const canWrite = computed(() => !!record.value && (store.mode !== 'central' || store.canWrite))
+const projectName = computed(() => (record.value?.projectName))
+const supplierName = computed(() => (record.value?.supplierName))
+const canWrite = computed(() => !!record.value && (store.canWrite))
 let active = true
 let request = 0
 function path(value: string) {
-  return store.mode === 'central' ? `${value}?origin=${store.origin}` : value
+  return (`${value}?origin=${store.origin}`)
 }
 
 useTabTitle(() => record.value?.orderNo ? `送货单 ${record.value.orderNo}` : record.value ? '未编号送货单' : undefined)
@@ -77,13 +75,13 @@ async function refresh() {
   loaded.value = false
   loadError.value = ''
   try {
-    if (store.mode === 'central' && requestedOrigin.value !== store.origin)
+    if (requestedOrigin.value !== store.origin)
       throw new Error('链接来源与当前数据模式不同，请切换到对应来源后重新读取')
-    await Promise.all([store.load(), projectStore?.load(), supplierStore?.load()])
+    await store.load()
     if (!active || generation !== request)
       return
     const current = store.byId(recordId.value)
-    if (store.mode === 'central' && current && current.dataOrigin !== requestedOrigin.value)
+    if (current && current.dataOrigin !== requestedOrigin.value)
       throw new Error('当前记录来源不匹配，请重新读取')
   }
   catch (cause) {
@@ -186,7 +184,7 @@ onBeforeUnmount(suspend)
         </div>
       </div>
     </div>
-    <DeliveryRecordHistory v-if="store.mode === 'central'" :record-id="record.id" :current-version="record.version" />
+    <DeliveryRecordHistory :record-id="record.id" :current-version="record.version" />
   </div>
 
   <div v-else-if="loadError" role="alert" class="panel p-6 text-13px text-danger">

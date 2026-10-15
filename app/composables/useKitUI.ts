@@ -156,7 +156,6 @@ export function useKitUI() {
     loading: toast.loading,
     promise: toast.promise,
     updateToast: toast.update,
-    dismissToast: toast.dismiss,
     undoToast: toast.undo,
     confirm,
     formModal,

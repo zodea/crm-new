@@ -293,7 +293,7 @@ const conditions = [{ key: 'freight' as const, label: '运费条件' }, { key: '
           </button>
         </fieldset>
       </section>
-      <FileRefAttachmentSection :attachments="attachments" :pending-attachments="pending" :pending-remove-ids="removeIds" :pending-restore-ids="restoreIds" :desktop-picker="false" :note="draft.note" :readonly="!canWrite || Boolean(session.pending) || session.busy" picker-description="选择真实报价原件，正文与报价同次保存" @files="pickFiles" @toggle-existing="toggleFile" @remove-pending="pending = pending.filter(file => file.localId !== $event)" @patch-pending="(fileId, patch) => { const file = pending.find(file => file.localId === fileId); if (file) Object.assign(file, patch) }" @update-note="draft.note = $event" />
+      <FileRefAttachmentSection :attachments="attachments" :pending-attachments="pending" :pending-remove-ids="removeIds" :pending-restore-ids="restoreIds" :note="draft.note" :readonly="!canWrite || Boolean(session.pending) || session.busy" picker-description="选择真实报价原件，正文与报价同次保存" @files="pickFiles" @toggle-existing="toggleFile" @remove-pending="pending = pending.filter(file => file.localId !== $event)" @patch-pending="(fileId, patch) => { const file = pending.find(file => file.localId === fileId); if (file) Object.assign(file, patch) }" @update-note="draft.note = $event" />
       <p v-if="history.length" class="m-0 text-13px text-ink-soft">
         已保留 {{ history.length }} 个不可变报价版本，可在报价详情查看历史原价与原件。
       </p>

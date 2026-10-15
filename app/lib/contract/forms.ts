@@ -1,6 +1,5 @@
 import type { OurSignatorySnapshot } from '../our-signatory/contract'
 import type { TransactionDb } from '~/lib/db/coordinator'
-import type { LookupOption } from '~/lib/kit/lookup'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
   hiddenCtesFor,
@@ -15,14 +14,12 @@ import {
 import { applyFileRefChanges } from '~/lib/forms/file-refs'
 import { contractOriginalPayloadDigest } from '~/lib/forms/original-content'
 import { materialContractTotal, validateMaterialDetails, validateMaterialSourceOriginals } from '~/lib/material-contract/line-model'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { generateId } from '~/lib/util/id'
 import { adoptConstructionManagementFee, emptyConstructionManagementFee, validateConstructionManagementFee } from '../construction-contract/management-fee'
 import { persistNativeConstructionManagementFee, readNativeConstructionManagementFee } from '../construction-contract/management-fee-storage'
 import { decodeOurSignatorySnapshot } from '../our-signatory/contract'
 import { contractNumberConflict, recordContractNumber } from '../our-signatory/number-registry'
 import { resolveContractSignatory } from '../our-signatory/storage'
-import { CONFIRMED_SETTLEMENT_SQL_VALUES } from './effective-status'
 
 export type F2FormKind
   = | 'construction'
@@ -321,15 +318,6 @@ async function assertProjectCustomerRelation(
     throw new Error('项目不存在或已删除')
   if (project.customer_id !== customerId)
     throw new Error('甲方客户与所选项目不一致')
-}
-
-export function contractLineItemAmount(line: ContractLineItemDraft): number {
-  return (nullableNumber(line.qty) ?? 0)
-    * (nullableNumber(line.taxInclusiveUnitPrice) ?? 0)
-}
-
-export function contractLineItemsTotal(lines: ContractLineItemDraft[] = []): number {
-  return lines.reduce((total, line) => total + contractLineItemAmount(line), 0)
 }
 
 function validateLineItems(
@@ -971,7 +959,7 @@ export async function saveF2Form(
   action: F2SaveAction,
   attachments: ContractFormAttachmentChanges = {},
 ): Promise<F2FormSaveResult> {
-  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis && !isDesktopRuntime())
+  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis)
     throw new Error('浏览器辅助合同请通过中央合同表单保存')
   return withTransaction(async (tx) => {
     if (kind === 'material')
@@ -1219,47 +1207,6 @@ export async function listContractFormAttachments(
   }))
 }
 
-export async function listExpenditureSettlementOptions(
-  filters: {
-    projectId?: string | null
-    supplierId?: string | null
-    contractId?: string | null
-  } = {},
-): Promise<LookupOption[]> {
-  const conditions = [`settlement.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})`]
-  const params: unknown[] = []
-  for (const [column, value] of [
-    ['project_id', filters.projectId],
-    ['supplier_id', filters.supplierId],
-    ['contract_id', filters.contractId],
-  ] as const) {
-    if (!value)
-      continue
-    conditions.push(`settlement.${column} = ?`)
-    params.push(value)
-  }
-  const rows = await select<{
-    id: string
-    name: string
-    total_amount: number
-  }>(`
-    ${hiddenCtesFor('expenditure_settlements', 'contracts')}
-    SELECT settlement.id, settlement.name, settlement.total_amount
-    FROM expenditure_settlements AS settlement
-    JOIN contracts AS contract
-      ON contract.id = settlement.contract_id
-    WHERE ${visibleCond('expenditure_settlements', 'settlement')}
-      AND ${visibleCond('contracts', 'contract')}
-      AND ${conditions.join(' AND ')}
-    ORDER BY settlement.settlement_date DESC, settlement.created_at DESC
-  `, params)
-  return rows.map(row => ({
-    id: row.id,
-    label: row.name,
-    hint: Number(row.total_amount).toFixed(2),
-  }))
-}
-
 interface DeleteBlocker {
   table: string
   column: string
@@ -1343,7 +1290,7 @@ export async function deleteF2Form(
   kind: F2FormKind,
   id: string,
 ): Promise<string | null> {
-  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis && !isDesktopRuntime())
+  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis)
     throw new Error('浏览器辅助合同不允许从旧本地源删除')
   return withTransaction(async (tx) => {
     if (PROJECT_FORM_KINDS.has(kind)) {
@@ -1359,7 +1306,7 @@ export async function deleteF2Form(
 
 /** Restore and number ownership share the actual Native transaction; generic undo cannot bypass it. */
 export async function undoF2Form(kind: F2FormKind, logId: string): Promise<boolean> {
-  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis && !isDesktopRuntime())
+  if ((kind === 'other_expense' || kind === 'company_expense') && 'window' in globalThis)
     throw new Error('浏览器辅助合同不允许从旧本地源撤回')
   return withTransaction(async (tx) => {
     const log = (await tx.select<{ table_name: string, record_id: string }>('SELECT table_name,record_id FROM operation_logs WHERE id=?', [logId]))[0]

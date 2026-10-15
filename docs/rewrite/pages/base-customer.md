@@ -29,7 +29,7 @@
 | 开票与银行 | 开票名称、开户行、银行账号 |
 | 联系与备注 | 联系人*、联系电话、备注、开票资料附件（最多 9 份） |
 
-浏览器正式客户表单只经 `CustomerCommandStore → CustomerCommandRepository → HTTP` 保存；新建 ID 由服务端分配，编辑携带 `baseVersion`，冲突时禁止静默覆盖。简称使用中英文逗号或顿号分隔，保存后参与客户检索。附件以命令变更集和 `file_refs` 元数据维护，不在客户头保存文件数组。测试客户只读，Tauri 仍保留既有本地适配路径。
+浏览器正式客户表单只经 `CustomerCommandStore → CustomerCommandRepository → HTTP` 保存；新建 ID 由服务端分配，编辑携带 `baseVersion`，冲突时禁止静默覆盖。简称使用中英文逗号或顿号分隔，保存后参与客户检索。附件以命令变更集和 `file_refs` 元数据维护，不在客户头保存文件数组。测试客户只读。
 
 ## 详情
 

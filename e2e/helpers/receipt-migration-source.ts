@@ -27,7 +27,6 @@ async function prepare() {
       VALUES ('http-file-436', 'receipt_registration', 'http-receipt-436', '迁移收款凭证.txt', 'C:/old-private/receipt.txt', 6, 'text/plain', 'voucher', '历史经办', '2026-09-10 01:00:00')`)
     await db.execute(`INSERT INTO file_payloads (file_ref_id, encoding, content) VALUES ('http-file-436', 'base64', '5pS25qy+')`)
     const source = await createCoreMigrationLocalSource({
-      isNative: () => false,
       isDemoActive: () => false,
       currentSchemaVersion: async () => LATEST_VERSION,
       select: sql => db.select(sql),

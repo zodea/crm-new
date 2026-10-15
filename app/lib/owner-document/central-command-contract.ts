@@ -9,7 +9,6 @@ import type {
   OwnerReportAuditDraft,
 } from './forms'
 
-export const OWNER_COMMERCIAL_DOCUMENT_READ_CAPABILITY = 'owner-document:read' as const
 export const OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY = 'owner-document:write' as const
 export const SUBCONTRACT_CHANGE_READ_CAPABILITY = 'subcontract-document:read' as const
 export const SUBCONTRACT_CHANGE_WRITE_CAPABILITY = 'subcontract-document:write' as const

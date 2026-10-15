@@ -4,6 +4,7 @@ import type { NotificationPage } from '~/lib/notifications/contract'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
+import { stageDataVisibilitySwitch } from '~/lib/data-visibility'
 import { notificationPendingKey } from '~/lib/notifications/pending'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import { useNotificationStore } from '~/stores/notifications'
@@ -17,10 +18,8 @@ describe('通知中心', () => {
   })
 
   async function enableDemo() {
-    const visibility = useDataVisibilityStore()
-    await visibility.initialize()
-    await visibility.authorizeDemo(async () => true)
-    visibility.commitPreference(true)
+    stageDataVisibilitySwitch(sessionStorage, true)
+    await useDataVisibilityStore().initialize(async () => true)
   }
 
   it('正式模式不暴露演示通知和角标', () => {
@@ -41,7 +40,7 @@ describe('通知中心', () => {
     const store = useNotificationStore()
     const firstUnread = store.items.find(item => !item.read)!
 
-    store.markRead(firstUnread.id)
+    store.openItem(firstUnread.id)
     expect(store.items.find(item => item.id === firstUnread.id)?.read).toBe(true)
 
     store.markAllRead()

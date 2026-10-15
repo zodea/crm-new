@@ -2,7 +2,7 @@ import type { PayrollActualLedgerRead } from '~/lib/payroll/central-actual-contr
 import type { PayrollStatementRow } from '~/lib/payroll/central-contract'
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
-import { createPayrollCompleteWorkbook, createPayrollMonthlyArchive } from '~/lib/payroll/complete-workbook'
+import { createPayrollCompleteWorkbook, createPayrollMonthlyArchiveFiles } from '~/lib/payroll/complete-workbook'
 import { payrollUiDocument } from '../helpers/payroll-a-ui-fixture'
 import { c1Frozen } from '../helpers/payroll-c1-ui'
 import { c2Frozen } from '../helpers/payroll-c2-ui'
@@ -56,22 +56,6 @@ function ledger(statementIds: string[], value: number): PayrollActualLedgerRead 
   }
 }
 
-function zipEntries(data: Uint8Array): { name: string, data: Uint8Array }[] {
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
-  const decoder = new TextDecoder()
-  const entries: { name: string, data: Uint8Array }[] = []
-  let offset = 0
-  while (offset + 30 <= data.length && view.getUint32(offset, true) === 0x04034B50) {
-    const size = view.getUint32(offset + 18, true)
-    const nameLength = view.getUint16(offset + 26, true)
-    const extraLength = view.getUint16(offset + 28, true)
-    const start = offset + 30 + nameLength + extraLength
-    entries.push({ name: decoder.decode(data.subarray(offset + 30, offset + 30 + nameLength)), data: data.slice(start, start + size) })
-    offset = start + size
-  }
-  return entries
-}
-
 describe('完整工资工作簿与按月归档', () => {
   it('按月合计各张 A 单本次核算，不拿全月最后一张累计代替多名负责人与管理簿', () => {
     const documents = [
@@ -80,8 +64,7 @@ describe('完整工资工作簿与按月归档', () => {
       { ...payrollUiDocument(), id: 'management-one', leaderName: '同名负责人', cumulativeAmount: 550, previouslyPaid: 350, grossAmount: 200, actualAmount: 180 },
     ]
     const entries = documents.map((document, index) => ({ row: row(document, { leaderWorkerId: index === 1 ? 'leader-two' : 'leader-one', book: index === 2 ? { bookPurpose: 'management' as const, managementBookId: 'management-one' } : { bookPurpose: 'ordinary' as const, managementBookId: null } }), document }))
-    const output = createPayrollMonthlyArchive('真实项目', [{ key: '2026-09', label: '真实项目-2026-09', entries, actualLedger: ledger(documents.map(document => document.id), 1130) }], [])
-    const files = zipEntries(output.data as Uint8Array)
+    const files = createPayrollMonthlyArchiveFiles('真实项目', [{ key: '2026-09', label: '真实项目-2026-09', entries, actualLedger: ledger(documents.map(document => document.id), 1130) }], [])
     const book = XLSX.read(files[1]!.data, { type: 'array' })
     expect(XLSX.utils.sheet_to_json((book.Sheets.月度对账 ?? book.Sheets.周期对账)!)).toEqual([expect.objectContaining({ 公式应付: 1300, 净实际: 1130, 差额: 170, 公式口径: expect.stringContaining('各张原单本次核算') })])
     expect(XLSX.utils.sheet_to_json(book.Sheets.目录!).map(item => (item as { 稳定工资身份: string }).稳定工资身份)).toEqual(['ordinary-one', 'ordinary-two', 'management-one'])
@@ -95,11 +78,10 @@ describe('完整工资工作簿与按月归档', () => {
     const c1 = { ...c1Frozen(), id: 'c1-mixed', month: '2026-09', grossAmount: 0.1, actualAmount: 0.1 }
     const c2 = { ...c2Frozen(), id: 'c2-mixed', month: '2026-09', grossAmount: 0.2, actualAmount: 0.2 }
     const documents = [second, c1, c2]
-    const output = createPayrollMonthlyArchive('真实项目', [
+    const files = createPayrollMonthlyArchiveFiles('真实项目', [
       { key: '2026-08', label: '真实项目-2026-08', entries: [{ row: row(first), document: first }], actualLedger: ledger(['a-first'], 800) },
       { key: '2026-09', label: '真实项目-2026-09', entries: documents.map(document => ({ row: row(document), document })), actualLedger: ledger(documents.map(document => document.id), 700.3) },
     ], [])
-    const files = zipEntries(output.data as Uint8Array)
     const august = XLSX.read(files[1]!.data, { type: 'array' })
     const september = XLSX.read(files[2]!.data, { type: 'array' })
     expect(XLSX.utils.sheet_to_json(august.Sheets.月度对账!)).toEqual([expect.objectContaining({ 公式应付: 1000, 净实际: 800, 差额: 200 })])
@@ -120,8 +102,8 @@ describe('完整工资工作簿与按月归档', () => {
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY])('不把不可用的历史公式金额 %s 算成零或可计算结论', (grossAmount) => {
     const document = { ...c1Frozen(), grossAmount }
-    const output = createPayrollMonthlyArchive('真实项目', [{ key: document.month, label: '历史缺损月份', entries: [{ row: row(document), document }], actualLedger: ledger([document.id], document.actualAmount) }], [])
-    const file = zipEntries(output.data as Uint8Array)[1]!
+    const files = createPayrollMonthlyArchiveFiles('真实项目', [{ key: document.month, label: '历史缺损月份', entries: [{ row: row(document), document }], actualLedger: ledger([document.id], document.actualAmount) }], [])
+    const file = files[1]!
     const book = XLSX.read(file.data, { type: 'array' })
     expect(XLSX.utils.sheet_to_json(book.Sheets.月度对账!, { defval: null })).toEqual([expect.objectContaining({ 公式应付: null, 差额: null, 对账结论: '不可判定' })])
   })
@@ -144,15 +126,14 @@ describe('完整工资工作簿与按月归档', () => {
     expect(book.SheetNames.filter(name => name.includes('发放汇总'))).toHaveLength(2)
   })
 
-  it('按月 ZIP 真正创建月份目录；C1 保工资+考勤，C2 保工资+签工且没有考勤', () => {
+  it('按月归档按月份目录组织；C1 保工资+考勤，C2 保工资+签工且没有考勤', () => {
     const c1 = { ...c1Frozen(), id: 'c1', projectId: 'project', projectName: '真实项目', month: '2026-08' }
     const c2 = { ...c2Frozen(), id: 'c2', projectId: 'project', projectName: '真实项目', month: '2026-09' }
-    const output = createPayrollMonthlyArchive('真实项目', [
+    const files = createPayrollMonthlyArchiveFiles('真实项目', [
       { key: '2026-08', label: '真实项目-2026-08', entries: [{ row: row(c1), document: c1 }], actualLedger: ledger(['c1'], c1.actualAmount) },
       { key: '2026-09', label: '真实项目-2026-09', entries: [{ row: row(c2), document: c2 }], actualLedger: ledger(['c2'], c2.actualAmount) },
     ], [{ statementId: 'missing', month: '2026-09', formatFamily: 'A', reason: '旧工资缺冻结正文' }])
-    const files = zipEntries(output.data as Uint8Array)
-    expect(files.map(file => file.name)).toEqual(['00-归档说明.md', '2026-08/真实项目-2026-08-完整工资工作簿-未正式出具.xlsx', '2026-09/真实项目-2026-09-部分工资工作簿-未正式出具.xlsx'])
+    expect(files.map(file => file.path)).toEqual(['00-归档说明.md', '2026-08/真实项目-2026-08-完整工资工作簿-未正式出具.xlsx', '2026-09/真实项目-2026-09-部分工资工作簿-未正式出具.xlsx'])
     const august = XLSX.read(files[1]!.data, { type: 'array' })
     const september = XLSX.read(files[2]!.data, { type: 'array' })
     expect(august.SheetNames).toEqual(expect.arrayContaining(['01_C1_工资表', '01_C1_考勤表']))

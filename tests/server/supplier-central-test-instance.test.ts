@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SUPPLIER_WRITE_CAPABILITY } from '~/lib/supplier/command-contract'
 import { SupplierRepositoryProblem } from '~/lib/supplier/repository'
 import { parseSupplierCommandRequest } from '../../server/utils/supplier-command-request'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 import { createSupplierReadTestInstance } from '../../server/utils/supplier-read-test-instance'
 
 const session: BusinessSession = {
@@ -18,7 +18,7 @@ describe('分供方中央写入测试实例', () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date('2026-08-23T15:59:59.000Z'))
-      const commands = createSupplierCommandTestInstance({ createId: () => 'read-proof-supplier' })
+      const commands = createSupplierCommandService({ createId: () => 'read-proof-supplier' })
       const reads = createSupplierReadTestInstance(() => session.capabilities, (id, asOf) => commands.rows(id, asOf), (id, asOf) => commands.sourceVersion(id, asOf))
       await commands.execute({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: SUPPLIER_WRITE_CAPABILITY, commandId: 'read-proof-create', baseVersion: null, action: 'save', draft: { name: '读取证据', supplierCategory: '材料供应商', contact: '联系人' }, attachments: {} }, session)
       const facts = structuredClone(commands.snapshot())
@@ -39,7 +39,7 @@ describe('分供方中央写入测试实例', () => {
     finally { vi.useRealTimers() }
   })
   it('独立保存劳务范围，省略保留、显式清空，并从列表与详情回读', async () => {
-    const commands = createSupplierCommandTestInstance({ createId: () => 'labor-supplier' })
+    const commands = createSupplierCommandService({ createId: () => 'labor-supplier' })
     const reads = createSupplierReadTestInstance(() => session.capabilities, id => commands.rows(id), id => commands.sourceVersion(id))
     const base = {
       workspaceId: session.workspaceId,
@@ -78,7 +78,7 @@ describe('分供方中央写入测试实例', () => {
   })
 
   it('以服务端 ID 建档、幂等执行，并暴露中央读取行', async () => {
-    const commands = createSupplierCommandTestInstance({
+    const commands = createSupplierCommandService({
       createId: () => 'supplier-real-1',
       now: () => '2026-08-23T03:00:00.000Z',
     })
@@ -123,7 +123,7 @@ describe('分供方中央写入测试实例', () => {
   })
 
   it('由同一中央读取端回读正式主档，并让演示四类事实保持真实来源', async () => {
-    const commands = createSupplierCommandTestInstance({
+    const commands = createSupplierCommandService({
       createId: () => 'supplier-real-read',
       now: () => '2026-08-23T03:30:00.000Z',
     })
@@ -169,7 +169,7 @@ describe('分供方中央写入测试实例', () => {
   })
 
   it('更新要求匹配 baseVersion，且正式保存校验三个必填字段', async () => {
-    const commands = createSupplierCommandTestInstance({
+    const commands = createSupplierCommandService({
       createId: () => 'supplier-real-2',
       now: () => '2026-08-23T04:00:00.000Z',
     })

@@ -50,16 +50,9 @@
 | [tests/server/quantity-migration.test.ts](../../../tests/server/quantity-migration.test.ts) | 单元／服务／状态 | 完整工程量在准备期间占住实例队列，确认后从同一服务读回映射身份，重复同步保持版本 |
 | [tests/server/quantity-test-instance.test.ts](../../../tests/server/quantity-test-instance.test.ts) | 单元／服务／状态 | 工程量中央 SQL 测试实例 |
 | [tests/server/quantity-workspace.test.ts](../../../tests/server/quantity-workspace.test.ts) | 单元／服务／状态 | 预算工作区事务不要求工程量或项目权限，失败不发布半份SQL |
-| [tests/stores/quantity-archive.test.ts](../../../tests/stores/quantity-archive.test.ts) | 单元／服务／状态 | quantity matrix archive：归档独立 action 与全域写入门控 |
-| [tests/stores/quantity-assignment.test.ts](../../../tests/stores/quantity-assignment.test.ts) | 单元／服务／状态 | quantity store：户×工种责任配置唯一写路径 |
-| [tests/stores/quantity-batch-completion.test.ts](../../../tests/stores/quantity-batch-completion.test.ts) | 单元／服务／状态 | quantity batch completion：整工种批量展开与逐阶段写入 |
-| [tests/stores/quantity-completion.test.ts](../../../tests/stores/quantity-completion.test.ts) | 单元／服务／状态 | quantity stage completion：单户×单阶段唯一写路径 |
 | [tests/stores/quantity-derived.test.ts](../../../tests/stores/quantity-derived.test.ts) | 单元／服务／状态 | quantity derived：统一派生读 seam |
 | [tests/stores/quantity-hollow-pending.test.ts](../../../tests/stores/quantity-hollow-pending.test.ts) | 单元／服务／状态 | 响应丢失冷恢复保原键原正文，后来版本不能覆盖原提交 |
 | [tests/stores/quantity-hollow-startup.test.ts](../../../tests/stores/quantity-hollow-startup.test.ts) | 单元／服务／状态 | 刷新精确空鼓工作页保直接目标，仍不保存为可恢复只读页签 |
-| [tests/stores/quantity-source.test.ts](../../../tests/stores/quantity-source.test.ts) | 单元／服务／状态 | 工程量运行环境入口 |
-| [tests/stores/quantity-template.test.ts](../../../tests/stores/quantity-template.test.ts) | 单元／服务／状态 | quantity store：户型模板唯一写路径 |
-| [tests/stores/quantity.test.ts](../../../tests/stores/quantity.test.ts) | 单元／服务／状态 | quantity store |
 | [tests/tabs/quantity-hollow-restore.test.ts](../../../tests/tabs/quantity-hollow-restore.test.ts) | 单元／服务／状态 | 真实原户空鼓冷恢复分别核验户、记录和历史修订并保工资原稿返回 |
 | [tests/tabs/quantity-restore.test.ts](../../../tests/tabs/quantity-restore.test.ts) | 单元／服务／状态 | 中央工程量户详情只读恢复 |
 | [tests/quantity/command-recovery.test.ts](../../../tests/quantity/command-recovery.test.ts) | 单元／服务／状态 | 工程量最小原编号及准确目标恢复 |
@@ -83,7 +76,7 @@
 | [tests/components/QuantityHollowFormState.test.ts](../../../tests/components/QuantityHollowFormState.test.ts) | 组件（jsdom） | 未知保存完整字段冷恢复，核对原提交后才进入真实记录详情 |
 | [tests/components/QuantityHollowHistory.test.ts](../../../tests/components/QuantityHollowHistory.test.ts) | 组件（jsdom） | 当前19减4显示15，原检查与整改的日期处数分别可读 |
 | [tests/components/QuantityHollowRectification.test.ts](../../../tests/components/QuantityHollowRectification.test.ts) | 组件（jsdom） | 真实公开来源 19 处取消小确认保输入，确认整改 4 处后仍保原检查且余 15 |
-| [tests/components/QuantityHollowRuntime.test.ts](../../../tests/components/QuantityHollowRuntime.test.ts) | 组件（jsdom） | 桌面原户深链不挂载三类中央空鼓页面，浏览器仍由原页读取权限 |
+| [tests/components/QuantityHollowRuntime.test.ts](../../../tests/components/QuantityHollowRuntime.test.ts) | 组件（jsdom） | 户深链挂载中央空鼓页面并由原页读取权限 |
 | [tests/components/QuantityScreenCentral.test.ts](../../../tests/components/QuantityScreenCentral.test.ts) | 组件（jsdom） | 正式工程量矩阵来源与入口 |
 | [tests/components/QuantityStageFields.test.ts](../../../tests/components/QuantityStageFields.test.ts) | 组件（jsdom） | 阶段整页字段 |
 | [tests/components/QuantityStageFormPage.test.ts](../../../tests/components/QuantityStageFormPage.test.ts) | 组件（jsdom） | 施工阶段配置整页 |
