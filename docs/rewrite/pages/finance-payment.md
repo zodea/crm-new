@@ -177,7 +177,7 @@
 
 `sourceDocument` 遵循现行 `EntityRefDTO` / `NavigationIntentDTO` 与 Target Registry 契约；缺稳定 ID、来源不一致或目标未注册时显示具体不可达原因，不由 DTO 拼可选路由，也不按单号/名称猜路由。
 
-工资实际收付在付款管理中作为独立只读分区，来源为工资 Repository 的项目台账。该分区按稳定原工资/收付身份下钻，保留返回入口；金额不并入 `payment_applications`、`payment_records` 或往来指标。P4 的跨域限定状态见[工资实施票](../../research/issue-review-2026-09-11/payroll-tickets/04-central-adjustments-and-actual-payments.md)，操作说明见[工资更正指南](../../guides/payroll-adjustments.md)。
+工资实际收付在付款管理中作为独立只读分区，来源为工资 Repository 的项目台账。该分区按稳定原工资/收付身份下钻，保留返回入口；金额不并入 `payment_applications`、`payment_records` 或往来指标。规则见[工资页面第六节](./subcontract-payroll.md#六独立更正与实际收付p4)，操作说明见[工资更正指南](../../guides/payroll-adjustments.md)。
 
 ### 3. 当前不扩张的相邻页面
 

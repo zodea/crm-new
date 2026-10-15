@@ -16,8 +16,11 @@
 | 专用视觉矩阵 | Playwright：`pnpm test:visual` | [视觉配置](../../playwright.visual.config.ts)，固定 Windows/Chromium 与隔离演示服务 |
 | 应用类型 | `pnpm typecheck` | Nuxt 项目类型；不覆盖普通测试、E2E 和测试配置的整体类型检查 |
 | 已纳入的工资测试类型 | `pnpm exec vue-tsc --noEmit -p tests/payroll/tsconfig.json` | 仅[配置](../../tests/payroll/tsconfig.json)显式纳入的文件及依赖 |
+| 循环依赖 | dpdm：`pnpm check:cycles` | [配置](../../dpdm.config.ts)覆盖的应用与服务端 TS 模块；调整模块边界或抽取共享逻辑后运行 |
+| 依赖重复版本 | node-modules-inspector：`pnpm check:deps` | [配置](../../node-modules-inspector.config.ts)；新增、升级依赖后运行 |
+| Markdown 相对链接 | `pnpm check:links` | 全仓已跟踪 Markdown；提交钩子只拦截本次引入的断链 |
 
-`pnpm test` 不包含浏览器组件、E2E 或视觉矩阵。浏览器组件与工资测试类型检查目前也未接入推送钩子和 CI，涉及这些文件时须单独选择对应本地入口。钩子实际执行范围见 [Git 工作流](../agents/git-workflow.md)，远端套件见 [CI 使用规则](../agents/ci-usage.md)。
+`pnpm test` 不包含浏览器组件、E2E 或视觉矩阵。浏览器组件、工资测试类型、循环依赖与依赖重复检查目前也未接入推送钩子和 CI，涉及这些文件时须单独选择对应本地入口。钩子实际执行范围见 [Git 工作流](../agents/git-workflow.md)，远端套件见 [CI 使用规则](../agents/ci-usage.md)。
 
 E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库，每案独占重置、接管和回读旅程。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。
 

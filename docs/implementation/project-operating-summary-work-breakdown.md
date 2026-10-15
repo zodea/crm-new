@@ -24,4 +24,4 @@
 5. 以[样本验收清单](../migration/ruijing-acceptance.md)核对合同、结算、银行支付与差异来源；样本金额只用于本地受控对账，不硬编码或提交真实票据。
 6. 完成后同步对应权威源、用户指南及验收证据，由 [#415](https://github.com/zodea/crm-new/issues/415) 汇总全模块规格与剩余差异。
 
-新路线见 [#402](https://github.com/zodea/crm-new/issues/402)，业务方向见[模块流程图](../research/module-development-flows.md)。旧 #116、#117、#104 等只保留决定与实现来源，不再作为本页排期入口。
+新路线见 [#402](https://github.com/zodea/crm-new/issues/402)，数据归属见 [ARCHITECTURE · 逻辑数据归属](../rewrite/ARCHITECTURE.md#data-ownership)。旧 #116、#117、#104 等只保留决定与实现来源，不再作为本页排期入口。

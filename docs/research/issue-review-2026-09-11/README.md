@@ -1,12 +1,12 @@
 # 瑞航 CRM 逐 Issue 审阅
 
-> 非权威源 · 2026-09-22 01:33 的开发状态快照。此页与交互报告保留当时状态；其后185个提交已经合入，31个独立Issue的最新远端交付核验见[交付记录](../../design/evidence/completed-issue-delivery-2026-09-22.md)。不要依据下表的“未推送”重新开发。#412 的旧 grill 已有新答案与独立承接，当前以[调查收尾](../../design/evidence/issue-412-decision-closeout.md)为准；下表保留历史快照，不是当前待问清单。
+> 非权威源 · 2026-09-22 01:33 的开发状态快照。此页与交互报告保留当时状态；其后185个提交已经合入，31个独立Issue的最新远端交付核验见[交付记录](https://github.com/zodea/crm-new/blob/212a1cb5/docs/design/evidence/completed-issue-delivery-2026-09-22.md)。不要依据下表的“未推送”重新开发。#412 的旧 grill 已有新答案与独立承接，当前以[#412 最终裁定](https://github.com/zodea/crm-new/issues/412#issuecomment-5769698605)为准；下表保留历史快照，不是当前待问清单。
 
 [打开可交互报告](./index.html)：完整业务流程、每个 Issue 流程图/异常返回、交互示意、实际截图与可导出的审阅意见。
 
 当前 46 个开放 Issue；本地完成 31，部分完成 14，实施中 0，已定稿待开发 0，待裁定 1。本地完成不代表远端交付或生产上线。
 
-按当前本地远端引用比较：领先 184，落后 0。远端获取、冲突及开放 PR 核查见[分支整合记录](../local-branch-integration-2026-09-10.md)。快照 HEAD `a2f117f52dffe3d7867f4ff82a1d62be372b0c2b`。
+按当前本地远端引用比较：领先 184，落后 0。远端获取、冲突及开放 PR 核查见[分支整合记录](https://github.com/zodea/crm-new/blob/212a1cb5/docs/research/local-branch-integration-2026-09-10.md)。快照 HEAD `a2f117f52dffe3d7867f4ff82a1d62be372b0c2b`。
 
 | Issue | 现状 | 已处理 | 剩余 |
 | --- | --- | --- | --- |
@@ -59,7 +59,7 @@
 
 ## 完整业务方向
 
-[既有全模块流程图](../module-development-flows.md)提供各模块 Mermaid 源图。本报告用可点击总图显示跨模块依赖及当前实现状态，不替代权威源。
+模块数据归属见 [ARCHITECTURE · 逻辑数据归属](../../rewrite/ARCHITECTURE.md#data-ownership)。本报告用可点击总图显示跨模块依赖及当前实现状态，不替代权威源。
 
 ## 更新方式
 

@@ -4,7 +4,7 @@
 
 产品与正式证据提交为 `fd0a7b6b4ab58eb177eea1db86a069067be92a4a`，正常提交钩子再次通过 654 文件 / 3866 项，112 个代码内容身份与提交一致，见[提交回执](./commit-receipt.json)。693 个专用临时文件及此前 15 份重复证据已送入回收站，可恢复；正式产物保留，见[清理记录](./cleanup-record.json)。
 
-本期承接[本地 P2 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/02-central-c1-attendance.md)。业务口径以[工资页面](../../../rewrite/pages/subcontract-payroll.md)、[数据库](../../../rewrite/DATABASE.md)与[命令](../../../rewrite/COMMANDS.md)为准；P1 的通过结果不替代本期 C1 验收。
+本期承接[本地 P2 实施票](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/02-central-c1-attendance.md)。业务口径以[工资页面](../../../rewrite/pages/subcontract-payroll.md)、[数据库](../../../rewrite/DATABASE.md)与[命令](../../../rewrite/COMMANDS.md)为准；P1 的通过结果不替代本期 C1 验收。
 
 ## 本期流程
 
@@ -75,4 +75,4 @@ flowchart TD
 
 ## 后续边界
 
-P3 新签工/C2、P4 补退及完整成本消费者、P5 房补管理费、P6 空鼓、P7 批量建议及完整工作簿继续独立实施；已记录的业务取舍留在各票 `$grill`。逐 Issue 流程与完整总图由[交互报告](../../../research/issue-review-2026-09-11/index.html#issue-412)统一展示。
+P3 新签工/C2、P4 补退及完整成本消费者、P5 房补管理费、P6 空鼓、P7 批量建议及完整工作簿继续独立实施；已记录的业务取舍留在各票 `$grill`。逐 Issue 流程与完整总图由[交互报告](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/index.html#issue-412)统一展示。

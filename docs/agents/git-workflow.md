@@ -6,7 +6,7 @@ Husky 由 `pnpm install` 的 `prepare` 启用；入口在 [`.husky/`](../../.hus
 
 | 时机 | 顺序与作用 |
 | --- | --- |
-| `pre-commit` | `git diff --cached --check` 检查新增冲突标记与空白；`git-hooks.mjs staged` 拦截暂存的临时目录、嵌套工作树和缓存；`pnpm exec lint-staged --concurrent=1` 逐批检查暂存代码 |
+| `pre-commit` | `git diff --cached --check` 检查新增冲突标记与空白；`git-hooks.mjs staged` 拦截暂存的临时目录、嵌套工作树和缓存；[`check-md-links.mjs --staged`](../../scripts/check-md-links.mjs) 拦截本次引入的 Markdown 相对链接失效（暂存文档中的断链，以及仍指向本次删除/改名路径的链接；历史断链不阻止提交，全量用 `pnpm check:links` 查看）；`pnpm exec lint-staged --concurrent=1` 逐批检查暂存代码 |
 | `commit-msg` | `pnpm exec commitlint --edit "$1"`，按 [commitlint.config.mjs](../../commitlint.config.mjs) 校验提交说明 |
 
 任一步失败即停止。暂存路径检查涵盖新增、修改、复制、重命名和类型变化，允许删除历史误入产物。[lint-staged 配置](../../.lintstagedrc) 无 `--fix`；失败后修具体文件再暂存。Windows 命令长度分块后的各批次按同一配置串行执行，避免多个 ESLint 同时分配内存或生成 Nuxt 类型；检查文件和规则保持一致。lint-staged 仍可能临时备份、还原部分暂存文件。提交钩子不运行类型检查或测试。
@@ -32,6 +32,8 @@ Git 提供远端名称和待推送的本地/远端引用，脚本按以下顺序
 
 路径以 [`.gitignore`](../../.gitignore) 和暂存路径检查为准。共享规则、技能与正式证据保持可追踪，不整目录忽略 `.codex/`、`.agents/`。忽略规则不取消已有跟踪，也不删除文件；清理前先保全正式产物与其他会话内容。
 
+任务临时产物统一放 `.tmp/<任务名>/`，不散放在 `.tmp` 根目录。任务提交或合并后删除对应目录：编译缓存、测试库、日志和截图直接删除；仍需留存的验证证据先移入 Issue 或正式证据位置；源码快照或备份须先确认已并入或可废弃。未提交任务的产物保留至提交。
+
 ## 合并后的分支清理
 
 获授权的合并完成后只清理对应工作分支；历史分支批量清理另行处理。直接在 `main` 开发无需另建或删分支。
@@ -41,7 +43,8 @@ Git 提供远端名称和待推送的本地/远端引用，脚本按以下顺序
 3. **核实归并。** 普通合并用 `git merge-base --is-ancestor <候选SHA> <目标分支>` 核验每个端点；squash/rebase 则核对 PR 原 head、合并结果及补丁等价性。新增未合入提交或证明不足时保留，不能只依赖 `branch -d` 的上游判断。
 4. **保全工作树。** 用 `git worktree list` 定位，检查已跟踪、未跟踪和忽略文件，以及活动会话/进程。数据库、密钥、浏览器配置、用户文档及归属不明资料先保全；核实绝对路径并采用可恢复清理，条件不足时保留并说明，禁止 `worktree remove --force`。
 5. **精确删除。** 切离候选后用 `git branch -d`，失败时查因而非升级为 `-D`。远端再次核实 SHA 后按下式删除；SHA 变化则重新核验，引用已不存在则无需操作。
-6. **核对结果。** 刷新失效的远端跟踪引用，检查分支、工作树与 Git 状态，报告删除/保留对象及恢复依据。
+6. **清理临时产物。** 按[临时文件与缓存](#临时文件与缓存)删除本任务的 `.tmp/<任务名>/`。
+7. **核对结果。** 刷新失效的远端跟踪引用，检查分支、工作树与 Git 状态，报告删除/保留对象及恢复依据。
 
 ```text
 git push --force-with-lease=refs/heads/<分支>:<已核验SHA> origin :refs/heads/<分支>

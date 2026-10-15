@@ -2,7 +2,7 @@
 
 P5 已独立提交 `61a6a10ddee611125d9d10b8dfd9dd81f99db467`。正常提交的类型、规范及完整测试 **740 文件、4190 项通过**（295.02 秒），见[产品提交检查](./checks/commit-product.log)。精确提交 340 个文件；提交后核对 144 个已测试源码文件未变，149 份运行证据的工作树及 Git 原始字节均与清单摘要一致，见[固定提交核对](./checks/product-verification.json)。本期不代表生产保存或发布完成。
 
-本期从 P4 后置登记 `85aa0b158eb7c1b1a7404e92b20373db3699b204` 继续。操作说明见[费用指南](../../../guides/payroll-fees.md)，限定验收与局部业务待决见 [P5 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/05-central-housing-and-management-fees.md)。本目录保存实际运行证据，不另设数据合同。
+本期从 P4 后置登记 `85aa0b158eb7c1b1a7404e92b20373db3699b204` 继续。操作说明见[费用指南](../../../guides/payroll-fees.md)，限定验收与局部业务待决见 [P5 实施票](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/05-central-housing-and-management-fees.md)。本目录保存实际运行证据，不另设数据合同。
 
 后置登记将 WAGE-14 限定提升为已验，WAGE-09/12 及 P6/P7、生产等级保持原边界。[登记回归](./checks/registration/registration-final-verified.log)为 2 文件 19 项通过；[保全检查](./checks/registration/registration-preservation.json)确认其他 45 条报告、全部案例验收等级及数量不变。总图四处文字按[实际渲染](./checks/registration/registration-render.json)检查，节点与连线几何未变；这些是报告登记检查，未冒充新业务浏览器验收。
 

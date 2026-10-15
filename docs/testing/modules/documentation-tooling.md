@@ -11,6 +11,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/tooling/commitlint.test.ts](../../../tests/tooling/commitlint.test.ts) | 工程工具测试 | commitlint 项目接入 |
+| [tests/tooling/check-md-links.test.ts](../../../tests/tooling/check-md-links.test.ts) | 工程工具测试 | Markdown 相对链接提取与失效判定 |
 | [tests/tooling/git-hooks.test.ts](../../../tests/tooling/git-hooks.test.ts) | 工程工具测试 | 暂存路径保护 |
 
 ## 文档／静态契约检查

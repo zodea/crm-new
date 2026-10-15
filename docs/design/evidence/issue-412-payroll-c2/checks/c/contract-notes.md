@@ -2,7 +2,7 @@
 
 > 2026-09-14，只读准备，非权威规格或验收结果。Root 正提交 P2；本次未修改产品、测试或长期文稿，未运行测试、服务、构建或提交。开始实施以 Root 给出的 P2 最终 SHA 和 A 正式公共合同为准。
 
-依据：`docs/research/issue-review-2026-09-11/payroll-tickets/03-central-c2-daywork.md`、本期 `preparation/implementation-plan.md`、现行 NAVIGATION、ADR 0014 和 KitUI 整页契约。已读 `vue-best-practices` 及 reactivity/sfc/component-data-flow/composables 四参考、`vue-router-best-practices`、`vueuse-functions`。没有新增业务取舍或需要重问的已定规则。
+依据：[`docs/research/issue-review-2026-09-11/payroll-tickets/03-central-c2-daywork.md`](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/03-central-c2-daywork.md)、本期 `preparation/implementation-plan.md`、现行 NAVIGATION、ADR 0014 和 KitUI 整页契约。已读 `vue-best-practices` 及 reactivity/sfc/component-data-flow/composables 四参考、`vue-router-best-practices`、`vueuse-functions`。没有新增业务取舍或需要重问的已定规则。
 
 ## 1. 已核入口与独立路由
 

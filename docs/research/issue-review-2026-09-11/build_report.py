@@ -231,7 +231,7 @@ def main():
     markdown=[f'# 瑞航 CRM 逐 Issue 审阅\n\n> 非权威源 · {stamp} 的开发状态快照。\n\n[打开可交互报告](./index.html)：完整业务流程、每个 Issue 流程图/异常返回、交互示意、实际截图与可导出的审阅意见。\n\n当前 {len(rows)} 个开放 Issue；本地完成 {counts["local-done"]}，部分完成 {counts["partial"]}，实施中 {counts["in-progress"]}，已定稿待开发 {counts["planned"]}，待裁定 {counts["decision"]}。本地完成不代表远端交付或生产上线。\n\n按当前本地远端引用比较：领先 {divergence[0]}，落后 {divergence[1]}。远端获取、冲突及开放 PR 核查见[分支整合记录](../local-branch-integration-2026-09-10.md)。快照 HEAD `{head}`。\n\n| Issue | 现状 | 已处理 | 剩余 |\n| --- | --- | --- | --- |']
     for r in rows:
         markdown.append(f'| [#{r["number"]} {r["title"]}]({r["url"]}) | {LABELS[r["status"]]} | '+ '<br>'.join(r['solved']).replace('|','／')+' | '+'<br>'.join(r['remaining']).replace('|','／')+' |')
-    markdown.append('\n## 完整业务方向\n\n[既有全模块流程图](../module-development-flows.md)提供各模块 Mermaid 源图。本报告用可点击总图显示跨模块依赖及当前实现状态，不替代权威源。\n\n## 更新方式\n\n维护同目录 `rows-*.json` 的事实判断；以新抓取的 `gh issue list --state open --json number,title,body,comments,labels,url,updatedAt` 结果调用 `build_report.py --issues <快照路径>`。生成器检查 Issue 全覆盖、唯一编号、异常回路索引与证据真实路径，不把源码检查当作业务验收。\n')
+    markdown.append('\n## 完整业务方向\n\n模块数据归属见 [ARCHITECTURE · 逻辑数据归属](../../rewrite/ARCHITECTURE.md#data-ownership)。本报告用可点击总图显示跨模块依赖及当前实现状态，不替代权威源。\n\n## 更新方式\n\n维护同目录 `rows-*.json` 的事实判断；以新抓取的 `gh issue list --state open --json number,title,body,comments,labels,url,updatedAt` 结果调用 `build_report.py --issues <快照路径>`。生成器检查 Issue 全覆盖、唯一编号、异常回路索引与证据真实路径，不把源码检查当作业务验收。\n')
     (HERE/'README.md').write_text('\n'.join(markdown),encoding='utf-8')
     print(json.dumps({'issues':len(rows),'counts':counts,'htmlBytes':(HERE/'index.html').stat().st_size},ensure_ascii=False))
 

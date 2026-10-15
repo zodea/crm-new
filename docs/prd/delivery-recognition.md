@@ -1,6 +1,6 @@
 # 送货单识别、归档与原件处置需求
 
-> 2026-09-08 更新。原 2026-07-05 六阶段移植方案已退出当前实施规格；历史背景由 Git 与[旧应用移植调查](../research/invoice-recognition-app-port-plan.md)保留。
+> 2026-09-08 更新。原 2026-07-05 六阶段移植方案已退出当前实施规格；历史背景由 Git 保留。
 >
 > 当前工作由[附件、OCR 与 Excel #406](https://github.com/zodea/crm-new/issues/406)和[物资归档与价格 #411](https://github.com/zodea/crm-new/issues/411)承接。本页保留产品需求与待核实能力，不声明已实现，不另立字段、状态或技术选型。
 
