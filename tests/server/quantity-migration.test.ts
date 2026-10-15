@@ -1,12 +1,11 @@
 import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '~/lib/migration/core-contract'
 import { expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { readQuantityMigrationGraphs } from '~/lib/quantity/migration-source'
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { prepareCoreMigrationCommandSources } from '../../server/utils/core-migration-preparation'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createQuantityTestInstance } from '../../server/utils/quantity-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMemoryDb, createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedQuantityMigrationSource } from '../helpers/quantity-migration-source'
 
 const context = { workspaceId: 'workspace-default', actorId: 'actor-default', capabilities: ['quantity:read', 'quantity:write', 'project:list:read'] }
@@ -15,9 +14,8 @@ const batchId = 'batch-quantity-442'
 const local: CoreMigrationSnapshotDTO = { authority: 'local', activeBatchId: null, entities: [] }
 
 async function source(): Promise<CoreMigrationSnapshotDTO> {
-  const database = await createMemoryDb()
+  const database = await createMigratedMemoryDb()
   try {
-    await runMigrations(database)
     await database.execute('INSERT INTO projects (id,name) VALUES (\'old-project\',\'迁入工程\')')
     await database.execute('INSERT INTO buildings (id,project_id,code,name) VALUES (\'old-building\',\'old-project\',\'B1\',\'迁入一栋\')')
     const graph = (await readQuantityMigrationGraphs(database))[0]!.graph

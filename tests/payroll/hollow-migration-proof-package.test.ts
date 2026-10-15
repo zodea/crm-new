@@ -1,10 +1,17 @@
-import { expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { parsePayrollProofPackage, readPayrollProofPackages, verifyPayrollProofPackage } from '../../app/lib/migration/payroll-proof-package'
-import { createReleasedPayrollHollowMigrationFixture, importPayrollHollowFixture } from '../helpers/payroll-hollow-migration-fixture'
+import { createReleasedPayrollHollowSource, importPayrollHollowFixture } from '../helpers/payroll-hollow-migration-fixture'
 import { cloneQuantityHollowSnapshot } from '../helpers/quantity-hollow-migration-fixture'
 
+// 原库只造一次；每案克隆原库后各自真实迁入。
+let source: Awaited<ReturnType<typeof createReleasedPayrollHollowSource>>
+beforeAll(async () => {
+  source = await createReleasedPayrollHollowSource()
+})
+afterAll(() => source?.close())
+
 it('真实工资原图包只接受完整可达祖先、原字节摘要和明确表映射', async () => {
-  const f = await createReleasedPayrollHollowMigrationFixture()
+  const f = await source.migrate()
   try {
     const proof = (await f.instance.withWorkspaceTransaction(tx => readPayrollProofPackages(tx))).get(f.scope.projectId)!
     expect(await verifyPayrollProofPackage(proof)).toEqual(proof)
@@ -26,7 +33,7 @@ it('真实工资原图包只接受完整可达祖先、原字节摘要和明确�
 }, 30_000)
 
 it('再次公开迁入前祖先身份映射被换成另一记录时必须拒绝', async () => {
-  const f = await createReleasedPayrollHollowMigrationFixture()
+  const f = await source.migrate()
   try {
     const cloned = await cloneQuantityHollowSnapshot(await f.instance.exportSnapshotBytes())
     try {

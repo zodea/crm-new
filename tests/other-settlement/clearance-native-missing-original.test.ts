@@ -8,9 +8,9 @@ import { createHistoricalClearanceMigrationSource } from '../../e2e/helpers/hist
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementService } from '../../server/utils/production-other-settlement-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { createMemoryDb } from '../helpers/memory-db'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture(size: number | null, wrongOwner = false) {
   const root = resolve('.tmp/a02-clearance-tests')
@@ -27,7 +27,7 @@ async function fixture(size: number | null, wrongOwner = false) {
     source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
   }
   finally { db.close() }
-  const storage = createProductionStorage({ directory, workspaceId: 'missing-clearance-workspace', ownerId: 'missing-clearance-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'missing-clearance-workspace', ownerId: 'missing-clearance-owner', purpose: 'verification' })
   const actor = { workspaceId: storage.identity.workspaceId, actorId: storage.identity.actorId, capabilities: ['supplier:list:read', 'supplier:write', 'other-settlement:read', 'other-settlement:write', 'core:migration:write', ...Object.values(FINANCE_FAMILIES).flatMap(family => [`${family}:read`, `${family}:write`])] }
   const identity = { workspaceId: actor.workspaceId, actorId: actor.actorId }
   const session = () => structuredClone(actor)

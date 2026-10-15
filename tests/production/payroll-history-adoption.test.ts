@@ -1,9 +1,7 @@
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
 import { createQuantityService } from '../../app/lib/quantity/central-service'
@@ -15,10 +13,11 @@ import { createProductionPayrollImport } from '../../server/utils/production-pay
 import { createProductionPayrollService } from '../../server/utils/production-payroll-service'
 import { validateProductionPayrollState } from '../../server/utils/production-payroll-validation'
 import { createProductionQuantityImport, readProductionQuantityImportedIdentities } from '../../server/utils/production-quantity-migration'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { loadQuantityHollowFacts } from '../../server/utils/quantity-hollow-facts'
 import { createQuantityHollowService } from '../../server/utils/quantity-hollow-service'
+import { runColdProcess } from '../helpers/cold-process'
 import { createPayrollAFeeAdjustmentFixture } from '../helpers/payroll-a-fee-adjustment-fixture'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 it('真实整库A/P5/P6混合历史按同源工程量映射正式接管，保管理更正退款、原价格配置、空鼓整改、正式号和完整原目录，独立冷进程不开放新A来源', async () => {
   const native = await createPayrollAFeeAdjustmentFixture()
@@ -30,7 +29,7 @@ it('真实整库A/P5/P6混合历史按同源工程量映射正式接管，保管
   const directory = await mkdtemp(`${base}/synthetic-`)
   const actor = { workspaceId: 'history-workspace', actorId: 'history-owner', capabilities: [...nativeActor.capabilities, 'core:migration:write', 'worker:sensitive:read'] }
   const options = { directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   try {
     await native.prices()
     await native.saveFees([native.fee()])
@@ -138,7 +137,7 @@ it('真实整库A/P5/P6混合历史按同源工程量映射正式接管，保管
     expect(native.db.raw.export()).toEqual(bytes)
     await expect(quantity.restore({ workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: 'history-dangerous-quantity-restore', importId: (await quantity.execute(qtyCommand, () => actor)).importId }, () => actor)).rejects.toThrow('整批恢复')
     await storage.close()
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-payroll-history-cold-process.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_PAYROLL_HISTORY_DIRECTORY: directory, CRM_PAYROLL_HISTORY_COMMAND: adopted.commandId, CRM_PAYROLL_HISTORY_ARCHIVE: archiveId } })
+    const child = await runColdProcess('production-payroll-history-cold-process', [], { env: { ...process.env, CRM_PAYROLL_HISTORY_DIRECTORY: directory, CRM_PAYROLL_HISTORY_COMMAND: adopted.commandId, CRM_PAYROLL_HISTORY_ARCHIVE: archiveId } })
     expect(JSON.parse(child.stdout)).toMatchObject({ recovered: { outcome: 'applied', result: adopted }, amounts: [300, 7400], net: 7650, numbers: ['128', '129'], valid: true })
   }
   finally {

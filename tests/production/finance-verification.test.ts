@@ -19,6 +19,7 @@ import { createProductionStorage } from '../../server/utils/production-storage'
 import { productionStorageManifest } from '../../server/utils/production-storage-schema'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { createOtherSettlementPay08Source } from '../helpers/other-settlement-pay08-source'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 /** Only synthetic, unused later domains are removed to model the exact historical backup release. */
 function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
@@ -72,7 +73,7 @@ async function fixture(companyContract = false) {
     native.source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
   }
   const options = { directory, workspaceId: 'finance-pay08-workspace', ownerId: 'finance-pay08-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['other-settlement:read', 'other-settlement:write', 'supplier:list:read', 'supplier:write', 'core:migration:write', ...Object.values(FINANCE_FAMILIES).flatMap(family => [`${family}:read`, `${family}:write`])] }
   const session = () => structuredClone(actor)
   const identity = { workspaceId: actor.workspaceId, actorId: actor.actorId }

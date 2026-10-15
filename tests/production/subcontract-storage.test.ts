@@ -1,9 +1,6 @@
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import process from 'node:process'
-import { promisify } from 'node:util'
 import { afterEach, expect, it } from 'vitest'
 import { createHttpSubcontractContractCommandRepository } from '../../app/lib/subcontract-contract/command-http-repository'
 import { decodeSubcontractContractDetailRead } from '../../app/lib/subcontract-contract/read-decoder'
@@ -11,6 +8,7 @@ import { contractOriginalDigest } from '../../server/utils/contract-original'
 import { createProductionConstructionContractService } from '../../server/utils/production-construction-contract-service'
 import { createProductionConstructionScopeService } from '../../server/utils/production-construction-scope-service'
 import { validateProductionSubcontractState } from '../../server/utils/production-subcontract-contract-record'
+import { runColdProcess } from '../helpers/cold-process'
 import { constructionScopeCommand } from '../helpers/production-construction-scope-fixture'
 import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
 import { createSubcontractNative } from '../helpers/production-subcontract-native'
@@ -90,7 +88,7 @@ it('分包原号未知结果在全新Node进程仅凭最小定位恢复，读取
   const descriptor = { commandId: request.commandId, workspaceId: f.session().workspaceId, actorId: f.session().actorId, family: 'subcontract-contract', targetId: null, action: request.action }
   const output = resolve(f.options.directory, 'cold-normal.json')
   await f.storage.close()
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-subcontract-cold.ts'), f.options.directory, saved.id, JSON.stringify(descriptor), output], { windowsHide: true })
+  await runColdProcess('production-subcontract-cold', [f.options.directory, saved.id, JSON.stringify(descriptor), output])
   const cold = JSON.parse(await readFile(output, 'utf8'))
   expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
   expect(cold.form).toEqual(before)
@@ -106,7 +104,7 @@ it('分包完整原库迁入在独立Node冷恢复互证原scope与回执，错�
   expect(await f.storage.select('SELECT * FROM subcontract_contract_import_resolutions')).toEqual([])
   const output = resolve(f.options.directory, 'cold-import.json')
   await f.storage.close()
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-subcontract-cold.ts'), f.options.directory, saved.ids[0]!, JSON.stringify(descriptor), output], { windowsHide: true })
+  await runColdProcess('production-subcontract-cold', [f.options.directory, saved.ids[0]!, JSON.stringify(descriptor), output])
   const cold = JSON.parse(await readFile(output, 'utf8'))
   expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
   expect(cold.form.constructionMain).toBeNull()

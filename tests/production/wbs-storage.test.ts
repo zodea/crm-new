@@ -1,13 +1,9 @@
 import type { ScheduleCommand } from '../../app/lib/schedule/central-contract'
 import type { WbsImportCommand } from '../../app/lib/schedule/import-contract'
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import process from 'node:process'
-import { promisify } from 'node:util'
 import { afterEach, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { createProductionProcessLibraryService } from '../../server/utils/production-process-library-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
@@ -15,7 +11,9 @@ import { wbsBytesDigest } from '../../server/utils/production-wbs-files'
 import { productionWbsLibraryUsage } from '../../server/utils/production-wbs-library-usage'
 import { createProductionWbsMigration } from '../../server/utils/production-wbs-migration'
 import { createProductionWbsService } from '../../server/utils/production-wbs-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { runColdProcess } from '../helpers/cold-process'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 import { createWbsActualBoqFixture } from '../helpers/production-wbs-upstream-fixture'
 
 const close: Array<() => Promise<void>> = []
@@ -27,7 +25,7 @@ async function fixture() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/wbs-`)
   const options = { directory, workspaceId: 'wbs-workspace', ownerId: 'wbs-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   close.push(() => storage.close())
   let actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['schedule:read', 'schedule:write', 'schedule:import', 'project:list:read', 'project:write', 'process-library:read', 'process-library:write'] }
   const session = () => structuredClone(actor)
@@ -57,8 +55,7 @@ async function fixture() {
   } }
 }
 async function migrationFixture(f: Awaited<ReturnType<typeof fixture>>, external = false, legacyJournal = false) {
-  const native = await createMemoryDb()
-  await runMigrations(native)
+  const native = await createMigratedMemoryDb()
   await native.execute('INSERT INTO projects(id,name) VALUES (?,?)', [f.project.id, '原排程项目'])
   for (const table of ['items', 'buildings', 'house_type_templates', 'construction_stages', 'floors', 'rooms', 'units', 'construction_stage_items', 'house_type_template_items']) {
     const columns = new Set((await native.select<{ name: string }>(`PRAGMA table_info(${table})`)).map(row => row.name))
@@ -140,7 +137,7 @@ it('wBS迁入原号在独立Node进程冷恢复；scope错配与封存错配均�
   await expect(source.migration.resolve({ ...missing, scopeId: '0'.repeat(64) }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
   const output = resolve(f.options.directory, 'cold-wbs-import.json')
   await f.storage.close()
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-wbs-cold.ts'), f.options.directory, f.project.id, JSON.stringify(descriptor), output], { windowsHide: true })
+  await runColdProcess('production-wbs-cold', [f.options.directory, f.project.id, JSON.stringify(descriptor), output])
   const cold = JSON.parse(await readFile(output, 'utf8'))
   expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
   expect(cold.read.history.removedTasks).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'legacy-ungrouped' })]))
@@ -184,7 +181,7 @@ it('正常WBS原意图丢响应后在独立Node冷进程仅凭原号恢复完整
   await f.storage.close()
   const descriptor = { family: 'schedule', targetId: f.project.id, action: 'create-group', commandId: command.commandId, workspaceId: command.workspaceId, actorId: command.actorId }
   const output = resolve(f.options.directory, 'cold-wbs-command.json')
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-wbs-cold.ts'), f.options.directory, f.project.id, JSON.stringify(descriptor), output], { windowsHide: true })
+  await runColdProcess('production-wbs-cold', [f.options.directory, f.project.id, JSON.stringify(descriptor), output])
   const cold = JSON.parse(await readFile(output, 'utf8'))
   expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
   expect(cold.read.snapshot.groups[0].tasks[0].floorPlans[0]).toMatchObject({ quantitySnapshot: { value: null, knownValue: 8, missingCount: 1 } })
@@ -328,7 +325,7 @@ it('真正同Main绑定保冻结8/null与原执行；无关兄弟价格可保存
   const descriptor = { family: 'schedule', targetId: f.project.id, action: 'bind-contract', commandId: command.commandId, workspaceId: command.workspaceId, actorId: command.actorId }
   const output = resolve(f.options.directory, 'cold-wbs-actual-boq.json')
   await f.storage.close()
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-wbs-cold.ts'), f.options.directory, f.project.id, JSON.stringify(descriptor), output], { windowsHide: true })
+  await runColdProcess('production-wbs-cold', [f.options.directory, f.project.id, JSON.stringify(descriptor), output])
   const cold = JSON.parse(await readFile(output, 'utf8'))
   expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
   expect(cold.read.snapshot.groups[0]).toMatchObject({ scopeBasis: 'contract', contractId: source.main.id })

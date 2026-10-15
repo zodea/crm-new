@@ -1,12 +1,18 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { PAYROLL_HOLLOW_DEDUCTION_TABLES } from '../../app/lib/payroll/central-hollow-deduction-schema'
-import { createReleasedPayrollHollowMigrationFixture, importPayrollHollowFixture } from '../helpers/payroll-hollow-migration-fixture'
+import { createReleasedPayrollHollowSource, importPayrollHollowFixture } from '../helpers/payroll-hollow-migration-fixture'
 import { cloneQuantityHollowSnapshot } from '../helpers/quantity-hollow-migration-fixture'
 
+// 原库只造一次；每案克隆原库后各自真实迁入，损坏只落在本案的目标库。
+let source: Awaited<ReturnType<typeof createReleasedPayrollHollowSource>>
+beforeAll(async () => {
+  source = await createReleasedPayrollHollowSource()
+})
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => {
   await Promise.all(closers.splice(0).map(close => close()))
 })
+afterAll(() => source?.close())
 
 const damagedTable = {
   'policy-zero': 'payroll_hollow_policy_revisions',
@@ -16,7 +22,7 @@ const damagedTable = {
   'quantity-count': 'quantity_hollow_revisions',
 } as const
 it.each(Object.keys(damagedTable) as Array<keyof typeof damagedTable>)('迁入暖缓存仍每次核原件与完整集合：%s', async (kind) => {
-  const f = await createReleasedPayrollHollowMigrationFixture()
+  const f = await source.migrate()
   closers.push(f.close)
   expect((await f.service.aOutput({ origin: 'real' }, f.statementId)).state).toBe('available')
   await f.instance.withWorkspaceTransaction(async (tx) => {
@@ -48,7 +54,7 @@ it.each(Object.keys(damagedTable) as Array<keyof typeof damagedTable>)('迁入�
 }, 30_000)
 
 it('迁入配置可追加真实0修订，原raw不改；重复迁入保全而恢复拒绝抹掉新修订', async () => {
-  const f = await createReleasedPayrollHollowMigrationFixture()
+  const f = await source.migrate()
   closers.push(f.close)
   const before = await f.instance.withWorkspaceTransaction(async tx => Object.fromEntries(await Promise.all(PAYROLL_HOLLOW_DEDUCTION_TABLES.map(async table => [table, await tx.select<Record<string, unknown>>(`SELECT * FROM ${table}`)]))))
   const query = { scope: { projectId: f.scope.projectId, crewId: null, leaderWorkerId: f.id('workers', f.original.draft.leaderWorkerId), formatFamily: 'A' as const, book: f.original.draft.book! }, month: '2026-09' }

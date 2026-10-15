@@ -1,7 +1,7 @@
 import type { CoreMigrationSourceDTO } from '../../app/lib/migration/core-contract'
+import type { createMemoryDb } from '../helpers/memory-db'
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { CORE_MIGRATION_CAPABILITY, CORE_MIGRATION_CONTRACT_VERSION, CORE_MIGRATION_SOURCE_MODE, CORE_MIGRATION_SOURCE_VERSION, CORE_MIGRATION_TOPOLOGY, coreMigrationSourceHashInput } from '../../app/lib/migration/core-contract'
 import { createCoreMigrationLocalSource } from '../../app/lib/migration/core-local-source'
 import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from '../../app/lib/migration/other-settlement-source'
@@ -9,7 +9,7 @@ import { createAuxiliaryContractTestInstance } from '../../server/utils/auxiliar
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createOtherSettlementInstance } from '../../server/utils/other-settlement-instance'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('aX05 结算迁移来源', () => {
   const databases: Array<Awaited<ReturnType<typeof createMemoryDb>>> = []
@@ -26,9 +26,8 @@ describe('aX05 结算迁移来源', () => {
     await expect(service.importBatch({ ...envelope, commandId: 'import-331', batchId: batch.batchId }, session)).rejects.toThrow()
   })
   it.each(['project', 'inspection', 'owner_notice', 'acceptance'])('%s 来源：完整迁移统一结算与真实罚扣、申请和支付源单', async (penaltyOrigin) => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     databases.push(db)
-    await runMigrations(db)
     await db.execute(`INSERT INTO projects (id, name) VALUES ('p', '项目')`)
     await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s', '检测单位')`)
     await db.execute(`INSERT INTO contracts (id, name, kind, project_id, supplier_id, status) VALUES ('c', '检测合同', '其他支出', 'p', 's', '已签订')`)

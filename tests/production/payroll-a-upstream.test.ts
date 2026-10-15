@@ -1,14 +1,12 @@
 import type { BoqCommand } from '../../app/lib/boq/production-contract'
-import { execFile } from 'node:child_process'
-import { resolve } from 'node:path'
 import process from 'node:process'
-import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 import { payrollCommandRecoveryScope } from '../../app/lib/payroll/command-recovery-scope'
 import { collectWorkbookReferences } from '../../server/utils/payroll-workbook-references'
 import { readProductionBoqQuantityFacts } from '../../server/utils/production-boq-record'
 import { loadProductionPayrollAQuantityFacts } from '../../server/utils/production-payroll-quantity-facts'
 import { createProductionPayrollService } from '../../server/utils/production-payroll-service'
+import { runColdProcess } from '../helpers/cold-process'
 import { installProductionBoqFixture } from '../helpers/production-boq-fixture'
 import { createPayrollAUpstreamFixture } from '../helpers/production-payroll-a-upstream-fixture'
 
@@ -59,7 +57,7 @@ it('真正生产A独立工资价→保存/核算/发放原回执，工资及所�
     expect(refs).toEqual(expect.arrayContaining([{ tableName: 'boq_lines', recordId: f.boq.line.id }, { tableName: 'construction_contract_records', recordId: f.boq.main.id }]))
     await f.storage.close()
     const descriptor = { commandId: release.commandId, workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, family: 'payroll', action: release.action.kind, targetId: saved.statementId, scopeId: payrollCommandRecoveryScope(release) }
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-payroll-a-cold.ts')], { cwd: resolve('.'), windowsHide: true, env: { ...process.env, CRM_PAYROLL_A_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptor, statementId: saved.statementId, projectId: f.project.id }) } })
+    const child = await runColdProcess('production-payroll-a-cold', [], { env: { ...process.env, CRM_PAYROLL_A_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptor, statementId: saved.statementId, projectId: f.project.id }) } })
     const cold = JSON.parse(child.stdout)
     expect(cold.recovered).toEqual({ outcome: 'applied', result: released, command: release })
     expect(cold.output.document).toEqual(output.document)

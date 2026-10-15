@@ -1,12 +1,19 @@
 import type { PayrollAAction, PayrollACommandRead } from '../../app/lib/payroll/central-a-contract'
-import { expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { decodePayrollAdjustmentRead } from '../../app/lib/payroll/central-adjustment-read-codec'
 import { encodePayrollAdjustmentWire } from '../../app/lib/payroll/central-adjustment-wire'
-import { createReleasedPayrollHollowMigrationFixture, importPayrollHollowFixture } from '../helpers/payroll-hollow-migration-fixture'
+import { createReleasedPayrollHollowSource, importPayrollHollowFixture } from '../helpers/payroll-hollow-migration-fixture'
 import { cloneQuantityHollowSnapshot } from '../helpers/quantity-hollow-migration-fixture'
 
+// 原库只造一次；每案克隆原库后各自真实迁入。
+let source: Awaited<ReturnType<typeof createReleasedPayrollHollowSource>>
+beforeAll(async () => {
+  source = await createReleasedPayrollHollowSource()
+})
+afterAll(() => source?.close())
+
 it('迁入原450扣款后真实更正300并补款150，再次迁入保留现金700与原冻结550', async () => {
-  const f = await createReleasedPayrollHollowMigrationFixture()
+  const f = await source.migrate()
   try {
     const target = { adjustmentId: null, draftKey: 'migrated-hollow-correction', originalStatementId: f.statementId } as const
     const initial = await f.service.adjustmentForm({ origin: 'real' }, { target })
@@ -58,7 +65,7 @@ it('迁入原450扣款后真实更正300并补款150，再次迁入保留现金7
 }, 30_000)
 
 it('迁入后600更正确认与后月实发50再导出，原前缀版本及确认原件保持可证', async () => {
-  const f = await createReleasedPayrollHollowMigrationFixture()
+  const f = await source.migrate()
   try {
     const target = { adjustmentId: null, draftKey: 'migrated-rate40', originalStatementId: f.statementId } as const
     const initial = await f.service.adjustmentForm({ origin: 'real' }, { target })

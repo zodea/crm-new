@@ -12,8 +12,8 @@ import { createProductionFinanceService } from '../../server/utils/production-fi
 import { createProductionMaterialContractService } from '../../server/utils/production-material-contract-service'
 import { createProductionOurSignatoryService } from '../../server/utils/production-our-signatory-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from './production-storage-seed'
 
 /** Only actual identity/upstream owners; no expense, material contract or cash fixture is added. */
 export async function installConstructionEngineeringFixture(storage: ProductionStorage, actor: BusinessSession, prefix = 'actual-engineering') {
@@ -36,7 +36,7 @@ export async function createConstructionScopeFixture() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const options = { directory, workspaceId: 'scope-workspace', ownerId: 'scope-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['construction-scope:read', 'construction-scope:write', 'construction-contract:read', 'construction-contract:write', 'material-contract:read', 'material-contract:write', 'subcontract-contract:read', 'auxiliary-contract:read', 'project:list:read', 'project:write', 'customer:list:read', 'customer:write', 'supplier:list:read', 'supplier:write', 'our-signatory:read', 'our-signatory:write', ...Object.values(FINANCE_FAMILIES).flatMap(family => [`${family}:read`, `${family}:write`])] }
   const session = () => structuredClone(actor)
   const baseCommand = { workspaceId: actor.workspaceId, actorId: actor.actorId, baseVersion: null, action: 'save', attachments: {} }

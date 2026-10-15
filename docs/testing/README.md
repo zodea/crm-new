@@ -8,9 +8,9 @@
 
 | 用途 | 工具与入口 | 范围 |
 | --- | --- | --- |
-| 单元、服务、状态及静态契约 | Vitest：`pnpm test:unit` | [unit 项目](../../vitest.config.ts)，排除组件与浏览器目录 |
+| 单元、服务、状态及静态契约 | Vitest：`pnpm test:unit` | [unit 与 unit-heavy 项目](../../vitest.config.ts)，排除组件与浏览器目录；冷进程、整库迁入与正式库读写等重夹具文件归 unit-heavy，在其余项目之后以半数逻辑核并发运行 |
 | jsdom 组件 | Vitest、Vue Test Utils、Testing Library：`pnpm test:components` | [component 项目](../../vitest.config.ts)；部分用例使用 `vitest-axe` 检查无障碍规则 |
-| 单元与 jsdom 组件合并 | `pnpm test` | 仅以上两个项目 |
+| 单元与 jsdom 组件合并 | `pnpm test` | 仅以上 unit、unit-heavy、component 三个项目 |
 | 真实浏览器组件行为 | Vitest Browser、Playwright provider、`vitest-browser-vue`：`pnpm test:browser` | [独立配置](../../vitest.browser.config.ts)，Chromium 多视口 |
 | 跨页面流程 | Playwright：`pnpm test:e2e`；精确文件用 `pnpm exec playwright test <files...>` | [E2E 配置](../../playwright.config.ts)，排除专用视觉矩阵；默认 E2E 不写存档截图 |
 | 专用视觉矩阵 | Playwright：`pnpm test:visual` | [视觉配置](../../playwright.visual.config.ts)，固定 Windows/Chromium 与隔离演示服务 |
@@ -22,7 +22,25 @@
 
 `pnpm test` 不包含浏览器组件、E2E 或视觉矩阵。浏览器组件、工资测试类型、循环依赖与依赖重复检查目前也未接入推送钩子和 CI，涉及这些文件时须单独选择对应本地入口。钩子实际执行范围见 [Git 工作流](../agents/git-workflow.md)，远端套件见 [CI 使用规则](../agents/ci-usage.md)。
 
-E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库，每案独占重置、接管和回读旅程。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。
+### Vitest 本地缓存
+
+`pnpm test`、`test:unit`、`test:components` 在已忽略的 `.tmp/` 下保留两类缓存，跨次运行复用：
+
+| 缓存 | 位置 | 失效方式 | 清除 |
+| --- | --- | --- | --- |
+| 模块转译（Vitest 实验特性 `experimental.fsModuleCache`） | `.tmp/vitest-cache/` | Vitest 按文件内容、配置与依赖版本自动判定 | `pnpm exec vitest --clearCache`（同时清除结果缓存），或删除目录 |
+| 冷进程入口预打包、默认全量迁移后的内存库快照（[全局准备](../../tests/global-setup.ts)），以及按身份缓存的正式库种子 | `.tmp/vitest-fixtures/` | 入口及迁移链依赖的源码内容哈希、esbuild/sql.js/Node 版本任一变化即整批重建；种子库随正式库建库源码、结构与升级 SQL 换键 | 删除目录 |
+
+过期风险：转译缓存是实验特性，改动 Vite 插件、别名或升级依赖后若出现无法解释的旧行为，先清除再复现；预打包把 `node_modules` 中的包留作外部依赖、运行时现读，不计入内容键。缓存只含转译产物、迁移后空库与建库后空库，不保存任何用例写入的数据或业务状态。
+
+E2E 分三个项目（[E2E 配置](../../playwright.config.ts)）：
+
+| 项目 | 范围 | 服务与并发 |
+| --- | --- | --- |
+| `chromium`、`chromium-b` | 中央 spec 按文件名排序后交替分组 | 各连一个独立 dev server（默认端口 3100、3102，可用 `PLAYWRIGHT_PORT`、`PLAYWRIGHT_PORT_B` 改；第二个用 `.tmp/e2e-nuxt-b` 作构建与 Vite 缓存目录），组内 1 个 worker |
+| `production` | `production-*.spec.ts` | 各 spec 自启 `.output/server/index.mjs`、空闲端口与 mkdtemp 数据目录，3 个 worker；须先 `pnpm build` 并设 `CRM_PRODUCTION_ACCEPTANCE=1`，否则跳过；只选本项目时不启动 dev server |
+
+迁入验收会重置所在 dev server 的默认中央仓库，每案独占重置、接管和回读旅程，因此中央组内只用一个 worker；两组的中央仓库在各自进程内存中，互不可见；截图基线两组共用 `chromium` 文件名。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。设置 `PLAYWRIGHT_BASE_URL` 连接外部服务时只保留单个中央项目、1 个 worker。命令行选项目时用 `--project=<名称>`：`--project <名称>` 会把后面的文件路径也当作项目名。
 
 ## 模块入口
 
@@ -119,9 +137,11 @@ E2E 默认使用一个 worker：迁入验收会重置共享的默认中央仓库
 
 ### 数据、资源与时间
 
-- 需要已迁移的内存库时用 [`createMigratedMemoryDb()`](../../tests/helpers/memory-db.ts)（每个 worker 只迁移一次，之后克隆）；只有验证迁移本身、空库或指定旧版本时，才用 `createMemoryDb()` 加 `runMigrations`。
+- 需要已迁移的内存库时用 [`createMigratedMemoryDb()`](../../tests/helpers/memory-db.ts)（整次运行由全局准备迁移一次并按迁移源码哈希缓存快照，各用例克隆）；只有验证迁移本身、空库或指定旧版本时，才用 `createMemoryDb()` 加 `runMigrations`。
+- 正式库夹具在新建的空数据目录上用 [`createSeededProductionStorage()`](../../tests/helpers/production-storage-seed.ts)（复制同身份种子库后打开，仍走完整打开校验）；验证建库、升级、结构或空目录行为的用例直接用 `createProductionStorage()`。
+- 冷恢复与独立服务进程用 [`runColdProcess` / `spawnColdProcess`](../../tests/helpers/cold-process.ts) 启动预打包入口，新入口登记到[全局准备](../../tests/global-setup.ts)的 `COLD_ENTRIES`；子进程仍须独立启动并从磁盘重开数据库，不得复用测试进程内存状态。
 - 每个打开的库都要在 `afterEach` 或 `finally` 中 `close()`；`vi.stubGlobal`、`vi.spyOn`、`vi.useFakeTimers` 在同一文件的 `afterEach` 中恢复。
 - 写入旅程由每个案例创建正式主档，或安装隔离的受控迁移来源，并使用回执 ID；演示记录只用于明确授权的只读场景。
 - 涉及当前时间时使用受控时钟或已有的时间注入；等待以页面状态、响应或时钟事件为准，不用固定延时。
-- 单条用例应在默认并发下数秒内完成；重夹具改为复用快照，不靠调大超时来掩盖。
+- 单条用例应在默认并发下数秒内完成；重夹具改为复用快照，不靠调大超时来掩盖。新增冷进程、整库迁入或正式库读写文件时，确认其路径落入 [`HEAVY_UNIT_TESTS`](../../vitest.config.ts)，不能归类时补登记。
 - 布局、滚动与焦点在真实浏览器中验证；[浏览器组件配置](../../vitest.browser.config.ts)会预扫全部组件的 UnoCSS 样式。

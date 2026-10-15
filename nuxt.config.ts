@@ -1,8 +1,12 @@
 import process from 'node:process'
 
+// 并行 E2E 的第二个 dev server 用独立构建目录与 Vite 依赖缓存，避免与默认 .nuxt 及共享 node_modules 缓存互相覆盖；未设置时保持默认。
+const buildDir = process.env.NUXT_BUILD_DIR
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   ssr: false,
+  ...(buildDir ? { buildDir } : {}),
   devtools: { enabled: process.env.NUXT_DEVTOOLS !== 'false' },
 
   nitro: {
@@ -49,6 +53,7 @@ export default defineNuxtConfig({
   ],
 
   vite: {
+    ...(buildDir ? { cacheDir: `${buildDir}/vite` } : {}),
     resolve: {
       // pnpm 的隔离/提升链接都必须让应用与 @pinia/nuxt 共享同一运行时实例。
       dedupe: ['vue', 'pinia'],

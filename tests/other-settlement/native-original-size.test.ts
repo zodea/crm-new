@@ -2,15 +2,13 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { beforeAll, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { readOtherSettlementStored } from '../../app/lib/other-settlement/storage'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let nativeTemplate: Uint8Array
 beforeAll(async () => {
-  const memory = await createMemoryDb()
+  const memory = await createMigratedMemoryDb()
   try {
-    await runMigrations(memory)
     nativeTemplate = memory.raw.export()
   }
   finally { memory.close() }

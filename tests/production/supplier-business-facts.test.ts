@@ -19,6 +19,7 @@ import { createProductionOurSignatoryService } from '../../server/utils/producti
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 const AS_OF = '2026-10-05T01:00:00.000Z'
 async function fixture() {
@@ -26,7 +27,7 @@ async function fixture() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const options = { directory, workspaceId: 'supplier-facts-workspace', ownerId: 'supplier-facts-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['customer:list:read', 'customer:write', 'project:list:read', 'project:write', 'supplier:list:read', 'supplier:write', 'material-contract:read', 'other-settlement:read', 'other-settlement:write', ...FINANCE_CAPABILITIES] }
   const session = () => structuredClone(actor)
   const owner = createProductionSupplierService(storage, { now: () => AS_OF })

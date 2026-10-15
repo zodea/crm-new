@@ -8,15 +8,15 @@ import { readWorkerReference } from '../../server/utils/production-crew-worker-r
 import { createProductionCrewWorkerService } from '../../server/utils/production-crew-worker-service'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementService, listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { installConstructionEngineeringFixture } from '../helpers/production-construction-scope-fixture'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 
 async function fixture(workerPayee = false) {
   const root = resolve('.tmp/a02-material-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(`${root}/other-settlement-`)
-  const storage = createProductionStorage({ directory, workspaceId: 'other-workspace', ownerId: 'other-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'other-workspace', ownerId: 'other-owner', purpose: 'verification' })
   const actor = { workspaceId: 'other-workspace', actorId: 'other-owner', capabilities: ['other-settlement:read', 'other-settlement:write', 'supplier:list:read', 'supplier:write', 'finance-reimbursement:read', 'finance-reimbursement:write', 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'finance-payment-record:write'] }
   const session = () => structuredClone(actor)
   const engineering = await installConstructionEngineeringFixture(storage, actor, 'other-engineering')

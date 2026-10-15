@@ -1,13 +1,9 @@
 import type { AuxiliaryContractCommand, AuxiliaryContractDraft, AuxiliaryImportCommand } from '../../app/lib/auxiliary-contract/contract'
 import type { ProductionStorage } from '../../server/utils/production-storage'
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import process from 'node:process'
-import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { signatorySnapshot } from '../../app/lib/our-signatory/contract'
 import { readOurSignatories } from '../../app/lib/our-signatory/storage'
 import { createAuxiliaryContractTestInstance } from '../../server/utils/auxiliary-contract-test-instance'
@@ -16,7 +12,8 @@ import { readAuxiliaryContractScopeFacts, validateProductionAuxiliaryState } fro
 import { createProductionAuxiliaryContractService } from '../../server/utils/production-auxiliary-contract-service'
 import { createProductionConstructionScopeService } from '../../server/utils/production-construction-scope-service'
 import { financeRecordSnapshot } from '../../server/utils/production-finance-journal'
-import { createMemoryDb } from '../helpers/memory-db'
+import { runColdProcess } from '../helpers/cold-process'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { constructionScopeCommand } from '../helpers/production-construction-scope-fixture'
 import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
 
@@ -35,8 +32,7 @@ async function productionFixture() {
   return { ...f, auxiliary: service, request }
 }
 async function nativeAuxiliary(f: Awaited<ReturnType<typeof productionFixture>>, legacy = false, specialIdentity = false, duplicateNumber = false, adoptedSignatory = false) {
-  const source = await createMemoryDb()
-  await runMigrations(source)
+  const source = await createMigratedMemoryDb()
   await source.execute('INSERT INTO projects(id,name) VALUES(\'legacy-aux-project\',\'原检测项目\')')
   await source.execute('INSERT INTO suppliers(id,name) VALUES(\'legacy-aux-supplier\',\'原检测商\')')
   await source.execute('ALTER TABLE contracts ADD COLUMN extension_integer INTEGER')
@@ -160,7 +156,7 @@ describe('正式 Auxiliary 同库完整owner', () => {
       const descriptor = { commandId: saved.commandId, workspaceId: f.session().workspaceId, actorId: f.session().actorId, family: importing ? 'auxiliary-contract-import' : 'auxiliary-contract', targetId: null, action: importing ? 'adopt' : 'draft', ...(source ? { scopeId: source.command.source.sha256 } : { scopeId: 'other_expense' }) }
       const output = resolve(f.options.directory, 'cold-auxiliary.json')
       await f.storage.close()
-      await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-auxiliary-cold.ts'), f.options.directory, id, 'other_expense', JSON.stringify(descriptor), output], { windowsHide: true })
+      await runColdProcess('production-auxiliary-cold', [f.options.directory, id, 'other_expense', JSON.stringify(descriptor), output])
       const cold = JSON.parse(await readFile(output, 'utf8'))
       expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
       expect(cold.detail.contract).toEqual(detail.contract)

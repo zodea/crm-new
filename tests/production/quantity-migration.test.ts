@@ -1,19 +1,19 @@
 import { Buffer } from 'node:buffer'
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 import { createProductionQuantityImport, readProductionQuantityImportedIdentities } from '../../server/utils/production-quantity-migration'
 import { createProductionQuantityService } from '../../server/utils/production-quantity-service'
 import { validateProductionQuantityState } from '../../server/utils/production-quantity-validation'
 import { createProductionStorage } from '../../server/utils/production-storage'
-import { createMemoryDb } from '../helpers/memory-db'
+import { runColdProcess } from '../helpers/cold-process'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 import { seedQuantityNativeRows } from '../helpers/quantity-migration-source'
 
 it('真实完整SQLite只读核验，本域原JSON/未知整数+BLOB/零与缺失及历史照片只存自身证据和共享原件', async () => {
-  const source = await createMemoryDb()
+  const source = await createMigratedMemoryDb()
   await seedQuantityNativeRows(source)
   await source.execute('ALTER TABLE items ADD COLUMN future_integer INTEGER')
   await source.execute('ALTER TABLE items ADD COLUMN future_binary BLOB')
@@ -26,7 +26,7 @@ it('真实完整SQLite只读核验，本域原JSON/未知整数+BLOB/零与缺�
   const base = resolve('.tmp/opt02-quantity-migration')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
-  const storage = createProductionStorage({ directory, workspaceId: 'quantity-workspace', ownerId: 'quantity-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'quantity-workspace', ownerId: 'quantity-owner', purpose: 'verification' })
   const actor = { workspaceId: 'quantity-workspace', actorId: 'quantity-owner', capabilities: ['quantity:read', 'quantity:write', 'worker:list:read', 'crew:list:read', 'worker:sensitive:read', 'project:list:read', 'core:migration:write'] }
   try {
     const now = '2026-10-07T08:00:00.000Z'
@@ -75,7 +75,7 @@ it('真实完整SQLite只读核验，本域原JSON/未知整数+BLOB/零与缺�
       expect(intent!.request_json).not.toContain(input.source.payloadBase64)
     })
     await storage.close()
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-quantity-import-cold-process.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_QUANTITY_COLD_DIRECTORY: directory, CRM_QUANTITY_IMPORT_SHA: sha256, CRM_QUANTITY_IMPORT_COMMAND: input.commandId } })
+    const child = await runColdProcess('production-quantity-import-cold-process', [], { env: { ...process.env, CRM_QUANTITY_COLD_DIRECTORY: directory, CRM_QUANTITY_IMPORT_SHA: sha256, CRM_QUANTITY_IMPORT_COMMAND: input.commandId } })
     expect(JSON.parse(child.stdout)).toMatchObject({ recovered: { outcome: 'applied', result }, identities: expect.arrayContaining([unit, completion, photo]), valid: true })
     const reopened = createProductionStorage({ directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' })
     try {
