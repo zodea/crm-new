@@ -4,7 +4,7 @@ import { CORE_MIGRATION_TOPOLOGY } from '~/lib/migration/core-contract'
 import { loadScheduleHistory } from '~/lib/schedule/history'
 import { createQuantityTestInstance } from '../../server/utils/quantity-test-instance'
 import { planWbsMigration } from '../../server/utils/wbs-migration'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedWbsMigrationSource } from '../helpers/wbs-migration-source'
 
 const projectId = 'server-project-q-project'
@@ -15,7 +15,7 @@ function target() {
   return createQuantityTestInstance({ session: () => context, projects: () => [{ id: projectId, name: '合成项目', code: 'P', dataOrigin: 'real' }, { id: 'independent-project', name: '独立项目', code: 'I', dataOrigin: 'real' }] })
 }
 async function snapshot() {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedWbsMigrationSource(db)
     const entities = CORE_MIGRATION_TOPOLOGY.flatMap(type => (source.entities[type] ?? []).map((row): CoreMigrationServerEntityDTO => ({

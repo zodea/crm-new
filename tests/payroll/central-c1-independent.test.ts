@@ -85,7 +85,7 @@ describe('c1 独立复验：事务末端、历史原组与月份边界', () => {
     expect(read.locks).toContainEqual(expect.objectContaining({ workerId: 'zero', month: '2026-08', statementId: 'old-c2', kind: 'released-month' }))
     expect((await f.service.detail({ origin: 'real' }, 'old-c2')).statement.stored.dayworkLinks).toContainEqual(expect.objectContaining({ dayworkRecordId: 'old-daywork', deletedAt: '2026-09-01' }))
     const before = await savedFacts(f)
-    await expect(f.service.executeAttendance(f.attendanceCommand(read, { workerId: 'zero', crewId: 'crew', workDate: '2026-08-31', hours: 0, overtimeHours: 0, workContent: '', note: '' }))).rejects.toThrow()
+    await expect(f.service.executeAttendance(f.attendanceCommand(read, { workerId: 'zero', crewId: 'crew', workDate: '2026-08-31', hours: 0, overtimeHours: 0, workContent: '', note: '' }))).rejects.toThrow('该人员当月已有签工链或已发工资，考勤不可再改')
     expect(await savedFacts(f)).toEqual(before)
   })
 
@@ -134,7 +134,7 @@ describe('c1 独立复验：事务末端、历史原组与月份边界', () => {
     if (corrupt.state !== 'available')
       throw new Error('公开发放未返回完整配对输出')
     Object.assign(corrupt.document.attendance[0]!, change)
-    expect(() => decodePayrollC1Read(encodePayrollC1Wire(corrupt), 'output', { origin: 'real' }, form.statementId!), JSON.stringify(change)).toThrow()
+    expect(() => decodePayrollC1Read(encodePayrollC1Wire(corrupt), 'output', { origin: 'real' }, form.statementId!), JSON.stringify(change)).toThrow('考勤或 C1 数据不完整')
   })
 
   it('全部班组筛选不能冒充工资主体的空班组，保存前拒绝无法原样冷读的来源', async () => {
@@ -144,7 +144,7 @@ describe('c1 独立复验：事务末端、历史原组与月份边界', () => {
     const read = await f.form(draft, 'all-crews')
     expect(read.eligibility.canSaveDraft).toBe(false)
     const before = await savedFacts(f)
-    await expect(f.service.executeC1(f.command(read, { kind: 'save-c1-draft', draft }))).rejects.toThrow()
+    await expect(f.service.executeC1(f.command(read, { kind: 'save-c1-draft', draft }))).rejects.toThrow('工资成员的当前项目或班组资格不可确认')
     expect(await savedFacts(f)).toEqual(before)
   })
 })

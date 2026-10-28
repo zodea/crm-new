@@ -1,7 +1,10 @@
 import type { TransactionDb } from '../db/coordinator'
+import { hasProductionPayrollSchema } from './central-schema'
 
 /** P7 协调表只保存不可变计划、原命令及执行证明，不构成第二套工资现金事实。 */
 export async function initializePayrollBatchSchema(tx: TransactionDb): Promise<void> {
+  if (await hasProductionPayrollSchema(tx))
+    return
   await tx.execute(`CREATE TABLE IF NOT EXISTS payroll_batch_plans (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,

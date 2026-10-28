@@ -2,7 +2,7 @@ import type { CoreMigrationLocalSourceDependencies } from '~/lib/migration/core-
 import { describe, expect, it, vi } from 'vitest'
 import { adoptConstructionManagementFee, emptyConstructionManagementFee } from '~/lib/construction-contract/management-fee'
 import { persistNativeConstructionManagementFee } from '~/lib/construction-contract/management-fee-storage'
-import { LATEST_VERSION, runMigrations } from '~/lib/db/migrations'
+import { LATEST_VERSION } from '~/lib/db/migrations'
 import { seedIfEmpty } from '~/lib/db/seed'
 import { materialQuotationSchemaDefinitions } from '~/lib/material-quotation/schema-upgrade'
 import {
@@ -16,7 +16,7 @@ import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-sourc
 import { PAYROLL_CENTRAL_MIGRATION_TABLES } from '~/lib/migration/payroll-central-source'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
   // 最新版本的替身包含已安装但尚无业务事实的独立报价 owner；未知查询仍拒绝。
@@ -315,7 +315,6 @@ function dependencies(
   overrides: Partial<CoreMigrationLocalSourceDependencies> = {},
 ): CoreMigrationLocalSourceDependencies {
   return {
-    isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: vi.fn().mockResolvedValue(LATEST_VERSION),
     select: vi.fn(async (sql: string) => sourceRows(sql)),
@@ -347,9 +346,8 @@ function dependencies(
 
 describe('core migration local source', () => {
   it('native总合同导出配置和全部采用历史，供应商合同不产生总合同配置属性', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await seedIfEmpty(db)
       const first = adoptConstructionManagementFee(emptyConstructionManagementFee(), { managementFeeAmount: 0, managementFeeBasis: '原主合同条款' }, { version: 'config-1', adoptedAt: '2026-10-05T00:00:00.000Z', contractVersion: 'native-version-1', actorId: null, commandId: null })
       const second = adoptConstructionManagementFee(first, { managementFeeAmount: 1200, managementFeeBasis: '补充核实主合同原文' }, { version: 'config-2', adoptedAt: '2026-10-05T00:01:00.000Z', contractVersion: 'native-version-2', actorId: null, commandId: null })
@@ -569,9 +567,8 @@ describe('core migration local source', () => {
   })
 
   it('完整 BOQ 与月度事实查询可在最新 SQLite schema 上执行', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await seedIfEmpty(db)
 
       const result = await createCoreMigrationLocalSource(dependencies({
@@ -596,9 +593,8 @@ describe('core migration local source', () => {
   })
 
   it('旧 SQLite 未建中央工资表时省略扩展，仍完整导出原工资金额与原文', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       const tables = await db.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')
       const centralTables = new Set<string>(PAYROLL_CENTRAL_MIGRATION_TABLES)
       expect(tables.filter(table => centralTables.has(table.name))).toEqual([])
@@ -617,9 +613,8 @@ describe('core migration local source', () => {
   })
 
   it('sqlite 本地写入时间经 ISO 规范化后可完成甲方单据受控迁移', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-local-323', '迁移甲方')`)
       await db.execute(`
         INSERT INTO projects (id, name, customer_id)
@@ -909,16 +904,6 @@ describe('core migration local source', () => {
       code: 'demo-source-not-allowed',
     })
     expect(deps.select).not.toHaveBeenCalled()
-  })
-
-  it('tauri 桌面端不读取浏览器 IndexedDB 迁移源', async () => {
-    const deps = dependencies({ isNative: () => true })
-    const source = createCoreMigrationLocalSource(deps)
-
-    await expect(source.readSource()).rejects.toMatchObject({ code: 'browser-only' })
-    await expect(source.createBackup('a'.repeat(64))).rejects.toMatchObject({ code: 'browser-only' })
-    expect(deps.select).not.toHaveBeenCalled()
-    expect(deps.loadProductionSnapshot).not.toHaveBeenCalled()
   })
 
   it('flushes the production connection before creating an immutable backup', async () => {

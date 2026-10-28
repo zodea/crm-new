@@ -18,6 +18,7 @@
 5. **`cn()` 用 clsx 单跑，不用 tailwind-merge**：样式覆盖走 cva 变体属性，而非 class 字符串对冲——避免运行时字符串魔法，冲突在 variant 层解决。
 6. **组件源码纳入仓库**（shadcn「你拥有源码」模式），落在 `app/components/ui/<name>/`；`useKitUI()` 保留为**薄封装**，`confirm/formModal/toast/promise/undoToast` 调用签名不变，业务页面无感迁移。
 7. **遵循官方扩展**：按项目安装版本的官方公开 API、模板和扩展方式接入；视觉差异优先通过令牌、变体、插槽解决。现有能力不足时，先说明缺口、维护成本与迁移影响，经用户确认后再改变组件契约或底层方案；视觉目标见 [ADR 0013](0013-align-all-ui-to-online-design.md)。
+8. **按职责选用 reka-ui 原语**：承担键盘导航、焦点、aria 或浮层定位的原子改用对应原语（如 `SegTab` → Tabs、`SelectFilter` → Select）；纯展示组件和原生已可访问的控件（如 `SearchInput`、`SectionHeader`、指标卡、`TablePager`）保持原实现。
 
 ## 考虑过的替代
 
@@ -31,5 +32,4 @@
 - `docs/design/kit-ui-component-specs.md` 等规格文档的"照着手写"承载改述为"基于 shadcn-vue + reka-ui 的桥接实现"；结构锚点、变体、令牌、行为规则仍有效（那是设计语言，与实现无关）。
 - 现行实现位置与调用契约统一见 [KitUI 组件规格](../design/kit-ui-component-specs.md)，词表与 Agent 导入文件不承载实现说明。
 - `/dev/kit-ui` 改为 shadcn 组件验证台。
-- 当时的迁移映射见[固定历史映射材料](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/kitui-to-shadcn-migration.md)，仅作非权威参考；当前 API 与实现边界以 [KitUI 组件规格](../design/kit-ui-component-specs.md)为准。
 - 桥接已离线验证：UnoCSS 生成器对语义色、圆角阶梯、`data-[state]` 动画变体均产出正确 CSS，无 Tailwind 引擎。

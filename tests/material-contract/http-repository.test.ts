@@ -189,6 +189,17 @@ describe('材料采购合同中央 HTTP Repository', () => {
     expect(() => decodeMaterialContractDetailRead(input)).toThrowError(expected)
   })
 
+  it('历史原件明确未知上传时间可读，错误日期仍拒绝且不把未知补成时间', async () => {
+    const attachment = { id: 'historical-original', ownerType: 'contract', ownerId: 'contract-1', fileName: '旧原件.pdf', filePath: '', fileSize: 0, mimeType: 'application/pdf', category: '', uploader: '', uploadedAt: null, deletedAt: null }
+    const response = { draft: { id: 'contract-1', name: '历史原合同' }, attachments: [attachment], version: '1', updatedAt: '2026-10-07T00:00:00.000Z' }
+    const repository = createHttpMaterialContractCommandRepository({ fetcher: vi.fn().mockResolvedValue(response) })
+    expect((await repository.loadForm('contract-1')).attachments).toEqual([attachment])
+    for (const uploadedAt of ['', '不是日期', '2026-99-99T00:00:00Z']) {
+      const invalid = createHttpMaterialContractCommandRepository({ fetcher: vi.fn().mockResolvedValue({ ...response, attachments: [{ ...attachment, uploadedAt }] }) })
+      await expect(invalid.loadForm('contract-1')).rejects.toThrow('表单无效')
+    }
+  })
+
   it('拒绝畸形中央表单 draft 与附件', async () => {
     const valid = {
       draft: {

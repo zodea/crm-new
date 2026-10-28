@@ -145,21 +145,24 @@ test.describe('Issue #326：甲方罚扣专属只读链', () => {
     await expect(page.getByText('单据来源或类型不匹配')).toBeVisible({ timeout: 20_000 })
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 列表与详情无页面级横滚，密集宽表只在自身区域滚动`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/owner/penalty?origin=real')
-      const table = page.locator('[data-ui="owner-document-table"]')
-      await expect(table).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#326 甲方罚扣列表 @ ${width}px`)
-      await table.focus()
-      await expect(table).toBeFocused()
-      if (width === 390)
-        await expectLocalHorizontalScroll(table, '#326 甲方罚扣列表 @ 390px')
+  test('列表与详情在各宽度无页面级横滚，密集宽表只在自身区域滚动', async ({ page }) => {
+    const expectNoOverflowAcrossWidths = async (label: string) => {
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+        await expectNoPageOverflow(page, `#326 ${label} @ ${width}px`)
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/owner/penalty?origin=real')
+    const table = page.locator('[data-ui="owner-document-table"]')
+    await expect(table).toBeVisible({ timeout: 20_000 })
+    await table.focus()
+    await expect(table).toBeFocused()
+    await expectLocalHorizontalScroll(table, '#326 甲方罚扣列表 @ 390px')
+    await expectNoOverflowAcrossWidths('甲方罚扣列表')
 
-      await page.goto('/owner/penalty/owner-penalty-real-326?origin=real')
-      await expect(page.getByTestId('owner-penalty-detail')).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#326 甲方罚扣详情 @ ${width}px`)
-    })
-  }
+    await page.goto('/owner/penalty/owner-penalty-real-326?origin=real')
+    await expect(page.getByTestId('owner-penalty-detail')).toBeVisible({ timeout: 20_000 })
+    await expectNoOverflowAcrossWidths('甲方罚扣详情')
+  })
 })

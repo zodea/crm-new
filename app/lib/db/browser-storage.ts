@@ -260,24 +260,6 @@ export async function loadLegacyProductionReadOnly(): Promise<boolean> {
   }
 }
 
-export async function saveLegacyProductionReadOnly(readOnly: boolean): Promise<void> {
-  const database = await openSnapshotDatabase()
-  try {
-    const transaction = database.transaction(SETTINGS_STORE, 'readwrite')
-    const done = transactionDone(transaction)
-    await requestResult(
-      transaction.objectStore(SETTINGS_STORE).put(
-        readOnly,
-        LEGACY_PRODUCTION_READ_ONLY_KEY,
-      ),
-    )
-    await done
-  }
-  finally {
-    database.close()
-  }
-}
-
 export async function loadBrowserCoreMigrationMarker(): Promise<BrowserCoreMigrationMarker | null> {
   const database = await openSnapshotDatabase()
   try {

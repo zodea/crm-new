@@ -101,7 +101,7 @@ export function createPayrollNumberingService(run: PayrollRun) {
           await db.execute('INSERT INTO payroll_command_receipts(command_id,actor_id,project_id,statement_id,config_scope_json,action,fingerprint,result_json,command_json) VALUES(?,?,?,?,?,?,?,?,?)', [command.commandId, context.actorId, command.projectId, command.statementId, null, `numbering-${command.action.kind}`, hash(command), payrollCanonical(result), payrollCanonical(command)])
           await readNumbering(db, context, source, input)
           return result
-        }, true)
+        }, true, command)
       }
       catch (cause) {
         if (absent && cause instanceof ProjectRepositoryProblem)

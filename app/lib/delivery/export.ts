@@ -5,7 +5,6 @@ import { assertDeliveryExportActive, loadCentralDeliveryExportSources } from '~/
 import { exportDataToBytes } from '~/lib/kit/export'
 import { createZip, sanitizeSegment } from '~/lib/project/archive'
 
-export const DELIVERY_XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export const DELIVERY_ZIP_MIME = 'application/zip'
 
 export interface DeliveryExportRow {

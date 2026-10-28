@@ -13,6 +13,9 @@ export function decodeQuantityBoq(value: unknown, query: QuantityReadQuery): Qua
   const lines = value.data.lines
   if (!Array.isArray(lines) || !lines.every(row => quantityObject(row)
     && ['id', 'contractId'].every(key => typeof row[key] === 'string' && row[key].trim())
+    && (row.bindingVersion === undefined || (typeof row.bindingVersion === 'string' && row.bindingVersion.trim()))
+    && (row.qualificationVersion === undefined || (typeof row.qualificationVersion === 'string' && row.qualificationVersion.trim()))
+    && (row.eligible === undefined || typeof row.eligible === 'boolean')
     && ['contractName', 'contractNo', 'itemName', 'unit'].every(key => typeof row[key] === 'string')
     && ['qty', 'unitPrice', 'effectiveUnitPrice'].every(key => quantity(row[key]))
     && typeof row.approvedDeltaQty === 'number' && Number.isFinite(row.approvedDeltaQty)

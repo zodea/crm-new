@@ -21,7 +21,6 @@
 | [tests/server/supplier-fact-source.test.ts](../../../tests/server/supplier-fact-source.test.ts) | 单元／服务／状态 | 分供方跨领域事实投影 |
 | [tests/stores/supplier-central.test.ts](../../../tests/stores/supplier-central.test.ts) | 单元／服务／状态 | 分供方中央 stores |
 | [tests/stores/supplier-credential-state.test.ts](../../../tests/stores/supplier-credential-state.test.ts) | 单元／服务／状态 | 中央证照会话所有权和原提交恢复 |
-| [tests/stores/supplier-detail.test.ts](../../../tests/stores/supplier-detail.test.ts) | 单元／服务／状态 | supplier detail store |
 | [tests/stores/supplier-taxpayer.test.ts](../../../tests/stores/supplier-taxpayer.test.ts) | 单元／服务／状态 | 每表单税务提交身份 |
 | [tests/supplier/credential-central.test.ts](../../../tests/supplier/credential-central.test.ts) | 单元／服务／状态 | 中央证照与主档同一事务旅程 |
 | [tests/supplier/credential-core-integration.test.ts](../../../tests/supplier/credential-core-integration.test.ts) | 单元／服务／状态 | 证照与中央迁移协调器完整接缝 |
@@ -33,11 +32,9 @@
 | [tests/supplier/credential-request.test.ts](../../../tests/supplier/credential-request.test.ts) | 单元／服务／状态 | 证照 HTTP 请求边界 |
 | [tests/supplier/credentials.test.ts](../../../tests/supplier/credentials.test.ts) | 单元／服务／状态 | 分供方证照规则 |
 | [tests/supplier/detail.test.ts](../../../tests/supplier/detail.test.ts) | 单元／服务／状态 | 分供方详情纯聚合 |
-| [tests/supplier/export.test.ts](../../../tests/supplier/export.test.ts) | 单元／服务／状态 | 分供方台账导出行 |
 | [tests/supplier/http-repository.test.ts](../../../tests/supplier/http-repository.test.ts) | 单元／服务／状态 | 分供方中央 HTTP Repository |
 | [tests/supplier/import-command.test.ts](../../../tests/supplier/import-command.test.ts) | 单元／服务／状态 | 分供方中央逐行导入 |
 | [tests/supplier/import.test.ts](../../../tests/supplier/import.test.ts) | 单元／服务／状态 | 分供方导入行归一 |
-| [tests/supplier/list.test.ts](../../../tests/supplier/list.test.ts) | 单元／服务／状态 | 分供方列表筛选 |
 | [tests/supplier/repository-contract.test.ts](../../../tests/supplier/repository-contract.test.ts) | 单元／服务／状态 | 分供方中央 Repository contract |
 | [tests/supplier/return-context.test.ts](../../../tests/supplier/return-context.test.ts) | 单元／服务／状态 | 分供方列表返回上下文 |
 | [tests/supplier/status.test.ts](../../../tests/supplier/status.test.ts) | 单元／服务／状态 | 分供方类别 |
@@ -54,7 +51,6 @@
 | [tests/components/SupplierCredentialOcrReview.test.ts](../../../tests/components/SupplierCredentialOcrReview.test.ts) | 组件（jsdom） | supplier credential OCR review |
 | [tests/components/SupplierCredentialOcrWorkflow.test.ts](../../../tests/components/SupplierCredentialOcrWorkflow.test.ts) | 组件（jsdom） | 中央 OCR 识别与人工确认工作流 |
 | [tests/components/SupplierCredentialScreen.test.ts](../../../tests/components/SupplierCredentialScreen.test.ts) | 组件（jsdom） | 中央分供方证照入口 |
-| [tests/components/SupplierCredentialTab.test.ts](../../../tests/components/SupplierCredentialTab.test.ts) | 组件（jsdom） | supplier credential tab |
 | [tests/components/SupplierDetailScreen.test.ts](../../../tests/components/SupplierDetailScreen.test.ts) | 组件（jsdom） | 分供方中央详情；材采可读而其他合同域不可用／无权／缺证时只显示已核事实与完整未知，禁止挂载缺源子区；统一可信合同及 demo 原边界 |
 | [tests/components/SupplierFactTable.test.ts](../../../tests/components/SupplierFactTable.test.ts) | 组件（jsdom） | 分供方合同事实类别 |
 | [tests/components/SupplierFormFields.test.ts](../../../tests/components/SupplierFormFields.test.ts) | 组件（jsdom） | 分供方表单资料辅助动作 |
@@ -71,7 +67,7 @@
 | [e2e/supplier-credentials-central.spec.ts](../../../e2e/supplier-credentials-central.spec.ts) | Playwright E2E | 真实旧库完整图迁入、历史凭证回读、同原件撤回与缺正文不冒充齐全 |
 | [e2e/supplier-crud.spec.ts](../../../e2e/supplier-crud.spec.ts) | Playwright E2E | 两类正式分供方新建、显式编辑、冷回读与页签复用；中央行菜单仅提供只读入口，旧本地删除由数据库及通用主数据测试覆盖 |
 | [e2e/supplier-detail.spec.ts](../../../e2e/supplier-detail.spec.ts) | Playwright E2E | 分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双页联动 |
-| [e2e/supplier-export.spec.ts](../../../e2e/supplier-export.spec.ts) | Playwright E2E | 两类正式主档 × 五档视口核对中央导出尚未接入的边界；实际 XLSX 内容和分类目录由 supplier/export 参数表覆盖 |
+| [e2e/supplier-export.spec.ts](../../../e2e/supplier-export.spec.ts) | Playwright E2E | 过渡契约：中央分供方列表不显示未接入的导出（#406/#407） |
 | [e2e/supplier-import.spec.ts](../../../e2e/supplier-import.spec.ts) | Playwright E2E | 中央导入：信用代码和唯一识别码独立映射，同外部旧 ID 重导更新并保留未映射资料 |
 | [e2e/supplier-list-replica.spec.ts](../../../e2e/supplier-list-replica.spec.ts) | Playwright E2E | ${width}px：完整列、紧凑标签、表格内滚动及可访问工具 |
 | [e2e/supplier-multifilter.spec.ts](../../../e2e/supplier-multifilter.spec.ts) | Playwright E2E | ${width}px 固定枚举复选与表头联动，返回链接保留组合且清空恢复全量 |

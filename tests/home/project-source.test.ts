@@ -1,11 +1,10 @@
 import type { ProjectListSourceRow } from '~/lib/project/repository'
 import { describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { createHomeProjectSource } from '~/lib/home/project-source'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
 import { createScheduleRepository } from '~/lib/schedule/central-repository'
 import { createProjectReadTestInstance, PROJECT_READ_FIXTURE } from '../../server/utils/project-read-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { fixtureProjectCustomerReferences } from '../helpers/project-read-meta'
 
 function central() {
@@ -66,9 +65,8 @@ describe('首页项目中央来源', () => {
 
   it('测试开关和中央权限均通过后才能读取演示快照，已读取空分组与未接入分开', async () => {
     const { repository, instance } = central()
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       const id = PROJECT_READ_FIXTURE[0]!.id
       await db.execute('INSERT INTO projects (id, name, code) VALUES (?, ?, ?)', [id, '旧演示名称', 'demo'])
       const source = createHomeProjectSource({ projects: repository, localDb: db })

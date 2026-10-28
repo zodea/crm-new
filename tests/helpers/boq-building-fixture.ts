@@ -5,11 +5,11 @@ import { prepareCoreMigrationCommandSources } from '../../server/utils/core-migr
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
 import { createQuantityTestInstance } from '../../server/utils/quantity-test-instance'
-import { createMemoryDb } from './memory-db'
+import { createMigratedMemoryDb } from './memory-db'
 import { seedWbsMigrationSource } from './wbs-migration-source'
 
 export async function createBoqBuildingFixture() {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   const source = await seedWbsMigrationSource(db)
   let session = structuredClone(resolveBusinessSession())
   const owner = createOwnerCommercialDocumentCommandTestInstance()

@@ -163,7 +163,6 @@ export function createProcessLibraryState(repository: ProcessLibraryPort, origin
   }
 
   return {
-    mode: 'central' as const,
     origin: computed(originFor),
     context: readonly(context),
     libraries,

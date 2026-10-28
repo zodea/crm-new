@@ -8,7 +8,7 @@ import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migrati
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
 import { scheduleService } from '../../server/utils/schedule-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 import { seedWbsMigrationSource } from '../helpers/wbs-migration-source'
 
@@ -25,7 +25,7 @@ afterEach(async () => {
 })
 
 it('完整 SQLite 图经确认原子迁入，绑定历史/软禁用/无组任务/冻结8与人工楼层均可读；重复确认保日常更正', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedWbsMigrationSource(db)
     const boq = JSON.parse(String(source.entities.construction_contracts[0]!.attributes!.boqCatalogJson))
@@ -74,7 +74,7 @@ it('完整 SQLite 图经确认原子迁入，绑定历史/软禁用/无组任务
 })
 
 it.each(['missing-floor', 'foreign-stage', 'wrong-library-version', 'snapshot-library-mismatch', 'orphan-log', 'cycle'] as const)('试跑阶段阻断损坏完整图 %s，不能改变接管状态', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedWbsMigrationSource(db)
     const entity = source.entities.wbs_projects![0]!
@@ -104,7 +104,7 @@ it.each(['missing-floor', 'foreign-stage', 'wrong-library-version', 'snapshot-li
 })
 
 it.each([false, true])('迁入后新绑定经重复确认保持不变，危险恢复即使审计缺失=%s也不能吞掉新合同关系', async (missingAudit) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedWbsMigrationSource(db)
     await db.execute('UPDATE schedule_groups SET contract_id = NULL, scope_basis = \'provisional\', contract_bound_at = NULL WHERE id = \'wbs-group\'')

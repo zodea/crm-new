@@ -2,20 +2,18 @@ import type { CoreMigrationSnapshotDTO } from '~/lib/migration/core-contract'
 import type { SupplierCredentialMigrationGraph } from '~/lib/migration/supplier-credential-source'
 import { Buffer } from 'node:buffer'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { readSupplierCredentialMigrationGraphs } from '~/lib/migration/supplier-credential-source'
 import { currentCredentialStatus, emptySupplierCredentialAggregate } from '~/lib/supplier/credential-domain'
 import { prepareSupplierCredentialMigration } from '../../server/utils/supplier-credential-migration'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const at = '2026-09-12T08:00:00.000Z'
 const now = new Date(at)
 const pdf = Buffer.from('%PDF-1.7\nold original').toString('base64')
 let original: SupplierCredentialMigrationGraph
 beforeAll(async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
-    await runMigrations(db)
     await db.execute('INSERT INTO suppliers (id, name, unique_code, tax_no, credential_status, credential_reviewed_at, credential_review_note) VALUES (\'legacy-supplier\', \'完整旧分供方\', \'INTERNAL-18-DIGITS\', \'ORIGINAL-TAX\', \'qualified\', ?, \'旧人工凭证\')', [at])
     for (const [index, category] of ['营业执照', '法人身份证', '银行账户资料'].entries()) {
       await db.execute('INSERT INTO supplier_credentials (id, supplier_id, category, file_name, ocr_result, ocr_confirmed_result, ocr_review_status, ocr_confirmed_at, added_at) VALUES (?, \'legacy-supplier\', ?, \'原件.pdf\', ?, ?, \'pending\', ?, ?)', [`credential-${index}`, category, '{"rawText":"保留原始结果"}', '{"previous":"保留已确认结果"}', at, at])

@@ -1,15 +1,18 @@
 import type { QuotationCommand } from '~/lib/material-quotation/contract'
 import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { createProductionMaterialQuotationOwner } from '../../server/utils/material-quotation-runtime'
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const base = resolve('.tmp/root-a01-a03-validation')
+  const base = testTempRoot('root-a01-a03-validation')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(join(base, 'quotation-backup-'))
   const storage = createProductionStorage({ directory, workspaceId: 'quotation-backup-workspace', ownerId: 'quotation-backup-owner', purpose: 'verification' })

@@ -6,7 +6,9 @@
 
 “当前已可用”仅指各指南注明版本和验证环境内的行为，不表示本轮复验或正式上线。实现缺口看[界面实现状态](../design/ui-implementation-status.md)，具体待开发项看对应指南。
 
-已登记的本机客户、项目、工序库和分供方切片见下表；其他中央能力仍受 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 的验证实例边界约束。持久化、备份恢复与部署以 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)及 [#471 上线关口](https://github.com/zodea/crm-new/issues/471)逐项验收。完整审批引擎、完整登录/RBAC 和 Tauri 正式交付不因指南列为“待开发”就自动进入当前任务范围。
+开发期间从其他电脑打开界面的启动方法及数据边界见[本地开发](../../README.md#本地开发)。
+
+已登记的本机客户、项目、工序库和分供方切片见下表；其他中央能力仍受 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 的验证实例边界约束。持久化、备份恢复与部署以 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)及 [#471 上线关口](https://github.com/zodea/crm-new/issues/471)逐项验收。完整审批引擎和完整登录/RBAC 不因指南列为“待开发”就自动进入当前任务范围。
 
 ## 当前指南
 

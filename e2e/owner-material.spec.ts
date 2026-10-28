@@ -102,16 +102,16 @@ test.describe('Issue #200 甲供材页面', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
   })
-  for (const width of RESPONSIVE_WIDTHS) {
-    for (const route of OWNER_MATERIAL_ROUTES) {
-      test(`${route.title} @ ${width}px 可运行并保持甲供边界`, async ({ page }) => {
+  for (const route of OWNER_MATERIAL_ROUTES) {
+    test(`${route.title} 可运行并保持甲供边界，各宽度无页面溢出`, async ({ page }) => {
+      await page.goto(route.path)
+      await expect(page.getByRole('heading', { name: route.title })).toBeVisible({ timeout: 20_000 })
+      await expectOwnerPageContract(page, route.kind)
+      for (const width of RESPONSIVE_WIDTHS) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-        await page.goto(route.path)
-        await expect(page.getByRole('heading', { name: route.title })).toBeVisible({ timeout: 20_000 })
-        await expectOwnerPageContract(page, route.kind)
         await expectNoPageOverflow(page, `${route.path} @ ${width}px`)
-      })
-    }
+      }
+    })
   }
 
   for (const input of OWNER_INPUTS) {

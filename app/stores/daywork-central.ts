@@ -37,7 +37,6 @@ export const useDayworkCentralStore = defineStore('daywork-central', () => {
     return { changedSinceCommand }
   }
   return {
-    dayworkSaving: pending.saving,
     loadDayworkList: (query: PayrollQuery, scope: PayrollDayworkScope) => repository().dayworkList(query, scope),
     loadDayworkForm: (query: PayrollQuery, input: PayrollDayworkFormInput) => input.draft === undefined ? pending.read(() => repository().dayworkForm(query, input)) : repository().dayworkForm(query, input),
     saveDaywork: (read: PayrollDayworkFormRead, record: PayrollDayworkRecordDraft) => execute(read, { kind: 'save-daywork', record }),

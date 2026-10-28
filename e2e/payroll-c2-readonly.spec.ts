@@ -1,16 +1,15 @@
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { payrollC2Repository, payrollC2Workspace, preparePayrollC2Fixture } from './helpers/payroll-c2-workspace'
 
 test.use({ actionTimeout: 15000 })
-async function capture(page: Page, info: TestInfo, name: string, selector?: string) {
+async function capture(page: Page, name: string, selector?: string) {
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
     if (selector)
       await page.locator(selector).scrollIntoViewIfNeeded()
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
   }
 }
 
@@ -38,10 +37,10 @@ test('旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签�
   await expect(page.getByRole('region', { name: '工资金额与状态', exact: true })).not.toContainText('100.00')
   await expect(page.getByRole('button', { name: '确认实际发放', exact: true }).and(page.locator(':enabled'))).toHaveCount(0)
   await expect(page.getByRole('button', { name: '下载工资与签工表', exact: true })).toHaveCount(0)
-  await capture(page, info, 'legacy-c2-missing-snapshot', '[aria-label="发放快照证据"]')
+  await capture(page, 'legacy-c2-missing-snapshot', '[aria-label="发放快照证据"]')
   await page.getByText('查看原表与关系历史', { exact: true }).click()
   await expect(page.locator('dl[aria-label="原工资头业务记录"]')).toContainText('100.00')
-  await capture(page, info, 'legacy-c2-original-amount', '[aria-label="原工资头业务记录"]')
+  await capture(page, 'legacy-c2-original-amount', '[aria-label="原工资头业务记录"]')
   const output = await repository.c2Output({ origin: 'real' }, legacy!.id)
   expect(output.state).toBe('unavailable')
   expect(await repository.detail({ origin: 'real' }, legacy!.id)).toEqual(before)
@@ -60,7 +59,7 @@ test('C2 来源拒权不能沿旧读保存，重读后仍保原项目及草稿�
   await page.goto(`/subcontract/payroll/new?${new URLSearchParams({ format: 'C2', origin: 'real', project: project.id, month: '2026-09', crew: leader.crewId || '', draftKey: 'c2-denied-original-draft' })}`)
   await expect(page.getByText('验收：当前身份没有 C2 工资读取权限', { exact: false })).toBeVisible()
   await expect(page.getByRole('button', { name: '保存工资草稿', exact: true }).and(page.locator(':enabled'))).toHaveCount(0)
-  await capture(page, info, 'c2-denied-read-retains-scope')
+  await capture(page, 'c2-denied-read-retains-scope')
   expect(new URL(page.url()).searchParams.get('project')).toBe(project.id)
   expect(new URL(page.url()).searchParams.get('draftKey')).toBe('c2-denied-original-draft')
   await page.unroute('**/api/read/payroll/c2-form')
@@ -70,7 +69,7 @@ test('C2 来源拒权不能沿旧读保存，重读后仍保原项目及草稿�
   expect(writes).toEqual([])
 })
 
-test('显式演示 C2 新稿及签工新稿保持不可写，不切到正式来源', async ({ page }, info) => {
+test('显式演示 C2 新稿及签工新稿保持不可写，不切到正式来源', async ({ page }) => {
   const writes: string[] = []
   page.on('request', (request) => {
     if (request.url().includes('/api/commands/'))
@@ -80,11 +79,11 @@ test('显式演示 C2 新稿及签工新稿保持不可写，不切到正式来�
   await expect(page.getByText('请选择正式工资来源，从台账进入有效的 C2 工资草稿。', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '保存工资草稿', exact: true }).and(page.locator(':enabled'))).toHaveCount(0)
   expect(new URL(page.url()).searchParams.get('origin')).toBe('demo')
-  await capture(page, info, 'c2-demo-write-unavailable')
+  await capture(page, 'c2-demo-write-unavailable')
   await page.goto('/subcontract/daywork/new?origin=demo&month=2026-09')
   await expect(page.getByText('请从正式签工台账打开有效记录。', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '保存并确认', exact: true }).and(page.locator(':enabled'))).toHaveCount(0)
   expect(new URL(page.url()).searchParams.get('origin')).toBe('demo')
-  await capture(page, info, 'daywork-demo-write-unavailable')
+  await capture(page, 'daywork-demo-write-unavailable')
   expect(writes).toEqual([])
 })

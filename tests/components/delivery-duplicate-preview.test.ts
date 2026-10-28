@@ -28,7 +28,6 @@ function setup() {
     loadDuplicateFile: (id: string) => new Promise<File>(resolve => pending.set(id, resolve)),
     loadDuplicateRepresentativeFile: async (id: string) => new File([id], `${id}-source.pdf`),
   }
-  const masterStore = { list: [], load: vi.fn() }
   const globals = {
     computed,
     shallowRef,
@@ -39,10 +38,8 @@ function setup() {
     onScopeDispose,
     useObjectUrl,
     useDeliveryStore: () => store,
-    useDeliveryRecordStore: () => ({ mode: 'native', origin: 'real' }),
-    useProjectStore: () => masterStore,
-    useProjectAliasStore: () => masterStore,
-    useSupplierStore: () => masterStore,
+    useDeliveryRecordStore: () => ({ origin: 'real', canWrite: true, list: [], context: { projects: [], suppliers: [] }, load: vi.fn().mockResolvedValue(undefined) }),
+    useSupplierCommandStore: () => ({}),
     useKitUI: () => ({ confirm: vi.fn(), promise: vi.fn(), warning: vi.fn() }),
     useFileDialog: () => ({ open: vi.fn(), onChange: vi.fn() }),
     useDropZone: () => ({ isOverDropZone: shallowRef(false) }),

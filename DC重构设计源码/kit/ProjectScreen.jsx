@@ -95,7 +95,7 @@
 
         {/* 红圈式表格（KitTable：≥10 行 / 容器内横滚 / 分页） */}
         {KitTable
-          ? <KitTable columns={columns} rows={rows} checkable pageSize={10} minRows={10}
+          ? <KitTable columns={columns} rows={rows} checkable pageSize={10}
               footerLeft={(cks) => cks.length ? ("已选 " + cks.length + " 个项目") : ("显示 " + rows.length + " 个，共 " + list.length + " 个项目")}
               empty="没有符合筛选条件的项目" />
           : <Panel padding={20} style={{ color: "var(--ink-soft)" }}>表格组件加载中…</Panel>}

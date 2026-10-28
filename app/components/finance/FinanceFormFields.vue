@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ConstructionMainSelection } from '~/lib/construction-scope/contract'
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { FinancePageDraft } from '~/lib/finance/page'
 import type { LookupOption } from '~/lib/kit/lookup'
@@ -11,6 +12,7 @@ defineProps<{
   draft: FinancePageDraft
   fieldErrors?: Record<string, string>
   fetchProjects: (keyword: string) => Promise<LookupOption[]>
+  fetchConstructionMains?: (keyword: string) => Promise<Array<LookupOption & { constructionMain: ConstructionMainSelection }>>
   fetchCustomers: (keyword: string) => Promise<LookupOption[]>
   fetchSuppliers: (keyword: string) => Promise<LookupOption[]>
   fetchWorkers?: (keyword: string) => Promise<LookupOption[]>
@@ -46,6 +48,7 @@ defineEmits<{
     :draft="draft"
     :field-errors="fieldErrors"
     :fetch-projects="fetchProjects"
+    :fetch-construction-mains="fetchConstructionMains"
     :fetch-workers="fetchWorkers"
     :fetch-original-expenses="fetchOriginalExpenses"
     :fetch-suppliers="fetchSuppliers"

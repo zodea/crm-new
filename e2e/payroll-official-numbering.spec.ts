@@ -103,7 +103,6 @@ test('原工资预览、人工起点、正式占号丢响应恢复、重复Excel
       await expect(page.getByRole('region', { name: '原工资明细', exact: true }).locator('details')).toContainText('60.125')
       await complete.press('Enter')
     }
-    await page.screenshot({ path: info.outputPath(`official-${width}.png`), fullPage: true })
   }
   for (const index of [1, 2]) {
     const downloading = page.waitForEvent('download')

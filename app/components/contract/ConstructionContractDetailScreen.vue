@@ -3,6 +3,7 @@ import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailRead
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useTimeoutFn } from '@vueuse/core'
 import ConstructionManagementFeeConfiguration from '~/components/contract/ConstructionManagementFeeConfiguration.vue'
+import ConstructionSpendingPanel from '~/components/contract/ConstructionSpendingPanel.vue'
 import ContractOriginalFilesPanel from '~/components/contract/ContractOriginalFilesPanel.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { useReceiptSourceReturn } from '~/composables/useReceiptSourceReturn'
@@ -35,13 +36,23 @@ const detail = computed(() => {
   return null
 })
 const loading = computed(() => state.value.kind === 'loading')
+function sectionIssue(key: string, label: string, fallback?: string) {
+  const source = detail.value?.meta.sources.find(row => row.key === key) ?? (fallback ? detail.value?.meta.sources.find(row => row.key === fallback) : undefined)
+  if (!source || source.state === 'readable')
+    return null
+  return { kind: source.state === 'forbidden' ? 'forbidden' as const : 'empty' as const, title: `${label}${source.state === 'forbidden' ? '无查看权限' : '暂不可读取'}`, description: source.state === 'forbidden' ? '请按当前查看权限核对此分区。' : '已保存的历史资料继续保留；当前缺少完整来源，不能据空列表推定没有记录。' }
+}
+function sectionCount(rows: readonly unknown[], key: string, label: string, fallback?: string) {
+  const issue = sectionIssue(key, label, fallback)
+  return issue ? issue.kind === 'forbidden' || !rows.length ? '待核' : `历史 ${rows.length} · 待核` : String(rows.length)
+}
 const tabs = computed(() => [
   { key: 'info', label: '详细资料' },
   { key: 'supplements', label: `补充合同 ${detail.value?.sections.supplements.length ?? 0}` },
-  { key: 'changes', label: `甲方变洽签 ${detail.value?.sections.changes.length ?? 0}` },
+  { key: 'changes', label: `甲方变洽签 ${detail.value ? sectionCount(detail.value.sections.changes, 'boq-changes', '甲方变洽签', 'owner-documents') : '待核'}` },
   { key: 'settlements', label: '验收结算' },
   { key: 'invoices', label: '票税管理' },
-  { key: 'receipts', label: `收款登记 ${detail.value?.sections.receipts.length ?? 0}` },
+  { key: 'receipts', label: `收款登记 ${detail.value ? sectionCount(detail.value.sections.receipts, 'construction-finance', '收款登记') : '待核'}` },
   { key: 'acceptance', label: '竣工验收及保修' },
 ])
 const tabKeys = new Set(tabs.value.map(tab => tab.key))
@@ -273,44 +284,62 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
             <ConstructionManagementFeeConfiguration class="mt-3" :configuration="detail.contract.managementFee" />
           </section>
           <ContractOriginalFilesPanel :owner-id="detail.contract.id" :origin="detail.dataOrigin" :source-version="detail.sourceVersion" :can-read="state.kind === 'ready' && detail.dataOrigin === origin && detail.capabilities.includes('construction-contract:read')" :files="detail.sections.files" :read-content="readOriginal" />
+          <ConstructionSpendingPanel v-if="state.kind === 'ready' && detail.dataOrigin === 'real' && detail.capabilities.includes('construction-scope:read') && detail.contract.project.state === 'resolved'" class="mt-4 border-t border-line pt-4" :project-id="detail.contract.project.id" :main-id="detail.contract.id" />
         </section>
 
         <section v-else-if="activeTab === 'supplements'" class="panel min-w-0 overflow-hidden p-4">
           <SectionHeader title="补充合同" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.supplements" empty-label="暂无补充合同" :focus-id="focusId" :return-to="returnTo" />
         </section>
         <section v-else-if="activeTab === 'changes'" class="panel min-w-0 overflow-hidden p-4">
-          <SectionHeader title="甲方变洽签" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.changes" empty-label="暂无甲方变洽签" :focus-id="focusId" :return-to="route.fullPath" />
+          <SectionHeader title="甲方变洽签" />
+          <StatePanel v-if="sectionIssue('boq-changes', '甲方变洽签', 'owner-documents')" v-bind="sectionIssue('boq-changes', '甲方变洽签', 'owner-documents')!" class="mt-3" compact />
+          <ConstructionContractFactTable v-if="!sectionIssue('boq-changes', '甲方变洽签', 'owner-documents') || (sectionIssue('boq-changes', '甲方变洽签', 'owner-documents')?.kind !== 'forbidden' && detail.sections.changes.length)" class="mt-3" :rows="detail.sections.changes" empty-label="暂无甲方变洽签" :focus-id="focusId" :return-to="route.fullPath" />
         </section>
         <section v-else-if="activeTab === 'settlements'" class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="月度报量" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.monthlyStatements" empty-label="暂无月度报量" :focus-id="focusId" :return-to="route.fullPath" />
+            <SectionHeader title="月度报量" />
+            <StatePanel v-if="sectionIssue('owner-documents', '月度报量')" v-bind="sectionIssue('owner-documents', '月度报量')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '月度报量') || (sectionIssue('owner-documents', '月度报量')?.kind !== 'forbidden' && detail.sections.settlements.monthlyStatements.length)" class="mt-3" :rows="detail.sections.settlements.monthlyStatements" empty-label="暂无月度报量" :focus-id="focusId" :return-to="route.fullPath" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="最终结算" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.finalSettlements" empty-label="暂无最终结算" :focus-id="focusId" :return-to="route.fullPath" />
+            <SectionHeader title="最终结算" />
+            <StatePanel v-if="sectionIssue('owner-documents', '最终结算')" v-bind="sectionIssue('owner-documents', '最终结算')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '最终结算') || (sectionIssue('owner-documents', '最终结算')?.kind !== 'forbidden' && detail.sections.settlements.finalSettlements.length)" class="mt-3" :rows="detail.sections.settlements.finalSettlements" empty-label="暂无最终结算" :focus-id="focusId" :return-to="route.fullPath" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="甲方罚扣" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.penalties" empty-label="暂无甲方罚扣" :focus-id="focusId" :return-to="route.fullPath" />
+            <SectionHeader title="甲方罚扣" />
+            <StatePanel v-if="sectionIssue('owner-documents', '甲方罚扣')" v-bind="sectionIssue('owner-documents', '甲方罚扣')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '甲方罚扣') || (sectionIssue('owner-documents', '甲方罚扣')?.kind !== 'forbidden' && detail.sections.settlements.penalties.length)" class="mt-3" :rows="detail.sections.settlements.penalties" empty-label="暂无甲方罚扣" :focus-id="focusId" :return-to="route.fullPath" />
           </div>
         </section>
         <section v-else-if="activeTab === 'invoices'" class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="开票申请" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.invoices.applications" empty-label="暂无开票申请" />
+            <SectionHeader title="开票申请" />
+            <StatePanel v-if="sectionIssue('construction-finance', '开票申请')" v-bind="sectionIssue('construction-finance', '开票申请')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('construction-finance', '开票申请') || (sectionIssue('construction-finance', '开票申请')?.kind !== 'forbidden' && detail.sections.invoices.applications.length)" class="mt-3" :rows="detail.sections.invoices.applications" empty-label="暂无开票申请" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="销项开票登记" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.invoices.registrations" empty-label="暂无销项开票登记" />
+            <SectionHeader title="销项开票登记" />
+            <StatePanel v-if="sectionIssue('construction-finance', '销项开票登记')" v-bind="sectionIssue('construction-finance', '销项开票登记')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('construction-finance', '销项开票登记') || (sectionIssue('construction-finance', '销项开票登记')?.kind !== 'forbidden' && detail.sections.invoices.registrations.length)" class="mt-3" :rows="detail.sections.invoices.registrations" empty-label="暂无销项开票登记" />
           </div>
         </section>
         <section v-else-if="activeTab === 'receipts'" class="panel min-w-0 overflow-hidden p-4">
           <SectionHeader title="收款登记" />
+          <StatePanel v-if="sectionIssue('construction-finance', '收款登记')" v-bind="sectionIssue('construction-finance', '收款登记')!" class="mt-3" compact />
           <StatePanel v-if="detail.receiptsProblem" class="mt-3" :kind="detail.receiptsProblem.code === 'forbidden' ? 'forbidden' : 'error'" title="收款金额暂不可用" :description="detail.receiptsProblem.message" :action-label="detail.receiptsProblem.retryable ? '重新读取收款' : ''" compact @action="load" />
-          <ConstructionContractFactTable v-else class="mt-3" :rows="detail.sections.receipts" empty-label="暂无收款登记" :return-to="route.fullPath" :restore-scroll-left="receiptReturnOrigin?.scrollLeft" @view-restored="restoreReceiptSource(route.fullPath)" />
+          <ConstructionContractFactTable v-else-if="!sectionIssue('construction-finance', '收款登记') || (sectionIssue('construction-finance', '收款登记')?.kind !== 'forbidden' && detail.sections.receipts.length)" class="mt-3" :rows="detail.sections.receipts" empty-label="暂无收款登记" :return-to="route.fullPath" :restore-scroll-left="receiptReturnOrigin?.scrollLeft" @view-restored="restoreReceiptSource(route.fullPath)" />
         </section>
         <section v-else class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="竣工验收" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.acceptance.acceptances" empty-label="暂无竣工验收记录" :focus-id="focusView === null || focusView === 'acceptance' ? focusId : null" :return-to="route.fullPath" anchor-scope="acceptance" return-focus-view="acceptance" />
+            <SectionHeader title="竣工验收" />
+            <StatePanel v-if="sectionIssue('owner-documents', '竣工验收')" v-bind="sectionIssue('owner-documents', '竣工验收')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '竣工验收') || (sectionIssue('owner-documents', '竣工验收')?.kind !== 'forbidden' && detail.sections.acceptance.acceptances.length)" class="mt-3" :rows="detail.sections.acceptance.acceptances" empty-label="暂无竣工验收记录" :focus-id="focusView === null || focusView === 'acceptance' ? focusId : null" :return-to="route.fullPath" anchor-scope="acceptance" return-focus-view="acceptance" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="保修到期" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.acceptance.warranties" empty-label="暂无保修到期记录" :focus-id="focusView === 'warranty' ? focusId : null" :return-to="route.fullPath" anchor-scope="warranty" return-focus-view="warranty" />
+            <SectionHeader title="保修到期" />
+            <StatePanel v-if="sectionIssue('owner-documents', '保修到期')" v-bind="sectionIssue('owner-documents', '保修到期')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '保修到期') || (sectionIssue('owner-documents', '保修到期')?.kind !== 'forbidden' && detail.sections.acceptance.warranties.length)" class="mt-3" :rows="detail.sections.acceptance.warranties" empty-label="暂无保修到期记录" :focus-id="focusView === 'warranty' ? focusId : null" :return-to="route.fullPath" anchor-scope="warranty" return-focus-view="warranty" />
           </div>
         </section>
       </div>

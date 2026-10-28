@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { ConstructionMainSelection } from '~/lib/construction-scope/contract'
 import type { FinancePageDraft } from '~/lib/finance/page'
 import type { LookupOption } from '~/lib/kit/lookup'
-import { computed, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onDeactivated, shallowRef, watch } from 'vue'
+import { useToast } from '~/composables/useToast'
 import { financeDraftMoney, financeInputNumber as inputNumber } from '~/lib/finance/input-number'
 import FinanceLineGrid from './FinanceLineGrid.vue'
 
@@ -10,6 +12,7 @@ const props = defineProps<{
   draft: FinancePageDraft
   fieldErrors?: Record<string, string>
   fetchProjects: (keyword: string) => Promise<LookupOption[]>
+  fetchConstructionMains?: (keyword: string) => Promise<Array<LookupOption & { constructionMain: ConstructionMainSelection }>>
   fetchWorkers?: (keyword: string) => Promise<LookupOption[]>
   fetchOriginalExpenses?: (keyword: string) => Promise<LookupOption[]>
   fetchSuppliers: (keyword: string) => Promise<LookupOption[]>
@@ -19,6 +22,11 @@ const emit = defineEmits<{
   patch: [patch: Partial<FinancePageDraft>]
   clearError: [field: string]
 }>()
+const toast = useToast()
+let engineeringSelection = 0
+watch(() => [props.kind, props.draft.id, props.fetchConstructionMains], () => engineeringSelection++, { flush: 'sync' })
+onDeactivated(() => engineeringSelection++)
+onBeforeUnmount(() => engineeringSelection++)
 
 const selectedApplicantKind = shallowRef<'worker' | 'supplier' | null>(null)
 watch(() => `${props.kind}:${props.draft.id ?? 'new'}`, () => {
@@ -48,6 +56,23 @@ function patch(field: keyof FinancePageDraft, value: unknown) {
 function updateLines(lines: unknown[]) {
   emit('patch', { lines } as Partial<FinancePageDraft>)
   emit('clearError', 'lines')
+}
+async function selectEngineering(id: string | null) {
+  const selection = ++engineeringSelection
+  const fetch = props.fetchConstructionMains
+  if (!id || !fetch) {
+    emit('patch', { constructionMain: undefined, projectId: null })
+    return
+  }
+  try {
+    const selected = (await fetch(id)).find(row => row.id === id)?.constructionMain
+    if (selection === engineeringSelection && selected)
+      emit('patch', { constructionMain: selected, projectId: selected.projectId })
+  }
+  catch (error) {
+    if (selection === engineeringSelection)
+      toast.error('工程选择未完成', error instanceof Error ? error.message : '请重试读取工程资格。')
+  }
 }
 
 function inputValue(event: Event): string {
@@ -145,9 +170,16 @@ function fieldClass(field: string) {
           </p>
           <span v-if="fieldErrors?.applicantWorkerId" class="field-error">{{ fieldErrors.applicantWorkerId }}</span>
         </div>
-        <div class="field-block">
-          <span class="field-label">归属项目（可空=公司开支）</span>
-          <LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" recent-key="finance-reimbursement-project" placeholder="留空表示公司开支" @update:model-value="patch('projectId', $event)" />
+        <div v-if="fetchConstructionMains && (!draft.id || (draft.status === 'draft' && draft.constructionMain))" class="field-block">
+          <span class="field-label">工程名称 *</span>
+          <LookupSelect :model-value="draft.constructionMain?.id ?? null" :fetch="fetchConstructionMains" placeholder="搜索工程名称、施工合同名称或编号" @update:model-value="selectEngineering" />
+          <p class="text-12px text-ink-soft">
+            费用与工程归属一起保存；共用费用分明细，本单各行须属于同一实际工程。
+          </p>
+        </div>
+        <div v-else class="field-block">
+          <span class="field-label">原归属项目</span>
+          <LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" recent-key="finance-reimbursement-project" placeholder="核对原实际项目；历史无项目记录保留" @update:model-value="patch('projectId', $event)" />
         </div>
         <label class="field-block">
           <span class="field-label">费用类别</span>
@@ -177,6 +209,8 @@ function fieldClass(field: string) {
         :lines="draft.lines ?? []"
         :fetch-counterparties="fetchSuppliers"
         :fetch-original-expenses="fetchOriginalExpenses"
+        :fetch-construction-mains="fetchConstructionMains"
+        :default-construction-main="draft.constructionMain"
         :total-label="`合计 ¥ ${financeDraftMoney(reimbursementTotal)}`"
         empty="暂无明细，请新增一行"
         @update="updateLines"

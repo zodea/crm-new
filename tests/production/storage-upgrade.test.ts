@@ -2,16 +2,79 @@ import type { StoredMaterialContract } from '../../server/utils/material-contrac
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { validateMaterialContractIdentities } from '../../server/utils/contract-identity-evidence'
+import { PRODUCTION_CONSTRUCTION_SCOPE_TABLES } from '../../server/utils/production-construction-scope-schema'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES, productionStorageManifest } from '../../server/utils/production-storage-schema'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 // Independent expected release scope: checking only the version would miss a partial owner registration.
-const expectedParticipants = ['backup', 'contract-number-registry', 'crew-worker', 'customer', 'finance', 'material-contracts', 'material-quotations', 'notifications', 'other-settlements', 'our-signatories', 'process-library', 'project', 'supplier']
+const expectedParticipants = ['auxiliary-contract', 'backup', 'boq', 'construction-contracts', 'construction-scope', 'contract-number-registry', 'crew-worker', 'customer', 'finance', 'material-contracts', 'material-quotations', 'notifications', 'other-settlements', 'our-signatories', 'payroll', 'process-library', 'project', 'quantity', 'subcontract-contracts', 'supplier', 'target-cost', 'wbs']
+const appendedOpt02Participants = ['target-cost', 'quantity', 'payroll', 'wbs', 'construction-contracts', 'boq', 'construction-scope', 'subcontract-contracts', 'auxiliary-contract'].map(domain => ({ domain, schema_version: domain === 'construction-scope' ? 2 : 1 }))
+
+it('真实v26工程关联扩展保全已有绑定、解绑和两种来源全部原证据，冷开不改写且不可变保护继续生效', async () => {
+  const base = testTempRoot('opt02-scope-upgrade')
+  await mkdir(base, { recursive: true })
+  const directory = await mkdtemp(`${base}/populated-v26-`)
+  const raw = new DatabaseSync(join(directory, 'ruihang.sqlite'))
+  raw.exec('PRAGMA foreign_keys=ON; BEGIN')
+  raw.exec(PRODUCTION_STORAGE_SCHEMA)
+  for (const upgrade of PRODUCTION_STORAGE_UPGRADES.filter(step => step.to <= 26)) raw.exec(upgrade.sql)
+  const timestamp = '2026-10-07T00:00:00.000Z'
+  raw.prepare('INSERT INTO production_metadata VALUES(1,26,?,?,?,?)').run('scope-upgrade-workspace', 'scope-upgrade-owner', 'verification', timestamp)
+  raw.prepare('INSERT INTO projects(id,name,code,customer_id,secondary_customer_id,draft_json,version,created_at,updated_at,deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run('original-project', '旧工程', 'OLD-P', null, null, '{ "extension" : "原文\\t保留" }', 1, timestamp, timestamp, null)
+  raw.prepare('INSERT INTO construction_contract_records(id,project_id,customer_id,deleted_at,record_json) VALUES(?,?,?,?,?)').run('original-main', 'original-project', null, null, '{ "draft" : { "id":"original-main","no":"OLD-M","name":"旧主合同" }, "version":1 }')
+  const digest = 'a'.repeat(64)
+  const original = ' { "unknown" : [0,null,"原文\\n保留"], "large" : "9223372036854775807" } '
+  for (const [domain, link, source, deleted] of [['material-contract', 'old-material-link', 'old-material', timestamp], ['original-expense', 'old-expense-link', 'old-expense-line', null]] as const) {
+    raw.prepare('INSERT INTO construction_scope_links VALUES(?,?,?,?,?,?,?,?,?,?)').run(link, domain, source, 'original-project', deleted ? null : 'original-main', deleted ? 2 : 1, digest, deleted ? null : digest, timestamp, deleted)
+    const versions = deleted ? [1, 2] : [1]
+    for (const version of versions) {
+      const commandId = `${link}-v${version}`
+      const unbound = deleted && version === 2
+      raw.prepare('INSERT INTO construction_scope_intents VALUES(?,?,?,?,?,?,?,?)').run(commandId, 'scope-upgrade-workspace', 'scope-upgrade-owner', link, unbound ? 'unbind' : 'bind', digest, original, timestamp)
+      raw.prepare('INSERT INTO construction_scope_history VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(link, version, domain, source, 'original-project', unbound ? null : 'original-main', digest, unbound ? null : digest, commandId, 'scope-upgrade-owner', timestamp, unbound ? timestamp : null)
+      raw.prepare('INSERT INTO construction_scope_receipts VALUES(?,?,?,?,?,?,?)').run(commandId, 'scope-upgrade-workspace', 'scope-upgrade-owner', link, digest, original, timestamp)
+    }
+  }
+  raw.prepare('INSERT INTO construction_scope_resolutions VALUES(?,?,?,?,?,?)').run('original-unknown-command', 'scope-upgrade-workspace', 'scope-upgrade-owner', 'old-material-link', 'bind', timestamp)
+  raw.exec('UPDATE construction_scope_revision SET revision=3; COMMIT')
+  const before = PRODUCTION_CONSTRUCTION_SCOPE_TABLES.map(table => raw.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all())
+  raw.close()
+  const storage = createProductionStorage({ directory, workspaceId: 'scope-upgrade-workspace', ownerId: 'scope-upgrade-owner', purpose: 'verification' })
+  try {
+    expect((await storage.status()).schemaVersion).toBe(28)
+    expect(await Promise.all(PRODUCTION_CONSTRUCTION_SCOPE_TABLES.map(table => storage.select(`SELECT * FROM ${table} ORDER BY rowid`)))).toEqual(before)
+    expect(await storage.select('PRAGMA foreign_key_check')).toEqual([])
+    await storage.close()
+    expect(await Promise.all(PRODUCTION_CONSTRUCTION_SCOPE_TABLES.map(table => storage.select(`SELECT * FROM ${table} ORDER BY rowid`)))).toEqual(before)
+    for (const table of ['construction_scope_history', 'construction_scope_intents', 'construction_scope_receipts', 'construction_scope_resolutions']) {
+      await expect(storage.execute(`DELETE FROM ${table}`)).rejects.toThrow('immutable')
+      await expect(storage.execute(`UPDATE ${table} SET actor_id=actor_id`)).rejects.toThrow('immutable')
+    }
+    await expect(storage.execute('DELETE FROM construction_scope_links')).rejects.toThrow('cannot be deleted')
+  }
+  finally { await storage.close() }
+})
+function participantsAfterOpt02(originals: Record<string, unknown>[]) {
+  return [...originals, ...appendedOpt02Participants].sort((left, right) => String(left.domain).localeCompare(String(right.domain)))
+}
 const newOwnerTables = [
+  'auxiliary_contract_revision',
+  'auxiliary_contract_records',
+  'auxiliary_contract_supplements',
+  'auxiliary_contract_versions',
+  'auxiliary_contract_files',
+  'auxiliary_contract_intents',
+  'auxiliary_contract_receipts',
+  'auxiliary_contract_resolutions',
+  'auxiliary_contract_imports',
+  'auxiliary_contract_import_restores',
   'quotation_revision',
   'material_quotations',
   'material_quotation_lines',
@@ -61,11 +124,157 @@ const newOwnerTables = [
   'other_settlement_files',
   'other_settlement_imports',
   'expenditure_settlement_clearance_links',
+  'target_costs',
+  'target_cost_items',
+  'target_cost_versions',
+  'target_cost_commands',
+  'target_cost_resolutions',
+  'target_cost_draft_claims',
+  'target_cost_files',
+  'target_cost_imports',
+  'target_cost_import_restores',
+  'target_cost_import_commands',
+  'target_cost_import_resolutions',
+  'items',
+  'buildings',
+  'floors',
+  'units',
+  'house_type_templates',
+  'rooms',
+  'house_type_template_items',
+  'construction_stages',
+  'construction_stage_items',
+  'unit_assignments',
+  'unit_assignment_scopes',
+  'unit_stage_completions',
+  'quantity_boq_references',
+  'quantity_hollow_records',
+  'quantity_hollow_revisions',
+  'quantity_hollow_rectifications',
+  'quantity_hollow_logs',
+  'quantity_hollow_command_receipts',
+  'quantity_hollow_migration_evidence',
+  'quantity_revisions',
+  'quantity_commands',
+  'quantity_resolutions',
+  'quantity_command_intents',
+  'quantity_source_imports',
+  'quantity_import_restores',
+  'payroll_subject_configs',
+  'wage_statements',
+  'wage_statement_lines',
+  'wage_statement_members',
+  'attendance_records',
+  'signed_daywork_records',
+  'wage_statement_daywork_records',
+  'wage_statement_allocations',
+  'payroll_revision',
+  'payroll_migration_evidence',
+  'payroll_a_subject_configs',
+  'payroll_a_price_revisions',
+  'payroll_a_statement_sources',
+  'payroll_command_receipts',
+  'payroll_c1_rate_revisions',
+  'payroll_c1_statement_sources',
+  'payroll_c2_statement_sources',
+  'payroll_adjustments',
+  'payroll_actual_events',
+  'payroll_actual_allocations',
+  'payroll_adjustment_applications',
+  'payroll_a_adjustment_coverage',
+  'payroll_a_management_books',
+  'payroll_a_management_book_revisions',
+  'payroll_a_fee_revisions',
+  'payroll_a_statement_books',
+  'payroll_a_negative_lines',
+  'payroll_a_management_ownership',
+  'payroll_a_rounding_revisions',
+  'payroll_hollow_policy_revisions',
+  'payroll_hollow_starts',
+  'payroll_hollow_adoptions',
+  'payroll_batch_plans',
+  'payroll_batch_attempts',
+  'payroll_batch_command_receipts',
+  'payroll_numbering_settings',
+  'payroll_official_issues',
+  'payroll_workbook_archives',
+  'payroll_workbook_receipts',
+  'payroll_workbook_references',
+  'payroll_publication_migration_proofs',
+  'payroll_command_journal',
+  'payroll_command_intents',
+  'payroll_source_imports',
+  'quantity_contract_references',
+  'schedule_group_buildings',
+  'task_dependencies',
+  'schedule_groups',
+  'schedule_tasks',
+  'task_item_map',
+  'schedule_task_floor_plans',
+  'schedule_migration_evidence',
+  'schedule_command_receipts',
+  'schedule_revisions',
+  'schedule_floor_quantity_snapshots',
+  'schedule_command_intents',
+  'schedule_command_resolutions',
+  'schedule_source_imports',
+  'schedule_import_restores',
+  'schedule_files',
+  'schedule_import_intents',
+  'schedule_import_commands',
+  'schedule_import_resolutions',
+  'construction_contract_revision',
+  'construction_contract_records',
+  'construction_contract_supplements',
+  'construction_contract_versions',
+  'construction_contract_files',
+  'construction_contract_intents',
+  'construction_contract_receipts',
+  'construction_contract_resolutions',
+  'construction_contract_imports',
+  'construction_contract_import_restores',
+  'construction_contract_import_intents',
+  'construction_contract_import_receipts',
+  'construction_contract_import_resolutions',
+  'construction_scope_revision',
+  'construction_scope_links',
+  'construction_scope_history',
+  'construction_scope_intents',
+  'construction_scope_receipts',
+  'construction_scope_resolutions',
+  'boq_revision',
+  'boq_files',
+  'boq_lines',
+  'item_unit_prices',
+  'boq_change_records',
+  'boq_history',
+  'boq_command_intents',
+  'boq_commands',
+  'boq_resolutions',
+  'boq_source_imports',
+  'boq_import_restores',
+  'boq_source_bindings',
+  'boq_import_intents',
+  'boq_import_commands',
+  'boq_import_resolutions',
+  'subcontract_contract_revision',
+  'subcontract_contract_records',
+  'subcontract_contract_supplements',
+  'subcontract_contract_versions',
+  'subcontract_contract_files',
+  'subcontract_contract_intents',
+  'subcontract_contract_receipts',
+  'subcontract_contract_resolutions',
+  'subcontract_contract_imports',
+  'subcontract_contract_import_restores',
+  'subcontract_contract_import_intents',
+  'subcontract_contract_import_receipts',
+  'subcontract_contract_import_resolutions',
 ]
 async function assertCurrentOwnerStructure(storage: ReturnType<typeof createProductionStorage>) {
-  expect((await storage.status()).schemaVersion).toBe(14)
+  expect((await storage.status()).schemaVersion).toBe(28)
   expect((await storage.status()).participants.slice().sort()).toEqual(expectedParticipants)
-  expect(await storage.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(expectedParticipants.map(domain => ({ domain, schema_version: 1 })))
+  expect(await storage.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(expectedParticipants.map(domain => ({ domain, schema_version: domain === 'construction-scope' ? 2 : 1 })))
   for (const table of newOwnerTables) {
     expect(await storage.select(`SELECT * FROM ${table}`)).toEqual(table.endsWith('_revision') ? [{ singleton: 1, revision: 0 }] : [])
   }
@@ -111,7 +320,7 @@ async function assertFrozenHistoryGuards(storage: ReturnType<typeof createProduc
 }
 
 async function seedV7NumberGraph() {
-  const base = resolve('.tmp/a03-storage-upgrade')
+  const base = testTempRoot('a03-storage-upgrade')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/upgrade-from-v7-`)
   const path = join(directory, 'ruihang.sqlite')
@@ -198,7 +407,7 @@ it('真实v7完整旧图升级占用最近成立编号，草稿改号/历史重�
 })
 
 it('既有客户v1库经同事务升级加入全部当前领域，客户参与者和原事实不被替换', async () => {
-  const base = resolve('.tmp/a03-storage-upgrade')
+  const base = testTempRoot('a03-storage-upgrade')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/upgrade-`)
   const raw = new DatabaseSync(join(directory, 'ruihang.sqlite'))
@@ -238,7 +447,7 @@ it('既有客户v1库经同事务升级加入全部当前领域，客户参与�
 })
 
 it('升级中途失败保持旧版本和完整旧参与者，未知参与者不会被自动抹掉', async () => {
-  const base = resolve('.tmp/a03-storage-upgrade')
+  const base = testTempRoot('a03-storage-upgrade')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/failed-upgrade-`)
   const path = join(directory, 'ruihang.sqlite')
@@ -262,7 +471,7 @@ it('升级中途失败保持旧版本和完整旧参与者，未知参与者不�
 })
 
 it('参与者登记仍在但实际审计表缺失时，冷打开明确拒绝而非报告已就绪', async () => {
-  const base = resolve('.tmp/a03-storage-upgrade')
+  const base = testTempRoot('a03-storage-upgrade')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/missing-table-`)
   const options = { directory, workspaceId: 'missing-table-workspace', ownerId: 'missing-table-owner', purpose: 'verification' as const }
@@ -308,7 +517,7 @@ it('v10至v12保原finance清单，v13只向同一参与者追加冻结核验，
 })
 
 it('真实v12升级核验表冲突保整份旧库；核实处理冲突后重试保留旧零、空值、银行原文且不补造核验', async () => {
-  const base = resolve('.tmp/a03-storage-upgrade')
+  const base = testTempRoot('a03-storage-upgrade')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/v12-verification-upgrade-`)
   const path = join(directory, 'ruihang.sqlite')
@@ -357,15 +566,15 @@ it('真实v12升级核验表冲突保整份旧库；核实处理冲突后重试�
   finally { preserved.close() }
   const retried = createProductionStorage(options)
   try {
-    expect((await retried.status()).schemaVersion).toBe(14)
+    expect((await retried.status()).schemaVersion).toBe(28)
     expect(await retried.select('SELECT * FROM payment_applications ORDER BY id')).toEqual(oldApplications)
     expect(await retried.select('SELECT * FROM payment_records')).toEqual(oldCash)
     expect(await retried.select('SELECT * FROM payment_record_application_allocations')).toEqual(oldAllocations)
-    expect(await retried.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(oldParticipants)
+    expect(await retried.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(participantsAfterOpt02(oldParticipants))
     expect(await retried.select('SELECT * FROM finance_payment_verifications')).toEqual([])
     expect(await retried.select('PRAGMA foreign_key_check')).toEqual([])
     await retried.close()
-    expect((await retried.status()).schemaVersion).toBe(14)
+    expect((await retried.status()).schemaVersion).toBe(28)
     expect(await retried.select('SELECT * FROM payment_applications ORDER BY id')).toEqual(oldApplications)
     expect(await retried.select('SELECT * FROM payment_records')).toEqual(oldCash)
     expect(await retried.select('SELECT * FROM finance_payment_verifications')).toEqual([])
@@ -395,7 +604,7 @@ it('v14只在既有Finance与Other参与者追加核定和明确采用关系，�
 const v13PreservedTables = ['expense_reimbursements', 'expense_reimbursement_lines', 'payment_applications', 'payment_records', 'payment_record_application_allocations', 'file_refs', 'file_payloads', 'production_participants', 'finance_payment_verifications'] as const
 
 async function seedV13ClearanceUpgrade(conflict?: 'finance_expense_clearance_verifications' | 'expenditure_settlement_clearance_links') {
-  const base = resolve('.tmp/root-clearance-validation/shared-upgrade')
+  const base = testTempRoot('root-clearance-validation/shared-upgrade')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(join(base, 'v13-original-'))
   const path = join(directory, 'ruihang.sqlite')
@@ -452,13 +661,57 @@ it.each([null, 'finance_expense_clearance_verifications', 'expenditure_settlemen
     for (const cold of [false, true]) {
       if (cold)
         await upgraded.close()
-      expect((await upgraded.status()).schemaVersion).toBe(14)
-      for (const [table, rows] of Object.entries(graph.rows))
-        expect(await upgraded.select(`SELECT * FROM ${table} ORDER BY rowid`)).toEqual(rows)
+      expect((await upgraded.status()).schemaVersion).toBe(28)
+      for (const [table, rows] of Object.entries(graph.rows)) {
+        if (table === 'production_participants')
+          expect(await upgraded.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(participantsAfterOpt02(rows))
+        else
+          expect(await upgraded.select(`SELECT * FROM ${table} ORDER BY rowid`)).toEqual(rows)
+      }
       expect(await upgraded.select('SELECT * FROM finance_expense_clearance_verifications')).toEqual([])
       expect(await upgraded.select('SELECT * FROM expenditure_settlement_clearance_links')).toEqual([])
       expect(await upgraded.select('PRAGMA foreign_key_check')).toEqual([])
     }
   }
   finally { await upgraded.close() }
+})
+
+it('既有v14主档升级后只读虚拟列保原JSON、删除事实、未知扩展和真实零，冷开不新建身份', async () => {
+  const base = testTempRoot('opt02-master-projection')
+  await mkdir(base, { recursive: true })
+  const directory = await mkdtemp(join(base, 'v14-'))
+  const path = join(directory, 'ruihang.sqlite')
+  const raw = new DatabaseSync(path)
+  const timestamp = '2026-10-07T00:00:00.000Z'
+  const records = [
+    { id: 'zero-wage-worker', deletedAt: null, version: 1, updatedAt: timestamp, extension: { original: 'Aa\n保原文' }, draft: { id: 'zero-wage-worker', name: '真实零', dailyWage: 0, crewId: null, currentProjectId: 'project-reuse-original' } },
+    { id: 'unknown-wage-worker', deletedAt: null, version: 1, updatedAt: timestamp, draft: { id: 'unknown-wage-worker', name: '未知', dailyWage: null, crewId: null } },
+    { id: 'deleted-original-worker', deletedAt: timestamp, version: 1, updatedAt: timestamp, draft: { id: 'deleted-original-worker', name: '已删除原身份', dailyWage: 200, crewId: null } },
+  ]
+  try {
+    raw.exec('BEGIN')
+    raw.exec(PRODUCTION_STORAGE_SCHEMA)
+    for (const step of PRODUCTION_STORAGE_UPGRADES.filter(step => step.to <= 14)) raw.exec(step.sql)
+    raw.prepare('INSERT INTO production_metadata VALUES(1,14,?,?,?,?)').run('projection-workspace', 'projection-owner', 'verification', timestamp)
+    for (const record of records)
+      raw.prepare('INSERT INTO workers(id,record_json) VALUES(?,?)').run(record.id, JSON.stringify(record))
+    raw.exec('COMMIT')
+  }
+  finally { raw.close() }
+  const options = { directory, workspaceId: 'projection-workspace', ownerId: 'projection-owner', purpose: 'verification' as const }
+  const storage = createProductionStorage(options)
+  try {
+    for (const cold of [false, true]) {
+      if (cold)
+        await storage.close()
+      expect(await storage.select('SELECT id,record_json FROM workers ORDER BY id')).toEqual(records.map(record => ({ id: record.id, record_json: JSON.stringify(record) })).sort((left, right) => left.id.localeCompare(right.id)))
+      expect(await storage.select('SELECT id,daily_wage,deleted_at,current_project_id FROM workers ORDER BY id')).toEqual([
+        { id: 'deleted-original-worker', daily_wage: 200, deleted_at: timestamp, current_project_id: null },
+        { id: 'unknown-wage-worker', daily_wage: null, deleted_at: null, current_project_id: null },
+        { id: 'zero-wage-worker', daily_wage: 0, deleted_at: null, current_project_id: 'project-reuse-original' },
+      ])
+      await expect(storage.execute('UPDATE workers SET name=? WHERE id=?', ['不得写第二主档', 'zero-wage-worker'])).rejects.toThrow(/generated/)
+    }
+  }
+  finally { await storage.close() }
 })

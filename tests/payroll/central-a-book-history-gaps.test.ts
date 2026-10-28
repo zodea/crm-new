@@ -15,7 +15,7 @@ it('管理已领用途关系及两份原件同时缺损时，不借旧A兼容分
     expect.soft(next.totals.previouslyPaid.value).toBeNull()
     expect.soft(next.totals.grossAmount.value).toBeNull()
     expect.soft(next.eligibility.canSaveDraft).toBe(false)
-    await expect(management.start('2026-09')).rejects.toThrow()
+    await expect(management.start('2026-09')).rejects.toThrow('此前实际发放金额存在历史缺口，不能作为零继续核算')
   }
   finally { await f.close() }
 })

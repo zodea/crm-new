@@ -23,7 +23,6 @@ import { wrapTabRouteComponents } from '~/lib/tabs/page-cache'
 import { useProductionAccessStore } from '~/stores/production-access'
 import { useTabsStore } from '~/stores/tabs'
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 enableAutoUnmount(afterEach)
 beforeEach(() => {
@@ -111,6 +110,30 @@ function linkSource(): ExpenseClearanceSourceDTO {
   return { id: 'original-expense-line', headerId: 'original-expense-head', projectId: null, amount: 100, version: '2', sourceRevision: 'finance-10', clearedAmount: 30, expenseItem: '真实原费', serviceSupplierId: 'actual-service', serviceSupplierNameSnapshot: '原服务方', applicantWorkerId: null, applicantSupplierId: 'actual-payee', applicantNameSnapshot: '实际垫付人', clearances: [], clearanceSourceHash: 'a'.repeat(64), clearanceLinks: [], clearanceItemAvailability: [{ verificationId: 'actual-verification', itemId: 'recognized-old-item', amountRemaining: 30 }], clearanceProofs: [{ schemaVersion: 'expense-clearance-verification-v1', id: 'actual-verification', originalExpenseLineId: 'original-expense-line', headerId: 'original-expense-head', expenseVersion: '2', sourceHash: 'a'.repeat(64), workspaceId: 'actual-workspace', actorId: 'actual-owner', verifiedAt: '2026-10-05T00:00:00.000Z', commandId: 'source-verification-command', basis: '已核旧30尚待实付', items: [{ id: 'recognized-old-item', sourceClearanceLineId: 'old-clearance-line', amount: 30, matchBasis: '真实旧30份额', missingOriginalDocument: true }], originals: [{ id: 'real-proof-file', ownerType: 'expense_reimbursement', ownerId: 'original-expense-head', fileName: '原账签收.bin', fileSize: 4, sha256: 'b'.repeat(64) }], sourceSnapshot: {} }], qualification: { state: 'verified', message: '旧30需明确绑定本头真实采用行', verificationId: 'actual-verification', recordedHandledAmount: 30, verifiedHandledAmount: 30, confirmedOtherAdoptedAmount: 30, verifiedOverlapAmount: 0, newAdoptableAmount: 40, legacyObligationAmount: 30, legacyPaidAmount: null, legacyUnpaidAmount: null } }
 }
 
+it('other表单中重新核对费用及采用公司归属只改变读面和当前输入，不触发原业务提交', async () => {
+  const f = await fixture('other', false)
+  const form = f.page()
+  const fields = form.getComponent(OtherSettlementFormFields)
+  await form.findAll('label').find(label => label.text().trim() === '结算名称 *')!.get('input').setValue('仍未提交的实际结算')
+  fields.vm.$emit('patch', { projectId: 'actual-project' })
+  await flushPromises()
+  const initialReads = f.repository.expenses.mock.calls.length
+  const reload = form.findAll('button').find(button => button.text() === '重新核对原费用来源')!
+  expect(reload.attributes('type')).toBe('button')
+  reload.element.click()
+  await flushPromises()
+  expect(f.repository.expenses).toHaveBeenCalledTimes(initialReads + 1)
+  expect(f.repository.execute).not.toHaveBeenCalled()
+  expect(fields.props('draft')).toMatchObject({ name: '仍未提交的实际结算', projectId: 'actual-project' })
+  const companyScope = form.findAll('button').find(button => button.text() === '采用公司归属')!
+  expect(companyScope.attributes('type')).toBe('button')
+  companyScope.element.click()
+  await flushPromises()
+  expect(fields.props('draft')).toMatchObject({ name: '仍未提交的实际结算', projectId: null })
+  expect(f.repository.execute).not.toHaveBeenCalled()
+  expect(f.commands).toEqual([])
+})
+
 it.each([false, true])('confirmed追加关联未知=%s保原head0/正文，receiptlink缺读先保原key，再只GET恢复不重发', async (unknown) => {
   const f = await fixture('other', unknown, linkSource())
   const form = f.page()
@@ -126,7 +149,9 @@ it.each([false, true])('confirmed追加关联未知=%s保原head0/正文，recei
   expect(Object.keys(f.commands[0]!.draft)).toEqual(['id', 'clearanceLinkEdit'])
   f.release()
   await flushPromises()
-  await form.findAll('button').find(button => button.text() === '核对原提交')!.trigger('click')
+  const recover = form.findAll('button').find(button => button.text() === '核对原提交')!
+  expect(recover.attributes('type')).toBe('button')
+  recover.element.click()
   await flushPromises()
   expect(form.text()).toContain('已保存待刷新，只重试读取')
   expect(f.repository.resolve).toHaveBeenCalledTimes(unknown ? 1 : 0)

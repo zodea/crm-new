@@ -1,19 +1,22 @@
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { join } from 'node:path'
+import { afterAll, expect, it } from 'vitest'
 import { FINANCE_FAMILIES } from '../../app/lib/finance/central-contract'
 import { createHistoricalClearanceMigrationSource } from '../../e2e/helpers/historical-clearance-migration-source'
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementService } from '../../server/utils/production-other-settlement-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { createMemoryDb } from '../helpers/memory-db'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture(size: number | null, wrongOwner = false) {
-  const root = resolve('.tmp/a02-clearance-tests')
+  const root = testTempRoot('a02-clearance-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'native-missing-clearance-'))
   const native = await createHistoricalClearanceMigrationSource(join(directory, 'native-source'))
@@ -27,7 +30,7 @@ async function fixture(size: number | null, wrongOwner = false) {
     source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
   }
   finally { db.close() }
-  const storage = createProductionStorage({ directory, workspaceId: 'missing-clearance-workspace', ownerId: 'missing-clearance-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'missing-clearance-workspace', ownerId: 'missing-clearance-owner', purpose: 'verification' })
   const actor = { workspaceId: storage.identity.workspaceId, actorId: storage.identity.actorId, capabilities: ['supplier:list:read', 'supplier:write', 'other-settlement:read', 'other-settlement:write', 'core:migration:write', ...Object.values(FINANCE_FAMILIES).flatMap(family => [`${family}:read`, `${family}:write`])] }
   const identity = { workspaceId: actor.workspaceId, actorId: actor.actorId }
   const session = () => structuredClone(actor)
@@ -65,8 +68,11 @@ it.each([12, null])('真实Native仅指定C外部原单缺失size=%s，保原met
     const physical = await f.storage.select('SELECT file_size,file_path FROM file_refs WHERE id=?', [f.fileId])
     expect(physical).toEqual(size === null ? [] : [{ file_size: size, file_path: f.originalPath }])
     const backup = join(f.directory, 'synthetic-clearance-backup.sqlite')
+    const metadata = (await f.storage.select<{ schema_version: number }>('SELECT schema_version FROM production_metadata WHERE singleton=1'))[0]!
     await f.storage.backupTo(backup)
-    expect((await inspectProductionBackup(backup)).schemaVersion).toBe(14)
+    const inventory = await inspectProductionBackup(backup)
+    expect(inventory.schemaVersion).toBe(metadata.schema_version)
+    expect(inventory.participants.finance!.tables).toContain('finance_expense_clearance_verifications')
     await f.storage.close()
     expect((await owner.expenses(f.session)).items[0]!.clearances[0]!.declaredMissingOriginals![0]!.fileSize).toBe(size)
   }

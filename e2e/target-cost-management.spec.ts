@@ -9,26 +9,26 @@ const cases = [
 ]
 
 test.describe('Issue #191：目标成本列表与科目维护', () => {
-  for (const width of viewports) {
-    test(`${width}px 专用列表筛选可达且无页面级横向溢出`, async ({ page }) => {
+  test('专用列表筛选在各宽度可达且无页面级横向溢出', async ({ page }) => {
+    await installProjectCentralFixture(page)
+    await page.goto('/project/target-cost?origin=real')
+
+    await expect(page.getByRole('heading', { name: '目标成本列表', exact: true }))
+      .toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('status', { name: '目标成本列表汇总' })).toBeVisible()
+    const filters = page.getByRole('search', { name: '目标成本筛选' })
+    for (const width of viewports) {
       await page.setViewportSize({
         width,
         height: width === 390 ? 844 : width === 768 ? 900 : 1000,
       })
-      await installProjectCentralFixture(page)
-      await page.goto('/project/target-cost?origin=real')
-
-      await expect(page.getByRole('heading', { name: '目标成本列表', exact: true }))
-        .toBeVisible({ timeout: 20_000 })
-      const filters = page.getByRole('search', { name: '目标成本筛选' })
       await expect(filters.getByPlaceholder('搜索版本名或项目')).toBeVisible()
       await expect(filters.getByLabel('项目', { exact: true })).toBeVisible()
       await expect(filters.getByRole('button', { name: /^基线范围，已选/ })).toBeVisible()
       await expect(filters.getByRole('button', { name: /^状态，已选/ })).toBeVisible()
-      await expect(page.getByRole('status', { name: '目标成本列表汇总' })).toBeVisible()
       await expectNoPageOverflow(page, `目标成本专用列表 @ ${width}px`)
-    })
-  }
+    }
+  })
 
   for (const input of cases) {
     test(`新建版本后可新增、编辑并刷新回显科目明细：${input.label}`, async ({ page }) => {

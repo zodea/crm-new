@@ -7,6 +7,7 @@ import type {
 } from './command-contract'
 import type { MaterialContractHttpFetcher } from './http-repository'
 import { isISODateTimeDTO } from '../../types/read-model'
+import { decodeConstructionMainSelection } from '../construction-scope/contract'
 import { decodeOurSignatorySnapshot } from '../our-signatory/contract'
 import { decodeOurSignatoryRecord } from '../our-signatory/http-repository'
 import {
@@ -49,12 +50,26 @@ function context(value: unknown): MaterialContractCommandContextDTO {
       decodeMaterialContractDraft({ lineItems: row.lineItems })
       if (row.ourSignatorySnapshot != null)
         decodeOurSignatorySnapshot(row.ourSignatorySnapshot)
+      if (row.constructionMain != null)
+        decodeConstructionMainSelection(row.constructionMain)
     }
   }
   if (value.ourSignatories !== undefined) {
     if (!Array.isArray(value.ourSignatories))
       return invalid('主体目录结构无效')
     value.ourSignatories.forEach(decodeOurSignatoryRecord)
+  }
+  if (value.constructionMains !== undefined) {
+    if (!Array.isArray(value.constructionMains) || !value.constructionMains.every(row => object(row) && typeof row.name === 'string' && typeof row.no === 'string' && typeof row.projectName === 'string'))
+      return invalid('工程施工主合同候选无效')
+    for (const row of value.constructionMains) {
+      try {
+        decodeConstructionMainSelection({ id: row.id, projectId: row.projectId, basis: row.basis })
+      }
+      catch {
+        return invalid('工程施工主合同身份或来源依据无效')
+      }
+    }
   }
   return value as unknown as MaterialContractCommandContextDTO
 }
@@ -84,6 +99,7 @@ function form(value: unknown, id: string): MaterialContractFormReadDTO {
       attachments: value.attachments.map(row => decodeMaterialContractAttachment(row, id)),
       version: value.version,
       updatedAt: value.updatedAt,
+      ...(value.constructionMain === undefined ? {} : { constructionMain: value.constructionMain === null ? null : decodeConstructionMainSelection(value.constructionMain) }),
     }
   }
   catch (cause) {

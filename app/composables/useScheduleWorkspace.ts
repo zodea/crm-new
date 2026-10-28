@@ -137,6 +137,7 @@ export function useScheduleWorkspace(props: { projectId?: string }) {
       return
     }
     if (task) {
+      store.beginPlanEdit?.(task.id)
       selectedTask.value = task
       taskDialogOpen.value = true
     }
@@ -190,6 +191,7 @@ export function useScheduleWorkspace(props: { projectId?: string }) {
     if (store.pendingCommand || store.saving)
       return
     taskDraftKey.value++
+    store.beginPlanEdit?.(task.id)
     selectedTask.value = task
     dependencyDialogOpen.value = false
     taskDialogOpen.value = true

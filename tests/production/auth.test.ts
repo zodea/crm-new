@@ -3,14 +3,16 @@ import { Buffer } from 'node:buffer'
 import { scryptSync } from 'node:crypto'
 import { once } from 'node:events'
 import { createServer, request as rawRequest } from 'node:http'
-import { resolve } from 'node:path'
 import { createApp, defineEventHandler, readBody, toNodeListener } from 'h3'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import loginHandler from '../../server/api/auth/login.post'
 import middleware from '../../server/middleware/production-access'
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { logoutProductionOwner, productionAuthStatus, requireProductionBusinessSession } from '../../server/utils/production-auth'
 import { getProductionRuntimeConfig } from '../../server/utils/production-config'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 const code = 'synthetic-access-code-only'
 const salt = '0123456789abcdef0123456789abcdef'
@@ -44,7 +46,7 @@ beforeEach(async () => {
   origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
   for (const [key, value] of Object.entries({
     CRM_RUN_MODE: 'production',
-    CRM_DATA_DIRECTORY: resolve('.codex-tmp/issue-450-auth-synthetic'),
+    CRM_DATA_DIRECTORY: testTempRoot('legacy-test-artifacts/issue-450-auth-synthetic'),
     CRM_WORKSPACE_ID: `verification-${++sequence}`,
     CRM_OWNER_ID: 'only-owner',
     CRM_DATA_PURPOSE: 'verification',
@@ -109,9 +111,9 @@ describe('单人正式访问保护', () => {
     expect((await request('/api/auth/login', { method: 'POST', body: { accessCode: `${code}-wrong` } })).status).toBe(401)
     const first = await login()
     const session = await (await request('/api/read/business-session', { cookie: first, headers: { 'x-actor-id': 'forged' } })).json()
-    expect(session).toEqual({ workspaceId: process.env.CRM_WORKSPACE_ID, actorId: 'only-owner', capabilities: ['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', 'project:list:read', 'project:write', 'project:original:write', 'project:lifecycle:write', 'process-library:read', 'process-library:write', 'supplier:list:read', 'supplier:write', 'supplier:sensitive:read', 'supplier-credential:read', 'supplier-credential:write', 'supplier:persistent:write', 'material-contract:read', 'material-contract:write', 'material-contract:sensitive:read', 'material-quotation:read', 'material-quotation:write', 'other-settlement:read', 'other-settlement:write', 'finance-current:read', 'finance-current:write', 'finance-reimbursement:read', 'finance-reimbursement:write', 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'finance-payment-record:write', 'finance-invoice-application:read', 'finance-invoice-application:write', 'core:migration:write', 'crew:list:read', 'crew:write', 'worker:list:read', 'worker:write', 'worker:sensitive:read', 'payroll:read', 'our-signatory:read', 'our-signatory:write'] })
+    expect(session).toEqual({ workspaceId: process.env.CRM_WORKSPACE_ID, actorId: 'only-owner', capabilities: ['customer:list:read', 'customer:write', 'customer:original:write', 'customer:lifecycle:write', 'project:list:read', 'project:write', 'project:original:write', 'project:lifecycle:write', 'process-library:read', 'process-library:write', 'supplier:list:read', 'supplier:write', 'supplier:sensitive:read', 'supplier-credential:read', 'supplier-credential:write', 'supplier:persistent:write', 'material-contract:read', 'material-contract:write', 'material-contract:sensitive:read', 'material-quotation:read', 'material-quotation:write', 'other-settlement:read', 'other-settlement:write', 'finance-current:read', 'finance-current:write', 'finance-reimbursement:read', 'finance-reimbursement:write', 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'finance-payment-record:write', 'finance-invoice-application:read', 'finance-invoice-application:write', 'core:migration:write', 'crew:list:read', 'crew:write', 'worker:list:read', 'worker:write', 'worker:sensitive:read', 'payroll:read', 'target-cost:read', 'target-cost:write', 'target-cost:import', 'payroll:write', 'quantity:read', 'quantity:write', 'schedule:read', 'schedule:write', 'schedule:import', 'construction-contract:read', 'construction-contract:write', 'construction-contract:import', 'boq:read', 'boq:write', 'boq:import', 'owner-document:read', 'owner-document:write', 'construction-scope:read', 'construction-scope:write', 'subcontract-contract:read', 'subcontract-contract:write', 'subcontract-contract:import', 'auxiliary-contract:read', 'auxiliary-contract:write', 'auxiliary-contract:import', 'our-signatory:read', 'our-signatory:write'] })
     expect(new Set(session.capabilities).size).toBe(session.capabilities.length)
-    expect(session.capabilities).not.toContain('payroll:write')
+    expect(session.capabilities).not.toContain('tax-declaration:write')
     const second = await login()
     expect((await request('/api/read/customers', { cookie: first })).status).toBe(401)
     expect((await request('/api/auth/logout', { method: 'POST', cookie: second })).status).toBe(200)
@@ -151,7 +153,7 @@ describe('单人正式访问保护', () => {
     expect((await request('/api/commands/customers', { method: 'POST', cookie, body: {}, headers })).status, JSON.stringify(headers)).toBe(403)
   })
 
-  it.each(Array.from(['/api/read/payroll', '/api/testing/customers/reset', '/api/read/customers/bad/id']).map(input => ({ input })))('跨站、假Host和测试/代理头不可突破，未接管API保持关闭：输入组合 2 案例 %#', async ({ input: path }) => {
+  it.each(Array.from(['/api/read/tax-declarations', '/api/testing/customers/reset', '/api/read/customers/bad/id']).map(input => ({ input })))('跨站、假Host和测试/代理头不可突破，未接管API保持关闭：输入组合 2 案例 %#', async ({ input: path }) => {
     const cookie = await login()
     const falseHost = await new Promise<number>((resolve, reject) => {
       const req = rawRequest(`${origin}/api/commands/customers`, { method: 'POST', headers: { Host: 'evil.example', Cookie: cookie, Origin: origin } }, (response) => {

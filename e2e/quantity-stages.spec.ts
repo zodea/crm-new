@@ -76,10 +76,8 @@ test('中央新项目建立两个阶段，显式报量逐项保存不丢草稿�
     await name.focus()
     await expect(name).toBeFocused()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
-    await page.screenshot({ path: testInfo.outputPath(`stages-${width}.png`), animations: 'disabled' })
     if (width === 390) {
       await page.getByLabel('涂料的报量阶段', { exact: true }).scrollIntoViewIfNeeded()
-      await page.screenshot({ path: testInfo.outputPath('reporting-390.png'), animations: 'disabled' })
     }
   }
   const archived = await page.request.post('/api/commands/quantity', { headers, data: { ...session, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: current.sourceVersion, action: { kind: 'set-archived', archived: true } } })

@@ -217,7 +217,7 @@ function unchangedOcrImage(file: File): PreparedOcrImage {
 async function renderSinglePagePdf(file: File): Promise<PdfRasterSource | null> {
   try {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-    // 通过主线程 worker 入口避免在 Nuxt/Tauri 中额外配置 workerSrc，PDF.js 仍会异步解析页面。
+    // 通过主线程 worker 入口避免在 Nuxt 中额外配置 workerSrc，PDF.js 仍会异步解析页面。
     await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
     const loadingTask = pdfjs.getDocument({
       data: new Uint8Array(await file.arrayBuffer()),

@@ -115,7 +115,7 @@ test.describe('Issue #422 材料采购合同列表', () => {
     await expect(list.locator('a[id^="material-contract-row-"]')).toHaveCount(0)
   })
 
-  test('真实命令保存长名称，五档视口局部横滚、关系入口及筛选焦点可用', async ({ page }, testInfo) => {
+  test('真实命令保存长名称，五档视口局部横滚、关系入口及筛选焦点可用', async ({ page }) => {
     test.setTimeout(90_000)
     const longName = '合成材料采购合同－长名称与零金额验收－外墙铝板及机电安装辅材联合采购标段'
     const largeAmount = '123456789012.34'
@@ -149,12 +149,10 @@ test.describe('Issue #422 材料采购合同列表', () => {
       await expect(dialog).toBeInViewport()
       await page.keyboard.press('Escape')
       await expect(filter).toBeFocused()
-      await page.screenshot({ path: testInfo.outputPath(`material-contract-list-${width}.png`), fullPage: true })
       await scroll.evaluate(element => element.scrollLeft = element.scrollWidth)
       await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
       await expect(name).toBeInViewport()
       await expect(list.getByRole('button', { name: '筛选合同状态', exact: true })).toBeInViewport()
-      await page.screenshot({ path: testInfo.outputPath(`material-contract-list-${width}-scrolled.png`), fullPage: true })
       await scroll.evaluate(element => element.scrollLeft = 0)
     }
     await name.click()

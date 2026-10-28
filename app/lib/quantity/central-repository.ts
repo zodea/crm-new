@@ -1,4 +1,5 @@
 import type { ProblemDTO } from '../../types/read-model'
+import type { CommandRecoveryDescriptor, CommandResolution } from '../forms/command-recovery'
 import type { QuantityBatchReadQuery, QuantityCommand, QuantityCommandResult, QuantityReadQuery, QuantityUnitReadQuery } from './central-contract'
 import type { QuantityHollowCommand, QuantityHollowCommandResult } from './central-hollow-contract'
 import type { QuantityPhotoIdentity } from './central-photo'
@@ -14,7 +15,7 @@ import { decodeQuantityAssignments, decodeQuantityBatchPlan, decodeQuantityCompl
 export type QuantityFetcher = (url: string, options?: {
   method?: 'POST'
   query?: Record<string, unknown>
-  body?: QuantityCommand
+  body?: QuantityCommand | CommandRecoveryDescriptor
   signal?: AbortSignal
 }) => Promise<unknown>
 
@@ -59,6 +60,15 @@ export function createQuantityRepository(fetcher: QuantityFetcher) {
     return request('/api/commands/quantity', { method: 'POST', body }, value => decodeQuantityCommand(value, body))
   }
   return {
+    resolve: (descriptor: CommandRecoveryDescriptor) => request('/api/commands/quantity/resolve', { method: 'POST', body: { ...descriptor } }, (value) => {
+      if (!quantityObject(value))
+        throw quantityProblem('unavailable', '原工程量恢复响应无法核对')
+      if (value.outcome === 'not-applied' && value.commandId === descriptor.commandId)
+        return value as unknown as CommandResolution<QuantityCommandResult>
+      if (value.outcome !== 'applied' || !quantityObject(value.result) || value.result.commandId !== descriptor.commandId || typeof value.result.id !== 'string' || typeof value.result.sourceVersion !== 'string' || !quantityStrings(value.result.logIds))
+        throw quantityProblem('unavailable', '原工程量恢复结果身份或来源无效')
+      return value as unknown as CommandResolution<QuantityCommandResult>
+    }),
     hollow: (query: QuantityUnitReadQuery, options: { signal?: AbortSignal } = {}) => {
       const scope = { ...query }
       return request('/api/read/quantity/hollow', { query: scope, signal: options.signal }, value => decodeQuantityHollow(value, scope))

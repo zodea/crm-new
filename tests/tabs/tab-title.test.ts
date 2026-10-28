@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { routeSubtitle, routeTitle } from '~/lib/tabs/tab-title'
+import { routeTitle } from '~/lib/tabs/tab-title'
 
 function productionPageSamples(): Array<[file: string, routePath: string]> {
   const pagesRoot = resolve(process.cwd(), 'app/pages')
@@ -39,12 +39,11 @@ function productionPageSamples(): Array<[file: string, routePath: string]> {
 }
 
 describe('导出配置页签文案', () => {
+  it('工程量迁入入口保留独立标题', () => {
+    expect(routeTitle('/subcontract/quantity/import')).toBe('工程量原库接管')
+  })
   it('动态工作流路由使用统一页签标题', () => {
     expect(routeTitle('/export/config/export-1')).toBe('导出配置')
-  })
-
-  it('顶栏副标题概括配置与执行阶段', () => {
-    expect(routeSubtitle('/export/config/export-1')).toBe('目录结构 · 命名规则 · 导出进度')
   })
 })
 
@@ -67,22 +66,16 @@ describe('导入映射页签文案', () => {
   it('实体路由使用统一页签标题', () => {
     expect(routeTitle('/import/mapping/demo-supplier')).toBe('导入映射')
   })
-
-  it('顶栏副标题概括三步向导', () => {
-    expect(routeSubtitle('/import/mapping/demo-supplier')).toBe('上传 · 映射 · 预览导入')
-  })
 })
 
 describe('工程量矩阵页签文案', () => {
-  it('标题与副标题使用责任、阶段分离后的领域语言', () => {
+  it('标题使用责任、阶段分离后的领域语言', () => {
     expect(routeTitle('/subcontract/quantity')).toBe('工程量管理')
-    expect(routeSubtitle('/subcontract/quantity')).toBe('户型模板 · 责任指派 · 阶段完成')
   })
 })
 
 describe('boq 页签文案', () => {
   it('清单工作区与专用拆表页不会落入通用合同详情', () => {
-    expect(routeSubtitle('/contract/boq')).toBe('合同清单 · 变更单 · 月度报量')
   })
 
   it.each([
@@ -101,14 +94,6 @@ describe('施工进度页签文案', () => {
     ['/schedule/project_1/bind/group_1', '绑定施工合同'],
   ])('%s 使用稳定业务标题，不把项目 id 或 new 当作标题', (path, title) => {
     expect(routeTitle(path)).toBe(title)
-  })
-
-  it.each([
-    { case: '\'/schedule\'', input: '/schedule', expected: 'WBS 排程 · 计划与实际进度' },
-    { case: '\'/schedule/new\'', input: '/schedule/new', expected: '选择楼栋 · 标准工序 · 生成排程' },
-    { case: '\'/schedule/project_1/bind/group_1\'', input: '/schedule/project_1/bind/group_1', expected: '楼栋覆盖 · 分项映射 · 数量差异' },
-  ])('工作台与新建页分别说明排程和生成流程 / routeSubtitle：$case', ({ input, expected }) => {
-    expect(routeSubtitle(input)).toBe(expected)
   })
 })
 

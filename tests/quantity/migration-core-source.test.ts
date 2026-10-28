@@ -1,9 +1,9 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, expect, it } from 'vitest'
-import { LATEST_VERSION, runMigrations } from '~/lib/db/migrations'
+import { LATEST_VERSION } from '~/lib/db/migrations'
 import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-source'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let memory: TestDb
 async function unused(): Promise<never> {
@@ -11,7 +11,6 @@ async function unused(): Promise<never> {
 }
 function readSource() {
   return createCoreMigrationLocalSource({
-    isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: async () => LATEST_VERSION,
     select: (sql, params) => memory.select(sql, params),
@@ -30,8 +29,7 @@ function readSource() {
   }).readSource()
 }
 beforeEach(async () => {
-  memory = await createMemoryDb()
-  await runMigrations(memory)
+  memory = await createMigratedMemoryDb()
   await memory.execute('INSERT INTO projects (id, name) VALUES (\'project-q442\', \'工程量项目\')')
 })
 afterEach(() => memory.close())

@@ -9,6 +9,7 @@ import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { constructionContractProblemFromUnknown } from '~/lib/construction-contract/repository'
 import {
   validateConstructionContractDetailReturnTo,
+  validateConstructionContractProjectReturnTo,
   validateConstructionContractReturnTo,
 } from '~/lib/construction-contract/return-context'
 import { F2_FORM_META, f2FormDefaults } from '~/lib/contract/page'
@@ -24,7 +25,6 @@ const {
   pendingAttachments,
   pendingRemoveIds,
   pendingRestoreIds,
-  desktopAttachmentPicker,
   readingFiles,
   invalidatePreparation,
   dirty: attachmentDirty,
@@ -33,7 +33,6 @@ const {
   acknowledge: acknowledgeAttachments,
   changes: attachmentChanges,
   handleFiles,
-  pickNativeFiles,
   removePending,
   patchPending,
   toggleExisting: toggleExistingAttachment,
@@ -57,13 +56,14 @@ const savedPending = computed(() => Boolean(commandSession.pending?.result))
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value || attachmentDirty.value)
 const pageState = computed(() => loading.value ? 'loading' : loadError.value && !commandSession.pending ? 'error' : 'ready')
 const detailReturnTo = computed(() => validateConstructionContractDetailReturnTo(route.query.returnTo, 'real'))
+const projectReturnTo = computed(() => validateConstructionContractProjectReturnTo(route.query.returnTo, draft.value.projectId ?? null, 'real'))
 const listReturnTo = computed(() => {
   if (!detailReturnTo.value)
-    return null
+    return projectReturnTo.value
   const nested = new URL(detailReturnTo.value, 'https://ruihang.invalid').searchParams.get('returnTo')
   return validateConstructionContractReturnTo(nested, 'real')
 })
-const returnTo = computed(() => detailReturnTo.value ?? '/contract/construction')
+const returnTo = computed(() => detailReturnTo.value ?? projectReturnTo.value ?? '/contract/construction')
 
 function lookup(rows: readonly { id: string, label: string }[], keyword: string): LookupOption[] {
   const needle = keyword.trim().toLocaleLowerCase('zh-CN')
@@ -75,11 +75,11 @@ const emptyLookup = async (): Promise<LookupOption[]> => []
 let initializeRequest = 0
 let viewActive = true
 function captureView() {
-  return { request: initializeRequest, generation: commandSession.generation, id: routeId.value, origin: route.query.origin }
+  return { request: initializeRequest, generation: commandSession.generation, id: routeId.value, origin: route.query.origin, projectId: route.query.projectId }
 }
 function currentView(view: ReturnType<typeof captureView>) {
   return viewActive && view.request === initializeRequest && view.generation === commandSession.generation
-    && view.id === routeId.value && view.origin === route.query.origin
+    && view.id === routeId.value && view.origin === route.query.origin && view.projectId === route.query.projectId
 }
 function deactivateView() {
   if (!viewActive)
@@ -122,6 +122,14 @@ async function initialize(targetId = routeId.value, retainInput = false) {
     if (retainInput && commandSession.authority && commandSession.targetId === targetId)
       return
     draft.value = hydrated.form?.draft ?? (f2FormDefaults('construction') as ProjectContractFormDraft)
+    if (!targetId && route.query.projectId !== undefined) {
+      if (Array.isArray(route.query.projectId) || typeof route.query.projectId !== 'string' || !route.query.projectId.trim() || (route.query.origin !== undefined && route.query.origin !== 'real'))
+        throw new Error('新建施工主合同的项目来源无效，请回项目菜单重新打开')
+      const sourceProject = hydrated.context.projects.find(row => row.id === route.query.projectId)
+      if (!sourceProject)
+        throw new Error('来源项目已删除、无权读取或不属于正式来源')
+      draft.value = { ...draft.value, projectId: sourceProject.id, customerId: sourceProject.customerId }
+    }
     resetAttachments(hydrated.form?.attachments ?? [])
     await nextTick()
     if (request !== initializeRequest || !viewActive)
@@ -296,7 +304,7 @@ async function recover() {
   }
 }
 useTabCloseGuard(mayLeave)
-watch([routeId, () => route.query.origin], ([id, origin]) => {
+watch([routeId, () => route.query.origin, () => route.query.projectId], ([id, origin]) => {
   if (origin != null && origin !== 'real') {
     initializeRequest++
     invalidatePreparation()
@@ -319,7 +327,7 @@ useTabTitle(title)
         正在读取附件正文，请稍候…
       </p>
       <ContractFormFields kind="construction" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="fetchCustomers" :fetch-suppliers="emptyLookup" :fetch-original-contracts="emptyLookup" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError" />
-      <ContractAttachmentSection :files-disabled="commandSession.busy || Boolean(commandSession.pending) || readingFiles" :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :desktop-picker="desktopAttachmentPicker" :note="draft.note ?? ''" @pick-native="pickNativeFiles" @files="handleFiles" @toggle-existing="toggleExistingAttachment" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patchDraft({ note: $event })" />
+      <ContractAttachmentSection :files-disabled="commandSession.busy || Boolean(commandSession.pending) || readingFiles" :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :note="draft.note ?? ''" @files="handleFiles" @toggle-existing="toggleExistingAttachment" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patchDraft({ note: $event })" />
       <FormFooter v-model="closeAfterSave" :actions="footerActions" :dirty="dirty" close-after-save :loading-action="loadingAction" :write-disabled="Boolean(commandSession.pending || readingFiles || pageState !== 'ready')" @action="save" />
     </form>
   </EntityFormShell>

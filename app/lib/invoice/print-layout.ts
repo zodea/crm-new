@@ -17,6 +17,8 @@ export interface PrintableInvoice {
   ocrStatus?: string
   reviewStatus?: string
   dupStatus?: string
+  /** Excel 导入的记录没有扫描原件，不能打印；旧排版 fixture 省略时不检查。 */
+  source?: string
 }
 
 export interface PrintSlot<T extends PrintableInvoice> {
@@ -24,8 +26,15 @@ export interface PrintSlot<T extends PrintableInvoice> {
   rotation: PrintRotation
 }
 
+export interface PrintSkippedInvoice<T extends PrintableInvoice> {
+  invoice: T
+  reason: string
+}
+
 export interface PrintLayout<T extends PrintableInvoice> {
   pages: PrintSlot<T>[][]
+  /** 已勾选但不满足打印条件、未进入排版的发票及原因，供页面明确提醒。 */
+  skipped: PrintSkippedInvoice<T>[]
   selectedCount: number
   pageCount: number
   totalAmount: number
@@ -40,6 +49,8 @@ export interface PrintQueueCheckResult {
 export function checkPrintableInvoice(invoice: PrintableInvoice): PrintQueueCheckResult {
   if (!invoice.id.trim())
     return { ok: false, reason: '缺少票据 ID，不能进入打印队列' }
+  if (invoice.source === 'excel')
+    return { ok: false, reason: 'Excel 导入的发票没有原件，不能打印' }
   if (invoice.ocrStatus != null && invoice.ocrStatus !== 'done')
     return { ok: false, reason: '识别尚未完成，不能进入打印队列' }
   if (invoice.reviewStatus != null && invoice.reviewStatus !== 'reviewed')
@@ -73,18 +84,24 @@ export function buildPrintLayout<T extends PrintableInvoice>(
   perPage: PrintPerPage,
   rotations: Readonly<Record<string, number>>,
 ): PrintLayout<T> {
-  const selected = invoices
-    .filter(invoice => selectedIds.has(invoice.id) && checkPrintableInvoice(invoice).ok)
-    .map(invoice => ({
-      invoice,
-      rotation: normalizePrintRotation(rotations[invoice.id] ?? invoice.printRotation),
-    }))
+  const selected: PrintSlot<T>[] = []
+  const skipped: PrintSkippedInvoice<T>[] = []
+  for (const invoice of invoices) {
+    if (!selectedIds.has(invoice.id))
+      continue
+    const check = checkPrintableInvoice(invoice)
+    if (check.ok)
+      selected.push({ invoice, rotation: normalizePrintRotation(rotations[invoice.id] ?? invoice.printRotation) })
+    else
+      skipped.push({ invoice, reason: check.reason ?? '不满足打印条件' })
+  }
   const pages: PrintSlot<T>[][] = []
   for (let index = 0; index < selected.length; index += perPage)
     pages.push(selected.slice(index, index + perPage))
 
   return {
     pages,
+    skipped,
     selectedCount: selected.length,
     pageCount: pages.length,
     totalAmount: selected.reduce((sum, slot) => sum + slot.invoice.totalAmount, 0),

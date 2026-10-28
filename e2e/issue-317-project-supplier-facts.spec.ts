@@ -195,15 +195,20 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await expect(page.getByRole('alert', { name: '工作台加载失败' })).toContainText('暂时不可用')
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 工作台无页面级横滚，事实表仅自身横滚`, async ({ page }) => {
+  test('工作台各宽度无页面级横滚，事实表仅自身横滚', async ({ page }) => {
+    await page.goto(WORKBENCH)
+    await expect(page.getByTestId('project-supplier-header')).toBeVisible({ timeout: 20_000 })
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto(WORKBENCH)
-      await expect(page.getByTestId('project-supplier-header')).toBeVisible({ timeout: 20_000 })
       await expectNoPageOverflow(page, `#317 工作台 @ ${width}px`)
-      await page.getByRole('tab', { name: /^合同/ }).click()
-      await expect(page.getByLabel('业务记录表格，可横向滚动')).toBeVisible()
+    }
+    await page.getByRole('tab', { name: /^合同/ }).click()
+    const table = page.getByLabel('业务记录表格，可横向滚动')
+    await expect(table).toBeVisible()
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+      await expect(table).toBeVisible()
       await expectNoPageOverflow(page, `#317 合同事实 @ ${width}px`)
-    })
-  }
+    }
+  })
 })

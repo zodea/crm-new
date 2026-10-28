@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { CrewWorkerImportPreview, CrewWorkerImportReferenceMapping, CrewWorkerImportResolution, CrewWorkerImportResult, CrewWorkerImportSource } from '~/lib/crew-worker/import-contract'
 import type { CommandRecoveryDescriptor } from '~/lib/forms/command-recovery'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { CREW_WORKER_IMPORT_SCHEMA_RANGE } from '~/lib/crew-worker/import-contract'
@@ -11,7 +10,6 @@ import { isISODateTimeDTO } from '~/types/read-model'
 
 interface Context { workspaceId: string, actorId: string, capabilities: string[] }
 interface State { context: Context, references: Array<{ entityType: string, serverId: string, label: string, version: string, sourceVersion: string }>, sources: Array<{ source_sha256: string, schema_version: number, created_at: string }> }
-const native = isTauri()
 const state = shallowRef<State | null>(null)
 const authority = shallowRef<Context | null>(null)
 const source = shallowRef<CrewWorkerImportSource | null>(null)
@@ -21,7 +19,6 @@ const pending = shallowRef<CommandRecoveryDescriptor | null>(null)
 const selectedProjects = ref<Record<string, string>>({})
 const busy = ref(false)
 const error = ref('')
-const exported = ref('')
 const recovery = commandRecoveryStorageForFamily('crew-worker-import')
 let generation = 0
 let active = true
@@ -40,8 +37,7 @@ function invalidate(problem: { message: string }) {
   busy.value = false
   error.value = problem.message
 }
-if (!native)
-  bindReadAuthority(invalidate)
+bindReadAuthority(invalidate)
 onBeforeUnmount(() => {
   active = false
   generation++
@@ -88,11 +84,9 @@ function verifyPreview(value: CrewWorkerImportPreview, sha256: string) {
   return value
 }
 async function load(epoch = generation) {
-  if (native)
-    return
   let fresh: State
   try {
-    const data = await $fetch<State>('/api/read/crew-worker/import')
+    const data = await $fetch<State, string>('/api/read/crew-worker/import')
     assertCurrent(epoch)
     fresh = verifyState(data)
   }
@@ -135,14 +129,6 @@ async function run(work: (epoch: number) => Promise<void>) {
       busy.value = false
   }
 }
-async function exportSnapshot(epoch = generation) {
-  const { createNativeMigrationSnapshot } = await import('~/lib/db/native-snapshot')
-  assertCurrent(epoch)
-  const snapshot = await createNativeMigrationSnapshot()
-  assertCurrent(epoch)
-  if (snapshot)
-    exported.value = `${snapshot.path} · SHA-256 ${snapshot.sha256} · 版本 ${snapshot.schemaVersion}`
-}
 async function choose(event: Event, epoch = generation) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -180,7 +166,7 @@ async function preflight(epoch = generation) {
   assertCurrent(epoch)
   if (!state.value || pending.value)
     return
-  const read = await $fetch<CrewWorkerImportPreview>('/api/commands/crew-worker/import', { method: 'POST', body: { workspaceId: state.value.context.workspaceId, actorId: state.value.context.actorId, commandId: `cw-preflight-${crypto.randomUUID()}`, action: 'preflight', source: captured.source, referenceMappings: captured.mappings } })
+  const read = await $fetch<CrewWorkerImportPreview, string>('/api/commands/crew-worker/import', { method: 'POST', body: { workspaceId: state.value.context.workspaceId, actorId: state.value.context.actorId, commandId: `cw-preflight-${crypto.randomUUID()}`, action: 'preflight', source: captured.source, referenceMappings: captured.mappings } })
   assertCurrent(epoch)
   preview.value = verifyPreview(read, captured.source.sha256)
 }
@@ -196,7 +182,7 @@ async function adopt(epoch = generation) {
   recovery.remember(commandRecoveryKey(descriptor), descriptor)
   pending.value = descriptor
   // The full source, project mappings, private fields and receipt body never enter recovery storage.
-  const saved = await $fetch<CrewWorkerImportResult>('/api/commands/crew-worker/import', { method: 'POST', body: { workspaceId: descriptor.workspaceId, actorId: descriptor.actorId, commandId: descriptor.commandId, action: 'adopt', source: captured.source, referenceMappings: captured.mappings } })
+  const saved = await $fetch<CrewWorkerImportResult, string>('/api/commands/crew-worker/import', { method: 'POST', body: { workspaceId: descriptor.workspaceId, actorId: descriptor.actorId, commandId: descriptor.commandId, action: 'adopt', source: captured.source, referenceMappings: captured.mappings } })
   assertCurrent(epoch)
   knownProof = { descriptor, result: verifyResult(saved, descriptor.commandId, captured.source.sha256) }
   await readBack(descriptor, knownProof.result, epoch)
@@ -223,7 +209,7 @@ async function recover(epoch = generation) {
     await readBack(descriptor, knownProof.result, epoch)
     return
   }
-  const resolution = await $fetch<CrewWorkerImportResolution>('/api/commands/crew-worker/import/resolve', { method: 'POST', body: { commandId: descriptor.commandId } })
+  const resolution = await $fetch<CrewWorkerImportResolution, string>('/api/commands/crew-worker/import/resolve', { method: 'POST', body: { commandId: descriptor.commandId } })
   assertCurrent(epoch)
   if (resolution.outcome === 'applied') {
     knownProof = { descriptor, result: verifyResult(resolution.result, descriptor.commandId) }
@@ -248,18 +234,8 @@ onMounted(() => void run(load))
     <p class="mt-2 text-12px leading-5 text-ink-soft">
       保留全局稳定身份、私密历史、原件、名册冻结和原回执。请保留桌面原数据库及一致快照；采用范围仅为工人、班组目录。
     </p>
-    <div v-if="native" class="grid min-w-0 gap-3">
-      <KitButton :disabled="busy" variant="primary" @click="run(exportSnapshot)">
-        导出当前数据库一致快照
-      </KitButton>
-      <p v-if="exported" class="m-0 break-all text-12px">
-        {{ exported }}
-      </p>
-      <p class="m-0 text-12px text-ink-soft">
-        导出后在已认证的中央工作区打开此页，选择该 SQLite 文件并逐条核对项目对应。
-      </p>
-    </div>
-    <div v-else class="grid min-w-0 gap-3">
+
+    <div class="grid min-w-0 gap-3">
       <div v-if="pending" class="border border-line bg-surface-2 p-3" role="status" data-testid="crew-worker-import-recovery">
         <p class="m-0 break-all text-12px">
           原迁入 {{ pending.commandId }} 尚未完成核对，先核对原结果再采用新来源。

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ConstructionMainSelection } from '~/lib/construction-scope/contract'
 import type {
   InvoiceAllocationDraft,
   PaymentApplicationAllocationDraft,
@@ -8,11 +9,13 @@ import type {
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { KitTableColumn } from '~/lib/kit/table'
 import { useFullscreen } from '@vueuse/core'
-import { computed, reactive, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onDeactivated, reactive, shallowRef, watch } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import KitTable from '~/components/ui/KitTable.vue'
 import LookupSelect from '~/components/ui/LookupSelect.vue'
+import { useToast } from '~/composables/useToast'
 import { financeInputTextNumber, financeInputNumber as inputNumber } from '~/lib/finance/input-number'
+import { forgetFinanceLineIdentity } from '~/lib/finance/input-snapshot'
 
 type GridKind = 'reimbursement' | 'settlement' | 'invoice' | 'payment'
 type GridLine
@@ -27,6 +30,8 @@ const props = defineProps<{
   fetchOptions?: (keyword: string) => Promise<LookupOption[]>
   fetchCounterparties?: (keyword: string) => Promise<LookupOption[]>
   fetchOriginalExpenses?: (keyword: string) => Promise<LookupOption[]>
+  fetchConstructionMains?: (keyword: string) => Promise<Array<LookupOption & { constructionMain: ConstructionMainSelection }>>
+  defaultConstructionMain?: ConstructionMainSelection
   disabledReason?: string
   totalLabel: string
   empty: string
@@ -35,6 +40,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   update: [lines: GridLine[]]
 }>()
+const toast = useToast()
+let engineeringContext = 0
+let engineeringSelection = 0
+const engineeringRequests = new WeakMap<GridLine, number>()
+watch(() => [props.kind, props.fetchConstructionMains, props.defaultConstructionMain?.projectId], () => engineeringContext++, { flush: 'sync' })
+onDeactivated(() => engineeringContext++)
+onBeforeUnmount(() => engineeringContext++)
 
 const root = shallowRef<HTMLElement | null>(null)
 const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(root)
@@ -80,6 +92,7 @@ const columns = computed<KitTableColumn[]>(() => [
   ...(props.kind === 'reimbursement'
     ? [{ field: 'date', title: '发生日期', width: 150, slot: 'date' } satisfies KitTableColumn, { field: 'counterparty', title: '实际交易方', minWidth: 240, slot: 'counterparty' } satisfies KitTableColumn, { field: 'original', title: '清偿已记录垫款', minWidth: 240, slot: 'original' } satisfies KitTableColumn]
     : []),
+  ...(props.kind === 'reimbursement' && props.fetchConstructionMains ? [{ field: 'constructionMain', title: '工程名称 / 施工合同', minWidth: 260, slot: 'constructionMain' } satisfies KitTableColumn] : []),
   { field: 'amount', title: '金额', width: 160, align: 'right', slot: 'amount' },
   { field: 'note', title: '备注', minWidth: 180, slot: 'note' },
   { type: 'action', title: '操作', width: 92, align: 'center', slot: 'action' },
@@ -110,6 +123,29 @@ function patchSource(index: number, value: string | null) {
       : 'paymentApplicationId'
   patch(index, { [key]: value } as Partial<GridLine>)
 }
+async function selectConstructionMain(index: number, id: string | null) {
+  const line = props.lines[index]
+  if (!line)
+    return
+  const context = engineeringContext
+  const selection = ++engineeringSelection
+  const fetch = props.fetchConstructionMains
+  engineeringRequests.set(line, selection)
+  if (!id || !fetch) {
+    patch(index, { constructionMain: undefined })
+    return
+  }
+  const current = () => context === engineeringContext && props.lines[index] === line && engineeringRequests.get(line) === selection
+  try {
+    const selected = (await fetch(id)).find(row => row.id === id)?.constructionMain
+    if (current() && selected)
+      patch(index, { constructionMain: selected })
+  }
+  catch (error) {
+    if (current())
+      toast.error('费用工程选择未完成', error instanceof Error ? error.message : '请重试读取工程资格。')
+  }
+}
 
 function emptyLine(): GridLine {
   if (props.kind === 'reimbursement') {
@@ -138,7 +174,9 @@ function add() {
 
 function copy(index: number) {
   const next = [...props.lines]
-  next.splice(index + 1, 0, { ...props.lines[index], id: undefined })
+  const copied = { ...props.lines[index], id: undefined }
+  forgetFinanceLineIdentity(copied)
+  next.splice(index + 1, 0, copied)
   emit('update', next)
 }
 
@@ -244,6 +282,10 @@ function importTsv() {
           <p v-if="row.originalExpenseLineId" class="text-12px text-ink-soft">
             原费用身份：{{ row.originalExpenseLineId }}
           </p>
+        </template>
+        <template #constructionMain="{ row, rowIndex }">
+          <LookupSelect v-if="!row.originalExpenseLineId && !row.id" :model-value="row.constructionMain?.id ?? defaultConstructionMain?.id ?? null" :fetch="fetchConstructionMains!" :disabled-reason="disabledReason" placeholder="新原费用必选实际工程与施工合同" @update:model-value="selectConstructionMain(rowIndex, $event)" />
+          <span v-else class="text-12px text-ink-soft">{{ row.originalExpenseLineId ? '沿原费用工程归属' : '已存归属在下方原费用分区核对' }}</span>
         </template>
         <template #counterparty="{ row, rowIndex }">
           <LookupSelect v-if="fetchCounterparties" :model-value="row.counterpartySupplierId" :fetch="fetchCounterparties" placeholder="选择实际服务分供方" @update:model-value="patch(rowIndex, { counterpartySupplierId: $event })" />

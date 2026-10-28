@@ -1,20 +1,23 @@
 import type { SupplierCredentialCommand } from '../../app/lib/supplier/credential-contract'
 import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { resolve } from 'node:path'
-import { expect, it, vi } from 'vitest'
+import { afterAll, expect, it, vi } from 'vitest'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 const actor = { workspaceId: 'supplier-disk-test', actorId: 'synthetic-owner', capabilities: ['supplier:list:read', 'supplier:write', 'supplier-credential:read', 'supplier-credential:write'] }
 const session = () => actor
 const command = { workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: 'create-supplier', requiredCapability: 'supplier:write', baseVersion: null, action: 'save', attachments: {}, draft: { name: '合成分供方', supplierCategory: '其他', contact: '合成人', taxNo: 'SYNTHETIC-TAX', externalRef: 'synthetic-external-key' } }
 async function setup() {
-  const base = resolve('.tmp/a01-supplier-tests')
+  const base = testTempRoot('a01-supplier-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/storage-`)
   const options = { directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const service = createProductionSupplierService(storage)
   const created = await service.execute(command, session)
   return { options, storage, service, created }

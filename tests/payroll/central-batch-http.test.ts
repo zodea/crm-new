@@ -10,9 +10,7 @@ import { createPayrollRepository } from '../../app/lib/payroll/central-repositor
 import { createPayrollAServiceFixture, payrollAFact } from '../helpers/payroll-a-service-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollAServiceFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 
 it.each([{ actorId: 'other-actor' }, { workspaceId: 'other-workspace' }])('batch HTTP/Repository rejects altered identity: %j', async (contextPatch) => {

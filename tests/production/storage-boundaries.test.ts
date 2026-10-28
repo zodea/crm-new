@@ -1,11 +1,14 @@
 import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const base = resolve('.codex-tmp/issue-450-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-450-tests')
   await mkdir(base, { recursive: true })
   return { directory: await mkdtemp(`${base}/boundary-`), workspaceId: 'isolated-workspace', ownerId: 'isolated-owner', purpose: 'verification' as const }
 }

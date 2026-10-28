@@ -1,13 +1,18 @@
 import process from 'node:process'
 
+// 并行 E2E 的第二个 dev server 用独立构建目录与 Vite 依赖缓存，避免与默认 .nuxt 及共享 node_modules 缓存互相覆盖；未设置时保持默认。
+const buildDir = process.env.NUXT_BUILD_DIR
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   ssr: false,
+  ...(buildDir ? { buildDir } : {}),
   devtools: { enabled: process.env.NUXT_DEVTOOLS !== 'false' },
 
   nitro: {
     // sql.js 按运行时路径加载 WASM；显式携带现有依赖，构建后无需手工补文件。
-    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'] },
+    // xlsx 整包内联：外置时 Windows 开发态会把 dist/cpexcel.js 写成裸盘符路径，ESM 加载失败。
+    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'], inline: [/[\\/]xlsx[\\/]/] },
   },
 
   runtimeConfig: {
@@ -48,19 +53,15 @@ export default defineNuxtConfig({
   ],
 
   vite: {
+    ...(buildDir ? { cacheDir: `${buildDir}/vite` } : {}),
     resolve: {
       // pnpm 的隔离/提升链接都必须让应用与 @pinia/nuxt 共享同一运行时实例。
       dedupe: ['vue', 'pinia'],
     },
     optimizeDeps: {
-      // 预打包应用壳、交互原语、桌面桥接与按需导入依赖，避免 dev
+      // 预打包应用壳、交互原语与按需导入依赖，避免 dev
       // 首次进入表单/导入路由时 Vite 发现新依赖并触发整页 reload。
       include: [
-        '@tauri-apps/api/core',
-        '@tauri-apps/api/path',
-        '@tauri-apps/plugin-dialog',
-        '@tauri-apps/plugin-fs',
-        '@tauri-apps/plugin-sql',
         '@vue/devtools-core',
         '@vue/devtools-kit',
         'class-variance-authority',

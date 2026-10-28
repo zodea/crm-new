@@ -1,5 +1,6 @@
+import type { createMemoryDb } from '../helpers/memory-db'
 import { afterEach, describe, expect, it } from 'vitest'
-import { LATEST_VERSION, runMigrations } from '~/lib/db/migrations'
+import { LATEST_VERSION } from '~/lib/db/migrations'
 import { CORE_MIGRATION_CAPABILITY } from '~/lib/migration/core-contract'
 import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-source'
 import { effectiveReceiptAmount } from '~/lib/receipt/effective'
@@ -7,7 +8,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { receiptCommandTestInstance } from '../../server/utils/receipt-command-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const session = resolveBusinessSession()
 async function unused(): Promise<never> {
@@ -16,7 +17,6 @@ async function unused(): Promise<never> {
 
 function readSource(db: Awaited<ReturnType<typeof createMemoryDb>>) {
   return createCoreMigrationLocalSource({
-    isNative: () => false,
     isDemoActive: () => false,
     currentSchemaVersion: async () => LATEST_VERSION,
     select: (sql, params) => db.select(sql, params),
@@ -42,9 +42,8 @@ afterEach(async () => {
 
 describe('普通收款完整受控迁移', () => {
   it('携施工合同的真实来源经 HTTP 解析保留清单和月度事实，拒绝混入收款字段', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute(`INSERT INTO customers (id, name) VALUES ('contract-customer-436', '甲方')`)
       await db.execute(`INSERT INTO projects (id, name, customer_id) VALUES ('contract-project-436', '工程', 'contract-customer-436')`)
       await db.execute(`INSERT INTO contracts (id, name, kind, project_id, customer_id, amount) VALUES ('contract-436', '合同', '施工', 'contract-project-436', 'contract-customer-436', 1000)`)
@@ -59,9 +58,8 @@ describe('普通收款完整受控迁移', () => {
     }
   })
   it('真实旧库完整迁入；重复确认保留更正，危险回滚保全独立新单、原件与回执', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute(`INSERT INTO customers (id, name) VALUES ('old-customer-436', '迁入甲方')`)
       await db.execute(`INSERT INTO projects (id, name, customer_id) VALUES ('old-project-436', '迁入项目', 'old-customer-436')`)
       await db.execute(`INSERT INTO receipt_registrations (

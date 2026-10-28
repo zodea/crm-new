@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
+import { existsSync, realpathSync } from 'node:fs'
 import process from 'node:process'
 import { describe, expect, it, vi } from 'vitest'
 import { checkPush, checkStagedPaths } from '../../scripts/git-hooks.mjs'
@@ -57,7 +58,6 @@ describe('暂存路径保护', () => {
     'scripts/__pycache__/helper.pyc',
     '.eslintcache',
     'app.tsbuildinfo',
-    'src-tauri/target/debug/app.exe',
   ])('阻止误暂存的产物 %s', (path) => {
     expect(() => checkStagedPaths([path])).toThrow('不能提交')
   })
@@ -225,5 +225,39 @@ describe('真实 Node 钩子入口', () => {
     })
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('无法识别 Git 推送范围')
+  })
+})
+
+describe('脚本在项目路径别名下的实际入口', () => {
+  const current = process.cwd()
+  const aliases = [current]
+  if (process.platform === 'win32' && /^[a-z]:/i.test(current)) {
+    const alternative = current.replace(/^[a-z]:/i, current[0]!.toUpperCase() === 'D' ? 'E:' : 'D:')
+    if (existsSync(alternative) && realpathSync(alternative).toLowerCase() === realpathSync(current).toLowerCase())
+      aliases.push(alternative)
+  }
+
+  it.each([
+    ['scripts/git-hooks.mjs', ['__invalid_command__']],
+    ['scripts/ocr-sample-acceptance.mjs', ['--unknown-regression-flag']],
+    ['scripts/ocr-sample-runner.mjs', ['--unknown-regression-flag']],
+  ])('直接执行 %s 时拒绝无效参数，路径别名不会静默跳过', (script, args) => {
+    for (const cwd of aliases) {
+      const result = spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8' })
+      expect(result.status, cwd).toBe(1)
+      expect(result.stderr, cwd).toMatch(/用法|未知参数/)
+    }
+  })
+
+  it('文档检查找不到 Git 时返回失败，路径别名不会静默跳过', () => {
+    for (const cwd of aliases) {
+      const result = spawnSync(process.execPath, ['scripts/check-md-links.mjs'], {
+        cwd,
+        encoding: 'utf8',
+        env: { ...process.env, PATH: '' },
+      })
+      expect(result.status, cwd).not.toBe(0)
+      expect(result.stderr, cwd).toMatch(/ENOENT|spawnSync/)
+    }
   })
 })

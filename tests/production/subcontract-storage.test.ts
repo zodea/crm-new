@@ -1,0 +1,227 @@
+import { Buffer } from 'node:buffer'
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { afterAll, afterEach, expect, it } from 'vitest'
+import { createHttpSubcontractContractCommandRepository } from '../../app/lib/subcontract-contract/command-http-repository'
+import { decodeSubcontractContractDetailRead } from '../../app/lib/subcontract-contract/read-decoder'
+import { contractOriginalDigest } from '../../server/utils/contract-original'
+import { createProductionConstructionContractService } from '../../server/utils/production-construction-contract-service'
+import { createProductionConstructionScopeService } from '../../server/utils/production-construction-scope-service'
+import { validateProductionSubcontractState } from '../../server/utils/production-subcontract-contract-record'
+import { runColdProcess } from '../helpers/cold-process'
+import { constructionScopeCommand } from '../helpers/production-construction-scope-fixture'
+import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
+import { createSubcontractNative } from '../helpers/production-subcontract-native'
+import { cleanupTestTempRoot } from '../helpers/test-temp-root'
+
+const closers: Array<() => Promise<void>> = []
+afterEach(async () => {
+  await Promise.all(closers.splice(0).map(close => close()))
+})
+async function fixture() {
+  const f = await createSubcontractFixture()
+  closers.push(() => f.storage.close())
+  return f
+}
+it('正式分包来源与单份Main同事务落盘，重复原号不重复关联或事实，后读保真实零/未知和原件', async () => {
+  const f = await fixture()
+  const request = f.command()
+  const saved = await f.service.execute(request, f.session)
+  expect(await f.service.execute(request, f.session)).toEqual(saved)
+  expect(await f.service.resolve(request.commandId, f.session)).toEqual({ outcome: 'applied', result: saved })
+  const form = await f.service.form(saved.id, f.session)
+  expect(form.constructionMain).toEqual(f.constructionMain)
+  expect(form.draft).toMatchObject({ projectId: f.project.id, supplierId: f.supplier.id, amount: 0, ourSignatoryId: f.signatory.id })
+  expect((await f.service.file(saved.id, form.attachments[0]!.id, 'real', f.session)).bytes).toEqual(Buffer.from('abc'))
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_records')).toHaveLength(1)
+  expect(await f.storage.select('SELECT * FROM construction_scope_links WHERE source_domain=\'subcontract-contract\'')).toHaveLength(1)
+  expect(await f.storage.select('SELECT * FROM construction_scope_history WHERE source_domain=\'subcontract-contract\'')).toHaveLength(1)
+  expect((await f.service.detail(saved.id, { origin: 'real' }, f.session)).contract.amounts).toMatchObject({ contract: '0.00', changed: '0.00', paid: null, settled: null })
+  const unknown = f.command({ action: 'draft' })
+  unknown.draft.amount = null
+  const drafted = await f.service.execute(unknown, f.session)
+  expect((await f.service.detail(drafted.id, { origin: 'real' }, f.session)).contract.amounts).toMatchObject({ contract: null, changed: null })
+})
+it('工程必选、错项目与变化basis整次拒绝，不保存新分包或关联；已证明未应用原号不能迟到写入', async () => {
+  const f = await fixture()
+  const missing = f.command({ action: 'draft', constructionMain: undefined })
+  await expect(f.service.execute(missing, f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed', commandOutcome: 'not-applied' } })
+  const stale = f.command({ constructionMain: { ...f.constructionMain, basis: '0'.repeat(64) } })
+  await expect(f.service.execute(stale, f.session)).rejects.toMatchObject({ problem: { code: 'conflict', commandOutcome: 'not-applied' } })
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_records')).toEqual([])
+  expect(await f.storage.select('SELECT * FROM construction_scope_links WHERE source_domain=\'subcontract-contract\'')).toEqual([])
+  expect(await f.service.resolve(missing.commandId, f.session)).toMatchObject({ outcome: 'not-applied' })
+  await expect(f.service.execute(missing, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+})
+it('完整真实SQLite分包主补图保存原ID/精确类型/未知JSON/原件/审计，无第二主档或整库私密字节；历史不强填工程关系', async () => {
+  const f = await fixture()
+  const source = await createSubcontractNative(f)
+  const saved = await source.service.adopt(source.command, f.session)
+  expect(await source.service.adopt(source.command, f.session)).toEqual(saved)
+  const form = await f.service.form('legacy-sub-head', f.session)
+  const commands = createHttpSubcontractContractCommandRepository({ fetcher: async () => f.service.form('legacy-sub-head', f.session) })
+  expect(await commands.loadForm('legacy-sub-head')).toEqual(form)
+  expect(form.constructionMain).toBeNull()
+  expect(form.draft).toMatchObject({ id: 'legacy-sub-head', projectId: f.project.id, supplierId: f.supplier.id, subKind: '劳务', amount: null })
+  const detail = decodeSubcontractContractDetailRead(await f.service.detail('legacy-sub-head', { origin: 'real' }, f.session))
+  expect(detail.sections.supplements[0]).toMatchObject({ id: 'legacy-sub-supp', amount: '0.00' })
+  expect(detail.sections.files.map(row => row.id).sort()).toEqual(['legacy-sub-head-file', 'legacy-sub-supp-file'])
+  const evidence = JSON.parse((await f.storage.select<{ evidence_json: string }>('SELECT evidence_json FROM subcontract_contract_imports'))[0]!.evidence_json)
+  expect(evidence.rawDomain.contracts[0].columns).toMatchObject({ extension_integer: { sqliteType: 'integer', exactValue: '9223372036854775807' }, extension_blob: { sqliteType: 'blob', exactValue: '0080FF' }, extension_json: { exactValue: '{"unknown":"原分包扩展","legacy":"legacy-sub-project"}' } })
+  expect(JSON.stringify(evidence)).not.toContain('DONT_COPY_SUBCONTRACT_OTHER_PRIVATE_DOMAIN')
+  expect(JSON.stringify(evidence)).not.toContain(source.command.source.payloadBase64)
+  expect(await f.storage.select('SELECT id FROM suppliers')).toHaveLength(1)
+  expect(await f.storage.select('SELECT id FROM projects')).toHaveLength(1)
+  expect((await f.service.file('legacy-sub-head', 'legacy-sub-supp-file', 'real', f.session)).bytes).toEqual(Buffer.from([0, 1, 2, 3]))
+  const restored = await source.service.restore({ commandId: 'sub-native-restore', workspaceId: f.session().workspaceId, actorId: f.session().actorId, importId: saved.importId }, f.session)
+  expect(restored.restored).toBe(true)
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_records')).toHaveLength(1)
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_versions')).toHaveLength(1)
+  expect(await f.storage.select('SELECT * FROM file_payloads')).toHaveLength(2)
+  expect(contractOriginalDigest(source.bytes)).toBe(source.command.source.sha256)
+  await expect(f.service.form('legacy-sub-head', f.session)).rejects.toMatchObject({ problem: { code: 'not-found' } })
+})
+it('分包原号未知结果在全新Node进程仅凭最小定位恢复，读取完整签约原件与原singleMain历史', async () => {
+  const f = await fixture()
+  const request = f.command()
+  const saved = await f.service.execute(request, f.session)
+  const before = await f.service.form(saved.id, f.session)
+  const descriptor = { commandId: request.commandId, workspaceId: f.session().workspaceId, actorId: f.session().actorId, family: 'subcontract-contract', targetId: null, action: request.action }
+  const output = resolve(f.options.directory, 'cold-normal.json')
+  await f.storage.close()
+  await runColdProcess('production-subcontract-cold', [f.options.directory, saved.id, JSON.stringify(descriptor), output])
+  const cold = JSON.parse(await readFile(output, 'utf8'))
+  expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
+  expect(cold.form).toEqual(before)
+  expect(cold.files[0]).toMatchObject({ payloadBase64: 'YWJj' })
+  expect(cold.relation.map((row: { main_id: string }) => row.main_id)).toEqual([f.main.id])
+})
+it('分包完整原库迁入在独立Node冷恢复互证原scope与回执，错误scope拒绝不伪未应用', async () => {
+  const f = await fixture()
+  const source = await createSubcontractNative(f)
+  const saved = await source.service.adopt(source.command, f.session)
+  const descriptor = { commandId: saved.commandId, workspaceId: f.session().workspaceId, actorId: f.session().actorId, family: 'subcontract-contract-import', targetId: null, action: 'adopt', scopeId: source.command.source.sha256 }
+  await expect(source.service.resolve({ ...descriptor, scopeId: '0'.repeat(64) }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_import_resolutions')).toEqual([])
+  const output = resolve(f.options.directory, 'cold-import.json')
+  await f.storage.close()
+  await runColdProcess('production-subcontract-cold', [f.options.directory, saved.ids[0]!, JSON.stringify(descriptor), output])
+  const cold = JSON.parse(await readFile(output, 'utf8'))
+  expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
+  expect(cold.form.constructionMain).toBeNull()
+  expect(cold.detail.sections.supplements[0]).toMatchObject({ id: 'legacy-sub-supp', amount: '0.00' })
+  expect(JSON.parse(cold.proof[0].evidence_json).rawDomain.operation_logs[0].columns.after_data.exactValue).toBe('{"original":"原审计JSON"}')
+})
+it('原分包历史被关联再解绑仍整批拒绝恢复，不丢原件和不可变关系/主补图', async () => {
+  const f = await fixture()
+  const source = await createSubcontractNative(f)
+  const adopted = await source.service.adopt(source.command, f.session)
+  const scope = createProductionConstructionScopeService(f.storage)
+  const sourceRef = { domain: 'subcontract-contract' as const, id: adopted.ids[0]! }
+  const read = await scope.read(sourceRef, f.session)
+  await scope.execute(constructionScopeCommand(read, 'sub-history-bind', f.main.id), f.session)
+  await scope.execute(constructionScopeCommand(await scope.read(sourceRef, f.session), 'sub-history-unbind', null), f.session)
+  const before = await f.storage.select('SELECT * FROM subcontract_contract_records')
+  await expect(source.service.restore({ commandId: 'sub-history-restore', workspaceId: f.session().workspaceId, actorId: f.session().actorId, importId: adopted.importId }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_records')).toEqual(before)
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_import_restores')).toEqual([])
+  expect(await f.storage.select<{ main_id: string | null }>('SELECT main_id FROM construction_scope_history WHERE source_domain=\'subcontract-contract\' ORDER BY version')).toEqual([{ main_id: f.main.id }, { main_id: null }])
+})
+it('未知旧分包回执保原号不可假not-applied、新正文不得覆盖；封套未知键先拒不解码不落意图', async () => {
+  const f = await fixture()
+  const source = await createSubcontractNative(f, true)
+  await source.service.adopt(source.command, f.session)
+  await expect(f.service.resolve('legacy-sub-command', f.session)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+  await expect(f.service.execute(f.command({ commandId: 'legacy-sub-command' }), f.session)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_resolutions')).toEqual([])
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_intents')).toEqual([])
+  await expect(source.service.adopt({ ...source.command, commandId: 'sub-illegal-envelope', other: 'invalid', source: { payloadBase64: 'not-sqlite', sha256: '0'.repeat(64) } }, f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+  expect(await f.storage.select('SELECT * FROM subcontract_contract_import_intents WHERE command_id=\'sub-illegal-envelope\'')).toEqual([])
+})
+it('实际选定版本冲突拒绝原号，无关分包/主合同配置变化不挡保存；正式编号跨同域不可重复', async () => {
+  const f = await fixture()
+  const first = await f.service.execute(f.command(), f.session)
+  const form = await f.service.form(first.id, f.session)
+  await f.service.execute(f.command(), f.session)
+  const mainService = createProductionConstructionContractService(f.storage)
+  const mainForm = await mainService.form(f.main.id, f.session)
+  await mainService.execute({ commandId: 'sub-unrelated-main-fee', workspaceId: f.session().workspaceId, actorId: f.session().actorId, id: f.main.id, requiredCapability: 'construction-contract:write', baseVersion: mainForm.version, action: 'save', draft: { ...mainForm.draft, managementFeeAmount: 7, managementFeeBasis: '仅原主合同配置修订' }, attachments: {} }, f.session, f.main.id)
+  const change = f.command({ id: first.id, baseVersion: form.version, action: 'save', draft: { ...form.draft, note: '分包无关字段保存' }, attachments: {} })
+  const saved = await f.service.execute(change, f.session, first.id)
+  expect((await f.service.form(first.id, f.session)).draft.note).toBe('分包无关字段保存')
+  await expect(f.service.execute({ ...change, commandId: 'sub-stale-original' }, f.session, first.id)).rejects.toMatchObject({ problem: { code: 'conflict', commandOutcome: 'not-applied' } })
+  const duplicate = f.command()
+  duplicate.draft.no = form.draft.no
+  await expect(f.service.execute(duplicate, f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed', commandOutcome: 'not-applied' } })
+  expect((await f.service.resolve(change.commandId, f.session)).outcome).toBe('applied')
+  expect(saved.version).toBe('2')
+})
+it('只读面不写DDL/locator或事实，权限与真实来源切换拒绝且保原键；选定原件损坏整tx拒绝', async () => {
+  const f = await fixture()
+  const request = f.command()
+  const saved = await f.service.execute(request, f.session)
+  const changes = (await f.storage.select('SELECT total_changes() AS changes'))[0]
+  await f.service.list({ origin: 'real' }, f.session)
+  await f.service.detail(saved.id, { origin: 'real' }, f.session)
+  await f.service.form(saved.id, f.session)
+  expect((await f.storage.select('SELECT total_changes() AS changes'))[0]).toEqual(changes)
+  expect(await f.storage.select('SELECT name FROM sqlite_master WHERE type=\'table\' AND name=\'contracts\'')).toEqual([])
+  await expect(f.service.detail(saved.id, { origin: 'demo' }, f.session)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+  const allowed = f.session()
+  f.setActor({ ...allowed, capabilities: allowed.capabilities.filter(value => value !== 'subcontract-contract:write') })
+  await expect(f.service.execute(f.command(), f.session)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+  f.setActor(allowed)
+  const form = await f.service.form(saved.id, f.session)
+  await expect(f.storage.withTransaction(async (tx) => {
+    await tx.execute('UPDATE file_payloads SET content=? WHERE file_ref_id=?', [new Uint8Array([0]), form.attachments[0]!.id])
+    await validateProductionSubcontractState(tx, f.session())
+  })).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+  expect((await f.service.file(saved.id, form.attachments[0]!.id, 'real', f.session)).bytes).toEqual(Buffer.from('abc'))
+  expect(await f.service.resolve(request.commandId, f.session)).toEqual({ outcome: 'applied', result: saved })
+})
+it.each([{ head: 0, supplement: 7, status: '有效', expected: '7.00' }, { head: 0, supplement: null, status: '有效', expected: null }, { head: 0, supplement: null, status: '已作废', expected: '0.00' }])('原owner金额$head+补充$supplement/$status读取$expected，明细及全筛选摘要同源且不借未接财务补零', async ({ head, supplement, status, expected }) => {
+  const f = await fixture()
+  const source = await createSubcontractNative(f, false, { head, supplement, status })
+  await source.service.adopt(source.command, f.session)
+  const detail = await f.service.detail('legacy-sub-head', { origin: 'real' }, f.session)
+  expect(detail.contract.amounts).toMatchObject({ contract: '0.00', changed: expected, paid: null, settled: null, invoiced: null })
+  const list = await f.service.list({ origin: 'real' }, f.session)
+  expect(list.items.find(row => row.id === 'legacy-sub-head')!.amounts.changed).toBe(expected)
+  expect(list.summary.origins.real).toMatchObject({ changedAmount: expected, settledAmount: null, paidAmount: null })
+})
+it('合法历史原件上传时间null保持unknown，不能冒用合同创建时间，整份历史表单仍可读与编辑', async () => {
+  const f = await fixture()
+  const source = await createSubcontractNative(f, false, { head: 0, uploadedAt: null })
+  await source.service.adopt(source.command, f.session)
+  const form = await f.service.form('legacy-sub-head', f.session)
+  expect(form.attachments[0]!.uploadedAt).toBeNull()
+  const physical = await f.storage.select<{ uploaded_at: string }>('SELECT uploaded_at FROM file_refs WHERE id=\'legacy-sub-head-file\'')
+  expect(physical[0]!.uploaded_at).toBe('')
+  const commands = createHttpSubcontractContractCommandRepository({ fetcher: async () => f.service.form('legacy-sub-head', f.session) })
+  expect((await commands.loadForm('legacy-sub-head')).attachments[0]!.uploadedAt).toBeNull()
+  const originalEvidence = (await f.storage.select<{ evidence_json: string }>('SELECT evidence_json FROM subcontract_contract_imports'))[0]!.evidence_json
+  const originalVersion = (await f.storage.select<{ snapshot_json: string }>('SELECT snapshot_json FROM subcontract_contract_versions WHERE id=\'legacy-sub-head\' AND version=1'))[0]!.snapshot_json
+  // Older adoption stored a creation-time fallback. Its frozen record remains; only the read projection follows proven raw NULL.
+  await f.storage.withTransaction(tx => tx.execute('UPDATE file_refs SET uploaded_at=? WHERE id=\'legacy-sub-head-file\'', ['2026-09-01T00:00:00.000Z']))
+  expect((await commands.loadForm('legacy-sub-head')).attachments[0]!.uploadedAt).toBeNull()
+  expect((await f.storage.select<{ evidence_json: string }>('SELECT evidence_json FROM subcontract_contract_imports'))[0]!.evidence_json).toBe(originalEvidence)
+  expect((await f.storage.select<{ snapshot_json: string }>('SELECT snapshot_json FROM subcontract_contract_versions WHERE id=\'legacy-sub-head\' AND version=1'))[0]!.snapshot_json).toBe(originalVersion)
+  await expect(createHttpSubcontractContractCommandRepository({ fetcher: async () => ({ ...form, attachments: form.attachments.map(file => ({ ...file, uploadedAt: 'not-a-date' })) }) }).loadForm('legacy-sub-head')).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+  const saved = await f.service.execute(f.command({ id: 'legacy-sub-head', action: 'save', baseVersion: form.version, constructionMain: undefined, attachments: {}, draft: { ...form.draft, note: '未知上传时间保留，整份历史仍可编辑', ourSignatoryId: f.signatory.id, ourSignatoryVersion: f.signatory.version, ourSignatorySnapshot: null } }), f.session, 'legacy-sub-head')
+  const after = await commands.loadForm('legacy-sub-head')
+  expect(after.draft.note).toBe('未知上传时间保留，整份历史仍可编辑')
+  expect(after.attachments[0]!.uploadedAt).toBeNull()
+  expect(await f.service.resolve(saved.commandId, f.session)).toMatchObject({ outcome: 'applied', result: saved })
+  await expect(f.storage.withTransaction(async (tx) => {
+    await tx.execute('UPDATE subcontract_contract_files SET original_metadata_json=json_set(original_metadata_json,\'$.uploaded_at\',\'invented\') WHERE file_ref_id=\'legacy-sub-head-file\'')
+    await validateProductionSubcontractState(tx, f.session())
+  })).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+  expect((await commands.loadForm('legacy-sub-head')).attachments[0]!.uploadedAt).toBeNull()
+  const proof = JSON.parse((await f.storage.select<{ evidence_json: string }>('SELECT evidence_json FROM subcontract_contract_imports'))[0]!.evidence_json)
+  expect(proof.rawDomain.file_refs.find((file: { legacyId: string }) => file.legacyId === 'legacy-sub-head-file').columns.uploaded_at).toMatchObject({ sqliteType: 'null', exactValue: null })
+  const first = JSON.parse((await f.storage.select<{ snapshot_json: string }>('SELECT snapshot_json FROM subcontract_contract_versions WHERE id=\'legacy-sub-head\' AND version=1'))[0]!.snapshot_json)
+  expect(first.attachments[0].uploadedAt).toBeNull()
+  expect(proof.rawDomain.contracts[0].columns.created_at.exactValue.replace(' ', 'T')).toBe(first.createdAt.slice(0, 19))
+})
+
+afterAll(cleanupTestTempRoot)

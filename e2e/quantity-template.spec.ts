@@ -115,16 +115,16 @@ test.describe('Issue #103 Slice 3：户型模板活链接与三量', () => {
       await expect(form.getByRole('combobox', { name: new RegExp(`分项 .*${input.itemName}`) })).toBeVisible()
     })
   }
-  for (const width of viewports) {
-    test(`${width}px 独立表单不撑宽页面，三量明细仅自身横滚`, async ({ page }) => {
+  test('独立表单在各宽度不撑宽页面，三量明细仅自身横滚', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    const f = await installQuantityProductionFixture(page)
+    const form = await openTemplateForm(page, f.templateId)
+
+    await expect(page.getByRole('dialog', { name: '户型模板与三量' })).toHaveCount(0)
+    const tableScroller = form.locator('.overflow-x-auto').last()
+    for (const width of viewports) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 960 })
-      const f = await installQuantityProductionFixture(page)
-      const form = await openTemplateForm(page, f.templateId)
-
-      await expect(page.getByRole('dialog', { name: '户型模板与三量' })).toHaveCount(0)
       await documentDoesNotOverflow(page)
-
-      const tableScroller = form.locator('.overflow-x-auto').last()
       const metrics = await tableScroller.evaluate(element => ({
         client: element.clientWidth,
         scroll: element.scrollWidth,
@@ -135,6 +135,6 @@ test.describe('Issue #103 Slice 3：户型模板活链接与三量', () => {
       else
         expect(metrics.scroll).toBeGreaterThanOrEqual(metrics.client)
       expect(metrics.overflowX).toMatch(/auto|scroll/)
-    })
-  }
+    }
+  })
 })

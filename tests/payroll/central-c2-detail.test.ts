@@ -67,5 +67,5 @@ it('极小 C2 单价的通用详情使用定点字符串，无损往返且拒绝
   expect(wire.statement.stored.lines[0]?.unitPrice).toBe('0.0000001')
   expect(decodePayrollRead(wire, 'detail', { origin: 'real' }, saved.statementId!)).toEqual(detail)
   wire.statement.lines[0]!.unitPrice = '1e-7'
-  expect(() => decodePayrollRead(wire, 'detail', { origin: 'real' }, saved.statementId!)).toThrow()
+  expect(() => decodePayrollRead(wire, 'detail', { origin: 'real' }, saved.statementId!)).toThrow('工资数值传输格式不完整')
 })

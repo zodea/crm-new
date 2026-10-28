@@ -2,6 +2,7 @@ import type { RecoveryStorage } from '../forms/command-recovery'
 import type { FileRefChanges } from '../forms/file-refs'
 import type { CentralFinanceKind, FinanceCommandAction, FinanceContext, FinanceFormRead, FinanceRepository } from './central-contract'
 import type { F3FormDraft } from './forms'
+import { commandVersionAtLeast } from '../forms/command-recovery'
 import { createFormCommandActions } from '../forms/command-session'
 import { hasConsistentReadMeta } from '../read-model/meta'
 import { financeFileHash } from './attachment-proof'
@@ -43,6 +44,34 @@ export function createFinanceCommandActions<K extends CentralFinanceKind>(kind: 
         || JSON.stringify(form.capabilities) !== JSON.stringify(context.capabilities)) {
         financeFailure('unavailable', '财务读取不属于当前工作区、身份或权限范围，请保留输入与原提交编号。')
       }
+    },
+    versionAtLeast: (current, original, evidence) => {
+      if (!commandVersionAtLeast(current, original))
+        return false
+      const result = evidence.result
+      if (result && 'expenseLineIdentities' in result && evidence.form) {
+        if (kind !== 'reimbursement' || !Array.isArray(result.expenseLineIdentities))
+          return false
+        const form = evidence.form as FinanceFormRead<'reimbursement'>
+        if (!result.expenseLineIdentities.every(entry => form.draft.lines.some(line => line.id === entry.id)))
+          return false
+      }
+      if (!result || !('constructionScopeLinks' in result))
+        return true
+      if (!Array.isArray(result.constructionScopeLinks) || kind !== 'reimbursement')
+        return false
+      // The first pass validates the receipt before any post-save read exists.
+      // Relationship acknowledgement happens only in the later form pass.
+      if (!evidence.form)
+        return true
+      const form = evidence.form as FinanceFormRead<'reimbursement'>
+      return result.constructionScopeLinks.every((entry) => {
+        const relation = entry?.relation
+        const row = form.draft.lines.find(line => line.id === relation?.sourceId)
+        if (!row || !relation)
+          return false
+        return relation.domain === 'original-expense' && row.constructionMain?.id === relation.mainId && !!row.constructionScopeVersion && commandVersionAtLeast(row.constructionScopeVersion, relation.version)
+      })
     },
     recoveryStorage,
   })

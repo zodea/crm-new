@@ -10,7 +10,6 @@ import type {
   CoreMigrationSourceEntityDTO,
   CoreMigrationTotalExpectationDTO,
 } from './core-contract'
-import { isTauri } from '@tauri-apps/api/core'
 import { CREW_PAYROLL_FEE_FIELDS, crewPayrollFeeAttributes } from '../crew-worker/payroll-fee-defaults'
 import {
   activateBrowserCoreMigration,
@@ -54,7 +53,6 @@ import { readWorkerModernGraphs } from './worker-roster-modern-source'
 import { WORKER_ROSTER_SOURCE_SQL, workerRosterSourceAttributes } from './worker-roster-source'
 
 export interface CoreMigrationLocalSourceDependencies {
-  isNative: () => boolean
   isDemoActive: () => boolean
   currentSchemaVersion: () => Promise<number>
   select: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<T[]>
@@ -1394,7 +1392,6 @@ async function readSqliteSnapshotSource(snapshot: Uint8Array): Promise<CoreMigra
 
 function defaultDependencies(): CoreMigrationLocalSourceDependencies {
   return {
-    isNative: isTauri,
     isDemoActive: () => useDataVisibilityStore().includeDemo,
     currentSchemaVersion: async () => getCurrentVersion(await getDb()),
     select: async <T extends Record<string, unknown>>(sql: string, params: unknown[] = []) => {
@@ -1420,16 +1417,12 @@ export function createCoreMigrationLocalSource(
   dependencies: CoreMigrationLocalSourceDependencies = defaultDependencies(),
 ) {
   async function readSource(): Promise<CoreMigrationSourceDTO> {
-    if (dependencies.isNative())
-      throw problem('browser-only', '本地快照迁移首版仅支持浏览器工作区')
     if (dependencies.isDemoActive())
       throw problem('demo-source-not-allowed', '请先关闭“包含测试数据”，再迁移正式本地数据')
     return buildSource(await dependencies.currentSchemaVersion(), dependencies.select)
   }
 
   async function createBackup(expectedSourceHash: string): Promise<BrowserDatabaseBackupMetadata> {
-    if (dependencies.isNative())
-      throw problem('browser-only', '本地快照迁移首版仅支持浏览器工作区')
     await dependencies.closeDatabase()
     const snapshot = await dependencies.loadProductionSnapshot()
     if (!snapshot)
@@ -1461,8 +1454,6 @@ export function createCoreMigrationLocalSource(
     expectedSourceHash: string,
     expectedSnapshotSha256: string,
   ): Promise<void> {
-    if (dependencies.isNative())
-      throw problem('browser-only', '本地快照迁移首版仅支持浏览器工作区')
     await dependencies.closeDatabase()
     const snapshot = await dependencies.loadProductionSnapshot()
     if (!snapshot)

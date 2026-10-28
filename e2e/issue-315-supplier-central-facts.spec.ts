@@ -157,21 +157,33 @@ test.describe('Issue #315：分供方中央详情与四类真实事实', () => {
     expect(await mismatchResponse.json()).toMatchObject({ data: { code: 'relationship-mismatch' } })
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 列表—详情—表单无页面级横滚`, async ({ page }) => {
+  test('列表—详情—表单在各宽度无页面级横滚', async ({ page }) => {
+    const name = '响应式分供方'
+    await createFormalSupplier(page, name)
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await createFormalSupplier(page, `响应式分供方 ${width}`)
       await expectNoPageOverflow(page, `#315 分供方详情 @ ${width}px`)
-      await page.getByRole('link', { name: '证照附件' }).click()
-      await expect(page.getByRole('button', { name: '上传原件', exact: true })).toBeVisible()
-      await expect(page.getByRole('heading', { name: `响应式分供方 ${width} · 证照附件` })).toBeFocused()
+    }
+    await page.getByRole('link', { name: '证照附件' }).click()
+    await expect(page.getByRole('button', { name: '上传原件', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: `${name} · 证照附件` })).toBeFocused()
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       await expectNoPageOverflow(page, `#315 分供方证照专用页 @ ${width}px`)
-      await page.getByRole('link', { name: '返回分供方详情' }).click()
-      await page.getByRole('link', { name: '编辑分供方' }).click()
+    }
+    await page.getByRole('link', { name: '返回分供方详情' }).click()
+    await page.getByRole('link', { name: '编辑分供方' }).click()
+    await expect(page.getByRole('heading', { name: '编辑 · 分供方' })).toBeVisible()
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       await expectNoPageOverflow(page, `#315 分供方表单 @ ${width}px`)
-      await page.getByRole('button', { name: '取消' }).click()
-      await page.getByRole('link', { name: '返回分供方列表' }).click()
+    }
+    await page.getByRole('button', { name: '取消' }).click()
+    await page.getByRole('link', { name: '返回分供方列表' }).click()
+    await expect(page.getByRole('button', { name: '新增分供方', exact: true })).toBeVisible()
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       await expectNoPageOverflow(page, `#315 分供方列表 @ ${width}px`)
-    })
-  }
+    }
+  })
 })

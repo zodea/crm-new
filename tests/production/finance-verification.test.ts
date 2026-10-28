@@ -2,9 +2,9 @@ import type { FinanceCommand } from '../../app/lib/finance/central-contract'
 import type { PaymentVerificationEdit } from '../../app/lib/finance/payment-verification'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { FINANCE_FAMILIES, financeFailure } from '../../app/lib/finance/central-contract'
 import { createFinanceCommandActions } from '../../app/lib/finance/command-session'
 import { createFinanceRepository } from '../../app/lib/finance/http-repository'
@@ -16,11 +16,51 @@ import { PRODUCTION_FINANCE_VERIFICATION_SCHEMA } from '../../server/utils/produ
 import { createProductionOtherSettlementMigration } from '../../server/utils/production-other-settlement-migration'
 import { listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { productionStorageManifest } from '../../server/utils/production-storage-schema'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { createOtherSettlementPay08Source } from '../helpers/other-settlement-pay08-source'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
+
+/** Only synthetic, unused later domains are removed to model the exact historical backup release. */
+function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
+  const currentVersion = Number(db.prepare('SELECT schema_version FROM production_metadata WHERE singleton=1').get()!.schema_version)
+  const current = productionStorageManifest(currentVersion)
+  const historical = productionStorageManifest(version)
+  const historicalTables = new Set([...historical.coreTables, ...Object.values(historical.participants).flatMap(participant => participant.tables)])
+  const added = [...new Set(Object.values(current.participants).flatMap(participant => participant.tables))].filter(table => !historicalTables.has(table))
+  const untouchedRevisionTables = new Set(['payroll_revision', 'construction_contract_revision', 'construction_scope_revision', 'subcontract_contract_revision', 'auxiliary_contract_revision', 'boq_revision'])
+  for (const table of added) {
+    const rows = db.prepare(`SELECT * FROM ${table}`).all()
+    expect(rows).toEqual(untouchedRevisionTables.has(table) ? [{ singleton: 1, revision: 0 }] : [])
+  }
+  db.exec('PRAGMA foreign_keys=OFF; BEGIN')
+  try {
+    for (const table of added.reverse()) db.exec(`DROP TABLE ${table}`)
+    for (const table of ['crews', 'workers']) {
+      const columns = db.prepare(`PRAGMA table_xinfo(${table})`).all().filter(column => Number(column.hidden) === 2)
+      for (const column of columns) {
+        expect(String(column.name)).toMatch(/^[a-z_]+$/)
+        db.exec(`ALTER TABLE ${table} DROP COLUMN ${column.name}`)
+      }
+    }
+    expect(db.prepare('SELECT id FROM projects WHERE matrix_archived_at IS NOT NULL').all()).toEqual([])
+    db.exec('ALTER TABLE projects DROP COLUMN matrix_archived_at')
+    for (const domain of Object.keys(current.participants).filter(domain => !historical.participants[domain]))
+      db.prepare('DELETE FROM production_participants WHERE domain=?').run(domain)
+    db.prepare('UPDATE production_metadata SET schema_version=? WHERE singleton=1').run(version)
+    db.exec('COMMIT; PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE')
+  }
+  catch (cause) {
+    db.exec('ROLLBACK')
+    throw cause
+  }
+}
 
 async function fixture(companyContract = false) {
-  const root = resolve('.tmp/a01-finance-production')
+  const root = testTempRoot('a01-finance-production')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'pay08-synthetic-'))
   const native = await createOtherSettlementPay08Source(join(directory, 'native-source'))
@@ -36,7 +76,7 @@ async function fixture(companyContract = false) {
     native.source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
   }
   const options = { directory, workspaceId: 'finance-pay08-workspace', ownerId: 'finance-pay08-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['other-settlement:read', 'other-settlement:write', 'supplier:list:read', 'supplier:write', 'core:migration:write', ...Object.values(FINANCE_FAMILIES).flatMap(family => [`${family}:read`, `${family}:write`])] }
   const session = () => structuredClone(actor)
   const identity = { workspaceId: actor.workspaceId, actorId: actor.actorId }
@@ -80,7 +120,7 @@ it('实际v12旧17表备份可只读核验、离线复制及隔离恢复，不�
       expect(raw.prepare('SELECT COUNT(*) AS n FROM finance_expense_clearance_verifications').get()).toEqual({ n: 0 })
       expect(raw.prepare('SELECT COUNT(*) AS n FROM expenditure_settlement_clearance_links').get()).toEqual({ n: 0 })
       expect(raw.prepare('SELECT COUNT(*) AS n FROM finance_payment_verifications').get()).toEqual({ n: 0 })
-      raw.exec('DROP TABLE expenditure_settlement_clearance_links; DROP TABLE finance_expense_clearance_verifications; DROP TABLE finance_payment_verifications; UPDATE production_metadata SET schema_version=12 WHERE singleton=1; PRAGMA journal_mode=DELETE')
+      historicalFixtureSchema(raw, 12)
     }
     finally { raw.close() }
     const before = await readFile(path)
@@ -89,7 +129,7 @@ it('实际v12旧17表备份可只读核验、离线复制及隔离恢复，不�
     expect(inventory.participants.finance!.tables).toHaveLength(17)
     expect(inventory.tables).not.toHaveProperty('finance_payment_verifications')
     expect(inventory.originals).toEqual({ files: 2, bytes: 8 })
-    expect(await readFile(path)).toEqual(before)
+    expect((await readFile(path)).equals(before)).toBe(true)
     const manifest = { format: 'ruihang-backup-v1', id, capturedAt: '2026-10-05T00:00:00.000Z', completedAt: '2026-10-05T00:00:00.000Z', inventory }
     await writeFile(join(packageDirectory, 'manifest.json'), JSON.stringify(manifest))
     expect(await readBackupPackage(staging, id)).toEqual(manifest)
@@ -106,7 +146,7 @@ it('实际v12旧17表备份可只读核验、离线复制及隔离恢复，不�
       expect(await recoveredStorage.select('SELECT amount,bank_serial_no,confirmed_by FROM payment_records WHERE id=?', [f.native.ids.payment])).toEqual([{ amount: 20, bank_serial_no: 'PAY08-OLD-BANK', confirmed_by: '原确认人' }])
     }
     finally { await recoveredStorage.close() }
-    expect(await readFile(path)).toEqual(before)
+    expect((await readFile(path)).equals(before)).toBe(true)
   }
   finally { await f.storage.close() }
 })
@@ -143,7 +183,7 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
       expect(historical.prepare('SELECT COUNT(*) AS n FROM finance_expense_clearance_verifications').get()).toEqual({ n: 0 })
       expect(historical.prepare('SELECT COUNT(*) AS n FROM expenditure_settlement_clearance_links').get()).toEqual({ n: 0 })
       expect(historical.prepare('SELECT COUNT(*) AS n FROM finance_payment_verifications').get()).toEqual({ n: 1 })
-      historical.exec('DROP TABLE expenditure_settlement_clearance_links; DROP TABLE finance_expense_clearance_verifications; UPDATE production_metadata SET schema_version=13 WHERE singleton=1; PRAGMA journal_mode=DELETE')
+      historicalFixtureSchema(historical, 13)
     }
     finally { historical.close() }
     backup.inventory = await inspectProductionBackup(historicalPath)
@@ -206,7 +246,7 @@ it.each(['conclusion', 'source', 'recomputed-source', 'missing-proof', 'original
     finally { db.close() }
     const bytes = await readFile(path)
     await expect(inspectProductionBackup(path)).rejects.toThrow()
-    expect(await readFile(path)).toEqual(bytes)
+    expect((await readFile(path)).equals(bytes)).toBe(true)
     expect((await f.finance.form('payment_application', f.native.ids.application, f.session)).draft.paymentVerification).toMatchObject({ required: true, status: 'verified' })
   }
   finally { await f.storage.close() }

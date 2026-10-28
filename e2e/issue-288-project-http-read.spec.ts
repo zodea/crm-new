@@ -1,7 +1,6 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 type Scenario = 'ready' | 'empty' | 'forbidden' | 'demo-forbidden' | 'unavailable'
 
@@ -146,12 +145,4 @@ test.describe('Issue #288：项目列表中央 HTTP 读链', () => {
     await expect(page.getByRole('status', { name: '没有符合条件的项目' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: '合和新城', exact: true })).toHaveCount(0)
   })
-
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 实际视口不产生页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await openProjectList(page)
-      await expectNoPageOverflow(page, `#288 项目列表 @ ${width}px`)
-    })
-  }
 })

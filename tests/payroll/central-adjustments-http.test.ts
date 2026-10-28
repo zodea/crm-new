@@ -8,9 +8,7 @@ import { createPayrollRepository } from '~/lib/payroll/central-repository'
 import { createPayrollAdjustmentFixture } from '../helpers/payroll-adjustment-service-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollAdjustmentFixture>>['service'] | null }))
-vi.mock('../../server/utils/payroll-runtime', () => ({ get payrollService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-runtime', () => ({ payrollServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 
 it('真实 HTTP 完成独立更正、退40及错记冲销，所有有符号实额以到分十进制传输', async () => {
@@ -79,7 +77,7 @@ it('真实 HTTP 完成独立更正、退40及错记冲销，所有有符号实�
     expect((await repo.adjustmentDetail({ origin: 'real' }, saved.adjustmentId!)).applications).toEqual(history.applications)
     const forged = structuredClone(history)
     forged.applications[0]!.appliedDelta = { value: -99, knownValue: -99, state: 'known', reasons: [] }
-    expect(() => decodePayrollAdjustmentRead(encodePayrollAdjustmentWire(forged), 'adjustment-history', { origin: 'real' }, f.statementId)).toThrow()
+    expect(() => decodePayrollAdjustmentRead(encodePayrollAdjustmentWire(forged), 'adjustment-history', { origin: 'real' }, f.statementId)).toThrow('工资更正读取与原目标、金额或确认依据不一致，请保留输入重新核对')
     f.setSession({ workspaceId: 'work', actorId: 'actor', capabilities: ['payroll:read'] })
     await expect(repo.executeAdjustment(actualCommand)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
   }

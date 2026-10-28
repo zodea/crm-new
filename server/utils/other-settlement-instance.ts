@@ -235,7 +235,7 @@ export function createOtherSettlementInstance(options: Options) {
         const references = options.originalExpenses?.() ?? []
         const sources = draft.originalExpenses.map((line) => {
           const source = references.find(row => row.id === line.originalExpenseLineId)
-          if (!source || source.version !== line.sourceVersion || source.sourceRevision !== line.sourceRevision)
+          if (!source || (line.consumptionVersion ? source.consumptionVersion !== line.consumptionVersion : source.version !== line.sourceVersion || source.sourceRevision !== line.sourceRevision))
             throw auxiliaryProblem('conflict', '原费用或来源版本已变化，请重新核对；当前输入保留')
           if ((draft.projectId ?? null) !== source.projectId || !identities().suppliers.some(row => row.id === source.serviceSupplierId))
             throw auxiliaryProblem('relationship-mismatch', '原费用项目/公司归属或实际服务交易方不匹配')

@@ -1,5 +1,4 @@
 import type { QuotationCommand, QuotationContext, QuotationFile, QuotationRead, QuotationRecord } from './contract'
-import { isTauri } from '@tauri-apps/api/core'
 import { isISODateTimeDTO } from '../../types/read-model'
 import { decodeContractOriginalContent } from '../forms/original-content'
 import { hasConsistentReadMeta, isReadMetaDTO } from '../read-model/meta'
@@ -78,8 +77,6 @@ export function quotationUnknownProblem(cause: unknown) {
 export function createQuotationHttpRepository(fetcher: (url: string, options?: object) => Promise<unknown>) {
   async function read<T>(load: () => Promise<unknown>, decode: (value: unknown) => T): Promise<T> {
     try {
-      if (isTauri())
-        return quotationProblem('unavailable', 'Native 尚无可信中央报价身份；保留本地原图，在正式浏览器工作区读取、写入或迁入')
       return decode(await load())
     }
     catch (cause) {

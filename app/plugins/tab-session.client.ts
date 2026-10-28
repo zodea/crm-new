@@ -1,5 +1,4 @@
 import type { DomainRepositories } from '~/plugins/repositories'
-import { isTauri } from '@tauri-apps/api/core'
 import { withTabRestoreDeadline } from '~/lib/tabs/restore-deadline'
 import { createTabRestoreValidator } from '~/lib/tabs/restore-target'
 
@@ -7,8 +6,6 @@ export default defineNuxtPlugin({
   name: 'tab-session',
   dependsOn: ['nuxt:router', 'domain-repositories', 'data-visibility'],
   setup(app) {
-    if (isTauri())
-      return
     const router = useRouter()
     const session = useTabSessionStore()
     const visibility = useDataVisibilityStore()

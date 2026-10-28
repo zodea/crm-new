@@ -1,15 +1,27 @@
 <script setup lang="ts">
+import type { InvoiceRecognitionFieldMark } from '~/lib/invoice/recognition-changes'
 import type { ConfidenceTier } from '~/lib/invoice/recognize'
 import type { Invoice } from '~/stores/invoice'
 import { resolveAttribution } from '~/lib/invoice/batch-pass'
+import { INVOICE_RECOGNITION_FIELDS } from '~/lib/invoice/recognition-changes'
 import { confidenceTier } from '~/lib/invoice/recognize'
 import { formatMoney } from '~/lib/util/money'
+import { invoiceCorrectionPatch } from '~/stores/invoice'
 
 // 字段校对表单（#60 反馈轮 7 定稿）：两列紧凑网格，置信度 = 输入框边框色 + 角标百分比
 // （角标/确认按钮放 label 行右侧，不占整行）；绿字段不放确认按钮、仅黄/红出现「✓确认」；
 // 黄/红字段被人工修正（编辑值）或点确认后置信度置满变绿。货物明细默认折叠。
+// 重新识别草稿期间（draft）：invoice 是草稿值，所有修改只经 edit 交给父级合并进草稿，不写库；
+// marks 标出识别前后不同的字段（警示边框 + 图标文字角标 + 读屏原值）。
+// 非草稿且原文件仍在会话中（focusLocatedKeys）：聚焦/悬停任一识别字段在原图上临时框出其所在块，失焦撤回。
 const props = defineProps<{
   invoice: Invoice
+  draft?: boolean
+  marks?: Readonly<Record<string, InvoiceRecognitionFieldMark>>
+  /** 原图比对可用时：已在原图框出的字段 key（角标读屏说明“原图已框出 / 原图未定位”） */
+  locatedKeys?: readonly string[]
+  /** 首次识别点字段定位可用时：原图上能定位的识别字段 key（其余识别字段读屏说明“原图未定位”） */
+  focusLocatedKeys?: readonly string[]
 }>()
 
 const emit = defineEmits<{
@@ -17,6 +29,13 @@ const emit = defineEmits<{
   archive: []
   discard: []
   rerecognize: []
+  edit: [patch: Partial<Invoice>]
+  /** 聚焦有识别标记的字段（或点字段定位下的识别字段）：原图强调对应区域 */
+  locate: [key: string]
+  /** 悬停同上字段：临时强调，离开为 null */
+  preview: [key: string | null]
+  /** 点字段定位下识别字段失焦：撤回该字段的框（重新识别比对的框常驻，不发出） */
+  release: [key: string]
 }>()
 
 const store = useInvoiceStore()
@@ -79,13 +98,28 @@ const attribution = computed(() =>
 )
 const isPersonal = computed(() => props.invoice.ownerKind === 'personal')
 
+/** 草稿期间修正只改草稿（同一域规则 invoiceCorrectionPatch），否则即时落库。 */
+function correct(field: keyof Invoice & string, value: string | number) {
+  if (props.draft) {
+    emit('edit', invoiceCorrectionPatch(props.invoice, field, value))
+    return
+  }
+  return store.correctField(props.invoice.id, field, value)
+}
+
 function setOwnerKind(kind: 'project' | 'personal') {
   if (props.invoice.ownerKind === kind)
     return
-  store.correctField(props.invoice.id, 'ownerKind', kind)
+  correct('ownerKind', kind)
+}
+
+function markId(f: FieldDef) {
+  return `${fieldInputId(f)}-recognition-mark`
 }
 
 function inputClass(f: FieldDef): string {
+  if (props.marks?.[f.key])
+    return 'border-warn! bg-warn-soft!'
   // 缺归属时对应项目标红(#63):归档强制归属的就地提示(选了个人开支则不标)
   if (f.key === 'projectName' && !isPersonal.value && !attribution.value)
     return 'border-danger!'
@@ -109,14 +143,18 @@ async function onFieldChange(f: FieldDef, e: Event) {
       el.value = String(props.invoice[f.key] ?? '')
       return
     }
-    await store.correctField(props.invoice.id, f.key, n)
+    await correct(f.key, n)
     return
   }
-  await store.correctField(props.invoice.id, f.key, raw)
+  await correct(f.key, raw)
 }
 
 /** ✓确认：不改值，仅人工判定该字段无误 → store 置满置信度变绿。 */
 async function confirmField(key: string) {
+  if (props.draft) {
+    emit('edit', { fieldConfidence: { ...props.invoice.fieldConfidence, [key]: 1 } })
+    return
+  }
   await store.confirmField(props.invoice.id, key)
 }
 
@@ -127,6 +165,42 @@ const isDuplicate = computed(() => props.invoice.dupStatus === 'duplicate')
 
 function fieldInputId(field: FieldDef) {
   return `invoice-review-${props.invoice.id}-${field.key}`
+}
+
+const RECOGNITION_KEYS = new Set(INVOICE_RECOGNITION_FIELDS.map(field => field.key))
+
+/** 点字段定位下该字段是否参与（识别字段才有原图区域）。 */
+function focusLocatable(f: FieldDef) {
+  return !!props.focusLocatedKeys && !props.marks && RECOGNITION_KEYS.has(f.key)
+}
+
+function regionHintId(f: FieldDef) {
+  return `${fieldInputId(f)}-region-hint`
+}
+
+function focusUnlocated(f: FieldDef) {
+  return focusLocatable(f) && !props.focusLocatedKeys!.includes(f.key)
+}
+
+function describedBy(f: FieldDef) {
+  if (props.marks?.[f.key])
+    return markId(f)
+  return focusUnlocated(f) ? regionHintId(f) : undefined
+}
+
+function onFieldFocus(f: FieldDef) {
+  if (props.marks?.[f.key] || focusLocatable(f))
+    emit('locate', f.key)
+}
+
+function onFieldBlur(f: FieldDef) {
+  if (focusLocatable(f))
+    emit('release', f.key)
+}
+
+function onFieldHover(f: FieldDef, hovering: boolean) {
+  if (props.marks?.[f.key] || focusLocatable(f))
+    emit('preview', hovering ? f.key : null)
 }
 
 // 货物明细默认折叠
@@ -143,6 +217,7 @@ const showItems = shallowRef(false)
       >
         <label :for="fieldInputId(f)" class="field-label flex items-center gap-1">
           <span>{{ f.label }}</span>
+          <InvoiceRecognitionFieldMark v-if="marks?.[f.key]" :id="markId(f)" :mark="marks[f.key]!" :located="locatedKeys ? locatedKeys.includes(f.key) : undefined" />
           <span class="flex-1" />
           <span
             v-if="tiers[f.key]"
@@ -162,15 +237,21 @@ const showItems = shallowRef(false)
             <span class="i-lucide-check text-11px" />确认
           </button>
         </label>
+        <span v-if="focusUnlocated(f)" :id="regionHintId(f)" class="sr-only">原图未定位</span>
 
         <select
           v-if="f.type === 'select'"
           :id="fieldInputId(f)"
           :aria-label="f.label"
+          :aria-describedby="describedBy(f)"
           :value="String(invoice[f.key] ?? '')"
           class="field-input w-full"
           :class="inputClass(f)"
           @change="onFieldChange(f, $event)"
+          @focus="onFieldFocus(f)"
+          @blur="onFieldBlur(f)"
+          @mouseenter="onFieldHover(f, true)"
+          @mouseleave="onFieldHover(f, false)"
         >
           <option v-for="o in f.options" :key="o" :value="o">
             {{ o }}
@@ -180,6 +261,7 @@ const showItems = shallowRef(false)
           v-else
           :id="fieldInputId(f)"
           :aria-label="f.label"
+          :aria-describedby="describedBy(f)"
           :value="String(invoice[f.key] ?? '')"
           :type="f.type ?? 'text'"
           :list="f.projectList ? 'review-project-names' : undefined"
@@ -187,6 +269,10 @@ const showItems = shallowRef(false)
           :class="[inputClass(f), f.mono ? 'font-mono' : '']"
           :step="f.type === 'number' ? '0.01' : undefined"
           @change="onFieldChange(f, $event)"
+          @focus="onFieldFocus(f)"
+          @blur="onFieldBlur(f)"
+          @mouseenter="onFieldHover(f, true)"
+          @mouseleave="onFieldHover(f, false)"
         >
       </div>
       <datalist id="review-project-names">

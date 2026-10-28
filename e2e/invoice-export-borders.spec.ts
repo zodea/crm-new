@@ -102,7 +102,7 @@ test.describe('Issue #437 发票 Excel 分组边框', () => {
     expect(errors).toEqual([])
   })
 
-  test('五档视口保留局部滚动、两组可编辑与弹窗键盘焦点，取消恢复不改默认', async ({ page }, testInfo) => {
+  test('五档视口保留局部滚动、两组可编辑与弹窗键盘焦点，取消恢复不改默认', async ({ page }) => {
     await installFixture(page)
     let dialog = await openPreview(page)
     for (const width of [390, 768, 1024, 1280, 1440]) {
@@ -121,7 +121,6 @@ test.describe('Issue #437 发票 Excel 分组边框', () => {
       await scroll.evaluate((element) => {
         element.scrollLeft = 0
       })
-      await page.screenshot({ path: testInfo.outputPath(`preview-${width}.png`), fullPage: true })
       for (const role of ['表头', '数据行']) {
         const color = dialog.getByRole('textbox', { name: `${role}上边框颜色` })
         await color.fill('#ABCDEF')
@@ -133,7 +132,6 @@ test.describe('Issue #437 发票 Excel 分组边框', () => {
         const footerBox = (await dialog.getByText('导出文件会包含当前设置、标题带、格式、合并单元格和合计行。', { exact: true }).boundingBox())!
         expect(groupBox.y).toBeGreaterThan(box!.y)
         expect(groupBox.y + groupBox.height).toBeLessThanOrEqual(footerBox.y)
-        await page.screenshot({ path: testInfo.outputPath(`borders-${role}-${width}.png`), fullPage: true })
       }
       await dialog.getByRole('button', { name: '确认导出' }).focus()
       await page.keyboard.press('Tab')
@@ -144,7 +142,6 @@ test.describe('Issue #437 发票 Excel 分组边框', () => {
     await dialog.getByRole('textbox', { name: '表头上边框颜色' }).fill('#')
     await dialog.getByRole('button', { name: '确认导出' }).click()
     await expect(dialog.getByRole('alert')).toContainText('边框颜色')
-    await page.screenshot({ path: testInfo.outputPath('invalid-color.png'), fullPage: true })
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
     dialog = await openPreview(page)

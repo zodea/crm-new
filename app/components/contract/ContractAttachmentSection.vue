@@ -13,13 +13,11 @@ defineProps<{
   pendingAttachments: ReadonlyArray<Readonly<PendingContractAttachment>>
   pendingRemoveIds: readonly string[]
   pendingRestoreIds: readonly string[]
-  desktopPicker: boolean
   note: string
   filesDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
-  pickNative: []
   files: [files: File[]]
   toggleExisting: [id: string]
   removePending: [localId: string]
@@ -41,19 +39,9 @@ function inputValue(event: Event): string {
 <template>
   <section id="section-attachments" class="panel scroll-mt-4 p-4">
     <SectionHeader title="附件与备注" />
-    <button
-      v-if="desktopPicker"
-      type="button"
-      :disabled="filesDisabled"
-      class="mt-3 flex min-h-24 w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
-      @click="emit('pickNative')"
-    >
-      <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
-      <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">所选文件正文随合同保存，单份不超过 10 MiB</span>
-    </button>
+
     <label
-      v-else
+
       class="mt-3 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />

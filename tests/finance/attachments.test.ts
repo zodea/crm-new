@@ -3,11 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, shallowRef } from 'vue'
 import { useFinanceFormAttachments } from '~/composables/useFinanceFormAttachments'
 
-const native = vi.hoisted(() => ({ open: vi.fn(), readFile: vi.fn(), basename: vi.fn() }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
-vi.mock('@tauri-apps/plugin-dialog', () => ({ open: native.open }))
-vi.mock('@tauri-apps/plugin-fs', () => ({ readFile: native.readFile }))
-vi.mock('@tauri-apps/api/path', () => ({ basename: native.basename }))
 const feedback = { warning: vi.fn(), error: vi.fn() }
 let scope: ReturnType<typeof effectScope>
 function open() {
@@ -26,15 +21,10 @@ afterEach(() => {
 })
 
 describe('f3 原件准备与发送稿确认', () => {
-  it('浏览器保存原字节及真实空文件，桌面选中路径也持久化正文', async () => {
+  it('浏览器保存原字节及真实空文件', async () => {
     const form = open()
     await form.handleFiles([new File([new Uint8Array([0, 128, 255])], '原件.bin'), new File([], '真实空件')])
     expect(form.changes().add).toEqual([expect.objectContaining({ fileName: '原件.bin', fileSize: 3, payloadBase64: 'AID/' }), expect.objectContaining({ fileName: '真实空件', fileSize: 0, payloadBase64: '' })])
-    native.open.mockResolvedValue(['C:\\原件\\付款.pdf'])
-    native.readFile.mockResolvedValue(new Uint8Array([1, 2, 3]))
-    native.basename.mockResolvedValue('付款.pdf')
-    await form.pickNativeFiles()
-    expect(form.changes().add?.[2]).toMatchObject({ filePath: 'C:\\原件\\付款.pdf', fileName: '付款.pdf', payloadBase64: 'AQID', fileSize: 3 })
   })
 
   it('确认仅清除已发送稿，后来新增、改分类、撤销删除/恢复意图均保留', async () => {

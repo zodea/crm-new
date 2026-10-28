@@ -2,7 +2,12 @@ import type { TransactionDb } from '../db/coordinator'
 import type { MasterDataSaveAction, TargetCostFormDraft } from '../master-data/forms'
 import { logCreate, selectVisibleSql, withUpdateLog } from '../db/soft-delete'
 import { round2 } from '../util/number'
-import { TARGET_COST_MONEY_FIELDS, targetCostProblem } from './central-contract'
+import { TARGET_COST_DRAFT_KEYS, TARGET_COST_MONEY_FIELDS, targetCostProblem } from './central-contract'
+
+/** Read metadata belongs to the read model, never to the editable command draft. */
+export function targetCostEditableDraft(header: TargetCostFormDraft): TargetCostFormDraft {
+  return Object.fromEntries(TARGET_COST_DRAFT_KEYS.filter(key => Object.hasOwn(header, key)).map(key => [key, header[key]]))
+}
 
 export function normalizeTargetCostHeader(draft: TargetCostFormDraft, action: MasterDataSaveAction, existingStatus = 'draft') {
   const status = action === 'submit' ? 'submitted' : action === 'draft' ? 'draft' : existingStatus

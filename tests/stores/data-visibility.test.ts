@@ -21,9 +21,8 @@ describe('global data visibility preference', () => {
     const first = useDataVisibilityStore()
     expect(first.includeDemo).toBe(false)
 
-    await first.initialize()
-    await first.authorizeDemo(vi.fn().mockResolvedValue(true))
-    first.commitPreference(true)
+    stageDataVisibilitySwitch(sessionStorage, true)
+    await first.initialize(vi.fn().mockResolvedValue(true))
     await nextTick()
     expect(first.includeDemo).toBe(true)
     expect(localStorage.getItem('ruihang:workspace-default:include-demo')).toBe('true')
@@ -47,9 +46,9 @@ describe('global data visibility preference', () => {
 
   it('can reset the presentation preference at a workspace/session boundary', async () => {
     const store = useDataVisibilityStore()
-    await store.initialize()
-    await store.authorizeDemo(vi.fn().mockResolvedValue(true))
-    store.commitPreference(true)
+    stageDataVisibilitySwitch(sessionStorage, true)
+    await store.initialize(vi.fn().mockResolvedValue(true))
+    expect(store.includeDemo).toBe(true)
 
     store.reset()
     await nextTick()

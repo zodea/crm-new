@@ -18,7 +18,6 @@ const read = vi.hoisted(() => ({ form: vi.fn(), files: vi.fn(), content: vi.fn()
 vi.mock('~/lib/finance/forms', () => ({ loadFinanceForm: read.form, listFinanceFormAttachments: read.files }))
 vi.mock('~/lib/forms/file-refs', async original => ({ ...await original<object>(), loadFileRefContent: read.content }))
 vi.mock('~/lib/db/connection', () => ({ select: vi.fn(), execute: vi.fn(), withTransaction: vi.fn() }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))
 afterEach(() => {

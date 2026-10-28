@@ -12,7 +12,6 @@
 | [tests/master-data/capabilities.test.ts](../../../tests/master-data/capabilities.test.ts) | 单元／服务／状态 | 班组/工人可承接能力 |
 | [tests/master-data/command-sessions.test.ts](../../../tests/master-data/command-sessions.test.ts) | 单元／服务／状态 | 打开两个主档后，保存前一个只更新自己的记录和版本 |
 | [tests/master-data/forms.test.ts](../../../tests/master-data/forms.test.ts) | 单元／服务／状态 | f1 整页表单领域 action |
-| [tests/master-data/list.test.ts](../../../tests/master-data/list.test.ts) | 单元／服务／状态 | 主数据列表筛选与排序 |
 | [tests/master-data/page.test.ts](../../../tests/master-data/page.test.ts) | 单元／服务／状态 | master data route metadata |
 | [tests/stores/master-data-read.test.ts](../../../tests/stores/master-data-read.test.ts) | 单元／服务／状态 | master data read store |
 
@@ -21,7 +20,6 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/components/MasterDataCapabilityFields.test.ts](../../../tests/components/MasterDataCapabilityFields.test.ts) | 组件（jsdom） | master data capability fields |
-| [tests/components/MasterDataRegistryList.test.ts](../../../tests/components/MasterDataRegistryList.test.ts) | 组件（jsdom） | master data registry list |
 
 ## Playwright E2E
 

@@ -22,14 +22,22 @@ it.each(['2026-13', '2026-00', '2026-8', '2026-08-01', ' '].flatMap(month => [
     await expect(f.service.attendanceMatrix({ origin: 'real' }, { projectId: 'p', month, crewId: null })).rejects.toThrow('范围无效')
     const emptyMonth = await f.service.attendanceMatrix({ origin: 'real' }, { projectId: 'p', month: '', crewId: null })
     await expect(f.service.executeAttendance(f.attendanceCommand(emptyMonth, { workerId: 'w', crewId: 'crew', workDate: '2026-08-01', hours: 8, overtimeHours: 0, workContent: '', note: '' }))).rejects.toThrow('范围无效')
-    await expect(f.service.c1Config({ origin: 'real' }, { projectId: 'p', month: '', crewId: null })).rejects.toThrow()
+    await expect(f.service.c1Config({ origin: 'real' }, { projectId: 'p', month: '', crewId: null })).rejects.toThrow('C1 配置月份无效')
     expect(await f.db.select('SELECT * FROM attendance_records')).toEqual([])
     expect(await f.db.select('SELECT * FROM payroll_command_receipts')).toEqual([])
   }
   finally { await f.close() }
 })
 
-it.each(Array.from([{ workDate: '2026-02-30' }, { hours: -1 }, { hours: Number.NaN }, { hours: Infinity }, { hours: 23, overtimeHours: 2 }, { workerId: 'outside' }, { crewId: 'next-crew' }]).map(input1 => ({ input1 })))('同日重存保持稳定原行与审计；非法日期工时和串项目班组拒绝且库不变：输入案例 %#', async ({ input1: change }) => {
+it.each([
+  { label: '非真实日期', change: { workDate: '2026-02-30' }, reason: '考勤日期、工时或固定范围无效' },
+  { label: '负工时', change: { hours: -1 }, reason: '考勤日期、工时或固定范围无效' },
+  { label: '工时非数', change: { hours: Number.NaN }, reason: '金额须精确到分，工时与费率须为有限数值或明确空值' },
+  { label: '工时无穷大', change: { hours: Infinity }, reason: '金额须精确到分，工时与费率须为有限数值或明确空值' },
+  { label: '工时加加班超过 24 小时', change: { hours: 23, overtimeHours: 2 }, reason: '考勤日期、工时或固定范围无效' },
+  { label: '工人无授权身份', change: { workerId: 'missing-authorized-identity' }, reason: '考勤工人不属于当前项目与班组' },
+  { label: '串用其他班组', change: { crewId: 'next-crew' }, reason: '考勤工人不属于当前项目与班组' },
+])('同日重存保持稳定原行与审计；$label 被拒绝且库不变', async ({ change, reason }) => {
   const f = await createPayrollC1ServiceFixture()
   try {
     const first = await f.attendance({ hours: 7.51, overtimeHours: 0 })
@@ -38,7 +46,7 @@ it.each(Array.from([{ workDate: '2026-02-30' }, { hours: -1 }, { hours: Number.N
     expect((await f.matrix()).records).toHaveLength(1)
     const baseline = await f.db.select('SELECT * FROM attendance_records')
 
-    await expect(f.attendance(change)).rejects.toThrow()
+    await expect(f.attendance(change)).rejects.toThrow(reason)
     expect(await f.db.select('SELECT * FROM attendance_records')).toEqual(baseline)
     expect((await f.db.select('SELECT * FROM operation_logs WHERE table_name=\'attendance_records\''))).toHaveLength(2)
   }
@@ -56,7 +64,7 @@ it('待确认独立签工以及已发软删零成员月份均封锁，A 工资�
     await f.db.execute('INSERT INTO wage_statements(id,project_id,crew_id,leader_worker_id,month,format_family,status,quantity_source) VALUES(?,?,?,?,?,?,?,?)', ['a-only', 'p', 'crew', 'w', '2026-08', 'A', 'draft', 'field'])
     await expect(f.attendance()).resolves.toMatchObject({ outcome: 'saved' })
     await f.db.execute('INSERT INTO wage_statements(id,project_id,crew_id,leader_worker_id,month,format_family,status,deleted_at,snapshot_json,quantity_source) VALUES(?,?,?,?,?,?,?,?,?,?)', ['old-c2', 'p', 'crew', 'member', '2026-08', 'C2', 'released', '2026-08-10', JSON.stringify({ month: '2026-08', members: [{ workerId: 'zero' }], allocations: [{ workerId: 'zero', amount: 0 }] }), 'field'])
-    await expect(f.attendance({ workerId: 'zero' })).rejects.toThrow()
+    await expect(f.attendance({ workerId: 'zero' })).rejects.toThrow('该人员当月已有签工链或已发工资，考勤不可再改')
     expect((await f.matrix()).locks).toContainEqual(expect.objectContaining({ workerId: 'zero', statementId: 'old-c2', kind: 'released-month' }))
   }
   finally { await f.close() }

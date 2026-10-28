@@ -1,17 +1,19 @@
 import type { SQLInputValue } from 'node:sqlite'
 import type { BusinessSession } from '../../server/utils/business-session'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { decodeConstructionContractDraft } from '~/lib/construction-contract/command-validation'
 import { adoptConstructionManagementFee, decodeConstructionManagementFee, emptyConstructionManagementFee } from '~/lib/construction-contract/management-fee'
 import { ensureConstructionManagementFeeSchema, persistNativeConstructionManagementFee, readNativeConstructionManagementFee } from '~/lib/construction-contract/management-fee-storage'
 import { migrations, runMigrations } from '~/lib/db/migrations'
 import { decodeMaterialContractDraft } from '~/lib/material-contract/command-validation'
-import { readNativeProjectConstructionManagementFees } from '~/lib/project/native-construction-management-fee'
 import { createConstructionContractCommandTestInstance } from '../../server/utils/construction-contract-command-test-instance'
 import { createMemoryDb } from '../helpers/memory-db'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 const at = '2026-10-05T08:00:00.000Z'
 const evidence = (version: string) => ({ version, adoptedAt: at, contractVersion: version, actorId: 'actor', commandId: `cmd-${version}` })
@@ -95,8 +97,6 @@ describe('总合同管理费配置与真实成本独立', () => {
       await expect(db.execute('UPDATE construction_management_fee_history SET amount=123 WHERE version=?', ['1'])).rejects.toThrow('不能修改')
       await expect(db.execute('DELETE FROM construction_management_fee_history WHERE version=?', ['1'])).rejects.toThrow('不能删除')
       await expect(persistNativeConstructionManagementFee(db, 'old', { ...restored, history: restored.history.map(row => row.version === '2' ? { ...row, amount: 123 } : row) })).rejects.toThrow('采用证据不一致')
-      const project = await readNativeProjectConstructionManagementFees(db, 'p', at)
-      expect(project.contracts.map(row => [row.id, row.configuration.amount])).toEqual([['old', 0]])
       expect(await db.select('SELECT amount FROM contracts WHERE id=?', ['old'])).toEqual([{ amount: 0 }])
       expect(await db.select('SELECT * FROM file_refs')).toEqual(originals)
       expect(await db.select('SELECT content FROM file_payloads')).toEqual([{ content: 'YQ==' }])
@@ -105,7 +105,7 @@ describe('总合同管理费配置与真实成本独立', () => {
   })
 
   it('磁盘升级完成而版本记账前冷断，重开57幂等补账，原配置/真实零/原件均可核验', async () => {
-    const base = resolve('.tmp/a03-management-fee-tests')
+    const base = testTempRoot('a03-management-fee-tests')
     await mkdir(base, { recursive: true })
     const directory = await mkdtemp(join(base, 'cold-native-'))
     const path = join(directory, 'synthetic.sqlite')

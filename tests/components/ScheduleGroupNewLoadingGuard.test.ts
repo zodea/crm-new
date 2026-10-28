@@ -344,16 +344,16 @@ describe('新建排程范围加载保护', () => {
     })
 
     expect((await screen.findByRole('alert')).textContent).toContain('process library offline')
-    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)[draftIdentity]).toEqual(draft)
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull()
 
     await fireEvent.click(screen.getByRole('button', { name: '重新加载' }))
 
     await waitFor(() => {
       expect((screen.getByLabelText('分组名称') as HTMLInputElement).value).toBe('区域返回草稿')
     })
-    await waitFor(() => expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)[draftIdentity]).toBeUndefined())
-    expect(warning).toHaveBeenCalledWith(
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull()
+    await waitFor(() => expect(warning).toHaveBeenCalledWith(
       expect.stringContaining('已从排程范围移除 1 栋失效楼栋'),
-    )
+    ))
   })
 })

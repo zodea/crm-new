@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { FinanceDeclaredMissingOriginal, FinanceMigrationMapping, FinanceMigrationOriginal, FinanceMigrationPreview, FinanceMigrationResult, FinanceMigrationSourceProof, FinanceMigrationState } from '~/lib/finance/migration-contract'
 import type { CommandRecoveryDescriptor } from '~/lib/forms/command-recovery'
-import { isTauri } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { financeProblemFromUnknown } from '~/lib/finance/central-contract'
@@ -9,12 +8,11 @@ import { createFinanceMigrationRepository } from '~/lib/finance/migration-reposi
 import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 
-const native = isTauri()
 const repository = createFinanceMigrationRepository((url, options) => {
   const body = options?.body
   if (body !== undefined && (body === null || typeof body !== 'object' || Array.isArray(body)))
     throw new Error('财务迁入提交格式无效。')
-  return $fetch<unknown>(url, { ...options, body, retry: 0 })
+  return $fetch<unknown, string>(url, { ...options, body, retry: 0 })
 })
 const recovery = createCommandRecoveryStorage(() => sessionStorage)
 const state = shallowRef<FinanceMigrationState | null>(null)
@@ -33,7 +31,6 @@ const missingSelected = ref<Record<string, boolean>>({})
 const missingReasons = ref<Record<string, string>>({})
 const busy = ref(false)
 const error = ref('')
-const exported = ref('')
 let generation = 0
 let active = true
 bindReadAuthority((problem) => {
@@ -84,8 +81,6 @@ async function run(work: () => Promise<void>) {
   }
 }
 async function load(token = generation) {
-  if (native)
-    return
   let fresh: FinanceMigrationState
   try {
     fresh = await repository.state()
@@ -253,14 +248,6 @@ async function recover() {
     error.value = '原迁入已核对为未采用并封存。原输入保留，重新核验后才能生成新提交。'
   }
 }
-async function exportSnapshot() {
-  const token = generation
-  const { createNativeMigrationSnapshot } = await import('~/lib/db/native-snapshot')
-  const snapshot = await createNativeMigrationSnapshot()
-  current(token)
-  if (snapshot)
-    exported.value = `${snapshot.path} · SHA-256 ${snapshot.sha256} · 版本 ${snapshot.schemaVersion}`
-}
 onMounted(() => void run(load))
 onUnmounted(() => {
   active = false
@@ -276,18 +263,8 @@ onUnmounted(() => {
     <p class="mt-2 text-12px leading-5 text-ink-soft">
       保留原费用、往来、票款分摊、冻结记录、原件和旧审计。请保留桌面原库与一致快照，先核对当前真实资料再采用。
     </p>
-    <div v-if="native" class="grid min-w-0 gap-3">
-      <KitButton :disabled="busy" @click="run(exportSnapshot)">
-        导出当前数据库一致快照
-      </KitButton>
-      <p v-if="exported" class="m-0 break-all text-12px">
-        {{ exported }}
-      </p>
-      <p class="m-0 text-12px text-ink-soft">
-        导出后在已认证的中央工作区选择该 SQLite 文件。桌面身份不会自动变为中央权限。
-      </p>
-    </div>
-    <div v-else class="grid min-w-0 gap-3">
+
+    <div class="grid min-w-0 gap-3">
       <p v-if="state" class="m-0 break-all text-12px">
         当前工作区 {{ state.workspaceId }} · 操作者 {{ state.actorId }} · 财务来源 {{ state.sourceVersion }}
       </p>

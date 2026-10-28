@@ -5,7 +5,7 @@ import {
   migrations,
   runMigrations,
 } from '~/lib/db/migrations'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 const F4_MIGRATION_VERSION = 23
 
@@ -48,8 +48,7 @@ async function seedReferences(db: MigrationDb) {
 
 describe('v23 F4 物资表单与库存事实迁移', () => {
   it('冷启动建立物资头表、子表、真实外键和索引', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     expect(LATEST_VERSION).toBeGreaterThanOrEqual(F4_MIGRATION_VERSION)
     const tables = await listTables(db)
@@ -169,8 +168,7 @@ describe('v23 F4 物资表单与库存事实迁移', () => {
   })
 
   it('数据库拒绝负计划量、非正到货行和负盘点数量', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await seedReferences(db)
 
     await expect(db.execute(`

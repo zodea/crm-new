@@ -1,7 +1,7 @@
 import type { MigrationDb } from '~/lib/db/migrations'
 import { describe, expect, it } from 'vitest'
 import { LATEST_VERSION, migrations, runMigrations } from '~/lib/db/migrations'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 const BOQ_MIGRATION_VERSION = 15
 
@@ -175,8 +175,7 @@ async function insertAncestors(db: MigrationDb) {
 
 describe('v15 BOQ 清单、变更与月度报量数据底座', () => {
   it('冷启动建立六张领域表、跨域引用列和查询索引', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     expect(await listTables(db)).toEqual(expect.arrayContaining([...BOQ_TABLES]))
     for (const table of BOQ_TABLES) {
@@ -198,8 +197,7 @@ describe('v15 BOQ 清单、变更与月度报量数据底座', () => {
   })
 
   it('boq 使用 contracts 施工合同作为 canonical ID，并以 boq_line_id 接入工程量与排程', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     const expectedForeignKeys: Record<string, ForeignKeyDescription[]> = {
       boq_files: [
@@ -253,8 +251,7 @@ describe('v15 BOQ 清单、变更与月度报量数据底座', () => {
   })
 
   it('状态、行类型、唯一单据和自动台账来源约束拒绝重复或非法数据', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await insertAncestors(db)
 
     await expect(db.execute(`INSERT INTO boq_files

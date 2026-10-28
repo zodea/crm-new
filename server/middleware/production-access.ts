@@ -1,14 +1,23 @@
 import { createError, defineEventHandler, getQuery, setResponseHeader } from 'h3'
 import { assertProductionRequest, requireProductionBusinessSession } from '../utils/production-auth'
+import { isProductionAuxiliaryContractRoute } from '../utils/production-auxiliary-contract-schema'
+import { isProductionBoqRoute } from '../utils/production-boq-access'
 import { getProductionRuntimeConfig } from '../utils/production-config'
+import { isProductionConstructionContractRoute } from '../utils/production-construction-contract-access'
+import { isProductionConstructionScopeRoute } from '../utils/production-construction-scope-access'
 import { isProductionCrewWorkerRoute } from '../utils/production-crew-worker-access'
 import { isProductionFinanceRoute } from '../utils/production-finance-access'
 import { isProductionMaterialContractRoute } from '../utils/production-material-contract-access'
 import { isProductionMaterialQuotationRoute } from '../utils/production-material-quotation-access'
 import { isProductionOtherSettlementRoute } from '../utils/production-other-settlement-access'
+import { isProductionPayrollRoute } from '../utils/production-payroll-access'
 import { isProductionProcessLibraryRequest } from '../utils/production-process-library-access'
 import { isProductionProjectRoute } from '../utils/production-project-access'
+import { isProductionQuantityRoute } from '../utils/production-quantity-access'
+import { isProductionSubcontractContractRoute } from '../utils/production-subcontract-contract-access'
 import { isProductionSupplierRoute } from '../utils/production-supplier-access'
+import { isProductionTargetCostRoute } from '../utils/production-target-cost-access'
+import { isProductionWbsRoute } from '../utils/production-wbs-access'
 
 const id = String.raw`[A-Za-z0-9][\w-]{2,79}`
 const readyReads = new RegExp(`^/api/read/(?:business-session|customers|customers-deleted|customer-commands/${id}|customers/${id}(?:/(?:form|lifecycle|audit|files/${id}))?)$`)
@@ -36,6 +45,15 @@ export default defineEventHandler((event) => {
     || isProductionFinanceRoute(event.method, path)
     || isProductionCrewWorkerRoute(event.method, path)
     || isProductionOtherSettlementRoute(event.method, path)
+    || isProductionTargetCostRoute(event.method, path)
+    || isProductionPayrollRoute(event.method, path)
+    || isProductionQuantityRoute(event.method, path)
+    || isProductionWbsRoute(path, event.method)
+    || isProductionConstructionContractRoute(path, event.method)
+    || isProductionSubcontractContractRoute(path, event.method)
+    || isProductionAuxiliaryContractRoute(path, event.method)
+    || isProductionBoqRoute(event.method, path)
+    || isProductionConstructionScopeRoute(event.method, path)
     || isProductionProcessLibraryRequest(event.method, path)
     || (event.method === 'POST' && (['/api/commands/customers', '/api/commands/customer-resolve', '/api/commands/production-backups', '/api/commands/notifications'].includes(path) || (readyWrites.test(path) && path.endsWith('/lifecycle'))))
     || (event.method === 'PUT' && readyWrites.test(path) && !path.endsWith('/lifecycle'))

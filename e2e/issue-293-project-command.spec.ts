@@ -1,7 +1,6 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 function testSession(testInfo: TestInfo) {
   return Buffer.from(testInfo.testId, 'utf8').toString('base64url')
@@ -183,13 +182,4 @@ test.describe('Issue #293：项目中央命令与本地草稿', () => {
     await expect(page.getByRole('status')).toContainText('已恢复上次仅保留在本地的草稿')
     await expect(page.getByLabel('项目名称 *')).toHaveValue('断网本地项目')
   })
-
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 项目整页表单不产生页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/project/form')
-      await expect(page.getByRole('heading', { name: '新建 · 项目' })).toBeVisible()
-      await expectNoPageOverflow(page, `#293 项目命令表单 @ ${width}px`)
-    })
-  }
 })

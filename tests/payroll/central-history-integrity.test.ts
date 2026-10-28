@@ -1,13 +1,11 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { readPayrollStatement } from '~/lib/payroll/central-read'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await db.execute('INSERT INTO projects(id,name) VALUES (\'p\',\'现在的工程名称\')')
   await db.execute('INSERT INTO workers(id,name) VALUES (\'leader\',\'现在的负责人姓名\'),(\'zero\',\'现在的零成员姓名\')')
 })

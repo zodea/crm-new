@@ -44,7 +44,6 @@ export const usePayrollC2Store = defineStore('payroll-c2-central', () => {
     })
   }
   return {
-    c2Saving: pending.saving,
     loadC2Form: (q: PayrollQuery, input: PayrollC2FormInput) => input.draft === undefined ? pending.read(() => repository().c2Form(q, input)) : repository().c2Form(q, input),
     loadC2Config: (q: PayrollQuery, scope: PayrollC2ConfigScope) => pending.read(() => repository().c2Config(q, scope)),
     loadC2Output: (q: PayrollQuery, id: string) => pending.read(() => repository().c2Output(q, id)),

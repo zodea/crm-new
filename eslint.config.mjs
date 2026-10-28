@@ -16,8 +16,6 @@ export default withNuxt(
       'DC重构设计源码/**',
       '设计系统配色更新/**',
       '参考文件数据/**',
-      'src-tauri/gen/**',
-      'src-tauri/target/**',
     ],
   }),
 )

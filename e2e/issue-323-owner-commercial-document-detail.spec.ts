@@ -132,22 +132,21 @@ test.describe('Issue #323：甲方变洽签与月度报量专属中央详情', (
     await expect(page.getByText('单据来源或类型不匹配')).toBeVisible()
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 专属详情无页面级横滚，量价表独立滚动`, async ({ page }) => {
+  test('专属详情在各宽度无页面级横滚，量价表在窄屏独立滚动', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/owner/report/report-real-323?origin=real')
+    await expect(page.getByTestId('owner-commercial-document-detail')).toBeVisible({ timeout: 20_000 })
+    const scroll = page.getByTestId('owner-document-lines-scroll')
+    await expect.poll(() => scroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+    await expect(scroll).toHaveAttribute('role', 'region')
+    await expect(scroll).toHaveAttribute('aria-label', '报量与审定明细，可横向滚动查看完整列')
+    await scroll.focus()
+    await expect(scroll).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/owner/report/report-real-323?origin=real')
-      await expect(page.getByTestId('owner-commercial-document-detail')).toBeVisible({ timeout: 20_000 })
       await expectNoPageOverflow(page, `#323 甲方月度报量详情 @ ${width}px`)
-      if (width === 390) {
-        const scroll = page.getByTestId('owner-document-lines-scroll')
-        await expect.poll(() => scroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
-        await expect(scroll).toHaveAttribute('role', 'region')
-        await expect(scroll).toHaveAttribute('aria-label', '报量与审定明细，可横向滚动查看完整列')
-        await scroll.focus()
-        await expect(scroll).toBeFocused()
-        await page.keyboard.press('ArrowRight')
-        await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
-      }
-    })
-  }
+    }
+  })
 })

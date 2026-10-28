@@ -1,4 +1,5 @@
 import type { TransactionDb } from '../db/coordinator'
+import { quantityProblem } from './central-contract'
 
 export const QUANTITY_HOLLOW_SCHEMA_VERSION = 1 as const
 /** 五表及原 JSON 的唯一运输白名单；不改写原文以适配迁入身份。 */
@@ -13,7 +14,6 @@ export type QuantityHollowTable = keyof typeof QUANTITY_HOLLOW_COLUMNS
 export type QuantityHollowRow = Record<string, string | number | null>
 export type QuantityHollowTables = Record<QuantityHollowTable, QuantityHollowRow[]>
 export const QUANTITY_HOLLOW_TABLES = Object.keys(QUANTITY_HOLLOW_COLUMNS) as QuantityHollowTable[]
-export const QUANTITY_HOLLOW_PRIMARY_KEYS = Object.fromEntries(QUANTITY_HOLLOW_TABLES.map(table => [table, 'id'])) as Record<QuantityHollowTable, 'id'>
 
 /** 首次原责任采集的固定字段；不保存工资或联系方式。 */
 export const QUANTITY_HOLLOW_RESPONSIBILITY_COLUMNS = {
@@ -35,6 +35,13 @@ export type QuantityHollowResponsibilityTable = keyof typeof QUANTITY_HOLLOW_RES
 export type QuantityHollowResponsibilityRows = Record<QuantityHollowResponsibilityTable, QuantityHollowRow[]>
 
 export async function initializeQuantityHollowSchema(db: TransactionDb): Promise<void> {
+  if ((await db.select('SELECT name FROM sqlite_schema WHERE type=\'table\' AND name=\'production_metadata\'')).length) {
+    const participants = await db.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'quantity\'')
+    const names = new Set((await db.select<{ name: string }>('SELECT name FROM sqlite_schema WHERE type=\'table\'')).map(row => row.name))
+    if (participants.length !== 1 || participants[0]?.schema_version !== QUANTITY_HOLLOW_SCHEMA_VERSION || QUANTITY_HOLLOW_TABLES.some(table => !names.has(table)))
+      throw quantityProblem('unavailable', '正式空鼓参与者未完成升级或实表缺失；停止读取，不在读取时补建。')
+    return
+  }
   const receipt = 'REFERENCES quantity_hollow_command_receipts(id) DEFERRABLE INITIALLY DEFERRED'
   const kinds = '\'create-hollow-inspection\',\'revise-hollow-inspection\',\'rectify-hollow-inspection\''
   await db.execute(`CREATE TABLE IF NOT EXISTS quantity_hollow_records (

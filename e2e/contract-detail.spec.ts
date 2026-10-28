@@ -25,19 +25,21 @@ test.describe('合同专属详情的演示只读与响应式验收', () => {
   })
 
   for (const contract of demoContracts) {
-    for (const width of RESPONSIVE_WIDTHS) {
-      test(`${width}px ${contract.domain} 展示合同金额、状态和只读来源`, async ({ page }) => {
+    test(`${contract.domain} 展示合同金额、状态和只读来源，各宽度不溢出`, async ({ page }) => {
+      await page.goto(`/contract/${contract.id}?origin=demo&contractKind=${contract.domain}`)
+      const heading = page.getByRole('heading', { name: contract.name, exact: true })
+      await expect(heading).toBeVisible()
+      await expect(page.getByText(contract.no, { exact: true }).first()).toBeVisible()
+      await expect(page.locator('[data-ui="status-tag"]').filter({ hasText: contract.status }).first()).toBeVisible()
+      await expect(page.getByText(contract.amount, { exact: true }).first()).toBeVisible()
+      await expect(page.getByText('演示只读', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '编辑合同', exact: true })).toHaveCount(0)
+      for (const width of RESPONSIVE_WIDTHS) {
         await page.setViewportSize({ width, height: 900 })
-        await page.goto(`/contract/${contract.id}?origin=demo&contractKind=${contract.domain}`)
-        await expect(page.getByRole('heading', { name: contract.name, exact: true })).toBeVisible()
-        await expect(page.getByText(contract.no, { exact: true }).first()).toBeVisible()
-        await expect(page.locator('[data-ui="status-tag"]').filter({ hasText: contract.status }).first()).toBeVisible()
-        await expect(page.getByText(contract.amount, { exact: true }).first()).toBeVisible()
-        await expect(page.getByText('演示只读', { exact: true })).toBeVisible()
-        await expect(page.getByRole('button', { name: '编辑合同', exact: true })).toHaveCount(0)
+        await expect(heading).toBeVisible()
         await expectNoPageOverflow(page, `${contract.domain} 合同详情 @ ${width}px`)
-      })
-    }
+      }
+    })
 
     test(`窄窗 ${contract.domain} 专有页签支持键盘切换、刷新恢复和局部横滚`, async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 })

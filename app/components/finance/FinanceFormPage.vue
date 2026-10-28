@@ -13,11 +13,13 @@ import type {
   FormFooterAction,
 } from '~/lib/master-data/page'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
+import ConstructionScopeSelector from '~/components/contract/ConstructionScopeSelector.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
+import { decodeConstructionMainSelection } from '~/lib/construction-scope/contract'
 import { verifyFinanceAttachments } from '~/lib/finance/attachment-proof'
 import { expenseContractKindsForPaymentType } from '~/lib/finance/domain'
 import { financeDraftMoney, financeInputTextNumber } from '~/lib/finance/input-number'
-import { captureFinanceInput } from '~/lib/finance/input-snapshot'
+import { applyFinanceLineIdentities, captureFinanceInput, captureFinanceLineIdentities } from '~/lib/finance/input-snapshot'
 import {
   F3_FORM_META,
   f3FormDefaults,
@@ -48,7 +50,6 @@ const {
   pendingAttachments,
   pendingRemoveIds,
   pendingRestoreIds,
-  desktopAttachmentPicker,
   dirty: attachmentDirty,
   reset: resetAttachments,
   capture: captureAttachments,
@@ -57,7 +58,6 @@ const {
   readingFiles,
   changes: attachmentChanges,
   handleFiles,
-  pickNativeFiles,
   toggleExisting: toggleExistingAttachment,
   removePending,
   patchPending,
@@ -87,17 +87,18 @@ let active = true
 let mounted = false
 let viewScope = ''
 const savedReadPending = shallowRef<{
-  result: Pick<F3SaveResult, 'id' | 'attachmentIds'>
+  result: Pick<F3SaveResult, 'id' | 'attachmentIds' | 'expenseLineIdentities'>
   kind: F3FormKind
   scope: string
   draft: FinancePageDraft
   files: ReturnType<typeof captureAttachments>
+  lineIdentities?: symbol[]
 } | null>(null)
 const readbackError = shallowRef('')
 const recovering = shallowRef(false)
 const writeInFlight = shallowRef(false)
 const centralSession = shallowRef<FinanceFormSession | null>(null)
-const submittedInput = shallowRef<{ draft: FinancePageDraft, files: ReturnType<typeof captureAttachments> } | null>(null)
+const submittedInput = shallowRef<{ draft: FinancePageDraft, files: ReturnType<typeof captureAttachments>, lineIdentities?: symbol[] } | null>(null)
 const sourceError = shallowRef('')
 const emptyVerificationInput = () => ({ actualDueAmount: '', cumulativePayableAmount: '', basis: '', fileIds: [] as string[] })
 const verificationInput = ref<PaymentVerificationInput>(emptyVerificationInput())
@@ -130,6 +131,7 @@ function editableSnapshot(value: FinancePageDraft) {
 }
 function readVerificationFacts(record: FinanceFormRecordMap[F3FormKind]) {
   return {
+    ...('status' in record ? { status: record.status } : {}),
     ...('paymentVerification' in record ? { paymentVerification: record.paymentVerification } : {}),
     ...('clearanceVerification' in record ? { clearanceVerification: record.clearanceVerification } : {}),
   }
@@ -175,6 +177,18 @@ function fetchIncomeContracts(keyword: string) {
     keyword,
     props.kind,
   )
+}
+async function fetchConstructionMains(keyword: string) {
+  const generation = viewGeneration
+  const scope = viewScope
+  const options = await financeStore.searchConstructionMains(keyword)
+  if (!isCurrent(generation, scope) || sourceError.value)
+    throw new Error('工程读取期间当前单据或读取来源已变化，请保留输入并重新核对。')
+  return options.map((option) => {
+    if (!('constructionMain' in option))
+      throw new Error('工程选项缺少真实施工主合同依据，请重新读取。')
+    return { ...option, constructionMain: decodeConstructionMainSelection(option.constructionMain) }
+  })
 }
 
 function fetchExpenseContracts(keyword: string) {
@@ -363,10 +377,15 @@ async function settleSavedRead(pending: NonNullable<typeof savedReadPending.valu
     return false
   const changed = editableSnapshot(draft.value) !== editableSnapshot(pending.draft)
   acknowledgeAttachments(files, pending.files, pending.result.attachmentIds)
-  if (!changed)
+  if (!changed) {
     draft.value = { ...f3FormDefaults(pending.kind), ...record } as FinancePageDraft
-  else
-    draft.value = { ...draft.value, id: pending.result.id, ...readVerificationFacts(record) }
+  }
+  else {
+    const lines = pending.kind === 'reimbursement' && pending.lineIdentities && pending.result.expenseLineIdentities
+      ? applyFinanceLineIdentities(draft.value.lines ?? [], pending.lineIdentities, pending.result.expenseLineIdentities, 'lines' in record ? record.lines ?? [] : [])
+      : draft.value.lines
+    draft.value = { ...draft.value, id: pending.result.id, ...(lines ? { lines } : {}), ...readVerificationFacts(record) }
+  }
   savedSnapshot.value = JSON.stringify({ ...f3FormDefaults(pending.kind), ...record })
   savedReadPending.value = null
   readbackError.value = ''
@@ -401,7 +420,10 @@ async function recoverOriginalCommand() {
           resetAttachments(resolved.form.attachments)
       }
       else {
-        draft.value = { ...draft.value, id: resolved.result.id, ...readVerificationFacts(resolved.form.draft) }
+        const lines = props.kind === 'reimbursement' && sent?.lineIdentities && 'expenseLineIdentities' in resolved.result && Array.isArray(resolved.result.expenseLineIdentities)
+          ? applyFinanceLineIdentities(draft.value.lines ?? [], sent.lineIdentities, resolved.result.expenseLineIdentities, 'lines' in resolved.form.draft ? resolved.form.draft.lines ?? [] : [])
+          : draft.value.lines
+        draft.value = { ...draft.value, id: resolved.result.id, ...(lines ? { lines } : {}), ...readVerificationFacts(resolved.form.draft) }
       }
       savedSnapshot.value = JSON.stringify({ ...f3FormDefaults(props.kind), ...resolved.form.draft })
       paymentTypeSelected.value = true
@@ -556,7 +578,8 @@ async function persist(action: F3SaveAction, footerAction?: FormFooterAction, ve
   if (clearanceVerificationEdit)
     submittedClearance.value = JSON.stringify(clearanceInput.value)
   const sentFiles = captureAttachments()
-  submittedInput.value = { draft: sentDraft, files: sentFiles }
+  const lineIdentities = kind === 'reimbursement' ? captureFinanceLineIdentities(draft.value.lines ?? []) : undefined
+  submittedInput.value = { draft: sentDraft, files: sentFiles, lineIdentities }
   writeInFlight.value = true
   try {
     const result = await financeStore.saveForm(
@@ -568,7 +591,7 @@ async function persist(action: F3SaveAction, footerAction?: FormFooterAction, ve
     )
     if (scope !== viewScope)
       return
-    const pending = { result, kind, scope, draft: sentDraft, files: sentFiles }
+    const pending = { result, kind, scope, draft: sentDraft, files: sentFiles, lineIdentities }
     savedReadPending.value = pending
     if (!isCurrent(generation, scope))
       return
@@ -957,6 +980,7 @@ onMounted(() => {
           :draft="draft"
           :field-errors="fieldErrors"
           :fetch-projects="fetchProjects"
+          :fetch-construction-mains="kind === 'reimbursement' ? fetchConstructionMains : undefined"
           :fetch-customers="fetchCustomers"
           :fetch-suppliers="fetchSuppliers"
           :fetch-workers="fetchWorkers"
@@ -969,6 +993,14 @@ onMounted(() => {
           @patch="patchDraft"
           @clear-error="clearFieldError"
         />
+
+        <section v-if="kind === 'reimbursement' && draft.id && centralSession?.context?.capabilities.includes('construction-scope:read')" class="panel min-w-0 space-y-3 p-4" aria-label="原费用施工归属">
+          <SectionHeader title="原费用施工归属" subtitle="新建费用与工程归属一起保存，每条只对应一份施工主合同；历史补充或后来改关联使用此处独立原编号，共用费用先拆原明细。" />
+          <ConstructionScopeSelector v-for="line in (draft.lines ?? []).filter(row => row.id && !row.originalExpenseLineId)" :key="line.id" :source="{ domain: 'original-expense', id: line.id! }" :disabled-reason="ordinaryDirty || sourceError || loading || writeInFlight || savedReadPending || centralPending || recovering ? '先保存并可靠读取原费用，保留当前输入与原提交编号。' : undefined" />
+          <p v-if="!(draft.lines ?? []).some(row => row.id && !row.originalExpenseLineId)" class="text-sm text-ink-soft">
+            保存真实原费用明细后核对施工归属；清偿行沿原费用引用，不另建一笔费用。
+          </p>
+        </section>
 
         <FinancePaymentVerificationSection
           v-if="kind === 'payment_application' && draft.paymentVerification?.required"
@@ -995,12 +1027,10 @@ onMounted(() => {
           :pending-attachments="pendingAttachments"
           :pending-remove-ids="pendingRemoveIds"
           :pending-restore-ids="pendingRestoreIds"
-          :desktop-picker="desktopAttachmentPicker"
           can-download
           picker-description="读取真实文件正文，与本次资料一起保存；旧元数据不补造原件"
           :title="kind === 'payment_record' ? '付款回单与备注' : '附件与备注'"
           :note="draft.note ?? ''"
-          @pick-native="pickNativeFiles"
           @files="handleFiles"
           @toggle-existing="toggleAttachment"
           @remove-pending="removePending"

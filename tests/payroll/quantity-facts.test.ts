@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest'
 import { loadPayrollAQuantityFacts } from '../../server/utils/payroll-quantity-facts'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 
 it('完成保留旧个人scope、8/null/0及原责任，缺量只影响原主体不跟随当前转组', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     const result = await loadPayrollAQuantityFacts(db, { projectId: 'pa-project', month: '2026-08' })
@@ -25,7 +25,7 @@ it('完成保留旧个人scope、8/null/0及原责任，缺量只影响原主体
 })
 
 it('缺失scope和责任按可证明原审计限定主体，不扩成整户也不转给当前责任', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     const [scope] = await db.select('SELECT * FROM unit_assignment_scopes WHERE id=\'pa-scope-eight\'')
@@ -48,7 +48,7 @@ it('缺失scope和责任按可证明原审计限定主体，不扩成整户也�
 })
 
 it('完成月份按原有效日期累计，错误日期不进入工资来源', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     expect((await loadPayrollAQuantityFacts(db, { projectId: 'pa-project', month: '2026-07' })).rows).toEqual([])
@@ -62,7 +62,7 @@ it('完成月份按原有效日期累计，错误日期不进入工资来源', a
 })
 
 it('内容指纹发现同总量同时间的换量，重建完成ID不重建已付责任身份', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     const read = () => loadPayrollAQuantityFacts(db, { projectId: 'pa-project', month: '2026-08' })

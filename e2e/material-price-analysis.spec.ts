@@ -71,20 +71,21 @@ test.describe('材料单价分析中央归档价格事实', () => {
       await expect(contracts.getByText(fixture.projectName, { exact: true })).toBeVisible()
       await expect(contracts.getByRole('link', { name: fixture.contractName, exact: true })).toHaveAttribute('href', `/contract/${fixture.contractId}?contractKind=material&origin=real`)
     })
-    for (const width of VIEWPORTS) {
-      test(`${input.query} ${width}px 搜索、趋势、合作合同与自身滚动边界`, async ({ page }) => {
+    test(`${input.query} 各宽度趋势与合作合同可达，且只在自身区域滚动`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      const fixture = await openPriceAnalysisWithFacts(page, input)
+      const visual = input.nextSupplier ? page.getByRole('list', { name: '厂家最新价' }) : page.getByRole('img', { name: input.chart, exact: true })
+      for (const width of VIEWPORTS) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
-        const fixture = await openPriceAnalysisWithFacts(page, input)
-        const visual = input.nextSupplier ? page.getByRole('list', { name: '厂家最新价' }) : page.getByRole('img', { name: input.chart, exact: true })
         await visual.scrollIntoViewIfNeeded()
         await expectInViewport(visual, `${width}px ${input.query}价格事实`)
         await expectNoPageOverflow(page, `${width}px 材料单价分析`)
         if (!input.nextSupplier && width <= 1024)
           await expectLocalHorizontalScroll(page.getByTestId('material-price-trend-scroll'), `${width}px ${input.query}趋势图`)
-        const contracts = page.getByRole('region', { name: '相关厂家合作合同' })
-        await contracts.scrollIntoViewIfNeeded()
-        await expect(contracts.getByRole('link', { name: fixture.contractName, exact: true })).toBeVisible()
-      })
-    }
+      }
+      const contracts = page.getByRole('region', { name: '相关厂家合作合同' })
+      await contracts.scrollIntoViewIfNeeded()
+      await expect(contracts.getByRole('link', { name: fixture.contractName, exact: true })).toBeVisible()
+    })
   }
 })

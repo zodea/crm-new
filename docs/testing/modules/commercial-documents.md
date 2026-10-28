@@ -49,7 +49,6 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-179-acceptance-lifecycle.spec.ts](../../../e2e/issue-179-acceptance-lifecycle.spec.ts) | Playwright E2E | 验收保修页签接入真实生命周期并移除占位卡 |
 | [e2e/issue-283-owner-document-readonly-details.spec.ts](../../../e2e/issue-283-owner-document-readonly-details.spec.ts) | Playwright E2E | Issue #283：甲方六类单据专属只读详情与双视图 |
 | [e2e/issue-323-owner-commercial-document-detail.spec.ts](../../../e2e/issue-323-owner-commercial-document-detail.spec.ts) | Playwright E2E | Issue #323：甲方变洽签与月度报量专属中央详情 |
 | [e2e/issue-324-acceptance-warranty-canonical.spec.ts](../../../e2e/issue-324-acceptance-warranty-canonical.spec.ts) | Playwright E2E | Issue #324：验收—保修 canonical 双视图 |

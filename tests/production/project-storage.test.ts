@@ -1,17 +1,19 @@
 import type { ProjectCommandRequestDTO } from '../../app/lib/project/command-contract'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const base = resolve('.codex-tmp/issue-452-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-452-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/project-`)
   const options = { directory, workspaceId: 'project-workspace', ownerId: 'project-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['project:list:read', 'project:write', 'customer:list:read', 'customer:write'] }
   const session = () => structuredClone(actor)
   const customer = await createProductionCustomerService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'customer:write', commandId: 'customer-create', baseVersion: null, action: 'save', draft: { name: '正式客户', contact: '负责人' }, attachments: {} }, session)
@@ -55,6 +57,22 @@ it('项目与原件同库冷回读，客户改名沿原 ID、未知指标不归�
     await f.service.executeLifecycle({ ...lifecycle, commandId: 'project-restore', action: 'restore', baseVersion: '2' }, f.session)
     expect((await f.service.file(saved.id, saved.attachmentIds[0]!, f.session)).sha256).toBe(original.sha256)
     expect((await f.service.audit(saved.id, f.session)).map(row => row.action)).toEqual(['create', 'delete', 'restore'])
+  }
+  finally { await f.storage.close() }
+})
+
+it('客户被有效项目引用时拒绝删除并列出影响范围，项目删除后才可删除客户', async () => {
+  const f = await fixture()
+  try {
+    const customers = createProductionCustomerService(f.storage)
+    const saved = await f.service.execute(f.command, f.session)
+    const customerDelete = { id: f.customer.id, workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'customer:write' as const, commandId: 'customer-delete-blocked', baseVersion: f.customer.version, action: 'delete' as const }
+    await expect(customers.executeLifecycle(customerDelete, f.session)).rejects.toMatchObject({ problem: { code: 'conflict', message: '客户仍被项目 1 个引用，不能删除；请先处理这些记录。' } })
+    expect(await customers.deleted(f.session)).toEqual([])
+
+    await f.service.executeLifecycle({ id: saved.id, workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'project:write', commandId: 'project-delete', baseVersion: saved.version, action: 'delete' }, f.session)
+    const deleted = await customers.executeLifecycle({ ...customerDelete, commandId: 'customer-delete' }, f.session)
+    expect(deleted.version).toBe(String(Number(f.customer.version) + 1))
   }
   finally { await f.storage.close() }
 })

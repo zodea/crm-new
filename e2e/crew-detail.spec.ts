@@ -21,29 +21,31 @@ test.describe('Issue #194：班组详情', () => {
     const response = await page.request.post('/api/testing/crew-workers/reset', { headers: { 'x-ruihang-test-reset': '1' }, data: { scenario: 'ready' } })
     expect(response.ok(), await response.text()).toBe(true)
   })
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 展示演示班组、责任范围和项目关联，页面不横向溢出`, async ({ page }) => {
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
-      await page.goto('/base/crew/crew_demo_001?origin=demo')
+  test('展示演示班组、责任范围和项目关联，各宽度页面不横向溢出', async ({ page }) => {
+    await page.goto('/base/crew/crew_demo_001?origin=demo')
 
-      const shell = page.locator('[data-ui="entity-detail-shell"]')
-      await expect(shell.getByRole('heading', { name: '泥水A班' }))
-        .toBeVisible({ timeout: 15_000 })
-      await expect(shell.getByText('测试档案只读', { exact: true })).toBeVisible()
-      await expect(shell.getByRole('link', { name: '编辑', exact: true })).toHaveCount(0)
-      await expect(shell.getByText('班组主档', { exact: true })).toBeVisible()
-      await expect(shell.getByText('成员', { exact: true }).last()).toBeVisible()
-      await expect(shell.getByText(/^(项目与工资事实|当前成员与责任项目)$/)).toBeVisible()
-      await expect(shell.getByText('137 **** 0001', { exact: true }).first()).toBeVisible()
-      await expect(shell.getByText('13700110001', { exact: true })).toHaveCount(0)
-      await expect(shell.getByText('13511220001', { exact: true })).toHaveCount(0)
-      await expect(shell.getByRole('link', { name: '虞建华', exact: true }))
-        .toHaveAttribute('href', /\/base\/worker\/wkr_demo_001\?origin=demo&returnTo=/)
-      await expect(shell.getByRole('button', { name: '添加成员', exact: true })).toHaveCount(0)
-      await expect(shell.getByRole('button', { name: '移出班组', exact: true })).toHaveCount(0)
+    const shell = page.locator('[data-ui="entity-detail-shell"]')
+    const heading = shell.getByRole('heading', { name: '泥水A班' })
+    await expect(heading)
+      .toBeVisible({ timeout: 15_000 })
+    await expect(shell.getByText('测试档案只读', { exact: true })).toBeVisible()
+    await expect(shell.getByRole('link', { name: '编辑', exact: true })).toHaveCount(0)
+    await expect(shell.getByText('班组主档', { exact: true })).toBeVisible()
+    await expect(shell.getByText('成员', { exact: true }).last()).toBeVisible()
+    await expect(shell.getByText(/^(项目与工资事实|当前成员与责任项目)$/)).toBeVisible()
+    await expect(shell.getByText('137 **** 0001', { exact: true }).first()).toBeVisible()
+    await expect(shell.getByText('13700110001', { exact: true })).toHaveCount(0)
+    await expect(shell.getByText('13511220001', { exact: true })).toHaveCount(0)
+    await expect(shell.getByRole('link', { name: '虞建华', exact: true }))
+      .toHaveAttribute('href', /\/base\/worker\/wkr_demo_001\?origin=demo&returnTo=/)
+    await expect(shell.getByRole('button', { name: '添加成员', exact: true })).toHaveCount(0)
+    await expect(shell.getByRole('button', { name: '移出班组', exact: true })).toHaveCount(0)
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
+      await expect(heading).toBeVisible()
       await expectNoPageOverflow(page, `班组详情 @ ${width}px`)
-    })
-  }
+    }
+  })
 
   test('窄窗头部键盘顺序稳定，密集关联表只在自身区域横滚', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })

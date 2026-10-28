@@ -1,11 +1,14 @@
 import type { SQLInputValue } from 'node:sqlite'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { migrations, runMigrations } from '~/lib/db/migrations'
 import { migrateNullableContractAmounts } from '~/lib/db/nullable-contract-amounts'
 import { createMemoryDb } from '../helpers/memory-db'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function native52() {
   const db = await createMemoryDb()
@@ -23,7 +26,7 @@ async function native52() {
 }
 it('实际v52磁盘在schema53已提交而版本记账前冷断，重开重试不丢证据也不重复占号', async () => {
   const old = await native52()
-  const base = resolve('.tmp/a02-material-tests')
+  const base = testTempRoot('a02-material-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(join(base, 'native53-cold-'))
   const path = join(directory, 'native.sqlite')

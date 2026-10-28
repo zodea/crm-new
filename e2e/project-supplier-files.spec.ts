@@ -173,7 +173,6 @@ test.describe('Issue #438 合作档案中央原件', () => {
       await panel.getByRole('button', { name: '下载选中 ZIP' }).focus()
       await expect(panel.getByRole('button', { name: '下载选中 ZIP' })).toBeFocused()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
-      await page.screenshot({ path: info.outputPath(`files-${width}.png`), fullPage: true })
     }
     expect(errors).toEqual([])
   })
@@ -206,7 +205,6 @@ test.describe('Issue #438 合作档案中央原件', () => {
     await panel.getByRole('button', { name: '下载选中 ZIP' }).click()
     await expect(panel.getByRole('alert')).toContainText('校验失败')
     await expect(panel.getByRole('checkbox', { name: '选择 隔离合同.pdf' })).toBeChecked()
-    await page.screenshot({ path: info.outputPath('hash-failure.png'), fullPage: true })
     await page.unroute(filePattern)
     const downloaded = page.waitForEvent('download')
     await panel.getByRole('button', { name: '下载选中 ZIP' }).click()

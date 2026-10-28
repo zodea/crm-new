@@ -1,12 +1,12 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { seedIfEmpty } from '~/lib/db/seed'
 import { useBoqStore } from '~/stores/boq'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
+vi.mock('~/stores/production-access', () => ({ useProductionAccessStore: () => ({ status: { mode: 'development', authenticated: false } }) }))
 
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => db.execute(sql, params),
@@ -26,8 +26,7 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await seedIfEmpty(db)
   setActivePinia(createPinia())
 })

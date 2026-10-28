@@ -1,8 +1,11 @@
 import type { ProcessLibraryCreateCommand } from '../../app/lib/schedule/process-library-contract'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { processLibraryProductionProcess } from '../helpers/production-process-library-process'
+import { cleanupTestTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it('独立服务进程公开保存后丢弃响应并重启，原键恢复原图且并开旧版仍按原身份解析', async () => {
   const f = await processLibraryProductionProcess()

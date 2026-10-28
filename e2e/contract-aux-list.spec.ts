@@ -33,23 +33,24 @@ test.describe('Issue #196：辅助合同与结算列表', () => {
     }
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 四类列表使用领域筛选且宽表只在局部横滚`, async ({ page }) => {
-      test.setTimeout(120_000)
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
+  test('四类列表使用领域筛选，各宽度宽表只在局部横滚', async ({ page }) => {
+    test.setTimeout(120_000)
 
-      for (const list of LISTS) {
-        await page.goto(list.path)
-        const root = page.locator(list.root)
-        await expect(root.getByRole('heading', { name: list.title }))
-          .toBeVisible({ timeout: 30_000 })
-        const status = root.getByRole('button', { name: /^状态，已选 0 项$/ })
+    for (const list of LISTS) {
+      await page.goto(list.path)
+      const root = page.locator(list.root)
+      await expect(root.getByRole('heading', { name: list.title }))
+        .toBeVisible({ timeout: 30_000 })
+      const status = root.getByRole('button', { name: /^状态，已选 0 项$/ })
+      const project = list.path === '/material/settlement'
+        ? root.getByRole('button', { name: /^项目，已选 0 项$/ })
+        : root.getByRole('combobox', { name: '筛选项目', exact: true })
+
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
         await expect(status).toBeVisible()
         await expect(root.locator('input[placeholder^="搜索"]')).toBeVisible()
         await expect(root.getByRole('button', { name: list.create, exact: true })).toBeVisible()
-        const project = list.path === '/material/settlement'
-          ? root.getByRole('button', { name: /^项目，已选 0 项$/ })
-          : root.getByRole('combobox', { name: '筛选项目', exact: true })
         if (list.project)
           await expect(project).toBeVisible()
         else
@@ -72,8 +73,8 @@ test.describe('Issue #196：辅助合同与结算列表', () => {
           )
         }
       }
-    })
-  }
+    }
+  })
 
   test('来源 query 可见、可清除，搜索无结果可恢复', async ({ page }) => {
     await page.goto('/material/settlement?project=project-demo&contract=contract-demo&supplier=supplier-demo')

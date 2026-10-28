@@ -6,9 +6,6 @@ import { computed, defineComponent, h, shallowRef, watch } from 'vue'
 import ScheduleBoard from '~/components/schedule/ScheduleBoard.vue'
 import ScheduleTimeline from '~/components/schedule/ScheduleTimeline.vue'
 
-const isDesktopRuntime = vi.hoisted(() => vi.fn())
-vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime }))
-
 vi.stubGlobal('computed', computed)
 vi.stubGlobal('shallowRef', shallowRef)
 vi.stubGlobal('watch', watch)
@@ -63,7 +60,6 @@ const snapshot: ScheduleProjectView = {
 
 describe('内部暂估排程绑定入口', () => {
   beforeEach(() => {
-    isDesktopRuntime.mockReset().mockReturnValue(true)
     window.sessionStorage.clear()
     setActivePinia(createPinia())
   })
@@ -103,7 +99,6 @@ describe('内部暂估排程绑定入口', () => {
   })
 
   it('浏览器可写工作区开放中央绑定并携带完整分组返回筛选', () => {
-    isDesktopRuntime.mockReturnValue(false)
     render(ScheduleBoard, {
       props: { snapshot, today: '2026-07-15', readonly: false, origin: 'real', returnContext: { task: 't', month: '2026-09', view: 'crew', assignee: 'crew:c' } },
       global: { components: { NuxtLink: NuxtLinkStub } },

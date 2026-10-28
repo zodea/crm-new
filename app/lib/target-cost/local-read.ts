@@ -4,7 +4,7 @@ import { listFormAttachments, loadTargetCostForm } from '../master-data/forms'
 import { targetCostProblem } from './central-contract'
 import { loadTargetCostDetail } from './detail'
 
-/** 仅桌面旧库及显式授权演示库消费；正式浏览器不得使用此读取器。 */
+/** 仅显式授权的演示库消费；正式数据不得使用此读取器。 */
 export async function localTargetCostForm(context: TargetCostContext, id: string | null, draftKey?: string): Promise<TargetCostFormRead> {
   const draft = id ? await loadTargetCostForm(id) : {}
   if (!draft)

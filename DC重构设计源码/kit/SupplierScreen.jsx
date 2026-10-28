@@ -107,7 +107,7 @@
         {/* 红圈式表格（KitTable：≥10 行 / 容器内横滚不撑破页面 / 分页）——反馈轮 8 */}
         {window.KitTable
           ? <window.KitTable
-              rows={rows} checkable pageSize={10} minRows={10}
+              rows={rows} checkable pageSize={10}
               footerLeft={(cks) => cks.length ? ("已选 " + cks.length + " 家") : ("显示 " + rows.length + " 家，共 " + list.length + " 家")}
               empty="没有符合筛选条件的分供方"
               columns={[

@@ -12,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { expect, test } from '@playwright/test'
 
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '需先构建，再在专属合成目录运行本机验收；不连接开发或用户数据')
-test('公开客户保存、丢响应、独立进程重启、原件和删除恢复保持一致', async ({ page }, testInfo) => {
+test('公开客户保存、丢响应、独立进程重启、原件和删除恢复保持一致', async ({ page }) => {
   test.setTimeout(180_000)
   const root = resolve('.')
   const base = resolve('.tmp/a01-a03-production/customer')
@@ -76,8 +76,6 @@ test('公开客户保存、丢响应、独立进程重启、原件和删除恢�
     for (const width of [390, 768, 1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-      if (width === 390)
-        await page.screenshot({ path: testInfo.outputPath('login-390.png'), fullPage: true })
     }
     await login(page)
     await page.getByRole('button', { name: '新建客户', exact: true }).first().click()
@@ -154,8 +152,6 @@ test('公开客户保存、丢响应、独立进程重启、原件和删除恢�
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       await savedReadButton.focus()
       await expect(savedReadButton).toBeFocused()
-      if ([390, 1440].includes(width))
-        await page.screenshot({ path: testInfo.outputPath(`customer-recovery-${width}.png`), fullPage: true })
     }
     await page.getByLabel('客户名称 *').fill('读取失败后继续编辑的稿件')
     await expect(page.getByRole('button', { name: '保存并提交', exact: true })).toBeDisabled()
@@ -179,8 +175,6 @@ test('公开客户保存、丢响应、独立进程重启、原件和删除恢�
     for (const width of [390, 768, 1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-      if ([390, 1440].includes(width))
-        await page.screenshot({ path: testInfo.outputPath(`customer-${width}.png`), fullPage: true })
     }
     await page.getByRole('button', { name: '删除客户', exact: true }).click()
     await expect(page.getByRole('dialog')).toBeVisible()

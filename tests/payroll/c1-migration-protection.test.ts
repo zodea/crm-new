@@ -11,7 +11,7 @@ import { coreMigrationTestInstance } from '../../server/utils/core-migration-tes
 import { payrollC1MigrationReferences } from '../../server/utils/payroll-c1-migration-references'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollC1Source } from '../helpers/payroll-c1-source'
 
 const session = resolveBusinessSession()
@@ -22,7 +22,7 @@ afterEach(async () => {
 })
 
 async function importedSource() {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source: CoreMigrationSourceDTO = await seedPayrollC1Source(db)
     const bytes = db.raw.export()

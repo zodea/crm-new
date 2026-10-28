@@ -1,5 +1,7 @@
 import type { DataOriginDTO, EntityRefDTO, MoneyDTO, NavigationIntentDTO, PageDTO, ProblemDTO, ReadMetaDTO } from '../../types/read-model'
+import type { ConstructionMainSelection } from '../construction-scope/contract'
 import type { ContractFormAttachment, ContractFormAttachmentChanges, F2SaveAction } from '../contract/forms'
+import type { OurSignatorySnapshot } from '../our-signatory/contract'
 
 export type AuxiliaryContractKind = 'other_expense' | 'company_expense'
 export const AUXILIARY_LABELS = { other_expense: '其他支出合同', company_expense: '公司支出合同' } as const
@@ -14,6 +16,9 @@ export interface AuxiliaryContractDraft {
   category?: string
   counterparty?: string
   partyA?: string
+  ourSignatoryId?: string | null
+  ourSignatoryVersion?: string | null
+  ourSignatorySnapshot?: OurSignatorySnapshot | null
   signDate?: string
   servicePeriod?: string
   amount?: number | null
@@ -21,6 +26,9 @@ export interface AuxiliaryContractDraft {
   invoiceType?: string
   paymentCycle?: string
   mainTerms?: string
+  content?: string
+  contactName?: string
+  contactPhone?: string
   status?: string
   note?: string
 }
@@ -34,6 +42,7 @@ export interface AuxiliaryContractCommand {
   action: F2SaveAction
   draft: AuxiliaryContractDraft
   attachments: ContractFormAttachmentChanges
+  constructionMain?: ConstructionMainSelection
 }
 export interface AuxiliaryContractAudit {
   createdBy: string | null
@@ -90,6 +99,27 @@ export interface AuxiliaryContractDetail {
   facts: AuxiliaryContractFact[]
   attachments: ContractFormAttachment[]
   capabilities: string[]
+  constructionMain?: ConstructionMainSelection | null
+  unavailableFactKinds?: AuxiliaryContractFact['kind'][]
+  diagnostics?: string[]
+}
+export interface AuxiliaryImportCommand {
+  commandId: string
+  workspaceId: string
+  actorId: string
+  source: { sha256: string, payloadBase64: string }
+  projects: Array<{ legacyId: string, id: string, version: string }>
+  suppliers: Array<{ legacyId: string, id: string, version: string }>
+  signatories: Array<{ legacyId: string, id: string, version: string }>
+  originals: Array<{ fileId: string, payloadBase64: string }>
+}
+export interface AuxiliaryImportResult { commandId: string, importId: string, sourceSha256: string, ids: string[], supplementIds: string[], restored?: boolean }
+export interface AuxiliaryImportPreview {
+  sourceSha256: string
+  schemaVersion: number
+  contracts: Array<{ id: string, kind: AuxiliaryContractKind, name: string, no: string, deletedAt: string | null }>
+  references: Array<{ kind: 'project' | 'supplier' | 'signatory', id: string, label: string, candidates: Array<{ id: string, label: string, version: string, deletedAt: string | null }> }>
+  requiredOriginals: Array<{ id: string, name: string }>
 }
 export type AuxiliaryContractPage = PageDTO<AuxiliaryContractDTO, Record<DataOriginDTO, { count: number, amount: MoneyDTO | null }>> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO>, projectOptions: Array<{ id: string, label: string }> }
 export class AuxiliaryContractProblem extends Error {

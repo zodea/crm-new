@@ -144,7 +144,8 @@ export function usePayrollANegativeLines(options: {
     }
     else {
       adopt(value)
-      const action = store().getPending(value)?.command.action
+      const pending = store().getPending(value)
+      const action = pending?.restoredFromDescriptor ? undefined : pending?.command.action
       if (action?.kind === 'save-a-negative-lines') {
         rows.value = action.lines.map(draft => ({ key: draft.lineId || generateId('negative-input'), draft: clone(draft) }))
         removed.value = clone(action.remove)

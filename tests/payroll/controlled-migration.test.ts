@@ -8,7 +8,7 @@ import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migrati
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { payrollOriginalSnapshot, seedPayrollMigrationSource, seedReleasedPayrollMigrationSource } from '../helpers/payroll-migration-source'
 import { readQuantityCoreSource, seedQuantityMigrationSource } from '../helpers/quantity-migration-source'
 
@@ -31,7 +31,7 @@ afterEach(async () => {
 })
 
 it.each(['foreign-table', 'foreign-project', 'foreign-current-row'] as const)('公开工资迁移复验审计归属，不能凭客户端项目图接管其他事实：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedPayrollMigrationSource(db)
     const entity = source.entities.payroll_projects!.find(row => row.legacyId === 'pay-project')!
@@ -58,7 +58,7 @@ it.each(['foreign-table', 'foreign-project', 'foreign-current-row'] as const)('�
 })
 
 it.each(['missing', 'cross-project'] as const)('旧缺关系行与坏快照可诊断保原文，同月零成员冲突不能当作无锁：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollMigrationSource(db)
     if (kind === 'cross-project')
@@ -84,7 +84,7 @@ it.each(['missing', 'cross-project'] as const)('旧缺关系行与坏快照可�
 })
 
 it.each(['untouched', 'daily-change', 'deleted-independent', 'zero-member', 'unclaimed-daywork', 'independent-audit', 'batch-plan'] as const)('危险恢复在删除前保护工资完整关系并保持全域不变：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const batch = await confirm(await seedPayrollMigrationSource(db))
     const ids = await quantityTestInstance.withWorkspaceTransaction(async tx => ({
@@ -139,7 +139,7 @@ it.each(['untouched', 'daily-change', 'deleted-independent', 'zero-member', 'unc
 })
 
 it('公开迁入后同库冷读原八表与不可变证据，重复确认保留日常更正', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const batch = await confirm(await seedPayrollMigrationSource(db))
     const read = () => quantityTestInstance.withWorkspaceTransaction(async tx => ({
@@ -165,7 +165,7 @@ it('公开迁入后同库冷读原八表与不可变证据，重复确认保留�
 })
 
 it('健康旧 C2 经公开迁入后由工资普通服务冷读完整冻结、原历史及未领用来源', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollMigrationSource(db)
     const seeded = await seedReleasedPayrollMigrationSource(db)
@@ -189,7 +189,7 @@ it('健康旧 C2 经公开迁入后由工资普通服务冷读完整冻结、原
 })
 
 it('缺失旧人员仅隔离无法映射的行，原图和对应旧ID不能丢失或按同名补造', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollMigrationSource(db)
     await db.execute('PRAGMA foreign_keys = OFF')
@@ -206,7 +206,7 @@ it('缺失旧人员仅隔离无法映射的行，原图和对应旧ID不能丢�
 })
 
 it('工资旧分项只经同一工程量图的稳定映射，数量图单独撤回也须保护工资引用', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedQuantityMigrationSource(db)
     await db.execute('INSERT INTO workers(id,name,crew_id) VALUES (\'pay-q-worker\',\'同名工人\',\'q-crew\')')

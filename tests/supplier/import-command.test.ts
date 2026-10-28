@@ -7,7 +7,7 @@ import { SUPPLIER_WRITE_CAPABILITY } from '~/lib/supplier/command-contract'
 import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http-repository'
 import { createSupplierRowImporter } from '~/lib/supplier/import-command'
 import { parseSupplierImportCommandRequest } from '../../server/utils/supplier-command-request'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 import { createSupplierReadTestInstance } from '../../server/utils/supplier-read-test-instance'
 
 const session: BusinessSession = {
@@ -18,7 +18,7 @@ const session: BusinessSession = {
 
 function harness() {
   let sequence = 0
-  const commands = createSupplierCommandTestInstance({ createId: () => `import-${++sequence}` })
+  const commands = createSupplierCommandService({ createId: () => `import-${++sequence}` })
   const reads = createSupplierReadTestInstance(() => session.capabilities, id => commands.rows(id), id => commands.sourceVersion(id))
   const fetcher = vi.fn<SupplierHttpFetcher>(async (url, options) => {
     if (url === '/api/read/business-session')

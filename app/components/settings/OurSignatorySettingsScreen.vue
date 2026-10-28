@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { OurSignatoryListDTO } from '~/lib/our-signatory/contract'
 import { createOurSignatoryRepository } from '~/lib/our-signatory/http-repository'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 
 const data = shallowRef<OurSignatoryListDTO | null>(null)
@@ -9,7 +8,7 @@ const error = ref('')
 const loading = ref(false)
 let generation = 0
 let active = true
-const repository = createOurSignatoryRepository((url, options) => $fetch<unknown>(url, { ...options, retry: 0 }))
+const repository = createOurSignatoryRepository((url, options) => $fetch<unknown, string>(url, { ...options, retry: 0 }))
 function invalidate() {
   generation++
   data.value = null
@@ -21,10 +20,7 @@ async function load() {
   const current = ++generation
   data.value = null
   error.value = ''
-  if (isDesktopRuntime()) {
-    error.value = '独立桌面路径尚未接入一致主体目录。请使用已开放的中央入口维护；旧合同原文仍保留。'
-    return
-  }
+
   loading.value = true
   try {
     const result = await repository.list()
@@ -73,7 +69,7 @@ useTabTitle('我方签约主体')
       </NuxtLink>
     </header>
     <section v-if="loading || error" class="panel p-4" role="status">
-      <p>{{ loading ? '正在读取我方主体目录' : error }}</p><button v-if="error && !isDesktopRuntime()" type="button" class="btn-secondary" @click="load">
+      <p>{{ loading ? '正在读取我方主体目录' : error }}</p><button v-if="error" type="button" class="btn-secondary" @click="load">
         重新读取
       </button>
     </section>

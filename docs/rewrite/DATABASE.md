@@ -4,7 +4,7 @@
 
 ## PG-01 本机客户持久参与者（#450）
 
-`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite`，由独立正式 schema 版本 1 引导；当前版本及逐域升级见下方共享存储清单。不把旧浏览器/Tauri schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
+`CRM_RUN_MODE=production` 的客户路径使用本机 `ruihang.sqlite`，由独立正式 schema 版本 1 引导；当前版本及逐域升级见下方共享存储清单。不把旧浏览器、旧桌面 schema 版本或迁移测试实例当作此库。领域字段沿本文件既有 `customers`、`file_refs` 定义，入口分派与运行约束见 [ADR 0021](../adr/0021-single-operator-windows-production-storage.md)。当前仅合成 `verification` 用途可写；正式用途业务写入等待基线备份和上线门禁。
 
 | 同库参与者 | 不可遗漏的事实 |
 | --- | --- |
@@ -51,9 +51,21 @@ schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`
 | `process_library_command_receipts` | 原命令ID、工作区/操作者、版本ID、完整命令JSON/指纹和原结果 |
 | `process_library_audits` | 原版本、原命令、操作者、创建动作、完整版本事实和时间 |
 
-所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态见下节 #451，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。[共享检查点](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力。
+所有正式 owner 通过 `productionRuntime()` 取得同一个 storage/coordinator。`backupTo` 仅在同队列生成新建本机一致副本；副本的完整清单和内容核验、独立介质发布、恢复及保护状态见下节 #451，正式业务写入门禁仍未放开。完整表清单同时核对 `sqlite_schema`，参与者有登记但缺实表时拒绝打开或升级。[共享检查点](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-463-production-process-library/checks/storage.md)只证明已列出的存储能力。
 
-工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 的使用投影尚未接通，引用数量为未知。存量中央迁入与 WBS 生产接管不由此切片证明。验证见 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-463-production-process-library/checks/storage.md)。
+工序库公开列表、详情和新版本命令已接磁盘 owner。完整工序图、系列修订、原命令与摘要、回执和审计同事务保存；每次读取交叉核对这些事实，任何损坏均拒绝，不能只筛掉坏版本。独立进程重启后仍按原版本 ID 和命令恢复；不会 seed 默认库或改写旧版。正式 WBS 已在同库读取真实实例对不可变工序版本的引用，权限不足或无法核验时仍为未知。早期 [#463 完整记录](../design/evidence/issue-463-production-process-library/README.md)及[共享检查点](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-463-production-process-library/checks/storage.md)只证明当时切片，当前 WBS 持久清单见下方。
+
+v14→v15 为既有班组、工人 `record_json` 增加只读 VIRTUAL 列，未增加主档或参与者；空值、真实零与删除状态分别从原 JSON 派生。v15→v16 加入 `target-cost:1`，v16→v17 加入 `quantity:1` 当前施工及空鼓事实，v17→v18 加入 `payroll:1` 完整工资事实，v18→v19 向工程量追加不可变原 intent 与最小恢复描述；v19→v20 追加内部 `wbs:1` 的实例、冻结楼层、原意图、回执、来源采用及恢复证据，工序库仍引用既有正式不可变版本；v20→v21 接入 `construction-contracts:1` 的真实主合同、补充协议历史、独立版本、签约原件及原命令；v21→v22 追加 `boq:1` 的原清单、E 维修价与有效变洽签事实及采用证据；v22→v23 在原施工参与者追加迁入/恢复原意图、回执与封存，不重写已应用 v21/v22；v23→v24 增加 `construction-scope:1` 的原来源到施工主合同的单份关联及不可变关系历史、原命令与封存，只保存关系和依赖摘要，不存第二份合同金额、成本、工资或现金。既有 v1–v14 升级和历史备份清单保持原定义。各域共享原项目、班组工人、操作日志和 BLOB 原件；工程量的 `projects.matrix_archived_at` 只拥有该矩阵的归档事实。正式上游与开放边界见 [ARCHITECTURE](./ARCHITECTURE.md#opt-02-scope-decision)；表已登记不证明全部日常来源已经可用。
+
+预算 `target_cost_versions` 核对每一原版本的当前图；`target_cost_files` 保原合法可空元数据及正文状态，正文只在共享 `file_payloads` 保存一份。`target_cost_imports` 保本领域原图、来源摘要、原列/未知扩展及明确采用证据，完整 SQLite 外部保留并沿[来源边界](#native-domain-snapshot)核验。受保护恢复退役本批采用关系，保原图、补传原件、审计及恢复回执，不物理撤除唯一正文。工程量原 intent、成功事实与原回执，以及工资配置/价格修订、A/C1/C2 分配、P4 补退/冲销、P5 管理簿、P6 采用、P7 原计划/执行、编号与目录均保在原 owner；固定名册及实名照片沿原 `worker_roster_*` 和工人原件 owner。
+
+WBS 实例沿 `schedule_groups`、`schedule_group_buildings`、`schedule_tasks`、`task_item_map`、`task_dependencies`、`schedule_task_floor_plans` 保存原计划、父子/边、软删和冻结依据；`schedule_floor_quantity_snapshots` 保真实零、已知部分、缺量及单位，未知不变零。`schedule_revisions` 与完整原图指纹互证；命令、来源和恢复证据不可变。`schedule_files` 仅关联本域真实分组/任务、所属项目、原文件元数据及正文状态，BLOB 继续共用唯一 `file_payloads`。合同/BOQ 引用索引仅保存稳定 ID、项目和父合同定位，以保已应用外键及原历史；新绑定在执行事务中先核真实 owner 的所选身份及资格，再追加所选定位，已存在而归属不同则拒绝，不覆盖旧确认、不批量同步、不复制名称、状态或量价。读取和版本资格始终来自真实 owner，索引本身不授予上游可用性；GET 不追加定位。
+
+v24→v25 只向同一 `boq:1` 追加完整来源整批迁入的原意图、回执和封存，整批以真实来源 SHA 及原批次为范围，不假挂第一份施工主合同；日常单合同命令与完整来源迁入分开核对，各自原编号保持可恢复，v22 已应用定义不变。
+
+v25→v26 接入 `subcontract-contracts:1`：原分包主合同、补充协议、独立版本、共享原件及普通/迁入/恢复各自的原意图、回执和封存。来源保全真实 SQLite 字节、原列及未知扩展，不复制正式项目、分供方或我方签约主体。v26→v27 仅将 `construction-scope` 升到版本 2，扩展支出合同的关系类型；既有绑定、解绑、关系版本、原 JSON、意图、回执和封存逐行保留，不重新生成 ID 或改写金额。公司合同头的独立性及新建工程选择规则见 [ARCHITECTURE 的已答决定](./ARCHITECTURE.md#opt-02-scope-decision)。
+
+v27→v28 接入 `auxiliary-contract:1`，保留其他支出合同和独立公司合同两种原职责；来源身份采用原表名与原 ID 的明确映射，合法跨表同 ID 不合并成一份合同。头、原补充协议、完整原件目录和版本、普通/全域来源迁入/恢复的原意图、回执及封存同库持久化；原税额、累计成本或已付镜像只保来源证据，不能成为新的成本或现金事实。
 
 ## PG-04 本机分供方持久参与者（#453）
 
@@ -82,9 +94,9 @@ schema v1 引导定义不可回写；v1→v2 同事务加入 `process-library:1`
 
 保留策略只接受同库成功回执对应的完整包，以北京时间日/月选择，保留最新及基线；未知内容、链接、不完整包和损坏包不自动清理。未来领域接管须同时更新共享清单、原件 owner 校验和恢复验收，不能把本票客户切片升级为所有尚未接管领域已可恢复。配置及操作见[使用指南](../guides/local-backup-and-restore.md)。
 
-> 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
+> 本文件是现有 SQLite 迁移来源（旧桌面一致快照 / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 
-当前落地事实（#279、#294、#320、#321）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。Tauri 不消费浏览器演示偏好，仍只连接原有 `sqlite:crm.db`。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份与 canonical 施工/分包合同的一次性分类、ID 映射、导入、对账和回滚使用同一受控迁移；其余领域仍由后续迁移票完成。
+当前落地事实（#279、#294、#320、#321）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份与 canonical 施工/分包合同的一次性分类、ID 映射、导入、对账和回滚使用同一受控迁移；其余领域仍由后续迁移票完成。
 
 当前落地事实（#293）：浏览器的正式项目新增/编辑已改由中央命令分配不透明 `projects.id`、记录递增 `version` 并生成最终更新时间。网络失败时的 `project-draft-*` 只是浏览器暂存意图，不是 `projects.id`、不得作外键。详细信封、幂等与冲突语义见 [`COMMANDS.md`](./COMMANDS.md)。
 
@@ -269,7 +281,7 @@ suppliers += (
 
 #### 分供方证照中央事实（#446）
 
-浏览器证照以中央 `(dataOrigin, supplierId)` 为唯一所有者，主档、列表与证照页共用当前资料状态和原件投影。证照专用领域保存稳定证照身份、文件关系与正文、类别要求、有效期、整体人工凭证、原始及已确认 OCR 事实和专用审计；普通主档附件集合仍为空。#447 在 #446 保全历史的基础上接通日常 OCR 识别与人工回填，上传和迁移均不自动重新识别。Tauri 历史 schema 与本地适配不被中央接管改写。
+浏览器证照以中央 `(dataOrigin, supplierId)` 为唯一所有者，主档、列表与证照页共用当前资料状态和原件投影。证照专用领域保存稳定证照身份、文件关系与正文、类别要求、有效期、整体人工凭证、原始及已确认 OCR 事实和专用审计；普通主档附件集合仍为空。#447 在 #446 保全历史的基础上接通日常 OCR 识别与人工回填，上传和迁移均不自动重新识别。旧桌面历史 schema 不被中央接管改写。
 
 资料状态从当前有效必需原件、类别要求及上海业务日期派生；人工结论只在整体凭证仍有效时保留。中央主档关键字段真实变化和影响必需资料的命令与凭证失效原子协调，字段范围及可见行为只见[分供方蓝本](./pages/base-supplier.md#credentialstatus-流转)。无关可选资料、无变化的要求值或普通非关键字段不误撤销结论；普通表单与导入不能伪造人工态。
 
@@ -895,7 +907,7 @@ subcontract_change_orders(
 --   deleted_at     TEXT  软删除（§8）
 ```
 
-归档当前值仍写回 `invoices` 并作为台账、价格分析和打印的唯一事实。归档 action 同一事务另向 `operation_logs(table_name='invoice_archive_provenance')` 写不可变审计快照，分开保存来源信息、原始 OCR、逐字段人工修订和归档时人工确认的当前值；读取审计不得反向覆盖 `invoices` 当前值。
+归档当前值仍写回 `invoices` 并作为台账、价格分析和打印的唯一事实。归档 action 同一事务另向 `operation_logs(table_name='invoice_archive_provenance')` 写不可变审计快照，分开保存来源信息、原始 OCR（首次识别结果）、逐字段修订（人工校对与重新识别覆盖均按时间留痕；重新识别草稿在用户确认保存时同一事务先以识别操作人写入识别结果，再把草稿上的人工修改以人工写一次）和归档时人工确认的当前值；读取审计不得反向覆盖 `invoices` 当前值。
 
 `invoice_export_settings` 是发票领域的本机单例配置表（迁移 v41），`settings_json` 保存发票台账 XLSX 的行列尺寸、字体、边框、格式、冻结与合并默认值。业务预览只保留本次草稿；保存和加载必须经 invoice store action 进入 SQLite，浏览器开发态随数据库 snapshot fallback 持久化，不再另写 `localStorage`，也不得复用只属于 OCR 的 `ocr_settings`。
 
@@ -1782,7 +1794,9 @@ P4 新 V2 更正追加同簿费用依据，保留原费项、组件及负价行�
 
 ### 户级空鼓、整改与工资采用（#412，P6）
 
-P6 在既有工程量和工资中央事务中增加以下追加事实。五张来源表与三张工资表均不保存可编辑余额，也不使用 `deleted_at` 隐藏已处理的来源。限定实现与验收范围见 [P6 验收记录](../design/evidence/issue-412-payroll-hollow/README.md)，不代表 #416 生产部署完成。
+P6 在既有工程量和工资中央事务中增加以下追加事实。五张来源表与三张工资表均不保存可编辑余额，也不使用 `deleted_at` 隐藏已处理的来源。户级空鼓检查是工资扣款、整改销记和维修统计共同消费的唯一记录，不另建第二份空鼓台账。
+
+**已定待开发：整改处理方式与维修统计。** 每次整改销记须记录处理方式：换砖或注空鼓胶，`quantity_hollow_rectifications` 追加处理方式字段（`tile_replacement` / `hollow_glue`）。已有整改记录的方式为未知，不按默认值回填。维修单价由经办人直接填入，不从工资空鼓扣款单价或合同价推导；未填单价时金额显示为未知，不按零计。维修成本界面按项目、楼栋、分项和处理方式汇总整改处数、单价与金额。
 
 | 表 | 事实与字段 |
 | --- | --- |
@@ -2023,7 +2037,7 @@ END;
 
 可见性父链刻意排除两项审计引用：`house_type_templates.copied_from_template_id` 只是一次性复制来源，删除来源不隐藏复制件；`unit_stage_completions.assignment_id` 只是完成时责任，软删旧责任不隐藏完成事实。
 
-`#442` 浏览器中央工程量适配中的 `quantity_boq_references` 仅存 `id + project_id + contract_id` 外部身份索引，模板行的 BOQ 外键指向此索引；量价与已签证增减仍读取中央施工合同/变洽签。该索引不是第二份 BOQ 业务表，也不改变显式桌面 SQLite 的物理 schema。迁移使用完整数据库候选准备，在外键、祖先及跨域对账通过后原子切换；月报自动完成量与有效 BOQ 来源在同一串行窗口重验后固化，具体读写契约见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442) 与 [COMMANDS](./COMMANDS.md#工程量中央命令与迁移接管442)。
+`#442` 浏览器中央工程量适配中的 `quantity_boq_references` 仅存 `id + project_id + contract_id` 外部身份索引，模板行的 BOQ 外键指向此索引；量价与已签证增减仍读取中央施工合同/变洽签。该索引不是第二份 BOQ 业务表，也不改变迁移来源 SQLite 的物理 schema。迁移使用完整数据库候选准备，在外键、祖先及跨域对账通过后原子切换；月报自动完成量与有效 BOQ 来源在同一串行窗口重验后固化，具体读写契约见 [READ-MODELS](./READ-MODELS.md#工程量中央读取与甲方月报442) 与 [COMMANDS](./COMMANDS.md#工程量中央命令与迁移接管442)。
 
 ### 工资完整工作簿保存目录（#479）
 
@@ -2435,7 +2449,7 @@ interface FileRef {
   ownerType: string // 多态类型标识
   ownerId: string // 关联实体的 id
   fileName: string
-  filePath: string // 可选：Tauri 本地相对路径
+  filePath: string // 可选：旧桌面本地相对路径（仅历史数据）
   fileSize: number
   mimeType: string // 原件 MIME，用于图片/PDF 预览
   category: string // 文件分类（合同/送货单/发票/证照/其他）
@@ -2453,7 +2467,7 @@ interface FilePayload {
 #### 送货单原件持久化约束
 
 - `#441` 的浏览器送货头、材料行、打印状态、修订和原件由同一中央领域保存；Repository/HTTP/command 是当前浏览器入口，失败不回落旧 SQLite。当前服务是可重置中央验证实例，尚不声明生产重启持久化或云端上线；部署边界见 ADR 0020。
-- 旧 `delivery_records` / `delivery_lines` / `file_refs(category=source)` / `file_payloads` 保留为受控迁移输入及显式 Tauri 适配。它们的旧本地归档行为不再是已接管浏览器的日常正式写源。
+- 旧 `delivery_records` / `delivery_lines` / `file_refs(category=source)` / `file_payloads` 保留为受控迁移输入。它们的旧本地归档行为不再是已接管浏览器的日常正式写源。
 - 上传批次与不可变资产分别保留稳定 ID。资产保存文件名、MIME、真实长度、完整字节、SHA-256、建立者和时间；同一明确批次且字节一致才复用资产。逻辑送货保存稳定 ID、当前项目/分供方、资产引用、结构化版本和唯一材料行事实。一份资产可供多条逻辑送货显式引用。
 - 新归档和人工修订必须选择当前有效项目、分供方并人工填写日期；缺失分供方、日期的历史记录保持原缺失与待核验，不能匹配同名主档或补当天日期。历史核对标记只有在当前必需事实完整时才有效；缺价格经人工确认可归档并标记价格待补录。
 - 结构化修订保存版本、原因、服务端操作者/时间和前后变化；业务字段编辑不改变原件字节。补传/替换建立新资产与修订引用，旧资产保留。列表和结构化审计不含正文，当前及历史正文均按需重验当前权限、逻辑 owner、来源和可证实祖先。
@@ -2611,7 +2625,7 @@ flowchart TD
 | 累计已付 | 按分供方连接已确认 `payment_records` 与 `payment_record_application_allocations` 求和 |
 | 应付余额 | 合同总额 − 累计已付 |
 
-金额聚合与关系计数分别过滤。当前中央[分供方读面](../../app/lib/supplier/read-page.ts)及[项目分供方读面](../../app/lib/project-supplier/read-page.ts)排除草稿（`draft/草稿`）、失效（`无效/作废/cancelled`）和软删合同，纳入有效补充协议；详情中的可追溯合同/关系列表不因此只剩金额纳入项。旧 [SQLite 列表 store](../../app/stores/supplier.ts)及[详情 store](../../app/stores/supplier-detail.ts)的已知合同金额聚合已对齐此口径，共用[有效状态与补充协议查询](../../app/lib/contract/effective-status.ts)；[store 回归](../../tests/stores/supplier-detail.test.ts)覆盖失效及草稿排除、有效补充协议、列表与详情金额一致，并验证合同计数与合作项目范围保留。旧路径未因此退役，也不改变中央读写边界。
+金额聚合与关系计数分别过滤。当前中央[分供方读面](../../app/lib/supplier/read-page.ts)及[项目分供方读面](../../app/lib/project-supplier/read-page.ts)排除草稿（`draft/草稿`）、失效（`无效/作废/cancelled`）和软删合同，纳入有效补充协议；详情中的可追溯合同/关系列表不因此只剩金额纳入项。旧 [SQLite 列表 store](../../app/stores/supplier.ts)的已知合同金额聚合已对齐此口径，共用[有效状态与补充协议查询](../../app/lib/contract/effective-status.ts)；旧详情 store 已随桌面端退役删除，不改变中央读写边界。
 
 ### 4.4 ProjectSupplier 汇总（project-supplier.md）
 
@@ -3084,6 +3098,8 @@ Native 导出使用现有注册连接池上的 `VACUUM INTO`，与本应用事�
 用户在正式浏览器明确选择该完整 SQLite 文件后，服务端先核验授权，再从实际字节重算 SHA-256、核验完整性及版本，并只读提取所迁领域的完整事实图；客户端提供的摘要、图和目录版本不能代替这一核验。不运行来源库迁移，不向来源写入，不按名称、金额或用途猜接身份。旧项目、分供方须逐项明确关联当前可读主档，采用时再次核对目标稳定 ID、记录版本与读源版本。
 
 完整来源文件由用户保留在导出位置；正式库只保存该领域的原始图、来源摘要、明确映射与确认依据，并沿共享文件机制保全该领域原件，不重复保存包含其他领域私密资料的整库字节。原工作区、人员、命令编号、回执、审计及冻结快照保持原值；映射后的当前关系是另有证据的采用投影，不能改写原始历史。来源原命令身份、重复提交及结果未知的处理直接遵守 [COMMANDS](./COMMANDS.md#idempotency-and-recovery)。
+
+历史原件上传时间为 SQL NULL 时，原列、原元数据和领域记录保留未知，读取 DTO 返回 `null`。共享 `file_refs.uploaded_at` 的既有非空文本列仅以空字符串编码该历史缺失；必须与完整来源的 NULL 列和不可变原元数据互证，不能用于掩盖新上传或错误日期。SQLite 无时区时间按其 UTC 语义作读取投影，不用合同创建时间补上传事实，也不重写已采用的原版本与源 JSON。
 
 Native v58 建立独立报价来源，v59 在既有付款头追加互斥的工人／分供方身份与采用姓名保护，v60 在原 `expenditure_settlements` 同表保全旧字段、零值和历史，并允许新结算未知金额及稳定原费用采用；旧文本保持原文，不按同名补身份。各正式领域的实际参与者、迁入范围和仍未接通的来源按 §2 对应实体说明。结构核验从真实编号升级脚本生成预期表、索引及触发器，冷启动和备份同时拒绝缺失或被替换的历史保护；结构看似完整不能替代事实图及原件核验。
 

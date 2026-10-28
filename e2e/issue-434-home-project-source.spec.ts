@@ -17,53 +17,55 @@ test.afterEach(async ({ page }, testInfo) => {
   expect(reset.ok()).toBe(true)
 })
 
-for (const width of [390, 768, 1024, 1280, 1440]) {
-  test(`${width}px 中央新项目空排程只读查看并返回同一身份`, async ({ page }, testInfo) => {
+test('中央新项目空排程只读查看并返回同一身份，各宽度无页面溢出', async ({ page }) => {
+  const widths = [390, 768, 1024, 1280, 1440] as const
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/project/form')
+  const name = '首页中央项目'
+  await page.getByLabel('项目名称 *').fill(name)
+  await page.getByLabel('项目经理 *').fill('项目经理')
+  const saved = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/commands/projects')
+  await page.getByRole('button', { name: '保存草稿' }).click()
+  expect((await saved).ok()).toBe(true)
+  await expect(page).toHaveURL(/\/project\/[A-Za-z0-9-]+\?origin=real$/)
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+  const id = new URL(page.url()).pathname.split('/').at(-1)!
+  await page.goto(`/?project=${id}&origin=real`)
+  const switcher = page.getByTestId('project-switcher-trigger')
+  await expect(switcher).toContainText(name)
+  await expect(page).toHaveURL(new RegExp(`project=${id}&origin=real`))
+  await switcher.focus()
+  await page.keyboard.press('ArrowDown')
+  const search = page.getByRole('combobox', { name: '搜索项目' })
+  await expect(search).toBeFocused()
+  await search.fill(name)
+  await expect(page.getByRole('option', { name: new RegExp(name) }).last()).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(switcher).toBeFocused()
+  const sourceLinkStyle = await page.getByRole('link', { name: '打开施工进度', exact: true }).evaluate(element => ({ borderStyle: getComputedStyle(element).borderTopStyle, decoration: getComputedStyle(element).textDecorationLine }))
+  expect(sourceLinkStyle).toEqual({ borderStyle: 'solid', decoration: 'none' })
+  const empty = page.getByRole('status', { name: `${name}还没有施工排程` })
+  await expect(empty).toContainText('已读取对应项目排程，当前没有楼栋分组。此入口仅提供只读查看。')
+  await expect(page.getByTestId('home-schedule-scroll')).toHaveCount(0)
+  for (const width of widths) {
     await page.setViewportSize({ width, height: 960 })
-    const errors: string[] = []
-    page.on('pageerror', error => errors.push(error.message))
-    await page.goto('/project/form')
-    const name = `首页中央项目 ${width}`
-    await page.getByLabel('项目名称 *').fill(name)
-    await page.getByLabel('项目经理 *').fill('项目经理')
-    const saved = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/commands/projects')
-    await page.getByRole('button', { name: '保存草稿' }).click()
-    expect((await saved).ok()).toBe(true)
-    await expect(page).toHaveURL(/\/project\/[A-Za-z0-9-]+\?origin=real$/)
-    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-    const id = new URL(page.url()).pathname.split('/').at(-1)!
-    await page.goto(`/?project=${id}&origin=real`)
-    const switcher = page.getByTestId('project-switcher-trigger')
-    await expect(switcher).toContainText(name)
-    await expect(page).toHaveURL(new RegExp(`project=${id}&origin=real`))
-    await switcher.focus()
-    await page.keyboard.press('ArrowDown')
-    const search = page.getByRole('combobox', { name: '搜索项目' })
-    await expect(search).toBeFocused()
-    await search.fill(name)
-    await expect(page.getByRole('option', { name: new RegExp(name) }).last()).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(switcher).toBeFocused()
-    const sourceLinkStyle = await page.getByRole('link', { name: '打开施工进度', exact: true }).evaluate(element => ({ borderStyle: getComputedStyle(element).borderTopStyle, decoration: getComputedStyle(element).textDecorationLine }))
-    expect(sourceLinkStyle).toEqual({ borderStyle: 'solid', decoration: 'none' })
-    const empty = page.getByRole('status', { name: `${name}还没有施工排程` })
-    await expect(empty).toContainText('已读取对应项目排程，当前没有楼栋分组。此入口仅提供只读查看。')
-    await expect(page.getByTestId('home-schedule-scroll')).toHaveCount(0)
     await expectNoPageOverflow(page, `${width}px 首页`)
-    await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true })
-    await page.getByRole('link', { name: '打开施工进度', exact: true }).click()
-    await expect(page).toHaveURL(new RegExp(`/schedule\\?project=${id}&origin=real&from=home`))
-    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-    await expect(page.getByRole('status', { name: '当前项目还没有施工排程' })).toBeVisible()
-    await expect(page.getByRole('link', { name: '新建楼栋分组' })).toHaveCount(0)
+  }
+  await page.getByRole('link', { name: '打开施工进度', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`/schedule\\?project=${id}&origin=real&from=home`))
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+  await expect(page.getByRole('status', { name: '当前项目还没有施工排程' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '新建楼栋分组' })).toHaveCount(0)
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 960 })
     await expectNoPageOverflow(page, `${width}px 来源查看`)
-    await page.screenshot({ path: testInfo.outputPath(`source-${width}.png`), fullPage: true })
-    await page.getByRole('link', { name: '返回首页项目' }).click()
-    await expect(page).toHaveURL(new RegExp(`project=${id}&origin=real`))
-    await expect(page.getByTestId('project-switcher-trigger')).toContainText(name)
-    expect(errors).toEqual([])
-  })
-}
+  }
+  await page.getByRole('link', { name: '返回首页项目' }).click()
+  await expect(page).toHaveURL(new RegExp(`project=${id}&origin=real`))
+  await expect(page.getByTestId('project-switcher-trigger')).toContainText(name)
+  expect(errors).toEqual([])
+})
 
 test('删除或来源不匹配的深链不借用首个本地项目', async ({ page }) => {
   await page.goto('/schedule?project=proj_demo_001&origin=real&from=home')
@@ -74,7 +76,7 @@ test('删除或来源不匹配的深链不借用首个本地项目', async ({ pa
   await expect(page).toHaveURL(/project=proj_demo_001&origin=real/)
 })
 
-test('缓存首页当前项目关系失效后撤下旧事实与查看入口', async ({ page }, testInfo) => {
+test('缓存首页当前项目关系失效后撤下旧事实与查看入口', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 960 })
   await page.goto('/project/form')
   const name = '首页来源关系验证项目'
@@ -99,7 +101,6 @@ test('缓存首页当前项目关系失效后撤下旧事实与查看入口', as
   await expect(page.getByRole('status', { name: `${name}还没有施工排程` })).toHaveCount(0)
   await expect(page.getByRole('link', { name: '打开施工进度', exact: true })).toHaveCount(0)
   await expectNoPageOverflow(page, '390px 当前项目关系失效')
-  await page.screenshot({ path: testInfo.outputPath('home-relationship-mismatch-390.png'), fullPage: true })
 })
 
 test('离开缓存首页后，迟到的项目读取不污染项目列表地址', async ({ page }) => {

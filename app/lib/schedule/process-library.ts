@@ -1,8 +1,6 @@
 import type { ScheduleTaskTemplate } from './template'
 import type { SoftDb } from '~/lib/db/soft-delete'
-import { hiddenCtesFor, logCreate, visibleCond } from '~/lib/db/soft-delete'
-import { generateId } from '~/lib/util/id'
-import { normalizeProcessLibraryDraft } from './process-library-domain'
+import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
 
 export interface ScheduleProcessLibraryOption {
   sourceVersion?: string
@@ -168,84 +166,4 @@ export async function loadScheduleProcessLibraryTasks(
     predecessorKey: row.predecessor_task_key || null,
     predecessorDisabled: Boolean(row.predecessor_disabled),
   }))
-}
-
-export async function loadScheduleProcessLibraryDetail(
-  db: SoftDb,
-  libraryId: string,
-): Promise<ScheduleProcessLibraryDetail | null> {
-  const library = (await loadScheduleProcessLibraries(db))
-    .find(candidate => candidate.id === libraryId)
-  if (!library)
-    return null
-  return {
-    ...library,
-    tasks: await loadScheduleProcessLibraryTasks(db, library.id),
-  }
-}
-
-export async function createScheduleProcessLibraryVersion(
-  db: SoftDb,
-  draft: ScheduleProcessLibraryVersionDraft,
-): Promise<ScheduleProcessLibraryDetail> {
-  const { code, name, tasks } = normalizeProcessLibraryDraft(draft)
-  if (draft.sourceLibraryId) {
-    const source = await loadScheduleProcessLibraryDetail(db, draft.sourceLibraryId)
-    if (!source)
-      throw new Error('来源工序库版本不存在或已删除')
-    if (source.code !== code)
-      throw new Error('基于旧版新建时不能修改工序库编码')
-  }
-  const [versionRow] = await db.select<{ next_version: number }>(`
-    SELECT COALESCE(MAX(version), 0) + 1 AS next_version
-    FROM schedule_process_libraries
-    WHERE code = ? AND deleted_at IS NULL
-  `, [code])
-  const [sortRow] = await db.select<{ next_order: number }>(`
-    SELECT COALESCE(MAX(sort_order), 0) + 10 AS next_order
-    FROM schedule_process_libraries
-    WHERE deleted_at IS NULL
-  `)
-  const version = Math.max(1, Number(versionRow?.next_version) || 1)
-  const libraryId = generateId('schedule_process_library')
-  await db.execute(`
-    INSERT INTO schedule_process_libraries
-      (id, code, name, version, description, is_default, sort_order)
-    VALUES (?, ?, ?, ?, ?, 0, ?)
-  `, [
-    libraryId,
-    code,
-    name,
-    version,
-    draft.description.trim(),
-    Number(sortRow?.next_order) || 10,
-  ])
-  await logCreate(db, 'schedule_process_libraries', libraryId)
-  for (const [index, task] of tasks.entries()) {
-    const taskId = generateId('schedule_process_library_task')
-    await db.execute(`
-      INSERT INTO schedule_process_library_tasks
-        (id, library_id, task_key, name, trade, color, duration_days,
-         stage_code, item_codes_json, predecessor_task_key, predecessor_disabled, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      taskId,
-      libraryId,
-      task.key,
-      task.name,
-      task.trade,
-      task.color,
-      task.durationDays,
-      task.stageCode,
-      JSON.stringify(task.itemCodes),
-      task.predecessorKey,
-      task.predecessorKey ? Number(task.predecessorDisabled) : 0,
-      (index + 1) * 10,
-    ])
-    await logCreate(db, 'schedule_process_library_tasks', taskId)
-  }
-  const created = await loadScheduleProcessLibraryDetail(db, libraryId)
-  if (!created)
-    throw new Error('标准工序库版本保存后无法读取')
-  return created
 }

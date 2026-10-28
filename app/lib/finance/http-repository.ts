@@ -1,6 +1,7 @@
 import type { LookupOption } from '../kit/lookup'
 import type { CentralFinanceKind, CentralFinanceListRow, FinanceCommand, FinanceCommandResult, FinanceContext, FinanceFormRead, FinanceReadEnvelope, FinanceReadScope, FinanceRepository } from './central-contract'
 import { isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { decodeConstructionMainSelection } from '../construction-scope/contract'
 import { isDecimalString } from '../read-model/decimal'
 import { hasConsistentReadMeta } from '../read-model/meta'
 import { FINANCE_FAMILIES, FINANCE_READ_SCHEMA, financeFailure, financeProblemFromUnknown, normalizeFinanceLookup } from './central-contract'
@@ -114,6 +115,11 @@ function requireReadSource(value: FinanceContext, source: string, capability: st
     broken()
 }
 function verifyLookupSources(value: FinanceContext, query: ReturnType<typeof normalizeFinanceLookup>) {
+  if (query.kind === 'construction-mains') {
+    requireReadSource(value, 'construction-contracts', 'construction-contract:read')
+    requireReadSource(value, 'projects', 'project:list:read')
+    return
+  }
   const source = query.kind === 'original-expenses' || query.kind === 'payment-applications' ? 'finance' : query.kind === 'settlements' ? 'expenditure-settlements' : query.kind
   const cap = query.kind === 'original-expenses' ? 'finance-reimbursement:read' : query.kind === 'payment-applications' ? 'finance-payment-application:read' : query.kind === 'settlements' ? 'other-settlement:read' : query.kind === 'invoices' ? 'finance-invoice:read' : `${query.kind.slice(0, -1)}:list:read`
   if (query.kind !== 'contracts') {
@@ -125,6 +131,12 @@ function verifyLookupSources(value: FinanceContext, query: ReturnType<typeof nor
   kinds.forEach(kind => requireReadSource(value, ...sources[kind]!))
 }
 function result(value: unknown, commandId: string, target?: string): FinanceCommandResult {
+  if (object(value) && value.expenseLineIdentities !== undefined && (!Array.isArray(value.expenseLineIdentities) || value.expenseLineIdentities.some(row => !object(row) || Object.keys(row).sort().join(',') !== 'id,inputIndex' || !id(row.id) || !Number.isSafeInteger(row.inputIndex) || Number(row.inputIndex) < 0)
+    || new Set(value.expenseLineIdentities.map(row => row.id)).size !== value.expenseLineIdentities.length || new Set(value.expenseLineIdentities.map(row => row.inputIndex)).size !== value.expenseLineIdentities.length)) {
+    broken()
+  }
+  if (object(value) && value.constructionScopeLinks !== undefined && (!Array.isArray(value.constructionScopeLinks) || value.constructionScopeLinks.some(row => !object(row) || !id(row.commandId) || !object(row.relation) || row.relation.domain !== 'original-expense' || !id(row.relation.sourceId) || !id(row.relation.id) || !id(row.relation.mainId) || typeof row.relation.version !== 'string' || !/^[1-9]\d*$/.test(row.relation.version))))
+    broken()
   if (object(value) && Object.hasOwn(value, 'paymentVerificationSha256') && (typeof value.paymentVerificationSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.paymentVerificationSha256)))
     broken()
   if (object(value) && (Object.hasOwn(value, 'clearanceVerificationSha256') || Object.hasOwn(value, 'clearanceVerificationId'))
@@ -157,6 +169,16 @@ export function createFinanceRepository(fetcher: FinanceFetcher): FinanceReposit
       verifyLookupSources(context(value, { kind, operation: 'lookup', query }), query)
       if (!object(value) || !uniqueRows(value.items) || value.items.some(row => !text(row.label) || !row.label.trim() || (row.hint !== undefined && !text(row.hint))))
         broken()
+      if (query.kind === 'construction-mains') {
+        for (const row of value.items) {
+          try {
+            const selected = decodeConstructionMainSelection(row.constructionMain)
+            if (selected.id !== row.id || (query.projectId && selected.projectId !== query.projectId))
+              broken()
+          }
+          catch { broken() }
+        }
+      }
       return value as unknown as FinanceReadEnvelope<LookupOption>
     },
     customer: async (kind, target) => {

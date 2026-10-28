@@ -1,18 +1,21 @@
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { join } from 'node:path'
+import { afterAll, expect, it } from 'vitest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { listMigrationReferences, readMigrationReference } from '../../server/utils/production-migration-references'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it('迁入关联使用实际同库主档ID与独立记录版本，权限/来源或损坏不能猜接', async () => {
-  const root = resolve('.tmp/root-a01-a03-validation')
+  const root = testTempRoot('root-a01-a03-validation')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'migration-references-'))
   const identity = { workspaceId: 'migration-reference-workspace', actorId: 'migration-reference-owner' }
-  const storage = createProductionStorage({ directory, workspaceId: identity.workspaceId, ownerId: identity.actorId, purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: identity.workspaceId, ownerId: identity.actorId, purpose: 'verification' })
   const actor = { ...identity, capabilities: ['project:list:read', 'project:write', 'supplier:list:read', 'supplier:write', 'customer:list:read', 'customer:write'] }
   const project = createProductionProjectService(storage)
   const supplier = createProductionSupplierService(storage)

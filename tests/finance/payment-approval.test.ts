@@ -1,9 +1,8 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { useFinanceStore } from '~/stores/finance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
 vi.mock('~/lib/db/connection', () => ({
@@ -24,8 +23,7 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await db.execute('INSERT INTO suppliers(id,name) VALUES(\'supplier-payment-approval\',\'独立批复校验收款方\')')
   setActivePinia(createPinia())
 })

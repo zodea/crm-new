@@ -6,9 +6,7 @@ import { createPayrollRepository } from '../../app/lib/payroll/central-repositor
 import { createPayrollWorkbookFixture } from '../helpers/payroll-workbook-fixture'
 
 const runtime = vi.hoisted(() => ({ service: null as Awaited<ReturnType<typeof createPayrollWorkbookFixture>>['archive'] | null }))
-vi.mock('../../server/utils/payroll-workbook-runtime', () => ({ get payrollWorkbookService() {
-  return runtime.service
-} }))
+vi.mock('../../server/utils/payroll-workbook-runtime', () => ({ payrollWorkbookServiceForEvent: () => runtime.service }))
 afterEach(() => vi.unstubAllGlobals())
 
 it('真实HTTP预览、归档、列表、冷读取及失响应核对往返，并拒绝多余请求字段', async () => {
@@ -49,7 +47,7 @@ it('真实HTTP预览、归档、列表、冷读取及失响应核对往返，并
     expect(preview.groups[0]!.entries[0]!.document.actualAmount).toBe(525)
     expect(preview.deliveryGaps).toEqual([])
     const command = f.command(preview)
-    await expect(repo.executeWorkbook(command)).rejects.toThrow()
+    await expect(repo.executeWorkbook(command)).rejects.toThrow('项目读取服务暂时不可用，请重试')
     const recovered = await repo.resolveWorkbook(command.commandId, 'p')
     expect(recovered.state).toBe('applied')
     if (recovered.state !== 'applied')

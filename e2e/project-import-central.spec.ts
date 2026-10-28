@@ -252,23 +252,25 @@ test('导入期间取消只完成当前行，重新上传原文件恢复剩余�
   expect(await centralRows(page)).toHaveLength(2)
 })
 
-for (const width of [390, 768, 1024, 1280, 1440]) {
-  test(`${width}px 上传映射预览失败表局部横滚、键盘焦点与取消`, async ({ page }, info) => {
-    await page.setViewportSize({ width, height: 900 })
-    await page.goto('/import/mapping/project')
-    await expectNoPageOverflow(page, '上传')
-    await upload(page, workbook([['拒绝行423', '不存在客户423', '经理423', '', 'VIEW-423']]))
-    await expect(page.getByRole('heading', { name: '导入项目', exact: true })).toBeFocused()
-    await expectNoPageOverflow(page, `预览 ${width}`)
-    const table = page.getByRole('region', { name: '客户身份与阶段核对表' })
-    await table.focus()
-    await page.keyboard.press('ArrowRight')
-    await page.getByRole('button', { name: '开始导入', exact: true }).click()
-    await expect(page.getByRole('region', { name: '项目行级拒绝清单' })).toBeVisible()
-    await expectNoPageOverflow(page, `失败 ${width}`)
-    await page.screenshot({ path: info.outputPath(`viewport-${width}.png`), fullPage: true })
-    await page.getByRole('button', { name: '返回项目列表', exact: true }).click()
-    await expect(page).toHaveURL(/\/project$/)
-    expect(await centralRows(page)).toHaveLength(0)
-  })
-}
+test('上传映射预览失败表在各宽度无页面横滚，键盘焦点与取消', async ({ page }) => {
+  const expectNoOverflowAcrossWidths = async (label: string) => {
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expectNoPageOverflow(page, `${label} ${width}`)
+    }
+  }
+  await page.goto('/import/mapping/project')
+  await expectNoOverflowAcrossWidths('上传')
+  await upload(page, workbook([['拒绝行423', '不存在客户423', '经理423', '', 'VIEW-423']]))
+  await expect(page.getByRole('heading', { name: '导入项目', exact: true })).toBeFocused()
+  await expectNoOverflowAcrossWidths('预览')
+  const table = page.getByRole('region', { name: '客户身份与阶段核对表' })
+  await table.focus()
+  await page.keyboard.press('ArrowRight')
+  await page.getByRole('button', { name: '开始导入', exact: true }).click()
+  await expect(page.getByRole('region', { name: '项目行级拒绝清单' })).toBeVisible()
+  await expectNoOverflowAcrossWidths('失败')
+  await page.getByRole('button', { name: '返回项目列表', exact: true }).click()
+  await expect(page).toHaveURL(/\/project$/)
+  expect(await centralRows(page)).toHaveLength(0)
+})

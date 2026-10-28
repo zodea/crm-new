@@ -3,13 +3,14 @@ import { encodePayrollAdjustmentWire, parsePayrollActualPaymentFormInput, parseP
 import { parsePayrollQuery } from '../../app/lib/payroll/central-codec'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { wireExact, wireId } from '../../app/lib/payroll/central-payroll-wire'
-import { payrollService } from './payroll-runtime'
+import { payrollServiceForEvent } from './payroll-runtime'
 import { throwQuantityError } from './quantity-error'
 
 /** 每个路由固定读取种类；客户端不能选择服务方法或提供另一种写动作。 */
 export function payrollAdjustmentReadHandler(kind: PayrollAdjustmentReadKind) {
   return defineEventHandler(async (event) => {
     try {
+      const payrollService = payrollServiceForEvent(event)
       const body: unknown = await readBody(event)
       wireExact(body, ['query', 'input'])
       wireExact(body.query, ['origin', 'includeDemo', 'projectId', 'crewId', 'month'])

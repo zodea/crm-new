@@ -1,10 +1,8 @@
 # #412 P1：A 工资中央核算与实际发放
 
-> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。历史多轮图片、审查与归档流水统一由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a)定位。当前规则以所引现行权威文档为准，保留的真实原件、源证明和产品打印不改写。
-
 > 本期已完成本地行为、视觉、完整测试及独立复核，达到 `slice-verified`；已独立提交 `c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d`，正常提交钩子通过。固定前置为 `1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3`；[P0 历史接管](../issue-412-payroll-history/README.md)的证据不替代本期日常写入。
 
-本期验证从真实已完成施工与现场量进入工资配置、独立草稿、核对、实际分配、冻结输出和原来源返回。范围及全部验收以[本地 P1 实施票](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/payroll-tickets/01-central-a-payroll.md)为准；长期计算和状态只见[工资页面](../../../rewrite/pages/subcontract-payroll.md)。未外发本票，未推送、部署或运行云 CI。
+本期验证从真实已完成施工与现场量进入工资配置、独立草稿、核对、实际分配、冻结输出和原来源返回。范围及全部验收以[本地 P1 实施票](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/01-central-a-payroll.md)为准；长期计算和状态只见[工资页面](../../../rewrite/pages/subcontract-payroll.md)。未外发本票，未推送、部署或运行云 CI。
 
 ## 本期流程
 
@@ -49,7 +47,7 @@ flowchart TD
 
 ## 最终验收
 
-最终批次 `8a1b9aed-bdf5-4eca-af94-67422e0ce565` 在全新专用内存实例，从真实 SQLite 预检、试运行、导入、确认开始，连续完成首张 A 工资、配置保稿、原来源往返、实际发放、冻结输出及第二张工资重核。未重置业务库，也未拼接旧批次结果。[来源身份与字节摘要](./browser/source-verification.json)、[完整浏览器记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/browser-run.log)和[逐图清单](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/manifest.json)对应同一个批次。
+最终批次 `8a1b9aed-bdf5-4eca-af94-67422e0ce565` 在全新专用内存实例，从真实 SQLite 预检、试运行、导入、确认开始，连续完成首张 A 工资、配置保稿、原来源往返、实际发放、冻结输出及第二张工资重核。未重置业务库，也未拼接旧批次结果。[来源身份与字节摘要](./browser/source-verification.json)、[完整浏览器记录](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/browser-run.log)和[逐图清单](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/manifest.json)对应同一个批次。
 
 | 验证 | 最终结果 |
 | --- | --- |
@@ -57,32 +55,32 @@ flowchart TD
 | 五档交互画面 | 17 组 × 390 / 768 / 1024 / 1280 / 1440，共 85 张逐张通过；C 20、Root 35、另一独立审查员 30 |
 | 完整测试 | `npm test`：626 个文件、3783 项全部通过，242.54 秒 |
 | 类型、构建及规范 | `pnpm typecheck`、构建及本期 109 个源码文件规范检查全部通过 |
-| 独立审查 | Standards / Spec 最终均为 0 项未解决；过程及增量修正见[审查记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/review.md) |
+| 独立审查 | Standards / Spec 最终均为 0 项未解决；过程及增量修正见[审查记录](./review.md) |
 | 冻结输出 | 原工资 PDF 文本回读通过，[工资打印页图](./pdf/frozen-a-payroll-1.png)目检通过；[真实 XLSX](./browser/frozen-a-payroll.xlsx)四表文件解析通过，发放汇总与成员分配核对一致 |
-| 使用指南 | 工资 5 页、迁移 7 页共 12 页已逐页检查；另有实际工资表 1 页，摘要分别记录于 [PDF 清单](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/pdf/manifest.json) |
+| 使用指南 | 工资 5 页、迁移 7 页共 12 页已逐页检查；另有实际工资表 1 页，摘要分别记录于 [PDF 清单](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/pdf/manifest.json) |
 
 实发工资按冻结值显示核算应发 320 元、实际发放 300 元，组内保留 300 元及明确 0 元成员；第二张已核对单在此前实际支付改变后持久标记需重核，重核保留原 75 元输入，再按此前实付 300 元完成发放。实际打印页的中文、金额、签字位和白纸背景均经目检，[查看渲染页](./pdf/frozen-a-payroll-1.png)。
 
-2026-09-14，旧工资打印 PDF 样本已按用户要求移入 Windows 回收站；当前阅读使用上述页图和 Markdown，原始清单中的路径及哈希保留为历史证据。恢复来源见[清理记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/guide-pdf-cleanup-2026-09-14.md)。
+2026-09-14，旧工资打印 PDF 样本已按用户要求移入 Windows 回收站；当前阅读使用上述页图和 Markdown，原始清单中的路径及哈希保留为历史证据。恢复来源见[清理记录](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/research/guide-pdf-cleanup-2026-09-14.md)。
 
 ## 交互效果
 
 | 流程 | 代表画面 |
 | --- | --- |
-| 首张工资与真实缺量 | [工程量入口](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/first-payroll-from-quantity-1440.png)、[8 / 缺值 / 0 的来源核对](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/quantity-missing-zero-390.png) |
-| 整页配置与原草稿 | [工资价格配置](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/subject-price-configuration-390.png)、[配置返回保留输入](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/draft-config-return-390.png) |
-| 原来源与跨楼层定位 | [第二楼层来源焦点](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/second-floor-source-focus-390.png)、[工程量返回](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/quantity-matrix-source-return-1440.png) |
-| 实发确认与失败保留 | [一分不一致](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/release-cent-mismatch-390.png)、[基准变化](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/stale-release-retained-390.png)、[回执丢失后核对原提交](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/unknown-release-retained-390.png) |
-| 冷读与跨月重核 | [完整冻结输出](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/released-frozen-output-1440.png)、[需重新核对](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/second-statement-needs-recheck-390.png)、[重核保留 75 元](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/rechecked-allocation-retained-390.png) |
+| 首张工资与真实缺量 | [工程量入口](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/first-payroll-from-quantity-1440.png)、[8 / 缺值 / 0 的来源核对](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/quantity-missing-zero-390.png) |
+| 整页配置与原草稿 | [工资价格配置](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/subject-price-configuration-390.png)、[配置返回保留输入](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/draft-config-return-390.png) |
+| 原来源与跨楼层定位 | [第二楼层来源焦点](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/second-floor-source-focus-390.png)、[工程量返回](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/quantity-matrix-source-return-1440.png) |
+| 实发确认与失败保留 | [一分不一致](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/release-cent-mismatch-390.png)、[基准变化](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/stale-release-retained-390.png)、[回执丢失后核对原提交](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/unknown-release-retained-390.png) |
+| 冷读与跨月重核 | [完整冻结输出](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/released-frozen-output-1440.png)、[需重新核对](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/second-statement-needs-recheck-390.png)、[重核保留 75 元](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/rechecked-allocation-retained-390.png) |
 
-全部视口及各文件 SHA256 见[唯一画面清单](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/browser/manifest.json)。Root 的 [35 张记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/review/root-image-review-final.json)与独立审查员的 [30 张记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/review/source-image-review-final.json)已归档。此前空白打印、灰底、窄屏配置和来源摘要裁切均有失败复现并已修正；旧诊断轮和视觉失败批次不计入本次 85 张通过结论。
+全部视口及各文件 SHA256 见[唯一画面清单](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/browser/manifest.json)。Root 的 [35 张记录](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/review/root-image-review-final.json)与独立审查员的 [30 张记录](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/review/source-image-review-final.json)已归档。此前空白打印、灰底、窄屏配置和来源摘要裁切均有失败复现并已修正；旧诊断轮和视觉失败批次不计入本次 85 张通过结论。
 
 ## 验收边界
 
 本期仅证明本地中央 A 工资切片和隔离测试实例中的完整链路。已独立提交 `c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d`，正常提交钩子再次通过626文件、3783项（219.34秒），110个代码内容身份与提交逐项一致，未推送、部署或运行云 CI；新增整页的既定设计来源等级不因行为通过而提升。
 
-C1/C2、独立更正与实际补退、房补管理费、空鼓扣款、批量资金建议和完整工作簿在本次验收时继续由 P2–P7 承接；#416 保留生产保存、备份与部署关口。历史分期依据见[调查规格](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/payroll-central-spec-draft.md)，当时的总图及逐 Issue 图见[历史交互报告源码](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/index.html)。当前可用范围直接见[工资页面](../../../rewrite/pages/subcontract-payroll.md)。
+C1/C2、独立更正与实际补退、房补管理费、空鼓扣款、批量资金建议和完整工作簿仍继续 P2–P7；#416 保留生产保存、备份与部署关口。各期可用范围见[总规格](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-central-spec-draft.md)，当前总图及逐 Issue 图见[交互报告](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/index.html#issue-412)。
 
-2026-09-13 10:27 已重新获取远端：13 个实际远端分支均为本地 HEAD 祖先，开放 PR 与未解决冲突为空。本地领先线上主分支 166 个提交、落后 0；包含本期功能提交，尚未推送。具体整合和原工作树边界见[分支记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/local-branch-integration-2026-09-10.md)。
+2026-09-13 10:27 已重新获取远端：13 个实际远端分支均为本地 HEAD 祖先，开放 PR 与未解决冲突为空。本地领先线上主分支 166 个提交、落后 0；包含本期功能提交，尚未推送。具体整合和原工作树边界见[分支记录](https://github.com/zodea/crm-new/blob/212a1cb5/docs/research/local-branch-integration-2026-09-10.md)。
 
-正常提交及代码核对见[提交凭据](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-a/commit-receipt.json)。三个浏览器JSON产物在正常格式化中只补末尾换行；唯一清单同时保存原摘要与当前归档摘要，原业务内容逐值相同。
+正常提交及代码核对见[提交凭据](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-a/commit-receipt.json)。三个浏览器JSON产物在正常格式化中只补末尾换行；唯一清单同时保存原摘要与当前归档摘要，原业务内容逐值相同。

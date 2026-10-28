@@ -16,13 +16,23 @@ import { isISODateTimeDTO } from '../../app/types/read-model'
 import { validateMaterialContractIdentities } from './contract-identity-evidence'
 import { createMaterialContractCommandTestInstance } from './material-contract-command-test-instance'
 import { readOurSignatories, validateOurSignatoryJournal } from './our-signatory-owner'
+import { validateProductionAuxiliaryState } from './production-auxiliary-contract-record'
+import { validateProductionBoqState } from './production-boq-validation'
+import { validateProductionConstructionState } from './production-construction-contract-record'
+import { validateProductionConstructionScopeState } from './production-construction-scope-record'
 import { validateProductionCrewWorkerJournal } from './production-crew-worker-validation'
 import { validateFinanceJournal } from './production-finance-journal'
+import { validateMaterialConstructionBindings } from './production-material-contract-record'
 import { notificationCommandFingerprint } from './production-notification-service'
 import { validateOtherSettlementImportEvidence } from './production-other-settlement-migration'
+import { validateProductionPayrollState } from './production-payroll-validation'
+import { validateProductionQuantityState } from './production-quantity-validation'
 import { ProductionStorageProblem, verifyProductionStorageSchema } from './production-storage'
 import { productionStorageManifest } from './production-storage-schema'
+import { validateProductionSubcontractState } from './production-subcontract-contract-record'
 import { validateProductionSupplierScopeMetadata } from './production-supplier-record'
+import { verifyProductionBudgetState } from './production-target-cost-state'
+import { verifyProductionWbsState } from './production-wbs-record'
 
 export interface ProductionBackupInventory {
   schemaVersion: number
@@ -77,6 +87,89 @@ function readOnlyDomainTransaction(db: DatabaseSync) {
 }
 
 function verifyOriginalOwner(db: DatabaseSync, row: Record<string, SQLOutputValue>, verifiedMetadataOnlyFileIds: ReadonlySet<string>) {
+  if (['boq_file', 'boq_change_order', 'owner_change_order'].includes(String(row.owner_type))) {
+    let qualified = false
+    for (const imported of db.prepare('SELECT evidence_json FROM boq_source_imports').all()) {
+      const evidence = JSON.parse(String(imported.evidence_json))
+      for (const file of evidence.fileProofs) {
+        const original = file.originalMetadata
+        const raw = evidence.rawDomain.file_refs.find((item: { legacyId: string }) => item.legacyId === row.id)
+        if (file.id !== row.id || !original || original.id !== row.id || original.owner_type !== row.owner_type || original.owner_id !== row.owner_id
+          || raw?.columns.owner_type?.exactValue !== row.owner_type || raw?.columns.owner_id?.exactValue !== row.owner_id) {
+          continue
+        }
+        const table = row.owner_type === 'boq_file' ? 'boq_files' : 'boq_change_records'
+        const mapping = evidence.mappings.find((item: { table: string, legacyId: string }) => item.table === table && item.legacyId === file.logicalFileId)
+        if (!mapping)
+          continue
+        const owner = db.prepare(`SELECT b.* FROM ${table} b
+          JOIN construction_contract_records c ON c.id=b.contract_id JOIN projects p ON p.id=b.project_id
+          WHERE b.id=? AND b.project_id=? AND b.contract_id=? AND c.project_id=p.id`).get(mapping.id, mapping.projectId, mapping.contractId)
+        if (!owner)
+          continue
+        const document = JSON.parse(String(owner.record_json))
+        if (row.owner_type === 'boq_file'
+          ? owner.file_ref_id !== row.id
+          : !document.files?.some((item: { id: string }) => item.id === row.id)
+            || (row.owner_type === 'boq_change_order'
+              ? mapping.legacyId !== row.owner_id
+              : document.legacyLedgerId !== row.owner_id && !(document.sourceType === 'manual' && mapping.legacyId === row.owner_id))) {
+          continue
+        }
+        if (verifiedMetadataOnlyFileIds.has(String(row.id)) ? file.bodyState !== 'metadata-only' || file.sha256 !== null : file.bodyState !== 'embedded' || file.sha256 !== row.sha256)
+          continue
+        qualified = true
+      }
+    }
+    if (!qualified)
+      backupInvalid('原清单或签证原件缺明确采用来源、原文件归属或同项目施工主合同依据。')
+    return
+  }
+  if (row.owner_type === 'boq_original') {
+    const confirmed = db.prepare(`SELECT f.id FROM boq_files f
+      JOIN construction_contract_records c ON c.id=f.contract_id
+      JOIN projects p ON p.id=f.project_id
+      WHERE f.file_ref_id=? AND f.id=? AND c.project_id=p.id`).get(row.id!, row.owner_id!)
+    const staged = db.prepare('SELECT workspace_id,actor_id,command_id,request_json FROM boq_command_intents').all().some((intent) => {
+      const request = JSON.parse(String(intent.request_json))
+      return request.action?.kind === 'import-file' && request.action.original?.fileRefId === row.id
+        && row.owner_id === `boq-file-${backupDigest(JSON.stringify([intent.workspace_id, intent.actor_id, intent.command_id])).slice(0, 24)}`
+    })
+    if (row.category !== 'original_boq' || (!confirmed && !staged))
+      backupInvalid('施工清单原件缺已确认清单或固定原命令的真实原始归属。')
+    return
+  }
+  if (row.owner_type === 'schedule_group' || row.owner_type === 'schedule_task') {
+    const table = row.owner_type === 'schedule_group' ? 'schedule_groups' : 'schedule_tasks'
+    const owner = db.prepare(`SELECT b.body_state,b.sha256 FROM schedule_files b
+      JOIN ${table} s ON s.id=b.owner_id JOIN projects p ON p.id=s.project_id
+      WHERE b.file_ref_id=? AND b.owner_type=? AND b.owner_id=? AND b.project_id=s.project_id`).get(row.id!, row.owner_type!, row.owner_id!)
+    if (!owner || (verifiedMetadataOnlyFileIds.has(String(row.id))
+      ? owner.body_state !== 'metadata-only' || owner.sha256 !== null
+      : owner.body_state !== 'embedded' || owner.sha256 !== row.sha256)) {
+      backupInvalid('排程原件缺少真实分组或任务及所属项目的归属。')
+    }
+    return
+  }
+  if (row.owner_type === 'target_cost') {
+    const owner = db.prepare(`SELECT f.body_state,f.sha256 FROM target_cost_files f
+      JOIN target_costs t ON t.id=f.target_cost_id WHERE f.file_ref_id=? AND t.id=?`).get(row.id!, row.owner_id!)
+    if (!owner || (verifiedMetadataOnlyFileIds.has(String(row.id))
+      ? owner.body_state !== 'metadata-only' || owner.sha256 !== null
+      : owner.body_state !== 'embedded' || owner.sha256 !== row.sha256)) {
+      backupInvalid('预算原件、版本归属、正文摘要或历史缺件证据不一致。')
+    }
+    return
+  }
+  if (row.owner_type === 'unit_stage_completion') {
+    const owner = db.prepare(`SELECT c.id FROM unit_stage_completions c
+      JOIN units u ON u.id=c.unit_id JOIN floors f ON f.id=u.floor_id
+      JOIN buildings b ON b.id=f.building_id JOIN construction_stages s ON s.id=c.stage_id
+      WHERE c.id=? AND b.project_id=s.project_id`).get(row.owner_id!)
+    if (!owner || row.category !== 'acceptance_photo' || !String(row.mime_type).startsWith('image/'))
+      backupInvalid('验收照片与真实户、楼栋、项目及施工阶段的归属不一致。')
+    return
+  }
   for (const kind of Object.keys(FINANCE_OWNER_TYPE) as Array<keyof typeof FINANCE_OWNER_TYPE>) {
     if (row.owner_type === FINANCE_OWNER_TYPE[kind]) {
       if (!db.prepare(`SELECT id FROM ${FINANCE_TABLE_BY_KIND[kind]} WHERE id=?`).get(row.owner_id!))
@@ -130,7 +223,55 @@ function verifyOriginalOwner(db: DatabaseSync, row: Record<string, SQLOutputValu
       backupInvalid('工人原件与全局目录、实名资产及实际正文摘要不一致。')
     return
   }
+  if (['contract', 'contract_supplement', 'company_expense_contract'].includes(String(row.owner_type))
+    && db.prepare('SELECT domain FROM production_participants WHERE domain=?').get('auxiliary-contract')) {
+    const binding = db.prepare('SELECT * FROM auxiliary_contract_files WHERE file_ref_id=?').get(row.id!)
+    if (binding) {
+      const owner = binding.owner_kind === 'supplement'
+        ? db.prepare('SELECT id FROM auxiliary_contract_supplements WHERE id=? AND contract_id=?').get(row.owner_id!, binding.contract_id!)
+        : db.prepare('SELECT id FROM auxiliary_contract_records WHERE id=?').get(row.owner_id!)
+      const collisions = [{ table: 'material_contract_records', participant: 'material-contracts' }, { table: 'construction_contract_records', participant: 'construction-contracts' }, { table: 'subcontract_contract_records', participant: 'subcontract-contracts' }]
+        .filter(domain => db.prepare('SELECT domain FROM production_participants WHERE domain=?').get(domain.participant))
+        .some(domain => Boolean(db.prepare(`SELECT id FROM ${domain.table} WHERE id=?`).get(row.owner_id!)))
+      // The complete auxiliary validator has already proved raw namespace mappings and every original byte.
+      if (!owner || collisions || binding.supplement_id !== (binding.owner_kind === 'supplement' ? row.owner_id : null)
+        || (verifiedMetadataOnlyFileIds.has(String(row.id)) ? binding.body_state !== 'metadata-only' || binding.sha256 !== null : binding.body_state !== 'embedded' || binding.sha256 !== row.sha256)) {
+        backupInvalid('辅助合同原件缺少唯一实际归属、完整来源映射或正文依据。')
+      }
+      return
+    }
+  }
   if (row.owner_type === 'contract' || row.owner_type === 'contract_supplement') {
+    for (const domain of [{ participant: 'construction-contracts', prefix: 'construction_contract' }, { participant: 'subcontract-contracts', prefix: 'subcontract_contract' }]) {
+      const registered = db.prepare('SELECT schema_version FROM production_participants WHERE domain=?').get(domain.participant)
+      const binding = registered ? db.prepare(`SELECT * FROM ${domain.prefix}_files WHERE file_ref_id=?`).get(row.id!) : undefined
+      if (!binding)
+        continue
+      const collisions = ['material_contract_records', 'construction_contract_records', 'subcontract_contract_records']
+        .filter(table => table !== `${domain.prefix}_records`)
+        .filter(table => table !== 'subcontract_contract_records' || db.prepare('SELECT domain FROM production_participants WHERE domain=?').get('subcontract-contracts'))
+        .some(table => Boolean(db.prepare(`SELECT id FROM ${table} WHERE id=?`).get(row.owner_id!)))
+      const owner = binding.owner_kind === 'supplement'
+        ? db.prepare(`SELECT id,contract_id FROM ${domain.prefix}_supplements WHERE id=? AND contract_id=?`).get(row.owner_id!, binding.contract_id!)
+        : db.prepare(`SELECT id FROM ${domain.prefix}_records WHERE id=?`).get(row.owner_id!)
+      let metadata
+      try {
+        metadata = JSON.parse(String(binding.original_metadata_json))
+      }
+      catch { backupInvalid('合同原件来源元数据损坏。') }
+      if (!owner || collisions || (binding.owner_kind === 'supplement') !== (row.owner_type === 'contract_supplement')
+        || binding.supplement_id !== (row.owner_type === 'contract_supplement' ? row.owner_id : null)
+        || metadata.id !== row.id || metadata.owner_id !== row.owner_id || metadata.owner_type !== row.owner_type
+        || metadata.file_name !== row.file_name || metadata.file_path !== row.file_path
+        || (metadata.file_size === null ? row.file_size !== null : BigInt(metadata.file_size) !== row.file_size)
+        || metadata.mime_type !== row.mime_type
+        || (verifiedMetadataOnlyFileIds.has(String(row.id))
+          ? binding.body_state !== 'metadata-only' || binding.sha256 !== null
+          : binding.body_state !== 'embedded' || binding.sha256 !== row.sha256)) {
+        backupInvalid('合同或协议原件缺少唯一真实归属、原目录或正文依据。')
+      }
+      return
+    }
     const record = db.prepare('SELECT record_json FROM material_contract_records WHERE id=?').get(row.owner_id!)
     let owner: StoredMaterialContract | undefined
     try {
@@ -149,7 +290,7 @@ function verifyOriginalOwner(db: DatabaseSync, row: Record<string, SQLOutputValu
   backupInvalid('备份出现未登记的原件归属；不能忽略该领域。')
 }
 
-function verifyMaterialOwner(db: DatabaseSync, workspaceId: string, actorId: string) {
+async function verifyMaterialOwner(db: DatabaseSync, workspaceId: string, actorId: string) {
   try {
     const records = db.prepare('SELECT * FROM material_contract_records').all()
     const contracts = records.map((record) => {
@@ -182,6 +323,7 @@ function verifyMaterialOwner(db: DatabaseSync, workspaceId: string, actorId: str
       sealedCommands: resolutions.map(row => String(row.scoped_id)),
     }
     createMaterialContractCommandTestInstance().importState(snapshot)
+    await validateMaterialConstructionBindings(readOnlyDomainTransaction(db), { workspaceId, actorId })
     for (const command of commands) {
       const result = command.result_json === null ? null : JSON.parse(String(command.result_json))
       if ((result?.id ?? null) !== command.contract_id)
@@ -222,7 +364,7 @@ export async function inspectProductionBackup(path: string): Promise<ProductionB
       backupInvalid('备份实表与完整清单不一致。')
     verifyProductionStorageSchema(db, schemaVersion)
     if (manifest.participants['material-contracts'])
-      verifyMaterialOwner(db, meta.workspace_id, meta.owner_id)
+      await verifyMaterialOwner(db, meta.workspace_id, meta.owner_id)
     if (manifest.participants['material-quotations']) {
       try {
         await validateMaterialQuotationSchema(readOnlyDomainTransaction(db))
@@ -240,6 +382,76 @@ export async function inspectProductionBackup(path: string): Promise<ProductionB
         await validateProductionCrewWorkerJournal(readOnlyDomainTransaction(db), { workspaceId: meta.workspace_id, actorId: meta.owner_id })
       }
       catch { backupInvalid('全局班组工人目录、实名原件、冻结历史或原回执证据不完整。') }
+    }
+    if (manifest.participants['target-cost']) {
+      try {
+        const budget = await verifyProductionBudgetState(readOnlyDomainTransaction(db))
+        for (const fileId of budget.metadataOnlyFileIds)
+          verifiedMetadataOnlyFileIds.add(fileId)
+      }
+      catch { backupInvalid('预算版本、原件、原命令、迁入原图或历史缺件依据不完整。') }
+    }
+    if (manifest.participants.payroll) {
+      try {
+        const payroll = await validateProductionPayrollState(readOnlyDomainTransaction(db))
+        for (const fileId of payroll.metadataOnlyFileIds)
+          verifiedMetadataOnlyFileIds.add(fileId)
+      }
+      catch { backupInvalid('工资冻结、原执行、正式编号、完整目录、原命令或迁入依据不完整。') }
+    }
+    if (manifest.participants.quantity) {
+      try {
+        const quantity = await validateProductionQuantityState(readOnlyDomainTransaction(db))
+        for (const fileId of quantity.metadataOnlyFileIds)
+          verifiedMetadataOnlyFileIds.add(fileId)
+      }
+      catch { backupInvalid('工程量原图、责任、照片、空鼓、原命令或迁入映射依据不完整。') }
+    }
+    if (manifest.participants.wbs) {
+      try {
+        const wbs = await verifyProductionWbsState(readOnlyDomainTransaction(db), { workspaceId: meta.workspace_id, actorId: meta.owner_id })
+        for (const fileId of wbs.metadataOnlyFileIds)
+          verifiedMetadataOnlyFileIds.add(fileId)
+      }
+      catch { backupInvalid('WBS原图、正式工序库、计划、原命令或迁入依据不完整。') }
+    }
+    if (manifest.participants['construction-contracts']) {
+      try {
+        const construction = await validateProductionConstructionState(readOnlyDomainTransaction(db), { workspaceId: meta.workspace_id, actorId: meta.owner_id })
+        for (const fileId of construction.metadataOnlyFileIds)
+          verifiedMetadataOnlyFileIds.add(fileId)
+      }
+      catch { backupInvalid('施工主合同、协议、签约主体、编号、原件、历史或原命令依据不完整。') }
+    }
+    if (manifest.participants['subcontract-contracts']) {
+      try {
+        const subcontract = await validateProductionSubcontractState(readOnlyDomainTransaction(db), { workspaceId: meta.workspace_id, actorId: meta.owner_id })
+        for (const fileId of subcontract.metadataOnlyFileIds)
+          verifiedMetadataOnlyFileIds.add(fileId)
+      }
+      catch { backupInvalid('分包主合同、协议、签约主体、编号、原件、历史或原命令依据不完整。') }
+    }
+    if (manifest.participants['auxiliary-contract']) {
+      try {
+        const auxiliary = await validateProductionAuxiliaryState(readOnlyDomainTransaction(db), { workspaceId: meta.workspace_id, actorId: meta.owner_id })
+        for (const fileId of auxiliary.metadataOnlyFileIds)
+          verifiedMetadataOnlyFileIds.add(fileId)
+      }
+      catch { backupInvalid('辅助合同、公司独立头、原补充协议、原件、历史或原命令依据不完整。') }
+    }
+    if (manifest.participants['construction-scope']) {
+      try {
+        await validateProductionConstructionScopeState(readOnlyDomainTransaction(db))
+      }
+      catch { backupInvalid('施工主合同与原合同或费用的单份关联、历史或原命令依据不完整。') }
+    }
+    if (manifest.participants.boq) {
+      try {
+        const boq = await validateProductionBoqState(readOnlyDomainTransaction(db))
+        for (const fileId of boq.metadataOnlyFileIds)
+          verifiedMetadataOnlyFileIds.add(fileId)
+      }
+      catch { backupInvalid('施工清单、有效变更、共享原件、原命令或完整迁入依据不完整。') }
     }
     if (manifest.participants.finance) {
       try {

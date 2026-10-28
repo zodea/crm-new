@@ -1,3 +1,4 @@
+import type { ConstructionMainOption, ConstructionMainSelection } from '../construction-scope/contract'
 import type {
   ContractFormAttachment,
   ContractFormAttachmentChanges,
@@ -6,6 +7,7 @@ import type {
 } from '../contract/forms'
 import type { ContractSupplierOption } from '../contract/page'
 import type { CommandResolution } from '../forms/command-recovery'
+import type { OurSignatoryRecord } from '../our-signatory/contract'
 
 export const SUBCONTRACT_CONTRACT_WRITE_CAPABILITY = 'subcontract-contract:write' as const
 
@@ -15,6 +17,8 @@ export interface SubcontractContractCommandContextDTO {
   capabilities: string[]
   projects: Array<{ id: string, label: string }>
   suppliers: ContractSupplierOption[]
+  constructionMains?: ConstructionMainOption[]
+  ourSignatories?: OurSignatoryRecord[]
 }
 
 export interface SubcontractContractCommandRequestDTO {
@@ -27,6 +31,7 @@ export interface SubcontractContractCommandRequestDTO {
   action: F2SaveAction
   draft: ProjectContractFormDraft
   attachments: ContractFormAttachmentChanges
+  constructionMain?: ConstructionMainSelection
 }
 
 export interface SubcontractContractCommandResultDTO {
@@ -42,6 +47,7 @@ export interface SubcontractContractFormReadDTO {
   attachments: ContractFormAttachment[]
   version: string
   updatedAt: string
+  constructionMain?: ConstructionMainSelection | null
 }
 
 export interface SubcontractContractCommandRepository {

@@ -75,7 +75,8 @@ export function usePayrollAFeesConfig(options: {
     management.value = null
   }
   function restorePending(value: PayrollAFeeConfigRead) {
-    const action = store.getPending(value)?.command.action
+    const pending = store.getPending(value)
+    const action = pending?.restoredFromDescriptor ? undefined : pending?.command.action
     if (action?.kind === 'save-a-fees') {
       rows.value = action.fees.map(draft => ({ key: draft.feeId || generateId('fee-input'), draft: clone(draft) }))
       removed.value = clone(action.remove)

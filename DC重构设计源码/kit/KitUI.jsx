@@ -123,7 +123,12 @@
   //     { key,label,value,type,options,placeholder,full,
   //       required:true,                            必填：label 星号 + 保存全量校验（红框 + 字段下红字 + warning toast 双通道）
   //       hint:"说明",                               字段下方灰色说明文字
-  //       suffix:"元",                               输入框尾单位
+  //       suffix:"元",                               输入框尾单位；单位为「元」或 capital:true 时悬停 / 聚焦显示人民币大写
+  //       auto:(vals)=>值, resetOn:["key"],          自动计算但可手动改写（如税额、无税金额）；用户改写后不再覆盖，
+  //                                                  resetOn 中任一字段变化即恢复自动计算；返回 null 表示不自动
+  //       check:(value, vals)=>"错误说明"|null,      输入时与保存时校验（如不能为负、不能超过含税金额、日期范围）
+  //       unique:(value, vals)=>"重复说明"|null,     保存校验时查重（如合同编号），返回说明即判为错误
+  //       min / max: "YYYY-MM-DD" | (vals)=>…         日期范围：日历置灰越界日期，保存时拦截
   //       type:"readonly",                          只读带出（灰底）；配 compute(vals) 任意字段变更实时重算（级联带出）
   //       type:"lookup",                            检索下拉：输入过滤 + 命中高亮 + ✕清空；options 可为 fn(vals)（级联过滤）
   //       dependsOn:{key,label},                    依赖字段未填：聚焦弹 warning toast「该字段依赖…」不开浮层
@@ -157,48 +162,94 @@
           var v = c.f.compute(vals);
           c.input.textContent = v == null || v === "" ? "—" : String(v);
         }
+        // 自动计算字段：resetOn 依赖变化则恢复自动；未手动改写时跟随其他字段
+        if (c.f.auto && c.f.resetOn) {
+          var sig = c.f.resetOn.map(function (k) { return vals[k]; }).join("|");
+          if (c.depSig != null && c.depSig !== sig) c.manual = false;
+          c.depSig = sig;
+        }
+        if (c.f.auto && !c.manual && c.setAuto) c.setAuto(c.f.auto(vals));
+        if (c.f.check && c.liveCheck) c.liveCheck(vals);
+        if (c.rangeOf) c.rerender && c.rerender();
+        // 级联选项（options 为函数）随其他字段刷新
+        if (c.rerender && typeof c.f.options === "function") c.rerender();
       });
     };
-    var inputStyle = { width: "100%", border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", padding: "8px 11px", fontSize: "13px", background: "#fff", boxSizing: "border-box", fontFamily: "inherit" };
+    var inputStyle = { width: "100%", height: "32px", border: "1px solid var(--line-strong)", borderRadius: "6px", padding: "0 10px", fontSize: "13px", background: "var(--panel)", boxSizing: "border-box", fontFamily: "inherit" };
+    // 文本类控件统一套 KitControls 外框（kc-ctl：32px / 焦点环 / 错误红框 / 单位后缀分段）
+    var ctlBox = function (inner, extraCls) {
+      var box = el("label", null); box.className = "kc-ctl" + (extraCls ? " " + extraCls : "");
+      box.appendChild(inner);
+      return box;
+    };
 
     // —— 检索下拉（KitLookup 设计稿版：过滤 + 高亮 + ✕ + 依赖拦截）——
+    // —— 字段提示行：错误 > 自动计算状态 > 说明 ——
+    function renderMsg(c) {
+      var e = c.err;
+      if (!e) return;
+      e.innerHTML = "";
+      e.removeAttribute("role");
+      if (c.errorText) { e.style.color = "var(--danger-ink)"; e.textContent = c.errorText; e.title = c.errorText; e.setAttribute("role", "alert"); return; }
+      e.style.color = "var(--ink-faint)";
+      e.textContent = c.f.hint || "";
+      e.title = c.f.hint || "";
+    }
+    // —— 金额大写：对应 reka-ui HoverCard（side="top"）；悬停 / 聚焦显示在输入框上方，可移入、选中复制或点复制按钮 ——
+    function attachCapital(box, input) {
+      var tip = null, timer = null;
+      var keep = function () { clearTimeout(timer); };
+      var hideSoon = function () { keep(); timer = setTimeout(hide, 200); };
+      var hide = function () { if (tip) { tip.remove(); tip = null; } };
+      var show = function () {
+        keep();
+        var KC = window.KitControls;
+        var t = KC && KC.toCapital ? KC.toCapital(input.value) : "";
+        if (!t) return hide();
+        var r = box.getBoundingClientRect();
+        if (!tip) {
+          tip = el("div", null); tip.className = "kc-hint-pop"; tip.setAttribute("role", "tooltip");
+          tip.addEventListener("mouseenter", keep); tip.addEventListener("mouseleave", hideSoon);
+          var txt = el("span", null); txt.className = "kc-hint-text"; tip.appendChild(txt);
+          var cp = el("button", null, "复制"); cp.className = "kc-hint-copy"; cp.type = "button"; cp.title = "复制"; cp.setAttribute("aria-label", "复制"); cp.style.fontSize = "11px"; cp.style.width = "auto"; cp.style.padding = "0 6px";
+          cp.addEventListener("mousedown", function (e) { e.preventDefault(); });
+          cp.addEventListener("click", function () { var v = tip.firstChild.textContent; var done = function () { cp.textContent = "已复制"; setTimeout(function () { if (cp) cp.textContent = "复制"; }, 1200); }; if (navigator.clipboard) navigator.clipboard.writeText(v).then(done, done); else done(); });
+          tip.appendChild(cp);
+          document.body.appendChild(tip);
+        }
+        tip.firstChild.textContent = t;
+        // 同 reka-ui HoverCard side="top"：以 bottom 锚定在输入框上方，不测量浮层高度
+        tip.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 8 - 280)) + "px"; tip.style.bottom = (window.innerHeight - r.top + 6) + "px";
+      };
+      box.addEventListener("mouseenter", show); box.addEventListener("mouseleave", hideSoon);
+      input.addEventListener("focus", show); input.addEventListener("blur", hideSoon); input.addEventListener("input", function () { if (tip) show(); });
+    }
+    // —— React 控件挂载：选择框 / 日期 / 检索复用 KitControls（与 reka-ui 同构），不在 DOM 里另写一套 ——
+    // 返回 { node, input(=外框，供校验标红), get, setError }；值变化 → markDirty + recompute
+    function mountKC(kind, f, extra) {
+      var KC = window.KitControls;
+      var host = el("div", { minWidth: "0" });
+      var state = { value: f.value != null ? f.value : "", error: false };
+      var root = ReactDOM.createRoot(host);
+      var render = function () {
+        var props = Object.assign({ value: state.value, error: state.error, placeholder: f.placeholder, ariaLabel: f.label,
+          onChange: function (v) { state.value = v; render(); markDirty(); recompute(); } }, extra ? extra() : null);
+        root.render(React.createElement(KC[kind], props));
+      };
+      render();
+      return { node: host, input: host, rerender: render, get: function () { return state.value; },
+        setError: function (on) { state.error = on; render(); } };
+    }
     function buildLookup(f) {
-      var wrap = el("div", { position: "relative" });
-      var input = el("input", inputStyle);
-      input.type = "text";
-      input.placeholder = f.placeholder || "输入关键词检索";
-      input.value = f.value != null ? f.value : "";
-      input.style.paddingRight = "26px";
-      var clearBtn = el("button", { position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)", border: "0", background: "transparent", cursor: "pointer", color: "var(--ink-faint)", fontSize: "14px", lineHeight: "1", padding: "2px", display: input.value ? "block" : "none" }, "✕");
-      var drop = el("div", { position: "absolute", left: "0", right: "0", top: "calc(100% + 4px)", zIndex: "30", background: "var(--panel)", border: "1px solid var(--line-strong)", borderRadius: "8px", boxShadow: "var(--shadow-pop)", maxHeight: "196px", overflowY: "auto", display: "none" });
       var getOptions = function () { return (typeof f.options === "function" ? f.options(getAllVals()) : f.options) || []; };
-      var depBlocked = function () {
-        if (!f.dependsOn) return false;
-        var v = getAllVals()[f.dependsOn.key];
-        if (v) return false;
+      var ctrl = mountKC("Combobox", f, function () { return { options: getOptions(), onCreate: f.onCreate, createLabel: f.createLabel }; });
+      // 依赖字段未填：聚焦即提示并失焦，不开浮层（契约 dependsOn）
+      ctrl.node.addEventListener("focusin", function (e) {
+        if (!f.dependsOn || getAllVals()[f.dependsOn.key]) return;
         toast("该字段依赖「" + (f.dependsOn.label || f.dependsOn.key) + "」的值，请补全后操作", "warn");
-        return true;
-      };
-      var render = function (kw) {
-        drop.innerHTML = "";
-        var list = getOptions().filter(function (o) { return !kw || String(o).toLowerCase().indexOf(kw.toLowerCase()) > -1; }).slice(0, 40);
-        if (!list.length) { drop.appendChild(el("div", { padding: "10px 12px", fontSize: "12px", color: "var(--ink-faint)" }, "无匹配项")); return; }
-        list.forEach(function (o) {
-          var label = String(o);
-          var html = kw ? label.replace(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), function (m) { return '<b style="color:var(--brand);font-weight:800;">' + m + "</b>"; }) : label;
-          var item = el("div", { padding: "8px 12px", fontSize: "13px", cursor: "pointer" }, html);
-          item.addEventListener("mouseenter", function () { item.style.background = "var(--brand-soft)"; });
-          item.addEventListener("mouseleave", function () { item.style.background = "transparent"; });
-          item.addEventListener("mousedown", function (e) { e.preventDefault(); input.value = label; clearBtn.style.display = "block"; drop.style.display = "none"; markDirty(); recompute(); });
-          drop.appendChild(item);
-        });
-      };
-      input.addEventListener("focus", function () { if (depBlocked()) { input.blur(); return; } render(""); drop.style.display = "block"; });
-      input.addEventListener("input", function () { render(input.value); drop.style.display = "block"; clearBtn.style.display = input.value ? "block" : "none"; markDirty(); recompute(); });
-      input.addEventListener("blur", function () { setTimeout(function () { drop.style.display = "none"; }, 120); });
-      clearBtn.addEventListener("mousedown", function (e) { e.preventDefault(); input.value = ""; clearBtn.style.display = "none"; markDirty(); recompute(); });
-      wrap.appendChild(input); wrap.appendChild(clearBtn); wrap.appendChild(drop);
-      return { node: wrap, input: input, get: function () { return input.value; } };
+        if (e.target && e.target.blur) e.target.blur();
+      });
+      return ctrl;
     }
 
     // —— 明细网格（KitEditGrid 设计稿版：添加/复制/删除 + 行内编辑 + 派生列 + Σ汇总）——
@@ -391,7 +442,7 @@
     // —— 布局：grid（弹窗，默认）｜cards（整页表单：每个 section 一张圆角卡片 + 锚点）——
     // 两列 = repeat(auto-fit, minmax(280px,1fr))：容器不足最小可读宽度自动降单列（ADR 0013 响应式契约②③，勿写死 1fr 1fr）
     var cardsMode = opts.layout === "cards";
-    var mkGrid = function () { return el("div", { display: "grid", gridTemplateColumns: opts.cols === 2 ? "repeat(auto-fit, minmax(280px, 1fr))" : "1fr", gap: "12px", alignContent: "start" }); };
+    var mkGrid = function () { return el("div", { display: "grid", gridTemplateColumns: opts.cols === 2 ? "repeat(auto-fit, minmax(280px, 1fr))" : "1fr", columnGap: "16px", rowGap: "6px", alignContent: "start" }); };
     var root, grid;
     if (cardsMode) { root = el("div"); grid = null; } else { root = grid = mkGrid(); }
     var openCard = function (title) {
@@ -413,8 +464,8 @@
         return;
       }
       if (cardsMode && !grid) openCard(null);
-      var wrap = el("div", (f.full || f.type === "grid" || f.type === "textarea") ? { gridColumn: "1 / -1" } : null);
-      var lab = el("div", { fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", marginBottom: "5px" });
+      var wrap = el("div", Object.assign({ display: "grid", gridTemplateRows: "20px auto 18px", rowGap: "4px", minWidth: "0" }, (f.full || f.type === "grid" || f.type === "textarea") ? { gridColumn: "1 / -1" } : null));
+      var lab = el("div", { fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", overflow: "hidden" });
       lab.innerHTML = f.label + (f.required ? ' <span style="color:var(--danger)">*</span>' : "");
       wrap.appendChild(lab);
       var ctrl;
@@ -428,45 +479,73 @@
         ctrl = buildFile(f);
         wrap.appendChild(ctrl.node);
       } else if (f.type === "readonly") {
-        var ro = el("div", { width: "100%", border: "1px dashed var(--line)", borderRadius: "var(--radius-btn)", padding: "8px 11px", fontSize: "13px", background: "var(--surface-2)", color: "var(--ink-soft)", boxSizing: "border-box", minHeight: "35px" }, f.value == null || f.value === "" ? "—" : String(f.value));
-        ctrl = { input: ro, get: function () { return ro.textContent === "—" ? "" : ro.textContent; } };
-        wrap.appendChild(ro);
+        var ro = el("span", { flex: "1", minWidth: "0", padding: "0 10px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, f.value == null || f.value === "" ? "—" : String(f.value));
+        var roBox = ctlBox(ro, "ro");
+        if (f.suffix) roBox.appendChild(el("span", null, f.suffix)).className = "kc-sfx";
+        ctrl = { input: ro, box: roBox, get: function () { return ro.textContent === "—" ? "" : ro.textContent; } };
+        wrap.appendChild(roBox);
       } else if (f.type === "select") {
-        var input = el("select", inputStyle);
-        var optList = (typeof f.options === "function" ? f.options({}) : f.options) || [];
-        optList.forEach(function (o) { var op = el("option", null, o); op.value = o; if (o === f.value) op.selected = true; input.appendChild(op); });
-        input.addEventListener("change", function () { markDirty(); recompute(); });
-        ctrl = { input: input, get: function () { return input.value; } };
-        wrap.appendChild(input);
+        ctrl = mountKC("Select", f, function () { return { options: (typeof f.options === "function" ? f.options(getAllVals()) : f.options) || [] }; });
+        wrap.appendChild(ctrl.node);
+      } else if (f.type === "date") {
+        var rangeOf = function () { var vals = getAllVals(); return { min: typeof f.min === "function" ? f.min(vals) : f.min, max: typeof f.max === "function" ? f.max(vals) : f.max }; };
+        ctrl = mountKC("DatePicker", f, (f.min || f.max) ? rangeOf : null);
+        if (f.min || f.max) ctrl.rangeOf = rangeOf;
+        wrap.appendChild(ctrl.node);
       } else if (f.type === "textarea") {
-        var ta = el("textarea", Object.assign({}, inputStyle, { minHeight: "64px", resize: "vertical" }));
+        var ta = el("textarea", { flex: "1", minWidth: "0" });
         ta.value = f.value || "";
+        ta.rows = 3;
         if (f.placeholder) ta.placeholder = f.placeholder;
         ta.addEventListener("input", function () { markDirty(); recompute(); });
-        ctrl = { input: ta, get: function () { return ta.value; } };
-        wrap.appendChild(ta);
+        var taBox = ctlBox(ta, "area");
+        ctrl = { input: ta, box: taBox, get: function () { return ta.value; } };
+        wrap.appendChild(taBox);
       } else {
-        var inp = el("input", inputStyle);
-        inp.type = f.type || "text";
+        var inp = el("input", null);
+        inp.type = f.type === "number" ? "text" : (f.type || "text");
+        if (f.type === "number" || f.suffix) { inp.style.textAlign = "right"; inp.style.fontVariantNumeric = "tabular-nums"; }
+        if (f.type === "number") inp.inputMode = "decimal";
         inp.value = f.value != null ? f.value : "";
         if (f.placeholder) inp.placeholder = f.placeholder;
-        inp.addEventListener("input", function () { markDirty(); recompute(); });
-        if (f.suffix) {
-          var sWrap = el("div", { position: "relative" });
-          inp.style.paddingRight = "34px";
-          sWrap.appendChild(inp);
-          sWrap.appendChild(el("span", { position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "12px", color: "var(--ink-faint)", pointerEvents: "none" }, f.suffix));
-          ctrl = { input: inp, get: function () { return inp.value; } };
-          wrap.appendChild(sWrap);
-        } else {
-          ctrl = { input: inp, get: function () { return inp.value; } };
-          wrap.appendChild(inp);
+        var inBox = ctlBox(inp);
+        if (f.suffix) inBox.appendChild(el("span", null, f.suffix)).className = "kc-sfx";
+        var isNum = f.type === "number" && f.decimals !== null;   // decimals:null = 纯数字输入，不做千分位（如税率）
+        // 数字：失焦千分位、聚焦还原；取值去逗号，自动计算与保存不受格式影响
+        var dp = f.decimals != null ? f.decimals : 2;
+        var fmtNum = function (raw) { var n = Number(String(raw).replace(/,/g, "")); return raw === "" || !isFinite(n) ? raw : n.toLocaleString("zh-CN", { minimumFractionDigits: dp, maximumFractionDigits: dp }); };
+        if (isNum) {
+          inp.value = fmtNum(inp.value);
+          inp.addEventListener("focus", function () { inp.value = inp.value.replace(/,/g, ""); });
+          inp.addEventListener("blur", function () { inp.value = fmtNum(inp.value); });
         }
+        ctrl = { input: inp, box: inBox, get: function () { return isNum ? inp.value.replace(/,/g, "") : inp.value; } };
+        if (f.auto) {
+          // 已存有值视为人工确认值，不被自动结果覆盖
+          ctrl.manual = f.value != null && f.value !== "";
+          ctrl.setAuto = function (v) { if (v == null) return; var t = typeof v === "number" ? v.toFixed(2) : String(v); inp.value = isNum && document.activeElement !== inp ? fmtNum(t) : t; };
+        }
+        inp.addEventListener("input", function () {
+          if (f.auto) ctrl.manual = true;
+          if (ctrl.errorText) { ctrl.errorText = ""; inBox.classList.remove("err"); }
+          renderMsg(ctrl); markDirty(); recompute();
+        });
+        if (f.check) ctrl.liveCheck = function (vals) {
+          var v = ctrl.get();
+          var msg = v === "" || v == null ? null : f.check(v, vals);
+          ctrl.errorText = msg || (ctrl.errorText && ctrl.errorKind === "check" ? "" : ctrl.errorText);
+          ctrl.errorKind = msg ? "check" : ctrl.errorKind;
+          inBox.classList.toggle("err", !!ctrl.errorText);
+          renderMsg(ctrl);
+        };
+        if (f.suffix === "元" || f.capital) attachCapital(inBox, inp);
+        wrap.appendChild(inBox);
       }
-      if (f.hint) wrap.appendChild(el("div", { fontSize: "11.5px", color: "var(--ink-faint)", marginTop: "4px", lineHeight: "1.5" }, f.hint));
-      var err = el("div", { fontSize: "11.5px", color: "var(--danger)", marginTop: "4px", display: "none" }, "");
+      // 说明与错误共用一条预留行：出错时红字替换说明，行高不变（V-09）
+      var err = el("div", { fontSize: "11.5px", lineHeight: "18px", color: "var(--ink-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, "");
       wrap.appendChild(err);
       ctrl.f = f; ctrl.wrap = wrap; ctrl.err = err;
+      renderMsg(ctrl);
       ctrls.push(ctrl);
       grid.appendChild(wrap);
     });
@@ -476,14 +555,24 @@
     var validate = function () {
       var bad = [];
       ctrls.forEach(function (c) {
-        var isEmpty = c.f.required && (c.get() === "" || c.get() == null || (Array.isArray(c.get()) && !c.get().length));
-        if (c.input && c.input.style) c.input.style.borderColor = isEmpty ? "var(--danger)" : "var(--line-strong)";
-        c.err.style.display = isEmpty ? "block" : "none";
-        c.err.textContent = isEmpty ? c.f.label + "：为必填项" : "";
-        if (isEmpty) bad.push(c);
+        var v = c.get();
+        var isEmpty = !!c.f.required && (v === "" || v == null || (Array.isArray(v) && !v.length));
+        var has = !isEmpty && v !== "" && v != null;
+        var rg = has && c.rangeOf ? c.rangeOf() : null;
+        var dup = (has && typeof c.f.check === "function" ? c.f.check(v, getAllVals()) : null)
+          || (rg && rg.min && String(v) < rg.min ? c.f.label + "不能早于 " + rg.min + (c.f.minLabel ? "（" + c.f.minLabel + "）" : "") : null)
+          || (rg && rg.max && String(v) > rg.max ? c.f.label + "不能晚于 " + rg.max + (c.f.maxLabel ? "（" + c.f.maxLabel + "）" : "") : null)
+          || (has && typeof c.f.unique === "function" ? c.f.unique(v, getAllVals()) : null);
+        var bad1 = isEmpty || !!dup;
+        if (c.setError) c.setError(bad1);
+        else if (c.box) c.box.classList.toggle("err", bad1);
+        else if (c.input && c.input.style) c.input.style.borderColor = bad1 ? "var(--danger)" : "var(--line-strong)";
+        c.errorText = isEmpty ? "请填写" + c.f.label : (dup || "");
+        renderMsg(c);
+        if (bad1) bad.push(c);
       });
       if (bad.length) {
-        toast(bad[0].f.label + "：为必填项" + (bad.length > 1 ? "（等 " + bad.length + " 处）" : ""), "warn");
+        toast((bad[0].errorText || bad[0].f.label + "：为必填项") + (bad.length > 1 ? "（等 " + bad.length + " 处）" : ""), "warn");
         bad[0].input.scrollIntoView({ block: "center", behavior: "smooth" });
       }
       return !bad.length;
@@ -491,8 +580,8 @@
 
     return { node: root, getVals: getVals, getAllVals: getAllVals, validate: validate, recompute: recompute, anchors: anchors,
       focusFirst: function () {
-        var first = ctrls.find(function (c) { return c.f.type !== "readonly" && c.f.type !== "grid" && c.f.type !== "file" && c.input && c.input.focus; });
-        if (first) setTimeout(function () { try { first.input.focus(); } catch (e) {} }, 50);
+        var first = ctrls.find(function (c) { return c.f.type !== "readonly" && c.f.type !== "grid" && c.f.type !== "file" && c.input; });
+        if (first) setTimeout(function () { try { var t = first.input.querySelector ? (first.input.querySelector("input,button,textarea") || first.input) : first.input; if (t.focus) t.focus(); } catch (e) {} }, 50);
       } };
   }
 

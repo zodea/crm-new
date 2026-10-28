@@ -3,9 +3,11 @@ import { scryptSync } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { resolve } from 'node:path'
 import { createApp, createError, createRouter, defineEventHandler, getHeader, getRouterParam, readBody, toNodeListener } from 'h3'
-import { expect, it, vi } from 'vitest'
+import { afterAll, expect, it, vi } from 'vitest'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it.each(Array.from([{ origin: 'demo' }, { includeDemo: true }, { capabilities: ['customer:write'] }, { commandId: 'with spaces' }, { commandId: 'x'.repeat(81) }]).flatMap(input1 => Array.from([{ origin: 'demo' }, { includeDemo: true }, { commandId: 'with spaces' }]).map(input2 => ({ input1, input2 }))))('生产公开命令在解码前拒绝跨来源、伪能力与无法回查的编号：输入案例 %#', async ({ input1, input2 }) => {
   vi.resetModules()
@@ -29,7 +31,7 @@ it.each(Array.from([{ origin: 'demo' }, { includeDemo: true }, { capabilities: [
   const server = createServer(toNodeListener(app)).listen(0, '127.0.0.1')
   await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  const base = resolve('.codex-tmp/issue-450-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-450-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/http-`)
   const code = 'http-boundary-synthetic-code'

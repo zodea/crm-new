@@ -10,9 +10,9 @@ import process from 'node:process'
 import { expect, test } from '@playwright/test'
 
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '需先构建，只连接本次合成目录与临时本机端口')
-test('客户原件公开备份、失响应原键、离线副本与隔离冷恢复保持一致', async ({ page }, info) => {
+test('客户原件公开备份、失响应原键、离线副本与隔离冷恢复保持一致', async ({ page }) => {
   test.setTimeout(150_000)
-  const base = resolve('.codex-tmp/issue-451-browser')
+  const base = resolve('.tmp/legacy-test-artifacts/issue-451-browser')
   await mkdir(base, { recursive: true })
   const root = await mkdtemp(`${base}/synthetic-`)
   const directories = Object.fromEntries(['source', 'staging', 'nas', 'offline', 'restore'].map(name => [name, join(root, name)]))
@@ -84,8 +84,6 @@ test('客户原件公开备份、失响应原键、离线副本与隔离冷恢�
       await expect.poll(() => dialog.evaluate(element => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(Math.min(640, width - 24) - 1)
       await page.keyboard.press('Tab')
       expect(await dialog.evaluate(element => element.contains(document.activeElement))).toBe(true)
-      if ([390, 1440].includes(width))
-        await page.screenshot({ path: info.outputPath(`backup-${width}.png`), fullPage: true })
     }
     let originalBackupCommand = ''
     let backupId = ''
@@ -144,7 +142,6 @@ test('客户原件公开备份、失响应原键、离线副本与隔离冷恢�
     expect(original.headers()['x-content-sha256']).toBe(createHash('sha256').update(bytes).digest('hex'))
     await page.goto(`${origin}/base/customer/${customer.id}?origin=real`)
     await expect(page.getByRole('heading', { name: command.draft.name, exact: true })).toBeVisible()
-    await page.screenshot({ path: info.outputPath('restored-customer.png'), fullPage: true })
     expect(errors).toEqual([])
   }
   finally {

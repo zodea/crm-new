@@ -31,7 +31,7 @@ import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
 interface Option { id: string, name: string, contact?: string, contactPhone?: string }
 
-interface StoredContract {
+export interface StoredSubcontractContract {
   draft: ProjectContractFormDraft & { id: string }
   attachments: ContractFormAttachment[]
   originals: Map<string, { bytes: Uint8Array, sha256: string }>
@@ -41,6 +41,13 @@ interface StoredContract {
   migrationBatchId: string | null
   settlementStatus: string | null
   clearanceStatus: string | null
+}
+type StoredContract = StoredSubcontractContract
+export interface SubcontractContractOwnerSnapshot {
+  schemaVersion: 1
+  sourceVersion: number
+  contracts: StoredSubcontractContract[]
+  supplements: SubcontractContractFactSources['supplements']
 }
 
 interface Options {
@@ -216,6 +223,28 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
   }
 
   const instance = {
+    /** Reuse the domain inside one formal transaction, without importing a second master directory. */
+    importState(snapshot: SubcontractContractOwnerSnapshot) {
+      if (snapshot.schemaVersion !== 1 || !Number.isSafeInteger(snapshot.sourceVersion) || snapshot.sourceVersion < 0 || new Set(snapshot.contracts.map(row => row.draft.id)).size !== snapshot.contracts.length)
+        throw failure('unavailable', '分包owner原身份或版本无效')
+      for (const row of snapshot.contracts) {
+        if (!row.draft.id || !Number.isSafeInteger(row.version) || row.version < 1 || !Number.isFinite(Date.parse(row.createdAt)) || !Number.isFinite(Date.parse(row.updatedAt)) || !(row.originals instanceof Map))
+          throw failure('unavailable', '分包原资料、时间、版本或原件目录缺失')
+        for (const file of row.attachments) {
+          if (!file.id || file.ownerType !== 'contract' || file.ownerId !== row.draft.id)
+            throw failure('unavailable', '分包原件串了正式归属')
+          const original = row.originals.get(file.id)
+          if (original && (original.bytes.length !== file.fileSize || contractOriginalDigest(original.bytes) !== original.sha256 || file.sha256 !== original.sha256))
+            throw failure('unavailable', '分包原件字节与摘要不一致')
+        }
+      }
+      contracts = new Map(structuredClone(snapshot.contracts).map(row => [row.draft.id, row]))
+      migratedSupplements = structuredClone(snapshot.supplements)
+      sourceVersion = snapshot.sourceVersion
+    },
+    exportState(): SubcontractContractOwnerSnapshot {
+      return { schemaVersion: 1, sourceVersion, contracts: structuredClone([...contracts.values()]), supplements: structuredClone(migratedSupplements) }
+    },
     reset() {
       contracts.clear()
       replay.clear()

@@ -13,7 +13,7 @@ import { decodeTargetCostRead, encodeTargetCostWire } from '../app/lib/target-co
 import { createVerifiedSignatory, verifiedSignatoryAdoption } from './helpers/contract-signatory'
 
 test.use({ actionTimeout: 15_000 })
-async function capture(page: Page, info: TestInfo, name: string, focus?: string) {
+async function capture(page: Page, name: string, focus?: string) {
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 15_000 })
   for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 960 })
@@ -22,10 +22,9 @@ async function capture(page: Page, info: TestInfo, name: string, focus?: string)
       await target.evaluate(node => node.scrollIntoView({ block: 'center' }))
       await expect(target).toBeInViewport()
     }
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), { message: `${name} @ ${width}px` }).toBe(true)
     for (const dialog of await page.locator('[role="dialog"]:visible').all())
       await expect(dialog).toHaveCSS('opacity', '1')
-    await page.screenshot({ path: info.outputPath(`${name}-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await page.setViewportSize({ width: 1440, height: 960 })
 }
@@ -94,10 +93,10 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
   if (!process.env.TARGET_COST_RESUME_IDENTITIES) {
     await expect(page.getByRole('heading', { name: `原当前预算 ${f.runId}`, exact: true })).toBeVisible()
     await expect(page.getByText('未填写分项名称（历史记录）')).toBeVisible()
-    await capture(page, info, 'migrated-null-and-zero')
+    await capture(page, 'migrated-null-and-zero')
     await page.getByText('查看版本来源与操作历史', { exact: false }).click()
     await expect(page.getByText('历史经办人', { exact: false })).toBeVisible()
-    await capture(page, info, 'history-and-missing-original', '[aria-label="预算版本历史"]')
+    await capture(page, 'history-and-missing-original', '[aria-label="预算版本历史"]')
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: '原预算.pdf', exact: true }).click()
     const originalDownload = await download
@@ -110,7 +109,7 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
       await expect(page.locator('input[data-field="name"]')).toBeEditable()
       await expect(page.locator('input[data-field="contractRevenue"]')).toHaveValue('')
       await expect(page.locator('input[data-field="plannedProfit"]')).toHaveValue('0')
-      await capture(page, info, 'empty-project-draft')
+      await capture(page, 'empty-project-draft')
       await page.locator('input[data-field="name"]').fill(`新预算 ${f.runId}`)
       await page.getByRole('combobox', { name: '检索项目', exact: true }).fill(`预算验收工程 ${f.runId}`)
       await page.getByRole('option', { name: new RegExp(`预算验收工程 ${f.runId}`) }).click()
@@ -143,7 +142,7 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
       await page.getByRole('button', { name: '复制选中', exact: true }).click()
       await page.getByLabel('选择第 2 行', { exact: true }).check()
       await page.getByRole('button', { name: '删除选中', exact: true }).click()
-      await capture(page, info, 'seven-category-edit', '[data-ui="kit-edit-grid"]')
+      await capture(page, 'seven-category-edit', '[data-ui="kit-edit-grid"]')
       await page.getByRole('button', { name: '保存科目明细', exact: true }).click()
       await expect(page.getByRole('button', { name: '编辑科目明细', exact: true })).toBeVisible()
       const saved = await readDetail(page, f.a)
@@ -169,7 +168,7 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     await expect(page.getByText(/来源.*变化|版本.*变化|资料.*变化/).first()).toBeVisible()
     await expect(page.locator('input[data-field="name"]')).toHaveValue(`当前保留稿 ${f.runId}`)
     await expect(page.getByRole('status', { name: '目标成本原提交待核对', exact: true })).toHaveCount(0)
-    await capture(page, info, 'stale-header-retained')
+    await capture(page, 'stale-header-retained')
     await page.getByRole('button', { name: '重新核对资料', exact: true }).click()
     await expect(page.getByRole('button', { name: '放弃修改并载入最新', exact: true })).toBeEnabled()
     await page.getByRole('button', { name: '放弃修改并载入最新', exact: true }).click()
@@ -192,7 +191,7 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     await page.getByLabel('预算备注').fill('原键恢复验证')
     await page.getByRole('button', { name: '保存', exact: true }).click()
     await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeEnabled()
-    await capture(page, info, 'unknown-header-retained')
+    await capture(page, 'unknown-header-retained')
     await page.unroute('**/api/commands/target-costs')
     const response = page.waitForResponse(response => response.url().endsWith('/api/commands/target-costs') && response.request().postDataJSON().commandId === originalKey)
     await page.getByRole('button', { name: '核对原提交', exact: true }).click()
@@ -213,10 +212,10 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     }
     await page.goto(detail)
     await page.getByRole('tab', { name: /成本对比/ }).click()
-    await capture(page, info, 'actual-source-completeness')
+    await capture(page, 'actual-source-completeness')
     await page.locator('a[href^="/contract/subcontract?"]').filter({ hasText: '查看正式合同' }).first().click()
     await expect(page.getByRole('link', { name: `预算实际来源 ${f.runId}`, exact: true })).toBeVisible()
-    await capture(page, info, 'source-return')
+    await capture(page, 'source-return')
     await page.getByRole('link', { name: `返回预算版本 · 原当前预算 ${f.runId}`, exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/project/target-cost/${encodeURIComponent(f.a)}`))
     await page.getByRole('button', { name: '查看项目', exact: true }).click()
@@ -225,7 +224,7 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     await page.getByRole('button', { name: '返回目标成本列表', exact: true }).click()
     await expect(page.getByPlaceholder('搜索版本名或项目')).toHaveValue(f.runId)
     await expect(page).toHaveURL(/pageSize=20/)
-    await capture(page, info, 'filtered-version-list')
+    await capture(page, 'filtered-version-list')
   })
 
   await test.step('A/B真实页签保独立科目草稿，取消关闭保留输入和焦点', async () => {
@@ -241,7 +240,7 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     const tabs = page.getByRole('navigation', { name: '已打开页面', exact: true })
     await tabs.getByRole('button', { name: `原当前预算 ${f.runId}`, exact: true }).click()
     await expect(page.getByRole('textbox', { name: '分项名称，第 1 行', exact: true })).toHaveValue('A页签未保存草稿')
-    await capture(page, info, 'parallel-version-drafts', '[data-ui="kit-edit-grid"]')
+    await capture(page, 'parallel-version-drafts', '[data-ui="kit-edit-grid"]')
     await tabs.getByRole('button', { name: `关闭 原当前预算 ${f.runId}`, exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
     await expect(page.getByRole('textbox', { name: '分项名称，第 1 行', exact: true })).toHaveValue('A页签未保存草稿')
@@ -263,7 +262,7 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     await expect(page.getByRole('heading', { name: `新预算 ${f.runId}`, exact: true })).toBeVisible()
     expect((await readDetail(page, f.a)).view.header.isBaseline).toBe(false)
     expect((await readDetail(page, f.b)).view.header).toMatchObject({ isBaseline: true, status: 'submitted' })
-    await capture(page, info, 'current-baseline')
+    await capture(page, 'current-baseline')
     await page.getByRole('button', { name: '返回目标成本列表', exact: true }).click()
     await page.getByPlaceholder('搜索版本名或项目').fill(`新预算 ${f.runId}`)
     const action = async (name: '删除' | '恢复') => {
@@ -283,6 +282,6 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     await expect(page.getByRole('link', { name: `新预算 ${f.runId}`, exact: true })).toBeVisible()
     expect((await readDetail(page, f.b)).deletedAt).toBeNull()
     expect((await readDetail(page, f.a)).view.header.isBaseline).toBe(false)
-    await capture(page, info, 'restored-baseline-list')
+    await capture(page, 'restored-baseline-list')
   })
 })

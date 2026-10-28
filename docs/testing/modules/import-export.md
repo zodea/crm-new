@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | [tests/kit/configured-export-runner.test.ts](../../../tests/kit/configured-export-runner.test.ts) | 单元／服务／状态 | 配置导出运行器 |
 | [tests/kit/export-config.test.ts](../../../tests/kit/export-config.test.ts) | 单元／服务／状态 | 配置导出：命名规则预览 |
-| [tests/kit/export-directory.test.ts](../../../tests/kit/export-directory.test.ts) | 单元／服务／状态 | 桌面导出目录适配器 |
+| [tests/kit/export-directory.test.ts](../../../tests/kit/export-directory.test.ts) | 单元／服务／状态 | 导出目录适配器 |
 | [tests/kit/export.test.ts](../../../tests/kit/export.test.ts) | 单元／服务／状态 | 导出路径分流：chooseExportPath |
 | [tests/kit/import-entities.test.ts](../../../tests/kit/import-entities.test.ts) | 单元／服务／状态 | 导入实体注册表 |
 | [tests/kit/import-mapping-tab.test.ts](../../../tests/kit/import-mapping-tab.test.ts) | 单元／服务／状态 | 导入登记按需加载、调用时目标冻结；页签上限、未知实体及导航失败回滚 |

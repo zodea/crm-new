@@ -2,13 +2,24 @@ import type { TestDb } from './memory-db'
 import { createHash } from 'node:crypto'
 import { runMigrations } from '../../app/lib/db/migrations'
 import { CORE_MIGRATION_CAPABILITY } from '../../app/lib/migration/core-contract'
-import { saveSignedDayworkRecord, upsertC2SubjectConfig } from '../../app/lib/payroll/daywork'
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { readQuantityCoreSource } from './quantity-migration-source'
+import { insertRows } from './sql-rows'
 
-/** 无工程量的真实签工源；用公开 Native 命令形成配置与相邻半工。 */
+/** 已退役本地 Native 命令曾产出的 C2 配置与相邻半工（逐行固化）。 */
+const c2SourceRows: Record<string, Record<string, string | number>[]> = {
+  payroll_subject_configs: [
+    { id: 'payroll_subject_config_mv52zf52_d', project_id: 'c2-project', crew_id: 'c2-crew', leader_worker_id: 'c2-leader', format_family: 'C2', unit_rate: 350.125, rule_text: '', enabled: 1, created_at: '2026-10-12 10:00:05', updated_at: '2026-10-12 10:00:05' },
+  ],
+  signed_daywork_records: [
+    { id: 'signed_daywork_mv52zf53_e', project_id: 'c2-project', crew_id: 'c2-crew', worker_id: 'c2-worker', work_date: '2026-08-02', work_content: '原始半工内容', start_time: '08:00', end_time: '12:00', labor_units: 0.5, witness: '证明人', confirmed_on: '2026-08-05', status: 'confirmed', note: '原备注', created_at: '2026-10-12 10:00:05', updated_at: '2026-10-12 10:00:05' },
+    { id: 'signed_daywork_mv52zf53_f', project_id: 'c2-project', crew_id: 'c2-crew', worker_id: 'c2-worker', work_date: '2026-08-02', work_content: '原始半工内容', start_time: '12:00', end_time: '16:00', labor_units: 0.5, witness: '', status: 'draft', note: '原备注', created_at: '2026-10-12 10:00:05', updated_at: '2026-10-12 10:00:05' },
+  ],
+}
+
+/** 无工程量的真实签工源：一条已确认、一条草稿的相邻半工。 */
 export async function seedPayrollC2MigrationSource(db: TestDb) {
   await runMigrations(db)
   await db.execute('INSERT INTO projects(id,name) VALUES (?,?)', ['c2-project', '零星签工工程'])
@@ -16,11 +27,10 @@ export async function seedPayrollC2MigrationSource(db: TestDb) {
     await db.execute('INSERT INTO crews(id,name) VALUES (?,?)', [id, name])
   for (const [id, name] of [['c2-leader', '原负责人'], ['c2-worker', '签工人员'], ['c2-zero', '无签工成员']])
     await db.execute('INSERT INTO workers(id,name,crew_id,current_project_id) VALUES (?,?,?,?)', [id, name, 'c2-crew', 'c2-project'])
-  const configId = await upsertC2SubjectConfig(db, { projectId: 'c2-project', crewId: 'c2-crew', leaderWorkerId: 'c2-leader', unitRate: 350.125, ruleText: '' })
-  const dayworkIds: string[] = []
-  for (const [startTime, endTime, status] of [['08:00', '12:00', 'confirmed'], ['12:00', '16:00', 'draft']] as const) {
-    dayworkIds.push(await saveSignedDayworkRecord(db, { projectId: 'c2-project', crewId: 'c2-crew', workerId: 'c2-worker', workDate: '2026-08-02', workContent: '原始半工内容', startTime, endTime, laborUnits: 0.5, witness: status === 'confirmed' ? '证明人' : null, confirmedOn: status === 'confirmed' ? '2026-08-05' : null, status, note: '原备注' }))
-  }
+  for (const [table, rows] of Object.entries(c2SourceRows))
+    await insertRows(db, table, rows)
+  const configId = String(c2SourceRows.payroll_subject_configs![0]!.id)
+  const dayworkIds = c2SourceRows.signed_daywork_records!.map(row => String(row.id))
   return { configId, dayworkIds, source: await readQuantityCoreSource(db) }
 }
 

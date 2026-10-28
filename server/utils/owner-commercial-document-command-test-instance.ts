@@ -131,6 +131,8 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   createId?: (kind: OwnerCommercialDocumentKind) => string
   createBoqLineId?: (changeId: string, changeLineId: string) => string
   createAttachmentId?: () => string
+  /** A production adapter may explicitly confirm the original declared label's stable actual identity. */
+  confirmExistingBuildingIdentity?: (lineId: string, buildingId: string) => boolean
   crews?: readonly SupplierSeed[]
   crewSource?: Pick<typeof crewWorkerCommandTestInstance, 'crewRows'>
   projects?: readonly ProjectSeed[]
@@ -695,7 +697,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const matches = context.buildings.filter(row => row.code === code || row.name === code)
     if (!code || matches.length !== 1 || matches[0]!.id !== building.id)
       throw failure('validation-failed', '楼栋编码不能唯一识别当前楼栋，请先修正项目区域')
-    if (line.building === code)
+    if (line.building === code && !options.confirmExistingBuildingIdentity?.(line.id, building.id))
       throw failure('validation-failed', '该行已有相同楼栋证据，无需更正')
     const candidate = clone(state)
     const original = candidate.boqLines.get(command.lineId)!
@@ -2604,6 +2606,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     rows(sessionId?: string | null) {
       const state = stateFor(sessionId)
       return [...state.documents.values()].map(source => withFinalSettlementEvidence(state, source))
+    },
+    /** Caller-owned transaction adapters persist this original BOQ set; never a second authority. */
+    boqRows(sessionId?: string | null) {
+      return [...stateFor(sessionId).boqLines.values()].map(clone)
     },
     sourceVersion(sessionId?: string | null) {
       const state = stateFor(sessionId)

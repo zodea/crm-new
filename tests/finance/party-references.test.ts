@@ -1,14 +1,17 @@
 import type { SQLInputValue } from 'node:sqlite'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { migrations, runMigrations } from '~/lib/db/migrations'
 import { createMemoryDb } from '../helpers/memory-db'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it('真实 v55 磁盘升级 v56 冷断重开核图，不按历史同名猜接；升级中断可回滚', async () => {
   const db = await createMemoryDb()
-  const root = resolve('.tmp/a01-finance-tests')
+  const root = testTempRoot('a01-finance-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'native56-identity-cold-'))
   const path = join(directory, 'synthetic.sqlite')

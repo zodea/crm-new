@@ -103,8 +103,8 @@
           { key: "exc", label: "无税审定金额", align: "right", money: true, width: 140 },
           { key: "date", label: "审定日期", mono: true, width: 110 },
           { key: "status", label: "状态", width: 90, render: (v) => StatusChip ? <StatusChip tone="ok">{v}</StatusChip> : v },
-        ]} rows={rows} minRows={5} sum={rows.length ? [{ label: "含税审定金额合计", value: delta }] : undefined}
-          footerLeft={"共 " + rows.length + " 条"} empty="暂无变洽签" />;
+        ]} rows={rows} sum={rows.length ? [{ label: "含税审定金额合计", value: delta }] : undefined}
+ empty="暂无变洽签" />;
       }
       if (tab === "settle") {
         const rows = split(c.settled, (i, amt) => ({ id: c.id + "-js" + i, no: "JS-2026-0" + i, period: "第 " + i + " 期", amount: amt, date: i === 1 ? "2026-04-20" : "2026-06-15", status: "已确认" }));
@@ -114,8 +114,8 @@
           { key: "amount", label: "结算金额", align: "right", money: true, width: 140 },
           { key: "date", label: "结算日期", mono: true, width: 110 },
           { key: "status", label: "状态", width: 90, render: (v) => StatusChip ? <StatusChip tone="ok">{v}</StatusChip> : v },
-        ]} rows={rows} minRows={5} sum={[{ label: "累计结算", value: c.settled || 0 }]}
-          footerLeft={"共 " + rows.length + " 条"} empty="暂无结算记录" />;
+        ]} rows={rows} sum={[{ label: "累计结算", value: c.settled || 0 }]}
+ empty="暂无结算记录" />;
       }
       if (tab === "invoice") {
         const rows = split(c.invoiced, (i, amt) => ({ id: c.id + "-fp" + i, no: "0944202600005" + (8700 + i * 37), type: "增值税专用发票", amount: amt, tax: Math.round(amt / 1.13 * 0.13 * 100) / 100, date: i === 1 ? "2026-04-25" : "2026-06-18" }));
@@ -125,8 +125,8 @@
           { key: "amount", label: "价税合计", align: "right", money: true, width: 140 },
           { key: "tax", label: "税额", align: "right", money: true, width: 120 },
           { key: "date", label: "开票日期", mono: true, width: 110 },
-        ]} rows={rows} minRows={5} sum={[{ label: invoiceLabel, value: c.invoiced || 0 }]}
-          footerLeft={"共 " + rows.length + " 条"} empty={"暂无" + invoiceLabel.slice(2) + "记录"} />;
+        ]} rows={rows} sum={[{ label: invoiceLabel, value: c.invoiced || 0 }]}
+ empty={"暂无" + invoiceLabel.slice(2) + "记录"} />;
       }
       // pay
       const rows = split(c.paid, (i, amt) => ({ id: c.id + "-zf" + i, no: (isCon ? "SK" : "FK") + "-2026-00" + i, amount: amt, method: "银行转账", date: i === 1 ? "2026-05-08" : "2026-06-22", payer: isCon ? (proj ? proj.developer : "甲方") : "广州市瑞航建筑工程有限公司" }));
@@ -136,8 +136,8 @@
         { key: "method", label: "支付方式", width: 100 },
         { key: "payer", label: isCon ? "付款方（甲方）" : "付款方（我方）", width: 220 },
         { key: "date", label: isCon ? "收款日期" : "支付日期", mono: true, width: 110 },
-      ]} rows={rows} minRows={5} sum={[{ label: payLabel, value: c.paid || 0 }]}
-        footerLeft={"共 " + rows.length + " 条"} empty={"暂无" + payLabel.slice(2) + "记录"} />;
+      ]} rows={rows} sum={[{ label: payLabel, value: c.paid || 0 }]}
+ empty={"暂无" + payLabel.slice(2) + "记录"} />;
     })();
 
     return (

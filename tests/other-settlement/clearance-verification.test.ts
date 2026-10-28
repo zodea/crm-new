@@ -1,18 +1,21 @@
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { isExpenseClearanceSourceDTO } from '../../app/lib/finance/clearance-verification'
 import { validateFinanceJournal } from '../../server/utils/production-finance-journal'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementService, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { adoptHistoricalExpenseFixture } from '../helpers/other-settlement-pay08-source'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture(existingAmount?: number, missingRecord = false) {
-  const root = resolve('.tmp/a02-clearance-tests')
+  const root = testTempRoot('a02-clearance-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(`${root}/clearance-chain-`)
-  const storage = createProductionStorage({ directory, workspaceId: 'clearance-synthetic-workspace', ownerId: 'clearance-synthetic-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'clearance-synthetic-workspace', ownerId: 'clearance-synthetic-owner', purpose: 'verification' })
   const actor = { workspaceId: storage.identity.workspaceId, actorId: storage.identity.actorId, capabilities: ['supplier:list:read', 'supplier:write', 'other-settlement:read', 'other-settlement:write', 'finance-reimbursement:read', 'finance-reimbursement:write', 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'finance-payment-record:write'] }
   const identity = { workspaceId: actor.workspaceId, actorId: actor.actorId }
   const session = () => structuredClone(actor)
@@ -20,7 +23,7 @@ async function fixture(existingAmount?: number, missingRecord = false) {
   const service = await supplier.execute({ ...identity, requiredCapability: 'supplier:write', commandId: 'clearance-service-party', baseVersion: null, action: 'save', attachments: {}, draft: { name: '实际服务方', supplierCategory: '其他', contact: '合成服务方' } }, session)
   const payee = await supplier.execute({ ...identity, requiredCapability: 'supplier:write', commandId: 'clearance-advance-party', baseVersion: null, action: 'save', attachments: {}, draft: { name: '实际垫付收款方', supplierCategory: '其他', contact: '合成收款方' } }, session)
   const finance = createProductionFinanceService(storage, { references: (tx, current) => ({ expenditure_settlements: id => readProductionOtherSettlementReference(tx, current, id) }) })
-  const expense = await finance.execute({ ...identity, kind: 'reimbursement', requiredCapability: 'finance-reimbursement:write', commandId: 'clearance-original-cost', baseVersion: null, action: 'save', attachments: {}, draft: { applicantSupplierId: payee.id, status: 'confirmed', reimbursementDate: '2026-10-05', lines: [{ expenseItem: '真实原费用100', amount: 100, counterpartySupplierId: service.id }] } }, session)
+  const expense = await adoptHistoricalExpenseFixture(storage, actor, { directory, serviceId: service.id, payeeId: payee.id, serviceName: '实际服务方', payeeName: '实际垫付收款方', prefix: 'clearance-historical-original' })
   const original = (await finance.form('reimbursement', expense.id, session)).draft.lines[0]!.id!
   const owner = createProductionOtherSettlementService(storage)
   let existing: { id: string, version: string } | null = null

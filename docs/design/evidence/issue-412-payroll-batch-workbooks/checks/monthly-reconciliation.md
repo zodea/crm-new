@@ -6,7 +6,7 @@
 
 按月 ZIP 曾复用负责人全周期算法。全月都是 A 时取最后一张的累计应付，混入 C1/C2 时又变为各张本次核算相加。同一月份多名负责人、普通/管理簿因此会丢金额。
 
-既有 [P7 规格](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/payroll-tickets/07-central-batch-payments-and-workbooks.md#公式与现金不能混算)规定月度与周期分别说明口径：A 周期采用最新累计，单月核算/支付差额独立展示，不代表周期新增债务。问题和修复边界已先登记在 [#412 评论](https://github.com/zodea/crm-new/issues/412#issuecomment-5769634230)。
+既有 [P7 规格](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/07-central-batch-payments-and-workbooks.md#公式与现金不能混算)规定月度与周期分别说明口径：A 周期采用最新累计，单月核算/支付差额独立展示，不代表周期新增债务。问题和修复边界已先登记在 [#412 评论](https://github.com/zodea/crm-new/issues/412#issuecomment-5769634230)。
 
 | 范围与输入 | 修复前 | 修复后 |
 | --- | --- | --- |

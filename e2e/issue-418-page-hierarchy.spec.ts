@@ -41,106 +41,120 @@ test.describe('Issue #418：页面层次与红圈结构对齐', () => {
     })
   }
 
-  for (const width of [390, 768, 1024, 1280, 1440]) {
-    test(`${width}px 详情资料分区、业务页签与金额跳转`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
-      await page.goto('/base/supplier/sup_demo_004?origin=demo')
-      const nav = page.getByRole('navigation', { name: '分供方业务事实' })
-      await expect(nav.getByRole('tab', { name: '详细资料', exact: true })).toHaveAttribute('aria-selected', 'true')
-      await expect(page.getByRole('region', { name: '基础信息', exact: true })).toBeVisible()
-      await expect(page.getByRole('region', { name: '联系人信息', exact: true })).toBeVisible()
-      await expect(page.getByRole('region', { name: '开票信息', exact: true })).toBeVisible()
-      await expectNoPageOverflow(page, `分供方详细资料 ${width}`)
+  const LAYOUT_WIDTHS = [390, 768, 1024, 1280, 1440] as const
+  const layoutViewport = (width: number) => ({ width, height: width === 390 ? 844 : 1000 })
 
-      const columns = await page.locator('[data-ui="entity-detail-body"]').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+  test('详情资料分区各宽度列数与无溢出，业务页签与金额跳转', async ({ page }) => {
+    await page.setViewportSize(layoutViewport(390))
+    await page.goto('/base/supplier/sup_demo_004?origin=demo')
+    const nav = page.getByRole('navigation', { name: '分供方业务事实' })
+    await expect(nav.getByRole('tab', { name: '详细资料', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('region', { name: '基础信息', exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: '联系人信息', exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: '开票信息', exact: true })).toBeVisible()
+
+    const body = page.locator('[data-ui="entity-detail-body"]')
+    const columnCount = () => body.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+    for (const width of LAYOUT_WIDTHS) {
+      await page.setViewportSize(layoutViewport(width))
+      if (width === 390)
+        await expect.poll(columnCount, `${width}px 详细资料列数`).toBe(1)
+      if (width >= 1280)
+        await expect.poll(columnCount, `${width}px 详细资料列数`).toBe(2)
+      const columns = await columnCount()
       expect(columns).toBeGreaterThanOrEqual(1)
       expect(columns).toBeLessThanOrEqual(2)
-      if (width === 390)
-        expect(columns).toBe(1)
-      if (width >= 1280)
-        expect(columns).toBe(2)
-      const body = page.locator('[data-ui="entity-detail-body"]')
       const geometry = await body.evaluate(element => ({ bounds: element.getBoundingClientRect().toJSON(), children: [...element.children].map(child => child.getBoundingClientRect().toJSON()) }))
       for (const child of geometry.children) {
         expect(child.left).toBeGreaterThanOrEqual(geometry.bounds.left - 1)
         expect(child.right).toBeLessThanOrEqual(geometry.bounds.right + 1)
       }
+      await expectNoPageOverflow(page, `分供方详细资料 ${width}`)
+    }
 
-      const contracts = nav.getByRole('tab', { name: /支出合同/ })
-      await contracts.click()
-      await expect(page.getByRole('region', { name: '基础信息', exact: true })).toHaveCount(0)
-      await expect(page.getByRole('link', { name: '五金机电采购合同' })).toBeVisible()
-      await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('contracts')
-      await page.reload()
-      await expect(contracts).toHaveAttribute('aria-selected', 'true')
-      await contracts.focus()
-      await page.keyboard.press('ArrowRight')
-      await expect(nav.getByRole('tab', { name: /支出结算/ })).toHaveAttribute('aria-selected', 'true')
+    // 页签与金额跳转只跑一次，放在最窄宽度：跳转后的页签需滚入视口
+    await page.setViewportSize(layoutViewport(390))
+    const contracts = nav.getByRole('tab', { name: /支出合同/ })
+    await contracts.click()
+    await expect(page.getByRole('region', { name: '基础信息', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: '五金机电采购合同' })).toBeVisible()
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('contracts')
+    await page.reload()
+    await expect(contracts).toHaveAttribute('aria-selected', 'true')
+    await contracts.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(nav.getByRole('tab', { name: /支出结算/ })).toHaveAttribute('aria-selected', 'true')
 
-      await page.getByRole('button', { name: '查看累计付款金额明细' }).click()
-      const payments = nav.getByRole('tab', { name: /付款管理/ })
-      await expect(payments).toHaveAttribute('aria-selected', 'true')
-      await expect(payments).toBeFocused()
-      await expect(payments).toBeInViewport()
-      await expect(page.getByRole('link', { name: '五金机电采购首期请款' })).toBeVisible()
+    await page.getByRole('button', { name: '查看累计付款金额明细' }).click()
+    const payments = nav.getByRole('tab', { name: /付款管理/ })
+    await expect(payments).toHaveAttribute('aria-selected', 'true')
+    await expect(payments).toBeFocused()
+    await expect(payments).toBeInViewport()
+    await expect(page.getByRole('link', { name: '五金机电采购首期请款' })).toBeVisible()
+    const workspace = page.locator('[data-shell-workspace]')
+    for (const width of LAYOUT_WIDTHS) {
+      await page.setViewportSize(layoutViewport(width))
       await expectNoPageOverflow(page, `分供方业务页签 ${width}`)
-      const workspace = page.locator('[data-shell-workspace]')
       expect(await workspace.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
-    })
+    }
+  })
 
-    for (const path of ['/finance/current', '/material/arrival', '/contract/construction', '/base/supplier', '/project', '/contract/material']) {
-      test(`${width}px 列表连续工作面与主操作：${path}`, async ({ page }) => {
-        await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
-        await page.goto(path)
-        const shell = page.locator('[data-list-shell]')
-        await expect(shell).toBeVisible()
-        const toolbar = shell.locator('[data-list-shell-toolbar]')
+  for (const path of ['/finance/current', '/material/arrival', '/contract/construction', '/base/supplier', '/project', '/contract/material']) {
+    test(`列表连续工作面与主操作在各宽度可达：${path}`, async ({ page }) => {
+      await page.setViewportSize(layoutViewport(390))
+      await page.goto(path)
+      const shell = page.locator('[data-list-shell]')
+      await expect(shell).toBeVisible()
+      const toolbar = shell.locator('[data-list-shell-toolbar]')
+      const table = shell.locator('[data-list-shell-table]')
+      const create = shell.getByRole('button', { name: /新建|新增/ }).or(shell.getByRole('link', { name: /新建|新增/ }))
+      for (const width of LAYOUT_WIDTHS) {
+        await page.setViewportSize(layoutViewport(width))
         await expect(toolbar).toBeVisible()
-        const table = shell.locator('[data-list-shell-table]')
         await expect(table.locator('.vxe-table')).toBeVisible()
         await expectNoPageOverflow(page, `${path} ${width}`)
         expect(await shell.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
         const bounds = await Promise.all([toolbar.boundingBox(), table.boundingBox()])
         expect(bounds[0]!.y).toBeLessThan(bounds[1]!.y)
-        const create = shell.getByRole('button', { name: /新建|新增/ }).or(shell.getByRole('link', { name: /新建|新增/ }))
         await expect(create).toBeVisible()
         await create.focus()
         await expect(create).toBeInViewport()
-      })
-    }
+      }
+    })
+  }
 
-    for (const input of [
-      { path: '/finance/current/new', attachment: '凭证与备注' },
-      { path: '/material/arrival/new', attachment: '送货单附件' },
-    ]) {
-      test(`${width}px 整页表单分区、两列上限与吸底操作：${input.path}`, async ({ page }) => {
-        await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
-        await page.goto(input.path)
-        const shell = page.locator('[data-ui="entity-form-shell"]')
-        await expect(shell).toBeVisible()
-        const footer = page.getByRole('group', { name: '表单操作' })
+  for (const input of [
+    { path: '/finance/current/new', attachment: '凭证与备注' },
+    { path: '/material/arrival/new', attachment: '送货单附件' },
+  ]) {
+    test(`整页表单分区、两列上限与吸底操作在各宽度可达：${input.path}`, async ({ page }) => {
+      await page.setViewportSize(layoutViewport(390))
+      await page.goto(input.path)
+      const shell = page.locator('[data-ui="entity-form-shell"]')
+      await expect(shell).toBeVisible()
+      const footer = page.getByRole('group', { name: '表单操作' })
+      const fields = shell.locator('.form-fields-grid').first()
+      const columnCount = () => fields.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+      const save = footer.getByRole('button', { name: '保存', exact: true })
+      const nav = shell.getByRole('navigation', { name: '表单分区' })
+      for (const width of LAYOUT_WIDTHS) {
+        await page.setViewportSize(layoutViewport(width))
         await expect(footer).toBeVisible()
-        const fields = shell.locator('.form-fields-grid').first()
         await expect(fields).toBeVisible()
-        const count = await fields.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
-        expect(count).toBeLessThanOrEqual(2)
         if (width === 390)
-          expect(count).toBe(1)
+          await expect.poll(columnCount, `${input.path} ${width} 字段列数`).toBe(1)
+        expect(await columnCount()).toBeLessThanOrEqual(2)
         await expectNoPageOverflow(page, `${input.path} ${width}`)
-        const save = footer.getByRole('button', { name: '保存', exact: true })
         await save.focus()
         await expect(save).toBeInViewport()
         await expect(save).toBeFocused()
-        const nav = shell.getByRole('navigation', { name: '表单分区' })
-        if (width >= 1280) {
+        if (width >= 1280)
           await expect(nav).toBeVisible()
-          await nav.getByRole('link', { name: input.attachment, exact: true }).click()
-          expect(new URL(page.url()).hash).toBe('')
-        }
-        else {
+        else
           await expect(nav).toBeHidden()
-        }
-      })
-    }
+      }
+      await nav.getByRole('link', { name: input.attachment, exact: true }).click()
+      expect(new URL(page.url()).hash).toBe('')
+    })
   }
 })

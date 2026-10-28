@@ -21,38 +21,44 @@ test.beforeEach(async ({ page }) => {
 })
 
 for (const list of listCases) {
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${list.title} ${width}px 保留领域筛选与新建入口，宽表只在内部滚动`, async ({ page }) => {
+  test(`${list.title} 保留领域筛选与新建入口，各宽度宽表只在内部滚动`, async ({ page }) => {
+    await page.goto(`/contract/${list.domain}`)
+    const root = page.getByTestId(list.root)
+    await expect(root.getByRole('heading', { name: list.title, exact: true })).toBeVisible({ timeout: 20_000 })
+    const filters = root.getByRole('region', { name: `${list.title}筛选`, exact: true })
+    const search = root.getByRole(list.searchRole, { name: list.search, exact: true })
+    const create = root.getByRole('link', { name: `新建${list.title}`, exact: true })
+    await expect(create).toHaveAttribute('href', `/contract/${list.domain}/form`)
+    const scroller = root.locator('.vxe-table--body-inner-wrapper').first()
+    const filterHeights = new Map<number, number>()
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
-      await page.goto(`/contract/${list.domain}`)
-      const root = page.getByTestId(list.root)
-      await expect(root.getByRole('heading', { name: list.title, exact: true })).toBeVisible({ timeout: 20_000 })
-      const filters = root.getByRole('region', { name: `${list.title}筛选`, exact: true })
       await expect(filters.getByRole('combobox', { name: '筛选项目', exact: true })).toBeVisible()
       await expect(filters.getByRole('combobox', { name: `筛选${list.party}`, exact: true })).toBeVisible()
       await expect(filters.getByRole('button', { name: /^筛选状态，已选 0 项$/ })).toBeVisible()
-      const search = root.getByRole(list.searchRole, { name: list.search, exact: true })
       await expect(search).toBeVisible()
-      const create = root.getByRole('link', { name: `新建${list.title}`, exact: true })
-      await expect(create).toHaveAttribute('href', `/contract/${list.domain}/form`)
       await expect(create).toBeVisible()
       if (list.domain === 'subcontract')
         await expect(filters.getByRole('button', { name: /^筛选分包类别，已选 0 项$/ })).toBeVisible()
       await expectNoPageOverflow(page, `${width}px ${list.title}列表`)
-      const scroller = root.locator('.vxe-table--body-inner-wrapper').first()
       await expect(scroller).toBeVisible()
       if (width <= 768)
         await expectLocalHorizontalScroll(scroller, `${width}px ${list.title}表格`)
       const filterBox = await filters.boundingBox()
       expect(filterBox).not.toBeNull()
-      await search.fill(`不存在的${list.title}`)
-      await expect(page.getByRole('status', { name: '没有符合当前筛选条件的合同', exact: true })).toBeVisible()
-      await expect(search).toHaveValue(`不存在的${list.title}`)
-      expect(Math.abs((await filters.boundingBox())!.height - filterBox!.height)).toBeLessThanOrEqual(1)
+      filterHeights.set(width, filterBox!.height)
+    }
+
+    await search.fill(`不存在的${list.title}`)
+    await expect(page.getByRole('status', { name: '没有符合当前筛选条件的合同', exact: true })).toBeVisible()
+    await expect(search).toHaveValue(`不存在的${list.title}`)
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      expect(Math.abs((await filters.boundingBox())!.height - filterHeights.get(width)!), `${width}px`).toBeLessThanOrEqual(1)
       await expect(create).toBeVisible()
       await expectNoPageOverflow(page, `${width}px ${list.title}空结果`)
-    })
-  }
+    }
+  })
 }
 
 test('材料采购演示合同只读，名称链接支持键盘进入并返回原筛选', async ({ page }) => {

@@ -1,16 +1,11 @@
-import type { TargetCostMetric } from '~/lib/target-cost/central-contract'
-import type { TargetCostDetailSummary as DetailSummary, TargetCostDetailHeader } from '~/lib/target-cost/detail'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, reactive } from 'vue'
 import TargetCostFormFields from '~/components/master-data/TargetCostFormFields.vue'
 import TargetCostAttachments from '~/components/target-cost/TargetCostAttachments.vue'
-import TargetCostDetailSummary from '~/components/target-cost/TargetCostDetailSummary.vue'
 import TargetCostMetricValue from '~/components/target-cost/TargetCostMetricValue.vue'
 import TargetCostProjectReturn from '~/components/target-cost/TargetCostProjectReturn.vue'
 import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
-import Metric from '~/components/ui/Metric.vue'
-import MetricGrid from '~/components/ui/MetricGrid.vue'
 
 const read = vi.fn()
 const route = reactive({ path: '/contract/subcontract', query: { origin: 'real', budgetId: 'budget-a', budgetProject: 'p', budgetReturnTo: '/project/target-cost/budget-a?origin=real&tab=comparison' } as Record<string, string> })
@@ -26,36 +21,6 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 describe('预算原值和受控回程', () => {
-  it('现行只读汇总随回读更新可证100、未知、真实零和已证空源，原金额及来源不被改写', async () => {
-    const completeZero: TargetCostMetric = { value: 0, knownValue: 0, status: 'complete', missingSources: [] }
-    const partial: TargetCostMetric = { value: null, knownValue: 100, status: 'partial', missingSources: ['P4实际工资源:unavailable'] }
-    const header: TargetCostDetailHeader = { id: 'budget-a', projectId: 'p', projectCode: '', projectName: '项目', name: '预算', isBaseline: true, contractRevenue: null, plannedProfit: null, signedContractSum: null, taxInclusiveTotal: 0, taxExclusiveTotal: null, taxAmount: null, status: 'submitted', note: '', createdAt: '', updatedAt: '' }
-    const summary: DetailSummary = { itemTotal: 0, signedAmount: 0, settledAmount: null, paidAmount: 0, remainingAmount: null, metrics: { targetAmount: completeZero, signedAmount: completeZero, settledAmount: partial, paidAmount: completeZero, remainingAmount: { value: null, knownValue: null, status: 'pending', missingSources: ['P4实际工资源:unavailable'] } } }
-    const original = structuredClone(summary)
-    const wrapper = mount(TargetCostDetailSummary, { props: { header, summary }, global: { components: { Metric, MetricGrid } } })
-    const dynamicCost = () => wrapper.get('[role="group"][aria-label="动态成本"]')
-    expect(dynamicCost().text()).toContain('已知 ¥100.00')
-    expect(dynamicCost().text()).toContain('部分已知')
-    expect(dynamicCost().text()).toContain('P4实际工资源:unavailable')
-    expect(wrapper.get('[role="group"][aria-label="预算剩余"]').text()).toContain('未知')
-    await wrapper.setProps({ summary: { ...summary, metrics: { ...summary.metrics, settledAmount: { value: null, knownValue: null, status: 'pending', missingSources: ['P4实际工资源:unavailable'] } } } })
-    expect(dynamicCost().text()).toContain('未知')
-    expect(dynamicCost().text()).toContain('来源未齐')
-    expect(dynamicCost().text()).not.toContain('¥0.00')
-    await wrapper.setProps({ summary: { ...summary, settledAmount: 0, metrics: { ...summary.metrics, settledAmount: completeZero } } })
-    expect(dynamicCost().text()).toContain('¥0.00')
-    expect(dynamicCost().text()).not.toContain('未知')
-    expect(dynamicCost().text()).not.toContain('来源未齐')
-    await wrapper.setProps({ summary: { itemTotal: 0, signedAmount: 0, settledAmount: 0, paidAmount: 0, remainingAmount: 0, metrics: { targetAmount: completeZero, signedAmount: completeZero, settledAmount: completeZero, paidAmount: completeZero, remainingAmount: completeZero } } })
-    expect(wrapper.get('[role="group"][aria-label="科目明细合计"]').text()).toContain('¥0.00')
-    expect(wrapper.get('[role="group"][aria-label="预算剩余"]').text()).toContain('¥0.00')
-    expect(wrapper.text()).not.toContain('未知')
-    expect(wrapper.find('input, button, select, a').exists()).toBe(false)
-    expect(wrapper.emitted('update:summary')).toBeUndefined()
-    expect(read).not.toHaveBeenCalled()
-    expect(summary).toEqual(original)
-    wrapper.unmount()
-  })
   it('缺失原件仅显示文件名和说明，不伪装可下载入口', () => {
     const file = { id: 'missing', ownerType: 'target_cost' as const, ownerId: 'a', fileName: '缺失原件.pdf', fileSize: null, mimeType: 'application/pdf', category: '', uploader: '', uploadedAt: null, deletedAt: null, payloadState: 'missing' as const }
     const wrapper = mount(TargetCostAttachments, { props: { files: [file], pending: [], removeIds: [], restoreIds: [], readonly: true }, global: { stubs: { SectionHeader: true } } })

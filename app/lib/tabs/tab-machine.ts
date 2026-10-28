@@ -96,18 +96,3 @@ export function closeOthers(state: TabsState, key: string): TabsState {
   const tabs = state.tabs.filter(t => t.key === HOME_KEY || t.key === key)
   return { tabs, activeKey: key }
 }
-
-/** 关闭右侧（保留指定页签及其左侧 + 首页）。若激活页签被关，改激活指定页签。 */
-export function closeRight(state: TabsState, key: string): TabsState {
-  const idx = state.tabs.findIndex(t => t.key === key)
-  if (idx === -1)
-    return state
-  const tabs = state.tabs.filter((t, i) => i <= idx || t.key === HOME_KEY)
-  const activeStillOpen = tabs.some(t => t.key === state.activeKey)
-  return { tabs, activeKey: activeStillOpen ? state.activeKey : key }
-}
-
-/** 关闭全部（仅留首页并激活）。 */
-export function closeAll(): TabsState {
-  return initialTabsState()
-}

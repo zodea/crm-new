@@ -2,7 +2,7 @@
 import type { PayrollSourceEvidence } from '~/lib/payroll/central-contract'
 
 defineProps<{ evidence: readonly PayrollSourceEvidence[] }>()
-const names: Record<string, string> = { configs: '工资配置', statements: '工资头', lines: '工资明细', members: '请款成员', allocations: '收款分配', attendance: '考勤', daywork: '签工', statementDaywork: '工资与签工关联', logs: '操作历史' }
+const names: Record<string, string> = { configs: '工资配置', statements: '工资头', lines: '工资明细', members: '请款成员', allocations: '收款分配', attendance: '考勤', daywork: '签工', statementDaywork: '工资与签工关联', logs: '操作历史', central: '工资配置、价修订与更正收付', fees: '费用与独立管理簿', deductions: '原空鼓与扣款采用', numbering: '原正式编号', publication: '固定名册与完整保存目录', coordination: 'P7取整、原计划与原执行' }
 </script>
 
 <template>

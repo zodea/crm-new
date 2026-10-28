@@ -14,7 +14,6 @@ import type { PayrollNumberingRepository } from './central-numbering-contract'
 import type { PayrollWorkbookRepository } from './central-workbook-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../project/repository'
 
-export const PAYROLL_READ_CAPABILITY = 'payroll:read' as const
 export type PayrollJson = null | boolean | number | string | PayrollJson[] | { [key: string]: PayrollJson }
 export interface PayrollJsonObject { [key: string]: PayrollJson }
 export interface PayrollQuery { origin: DataOriginDTO, includeDemo?: boolean, projectId?: string, month?: string, crewId?: string }
@@ -108,6 +107,7 @@ export interface PayrollListRead { context: PayrollContext, rows: PayrollStateme
 export interface PayrollDetailRead { context: PayrollContext, statement: PayrollStatementDetail, history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
 export interface PayrollSourcesRead { context: PayrollContext, projectId: string, configs: PayrollConfig[], attendance: PayrollAttendance[], daywork: PayrollDaywork[], locks: PayrollSourceLock[], diagnostics: PayrollDiagnostic[], history: PayrollHistoryEntry[], evidence: PayrollSourceEvidence[] }
 export interface PayrollRepository extends PayrollARepository, PayrollARoundingRepository, PayrollAFeesRepository, PayrollAttendanceRepository, PayrollBatchRepository, PayrollC1Repository, PayrollC2Repository, PayrollDayworkRepository, PayrollAdjustmentRepository, PayrollActualRepository, PayrollHollowRepository, PayrollNumberingRepository, PayrollWorkbookRepository {
+  resolveCommand?: (descriptor: import('../forms/command-recovery').CommandRecoveryDescriptor) => Promise<{ outcome: 'applied', command: object, result: unknown } | { outcome: 'not-applied', commandId: string }>
   list: (query: PayrollQuery) => Promise<PayrollListRead>
   detail: (query: PayrollQuery, id: string) => Promise<PayrollDetailRead>
   sources: (query: PayrollQuery & { projectId: string }) => Promise<PayrollSourcesRead>

@@ -3,7 +3,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createQuantityDatabase } from '../../server/utils/quantity-database'
 import { applyQuantityMigration, planQuantityMigration } from '../../server/utils/quantity-migration'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedQuantityMigrationSource } from '../helpers/quantity-migration-source'
 
 it('工程量候选SQL完全准备后才交换，失败候选不改变现有数据库', async () => {
@@ -26,7 +26,7 @@ it('工程量候选SQL完全准备后才交换，失败候选不改变现有数�
 })
 
 it('实际SQL导入保留软删、历史BOQ与审计双快照，完成后恢复新增整户触发器', async () => {
-  const native = await createMemoryDb()
+  const native = await createMigratedMemoryDb()
   const database = await createQuantityDatabase()
   try {
     const source = await seedQuantityMigrationSource(native)

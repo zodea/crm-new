@@ -1,12 +1,12 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
-import { getPaymentApplicationSummary, getProjectConfirmedPaymentTotal } from '~/lib/finance/forms'
+import { getPaymentApplicationSummary } from '~/lib/finance/forms'
 import {
   buildPaymentApplicationInsight,
   loadPaymentApplicationDetail,
 } from '~/lib/finance/payment-detail'
-import { createMemoryDb } from '../helpers/memory-db'
+import { verifiedFinanceSum } from '~/lib/finance/persistent-rows'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -25,10 +25,14 @@ vi.mock('~/lib/db/connection', () => ({
     }
   },
 }))
+/** 项目已确认现金合计：与付款汇总同口径，未知值不按零汇总。 */
+async function confirmedPaymentTotal(projectId: string) {
+  const rows = await mem.select<{ amount: unknown }>('SELECT amount FROM payment_records WHERE project_id=? AND confirmation_status=\'confirmed\' AND deleted_at IS NULL', [projectId])
+  return verifiedFinanceSum(rows.map(row => row.amount))
+}
 
 async function prepare(settlementStatus = '已确认') {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`
     INSERT INTO projects (id, name, approval_status)
     VALUES ('detail-project', '详情项目', 'submitted'), ('other-project', '其他项目', 'submitted')
@@ -187,8 +191,8 @@ describe('付款申请智能业务洞察', () => {
     if (source === 'paid' || source === 'cash')
       await expect(getPaymentApplicationSummary('detail-application')).rejects.toThrow('未知值按零汇总')
     if (source === 'cash') {
-      await expect(getProjectConfirmedPaymentTotal('detail-project')).rejects.toThrow('未知值按零汇总')
-      expect(await getProjectConfirmedPaymentTotal('other-project')).toBe(0)
+      await expect(confirmedPaymentTotal('detail-project')).rejects.toThrow('未知值按零汇总')
+      expect(await confirmedPaymentTotal('other-project')).toBe(0)
     }
     expect(await mem.select('SELECT * FROM payment_record_application_allocations ORDER BY id')).toEqual(originals)
   })

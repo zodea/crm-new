@@ -143,88 +143,90 @@ test.describe('Issue #112 R2：高风险业务工作区', () => {
     })
   }
 
-  for (const viewport of MATRIX) {
-    test(`${viewport.width}px 归档范围入口按容器切换且页面不横滚`, async ({ page }) => {
-      await page.setViewportSize(viewport)
-      await page.goto('/material/delivery/archive')
-      await page.waitForLoadState('networkidle')
+  test('归档范围入口在各宽度按容器切换且页面不横滚', async ({ page }) => {
+    await page.setViewportSize(MATRIX[0])
+    await page.goto('/material/delivery/archive')
+    await page.waitForLoadState('networkidle')
 
-      const scopeTrigger = page.getByRole('button', { name: '选择归档范围' })
-      const desktopTreeTitle = page.getByText('归档库 · 项目 → 分供方', { exact: true })
+    const scopeTrigger = page.getByRole('button', { name: '选择归档范围' })
+    const desktopTreeTitle = page.getByText('归档库 · 项目 → 分供方', { exact: true })
+    await expect(scopeTrigger).toBeVisible()
+    await scopeTrigger.focus()
+    await scopeTrigger.press('Enter')
+    await expect(page.getByRole('dialog', { name: '选择项目' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(scopeTrigger).toBeFocused()
+
+    for (const viewport of MATRIX) {
+      await page.setViewportSize(viewport)
       if (viewport.compact) {
         await expect(scopeTrigger).toBeVisible()
         await expect(desktopTreeTitle).toBeHidden()
-        await scopeTrigger.focus()
-        await scopeTrigger.press('Enter')
-        await expect(page.getByRole('dialog', { name: '选择项目' })).toBeVisible()
-        await page.keyboard.press('Escape')
-        await expect(scopeTrigger).toBeFocused()
       }
       else {
         await expect(scopeTrigger).toBeHidden()
         await expect(desktopTreeTitle).toBeVisible()
       }
-
       await documentDoesNotOverflow(page)
-    })
-  }
+    }
+  })
 
-  for (const width of [390, 768]) {
-    test(`${width}px 归档 Sheet 逐级选择项目与分供方，并与表格共享筛选状态`, async ({ page }) => {
-      const fixture = fixtures.get(page)!
+  test('归档 Sheet 逐级选择项目与分供方，并与表格共享筛选状态，窄屏表格局部横滚', async ({ page }) => {
+    const fixture = fixtures.get(page)!
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/material/delivery/archive')
+    await page.waitForLoadState('networkidle')
+
+    const scopeTrigger = page.getByRole('button', { name: '选择归档范围' })
+    await scopeTrigger.press('Enter')
+    let sheet = page.getByTestId('archive-scope-sheet')
+    await sheet.getByRole('button', { name: new RegExp(fixture.projectName) }).click()
+    await expect(sheet.getByRole('heading', { name: fixture.projectName })).toBeVisible()
+    await sheet.getByRole('button', { name: new RegExp(fixture.supplierName) }).click()
+
+    await expect(scopeTrigger).toContainText(`${fixture.projectName} · ${fixture.supplierName}`)
+    await expect(page.getByRole('link', { name: fixture.deliveryOrderNo, exact: true })).toBeVisible()
+
+    await scopeTrigger.press('Enter')
+    sheet = page.getByTestId('archive-scope-sheet')
+    await sheet.getByRole('button', { name: new RegExp(fixture.projectName) }).click()
+    await expect(sheet.getByRole('button', { name: new RegExp(fixture.supplierName) })).toHaveAttribute('aria-pressed', 'true')
+    await page.keyboard.press('Escape')
+    await expect(scopeTrigger).toBeFocused()
+
+    for (const width of [390, 768]) {
       await page.setViewportSize({ width, height: 844 })
-      await page.goto('/material/delivery/archive')
-      await page.waitForLoadState('networkidle')
-
-      const scopeTrigger = page.getByRole('button', { name: '选择归档范围' })
-      await scopeTrigger.press('Enter')
-      let sheet = page.getByTestId('archive-scope-sheet')
-      await sheet.getByRole('button', { name: new RegExp(fixture.projectName) }).click()
-      await expect(sheet.getByRole('heading', { name: fixture.projectName })).toBeVisible()
-      await sheet.getByRole('button', { name: new RegExp(fixture.supplierName) }).click()
-
-      await expect(scopeTrigger).toContainText(`${fixture.projectName} · ${fixture.supplierName}`)
-      await expect(page.getByRole('link', { name: fixture.deliveryOrderNo, exact: true })).toBeVisible()
-
-      await scopeTrigger.press('Enter')
-      sheet = page.getByTestId('archive-scope-sheet')
-      await sheet.getByRole('button', { name: new RegExp(fixture.projectName) }).click()
-      await expect(sheet.getByRole('button', { name: new RegExp(fixture.supplierName) })).toHaveAttribute('aria-pressed', 'true')
-      await page.keyboard.press('Escape')
-      await expect(scopeTrigger).toBeFocused()
-
       const hasLocalHorizontalScroller = await page.getByTestId('delivery-archive-table').evaluate(root =>
         Array.from(root.querySelectorAll<HTMLElement>('*')).some((element) => {
           const style = getComputedStyle(element)
           return element.scrollWidth > element.clientWidth + 1 && /auto|scroll/.test(style.overflowX)
         }),
       )
-      expect(hasLocalHorizontalScroller).toBe(true)
+      expect(hasLocalHorizontalScroller, `${width}px 归档表局部横滚`).toBe(true)
       await documentDoesNotOverflow(page)
-    })
-  }
+    }
+  })
 
-  for (const viewport of [
-    { width: 390, height: 844, columns: 1 },
-    { width: 768, height: 900, columns: 2 },
-    { width: 1024, height: 900, columns: 2 },
-    { width: 1280, height: 900, columns: 2 },
-    { width: 1440, height: 1000, columns: 2 },
-  ] as const) {
-    test(`${viewport.width}px 手动发票录入使用 ${viewport.columns} 列且主动作可达`, async ({ page }) => {
+  test('手动发票录入在各宽度使用对应列数且主动作可达', async ({ page }) => {
+    await page.goto('/finance/invoice')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('button', { name: '手动录入', exact: true }).click()
+
+    const dialog = page.getByRole('dialog', { name: '手动录入发票' })
+    const grid = dialog.locator('.grid-cols-2')
+    for (const viewport of [
+      { width: 390, height: 844, columns: 1 },
+      { width: 768, height: 900, columns: 2 },
+      { width: 1024, height: 900, columns: 2 },
+      { width: 1280, height: 900, columns: 2 },
+      { width: 1440, height: 1000, columns: 2 },
+    ] as const) {
       await page.setViewportSize(viewport)
-      await page.goto('/finance/invoice')
-      await page.waitForLoadState('networkidle')
-      await page.getByRole('button', { name: '手动录入', exact: true }).click()
-
-      const dialog = page.getByRole('dialog', { name: '手动录入发票' })
-      const grid = dialog.locator('.grid-cols-2')
-      const columns = await grid.evaluate(element =>
+      await expect.poll(() => grid.evaluate(element =>
         getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
-      )
-      expect(columns).toBe(viewport.columns)
+      ), `${viewport.width}px 录入列数`).toBe(viewport.columns)
       await expect(dialog.getByRole('button', { name: '添加', exact: true })).toBeVisible()
       await documentDoesNotOverflow(page)
-    })
-  }
+    }
+  })
 })

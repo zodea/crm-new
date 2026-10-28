@@ -1,15 +1,17 @@
 import type { CustomerCommandRequestDTO } from '../../app/lib/customer/command-contract'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const base = resolve('.codex-tmp/issue-450-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-450-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/failure-`)
-  const storage = createProductionStorage({ directory, workspaceId: 'isolated-workspace', ownerId: 'isolated-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'isolated-workspace', ownerId: 'isolated-owner', purpose: 'verification' })
   const service = createProductionCustomerService(storage)
   const actor = { workspaceId: 'isolated-workspace', actorId: 'isolated-owner', capabilities: ['customer:list:read', 'customer:write'] }
   const command: CustomerCommandRequestDTO = { workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: 'failure-create', requiredCapability: 'customer:write', baseVersion: null, action: 'save', draft: { name: '失败验证', contact: '验证人' }, attachments: { add: [{ fileName: '原件.txt', fileSize: 3, contentBase64: 'YWJj' }] } }

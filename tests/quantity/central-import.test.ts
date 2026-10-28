@@ -159,7 +159,7 @@ describe('三类工程量中央日常导入', () => {
       if (url === '/api/read/quantity/region')
         return instance.region(options!.query as typeof query)
       if (url === '/api/read/quantity/templates') {
-        if (failReadback) {
+        if (failReadback && requests.length > 0) {
           failReadback = false
           throw quantityProblem('unavailable', '回读中断')
         }

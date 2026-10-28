@@ -145,7 +145,6 @@ export function createDeliveryRecordState(repository: DeliveryRepository, origin
     await mutate({ ...identity, commandId: '', action: 'print', targets, disposition })
   }
   return {
-    mode: 'central' as const,
     origin: computed(originFor),
     list: readonly(list),
     context: readonly(context),

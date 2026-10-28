@@ -3,23 +3,29 @@ import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { decodeContractPriceRead } from '../../app/lib/material-contract/price-facts'
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
+import { createProductionConstructionContractService } from '../../server/utils/production-construction-contract-service'
+import { readProductionConstructionScopeMainFact } from '../../server/utils/production-construction-scope-record'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionMaterialContractService, readMaterialContractProjectFacts } from '../../server/utils/production-material-contract-service'
 import { createProductionOurSignatoryService } from '../../server/utils/production-our-signatory-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const base = resolve('.tmp/a02-material-tests')
+  const base = testTempRoot('a02-material-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/storage-`)
   const options = { directory, workspaceId: 'material-disk-workspace', ownerId: 'material-disk-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
-  const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['material-contract:read', 'material-contract:write', 'project:list:read', 'project:write', 'customer:list:read', 'customer:write', 'supplier:list:read', 'supplier:write', 'our-signatory:read', 'our-signatory:write'] }
+  const storage = await createSeededProductionStorage(options)
+  const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['material-contract:read', 'material-contract:write', 'construction-contract:read', 'construction-contract:write', 'construction-scope:read', 'construction-scope:write', 'project:list:read', 'project:write', 'customer:list:read', 'customer:write', 'supplier:list:read', 'supplier:write', 'our-signatory:read', 'our-signatory:write'] }
   const session = () => structuredClone(actor)
   const envelope = { workspaceId: actor.workspaceId, actorId: actor.actorId, baseVersion: null, action: 'save', attachments: {} }
   const customer = await createProductionCustomerService(storage).execute({ ...envelope, requiredCapability: 'customer:write', commandId: 'create-customer', draft: { name: '合成正式客户', contact: '合成人' } }, session)
@@ -27,7 +33,10 @@ async function fixture() {
   const supplier = await createProductionSupplierService(storage).execute({ ...envelope, requiredCapability: 'supplier:write', commandId: 'create-supplier', draft: { name: '合成正式分供方', supplierCategory: '其他', contact: '合成人' } }, session)
   const signatory = await createProductionOurSignatoryService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'our-signatory:write', commandId: 'create-own-party', baseVersion: null, draft: { name: '合成我方公司', taxNo: 'SYNTHETIC-TAX-NO', registeredAddress: null, legalRepresentative: null, verificationNote: '独立合成文书核实事实', status: 'active' } }, session)
   const bytes = Buffer.from('synthetic material original')
-  const command: MaterialContractCommandRequestDTO = { ...envelope, requiredCapability: 'material-contract:write', commandId: 'create-material', action: 'submit', draft: {
+  const main = await createProductionConstructionContractService(storage).execute({ ...envelope, requiredCapability: 'construction-contract:write', commandId: 'material-upstream-main', draft: { name: '原采购工程施工合同', projectId: project.id, customerId: customer.id, content: '真实工程', signDate: '2026-10-07', ourSignatoryId: signatory.id, ourSignatoryVersion: signatory.version, status: '已签订' } }, session)
+  const actualMain = await storage.withTransaction(tx => readProductionConstructionScopeMainFact(tx, actor, main.id))
+  const constructionMain = { id: actualMain.id, projectId: project.id, basis: actualMain.basis }
+  const command: MaterialContractCommandRequestDTO = { ...envelope, requiredCapability: 'material-contract:write', commandId: 'create-material', action: 'submit', constructionMain, draft: {
     name: '合成方管采购',
     projectId: project.id,
     supplierId: supplier.id,
@@ -42,6 +51,91 @@ async function fixture() {
   }, attachments: { add: [{ fileName: '合成合同原件.txt', fileSize: bytes.length, mimeType: 'text/plain', payloadBase64: bytes.toString('base64') }, { fileName: '合成空文件.txt', fileSize: 0, mimeType: 'text/plain', payloadBase64: '' }] } }
   return { storage, options, actor, session, command, bytes, service: createProductionMaterialContractService(storage), signatories: createProductionOurSignatoryService(storage) }
 }
+
+it('新建工程必选在原请求固定后校验，缺失拒绝不留半份合同且同原键不能更换内容', async () => {
+  const f = await fixture()
+  try {
+    const { constructionMain: selected, ...withoutMain } = f.command
+    expect(selected).toBeDefined()
+    const request = { ...withoutMain, commandId: 'missing-engineering-original' }
+    await expect(f.service.execute(request, f.session)).rejects.toThrow('必须搜索并选择')
+    expect(await f.storage.select('SELECT * FROM material_contract_records')).toEqual([])
+    expect(await f.storage.select('SELECT * FROM construction_scope_links')).toEqual([])
+    expect((await f.storage.select<{ request_json: string }>('SELECT request_json FROM material_contract_commands')).map(row => JSON.parse(row.request_json))).toEqual([{ ...request, attachments: { ...request.attachments, removeIds: [], restoreIds: [] } }])
+    await expect(f.service.execute({ ...request, constructionMain: selected }, f.session)).rejects.toThrow('同一命令编号')
+    await f.storage.close()
+    expect(await f.service.resolve(request.commandId, f.session)).toEqual({ outcome: 'not-applied', commandId: request.commandId })
+    await expect(f.service.execute(request, f.session)).rejects.toThrow('封存')
+    expect(await f.storage.select('SELECT * FROM material_contract_records')).toEqual([])
+  }
+  finally { await f.storage.close() }
+})
+
+it('工程关联回执故障整事务回滚原合同、原件和占号，原编号冷重开仍只创建一次', async () => {
+  const f = await fixture()
+  const fault = new Error('synthetic-scope-receipt-disk-failure')
+  const brokenStorage: typeof f.storage = {
+    ...f.storage,
+    withTransaction: async work => f.storage.withTransaction(tx => work({
+      ...tx,
+      execute: async (sql, ...args) => {
+        if (/INSERT INTO construction_scope_receipts/i.test(sql))
+          throw fault
+        return tx.execute(sql, ...args)
+      },
+    })),
+  }
+  const command = { ...f.command, commandId: 'atomic-engineering-original', draft: { ...f.command.draft, no: 'ATOMIC-MAT-1' } }
+  const tables = ['material_contract_records', 'material_contract_commands', 'construction_scope_links', 'construction_scope_history', 'construction_scope_intents', 'construction_scope_receipts', 'file_refs', 'file_payloads', 'contract_number_claims', 'contract_number_history']
+  try {
+    const before = await Promise.all(tables.map(table => f.storage.select(`SELECT * FROM ${table} ORDER BY rowid`)))
+    await expect(createProductionMaterialContractService(brokenStorage).execute(command, f.session)).rejects.toBe(fault)
+    expect(await Promise.all(tables.map(table => f.storage.select(`SELECT * FROM ${table} ORDER BY rowid`)))).toEqual(before)
+    const saved = await f.service.execute(command, f.session)
+    const links = await f.storage.select('SELECT * FROM construction_scope_links')
+    expect(links).toEqual([expect.objectContaining({ source_domain: 'material-contract', source_id: saved.id, main_id: command.constructionMain!.id, project_id: command.draft.projectId })])
+    await f.storage.close()
+    expect(await f.service.execute(command, f.session)).toEqual(saved)
+    expect(await f.service.resolve(command.commandId, f.session)).toEqual({ outcome: 'applied', result: saved })
+    expect(await f.storage.select('SELECT * FROM construction_scope_links')).toEqual(links)
+    expect(Buffer.from((await f.service.file(saved.id, saved.attachmentIds[0]!, f.session)).bytes).equals(f.bytes)).toBe(true)
+    expect(await inspectProductionBackup(await f.storage.backupTo(resolve(f.options.directory, 'atomic-complete.sqlite')).then(() => resolve(f.options.directory, 'atomic-complete.sqlite')))).toMatchObject({ originals: { files: saved.attachmentIds.length, bytes: f.bytes.length } })
+  }
+  finally { await f.storage.close() }
+})
+
+it('备份及冷读拒绝丢失整份工程关联证据的已保存原合同，不能把空关系误当历史未关联', async () => {
+  const f = await fixture()
+  try {
+    const saved = await f.service.execute(f.command, f.session)
+    const directory = resolve(f.options.directory, 'missing-whole-engineering-proof')
+    await mkdir(directory)
+    const path = resolve(directory, 'ruihang.sqlite')
+    await f.storage.backupTo(path)
+    await inspectProductionBackup(path)
+    const damaged = new DatabaseSync(path)
+    try {
+      const guards = damaged.prepare('SELECT name,sql FROM sqlite_schema WHERE type=\'trigger\' AND tbl_name LIKE \'construction_scope_%\'').all()
+      for (const guard of guards)
+        damaged.exec(`DROP TRIGGER "${guard.name}"`)
+      for (const table of ['construction_scope_receipts', 'construction_scope_history', 'construction_scope_intents', 'construction_scope_links'])
+        damaged.exec(`DELETE FROM ${table}`)
+      damaged.exec('UPDATE construction_scope_revision SET revision=0')
+      for (const guard of guards)
+        damaged.exec(String(guard.sql))
+    }
+    finally { damaged.close() }
+    await expect(inspectProductionBackup(path)).rejects.toThrow('材采')
+    const copy = createProductionStorage({ ...f.options, directory })
+    try {
+      await expect(createProductionMaterialContractService(copy).form(saved.id, f.session)).rejects.toThrow('证据损坏')
+      expect(await copy.select('SELECT * FROM construction_scope_links')).toEqual([])
+    }
+    finally { await copy.close() }
+    expect((await f.service.form(saved.id, f.session)).constructionMain?.id).toBe(f.command.constructionMain!.id)
+  }
+  finally { await f.storage.close() }
+})
 
 it('目录更名与停用保核实历史，原合同与既有协议快照固定；新选择核对当前目录版本', async () => {
   const f = await fixture()

@@ -28,10 +28,10 @@
 
 | 位置 | 图数 | 说明 |
 | --- | --- | --- |
-| [ui-initial/](ui-initial/) | 15 | 模板、区域、矩阵各五档，模板图为列宽修正后的结果 |
-| [stages/](stages/) | 6 | 阶段五档及 390px 报量区域；最终图已排除提示遮挡 |
-| [completion/](completion/) | 20 | 责任、单阶段完成、户详情、批量完成各五档 |
-| [exports/](exports/) | 2 | 解除归档确认与独立分类导出配置 |
+| [ui-initial/](https://github.com/zodea/crm-new/tree/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-442/ui-initial) | 15 | 模板、区域、矩阵各五档，模板图为列宽修正后的结果 |
+| [stages/](https://github.com/zodea/crm-new/tree/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-442/stages) | 6 | 阶段五档及 390px 报量区域；最终图已排除提示遮挡 |
+| [completion/](https://github.com/zodea/crm-new/tree/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-442/completion) | 20 | 责任、单阶段完成、户详情、批量完成各五档 |
+| [exports/](https://github.com/zodea/crm-new/tree/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-442/exports) | 2 | 解除归档确认与独立分类导出配置 |
 | [totals/](totals/) | 5 | 分单位合计、缺量说明及键盘弹层；另含真实台账与回读 JSON |
 
 总票目录另有导入 5 图、月报 7 图，共 60 张 UI 图；迁移的 PDF 渲染图单列，不计为 UI 截图。

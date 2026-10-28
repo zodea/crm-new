@@ -1,6 +1,5 @@
 import type { QuotationGraph, QuotationImportResult } from './graph'
 import type { QuotationImportBinding, QuotationMigrationSource } from './import-evidence'
-import { isTauri } from '@tauri-apps/api/core'
 import { isISODateTimeDTO } from '../../types/read-model'
 import { hasConsistentReadMeta, isReadMetaDTO } from '../read-model/meta'
 import { isObject, quotationProblem, validId } from './contract'
@@ -26,8 +25,6 @@ export interface QuotationImportRequest {
 export function createQuotationImportRepository(fetcher: (url: string, options?: object) => Promise<unknown>) {
   async function read<T>(load: () => Promise<unknown>, decode: (value: unknown) => T): Promise<T> {
     try {
-      if (isTauri())
-        return quotationProblem('unavailable', 'Native 尚无可信中央报价迁入身份；请从桌面设置导出一致快照，在正式浏览器工作区核验')
       return decode(await load())
     }
     catch (cause) {

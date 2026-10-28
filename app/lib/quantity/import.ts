@@ -7,12 +7,11 @@ import type { QuantityTemplateDraft } from './template'
 import type { SoftDb } from '~/lib/db/soft-delete'
 import type { ImportTemplateField } from '~/lib/kit/import-mapping'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
-import { loadQuantityAssignmentWorkspace, persistQuantityAssignments } from './assignment'
-import { loadQuantityCompletionWorkspace, persistQuantityStageCompletion } from './completion'
+import { loadQuantityAssignmentWorkspace } from './assignment'
+import { loadQuantityCompletionWorkspace } from './completion'
 import {
   editableQuantityTemplateDraft,
   loadQuantityTemplateWorkspace,
-  persistQuantityTemplate,
 } from './template'
 
 export const QUANTITY_TEMPLATE_IMPORT_FIELDS: readonly ImportTemplateField[] = [
@@ -123,15 +122,6 @@ async function findUnitId(
   return unit.id
 }
 
-/**
- * 模板量逐行导入：定位/追加 户型、房间、分项与量行后整模板保存，
- * 复用 persistQuantityTemplate 的全部不变量（整户范围、活链接、乐观锁）。
- */
-export async function importQuantityTemplateRow(db: SoftDb, row: Record<string, unknown>): Promise<void> {
-  const projectId = await findProjectId(db, str(row, 'projectCode'))
-  await persistQuantityTemplate(db, await buildQuantityTemplateImportDraft(db, projectId, row))
-}
-
 export async function buildQuantityTemplateImportDraft(db: SoftDb, projectId: string, row: Record<string, unknown>): Promise<QuantityTemplateDraft> {
   const templateCode = str(row, 'templateCode')
   const roomCode = str(row, 'roomCode')
@@ -240,19 +230,6 @@ export async function buildQuantityTemplateImportDraft(db: SoftDb, projectId: st
   return draft
 }
 
-/** 责任配置逐行导入：单户 draft 走 persistQuantityAssignments，导入文件视为权威、允许替换。 */
-export async function importQuantityAssignmentRow(db: SoftDb, row: Record<string, unknown>): Promise<void> {
-  const projectId = await findProjectId(db, str(row, 'projectCode'))
-  const unitId = await findUnitId(
-    db,
-    projectId,
-    str(row, 'buildingCode'),
-    str(row, 'floorCode'),
-    str(row, 'unitCode'),
-  )
-  await persistQuantityAssignments(db, await buildQuantityAssignmentImportDraft(db, projectId, unitId, row))
-}
-
 export async function buildQuantityAssignmentImportDraft(db: SoftDb, projectId: string, unitId: string, row: Record<string, unknown>, identity?: { kind: 'crew' | 'worker', id: string }): Promise<QuantityAssignmentBatchDraft> {
   const trade = str(row, 'trade')
   const crewName = str(row, 'crewName')
@@ -307,20 +284,7 @@ export async function buildQuantityAssignmentImportDraft(db: SoftDb, projectId: 
   }
 }
 
-/** 阶段完成逐行导入：历史回填走 allowMissingPhotos 迁移通道，仍按唯一写路径落事实。 */
-export async function importQuantityCompletionRow(db: SoftDb, row: Record<string, unknown>): Promise<void> {
-  const projectId = await findProjectId(db, str(row, 'projectCode'))
-  const unitId = await findUnitId(
-    db,
-    projectId,
-    str(row, 'buildingCode'),
-    str(row, 'floorCode'),
-    str(row, 'unitCode'),
-  )
-  await persistQuantityStageCompletion(db, { ...await buildQuantityCompletionImportDraft(db, projectId, unitId, row), allowMissingPhotos: true })
-}
-
-export async function buildQuantityCompletionImportDraft(db: SoftDb, projectId: string, unitId: string, row: Record<string, unknown>): Promise<Omit<QuantityCompletionDraft, 'allowMissingPhotos'>> {
+export async function buildQuantityCompletionImportDraft(db: SoftDb, projectId: string, unitId: string, row: Record<string, unknown>, options: NonNullable<Parameters<typeof loadQuantityCompletionWorkspace>[3]> = {}): Promise<Omit<QuantityCompletionDraft, 'allowMissingPhotos'>> {
   const stageCode = str(row, 'stageCode')
   if (!stageCode)
     throw new Error('缺少阶段编码')
@@ -336,7 +300,7 @@ export async function buildQuantityCompletionImportDraft(db: SoftDb, projectId: 
   if (!completedAt)
     throw new Error('缺少完成日期')
 
-  const workspace = await loadQuantityCompletionWorkspace(db, projectId, unitId)
+  const workspace = await loadQuantityCompletionWorkspace(db, projectId, unitId, options)
   const stage = workspace.stages.find(candidate => candidate.code === stageCode)
   if (!stage)
     throw new Error(`工序阶段「${stageCode}」不存在或不支持按户完成`)

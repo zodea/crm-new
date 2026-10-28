@@ -80,7 +80,6 @@ test('真实三张工资从0暂缓到自动分完1000，五档视口及逐单冷
     await dialog.getByLabel('实际发放（元）').first().focus()
     await page.keyboard.press('Tab')
     expect(await dialog.evaluate(node => node.contains(document.activeElement))).toBe(true)
-    await page.screenshot({ path: info.outputPath(`batch-remainder-${width}.png`), fullPage: true })
   }
   await dialog.getByRole('button', { name: '固定批次计划', exact: true }).click()
   for (let index = 0; index < 3; index++)

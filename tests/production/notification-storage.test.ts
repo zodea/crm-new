@@ -1,21 +1,25 @@
 import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { join } from 'node:path'
+import { afterAll, expect, it } from 'vitest'
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { createProductionNotificationService } from '../../server/utils/production-notification-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 const actor = { workspaceId: 'notification-workspace', actorId: 'notification-owner', capabilities: ['supplier:list:read', 'supplier:write', 'supplier-credential:read', 'supplier-credential:write'] }
 const session = () => actor
 const bytes = Buffer.from('%PDF-1.7\nSynthetic expiry original\n%%EOF')
 async function setup() {
-  const base = resolve('.tmp/a01-notification-tests')
+  const base = testTempRoot('a01-notification-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/storage-`)
   const options = { directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   let timestamp = '2026-10-03T00:00:00.000Z'
   const now = () => timestamp
   const suppliers = createProductionSupplierService(storage, { now })

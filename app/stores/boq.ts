@@ -5,11 +5,12 @@ import type {
 import type { PersistBoqImportInput } from '~/lib/boq/import'
 import type { BoqLinePatch } from '~/lib/boq/lines'
 import type { MonthlyStatementView } from '~/lib/boq/monthly'
+import type { BoqOriginalInput } from '~/lib/boq/production-contract'
 import type { BoqCatalogProject, BoqWorkspace } from '~/lib/boq/read-model'
 import type { ExportFileOptions } from '~/lib/kit/export'
 import type { QuantityBasis } from '~/lib/quantity/basis'
 import { defineStore } from 'pinia'
-import { readonly, shallowRef } from 'vue'
+import { computed, readonly, shallowRef, watch } from 'vue'
 import {
   approveBoqChangeOrder,
   createBoqChangeOrder,
@@ -25,6 +26,7 @@ import {
   loadMonthlyStatement,
   regenerateMonthlyStatement,
 } from '~/lib/boq/monthly'
+import { productionBoqWorkspaceProjection } from '~/lib/boq/production-projection'
 import { loadBoqCatalog, loadBoqWorkspace } from '~/lib/boq/read-model'
 import { execute, select, withTransaction } from '~/lib/db/connection'
 import {
@@ -34,6 +36,8 @@ import {
 } from '~/lib/db/soft-delete'
 import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
+import { useProductionBoqStore } from '~/stores/boq-production'
+import { useProductionAccessStore } from '~/stores/production-access'
 
 const db = { execute, select }
 
@@ -54,6 +58,17 @@ export interface BoqAttachmentDraft {
 }
 
 export const useBoqStore = defineStore('boq', () => {
+  const access = useProductionAccessStore()
+  const central = useProductionBoqStore()
+  const formal = computed(() => access.status?.mode === 'production' || (access.status?.mode !== 'development'))
+  watch(() => [access.status?.mode, access.status?.mode === 'production' ? access.status.ownerId : undefined, access.status?.authenticated], () => central.clearWorkspace())
+  const formalWorkspace = computed(() => {
+    const source = central.workspace
+    if (!source)
+      return null
+    const parent = central.directory?.contracts.find(row => row.id === source.contractId)
+    return productionBoqWorkspaceProjection(source, parent?.projectName ?? '', parent?.name ?? '', parent?.no ?? '')
+  })
   const catalog = shallowRef<BoqCatalogProject[]>([])
   const workspace = shallowRef<BoqWorkspace | null>(null)
   const monthlyStatement = shallowRef<MonthlyStatementView | null>(null)
@@ -66,6 +81,8 @@ export const useBoqStore = defineStore('boq', () => {
   let latestMonthlyRequest = 0
 
   async function loadCatalog() {
+    if (formal.value)
+      return central.loadCatalog()
     loading.value = true
     error.value = ''
     try {
@@ -82,6 +99,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   function clearWorkspace() {
+    if (formal.value)
+      return central.clearWorkspace()
     latestWorkspaceRequest += 1
     latestMonthlyRequest += 1
     activeProjectId = ''
@@ -92,6 +111,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function loadWorkspace(projectId: string, contractId: string) {
+    if (formal.value)
+      return central.loadWorkspace(projectId, contractId)
     const request = ++latestWorkspaceRequest
     activeProjectId = projectId
     activeContractId = contractId
@@ -120,6 +141,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function loadStatement(statementId: string) {
+    if (formal.value)
+      throw new Error('正式甲方报量未采用此本地源单，请保留原清单')
     const request = ++latestMonthlyRequest
     if (monthlyStatement.value?.id !== statementId)
       monthlyStatement.value = null
@@ -169,20 +192,41 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function updateLine(lineId: string, patch: BoqLinePatch) {
+    if (formal.value) {
+      const line = central.workspace?.lines.find(row => row.id === lineId)
+      if (!line)
+        throw new Error('请先读取原施工主合同的清单行')
+      return central.execute({ kind: 'patch-line', lineId, version: line.version, patch })
+    }
     return save('清单行保存', () => withTransaction(tx => persistBoqLinePatch(tx, lineId, patch)))
   }
 
   async function removeLine(lineId: string) {
+    if (formal.value) {
+      const line = central.workspace?.lines.find(row => row.id === lineId)
+      if (!line)
+        throw new Error('请先读取原清单行')
+      await central.execute({ kind: 'delete-line', lineId, version: line.version })
+      return null
+    }
     return save('清单行删除', () => withTransaction(tx => softDelete(tx, 'boq_lines', lineId)))
   }
 
-  async function importWorkbook(input: PersistBoqImportInput) {
+  async function importWorkbook(input: PersistBoqImportInput & { original?: BoqOriginalInput }) {
+    if (formal.value) {
+      if (!input.original)
+        throw new Error('正式采用必须提供完整原清单文件')
+      const saved = await central.importWorkbook({ ...input, original: input.original })
+      return { fileId: saved.fileId!, lineCount: saved.lineIds?.length ?? 0, unitPriceCount: saved.priceIds?.length ?? 0, linkedTemplateLineCount: 0, logIds: [] }
+    }
     activeProjectId = input.projectId
     activeContractId = input.contractId
     return save('清单导入', () => withTransaction(tx => persistBoqImport(tx, input)))
   }
 
   async function createChange(draft: CreateBoqChangeOrderDraft) {
+    if (formal.value)
+      return central.createChange(draft)
     activeProjectId = draft.projectId
     activeContractId = draft.contractId
     return save('变更单创建', () => withTransaction(tx => createBoqChangeOrder(tx, draft)))
@@ -193,6 +237,8 @@ export const useBoqStore = defineStore('boq', () => {
     target: 'submitted' | 'rejected',
     statusNote = '',
   ) {
+    if (formal.value)
+      return central.transitionChange(orderId, target, statusNote)
     return save(
       '变更单状态更新',
       () => withTransaction(tx => transitionBoqChangeOrder(tx, orderId, target, statusNote)),
@@ -200,6 +246,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function approveChange(orderId: string, approvedAt: string) {
+    if (formal.value)
+      return central.approveChange(orderId, approvedAt)
     return save(
       '变更单签证',
       () => withTransaction(tx => approveBoqChangeOrder(tx, orderId, approvedAt)),
@@ -211,6 +259,8 @@ export const useBoqStore = defineStore('boq', () => {
     draft: ReviseApprovedBoqChangeOrderDraft,
     secondConfirmed = false,
   ) {
+    if (formal.value)
+      throw new Error('已签证更正须核对原冻结与后续引用，当前不回落本地重写')
     return save(
       '已签证变更更正',
       () => withTransaction(tx => reviseApprovedBoqChangeOrder(tx, orderId, draft, secondConfirmed)),
@@ -218,6 +268,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function removeChange(orderId: string, allowApproved = false) {
+    if (formal.value)
+      throw new Error('正式变洽签的历史与依赖仍保留，不能用本地删除撤除')
     return save('变更单删除', () => withTransaction(async (tx) => {
       const [order] = await tx.select<{ status: string, ledger_id: string | null }>(
         `SELECT status, ledger_id
@@ -243,6 +295,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function addChangeAttachment(orderId: string, draft: BoqAttachmentDraft) {
+    if (formal.value)
+      return central.attachmentChange(orderId, { add: [{ fileName: draft.fileName, fileSize: draft.fileSize, mimeType: draft.mimeType, category: draft.category, payloadBase64: draft.contentBase64 }] })
     return save('变更附件保存', () => withTransaction(async (tx) => {
       const [order] = await tx.select<{ id: string }>(
         `SELECT id FROM boq_change_orders WHERE id = ? AND deleted_at IS NULL`,
@@ -279,6 +333,12 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function loadAttachmentFile(attachmentId: string): Promise<ExportFileOptions> {
+    if (formal.value) {
+      const change = central.workspace?.changes.find(row => row.document.files.some(file => file.id === attachmentId && file.deletedAt === null))
+      if (!change)
+        throw new Error('原签证附件未从当前真实主合同读取')
+      return central.originalFile('owner-change', change.id, attachmentId)
+    }
     const [attachment] = await select<{
       file_name: string
       mime_type: string
@@ -308,6 +368,13 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function removeAttachment(attachmentId: string) {
+    if (formal.value) {
+      const change = central.workspace?.changes.find(row => row.document.files.some(file => file.id === attachmentId && file.deletedAt === null))
+      if (!change)
+        throw new Error('原签证附件未从当前真实主合同读取')
+      await central.attachmentChange(change.id, { removeIds: [attachmentId] })
+      return null
+    }
     return save(
       '变更附件删除',
       () => withTransaction(tx => softDelete(tx, 'file_refs', attachmentId)),
@@ -318,6 +385,8 @@ export const useBoqStore = defineStore('boq', () => {
     month: string,
     basis: QuantityBasis = DEFAULT_PROGRESS_QUANTITY_BASIS,
   ) {
+    if (formal.value)
+      throw new Error('正式甲方报量源单尚未接通，不用本地数据生成')
     const result = await save(
       '月度报量生成',
       () => withTransaction(tx => generateMonthlyStatement(
@@ -333,6 +402,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function regenerateMonthly(statementId: string, basis: QuantityBasis) {
+    if (formal.value)
+      throw new Error('甲方报量尚未接通正式源单，不用空量或本地记录补造')
     const result = await save(
       '月度报量换基准重算',
       () => withTransaction(tx => regenerateMonthlyStatement(tx, statementId, basis)),
@@ -342,6 +413,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function adjustMonthly(lineId: string, adjustedQty: number, note: string) {
+    if (formal.value)
+      throw new Error('正式甲方报量来源尚未接通，不回落本地修改')
     const result = await save(
       '月度报量调整',
       () => withTransaction(tx => adjustMonthlyStatementLine(tx, lineId, adjustedQty, note)),
@@ -352,6 +425,8 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   async function undo(logIds: readonly string[]) {
+    if (formal.value)
+      throw new Error('正式清单仅核对原命令与本域受保护恢复，不回落本地撤销')
     return save('撤回', () => withTransaction(async (tx) => {
       for (const logId of [...logIds].reverse())
         await undoOperation(tx, logId)
@@ -359,12 +434,16 @@ export const useBoqStore = defineStore('boq', () => {
   }
 
   return {
-    catalog: readonly(catalog),
-    workspace: readonly(workspace),
+    catalog: computed(() => formal.value ? central.catalog : catalog.value),
+    workspace: computed(() => formal.value ? formalWorkspace.value : workspace.value),
     monthlyStatement: readonly(monthlyStatement),
-    loading: readonly(loading),
-    saving: readonly(saving),
-    error: readonly(error),
+    loading: computed(() => formal.value ? central.loading : loading.value),
+    saving: computed(() => formal.value ? central.saving : saving.value),
+    error: computed(() => formal.value ? central.error : error.value),
+    production: formal,
+    pending: computed(() => formal.value ? central.pending : []),
+    recover: central.recover,
+    prices: computed(() => formal.value ? central.workspace?.prices ?? [] : []),
     loadCatalog,
     clearWorkspace,
     loadWorkspace,
@@ -379,6 +458,9 @@ export const useBoqStore = defineStore('boq', () => {
     removeChange,
     addChangeAttachment,
     loadAttachmentFile,
+    originalFiles: computed(() => formal.value ? central.workspace?.files ?? [] : []),
+    savedCommands: computed(() => formal.value ? central.savedCommands : []),
+    loadOriginalFile: (ownerId: string, fileRefId: string) => central.originalFile('boq-file', ownerId, fileRefId),
     removeAttachment,
     generateMonthly,
     regenerateMonthly,

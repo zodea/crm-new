@@ -33,7 +33,6 @@ import { paymentApplicationDetailModel } from '~/lib/finance/payment-detail-repo
 import { verifiedFinanceNumber, verifiedFinanceSum } from '~/lib/finance/persistent-rows'
 import { loadFileRefContent } from '~/lib/forms/file-refs'
 import { readNativeOtherSettlementReference } from '~/lib/other-settlement/storage'
-import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 import { toErrorMessage } from '~/lib/util/error'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
@@ -96,7 +95,7 @@ export const useFinanceStore = defineStore('finance', () => {
       financeFailure('forbidden', '当前为测试数据来源，不能使用正式财务记录或原提交；请恢复原来源后核对。')
     return useNuxtApp().$repositories.finance
   }
-  const isCentral = (kind: F3FormKind): boolean => kind !== 'receipt' && 'window' in globalThis && !isDesktopRuntime()
+  const isCentral = (kind: F3FormKind): boolean => kind !== 'receipt' && 'window' in globalThis
   function centralKind<K extends F3FormKind>(kind: K): Exclude<K, 'receipt'>
   function centralKind(kind: F3FormKind): CentralFinanceKind {
     if (kind === 'receipt')
@@ -451,6 +450,11 @@ export const useFinanceStore = defineStore('finance', () => {
   }
 
   const searchProjects = (keyword: string, kind?: F3FormKind) => searchLookup('projects', keyword, kind)
+  async function searchConstructionMains(keyword: string, projectId?: string | null) {
+    if (!isCentral('reimbursement'))
+      throw new Error('当前来源不能搜索真实工程与施工主合同；原资料继续保留。')
+    return (await centralRead('reimbursement', () => repository().lookup('reimbursement', { kind: 'construction-mains', keyword, ...(projectId ? { projectId } : {}) }))).items
+  }
   const searchCustomers = (keyword: string, kind?: F3FormKind) => searchLookup('customers', keyword, kind)
   const searchSuppliers = (keyword: string, kind?: F3FormKind) => searchLookup('suppliers', keyword, kind)
   const searchWorkers = (keyword: string, kind?: F3FormKind) => searchLookup('workers', keyword, kind)
@@ -666,6 +670,7 @@ export const useFinanceStore = defineStore('finance', () => {
     loadOne,
     loadList,
     searchProjects,
+    searchConstructionMains,
     searchCustomers,
     searchSuppliers,
     searchWorkers,

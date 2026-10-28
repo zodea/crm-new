@@ -1,12 +1,11 @@
 import type { PayrollAdjustmentAction, PayrollAdjustmentFormRead } from '~/lib/payroll/central-adjustment-contract'
 import type { PayrollC2Command, PayrollC2FormRead } from '~/lib/payroll/central-c2-contract'
 import { afterEach, expect, it } from 'vitest'
-import { upsertC2SubjectConfig } from '~/lib/payroll/daywork'
 import { resolveBusinessSession } from '../../server/utils/business-session'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { payrollService } from '../../server/utils/payroll-runtime'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { importPayrollC2MigrationSource, seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
 
 afterEach(async () => {
@@ -15,12 +14,12 @@ afterEach(async () => {
 })
 
 it('真实更正保存、确认及退款后重复迁入保原事实，无关原图可恢复，相关恢复整批拒绝', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollC2MigrationSource(db)
     await db.execute('INSERT INTO projects(id,name) VALUES (\'other-project\',\'无关工程\')')
     await db.execute('INSERT INTO workers(id,name,current_project_id) VALUES (\'other-worker\',\'无关负责人\',\'other-project\')')
-    await upsertC2SubjectConfig(db, { projectId: 'other-project', crewId: null, leaderWorkerId: 'other-worker', unitRate: 500, ruleText: '' })
+    await db.execute('INSERT INTO payroll_subject_configs(id,project_id,crew_id,leader_worker_id,format_family,unit_rate,rule_text) VALUES (?,?,?,?,\'C2\',?,\'\')', ['other-config', 'other-project', null, 'other-worker', 500])
     const imported = await importPayrollC2MigrationSource(db)
     const { projectId, leaderWorkerId, workerId } = imported
     const config = await payrollService.c2Config({ origin: 'real' }, { projectId, leaderWorkerId })

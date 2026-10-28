@@ -137,16 +137,19 @@ test.describe('Issue #322：补充协议稳定聚焦与来源恢复', () => {
     await expect(page.getByText('分包合同详情查询参数无效')).toBeVisible({ timeout: 20_000 })
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 两类补充协议聚焦保持可见且无页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/contract/con_demo_sg01?origin=demo&contractKind=construction&tab=supplements&focus=cs_demo_sg01_01')
-      await expect(page.locator('#construction-contract-fact-cs_demo_sg01_01')).toBeFocused({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#322 施工补充协议聚焦 @ ${width}px`)
+  test('两类补充协议聚焦后在各宽度无页面级横滚', async ({ page }) => {
+    const expectNoOverflowAcrossWidths = async (label: string) => {
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+        await expectNoPageOverflow(page, `#322 ${label} @ ${width}px`)
+      }
+    }
+    await page.goto('/contract/con_demo_sg01?origin=demo&contractKind=construction&tab=supplements&focus=cs_demo_sg01_01')
+    await expect(page.locator('#construction-contract-fact-cs_demo_sg01_01')).toBeFocused({ timeout: 20_000 })
+    await expectNoOverflowAcrossWidths('施工补充协议聚焦')
 
-      await page.goto('/contract/con_demo_fb01?origin=demo&contractKind=subcontract&tab=changes&focus=sub-supplement-1')
-      await expect(page.locator('#subcontract-contract-fact-sub-supplement-1')).toBeFocused({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#322 分包补充协议聚焦 @ ${width}px`)
-    })
-  }
+    await page.goto('/contract/con_demo_fb01?origin=demo&contractKind=subcontract&tab=changes&focus=sub-supplement-1')
+    await expect(page.locator('#subcontract-contract-fact-sub-supplement-1')).toBeFocused({ timeout: 20_000 })
+    await expectNoOverflowAcrossWidths('分包补充协议聚焦')
+  })
 })

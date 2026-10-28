@@ -1,10 +1,13 @@
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { join } from 'node:path'
+import { afterAll, expect, it } from 'vitest'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it('一致备份保留已提交事实并拒绝覆盖已有目标，原库和副本能独立读取', async () => {
-  const base = resolve('.codex-tmp/issue-463-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-463-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/backup-source-`)
   const destination = await mkdtemp(`${base}/backup-target-`)
@@ -31,7 +34,7 @@ it('一致备份保留已提交事实并拒绝覆盖已有目标，原库和副�
 })
 
 it('备份在前一事务提交后执行，后续写入和关闭均等待备份完成', async () => {
-  const base = resolve('.codex-tmp/issue-463-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-463-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/queued-source-`)
   const destination = await mkdtemp(`${base}/queued-target-`)

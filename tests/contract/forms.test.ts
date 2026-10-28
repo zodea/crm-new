@@ -7,14 +7,12 @@ import { readNativeConstructionManagementFee } from '~/lib/construction-contract
 import {
   deleteF2Form,
   listContractFormAttachments,
-  listExpenditureSettlementOptions,
   loadContractSupplementForm,
   loadF2Form,
 } from '~/lib/contract/forms'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadFileRefContent } from '~/lib/forms/file-refs'
 import { useContractStore } from '~/stores/contract'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 let failFileInsert = false
@@ -48,8 +46,7 @@ vi.mock('~/lib/db/connection', () => ({
 
 beforeEach(async () => {
   failFileInsert = false
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   const ownFacts = JSON.stringify({ name: '合同我方实际公司', taxNo: 'TEST-TAX', registeredAddress: null, legalRepresentative: null, verificationNote: '本测试独立核实主体事实', status: 'active' })
   await mem.execute('INSERT INTO our_signatories VALUES(?,?,?,?,?)', ['our-contract', ownFacts, 1, '2026-10-04T00:00:00.000Z', '2026-10-04T00:00:00.000Z'])
   await mem.execute('INSERT INTO our_signatory_history VALUES(?,?,?,?,?,?,?)', ['our-contract-v1', 'our-contract', 1, ownFacts, null, null, '2026-10-04T00:00:00.000Z'])
@@ -672,7 +669,7 @@ describe('f2 合同与支出结算领域 action', () => {
     }, 'submit')).rejects.toThrow('材采明细含税汇总与合同头金额不一致')
   })
 
-  it('附件失败回滚头表、明细和操作日志，结算 lookup 只返回真实可选源单', async () => {
+  it('附件失败回滚头表、明细和操作日志', async () => {
     const store = useContractStore()
     failFileInsert = true
     await expect(store.saveForm('material', {
@@ -700,42 +697,6 @@ describe('f2 合同与支出结算领域 action', () => {
       FROM contract_line_items
       WHERE material_name = '瓷砖'
     `)).toEqual([{ total: 0 }])
-
-    failFileInsert = false
-    const other = await store.saveForm('other_expense', {
-      ...OUR_SELECTED,
-      name: '可结算合同',
-      projectId: 'project-contract',
-      supplierId: 'supplier-contract',
-      otherExpenseKind: '其他',
-      content: '服务',
-      signDate: '2026-07-01',
-      amount: 100,
-    }, 'submit')
-    const settlement = await store.saveForm('other_settlement', {
-      name: '可选结算',
-      projectId: 'project-contract',
-      contractId: other.id,
-      totalAmount: 80,
-      settlementDate: '2026-07-20',
-    }, 'submit')
-    await store.saveForm('other_settlement', {
-      name: '',
-    }, 'draft')
-
-    expect(await listExpenditureSettlementOptions({
-      projectId: 'project-contract',
-      contractId: other.id,
-    })).toEqual([])
-    await mem.execute('UPDATE expenditure_settlements SET status = ? WHERE id = ?', ['confirmed', settlement.id])
-    expect(await listExpenditureSettlementOptions({
-      projectId: 'project-contract',
-      contractId: other.id,
-    })).toEqual([{
-      id: settlement.id,
-      label: '可选结算',
-      hint: '80.00',
-    }])
   })
 
   it('合同存在有效结算时阻止删除，结算软删除后才允许删除合同', async () => {

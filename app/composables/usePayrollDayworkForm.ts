@@ -66,7 +66,7 @@ export function usePayrollDayworkForm() {
       draft.value = dayworkDraft(value.draft)
       original.value = JSON.stringify(draft.value)
       const operation = store.getDayworkPending(value)
-      if (operation?.command.action.kind === 'save-daywork')
+      if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'save-daywork')
         draft.value = clone(operation.command.action.record)
     }
   }, { immediate: true })

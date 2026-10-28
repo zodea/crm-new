@@ -130,20 +130,6 @@ describe('送货单归档库导出', () => {
       remove: vi.fn(),
       undo: vi.fn(),
     }))
-    vi.stubGlobal('useProjectStore', () => ({
-      list: [{ id: 'project-1', name: '合和新城' }],
-      byId: () => ({ id: 'project-1', name: '合和新城' }),
-      load: vi.fn().mockResolvedValue(undefined),
-    }))
-    vi.stubGlobal('useSupplierStore', () => ({
-      list: [{ id: 'supplier-1', name: '广州建材有限公司' }],
-      byId: () => ({ id: 'supplier-1', name: '广州建材有限公司' }),
-      load: vi.fn().mockResolvedValue(undefined),
-    }))
-    vi.stubGlobal('useContractStore', () => ({
-      list: [],
-      load: vi.fn().mockResolvedValue(undefined),
-    }))
   })
 
   it('用户取消统一写盘时保持静默，不触发额外成功或缺原件提示', async () => {
@@ -188,18 +174,12 @@ describe('送货单归档库导出', () => {
   })
 
   it('中央归档只使用当前关系，带冒号的稳定 ID 可筛选，读取失败撤下旧事实和动作', async () => {
-    const central = reactive({ mode: 'central', origin: 'real', canWrite: true, loading: false, list: [{ ...record, id: 'd:1', projectId: 'p:1', supplierId: 's:1', dataOrigin: 'real', projectName: '中央项目', supplierName: '中央分供方' }], context: { projects: [{ id: 'p:1', name: '中央项目' }], suppliers: [{ id: 's:1', name: '中央分供方' }], materialContracts: [] }, load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn(), remove: vi.fn(), undo: vi.fn() })
+    const central = reactive({ origin: 'real', canWrite: true, loading: false, list: [{ ...record, id: 'd:1', projectId: 'p:1', supplierId: 's:1', dataOrigin: 'real', projectName: '中央项目', supplierName: '中央分供方' }], context: { projects: [{ id: 'p:1', name: '中央项目' }], suppliers: [{ id: 's:1', name: '中央分供方' }], materialContracts: [] }, load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn(), remove: vi.fn(), undo: vi.fn() })
     vi.stubGlobal('useDeliveryRecordStore', () => central)
-    const local = vi.fn(() => {
-      throw new Error('不能回落本机主档')
-    })
-    for (const name of ['useProjectStore', 'useSupplierStore', 'useContractStore'])
-      vi.stubGlobal(name, local)
     render(DeliveryArchiveScreen, { global: { components: { ...globalComponents, ArchiveScopePicker: ScopeStub } } })
     await screen.findByText('中央项目')
     await fireEvent.click(screen.getByRole('button', { name: '筛选中央分供方' }))
     expect(screen.getByRole('link', { name: 'SH-001' }).getAttribute('href')).toBe('/material/delivery/archive/d%3A1?origin=real')
-    expect(local).not.toHaveBeenCalled()
     central.load.mockRejectedValueOnce(new Error('关联权限已撤销'))
     await fireEvent.click(screen.getByRole('button', { name: '刷新' }))
     await screen.findByRole('alert')
@@ -211,7 +191,7 @@ describe('送货单归档库导出', () => {
   })
 
   it('等待目录选择时切换来源，取消当前导出且不再读取迟到原件', async () => {
-    const central = reactive({ mode: 'central', origin: 'real', canWrite: true, loading: false, list: [record], context: { projects: [], suppliers: [], materialContracts: [] }, load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn() })
+    const central = reactive({ origin: 'real', canWrite: true, loading: false, list: [record], context: { projects: [], suppliers: [], materialContracts: [] }, load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn() })
     vi.stubGlobal('useDeliveryRecordStore', () => central)
     let proceed!: () => void
     kitUi.exportFile.mockImplementationOnce(async (options) => {

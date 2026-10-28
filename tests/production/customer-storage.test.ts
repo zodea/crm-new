@@ -1,13 +1,15 @@
 import type { CustomerCommandRequestDTO } from '../../app/lib/customer/command-contract'
 import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it('客户含原件保存后冷打开读回同一身份、审计和回执，同键异文不能新增', async () => {
-  const base = resolve('.codex-tmp/issue-450-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-450-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/customer-`)
   const options = { directory, workspaceId: 'isolated-workspace', ownerId: 'isolated-owner', purpose: 'verification' as const }

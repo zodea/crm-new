@@ -68,7 +68,6 @@ test('三类实际 CSV 经中央导入：零与未知、唯一责任、缺照拒
     await download.focus()
     await expect(download).toBeFocused()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
-    await page.screenshot({ path: testInfo.outputPath(`quantity-import-${width}.png`), animations: 'disabled' })
   }
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: /下载.*拒绝/ }).click()

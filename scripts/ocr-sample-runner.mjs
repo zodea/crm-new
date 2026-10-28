@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { extname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { pathToFileURL } from 'node:url'
+import { isMainModule } from './is-main-module.mjs'
 import { buildReport } from './ocr-sample-acceptance.mjs'
 
 const CONTENT_TYPES = {
@@ -874,7 +874,7 @@ export {
   summarizeOcrPayload,
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url)) {
   try {
     const options = parseArgs(process.argv.slice(2))
     if (options.help) {

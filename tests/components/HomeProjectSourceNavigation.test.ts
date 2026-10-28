@@ -16,7 +16,6 @@ import { fixtureProjectCustomerReferences } from '../helpers/project-read-meta'
 vi.mock('~/lib/db/connection', () => ({ select: () => {
   throw new Error('正式项目不得回读旧本地库')
 } }))
-vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => false }))
 
 const ProjectSwitcher = defineComponent({
   props: ['modelValue', 'projects'],

@@ -1,9 +1,9 @@
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { OTHER_SETTLEMENT_SCHEMA } from '~/lib/other-settlement/schema'
 import { otherSettlementFingerprint, otherSettlementKey } from '~/lib/other-settlement/storage'
 import { decodeOtherSettlementCommand } from '~/lib/other-settlement/validation'
@@ -13,17 +13,21 @@ import { readOriginalExpenseReference } from '../../server/utils/production-fina
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementMigration, validateOtherSettlementImportEvidence } from '../../server/utils/production-other-settlement-migration'
 import { createProductionOtherSettlementService, listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { adoptHistoricalExpenseFixture } from '../helpers/other-settlement-pay08-source'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const root = resolve('.tmp/a02-material-tests')
+  const root = testTempRoot('a02-material-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'other-native-import-'))
   const sourcePath = join(directory, 'synthetic-source.sqlite')
   const raw = new DatabaseSync(sourcePath)
   const actor = { workspaceId: 'other-import-workspace', actorId: 'other-import-owner', capabilities: ['other-settlement:read', 'other-settlement:write', 'core:migration:write', 'project:list:read', 'supplier:list:read', 'supplier:write'] }
-  raw.exec(`PRAGMA foreign_keys=ON;
+  raw.exec(`PRAGMA foreign_keys=ON; BEGIN;
 CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY);INSERT INTO schema_migrations VALUES(60);
 CREATE TABLE suppliers(id TEXT PRIMARY KEY,name TEXT);INSERT INTO suppliers VALUES('native-service','原服务交易方');
 CREATE TABLE file_refs(id TEXT PRIMARY KEY,owner_type TEXT,owner_id TEXT,file_name TEXT,file_path TEXT,file_size INTEGER,mime_type TEXT,category TEXT,uploader TEXT,uploaded_at TEXT,deleted_at TEXT);
@@ -39,12 +43,13 @@ ${OTHER_SETTLEMENT_SCHEMA}`)
   raw.prepare('INSERT INTO file_refs VALUES(?,?,?,?,?,?,?,?,?,?,NULL)').run('raw-metadata', 'expenditure_settlement', 'native-zero', '仅有历史登记.bin', '', 7, 'application/octet-stream', '旧登记', '原上传者', '2026-10-01T01:00:00.000Z')
   raw.prepare('INSERT INTO other_settlement_resolutions VALUES(?,?,?,?,?)').run(otherSettlementKey('source-business-key', actor), 'source-business-key', actor.workspaceId, actor.actorId, '2026-10-01T00:00:00.000Z')
   raw.prepare('INSERT INTO other_settlement_imports VALUES(?,?,?,?,NULL,NULL,NULL,NULL,NULL,?)').run(JSON.stringify([actor.workspaceId, actor.actorId, 'other-settlement-import', 'source-import-key']), 'source-import-key', actor.workspaceId, actor.actorId, '2026-10-01T00:00:00.000Z')
+  raw.exec('COMMIT')
   raw.close()
   const bytes = await readFile(sourcePath)
   const source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
   const targetPath = join(directory, 'target')
   await mkdir(targetPath)
-  const storage = createProductionStorage({ directory: targetPath, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory: targetPath, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' })
   const session = () => structuredClone(actor)
   const supplier = await createProductionSupplierService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier:write', commandId: 'actual-service', action: 'save', baseVersion: null, draft: { name: '实际服务主档', supplierCategory: '其他', contact: '合成人' }, attachments: {} }, session)
   const migration = createProductionOtherSettlementMigration(storage)
@@ -121,7 +126,7 @@ it.each([{ existingAmount: 0, deleted: false, retained: false, alias: false }, {
   try {
     f.actor.capabilities.push('finance-reimbursement:read', 'finance-reimbursement:write', 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'finance-payment-record:write')
     const finance = createProductionFinanceService(f.storage, { references: (tx, actor) => ({ expenditure_settlements: id => readProductionOtherSettlementReference(tx, actor, id), settlementCandidates: () => listProductionOtherSettlementReferences(tx, actor) }) })
-    const expense = await finance.execute({ workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'finance-reimbursement:write', commandId: 'actual-modern-expense', kind: 'reimbursement', baseVersion: null, action: 'save', attachments: {}, draft: { applicantSupplierId: f.supplier.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '现代原费用', counterpartySupplierId: f.supplier.id, amount: 100 }] } }, f.session)
+    const expense = await adoptHistoricalExpenseFixture(f.storage, f.actor, { directory: f.directory, serviceId: f.supplier.id, payeeId: f.supplier.id, serviceName: '实际服务主档', payeeName: '实际服务主档', prefix: 'modern-native-original' })
     const expenseForm = await finance.form('reimbursement', expense.id, f.session)
     const current = await f.storage.withTransaction(tx => readOriginalExpenseReference(tx, f.actor, expenseForm.draft.lines[0]!.id))
     const owner = createProductionOtherSettlementService(f.storage)

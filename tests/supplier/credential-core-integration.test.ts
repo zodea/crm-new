@@ -5,15 +5,14 @@ import type { SupplierCredentialAction, SupplierCredentialCommand } from '~/lib/
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { CORE_MIGRATION_CAPABILITY, CORE_MIGRATION_CONTRACT_VERSION, CORE_MIGRATION_SOURCE_MODE, CORE_MIGRATION_SOURCE_VERSION, CORE_MIGRATION_TOPOLOGY, coreMigrationSourceHashInput, isCoreMigrationBlockingIssue } from '~/lib/migration/core-contract'
 import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes } from '~/lib/migration/supplier-credential-source'
 import { prepareCoreMigrationCommandSources } from '../../server/utils/core-migration-preparation'
 import { parseCoreMigrationBatchCommand, parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 import { createSupplierCredentialService } from '../../server/utils/supplier-credential-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const at = '2026-09-12T10:00:00.000Z'
 const pdf = Buffer.from('%PDF-1.7\ncontrolled original').toString('base64')
@@ -34,9 +33,8 @@ function rehash(value: CoreMigrationSourceDTO): CoreMigrationSourceDTO {
   return { ...value, sourceHash: createHash('sha256').update(coreMigrationSourceHashInput(value)).digest('hex') }
 }
 beforeAll(async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
-    await runMigrations(db)
     await db.execute('INSERT INTO suppliers (id, name, unique_code, tax_no, credential_status, credential_reviewed_at, credential_review_note, created_at, updated_at) VALUES (\'old-supplier\', \'待迁入完整分供方\', \'INTERNAL-CODE\', \'91350100M000100Y43\', \'qualified\', ?, \'原人工确认\', ?, ?)', [at, at, at])
     await db.execute('INSERT INTO suppliers (id, name, created_at, updated_at) VALUES (\'empty-old-supplier\', \'只有主档的分供方\', ?, ?)', [at, at])
     for (const [index, category] of ['营业执照', '法人身份证', '银行账户资料'].entries()) {
@@ -71,7 +69,7 @@ function batchCommand(commandId: string, batchId: string) {
 }
 function fixture(others: CoreMigrationSynchronousSource[] = []) {
   let sequence = 0
-  const suppliers = createSupplierCommandTestInstance({ now: () => at, createId: () => `new-supplier-${++sequence}` })
+  const suppliers = createSupplierCommandService({ now: () => at, createId: () => `new-supplier-${++sequence}` })
   const credentials = createSupplierCredentialService({ read: suppliers.readCredentialScope, transact: suppliers.transactCredentialScope }, { now: () => at, createId: () => `new-credential-${++sequence}` })
   const core = createCoreMigrationTestInstance({
     now: () => at,

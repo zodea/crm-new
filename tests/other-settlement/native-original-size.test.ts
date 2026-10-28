@@ -1,23 +1,22 @@
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { beforeAll, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readOtherSettlementStored } from '../../app/lib/other-settlement/storage'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 
 let nativeTemplate: Uint8Array
 beforeAll(async () => {
-  const memory = await createMemoryDb()
+  const memory = await createMigratedMemoryDb()
   try {
-    await runMigrations(memory)
     nativeTemplate = memory.raw.export()
   }
   finally { memory.close() }
 })
 
 it.each([null, 0])('真实Native历史原件大小%s冷读取不伪造0、不改原元数据或正文', async (fileSize) => {
-  const base = resolve('.tmp/a02-material-tests')
+  const base = testTempRoot('a02-material-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(join(base, 'other-native-original-size-'))
   const path = join(directory, 'synthetic-native.sqlite')
@@ -49,3 +48,5 @@ it.each([null, 0])('真实Native历史原件大小%s冷读取不伪造0、不改
   finally { raw.close() }
   expect((await readFile(path)).equals(bytes)).toBe(true)
 })
+
+afterAll(cleanupTestTempRoot)

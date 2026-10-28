@@ -1,14 +1,17 @@
 import { Buffer } from 'node:buffer'
 import { copyFile, lstat, mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve, toNamespacedPath } from 'node:path'
+import { join, toNamespacedPath } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { backupDigest, backupFileDigest, inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it('清单来自实际一致副本，覆盖客户原件/审计/回执，字节坏损或未知表拒绝', async () => {
-  const base = resolve('.codex-tmp/issue-451-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-451-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/manifest-`)
   const identity = { workspaceId: 'backup-workspace', ownerId: 'backup-owner', purpose: 'verification' as const }
@@ -48,7 +51,7 @@ it('清单来自实际一致副本，覆盖客户原件/审计/回执，字节�
 })
 
 async function longPathBackup() {
-  const base = resolve('.tmp/a02-clearance-tests')
+  const base = testTempRoot('a02-clearance-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(join(base, 'manifest-long-path-'))
   const identity = { workspaceId: 'long-backup-workspace', ownerId: 'long-backup-owner', purpose: 'verification' as const }

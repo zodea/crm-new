@@ -8,7 +8,6 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/customer/detail.test.ts](../../../tests/customer/detail.test.ts) | 单元／服务／状态 | 客户详情只读模型 |
 | [tests/customer/http-repository.test.ts](../../../tests/customer/http-repository.test.ts) | 单元／服务／状态 | 客户中央 HTTP Repository |
 | [tests/customer/repository-contract.test.ts](../../../tests/customer/repository-contract.test.ts) | 单元／服务／状态 | 客户中央 Repository contract |
 | [tests/customer/return-context.test.ts](../../../tests/customer/return-context.test.ts) | 单元／服务／状态 | 客户列表返回上下文 |

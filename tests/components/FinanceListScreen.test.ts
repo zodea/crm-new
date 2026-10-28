@@ -4,7 +4,6 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, onActivated, onMounted, readonly, shallowRef, watch } from 'vue'
 import FinanceListScreen from '~/components/finance/FinanceListScreen.vue'
-import ListFilterBar from '~/components/shared/ListFilterBar.vue'
 import SearchInput from '~/components/ui/SearchInput.vue'
 
 const load = vi.hoisted(() => vi.fn())
@@ -113,7 +112,6 @@ describe('保留原收款列表交互保护', () => {
         components: {
           KitTable: KitTableStub,
           KitButton: defineComponent({ template: '<button><slot /></button>' }),
-          ListFilterBar,
           SearchInput,
         },
       },

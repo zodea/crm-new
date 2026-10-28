@@ -7,8 +7,7 @@ import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/co
 import { useProductionAccessStore } from '~/stores/production-access'
 
 const host = vi.hoisted(() => ({ native: false, exportSnapshot: vi.fn(), inspect: vi.fn() }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => host.native }))
-vi.mock('~/lib/db/native-snapshot', () => ({ createNativeMigrationSnapshot: host.exportSnapshot, inspectNativeMigrationSnapshot: host.inspect }))
+vi.mock('~/lib/db/native-snapshot', () => ({ inspectNativeMigrationSnapshot: host.inspect }))
 const fetch = vi.fn()
 const context = { workspaceId: 'migration-workspace', actorId: 'migration-owner', capabilities: ['core:migration:write', 'worker:sensitive:read', 'worker:list:read', 'crew:list:read'] }
 const sourceSha = 'a'.repeat(64)
@@ -111,18 +110,6 @@ it('未知响应或错误原编号不清除原描述，失权或换操作者时�
   expect(screen.queryByTestId('crew-worker-import-recovery')).toBeNull()
   expect(screen.queryByTestId('crew-worker-import-result')).toBeNull()
   expect(JSON.parse(localStorage.getItem(recoveryKey)!)).toEqual(pending)
-})
-
-it('native 显式导出取消后不切换来源、不生成中央身份或自动上传', async () => {
-  host.native = true
-  host.exportSnapshot.mockResolvedValue(null)
-  mount()
-  const button = screen.getByRole('button', { name: '导出当前数据库一致快照' }) as HTMLButtonElement
-  await waitFor(() => expect(button.disabled).toBe(false))
-  await fireEvent.click(button)
-  await waitFor(() => expect(host.exportSnapshot).toHaveBeenCalledOnce())
-  expect(fetch).not.toHaveBeenCalled()
-  expect(localStorage.length).toBe(0)
 })
 
 it('授权与实际读取来源字段损坏时禁用新迁入，并保留已有恢复描述', async () => {

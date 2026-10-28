@@ -1,10 +1,8 @@
 # P6 户级空鼓、整改与人工扣款
 
-> 本页保留已完成切片的实测摘要及原验收边界；日期、数量和阶段状态属于当次记录。已纳入版本控制的历史图片、审查与归档流水由[固定 Git 原始材料](https://github.com/zodea/crm-new/tree/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-hollow)定位。本轮核实的33份检查标准输出未被 Git 追踪，不能从该链接取得，其回收原文通过回收站恢复。当前规则以所引现行权威文档为准，真实原件、源证明和产品打印不改写。
-
 本地产品验收已通过，基线为 P5 登记提交 `e344a5444cd52bfeb65e78b031912d5241666fc0`，P6 产品已独立提交 `edc03faba20e0c5c665b7fc2011e2a4120d8428f`。正常提交钩子类型检查及完整 `npm test` 782 文件 / 4312 项通过（326.16 秒）；240 个源码 Git 对象与冻结清单完全一致。本记录只覆盖 #412 的 P6，不能据此宣称 #412 全部完成或生产持久化已通过。
 
-规格见 [P6 实施票](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)，操作见 [Markdown 指南](../../../guides/payroll-hollow.md)。不另生成指南 PDF；产品打印仅用于验证实际工资输出，完成后保留必要页图。
+规格见 [P6 实施票](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md)，操作见 [Markdown 指南](../../../guides/payroll-hollow.md)。不另生成指南 PDF；产品打印仅用于验证实际工资输出，完成后保留必要页图。
 
 ## 交付流程
 
@@ -50,13 +48,13 @@ flowchart TD
 | 原采用更正表暴露内部 JSON，且 V3 误隐藏费用更正 | 以冻结事实显示位置、分项、单位、原责任人和价格依据；版本门禁允许 V2/V3 并继续拒绝旧 V1。两组五档最终图和正式组件回归通过。 |
 | 已发单只显示冻结 15 处，后来全整改与新月份改价无法并列解释 | A/C1/C2 及迁入已发单新增只读当前来源伴随视图；冻结 19 / 4 / 15、单价 30 与当前 19 / 19 / 0、单价 45 分区显示，当前行严格绑定原冻结身份，且不重算原 450 扣款和 550 实发。 |
 
-作者自验与非作者复验分开登记，见 [A 复核](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-hollow/checks/a/independent-review.md) 与 [B 复核](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-hollow/checks/b/independent-review.md)。最终生产构建、E2E、输出回读和补正图范围见 [最终运行记录](./checks/final-runtime.md)、[产品提交核验](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-hollow/checks/product-verification.json.txt)、[登记保全核验](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-hollow/checks/registration/registration-preservation.json.txt) 与 [Root 逐图记录](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/design/evidence/issue-412-payroll-hollow/checks/root/visual-review.md)；不能把组件测试或文件存在当作本轮实图。
+作者自验与非作者复验分开登记，见 [A 复核](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-hollow/checks/a/independent-review.md) 与 [B 复核](./checks/b/independent-review.md)。最终生产构建、E2E、输出回读和补正图范围见 [最终运行记录](./checks/final-runtime.md)、[产品提交核验](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-hollow/checks/product-verification.json.txt)、[登记保全核验](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-hollow/checks/registration/registration-preservation.json.txt) 与 [Root 逐图记录](https://github.com/zodea/crm-new/blob/0467f2298e7f72ed1c1dce5d578a3f131aa9a4bb/docs/design/evidence/issue-412-payroll-hollow/checks/root/visual-review.md)；不能把组件测试或文件存在当作本轮实图。
 
 2026-09-15 04:18 的完整 `npm test` 为 780 文件 / 4308 项，其中 779 文件 / 4307 项通过；唯一失败为原费用迁入更正长链超出默认 5000ms。该项隔离原断言通过，仅为其设置 30000ms 上限后再次通过，未放宽全局超时或业务断言。该轮早于最后补正，最终全量结果以正常提交钩子为准。2026-09-21 的最终生产构建、类型检查和真实 E2E 已通过；239 个精确源码路径整体 lint 及最后 4 个补正路径 lint 均通过。
 
 ## 持续保留的边界
 
-用户已明确每单人工确认新增未处理项，启动不跨单延续，旧已扣项不重扣、后来修复不自动退款；依据与新增真实算例见 [P6 已裁定范围](https://github.com/zodea/crm-new/blob/c16869fcbf954dddd46143839afe5790f3828f1a/docs/research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md#已裁定的逐单范围)。同一已采用记录改总数继续要求核实更正，不按金额猜部分采用。P7 继续负责批量资金与完整工作簿；生产保存、备份恢复和部署的现行边界见 [ARCHITECTURE](../../../rewrite/ARCHITECTURE.md#runtime-environments)，原调查与拆分见[固定 Git 定位](../../../rewrite/ARCHITECTURE.md#production-investigation-evidence)，实际上线由 [#471](https://github.com/zodea/crm-new/issues/471)另验。
+用户已明确每单人工确认新增未处理项，启动不跨单延续，旧已扣项不重扣、后来修复不自动退款；依据与新增真实算例见 [P6 已裁定范围](https://github.com/zodea/crm-new/blob/212a1cb586af9396f4e4a9dbee50eeb7333e0cf5/docs/research/issue-review-2026-09-11/payroll-tickets/06-central-hollow-and-deductions.md#已裁定的逐单范围)。同一已采用记录改总数继续要求核实更正，不按金额猜部分采用。P7 继续负责批量资金与完整工作簿；生产保存、备份恢复和部署的现行边界见 [ARCHITECTURE](../../../rewrite/ARCHITECTURE.md#runtime-environments)，原调查与拆分见[固定 Git 定位](../../../rewrite/ARCHITECTURE.md#production-investigation-evidence)，实际上线由 [#471](https://github.com/zodea/crm-new/issues/471)另验。
 
 2026-09-22 裁定收尾仅新增验收测试及更新文档，未修改产品代码。精确 `npm test` 覆盖新增检查、原扣款和倒序补月3文件7项通过（14.38秒）；类型与精确 ESLint 通过，独立 Standards / Spec 无阻断。没有重复运行未改产品的完整套件或浏览器，也未新增 PDF。
 

@@ -84,7 +84,7 @@ export function useConfiguredExportRunner(
       return 'cancelled'
 
     if (target.supportsSubdirectories === false)
-      throw new Error('当前浏览器不支持保留目录结构，请使用桌面端或支持目录访问的浏览器')
+      throw new Error('当前浏览器不支持保留目录结构，请使用支持目录访问的浏览器')
 
     if (writtenDisplayPath !== target.displayPath) {
       writtenPaths.clear()

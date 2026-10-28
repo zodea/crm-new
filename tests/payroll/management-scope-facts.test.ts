@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest'
 import { loadPayrollAManagementScopeFacts } from '../../server/utils/payroll-management-scope-facts'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollAQuantitySource } from '../helpers/payroll-a-quantity-source'
 
 const context = { workspaceId: 'w', actorId: 'a', origin: 'real' as const, sourceVersion: 'test', capabilities: ['payroll:read'], readonly: true }
 it('原责任范围包含未完成格子，保留明确细格，不产生施工完成数量', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedPayrollAQuantitySource(db)
     await db.execute('DELETE FROM unit_stage_completions WHERE assignment_id=\'pa-asg-other\'')

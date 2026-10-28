@@ -30,7 +30,7 @@
 
 ### 项目切换器
 
-采用 GitHub 型“当前上下文触发器 + 可搜索面板”，以同一入口覆盖不同项目数量；未采用最近使用分组、访问历史持久化、按数量切换皮肤或两级 scope。现行结构见 [KitUI §08](./kit-ui-component-specs.md)，完整比较见[项目切换器调研](../research/project-switcher-patterns.md)。
+采用 GitHub 型“当前上下文触发器 + 可搜索面板”，以同一入口覆盖不同项目数量；未采用最近使用分组、访问历史持久化、按数量切换皮肤、两级 scope 或侧栏常驻项目列表（会与业务域导航争夺层级）。现行结构见 [KitUI §08](./kit-ui-component-specs.md)。
 
 - [GitHub · Repository switcher](https://github.blog/changelog/2026-06-18-repository-switcher-generally-available-in-global-navigation/) 与 [Primer SelectPanel](https://primer.style/product/components/select-panel/)：当前上下文可见、打开后搜索的主要来源。
 - [GitLab · Search or go to](https://docs.gitlab.com/tutorials/left_sidebar/)：搜索和常访问项目的信息组织。

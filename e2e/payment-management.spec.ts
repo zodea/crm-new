@@ -18,21 +18,21 @@ test.describe('Issue #203：付款管理', () => {
     await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 展示真实批复、已确认支付和应付余额，页面不横向溢出`, async ({ page }) => {
-      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
-      await page.goto('/finance/payment-management')
+  test('展示真实批复、已确认支付和应付余额，各宽度页面不横向溢出', async ({ page }) => {
+    await page.goto('/finance/payment-management')
 
-      const toolbar = page.locator('[data-ui="payment-management-toolbar"]')
-      await expect(toolbar.getByRole('heading', { name: '付款管理' }))
-        .toBeVisible({ timeout: 60_000 })
-      await expect(page.getByRole('group', { name: '应付余额' })).toBeVisible()
-      await expect(page.getByRole('button', { name: '付款状态，已选 1 项' })).toContainText('待支付')
-      await expect(page.getByText('五金机电采购首期请款', { exact: true })).toBeVisible()
-      await expect(page.getByText('灯具采购结清请款', { exact: true })).toBeVisible()
+    const toolbar = page.locator('[data-ui="payment-management-toolbar"]')
+    await expect(toolbar.getByRole('heading', { name: '付款管理' }))
+      .toBeVisible({ timeout: 60_000 })
+    await expect(page.getByRole('group', { name: '应付余额' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '付款状态，已选 1 项' })).toContainText('待支付')
+    await expect(page.getByText('五金机电采购首期请款', { exact: true })).toBeVisible()
+    await expect(page.getByText('灯具采购结清请款', { exact: true })).toBeVisible()
+    for (const width of RESPONSIVE_WIDTHS) {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
       await expectNoPageOverflow(page, `付款管理 @ ${width}px`)
-    })
-  }
+    }
+  })
 
   test('搜索、项目筛选和业务态切换共享同一真实数据管线', async ({ page }) => {
     await page.goto('/finance/payment-management')

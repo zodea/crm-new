@@ -1,8 +1,7 @@
 import { execFileSync, execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
+import { isMainModule } from './is-main-module.mjs'
 
 // 只拦截有明确用途的目录/缓存名，正式 evidence 下的图片、日志、JSON 仍可提交。
 export function isTemporaryPath(path) {
@@ -10,7 +9,6 @@ export function isTemporaryPath(path) {
     || /^\.(?:claude\/worktrees|codex\/(?:cache|logs|sessions))(?:\/|$)/i.test(path)
     || /(?:^|\/)(?:node_modules|\.output|\.data|\.nuxt|\.nitro|\.cache|dist|\.pnpm-store|\.npm|\.vite|\.vitest|__pycache__|\.pytest_cache|\.ruff_cache)(?:\/|$)/i.test(path)
     || /(?:^|\/)(?:\.eslintcache|\.stylelintcache)$|\.(?:tsbuildinfo|py[cod])$/i.test(path)
-    || /^src-tauri\/(?:target|gen)(?:\/|$)/i.test(path)
 }
 
 export function checkStagedPaths(paths) {
@@ -103,7 +101,7 @@ function main() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMainModule(import.meta.url)) {
   try {
     main()
   }

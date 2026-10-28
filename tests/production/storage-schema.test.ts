@@ -1,9 +1,12 @@
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it.each([
   ['finance_history_no_delete', 'drop'],
@@ -17,7 +20,7 @@ it.each([
   ['expenditure_settlement_clearance_links_no_update', 'replace-clearance-link'],
   ['expenditure_settlement_clearance_links_no_delete', 'drop'],
 ] as const)('真实盘历史保护 %s 缺失或被替换时冷启动和备份均拒绝，不重建保护冒充原库完整', async (guard, damage) => {
-  const base = resolve('.tmp/root-clearance-validation/schema-evidence')
+  const base = testTempRoot('root-clearance-validation/schema-evidence')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(join(base, 'guard-'))
   const options = { directory, workspaceId: 'schema-evidence-workspace', ownerId: 'schema-evidence-owner', purpose: 'verification' as const }

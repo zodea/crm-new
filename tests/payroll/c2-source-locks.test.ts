@@ -1,18 +1,36 @@
 import { expect, it } from 'vitest'
 import { initializePayrollSchema } from '../../app/lib/payroll/central-schema'
 import { loadPayrollDayworkOccupations, loadPayrollSourceExclusions, payrollDayworkOccupationsFromGraph, payrollSourceExclusionsFromGraph } from '../../app/lib/payroll/central-source-locks'
-import { buildWageDraftSource, createWageStatementDraft } from '../../app/lib/payroll/statements'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { seedPayrollC2MigrationSource } from '../helpers/payroll-c2-migration-source'
+import { insertRows } from '../helpers/sql-rows'
+
+/** 已退役本地建单曾为 C2 半工源产出的未发草稿（逐行固化）：仅领用已确认半工。 */
+const c2DraftRows: Record<string, Record<string, string | number>[]> = {
+  wage_statements: [
+    { id: 'wage_statement_mv52zf5q_g', project_id: 'c2-project', crew_id: 'c2-crew', leader_worker_id: 'c2-leader', subject_config_id: 'payroll_subject_config_mv52zf52_d', month: '2026-08', format_family: 'C2', period_kind: 'monthly', purpose: 'advance', quantity_source: 'field', status: 'draft', needs_recheck: 0, pay_ratio: 1, cumulative_amount: 175.06, previously_paid: 0, gross_amount: 175.06, source_version: 'wage-src-fb8f2c37', source_updated_at: '2026-10-12 10:00:05', checked_source_version: '', adjustment_reason: '', operator_name: '', note: '', created_at: '2026-10-12 10:00:05', updated_at: '2026-10-12 10:00:05' },
+  ],
+  wage_statement_lines: [
+    { id: 'wage_line_mv52zf5q_k', statement_id: 'wage_statement_mv52zf5q_g', worker_id: 'c2-worker', item_name: '零星签工 · 签工人员', unit: '工', quantity: 0.5, unit_price: 350.125, amount: 175.06, sort_order: 0, created_at: '2026-10-12 10:00:05', updated_at: '2026-10-12 10:00:05' },
+  ],
+  wage_statement_members: [
+    { id: 'wage_member_mv52zf5q_h', statement_id: 'wage_statement_mv52zf5q_g', worker_id: 'c2-leader', is_leader: 1, created_at: '2026-10-12 10:00:05' },
+    { id: 'wage_member_mv52zf5q_i', statement_id: 'wage_statement_mv52zf5q_g', worker_id: 'c2-worker', is_leader: 0, created_at: '2026-10-12 10:00:05' },
+    { id: 'wage_member_mv52zf5q_j', statement_id: 'wage_statement_mv52zf5q_g', worker_id: 'c2-zero', is_leader: 0, created_at: '2026-10-12 10:00:05' },
+  ],
+  wage_statement_daywork_records: [
+    { id: 'wage_daywork_mv52zf5r_l', statement_id: 'wage_statement_mv52zf5q_g', daywork_record_id: 'signed_daywork_mv52zf53_e', created_at: '2026-10-12 10:00:05' },
+  ],
+}
 
 it('他单未发逐条领用可见，但不制造同格式整月编辑锁；已发软删头与关联仍占用', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
-    const { dayworkIds, configId } = await seedPayrollC2MigrationSource(db)
+    const { dayworkIds } = await seedPayrollC2MigrationSource(db)
     await initializePayrollSchema(db)
-    const draft = { projectId: 'c2-project', crewId: 'c2-crew', leaderWorkerId: 'c2-leader', memberWorkerIds: ['c2-worker', 'c2-zero'], month: '2026-08', formatFamily: 'C2' as const, quantitySource: 'field' as const, subjectConfigId: configId }
-    const source = await buildWageDraftSource(db, draft)
-    const statementId = await createWageStatementDraft(db, { ...draft, purpose: 'advance', periodKind: 'monthly', payRatio: 1, lines: source.lines, sourceVersion: source.sourceVersion, sourceUpdatedAt: source.sourceUpdatedAt, sourceRecordIds: source.sourceRecordIds })
+    for (const [table, rows] of Object.entries(c2DraftRows))
+      await insertRows(db, table, rows)
+    const statementId = String(c2DraftRows.wage_statements![0]!.id)
     const query = { projectId: 'c2-project', recordIds: [dayworkIds[0]!] }
     expect(await loadPayrollDayworkOccupations(db, query)).toContainEqual(expect.objectContaining({ statementId, dayworkRecordId: dayworkIds[0], kind: 'active-link', status: 'draft' }))
     expect(await loadPayrollDayworkOccupations(db, { ...query, recordIds: [] })).toEqual([])

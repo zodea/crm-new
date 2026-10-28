@@ -1,7 +1,6 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
 
@@ -116,14 +115,4 @@ test.describe('Issue #313：项目列表完整来源上下文', () => {
     await expect(page.getByRole('combobox', { name: '每页条数' })).toHaveValue('20')
     await expect(page.getByRole('link', { name: filteredName, exact: true }).first()).toBeFocused()
   })
-
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 往返入口不产生页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await openProjectList(page)
-      await page.getByRole('link', { name: '合和新城', exact: true }).first().click()
-      await expect(page.getByRole('link', { name: '返回项目列表' })).toBeVisible()
-      await expectNoPageOverflow(page, `#313 项目来源往返 @ ${width}px`)
-    })
-  }
 })

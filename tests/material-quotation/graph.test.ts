@@ -1,9 +1,9 @@
 import type { SQLInputValue } from 'node:sqlite'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
 import { newQuotationDraft, quotationCommandKey } from '~/lib/material-quotation/contract'
 import { exportQuotationGraph, quotationGraphHash, validateQuotationImportEvidence } from '~/lib/material-quotation/graph'
@@ -15,11 +15,14 @@ import { createProductionMaterialQuotationOwner } from '../../server/utils/mater
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture(related = false, sameIdentity = false) {
-  const root = resolve('.tmp/a02-material-tests')
+  const root = testTempRoot('a02-material-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'quotation-import-'))
   const raw = new DatabaseSync(join(directory, 'synthetic-source.sqlite'))
@@ -46,7 +49,7 @@ async function fixture(related = false, sameIdentity = false) {
   const graphHash = await quotationGraphHash(graph)
   const targetDirectory = join(directory, 'target')
   await mkdir(targetDirectory)
-  const target = createProductionStorage({ directory: targetDirectory, workspaceId: 'central-quote-workspace', ownerId: 'central-quote-owner', purpose: 'verification' })
+  const target = await createSeededProductionStorage({ directory: targetDirectory, workspaceId: 'central-quote-workspace', ownerId: 'central-quote-owner', purpose: 'verification' })
   const actor = { workspaceId: 'central-quote-workspace', actorId: 'central-quote-owner', capabilities: ['material-quotation:read', 'material-quotation:write', 'core:migration:write', 'project:list:read', 'supplier:list:read', 'project:write', 'supplier:write', 'customer:list:read', 'customer:write'] }
   const owner = createProductionMaterialQuotationOwner(target)
   const bytes = await readFile(join(directory, 'synthetic-source.sqlite'))

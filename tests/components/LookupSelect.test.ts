@@ -25,6 +25,28 @@ afterEach(() => {
 })
 
 describe('lookupSelect public behavior', () => {
+  it('keeps the selected option available when reopening without a recent list', async () => {
+    vi.useFakeTimers()
+    const fetchOptions = vi.fn(async () => [
+      { id: 'main-a', label: '同工程 · 合同甲' },
+      { id: 'main-b', label: '同工程 · 合同乙' },
+    ])
+    const { rerender } = render(LookupSelect, { props: { fetch: fetchOptions, placeholder: '选择工程', modelValue: null } })
+    const input = screen.getByRole('combobox', { name: '选择工程' })
+    await fireEvent.focus(input)
+    await fireEvent.update(input, '同工程')
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    await fireEvent.click(screen.getByRole('option', { name: '同工程 · 合同乙' }))
+    await rerender({ fetch: fetchOptions, placeholder: '选择工程', modelValue: 'main-b' })
+    await fireEvent.focus(input)
+    await fireEvent.keyDown(input, { key: 'ArrowDown' })
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    expect(screen.getByRole('option', { name: '同工程 · 合同乙' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: '同工程 · 合同甲' })).toBeTruthy()
+  })
+
   it('debounces search, highlights results, and emits the selected id', async () => {
     vi.useFakeTimers()
     const fetchOptions = vi.fn(async () => [

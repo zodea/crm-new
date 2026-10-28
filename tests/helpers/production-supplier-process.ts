@@ -1,16 +1,16 @@
 import type { ChildProcess } from 'node:child_process'
 import { Buffer } from 'node:buffer'
-import { spawn } from 'node:child_process'
 import { scryptSync } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { createServer } from 'node:net'
-import { resolve } from 'node:path'
 import process from 'node:process'
 import { expect } from 'vitest'
+import { spawnColdProcess } from './cold-process'
+import { testTempRoot } from './test-temp-root'
 
 export async function supplierProductionProcess() {
-  const base = resolve('.tmp/a01-supplier-process-tests')
+  const base = testTempRoot('a01-supplier-process-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/process-`)
   const probe = createServer().listen(0, '127.0.0.1')
@@ -29,7 +29,7 @@ export async function supplierProductionProcess() {
     directory,
     request,
     async start(failRecognition = false) {
-      child = spawn(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-supplier-server.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_RUN_MODE: 'production', CRM_DATA_DIRECTORY: directory, CRM_WORKSPACE_ID: 'supplier-workspace', CRM_OWNER_ID: 'supplier-owner', CRM_DATA_PURPOSE: 'verification', CRM_PUBLIC_ORIGIN: origin, CRM_ACCESS_CODE_HASH: hash, NITRO_HOST: '127.0.0.1', NITRO_PORT: String(port), SUPPLIER_TEST_OCR_FAILURE: failRecognition ? '1' : '' }, stdio: ['ignore', 'pipe', 'pipe'] })
+      child = spawnColdProcess('production-supplier-server', { env: { ...process.env, CRM_RUN_MODE: 'production', CRM_DATA_DIRECTORY: directory, CRM_WORKSPACE_ID: 'supplier-workspace', CRM_OWNER_ID: 'supplier-owner', CRM_DATA_PURPOSE: 'verification', CRM_PUBLIC_ORIGIN: origin, CRM_ACCESS_CODE_HASH: hash, NITRO_HOST: '127.0.0.1', NITRO_PORT: String(port), SUPPLIER_TEST_OCR_FAILURE: failRecognition ? '1' : '' }, stdio: ['ignore', 'pipe', 'pipe'] })
       child.stdout!.on('data', data => logs += String(data))
       child.stderr!.on('data', data => logs += String(data))
       await expect.poll(async () => {
@@ -48,7 +48,7 @@ export async function supplierProductionProcess() {
     },
     async stop() {
       if (child && child.exitCode === null) {
-        const exited = once(child, 'exit')
+        const exited = once(child, 'close')
         child.kill()
         await exited
       }

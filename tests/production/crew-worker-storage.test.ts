@@ -1,8 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { encodePayrollHostSection } from '../../app/lib/crew-worker/payroll-read'
 import { decodeWorkerDetailRead } from '../../app/lib/crew-worker/read-decoder'
 import { formDefaults } from '../../app/lib/master-data/page'
@@ -14,15 +13,18 @@ import { listWorkerReferences, readWorkerReference } from '../../server/utils/pr
 import { createProductionCrewWorkerService } from '../../server/utils/production-crew-worker-service'
 import { validateProductionCrewWorkerJournal } from '../../server/utils/production-crew-worker-validation'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createCrewWorkerNativeSource } from '../helpers/crew-worker-native-source'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const base = resolve('.tmp/a03-crew-worker-production')
+  const base = testTempRoot('a03-crew-worker-production')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
   const options = { directory, workspaceId: 'crew-workspace', ownerId: 'crew-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage(options)
+  const storage = await createSeededProductionStorage(options)
   const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: [...PRODUCTION_CREW_WORKER_CAPABILITIES, 'project:list:read', 'project:write'] }
   return { storage, actor }
 }

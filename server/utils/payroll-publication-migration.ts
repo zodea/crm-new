@@ -10,6 +10,7 @@ import { PAYROLL_PUBLICATION_COLUMNS, PAYROLL_PUBLICATION_TABLES, publicationRow
 import { parsePayrollProjectGraph } from '../../app/lib/migration/payroll-source'
 import { payrollAAmount } from '../../app/lib/payroll/central-a-calculation'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
+import { hasProductionPayrollSchema } from '../../app/lib/payroll/central-schema'
 import { loadPayrollActualFacts } from './payroll-actual-facts'
 import { mapPublicationArchiveRow, mapRosterArchive, mapWorkbookArchive, provePublicationOriginal, publicationMapper, publicationProofHash } from './payroll-publication-proof'
 import { initializePayrollWorkbookSchema, workbookHash } from './payroll-workbook-storage'
@@ -22,6 +23,8 @@ function invalid(): never {
 }
 
 async function initialize(db: TransactionDb) {
+  if (await hasProductionPayrollSchema(db))
+    return
   await initializeWorkerRosterSchema(db)
   await initializePayrollWorkbookSchema(db)
   await db.execute('CREATE TABLE IF NOT EXISTS payroll_publication_migration_proofs(table_name TEXT NOT NULL,record_id TEXT NOT NULL,proof_json TEXT NOT NULL,PRIMARY KEY(table_name,record_id))')

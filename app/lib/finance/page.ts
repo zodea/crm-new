@@ -78,7 +78,7 @@ export const F3_FORM_META: Record<F3FormKind, FinanceFormMeta> = {
   },
   reimbursement: {
     label: '费用报销',
-    subtitle: '报销头 + 费用明细 · 公司开支允许空项目',
+    subtitle: '原费用逐行归属工程 · 清偿沿原费用记录',
     listPath: '/finance/reimbursement',
     newPath: '/finance/reimbursement/new',
     sections: [

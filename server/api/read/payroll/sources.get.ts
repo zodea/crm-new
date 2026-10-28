@@ -1,10 +1,11 @@
 import { encodePayrollWire, parsePayrollQuery } from '../../../../app/lib/payroll/central-codec'
 import { payrollProblem } from '../../../../app/lib/payroll/central-contract'
-import { payrollService } from '../../../utils/payroll-runtime'
+import { payrollServiceForEvent } from '../../../utils/payroll-runtime'
 import { throwQuantityError } from '../../../utils/quantity-error'
 
 export default defineEventHandler(async (event) => {
   try {
+    const payrollService = payrollServiceForEvent(event)
     const query = parsePayrollQuery(getQuery(event))
     if (!query.projectId)
       throw payrollProblem('invalid-query', '请选择要核对的工资来源项目')

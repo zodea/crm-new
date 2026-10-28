@@ -19,13 +19,15 @@ function normalize(table: QuantityMigrationTable, row: QuantityMigrationRow): Qu
 }
 
 /** 仅供受保护 SQLite 快照适配器使用；按物理身份读取，不因祖先软删丢历史。 */
-export async function readQuantityMigrationGraphs(db: Pick<SoftDb, 'select'>): Promise<QuantityMigrationProjectSource[]> {
+export async function readQuantityMigrationGraphs(db: Pick<SoftDb, 'select'>, options: { captureUnknownColumns?: boolean } = {}): Promise<QuantityMigrationProjectSource[]> {
   const projects = await db.select<Project>('SELECT id, name, matrix_archived_at, deleted_at FROM projects ORDER BY id')
-  const hollowTables = await readQuantityHollowTables(db)
+  const hollowTables = await readQuantityHollowTables(db, options)
   const hollow = hollowTables ? await buildQuantityHollowMigrationGraphs(db, hollowTables, projects.map(project => project.id)) : null
   const rows = {} as Record<QuantityMigrationTable, QuantityMigrationRow[]>
   for (const table of QUANTITY_MIGRATION_TABLES) {
-    const where = table === 'file_refs' ? ' WHERE owner_type = \'unit_stage_completion\'' : ''
+    const where = table === 'file_refs'
+      ? ' WHERE owner_type = \'unit_stage_completion\''
+      : table === 'file_payloads' ? ' WHERE file_ref_id IN (SELECT id FROM file_refs WHERE owner_type = \'unit_stage_completion\')' : ''
     const primaryKey = table === 'file_payloads' ? 'file_ref_id' : 'id'
     rows[table] = (await db.select<QuantityMigrationRow>(`SELECT ${QUANTITY_MIGRATION_COLUMNS[table].join(', ')} FROM ${table}${where} ORDER BY ${primaryKey}`)).map(row => normalize(table, row))
   }

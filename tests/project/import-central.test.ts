@@ -3,19 +3,18 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as XLSX from 'xlsx'
 import { useImportRunner } from '~/composables/useImportRunner'
-import { runMigrations } from '~/lib/db/migrations'
 import { getImportEntity } from '~/lib/kit/import-entities'
 import { autoMatchColumns, buildImportRows } from '~/lib/kit/import-mapping'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
 import { annotateProjectImportRows } from '~/lib/project/import'
-import { parseSheetForMapping } from '~/lib/util/excel'
+import { parseWorkbookForMapping } from '~/lib/util/excel'
 import { useProjectStore } from '~/stores/project'
 import { useProjectCommandStore } from '~/stores/project-command'
 import { createCustomerCommandTestInstance } from '../../server/utils/customer-command-test-instance'
 import { createCustomerReadTestInstance } from '../../server/utils/customer-read-test-instance'
 import { createProjectCommandTestInstance } from '../../server/utils/project-command-test-instance'
 import { createProjectReadTestInstance } from '../../server/utils/project-read-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let local: TestDb
 vi.mock('~/lib/db/connection', () => ({
@@ -30,8 +29,7 @@ afterEach(() => {
 
 describe('项目 Excel → 实际存储 → 中央回读', () => {
   it('同一合成身份经真实解析与实体入口导入后，中央列表和详情能回读，本地不产生正式项目', async () => {
-    local = await createMemoryDb()
-    await runMigrations(local)
+    local = await createMigratedMemoryDb()
     await local.execute('INSERT INTO customers (id, name) VALUES (?, ?)', ['customer-import-408', '导入复现甲方408'])
     setActivePinia(createPinia())
     vi.stubGlobal('useProjectStore', useProjectStore)
@@ -59,7 +57,7 @@ describe('项目 Excel → 实际存储 → 中央回读', () => {
       ['项目名称', '客户', '项目经理', '业务流程阶段', '外部旧ID'],
       ['Excel中央复现408', 'customer-import-408', '合成经理408', '施工中', 'EXCEL-408-001'],
     ]), '合成项目408')
-    const parsed = await parseSheetForMapping(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }))
+    const parsed = (await parseWorkbookForMapping(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }))).sheets[0]!
     const entity = getImportEntity('project')!
     const rows = annotateProjectImportRows(buildImportRows(autoMatchColumns(parsed.columns, entity.fields), parsed.rows), parsed)
     const runner = useImportRunner({ yieldToView: async () => {} })

@@ -131,11 +131,9 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
         await expectNoPageOverflow(page, `送货核对 ${width}`)
         if (width >= 1280)
           await waitForPdfPaint(page.getByTitle('双页送货原件.pdf 原始 PDF', { exact: true }))
-        await page.screenshot({ path: info.outputPath(`delivery-review-${width}.png`), fullPage: true, animations: 'disabled' })
         await review.getByText('材料明细', { exact: true }).scrollIntoViewIfNeeded()
         await review.locator('table tbody input').first().scrollIntoViewIfNeeded()
         await expectNoPageOverflow(page, `送货核对材料与确认 ${width}`)
-        await page.screenshot({ path: info.outputPath(`delivery-review-lines-${width}.png`), fullPage: true, animations: 'disabled' })
       }
     }
     await review.getByRole('button', { name: '确认人工归档', exact: true }).click()
@@ -192,7 +190,6 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
     await page.getByLabel('修订原因', { exact: false }).focus()
     await expect(page.getByLabel('修订原因', { exact: false })).toBeFocused()
     await expectNoPageOverflow(page, `送货修订 ${width}`)
-    await page.screenshot({ path: info.outputPath(`delivery-form-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   const concurrent = await page.request.post('/api/commands/deliveries', { data: {
     workspaceId: source.workspaceId,
@@ -220,7 +217,6 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
     await page.setViewportSize({ width, height: 900 })
     await currentReview.getByRole('heading', { name: '核对当前送货记录' }).scrollIntoViewIfNeeded()
     await expectNoPageOverflow(page, `送货冲突核对 ${width}`)
-    await page.screenshot({ path: info.outputPath(`delivery-conflict-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await currentReview.getByRole('button', { name: '采用已核对的当前版本', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '继续核对', exact: true }).click()
@@ -232,7 +228,6 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
   const adopt = page.getByRole('dialog').getByRole('button', { name: '已核对，保留人工稿', exact: true })
   await adopt.focus()
   await expect(adopt).toBeFocused()
-  await page.screenshot({ path: info.outputPath('delivery-conflict-confirm.png'), fullPage: true, animations: 'disabled' })
   await adopt.press('Enter')
   await page.getByRole('button', { name: '保存归档修改', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '确认修改', exact: true }).click()
@@ -254,11 +249,9 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
     await expect(page.getByRole('link', { name: '编辑', exact: true })).toBeFocused()
     await expectNoPageOverflow(page, `送货详情 ${width}`)
     await waitForPdfPaint(page.getByTestId('delivery-source-pdf').first())
-    await page.screenshot({ path: info.outputPath(`delivery-detail-${width}.png`), fullPage: true, animations: 'disabled' })
     await history.getByText('核对原件后修正日期和材料名称', { exact: true }).scrollIntoViewIfNeeded()
     await expect(history.getByText('核对原件后修正日期和材料名称', { exact: true })).toBeInViewport()
     await expectNoPageOverflow(page, `送货历史 ${width}`)
-    await page.screenshot({ path: info.outputPath(`delivery-history-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByTitle('返回归档库').click()
@@ -272,7 +265,6 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 })
     await expectNoPageOverflow(page, `送货归档库 ${width}`)
-    await page.screenshot({ path: info.outputPath(`delivery-archive-${width}.png`), fullPage: true, animations: 'disabled' })
   }
   await page.getByRole('navigation').getByRole('link', { name: '送货单识别', exact: true }).click()
   const printQueue = page.locator('aside').filter({ hasText: '处理队列' })
@@ -292,7 +284,7 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
   expect(errors).toEqual([])
 })
 
-test('中央隔离拒绝越权与旧版本，缺原件经失败重试补传再替换，历史仍可下载旧字节', async ({ page }, info) => {
+test('中央隔离拒绝越权与旧版本，缺原件经失败重试补传再替换，历史仍可下载旧字节', async ({ page }) => {
   test.setTimeout(120_000)
   const source = await context(page)
   const envelope = { workspaceId: source.workspaceId, actorId: source.actorId, requiredCapability: 'delivery:write', origin: 'real' }
@@ -362,7 +354,6 @@ test('中央隔离拒绝越权与旧版本，缺原件经失败重试补传再�
   await history.getByRole('button', { name: '下载原件', exact: true }).click()
   expect(await bytes(await oldDownload)).toEqual(original)
   await expectNoPageOverflow(page, '补传与旧原件历史')
-  await page.screenshot({ path: info.outputPath('delivery-supplement-history.png'), fullPage: true, animations: 'disabled' })
   await page.getByRole('navigation').getByRole('link', { name: '送货单识别', exact: true }).click()
   await page.locator('aside').filter({ hasText: '处理队列' }).getByRole('button', { name: '登记已打印', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '确认已实际打印', exact: true }).click()

@@ -38,8 +38,19 @@
     .dc-tab-x:hover { background: var(--danger-soft); color: var(--danger-ink); }
     .dc-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:12px; }
     .dc-form-fields { grid-template-columns:repeat(auto-fit,minmax(min(100%,max(280px,calc(50% - 6px))),1fr)); }
-    .dc-fields label { display:grid; gap:6px; min-width:0; }
-    .dc-fields input, .dc-fields select, .dc-fields textarea, .dc-state-select { min-width:0; max-width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:var(--radius-btn); background:var(--panel); color:var(--ink); font:inherit; }
+    .dc-fields label { display:grid; gap:6px; min-width:0; align-content:start; font-size:12px; font-weight:600; color:var(--ink-soft); }
+    .dc-fields label > input, .dc-fields label > select, .dc-fields label > textarea { font-weight:400; color:var(--ink); }
+    /* 原生控件统一外观（2026-10-07 评审 V-08）：32px、细箭头、品牌焦点环、错误红框；复杂交互改用 KitControls */
+    .dc-fields input, .dc-fields select, .dc-fields textarea, .dc-state-select { box-sizing:border-box; min-width:0; max-width:100%; height:32px; padding:0 10px; border:1px solid var(--line-strong); border-radius:6px; background:var(--panel); color:var(--ink); font:inherit; font-size:13px; transition:border-color .12s, box-shadow .12s; }
+    .dc-fields textarea { height:auto; min-height:64px; padding:8px 10px; line-height:1.6; resize:vertical; }
+    .dc-fields select, .dc-state-select { appearance:none; -webkit-appearance:none; padding-right:28px; cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 8px center; }
+    .dc-fields input:hover, .dc-fields select:hover, .dc-fields textarea:hover { border-color:#9aa6b8; }
+    .dc-fields input:focus, .dc-fields select:focus, .dc-fields textarea:focus, .dc-state-select:focus { outline:0; border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-soft); }
+    .dc-fields input[aria-invalid=true], .dc-fields select[aria-invalid=true], .dc-fields textarea[aria-invalid=true] { border-color:var(--danger); box-shadow:0 0 0 3px var(--danger-soft); }
+    .dc-fields input[readonly], .dc-fields textarea[readonly] { background:var(--surface-2); color:var(--ink-soft); border-style:dashed; }
+    .dc-fields input::placeholder, .dc-fields textarea::placeholder { color:var(--ink-faint); }
+    .dc-fields input[type=checkbox], .dc-fields input[type=radio] { height:auto; accent-color:var(--brand); }
+    .dc-state-select { height:28px; font-size:12px; }
     .dc-fields dd { margin:4px 0 0; overflow-wrap:anywhere; }
     .dc-fields dt { color:var(--ink-soft); font-size:12px; }
     :root {
@@ -101,6 +112,12 @@
         <x-import component-from-global-scope="KitTableScreen" from="./kit/KitTable.jsx" hint-size="0,0"></x-import>
       </sc-if>
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="KitControlsPreload" from="./kit/KitControls.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ListShellPreload" from="./kit/ListShell.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="KitAtomsScreen" from="./kit/KitAtoms.jsx" hint-size="0,0"></x-import>
       </sc-if>
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
@@ -117,6 +134,19 @@
       </sc-if>
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="DetailShellPreload" from="./kit/DetailShell.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <!-- 待补设计回填：报价/工资收付/签工/空鼓的共享演示数据预载，详情与表单屏不依赖列表屏先打开 -->
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="QuotationDataPreload" from="./kit/QuotationData.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollLedgerSharedPreload" from="./kit/PayrollLedgerShared.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="DayworkDemoPreload" from="./kit/DayworkScreen.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="HollowDemoPreload" from="./kit/HollowDetailScreen.jsx" hint-size="0,0"></x-import>
       </sc-if>
       <!-- 整页表单底座 + 分域表单规格注册（grill 决议 2026-07-18：全实体新建/编辑走整页表单路由） -->
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
@@ -363,6 +393,79 @@
       <sc-if value="{{ isQuantityStages }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="QuantityStagesScreen" from="./kit/QuantityStagesScreen.jsx" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
       </sc-if>
+      <!-- 待补设计回填（design-coverage 原 design-pending 路由） -->
+      <sc-if value="{{ isOurSignatory }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OurSignatoryScreen" from="./kit/OurSignatoryScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isOurSignatoryForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OurSignatoryFormScreen" from="./kit/OurSignatoryFormScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isWorkerPrivate }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="WorkerPrivateScreen" from="./kit/WorkerPrivateScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isBoqBuildingEvidence }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="BoqBuildingEvidenceScreen" from="./kit/BoqBuildingEvidenceScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isQuotation }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="QuotationScreen" from="./kit/QuotationScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isQuotationDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="QuotationDetailScreen" from="./kit/QuotationDetailScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isQuotationForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="QuotationFormScreen" from="./kit/QuotationFormScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isQuotationImport }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="QuotationImportScreen" from="./kit/QuotationImportScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isOtherSettleImport }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OtherSettleImportScreen" from="./kit/OtherSettleImportScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollConfig }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollConfigScreen" from="./kit/PayrollConfigScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollFormScreen" from="./kit/PayrollFormScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollIssue }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollIssueScreen" from="./kit/PayrollIssueScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollSources }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollSourcesScreen" from="./kit/PayrollSourcesScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollWorkbooks }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollWorkbooksScreen" from="./kit/PayrollWorkbooksScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollRoster }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollRosterScreen" from="./kit/PayrollRosterScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollAdjustmentDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollAdjustmentDetailScreen" from="./kit/PayrollAdjustmentDetailScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollAdjustmentForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollAdjustmentFormScreen" from="./kit/PayrollAdjustmentFormScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollPayments }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollPaymentsScreen" from="./kit/PayrollPaymentsScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollPaymentDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollPaymentDetailScreen" from="./kit/PayrollPaymentDetailScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollPaymentForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollPaymentFormScreen" from="./kit/PayrollPaymentFormScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollReversalForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollReversalFormScreen" from="./kit/PayrollReversalFormScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isDayworkForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="DayworkFormScreen" from="./kit/DayworkFormScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isHollowDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="HollowDetailScreen" from="./kit/HollowDetailScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isHollowForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="HollowFormScreen" from="./kit/HollowFormScreen.jsx" data="{{ kitData }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
     </main>
   </div>
 </div>
@@ -371,6 +474,31 @@
 <script type="text/x-dc" data-dc-script>
 
 const PAGE = {
+  // 待补设计回填：实现已上线、设计稿此前无落点的生产路由
+  ourSignatory: { title: "我方签约主体", subtitle: "核实资料 · 停用保留身份 · 合同快照" },
+  ourSignatoryForm: { title: "我方签约主体表单", subtitle: "新增 / 编辑 · 核实资料" },
+  workerPrivate: { title: "工人私密资料", subtitle: "实名 · 劳动合同 · 照片原件" },
+  boqBuildingEvidence: { title: "更正楼栋证据", subtitle: "合同清单 · 来源更正 / 只读来源" },
+  quotation: { title: "材料报价", subtitle: "乙供材管理 · 独立报价 · 原文与原件" },
+  quotationDetail: { title: "报价详情", subtitle: "冻结版本 · 原价 · 原件" },
+  quotationForm: { title: "材料报价表单", subtitle: "报价资料 · 材料原始明细 · 原件与备注" },
+  quotationImport: { title: "报价来源迁入", subtitle: "完整来源图核验 · 逐条确认主档" },
+  otherSettleImport: { title: "支出结算历史迁入", subtitle: "完整原库核验 · 逐条确认主档" },
+  payrollConfig: { title: "工资配置", subtitle: "A 比例·单价·费用·取整·空鼓 · C1 个人标准 · C2 主体单价与规则" },
+  payrollForm: { title: "工资草稿", subtitle: "A·C1·C2·独立管理费草稿整页" },
+  payrollIssue: { title: "预览与正式出具工资", subtitle: "冻结原件 · 项目正式编号" },
+  payrollSources: { title: "工资来源", subtitle: "配置·考勤·签工·月份与签工占用（只读）" },
+  payrollWorkbooks: { title: "完整工资工作簿", subtitle: "固定原工资、正式编号与名册版本" },
+  payrollRoster: { title: "工资实名名册归档", subtitle: "独立登记日期的实名名册版本" },
+  payrollAdjustmentDetail: { title: "工资更正详情", subtitle: "原签名事实 · 已确认差额 · 原更正链余额" },
+  payrollAdjustmentForm: { title: "独立工资更正", subtitle: "保存更正依据后单独确认核算差额；实际补发或退款另行登记" },
+  payrollPayments: { title: "工资实际收付", subtitle: "按项目只读 · 原发放、补退与错记冲销同源" },
+  payrollPaymentDetail: { title: "工资实际收付详情", subtitle: "" },
+  payrollPaymentForm: { title: "登记工资实际补退", subtitle: "仅登记已经真实发生的补发或退款" },
+  payrollReversalForm: { title: "工资错记冲销", subtitle: "核实原登记未真实发生后追加冲销" },
+  dayworkForm: { title: "签工记录", subtitle: "零星签工 · 逐日用工事实 · 待确认不计薪，人工确认后计薪" },
+  hollowDetail: { title: "空鼓检查与整改", subtitle: "工程量 · 原户检查 · 追加整改销记" },
+  hollowForm: { title: "空鼓检查", subtitle: "工程量 · 记录/修订原户检查 · 保留原记录" },
   quantityStages: { title: "施工阶段配置", subtitle: "" },
   processLibraryDetail: { title: "工序库版本详情", subtitle: "" },
   payApplyDetail: { title: "付款申请详情", subtitle: "" },
@@ -447,6 +575,9 @@ const PAGE = {
   projectSupplierImport: { title: "导入合作分供方", subtitle: "自动分类 · 人工确认新建 · 重复关系跳过" },
 };
 
+// 待补设计回填屏均支持 params.previewState
+const PREVIEW_ROUTES = ["ourSignatory","ourSignatoryForm","workerPrivate","boqBuildingEvidence","quotation","quotationDetail","quotationForm","quotationImport","otherSettleImport","payrollConfig","payrollForm","payrollIssue","payrollSources","payrollWorkbooks","payrollRoster","payrollAdjustmentDetail","payrollAdjustmentForm","payrollPayments","payrollPaymentDetail","payrollPaymentForm","payrollReversalForm","dayworkForm","hollowDetail","hollowForm"];
+
 const INITIAL_DESIGN_PROTOTYPE = new URLSearchParams(window.location.search).get("prototype") === "delivery-review";
 
 class Component extends DCLogic {
@@ -476,6 +607,14 @@ class Component extends DCLogic {
     if (route === "crewDetail") return route + ":" + (p.crewId || "");
     if (route === "payrollDetail") return route + ":" + (p.book || p.worker || "") + ":" + (p.crew || "") + ":" + (p.project || "");
     if (route === "quantityUnit") return route + ":" + (p.building || "") + ":" + (p.floor || "") + ":" + (p.unit || "");
+    if (["ourSignatoryForm", "quotationForm", "dayworkForm", "payrollAdjustmentDetail", "payrollPaymentDetail", "quotationDetail", "workerPrivate", "payrollIssue"].includes(route)) return route + ":" + (p.id || "new");
+    if (route === "payrollConfig") return route + ":" + (p.format || "A");
+    if (route === "payrollForm") return route + ":" + (p.id || ("new:" + (p.format || "")));
+    if (route === "payrollAdjustmentForm") return route + ":" + (p.id || ("new:" + (p.statementId || "") + ":" + (p.correctsAdjustmentId || "")));
+    if (route === "payrollPaymentForm") return route + ":" + [].concat(p.adjustmentIds || p.adjustmentId || []).join(",");
+    if (route === "payrollReversalForm") return route + ":" + (p.eventId || ("st:" + (p.statementId || "")));
+    if (route === "hollowDetail" || route === "hollowForm") return route + ":" + (p.building || "") + ":" + (p.floor || "") + ":" + (p.unit || "") + ":" + (p.id || "new");
+    if (route === "boqBuildingEvidence") return route + ":" + (p.contract || "") + ":" + (p.line || "");
     return route; // 列表类页面：一个 route 一个页签
   }
 
@@ -518,6 +657,12 @@ class Component extends DCLogic {
       else if (route === "boqImport" || route === "boqList") name = (p.contract || "").slice(0, 10);
     } catch (e) { name = ""; }
     if (route === "projectSupplier") return (p.project || "项目") + "×" + (p.supplier || "分供方");
+    if (route === "ourSignatoryForm") return (p.id ? "编辑" : "新增") + " · 我方签约主体";
+    if (route === "quotationForm") return (p.id ? "编辑" : "新增") + " · 材料报价";
+    if (route === "dayworkForm") return (p.id ? "编辑" : "新增") + "签工记录";
+    if (route === "hollowForm") return (p.id ? "修订" : "记录") + "空鼓检查";
+    if (route === "hollowDetail") return (p.unit || "") + " 空鼓记录";
+    if (route === "workerPrivate") { const w = (d.workers || []).find(x => x.id === p.id); return w ? w.name + " · 私密资料" : page.title; }
     return name ? page.title + "·" + name : page.title;
   }
 
@@ -623,17 +768,21 @@ class Component extends DCLogic {
     // 整页表单路由点亮其来源列表的侧栏项
     const fp = window.KIT_FORM_PAGES && window.KIT_FORM_PAGES[r];
     if (fp && fp.listRoute) r = fp.listRoute;
-    if (key === "payroll") return r === "payroll" || r === "payrollDetail";
-    if (key === "quantity") return ["quantity", "quantityUnit", "quantityStages"].includes(r);
+    if (key === "payroll") return r === "payroll" || r === "payrollDetail" || (r.startsWith("payroll") && !!PAGE[r]);
+    if (key === "materialQuotation") return ["quotation", "quotationDetail", "quotationForm", "quotationImport"].includes(r);
+    if (key === "ourSignatories") return r === "ourSignatory" || r === "ourSignatoryForm";
+    if (key === "daywork") return r === "daywork" || r === "dayworkForm";
+    if (key === "otherSettle") return r === "otherSettle" || r === "otherSettleImport";
+    if (key === "quantity") return ["quantity", "quantityUnit", "quantityStages", "hollowDetail", "hollowForm"].includes(r);
     if (key === "payApply") return r === "payApply" || r === "payApplyDetail";
     if (key === "crew") return r === "crew" || r === "crewDetail";
     if (key === "supplier") return r === "supplier" || r === "supplierDetail";
-    if (key === "worker") return r === "worker" || r === "workerDetail";
+    if (key === "worker") return r === "worker" || r === "workerDetail" || r === "workerPrivate";
     if (key === "project") return r === "project" || r === "projectDetail" || r === "projectSupplier";
     if (key === "invoice") return r === "invoice";
     if (key === "schedule") return ["schedule", "scheduleGroupNew", "scheduleBind", "processLibrary", "processLibraryDetail"].includes(r);
     if (key === "invoiceLedger") return r === "invoiceLedger" || r === "invoiceEdit";
-    if (key === "boqList") return r === "boqList";           // 批A：清单拆表独立入主合同管理组，不再挂工程量清单下
+    if (key === "boqList") return r === "boqList" || r === "boqBuildingEvidence";           // 批A：清单拆表独立入主合同管理组，不再挂工程量清单下
     if (key === "customer") return r === "customer" || r === "customerDetail";  // 批E：客户列表/详情同亮
     if (key === "conContract" || key === "subContract" || key === "matContract") {
       if (r === key) return true;
@@ -654,7 +803,7 @@ class Component extends DCLogic {
     const isActive = k => this._isActive(k);
     const W = collapsed ? 48 : 208;
 
-    // 侧栏导航（锁定版）：1 个顶层项 + 9 个分组 = 51 个叶子，与实现 app/lib/nav/nav-tree.ts 逐条对齐
+    // 侧栏导航（锁定版）：1 个顶层项 + 9 个分组 = 53 个叶子，与实现 app/lib/nav/nav-tree.ts 逐条对齐
     // （key 与 label 一致性由 tests/ui/design-token-contract.test.ts 的设计覆盖契约断言）。
     // 所有叶子均已实装，不再保留「待建 / 待设计」占位机制。
     const NAV = [
@@ -683,6 +832,7 @@ class Component extends DCLogic {
         { key: "payroll", mark: "资", label: "工资核算", hint: "核算发放" },
       ]},
       { type: "group", key: "g-material", label: "乙供材管理", icon: "package", items: [
+        { key: "materialQuotation", route: "quotation", mark: "报", label: "材料报价", hint: "独立报价 · 原件" },
         { key: "matContract", mark: "采", label: "材料采购合同", hint: "采购台账" },
         { key: "matRequisition", mark: "料", label: "下料单", hint: "要料计划" },
         { key: "matArrival", mark: "到", label: "材料到货", hint: "入库" },
@@ -728,6 +878,7 @@ class Component extends DCLogic {
         { key: "worker", mark: "工", label: "工人信息", hint: "人员证书" },
       ]},
       { type: "group", key: "g-settings", label: "设置", icon: "settings", items: [
+        { key: "ourSignatories", route: "ourSignatory", mark: "司", icon: "building-2", label: "我方签约主体", hint: "核实·快照" },
         { key: "dataMigration", mark: "迁", icon: "database-backup", label: "本地数据迁移", hint: "预检·备份" },
         { key: "ocrSettings", mark: "设", label: "OCR 设置", hint: "引擎·参数" },
       ]},
@@ -744,7 +895,7 @@ class Component extends DCLogic {
 
     const query = "";
     const matches = n => !query || (n.label + n.hint).toLowerCase().includes(query);
-    const leaf = (n, compact) => React.createElement("button", { key:n.key, type:"button", title:n.label, "aria-label":n.label, "aria-current":isActive(n.key) ? "page" : undefined, onClick:()=>navigate(n.key), style:compact ? {justifyContent:"center",padding:6} : undefined }, React.createElement(Icon,{name:n.icon || "file-text",size:18}), !compact && n.label);
+    const leaf = (n, compact) => React.createElement("button", { key:n.key, type:"button", title:n.label, "aria-label":n.label, "aria-current":isActive(n.key) ? "page" : undefined, onClick:()=>navigate(n.route || n.key), style:compact ? {justifyContent:"center",padding:6} : undefined }, React.createElement(Icon,{name:n.icon || "file-text",size:18}), !compact && n.label);
     const nav = compact => React.createElement("nav", {className:"dc-nav", "aria-label":"主导航",style:{flex:1}}, ...NAV.map(n => {
       if (n.type === "item") return matches(n) ? leaf(n,compact) : null;
       const items = n.items.filter(matches);
@@ -787,7 +938,7 @@ class Component extends DCLogic {
       sideW:           collapsed ? 68 : 248,
       workspaceClass: "dc-workspace" + (collapsed ? " is-collapsed" : ""),
       menuToggle: React.createElement("button", {type:"button",className:"dc-menu-toggle",onClick:()=>this.mobileNav && this.mobileNav.showModal(), "aria-label":"打开导航"}, "☰"),
-      statePreview: (["dataMigration", "payApplyDetail", "processLibraryDetail", "quantityStages"].includes(route) || formPage) ? React.createElement("label", {style:{fontSize:12,display:"flex",alignItems:"center",gap:4}}, "设计状态", React.createElement("select", {className:"dc-state-select", "aria-label":"设计状态",value:params.previewState || "ready", onChange:e=>this.setState({params:{...params,previewState:e.target.value}})}, ...[["ready","正常"],["empty","空"],["loading","加载"],["error","错误"],["readonly","只读"]].map(([value,label])=>React.createElement("option",{key:value,value},label)))) : null,
+      statePreview: (["dataMigration", "payApplyDetail", "processLibraryDetail", "quantityStages", "daywork"].includes(route) || PREVIEW_ROUTES.includes(route) || formPage) ? React.createElement("label", {style:{fontSize:12,display:"flex",alignItems:"center",gap:4}}, "设计状态", React.createElement("select", {className:"dc-state-select", "aria-label":"设计状态",value:params.previewState || "ready", onChange:e=>this.setState({params:{...params,previewState:e.target.value}})}, ...[["ready","正常"],["empty","空"],["loading","加载"],["error","错误"],["readonly","只读"],["pending","结果未知"]].map(([value,label])=>React.createElement("option",{key:value,value},label)))) : null,
       pageTitle:       page.title,
       pageSubtitle:    page.subtitle,
       isHome:          route === "home",
@@ -863,6 +1014,30 @@ class Component extends DCLogic {
       isPayApplyDetail: route === "payApplyDetail",
       isProcessLibraryDetail: route === "processLibraryDetail",
       isQuantityStages: route === "quantityStages",
+      isOurSignatory: route === "ourSignatory",
+      isOurSignatoryForm: route === "ourSignatoryForm",
+      isWorkerPrivate: route === "workerPrivate",
+      isBoqBuildingEvidence: route === "boqBuildingEvidence",
+      isQuotation: route === "quotation",
+      isQuotationDetail: route === "quotationDetail",
+      isQuotationForm: route === "quotationForm",
+      isQuotationImport: route === "quotationImport",
+      isOtherSettleImport: route === "otherSettleImport",
+      isPayrollConfig: route === "payrollConfig",
+      isPayrollForm: route === "payrollForm",
+      isPayrollIssue: route === "payrollIssue",
+      isPayrollSources: route === "payrollSources",
+      isPayrollWorkbooks: route === "payrollWorkbooks",
+      isPayrollRoster: route === "payrollRoster",
+      isPayrollAdjustmentDetail: route === "payrollAdjustmentDetail",
+      isPayrollAdjustmentForm: route === "payrollAdjustmentForm",
+      isPayrollPayments: route === "payrollPayments",
+      isPayrollPaymentDetail: route === "payrollPaymentDetail",
+      isPayrollPaymentForm: route === "payrollPaymentForm",
+      isPayrollReversalForm: route === "payrollReversalForm",
+      isDayworkForm: route === "dayworkForm",
+      isHollowDetail: route === "hollowDetail",
+      isHollowForm: route === "hollowForm",
       // 顶栏日期按实际当天渲染；此前硬编码为某次演示当天，会被误当规格
       today:           (() => {
         const now = new Date();

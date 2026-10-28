@@ -1,10 +1,13 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { migrations, runMigrations } from '../../app/lib/db/migrations'
 import { migrateExpenditureSettlementOwner } from '../../app/lib/other-settlement/schema-upgrade'
 import { createMemoryDb } from '../../tests/helpers/memory-db'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function diskSource(unknown = false) {
   const db = await createMemoryDb()
@@ -21,7 +24,7 @@ async function diskSource(unknown = false) {
     await db.execute('CREATE TRIGGER historical_settlement_note BEFORE UPDATE OF legacy_extra ON expenditure_settlements WHEN NEW.legacy_extra=\'forbidden\' BEGIN SELECT RAISE(ABORT,\'old evidence guard\'); END')
     await db.execute('INSERT INTO expenditure_settlements(id,no,name,total_amount,created_by,status,legacy_extra) VALUES(?,?,?,?,?,?,?)', ['old-zero', 'JS-OLD', '原结算', unknown ? null : 0, 'historical-actor', 'confirmed', '原独有证据'])
     await db.execute('INSERT INTO historical_settlement_reference VALUES(?,?)', ['old-link', 'old-zero'])
-    const base = resolve('.tmp/a03-other-migration-review')
+    const base = testTempRoot('a03-other-migration-review')
     await mkdir(base, { recursive: true })
     const dir = await mkdtemp(`${base}/synthetic-`)
     const path = resolve(dir, 'native.sqlite')

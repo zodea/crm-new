@@ -1,12 +1,13 @@
 import type { SQLInputValue } from 'node:sqlite'
 import type { TestDb } from '../helpers/memory-db'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { migrations, runMigrations } from '~/lib/db/migrations'
 import { migrateExpenseReferences, originalExpenseReference } from '~/lib/finance/expense-references'
 import { createMemoryDb } from '../helpers/memory-db'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 
 let db: TestDb
 beforeEach(async () => {
@@ -35,7 +36,7 @@ describe('既有费用原身份引用及迁移保全', () => {
     const original = await db.select('SELECT * FROM expense_reimbursement_lines ORDER BY id')
     const evidenceTables = ['expense_reimbursements', 'file_refs', 'file_payloads', 'suppliers', 'supplier_credential_review_history', 'contracts', 'our_signatories', 'contract_number_claims', 'contract_number_history']
     const originalEvidence = new Map(await Promise.all(evidenceTables.map(async table => [table, await db.select(`SELECT * FROM ${table} ORDER BY 1`)] as const)))
-    const root = resolve('.tmp/a01-supplier-tests')
+    const root = testTempRoot('a01-supplier-tests')
     await mkdir(root, { recursive: true })
     const directory = await mkdtemp(join(root, 'native54-expense-cold-'))
     const path = join(directory, 'synthetic.sqlite')
@@ -141,3 +142,5 @@ describe('既有费用原身份引用及迁移保全', () => {
     expect(await originalExpenseReference(db, 'expense-original')).toMatchObject({ amount: 100, projectId: 'project-a', applicant: '保全历史申请人' })
   })
 })
+
+afterAll(cleanupTestTempRoot)

@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
-import { parseSheetForMapping, parseWorkbookForMapping } from '~/lib/util/excel'
+import { parseWorkbookForMapping } from '~/lib/util/excel'
 
 function workbookBuffer(rows: unknown[][]): ArrayBuffer {
   const ws = XLSX.utils.aoa_to_sheet(rows)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+}
+
+async function firstSheet(input: ArrayBuffer) {
+  return (await parseWorkbookForMapping(input)).sheets[0]!
 }
 
 describe('导入源解析：原始表头 + 行', () => {
@@ -34,7 +38,7 @@ describe('导入源解析：原始表头 + 行', () => {
   })
 
   it('第一行作表头，数据行按单元格显示格式转文本（所见即所得）', async () => {
-    const sheet = await parseSheetForMapping(workbookBuffer([
+    const sheet = await firstSheet(workbookBuffer([
       ['分供方名称', '类别', '匹配标识'],
       ['华东建材', '材料', 'HQ-001'],
       ['南方设备', '设备', 2077],
@@ -48,7 +52,7 @@ describe('导入源解析：原始表头 + 行', () => {
   })
 
   it('表头带首尾空格时列名与数据行键逐字一致，取值不落空', async () => {
-    const sheet = await parseSheetForMapping(workbookBuffer([
+    const sheet = await firstSheet(workbookBuffer([
       [' 分供方名称 ', '类别'],
       ['华东建材', '材料'],
     ]))
@@ -59,7 +63,7 @@ describe('导入源解析：原始表头 + 行', () => {
   })
 
   it('重复表头按 SheetJS 规则加 _1 后缀，两列数据都可映射', async () => {
-    const sheet = await parseSheetForMapping(workbookBuffer([
+    const sheet = await firstSheet(workbookBuffer([
       ['金额', '金额', '名称'],
       [100, 200, '华东建材'],
     ]))
@@ -71,7 +75,7 @@ describe('导入源解析：原始表头 + 行', () => {
   })
 
   it('日期格以显示文本而非 Excel 序列号进入行数据', async () => {
-    const sheet = await parseSheetForMapping(workbookBuffer([
+    const sheet = await firstSheet(workbookBuffer([
       ['名称', '日期'],
       ['华东建材', new Date(Date.UTC(2024, 0, 15))],
     ]))
@@ -110,14 +114,14 @@ describe('导入源解析：原始表头 + 行', () => {
       0x0A,
     ])
 
-    const sheet = await parseSheetForMapping(gbk.buffer as ArrayBuffer)
+    const sheet = await firstSheet(gbk.buffer as ArrayBuffer)
 
     expect(sheet.columns).toEqual(['名称', '类别'])
     expect(sheet.rows).toEqual([{ 名称: '华东建材', 类别: '材料' }])
   })
 
   it('数据行缺格时对应键不出现', async () => {
-    const sheet = await parseSheetForMapping(workbookBuffer([
+    const sheet = await firstSheet(workbookBuffer([
       ['名称', '联系人'],
       ['华东建材'],
     ]))
@@ -128,7 +132,7 @@ describe('导入源解析：原始表头 + 行', () => {
   it('csv 字节流同样可解析', async () => {
     const csv = new TextEncoder().encode('名称,类别\n华东建材,材料\n')
 
-    const sheet = await parseSheetForMapping(csv.buffer as ArrayBuffer)
+    const sheet = await firstSheet(csv.buffer as ArrayBuffer)
 
     expect(sheet.columns).toEqual(['名称', '类别'])
     expect(sheet.rows).toEqual([{ 名称: '华东建材', 类别: '材料' }])
@@ -136,7 +140,7 @@ describe('导入源解析：原始表头 + 行', () => {
 
   it('csv 保留原始日期、前导零编码和精度，不自动转成本地显示格式', async () => {
     const csv = new TextEncoder().encode('完成日期,户编码,数量\n2026-09-11,00101,0.0000001\n')
-    const sheet = await parseSheetForMapping(csv.buffer as ArrayBuffer)
+    const sheet = await firstSheet(csv.buffer as ArrayBuffer)
     expect(sheet.rows).toEqual([{ 完成日期: '2026-09-11', 户编码: '00101', 数量: '0.0000001' }])
   })
 
@@ -146,18 +150,14 @@ describe('导入源解析：原始表头 + 行', () => {
     const bytes = new Uint8Array(prefix.length + suffix.length)
     bytes.set(prefix)
     bytes.set(suffix, prefix.length)
-    expect((await parseSheetForMapping(bytes.buffer)).rows).toEqual([{ 名称: 'A', date: '2026-09-11' }])
+    expect((await firstSheet(bytes.buffer)).rows).toEqual([{ 名称: 'A', date: '2026-09-11' }])
     const workbook = XLSX.utils.book_new()
     const worksheet = XLSX.utils.aoa_to_sheet([['日期', '编码'], [new Date(Date.UTC(2026, 8, 11)), 101]])
     worksheet.A2!.z = 'yyyy-mm-dd'
     worksheet.B2!.z = '00000'
     XLSX.utils.book_append_sheet(workbook, worksheet, '数据')
-    const sheet = await parseSheetForMapping(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer)
+    const sheet = await firstSheet(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer)
     expect(sheet.rows).toEqual([{ 日期: '2026-09-11', 编码: '00101' }])
-  })
-
-  it('没有表头的空表报可读错误', async () => {
-    await expect(parseSheetForMapping(workbookBuffer([]))).rejects.toThrow('表头')
   })
 
   it('工作簿允许空白辅助 Sheet，所选数据表保留文件摘要与原始空行后的行号', async () => {

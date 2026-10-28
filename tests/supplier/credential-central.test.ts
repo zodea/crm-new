@@ -1,7 +1,7 @@
 import type { SupplierCredentialAction, SupplierCredentialCommand } from '~/lib/supplier/credential-contract'
 import { Buffer } from 'node:buffer'
 import { describe, expect, it } from 'vitest'
-import { createSupplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 import { createSupplierCredentialService } from '../../server/utils/supplier-credential-service'
 
 const session = { workspaceId: 'credential-workspace', actorId: 'credential-actor', capabilities: ['supplier:write', 'supplier:list:read', 'supplier-credential:read', 'supplier-credential:write', 'demo:read'] }
@@ -9,7 +9,7 @@ const pdf = Buffer.from('%PDF-1.7\nSynthetic credential\n%%EOF')
 async function setup() {
   let clock = '2026-09-12T15:59:59.000Z'
   let sequence = 0
-  const commands = createSupplierCommandTestInstance({ now: () => clock, createId: () => `supplier-${++sequence}` })
+  const commands = createSupplierCommandService({ now: () => clock, createId: () => `supplier-${++sequence}` })
   const created = await commands.execute({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'supplier:write', commandId: 'create', baseVersion: null, action: 'save', attachments: {}, draft: { name: '合成分供方', supplierCategory: '其他', contact: '合成联系人', taxNo: 'TEST-TAX', uniqueCode: 'INTERNAL', externalRef: 'legacy-import' } }, session)
   const service = createSupplierCredentialService({ read: commands.readCredentialScope, transact: commands.transactCredentialScope }, { now: () => clock, createId: () => `credential-${++sequence}` })
   const read = () => service.read(created.id, 'real', session)

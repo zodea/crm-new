@@ -72,7 +72,7 @@ describe('浏览器页签恢复接线', () => {
     tabs.close('/base/supplier')
     expect(session.problems).toEqual([])
     expect(stored().tabs.map(tab => tab.key)).toEqual(['/project'])
-    tabs.closeEvery()
+    await tabs.requestCloseEvery()
     expect(stored()).toMatchObject({ tabs: [], activeKey: 'home' })
   })
 
@@ -86,7 +86,7 @@ describe('浏览器页签恢复接线', () => {
     expect(await session.startupPath('/project/new', true)).toBe('/base/customer')
     tabs.open({ fullPath: '/project', title: '项目' })
     const before = stored()
-    tabs.refreshActive()
+    await tabs.requestRefresh()
     expect(stored()).toEqual(before)
   })
 
@@ -110,6 +110,8 @@ describe('浏览器页签恢复接线', () => {
     ['/contract/construction/form', 'construction-contract', null],
     ['/contract/material/form/contract-a?origin=real', 'material-contract', 'contract-a'],
     ['/contract/subcontract/form/contract-b?origin=real', 'subcontract-contract', 'contract-b'],
+    ['/contract/other-settlement/form?origin=real&project=original-project', 'other-settlement', null],
+    ['/contract/other-settlement/form/settlement-original?origin=real', 'other-settlement', 'settlement-original'],
     ['/finance/receipt/new?origin=real', 'receipt', null],
     ['/finance/receipt/form/receipt-a?origin=real', 'receipt', 'receipt-a'],
   ] as const)('有效原编号刷新保留精确目标但不持久写态页签或正文：%s', async (path, family, targetId) => {
@@ -190,6 +192,62 @@ describe('浏览器页签恢复接线', () => {
     expect(await session.startupPath(path, true)).toBe('/project')
     recovery.clear(commandRecoveryKey({ ...pending, actorId: 'other-actor' }), pending.commandId)
     recovery.remember(commandRecoveryKey({ ...pending, family: 'other-domain' }), { ...pending, family: 'other-domain' })
+    expect(await session.startupPath(path, true)).toBe('/project')
+  })
+
+  it('其他结算确认只恢复已有原单的准确路径，不授予新稿或另一实体确认', async () => {
+    seed([descriptor('/project')])
+    const recovery = createCommandRecoveryStorage()
+    const pending = { ...scope, family: 'other-settlement', targetId: 'original-other', action: 'confirm', commandId: 'original-other-confirm' }
+    recovery.remember(commandRecoveryKey(pending), pending)
+    const { session } = initialize(success)
+    const path = '/contract/other-settlement/form/original-other?origin=real'
+    expect(await session.startupPath(path, true)).toBe(path)
+    for (const invalid of [path.replace('original-other', 'another-other'), path.replace('origin=real', 'origin=demo'), '/contract/other-settlement/form?origin=real'])
+      expect(await session.startupPath(invalid, true)).toBe('/project')
+    recovery.remember(commandRecoveryKey({ ...pending, targetId: null }), { ...pending, targetId: null })
+    expect(await session.startupPath('/contract/other-settlement/form?origin=real', true)).toBe('/project')
+  })
+
+  it('辅助合同两种新稿原编号隔离，完整领域迁入在两列表恢复同一批', async () => {
+    seed([descriptor('/project')])
+    const recovery = createCommandRecoveryStorage()
+    const pending = { ...scope, family: 'auxiliary-contract', targetId: null, scopeId: 'other_expense', action: 'draft', commandId: 'original-other-draft' }
+    recovery.remember(commandRecoveryKey(pending), pending)
+    const { session } = initialize(success)
+    const other = '/contract/other-expense/form?origin=real'
+    const company = '/contract/company-expense/form?origin=real'
+    expect(await session.startupPath(other, true)).toBe(other)
+    expect(await session.startupPath(company, true)).toBe('/project')
+    expect(await session.startupPath(other.replace('origin=real', 'origin=demo'), true)).toBe('/project')
+    const independent = { ...pending, scopeId: 'company_expense', commandId: 'original-company-draft' }
+    recovery.remember(commandRecoveryKey(independent), independent)
+    expect(commandRecoveryKey(independent)).not.toBe(commandRecoveryKey(pending))
+    expect(await session.startupPath(company, true)).toBe(company)
+    const imported = { ...scope, family: 'auxiliary-contract-import', targetId: null, scopeId: 'a'.repeat(64), action: 'adopt', commandId: 'original-complete-auxiliary-import' }
+    recovery.remember(commandRecoveryKey(imported), imported)
+    for (const path of ['/contract/other-expense?origin=real', '/contract/company-expense?origin=real'])
+      expect(await session.startupPath(path, true)).toBe(path)
+    expect(JSON.parse(sessionStorage.getItem(commandRecoveryKey(imported))!)).toEqual(imported)
+  })
+
+  it('新WBS入口刷新只核对同身份同项目的原编号，未授予另一项目或新提交', async () => {
+    seed([descriptor('/project')])
+    const path = '/schedule/new?project=wbs-project&origin=real'
+    const pending = { ...scope, family: 'schedule', targetId: 'wbs-project', action: 'create-group', commandId: 'original-wbs-group' }
+    const recovery = createCommandRecoveryStorage()
+    const key = commandRecoveryKey(pending)
+    recovery.remember(key, pending)
+    const { session } = initialize(success)
+    expect(await session.startupPath(path, true)).toBe(path)
+    expect(JSON.parse(sessionStorage.getItem(key)!)).toEqual(pending)
+    for (const invalid of [path.replace('wbs-project', 'another-project'), `${path}&project=wbs-project`, path.replace('origin=real', 'origin=demo')])
+      expect(await session.startupPath(invalid, true)).toBe('/project')
+    recovery.clear(key, pending.commandId)
+    recovery.remember(key, { ...pending, action: 'submit' })
+    expect(await session.startupPath(path, true)).toBe('/project')
+    sessionStorage.clear()
+    recovery.remember(commandRecoveryKey({ ...pending, actorId: 'other-actor' }), { ...pending, actorId: 'other-actor' })
     expect(await session.startupPath(path, true)).toBe('/project')
   })
 

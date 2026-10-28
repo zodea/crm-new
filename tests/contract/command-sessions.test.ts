@@ -51,6 +51,29 @@ describe('合同选择分供方', () => {
   })
 })
 
+it('材采附带工程依据同原请求发送，可靠后读且没有后来输入时不误报已修改', async () => {
+  const input = { ...f2FormDefaults('material'), name: '实际选择工程' }
+  const constructionMain = { id: 'actual-main', projectId: 'actual-project', basis: 'a'.repeat(64) }
+  const context = { workspaceId: 'w', actorId: 'u', capabilities: ['material-contract:write'], projects: [], suppliers: [] }
+  const repository = {
+    context: vi.fn(async () => context),
+    execute: vi.fn(async (request: { commandId: string }) => ({ id: 'saved-material', commandId: request.commandId, version: '1', updatedAt, attachmentIds: [] })),
+    loadForm: vi.fn(async () => ({ draft: { ...input, id: 'saved-material' }, attachments: [], version: '1', updatedAt, constructionMain })),
+    resolve: vi.fn(),
+  }
+  vi.stubGlobal('useNuxtApp', () => ({ $repositories: { materialContractCommands: repository } }))
+  const store = useMaterialContractCommandStore()
+  const session = store.createSession()
+  await store.hydrate(session, null)
+  const saved = await store.saveForm(session, input, 'draft', {}, { constructionMain })
+  expect(repository.execute).toHaveBeenCalledWith(expect.objectContaining({ constructionMain, draft: input }))
+  expect(saved.retainedInput).toBe(false)
+  expect(saved.form.constructionMain).toEqual(constructionMain)
+  expect(session.pending).toBeNull()
+  expect(repository.resolve).not.toHaveBeenCalled()
+  expect((globalThis.sessionStorage as unknown as ReturnType<typeof memoryStorage>).values.size).toBe(0)
+})
+
 describe.each(cases)('%s 合同表单会话', (kind, useStore) => {
   function fixture() {
     const records = new Map<string, { version: string, draft: ReturnType<typeof f2FormDefaults> & { id: string } }>()

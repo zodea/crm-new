@@ -48,23 +48,23 @@ test('首页正式项目切换、排程与工程量下钻使用同一回执身�
   expect(errors).toEqual([])
 })
 
-for (const viewport of [...RESPONSIVE_WIDTHS.map(width => ({ width, height: width === 390 ? 844 : 1000 })), EQUIVALENT_200_PERCENT_VIEWPORT]) {
-  test(`${viewport.width}px 首页项目切换、键盘、甘特局部滚动和施工入口可达`, async ({ page }) => {
+test('首页项目切换器键盘可用，各宽度甘特局部滚动和施工入口可达', async ({ page }) => {
+  const fixture = await installScheduleProductionFixture(page)
+  await page.goto(`/?project=${fixture.projectId}&origin=real`)
+  await expect(page.getByRole('link', { name: '打开施工进度', exact: true })).toHaveAttribute('href', `/schedule?project=${fixture.projectId}&origin=real&from=home`)
+  await expect(page.getByTestId('home-schedule-scroll').getByText('今天', { exact: true })).toBeVisible()
+  const switcher = page.getByTestId('project-switcher-trigger')
+  await expect(switcher).toContainText('E2E正式工程量项目')
+  const scroll = page.getByTestId('home-schedule-scroll')
+  for (const viewport of [...RESPONSIVE_WIDTHS.map(width => ({ width, height: width === 390 ? 844 : 1000 })), EQUIVALENT_200_PERCENT_VIEWPORT]) {
     await page.setViewportSize(viewport)
-    const fixture = await installScheduleProductionFixture(page)
-    await page.goto(`/?project=${fixture.projectId}&origin=real`)
     await expect(page.getByRole('link', { name: '全部项目', exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: '打开施工进度', exact: true })).toHaveAttribute('href', `/schedule?project=${fixture.projectId}&origin=real&from=home`)
-    await expect(page.getByTestId('home-schedule-scroll').getByText('今天', { exact: true })).toBeVisible()
-    const switcher = page.getByTestId('project-switcher-trigger')
-    await expect(switcher).toContainText('E2E正式工程量项目')
     await switcher.focus()
     await page.keyboard.press('ArrowDown')
     await expect(page.getByRole('combobox', { name: '搜索项目', exact: true })).toBeFocused()
     await expect(page.getByRole('option', { name: /E2E正式工程量项目/ }).last()).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('Escape')
     await expect(switcher).toBeFocused()
-    const scroll = page.getByTestId('home-schedule-scroll')
     await expect(scroll).toBeVisible()
     const metrics = await scroll.evaluate((element) => {
       element.scrollLeft = 0
@@ -72,13 +72,13 @@ for (const viewport of [...RESPONSIVE_WIDTHS.map(width => ({ width, height: widt
       return { client: element.clientWidth, width: element.scrollWidth, left: element.scrollLeft }
     })
     if (viewport.width <= 768) {
-      expect(metrics.width).toBeGreaterThan(metrics.client)
-      expect(metrics.left).toBeGreaterThan(0)
+      expect(metrics.width, `${viewport.width}px`).toBeGreaterThan(metrics.client)
+      expect(metrics.left, `${viewport.width}px`).toBeGreaterThan(0)
     }
     else {
-      expect(metrics.width).toBeGreaterThanOrEqual(metrics.client)
-      expect(metrics.left).toBe(metrics.width - metrics.client)
+      expect(metrics.width, `${viewport.width}px`).toBeGreaterThanOrEqual(metrics.client)
+      expect(metrics.left, `${viewport.width}px`).toBe(metrics.width - metrics.client)
     }
     await expectNoPageOverflow(page, `${viewport.width}px 首页排程`)
-  })
-}
+  }
+})

@@ -8,6 +8,7 @@ export async function initializeTargetCostSchema(tx: TransactionDb) {
   await tx.execute(`CREATE TABLE IF NOT EXISTS target_cost_command_receipts (
     command_id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, target_cost_id TEXT NOT NULL,
     action TEXT NOT NULL, fingerprint TEXT NOT NULL, result_json TEXT NOT NULL)`)
+  await tx.execute('CREATE TABLE IF NOT EXISTS target_cost_command_resolutions(command_id TEXT PRIMARY KEY,actor_id TEXT NOT NULL)')
 }
 
 export async function advanceTargetCostRevision(tx: TransactionDb): Promise<void> {

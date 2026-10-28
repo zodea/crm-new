@@ -5,7 +5,7 @@
 
 ## 一、收款登记
 
-浏览器列表 `/finance/receipt`、新建 `/finance/receipt/new`、只读详情 `/finance/receipt/:id?origin=:dataOrigin` 与编辑 `/finance/receipt/form/:id?origin=real` 共用普通收款中央来源（#436）。详情身份只由收款稳定 ID 与来源确定，未填客户的草稿也可读取；`returnTo` 等 query 仅表达来源上下文。编辑由当前真实写权限控制，查看不得复用表单壳。桌面原有 SQLite 适配边界仍按 ADR 0020。
+浏览器列表 `/finance/receipt`、新建 `/finance/receipt/new`、只读详情 `/finance/receipt/:id?origin=:dataOrigin` 与编辑 `/finance/receipt/form/:id?origin=real` 共用普通收款中央来源（#436）。详情身份只由收款稳定 ID 与来源确定，未填客户的草稿也可读取；`returnTo` 等 query 仅表达来源上下文。编辑由当前真实写权限控制，查看不得复用表单壳。
 
 | 分区 | 字段与规则 |
 |---|---|

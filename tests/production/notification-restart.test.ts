@@ -1,6 +1,9 @@
 import { Buffer } from 'node:buffer'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { supplierProductionProcess } from '../helpers/production-supplier-process'
+import { cleanupTestTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it('真实HTTP启动补算到期提醒，登录/失响应/重启保留已读原键，演示源与篡改身份拒绝', async () => {
   const fixture = await supplierProductionProcess()

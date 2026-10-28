@@ -77,6 +77,10 @@ const { store, today, origin, canWrite, sourceError, selectedProjectId, initiali
       </div>
     </section>
 
+    <p v-if="store.contractSourceState === 'unavailable'" class="panel p-3 text-12px text-ink-soft" role="status">
+      {{ store.contractSourceMessage }}
+    </p>
+
     <section v-if="(!initialized || store.loading) && !store.snapshot" class="panel grid min-h-64 gap-3 p-4" role="status" aria-label="正在读取施工排程">
       <span class="sr-only">正在读取施工排程…</span>
       <div class="h-7 w-56 animate-pulse rounded bg-surface-3" />
@@ -118,6 +122,7 @@ const { store, today, origin, canWrite, sourceError, selectedProjectId, initiali
       :readonly="!canWrite"
       :origin="origin ?? undefined"
       :return-context="route.query"
+      :contract-binding-available="store.contractSourceState !== 'unavailable'"
       @select-task="openTask"
       @add-task="addTask"
       @reschedule-task="rescheduleTask"

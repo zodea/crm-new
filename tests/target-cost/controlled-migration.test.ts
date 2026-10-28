@@ -6,7 +6,7 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 import { seedTargetCostMigrationSource } from '../helpers/target-cost-migration-source'
 
@@ -23,7 +23,7 @@ afterEach(async () => {
 })
 
 it.each(['untouched', 'independent-project', 'deleted-independent-project', 'historical-project', 'independent-item', 'receipt'] as const)('恢复预算迁入时保护可解释来源：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const batch = await prepare(await seedTargetCostMigrationSource(db))
     await coreMigrationTestInstance.importBatch({ ...envelope('budget-import'), batchId: batch.batchId }, session)
@@ -66,7 +66,7 @@ it.each(['untouched', 'independent-project', 'deleted-independent-project', 'his
 })
 
 it('项目迁入没有预算图时，日常独立预算仍会阻止项目恢复', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     await seedTargetCostMigrationSource(db)
     await db.execute('DELETE FROM operation_logs')
@@ -88,7 +88,7 @@ it('项目迁入没有预算图时，日常独立预算仍会阻止项目恢复'
 })
 
 it.each(['duplicate-baseline', 'wrong-project', 'orphan-item', 'broken-payload'] as const)('试跑阻断完整预算来源错误：%s', async (kind) => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const source = await seedTargetCostMigrationSource(db)
     const entity = source.entities.target_cost_versions![kind === 'duplicate-baseline' ? 1 : 0]!
@@ -115,7 +115,7 @@ it.each(['duplicate-baseline', 'wrong-project', 'orphan-item', 'broken-payload']
 })
 
 it('正式迁入完整预算版本，空项目/旧空分项名/零/删除历史/缺原件保真，重复确认保日常更正', async () => {
-  const db = await createMemoryDb()
+  const db = await createMigratedMemoryDb()
   try {
     const batch = await prepare(await seedTargetCostMigrationSource(db))
     expect(batch.issues.filter(row => row.metricKey === 'apply-failed')).toEqual([])

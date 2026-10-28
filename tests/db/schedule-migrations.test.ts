@@ -1,7 +1,7 @@
 import type { MigrationDb } from '~/lib/db/migrations'
 import { describe, expect, it } from 'vitest'
 import { migrations, runMigrations } from '~/lib/db/migrations'
-import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, createMigratedMemoryDb, listTables } from '../helpers/memory-db'
 
 const SCHEDULE_MIGRATION_VERSION = 14
 
@@ -162,8 +162,7 @@ async function insertScheduleAncestors(db: MigrationDb): Promise<void> {
 
 describe('施工进度排程数据底座', () => {
   it('冷启动建立排程表、规格列和查询索引', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     expect(await listTables(db)).toEqual(expect.arrayContaining([...SCHEDULE_TABLES]))
     for (const table of SCHEDULE_TABLES) {
@@ -177,8 +176,7 @@ describe('施工进度排程数据底座', () => {
   })
 
   it('排程表的外键与领域关系一致', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
 
     for (const table of SCHEDULE_TABLES) {
       const foreignKeys = await db.select<ForeignKeyDescription>(`
@@ -192,8 +190,7 @@ describe('施工进度排程数据底座', () => {
   })
 
   it('自动进度、人工进度、计划区间、基线和依赖约束拒绝非法状态', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await insertScheduleAncestors(db)
 
     await expect(db.execute(`INSERT INTO schedule_tasks
@@ -238,8 +235,7 @@ describe('施工进度排程数据底座', () => {
   })
 
   it('分项×楼层计划保持唯一范围并拒绝倒排日期', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await insertScheduleAncestors(db)
     await db.execute(`INSERT INTO floors (id, building_id, code, name)
       VALUES ('floor-schedule', 'building-schedule', 'F1', '1层')`)

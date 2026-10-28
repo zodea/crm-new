@@ -1,21 +1,24 @@
 import type { SQLInputValue } from 'node:sqlite'
 import type { QuotationCommand } from '~/lib/material-quotation/contract'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
 import { newQuotationDraft } from '~/lib/material-quotation/contract'
 import { ensureMaterialQuotationSchema } from '~/lib/material-quotation/schema-upgrade'
 import { createQuotationOwner, validateQuotationJournal } from '~/lib/material-quotation/sqlite-owner'
 import { createProductionMaterialQuotationOwner } from '../../server/utils/material-quotation-runtime'
-import { createProductionStorage } from '../../server/utils/production-storage'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const root = resolve('.tmp/a02-material-tests')
+  const root = testTempRoot('a02-material-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'quotation-storage-'))
-  const storage = createProductionStorage({ directory, workspaceId: 'quote-workspace', ownerId: 'quote-actor', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'quote-workspace', ownerId: 'quote-actor', purpose: 'verification' })
   let actor = { workspaceId: 'quote-workspace', actorId: 'quote-actor', capabilities: ['material-quotation:read', 'material-quotation:write', 'project:list:read', 'supplier:list:read'] }
   const session = () => actor
   const owner = createProductionMaterialQuotationOwner(storage)
@@ -200,7 +203,7 @@ describe('native58结构恢复边界', () => {
     }
   })
   it('物理库commit后、版本登记前中断并冷开，历史原件和封存原编号均保全', async () => {
-    const root = resolve('.tmp/a02-material-tests')
+    const root = testTempRoot('a02-material-tests')
     await mkdir(root, { recursive: true })
     const directory = await mkdtemp(join(root, 'quotation-native-cold-'))
     const path = join(directory, 'synthetic-native.sqlite')

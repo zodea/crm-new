@@ -201,8 +201,6 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
           await page.setViewportSize({ width, height: 900 })
           await expectNoPageOverflow(page, `${path} ${width}px`)
         }
-        if (path === '/project')
-          await page.screenshot({ path: testInfo.outputPath('a01-project-status-1440.png') })
       })
     }
     expect(errors).toEqual([])
@@ -294,8 +292,6 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
       await expect(cell(0, 'unit')).toBeFocused()
       await page.keyboard.press('Tab')
       await expect(cell(0, 'qty')).toBeFocused()
-      if (width === 390 || width === 1440)
-        await page.screenshot({ path: testInfo.outputPath(`a02-form-${width}.png`) })
     }
 
     await page.getByLabel('合同名称 *').fill('A02 列粘贴合同')
@@ -444,18 +440,21 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     await expect(page.getByRole('button', { name: '重新加载' })).toBeVisible()
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 列表、详情与宽表无页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/contract/material?search=瓷砖')
-      await expect(page.getByTestId('material-contract-list')).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#318 列表 @ ${width}px`)
-      await page.getByRole('link', { name: '瓷砖采购合同', exact: true }).click()
-      await expect(page.getByTestId('material-contract-detail')).toBeVisible()
-      await expectNoPageOverflow(page, `#318 详情 @ ${width}px`)
-      await page.getByRole('tab', { name: /采购明细/ }).click()
-      await expect(page.getByTestId('material-contract-lines-scroll')).toBeVisible()
-      await expectNoPageOverflow(page, `#318 采购明细 @ ${width}px`)
-    })
-  }
+  test('列表、详情与宽表在各宽度无页面级横滚', async ({ page }) => {
+    const expectNoOverflowAcrossWidths = async (label: string) => {
+      for (const width of RESPONSIVE_WIDTHS) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+        await expectNoPageOverflow(page, `#318 ${label} @ ${width}px`)
+      }
+    }
+    await page.goto('/contract/material?search=瓷砖')
+    await expect(page.getByTestId('material-contract-list')).toBeVisible({ timeout: 20_000 })
+    await expectNoOverflowAcrossWidths('列表')
+    await page.getByRole('link', { name: '瓷砖采购合同', exact: true }).click()
+    await expect(page.getByTestId('material-contract-detail')).toBeVisible()
+    await expectNoOverflowAcrossWidths('详情')
+    await page.getByRole('tab', { name: /采购明细/ }).click()
+    await expect(page.getByTestId('material-contract-lines-scroll')).toBeVisible()
+    await expectNoOverflowAcrossWidths('采购明细')
+  })
 })

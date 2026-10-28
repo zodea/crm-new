@@ -4,18 +4,24 @@ import { scryptSync } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { resolve } from 'node:path'
 import { createApp, createError, createRouter, defineEventHandler, getHeader, getQuery, getRouterParam, readBody, toNodeListener } from 'h3'
-import { expect, it, vi } from 'vitest'
+import { afterAll, expect, it, vi } from 'vitest'
 import middleware from '../../server/middleware/production-access'
 import { loginProductionOwner } from '../../server/utils/production-auth'
 import { productionCustomerRuntime } from '../../server/utils/production-customer-runtime'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
+
+for (const [key, value] of Object.entries({ defineEventHandler, createError, getHeader, getQuery, getRouterParam, readBody })) vi.stubGlobal(key, value)
+// Load the real handlers before timing the HTTP business journey; no HTTP operation is mocked.
+const [{ default: create }, { default: list }, { default: detail }] = await Promise.all([
+  import('../../server/api/commands/process-libraries.post'),
+  import('../../server/api/read/process-libraries.get'),
+  import('../../server/api/read/process-libraries/[id].get'),
+])
 
 async function fixture() {
-  for (const [key, value] of Object.entries({ defineEventHandler, createError, getHeader, getQuery, getRouterParam, readBody })) vi.stubGlobal(key, value)
-  const create = (await import('../../server/api/commands/process-libraries.post')).default
-  const list = (await import('../../server/api/read/process-libraries.get')).default
-  const detail = (await import('../../server/api/read/process-libraries/[id].get')).default
   const router = createRouter()
   const app = createApp({ debug: false }).use(middleware)
   router.post('/api/auth/login', defineEventHandler(async event => loginProductionOwner(event, await readBody(event))))
@@ -26,7 +32,7 @@ async function fixture() {
   const server = createServer(toNodeListener(app)).listen(0, '127.0.0.1')
   await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  const base = resolve('.codex-tmp/issue-463-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-463-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/http-`)
   const code = 'process-library-synthetic-access'
@@ -62,11 +68,15 @@ it('正式公开工序库保存完整版本且同键重复不升号，旧版本�
     const result = await saved.json()
     expect(result).toMatchObject({ commandId: command.commandId, version: 1, sourceVersion: '1' })
     const original = await (await f.request(`/api/read/process-libraries/${result.id}?origin=real`)).json()
-    expect(original).toMatchObject({ id: result.id, createdBy: 'library-owner', version: 1, usageCount: null, tasks: [{ key: 'later', predecessorKey: 'first', predecessorDisabled: true, itemCodes: ['I2'] }, { key: 'first', predecessorKey: null }] })
+    expect(original).toMatchObject({ id: result.id, createdBy: 'library-owner', version: 1, usageCount: 0, usageProjects: [], tasks: [{ key: 'later', predecessorKey: 'first', predecessorDisabled: true, itemCodes: ['I2'] }, { key: 'first', predecessorKey: null }] })
+    const [stored] = await productionCustomerRuntime()!.storage.select<{ snapshot_json: string }>('SELECT snapshot_json FROM process_library_versions WHERE id=?', [result.id])
+    expect(JSON.parse(stored!.snapshot_json)).toMatchObject({ usageCount: null })
+    expect(JSON.parse(stored!.snapshot_json)).not.toHaveProperty('usageProjects')
     expect(await (await f.request('/api/commands/process-libraries', command)).json()).toEqual(result)
     const newer = await f.request('/api/commands/process-libraries', { ...command, commandId: 'library-create-second', baseVersion: 1, sourceVersion: '1', draft: { ...command.draft, sourceLibraryId: result.id, name: '第二版名称' } })
     expect(await newer.json()).toMatchObject({ version: 2 })
     expect(await (await f.request(`/api/read/process-libraries/${result.id}?origin=real`)).json()).toEqual(original)
+    expect(await productionCustomerRuntime()!.storage.select('SELECT snapshot_json FROM process_library_versions WHERE id=?', [result.id])).toEqual([stored])
     expect(await (await f.request('/api/read/process-libraries?origin=real')).json()).toMatchObject({ seriesVersions: { LIB: 2 }, sourceVersion: '2' })
   }
   finally { await f.close() }

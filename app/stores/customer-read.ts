@@ -3,8 +3,6 @@ import type {
   CustomerDetailReadDTO,
   CustomerListPageDTO,
   CustomerListQueryDTO,
-  CustomerReceiptDetailQueryDTO,
-  CustomerReceiptDetailReadDTO,
 } from '~/lib/customer/repository'
 import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
@@ -23,32 +21,21 @@ function sameDetailQuery(left: CustomerDetailQueryDTO | null, right: CustomerDet
     && left.includeDemo === right.includeDemo
 }
 
-function sameReceiptQuery(left: CustomerReceiptDetailQueryDTO | null, right: CustomerReceiptDetailQueryDTO): boolean {
-  return sameDetailQuery(left, right)
-    && left?.customerId === right.customerId
-}
-
 export const useCustomerReadStore = defineStore('customer-read', () => {
   const repository = useNuxtApp().$repositories.customerRead
   const listState = shallowRef<ReadState<CustomerListPageDTO>>({ kind: 'idle' })
   const detailState = shallowRef<ReadState<CustomerDetailReadDTO>>({ kind: 'idle' })
-  const receiptState = shallowRef<ReadState<CustomerReceiptDetailReadDTO>>({ kind: 'idle' })
   const listQuery = shallowRef<CustomerListQueryDTO | null>(null)
   const detailQuery = shallowRef<CustomerDetailQueryDTO | null>(null)
-  const receiptQuery = shallowRef<CustomerReceiptDetailQueryDTO | null>(null)
   let latestList = 0
   let latestDetail = 0
-  let latestReceipt = 0
   bindReadAuthority((problem) => {
     latestList++
     latestDetail++
-    latestReceipt++
     listQuery.value = null
     detailQuery.value = null
-    receiptQuery.value = null
     listState.value = readFailureState<CustomerListPageDTO>(problem, null)
     detailState.value = readFailureState<CustomerDetailReadDTO>(problem, null)
-    receiptState.value = readFailureState<CustomerReceiptDetailReadDTO>(problem, null)
   })
 
   async function loadList(query: CustomerListQueryDTO) {
@@ -86,31 +73,12 @@ export const useCustomerReadStore = defineStore('customer-read', () => {
     }
   }
 
-  async function loadReceipt(query: CustomerReceiptDetailQueryDTO) {
-    const request = ++latestReceipt
-    const prior = sameReceiptQuery(receiptQuery.value, query) ? previous(receiptState.value) : null
-    receiptQuery.value = { ...query }
-    receiptState.value = { kind: 'loading', previous: prior }
-    try {
-      const detail = await repository.getReceipt(query)
-      if (request === latestReceipt)
-        receiptState.value = { kind: 'ready', data: detail }
-    }
-    catch (cause) {
-      if (request === latestReceipt)
-        receiptState.value = failureState(cause, prior)
-    }
-  }
-
   return {
     listState: shallowReadonly(listState),
     detailState: shallowReadonly(detailState),
-    receiptState: shallowReadonly(receiptState),
     listQuery: shallowReadonly(listQuery),
     detailQuery: shallowReadonly(detailQuery),
-    receiptQuery: shallowReadonly(receiptQuery),
     loadList,
     loadDetail,
-    loadReceipt,
   }
 })

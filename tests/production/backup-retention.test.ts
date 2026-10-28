@@ -1,13 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { join } from 'node:path'
+import { afterAll, expect, it } from 'vitest'
 import { createLocalBackup } from '../../server/utils/production-backup-package'
 import { pruneProductionBackups } from '../../server/utils/production-backup-retention'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it.each(Array.from([0, 1, 3]).map(input1 => ({ input1 })))('只清理有成功回执且完整的到期包，保留最后成功/基线及混入未知文件的包：输入案例 %#', async ({ input1: index }) => {
-  const base = resolve('.codex-tmp/issue-451-tests')
+  const base = testTempRoot('legacy-test-artifacts/issue-451-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/retention-`)
   const source = join(directory, 'source')

@@ -1,3 +1,4 @@
+import type { Database } from 'sql.js'
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollProjectGraph } from '../../app/lib/migration/payroll-source'
 import type { PayrollAFrozenDocument } from '../../app/lib/payroll/central-a-contract'
@@ -59,14 +60,13 @@ export interface PayrollMigratedProof {
 }
 const empty = (): PayrollMigratedProof => ({ numbering: emptyPayrollNumberingProof(), hollow: emptyPayrollHollowSourceProof(), negativeLineRevisions: new Map(), aDocuments: new Map(), c1Documents: new Map(), c2Documents: new Map(), originals: new Map(), records: new Map(), draftBases: new Map(), facts: new Map(), snapshots: new Map(), releasedApplications: new Map() })
 let runtime: ReturnType<typeof initSqlJs> | undefined
+// 空结构只取决于迁移与工资结构代码；同进程复用其字节，避免每次核验重放全部 ALTER。
+let schemaBytes: Promise<Uint8Array> | undefined
 const sourceProofs = new Map<string, Promise<PayrollMigratedProof>>()
 const key = (table: string, id: unknown) => JSON.stringify([table, id])
 
-/** 原 JSON 在原身份空间内验证；临时库只存在内存，不能写回正式事实。 */
-export async function withPayrollMigratedSource<T>(graph: PayrollProjectGraph, work: (tx: TransactionDb) => Promise<T>): Promise<T> {
-  runtime ??= initSqlJs({ locateFile: () => createRequire(import.meta.url).resolve('sql.js/dist/sql-wasm.wasm') })
-  const db = new (await runtime).Database()
-  const tx: TransactionDb = {
+function driverFor(db: Database): TransactionDb {
+  return {
     async execute(sql, params = []) { db.run(sql, params as never[]) },
     async select<T>(sql: string, params: unknown[] = []): Promise<T[]> {
       const statement = db.prepare(sql)
@@ -79,9 +79,30 @@ export async function withPayrollMigratedSource<T>(graph: PayrollProjectGraph, w
       finally { statement.free() }
     },
   }
+}
+
+/** 原 JSON 在原身份空间内验证；临时库只存在内存，不能写回正式事实。 */
+export async function withPayrollMigratedSource<T>(graph: PayrollProjectGraph, work: (tx: TransactionDb) => Promise<T>): Promise<T> {
+  runtime ??= initSqlJs({ locateFile: () => createRequire(import.meta.url).resolve('sql.js/dist/sql-wasm.wasm') })
+  const SQL = await runtime
+  if (!schemaBytes) {
+    schemaBytes = (async () => {
+      const template = new SQL.Database()
+      try {
+        const tx = driverFor(template)
+        await runMigrations(tx)
+        await initializePayrollSchema(tx)
+        return template.export()
+      }
+      finally { template.close() }
+    })()
+    void schemaBytes.catch(() => {
+      schemaBytes = undefined
+    })
+  }
+  const db = new SQL.Database(await schemaBytes)
+  const tx = driverFor(db)
   try {
-    await runMigrations(tx)
-    await initializePayrollSchema(tx)
     await tx.execute('PRAGMA foreign_keys=OFF')
     if (graph.deductions) {
       // 仅装载所携带的真实原件闭包；这份内存容器不产生任何业务成功凭据。

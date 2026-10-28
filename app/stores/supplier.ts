@@ -1,43 +1,19 @@
-import type { ConfirmImpact } from '~/lib/kit/confirm'
-import type {
-  FormAttachmentChanges,
-  MasterDataSaveAction,
-  SupplierFormDraft,
-} from '~/lib/master-data/forms'
 import type { SupplierCredentialRequirementFact, SupplierCredentialStatusFact } from '~/lib/supplier/credentials'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { effectiveExpenditureSupplementAmountSql, INEFFECTIVE_EXPENDITURE_CONTRACT_SQL_VALUES } from '~/lib/contract/effective-status'
-import { db } from '~/lib/db/client'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
-  downstreamImpact as downstreamImpactCounts,
   hiddenCtesFor,
   selectVisibleSql,
   visibleCond,
 } from '~/lib/db/soft-delete'
-import {
-  listFormAttachments,
-  loadSupplierForm,
-  saveSupplierForm,
-} from '~/lib/master-data/forms'
+
 import { writeSupplierAudit } from '~/lib/supplier/audit'
 import { shanghaiBusinessDate, storedSupplierCredentialStatus } from '~/lib/supplier/credentials'
-import { withSupplierImportCreateDefaults } from '~/lib/supplier/import'
-import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 import { toNum } from '~/lib/util/number'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
-
-// 子表中文标签（PARENT_REFS 无展示名，这是唯一需本地保留的信息；缺省回退表名；对称 stores/project.ts）。
-const TABLE_LABELS: Record<string, string> = {
-  invoices: '发票',
-  supplier_credentials: '证照',
-  project_suppliers: '合作项目关系',
-  expenditure_contracts: '支出合同',
-  contracts: '合同',
-  payment_applications: '请款单',
-}
 
 export interface Supplier {
   id: string
@@ -148,10 +124,6 @@ const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
 /** 登记键序（单次求值）：列名清单与绑定值清单都按同一序派生，保证 SQL 占位符与实参一一对齐。 */
 const SUPPLIER_COLUMN_KEYS = Object.keys(SUPPLIER_COLUMNS) as (keyof SupplierData)[]
 const SUPPLIER_COLS = SUPPLIER_COLUMN_KEYS.map(k => SUPPLIER_COLUMNS[k].col)
-
-/** 写路径共用 SQL（add 的 INSERT、update 的 SET 均由登记表派生，杜绝列漂移）。 */
-const INSERT_SQL = `INSERT INTO suppliers (id, ${SUPPLIER_COLS.join(', ')}, created_at, updated_at)
-       VALUES (?, ${SUPPLIER_COLS.map(() => '?').join(', ')}, ?, ?)`
 const UPDATE_SQL = `UPDATE suppliers SET ${SUPPLIER_COLS.map(c => `${c}=?`).join(', ')}, updated_at=? WHERE id=?`
 
 /** 写路径唯一绑定源：按登记键序产出各列 SQL 实参（aliases → JSON、registered_capital 允许 null 等特殊取值都收在登记表里）。 */
@@ -288,50 +260,6 @@ export const useSupplierStore = defineStore('supplier', () => {
     return list.value.find(s => s.id === id)
   }
 
-  async function add(data: Partial<Supplier>, sourceCategory = 'store') {
-    const id = generateId('sup')
-    const now = new Date().toISOString()
-    const safeData: Partial<Supplier> = {
-      ...data,
-      credentialStatus: 'incomplete',
-      credentialReviewedAt: null,
-      credentialReviewNote: '',
-    }
-    await withTransaction(async (tx) => {
-      await tx.execute(INSERT_SQL, [id, ...supplierToBindings(safeData), now, now])
-      await writeSupplierAudit(tx, {
-        supplierId: id,
-        action: 'create',
-        outcome: 'created',
-        sourceCategory,
-        changedFields: SUPPLIER_COLS.filter(column =>
-          !['credential_status', 'credential_reviewed_at', 'credential_review_note'].includes(column),
-        ),
-        createdAt: now,
-      })
-    })
-    await load()
-    return id
-  }
-
-  /** ADR 0005 导入唯一写路径：有外部旧 ID 时更新既有记录，否则新增。 */
-  async function upsertImported(data: Partial<Supplier>) {
-    const externalRef = data.externalRef?.trim() ?? ''
-    if (!externalRef)
-      return add(withSupplierImportCreateDefaults(data), 'import')
-
-    const [row] = await select<Record<string, unknown>>(
-      selectVisibleSql('suppliers', 'AND external_ref = ? LIMIT 1'),
-      [externalRef],
-    )
-    if (!row)
-      return add(withSupplierImportCreateDefaults({ ...data, externalRef }), 'import')
-
-    const existing = rowToSupplier(row)
-    await update(existing.id, { ...existing, ...data, externalRef }, 'import')
-    return existing.id
-  }
-
   /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
   async function update(id: string, data: Partial<Supplier>, sourceCategory = 'store') {
     const now = new Date().toISOString()
@@ -375,119 +303,6 @@ export const useSupplierStore = defineStore('supplier', () => {
     return auditId
   }
 
-  async function saveForm(
-    draft: SupplierFormDraft,
-    action: MasterDataSaveAction,
-    attachments?: FormAttachmentChanges,
-  ) {
-    const result = await saveSupplierForm(draft, action, attachments)
-    await load()
-    return result
-  }
-
-  /**
-   * 删除前统计各下游子表在「应用可见集」中的未删记录，返回 cascade 杀伤清单（ADR 0003）。
-   */
-  async function downstreamImpact(id: string): Promise<ConfirmImpact[]> {
-    const counts = await downstreamImpactCounts(db, 'suppliers', id)
-    return counts
-      .map(c => ({ label: TABLE_LABELS[c.table] ?? c.table, n: c.n }))
-  }
-
-  async function remove(id: string) {
-    const auditId = await withTransaction(async (tx) => {
-      const [supplier] = await tx.select<{ deleted_at: string | null }>(
-        'SELECT deleted_at FROM suppliers WHERE id = ?',
-        [id],
-      )
-      if (!supplier || supplier.deleted_at != null)
-        return null
-      const now = new Date().toISOString()
-      await tx.execute(
-        'UPDATE suppliers SET deleted_at = ?, updated_at = ? WHERE id = ?',
-        [now, now, id],
-      )
-      return writeSupplierAudit(tx, {
-        supplierId: id,
-        action: 'delete',
-        outcome: 'deleted',
-        sourceCategory: 'store',
-        changedFields: ['deleted_at'],
-        createdAt: now,
-      })
-    })
-    await load()
-    return auditId
-  }
-
-  async function restore(id: string) {
-    const auditId = await withTransaction(async (tx) => {
-      const [supplier] = await tx.select<{ deleted_at: string | null }>(
-        'SELECT deleted_at FROM suppliers WHERE id = ?',
-        [id],
-      )
-      if (!supplier || supplier.deleted_at == null)
-        return null
-      const now = new Date().toISOString()
-      await tx.execute(
-        'UPDATE suppliers SET deleted_at = NULL, updated_at = ? WHERE id = ?',
-        [now, id],
-      )
-      return writeSupplierAudit(tx, {
-        supplierId: id,
-        action: 'restore',
-        outcome: 'restored',
-        sourceCategory: 'store',
-        changedFields: ['deleted_at'],
-        createdAt: now,
-      })
-    })
-    await load()
-    return auditId
-  }
-
-  async function undo(auditId: string) {
-    const changed = await withTransaction(async (tx) => {
-      const [audit] = await tx.select<{
-        supplier_id: string
-        action: 'delete' | 'restore' | string
-      }>(
-        `SELECT supplier_id, action FROM supplier_audits WHERE id = ?`,
-        [auditId],
-      )
-      if (!audit || !['delete', 'restore'].includes(audit.action))
-        return false
-      const [supplier] = await tx.select<{ deleted_at: string | null }>(
-        'SELECT deleted_at FROM suppliers WHERE id = ?',
-        [audit.supplier_id],
-      )
-      if (!supplier)
-        return false
-      const undoDelete = audit.action === 'delete'
-      if ((undoDelete && supplier.deleted_at == null)
-        || (!undoDelete && supplier.deleted_at != null)) {
-        return false
-      }
-      const now = new Date().toISOString()
-      await tx.execute(
-        `UPDATE suppliers SET deleted_at = ?, updated_at = ? WHERE id = ?`,
-        [undoDelete ? null : now, now, audit.supplier_id],
-      )
-      await writeSupplierAudit(tx, {
-        supplierId: audit.supplier_id,
-        action: undoDelete ? 'restore' : 'delete',
-        outcome: undoDelete ? 'undo_delete' : 'undo_restore',
-        sourceCategory: 'undo',
-        changedFields: ['deleted_at'],
-        createdAt: now,
-      })
-      return true
-    })
-    if (changed)
-      await load()
-    return changed
-  }
-
   return {
     list: readonly(list),
     listStats: readonly(listStats),
@@ -495,15 +310,6 @@ export const useSupplierStore = defineStore('supplier', () => {
     loading: readonly(loading),
     load,
     byId,
-    add,
     update,
-    upsertImported,
-    saveForm,
-    loadForm: loadSupplierForm,
-    loadFormAttachments: (id: string) => listFormAttachments('supplier', id),
-    remove,
-    restore,
-    undo,
-    downstreamImpact,
   }
 })

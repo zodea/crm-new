@@ -8,6 +8,7 @@ import type { QuantityCompletionDraft } from './completion'
 import type { QuantityReadAdapter } from './read-adapter'
 import type { QuantityRegionNodeDraft, QuantityRegionUnitDraft } from './region'
 import type { QuantityTemplateDraft } from './template'
+import type { QuantityWorkspaceDependencies } from './workspace-state'
 import { computed, readonly, shallowRef } from 'vue'
 import { toErrorMessage } from '../util/error'
 import { quantityProblem } from './central-contract'
@@ -20,14 +21,15 @@ export function createQuantityBrowserState(dependencies: {
   execute: (command: QuantityCommand) => Promise<QuantityCommandResult>
   catalog: () => Promise<QuantityProjectChoice[]>
   includeDemo: () => boolean
+  recovery?: (surface: string) => NonNullable<QuantityWorkspaceDependencies<{ projectId: string }, QuantityReadQuery, QuantityCommand['action']>['recovery']>
 }) {
   const common = { context: dependencies.context, execute: dependencies.execute }
-  const matrix = createQuantityWorkspaceState({ ...common, read: dependencies.reads.workspace })
-  const templates = createQuantityWorkspaceState({ ...common, read: dependencies.reads.templates })
-  const region = createQuantityWorkspaceState({ ...common, read: dependencies.reads.region })
-  const assignments = createQuantityWorkspaceState({ ...common, read: dependencies.reads.assignments })
-  const completion = createQuantityWorkspaceState({ ...common, read: dependencies.reads.completion })
-  const batch = createQuantityWorkspaceState({ ...common, read: dependencies.reads.batchPlan })
+  const matrix = createQuantityWorkspaceState({ ...common, recovery: dependencies.recovery?.('matrix'), read: dependencies.reads.workspace })
+  const templates = createQuantityWorkspaceState({ ...common, recovery: dependencies.recovery?.('templates'), read: dependencies.reads.templates })
+  const region = createQuantityWorkspaceState({ ...common, recovery: dependencies.recovery?.('region'), read: dependencies.reads.region })
+  const assignments = createQuantityWorkspaceState({ ...common, recovery: dependencies.recovery?.('assignments'), read: dependencies.reads.assignments })
+  const completion = createQuantityWorkspaceState({ ...common, recovery: dependencies.recovery?.('completion'), read: dependencies.reads.completion })
+  const batch = createQuantityWorkspaceState({ ...common, recovery: dependencies.recovery?.('batch'), read: dependencies.reads.batchPlan })
   const catalog = shallowRef<QuantityProjectChoice[]>([])
   const catalogLoading = shallowRef(false)
   const catalogError = shallowRef('')
@@ -184,6 +186,7 @@ export function createQuantityBrowserState(dependencies: {
     if (!result.batch)
       throw quantityProblem('internal-error', '批量完成结果不完整，请重新读取确认')
     try {
+      await batch.load({ ...query(draft.projectId, batch.scope.value!.origin), trade: draft.trade, unitIds: draft.items.map(item => item.unitId) })
       await reloadMatrix(draft.projectId, batch.scope.value!.origin)
     }
     catch (cause) { completionNotice.value = `批量完成已保存，但刷新失败：${toErrorMessage(cause)}` }
@@ -202,6 +205,18 @@ export function createQuantityBrowserState(dependencies: {
       state.cancel()
   }
   return {
+    pendingMatrix: matrix.pendingOperations,
+    recoverMatrix: matrix.recover,
+    pendingTemplates: templates.pendingOperations,
+    recoverTemplates: templates.recover,
+    pendingRegion: region.pendingOperations,
+    recoverRegion: region.recover,
+    pendingAssignments: assignments.pendingOperations,
+    recoverAssignments: assignments.recover,
+    pendingCompletion: completion.pendingOperations,
+    recoverCompletion: completion.recover,
+    pendingBatch: batch.pendingOperations,
+    recoverBatch: batch.recover,
     catalog: readonly(catalog),
     snapshot,
     stageProgress,

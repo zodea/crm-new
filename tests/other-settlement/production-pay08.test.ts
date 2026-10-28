@@ -1,22 +1,25 @@
 import type { FinanceCommand } from '../../app/lib/finance/central-contract'
 import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { join } from 'node:path'
+import { afterAll, expect, it } from 'vitest'
 import { FINANCE_FAMILIES } from '../../app/lib/finance/central-contract'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementMigration } from '../../server/utils/production-other-settlement-migration'
 import { createProductionOtherSettlementService, listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
-import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { createOtherSettlementPay08Source } from '../helpers/other-settlement-pay08-source'
+import { createSeededProductionStorage } from '../helpers/production-storage-seed'
+import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 async function fixture() {
-  const root = resolve('.tmp/a02-material-tests')
+  const root = testTempRoot('a02-material-tests')
   await mkdir(root, { recursive: true })
   const directory = await mkdtemp(join(root, 'other-pay08-'))
   const native = await createOtherSettlementPay08Source(join(directory, 'native-source'))
-  const storage = createProductionStorage({ directory, workspaceId: 'other-pay08-workspace', ownerId: 'other-pay08-owner', purpose: 'verification' })
+  const storage = await createSeededProductionStorage({ directory, workspaceId: 'other-pay08-workspace', ownerId: 'other-pay08-owner', purpose: 'verification' })
   const actor = { workspaceId: 'other-pay08-workspace', actorId: 'other-pay08-owner', capabilities: ['other-settlement:read', 'other-settlement:write', 'supplier:list:read', 'supplier:write', 'core:migration:write', ...Object.values(FINANCE_FAMILIES).flatMap(family => [`${family}:read`, `${family}:write`])] }
   const session = () => structuredClone(actor)
   const supplierOwner = createProductionSupplierService(storage)
@@ -95,7 +98,7 @@ it('核验权限与依据原件归属严格校验，实际原費版本改变不�
     expect(await f.storage.select('SELECT * FROM finance_payment_verifications')).toEqual(before)
     await f.finance.execute(await f.verifyRequest('pay08-before-source-change'), f.session)
     // Independent records move both owner revisions without changing the frozen source records.
-    await f.finance.execute({ workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, kind: 'reimbursement', requiredCapability: 'finance-reimbursement:write', baseVersion: null, commandId: 'pay08-unrelated-finance-record', action: 'draft', attachments: {}, draft: { applicantSupplierId: f.payeeId, reimbursementDate: '2026-10-05', status: 'draft', lines: [{ expenseItem: '另一条未确认费用', counterpartySupplierId: f.payeeId, amount: 0 }] } }, f.session)
+    await f.finance.execute({ workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, kind: 'current', requiredCapability: 'finance-current:write', baseVersion: null, commandId: 'pay08-unrelated-finance-record', action: 'draft', attachments: {}, draft: { direction: 'payment', supplierId: f.payeeId, transactionDate: '2026-10-05', status: 'draft', amount: 0, purpose: '另一条未确认往来' } }, f.session)
     const original = (await f.owner.expenses(f.session)).items.find(row => row.id === f.native.ids.expenseLine)!
     await f.owner.execute({ workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'other-settlement:write', baseVersion: null, commandId: 'pay08-unrelated-settlement-record', action: 'draft', attachments: {}, draft: { name: '另一条未确认结算', projectId: null, contractId: null, totalAmount: 0, taxRate: null, settlementDate: '2026-10-05', originalExpenses: [{ originalExpenseLineId: original.id, sourceVersion: original.version, sourceRevision: original.sourceRevision, amount: 0 }] } }, f.session)
     expect((await f.finance.form('payment_application', f.native.ids.application, f.session)).draft.paymentVerification).toMatchObject({ required: true, status: 'verified', proof: { actualDueAmount: 70, cumulativePayableAmount: 70 } })

@@ -1,4 +1,5 @@
-import type { MaterialContractFormReadDTO } from '~/lib/material-contract/command-contract'
+import type { ConstructionMainSelection } from '~/lib/construction-scope/contract'
+import type { MaterialContractCommandContextDTO, MaterialContractFormReadDTO } from '~/lib/material-contract/command-contract'
 import { defineStore } from 'pinia'
 import { createContractCommandActions } from '~/lib/contract/command-session'
 import { MATERIAL_CONTRACT_WRITE_CAPABILITY } from '~/lib/material-contract/command-contract'
@@ -11,7 +12,7 @@ export class MaterialContractCommandConflictError extends Error {
   }
 }
 
-export const useMaterialContractCommandStore = defineStore('material-contract-command', () => createContractCommandActions({
+export const useMaterialContractCommandStore = defineStore('material-contract-command', () => createContractCommandActions<MaterialContractCommandContextDTO, typeof MATERIAL_CONTRACT_WRITE_CAPABILITY, { constructionMain?: ConstructionMainSelection }, MaterialContractFormReadDTO>({
   repository: () => useNuxtApp().$repositories.materialContractCommands,
   capability: MATERIAL_CONTRACT_WRITE_CAPABILITY,
   problemFromUnknown: materialContractProblemFromUnknown,

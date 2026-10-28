@@ -1,9 +1,12 @@
 import { Buffer } from 'node:buffer'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { decodeSupplierDetailRead, decodeSupplierListPage } from '../../app/lib/supplier/read-decoder'
 import { supplierProductionProcess } from '../helpers/production-supplier-process'
+import { cleanupTestTempRoot } from '../helpers/test-temp-root'
+
+afterAll(cleanupTestTempRoot)
 
 it('真实公开服务重启后恢复原件、OCR候选/人工值及失响应原键，回滚/撤权/跨来源仍拒绝', async () => {
   const f = await supplierProductionProcess()

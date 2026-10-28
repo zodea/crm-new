@@ -202,6 +202,7 @@ useTabTitle(() => '施工阶段配置')
 </script>
 
 <template>
+  <QuantityCommandRecovery surface="stages" :project-id="projectId" />
   <EntityFormShell data-testid="quantity-stage-form" title="施工阶段配置" subtitle="先建立项目阶段与分项关系，再明确月度报量采用的阶段。" back-label="返回工程量矩阵" :sections="[{ key: 'stage', label: '阶段信息' }, { key: 'items', label: '关联分项' }, { key: 'reporting', label: '月度报量' }]" :state="shellState" state-title="阶段配置暂不可用" :state-description="errorMessage" state-action-label="重新读取" @back="router.push(returnPath)" @state-action="reload">
     <template #status>
       <span class="chip-brand">{{ origin === 'demo' ? '演示来源' : '正式项目' }}</span>
