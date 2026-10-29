@@ -686,11 +686,13 @@ it('既有v14主档升级后只读虚拟列保原JSON、删除事实、未知扩
     { id: 'deleted-original-worker', deletedAt: timestamp, version: 1, updatedAt: timestamp, draft: { id: 'deleted-original-worker', name: '已删除原身份', dailyWage: 200, crewId: null } },
   ]
   try {
+    raw.exec('BEGIN')
     raw.exec(PRODUCTION_STORAGE_SCHEMA)
     for (const step of PRODUCTION_STORAGE_UPGRADES.filter(step => step.to <= 14)) raw.exec(step.sql)
     raw.prepare('INSERT INTO production_metadata VALUES(1,14,?,?,?,?)').run('projection-workspace', 'projection-owner', 'verification', timestamp)
     for (const record of records)
       raw.prepare('INSERT INTO workers(id,record_json) VALUES(?,?)').run(record.id, JSON.stringify(record))
+    raw.exec('COMMIT')
   }
   finally { raw.close() }
   const options = { directory, workspaceId: 'projection-workspace', ownerId: 'projection-owner', purpose: 'verification' as const }
