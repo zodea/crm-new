@@ -28,6 +28,9 @@ process.argv.forEach((arg, index, all) => {
   }
 })
 const productionOnly = selectedProjects.length > 0 && selectedProjects.every(name => name === 'production')
+const activeCentralServers = selectedProjects.length === 0
+  ? centralServers
+  : centralServers.filter((_, group) => selectedProjects.includes(group ? 'chromium-b' : 'chromium'))
 
 export default defineConfig({
   testDir: './e2e',
@@ -64,7 +67,7 @@ export default defineConfig({
   ],
   webServer: externalBaseURL || productionOnly
     ? undefined
-    : centralServers.map(server => ({
+    : activeCentralServers.map(server => ({
         command: `node ./node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port ${server.port}`,
         env: {
           NUXT_DEVTOOLS: 'false',
