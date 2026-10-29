@@ -201,6 +201,7 @@ describe('design coverage contract', () => {
     ['/finance/payment/:id/detail', 'payApplyDetail', 'isPayApplyDetail', 'PayApplyDetailScreen', 'PayApplyDetailScreen.jsx'],
     ['/settings/data-migration', 'dataMigration', 'isDataMigration', 'DataMigrationScreen', 'DataMigrationScreen.jsx'],
     ['/subcontract/quantity/stages', 'quantityStages', 'isQuantityStages', 'QuantityStagesScreen', 'QuantityStagesScreen.jsx'],
+    ['/subcontract/quantity/import', 'quantityImport', 'isQuantityImport', 'QuantityImportScreen', 'QuantityImportScreen.jsx'],
     ['/schedule/process-library/:id', 'processLibraryDetail', 'isProcessLibraryDetail', 'ScheduleProcessLibraryDetailScreen', 'ScheduleProcessLibraryDetailScreen.jsx'],
   ])('maps %s to its registered and mounted design screen', (appRoute, route, flag, global, file) => {
     const html = readFileSync(DESIGN_HTML_PATH, 'utf8')

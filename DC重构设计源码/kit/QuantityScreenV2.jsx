@@ -350,6 +350,7 @@
                 "</div>",
             })} />
             <Button size="sm" icon="list-tree" onClick={() => navigate("quantityStages")}>阶段配置</Button>
+            <Button size="sm" onClick={() => navigate("quantityImport")}>原库接管</Button>
             <Button size="sm" icon="table-2" onClick={() => setVariance(true)}>量差总表</Button>
             <Button size="sm" icon="download" onClick={() => UI().toast("正在导出工程量 Excel…")}>导出</Button>
             <Button size="sm" variant="primary" icon="clipboard-list" onClick={() => navigate("boqList", { project: "合和新城", contract: "合和七期户内合同版-清单" })}>工程量清单</Button>

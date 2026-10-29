@@ -384,6 +384,9 @@
       <sc-if value="{{ isDataMigration }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="DataMigrationScreen" from="./kit/DataMigrationScreen.jsx" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
       </sc-if>
+      <sc-if value="{{ isQuantityImport }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="QuantityImportScreen" from="./kit/QuantityImportScreen.jsx" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
       <sc-if value="{{ isPayApplyDetail }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="PayApplyDetailScreen" from="./kit/PayApplyDetailScreen.jsx" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
       </sc-if>
@@ -500,6 +503,7 @@ const PAGE = {
   hollowDetail: { title: "空鼓检查与整改", subtitle: "工程量 · 原户检查 · 追加整改销记" },
   hollowForm: { title: "空鼓检查", subtitle: "工程量 · 记录/修订原户检查 · 保留原记录" },
   quantityStages: { title: "施工阶段配置", subtitle: "" },
+  quantityImport: { title: "工程量原库接管", subtitle: "" },
   processLibraryDetail: { title: "工序库版本详情", subtitle: "" },
   payApplyDetail: { title: "付款申请详情", subtitle: "" },
   dataMigration: { title: "本地数据迁移", subtitle: "" },
@@ -773,7 +777,7 @@ class Component extends DCLogic {
     if (key === "ourSignatories") return r === "ourSignatory" || r === "ourSignatoryForm";
     if (key === "daywork") return r === "daywork" || r === "dayworkForm";
     if (key === "otherSettle") return r === "otherSettle" || r === "otherSettleImport";
-    if (key === "quantity") return ["quantity", "quantityUnit", "quantityStages", "hollowDetail", "hollowForm"].includes(r);
+    if (key === "quantity") return ["quantity", "quantityUnit", "quantityStages", "quantityImport", "hollowDetail", "hollowForm"].includes(r);
     if (key === "payApply") return r === "payApply" || r === "payApplyDetail";
     if (key === "crew") return r === "crew" || r === "crewDetail";
     if (key === "supplier") return r === "supplier" || r === "supplierDetail";
@@ -938,7 +942,7 @@ class Component extends DCLogic {
       sideW:           collapsed ? 68 : 248,
       workspaceClass: "dc-workspace" + (collapsed ? " is-collapsed" : ""),
       menuToggle: React.createElement("button", {type:"button",className:"dc-menu-toggle",onClick:()=>this.mobileNav && this.mobileNav.showModal(), "aria-label":"打开导航"}, "☰"),
-      statePreview: (["dataMigration", "payApplyDetail", "processLibraryDetail", "quantityStages", "daywork"].includes(route) || PREVIEW_ROUTES.includes(route) || formPage) ? React.createElement("label", {style:{fontSize:12,display:"flex",alignItems:"center",gap:4}}, "设计状态", React.createElement("select", {className:"dc-state-select", "aria-label":"设计状态",value:params.previewState || "ready", onChange:e=>this.setState({params:{...params,previewState:e.target.value}})}, ...[["ready","正常"],["empty","空"],["loading","加载"],["error","错误"],["readonly","只读"],["pending","结果未知"]].map(([value,label])=>React.createElement("option",{key:value,value},label)))) : null,
+      statePreview: (["dataMigration", "quantityImport", "payApplyDetail", "processLibraryDetail", "quantityStages", "daywork"].includes(route) || PREVIEW_ROUTES.includes(route) || formPage) ? React.createElement("label", {style:{fontSize:12,display:"flex",alignItems:"center",gap:4}}, "设计状态", React.createElement("select", {className:"dc-state-select", "aria-label":"设计状态",value:params.previewState || "ready", onChange:e=>this.setState({params:{...params,previewState:e.target.value}})}, ...[["ready","正常"],["empty","空"],["loading","加载"],["error","错误"],["readonly","只读"],["pending","结果未知"]].map(([value,label])=>React.createElement("option",{key:value,value},label)))) : null,
       pageTitle:       page.title,
       pageSubtitle:    page.subtitle,
       isHome:          route === "home",
@@ -1011,6 +1015,7 @@ class Component extends DCLogic {
       isImportMapping:         route === "importMapping",
       isProjectSupplierImport: route === "projectSupplierImport",
       isDataMigration: route === "dataMigration",
+      isQuantityImport: route === "quantityImport",
       isPayApplyDetail: route === "payApplyDetail",
       isProcessLibraryDetail: route === "processLibraryDetail",
       isQuantityStages: route === "quantityStages",

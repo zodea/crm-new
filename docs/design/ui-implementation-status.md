@@ -91,42 +91,35 @@
 <!-- design-coverage:begin -->
 | 口径 | 数量 |
 | --- | ---: |
-| 设计稿 PAGE 路由 | 97 |
+| 设计稿 PAGE 路由 | 98 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 53 |
 | 实现页面文件（含 dev） | 172 |
 | 开发预览路由 | 5 |
 | 实现生产路由（排除 dev） | 167 |
 | 实现侧栏叶子 | 53 |
-| 已覆盖 | 166 |
-| 待补设计（实现有、设计稿没有） | 1 |
+| 已覆盖 | 167 |
+| 待补设计（实现有、设计稿没有） | 0 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
-侧栏集合按上表和生成 JSON 核对；当前 DC 已加入“本地数据迁移”叶子，不能沿旧快照将它继续登记为缺设计。设计覆盖只表示实际源码有对应落点，不能代替运行或业务验收。
+设计覆盖只表示实际源码有对应落点，不能代替运行或业务验收。
 
 ## 3. 两向设计缺口
 
 ### 设计稿有、实现没有
 
-**当前为 0。** `design-coverage.json` 的 `designOnly` 为空；历史落地提交只从 Git 追溯，不在本状态表保留易失效短哈希。
+逐项以 [`design-coverage.json`](./design-coverage.json) 的 `designOnly` 为准；历史落地提交从 Git 追溯。
 
 ### 实现有、设计稿没有
 
-下表路由已有实现，尚无一一对应的 DC 页面；数量只看上方生成表。在补齐设计源码前保持 `design-pending`，本地运行验收不等于设计源码已覆盖。旧 #305/#294 仅保留来源含义。
-
-| 生产路由 | 当前设计状态 | 本轮复核承接 |
-| --- | --- | --- |
-| `/finance/payment/:id/detail` | `payApplyDetail`；已注册并挂载 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
-| `/settings/data-migration` | `dataMigration`；已注册并挂载 | [#414](https://github.com/zodea/crm-new/issues/414) |
-| `/subcontract/quantity/stages` | `quantityStages`；已注册并挂载，原运行证据保留 | [#442](https://github.com/zodea/crm-new/issues/442) |
-| `/schedule/process-library/:id` | `processLibraryDetail`；已注册并挂载 | [#443](https://github.com/zodea/crm-new/issues/443) |
+逐路由缺口与原因以 [`design-coverage.json`](./design-coverage.json) 中的 `design-pending` 为准。在补齐设计源码前保持待补；本地运行验收不等于设计源码已覆盖。
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和只读详情动作。
 
 ## 4. 已搭但未闭环
 
-以下页面域与 [`READ-MODELS.md`](../rewrite/READ-MODELS.md) 使用同一稳定 code；路由数从运行矩阵计算，当前复核承接按 #402 的模块归属生成。机器账本的 `implementationIssues` 表示当前复核责任，`historicalImplementationIssues` 保留旧实施来源；它们均不表示 Issue 已关闭或功能已通过。具体领取状态、实施子票与原生依赖实时查询 GitHub。只有对应实施范围具备提交、测试和运行证据后才可更新实现状态，旧票因“被替代”关闭不能作为完成依据。
+下表保留 #402 复核时的页面域与承接关系，属于历史索引，不代表当前任务状态或验收通过；当前页面域以 [`READ-MODELS.md`](../rewrite/READ-MODELS.md) 为准，具体任务状态须查询对应 Issue。旧机器账本及生成脚本已不在当前工作区，不能将下表当作实时生成结果。
 
 <!-- implementation-frontier:begin -->
 | 页面域 | 路由数 | 当前复核承接 |

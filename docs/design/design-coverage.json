@@ -1,17 +1,17 @@
 {
   "$schema": "本文件由 pnpm design:sync-coverage 生成；status 只允许 covered / design-pending / retired。",
   "counts": {
-    "designPageRoutes": 97,
+    "designPageRoutes": 98,
     "designFormRoutes": 40,
     "designNavGroups": 9,
     "designNavLeaves": 53,
-    "designMountedScreens": 122,
+    "designMountedScreens": 123,
     "trackedPageFiles": 172,
     "devPageFiles": 5,
     "appPageFiles": 167,
     "appNavLeaves": 53,
-    "covered": 166,
-    "designPending": 1,
+    "covered": 167,
+    "designPending": 0,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -867,10 +867,8 @@
     },
     {
       "appRoute": "/subcontract/quantity/import",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "完整 SQLite 领域迁入是本轮正式接管的独立工具；现有 DC 未注册对应预检、人工映射、原件和整批恢复屏，暂依现行迁入规格与 KitUI 原语。",
-      "issue": "#416"
+      "designRoute": "quantityImport",
+      "status": "covered"
     },
     {
       "appRoute": "/subcontract/quantity/region",
