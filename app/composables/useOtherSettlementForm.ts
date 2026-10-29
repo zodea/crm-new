@@ -3,6 +3,7 @@ import type { FormFooterAction } from '~/lib/master-data/page'
 import type { OtherSettlementDraft } from '~/lib/other-settlement/contract'
 import { onBeforeRouteLeave } from 'vue-router'
 import { clearanceBindingEdit, emptyClearanceBindingInput } from '~/components/other-settlement/clearance-binding-input'
+import { useContractFormNavigation } from '~/composables/useContractFormNavigation'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryProblemFromUnknown } from '~/lib/auxiliary-contract/repository'
 import { isConfirmedExpenditureSettlement } from '~/lib/contract/effective-status'
@@ -15,6 +16,7 @@ export function useOtherSettlementForm() {
   const route = useRoute()
   const router = useRouter()
   const kit = useKitUI()
+  const { openNew } = useContractFormNavigation('other_settlement')
   const repository = useNuxtApp().$repositories.otherSettlements
   const expectedLinkIds = shallowRef<string[]>([])
   const commandRepository = {
@@ -93,7 +95,8 @@ export function useOtherSettlementForm() {
     const previousAllowLeave = allowLeave
     allowLeave = true
     try {
-      await router.replace(`${OTHER_SETTLEMENT_PATH}/form/${target}?origin=real`)
+      const returnTo = validateAuxiliaryReturnTo(route.query.returnTo)
+      await router.replace({ path: `${OTHER_SETTLEMENT_PATH}/form/${target}`, query: { origin: 'real', ...(returnTo ? { returnTo } : {}) } })
     }
     finally {
       allowLeave = previousAllowLeave
@@ -136,6 +139,7 @@ export function useOtherSettlementForm() {
   }
   async function initialize(retain = false) {
     const current = ++generation
+    loadingAction.value = null
     loading.value = true
     loadError.value = ''
     if (!retain) {
@@ -235,12 +239,19 @@ export function useOtherSettlementForm() {
       allowLeave = true
       try {
         if (action === 'saveNew') {
-          actions.startNew(session)
-          await router.push(`${OTHER_SETTLEMENT_PATH}/form`)
-          await initialize()
+          await openNew(async () => {
+            actions.startNew(session)
+            await initialize()
+          })
         }
         else if (closeAfterSave.value || confirming) {
-          await router.push(`${OTHER_SETTLEMENT_PATH}/${result.id}?origin=real`)
+          const returnTo = validateAuxiliaryReturnTo(route.query.returnTo)
+          const detailPath = `${OTHER_SETTLEMENT_PATH}/${encodeURIComponent(result.id)}`
+          // 编辑来源本身就是详情时恢复其完整查询；新建时把已核验来源带到新详情。
+          if (returnTo && new URL(returnTo, 'http://localhost').pathname === detailPath)
+            await router.push(returnTo)
+          else
+            await router.push({ path: detailPath, query: { origin: 'real', ...(returnTo ? { returnTo } : {}) } })
         }
         else {
           await canonicalTarget(result.id)

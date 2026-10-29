@@ -33,6 +33,7 @@ beforeEach(() => {
   vi.stubGlobal('useTabTitle', vi.fn())
   vi.stubGlobal('useTabCloseGuard', vi.fn())
   vi.stubGlobal('useContractFormAttachments', useContractFormAttachments)
+  vi.stubGlobal('useTabsStore', useTabsStore)
   vi.stubGlobal('useOtherSettlementForm', useOtherSettlementForm)
 })
 afterEach(() => {
