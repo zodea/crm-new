@@ -82,13 +82,14 @@ function expectCompleteGraph(snapshot: CoreMigrationSnapshotDTO, input: Migratio
   const credentials = entity('supplier_credentials')
   expect(credentials.references).toEqual({ supplierId: supplier.id })
   expect(JSON.parse(String(credentials.attributes.graphJson))).toMatchObject({
-    schemaVersion: 1,
+    schemaVersion: 2,
     supplier: { id: 'supplier-local-294', name: input.supplierName },
     credentials: [],
     files: [],
     payloads: [],
     credentialAudits: [],
     supplierAudits: [],
+    reviewHistory: [],
   })
   expect(JSON.parse(String(entity('process_libraries').attributes.graphJson))).toMatchObject({
     schemaVersion: 1,
@@ -251,7 +252,8 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
 
   for (const input of MIGRATION_INPUTS) {
     test(`真实旧库快照 ${input.name} 经显式流程进入中央读链，刷新后仍可回滚`, async ({ page }) => {
-      test.slow()
+      // 旧库迁移后首次打开项目列表还需等待开发服务编译。
+      test.setTimeout(180_000)
       await page.goto('/settings/data-migration')
       await expect(page.getByTestId('core-migration-page').getByRole('heading', { name: '本地数据迁移' }))
         .toBeVisible({ timeout: 60_000 })
@@ -412,7 +414,7 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
     const rollback = page.getByRole('button', { name: '回滚到本地快照' })
     const rollbackReceipt = await migrationCommand(page, '回滚到本地快照', `/api/migrations/core/${batch.batchId}/rollback`)
     expect(await rollbackReceipt.json()).toMatchObject({ batchId: batch.batchId, status: 'rolled-back' })
-    await expect(page.getByRole('alert')).toHaveText('测试：本地快照暂时无法恢复')
+    await expect(page.getByRole('alert').filter({ hasText: '测试：本地快照暂时无法恢复' })).toHaveText('测试：本地快照暂时无法恢复')
     await expect(page.getByText('中央已回滚，等待恢复本地快照', { exact: true })).toBeVisible()
     await expect(page.getByText('对账通过，未发现迁移差异')).toHaveCount(0)
     await expect(page.getByRole('button', { name: '运行预检' })).toBeDisabled()
