@@ -8,6 +8,113 @@ import { expectNoPageOverflow } from './helpers/responsive'
 
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '使用全新正式构建与隔离合成数据库，不连接用户数据库')
 
+test('五类正式财务列表保留紧凑工具、真实筛选和窄屏焦点', async ({ page }, info) => {
+  test.setTimeout(120_000)
+  const f = await createCrewWorkerProductionFixture(page, info)
+  try {
+    await f.start()
+    await f.login()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    for (const [path, label] of [['billing', '开票申请'], ['current', '往来收付'], ['records', '支付记录'], ['reimbursement', '费用报销'], ['payment', '付款申请']]) {
+      await page.goto(`${f.origin}/finance/${path}`)
+      const toolbar = page.getByLabel('单据列表工具栏')
+      await expect(toolbar.getByRole('heading', { name: label, exact: true })).toBeVisible()
+      expect((await toolbar.boundingBox())!.height).toBeLessThanOrEqual(32)
+      await expect(toolbar.getByRole('searchbox')).toBeVisible()
+      await expect(toolbar.getByRole('button', { name: '刷新', exact: true })).toBeVisible()
+      await expect(toolbar.getByRole('button', { name: `新建${label}`, exact: true })).toBeVisible()
+      await page.getByRole('button', { name: '筛选项目', exact: true }).click()
+      await expect(page.getByRole('group', { name: '项目筛选值' })).toBeVisible()
+      await expect(page.getByRole('checkbox', { name: '不限', exact: true })).toBeChecked()
+      await page.getByRole('button', { name: '清除', exact: true }).click()
+      await toolbar.getByRole('button', { name: '列表筛选', exact: true }).click()
+      await expect(page.getByRole('group', { name: '项目', exact: true })).toBeVisible()
+      await expect(page.getByRole('group', { name: '状态', exact: true })).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expectNoPageOverflow(page, `正式${label}列表`)
+    }
+    for (const width of [390, 768, 1024]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(`${f.origin}/finance/payment`)
+      const filter = page.getByLabel('单据列表工具栏').getByRole('button', { name: '列表筛选', exact: true })
+      await expectNoPageOverflow(page, `正式付款申请列表 ${width}px`)
+      await filter.focus()
+      await page.keyboard.press('Enter')
+      await expect(page.getByRole('group', { name: '项目', exact: true })).toBeInViewport()
+      await page.keyboard.press('Escape')
+      await expect(filter).toBeFocused()
+    }
+  }
+  finally {
+    await f.cleanup()
+  }
+})
+
+test('正式往来列表与可写表单在五档视口保持布局及焦点', async ({ page }, info) => {
+  test.setTimeout(120_000)
+  const f = await createCrewWorkerProductionFixture(page, info)
+  try {
+    await f.start()
+    await f.login()
+    const contextResponse = await f.request('/api/read/finance/current/context')
+    expect(contextResponse.ok(), await contextResponse.text()).toBe(true)
+    const { workspaceId, actorId } = await contextResponse.json()
+    async function command(path: string, capability: string, commandId: string, draft: object, extra: object = {}) {
+      const response = await f.request(`/api/commands/${path}`, { method: 'POST', data: { workspaceId, actorId, requiredCapability: capability, commandId, baseVersion: null, action: 'draft', attachments: {}, draft, ...extra } })
+      expect(response.ok(), await response.text()).toBe(true)
+      return response.json()
+    }
+    const supplier = await command('suppliers', 'supplier:write', 'layout-current-supplier', { name: '布局合成分供方', supplierCategory: '其他', contact: '合成人' })
+    const project = await command('projects', 'project:write', 'layout-current-project', { name: '布局合成项目' })
+    await command('finance', 'finance-current:write', 'layout-current', { projectId: project.id, supplierId: supplier.id, direction: 'payment', amount: 0, transactionDate: '2026-10-05' }, { kind: 'current' })
+    await page.goto(`${f.origin}/finance/current`)
+    const shell = page.locator('[data-list-shell]')
+    const toolbar = shell.locator('[data-list-shell-toolbar]')
+    const table = shell.locator('[data-list-shell-table]')
+    const create = shell.getByRole('button', { name: /新建|新增/ }).or(shell.getByRole('link', { name: /新建|新增/ }))
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+      await expect(toolbar).toBeVisible()
+      await expect(table.locator('.vxe-table')).toBeVisible()
+      await expectNoPageOverflow(page, `正式往来列表 ${width}px`)
+      expect(await shell.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+      const bounds = await Promise.all([toolbar.boundingBox(), table.boundingBox()])
+      expect(bounds[0]!.y).toBeLessThan(bounds[1]!.y)
+      await create.focus()
+      await expect(create).toBeInViewport()
+    }
+    await page.goto(`${f.origin}/finance/current/new`)
+    const form = page.locator('[data-ui="entity-form-shell"]')
+    const footer = page.getByRole('group', { name: '表单操作' })
+    const fields = form.locator('.form-fields-grid').first()
+    const save = footer.getByRole('button', { name: '保存', exact: true })
+    const nav = form.getByRole('navigation', { name: '表单分区' })
+    await expect(save).toBeEnabled()
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+      await expect(footer).toBeVisible()
+      await expect(fields).toBeVisible()
+      const columns = await fields.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+      if (width === 390)
+        expect(columns).toBe(1)
+      expect(columns).toBeLessThanOrEqual(2)
+      await expectNoPageOverflow(page, `正式往来表单 ${width}px`)
+      await save.focus()
+      await expect(save).toBeInViewport()
+      await expect(save).toBeFocused()
+      if (width >= 1280)
+        await expect(nav).toBeVisible()
+      else
+        await expect(nav).toBeHidden()
+    }
+    await nav.getByRole('link', { name: '凭证与备注', exact: true }).click()
+    expect(new URL(page.url()).hash).toBe('')
+  }
+  finally {
+    await f.cleanup()
+  }
+})
+
 for (const outcome of ['unknown', 'known-read-failed'] as const) {
   test(`正式往来整页 ${outcome} 保原编号、原件与后来输入，五档核对及冷开启读取真实付款详情`, async ({ page }, info) => {
     test.setTimeout(180000)

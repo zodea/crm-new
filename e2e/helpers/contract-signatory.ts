@@ -23,10 +23,11 @@ export async function createVerifiedSignatory(page: Page, name: string, sessionI
   return result.id as string
 }
 
-export async function selectVerifiedSignatory(page: Page, id: string, name: string) {
-  const field = page.getByTestId('contract-our-signatory')
+export async function selectVerifiedSignatory(page: Page, _id: string, name: string) {
+  const field = page.getByTestId('contract-our-signatory').getByRole('combobox')
   await expect(field).toBeEnabled()
-  await field.selectOption(id)
+  await field.fill(name)
+  await page.getByRole('option', { name, exact: true }).click()
   await expect(page.getByTestId('contract-our-signatory-snapshot')).toHaveText(`文书采用：${name} · 核实版本 1`)
 }
 

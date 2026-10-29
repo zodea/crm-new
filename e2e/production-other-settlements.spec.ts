@@ -5,12 +5,170 @@ import process from 'node:process'
 import { DatabaseSync } from 'node:sqlite'
 import { expect, test } from '@playwright/test'
 import { createOtherSettlementPay08Source } from '../tests/helpers/other-settlement-pay08-source'
+import { selectVerifiedSignatory } from './helpers/contract-signatory'
 import { createCrewWorkerProductionFixture } from './helpers/crew-worker-production-fixture'
 import { createHistoricalClearanceMigrationSource } from './helpers/historical-clearance-migration-source'
 import { createOtherSettlementMigrationSource } from './helpers/other-settlement-migration-source'
-import { expectNoPageOverflow } from './helpers/responsive'
+import { EQUIVALENT_200_PERCENT_VIEWPORT, expectLocalHorizontalScroll, expectNoPageOverflow, tabUntilFocused } from './helpers/responsive'
 
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '全新正式构建与隔离合成存储验收，不连接用户数据库')
+test('正式施工合同原件往返及其他支出合同结算使用同一合成工程', async ({ page }, info) => {
+  test.setTimeout(150_000)
+  const f = await createCrewWorkerProductionFixture(page, info)
+  try {
+    await f.start()
+    await f.login()
+    const ctx = await (await f.request('/api/read/other-settlements/context')).json()
+    const identity = { workspaceId: ctx.workspaceId, actorId: ctx.actorId, baseVersion: null }
+    async function command(path: string, capability: string, commandId: string, draft: object) {
+      const response = await f.request(`/api/commands/${path}`, { method: 'POST', data: { ...identity, requiredCapability: capability, commandId, action: 'draft', draft, attachments: {} } })
+      expect(response.ok(), await response.text()).toBe(true)
+      return response.json()
+    }
+    const ownResponse = await f.request('/api/commands/our-signatories', { method: 'POST', data: { ...identity, requiredCapability: 'our-signatory:write', commandId: 'f2-real-signer', draft: { name: 'F2合成签约主体', taxNo: null, registeredAddress: null, legalRepresentative: null, verificationNote: '合成文书核实', status: 'active' } } })
+    expect(ownResponse.ok(), await ownResponse.text()).toBe(true)
+    const own = await ownResponse.json()
+    const customer = await command('customers', 'customer:write', 'f2-real-customer', { name: 'F2合成客户', contact: '合成人' })
+    const supplier = await command('suppliers', 'supplier:write', 'f2-real-supplier', { name: 'F2合成分供方', supplierCategory: '其他', contact: '合成人' })
+    const project = await command('projects', 'project:write', 'f2-real-project', { name: 'F2合成工程', customerId: customer.id })
+    async function choose(label: string, name: string) {
+      await page.getByRole('combobox', { name: label, exact: true }).fill(name)
+      await page.getByRole('option').filter({ hasText: name }).first().click()
+    }
+    await page.goto(`${f.origin}/contract/construction/form`)
+    await selectVerifiedSignatory(page, own.id, 'F2合成签约主体')
+    await page.getByTestId('contract-name').fill('F2合成施工合同')
+    await choose('检索项目', 'F2合成工程')
+    await choose('检索客户', 'F2合成客户')
+    await page.getByTestId('contract-content').fill('合成施工内容')
+    await page.getByTestId('contract-sign-date').fill('2026-07-25')
+    await page.getByTestId('contract-amount').fill('100')
+    await page.locator('input[type="file"]').setInputFiles({ name: 'f2-synthetic.pdf', mimeType: 'application/pdf', buffer: Buffer.from('synthetic-contract') })
+    await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
+    await page.getByRole('button', { name: '保存并提交' }).click()
+    await expect(page).toHaveURL(/\/contract\/construction\/form\/[^/?]+(?:\?|$)/)
+    await expect(page.getByRole('checkbox', { name: '【保存】后关闭' })).toBeChecked()
+    await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
+    await expect(page.getByRole('combobox', { name: '合同状态', exact: true })).toHaveText('审批中')
+    const constructionId = new URL(page.url()).pathname.split('/').at(-1)!
+    const saved = await f.request(`/api/read/construction-contracts/${constructionId}/form`)
+    expect(saved.ok(), await saved.text()).toBe(true)
+    expect((await saved.json()).draft).toMatchObject({ projectId: project.id, customerId: customer.id, amount: 100, status: '审批中' })
+    const attachments = page.locator('#section-attachments')
+    await expect(attachments.getByText('f2-synthetic.pdf', { exact: true })).toBeVisible()
+    await attachments.getByRole('button', { name: '删除' }).click()
+    await page.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(attachments.getByText('已删除', { exact: true })).toBeVisible()
+    await attachments.getByRole('button', { name: '恢复' }).click()
+    await page.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(attachments.getByText('已删除', { exact: true })).toHaveCount(0)
+    await page.goto(`${f.origin}/contract/other-expense/form`)
+    await page.getByLabel('合同名称 *', { exact: true }).fill('F2合成其他支出合同')
+    await choose('搜索工程及施工主合同名称 / 编号', 'F2合成施工合同')
+    await choose('检索分供方', 'F2合成分供方')
+    await choose('搜索真实签约主体', 'F2合成签约主体')
+    await page.getByLabel('主要条款').fill('合成租赁服务')
+    await page.getByLabel('签订日期 *').fill('2026-07-25')
+    await page.getByLabel('合同金额 *', { exact: true }).fill('80')
+    await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
+    await page.getByRole('button', { name: '保存并提交' }).click()
+    await page.getByRole('dialog', { name: '提交合同' }).getByRole('button', { name: '提交', exact: true }).click()
+    await expect(page).toHaveURL(/\/contract\/other-expense\/form\/[^/?]+(?:\?|$)/)
+    await page.goto(`${f.origin}/contract/other-settlement/form`)
+    await page.getByRole('combobox', { name: '结算来源', exact: true }).selectOption('contract')
+    await page.getByLabel('结算名称 *', { exact: true }).fill('F2合成其他支出结算')
+    await choose('检索项目', 'F2合成工程')
+    await choose('检索其他支出合同', 'F2合成其他支出合同')
+    await page.getByLabel('含税结算金额 *').fill('60')
+    await page.getByLabel('结算日期 *').fill('2026-07-25')
+    await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
+    await page.getByRole('button', { name: '保存并提交' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '提交', exact: true }).click()
+    await expect(page).toHaveURL(/\/contract\/other-settlement\/form\/[^/?]+(?:\?|$)/)
+    await expect(page.getByRole('button', { name: '确认结算', exact: true })).toBeEnabled()
+    const settlementId = new URL(page.url()).pathname.split('/').at(-1)!
+    const settlement = await f.request(`/api/read/other-settlements/${settlementId}?origin=real`)
+    expect(settlement.ok(), await settlement.text()).toBe(true)
+    expect((await settlement.json()).settlement.draft).toMatchObject({ id: settlementId, status: 'pending', projectId: project.id, totalAmount: 60 })
+    expect(supplier.id).toBeTruthy()
+  }
+  finally {
+    await f.cleanup()
+  }
+})
+for (const input of ['合成未保存输入甲', '合成未保存输入乙']) {
+  test(`付款申请正式来源：${input}在五档视口及200%布局下键盘操作可达`, async ({ page }, info) => {
+    test.setTimeout(120_000)
+    const f = await createCrewWorkerProductionFixture(page, info)
+    try {
+      await f.start()
+      await f.login()
+      await page.goto(`${f.origin}/finance/payment/new`)
+      const type = page.getByRole('button', { name: '有合同-材料', exact: true })
+      await expect(type).toBeVisible()
+      await type.focus()
+      await expect(type).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(page.getByRole('heading', { name: '新建 · 付款申请' })).toBeVisible()
+      const field = page.getByTestId('finance-name')
+      const footer = page.getByRole('group', { name: '表单操作' })
+      const cancel = footer.getByRole('button', { name: '取消', exact: true })
+      const save = footer.getByRole('button', { name: '保存', exact: true })
+      await expect(save).toBeEnabled()
+      if (input === '合成未保存输入甲') {
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.getByTestId('add-grid-line').first().click({ timeout: 15_000 })
+        const grid = page.getByTestId('finance-line-grid').first()
+        const scrollRoot = grid.locator(':scope > .overflow-auto')
+        await expectLocalHorizontalScroll(scrollRoot, '正式付款申请明细')
+        await expect.poll(() => scrollRoot.evaluate(root => [...root.querySelectorAll<HTMLElement>('*')].filter((element) => {
+          const overflowX = getComputedStyle(element).overflowX
+          return ['auto', 'scroll'].includes(overflowX) && element.scrollWidth > element.clientWidth + 1
+        }).length)).toBe(0)
+        await scrollRoot.evaluate(root => root.scrollLeft = root.scrollWidth)
+        await expect.poll(() => scrollRoot.evaluate(root => root.scrollLeft)).toBeGreaterThan(0)
+        const lastAction = grid.getByTitle('删除').last()
+        await lastAction.scrollIntoViewIfNeeded()
+        await expect(lastAction).toBeInViewport()
+        await expectNoPageOverflow(page, '正式付款申请明细 @ 390px')
+      }
+      for (const width of [390, 768, 1024, 1280, 1440]) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+        await expectNoPageOverflow(page, `正式付款申请 ${width}px`)
+        await field.focus()
+        await expect(field).toBeFocused()
+        await tabUntilFocused(page, cancel)
+        await expect(cancel).toBeInViewport()
+        await tabUntilFocused(page, save)
+        await expect(save).toBeFocused()
+        await expect(save).toBeInViewport()
+      }
+      await page.setViewportSize(EQUIVALENT_200_PERCENT_VIEWPORT)
+      await expectNoPageOverflow(page, '正式付款申请 200%')
+      await field.fill(input)
+      await field.focus()
+      await tabUntilFocused(page, cancel)
+      await tabUntilFocused(page, save)
+      await tabUntilFocused(page, cancel, 'backward', 10)
+      await page.keyboard.press('Enter')
+      const dialog = page.getByRole('dialog', { name: '放弃修改' })
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeFocused()
+      await page.keyboard.press('Escape')
+      await expect(dialog).toBeHidden()
+      await expect(cancel).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(dialog).toBeVisible()
+      await page.keyboard.press('Tab')
+      await expect(dialog.getByRole('button', { name: '放弃修改', exact: true })).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect.poll(() => new URL(page.url()).pathname).toBe('/finance/payment')
+    }
+    finally {
+      await f.cleanup()
+    }
+  })
+}
 test('真实原费用→结算→申请→实付，整页原键恢复、版本冻结、原件与完整Native迁入冷开五档', async ({ page }, info) => {
   test.setTimeout(180000)
   const f = await createCrewWorkerProductionFixture(page, info)
@@ -29,9 +187,22 @@ test('真实原费用→结算→申请→实付，整页原键恢复、版本�
     }
     const service = await command('suppliers', { name: '实际服务交易方', supplierCategory: '其他', contact: '合成人' }, 'other-browser-service', 'supplier:write')
     const payee = await command('suppliers', { name: '实际垫付收款人', supplierCategory: '其他', contact: '合成人' }, 'other-browser-payee', 'supplier:write')
-    await command('finance/reimbursement', { applicantSupplierId: payee.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '实际无合同运输费用', counterpartySupplierId: service.id, amount: 100 }] }, 'other-browser-expense', 'finance-reimbursement:write', { kind: 'reimbursement' })
+    const customer = await command('customers', { name: '合成原费用甲方', contact: '合成人' }, 'other-browser-customer', 'customer:write')
+    const project = await command('projects', { name: '合成原费用工程', customerId: customer.id, manager: '合成人' }, 'other-browser-project', 'project:write')
+    const signerResponse = await f.request('/api/commands/our-signatories', { method: 'POST', data: { ...identity, requiredCapability: 'our-signatory:write', commandId: 'other-browser-signer', baseVersion: null, draft: { name: '合成原费用签约主体', taxNo: null, registeredAddress: null, legalRepresentative: null, verificationNote: '合成核验', status: 'active' } } })
+    expect(signerResponse.ok(), await signerResponse.text()).toBe(true)
+    const signer = await signerResponse.json()
+    const main = await command('construction-contracts', { name: '合成原费用施工主合同', no: 'OTHER-MAIN', projectId: project.id, customerId: customer.id, content: '合成工程', signDate: '2026-10-05', amount: 100, ourSignatoryId: signer.id, ourSignatoryVersion: signer.version }, 'other-browser-main', 'construction-contract:write')
+    const scopeContext = await (await f.request('/api/read/auxiliary-contracts/context')).json()
+    const mainOption = scopeContext.constructionMains.find((row: { id: string }) => row.id === main.id)
+    expect(mainOption).toBeDefined()
+    const constructionMain = { id: mainOption.id, projectId: mainOption.projectId, basis: mainOption.basis }
+    await command('finance/reimbursement', { projectId: project.id, constructionMain, applicantSupplierId: payee.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '实际无合同运输费用', counterpartySupplierId: service.id, amount: 100 }] }, 'other-browser-expense', 'finance-reimbursement:write', { kind: 'reimbursement' })
     await page.goto(`${f.origin}/contract/other-settlement/form`)
-    await page.getByLabel('采用原费用 实际无合同运输费用', { exact: true }).check()
+    const projectLookup = page.getByRole('combobox', { name: '检索项目' })
+    await projectLookup.fill('合成原费用工程')
+    await page.getByRole('option', { name: /合成原费用工程/ }).click()
+    await page.getByLabel('采用原费用 实际无合同运输费用', { exact: true }).check({ timeout: 15_000 })
     await page.getByLabel('原费用 实际无合同运输费用 采用金额', { exact: true }).fill('70')
     await page.getByLabel('结算名称 *', { exact: true }).fill('实际无合同费用结算')
     await page.getByLabel('结算日期 *', { exact: true }).fill('2026-10-05')
@@ -70,7 +241,7 @@ test('真实原费用→结算→申请→实付，整页原键恢复、版本�
     await page.unroute('**/api/commands/other-settlements')
     const rows = await (await f.request('/api/read/other-settlements')).json()
     const row = rows.items[0]
-    expect(row.draft).toMatchObject({ supplierId: service.id, payeeSupplierId: payee.id, payeeWorkerId: null, totalAmount: 70, contractId: null, projectId: null })
+    expect(row.draft).toMatchObject({ supplierId: service.id, payeeSupplierId: payee.id, payeeWorkerId: null, totalAmount: 70, contractId: null, projectId: project.id })
     const remote = await command('other-settlements', { ...row.draft, name: '另一已保存版本' }, 'other-browser-concurrent', 'other-settlement:write', { id: row.id, baseVersion: '1' })
     await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
     await expect(page.getByText('服务器版本 2；当前输入已保留。')).toBeVisible()
@@ -115,8 +286,8 @@ test('真实原费用→结算→申请→实付，整页原键恢复、版本�
     expect(current.settlement.version).toBe('3')
     const submitted = await command('other-settlements', current.settlement.draft, 'other-browser-submit', 'other-settlement:write', { id: row.id, baseVersion: current.settlement.version, action: 'submit' })
     const confirmed = await command('other-settlements', current.settlement.draft, 'other-browser-confirm', 'other-settlement:write', { id: row.id, baseVersion: submitted.version, action: 'confirm' })
-    const application = await command('finance/payment_application', { name: '实际原费用付款申请', bizType: '公司付款', supplierId: payee.id, applyAmount: 70, applyDate: '2026-10-05', applicant: '合成财务', invoiceState: '无需发票', settlementAllocations: [{ settlementId: row.id, allocatedAmount: 70 }] }, 'other-browser-application', 'finance-payment-application:write', { kind: 'payment_application', action: 'submit' })
-    const payment = await command('finance/payment_record', { supplierId: payee.id, payeeName: '实际垫付收款人', amount: 30, paymentDate: '2026-10-05', voucherNo: 'SYNTHETIC-OTHER-VOUCHER', bankSerialNo: 'SYNTHETIC-OTHER-BANK', confirmedBy: '合成财务', applicationAllocations: [{ paymentApplicationId: application.id, allocatedAmount: 30 }] }, 'other-browser-payment', 'finance-payment-record:write', { kind: 'payment_record', action: 'confirm' })
+    const application = await command('finance/payment_application', { name: '实际原费用付款申请', projectId: project.id, bizType: '项目费用', supplierId: payee.id, applyAmount: 70, applyDate: '2026-10-05', applicant: '合成财务', invoiceState: '无需发票', settlementAllocations: [{ settlementId: row.id, allocatedAmount: 70 }] }, 'other-browser-application', 'finance-payment-application:write', { kind: 'payment_application', action: 'submit' })
+    const payment = await command('finance/payment_record', { projectId: project.id, supplierId: payee.id, payeeName: '实际垫付收款人', amount: 30, paymentDate: '2026-10-05', voucherNo: 'SYNTHETIC-OTHER-VOUCHER', bankSerialNo: 'SYNTHETIC-OTHER-BANK', confirmedBy: '合成财务', applicationAllocations: [{ paymentApplicationId: application.id, allocatedAmount: 30 }] }, 'other-browser-payment', 'finance-payment-record:write', { kind: 'payment_record', action: 'confirm' })
     const paid = await (await f.request(`/api/read/other-settlements/${row.id}`)).json()
     expect(paid.settlement.amounts).toMatchObject({ total: '70.00', net: '70.00', applied: '70.00', paid: '30.00', unpaid: '40.00' })
     await page.goto(`${f.origin}/contract/other-settlement/${row.id}?origin=real`)
@@ -384,7 +555,7 @@ test('Native原纸缺失E100/C30经整页替代核定，合并新70及旧30义�
   try {
     await f.start()
     await f.login()
-    const native = await createHistoricalClearanceMigrationSource(join('.tmp/a03-clearance-e2e', `native-${Date.now()}-${process.pid}`))
+    const native = await createHistoricalClearanceMigrationSource(join(f.directory, 'native-clearance-source'))
     await info.attach('historical-clearance-synthetic-source', { body: native.path, contentType: 'text/plain' })
     await info.attach('historical-clearance-synthetic-storage', { body: f.directory, contentType: 'text/plain' })
     const context = await (await f.request('/api/read/finance/reimbursement/context')).json()
@@ -399,8 +570,10 @@ test('Native原纸缺失E100/C30经整页替代核定，合并新70及旧30义�
     const payeeId = suppliers.find(row => row.legacyId === native.ids.payee)!.id
     await page.goto(`${f.origin}/settings/data-migration`)
     const migration = page.getByRole('region', { name: '财务原库迁入', exact: true })
-    await migration.getByLabel('选择桌面导出的 SQLite 一致快照').setInputFiles(native.path)
-    await expect(migration.getByText('费用与报销：2 条（含已移除历史 0 条）', { exact: true })).toBeVisible()
+    const sourceFile = migration.getByLabel('选择桌面导出的 SQLite 一致快照')
+    await expect(sourceFile).toBeEnabled()
+    await sourceFile.setInputFiles(native.path)
+    await expect(migration.getByText('费用与报销：2 条（含已移除历史 0 条）', { exact: true })).toBeVisible({ timeout: 30_000 })
     for (const supplier of suppliers)
       await migration.getByRole('combobox', { name: new RegExp(supplier.legacyId) }).selectOption(supplier.id)
     for (const basis of await migration.getByLabel('身份对应的确认依据').all())
