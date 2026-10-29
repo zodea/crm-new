@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test'
 
 const BACKUP_INPUT = { createdAt: '2026-09-15T00:00:00.000Z' }
 
-test('Issue #436 真实 SQLite 全字段及正文经 HTTP 迁移、中央更正与批次回滚', async ({ request }, info) => {
+test('Issue #436 真实 SQLite 全字段及正文经 HTTP 迁移、更正后拒绝危险回滚', async ({ request }, info) => {
   test.setTimeout(90_000)
   const reset = await request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
   expect(reset.ok()).toBe(true)
@@ -58,16 +58,28 @@ test('Issue #436 真实 SQLite 全字段及正文经 HTTP 迁移、中央更正�
     expect(replay.ok(), await replay.text()).toBe(true)
     const corrected = await (await request.get(`/api/read/receipts/${encodeURIComponent(original.id)}/record?origin=real`)).json()
     expect(corrected.record.draft.note).toBe('中央更正保留')
-    const independentResponse = await request.post('/api/commands/receipts', { data: { ...save, commandId: 'receipt-http-independent', baseVersion: null, draft: { ...original.draft, no: 'SK-HTTP-INDEPENDENT-436', bankSerialNo: '' } } })
+    // 独立记录不能沿用本批迁入的项目、客户或合同身份，否则回滚必须拒绝。
+    const independentCustomerResponse = await request.post('/api/commands/customers', { data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'customer:write', commandId: 'receipt-independent-customer', baseVersion: null, action: 'save', draft: { name: '独立合成收款客户', contact: '合成经办人' }, attachments: {} } })
+    expect(independentCustomerResponse.ok(), await independentCustomerResponse.text()).toBe(true)
+    const independentCustomer = await independentCustomerResponse.json()
+    const independentProjectResponse = await request.post('/api/commands/projects', { data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'project:write', commandId: 'receipt-independent-project', baseVersion: null, action: 'draft', draft: { name: '独立合成收款项目', customerId: independentCustomer.id, manager: '合成经办人', status: '筹备中' }, attachments: {} } })
+    expect(independentProjectResponse.ok(), await independentProjectResponse.text()).toBe(true)
+    const independentProject = await independentProjectResponse.json()
+    const independentResponse = await request.post('/api/commands/receipts', { data: { ...save, commandId: 'receipt-http-independent', baseVersion: null, draft: { ...original.draft, no: 'SK-HTTP-INDEPENDENT-436', projectId: independentProject.id, customerId: independentCustomer.id, contractId: null, bankSerialNo: '' } } })
     expect(independentResponse.ok(), await independentResponse.text()).toBe(true)
     const independent = await independentResponse.json()
     const rollback = await request.post(`/api/migrations/core/${batch.batchId}/rollback`, { data: { ...envelope('receipt-http-rollback'), batchId: batch.batchId } })
-    expect(rollback.ok(), await rollback.text()).toBe(true)
-    expect((await request.get(`/api/read/receipts/${encodeURIComponent(original.id)}/record?origin=real`)).status()).toBe(404)
+    expect(rollback.status()).toBe(409)
+    expect(await rollback.json()).toMatchObject({ data: { code: 'conflict', message: expect.stringContaining('迁入收款已有后来修改') } })
+    expect((await request.get(`/api/read/receipts/${encodeURIComponent(original.id)}/record?origin=real`)).ok()).toBe(true)
     expect((await request.get(`/api/read/receipts/${encodeURIComponent(independent.id)}/record?origin=real`)).ok()).toBe(true)
-    expect((await request.get(`/api/read/receipts/${encodeURIComponent(original.id)}/files/http-file-436?origin=real`)).status()).toBe(404)
+    expect((await request.get(`/api/read/receipts/${encodeURIComponent(original.id)}/files/http-file-436?origin=real`)).ok()).toBe(true)
   }
   finally {
-    await request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
+    // 本案已验证真实回滚拒绝；随后仅销毁开发实例中的合成收款，避免把后来修改带到下一案。
+    const clearReceipts = await request.post('/api/testing/receipts/reset', { headers: { 'x-ruihang-test-reset': '1' }, data: { scenario: 'ready', seed: true } })
+    expect(clearReceipts.ok(), await clearReceipts.text()).toBe(true)
+    const clearMigration = await request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
+    expect(clearMigration.ok(), await clearMigration.text()).toBe(true)
   }
 })

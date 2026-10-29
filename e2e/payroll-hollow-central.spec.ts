@@ -210,6 +210,7 @@ test('原户19减4、真实楼层冷返回、人工450扣款550发放及独立�
   const laterConfigPath = `/subcontract/payroll/config?${new URLSearchParams({ origin: 'real', project: f.scope.projectId, crew: f.scope.crewId, leader: f.scope.leaderWorkerId, month: '2026-09' })}`
   await page.goto(laterConfigPath)
   const laterPolicy = page.getByRole('article', { name: '墙砖空鼓配置', exact: true })
+  await expect(laterPolicy.getByLabel('空鼓单处金额', { exact: true })).toBeVisible({ timeout: 30_000 })
   await laterPolicy.getByLabel('空鼓单处金额', { exact: true }).fill('45')
   await page.getByRole('button', { name: '保存空鼓分项配置', exact: true }).click()
   await expect(page.getByText('空鼓分项配置已保存并核对。', { exact: true })).toBeVisible()

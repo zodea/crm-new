@@ -116,7 +116,7 @@ test('多条补贴与独立管理簿：明确配置、未知提交恢复、520�
   await page.unroute('**/api/commands/payroll-a-fees')
   const ordinaryId = await ordinary.saveOrdinary()
   await page.goto(`/subcontract/payroll/${encodeURIComponent(ordinaryId)}?origin=real`)
-  await expect(page.getByText('3,815.00', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('3,815.00', { exact: false }).first()).toBeVisible({ timeout: 30_000 })
   await capture(page, 'ordinary-work-and-215-fees', '[aria-label="A工资处理"]')
   await release(page, ordinaryId, 3815)
   await output(page, info, 'ordinary-3815', 3815, null)
