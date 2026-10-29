@@ -1,5 +1,7 @@
 # 财务收付与审批
 
+五类财务列表的工具、筛选与窄屏焦点使用 [production-finance-storage](../../../e2e/production-finance-storage.spec.ts) 的独立合成生产来源；付款申请五档视口、200% 布局、390px 明细局部横滚，以及可写状态下的键盘和放弃修改路径使用 [production-other-settlements](../../../e2e/production-other-settlements.spec.ts)。开发环境缺正式来源时保持只读。
+
 [返回测试模块索引](../README.md)
 
 本页记录文件归属与定位线索，不评定测试价值或业务验收状态。每个文件只在一个模块表中登记；跨模块关系在备注或总索引中说明。场景列默认摘取文件内首个分组／测试名称，仅用于定位，不代表文件全部断言已经复核。
@@ -70,7 +72,7 @@
 | [e2e/production-finance-storage.spec.ts](../../../e2e/production-finance-storage.spec.ts) | 实际正式构建与隔离 SQLite | F3 整页未知提交冷重启后原键恢复，已保存后读失败只重读；实际工作台、列表失败重读、付款申请 context/list/form/detail JSON 与同域范围、详情编辑及正式登记预填、三类回票义务与真实零、五档交互、原件、后来输入与真实零/未填写批复 |
 | [e2e/payment-approval.spec.ts](../../../e2e/payment-approval.spec.ts) | Playwright E2E | Issue #439 批复空值与明确零 |
 | [e2e/payment-management.spec.ts](../../../e2e/payment-management.spec.ts) | Playwright E2E · 测试数据只读 | 付款管理四档布局、筛选/键盘、表格局部横滚，以及测试来源禁止正式详情/编辑/登记；原正式导航与金额预填保护由上方真实生产链承接 |
-| [e2e/receipt-migration.spec.ts](../../../e2e/receipt-migration.spec.ts) | Playwright E2E | Issue #436 真实 SQLite 全字段及正文经 HTTP 迁移、中央更正与批次回滚 |
+| [e2e/receipt-migration.spec.ts](../../../e2e/receipt-migration.spec.ts) | Playwright E2E | Issue #436 真实 SQLite 迁移、更正后拒绝危险回滚并保全原件 |
 | [e2e/receipt-registration.spec.ts](../../../e2e/receipt-registration.spec.ts) | Playwright E2E | Issue #436 普通收款中央全链 |
 
 ## 辅助文件与配置（非独立测试）

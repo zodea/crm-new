@@ -4,9 +4,11 @@ import type { OtherSettlementContext, OtherSettlementFact, OtherSettlementResult
 import type { BusinessSession } from './business-session'
 import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
-import { CONFIRMED_SETTLEMENT_SQL_VALUES, isEffectiveExpenditureContract } from '../../app/lib/contract/effective-status'
+import { CONFIRMED_SETTLEMENT_SQL_VALUES, isConfirmedExpenditureSettlement, isEffectiveExpenditureContract } from '../../app/lib/contract/effective-status'
 import { FinanceRepositoryProblem } from '../../app/lib/finance/central-contract'
+import { expenseConsumptionFingerprint } from '../../app/lib/finance/clearance-verification'
 import { contractOriginalPayloadDigest } from '../../app/lib/forms/original-content'
 import { decodeOtherSettlementResult, otherSettlementFingerprint, otherSettlementKey, readOtherSettlementStored, validateOtherSettlementJournal } from '../../app/lib/other-settlement/storage'
 import { decodeOtherSettlementCommand } from '../../app/lib/other-settlement/validation'
@@ -300,8 +302,35 @@ export function createProductionOtherSettlementService(storage: ProductionStorag
         if (request.id && data.records.find(row => row.id === request.id)?.version === 0)
           return fail('unavailable', '旧结算需先完成完整来源核验；保留旧原文、原件和当前输入')
         const expenses = request.draft.originalExpenses?.length ? await listOriginalExpenseReferences(tx, actor) : []
+        // 提交时已原子写入本结算的明确旧份额关联。确认时只剔除这些自身关联，
+        // 重算提交前摘要；其他来源或关联变化仍必须触发冲突。
+        const target = request.id ? data.records.find(row => row.id === request.id) : undefined
+        const normalized = structuredClone(request)
+        if (request.action === 'confirm' && target && !isConfirmedExpenditureSettlement(target.draft.status ?? '')
+          && otherSettlementFingerprint(target.draft.originalExpenses ?? []) === otherSettlementFingerprint(request.draft.originalExpenses ?? [])) {
+          for (const line of normalized.draft.originalExpenses ?? []) {
+            const source = expenses.find(row => row.id === line.originalExpenseLineId)
+            const ownLinks = source?.clearanceLinks.filter(link => link.settlementId === request.id) ?? []
+            if (!source || !line.consumptionVersion || !ownLinks.length || !source.consumptionVersion)
+              continue
+            const bindings = line.clearanceAllocations ?? []
+            if (ownLinks.length !== bindings.length || ownLinks.some(link => !bindings.some(binding => binding.verificationId === link.verificationId && binding.itemId === link.itemId && binding.amount === link.amount)))
+              continue
+            const before = {
+              ...source,
+              clearanceLinks: source.clearanceLinks.filter(link => link.settlementId !== request.id),
+              clearanceItemAvailability: source.clearanceItemAvailability.map(item => ({
+                ...item,
+                amountRemaining: item.amountRemaining === null ? null : (Math.round(item.amountRemaining * 100) + ownLinks.filter(link => link.verificationId === item.verificationId && link.itemId === item.itemId).reduce((sum, link) => sum + Math.round(link.amount * 100), 0)) / 100,
+              })),
+            }
+            const priorConsumption = `expense-consumption-v1:${createHash('sha256').update(expenseConsumptionFingerprint(before)).digest('hex')}`
+            if (priorConsumption === line.consumptionVersion)
+              line.consumptionVersion = source.consumptionVersion
+          }
+        }
         const domain = instance(data, expenses)
-        const result: OtherSettlementResult = await domain.execute(request, actor)
+        const result: OtherSettlementResult = await domain.execute(normalized, actor)
         const record = domain.snapshot().find(row => row.id === result.id)!
         // Dynamic downstream facts are read from finance, never persisted as another cash/cost authority.
         record.facts = request.id ? data.originalRecords.find(row => row.id === request.id)!.facts : []

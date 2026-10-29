@@ -54,7 +54,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/production-backup.spec.ts](../../../e2e/production-backup.spec.ts) | Playwright E2E | 客户原件公开备份、失响应原键、离线副本与隔离冷恢复保持一致 |
-| [e2e/production-our-signatories.spec.ts](../../../e2e/production-our-signatories.spec.ts) | Playwright E2E | 自有随机端口和合成磁盘库：主体整页维护、实际选择/协议冻结、丢响应原命令恢复保后来输入、五档视口和独立进程重启读取 |
+| [e2e/production-our-signatories.spec.ts](../../../e2e/production-our-signatories.spec.ts) | Playwright E2E | 自有随机端口和合成磁盘库：材采选施工主合同后整页创建、编辑和关系回读；主体选择/协议冻结、原命令恢复、五档视口与独立进程重启读取 |
 
 ## 辅助文件与配置（非独立测试）
 

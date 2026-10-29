@@ -51,7 +51,7 @@ it('原费用100/缺原纸清偿30替代核实，新70及旧30显式同结算续
     expect(source.qualification).toMatchObject({ state: 'verified', verifiedHandledAmount: 30, newAdoptableAmount: 70, legacyObligationAmount: 30, legacyPaidAmount: 0, legacyUnpaidAmount: 30 })
     expect(source.clearances).toEqual([expect.objectContaining({ id: f.paperMissingLine, missingOriginalDocument: true, originalDocumentState: 'not-digitized' })])
     const proof = source.clearanceProofs.at(-1)!
-    const request = { ...f.identity, requiredCapability: 'other-settlement:write', commandId: 'clearance-new-and-old-one-settlement', baseVersion: null, action: 'submit' as const, attachments: {}, draft: { name: '新70及旧30明确承接', projectId: null, contractId: null, settlementDate: '2026-10-05', totalAmount: 100, originalExpenses: [{ originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, amount: 100, clearanceAllocations: [{ verificationId: proof.id, itemId: proof.items[0]!.id, amount: 30 }] }] } }
+    const request = { ...f.identity, requiredCapability: 'other-settlement:write', commandId: 'clearance-new-and-old-one-settlement', baseVersion: null, action: 'submit' as const, attachments: {}, draft: { name: '新70及旧30明确承接', projectId: null, contractId: null, settlementDate: '2026-10-05', totalAmount: 100, originalExpenses: [{ originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, consumptionVersion: source.consumptionVersion, amount: 100, clearanceAllocations: [{ verificationId: proof.id, itemId: proof.items[0]!.id, amount: 30 }] }] } }
     const saved = await f.owner.execute(request, f.session)
     await f.owner.execute({ ...request, id: saved.id, commandId: 'clearance-confirm-all', baseVersion: saved.version, action: 'confirm' }, f.session)
     source = (await f.owner.expenses(f.session)).items[0]!
@@ -67,6 +67,24 @@ it('原费用100/缺原纸清偿30替代核实，新70及旧30显式同结算续
     expect(await f.finance.execute(paymentRequest, f.session)).toEqual(payment)
     expect((await f.finance.resolve('reimbursement', verified.commandId, f.session)).outcome).toBe('applied')
     expect((await f.owner.expenses(f.session)).items[0]!.qualification.newAdoptableAmount).toBe(0)
+  }
+  finally { await f.storage.close() }
+})
+
+it('提交后其他结算占用原费用时，确认仍拒绝过期来源并保留原结算', async () => {
+  const f = await fixture()
+  try {
+    await f.verify()
+    const source = (await f.owner.expenses(f.session)).items[0]!
+    const proof = source.clearanceProofs.at(-1)!
+    const first = { ...f.identity, requiredCapability: 'other-settlement:write', commandId: 'clearance-first-submit', baseVersion: null, action: 'submit' as const, attachments: {}, draft: { name: '待确认原结算', projectId: null, contractId: null, settlementDate: '2026-10-05', totalAmount: 100, originalExpenses: [{ originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, consumptionVersion: source.consumptionVersion, amount: 100, clearanceAllocations: [{ verificationId: proof.id, itemId: proof.items[0]!.id, amount: 30 }] }] } }
+    const saved = await f.owner.execute(first, f.session)
+    const latest = (await f.owner.expenses(f.session)).items[0]!
+    const second = { ...first, commandId: 'clearance-second-submit', draft: { ...first.draft, name: '其他结算', totalAmount: 1, originalExpenses: [{ originalExpenseLineId: latest.id, sourceVersion: latest.version, sourceRevision: latest.sourceRevision, consumptionVersion: latest.consumptionVersion, amount: 1 }] } }
+    const other = await f.owner.execute(second, f.session)
+    await f.owner.execute({ ...second, id: other.id, commandId: 'clearance-second-confirm', baseVersion: other.version, action: 'confirm' }, f.session)
+    await expect(f.owner.execute({ ...first, id: saved.id, commandId: 'clearance-first-confirm', baseVersion: saved.version, action: 'confirm' }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect((await f.owner.detail(saved.id, { origin: 'real' }, f.session)).settlement.version).toBe(saved.version)
   }
   finally { await f.storage.close() }
 })
