@@ -992,7 +992,7 @@ describe('core migration local source', () => {
           sourceSchemaVersion: LATEST_VERSION,
           sourceVersion: CORE_MIGRATION_SOURCE_VERSION,
           sourceHash: 'a'.repeat(64),
-          snapshotSha256: 'b'.repeat(64),
+          snapshotSha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
           immutable: true,
           snapshotKey: 'production',
           byteLength: 3,
@@ -1020,6 +1020,9 @@ describe('core migration local source', () => {
       confirmedAt: '2026-08-15T01:00:00.000Z',
       rollbackExpiresAt: '2026-08-22T01:00:00.000Z',
     })
+    // 旧库已只读，确认时只能读取受保护快照，不能重新打开普通业务连接。
+    expect(deps.currentSchemaVersion).not.toHaveBeenCalled()
+    expect(deps.readSnapshotSource).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]))
     await source.rollback('core-source-hash', 'a'.repeat(64))
 
     expect(events).toEqual([
@@ -1029,6 +1032,21 @@ describe('core migration local source', () => {
       'restore:core-source-hash',
       'clear',
     ])
+  })
+
+  it('确认时快照字节已变化则拒绝激活迁移标记', async () => {
+    const deps = dependencies({
+      loadBackup: vi.fn().mockResolvedValue({ metadata: { sourceHash: 'a'.repeat(64), snapshotSha256: 'b'.repeat(64) }, snapshot: new Uint8Array([1, 2, 3]) }),
+      readSnapshotSource: vi.fn().mockResolvedValue({ sourceHash: 'a'.repeat(64) }),
+    })
+    await expect(createCoreMigrationLocalSource(deps).confirmSwitch({
+      batchId: 'batch-1',
+      backupId: 'backup-1',
+      sourceHash: 'a'.repeat(64),
+      confirmedAt: '2026-08-15T01:00:00.000Z',
+      rollbackExpiresAt: '2026-08-22T01:00:00.000Z',
+    })).rejects.toMatchObject({ code: 'source-changed-after-preflight' })
+    expect(deps.activateMigration).not.toHaveBeenCalled()
   })
 
   it('queries every entity in the declared topology', async () => {

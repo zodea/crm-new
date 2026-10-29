@@ -1482,8 +1482,12 @@ export function createCoreMigrationLocalSource(
   }
 
   async function confirmSwitch(marker: BrowserCoreMigrationMarker): Promise<void> {
-    await assertQuotationCoreMigrationGate(await dependencies.currentSchemaVersion(), dependencies.select)
-    await dependencies.closeDatabase()
+    // prepareSwitch 已锁定旧库，不能再经普通连接读取；改为核验受保护的原始快照。
+    // readSnapshotSource 仍执行报价迁入门禁，且同时校验预检来源和备份字节摘要。
+    const backup = await dependencies.loadBackup(marker.backupId)
+    if (!backup || backup.metadata.sourceHash !== marker.sourceHash)
+      throw problem('source-changed-after-preflight', '受保护的本地备份与待确认来源不匹配')
+    await assertCurrentSource(marker.sourceHash, backup.metadata.snapshotSha256)
     await dependencies.activateMigration(marker)
   }
 
