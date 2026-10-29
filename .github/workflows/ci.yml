@@ -183,7 +183,7 @@ jobs:
       - name: Run production acceptance
         env:
           CRM_PRODUCTION_ACCEPTANCE: '1'
-        run: pnpm exec playwright test --project=production --forbid-only
+        run: pnpm exec playwright test --project=production --forbid-only '--reporter=list,github'
       - name: Upload diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
