@@ -24,7 +24,7 @@ async function fixture() {
   const sourcePath = join(directory, 'synthetic-source.sqlite')
   const raw = new DatabaseSync(sourcePath)
   const actor = { workspaceId: 'other-import-workspace', actorId: 'other-import-owner', capabilities: ['other-settlement:read', 'other-settlement:write', 'core:migration:write', 'project:list:read', 'supplier:list:read', 'supplier:write'] }
-  raw.exec(`PRAGMA foreign_keys=ON;
+  raw.exec(`PRAGMA foreign_keys=ON; BEGIN;
 CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY);INSERT INTO schema_migrations VALUES(60);
 CREATE TABLE suppliers(id TEXT PRIMARY KEY,name TEXT);INSERT INTO suppliers VALUES('native-service','原服务交易方');
 CREATE TABLE file_refs(id TEXT PRIMARY KEY,owner_type TEXT,owner_id TEXT,file_name TEXT,file_path TEXT,file_size INTEGER,mime_type TEXT,category TEXT,uploader TEXT,uploaded_at TEXT,deleted_at TEXT);
@@ -40,6 +40,7 @@ ${OTHER_SETTLEMENT_SCHEMA}`)
   raw.prepare('INSERT INTO file_refs VALUES(?,?,?,?,?,?,?,?,?,?,NULL)').run('raw-metadata', 'expenditure_settlement', 'native-zero', '仅有历史登记.bin', '', 7, 'application/octet-stream', '旧登记', '原上传者', '2026-10-01T01:00:00.000Z')
   raw.prepare('INSERT INTO other_settlement_resolutions VALUES(?,?,?,?,?)').run(otherSettlementKey('source-business-key', actor), 'source-business-key', actor.workspaceId, actor.actorId, '2026-10-01T00:00:00.000Z')
   raw.prepare('INSERT INTO other_settlement_imports VALUES(?,?,?,?,NULL,NULL,NULL,NULL,NULL,?)').run(JSON.stringify([actor.workspaceId, actor.actorId, 'other-settlement-import', 'source-import-key']), 'source-import-key', actor.workspaceId, actor.actorId, '2026-10-01T00:00:00.000Z')
+  raw.exec('COMMIT')
   raw.close()
   const bytes = await readFile(sourcePath)
   const source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
