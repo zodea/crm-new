@@ -13,6 +13,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_production_acceptance:
+        description: Build and run isolated production acceptance tests
+        required: true
+        default: false
+        type: boolean
       run_visual:
         description: Run Windows visual regression once for a merged PR batch
         required: true
@@ -133,18 +138,57 @@ jobs:
           E2E_TARGETS: ${{ inputs.e2e_targets }}
         run: |
           if [[ -z "$E2E_TARGETS" ]]; then
-            pnpm test:e2e
+            pnpm exec playwright test --project=chromium --project=chromium-b
             exit 0
           fi
 
           read -r -a targets <<< "$E2E_TARGETS"
-          pnpm exec playwright test "${targets[@]}"
+          pnpm exec playwright test --project=chromium --project=chromium-b "${targets[@]}"
 
       - name: Upload Playwright diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: playwright-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  production-acceptance:
+    name: production-acceptance
+    if: ${{ inputs.run_production_acceptance }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.26.0
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build production application
+        run: pnpm build
+      - name: Run production acceptance
+        env:
+          CRM_PRODUCTION_ACCEPTANCE: '1'
+        run: pnpm exec playwright test --project=production --forbid-only
+      - name: Upload diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: production-acceptance-results
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
