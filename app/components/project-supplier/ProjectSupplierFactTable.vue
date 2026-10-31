@@ -15,6 +15,7 @@ defineProps<{
   rows: readonly ProjectSupplierFactTableRow[]
   empty: string
   returnTo: string
+  unverifiedLabel?: string
 }>()
 </script>
 
@@ -62,7 +63,7 @@ defineProps<{
             <span v-else class="break-words">{{ cell.text || '—' }}</span>
           </td>
           <td class="whitespace-nowrap px-3 py-2.5">
-            <ProjectSupplierSourceLink label="查看源单" :intent="row.navigation" :return-to="returnTo" />
+            <ProjectSupplierSourceLink label="查看源单" :intent="row.navigation" :return-to="returnTo" :unverified-label="unverifiedLabel" />
           </td>
         </tr>
       </tbody>

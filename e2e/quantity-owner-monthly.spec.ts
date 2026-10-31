@@ -12,7 +12,7 @@ async function setupMonthly(request: APIRequestContext) {
   const headers = { 'x-ruihang-test-session': `quantity-monthly-${randomUUID()}` }
   const session = await (await request.get('/api/read/business-session', { headers })).json()
   const create = async (entity: string, capability: string, draft: Record<string, unknown>, action = 'draft') => {
-    const response = await request.post(`/api/commands/${entity}`, { headers, data: { ...session, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action, draft, attachments: {} } })
+    const response = await request.post(`/api/commands/${entity}`, { headers, data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action, draft, attachments: {} } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }
@@ -34,7 +34,7 @@ async function setupMonthly(request: APIRequestContext) {
   }
   let version = (await read('/api/read/quantity/region')).sourceVersion
   const execute = async (action: QuantityCommand['action']) => {
-    const response = await request.post('/api/commands/quantity', { headers, data: { ...session, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action } })
+    const response = await request.post('/api/commands/quantity', { headers, data: { workspaceId: session.workspaceId, actorId: session.actorId, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action } })
     expect(response.ok(), await response.text()).toBe(true)
     const result = await response.json()
     version = result.sourceVersion

@@ -61,13 +61,13 @@ test('工程量真实SQLite十五表经HTTP迁移，更正与独立新增保留�
     const stage = detail.data.stages[0]
     const content = await read('photo', { ...detailQuery, completionId: stage.completion.id, photoId: id('file_refs', 'q-photo') } as typeof query)
     expect(content.data.contentBase64).toBe('AQID')
-    const correction = await request.post('/api/commands/quantity', { data: { ...session, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: detail.sourceVersion, action: { kind: 'save-completion', draft: { projectId, unitId, stageId: stage.id, status: 'completed', completedAt: '2026-09-11', note: '中央HTTP更正', expectedCompletionId: stage.completion.id, expectedCompletionFingerprint: stage.completion.fingerprint, expectedAssignmentId: stage.currentAssignment?.id ?? null, photos: [] } } } })
+    const correction = await request.post('/api/commands/quantity', { data: { workspaceId: session.workspaceId, actorId: session.actorId, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: detail.sourceVersion, action: { kind: 'save-completion', draft: { projectId, unitId, stageId: stage.id, status: 'completed', completedAt: '2026-09-11', note: '中央HTTP更正', expectedCompletionId: stage.completion.id, expectedCompletionFingerprint: stage.completion.fingerprint, expectedAssignmentId: stage.currentAssignment?.id ?? null, photos: [] } } } })
     expect(correction.ok(), await correction.text()).toBe(true)
     await transition('confirm')
     expect((await read('completion', detailQuery)).data.stages[0].completion.note).toBe('中央HTTP更正')
     const independentQuery = { ...query, projectId: independent.id }
     const independentBefore = await read('region', independentQuery)
-    const newBuilding = await request.post('/api/commands/quantity', { data: { ...session, projectId: independent.id, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: independentBefore.sourceVersion, action: { kind: 'create-building', draft: { code: 'I1', name: '独立新建一栋' } } } })
+    const newBuilding = await request.post('/api/commands/quantity', { data: { workspaceId: session.workspaceId, actorId: session.actorId, projectId: independent.id, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: independentBefore.sourceVersion, action: { kind: 'create-building', draft: { code: 'I1', name: '独立新建一栋' } } } })
     expect(newBuilding.ok(), await newBuilding.text()).toBe(true)
     const expected = await read('region', independentQuery)
     await transition('rollback')

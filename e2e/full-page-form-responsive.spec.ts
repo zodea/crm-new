@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
+import { installContractEngineeringFixture } from './helpers/contract-engineering-fixture'
 import { installProjectCentralFixture, PROJECT_INPUTS } from './helpers/project-central-fixture'
 import {
   EQUIVALENT_200_PERCENT_VIEWPORT,
@@ -20,16 +21,7 @@ interface RepresentativeForm extends FormRoute {
   firstField: (page: Page) => Locator
 }
 
-async function preparePaymentForm(page: Page) {
-  await expect(page.getByRole('heading', { name: '选择付款业务类型' })).toBeVisible({
-    timeout: 20_000,
-  })
-  const paymentType = page.getByRole('button', { name: '有合同-材料', exact: true })
-  await paymentType.focus()
-  await expect(paymentType).toBeFocused()
-  await page.keyboard.press('Enter')
-}
-
+// 付款申请的可写键盘路径及明细布局由 production-other-settlements 的正式合成来源承接。
 const REPRESENTATIVE_FORMS: RepresentativeForm[] = [
   {
     path: '/base/supplier/form',
@@ -37,14 +29,6 @@ const REPRESENTATIVE_FORMS: RepresentativeForm[] = [
     listPath: '/base/supplier',
     primaryAction: '保存',
     firstField: page => page.getByLabel('公司全称 *'),
-  },
-  {
-    path: '/finance/payment/new',
-    title: '新建 · 付款申请',
-    listPath: '/finance/payment',
-    primaryAction: '保存',
-    firstField: page => page.getByTestId('finance-name'),
-    prepare: preparePaymentForm,
   },
   {
     path: '/material/arrival/new',
@@ -129,11 +113,15 @@ test.describe('#112 R3-B 整页表单增量验收', () => {
         // 1440px 显示器在浏览器 200% 缩放下约等于 720 CSS px 布局视口。
         await page.setViewportSize(EQUIVALENT_200_PERCENT_VIEWPORT)
 
+        if (form.path === '/contract/material/form') {
+          // 此用例只验证筛选与焦点；正式施工主合同的真实来源及保存另由生产验收覆盖。
+          await installContractEngineeringFixture(page, 'material', PROJECT_INPUTS[0].name)
+        }
         await openRepresentativeForm(page, form)
         await expectNoPageOverflow(page, `${form.path} @ 720px`)
 
         if (form.path === '/contract/material/form') {
-          const projectFilter = page.getByLabel('检索项目')
+          const projectFilter = page.getByRole('combobox', { name: '搜索工程及施工主合同' })
           await projectFilter.focus()
           await expect(projectFilter).toBeFocused()
           await page.keyboard.type(PROJECT_INPUTS[0].name)
@@ -170,18 +158,7 @@ test.describe('#112 R3-B 整页表单增量验收', () => {
     }
   }
   const denseForms = [
-    {
-      path: '/finance/payment/new',
-      title: '新建 · 付款申请',
-      prepare: preparePaymentForm,
-      addLine: async (page: Page) => page.getByTestId('add-grid-line').first().click(),
-      root: (page: Page) => page.getByTestId('finance-line-grid').first().locator(':scope > .overflow-auto'),
-      lastAction: (page: Page) => page
-        .getByTestId('finance-line-grid')
-        .first()
-        .getByTitle('删除')
-        .last(),
-    },
+    // 付款申请明细横滚由 production-other-settlements 中的隔离正式来源验收。
     {
       path: '/finance/reimbursement/new',
       title: '新建 · 费用报销',

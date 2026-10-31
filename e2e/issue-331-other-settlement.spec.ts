@@ -104,13 +104,14 @@ test.describe('AX05 其他支出结算中央往返', () => {
     }
   })
   test('真实空态、请求失败重试、无权限和未找到', async ({ page }, info) => {
+    test.setTimeout(90_000)
     const session = Buffer.from(info.testId).toString('base64url')
     const reset = (scenario: string) => page.request.post('/api/testing/other-settlements/reset', { headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': session }, data: { scenario } })
     await page.goto('/contract/other-settlement')
     await expect(page.locator('[data-ui="kit-table-empty"]:visible').getByText('暂无其他支出结算', { exact: true })).toBeVisible()
     await reset('unavailable')
     await page.reload()
-    await expect(page.getByText('其他支出结算读取失败，请重试', { exact: true })).toBeVisible()
+    await expect(page.getByText('其他支出结算读取失败，请重试', { exact: true })).toBeVisible({ timeout: 30_000 })
     await reset('ready')
     await page.getByRole('button', { name: '重新加载' }).click()
     await expect(page.locator('[data-ui="kit-table-empty"]:visible').getByText('暂无其他支出结算', { exact: true })).toBeVisible()

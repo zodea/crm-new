@@ -68,13 +68,10 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await expect(page.getByRole('tab', { name: /^合同/ })).toHaveAttribute('aria-selected', 'true')
 
     await page.getByRole('tab', { name: /^请款/ }).click()
-    const claimSource = page.getByRole('link', { name: '查看源单' }).first()
-    await expect(claimSource).toHaveAttribute('href', /\/finance\/payment\/.*projectId=proj_demo_002.*supplierId=sup_demo_004.*returnTo=/)
-    await claimSource.click()
-    await expect(page.getByRole('heading', { name: /付款申请/ })).toBeVisible()
-    await page.getByRole('link', { name: '返回项目分供方工作台' }).click()
-    await expect(page).toHaveURL(/\/project\/proj_demo_002\/supplier\/sup_demo_004\?origin=demo&tab=claim$/)
+    await expect(page.getByText('来源待核验').first()).toBeVisible()
+    await expect(page.getByRole('link', { name: '查看源单' })).toHaveCount(0)
     await expect(page.getByRole('tab', { name: /^请款/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page).toHaveURL(/tab=claim/)
     await page.reload()
     await expect(page.getByRole('tab', { name: /^请款/ })).toHaveAttribute('aria-selected', 'true')
     for (const tab of ['收票', '付款', '结算']) {

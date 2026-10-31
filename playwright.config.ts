@@ -38,6 +38,8 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
+  // 本机冷启动的模块加载可能超过默认 5 秒；仍需等到相同的可观察结果。
+  expect: { timeout: 15_000 },
   // 两个中央组各 1 个 worker，production 组 3 个。
   workers: 5,
   reporter: process.env.CI ? 'github' : 'list',

@@ -4,9 +4,8 @@ import type { OtherSettlementDTO } from '~/lib/other-settlement/contract'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
-import { enumFilterValues } from '~/lib/kit/enum-filter'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
-import { OTHER_SETTLEMENT_AMOUNT_LABELS, OTHER_SETTLEMENT_PATH, OTHER_SETTLEMENT_STATUS_LABELS } from '~/lib/other-settlement/contract'
+import { OTHER_SETTLEMENT_AMOUNT_LABELS, OTHER_SETTLEMENT_PATH, OTHER_SETTLEMENT_STATUS_LABELS, otherSettlementStatusFilterValues } from '~/lib/other-settlement/contract'
 
 const route = useRoute()
 const root = useTemplateRef<HTMLElement>('root')
@@ -18,9 +17,9 @@ const { data: page, shellState, problem, load } = useAuxiliaryContractRead(
   { snapshotKey: () => JSON.stringify([route.query.origin ?? 'real']) },
 )
 const search = shallowRef(String(route.query.search ?? ''))
-const status = computed({ get: () => enumFilterValues(route.query.status), set: (value: string[]) => void filter({ status: value.length ? value : undefined }) })
+const status = computed({ get: () => otherSettlementStatusFilterValues(route.query.status), set: (value: string[]) => void filter({ status: value.length ? value : undefined }) })
 const project = computed({ get: () => String(route.query.projectId ?? ''), set: value => void filter({ projectId: value || undefined }) })
-const statuses = Object.entries(OTHER_SETTLEMENT_STATUS_LABELS).map(([key, label]) => ({ key, label }))
+const statuses = Object.entries(OTHER_SETTLEMENT_STATUS_LABELS).filter(([key]) => key !== '已确认').map(([key, label]) => ({ key, label }))
 const columns: KitTableColumn[] = [
   { field: 'name', title: '结算名称', width: 210, slot: 'name' },
   { field: 'no', title: '结算单号', width: 150 },
@@ -36,7 +35,7 @@ const columns: KitTableColumn[] = [
   ...([['createdBy', '创建人'], ['createdAt', '创建时间'], ['updatedBy', '修改人'], ['updatedAt', '修改时间']] as const).map(([field, title]) => ({ field, title, width: 170 })),
   { field: 'action', title: '操作', width: 76, fixed: 'right' as const, slot: 'action' },
 ]
-const rows = computed(() => page.value?.items.map(row => ({ id: row.id, source: row, name: row.draft.name || '未命名结算', no: row.draft.no || '未记录', date: row.draft.settlementDate || '未记录', type: row.draft.settlementType || '未记录', project: row.project.label || '关系不可用', contractName: row.contract.label || '关系不可用', supplier: row.supplier.label || '关系不可用', ...Object.fromEntries(Object.entries(row.amounts).map(([key, value]) => [key, auxiliaryMoney(value)])), status: statuses.find(s => s.key === row.draft.status)?.label || '未记录', business: '其他支出结算', attachmentCount: row.attachmentCount, ...Object.fromEntries(Object.entries(row.audit).map(([key, value]) => [key, value || '未记录'])) })) ?? [])
+const rows = computed(() => page.value?.items.map(row => ({ id: row.id, source: row, name: row.draft.name || '未命名结算', no: row.draft.no || '未记录', date: row.draft.settlementDate || '未记录', type: row.draft.settlementType || '未记录', project: row.project.label || '关系不可用', contractName: row.contract.label || '关系不可用', supplier: row.supplier.label || '关系不可用', ...Object.fromEntries(Object.entries(row.amounts).map(([key, value]) => [key, auxiliaryMoney(value)])), status: OTHER_SETTLEMENT_STATUS_LABELS[row.draft.status ?? ''] || '未记录', business: '其他支出结算', attachmentCount: row.attachmentCount, ...Object.fromEntries(Object.entries(row.audit).map(([key, value]) => [key, value || '未记录'])) })) ?? [])
 const canWrite = computed(() => page.value?.capabilities.includes('other-settlement:write'))
 const hasFilters = computed(() => ['search', 'projectId', 'contractId', 'supplierId'].some(key => route.query[key]) || status.value.length > 0)
 const fetchProjects = async (keyword: string) => page.value?.projectOptions.filter(p => p.label.includes(keyword)) ?? []

@@ -48,7 +48,7 @@ async function installOwnerBoqFixture(page: Page, input: (typeof CHANGE_CASES)[n
   await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))
   const session = await (await page.request.get('/api/read/business-session')).json()
   const create = async (domain: string, requiredCapability: string, draft: Record<string, unknown>) => {
-    const response = await page.request.post(`/api/commands/${domain}`, { data: { ...session, requiredCapability, commandId: randomUUID(), baseVersion: null, action: 'draft', draft, attachments: {} } })
+    const response = await page.request.post(`/api/commands/${domain}`, { data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability, commandId: randomUUID(), baseVersion: null, action: 'draft', draft, attachments: {} } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }

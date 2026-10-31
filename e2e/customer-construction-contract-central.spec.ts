@@ -116,7 +116,7 @@ for (const input of CUSTOMER_INPUTS) {
         const response = await fetch(`/api/commands/${entity}${id ? `/${id}` : ''}`, {
           method: id ? 'PUT' : 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ ...session, ...(id ? { id } : {}), requiredCapability: entity === 'customers' ? 'customer:write' : entity === 'projects' ? 'project:write' : 'construction-contract:write', commandId: crypto.randomUUID(), baseVersion: form?.version ?? null, action: 'save', draft: { ...form?.draft, ...draft }, attachments: {} }),
+          body: JSON.stringify({ workspaceId: session.workspaceId, actorId: session.actorId, ...(id ? { id } : {}), requiredCapability: entity === 'customers' ? 'customer:write' : entity === 'projects' ? 'project:write' : 'construction-contract:write', commandId: crypto.randomUUID(), baseVersion: form?.version ?? null, action: 'save', draft: { ...form?.draft, ...draft }, attachments: {} }),
         })
         const result = await response.json()
         if (!response.ok)

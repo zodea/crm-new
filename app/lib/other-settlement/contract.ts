@@ -2,9 +2,19 @@ import type { EntityRefDTO, MoneyDTO, NavigationIntentDTO, PageDTO } from '../..
 import type { AuxiliaryContractAudit } from '../auxiliary-contract/contract'
 import type { ContractFormAttachment, ContractFormAttachmentChanges } from '../contract/forms'
 import type { ExpenseClearanceAllocationDTO, ExpenseClearanceAllocationInput, ExpenseClearanceLink, ExpenseClearanceLinkEdit } from '../finance/clearance-verification'
+import { enumFilterValues, matchesEnumFilter } from '../kit/enum-filter'
 
 export const OTHER_SETTLEMENT_PATH = '/contract/other-settlement'
 export const OTHER_SETTLEMENT_STATUS_LABELS: Record<string, string> = { draft: '草稿', pending: '待确认', confirmed: '已确认', 已确认: '已确认' }
+/** 保留历史值，筛选显示和链接统一为当前状态键。 */
+export function otherSettlementStatusFilterValues(value: unknown): string[] {
+  return [...new Set(enumFilterValues(value).map(status => status === '已确认' ? 'confirmed' : status))]
+}
+
+export function matchesOtherSettlementStatus(value: string | null | undefined, selection: unknown): boolean {
+  const selected = otherSettlementStatusFilterValues(selection)
+  return matchesEnumFilter(value === '已确认' ? 'confirmed' : value, selected)
+}
 export interface OtherSettlementExpenseInput {
   originalExpenseLineId: string
   sourceVersion: string

@@ -28,7 +28,7 @@ test('中央责任、缺照草稿、照片完成和责任替换保留历史，�
   }
   const execute = async (action: QuantityCommand['action']) => {
     const current = await read('region')
-    const response = await page.request.post('/api/commands/quantity', { data: { ...session, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: current.sourceVersion, action } })
+    const response = await page.request.post('/api/commands/quantity', { data: { workspaceId: session.workspaceId, actorId: session.actorId, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: current.sourceVersion, action } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }
@@ -60,6 +60,7 @@ test('中央责任、缺照草稿、照片完成和责任替换保留历史，�
     }
   }
   await page.goto(matrixUrl)
+  await expect(page.getByRole('button', { name: '责任配置', exact: true })).toBeVisible({ timeout: 45_000 })
   await page.getByRole('button', { name: '责任配置', exact: true }).click()
   const assignment = page.getByRole('dialog', { name: '户 × 工种责任配置', exact: true })
   await assignment.getByRole('combobox', { name: '班组', exact: true }).click()

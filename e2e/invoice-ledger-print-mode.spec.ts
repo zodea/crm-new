@@ -6,6 +6,7 @@ for (const input of [
   { label: '多张归档票', numbers: ['26442000000000000502', '26442000000000000503'], amounts: [226, 339] },
 ]) {
   test(`发票台账打印入口：双栏选择、取消打印确认并返回：${input.label}`, async ({ page }) => {
+    test.setTimeout(90_000)
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
     await page.addInitScript(() => {
@@ -22,7 +23,7 @@ for (const input of [
 
     await page.clock.setFixedTime(new Date('2026-09-11T04:00:00.000Z'))
     await page.goto('/finance/ledger')
-    await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible({ timeout: 30_000 })
     await updateProductionSnapshot(page, (database) => {
       database.run('DELETE FROM invoices')
       for (const [index, number] of input.numbers.entries()) {

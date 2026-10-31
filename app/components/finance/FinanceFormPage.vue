@@ -847,6 +847,8 @@ onActivated(() => {
   active = true
   if (mounted && savedReadPending.value)
     readbackError.value ||= '本次已保存，请只重试同一记录读取'
+  else if (mounted && scopeKey() === viewScope && centralSession.value?.authority && !centralSession.value.context && !centralPending.value && !sourceError.value)
+    void retrySourceRead()
 })
 watch(() => [props.kind, routeId.value] as const, () => {
   if (active && scopeKey() !== viewScope) {

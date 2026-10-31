@@ -91,6 +91,8 @@ jobs:
           pnpm exec eslint "${files[@]}"
 
       - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm typecheck
 
       - name: Unit tests

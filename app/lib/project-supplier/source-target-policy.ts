@@ -2,7 +2,6 @@ import type { DataOriginDTO, EntityKindDTO } from '../../types/read-model'
 
 const VERIFIED_DEMO_SOURCE_TARGETS = new Set([
   'contract:detail',
-  'payment-application:detail',
 ])
 
 export function isVerifiedProjectSupplierSourceTarget(input: {

@@ -60,6 +60,59 @@ describe('中央绑定固定预览与原提交恢复', () => {
 })
 
 describe('浏览器中央 WBS 项目会话与失响应恢复', () => {
+  it('只释放带当前编号未应用证明的冲突，其他编号仍需恢复', async () => {
+    const store = useScheduleStore()
+    await store.loadProject('p')
+    mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => {
+      const failure = scheduleProblem('stale-source', '来源变化')
+      Object.assign(failure.problem, { commandId: command.commandId, commandOutcome: 'not-applied' })
+      throw failure
+    })
+    await expect(store.setBaseline('p')).rejects.toThrow('来源变化')
+    expect(store.pendingCommand).toBeNull()
+    mocks.save.mockImplementationOnce(async () => {
+      const failure = scheduleProblem('stale-source', '来源变化')
+      Object.assign(failure.problem, { commandId: 'other', commandOutcome: 'not-applied' })
+      throw failure
+    })
+    await expect(store.setBaseline('p')).rejects.toThrow('来源变化')
+    expect(store.pendingCommand).not.toBeNull()
+  })
+  it('依赖保存的准确回读只推进对应任务的编辑版本；后续其他变更不能抬高草稿版本', async () => {
+    const store = useScheduleStore()
+    await store.loadProject('p')
+    store.beginPlanEdit('task')
+    mocks.save.mockImplementation(async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'p', sourceVersion: 'v2', value: null }))
+    mocks.read.mockResolvedValueOnce(read('p', 'v2'))
+    await store.updateDependency('task', 'predecessor', 0)
+    expect(mocks.save.mock.calls[0]![0].sourceVersion).toBe('v1')
+    mocks.read.mockResolvedValueOnce(read('p', 'v3'))
+    await store.recheck()
+    mocks.save.mockRejectedValueOnce(scheduleProblem('stale-source', '其他修改'))
+    await expect(store.saveTaskPlan('task', { plannedStart: '2026-09-01', plannedFinish: '2026-09-06', manualProgress: 0, floorPlans: [], dependency: null })).rejects.toThrow('其他修改')
+    expect(mocks.save.mock.calls[1]![0].sourceVersion).toBe('v2')
+  })
+  it('依赖保存后读到更新的第三方版本时不改变编辑依据', async () => {
+    const store = useScheduleStore()
+    await store.loadProject('p')
+    store.beginPlanEdit('task')
+    mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'p', sourceVersion: 'v2', value: null }))
+    mocks.read.mockResolvedValueOnce(read('p', 'v3'))
+    await store.updateDependency('task', 'predecessor', 0)
+    mocks.save.mockRejectedValueOnce(scheduleProblem('stale-source', '其他修改'))
+    await expect(store.saveTaskPlan('task', { plannedStart: '2026-09-01', plannedFinish: '2026-09-06', manualProgress: 0, floorPlans: [], dependency: null })).rejects.toThrow('其他修改')
+    expect(mocks.save.mock.calls[1]![0].sourceVersion).toBe('v1')
+  })
+  it('拖动调整使用当前页面版本，不沿用先前任务草稿的版本', async () => {
+    const store = useScheduleStore()
+    await store.loadProject('p')
+    store.beginPlanEdit('task')
+    mocks.read.mockResolvedValueOnce(read('p', 'v2'))
+    await store.recheck()
+    mocks.save.mockRejectedValueOnce(scheduleProblem('stale-source', '拒绝提交'))
+    await expect(store.rescheduleTask('task', { plannedFinish: '2026-09-07' }, [])).rejects.toThrow('拒绝提交')
+    expect(mocks.save.mock.calls[0]![0].sourceVersion).toBe('v2')
+  })
   it('正式读取从不访问本地 SQL；项目切换的迟到读取不覆盖新项目', async () => {
     let resolve!: (value: ScheduleRead) => void
     mocks.read.mockImplementationOnce(() => new Promise<ScheduleRead>((done) => {

@@ -91,7 +91,7 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
   const detail = `/project/target-cost/${encodeURIComponent(f.a)}?origin=real&returnTo=${encodeURIComponent(list)}`
   await page.goto(detail)
   if (!process.env.TARGET_COST_RESUME_IDENTITIES) {
-    await expect(page.getByRole('heading', { name: `原当前预算 ${f.runId}`, exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: `原当前预算 ${f.runId}`, exact: true })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('未填写分项名称（历史记录）')).toBeVisible()
     await capture(page, 'migrated-null-and-zero')
     await page.getByText('查看版本来源与操作历史', { exact: false }).click()
@@ -179,7 +179,9 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
   await test.step('真实已应用丢回执，原键恢复只提交一次', async () => {
     let intercepted: unknown = null
     let originalKey = ''
+    let sends = 0
     await page.route('**/api/commands/target-costs', async (route) => {
+      sends++
       if (intercepted)
         return route.continue()
       intercepted = route.request().postDataJSON()
@@ -193,9 +195,16 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeEnabled()
     await capture(page, 'unknown-header-retained')
     await page.unroute('**/api/commands/target-costs')
-    const response = page.waitForResponse(response => response.url().endsWith('/api/commands/target-costs') && response.request().postDataJSON().commandId === originalKey)
+    page.on('request', (request) => {
+      if (request.url().endsWith('/api/commands/target-costs') && request.method() === 'POST')
+        sends++
+    })
+    const response = page.waitForResponse(response => response.url().endsWith('/api/commands/target-costs/resolve') && response.request().postDataJSON().commandId === originalKey)
     await page.getByRole('button', { name: '核对原提交', exact: true }).click()
-    expect((await response).ok()).toBe(true)
+    const resolved = await response
+    expect(resolved.ok(), await resolved.text()).toBe(true)
+    expect(await resolved.json()).toMatchObject({ outcome: 'applied', result: { commandId: originalKey } })
+    expect(sends).toBe(1)
     await expect(page.getByRole('heading', { name: `新预算 ${f.runId}`, exact: true })).toBeVisible()
     expect((await readDetail(page, f.b)).view.header.note).toBe('原键恢复验证')
   })

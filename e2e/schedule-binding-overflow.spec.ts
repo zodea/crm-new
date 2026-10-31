@@ -33,7 +33,10 @@ test('组件读取夹具：四条稳定清单来源与完整长说明可键盘�
     await table.locator('.vxe-table--body-inner-wrapper').evaluate((node) => {
       node.scrollLeft = node.scrollWidth
     })
-    await fourth.focus()
+    await sources.focus()
+    for (let index = 0; index < 4; index++)
+      await page.keyboard.press('Tab')
+    await expect(fourth).toBeFocused()
     await reasons.evaluate((node) => {
       node.scrollTop = node.scrollHeight
     })

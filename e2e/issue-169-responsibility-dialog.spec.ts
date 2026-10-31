@@ -10,6 +10,9 @@ test.describe('Issue #169：责任配置弹窗视觉与模态边界', () => {
     const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
 
     await expect(editor).toBeVisible()
+    await expect(editor.getByText('责任只写户 × 工种；不会在这里登记完成状态或完成日期。')).toBeVisible()
+    await expect(editor.getByText('按当前楼栋分组选择；格内始终显示所选工种的当前责任。')).toBeVisible()
+    await expect(editor.getByRole('button', { name: '保存责任', exact: true })).toBeVisible()
     const metrics = await editor.evaluate((dialog) => {
       const nav = dialog.querySelector<HTMLElement>('.form-dialog__nav button')!
       const picker = dialog.querySelector<HTMLElement>('[data-testid="quantity-assignment-unit-picker"]')!
@@ -36,9 +39,14 @@ test.describe('Issue #169：责任配置弹窗视觉与模态边界', () => {
       floorItems: 2,
       workspaceOverflow: 'hidden',
     })
-    await expect(editor).toHaveScreenshot('responsibility-dialog-1740x974.png', {
-      animations: 'disabled',
-    })
+    // Windows 中 Noto Sans SC 同名字体的静态版和可变版渲染字形不同；
+    // 两份基线均保持原像素断言，不能用较大的差异阈值掩盖布局变化。
+    try {
+      await expect(editor).toHaveScreenshot('responsibility-dialog-1740x974.png', { animations: 'disabled', timeout: 5_000 })
+    }
+    catch {
+      await expect(editor).toHaveScreenshot('responsibility-dialog-1740x974-noto-static.png', { animations: 'disabled' })
+    }
   })
 
   test('代表视口保持内容与操作可达且不撑宽页面', async ({ page }) => {

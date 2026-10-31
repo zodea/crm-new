@@ -65,9 +65,9 @@ const test = base.extend<{ boq: BoqFixture }>({
       insert('unit_stage_completions', { id: id('completion'), unit_id: id('unit'), stage_id: id('stage'), assignment_id: id('assignment'), status: 'completed', completed_at: `${INPUT.generationMonth}-15` })
     })
     await page.reload()
-    await expect(page.getByTestId('boq-contract-number')).toHaveText(INPUT.contractNumber)
+    await expect(page.getByTestId('boq-contract-number')).toHaveText(INPUT.contractNumber, { timeout: 30_000 })
     await use({ projectId: id('project'), contractId: id('contract'), changeId: id('change'), wallId: id('wall') })
-  }, { auto: true }],
+  }, { auto: true, timeout: 90_000 }],
 })
 
 function boqWorkbook(includeUnitPrice = true, input = { quantity: INPUT.pipe.quantity, price: INPUT.pipe.price }): Buffer {

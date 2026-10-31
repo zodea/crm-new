@@ -25,3 +25,5 @@
 | [tests/helpers/project-read-meta.ts](../../../tests/helpers/project-read-meta.ts) | 辅助／夹具（非独立测试） | 项目及真实客户参考来源夹具 |
 | [tests/helpers/verified-signatory.ts](../../../tests/helpers/verified-signatory.ts) | 辅助／夹具（非独立测试） | 在同一隔离SQL目录明确创建并读取主体采用事实 |
 | [e2e/helpers/contract-signatory.ts](../../../e2e/helpers/contract-signatory.ts) | 辅助／夹具（非独立测试） | 端到端实际主体创建、选择与冻结采用准备 |
+| [e2e/helpers/contract-engineering-fixture.ts](../../../e2e/helpers/contract-engineering-fixture.ts) | 辅助／夹具（非独立测试） | 仅为开发界面测试提供合成施工主合同候选；正式关系保存须以生产验收核对 |
+| [e2e/helpers/owner-document-read-fixture.ts](../../../e2e/helpers/owner-document-read-fixture.ts) | 辅助／夹具（非独立测试） | 为单据界面合成响应提供会话身份与来源读取证明，不代表正式来源接入 |

@@ -50,7 +50,7 @@ test('真实长签工发放后两表分页与下载回读，精确单价及明�
   expect((await repository.c2Output(query, statementId)).document).toEqual(before.document)
   await page.addInitScript(() => Object.defineProperty(window, 'showDirectoryPicker', { configurable: true, value: undefined }))
   await page.goto(`/subcontract/payroll/${statementId}?origin=real`)
-  await expect(page.getByRole('button', { name: '下载工资与签工表', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下载工资与签工表', exact: true })).toBeVisible({ timeout: 30_000 })
   const downloaded = page.waitForEvent('download')
   await page.getByRole('button', { name: '下载工资与签工表', exact: true }).click()
   const file = await downloaded

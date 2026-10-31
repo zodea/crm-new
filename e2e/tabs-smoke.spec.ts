@@ -8,6 +8,7 @@ async function openSidebarRoute(page: Page, label: string, path: string) {
   await sidebar.getByRole('searchbox', { name: '搜索菜单' }).fill(label)
   await sidebar.getByRole('link', { name: label, exact: true }).click()
   await expect.poll(() => new URL(page.url()).pathname).toBe(path)
+  await expect(sidebar.getByRole('searchbox', { name: '搜索菜单' })).toHaveValue('', { timeout: 30_000 })
 }
 
 // 上限 15 指可关闭页签；固定首页另行验证，不依赖偶然的初始页签数量。
@@ -15,7 +16,7 @@ for (const input of [
   { width: 1280, first: PROJECT_INPUTS[0], second: PROJECT_INPUTS[1] },
 ]) {
   test(`页签完整旅程：正式项目、切换、右键关闭与15上限 @ ${input.width}px`, async ({ page }) => {
-    test.setTimeout(90_000)
+    test.setTimeout(180_000)
     await page.setViewportSize({ width: input.width, height: 900 })
     await page.addInitScript(() => localStorage.setItem('ruihang-sidebar-pinned', 'true'))
     const sessionId = `tabs-journey-${randomUUID()}`

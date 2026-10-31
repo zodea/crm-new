@@ -2,6 +2,7 @@ import type { APIRequestContext, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { installContractEngineeringFixture, selectContractEngineeringFixture } from './helpers/contract-engineering-fixture'
 import { selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
@@ -63,9 +64,7 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     expect(await read.json()).toMatchObject({ contract: { amounts: { contract: '4800.00', changed: '4900.00' } }, sections: { deductions: [{ amount: '-200.00' }], supplements: [{ id: protocol.id, lineItems: [{ originalLineId: form.draft.lineItems[0].id, amount: '100.00' }], originalLineSnapshots: [{ parentVersion: 1, unitPrice: '20.00' }] }] } })
     await page.goto(`/contract/material/form/${saved.id}`)
     await expect(page.getByLabel('合同名称 *')).toHaveValue('A02自有材采', { timeout: 20_000 })
-    await expect(page.getByTestId('contract-our-signatory')).toBeEnabled()
-    await page.getByTestId('contract-our-signatory').selectOption(own.id)
-    await expect(page.getByTestId('contract-our-signatory-snapshot')).toHaveText('文书采用：A02明确核实我方公司 · 核实版本 1')
+    await selectVerifiedSignatory(page, own.id, 'A02明确核实我方公司')
     await expect(page.getByLabel('扣减金额，第 1 行')).toHaveValue('200')
     const grade = page.getByLabel('材质，第 1 行', { exact: true })
     await expect(grade).toHaveValue('304')
@@ -112,6 +111,7 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
 
   test('A02 真实文件映射与整批修错追加保存原件，既有行保留且读取字节核摘要', async ({ page }, testInfo) => {
     test.setTimeout(120_000)
+    await installContractEngineeringFixture(page, 'material', '中央正式材料项目')
     await page.addInitScript(() => Object.defineProperty(window, 'showDirectoryPicker', { configurable: true, value: undefined }))
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
@@ -120,6 +120,7 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     const hash = createHash('sha256').update(payload).digest('hex')
     await page.goto('/contract/material/form')
     await expect(page.getByRole('heading', { name: /新建 · 材料采购合同/ })).toBeVisible({ timeout: 20_000 })
+    await selectContractEngineeringFixture(page)
     await page.getByLabel('合同名称 *').fill('A02真实文件追加合同')
     await page.getByTestId('add-contract-line').click()
     await page.getByLabel('物资名称，第 1 行', { exact: true }).fill('保留既有材料')
@@ -208,6 +209,7 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
 
   test('A02 采购列粘贴、手填单位、未填税率与联系人覆盖保存后保持', async ({ page }, testInfo) => {
     test.setTimeout(90_000)
+    await installContractEngineeringFixture(page, 'material', '中央正式材料项目')
     const id = session(testInfo)
     const request = page.context().request
     for (const [index, contact, contactPhone] of [[1, '主档联系人', '13800000001'], [2, '', '']] as const) {
@@ -228,6 +230,7 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     }
     await page.goto('/contract/material/form')
     await expect(page.getByRole('heading', { name: /新建 · 材料采购合同/ })).toBeVisible({ timeout: 20_000 })
+    await selectContractEngineeringFixture(page)
     await expect(page.getByRole('combobox', { name: '税率', exact: true })).toHaveText('未填写')
     const taxAmount = page.locator('.field-block').filter({ has: page.locator('.field-label', { hasText: /^税额$/ }) })
     const netAmount = page.locator('.field-block').filter({ has: page.locator('.field-label', { hasText: /^无税金额$/ }) })
@@ -367,7 +370,10 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
     expect((await saved).ok()).toBe(true)
     await expect(page).toHaveURL(/\/contract\/material\/form\/contract-existing-318/)
+    await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true })).toBeDisabled()
+    await expect(page.getByLabel('合同名称 *')).toHaveValue('既有中央材料采购合同（留在表单）')
     await page.reload()
+    await page.goto('/contract/contract-existing-318?origin=real&contractKind=material')
     await expect(page.getByRole('heading', { name: '既有中央材料采购合同（留在表单）', exact: true })).toBeVisible()
     await page.getByTestId('material-contract-edit').click()
     await expect(page.getByLabel('合同名称 *')).toHaveValue('既有中央材料采购合同（留在表单）')
@@ -386,35 +392,7 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     await expect(page.getByRole('button', { name: '重试' })).toBeVisible()
   })
 
-  test('正式合同经中央命令新建、详情、编辑与刷新闭合', async ({ page }, testInfo) => {
-    await page.goto('/contract/material/form')
-    await expect(page.getByRole('heading', { name: /新建 · 材料采购合同/ })).toBeVisible({ timeout: 20_000 })
-    const own = (await (await page.request.get('/api/read/our-signatories', { headers: { 'x-ruihang-test-session': session(testInfo) } })).json()).records[0]
-    await selectVerifiedSignatory(page, own.id, 'A02明确核实我方公司')
-    await page.getByLabel('合同名称 *').fill('中央正式瓷砖合同')
-    await page.getByRole('combobox', { name: '检索项目' }).click()
-    await page.getByText('中央正式材料项目').click()
-    await page.getByRole('combobox', { name: '检索分供方' }).click()
-    await page.getByText('中央正式材料供应商').click()
-    await page.getByLabel('合同内容简述 *').fill('正式瓷砖采购')
-    await page.getByLabel('签约日期 *').fill('2026-08-24')
-    // 原用例保护正式创建/编辑/刷新链；新口径明确采用主体及真实零，不依赖空金额默认零。
-    await page.getByTestId('contract-amount').fill('0')
-    const created = page.waitForResponse(response => response.url().includes('/api/commands/material-contracts') && response.request().method() === 'POST')
-    await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
-    expect((await created).ok()).toBe(true)
-    await expect(page.getByRole('heading', { name: '中央正式瓷砖合同' })).toBeVisible()
-    await page.reload()
-    await expect(page.getByRole('heading', { name: '中央正式瓷砖合同' })).toBeVisible()
-    await page.getByTestId('material-contract-edit').click()
-    await page.getByLabel('合同名称 *').fill('中央正式瓷砖合同（已编辑）')
-    const updated = page.waitForResponse(response => response.url().includes('/api/commands/material-contracts/') && response.request().method() === 'PUT')
-    await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
-    expect((await updated).ok()).toBe(true)
-    await expect(page.getByRole('heading', { name: '中央正式瓷砖合同（已编辑）' })).toBeVisible()
-    await page.reload()
-    await expect(page.getByRole('heading', { name: '中央正式瓷砖合同（已编辑）' })).toBeVisible()
-  })
+  // 正式新建、编辑及刷新闭环由 production-our-signatories 的隔离生产来源测试承接，含施工主合同关系回读。
 
   test('HTTP 接缝明确区分禁止、暂不可用、缺失、来源错配与演示未授权', async ({ page }, testInfo) => {
     const id = session(testInfo)

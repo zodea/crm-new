@@ -116,7 +116,6 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(page.locator('object')).toHaveCount(0)
   await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
   await expect(viewer.getByText('原图比对')).toHaveCount(0)
-  await page.screenshot({ path: '.tmp/invoice-preview/workspace-preview-1440.png', animations: 'disabled' })
   // 普通预览：键盘操作缩放与左右旋转，页面画框随之换算。
   const firstPage = viewer.locator('[data-page-index="0"]')
   const zoomIn = viewer.getByRole('button', { name: '放大原图' })
@@ -152,7 +151,6 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
   await expect(regionBox(page, 'invoiceNumber')).toContainText('单据编号')
   await expectInViewport(regionBox(page, 'invoiceNumber'), '首次识别强调框 @ 1440px')
-  await page.screenshot({ path: '.tmp/invoice-preview/first-focus-1440.png', animations: 'disabled' })
   await page.keyboard.press('Tab')
   await expect(page.getByLabel('开票日期', { exact: true })).toBeFocused()
   await expect(regionBox(page, 'invoiceDate')).toHaveAttribute('data-active', 'true')
@@ -178,7 +176,6 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
   await expectInViewport(regionBox(page, 'invoiceNumber'), '切到原件面板后首次识别强调框 @ 390px')
   await expectNoPageOverflow(page, '切到原件面板点字段定位 @ 390px')
-  await page.screenshot({ path: '.tmp/invoice-preview/first-focus-pane-390.png', animations: 'disabled' })
   await page.keyboard.press('ArrowRight')
   await expect(reviewTab).toBeFocused()
   await page.getByLabel('开票日期', { exact: true }).focus()
@@ -223,7 +220,6 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(regionBox(page, 'totalAmount taxAmount')).toHaveAttribute('data-active', 'true')
   await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'false')
   await expectInViewport(regionBox(page, 'totalAmount taxAmount'), '工作台强调框 @ 1440px')
-  await page.screenshot({ path: '.tmp/invoice-preview/workspace-compare-1440.png' })
   await changeItems.first().focus()
   await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
   await page.keyboard.press('Tab')
@@ -310,7 +306,6 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
   await expect(viewer.getByTestId('invoice-region-box')).toHaveCount(0)
   await expect(page.getByRole('img', { name: /发票示意图/ })).toHaveCount(0)
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await page.screenshot({ path: '.tmp/invoice-preview/edit-original-1440.png', animations: 'disabled' })
   await expectViewerLocalScroll(page, '编辑页原件 @ 1440px')
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 })
@@ -342,8 +337,6 @@ test('工作台与编辑页重新识别先作草稿：高亮变动、保存二�
     await expect(regionBox(page, 'totalAmount taxAmount')).toHaveAttribute('data-active', 'true')
     await page.getByTestId('invoice-region-viewer').scrollIntoViewIfNeeded()
     await expectInViewport(regionBox(page, 'totalAmount taxAmount'), `编辑页强调框 @ ${width}px`)
-    if (width === 1440)
-      await page.screenshot({ path: '.tmp/invoice-preview/edit-compare-1440.png' })
     await page.getByLabel('单据编号', { exact: true }).focus()
     await expect(regionBox(page, 'invoiceNumber')).toHaveAttribute('data-active', 'true')
   }

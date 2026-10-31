@@ -1,4 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { installContractEngineeringFixture, selectContractEngineeringFixture } from './helpers/contract-engineering-fixture'
+import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 test('取消关闭和刷新保留草稿，后台页签也先确认再卸载', async ({ page }, testInfo) => {
@@ -52,22 +55,32 @@ test('从首页关闭后台表单的其他页签后激活该表单并保留输�
 })
 
 for (const kind of ['construction', 'material', 'subcontract'] as const) {
-  test(`${kind} 保存并新建连续两次创建独立合同并清空表单`, async ({ page }, testInfo) => {
-    const id = `audit-new-${kind}-${testInfo.workerIndex}`
+  test(`${kind} 保存并新建连续两次创建独立合同并清空表单`, async ({ page }) => {
+    const id = `audit-new-${kind}-${randomUUID()}`
     await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': id })
     const reset = await page.request.post(`/api/testing/${kind}-contracts/reset`, {
       headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': id },
       data: { scenario: 'ready' },
     })
     expect(reset.ok()).toBe(true)
+    const ownName = '连续新建合成签约主体'
+    const ownId = await createVerifiedSignatory(page, ownName, id)
+    if (kind !== 'construction')
+      await installContractEngineeringFixture(page, kind, kind === 'material' ? '中央正式材料项目' : '中央正式施工项目')
     await page.goto(`/contract/${kind}/form`)
     const savedIds: string[] = []
     for (let index = 0; index < 2; index++) {
       const name = page.getByLabel('合同名称 *')
       await expect(name).toHaveValue('', { timeout: 20_000 })
       await name.fill(`连续新增合同 ${index + 1}`)
-      await page.getByRole('combobox', { name: '检索项目' }).click()
-      await page.getByText(kind === 'material' ? '中央正式材料项目' : '中央正式施工项目', { exact: true }).click()
+      await selectVerifiedSignatory(page, ownId, ownName)
+      if (kind === 'construction') {
+        await page.getByRole('combobox', { name: '检索项目' }).click()
+        await page.getByText('中央正式施工项目', { exact: true }).click()
+      }
+      else {
+        await selectContractEngineeringFixture(page)
+      }
       await page.getByRole('combobox', { name: kind === 'construction' ? '检索客户' : '检索分供方' }).click()
       await page.getByText(kind === 'construction' ? '中央正式甲方客户' : kind === 'material' ? '中央正式材料供应商' : '中央正式劳务分供方', { exact: true }).click()
       await page.getByLabel('合同内容简述 *').fill('保存并新建回归')

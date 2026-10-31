@@ -14,7 +14,7 @@ PAY-07 只保留旧金额并添加来源，不推测 v21/v22 压缩零的原意�
 
 - 定向 11 文件 92 项通过：`tests/db/payment-approval-migration.test.ts`；`tests/finance/{payment-approval,payment-approval-source,payment-detail}.test.ts`；`tests/stores/{payment-management,supplier-detail}.test.ts`；`tests/components/{FinanceFormFields,PaymentApprovalReturn}.test.ts`；`tests/{supplier,project-supplier}/repository-contract.test.ts`；`tests/server/core-migration-test-instance.test.ts`。
 - 验证内容包括迁移原值/三类分摊/银行记录/索引触发器保留、失败回滚和重试；新 null/明确 0、备注不升级来源、伪造来源与不一致输入拒绝、附件保存失败原子回滚；所有本票投影及不完整合计；47/48/49 来源版本与哈希校验。
-- `e2e/payment-approval.spec.ts` 两项实际 Chromium 场景均通过，独立计数：历史零、取消及五档场景 20.0 秒；最后新建空批复、零、清空与重载场景 18.0 秒（含服务启动 27.5 秒）。最后一次只收窄测试流程，未更改已通过五档场景的产品源码。
+- 当时的 `e2e/payment-approval.spec.ts` 两项实际 Chromium 场景均通过，独立计数：历史零、取消及五档场景 20.0 秒；最后新建空批复、零、清空与重载场景 18.0 秒（含服务启动 27.5 秒）。该路径为历史证据；现行等价场景已迁到 [`production-payment-approval.spec.ts`](../../../../e2e/production-payment-approval.spec.ts)，使用隔离合成正式来源。
 - 新建场景经保存→返回列表→整页重载→重新打开详情核对；明确零保存后另验证真实已打开页签返回读到 0/0。历史场景保留已确认支付 30、旧零仍待核验、登记兼容回填 70，编辑 80 后放弃不会确认来源。
 - 五档为 390 / 768 / 1024 / 1280 / 1440 × 900。验证无页面横向溢出、编辑按钮键盘焦点与 Enter、滚动到批复输入并聚焦、历史金额提示和管理汇总。截图已逐张查看；详情记录顶部金额，表单记录滚动后审批区，密集表格在自己的区域滚动。
 - 使用指南 PDF 四页已渲染逐页检查；最终补明页签恢复边界后再次生成并查看受影响页。

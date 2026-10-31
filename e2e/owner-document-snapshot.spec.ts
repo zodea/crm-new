@@ -1,6 +1,7 @@
 import type { OwnerCommercialDocumentSource } from '../app/lib/owner-document/central-repository'
 import { expect, test } from '@playwright/test'
 import { buildOwnerCommercialDocumentListPage, parseOwnerCommercialDocumentListQuery } from '../app/lib/owner-document/central-repository'
+import { withSyntheticOwnerRead } from './helpers/owner-document-read-fixture'
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' })
 
@@ -41,6 +42,7 @@ const document: OwnerCommercialDocumentSource = {
 }
 
 test('普通错误保留旧表，受限错误清空权限与记录，重试及成功空快照边界正确', async ({ page }) => {
+  const session = await (await page.request.get('/api/read/business-session')).json()
   let failure: 'unavailable' | 'forbidden' | null = null
   let empty = false
   let hold: Promise<void> | null = null
@@ -53,7 +55,8 @@ test('普通错误保留旧表，受限错误清空权限与记录，重试及�
       return
     }
     const query = parseOwnerCommercialDocumentListQuery('owner_change', Object.fromEntries(new URL(route.request().url()).searchParams))
-    await route.fulfill({ json: buildOwnerCommercialDocumentListPage({ documents: empty ? [] : [document], query, asOf: document.updatedAt, sourceVersion: 'snapshot-regression', capabilities: ['owner-document:read', 'owner-document:write'] }) })
+    const result = buildOwnerCommercialDocumentListPage({ documents: empty ? [] : [document], query, asOf: document.updatedAt, sourceVersion: 'snapshot-regression', capabilities: session.capabilities })
+    await route.fulfill({ json: withSyntheticOwnerRead(result, session, query, document.updatedAt) })
   })
   const initialRead = page.waitForResponse(response => new URL(response.url()).pathname === '/api/read/owner-documents/owner_change' && response.status() === 200)
   await page.goto('/owner/change')
@@ -101,6 +104,7 @@ test('普通错误保留旧表，受限错误清空权限与记录，重试及�
 })
 
 test('验收切至保修等待期间不沿用前视图的记录和权限', async ({ page }) => {
+  const session = await (await page.request.get('/api/read/business-session')).json()
   let release!: () => void
   const warrantyPending = new Promise<void>(resolve => release = resolve)
   await page.route('**/api/read/owner-documents/acceptance?*', async (route) => {
@@ -110,7 +114,8 @@ test('验收切至保修等待期间不沿用前视图的记录和权限', async
     const documents: OwnerCommercialDocumentSource[] = query.variant === 'warranty'
       ? [{ ...document, kind: 'acceptance', id: 'warranty', no: 'BX-SNAPSHOT', status: 'warranty' }]
       : [{ ...document, kind: 'acceptance', no: 'YS-SNAPSHOT', status: 'accepted' }]
-    await route.fulfill({ json: buildOwnerCommercialDocumentListPage({ documents, query, asOf: document.updatedAt, sourceVersion: 'variant-regression', capabilities: ['owner-document:read'] }) })
+    const result = buildOwnerCommercialDocumentListPage({ documents, query, asOf: document.updatedAt, sourceVersion: 'variant-regression', capabilities: session.capabilities })
+    await route.fulfill({ json: withSyntheticOwnerRead(result, session, query, document.updatedAt) })
   })
   const initialRead = page.waitForResponse(response => new URL(response.url()).pathname === '/api/read/owner-documents/acceptance' && response.status() === 200)
   await page.goto('/owner/acceptance?variant=acceptance&status=all')

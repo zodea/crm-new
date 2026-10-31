@@ -3,6 +3,10 @@ import type { SupplierCredentialSnapshot } from '../app/lib/supplier/credential-
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { SUPPLIER_DETAIL_READ_SCHEMA } from '../app/lib/supplier/read-contract'
+import { parseSupplierDetailQuery } from '../app/lib/supplier/read-page'
+import { createReadMeta, readQueryScope, withReadMeta } from '../server/utils/read-meta'
+import { buildSupplierDetailRead } from '../tests/helpers/supplier-read-meta'
 import { cooperationPdfFixture } from '../tests/project-supplier/pdf-fixture'
 import { expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
@@ -40,6 +44,53 @@ async function snapshot(page: Page, id: string): Promise<SupplierCredentialSnaps
   return response.json()
 }
 
+// 只为界面行为模拟完整来源；真实服务仍需显示缺源，不能把缺源解释成零。
+async function installCompleteSupplierReadFixture(page: Page, id: string, contract?: { id: string, projectId: string, amount: number, signDate: string }) {
+  const url = `**/api/read/suppliers/${id}?*`
+  const sessionResponse = await page.request.get('/api/read/business-session')
+  expect(sessionResponse.ok(), await sessionResponse.text()).toBe(true)
+  const session = await sessionResponse.json()
+  await page.route(url, async (route) => {
+    const query = parseSupplierDetailQuery(id, Object.fromEntries(new URL(route.request().url()).searchParams))
+    const source = {
+      dataOrigin: 'real' as const,
+      id,
+      name: supplierInput.name,
+      aliases: [],
+      externalRef: '',
+      uniqueCode: supplierInput.taxNo,
+      taxNo: supplierInput.taxNo,
+      businessType: '',
+      supplierCategory: supplierInput.supplierCategory,
+      rating: '',
+      legalRep: '',
+      registeredCapital: null,
+      registeredDate: null,
+      address: '',
+      taxpayerType: '',
+      mainBusiness: '',
+      invoiceName: '',
+      invoiceAddress: '',
+      bank: '',
+      bankAccount: supplierInput.bankAccount,
+      phone: '',
+      contact: supplierInput.contact,
+      contactPhone: supplierInput.contactPhone,
+      contactTitle: '',
+      credentialStatus: 'incomplete',
+      note: '',
+      updatedAt: '2026-09-11T00:00:00.000Z',
+    }
+    const contracts = contract ? [{ dataOrigin: 'real' as const, id: contract.id, supplierId: id, projectId: contract.projectId, no: '', name: 'E2E正式采购合同', kind: '材采', amount: contract.amount, supplementAmount: 0, signDate: contract.signDate, status: '生效' }] : []
+    const asOf = '2026-09-11T00:00:00.000Z'
+    const sourceVersion = 'synthetic-complete-facts'
+    const projection = buildSupplierDetailRead({ suppliers: [source], projects: [], projectSuppliers: [], contracts, settlements: [], invoices: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], query, asOf, sourceVersion, capabilities: session.capabilities })
+    const meta = createReadMeta({ session, schemaVersion: SUPPLIER_DETAIL_READ_SCHEMA, operation: 'supplier-fixture-read', dataOrigin: 'real', asOf, coverage: 'complete', scope: readQueryScope(query), sources: ['suppliers', 'projects', 'contracts', 'settlements', 'invoices', 'payments'].map(key => ({ key, state: 'readable' as const, sourceVersion, asOf })) })
+    await route.fulfill({ json: withReadMeta(projection, meta) })
+  })
+  return () => page.unroute(url)
+}
+
 for (const contractCase of [
   { name: '整数数量', qty: 2, price: 15, amount: 30, money: '¥30.00', signDate: '2026-09-11' },
   { name: '小数数量与闰日', qty: 0.5, price: 8, amount: 4, money: '¥4.00', signDate: '2024-02-29' },
@@ -55,18 +106,31 @@ for (const contractCase of [
     })
     expect(project.ok(), await project.text()).toBe(true)
     const projectId = (await project.json()).id
+    const ownResponse = await page.request.post('/api/commands/our-signatories', {
+      data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'our-signatory:write', commandId: randomUUID(), baseVersion: null, draft: { name: '合成已核实签约主体', taxNo: null, registeredAddress: null, legalRepresentative: null, verificationNote: '隔离测试文书核实', status: 'active' } },
+    })
+    expect(ownResponse.ok(), await ownResponse.text()).toBe(true)
+    const own = await ownResponse.json()
     const contract = await page.request.post('/api/commands/material-contracts', {
-      data: { ...session, requiredCapability: 'material-contract:write', commandId: randomUUID(), baseVersion: null, action: 'submit', draft: { name: 'E2E正式采购合同', projectId, supplierId, content: '合成材料采购', signDate: contractCase.signDate, amount: contractCase.amount, taxRate: null, lineItems: [{ materialName: '合成材料', unit: '根', qty: contractCase.qty, taxInclusiveUnitPrice: contractCase.price }] }, attachments: {} },
+      data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'material-contract:write', commandId: randomUUID(), baseVersion: null, action: 'submit', draft: { name: 'E2E正式采购合同', projectId, supplierId, ourSignatoryId: own.id, ourSignatoryVersion: own.version, content: '合成材料采购', signDate: contractCase.signDate, amount: contractCase.amount, taxRate: null, lineItems: [{ materialName: '合成材料', unit: '根', qty: contractCase.qty, taxInclusiveUnitPrice: contractCase.price }] }, attachments: {} },
     })
     expect(contract.ok(), await contract.text()).toBe(true)
     const contractId = (await contract.json()).id
+
+    const incompleteRead = await page.request.get(`/api/read/suppliers/${supplierId}?origin=real`)
+    expect(incompleteRead.ok(), await incompleteRead.text()).toBe(true)
+    const incomplete = await incompleteRead.json()
+    expect(incomplete.unavailableSources).toEqual(expect.arrayContaining(['invoices', 'payments']))
+    expect(incomplete.summary.invoiceAmount.value).toBeNull()
+    expect(incomplete.summary.paymentAmount.value).toBeNull()
+    const removeCompleteSource = await installCompleteSupplierReadFixture(page, supplierId, { id: contractId, projectId, amount: contractCase.amount, signDate: contractCase.signDate })
 
     await page.goto('/base/supplier')
     await page.getByPlaceholder('搜索关键词…').fill(supplierInput.name)
     await page.getByRole('link', { name: supplierInput.name, exact: true }).first().click()
     await expect(page).toHaveURL(url => url.pathname === `/base/supplier/${supplierId}` && url.searchParams.get('origin') === 'real')
     const tabs = page.getByRole('navigation', { name: '分供方业务事实' })
-    await expect(tabs.getByRole('tab')).toHaveText(['详细资料', '合作项目 0', '支出合同 1', '支出结算 0', '收票登记 0', '付款管理 0'])
+    await expect(tabs.getByRole('tab')).toHaveText([/^\s*详细资料\s*$/, /^\s*合作项目\s+0\s*$/, /^\s*支出合同\s+1\s*$/, /^\s*支出结算\s+0\s*$/, /^\s*收票登记\s+0\s*$/, /^\s*付款管理\s+0\s*$/])
     for (const masked of ['138 **** 3456', '9144 **** 3456', '6228 **** 7788'])
       await expect(page.getByText(masked, { exact: true }).first()).toBeVisible()
     for (const raw of [supplierInput.contactPhone, supplierInput.taxNo, supplierInput.bankAccount])
@@ -91,6 +155,7 @@ for (const contractCase of [
       await expect(page.getByRole('status', { name: empty })).toBeVisible()
     }
 
+    await removeCompleteSource()
     await page.getByRole('link', { name: '证照附件', exact: true }).click()
     for (const input of credentialInputs) {
       await page.getByRole('button', { name: '上传原件', exact: true }).click()
@@ -146,6 +211,8 @@ for (const tabCase of [
 ]) {
   test(`分供方事实页签深链刷新恢复：${tabCase.key}`, async ({ page }) => {
     const id = await createSupplier(page)
+    if (tabCase.key === 'invoices')
+      await installCompleteSupplierReadFixture(page, id)
     await page.goto(`/base/supplier/${id}?origin=real&tab=${tabCase.key}`)
     const tab = page.getByRole('navigation', { name: '分供方业务事实' }).getByRole('tab', { name: tabCase.label, exact: true })
     await expect(tab).toHaveAttribute('aria-selected', 'true')

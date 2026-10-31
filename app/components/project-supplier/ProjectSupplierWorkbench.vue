@@ -135,7 +135,7 @@ watch(() => [props.projectId, props.supplierId, origin.value, route.query.tab, v
       <ProjectSupplierOverview v-if="activeTab === 'overview'" :data="data" :return-to="returnTo" />
       <section v-else class="panel min-w-0 overflow-hidden" :aria-label="`${tabs.find(tab => tab.key === activeTab)?.label}事实`">
         <ProjectSupplierFactTable v-if="activeTab === 'contract'" :columns="['合同编号', '合同名称', '类型', '合同额', '变更后合同额', '签订日期', '附件', '状态']" :rows="contractRows" empty="暂无合同事实" :return-to="returnTo" />
-        <ProjectSupplierFactTable v-else-if="activeTab === 'claim'" :columns="['请款编号', '请款名称', '申请金额', '审批金额', '申请日期', '发票状态', '附件', '状态']" :rows="claimRows" empty="暂无请款事实" :return-to="returnTo" />
+        <ProjectSupplierFactTable v-else-if="activeTab === 'claim'" :columns="['请款编号', '请款名称', '申请金额', '审批金额', '申请日期', '发票状态', '附件', '状态']" :rows="claimRows" empty="暂无请款事实" :return-to="returnTo" :unverified-label="origin === 'demo' ? '来源待核验' : undefined" />
         <ProjectSupplierFactTable v-else-if="activeTab === 'ticket'" :columns="['发票号码', '开票日期', '类型', '含税金额', '税额', '文件', '入账状态']" :rows="invoiceRows" empty="暂无收票事实" :return-to="returnTo" />
         <ProjectSupplierFactTable v-else-if="activeTab === 'payment'" :columns="['支付编号', '支付日期', '本关系分摊金额', '方式', '凭证号', '请款单', '附件', '确认状态']" :rows="paymentRows" empty="暂无付款事实" :return-to="returnTo" />
         <ProjectSupplierFactTable v-else :columns="['结算编号', '结算名称', '类型', '结算金额', '结算日期', '附件', '状态']" :rows="settlementRows" empty="暂无结算事实" :return-to="returnTo" />

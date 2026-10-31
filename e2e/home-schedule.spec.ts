@@ -58,8 +58,11 @@ test('首页项目切换器键盘可用，各宽度甘特局部滚动和施工�
   const scroll = page.getByTestId('home-schedule-scroll')
   for (const viewport of [...RESPONSIVE_WIDTHS.map(width => ({ width, height: width === 390 ? 844 : 1000 })), EQUIVALENT_200_PERCENT_VIEWPORT]) {
     await page.setViewportSize(viewport)
+    // 跨过窄屏断点时触发器会重建；等浏览器完成布局和响应式更新再实际聚焦。
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
     await expect(page.getByRole('link', { name: '全部项目', exact: true })).toBeVisible()
     await switcher.focus()
+    await expect(switcher).toBeFocused()
     await page.keyboard.press('ArrowDown')
     await expect(page.getByRole('combobox', { name: '搜索项目', exact: true })).toBeFocused()
     await expect(page.getByRole('option', { name: /E2E正式工程量项目/ }).last()).toHaveAttribute('aria-selected', 'true')

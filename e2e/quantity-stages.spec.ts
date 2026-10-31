@@ -26,7 +26,8 @@ test('中央新项目建立两个阶段，显式报量逐项保存不丢草稿�
   const initial = await read()
   expect(initial.data.stages).toEqual([])
   const template = await page.request.post('/api/commands/quantity', { headers, data: {
-    ...session,
+    workspaceId: session.workspaceId,
+    actorId: session.actorId,
     projectId,
     origin: 'real',
     requiredCapability: 'quantity:write',
@@ -80,7 +81,7 @@ test('中央新项目建立两个阶段，显式报量逐项保存不丢草稿�
       await page.getByLabel('涂料的报量阶段', { exact: true }).scrollIntoViewIfNeeded()
     }
   }
-  const archived = await page.request.post('/api/commands/quantity', { headers, data: { ...session, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: current.sourceVersion, action: { kind: 'set-archived', archived: true } } })
+  const archived = await page.request.post('/api/commands/quantity', { headers, data: { workspaceId: session.workspaceId, actorId: session.actorId, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: current.sourceVersion, action: { kind: 'set-archived', archived: true } } })
   expect(archived.ok(), await archived.text()).toBe(true)
   await page.getByRole('button', { name: '重新读取', exact: true }).click()
   await expect(page.getByText('矩阵已归档', { exact: true })).toBeVisible()

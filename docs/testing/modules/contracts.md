@@ -9,7 +9,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/issue-277-material-contract-supplier-zero-chain.spec.ts](../../../e2e/issue-277-material-contract-supplier-zero-chain.spec.ts) | Playwright E2E | Issue #277：项目—材采合同—分供方零值只读样板链 |
-| [e2e/issue-318-material-contract-detail.spec.ts](../../../e2e/issue-318-material-contract-detail.spec.ts) | Playwright E2E | Issue #318：材料采购合同中央只读详情 |
+| [e2e/issue-318-material-contract-detail.spec.ts](../../../e2e/issue-318-material-contract-detail.spec.ts) | Playwright E2E | Issue #318：材料采购合同中央只读详情；正式新建、编辑及施工主合同关系回读在生产验收中验证 |
 | [e2e/issue-422-material-contract-list.spec.ts](../../../e2e/issue-422-material-contract-list.spec.ts) | Playwright E2E | Issue #422 材料采购合同列表 |
 | [tests/components/MaterialContractDetailScreen.test.ts](../../../tests/components/MaterialContractDetailScreen.test.ts) | 组件（jsdom） | 材料采购合同中央详情 |
 | [tests/components/MaterialContractFactTable.test.ts](../../../tests/components/MaterialContractFactTable.test.ts) | 组件（jsdom） | 材料采购合同来源事实表 |

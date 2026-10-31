@@ -64,7 +64,7 @@ test.describe('合同专属详情的演示只读与响应式验收', () => {
     await page.getByRole('tab', { name: /^收款登记\s+1$/ }).click()
     await expect(page.getByRole('link', { name: '合和地产集团进度收款', exact: true })).toHaveAttribute('href', /\/finance\/receipt\/rr_mz0x1_0\?origin=demo&customerId=customer_demo_001/)
     await page.goto('/contract/con_demo_cg01?origin=demo&contractKind=material')
-    await expect(page.getByRole('tab')).toHaveText(['详细信息', '采购明细 2', '材料管理', '发票登记 1', '付款信息 1', '支出结算 1', '项目扣罚 1'])
+    await expect(page.getByRole('tab')).toHaveText([/^\s*详细信息\s*$/, /^\s*采购明细\s+2\s*$/, /^\s*补充协议\s+0\s*$/, /^\s*材料管理\s*$/, /^\s*发票登记\s+1\s*$/, /^\s*付款信息\s+1\s*$/, /^\s*支出结算\s+1\s*$/, /^\s*项目扣罚\s+1\s*$/])
     await expect(page.getByRole('tab', { name: /变洽签/ })).toHaveCount(0)
   })
 })

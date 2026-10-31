@@ -23,7 +23,7 @@ async function prepare() {
     const source = await createCoreMigrationLocalSource({
       isDemoActive: () => false,
       currentSchemaVersion: async () => LATEST_VERSION,
-      select: sql => db.select(sql),
+      select: (sql, params) => db.select(sql, params),
       closeDatabase: unused,
       loadProductionSnapshot: unused,
       readSnapshotSource: unused,

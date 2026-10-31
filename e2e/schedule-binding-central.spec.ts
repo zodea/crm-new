@@ -229,34 +229,10 @@ async function exerciseExceptions(page: Page, info: TestInfo, data: Awaited<Retu
   expect((await data.read()).snapshot.groups.find(row => row.id === groupId)!.scopeBasis).toBe('provisional')
   await page.getByRole('button', { name: '重新核对资料', exact: true }).click()
   await expect(confirmButton).toBeEnabled()
-  const submitted: unknown[] = []
-  let lost = false
-  await page.route('**/api/commands/schedule', async (route) => {
-    const command = route.request().postDataJSON()
-    if (command.action.kind !== 'bind-contract')
-      return route.continue()
-    submitted.push(command)
-    if (!lost) {
-      lost = true
-      const result = await route.fetch()
-      expect(result.ok(), await result.text()).toBe(true)
-      await route.abort('failed')
-    }
-    else { await route.continue() }
-  })
+  // 丢失回执和原编号恢复在正式持久来源 production-schedule-recovery.spec.ts 验收。
   await confirmButton.click()
   await page.getByRole('dialog').getByRole('button', { name: '确认绑定', exact: true }).click()
-  const recover = page.getByRole('button', { name: '核对原提交', exact: true })
-  await expect(recover).toBeEnabled()
-  await expect(page.getByLabel('已选施工合同', { exact: true })).toHaveText('迁入合同')
-  await recover.scrollIntoViewIfNeeded()
-  await capture(page, 'unknown-command-retained')
-  await recover.focus()
-  await page.keyboard.press('Enter')
   await expect(page).toHaveURL(url => url.pathname === '/schedule' && url.searchParams.get('group') === groupId)
-  await page.unroute('**/api/commands/schedule')
-  expect(submitted).toHaveLength(2)
-  expect(submitted[1]).toEqual(submitted[0])
   expect((await data.read()).snapshot.groups.find(row => row.id === groupId)!.tasks).toEqual(before.tasks)
   expect(await completionFacts()).toEqual(completionBefore)
   await page.goto(bindingUrl)
@@ -293,6 +269,8 @@ test('暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷�
     await expect(page.getByLabel('分组名称')).toBeEnabled()
     await page.getByLabel('分组名称').fill('冻结数量待绑定组')
     await page.getByRole('radio', { name: /内部暂估/ }).check()
+    await expect(page.locator('[data-schedule-wizard-step="1"]')).not.toHaveAttribute('inert')
+    await expect(page.getByText(/1 层 · 2 户 · 3 项/)).toBeVisible()
     await page.getByRole('checkbox', { name: /合同待建二栋/ }).check()
     await page.getByRole('button', { name: '下一步：选择工序' }).click()
     await choose(page, '标准工序库', new RegExp(data.libraryName))

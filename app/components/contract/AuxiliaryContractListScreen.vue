@@ -304,13 +304,19 @@ useTabTitle(() => AUXILIARY_LABELS[props.kind])
         <p v-if="migrationError" role="alert" class="m-0 break-words text-13px text-danger">
           {{ migrationError }}
         </p>
+        <p v-if="!migration && !migrationError" role="status" class="m-0 text-12px text-ink-soft">
+          正在核对迁入来源…
+        </p>
+        <KitButton v-if="!migration && migrationError" :disabled="migrationBusy" @click="loadMigration">
+          重新核对来源
+        </KitButton>
         <div v-if="migrationPending" role="status" class="flex min-w-0 flex-wrap items-center gap-2">
           <span class="min-w-0 break-all text-12px">原编号：{{ migrationPending.commandId }}；{{ migrationResult ? '已应用待读取，仅重试读取' : '结果未知，请核对原编号' }}</span>
           <KitButton :disabled="migrationBusy" @click="recoverMigration">
             核对原采用结果
           </KitButton>
         </div>
-        <fieldset :disabled="migrationBusy || Boolean(migrationPending)" class="m-0 grid min-w-0 gap-3 border-0 p-0">
+        <fieldset :disabled="!migration || migrationBusy || Boolean(migrationPending)" class="m-0 grid min-w-0 gap-3 border-0 p-0">
           <label class="field-block"><span class="field-label">完整 SQLite 来源文件</span><input type="file" accept=".sqlite,.db,.sqlite3" aria-label="完整辅助合同来源文件" @change="selectNative"></label>
           <template v-if="preview">
             <p class="m-0 break-all text-12px">

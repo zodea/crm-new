@@ -72,6 +72,7 @@
 | [e2e/schedule-binding-central.spec.ts](../../../e2e/schedule-binding-central.spec.ts) | Playwright E2E | 暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷读及原楼层来源五档闭环 |
 | [e2e/schedule-binding-overflow.spec.ts](../../../e2e/schedule-binding-overflow.spec.ts) | Playwright E2E | 组件读取夹具：四条稳定清单来源与完整长说明可键盘滚动并进入第四行 |
 | [e2e/schedule-central.spec.ts](../../../e2e/schedule-central.spec.ts) | Playwright E2E | 中央合同三步建组、冻结历史、任务调整与基线在五档视口闭环 |
+| [e2e/production-schedule-recovery.spec.ts](../../../e2e/production-schedule-recovery.spec.ts) | 生产 Playwright E2E | 隔离正式排程建组及合同绑定回执丢失、原编号核对、冻结计划和完成事实、独立进程冷恢复 |
 | [e2e/schedule-process-library.spec.ts](../../../e2e/schedule-process-library.spec.ts) | Playwright E2E | 标准工序库版本维护与建组甘特 |
 | [e2e/schedule-progress.spec.ts](../../../e2e/schedule-progress.spec.ts) | Playwright E2E | Issue #114：施工进度 WBS 排程 |
 | [e2e/wbs-migration.spec.ts](../../../e2e/wbs-migration.spec.ts) | Playwright E2E | 完整旧 WBS 经真实 HTTP 接管，冻结绑定历史与冷读一致，重复确认保更正，独立新组阻止危险恢复 |

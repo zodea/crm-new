@@ -64,6 +64,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-chromium-win32.png](../../../e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-chromium-win32.png) | 视觉基线 | 责任配置弹窗截图 |
+| [e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-noto-static-chromium-win32.png](../../../e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-noto-static-chromium-win32.png) | 视觉基线 | Windows 同名 Noto 静态字体渲染的责任配置弹窗截图 |
 
 ## 组件（jsdom）
 

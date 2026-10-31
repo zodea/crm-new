@@ -13,6 +13,7 @@ const PRINT_ROWS = [
 
 for (const input of [{ perPage: '1', pages: 7 }, { perPage: '2', pages: 4 }, { perPage: '4', pages: 2 }]) {
   test(`发票打印每页${input.perPage}张：选择、合计、旋转与打印回读`, async ({ page }) => {
+    test.setTimeout(90_000)
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
     await page.addInitScript(() => {
@@ -29,7 +30,7 @@ for (const input of [{ perPage: '1', pages: 7 }, { perPage: '2', pages: 4 }, { p
 
     await page.clock.setFixedTime(new Date('2026-09-11T04:00:00.000Z'))
     await page.goto('/finance/ledger')
-    await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible({ timeout: 30_000 })
     await updateProductionSnapshot(page, (database) => {
       database.run('DELETE FROM invoices')
       for (const row of PRINT_ROWS) {

@@ -289,7 +289,7 @@ export const useScheduleStore = defineStore('schedule', () => {
       throw scheduleProblem('forbidden', '当前来源或身份不能修改排程')
     if (pendingCommand.value)
       throw scheduleProblem('conflict', '上次提交结果尚未确认，请先恢复原提交')
-    const editingId = 'taskId' in action ? action.taskId : action.kind === 'update-dependency' ? action.successorId : null
+    const editingId = action.kind === 'reschedule-task' ? null : 'taskId' in action ? action.taskId : action.kind === 'update-dependency' ? action.successorId : null
     if (editingId && editingBaselines.has(editingId))
       baseline = editingBaselines.get(editingId)!
     if (!baseline || baseline.workspaceId !== workspaceId.value || baseline.actorId !== actorId.value || baseline.origin !== origin.value)
@@ -315,6 +315,12 @@ export const useScheduleStore = defineStore('schedule', () => {
     const current = scheduleVersionBasis(loaded.sourceVersion)
     if ((result.sourceVersion.startsWith('wbs-v1:') && (!original || !current || current.projectId !== result.projectId || current.revision < original.revision)) || (!result.sourceVersion.startsWith('wbs-v1:') && !loaded.sourceVersion))
       throw scheduleProblem('unavailable', '已保存的WBS版本尚未可靠读取，请只重试读取')
+    const command = pending.value[key]?.command
+    if (command?.action.kind === 'update-dependency' && scopeProjectId.value === descriptor.targetId && workspaceId.value === descriptor.workspaceId && actorId.value === descriptor.actorId && origin.value === 'real' && loaded.sourceVersion === result.sourceVersion) {
+      const baseline = editingBaselines.get(command.action.successorId)
+      if (baseline?.sourceVersion === command.sourceVersion && baseline.workspaceId === command.workspaceId && baseline.actorId === command.actorId && baseline.origin === command.origin)
+        editingBaselines.set(command.action.successorId, { ...baseline, sourceVersion: result.sourceVersion })
+    }
     if (scopeProjectId.value === descriptor.targetId && workspaceId.value === descriptor.workspaceId && actorId.value === descriptor.actorId && origin.value === 'real')
       apply(loaded)
     recovery.clear(key, descriptor.commandId)

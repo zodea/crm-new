@@ -1,13 +1,14 @@
 import { expect, test } from '@playwright/test'
 
 test('辅助合同和其他支出结算保留旧链接并提交完整多选值，默认控件无粗框', async ({ page }) => {
+  test.setTimeout(120_000)
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     for (const path of ['/contract/company-expense?category=房租', '/contract/other-expense?category=机械租赁', '/contract/other-settlement?status=draft']) {
       await page.goto(path)
       const isSettlement = path.includes('other-settlement')
       const trigger = page.getByRole('button', { name: `状态，已选 ${isSettlement ? 1 : 0} 项`, exact: true })
-      await expect(trigger).toBeVisible()
+      await expect(trigger).toBeVisible({ timeout: 45_000 })
       if (!isSettlement) {
         if (width === 390)
           await expect(page.getByRole('button', { name: '类别，已选 1 项', exact: true })).toBeVisible()
@@ -42,4 +43,13 @@ test('辅助合同和其他支出结算保留旧链接并提交完整多选值�
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
     }
   }
+  await page.goto('/contract/other-settlement?status=%E5%B7%B2%E7%A1%AE%E8%AE%A4')
+  const statusFilter = page.getByRole('button', { name: '状态，已选 1 项', exact: true })
+  await statusFilter.click()
+  const dialog = page.getByRole('dialog', { name: /^状态/ })
+  const confirmed = dialog.getByRole('checkbox', { name: '已确认', exact: true })
+  await expect(confirmed).toHaveCount(1)
+  await expect(confirmed).toBeChecked()
+  await dialog.getByRole('button', { name: '应用', exact: true }).click()
+  await expect.poll(() => new URL(page.url()).searchParams.getAll('status')).toEqual(['confirmed'])
 })

@@ -6,7 +6,8 @@ import type { BusinessSession } from './business-session'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { auxiliaryTaxExclusive, subtractAuxiliaryMoney, sumAuxiliaryMoney } from '../../app/lib/auxiliary-contract/facts'
 import { isConfirmedExpenditureSettlement } from '../../app/lib/contract/effective-status'
-import { enumFilterValues, matchesEnumFilter } from '../../app/lib/kit/enum-filter'
+import { enumFilterValues } from '../../app/lib/kit/enum-filter'
+import { matchesOtherSettlementStatus } from '../../app/lib/other-settlement/contract'
 import { isEffectiveSettlementFact } from '../../app/lib/other-settlement/facts'
 import { decodeOtherSettlementCommand } from '../../app/lib/other-settlement/validation'
 import { parsePageQuery, resolvePagination } from '../../app/lib/read-model/pagination'
@@ -189,7 +190,7 @@ export function createOtherSettlementInstance(options: Options) {
       if (query.origin && !['real', 'demo'].includes(String(query.origin)))
         throw auxiliaryProblem('invalid-query', '数据来源无效')
       const search = String(query.search ?? '').trim().toLocaleLowerCase('zh-CN')
-      const all = [...records.values()].filter(row => row.workspaceId === session.workspaceId && query.origin !== 'demo').map(dto).filter(row => (!query.projectId || row.draft.projectId === query.projectId) && (!query.contractId || row.draft.contractId === query.contractId) && (!query.supplierId || row.draft.supplierId === query.supplierId) && matchesEnumFilter(row.draft.status, query.status)
+      const all = [...records.values()].filter(row => row.workspaceId === session.workspaceId && query.origin !== 'demo').map(dto).filter(row => (!query.projectId || row.draft.projectId === query.projectId) && (!query.contractId || row.draft.contractId === query.contractId) && (!query.supplierId || row.draft.supplierId === query.supplierId) && matchesOtherSettlementStatus(row.draft.status, query.status)
         && (!search || [row.draft.name, row.draft.no, row.contract.label, row.supplier.label].some(value => value?.toLocaleLowerCase('zh-CN').includes(search)))).sort((a, b) => a.id.localeCompare(b.id))
       const { requestedPage, pageSize } = parsePageQuery(query, () => {
         throw auxiliaryProblem('invalid-query', '结算分页参数无效')

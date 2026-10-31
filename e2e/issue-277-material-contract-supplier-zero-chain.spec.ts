@@ -34,7 +34,7 @@ test.describe('Issue #277：项目—材采合同—分供方零值只读样板�
     await workspace.evaluate(element => element.scrollTop = 48)
     await materialJourneyLink.focus()
     const projectScrollTop = await workspace.evaluate(element => element.scrollTop)
-    await materialJourneyLink.click()
+    await materialJourneyLink.press('Enter')
     await page.getByLabel('搜索材料采购合同').fill('既有中央')
     const contractLink = page.getByRole('link', { name: '既有中央材料采购合同' })
     await expect(contractLink).toBeVisible()
@@ -47,7 +47,7 @@ test.describe('Issue #277：项目—材采合同—分供方零值只读样板�
     await workspace.evaluate(element => element.scrollTop = 96)
     await supplierFactLink.focus()
     const contractScrollTop = await workspace.evaluate(element => element.scrollTop)
-    await supplierFactLink.click()
+    await supplierFactLink.press('Enter')
 
     await expect(page.getByRole('heading', { name: '中央正式材料供应商' })).toBeVisible()
     const summary = page.getByTestId('supplier-summary')

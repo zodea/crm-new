@@ -7,6 +7,7 @@ const props = defineProps<{
   intent: NavigationIntentDTO
   returnTo: string
   label: string
+  unverifiedLabel?: string
 }>()
 
 const target = computed(() => resolveNavigationTarget(props.intent, { returnTo: props.returnTo }))
@@ -16,5 +17,5 @@ const target = computed(() => resolveNavigationTarget(props.intent, { returnTo: 
   <NuxtLink v-if="target.state === 'resolved'" :to="target.to" class="cell--link" :title="`打开${target.label}`">
     {{ label }}
   </NuxtLink>
-  <span v-else class="text-ink-faint" :title="target.message">{{ target.message }}</span>
+  <span v-else class="text-ink-faint" :title="target.message">{{ intent.kind === 'unavailable' && intent.reason === 'unverified-target' && unverifiedLabel ? unverifiedLabel : target.message }}</span>
 </template>

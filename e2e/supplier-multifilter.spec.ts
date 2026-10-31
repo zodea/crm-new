@@ -1,6 +1,7 @@
 import type { SupplierListSourceRow } from '../app/lib/supplier/read-contract'
 import { expect, test } from '@playwright/test'
-import { buildSupplierListPage, parseSupplierListQuery } from '../app/lib/supplier/read-page'
+import { parseSupplierListQuery } from '../app/lib/supplier/read-page'
+import { buildSupplierListPage } from '../tests/helpers/supplier-read-meta'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ screenshot: 'off', video: 'off', trace: 'off' })
@@ -46,7 +47,7 @@ test.beforeEach(async ({ page }) => {
 test('固定枚举复选与表头联动，返回链接保留组合且清空恢复全量，各宽度浮层不溢出', async ({ page }) => {
   await page.goto('/base/supplier?sort=name-asc')
   const list = page.locator('.supplier-reference-list')
-  await expect(list.getByText('共 30 条', { exact: true })).toBeVisible()
+  await expect(list.getByText('共 30 条', { exact: true })).toBeVisible({ timeout: 20_000 })
   await list.getByRole('button', { name: '筛选', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '筛选', exact: true })
   const categories = dialog.getByRole('group', { name: '分供方类别', exact: true })

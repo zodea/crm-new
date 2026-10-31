@@ -181,6 +181,14 @@ INSERT INTO penalty_records VALUES('native-source-penalty','executed');`)
     const source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: bytes.toString('base64') }
     await f.migration.importSnapshot({ ...f.request, source }, f.session)
     const detail = await owner.detail(saved.id, { origin: 'real' }, f.session)
+    if (alias) {
+      for (const status of ['confirmed', '已确认']) {
+        const list = await owner.list({ origin: 'real', status }, f.session)
+        expect(list.items.map(row => row.id)).toEqual(expect.arrayContaining([saved.id, existingSettlementId]))
+        expect(list.items.find(row => row.id === saved.id)?.draft.status).toBe('已确认')
+        expect(list.items.find(row => row.id === existingSettlementId)?.draft.status).toBe('confirmed')
+      }
+    }
     expect(detail.settlement.draft.originalExpenses).toEqual(request.draft.originalExpenses)
     expect(detail.settlement.draft).toMatchObject({ supplierId: f.supplier.id, payeeSupplierId: f.supplier.id, payeeNameSnapshot: '实际服务主档' })
     expect(detail.settlement.amounts.net).toBe(existingAmount || retained ? null : '70.00')

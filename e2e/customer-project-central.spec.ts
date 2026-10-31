@@ -138,14 +138,25 @@ for (const input of CUSTOMER_INPUTS) {
         await expect.poll(() => table.evaluate(element => element.scrollWidth - element.clientWidth)).toBeGreaterThan(0)
         await link.focus()
         await expect(link).toBeFocused()
-        const scrollLeft = await table.evaluate((element) => {
-          element.scrollLeft = Math.min(110, element.scrollWidth - element.clientWidth)
+        const scrollLeft = await table.evaluate(async (element) => {
+          const target = Math.min(110, element.scrollWidth - element.clientWidth)
+          if (element.scrollLeft !== target) {
+            const scrolled = new Promise<void>(resolve => element.addEventListener('scroll', () => resolve(), { once: true }))
+            element.scrollLeft = target
+            await scrolled
+          }
           return element.scrollLeft
         })
         expect(scrollLeft).toBeGreaterThan(0)
         await expect.poll(() => table.evaluate(element => element.scrollLeft)).toBe(scrollLeft)
         await link.press('Enter')
         await expect(page.getByRole('heading', { name: named('Excel关联项目424'), exact: true })).toBeVisible()
+        const returnTo = new URL(page.url()).searchParams.get('returnTo')
+        expect(returnTo).toBeTruthy()
+        const contextId = new URL(returnTo!, page.url()).searchParams.get('relationContext')
+        expect(contextId).toBeTruthy()
+        const stored = await page.evaluate(id => JSON.parse(sessionStorage.getItem(`ruihang:customer-relation-return:${id}`) ?? 'null'), contextId)
+        expect(stored).toMatchObject({ scrollLeft })
         await expectNoPageOverflow(page, `关联项目详情 @ ${width}`)
         await page.reload()
         const back = page.getByRole('link', { name: '返回客户详情', exact: true })

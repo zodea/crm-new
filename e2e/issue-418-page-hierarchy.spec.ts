@@ -99,7 +99,8 @@ test.describe('Issue #418：页面层次与红圈结构对齐', () => {
     }
   })
 
-  for (const path of ['/finance/current', '/material/arrival', '/contract/construction', '/base/supplier', '/project', '/contract/material']) {
+  // 财务来源的列表与可写表单布局由 production-finance-storage 的隔离来源等价验证。
+  for (const path of ['/material/arrival', '/contract/construction', '/base/supplier', '/project', '/contract/material']) {
     test(`列表连续工作面与主操作在各宽度可达：${path}`, async ({ page }) => {
       await page.setViewportSize(layoutViewport(390))
       await page.goto(path)
@@ -124,7 +125,6 @@ test.describe('Issue #418：页面层次与红圈结构对齐', () => {
   }
 
   for (const input of [
-    { path: '/finance/current/new', attachment: '凭证与备注' },
     { path: '/material/arrival/new', attachment: '送货单附件' },
   ]) {
     test(`整页表单分区、两列上限与吸底操作在各宽度可达：${input.path}`, async ({ page }) => {

@@ -30,7 +30,7 @@ test('旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出
       writes.push(request.url())
   })
   await page.goto(`/subcontract/payroll/${legacy!.id}?origin=real&format=C1&month=2026-07`)
-  await expect(page.getByRole('region', { name: '发放快照证据', exact: true })).toContainText('原资料未保留发放原文。')
+  await expect(page.getByRole('region', { name: '发放快照证据', exact: true })).toContainText('原资料未保留发放原文。', { timeout: 20_000 })
   const workspace = page.locator('[aria-label="C1工资核对与发放"]')
   await expect(workspace).toContainText('原记录标为已发放，本页只读；逐日来源或发放证据不完整，不能生成配对输出。')
   await expect(workspace).not.toContainText('本次工资与考勤已冻结')

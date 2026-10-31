@@ -2,6 +2,7 @@ import type { OwnerCommercialDocumentSource } from '../app/lib/owner-document/ce
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { buildOwnerCommercialDocumentListPage, parseOwnerCommercialDocumentListQuery } from '../app/lib/owner-document/central-repository'
+import { withSyntheticOwnerRead } from './helpers/owner-document-read-fixture'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' })
@@ -53,14 +54,18 @@ for (const input of [
   { firstNo: 'FL-101', nextNo: 'FL-102', firstType: 'change_negotiation', firstTypeLabel: '变更洽商', nextType: 'site_visa', nextStatus: 'draft', nextStatusLabel: '草稿', firstAmount: 250, nextAmount: 450 },
 ]) {
   test(`${input.firstNo}/${input.nextStatus}单据多选联动完整结果、清空与无闪动刷新，各宽度无页面溢出`, async ({ page }) => {
+    test.setTimeout(60_000)
+    const session = await (await page.request.get('/api/read/business-session')).json()
     const documents = [{ ...source, no: input.firstNo, documentType: input.firstType, amount: input.firstAmount }, { ...source, id: 'filter-document-2', no: input.nextNo, status: input.nextStatus, documentType: input.nextType, amount: input.nextAmount }]
     await page.route('**/api/read/owner-documents/owner_change?*', async (route) => {
       const query = parseOwnerCommercialDocumentListQuery('owner_change', Object.fromEntries(new URL(route.request().url()).searchParams))
-      await route.fulfill({ json: buildOwnerCommercialDocumentListPage({ documents, query, asOf: '2026-09-08T00:00:00.000Z', sourceVersion: 'multifilter-synthetic', capabilities: ['owner-document:read'] }) })
+      const asOf = '2026-09-08T00:00:00.000Z'
+      const result = buildOwnerCommercialDocumentListPage({ documents, query, asOf, sourceVersion: 'multifilter-synthetic', capabilities: session.capabilities })
+      await route.fulfill({ json: withSyntheticOwnerRead(result, session, query, asOf) })
     })
     await page.goto('/owner/change')
     const table = page.locator('[data-ui="owner-document-table"]')
-    await expect(table.getByRole('link', { name: input.firstNo, exact: true })).toBeVisible()
+    await expect(table.getByRole('link', { name: input.firstNo, exact: true })).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: '状态，已选 1 项' }).click()
     const dialog = page.getByRole('dialog', { name: /^状态/ })
     await dialog.getByRole('checkbox', { name: input.nextStatusLabel, exact: true }).check()

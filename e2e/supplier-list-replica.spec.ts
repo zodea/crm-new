@@ -2,7 +2,8 @@ import type { Page } from '@playwright/test'
 import type { SupplierListSourceRow } from '../app/lib/supplier/read-contract'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { buildSupplierDetailRead, buildSupplierListPage, parseSupplierDetailQuery, parseSupplierListQuery } from '../app/lib/supplier/read-page'
+import { parseSupplierDetailQuery, parseSupplierListQuery } from '../app/lib/supplier/read-page'
+import { buildSupplierDetailRead, buildSupplierListPage } from '../tests/helpers/supplier-read-meta'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 test.use({ screenshot: 'off', video: 'off', trace: 'off' })
@@ -72,7 +73,7 @@ test('完整列、紧凑标签、表格内滚动及可访问工具在各宽度�
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/base/supplier?sort=name-asc')
   const list = page.locator('.supplier-reference-list')
-  await expect(list.getByRole('heading', { name: '全部分供方' })).toBeVisible()
+  await expect(list.getByRole('heading', { name: '全部分供方' })).toBeVisible({ timeout: 20_000 })
   await expect(list.getByRole('link', { name: '界面对照供应商01', exact: true })).toBeVisible()
   await expect(list.getByRole('combobox', { name: '每页条数' })).toHaveValue('20')
   for (const tone of ['warn', 'brand', 'ok', 'danger'])
@@ -135,11 +136,12 @@ test('搜索与列头条件都筛全量记录，分页、工具筛选与清空�
 })
 
 test('返回定位仅执行一次，继续搜索不抢焦点且数值升序正确显示', async ({ page }) => {
-  const id = supplierIdentities.get(page)![0]!.id
+  const target = [...supplierIdentities.get(page)!].sort((left, right) => left.id.localeCompare(right.id))[0]!
+  const { id, name } = target
   await page.goto(`/base/supplier?sort=paymentAmount-asc#supplier-row-${encodeURIComponent(encodeURIComponent(`real:${id}`))}`)
   const list = page.locator('.supplier-reference-list')
-  await expect(list.getByRole('link', { name: '界面对照供应商01', exact: true })).toBeFocused()
-  const focusedName = list.getByRole('link', { name: '界面对照供应商01', exact: true })
+  await expect(list.getByRole('link', { name, exact: true })).toBeFocused()
+  const focusedName = list.getByRole('link', { name, exact: true })
   await expect(focusedName).toHaveCSS('outline-style', 'none')
   await expect(focusedName).toHaveCSS('text-decoration-line', 'underline')
   const search = list.getByRole('searchbox')

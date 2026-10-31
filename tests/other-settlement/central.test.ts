@@ -26,7 +26,7 @@ describe('aX05 其他支出结算中央命令', () => {
     expect(service.snapshot()).toEqual(before)
   })
   it('状态多选作用于完整集合，与项目条件相交，兼容单值和空数组', () => {
-    const records: OtherSettlementStored[] = ['draft', 'pending', 'confirmed'].map(status => ({
+    const records: OtherSettlementStored[] = ['draft', 'pending', 'confirmed', '已确认'].map(status => ({
       id: status,
       version: 1,
       workspaceId: session.workspaceId,
@@ -39,8 +39,12 @@ describe('aX05 其他支出结算中央命令', () => {
     const service = createOtherSettlementInstance({ identities: () => ({ projects: [{ id: 'p1', label: '项目' }], suppliers: [{ id: 's1', label: '单位' }], contracts }), records })
     expect(service.list({ status: ['draft', 'pending'] }, session).pagination.total).toBe(2)
     expect(service.list({ status: ['draft', 'pending'], projectId: 'other' }, session).pagination.total).toBe(0)
-    expect(service.list({ status: 'confirmed' }, session).pagination.total).toBe(1)
-    expect(service.list({ status: [] }, session).pagination.total).toBe(3)
+    for (const status of ['confirmed', '已确认']) {
+      const rows = service.list({ status }, session).items
+      expect(rows.map(row => row.draft.status).sort()).toEqual(['confirmed', '已确认'].sort())
+    }
+    expect(service.list({ status: ['draft', 'confirmed'] }, session).pagination.total).toBe(3)
+    expect(service.list({ status: [] }, session).pagination.total).toBe(4)
   })
   it('前期金额不纳入晚于本单日期的已确认结算，历史缺失审计不在编辑时伪造', async () => {
     const base: OtherSettlementStored = { id: 'current', version: 1, workspaceId: session.workspaceId, migrationBatchId: null, draft: { ...command().draft, supplierId: 's1', status: 'draft' }, attachments: [], facts: [], audit: { createdAt: null, updatedAt: null, createdBy: null, updatedBy: null, responsible: null, department: null } }

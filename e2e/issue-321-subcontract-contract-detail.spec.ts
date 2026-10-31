@@ -1,6 +1,7 @@
 import type { APIRequestContext, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import { installContractEngineeringFixture, selectContractEngineeringFixture } from './helpers/contract-engineering-fixture'
 import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
@@ -60,12 +61,12 @@ test.describe('Issue #321：分包合同专属中央详情', () => {
   test('正式分包合同经中央命令新建、编辑、详情和刷新闭合', async ({ page }, testInfo) => {
     const ownName = '分包验收已核实签约主体'
     const ownId = await createVerifiedSignatory(page, ownName, session(testInfo))
+    await installContractEngineeringFixture(page, 'subcontract', '中央正式施工项目')
     await page.goto('/contract/subcontract/form')
     await expect(page.getByRole('heading', { name: /新建 · 分包合同/ })).toBeVisible({ timeout: 20_000 })
     await selectVerifiedSignatory(page, ownId, ownName)
     await page.getByLabel('合同名称 *').fill('中央正式劳务分包')
-    await page.getByRole('combobox', { name: '检索项目' }).click()
-    await page.getByText('中央正式施工项目', { exact: true }).click()
+    await selectContractEngineeringFixture(page)
     await page.getByRole('combobox', { name: '检索分供方' }).click()
     await page.getByText('中央正式劳务分供方', { exact: true }).click()
     await page.getByLabel('合同内容简述 *').fill('正式劳务分包范围')

@@ -9,7 +9,7 @@ test('新项目经真实整页建立模板清单关联和区域，刷新与五�
   await page.context().setExtraHTTPHeaders(headers)
   const session = await (await page.request.get('/api/read/business-session', { headers })).json()
   const create = async (entity: string, capability: string, draft: Record<string, unknown>) => {
-    const response = await page.request.post(`/api/commands/${entity}`, { headers, data: { ...session, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action: 'draft', draft, attachments: {} } })
+    const response = await page.request.post(`/api/commands/${entity}`, { headers, data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action: 'draft', draft, attachments: {} } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }
@@ -45,7 +45,8 @@ test('新项目经真实整页建立模板清单关联和区域，刷新与五�
   }
 
   await page.goto(`/subcontract/quantity?project=${projectId}&origin=real`)
-  await page.getByRole('button', { name: '户型模板', exact: true }).click()
+  // 冷进程首次编译工程量页面可能超过普通交互等待。
+  await page.getByRole('button', { name: '户型模板', exact: true }).click({ timeout: 40_000 })
   await expect(page).toHaveURL(/\/template\?.*origin=real/)
   const form = page.getByTestId('quantity-template-form')
   await form.getByLabel('户型编码 *', { exact: true }).fill('A')

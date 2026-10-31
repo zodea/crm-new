@@ -28,7 +28,7 @@ test('三类实际 CSV 经中央导入：零与未知、唯一责任、缺照拒
   const code = (await read('region')).data.projectCode
   expect(code).toBe('Q-IMPORT-442')
   const execute = async (action: Record<string, unknown>) => {
-    const response = await page.request.post('/api/commands/quantity', { data: { ...session, projectId: project.id, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: (await read('region')).sourceVersion, action } })
+    const response = await page.request.post('/api/commands/quantity', { data: { workspaceId: session.workspaceId, actorId: session.actorId, projectId: project.id, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: (await read('region')).sourceVersion, action } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }

@@ -101,9 +101,10 @@ test.describe('Issue #192：项目×分供方工作台与文件导入', () => {
 
   for (const input of READ_INPUTS) {
     test(`只读项目进入真实合同来源，返回保持合同页签：${input.project}`, async ({ page }) => {
+      test.setTimeout(90_000)
       await page.setViewportSize({ width: 1440, height: 1000 })
       await page.goto(`/project/${input.projectId}?origin=demo`)
-      await expect(page.getByRole('heading', { name: input.project, exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: input.project, exact: true })).toBeVisible({ timeout: 30_000 })
       await page.getByRole('region', { name: '项目分供方' }).getByRole('link', { name: input.supplier, exact: true }).click()
       await waitForWorkbench(page, input)
       await page.getByRole('tab', { name: /^合同/ }).click()

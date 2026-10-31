@@ -17,7 +17,8 @@ function markdown(input: typeof cases[number], supplier = MATERIAL_PRODUCTION_FI
 test.beforeEach(async ({ page }) => {
   test.setTimeout(90_000)
   fixtures.set(page, await installMaterialProductionFixture(page))
-  await page.clock.install({ time: new Date('2026-08-06T04:00:00.000Z') })
+  // 固定业务日期，避免识别结果随本机日期变化。
+  await page.clock.setFixedTime(new Date('2026-08-06T04:00:00.000Z'))
 })
 
 async function chooseLookup(page: Page, label: string, name: string) {
@@ -66,7 +67,7 @@ for (const input of cases) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ engine: 'paddleocr-official-api', model: 'PaddleOCR-VL-1.6', jobId: `job-delivery-${input.no}`, pages: [{ pageIndex: 0, markdown: content, prunedResult: {}, layoutRegions: [] }], markdownPages: [content], dataInfo: { numPages: 1 } }) })
     })
     await page.goto('/material/delivery')
-    await expect(page.getByRole('button', { name: '上传送货单', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '上传送货单', exact: true })).toBeVisible({ timeout: 20_000 })
     const picker = page.waitForEvent('filechooser')
     const buffer = await scan(page)
     await page.getByRole('button', { name: '上传送货单', exact: true }).click()
@@ -89,9 +90,11 @@ for (const input of cases) {
     await qty.fill(input.qty)
     await amount.fill(input.amount)
     await expect(page.getByText('金额已勾稽', { exact: true })).toBeVisible()
-    await review.getByRole('button', { name: '确认人工归档', exact: true }).click()
+    // 固定日期会影响通知的到期判断；键盘操作也覆盖按钮的可访问入口。
+    await review.getByRole('button', { name: '确认人工归档', exact: true }).focus()
+    await page.keyboard.press('Enter')
     await page.getByRole('dialog').getByRole('button', { name: '确认人工归档', exact: true }).click()
-    await expect(page.getByText('已归档 · 待打印', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('已归档 · 待打印', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
     const records = (await (await page.request.get('/api/read/deliveries?origin=real')).json()).records
     const archived = records.find((record: { orderNo: string }) => record.orderNo === input.no)
     expect(archived).toMatchObject({ projectId: fixture.projectId, supplierId: fixture.supplierId, deliveryDate: input.date, totalAmount: Number(input.amount), printDisposition: 'pending' })

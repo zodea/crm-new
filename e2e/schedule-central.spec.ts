@@ -191,7 +191,8 @@ test('中央合同三步建组、冻结历史、任务调整与基线在五档�
   expect(errors).toEqual([])
 })
 
-test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身份往返', async ({ page }) => {
+// 未知提交恢复由 production-schedule-recovery.spec.ts 使用正式持久来源验收。
+test('暂估冻结、自动进度及矩阵户详情同身份往返', async ({ page }) => {
   test.setTimeout(180_000)
   const fixture = await installQuantityProductionFixture(page)
   const quantityItems = (await fixture.read('templates')).data.items
@@ -226,24 +227,9 @@ test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身�
   await choose(page, '标准工序库', /中央暂估工序库/)
   await page.getByLabel('计划开始', { exact: true }).fill('2026-08-01')
   await page.getByRole('button', { name: '下一步：预览排程' }).click()
-  const submissions: string[] = []
-  await page.route('**/api/commands/schedule', async (route) => {
-    submissions.push(route.request().postData()!)
-    if (submissions.length === 1) {
-      expect((await route.fetch()).ok()).toBe(true)
-      await route.abort('failed')
-    }
-    else { await route.continue() }
-  })
   await page.getByRole('button', { name: '生成排程', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '生成排程', exact: true }).click()
-  await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
-  await capture(page, 'pending-command')
-  await page.getByRole('button', { name: '核对原提交', exact: true }).click()
   await expect(page).toHaveURL(/\/schedule\?.*group=/)
-  expect(submissions).toHaveLength(2)
-  expect(submissions[1]).toBe(submissions[0])
-  await page.unroute('**/api/commands/schedule')
   const read = async (): Promise<ScheduleRead> => (await page.request.get('/api/read/schedule/workspace', { params: { projectId: fixture.projectId, origin: 'real', includeDemo: false } })).json()
   const saved = await read()
   expect(saved.snapshot.groups).toHaveLength(1)

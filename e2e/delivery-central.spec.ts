@@ -108,7 +108,8 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
   await expect(page.getByRole('button', { name: '上传送货单', exact: true })).toBeVisible({ timeout: 60_000 })
   const picker = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: '上传送货单', exact: true }).click()
-  const recognized = page.waitForResponse(response => new URL(response.url()).pathname === '/api/ocr/recognize' && response.request().method() === 'POST')
+  // 冷启动需先在浏览器解析两页 PDF，再发识别请求；仍等待实际响应并检查结果。
+  const recognized = page.waitForResponse(response => new URL(response.url()).pathname === '/api/ocr/recognize' && response.request().method() === 'POST', { timeout: 60_000 })
   await (await picker).setFiles({ name: '双页送货原件.pdf', mimeType: 'application/pdf', buffer: Buffer.from(original) })
   const recognition = await recognized
   expect(recognition.ok(), await recognition.text()).toBe(true)

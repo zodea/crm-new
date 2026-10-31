@@ -1,6 +1,7 @@
 import type { MaterialContractListPageDTO } from '../app/lib/material-contract/read-contract'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectLocalHorizontalScroll, expectNoPageOverflow } from './helpers/responsive'
 
 const money = (value: number | string) => `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -115,11 +116,14 @@ test.describe('Issue #422 材料采购合同列表', () => {
     await expect(list.locator('a[id^="material-contract-row-"]')).toHaveCount(0)
   })
 
-  test('真实命令保存长名称，五档视口局部横滚、关系入口及筛选焦点可用', async ({ page }) => {
+  test('真实命令保存长名称，五档视口局部横滚、关系入口及筛选焦点可用', async ({ page }, testInfo) => {
     test.setTimeout(90_000)
     const longName = '合成材料采购合同－长名称与零金额验收－外墙铝板及机电安装辅材联合采购标段'
     const largeAmount = '123456789012.34'
     await page.goto('/contract/material/form/contract-existing-318')
+    const session = Buffer.from(testInfo.testId).toString('base64url')
+    const signatory = await createVerifiedSignatory(page, '材料列表验收合成我方公司', session)
+    await selectVerifiedSignatory(page, signatory, '材料列表验收合成我方公司')
     await page.getByLabel('合同名称 *').fill(longName)
     await page.getByLabel('含税合同金额 *', { exact: true }).fill(largeAmount)
     const saved = page.waitForResponse(response => response.url().includes('/api/commands/material-contracts/') && response.request().method() === 'PUT')

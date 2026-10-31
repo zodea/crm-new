@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test'
 
 for (const path of ['company-expense', 'other-expense', 'other-settlement']) {
   test(`${path} 同来源筛选和刷新保留表格，失败可重试，拒绝权限时清空`, async ({ page }, info) => {
+    // 开发服务首次编译较慢；业务读取、保留旧行与拒权断言仍逐项验证。
+    test.setTimeout(90_000)
     const session = Buffer.from(info.testId).toString('base64url')
     await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': session })
     for (const domain of ['projects', 'suppliers', 'auxiliary-contracts', 'other-settlements']) {
@@ -16,7 +18,7 @@ for (const path of ['company-expense', 'other-expense', 'other-settlement']) {
     const settlement = path === 'other-settlement'
     const list = page.getByTestId(settlement ? 'other-settlement-list' : 'auxiliary-list')
     const row = list.locator(`a[id^="${settlement ? 'other-settlement-' : 'aux-row-'}"]:visible`).first()
-    await expect(row).toBeVisible({ timeout: 20_000 })
+    await expect(row).toBeVisible({ timeout: 45_000 })
     await row.evaluate(element => element.setAttribute('data-retained-row', 'yes'))
     const endpoint = settlement ? 'other-settlements' : 'auxiliary-contracts'
     let mode: 'delay' | 'pass' | 'fail' | 'forbidden' = 'delay'

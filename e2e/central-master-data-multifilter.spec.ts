@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { buildCrewListPage, buildWorkerListPage, parseCrewListQuery, parseWorkerListQuery } from '../app/lib/crew-worker/read-page'
 import { buildCustomerListPage, parseCustomerListQuery } from '../app/lib/customer/read-page'
+import { createReadMeta, readQueryScope, withOriginReadMeta } from '../server/utils/read-meta'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ screenshot: 'off', video: 'off', trace: 'off' })
@@ -65,14 +66,23 @@ const workers: WorkerSourceRow[] = crews.map((crew, index) => ({
 test.beforeEach(async ({ page }) => {
   await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `master-multifilter-${randomUUID()}` })
   await page.clock.install({ time: new Date(asOf) })
+  const sessionResponse = await page.request.get('/api/read/business-session')
+  expect(sessionResponse.ok(), await sessionResponse.text()).toBe(true)
+  const session = await sessionResponse.json()
   await page.route(/\/api\/read\/(customers|crews|workers)\?/, async (route) => {
     const url = new URL(route.request().url())
     const input = Object.fromEntries(url.searchParams)
-    const common = { asOf, sourceVersion: 'multi-fixture', capabilities: [], crews, workers, projects: [], assignments: [], wages: [] }
-    const result = url.pathname.endsWith('/customers')
+    const customer = url.pathname.endsWith('/customers')
+    const crew = url.pathname.endsWith('/crews')
+    const query = customer ? parseCustomerListQuery(input) : crew ? parseCrewListQuery(input) : parseWorkerListQuery(input)
+    const common = { asOf, sourceVersion: 'multi-fixture', capabilities: session.capabilities, crews, workers, projects: [], assignments: [], wages: [] }
+    const result = customer
       ? buildCustomerListPage({ ...common, rows: customers, query: parseCustomerListQuery(input) })
-      : url.pathname.endsWith('/crews') ? buildCrewListPage({ ...common, query: parseCrewListQuery(input) }) : buildWorkerListPage({ ...common, query: parseWorkerListQuery(input) })
-    await route.fulfill({ json: result })
+      : crew ? buildCrewListPage({ ...common, query: parseCrewListQuery(input) }) : buildWorkerListPage({ ...common, query: parseWorkerListQuery(input) })
+    const schemaVersion = customer ? 'customer-read-v2' : 'crew-worker-read-v2'
+    const sources = (origin: 'real' | 'demo') => (customer ? ['customers'] : ['crews', 'workers', 'projects', 'assignments', 'wages']).map(key => ({ key, state: origin === 'real' ? 'readable' as const : 'not-requested' as const, sourceVersion: origin === 'real' ? 'multi-fixture' : null, asOf: origin === 'real' ? asOf : null }))
+    const meta = (origin: 'real' | 'demo') => createReadMeta({ session, schemaVersion, operation: `${customer ? 'customer' : crew ? 'crew' : 'worker'}:list`, dataOrigin: origin, asOf, coverage: origin === 'real' ? 'complete' : 'unknown', scope: readQueryScope(query), sources: sources(origin) })
+    await route.fulfill({ json: withOriginReadMeta(result, { real: meta('real'), demo: meta('demo') }) })
   })
 })
 

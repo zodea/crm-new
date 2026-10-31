@@ -66,7 +66,7 @@
 | [e2e/supplier-credential-ocr-central.spec.ts](../../../e2e/supplier-credential-ocr-central.spec.ts) | Playwright E2E | 授权合成原件识别失败重试、稍后冷读、税号矛盾和陈旧确认保选择、重新识别保留确认 |
 | [e2e/supplier-credentials-central.spec.ts](../../../e2e/supplier-credentials-central.spec.ts) | Playwright E2E | 真实旧库完整图迁入、历史凭证回读、同原件撤回与缺正文不冒充齐全 |
 | [e2e/supplier-crud.spec.ts](../../../e2e/supplier-crud.spec.ts) | Playwright E2E | 两类正式分供方新建、显式编辑、冷回读与页签复用；中央行菜单仅提供只读入口，旧本地删除由数据库及通用主数据测试覆盖 |
-| [e2e/supplier-detail.spec.ts](../../../e2e/supplier-detail.spec.ts) | Playwright E2E | 分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双页联动 |
+| [e2e/supplier-detail.spec.ts](../../../e2e/supplier-detail.spec.ts) | Playwright E2E | 真实读源缺口及完整合成读模型的六类事实界面、证照软删除撤回与列表双页联动；合成读模型不代表收票来源已接入 |
 | [e2e/supplier-export.spec.ts](../../../e2e/supplier-export.spec.ts) | Playwright E2E | 过渡契约：中央分供方列表不显示未接入的导出（#406/#407） |
 | [e2e/supplier-import.spec.ts](../../../e2e/supplier-import.spec.ts) | Playwright E2E | 中央导入：信用代码和唯一识别码独立映射，同外部旧 ID 重导更新并保留未映射资料 |
 | [e2e/supplier-list-replica.spec.ts](../../../e2e/supplier-list-replica.spec.ts) | Playwright E2E | ${width}px：完整列、紧凑标签、表格内滚动及可访问工具 |

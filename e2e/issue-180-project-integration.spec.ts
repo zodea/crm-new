@@ -6,6 +6,7 @@ import { expectLocalHorizontalScroll, expectNoPageOverflow, tabUntilFocused } fr
 // tests/production/finance-storage.test.ts；无入口的旧经营投影已清理。
 // 中央已接旅程由当前来源感知卡片进入；未接管领域不重建本地十页签。
 test('中央项目的材采、商务、工资与收款使用同一项目身份且来源不混合', async ({ page }) => {
+  test.setTimeout(90_000)
   const fixture = await installProjectCentralFixture(page)
   await fixture.open()
   const dto = await fixture.read()
@@ -32,6 +33,7 @@ const VIEWPORTS = [
 ] as const
 
 test('中央项目各宽度保持页面边界，工资密表局部滚动及导航键盘可达', async ({ page }) => {
+  test.setTimeout(90_000)
   const fixture = await installProjectCentralFixture(page)
   await fixture.open()
   const table = page.getByRole('region', { name: '工资实际收付明细，可横向滚动', exact: true })

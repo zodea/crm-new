@@ -120,6 +120,8 @@ async function initialize(targetId = routeId.value, retainInput = false) {
   const request = ++initializeRequest
   invalidatePreparation()
   loading.value = true
+  // 新视图接管状态后，上一笔保存的 finally 不再有权清理它。
+  loadingAction.value = null
   context.value = null
   loadError.value = ''
   fieldErrors.value = {}

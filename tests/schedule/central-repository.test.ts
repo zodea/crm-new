@@ -11,6 +11,17 @@ function read(): ScheduleRead {
 const command: ScheduleCommand = { commandId: 'original', workspaceId: 'w', actorId: 'a', origin: 'real', projectId: query.projectId, requiredCapability: 'schedule:write', sourceVersion: 'q:0+wbs:0+source', action: { kind: 'set-baseline' } }
 
 describe('中央 WBS HTTP Repository', () => {
+  it('只保留匹配原命令的明确未应用证明', async () => {
+    const rejection = (commandId: string) => ({ response: { status: 409, _data: { data: { code: 'stale-source', message: '来源变化', retryable: false, fieldErrors: {}, traceId: null, commandId, commandOutcome: 'not-applied' } } } })
+    const matched = createScheduleRepository(async () => {
+      throw rejection('original')
+    })
+    await expect(matched.execute(command)).rejects.toMatchObject({ problem: { code: 'stale-source', commandId: 'original', commandOutcome: 'not-applied' } })
+    const mismatched = createScheduleRepository(async () => {
+      throw rejection('different')
+    })
+    await expect(mismatched.execute(command)).rejects.not.toHaveProperty('problem.commandOutcome')
+  })
   it('真实HTTP往返保留来源、运行日、合同和原提交编号；对调用方只交独立数据', async () => {
     const observed: { path: string, params: Record<string, string>, method?: string, body: string }[] = []
     const server = createServer(async (request, response) => {

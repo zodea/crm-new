@@ -52,7 +52,8 @@ export async function installProjectCentralFixture(page: Page, input: ProjectCen
   page.on('pageerror', error => errors.push(error.message))
   const open = async () => {
     await page.goto(url)
-    await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
+    // 首次访问项目详情需等待开发服务编译，避免把空白编译期误判为读取失败。
+    await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible({ timeout: 45_000 })
     await expect(page.getByRole('status', { name: '中央项目只读详情', exact: true })).toBeVisible()
   }
   return { id, input, url, read, open, errors }
