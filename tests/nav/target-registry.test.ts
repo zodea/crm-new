@@ -498,7 +498,6 @@ describe('唯一 Target Registry', () => {
 
   it.each([
     ['contract', 'detail', '/contract/source-1'],
-    ['payment-application', 'detail', '/finance/payment/source-1/detail'],
   ] as const)('项目分供方来源记录 %s/%s 消费双父 ID 与受限返回页签', (entity, variant, path) => {
     const returnTo = '/project/project-1/supplier/supplier-1?origin=demo&tab=settlement'
     const intent: NavigationIntentDTO = {
@@ -517,6 +516,7 @@ describe('唯一 Target Registry', () => {
   })
 
   it.each([
+    ['payment-application', 'detail'],
     ['invoice', 'detail'],
     ['payment-record', 'detail'],
     ['settlement', 'subcontract-settlement'],
