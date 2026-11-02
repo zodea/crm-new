@@ -28,7 +28,7 @@
 | `loadDayworkList(query, scope)` | `origin` 与项目/月/班组/独立签工状态筛选；返回 context、原 scope、合法 options、原 records、逐条当前占用/月锁/诊断。空项目或月返回候选及明确空态，不默认首项、不读全年。 |
 | `loadDayworkForm(query, input)` | `{recordId}` 或 `{recordId:null,draftKey,draft?:Partial<…>}`；返回原目标、context、draft、options、实际可编辑/可确认状态与字段错误/原因。既有只读应保原字段及证据，不能只剩建单 blocker。 |
 | `loadC2Form(query, input)` | 沿 C1 的 `{statementId}` / `{statementId:null,draftKey,draft?:Partial<…>}`；返回 context、status、draft、members、逐条 facts、所用 subjectConfig、金额完整度、blockers、eligibility、sources。事实必须分出待确认/他单占用/缺证据/可用，不能空数组掩盖。 |
-| `loadC2Config(query, scope)` | scope 为 projectId+leaderWorkerId；返回原配置稳定 ID、原 unitRate（number|null）、原 ruleText（明确空串保留）、实际关系/状态、候选及 readonlyReasons。页面不把当下默认文案写回旧配置。 |
+| `loadC2Config(query, scope)` | scope 为 projectId+leaderWorkerId；返回原配置稳定 ID、原 unitRate（number\|null）、原 ruleText（明确空串保留）、实际关系/状态、候选及 readonlyReasons。页面不把当下默认文案写回旧配置。 |
 | `loadC2Output(query, id)` | 严格 available+专属 FrozenDocument / unavailable+reasons；网络读取中或失败是页面读态，不得冒充已确认历史缺损。 |
 
 保存/人工确认/配置/草稿/核对/发放均接固定 read，由 store 组装原身份和 sourceVersion。UI 不计算提交金额、费率或已付，不把 records/配置正文自行转成工资来源；若合同提供选择来源 ID，UI 只提交该合同明确的 stable ID 选择，资格、占用与最终关联由服务复验。选负责人/用工人采用其明确实际 crewId；null 只表示实际无组，台账的“全部班组”不是工资/记录主体。
@@ -67,7 +67,7 @@
 | 签工台账/表单 | 新 `CentralSignedDayworkScreen.vue`、`CentralDayworkFormPage.vue`、`PayrollDayworkFormFields.vue`、`PayrollDayworkTable.vue`、`PayrollDayworkConfirmDialog.vue`；对应 `useCentralDaywork.ts` / `usePayrollDayworkForm.ts`。台账读筛选；字段组件 props draft/options/errors，emit patch；确认弹层 props 原 record/pending，emit 原证明确认/恢复。 |
 | C2 工资/配置 | 新 `CentralC2DraftFormPage.vue`、`PayrollC2FormFields.vue`、`PayrollC2ConfigScreen.vue`、`PayrollC2SourceReview.vue`、`PayrollC2StatementWorkspace.vue`、`PayrollC2ReleaseDialog.vue`；相应 `usePayrollC2Form/Config/Statement.ts`。页面本地固定 read，服务 mutation 归 store；表单和展示按职责拆分。 |
 | 导航与来源返回 | 新 `c2-navigation.ts` / `PayrollC2SourceReturn.vue`；精确改 `central-navigation.ts`、`target-registry.ts`、`restore-target.ts`、`app/types/read-model.ts` 实体字面量及 `CrewWorkerCentralDetailScreen.vue` 受控 C2 返回分支。A/B 不并行写这些 C 接缝。 |
-| 打印/XLSX | 新 `PayrollC2FrozenPrint.vue`、`c2-export.ts`，只接 A FrozenDocument；按原成员标签/逐签工/配置规则/实发分配输出签工表及工资表，不输出考勤、不强转旧 Native 文档、不用 `??0` 或 `ruleText || 默认脚注`。沿现 exportFile/XLSX，不加依赖。 |
+| 打印/XLSX | 新 `PayrollC2FrozenPrint.vue`、`c2-export.ts`，只接 A FrozenDocument；按原成员标签/逐签工/配置规则/实发分配输出签工表及工资表，不输出考勤、不强转旧 Native 文档、不用 `??0` 或 `ruleText \|\| 默认脚注`。沿现 exportFile/XLSX，不加依赖。 |
 | 验证 | C 自有组件、导航/导出 unit、真实主链/恢复/只读 E2E 与 helper。共享 B 真实迁入夹具；Root 的独立反例、metadata、权威文档、指南与最终 service/full/type/build 不占用。 |
 
 整页继续 EntityFormShell、检索 LookupSelect、最多两列/窄屏单列；空值输入与建议分开，disabled/pending 仍显原项目/班组/负责人名称。局部密集表各自横滚，长内容可换行且有定位。C 不写 A domain/API/Repository/stores/schema，不改 B facts/锁/迁移，也不修改 Native 业务算法。

@@ -16,6 +16,8 @@ export default withNuxt(
       'DC重构设计源码/**',
       '设计系统配色更新/**',
       '参考文件数据/**',
+      // Tauri 生成的 schema 是工具产物，不对其应用手写 JSON 的格式规则。
+      'src-tauri/gen/**',
     ],
   }),
 )
