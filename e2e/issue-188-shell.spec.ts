@@ -85,6 +85,12 @@ test('Issue #188：导航搜索与页签溢出均可由键盘可达控件操作'
   await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(48)
   await expect(previous).toHaveCount(0)
   await expect(next).toHaveCount(0)
+  await sidebarFrame.hover()
+  await expect(sidebarFrame).toHaveAttribute('data-peek-open', 'true')
+  await page.mouse.move(800, 700)
+  await expect(sidebarFrame).not.toHaveAttribute('data-peek-open', 'true')
+  await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(48)
+  await expect(page.locator('[data-overlay-backdrop]')).toHaveCount(0)
 
   await page.getByRole('button', { name: '固定侧栏' }).click()
   await expect.poll(async () => Math.round((await sidebarFrame.boundingBox())?.width ?? 0)).toBe(208)
