@@ -230,6 +230,7 @@ const SAMPLES: VisualSample[] = [
 
       await expect(page.locator('[data-ui="supplier-list-table"] .vxe-body--row').first())
         .toBeVisible()
+      await expect(page.getByRole('status').filter({ hasText: '关联发票与付款尚未接入' })).toBeVisible()
 
       const tabList = page.getByRole('navigation', { name: '已打开页面' })
       const overflow = await tabList.evaluate(element => element.scrollWidth > element.clientWidth)
