@@ -27,6 +27,11 @@ for (const input of [
 
     await page.goto('/')
     await page.waitForLoadState('networkidle')
+    const unexpectedDocuments: string[] = []
+    page.on('request', (request) => {
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+        unexpectedDocuments.push(request.url())
+    })
     const tabBar = page.getByRole('navigation', { name: '已打开页面' })
     const homeTab = tabBar.getByRole('button', { name: '首页', exact: true })
     await expect(homeTab).toBeVisible()
@@ -77,6 +82,7 @@ for (const input of [
     ] as const) {
       await openSidebarRoute(page, label, path)
     }
+    expect(unexpectedDocuments, '页签导航期间不应重新加载浏览器文档').toEqual([])
     await expect(tabBar.getByRole('button', { name: /^关闭 / })).toHaveCount(15)
     await expect(homeTab).toBeVisible()
 

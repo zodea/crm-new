@@ -43,4 +43,4 @@
 | [e2e/shell-visual.spec.ts](../../../e2e/shell-visual.spec.ts) | Playwright E2E | Issue #419：外壳保持深色侧栏与清晰可读的全站导航尺寸 |
 | [e2e/sidebar-accordion.spec.ts](../../../e2e/sidebar-accordion.spec.ts) | Playwright E2E | 侧栏一级目录单开模式 |
 | [e2e/tab-session-restore.spec.ts](../../../e2e/tab-session-restore.spec.ts) | Playwright E2E | 初始导航完成后才恢复活动页，刷新与关闭保留正确集合 |
-| [e2e/tabs-smoke.spec.ts](../../../e2e/tabs-smoke.spec.ts) | Playwright E2E | 页签完整旅程：打开、切换、右键关闭并触发上限提示 |
+| [e2e/tabs-smoke.spec.ts](../../../e2e/tabs-smoke.spec.ts) | Playwright E2E | 页签完整旅程：打开、切换、右键关闭、上限提示及导航期间无意外文档重载；冷缓存运行可检验开发服务依赖预处理 |
