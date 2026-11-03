@@ -35,7 +35,11 @@ it('成功后响应丢失保留原键，禁止替换原提交；核对和合法�
   await store.hydrate(session, null)
   const draft = { name: '已经提交', contact: '合成人' }
   const attachments = { add: [{ fileName: '原件.txt', fileSize: 3, contentBase64: 'YWJj' }] }
-  await expect(store.saveForm(session, draft, 'save', attachments)).rejects.toThrow()
+  await expect(store.saveForm(session, draft, 'save', attachments)).rejects.toMatchObject({
+    message: '项目读取服务暂时不可用，请重试',
+    problem: { code: 'unavailable' },
+    cause: expect.objectContaining({ message: 'response lost after commit' }),
+  })
   expect([...values.values()]).toEqual([commandId])
   const failure = await store.saveForm(session, { ...draft, name: '尚未保存的新输入' }, 'save', attachments).catch(cause => cause)
   expect(failure.message).toContain('原提交结果未知')
@@ -83,7 +87,11 @@ it('身份切换、错误目标和过旧版本不能清理旧键；后续合法�
   const store = useProjectPersistentCommandStore()
   const session = store.createSession()
   await store.hydrate(session, null)
-  await expect(store.saveForm(session, { name: '原稿' }, 'save')).rejects.toThrow()
+  await expect(store.saveForm(session, { name: '原稿' }, 'save')).rejects.toMatchObject({
+    message: '项目读取服务暂时不可用，请重试',
+    problem: { code: 'unavailable' },
+    cause: expect.objectContaining({ message: 'unknown' }),
+  })
   currentContext = { ...context, actorId: 'other-owner' }
   await expect(store.recover(session)).rejects.toThrow('身份或权限')
   expect(values.size).toBe(1)

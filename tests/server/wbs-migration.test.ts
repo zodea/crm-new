@@ -35,12 +35,12 @@ async function snapshot() {
   finally { db.close() }
 }
 
-it('wBS 写后 SQL 冲突丢弃已准备工程量候选，失败后队列可继续读取与保存', async () => {
+it('分组名冲突时丢弃已准备的工程量候选，失败后 WBS 队列可继续读取与保存', async () => {
   const instance = target()
   try {
     await instance.withSchedule(query, db => db.execute('INSERT INTO schedule_groups (id,project_id,name,scope_basis) VALUES (?,?,?,?)', ['independent-existing-group', projectId, '已绑定的原暂估组', 'provisional']))
     const before = await instance.region(query)
-    await expect(instance.prepareMigrationSnapshot(await snapshot())).rejects.toThrow()
+    await expect(instance.prepareMigrationSnapshot(await snapshot())).rejects.toThrow('UNIQUE constraint failed: schedule_groups.project_id, schedule_groups.name')
     expect((await instance.region(query)).data).toEqual(before.data)
     expect((await instance.region(query)).sourceVersion).toBe(before.sourceVersion)
     expect(await instance.withSchedule(query, db => db.select('SELECT id FROM schedule_groups'))).toEqual([{ id: 'independent-existing-group' }])

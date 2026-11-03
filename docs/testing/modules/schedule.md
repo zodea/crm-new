@@ -35,7 +35,7 @@
 | [tests/schedule/process-library-domain.test.ts](../../../tests/schedule/process-library-domain.test.ts) | 单元／服务／状态 | 标准工序库前置关系校验 |
 | [tests/schedule/read-model.test.ts](../../../tests/schedule/read-model.test.ts) | 单元／服务／状态 | 排程 read model |
 | [tests/schedule/wbs-controlled-migration.test.ts](../../../tests/schedule/wbs-controlled-migration.test.ts) | 单元／服务／状态 | 完整 SQLite 图经确认原子迁入，绑定历史/软禁用/无组任务/冻结8与人工楼层均可读；重复确认保日常更正 |
-| [tests/server/wbs-migration.test.ts](../../../tests/server/wbs-migration.test.ts) | 单元／服务／状态 | wBS 写后 SQL 冲突丢弃已准备工程量候选，失败后队列可继续读取与保存 |
+| [tests/server/wbs-migration.test.ts](../../../tests/server/wbs-migration.test.ts) | 单元／服务／状态 | WBS 写后分组名唯一约束冲突丢弃已准备工程量候选，原组和版本保留，失败后队列可继续读取与保存 |
 | [tests/stores/process-library-central-state.test.ts](../../../tests/stores/process-library-central-state.test.ts) | 单元／服务／状态 | 中央工序库公开状态 |
 | [tests/stores/schedule-central-library-source.test.ts](../../../tests/stores/schedule-central-library-source.test.ts) | 单元／服务／状态 | 浏览器 WBS 的工序库来源接管 |
 | [tests/stores/schedule-central-state.test.ts](../../../tests/stores/schedule-central-state.test.ts) | 单元／服务／状态 | 中央绑定固定预览与原提交恢复 |

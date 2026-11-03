@@ -108,8 +108,10 @@ describe('客户收款只读取当前会话的中央事实', () => {
     expect(detail.summary).toMatchObject({ receiptCount: null, effectiveReceiptAmount: null, draftReceiptCount: null, outstandingAmount: null })
     expect(detail.projects[0]).toMatchObject({ receiptCount: null, effectiveReceiptAmount: null })
     expect(detail.contracts[0]).toMatchObject({ receiptAmount: null, outstandingAmount: null })
-    expect(() => decodeCustomerDetailRead({ ...detail, summary: { ...detail.summary, receiptCount: 0 } })).toThrow()
-    expect(() => decodeCustomerDetailRead({ ...detail, summary: { ...detail.summary, effectiveReceiptAmount: '0.00' } })).toThrow()
+    expect(() => decodeCustomerDetailRead({ ...detail, summary: { ...detail.summary, receiptCount: 0 } })).toThrow('中央后台返回的客户详情读模型无效')
+    expect(() => decodeCustomerDetailRead({ ...detail, summary: { ...detail.summary, draftReceiptCount: 0 } })).toThrow('中央后台返回的客户详情读模型无效')
+    expect(() => decodeCustomerDetailRead({ ...detail, summary: { ...detail.summary, effectiveReceiptAmount: '0.00' } })).toThrow('中央后台返回的客户详情读模型无效')
+    expect(() => decodeCustomerDetailRead({ ...detail, summary: { ...detail.summary, outstandingAmount: '0.00' } })).toThrow('中央后台返回的客户详情读模型无效')
     expect(JSON.stringify(detail)).not.toContain('receipt-real-325')
     await expect(customerReadTestInstance.receipt('receipt-real-325', { ...query, customerId }, scope))
       .rejects

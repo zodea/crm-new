@@ -28,7 +28,7 @@ it('公开迁入冷读保余15处，中央追加整改后仍可重试原命令�
     expect(await target.reload().executeHollow(command)).toEqual(receipt)
     const after = await target.reload().hollow(target.scope)
     expect(after.data.records[0]).toMatchObject({ remainingCount: 12, rectifiedCount: 7 })
-    await expect(target.rollback()).rejects.toThrow()
+    await expect(target.rollback()).rejects.toThrow('迁入空鼓检查已有独立追加的修订、整改或回执；已阻止恢复并保留原件')
     expect((await target.service.hollow(target.scope)).data).toEqual(after.data)
     expect(target.core.snapshot(target.session).authority).toBe('central')
   }
@@ -127,7 +127,7 @@ it.each([true, false])('恢复核对独立原生检查与本批次责任人的�
     const independent = await target.createIndependent(related)
     expect(independent.read.data.records[0]).toMatchObject({ remainingCount: 0, inspection: { input: { count: 0 } } })
     if (related) {
-      await expect(target.rollback()).rejects.toThrow()
+      await expect(target.rollback()).rejects.toThrow('独立空鼓检查原件仍引用本批次项目、责任或施工主体；已阻止恢复并保留全部当前事实')
       expect(target.core.snapshot(target.session).authority).toBe('central')
     }
     else {

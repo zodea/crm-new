@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | [tests/server/project-customer-reference.test.ts](../../../tests/server/project-customer-reference.test.ts) | 单元／服务／状态 | 真实项目客户候选与权限降级 |
 | [tests/project/cost-amounts.test.ts](../../../tests/project/cost-amounts.test.ts) | 单元／服务／状态 | 可空金额归集与真实零 |
-| [tests/production/project-pending.test.ts](../../../tests/production/project-pending.test.ts) | 单元／服务／状态 | 未知结果禁止替换原提交；可靠回执与合法同项目回读共同清理，读取失败只读重试，身份变化及错误目标不解锁 |
+| [tests/production/project-pending.test.ts](../../../tests/production/project-pending.test.ts) | 单元／服务／状态 | 响应丢失保留不可用原因和原异常，未知结果禁止替换原提交；可靠回执与合法同项目回读共同清理，读取失败只读重试，身份变化及错误目标不解锁 |
 | [tests/production/project-storage.test.ts](../../../tests/production/project-storage.test.ts) | 单元／服务／状态 | 项目与原件同库冷回读，客户改名沿原 ID、未知指标不归零、删除恢复保留原件；客户被有效项目引用时拒绝删除 |
 | [tests/project/archive.test.ts](../../../tests/project/archive.test.ts) | 单元／服务／状态 | 档案路径清洗与稳定 ZIP 打包 |
 | [tests/project/cost-control.test.ts](../../../tests/project/cost-control.test.ts) | 单元／服务／状态 | project cost control read model |
