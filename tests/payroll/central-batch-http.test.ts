@@ -22,7 +22,7 @@ it.each([{ actorId: 'other-actor' }, { workspaceId: 'other-workspace' }])('batch
   const scope = { projectId: 'p', month: '2026-08', crewId: 'crew', leaderWorkerId: 'w' }
   const config = await f.service.aConfig({ origin: 'real' }, scope)
   await f.service.execute(f.command(config, { kind: 'save-a-prices', prices: [{ priceId: null, itemId: 'item', unit: '㎡', mode: 'baseline', workerId: null, effectiveMonth: '2026-08', unitPrice: 750, scope: { kind: 'project' } }] }))
-  const draft: PayrollADraft = { ...f.draft, memberWorkerIds: ['w', 'zero'], payRatio: 0.8 }
+  const draft: PayrollADraft = { ...f.draft, memberWorkerIds: ['w', 'zero'], payRatio: 0.8, ratioPlan: { schemaVersion: 1, itemRatios: [{ itemId: 'item', ratio: 0.8 }], feeRatios: [] } }
   const form = await f.service.aForm({ origin: 'real' }, { statementId: null, draftKey: 'batch-http', draft })
   const saved = await f.service.execute(f.command(form, { kind: 'save-a-draft', draft }))
   const persisted = await f.service.aForm({ origin: 'real' }, { statementId: saved.statementId! })

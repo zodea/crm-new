@@ -18,22 +18,29 @@ const management = computed(() => feesDocument.value?.book.bookPurpose === 'mana
     <div class="payroll-a-print" aria-hidden="true">
       <article class="payroll-a-print-page" data-payroll-print-page>
         <header class="payroll-a-print-title">
-          <h1>{{ document.projectName }}{{ management ? '管理费进度款单' : '工资表' }}</h1><p>{{ document.month }} · {{ document.crewName || '未关联班组' }} · {{ management ? '管理人' : '负责人' }}：{{ document.leaderName }} · {{ { monthly: '月度请款', settlement: '工程结算', retention: '尾款' }[document.periodKind] }}</p><p>按实际完成现场量核算 · 支付比例 {{ document.payRatio * 100 }}%</p>
+          <h1>{{ document.projectName }}{{ management ? '管理费进度款单' : '工资表' }}</h1><p>{{ document.month }} · {{ document.crewName || '未关联班组' }} · {{ management ? '管理人' : '负责人' }}：{{ document.leaderName }} · {{ { monthly: '月度请款', settlement: '工程结算', retention: '尾款' }[document.periodKind] }}</p><p>按实际完成现场量核算 · {{ document.ratioPlan ? '费用默认比例' : '支付比例' }} {{ document.payRatio * 100 }}%</p>
           <PayrollOfficialIdentity v-if="officialIssue" :issue="officialIssue" />
         </header>
         <table v-if="!management">
           <thead>
             <tr>
-              <th>序号</th><th>姓名</th><th>分项</th><th>单位</th><th>完成量</th><th>单价</th><th>金额</th><th class="signature">
+              <th>序号</th><th>姓名</th><th>分项</th><th>单位</th><th>完成量</th><th>单价</th><th>金额</th><th v-if="document.ratioPlan">
+                比例
+              </th><th class="signature">
                 签字确认并按手印
               </th>
             </tr>
           </thead><tbody>
             <tr v-for="(line, index) in document.lines" :key="line.id">
-              <td>{{ index + 1 }}</td><td>{{ line.workerName }}</td><td>{{ line.itemName }}</td><td>{{ line.unit }}</td><td>{{ line.quantity }}</td><td>{{ payrollAmount(line.unitPrice) }}</td><td>{{ payrollAmount(line.amount) }}</td><td />
+              <td>{{ index + 1 }}</td><td>{{ line.workerName }}</td><td>{{ line.itemName }}</td><td>{{ line.unit }}</td><td>{{ line.quantity }}</td><td>{{ payrollAmount(line.unitPrice) }}</td><td>{{ payrollAmount(line.amount) }}</td><td v-if="document.ratioPlan">
+                {{ document.ratioPlan.itemRatios.find(row => row.itemId === line.itemId)?.ratio == null ? '未记录' : `${document.ratioPlan.itemRatios.find(row => row.itemId === line.itemId)!.ratio! * 100}%` }}
+              </td><td />
             </tr>
           </tbody>
         </table>
+        <p v-for="row in document.ratioPlan?.feeRatios ?? []" :key="`${row.kind}:${row.id}`">
+          {{ (row.kind === 'fee' ? feesDocument?.fees.lines.find(line => line.feeId === row.id)?.name : feesDocument?.fees.negativeLines.find(line => line.lineId === row.id)?.label) || '费用名称未记录' }}：{{ row.ratio * 100 }}%
+        </p>
         <PayrollAFeesFrozenSection v-if="feesDocument" :document="feesDocument" />
         <PayrollHollowFrozenSection v-if="document.hollow" :snapshot="document.hollow" />
         <section class="payroll-a-print-confirmation">

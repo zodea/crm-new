@@ -10,7 +10,7 @@ function basisRows(basis: PayrollAdjustmentBasisDraft | null): Cell[][] {
   if (!basis)
     return [['原依据未完整记录']]
   if (basis.formatFamily === 'A')
-    return [['采用比例', basis.payRatio], ...basis.components.map(row => [row.ownershipKey, row.priceRevisionId, row.quantity, row.unitPrice])]
+    return [[basis.ratioPlan ? '费用默认比例' : '采用比例', basis.payRatio], ...(basis.ratioPlan?.itemRatios.map(row => ['工程量分项比例', row.itemId, row.ratio] as Cell[]) ?? []), ...(basis.ratioPlan?.feeRatios.map(row => [row.kind === 'fee' ? '费用单独比例' : '负价单独比例', row.id, row.ratio] as Cell[]) ?? []), ...basis.components.map(row => [row.ownershipKey, row.priceRevisionId, row.quantity, row.unitPrice])]
   if (basis.formatFamily === 'C1')
     return [...basis.rates.map(row => [row.workerId, '日薪 / 加班标准', row.dailyWage, row.overtimeRate, row.overtimeRule]), ...basis.records.map(row => [row.recordId, row.workerId, row.workDate, row.hours, row.overtimeHours, row.workContent])]
   return [['主体单价', basis.unitRate, '配置', basis.configId], ...basis.records.map(row => [row.recordId, row.workerId, row.workDate, row.laborUnits, `${row.startTime}—${row.endTime}`, row.workContent, row.witness, row.confirmedOn])]

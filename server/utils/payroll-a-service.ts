@@ -6,11 +6,12 @@ import type { PayrollIdentitySource, PayrollRun, PayrollServiceOptions } from '.
 import { createHash } from 'node:crypto'
 import { payrollAAmount, payrollACanonical, payrollAFactInSubject, payrollALines, payrollAMoney } from '../../app/lib/payroll/central-a-calculation'
 import { decodePayrollAResult, encodePayrollAWire, parsePayrollACommand } from '../../app/lib/payroll/central-a-codec'
-import { payrollACalculationVersion, payrollACrossBookConflicts, payrollAWriteRow, persistPayrollACalculation, releasePayrollA } from '../../app/lib/payroll/central-a-command'
+import { payrollACalculationVersion, payrollACrossBookConflicts, payrollAWriteRow, persistPayrollACalculation, persistPayrollASource, releasePayrollA } from '../../app/lib/payroll/central-a-command'
 import { payrollAManagementContains } from '../../app/lib/payroll/central-a-fees-calculation'
-import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
-import { isPayrollAStatementSourceSnapshotV2, isPayrollAStatementSourceSnapshotV3 } from '../../app/lib/payroll/central-a-fees-validation'
+import { hasPayrollAFeesDocument, hasPayrollAFeesForm } from '../../app/lib/payroll/central-a-fees-contract'
+import { isPayrollAStatementSourceSnapshotV2, isPayrollAStatementSourceSnapshotV3, isPayrollAStatementSourceSnapshotV4 } from '../../app/lib/payroll/central-a-fees-validation'
 import { loadPayrollAConfigHistory } from '../../app/lib/payroll/central-a-history'
+import { calculatePayrollAItemRatios, carryPayrollARatioPlan } from '../../app/lib/payroll/central-a-item-ratio'
 import { assertPayrollAMonth, assertPayrollARatio, loadPayrollAPrices, loadPayrollASubjectConfig, savePayrollAPrices } from '../../app/lib/payroll/central-a-prices'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { payrollHollowFrozenReadWithCurrent } from '../../app/lib/payroll/central-hollow-deduction-read'
@@ -48,13 +49,62 @@ async function head(db: TransactionDb, id: string): Promise<Row> {
 }
 async function savedDraft(db: TransactionDb, row: Row): Promise<PayrollADraft> {
   const members = await db.select<{ worker_id: string }>('SELECT worker_id FROM wage_statement_members WHERE statement_id = ? AND deleted_at IS NULL ORDER BY worker_id', [row.id])
-  const relation = await db.select('SELECT statement_id FROM payroll_a_statement_books WHERE statement_id=?', [row.id])
-  const proof = relation.length ? await resolvePayrollABook(db, text(row.id)) : null
-  return { projectId: text(row.project_id), crewId: row.crew_id == null ? null : text(row.crew_id), leaderWorkerId: text(row.leader_worker_id), memberWorkerIds: members.map(member => member.worker_id), month: text(row.month), periodKind: row.period_kind as PayrollADraft['periodKind'], payRatio: number(row.pay_ratio), note: text(row.note), ...(proof?.state === 'proven' ? { book: proof.book } : {}) }
+  const proof = await resolvePayrollABook(db, text(row.id))
+  const [source] = await db.select<{ source_json: string }>('SELECT source_json FROM payroll_a_statement_sources WHERE statement_id=?', [row.id])
+  let ratioPlan: PayrollADraft['ratioPlan']
+  if (source) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(source.source_json)
+    }
+    catch {
+      throw payrollProblem('unavailable', '工资来源正文无法核实')
+    }
+    if (parsed && typeof parsed === 'object' && 'schemaVersion' in parsed && parsed.schemaVersion === 4) {
+      if (!isPayrollAStatementSourceSnapshotV4(parsed))
+        throw payrollProblem('unavailable', '工资分项比例原始依据无法核实')
+      ratioPlan = parsed.ratioPlan
+    }
+  }
+  return { projectId: text(row.project_id), crewId: row.crew_id == null ? null : text(row.crew_id), leaderWorkerId: text(row.leader_worker_id), memberWorkerIds: members.map(member => member.worker_id), month: text(row.month), periodKind: row.period_kind as PayrollADraft['periodKind'], payRatio: number(row.pay_ratio), note: text(row.note), ...(proof?.state === 'proven' ? { book: proof.book } : {}), ...(ratioPlan ? { ratioPlan } : {}) }
 }
 async function priorPayments(db: TransactionDb, scope: PayrollASubjectScope, excluded: string | null) {
   // 已发事实包括后来软删的旧头；隐藏或删除不能把真实已付款解除成未付款。
   return loadPayrollABookPayments(db, { ...scope, book: 'book' in scope && scope.book ? scope.book as NonNullable<PayrollADraft['book']> : { bookPurpose: 'ordinary', managementBookId: null } }, excluded)
+}
+async function previousItemRatioPlan(db: TransactionDb, draft: Partial<PayrollADraft>): Promise<PayrollADraft['ratioPlan']> {
+  if (!draft.projectId || !draft.leaderWorkerId || !draft.month || !draft.book || draft.periodKind === 'retention')
+    return undefined
+  const previousMonth = new Date(`${draft.month}-01T00:00:00Z`)
+  previousMonth.setUTCMonth(previousMonth.getUTCMonth() - 1)
+  const rows = await db.select<Row>('SELECT id,status FROM wage_statements WHERE project_id=? AND leader_worker_id=? AND format_family=\'A\' AND period_kind=\'monthly\' AND status IN (\'draft\',\'checked\',\'released\') AND deleted_at IS NULL AND month=? ORDER BY id', [draft.projectId, draft.leaderWorkerId, previousMonth.toISOString().slice(0, 7)])
+  const matching: Row[] = []
+  for (const row of rows) {
+    const proof = await resolvePayrollABook(db, text(row.id))
+    // 未证明所属簿的工资不能排除属于当前簿，不能据此选择另一张作为唯一上月依据。
+    if (proof.state !== 'proven')
+      return undefined
+    if (proof.state === 'proven' && samePayrollABook(proof.book, draft.book))
+      matching.push(row)
+  }
+  if (matching.length !== 1)
+    return undefined
+  const previous = matching[0]!
+  if (previous.status === 'released') {
+    const statementId = text(previous.id)
+    const document = (await loadPayrollMigratedProof(db, draft.projectId)).aDocuments.get(statementId)
+      ?? (await loadPayrollAReleasedWithMigration(db, statementId)).get(statementId)
+    return document?.ratioPlan
+  }
+  // 迁入草稿的原身份需单独证明；不按相同名称猜成本项目的分项。
+  if ((await db.select('SELECT entity_id FROM payroll_migration_evidence WHERE entity_id=?', [previous.id])).length)
+    return undefined
+  const [source] = await db.select<{ source_json: string }>('SELECT source_json FROM payroll_a_statement_sources WHERE statement_id=?', [previous.id])
+  try {
+    const parsed: unknown = source ? JSON.parse(source.source_json) : null
+    return isPayrollAStatementSourceSnapshotV4(parsed) ? parsed.ratioPlan : undefined
+  }
+  catch { return undefined }
 }
 async function ratioDefault(db: TransactionDb, draft: Partial<PayrollADraft>, source: PayrollIdentitySource): Promise<PayrollARatioDefault> {
   const base = { statementId: null, configId: null, sourceVersion: null }
@@ -128,9 +178,9 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
         originalSource = savedSource ? JSON.parse(savedSource.source_json) : null
       }
       catch { throw payrollProblem('unavailable', '原工资来源正文无法核实') }
-      if (originalSource && typeof originalSource === 'object' && 'schemaVersion' in originalSource && (originalSource.schemaVersion === 2 || originalSource.schemaVersion === 3)) {
+      if (originalSource && typeof originalSource === 'object' && 'schemaVersion' in originalSource && (originalSource.schemaVersion === 2 || originalSource.schemaVersion === 3 || originalSource.schemaVersion === 4)) {
         const document = (await loadPayrollAReleasedWithMigration(db, String(row.id))).get(String(row.id))
-        if (!document || !hasPayrollAFeesDocument(document) || (!isPayrollAStatementSourceSnapshotV2(originalSource) && !isPayrollAStatementSourceSnapshotV3(originalSource)))
+        if (!document || !hasPayrollAFeesDocument(document) || (!isPayrollAStatementSourceSnapshotV2(originalSource) && !isPayrollAStatementSourceSnapshotV3(originalSource) && !isPayrollAStatementSourceSnapshotV4(originalSource)))
           throw payrollProblem('unavailable', '原费用清单、用途或发放证明无法核实')
         const frozen = payrollAFeesFrozenForm(base, document, originalSource)
         if (frozen.hollow?.snapshot) {
@@ -140,7 +190,10 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
         return frozen
       }
     }
-    const draft = row ? { ...await savedDraft(db, row), ...(row.status === 'draft' ? input.draft : {}) } : { ...input.draft }
+    const saved = row ? await savedDraft(db, row) : null
+    const draft = row ? { ...saved, ...(row.status === 'draft' ? input.draft : {}) } : { ...input.draft }
+    if (row?.status === 'draft' && input.draft && !input.draft.ratioPlan && saved && ['projectId', 'month', 'crewId', 'leaderWorkerId'].some(key => key in input.draft! && input.draft![key as keyof PayrollADraft] !== saved[key as keyof PayrollADraft]))
+      delete draft.ratioPlan
     if (!row && draft.projectId && draft.month)
       draft.book ??= { bookPurpose: 'ordinary', managementBookId: null }
     if (row && input.draft?.book) {
@@ -183,6 +236,15 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
         blocks.push(blocker(fact.fieldQty === null ? 'field-quantity-missing' : 'unit-missing', fact.fieldQty === null ? '已完成施工的现场量尚未提供' : '施工来源的计量单位未提供', { completionId: fact.completionId, assignmentId: fact.assignmentId, unitId: fact.unitId, roomId: fact.roomId, itemId: fact.itemId }))
     }
     const lines = draft.book?.bookPurpose === 'management' ? [] : payrollALines(facts, prices, scope, draft.month ?? '')
+    if ((row?.status !== 'released' || draft.ratioPlan) && draft.projectId && draft.month && draft.leaderWorkerId) {
+      const previousPlan = await previousItemRatioPlan(db, draft)
+      const previousFees = previousPlan?.feeRatios ?? []
+      const currentFees = draft.ratioPlan?.feeRatios ?? []
+      const carried = carryPayrollARatioPlan({ periodKind: draft.periodKind ?? 'monthly', itemIds: [...new Set(lines.map(line => line.itemId))], feeIds: [...previousFees, ...currentFees].map(({ kind, id }) => ({ kind, id })), current: draft.ratioPlan, previous: previousPlan })
+      draft.ratioPlan = carried.plan
+      for (const reason of carried.reasons)
+        blocks.push(blocker('item-ratio-source-changed', reason, { field: 'ratioPlan' }))
+    }
     for (const line of lines) {
       line.workerName = source.workers.find(worker => worker.id === line.workerId)?.name ?? null
       line.sources = [...new Map(line.facts.map(fact => [fact.unitId, payrollANavigation(base, scope.projectId, 'quantity-unit', fact.unitId, fact.unitName ?? '施工户', { stageId: fact.stageId, itemId: fact.itemId, completionId: fact.completionId })])).values()].filter((intent): intent is NavigationIntentDTO => intent !== null)
@@ -197,7 +259,10 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
     const payments = await priorPayments(db, { ...scope, ...(draft.book ? { book: draft.book } : {}) }, input.statementId ?? null)
     const previouslyPaid = payrollAAmount(payments.map(payment => number(payment.actual_amount)), payments.some(payment => payment.actual_amount == null) ? ['历史 A 工资实际发放金额未记录'] : [])
     const workAmount = payrollAAmount(lines.map(line => line.amount), lines.some(line => line.amount === null) ? ['施工量或工资单价未完整提供'] : [])
-    const cumulativeAmount = workAmount.value !== null && draft.payRatio !== null && draft.payRatio !== undefined ? payrollAAmount([payrollAMoney(workAmount.value * draft.payRatio)]) : payrollAAmount([null], ['累计核算依据不完整'])
+    const itemCalculation = draft.ratioPlan ? calculatePayrollAItemRatios({ periodKind: draft.periodKind ?? 'monthly', defaultRatio: draft.payRatio ?? null, ...draft.ratioPlan, workLines: lines, feeLines: [], negativeLines: [] }) : null
+    for (const reason of itemCalculation?.reasons ?? [])
+      blocks.push(blocker('item-ratio-incomplete', reason, { field: 'ratioPlan' }))
+    const cumulativeAmount = itemCalculation?.cumulativeAmount ?? (workAmount.value !== null && draft.payRatio !== null && draft.payRatio !== undefined ? payrollAAmount([payrollAMoney(workAmount.value * draft.payRatio)]) : payrollAAmount([null], ['累计核算依据不完整']))
     const adjustmentReconciliation = draft.book ? undefined : await loadPayrollAAdjustmentReconciliation(db, { formatFamily: 'A', periodKind: draft.periodKind ?? 'monthly', payRatio: draft.payRatio ?? null, source: { schemaVersion: 1, subject: scope, facts, priceRevisions: prices.filter(p => lines.some(l => l.priceRevisionIds.includes(p.id))) }, components: lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0] ?? '', quantity: fact.fieldQty, unitPrice: line.unitPrice }))) }, payments.map(p => String(p.id)), input.statementId)
     const grossAmount = adjustmentReconciliation?.availableAmount ?? (cumulativeAmount.value !== null && previouslyPaid.value !== null ? payrollAAmount([Math.max(0, payrollAMoney(cumulativeAmount.value - previouslyPaid.value))]) : payrollAAmount([null], ['累计应付或此前实发未完整提供']))
     for (const reason of adjustmentReconciliation?.reasons ?? [])
@@ -213,7 +278,7 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
         ? await loadPayrollABlockerLocation(db, base, scope.projectId, block)
         : { sourceUnavailableReason: '当前工资项目不可用，无法核实原来源位置' })
     }
-    const context: PayrollAContext = { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion: `${base.sourceVersion}+a:${hash({ scope, month: draft.month, periodKind: draft.periodKind, payRatio: draft.payRatio, all, prices, payments, ...(adjustmentReconciliation ? { adjustmentReconciliation } : {}) })}` }
+    const context: PayrollAContext = { ...base, readonly: !base.capabilities.includes('payroll:write'), sourceVersion: `${base.sourceVersion}+a:${hash({ scope, month: draft.month, periodKind: draft.periodKind, payRatio: draft.payRatio, ...(draft.ratioPlan ? { ratioPlan: draft.ratioPlan } : {}), all, prices, payments, ...(adjustmentReconciliation ? { adjustmentReconciliation } : {}) })}` }
     const status = row ? row.status as PayrollAFormRead['status'] : 'new'
     const writable = !context.readonly && blocks.length === 0
     const read: PayrollAFormRead = { context, statementId: input.statementId, draftKey: input.statementId ? null : input.draftKey!, status, needsRecheck: !!row?.needs_recheck, draft, options: memberOptions, members: memberOptions.workers.filter(worker => scope.memberWorkerIds.includes(worker.id)), facts, lines, prices, ratioDefault: defaults, totals: { workAmount, cumulativeAmount, previouslyPaid, grossAmount }, paymentSourceVersion: hash(adjustmentReconciliation ? { payments, adjustmentReconciliation } : payments), ...(adjustmentReconciliation ? { adjustmentReconciliation } : {}), blockers: blocks, eligibility: { canSaveDraft: writable && ['new', 'draft'].includes(status), canCheck: writable && ['draft', 'checked'].includes(status), canRelease: writable && status === 'checked' && !row?.needs_recheck && grossAmount.value !== null && grossAmount.value > 0, canOutput: false, reasons: blocks.map(block => block.message) } }
@@ -335,6 +400,17 @@ export function createPayrollAService(run: PayrollRun, options: PayrollServiceOp
                 if (read.draft.periodKind === 'retention' && action.payRatio !== 1)
                   throw payrollProblem('validation-failed', '尾款档比例固定为 100%')
                 await payrollAWriteRow(db, 'wage_statements', command.statementId, { pay_ratio: action.payRatio, needs_recheck: Number(read.status === 'checked'), updated_at: new Date().toISOString() }, context.actorId)
+                result.outcome = read.status === 'checked' ? 'needs-recheck' : 'saved'
+              }
+              else if (action.kind === 'set-a-ratio-plan') {
+                if (!command.statementId || !['draft', 'checked'].includes(read.status) || !hasPayrollAFeesForm(read) || !read.fees || !read.book)
+                  throw payrollProblem('conflict', '只能修改来源完整的未发工资分项比例')
+                const itemIds = [...new Set(read.lines.map(line => line.itemId))].sort()
+                const submittedIds = action.ratioPlan.itemRatios.map(row => row.itemId).sort()
+                if (JSON.stringify(itemIds) !== JSON.stringify(submittedIds) || action.ratioPlan.itemRatios.some(row => row.ratio === null || (read.draft.periodKind === 'retention' && row.ratio !== 1)) || action.ratioPlan.feeRatios.some(row => (read.draft.periodKind === 'retention' && row.ratio !== 1) || (row.kind === 'fee' ? !read.fees!.lines.some(line => line.feeId === row.id) : !read.fees!.negativeLines.some(line => line.lineId === row.id && !line.removed))))
+                  throw payrollProblem('validation-failed', '请核对完整分项及原费用比例；尾款固定为100%')
+                await persistPayrollASource(db, command.statementId, { ...read, draft: { ...read.draft, ratioPlan: action.ratioPlan } })
+                await payrollAWriteRow(db, 'wage_statements', command.statementId, { needs_recheck: Number(read.status === 'checked'), updated_at: new Date().toISOString() }, context.actorId)
                 result.outcome = read.status === 'checked' ? 'needs-recheck' : 'saved'
               }
               else if (action.kind === 'save-a-draft' || action.kind === 'check-a') {

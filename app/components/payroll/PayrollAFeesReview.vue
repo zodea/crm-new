@@ -57,12 +57,12 @@ onScopeDispose(() => {
         {{ read.fees.management?.revision.evidenceNote }}。本簿只累计自己的实际已领，不扣除管理人普通施工簿的工资。
       </p>
       <div class="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
-        <div v-for="amount in amounts" :key="amount.label" class="rounded border border-line p-3">
+        <div v-for="amount in amounts" :key="amount.label" class="min-w-0 rounded border border-line p-3">
           <p class="text-12px text-ink-faint">
             {{ amount.label }}
           </p><p class="mt-1 break-words font-mono text-14px font-700">
             {{ payrollAmountSummary(amount.value) }}
-          </p><p v-for="reason in amount.value.reasons" :key="reason" class="mt-1 text-11px text-warn">
+          </p><p v-for="reason in amount.value.reasons" :key="reason" class="mt-1 break-all text-11px text-warn">
             {{ reason }}
           </p>
         </div>

@@ -1,7 +1,9 @@
 import type { PayrollAFeeConfigRead, PayrollAFeesFormRead, PayrollAFeesFrozenDocument } from '../../app/lib/payroll/central-a-fees-contract'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { decodePayrollARead, encodePayrollAWire } from '../../app/lib/payroll/central-a-codec'
+import { payrollAAmount } from '../../app/lib/payroll/central-a-calculation'
+import { decodePayrollARead, encodePayrollAWire, isPayrollAFrozenDocument } from '../../app/lib/payroll/central-a-codec'
 import { decodePayrollAFeeConfigRead, decodePayrollAFeesResult } from '../../app/lib/payroll/central-a-fees-codec'
+import { isPayrollAStatementSourceSnapshotV4 } from '../../app/lib/payroll/central-a-fees-validation'
 import { createPayrollAFeesFixture } from '../helpers/payroll-a-fees-fixture'
 
 describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
@@ -15,7 +17,7 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
     await fixture.prices()
     await fixture.saveFees([fixture.fee()])
     config = await fixture.feeConfig()
-    const draft = { ...fixture.draft, book: fixture.ordinary, payRatio: 1 }
+    const draft = { ...fixture.draft, book: fixture.ordinary, payRatio: 1, ratioPlan: { schemaVersion: 1 as const, itemRatios: ['wall', 'floor', 'shower'].map(itemId => ({ itemId, ratio: 1 })), feeRatios: [] } }
     const saved = await fixture.service.execute(fixture.command(await fixture.form(draft), { kind: 'save-a-draft', draft }))
     form = await fixture.service.aForm({ origin: 'real' }, { statementId: saved.statementId! }) as PayrollAFeesFormRead
     await fixture.release(saved.statementId!, 3730)
@@ -36,6 +38,33 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
 
   it('公开服务的配置、费用表单和冻结输出仍可读取', () => {
     expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(config), { origin: 'real' }, config.scope)).not.toThrow()
+  })
+
+  it('新分项比例来源只接受有原施工分项与原费用身份的完整版本', async () => {
+    const [row] = await fixture.db.select<{ source_json: string }>('SELECT source_json FROM payroll_a_statement_sources WHERE statement_id=?', [document.id])
+    const source = JSON.parse(row!.source_json)
+    const plan = { schemaVersion: 1, itemRatios: [{ itemId: 'wall', ratio: 0.5 }, { itemId: 'floor', ratio: null }], feeRatios: [{ kind: 'fee', id: source.fees.feeRevisions[0].feeId, ratio: 0 }] }
+    const current = { ...source, schemaVersion: 4, ratioPlan: plan }
+    expect(isPayrollAStatementSourceSnapshotV4(current)).toBe(true)
+    expect(isPayrollAStatementSourceSnapshotV4({ ...current, ratioPlan: { ...plan, itemRatios: [{ itemId: 'unrelated', ratio: 0.5 }] } })).toBe(false)
+    expect(isPayrollAStatementSourceSnapshotV4({ ...current, ratioPlan: { ...plan, feeRatios: [{ kind: 'fee', id: 'unknown-fee', ratio: 0.5 }] } })).toBe(false)
+    expect(isPayrollAStatementSourceSnapshotV4({ ...current, extra: 'unsupported' })).toBe(false)
+  })
+
+  it('新冻结按各分项比例验证累计金额，旧冻结继续按原公式验证', () => {
+    expect(isPayrollAFrozenDocument(document)).toBe(true)
+    const ratioPlan = { schemaVersion: 1 as const, itemRatios: [{ itemId: 'wall', ratio: 0.5 }, { itemId: 'floor', ratio: 0.2 }, { itemId: 'shower', ratio: 0.3 }], feeRatios: [] }
+    const next = structuredClone(document)
+    next.ratioPlan = ratioPlan
+    next.cumulativeAmount = 1930
+    next.grossAmount = 1930
+    next.actualAmount = 100
+    next.allocations = next.allocations.map(row => ({ ...row, amount: row.isLeader ? 100 : 0, allocatedAmountFen: row.isLeader ? 10000 : 0 }))
+    next.fees.totals.cumulativeAmount = payrollAAmount([1930])
+    next.fees.totals.grossAmount = payrollAAmount([1930])
+    expect(isPayrollAFrozenDocument(next)).toBe(true)
+    expect(isPayrollAFrozenDocument({ ...next, cumulativeAmount: 1931 })).toBe(false)
+    expect(isPayrollAFrozenDocument({ ...next, ratioPlan: { ...ratioPlan, itemRatios: ratioPlan.itemRatios.filter(row => row.itemId !== 'wall') } })).toBe(false)
   })
 
   it.each([

@@ -16,6 +16,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     saveADraft: centralA.saveADraft,
     checkA: centralA.checkA,
     setAPayRatio: centralA.setAPayRatio,
+    setARatioPlan: centralA.setARatioPlan,
     releaseA: centralA.releaseA,
     saveASubjectConfig: centralA.saveASubjectConfig,
     saveAPrices: centralA.saveAPrices,

@@ -35,7 +35,7 @@ it('真正生产A独立工资价→保存/核算/发放原回执，工资及所�
     const config = await service.aConfig({ origin: 'real' }, scope)
     const identity = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, projectId: f.project.id }
     await service.execute({ ...identity, commandId: 'a-formal-independent-price', sourceVersion: config.context.sourceVersion, statementId: null, draftKey: null, configScope: scope, action: { kind: 'save-a-prices', prices: [{ priceId: null, itemId: f.itemId, unit: '㎡', mode: 'baseline', workerId: null, effectiveMonth: '2026-10', unitPrice: 10, scope: { kind: 'project' } }] } })
-    const draft = { ...scope, memberWorkerIds: [f.leader.id, f.zero.id], payRatio: 1, periodKind: 'monthly' as const, book: { bookPurpose: 'ordinary' as const, managementBookId: null }, note: '保原项目实际来源与固定零成员' }
+    const draft = { ...scope, memberWorkerIds: [f.leader.id, f.zero.id], payRatio: 1, ratioPlan: { schemaVersion: 1 as const, itemRatios: [{ itemId: f.itemId, ratio: 1 }], feeRatios: [] }, periodKind: 'monthly' as const, book: { bookPurpose: 'ordinary' as const, managementBookId: null }, note: '保原项目实际来源与固定零成员' }
     const form = await service.aForm({ origin: 'real' }, { statementId: null, draftKey: 'a-formal-upstream-book', draft })
     expect(form.blockers).toEqual([])
     expect(form.totals.grossAmount.value).toBe(1000)

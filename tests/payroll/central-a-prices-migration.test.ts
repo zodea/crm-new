@@ -15,7 +15,7 @@ async function fixture() {
   closers.push(original.close)
   const migrated = await importPayrollHollowFixture(original.db, original.identities)
   closers.push(migrated.close)
-  const draft = { ...original.draft, projectId: migrated.scope.projectId, leaderWorkerId: migrated.id('workers', original.draft.leaderWorkerId), memberWorkerIds: original.draft.memberWorkerIds.map(id => migrated.id('workers', id)), month: '2026-09' }
+  const draft = { ...original.draft, projectId: migrated.scope.projectId, leaderWorkerId: migrated.id('workers', original.draft.leaderWorkerId), memberWorkerIds: original.draft.memberWorkerIds.map(id => migrated.id('workers', id)), ratioPlan: { ...original.draft.ratioPlan!, itemRatios: original.draft.ratioPlan!.itemRatios.map(row => ({ ...row, itemId: migrated.id('items', row.itemId) })) }, month: '2026-09' }
   const scope = { projectId: draft.projectId, crewId: null, leaderWorkerId: draft.leaderWorkerId, month: draft.month }
   let sequence = 0
   const command = (read: PayrollACommandRead, action: PayrollAAction) => ({ ...original.command(read, action), commandId: `migrated-price-${++sequence}`, projectId: draft.projectId })
@@ -60,7 +60,7 @@ it.each([
   try {
     const second = await importPayrollHollowFixture(cloned, first.identities)
     closers.push(second.close)
-    const draft = { ...first.draft, projectId: second.scope.projectId, leaderWorkerId: second.id('workers', first.draft.leaderWorkerId), memberWorkerIds: first.draft.memberWorkerIds.map(id => second.id('workers', id)), month: '2026-10' }
+    const draft = { ...first.draft, projectId: second.scope.projectId, leaderWorkerId: second.id('workers', first.draft.leaderWorkerId), memberWorkerIds: first.draft.memberWorkerIds.map(id => second.id('workers', id)), ratioPlan: { ...first.draft.ratioPlan, itemRatios: first.draft.ratioPlan.itemRatios.map(row => ({ ...row, itemId: second.id('items', row.itemId) })) }, month: '2026-10' }
     const scope = { projectId: draft.projectId, crewId: null, leaderWorkerId: draft.leaderWorkerId, month: draft.month }
     let sequence = 0
     const command = (read: PayrollACommandRead, action: PayrollAAction) => ({ ...first.original.command(read, action), commandId: `second-migrated-price-${++sequence}`, projectId: draft.projectId })

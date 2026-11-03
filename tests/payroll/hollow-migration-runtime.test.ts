@@ -42,7 +42,9 @@ it('真实原检查19整改4与工资550整体迁入，公开冻结输出和后�
   expect(output.document.hollow?.adoptions[0]?.line.proof.fingerprint).toBe(sourceOutput.document.hollow?.adoptions[0]?.line.proof.fingerprint)
   expect(output.document.hollow?.adoptions[0]?.line.recordId).toBe(f.recordId)
   expect(decodePayrollARead(encodePayrollAWire(output), 'output', { origin: 'real' }, mappedStatement)).toEqual(output)
-  const next = await f.service.aForm({ origin: 'real' }, { statementId: null, draftKey: 'migrated-hollow-september', draft: { ...original.draft, projectId: f.scope.projectId, leaderWorkerId: f.id('workers', original.draft.leaderWorkerId), memberWorkerIds: original.draft.memberWorkerIds.map(id => f.id('workers', id)), month: '2026-09' } })
+  const { ratioPlan: _originalRatioPlan, ...originalScope } = original.draft
+  const next = await f.service.aForm({ origin: 'real' }, { statementId: null, draftKey: 'migrated-hollow-september', draft: { ...originalScope, projectId: f.scope.projectId, leaderWorkerId: f.id('workers', original.draft.leaderWorkerId), memberWorkerIds: original.draft.memberWorkerIds.map(id => f.id('workers', id)), month: '2026-09' } })
+  expect(next.draft.ratioPlan?.itemRatios).toEqual([{ itemId: f.id('items', original.target.itemId), ratio: 2 / 3 }])
   expect(next.hollow?.totals.previousProcessed.value).toBe(450)
   expect(next.totals.grossAmount.value, JSON.stringify({ blockers: next.blockers, totals: next.totals, hollow: next.hollow?.reasons })).toBe(0)
   const projection = await f.instance.withWorkspaceTransaction(tx => loadPayrollMigratedHollow(tx, f.scope.projectId))

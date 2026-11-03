@@ -94,7 +94,8 @@ it('迁入后管理配置只用映射原责任，后月延续负价与已领，�
     const repeated = await f.instance.prepareMigrationSnapshot(coreMigrationTestInstance.snapshot(f.session))
     repeated.commit()
     expect((await f.service.aOutput({ origin: 'real' }, id)).state).toBe('available')
-    await expect(coreMigrationTestInstance.rollback({ ...f.envelope('fees-after-new-rollback'), batchId: f.batch.batchId }, f.session)).rejects.toThrow('工资迁移：新增 A 类原证据结构不可确认，不能安全撤回来源')
+    // V4 来源现在可识别，因此按真实引用而非未知格式拒绝整批撤回。
+    await expect(coreMigrationTestInstance.rollback({ ...f.envelope('fees-after-new-rollback'), batchId: f.batch.batchId }, f.session)).rejects.toThrow('工资迁移：独立工资配置、来源、回执或历史仍引用待撤身份')
     expect((await f.service.aOutput({ origin: 'real' }, id)).state).toBe('available')
   }
   finally { await f.original.close() }
@@ -108,7 +109,7 @@ it('迁入原费用依据仍可独立更正和实际退款，原签字输出不�
     const initial = await f.service.adjustmentForm({ origin: 'real' }, { target })
     if (initial.draft.basis?.formatFamily !== 'A' || !initial.draft.basis.fees)
       throw new Error('缺少原费用更正依据')
-    expect(initial.draft.basis.source.schemaVersion).toBe(2)
+    expect(initial.draft.basis.source).toMatchObject({ schemaVersion: 4, ratioPlan: { itemRatios: expect.arrayContaining([expect.objectContaining({ ratio: 1 })]) } })
     expect(initial.original.book).toEqual({ bookPurpose: 'ordinary', managementBookId: null })
     const draft = { ...initial.draft, reason: '原补贴量核对为九十', evidenceNote: '按原墙砖责任核实，不改原签字', basis: { ...initial.draft.basis, fees: { ...initial.draft.basis.fees, components: initial.draft.basis.fees.components.map(component => ({ ...component, quantity: 90 })) } } }
     const preview = await f.service.adjustmentForm({ origin: 'real' }, { target, draft })

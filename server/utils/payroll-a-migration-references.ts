@@ -3,11 +3,13 @@ import type { PayrollACommand } from '../../app/lib/payroll/central-a-contract'
 import { createHash } from 'node:crypto'
 import { payrollACanonical } from '../../app/lib/payroll/central-a-calculation'
 import { encodePayrollAWire, parsePayrollACommand } from '../../app/lib/payroll/central-a-codec'
+import { isPayrollAStatementSourceSnapshotV4 } from '../../app/lib/payroll/central-a-fees-validation'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { payrollAdjustmentReceiptReferences } from './payroll-adjustment-migration-references'
 import { payrollC1ReceiptReferences } from './payroll-c1-migration-references'
 import { payrollC2ReceiptReferences } from './payroll-c2-migration-references'
 import { createPayrollFeesReferenceCollector, payrollFeesReceiptReferences } from './payroll-fees-migration-references'
+import { createPayrollHollowReferenceCollector } from './payroll-hollow-migration-references'
 import { payrollNumberingReceiptReferences } from './payroll-numbering-data'
 
 export const PAYROLL_A_REFERENCE_TABLES = ['payroll_a_subject_configs', 'payroll_a_price_revisions', 'payroll_a_statement_sources', 'payroll_command_receipts'] as const
@@ -53,7 +55,21 @@ export async function payrollAMigrationReferences(db: TransactionDb): Promise<Se
     for (const cell of array(scope.cells)) fields(object(cell), sourceFields)
   }
   function source(source: Record<string, unknown>) {
-    if (source.schemaVersion === 2) {
+    if (source.schemaVersion === 4) {
+      if (!isPayrollAStatementSourceSnapshotV4(source))
+        invalid()
+      const { ratioPlan, hollow, ...previous } = source
+      const fees = createPayrollFeesReferenceCollector()
+      fees.source({ ...previous, schemaVersion: 2 })
+      for (const reference of fees.refs) result.add(reference)
+      if (hollow) {
+        const collector = createPayrollHollowReferenceCollector()
+        collector.snapshot(hollow)
+        for (const reference of collector.refs) result.add(reference)
+      }
+      for (const item of ratioPlan.itemRatios) add('items', item.itemId)
+    }
+    else if (source.schemaVersion === 2) {
       const fees = createPayrollFeesReferenceCollector()
       fees.source(source)
       for (const reference of fees.refs) result.add(reference)
@@ -114,6 +130,10 @@ export async function payrollAMigrationReferences(db: TransactionDb): Promise<Se
       if (action.draft.book)
         add('payroll_a_management_books', action.draft.book.managementBookId)
       for (const id of action.draft.memberWorkerIds) add('workers', id)
+      for (const item of action.draft.ratioPlan?.itemRatios ?? []) add('items', item.itemId)
+    }
+    else if (action.kind === 'set-a-ratio-plan') {
+      for (const item of action.ratioPlan.itemRatios) add('items', item.itemId)
     }
     else if (action.kind === 'release-a') {
       for (const allocation of action.release.allocations) add('workers', allocation.workerId)

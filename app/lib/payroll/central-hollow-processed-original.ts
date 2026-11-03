@@ -41,8 +41,9 @@ export async function payrollHollowProcessedOriginal(db: PayrollDb, adoption: Pa
   const source = stored ? parsed(stored.source_json) : null
   if (adoption.scope.formatFamily === 'A') {
     const document = raw.aDocument
-    if (!isPayrollAFrozenDocument(document) || !isPayrollAStatementSourceVersioned(source) || !same(raw.aSource, source) || source.subject.leaderWorkerId !== adoption.scope.leaderWorkerId || source.subject.crewId !== adoption.scope.crewId || !document.hollow || source.schemaVersion !== 3
+    if (!isPayrollAFrozenDocument(document) || !isPayrollAStatementSourceVersioned(source) || !same(raw.aSource, source) || source.subject.leaderWorkerId !== adoption.scope.leaderWorkerId || source.subject.crewId !== adoption.scope.crewId || !document.hollow || (source.schemaVersion !== 3 && source.schemaVersion !== 4)
       || !same(source.hollow, { ...document.hollow, adoptions: [] }) || !same(source.adjustmentReconciliation, document.adjustmentReconciliation) || !('fees' in document) || !same(source.fees, document.fees)
+      || (source.schemaVersion === 4 && !same(source.ratioPlan, document.ratioPlan))
       || !await payrollAFeesPhysicalProof(db, adoption.statementId, source, fees)) {
       return null
     }
@@ -50,7 +51,7 @@ export async function payrollHollowProcessedOriginal(db: PayrollDb, adoption: Pa
     const moneyLines = (lines: typeof document.lines) => lines.map(line => ({ workerId: line.workerId, itemId: line.itemId, unit: line.unit, quantity: line.quantity, knownQuantity: line.knownQuantity, unitPrice: line.unitPrice, amount: line.amount, priceRevisionIds: line.priceRevisionIds, facts: line.facts }))
     if (!same(moneyLines(calculated), moneyLines(document.lines)) || !same(source.subject.memberWorkerIds.slice().sort(), document.members.map(m => m.workerId).sort()))
       return null
-    const basis: PayrollAdjustmentBasisDraft = { formatFamily: 'A', periodKind: document.periodKind, source, payRatio: document.payRatio, components: document.lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0]!, quantity: fact.fieldQty, unitPrice: line.unitPrice }))), fees: payrollAFeeAdjustmentBasis(source), hollow: payrollHollowAdjustmentBasis(document.hollow) }
+    const basis: PayrollAdjustmentBasisDraft = { formatFamily: 'A', periodKind: document.periodKind, source, payRatio: document.payRatio, ...(document.ratioPlan ? { ratioPlan: structuredClone(document.ratioPlan) } : {}), components: document.lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0]!, quantity: fact.fieldQty, unitPrice: line.unitPrice }))), fees: payrollAFeeAdjustmentBasis(source), hollow: payrollHollowAdjustmentBasis(document.hollow) }
     return original(document, basis, { document, source })
   }
   if (adoption.scope.formatFamily === 'C1') {

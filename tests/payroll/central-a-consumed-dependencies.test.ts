@@ -15,7 +15,7 @@ async function fixture() {
   const coordinator = createDbCoordinator(async () => native.db)
   const service = createPayrollService({ schemaInitialized: true, session: () => actor, identities: () => structuredClone(native.source), quantityFacts: loadPayrollAQuantityFacts, managementScopeFacts: loadPayrollAManagementScopeFacts, transaction: work => coordinator.withTransaction(tx => work(tx, actor)) })
   let sequence = 0
-  const draft = { ...native.draft, book: native.ordinary }
+  const draft = { ...native.draft, book: native.ordinary, ratioPlan: { schemaVersion: 1 as const, itemRatios: ['wall', 'floor', 'shower'].map(itemId => ({ itemId, ratio: 0.8 })), feeRatios: [] } }
   const form = () => service.aForm({ origin: 'real' }, { statementId: null, draftKey: 'actual-a-input', draft })
   const config = () => service.aConfig({ origin: 'real' }, { projectId: 'p', crewId: 'crew', leaderWorkerId: 'w', month: '2026-08' })
   const command = (read: PayrollACommandRead, action: PayrollAAction) => ({ commandId: `a-consumed-${++sequence}`, workspaceId: actor.workspaceId, actorId: actor.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, projectId: 'p', sourceVersion: read.context.sourceVersion, statementId: 'statementId' in read ? read.statementId : null, draftKey: 'draftKey' in read ? read.draftKey : null, configScope: 'scope' in read ? read.scope : null, action })

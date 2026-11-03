@@ -1,6 +1,6 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAContext, PayrollAFormRead, PayrollAQuantityFacts } from '../../app/lib/payroll/central-a-contract'
-import type { PayrollABookRef, PayrollAFeeConfigRead, PayrollAFeeConfigScope, PayrollAFeesFormRead, PayrollAFeesSourceSnapshot, PayrollAManagementOwnership, PayrollAStatementSourceSnapshotV2 } from '../../app/lib/payroll/central-a-fees-contract'
+import type { PayrollABookRef, PayrollAFeeConfigRead, PayrollAFeeConfigScope, PayrollAFeesFormRead, PayrollAFeesSourceSnapshot, PayrollAManagementOwnership, PayrollAStatementSourceSnapshotV2, PayrollAStatementSourceSnapshotV4 } from '../../app/lib/payroll/central-a-fees-contract'
 import type { NavigationIntentDTO } from '../../app/types/read-model'
 import type { PayrollIdentitySource, PayrollServiceOptions } from './payroll-service'
 import { createHash } from 'node:crypto'
@@ -8,6 +8,7 @@ import { payrollAAmount, payrollACanonical, payrollAMoney } from '../../app/lib/
 import { payrollAFeeAdjustmentBasis } from '../../app/lib/payroll/central-a-fee-adjustment'
 import { payrollAFeeLines, payrollAFeeTotal } from '../../app/lib/payroll/central-a-fees-calculation'
 import { hasPayrollAFeesDocument } from '../../app/lib/payroll/central-a-fees-contract'
+import { calculatePayrollAItemRatios } from '../../app/lib/payroll/central-a-item-ratio'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { loadPayrollAAdjustmentReconciliation } from './payroll-a-adjustment-reconciliation'
 import { loadPayrollABookPayments, samePayrollABook } from './payroll-a-book'
@@ -98,6 +99,8 @@ export async function extendPayrollAFeesForm(db: TransactionDb, read: PayrollAFo
   }
   const blocks: PayrollAFeesFormRead['blockers'] = read.blockers.map(b => ({ ...b, feeId: null, managementBookId: null, negativeLineId: null }))
   const add = (code: string, message: string) => blocks.push({ code, message, locationLabel: null, sourceUnavailableReason: null, field: null, completionId: null, assignmentId: null, unitId: null, roomId: null, itemId: null, workerId: null, statementId: read.statementId, source: null, feeId: null, managementBookId: book.managementBookId, negativeLineId: null })
+  if (read.draft.ratioPlan?.feeRatios.some(ratio => ratio.kind === 'fee' ? !config.fees.some(fee => fee.feeId === ratio.id) : !negativeLines.some(line => line.lineId === ratio.id)))
+    add('item-ratio-source-changed', '已填写比例的费用或负价行已变化，请重新核对')
   if (unavailableNegativeHistory.length)
     add('negative-history-unproven', '原管理单的负价完整集合或发放证明缺损，不能按零或当前追加行继续累计')
   if (config.fees.some(f => f.crewId !== (read.draft.crewId ?? null) || f.leaderWorkerId !== read.draft.leaderWorkerId))
@@ -112,7 +115,9 @@ export async function extendPayrollAFeesForm(db: TransactionDb, read: PayrollAFo
   const negativeAmount = payrollAAmount([...negativeLines.map(l => l.signedAmountFen === null ? null : l.signedAmountFen / 100), ...unavailableNegativeHistory.map(() => null)], unavailableNegativeHistory.length ? ['原管理单负价集合未获证明'] : [])
   const workAmount = book.bookPurpose === 'management' ? payrollAAmount([]) : read.totals.workAmount
   const listAmount = payrollAFeeTotal([workAmount, subsidyAmount, managementAmount, negativeAmount])
-  const cumulativeAmount = payrollAAmount([listAmount.value === null || read.draft.payRatio == null ? null : payrollAMoney(listAmount.value * read.draft.payRatio)])
+  const ratioCalculation = read.draft.ratioPlan ? calculatePayrollAItemRatios({ periodKind: read.draft.periodKind ?? 'monthly', defaultRatio: read.draft.payRatio ?? null, ...read.draft.ratioPlan, workLines: read.lines, feeLines: lines, negativeLines }) : null
+  for (const reason of ratioCalculation?.reasons ?? []) add('item-ratio-incomplete', reason)
+  const cumulativeAmount = ratioCalculation?.cumulativeAmount ?? payrollAAmount([listAmount.value === null || read.draft.payRatio == null ? null : payrollAMoney(listAmount.value * read.draft.payRatio)])
   const previouslyPaid = read.totals.previouslyPaid
   const grossAmount = payrollAAmount([cumulativeAmount.value === null || previouslyPaid.value === null ? null : Math.max(0, payrollAMoney(cumulativeAmount.value - previouslyPaid.value))])
   const totals = { workAmount, subsidyAmount, managementAmount, negativeAmount, listAmount, cumulativeAmount, previouslyPaid, grossAmount }
@@ -130,8 +135,9 @@ export async function extendPayrollAFeesForm(db: TransactionDb, read: PayrollAFo
     add('management-already-owned', '原施工责任已有其他管理簿领取，换管理人或重建单据不能再次领取')
   const fees: PayrollAFeesSourceSnapshot = { schemaVersion: 1, configSourceVersion: payrollAFeesHash({ revisions: config.fees, management, crewDefaults: config.crewDefaults }), crewDefaults: config.crewDefaults, feeRevisions: config.fees, management, managementOwnership, negativeLines, lines, totals }
   const payments = await loadPayrollABookPayments(db, { projectId: read.draft.projectId!, leaderWorkerId: read.draft.leaderWorkerId!, book }, read.statementId)
-  const rawSource: PayrollAStatementSourceSnapshotV2 = { schemaVersion: 2, subject: { projectId: read.draft.projectId!, crewId: read.draft.crewId ?? null, leaderWorkerId: read.draft.leaderWorkerId!, memberWorkerIds: read.draft.memberWorkerIds! }, facts: read.facts, priceRevisions: read.prices.filter(p => read.lines.some(l => l.priceRevisionIds.includes(p.id))), book, fees: structuredClone(fees) }
-  const reconciliation = await loadPayrollAAdjustmentReconciliation(db, { formatFamily: 'A', periodKind: read.draft.periodKind ?? 'monthly', payRatio: read.draft.payRatio ?? null, source: rawSource, components: read.lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0] ?? '', quantity: fact.fieldQty, unitPrice: line.unitPrice }))), fees: payrollAFeeAdjustmentBasis(rawSource) }, payments.map(p => String(p.id)), read.statementId)
+  const baseSource: PayrollAStatementSourceSnapshotV2 = { schemaVersion: 2, subject: { projectId: read.draft.projectId!, crewId: read.draft.crewId ?? null, leaderWorkerId: read.draft.leaderWorkerId!, memberWorkerIds: read.draft.memberWorkerIds! }, facts: read.facts, priceRevisions: read.prices.filter(p => read.lines.some(l => l.priceRevisionIds.includes(p.id))), book, fees: structuredClone(fees) }
+  const rawSource: PayrollAStatementSourceSnapshotV2 | PayrollAStatementSourceSnapshotV4 = read.draft.ratioPlan ? { ...baseSource, schemaVersion: 4, ratioPlan: structuredClone(read.draft.ratioPlan) } : baseSource
+  const reconciliation = await loadPayrollAAdjustmentReconciliation(db, { formatFamily: 'A', periodKind: read.draft.periodKind ?? 'monthly', payRatio: read.draft.payRatio ?? null, ...(read.draft.ratioPlan ? { ratioPlan: structuredClone(read.draft.ratioPlan) } : {}), source: rawSource, components: read.lines.flatMap(line => line.facts.map(fact => ({ ownershipKey: fact.ownershipKey, priceRevisionId: line.priceRevisionIds[0] ?? '', quantity: fact.fieldQty, unitPrice: line.unitPrice }))), fees: payrollAFeeAdjustmentBasis(rawSource) }, payments.map(p => String(p.id)), read.statementId)
   if (reconciliation) {
     totals.grossAmount = reconciliation.availableAmount
     for (const reason of reconciliation.reasons) add('adjustment-source-unproven', reason)

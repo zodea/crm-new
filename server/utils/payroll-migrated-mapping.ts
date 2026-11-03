@@ -1,6 +1,7 @@
 import type { PayrollAAdjustmentCoverage, PayrollAAdjustmentReconciliation } from '../../app/lib/payroll/central-a-adjustment-contract'
 import type { PayrollABlocker, PayrollAFrozenDocument, PayrollALine, PayrollAPriceRevision, PayrollAQuantityFact } from '../../app/lib/payroll/central-a-contract'
 import type { PayrollAStatementSourceVersioned } from '../../app/lib/payroll/central-a-fees-contract'
+import type { PayrollARatioPlan } from '../../app/lib/payroll/central-a-item-ratio'
 import type { PayrollActualFact, PayrollActualPaymentSnapshot, PayrollActualRef, PayrollActualReversalSnapshot, PayrollProofRef } from '../../app/lib/payroll/central-actual-contract'
 import type { PayrollAAdjustmentBasis, PayrollAdjustmentBasisDraft, PayrollAdjustmentConfirmedSnapshot, PayrollAdjustmentRecord, PayrollOriginalWageRef } from '../../app/lib/payroll/central-adjustment-contract'
 import type { PayrollC1FrozenDocument } from '../../app/lib/payroll/central-c1-contract'
@@ -136,6 +137,9 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[], h
   function reconciliation(value: PayrollAAdjustmentReconciliation): PayrollAAdjustmentReconciliation {
     return { ...value, rawBasis: aBasis(value.rawBasis), effectiveBasis: aBasis(value.effectiveBasis), actualIdentities: value.actualIdentities.map(actualIdentity), coverage: value.coverage.map(coverage) }
   }
+  function ratioPlan(value: PayrollARatioPlan): PayrollARatioPlan {
+    return { schemaVersion: 1, itemRatios: value.itemRatios.map(row => ({ ...row, itemId: id('items', row.itemId) })), feeRatios: value.feeRatios.map(row => ({ ...row, id: row.kind === 'fee' ? feeMapper.feeId(row.id) : feeMapper.lineId(row.id) })) }
+  }
   function source(value: PayrollAStatementSourceVersioned): PayrollAStatementSourceVersioned {
     return {
       ...value,
@@ -144,11 +148,12 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[], h
       priceRevisions: value.priceRevisions.map(price),
       ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}),
       ...(value.schemaVersion !== 1 ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees) } : {}),
-      ...(value.schemaVersion === 3 ? { hollow: hollowMapper.snapshot(value.hollow) } : {}),
+      ...(value.schemaVersion === 3 || (value.schemaVersion === 4 && value.hollow) ? { hollow: hollowMapper.snapshot(value.hollow!) } : {}),
+      ...(value.schemaVersion === 4 ? { ratioPlan: ratioPlan(value.ratioPlan) } : {}),
     }
   }
   function aBasis(value: PayrollAAdjustmentBasis): PayrollAAdjustmentBasis {
-    return { ...value, source: source(value.source), components: value.components.map(component => ({ ...component, ownershipKey: ownership(component.ownershipKey), priceRevisionId: id('payroll_a_price_revisions', component.priceRevisionId) })), ...(value.fees ? { fees: feeMapper.basis(value.fees) } : {}), ...(value.hollow ? { hollow: hollowMapper.basis(value.hollow) } : {}) }
+    return { ...value, source: source(value.source), ...(value.ratioPlan ? { ratioPlan: ratioPlan(value.ratioPlan) } : {}), components: value.components.map(component => ({ ...component, ownershipKey: ownership(component.ownershipKey), priceRevisionId: id('payroll_a_price_revisions', component.priceRevisionId) })), ...(value.fees ? { fees: feeMapper.basis(value.fees) } : {}), ...(value.hollow ? { hollow: hollowMapper.basis(value.hollow) } : {}) }
   }
   function basis(value: PayrollAdjustmentBasisDraft): PayrollAdjustmentBasisDraft {
     if (value.formatFamily === 'C1') {
@@ -249,7 +254,7 @@ export function createPayrollMigratedMapper(mapping: PayrollIdentityMapping[], h
     return { ...value, id: lineId, workerId: id('workers', value.workerId), itemId: id('items', value.itemId), priceRevisionIds: value.priceRevisionIds.map(value => id('payroll_a_price_revisions', value)), facts: value.facts.map(quantity), sources: value.sources.map(navigation), blockers: value.blockers.map(aBlocker) }
   }
   function aDocument(value: PayrollAFrozenDocument): PayrollAFrozenDocument {
-    return { ...value, ...(value.hollow ? { hollow: hollowMapper.snapshot(value.hollow) } : {}), id: id('wage_statements', value.id), projectId: id('projects', value.projectId), lines: value.lines.map(aLine), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })), previousPayments: value.previousPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId) })), ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}), ...(hasPayrollAFeesDocument(value) ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees), previousBookPayments: value.previousBookPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId), book: feeMapper.book(payment.book) })) } : {}) }
+    return { ...value, ...(value.hollow ? { hollow: hollowMapper.snapshot(value.hollow) } : {}), ...(value.ratioPlan ? { ratioPlan: ratioPlan(value.ratioPlan) } : {}), id: id('wage_statements', value.id), projectId: id('projects', value.projectId), lines: value.lines.map(aLine), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })), previousPayments: value.previousPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId) })), ...(value.adjustmentReconciliation ? { adjustmentReconciliation: reconciliation(value.adjustmentReconciliation) } : {}), ...(hasPayrollAFeesDocument(value) ? { book: feeMapper.book(value.book), fees: feeMapper.fees(value.fees), previousBookPayments: value.previousBookPayments.map(payment => ({ ...payment, statementId: id('wage_statements', payment.statementId), book: feeMapper.book(payment.book) })) } : {}) }
   }
   function c1Document(value: PayrollC1FrozenDocument): PayrollC1FrozenDocument {
     return { ...value, ...(value.hollow ? { hollow: hollowMapper.snapshot(value.hollow) } : {}), id: id('wage_statements', value.id), projectId: id('projects', value.projectId), crewId: nullableId('crews', value.crewId), lines: value.lines.map(line => ({ ...line, id: `${id('workers', line.workerId)}:${line.kind}`, workerId: id('workers', line.workerId), attendanceIds: line.attendanceIds.map(value => id('attendance_records', value)) })), rates: value.rates.map(rate => ({ ...rate, workerId: id('workers', rate.workerId), configId: nullableId('payroll_c1_rate_revisions', rate.configId) })), attendance: value.attendance.map(fact => ({ ...fact, id: id('attendance_records', fact.id), projectId: id('projects', fact.projectId), crewId: nullableId('crews', fact.crewId), workerId: id('workers', fact.workerId) })), members: value.members.map(member => ({ ...member, workerId: id('workers', member.workerId) })), allocations: value.allocations.map(allocation => ({ ...allocation, workerId: id('workers', allocation.workerId) })) }

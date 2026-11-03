@@ -50,8 +50,8 @@ it('真实管理工资无普通施工行时仍保护管理范围、费用修订�
 it('工资被空鼓全额扣完且后来全部整改，目录仍保护原检查、整改、起点和采用引用', async () => {
   const f = await createPayrollHollowFixture()
   try {
-    const draft = { ...f.draft, payRatio: 0.3 }
-    const saved = await f.service.execute(f.command(await f.form({ payRatio: 0.3 }), { kind: 'save-a-draft', draft }))
+    const draft = { ...f.draft, payRatio: 0.3, ratioPlan: { schemaVersion: 1 as const, itemRatios: [{ itemId: f.target.itemId, ratio: 0.3 }], feeRatios: [] } }
+    const saved = await f.service.execute(f.command(await f.form(draft), { kind: 'save-a-draft', draft }))
     const statementId = saved.statementId!
     const read = () => f.service.aForm({ origin: 'real' }, { statementId })
     await f.service.executeHollow(f.startCommand((await read()).hollow!))

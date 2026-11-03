@@ -1,6 +1,6 @@
 import type { PayrollAAdjustmentCoverage, PayrollAAdjustmentDimension } from '../../app/lib/payroll/central-a-adjustment-contract'
 import type { PayrollAAdjustmentBasis } from '../../app/lib/payroll/central-adjustment-contract'
-import { applyPayrollAAdjustmentDimension } from '../../app/lib/payroll/central-a-adjustment-coverage'
+import { applyPayrollAAdjustmentDimension, payrollAAdjustmentRatio } from '../../app/lib/payroll/central-a-adjustment-coverage'
 import { payrollAAdjustmentDimension as dimension, payrollAAdjustmentOwnership as ownership } from './payroll-a-reconciliation-shared'
 import { payrollAdjustmentHash as hash } from './payroll-adjustment-facts'
 
@@ -16,7 +16,8 @@ export function reconcilePayrollAFeeAdjustments(raw: PayrollAAdjustmentBasis, ef
   const coverage: PayrollAAdjustmentCoverage[] = []
   function push(row: PayrollAAdjustmentCoverage) {
     for (const d of row.dimensions) {
-      const key = d.dimension === 'pay-ratio' ? 'pay-ratio' : `${row.feeComponentKey ?? row.negativeLineId}:${d.dimension}`
+      const feeId = effective.fees?.components.find(c => c.componentKey === row.feeComponentKey)?.feeId
+      const key = d.dimension === 'pay-ratio' ? effective.ratioPlan ? `${row.feeComponentKey ? `fee:${feeId}` : `negative:${row.negativeLineId}`}:pay-ratio` : 'pay-ratio' : `${row.feeComponentKey ?? row.negativeLineId}:${d.dimension}`
       if (changed.has(key) && changed.get(key) !== head.rootAdjustmentId)
         row.reasons.push('同一费用维度涉及不同原单更正，须核实前后引用')
       changed.set(key, head.rootAdjustmentId)
@@ -33,7 +34,11 @@ export function reconcilePayrollAFeeAdjustments(raw: PayrollAAdjustmentBasis, ef
   }
   for (const component of after.fees.components) {
     const old = before.fees.components.find(c => c.componentKey === component.componentKey)
-    if (!old || (old.quantity === component.quantity && old.unitPrice === component.unitPrice && before.payRatio === after.payRatio))
+    if (!old)
+      continue
+    const beforeRatio = payrollAAdjustmentRatio(before, 'fee', old.feeId)
+    const afterRatio = payrollAAdjustmentRatio(after, 'fee', old.feeId)
+    if (old.quantity === component.quantity && old.unitPrice === component.unitPrice && beforeRatio === afterRatio)
       continue
     const current = raw.fees?.components.find(c => c.componentKey === component.componentKey)
     const oldFact = originalSource.lines.flatMap(l => l.components).find(c => c.componentKey === component.componentKey)?.fact
@@ -47,13 +52,17 @@ export function reconcilePayrollAFeeAdjustments(raw: PayrollAAdjustmentBasis, ef
       dimensions.push(dimension('fee-quantity', old.quantity, component.quantity, current?.quantity ?? null, sameOwnership && sameFee))
     if (old.unitPrice !== component.unitPrice)
       dimensions.push(dimension('fee-unit-price', old.unitPrice, component.unitPrice, current?.unitPrice ?? null, sameOwnership && sameFee))
-    if (before.payRatio !== after.payRatio)
-      dimensions.push(dimension('pay-ratio', before.payRatio, after.payRatio, raw.payRatio, sameOwnership && sameFee))
+    if (beforeRatio !== afterRatio)
+      dimensions.push(dimension('pay-ratio', beforeRatio, afterRatio, payrollAAdjustmentRatio(raw, 'fee', old.feeId), sameOwnership && sameFee))
     push({ adjustmentId: head.id, rootAdjustmentId: head.rootAdjustmentId, originalStatementId: head.originalStatementId, ownershipKey: component.ownershipKey, feeComponentKey: component.componentKey, originalSourceFingerprint: oldFact?.sourceFingerprint ?? '', currentSourceFingerprint: currentFact?.sourceFingerprint ?? null, originalPriceRevisionId: old.feeRevisionId, currentPriceRevisionId: current?.feeRevisionId ?? null, dimensions, reasons: sameOwnership && sameFee ? [] : ['费用的原责任、同簿用途或采用修订沿革不能核实'] })
   }
   for (const line of after.fees.negativeLines) {
     const old = before.fees.negativeLines.find(n => n.lineId === line.lineId)
-    if (!old || (old.quantity === line.quantity && old.unitPrice === line.unitPrice && before.payRatio === after.payRatio))
+    if (!old)
+      continue
+    const beforeRatio = payrollAAdjustmentRatio(before, 'negative', old.lineId)
+    const afterRatio = payrollAAdjustmentRatio(after, 'negative', old.lineId)
+    if (old.quantity === line.quantity && old.unitPrice === line.unitPrice && beforeRatio === afterRatio)
       continue
     const current = raw.fees?.negativeLines.find(n => n.lineId === line.lineId)
     const oldRevision = originalSource.negativeLines.find(n => n.id === old.originalNegativeRevisionId)
@@ -64,8 +73,8 @@ export function reconcilePayrollAFeeAdjustments(raw: PayrollAAdjustmentBasis, ef
       dimensions.push(dimension('negative-quantity', old.quantity, line.quantity, current?.quantity ?? null, related))
     if (old.unitPrice !== line.unitPrice)
       dimensions.push(dimension('negative-unit-price', old.unitPrice, line.unitPrice, current?.unitPrice ?? null, related))
-    if (before.payRatio !== after.payRatio)
-      dimensions.push(dimension('pay-ratio', before.payRatio, after.payRatio, raw.payRatio, related))
+    if (beforeRatio !== afterRatio)
+      dimensions.push(dimension('pay-ratio', beforeRatio, afterRatio, payrollAAdjustmentRatio(raw, 'negative', old.lineId), related))
     push({ adjustmentId: head.id, rootAdjustmentId: head.rootAdjustmentId, originalStatementId: head.originalStatementId, ownershipKey: line.lineId, negativeLineId: line.lineId, originalSourceFingerprint: hash(oldRevision ?? null), currentSourceFingerprint: currentRevision ? hash(currentRevision) : null, originalPriceRevisionId: old.originalNegativeRevisionId, currentPriceRevisionId: current?.originalNegativeRevisionId ?? null, dimensions, reasons: related ? [] : ['负价原行的管理簿、责任范围及原依据沿革不能核实'] })
   }
   return coverage

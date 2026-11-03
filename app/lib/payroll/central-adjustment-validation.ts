@@ -1,6 +1,7 @@
 import type { PayrollAAdjustmentBasis, PayrollAdjustmentBasisDraft, PayrollAdjustmentDraft, PayrollAdjustmentTarget, PayrollC1AdjustmentBasis, PayrollC2AdjustmentBasis, PayrollCorrectionCommand } from './central-adjustment-contract'
 import { assertPayrollAFeeAdjustmentBasis, payrollAFeeCorrectionReasons } from './central-a-fee-adjustment'
 import { isPayrollAStatementSourceVersioned } from './central-a-fees-validation'
+import { isPayrollARatioPlan } from './central-a-item-ratio'
 import { payrollCanonical } from './central-command-shared'
 import { payrollProblem } from './central-contract'
 import { assertPayrollHollowAdjustmentBasis, payrollHollowCorrectionReasons } from './central-hollow-deduction-adjustment'
@@ -26,9 +27,11 @@ export function assertPayrollAdjustmentDraft(value: unknown): asserts value is P
   if (wireObject(value.basis) && Object.hasOwn(value.basis, 'hollow'))
     assertPayrollHollowAdjustmentBasis(value.basis.hollow)
   if (wireObject(value.basis) && value.basis.formatFamily === 'A') {
-    wireExact(value.basis, ['formatFamily', 'periodKind', 'source', 'payRatio', 'components', 'fees', 'hollow'])
+    wireExact(value.basis, ['formatFamily', 'periodKind', 'source', 'payRatio', 'components', 'fees', 'hollow', 'ratioPlan'])
     if (!isPayrollAStatementSourceVersioned(value.basis.source) || !['monthly', 'settlement', 'retention'].includes(String(value.basis.periodKind)) || !wireNullableNumber(value.basis.payRatio) || !Array.isArray(value.basis.components))
       fail('A 更正须保留原完整施工责任、价格来源和发放档位')
+    if (value.basis.source.schemaVersion === 4 ? !isPayrollARatioPlan(value.basis.ratioPlan) : Object.hasOwn(value.basis, 'ratioPlan'))
+      fail('分项更正须保留已冻结比例计划，旧来源不能补造')
     if (value.basis.source.schemaVersion !== 1)
       assertPayrollAFeeAdjustmentBasis(value.basis.fees)
     else if (Object.hasOwn(value.basis, 'fees'))
@@ -133,6 +136,14 @@ function payrollACorrectionReasons(basis: PayrollAAdjustmentBasis, original: Pay
   }
   if (basis.payRatio === null || basis.payRatio < 0 || basis.payRatio > 1 || (basis.periodKind === 'retention' && basis.payRatio !== 1))
     reasons.push('A 更正比例须在0至1之间，尾款档位固定为1')
+  if (original.ratioPlan) {
+    if (!basis.ratioPlan || payrollCanonical(basis.ratioPlan.itemRatios.map(row => row.itemId).sort()) !== payrollCanonical(original.ratioPlan.itemRatios.map(row => row.itemId).sort()))
+      reasons.push('分项更正须保留原完整工程量分项集合')
+    if (basis.ratioPlan?.itemRatios.some(row => row.ratio === null || (basis.periodKind === 'retention' && row.ratio !== 1)) || basis.ratioPlan?.feeRatios.some(row => basis.periodKind === 'retention' && row.ratio !== 1))
+      reasons.push('分项比例须完整填写，尾款固定为100%')
+    if (basis.ratioPlan?.feeRatios.some(row => row.kind === 'fee' ? !basis.fees?.components.some(c => c.feeId === row.id) : !basis.fees?.negativeLines.some(n => n.lineId === row.id)))
+      reasons.push('费用比例须指向原费用或负价行')
+  }
   return [...new Set(reasons)]
 }
 export function payrollCorrectionReasons(basis: PayrollAdjustmentBasisDraft, original: PayrollAdjustmentBasisDraft): string[] {

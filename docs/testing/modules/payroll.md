@@ -99,11 +99,11 @@
 | [tests/payroll/hollow-deduction-calculation.test.ts](../../../tests/payroll/hollow-deduction-calculation.test.ts) | 单元／服务／状态 | 人工空鼓扣款的本次核算 |
 | [tests/payroll/hollow-deduction-command.test.ts](../../../tests/payroll/hollow-deduction-command.test.ts) | 单元／服务／状态 | 空鼓工资提交的封闭边界 |
 | [tests/payroll/hollow-export.test.ts](../../../tests/payroll/hollow-export.test.ts) | 单元／服务／状态 | ${format}真实发放工作簿将请款1000、空鼓450与现金550分列且保原来源 |
-| [tests/payroll/hollow-migration-adjustments.test.ts](../../../tests/payroll/hollow-migration-adjustments.test.ts) | 单元／服务／状态 | 迁入原450扣款后真实更正300并补款150，再次迁入保留现金700与原冻结550 |
+| [tests/payroll/hollow-migration-adjustments.test.ts](../../../tests/payroll/hollow-migration-adjustments.test.ts) | 单元／服务／状态 | 迁入扣款更正及实付；下月继承映射分项比例，多次迁入保原冻结 |
 | [tests/payroll/hollow-migration-graph.test.ts](../../../tests/payroll/hollow-migration-graph.test.ts) | 单元／服务／状态 | 工资只出现部分空鼓扣款三表时拒绝导出，不能静默降回旧工资图 |
 | [tests/payroll/hollow-migration-integrity.test.ts](../../../tests/payroll/hollow-migration-integrity.test.ts) | 单元／服务／状态 | 迁入配置可追加真实0修订，原raw不改；重复迁入保全而恢复拒绝抹掉新修订 |
 | [tests/payroll/hollow-migration-proof-package.test.ts](../../../tests/payroll/hollow-migration-proof-package.test.ts) | 单元／服务／状态 | 真实工资原图包只接受完整可达祖先、原字节摘要和明确表映射 |
-| [tests/payroll/hollow-migration-runtime.test.ts](../../../tests/payroll/hollow-migration-runtime.test.ts) | 单元／服务／状态 | 真实原检查19整改4与工资550整体迁入，公开冻结输出和后月已处理450保留 |
+| [tests/payroll/hollow-migration-runtime.test.ts](../../../tests/payroll/hollow-migration-runtime.test.ts) | 单元／服务／状态 | 真实检查与工资迁入、映射分项比例下月继承、冻结输出及已处理扣款 |
 | [tests/stores/payroll-hollow-pending.test.ts](../../../tests/stores/payroll-hollow-pending.test.ts) | 单元／服务／状态 | 扣款配置未知回复冷重建仍保原编号、开关、明确零和生效月份 |
 
 ## 批次与分配
@@ -147,6 +147,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/payroll-a-central.spec.ts](../../../e2e/payroll-a-central.spec.ts) | Playwright E2E | A工资真实迁入、配置保稿、实际核对发放、跨月重核与冻结输出完整旅程 |
+| [e2e/payroll-item-ratios.spec.ts](../../../e2e/payroll-item-ratios.spec.ts) | Playwright E2E | 合成来源中逐分项比例、费用覆盖、少发、上月继承与尾款锁定 |
 | [e2e/payroll-fees-central.spec.ts](../../../e2e/payroll-fees-central.spec.ts) | Playwright E2E | 多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出 |
 | [tests/components/PayrollAConfigState.test.ts](../../../tests/components/PayrollAConfigState.test.ts) | 组件（jsdom） | 尚无工资的新项目从已验证配置读取得到项目候选 |
 | [tests/components/PayrollACreateFromQuantity.test.ts](../../../tests/components/PayrollACreateFromQuantity.test.ts) | 组件（jsdom） | 没有旧工资的纯量项目按授权新建候选显示入口，固定draftKey并保来源筛选 |
@@ -173,6 +174,10 @@
 | [tests/payroll/a-receipt-migration.test.ts](../../../tests/payroll/a-receipt-migration.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
 | [tests/payroll/central-a-adjustment-reconciliation.test.ts](../../../tests/payroll/central-a-adjustment-reconciliation.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
 | [tests/payroll/central-a-adjustments.test.ts](../../../tests/payroll/central-a-adjustments.test.ts) | 单元／服务／状态 | a 更正按原施工责任、现场量、价和比例重新核算；原签名与原施工完成不改 |
+| [tests/payroll/central-a-item-ratio.test.ts](../../../tests/payroll/central-a-item-ratio.test.ts) | 单元 | 分项和费用比例、明确零与未知、上月继承、尾款及安全精度 |
+| [tests/payroll/central-a-item-ratio-service.test.ts](../../../tests/payroll/central-a-item-ratio-service.test.ts) | 服务 | 分项比例保存、冻结、继承、已核对后修改及独立更正与后月包含关系 |
+| [tests/components/PayrollAItemRatioFields.test.ts](../../../tests/components/PayrollAItemRatioFields.test.ts) | 组件 | 分项和费用比例输入、恢复默认及尾款只读 |
+| [tests/browser/PayrollAItemRatioFields.test.ts](../../../tests/browser/PayrollAItemRatioFields.test.ts) | 浏览器组件 | 键盘填写、费用默认、尾款只读及主要视口不横向溢出 |
 | [tests/payroll/central-a-amount-integrity.test.ts](../../../tests/payroll/central-a-amount-integrity.test.ts) | 单元／服务／状态 | a 工资公开核算的历史实付完整性 |
 | [tests/payroll/central-a-book-history-gaps.test.ts](../../../tests/payroll/central-a-book-history-gaps.test.ts) | 单元／服务／状态 | 管理已领用途关系及两份原件同时缺损时，不借旧A兼容分支变成零已领 |
 | [tests/payroll/central-a-codec.test.ts](../../../tests/payroll/central-a-codec.test.ts) | 单元／服务／状态 | 工资预览拒绝缺数量/状态权限不符/错目标，金额不能传输时取整成另一笔 |

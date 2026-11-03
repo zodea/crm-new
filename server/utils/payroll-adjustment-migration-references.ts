@@ -98,11 +98,14 @@ export function createPayrollAdjustmentReferenceCollector() {
         fees.identity(value.source.book)
         fees.feesSnapshot(value.source.fees)
       }
-      if (value.source.schemaVersion === 3) {
+      if (value.source.schemaVersion === 3 || (value.source.schemaVersion === 4 && value.source.hollow)) {
         const hollow = createPayrollHollowReferenceCollector()
-        hollow.snapshot(value.source.hollow)
+        hollow.snapshot(value.source.hollow!)
         for (const reference of hollow.refs) refs.add(reference)
       }
+      if (value.source.schemaVersion === 4)
+        value.source.ratioPlan.itemRatios.forEach(item => add('items', item.itemId))
+      value.ratioPlan?.itemRatios.forEach(item => add('items', item.itemId))
       if (value.fees)
         fees.basis(value.fees)
       for (const reference of fees.refs) refs.add(reference)

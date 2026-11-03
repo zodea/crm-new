@@ -97,13 +97,14 @@ describe('a HTTP/Repository 往返', () => {
     await f.db.execute('INSERT INTO items(id,project_id,code,name,trade,unit) VALUES(\'item\',\'p\',\'WALL\',\'墙砖\',\'泥工\',\'㎡\')')
     await repo.execute(f.command(config, { kind: 'save-a-prices', prices: [{ priceId: null, itemId: 'item', unit: '㎡', mode: 'baseline', workerId: null, effectiveMonth: '2026-08', unitPrice: 0, scope: { kind: 'project' } }] }))
     f.facts.rows[0]!.fieldQty = 8.123456
-    const input = { statementId: null, draftKey: 'new-a', draft: f.draft } as const
+    const draft = { ...f.draft, ratioPlan: { schemaVersion: 1 as const, itemRatios: [{ itemId: 'item', ratio: 0.8 }], feeRatios: [] } }
+    const input = { statementId: null, draftKey: 'new-a', draft } as const
     const form = await repo.aForm({ origin: 'real' }, input)
     expect(form.facts[0]?.fieldQty).toBe(8.123456)
     expect(form.lines[0]?.unitPrice).toBe(0)
     expect(form.totals.workAmount).toMatchObject({ value: 0, state: 'known' })
     expect(wire.at(-1)).toMatchObject({ facts: [{ fieldQty: '8.123456' }], lines: [{ unitPrice: '0.00' }], totals: { workAmount: { value: '0.00' } } })
-    const saved = await repo.execute(f.command(form, { kind: 'save-a-draft', draft: f.draft }))
+    const saved = await repo.execute(f.command(form, { kind: 'save-a-draft', draft }))
     expect((await repo.aForm({ origin: 'real' }, { statementId: saved.statementId! })).statementId).toBe(saved.statementId)
     expect((await repo.aOutput({ origin: 'real' }, saved.statementId!)).state).toBe('unavailable')
     const forged = { ...f.command(form, { kind: 'check-a' }), action: { kind: 'check-a', previouslyPaid: '0.00', facts: [] } }

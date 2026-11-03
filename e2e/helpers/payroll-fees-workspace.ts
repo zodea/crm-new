@@ -44,8 +44,11 @@ export async function payrollFeesWorkspace(page: Page, info: TestInfo) {
     await repository.execute(command(config, { kind: 'save-a-prices', prices: config.priceOptions.map(item => ({ priceId: null, itemId: item.itemId, unit: item.unit, mode: 'baseline', workerId: null, effectiveMonth: '2026-07', unitPrice: item.itemName === '墙砖' ? 36 : 0, scope: { kind: 'project' } })) }))
     const configPath = (month = '2026-07') => `/subcontract/payroll/config?${new URLSearchParams({ origin: 'real', project: projectId, crew: crewId, leader: leaderWorkerId, month })}`
     async function saveOrdinary(month = '2026-07') {
-      const draft = { ...scope, month, periodKind: 'monthly' as const, memberWorkerIds: [leaderWorkerId, zeroId], payRatio: 1, note: '真实普通工资与管理费分别核对', book: { bookPurpose: 'ordinary' as const, managementBookId: null } }
-      const form = await repository.aForm(query, { statementId: null, draftKey: randomUUID(), draft })
+      const initial = { ...scope, month, periodKind: 'monthly' as const, memberWorkerIds: [leaderWorkerId, zeroId], payRatio: 1, note: '真实普通工资与管理费分别核对', book: { bookPurpose: 'ordinary' as const, managementBookId: null } }
+      const draftKey = randomUUID()
+      const preview = await repository.aForm(query, { statementId: null, draftKey, draft: initial })
+      const draft = { ...initial, ratioPlan: { ...preview.draft.ratioPlan!, itemRatios: preview.draft.ratioPlan!.itemRatios.map(row => ({ ...row, ratio: 1 })) } }
+      const form = await repository.aForm(query, { statementId: null, draftKey, draft })
       return (await repository.execute(command(form, { kind: 'save-a-draft', draft }))).statementId!
     }
     return { ...scope, zeroId, items, configPath, saveOrdinary }

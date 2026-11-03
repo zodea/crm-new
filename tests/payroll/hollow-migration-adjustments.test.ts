@@ -82,11 +82,13 @@ it('迁入后600更正确认与后月实发50再导出，原前缀版本及确�
     const config = await f.service.aConfig({ origin: 'real' }, { projectId: f.scope.projectId, month: '2026-09', crewId: null, leaderWorkerId: workerId })
     const price = config.prices[0]!
     await f.service.execute(command(config, { kind: 'save-a-prices', prices: [{ priceId: price.priceId, itemId: price.itemId, unit: price.unit, mode: 'baseline', workerId: null, effectiveMonth: '2026-09', unitPrice: 300, scope: price.scope }] }))
-    const nextDraft = { ...f.original.draft, projectId: f.scope.projectId, leaderWorkerId: workerId, memberWorkerIds: [workerId], month: '2026-09' }
+    const { ratioPlan: _originalRatioPlan, ...originalScope } = f.original.draft
+    const nextDraft = { ...originalScope, projectId: f.scope.projectId, leaderWorkerId: workerId, memberWorkerIds: [workerId], month: '2026-09' }
     const next = await f.service.aForm({ origin: 'real' }, { statementId: null, draftKey: 'migrated-later50', draft: nextDraft })
+    expect(next.draft.ratioPlan?.itemRatios).toEqual([{ itemId: f.id('items', f.original.target.itemId), ratio: 2 / 3 }])
     expect(next.hollow?.totals.previousProcessed.value).toBe(600)
     expect(next.totals.grossAmount.value).toBe(50)
-    const saved = await f.service.execute(command(next, { kind: 'save-a-draft', draft: nextDraft }))
+    const saved = await f.service.execute(command(next, { kind: 'save-a-draft', draft: { ...nextDraft, ratioPlan: next.draft.ratioPlan } }))
     const form = () => f.service.aForm({ origin: 'real' }, { statementId: saved.statementId! })
     await f.service.execute(command(await form(), { kind: 'check-a' }))
     const candidate = (await f.service.releaseAdjustmentPreview({ origin: 'real' }, { statementId: saved.statementId! })).candidates.find(row => row.adjustmentId === correction.adjustmentId)!

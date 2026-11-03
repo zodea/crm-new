@@ -161,6 +161,12 @@ test('原户19减4、真实楼层冷返回、人工450扣款550发放及独立�
   await expect(page.getByRole('checkbox', { name: '零收款成员', exact: true })).toBeChecked()
   await capture(page, 'wage-cold-draft-preserved', '#section-note')
   await page.getByRole('button', { name: '核对完成量与单价', exact: true }).click()
+  const itemRatios = page.getByRole('region', { name: '工程量分项支付比例', exact: true }).locator('input[aria-label$="支付比例"]')
+  for (let index = 0; index < await itemRatios.count(); index++) {
+    await itemRatios.nth(index).fill('100')
+    await itemRatios.nth(index).blur()
+  }
+  await expect(page.getByRole('button', { name: '保存工资草稿', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: '保存工资草稿', exact: true }).click()
   await expect(page.getByRole('button', { name: '开始扣款', exact: true })).toBeEnabled()
   const statementId = decodeURIComponent(new URL(page.url()).pathname.split('/').at(-1)!)

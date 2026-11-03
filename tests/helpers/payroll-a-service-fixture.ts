@@ -27,8 +27,17 @@ export async function createPayrollAServiceFixture(options: Pick<PayrollServiceO
   }, quantityFacts: options.quantityFacts ?? (async () => structuredClone(facts)), managementScopeFacts: options.managementScopeFacts, transaction: work => coordinator.withTransaction(tx => work(tx, session)) })
   let sequence = 0
   const draft: PayrollADraft = { projectId: 'p', crewId: 'crew', leaderWorkerId: 'w', memberWorkerIds: ['w', 'zero'], month: '2026-08', periodKind: 'monthly', payRatio: 0.8, note: '' }
-  const command = (read: PayrollACommandRead, action: PayrollAAction): PayrollACommand => ({ commandId: `cmd-${++sequence}`, workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: read.context.origin, requiredCapability: 'payroll:write', sourceVersion: read.context.sourceVersion, projectId: 'scope' in read ? read.scope.projectId : read.draft.projectId!, statementId: 'statementId' in read ? read.statementId : null, draftKey: 'draftKey' in read ? read.draftKey : null, configScope: 'scope' in read ? read.scope : null, action })
-  const form = (overrides: Partial<PayrollADraft> = {}, draftKey = 'new-a') => service.aForm({ origin: 'real' }, { statementId: null, draftKey, draft: { ...draft, ...overrides } })
+  const command = (read: PayrollACommandRead, action: PayrollAAction): PayrollACommand => ({ commandId: `cmd-${++sequence}`, workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: read.context.origin, requiredCapability: 'payroll:write', sourceVersion: read.context.sourceVersion, projectId: 'scope' in read ? read.scope.projectId : read.draft.projectId!, statementId: 'statementId' in read ? read.statementId : null, draftKey: 'draftKey' in read ? read.draftKey : null, configScope: 'scope' in read ? read.scope : null, action: action.kind === 'save-a-draft' && !action.draft.ratioPlan && 'draft' in read && read.draft.ratioPlan ? { ...action, draft: { ...action.draft, ratioPlan: read.draft.ratioPlan } } : action })
+  const form = async (overrides: Partial<PayrollADraft> = {}, draftKey = 'new-a') => {
+    const input = { ...draft, ...overrides }
+    const preview = await service.aForm({ origin: 'real' }, { statementId: null, draftKey, draft: input })
+    // 旧测试按整单比例核算，此夹具显式为各原分项填写同一比例以保留原断言。
+    if (!Object.hasOwn(overrides, 'ratioPlan') && preview.draft.ratioPlan?.itemRatios.some(row => row.ratio === null) && preview.draft.payRatio != null) {
+      const ratioPlan = { ...preview.draft.ratioPlan, itemRatios: preview.draft.ratioPlan.itemRatios.map(row => ({ ...row, ratio: preview.draft.payRatio! })) }
+      return service.aForm({ origin: 'real' }, { statementId: null, draftKey, draft: { ...input, ratioPlan } })
+    }
+    return preview
+  }
   const config = () => service.aConfig({ origin: 'real' }, { projectId: 'p', month: '2026-08', crewId: 'crew', leaderWorkerId: 'w' })
   return {
     db,

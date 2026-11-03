@@ -1,4 +1,4 @@
-import type { PayrollAFeeAdjustmentBasis, PayrollAStatementSourceSnapshotV2 } from './central-a-fees-contract'
+import type { PayrollAFeeAdjustmentBasis, PayrollAStatementSourceSnapshotV2, PayrollAStatementSourceSnapshotV4 } from './central-a-fees-contract'
 import type { PayrollAStatementSourceSnapshotV3 } from './central-a-hollow-contract'
 import type { PayrollAAdjustmentBasis } from './central-adjustment-contract'
 import { payrollAAmount } from './central-a-calculation'
@@ -6,10 +6,10 @@ import { isPayrollABook, isPayrollANegativeValues } from './central-a-fees-valid
 import { payrollCanonical } from './central-command-shared'
 import { payrollProblem } from './central-contract'
 import { wireCent, wireExact, wireId, wireNullableNumber, wireText } from './central-payroll-wire'
-import { rounded } from './statements'
+import { amountInCents, rounded } from './statements'
 
 /** 从已证原冻结取可改的量价，来源只保留在上层 source 一份。 */
-export function payrollAFeeAdjustmentBasis(source: PayrollAStatementSourceSnapshotV2 | PayrollAStatementSourceSnapshotV3): PayrollAFeeAdjustmentBasis {
+export function payrollAFeeAdjustmentBasis(source: PayrollAStatementSourceSnapshotV2 | PayrollAStatementSourceSnapshotV3 | PayrollAStatementSourceSnapshotV4): PayrollAFeeAdjustmentBasis {
   return { schemaVersion: 1, book: source.book, components: source.fees.lines.flatMap(line => line.components.map(c => ({ componentKey: c.componentKey, feeId: c.feeId, feeRevisionId: c.feeRevisionId, ownershipKey: c.ownershipKey, quantity: c.quantity, unitPrice: c.unitPrice }))), negativeLines: source.fees.negativeLines.filter(n => !n.removed).map(n => ({ lineId: n.lineId, originalNegativeRevisionId: n.id, label: n.label, quantity: n.quantity, unit: n.unit, unitPrice: n.unitPrice, scope: n.scope, reason: n.reason, evidenceNote: n.evidenceNote, actualRef: n.actualRef })) }
 }
 
@@ -64,22 +64,29 @@ export function payrollAFeeCorrectionReasons(basis: PayrollAAdjustmentBasis, ori
 }
 
 /** 与 A 原核算一致：同费项/楼栋/分项/单位/价修订先合量，再结算到分。 */
-export function payrollAFeeCorrectionAmount(basis: PayrollAAdjustmentBasis, reasons: string[] = []) {
+export function payrollAFeeCorrectionLines(basis: PayrollAAdjustmentBasis) {
   if (basis.source.schemaVersion === 1)
-    return basis.fees === undefined ? payrollAAmount([0], reasons) : payrollAAmount([null], [...reasons, '旧来源没有费用证明'])
+    return basis.fees === undefined ? { positive: [], negative: [] } : null
   if (!basis.fees || payrollCanonical(basis.fees.book) !== payrollCanonical(basis.source.book))
-    return payrollAAmount([null], [...reasons, 'A V2 更正缺少同簿费用依据'])
+    return null
   const sourceComponents = basis.source.fees.lines.flatMap(l => l.components)
-  const groups = new Map<string, { quantity: number | null, unitPrice: number | null }>()
+  const groups = new Map<string, { feeId: string, quantity: number | null, unitPrice: number | null }>()
   for (const c of basis.fees.components) {
     const original = sourceComponents.find(o => o.componentKey === c.componentKey && o.feeId === c.feeId && o.feeRevisionId === c.feeRevisionId && o.ownershipKey === c.ownershipKey)
     if (!original)
-      return payrollAAmount([null], [...reasons, '费用组件缺少原费项责任'])
+      return null
     const key = payrollCanonical([c.feeId, original.fact.buildingId, original.fact.itemId, original.fact.unit, c.feeRevisionId, c.unitPrice])
     const old = groups.get(key)
-    groups.set(key, { quantity: c.quantity === null || old?.quantity === null ? null : c.quantity + (old?.quantity ?? 0), unitPrice: c.unitPrice })
+    groups.set(key, { feeId: c.feeId, quantity: c.quantity === null || old?.quantity === null ? null : c.quantity + (old?.quantity ?? 0), unitPrice: c.unitPrice })
   }
-  const positive = [...groups.values()].map(g => g.quantity === null || g.unitPrice === null ? null : rounded(g.quantity * g.unitPrice))
-  const negative = basis.fees.negativeLines.map(n => n.quantity === null || n.unitPrice === null ? null : rounded(n.quantity * n.unitPrice))
-  return payrollAAmount([...positive, ...negative], reasons)
+  const positive = [...groups.values()].map(g => ({ feeId: g.feeId, amount: payrollAAmount([g.quantity === null || g.unitPrice === null ? null : rounded(g.quantity * g.unitPrice)]) }))
+  const negative = basis.fees.negativeLines.map(n => ({ lineId: n.lineId, signedAmountFen: n.quantity === null || n.unitPrice === null ? null : amountInCents(rounded(n.quantity * n.unitPrice)) }))
+  return { positive, negative }
+}
+
+export function payrollAFeeCorrectionAmount(basis: PayrollAAdjustmentBasis, reasons: string[] = []) {
+  const lines = payrollAFeeCorrectionLines(basis)
+  if (!lines)
+    return payrollAAmount([null], [...reasons, '费用更正缺少同簿或原责任依据'])
+  return payrollAAmount([...lines.positive.map(line => line.amount.value), ...lines.negative.map(line => line.signedAmountFen === null ? null : line.signedAmountFen / 100)], reasons)
 }

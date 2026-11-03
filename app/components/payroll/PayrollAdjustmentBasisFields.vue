@@ -41,6 +41,24 @@ function update(group: 'records' | 'rates' | 'components', index: number, field:
 function amount(event: Event) {
   return c2InputNumber((event.target as HTMLInputElement).value)
 }
+function updateRatio(kind: 'item' | 'fee' | 'negative', id: string, event: Event) {
+  const basis = props.basis
+  if (props.disabled || basis?.formatFamily !== 'A' || !basis.ratioPlan)
+    return
+  const value = amount(event)
+  const ratioPlan = JSON.parse(JSON.stringify(basis.ratioPlan)) as typeof basis.ratioPlan
+  if (kind === 'item') {
+    const entry = ratioPlan.itemRatios.find(row => row.itemId === id)
+    if (entry)
+      entry.ratio = value === null ? null : value / 100
+  }
+  else {
+    ratioPlan.feeRatios = ratioPlan.feeRatios.filter(row => row.kind !== kind || row.id !== id)
+    if (value !== null)
+      ratioPlan.feeRatios.push({ kind, id, ratio: value / 100 })
+  }
+  emit('change', { ...basis, ratioPlan })
+}
 </script>
 
 <template>
@@ -50,7 +68,12 @@ function amount(event: Event) {
       原核算依据不完整，不能补造更正来源。
     </p>
     <template v-else-if="basis.formatFamily === 'A'">
-      <label class="grid max-w-md gap-1 text-12px">本次更正采用比例（0 至 1）<input :value="basis.payRatio ?? ''" type="number" min="0" max="1" step="any" class="field-input" :disabled="disabled || basis.periodKind === 'retention'" @input="emit('change', { ...basis, payRatio: amount($event) })"></label>
+      <label class="grid max-w-md gap-1 text-12px">{{ basis.ratioPlan ? '费用默认比例' : '本次更正采用比例' }}（0 至 1）<input :value="basis.payRatio ?? ''" type="number" min="0" max="1" step="any" class="field-input" :disabled="disabled || basis.periodKind === 'retention'" @input="emit('change', { ...basis, payRatio: amount($event) })"></label>
+      <div v-if="basis.ratioPlan" class="grid gap-3 sm:grid-cols-2">
+        <label v-for="row in basis.ratioPlan.itemRatios" :key="row.itemId" class="grid gap-1 text-12px">{{ basis.source.facts.find(fact => fact.itemId === row.itemId)?.itemName || '原分项' }}更正比例（%）<input :value="row.ratio === null ? '' : row.ratio * 100" type="number" min="0" max="100" step="0.01" class="field-input" :disabled="disabled || basis.periodKind === 'retention'" @input="updateRatio('item', row.itemId, $event)"></label>
+        <label v-for="row in [...new Map((basis.fees?.components ?? []).map(component => [component.feeId, component])).values()]" :key="row.feeId" class="grid gap-1 text-12px">{{ feeSource?.lines.find(line => line.feeId === row.feeId)?.name || '原费用' }}单独比例（%，留空使用默认比例）<input :value="basis.ratioPlan.feeRatios.find(entry => entry.kind === 'fee' && entry.id === row.feeId)?.ratio == null ? '' : basis.ratioPlan.feeRatios.find(entry => entry.kind === 'fee' && entry.id === row.feeId)!.ratio * 100" type="number" min="0" max="100" step="0.01" class="field-input" :disabled="disabled || basis.periodKind === 'retention'" @input="updateRatio('fee', row.feeId, $event)"></label>
+        <label v-for="row in basis.fees?.negativeLines ?? []" :key="row.lineId" class="grid gap-1 text-12px">{{ row.label }}单独比例（%，留空使用默认比例）<input :value="basis.ratioPlan.feeRatios.find(entry => entry.kind === 'negative' && entry.id === row.lineId)?.ratio == null ? '' : basis.ratioPlan.feeRatios.find(entry => entry.kind === 'negative' && entry.id === row.lineId)!.ratio * 100" type="number" min="0" max="100" step="0.01" class="field-input" :disabled="disabled || basis.periodKind === 'retention'" @input="updateRatio('negative', row.lineId, $event)"></label>
+      </div>
       <div v-if="basis.components.length" tabindex="0" aria-label="A 原责任量价更正表" class="min-w-0 overflow-x-auto">
         <table class="w-full min-w-640px text-left text-12px">
           <thead>

@@ -351,9 +351,9 @@ P0 通过受控迁移接管完整工资/考勤/签工图，历史读取不新造
 
 ### A 工资中央命令（#412，P1）
 
-`POST /api/commands/payroll-a` 使用 `payroll:write`，接受 `save-a-draft / check-a / set-a-pay-ratio / release-a / save-a-subject-config / save-a-prices`。工资绑定原 `statementId` 或独立 `draftKey`，配置绑定完整原 `configScope`；客户端不提交已付合计、来源资格、核算行或冻结结果。
+`POST /api/commands/payroll-a` 使用 `payroll:write`，接受 `save-a-draft / check-a / set-a-pay-ratio / set-a-ratio-plan / release-a / save-a-subject-config / save-a-prices`。工资绑定原 `statementId` 或独立 `draftKey`，配置绑定完整原 `configScope`；客户端不提交已付合计、来源资格、核算行或冻结结果。
 
-草稿可保存主体范围、全成员、月份、比例和备注；已核对仅改比例、重核或发放，改比例持久标需重核，已发只读。核对/发放重读原责任、现场量、适用价、成员、本簿此前真实已付；依据不一致时提交需重核结果，不能抛错回滚后仍显示已核对。实发/全成员分配精确到分含零成员，唯一发放、完整快照及采用关系一起提交。结算/尾款与价格修订见 [工资页面](./pages/subcontract-payroll.md#工资核算)、[DATABASE](./DATABASE.md#a-工资中央来源配置与发放412)，历史验证见 [P1](../design/evidence/issue-412-payroll-a/README.md)。
+草稿可保存主体范围、全成员、月份、比例和备注；`set-a-ratio-plan` 仅对未发工资保存完整分项及费用比例，服务端核对当前稳定身份、合法比例与尾款固定 100%。已核对单修改整单默认或分项比例均持久标需重核，已发只读。核对/发放重读原责任、现场量、适用价、成员、本簿此前真实已付；依据不一致时提交需重核结果，不能抛错回滚后仍显示已核对。实发/全成员分配精确到分含零成员，唯一发放、完整快照及采用关系一起提交。结算/尾款与价格修订见 [工资页面](./pages/subcontract-payroll.md#工资核算)、[DATABASE](./DATABASE.md#a-工资中央来源配置与发放412)，历史验证见 [P1](../design/evidence/issue-412-payroll-a/README.md)。
 
 ### 考勤与 C1 工资中央命令（#412，P2）
 

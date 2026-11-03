@@ -8,8 +8,8 @@ import { createPayrollHollowFixture } from '../helpers/payroll-hollow-fixture'
 it('明确空鼓450全部抵完请款450时可在原发放确认中提交全员0，撤权和普通零额仍拒', async () => {
   const f = await createPayrollHollowFixture()
   try {
-    const draft = { ...f.draft, payRatio: 0.3 }
-    const saved = await f.service.execute(f.command(await f.form({ payRatio: 0.3 }), { kind: 'save-a-draft', draft }))
+    const draft = { ...f.draft, payRatio: 0.3, ratioPlan: { schemaVersion: 1 as const, itemRatios: [{ itemId: f.target.itemId, ratio: 0.3 }], feeRatios: [] } }
+    const saved = await f.service.execute(f.command(await f.form(draft), { kind: 'save-a-draft', draft }))
     const statementId = saved.statementId!
     const form = () => f.service.aForm({ origin: 'real' }, { statementId })
     await f.service.executeHollow(f.startCommand((await form()).hollow!))

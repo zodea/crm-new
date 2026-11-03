@@ -1,6 +1,7 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAAdjustmentCoverage, PayrollAAdjustmentDimension, PayrollAAdjustmentReconciliation } from '../../app/lib/payroll/central-a-adjustment-contract'
 import type { PayrollAAdjustmentBasis } from '../../app/lib/payroll/central-adjustment-contract'
+import { applyPayrollAAdjustmentDimension, payrollAAdjustmentRatio } from '../../app/lib/payroll/central-a-adjustment-coverage'
 import { payrollAAmount } from '../../app/lib/payroll/central-a-calculation'
 import { isPayrollAStatementSourceVersioned } from '../../app/lib/payroll/central-a-fees-validation'
 import { payrollCorrectionAmount } from '../../app/lib/payroll/central-adjustment-calculation'
@@ -35,9 +36,13 @@ export async function loadPayrollAAdjustmentReconciliation(tx: TransactionDb, ra
     }
     for (const component of after.components) {
       const original = before.components.find(c => c.ownershipKey === component.ownershipKey)
-      if (!original || (component.quantity === original.quantity && component.unitPrice === original.unitPrice && before.payRatio === after.payRatio))
-        continue
       const oldFact = before.source.facts.find(f => f.ownershipKey === component.ownershipKey)
+      if (!original || !oldFact)
+        continue
+      const beforeRatio = payrollAAdjustmentRatio(before, 'item', oldFact.itemId)
+      const afterRatio = payrollAAdjustmentRatio(after, 'item', oldFact.itemId)
+      if (component.quantity === original.quantity && component.unitPrice === original.unitPrice && beforeRatio === afterRatio)
+        continue
       const currentFact = rawBasis.source.facts.find(f => f.ownershipKey === component.ownershipKey)
       const current = effectiveBasis.components.find(c => c.ownershipKey === component.ownershipKey)
       const oldPrice = before.source.priceRevisions.find(p => p.id === original.priceRevisionId)
@@ -49,13 +54,13 @@ export async function loadPayrollAAdjustmentReconciliation(tx: TransactionDb, ra
         dimensions.push(dimension('quantity', original.quantity, component.quantity, current?.quantity ?? null, sameOwnership))
       if (component.unitPrice !== original.unitPrice)
         dimensions.push(dimension('unit-price', original.unitPrice, component.unitPrice, current?.unitPrice ?? null, sameOwnership && samePrice))
-      if (before.payRatio !== after.payRatio)
-        dimensions.push(dimension('pay-ratio', before.payRatio, after.payRatio, rawBasis.payRatio, sameOwnership))
+      if (beforeRatio !== afterRatio)
+        dimensions.push(dimension('pay-ratio', beforeRatio, afterRatio, payrollAAdjustmentRatio(rawBasis, 'item', oldFact.itemId), sameOwnership))
       const localReasons = dimensions.filter(d => d.state === 'unproven').map(d => `责任 ${component.ownershipKey} 的 ${d.dimension} 已变化，尚不能证明当前来源已包含或可沿用原更正`)
       if (!sameOwnership || !samePrice)
         localReasons.push(`责任 ${component.ownershipKey} 的原施工范围或采用价格沿革不能核实`)
       for (const d of dimensions) {
-        const key = d.dimension === 'pay-ratio' ? 'pay-ratio' : `${component.ownershipKey}:${d.dimension}`
+        const key = d.dimension === 'pay-ratio' ? rawBasis.ratioPlan ? `item:${oldFact.itemId}:pay-ratio` : 'pay-ratio' : `${component.ownershipKey}:${d.dimension}`
         if (changed.has(key) && changed.get(key) !== head.rootAdjustmentId)
           localReasons.push(`责任 ${component.ownershipKey} 的同一维度涉及不同原单更正，需核实前后引用`)
         changed.set(key, head.rootAdjustmentId)
@@ -64,7 +69,7 @@ export async function loadPayrollAAdjustmentReconciliation(tx: TransactionDb, ra
             current.quantity = d.effective
           else if (d.dimension === 'unit-price')
             current.unitPrice = d.effective
-          else effectiveBasis.payRatio = d.effective
+          else applyPayrollAAdjustmentDimension(effectiveBasis, { adjustmentId: head.id, rootAdjustmentId: head.rootAdjustmentId, originalStatementId: head.originalStatementId, ownershipKey: component.ownershipKey, originalSourceFingerprint: '', currentSourceFingerprint: null, originalPriceRevisionId: original.priceRevisionId, currentPriceRevisionId: null, dimensions: [], reasons: [] }, d, d.effective)
         }
       }
       coverage.push({ adjustmentId: head.id, rootAdjustmentId: head.rootAdjustmentId, originalStatementId: head.originalStatementId, ownershipKey: component.ownershipKey, originalSourceFingerprint: oldFact?.sourceFingerprint ?? '', currentSourceFingerprint: currentFact?.sourceFingerprint ?? null, originalPriceRevisionId: original.priceRevisionId, currentPriceRevisionId: current?.priceRevisionId ?? null, dimensions, reasons: localReasons })

@@ -1,7 +1,9 @@
 import type { NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollAAmount, PayrollABlocker, PayrollACommand, PayrollACommandResult, PayrollAConfigScope, PayrollAContext, PayrollADraft, PayrollAFormRead, PayrollAFrozenDocument, PayrollAOptions, PayrollAPeriodKind, PayrollAPriceScope, PayrollAQuantityFact, PayrollAStatementSourceSnapshot } from './central-a-contract'
+import type { PayrollARatioPlan } from './central-a-item-ratio'
 import type { PayrollActualRef } from './central-actual-contract'
 import type { PayrollHistoryEntry, PayrollQuery } from './central-contract'
+import type { PayrollHollowSnapshot } from './central-hollow-deduction-contract'
 
 /** P5 独立扩展。旧 A/source V1 的缺省字段及原 JSON 不补写、不规范化。 */
 export type PayrollFieldFact<T> = { state: 'missing' } | { state: 'null', value: null } | { state: 'value', value: T }
@@ -368,7 +370,13 @@ export interface PayrollAStatementSourceSnapshotV2 extends Omit<PayrollAStatemen
   book: PayrollABookRef
   fees: PayrollAFeesSourceSnapshot
 }
-export type PayrollAStatementSourceVersioned = PayrollAStatementSourceSnapshot | PayrollAStatementSourceSnapshotV2 | import('./central-a-hollow-contract').PayrollAStatementSourceSnapshotV3
+/** 分项比例仅在新快照中携带；原 V1–V3 的比例含义和原始正文保持不变。 */
+export interface PayrollAStatementSourceSnapshotV4 extends Omit<PayrollAStatementSourceSnapshotV2, 'schemaVersion'> {
+  schemaVersion: 4
+  ratioPlan: PayrollARatioPlan
+  hollow?: PayrollHollowSnapshot
+}
+export type PayrollAStatementSourceVersioned = PayrollAStatementSourceSnapshot | PayrollAStatementSourceSnapshotV2 | import('./central-a-hollow-contract').PayrollAStatementSourceSnapshotV3 | PayrollAStatementSourceSnapshotV4
 
 /** 明确受控投影，旧 frozen document 不反向注入缺省 book/fees。 */
 export interface PayrollAFeesFrozenDocument extends PayrollAFrozenDocument {

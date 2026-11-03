@@ -2,6 +2,7 @@
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollAAdjustmentReconciliation } from './central-a-adjustment-contract'
 import type { PayrollABookRef } from './central-a-fees-contract'
+import type { PayrollARatioPlan } from './central-a-item-ratio'
 import type { PayrollContext, PayrollDetailRead, PayrollHistoryEntry, PayrollProjectOption, PayrollQuery } from './central-contract'
 import type { PayrollHollowRead, PayrollHollowSnapshot } from './central-hollow-deduction-contract'
 import type { PayrollReleaseAdjustmentApplication } from './central-release-adjustment-contract'
@@ -220,6 +221,8 @@ export interface PayrollADraft extends PayrollASubjectScope {
   month: string
   periodKind: PayrollAPeriodKind
   payRatio: number | null
+  /** 新单按工程量分项；旧单无此字段，禁止按当前默认比例补造历史事实。 */
+  ratioPlan?: PayrollARatioPlan
   note: string
 }
 
@@ -286,6 +289,7 @@ export interface PayrollAReleaseDraft {
 export type PayrollAAction = { kind: 'save-a-draft', draft: PayrollADraft }
   | { kind: 'check-a' }
   | { kind: 'set-a-pay-ratio', payRatio: number | null }
+  | { kind: 'set-a-ratio-plan', ratioPlan: PayrollARatioPlan }
   | { kind: 'release-a', release: PayrollAReleaseDraft }
   | { kind: 'save-a-subject-config', config: PayrollASubjectConfigDraft }
   | { kind: 'save-a-prices', prices: PayrollAPriceDraft[] }
@@ -337,6 +341,8 @@ export interface PayrollAStatementSourceSnapshot {
 export interface PayrollAFrozenDocument {
   hollow?: PayrollHollowSnapshot
   adjustmentReconciliation?: PayrollAAdjustmentReconciliation
+  /** 新单冻结时保存分项比例；旧单不存在此字段。 */
+  ratioPlan?: PayrollARatioPlan
   id: string
   projectId: string
   projectName: string

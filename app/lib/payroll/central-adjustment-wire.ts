@@ -9,7 +9,7 @@ import { assertPayrollReversalCommand, assertPayrollReversalDraft, assertPayroll
 import { isPayrollSourceIdentity } from './migration-identity'
 
 const moneyKeys = new Set(['amount', 'delta', 'remainingAmount', 'embeddedInCalculation', 'additionalWithholding'])
-const decimalKeys = new Set(['quantity', 'knownQuantity', 'fieldQty', 'unitPrice', 'unitRate', 'payRatio', 'dailyWage', 'overtimeRate', 'hours', 'overtimeHours', 'laborUnits'])
+const decimalKeys = new Set(['quantity', 'knownQuantity', 'fieldQty', 'unitPrice', 'unitRate', 'payRatio', 'ratio', 'dailyWage', 'overtimeRate', 'hours', 'overtimeHours', 'laborUnits'])
 function transform(v: unknown, decode: boolean): unknown {
   if (Array.isArray(v))
     return v.map(child => transform(child, decode))

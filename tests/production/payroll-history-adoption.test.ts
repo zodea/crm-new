@@ -63,7 +63,7 @@ it('真实整库A/P5/P6混合历史按同源工程量映射正式接管，保管
     inspected = await hollow.hollow(query)
     await hollow.executeHollow(hollowCommand(inspected, 'native-history-rectification', { kind: 'rectify-hollow-inspection', recordId: inspected.data.records[0]!.recordId, expectedRevisionId: inspected.data.records[0]!.inspection.revisionId, rectifiedOn: '2026-08-02', count: 1, note: '原已整改一处' }))
     const service = createPayrollService({ session: () => nativeActor, identities: () => native.source, transaction: work => coordinator.withTransaction(tx => work(tx, nativeActor)), quantityFacts: loadPayrollAQuantityFacts, managementScopeFacts: loadPayrollAManagementScopeFacts, hollowFacts: loadQuantityHollowFacts })
-    const draft = { ...native.draft, book: native.ordinary, payRatio: 1, note: '原普通工资与全零成员' }
+    const draft = { ...native.draft, book: native.ordinary, payRatio: 1, ratioPlan: { schemaVersion: 1 as const, itemRatios: ['wall', 'floor', 'shower'].map(itemId => ({ itemId, ratio: 1 })), feeRatios: [] }, note: '原普通工资与全零成员' }
     const form = await service.aForm({ origin: 'real' }, { statementId: null, draftKey: 'native-history-ordinary', draft })
     const ordinary = await service.execute(native.command(form, { kind: 'save-a-draft', draft }))
     let current = await service.aForm({ origin: 'real' }, { statementId: ordinary.statementId! })

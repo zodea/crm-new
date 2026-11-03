@@ -1,10 +1,11 @@
-import type { PayrollACommand, PayrollACommandResult, PayrollAConfigRead, PayrollAConfigScope, PayrollAFormInput, PayrollAFormRead, PayrollAFrozenDocument, PayrollAOutputRead, PayrollAStatementSourceSnapshot } from './central-a-contract'
+import type { PayrollACommand, PayrollACommandResult, PayrollAConfigRead, PayrollAConfigScope, PayrollAFormInput, PayrollAFormRead, PayrollAFrozenDocument, PayrollAOutputRead, PayrollAPeriodKind, PayrollAStatementSourceSnapshot } from './central-a-contract'
 import type { PayrollQuery } from './central-contract'
 import { isQuantitySourceIdentity } from '../quantity/migration-identity'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { isPayrollAAdjustmentReconciliation } from './central-a-adjustment-validation'
 import { isPayrollAFeesFormExtension } from './central-a-fees-read-validation'
 import { isPayrollABook, isPayrollAFeesFrozenDocument } from './central-a-fees-validation'
+import { calculatePayrollAItemRatios, isPayrollARatioPlan } from './central-a-item-ratio'
 import { payrollProblem } from './central-contract'
 import { isPayrollHollowRead } from './central-hollow-deduction-read'
 import { payrollHollowAllowsZeroRelease } from './central-hollow-deduction-release'
@@ -16,7 +17,7 @@ import { isPayrollSourceIdentity } from './migration-identity'
 import { amountInCents } from './statements'
 
 const moneyFields = new Set(['unitPrice', 'amount', 'actualAmount', 'workAmount', 'cumulativeAmount', 'previouslyPaid', 'grossAmount', 'listAmount'])
-const decimalFields = new Set(['payRatio', 'initialPayRatio', 'quantity', 'knownQuantity', 'fieldQty'])
+const decimalFields = new Set(['payRatio', 'initialPayRatio', 'quantity', 'knownQuantity', 'fieldQty', 'ratio'])
 const text = (v: unknown): v is string => typeof v === 'string'
 const nullableText = (v: unknown) => v === null || text(v)
 const number = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
@@ -120,7 +121,7 @@ function amount(v: unknown) {
 function draft(v: unknown, partial: boolean) {
   if (!object(v))
     return false
-  const checks: Record<string, (v: unknown) => boolean> = { projectId: isStableRouteIdentity, leaderWorkerId: isStableRouteIdentity, crewId: v => v === null || isStableRouteIdentity(v), memberWorkerIds: v => array(v, isStableRouteIdentity), month, periodKind: v => kinds.includes(String(v)), payRatio: nullableNumber, note: text, book: v => v === undefined || isPayrollABook(v) }
+  const checks: Record<string, (v: unknown) => boolean> = { projectId: isStableRouteIdentity, leaderWorkerId: isStableRouteIdentity, crewId: v => v === null || isStableRouteIdentity(v), memberWorkerIds: v => array(v, isStableRouteIdentity), month, periodKind: v => kinds.includes(String(v)), payRatio: nullableNumber, note: text, book: v => v === undefined || isPayrollABook(v), ratioPlan: v => v === undefined || isPayrollARatioPlan(v) }
   return Object.keys(v).every(key => key in checks) && Object.entries(checks).every(([key, check]) => {
     // 读取预览允许尚未选定/主动清空选择；持久保存继续执行完整身份与日期校验。
     if (partial && (!(key in v) || (v[key] === '' && ['projectId', 'leaderWorkerId', 'month'].includes(key))))
@@ -165,6 +166,11 @@ export function parsePayrollACommand(value: unknown): PayrollACommand {
     exact(action, ['kind', 'payRatio'])
     if (!nullableNumber(action.payRatio))
       fail('单据比例无效')
+  }
+  else if (action.kind === 'set-a-ratio-plan') {
+    exact(action, ['kind', 'ratioPlan'])
+    if (!isPayrollARatioPlan(action.ratioPlan))
+      fail('分项比例计划无效')
   }
   else if (action.kind === 'release-a') {
     exact(action, ['kind', 'release'])
@@ -222,7 +228,17 @@ export function isPayrollAFrozenDocument(v: unknown): v is PayrollAFrozenDocumen
   const reconciliation = v.adjustmentReconciliation
   if (reconciliation !== undefined && (!isPayrollAAdjustmentReconciliation(reconciliation) || reconciliation.rawCumulative.value !== v.cumulativeAmount || reconciliation.availableAmount.value !== (hollow ? hollow.totals.claimSubtotal.value : v.grossAmount) || reconciliation.rawBasis.payRatio !== v.payRatio || reconciliation.reasons.length))
     return false
-  if (lines.reduce((sum, l) => sum + cents(l.amount!), 0) !== cents(Number(v.workAmount)) || cents(Number(fees ? fees.listAmount : v.workAmount) * Number(v.payRatio)) !== cents(Number(v.cumulativeAmount)) || payments.reduce((sum, p) => sum + cents(p.amount), 0) !== cents(Number(v.previouslyPaid)) || (reconciliation === undefined && Math.max(0, cents(Number(v.cumulativeAmount)) - cents(Number(v.previouslyPaid))) !== cents(Number(hollow ? hollow.totals.claimSubtotal.value : v.grossAmount))))
+  let cumulativeMatches: boolean
+  if (v.ratioPlan !== undefined) {
+    if (!fees || !isPayrollARatioPlan(v.ratioPlan))
+      return false
+    const calculated = calculatePayrollAItemRatios({ periodKind: v.periodKind as PayrollAPeriodKind, defaultRatio: Number(v.payRatio), ...v.ratioPlan, workLines: lines, feeLines: fees.fees.lines, negativeLines: fees.fees.negativeLines })
+    cumulativeMatches = calculated.reasons.length === 0 && calculated.cumulativeAmount.value !== null && cents(calculated.cumulativeAmount.value) === cents(Number(v.cumulativeAmount))
+  }
+  else {
+    cumulativeMatches = cents(Number(fees ? fees.listAmount : v.workAmount) * Number(v.payRatio)) === cents(Number(v.cumulativeAmount))
+  }
+  if (lines.reduce((sum, l) => sum + cents(l.amount!), 0) !== cents(Number(v.workAmount)) || !cumulativeMatches || payments.reduce((sum, p) => sum + cents(p.amount), 0) !== cents(Number(v.previouslyPaid)) || (reconciliation === undefined && Math.max(0, cents(Number(v.cumulativeAmount)) - cents(Number(v.previouslyPaid))) !== cents(Number(hollow ? hollow.totals.claimSubtotal.value : v.grossAmount))))
     return false
   return new Set(members.map(m => m.workerId)).size === members.length && members.filter(m => m.isLeader).length === 1 && allocations.length === members.length && new Set(allocations.map(a => a.workerId)).size === members.length && allocations.every(a => members.some(m => m.workerId === a.workerId)) && allocations.reduce((sum, a) => sum + a.allocatedAmountFen, 0) === cents(Number(v.actualAmount))
 }
@@ -274,7 +290,7 @@ export function decodePayrollAResult(v: unknown, command: PayrollACommand): Payr
     fail('工资提交回执与原目标不一致')
   if (!command.action.kind.startsWith('save-a-prices') && command.action.kind !== 'save-a-subject-config' && !v.statementId)
     fail('工资回执缺少单据身份')
-  const outcomes: Record<PayrollACommand['action']['kind'], string[]> = { 'save-a-draft': ['saved'], 'check-a': ['checked'], 'set-a-pay-ratio': ['saved', 'needs-recheck'], 'release-a': ['released', 'needs-recheck'], 'save-a-subject-config': ['saved'], 'save-a-prices': ['saved'] }
+  const outcomes: Record<PayrollACommand['action']['kind'], string[]> = { 'save-a-draft': ['saved'], 'check-a': ['checked'], 'set-a-pay-ratio': ['saved', 'needs-recheck'], 'set-a-ratio-plan': ['saved', 'needs-recheck'], 'release-a': ['released', 'needs-recheck'], 'save-a-subject-config': ['saved'], 'save-a-prices': ['saved'] }
   if (!outcomes[command.action.kind].includes(String(v.outcome)))
     fail('工资回执结果与原动作不一致')
   return v as unknown as PayrollACommandResult

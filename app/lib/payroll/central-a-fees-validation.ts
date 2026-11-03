@@ -1,4 +1,4 @@
-import type { PayrollABookRef, PayrollAFeeBasis, PayrollAFeeDraft, PayrollAFeesFrozenDocument, PayrollAFeesSourceSnapshot, PayrollAManagementScope, PayrollAStatementSourceSnapshotV2, PayrollAStatementSourceVersioned } from './central-a-fees-contract'
+import type { PayrollABookRef, PayrollAFeeBasis, PayrollAFeeDraft, PayrollAFeesFrozenDocument, PayrollAFeesSourceSnapshot, PayrollAManagementScope, PayrollAStatementSourceSnapshotV2, PayrollAStatementSourceSnapshotV4, PayrollAStatementSourceVersioned } from './central-a-fees-contract'
 import type { PayrollAStatementSourceSnapshotV3 } from './central-a-hollow-contract'
 import { isQuantitySourceIdentity } from '../quantity/migration-identity'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
@@ -6,6 +6,7 @@ import { payrollAAmount, payrollACanonical, payrollAMoney } from './central-a-ca
 import { isPayrollAStatementSourceSnapshot } from './central-a-codec'
 import { payrollAFeeTotal, payrollAManagementContains } from './central-a-fees-calculation'
 import { isPayrollAFeeBlocker, isPayrollAFeeCell, isPayrollAFeeNavigation, isPayrollAFeePriceScope, isPayrollAFeeQuantityFact } from './central-a-fees-read-primitives'
+import { isPayrollARatioPlan } from './central-a-item-ratio'
 import { payrollProblem } from './central-contract'
 import { isPayrollHollowSnapshot } from './central-hollow-deduction-snapshot'
 import { payrollObject } from './central-snapshot'
@@ -110,7 +111,17 @@ export function isPayrollAStatementSourceSnapshotV2(v: unknown): v is PayrollASt
   return source.fees.lines.every(l => l.components.every(c => source.facts.some(f => f.ownershipKey === c.ownershipKey && same(f, c.fact)) && c.quantity === c.fact.fieldQty && (source.book.bookPurpose === 'management' ? !!source.fees.management && payrollAManagementContains(source.fees.management.revision.scope, c.fact) && same(c.managementOwnership, { purpose: 'management-fee', projectId: source.subject.projectId, ownershipKey: c.ownershipKey }) : c.managementOwnership === null)))
 }
 export function isPayrollAStatementSourceVersioned(v: unknown): v is PayrollAStatementSourceVersioned {
-  return feeObject(v) && (v.schemaVersion === 1 ? isPayrollAStatementSourceSnapshot(v) : v.schemaVersion === 3 ? isPayrollAStatementSourceSnapshotV3(v) : isPayrollAStatementSourceSnapshotV2(v))
+  return feeObject(v) && (v.schemaVersion === 1 ? isPayrollAStatementSourceSnapshot(v) : v.schemaVersion === 3 ? isPayrollAStatementSourceSnapshotV3(v) : v.schemaVersion === 4 ? isPayrollAStatementSourceSnapshotV4(v) : isPayrollAStatementSourceSnapshotV2(v))
+}
+export function isPayrollAStatementSourceSnapshotV4(v: unknown): v is PayrollAStatementSourceSnapshotV4 {
+  if (!feeObject(v) || v.schemaVersion !== 4 || !isPayrollARatioPlan(v.ratioPlan))
+    return false
+  const { ratioPlan, hollow, ...previous } = v
+  if (hollow === undefined ? !isPayrollAStatementSourceSnapshotV2({ ...previous, schemaVersion: 2 }) : !isPayrollAStatementSourceSnapshotV3({ ...previous, schemaVersion: 3, hollow }))
+    return false
+  const source = v as unknown as PayrollAStatementSourceSnapshotV4
+  return ratioPlan.itemRatios.every(row => source.facts.some(fact => fact.itemId === row.itemId))
+    && ratioPlan.feeRatios.every(row => row.kind === 'fee' ? source.fees.feeRevisions.some(fee => fee.feeId === row.id) : source.fees.negativeLines.some(line => line.lineId === row.id))
 }
 export function isPayrollAStatementSourceSnapshotV3(v: unknown): v is PayrollAStatementSourceSnapshotV3 {
   if (!feeObject(v) || v.schemaVersion !== 3 || !isPayrollHollowSnapshot(v.hollow) || v.hollow.state !== 'available' || v.hollow.adoptions.length || v.hollow.scope.formatFamily !== 'A')

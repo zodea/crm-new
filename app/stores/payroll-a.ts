@@ -92,6 +92,7 @@ export const usePayrollAStore = defineStore('payroll-a-central', () => {
     saveADraft: (read: PayrollAFormRead, draft: PayrollADraft) => statementAction(read, { kind: 'save-a-draft', draft }),
     checkA: (read: PayrollAFormRead) => statementAction(read, { kind: 'check-a' }),
     setAPayRatio: (read: PayrollAFormRead, payRatio: number | null) => statementAction(read, { kind: 'set-a-pay-ratio', payRatio }),
+    setARatioPlan: (read: PayrollAFormRead, ratioPlan: NonNullable<PayrollAFormRead['draft']['ratioPlan']>) => statementAction(read, { kind: 'set-a-ratio-plan', ratioPlan }),
     releaseA: (read: PayrollAFormRead, release: PayrollAReleaseDraft) => statementAction(read, { kind: 'release-a', release }),
     saveASubjectConfig: (read: PayrollAConfigRead, config: PayrollASubjectConfigDraft) => execute(read, { kind: 'save-a-subject-config', config }),
     saveAPrices: (read: PayrollAConfigRead, prices: PayrollAPriceDraft[]) => execute(read, { kind: 'save-a-prices', prices }),

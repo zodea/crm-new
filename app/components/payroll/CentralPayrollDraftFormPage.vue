@@ -13,6 +13,10 @@ const management = computed(() => feeRead.value?.book?.bookPurpose === 'manageme
 const title = computed(() => management.value ? '编辑独立管理费草稿' : id.value ? '编辑 A 工资草稿' : '新建 A 工资草稿')
 const configuration = computed(() => ({ path: '/subcontract/payroll/config', query: { origin: 'real', project: draft.value.projectId, month: draft.value.month, crew: draft.value.crewId || '', leader: draft.value.leaderWorkerId, managementBookId: draft.value.book?.managementBookId || undefined, returnTo: route.fullPath } }))
 async function change(patch: Partial<PayrollADraft>) {
+  if (['projectId', 'month', 'crewId', 'leaderWorkerId'].some(key => key in patch))
+    patch.ratioPlan = undefined
+  if (patch.periodKind === 'retention' && draft.value.ratioPlan)
+    patch.ratioPlan = { ...draft.value.ratioPlan, itemRatios: draft.value.ratioPlan.itemRatios.map(row => ({ ...row, ratio: 1 })), feeRatios: draft.value.ratioPlan.feeRatios.map(row => ({ ...row, ratio: 1 })) }
   ui.change(patch)
   if (['projectId', 'month', 'crewId', 'leaderWorkerId', 'periodKind'].some(key => key in patch))
     await ui.load(true)
@@ -39,6 +43,7 @@ useTabTitle(title)
         请先按当前请款范围重新核对来源，再保存草稿。
       </p>
       <PayrollASourceReview v-if="!management" :read="matchingRead" :return-to="route.fullPath" />
+      <PayrollAItemRatioFields v-if="draft.ratioPlan" :read="matchingRead" :plan="draft.ratioPlan" :disabled="!editable" @change="ui.change({ ratioPlan: $event })" @preview="ui.load(true)" />
       <PayrollHollowReview v-if="matchingRead.hollow" :read="matchingRead.hollow" :return-to="route.fullPath" readonly :blocked="busy || !!pending" @changed="ui.load()" />
       <PayrollAFeesReview v-if="feeRead" :read="feeRead" :return-to="route.fullPath" />
       <PayrollANegativeLinesSection v-if="management" :ui="ui.negative" />

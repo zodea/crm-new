@@ -83,7 +83,7 @@ function name(line: PayrollALine) {
       <div v-for="amount in amounts" :key="amount.label" class="min-w-0 rounded border border-line p-3">
         <span class="text-12px text-ink-faint">{{ amount.label }}</span><p class="mt-1 break-words font-mono text-14px font-700">
           {{ payrollAmountSummary(amount.value) }}
-        </p><p v-for="reason in amount.value.reasons" :key="reason" class="mt-1 text-11px leading-4 text-warn">
+        </p><p v-for="reason in amount.value.reasons" :key="reason" class="mt-1 break-all text-11px leading-4 text-warn">
           {{ reason }}
         </p>
       </div>

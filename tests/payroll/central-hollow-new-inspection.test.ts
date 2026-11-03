@@ -17,7 +17,7 @@ it('原15处已扣、5处仍未修、新增2处时后单仅人工启动新增2�
     await f.quantityService.executeHollow(f.hollowCommand(quantity, { kind: 'create-hollow-inspection', target: f.target, input: { inspectedOn: '2026-09-02', count: 2, note: '另外新增2处，独立排查，不修订原已采用记录' } }))
     quantity = await f.quantityService.hollow(f.scope)
     const added = quantity.data.records.find(row => row.recordId !== f.recordId)!
-    const draft = { ...f.draft, month: '2026-09', payRatio: 1 }
+    const draft = { ...f.draft, month: '2026-09', payRatio: 1, ratioPlan: { schemaVersion: 1 as const, itemRatios: [{ itemId: f.target.itemId, ratio: 1 }], feeRatios: [] } }
     const initial = await f.form(draft, 'hollow-september-new-two')
     expect(initial.hollow?.rows.find(row => row.fact.recordId === f.recordId)).toMatchObject({ state: 'already-processed', amount: { value: 0 }, fact: { remainingCount: 5 } })
     expect(initial.hollow?.rows.find(row => row.fact.recordId === added.recordId)).toMatchObject({ state: 'ready', amount: { value: 60 }, fact: { remainingCount: 2 } })

@@ -221,6 +221,11 @@ test('A工资真实迁入、配置保稿、实际核对发放、跨月重核与�
     await expect(page).toHaveURL(draftPath)
     await expect(page.getByRole('textbox', { name: '工资备注', exact: true })).toHaveValue('配置往返保留备注')
     await page.getByRole('button', { name: '核对完成量与单价', exact: true }).click()
+    const items = page.getByRole('region', { name: '工程量分项支付比例', exact: true }).locator('input[aria-label$="支付比例"]')
+    await expect(items).toHaveCount(1)
+    await items.first().fill('80')
+    await items.first().blur()
+    await expect(page.getByRole('button', { name: '保存工资草稿', exact: true })).toBeEnabled()
     await expect(page.getByRole('spinbutton', { name: '本次支付比例', exact: true })).toHaveValue('80')
     await capture(page, info, 'draft-config-return', '[aria-label="A工资完成来源核对"]')
   })
@@ -258,7 +263,7 @@ test('A工资真实迁入、配置保稿、实际核对发放、跨月重核与�
   expect(augustRead.totals.grossAmount.value).toBe(320)
   let september = ''
   await test.step('另一月份先核对，第一笔少发只记真实300，原回执丢失可恢复', async () => {
-    const draft: PayrollADraft = { projectId: f.project, month: '2026-09', periodKind: 'settlement', crewId: f.crew, leaderWorkerId: f.worker, memberWorkerIds: [f.worker, f.zero], payRatio: 0.95, note: '先核对的结算单' }
+    const draft: PayrollADraft = { projectId: f.project, month: '2026-09', periodKind: 'settlement', crewId: f.crew, leaderWorkerId: f.worker, memberWorkerIds: [f.worker, f.zero], payRatio: 0.95, ratioPlan: { schemaVersion: 1, itemRatios: [{ itemId: f.item, ratio: 0.95 }], feeRatios: [] }, note: '先核对的结算单' }
     const preview = await repo.aForm(query, { statementId: null, draftKey: randomUUID(), draft })
     const result = await command(page, preview, { kind: 'save-a-draft', draft })
     expect(result.statementId).toBeTruthy()

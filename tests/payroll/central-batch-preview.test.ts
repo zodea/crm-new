@@ -22,7 +22,7 @@ describe('central payroll batch preview and immutable confirmation', () => {
       const scope = { projectId: 'p', month: '2026-08', crewId: 'crew', leaderWorkerId }
       const config = await f.service.aConfig({ origin: 'real' }, scope)
       await f.service.execute(f.command(config, { kind: 'save-a-prices', prices: [{ priceId: null, itemId: 'item', unit: '㎡', mode: 'baseline', workerId: null, effectiveMonth: '2026-08', unitPrice, scope: { kind: 'project' } }] }))
-      const draft: PayrollADraft = { projectId: 'p', crewId: 'crew', leaderWorkerId, memberWorkerIds: leaderWorkerId === 'w' ? ['w', 'zero'] : ['other'], month: '2026-08', periodKind: 'monthly', payRatio: 0.8, note: '' }
+      const draft: PayrollADraft = { projectId: 'p', crewId: 'crew', leaderWorkerId, memberWorkerIds: leaderWorkerId === 'w' ? ['w', 'zero'] : ['other'], month: '2026-08', periodKind: 'monthly', payRatio: 0.8, ratioPlan: { schemaVersion: 1, itemRatios: [{ itemId: 'item', ratio: 0.8 }], feeRatios: [] }, note: '' }
       const form = await f.service.aForm({ origin: 'real' }, { statementId: null, draftKey, draft })
       const saved = await f.service.execute(f.command(form, { kind: 'save-a-draft', draft }))
       const persisted = await f.service.aForm({ origin: 'real' }, { statementId: saved.statementId! })

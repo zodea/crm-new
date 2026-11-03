@@ -98,8 +98,8 @@ describe('真实户记录到工资扣款', () => {
   it('完整扣款450恰好抵完工资450时可明确实发0，采用原件而不制造现金', async () => {
     const f = await createPayrollHollowFixture()
     closers.push(f.close)
-    const draft = { ...f.draft, payRatio: 0.3 }
-    const initial = await f.form({ payRatio: draft.payRatio })
+    const draft = { ...f.draft, payRatio: 0.3, ratioPlan: { schemaVersion: 1 as const, itemRatios: [{ itemId: f.target.itemId, ratio: 0.3 }], feeRatios: [] } }
+    const initial = await f.form(draft)
     expect(initial.totals.grossAmount.value).toBe(450)
     const saved = await f.service.execute(f.command(initial, { kind: 'save-a-draft', draft }))
     const statementId = saved.statementId!
@@ -120,6 +120,6 @@ describe('真实户记录到工资扣款', () => {
     expect(decodePayrollARead(encodePayrollAWire(output), 'output', { origin: 'real' }, statementId)).toEqual(output)
     const actual = await f.service.actualLedger({ origin: 'real' }, { projectId: draft.projectId })
     expect(actual.netAmount.value).toBe(0)
-    expect((await f.form({ month: '2026-09', payRatio: 0.3 }, 'hollow-zero-next')).totals.grossAmount.value).toBe(0)
+    expect((await f.form({ ...draft, month: '2026-09' }, 'hollow-zero-next')).totals.grossAmount.value).toBe(0)
   }, 30_000)
 })

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { PayrollALine } from '~/lib/payroll/central-a-contract'
 import { computed, nextTick, shallowRef } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { usePayrollAStatement } from '~/composables/usePayrollAStatement'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { createPayrollAWorkbook } from '~/lib/payroll/a-export'
 import { payrollInputNumber, payrollRatioLabel } from '~/lib/payroll/a-presentation'
 import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
@@ -14,7 +16,24 @@ const adjustmentsReady = shallowRef(false)
 const hollowLocked = shallowRef(false)
 const kit = useKitUI()
 const ui = usePayrollAStatement({ id: () => props.statementId, origin: () => props.origin, changed: () => emit('changed') })
-const { matching, output, active, busy, error, writable, pending, feesPending, ratio, releaseOpen, releaseRead, releaseDraft } = ui
+const { matching, output, active, busy, error, writable, pending, feesPending, ratio, ratioPlan, releaseOpen, releaseRead, releaseDraft } = ui
+const ratioPlanDirty = computed(() => JSON.stringify(ratioPlan.value) !== JSON.stringify(matching.value?.draft.ratioPlan ?? null))
+const ratioDirty = computed(() => !!matching.value && (ratio.value !== matching.value.draft.payRatio || ratioPlanDirty.value))
+async function mayLeave() {
+  if (!ratioDirty.value)
+    return true
+  const before = JSON.stringify([ratio.value, ratioPlan.value])
+  const accepted = await kit.confirm({ variant: 'simple', title: '放弃比例修改', message: '当前比例尚未保存，确认放弃？', confirmLabel: '放弃修改' })
+  return accepted && before === JSON.stringify([ratio.value, ratioPlan.value]) && !pending.value
+}
+useTabCloseGuard(mayLeave)
+onBeforeRouteLeave(mayLeave)
+useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
+  if (ratioDirty.value) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+})
 const selectedLine = shallowRef<PayrollALine | null>(null)
 const feeRead = computed(() => matching.value && hasPayrollAFeesForm(matching.value) ? matching.value : null)
 const edit = computed(() => ({ path: `/subcontract/payroll/form/${encodeURIComponent(props.statementId)}`, query: { origin: props.origin, returnTo: props.returnTo } }))
@@ -66,16 +85,16 @@ async function print() {
             编辑管理清单负价行
           </NuxtLink><NuxtLink v-if="matching.status !== 'released'" :to="config" class="btn-secondary">
             工资配置
-          </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck || hollowLocked" @click="ui.execute('check')">
+          </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck || hollowLocked || ratioDirty" @click="ui.execute('check')">
             重新核对工资
-          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease || !adjustmentsReady || hollowLocked" @click="ui.openRelease">
+          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease || !adjustmentsReady || hollowLocked || ratioDirty" @click="ui.openRelease">
             确认实际发放
           </KitButton>
         </div>
         <div v-if="matching.status !== 'released'" class="grid max-w-lg gap-2">
-          <label class="grid gap-1 text-12px">本次支付比例（%）<input :value="ratio === null ? '' : ratio * 100" type="number" min="0" max="100" step="0.01" aria-label="核对单支付比例" class="field-input min-w-0" :disabled="!writable || matching.draft.periodKind === 'retention' || hollowLocked" @input="ratio = payrollInputNumber(($event.target as HTMLInputElement).value) === null ? null : Number(($event.target as HTMLInputElement).value) / 100"></label><p class="text-12px text-ink-faint">
+          <label class="grid gap-1 text-12px">费用默认比例（%）<input :value="ratio === null ? '' : ratio * 100" type="number" min="0" max="100" step="0.01" aria-label="核对单支付比例" class="field-input min-w-0" :disabled="!writable || matching.draft.periodKind === 'retention' || hollowLocked || ratioPlanDirty" @input="ratio = payrollInputNumber(($event.target as HTMLInputElement).value) === null ? null : Number(($event.target as HTMLInputElement).value) / 100"></label><p class="text-12px text-ink-faint">
             {{ payrollRatioLabel(matching.ratioDefault) }}。已保存比例不会被建议值覆盖。
-          </p><KitButton class="justify-self-start" :disabled="!writable || matching.draft.periodKind === 'retention' || ratio === matching.draft.payRatio || hollowLocked" @click="ui.execute('ratio')">
+          </p><KitButton class="justify-self-start" :disabled="!writable || matching.draft.periodKind === 'retention' || ratio === matching.draft.payRatio || hollowLocked || ratioPlanDirty" @click="ui.execute('ratio')">
             保存本次比例（需重新核对）
           </KitButton>
         </div>
@@ -83,6 +102,12 @@ async function print() {
           {{ reason }}
         </p>
       </section>
+      <template v-if="matching.status !== 'released' && ratioPlan">
+        <PayrollAItemRatioFields :read="matching" :plan="ratioPlan" :disabled="!writable || hollowLocked || ratio !== matching.draft.payRatio" @change="ratioPlan = $event" />
+        <KitButton class="justify-self-start" :disabled="!writable || !ratioPlanDirty || hollowLocked || ratio !== matching.draft.payRatio" @click="ui.execute('item-ratios')">
+          保存分项比例（需重新核对）
+        </KitButton>
+      </template>
       <PayrollASourceReview v-if="matching.status !== 'released' && feeRead?.book?.bookPurpose !== 'management'" :read="matching" :return-to="returnTo" :editable="writable" @price="selectedLine = $event" />
       <PayrollAFeesReview v-if="feeRead" :read="feeRead" :return-to="returnTo" />
     </template>

@@ -1,4 +1,5 @@
 import type { PayrollAFormRead, PayrollAOutputRead, PayrollAReleaseDraft, PayrollAStatementCommandResult } from '~/lib/payroll/central-a-contract'
+import type { PayrollARatioPlan } from '~/lib/payroll/central-a-item-ratio'
 import type { PayrollReleaseAdjustmentApplication } from '~/lib/payroll/central-release-adjustment-contract'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { payrollReleaseDefault } from '~/lib/payroll/a-presentation'
@@ -22,6 +23,7 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
   const releaseRead = shallowRef<PayrollAFormRead | null>(null)
   const releaseDraft = shallowRef<PayrollAReleaseDraft | null>(null)
   const ratio = shallowRef<number | null>(null)
+  const ratioPlan = shallowRef<PayrollARatioPlan | null>(null)
   const target = () => JSON.stringify([options.id(), options.origin()])
   const matching = computed(() => read.value?.statementId === options.id() && read.value.context.origin === options.origin() ? read.value : null)
   const pending = computed(() => matching.value ? store.getAPending(matching.value) : null)
@@ -48,13 +50,14 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
         return
       if (value.statementId !== options.id() || value.context.origin !== options.origin())
         throw new Error('工资核对目标与当前来源不一致。')
-      if (matching.value && (pending.value || releaseOpen.value || ratio.value !== matching.value.draft.payRatio) && !replace) {
+      if (matching.value && (pending.value || releaseOpen.value || ratio.value !== matching.value.draft.payRatio || JSON.stringify(ratioPlan.value) !== JSON.stringify(matching.value.draft.ratioPlan ?? null)) && !replace) {
         latest.value = value
       }
       else {
         read.value = value
         latest.value = null
         ratio.value = value.draft.payRatio ?? null
+        ratioPlan.value = value.draft.ratioPlan ? structuredClone(value.draft.ratioPlan) : null
       }
       const operation = store.getAPending(value)
       if (!operation?.restoredFromDescriptor && operation?.command.action.kind === 'release-a' && !releaseOpen.value) {
@@ -109,9 +112,9 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
     else
       kit.success(result.outcome === 'released' ? '实际发放已保存，工资资料已冻结。' : '工资核对结果已保存。')
   }
-  async function execute(kind: 'check' | 'ratio' | 'release', release?: PayrollAReleaseDraft) {
+  async function execute(kind: 'check' | 'ratio' | 'item-ratios' | 'release', release?: PayrollAReleaseDraft) {
     const value = kind === 'release' ? releaseRead.value : matching.value
-    if (!value || !writable.value || (kind === 'check' && !value.eligibility.canCheck) || (kind === 'release' && !value.eligibility.canRelease))
+    if (!value || !writable.value || (kind === 'item-ratios' && !ratioPlan.value) || (kind === 'check' && !value.eligibility.canCheck) || (kind === 'release' && !value.eligibility.canRelease))
       return
     const requested = target()
     const request = sequence
@@ -120,7 +123,7 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
     if (release)
       releaseDraft.value = release
     try {
-      const result = kind === 'check' ? await store.checkA(value) : kind === 'ratio' ? await store.setAPayRatio(value, ratio.value) : await store.releaseA(value, release!)
+      const result = kind === 'check' ? await store.checkA(value) : kind === 'ratio' ? await store.setAPayRatio(value, ratio.value) : kind === 'item-ratios' && ratioPlan.value ? await store.setARatioPlan(value, ratioPlan.value) : await store.releaseA(value, release!)
       if (same(requested, request)) {
         working.value = false
         await completed(result, requested, request)
@@ -198,5 +201,5 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
     active.value = false
     sequence += 1
   })
-  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, feesPending, ratio, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, setReleaseApplications, recover }
+  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, feesPending, ratio, ratioPlan, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, setReleaseApplications, recover }
 }

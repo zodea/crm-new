@@ -89,7 +89,10 @@ export async function loadPayrollAReleasedDocuments(db: PayrollDb, statementId?:
     }
     if (source.schemaVersion !== 1 && (!same(feeCalculation(source.fees.lines), feeCalculation(payrollAFeeLines(source.facts, source.fees.feeRevisions, document.month))) || !same(source.fees, (document as unknown as Record<string, unknown>).fees) || !same(source.book, (document as unknown as Record<string, unknown>).book) || !await payrollAFeesPhysicalProof(db, document.id, source, await feeProjection?.(source.subject.projectId))))
       continue
-    if (source.schemaVersion === 3 ? !document.hollow || !same(source.hollow, { ...document.hollow, adoptions: [] }) : document.hollow !== undefined)
+    const hollowSource = source.schemaVersion === 3 ? source.hollow : source.schemaVersion === 4 ? source.hollow : undefined
+    if (hollowSource ? !document.hollow || !same(hollowSource, { ...document.hollow, adoptions: [] }) : document.hollow !== undefined)
+      continue
+    if (source.schemaVersion === 4 ? !same(source.ratioPlan, document.ratioPlan) : document.ratioPlan !== undefined)
       continue
     if (document.hollow && !await provePayrollHollowFrozen(db, document.hollow, document.id, hollowProjection))
       continue

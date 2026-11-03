@@ -53,6 +53,8 @@ describe('工资核对后的事务复验与不可重复发放', () => {
     expect(await f.db.select('SELECT worker_id,allocated_amount_fen FROM wage_statement_allocations WHERE statement_id=?', [oldSecond.statementId])).toEqual([])
     expect((await f.service.actualLedger({ origin: 'real' }, { projectId: 'p' })).netAmount.value).toBe(900)
     await f.service.execute(f.command(await second(), { kind: 'set-a-pay-ratio', payRatio: 0.9 }))
+    const beforePlan = await second()
+    await f.service.execute(f.command(beforePlan, { kind: 'set-a-ratio-plan', ratioPlan: { ...beforePlan.draft.ratioPlan!, itemRatios: beforePlan.draft.ratioPlan!.itemRatios.map(row => ({ ...row, ratio: 0.9 })) } }))
     f.source.crews[0]!.defaultPayRatio = 0.6
     f.source.crews[0]!.ratioExplicitlyConfigured = true
     await f.service.execute(f.command(await second(), { kind: 'check-a' }))
