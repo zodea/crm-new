@@ -35,7 +35,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/customer-construction-contract-central.spec.ts](../../../e2e/customer-construction-contract-central.spec.ts) | Playwright E2E | 两套金额与日期输入的正式合同回读、主次客户隔离及嵌套来源冷恢复；普通截图先验证无焦点和悬停，再执行键盘及返回焦点验收 |
-| [e2e/customer-detail.spec.ts](../../../e2e/customer-detail.spec.ts) | Playwright E2E | 具名演示客户只读关系；项目、施工合同及收款完整来源/返回地址、关系上下文与原链接焦点；四档视口局部横滚及键盘页签 |
+| [e2e/customer-detail.spec.ts](../../../e2e/customer-detail.spec.ts) | Playwright E2E | 合成客户只读关系；项目、施工合同及收款完整来源/返回地址、关系上下文与原链接焦点；四档视口局部横滚及键盘页签 |
 | [e2e/customer-project-central.spec.ts](../../../e2e/customer-project-central.spec.ts) | Playwright E2E | 两套阶段与名称输入的项目保存、真实 Excel、主次客户稳定身份及列表—客户—项目冷刷新返回 |
 | [e2e/customer-receipt-source.spec.ts](../../../e2e/customer-receipt-source.spec.ts) | Playwright E2E | 同会话正式提交普通收款，独立中央源撤回后客户及详情移除原记录；无权/不可用分别隐藏旧金额并保持未知、权限恢复与键盘重试；五档视口保留局部横滚 |
 | [e2e/issue-314-customer-central-chain.spec.ts](../../../e2e/issue-314-customer-central-chain.spec.ts) | Playwright E2E | Issue #314：客户中央列表—详情—显式编辑链 |
