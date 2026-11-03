@@ -44,6 +44,9 @@ logs
 /test-results/
 /blob-report/
 
+# 局域网隔离验证库与私钥，仅保存在本机
+/output/lan-verification/
+
 # Misc
 .DS_Store
 .fleet
