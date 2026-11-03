@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildInvoiceFieldConfidence,
   parseInvoiceText,
+  parseInvoiceTextPreservingUnknowns,
 } from '~/lib/recognize/invoice-parse'
 
 const ELECTRONIC_INVOICE_TEXT = `
@@ -107,6 +108,41 @@ describe('parseInvoiceText', () => {
     expect(confidence.amount).toBeLessThan(0.85)
     expect(confidence.taxAmount).toBeLessThan(0.85)
     expect(confidence.totalAmount).toBeLessThan(0.85)
+  })
+
+  it('保留明细真实零值，缺失数量、单价和金额保持未知，不用部分明细伪造合计', () => {
+    const result = parseInvoiceTextPreservingUnknowns(`
+      <table>
+        <tr><td>项目名称</td><td>数量</td><td>单价</td><td>金额</td><td>税额</td></tr>
+        <tr><td>材料甲</td><td>0</td><td>0</td><td>100.00</td><td>9.00</td></tr>
+        <tr><td>材料乙</td><td></td><td></td><td></td><td></td></tr>
+      </table>
+    `)
+    expect(result.items[0]).toMatchObject({ quantity: 0, unitPrice: 0, amount: 100, taxAmount: 9 })
+    expect(result.items[1]).toMatchObject({ quantity: null, unitPrice: null, amount: null, taxAmount: null })
+    expect(result.amount).toBeNull()
+    expect(result.taxAmount).toBeNull()
+    expect(result.totalAmount).toBeNull()
+    expect(result.balanced).toBe(false)
+  })
+
+  it('只有票面总额而无明确明细金额时，不把整票金额分配给猜出的单行', () => {
+    const result = parseInvoiceTextPreservingUnknowns('*建材*材料甲\n合计 ¥100.00 ¥9.00\n价税合计（小写）¥109.00')
+    expect(result.totalAmount).toBe(109)
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]).toMatchObject({ quantity: null, unitPrice: null, amount: null, taxAmount: null })
+  })
+
+  it('完整明细的真实零金额仍参与合计', () => {
+    const result = parseInvoiceTextPreservingUnknowns(`
+      <table>
+        <tr><td>项目名称</td><td>数量</td><td>单价</td><td>金额</td><td>税额</td></tr>
+        <tr><td>材料甲</td><td>0</td><td>0</td><td>0.00</td><td>0.00</td></tr>
+      </table>
+      价税合计（小写）：¥0.00
+    `)
+    expect(result).toMatchObject({ amount: 0, taxAmount: 0, totalAmount: 0, balanced: true })
+    expect(result.items[0]).toMatchObject({ quantity: 0, unitPrice: 0, amount: 0, taxAmount: 0 })
   })
 
   it('兼容字符间被 OCR 插入空格的票号、日期和金额', () => {

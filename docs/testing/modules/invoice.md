@@ -20,7 +20,7 @@
 | [tests/invoice/recognize.test.ts](../../../tests/invoice/recognize.test.ts) | 单元／服务／状态 | confidenceTier:置信度分档(边框色/角标/✓确认 依据) |
 | [tests/invoice/status.test.ts](../../../tests/invoice/status.test.ts) | 单元／服务／状态 | invoiceDocStatus:单一权威的状态优先级 |
 | [tests/recognize/invoice-engine.test.ts](../../../tests/recognize/invoice-engine.test.ts) | 单元／服务／状态 | recognizeInvoice；带版面块坐标时给出字段块级区域，无坐标为空 |
-| [tests/recognize/invoice-parse.test.ts](../../../tests/recognize/invoice-parse.test.ts) | 单元／服务／状态 | 发票文本字段、价税、字符间距与成对重复字；证据不足不补造公司 |
+| [tests/recognize/invoice-parse.test.ts](../../../tests/recognize/invoice-parse.test.ts) | 单元／服务／状态 | 发票字段、价税、重复字及候选明细的零值/未知值；不以部分明细伪造合计或将整票金额分配给猜测的单行 |
 | [tests/stores/invoice-archive.test.ts](../../../tests/stores/invoice-archive.test.ts) | 单元／服务／状态 | invoice store 归档来源留痕 |
 | [tests/stores/invoice-preferences.test.ts](../../../tests/stores/invoice-preferences.test.ts) | 单元／服务／状态 | invoice store 导出样式偏好 |
 | [tests/stores/invoice-printing.test.ts](../../../tests/stores/invoice-printing.test.ts) | 单元／服务／状态 | invoice store 打印计数 |

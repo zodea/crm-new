@@ -11,6 +11,14 @@ export interface ParsedInvoiceItem {
   taxAmount: number
 }
 
+/** 新的本机候选保留票面未识别的数值；0 只表示原文明示的零。 */
+export interface ParsedInvoiceCandidateItem extends Omit<ParsedInvoiceItem, 'quantity' | 'unitPrice' | 'amount' | 'taxAmount'> {
+  quantity: number | null
+  unitPrice: number | null
+  amount: number | null
+  taxAmount: number | null
+}
+
 export interface ParsedInvoice {
   invoiceType: string
   invoiceNumber: string
@@ -27,6 +35,10 @@ export interface ParsedInvoice {
   projectHint: string
   items: ParsedInvoiceItem[]
   balanced: boolean
+}
+
+export interface ParsedInvoiceCandidate extends Omit<ParsedInvoice, 'items'> {
+  items: ParsedInvoiceCandidateItem[]
 }
 
 const RADICAL_FIX: Record<string, string> = {
@@ -249,7 +261,7 @@ function labelledTaxAmount(text: string): number | null {
   return match ? parseNumber(match[1]) : null
 }
 
-function extractMoneyFields(text: string, items: ParsedInvoiceItem[]): Pick<ParsedInvoice, 'amount' | 'taxAmount' | 'totalAmount' | 'balanced'> {
+function extractMoneyFields(text: string, items: ParsedInvoiceCandidateItem[]): Pick<ParsedInvoice, 'amount' | 'taxAmount' | 'totalAmount' | 'balanced'> {
   let totalAmount = totalFromText(text)
   let amount: number | null = null
   let taxAmount: number | null = null
@@ -270,16 +282,16 @@ function extractMoneyFields(text: string, items: ParsedInvoiceItem[]): Pick<Pars
   }
 
   if (items.length) {
-    const itemAmount = round2(items.reduce((sum, item) => sum + item.amount, 0))
-    const itemTax = round2(items.reduce((sum, item) => sum + item.taxAmount, 0))
+    const itemAmount = items.every(item => item.amount !== null) ? round2(items.reduce((sum, item) => sum + item.amount!, 0)) : null
+    const itemTax = items.every(item => item.taxAmount !== null) ? round2(items.reduce((sum, item) => sum + item.taxAmount!, 0)) : null
     moneySourceConflict = matchingPair != null
-      && (Math.abs(matchingPair[0] - itemAmount) > MONEY_RECONCILIATION_TOLERANCE
-        || Math.abs(matchingPair[1] - itemTax) > MONEY_RECONCILIATION_TOLERANCE)
-    if (itemAmount > 0) {
+      && ((itemAmount !== null && Math.abs(matchingPair[0] - itemAmount) > MONEY_RECONCILIATION_TOLERANCE)
+        || (itemTax !== null && Math.abs(matchingPair[1] - itemTax) > MONEY_RECONCILIATION_TOLERANCE))
+    if (itemAmount !== null) {
       amount = itemAmount
       independentAmount = true
     }
-    if (itemTax > 0)
+    if (itemTax !== null)
       taxAmount = itemTax
   }
 
@@ -300,7 +312,7 @@ function extractMoneyFields(text: string, items: ParsedInvoiceItem[]): Pick<Pars
   return { amount, taxAmount, totalAmount, balanced }
 }
 
-function extractTaxRate(text: string, items: ParsedInvoiceItem[]): string {
+function extractTaxRate(text: string, items: ParsedInvoiceCandidateItem[]): string {
   const values = new Set<string>()
   for (const item of items) {
     const normalized = item.taxRate.replace('%', '')
@@ -388,8 +400,8 @@ function mapInvoiceHeader(cells: string[]): Partial<Record<InvoiceItemColumn, nu
   return columns.name != null && Object.keys(columns).length >= 3 ? columns : null
 }
 
-function parseTableItems(rawText: string): ParsedInvoiceItem[] {
-  const items: ParsedInvoiceItem[] = []
+function parseTableItems(rawText: string): ParsedInvoiceCandidateItem[] {
+  const items: ParsedInvoiceCandidateItem[] = []
   for (const rows of extractTableRows(rawText)) {
     const headerIndex = rows.findIndex(row => mapInvoiceHeader(row) != null)
     if (headerIndex < 0)
@@ -405,14 +417,14 @@ function parseTableItems(rawText: string): ParsedInvoiceItem[] {
       const compactName = compactChineseSpacing(name).replace(/\s/g, '')
       if (!name || /^(?:合计|总计|小计|价税合计|税价合计|备注$)/.test(compactName))
         continue
-      const amount = parseNumber(columns.amount == null ? null : cells[columns.amount]) ?? 0
-      const taxAmount = parseNumber(columns.taxAmount == null ? null : cells[columns.taxAmount]) ?? 0
+      const amount = parseNumber(columns.amount == null ? null : cells[columns.amount])
+      const taxAmount = parseNumber(columns.taxAmount == null ? null : cells[columns.taxAmount])
       items.push({
         name,
         spec: columns.spec == null ? '' : String(cells[columns.spec] || ''),
         unit: columns.unit == null ? '' : String(cells[columns.unit] || ''),
-        quantity: parseNumber(columns.quantity == null ? null : cells[columns.quantity]) ?? 0,
-        unitPrice: parseNumber(columns.unitPrice == null ? null : cells[columns.unitPrice]) ?? 0,
+        quantity: parseNumber(columns.quantity == null ? null : cells[columns.quantity]),
+        unitPrice: parseNumber(columns.unitPrice == null ? null : cells[columns.unitPrice]),
         amount,
         taxRate: columns.taxRate == null ? '' : String(cells[columns.taxRate] || '').replace(/\s/g, ''),
         taxAmount,
@@ -457,7 +469,7 @@ function extractProjectHint(text: string): string {
   return match?.[1]?.replace(/\s+/g, ' ').trim() || ''
 }
 
-function fallbackItem(text: string, money: Pick<ParsedInvoice, 'amount' | 'taxAmount' | 'taxRate'>): ParsedInvoiceItem[] {
+function fallbackItem(text: string): ParsedInvoiceCandidateItem[] {
   const categoryMatch = text.match(/\*([^*\n]{1,24})\*/)
   if (!categoryMatch || categoryMatch.index == null)
     return []
@@ -479,15 +491,15 @@ function fallbackItem(text: string, money: Pick<ParsedInvoice, 'amount' | 'taxAm
     name: `*${category}*${name}`,
     spec: '',
     unit: '',
-    quantity: 0,
-    unitPrice: 0,
-    amount: money.amount ?? 0,
-    taxRate: money.taxRate,
-    taxAmount: money.taxAmount ?? 0,
+    quantity: null,
+    unitPrice: null,
+    amount: null,
+    taxRate: '',
+    taxAmount: null,
   }]
 }
 
-export function parseInvoiceText(rawText: string): ParsedInvoice {
+export function parseInvoiceTextPreservingUnknowns(rawText: string): ParsedInvoiceCandidate {
   const text = normalizeText(rawText)
   const invoiceNumber = extractInvoiceNumber(text)
   const companies = extractCompanies(text)
@@ -497,7 +509,7 @@ export function parseInvoiceText(rawText: string): ParsedInvoice {
   const money = extractMoneyFields(text, tableItems)
   const taxRate = extractTaxRate(text, tableItems)
   if (!items.length)
-    items = fallbackItem(text, { ...money, taxRate })
+    items = fallbackItem(text)
 
   return {
     invoiceType: extractInvoiceType(text),
@@ -516,6 +528,12 @@ export function parseInvoiceText(rawText: string): ParsedInvoice {
     items,
     balanced: money.balanced,
   }
+}
+
+/** 旧浏览器工作区保留既有明细结构；中央持久化候选必须使用保留未知值的接口。 */
+export function parseInvoiceText(rawText: string): ParsedInvoice {
+  const parsed = parseInvoiceTextPreservingUnknowns(rawText)
+  return { ...parsed, items: parsed.items.map(item => ({ ...item, quantity: item.quantity ?? 0, unitPrice: item.unitPrice ?? 0, amount: item.amount ?? 0, taxAmount: item.taxAmount ?? 0 })) }
 }
 
 export function buildInvoiceFieldConfidence(parsed: ParsedInvoice): Record<string, number> {
