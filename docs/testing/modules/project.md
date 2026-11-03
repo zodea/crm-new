@@ -67,7 +67,7 @@
 | [e2e/project-central-entries.spec.ts](../../../e2e/project-central-entries.spec.ts) | Playwright E2E | 中央项目详情基础资料与材采、其他支出、分包、验收保修、收款入口保持正式身份并可跳转；未接管的本地阶段、文件柜、预算、往来支付、到货归档与档案导出不出现；多宽度不溢出 |
 | [e2e/project-crud.spec.ts](../../../e2e/project-crud.spec.ts) | Playwright E2E | 项目列表正式新增与中央导入均可进入现行整页命令 |
 | [e2e/project-detail-metrics.spec.ts](../../../e2e/project-detail-metrics.spec.ts) | Playwright E2E | 收款来源暂不可用／无权限时保留未知和基础资料，不冒零或把本地票面差额展示为真实税额 |
-| [e2e/project-detail.spec.ts](../../../e2e/project-detail.spec.ts) | Playwright E2E | 显式包含测试数据的两项目列表↔只读详情保持 demo 来源、页签复用及缺失实体空态 |
+| [e2e/project-detail.spec.ts](../../../e2e/project-detail.spec.ts) | Playwright E2E | 独立合成项目列表↔只读详情保持 demo 来源、页签复用及缺失实体空态 |
 | [e2e/project-import-central.spec.ts](../../../e2e/project-import-central.spec.ts) | Playwright E2E | 两组真实 Excel 输入按中央客户回执 ID／唯一名称解析筹备／施工阶段；中央保存、详情冷回读、重传 ID 与版本幂等，部分拒绝、响应丢失重试、取消和五视口 |
 | [e2e/project-import.spec.ts](../../../e2e/project-import.spec.ts) | Playwright E2E | 项目导入：有中央写权限时从项目列表打开真实导入流程 |
 | [e2e/project-subtables.spec.ts](../../../e2e/project-subtables.spec.ts) | Playwright E2E | 九类项目商务卡片进入各自中央列表，保留项目、来源、variant 和具名返回锚点 |

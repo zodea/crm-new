@@ -1,13 +1,66 @@
+import type { ProjectListSourceRow } from '../app/lib/project/read-contract'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { buildProjectDetailRead, buildProjectListPage, parseProjectDetailQuery, parseProjectListQuery } from '../app/lib/project/read-page'
+import { createReadMeta, readQueryScope, withOriginReadMeta, withReadMeta } from '../server/utils/read-meta'
 
-// 当前项目列表与详情均使用中央 DTO；测试来源必须显式授权且保持只读。
+// 固定合成只读来源，不依赖演示种子里的业务名称或 ID。
 const PROJECTS = [
-  { id: 'proj_demo_001', name: '合和新城' },
-  { id: 'proj_demo_002', name: '锦绣华庭' },
+  { id: 'project-synthetic-detail-1', name: '合成详情项目甲' },
+  { id: 'project-synthetic-detail-2', name: '合成详情项目乙' },
 ] as const
+const asOf = '2026-09-08T00:00:00.000Z'
+const rows: ProjectListSourceRow[] = PROJECTS.map(project => ({
+  ...project,
+  dataOrigin: 'demo',
+  code: project.id,
+  status: '施工中',
+  contractAmount: null,
+  operationType: '',
+  startDate: null,
+  plannedEnd: null,
+  actualEnd: null,
+  plannedDuration: null,
+  manager: '',
+  execManager: '',
+  builder: '',
+  customerId: null,
+  customerName: null,
+  customerPermission: 'allowed',
+  secondaryCustomerId: null,
+  secondaryCustomerName: null,
+  secondaryCustomerPermission: 'allowed',
+  contractName: '',
+  contractor: '',
+  region: '',
+  riskLevel: '',
+  address: '',
+  income: null,
+  budget: null,
+  updatedAt: asOf,
+}))
 
 test.beforeEach(async ({ page }) => {
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `project-detail-${randomUUID()}` })
   await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+  const response = await page.request.get('/api/read/business-session')
+  expect(response.ok(), await response.text()).toBe(true)
+  const session = await response.json()
+  const sources = [{ key: 'projects', state: 'readable' as const, sourceVersion: 'synthetic-project-detail-v1', asOf }]
+  await page.route(/\/api\/read\/projects(?:\/project-synthetic-detail-[12])?(?:\?|$)/, async (route) => {
+    const url = new URL(route.request().url())
+    const input = Object.fromEntries(url.searchParams)
+    const id = url.pathname.split('/').at(-1)!
+    if (id === 'projects') {
+      const query = parseProjectListQuery(input)
+      const meta = (dataOrigin: 'demo' | 'real') => createReadMeta({ session, schemaVersion: 'project-read-v2', operation: 'project:list', dataOrigin, asOf, coverage: 'complete', scope: { query: readQueryScope(query) }, sources })
+      return route.fulfill({ json: withOriginReadMeta(buildProjectListPage({ rows, query, asOf, sourceVersion: 'synthetic-project-detail-v1', capabilities: session.capabilities }), { real: meta('real'), demo: meta('demo') }) })
+    }
+    const query = parseProjectDetailQuery(id, input)
+    const detail = buildProjectDetailRead({ rows, query, asOf, sourceVersion: 'synthetic-project-detail-v1', capabilities: session.capabilities })
+    const meta = createReadMeta({ session, schemaVersion: 'project-read-v2', operation: 'project:detail', dataOrigin: 'demo', asOf, coverage: 'complete', scope: { query: readQueryScope(query) }, sources })
+    return route.fulfill({ json: withReadMeta(detail, meta) })
+  })
 })
 
 for (const project of PROJECTS) {
