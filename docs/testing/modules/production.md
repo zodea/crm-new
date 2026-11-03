@@ -13,7 +13,7 @@
 | [tests/production/quantity-storage.test.ts](../../../tests/production/quantity-storage.test.ts) | 真实磁盘与独立进程 | 原工程量事实、主档只读、动作消费版本、失效楼栋拒绝及无副作用、原命令封存与冷恢复 |
 | [tests/production/quantity-migration.test.ts](../../../tests/production/quantity-migration.test.ts) | 真实完整 SQLite 与独立进程 | 领域原图、精确 SQL 原列、同源映射、共享原件、清单撤权拒绝、整批恢复及下游引用保护 |
 | [tests/production/wbs-storage.test.ts](../../../tests/production/wbs-storage.test.ts) | 真实磁盘与独立进程 | 真实暂估及单位、正式不可变库、实际动作依赖、迁入原图和原件、原号封存及危险恢复 |
-| [tests/production/payroll-storage.test.ts](../../../tests/production/payroll-storage.test.ts) | 真实磁盘与独立进程 | C1/C2 冻结与零成员、P4/P7、正式编号、固定名册及完整目录、原键与回执故障回滚 |
+| [tests/production/payroll-storage.test.ts](../../../tests/production/payroll-storage.test.ts) | 真实磁盘与独立进程 | C1/C2 冻结与零成员、P4/P7、正式编号、固定名册及完整目录、原键与回执故障回滚；C1 班组资格变化后陈旧来源拒绝核对，重读保留草稿并明确阻断原因 |
 | [tests/production/payroll-history-adoption.test.ts](../../../tests/production/payroll-history-adoption.test.ts) | 真实完整 SQLite 与同库引用 | A/P5/P6 原冻结、管理簿与更正补退、同源工程量引用和原目录保全 |
 | [tests/production/storage-schema.test.ts](../../../tests/production/storage-schema.test.ts) | 单元／服务／状态 | 真实盘历史与付款核验保护被删除、替换或改变条件时冷启动和备份拒绝，不重建保护冒充完整 |
 | [tests/production/migration-references.test.ts](../../../tests/production/migration-references.test.ts) | 单元／服务／状态 | 实际主档引用ID和独立版本、权限、冷打开及损坏拒绝 |

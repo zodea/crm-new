@@ -19,8 +19,9 @@ it('工程量候选SQL完全准备后才交换，失败候选不改变现有数�
     await expect(database.prepare(async (candidate) => {
       await candidate.execute('UPDATE buildings SET name=\'未完成的写入\'')
       await candidate.execute('INSERT INTO floors (id,building_id,code,name) VALUES (\'f\',\'missing\',\'F1\',\'孤儿楼层\')')
-    })).rejects.toThrow()
+    })).rejects.toThrow('FOREIGN KEY constraint failed')
     expect(await database.select('SELECT name FROM buildings')).toEqual([{ name: '一栋' }])
+    expect(await database.select('SELECT id FROM floors')).toEqual([])
   }
   finally { await database.close() }
 })
@@ -70,7 +71,7 @@ it('中央模板外键只引用真实外部BOQ身份索引，无需制造BOQ文�
     await database.execute('INSERT INTO house_type_template_items (id,room_id,item_id,boq_line_id) VALUES (\'line\',\'r\',\'i\',\'real-boq\')')
     expect(await database.select('SELECT id FROM boq_files')).toEqual([])
     expect(await database.select('SELECT id FROM boq_lines')).toEqual([])
-    await expect(database.execute('UPDATE house_type_template_items SET boq_line_id=\'missing\'')).rejects.toThrow()
+    await expect(database.execute('UPDATE house_type_template_items SET boq_line_id=\'missing\'')).rejects.toThrow('FOREIGN KEY constraint failed')
     expect(await database.select('SELECT boq_line_id FROM house_type_template_items')).toEqual([{ boq_line_id: 'real-boq' }])
   }
   finally { await database.close() }

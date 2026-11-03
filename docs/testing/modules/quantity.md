@@ -45,9 +45,9 @@
 | [tests/quantity/variance.test.ts](../../../tests/quantity/variance.test.ts) | 单元／服务／状态 | 工程量量差总表 |
 | [tests/quantity/wage-source.test.ts](../../../tests/quantity/wage-source.test.ts) | 单元／服务／状态 | 关联工资：工程量向工资提供的来源 |
 | [tests/quantity/workspace-state.test.ts](../../../tests/quantity/workspace-state.test.ts) | 单元／服务／状态 | 工程量工作面独立编辑会话 |
-| [tests/server/quantity-database.test.ts](../../../tests/server/quantity-database.test.ts) | 单元／服务／状态 | 工程量候选SQL完全准备后才交换，失败候选不改变现有数据库 |
+| [tests/server/quantity-database.test.ts](../../../tests/server/quantity-database.test.ts) | 单元／服务／状态 | 工程量候选原子交换；孤儿楼层与无效 BOQ 外键被拒，原数据不变 |
 | [tests/server/quantity-hollow-migration.test.ts](../../../tests/server/quantity-hollow-migration.test.ts) | 单元／服务／状态 | 公开迁入冷读保余15处，中央追加整改后仍可重试原命令且恢复受保护 |
-| [tests/server/quantity-migration.test.ts](../../../tests/server/quantity-migration.test.ts) | 单元／服务／状态 | 完整工程量在准备期间占住实例队列，确认后从同一服务读回映射身份，重复同步保持版本 |
+| [tests/server/quantity-migration.test.ts](../../../tests/server/quantity-migration.test.ts) | 单元／服务／状态 | 工程量迁入队列与映射身份；楼栋编码冲突阻断准备和确认，原事实及后续读写保全 |
 | [tests/server/quantity-test-instance.test.ts](../../../tests/server/quantity-test-instance.test.ts) | 单元／服务／状态 | 工程量中央 SQL 测试实例 |
 | [tests/server/quantity-workspace.test.ts](../../../tests/server/quantity-workspace.test.ts) | 单元／服务／状态 | 预算工作区事务不要求工程量或项目权限，失败不发布半份SQL |
 | [tests/stores/quantity-derived.test.ts](../../../tests/stores/quantity-derived.test.ts) | 单元／服务／状态 | quantity derived：统一派生读 seam |

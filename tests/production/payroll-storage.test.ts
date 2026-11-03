@@ -291,7 +291,12 @@ it('当前项目分配变化不影响明确旧项目C1输入，真实日薪与�
     await expect(f.service.executeC1(f.command(sameProject, { kind: 'check-c1' }))).rejects.toThrow('个人标准')
     const afterPrice = await f.service.c1Form({ origin: 'real' }, { statementId: saved.statementId! })
     await move({ crewId: null })
-    await expect(f.service.executeC1(f.command(afterPrice, { kind: 'check-c1' }))).rejects.toThrow()
+    await expect(f.service.executeC1(f.command(afterPrice, { kind: 'check-c1' }))).rejects.toThrow('C1 考勤、个人标准、成员或占用已变化，请保留输入重新读取')
+    const afterCrewChange = await f.service.c1Form({ origin: 'real' }, { statementId: saved.statementId! })
+    expect(afterCrewChange.status).toBe('draft')
+    expect(afterCrewChange.draft).toEqual(afterPrice.draft)
+    expect(afterCrewChange.eligibility.canCheck).toBe(false)
+    expect(afterCrewChange.blockers).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'worker-unavailable', workerId: 'payroll-leader' })]))
   }
   finally { await f.storage.close() }
 })
