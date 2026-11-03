@@ -51,16 +51,14 @@ describe('空鼓工资提交的封闭边界', () => {
     if (command.action.kind !== 'save-hollow-policies')
       throw new Error('fixture')
     command.action.policies[0]!.enabled = false
-    expect(parsePayrollHollowCommand(encodePayrollHollowWire(command))).toEqual(command)
     const wire = encodePayrollHollowWire(command) as { action: { policies: Array<Record<string, unknown>> } }
     delete wire.action.policies[0]!.enabled
     return { command, wire }
   }
 
-  it('明确关闭保留false，missing不等于false或默认价', () => {
-    const { wire } = createDisabledPolicyWire()
-    wire.action.policies[0]!.enabled = false
-    delete wire.action.policies[0]!.unitAmount
+  it('明确关闭保留 false 和明确空单处价格', () => {
+    const { command } = createDisabledPolicyWire()
+    expect(parsePayrollHollowCommand(encodePayrollHollowWire(command))).toEqual(command)
   })
 
   it.each([

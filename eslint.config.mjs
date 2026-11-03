@@ -20,4 +20,23 @@ export default withNuxt(
       'src-tauri/gen/**',
     ],
   }),
+  {
+    name: 'crm/vitest-assertions',
+    files: ['tests/**/*.test.{js,jsx,ts,tsx}'],
+    rules: {
+      // 只约束 Vitest 测试，不把 Playwright 的断言语义混进来。
+      'test/valid-expect-in-promise': 'error',
+      'test/expect-expect': 'error',
+    },
+  },
+  ...[
+    { file: 'tests/payroll/a-navigation.test.ts', helpers: ['createInspectRestorableTabPathFixture', 'createPayrollSourceContextFixture'] },
+    { file: 'tests/payroll/c1-navigation.test.ts', helpers: ['createPayrollC1WorkspaceReturnFixture6', 'createPayrollC1WorkspaceReturnFixture20'] },
+    { file: 'tests/payroll/central-a-fees-codec.test.ts', helpers: ['createFeeCommandReceipt'] },
+    { file: 'tests/schedule/process-library-request.test.ts', helpers: ['expectInvalid'] },
+  ].map(({ file, helpers }) => ({
+    name: `crm/assertion-helpers/${file}`,
+    files: [file],
+    rules: { 'test/expect-expect': ['error', { assertFunctionNames: ['expect', ...helpers] }] },
+  })),
 )

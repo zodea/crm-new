@@ -82,12 +82,12 @@ describe('人工税务核验中央边界', () => {
   async function createParseSupplierTaxpayerCommandFixture() {
     const state = await setup()
     const command = state.command()
-    expect(parseSupplierTaxpayerCommand(command, state.created.id)).toEqual(command)
     return { state, command }
   }
 
-  it('hTTP 不接收客户端时间、来源、其他字段或错路由主体', async () => {
-    await createParseSupplierTaxpayerCommandFixture()
+  it('税务核验 HTTP 命令保留完整合法主体与用户输入', async () => {
+    const { state, command } = await createParseSupplierTaxpayerCommandFixture()
+    expect(parseSupplierTaxpayerCommand(command, state.created.id)).toEqual(command)
   })
 
   it.each([

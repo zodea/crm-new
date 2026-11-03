@@ -95,6 +95,8 @@ E2E 分三个项目（[E2E 配置](../../playwright.config.ts)）：
 
 ### 断言
 
+Vitest 测试启用 `test/valid-expect-in-promise` 和 `test/expect-expect`，防止包含断言的 Promise 链被遗忘，以及测试没有断言。少数在辅助函数中完成断言的测试只在对应文件登记具体函数名，不全局放宽。浏览器端 Playwright 测试按其自身规则检查。现装插件的 `valid-expect` 会误报合法的 `expect.any` 和先绑定后等待的断言，不能通过改变测试时序消除这些误报；上游已合并 [`expect.any` 修复](https://github.com/vitest-dev/eslint-plugin-vitest/pull/925)，全局启用前仍需核对可用版本、兼容性及其余异步误报。
+
 | 不要这样写 | 应该这样写 |
 | --- | --- |
 | 不带参数的 `toThrow()`、`rejects.toThrow()`、`rejects.toBeDefined()` | 断言具体错误文案或 problem code；任何异常都能让无参断言通过 |
