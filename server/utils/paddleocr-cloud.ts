@@ -296,18 +296,29 @@ export class PaddleOcrCloudClient {
   }
 
   async recognize(input: PaddleOcrCloudInput): Promise<PaddleOcrCloudResult> {
-    const jobId = await this.submit(input)
-    input.onProgress?.(0)
-    const jsonUrl = await this.poll(jobId, input.onProgress)
-    const resultResponse = await this.request(jsonUrl)
-    const text = await resultResponse.text()
-    const parsed = parseDocumentResult(parseJsonLines(text))
+    try {
+      const jobId = await this.submit(input)
+      input.onProgress?.(0)
+      const jsonUrl = await this.poll(jobId, input.onProgress)
+      const resultResponse = await this.request(jsonUrl)
+      const text = await resultResponse.text()
+      const parsed = parseDocumentResult(parseJsonLines(text))
 
-    return {
-      engine: 'paddleocr-official-api',
-      model: PADDLE_OCR_MODEL,
-      jobId,
-      ...parsed,
+      return {
+        engine: 'paddleocr-official-api',
+        model: PADDLE_OCR_MODEL,
+        jobId,
+        ...parsed,
+      }
+    }
+    catch (error) {
+      if (error instanceof PaddleOcrCloudError && error.message.includes(this.accessToken)) {
+        throw new PaddleOcrCloudError(error.code, error.message.replaceAll(this.accessToken, '[已隐藏]'), {
+          retryable: error.retryable,
+          statusCode: error.statusCode,
+        })
+      }
+      throw error
     }
   }
 

@@ -252,7 +252,7 @@ describe('paddleOcrCloudClient', () => {
       .mockResolvedValueOnce(jsonResponse({ code: 0, data: { jobId: 'failed_job' } }))
       .mockResolvedValueOnce(jsonResponse({
         code: 0,
-        data: { state: 'failed', errorMsg: '图片无法解析' },
+        data: { state: 'failed', errorMsg: '图片无法解析，令牌 secret-must-not-leak' },
       }))
     const client = new PaddleOcrCloudClient({
       accessToken: 'secret-must-not-leak',
@@ -268,6 +268,15 @@ describe('paddleOcrCloudClient', () => {
 
     expect(error).toMatchObject({ code: 'job-failed', retryable: false })
     expect(error.message).toContain('图片无法解析')
+    expect(error.message).not.toContain('secret-must-not-leak')
+  })
+
+  it('提交接口返回错误时也隐藏上游回显的令牌', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({ code: 400, msg: '请求无效：secret-must-not-leak' }))
+    const client = new PaddleOcrCloudClient({ accessToken: 'secret-must-not-leak', fetch: fetchMock })
+    const error = await client.recognize({ fileName: 'broken.jpg', contentType: 'image/jpeg', data: new Uint8Array([1]) }).catch(reason => reason) as PaddleOcrCloudError
+    expect(error).toMatchObject({ code: 'invalid-request', retryable: false })
+    expect(error.message).toContain('请求无效')
     expect(error.message).not.toContain('secret-must-not-leak')
   })
 
