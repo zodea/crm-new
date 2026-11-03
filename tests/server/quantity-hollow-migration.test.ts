@@ -86,11 +86,14 @@ it('迁入命令键不可被本地领取；完整原件未变化时公开恢复�
     const current = await target.service.hollow(target.scope)
     const [receipt] = await target.instance.withWorkspaceTransaction(tx => tx.select<{ command_id: string, request_json: string }>('SELECT command_id,request_json FROM quantity_hollow_command_receipts ORDER BY id'))
     expect(receipt!.command_id).not.toBe(JSON.parse(receipt!.request_json).commandId)
-    await expect(target.service.executeHollow({ ...target.command(current, { kind: 'rectify-hollow-inspection', recordId: target.recordId, expectedRevisionId: current.data.records[0]!.inspection.revisionId, rectifiedOn: '2026-09-15', count: 1, note: '不能领取原回执' }), commandId: receipt!.command_id })).rejects.toThrow()
+    await expect(target.service.executeHollow({ ...target.command(current, { kind: 'rectify-hollow-inspection', recordId: target.recordId, expectedRevisionId: current.data.records[0]!.inspection.revisionId, rectifiedOn: '2026-09-15', count: 1, note: '不能领取原回执' }), commandId: receipt!.command_id })).rejects.toThrow('迁入原来源命令仅供历史核对，不能由当前命令领取或重放')
     expect((await target.reload().hollow(target.scope)).data).toEqual(current.data)
+    const before = await target.instance.withWorkspaceTransaction(async tx => Promise.all(QUANTITY_HOLLOW_TABLES.map(table => tx.select(`SELECT * FROM ${table}`))))
+    expect(before).toHaveLength(5)
+    for (const table of before) expect(table.length).toBeGreaterThan(0)
     await target.rollback()
     const rows = await target.instance.withWorkspaceTransaction(async tx => Promise.all(QUANTITY_HOLLOW_TABLES.map(table => tx.select(`SELECT * FROM ${table}`))))
-    expect(rows.every(table => table.length === 0)).toBe(true)
+    expect(rows).toEqual([[], [], [], [], []])
     expect(target.core.snapshot(target.session).authority).toBe('local')
   }
   finally {
@@ -111,7 +114,9 @@ it('已经冷读成功的来源仍逐次核物理原件，改整改原备注不�
     await target.instance.withWorkspaceTransaction(tx => tx.execute('UPDATE quantity_hollow_rectifications SET note=?', ['改动原四处备注']))
     expect((await load()).records).toEqual([])
     expect((await load()).unavailable).not.toEqual([])
-    await expect(target.rollback()).rejects.toThrow()
+    await expect(target.rollback()).rejects.toThrow('工程量迁移空鼓原件：迁入原件物理行已改变或缺失')
+    expect(target.core.snapshot(target.session).authority).toBe('central')
+    expect(await target.instance.withWorkspaceTransaction(tx => tx.select('SELECT note FROM quantity_hollow_rectifications'))).toEqual([{ note: '改动原四处备注' }])
   }
   finally {
     await target?.close()

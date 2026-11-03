@@ -152,27 +152,31 @@ describe('正式施工合同保存→客户中央回读', () => {
   }
 
   it.each([
-    { case: '{ ...valid, summary: { ...valid.summary, contractCount: 99 } }', prepare: async ({ valid }: Awaited<ReturnType<typeof createDecodeCustomerDetailReadFixture>>) => {
+    { case: '正常来源的合同数量与实际不符', prepare: async ({ valid }: Awaited<ReturnType<typeof createDecodeCustomerDetailReadFixture>>) => {
       return { input: { ...valid, summary: { ...valid.summary, contractCount: 99 } } } as const
     } },
-    { case: '{ ...failed, summary: { ...failed.summary, effectiveContractAmount: \'0.00\' } }', prepare: async (_fixture: Awaited<ReturnType<typeof createDecodeCustomerDetailReadFixture>>) => {
+    { case: '合同来源不可用时有效金额伪零', prepare: async (_fixture: Awaited<ReturnType<typeof createDecodeCustomerDetailReadFixture>>) => {
       contracts.reset('unavailable', scope)
       const failed = await detail()
       return { input: { ...failed, summary: { ...failed.summary, effectiveContractAmount: '0.00' } } } as const
     } },
-  ])('hTTP 解码拒绝来源/类别/客户错配、失败态假零以及伪造正常计数 / decodeCustomerDetailRead：$case', async ({ prepare }) => {
+  ])('客户合同读模型拒绝 $case', async ({ prepare }) => {
     const fixture = await createDecodeCustomerDetailReadFixture()
     const { input } = await prepare(fixture)
-    expect(() => decodeCustomerDetailRead(input)).toThrow()
+    expect(() => decodeCustomerDetailRead(input)).toThrow('中央后台返回的客户详情读模型无效')
   })
 
-  it.each(Array.from([{ dataOrigin: 'demo' }, { contractKind: '分包' }, { customerId: 'other' }]).map(input => ({ input })))('hTTP 解码拒绝来源/类别/客户错配、失败态假零以及伪造正常计数：输入组合 1 案例 %#', async ({ input: patch }) => {
+  it.each([
+    { case: '来源', patch: { dataOrigin: 'demo' } },
+    { case: '类别', patch: { contractKind: '分包' } },
+    { case: '客户', patch: { customerId: 'other' } },
+  ])('客户合同导航拒绝 $case 错配', async ({ patch }) => {
     await save()
     const valid = await detail()
     const invalid = structuredClone(valid)
     const navigation = invalid.contracts[0]!.navigation
     if (navigation.kind === 'entity-detail')
       Object.assign(navigation.filters, patch)
-    expect(() => decodeCustomerDetailRead(invalid)).toThrow()
+    expect(() => decodeCustomerDetailRead(invalid)).toThrow('中央后台返回的客户详情读模型无效')
   })
 })

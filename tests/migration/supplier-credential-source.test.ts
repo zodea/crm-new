@@ -114,7 +114,16 @@ describe('分供方证照完整物理图来源', () => {
     await expect(readSupplierCredentialMigrationGraphs(source)).rejects.toThrow(/祖先/)
   })
 
-  it.each(['foreign-file', 'duplicate-file', 'duplicate-requirement', 'audit-parent', 'payload-size', 'payload-type', 'payload-noncanonical', 'ocr-json'] as const)('拒绝 %s 损坏图，不丢弃证据或补造关系', async (kind) => {
+  it.each([
+    { kind: 'foreign-file', error: '证照原件关系缺失或所有者错配' },
+    { kind: 'duplicate-file', error: 'file_refs稳定身份重复' },
+    { kind: 'duplicate-requirement', error: '同类别存在重复活跃资料要求' },
+    { kind: 'audit-parent', error: '证照审计缺少原证照身份' },
+    { kind: 'payload-size', error: '原件正文与文件大小不一致' },
+    { kind: 'payload-type', error: '证照扩展名与文件类型不匹配' },
+    { kind: 'payload-noncanonical', error: '原件正文必须使用规范 Base64 编码' },
+    { kind: 'ocr-json', error: 'OCR 原文 JSON 损坏' },
+  ])('拒绝 $kind 损坏图，不丢弃证据或补造关系', async ({ kind, error }) => {
     const source = await setup()
     const graph = JSON.parse(String((await readSupplierCredentialMigrationGraphs(source))[0]!.attributes!.graphJson))
     if (kind === 'foreign-file')
@@ -137,10 +146,16 @@ describe('分供方证照完整物理图来源', () => {
     }
     if (kind === 'ocr-json')
       graph.credentials[0].ocr_result = '{broken'
-    expect(() => parseSupplierCredentialMigrationGraph(graph)).toThrow()
+    expect(() => parseSupplierCredentialMigrationGraph(graph)).toThrow(error)
   })
 
-  it.each(['invalid-date', 'invalid-flag', 'sensitive-audit', 'sensitive-outcome', 'sensitive-source'] as const)('拒绝 %s 非法事实，不向审计复制正文', async (kind) => {
+  it.each([
+    { kind: 'invalid-date', error: '证照有效期日期无效' },
+    { kind: 'invalid-flag', error: '证照有效期或 OCR 核对状态无效' },
+    { kind: 'sensitive-audit', error: '审计只能包含已知字段名，不得含敏感正文' },
+    { kind: 'sensitive-outcome', error: '审计结果与来源必须是规范类别，不得含敏感正文' },
+    { kind: 'sensitive-source', error: '审计结果与来源必须是规范类别，不得含敏感正文' },
+  ])('拒绝 $kind 非法事实，不向审计复制正文', async ({ kind, error }) => {
     const source = await setup()
     const graph = JSON.parse(String((await readSupplierCredentialMigrationGraphs(source))[0]!.attributes!.graphJson))
     if (kind === 'invalid-date')
@@ -153,6 +168,6 @@ describe('分供方证照完整物理图来源', () => {
       graph.supplierAudits[0].outcome = '退回备注正文'
     if (kind === 'sensitive-source')
       graph.supplierAudits[0].source_category = 'https://example.test/?taxNo=PRIVATE'
-    expect(() => parseSupplierCredentialMigrationGraph(graph)).toThrow()
+    expect(() => parseSupplierCredentialMigrationGraph(graph)).toThrow(error)
   })
 })

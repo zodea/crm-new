@@ -16,7 +16,7 @@
 | [tests/production/customer-pending.test.ts](../../../tests/production/customer-pending.test.ts) | 单元／服务／状态 | 响应丢失保留不可用原因和原异常，未知结果禁止替换原提交；可靠回执与合法同客户回读共同清理，读取失败只读重试，身份变化及错误目标不解锁 |
 | [tests/production/customer-storage.test.ts](../../../tests/production/customer-storage.test.ts) | 单元／服务／状态 | 客户含原件保存后冷打开读回同一身份、审计和回执，同键异文不能新增 |
 | [tests/server/customer-central-test-instance.test.ts](../../../tests/server/customer-central-test-instance.test.ts) | 单元／服务／状态 | 客户中央读写测试实例 |
-| [tests/server/customer-construction-contract-central.test.ts](../../../tests/server/customer-construction-contract-central.test.ts) | 单元／服务／状态 | 关联施工合同：客户端合同事实 |
+| [tests/server/customer-construction-contract-central.test.ts](../../../tests/server/customer-construction-contract-central.test.ts) | 单元／服务／状态 | 客户关联施工合同事实；读模型拒绝来源、类别、客户错配与来源失败伪零、合同数量错配 |
 | [tests/server/customer-project-central.test.ts](../../../tests/server/customer-project-central.test.ts) | 单元／服务／状态 | 中央项目事实→客户关联回读 |
 | [tests/server/customer-receipt-source.test.ts](../../../tests/server/customer-receipt-source.test.ts) | 单元／服务／状态 | 客户收款只读取当前会话的中央事实；来源不可用或无权限时，未知数量、金额及差额不能伪造为零 |
 | [tests/stores/customer-central.test.ts](../../../tests/stores/customer-central.test.ts) | 单元／服务／状态 | 客户中央 stores |

@@ -11,7 +11,7 @@
 | [tests/stores/supplier-persistent-command.test.ts](../../../tests/stores/supplier-persistent-command.test.ts) | 单元／服务／状态 | 分供方原提交恢复、后读失败及输入保全 |
 | [tests/supplier/native-review-history.test.ts](../../../tests/supplier/native-review-history.test.ts) | 单元／服务／状态 | Native 原件及人工核验不可变历史 |
 | [tests/db/supplier-labor-scope-migration.test.ts](../../../tests/db/supplier-labor-scope-migration.test.ts) | 单元／服务／状态 | 分供方可选劳务范围迁移 |
-| [tests/migration/supplier-credential-source.test.ts](../../../tests/migration/supplier-credential-source.test.ts) | 单元／服务／状态 | 分供方证照完整物理图来源 |
+| [tests/migration/supplier-credential-source.test.ts](../../../tests/migration/supplier-credential-source.test.ts) | 单元／服务／状态 | 分供方证照完整物理图来源；损坏的原件、关联、OCR、有效期及审计敏感正文按具体原因拒绝 |
 | [tests/production/supplier-credential-pending.test.ts](../../../tests/production/supplier-credential-pending.test.ts) | 单元／服务／状态 | 证照原件失响应冷恢复只凭原键核对，正文不进浏览器持久层且不二次上传 |
 | [tests/production/supplier-pending.test.ts](../../../tests/production/supplier-pending.test.ts) | 单元／服务／状态 | 主档丢响应后只存原键，冷恢复先读原分供方，不重复创建 |
 | [tests/production/supplier-restart.test.ts](../../../tests/production/supplier-restart.test.ts) | 单元／服务／状态 | 真实公开服务重启后恢复原件、OCR候选/人工值及失响应原键；真实财务空源及双读权证明实付零、排序和再次冷读，未接项目及合同仍未知，回滚/撤权/跨来源仍拒绝 |
