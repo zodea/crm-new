@@ -128,14 +128,23 @@ describe('送货单 Excel 导出', () => {
 
   it('按项目、分供方、日期、单号排序', () => {
     const rows = deliveryLedgerRows([
-      record({ id: 'late', orderNo: 'SH-002', deliveryDate: '2026-08-02' }),
-      record({ id: 'early', orderNo: 'SH-001', deliveryDate: '2026-08-01' }),
+      record({ id: 'project-b', projectId: 'B', supplierId: 'A', orderNo: 'SH-001', deliveryDate: '2026-08-01' }),
+      record({ id: 'supplier-b', projectId: 'A', supplierId: 'B', orderNo: 'SH-001', deliveryDate: '2026-08-01' }),
+      record({ id: 'late', projectId: 'A', supplierId: 'A', orderNo: 'SH-001', deliveryDate: '2026-08-02' }),
+      record({ id: 'second', projectId: 'A', supplierId: 'A', orderNo: 'SH-002', deliveryDate: '2026-08-01' }),
+      record({ id: 'first', projectId: 'A', supplierId: 'A', orderNo: 'SH-001', deliveryDate: '2026-08-01' }),
     ], {
-      projectName: () => '滨江壹号',
-      supplierName: () => '华东建材',
+      projectName: id => id,
+      supplierName: id => id ?? '',
     })
 
-    expect(rows.map(row => row.orderNo)).toEqual(['SH-001', 'SH-002'])
+    expect(rows.map(row => [row.projectName, row.supplierName, row.deliveryDate, row.orderNo])).toEqual([
+      ['A', 'A', '2026-08-01', 'SH-001'],
+      ['A', 'A', '2026-08-01', 'SH-002'],
+      ['A', 'A', '2026-08-02', 'SH-001'],
+      ['A', 'B', '2026-08-01', 'SH-001'],
+      ['B', 'A', '2026-08-01', 'SH-001'],
+    ])
   })
 
   it('共用原件只加载和打包一次，并在 Excel 标记无法拆分', async () => {
