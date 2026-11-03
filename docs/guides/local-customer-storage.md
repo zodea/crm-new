@@ -42,6 +42,7 @@
 2. 在本机查看 `output/lan-verification/access-code.txt` 获取测试访问码。只向本人控制的测试电脑提供访问码；不要传递 `private-key.pem` 或 `settings.json`。
 3. 将 `output/lan-verification/certificate.cer` 复制到要使用的电脑，先通过可信渠道核对证书 SHA-256 指纹，再由本人在该电脑信任此测试证书。证书不含私钥；不要绕过浏览器证书警告。信任后重新打开加密入口并登录。
 4. 保存的已接管数据保存在本机 `output/lan-verification/data` 中；不要删除或直接复制运行中的数据库作为备份。访问另一台电脑、刷新或重启服务前后的未保存输入仍可能丢失。
+5. 重新启动测试入口后，“备份与恢复”可生成本机一致备份并验证隔离恢复；副本位于 `output/lan-verification/backup/primary`，与原库仍在同一台电脑，不能防止硬盘故障。离线介质尚未配置，“复制到离线介质”不会成功，也不能将本机目录当作独立副本。
 
 测试证书有效期和绑定地址需核对；地址变化或证书过期时不能继续沿用原入口。首次启动和局域网防火墙需由维护人配置。使用 `scripts/stop-lan-verification.ps1` 停止验证入口及其本机后台，测试数据保留；不要结束其他 Node 进程。
 

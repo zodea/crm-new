@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { request as httpRequest } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
 import { createServer as createNetServer } from 'node:net'
+import { join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
@@ -43,6 +44,35 @@ export function createVerificationProxy({ publicOrigin, backendOrigin }) {
   }
 }
 
+/** 仅传入本验证入口明确准备的备份目录，不继承其他工作区的配置。 */
+export function verificationBackendEnvironment({ systemRoot, path, temp, tmp, directory, accessCodeHash, backendOrigin, backendPort, backupRoot }) {
+  return {
+    SystemRoot: systemRoot,
+    PATH: path,
+    TEMP: temp,
+    TMP: tmp,
+    NODE_ENV: 'production',
+    CRM_RUN_MODE: 'production',
+    CRM_DATA_PURPOSE: 'verification',
+    CRM_WORKSPACE_ID: 'lan-verification',
+    CRM_OWNER_ID: 'lan-owner',
+    CRM_DATA_DIRECTORY: directory,
+    CRM_PUBLIC_ORIGIN: backendOrigin,
+    CRM_ACCESS_CODE_HASH: accessCodeHash,
+    NITRO_HOST: '127.0.0.1',
+    NITRO_PORT: String(backendPort),
+    PORT: String(backendPort),
+    ...(backupRoot
+      ? {
+          CRM_BACKUP_STAGING_DIRECTORY: join(backupRoot, 'staging'),
+          CRM_BACKUP_DIRECTORY: join(backupRoot, 'primary'),
+          CRM_BACKUP_OFFLINE_DIRECTORY: join(backupRoot, 'offline-not-connected'),
+          CRM_BACKUP_RESTORE_DIRECTORY: join(backupRoot, 'restore'),
+        }
+      : {}),
+  }
+}
+
 async function main() {
   const { CRM_LAN_TEST_ORIGIN: publicOrigin, CRM_LAN_TEST_CERT: certPath, CRM_LAN_TEST_KEY: keyPath, CRM_DATA_DIRECTORY: directory, CRM_ACCESS_CODE_HASH: accessCodeHash } = process.env
   if (!publicOrigin || !certPath || !keyPath || !directory || !accessCodeHash)
@@ -62,7 +92,7 @@ async function main() {
     cwd: process.cwd(),
     windowsHide: true,
     stdio: 'ignore',
-    env: { SystemRoot: process.env.SystemRoot, PATH: process.env.PATH, TEMP: process.env.TEMP, TMP: process.env.TMP, NODE_ENV: 'production', CRM_RUN_MODE: 'production', CRM_DATA_PURPOSE: 'verification', CRM_WORKSPACE_ID: 'lan-verification', CRM_OWNER_ID: 'lan-owner', CRM_DATA_DIRECTORY: directory, CRM_PUBLIC_ORIGIN: backendOrigin, CRM_ACCESS_CODE_HASH: accessCodeHash, NITRO_HOST: '127.0.0.1', NITRO_PORT: String(backendPort), PORT: String(backendPort) },
+    env: verificationBackendEnvironment({ systemRoot: process.env.SystemRoot, path: process.env.PATH, temp: process.env.TEMP, tmp: process.env.TMP, directory, accessCodeHash, backendOrigin, backendPort, backupRoot: process.env.CRM_LAN_TEST_BACKUP_ROOT }),
   })
   const stop = () => {
     backend.kill()

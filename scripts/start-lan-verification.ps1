@@ -21,6 +21,24 @@ $env:CRM_LAN_TEST_CERT = Join-Path $verificationRoot 'certificate.pem'
 $env:CRM_LAN_TEST_KEY = Join-Path $verificationRoot 'private-key.pem'
 $env:CRM_DATA_DIRECTORY = Join-Path $verificationRoot 'data'
 $env:CRM_ACCESS_CODE_HASH = $config.accessCodeHash
+$backupRoot = Join-Path $verificationRoot 'backup'
+foreach ($parent in @($verificationRoot, $backupRoot)) {
+  New-Item -ItemType Directory -Path $parent -Force | Out-Null
+  if ((Get-Item -LiteralPath $parent -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+    throw '验证备份目录不能是重解析点。'
+  }
+}
+if (Test-Path -LiteralPath (Join-Path $backupRoot 'offline-not-connected')) {
+  throw '未连接离线介质的占位路径已存在，不能将本机目录误记为离线副本。'
+}
+foreach ($name in @('staging', 'primary', 'restore')) {
+  $directory = Join-Path $backupRoot $name
+  New-Item -ItemType Directory -Path $directory -Force | Out-Null
+  if ((Get-Item -LiteralPath $directory -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+    throw '验证备份目录不能是重解析点。'
+  }
+}
+$env:CRM_LAN_TEST_BACKUP_ROOT = $backupRoot
 $node = (Get-Command node.exe -ErrorAction Stop).Source
 $entry = Join-Path $projectRoot 'scripts/lan-verification-proxy.mjs'
 $proc = Start-Process -FilePath $node -ArgumentList @("`"$entry`"") -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
