@@ -32,3 +32,10 @@
 | --- | --- | --- |
 | [e2e/ocr-settings-recovery.spec.ts](../../../e2e/ocr-settings-recovery.spec.ts) | Playwright E2E | OCR 设置重读失败锁定写入，键盘重试恢复原配置 |
 | [e2e/ocr-settings.spec.ts](../../../e2e/ocr-settings.spec.ts) | Playwright E2E | Issue #204：OCR 设置 |
+| [tests/ocr-local-browser/runtime.spec.ts](../../../tests/ocr-local-browser/runtime.spec.ts) | Playwright 独立配置 | 合成图片、扫描及中文 PDF、本地资源与外站请求；依赖隔离开发服务和本机 OCR 资源 |
+
+## 辅助文件与配置（非独立测试）
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/ocr-local-browser/playwright.config.ts](../../../tests/ocr-local-browser/playwright.config.ts) | 浏览器测试配置 | 本地 OCR 浏览器验证的独立配置 |

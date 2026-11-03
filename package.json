@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "nuxt build",
+    "build:local-ocr-sdk": "vite build --config scripts/local-ocr-sdk.config.ts",
     "check:cycles": "dpdm",
     "check:deps": "node-modules-inspector report duplicates --depth 20",
     "check:links": "node scripts/check-md-links.mjs",
@@ -35,6 +36,7 @@
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.116",
+    "@paddleocr/paddleocr-js": "0.4.2",
     "@pinia/nuxt": "^0.11.3",
     "@unocss/nuxt": "^66.7.5",
     "@vueuse/core": "^14.3.0",

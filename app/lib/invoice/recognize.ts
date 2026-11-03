@@ -5,10 +5,12 @@
 // 金额满足两位小数铁律(amount+tax=total)。
 import type { InvoiceFieldRegions } from '~/lib/invoice/recognition-regions'
 import type { RecognizeDocumentOptions } from '~/lib/recognize/engine'
+import type { ParsedInvoiceCandidate } from '~/lib/recognize/invoice-parse'
+import type { recognizeLocalInvoiceDocument } from '~/lib/recognize/local-document'
 import { INVOICE_RECOGNITION_FIELDS } from '~/lib/invoice/recognition-changes'
 import { locateInvoiceFieldRegions } from '~/lib/invoice/recognition-regions'
 import { OcrRecognitionError, recognizeDocument } from '~/lib/recognize/engine'
-import { buildInvoiceFieldConfidence, parseInvoiceText } from '~/lib/recognize/invoice-parse'
+import { buildInvoiceFieldConfidence, parseInvoiceText, parseInvoiceTextPreservingUnknowns } from '~/lib/recognize/invoice-parse'
 import { round2 } from '~/lib/util/number'
 
 export interface InvoiceItem {
@@ -136,4 +138,55 @@ export async function recognizeInvoice(
     ocrConfidence,
   }
   return { ...fields, fieldRegions: locateInvoiceFieldRegions(cloud.pages, fields, INVOICE_RECOGNITION_FIELDS) }
+}
+
+/** 本机识别候选保留未知金额及未识别页；候选须由用户核对，不能直接作为已确认票面。 */
+export interface LocalInvoiceCandidate {
+  source: 'local' | 'cloud'
+  fields: ParsedInvoiceCandidate
+  textPages: string[]
+  unrecognizedPageIndexes: number[]
+  requiresReview: true
+  fieldRegions?: InvoiceFieldRegions
+}
+
+export async function recognizeInvoiceLocally(
+  input: { file: File, basePath: string },
+  options: {
+    onProgress?: (percent: number) => void
+    readDocument?: typeof recognizeLocalInvoiceDocument
+  } = {},
+): Promise<LocalInvoiceCandidate> {
+  const readDocument = options.readDocument ?? (await import('~/lib/recognize/local-document')).recognizeLocalInvoiceDocument
+  const result = await readDocument(input.file, input.basePath, options.onProgress)
+  return {
+    source: 'local',
+    fields: parseInvoiceTextPreservingUnknowns(result.pages.join('\n\n')),
+    textPages: result.pages,
+    unrecognizedPageIndexes: result.unrecognizedPageIndexes,
+    requiresReview: true,
+  }
+}
+
+/** 用户明确决定使用云识别后才上传文件；字段保留未知且仍须人工核对。 */
+export async function recognizeInvoiceWithCloudConsent(
+  input: { file: File },
+  options: RecognizeDocumentOptions & { consent: boolean },
+): Promise<LocalInvoiceCandidate> {
+  if (options.consent !== true)
+    throw new OcrRecognitionError('cloud-consent-required', '请先确认将所选文件发送至云识别服务')
+  const cloud = await recognizeDocument(input.file, options)
+  if (cloud.pages.length !== cloud.markdownPages.length
+    || cloud.pages.some((page, index) => page.pageIndex !== index || page.markdown !== cloud.markdownPages[index])) {
+    throw new OcrRecognitionError('invalid-response', '云识别返回的页面顺序或数量不完整')
+  }
+  const fields = parseInvoiceTextPreservingUnknowns(cloud.markdownPages.join('\n\n'))
+  return {
+    source: 'cloud',
+    fields,
+    textPages: cloud.markdownPages,
+    unrecognizedPageIndexes: cloud.markdownPages.flatMap((text, index) => text.trim() ? [] : [index]),
+    requiresReview: true,
+    fieldRegions: locateInvoiceFieldRegions(cloud.pages, fields, INVOICE_RECOGNITION_FIELDS),
+  }
 }

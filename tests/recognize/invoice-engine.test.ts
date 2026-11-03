@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { recognizeInvoice } from '~/lib/invoice/recognize'
+import { recognizeInvoice, recognizeInvoiceWithCloudConsent } from '~/lib/invoice/recognize'
 
 function jsonResponse(markdown: string, prunedResult: Record<string, unknown> = {}, layoutRegions: unknown[] = []): Response {
   return new Response(JSON.stringify({
@@ -36,6 +36,23 @@ const INVOICE_MARKDOWN = `
 `
 
 describe('recognizeInvoice', () => {
+  it('云候选只有明确同意后才发送文件，保留未知明细并要求人工核对', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(`
+      发票号码：12345678
+      <table><tr><td>项目名称</td><td>数量</td><td>金额</td></tr><tr><td>合成材料</td><td>0</td><td></td></tr></table>
+    `))
+    const file = new File(['synthetic'], 'synthetic.png')
+    await expect(recognizeInvoiceWithCloudConsent({ file }, { consent: false, fetch: fetchMock })).rejects.toMatchObject({ code: 'cloud-consent-required' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    const result = await recognizeInvoiceWithCloudConsent({ file }, { consent: true, fetch: fetchMock })
+    expect(result.source).toBe('cloud')
+    expect((fetchMock.mock.calls[0]?.[1]?.body as FormData).get('file')).toBe(file)
+    expect(result.fields.items[0]).toMatchObject({ quantity: 0, unitPrice: null, amount: null, taxAmount: null })
+    expect(result.fields.totalAmount).toBeNull()
+    expect(result.textPages).toHaveLength(1)
+    expect(result.requiresReview).toBe(true)
+  })
+
   it('用在线版面结果生成可进入发票校对工作台的完整字段', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse(INVOICE_MARKDOWN))
     const progress: number[] = []

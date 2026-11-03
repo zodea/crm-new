@@ -6,3 +6,6 @@
 # P5 原始运行记录保留原字节,避免 Windows 检出换行改写归档摘要。
 docs/design/evidence/issue-412-payroll-fees/**/*.json.txt binary
 docs/design/evidence/issue-412-payroll-fees/**/*.log binary
+
+# 中文 PDF 合成夹具按原字节保留，避免改写交叉引用偏移。
+tests/ocr-local-browser/chinese-synthetic.pdf binary
