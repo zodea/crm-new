@@ -18,22 +18,26 @@ describe('送货 HTTP 命令解析', () => {
   it.each([
     { case: '缺值', amount: null },
     { case: '明确零', amount: 0 },
-  ])('保留$case，按动作读取必要字段', ({ amount }) => {
+  ])('归档保留$case', ({ amount }) => {
     const body = { ...valid, draft: { ...valid.draft, lines: [{ ...valid.draft.lines[0], unitPrice: amount, amount }] } }
     expect(parseDeliveryCommand(body)).toEqual(body)
-    expect(parseDeliveryCommand({ action: 'print', commandId: 'print', workspaceId: 'workspace', actorId: 'actor', requiredCapability: 'delivery:write', origin: 'real', targets: [{ id: 'record', baseVersion: '1' }], disposition: 'printed' })).toMatchObject({ targets: [{ id: 'record', baseVersion: '1' }] })
+  })
+
+  it('打印命令保留目标身份、版本和打印状态', () => {
+    const body = { action: 'print', commandId: 'print', workspaceId: 'workspace', actorId: 'actor', requiredCapability: 'delivery:write', origin: 'real', targets: [{ id: 'record', baseVersion: '1' }], disposition: 'printed' }
+    expect(parseDeliveryCommand(body)).toEqual(body)
   })
 
   it.each([
-    { ...valid, draft: { ...valid.draft, assetId: 'other-owner' } },
-    { ...valid, draft: { ...valid.draft, rawSiteText: 1 } },
-    { ...valid, draft: { ...valid.draft, lines: [{ ...valid.draft.lines[0], qty: '1' }] } },
-    { ...valid, draft: { ...valid.draft, confirmations: { pricePendingConfirmed: 'yes' } } },
-    { ...valid, source: { id: 'forged-asset', fileName: 'a.pdf', mimeType: 'application/pdf', fileSize: 1, payloadBase64: 'YQ==' } },
-    { ...valid, origin: 'demo' },
-    { ...valid, requiredCapability: 'delivery:read' },
-    { ...valid, action: 'revise', id: 'record', baseVersion: '1', reason: '修正', source: null },
-  ])('非法字段在进入命令服务前被拒绝', (body) => {
-    expect(() => parseDeliveryCommand(body)).toThrow('格式')
+    { name: '草稿伪造原件身份', body: { ...valid, draft: { ...valid.draft, assetId: 'other-owner' } } },
+    { name: '工地原文不是文本', body: { ...valid, draft: { ...valid.draft, rawSiteText: 1 } } },
+    { name: '数量是字符串', body: { ...valid, draft: { ...valid.draft, lines: [{ ...valid.draft.lines[0], qty: '1' }] } } },
+    { name: '待补价格确认不是布尔值', body: { ...valid, draft: { ...valid.draft, confirmations: { pricePendingConfirmed: 'yes' } } } },
+    { name: '上传伪造原件身份', body: { ...valid, source: { id: 'forged-asset', fileName: 'a.pdf', mimeType: 'application/pdf', fileSize: 1, payloadBase64: 'YQ==' } } },
+    { name: '来源为演示数据', body: { ...valid, origin: 'demo' } },
+    { name: '声明只读权限', body: { ...valid, requiredCapability: 'delivery:read' } },
+    { name: '修订命令携带原件字段', body: { ...valid, action: 'revise', id: 'record', baseVersion: '1', reason: '修正', source: null } },
+  ])('$name：在进入命令服务前被拒绝', ({ body }) => {
+    expect(() => parseDeliveryCommand(body)).toThrow('送货命令或字段格式无效，请重新核对')
   })
 })
