@@ -42,9 +42,9 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/crew-detail.spec.ts](../../../e2e/crew-detail.spec.ts) | Playwright E2E | Issue #194：班组详情 |
+| [e2e/crew-detail.spec.ts](../../../e2e/crew-detail.spec.ts) | Playwright E2E | Issue #194：合成只读班组详情及正式空班组 |
 | [e2e/issue-316-crew-worker-central-chain.spec.ts](../../../e2e/issue-316-crew-worker-central-chain.spec.ts) | Playwright E2E | 班组—工人跨项目身份、整页及成员原命令恢复、五档布局／局部滚动／焦点 |
-| [e2e/worker-detail.spec.ts](../../../e2e/worker-detail.spec.ts) | Playwright E2E | Issue #194：工人详情 |
+| [e2e/worker-detail.spec.ts](../../../e2e/worker-detail.spec.ts) | Playwright E2E | Issue #194：合成只读工人详情、责任关系与隐私遮罩 |
 | [e2e/worker-roster-archive.spec.ts](../../../e2e/worker-roster-archive.spec.ts) | Playwright E2E | 工人整页维护、工资成员归档、冷回读、真实照片 ZIP 与权限撤销 |
 | [e2e/production-crew-worker-storage.spec.ts](../../../e2e/production-crew-worker-storage.spec.ts) | Playwright E2E | 真磁盘全局工人班组整页新建／编辑、跨项目选择同一稳定工人、候选改名刷新、私密银行资料与历史保全、明确 Native 原图迁入、实名原件、五档视口及冷读 |
 

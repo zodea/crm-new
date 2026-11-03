@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { installCrewWorkerDetailFixture } from './helpers/crew-worker-detail-fixture'
 import {
   expectLocalHorizontalScroll,
   expectNoPageOverflow,
@@ -20,12 +21,13 @@ test.describe('Issue #194：班组详情', () => {
     await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
     const response = await page.request.post('/api/testing/crew-workers/reset', { headers: { 'x-ruihang-test-reset': '1' }, data: { scenario: 'ready' } })
     expect(response.ok(), await response.text()).toBe(true)
+    await installCrewWorkerDetailFixture(page)
   })
-  test('展示演示班组、责任范围和项目关联，各宽度页面不横向溢出', async ({ page }) => {
-    await page.goto('/base/crew/crew_demo_001?origin=demo')
+  test('展示合成班组、责任范围和项目关联，各宽度页面不横向溢出', async ({ page }) => {
+    await page.goto('/base/crew/synthetic-detail-crew?origin=demo')
 
     const shell = page.locator('[data-ui="entity-detail-shell"]')
-    const heading = shell.getByRole('heading', { name: '泥水A班' })
+    const heading = shell.getByRole('heading', { name: '合成砌筑班' })
     await expect(heading)
       .toBeVisible({ timeout: 15_000 })
     await expect(shell.getByText('测试档案只读', { exact: true })).toBeVisible()
@@ -36,8 +38,8 @@ test.describe('Issue #194：班组详情', () => {
     await expect(shell.getByText('137 **** 0001', { exact: true }).first()).toBeVisible()
     await expect(shell.getByText('13700110001', { exact: true })).toHaveCount(0)
     await expect(shell.getByText('13511220001', { exact: true })).toHaveCount(0)
-    await expect(shell.getByRole('link', { name: '虞建华', exact: true }))
-      .toHaveAttribute('href', /\/base\/worker\/wkr_demo_001\?origin=demo&returnTo=/)
+    await expect(shell.getByRole('link', { name: '合成工人甲', exact: true }))
+      .toHaveAttribute('href', /\/base\/worker\/synthetic-detail-worker\?origin=demo&returnTo=/)
     await expect(shell.getByRole('button', { name: '添加成员', exact: true })).toHaveCount(0)
     await expect(shell.getByRole('button', { name: '移出班组', exact: true })).toHaveCount(0)
     for (const width of RESPONSIVE_WIDTHS) {
@@ -49,10 +51,10 @@ test.describe('Issue #194：班组详情', () => {
 
   test('窄窗头部键盘顺序稳定，密集关联表只在自身区域横滚', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/base/crew/crew_demo_001?origin=demo')
+    await page.goto('/base/crew/synthetic-detail-crew?origin=demo')
 
     const back = page.getByRole('link', { name: '返回班组列表' })
-    const member = page.getByRole('link', { name: '虞建华', exact: true })
+    const member = page.getByRole('link', { name: '合成工人甲', exact: true })
     await expectTabSequence(page, back, [member], '只读班组返回入口与成员关系')
     await expectLocalHorizontalScroll(page.getByLabel('班组成员表，可横向滚动查看全部列'), '班组成员表')
     const projects = page.locator('section').filter({ has: page.getByText(/^(项目与工资事实|当前成员与责任项目)$/) })

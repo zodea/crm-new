@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { installCrewWorkerDetailFixture } from './helpers/crew-worker-detail-fixture'
 import {
   expectLocalHorizontalScroll,
   expectNoPageOverflow,
@@ -19,16 +20,18 @@ test.describe('Issue #194：工人详情', () => {
     await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
     const response = await page.request.post('/api/testing/crew-workers/reset', { headers: { 'x-ruihang-test-reset': '1' }, data: { scenario: 'ready' } })
     expect(response.ok(), await response.text()).toBe(true)
+    await installCrewWorkerDetailFixture(page)
   })
-  test('展示演示个人、班组和项目责任，各宽度页面不横向溢出', async ({ page }) => {
-    await page.goto('/base/worker/wkr_demo_003?origin=demo')
+  test('展示合成个人、班组和项目责任，各宽度页面不横向溢出', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.goto('/base/worker/synthetic-detail-worker?origin=demo')
 
     const shell = page.locator('[data-ui="entity-detail-shell"]')
-    await expect(shell.getByRole('heading', { name: '张建国' }))
-      .toBeVisible({ timeout: 15_000 })
+    await expect(shell.getByRole('heading', { name: '合成工人甲' }))
+      .toBeVisible({ timeout: 60_000 })
     await expect(shell.getByRole('link', { name: '返回工人列表' }))
       .toHaveAttribute('href', '/base/worker')
-    await expect(shell.getByText('泥水A班', { exact: true }).first()).toBeVisible()
+    await expect(shell.getByText('合成砌筑班', { exact: true }).first()).toBeVisible()
     await expect(shell.getByText('工人主档', { exact: true })).toBeVisible()
     await expect(shell.getByText('测试档案只读', { exact: true })).toBeVisible()
     await expect(shell.getByRole('link', { name: '编辑', exact: true })).toHaveCount(0)
@@ -46,7 +49,7 @@ test.describe('Issue #194：工人详情', () => {
 
   test('窄窗责任单元表只在自身区域横向滚动', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/base/worker/wkr_demo_003?origin=demo')
+    await page.goto('/base/worker/synthetic-detail-worker?origin=demo')
 
     await expectLocalHorizontalScroll(
       page.locator('section').filter({ has: page.getByText('项目与责任单元', { exact: true }) }).locator('div.overflow-x-auto'),
