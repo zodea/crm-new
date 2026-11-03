@@ -280,65 +280,15 @@ describe('材料单价分析', () => {
     expect(catalog).toHaveLength(6)
     expect(catalog.find(material => material.name === 'BV 电线')?.officialIdentity)
       .toMatchObject({ materialCode: '280304800070120011' })
+    for (const variantName of ['ZR-BV 电线', 'NH-BV 电线', 'YJV22 电缆']) {
+      expect(catalog.find(material => material.name === variantName)?.officialIdentity, variantName).toBeNull()
+    }
     expect(catalog.find(material => material.name === 'YJV 电缆')?.key)
       .not
       .toBe(catalog.find(material => material.name === 'YJV22 电缆')?.key)
     expect(catalog.find(material => material.spec === '4×25+1×16 mm²')?.key)
       .not
       .toBe(catalog.find(material => material.spec === '4×25 mm²')?.key)
-  })
-
-  it.each(Array.from(['ZR-BV 电线', 'NH-BV 电线', 'YJV22 电缆']).map(input => ({ input })))('型号变体在目录中保持独立，且不关联普通 BV 官方价格：输入组合 1 案例 %#', ({ input: variantName }) => {
-    const catalog = buildMaterialPriceCatalog([
-      delivery('bv', 'supplier-a', '2026-05-01', [{
-        id: 'line-bv',
-        materialName: 'BV 电线',
-        spec: '1×2.5 mm²',
-        unit: 'm',
-        unitPrice: 2.5,
-      }]),
-      delivery('zr-bv', 'supplier-a', '2026-05-02', [{
-        id: 'line-zr-bv',
-        materialName: 'ZR-BV 电线',
-        spec: '1×2.5 mm²',
-        unit: 'm',
-        unitPrice: 2.8,
-      }]),
-      delivery('nh-bv', 'supplier-b', '2026-05-03', [{
-        id: 'line-nh-bv',
-        materialName: 'NH-BV 电线',
-        spec: '2.5mm2',
-        unit: 'm',
-        unitPrice: 3,
-      }]),
-      delivery('yjv', 'supplier-b', '2026-05-04', [{
-        id: 'line-yjv',
-        materialName: 'YJV 电缆',
-        spec: '4×25 mm²',
-        unit: 'm',
-        unitPrice: 80,
-      }]),
-      delivery('yjv22', 'supplier-b', '2026-05-05', [{
-        id: 'line-yjv22',
-        materialName: 'YJV22 电缆',
-        spec: '4×25 mm²',
-        unit: 'm',
-        unitPrice: 90,
-      }]),
-      delivery('yjv-composite', 'supplier-b', '2026-05-06', [{
-        id: 'line-yjv-composite',
-        materialName: 'YJV 电缆',
-        spec: '4×25+1×16 mm²',
-        unit: 'm',
-        unitPrice: 100,
-      }]),
-    ], suppliers, projects)
-
-    expect(catalog).toHaveLength(6)
-    expect(catalog.find(material => material.name === 'BV 电线')?.officialIdentity)
-      .toMatchObject({ materialCode: '280304800070120011' })
-    expect(catalog.find(material => material.name === variantName)?.officialIdentity)
-      .toBeNull()
   })
 
   it('米与 m、千米与 km 分别归并，但不跨量级合并或改价', () => {
