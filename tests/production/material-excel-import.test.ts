@@ -64,6 +64,17 @@ it('整文件合同、明细、原件及施工关联同事务提交，失败不�
       expect(form.attachments).toHaveLength(1)
       expect(Buffer.from((await service.file(receipt!.id, form.attachments[0]!.id, session)).bytes).equals(bytes)).toBe(true)
     }
+    const originalId = result.results[0]!.id
+    const original = await service.form(originalId, session)
+    const replacementPreview = await service.previewExcel({ file }, session)
+    const candidate = replacementPreview.rows[0]!.candidates.find(row => row.id === originalId)!
+    const replacement = { ...request, decisions: replacementPreview.rows.map((row, index) => index === 0
+      ? { key: row.key, fingerprint: row.fingerprint, kind: 'replace', id: candidate.id, version: candidate.version, project: row.projects[0], supplier: row.suppliers[0], signatory: row.signatories[0], main: { id: row.mains[0]!.id, projectId: row.mains[0]!.projectId, basis: row.mains[0]!.basis } }
+      : { key: row.key, fingerprint: row.fingerprint, kind: 'skip' }) }
+    await expect(service.importExcel(replacement, session)).rejects.toThrow('已有采购明细')
+    expect(await service.form(originalId, session)).toEqual(original)
+    expect(await storage.select('SELECT * FROM material_contract_records')).toHaveLength(2)
+    expect(Buffer.from((await service.file(originalId, original.attachments[0]!.id, session)).bytes).equals(bytes)).toBe(true)
     await storage.close()
     service = createProductionMaterialContractService(storage)
     expect(await service.importExcel(request, session)).toEqual(result)

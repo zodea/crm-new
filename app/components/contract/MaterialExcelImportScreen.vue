@@ -199,7 +199,7 @@ const display = (value: unknown) => value == null || value === '' ? '（空）' 
           <p v-if="numberText(row.draft.no) && numberText(row.draft.no) === numberText(candidate.no)" class="text-danger">
             合同编号相同，请核对；草稿可同号，正式提交时检查编号。
           </p><p v-if="candidate.lineCount && row.lineCount" class="text-danger">
-            已有明细与文件明细冲突，请在合同页面逐项核对后再导入。
+            已有明细与文件明细冲突。明细可能被补充协议、财务或其他历史资料采用；当前无法完整核验所有引用，暂不能批量替换。请查看原合同和相关资料后，在合同页面处理。
           </p><div class="overflow-x-auto" tabindex="0" aria-label="已有合同与文件对比">
             <table class="w-full min-w-[28rem] text-left">
               <thead><tr><th>字段</th><th>已有</th><th>文件</th></tr></thead><tbody>

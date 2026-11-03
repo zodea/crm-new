@@ -26,7 +26,7 @@ it('小屏及桌面可键盘核对合同、选择关联，并在表内滚动', a
   ;(check.element() as HTMLElement).focus()
   await expect.element(check).toHaveFocus()
   await userEvent.keyboard('{Enter}')
-  await expect.element(page.getByText('已有明细与文件明细冲突，请在合同页面逐项核对后再导入。')).toBeVisible()
+  await expect.element(page.getByText(/当前无法完整核验所有引用，暂不能批量替换/)).toBeVisible()
   const scroll = page.getByLabelText('已有合同与文件对比').element() as HTMLElement
   expect(getComputedStyle(scroll).overflowX).toBe('auto')
   expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth)

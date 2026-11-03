@@ -22,7 +22,7 @@ it('关联未确认或已有明细冲突不能提交；确认后完整整批发�
   await fireEvent.change(screen.getByLabelText('选择导入文件'), { target: { files: [file] } })
   await waitFor(() => expect((screen.getByRole('button', { name: '核对工作簿' }) as HTMLButtonElement).disabled).toBe(false))
   await fireEvent.click(screen.getByRole('button', { name: '核对工作簿' }))
-  await waitFor(() => expect(screen.getByText('已有明细与文件明细冲突，请在合同页面逐项核对后再导入。')).toBeTruthy())
+  await waitFor(() => expect(screen.getByText(/当前无法完整核验所有引用，暂不能批量替换/)).toBeTruthy())
   expect((screen.getByRole('option', { name: /替换/ }) as HTMLOptionElement).disabled).toBe(true)
   const submit = screen.getByRole('button', { name: '确认并保存整批合同' })
   expect((submit as HTMLButtonElement).disabled).toBe(true)
