@@ -1,5 +1,7 @@
 import type { ImportTemplateField } from './import-mapping'
 import type { Invoice } from '~/stores/invoice'
+import { CREW_EXCEL_FIELDS, normalizeCrewExcelRow } from '~/lib/crew-worker/excel-import'
+import { normalizeWorkerExcelRow, WORKER_EXCEL_FIELDS } from '~/lib/crew-worker/worker-excel-import'
 import { getInvoiceImportSourceMeta, invoiceNaturalKey } from '~/lib/invoice/excel'
 import {
   QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
@@ -9,7 +11,9 @@ import {
 } from '~/lib/quantity/import'
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
 import { round2 } from '~/lib/util/number'
+import { useCrewExcelImportStore } from '~/stores/crew-excel-import'
 import { useQuantityStore } from '~/stores/quantity'
+import { useWorkerExcelImportStore } from '~/stores/worker-excel-import'
 import { MATERIAL_CONTRACT_LINE_IMPORT_FIELDS } from '../material-contract/import'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
@@ -280,6 +284,32 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
     async importRow(row) {
       await useSupplierCommandStore().importRow(row)
     },
+  },
+  'crew': {
+    key: 'crew',
+    label: '班组',
+    fields: CREW_EXCEL_FIELDS,
+    validateRow(row) {
+      try {
+        normalizeCrewExcelRow(row)
+        return null
+      }
+      catch (cause) { return cause instanceof Error ? cause.message : '班组导入内容无效' }
+    },
+    async importRow(row) { await useCrewExcelImportStore().importRow(row) },
+  },
+  'worker': {
+    key: 'worker',
+    label: '工人',
+    fields: WORKER_EXCEL_FIELDS,
+    validateRow(row) {
+      try {
+        normalizeWorkerExcelRow(row)
+        return null
+      }
+      catch (cause) { return cause instanceof Error ? cause.message : '工人导入内容无效' }
+    },
+    async importRow(row) { await useWorkerExcelImportStore().importRow(row) },
   },
   'demo-supplier': {
     key: 'demo-supplier',

@@ -1,15 +1,31 @@
+import { resolve } from 'node:path'
 import process from 'node:process'
+import { isolatedFreshBuildPaths } from './scripts/e2e-isolation'
 
 // 并行 E2E 的第二个 dev server 用独立构建目录与 Vite 依赖缓存，避免与默认 .nuxt 及共享 node_modules 缓存互相覆盖；未设置时保持默认。
 const buildDir = process.env.NUXT_BUILD_DIR
+const localOcrAssetsDirectory = process.env.CRM_LOCAL_OCR_ASSETS_DIRECTORY
+const isolatedOutput = process.env.CRM_E2E_BUILD_OUTPUT_DIR
+const isolatedPaths = isolatedOutput ? isolatedFreshBuildPaths(process.cwd(), buildDir ?? '', isolatedOutput) : null
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   ssr: false,
-  ...(buildDir ? { buildDir } : {}),
+  ...(buildDir ? { buildDir: isolatedPaths?.build ?? buildDir } : {}),
   devtools: { enabled: process.env.NUXT_DEVTOOLS !== 'false' },
 
   nitro: {
+    ...(isolatedPaths ? { output: { dir: isolatedPaths.output } } : {}),
+    // PDF.js 读取中文文字型 PDF 时按需加载内置字符映射；打包与开发环境使用同一来源。
+    publicAssets: [
+      { dir: resolve('node_modules/pdfjs-dist/cmaps'), baseURL: '/pdfjs/cmaps' },
+      ...(localOcrAssetsDirectory
+        ? [
+            { dir: `${localOcrAssetsDirectory}/ocr-models`, baseURL: '/local-ocr/models' },
+            { dir: `${localOcrAssetsDirectory}/ocr-runtime`, baseURL: '/local-ocr/runtime' },
+          ]
+        : []),
+    ],
     // sql.js 按运行时路径加载 WASM；显式携带现有依赖，构建后无需手工补文件。
     // xlsx 整包内联：外置时 Windows 开发态会把 dist/cpexcel.js 写成裸盘符路径，ESM 加载失败。
     externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'], inline: [/[\\/]xlsx[\\/]/] },

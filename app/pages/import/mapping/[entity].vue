@@ -1,8 +1,16 @@
 <script setup lang="ts">
+import type { CrewExcelReviewEntry } from '~/components/crew-worker/CrewExcelReview.vue'
+import type { WorkerExcelReviewEntry } from '~/components/crew-worker/WorkerExcelReview.vue'
+import type { SupplierReviewEntry } from '~/components/supplier/SupplierImportReview.vue'
 import type { ImportRowRejection, ImportRunResult } from '~/composables/useImportRunner'
+import type { CrewExcelDraft, CrewExcelPreview } from '~/lib/crew-worker/excel-import-contract'
+import type { WorkerExcelDraft, WorkerExcelPreview } from '~/lib/crew-worker/worker-excel-contract'
 import type { ImportColumnMatch, ImportStepId } from '~/lib/kit/import-mapping'
+import type { SupplierImportDraft, SupplierImportPreview } from '~/lib/supplier/command-contract'
 import type { RawImportSheet } from '~/lib/util/excel'
 import { Button } from '~/components/ui/button'
+import { crewExcelDuplicates, normalizeCrewExcelRow } from '~/lib/crew-worker/excel-import'
+import { normalizeWorkerExcelRow, workerExcelDuplicates } from '~/lib/crew-worker/worker-excel-import'
 import { annotateInvoiceImportRows, getInvoiceImportSourceMeta } from '~/lib/invoice/excel'
 import { getImportEntity } from '~/lib/kit/import-entities'
 import {
@@ -12,9 +20,14 @@ import {
   importStepperSteps,
   listMissingRequiredFields,
 } from '~/lib/kit/import-mapping'
+import { setSupplierImportDecision, setSupplierImportSource, supplierImportDraftFromRow, supplierImportSourceKey } from '~/lib/supplier/import-command'
+import { supplierImportFileDuplicates } from '~/lib/supplier/import-review'
+import { bindCrewExcelRow, crewExcelSourceKey } from '~/stores/crew-excel-import'
+import { bindWorkerExcelRow, workerExcelSourceKey } from '~/stores/worker-excel-import'
 
 const route = useRoute()
 const router = useRouter()
+const baseURL = useRuntimeConfig().app.baseURL
 const tabsStore = useTabsStore()
 const toast = useToast()
 
@@ -34,6 +47,23 @@ const { done, error, phase, total } = runner
 const { exportFile } = useKitUI()
 const rowNumbers = new WeakMap<Record<string, unknown>, number>()
 const invoiceStore = useInvoiceStore()
+const supplierPrepared = shallowRef<ReadonlyMap<number, { draft: SupplierImportDraft, preview: SupplierImportPreview }>>(new Map())
+const supplierChoices = shallowRef<Readonly<Record<number, string>>>({})
+const supplierPreviewBusy = shallowRef(false)
+const supplierPreviewError = shallowRef('')
+const supplierRecoveryNotice = shallowRef('')
+const crewPrepared = shallowRef<ReadonlyMap<number, { draft: CrewExcelDraft, preview: CrewExcelPreview }>>(new Map())
+const crewChoices = shallowRef<Readonly<Record<number, string>>>({})
+const crewPreviewBusy = shallowRef(false)
+const crewStarting = shallowRef(false)
+const crewPreviewError = shallowRef('')
+const crewRecoveryNotice = shallowRef('')
+const workerPrepared = shallowRef<ReadonlyMap<number, { draft: WorkerExcelDraft, preview: WorkerExcelPreview }>>(new Map())
+const workerChoices = shallowRef<Readonly<Record<number, string>>>({})
+const workerRelations = shallowRef<Readonly<Record<number, { crew?: string, project?: string }>>>({})
+const workerPreviewBusy = shallowRef(false)
+const workerPreviewError = shallowRef('')
+const workerRecoveryNotice = shallowRef('')
 
 const steps = computed(() => importStepperSteps({
   currentStep: currentStep.value,
@@ -48,11 +78,72 @@ const allRows = computed(() => entityKey === 'invoice'
 const keptEntries = computed(() => allRows.value
   .map((row, index) => ({ index, row }))
   .filter(entry => !excludedRows.value.has(entry.index)))
+const sourceRowNumber = (index: number) => sheet.value?.rowNumbers?.[index] ?? (sheet.value?.headerRow ?? 0) + index + 2
+const supplierDuplicates = computed(() => supplierImportFileDuplicates(keptEntries.value.flatMap(({ index }) => {
+  const prepared = supplierPrepared.value.get(index)
+  return prepared && supplierChoices.value[index] !== 'skip' ? [{ index, draft: prepared.draft }] : []
+})))
+const supplierReviewEntries = computed<SupplierReviewEntry[]>(() => keptEntries.value.flatMap(({ index }) => {
+  const prepared = supplierPrepared.value.get(index)
+  if (!prepared)
+    return []
+  const sameFileRows = supplierDuplicates.value.get(index) ?? []
+  if (!prepared.preview.candidates.length && !sameFileRows.length && supplierChoices.value[index] !== 'skip')
+    return []
+  return [{ index, rowNumber: sourceRowNumber(index), row: prepared.draft as Record<string, unknown>, preview: prepared.preview, sameFileRows: sameFileRows.map(sourceRowNumber) }]
+}))
+const supplierNeedsReview = computed(() => supplierReviewEntries.value.some(({ index, preview, sameFileRows }) => {
+  const choice = supplierChoices.value[index]
+  const valid = choice === 'create' || (choice?.startsWith('replace:') && preview.candidates.some(candidate => candidate.id === choice.slice(8)))
+  return choice !== 'skip' && (sameFileRows.length > 0 || (preview.candidates.length > 0 && !valid))
+}))
+const crewDuplicates = computed(() => crewExcelDuplicates(keptEntries.value.flatMap(({ index }) => {
+  const prepared = crewPrepared.value.get(index)
+  return prepared && crewChoices.value[index] !== 'skip' ? [{ index, draft: prepared.draft }] : []
+})))
+const crewReviewEntries = computed<CrewExcelReviewEntry[]>(() => keptEntries.value.flatMap(({ index }) => {
+  const prepared = crewPrepared.value.get(index)
+  if (!prepared)
+    return []
+  const sameFileRows = crewDuplicates.value.get(index) ?? []
+  if (!prepared.preview.candidates.length && !sameFileRows.length && crewChoices.value[index] !== 'skip')
+    return []
+  return [{ index, rowNumber: sourceRowNumber(index), row: prepared.draft as Record<string, unknown>, preview: prepared.preview, sameFileRows: sameFileRows.map(sourceRowNumber) }]
+}))
+const crewNeedsReview = computed(() => crewReviewEntries.value.some(({ index, preview, sameFileRows }) => {
+  const choice = crewChoices.value[index]
+  const valid = choice === 'create' || (choice?.startsWith('replace:') && preview.candidates.some(candidate => candidate.id === choice.slice(8)))
+  return choice !== 'skip' && (sameFileRows.length > 0 || (preview.candidates.length > 0 && !valid))
+}))
+const workerDuplicates = computed(() => workerExcelDuplicates(keptEntries.value.flatMap(({ index }) => {
+  const prepared = workerPrepared.value.get(index)
+  return prepared && workerChoices.value[index] !== 'skip' ? [{ index, draft: prepared.draft }] : []
+})))
+const workerReviewEntries = computed<WorkerExcelReviewEntry[]>(() => keptEntries.value.flatMap(({ index }) => {
+  const prepared = workerPrepared.value.get(index)
+  if (!prepared)
+    return []
+  const sameFileRows = workerDuplicates.value.get(index) ?? []
+  if (!prepared.preview.candidates.length && !sameFileRows.length && !prepared.draft.crewName && !prepared.draft.projectName && workerChoices.value[index] !== 'skip')
+    return []
+  return [{ index, rowNumber: sourceRowNumber(index), row: prepared.draft as Record<string, unknown>, preview: prepared.preview, sameFileRows: sameFileRows.map(sourceRowNumber) }]
+}))
+const workerNeedsReview = computed(() => workerReviewEntries.value.some(({ index, row, preview, sameFileRows }) => {
+  const choice = workerChoices.value[index]
+  if (choice === 'skip')
+    return false
+  const valid = choice === 'create' || (choice?.startsWith('replace:') && preview.candidates.some(candidate => candidate.id === choice.slice(8)))
+  const relation = workerRelations.value[index]
+  return sameFileRows.length > 0 || (preview.candidates.length > 0 && !valid)
+    || (!!row.crewName && !preview.crews.some(candidate => candidate.id === relation?.crew))
+    || (!!row.projectName && !preview.projects.some(candidate => candidate.id === relation?.project))
+}))
+const importableEntries = computed(() => keptEntries.value.filter(entry => (entityKey !== 'supplier' || supplierChoices.value[entry.index] !== 'skip') && (entityKey !== 'crew' || crewChoices.value[entry.index] !== 'skip') && (entityKey !== 'worker' || workerChoices.value[entry.index] !== 'skip')))
 const progressPercent = computed(() =>
   total.value === 0 ? 0 : Math.round((done.value / total.value) * 100))
 
 // 预占式页签下该回填暂不生效（AppTabBar 静态标题最后覆盖），机制修复见 #98。
-useTabTitle(() => entity ? `导入映射 · ${entity.label}` : '导入映射')
+useTabTitle(() => entityKey === 'material-contract' ? '批量导入采购合同' : entity ? `导入映射 · ${entity.label}` : '导入映射')
 
 function onLoaded(parsed: RawImportSheet) {
   sheet.value = parsed
@@ -77,10 +168,142 @@ function confirmSuggestion(fieldKey: string) {
     mapping.value = { ...mapping.value, [fieldKey]: { ...match, confidence: 'confirmed' } }
 }
 
-function goPreview() {
+async function goPreview() {
   if (missingRequired.value.length)
     return
+  if (entityKey === 'supplier') {
+    const selectedSheet = sheet.value
+    const selectedMapping = mapping.value
+    const selectedExclusions = excludedRows.value
+    supplierPreviewBusy.value = true
+    supplierPreviewError.value = ''
+    supplierPrepared.value = new Map()
+    supplierChoices.value = {}
+    try {
+      const recovered = await useSupplierCommandStore().recoverPendingImports()
+      if (recovered.applied || recovered.notApplied)
+        supplierRecoveryNotice.value = `已核对上次导入：${recovered.applied} 行已保存，${recovered.notApplied} 行未保存。请重新核对本次预览后选择。`
+      const valid = keptEntries.value.flatMap(({ index, row }) => {
+        try {
+          return [{ index, draft: supplierImportDraftFromRow(row) }]
+        }
+        catch { return [] }
+      })
+      const repository = useNuxtApp().$repositories.supplierCommands
+      const before = await repository.context()
+      const batch = await repository.previewImport(valid.map(item => item.draft))
+      const after = await repository.context()
+      const expected = [...before.capabilities].sort().join('\0')
+      if (batch.workspaceId !== before.workspaceId || batch.actorId !== before.actorId || after.workspaceId !== before.workspaceId || after.actorId !== before.actorId
+        || [...batch.capabilities].sort().join('\0') !== expected || [...after.capabilities].sort().join('\0') !== expected
+        || !before.capabilities.includes('supplier:write') || !before.capabilities.includes('supplier:list:read')) {
+        throw new Error('预览期间身份、权限或资料来源变化，请重新预览')
+      }
+      if (sheet.value !== selectedSheet || mapping.value !== selectedMapping || excludedRows.value !== selectedExclusions)
+        throw new Error('文件或映射已变化，请重新预览')
+      supplierPrepared.value = new Map(valid.map((item, index) => [item.index, { draft: item.draft, preview: batch.previews[index]! }]))
+    }
+    catch (cause) {
+      supplierPreviewError.value = cause instanceof Error ? cause.message : '无法读取已有分供方，请重试'
+      return
+    }
+    finally { supplierPreviewBusy.value = false }
+  }
+  if (entityKey === 'crew') {
+    const selectedSheet = sheet.value
+    const selectedMapping = mapping.value
+    const selectedExclusions = excludedRows.value
+    crewPreviewBusy.value = true
+    crewPreviewError.value = ''
+    crewPrepared.value = new Map()
+    crewChoices.value = {}
+    try {
+      const recovered = await useCrewExcelImportStore().recoverPending()
+      if (recovered.applied || recovered.notApplied)
+        crewRecoveryNotice.value = `已核对上次导入：${recovered.applied} 行已保存，${recovered.notApplied} 行未保存。请重新核对本次预览后选择。`
+      const valid = keptEntries.value.flatMap(({ index, row }) => {
+        try {
+          return [{ index, draft: normalizeCrewExcelRow(row) }]
+        }
+        catch { return [] }
+      })
+      const repository = useNuxtApp().$repositories.crewWorkerCommands
+      const before = await repository.context()
+      const batch = await repository.previewCrewExcel(valid.map(item => item.draft))
+      const after = await repository.context()
+      const expected = [...before.capabilities].sort().join('\0')
+      if (batch.workspaceId !== before.workspaceId || batch.actorId !== before.actorId || after.workspaceId !== before.workspaceId || after.actorId !== before.actorId
+        || [...batch.capabilities].sort().join('\0') !== expected || [...after.capabilities].sort().join('\0') !== expected
+        || !before.capabilities.includes('crew:write') || !before.capabilities.includes('crew:list:read')) {
+        throw new Error('预览期间身份、权限或资料来源变化，请重新预览')
+      }
+      if (sheet.value !== selectedSheet || mapping.value !== selectedMapping || excludedRows.value !== selectedExclusions)
+        throw new Error('文件或映射已变化，请重新预览')
+      crewPrepared.value = new Map(valid.map((item, index) => [item.index, { draft: item.draft, preview: batch.previews[index]! }]))
+    }
+    catch (cause) {
+      crewPreviewError.value = cause instanceof Error ? cause.message : '无法读取已有班组，请重试'
+      return
+    }
+    finally { crewPreviewBusy.value = false }
+  }
+  if (entityKey === 'worker') {
+    const selectedSheet = sheet.value
+    const selectedMapping = mapping.value
+    const selectedExclusions = excludedRows.value
+    workerPreviewBusy.value = true
+    workerPreviewError.value = ''
+    workerPrepared.value = new Map()
+    workerChoices.value = {}
+    workerRelations.value = {}
+    try {
+      const recovered = await useWorkerExcelImportStore().recoverPending()
+      if (recovered.applied || recovered.notApplied)
+        workerRecoveryNotice.value = `已核对上次导入：${recovered.applied} 行已保存，${recovered.notApplied} 行未保存。请重新核对本次预览后选择。`
+      const valid = keptEntries.value.flatMap(({ index, row }) => {
+        try {
+          return [{ index, draft: normalizeWorkerExcelRow(row) }]
+        }
+        catch { return [] }
+      })
+      const repository = useNuxtApp().$repositories.crewWorkerCommands
+      const before = await repository.context()
+      const batch = await repository.previewWorkerExcel(valid.map(item => item.draft))
+      const after = await repository.context()
+      const expected = [...before.capabilities].sort().join('\0')
+      if (batch.workspaceId !== before.workspaceId || batch.actorId !== before.actorId || after.workspaceId !== before.workspaceId || after.actorId !== before.actorId
+        || [...batch.capabilities].sort().join('\0') !== expected || [...after.capabilities].sort().join('\0') !== expected
+        || !['worker:write', 'worker:list:read', 'worker:sensitive:read', 'crew:list:read'].every(capability => before.capabilities.includes(capability))) {
+        throw new Error('预览期间身份、权限或资料来源变化，请重新预览')
+      }
+      if (sheet.value !== selectedSheet || mapping.value !== selectedMapping || excludedRows.value !== selectedExclusions)
+        throw new Error('文件或映射已变化，请重新预览')
+      workerPrepared.value = new Map(valid.map((item, index) => [item.index, { draft: item.draft, preview: batch.previews[index]! }]))
+    }
+    catch (cause) {
+      workerPreviewError.value = cause instanceof Error ? cause.message : '无法读取工人或关联资料，请重试'
+      return
+    }
+    finally { workerPreviewBusy.value = false }
+  }
   currentStep.value = 'preview-import'
+}
+
+function chooseSupplier(index: number, value: string) {
+  if (phase.value === 'idle')
+    supplierChoices.value = { ...supplierChoices.value, [index]: value }
+}
+function chooseCrew(index: number, value: string) {
+  if (phase.value === 'idle' && !crewStarting.value)
+    crewChoices.value = { ...crewChoices.value, [index]: value }
+}
+function chooseWorker(index: number, value: string) {
+  if (phase.value === 'idle' && !crewStarting.value)
+    workerChoices.value = { ...workerChoices.value, [index]: value }
+}
+function chooseWorkerRelation(index: number, kind: 'crew' | 'project', value: string) {
+  if (phase.value === 'idle' && !crewStarting.value)
+    workerRelations.value = { ...workerRelations.value, [index]: { ...workerRelations.value[index], [kind]: value } }
 }
 
 function backToUpload() {
@@ -89,13 +312,13 @@ function backToUpload() {
 
 function backToMapping() {
   // 已开始导入（含失败半途）不允许回改映射，避免重复入库已成功行。
-  if (phase.value !== 'idle')
+  if (phase.value !== 'idle' || crewStarting.value)
     return
   currentStep.value = 'mapping'
 }
 
 function removeRow(index: number) {
-  if (phase.value !== 'idle')
+  if (phase.value !== 'idle' || crewStarting.value)
     return
   excludedRows.value = new Set([...excludedRows.value, index])
 }
@@ -118,15 +341,131 @@ async function settle(result: ImportRunResult) {
 }
 
 async function startImport() {
-  if (!entity || phase.value === 'running' || !keptEntries.value.length)
+  if (!entity || phase.value === 'running' || crewStarting.value || !importableEntries.value.length || (entityKey === 'supplier' && supplierNeedsReview.value) || (entityKey === 'crew' && crewNeedsReview.value) || (entityKey === 'worker' && workerNeedsReview.value))
     return
-  for (const entry of keptEntries.value)
-    rowNumbers.set(entry.row, entry.index + 2)
-  await settle(await runner.start(
-    keptEntries.value.map(entry => entry.row),
-    entity.importRow,
-    entity.validateRow,
-  ))
+  if (entityKey === 'supplier') {
+    try {
+      const source = sheet.value
+      if (!source?.sourceHash)
+        throw new Error('导入文件来源不完整，请重新选择文件')
+      for (const entry of importableEntries.value)
+        setSupplierImportSource(entry.row, await supplierImportSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index)))
+    }
+    catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '无法核对导入来源')
+      return
+    }
+  }
+  if (entityKey === 'crew') {
+    crewStarting.value = true
+    try {
+      const source = sheet.value
+      const capturedMapping = mapping.value
+      const capturedExclusions = excludedRows.value
+      const capturedChoices = crewChoices.value
+      if (!source?.sourceHash)
+        throw new Error('导入文件来源不完整，请重新选择文件')
+      for (const entry of importableEntries.value) {
+        const prepared = crewPrepared.value.get(entry.index)
+        if (!prepared)
+          continue
+        const choice = crewChoices.value[entry.index]
+        const candidate = choice?.startsWith('replace:') ? prepared.preview.candidates.find(value => value.id === choice.slice(8)) : undefined
+        const decision = candidate ? { kind: 'replace' as const, fingerprint: prepared.preview.fingerprint, id: candidate.id, version: candidate.version } : { kind: 'create' as const, fingerprint: prepared.preview.fingerprint }
+        bindCrewExcelRow(entry.row, decision, await crewExcelSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index)))
+      }
+      if (sheet.value !== source || mapping.value !== capturedMapping || excludedRows.value !== capturedExclusions || crewChoices.value !== capturedChoices)
+        throw new Error('文件、映射或确认选择已变化，请重新预览')
+    }
+    catch (cause) {
+      crewStarting.value = false
+      toast.error(cause instanceof Error ? cause.message : '无法核对导入来源')
+      return
+    }
+  }
+  if (entityKey === 'worker') {
+    crewStarting.value = true
+    try {
+      const source = sheet.value
+      const capturedMapping = mapping.value
+      const capturedExclusions = excludedRows.value
+      const capturedChoices = workerChoices.value
+      const capturedRelations = workerRelations.value
+      if (!source?.sourceHash)
+        throw new Error('导入文件来源不完整，请重新选择文件')
+      for (const entry of importableEntries.value) {
+        const prepared = workerPrepared.value.get(entry.index)
+        if (!prepared)
+          continue
+        const choice = workerChoices.value[entry.index]
+        const target = choice?.startsWith('replace:') ? prepared.preview.candidates.find(value => value.id === choice.slice(8)) : undefined
+        const relations = workerRelations.value[entry.index]
+        const crew = prepared.preview.crews.find(value => value.id === relations?.crew)
+        const project = prepared.preview.projects.find(value => value.id === relations?.project)
+        const decision = { ...(target ? { kind: 'replace' as const, id: target.id, version: target.version } : { kind: 'create' as const }), fingerprint: prepared.preview.fingerprint, ...(crew ? { crew: { id: crew.id, version: crew.version } } : {}), ...(project ? { project: { id: project.id, version: project.version } } : {}) }
+        bindWorkerExcelRow(entry.row, decision, await workerExcelSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index)))
+      }
+      if (sheet.value !== source || mapping.value !== capturedMapping || excludedRows.value !== capturedExclusions || workerChoices.value !== capturedChoices || workerRelations.value !== capturedRelations)
+        throw new Error('文件、映射或确认选择已变化，请重新预览')
+    }
+    catch (cause) {
+      crewStarting.value = false
+      toast.error(cause instanceof Error ? cause.message : '无法核对导入来源')
+      return
+    }
+  }
+  for (const entry of importableEntries.value) {
+    rowNumbers.set(entry.row, sourceRowNumber(entry.index))
+    if (entityKey === 'supplier') {
+      const prepared = supplierPrepared.value.get(entry.index)
+      if (prepared) {
+        const choice = supplierChoices.value[entry.index]
+        const candidate = choice?.startsWith('replace:') ? prepared.preview.candidates.find(value => value.id === choice.slice(8)) : undefined
+        setSupplierImportDecision(entry.row, candidate
+          ? { kind: 'replace', fingerprint: prepared.preview.fingerprint, id: candidate.id, version: candidate.version }
+          : { kind: 'create', fingerprint: prepared.preview.fingerprint })
+      }
+    }
+  }
+  try {
+    await settle(await runner.start(
+      importableEntries.value.map(entry => entry.row),
+      entity.importRow,
+      entity.validateRow,
+    ))
+  }
+  finally { crewStarting.value = false }
+}
+
+async function recoverSupplierImport() {
+  try {
+    const result = await useSupplierCommandStore().recoverPendingImports()
+    runner.reset()
+    supplierRecoveryNotice.value = `已核对上次导入：${result.applied} 行已保存，${result.notApplied} 行未保存。请重新核对本次预览后选择。`
+    currentStep.value = 'mapping'
+  }
+  catch (cause) {
+    toast.error(cause instanceof Error ? cause.message : '暂时无法核对原导入，请保留当前页面')
+  }
+}
+
+async function recoverCrewImport() {
+  try {
+    const result = await useCrewExcelImportStore().recoverPending()
+    runner.reset()
+    crewRecoveryNotice.value = `已核对上次导入：${result.applied} 行已保存，${result.notApplied} 行未保存。请重新核对本次预览后选择。`
+    currentStep.value = 'mapping'
+  }
+  catch (cause) { toast.error(cause instanceof Error ? cause.message : '暂时无法核对原导入，请保留当前页面') }
+}
+async function recoverWorkerImport() {
+  try {
+    const result = await useWorkerExcelImportStore().recoverPending()
+    runner.reset()
+    workerRecoveryNotice.value = `已核对上次导入：${result.applied} 行已保存，${result.notApplied} 行未保存。请重新核对本次预览后选择。`
+    currentStep.value = 'mapping'
+  }
+  catch (cause) { toast.error(cause instanceof Error ? cause.message : '暂时无法核对原导入，请保留当前页面') }
 }
 
 async function retryImport() {
@@ -193,7 +532,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <ProjectImportScreen v-if="entityKey === 'project'" />
+  <MaterialExcelImportScreen v-if="entityKey === 'material-contract'" />
+  <ProjectImportScreen v-else-if="entityKey === 'project'" />
   <main v-else class="mx-auto max-w-4xl py-3" aria-labelledby="import-mapping-title">
     <template v-if="entity">
       <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -217,6 +557,12 @@ onUnmounted(() => {
       </div>
 
       <section v-if="currentStep === 'upload'" aria-label="第一步：上传">
+        <p v-if="entityKey === 'crew'" class="mb-3 text-12px text-ink-soft">
+          先下载并填写 <a :href="`${baseURL}templates/crew-excel-template.xlsx`" download="班组批量导入模板.xlsx" class="text-brand underline">班组 Excel 参考模板</a>；填写后选择“班组资料”工作表。
+        </p>
+        <p v-if="entityKey === 'worker'" class="mb-3 text-12px text-ink-soft">
+          先下载并填写 <a :href="`${baseURL}templates/worker-excel-template.xlsx`" download="工人批量导入模板.xlsx" class="text-brand underline">工人 Excel 参考模板</a>；填写后选择“工人资料”工作表。
+        </p>
         <InvoiceWorkbookUploadStep v-if="entityKey === 'invoice'" @loaded="onLoaded" />
         <ImportUploadStep v-else @loaded="onLoaded" />
         <div class="mt-4 flex justify-end">
@@ -235,6 +581,24 @@ onUnmounted(() => {
           @select="selectColumn"
           @confirm="confirmSuggestion"
         />
+        <p v-if="supplierPreviewError" role="alert" class="mt-2 text-12px text-danger">
+          {{ supplierPreviewError }}
+        </p>
+        <p v-if="supplierRecoveryNotice" role="status" class="mt-2 text-12px text-ink-soft">
+          {{ supplierRecoveryNotice }}
+        </p>
+        <p v-if="crewPreviewError" role="alert" class="mt-2 text-12px text-danger">
+          {{ crewPreviewError }}
+        </p>
+        <p v-if="crewRecoveryNotice" role="status" class="mt-2 text-12px text-ink-soft">
+          {{ crewRecoveryNotice }}
+        </p>
+        <p v-if="workerPreviewError" role="alert" class="mt-2 text-12px text-danger">
+          {{ workerPreviewError }}
+        </p>
+        <p v-if="workerRecoveryNotice" role="status" class="mt-2 text-12px text-ink-soft">
+          {{ workerRecoveryNotice }}
+        </p>
 
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3">
           <p
@@ -254,7 +618,7 @@ onUnmounted(() => {
             <Button variant="outline" @click="backToUpload">
               重新上传
             </Button>
-            <KitButton variant="primary" :disabled="missingRequired.length > 0" @click="goPreview">
+            <KitButton variant="primary" :disabled="missingRequired.length > 0 || supplierPreviewBusy || crewPreviewBusy || workerPreviewBusy" :loading="supplierPreviewBusy || crewPreviewBusy || workerPreviewBusy" @click="goPreview">
               下一步
             </KitButton>
           </div>
@@ -269,6 +633,18 @@ onUnmounted(() => {
           :locked="phase !== 'idle'"
           @remove="removeRow"
         />
+        <SupplierImportReview v-if="entityKey === 'supplier'" :entries="supplierReviewEntries" :fields="fields" :choices="supplierChoices" :locked="phase !== 'idle'" @choose="chooseSupplier" />
+        <CrewExcelReview v-if="entityKey === 'crew'" :entries="crewReviewEntries" :fields="fields" :choices="crewChoices" :locked="phase !== 'idle' || crewStarting" @choose="chooseCrew" />
+        <WorkerExcelReview v-if="entityKey === 'worker'" :entries="workerReviewEntries" :fields="fields" :choices="workerChoices" :relations="workerRelations" :locked="phase !== 'idle' || crewStarting" @choose="chooseWorker" @relation="chooseWorkerRelation" />
+        <p v-if="supplierRecoveryNotice" role="status" class="mt-2 text-12px text-ink-soft">
+          {{ supplierRecoveryNotice }}
+        </p>
+        <p v-if="crewRecoveryNotice" role="status" class="mt-2 text-12px text-ink-soft">
+          {{ crewRecoveryNotice }}
+        </p>
+        <p v-if="workerRecoveryNotice" role="status" class="mt-2 text-12px text-ink-soft">
+          {{ workerRecoveryNotice }}
+        </p>
 
         <div
           v-if="phase !== 'idle'"
@@ -353,6 +729,15 @@ onUnmounted(() => {
             <KitButton variant="danger" @click="retryImport">
               重试失败行
             </KitButton>
+            <Button v-if="entityKey === 'supplier'" variant="outline" @click="recoverSupplierImport">
+              核对原提交并重新预览
+            </Button>
+            <Button v-if="entityKey === 'crew'" variant="outline" @click="recoverCrewImport">
+              核对原提交并重新预览
+            </Button>
+            <Button v-if="entityKey === 'worker'" variant="outline" @click="recoverWorkerImport">
+              核对原提交并重新预览
+            </Button>
             <Button variant="ghost" @click="closeImportTab">
               取消
             </Button>
@@ -375,7 +760,7 @@ onUnmounted(() => {
             </Button>
             <KitButton
               variant="accent"
-              :disabled="!keptEntries.length"
+              :disabled="!importableEntries.length || crewStarting || (entityKey === 'supplier' && supplierNeedsReview) || (entityKey === 'crew' && crewNeedsReview) || (entityKey === 'worker' && workerNeedsReview)"
               :loading="phase === 'running'"
               @click="startImport"
             >

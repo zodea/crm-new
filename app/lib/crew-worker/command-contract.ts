@@ -5,6 +5,8 @@ import type {
   MasterDataSaveAction,
   WorkerFormDraft,
 } from '../master-data/forms'
+import type { CrewExcelDraft, CrewExcelImportCommand, CrewExcelPreviewBatch } from './excel-import-contract'
+import type { WorkerExcelDraft, WorkerExcelImportCommand, WorkerExcelPreviewBatch } from './worker-excel-contract'
 
 export const CREW_WRITE_CAPABILITY = 'crew:write' as const
 export const WORKER_WRITE_CAPABILITY = 'worker:write' as const
@@ -64,4 +66,8 @@ export interface CrewWorkerCommandRepository {
   executeWorker: (request: WorkerCommandRequestDTO) => Promise<CrewWorkerCommandResultDTO>
   resolveCrew: (commandId: string) => Promise<CommandResolution<CrewWorkerCommandResultDTO>>
   resolveWorker: (commandId: string) => Promise<CommandResolution<CrewWorkerCommandResultDTO>>
+  previewCrewExcel: (drafts: CrewExcelDraft[]) => Promise<CrewExcelPreviewBatch>
+  importCrewExcel: (request: CrewExcelImportCommand) => Promise<CrewWorkerCommandResultDTO>
+  previewWorkerExcel: (drafts: WorkerExcelDraft[]) => Promise<WorkerExcelPreviewBatch>
+  importWorkerExcel: (request: WorkerExcelImportCommand) => Promise<CrewWorkerCommandResultDTO>
 }

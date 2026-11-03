@@ -10,7 +10,7 @@ import { buildSupplierDetailRead, buildSupplierListPage, parseSupplierDetailQuer
 import { projectSupplierPartialFacts, readProductionSupplierFacts, supplierFactUnavailableSources } from './production-supplier-facts'
 import { productionSupplierFailure as fail, loadProductionSuppliers, saveProductionSuppliers } from './production-supplier-record'
 import { createReadMeta, readQueryScope, withOriginReadMeta, withReadMeta } from './read-meta'
-import { parseSupplierCommandRequest, parseSupplierImportCommandRequest } from './supplier-command-request'
+import { parseSupplierCommandRequest, parseSupplierImportCommandRequest, parseSupplierImportPreviewRequest } from './supplier-command-request'
 import { createSupplierCommandService } from './supplier-command-service'
 import { createPersistentSupplierCredentialOcrService } from './supplier-credential-ocr-service'
 import { createSupplierCredentialService } from './supplier-credential-service'
@@ -26,7 +26,7 @@ function masterRequest(value: unknown, routeId?: string, imported = false) {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return fail('validation-failed', '分供方命令格式无效。')
   const input = value as Record<string, unknown>
-  const allowed = imported ? ['workspaceId', 'actorId', 'requiredCapability', 'commandId', 'draft'] : ['id', 'workspaceId', 'actorId', 'requiredCapability', 'commandId', 'baseVersion', 'action', 'draft', 'attachments']
+  const allowed = imported ? ['workspaceId', 'actorId', 'requiredCapability', 'commandId', 'draft', 'decision'] : ['id', 'workspaceId', 'actorId', 'requiredCapability', 'commandId', 'baseVersion', 'action', 'draft', 'attachments']
   if (Object.keys(input).some(key => !allowed.includes(key)))
     return fail('validation-failed', '正式分供方命令含不受支持的字段。')
   productionSupplierId(input.commandId)
@@ -112,6 +112,10 @@ export function createProductionSupplierService(storage: ProductionStorage, opti
     importRow(value: unknown, session: Session) {
       const command = masterRequest(value, undefined, true)
       return run(session, true, (service, actor) => service.importRow(command, actor), command.commandId, 'master')
+    },
+    previewImport(value: unknown, session: Session) {
+      const drafts = parseSupplierImportPreviewRequest(value)
+      return run(session, false, (service, actor) => ({ workspaceId: actor.workspaceId, actorId: actor.actorId, capabilities: [...actor.capabilities], previews: service.previewImport(drafts, actor) }))
     },
     form(id: string, session: Session) {
       productionSupplierId(id)

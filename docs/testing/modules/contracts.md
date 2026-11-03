@@ -8,6 +8,12 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/material-contract/excel-import.test.ts](../../../tests/material-contract/excel-import.test.ts) | 单元／服务／状态 | 两表分组、来源行、金额及编号口径 |
+| [tests/production/material-excel-import.test.ts](../../../tests/production/material-excel-import.test.ts) | 正式合成磁盘 | 整批合同、明细、原件和施工关联原子保存，故障回滚与冷重放 |
+| [tests/stores/material-excel-import.test.ts](../../../tests/stores/material-excel-import.test.ts) | 单元／服务／状态 | 匿名原批次恢复、同目标后读和混合回执拒绝 |
+| [tests/components/MaterialExcelImportScreen.test.ts](../../../tests/components/MaterialExcelImportScreen.test.ts) | 组件（jsdom） | 关联确认和已有明细冲突阻断 |
+| [tests/browser/MaterialExcelImportScreen.test.ts](../../../tests/browser/MaterialExcelImportScreen.test.ts) | 浏览器组件 | 文件选择、键盘焦点、关联选择和多视口；不替代正式整页旅程 |
+| [e2e/production-material-excel-import.spec.ts](../../../e2e/production-material-excel-import.spec.ts) | 正式隔离 Playwright | 填写实际模板、整批关联、丢响应后重启核对及每份合同原字节 |
 | [e2e/issue-277-material-contract-supplier-zero-chain.spec.ts](../../../e2e/issue-277-material-contract-supplier-zero-chain.spec.ts) | Playwright E2E | Issue #277：项目—材采合同—分供方零值只读样板链 |
 | [e2e/issue-318-material-contract-detail.spec.ts](../../../e2e/issue-318-material-contract-detail.spec.ts) | Playwright E2E | Issue #318：材料采购合同中央只读详情；正式新建、编辑及施工主合同关系回读在生产验收中验证 |
 | [e2e/issue-422-material-contract-list.spec.ts](../../../e2e/issue-422-material-contract-list.spec.ts) | Playwright E2E | Issue #422 材料采购合同列表 |

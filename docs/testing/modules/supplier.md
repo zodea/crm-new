@@ -68,7 +68,9 @@
 | [e2e/supplier-crud.spec.ts](../../../e2e/supplier-crud.spec.ts) | Playwright E2E | 两类正式分供方新建、显式编辑、冷回读与页签复用；中央行菜单仅提供只读入口，旧本地删除由数据库及通用主数据测试覆盖 |
 | [e2e/supplier-detail.spec.ts](../../../e2e/supplier-detail.spec.ts) | Playwright E2E | 真实读源缺口及完整合成读模型的六类事实界面、证照软删除撤回与列表双页联动；合成读模型不代表收票来源已接入 |
 | [e2e/supplier-export.spec.ts](../../../e2e/supplier-export.spec.ts) | Playwright E2E | 过渡契约：中央分供方列表不显示未接入的导出（#406/#407） |
-| [e2e/supplier-import.spec.ts](../../../e2e/supplier-import.spec.ts) | Playwright E2E | 中央导入：信用代码和唯一识别码独立映射，同外部旧 ID 重导更新并保留未映射资料 |
+| [e2e/supplier-import.spec.ts](../../../e2e/supplier-import.spec.ts) | Playwright E2E | 中央导入：独立映射编码，预览冲突并确认替换、保留未映射资料，同文件重复行跳过及多视口核对 |
+| [e2e/production-supplier-excel-import.spec.ts](../../../e2e/production-supplier-excel-import.spec.ts) | 正式隔离 Playwright | 分供方同名与重复行、明确替换、未映射字段及断线重启恢复 |
+| [tests/browser/SupplierImportReview.test.ts](../../../tests/browser/SupplierImportReview.test.ts) | 浏览器组件 | 分页、键盘选择、焦点及冲突对比表局部横向滚动；不替代整页导入旅程 |
 | [e2e/supplier-list-replica.spec.ts](../../../e2e/supplier-list-replica.spec.ts) | Playwright E2E | ${width}px：完整列、紧凑标签、表格内滚动及可访问工具 |
 | [e2e/supplier-multifilter.spec.ts](../../../e2e/supplier-multifilter.spec.ts) | Playwright E2E | ${width}px 固定枚举复选与表头联动，返回链接保留组合且清空恢复全量 |
 | [e2e/supplier-reference-layout.spec.ts](../../../e2e/supplier-reference-layout.spec.ts) | Playwright E2E | Issue #193/#206：两类正式主档、脱敏、局部滚动、类别选择及独立证照入口 |

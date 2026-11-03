@@ -5,12 +5,14 @@ import type {
   SupplierCommandResultDTO,
   SupplierFormReadDTO,
   SupplierImportCommandRequestDTO,
+  SupplierImportDraft,
+  SupplierImportPreview,
 } from '../../app/lib/supplier/command-contract'
 import type { SupplierCredentialAggregate } from '../../app/lib/supplier/credential-domain'
 import type { SupplierListSourceRow } from '../../app/lib/supplier/repository'
 import type { BusinessSession } from './business-session'
 import type { SupplierCredentialScope } from './supplier-credential-service'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { supplierCredentialMasterDraft } from '../../app/lib/migration/supplier-credential-source'
 import { SUPPLIER_WRITE_CAPABILITY } from '../../app/lib/supplier/command-contract'
 import { SupplierCredentialNotAppliedProblem } from '../../app/lib/supplier/credential-contract'
@@ -18,6 +20,7 @@ import { credentialMasterChanged, credentialRecords, currentCredentialStatus, em
 import { shanghaiBusinessDate } from '../../app/lib/supplier/credentials'
 import { supplierProblem, SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
 import { preserveTaxpayerVerification } from '../../app/lib/supplier/taxpayer-verification'
+import { maskBankAccount, maskIdentifier, maskPhone } from '../../app/lib/util/privacy'
 import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 import { migratedSupplierCredentialMaster, prepareSupplierCredentialMigration } from './supplier-credential-migration'
 
@@ -60,6 +63,36 @@ function text(value: unknown): string {
 
 function failure(code: 'forbidden' | 'validation-failed' | 'not-found' | 'conflict', message: string, fieldErrors: Record<string, string[]> = {}): SupplierRepositoryProblem {
   return new SupplierRepositoryProblem({ ...supplierProblem(code, message), fieldErrors })
+}
+
+const sensitiveImportFields = new Set(['uniqueCode', 'taxNo', 'bankAccount', 'phone', 'contactPhone'])
+const normalizeMatch = (value: unknown) => text(value).replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN')
+
+function importPreview(state: SessionState, draft: SupplierImportDraft, session: BusinessSession): SupplierImportPreview {
+  if (!session.capabilities.includes(SUPPLIER_WRITE_CAPABILITY) || !session.capabilities.includes('supplier:list:read'))
+    throw failure('forbidden', '无分供方导入预览权限')
+  const sensitive = session.capabilities.includes('supplier:sensitive:read')
+  if (!sensitive && ['uniqueCode', 'taxNo'].some(key => Object.hasOwn(draft, key)))
+    throw failure('forbidden', '导入内部编码或信用代码需要敏感资料查看权限，无法核对重复资料')
+  const matchFields = ['name', 'externalRef', ...(sensitive ? ['uniqueCode', 'taxNo'] : [])] as const
+  const candidates = [...state.suppliers.values()].flatMap((item) => {
+    const matchedBy = matchFields.filter(key => normalizeMatch(draft[key as keyof SupplierImportDraft]) !== '' && normalizeMatch(draft[key as keyof SupplierImportDraft]) === normalizeMatch(item.draft[key as keyof SupplierFormDraft])) as SupplierImportPreview['candidates'][number]['matchedBy']
+    if (!matchedBy.length)
+      return []
+    const fields: Record<string, unknown> = {}
+    for (const key of Object.keys(draft)) {
+      const raw = item.draft[key as keyof SupplierFormDraft]
+      fields[key] = !sensitive && sensitiveImportFields.has(key)
+        ? key === 'bankAccount' ? maskBankAccount(text(raw)) : key === 'phone' || key === 'contactPhone' ? maskPhone(text(raw)) : maskIdentifier(text(raw))
+        : raw ?? null
+    }
+    return [{ id: item.id, version: String(item.version), name: text(item.draft.name), matchedBy, fields: fields as SupplierImportDraft }]
+  }).sort((a, b) => a.id.localeCompare(b.id))
+  if (!sensitive && candidates.length && Object.keys(draft).some(key => sensitiveImportFields.has(key)))
+    throw failure('forbidden', '候选资料包含受限识别码、账号或电话，需要敏感资料查看权限后核对')
+  const canonicalDraft = Object.fromEntries(Object.keys(draft).sort().map(key => [key, draft[key as keyof SupplierImportDraft]]))
+  const fingerprint = createHash('sha256').update(JSON.stringify({ draft: canonicalDraft, candidates: candidates.map(({ id, version }) => ({ id, version })) })).digest('hex')
+  return { candidates, fingerprint }
 }
 
 function cleanDraft(value: SupplierFormDraft): SupplierFormDraft {
@@ -230,6 +263,12 @@ export function createSupplierCommandService(options: Options = {}) {
   }
 
   const instance = {
+    previewImport(drafts: readonly SupplierImportDraft[], session: BusinessSession, sessionId?: string | null): SupplierImportPreview[] {
+      if (!Array.isArray(drafts) || drafts.length > 5000)
+        throw failure('validation-failed', '导入预览最多支持 5000 行')
+      const state = stateFor(sessionId)
+      return drafts.map(draft => importPreview(state, draft, session))
+    },
     snapshot(sessionId?: string | null): SupplierCommandState {
       return cloneState(stateFor(sessionId))
     },
@@ -361,19 +400,24 @@ export function createSupplierCommandService(options: Options = {}) {
       const duplicate = state.commands.get(request.commandId)
       if (duplicate)
         return { ...duplicate, attachmentIds: [] }
+      const preview = importPreview(state, request.draft, session)
+      if (preview.candidates.length && !request.decision)
+        throw failure('conflict', '发现可能已有的分供方，请预览并确认新建或替换')
+      if (request.decision && request.decision.fingerprint !== preview.fingerprint)
+        throw failure('conflict', '候选资料或导入内容已变化，请重新预览')
+      const selected = request.decision?.kind === 'replace' ? request.decision : null
+      const existing = selected ? state.suppliers.get(selected.id) : undefined
+      if (selected && (!existing || String(existing.version) !== selected.version || !preview.candidates.some(candidate => candidate.id === selected.id && candidate.version === selected.version)))
+        throw failure('conflict', '选择的分供方或版本已变化，请重新预览')
       const externalRef = text(request.draft.externalRef)
-      const matches = externalRef
-        ? [...state.suppliers.values()].filter(item => text(item.draft.externalRef) === externalRef)
-        : []
-      if (matches.length > 1)
-        throw failure('conflict', '外部旧 ID 对应多个分供方，请先核对匹配标识', { externalRef: ['外部旧 ID 未唯一匹配'] })
-      const existing = matches[0]
+      if (externalRef && [...state.suppliers.values()].some(item => item.id !== existing?.id && text(item.draft.externalRef) === externalRef))
+        throw failure('conflict', '外部旧 ID 已关联其他分供方，请核对后修改或选择正确记录')
       // 查找、合并与 execute 的写入在同一同步段内完成；不以客户端分页结果推测匹配。
-      // 新建沿既定最小导入合同；重导只覆盖明确映射的字段，核验结论由原有规则维护。
+      // 只有明确选择替换才合并现有主档；只覆盖映射字段，核验结论由原有规则维护。
       const draft: SupplierFormDraft = {
         ...(existing?.draft ?? { aliases: [], supplierCategory: '其他', taxpayerType: '未核验', approvalStatus: 'draft' }),
         ...request.draft,
-        externalRef,
+        externalRef: Object.hasOwn(request.draft, 'externalRef') ? externalRef : existing?.draft.externalRef ?? '',
       }
       state.importFingerprints.set(request.commandId, fingerprint)
       return instance.execute({

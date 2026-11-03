@@ -245,6 +245,9 @@ useTabTitle('材料采购合同')
         <span class="i-lucide-search pointer-events-none absolute left-2.5 top-1/2 text-14px text-ink-faint -translate-y-1/2" aria-hidden="true" />
         <input v-model="search" type="search" class="field-input h-8 min-w-0 w-full pl-8 text-13px" placeholder="搜索合同名称或编号" aria-label="搜索材料采购合同">
       </div>
+      <NuxtLink v-if="canCreate" to="/import/mapping/material-contract" class="btn-secondary min-h-8 text-13px">
+        导入采购合同
+      </NuxtLink>
       <NuxtLink v-if="canCreate" to="/contract/material/form" class="btn-primary min-h-8 text-13px">
         新建材料采购合同
       </NuxtLink>

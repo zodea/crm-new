@@ -96,11 +96,15 @@ it('磁盘冷打开保留主档、原件、人工核验、原回执及导入指�
     expect(read.supplierVersion).toBe(verified.supplierVersion)
     expect(await service.file({ supplierId: state.created.id, credentialId: original.id, fileId: original.file!.id, origin: 'real' }, session)).toMatchObject({ state: 'available', payloadBase64: bytes.toString('base64') })
     expect((await service.form(state.created.id, session)).draft).toMatchObject(verified.verification)
-    const imported = { workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier:write', commandId: 'import-supplier', draft: { name: '合成更新名称', externalRef: 'synthetic-external-key', note: '导入保留证照' } }
+    const draft = { name: '合成分供方', note: '导入保留证照' }
+    const preview = (await service.previewImport({ drafts: [draft] }, session)).previews[0]!
+    const target = preview.candidates.find(value => value.id === state.created.id)!
+    const imported = { workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier:write', commandId: 'import-supplier', draft, decision: { kind: 'replace', fingerprint: preview.fingerprint, id: target.id, version: target.version } }
     const result = await service.importRow(imported, session)
     expect(result.id).toBe(state.created.id)
     await reopened.close()
     expect(await service.importRow(imported, session)).toEqual(result)
+    expect((await service.form(state.created.id, session)).draft.externalRef).toBe('synthetic-external-key')
     expect((await service.rows(session)).rows).toHaveLength(1)
     await expect(service.execute({ ...command, draft: { ...command.draft, name: '不能改用原键' } }, session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await expect(service.file({ supplierId: state.created.id, credentialId: original.id, fileId: original.file!.id, origin: 'real' }, () => ({ ...actor, capabilities: ['supplier:list:read'] }))).rejects.toMatchObject({ problem: { code: 'forbidden' } })

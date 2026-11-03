@@ -5,8 +5,10 @@ import type {
   WorkerCommandRequestDTO,
   WorkerFormReadDTO,
 } from '../../app/lib/crew-worker/command-contract'
+import type { CrewExcelDraft, CrewExcelImportCommand, CrewExcelPreview } from '../../app/lib/crew-worker/excel-import-contract'
 import type { CrewPayrollFeeValues } from '../../app/lib/crew-worker/payroll-fee-defaults'
 import type { CrewSourceRow, WorkerSourceRow } from '../../app/lib/crew-worker/read-contract'
+import type { WorkerExcelDraft, WorkerExcelImportCommand, WorkerExcelPreview, WorkerExcelReference } from '../../app/lib/crew-worker/worker-excel-contract'
 import type { CrewFormDraft, WorkerFormDraft } from '../../app/lib/master-data/forms'
 import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { PayrollCrewFeeDefaults } from '../../app/lib/payroll/central-a-fees-contract'
@@ -20,7 +22,7 @@ import {
 } from '../../app/lib/crew-worker/command-contract'
 import { CREW_PAYROLL_FEE_FIELDS, crewPayrollFeeValues, updatedCrewPayrollFeeValues } from '../../app/lib/crew-worker/payroll-fee-defaults'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from '../../app/lib/crew-worker/read-contract'
-import { commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
+import { commandFingerprint, commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
 import { assertRetainedMigrationReferences, migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 
 export interface CrewWorkerStored<TDraft> {
@@ -46,6 +48,7 @@ export interface CrewWorkerCommandOptions {
   createId?: (kind: 'crew' | 'worker') => string
   now?: () => string
   projectIds?: (sessionId?: string | null) => readonly string[]
+  projectReferences?: (sessionId?: string | null) => readonly WorkerExcelReference[]
 }
 
 function text(value: unknown): string {
@@ -154,6 +157,7 @@ export function createCrewWorkerCommandService(options: CrewWorkerCommandOptions
   const createId = options.createId ?? (() => randomUUID())
   const now = options.now ?? (() => new Date().toISOString())
   const projectIds = options.projectIds ?? (() => [])
+  const projectReferences = options.projectReferences ?? (() => [])
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
   const stateFor = (sessionId?: string | null) => {
     const key = keyFor(sessionId)
@@ -170,13 +174,17 @@ export function createCrewWorkerCommandService(options: CrewWorkerCommandOptions
     request: CrewCommandRequestDTO | WorkerCommandRequestDTO
     session: BusinessSession
     sessionId?: string | null
+    journalRequest?: { commandId: string }
+    preserveCrewStatus?: boolean
+    preserveWorkerStatus?: boolean
+    explicitCrewFeeFields?: readonly string[]
   }): Promise<CrewWorkerCommandResultDTO> {
     const requiredCapability = input.kind === 'crew' ? CREW_WRITE_CAPABILITY : WORKER_WRITE_CAPABILITY
     assertIdentity(input.request, input.session, requiredCapability)
     assertEmptyAttachments(input.request.attachments)
     const state = stateFor(input.sessionId)
     input = structuredClone(input)
-    const { key: commandKey, previous: duplicate } = commandReplay(state, input.request, input.session, input.kind, message => fail('conflict', message))
+    const { key: commandKey, previous: duplicate } = commandReplay(state, input.journalRequest ?? input.request, input.session, input.kind, message => fail('conflict', message))
     if (duplicate)
       return { ...duplicate, attachmentIds: [] }
     const records = (input.kind === 'crew' ? state.crews : state.workers) as Map<string, CrewWorkerStored<TDraft>>
@@ -206,7 +214,8 @@ export function createCrewWorkerCommandService(options: CrewWorkerCommandOptions
         throw fail('validation-failed', '发放比例必须在 0 到 1 之间', { defaultPayRatio: ['发放比例必须在 0 到 1 之间'] })
       if ([...state.crews.values()].some(item => item.id !== input.request.id && text(item.draft.name) === text(crewDraft.name)))
         throw fail('validation-failed', '班组名称已存在', { name: ['班组名称已存在'] })
-      crewDraft.status = lifecycle(input.request.action)
+      if (!input.preserveCrewStatus)
+        crewDraft.status = lifecycle(input.request.action)
     }
     else {
       const workerDraft = draft as WorkerFormDraft
@@ -220,14 +229,16 @@ export function createCrewWorkerCommandService(options: CrewWorkerCommandOptions
         if (!projectIds(input.sessionId).includes(workerDraft.currentProjectId))
           throw fail('validation-failed', '当前项目不存在或来源不匹配', { currentProjectId: ['必须选择同工作区真实项目'] })
       }
-      workerDraft.status = lifecycle(input.request.action)
+      if (!input.preserveWorkerStatus)
+        workerDraft.status = lifecycle(input.request.action)
     }
     const id = existing?.id ?? createId(input.kind)
     const timestamp = now()
     const stored: CrewWorkerStored<TDraft> = { id, draft: { ...draft, id }, version: (existing?.version ?? 0) + 1, updatedAt: timestamp, migrationBatchId: existing?.migrationBatchId ?? null, ...(existing?.linkedWorkerId !== undefined ? { linkedWorkerId: existing.linkedWorkerId } : {}) }
     if (input.kind === 'crew') {
       try {
-        stored.payrollFeeDefaults = updatedCrewPayrollFeeValues(draft, existing ? { draft: existing.draft, values: existing.payrollFeeDefaults ?? updatedCrewPayrollFeeValues(existing.draft) } : undefined)
+        const previousDraft = existing ? Object.fromEntries(Object.entries(existing.draft).filter(([key]) => !input.explicitCrewFeeFields?.includes(key))) : null
+        stored.payrollFeeDefaults = updatedCrewPayrollFeeValues(draft, existing ? { draft: previousDraft!, values: existing.payrollFeeDefaults ?? updatedCrewPayrollFeeValues(existing.draft) } : undefined)
       }
       catch (cause) { throw fail('validation-failed', cause instanceof Error ? cause.message : '班组费用默认无效') }
     }
@@ -236,6 +247,54 @@ export function createCrewWorkerCommandService(options: CrewWorkerCommandOptions
     const result = { id, commandId: input.request.commandId, version: String(stored.version), updatedAt: timestamp, attachmentIds: [] }
     state.commands.set(commandKey, result)
     return { ...result, attachmentIds: [] }
+  }
+
+  function previewCrewExcel(draft: CrewExcelDraft, session: BusinessSession, sessionId?: string | null): CrewExcelPreview {
+    if (!session.capabilities.includes('crew:list:read') || !session.capabilities.includes(CREW_WRITE_CAPABILITY))
+      throw fail('forbidden', '无班组导入预览权限')
+    const name = text(draft.name).replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN')
+    if (!name)
+      throw fail('validation-failed', '班组名称必填')
+    const candidates = [...stateFor(sessionId).crews.values()]
+      .filter(item => !item.deletedAt && text(item.draft.name).replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN') === name)
+      .map((item) => {
+        const facts = item.payrollFeeDefaults ?? updatedCrewPayrollFeeValues(item.draft)
+        const fields = Object.fromEntries(Object.keys(draft).map((key) => {
+          const fee = CREW_PAYROLL_FEE_FIELDS.find(field => field.attribute === key)
+          const fact = fee ? facts[fee.fact] : null
+          return [key, fact ? fact.state === 'value' ? fact.value : null : (item.draft as Record<string, unknown>)[key] ?? null]
+        })) as CrewExcelDraft
+        return { id: item.id, version: String(item.version), name: text(item.draft.name), fields }
+      })
+      .sort((a, b) => a.id.localeCompare(b.id))
+    return { fingerprint: commandFingerprint({ draft, candidates: candidates.map(({ id, version }) => ({ id, version })) }), candidates }
+  }
+
+  function previewWorkerExcel(draft: WorkerExcelDraft, session: BusinessSession, sessionId?: string | null): WorkerExcelPreview {
+    if (!['worker:list:read', 'worker:write', 'worker:sensitive:read', 'crew:list:read'].every(capability => session.capabilities.includes(capability)))
+      throw fail('forbidden', '工人导入需要工人写入、目录及私密资料查看权限')
+    if (draft.projectName && !session.capabilities.includes('project:list:read'))
+      throw fail('forbidden', '无项目目录权限，无法核对当前项目')
+    const normalize = (value: unknown) => text(value).replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN')
+    if (!normalize(draft.name))
+      throw fail('validation-failed', '工人姓名必填')
+    const state = stateFor(sessionId)
+    const projects = draft.projectName ? projectReferences(sessionId).filter(item => normalize(item.name) === normalize(draft.projectName)).map(item => ({ ...item })).sort((a, b) => a.id.localeCompare(b.id)) : []
+    const crews = draft.crewName ? [...state.crews.values()].filter(item => !item.deletedAt && normalize(item.draft.name) === normalize(draft.crewName)).map(item => ({ id: item.id, name: text(item.draft.name), version: String(item.version) })).sort((a, b) => a.id.localeCompare(b.id)) : []
+    const candidates = [...state.workers.values()].filter(item => !item.deletedAt).flatMap((item) => {
+      const matchedBy = (['name', 'idCard', 'phone'] as const).filter(key => normalize(draft[key]) && normalize(draft[key]) === normalize(item.draft[key]))
+      if (!matchedBy.length)
+        return []
+      const fields = Object.fromEntries(Object.keys(draft).map((key) => {
+        if (key === 'crewName')
+          return [key, item.draft.crewId ? state.crews.get(item.draft.crewId)?.draft.name ?? null : null]
+        if (key === 'projectName')
+          return [key, item.draft.currentProjectId ? projectReferences(sessionId).find(project => project.id === item.draft.currentProjectId)?.name ?? null : null]
+        return [key, (item.draft as Record<string, unknown>)[key] ?? null]
+      }))
+      return [{ id: item.id, name: text(item.draft.name), version: String(item.version), matchedBy, fields }]
+    }).sort((a, b) => a.id.localeCompare(b.id))
+    return { fingerprint: commandFingerprint({ draft, candidates: candidates.map(({ id, version }) => ({ id, version })), crews, projects }), candidates, crews, projects }
   }
 
   return {
@@ -335,8 +394,79 @@ export function createCrewWorkerCommandService(options: CrewWorkerCommandOptions
     executeCrew(request: CrewCommandRequestDTO, session: BusinessSession, sessionId?: string | null) {
       return execute<CrewFormDraft>({ kind: 'crew', request, session, sessionId })
     },
+    previewCrewExcel(drafts: readonly CrewExcelDraft[], session: BusinessSession, sessionId?: string | null) {
+      return drafts.map(draft => previewCrewExcel(draft, session, sessionId))
+    },
+    async importCrewExcel(request: CrewExcelImportCommand, session: BusinessSession, sessionId?: string | null) {
+      assertIdentity(request, session, CREW_WRITE_CAPABILITY)
+      if (!session.capabilities.includes('crew:list:read'))
+        throw fail('forbidden', '无班组导入预览权限')
+      const state = stateFor(sessionId)
+      const replay = commandReplay(state, request, session, 'crew', message => fail('conflict', message))
+      if (replay.previous)
+        return replay.previous
+      const preview = previewCrewExcel(request.draft, session, sessionId)
+      if (preview.fingerprint !== request.decision.fingerprint)
+        throw fail('conflict', '班组候选或导入内容已变化，请重新预览')
+      const selected = request.decision.kind === 'replace' ? request.decision : null
+      const existing = selected?.id ? state.crews.get(selected.id) : undefined
+      if (selected && (!existing || existing.deletedAt || String(existing.version) !== selected.version || !preview.candidates.some(candidate => candidate.id === selected.id && candidate.version === selected.version)))
+        throw fail('conflict', '所选班组或版本已变化，请重新预览')
+      const action = existing?.draft.status === 'submitted' ? 'save' : 'draft'
+      return execute<CrewFormDraft>({ kind: 'crew', session, sessionId, journalRequest: request, preserveCrewStatus: !!existing, explicitCrewFeeFields: Object.keys(request.draft), request: {
+        workspaceId: request.workspaceId,
+        actorId: request.actorId,
+        commandId: request.commandId,
+        requiredCapability: CREW_WRITE_CAPABILITY,
+        ...(existing ? { id: existing.id } : {}),
+        baseVersion: existing ? String(existing.version) : null,
+        action,
+        draft: { ...existing?.draft, ...request.draft },
+        attachments: {},
+      } })
+    },
     executeWorker(request: WorkerCommandRequestDTO, session: BusinessSession, sessionId?: string | null) {
       return execute<WorkerFormDraft>({ kind: 'worker', request, session, sessionId })
+    },
+    previewWorkerExcel(drafts: readonly WorkerExcelDraft[], session: BusinessSession, sessionId?: string | null) {
+      return drafts.map(draft => previewWorkerExcel(draft, session, sessionId))
+    },
+    async importWorkerExcel(request: WorkerExcelImportCommand, session: BusinessSession, sessionId?: string | null) {
+      assertIdentity(request, session, WORKER_WRITE_CAPABILITY)
+      if (!['worker:list:read', 'worker:sensitive:read', 'crew:list:read'].every(capability => session.capabilities.includes(capability)) || (request.draft.projectName && !session.capabilities.includes('project:list:read')))
+        throw fail('forbidden', '工人导入所需权限已变化')
+      const state = stateFor(sessionId)
+      const replay = commandReplay(state, request, session, 'worker', message => fail('conflict', message))
+      if (replay.previous)
+        return replay.previous
+      const preview = previewWorkerExcel(request.draft, session, sessionId)
+      if (preview.fingerprint !== request.decision.fingerprint)
+        throw fail('conflict', '工人或关联候选已变化，请重新预览')
+      const selected = request.decision.kind === 'replace' ? request.decision : null
+      const existing = selected?.id ? state.workers.get(selected.id) : undefined
+      if (selected && (!existing || existing.deletedAt || String(existing.version) !== selected.version || !preview.candidates.some(candidate => candidate.id === selected.id && candidate.version === selected.version)))
+        throw fail('conflict', '所选工人或版本已变化，请重新预览')
+      const crew = request.decision.crew
+      const project = request.decision.project
+      if (Boolean(request.draft.crewName) !== Boolean(crew) || (crew && !preview.crews.some(item => item.id === crew.id && item.version === crew.version)))
+        throw fail('conflict', '请明确选择有效班组并重新核对')
+      if (Boolean(request.draft.projectName) !== Boolean(project) || (project && !preview.projects.some(item => item.id === project.id && item.version === project.version)))
+        throw fail('conflict', '请明确选择有效项目并重新核对')
+      const idCard = text(request.draft.idCard).toLocaleUpperCase('zh-CN')
+      if (idCard && [...state.workers.values()].some(item => !item.deletedAt && item.id !== existing?.id && text(item.draft.idCard).toLocaleUpperCase('zh-CN') === idCard))
+        throw fail('conflict', '身份证号已关联其他工人，请先核对资料')
+      const { crewName: _crewName, projectName: _projectName, ...fields } = request.draft
+      return execute<WorkerFormDraft>({ kind: 'worker', session, sessionId, journalRequest: request, preserveWorkerStatus: !!existing, request: {
+        workspaceId: request.workspaceId,
+        actorId: request.actorId,
+        commandId: request.commandId,
+        requiredCapability: WORKER_WRITE_CAPABILITY,
+        ...(existing ? { id: existing.id } : {}),
+        baseVersion: existing ? String(existing.version) : null,
+        action: existing?.draft.status === 'submitted' ? 'save' : 'draft',
+        draft: { ...existing?.draft, ...fields, ...(crew ? { crewId: crew.id } : {}), ...(project ? { currentProjectId: project.id } : {}) },
+        attachments: {},
+      } })
     },
   }
 }

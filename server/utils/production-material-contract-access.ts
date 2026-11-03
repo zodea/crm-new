@@ -8,6 +8,6 @@ export function isProductionMaterialContractRoute(method: string, path: string):
     return new RegExp(`^/api/read/material-contracts/${id}(?:/form|/files/${id})?$`).test(path)
   }
   if (method === 'POST')
-    return ['/api/commands/material-contracts', '/api/commands/material-contracts/resolve'].includes(path)
+    return ['/api/commands/material-contracts', '/api/commands/material-contracts/resolve', '/api/commands/material-contracts/excel-preview', '/api/commands/material-contracts/excel-import'].includes(path)
   return method === 'PUT' && new RegExp(`^/api/commands/material-contracts/${id}$`).test(path)
 }

@@ -6,6 +6,7 @@ import type { ProductionStorage } from './production-storage'
 import { randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import { buildCrewDetailRead, buildCrewListPage, buildWorkerDetailRead, buildWorkerListPage, parseCrewDetailQuery, parseCrewListQuery, parseWorkerDetailQuery, parseWorkerListQuery } from '../../app/lib/crew-worker/read-page'
+import { parseCrewExcelImport, parseCrewExcelPreview } from './crew-excel-import-request'
 import { parseCrewCommandRequest, parseWorkerCommandRequest } from './crew-worker-command-request'
 import { createCrewWorkerCommandService } from './crew-worker-command-service'
 import { loadPayrollHostSection } from './crew-worker-payroll-read'
@@ -14,6 +15,7 @@ import { productionPayrollStatements } from './production-payroll-service'
 import { projectDraft } from './production-project-record'
 import { productionWorkerOriginals } from './production-worker-originals'
 import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
+import { parseWorkerExcelImport, parseWorkerExcelPreview } from './worker-excel-import-request'
 import { createWorkerRosterService } from './worker-roster-service'
 
 type Session = () => BusinessSession
@@ -33,8 +35,8 @@ export function createProductionCrewWorkerService(storage: ProductionStorage, op
     return storage.withTransaction(async (tx) => {
       const initial = await loadProductionCrewWorkers(tx, actor)
       const timestamp = now()
-      const projects = actor.capabilities.includes('project:list:read') ? await tx.select<{ id: string }>('SELECT id FROM projects WHERE deleted_at IS NULL') : []
-      const domain = createCrewWorkerCommandService({ initialState: initial, now: () => timestamp, projectIds: () => projects.map(row => row.id) })
+      const projects = actor.capabilities.includes('project:list:read') ? await tx.select<{ id: string, name: string, version: number }>('SELECT id,name,version FROM projects WHERE deleted_at IS NULL') : []
+      const domain = createCrewWorkerCommandService({ initialState: initial, now: () => timestamp, projectIds: () => projects.map(row => row.id), projectReferences: () => projects.map(row => ({ id: row.id, name: row.name, version: String(row.version) })) })
       const result = await work(tx, domain, actor, timestamp)
       const after = domain.snapshot()
       if (!isDeepStrictEqual(initial, after)) {
@@ -93,6 +95,22 @@ export function createProductionCrewWorkerService(storage: ProductionStorage, op
     })
   }
   return {
+    previewCrewExcel(raw: unknown, session: Session) {
+      const drafts = parseCrewExcelPreview(raw)
+      return run(session, false, undefined, (_tx, domain, actor) => ({ workspaceId: actor.workspaceId, actorId: actor.actorId, capabilities: [...actor.capabilities], previews: domain.previewCrewExcel(drafts, actor) }))
+    },
+    importCrewExcel(raw: unknown, session: Session) {
+      const command = parseCrewExcelImport(raw)
+      return run(session, true, 'crew:write', (_tx, domain, actor) => domain.importCrewExcel(command, actor))
+    },
+    previewWorkerExcel(raw: unknown, session: Session) {
+      const drafts = parseWorkerExcelPreview(raw)
+      return run(session, false, undefined, (_tx, domain, actor) => ({ workspaceId: actor.workspaceId, actorId: actor.actorId, capabilities: [...actor.capabilities], previews: domain.previewWorkerExcel(drafts, actor) }))
+    },
+    importWorkerExcel(raw: unknown, session: Session) {
+      const command = parseWorkerExcelImport(raw)
+      return run(session, true, 'worker:write', (_tx, domain, actor) => domain.importWorkerExcel(command, actor))
+    },
     executeCrew(raw: unknown, session: Session, id?: string) {
       const command = request('crew', raw, id) as ReturnType<typeof parseCrewCommandRequest>
       return run(session, true, 'crew:write', (_tx, domain, actor) => domain.executeCrew(command, actor))

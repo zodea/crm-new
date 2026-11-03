@@ -4,7 +4,7 @@ import { projectCommandTestInstance } from './project-command-test-instance'
 
 /** Development adapter supplies its explicit project source; the domain service owns no database. */
 export function createCrewWorkerCommandTestInstance(options: CrewWorkerCommandOptions = {}) {
-  return createCrewWorkerCommandService({ ...options, projectIds: options.projectIds ?? (sessionId => projectCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => row.id)) })
+  return createCrewWorkerCommandService({ ...options, projectIds: options.projectIds ?? (sessionId => projectCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => row.id)), projectReferences: options.projectReferences ?? (sessionId => projectCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, name: row.name, version: projectCommandTestInstance.sourceVersion(sessionId) }))) })
 }
 
 export const crewWorkerCommandTestInstance = createCrewWorkerCommandTestInstance()

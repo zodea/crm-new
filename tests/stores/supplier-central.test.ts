@@ -139,7 +139,7 @@ describe('分供方中央 stores', () => {
     repositories.supplierCommands.execute
       .mockRejectedValueOnce(new SupplierRepositoryProblem(supplierProblem('unavailable', '保存响应丢失', true)))
       .mockImplementationOnce(async request => ({ id: 'editing-supplier', commandId: request.commandId, version: '4', updatedAt: '2026-09-08T02:00:00.000Z', attachmentIds: [] }))
-    repositories.supplierCommands.importRow.mockResolvedValue({ id: 'imported-supplier', version: '2', updatedAt: '2026-09-08T01:00:00.000Z', attachmentIds: [] })
+    repositories.supplierCommands.importRow.mockImplementation(async request => ({ id: 'imported-supplier', commandId: request.commandId, version: '2', updatedAt: '2026-09-08T01:00:00.000Z', attachmentIds: [] }))
     const store = useSupplierCommandStore()
     const session = store.createSession()
     await store.hydrate(session, 'editing-supplier')
@@ -160,7 +160,7 @@ describe('分供方中央 stores', () => {
     const result = { id: 'imported-supplier', version: '1', updatedAt: '2026-09-08T00:00:00.000Z', attachmentIds: [] }
     repositories.supplierCommands.importRow
       .mockRejectedValueOnce(new Error('写入响应丢失'))
-      .mockResolvedValue(result)
+      .mockImplementation(async request => ({ ...result, commandId: request.commandId }))
     let completeRead!: (value: unknown) => void
     const reading = new Promise(resolve => completeRead = resolve)
     repositories.supplierCommands.loadForm

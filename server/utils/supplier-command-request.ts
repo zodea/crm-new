@@ -95,11 +95,22 @@ export function parseSupplierCommandRequest(value: unknown, routeId?: string): S
 /** 导入只接受主数据映射字段，不接收主档 ID、审核或核验结论。 */
 export function parseSupplierImportCommandRequest(value: unknown): SupplierImportCommandRequestDTO {
   if (!object(value) || !object(value.draft)
-    || Object.keys(value).some(key => !['workspaceId', 'actorId', 'requiredCapability', 'commandId', 'draft'].includes(key))
+    || Object.keys(value).some(key => !['workspaceId', 'actorId', 'requiredCapability', 'commandId', 'draft', 'decision'].includes(key))
     || Object.keys(value.draft).some(key => ['id', 'approvalStatus', 'taxpayerVerificationStatus', 'taxpayerVerificationSource', 'taxpayerVerifiedAt', 'taxpayerVerificationNote'].includes(key))) {
     return fail('分供方导入内容无效；导入不能指定主档 ID 或核验结论')
   }
-  const parsed = parseSupplierCommandRequest({ ...value, baseVersion: null, action: 'draft', attachments: {} })
+  const decision = value.decision
+  if (decision !== undefined && (!object(decision)
+    || !/^[a-f0-9]{64}$/.test(String(decision.fingerprint))
+    || (decision.kind === 'create'
+      ? Object.keys(decision).sort().join(',') !== 'fingerprint,kind'
+      : decision.kind === 'replace'
+        ? Object.keys(decision).sort().join(',') !== 'fingerprint,id,kind,version' || typeof decision.id !== 'string' || !decision.id.trim() || typeof decision.version !== 'string' || !/^[1-9]\d*$/.test(decision.version)
+        : true))) {
+    return fail('分供方导入确认内容无效，请重新预览')
+  }
+  const { decision: _decision, ...envelope } = value
+  const parsed = parseSupplierCommandRequest({ ...envelope, baseVersion: null, action: 'draft', attachments: {} })
   if (!parsed.draft.name?.trim())
     return fail('公司全称不能为空')
   return {
@@ -108,5 +119,13 @@ export function parseSupplierImportCommandRequest(value: unknown): SupplierImpor
     requiredCapability: SUPPLIER_WRITE_CAPABILITY,
     commandId: parsed.commandId,
     draft: parsed.draft,
+    ...(decision === undefined ? {} : { decision: decision as SupplierImportCommandRequestDTO['decision'] }),
   }
+}
+
+/** 预览采用和正式导入相同的字段白名单，不允许传主档 ID 或人工审核结果。 */
+export function parseSupplierImportPreviewRequest(value: unknown): SupplierImportCommandRequestDTO['draft'][] {
+  if (!object(value) || Object.keys(value).join(',') !== 'drafts' || !Array.isArray(value.drafts) || value.drafts.length > 5000)
+    return fail('分供方导入预览内容无效')
+  return value.drafts.map(draft => parseSupplierImportCommandRequest({ workspaceId: 'preview', actorId: 'preview', requiredCapability: SUPPLIER_WRITE_CAPABILITY, commandId: 'preview', draft }).draft)
 }

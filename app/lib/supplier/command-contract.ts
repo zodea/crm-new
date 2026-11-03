@@ -35,12 +35,36 @@ export interface SupplierCommandResultDTO {
 
 export type SupplierImportDraft = Omit<SupplierFormDraft, 'id' | 'approvalStatus' | 'taxpayerVerificationStatus' | 'taxpayerVerificationSource' | 'taxpayerVerifiedAt' | 'taxpayerVerificationNote'>
 
+export interface SupplierImportCandidate {
+  id: string
+  version: string
+  name: string
+  matchedBy: Array<'name' | 'externalRef' | 'uniqueCode' | 'taxNo'>
+  fields: SupplierImportDraft
+}
+
+export interface SupplierImportPreview {
+  fingerprint: string
+  candidates: SupplierImportCandidate[]
+}
+
+export interface SupplierImportPreviewBatch {
+  workspaceId: string
+  actorId: string
+  capabilities: readonly string[]
+  previews: SupplierImportPreview[]
+}
+
+export type SupplierImportDecision = { kind: 'create', fingerprint: string }
+  | { kind: 'replace', fingerprint: string, id: string, version: string }
+
 export interface SupplierImportCommandRequestDTO {
   workspaceId: string
   actorId: string
   requiredCapability: typeof SUPPLIER_WRITE_CAPABILITY
   commandId: string
   draft: SupplierImportDraft
+  decision?: SupplierImportDecision
 }
 
 export interface SupplierFormReadDTO {
@@ -55,5 +79,6 @@ export interface SupplierCommandRepository {
   loadForm: (id: string) => Promise<SupplierFormReadDTO>
   execute: (request: SupplierCommandRequestDTO) => Promise<SupplierCommandResultDTO>
   importRow: (request: SupplierImportCommandRequestDTO) => Promise<SupplierCommandResultDTO>
+  previewImport: (drafts: SupplierImportDraft[]) => Promise<SupplierImportPreviewBatch>
   recordTaxpayerVerification: (request: SupplierTaxpayerCommand) => Promise<SupplierTaxpayerResult>
 }

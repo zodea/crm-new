@@ -8,6 +8,10 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/crew-worker/excel-import.test.ts](../../../tests/crew-worker/excel-import.test.ts) | 单元／服务／状态 | 班组表格转换、显式替换、历史费用状态及正式磁盘冷恢复 |
+| [tests/crew-worker/worker-excel-import.test.ts](../../../tests/crew-worker/worker-excel-import.test.ts) | 单元／服务／状态 | 工人候选、班组项目明确选择、隐私权限及正式磁盘冷恢复 |
+| [tests/stores/crew-excel-import.test.ts](../../../tests/stores/crew-excel-import.test.ts) | 单元／服务／状态 | 导入失响应、权限切换和同一班组后读 |
+| [tests/stores/worker-excel-import.test.ts](../../../tests/stores/worker-excel-import.test.ts) | 单元／服务／状态 | 工人导入丢响应、权限切换及同一工人后读 |
 | [tests/server/crew-worker-resolve-http.test.ts](../../../tests/server/crew-worker-resolve-http.test.ts) | 单元／服务／状态 | 班组工人HTTP原命令核对及结果封存 |
 | [tests/server/crew-worker-read-meta.test.ts](../../../tests/server/crew-worker-read-meta.test.ts) | 单元／服务／状态 | 全局工人、班组及项目主档的真实来源证明 |
 | [tests/stores/crew-form-revalidation.test.ts](../../../tests/stores/crew-form-revalidation.test.ts) | 单元／服务／状态 | 班组表单同目标后读与来源切换 |
@@ -30,6 +34,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/components/CrewExcelReview.test.ts](../../../tests/components/CrewExcelReview.test.ts) | 组件（jsdom） | 重复班组分页对比与显式选择 |
+| [tests/components/WorkerExcelReview.test.ts](../../../tests/components/WorkerExcelReview.test.ts) | 组件（jsdom） | 工人重复分页及班组、项目候选选择 |
 | [tests/components/CrewWorkerCentralListScreen.test.ts](../../../tests/components/CrewWorkerCentralListScreen.test.ts) | 组件（jsdom） | 全局目录合法旧快照及不可用反馈 |
 | [tests/components/CrewWorkerMigrationPanel.test.ts](../../../tests/components/CrewWorkerMigrationPanel.test.ts) | 组件（jsdom） | 完整来源选择、明示映射、原键恢复及身份失效隔离 |
 | [tests/components/CrewFormFields.test.ts](../../../tests/components/CrewFormFields.test.ts) | 组件（jsdom） | 班组表单领域字段 |
@@ -42,11 +48,20 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [e2e/crew-excel-import.spec.ts](../../../e2e/crew-excel-import.spec.ts) | Playwright E2E | 合成班组同名确认、文件内重复、未映射字段保留及多视口；需独立服务运行 |
+| [e2e/production-worker-excel-import.spec.ts](../../../e2e/production-worker-excel-import.spec.ts) | 正式隔离 Playwright | 工人敏感权限、同名选择、关联、丢响应核对及多视口；使用独立合成工作区 |
+| [e2e/production-crew-excel-import.spec.ts](../../../e2e/production-crew-excel-import.spec.ts) | 正式隔离 Playwright | 班组同名与重复行、明确替换、未映射字段及断线重启恢复 |
 | [e2e/crew-detail.spec.ts](../../../e2e/crew-detail.spec.ts) | Playwright E2E | Issue #194：合成只读班组详情及正式空班组 |
 | [e2e/issue-316-crew-worker-central-chain.spec.ts](../../../e2e/issue-316-crew-worker-central-chain.spec.ts) | Playwright E2E | 班组—工人跨项目身份、整页及成员原命令恢复、五档布局／局部滚动／焦点 |
 | [e2e/worker-detail.spec.ts](../../../e2e/worker-detail.spec.ts) | Playwright E2E | Issue #194：合成只读工人详情、责任关系与隐私遮罩 |
 | [e2e/worker-roster-archive.spec.ts](../../../e2e/worker-roster-archive.spec.ts) | Playwright E2E | 工人整页维护、工资成员归档、冷回读、真实照片 ZIP 与权限撤销 |
 | [e2e/production-crew-worker-storage.spec.ts](../../../e2e/production-crew-worker-storage.spec.ts) | Playwright E2E | 真磁盘全局工人班组整页新建／编辑、跨项目选择同一稳定工人、候选改名刷新、私密银行资料与历史保全、明确 Native 原图迁入、实名原件、五档视口及冷读 |
+
+## 真实浏览器组件
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/browser/CrewExcelReview.test.ts](../../../tests/browser/CrewExcelReview.test.ts) | 浏览器组件 | 重复核对分页、键盘焦点及窄容器局部滚动；不代替整页旅程 |
 
 ## 辅助文件与配置（非独立测试）
 

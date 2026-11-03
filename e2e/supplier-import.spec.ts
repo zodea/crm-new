@@ -26,7 +26,7 @@ test.afterEach(async ({ page }, info) => {
   await reset(page, info)
 })
 
-async function uploadCsv(page: Page, rows: string[], matched: string[]) {
+async function uploadCsv(page: Page, rows: string[], matched: string[], replaceId?: string) {
   await page.getByRole('button', { name: '导入分供方', exact: true }).click()
   await expect(page).toHaveURL(/\/import\/mapping\/supplier$/)
   await page.getByLabel('选择导入文件').setInputFiles({
@@ -37,6 +37,14 @@ async function uploadCsv(page: Page, rows: string[], matched: string[]) {
   for (const key of matched)
     await expect(page.locator(`[data-field="${key}"]`)).toHaveAttribute('data-status', 'matched')
   await page.getByRole('button', { name: '下一步', exact: true }).click()
+  if (replaceId) {
+    await expect(page.getByRole('button', { name: '开始导入', exact: true })).toBeDisabled()
+    const review = page.getByRole('region', { name: '分供方重复资料核对' })
+    await expect(review).toContainText('已有：中央导入验收供方')
+    await expect(review).toContainText('张三')
+    await expect(review).toContainText('王五')
+    await review.getByLabel('第 2 行处理方式').selectOption(`replace:${replaceId}`)
+  }
   const saved = page.waitForResponse(response => response.url().endsWith('/api/commands/suppliers/import') && response.request().method() === 'POST')
   await page.getByRole('button', { name: '开始导入', exact: true }).click()
   const response = await saved
@@ -46,7 +54,7 @@ async function uploadCsv(page: Page, rows: string[], matched: string[]) {
   return result.id as string
 }
 
-test('中央导入：信用代码和唯一识别码独立映射，同外部旧 ID 重导更新并保留未映射资料', async ({ page }, info) => {
+test('中央导入：信用代码和唯一识别码独立映射，确认后重导更新并保留未映射资料', async ({ page }, info) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/base/supplier')
@@ -60,7 +68,7 @@ test('中央导入：信用代码和唯一识别码独立映射，同外部旧 I
   const response = await page.context().request.get(`/api/read/suppliers/${id}/form`, { headers: { 'x-ruihang-test-session': sessionId(info) } })
   expect(response.ok()).toBe(true)
   expect(await response.json()).toMatchObject({ draft: { uniqueCode: 'RH-IMPORT-421', taxNo: '914401014210000001', laborScope: '石材安装\n楼梯铺贴' } })
-  const updatedId = await uploadCsv(page, ['公司全称,主要联系人,外部旧ID', '中央导入验收供方,王五,HQ-IMPORT-421'], ['name', 'contact', 'externalRef'])
+  const updatedId = await uploadCsv(page, ['公司全称,主要联系人,外部旧ID', '中央导入验收供方,王五,HQ-IMPORT-421'], ['name', 'contact', 'externalRef'], id)
   expect(updatedId).toBe(id)
   await list.getByRole('searchbox').fill('中央导入验收供方')
   await expect(list.getByText('共 1 条', { exact: true })).toBeVisible()
@@ -72,6 +80,38 @@ test('中央导入：信用代码和唯一识别码独立映射，同外部旧 I
   await expect(page.getByLabel('劳务承包范围', { exact: true })).toHaveValue('石材安装\n楼梯铺贴')
   await expect(page.getByLabel('主营业务', { exact: true })).toHaveValue('建筑施工')
   expect(errors).toEqual([])
+})
+
+test('同一个文件中有重复资料时可逐行跳过，不会静默创建两份', async ({ page }) => {
+  await page.goto('/base/supplier')
+  await page.getByRole('button', { name: '导入分供方', exact: true }).click()
+  await page.getByLabel('选择导入文件').setInputFiles({
+    name: 'duplicate-synthetic.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('公司全称,主要联系人\n合成重复公司,联系人甲\n合成重复公司,联系人乙', 'utf-8'),
+  })
+  await page.getByRole('button', { name: '下一步', exact: true }).click()
+  const review = page.getByRole('region', { name: '分供方重复资料核对' })
+  await expect(review).toContainText('第 2 行')
+  await expect(review).toContainText('第 3 行')
+  await expect(page.getByRole('button', { name: '开始导入', exact: true })).toBeDisabled()
+  for (const width of [390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expectNoPageOverflow(page, `${width}px 分供方重复核对`)
+  }
+  const choice = review.getByLabel('第 3 行处理方式')
+  await choice.focus()
+  await expect(choice).toBeFocused()
+  await page.keyboard.press('End')
+  await expect(choice).toHaveValue('skip')
+  await expect(page.getByRole('button', { name: '开始导入', exact: true })).toBeEnabled()
+  const saved = page.waitForResponse(response => response.url().endsWith('/api/commands/suppliers/import') && response.request().method() === 'POST')
+  await page.getByRole('button', { name: '开始导入', exact: true }).click()
+  expect((await saved).ok()).toBe(true)
+  await expect(page).toHaveURL(/\/base\/supplier$/)
+  const list = page.locator('.supplier-reference-list')
+  await list.getByRole('searchbox').fill('合成重复公司')
+  await expect(list.getByText('共 1 条', { exact: true })).toBeVisible()
 })
 
 test('问号帮助可悬浮、键盘及触摸打开且各宽度不越出视口，劳务范围保存和清空后可回读', async ({ page }) => {

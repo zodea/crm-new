@@ -267,6 +267,12 @@ onActivated(() => {
           <button type="button" class="btn-secondary" :disabled="loading" @click="load">
             <span class="i-lucide-refresh-cw mr-1" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />刷新
           </button>
+          <NuxtLink v-if="canCreate && kind === 'crew'" to="/import/mapping/crew" class="btn-secondary">
+            导入班组
+          </NuxtLink>
+          <NuxtLink v-if="canCreate && kind === 'worker' && readPage?.capabilities.includes('worker:sensitive:read')" to="/import/mapping/worker" class="btn-secondary">
+            导入工人
+          </NuxtLink>
           <NuxtLink v-if="canCreate" :to="`/base/${kind}/form`" class="btn-primary">
             <span class="i-lucide-plus mr-1" aria-hidden="true" />新增{{ kind === 'crew' ? '班组' : '工人' }}
           </NuxtLink>

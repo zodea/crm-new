@@ -9,8 +9,12 @@ import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { expect } from '@playwright/test'
+import { isolatedInheritedEnvironment, isolatedServerEntry } from '../../scripts/e2e-isolation'
 
-export async function createCrewWorkerProductionFixture(page: Page, info: TestInfo) {
+export async function createCrewWorkerProductionFixture(page: Page, info: TestInfo, options: { serverEntry?: string, requireIsolated?: boolean } = {}) {
+  if (options.requireIsolated && !options.serverEntry)
+    throw new Error('正式导入验收必须明确指定独立构建入口')
+  const entry = options.serverEntry ? isolatedServerEntry(process.cwd(), options.serverEntry) : '.output/server/index.mjs'
   const base = resolve('.tmp/a03-crew-worker-browser')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/synthetic-`)
@@ -33,7 +37,8 @@ export async function createCrewWorkerProductionFixture(page: Page, info: TestIn
     child = null
   }
   async function start() {
-    child = spawn(process.execPath, ['.output/server/index.mjs'], { cwd: resolve('.'), windowsHide: true, env: { ...process.env, NODE_ENV: 'production', CRM_RUN_MODE: 'production', CRM_DATA_DIRECTORY: directory, CRM_WORKSPACE_ID: 'crew-browser-workspace', CRM_OWNER_ID: 'crew-browser-owner', CRM_DATA_PURPOSE: 'verification', CRM_PUBLIC_ORIGIN: origin, CRM_ACCESS_CODE_HASH: hash, NITRO_HOST: '127.0.0.1', NITRO_PORT: String(port), PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'] })
+    const inherited = isolatedInheritedEnvironment(process.env)
+    child = spawn(process.execPath, [entry], { cwd: resolve('.'), windowsHide: true, env: { ...inherited, NODE_ENV: 'production', CRM_RUN_MODE: 'production', CRM_DATA_DIRECTORY: directory, CRM_WORKSPACE_ID: 'crew-browser-workspace', CRM_OWNER_ID: 'crew-browser-owner', CRM_DATA_PURPOSE: 'verification', CRM_PUBLIC_ORIGIN: origin, CRM_ACCESS_CODE_HASH: hash, NITRO_HOST: '127.0.0.1', NITRO_PORT: String(port), PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'] })
     child.stdout!.on('data', data => logs += String(data))
     child.stderr!.on('data', data => logs += String(data))
     await expect.poll(async () => {

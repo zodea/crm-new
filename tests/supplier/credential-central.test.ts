@@ -48,7 +48,10 @@ describe('中央证照与主档同一事务旅程', () => {
     const form = state.commands.form(state.created.id, session)
     await state.commands.execute({ id: state.created.id, workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'supplier:write', commandId: 'master-noncritical', baseVersion: form.version, action: 'save', attachments: {}, draft: { ...form.draft, laborScope: '安装', note: '普通备注' } }, session)
     expect(state.read().status).toBe('qualified')
-    await state.commands.importRow({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'supplier:write', commandId: 'import-critical', draft: { name: '更正工商名称', externalRef: 'legacy-import' } }, session)
+    const draft = { name: '更正工商名称', externalRef: 'legacy-import' }
+    const preview = state.commands.previewImport([draft], session)[0]!
+    const target = preview.candidates.find(value => value.id === state.created.id)!
+    await state.commands.importRow({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'supplier:write', commandId: 'import-critical', draft, decision: { kind: 'replace', fingerprint: preview.fingerprint, id: target.id, version: target.version } }, session)
     expect(state.read()).toMatchObject({ status: 'reviewing', reviewCurrent: false, review: { decision: 'qualified' }, reviewHistory: [{ decision: 'qualified' }] })
     expect(state.commands.rows()[0]?.credentialStatus).toBe('reviewing')
   })

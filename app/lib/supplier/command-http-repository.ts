@@ -4,6 +4,8 @@ import type {
   SupplierCommandRepository,
   SupplierCommandResultDTO,
   SupplierFormReadDTO,
+  SupplierImportDraft,
+  SupplierImportPreviewBatch,
 } from './command-contract'
 import type { SupplierHttpFetcher } from './http-repository'
 import type { SupplierTaxpayerCommand, SupplierTaxpayerResult } from './taxpayer-verification'
@@ -86,6 +88,30 @@ function form(value: unknown, id: string): SupplierFormReadDTO {
   return { ...loaded, draft: { ...loaded.draft, laborScope: loaded.draft.laborScope ?? '' } }
 }
 
+function preview(value: unknown, drafts: SupplierImportDraft[]): SupplierImportPreviewBatch {
+  if (!object(value) || typeof value.workspaceId !== 'string' || !value.workspaceId || typeof value.actorId !== 'string' || !value.actorId
+    || !Array.isArray(value.capabilities) || !value.capabilities.every(item => typeof item === 'string') || new Set(value.capabilities).size !== value.capabilities.length
+    || !Array.isArray(value.previews) || value.previews.length !== drafts.length) {
+    return invalid('分供方导入预览行数不完整')
+  }
+  for (const [index, entry] of value.previews.entries()) {
+    if (!object(entry) || typeof entry.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(entry.fingerprint) || !Array.isArray(entry.candidates))
+      return invalid('分供方导入预览不完整')
+    const ids = new Set<string>()
+    for (const candidate of entry.candidates) {
+      if (!object(candidate) || typeof candidate.id !== 'string' || !candidate.id || ids.has(candidate.id)
+        || typeof candidate.version !== 'string' || !/^[1-9]\d*$/.test(candidate.version) || typeof candidate.name !== 'string'
+        || !Array.isArray(candidate.matchedBy) || !candidate.matchedBy.length || !candidate.matchedBy.every((key: unknown) => ['name', 'externalRef', 'uniqueCode', 'taxNo'].includes(String(key)))
+        || !object(candidate.fields) || Object.keys(candidate.fields).some(key => !Object.hasOwn(drafts[index]!, key))
+        || Object.keys(drafts[index]!).some(key => !Object.hasOwn(candidate.fields as object, key))) {
+        return invalid('分供方导入候选身份、版本或字段不完整')
+      }
+      ids.add(candidate.id)
+    }
+  }
+  return structuredClone(value) as unknown as SupplierImportPreviewBatch
+}
+
 function taxpayerResult(value: unknown, request: SupplierTaxpayerCommand): SupplierTaxpayerResult {
   if (!object(value) || value.supplierId !== request.supplierId || value.commandId !== request.commandId
     || !['supplierVersion', 'credentialVersion', 'auditId'].every(key => typeof value[key] === 'string' && value[key])
@@ -123,6 +149,10 @@ export function createHttpSupplierCommandRepository(options: { fetcher: Supplier
     importRow: request => readSupplierHttp(
       () => options.fetcher('/api/commands/suppliers/import', { method: 'POST', body: { ...request } }),
       result,
+    ),
+    previewImport: drafts => readSupplierHttp(
+      () => options.fetcher('/api/commands/suppliers/import-preview', { method: 'POST', body: { drafts } }),
+      value => preview(value, drafts),
     ),
   }
 }

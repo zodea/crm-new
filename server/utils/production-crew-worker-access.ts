@@ -5,6 +5,6 @@ export function isProductionCrewWorkerRoute(method: string, path: string): boole
   if (method === 'GET')
     return new RegExp(`^/api/read/(?:crews|workers|(?:crews|workers)/${id}(?:/form)?|crew-worker-facts/(?:assignment|wage|penalty)/${id}|worker-roster/(?:profile|file|archives|archive)|crew-worker/import)$`).test(path)
   if (method === 'POST')
-    return ['/api/commands/crews', '/api/commands/workers', '/api/commands/crews/resolve', '/api/commands/workers/resolve', '/api/commands/worker-roster', '/api/commands/worker-roster-resolve', '/api/read/worker-roster/preview', '/api/commands/crew-worker/import', '/api/commands/crew-worker/import/resolve'].includes(path)
+    return ['/api/commands/crews', '/api/commands/workers', '/api/commands/crews/resolve', '/api/commands/workers/resolve', '/api/commands/crews/excel-preview', '/api/commands/crews/excel-import', '/api/commands/workers/excel-preview', '/api/commands/workers/excel-import', '/api/commands/worker-roster', '/api/commands/worker-roster-resolve', '/api/read/worker-roster/preview', '/api/commands/crew-worker/import', '/api/commands/crew-worker/import/resolve'].includes(path)
   return method === 'PUT' && new RegExp(`^/api/commands/(?:crews|workers)/${id}$`).test(path)
 }

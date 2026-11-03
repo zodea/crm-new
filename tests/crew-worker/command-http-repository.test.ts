@@ -4,6 +4,33 @@ import { createHttpCrewWorkerCommandRepository } from '~/lib/crew-worker/command
 import { formDefaults } from '~/lib/master-data/page'
 
 describe('班组—工人中央 command HTTP Repository', () => {
+  it('工人导入预览严格核对关联候选与回执目标', async () => {
+    const draft = { name: '合成人员', crewName: '合成班组' }
+    const preview = { fingerprint: 'a'.repeat(64), candidates: [], crews: [{ id: 'crew-1', name: '合成班组', version: '2' }], projects: [] }
+    const payload = { workspaceId: 'workspace', actorId: 'actor', capabilities: ['worker:write', 'worker:list:read', 'worker:sensitive:read', 'crew:list:read'], previews: [preview] }
+    const fetcher = vi.fn().mockResolvedValue(payload)
+    const repository = createHttpCrewWorkerCommandRepository({ fetcher })
+    expect(await repository.previewWorkerExcel([draft])).toEqual(payload)
+    fetcher.mockResolvedValue({ ...payload, previews: [{ ...preview, crews: [preview.crews[0], preview.crews[0]] }] })
+    await expect(repository.previewWorkerExcel([draft])).rejects.toThrow('关联候选')
+    fetcher.mockResolvedValue({ id: 'other-worker', commandId: 'worker-original', version: '1', updatedAt: '2026-08-23T00:00:00.000Z', attachmentIds: [] })
+    await expect(repository.importWorkerExcel({ workspaceId: 'workspace', actorId: 'actor', requiredCapability: 'worker:write', commandId: 'worker-original', draft, decision: { kind: 'replace', fingerprint: 'a'.repeat(64), id: 'worker-1', version: '1', crew: { id: 'crew-1', version: '2' } } })).rejects.toThrow('目标不一致')
+  })
+  it('导入预览拒绝缺行、越权字段及不匹配回执', async () => {
+    const draft = { name: '合成班组', note: '新备注' }
+    const candidate = { id: 'crew-original', version: '1', name: '合成班组', fields: { name: '合成班组', note: '原备注' } }
+    const payload = { workspaceId: 'workspace', actorId: 'actor', capabilities: ['crew:write', 'crew:list:read'], previews: [{ fingerprint: 'a'.repeat(64), candidates: [candidate] }] }
+    const fetcher = vi.fn().mockResolvedValue(payload)
+    const repository = createHttpCrewWorkerCommandRepository({ fetcher })
+    expect(await repository.previewCrewExcel([draft])).toEqual(payload)
+    fetcher.mockResolvedValue({ ...payload, previews: [] })
+    await expect(repository.previewCrewExcel([draft])).rejects.toThrow('行数')
+    fetcher.mockResolvedValue({ ...payload, previews: [{ ...payload.previews[0], candidates: [{ ...candidate, fields: { ...candidate.fields, contactPhone: '不应泄露' } }] }] })
+    await expect(repository.previewCrewExcel([draft])).rejects.toThrow('字段')
+    fetcher.mockResolvedValue({ id: 'another-crew', commandId: 'import-original', version: '1', updatedAt: '2026-08-23T00:00:00.000Z', attachmentIds: [] })
+    await expect(repository.importCrewExcel({ workspaceId: 'workspace', actorId: 'actor', requiredCapability: 'crew:write', commandId: 'import-original', draft, decision: { kind: 'replace', fingerprint: 'a'.repeat(64), id: 'crew-original', version: '1' } })).rejects.toThrow('目标不一致')
+  })
+
   it('显式新建班组只向中央命令端点提交会话信封', async () => {
     const fetcher = vi.fn(async (url: string) => url === '/api/read/business-session'
       ? {

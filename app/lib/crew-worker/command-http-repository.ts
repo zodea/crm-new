@@ -7,7 +7,9 @@ import type {
   CrewWorkerCommandResultDTO,
   WorkerFormReadDTO,
 } from './command-contract'
+import type { CrewExcelDraft, CrewExcelPreviewBatch } from './excel-import-contract'
 import type { CrewWorkerHttpFetcher } from './http-repository'
+import type { WorkerExcelDraft, WorkerExcelPreviewBatch } from './worker-excel-contract'
 import { isISODateTimeDTO } from '../../types/read-model'
 import { commandVersionAtLeast } from '../forms/command-recovery'
 import { readCrewWorkerHttp } from './http-repository'
@@ -49,6 +51,58 @@ function resolution(value: unknown, commandId: string): CommandResolution<CrewWo
       return { outcome: 'applied', result: receipt }
   }
   return invalid('班组—工人核对回执与原编号不一致，请保留原编号')
+}
+
+function excelPreview(value: unknown, drafts: CrewExcelDraft[]): CrewExcelPreviewBatch {
+  if (!object(value) || typeof value.workspaceId !== 'string' || !value.workspaceId || typeof value.actorId !== 'string' || !value.actorId
+    || !Array.isArray(value.capabilities) || !value.capabilities.every(item => typeof item === 'string') || new Set(value.capabilities).size !== value.capabilities.length
+    || !Array.isArray(value.previews) || value.previews.length !== drafts.length) {
+    return invalid('班组导入预览来源或行数无效')
+  }
+  for (const [index, preview] of value.previews.entries()) {
+    if (!object(preview) || typeof preview.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(preview.fingerprint) || !Array.isArray(preview.candidates))
+      return invalid('班组导入候选无效')
+    const ids = new Set<string>()
+    for (const candidate of preview.candidates) {
+      if (!object(candidate) || typeof candidate.id !== 'string' || !candidate.id || ids.has(candidate.id) || typeof candidate.version !== 'string' || !commandVersionAtLeast(candidate.version, candidate.version)
+        || typeof candidate.name !== 'string' || !object(candidate.fields)
+        || Object.keys(candidate.fields).some(key => !Object.hasOwn(drafts[index]!, key)) || Object.keys(drafts[index]!).some(key => !Object.hasOwn(candidate.fields as object, key))) {
+        return invalid('班组导入候选身份、版本或字段无效')
+      }
+      ids.add(candidate.id)
+    }
+  }
+  return structuredClone(value) as unknown as CrewExcelPreviewBatch
+}
+
+function workerExcelPreview(value: unknown, drafts: WorkerExcelDraft[]): WorkerExcelPreviewBatch {
+  if (!object(value) || typeof value.workspaceId !== 'string' || !value.workspaceId || typeof value.actorId !== 'string' || !value.actorId
+    || !Array.isArray(value.capabilities) || !value.capabilities.every(item => typeof item === 'string') || new Set(value.capabilities).size !== value.capabilities.length
+    || !Array.isArray(value.previews) || value.previews.length !== drafts.length) {
+    return invalid('工人导入预览来源或行数无效')
+  }
+  for (const [index, preview] of value.previews.entries()) {
+    if (!object(preview) || typeof preview.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(preview.fingerprint) || !Array.isArray(preview.candidates) || !Array.isArray(preview.crews) || !Array.isArray(preview.projects))
+      return invalid('工人导入候选无效')
+    for (const refs of [preview.crews, preview.projects]) {
+      const ids = new Set<string>()
+      for (const ref of refs) {
+        if (!object(ref) || typeof ref.id !== 'string' || !ref.id || ids.has(ref.id) || typeof ref.name !== 'string' || typeof ref.version !== 'string' || !ref.version)
+          return invalid('工人导入关联候选无效')
+        ids.add(ref.id)
+      }
+    }
+    const ids = new Set<string>()
+    for (const candidate of preview.candidates) {
+      if (!object(candidate) || typeof candidate.id !== 'string' || !candidate.id || ids.has(candidate.id) || typeof candidate.version !== 'string' || !commandVersionAtLeast(candidate.version, candidate.version)
+        || typeof candidate.name !== 'string' || !Array.isArray(candidate.matchedBy) || !candidate.matchedBy.length || !candidate.matchedBy.every((key: unknown) => ['name', 'idCard', 'phone'].includes(String(key)))
+        || !object(candidate.fields) || Object.keys(candidate.fields).some(key => !Object.hasOwn(drafts[index]!, key)) || Object.keys(drafts[index]!).some(key => !Object.hasOwn(candidate.fields as object, key))) {
+        return invalid('工人导入候选身份、版本或字段无效')
+      }
+      ids.add(candidate.id)
+    }
+  }
+  return structuredClone(value) as unknown as WorkerExcelPreviewBatch
 }
 
 const CREW_TEXT_FIELDS = [
@@ -186,6 +240,32 @@ export function createHttpCrewWorkerCommandRepository(options: { fetcher: CrewWo
     resolveWorker: commandId => readCrewWorkerHttp(
       () => options.fetcher('/api/commands/workers/resolve', { method: 'POST', body: { commandId } }),
       value => resolution(value, commandId),
+    ),
+    previewCrewExcel: drafts => readCrewWorkerHttp(
+      () => options.fetcher('/api/commands/crews/excel-preview', { method: 'POST', body: { drafts } }),
+      value => excelPreview(value, drafts),
+    ),
+    importCrewExcel: request => readCrewWorkerHttp(
+      () => options.fetcher('/api/commands/crews/excel-import', { method: 'POST', body: request }),
+      (value) => {
+        const receipt = result(value)
+        if (receipt.commandId !== request.commandId || (request.decision.kind === 'replace' && receipt.id !== request.decision.id))
+          return invalid('班组导入回执与原编号或目标不一致')
+        return receipt
+      },
+    ),
+    previewWorkerExcel: drafts => readCrewWorkerHttp(
+      () => options.fetcher('/api/commands/workers/excel-preview', { method: 'POST', body: { drafts } }),
+      value => workerExcelPreview(value, drafts),
+    ),
+    importWorkerExcel: request => readCrewWorkerHttp(
+      () => options.fetcher('/api/commands/workers/excel-import', { method: 'POST', body: request }),
+      (value) => {
+        const receipt = result(value)
+        if (receipt.commandId !== request.commandId || (request.decision.kind === 'replace' && receipt.id !== request.decision.id))
+          return invalid('工人导入回执与原编号或目标不一致')
+        return receipt
+      },
     ),
   }
 }

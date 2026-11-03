@@ -7,7 +7,7 @@ import { commandVersionAtLeast } from '~/lib/forms/command-recovery'
 import { createFormCommandActions } from '~/lib/forms/command-session'
 import { SUPPLIER_WRITE_CAPABILITY } from '~/lib/supplier/command-contract'
 import { credentialProblem } from '~/lib/supplier/credential-contract'
-import { createSupplierRowImporter } from '~/lib/supplier/import-command'
+import { createSupplierRowImporter, getSupplierImportSource } from '~/lib/supplier/import-command'
 import { clearSupplierPending, readSupplierPending, rememberSupplierPending, SUPPLIER_PERSISTENT_CAPABILITY, supplierPendingKey, supplierPendingTargets } from '~/lib/supplier/pending'
 import { supplierProblemFromUnknown } from '~/lib/supplier/repository'
 
@@ -58,13 +58,99 @@ export const useSupplierCommandStore = defineStore('supplier-command', () => {
 
   const latestWrite = shallowRef<{ id: string, version: string } | null>(null)
   let rowImporter: ReturnType<typeof createSupplierRowImporter> | null = null
+  let importPending = new WeakMap<Record<string, unknown>, { key: string, commandId: string, workspaceId: string, actorId: string }>()
+  const activeImportRows = new WeakSet<Record<string, unknown>>()
+  let activeImportCount = 0
+  let recoveringImports = false
+
+  function resetImportCache() {
+    rowImporter = null
+    importPending = new WeakMap()
+  }
 
   async function importRow(row: Record<string, unknown>) {
-    rowImporter ??= createSupplierRowImporter(repository())
-    const result = await rowImporter(row)
-    // 导入回读后通知缓存页面；不改变正在编辑的目标、版本或待重试保存命令。
-    latestWrite.value = { id: result.id, version: result.version }
-    return result
+    if (recoveringImports || activeImportRows.has(row))
+      throw credentialProblem('conflict', '该导入行正在保存，请等待当前结果。')
+    activeImportRows.add(row)
+    activeImportCount++
+    rowImporter ??= createSupplierRowImporter(repository(), { onPrepared: async (request, sourceRow, persistent) => {
+      const context = await repository().context()
+      if (context.workspaceId !== request.workspaceId || context.actorId !== request.actorId || !context.capabilities.includes(SUPPLIER_WRITE_CAPABILITY) || context.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY) !== persistent)
+        throw credentialProblem('forbidden', '导入期间身份或权限变化，请重新预览。')
+      if (!context.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY))
+        return
+      const source = getSupplierImportSource(sourceRow)
+      if (!source || !/^import:[a-f0-9]{64}$/.test(source))
+        throw credentialProblem('validation-failed', '缺少导入来源，请重新选择文件。')
+      const key = supplierPendingKey(context, source)
+      rememberSupplierPending(key, request.commandId)
+      importPending.set(sourceRow, { key, commandId: request.commandId, workspaceId: context.workspaceId, actorId: context.actorId })
+    } })
+    try {
+      const result = await rowImporter(row)
+      const pending = importPending.get(row)
+      if (pending) {
+        const current = await repository().context()
+        if (current.workspaceId !== pending.workspaceId || current.actorId !== pending.actorId || !current.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY) || !current.capabilities.includes(SUPPLIER_WRITE_CAPABILITY) || result.commandId !== pending.commandId)
+          throw credentialProblem('forbidden', '导入后身份、权限或原编号变化，请保留原提交。')
+        clearSupplierPending(pending.key, pending.commandId)
+        importPending.delete(row)
+      }
+      // 导入回读后通知缓存页面；不改变正在编辑的目标、版本或待重试保存命令。
+      latestWrite.value = { id: result.id, version: result.version }
+      return result
+    }
+    finally {
+      activeImportRows.delete(row)
+      activeImportCount--
+    }
+  }
+
+  /** 只保存原提交号；重进导入前先核对同工作区全部未决行，不保存表格正文。 */
+  async function recoverPendingImports() {
+    if (activeImportCount || recoveringImports)
+      throw credentialProblem('conflict', '已有分供方导入正在保存，请等待当前结果。')
+    recoveringImports = true
+    try {
+      const context = await repository().context()
+      if (!context.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY)) {
+        resetImportCache()
+        return { applied: 0, notApplied: 0 }
+      }
+      if (!context.capabilities.includes(SUPPLIER_WRITE_CAPABILITY))
+        throw credentialProblem('forbidden', '无分供方导入权限，不能核对原提交。')
+      let applied = 0
+      let notApplied = 0
+      const targets = supplierPendingTargets(context).filter(value => value.startsWith('import:'))
+      if (targets.some(value => !/^import:[a-f0-9]{64}$/.test(value)))
+        throw credentialProblem('unavailable', '原导入标识损坏，请保留当前资料并核对恢复信息。')
+      for (const target of targets) {
+        const key = supplierPendingKey(context, target)
+        const commandId = readSupplierPending(key)
+        if (!commandId)
+          continue
+        const resolved = await useNuxtApp().$repositories.supplierProduction.resolve(commandId)
+        if (resolved.outcome === 'applied') {
+          if (!('id' in resolved.result) || resolved.result.commandId !== commandId)
+            throw credentialProblem('relationship-mismatch', '原导入回执类型或编号不一致，请停止恢复。')
+          const form = await repository().loadForm(resolved.result.id)
+          if (form.draft.id !== resolved.result.id || !commandVersionAtLeast(form.version, resolved.result.version))
+            throw credentialProblem('unavailable', '原导入已保存，但同一主档尚未可靠读取。')
+          latestWrite.value = { id: resolved.result.id, version: form.version }
+          applied++
+        }
+        else { notApplied++ }
+        const current = await repository().context()
+        if (current.workspaceId !== context.workspaceId || current.actorId !== context.actorId || !current.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY) || !current.capabilities.includes(SUPPLIER_WRITE_CAPABILITY))
+          throw credentialProblem('forbidden', '核对期间身份或权限变化，请保留原编号。')
+        clearSupplierPending(key, commandId)
+      }
+      resetImportCache()
+      return { applied, notApplied }
+    }
+    finally {
+      recoveringImports = false
+    }
   }
 
   async function hydrate(session: CommandSession, id: string | null) {
@@ -401,6 +487,7 @@ export const useSupplierCommandStore = defineStore('supplier-command', () => {
     createSession,
     hydrate,
     importRow,
+    recoverPendingImports,
     saveForm,
     recover,
     revalidate,

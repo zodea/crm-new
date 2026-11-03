@@ -5,7 +5,7 @@ import { getImportEntity } from '~/lib/kit/import-entities'
 import { autoMatchColumns, buildImportRows } from '~/lib/kit/import-mapping'
 import { SUPPLIER_WRITE_CAPABILITY } from '~/lib/supplier/command-contract'
 import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http-repository'
-import { createSupplierRowImporter } from '~/lib/supplier/import-command'
+import { createSupplierRowImporter, setSupplierImportDecision, supplierImportDraftFromRow } from '~/lib/supplier/import-command'
 import { parseSupplierImportCommandRequest } from '../../server/utils/supplier-command-request'
 import { createSupplierCommandService } from '../../server/utils/supplier-command-service'
 import { createSupplierReadTestInstance } from '../../server/utils/supplier-read-test-instance'
@@ -13,7 +13,7 @@ import { createSupplierReadTestInstance } from '../../server/utils/supplier-read
 const session: BusinessSession = {
   workspaceId: 'import-workspace',
   actorId: 'import-actor',
-  capabilities: ['supplier:list:read', SUPPLIER_WRITE_CAPABILITY],
+  capabilities: ['supplier:list:read', SUPPLIER_WRITE_CAPABILITY, 'supplier:sensitive:read'],
 }
 
 function harness() {
@@ -74,13 +74,19 @@ describe('分供方中央逐行导入', () => {
     await h.importRow({ name: '原始分供方', externalRef: 'HQ-PATCH', mainBusiness: '主营业务', laborScope: '安装范围', contact: '旧联系人', taxNo: 'TAX-PATCH', bank: '开户行' })
     const imported = { ...h.commands.rows()[0]!, id: 'reviewed', externalRef: 'HQ-REVIEWED', taxNo: 'TAX-REVIEWED', credentialStatus: 'qualified' }
     h.commands.prepareImportedSuppliers([imported]).commit()
-    await h.importRow({ name: '原始分供方', externalRef: 'HQ-REVIEWED', contact: '新联系人' })
+    async function replace(row: Record<string, unknown>) {
+      const preview = h.commands.previewImport([supplierImportDraftFromRow(row)], session)[0]!
+      const candidate = preview.candidates.find(value => value.id === 'reviewed')!
+      setSupplierImportDecision(row, { kind: 'replace', fingerprint: preview.fingerprint, id: candidate.id, version: candidate.version })
+      return h.importRow(row)
+    }
+    await replace({ name: '原始分供方', externalRef: 'HQ-REVIEWED', contact: '新联系人' })
     expect(h.commands.form('reviewed', session).draft).toMatchObject({ mainBusiness: '主营业务', laborScope: '安装范围', bank: '开户行', contact: '新联系人' })
-    await h.importRow({ name: '原始分供方', externalRef: 'HQ-REVIEWED', laborScope: '' })
+    await replace({ name: '原始分供方', externalRef: 'HQ-REVIEWED', laborScope: '' })
     // 旧导入标签没有人工凭证与原件；有效人工结论的非关键编辑保留由 credential-central 完整旅程验证。
     expect(h.commands.rows().find(row => row.id === 'reviewed')).toMatchObject({ laborScope: '', mainBusiness: '主营业务', credentialStatus: 'incomplete' })
     expect(h.commands.rows()).toHaveLength(2)
-    await h.importRow({ name: '更改工商名称', externalRef: 'HQ-REVIEWED' })
+    await replace({ name: '更改工商名称', externalRef: 'HQ-REVIEWED' })
     expect(h.commands.rows().find(row => row.id === 'reviewed')?.credentialStatus).toBe('incomplete')
   })
 
@@ -117,11 +123,18 @@ describe('分供方中央逐行导入', () => {
   it('匹配标识不唯一或身份代码冲突时拒绝，不任意覆盖记录', async () => {
     const h = harness()
     await h.importRow({ name: '原始分供方', externalRef: 'HQ-DUP', uniqueCode: 'CODE-DUP', taxNo: 'TAX-DUP' })
-    await expect(h.importRow({ name: '第二分供方', uniqueCode: 'CODE-DUP' })).rejects.toThrow('分供方内部编码已存在')
-    await expect(h.importRow({ name: '第三分供方', taxNo: 'TAX-DUP' })).rejects.toThrow('统一社会信用代码已存在')
+    async function createAfterReview(row: Record<string, unknown>) {
+      const preview = h.commands.previewImport([supplierImportDraftFromRow(row)], session)[0]!
+      setSupplierImportDecision(row, { kind: 'create', fingerprint: preview.fingerprint })
+      return h.importRow(row)
+    }
+    await expect(createAfterReview({ name: '第二分供方', uniqueCode: 'CODE-DUP' })).rejects.toThrow('分供方内部编码已存在')
+    await expect(createAfterReview({ name: '第三分供方', taxNo: 'TAX-DUP' })).rejects.toThrow('统一社会信用代码已存在')
     const duplicate = { ...h.commands.rows()[0]!, id: 'duplicate-ref', uniqueCode: '', taxNo: '' }
     h.commands.prepareImportedSuppliers([duplicate]).commit()
-    await expect(h.importRow({ name: '不应覆盖', externalRef: 'HQ-DUP' })).rejects.toThrow('外部旧 ID 对应多个分供方')
+    const ambiguous = { name: '不应覆盖', externalRef: 'HQ-DUP' }
+    expect(h.commands.previewImport([ambiguous], session)[0]!.candidates).toHaveLength(2)
+    await expect(h.importRow(ambiguous)).rejects.toThrow('预览并确认')
     expect(h.commands.rows().map(row => row.name)).toEqual(['原始分供方', '原始分供方'])
   })
 
