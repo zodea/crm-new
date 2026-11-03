@@ -478,6 +478,7 @@ describe('f4 物资事实、派生库存与甲供材总控', () => {
 
   it('附件失败会原子回滚单头、明细和操作日志', async () => {
     const store = useMaterialStore()
+    const logsBefore = await mem.select('SELECT COUNT(*) AS n FROM operation_logs')
     failFileInsert = true
     await expect(store.saveForm('mat_arrival', {
       no: 'DH-ROLLBACK',
@@ -501,5 +502,6 @@ describe('f4 物资事实、派生库存与甲供材总控', () => {
     expect(await mem.select(`
       SELECT id FROM material_arrival_lines
     `)).toEqual([])
+    expect(await mem.select('SELECT COUNT(*) AS n FROM operation_logs')).toEqual(logsBefore)
   })
 })

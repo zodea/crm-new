@@ -46,7 +46,7 @@ describe('户级空鼓的受控来源导航', () => {
     if (resolved.state !== 'resolved')
       throw new Error('来源不可达')
     const url = new URL(resolved.to, 'https://test.invalid')
-    expect(url.pathname).toBe(quantityHollowPath(scope, 'detail', recordId))
+    expect(url.pathname).toBe(`/subcontract/quantity/project/${encodeURIComponent(unitId)}/hollow/${encodeURIComponent(recordId)}`)
     expect(url.searchParams.get('revisionId')).toBe(revisionId)
     expect(payrollSourceContext(Object.fromEntries(url.searchParams), { kind: 'quantity-unit', id: unitId, projectId: 'project', origin: 'real' })?.returnTo).toBe(back)
     expect(inspectRestorableTabPath(resolved.to)?.fullPath).toBe(resolved.to)

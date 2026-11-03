@@ -657,7 +657,13 @@ describe('材料单价分析', () => {
       delivery('c-1', 'supplier-c', '2026-05-03', [
         { id: 'line-c1', materialName: 'BV 电线', spec: '2.5', unit: 'm', unitPrice: 2.6 },
       ]),
-    ], suppliers, projects)
+      delivery('d-1', 'supplier-d', '2026-05-04', [
+        { id: 'line-d1', materialName: 'BV 电线', spec: '2.5', unit: 'm', unitPrice: 2.9 },
+      ]),
+      delivery('e-1', 'supplier-e', '2026-05-05', [
+        { id: 'line-e1', materialName: 'BV 电线', spec: '2.5', unit: 'm', unitPrice: 3 },
+      ]),
+    ], [...suppliers, { id: 'supplier-d', name: '丁厂' }, { id: 'supplier-e', name: '戊厂' }], projects)
 
     const analysis = analyzeMaterialPrices(catalog[0]!, [
       'supplier-a',
@@ -668,7 +674,7 @@ describe('材料单价分析', () => {
     ])
 
     expect(analysis.mode).toBe('trend')
-    expect(analysis.series).toHaveLength(3)
+    expect(analysis.series.map(series => series.supplierId)).toEqual(['supplier-a', 'supplier-b', 'supplier-c', 'supplier-d'])
     expect(analysis.series[0]).toMatchObject({
       supplierId: 'supplier-a',
       supplierName: '甲厂',

@@ -53,12 +53,16 @@ describe('确认按钮门控：isConfirmEnabled', () => {
 
 describe('挂起时长：resolveHoldMs', () => {
   it('永不少于 3 秒', () => {
-    expect(resolveHoldMs()).toBe(MIN_HOLD_MS)
+    expect(MIN_HOLD_MS).toBe(3000)
+    expect(resolveHoldMs()).toBe(3000)
   })
 
   it.each([
-    { case: '1000', input: 1000, expected: MIN_HOLD_MS },
-    { case: '0', input: 0, expected: MIN_HOLD_MS },
+    { case: '1000', input: 1000, expected: 3000 },
+    { case: '0', input: 0, expected: 3000 },
+    { case: '2999', input: 2999, expected: 3000 },
+    { case: '3000', input: 3000, expected: 3000 },
+    { case: '3001', input: 3001, expected: 3001 },
   ])('永不少于 3 秒 / resolveHoldMs：$case', ({ input, expected }) => {
     expect(resolveHoldMs(input)).toBe(expected)
   })

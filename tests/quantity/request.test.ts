@@ -14,11 +14,21 @@ describe('工程量 HTTP 请求边界', () => {
     expect(() => parseQuantityReadQuery(input)).toThrow(expected)
   })
 
-  it.each(([{ actorId: '' }, { baseVersion: null }, { action: [] }, { origin: 'demo' }, { requiredCapability: 'project:write' }]).map(input => ({ input })))('命令要求身份、能力和版本，并固化入口草稿：输入案例 %#', ({ input: patch }) => {
+  it('命令固化入口草稿', () => {
     const body = { workspaceId: 'w', actorId: 'a', commandId: 'c', projectId: 'p', baseVersion: 'quantity:p:0', requiredCapability: 'quantity:write', origin: 'real', action: { kind: 'create-building', draft: { code: '1', name: '1栋' } } }
     const command = parseQuantityCommand(body)
     body.action.draft.name = '后续输入'
     expect(command.action).toMatchObject({ draft: { name: '1栋' } })
+  })
+
+  it.each([
+    { name: '空操作人', patch: { actorId: '' } },
+    { name: '缺少版本', patch: { baseVersion: null } },
+    { name: '非法动作', patch: { action: [] } },
+    { name: '演示来源', patch: { origin: 'demo' } },
+    { name: '错误权限', patch: { requiredCapability: 'project:write' } },
+  ])('命令拒绝$name', ({ patch }) => {
+    const body = { workspaceId: 'w', actorId: 'a', commandId: 'c', projectId: 'p', baseVersion: 'quantity:p:0', requiredCapability: 'quantity:write', origin: 'real', action: { kind: 'create-building', draft: { code: '1', name: '1栋' } } }
     expect(() => parseQuantityCommand({ ...body, ...patch })).toThrow('格式无效')
   })
 
@@ -27,7 +37,7 @@ describe('工程量 HTTP 请求边界', () => {
     it('关联事实保持原契约', () => {
       expect(parseQuantityUnitReadQuery({ ...query, unitId: 'u' })).toEqual({ ...query, unitId: 'u' })
       expect(parseQuantityPhotoReadQuery({ ...query, unitId: 'u', completionId: 'c', photoId: 'f' })).toEqual({ ...query, unitId: 'u', completionId: 'c', photoId: 'f' })
-      expect(() => parseQuantityPhotoReadQuery({ ...query, unitId: 'u', photoId: 'f' })).toThrow()
+      expect(() => parseQuantityPhotoReadQuery({ ...query, unitId: 'u', photoId: 'f' })).toThrow('工程量查询缺少有效户、工种或照片归属')
     })
 
     it.each([
@@ -40,19 +50,11 @@ describe('工程量 HTTP 请求边界', () => {
 
   it.each(Array.from([{ unitId: '' }, { unitId: ['u'] }]).map(input => ({ input })))('户、批量阶段和照片查询必须明确完整归属，拒绝空值、重复户和数组注入：输入组合 1 案例 %#', ({ input: patch }) => {
     const query = { projectId: 'p', origin: 'real', includeDemo: false }
-    expect(parseQuantityUnitReadQuery({ ...query, unitId: 'u' })).toEqual({ ...query, unitId: 'u' })
-    expect(parseQuantityBatchReadQuery({ ...query, trade: '油漆工', unitIds: 'u' })).toEqual({ ...query, trade: '油漆工', unitIds: ['u'] })
-    expect(parseQuantityBatchReadQuery({ ...query, trade: '油漆工', unitIds: ['u1', 'u2'] })).toEqual({ ...query, trade: '油漆工', unitIds: ['u1', 'u2'] })
-    expect(parseQuantityPhotoReadQuery({ ...query, unitId: 'u', completionId: 'c', photoId: 'f' })).toEqual({ ...query, unitId: 'u', completionId: 'c', photoId: 'f' })
-    expect(() => parseQuantityUnitReadQuery({ ...query, ...patch })).toThrow()
+    expect(() => parseQuantityUnitReadQuery({ ...query, ...patch })).toThrow('工程量查询缺少有效户、工种或照片归属')
   })
 
   it.each(Array.from([[], ['u', 'u'], [''], { u: 'u' }]).map(input => ({ input })))('户、批量阶段和照片查询必须明确完整归属，拒绝空值、重复户和数组注入：输入组合 2 案例 %#', ({ input: unitIds }) => {
     const query = { projectId: 'p', origin: 'real', includeDemo: false }
-    expect(parseQuantityUnitReadQuery({ ...query, unitId: 'u' })).toEqual({ ...query, unitId: 'u' })
-    expect(parseQuantityBatchReadQuery({ ...query, trade: '油漆工', unitIds: 'u' })).toEqual({ ...query, trade: '油漆工', unitIds: ['u'] })
-    expect(parseQuantityBatchReadQuery({ ...query, trade: '油漆工', unitIds: ['u1', 'u2'] })).toEqual({ ...query, trade: '油漆工', unitIds: ['u1', 'u2'] })
-    expect(parseQuantityPhotoReadQuery({ ...query, unitId: 'u', completionId: 'c', photoId: 'f' })).toEqual({ ...query, unitId: 'u', completionId: 'c', photoId: 'f' })
-    expect(() => parseQuantityBatchReadQuery({ ...query, trade: '油漆工', unitIds })).toThrow()
+    expect(() => parseQuantityBatchReadQuery({ ...query, trade: '油漆工', unitIds })).toThrow('批量工程量查询需要不重复的有效户')
   })
 })

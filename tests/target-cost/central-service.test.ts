@@ -66,13 +66,6 @@ describe('中央预算工作区事务', () => {
     return { f, result, wire, decoded, incomplete }
   }
 
-  it('详情边界保留旧小数数量与null金额，缺损头金额及错科目来源不进入页面', async () => {
-    const { wire } = await createDecodeTargetCostReadFixture()
-    const wrongSource = structuredClone(wire)
-    const category = wrongSource.view.categories.find(row => row.category === '材料')!
-    category.sources.contract = { kind: 'entity-list', entity: 'contract', variant: 'material', view: null, filters: { projectId: 'p', dataOrigin: 'real', costCategory: '其他' } }
-  })
-
   it.each([
     { case: 'incomplete / \'detail\' / { origin: \'real\' } / result.id', prepare: async ({ result, incomplete }: Awaited<ReturnType<typeof createDecodeTargetCostReadFixture>>) => {
       return { input: incomplete, argument2: 'detail', argument3: { origin: 'real' }, argument4: result.id, expected: '不完整' } as const

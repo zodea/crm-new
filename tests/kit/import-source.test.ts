@@ -80,9 +80,7 @@ describe('导入源解析：原始表头 + 行', () => {
       ['华东建材', new Date(Date.UTC(2024, 0, 15))],
     ]))
 
-    const value = sheet.rows[0]!.日期
-    expect(typeof value).toBe('string')
-    expect(value).not.toMatch(/^45\d{3}/)
+    expect(sheet.rows[0]!.日期).toBe('1/15/24')
   })
 
   it('gbk 编码的无 BOM csv 自动回退 GB18030 解码', async () => {

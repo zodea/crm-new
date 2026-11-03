@@ -69,6 +69,15 @@ it.each([
   source[kind] = []
   await waitFor(() => expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('data-overlay')).toBe('false'))
   expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('aria-busy')).toBe('true')
+  state.loading = false
+  await waitFor(() => expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('aria-busy')).toBe('false'))
+  expect(screen.queryAllByRole('article')).toHaveLength(0)
+  state.loading = true
+  await waitFor(() => expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('aria-busy')).toBe('true'))
+  expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('data-overlay')).toBe('false')
+  state.loading = false
+  await waitFor(() => expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('aria-busy')).toBe('false'))
+  expect(screen.queryAllByRole('article')).toHaveLength(0)
 })
 
 describe('公共单据列表的真实状态与表头筛选', () => {

@@ -142,6 +142,12 @@ describe('solveFactorCombinations：小数数量与金额精度', () => {
 })
 
 describe('solveFactorCombinations：上限与时限', () => {
+  it('请求超过硬上限时最多返回 5000 个结果', () => {
+    const result = solveFactorCombinations([factor(1, 1), factor(2, 2)], 10000, { maxResults: 6000, now: frozenClock })
+    expect(result.totalCount).toBe(5001)
+    expect(result.solutions).toHaveLength(5000)
+    expect(result.truncated).toBe(true)
+  })
   it('达到返回上限后截断展示，但保留可统计的总解数', () => {
     const result = solveFactorCombinations(
       [factor(1, 1), factor(2, 2)],

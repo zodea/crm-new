@@ -133,6 +133,8 @@ describe('配置导出运行器', () => {
       displayPath: 'E:\\备份',
     })
     expect(otherTarget.writeFile).toHaveBeenCalledTimes(2)
+    expect(otherTarget.writeFile).toHaveBeenNthCalledWith(1, '滨江壹号/华东建材/华东建材.txt', new TextEncoder().encode('第一份'), undefined)
+    expect(otherTarget.writeFile).toHaveBeenNthCalledWith(2, '滨江壹号/南方设备/南方设备.txt', new TextEncoder().encode('第二份'), undefined)
   })
 
   it('写盘失败保留失败步，重试从写盘继续', async () => {

@@ -936,18 +936,15 @@ describe('core migration local source', () => {
     const backup = await source.createBackup(protectedSource.sourceHash)
 
     expect(events).toEqual(['close', 'snapshot', 'decode-snapshot', 'backup'])
-    expect(backup.backupId).toMatch(
-      new RegExp(`^core-migration-${protectedSource.sourceHash}-[a-f0-9]{64}$`),
-    )
+    const digest = '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81'
+    expect(backup.backupId).toBe(`core-migration-${protectedSource.sourceHash}-${digest}`)
     expect(deps.createBackup).toHaveBeenCalledWith({
-      backupId: expect.stringMatching(
-        new RegExp(`^core-migration-${protectedSource.sourceHash}-[a-f0-9]{64}$`),
-      ),
+      backupId: `core-migration-${protectedSource.sourceHash}-${digest}`,
       createdAt: '2026-08-15T01:00:00.000Z',
       sourceSchemaVersion: LATEST_VERSION,
       sourceVersion: CORE_MIGRATION_SOURCE_VERSION,
       sourceHash: protectedSource.sourceHash,
-      snapshotSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      snapshotSha256: digest,
       snapshot: new Uint8Array([1, 2, 3]),
     })
   })

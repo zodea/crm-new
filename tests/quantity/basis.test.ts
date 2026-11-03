@@ -31,10 +31,15 @@ describe('工程量取数基准', () => {
     expect(new Set(mapped).size).toBe(mapped.length)
   })
 
-  it.each((QUANTITY_BASIS_OPTIONS).map(input => ({ input })))('选项与显示名保持一致，界面不另造标签：输入案例 %#', ({ input: option }) => {
-    expect(QUANTITY_BASIS_OPTIONS.map(option => option.value))
-      .toEqual(['contract', 'provisional', 'field'])
-    expect(option.label).toBe(quantityBasisLabel(option.value))
+  it('选项与显示名使用约定的三个基准', () => {
+    expect(QUANTITY_BASIS_OPTIONS).toEqual([
+      { value: 'contract', label: '合同量' },
+      { value: 'provisional', label: '暂估量' },
+      { value: 'field', label: '现场复核量' },
+    ])
+    expect(quantityBasisLabel('contract')).toBe('合同量')
+    expect(quantityBasisLabel('provisional')).toBe('暂估量')
+    expect(quantityBasisLabel('field')).toBe('现场复核量')
   })
 
   it('拒绝未知基准，避免把任意字符串拼进 SQL 列名', () => {

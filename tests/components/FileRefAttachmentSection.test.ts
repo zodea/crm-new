@@ -86,6 +86,10 @@ describe('fileRefAttachmentSection restore flow', () => {
     })
 
     expect(wrapper.find('[data-testid="finance-attachment-input"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('付款申请.pdf')
+    expect(wrapper.text()).toContain('未上传依据.pdf')
+    expect((wrapper.get('input[aria-label="附件分类"]').element as HTMLInputElement).value).toBe('变更依据')
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('仅供复制')
     expect(wrapper.find('button').exists()).toBe(false)
     expect(wrapper.get('input[aria-label="附件分类"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('textarea').attributes('disabled')).toBeDefined()

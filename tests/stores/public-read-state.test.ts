@@ -122,6 +122,10 @@ describe.each(domains)('%s公共读取发布与会话事实隔离', (domain) => 
     changed.resolve(structuredClone(snapshot))
     await pending
     expect(f.state().kind).toBe('ready')
+    f.read.mockRejectedValueOnce({ response: { status: 503, _data: { data: unavailable } } })
+    await f.load('target-new', 'real')
+    expect(f.state()).toMatchObject({ kind: 'unavailable', previous: null, problem: { code: 'unavailable' } })
+    expect(JSON.stringify(f.state())).not.toContain(snapshot.privateFact)
   })
 
   it('实际退出事件同步清事实，退出前迟到成功不能重新进入缓存', async () => {

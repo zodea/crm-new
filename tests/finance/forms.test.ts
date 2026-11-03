@@ -731,6 +731,15 @@ describe('收款登记业务边界', () => {
 })
 
 describe('付款申请票款勾稽', () => {
+  it.each([
+    { name: '结算', allocations: { settlementAllocations: [{ settlementId: 'settlement-finance', allocatedAmount: 40 }, { settlementId: 'settlement-finance', allocatedAmount: 40 }] }, error: '同一付款申请不能重复关联结算' },
+    { name: '发票', allocations: { invoiceAllocations: [{ invoiceId: 'invoice-finance-a', allocatedAmount: 40 }, { invoiceId: 'invoice-finance-a', allocatedAmount: 40 }] }, error: '同一付款申请不能重复关联发票' },
+  ])('重复关联同一$name时整笔拒绝', async ({ allocations, error }) => {
+    const store = useFinanceStore()
+    const input = { name: '重复关联测试', bizType: '有合同-材料', projectId: 'project-finance', supplierId: 'supplier-finance', contractId: 'contract-expense', applyAmount: 100, invoiceState: '先款后票' as const, ...allocations }
+    await expect(store.saveForm('payment_application', input, 'draft')).rejects.toThrow(error)
+    expect(await mem.select('SELECT id FROM payment_applications')).toEqual([])
+  })
   it('公司付款采用结算10不能提交申请100，草稿保留不完整输入、正常公司支付和实际零各自有效', async () => {
     const store = useFinanceStore()
     await mem.execute(`INSERT INTO expenditure_settlements(id,no,name,biz_type,project_id,supplier_id,total_amount,settlement_date,status) VALUES('company-source-ten','JS-COMPANY','实际公司结算','其他',NULL,'supplier-finance',10,'2026-10-05','已确认')`)

@@ -26,20 +26,16 @@ describe('工程量正式项目候选', () => {
     expect(demo).not.toHaveBeenCalled()
   })
 
-  it('非末页被截短、末页缺项或同版本总数变化均不显示为完整候选', async () => {
-    const demo = vi.fn().mockResolvedValue([])
-    expect(demo).not.toHaveBeenCalled()
-  })
-
   it.each(Array.from([
-    [page(['truncated'], 1, 101), page(['last'], 2, 101)],
-    [page(['only'], 1, 2)],
-    [page(Array.from({ length: 100 }, (_, i) => `project-${i}`), 1, 101), page(['last'], 2, 100)],
-  ]).map(input => ({ input })))('非末页被截短、末页缺项或同版本总数变化均不显示为完整候选：输入组合 1 案例 %#', async ({ input: pages }) => {
+    { name: '非末页被截短', pages: [page(['truncated'], 1, 101), page(['last'], 2, 101)], error: '项目目录分页未完整返回' },
+    { name: '末页缺项', pages: [page(['only'], 1, 2)], error: '项目目录分页未完整返回' },
+    { name: '同版本总数变化', pages: [page(Array.from({ length: 100 }, (_, i) => `project-${i}`), 1, 101), page(['last'], 2, 100)], error: '项目目录在分页读取期间发生变化' },
+  ]))('非末页被截短、末页缺项或同版本总数变化均不显示为完整候选：$name', async ({ pages, error }) => {
     const demo = vi.fn().mockResolvedValue([])
     const list = vi.fn()
     for (const value of pages)
       list.mockResolvedValueOnce(value)
-    await expect(loadQuantityBrowserCatalog({ list, demo }, { includeDemo: true, capabilities: ['demo:read'] })).rejects.toThrow()
+    await expect(loadQuantityBrowserCatalog({ list, demo }, { includeDemo: true, capabilities: ['demo:read'] })).rejects.toThrow(error)
+    expect(demo).not.toHaveBeenCalled()
   })
 })

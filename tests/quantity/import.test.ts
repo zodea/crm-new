@@ -260,6 +260,7 @@ describe('quantity import：三类目标逐行复用唯一写路径', () => {
   })
 
   it('旧合一行预检只校验不写库：可迁移行通过，无阶段工种与不唯一户被拒', async () => {
+    const logsBefore = await mem.select<{ n: number }>('SELECT COUNT(*) AS n FROM operation_logs')
     await expect(precheckQuantityLegacyRow(mem, {
       projectCode: 'P1',
       unitCode: '01',
@@ -289,6 +290,6 @@ describe('quantity import：三类目标逐行复用唯一写路径', () => {
     expect(await mem.select('SELECT id FROM unit_stage_completions')).toEqual([])
     expect(await mem.select<{ n: number }>(
       `SELECT COUNT(*) AS n FROM operation_logs`,
-    )).toEqual([{ n: expect.any(Number) }])
+    )).toEqual(logsBefore)
   })
 })

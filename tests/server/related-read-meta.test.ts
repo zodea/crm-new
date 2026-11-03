@@ -30,7 +30,7 @@ describe('辅助合同、收款及双父工作台严格读取协议', () => {
     await expect(repository.list({ kind: 'company_expense', page: 99, pageSize: 10 })).resolves.toEqual(page)
     for (const invalid of [{ ...page, meta: undefined }, { ...page, pagination: { ...page.pagination, requestedPage: 98 } }, { ...page, pagination: { ...page.pagination, pageSize: 20 } }]) {
       wire = invalid
-      await expect(repository.list({ kind: 'company_expense', page: 99, pageSize: 10 })).rejects.toBeDefined()
+      await expect(repository.list({ kind: 'company_expense', page: 99, pageSize: 10 })).rejects.toMatchObject({ problem: { code: 'internal-error', message: '合同服务返回无效数据' } })
     }
     const detail = owner.detail('aux-original', { kind: 'company_expense' }, actor)
     expect(hasConsistentReadMeta(detail, 'auxiliary-contract-read-v2', 'real')).toBe(true)
@@ -50,7 +50,7 @@ describe('辅助合同、收款及双父工作台严格读取协议', () => {
     await expect(repository.list({ page: 20, pageSize: 10 })).resolves.toEqual(page)
     for (const invalid of [{ ...page, meta: undefined }, { ...page, pagination: { ...page.pagination, requestedPage: 19 } }, { ...page, pagination: { ...page.pagination, pageSize: 20 } }, { ...page, items: page.items.map(row => ({ ...row, meta: { ...row.meta, actorId: 'other-actor' } })) }]) {
       wire = invalid
-      await expect(repository.list({ page: 20, pageSize: 10 })).rejects.toBeDefined()
+      await expect(repository.list({ page: 20, pageSize: 10 })).rejects.toMatchObject({ problem: { code: 'internal-error', message: '收款服务响应数据无效' } })
     }
     const limited = owner.detail(saved.id, { origin: 'real' }, { ...session, capabilities: ['receipt:read'] })
     expect(limited.meta.sources.filter(source => source.key !== 'receipts')).toEqual(expect.arrayContaining([
@@ -60,8 +60,8 @@ describe('辅助合同、收款及双父工作台严格读取协议', () => {
     expect(JSON.stringify(limited)).not.toMatch(/project-a|customer-a/)
     wire = owner.detail(saved.id, { origin: 'real' }, session)
     await expect(repository.detail(saved.id, { origin: 'real' })).resolves.toBeDefined()
-    await expect(repository.detail('different-id', { origin: 'real' })).rejects.toBeDefined()
-    await expect(repository.detail(saved.id, { origin: 'demo', includeDemo: true })).rejects.toBeDefined()
+    await expect(repository.detail('different-id', { origin: 'real' })).rejects.toMatchObject({ problem: { code: 'internal-error', message: '收款服务响应数据无效' } })
+    await expect(repository.detail(saved.id, { origin: 'demo', includeDemo: true })).rejects.toMatchObject({ problem: { code: 'internal-error', message: '收款服务响应数据无效' } })
   })
 
   it('工作台证据来自真实owner时点，HTTP双父/来源必须匹配本次请求', async () => {
@@ -74,10 +74,10 @@ describe('辅助合同、收款及双父工作台严格读取协议', () => {
     const repository = createHttpProjectSupplierReadRepository({ fetcher: async () => wire })
     const query = parseProjectSupplierWorkbenchQuery('proj_demo_002', 'sup_demo_004', { origin: 'demo', includeDemo: true })
     await expect(repository.get(query)).resolves.toEqual(detail)
-    await expect(repository.get({ ...query, projectId: 'other' })).rejects.toBeDefined()
-    await expect(repository.get({ ...query, supplierId: 'other' })).rejects.toBeDefined()
-    await expect(repository.get({ ...query, origin: 'real' })).rejects.toBeDefined()
+    await expect(repository.get({ ...query, projectId: 'other' })).rejects.toMatchObject({ problem: { code: 'internal-error', message: '工作台返回与本次项目、分供方或来源不一致' } })
+    await expect(repository.get({ ...query, supplierId: 'other' })).rejects.toMatchObject({ problem: { code: 'internal-error', message: '工作台返回与本次项目、分供方或来源不一致' } })
+    await expect(repository.get({ ...query, origin: 'real' })).rejects.toMatchObject({ problem: { code: 'internal-error', message: '工作台返回与本次项目、分供方或来源不一致' } })
     wire = { ...detail, meta: undefined }
-    await expect(repository.get(query)).rejects.toBeDefined()
+    await expect(repository.get(query)).rejects.toMatchObject({ problem: { code: 'internal-error', message: '中央后台返回的项目分供方工作台读模型无效' } })
   })
 })

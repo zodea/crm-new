@@ -50,16 +50,18 @@ const resolve = (kind: 'projects' | 'suppliers', id: string) => id === (kind ===
 
 describe('可证明的旧送货历史恢复', () => {
   it.each([
-    { supplier_id: null },
-    { delivery_date: '' },
-    { delivery_date: '2026-02-31' },
-    { __delivery_line_ids: [] },
-  ])('旧 reviewed 标记不能把不完整头或空材料升级为人工已核验：%j', (missing) => {
+    { missing: { supplier_id: null }, expectedLines: 1 },
+    { missing: { delivery_date: '' }, expectedLines: 1 },
+    { missing: { delivery_date: '2026-02-31' }, expectedLines: 1 },
+    { missing: { __delivery_line_ids: [] }, expectedLines: 0 },
+  ])('旧 reviewed 标记不能把不完整头或空材料升级为人工已核验：$missing', ({ missing, expectedLines }) => {
     const log = { ...audit[0], beforeData: JSON.stringify({ ...head, __delivery_line_ids: ['old-line'], ...missing }), afterData: audit[0]!.afterData }
     const result = restoreLegacyDeliveryHistory(record, 'legacy-record', lines, [log], resolve)
     expect(result.revisions).toHaveLength(1)
     expect(result.revisions[0]?.before).toMatchObject({ currentValuesConfirmed: false, reviewStatus: 'unreviewed', ocrStatus: 'reviewed' })
-    expect(result.revisions[0]?.before?.lines.every(line => !line.currentValueConfirmed)).toBe(true)
+    expect(result.revisions[0]?.before?.lines).toHaveLength(expectedLines)
+    if (expectedLines)
+      expect(result.revisions[0]?.before?.lines[0]).toMatchObject({ qty: 1, currentValueConfirmed: false })
   })
 
   it('历史明细为零数量时保留原值但取消价格事实资格', () => {

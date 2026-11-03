@@ -11,6 +11,9 @@ describe('中央送货项目建议来源', () => {
 
   it('规范化后的工地原文指向两个稳定项目时不自动建议任何一方', () => {
     const candidates = confirmedDeliveryProjectCandidates([...projects, { id: 'other-p', name: '另一项目', dataOrigin: 'real' }], [verified, { ...verified, projectId: 'other-p', rawSiteText: '北门 工地' }], 'real')
-    expect(candidates.every(candidate => candidate.aliases.length === 0)).toBe(true)
+    expect(candidates).toEqual([
+      { id: 'central-p', name: '正式项目', aliases: [] },
+      { id: 'other-p', name: '另一项目', aliases: [] },
+    ])
   })
 })

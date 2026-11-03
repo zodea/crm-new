@@ -317,10 +317,12 @@ describe('通知中心', () => {
     const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('quota')
     })
-    await store.openItem(eventId)
-    expect(execute).not.toHaveBeenCalled()
-    expect(store.error).toContain('无法可靠保留')
-    set.mockRestore()
+    try {
+      await store.openItem(eventId)
+      expect(execute).not.toHaveBeenCalled()
+      expect(store.error).toContain('无法可靠保留')
+    }
+    finally { set.mockRestore() }
   })
 
   it('保存后真实401清私密事实，保原编号且不以旧导航完成，再登录后只恢复读取', async () => {

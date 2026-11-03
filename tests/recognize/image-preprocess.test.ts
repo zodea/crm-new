@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { detectDocumentGeometry, prepareDeliveryOcrImage } from '~/lib/recognize/image-preprocess'
 
 const { getDocumentMock } = vi.hoisted(() => ({
@@ -37,6 +37,7 @@ describe('prepareDeliveryOcrImage', () => {
       callback(new Blob(['derived'], { type: 'image/png' }))
     })
   })
+  afterEach(() => vi.restoreAllMocks())
 
   it('将单页 PDF 渲染为图片后再进入图像预处理链路', async () => {
     const render = vi.fn().mockResolvedValue(undefined)

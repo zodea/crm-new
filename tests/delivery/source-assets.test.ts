@@ -13,7 +13,7 @@ describe('送货旧原件到不可变中央资产映射', () => {
     expect(result.assets).toHaveLength(1)
     expect(result.links.map(link => link.assetId)).toEqual([result.assets[0]!.id, result.assets[0]!.id])
     expect(result.assets[0]).toMatchObject({ payloadBase64: original, fileSize: atob(original).length })
-    expect(result.assets[0]!.sha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(result.assets[0]!.sha256).toBe('b0d6b4b58cbdab6b416a21a8fde77d2babae7e62d7a1f71077caafc7b304abb0')
     expect(await mapDeliverySourceAssets([...records].reverse(), [source('delivery-2'), source('delivery-1')])).toEqual(result)
   })
 

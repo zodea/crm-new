@@ -71,23 +71,18 @@ describe('普通收款中央命令与公开读回', () => {
     expect(instance.facts().rows).toEqual([expect.objectContaining({ id: 'receipt-a', draft: { ...draft, status: 'submitted' } })])
   })
 
-  it('错误关系、非法日期与空值零值提交均被拒绝，不产生收款事实', () => {
-    const instance = createReceiptCommandTestInstance({ references: () => references })
-    expect(instance.facts().rows).toEqual([])
-  })
-
-  it.each(Array.from([
-    { projectId: 'missing' },
-    { customerId: 'missing' },
-    { contractId: 'missing' },
-    { projectId: null },
-    { customerId: null },
-    { receiptDate: '2026-02-30' },
-    { amount: null },
-    { amount: '0.00' },
-    { amount: '-1.00' },
-    { amount: '1.005' },
-  ]).map(input => ({ input })))('错误关系、非法日期与空值零值提交均被拒绝，不产生收款事实：输入组合 1 案例 %#', ({ input: patch }) => {
+  it.each([
+    { name: '不存在的项目', patch: { projectId: 'missing' }, field: 'projectId', error: '项目不存在、已删除或不可读' },
+    { name: '不存在的客户', patch: { projectId: null, customerId: 'missing' }, field: 'customerId', error: '付款方客户不存在、已删除或不可读' },
+    { name: '不存在的合同', patch: { contractId: 'missing' }, field: 'contractId', error: '施工合同不存在、已删除或不可读' },
+    { name: '未选项目', patch: { projectId: null }, field: 'projectId', error: '请选择项目' },
+    { name: '未选客户', patch: { customerId: null }, field: 'customerId', error: '请选择付款方客户' },
+    { name: '无效日期', patch: { receiptDate: '2026-02-30' }, field: 'receiptDate', error: '请输入真实有效的日期' },
+    { name: '空金额', patch: { amount: null }, field: 'amount', error: '收款金额必须大于 0' },
+    { name: '零金额', patch: { amount: '0.00' }, field: 'amount', error: '收款金额必须大于 0' },
+    { name: '负金额', patch: { amount: '-1.00' }, field: 'amount', error: '金额必须是安全范围内的非负两位小数' },
+    { name: '超出分精度', patch: { amount: '1.005' }, field: 'amount', error: '金额必须是安全范围内的非负两位小数' },
+  ])('提交拒绝$name且不产生收款事实', ({ patch, field, error }) => {
     const instance = createReceiptCommandTestInstance({ references: () => references })
     expect(() => instance.execute({
       workspaceId: session.workspaceId,
@@ -99,7 +94,24 @@ describe('普通收款中央命令与公开读回', () => {
       action: 'submit',
       draft: { ...draft, ...patch },
       attachments: {},
-    }, session)).toThrow()
+    }, session)).toThrowError(expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed', fieldErrors: expect.objectContaining({ [field]: [error] }) }) }))
+    expect(instance.facts().rows).toEqual([])
+  })
+
+  it.each([
+    { name: '客户不是项目主客户', patch: { customerId: 'customer-b' }, field: 'customerId', error: '付款方客户必须是所选项目的主客户' },
+    { name: '合同属于其他项目', patch: { contractId: 'contract-b' }, field: 'contractId', error: '施工合同必须属于所选项目和付款方客户' },
+    { name: '保存时缺少收款日期', patch: { receiptDate: '' }, field: 'receiptDate', error: '请填写收款日期' },
+    { name: '保存时金额为零', patch: { amount: '0.00' }, field: 'amount', error: '收款金额必须大于 0' },
+  ])('保存拒绝$name且不产生事实', ({ patch, field, error }) => {
+    const extended = {
+      projects: [...references.projects, { id: 'project-b', name: '项目乙', customerId: 'customer-b' }],
+      customers: [...references.customers, { id: 'customer-b', name: '乙方客户' }],
+      contracts: [...references.contracts, { ...references.contracts[0]!, id: 'contract-b', projectId: 'project-b', customerId: 'customer-b' }],
+    }
+    const instance = createReceiptCommandTestInstance({ references: () => extended })
+    expect(() => instance.execute(command({ action: 'save', draft: { ...draft, ...patch } }), session)).toThrowError(expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed', fieldErrors: expect.objectContaining({ [field]: [error] }) }) }))
+    expect(instance.facts().rows).toEqual([])
   })
 
   it('不完整草稿保留空金额与明确零，保存不接受客户端伪造已确认状态', () => {
@@ -162,7 +174,7 @@ describe('普通收款中央命令与公开读回', () => {
     expect(() => instance.fileContent(first.id, attachmentId, { ...session, capabilities: [] })).toThrow(/权限/)
   })
 
-  it('无正文、错误大小及非法编码拒绝整个新建，合法空文件仍能保存', () => {
+  it('合法空文件随收款保存并读回', () => {
     const instance = createReceiptCommandTestInstance({ references: () => references })
     expect(instance.facts().rows).toEqual([])
     const result = instance.execute({ ...command(), attachments: { add: [{ fileName: '空文件', fileSize: 0, payloadBase64: '' }] } }, session)

@@ -62,6 +62,10 @@ describe('候选与导出完整集合', () => {
     result.meta.sourceVersion = null
     result.meta.sources[0]!.sourceVersion = null
     await expect(collectReadPages({ load: async () => result, identity: row => row.id })).rejects.toThrow('完整')
+    const unknownScope = page(1)
+    unknownScope.meta.authorizedScope.coverage = 'unknown'
+    unknownScope.originMeta.real.authorizedScope.coverage = 'unknown'
+    await expect(collectReadPages({ load: async () => unknownScope, identity: row => row.id })).rejects.toThrow('完整')
     await expect(collectReadPages({ load: async number => page(number), identity: row => row.id, isCurrent: () => false })).rejects.toThrow('权限')
     const empty = page(1)
     empty.items = []

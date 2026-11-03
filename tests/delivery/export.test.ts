@@ -158,6 +158,7 @@ describe('送货单 Excel 导出', () => {
 
     expect(loadSource).toHaveBeenCalledOnce()
     expect(result.sources).toHaveLength(1)
+    expect(result.rows).toHaveLength(2)
     expect(result.rows.every(row => row.sourceFile === '共用送货单.png / 共用原件')).toBe(true)
     expect(result.rows.every(row => row.exception === '多单共用原件/无法拆分')).toBe(true)
     const entries = zipEntries(result.data)

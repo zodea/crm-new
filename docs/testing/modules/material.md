@@ -34,7 +34,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/material-forms.spec.ts](../../../e2e/material-forms.spec.ts) | Playwright E2E | F4 物资整页表单：草稿真实编辑路由与冷回读、两组库存数量、结算与归档；四档视口分别使用独立浏览器上下文覆盖十二条表单 |
+| [e2e/material-forms.spec.ts](../../../e2e/material-forms.spec.ts) | Playwright E2E | F4 物资整页表单：草稿真实编辑路由与冷回读、两组库存数量、结算与归档；逐表单导航后循环检查各视口 |
 | [e2e/material-price-analysis.spec.ts](../../../e2e/material-price-analysis.spec.ts) | Playwright E2E | 正式项目、分供方、材料合同与送货事实；电线厂家趋势、两家钢材比价及五档视口 |
 | [e2e/production-material-quotations.spec.ts](../../../e2e/production-material-quotations.spec.ts) | Playwright E2E | 真实磁盘报价、完整来源选择与明确跨 ID 迁入、失响应原键及历史冷读、五档视口 |
 | [e2e/owner-material.spec.ts](../../../e2e/owner-material.spec.ts) | Playwright E2E | Issue #200 甲供材页面 |

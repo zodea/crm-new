@@ -29,17 +29,22 @@ describe('送货既有材采合同来源', () => {
     expect(await readDeliveryMaterialContracts({ list } as unknown as MaterialContractReadRepository, 'real')).toMatchObject([{ id: 'zero', amount: 0 }, { id: 'unknown', amount: null }])
   })
 
-  it('跨来源、受限关系、重复记录或读取中版本变化不发布部分合同', async () => {
+  it('读取中版本变化不发布部分合同', async () => {
     const list = vi.fn().mockResolvedValueOnce(page(Array.from({ length: 100 }, (_, index) => row(String(index))), 1, 101)).mockResolvedValueOnce(page([row('last')], 2, 101, 'v2'))
     await expect(readDeliveryMaterialContracts({ list } as unknown as MaterialContractReadRepository, 'real')).rejects.toThrow('变化')
   })
 
-  it.each(Array.from([
-    { ...row('bad'), dataOrigin: 'demo' },
-    { ...row('bad'), project: { state: 'forbidden', id: 'private-id' } },
-  ]).map(input => ({ input })))('跨来源、受限关系、重复记录或读取中版本变化不发布部分合同：输入组合 1 案例 %#', async ({ input: changed }) => {
+  it.each([
+    { name: '来源不一致', changed: { ...row('bad'), dataOrigin: 'demo' }, error: '材采合同来源或身份不一致' },
+    { name: '项目关系受限', changed: { ...row('bad'), project: { state: 'forbidden', id: 'private-id' } }, error: '部分材采合同关联受限' },
+  ])('$name不发布合同', async ({ changed, error }) => {
     const list = vi.fn().mockResolvedValue(page([changed as MaterialContractListItemDTO], 1))
-    await expect(readDeliveryMaterialContracts({ list } as unknown as MaterialContractReadRepository, 'real')).rejects.toThrow()
+    await expect(readDeliveryMaterialContracts({ list } as unknown as MaterialContractReadRepository, 'real')).rejects.toThrow(error)
+  })
+
+  it('跨分页重复身份不发布部分合同', async () => {
+    const list = vi.fn().mockResolvedValueOnce(page(Array.from({ length: 100 }, (_, index) => row(String(index))), 1, 101)).mockResolvedValueOnce(page([row('0')], 2, 101))
+    await expect(readDeliveryMaterialContracts({ list } as unknown as MaterialContractReadRepository, 'real')).rejects.toThrow('包含重复身份')
   })
 
   it('取消后到达的合同页不再发布', async () => {

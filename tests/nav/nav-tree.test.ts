@@ -14,6 +14,7 @@ function leaves() {
 
 describe('侧栏导航树', () => {
   it('每个导航叶子都有可静态提取的 Lucide 图标', () => {
+    expect(leaves().length).toBeGreaterThan(0)
     expect(leaves().every(item => item.icon.startsWith('i-lucide-'))).toBe(true)
   })
 

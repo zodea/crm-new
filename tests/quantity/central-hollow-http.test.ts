@@ -48,8 +48,12 @@ it('真实 HTTP 与 Repository 冷读明确零、修订及整改，并按历史�
     const revised = await repository.hollow(f.scope)
     expect(revised.data.records[0]!.revisions.map(row => row.input.count)).toEqual([0, 19])
     expect(quantityHollowReceiptObserved(revised, command, created)).toBe(true)
-    await expect(repository.execute({ ...f.command(revised, { kind: 'rectify-hollow-inspection', recordId: created.hollow.recordId, expectedRevisionId: revised.data.records[0]!.inspection.revisionId, rectifiedOn: '2026-09-15', count: 20, note: '超额' }), extra: 'forged' } as never)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    const rectification = { kind: 'rectify-hollow-inspection' as const, recordId: created.hollow.recordId, expectedRevisionId: revised.data.records[0]!.inspection.revisionId, rectifiedOn: '2026-09-15', count: 20, note: '超额' }
+    await expect(repository.execute(f.command(revised, rectification))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    await expect(repository.execute(f.command(revised, { ...rectification, count: 1, rectifiedOn: '2026-09-14' }))).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
     expect((await repository.hollow(f.scope)).data.records[0]!.remainingCount).toBe(19)
+    await repository.execute(f.command(revised, { ...rectification, count: 19, note: '全部整改' }))
+    expect((await repository.hollow(f.scope)).data.records[0]).toMatchObject({ remainingCount: 0, rectifiedCount: 19, eligibility: { rectify: { allowed: false } } })
   }
   finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))

@@ -168,13 +168,13 @@ describe('送货原件与修订中央公开行为', () => {
   })
 
   it.each([
-    { ...draft, supplierId: null },
-    { ...draft, deliveryDate: '' },
-    { ...draft, lines: [{ ...draft.lines[0]!, qty: null }] },
-    { ...draft, lines: [{ ...draft.lines[0]!, unit: '' }] },
-  ])('归档不自动补缺失供应商、日期或未确认明细', (invalidDraft) => {
+    { name: '缺少分供方', invalidDraft: { ...draft, supplierId: null }, message: '请依据原件人工选择分供方' },
+    { name: '缺少送货日期', invalidDraft: { ...draft, deliveryDate: '' }, message: '请依据原件人工填写送货日期' },
+    { name: '缺少数量', invalidDraft: { ...draft, lines: [{ ...draft.lines[0]!, qty: null }] }, message: '每条明细必须确认材料名称、单位和非零数量' },
+    { name: '缺少单位', invalidDraft: { ...draft, lines: [{ ...draft.lines[0]!, unit: '' }] }, message: '每条明细必须确认材料名称、单位和非零数量' },
+  ])('归档不自动补全：$name', ({ invalidDraft, message }) => {
     const { service } = setup()
-    expect(() => service.execute(archive({ draft: invalidDraft }), session)).toThrow()
+    expect(() => service.execute(archive({ draft: invalidDraft }), session)).toThrow(message)
     expect(service.list(session).records).toHaveLength(0)
   })
 })

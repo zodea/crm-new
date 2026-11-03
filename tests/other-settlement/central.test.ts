@@ -1,5 +1,6 @@
 import type { OtherSettlementStored } from '../../server/utils/other-settlement-instance'
 import { describe, expect, it } from 'vitest'
+import { decodeOtherSettlementDraft } from '~/lib/other-settlement/validation'
 import { createOtherSettlementInstance } from '../../server/utils/other-settlement-instance'
 
 const session = { workspaceId: 'workspace-default', actorId: 'actor-default', capabilities: ['other-settlement:read', 'other-settlement:write'] }
@@ -15,6 +16,17 @@ function command(patch: Record<string, unknown> = {}) {
   return { ...session, requiredCapability: 'other-settlement:write', commandId: 'save-331', baseVersion: null, action: 'save', draft: { name: '九月检测结算', no: 'JS-331', projectId: 'p1', contractId: 'c1', totalAmount: 1060, taxRate: 6, settlementDate: '2026-09-06', settlementType: '过程结算' }, attachments: {}, ...patch }
 }
 describe('aX05 其他支出结算中央命令', () => {
+  it.each([
+    { name: '负金额', draft: { totalAmount: -1 }, message: '金额或税率无效' },
+    { name: '金额超过分精度', draft: { totalAmount: 1.005 }, message: '金额或税率无效' },
+    { name: '税率超过百分之百', draft: { taxRate: 101 }, message: '金额或税率无效' },
+    { name: '无效日期', draft: { settlementDate: '2026-02-30' }, message: '结算日期无效' },
+    { name: '无效结算类型', draft: { settlementType: '未知类型' }, message: '结算类型无效' },
+    { name: '两个收款人', draft: { payeeSupplierId: 'supplier', payeeWorkerId: 'worker' }, message: '实际收款分供方和工人身份必须互斥' },
+    { name: '重复原费用', draft: { originalExpenses: [{ originalExpenseLineId: 'line', sourceVersion: 'v1', sourceRevision: 'r1', amount: 1 }, { originalExpenseLineId: 'line', sourceVersion: 'v1', sourceRevision: 'r1', amount: 1 }] }, message: '同一原费用行不可重复采用' },
+  ])('拒绝$name的结算草稿', ({ draft, message }) => {
+    expect(() => decodeOtherSettlementDraft(draft)).toThrow(message)
+  })
   it.each(['confirmed', '已确认'])('确认状态%s沿同一规则冻结、前期/累计与合同事实保真', async (status) => {
     const prior: OtherSettlementStored = { id: 'historical-confirmed', version: 1, workspaceId: session.workspaceId, migrationBatchId: null, draft: { ...command().draft, supplierId: 's1', status, totalAmount: 100, settlementDate: '2026-09-01' }, attachments: [], facts: [], audit: { createdAt: null, updatedAt: null, createdBy: '真实原操作者', updatedBy: '真实原操作者', responsible: null, department: null } }
     const current = { ...prior, id: 'current', draft: { ...prior.draft, status: 'draft', totalAmount: 20, settlementDate: '2026-09-06' } }

@@ -75,9 +75,6 @@ describe('工程量矩阵页签文案', () => {
 })
 
 describe('boq 页签文案', () => {
-  it('清单工作区与专用拆表页不会落入通用合同详情', () => {
-  })
-
   it.each([
     { case: '\'/contract/boq\'', input: '/contract/boq', expected: '工程量清单' },
     { case: '\'/contract/boq/import\'', input: '/contract/boq/import', expected: '清单拆表' },

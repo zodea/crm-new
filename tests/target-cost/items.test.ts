@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { persistTargetCostItems } from '~/lib/target-cost/items'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('target cost item persistence', () => {
   it('updates, inserts, soft-deletes and reorders one version in one write unit', async () => {
     const db = await createMigratedMemoryDb()
+    onTestFinished(() => db.close())
     await db.execute(`
       INSERT INTO target_costs (id, name, status)
       VALUES ('target-items', '目标成本科目测试', 'draft')
@@ -71,6 +72,7 @@ describe('target cost item persistence', () => {
 
   it('rejects invalid values and ids owned by another target before changing rows', async () => {
     const db = await createMigratedMemoryDb()
+    onTestFinished(() => db.close())
     await db.execute(`
       INSERT INTO target_costs (id, name, status)
       VALUES ('target-a', 'A', 'draft'), ('target-b', 'B', 'draft')

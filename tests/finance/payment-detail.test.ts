@@ -148,6 +148,12 @@ describe('付款申请智能业务洞察', () => {
     await expect(loadPaymentApplicationDetail('zero-invoice-obligation')).rejects.toThrow('不能读取为零')
     expect(await mem.select('SELECT apply_amount,invoice_state FROM payment_applications WHERE id=\'zero-invoice-obligation\'')).toEqual([{ apply_amount: 'unknown', invoice_state: '无需发票' }])
   })
+  it('先款后票的已关联票额超过申请额时待回票为零', async () => {
+    await mem.execute('UPDATE invoices SET total_amount=200 WHERE id=\'detail-invoice\'')
+    await mem.execute('UPDATE payment_application_invoice_allocations SET allocated_amount=120 WHERE id=\'detail-invoice-allocation\'')
+    expect(await getPaymentApplicationSummary('detail-application')).toMatchObject({ invoiceAllocated: 120, invoiceDifference: -20, pendingInvoiceAmount: 0 })
+    expect(await loadPaymentApplicationDetail('detail-application')).toMatchObject({ invoiceDifference: 0, pendingInvoiceAmount: 0 })
+  })
   it('历史工人清偿详情保冻结姓名、按同一工人跨项目实付读取，不按同名或空分供方归零', async () => {
     await mem.execute(`INSERT INTO workers(id,name) VALUES('detail-worker','现行工人姓名'),('same-name-worker','现行工人姓名')`)
     for (const [id, project, worker] of [['worker-head', 'detail-project', 'detail-worker'], ['worker-other', 'other-project', 'detail-worker'], ['same-name-other', 'other-project', 'same-name-worker']] as const) {

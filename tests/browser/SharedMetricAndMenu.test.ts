@@ -33,7 +33,6 @@ describe('共享指标与行菜单真实浏览器验收', () => {
     const action = page.getByRole('button', { name: '已发原单 12份' })
     await userEvent.tab()
     await expect.element(action).toHaveFocus()
-    await page.screenshot({ path: `../../.tmp/opt02-ui/vue-metrics-${window.innerWidth}.png` })
     expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth)
   })
 
@@ -59,7 +58,6 @@ describe('共享指标与行菜单真实浏览器验收', () => {
     expect(box.right).toBeLessThanOrEqual(window.innerWidth)
     expect(box.top).toBeGreaterThanOrEqual(0)
     expect(box.bottom).toBeLessThanOrEqual(window.innerHeight)
-    await page.screenshot({ path: `../../.tmp/opt02-ui/vue-menu-${window.innerWidth}.png` })
     await userEvent.keyboard('{Escape}')
     await expect.element(trigger).toHaveFocus()
     await expect.element(menu).not.toBeInTheDocument()

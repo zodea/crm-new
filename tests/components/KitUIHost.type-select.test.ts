@@ -20,6 +20,7 @@ import {
 
 const hostState = useKitUIHostState()
 const mountedHosts: Array<ReturnType<typeof mount>> = []
+const temporaryOrigins: HTMLElement[] = []
 
 beforeAll(() => {
   vi.stubGlobal('useKitUIHostState', useKitUIHostState)
@@ -28,6 +29,8 @@ beforeAll(() => {
 afterEach(async () => {
   for (const wrapper of mountedHosts.splice(0))
     wrapper.unmount()
+  for (const origin of temporaryOrigins.splice(0))
+    origin.remove()
   hostState.resolveConfirm(false)
   hostState.resolveFormModal(null)
   hostState.resolveTypeSelect(null)
@@ -134,6 +137,7 @@ describe('kitUIHost typeSelect integration', () => {
 
   it('与 formModal/confirm 使用真实模态栈，遮罩和 Esc 只关闭顶层并恢复焦点', async () => {
     const origin = document.createElement('button')
+    temporaryOrigins.push(origin)
     origin.textContent = '打开类型选择'
     document.body.append(origin)
     origin.focus()

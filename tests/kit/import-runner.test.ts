@@ -20,6 +20,8 @@ describe('导入执行器', () => {
 
     expect(importRow).toHaveBeenCalledTimes(3)
     expect(importRow).toHaveBeenNthCalledWith(1, rows[0])
+    expect(importRow).toHaveBeenNthCalledWith(2, rows[1])
+    expect(importRow).toHaveBeenNthCalledWith(3, rows[2])
     expect(runner.phase.value).toBe('completed')
     expect(runner.done.value).toBe(3)
     expect(runner.total.value).toBe(3)
@@ -72,6 +74,8 @@ describe('导入执行器', () => {
 
     // 3 行共 4 次调用：第 2 行失败一次后重试成功，第 1 行不重复。
     expect(importRow).toHaveBeenCalledTimes(4)
+    expect(importRow).toHaveBeenNthCalledWith(1, rows[0])
+    expect(importRow).toHaveBeenNthCalledWith(2, rows[1])
     expect(importRow).toHaveBeenNthCalledWith(3, rows[1])
     expect(importRow).toHaveBeenNthCalledWith(4, rows[2])
     expect(runner.done.value).toBe(3)

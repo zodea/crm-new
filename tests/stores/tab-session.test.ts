@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { TabDescriptor, TabRestoreValidator } from '~/lib/tabs/restoration-contract'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
 import { tabSessionStorageKey } from '~/lib/tabs/session-persistence'
 import { useTabSessionStore } from '~/stores/tab-session'
@@ -40,6 +40,7 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
 })
+afterEach(() => useTabSessionStore().dispose())
 
 describe('浏览器页签恢复接线', () => {
   it('启动仅验证活动页，首次激活再验证其他详情，旧标题不先泄露', async () => {

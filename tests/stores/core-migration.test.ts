@@ -468,6 +468,7 @@ describe('core migration store', () => {
     await store.hydrate()
     expect(store.phase).toBe('confirmed')
     expect(store.activeMigration).toMatchObject({ batchId: pending.batchId })
+    expect(repository.confirm).toHaveBeenCalled()
     expect(repository.confirm.mock.calls.every(([command]) => command.commandId === pending.commandId)).toBe(true)
   })
 })

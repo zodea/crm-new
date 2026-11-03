@@ -13,11 +13,20 @@ describe('送货单号规范化', () => {
       projectId: 'project-1',
       supplierId: 'supplier-1',
       orderNo: ' abc-123 ',
-    })).toBe(deliveryNaturalKey({
+    })).toBe('["project-1","supplier-1","ABC-123"]')
+    expect(deliveryNaturalKey({
       projectId: 'project-1',
       supplierId: 'supplier-1',
       orderNo: 'ＡＢＣ－１２３',
-    }))
+    })).toBe('["project-1","supplier-1","ABC-123"]')
+  })
+
+  it.each([
+    { name: '项目', projectId: '', supplierId: 's', orderNo: 'A' },
+    { name: '分供方', projectId: 'p', supplierId: '', orderNo: 'A' },
+    { name: '单号', projectId: 'p', supplierId: 's', orderNo: ' ' },
+  ])('缺少$name不生成自然键', ({ projectId, supplierId, orderNo }) => {
+    expect(deliveryNaturalKey({ projectId, supplierId, orderNo })).toBeNull()
   })
 
   it.each([

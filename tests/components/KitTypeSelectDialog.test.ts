@@ -56,8 +56,8 @@ describe('kitTypeSelectDialog public contract', () => {
     wrapper.unmount()
   })
 
-  it('defaultValue 缺失或无效时回退到第一项', async () => {
-    const wrapper = mountTypeSelect({ defaultValue: 'missing' })
+  it.each([{ name: '缺失', defaultValue: undefined }, { name: '无效', defaultValue: 'missing' }])('defaultValue $name时回退到第一项', async ({ defaultValue }) => {
+    const wrapper = mountTypeSelect({ defaultValue })
 
     await vi.waitFor(() => {
       expect((screen.getByRole('radio', { name: /有合同付款/ }) as HTMLInputElement).checked).toBe(true)
@@ -87,9 +87,16 @@ describe('kitTypeSelectDialog public contract', () => {
     const second = screen.getByRole('radio', { name: '预付款申请' }) as HTMLInputElement
     expect(second.checked).toBe(true)
     expect(document.activeElement).toBe(second)
-
-    await fireEvent.keyDown(second, { key: 'Enter' })
-    expect(wrapper.emitted('select')).toEqual([['advance']])
+    await fireEvent.keyDown(second, { key: 'ArrowUp' })
+    await fireEvent.keyDown(first, { key: 'ArrowUp' })
+    const last = screen.getByRole('radio', { name: '公司付款' }) as HTMLInputElement
+    expect(last.checked).toBe(true)
+    expect(document.activeElement).toBe(last)
+    await fireEvent.keyDown(last, { key: 'ArrowDown' })
+    expect((first as HTMLInputElement).checked).toBe(true)
+    expect(document.activeElement).toBe(first)
+    await fireEvent.keyDown(first, { key: 'Enter' })
+    expect(wrapper.emitted('select')).toEqual([['contract']])
     wrapper.unmount()
   })
 

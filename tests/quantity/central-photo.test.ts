@@ -21,9 +21,17 @@ beforeEach(async () => {
 })
 afterEach(() => memory.close())
 
-it.each(([{ ...photo, fileSize: 4 }, { ...photo, contentBase64: 'AQI=' }, { ...photo, contentBase64: 'AQI#' }, { ...photo, mimeType: 'text/html' }]).map(input => ({ input })))('验收照片的编码、实际长度及图片类型都要验证，拒绝伪造元数据：输入案例 %#', ({ input: invalid }) => {
+it('有效照片可解码为原字节', () => {
   expect(validateQuantityPhoto(photo)).toEqual(new Uint8Array([1, 2, 3]))
-  expect(() => validateQuantityPhoto(invalid)).toThrow()
+})
+
+it.each([
+  { name: '声明长度不符', invalid: { ...photo, fileSize: 4 } },
+  { name: '正文长度不符', invalid: { ...photo, contentBase64: 'AQI=' } },
+  { name: '编码非法', invalid: { ...photo, contentBase64: 'AQI#' } },
+  { name: '非图片类型', invalid: { ...photo, mimeType: 'text/html' } },
+])('验收照片拒绝$name', ({ invalid }) => {
+  expect(() => validateQuantityPhoto(invalid)).toThrow('验收照片名称、类型、大小或正文不符')
 })
 
 it('照片只按当前项目、户和阶段完成的稳定身份返回，并给出可独立校验的 SHA-256', async () => {
@@ -33,7 +41,6 @@ it('照片只按当前项目、户和阶段完成的稳定身份返回，并给�
 })
 
 it.each(Array.from([{ ...query, projectId: 'other' }, { ...query, unitId: 'other-unit' }, { ...query, completionId: 'other-done' }]).map(input => ({ input })))('照片只按当前项目、户和阶段完成的稳定身份返回，并给出可独立校验的 SHA-256：输入组合 1 案例 %#', async ({ input: wrong }) => {
-  expect(await readQuantityCentralPhoto(memory, query)).toMatchObject({ ...query, ...photo, sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81' })
   await expect(readQuantityCentralPhoto(memory, wrong)).rejects.toMatchObject({ problem: { code: 'not-found' } })
 })
 
