@@ -41,6 +41,8 @@ describe('prepareDeliveryOcrImage', () => {
 
   it('将单页 PDF 渲染为图片后再进入图像预处理链路', async () => {
     const render = vi.fn().mockResolvedValue(undefined)
+    const cleanup = vi.fn()
+    const destroy = vi.fn()
     const getPage = vi.fn().mockResolvedValue({
       getViewport: () => ({ width: 1000, height: 1400 }),
       render: () => ({ promise: render() }),
@@ -49,18 +51,20 @@ describe('prepareDeliveryOcrImage', () => {
       promise: Promise.resolve({
         numPages: 1,
         getPage,
-        cleanup: vi.fn(),
+        cleanup,
         destroy: vi.fn(),
       }),
-      destroy: vi.fn(),
+      destroy,
     })
 
     const source = new File(['pdf'], '2026.5.21广州德力.pdf', { type: 'application/pdf' })
     const prepared = await prepareDeliveryOcrImage(source)
 
-    expect(getDocumentMock).toHaveBeenCalledWith(expect.objectContaining({ data: expect.any(Uint8Array) }))
+    expect(getDocumentMock).toHaveBeenCalledWith(expect.objectContaining({ data: new Uint8Array([112, 100, 102]) }))
     expect(getPage).toHaveBeenCalledWith(1)
     expect(render).toHaveBeenCalledOnce()
+    expect(cleanup).toHaveBeenCalledOnce()
+    expect(destroy).toHaveBeenCalledOnce()
     expect(prepared.transformed).toBe(true)
     expect(prepared.file.type).toBe('image/png')
     expect(prepared.file.name).toBe('2026.5.21广州德力.ocr.png')
@@ -69,19 +73,23 @@ describe('prepareDeliveryOcrImage', () => {
 
   it('多页 PDF 不拆页或渲染，保持原文件交给 VL', async () => {
     const getPage = vi.fn()
+    const cleanup = vi.fn()
+    const destroy = vi.fn()
     getDocumentMock.mockReturnValue({
       promise: Promise.resolve({
         numPages: 2,
         getPage,
-        cleanup: vi.fn(),
+        cleanup,
       }),
-      destroy: vi.fn(),
+      destroy,
     })
 
     const source = new File(['pdf'], 'multi-page.pdf', { type: 'application/pdf' })
     const prepared = await prepareDeliveryOcrImage(source)
 
     expect(getPage).not.toHaveBeenCalled()
+    expect(cleanup).toHaveBeenCalledOnce()
+    expect(destroy).toHaveBeenCalledOnce()
     expect(prepared).toEqual({
       file: source,
       transformed: false,
