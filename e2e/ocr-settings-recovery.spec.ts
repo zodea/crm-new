@@ -1,4 +1,3 @@
-import { mkdir } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow } from './helpers/responsive'
 
@@ -60,9 +59,6 @@ test('OCR 设置重读失败锁定写入，键盘重试恢复原配置', async (
     await page.keyboard.press('Shift+Tab')
     await expect(retry).toBeFocused()
     await expectNoPageOverflow(page, `OCR 设置读取失败 @ ${width}px`)
-    if (process.env.CRM_EVIDENCE_DIR) {
-      await mkdir(process.env.CRM_EVIDENCE_DIR, { recursive: true })
-    }
   }
   await retry.press('Enter')
   await expect(form.getByText('已保存', { exact: true })).toBeVisible()
