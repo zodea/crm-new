@@ -1,10 +1,10 @@
 import type { TestProject } from 'vitest/node'
 import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { join, relative, resolve } from 'node:path'
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { build, version as esbuildVersion } from 'esbuild'
+import { createFixtureCacheDirectory, findFixtureCaches, publishFixtureCache } from './helpers/fixture-cache'
 
 /**
  * 冷进程与独立服务入口：每个入口都是 tests/helpers/<名称>.ts，经 runColdProcess/spawnColdProcess 以独立 Node 进程启动。
@@ -40,11 +40,12 @@ declare module 'vitest' {
 }
 
 const root = resolve(import.meta.dirname, '..')
-const cacheRoot = join(root, '.tmp', 'vitest-fixtures')
+const tempRoot = join(root, '.tmp')
+const cacheRoot = join(tempRoot, 'vitest-fixtures-v2')
 const bundleRoot = join(cacheRoot, 'cold-bundles')
 const MIGRATIONS_ENTRY = 'app/lib/db/migrations.ts'
 
-interface BundleManifest { key: string, inputs: Record<string, string>, migrationInputs: string[] }
+interface BundleManifest { key: string, inputs: Record<string, string>, migrationInputs: string[], directory: string }
 
 const sha256 = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
 async function hashFiles(paths: readonly string[]): Promise<Record<string, string> | null> {
@@ -59,24 +60,32 @@ async function hashFiles(paths: readonly string[]): Promise<Record<string, strin
 const keyOf = (inputs: Record<string, string>, extra: string) => sha256(JSON.stringify([extra, Object.entries(inputs).sort(([a], [b]) => a.localeCompare(b))]))
 const bundleSalt = JSON.stringify({ esbuildVersion, node: process.versions.node, entries: COLD_ENTRIES, format: 'esm-v1' })
 
-async function readManifest(): Promise<BundleManifest | null> {
-  try {
-    return JSON.parse(await readFile(join(bundleRoot, 'manifest.json'), 'utf8')) as BundleManifest
-  }
-  catch { return null }
-}
-
-/** 源码内容未变且产物齐全时复用；否则整批重打到新目录后原子换名，旧目录随后清理。 */
+const bundleFiles = [...COLD_ENTRIES, 'migrations-key'].map(name => `${name}.mjs`)
+/** 源码内容与产物摘要均吻合才复用；每次新构建写入独立目录，不删除旧缓存。 */
 async function ensureColdBundles(): Promise<BundleManifest> {
-  const previous = await readManifest()
-  if (previous) {
-    const current = await hashFiles(Object.keys(previous.inputs))
-    const directory = join(bundleRoot, previous.key)
-    if (current && keyOf(current, bundleSalt) === previous.key && COLD_ENTRIES.every(name => existsSync(join(directory, `${name}.mjs`))))
-      return previous
+  const caches = await findFixtureCaches<{ inputs: Record<string, string>, migrationInputs: string[] }>(bundleRoot, bundleFiles)
+  for (const { directory, manifest } of caches) {
+    const previous = manifest.metadata
+    if (!previous || typeof previous.inputs !== 'object' || !previous.inputs || !Array.isArray(previous.migrationInputs) || previous.migrationInputs.some(path => typeof path !== 'string'))
+      continue
+    const paths = Object.keys(previous.inputs)
+    if (!/^[0-9a-f]{64}$/.test(manifest.key)
+      || Object.values(previous.inputs).some(value => typeof value !== 'string' || !/^[0-9a-f]{64}$/.test(value))
+      || ![MIGRATIONS_ENTRY, ...COLD_ENTRIES.map(name => `tests/helpers/${name}.ts`)].every(path => paths.includes(path))
+      || previous.migrationInputs.some(path => !paths.includes(path))) {
+      continue
+    }
+    if ([...paths, ...previous.migrationInputs].some((path) => {
+      const inside = relative(root, resolve(root, path))
+      return !inside || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)
+    })) {
+      continue
+    }
+    const current = await hashFiles(paths)
+    if (current && keyOf(current, bundleSalt) === manifest.key)
+      return { key: manifest.key, ...previous, directory }
   }
-  await mkdir(bundleRoot, { recursive: true })
-  const staging = join(bundleRoot, `staging-${process.pid}-${Date.now()}`)
+  const staging = await createFixtureCacheDirectory(bundleRoot)
   const result = await build({
     absWorkingDir: root,
     entryPoints: [
@@ -98,20 +107,9 @@ async function ensureColdBundles(): Promise<BundleManifest> {
   const outputInputs = (out: string) => Object.keys(Object.entries(result.metafile.outputs).find(([path]) => path.endsWith(`/${out}.mjs`))![1].inputs)
   const inputs = (await hashFiles(Object.keys(result.metafile.inputs)))!
   const key = keyOf(inputs, bundleSalt)
-  const manifest: BundleManifest = { key, inputs, migrationInputs: outputInputs('migrations-key') }
-  const target = join(bundleRoot, key)
-  // 并发的另一 project 可能已按同键换名完成；同键内容相同，保留先到者。
-  await rename(staging, target).catch(async (cause) => {
-    if (!existsSync(target))
-      throw cause
-    await rm(staging, { recursive: true, force: true })
-  })
-  await writeFile(join(bundleRoot, 'manifest.json'), JSON.stringify(manifest), 'utf8')
-  for (const name of await readdir(bundleRoot)) {
-    if (name !== key && name !== 'manifest.json' && !name.startsWith('staging-'))
-      await rm(join(bundleRoot, name), { recursive: true, force: true })
-  }
-  return manifest
+  const metadata = { inputs, migrationInputs: outputInputs('migrations-key') }
+  await publishFixtureCache(staging, key, metadata, bundleFiles)
+  return { key, ...metadata, directory: staging }
 }
 
 /** 迁移链源码、测试库驱动和 sql.js 版本共同作键；同键文件已存在时直接复用。 */
@@ -120,32 +118,29 @@ async function ensureMigratedSnapshot(manifest: BundleManifest): Promise<Migrate
   const inputs = (await hashFiles([...manifest.migrationInputs, 'tests/helpers/memory-db.ts']))!
   const key = keyOf(inputs, JSON.stringify({ sqlJsVersion }))
   const directory = join(cacheRoot, 'migrated-memory')
-  const path = join(directory, `${key}.sqlite`)
-  const metaPath = join(directory, `${key}.json`)
-  if (existsSync(path) && existsSync(metaPath))
-    return { path, foreignKeys: (JSON.parse(await readFile(metaPath, 'utf8')) as { foreignKeys: number }).foreignKeys }
+  const caches = await findFixtureCaches<{ foreignKeys: number }>(directory, ['snapshot.sqlite'])
+  const existing = caches.find(cache => cache.manifest.key === key && (cache.manifest.metadata?.foreignKeys === 0 || cache.manifest.metadata?.foreignKeys === 1))
+  if (existing)
+    return { path: join(existing.directory, 'snapshot.sqlite'), foreignKeys: existing.manifest.metadata.foreignKeys }
   const { migrateMemorySnapshot } = await import('./helpers/memory-db')
   const { bytes, foreignKeys } = await migrateMemorySnapshot()
-  await mkdir(directory, { recursive: true })
-  for (const name of await readdir(directory)) {
-    if (!name.endsWith('.tmp'))
-      await rm(join(directory, name), { force: true })
-  }
-  const staging = `${path}.${process.pid}.tmp`
-  await writeFile(staging, bytes)
-  await rename(staging, path).catch(async (cause) => {
-    if (!existsSync(path))
-      throw cause
-    await rm(staging, { force: true })
-  })
-  await writeFile(metaPath, JSON.stringify({ foreignKeys }), 'utf8')
+  const staging = await createFixtureCacheDirectory(directory)
+  const path = join(staging, 'snapshot.sqlite')
+  await writeFile(path, bytes, { flag: 'wx' })
+  await publishFixtureCache(staging, key, { foreignKeys }, ['snapshot.sqlite'])
   return { path, foreignKeys }
 }
 
 export default async function setup(project: TestProject) {
   const started = performance.now()
+  for (const directory of [tempRoot, cacheRoot]) {
+    await mkdir(directory, { recursive: true })
+    const stat = await lstat(directory)
+    if (!stat.isDirectory() || stat.isSymbolicLink())
+      throw new Error(`测试缓存路径不是普通目录：${directory}`)
+  }
   const manifest = await ensureColdBundles()
-  project.provide('coldBundleDirectory', join(bundleRoot, manifest.key))
+  project.provide('coldBundleDirectory', manifest.directory)
   project.provide('migratedMemorySnapshot', await ensureMigratedSnapshot(manifest))
   if (process.env.VITEST_FIXTURE_TIMING)
     process.stdout.write(`[global-setup] ${project.name}: ${Math.round(performance.now() - started)}ms (${relative(root, bundleRoot)})\n`)

@@ -12,11 +12,14 @@
 | [e2e/helpers/visual-environment.ts](../../../e2e/helpers/visual-environment.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/browser/setup.ts](../../../tests/browser/setup.ts) | 测试环境初始化 | 真实浏览器组件测试初始化 |
 | [tests/components/setup.ts](../../../tests/components/setup.ts) | 测试环境初始化 | jsdom 测试清理与浏览器 API 替身 |
-| [tests/global-setup.ts](../../../tests/global-setup.ts) | 测试环境初始化 | unit 全局准备：冷进程入口预打包、迁移后内存库快照 |
+| [tests/global-setup.ts](../../../tests/global-setup.ts) | 测试环境初始化 | unit 全局准备：冷进程入口预打包、迁移后内存库快照；共享旧缓存不自动删除 |
+| [tests/helpers/fixture-cache.ts](../../../tests/helpers/fixture-cache.ts) | 辅助／夹具（非独立测试） | 缓存独立发布、摘要校验及同键冲突拒绝 |
+| [tests/tooling/fixture-cache.test.ts](../../../tests/tooling/fixture-cache.test.ts) | 工程工具测试 | 并发缓存、旧文件保留、篡改与同键冲突 |
 | [tests/helpers/cold-process.ts](../../../tests/helpers/cold-process.ts) | 辅助／夹具（非独立测试） | 以独立 Node 进程启动预打包的冷恢复与服务入口 |
-| [tests/helpers/test-temp-root.ts](../../../tests/helpers/test-temp-root.ts) | 辅助／夹具（非独立测试） | 每个测试文件的合成数据隔离与安全清理 |
-| [tests/tooling/test-temp-root.test.ts](../../../tests/tooling/test-temp-root.test.ts) | 工程工具测试 | 临时目录归属、活动进程保护与清理 |
-| [tests/helpers/production-storage-seed.ts](../../../tests/helpers/production-storage-seed.ts) | 辅助／夹具（非独立测试） | 新建空目录复制同身份正式库种子后打开 |
+| [tests/helpers/test-temp-root.ts](../../../tests/helpers/test-temp-root.ts) | 辅助／夹具（非独立测试） | 每个测试文件的合成数据隔离与保留 |
+| [tests/tooling/test-temp-root.test.ts](../../../tests/tooling/test-temp-root.test.ts) | 工程工具测试 | 临时目录隔离、进程运行或退出时保留数据 |
+| [tests/helpers/production-storage-seed.ts](../../../tests/helpers/production-storage-seed.ts) | 辅助／夹具（非独立测试） | 测试种子独立生成与保留；校验身份、结构及完整性后复制冷打开 |
+| [tests/tooling/production-storage-seed.test.ts](../../../tests/tooling/production-storage-seed.test.ts) | 工程工具测试 | 并发种子、身份拒绝和已有目标保留 |
 | [tests/helpers/memory-db.ts](../../../tests/helpers/memory-db.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/material-read-meta.ts](../../../tests/helpers/material-read-meta.ts) | 辅助／夹具（非独立测试） | 材采来源与真实元数据夹具 |
 | [tests/helpers/notification-read-meta.ts](../../../tests/helpers/notification-read-meta.ts) | 辅助／夹具（非独立测试） | 通知来源元数据夹具 |

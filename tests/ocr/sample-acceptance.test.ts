@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -10,6 +9,7 @@ import {
   createComparisonSkeleton,
   selectRepresentativeSamples,
 } from '../../scripts/ocr-sample-acceptance.mjs'
+import { testTempRoot } from '../helpers/test-temp-root'
 
 describe('ocr 本地样本验收清单', () => {
   it.each([
@@ -76,34 +76,29 @@ describe('ocr 本地样本验收清单', () => {
   })
 
   it('扫描本地样本时只输出元数据和对照骨架，不依赖私有样本目录', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'crm-ocr-acceptance-'))
-    try {
-      const invoiceDirectory = join(root, '发票')
-      const deliveryDirectory = join(root, '送货单')
-      await mkdir(invoiceDirectory)
-      await mkdir(deliveryDirectory)
-      await writeFile(join(invoiceDirectory, 'invoice.pdf'), '%PDF-1.4\n')
-      await writeFile(join(deliveryDirectory, 'delivery.jpg'), 'synthetic-image-fixture')
+    const root = await mkdtemp(join(testTempRoot(), 'ocr-acceptance-'))
+    const invoiceDirectory = join(root, '发票')
+    const deliveryDirectory = join(root, '送货单')
+    await mkdir(invoiceDirectory)
+    await mkdir(deliveryDirectory)
+    await writeFile(join(invoiceDirectory, 'invoice.pdf'), '%PDF-1.4\n')
+    await writeFile(join(deliveryDirectory, 'delivery.jpg'), 'synthetic-image-fixture')
 
-      const report = await buildReport({
-        root,
-        mode: 'representative',
-        perGroup: 1,
-      })
+    const report = await buildReport({
+      root,
+      mode: 'representative',
+      perGroup: 1,
+    })
 
-      expect(report.safety).toEqual({
-        callsOcrApi: false,
-        includesRawOcr: false,
-        includesFileContent: false,
-        productDataMutation: false,
-      })
-      expect(report.totals.supportedFiles).toBe(2)
-      expect(report.totals.selectedFiles).toBe(2)
-      expect(report.samples.every(sample => sample.comparison.status === 'pending')).toBe(true)
-      expect(JSON.stringify(report)).not.toContain('accessToken')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    expect(report.safety).toEqual({
+      callsOcrApi: false,
+      includesRawOcr: false,
+      includesFileContent: false,
+      productDataMutation: false,
+    })
+    expect(report.totals.supportedFiles).toBe(2)
+    expect(report.totals.selectedFiles).toBe(2)
+    expect(report.samples.every(sample => sample.comparison.status === 'pending')).toBe(true)
+    expect(JSON.stringify(report)).not.toContain('accessToken')
   })
 })
