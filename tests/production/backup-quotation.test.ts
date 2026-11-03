@@ -16,28 +16,34 @@ async function fixture() {
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(join(base, 'quotation-backup-'))
   const storage = createProductionStorage({ directory, workspaceId: 'quotation-backup-workspace', ownerId: 'quotation-backup-owner', purpose: 'verification' })
-  const actor = { ...storage.identity, capabilities: ['material-quotation:read', 'material-quotation:write'] }
-  const bytes = Buffer.from([0, 10, 128, 255])
-  const command: QuotationCommand = {
-    ...storage.identity,
-    requiredCapability: 'material-quotation:write',
-    commandId: 'quotation-backup-original',
-    baseVersion: null,
-    action: 'save',
-    draft: {
-      partyName: ' 未建档报价方原文\n',
-      supplierId: null,
-      projectId: null,
-      scope: 'general',
-      quotationDate: '2026-10-05',
-      note: '原单条款',
-      lines: [{ id: 'original-quotation-line', name: '原材料', spec: '原规格', grade: '', brand: '', unit: '米', unitPrice: 0, quantity: null, taxIncluded: null, taxRate: null, freight: null, quantityCondition: null, paymentCondition: null, validity: null }],
-    },
-    attachments: { add: [{ fileName: '报价原件.bin', fileSize: bytes.length, mimeType: 'application/octet-stream', payloadBase64: bytes.toString('base64') }] },
+  try {
+    const actor = { ...storage.identity, capabilities: ['material-quotation:read', 'material-quotation:write'] }
+    const bytes = Buffer.from([0, 10, 128, 255])
+    const command: QuotationCommand = {
+      ...storage.identity,
+      requiredCapability: 'material-quotation:write',
+      commandId: 'quotation-backup-original',
+      baseVersion: null,
+      action: 'save',
+      draft: {
+        partyName: ' 未建档报价方原文\n',
+        supplierId: null,
+        projectId: null,
+        scope: 'general',
+        quotationDate: '2026-10-05',
+        note: '原单条款',
+        lines: [{ id: 'original-quotation-line', name: '原材料', spec: '原规格', grade: '', brand: '', unit: '米', unitPrice: 0, quantity: null, taxIncluded: null, taxRate: null, freight: null, quantityCondition: null, paymentCondition: null, validity: null }],
+      },
+      attachments: { add: [{ fileName: '报价原件.bin', fileSize: bytes.length, mimeType: 'application/octet-stream', payloadBase64: bytes.toString('base64') }] },
+    }
+    const owner = createProductionMaterialQuotationOwner(storage)
+    const receipt = await owner.execute(command, () => actor)
+    return { storage, directory, actor, bytes, command, owner, receipt }
   }
-  const owner = createProductionMaterialQuotationOwner(storage)
-  const receipt = await owner.execute(command, () => actor)
-  return { storage, directory, actor, bytes, command, owner, receipt }
+  catch (error) {
+    await storage.close()
+    throw error
+  }
 }
 
 it('备份核验实际报价参与者、冻结原价、原件和原回执，隔离冷开沿原编号恢复', async () => {

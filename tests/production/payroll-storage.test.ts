@@ -26,25 +26,31 @@ async function fixture() {
   const directory = await mkdtemp(`${base}/synthetic-`)
   const options = { directory, workspaceId: 'payroll-workspace', ownerId: 'payroll-owner', purpose: 'verification' as const }
   const storage = await createSeededProductionStorage(options)
-  const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['payroll:read', 'payroll:write', 'worker:list:read', 'crew:list:read', 'project:list:read'] }
-  const now = '2026-10-07T08:00:00.000Z'
-  await storage.withTransaction(async (db) => {
-    for (const id of ['payroll-project', 'unrelated-project'])
-      await db.execute('INSERT INTO projects(id,name,code,draft_json,version,created_at,updated_at) VALUES (?,?,?,?,1,?,?)', [id, id, id, JSON.stringify({ id, name: id, code: id }), now, now])
-    const crew = { id: 'payroll-crew', version: 1, updatedAt: now, draft: { id: 'payroll-crew', name: '真实时工班组' } }
-    await db.execute('INSERT INTO crews(id,record_json) VALUES (?,?)', [crew.id, JSON.stringify(crew)])
-    for (const [id, dailyWage, deletedAt] of [['payroll-leader', 481, null], ['payroll-zero', 0, null], ['payroll-other-project', 400, null], ['payroll-deleted', 999, now]] as const) {
-      const worker = { id, version: 1, updatedAt: now, deletedAt, draft: { id, name: id, crewId: crew.id, currentProjectId: id === 'payroll-other-project' ? 'unrelated-project' : 'payroll-project', dailyWage } }
-      await db.execute('INSERT INTO workers(id,record_json) VALUES (?,?)', [id, JSON.stringify(worker)])
-    }
-  })
-  const owner = createProductionPayrollService(storage)
-  const service = owner.forSession(() => actor)
-  const scope = { projectId: 'payroll-project', crewId: 'payroll-crew', month: '2026-08' }
-  const draft = { ...scope, leaderWorkerId: 'payroll-leader', memberWorkerIds: ['payroll-leader', 'payroll-zero'], note: '独立正式工资' }
-  let sequence = 0
-  const command = (read: PayrollC1CommandRead, action: PayrollC1Action) => ({ commandId: `payroll-test-${++sequence}`, workspaceId: actor.workspaceId, actorId: actor.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, sourceVersion: read.context.sourceVersion, projectId: scope.projectId, statementId: 'statementId' in read ? read.statementId : null, draftKey: 'draftKey' in read ? read.draftKey : null, configScope: 'scope' in read ? read.scope : null, action })
-  return { storage, options, actor, owner, service, scope, draft, command }
+  try {
+    const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['payroll:read', 'payroll:write', 'worker:list:read', 'crew:list:read', 'project:list:read'] }
+    const now = '2026-10-07T08:00:00.000Z'
+    await storage.withTransaction(async (db) => {
+      for (const id of ['payroll-project', 'unrelated-project'])
+        await db.execute('INSERT INTO projects(id,name,code,draft_json,version,created_at,updated_at) VALUES (?,?,?,?,1,?,?)', [id, id, id, JSON.stringify({ id, name: id, code: id }), now, now])
+      const crew = { id: 'payroll-crew', version: 1, updatedAt: now, draft: { id: 'payroll-crew', name: '真实时工班组' } }
+      await db.execute('INSERT INTO crews(id,record_json) VALUES (?,?)', [crew.id, JSON.stringify(crew)])
+      for (const [id, dailyWage, deletedAt] of [['payroll-leader', 481, null], ['payroll-zero', 0, null], ['payroll-other-project', 400, null], ['payroll-deleted', 999, now]] as const) {
+        const worker = { id, version: 1, updatedAt: now, deletedAt, draft: { id, name: id, crewId: crew.id, currentProjectId: id === 'payroll-other-project' ? 'unrelated-project' : 'payroll-project', dailyWage } }
+        await db.execute('INSERT INTO workers(id,record_json) VALUES (?,?)', [id, JSON.stringify(worker)])
+      }
+    })
+    const owner = createProductionPayrollService(storage)
+    const service = owner.forSession(() => actor)
+    const scope = { projectId: 'payroll-project', crewId: 'payroll-crew', month: '2026-08' }
+    const draft = { ...scope, leaderWorkerId: 'payroll-leader', memberWorkerIds: ['payroll-leader', 'payroll-zero'], note: '独立正式工资' }
+    let sequence = 0
+    const command = (read: PayrollC1CommandRead, action: PayrollC1Action) => ({ commandId: `payroll-test-${++sequence}`, workspaceId: actor.workspaceId, actorId: actor.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, sourceVersion: read.context.sourceVersion, projectId: scope.projectId, statementId: 'statementId' in read ? read.statementId : null, draftKey: 'draftKey' in read ? read.draftKey : null, configScope: 'scope' in read ? read.scope : null, action })
+    return { storage, options, actor, owner, service, scope, draft, command }
+  }
+  catch (error) {
+    await storage.close()
+    throw error
+  }
 }
 
 it('正式C2签工、P7原执行、P4真实补退、正式编号、固定名册原件及完整目录同盘保全并独立进程冷恢复', async () => {

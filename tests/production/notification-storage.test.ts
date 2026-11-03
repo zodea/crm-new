@@ -20,15 +20,21 @@ async function setup() {
   const directory = await mkdtemp(`${base}/storage-`)
   const options = { directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' as const }
   const storage = await createSeededProductionStorage(options)
-  let timestamp = '2026-10-03T00:00:00.000Z'
-  const now = () => timestamp
-  const suppliers = createProductionSupplierService(storage, { now })
-  const notifications = createProductionNotificationService(storage, { now })
-  const supplier = await suppliers.execute({ commandId: 'create-warning-supplier', workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier:write', action: 'save', baseVersion: null, attachments: {}, draft: { name: '合成临期分供方', contact: '合成人', supplierCategory: '其他' } }, session)
-  const original = await suppliers.executeCredential({ commandId: 'warning-original', supplierId: supplier.id, origin: 'real', workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier-credential:write', baseSupplierVersion: '1', baseCredentialVersion: '0', action: 'upload', draft: { category: '营业执照', expiresAt: '2026-10-11', validFrom: '', longTerm: false, fileName: '合成原件.pdf', mimeType: 'application/pdf', fileSize: bytes.length, payloadBase64: bytes.toString('base64') } }, session)
-  return { storage, options, suppliers, notifications, supplier, original, now, setClock: (value: string) => {
-    timestamp = value
-  } }
+  try {
+    let timestamp = '2026-10-03T00:00:00.000Z'
+    const now = () => timestamp
+    const suppliers = createProductionSupplierService(storage, { now })
+    const notifications = createProductionNotificationService(storage, { now })
+    const supplier = await suppliers.execute({ commandId: 'create-warning-supplier', workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier:write', action: 'save', baseVersion: null, attachments: {}, draft: { name: '合成临期分供方', contact: '合成人', supplierCategory: '其他' } }, session)
+    const original = await suppliers.executeCredential({ commandId: 'warning-original', supplierId: supplier.id, origin: 'real', workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'supplier-credential:write', baseSupplierVersion: '1', baseCredentialVersion: '0', action: 'upload', draft: { category: '营业执照', expiresAt: '2026-10-11', validFrom: '', longTerm: false, fileName: '合成原件.pdf', mimeType: 'application/pdf', fileSize: bytes.length, payloadBase64: bytes.toString('base64') } }, session)
+    return { storage, options, suppliers, notifications, supplier, original, now, setClock: (value: string) => {
+      timestamp = value
+    } }
+  }
+  catch (error) {
+    await storage.close()
+    throw error
+  }
 }
 
 it('主动评估7天界线，重复投递、已读、跨日过期与续期分离，冷开保留同事件/原回执和字节', async () => {

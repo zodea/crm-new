@@ -26,10 +26,12 @@ it.each([
   const options = { directory, workspaceId: 'schema-evidence-workspace', ownerId: 'schema-evidence-owner', purpose: 'verification' as const }
   const storage = createProductionStorage(options)
   const snapshot = join(directory, 'complete.sqlite')
-  await storage.getDb()
-  await storage.backupTo(snapshot)
-  await expect(inspectProductionBackup(snapshot)).resolves.toMatchObject({ workspaceId: options.workspaceId })
-  await storage.close()
+  try {
+    await storage.getDb()
+    await storage.backupTo(snapshot)
+    await expect(inspectProductionBackup(snapshot)).resolves.toMatchObject({ workspaceId: options.workspaceId })
+  }
+  finally { await storage.close() }
   const source = join(directory, 'ruihang.sqlite')
   for (const path of [source, snapshot]) {
     const db = new DatabaseSync(path)

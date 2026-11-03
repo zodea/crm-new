@@ -25,31 +25,37 @@ async function fixture() {
   const directory = await mkdtemp(`${base}/storage-`)
   const options = { directory, workspaceId: 'material-disk-workspace', ownerId: 'material-disk-owner', purpose: 'verification' as const }
   const storage = await createSeededProductionStorage(options)
-  const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['material-contract:read', 'material-contract:write', 'construction-contract:read', 'construction-contract:write', 'construction-scope:read', 'construction-scope:write', 'project:list:read', 'project:write', 'customer:list:read', 'customer:write', 'supplier:list:read', 'supplier:write', 'our-signatory:read', 'our-signatory:write'] }
-  const session = () => structuredClone(actor)
-  const envelope = { workspaceId: actor.workspaceId, actorId: actor.actorId, baseVersion: null, action: 'save', attachments: {} }
-  const customer = await createProductionCustomerService(storage).execute({ ...envelope, requiredCapability: 'customer:write', commandId: 'create-customer', draft: { name: '合成正式客户', contact: '合成人' } }, session)
-  const project = await createProductionProjectService(storage).execute({ ...envelope, requiredCapability: 'project:write', commandId: 'create-project', draft: { name: '合成正式项目', customerId: customer.id, manager: '合成人' } }, session)
-  const supplier = await createProductionSupplierService(storage).execute({ ...envelope, requiredCapability: 'supplier:write', commandId: 'create-supplier', draft: { name: '合成正式分供方', supplierCategory: '其他', contact: '合成人' } }, session)
-  const signatory = await createProductionOurSignatoryService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'our-signatory:write', commandId: 'create-own-party', baseVersion: null, draft: { name: '合成我方公司', taxNo: 'SYNTHETIC-TAX-NO', registeredAddress: null, legalRepresentative: null, verificationNote: '独立合成文书核实事实', status: 'active' } }, session)
-  const bytes = Buffer.from('synthetic material original')
-  const main = await createProductionConstructionContractService(storage).execute({ ...envelope, requiredCapability: 'construction-contract:write', commandId: 'material-upstream-main', draft: { name: '原采购工程施工合同', projectId: project.id, customerId: customer.id, content: '真实工程', signDate: '2026-10-07', ourSignatoryId: signatory.id, ourSignatoryVersion: signatory.version, status: '已签订' } }, session)
-  const actualMain = await storage.withTransaction(tx => readProductionConstructionScopeMainFact(tx, actor, main.id))
-  const constructionMain = { id: actualMain.id, projectId: project.id, basis: actualMain.basis }
-  const command: MaterialContractCommandRequestDTO = { ...envelope, requiredCapability: 'material-contract:write', commandId: 'create-material', action: 'submit', constructionMain, draft: {
-    name: '合成方管采购',
-    projectId: project.id,
-    supplierId: supplier.id,
-    ourSignatoryId: signatory.id,
-    ourSignatoryVersion: signatory.version,
-    content: '合成原签约事实',
-    signDate: '2026-10-04',
-    amount: 4800,
-    taxRate: null,
-    lineItems: [{ materialName: '方管', spec: '40×40×2', materialGrade: '304', unit: '米', qty: 100, taxInclusiveUnitPrice: 20 }, { materialName: '方管', materialGrade: '', unit: '米', qty: 100, taxInclusiveUnitPrice: 30 }],
-    deductions: [{ name: '整单优惠', amount: 200, basis: '合成合同明确优惠200元' }],
-  }, attachments: { add: [{ fileName: '合成合同原件.txt', fileSize: bytes.length, mimeType: 'text/plain', payloadBase64: bytes.toString('base64') }, { fileName: '合成空文件.txt', fileSize: 0, mimeType: 'text/plain', payloadBase64: '' }] } }
-  return { storage, options, actor, session, command, bytes, service: createProductionMaterialContractService(storage), signatories: createProductionOurSignatoryService(storage) }
+  try {
+    const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['material-contract:read', 'material-contract:write', 'construction-contract:read', 'construction-contract:write', 'construction-scope:read', 'construction-scope:write', 'project:list:read', 'project:write', 'customer:list:read', 'customer:write', 'supplier:list:read', 'supplier:write', 'our-signatory:read', 'our-signatory:write'] }
+    const session = () => structuredClone(actor)
+    const envelope = { workspaceId: actor.workspaceId, actorId: actor.actorId, baseVersion: null, action: 'save', attachments: {} }
+    const customer = await createProductionCustomerService(storage).execute({ ...envelope, requiredCapability: 'customer:write', commandId: 'create-customer', draft: { name: '合成正式客户', contact: '合成人' } }, session)
+    const project = await createProductionProjectService(storage).execute({ ...envelope, requiredCapability: 'project:write', commandId: 'create-project', draft: { name: '合成正式项目', customerId: customer.id, manager: '合成人' } }, session)
+    const supplier = await createProductionSupplierService(storage).execute({ ...envelope, requiredCapability: 'supplier:write', commandId: 'create-supplier', draft: { name: '合成正式分供方', supplierCategory: '其他', contact: '合成人' } }, session)
+    const signatory = await createProductionOurSignatoryService(storage).execute({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'our-signatory:write', commandId: 'create-own-party', baseVersion: null, draft: { name: '合成我方公司', taxNo: 'SYNTHETIC-TAX-NO', registeredAddress: null, legalRepresentative: null, verificationNote: '独立合成文书核实事实', status: 'active' } }, session)
+    const bytes = Buffer.from('synthetic material original')
+    const main = await createProductionConstructionContractService(storage).execute({ ...envelope, requiredCapability: 'construction-contract:write', commandId: 'material-upstream-main', draft: { name: '原采购工程施工合同', projectId: project.id, customerId: customer.id, content: '真实工程', signDate: '2026-10-07', ourSignatoryId: signatory.id, ourSignatoryVersion: signatory.version, status: '已签订' } }, session)
+    const actualMain = await storage.withTransaction(tx => readProductionConstructionScopeMainFact(tx, actor, main.id))
+    const constructionMain = { id: actualMain.id, projectId: project.id, basis: actualMain.basis }
+    const command: MaterialContractCommandRequestDTO = { ...envelope, requiredCapability: 'material-contract:write', commandId: 'create-material', action: 'submit', constructionMain, draft: {
+      name: '合成方管采购',
+      projectId: project.id,
+      supplierId: supplier.id,
+      ourSignatoryId: signatory.id,
+      ourSignatoryVersion: signatory.version,
+      content: '合成原签约事实',
+      signDate: '2026-10-04',
+      amount: 4800,
+      taxRate: null,
+      lineItems: [{ materialName: '方管', spec: '40×40×2', materialGrade: '304', unit: '米', qty: 100, taxInclusiveUnitPrice: 20 }, { materialName: '方管', materialGrade: '', unit: '米', qty: 100, taxInclusiveUnitPrice: 30 }],
+      deductions: [{ name: '整单优惠', amount: 200, basis: '合成合同明确优惠200元' }],
+    }, attachments: { add: [{ fileName: '合成合同原件.txt', fileSize: bytes.length, mimeType: 'text/plain', payloadBase64: bytes.toString('base64') }, { fileName: '合成空文件.txt', fileSize: 0, mimeType: 'text/plain', payloadBase64: '' }] } }
+    return { storage, options, actor, session, command, bytes, service: createProductionMaterialContractService(storage), signatories: createProductionOurSignatoryService(storage) }
+  }
+  catch (error) {
+    await storage.close()
+    throw error
+  }
 }
 
 it('新建工程必选在原请求固定后校验，缺失拒绝不留半份合同且同原键不能更换内容', async () => {
@@ -428,8 +434,10 @@ it('合同约定价从真实磁盘owner读取，本行NULL不套头税，冷打�
     expect((await f.service.form(saved.id, f.session)).draft.taxRate).toBe(13)
     f.actor.capabilities = f.actor.capabilities.filter(value => !['supplier:list:read', 'project:list:read'].includes(value))
     const restricted = decodeContractPriceRead(await f.service.prices('real', f.session), 'real')
+    expect(restricted.items.map(row => row.taxInclusiveUnitPrice)).toEqual([20, 30])
     expect(restricted.items.every(row => row.supplierId === null && row.supplierName === null && row.projectId === null && row.projectName === null)).toBe(true)
     expect(restricted.meta.sources.find(row => row.key === 'suppliers')?.state).toBe('forbidden')
+    expect(restricted.meta.sources.find(row => row.key === 'projects')?.state).toBe('forbidden')
     await expect(f.service.prices('demo', f.session)).rejects.toThrow('不接受')
     f.actor.capabilities = []
     await expect(f.service.prices('real', f.session)).rejects.toThrow('权限')

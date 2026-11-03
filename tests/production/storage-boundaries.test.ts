@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, expect, it } from 'vitest'
@@ -17,7 +17,9 @@ it('缺失目录、损坏文件与未知版本停止初始化，不替换已有�
   await expect(createProductionStorage({ ...config, directory: join(config.directory, 'not-created') }).status()).rejects.toThrow('目录缺失')
   const path = join(config.directory, 'ruihang.sqlite')
   await writeFile(path, 'intentional-corrupt-synthetic-database')
+  const corruptBytes = await readFile(path)
   await expect(createProductionStorage(config).status()).rejects.toThrow('无法初始化或读取')
+  expect(await readFile(path)).toEqual(corruptBytes)
   const newer = await fixture()
   const first = createProductionStorage(newer)
   await first.status()
@@ -26,6 +28,11 @@ it('缺失目录、损坏文件与未知版本停止初始化，不替换已有�
   raw.exec('UPDATE production_metadata SET schema_version=9000')
   raw.close()
   await expect(createProductionStorage(newer).status()).rejects.toThrow('版本不兼容')
+  const unchanged = new DatabaseSync(join(newer.directory, 'ruihang.sqlite'), { readOnly: true })
+  try {
+    expect(unchanged.prepare('SELECT schema_version FROM production_metadata').get()).toMatchObject({ schema_version: 9000 })
+  }
+  finally { unchanged.close() }
 })
 it('只读文件、改变身份/用途都停止写入；生产用途未过备份门禁不开放业务写入', async () => {
   const config = await fixture()

@@ -14,17 +14,23 @@ async function fixture() {
   const directory = await mkdtemp(`${base}/synthetic-`)
   const options = { directory, workspaceId: 'quantity-workspace', ownerId: 'quantity-owner', purpose: 'verification' as const }
   const storage = await createSeededProductionStorage(options)
-  const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['quantity:read', 'quantity:write', 'worker:list:read', 'crew:list:read', 'project:list:read'] }
-  const now = '2026-10-07T08:00:00.000Z'
-  await storage.withTransaction(async (db) => {
-    for (const id of ['quantity-project', 'other-project'])
-      await db.execute('INSERT INTO projects(id,name,code,draft_json,version,created_at,updated_at) VALUES (?,?,?,?,1,?,?)', [id, id, id, JSON.stringify({ name: id, code: id }), now, now])
-  })
-  const owner = createProductionQuantityService(storage)
-  const service = owner.forSession(() => actor)
-  const query = { projectId: 'quantity-project', origin: 'real' as const, includeDemo: false }
-  const command = (baseVersion: string, commandId: string, action: QuantityRegionAction): QuantityCommand => ({ projectId: query.projectId, origin: 'real', workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'quantity:write', commandId, baseVersion, action })
-  return { storage, options, actor, owner, service, query, command }
+  try {
+    const actor = { workspaceId: options.workspaceId, actorId: options.ownerId, capabilities: ['quantity:read', 'quantity:write', 'worker:list:read', 'crew:list:read', 'project:list:read'] }
+    const now = '2026-10-07T08:00:00.000Z'
+    await storage.withTransaction(async (db) => {
+      for (const id of ['quantity-project', 'other-project'])
+        await db.execute('INSERT INTO projects(id,name,code,draft_json,version,created_at,updated_at) VALUES (?,?,?,?,1,?,?)', [id, id, id, JSON.stringify({ name: id, code: id }), now, now])
+    })
+    const owner = createProductionQuantityService(storage)
+    const service = owner.forSession(() => actor)
+    const query = { projectId: 'quantity-project', origin: 'real' as const, includeDemo: false }
+    const command = (baseVersion: string, commandId: string, action: QuantityRegionAction): QuantityCommand => ({ projectId: query.projectId, origin: 'real', workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'quantity:write', commandId, baseVersion, action })
+    return { storage, options, actor, owner, service, query, command }
+  }
+  catch (error) {
+    await storage.close()
+    throw error
+  }
 }
 
 it('正式工程量读取不发DDL或同步/复活任何主档，区域写入保持同盘原命令回执', async () => {
