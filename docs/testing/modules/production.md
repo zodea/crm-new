@@ -8,6 +8,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/server/lan-verification-proxy.test.ts](../../../tests/server/lan-verification-proxy.test.ts) | 本机 HTTP 与合成数据 | 隔离入口来源校验、登录凭据、备份配置及二进制原件传输字节核对 |
 | [tests/production/target-cost-storage.test.ts](../../../tests/production/target-cost-storage.test.ts) | 真实磁盘与独立进程 | 原预算版本、实际消费依据、完整 SQLite 输入与本域来源保全、原件、原编号和受保护整批恢复 |
 | [tests/production/quantity-storage.test.ts](../../../tests/production/quantity-storage.test.ts) | 真实磁盘与独立进程 | 原工程量事实、主档只读、动作消费版本、原命令封存与冷恢复 |
 | [tests/production/quantity-migration.test.ts](../../../tests/production/quantity-migration.test.ts) | 真实完整 SQLite 与独立进程 | 领域原图、精确 SQL 原列、同源映射、共享原件、整批恢复及下游引用保护 |

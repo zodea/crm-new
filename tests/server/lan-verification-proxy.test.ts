@@ -1,4 +1,6 @@
 import type { Server } from 'node:http'
+import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { once } from 'node:events'
 import { createServer, request } from 'node:http'
 import { join } from 'node:path'
@@ -50,4 +52,46 @@ it('只转发固定入口和同源写入，保留登录凭据并拒绝伪造代�
   expect((await call({ host: 'evil.example', origin: publicOrigin })).status).toBe(403)
   expect((await call({ host: '192.168.1.20:3443', origin: 'https://evil.example' })).status).toBe(403)
   expect((await call({ 'host': '192.168.1.20:3443', 'origin': publicOrigin, 'x-forwarded-for': '127.0.0.1' })).status).toBe(403)
+})
+
+it('原件正文经验证入口完整上传并下载，未改动二进制内容', async () => {
+  const original = Buffer.alloc(1024 * 1024)
+  for (let index = 0; index < original.length; index++)
+    original[index] = index % 251
+  let uploaded = Buffer.alloc(0)
+  const backend = createServer((req, res) => {
+    if (req.method === 'POST') {
+      const chunks: Buffer[] = []
+      req.on('data', chunk => chunks.push(Buffer.from(chunk)))
+      req.on('end', () => {
+        uploaded = Buffer.concat(chunks)
+        res.end('stored')
+      })
+    }
+    else {
+      res.setHeader('content-type', 'application/octet-stream')
+      res.end(uploaded)
+    }
+  }).listen(0, '127.0.0.1')
+  servers.push(backend)
+  await once(backend, 'listening')
+  const backendOrigin = `http://127.0.0.1:${(backend.address() as { port: number }).port}`
+  const publicOrigin = 'https://192.168.1.20:3443'
+  const proxy = createServer(createVerificationProxy({ publicOrigin, backendOrigin })).listen(0, '127.0.0.1')
+  servers.push(proxy)
+  await once(proxy, 'listening')
+  const port = (proxy.address() as { port: number }).port
+  const exchange = (method: string, body?: Buffer) => new Promise<Buffer>((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port, path: '/api/synthetic-original', method, headers: { host: '192.168.1.20:3443', ...(method === 'POST' ? { 'origin': publicOrigin, 'content-length': String(body!.length) } : {}) } }, (res) => {
+      const chunks: Buffer[] = []
+      res.on('data', chunk => chunks.push(Buffer.from(chunk)))
+      res.on('end', () => res.statusCode === 200 ? resolve(Buffer.concat(chunks)) : reject(new Error(`HTTP ${res.statusCode}`)))
+    })
+    req.on('error', reject)
+    req.end(body)
+  })
+  expect((await exchange('POST', original)).toString()).toBe('stored')
+  const received = await exchange('GET')
+  expect(received.length).toBe(original.length)
+  expect(createHash('sha256').update(received).digest('hex')).toBe(createHash('sha256').update(original).digest('hex'))
 })
