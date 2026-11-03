@@ -11,7 +11,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/db/f3-finance-migrations.test.ts](../../../tests/db/f3-finance-migrations.test.ts) | 单元／服务／状态 | v22 F3 资金表单与票款分摊迁移 |
-| [tests/db/finance-seed.test.ts](../../../tests/db/finance-seed.test.ts) | 单元／服务／状态 | 资金演示 seed |
+| [tests/db/finance-seed.test.ts](../../../tests/db/finance-seed.test.ts) | 单元／服务／状态 | 演示与合成付款分摊通过业务汇总读取，已确认、待核和不同申请分别核对 |
 | [tests/db/payment-approval-migration.test.ts](../../../tests/db/payment-approval-migration.test.ts) | 单元／服务／状态 | 付款批复金额来源迁移 |
 | [tests/finance/forms.test.ts](../../../tests/finance/forms.test.ts) | 单元／服务／状态 | f3 六条资金表单领域 action |
 | [tests/finance/http-repository.test.ts](../../../tests/finance/http-repository.test.ts) | 单元／服务／状态 | F3 当前读取身份、版本、权限与严格 HTTP DTO；真实查询编码下未选工人和合法空候选保留空值，非法编号、身份冲突及未就绪来源继续拒绝，不把未知值补成零 |

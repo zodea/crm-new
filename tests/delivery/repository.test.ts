@@ -14,7 +14,13 @@ function setup() {
   return { service, record, content }
 }
 describe('送货 HTTP Repository 边界', () => {
-  it.each(([{ recordId: 'other-owner' }, { projectId: 'other-project' }, { origin: 'demo' }, { fileSize: 1 }, { sha256: '0'.repeat(64) }]).map(input => ({ input })))('校验归属、完整字节和摘要，不让不同owner的同名原件冒充返回：输入案例 %#', async ({ input: patch }) => {
+  it.each([
+    { name: '其他记录', patch: { recordId: 'other-owner' } },
+    { name: '其他项目', patch: { projectId: 'other-project' } },
+    { name: '不同来源', patch: { origin: 'demo' } },
+    { name: '文件长度错误', patch: { fileSize: 1 } },
+    { name: '文件摘要错误', patch: { sha256: '0'.repeat(64) } },
+  ])('原件读取拒绝$name，正常原字节仍可读取', async ({ patch }) => {
     const { record, content } = setup()
     const fetcher = vi.fn().mockResolvedValue(content)
     const repository = createDeliveryRepository(fetcher)

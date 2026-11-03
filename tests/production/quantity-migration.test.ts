@@ -54,7 +54,7 @@ it('真实完整SQLite只读核验，本域原JSON/未知整数+BLOB/零与缺�
     const actual = await service.completion({ ...query, unitId: unit.id })
     expect(actual.data.planWindow).toBeNull()
     expect(actual.data.stages).toEqual(expect.arrayContaining([expect.objectContaining({ quantities: expect.arrayContaining([expect.objectContaining({ recognizedContractQty: 8, contractQty: 0, provisionalQty: 6, fieldQty: null })]), photos: [expect.objectContaining({ id: photo.id })], completion: expect.objectContaining({ id: completion.id }) })]))
-    await expect(service.boq(query)).rejects.toThrow()
+    await expect(service.boq(query)).rejects.toThrow('当前身份无权读取施工合同清单与已批变更')
     await storage.withTransaction(async (db) => {
       const columns = await db.select<{ name: string }>('PRAGMA table_info(quantity_source_imports)')
       expect(columns.map(row => row.name)).not.toContain('source_bytes')

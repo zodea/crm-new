@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | [tests/server/lan-verification-proxy.test.ts](../../../tests/server/lan-verification-proxy.test.ts) | 本机 HTTP 与合成数据 | 隔离入口来源校验、登录凭据、备份配置及二进制原件传输字节核对 |
 | [tests/production/target-cost-storage.test.ts](../../../tests/production/target-cost-storage.test.ts) | 真实磁盘与独立进程 | 原预算版本、实际消费依据、完整 SQLite 输入与本域来源保全、原件、原编号和受保护整批恢复 |
-| [tests/production/quantity-storage.test.ts](../../../tests/production/quantity-storage.test.ts) | 真实磁盘与独立进程 | 原工程量事实、主档只读、动作消费版本、原命令封存与冷恢复 |
-| [tests/production/quantity-migration.test.ts](../../../tests/production/quantity-migration.test.ts) | 真实完整 SQLite 与独立进程 | 领域原图、精确 SQL 原列、同源映射、共享原件、整批恢复及下游引用保护 |
+| [tests/production/quantity-storage.test.ts](../../../tests/production/quantity-storage.test.ts) | 真实磁盘与独立进程 | 原工程量事实、主档只读、动作消费版本、失效楼栋拒绝及无副作用、原命令封存与冷恢复 |
+| [tests/production/quantity-migration.test.ts](../../../tests/production/quantity-migration.test.ts) | 真实完整 SQLite 与独立进程 | 领域原图、精确 SQL 原列、同源映射、共享原件、清单撤权拒绝、整批恢复及下游引用保护 |
 | [tests/production/wbs-storage.test.ts](../../../tests/production/wbs-storage.test.ts) | 真实磁盘与独立进程 | 真实暂估及单位、正式不可变库、实际动作依赖、迁入原图和原件、原号封存及危险恢复 |
 | [tests/production/payroll-storage.test.ts](../../../tests/production/payroll-storage.test.ts) | 真实磁盘与独立进程 | C1/C2 冻结与零成员、P4/P7、正式编号、固定名册及完整目录、原键与回执故障回滚 |
 | [tests/production/payroll-history-adoption.test.ts](../../../tests/production/payroll-history-adoption.test.ts) | 真实完整 SQLite 与同库引用 | A/P5/P6 原冻结、管理簿与更正补退、同源工程量引用和原目录保全 |
@@ -27,9 +27,9 @@
 | [tests/production/backup-manifest.test.ts](../../../tests/production/backup-manifest.test.ts) | 单元／服务／状态 | 一致副本清单及超过 260 字符中文普通路径的只读核验；原件、两版审计、回执和摘要保全，缺正文、字节坏损或未知表拒绝 |
 | [tests/production/backup-package.test.ts](../../../tests/production/backup-package.test.ts) | 单元／服务／状态 | 中文深目录新库与冷打开、长目标一致备份、离线复制及隔离恢复；原件和同键回执保真、不重复写，已有目标与健康副本不被覆盖 |
 | [tests/production/backup-policy.test.ts](../../../tests/production/backup-policy.test.ts) | 单元／服务／状态 | 备份保护与调度使用实际数据时点 |
-| [tests/production/backup-retention.test.ts](../../../tests/production/backup-retention.test.ts) | 单元／服务／状态 | 只清理有成功回执且完整的到期包，保留最后成功/基线及混入未知文件的包 |
+| [tests/production/backup-retention.test.ts](../../../tests/production/backup-retention.test.ts) | 单元／服务／状态 | 一次旅程检查已清理包确实不存在，并逐一保留最后成功、基线和混入未知文件的包 |
 | [tests/production/backup-service.test.ts](../../../tests/production/backup-service.test.ts) | 单元／服务／状态 | 计划补跑、原键回执、介质失败保上份、离线时点和隔离恢复证明持久一致 |
-| [tests/production/backup-ui-state.test.ts](../../../tests/production/backup-ui-state.test.ts) | 单元／服务／状态 | 备份失响应后刷新重建界面仍使用原编号，成功回读后才清除 |
+| [tests/production/backup-ui-state.test.ts](../../../tests/production/backup-ui-state.test.ts) | 单元／服务／状态 | 备份失响应后刷新重建界面仍使用原编号，成功回读后才清除；不完整成功回执的明确拒绝 |
 | [tests/production/material-contract-storage.test.ts](../../../tests/production/material-contract-storage.test.ts) | 单元／服务／状态 | 材采日常 SQL 事务、原件与回执冷读、完整混合图备份及封存；损坏图停止恢复，未接管正式初次写入保持门禁 |
 | [tests/production/storage-backup.test.ts](../../../tests/production/storage-backup.test.ts) | 单元／服务／状态 | 一致备份保留已提交事实并拒绝覆盖已有目标，原库和副本能独立读取 |
 | [tests/production/storage-boundaries.test.ts](../../../tests/production/storage-boundaries.test.ts) | 单元／服务／状态 | 缺失目录、损坏文件与未知版本停止初始化，不替换已有文件 |
@@ -37,7 +37,7 @@
 | [tests/production/storage.test.ts](../../../tests/production/storage.test.ts) | 单元／服务／状态 | 磁盘权威事务提交后冷打开保留原值，失败事务不留下半份结果 |
 | [tests/production/boq-migration.test.ts](../../../tests/production/boq-migration.test.ts) | 单元／服务／状态 | 完整 BOQ SQLite 原图、原件、显式映射、隐私与整批恢复 |
 | [tests/production/boq-storage.test.ts](../../../tests/production/boq-storage.test.ts) | 单元／服务／状态 | 日常清单与变洽签、真实上游、原件及原编号冷恢复 |
-| [tests/production/construction-contract-storage.test.ts](../../../tests/production/construction-contract-storage.test.ts) | 单元／服务／状态 | 施工主合同与协议、完整原件、历史与实际源冷恢复 |
+| [tests/production/construction-contract-storage.test.ts](../../../tests/production/construction-contract-storage.test.ts) | 单元／服务／状态 | 施工主合同与协议、完整原件、历史与实际源冷恢复；合成旧库夹具设异常关闭保护 |
 | [tests/production/construction-scope-storage.test.ts](../../../tests/production/construction-scope-storage.test.ts) | 单元／服务／状态 | 同库单份工程关联、原费用去重、权限及真实来源消费 |
 | [tests/production/migration-domain-evidence.test.ts](../../../tests/production/migration-domain-evidence.test.ts) | 单元／服务／状态 | 来源原列、未知扩展、整数与 BLOB 的精确保全 |
 | [tests/production/payroll-a-upstream.test.ts](../../../tests/production/payroll-a-upstream.test.ts) | 单元／服务／状态 | A 工资实际工程量与 BOQ 上游、独立工资价及发放冷恢复 |

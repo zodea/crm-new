@@ -172,7 +172,7 @@ describe('材料采购合同中央 Repository contract', () => {
     expect(forbidden.contract.supplier).toMatchObject({ state: 'forbidden', id: null, label: null })
     expect(forbidden.supplierNavigation).toEqual({ kind: 'unavailable', reason: 'forbidden' })
     expect(JSON.stringify(forbidden)).not.toContain('supplier-1')
-    expect(() => decodeMaterialContractDetailRead({ ...forbidden, contract: { ...forbidden.contract, supplier: { ...forbidden.contract.supplier, id: 'supplier-1' } } })).toThrow()
+    expect(() => decodeMaterialContractDetailRead({ ...forbidden, contract: { ...forbidden.contract, supplier: { ...forbidden.contract.supplier, id: 'supplier-1' } } })).toThrow('中央后台返回的材料采购合同详情读模型无效')
   })
 
   it('只按合同稳定 ID 汇总采购明细、物资、票款、结算、罚扣和文件', () => {

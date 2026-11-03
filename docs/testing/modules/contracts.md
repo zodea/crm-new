@@ -24,10 +24,10 @@
 | [tests/material-contract/command-contract.test.ts](../../../tests/material-contract/command-contract.test.ts) | 单元／服务／状态 | 材料采购合同中央 command contract |
 | [tests/material-contract/command-store.test.ts](../../../tests/material-contract/command-store.test.ts) | 单元／服务／状态 | 材料采购合同冲突恢复 |
 | [tests/material-contract/controlled-migration.test.ts](../../../tests/material-contract/controlled-migration.test.ts) | 单元／服务／状态 | 真实 SQLite v49–54 完整主合同、协议明细、减项及原件图；v53/54 已采用主体冻结版本与同图目录全历史经解码、预检、导入、确认、冷恢复与受控回滚保全 |
-| [tests/material-contract/http-repository.test.ts](../../../tests/material-contract/http-repository.test.ts) | 单元／服务／状态 | 材料采购合同中央 HTTP Repository |
+| [tests/material-contract/http-repository.test.ts](../../../tests/material-contract/http-repository.test.ts) | 单元／服务／状态 | 材采 HTTP 读取明确约定价行及未知税率，拒绝损坏来源元数据 |
 | [tests/material-contract/line-import.test.ts](../../../tests/material-contract/line-import.test.ts) | 单元／服务／状态 | 文件映射保源行、材质与未知单位；全部修错并核实量价单位后一次追加当前合同草稿 |
 | [tests/material-contract/owned-details.test.ts](../../../tests/material-contract/owned-details.test.ts) | 单元／服务／状态 | 材质、独立减项、自有协议明细、原行冻结与原编号封存；后来输入保留及稳定行身份承接 |
-| [tests/material-contract/repository-contract.test.ts](../../../tests/material-contract/repository-contract.test.ts) | 单元／服务／状态 | 材料采购合同中央 Repository contract |
+| [tests/material-contract/repository-contract.test.ts](../../../tests/material-contract/repository-contract.test.ts) | 单元／服务／状态 | 材料采购合同中央读取契约；无权引用禁止泄露目标身份 |
 | [tests/material-contract/return-context.test.ts](../../../tests/material-contract/return-context.test.ts) | 单元／服务／状态 | 材料采购合同列表返回上下文 |
 | [tests/stores/material-contract-read.test.ts](../../../tests/stores/material-contract-read.test.ts) | 单元／服务／状态 | 同来源暂不可用保快照、401和真实访问切换清事实、跨来源与迟到响应隔离 |
 | [tests/server/material-contract-central-test-instance.test.ts](../../../tests/server/material-contract-central-test-instance.test.ts) | 单元／服务／状态 | 材料采购合同中央测试实例 |

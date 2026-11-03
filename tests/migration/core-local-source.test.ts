@@ -811,6 +811,9 @@ describe('core migration local source', () => {
         .toContainEqual(expect.objectContaining({
           periodNo: '2026-08',
           boqLineId: 'boq-line-local-323',
+          autoQty: 12,
+          missingQtyCount: 0,
+          quantityBasis: 'field',
           sourceUpdatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/),
         }))
 

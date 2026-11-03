@@ -143,7 +143,7 @@ describe('送货原件与修订中央公开行为', () => {
     expect(service.execute(archive(), session).version).toBe('1')
   })
 
-  it.each((['delivery:read', 'project:list:read', 'supplier:list:read']).map(input => ({ input })))('测试会话、workspace、origin和当前权限均不可借同名或共享资产绕过：输入案例 %#', ({ input: removed }) => {
+  it.each(['delivery:read', 'project:list:read', 'supplier:list:read'])('测试会话、workspace、origin 和缺少 %s 权限均不能绕过', (removed) => {
     const { service } = setup()
     const first = service.execute(archive(), session, 'test-one')
     const assetId = service.detail(first.id, session, 'test-one').assetId!

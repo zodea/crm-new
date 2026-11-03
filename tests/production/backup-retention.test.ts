@@ -9,7 +9,7 @@ import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 
 afterAll(cleanupTestTempRoot)
 
-it.each(Array.from([0, 1, 3]).map(input1 => ({ input1 })))('只清理有成功回执且完整的到期包，保留最后成功/基线及混入未知文件的包：输入案例 %#', async ({ input1: index }) => {
+it('只清理有成功回执且完整的到期包，保留最后成功、基线及混入未知文件的包', async () => {
   const base = testTempRoot('legacy-test-artifacts/issue-451-tests')
   await mkdir(base, { recursive: true })
   const directory = await mkdtemp(`${base}/retention-`)
@@ -29,9 +29,10 @@ it.each(Array.from([0, 1, 3]).map(input1 => ({ input1 })))('只清理有成功�
     const result = await pruneProductionBackups(target, packages, new Set([packages[0]!.id]), { dailyCopies: 1, monthlyCopies: 1 })
     expect(result.removed).toEqual([packages[2]!.id])
     expect(result.skipped).toEqual([packages[1]!.id])
-    await expect(access(join(target, packages[2]!.id))).rejects.toThrow()
+    await expect(access(join(target, packages[2]!.id))).rejects.toMatchObject({ code: 'ENOENT' })
 
-    expect((await readFile(join(target, packages[index]!.id, 'data.sqlite'))).length).toBeGreaterThan(0)
+    for (const index of [0, 1, 3])
+      expect((await readFile(join(target, packages[index]!.id, 'data.sqlite'))).length).toBeGreaterThan(0)
     expect(await readFile(join(target, packages[1]!.id, 'unclassified.txt'), 'utf8')).toBe('keep this file')
   }
   finally { await storage.close() }

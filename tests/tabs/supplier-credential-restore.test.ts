@@ -40,9 +40,9 @@ describe('中央证照独立页签恢复', () => {
   })
 
   it.each([
-    { supplierId: 'supplier-b' },
-    { dataOrigin: 'demo' as const },
-  ])('专用读面返回其他身份或来源时拒绝恢复 %#', async (patch) => {
+    { reason: '其他分供方', patch: { supplierId: 'supplier-b' } },
+    { reason: '演示来源', patch: { dataOrigin: 'demo' as const } },
+  ])('专用读面返回$reason时拒绝恢复', async ({ patch }) => {
     const { read, validate } = setup()
     read.mockResolvedValue(credentialSnapshot(patch))
     await expect(validate(descriptor)).resolves.toMatchObject({ state: 'mismatch' })
@@ -71,22 +71,24 @@ describe('中央证照独立页签恢复', () => {
   const list = createSupplierReturnTo('real:supplier-a', { search: '合成', category: [], credentialStatus: [], page: 2, pageSize: 20, sort: 'updated-desc' })
   const detail = `/base/supplier/supplier-a?origin=real&returnTo=${encodeURIComponent(list)}`
 
-  it.each(([list, detail]).map(input => ({ input })))('返回同一分供方详情与列表位置保留，错误祖先身份和来源去除：输入案例 %#', async ({ input: caseInput }) => {
+  it.each([
+    { page: '分供方列表', returnTo: list },
+    { page: '同一分供方详情', returnTo: detail },
+  ])('返回$page时保留原位置', async ({ returnTo }) => {
     const { validate } = setup()
-    { const returnTo = caseInput
-      const result = await validate({ ...descriptor, fullPath: `${descriptor.fullPath}&returnTo=${encodeURIComponent(returnTo)}` })
-      expect(result.state).toBe('resolved')
-      if (result.state === 'resolved')
-        expect(new URL(result.fullPath, 'https://example.test').searchParams.get('returnTo')).toBe(returnTo) }
+    const result = await validate({ ...descriptor, fullPath: `${descriptor.fullPath}&returnTo=${encodeURIComponent(returnTo)}` })
+    expect(result.state).toBe('resolved')
+    if (result.state === 'resolved')
+      expect(new URL(result.fullPath, 'https://example.test').searchParams.get('returnTo')).toBe(returnTo)
   })
 
-  it.each(Array.from([
-    '/base/supplier/supplier-b?origin=real',
-    '/base/supplier/supplier-a?origin=demo',
-    createSupplierReturnTo('demo:supplier-a', { search: '', category: [], credentialStatus: [], page: 1, pageSize: 20, sort: 'updated-desc' }),
-    createSupplierReturnTo('real:supplier-b', { search: '', category: [], credentialStatus: [], page: 1, pageSize: 20, sort: 'updated-desc' }),
-    'https://external.example/credentials',
-  ]).map(input => ({ input })))('返回同一分供方详情与列表位置保留，错误祖先身份和来源去除：输入组合 1 案例 %#', async ({ input: returnTo }) => {
+  it.each([
+    { reason: '其他分供方详情', returnTo: '/base/supplier/supplier-b?origin=real' },
+    { reason: '演示来源详情', returnTo: '/base/supplier/supplier-a?origin=demo' },
+    { reason: '演示来源列表', returnTo: createSupplierReturnTo('demo:supplier-a', { search: '', category: [], credentialStatus: [], page: 1, pageSize: 20, sort: 'updated-desc' }) },
+    { reason: '其他分供方列表', returnTo: createSupplierReturnTo('real:supplier-b', { search: '', category: [], credentialStatus: [], page: 1, pageSize: 20, sort: 'updated-desc' }) },
+    { reason: '外部网站', returnTo: 'https://external.example/credentials' },
+  ])('去除指向$reason的返回地址', async ({ returnTo }) => {
     const { validate } = setup()
     const result = await validate({ ...descriptor, fullPath: `${descriptor.fullPath}&returnTo=${encodeURIComponent(returnTo)}` })
     expect(result).toMatchObject({ state: 'resolved', fullPath: descriptor.fullPath })

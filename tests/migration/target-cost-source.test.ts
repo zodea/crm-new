@@ -32,7 +32,7 @@ it.each(['is_baseline', 'created_at', 'note'])('完整来源不能以空 %s 绕�
     const source = await seedTargetCostMigrationSource(db)
     const graph = JSON.parse(String(source.entities.target_cost_versions![0]!.attributes!.budgetGraphJson))
     graph.head[field] = null
-    expect(() => parseBudgetVersionGraph(graph)).toThrow()
+    expect(() => parseBudgetVersionGraph(graph)).toThrow(`预算迁移：head.${field}违反原表非空约束`)
   }
   finally { db.close() }
 })

@@ -8,7 +8,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/migration/target-cost-source.test.ts](../../../tests/migration/target-cost-source.test.ts) | 单元／服务／状态 | 受控来源按预算版本保存完整图，项目无工程量、无项目草稿、旧空分项名及缺原件均保真 |
+| [tests/migration/target-cost-source.test.ts](../../../tests/migration/target-cost-source.test.ts) | 单元／服务／状态 | 预算完整图保真；缺失必填字段逐项返回原表非空约束错误 |
 | [tests/stores/target-cost-central.test.ts](../../../tests/stores/target-cost-central.test.ts) | 单元／服务／状态 | 预算固定页面快照与原提交恢复 |
 | [tests/stores/target-cost-pending-storage.test.ts](../../../tests/stores/target-cost-pending-storage.test.ts) | 单元／服务／状态 | 原附件提交不能可靠保存时阻断发送，恢复存储后可用原草稿重试 |
 | [tests/tabs/target-cost-restore.test.ts](../../../tests/tabs/target-cost-restore.test.ts) | 单元／服务／状态 | 演示冷恢复先核服务端授权，再用同一隔离只读adapter，不误打正式详情 |

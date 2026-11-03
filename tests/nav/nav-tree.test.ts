@@ -144,7 +144,7 @@ describe('侧栏导航树', () => {
     ['payRecord', '/finance/records'],
     ['reimburse', '/finance/reimbursement'],
     ['payApply', '/finance/payment'],
-  ] as const))('f3 六类资金表单入口已启用，新增和编辑路由保持来源导航点亮：输入案例 %#', (key, route) => {
+  ] as const))('资金入口 %s 的新增和编辑路由保持来源导航点亮', (key, route) => {
     expect(leaves().find(item => item.key === key)?.to).toBe(route)
     expect(activeNavKey(`${route}/new`)).toBe(key)
     expect(activeNavKey(`${route}/form/f3_1`)).toBe(key)
@@ -161,10 +161,13 @@ describe('侧栏导航树', () => {
     ['omArrival', '/owner-material/arrival'],
     ['omUse', '/owner-material/use'],
     ['omDirect', '/owner-material/direct'],
-  ] as const))('f4 乙供材与甲供材入口全部启用，整页表单保持来源导航点亮：输入案例 %#', (key, route) => {
+  ] as const))('物资入口 %s 的整页表单保持来源导航点亮', (key, route) => {
     expect(leaves().find(item => item.key === key)?.to).toBe(route)
     expect(activeNavKey(`${route}/new`)).toBe(key)
     expect(activeNavKey(`${route}/f4_1`)).toBe(key)
+  })
+
+  it('送货归档新增和编辑表单保持归档入口点亮', () => {
     expect(activeNavKey('/material/delivery/archive/form')).toBe('deliveryArchive')
     expect(activeNavKey('/material/delivery/archive/form/delivery_1')).toBe('deliveryArchive')
   })
@@ -190,7 +193,7 @@ describe('侧栏导航树', () => {
     ['subChange', '/subcontract/change'],
     ['subSettle', '/subcontract/settlement'],
     ['projPenalty', '/project/penalty'],
-  ] as const))('f5 八类甲方与分包单据入口全部启用，新增和编辑路由保持来源导航点亮：输入案例 %#', (key, route) => {
+  ] as const))('甲方或分包单据入口 %s 的新增和编辑路由保持来源导航点亮', (key, route) => {
     expect(leaves().find(item => item.key === key)?.to).toBe(route)
     expect(activeNavKey(`${route}/new`)).toBe(key)
     expect(activeNavKey(`${route}/f5_1`)).toBe(key)

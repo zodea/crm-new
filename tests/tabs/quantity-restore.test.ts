@@ -38,7 +38,10 @@ describe('中央工程量户详情只读恢复', () => {
     expect(completion).not.toHaveBeenCalled()
   })
 
-  it.each((['/subcontract/quantity', descriptor.key]).map(input => ({ input })))('列表与户详情刷新后仍保留矩阵班组、月份和楼栋范围：输入案例 %#', async ({ input: path }) => {
+  it.each([
+    { page: '列表', path: '/subcontract/quantity' },
+    { page: '户详情', path: descriptor.key },
+  ])('$page 刷新后仍保留矩阵班组、月份和楼栋范围', async ({ path }) => {
     const { validate } = setup()
     const filters = 'origin=real&project=project-1&building=building-1&month=2026-08&view=crew&trade=masonry&assignee=crew%3Acrew-1'
     const fullPath = `${path}?${filters}`

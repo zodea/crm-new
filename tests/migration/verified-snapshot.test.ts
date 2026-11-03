@@ -6,16 +6,18 @@ import { createMemoryDb } from '../helpers/memory-db'
 
 async function fixture(orphan = false, large = false, padded = false) {
   const db = await createMemoryDb()
-  db.raw.exec('CREATE TABLE schema_migrations(version INTEGER); INSERT INTO schema_migrations VALUES(58); CREATE TABLE workers(id TEXT PRIMARY KEY,name TEXT NOT NULL); CREATE TABLE frozen(id TEXT PRIMARY KEY, worker_id TEXT REFERENCES workers(id),body TEXT,original BLOB); INSERT INTO workers VALUES(\'same-stable-worker\',\'  原姓名  \'); INSERT INTO frozen VALUES(\'frozen-1\',\'same-stable-worker\',\'{"amount":0,"unknown":null}\',X\'000A80FF\');')
-  if (orphan)
-    db.raw.exec('PRAGMA foreign_keys=OFF; INSERT INTO frozen VALUES(\'orphan\',\'unknown-worker\',\'{}\',X\'00\');')
-  if (large)
-    db.raw.exec('CREATE TABLE domain_extension(id TEXT PRIMARY KEY,original BLOB); INSERT INTO domain_extension VALUES(\'full-original\',zeroblob(8388608));')
-  if (padded)
-    db.raw.exec('CREATE TABLE padding_evidence(value TEXT);')
-  const bytes = db.raw.export()
-  db.close()
-  return { bytes, proof: { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: Buffer.from(bytes).toString('base64') } }
+  try {
+    db.raw.exec('CREATE TABLE schema_migrations(version INTEGER); INSERT INTO schema_migrations VALUES(58); CREATE TABLE workers(id TEXT PRIMARY KEY,name TEXT NOT NULL); CREATE TABLE frozen(id TEXT PRIMARY KEY, worker_id TEXT REFERENCES workers(id),body TEXT,original BLOB); INSERT INTO workers VALUES(\'same-stable-worker\',\'  原姓名  \'); INSERT INTO frozen VALUES(\'frozen-1\',\'same-stable-worker\',\'{"amount":0,"unknown":null}\',X\'000A80FF\');')
+    if (orphan)
+      db.raw.exec('PRAGMA foreign_keys=OFF; INSERT INTO frozen VALUES(\'orphan\',\'unknown-worker\',\'{}\',X\'00\');')
+    if (large)
+      db.raw.exec('CREATE TABLE domain_extension(id TEXT PRIMARY KEY,original BLOB); INSERT INTO domain_extension VALUES(\'full-original\',zeroblob(8388608));')
+    if (padded)
+      db.raw.exec('CREATE TABLE padding_evidence(value TEXT);')
+    const bytes = db.raw.export()
+    return { bytes, proof: { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: Buffer.from(bytes).toString('base64') } }
+  }
+  finally { db.close() }
 }
 
 describe('中央实际 SQLite 来源核验', () => {
@@ -52,13 +54,15 @@ describe('中央实际 SQLite 来源核验', () => {
       expect(evidence).toEqual({ sha256: f.proof.sha256, schemaVersion: 58 })
       expect(await tx.select('SELECT id,name FROM workers')).toEqual([{ id: 'same-stable-worker', name: '  原姓名  ' }])
       await expect(tx.execute('DELETE FROM frozen')).rejects.toThrow('只允许核验')
-      await expect(tx.select('DELETE FROM workers RETURNING id')).rejects.toThrow()
+      await expect(tx.select('DELETE FROM workers RETURNING id')).rejects.toThrow('attempt to write a readonly database')
+      expect(await tx.select('SELECT id,name FROM workers')).toEqual([{ id: 'same-stable-worker', name: '  原姓名  ' }])
       return tx.select('SELECT id,body,hex(original) AS original FROM frozen')
     })
     expect(result).toEqual([{ id: 'frozen-1', body: '{"amount":0,"unknown":null}', original: '000A80FF' }])
     const reopened = await createMemoryDb(f.bytes)
     try {
       expect(await reopened.select('SELECT COUNT(*) AS n FROM frozen')).toEqual([{ n: 1 }])
+      expect(await reopened.select('SELECT id,name FROM workers')).toEqual([{ id: 'same-stable-worker', name: '  原姓名  ' }])
     }
     finally { reopened.close() }
   })

@@ -11,7 +11,7 @@
 | [tests/util/entity-reference.test.ts](../../../tests/util/entity-reference.test.ts) | 单元／服务／状态 | 稳定目标、来源与不可访问关系 |
 | [tests/kit/entity-link.test.ts](../../../tests/kit/entity-link.test.ts) | 单元／服务／状态 | entityLink 解析（specs §07：type→route 唯一映射 + 退化不做死链） |
 | [tests/kit/workflow-tab.test.ts](../../../tests/kit/workflow-tab.test.ts) | 单元／服务／状态 | 预占式工作流页签（导出/导入共用） |
-| [tests/nav/nav-tree.test.ts](../../../tests/nav/nav-tree.test.ts) | 单元／服务／状态 | 侧栏导航树 |
+| [tests/nav/nav-tree.test.ts](../../../tests/nav/nav-tree.test.ts) | 单元／服务／状态 | 侧栏入口及资金、物资、甲方和分包表单的来源导航；送货归档入口单独验证 |
 | [tests/nav/return-to.test.ts](../../../tests/nav/return-to.test.ts) | 单元／服务／状态 | project returnTo contract |
 | [tests/nav/target-registry.test.ts](../../../tests/nav/target-registry.test.ts) | 单元／服务／状态 | 唯一 Target Registry |
 | [tests/stores/tab-session.test.ts](../../../tests/stores/tab-session.test.ts) | 单元／服务／状态 | 浏览器页签按需验证；迁入页仅凭同身份原命令编号恢复，不缓存正文，不借其他 actor、来源或命令族授予恢复资格 |

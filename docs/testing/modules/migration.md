@@ -9,8 +9,8 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/migration/core-http-repository.test.ts](../../../tests/migration/core-http-repository.test.ts) | 单元／服务／状态 | hTTP core migration repository |
-| [tests/migration/core-local-source.test.ts](../../../tests/migration/core-local-source.test.ts) | 单元／服务／状态 | core migration local source |
-| [tests/migration/verified-snapshot.test.ts](../../../tests/migration/verified-snapshot.test.ts) | 单元／服务／状态 | 中央完整大 SQLite 字节的线性规范编码核验、独立摘要、原字节、外键及只读领域提取 |
+| [tests/migration/core-local-source.test.ts](../../../tests/migration/core-local-source.test.ts) | 单元／服务／状态 | 核心迁移来源及真实 SQLite 月度工程量的数值、缺失计数与依据 |
+| [tests/migration/verified-snapshot.test.ts](../../../tests/migration/verified-snapshot.test.ts) | 单元／服务／状态 | 中央完整大 SQLite 字节的线性规范编码核验、独立摘要、原字节、外键及只读领域提取；写入拒绝的原因及记录保持 |
 | [tests/migration/core-migration-navigation.test.ts](../../../tests/migration/core-migration-navigation.test.ts) | 单元／服务／状态 | 核心身份迁移入口 |
 | [tests/server/audit-central-identities.test.ts](../../../tests/server/audit-central-identities.test.ts) | 单元／服务／状态 | 审计正式身份边界 |
 | [tests/server/core-migration-preparation.test.ts](../../../tests/server/core-migration-preparation.test.ts) | 单元／服务／状态 | 异步SQL准备失败时丢弃已准备资源，其他领域既不取旧快照也不切换 |

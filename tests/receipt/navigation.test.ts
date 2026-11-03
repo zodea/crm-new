@@ -10,14 +10,25 @@ describe('普通收款稳定身份与来源往返', () => {
     expect(resolveNavigationTarget(intent)).toMatchObject({ state: 'resolved', to: '/finance/receipt/draft%2Fa?origin=real' })
   })
 
-  it.each((['/base/customer/customer-a?origin=real&tab=receipts', '/contract/contract-a?origin=real&contractKind=construction&tab=receipts', '/finance/receipt?search=SK&page=2&pageSize=10']).map(input => ({ input })))('客户、施工合同和收款列表来源均由统一入口保存，查询不承担收款身份：输入案例 %#', ({ input: source }) => {
+  it.each([
+    { name: '客户详情及收款页签', source: '/base/customer/customer-a?origin=real&tab=receipts' },
+    { name: '施工合同详情及合同类型', source: '/contract/contract-a?origin=real&contractKind=construction&tab=receipts' },
+    { name: '收款列表筛选及分页', source: '/finance/receipt?search=SK&page=2&pageSize=10' },
+  ])('保留$name的返回地址，收款仍使用自身身份', ({ source }) => {
     const result = resolveNavigationTarget(intent, { returnTo: source })
     expect(result.state).toBe('resolved')
     if (result.state === 'resolved')
       expect(new URL(result.to, 'https://crm.invalid').searchParams.get('returnTo')).toBe(source)
   })
 
-  it.each((['https://outside.invalid/', '//outside.invalid/', '/finance/receipt/new', '/finance/receipt/form/a', '/finance/receipt/a?origin=demo', '/finance/receipt?unknown=1']).map(input => ({ input })))('返回仅接受相同来源的已知业务路径，保留列表筛选分页并拒绝外部或写态目标：输入案例 %#', ({ input: value }) => {
+  it.each([
+    { name: '外部绝对地址', value: 'https://outside.invalid/' },
+    { name: '协议相对外部地址', value: '//outside.invalid/' },
+    { name: '新建页', value: '/finance/receipt/new' },
+    { name: '编辑页', value: '/finance/receipt/form/a' },
+    { name: '不同来源的收款详情', value: '/finance/receipt/a?origin=demo' },
+    { name: '列表未知查询字段', value: '/finance/receipt?unknown=1' },
+  ])('拒绝返回$name，并保留合法列表筛选分页', ({ value }) => {
     expect(validateReceiptReturnTo('/finance/receipt?search=SK&page=3&pageSize=20#receipt-real-a', 'real')).toBe('/finance/receipt?search=SK&page=3&pageSize=20#receipt-real-a')
     expect(validateReceiptReturnTo(value, 'real')).toBeNull()
   })

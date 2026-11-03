@@ -8,9 +8,9 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/delivery/central-service.test.ts](../../../tests/delivery/central-service.test.ts) | 单元／服务／状态 | 送货原件与修订中央公开行为 |
+| [tests/delivery/central-service.test.ts](../../../tests/delivery/central-service.test.ts) | 单元／服务／状态 | 送货原件与修订中央公开行为；逐项验证当前权限及会话隔离 |
 | [tests/delivery/central-state.test.ts](../../../tests/delivery/central-state.test.ts) | 单元／服务／状态 | 送货浏览器中央状态 |
-| [tests/delivery/controlled-migration.test.ts](../../../tests/delivery/controlled-migration.test.ts) | 单元／服务／状态 | 送货完整受控迁移 |
+| [tests/delivery/controlled-migration.test.ts](../../../tests/delivery/controlled-migration.test.ts) | 单元／服务／状态 | 送货完整受控迁移；旧原件不能借当前记录读取 |
 | [tests/delivery/export.test.ts](../../../tests/delivery/export.test.ts) | 单元／服务／状态 | 送货单 Excel 导出 |
 | [tests/delivery/legacy-history.test.ts](../../../tests/delivery/legacy-history.test.ts) | 单元／服务／状态 | 可证明的旧送货历史恢复 |
 | [tests/delivery/match.test.ts](../../../tests/delivery/match.test.ts) | 单元／服务／状态 | matchSupplierName |
@@ -19,7 +19,7 @@
 | [tests/delivery/read-service.test.ts](../../../tests/delivery/read-service.test.ts) | 单元／服务／状态 | 送货 HTTP 读入口服务 |
 | [tests/delivery/records.test.ts](../../../tests/delivery/records.test.ts) | 单元／服务／状态 | 送货单 pass-1：版本化持久化 |
 | [tests/delivery/reference-suggestions.test.ts](../../../tests/delivery/reference-suggestions.test.ts) | 单元／服务／状态 | 中央送货项目建议来源 |
-| [tests/delivery/repository.test.ts](../../../tests/delivery/repository.test.ts) | 单元／服务／状态 | 送货 HTTP Repository 边界 |
+| [tests/delivery/repository.test.ts](../../../tests/delivery/repository.test.ts) | 单元／服务／状态 | 送货 HTTP Repository 原件归属、来源及完整性边界 |
 | [tests/delivery/request.test.ts](../../../tests/delivery/request.test.ts) | 单元／服务／状态 | 送货 HTTP 命令解析 |
 | [tests/delivery/review.test.ts](../../../tests/delivery/review.test.ts) | 单元／服务／状态 | 送货单号规范化 |
 | [tests/delivery/source-assets.test.ts](../../../tests/delivery/source-assets.test.ts) | 单元／服务／状态 | 送货旧原件到不可变中央资产映射 |

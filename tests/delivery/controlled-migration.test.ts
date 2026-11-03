@@ -116,7 +116,7 @@ describe('送货完整受控迁移', () => {
       const importedSource = coreMigrationTestInstance.snapshot(session).entities.find(entity => entity.id === record.id)!
       const retired = JSON.parse(String(importedSource.attributes.legacyOriginalsJson))[0]
       expect(retired.asset.payloadBase64).toBe(payload)
-      expect(() => deliveryCommandTestInstance.fileContent(record.id, `${record.migrationBatchId}:${retired.asset.id}`, session)).toThrow()
+      expect(() => deliveryCommandTestInstance.fileContent(record.id, `${record.migrationBatchId}:${retired.asset.id}`, session)).toThrow('该送货记录的原件不存在')
       expect(JSON.stringify(record)).not.toContain('历史原件.pdf')
       expect(record.legacyAudit).toContain('待核验')
       expect(JSON.stringify(record)).not.toContain('unparseable legacy snapshot')

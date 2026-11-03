@@ -53,5 +53,5 @@ it('无法保存原键时不发送，坏成功响应不冒认完成', async () =
   await store.perform('backup')
   expect(execute).not.toHaveBeenCalled()
   expect(store.problem).toContain('无法可靠')
-  expect(() => decodeBackupStatus({ ...status, latest: { state: 'succeeded' } })).toThrow()
+  expect(() => decodeBackupStatus({ ...status, latest: { state: 'succeeded' } })).toThrow('备份结果不完整，请保留原操作编号重新核对。')
 })

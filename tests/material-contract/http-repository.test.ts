@@ -17,6 +17,11 @@ describe('材料采购合同中央 HTTP Repository', () => {
     const controller = new AbortController()
     const prices = await repository.prices!('demo', { signal: controller.signal })
     expect(fetcher).toHaveBeenCalledWith('/api/read/material-contracts/prices', { query: { origin: 'demo' }, signal: controller.signal })
+    expect(prices.items).toHaveLength(2)
+    expect(prices.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ contractId: 'con_demo_cg01', lineId: 'line-demo-318-1', materialName: '墙地砖', quantity: 1000, taxInclusiveUnitPrice: 120 }),
+      expect.objectContaining({ contractId: 'con_demo_cg01', lineId: 'line-demo-318-2', materialName: '粘结剂', quantity: 500, taxInclusiveUnitPrice: 42 }),
+    ]))
     expect(prices.items.every(row => row.dataOrigin === 'demo' && row.applicableTaxRate === null)).toBe(true)
     expect(prices.meta.dataOrigin).toBe('demo')
     await expect(repository.prices!('real')).rejects.toMatchObject({ problem: { code: 'internal-error' } })
@@ -49,12 +54,12 @@ describe('材料采购合同中央 HTTP Repository', () => {
     ]) {
       const invalid = structuredClone(page)
       mutate(invalid)
-      expect(() => decodeMaterialContractListPage(invalid)).toThrow()
+      expect(() => decodeMaterialContractListPage(invalid)).toThrow('中央后台返回的材料采购合同列表读模型无效')
     }
     const detail = read.detail('con_demo_cg01', { origin: 'demo', includeDemo: 'true' })
     const invalid = structuredClone(detail)
     invalid.meta.dataOrigin = 'real'
-    expect(() => decodeMaterialContractDetailRead(invalid)).toThrow()
+    expect(() => decodeMaterialContractDetailRead(invalid)).toThrow('中央后台返回的材料采购合同详情读模型无效')
   })
   it.each([401, 403])('真实 HTTP %s 即使损坏 Problem 正文也保留身份错误，不降为网络暂不可用', async (status) => {
     const read = createHttpMaterialContractReadRepository({ fetcher: vi.fn().mockRejectedValue({ response: { status, _data: { data: { code: 'unavailable', fieldErrors: { name: '错误类型' } } } } }) })
