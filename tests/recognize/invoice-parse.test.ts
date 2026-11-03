@@ -125,6 +125,36 @@ describe('parseInvoiceText', () => {
     expect(result.totalAmount).toBe(109)
   })
 
+  it('同一行的买卖方标签不进入公司名称', () => {
+    const result = parseInvoiceText('购 销\n买 名称: 合成甲建设有限公司 售 名称: 合成乙材料有限公司\n开票日期：2026年05月23日')
+    expect(result.buyer).toBe('合成甲建设有限公司')
+    expect(result.seller).toBe('合成乙材料有限公司')
+  })
+
+  it('文字层每字重复时能恢复明确的买卖方，不把标签当成名称', () => {
+    const result = parseInvoiceText('购 名称: 合合成成甲甲建建设设有有限限公公司司 销 名称: 合合成成乙乙材材料料有有限限公公司司\n开票日期：2026年04月11日')
+    expect(result.buyer).toBe('合成甲建设有限公司')
+    expect(result.seller).toBe('合成乙材料有限公司')
+    const spaced = parseInvoiceText('买 名 称 : 合 合 成 成 甲 甲 建 建 设 设 有 有 限 限 公 公 司 司 售 名 称 : 合 合 成 成 乙 乙 材 材 料 料 有 有 限 限 公 公 司 司')
+    expect(spaced.buyer).toBe('合成甲建设有限公司')
+    expect(spaced.seller).toBe('合成乙材料有限公司')
+    const reversed = parseInvoiceText('销 名称: 合合成成乙乙材材料料有有限限公公司司 购 名称: 合合成成甲甲建建设设有有限限公公司司')
+    expect(reversed.buyer).toBe('合成甲建设有限公司')
+    expect(reversed.seller).toBe('合成乙材料有限公司')
+  })
+
+  it('重复字证据不完整时不补造买卖方，真实重复字名称保持原样', () => {
+    const incomplete = parseInvoiceText('购 名称: 合合成成甲甲建建设设有有限限公公司司')
+    expect(incomplete.buyer).toBe('')
+    expect(incomplete.seller).toBe('')
+    const unlabelled = parseInvoiceText('名称: 合合成成甲甲建建设设有有限限公公司司\n名称: 合合成成乙乙材材料料有有限限公公司司')
+    expect(unlabelled.buyer).toBe('')
+    expect(unlabelled.seller).toBe('')
+    const legitimate = parseInvoiceText('名称: 人人材料有限公司\n名称: 合成建材有限公司')
+    expect(legitimate.buyer).toBe('人人材料有限公司')
+    expect(legitimate.seller).toBe('合成建材有限公司')
+  })
+
   it('字段缺失或价税不平时降置信，不伪造为已确认', () => {
     const result = parseInvoiceText('电子发票 发票号码：12345678 价税合计（小写）：¥100.00 税额：¥20.00')
     const confidence = buildInvoiceFieldConfidence(result)

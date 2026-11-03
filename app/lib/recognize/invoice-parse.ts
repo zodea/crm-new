@@ -176,6 +176,32 @@ function extractCompanies(text: string): string[] {
     const candidates = compactChineseSpacing(line).match(COMPANY_MATCH_RE) || []
     candidates.forEach(push)
   }
+  // 部分电子票文字层每字重复；仅在两侧名称都完整成对且普通提取没有结果时恢复，避免改写真实名称。
+  if (!output.length) {
+    const recovered: Array<{ role: 'buyer' | 'seller', name: string }> = []
+    const roleAtEnd = /(?:购买方|买方|销售方|卖方|[购买销售])$/
+    for (const line of text.split('\n')) {
+      const segments = compactChineseSpacing(line).split(/名称[ \t]*[:：]/)
+      for (let index = 1; index < segments.length; index++) {
+        const previous = (segments[index - 1] ?? '').trim()
+        const roleText = previous.match(roleAtEnd)?.[0]
+        if (!roleText)
+          continue
+        const segment = (segments[index] ?? '').trim()
+        const value = cleanCompanyName(index < segments.length - 1 ? segment.replace(roleAtEnd, '') : segment)
+        const chars = Array.from(value.replace(/\s+/g, ''))
+        if (chars.length < 6 || chars.length % 2 || chars.some((character, i) => i % 2 === 0 && character !== chars[i + 1]))
+          continue
+        const name = chars.filter((_character, i) => i % 2 === 0).join('')
+        if (validCompanyName(name))
+          recovered.push({ role: /^(?:购|买)/.test(roleText) ? 'buyer' : 'seller', name })
+      }
+    }
+    const buyers = recovered.filter(value => value.role === 'buyer')
+    const sellers = recovered.filter(value => value.role === 'seller')
+    if (recovered.length === 2 && buyers.length === 1 && sellers.length === 1 && buyers[0]!.name !== sellers[0]!.name)
+      return [buyers[0]!.name, sellers[0]!.name]
+  }
   return output
 }
 
