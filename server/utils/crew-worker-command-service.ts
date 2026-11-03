@@ -202,6 +202,8 @@ export function createCrewWorkerCommandService(options: CrewWorkerCommandOptions
     }
     if (input.kind === 'crew') {
       const crewDraft = draft as CrewFormDraft
+      if (crewDraft.defaultPayRatio != null && (typeof crewDraft.defaultPayRatio !== 'number' || !Number.isFinite(crewDraft.defaultPayRatio) || crewDraft.defaultPayRatio < 0 || crewDraft.defaultPayRatio > 1))
+        throw fail('validation-failed', '发放比例必须在 0 到 1 之间', { defaultPayRatio: ['发放比例必须在 0 到 1 之间'] })
       if ([...state.crews.values()].some(item => item.id !== input.request.id && text(item.draft.name) === text(crewDraft.name)))
         throw fail('validation-failed', '班组名称已存在', { name: ['班组名称已存在'] })
       crewDraft.status = lifecycle(input.request.action)

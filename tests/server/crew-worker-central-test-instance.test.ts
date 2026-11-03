@@ -15,6 +15,25 @@ const session = {
 }
 
 describe('班组—工人中央 command 测试实例', () => {
+  it.each([
+    { name: '负比例', ratio: -0.01 },
+    { name: '大于百分之百', ratio: 1.01 },
+  ])('班组保存拒绝$name且不产生记录', async ({ ratio }) => {
+    const instance = createCrewWorkerCommandTestInstance()
+    const draft = { ...formDefaults('crew'), name: '比例班组', trade: '泥工', contactName: '负责人', contactPhone: '13812345678', defaultPayRatio: ratio }
+    const request = { ...session, requiredCapability: CREW_WRITE_CAPABILITY, commandId: 'invalid-ratio', baseVersion: null, action: 'save' as const, draft, attachments: {} }
+    await expect(instance.executeCrew(request, session)).rejects.toMatchObject({ problem: { code: 'validation-failed', fieldErrors: { defaultPayRatio: ['发放比例必须在 0 到 1 之间'] } } })
+    expect(instance.crewRows()).toEqual([])
+  })
+
+  it.each([null, 0, 1])('班组保存接受未配置及边界比例 %s', async (ratio) => {
+    const instance = createCrewWorkerCommandTestInstance()
+    const draft = { ...formDefaults('crew'), name: '比例班组', trade: '泥工', contactName: '负责人', contactPhone: '13812345678', defaultPayRatio: ratio }
+    const request = { ...session, requiredCapability: CREW_WRITE_CAPABILITY, commandId: 'valid-ratio', baseVersion: null, action: 'save' as const, draft, attachments: {} }
+    const created = await instance.executeCrew(request, session)
+    expect(instance.crewForm(created.id, session).draft.defaultPayRatio).toBe(ratio)
+  })
+
   it('由服务器分配稳定 ID，幂等创建，并用 baseVersion 保护显式编辑', async () => {
     let sequence = 0
     const instance = createCrewWorkerCommandTestInstance({

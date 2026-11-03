@@ -50,6 +50,23 @@ it('正式同事务工人候选按全局稳定 ID 返回，跨项目和同名均
 })
 
 const workerRequest = (actor: Awaited<ReturnType<typeof fixture>>['actor'], commandId: string) => ({ workspaceId: actor.workspaceId, actorId: actor.actorId, commandId, requiredCapability: 'worker:write', action: 'save' as const, baseVersion: null, draft: { ...formDefaults('worker'), name: '合成全局工人', phone: '13800000011', trade: '泥工', bankName: '合成测试银行', bankAccount: 'synthetic-bank-account', dailyWage: 0 }, attachments: {} })
+it('班组比例缺失可保存并冷读，越界比例不写入事实与回执', async () => {
+  const { storage, actor } = await fixture()
+  try {
+    let service = createProductionCrewWorkerService(storage)
+    const request = { workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: 'crew-ratio-valid', requiredCapability: 'crew:write', action: 'save' as const, baseVersion: null, draft: { ...formDefaults('crew'), name: '合成比例班组', trade: '泥工', contactName: '负责人', contactPhone: '13900139000', defaultPayRatio: null }, attachments: {} }
+    const created = await service.executeCrew(request, () => actor)
+    await expect(service.executeCrew({ ...request, commandId: 'crew-ratio-invalid', id: created.id, baseVersion: created.version, draft: { ...request.draft, id: created.id, defaultPayRatio: 1.5 } }, () => actor, created.id)).rejects.toMatchObject({ problem: { code: 'validation-failed', fieldErrors: { defaultPayRatio: ['发放比例必须在 0 到 1 之间'] } } })
+    await storage.close()
+    service = createProductionCrewWorkerService(storage)
+    expect((await service.crewForm(created.id, () => actor)).draft.defaultPayRatio).toBeNull()
+    expect(await service.resolve('crew', request.commandId, () => actor)).toEqual({ outcome: 'applied', result: created })
+    await storage.withTransaction(async (tx) => {
+      expect(await tx.select('SELECT command_id FROM crew_worker_command_receipts WHERE command_id=?', ['crew-ratio-invalid'])).toEqual([])
+    })
+  }
+  finally { await storage.close() }
+})
 it('正式写入、原键幂等、未知结果冷恢复、版本冲突、未应用封存均在同一真实磁盘事务中闭合', async () => {
   const { storage, actor } = await fixture()
   try {
