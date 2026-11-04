@@ -36,9 +36,9 @@ describe('公共分页协议', () => {
   ] as const
   it.each(parsers)('%s API 拒绝非法页与大小，缺省值有明确含义', (_name, parse) => {
     for (const page of [0, -1, 1.5, '', '0', 'NaN', ['1', '2'], Number.MAX_SAFE_INTEGER + 1])
-      expect(() => parse({ page })).toThrow()
+      expect(() => parse({ page })).toThrow('分页参数无效')
     for (const pageSize of [0, 3, 1.5, '', 'garbage', ['10']])
-      expect(() => parse({ pageSize })).toThrow()
+      expect(() => parse({ pageSize })).toThrow('分页参数无效')
     expect(parse({ page: '999', pageSize: '20' })).toMatchObject({ page: 999, pageSize: 20 })
     expect(parse({}).page).toBe(1)
   })
