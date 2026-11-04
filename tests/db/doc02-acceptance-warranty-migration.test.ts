@@ -55,8 +55,9 @@ describe('v44 验收—保修 canonical 生命周期迁移', () => {
 
   it('审计表拒绝重复状态事实和跨记录引用', async () => {
     const db = await createMigratedMemoryDb()
-    await db.execute(`INSERT INTO project_acceptances (id, status) VALUES ('acceptance-324', 'submitted')`)
-    await db.execute(`
+    try {
+      await db.execute(`INSERT INTO project_acceptances (id, status) VALUES ('acceptance-324', 'submitted')`)
+      await db.execute(`
       INSERT INTO project_acceptance_lifecycle_events (
         id, acceptance_id, action, from_status, to_status, actor_id, actor_name, occurred_at
       ) VALUES (
@@ -64,22 +65,50 @@ describe('v44 验收—保修 canonical 生命周期迁移', () => {
         'actor-324', '周经办', '2026-08-25T02:00:00.000Z'
       )
     `)
-    await expect(db.execute(`
+      await expect(db.execute(`
       INSERT INTO project_acceptance_lifecycle_events (
         id, acceptance_id, action, from_status, to_status, actor_id, actor_name, occurred_at
       ) VALUES (
         'event-accepted-repeat-324', 'acceptance-324', 'accept', 'submitted', 'accepted',
         'actor-324', '周经办', '2026-08-25T02:01:00.000Z'
       )
-    `)).rejects.toThrow()
-    await expect(db.execute(`
+    `)).rejects.toThrow('UNIQUE constraint failed: project_acceptance_lifecycle_events.acceptance_id, project_acceptance_lifecycle_events.to_status')
+      await expect(db.execute(`
       INSERT INTO project_acceptance_lifecycle_events (
         id, acceptance_id, action, from_status, to_status, actor_id, actor_name, occurred_at
       ) VALUES (
         'event-orphan-324', 'missing-acceptance-324', 'accept', 'submitted', 'accepted',
         'actor-324', '周经办', '2026-08-25T02:00:00.000Z'
       )
-    `)).rejects.toThrow()
-    db.close()
+    `)).rejects.toThrow('FOREIGN KEY constraint failed')
+      expect(await db.select('SELECT id, acceptance_id, action, from_status, to_status, actor_id, actor_name, occurred_at FROM project_acceptance_lifecycle_events')).toEqual([{
+        id: 'event-accepted-324',
+        acceptance_id: 'acceptance-324',
+        action: 'accept',
+        from_status: 'submitted',
+        to_status: 'accepted',
+        actor_id: 'actor-324',
+        actor_name: '周经办',
+        occurred_at: '2026-08-25T02:00:00.000Z',
+      }])
+      await db.execute(`INSERT INTO project_acceptances (id, status) VALUES ('acceptance-other-324', 'submitted')`)
+      await db.execute(`
+        INSERT INTO project_acceptance_lifecycle_events
+          (id, acceptance_id, action, from_status, to_status, actor_id, actor_name, occurred_at)
+        VALUES ('event-other-324', 'acceptance-other-324', 'accept', 'submitted', 'accepted', 'actor-324', '周经办', '2026-08-25T03:00:00.000Z')
+      `)
+      await db.execute(`
+        INSERT INTO project_acceptance_lifecycle_events
+          (id, acceptance_id, action, from_status, to_status, actor_id, actor_name, occurred_at)
+        VALUES ('event-warranty-324', 'acceptance-324', 'start-warranty', 'accepted', 'warranty', 'actor-324', '周经办', '2026-08-25T04:00:00.000Z')
+      `)
+      expect(await db.select('SELECT id, acceptance_id, to_status FROM project_acceptance_lifecycle_events ORDER BY id')).toEqual([
+        { id: 'event-accepted-324', acceptance_id: 'acceptance-324', to_status: 'accepted' },
+        { id: 'event-other-324', acceptance_id: 'acceptance-other-324', to_status: 'accepted' },
+        { id: 'event-warranty-324', acceptance_id: 'acceptance-324', to_status: 'warranty' },
+      ])
+      expect(await db.select('PRAGMA foreign_key_check')).toEqual([])
+    }
+    finally { db.close() }
   })
 })
