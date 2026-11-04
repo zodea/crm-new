@@ -90,6 +90,11 @@ export function useImportRunner(
       if (now - lastYieldAt >= 16) {
         await environment.yieldToView()
         lastYieldAt = Date.now()
+        // 页签可能在等待界面渲染时卸载；尚未开始的下一行不能再写入。
+        if (cancelled) {
+          phase.value = 'idle'
+          return { status: 'cancelled' }
+        }
       }
       const row = pendingRows[done.value]!
       try {

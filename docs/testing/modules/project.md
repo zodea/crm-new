@@ -52,6 +52,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/browser/ProjectManagementFees.test.ts](../../../tests/browser/ProjectManagementFees.test.ts) | Vitest Browser／Chromium | 五档视口管理费原净额与未知总额、原单链接、键盘展开及重读、撤权去除旧金额与链接，可证空源保留真实零 |
+| [tests/browser/ProjectImportCancel.test.ts](../../../tests/browser/ProjectImportCancel.test.ts) | Vitest Browser／Chromium | 真实项目导入界面搭配合成 Excel、内存命令和受控渲染等待；停止后尚未开始的行不提交 |
 
 ## Playwright E2E
 

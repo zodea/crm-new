@@ -118,6 +118,64 @@ describe('导入执行器', () => {
     expect(runner.done.value).toBe(1)
   })
 
+  it('尚未开始处理行时取消，界面更新结束后不启动写入', async () => {
+    let release!: () => void
+    const rendering = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const yieldToView = vi.fn(() => rendering)
+    const importRow = vi.fn().mockResolvedValue(undefined)
+    const runner = useImportRunner({ yieldToView })
+    const running = runner.start(rows, importRow)
+
+    expect(yieldToView).toHaveBeenCalledOnce()
+    runner.cancel()
+    release()
+
+    await expect(running).resolves.toEqual({ status: 'cancelled' })
+    expect(importRow).not.toHaveBeenCalled()
+    expect(runner.phase.value).toBe('idle')
+    expect(runner.done.value).toBe(0)
+  })
+
+  it('已完成的行保留，取消等待渲染中的下一行不会写入', async () => {
+    let release!: () => void
+    let reportWaiting!: () => void
+    const rendering = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const waiting = new Promise<void>((resolve) => {
+      reportWaiting = resolve
+    })
+    let now = 100
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const yieldToView = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(() => {
+        reportWaiting()
+        return rendering
+      })
+    const importRow = vi.fn(async () => {
+      now += 17
+    })
+    const runner = useImportRunner({ yieldToView })
+    try {
+      const running = runner.start(rows, importRow)
+      await waiting
+      runner.cancel()
+      release()
+
+      await expect(running).resolves.toEqual({ status: 'cancelled' })
+      expect(importRow).toHaveBeenCalledExactlyOnceWith(rows[0])
+      expect(runner.done.value).toBe(1)
+      expect(runner.phase.value).toBe('idle')
+    }
+    finally {
+      release()
+      clock.mockRestore()
+    }
+  })
+
   it('reset 清空进度与错误回到初始态', async () => {
     const importRow = vi.fn().mockRejectedValue(new Error('失败'))
     const runner = useImportRunner(runnerEnvironment())
