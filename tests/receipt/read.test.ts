@@ -18,7 +18,7 @@ describe('普通收款中央读模型与 Repository', () => {
       await expect(repository.resolve('receipt-original')).rejects.toMatchObject({ problem: { code: 'internal-error' } })
     }
     fetcher.mockRejectedValue({ statusCode: 404 })
-    await expect(repository.resolve('receipt-original')).rejects.toBeDefined()
+    await expect(repository.resolve('receipt-original')).rejects.toMatchObject({ problem: { code: 'unavailable', message: '收款服务暂时不可用，请重试', retryable: true } })
   })
   it('repository 按本次来源查询拒绝串入的演示行、候选与累计，显式启用后才接收', async () => {
     const commands = createReceiptCommandTestInstance({ references: () => references })
