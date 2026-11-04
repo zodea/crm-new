@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import type { ProjectReturnOrigin } from '~/lib/nav/return-to'
+import { describe, expect, it, vi } from 'vitest'
 import {
   createProjectReturnOrigin,
   resolveProjectReturnContext,
@@ -107,5 +108,54 @@ describe('project returnTo contract', () => {
       now,
       load: () => available ? ready : null,
     })).toEqual(restored ? { to: RETURN_TO, origin: ready } : { to: '/project', origin: null })
+  })
+
+  it.each([
+    { case: '来源记录身份不一致', override: { id: 'origin_other' } },
+    { case: '来源页签被改成其他列表', override: { tabKey: '/base/supplier' } },
+    { case: '来源行锚点与链接不一致', override: { anchorId: 'project-row-demo:another-project' } },
+    { case: '滚动位置为负数', override: { scrollTop: -1 } },
+    { case: '滚动位置不是有限数', override: { scrollTop: Number.NaN } },
+    { case: '过期时间不是有限数', override: { expiresAt: Number.POSITIVE_INFINITY } },
+    { case: '刚到过期时刻', override: { expiresAt: NOW } },
+  ])('不恢复被篡改或过期的项目列表来源：$case', ({ override }) => {
+    const origin = {
+      id: 'origin_313',
+      returnTo: RETURN_TO,
+      tabKey: '/project',
+      anchorId: 'project-row-demo:proj_demo_001',
+      scrollTop: 684,
+      expiresAt: NOW + 1,
+      ...override,
+    } as ProjectReturnOrigin
+
+    expect(resolveProjectReturnContext({ returnTo: RETURN_TO, contextId: 'origin_313', now: NOW, load: () => origin }))
+      .toEqual({ to: '/project', origin: null })
+  })
+
+  it('过期前一毫秒仍可恢复原列表，过期时精确回退', () => {
+    const origin: ProjectReturnOrigin = {
+      id: 'origin_313',
+      returnTo: RETURN_TO,
+      tabKey: '/project',
+      anchorId: 'project-row-demo:proj_demo_001',
+      scrollTop: 684,
+      expiresAt: NOW + 1,
+    }
+    const request = { returnTo: RETURN_TO, contextId: 'origin_313', load: () => origin }
+    expect(resolveProjectReturnContext({ ...request, now: NOW })).toEqual({ to: RETURN_TO, origin })
+    expect(resolveProjectReturnContext({ ...request, now: NOW + 1 })).toEqual({ to: '/project', origin: null })
+  })
+
+  it('无效上下文编号不读取来源，无法解码的锚点不能恢复', () => {
+    const load = vi.fn(() => null)
+    expect(resolveProjectReturnContext({ returnTo: RETURN_TO, contextId: '../wrong', now: NOW, load }))
+      .toEqual({ to: '/project', origin: null })
+    expect(load).not.toHaveBeenCalled()
+
+    const invalidAnchor = '/project?nav=origin_313#project-row-%'
+    const origin: ProjectReturnOrigin = { id: 'origin_313', returnTo: invalidAnchor, tabKey: '/project', anchorId: 'project-row-%', scrollTop: 0, expiresAt: NOW + 1 }
+    expect(resolveProjectReturnContext({ returnTo: invalidAnchor, contextId: 'origin_313', now: NOW, load: () => origin }))
+      .toEqual({ to: '/project', origin: null })
   })
 })
