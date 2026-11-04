@@ -21,7 +21,7 @@
 | [tests/helpers/test-temp-root.ts](../../../tests/helpers/test-temp-root.ts) | 辅助／夹具（非独立测试） | 每个测试文件的合成数据隔离与保留 |
 | [tests/tooling/test-temp-root.test.ts](../../../tests/tooling/test-temp-root.test.ts) | 工程工具测试 | 临时目录隔离、进程运行或退出时保留数据 |
 | [tests/helpers/production-storage-seed.ts](../../../tests/helpers/production-storage-seed.ts) | 辅助／夹具（非独立测试） | 测试种子独立生成与保留；校验身份、结构及完整性后复制冷打开 |
-| [tests/tooling/production-storage-seed.test.ts](../../../tests/tooling/production-storage-seed.test.ts) | 工程工具测试 | 并发种子、身份拒绝和已有目标保留 |
+| [tests/tooling/production-storage-seed.test.ts](../../../tests/tooling/production-storage-seed.test.ts) | unit-heavy／合成磁盘库 | 并发生成独立种子、身份与完整性冷核，以及旧内容和已有目标保留 |
 | [tests/helpers/memory-db.ts](../../../tests/helpers/memory-db.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/material-read-meta.ts](../../../tests/helpers/material-read-meta.ts) | 辅助／夹具（非独立测试） | 材采来源与真实元数据夹具 |
 | [tests/helpers/notification-read-meta.ts](../../../tests/helpers/notification-read-meta.ts) | 辅助／夹具（非独立测试） | 通知来源元数据夹具 |

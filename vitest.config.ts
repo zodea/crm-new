@@ -10,6 +10,7 @@ const HEAVY_UNIT_TESTS = [
   'tests/other-settlement/{clearance,production,native,stable-payee}-*.test.ts',
   'tests/material-quotation/{storage,graph}.test.ts',
   'tests/payroll/central-hollow-processed-proof.test.ts',
+  'tests/tooling/production-storage-seed.test.ts',
 ]
 const NON_UNIT_TESTS = ['tests/components/**/*.test.ts', 'tests/browser/**/*.test.ts']
 // 服务与迁入用例在真实内存库上走完整链路，满负载并行时单例可达数秒；默认 5s 会随机超时。
