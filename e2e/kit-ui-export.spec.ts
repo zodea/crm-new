@@ -14,7 +14,7 @@ test('KitUI 单文件导出：选择目录、写入文件且只显示一次成�
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.addInitScript(() => {
-    const testWindow = window as ExportTestWindow
+    const testWindow = window as unknown as ExportTestWindow
     testWindow.__exportTestWrites = []
     Object.defineProperty(window, 'showDirectoryPicker', {
       configurable: true,
@@ -62,7 +62,7 @@ test('KitUI 单文件导出：选择目录、写入文件且只显示一次成�
   await expect(page.getByRole('progressbar')).toHaveCount(0)
   await expect(page.locator('[data-ripple], .ripple')).toHaveCount(0)
 
-  const writes = await page.evaluate(() => (window as ExportTestWindow).__exportTestWrites)
+  const writes = await page.evaluate(() => (window as unknown as ExportTestWindow).__exportTestWrites)
   expect(writes).toHaveLength(1)
   expect(writes[0]).toMatchObject({
     name: '瑞航CRM-导出演示.txt',
@@ -77,7 +77,7 @@ test('KitUI 单文件导出：关闭目录选择器时静默取消', async ({ pa
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.addInitScript(() => {
-    const testWindow = window as ExportTestWindow
+    const testWindow = window as unknown as ExportTestWindow
     testWindow.__exportTestWrites = []
     Object.defineProperty(window, 'showDirectoryPicker', {
       configurable: true,
@@ -95,7 +95,7 @@ test('KitUI 单文件导出：关闭目录选择器时静默取消', async ({ pa
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('progressbar')).toHaveCount(0)
   await expect(page.locator('[data-ripple], .ripple')).toHaveCount(0)
-  await expect.poll(async () => await page.evaluate(() => (window as ExportTestWindow).__exportTestWrites)).toEqual([])
+  await expect.poll(async () => await page.evaluate(() => (window as unknown as ExportTestWindow).__exportTestWrites)).toEqual([])
   expect(pageErrors, '取消目录选择不应产生客户端运行错误').toEqual([])
 })
 
