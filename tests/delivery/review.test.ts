@@ -159,6 +159,38 @@ describe('送货单人工复核金额', () => {
       .some(issue => issue.key === 'items')).toBe(true)
   })
 
+  it.each([
+    { label: '非闰年二月二十九日', date: '2025-02-29', qty: 1, expected: 'date' },
+    { label: '四月三十一日', date: '2026-04-31', qty: 1, expected: 'date' },
+    { label: '非数字数量', date: '2026-04-30', qty: Number.NaN, expected: 'items' },
+    { label: '无限数量', date: '2026-04-30', qty: Number.POSITIVE_INFINITY, expected: 'items' },
+  ])('不可核实的日期或数量须在审核阶段阻断：$label', ({ date, qty, expected }) => {
+    const issues = deliveryReviewIssueDetails({
+      projectId: 'project-1',
+      supplierId: 'supplier-1',
+      orderNo: 'DL-INVALID',
+      deliveryDate: date,
+      docType: '送货单',
+      note: '',
+      items: [{ id: 'line-1', name: '电线', unit: 'm', qty, unitPrice: null, amount: null, amountSource: 'manual' }],
+      confirmations: { humanReviewed: true },
+    })
+    expect(issues.map(issue => issue.key)).toContain(expected)
+  })
+
+  it('闰年真实日期与有限正数数量仍可在价格待补录时归档', () => {
+    expect(deliveryReviewIssueDetails({
+      projectId: 'project-1',
+      supplierId: 'supplier-1',
+      orderNo: 'DL-VALID',
+      deliveryDate: '2024-02-29',
+      docType: '送货单',
+      note: '',
+      items: [{ id: 'line-1', name: '电线', unit: 'm', qty: 0.5, unitPrice: null, amount: null, amountSource: 'manual' }],
+      confirmations: { humanReviewed: true },
+    })).toEqual([])
+  })
+
   it('金额与数量乘单价不一致时仍需人工复核并记录原因', () => {
     const input = {
       projectId: 'project-1',

@@ -17,6 +17,18 @@ const ROTATED_DELIVERY_MARKDOWN = `
 `
 
 describe('parseDeliveryMarkdown', () => {
+  it.each(['2025年2月29日', '2026年4月31日'])('不存在的日期 %s 不得作为送货日期，原识别文本仍保留', (date) => {
+    const source = `送货单\n日期：${date}\n| 名称 | 单位 | 数量 |\n| --- | --- | --- |\n| 电线 | 米 | 1 |`
+    const result = parseDeliveryMarkdown([source])
+    expect(result.docs[0]?.date).toBe('')
+    expect(result.rawText).toContain(date)
+  })
+
+  it('真实闰日仍可从送货识别文本解析', () => {
+    const result = parseDeliveryMarkdown(['送货单\n日期：2024年2月29日\n| 名称 | 单位 | 数量 |\n| --- | --- | --- |\n| 电线 | 米 | 1 |'])
+    expect(result.docs[0]?.date).toBe('2024-02-29')
+  })
+
   it('兼容 OCR 将手写日期识别为空格分隔的年月日', () => {
     const result = parseDeliveryMarkdown([`
       # 广州德力五金机电有限公司庆丰电线厂门市部送货单

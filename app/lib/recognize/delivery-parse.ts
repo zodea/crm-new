@@ -1,4 +1,5 @@
 import { round2 } from '~/lib/util/number'
+import { isISODateDTO } from '~/types/read-model'
 
 export interface ParsedDeliveryItem {
   name: string
@@ -128,9 +129,8 @@ function findDate(lines: string[]): string {
   const year = Number(match[1])
   const month = Number(match[2])
   const day = Number(match[3])
-  if (month < 1 || month > 12 || day < 1 || day > 31)
-    return ''
-  return `${year}-${pad2(month)}-${pad2(day)}`
+  const date = `${year}-${pad2(month)}-${pad2(day)}`
+  return isISODateDTO(date) ? date : ''
 }
 
 function trailingSerial(value: string): string {

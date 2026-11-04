@@ -1,4 +1,5 @@
 import { round2 } from '~/lib/util/number'
+import { isISODateDTO } from '~/types/read-model'
 
 export type DeliveryAmountSource = 'calculated' | 'ocr' | 'manual'
 
@@ -167,13 +168,13 @@ export function deliveryReviewIssueDetails(
     issues.push({ key: 'project', label: '必须选择所属项目' })
   if (!input.supplierId)
     issues.push({ key: 'supplier', label: '必须人工选择已有分供方，或先确认新增分供方' })
-  if (!input.deliveryDate)
-    issues.push({ key: 'date', label: '缺少送货日期，必须依据原件人工补录' })
+  if (!isISODateDTO(input.deliveryDate))
+    issues.push({ key: 'date', label: input.deliveryDate ? '送货日期无效，必须依据原件人工核对' : '缺少送货日期，必须依据原件人工补录' })
   if (!normalizeDeliveryOrderNo(input.orderNo) && !confirmations.noOrderNoConfirmed)
     issues.push({ key: 'order-no', label: '缺少送货单号；只有确认原件确实无单号后才能归档' })
 
   const invalidLines = input.items.filter(item =>
-    !item.name.trim() || !item.unit.trim() || item.qty == null || item.qty <= 0,
+    !item.name.trim() || !item.unit.trim() || item.qty == null || !Number.isFinite(item.qty) || item.qty <= 0,
   )
   if (invalidLines.length)
     issues.push({ key: 'items', label: '每条明细必须人工确认材料名称、单位和非零数量' })

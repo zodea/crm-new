@@ -42,6 +42,12 @@
 | [tests/components/DeliveryReferences.test.ts](../../../tests/components/DeliveryReferences.test.ts) | 组件（jsdom） | 送货处理区中央资料与独立别名保存 |
 | [tests/components/delivery-duplicate-preview.test.ts](../../../tests/components/delivery-duplicate-preview.test.ts) | 组件（jsdom） | 送货单重复对照预览 |
 
+## 浏览器组件
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/browser/DeliveryReviewCalendar.test.ts](../../../tests/browser/DeliveryReviewCalendar.test.ts) | Vitest Browser／Chromium | 日期与数量无效时提示并阻断归档，纠正后恢复操作；五档视口 |
+
 ## Playwright E2E
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
