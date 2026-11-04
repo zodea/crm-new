@@ -83,8 +83,15 @@ it.each(['sqlite-v47', 'sqlite-v48', 'sqlite-v49', 'sqlite-v50'])('批复来源�
   const instance = createCoreMigrationTestInstance()
   const input = source({ sourceVersion })
   const envelope = { workspaceId: SESSION.workspaceId, actorId: SESSION.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, source: input, backup: null }
-  await expect(instance.preflight({ ...envelope, commandId: `approval-${sourceVersion}` }, SESSION)).resolves.toBeDefined()
-  await expect(instance.preflight({ ...envelope, commandId: `tampered-${sourceVersion}`, source: { ...input, sourceHash: '0'.repeat(64) } }, SESSION)).rejects.toThrow('sourceHash')
+  await expect(instance.preflight({ ...envelope, commandId: `approval-${sourceVersion}` }, SESSION)).resolves.toEqual({
+    eligible: true,
+    contractVersion: CORE_MIGRATION_CONTRACT_VERSION,
+    mode: CORE_MIGRATION_SOURCE_MODE,
+    sourceVersion,
+    sourceHash: input.sourceHash,
+    entityCount: 8,
+  })
+  await expect(instance.preflight({ ...envelope, commandId: `tampered-${sourceVersion}`, source: { ...input, sourceHash: '0'.repeat(64) } }, SESSION)).rejects.toMatchObject({ problem: { code: 'validation-failed', message: expect.stringContaining('sourceHash') } })
 })
 
 function sha256(value: string): string {
@@ -252,7 +259,15 @@ describe('core migration test instance', () => {
   })
   it.each(['sqlite-v47', 'sqlite-v48'])('兼容已定版本 %s 的合法快照', async (sourceVersion) => {
     const instance = createCoreMigrationTestInstance()
-    await expect(instance.preflight(sourceCommand(`version-${sourceVersion}`, cleanSource({ sourceVersion })), SESSION)).resolves.toBeDefined()
+    const input = cleanSource({ sourceVersion })
+    await expect(instance.preflight(sourceCommand(`version-${sourceVersion}`, input), SESSION)).resolves.toEqual({
+      eligible: true,
+      contractVersion: CORE_MIGRATION_CONTRACT_VERSION,
+      mode: CORE_MIGRATION_SOURCE_MODE,
+      sourceVersion,
+      sourceHash: input.sourceHash,
+      entityCount: 6,
+    })
   })
 
   it.each(['缺省', '显式空数组'])('网络命令保留%s工资图并保持来源哈希', async (mode) => {
