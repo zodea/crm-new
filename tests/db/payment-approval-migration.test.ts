@@ -27,8 +27,9 @@ describe('付款批复金额来源迁移', () => {
       expect(await db.select('SELECT approved_amount, approved_amount_origin FROM payment_applications')).toEqual([{ approved_amount: 0, approved_amount_origin: 'legacy' }])
       expect(await db.select('SELECT name FROM sqlite_master WHERE name = \'payment_approval_test_index\'')).toHaveLength(1)
       expect(await db.select('PRAGMA foreign_key_check')).toEqual([])
-      await expect(db.execute('UPDATE payment_applications SET approved_amount = -1 WHERE id = \'old\'')).rejects.toThrow()
-      await expect(db.execute('UPDATE payment_applications SET approved_amount_origin = \'guessed\' WHERE id = \'old\'')).rejects.toThrow()
+      await expect(db.execute('UPDATE payment_applications SET approved_amount = -1 WHERE id = \'old\'')).rejects.toThrow('CHECK constraint failed: approved_amount IS NULL OR approved_amount >= 0')
+      await expect(db.execute('UPDATE payment_applications SET approved_amount_origin = \'guessed\' WHERE id = \'old\'')).rejects.toThrow('CHECK constraint failed: approved_amount_origin IN (\'legacy\', \'user-entry\')')
+      expect(await db.select('SELECT approved_amount, approved_amount_origin FROM payment_applications WHERE id = \'old\'')).toEqual([{ approved_amount: 0, approved_amount_origin: 'legacy' }])
     }
     finally {
       db.close()
