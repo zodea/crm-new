@@ -37,14 +37,19 @@ async function prepare() {
       }
     }
     const context: QuantityContext = { workspaceId: 'hollow-browser-original', actorId: 'hollow-browser-operator', capabilities: ['quantity:read', 'quantity:write', 'project:list:read', 'worker:list:read', 'crew:list:read'] }
-    const coordinator = createDbCoordinator(async () => db)
+    const coordinator = createDbCoordinator(async () => ({ ...db, close: async () => db.close() }))
     const quantity = createQuantityService({ workspaceId: context.workspaceId, database: coordinator, project: async id => id === 'hollow-browser' ? { id, name: `P6 原户空鼓核验工程 ${runId}`, code: 'P6', dataOrigin: 'real' as const } : null, people: async () => [{ id: 'hollow-crew', name: '空鼓现场班组', kind: 'crew' as const, trade: '泥工', trades: ['泥工'], itemNames: [], dataOrigin: 'real' as const }, ...[['hollow-leader', '原施工责任人'], ['hollow-zero', '零收款成员']].map(([id, name]) => ({ id: id!, name: name!, kind: 'worker' as const, trade: '泥工', trades: ['泥工'], itemNames: [], dataOrigin: 'real' as const }))] })
     const query = { projectId: 'hollow-browser', origin: 'real' as const, includeDemo: false }
     // 原责任由公开命令创建，审计/细分正文随真实来源运输；不手写健康审计。
     for (const side of ['east', 'west']) {
       const unitId = `${side}-unit`
       const read = await quantity.assignments(query, context)
-      const scopes = read.data.scopeOptions.filter(option => option.unitId === unitId).map(option => ({ unitId, roomId: option.roomId, itemId: option.itemId }))
+      const unit = read.data.units.find(candidate => candidate.id === unitId)
+      if (!unit)
+        throw new Error(`原责任户不存在：${unitId}`)
+      const scopes = read.data.scopeOptions.filter(option => option.templateId === unit.templateId && option.trade === '泥工').map(option => ({ unitId, roomId: option.roomId, itemId: option.itemId }))
+      if (!scopes.length)
+        throw new Error(`原责任户缺少泥工房间分项范围：${unitId}`)
       await quantity.execute({ workspaceId: context.workspaceId, actorId: context.actorId, requiredCapability: 'quantity:write', commandId: `hollow-original-assignment-${side}`, baseVersion: read.sourceVersion, origin: 'real', projectId: query.projectId, action: { kind: 'save-assignments', draft: { projectId: query.projectId, trade: '泥工', assigneeKind: 'worker', assigneeId: 'hollow-leader', unitIds: [unitId], expectedAssignments: [{ unitId, assignmentId: null, fingerprint: null }], scopes, note: '原生公开责任指派', allowReplacement: false } } }, context)
       const [assignment] = await db.select<{ id: string }>('SELECT id FROM unit_assignments WHERE unit_id=? AND deleted_at IS NULL', [unitId])
       if (!assignment)

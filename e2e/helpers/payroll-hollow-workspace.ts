@@ -13,8 +13,18 @@ import { payrollC2Repository } from './payroll-c2-workspace'
 
 export async function payrollHollowWorkspace(page: Page, info: TestInfo) {
   const output = info.outputPath('hollow-base-source.json')
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('e2e/helpers/payroll-hollow-migration-source.ts'), output, randomUUID()])
+  const sourceConfig = process.env.CRM_E2E_VITEST_CONFIG || 'vitest.config.ts'
+  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve(sourceConfig), resolve('e2e/helpers/payroll-hollow-migration-source.ts'), output, randomUUID()])
   const { source, snapshotSha256, byteLength } = JSON.parse(await readFile(output, 'utf8'))
+  const graph = JSON.parse(source.entities.quantity_projects[0].attributes.graphJson)
+  const assignmentUnits = new Map<string, string>(graph.tables.unit_assignments.map((row: { id: string, unit_id: string }) => [row.id, row.unit_id]))
+  const scopes = graph.tables.unit_assignment_scopes.map((row: { assignment_id: string, room_id: string, item_id: string }) => [assignmentUnits.get(row.assignment_id), row.room_id, row.item_id].join('|')).sort()
+  expect(scopes).toEqual([
+    'east-unit|east-客厅:原墙面|floor',
+    'east-unit|east-客厅:原墙面|wall',
+    'west-unit|west-客厅:原墙面|floor',
+    'west-unit|west-客厅:原墙面|wall',
+  ])
   const session = await (await page.request.get('/api/read/business-session')).json()
   const envelope = () => ({ workspaceId: session.workspaceId, actorId: session.actorId, commandId: randomUUID(), requiredCapability: 'core:migration:write' })
   const reset = await page.request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
