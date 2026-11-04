@@ -35,6 +35,21 @@ afterEach(() => {
 })
 
 describe('识别送货人工归档与别名的独立结果', () => {
+  it('工地和文件名的分离片段不能拼出项目预选，单来源完整命中仍可建议', async () => {
+    const { api, central, delivery, view } = setup()
+    await flushPromises()
+    central.context.projects = [{ id: 'p', name: '北门东区', dataOrigin: 'real' }]
+    delivery.files[0]!.name = '东区项目送货单.pdf'
+    delivery.files[0]!.docs[0]!.siteText = '北门'
+    api.patchDraft({ projectId: '' })
+    await flushPromises()
+    expect(api.reviewDraft.value?.projectId).toBe('')
+    expect(api.canArchive.value).toBe(false)
+    delivery.files[0]!.docs[0]!.siteText = '北门东区'
+    await flushPromises()
+    expect(api.reviewDraft.value?.projectId).toBe('p')
+    view.unmount()
+  })
   it('缺必填事实不开放归档，只有待人工质量确认时允许进入确认', async () => {
     const { api, delivery, view } = setup()
     await flushPromises()

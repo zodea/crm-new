@@ -107,13 +107,13 @@ export function matchProjectText(
   sourceTexts: readonly string[],
   projects: readonly ProjectMatchCandidate[],
 ): ProjectMatchCandidate | null {
-  const source = normalize(sourceTexts.join(' '))
-  if (!source)
+  const sources = sourceTexts.map(normalize).filter(Boolean)
+  if (!sources.length)
     return null
   const matches = projects
     .flatMap(project => [project.name, ...(project.aliases ?? [])]
       .map(variant => ({ project, variant: normalize(variant) }))
-      .filter(entry => entry.variant && source.includes(entry.variant)))
+      .filter(entry => entry.variant && sources.some(source => source.includes(entry.variant))))
     .sort((left, right) => right.variant.length - left.variant.length)
   const best = matches[0]
   if (!best || matches.some(match => match.variant.length === best.variant.length && match.project.id !== best.project.id))

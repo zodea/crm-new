@@ -41,6 +41,17 @@ describe('matchSupplierName', () => {
 })
 
 describe('matchProjectText', () => {
+  it('工地原文和文件名不能跨来源拼接出从未出现的项目名', () => {
+    const projects = [{ id: 'project-one', name: '北门东区' }]
+    expect(matchProjectText(['北门', '东区'], projects)).toBeNull()
+    expect(matchProjectText(['北门', '东区项目送货单.pdf'], projects)).toBeNull()
+  })
+
+  it('单个来源内部 OCR 空格仍按现行规则归一后匹配', () => {
+    const projects = [{ id: 'project-one', name: '北门东区' }]
+    expect(matchProjectText(['送货地点：北 门 东 区', '其他文件.pdf'], projects)).toEqual(projects[0])
+  })
+
   it.each([
     { case: '[\'中央项目送货\'] / [{ id: \'a\', name: \'中央项目\' }, { id: \'b\', name: \'中央项目\' }]', input: ['中央项目送货'], argument2: [{ id: 'a', name: '中央项目' }, { id: 'b', name: '中央项目' }] },
     { case: '[\'北门东区\'] / [{ id: \'a\', name: \'项目甲\', aliases: [\'北门\'] }, { id: \'b\', name: \'项目乙\', aliases: [\'东区\'] }]', input: ['北门东区'], argument2: [{ id: 'a', name: '项目甲', aliases: ['北门'] }, { id: 'b', name: '项目乙', aliases: ['东区'] }] },

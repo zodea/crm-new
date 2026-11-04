@@ -13,7 +13,7 @@
 | [tests/delivery/controlled-migration.test.ts](../../../tests/delivery/controlled-migration.test.ts) | 单元／服务／状态 | 送货完整受控迁移；旧原件不能借当前记录读取 |
 | [tests/delivery/export.test.ts](../../../tests/delivery/export.test.ts) | 单元／服务／状态 | 送货单 Excel 导出 |
 | [tests/delivery/legacy-history.test.ts](../../../tests/delivery/legacy-history.test.ts) | 单元／服务／状态 | 可证明的旧送货历史恢复 |
-| [tests/delivery/match.test.ts](../../../tests/delivery/match.test.ts) | 单元／服务／状态 | matchSupplierName |
+| [tests/delivery/match.test.ts](../../../tests/delivery/match.test.ts) | 单元／服务／状态 | 分供方及送货项目名称匹配，包含独立来源与歧义边界 |
 | [tests/delivery/material-contracts.test.ts](../../../tests/delivery/material-contracts.test.ts) | 单元／服务／状态 | 送货既有材采合同来源 |
 | [tests/delivery/migration-source.test.ts](../../../tests/delivery/migration-source.test.ts) | 单元／服务／状态 | 送货旧库完整迁移来源 |
 | [tests/delivery/read-service.test.ts](../../../tests/delivery/read-service.test.ts) | 单元／服务／状态 | 送货 HTTP 读入口服务 |
@@ -46,6 +46,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/browser/DeliveryProjectSuggestion.test.ts](../../../tests/browser/DeliveryProjectSuggestion.test.ts) | Vitest Browser／Chromium | 工地原文与文件名分源匹配，避免误预选并保留人工选择；五档视口 |
 | [tests/browser/DeliveryReviewCalendar.test.ts](../../../tests/browser/DeliveryReviewCalendar.test.ts) | Vitest Browser／Chromium | 日期与数量无效时提示并阻断归档，纠正后恢复操作；五档视口 |
 
 ## Playwright E2E
