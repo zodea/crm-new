@@ -361,18 +361,27 @@ export class PaddleOcrCloudClient {
   private async poll(jobId: string, onProgress?: (percent: number) => void): Promise<string> {
     const startedAt = this.now()
     let interval = INITIAL_POLL_INTERVAL_MS
+    const timeout = () => new PaddleOcrCloudError('poll-timeout', 'PaddleOCR 识别等待超时，可稍后重新识别', { retryable: true })
 
     while (true) {
       const elapsed = this.now() - startedAt
-      if (elapsed >= this.pollTimeoutMs) {
-        throw new PaddleOcrCloudError('poll-timeout', 'PaddleOCR 识别等待超时，可稍后重新识别', {
-          retryable: true,
-        })
-      }
+      if (elapsed >= this.pollTimeoutMs)
+        throw timeout()
 
-      const response = await this.request(`${this.baseUrl}${JOBS_PATH}/${encodeURIComponent(jobId)}`, {
-        headers: this.authHeaders(),
-      })
+      const available = this.pollTimeoutMs - elapsed
+      let response: string
+      try {
+        response = await this.request(`${this.baseUrl}${JOBS_PATH}/${encodeURIComponent(jobId)}`, {
+          headers: this.authHeaders(),
+        }, Math.min(this.requestTimeoutMs, available))
+      }
+      catch (error) {
+        if (available <= this.requestTimeoutMs && error instanceof PaddleOcrCloudError && error.code === 'request-timeout')
+          throw timeout()
+        throw error
+      }
+      if (this.now() - startedAt >= this.pollTimeoutMs)
+        throw timeout()
       const status = parseJobStatus(await this.apiData(response))
       const progress = jobProgress(status)
       if (progress != null)
@@ -393,11 +402,8 @@ export class PaddleOcrCloudClient {
       }
 
       const remaining = this.pollTimeoutMs - (this.now() - startedAt)
-      if (remaining <= 0) {
-        throw new PaddleOcrCloudError('poll-timeout', 'PaddleOCR 识别等待超时，可稍后重新识别', {
-          retryable: true,
-        })
-      }
+      if (remaining <= 0)
+        throw timeout()
       await this.sleep(Math.min(interval, remaining))
       interval = Math.min(interval * POLL_INTERVAL_MULTIPLIER, MAX_POLL_INTERVAL_MS)
     }
@@ -407,9 +413,9 @@ export class PaddleOcrCloudClient {
     return { Authorization: `Bearer ${this.accessToken}` }
   }
 
-  private async request(url: string, init: RequestInit = {}): Promise<string> {
+  private async request(url: string, init: RequestInit = {}, timeoutMs = this.requestTimeoutMs): Promise<string> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.requestTimeoutMs)
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
 
     try {
       const response = await this.fetch(url, { ...init, signal: controller.signal })
