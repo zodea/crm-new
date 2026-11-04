@@ -22,11 +22,14 @@ import { withVerifiedMigrationSnapshot } from './migration-snapshot'
 import { appendProductionConstructionScopeBinding } from './production-construction-scope-command'
 import { readProductionConstructionMainOptions, readProductionConstructionScopeLink } from './production-construction-scope-record'
 import { createExpenseClearanceVerification, expenseClearanceVerificationState, validateExpenseClearanceJournal } from './production-finance-clearance'
+import { listPaymentContractCandidates, verifyPaymentContract } from './production-finance-contract'
+import { captureFinanceInvoiceAdoptions, capturePaymentInvoiceCoverage, capturePaymentInvoiceEvidence, validateFinanceInvoiceAdoptions, validatePaymentInvoiceEvidence, verifyPaymentInvoiceScope } from './production-finance-invoice-adoption'
 import { financeRecordSnapshot, validateFinanceJournal } from './production-finance-journal'
 import { authorizeFinanceImport, importNativeFinance, previewNativeFinance, readNativeFinanceSource } from './production-finance-migration'
 import { financePersistedDateTime, productionPaymentApplicationDetail } from './production-finance-payment-detail'
 import { productionFinanceReferences } from './production-finance-references'
 import { financeCommandFingerprint, financeId, parseFinanceCommand } from './production-finance-request'
+import { createPaymentSettlementEvidence, validatePaymentSettlementEvidence } from './production-finance-settlement-evidence'
 import { createPaymentVerification, paymentVerificationCap, paymentVerificationState } from './production-finance-verification'
 import { createReadMeta, withReadMeta } from './read-meta'
 
@@ -141,7 +144,10 @@ function commandResult(value: string, commandId: string, kind: CentralFinanceKin
   try {
     const result = JSON.parse(value) as FinanceCommandResult
     if (result.commandId !== commandId || !result.id || (target && result.id !== target) || !/^[1-9]\d*$/.test(result.version)
-      || !Number.isFinite(Date.parse(result.updatedAt)) || !Array.isArray(result.attachmentIds) || new Set(result.attachmentIds).size !== result.attachmentIds.length) {
+      || !Number.isFinite(Date.parse(result.updatedAt)) || !Array.isArray(result.attachmentIds) || new Set(result.attachmentIds).size !== result.attachmentIds.length
+      || (result.invoiceAdoptionsSha256 !== undefined && (typeof result.invoiceAdoptionsSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(result.invoiceAdoptionsSha256)))
+      || (result.paymentSettlementEvidenceSha256 !== undefined && (typeof result.paymentSettlementEvidenceSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(result.paymentSettlementEvidenceSha256)))
+      || (result.paymentInvoiceEvidenceSha256 !== undefined && (typeof result.paymentInvoiceEvidenceSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(result.paymentInvoiceEvidenceSha256)))) {
       throw new Error('invalid receipt')
     }
     return result
@@ -173,7 +179,7 @@ async function envelope<T extends object>(tx: TransactionDb, actor: BusinessSess
   for (const [key, domain, capability, table] of referenceSources) {
     let state: SourceEvidenceDTO['state'] = actor.capabilities.includes(capability) ? 'unavailable' : 'forbidden'
     let sourceVersion: string | null = null
-    if (state !== 'forbidden' && participants.some(row => row.domain === domain && row.schema_version === 1) && tables.some(row => row.name === table)) {
+    if (state !== 'forbidden' && participants.some(row => row.domain === domain && (row.schema_version === 1 || (domain === 'invoices' && [2, 3].includes(row.schema_version)))) && tables.some(row => row.name === table)) {
       const revision = (await tx.select<{ revision: number }>(`SELECT revision FROM ${table} WHERE singleton=1`))[0]
       if (!revision || !Number.isSafeInteger(revision.revision) || revision.revision < 0)
         fail('unavailable', '财务关联来源版本损坏，不能继续使用旧结果。')
@@ -196,13 +202,24 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
     return actor
   }
   async function run<T>(kind: CentralFinanceKind, session: Session, write: boolean, work: (tx: FinanceDomainTx, actor: BusinessSession) => Promise<T>) {
-    const actor = authorize(session, kind, write)
+    const actor = structuredClone(authorize(session, kind, write))
     if (write)
       storage.assertBusinessWrite()
     return storage.withTransaction(async (base) => {
-      authorize(session, kind, write)
+      if (!isDeepStrictEqual(authorize(session, kind, write), actor))
+        fail('forbidden', '财务操作期间身份或权限改变，整个事务已撤回。')
       const tx: FinanceDomainTx = { ...base, references: productionFinanceReferences(base, actor, options.references?.(base, actor)) }
+      tx.paymentContract = { verify: (reference, projectId, supplierId, bizType) => verifyPaymentContract(tx, actor, reference, projectId, supplierId, bizType) }
+      tx.paymentInvoiceScope = { check: id => verifyPaymentInvoiceScope(tx, actor, id) }
+      tx.paymentSettlementEvidence = createPaymentSettlementEvidence()
       tx.paymentVerification = { confirmationCap: id => paymentVerificationCap(tx, actor, id) }
+      const paymentInvoiceEvidence: unknown[] = []
+      tx.paymentInvoiceGuard = {
+        check: async (id) => {
+          paymentInvoiceEvidence.push(await capturePaymentInvoiceEvidence(tx, actor, id))
+        },
+        evidence: () => paymentInvoiceEvidence,
+      }
       let result: T
       try {
         result = await work(tx, actor)
@@ -277,7 +294,20 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
         await tx.execute('INSERT INTO finance_versions VALUES(?,?,?,?) ON CONFLICT(kind,id) DO UPDATE SET version=excluded.version,updated_at=excluded.updated_at', [request.kind, saved.id, next, updatedAt])
         await tx.execute('UPDATE operation_logs SET operator=? WHERE rowid>?', [actor.actorId, beforeLog])
         await tx.execute('UPDATE finance_revision SET revision=revision+1 WHERE singleton=1')
-        await tx.execute('INSERT INTO finance_history VALUES(?,?,?,?,?,?,?)', [request.kind, saved.id, next, request.commandId, actor.actorId, updatedAt, JSON.stringify(await financeRecordSnapshot(tx, request.kind, saved.id))])
+        const snapshot = await financeRecordSnapshot(tx, request.kind, saved.id)
+        const invoiceAdoptions = request.kind === 'payment_application' && !verificationEdit && request.action !== 'delete'
+          ? await captureFinanceInvoiceAdoptions(tx, actor, saved.id)
+          : undefined
+        const paymentInvoiceEvidence = request.kind === 'payment_record' && request.action === 'confirm' ? tx.paymentInvoiceGuard!.evidence() : undefined
+        const paymentInvoiceCoverage = paymentInvoiceEvidence === undefined ? undefined : await capturePaymentInvoiceCoverage(tx, saved.id)
+        const paymentSettlementEvidence = request.kind === 'payment_application' && !verificationEdit && request.action !== 'delete' ? tx.paymentSettlementEvidence!.evidence() : undefined
+        const frozen = { ...snapshot, ...(invoiceAdoptions === undefined ? {} : { invoiceAdoptions }), ...(paymentInvoiceEvidence === undefined ? {} : { paymentInvoiceEvidence }), ...(paymentSettlementEvidence === undefined ? {} : { paymentSettlementEvidence }) }
+        await validateFinanceInvoiceAdoptions(tx, frozen)
+        await validatePaymentInvoiceEvidence(tx, frozen, paymentInvoiceCoverage)
+        await validatePaymentSettlementEvidence(tx, frozen)
+        await tx.execute('INSERT INTO finance_history VALUES(?,?,?,?,?,?,?)', [request.kind, saved.id, next, request.commandId, actor.actorId, updatedAt, JSON.stringify(frozen)])
+        if (paymentInvoiceEvidence !== undefined)
+          await tx.execute('INSERT INTO finance_payment_invoice_coverage(record_id,version,command_id,coverage_json,invoice_evidence_sha256) VALUES(?,?,?,?,?)', [saved.id, next, request.commandId, JSON.stringify(paymentInvoiceCoverage), financeCommandFingerprint(paymentInvoiceEvidence)])
         const constructionScopeLinks = []
         for (const row of newOriginalLines) {
           const id = saved.expenseLineIds?.[row.index]
@@ -291,7 +321,7 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
         }
         const { expenseLineIds: _expenseLineIds, ...sourceResult } = saved
         const expenseLineIdentities = saved.expenseLineIds?.flatMap((id, inputIndex) => id ? [{ inputIndex, id }] : [])
-        const result: FinanceCommandResult = { ...sourceResult, commandId: request.commandId, version: String(next), updatedAt, attachmentIds, ...(expenseLineIdentities ? { expenseLineIdentities } : {}), ...(constructionScopeLinks.length ? { constructionScopeLinks } : {}), ...(paymentVerification ? { paymentVerificationSha256: financeCommandFingerprint(paymentVerification) } : {}), ...(clearanceVerification ? { clearanceVerificationSha256: financeCommandFingerprint(clearanceVerification), clearanceVerificationId: clearanceVerification.id } : {}) }
+        const result: FinanceCommandResult = { ...sourceResult, commandId: request.commandId, version: String(next), updatedAt, attachmentIds, ...(expenseLineIdentities ? { expenseLineIdentities } : {}), ...(constructionScopeLinks.length ? { constructionScopeLinks } : {}), ...(paymentVerification ? { paymentVerificationSha256: financeCommandFingerprint(paymentVerification) } : {}), ...(clearanceVerification ? { clearanceVerificationSha256: financeCommandFingerprint(clearanceVerification), clearanceVerificationId: clearanceVerification.id } : {}), ...(invoiceAdoptions !== undefined ? { invoiceAdoptionsSha256: financeCommandFingerprint(invoiceAdoptions) } : {}), ...(paymentInvoiceEvidence !== undefined ? { paymentInvoiceEvidenceSha256: financeCommandFingerprint(paymentInvoiceEvidence) } : {}), ...(paymentSettlementEvidence !== undefined ? { paymentSettlementEvidenceSha256: financeCommandFingerprint(paymentSettlementEvidence) } : {}) }
         await tx.execute('UPDATE finance_commands SET result_json=? WHERE command_id=?', [JSON.stringify(result), request.commandId])
         await validateExpenseClearanceJournal(tx, actor)
         await tx.execute('RELEASE finance_operation')
@@ -425,6 +455,11 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
             })
           : (await tx.select<{ id: string, name: string }>(`SELECT id,name FROM ${query.kind} WHERE deleted_at IS NULL ORDER BY name,id`)).map(row => ({ id: row.id, label: row.name, hint: row.id }))
       }
+      else if (query.kind === 'payment-contracts') {
+        if (kind !== 'payment_application' || !query.paymentBizType)
+          fail('validation-failed', '付款合同候选缺少付款类型。')
+        rows = await listPaymentContractCandidates(tx, actor, query.projectId ?? null, query.supplierId ?? null, query.paymentBizType)
+      }
       else if (query.kind === 'workers') {
         if (!actor.capabilities.includes('worker:list:read'))
           fail('forbidden', '当前身份无全局工人清单读取权限。')
@@ -472,7 +507,24 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
           fail('forbidden', '当前身份无结算读取权限。')
         if (!owners.settlementCandidates)
           fail('unavailable', '正式支出结算来源尚未接通。')
-        const source = (await owners.settlementCandidates()).filter(row => row.project_id === (query.projectId ?? null) && row.contract_id === (query.contractId ?? null) && (!query.supplierId || row.supplier_id === query.supplierId) && (!query.workerId || row.worker_id === query.workerId) && isConfirmedExpenditureSettlement(String(row.status)) && !row.deleted_at)
+        if (query.contractId && (!query.contractDomain || !query.contractVersion))
+          fail('unavailable', '请先重新选择带领域和版本的付款合同。')
+        let source = (await owners.settlementCandidates()).filter(row => row.project_id === (query.projectId ?? null) && row.contract_id === (query.contractId ?? null) && (!query.supplierId || row.supplier_id === query.supplierId) && (!query.workerId || row.worker_id === query.workerId) && isConfirmedExpenditureSettlement(String(row.status)) && !row.deleted_at)
+        if (query.contractId) {
+          for (const row of source) {
+            const evidence = row.contractEvidence
+            if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence) || !('state' in evidence) || evidence.state === 'unavailable' || evidence.state === 'none')
+              fail('unavailable', '结算合同领域来源尚未核实，不能显示为候选。')
+            if (evidence.state === 'forbidden')
+              fail('forbidden', '当前身份无权核实结算合同来源。')
+            if (evidence.state !== 'resolved')
+              fail('unavailable', '结算合同证据状态无效。')
+          }
+          source = source.filter((row) => {
+            const evidence = row.contractEvidence as { state: string, domain?: string, id?: string, version?: string }
+            return evidence.state === 'resolved' && evidence.domain === query.contractDomain && evidence.id === query.contractId && evidence.version === query.contractVersion
+          })
+        }
         if (source.some(row => typeof row.total_amount !== 'number' || !Number.isFinite(row.total_amount)))
           fail('unavailable', '结算净额尚未核实，不能显示为零或采用旧总额。')
         rows = source.filter(row => Number(row.total_amount) > 0).map(row => ({ id: String(row.id), label: String(row.name), hint: `${row.no || '未编号'} · 净额 ¥${Number(row.total_amount).toFixed(2)}` }))
@@ -482,7 +534,12 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
           fail('forbidden', '当前身份无实际发票读取权限。')
         if (!owners.invoiceCandidates)
           fail('unavailable', '实际发票正式来源尚未接通，开票申请不代替发票事实。')
-        rows = (await owners.invoiceCandidates()).filter(row => (!query.projectId || row.project_id === query.projectId) && (!query.supplierId || row.supplier_id === query.supplierId) && !row.deleted_at).map(row => ({ id: String(row.id), label: String(row.invoice_number), hint: `含税 ¥${verifiedFinanceSum([row.total_amount]).toFixed(2)}` }))
+        const invoices = await owners.invoiceCandidates()
+        if (kind === 'payment_application' && invoices.some(row => !['project', 'personal', 'company'].includes(String(row.owner_kind)) || (row.owner_kind === 'project' ? typeof row.project_id !== 'string' || !row.project_id : row.project_id !== null)))
+          fail('unavailable', '发票归属来源不完整，请先核对。')
+        rows = invoices.filter(row => (kind === 'payment_application'
+          ? query.projectId ? row.owner_kind === 'project' && row.project_id === query.projectId : row.owner_kind === 'company' && row.project_id === null
+          : !query.projectId || row.project_id === query.projectId) && (!query.supplierId || row.supplier_id === query.supplierId) && !row.deleted_at).map(row => ({ id: String(row.id), label: String(row.invoice_number), hint: `含税 ¥${verifiedFinanceSum([row.total_amount]).toFixed(2)}` }))
       }
       else {
         fail('validation-failed', '财务候选类型无效。')

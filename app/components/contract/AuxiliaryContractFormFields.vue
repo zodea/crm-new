@@ -5,12 +5,11 @@ import type { LookupOption } from '~/lib/kit/lookup'
 import { AUXILIARY_CATEGORIES } from '~/lib/auxiliary-contract/contract'
 
 const props = defineProps<{ draft: AuxiliaryContractDraft, errors: Record<string, string>, fetchProjects: (keyword: string) => Promise<LookupOption[]>, fetchSuppliers: (keyword: string) => Promise<LookupOption[]>, fetchMains: (keyword: string) => Promise<LookupOption[]>, fetchSignatories: (keyword: string) => Promise<LookupOption[]>, constructionMain: ConstructionMainSelection | null }>()
-const emit = defineEmits<{ patch: [patch: Partial<AuxiliaryContractDraft>], selectMain: [id: string | null], selectSignatory: [id: string | null] }>()
+const emit = defineEmits<{ patch: [patch: Partial<AuxiliaryContractDraft>], selectMain: [id: string | null], selectSignatory: [id: string | null], selectSupplier: [id: string | null] }>()
 const categories = computed(() => AUXILIARY_CATEGORIES[props.draft.kind].map(value => ({ key: value, label: value })))
 const fields = computed(() => [
   { key: 'no', label: '合同编号' },
   { key: 'name', label: '合同名称 *' },
-  ...(props.draft.kind === 'company_expense' ? [{ key: 'counterparty', label: '对方单位 *' }] : []),
   { key: 'signDate', label: '签订日期 *', type: 'date' },
   { key: 'servicePeriod', label: '租期或服务期' },
   ...(props.draft.kind === 'other_expense' ? [{ key: 'contactName', label: '履约联系人' }, { key: 'contactPhone', label: '联系方式' }] : []),
@@ -43,6 +42,15 @@ function number(key: 'amount' | 'taxRate', event: Event) {
       <div class="field-block">
         <span class="field-label">类别 *</span><SelectFilter :model-value="draft.category" :options="categories" aria-label="合同类别" full-width @update:model-value="emit('patch', { category: $event })" /><span v-if="errors.category" class="field-error">{{ errors.category }}</span>
       </div>
+      <div v-if="draft.kind === 'company_expense'" class="field-block">
+        <label class="field-label" for="company-supplier">乙方分供方 *</label>
+        <LookupSelect field="company-supplier" :model-value="draft.supplierId ?? null" :fetch="fetchSuppliers" :invalid="Boolean(errors.supplierId)" placeholder="搜索已有分供方" @update:model-value="emit('selectSupplier', $event)" />
+        <p v-if="draft.supplierId && draft.counterparty" class="m-0 text-12px text-ink-soft">
+          合同采用名称：{{ draft.counterparty }}
+        </p>
+        <span v-if="errors.supplierId" class="field-error">{{ errors.supplierId }}</span>
+      </div>
+      <label v-if="draft.kind === 'company_expense' && draft.id && !draft.supplierId" class="field-block"><span class="field-label">历史对方单位原文（尚未关联分供方）</span><input :value="draft.counterparty ?? ''" class="field-input w-full" @input="input('counterparty', $event)"></label>
       <template v-if="draft.kind === 'other_expense'">
         <div v-if="draft.id && !constructionMain" class="field-block">
           <span class="field-label">历史项目 *</span><LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" :invalid="Boolean(errors.projectId)" placeholder="检索项目" @update:model-value="emit('patch', { projectId: $event })" /><span v-if="errors.projectId" class="field-error">{{ errors.projectId }}</span>

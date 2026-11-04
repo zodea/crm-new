@@ -8,6 +8,7 @@ import { approvalPaymentCap } from '../../app/lib/finance/approval-amount'
 import { financeFailure as fail, financeProblemFromUnknown } from '../../app/lib/finance/central-contract'
 import { isPaymentVerificationProof, requiresPaymentVerification } from '../../app/lib/finance/payment-verification'
 import { verifiedFinanceSum } from '../../app/lib/finance/persistent-rows'
+import { validateFinanceContractHistory } from './production-finance-contract-history'
 import { readOriginalExpenseReference } from './production-finance-expense-references'
 import { financeCanonical, financeCommandFingerprint } from './production-finance-request'
 
@@ -179,7 +180,15 @@ async function currentProof(tx: FinanceDomainTx, actor: BusinessSession, id: str
   const version = (await tx.select<{ version: number }>('SELECT version FROM finance_versions WHERE kind=\'payment_application\' AND id=?', [id]))[0]
   if (!proof || proof.workspaceId !== actor.workspaceId || proof.actorId !== actor.actorId)
     fail('unavailable', '历史批复未知需先完成真实业务核验，不能重填批复后直接确认支付。')
-  if (proof.applicationVersion !== String(version?.version) || proof.applicationSnapshotSha256 !== financeCommandFingerprint(await applicationSnapshot(tx, id)))
+  const snapshot = await applicationSnapshot(tx, id)
+  const history = await validateFinanceContractHistory(tx)
+  if (history.isLegacy(id, version?.version)) {
+    if (snapshot.head.contract_domain !== null || snapshot.head.contract_version !== null)
+      fail('unavailable', '付款合同身份已变化，请重新核验当前依据。')
+    delete snapshot.head.contract_domain
+    delete snapshot.head.contract_version
+  }
+  if (proof.applicationVersion !== String(version?.version) || proof.applicationSnapshotSha256 !== financeCommandFingerprint(snapshot))
     fail('unavailable', '付款申请或采用关系已变化，请重新核验当前依据；旧核验继续冻结保留。')
   const facts = await verifiedSources(tx, actor, id)
   if (financeCanonical(facts.sources) !== financeCanonical(proof.sources) || financeCanonical(await originals(tx, id, proof.fileIds)) !== financeCanonical(proof.originals))

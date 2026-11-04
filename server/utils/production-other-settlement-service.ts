@@ -13,10 +13,11 @@ import { contractOriginalPayloadDigest } from '../../app/lib/forms/original-cont
 import { decodeOtherSettlementResult, otherSettlementFingerprint, otherSettlementKey, readOtherSettlementStored, validateOtherSettlementJournal } from '../../app/lib/other-settlement/storage'
 import { decodeOtherSettlementCommand } from '../../app/lib/other-settlement/validation'
 import { createOtherSettlementInstance } from './other-settlement-instance'
-import { readAuxiliaryContractScopeFacts } from './production-auxiliary-contract-record'
+import { readAuxiliaryContractScopeFacts, validateProductionAuxiliaryState } from './production-auxiliary-contract-record'
 import { listWorkerReferences } from './production-crew-worker-references'
 import { appendClearanceLink, readClearanceLinks, validateExpenseClearanceJournal } from './production-finance-clearance'
 import { listOriginalExpenseReferences, readOriginalExpenseReference } from './production-finance-expense-references'
+import { listMigrationReferences } from './production-migration-references'
 import { assertOtherSettlementSourceCommandUnused, validateOtherSettlementImportEvidence } from './production-other-settlement-migration'
 import { createReadMeta, withReadMeta } from './read-meta'
 
@@ -56,7 +57,7 @@ async function actualFacts(tx: TransactionDb, record: OtherSettlementStored, act
 }> {
   if (!record.draft.originalExpenses?.length && !record.draft.contractId)
     return { facts: record.facts, sources: [] }
-  const participant = await tx.select('SELECT domain FROM production_participants WHERE domain=\'finance\' AND schema_version=1')
+  const participant = await tx.select('SELECT domain FROM production_participants WHERE domain=\'finance\' AND schema_version IN (1,2)')
   if (!participant.length)
     return { facts: null, sources: [] }
   if (!['finance-reimbursement:read', 'finance-payment-application:read', 'finance-payment-record:read'].every(capability => actor.capabilities.includes(capability)))
@@ -200,7 +201,7 @@ async function envelope<T extends object>(tx: TransactionDb, actor: BusinessSess
   const revision = (await tx.select<{
     revision: number
   }>('SELECT revision FROM other_settlement_revision WHERE singleton=1'))[0]!.revision
-  const participant = (await tx.select('SELECT domain FROM production_participants WHERE domain=\'finance\' AND schema_version=1')).length > 0
+  const participant = (await tx.select('SELECT domain FROM production_participants WHERE domain=\'finance\' AND schema_version IN (1,2)')).length > 0
   const finance = participant && (await tx.select<{
     revision: number
   }>('SELECT revision FROM finance_revision WHERE singleton=1'))[0]
@@ -429,6 +430,62 @@ export function createProductionOtherSettlementService(storage: ProductionStorag
     }),
   }
 }
+
+export type SettlementContractEvidence
+  = | { state: 'none', settlementId: string, settlementVersion: string }
+    | { state: 'unavailable' | 'forbidden', settlementId: string, settlementVersion: string, reason: string }
+    | { state: 'resolved', settlementId: string, settlementVersion: string, domain: 'auxiliary', kind: 'other_expense', id: string, version: string, sourceVersion: string, projectId: string, projectVersion: string, projectSourceVersion: string, supplierId: string, supplierVersion: string, supplierSourceVersion: string }
+
+/** Current, same-transaction evidence only; migrated legacy contract IDs are not mappings. */
+async function settlementContractEvidence(tx: TransactionDb, actor: BusinessSession, record: OtherSettlementStored, available: Awaited<ReturnType<typeof identities>>, loadSources: () => Promise<{ facts: Awaited<ReturnType<typeof readAuxiliaryContractScopeFacts>>, source: Awaited<ReturnType<typeof validateProductionAuxiliaryState>>, projects: Awaited<ReturnType<typeof listMigrationReferences>>, suppliers: Awaited<ReturnType<typeof listMigrationReferences>> }>): Promise<SettlementContractEvidence> {
+  const base = { settlementId: record.id, settlementVersion: String(record.version) }
+  const contractId = record.draft.contractId
+  if (!contractId)
+    return { ...base, state: 'none' }
+  if (record.version === 0 || record.migrationBatchId)
+    return { ...base, state: 'unavailable', reason: '历史结算合同尚无明确身份映射' }
+  if (!['auxiliary-contract:read', 'project:list:read', 'supplier:list:read'].every(capability => actor.capabilities.includes(capability)))
+    return { ...base, state: 'forbidden', reason: '缺少合同、项目或分供方来源读取权限' }
+  const [participant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'auxiliary-contract\'')
+  if (participant?.schema_version !== 1)
+    return { ...base, state: 'unavailable', reason: '真实辅助合同来源不可用' }
+  const [history] = await tx.select<{ command_id: string }>('SELECT command_id FROM other_settlement_history WHERE settlement_id=? AND version=?', [record.id, record.version])
+  const [receipt] = history ? await tx.select<{ request_json: string }>('SELECT request_json FROM other_settlement_commands WHERE settlement_id=? AND command_id=?', [record.id, history.command_id]) : []
+  let requested: OtherSettlementStored['draft'] | undefined
+  try {
+    requested = receipt ? JSON.parse(receipt.request_json).draft : undefined
+  }
+  catch {
+    return { ...base, state: 'unavailable', reason: '结算原命令无法核实' }
+  }
+  if (!requested || requested.contractId !== contractId || (requested.projectId ?? null) !== (record.draft.projectId ?? null) || (requested.supplierId && requested.supplierId !== record.draft.supplierId))
+    return { ...base, state: 'unavailable', reason: '结算冻结关系与原命令不一致' }
+  let resolvedSources: Awaited<ReturnType<typeof loadSources>>
+  try {
+    resolvedSources = await loadSources()
+  }
+  catch (cause) {
+    const problem = cause && typeof cause === 'object' && 'problem' in cause ? cause.problem : null
+    if (problem && typeof problem === 'object' && 'code' in problem && (problem.code === 'forbidden' || problem.code === 'unavailable'))
+      return { ...base, state: problem.code, reason: '合同、项目或分供方来源不可核实' }
+    throw cause
+  }
+  const { facts, source, projects, suppliers } = resolvedSources
+  const contract = facts.find(row => row.id === contractId && row.eligible && isEffectiveExpenditureContract(row.status))
+  if (!contract || !contract.projectId || !contract.supplierId || contract.projectId !== record.draft.projectId || contract.supplierId !== record.draft.supplierId)
+    return { ...base, state: 'unavailable', reason: '当前合同类型、项目或服务分供方无法核实' }
+  if (!available.projects.some(row => row.id === contract.projectId) || !available.suppliers.some(row => row.id === contract.supplierId))
+    return { ...base, state: 'unavailable', reason: '结算项目或服务分供方已不可用' }
+  const project = projects.find(row => row.serverId === contract.projectId)
+  const supplier = suppliers.find(row => row.serverId === contract.supplierId)
+  if (!project || !supplier)
+    return { ...base, state: 'unavailable', reason: '结算项目或分供方来源版本无法核实' }
+  const owner = source.state.contracts.find(row => row.draft.id === contractId && row.draft.kind === 'other_expense')
+  if (!owner || !Number.isSafeInteger(owner.version) || owner.version < 1 || !Number.isSafeInteger(source.state.sourceVersion) || source.state.sourceVersion < 0)
+    return { ...base, state: 'unavailable', reason: '合同稳定身份或来源版本无法核实' }
+  return { ...base, state: 'resolved', domain: 'auxiliary', kind: 'other_expense', id: contractId, version: String(owner.version), sourceVersion: `auxiliary-contract-${source.state.sourceVersion}`, projectId: contract.projectId, projectVersion: project.version, projectSourceVersion: project.sourceVersion, supplierId: contract.supplierId, supplierVersion: supplier.version, supplierSourceVersion: supplier.sourceVersion }
+}
+
 export async function listProductionOtherSettlementReferences(tx: TransactionDb, actor: BusinessSession) {
   const metadata = (await tx.select<{
     workspace_id: string
@@ -440,10 +497,12 @@ export async function listProductionOtherSettlementReferences(tx: TransactionDb,
   await validateOtherSettlementImportEvidence(tx, actor)
   const data = await loaded(tx, actor)
   const service = instance(data)
-  return data.records.map((record) => {
+  let cachedSources: Promise<{ facts: Awaited<ReturnType<typeof readAuxiliaryContractScopeFacts>>, source: Awaited<ReturnType<typeof validateProductionAuxiliaryState>>, projects: Awaited<ReturnType<typeof listMigrationReferences>>, suppliers: Awaited<ReturnType<typeof listMigrationReferences>> }> | undefined
+  const loadSources = () => cachedSources ??= Promise.all([readAuxiliaryContractScopeFacts(tx, actor), validateProductionAuxiliaryState(tx, actor), listMigrationReferences(tx, actor, 'projects'), listMigrationReferences(tx, actor, 'suppliers')]).then(([facts, source, projects, suppliers]) => ({ facts, source, projects, suppliers }))
+  return Promise.all(data.records.map(async (record) => {
     const dto = service.detail(record.id, { origin: 'real' }, actor).settlement
-    return { id: record.id, name: record.draft.name ?? '', no: record.draft.no ?? '', project_id: record.draft.projectId ?? null, contract_id: record.draft.contractId ?? null, supplier_id: record.draft.payeeSupplierId ?? (record.draft.originalExpenses?.length ? null : record.draft.supplierId ?? null), worker_id: record.draft.payeeWorkerId ?? null, payee_name_snapshot: record.draft.payeeNameSnapshot ?? null, total_amount: dto.amounts.net === null ? null : Number(dto.amounts.net), status: record.draft.status ?? '', original_expense_line_ids: record.draft.originalExpenses?.map(line => line.originalExpenseLineId) ?? [], service_supplier_id: record.draft.supplierId ?? null, deleted_at: data.deletedAtById.get(record.id) ?? null, version: String(record.version), source_revision: `other-settlement-${data.revision}`, unavailable_reason: dto.qualificationUnavailableReason ?? null }
-  })
+    return { id: record.id, name: record.draft.name ?? '', no: record.draft.no ?? '', project_id: record.draft.projectId ?? null, contract_id: record.draft.contractId ?? null, supplier_id: record.draft.payeeSupplierId ?? (record.draft.originalExpenses?.length ? null : record.draft.supplierId ?? null), worker_id: record.draft.payeeWorkerId ?? null, payee_name_snapshot: record.draft.payeeNameSnapshot ?? null, total_amount: dto.amounts.net === null ? null : Number(dto.amounts.net), status: record.draft.status ?? '', original_expense_line_ids: record.draft.originalExpenses?.map(line => line.originalExpenseLineId) ?? [], service_supplier_id: record.draft.supplierId ?? null, deleted_at: data.deletedAtById.get(record.id) ?? null, version: String(record.version), source_revision: `other-settlement-${data.revision}`, unavailable_reason: dto.qualificationUnavailableReason ?? null, contractEvidence: await settlementContractEvidence(tx, actor, record, data.source, loadSources) }
+  }))
 }
 export async function readProductionOtherSettlementReference(tx: TransactionDb, actor: BusinessSession, id: string) {
   const row = (await listProductionOtherSettlementReferences(tx, actor)).find(row => row.id === id) ?? null

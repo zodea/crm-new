@@ -66,7 +66,7 @@ export interface FinanceCommand {
   draft: F3FormDraft
   attachments: FileRefChanges
 }
-export interface FinanceCommandResult { id: string, commandId: string, version: string, updatedAt: string, attachmentIds: string[], logId: string | null, paymentVerificationSha256?: string, clearanceVerificationSha256?: string, clearanceVerificationId?: string, constructionScopeLinks?: ConstructionScopeResult[], expenseLineIdentities?: Array<{ inputIndex: number, id: string }> }
+export interface FinanceCommandResult { id: string, commandId: string, version: string, updatedAt: string, attachmentIds: string[], logId: string | null, paymentVerificationSha256?: string, clearanceVerificationSha256?: string, clearanceVerificationId?: string, invoiceAdoptionsSha256?: string, paymentInvoiceEvidenceSha256?: string, paymentSettlementEvidenceSha256?: string, constructionScopeLinks?: ConstructionScopeResult[], expenseLineIdentities?: Array<{ inputIndex: number, id: string }> }
 export interface FinanceFormData<K extends CentralFinanceKind = CentralFinanceKind> {
   draft: FinanceFormRecordMap[K]
   attachments: Array<FileRefRecord & { sha256: string | null }>
@@ -74,14 +74,14 @@ export interface FinanceFormData<K extends CentralFinanceKind = CentralFinanceKi
   updatedAt: string
 }
 export interface FinanceFormRead<K extends CentralFinanceKind = CentralFinanceKind> extends FinanceFormData<K>, FinanceContext {}
-export type FinanceLookupKind = 'projects' | 'customers' | 'suppliers' | 'workers' | 'contracts' | 'settlements' | 'invoices' | 'original-expenses' | 'payment-applications' | 'construction-mains'
-export interface FinanceLookupQuery { kind: FinanceLookupKind, keyword: string, projectId?: string | null, supplierId?: string | null, workerId?: string | null, contractId?: string | null, excludeId?: string, contractKinds?: string[], paymentBizType?: string }
+export type FinanceLookupKind = 'projects' | 'customers' | 'suppliers' | 'workers' | 'contracts' | 'payment-contracts' | 'settlements' | 'invoices' | 'original-expenses' | 'payment-applications' | 'construction-mains'
+export interface FinanceLookupQuery { kind: FinanceLookupKind, keyword: string, projectId?: string | null, supplierId?: string | null, workerId?: string | null, contractId?: string | null, contractDomain?: string | null, contractVersion?: string | null, excludeId?: string, contractKinds?: string[], paymentBizType?: string }
 export function normalizeFinanceLookup(value: unknown): FinanceLookupQuery {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     financeFailure('validation-failed', '财务候选查询无效。')
   const query = value as Record<string, unknown>
-  if (Object.keys(query).some(key => !['kind', 'keyword', 'projectId', 'supplierId', 'workerId', 'contractId', 'excludeId', 'contractKinds', 'paymentBizType'].includes(key))
-    || !['projects', 'customers', 'suppliers', 'workers', 'contracts', 'settlements', 'invoices', 'original-expenses', 'payment-applications', 'construction-mains'].includes(String(query.kind))
+  if (Object.keys(query).some(key => !['kind', 'keyword', 'projectId', 'supplierId', 'workerId', 'contractId', 'contractDomain', 'contractVersion', 'excludeId', 'contractKinds', 'paymentBizType'].includes(key))
+    || !['projects', 'customers', 'suppliers', 'workers', 'contracts', 'payment-contracts', 'settlements', 'invoices', 'original-expenses', 'payment-applications', 'construction-mains'].includes(String(query.kind))
     || (query.keyword !== undefined && (typeof query.keyword !== 'string' || query.keyword.length > 200))) {
     financeFailure('validation-failed', '财务候选查询包含不支持的范围。')
   }
@@ -99,6 +99,12 @@ export function normalizeFinanceLookup(value: unknown): FinanceLookupQuery {
   }
   if (result.workerId && result.supplierId)
     financeFailure('validation-failed', '财务候选付款对象不能同时为工人与分供方。')
+  if (query.contractDomain != null || query.contractVersion != null) {
+    if (query.kind !== 'settlements' || !result.contractId || !['construction', 'subcontract', 'material', 'auxiliary', 'company'].includes(String(query.contractDomain)) || typeof query.contractVersion !== 'string' || !/^[1-9]\d*$/.test(query.contractVersion))
+      financeFailure('validation-failed', '结算候选合同领域或版本无效。')
+    result.contractDomain = String(query.contractDomain)
+    result.contractVersion = query.contractVersion
+  }
   if (query.excludeId !== undefined) {
     if (typeof query.excludeId !== 'string' || !/^[a-z0-9][\w-]{2,99}$/i.test(query.excludeId))
       financeFailure('validation-failed', '财务候选排除编号无效。')
@@ -111,7 +117,7 @@ export function normalizeFinanceLookup(value: unknown): FinanceLookupQuery {
     result.contractKinds = [...kinds].sort() as string[]
   }
   if (query.paymentBizType !== undefined) {
-    if (query.kind !== 'contracts' || typeof query.paymentBizType !== 'string' || !PAYMENT_BIZ_TYPES.includes(query.paymentBizType as typeof PAYMENT_BIZ_TYPES[number]))
+    if (!['contracts', 'payment-contracts'].includes(String(query.kind)) || typeof query.paymentBizType !== 'string' || !PAYMENT_BIZ_TYPES.includes(query.paymentBizType as typeof PAYMENT_BIZ_TYPES[number]))
       financeFailure('validation-failed', '付款合同候选的业务类型无效。')
     result.paymentBizType = query.paymentBizType
   }

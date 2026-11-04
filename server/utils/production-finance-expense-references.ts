@@ -11,7 +11,7 @@ async function authorize(tx: TransactionDb, actor: BusinessSession) {
     financeFailure('forbidden', '当前身份无权读取原费用。')
   const metadata = (await tx.select<{ workspace_id: string, owner_id: string }>('SELECT workspace_id,owner_id FROM production_metadata WHERE singleton=1'))[0]
   const participant = (await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'finance\''))[0]
-  if (!metadata || metadata.workspace_id !== actor.workspaceId || metadata.owner_id !== actor.actorId || participant?.schema_version !== 1)
+  if (!metadata || metadata.workspace_id !== actor.workspaceId || metadata.owner_id !== actor.actorId || ![1, 2].includes(participant?.schema_version ?? 0))
     financeFailure('unavailable', '原费用正式来源不属于当前工作区或尚未接通。')
 }
 export async function readOriginalExpenseReference(tx: TransactionDb, actor: BusinessSession, id: string) {

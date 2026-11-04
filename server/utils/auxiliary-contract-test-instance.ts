@@ -74,7 +74,7 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
       draft: structuredClone(d),
       version: String(stored.version),
       project: d.kind === 'company_expense' ? null : ref('project', d.projectId, projects),
-      supplier: d.kind === 'company_expense' ? null : ref('supplier', d.supplierId, suppliers),
+      supplier: d.kind === 'company_expense' && !d.supplierId ? null : ref('supplier', d.supplierId, suppliers),
       navigation: { kind: 'entity-detail', subject: { state: 'resolved', entity: 'contract', id: d.id, label: d.name || '未命名合同', no: d.no || null }, variant: d.kind, view: null, filters: { dataOrigin: 'real', contractKind: d.kind } },
       amounts: { contract: amount, changed: sumAuxiliaryMoney([amount, sumAuxiliaryFacts(related, 'supplement')]), taxExclusive: exclusive, tax: subtractAuxiliaryMoney(amount, exclusive), invoiced, paid, settled, byInvoicePayable: subtractAuxiliaryMoney(invoiced, paid), bySettlementPayable: subtractAuxiliaryMoney(settled, paid) },
       settlementStatus: stored.settlementStatus,

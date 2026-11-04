@@ -10,7 +10,7 @@ import { isPaginationDTO, parsePageQuery } from '../read-model/pagination'
 import { problemFromHttpFailure } from '../read-model/problem'
 import { AuxiliaryContractProblem, auxiliaryProblem } from './contract'
 
-export interface AuxiliaryContractContext { workspaceId: string, actorId: string, capabilities: readonly string[], projects: Array<{ id: string, label: string }>, suppliers: Array<{ id: string, label: string }>, constructionMains?: ConstructionMainOption[], ourSignatories?: OurSignatoryRecord[] }
+export interface AuxiliaryContractContext { workspaceId: string, actorId: string, capabilities: readonly string[], projects: Array<{ id: string, label: string }>, suppliers: Array<{ id: string, label: string, version?: string }>, constructionMains?: ConstructionMainOption[], ourSignatories?: OurSignatoryRecord[] }
 export interface AuxiliaryContractResult { id: string, commandId: string, version: string, updatedAt: string, attachmentIds: string[] }
 export type AuxiliaryFetcher = (url: string, options?: { method?: 'POST', body?: unknown, query?: Record<string, unknown> }) => Promise<unknown>
 export interface AuxiliaryContractFormRead { draft: AuxiliaryContractCommand['draft'] & { id: string }, version: string, updatedAt: string, attachments: AuxiliaryContractDetail['attachments'], constructionMain: AuxiliaryContractDetail['constructionMain'] }
@@ -42,7 +42,7 @@ function validateContract(value: unknown) {
   const audit = value.audit
   if (!['createdBy', 'updatedBy', 'createdAt', 'updatedAt', 'responsible', 'department'].every(key => audit[key] === null || typeof audit[key] === 'string'))
     invalid()
-  if (value.kind === 'company_expense' ? value.project !== null || value.supplier !== null : !object(value.project) || !object(value.supplier))
+  if (value.kind === 'company_expense' ? value.project !== null || !(value.supplier === null || object(value.supplier)) : !object(value.project) || !object(value.supplier))
     invalid()
   for (const key of ['project', 'supplier'] as const) {
     const ref = value[key]
@@ -113,7 +113,8 @@ export function createAuxiliaryContractRepository(fetcher: AuxiliaryFetcher) {
     }),
     context: () => read('/api/read/auxiliary-contracts/context', undefined, (value) => {
       if (!object(value) || typeof value.workspaceId !== 'string' || typeof value.actorId !== 'string' || !Array.isArray(value.capabilities) || !Array.isArray(value.projects) || !Array.isArray(value.suppliers)
-        || ![...value.projects, ...value.suppliers].every(row => object(row) && typeof row.id === 'string' && typeof row.label === 'string')) {
+        || ![...value.projects, ...value.suppliers].every(row => object(row) && typeof row.id === 'string' && typeof row.label === 'string')
+        || !value.suppliers.every(row => object(row) && (row.version === undefined || (typeof row.version === 'string' && /^[1-9]\d*$/.test(row.version) && Number.isSafeInteger(Number(row.version)))))) {
         return invalid()
       }
       return value as unknown as AuxiliaryContractContext

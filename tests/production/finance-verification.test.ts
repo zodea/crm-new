@@ -1,22 +1,29 @@
+import type { SQLInputValue } from 'node:sqlite'
 import type { FinanceCommand } from '../../app/lib/finance/central-contract'
 import type { PaymentVerificationEdit } from '../../app/lib/finance/payment-verification'
+import type { ProductionStorage } from '../../server/utils/production-storage'
+import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { copyFile, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, expect, it } from 'vitest'
+import { createDbCoordinator } from '../../app/lib/db/coordinator'
 import { FINANCE_FAMILIES, financeFailure } from '../../app/lib/finance/central-contract'
 import { createFinanceCommandActions } from '../../app/lib/finance/command-session'
 import { createFinanceRepository } from '../../app/lib/finance/http-repository'
 import { inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { copyBackupPackage, createLocalBackup, readBackupPackage, restoreBackupIsolated } from '../../server/utils/production-backup-package'
+import { validateFinanceJournal } from '../../server/utils/production-finance-journal'
 import { financeCommandFingerprint } from '../../server/utils/production-finance-request'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { PRODUCTION_FINANCE_VERIFICATION_SCHEMA } from '../../server/utils/production-finance-verification-schema'
 import { createProductionOtherSettlementMigration } from '../../server/utils/production-other-settlement-migration'
 import { listProductionOtherSettlementReferences, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
-import { productionStorageManifest } from '../../server/utils/production-storage-schema'
+import { PRODUCTION_STORAGE_UPGRADES, productionStorageManifest } from '../../server/utils/production-storage-schema'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { createOtherSettlementPay08Source } from '../helpers/other-settlement-pay08-source'
 import { createSeededProductionStorage } from '../helpers/production-storage-seed'
@@ -31,14 +38,35 @@ function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
   const historical = productionStorageManifest(version)
   const historicalTables = new Set([...historical.coreTables, ...Object.values(historical.participants).flatMap(participant => participant.tables)])
   const added = [...new Set(Object.values(current.participants).flatMap(participant => participant.tables))].filter(table => !historicalTables.has(table))
-  const untouchedRevisionTables = new Set(['payroll_revision', 'construction_contract_revision', 'construction_scope_revision', 'subcontract_contract_revision', 'auxiliary_contract_revision', 'boq_revision'])
+  const untouchedRevisionTables = new Set(['payroll_revision', 'construction_contract_revision', 'construction_scope_revision', 'subcontract_contract_revision', 'auxiliary_contract_revision', 'boq_revision', 'invoice_revision', 'invoice_correction_revision'])
   for (const table of added) {
     const rows = db.prepare(`SELECT * FROM ${table}`).all()
-    expect(rows).toEqual(untouchedRevisionTables.has(table) ? [{ singleton: 1, revision: 0 }] : [])
+    expect(rows).toEqual(table === 'finance_contract_upgrade_anchor'
+      ? [{ singleton: 1, legacy_history_count: 0 }]
+      : untouchedRevisionTables.has(table) ? [{ singleton: 1, revision: 0 }] : [])
   }
   db.exec('PRAGMA foreign_keys=OFF; BEGIN')
   try {
+    // Construct pre-v31 synthetic frozen snapshots before taking the historical baseline; only remove fields that did not exist then.
+    const historyGuard = String(db.prepare('SELECT sql FROM sqlite_schema WHERE type=\'trigger\' AND name=\'finance_history_no_update\'').get()!.sql)
+    const paymentHistories = db.prepare('SELECT id,version,snapshot_json FROM finance_history WHERE kind=\'payment_application\'').all()
+    db.exec('DROP TRIGGER finance_history_no_update')
+    for (const row of paymentHistories) {
+      const snapshot = JSON.parse(String(row.snapshot_json))
+      expect(snapshot.head.contract_domain).toBeNull()
+      expect(snapshot.head.contract_version).toBeNull()
+      delete snapshot.head.contract_domain
+      delete snapshot.head.contract_version
+      db.prepare('UPDATE finance_history SET snapshot_json=? WHERE kind=\'payment_application\' AND id=? AND version=?').run(JSON.stringify(snapshot), row.id!, row.version!)
+    }
+    db.exec(historyGuard)
+    // v32 installs attachment guards on the older shared tables; remove only those synthetic later-version guards before dropping their empty owner tables.
+    for (const trigger of ['invoice_correction_file_metadata', 'invoice_correction_file_no_delete', 'invoice_correction_payload_no_update', 'invoice_correction_payload_no_delete'])
+      db.exec(`DROP TRIGGER ${trigger}`)
     for (const table of added.reverse()) db.exec(`DROP TABLE ${table}`)
+    expect(db.prepare('SELECT id FROM payment_applications WHERE contract_domain IS NOT NULL OR contract_version IS NOT NULL').all()).toEqual([])
+    db.exec('ALTER TABLE payment_applications DROP COLUMN contract_version')
+    db.exec('ALTER TABLE payment_applications DROP COLUMN contract_domain')
     for (const table of ['crews', 'workers']) {
       const columns = db.prepare(`PRAGMA table_xinfo(${table})`).all().filter(column => Number(column.hidden) === 2)
       for (const column of columns) {
@@ -50,6 +78,10 @@ function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
     db.exec('ALTER TABLE projects DROP COLUMN matrix_archived_at')
     for (const domain of Object.keys(current.participants).filter(domain => !historical.participants[domain]))
       db.prepare('DELETE FROM production_participants WHERE domain=?').run(domain)
+    for (const [domain, participant] of Object.entries(historical.participants)) {
+      expect(db.prepare('SELECT schema_version FROM production_participants WHERE domain=?').get(domain)).toEqual({ schema_version: current.participants[domain]!.schemaVersion })
+      db.prepare('UPDATE production_participants SET schema_version=? WHERE domain=?').run(participant.schemaVersion, domain)
+    }
     db.prepare('UPDATE production_metadata SET schema_version=? WHERE singleton=1').run(version)
     db.exec('COMMIT; PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE')
   }
@@ -116,11 +148,15 @@ it('实际v12旧17表备份可只读核验、离线复制及隔离恢复，不�
     await f.storage.backupTo(path)
     // This isolated synthetic snapshot models the exact previous schema; no business row or old receipt is changed.
     const raw = new DatabaseSync(path)
+    let frozenHistory: unknown[] = []
+    let frozenCommands: unknown[] = []
     try {
       expect(raw.prepare('SELECT COUNT(*) AS n FROM finance_expense_clearance_verifications').get()).toEqual({ n: 0 })
       expect(raw.prepare('SELECT COUNT(*) AS n FROM expenditure_settlement_clearance_links').get()).toEqual({ n: 0 })
       expect(raw.prepare('SELECT COUNT(*) AS n FROM finance_payment_verifications').get()).toEqual({ n: 0 })
       historicalFixtureSchema(raw, 12)
+      frozenHistory = raw.prepare('SELECT kind,id,version,command_id,actor_id,occurred_at,snapshot_json FROM finance_history ORDER BY kind,id,version').all()
+      frozenCommands = raw.prepare('SELECT * FROM finance_commands ORDER BY command_id').all()
     }
     finally { raw.close() }
     const before = await readFile(path)
@@ -138,6 +174,10 @@ it('实际v12旧17表备份可只读核验、离线复制及隔离恢复，不�
     expect(recovered.inventory).toEqual(inventory)
     const recoveredStorage = createProductionStorage({ ...f.options, directory: recovered.directory })
     try {
+      await recoveredStorage.status()
+      expect(await recoveredStorage.select('SELECT kind,id,version,command_id,actor_id,occurred_at,snapshot_json FROM finance_history ORDER BY kind,id,version')).toEqual(frozenHistory)
+      expect(await recoveredStorage.select('SELECT * FROM finance_commands ORDER BY command_id')).toEqual(frozenCommands)
+      await expect(validateFinanceJournal(recoveredStorage, f.actor)).resolves.toBeDefined()
       const service = f.financeService(recoveredStorage)
       expect((await service.form('payment_application', f.native.ids.application, f.session)).draft).toMatchObject({ approvedAmount: 0, approvedAmountOrigin: 'legacy', paidAmount: 20, paymentVerification: { required: true, status: 'missing', proof: null } })
       expect(await recoveredStorage.select('SELECT * FROM finance_payment_verifications')).toEqual([])
@@ -155,9 +195,86 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
   const f = await fixture()
   try {
     const request = await f.verify('pay08-backup-verification')
-    const result = await f.finance.execute(request, f.session)
-    const actualRead = await f.finance.form('payment_application', f.native.ids.application, f.session)
+    const staging = join(f.directory, 'proof-staging')
+    const offline = join(f.directory, 'proof-offline')
+    const restore = join(f.directory, 'proof-restore')
+    for (const path of [staging, offline, restore]) await mkdir(path)
+    const backup = await createLocalBackup(f.storage, staging, `backup-${randomUUID()}`, () => '2026-10-05T01:00:00.000Z')
+    // Build a v13 synthetic clone before issuing its verification, so its proof is generated against the genuine old physical columns.
+    const historicalPath = join(staging, backup.id, 'data.sqlite')
+    const historical = new DatabaseSync(historicalPath)
+    try {
+      expect(historical.prepare('SELECT COUNT(*) AS n FROM finance_expense_clearance_verifications').get()).toEqual({ n: 0 })
+      expect(historical.prepare('SELECT COUNT(*) AS n FROM expenditure_settlement_clearance_links').get()).toEqual({ n: 0 })
+      expect(historical.prepare('SELECT COUNT(*) AS n FROM finance_payment_verifications').get()).toEqual({ n: 0 })
+      historicalFixtureSchema(historical, 13)
+    }
+    finally { historical.close() }
+    const oldDb = new DatabaseSync(historicalPath, { enableForeignKeyConstraints: true })
+    const coordinator = createDbCoordinator(async () => ({
+      async execute(sql, params) {
+        if (params)
+          oldDb.prepare(sql).run(...params as SQLInputValue[])
+        else oldDb.exec(sql)
+      },
+      async select<T>(sql: string, params: unknown[] = []) { return oldDb.prepare(sql).all(...params as SQLInputValue[]) as T[] },
+      async close() { oldDb.close() },
+    }))
+    const oldStorage = { ...coordinator, identity: { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId }, assertBusinessWrite() {} } as ProductionStorage
+    const { result, actualRead, frozenHistory, frozenCommands, frozenProof } = await (async () => {
+      try {
+        const oldFinance = f.financeService(oldStorage)
+        const result = await oldFinance.execute(request, f.session)
+        const actualRead = await oldFinance.form('payment_application', f.native.ids.application, f.session)
+        await validateFinanceJournal(oldStorage, f.actor)
+        const frozenHistory = await oldStorage.select('SELECT * FROM finance_history ORDER BY kind,id,version')
+        const frozenCommands = await oldStorage.select('SELECT * FROM finance_commands ORDER BY command_id')
+        const frozenProof = await oldStorage.select('SELECT * FROM finance_payment_verifications ORDER BY id')
+        return { result, actualRead, frozenHistory, frozenCommands, frozenProof }
+      }
+      finally { await oldStorage.close() }
+    })()
     const before = actualRead.draft.paymentVerification!
+    const v30Directory = join(f.directory, 'v30-synthetic-copy')
+    await mkdir(v30Directory)
+    const v30Path = join(v30Directory, 'ruihang.sqlite')
+    await copyFile(historicalPath, v30Path, constants.COPYFILE_EXCL)
+    const v30 = new DatabaseSync(v30Path, { enableForeignKeyConstraints: true })
+    try {
+      v30.exec('BEGIN')
+      try {
+        for (const step of PRODUCTION_STORAGE_UPGRADES.filter(step => step.from >= 13 && step.to <= 30)) {
+          v30.exec(step.sql)
+          v30.prepare('UPDATE production_metadata SET schema_version=? WHERE singleton=1').run(step.to)
+        }
+        v30.exec('COMMIT')
+      }
+      catch (error) {
+        v30.exec('ROLLBACK')
+        throw error
+      }
+    }
+    finally { v30.close() }
+    expect((await inspectProductionBackup(v30Path)).schemaVersion).toBe(30)
+    const upgradedV30 = createProductionStorage({ ...f.options, directory: v30Directory })
+    try {
+      const upgradedService = f.financeService(upgradedV30)
+      expect(await upgradedService.execute(request, f.session)).toEqual(result)
+      await expect(upgradedService.execute({ ...request, draft: { id: f.native.ids.application, verificationEdit: { ...f.edit, basis: '同编号不同依据' } } }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+      expect(await upgradedV30.select('SELECT * FROM finance_history ORDER BY kind,id,version')).toEqual(frozenHistory)
+      expect(await upgradedV30.select('SELECT * FROM finance_commands ORDER BY command_id')).toEqual(frozenCommands)
+      expect(await upgradedV30.select('SELECT * FROM finance_payment_verifications ORDER BY id')).toEqual(frozenProof)
+      await expect(validateFinanceJournal(upgradedV30, f.actor)).resolves.toBeDefined()
+      const current = await upgradedService.form('payment_application', f.native.ids.application, f.session)
+      await upgradedService.execute({ ...request, commandId: 'v30-later-verification', baseVersion: current.version, draft: { id: f.native.ids.application, verificationEdit: { ...f.edit, basis: '升级后重新核验' } } }, f.session)
+      const afterHistory = await upgradedV30.select<{ kind: string, id: string, version: number, snapshot_json: string }>('SELECT * FROM finance_history ORDER BY kind,id,version')
+      for (const old of frozenHistory as { kind: string, id: string, version: number }[])
+        expect(afterHistory.find(row => row.kind === old.kind && row.id === old.id && row.version === old.version)).toEqual(old)
+      const latest = afterHistory.filter(row => row.kind === 'payment_application' && row.id === f.native.ids.application).at(-1)!
+      expect(JSON.parse(latest.snapshot_json).head).toMatchObject({ contract_domain: null, contract_version: null })
+      await expect(validateFinanceJournal(upgradedV30, f.actor)).resolves.toBeDefined()
+    }
+    finally { await upgradedV30.close() }
     expect((await createFinanceRepository(async () => actualRead).form('payment_application', f.native.ids.application)).draft.paymentVerification).toEqual(before)
     const invalidActor = structuredClone(actualRead)
     invalidActor.draft.paymentVerification!.proof!.actorId = 'another-pay08-owner'
@@ -171,21 +288,6 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
       await expect(createFinanceRepository(async () => invalid).form('payment_application', f.native.ids.application)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
     for (const sha of [null, 0, 'unknown', 'A'.repeat(64)])
       await expect(createFinanceRepository(async () => ({ ...result, paymentVerificationSha256: sha })).execute(request)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
-    const staging = join(f.directory, 'proof-staging')
-    const offline = join(f.directory, 'proof-offline')
-    const restore = join(f.directory, 'proof-restore')
-    for (const path of [staging, offline, restore]) await mkdir(path)
-    const backup = await createLocalBackup(f.storage, staging, `backup-${randomUUID()}`, () => '2026-10-05T01:00:00.000Z')
-    // Only this synthetic backup clone models actual v13; preserve its existing PAY08 proof and every business/original row.
-    const historicalPath = join(staging, backup.id, 'data.sqlite')
-    const historical = new DatabaseSync(historicalPath)
-    try {
-      expect(historical.prepare('SELECT COUNT(*) AS n FROM finance_expense_clearance_verifications').get()).toEqual({ n: 0 })
-      expect(historical.prepare('SELECT COUNT(*) AS n FROM expenditure_settlement_clearance_links').get()).toEqual({ n: 0 })
-      expect(historical.prepare('SELECT COUNT(*) AS n FROM finance_payment_verifications').get()).toEqual({ n: 1 })
-      historicalFixtureSchema(historical, 13)
-    }
-    finally { historical.close() }
     backup.inventory = await inspectProductionBackup(historicalPath)
     await writeFile(join(staging, backup.id, 'manifest.json'), JSON.stringify(backup))
     expect(backup.inventory.schemaVersion).toBe(13)
@@ -199,8 +301,21 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
     try {
       const service = f.financeService(recovered)
       expect(await service.execute(request, f.session)).toEqual(result)
+      expect(await recovered.select('SELECT * FROM finance_history ORDER BY kind,id,version')).toEqual(frozenHistory)
+      expect(await recovered.select('SELECT * FROM finance_commands ORDER BY command_id')).toEqual(frozenCommands)
+      expect(await recovered.select('SELECT * FROM finance_payment_verifications ORDER BY id')).toEqual(frozenProof)
       expect((await service.form('payment_application', f.native.ids.application, f.session)).draft.paymentVerification).toEqual(before)
       expect(before.proof).toMatchObject({ actorId: f.actor.actorId, workspaceId: f.actor.workspaceId, actualDueAmount: 70, cumulativePayableAmount: 70, basis: f.edit.basis, fileIds: [f.native.ids.applicationFile] })
+      const corruptDirectory = join(f.directory, 'non-null-synthetic-copy')
+      await mkdir(corruptDirectory)
+      await recovered.backupTo(join(corruptDirectory, 'ruihang.sqlite'))
+      const corrupt = createProductionStorage({ ...f.options, directory: corruptDirectory })
+      try {
+        await corrupt.execute('UPDATE payment_applications SET contract_id=?,contract_domain=?,contract_version=? WHERE id=?', ['synthetic-id', 'material', '1', f.native.ids.application])
+        await expect(validateFinanceJournal(corrupt, f.actor)).rejects.toThrow()
+        expect((await f.financeService(corrupt).form('payment_application', f.native.ids.application, f.session)).draft.paymentVerification).toMatchObject({ status: 'stale', proof: null })
+      }
+      finally { await corrupt.close() }
       const paid = await service.execute(f.payment('pay08-restored-payment'), f.session)
       await recovered.close()
       expect(await service.execute(f.payment('pay08-restored-payment'), f.session)).toEqual(paid)
@@ -210,6 +325,9 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
       expect((await service.original('payment_application', f.native.ids.application, f.native.ids.applicationFile, f.session)).bytes).toEqual(new Uint8Array([0, 10, 128, 255]))
     }
     finally { await recovered.close() }
+    const script = `const {registerHooks}=require('node:module'),{pathToFileURL}=require('node:url'),path=require('node:path');registerHooks({resolve(s,c,n){if(s.startsWith('~/'))s=pathToFileURL(path.resolve('app',s.slice(2))).href;try{return n(s,c)}catch(e){if((s.startsWith('.')||s.startsWith('file:'))&&e.code==='ERR_MODULE_NOT_FOUND')return n(s+'.ts',c);throw e}}});(async()=>{const {createProductionStorage}=await import('./server/utils/production-storage.ts');const {validateFinanceJournal}=await import('./server/utils/production-finance-journal.ts');const [directory,actorJson]=process.argv.slice(1);const actor=JSON.parse(actorJson);const storage=createProductionStorage({directory,workspaceId:actor.workspaceId,ownerId:actor.actorId,purpose:'verification'});await validateFinanceJournal(storage,actor);const proof=await storage.select('SELECT * FROM finance_payment_verifications ORDER BY id');process.stdout.write(JSON.stringify(proof));await storage.close()})().catch(e=>{process.stderr.write(String(e));process.exitCode=1})`
+    const coldProof = JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '-e', script, restored.directory, JSON.stringify(f.actor)], { cwd: process.cwd(), encoding: 'utf8' }))
+    expect(coldProof).toEqual(frozenProof)
   }
   finally { await f.storage.close() }
 })

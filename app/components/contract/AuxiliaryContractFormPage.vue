@@ -2,7 +2,7 @@
 import type { AuxiliaryContractKind } from '~/lib/auxiliary-contract/contract'
 
 const props = defineProps<{ kind: AuxiliaryContractKind }>()
-const { draft, title, files, errors, loading, loadError, saveError, loadingAction, closeAfterSave, dirty, initialize, save, leave, patch, pending, pendingCommandId, recover, constructionMain, selectMain, fetchMains, fetchSignatories, selectSignatory, fetchProjects, fetchSuppliers } = useAuxiliaryContractForm(() => props.kind)
+const { draft, title, files, errors, loading, loadError, saveError, loadingAction, closeAfterSave, dirty, initialize, save, leave, patch, pending, pendingCommandId, recover, constructionMain, selectMain, fetchMains, fetchSignatories, selectSignatory, selectSupplier, fetchProjects, fetchSuppliers } = useAuxiliaryContractForm(() => props.kind)
 const { attachments, pendingAttachments, pendingRemoveIds, pendingRestoreIds, handleFiles, toggleExisting, removePending, patchPending } = files
 const actions = computed(() => draft.value.status && draft.value.status !== '草稿' ? ['cancel', 'save'] as const : ['cancel', 'draft', 'saveNew', 'saveSubmit', 'save'] as const)
 </script>
@@ -20,7 +20,7 @@ const actions = computed(() => draft.value.status && draft.value.status !== '草
         </KitButton>
       </div>
       <fieldset :disabled="pending || Boolean(loadingAction)" class="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
-        <AuxiliaryContractFormFields :draft="draft" :errors="errors" :fetch-projects="fetchProjects" :fetch-suppliers="fetchSuppliers" :construction-main="constructionMain" :fetch-mains="fetchMains" :fetch-signatories="fetchSignatories" @patch="patch" @select-main="selectMain" @select-signatory="selectSignatory" />
+        <AuxiliaryContractFormFields :draft="draft" :errors="errors" :fetch-projects="fetchProjects" :fetch-suppliers="fetchSuppliers" :construction-main="constructionMain" :fetch-mains="fetchMains" :fetch-signatories="fetchSignatories" @patch="patch" @select-main="selectMain" @select-signatory="selectSignatory" @select-supplier="selectSupplier" />
         <ContractAttachmentSection :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :note="draft.note ?? ''" @files="handleFiles" @toggle-existing="toggleExisting" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patch({ note: $event })" />
       </fieldset>
       <FormFooter v-model="closeAfterSave" :actions="[...actions]" :dirty="dirty" close-after-save :loading-action="loadingAction" :write-disabled="pending || files.readingFiles.value" @action="save" />

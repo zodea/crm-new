@@ -6,8 +6,12 @@ import { PRODUCTION_CONSTRUCTION_CONTRACT_SCHEMA, PRODUCTION_CONSTRUCTION_CONTRA
 import { PRODUCTION_CONSTRUCTION_SCOPE_CONTRACT_UPGRADE, PRODUCTION_CONSTRUCTION_SCOPE_SCHEMA, PRODUCTION_CONSTRUCTION_SCOPE_TABLES } from './production-construction-scope-schema'
 import { PRODUCTION_CREW_WORKER_SCHEMA, PRODUCTION_CREW_WORKER_TABLES } from './production-crew-worker-schema'
 import { PRODUCTION_FINANCE_CLEARANCE_SCHEMA, PRODUCTION_FINANCE_CLEARANCE_TABLES, PRODUCTION_OTHER_CLEARANCE_SCHEMA, PRODUCTION_OTHER_CLEARANCE_TABLES } from './production-finance-clearance-schema'
+import { PRODUCTION_FINANCE_CONTRACT_TABLES, PRODUCTION_FINANCE_CONTRACT_UPGRADE } from './production-finance-contract-upgrade'
 import { PRODUCTION_FINANCE_SCHEMA, PRODUCTION_FINANCE_TABLES } from './production-finance-schema'
 import { PRODUCTION_FINANCE_VERIFICATION_SCHEMA, PRODUCTION_FINANCE_VERIFICATION_TABLES } from './production-finance-verification-schema'
+import { PRODUCTION_INVOICE_COMPANY_UPGRADE } from './production-invoice-company-upgrade'
+import { PRODUCTION_INVOICE_CORRECTION_SCHEMA, PRODUCTION_INVOICE_CORRECTION_TABLES } from './production-invoice-correction-schema'
+import { PRODUCTION_INVOICE_SCHEMA, PRODUCTION_INVOICE_TABLES } from './production-invoice-schema'
 import { PRODUCTION_MASTER_READ_SCHEMA } from './production-master-read-schema'
 import { PRODUCTION_MATERIAL_CONTRACT_SCHEMA, PRODUCTION_MATERIAL_CONTRACT_TABLES } from './production-material-contract-schema'
 import { PRODUCTION_MATERIAL_QUOTATION_SCHEMA, PRODUCTION_MATERIAL_QUOTATION_TABLES } from './production-material-quotation-schema'
@@ -23,7 +27,7 @@ import { PRODUCTION_SUPPLIER_SCHEMA, PRODUCTION_SUPPLIER_TABLES } from './produc
 import { PRODUCTION_TARGET_COST_SCHEMA, PRODUCTION_TARGET_COST_TABLES } from './production-target-cost-schema'
 import { PRODUCTION_WBS_SCHEMA, PRODUCTION_WBS_TABLES } from './production-wbs-schema'
 
-export const PRODUCTION_STORAGE_VERSION = 28
+export const PRODUCTION_STORAGE_VERSION = 32
 /** Append a new numbered upgrade when a domain lands; never rewrite an applied step. */
 export const PRODUCTION_STORAGE_UPGRADES = [
   { from: 1, to: 2, sql: PRODUCTION_PROCESS_LIBRARY_SCHEMA, participants: { 'process-library': { schemaVersion: 1, tables: PRODUCTION_PROCESS_LIBRARY_TABLES } } },
@@ -76,6 +80,10 @@ export const PRODUCTION_STORAGE_UPGRADES = [
   { from: 25, to: 26, sql: PRODUCTION_SUBCONTRACT_CONTRACT_SCHEMA, participants: { 'subcontract-contracts': { schemaVersion: 1, tables: PRODUCTION_SUBCONTRACT_CONTRACT_TABLES } } },
   { from: 26, to: 27, sql: PRODUCTION_CONSTRUCTION_SCOPE_CONTRACT_UPGRADE, participants: { 'construction-scope': { schemaVersion: 2, tables: PRODUCTION_CONSTRUCTION_SCOPE_TABLES } } },
   { from: 27, to: 28, sql: PRODUCTION_AUXILIARY_CONTRACT_SCHEMA, participants: { 'auxiliary-contract': { schemaVersion: 1, tables: PRODUCTION_AUXILIARY_CONTRACT_TABLES } } },
+  { from: 28, to: 29, sql: PRODUCTION_INVOICE_SCHEMA, participants: { invoices: { schemaVersion: 1, tables: PRODUCTION_INVOICE_TABLES } } },
+  { from: 29, to: 30, sql: PRODUCTION_INVOICE_COMPANY_UPGRADE, participants: { invoices: { schemaVersion: 2, tables: PRODUCTION_INVOICE_TABLES } } },
+  { from: 30, to: 31, sql: PRODUCTION_FINANCE_CONTRACT_UPGRADE, participants: { finance: { schemaVersion: 2, tables: [...PRODUCTION_FINANCE_TABLES, ...PRODUCTION_FINANCE_VERIFICATION_TABLES, ...PRODUCTION_FINANCE_CLEARANCE_TABLES, ...PRODUCTION_FINANCE_CONTRACT_TABLES] } } },
+  { from: 31, to: 32, sql: `${PRODUCTION_INVOICE_CORRECTION_SCHEMA}\nUPDATE production_participants SET schema_version=3 WHERE domain='invoices' AND schema_version=2;`, participants: { invoices: { schemaVersion: 3, tables: [...PRODUCTION_INVOICE_TABLES, ...PRODUCTION_INVOICE_CORRECTION_TABLES] } } },
 ] as const
 
 export function productionStorageManifest(version = PRODUCTION_STORAGE_VERSION) {

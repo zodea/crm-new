@@ -10,6 +10,17 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/finance/payment-contract.test.ts](../../../tests/finance/payment-contract.test.ts) | 单元／服务／状态 | 付款合同领域、身份与版本 |
+| [tests/production/finance-application-actions.test.ts](../../../tests/production/finance-application-actions.test.ts) | 隔离 SQLite／服务 | 付款申请新增、编辑、重复删除和原回执 |
+| [tests/production/finance-contract-upgrade.test.ts](../../../tests/production/finance-contract-upgrade.test.ts) | 隔离 SQLite／升级 | 旧合同身份未知、历史冻结与升级回滚 |
+| [tests/production/finance-invoice-adoption.test.ts](../../../tests/production/finance-invoice-adoption.test.ts) | 隔离 SQLite／真实来源 | 发票采用版本冻结与合同变更后的历史 |
+| [tests/production/finance-invoice-source-version.test.ts](../../../tests/production/finance-invoice-source-version.test.ts) | 隔离 SQLite／服务 | 发票参与者版本与付款来源核验 |
+| [tests/production/finance-migration-application-actions.test.ts](../../../tests/production/finance-migration-application-actions.test.ts) | 合成旧库／隔离服务 | 旧申请编辑、重复删除与迁入事实保全 |
+| [tests/production/payment-contract-domains.test.ts](../../../tests/production/payment-contract-domains.test.ts) | 隔离 SQLite／真实来源 | 分包、其他支出和公司合同的票款链 |
+| [tests/production/payment-invoice-confirmation.test.ts](../../../tests/production/payment-invoice-confirmation.test.ts) | 隔离 SQLite／真实来源 | 付款确认的发票核对、冻结及原编号 |
+| [tests/production/payment-invoice-evidence.test.ts](../../../tests/production/payment-invoice-evidence.test.ts) | 单元／服务 | 合同、权限、来源及发票归属拒绝 |
+| [tests/production/payment-settlement-evidence.test.ts](../../../tests/production/payment-settlement-evidence.test.ts) | 隔离 SQLite／真实来源 | 结算合同、来源版本与付款冻结 |
+| [tests/helpers/finance-evidence-corruption.ts](../../../tests/helpers/finance-evidence-corruption.ts) | 辅助／夹具 | 供隔离财务证据验证使用的合成历史 |
 | [tests/db/f3-finance-migrations.test.ts](../../../tests/db/f3-finance-migrations.test.ts) | 单元／服务／状态 | v22 F3 资金表单与票款分摊迁移 |
 | [tests/db/finance-seed.test.ts](../../../tests/db/finance-seed.test.ts) | 单元／服务／状态 | 演示与合成付款分摊通过业务汇总读取，已确认、待核和不同申请分别核对 |
 | [tests/db/payment-approval-migration.test.ts](../../../tests/db/payment-approval-migration.test.ts) | 单元／服务／状态 | 付款批复金额来源迁移 |
@@ -60,6 +71,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/browser/FinancePaymentContractSelection.test.ts](../../../tests/browser/FinancePaymentContractSelection.test.ts) | 真实组件／模拟来源 | 同号跨域合同、键盘及收款方变化 |
+| [tests/browser/FinancePaymentContractRefresh.test.ts](../../../tests/browser/FinancePaymentContractRefresh.test.ts) | 真实组件／模拟来源 | 同一合同版本刷新、分摊保留及失权后的旧候选撤下 |
 | [tests/browser/FinanceOriginalRecovery.test.ts](../../../tests/browser/FinanceOriginalRecovery.test.ts) | 实际 Vue 页面与浏览器文件操作 | 五档布局、下载原字节、已保存后读回失败不重放与焦点恢复；隔离 Repository 不证明生产接管 |
 | [tests/browser/components/FinanceMigration.browser.test.ts](../../../tests/browser/components/FinanceMigration.browser.test.ts) | 实际迁入 Vue 页面与 Chromium | 真实 Native SQLite 文件、显式关系与原件补齐、原编号未知及只读恢复、失权迟到隔离、五档布局与键盘；生产迁入持久化另由实际磁盘测试验证 |
 | [tests/browser/FinancePartySelection.test.ts](../../../tests/browser/FinancePartySelection.test.ts) | 实际 Vue 字段、LookupSelect 与 Vxe 表格 | 工人／分供方明示选择、原费用引用、键鼠及清空焦点、依赖禁用和表内横滚；数据库写入另由领域测试验证 |
@@ -69,6 +82,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/finance-forms.spec.ts](../../../e2e/finance-forms.spec.ts) | Playwright E2E | 中央收款、中央未配置及演示来源的 F3 输入保留／禁写／零写请求与五档布局；显式合成 Native 旧库的完整字节、12 表、原件和审计对账。Native 保存、真实分摊与人工确认由 FinanceNativeFlows 独立验证 |
+| [e2e/production-company-payment-contract.spec.ts](../../../e2e/production-company-payment-contract.spec.ts) | 实际正式构建与隔离 SQLite | 公司合同手选分供方，项目和公司付款选择合同领域、ID 与版本；版本变化后刷新、原编号恢复、五视口及重启冷读。页面验证真实会话注销，付款采用发票时单项读取权限撤销由 [finance-storage.test.ts](../../../tests/production/finance-storage.test.ts) 的服务级合成旅程验证。运行时显式设置 `CRM_COMPANY_PAYMENT_ACCEPTANCE=1` 与 `CRM_COMPANY_PAYMENT_E2E_ENTRY` 为项目内全新隔离构建的 `server/index.mjs`，并通过 `--output` 指定新的项目临时目录 |
 | [e2e/production-finance-storage.spec.ts](../../../e2e/production-finance-storage.spec.ts) | 实际正式构建与隔离 SQLite | F3 整页未知提交冷重启后原键恢复，已保存后读失败只重读；实际工作台、列表失败重读、付款申请 context/list/form/detail JSON 与同域范围、详情编辑及正式登记预填、三类回票义务与真实零、五档交互、原件、后来输入与真实零/未填写批复 |
 | [e2e/production-payment-approval.spec.ts](../../../e2e/production-payment-approval.spec.ts) | 生产 Playwright E2E | Issue #439 批复空值、明确零和历史核验；使用隔离合成正式来源 |
 | [e2e/payment-management.spec.ts](../../../e2e/payment-management.spec.ts) | Playwright E2E · 测试数据只读 | 付款管理四档布局、筛选/键盘、表格局部横滚，以及测试来源禁止正式详情/编辑/登记；原正式导航与金额预填保护由上方真实生产链承接 |

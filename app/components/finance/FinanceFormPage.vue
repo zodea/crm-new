@@ -209,6 +209,7 @@ function fetchSettlements(keyword: string) {
     keyword,
     props.kind,
     { supplierId: draft.value.supplierId ?? null, workerId: draft.value.workerId ?? null },
+    draft.value.contractReference,
   )
 }
 
@@ -539,7 +540,7 @@ function selectPaymentType(bizType: string) {
   patchDraft({
     bizType,
     ...(bizType === '公司付款'
-      ? { projectId: null, contractId: null, settlementAllocations: [] }
+      ? { projectId: null, contractId: null, contractReference: null, settlementAllocations: [], invoiceAllocations: [] }
       : {}),
   })
   paymentTypeSelected.value = true

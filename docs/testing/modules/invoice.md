@@ -8,6 +8,23 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/production/invoice-access.test.ts](../../../tests/production/invoice-access.test.ts) | 路由边界 | 正式发票与更正 API 方法及范围 |
+| [tests/production/invoice-owner.test.ts](../../../tests/production/invoice-owner.test.ts) | 隔离 SQLite／服务 | 发票原件、核对、归档、回执及冷读取 |
+| [tests/production/invoice-contracts.test.ts](../../../tests/production/invoice-contracts.test.ts) | 隔离 SQLite／服务 | 其他支出合同来源核验 |
+| [tests/production/invoice-contract-buyer-integration.test.ts](../../../tests/production/invoice-contract-buyer-integration.test.ts) | 隔离 SQLite／真实合同 owner | 四类项目合同主体、版本及权限 |
+| [tests/production/invoice-company-upgrade.test.ts](../../../tests/production/invoice-company-upgrade.test.ts) | 隔离 SQLite／升级 | 公司归属与合同升级保留旧事实 |
+| [tests/production/invoice-company-owner-integration.test.ts](../../../tests/production/invoice-company-owner-integration.test.ts) | 隔离 SQLite／真实 owner | 公司合同、双方主体、归档及备份冷恢复 |
+| [tests/production/invoice-company-migration-proof.test.ts](../../../tests/production/invoice-company-migration-proof.test.ts) | 隔离 SQLite／真实 owner | 同源公司合同和逐票主体映射 |
+| [tests/production/invoice-legacy-archive-contract.test.ts](../../../tests/production/invoice-legacy-archive-contract.test.ts) | 隔离 SQLite／真实 owner | 旧项目票归档时核对实际合同、双方主体与历史回执 |
+| [tests/production/invoice-manual-company-guards.test.ts](../../../tests/production/invoice-manual-company-guards.test.ts) | 隔离 SQLite／服务 | 手工公司票身份、税号、来源及原编号 |
+| [tests/production/invoice-correction-eligibility.test.ts](../../../tests/production/invoice-correction-eligibility.test.ts) | 隔离 SQLite／服务 | 更正资格、付款打印阻断、提交与冷恢复 |
+| [tests/production/invoice-correction-schema.test.ts](../../../tests/production/invoice-correction-schema.test.ts) | 隔离 SQLite／结构 | 更正版本、回执、附件及回滚 |
+| [tests/production/invoice-migration-backup.test.ts](../../../tests/production/invoice-migration-backup.test.ts) | 隔离 SQLite／备份 | 迁入证据、原件与原回执冷恢复 |
+| [tests/production/invoice-migration-catalog.test.ts](../../../tests/production/invoice-migration-catalog.test.ts) | 隔离 SQLite／服务 | 迁入目标目录编排和来源缺口 |
+| [tests/production/invoice-migration-correction-number.test.ts](../../../tests/production/invoice-migration-correction-number.test.ts) | 隔离 SQLite／服务 | 迁入与普通发票命令族各自恢复 |
+| [tests/production/invoice-migration-publish.test.ts](../../../tests/production/invoice-migration-publish.test.ts) | 隔离 SQLite／服务 | 完整旧库原子发布、原证据及原号恢复 |
+| [tests/production/invoice-migration-source.test.ts](../../../tests/production/invoice-migration-source.test.ts) | 合成旧库／预检 | 旧来源和公司合同引用保护 |
+| [tests/server/invoice-migration-catalog-route.test.ts](../../../tests/server/invoice-migration-catalog-route.test.ts) | 路由／服务 | 发票迁入目录请求与鉴权 |
 | [tests/composables/useInvoiceRegionTarget.test.ts](../../../tests/composables/useInvoiceRegionTarget.test.ts) | 单元／服务／状态 | 原图强调目标：宽屏失焦撤框、悬停临时覆盖；窄屏切到原件面板恢复最近一次定位（含先换面板后失焦），切回后按新焦点更新，reset 不恢复旧定位 |
 | [tests/db/invoice-ledger.test.ts](../../../tests/db/invoice-ledger.test.ts) | 单元／服务／状态 | checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.4「核对完成是归档唯一前置」) |
 | [tests/finance/factor-combination.test.ts](../../../tests/finance/factor-combination.test.ts) | 单元／服务／状态 | solveFactorCombinations：精确整数组合 |

@@ -8,12 +8,13 @@ export interface CommandRecoveryDescriptor {
   targetId: string | null
   action: string
   scopeId?: string
+  sourceSha256?: string
 }
 
 export type CommandResolution<R> = { outcome: 'applied', result: R } | { outcome: 'not-applied', commandId: string }
 export type RecoveryStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
-/** Scope and identity only: drafts, originals and receipt bodies stay in page memory. */
+/** Scope, command identity and the invoice source digest only; drafts and originals stay in page memory. */
 export function commandRecoveryKey(scope: Pick<CommandRecoveryDescriptor, 'workspaceId' | 'actorId' | 'family' | 'targetId' | 'scopeId'>) {
   const key = `crm:form-command:v1:${[scope.family, scope.workspaceId, scope.actorId, scope.targetId ?? 'new'].map(encodeURIComponent).join(':')}`
   // Independent drafts explicitly separate their scope; ordinary entity IDs already name their owner.
@@ -32,11 +33,13 @@ export function createCommandRecoveryStorage(storage: () => RecoveryStorage = ()
       if (text === null)
         return null
       const value = JSON.parse(text)
-      if (!value || Object.keys(value).sort().join(',') !== (Object.hasOwn(value, 'scopeId') ? 'action,actorId,commandId,family,scopeId,targetId,workspaceId' : 'action,actorId,commandId,family,targetId,workspaceId')
+      const fields = ['action', 'actorId', 'commandId', 'family', 'targetId', 'workspaceId', ...(Object.hasOwn(value ?? {}, 'scopeId') ? ['scopeId'] : []), ...(Object.hasOwn(value ?? {}, 'sourceSha256') ? ['sourceSha256'] : [])].sort().join(',')
+      if (!value || Object.keys(value).sort().join(',') !== fields
         || !['workspaceId', 'actorId', 'family', 'action'].every(field => typeof value[field] === 'string' && value[field].trim())
         || typeof value.commandId !== 'string' || !/^[a-z0-9][\w-]{2,79}$/i.test(value.commandId)
         || !(value.targetId === null || (typeof value.targetId === 'string' && value.targetId.trim()))
         || (Object.hasOwn(value, 'scopeId') && (typeof value.scopeId !== 'string' || !value.scopeId.trim() || /[\s/\\?#]/.test(value.scopeId) || [...value.scopeId].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)))
+        || (Object.hasOwn(value, 'sourceSha256') && (value.family !== 'invoice-legacy' || value.action !== 'publish' || value.targetId !== null || typeof value.sourceSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sourceSha256)))
         || commandRecoveryKey(value) !== key) {
         throw unavailable()
       }
@@ -80,6 +83,26 @@ export function commandRecoveryStorageForFamily(family: string) {
   return createCommandRecoveryStorage(() => family === 'crew-worker-import' ? globalThis.localStorage : globalThis.sessionStorage)
 }
 
+/** Preserve the migration page on reload if this identity has an unresolved publish or batch retirement. */
+export function hasInvoiceMigrationStartupRecovery(fullPath: string, scope: Pick<CommandRecoveryDescriptor, 'workspaceId' | 'actorId'>, storage: Storage) {
+  const url = recoveryUrl(fullPath)
+  if (!url || url.pathname !== '/settings/data-migration')
+    return false
+  const prefix = commandRecoveryKey({ ...scope, family: 'invoice-legacy', targetId: null }).slice(0, -3)
+  const recovery = createCommandRecoveryStorage(() => storage)
+  for (let index = 0; index < storage.length; index++) {
+    const key = storage.key(index)
+    if (!key?.startsWith(prefix))
+      continue
+    const descriptor = recovery.read(key)
+    if (descriptor?.family === 'invoice-legacy' && descriptor.workspaceId === scope.workspaceId && descriptor.actorId === scope.actorId
+      && ((descriptor.action === 'publish' && descriptor.targetId === null) || (descriptor.action === 'retire' && descriptor.targetId !== null))) {
+      return true
+    }
+  }
+  return false
+}
+
 function recoveryUrl(fullPath: string): URL | null {
   if (!fullPath.startsWith('/') || fullPath.startsWith('//') || fullPath.includes('\\'))
     return null
@@ -101,6 +124,13 @@ export function commandRecoveryFormTarget(fullPath: string): Pick<CommandRecover
   if (schedule)
     return schedule
   try {
+    const invoiceCorrection = /^\/finance\/invoice\/correction\/([^/]+)$/.exec(url.pathname)
+    if (invoiceCorrection) {
+      const targetId = decodeURIComponent(invoiceCorrection[1]!)
+      if (!targetId.trim() || /[\s/\\?#]/.test(targetId) || [...targetId].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))
+        return null
+      return { family: 'finance-invoice', targetId }
+    }
     if (url.pathname === '/material/quotations/import')
       return { family: 'material-quotation-import', targetId: null }
     if (url.pathname === '/contract/other-settlement/import')

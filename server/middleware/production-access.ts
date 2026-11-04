@@ -7,6 +7,7 @@ import { isProductionConstructionContractRoute } from '../utils/production-const
 import { isProductionConstructionScopeRoute } from '../utils/production-construction-scope-access'
 import { isProductionCrewWorkerRoute } from '../utils/production-crew-worker-access'
 import { isProductionFinanceRoute } from '../utils/production-finance-access'
+import { isProductionInvoiceRoute } from '../utils/production-invoice-access'
 import { isProductionMaterialContractRoute } from '../utils/production-material-contract-access'
 import { isProductionMaterialQuotationRoute } from '../utils/production-material-quotation-access'
 import { isProductionOtherSettlementRoute } from '../utils/production-other-settlement-access'
@@ -43,6 +44,7 @@ export default defineEventHandler((event) => {
   const ready = (event.method === 'GET' && (readyReads.test(path) || ['/api/production/status', '/api/production/backup/status', '/api/read/notifications'].includes(path)))
     || isProductionProjectRoute(event.method, path)
     || isProductionFinanceRoute(event.method, path)
+    || isProductionInvoiceRoute(event.method, path)
     || isProductionCrewWorkerRoute(event.method, path)
     || isProductionOtherSettlementRoute(event.method, path)
     || isProductionTargetCostRoute(event.method, path)

@@ -484,7 +484,7 @@ export const useFinanceStore = defineStore('finance', () => {
     supplierId?: string | null,
   ): Promise<LookupOption[]> {
     if (isCentral(kind))
-      return (await centralRead(kind, () => repository().lookup(centralKind(kind), { kind: 'contracts', projectId, contractKinds: kinds, keyword, ...(paymentBizType ? { paymentBizType, supplierId } : {}) }))).items
+      return (await centralRead(kind, () => repository().lookup(centralKind(kind), { kind: kind === 'payment_application' ? 'payment-contracts' : 'contracts', projectId, contractKinds: kinds, keyword, ...(paymentBizType ? { paymentBizType, supplierId } : {}) }))).items
     if (!projectId)
       return []
     const pattern = `%${keyword.trim()}%`
@@ -516,9 +516,10 @@ export const useFinanceStore = defineStore('finance', () => {
     keyword: string,
     kind: F3FormKind = 'payment_application',
     payee: { supplierId?: string | null, workerId?: string | null } = {},
+    contractReference?: { domain: string, id: string, version: string } | null,
   ): Promise<LookupOption[]> {
     if (isCentral(kind))
-      return (await centralRead(kind, () => repository().lookup(centralKind(kind), { kind: 'settlements', projectId, contractId, ...payee, keyword }))).items
+      return (await centralRead(kind, () => repository().lookup(centralKind(kind), { kind: 'settlements', projectId, contractId, ...payee, keyword, ...(contractReference ? { contractDomain: contractReference.domain, contractVersion: contractReference.version } : {}) }))).items
     return withTransaction(async ({ select }) => {
       const pattern = `%${keyword.trim()}%`
       const rows = await select<{

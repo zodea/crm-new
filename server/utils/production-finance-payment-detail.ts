@@ -7,6 +7,9 @@ import { financeFailure, financeProblemFromUnknown } from '../../app/lib/finance
 import { buildPaymentApplicationInsight, roundPaymentDetailMoney } from '../../app/lib/finance/payment-detail-model'
 import { verifiedFinanceSum } from '../../app/lib/finance/persistent-rows'
 import { decimalNumber } from '../../app/lib/read-model/decimal'
+import { validateFinanceInvoiceAdoptions } from './production-finance-invoice-adoption'
+import { validateFinanceImportSourceEvidence } from './production-finance-journal'
+import { financeCommandFingerprint } from './production-finance-request'
 
 type Row = Record<string, unknown>
 const money = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? decimalNumber(value) : null
@@ -19,12 +22,57 @@ export function financePersistedDateTime(value: unknown): string {
   return new Date(normalized).toISOString()
 }
 async function frozenReference(tx: FinanceDomainTx, table: string, id: string): Promise<Row | null> {
-  const rows = await tx.select<{ evidence_json: string }>('SELECT evidence_json FROM finance_imports')
+  const rows = await tx.select<{ evidence_json: string, fingerprint: string }>('SELECT evidence_json,fingerprint FROM finance_imports')
   for (const row of rows) {
-    const evidence = JSON.parse(row.evidence_json)
-    const reference = evidence.retainedReferences?.find((item: Row) => item.entityType === table && item.id === id)
-    if (reference?.row)
-      return reference.row
+    let evidence: Row
+    try {
+      evidence = JSON.parse(row.evidence_json)
+      if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence))
+        return financeFailure('unavailable', '财务迁入冻结依据损坏，请核对备份。')
+    }
+    catch { return financeFailure('unavailable', '财务迁入冻结依据损坏，请核对备份。') }
+    validateFinanceImportSourceEvidence(evidence, row.fingerprint)
+    const reference = (evidence.retainedReferences as Row[]).find(item => item.entityType === table && item.id === id)
+    if (reference?.row) {
+      if (typeof reference.row !== 'object' || Array.isArray(reference.row))
+        return financeFailure('unavailable', '财务迁入冻结依据损坏，请核对备份。')
+      return reference.row as Row
+    }
+  }
+  return null
+}
+async function frozenInvoiceAdoption(tx: FinanceDomainTx, applicationId: string, allocationId: string, invoiceId: string): Promise<Row | null> {
+  const rows = await tx.select<{ snapshot_json: string, result_json: string | null }>('SELECT h.snapshot_json,c.result_json FROM finance_history h LEFT JOIN finance_commands c ON c.command_id=h.command_id WHERE h.kind=? AND h.id=? ORDER BY h.version DESC', ['payment_application', applicationId])
+  for (const row of rows) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(row.snapshot_json)
+    }
+    catch { return financeFailure('unavailable', '付款冻结历史损坏，请核对备份。') }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return financeFailure('unavailable', '付款冻结历史损坏，请核对备份。')
+    const snapshot = parsed as Row
+    let result: unknown
+    try {
+      result = row.result_json === null ? null : JSON.parse(row.result_json)
+    }
+    catch { return financeFailure('unavailable', '付款采用回执损坏，请核对备份。') }
+    const hasEvidence = Object.hasOwn(snapshot, 'invoiceAdoptions')
+    const hasDigest = !!result && typeof result === 'object' && !Array.isArray(result) && Object.hasOwn(result, 'invoiceAdoptionsSha256')
+    if (hasEvidence !== hasDigest)
+      return financeFailure('unavailable', '付款采用证据与回执不一致，请核对备份。')
+    if (!hasEvidence)
+      continue
+    if (!Array.isArray(snapshot.invoiceAdoptions) || !result || typeof result !== 'object' || !('invoiceAdoptionsSha256' in result) || result.invoiceAdoptionsSha256 !== financeCommandFingerprint(snapshot.invoiceAdoptions))
+      return financeFailure('unavailable', '付款采用证据与回执不一致，请核对备份。')
+    await validateFinanceInvoiceAdoptions(tx, snapshot)
+    const adoption = snapshot.invoiceAdoptions.find(item => item?.allocationId === allocationId && item?.invoice?.id === invoiceId)
+    if (adoption) {
+      const fields = adoption.invoice.fields
+      if (!fields || typeof fields !== 'object')
+        return financeFailure('unavailable', '付款采用的发票票面损坏。')
+      return { invoice_number: fields.invoiceNumber, invoice_date: fields.invoiceDate, total_amount: fields.totalAmount }
+    }
   }
   return null
 }
@@ -84,7 +132,9 @@ export async function productionPaymentApplicationDetail(tx: FinanceDomainTx, ac
   }
   const invoices: PaymentApplicationDetailDTO['invoices'] = []
   for (const allocation of draft.invoiceAllocations) {
-    const row = actor.capabilities.includes('finance-invoice:read') ? await frozenReference(tx, 'invoices', allocation.invoiceId) : null
+    const row = actor.capabilities.includes('finance-invoice:read')
+      ? await frozenInvoiceAdoption(tx, draft.id, allocation.id, allocation.invoiceId) ?? await frozenReference(tx, 'invoices', allocation.invoiceId)
+      : null
     invoices.push({ id: allocation.invoiceId, invoiceNumber: String(row?.invoice_number ?? ''), invoiceDate: String(row?.invoice_date ?? ''), totalAmount: money(row?.total_amount), allocatedAmount: decimalNumber(allocation.allocatedAmount), note: allocation.note, sourceState: row ? 'frozen' : actor.capabilities.includes('finance-invoice:read') ? 'unavailable' : 'forbidden' })
   }
   const cash = actor.capabilities.includes('finance-payment-record:read')

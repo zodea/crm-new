@@ -20,7 +20,10 @@ import { readProductionConstructionScopeMainFact } from '../../server/utils/prod
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { readOriginalExpenseReference } from '../../server/utils/production-finance-expense-references'
 import { validateFinanceJournal } from '../../server/utils/production-finance-journal'
+import { productionFinanceOwners } from '../../server/utils/production-finance-runtime'
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
+import { createProductionInvoiceMigration } from '../../server/utils/production-invoice-migration'
+import { createProductionInvoiceService } from '../../server/utils/production-invoice-service'
 import { readMigrationReference } from '../../server/utils/production-migration-references'
 import { createProductionOurSignatoryService } from '../../server/utils/production-our-signatory-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
@@ -48,6 +51,34 @@ async function fixture() {
   const request = (kind: FinanceCommand['kind'], commandId: string, draft: FinanceCommand['draft'], action: FinanceCommand['action'] = 'submit'): FinanceCommand => ({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: `${FINANCE_FAMILIES[kind]}:write`, commandId, kind, baseVersion: null, action, attachments: {}, draft })
   return { storage, options, actor, session, customer, project, supplier, service, request }
 }
+
+it('付款采用发票期间撤回发票权限会回滚整笔事务，恢复后可沿原编号提交', async () => {
+  const f = await fixture()
+  f.actor.capabilities.push('finance-invoice:read', 'finance-invoice:write', 'our-signatory:read', 'our-signatory:write')
+  try {
+    const supplier = await createProductionSupplierService(f.storage).execute({ ...f.storage.identity, requiredCapability: 'supplier:write', commandId: 'revoke-invoice-supplier', baseVersion: null, action: 'save', attachments: {}, draft: { name: '合成销方', taxNo: 'SYN-SELLER', supplierCategory: '其他', contact: '合成人' } }, f.session)
+    const signatory = await createProductionOurSignatoryService(f.storage).execute({ ...f.storage.identity, requiredCapability: 'our-signatory:write', commandId: 'revoke-invoice-buyer', baseVersion: null, draft: { name: '合成主体', taxNo: 'SYN-BUYER', registeredAddress: null, legalRepresentative: null, verificationNote: '合成资料', status: 'active' } }, f.session)
+    const invoices = createProductionInvoiceService(f.storage)
+    const envelope = { ...f.storage.identity, requiredCapability: 'finance-invoice:write' }
+    const fields = { invoiceNumber: 'SYN-REVOKE-1', invoiceDate: '2026-01-01', invoiceType: '', buyer: '', buyerTaxNo: 'SYN-BUYER', seller: '合成销方', sellerTaxNo: 'SYN-SELLER', amount: null, taxAmount: 0, totalAmount: 100, taxRate: '', remark: '' }
+    const created = await invoices.execute({ ...envelope, action: 'manual', commandId: 'revoke-invoice-create', baseVersion: null, fields, items: [] }, f.session)
+    const reviewed = await invoices.execute({ ...envelope, action: 'review', commandId: 'revoke-invoice-review', invoiceId: created.invoiceId, baseVersion: created.version, manualCompletion: true }, f.session)
+    await invoices.execute({ ...envelope, action: 'archive', commandId: 'revoke-invoice-archive', invoiceId: created.invoiceId, baseVersion: reviewed.version, ownerKind: 'project', projectId: f.project.id, supplierId: supplier.id, taxNumbersConfirmed: true, taxVerification: { buyerId: signatory.id, buyerVersion: signatory.version, supplierVersion: supplier.version } }, f.session)
+    const finance = createProductionFinanceService(f.storage, { references: productionFinanceOwners })
+    const request = f.request('payment_application', 'revoke-invoice-payment', { name: '合成撤权付款', bizType: '项目费用', projectId: f.project.id, supplierId: supplier.id, applyAmount: 30, invoiceState: '先款后票', invoiceAllocations: [{ invoiceId: created.invoiceId, allocatedAmount: 30 }] }, 'draft')
+    const tables = ['payment_applications', 'payment_application_invoice_allocations', 'finance_history', 'finance_commands'] as const
+    const before = await Promise.all(tables.map(table => f.storage.select(`SELECT * FROM ${table} ORDER BY rowid`)))
+    let checks = 0
+    const revoked = () => ({ ...f.actor, capabilities: ++checks >= 3 ? f.actor.capabilities.filter(cap => cap !== 'finance-invoice:read') : [...f.actor.capabilities] })
+    await expect(finance.execute(request, revoked)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+    expect(checks).toBeGreaterThanOrEqual(3)
+    expect(await Promise.all(tables.map(table => f.storage.select(`SELECT * FROM ${table} ORDER BY rowid`)))).toEqual(before)
+    const result = await finance.execute(request, f.session)
+    expect((await finance.paymentDetail(result.id, f.session)).detail.invoices).toMatchObject([{ invoiceNumber: 'SYN-REVOKE-1', allocatedAmount: '30', sourceState: 'frozen' }])
+    expect(await finance.execute(request, f.session)).toEqual(result)
+  }
+  finally { await f.storage.close() }
+})
 
 async function engineering(f: Awaited<ReturnType<typeof fixture>>) {
   f.actor.capabilities.push('our-signatory:read', 'our-signatory:write', 'construction-contract:read', 'construction-contract:write', 'construction-scope:read', 'construction-scope:write')
@@ -169,6 +200,49 @@ it('正式付款管理沿实际同库清单与详情，现金权限和版本变�
   }
   finally {
     vi.unstubAllGlobals()
+    await f.storage.close()
+  }
+})
+
+it('旧财务及发票先后迁入时付款详情保留旧票据，权限与缺证均明确显示', async () => {
+  const f = await fixture()
+  const n = await nativeSource(60)
+  f.actor.capabilities.push('core:migration:write', 'finance-invoice:read', 'finance-invoice:write', 'finance-invoice:import')
+  try {
+    await n.native.execute(`INSERT INTO invoices(id,source,invoice_number,invoice_date,seller,amount,tax_amount,total_amount,ocr_status,review_status,account_status,dup_status,owner_kind,archived_at,print_count,print_rotation,items) VALUES ('native-invoice','excel','OLD-0001','2026-01-02','合成销方',0,0,50,'done','reviewed','archived','normal','personal','2026-01-03T00:00:00.000Z',0,0,'[]')`)
+    await n.native.execute(`INSERT INTO payment_application_invoice_allocations(id,payment_application_id,invoice_id,allocated_amount,note) VALUES ('native-invoice-allocation','native-application','native-invoice',20,'旧分摊')`)
+    const bytes = n.native.raw.export()
+    const source = { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: Buffer.from(bytes).toString('base64') }
+    const project = await f.storage.withTransaction(tx => readMigrationReference(tx, f.actor, 'projects', f.project.id))
+    const supplier = await f.storage.withTransaction(tx => readMigrationReference(tx, f.actor, 'suppliers', f.supplier.id))
+    const mappings = [{ entityType: 'projects', legacyId: 'native-project', targetId: f.project.id, version: project!.version, sourceVersion: project!.sourceVersion, reason: '核对旧项目' }, { entityType: 'suppliers', legacyId: 'native-supplier', targetId: f.supplier.id, version: supplier!.version, sourceVersion: supplier!.sourceVersion, reason: '核对旧分供方' }]
+    await f.service.importSnapshot({ ...f.storage.identity, commandId: 'finance-invoice-native-import', source, mappings }, f.session)
+    const detail = async () => (await f.service.paymentDetail('native-application', f.session)).detail.invoices
+    expect(await detail()).toMatchObject([{ id: 'native-invoice', invoiceNumber: 'OLD-0001', totalAmount: '50', allocatedAmount: '20', sourceState: 'frozen' }])
+    const denied = () => ({ ...f.actor, capabilities: f.actor.capabilities.filter(cap => cap !== 'finance-invoice:read') })
+    expect((await f.service.paymentDetail('native-application', denied)).detail.invoices).toMatchObject([{ invoiceNumber: '', totalAmount: null, allocatedAmount: '20', sourceState: 'forbidden' }])
+    const migration = createProductionInvoiceMigration(f.storage)
+    await migration.publish({ ...f.storage.identity, commandId: 'invoice-after-finance-import', source, mappings: { projects: [], suppliers: [], contracts: [] }, confirmed: true }, f.session)
+    expect(await detail()).toMatchObject([{ id: 'native-invoice', invoiceNumber: 'OLD-0001', totalAmount: '50', allocatedAmount: '20', sourceState: 'frozen' }])
+    await f.storage.close()
+    expect(await detail()).toMatchObject([{ invoiceNumber: 'OLD-0001', totalAmount: '50', sourceState: 'frozen' }])
+    // 仅在本次新建的合成库中模拟冻结引用缺失及被改写。
+    const [original] = await f.storage.select<{ evidence_json: string }>('SELECT evidence_json FROM finance_imports WHERE command_id=?', ['finance-invoice-native-import'])
+    const evidence = JSON.parse(original!.evidence_json)
+    await f.storage.execute('DROP TRIGGER finance_imports_no_update')
+    const missing = structuredClone(evidence)
+    missing.retainedReferences = []
+    await f.storage.execute('UPDATE finance_imports SET evidence_json=? WHERE command_id=?', [JSON.stringify(missing), 'finance-invoice-native-import'])
+    await expect(detail()).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    await expect(validateFinanceJournal(f.storage, f.actor)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    const altered = structuredClone(evidence)
+    altered.retainedReferences.find((row: { entityType: string, id: string }) => row.entityType === 'invoices' && row.id === 'native-invoice').row.total_amount = 999
+    await f.storage.execute('UPDATE finance_imports SET evidence_json=? WHERE command_id=?', [JSON.stringify(altered), 'finance-invoice-native-import'])
+    await expect(detail()).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    await expect(validateFinanceJournal(f.storage, f.actor)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+  }
+  finally {
+    n.native.close()
     await f.storage.close()
   }
 })

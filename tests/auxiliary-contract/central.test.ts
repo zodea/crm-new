@@ -1,7 +1,7 @@
 import type { AuxiliaryContractCommand, AuxiliaryContractDraft, AuxiliaryImportCommand } from '../../app/lib/auxiliary-contract/contract'
 import type { ProductionStorage } from '../../server/utils/production-storage'
 import { Buffer } from 'node:buffer'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import { signatorySnapshot } from '../../app/lib/our-signatory/contract'
@@ -12,6 +12,7 @@ import { readAuxiliaryContractScopeFacts, validateProductionAuxiliaryState } fro
 import { createProductionAuxiliaryContractService } from '../../server/utils/production-auxiliary-contract-service'
 import { createProductionConstructionScopeService } from '../../server/utils/production-construction-scope-service'
 import { financeRecordSnapshot } from '../../server/utils/production-finance-journal'
+import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { constructionScopeCommand } from '../helpers/production-construction-scope-fixture'
@@ -97,17 +98,83 @@ describe('正式 Auxiliary 同库完整owner', () => {
     const drafted = await f.auxiliary.execute(f.request({ draft: { ...request.draft, amount: null } }), f.session)
     expect((await f.auxiliary.detail(drafted.id, { kind: 'other_expense' }, f.session)).contract.amounts.contract).toBeNull()
   })
-  it('公司头独立且拒工程/分供方与自由甲方冒名，版本冲突和原号封存不能迟到提交', async () => {
+  it('公司头独立且需明确真实分供方，拒工程与自由甲方冒名，版本冲突和原号封存不能迟到提交', async () => {
     const f = await productionFixture()
-    const companyRequest = f.request({ constructionMain: undefined, draft: { ...company, partyA: undefined, ourSignatoryId: f.signatory.id, ourSignatoryVersion: f.signatory.version } })
+    const companyRequest = f.request({ constructionMain: undefined, draft: { ...company, supplierId: f.supplier.id, supplierVersion: f.supplier.version, partyA: undefined, ourSignatoryId: f.signatory.id, ourSignatoryVersion: f.signatory.version } })
     const saved = await f.auxiliary.execute(companyRequest, f.session)
-    expect((await f.auxiliary.detail(saved.id, { kind: 'company_expense' }, f.session)).contract.project).toBeNull()
+    const detail = (await f.auxiliary.detail(saved.id, { kind: 'company_expense' }, f.session)).contract
+    expect(detail.project).toBeNull()
+    expect(detail.draft).toMatchObject({ supplierId: f.supplier.id, supplierVersion: f.supplier.version, counterparty: '分包正式分供方' })
+    expect(detail.supplier).toMatchObject({ state: 'resolved', id: f.supplier.id })
+    expect(await f.auxiliary.execute(companyRequest, f.session)).toEqual(saved)
     const changed = { ...companyRequest, id: saved.id, commandId: 'auxiliary-stale-version', baseVersion: '0' }
     await expect(f.auxiliary.execute(changed, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     const scope = { commandId: changed.commandId, workspaceId: f.session().workspaceId, actorId: f.session().actorId, action: 'save' as const, scopeId: saved.id }
     expect(await f.auxiliary.resolve(scope, f.session)).toMatchObject({ outcome: 'not-applied' })
     await expect(f.auxiliary.execute(changed, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await expect(f.auxiliary.execute({ ...companyRequest, commandId: 'auxiliary-forged-company', constructionMain: f.constructionMain }, f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+  })
+  it('新公司合同拒绝缺分供方、过期版本与无读取权限，均不写合同', async () => {
+    const f = await productionFixture()
+    const request = f.request({ constructionMain: undefined, draft: { ...company, partyA: undefined, supplierId: f.supplier.id, supplierVersion: f.supplier.version } })
+    await expect(f.auxiliary.execute({ ...request, commandId: 'company-missing-supplier', draft: { ...request.draft, supplierId: null, supplierVersion: null } }, f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    await expect(f.auxiliary.execute({ ...request, commandId: 'company-stale-supplier', draft: { ...request.draft, supplierVersion: '999999' } }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const actor = f.session()
+    f.setActor({ ...actor, capabilities: actor.capabilities.filter(item => item !== 'supplier:list:read') })
+    await expect(f.auxiliary.execute({ ...request, commandId: 'company-supplier-forbidden' }, f.session)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+    expect(await f.storage.select('SELECT id FROM auxiliary_contract_records')).toEqual([])
+  })
+  it('公司合同回执及分供方采用快照在独立进程与数据库备份冷读保持一致，撤权隐藏关系', async () => {
+    const f = await productionFixture()
+    const request = f.request({ constructionMain: undefined, draft: { ...company, partyA: undefined, supplierId: f.supplier.id, supplierVersion: f.supplier.version } })
+    const saved = await f.auxiliary.execute(request, f.session)
+    const detail = await f.auxiliary.detail(saved.id, { kind: 'company_expense' }, f.session)
+    const backupDirectory = resolve(f.options.directory, 'company-backup')
+    await mkdir(backupDirectory)
+    await f.storage.backupTo(resolve(backupDirectory, 'ruihang.sqlite'))
+    const actor = f.session()
+    f.setActor({ ...actor, capabilities: actor.capabilities.filter(item => item !== 'supplier:list:read') })
+    const restricted = await f.auxiliary.detail(saved.id, { kind: 'company_expense' }, f.session)
+    expect(restricted.contract.supplier).toMatchObject({ state: 'forbidden', id: null, label: null })
+    expect(restricted.contract.draft).toMatchObject({ supplierId: null, supplierVersion: null })
+    await f.storage.close()
+    const descriptor = { commandId: request.commandId, workspaceId: actor.workspaceId, actorId: actor.actorId, family: 'auxiliary-contract', targetId: null, action: 'draft' }
+    for (const directory of [f.options.directory, backupDirectory]) {
+      const output = resolve(directory, 'company-cold.json')
+      await runColdProcess('production-auxiliary-cold', [directory, saved.id, 'company_expense', JSON.stringify(descriptor), output])
+      const cold = JSON.parse(await readFile(output, 'utf8'))
+      expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
+      expect(cold.detail.contract).toEqual(detail.contract)
+      expect(cold.history).toHaveLength(1)
+    }
+  })
+  it('分供方主档变化时拒绝过期新选择，已采用的合同名称和版本不反向改写', async () => {
+    const f = await productionFixture()
+    const request = f.request({ constructionMain: undefined, draft: { ...company, partyA: undefined, supplierId: f.supplier.id, supplierVersion: f.supplier.version } })
+    const saved = await f.auxiliary.execute(request, f.session)
+    const storedSupplier = (await f.storage.select<{ draft_json: string }>('SELECT draft_json FROM suppliers WHERE id=?', [f.supplier.id]))[0]!
+    await createProductionSupplierService(f.storage).execute({ workspaceId: f.session().workspaceId, actorId: f.session().actorId, requiredCapability: 'supplier:write', commandId: 'company-supplier-renamed', id: f.supplier.id, baseVersion: f.supplier.version, action: 'save', attachments: {}, draft: { ...JSON.parse(storedSupplier.draft_json), name: '分供方新名称' } }, f.session, f.supplier.id)
+    await expect(f.auxiliary.execute({ ...request, commandId: 'company-stale-real-change' }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const detail = await f.auxiliary.detail(saved.id, { kind: 'company_expense' }, f.session)
+    expect(detail.contract.draft).toMatchObject({ supplierId: f.supplier.id, supplierVersion: f.supplier.version, counterparty: '分包正式分供方' })
+    expect(detail.contract.supplier).toMatchObject({ state: 'resolved', label: '分供方新名称' })
+    const edited = await f.auxiliary.execute({ ...request, id: saved.id, baseVersion: saved.version, commandId: 'company-save-frozen-name', draft: detail.contract.draft }, f.session)
+    expect((await f.auxiliary.detail(edited.id, { kind: 'company_expense' }, f.session)).contract.draft).toMatchObject({ supplierVersion: f.supplier.version, counterparty: '分包正式分供方' })
+  })
+  it.each([false, true])('公司发票当前或历史消费后不得改分供方（历史=%s）', async (history) => {
+    const f = await productionFixture()
+    const request = f.request({ constructionMain: undefined, draft: { ...company, partyA: undefined, supplierId: f.supplier.id, supplierVersion: f.supplier.version } })
+    const saved = await f.auxiliary.execute(request, f.session)
+    await f.storage.execute(`INSERT INTO invoices(id,source_kind,ocr_status,review_status,account_status,owner_kind,contract_domain,contract_id,contract_version,version,created_at,updated_at)
+      VALUES('company-invoice','manual','pending','unreviewed','none','company','company',?,?,1,'t','t')`, [saved.id, saved.version])
+    if (history) {
+      await f.storage.execute(`INSERT INTO invoice_command_receipts VALUES('company-invoice-command','w','actor','company-invoice','link-contract','fp','{}','t')`)
+      await f.storage.execute('INSERT INTO invoice_audits VALUES(?,?,?,?,?,?,?,?)', ['company-invoice-audit', 'company-invoice', 'company-invoice-command', 'actor', 'link-contract', null, JSON.stringify({ contract: { domain: 'company', id: saved.id, version: saved.version } }), 't'])
+      await f.storage.execute(`UPDATE invoices SET contract_domain=NULL,contract_id=NULL,contract_version=NULL WHERE id='company-invoice'`)
+    }
+    await expect(f.auxiliary.execute({ ...request, id: saved.id, baseVersion: saved.version, commandId: `company-change-${history}`, draft: { ...request.draft, supplierId: 'another-supplier', supplierVersion: '1' } }, f.session)).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
+    const head = await f.auxiliary.detail(saved.id, { kind: 'company_expense' }, f.session)
+    expect(head.contract.draft.supplierId).toBe(f.supplier.id)
   })
   it('两类同原ID完整Native图按原表命名空间隔离，原列i64/BLOB/JSON、有效增补与完整原件保全且无其他域字节', async () => {
     const f = await productionFixture()
@@ -122,6 +189,9 @@ describe('正式 Auxiliary 同库完整owner', () => {
     expect(projectDetail.attachments.map(file => file.id).sort()).toEqual(['legacy-aux-head-file', 'legacy-aux-supp-file'])
     const companyDetail = await f.auxiliary.detail('company-expense-same-aux-id', { kind: 'company_expense' }, f.session)
     expect(companyDetail.contract).toMatchObject({ project: null, draft: { partyA: '原公司文本' } })
+    expect(companyDetail.contract.supplier).toBeNull()
+    expect(companyDetail.contract.draft.supplierId ?? null).toBeNull()
+    expect(companyDetail.contract.draft.counterparty).toBe('原出租方')
     expect((await f.auxiliary.file(companyDetail.contract.id, 'legacy-aux-company-file', f.session)).payloadBase64).toBe('YWJj')
     const evidence = JSON.parse((await f.storage.select<{ evidence_json: string }>('SELECT evidence_json FROM auxiliary_contract_imports'))[0]!.evidence_json)
     expect(evidence.rawDomain.contracts[0].columns).toMatchObject({ extension_integer: { sqliteType: 'integer', exactValue: '9223372036854775807' }, extension_blob: { sqliteType: 'blob', exactValue: '0080FF' }, extension_json: { exactValue: '{"原扩展":"不能改JSON"}' } })
@@ -214,12 +284,12 @@ describe('正式 Auxiliary 同库完整owner', () => {
   })
   it('business-invalid公司关系原意图只保raw fingerprint，封存未应用后不污染后续合法source/只读与validator', async () => {
     const f = await productionFixture()
-    const invalid = f.request({ constructionMain: undefined, draft: { kind: 'company_expense', name: '不能挂分供方的公司头', supplierId: f.supplier.id } })
+    const invalid = f.request({ constructionMain: undefined, draft: { kind: 'company_expense', name: '不能挂项目的公司头', projectId: f.project.id } })
     await expect(f.auxiliary.execute(invalid, f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
     const raw = (await f.storage.select<{ request_json: string }>('SELECT request_json FROM auxiliary_contract_intents WHERE command_id=?', [invalid.commandId]))[0]!
-    expect(JSON.parse(raw.request_json).draft.supplierId).toBe(f.supplier.id)
+    expect(JSON.parse(raw.request_json).draft.projectId).toBe(f.project.id)
     expect(await f.auxiliary.resolve({ commandId: invalid.commandId, workspaceId: f.session().workspaceId, actorId: f.session().actorId, action: 'save', scopeId: 'new-company_expense' }, f.session)).toMatchObject({ outcome: 'not-applied', commandId: invalid.commandId })
-    const valid = await f.auxiliary.execute(f.request({ constructionMain: undefined, draft: { kind: 'company_expense', name: '真正独立公司头' } }), f.session)
+    const valid = await f.auxiliary.execute(f.request({ constructionMain: undefined, draft: { kind: 'company_expense', name: '真正独立公司头', supplierId: f.supplier.id, supplierVersion: f.supplier.version } }), f.session)
     expect((await f.auxiliary.detail(valid.id, { kind: 'company_expense' }, f.session)).contract.draft.name).toBe('真正独立公司头')
     await f.storage.withTransaction(tx => validateProductionAuxiliaryState(tx, f.session()))
     expect(await f.storage.select('SELECT id FROM auxiliary_contract_records')).toEqual([{ id: valid.id }])

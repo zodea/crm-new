@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { FinancePageDraft } from '~/lib/finance/page'
+import type { PaymentContractReference } from '~/lib/finance/payment-contract'
 import type { LookupOption } from '~/lib/kit/lookup'
 import { computed, shallowRef, watch } from 'vue'
 import { approvalAmountLabel, readApprovalAmount } from '~/lib/finance/approval-amount'
 import { needsSettlementAllocation, PAYMENT_BIZ_TYPES } from '~/lib/finance/domain'
 import { financeDraftMoney, financeInputNumber as inputNumber } from '~/lib/finance/input-number'
+import { parsePaymentContractReference, paymentContractSelectionKey } from '~/lib/finance/payment-contract'
 import FinanceLineGrid from './FinanceLineGrid.vue'
 
 const props = defineProps<{
@@ -53,12 +55,12 @@ async function fetchPayees(keyword: string) {
 function choosePayeeKind(value: string | undefined) {
   payeeKind.value = value === 'worker' ? 'worker' : 'supplier'
   payeeLabels.clear()
-  emit('patch', { supplierId: null, workerId: null, payeeNameSnapshot: null, contractId: null, settlementAllocations: [], invoiceAllocations: [], applicationAllocations: [] })
+  emit('patch', { supplierId: null, workerId: null, payeeNameSnapshot: null, contractId: null, contractReference: null, settlementAllocations: [], invoiceAllocations: [], applicationAllocations: [] })
 }
 function choosePayee(value: string | null | undefined) {
   const id = value || null
   const name = id ? payeeLabels.get(id) : undefined
-  emit('patch', { supplierId: payeeKind.value === 'supplier' ? id : null, workerId: payeeKind.value === 'worker' ? id : null, payeeNameSnapshot: null, ...(props.kind === 'payment_record' ? { payeeName: name ?? '' } : {}), contractId: null, settlementAllocations: [], invoiceAllocations: [], applicationAllocations: [] })
+  emit('patch', { supplierId: payeeKind.value === 'supplier' ? id : null, workerId: payeeKind.value === 'worker' ? id : null, payeeNameSnapshot: null, ...(props.kind === 'payment_record' ? { payeeName: name ?? '' } : {}), contractId: null, contractReference: null, settlementAllocations: [], invoiceAllocations: [], applicationAllocations: [] })
   emit('clearError', 'supplierId')
 }
 const COST_OPTIONS = options(['合同劳务', '专业分包', '材料', '机械', '管理费', '项目费用', '其他'])
@@ -74,8 +76,54 @@ const isCompanyPayment = computed(() =>
 )
 const showsContract = computed(() =>
   props.kind === 'payment_application'
-  && (props.draft.bizType?.startsWith('有合同-') || props.draft.bizType === '预付款'),
+  && (props.draft.bizType?.startsWith('有合同-') || props.draft.bizType === '预付款' || props.draft.bizType === '公司付款'),
 )
+const contractChoices = new Map<string, PaymentContractReference>()
+let contractRequest = 0
+const contractFetchRevision = shallowRef(0)
+const contractNeedsReselection = shallowRef(false)
+function contractOptionKey(reference: PaymentContractReference) {
+  return `${paymentContractSelectionKey(reference)}@${reference.version}`
+}
+async function fetchPaymentContracts(keyword: string) {
+  const request = ++contractRequest
+  const scope = JSON.stringify([props.draft.projectId, props.draft.supplierId, props.draft.bizType])
+  const options = await props.fetchExpenseContracts(keyword)
+  if (request !== contractRequest || scope !== JSON.stringify([props.draft.projectId, props.draft.supplierId, props.draft.bizType]))
+    throw new DOMException('合同候选范围已变化。', 'AbortError')
+  contractChoices.clear()
+  return options.map((option) => {
+    if ('paymentContract' in option) {
+      const reference = parsePaymentContractReference(option.paymentContract)
+      if (!reference || paymentContractSelectionKey(reference) !== option.id)
+        throw new Error('合同候选身份缺失，请重新读取。')
+      const key = contractOptionKey(reference)
+      contractChoices.set(key, reference)
+      return { ...option, id: key }
+    }
+    return option
+  })
+}
+const contractLookup = computed(() => {
+  const revision = contractFetchRevision.value
+  return (keyword: string) => revision === contractFetchRevision.value
+    ? fetchPaymentContracts(keyword)
+    : Promise.reject(new DOMException('合同候选已重新读取。', 'AbortError'))
+})
+function refreshContracts() {
+  contractRequest++
+  contractChoices.clear()
+  contractNeedsReselection.value = true
+  contractFetchRevision.value++
+}
+function chooseContract(key: string | null | undefined) {
+  const reference = key ? contractChoices.get(key) : null
+  const previous = props.draft.contractReference
+  const sameContract = reference && previous && reference.domain === previous.domain && reference.id === previous.id
+  emit('patch', { contractId: reference?.id ?? key ?? null, contractReference: reference ?? null, ...(sameContract ? {} : { settlementAllocations: [], invoiceAllocations: [] }) })
+  contractNeedsReselection.value = false
+  emit('clearError', 'contractId')
+}
 const showsSettlements = computed(() =>
   props.kind === 'payment_application'
   && (needsSettlementAllocation(props.draft.bizType ?? '') || props.draft.bizType === '公司付款'),
@@ -117,16 +165,19 @@ function patch(field: keyof FinancePageDraft, value: unknown) {
   if (field === 'projectId' && props.kind === 'payment_application') {
     Object.assign(next, {
       contractId: null,
+      contractReference: null,
       settlementAllocations: [],
       invoiceAllocations: [],
     })
   }
   if (field === 'supplierId' && props.kind === 'payment_application')
-    Object.assign(next, { contractId: null, invoiceAllocations: [] })
+    Object.assign(next, { contractId: null, contractReference: null, invoiceAllocations: [] })
   if (field === 'contractId' && props.kind === 'payment_application')
     Object.assign(next, { settlementAllocations: [] })
+  if (field === 'bizType' && props.kind === 'payment_application' && value !== props.draft.bizType)
+    Object.assign(next, { contractId: null, contractReference: null, settlementAllocations: [], invoiceAllocations: [] })
   if (field === 'bizType' && value === '公司付款')
-    Object.assign(next, { projectId: null, contractId: null, settlementAllocations: [] })
+    Object.assign(next, { projectId: null, contractId: null, contractReference: null, settlementAllocations: [] })
   if (field === 'invoiceState' && value === '无需发票')
     Object.assign(next, { invoiceAllocations: [] })
   emit('patch', next)
@@ -183,8 +234,13 @@ function fieldClass(field: string) {
           <span class="field-hint">工人垫款清偿须采用原费用结算；工人工资在工资实际收付流程办理。个人临时金选择分供方。</span>
         </div>
         <div v-if="showsContract" class="field-block" :class="fieldClass('contractId')">
-          <span class="field-label">关联合同 *</span>
-          <LookupSelect :model-value="draft.contractId" :fetch="fetchExpenseContracts" recent-key="finance-payment-contract" :disabled-reason="draft.projectId ? undefined : '请先选择项目'" placeholder="检索支出合同" @update:model-value="patch('contractId', $event)" />
+          <span class="field-label">关联合同{{ isCompanyPayment ? '' : ' *' }}</span>
+          <LookupSelect :model-value="draft.contractReference ? contractOptionKey(draft.contractReference) : draft.contractId" :fetch="contractLookup" recent-key="finance-payment-contract" :disabled-reason="!draft.supplierId ? '请先选择分供方' : !isCompanyPayment && !draft.projectId ? '请先选择项目' : undefined" placeholder="检索支出合同" @update:model-value="chooseContract" />
+          <button type="button" class="self-start text-12px text-brand underline" :disabled="!draft.supplierId || (!isCompanyPayment && !draft.projectId)" @click="refreshContracts">
+            重新读取合同
+          </button>
+          <span v-if="contractNeedsReselection" class="field-hint">请重新选择合同并核对版本；其他输入仍保留。</span>
+          <span v-if="draft.contractId && !draft.contractReference" class="field-hint">原合同领域待核实，请重新选择真实合同。</span>
           <span v-if="fieldErrors?.contractId" class="field-error">{{ fieldErrors.contractId }}</span>
         </div>
         <div class="field-block">

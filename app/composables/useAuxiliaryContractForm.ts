@@ -144,6 +144,16 @@ export function useAuxiliaryContractForm(kind: () => AuxiliaryContractKind) {
     const selected = (context.value?.ourSignatories ?? []).find(row => row.id === id && row.draft.status === 'active')
     patch({ ourSignatoryId: selected?.id ?? null, ourSignatoryVersion: selected?.version ?? null, ourSignatorySnapshot: selected ? signatorySnapshot(selected) : null })
   }
+  function selectSupplier(id: string | null) {
+    if (pending.value)
+      return
+    const selected = (context.value?.suppliers ?? []).find(row => row.id === id)
+    if (kind() === 'company_expense' && selected?.id === draft.value.supplierId && selected?.version === draft.value.supplierVersion)
+      return
+    patch(kind() === 'company_expense'
+      ? { supplierId: selected?.id ?? null, supplierVersion: selected?.version ?? null, counterparty: selected?.label ?? (draft.value.id ? draft.value.counterparty : '') }
+      : { supplierId: selected?.id ?? null })
+  }
   function patch(value: Partial<AuxiliaryContractDraft>) {
     if (pending.value)
       return
@@ -233,5 +243,5 @@ export function useAuxiliaryContractForm(kind: () => AuxiliaryContractKind) {
   watch(() => `${kind()}:${targetId.value}:${route.query.origin}`, () => void initialize(), { immediate: true })
   onBeforeUnmount(() => generation++)
   useTabTitle(title)
-  return { draft, title, files, errors, loading, loadError, saveError, loadingAction, closeAfterSave, dirty, initialize, save, leave, patch, pending, pendingCommandId, recover, constructionMain, selectMain, fetchMains, fetchSignatories, selectSignatory, fetchProjects: lookup('projects'), fetchSuppliers: lookup('suppliers') }
+  return { draft, title, files, errors, loading, loadError, saveError, loadingAction, closeAfterSave, dirty, initialize, save, leave, patch, pending, pendingCommandId, recover, constructionMain, selectMain, fetchMains, fetchSignatories, selectSignatory, selectSupplier, fetchProjects: lookup('projects'), fetchSuppliers: lookup('suppliers') }
 }

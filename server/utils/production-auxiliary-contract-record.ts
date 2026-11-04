@@ -52,6 +52,8 @@ function validateRecord(record: AuxiliaryStoredContract, actor: Actor, id: strin
   }
   if (d.ourSignatorySnapshot && (d.ourSignatoryId !== d.ourSignatorySnapshot.id || d.ourSignatoryVersion !== d.ourSignatorySnapshot.version || d.partyA !== d.ourSignatorySnapshot.name))
     return fail('unavailable', '辅助合同采用主体稳定ID与当时文书快照不一致')
+  if (d.kind === 'company_expense' && d.supplierId && (!d.supplierVersion || !d.counterparty))
+    return fail('unavailable', '公司合同分供方身份、版本或采用名称不完整')
   for (const file of record.attachments) {
     if (!file.id || file.ownerId !== id || file.ownerType !== (d.kind === 'company_expense' ? 'company_expense_contract' : 'contract') || !Number.isSafeInteger(file.fileSize) || file.fileSize < 0 || file.filePath !== '')
       return fail('unavailable', '辅助合同签约原件目录串归属或大小无效')
@@ -101,7 +103,7 @@ export async function validateProductionAuxiliaryState(tx: ReadTx, actor: Actor,
   const metadataOnlyFileIds = new Set<string>()
   for (const row of rows) {
     const head = contracts.find(record => record.draft.id === row.id)!
-    if ((head.draft.projectId ?? null) !== row.project_id || (head.draft.supplierId ?? null) !== row.supplier_id || (head.draft.kind === 'company_expense' && (row.project_id !== null || row.supplier_id !== null)))
+    if ((head.draft.projectId ?? null) !== row.project_id || (head.draft.supplierId ?? null) !== row.supplier_id || (head.draft.kind === 'company_expense' && row.project_id !== null))
       return fail('unavailable', '辅助合同原关系与持久化稳定ID不同')
     const history = versions.filter(item => item.id === row.id)
     if (history.length !== head.version || history.some((item, index) => item.version !== index + 1) || !isDeepStrictEqual(parseJson(history.at(-1)?.snapshot_json), head))

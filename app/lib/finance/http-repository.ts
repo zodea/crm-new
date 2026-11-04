@@ -6,7 +6,8 @@ import { isDecimalString } from '../read-model/decimal'
 import { hasConsistentReadMeta } from '../read-model/meta'
 import { FINANCE_FAMILIES, FINANCE_READ_SCHEMA, financeFailure, financeProblemFromUnknown, normalizeFinanceLookup } from './central-contract'
 import { isExpenseClearanceVerificationState } from './clearance-verification'
-import { FINANCE_OWNER_TYPE, pendingInvoiceAmountForRead } from './domain'
+import { expenseContractKindsForPaymentType, FINANCE_OWNER_TYPE, pendingInvoiceAmountForRead } from './domain'
+import { parsePaymentContractReference, paymentContractSelectionKey } from './payment-contract'
 import { decodePaymentApplicationDetail } from './payment-detail-repository'
 import { isPaymentVerificationState } from './payment-verification'
 
@@ -57,6 +58,11 @@ function relationRows(value: unknown, target: string) {
 function validDraft(kind: CentralFinanceKind, value: unknown, target: string): boolean {
   if (!object(value) || value.id !== target || !id(value.id) || !draftFields[kind].every(field => text(value[field])) || !nullableId(value.projectId))
     return false
+  if (kind === 'payment_application' && value.contractReference != null) {
+    const reference = parsePaymentContractReference(value.contractReference)
+    if (!reference || reference.id !== value.contractId)
+      return false
+  }
   for (const field of ['supplierId', 'workerId', 'contractId', 'customerId', 'applicantWorkerId', 'applicantSupplierId']) {
     if (Object.hasOwn(value, field) && !nullableId(value[field]))
       return false
@@ -120,6 +126,12 @@ function verifyLookupSources(value: FinanceContext, query: ReturnType<typeof nor
     requireReadSource(value, 'projects', 'project:list:read')
     return
   }
+  if (query.kind === 'payment-contracts') {
+    const kinds = query.paymentBizType === '公司付款' ? ['其他支出'] : expenseContractKindsForPaymentType(query.paymentBizType ?? '')
+    const sources: Record<string, [string, string]> = { 分包: ['subcontract-contracts', 'subcontract-contract:read'], 材采: ['material-contracts', 'material-contract:read'], 其他支出: ['auxiliary-contracts', 'auxiliary-contract:read'] }
+    kinds.forEach(kind => requireReadSource(value, ...sources[kind]!))
+    return
+  }
   const source = query.kind === 'original-expenses' || query.kind === 'payment-applications' ? 'finance' : query.kind === 'settlements' ? 'expenditure-settlements' : query.kind
   const cap = query.kind === 'original-expenses' ? 'finance-reimbursement:read' : query.kind === 'payment-applications' ? 'finance-payment-application:read' : query.kind === 'settlements' ? 'other-settlement:read' : query.kind === 'invoices' ? 'finance-invoice:read' : `${query.kind.slice(0, -1)}:list:read`
   if (query.kind !== 'contracts') {
@@ -138,6 +150,12 @@ function result(value: unknown, commandId: string, target?: string): FinanceComm
   if (object(value) && value.constructionScopeLinks !== undefined && (!Array.isArray(value.constructionScopeLinks) || value.constructionScopeLinks.some(row => !object(row) || !id(row.commandId) || !object(row.relation) || row.relation.domain !== 'original-expense' || !id(row.relation.sourceId) || !id(row.relation.id) || !id(row.relation.mainId) || typeof row.relation.version !== 'string' || !/^[1-9]\d*$/.test(row.relation.version))))
     broken()
   if (object(value) && Object.hasOwn(value, 'paymentVerificationSha256') && (typeof value.paymentVerificationSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.paymentVerificationSha256)))
+    broken()
+  if (object(value) && Object.hasOwn(value, 'invoiceAdoptionsSha256') && (typeof value.invoiceAdoptionsSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.invoiceAdoptionsSha256)))
+    broken()
+  if (object(value) && Object.hasOwn(value, 'paymentInvoiceEvidenceSha256') && (typeof value.paymentInvoiceEvidenceSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.paymentInvoiceEvidenceSha256)))
+    broken()
+  if (object(value) && Object.hasOwn(value, 'paymentSettlementEvidenceSha256') && (typeof value.paymentSettlementEvidenceSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.paymentSettlementEvidenceSha256)))
     broken()
   if (object(value) && (Object.hasOwn(value, 'clearanceVerificationSha256') || Object.hasOwn(value, 'clearanceVerificationId'))
     && (!id(value.clearanceVerificationId) || typeof value.clearanceVerificationSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.clearanceVerificationSha256))) {
@@ -177,6 +195,13 @@ export function createFinanceRepository(fetcher: FinanceFetcher): FinanceReposit
               broken()
           }
           catch { broken() }
+        }
+      }
+      if (query.kind === 'payment-contracts') {
+        for (const row of value.items) {
+          const reference = parsePaymentContractReference(row.paymentContract)
+          if (!reference || row.id !== paymentContractSelectionKey(reference))
+            broken()
         }
       }
       return value as unknown as FinanceReadEnvelope<LookupOption>

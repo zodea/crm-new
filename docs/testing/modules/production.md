@@ -18,8 +18,8 @@
 | [tests/production/storage-schema.test.ts](../../../tests/production/storage-schema.test.ts) | 单元／服务／状态 | 真实盘历史与付款核验保护被删除、替换或改变条件时冷启动和备份拒绝，不重建保护冒充完整 |
 | [tests/production/migration-references.test.ts](../../../tests/production/migration-references.test.ts) | 单元／服务／状态 | 实际主档引用ID和独立版本、权限、冷打开及损坏拒绝 |
 | [tests/production/backup-quotation.test.ts](../../../tests/production/backup-quotation.test.ts) | 单元／服务／状态 | 报价实际参与者、原价与未知税点、原件字节、冷回执；结构完整性及损坏历史拒绝 |
-| [tests/production/finance-storage.test.ts](../../../tests/production/finance-storage.test.ts) | 单元／服务／状态 | F3 单库事务、原费用不重复计成本、实付确认与撤回、原件与冷启动原键，工作台实付权限／来源版本及失权迟到响应 |
-| [tests/production/finance-verification.test.ts](../../../tests/production/finance-verification.test.ts) | 实际 SQLite 及正式参与者 | 旧v12备份兼容、v13真实核验和原件冷恢复；损坏依据拒绝、未知原键与可靠后读、撤权、版本冲突及未接公司合同源 |
+| [tests/production/finance-storage.test.ts](../../../tests/production/finance-storage.test.ts) | 单元／服务／状态 | F3 单库事务、原费用不重复计成本、实付确认与撤回、原件与冷启动原键，工作台实付权限／来源版本及失权迟到响应；付款采用发票期间撤权回滚 |
+| [tests/production/finance-verification.test.ts](../../../tests/production/finance-verification.test.ts) | 实际 SQLite 及正式参与者 | 旧 v12/v13 备份、v30 升级历史冻结及原件冷恢复；损坏依据拒绝、未知原键与可靠后读、撤权和版本冲突 |
 | [tests/production/crew-worker-storage.test.ts](../../../tests/production/crew-worker-storage.test.ts) | 单元／服务／状态 | 全局工人稳定身份、跨项目候选、隐私与权限边界、同库冷读取及损坏来源拒绝 |
 | [tests/production/notification-restart.test.ts](../../../tests/production/notification-restart.test.ts) | 单元／服务／状态 | 消息原键与已读事实冷重启保全 |
 | [tests/production/notification-storage.test.ts](../../../tests/production/notification-storage.test.ts) | 单元／服务／状态 | 消息事件、原命令及已读事实同库持久化 |
@@ -33,7 +33,7 @@
 | [tests/production/material-contract-storage.test.ts](../../../tests/production/material-contract-storage.test.ts) | 单元／服务／状态 | 材采日常 SQL 事务、原件与回执冷读、完整混合图备份及封存；损坏图停止恢复，未接管正式初次写入保持门禁 |
 | [tests/production/storage-backup.test.ts](../../../tests/production/storage-backup.test.ts) | 单元／服务／状态 | 一致备份保留已提交事实并拒绝覆盖已有目标，原库和副本能独立读取 |
 | [tests/production/storage-boundaries.test.ts](../../../tests/production/storage-boundaries.test.ts) | 单元／服务／状态 | 缺失目录、损坏文件与未知版本停止初始化，不替换已有文件 |
-| [tests/production/storage-upgrade.test.ts](../../../tests/production/storage-upgrade.test.ts) | 单元／服务／状态 | v1/v7/v12 同事务升级与冲突回滚、原金额和现金保全、v13 核验追加及旧备份表清单保留；v13→v14 核定和明确采用关系冲突回滚、原费用／清偿／批复／银行分摊及原件保全，冷重开不补造核验 |
+| [tests/production/storage-upgrade.test.ts](../../../tests/production/storage-upgrade.test.ts) | 单元／服务／状态 | v1/v7/v12 同事务升级与冲突回滚、原金额和现金保全、v13 核验追加及旧备份表清单保留；v13→v14 核定和明确采用关系冲突回滚、原费用／清偿／批复／银行分摊及原件保全，v28 起发票登记、v29–32 清单及冲突回滚；冷重开不补造核验 |
 | [tests/production/storage.test.ts](../../../tests/production/storage.test.ts) | 单元／服务／状态 | 磁盘权威事务提交后冷打开保留原值，失败事务不留下半份结果 |
 | [tests/production/boq-migration.test.ts](../../../tests/production/boq-migration.test.ts) | 单元／服务／状态 | 完整 BOQ SQLite 原图、原件、显式映射、隐私与整批恢复 |
 | [tests/production/boq-storage.test.ts](../../../tests/production/boq-storage.test.ts) | 单元／服务／状态 | 日常清单与变洽签、真实上游、原件及原编号冷恢复 |

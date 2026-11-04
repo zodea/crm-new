@@ -486,20 +486,21 @@ describe('f3 六条资金表单领域 action', () => {
         note: '',
       }],
     }, 'submit')
+    // 本机夹具没有中央合同发票证明；以真实无合同结算继续验证六类实体及票款分摊。
+    await mem.execute(`INSERT INTO expenditure_settlements(id,no,name,biz_type,project_id,supplier_id,total_amount,settlement_date,status) VALUES('settlement-no-contract','JS-F3-NO-CONTRACT','无合同结算','其他','project-finance','supplier-finance',100,'2026-07-01','已确认')`)
     const application = await store.saveForm('payment_application', {
       no: 'FK-F3',
-      name: '材料付款申请',
-      bizType: '有合同-材料',
+      name: '无合同综合付款申请',
+      bizType: '管理费',
       projectId: 'project-finance',
       supplierId: 'supplier-finance',
-      contractId: 'contract-expense',
       costName: '材料',
       applyAmount: 100,
       applyDate: '2026-07-14',
       applicant: '赵工',
       invoiceState: '先票后款',
       settlementAllocations: [{
-        settlementId: 'settlement-finance',
+        settlementId: 'settlement-no-contract',
         allocatedAmount: 100,
         note: '',
       }],
@@ -656,7 +657,10 @@ describe('f3 六条资金表单领域 action', () => {
     expect(await mem.select('SELECT id FROM expense_reimbursements')).toEqual([{ id: saved.id }])
     await store.saveForm('reimbursement', { ...first, lines: [retained] }, 'save')
     expect((await loadFinanceForm('reimbursement', saved.id))?.lines?.map(line => line.id)).toEqual([retained.id])
-    expect(await mem.select('SELECT expense_item,amount,deleted_at FROM expense_reimbursement_lines WHERE id=?', [removed.id])).toEqual([{ expense_item: '仓储', amount: 25, deleted_at: expect.any(String) }])
+    const removedLine = await mem.select<{ expense_item: string, amount: number, deleted_at: unknown }>('SELECT expense_item,amount,deleted_at FROM expense_reimbursement_lines WHERE id=?', [removed.id])
+    expect(removedLine).toHaveLength(1)
+    expect(removedLine[0]).toMatchObject({ expense_item: '仓储', amount: 25 })
+    expect(typeof removedLine[0]!.deleted_at).toBe('string')
     expect(await mem.select('SELECT before_data FROM operation_logs WHERE table_name=? AND record_id=? AND action=?', ['expense_reimbursement_lines', removed.id, 'delete'])).toEqual([{ before_data: expect.stringContaining('仓储') }])
   })
 
@@ -778,14 +782,13 @@ describe('付款申请票款勾稽', () => {
     await expect(store.saveForm('payment_record', { workerId: 'worker-finance', amount: 0, purpose: '工资' }, 'draft')).rejects.toThrow('工人工资')
   })
 
-  it('分别执行先票后款、先款后票、无需发票三种提交规则', async () => {
+  it('无合同先票后款保留提交金额核对，先款后票及无需发票规则不变', async () => {
     const store = useFinanceStore()
     await expect(store.saveForm('payment_application', {
       name: '先票后款不平',
-      bizType: '预付款',
+      bizType: '管理费',
       projectId: 'project-finance',
       supplierId: 'supplier-finance',
-      contractId: 'contract-expense',
       applyAmount: 60,
       applyDate: '2026-07-16',
       applicant: '赵工',
@@ -917,7 +920,14 @@ describe('支付事实确认与撤回', () => {
     const store = useFinanceStore()
     const input = { name: '真实已付款原申请', bizType: '有合同-材料', projectId: 'project-finance', supplierId: 'supplier-finance', contractId: 'contract-expense', applyAmount: 100, applyDate: '2026-10-05', applicant: '实际财务', invoiceState: '先票后款' as const, settlementAllocations: [{ settlementId: 'settlement-finance', allocatedAmount: 100 }], invoiceAllocations: [{ invoiceId: 'invoice-finance-a', allocatedAmount: 100 }] }
     const application = await store.saveForm('payment_application', input, 'submit')
-    const payment = await store.saveForm('payment_record', { projectId: 'project-finance', supplierId: 'supplier-finance', payeeName: '实际收款人', amount: 30, paymentDate: '2026-10-05', voucherNo: 'FROZEN-SOURCE', bankSerialNo: 'FROZEN-SOURCE', confirmedBy: '财务', applicationAllocations: [{ paymentApplicationId: application.id, allocatedAmount: 30 }] }, 'confirm')
+    const proposedPayment = { projectId: 'project-finance', supplierId: 'supplier-finance', payeeName: '实际收款人', amount: 30, paymentDate: '2026-10-05', voucherNo: 'FROZEN-SOURCE', bankSerialNo: 'FROZEN-SOURCE', confirmedBy: '财务', applicationAllocations: [{ paymentApplicationId: application.id, allocatedAmount: 30 }] }
+    await expect(store.saveForm('payment_record', proposedPayment, 'confirm')).rejects.toThrow('无法核验付款发票与合同')
+    expect(await mem.select('SELECT id FROM payment_records')).toEqual([])
+    // 合成已有历史现金，验证旧记录不会因新命令门槛被删除或释放额度。
+    const payment = { id: 'historical-frozen-payment' }
+    await mem.execute(`INSERT INTO payment_records(id,project_id,supplier_id,payee_name,amount,payment_date,voucher_no,bank_serial_no,confirmed_by,confirmation_status) VALUES(?,?,?,?,?,?,?,?,?,?)`, [payment.id, 'project-finance', 'supplier-finance', '实际收款人', 30, '2026-10-05', 'FROZEN-SOURCE', 'FROZEN-SOURCE', '财务', 'draft'])
+    await mem.execute('INSERT INTO payment_record_application_allocations(id,payment_record_id,payment_application_id,allocated_amount) VALUES(?,?,?,?)', ['historical-frozen-allocation', payment.id, application.id, 30])
+    await mem.execute('UPDATE payment_records SET confirmation_status=?,confirmed_at=? WHERE id=?', ['confirmed', '2026-10-05T00:00:00.000Z', payment.id])
     const frozen = await mem.select('SELECT * FROM payment_record_application_allocations')
     const sourceRows = await mem.select('SELECT * FROM payment_application_settlement_allocations')
     const audits = await mem.select('SELECT * FROM operation_logs ORDER BY id')

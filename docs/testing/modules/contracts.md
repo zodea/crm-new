@@ -8,6 +8,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/other-settlement/production-contract-evidence.test.ts](../../../tests/other-settlement/production-contract-evidence.test.ts) | 隔离 SQLite／真实来源 | 其他结算合同证据与付款冻结关联 |
 | [tests/material-contract/excel-import.test.ts](../../../tests/material-contract/excel-import.test.ts) | 单元／服务／状态 | 两表分组、来源行、金额及编号口径 |
 | [tests/production/material-excel-import.test.ts](../../../tests/production/material-excel-import.test.ts) | 正式合成磁盘 | 整批合同、明细、原件和施工关联原子保存，故障回滚与冷重放 |
 | [tests/stores/material-excel-import.test.ts](../../../tests/stores/material-excel-import.test.ts) | 单元／服务／状态 | 匿名原批次恢复、同目标后读和混合回执拒绝 |
@@ -60,6 +61,7 @@
 | [e2e/issue-322-contract-supplement-focus.spec.ts](../../../e2e/issue-322-contract-supplement-focus.spec.ts) | Playwright E2E | Issue #322：补充协议稳定聚焦与来源恢复 |
 | [tests/components/ContractDetailSections.test.ts](../../../tests/components/ContractDetailSections.test.ts) | 组件（jsdom） | contract detail sections |
 | [tests/components/ContractFormFields.test.ts](../../../tests/components/ContractFormFields.test.ts) | 组件（jsdom） | contractFormFields lookup data flow |
+| [tests/browser/AuxiliaryCompanySupplier.test.ts](../../../tests/browser/AuxiliaryCompanySupplier.test.ts) | 真实组件／模拟来源 | 公司合同手选分供方、旧对方原文及键盘视口 |
 | [tests/components/ContractFormPage.test.ts](../../../tests/components/ContractFormPage.test.ts) | 组件（jsdom） | 辅助合同整页表单状态 |
 | [tests/components/ContractLineItemsEditor.test.ts](../../../tests/components/ContractLineItemsEditor.test.ts) | 组件（jsdom） | contractLineItemsEditor |
 | [tests/contract/central-list-filters.test.ts](../../../tests/contract/central-list-filters.test.ts) | 单元／服务／状态 | 合同中央列表固定条件多选 |

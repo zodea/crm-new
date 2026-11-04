@@ -13,6 +13,7 @@ export interface AuxiliaryContractDraft {
   name?: string
   projectId?: string | null
   supplierId?: string | null
+  supplierVersion?: string | null
   category?: string
   counterparty?: string
   partyA?: string

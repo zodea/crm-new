@@ -3,6 +3,7 @@ import { createError } from 'h3'
 import { requireProductionBusinessSession } from './production-auth'
 import { getProductionRuntimeConfig } from './production-config'
 import { FINANCE_CAPABILITIES } from './production-finance-access'
+import { PRODUCTION_INVOICE_CAPABILITIES } from './production-invoice-access'
 
 export interface BusinessSession {
   workspaceId: string
@@ -15,6 +16,7 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
   actorId: 'actor-default',
   capabilities: Object.freeze([
     ...FINANCE_CAPABILITIES,
+    ...PRODUCTION_INVOICE_CAPABILITIES,
     'payroll:read',
     'payroll:write',
     'target-cost:read',

@@ -30,7 +30,7 @@ it('真实公开服务重启后恢复原件、OCR候选/人工值及失响应原
     expect(currentSession.capabilities).toEqual(expect.arrayContaining(['finance-payment-application:read', 'finance-payment-record:read']))
     const paymentSource = new DatabaseSync(join(f.directory, 'ruihang.sqlite'), { readOnly: true })
     try {
-      expect(paymentSource.prepare('SELECT schema_version FROM production_participants WHERE domain=?').all('finance')).toEqual([{ schema_version: 1 }])
+      expect(paymentSource.prepare('SELECT schema_version FROM production_participants WHERE domain=?').all('finance')).toEqual([{ schema_version: 2 }])
       expect(paymentSource.prepare('SELECT revision FROM finance_revision WHERE singleton=1').all()).toEqual([{ revision: 0 }])
       expect(paymentSource.prepare('SELECT COUNT(*) AS n FROM payment_records').all()).toEqual([{ n: 0 }])
       expect(paymentSource.prepare('SELECT COUNT(*) AS n FROM payment_record_application_allocations').all()).toEqual([{ n: 0 }])

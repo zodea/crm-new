@@ -3,7 +3,7 @@ import { isISODateDTO } from '../../types/read-model'
 import { decodeOurSignatorySnapshot } from '../our-signatory/contract'
 import { AUXILIARY_CATEGORIES, auxiliaryKind, auxiliaryProblem } from './contract'
 
-const TEXT_FIELDS = ['id', 'no', 'name', 'projectId', 'supplierId', 'category', 'counterparty', 'partyA', 'ourSignatoryId', 'ourSignatoryVersion', 'signDate', 'servicePeriod', 'invoiceType', 'paymentCycle', 'mainTerms', 'content', 'contactName', 'contactPhone', 'status', 'note'] as const
+const TEXT_FIELDS = ['id', 'no', 'name', 'projectId', 'supplierId', 'supplierVersion', 'category', 'counterparty', 'partyA', 'ourSignatoryId', 'ourSignatoryVersion', 'signDate', 'servicePeriod', 'invoiceType', 'paymentCycle', 'mainTerms', 'content', 'contactName', 'contactPhone', 'status', 'note'] as const
 export function decodeAuxiliaryDraft(value: unknown): AuxiliaryContractDraft {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw auxiliaryProblem('validation-failed', '合同资料格式不正确')
@@ -36,8 +36,10 @@ export function decodeAuxiliaryDraft(value: unknown): AuxiliaryContractDraft {
   }
   if (draft.signDate && !isISODateDTO(draft.signDate))
     throw auxiliaryProblem('validation-failed', '签订日期无效', { signDate: ['请输入真实日期'] })
-  if (kind === 'company_expense' && (draft.projectId || draft.supplierId))
-    throw auxiliaryProblem('validation-failed', '公司合同不能挂项目或项目分供方')
+  if (kind === 'company_expense' && draft.projectId)
+    throw auxiliaryProblem('validation-failed', '公司合同不能挂项目')
+  if (draft.supplierVersion && (!draft.supplierId || !/^[1-9]\d*$/.test(draft.supplierVersion) || !Number.isSafeInteger(Number(draft.supplierVersion))))
+    throw auxiliaryProblem('validation-failed', '分供方版本无效')
   if (kind === 'other_expense' && draft.counterparty)
     throw auxiliaryProblem('validation-failed', '其他支出合同必须使用真实分供方')
   if (draft.category && !AUXILIARY_CATEGORIES[kind].includes(draft.category))

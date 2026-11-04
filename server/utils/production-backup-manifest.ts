@@ -22,6 +22,7 @@ import { validateProductionConstructionState } from './production-construction-c
 import { validateProductionConstructionScopeState } from './production-construction-scope-record'
 import { validateProductionCrewWorkerJournal } from './production-crew-worker-validation'
 import { validateFinanceJournal } from './production-finance-journal'
+import { validateProductionInvoiceJournal } from './production-invoice-service'
 import { validateMaterialConstructionBindings } from './production-material-contract-record'
 import { notificationCommandFingerprint } from './production-notification-service'
 import { validateOtherSettlementImportEvidence } from './production-other-settlement-migration'
@@ -86,7 +87,22 @@ function readOnlyDomainTransaction(db: DatabaseSync) {
   }
 }
 
-function verifyOriginalOwner(db: DatabaseSync, row: Record<string, SQLOutputValue>, verifiedMetadataOnlyFileIds: ReadonlySet<string>) {
+export function verifyBackupOriginalOwner(db: DatabaseSync, row: Record<string, SQLOutputValue>, verifiedMetadataOnlyFileIds: ReadonlySet<string>) {
+  if (row.owner_type === 'invoice_correction') {
+    const participant = db.prepare('SELECT schema_version FROM production_participants WHERE domain=\'invoices\'').get()
+    const binding = db.prepare('SELECT b.sha256 FROM invoice_correction_files b JOIN invoice_corrections c ON c.id=b.correction_id WHERE b.file_ref_id=? AND c.id=?').get(row.id!, row.owner_id!)
+    if (!participant || Number(participant.schema_version) !== 3 || !binding || row.category !== 'correction-evidence' || row.deleted_at !== null
+      || binding.sha256 !== row.sha256 || verifiedMetadataOnlyFileIds.has(String(row.id))) {
+      backupInvalid('发票更正附件与已登记更正单、真实正文或稳定身份不一致。')
+    }
+    return
+  }
+  if (row.owner_type === 'invoice') {
+    const owner = db.prepare('SELECT id FROM invoices WHERE id=? AND original_file_id=?').get(row.owner_id!, row.id!)
+    if (!owner || row.category !== 'invoice-original' || row.deleted_at !== null || verifiedMetadataOnlyFileIds.has(String(row.id)))
+      backupInvalid('发票原件与发票、稳定文件身份或正文归属不一致。')
+    return
+  }
   if (['boq_file', 'boq_change_order', 'owner_change_order'].includes(String(row.owner_type))) {
     let qualified = false
     for (const imported of db.prepare('SELECT evidence_json FROM boq_source_imports').all()) {
@@ -290,6 +306,15 @@ function verifyOriginalOwner(db: DatabaseSync, row: Record<string, SQLOutputValu
   backupInvalid('备份出现未登记的原件归属；不能忽略该领域。')
 }
 
+export function verifyInvoiceOriginalReferences(db: DatabaseSync) {
+  const missing = db.prepare(`SELECT i.id FROM invoices i LEFT JOIN file_refs f
+    ON f.id=i.original_file_id AND f.owner_type='invoice' AND f.owner_id=i.id
+    LEFT JOIN file_payloads p ON p.file_ref_id=f.id
+    WHERE i.original_file_id IS NOT NULL AND (f.id IS NULL OR f.deleted_at IS NOT NULL OR p.file_ref_id IS NULL) LIMIT 1`).get()
+  if (missing)
+    backupInvalid('发票备份缺少对应的原件或正文。')
+}
+
 async function verifyMaterialOwner(db: DatabaseSync, workspaceId: string, actorId: string) {
   try {
     const records = db.prepare('SELECT * FROM material_contract_records').all()
@@ -363,6 +388,13 @@ export async function inspectProductionBackup(path: string): Promise<ProductionB
     if (actual.length !== expected.size || actual.some(table => !expected.has(table)))
       backupInvalid('备份实表与完整清单不一致。')
     verifyProductionStorageSchema(db, schemaVersion)
+    if (manifest.participants.invoices) {
+      verifyInvoiceOriginalReferences(db)
+      try {
+        await validateProductionInvoiceJournal(readOnlyDomainTransaction(db), { workspaceId: meta.workspace_id, actorId: meta.owner_id })
+      }
+      catch { backupInvalid('发票备份的原回执、版本、识别记录或审计历史不完整。') }
+    }
     if (manifest.participants['material-contracts'])
       await verifyMaterialOwner(db, meta.workspace_id, meta.owner_id)
     if (manifest.participants['material-quotations']) {
@@ -552,7 +584,7 @@ export async function inspectProductionBackup(path: string): Promise<ProductionB
     let files = 0
     let bytes = 0
     for (const row of db.prepare('SELECT f.*,p.content,p.sha256 FROM file_refs f LEFT JOIN file_payloads p ON p.file_ref_id=f.id ORDER BY f.id').iterate()) {
-      verifyOriginalOwner(db, row, verifiedMetadataOnlyFileIds)
+      verifyBackupOriginalOwner(db, row, verifiedMetadataOnlyFileIds)
       // Only verified immutable source evidence can establish a pre-existing missing body.
       if (row.content === null && row.sha256 === null && verifiedMetadataOnlyFileIds.has(String(row.id)))
         continue

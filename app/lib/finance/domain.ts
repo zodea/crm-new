@@ -1,6 +1,7 @@
 import type { ConstructionMainSelection } from '../construction-scope/contract'
 import type { ApprovedAmountEdit, ApprovedAmountOrigin } from './approval-amount'
 import type { ExpenseClearanceVerificationEdit, ExpenseClearanceVerificationState } from './clearance-verification'
+import type { PaymentContractReference } from './payment-contract'
 import type { PaymentVerificationEdit, PaymentVerificationState } from './payment-verification'
 import type { FinanceDomainTx } from './reference'
 import type { TransactionDb } from '~/lib/db/coordinator'
@@ -16,6 +17,7 @@ import { generateId } from '~/lib/util/id'
 import { approvalAmountForSave, paymentConfirmationCap } from './approval-amount'
 import { originalExpenseReference } from './expense-references'
 import { financePartySnapshot } from './party-references'
+import { parsePaymentContractReference } from './payment-contract'
 import { requiresPaymentVerification } from './payment-verification'
 import { FinanceAmountSourceError, requireVerifiedFinanceNumbers, verifiedFinanceNumber, verifiedFinanceSum } from './persistent-rows'
 import { isFinanceReferenceTable } from './reference'
@@ -166,6 +168,7 @@ export interface PaymentApplicationFormDraft {
   workerId?: string | null
   payeeNameSnapshot?: string | null
   contractId?: string | null
+  contractReference?: PaymentContractReference | null
   costName?: string
   applyAmount?: number | null
   applyDate?: string
@@ -993,6 +996,9 @@ async function validatePaymentApplicationAllocations(
     const settlement = await assertReference<{
       project_id: string | null
       contract_id: string | null
+      contract_domain?: string | null
+      contractEvidence?: unknown
+      version?: unknown
       supplier_id: string | null
       worker_id?: string | null
       original_expense_line_ids?: string[]
@@ -1003,8 +1009,23 @@ async function validatePaymentApplicationAllocations(
       throw new Error('关联结算尚未确认，不能用于付款申请')
     if (nullableId(draft.projectId) !== settlement.project_id)
       throw new Error('关联结算不属于所选项目')
-    if (draft.contractId && settlement.contract_id !== draft.contractId)
+    if (draft.contractId && tx.paymentContract) {
+      if (settlement.contract_id !== draft.contractId)
+        throw new Error('关联结算不属于所选合同')
+      if (!draft.contractReference || !tx.paymentSettlementEvidence)
+        throw new FinanceAmountSourceError('关联结算缺少可核实的合同领域，暂不能用于该付款申请。')
+      tx.paymentSettlementEvidence.check(settlement.contractEvidence, { settlementId, settlementVersion: settlement.version, projectId: nullableId(draft.projectId), supplierId: nullableId(draft.supplierId), contract: draft.contractReference })
+    }
+    else if (tx.paymentContract) {
+      if (!tx.paymentSettlementEvidence)
+        throw new FinanceAmountSourceError('关联结算的无合同来源无法核实。')
+      tx.paymentSettlementEvidence.checkNone(settlement.contractEvidence, { settlementId, settlementVersion: settlement.version })
+      if (settlement.contract_id !== null)
+        throw new FinanceAmountSourceError('关联结算的无合同来源与实际关系不一致。')
+    }
+    else if (settlement.contract_id !== (draft.contractId || null)) {
       throw new Error('关联结算不属于所选合同')
+    }
     if (nullableId(draft.workerId) !== nullableId(settlement.worker_id) || nullableId(draft.supplierId) !== nullableId(settlement.supplier_id))
       throw new Error('关联结算的真实收款对象与付款申请不一致')
     if (draft.workerId && (settlement.contract_id !== null || !Array.isArray(settlement.original_expense_line_ids) || settlement.original_expense_line_ids.length === 0))
@@ -1037,8 +1058,14 @@ async function validatePaymentApplicationAllocations(
       project_id: string | null
       supplier_id: string | null
       total_amount: number
+      owner_kind?: string
     }>(tx, 'invoices', invoiceId, '关联发票')
-    if (draft.projectId && invoice.project_id && invoice.project_id !== draft.projectId)
+    if (tx.paymentContract && (draft.bizType === '公司付款'
+      ? invoice.owner_kind !== 'company' || invoice.project_id !== null
+      : invoice.owner_kind !== 'project' || !draft.projectId || invoice.project_id !== draft.projectId)) {
+      throw new Error('关联发票与付款申请的项目或公司归属不一致')
+    }
+    if (!tx.paymentContract && draft.projectId && invoice.project_id && invoice.project_id !== draft.projectId)
       throw new Error('关联发票不属于所选项目')
     if (draft.supplierId && invoice.supplier_id && invoice.supplier_id !== draft.supplierId)
       throw new Error('关联发票不属于所选分供方')
@@ -1053,6 +1080,7 @@ async function validatePaymentApplicationAllocations(
   if (
     action !== 'draft'
     && invoiceState === '先票后款'
+    && !draft.contractId
     && !moneyEqual(invoiceTotal, amount)
   ) {
     throw new Error('关联发票金额必须等于申请金额')
@@ -1075,6 +1103,7 @@ async function savePaymentApplication(
     worker_id: string | null
     supplier_id: string | null
     payee_name_snapshot: string | null
+    company_expense_contract_id: string | null
   }>(tx, 'payment_applications', id)
   const approval = approvalAmountForSave(draft.approvedAmount, draft.approvedAmountEdit, existing)
   if (existing && (
@@ -1105,7 +1134,15 @@ async function savePaymentApplication(
   const party = await financePartySnapshot(tx, { workerId: draft.workerId, supplierId: draft.supplierId }, existing ? { workerId: nullableId(existing.worker_id), supplierId: nullableId(existing.supplier_id), nameSnapshot: nullableSnapshot(existing.payee_name_snapshot) } : undefined, tx.references)
   if (party.workerId && ((action !== 'draft' && !draft.settlementAllocations?.length) || draft.contractId || draft.bizType === '管理费' || draft.bizType === '预付款' || draft.bizType?.startsWith('有合同-')))
     throw new Error('工人收款必须沿已核实原费用结算清偿；工资请使用工人工资实际收付流程')
-  if (draft.contractId) {
+  const paymentContract = draft.contractReference == null ? null : parsePaymentContractReference(draft.contractReference)
+  if (draft.contractReference != null && (!paymentContract || paymentContract.id !== draft.contractId))
+    throw new Error('所选付款合同身份不完整或不一致，请重新选择')
+  if (draft.contractId && tx.paymentContract && !paymentContract)
+    throw new FinanceAmountSourceError('付款合同领域或版本缺失，请重新选择并核对合同。')
+  if (paymentContract && tx.paymentContract) {
+    await tx.paymentContract.verify(paymentContract, projectId, nullableId(draft.supplierId), text(draft.bizType))
+  }
+  else if (draft.contractId) {
     const contract = await assertReference<{
       project_id: string
       supplier_id: string | null
@@ -1151,7 +1188,8 @@ async function savePaymentApplication(
     nullableId(draft.supplierId),
     party.workerId,
     party.nameSnapshot,
-    nullableId(draft.contractId),
+    paymentContract?.domain === 'company' ? null : nullableId(draft.contractId),
+    ...(tx.paymentContract ? [paymentContract?.domain === 'company' ? paymentContract.id : paymentContract ? null : existing?.company_expense_contract_id ?? null, paymentContract?.domain ?? null, paymentContract?.version ?? null] : []),
     text(draft.costName),
     amount,
     text(draft.applyDate),
@@ -1172,7 +1210,7 @@ async function savePaymentApplication(
     ? await withUpdateLog(tx, 'payment_applications', id, () => tx.execute(`
         UPDATE payment_applications
         SET no = ?, name = ?, biz_type = ?, project_id = ?, supplier_id = ?, worker_id = ?, payee_name_snapshot = ?,
-            contract_id = ?, cost_name = ?, apply_amount = ?, apply_date = ?,
+            contract_id = ?, ${tx.paymentContract ? 'company_expense_contract_id = ?, contract_domain = ?, contract_version = ?,' : ''} cost_name = ?, apply_amount = ?, apply_date = ?,
             applicant = ?, invoice_state = ?, pay_content = ?, prepay_deduct = ?,
             prepay_note = ?, approved_amount = ?, approved_amount_origin = ?, approval_note = ?, status = ?,
             note = ?, external_ref = ?, updated_at = ?
@@ -1181,12 +1219,12 @@ async function savePaymentApplication(
     : await (async () => {
         await tx.execute(`
           INSERT INTO payment_applications (
-            id, no, name, biz_type, project_id, supplier_id, worker_id, payee_name_snapshot, contract_id,
+            id, no, name, biz_type, project_id, supplier_id, worker_id, payee_name_snapshot, contract_id, ${tx.paymentContract ? 'company_expense_contract_id, contract_domain, contract_version,' : ''}
             cost_name, apply_amount, apply_date, applicant, invoice_state,
             pay_content, prepay_deduct, prepay_note, approved_amount, approved_amount_origin,
             approval_note, status, note, external_ref, created_at, updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${tx.paymentContract ? '?, ?, ?, ' : ''}?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [id, ...values.slice(0, -1), now, now])
         return logCreate(tx, 'payment_applications', id)
       })()
@@ -1273,12 +1311,26 @@ async function validatePaymentRecord(
       apply_amount: number
       approved_amount: number | null
       approved_amount_origin: ApprovedAmountOrigin
+      contract_id: string | null
+      company_expense_contract_id: string | null
+      invoice_state: string | null
     }>(tx, 'payment_applications', applicationId, '付款申请')
     if (nullableId(draft.projectId) !== application.project_id)
       throw new Error('付款申请与支付记录的项目归属不一致')
     if (nullableId(draft.supplierId) !== application.supplier_id || nullableId(draft.workerId) !== nullableId(application.worker_id))
       throw new Error('付款申请与支付记录的真实收款对象不一致')
     if (action === 'confirm') {
+      if (tx.paymentInvoiceScope)
+        await tx.paymentInvoiceScope.check(applicationId)
+      if (application.contract_id || application.company_expense_contract_id) {
+        if (!['先票后款', '先款后票', '无需发票'].includes(String(application.invoice_state)))
+          throw new FinanceAmountSourceError('付款申请的回票类型无法核实，请先核对原申请。')
+        if (application.invoice_state !== '无需发票') {
+          if (!tx.paymentInvoiceGuard)
+            throw new FinanceAmountSourceError('当前来源无法核验付款发票与合同，请使用可信中央工作区。')
+          await tx.paymentInvoiceGuard.check(applicationId)
+        }
+      }
       const alreadyPaid = await tx.select<{ amount: unknown }>(`
         SELECT allocation.allocated_amount AS amount
         FROM payment_record_application_allocations AS allocation
@@ -1673,6 +1725,11 @@ async function loadPaymentApplication(
   if (!row)
     return null
   requireVerifiedFinanceNumbers('payment_applications', row)
+  const contractReference = row.contract_domain == null && row.contract_version == null
+    ? null
+    : parsePaymentContractReference({ domain: row.contract_domain, id: row.contract_domain === 'company' ? row.company_expense_contract_id : row.contract_id, version: row.contract_version })
+  if ((row.contract_domain != null || row.contract_version != null) && !contractReference)
+    throw new FinanceAmountSourceError('付款合同身份或版本损坏，请核对原记录。')
   const [settlements, invoices, summary] = await Promise.all([
     db.select<Record<string, unknown>>(`
       SELECT * FROM payment_application_settlement_allocations
@@ -1698,7 +1755,8 @@ async function loadPaymentApplication(
     supplierId: row.supplier_id == null ? null : String(row.supplier_id),
     workerId: nullableId(row.worker_id),
     payeeNameSnapshot: nullableSnapshot(row.payee_name_snapshot),
-    contractId: row.contract_id == null ? null : String(row.contract_id),
+    contractId: contractReference?.id ?? (row.contract_id == null ? null : String(row.contract_id)),
+    contractReference,
     costName: String(row.cost_name ?? ''),
     applyAmount: verifiedFinanceNumber(row.apply_amount),
     applyDate: String(row.apply_date ?? ''),

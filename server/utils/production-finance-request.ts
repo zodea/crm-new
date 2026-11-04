@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { decodeConstructionMainSelection } from '../../app/lib/construction-scope/contract'
 import { CENTRAL_FINANCE_KINDS, FINANCE_FAMILIES, financeFailure } from '../../app/lib/finance/central-contract'
 import { isExpenseClearanceVerificationEdit } from '../../app/lib/finance/clearance-verification'
+import { parsePaymentContractReference } from '../../app/lib/finance/payment-contract'
 import { isPaymentVerificationEdit } from '../../app/lib/finance/payment-verification'
 
 export function financeCanonical(value: unknown): string {
@@ -56,6 +57,8 @@ export function parseFinanceCommand(value: unknown): FinanceCommand {
   if (['unconfirm', 'delete'].includes(String(body.action)) && !body.id)
     financeFailure('validation-failed', '此操作缺少已存在财务记录的稳定编号。')
   const draft = body.draft as Record<string, unknown>
+  if (draft.contractReference != null && (kind !== 'payment_application' || !parsePaymentContractReference(draft.contractReference)))
+    financeFailure('validation-failed', '付款合同身份、领域或版本无效。')
   try {
     if (draft.constructionMain !== undefined) {
       if (kind !== 'reimbursement')

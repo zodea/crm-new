@@ -300,12 +300,12 @@ it('真实其他支出合同同tx关联后进入Other候选和承诺，公司头
     const auxiliary = createProductionAuxiliaryContractService(f.storage)
     const base = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: 'auxiliary-contract:write', baseVersion: null, action: 'submit' as const, attachments: { add: [{ fileName: '原项目服务合同.txt', mimeType: 'text/plain', fileSize: 3, payloadBase64: 'YWJj' }] } }
     const saved = await auxiliary.execute({ ...base, commandId: 'scope-real-aux-other', constructionMain: { id: main.id, projectId: f.project.id, basis: main.basis }, draft: { kind: 'other_expense', name: '实际检测服务合同', no: 'SCOPE-AUX-OTHER', projectId: f.project.id, supplierId: f.supplier.id, category: '检测服务', signDate: '2026-10-07', amount: 200, taxRate: 0, ourSignatoryId: f.signatory.id, ourSignatoryVersion: f.signatory.version } }, f.session)
-    const company = await auxiliary.execute({ ...base, commandId: 'scope-real-aux-company', draft: { kind: 'company_expense', name: '独立公司合同', no: 'SCOPE-AUX-COMPANY', counterparty: '独立软件合同对方', category: '软件', signDate: '2026-10-07', amount: 50, taxRate: 0, ourSignatoryId: f.signatory.id, ourSignatoryVersion: f.signatory.version } }, f.session)
+    const company = await auxiliary.execute({ ...base, commandId: 'scope-real-aux-company', draft: { kind: 'company_expense', name: '独立公司合同', no: 'SCOPE-AUX-COMPANY', supplierId: f.supplier.id, supplierVersion: f.supplier.version, category: '软件', signDate: '2026-10-07', amount: 50, taxRate: 0, ourSignatoryId: f.signatory.id, ourSignatoryVersion: f.signatory.version } }, f.session)
     const other = createProductionOtherSettlementService(f.storage)
     const context = await other.context(f.session)
     expect(context.contracts).toEqual([expect.objectContaining({ id: saved.id, kind: 'other_expense', projectId: f.project.id, supplierId: f.supplier.id, amount: '200.00', changedAmount: '200.00' })])
     expect(context.contracts.some(row => row.id === company.id)).toBe(false)
-    expect(await f.storage.select('SELECT project_id FROM auxiliary_contract_records WHERE id=?', [company.id])).toEqual([{ project_id: null }])
+    expect(await f.storage.select('SELECT project_id,supplier_id FROM auxiliary_contract_records WHERE id=?', [company.id])).toEqual([{ project_id: null, supplier_id: f.supplier.id }])
     const spending = await f.storage.withTransaction(tx => readProductionConstructionSpending(tx, f.actor, f.project.id, f.main.id))
     expect(spending.rows.filter(row => row.metric === 'committed').map(row => [row.sourceId, row.amount])).toEqual(expect.arrayContaining([[f.material.id, 100], [saved.id, 200]]))
     expect(spending.metrics.committed).toEqual({ knownAmount: 300, amount: 300, complete: true })
@@ -398,7 +398,7 @@ it('实际付款只读原银行确认及精确分摊，费用/申请/结算不�
     const source = { domain: 'material-contract' as const, id: f.material.id }
     await f.scope.execute(constructionScopeCommand(await f.scope.read(source, f.session), 'scope-paid-source', f.main.id), f.session)
     const base = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, baseVersion: null, action: 'save' as const, attachments: {} }
-    const app = await f.finance.execute({ ...base, commandId: 'scope-actual-material-application', kind: 'payment_application', requiredCapability: 'finance-payment-application:write', draft: { name: '已批材料预付款', projectId: f.project.id, contractId: f.material.id, supplierId: f.supplier.id, bizType: '预付款', applyAmount: 20, approvedAmount: 20, status: 'approved', prepay: true, applyDate: '2026-10-07', applicant: '核验财务', invoiceState: '无需发票' } }, f.session)
+    const app = await f.finance.execute({ ...base, commandId: 'scope-actual-material-application', kind: 'payment_application', requiredCapability: 'finance-payment-application:write', draft: { name: '已批材料预付款', projectId: f.project.id, contractId: f.material.id, contractReference: { domain: 'material', id: f.material.id, version: f.material.version }, supplierId: f.supplier.id, bizType: '预付款', applyAmount: 20, approvedAmount: 20, status: 'approved', prepay: true, applyDate: '2026-10-07', applicant: '核验财务', invoiceState: '无需发票' } }, f.session)
     const before = await f.storage.withTransaction(tx => readProductionConstructionSpending(tx, f.actor, f.project.id, f.main.id))
     expect(before.metrics.committed.amount).toBe(100)
     expect(before.metrics.paid.amount).toBe(0)

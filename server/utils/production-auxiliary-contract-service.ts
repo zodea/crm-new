@@ -75,7 +75,7 @@ export function createProductionAuxiliaryContractService(storage: ProductionStor
   }
   async function owner(tx: TransactionDb, actor: BusinessSession, data: Awaited<ReturnType<typeof validateProductionAuxiliaryState>>) {
     const projects = actor.capabilities.includes('project:list:read') ? await tx.select<{ id: string, name: string }>('SELECT id,name FROM projects WHERE deleted_at IS NULL ORDER BY name,id') : []
-    const suppliers = actor.capabilities.includes('supplier:list:read') ? [...(await loadProductionSuppliers(tx, actor)).suppliers.values()].map(row => ({ id: row.id, name: row.draft.name ?? '' })) : []
+    const suppliers = actor.capabilities.includes('supplier:list:read') ? [...(await loadProductionSuppliers(tx, actor)).suppliers.values()].map(row => ({ id: row.id, name: row.draft.name ?? '', version: String(row.version) })) : []
     const instance = createAuxiliaryContractTestInstance({ projects, suppliers })
     const hidden = new Set((await tx.select<Row>('SELECT c.id FROM auxiliary_contract_records c LEFT JOIN projects p ON p.id=c.project_id WHERE c.deleted_at IS NOT NULL OR p.deleted_at IS NOT NULL')).map(row => row.id))
     instance.importState({ ...data.state, contracts: data.state.contracts.filter(row => !hidden.has(row.draft.id)).map(row => ({ ...row, facts: data.supplements.filter(fact => fact.contractId === row.draft.id && fact.deletedAt === null) })) })
@@ -137,7 +137,7 @@ export function createProductionAuxiliaryContractService(storage: ProductionStor
         if (!actor.capabilities.includes('auxiliary-contract:write'))
           return fail('forbidden', '当前辅助合同表单只读')
         const catalog = await owner(tx, actor, data)
-        return { ...actor, projects: catalog.projects.map(row => ({ id: row.id, label: row.name })), suppliers: catalog.suppliers.map(row => ({ id: row.id, label: row.name })), constructionMains: await readProductionConstructionMainOptions(tx, actor), ourSignatories: actor.capabilities.includes('our-signatory:read') ? (await readOurSignatories(tx)).records : [] }
+        return { ...actor, projects: catalog.projects.map(row => ({ id: row.id, label: row.name })), suppliers: catalog.suppliers.map(row => ({ id: row.id, label: row.name, version: row.version })), constructionMains: await readProductionConstructionMainOptions(tx, actor), ourSignatories: actor.capabilities.includes('our-signatory:read') ? (await readOurSignatories(tx)).records : [] }
       })
     },
     list(input: Row, session: Session) {
@@ -157,6 +157,7 @@ export function createProductionAuxiliaryContractService(storage: ProductionStor
           if (!actor.capabilities.includes('supplier:list:read') && item.supplier) {
             item.supplier = { state: 'forbidden', entity: 'supplier', id: null, label: null, reason: 'permission-denied' }
             item.draft.supplierId = null
+            item.draft.supplierVersion = null
           }
         }
         const proof = await meta(tx, actor, 'auxiliary-contract:list', input, data.state.sourceVersion)
@@ -186,6 +187,7 @@ export function createProductionAuxiliaryContractService(storage: ProductionStor
         if (!actor.capabilities.includes('supplier:list:read') && detail.contract.supplier) {
           detail.contract.supplier = { state: 'forbidden', entity: 'supplier', id: null, label: null, reason: 'permission-denied' }
           detail.contract.draft.supplierId = null
+          detail.contract.draft.supplierVersion = null
         }
         for (const supplement of data.supplements.filter(row => row.contractId === id && row.deletedAt === null))
           detail.attachments.push(...supplement.attachments.filter(file => (input.includeDeleted === 'true' && actor.capabilities.includes('auxiliary-contract:write')) || file.deletedAt === null))
@@ -209,17 +211,32 @@ export function createProductionAuxiliaryContractService(storage: ProductionStor
             return fail('conflict', '所选工程、施工主合同资格或采用依据已经变化')
         }
         const prior = data.state.contracts.find(row => row.draft.id === command.id)
-        if (prior && (prior.draft.projectId !== command.draft.projectId || prior.draft.supplierId !== command.draft.supplierId) && await consumed(tx, prior.draft.id))
+        if (command.draft.kind === 'company_expense' && (command.draft.supplierId || prior?.draft.supplierId) && !actor.capabilities.includes('supplier:list:read'))
+          return fail('forbidden', '无分供方读取权限，不能核对公司合同关系')
+        if (prior && (prior.draft.projectId !== command.draft.projectId || prior.draft.supplierId !== command.draft.supplierId || (prior.draft.kind === 'company_expense' && prior.draft.supplierVersion !== command.draft.supplierVersion)) && await consumed(tx, prior.draft.id))
           return fail('relationship-mismatch', '辅助合同已被真实下游、历史或原意图消费，不能改归属')
-        const { instance } = await owner(tx, actor, data)
+        const { instance, suppliers } = await owner(tx, actor, data)
         const fileBodies = (command.attachments.add ?? []).map(file => contractOriginalBytes(file, { required: true, fail: message => fail('validation-failed', message) })!)
         const execution = structuredClone(command)
         const originalDraft = execution.draft
+        if (originalDraft.kind === 'company_expense') {
+          if ((!prior || prior.draft.supplierId) && !originalDraft.supplierId)
+            return fail('validation-failed', '公司合同请选择已有分供方')
+          if (originalDraft.supplierId) {
+            const supplier = suppliers.find(row => row.id === originalDraft.supplierId)
+            if (!supplier || !supplier.name.trim())
+              return fail('unavailable', '公司合同所选分供方不可读取')
+            const unchanged = prior?.draft.supplierId === originalDraft.supplierId && prior.draft.supplierVersion === originalDraft.supplierVersion
+            if (!unchanged && supplier.version !== originalDraft.supplierVersion)
+              return fail('conflict', '分供方资料已变化，请重新读取并选择')
+            execution.draft = { ...originalDraft, counterparty: unchanged ? prior!.draft.counterparty : supplier.name }
+          }
+        }
         if (!prior && originalDraft.partyA && !originalDraft.ourSignatoryId)
           return fail('validation-failed', '新辅助合同甲方必须从真实我方主档选择，不能自由文本冒名')
         try {
           const adopted = await resolveContractSignatory(tx, { id: originalDraft.ourSignatoryId, version: originalDraft.ourSignatoryVersion, prior: prior?.draft.ourSignatorySnapshot, required: command.action === 'submit' })
-          execution.draft = { ...originalDraft, ourSignatoryId: adopted?.id ?? null, ourSignatoryVersion: adopted?.version ?? null, ourSignatorySnapshot: adopted, partyA: adopted?.name ?? originalDraft.partyA }
+          execution.draft = { ...execution.draft, ourSignatoryId: adopted?.id ?? null, ourSignatoryVersion: adopted?.version ?? null, ourSignatorySnapshot: adopted, partyA: adopted?.name ?? originalDraft.partyA }
         }
         catch (cause) {
           if (cause instanceof OurSignatoryRepositoryProblem)
@@ -305,6 +322,15 @@ export function createProductionAuxiliaryContractService(storage: ProductionStor
 async function consumed(tx: ReadTx, id: string) {
   if ((await tx.select('SELECT 1 FROM construction_scope_history WHERE source_domain=\'auxiliary-contract\' AND source_id=?', [id]))[0] || (await tx.select('SELECT command_id FROM construction_scope_intents WHERE json_extract(request_json,\'$.source.domain\')=\'auxiliary-contract\' AND json_extract(request_json,\'$.source.id\')=?', [id]))[0] || (await tx.select('SELECT id FROM expenditure_settlements WHERE contract_id=?', [id]))[0])
     return true
+  if ((await tx.select('SELECT name FROM sqlite_schema WHERE type=\'table\' AND name=\'invoices\''))[0]) {
+    if ((await tx.select('SELECT id FROM invoices WHERE contract_domain=\'company\' AND contract_id=? LIMIT 1', [id]))[0])
+      return true
+    if ((await tx.select(`SELECT id FROM invoice_audits
+      WHERE (json_extract(before_json,'$.contract.domain')='company' AND json_extract(before_json,'$.contract.id')=?)
+         OR (json_extract(after_json,'$.contract.domain')='company' AND json_extract(after_json,'$.contract.id')=?) LIMIT 1`, [id, id]))[0]) {
+      return true
+    }
+  }
   for (const table of ['payment_applications', 'invoice_applications']) {
     const columns = await tx.select<{ name: string }>(`PRAGMA table_info(${table})`)
     for (const foreign of ['contract_id', 'company_expense_contract_id']) {
