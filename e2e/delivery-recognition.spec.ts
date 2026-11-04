@@ -10,7 +10,7 @@ const cases = [
   { name: '小数数量与闰日', no: 'SH-E2E-DECIMAL', date: '2028-02-29', ocrDate: '2028.02.29', qty: '0.5', alteredQty: '1', price: '12.50', amount: '6.25', ocrAmount: '6.25', wrongAmount: '7' },
 ] as const
 
-function markdown(input: typeof cases[number], supplier = MATERIAL_PRODUCTION_FIXTURE.supplierName) {
+function markdown(input: typeof cases[number], supplier: string = MATERIAL_PRODUCTION_FIXTURE.supplierName) {
   return `# ${supplier}销售单\n客户名称：广州市瑞航建筑工程有限公司\n送货地址：${MATERIAL_PRODUCTION_FIXTURE.projectName}\n单号：${input.no}\n日期：${input.ocrDate}\n<table><tr><td>序号</td><td>商品名称</td><td>规格</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr><tr><td>1</td><td>普通硅酸盐水泥</td><td>P.O 42.5</td><td>袋</td><td>${input.qty}</td><td>${input.price}</td><td>${input.ocrAmount}</td></tr><tr><td></td><td>合计</td><td></td><td></td><td></td><td></td><td>${input.ocrAmount}</td></tr></table>`
 }
 

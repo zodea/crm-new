@@ -21,7 +21,7 @@ export async function preparePayrollRosterWorkspace(page: Page, info: TestInfo) 
   const access = (allowed: boolean) => page.request.post('/api/testing/worker-roster/access', { headers: { 'x-ruihang-test-reset': '1' }, data: { allowed } })
   const granted = await access(true)
   expect(granted.ok(), await granted.text()).toBe(true)
-  const fetcher = async (path: string, options?: { method?: 'POST', body?: unknown, query?: Record<string, unknown> }) => {
+  const fetcher = async (path: string, options?: { method?: 'GET' | 'POST' | 'PUT', body?: unknown, query?: Record<string, unknown> }) => {
     const response = await page.request.fetch(path, { method: options?.method ?? 'GET', params: options?.query ? Object.fromEntries(Object.entries(options.query).map(([key, value]) => [key, String(value)])) : undefined, data: options?.body })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()

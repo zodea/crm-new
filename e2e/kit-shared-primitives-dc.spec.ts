@@ -7,7 +7,12 @@ const dsRoot = new URL('_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/', dcRoot)
 async function inlineStyles(url: URL): Promise<string> {
   const source = await readFile(url, 'utf8')
   const imports = [...source.matchAll(/@import\s+"([^"]+\.css)";/g)]
-  const nested = await Promise.all(imports.map(match => inlineStyles(new URL(match[1], url))))
+  const nested = await Promise.all(imports.map((match) => {
+    const path = match[1]
+    if (!path)
+      throw new Error('设计稿样式引用路径缺失')
+    return inlineStyles(new URL(path, url))
+  }))
   return [...nested, source.replace(/@import\s+"[^"]+\.css";/g, '')].join('\n')
 }
 

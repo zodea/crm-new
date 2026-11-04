@@ -23,7 +23,7 @@ for (const input of [{ perPage: '1', pages: 7 }, { perPage: '2', pages: 4 }, { p
         value: 0,
       })
       window.print = () => {
-        const target = window as Window & { __invoicePrintCalls: number }
+        const target = window as unknown as { __invoicePrintCalls: number }
         target.__invoicePrintCalls += 1
       }
     })
@@ -98,13 +98,13 @@ for (const input of [{ perPage: '1', pages: 7 }, { perPage: '2', pages: 4 }, { p
     await expect(summary).toHaveText('已勾 6 张 · 3 页 A4 · 金额合计 ¥2,938.00')
 
     await page.getByRole('button', { name: '打印选中', exact: true }).click()
-    expect(await page.evaluate(() => (window as Window & { __invoicePrintCalls: number }).__invoicePrintCalls)).toBe(1)
+    expect(await page.evaluate(() => (window as unknown as { __invoicePrintCalls: number }).__invoicePrintCalls)).toBe(1)
     let confirm = page.getByRole('dialog', { name: '确认打印结果' })
     await confirm.getByRole('button', { name: '取消', exact: true }).click()
     await expect(firstInvoice).toContainText('打印 0 次')
 
     await page.getByRole('button', { name: '打印选中', exact: true }).click()
-    expect(await page.evaluate(() => (window as Window & { __invoicePrintCalls: number }).__invoicePrintCalls)).toBe(2)
+    expect(await page.evaluate(() => (window as unknown as { __invoicePrintCalls: number }).__invoicePrintCalls)).toBe(2)
     confirm = page.getByRole('dialog', { name: '确认打印结果' })
     await expect(confirm).toContainText('6 张发票')
     await expect(confirm).toContainText('3 页 A4')

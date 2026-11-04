@@ -125,7 +125,7 @@ for (const input of CUSTOMER_INPUTS) {
       }, { entity, draft: adoptedDraft, id })
     }
 
-    const saveContract = (page: Page, name: string, amount = input.amount) => saveEntity(page, 'construction-contracts', { name, amount, projectId: 'project-real-320', customerId: 'customer-real-320', content: '隔离合成施工', signDate: input.date, status: '履约中' })
+    const saveContract = (page: Page, name: string, amount: number = input.amount) => saveEntity(page, 'construction-contracts', { name, amount, projectId: 'project-real-320', customerId: 'customer-real-320', content: '隔离合成施工', signDate: input.date, status: '履约中' })
     const customerUrl = '/base/customer/customer-real-320?origin=real&tab=contracts'
 
     test.beforeEach(async ({ page }, info) => {
