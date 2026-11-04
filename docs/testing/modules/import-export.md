@@ -19,6 +19,12 @@
 | [tests/kit/import-source.test.ts](../../../tests/kit/import-source.test.ts) | 单元／服务／状态 | 导入源解析：原始表头 + 行 |
 | [tests/stores/export-workflows.test.ts](../../../tests/stores/export-workflows.test.ts) | 单元／服务／状态 | 配置导出工作流上下文 |
 
+## 浏览器组件
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/browser/ConfiguredExportDirectoryIdentity.test.ts](../../../tests/browser/ConfiguredExportDirectoryIdentity.test.ts) | Vitest Browser／Chromium | 配置导出界面写入中断后选择同名不同目录，内存目录句柄核对身份并重写全部文件 |
+
 ## Playwright E2E
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |

@@ -97,6 +97,8 @@ export interface ExportDirectoryTarget {
   displayPath: string
   /** false 表示浏览器标准下载只能扁平落盘，不能冒充已创建目录结构。必填，避免新落点忘记声明时被误放行。 */
   supportsSubdirectories: boolean
+  /** 不能仅凭目录显示名判断重试落点；无法验证时须拒绝恢复。 */
+  sameDirectory?: (other: ExportDirectoryTarget) => Promise<boolean>
   writeFile: (name: string, data: Uint8Array, mimeType?: string) => Promise<void>
 }
 

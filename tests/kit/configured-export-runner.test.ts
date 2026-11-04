@@ -82,6 +82,7 @@ describe('配置导出运行器', () => {
       writeFile: vi.fn()
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('磁盘已满')),
+      sameDirectory: vi.fn().mockResolvedValue(true),
     })
     const retryTarget = target()
     const runner = useConfiguredExportRunner(multiFileSource, settings, {
@@ -118,6 +119,7 @@ describe('配置导出运行器', () => {
       writeFile: vi.fn()
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('磁盘已满')),
+      sameDirectory: vi.fn().mockResolvedValue(false),
     })
     const otherTarget = target({ displayPath: 'E:\\备份' })
     const runner = useConfiguredExportRunner(multiFileSource, settings, {
@@ -135,6 +137,79 @@ describe('配置导出运行器', () => {
     expect(otherTarget.writeFile).toHaveBeenCalledTimes(2)
     expect(otherTarget.writeFile).toHaveBeenNthCalledWith(1, '滨江壹号/华东建材/华东建材.txt', new TextEncoder().encode('第一份'), undefined)
     expect(otherTarget.writeFile).toHaveBeenNthCalledWith(2, '滨江壹号/南方设备/南方设备.txt', new TextEncoder().encode('第二份'), undefined)
+  })
+
+  it('重试选择名称相同但身份不同的目录时，重新写入全部文件', async () => {
+    const multiFileSource: ConfiguredExportSource = {
+      ...source,
+      files: [
+        { row: { projectName: '滨江壹号', supplierName: '华东建材' }, data: '第一份' },
+        { row: { projectName: '滨江壹号', supplierName: '南方设备' }, data: '第二份' },
+      ],
+    }
+    const first = Object.assign(target({
+      displayPath: '导出',
+      writeFile: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('磁盘已满')),
+    }), { sameDirectory: vi.fn().mockResolvedValue(false) })
+    const second = target({ displayPath: '导出' })
+    const runner = useConfiguredExportRunner(multiFileSource, settings, {
+      pickDirectory: vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second),
+      yieldToView: vi.fn().mockResolvedValue(undefined),
+    })
+
+    expect(await runner.start()).toMatchObject({ status: 'failed' })
+    expect(await runner.retry()).toEqual({ status: 'exported', displayPath: '导出' })
+    expect(second.writeFile).toHaveBeenCalledTimes(2)
+    expect(first.sameDirectory).toHaveBeenCalledExactlyOnceWith(second)
+    expect(second.writeFile).toHaveBeenNthCalledWith(1, '滨江壹号/华东建材/华东建材.txt', new TextEncoder().encode('第一份'), undefined)
+    expect(second.writeFile).toHaveBeenNthCalledWith(2, '滨江壹号/南方设备/南方设备.txt', new TextEncoder().encode('第二份'), undefined)
+  })
+
+  it('目录身份比较失败时停止且保留进度，核对恢复后只补写未完成文件', async () => {
+    const multiFileSource: ConfiguredExportSource = {
+      ...source,
+      files: [
+        { row: { projectName: '滨江壹号', supplierName: '华东建材' }, data: '第一份' },
+        { row: { projectName: '滨江壹号', supplierName: '南方设备' }, data: '第二份' },
+      ],
+    }
+    const identityError = new Error('无法核对导出目录身份，已保留进度')
+    const sameDirectory = vi.fn().mockRejectedValueOnce(identityError).mockResolvedValueOnce(true)
+    const first = target({ sameDirectory, writeFile: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('磁盘已满')) })
+    const unverifiable = target()
+    const recovered = target()
+    const runner = useConfiguredExportRunner(multiFileSource, settings, {
+      pickDirectory: vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(unverifiable).mockResolvedValueOnce(recovered),
+      yieldToView: vi.fn().mockResolvedValue(undefined),
+    })
+
+    expect(await runner.start()).toMatchObject({ status: 'failed' })
+    expect(await runner.retry()).toEqual({ status: 'failed', error: identityError })
+    expect(runner.error.value).toBe('无法核对导出目录身份，已保留进度')
+    expect(unverifiable.writeFile).not.toHaveBeenCalled()
+    expect(await runner.retry()).toEqual({ status: 'exported', displayPath: 'D:\\导出' })
+    expect(recovered.writeFile).toHaveBeenCalledExactlyOnceWith('滨江壹号/南方设备/南方设备.txt', new TextEncoder().encode('第二份'), undefined)
+  })
+
+  it('落点不支持身份比较时停止，不能按同名假定为原目录', async () => {
+    const multiFileSource: ConfiguredExportSource = {
+      ...source,
+      files: [
+        { row: { projectName: '滨江壹号', supplierName: '华东建材' }, data: '第一份' },
+        { row: { projectName: '滨江壹号', supplierName: '南方设备' }, data: '第二份' },
+      ],
+    }
+    const first = target({ writeFile: vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('磁盘已满')) })
+    const second = target()
+    const runner = useConfiguredExportRunner(multiFileSource, settings, {
+      pickDirectory: vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second),
+      yieldToView: vi.fn().mockResolvedValue(undefined),
+    })
+
+    expect(await runner.start()).toMatchObject({ status: 'failed' })
+    expect(await runner.retry()).toMatchObject({ status: 'failed', error: { message: expect.stringContaining('无法核对导出目录身份') } })
+    expect(second.writeFile).not.toHaveBeenCalled()
+    expect(runner.stepper.value.phase).toBe('failed')
   })
 
   it('写盘失败保留失败步，重试从写盘继续', async () => {

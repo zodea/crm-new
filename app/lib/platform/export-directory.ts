@@ -12,9 +12,12 @@ interface BrowserFileHandle {
 
 interface BrowserDirectoryHandle {
   name: string
+  isSameEntry?: (other: BrowserDirectoryHandle) => Promise<boolean>
   getDirectoryHandle: (name: string, options: { create: true }) => Promise<BrowserDirectoryHandle>
   getFileHandle: (name: string, options: { create: boolean }) => Promise<BrowserFileHandle>
 }
+
+const browserDirectories = new WeakMap<ExportDirectoryTarget, BrowserDirectoryHandle>()
 
 interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: (options: { mode: 'readwrite' }) => Promise<BrowserDirectoryHandle>
@@ -71,9 +74,23 @@ async function pickBrowserDirectory(
 ): Promise<ExportDirectoryTarget | null> {
   try {
     const directory = await picker({ mode: 'readwrite' })
-    return {
+    const target: ExportDirectoryTarget = {
       displayPath: directory.name,
       supportsSubdirectories: true,
+      async sameDirectory(other) {
+        const otherDirectory = browserDirectories.get(other)
+        if (!otherDirectory || typeof directory.isSameEntry !== 'function')
+          throw new Error('无法核对导出目录身份，已保留进度，请使用支持目录身份校验的浏览器重试')
+        try {
+          const same = await directory.isSameEntry(otherDirectory)
+          if (typeof same !== 'boolean')
+            throw new Error('目录身份结果无效')
+          return same
+        }
+        catch (cause) {
+          throw new Error('无法核对导出目录身份，已保留进度，请检查目录权限后重试', { cause })
+        }
+      },
       async writeFile(relativePath, data) {
         const segments = relativePathSegments(relativePath)
         if (segments.length > 1 && !options.recursive)
@@ -98,6 +115,8 @@ async function pickBrowserDirectory(
         }
       },
     }
+    browserDirectories.set(target, directory)
+    return target
   }
   catch (error) {
     if (isAbortError(error))

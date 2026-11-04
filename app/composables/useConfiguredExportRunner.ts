@@ -49,10 +49,10 @@ export function useConfiguredExportRunner(
   const running = computed(() => stepper.value.phase === 'running')
   let preparedFiles: ConfiguredExportFile[] | null = null
   let displayPath: string | null = null
-  // 已成功写出的文件（按落点 displayPath 记账）：重试同一目录时跳过续写，
+  // 已成功写出的文件按目录身份记账：重试同一目录时跳过续写，
   // 避免写盘层「绝不覆盖」把已写文件再落成 ` (2)` 副本。
   const writtenPaths = new Set<string>()
-  let writtenDisplayPath: string | null = null
+  let writtenTarget: ExportDirectoryTarget | null = null
 
   function reset() {
     stepper.value = createExportStepper()
@@ -60,7 +60,7 @@ export function useConfiguredExportRunner(
     preparedFiles = null
     displayPath = null
     writtenPaths.clear()
-    writtenDisplayPath = null
+    writtenTarget = null
   }
 
   async function readData() {
@@ -86,10 +86,16 @@ export function useConfiguredExportRunner(
     if (target.supportsSubdirectories === false)
       throw new Error('当前浏览器不支持保留目录结构，请使用支持目录访问的浏览器')
 
-    if (writtenDisplayPath !== target.displayPath) {
-      writtenPaths.clear()
-      writtenDisplayPath = target.displayPath
+    if (writtenTarget && writtenPaths.size && writtenTarget !== target) {
+      if (!writtenTarget.sameDirectory)
+        throw new Error('无法核对导出目录身份，已保留进度，请使用支持目录身份校验的浏览器重试')
+      const same = await writtenTarget.sameDirectory(target)
+      if (typeof same !== 'boolean')
+        throw new Error('无法核对导出目录身份，已保留进度，请重新选择目录')
+      if (!same)
+        writtenPaths.clear()
     }
+    writtenTarget = target
     for (const file of preparedFiles) {
       if (writtenPaths.has(file.relativePath))
         continue
