@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, expect, it } from 'vitest'
 import { backupFileDigest, inspectProductionBackup } from '../../server/utils/production-backup-manifest'
@@ -33,7 +33,8 @@ it('真实独立副本与离线复制保留数据时间，隔离恢复不覆盖�
     const corrupt = `backup-${randomUUID()}`
     await createLocalBackup(storage, locations.staging!, corrupt, () => '2026-09-22T12:00:00.000Z')
     await writeFile(join(locations.staging!, corrupt, 'data.sqlite'), '不是数据库')
-    await expect(copyBackupPackage(locations.staging!, locations.nas!, corrupt)).rejects.toThrow()
+    await expect(copyBackupPackage(locations.staging!, locations.nas!, corrupt)).rejects.toThrow('file is not a database')
+    await expect(lstat(join(locations.nas!, corrupt))).rejects.toMatchObject({ code: 'ENOENT' })
     expect((await readFile(join(locations.nas!, id, 'data.sqlite'))).equals(successful)).toBe(true)
     expect(await readBackupPackage(locations.nas!, id)).toEqual(local)
   }
@@ -141,7 +142,8 @@ it('中文长路径备份包完整离线复制与隔离冷恢复，原件回执�
     const damaged = `backup-${randomUUID()}`
     await createLocalBackup(storage, staging, damaged, () => '2026-10-05T01:00:00.000Z')
     await writeFile(join(staging, damaged, 'data.sqlite'), '不是数据库')
-    await expect(copyBackupPackage(staging, offline, damaged)).rejects.toThrow()
+    await expect(copyBackupPackage(staging, offline, damaged)).rejects.toThrow('file is not a database')
+    await expect(lstat(join(offline, damaged))).rejects.toMatchObject({ code: 'ENOENT' })
     expect(await readBackupPackage(offline, id)).toEqual(local)
     expect(await backupFileDigest(join(offline, id, 'data.sqlite'))).toBe(sourceDigest)
   }
