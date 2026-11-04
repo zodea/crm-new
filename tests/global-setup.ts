@@ -4,7 +4,7 @@ import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { build, version as esbuildVersion } from 'esbuild'
-import { createFixtureCacheDirectory, findFixtureCaches, publishFixtureCache } from './helpers/fixture-cache'
+import { createFixtureCacheDirectory, createFixtureSourceHashReader, findFixtureCaches, publishFixtureCache } from './helpers/fixture-cache'
 
 /**
  * 冷进程与独立服务入口：每个入口都是 tests/helpers/<名称>.ts，经 runColdProcess/spawnColdProcess 以独立 Node 进程启动。
@@ -48,22 +48,50 @@ const MIGRATIONS_ENTRY = 'app/lib/db/migrations.ts'
 interface BundleManifest { key: string, inputs: Record<string, string>, migrationInputs: string[], directory: string }
 
 const sha256 = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
-async function hashFiles(paths: readonly string[]): Promise<Record<string, string> | null> {
+async function hashFiles(paths: readonly string[], readHash: (path: string) => Promise<string | null> = async (path) => {
+  try {
+    return sha256(await readFile(join(root, path)))
+  }
+  catch { return null }
+}): Promise<Record<string, string> | null> {
   const entries = await Promise.all(paths.map(async (path) => {
-    try {
-      return [path, sha256(await readFile(join(root, path)))] as const
-    }
-    catch { return null }
+    const hash = await readHash(path)
+    return hash === null ? null : [path, hash] as const
   }))
   return entries.includes(null) ? null : Object.fromEntries(entries as Array<readonly [string, string]>)
 }
 const keyOf = (inputs: Record<string, string>, extra: string) => sha256(JSON.stringify([extra, Object.entries(inputs).sort(([a], [b]) => a.localeCompare(b))]))
-const bundleSalt = JSON.stringify({ esbuildVersion, node: process.versions.node, entries: COLD_ENTRIES, format: 'esm-v1' })
+export const coldBundleOptions = {
+  outExtension: { '.js': '.mjs' },
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  target: 'node24',
+  packages: 'external',
+  alias: { '~': './app' },
+} as const
+export const coldBundleSalt = (options: unknown = coldBundleOptions) => JSON.stringify({ esbuildVersion, node: process.versions.node, entries: COLD_ENTRIES, options })
+const bundleSalt = coldBundleSalt()
+
+export async function checkCandidateSourceHashes(
+  paths: readonly string[],
+  expectedKey: string,
+  salt: string,
+  readCached: (path: string) => Promise<string | null>,
+  readFresh?: (path: string) => Promise<string | null>,
+): Promise<'different' | 'changed' | 'verified'> {
+  const current = await hashFiles(paths, readCached)
+  if (!current || keyOf(current, salt) !== expectedKey)
+    return 'different'
+  const verified = await hashFiles(paths, readFresh)
+  return verified && keyOf(verified, salt) === expectedKey ? 'verified' : 'changed'
+}
 
 const bundleFiles = [...COLD_ENTRIES, 'migrations-key'].map(name => `${name}.mjs`)
 /** 源码内容与产物摘要均吻合才复用；每次新构建写入独立目录，不删除旧缓存。 */
 async function ensureColdBundles(): Promise<BundleManifest> {
   const caches = await findFixtureCaches<{ inputs: Record<string, string>, migrationInputs: string[] }>(bundleRoot, bundleFiles)
+  const readCandidateHash = createFixtureSourceHashReader(path => readFile(join(root, path)))
   for (const { directory, manifest } of caches) {
     const previous = manifest.metadata
     if (!previous || typeof previous.inputs !== 'object' || !previous.inputs || !Array.isArray(previous.migrationInputs) || previous.migrationInputs.some(path => typeof path !== 'string'))
@@ -81,12 +109,15 @@ async function ensureColdBundles(): Promise<BundleManifest> {
     })) {
       continue
     }
-    const current = await hashFiles(paths)
-    if (current && keyOf(current, bundleSalt) === manifest.key)
+    const verification = await checkCandidateSourceHashes(paths, manifest.key, bundleSalt, readCandidateHash)
+    if (verification === 'verified')
       return { key: manifest.key, ...previous, directory }
+    if (verification === 'changed')
+      break
   }
   const staging = await createFixtureCacheDirectory(bundleRoot)
   const result = await build({
+    ...coldBundleOptions,
     absWorkingDir: root,
     entryPoints: [
       ...COLD_ENTRIES.map(name => ({ in: `tests/helpers/${name}.ts`, out: name })),
@@ -94,13 +125,6 @@ async function ensureColdBundles(): Promise<BundleManifest> {
       { in: MIGRATIONS_ENTRY, out: 'migrations-key' },
     ],
     outdir: staging,
-    outExtension: { '.js': '.mjs' },
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    target: 'node24',
-    packages: 'external',
-    alias: { '~': './app' },
     metafile: true,
     logLevel: 'silent',
   })
