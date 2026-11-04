@@ -149,12 +149,20 @@ describe('普通收款中央命令与公开读回', () => {
     expect(() => instance.execute(command(), { ...session, capabilities: ['receipt:read'] })).toThrow(/权限/)
   })
 
-  it.each(Array.from([{ origin: 'demo' }, { actorId: 'other' }, { workspaceId: 'other' }, { commandId: '' }, { action: 'confirm' }]).map(input => ({ input })))('读取权限与写权限独立，演示来源、伪造会话及未知动作不能写入：输入组合 1 案例 %#', ({ input: patch }) => {
+  it.each([
+    { name: '演示来源', patch: { origin: 'demo' }, code: 'forbidden', message: '收款命令的来源或会话身份无效' },
+    { name: '其他操作人', patch: { actorId: 'other' }, code: 'forbidden', message: '收款命令的来源或会话身份无效' },
+    { name: '其他工作区', patch: { workspaceId: 'other' }, code: 'forbidden', message: '收款命令的来源或会话身份无效' },
+    { name: '空命令编号', patch: { commandId: '' }, code: 'validation-failed', message: '收款命令编号或保存动作无效' },
+    { name: '未知操作', patch: { action: 'confirm' }, code: 'validation-failed', message: '收款命令编号或保存动作无效' },
+  ])('拒绝$name且不更改已有收款事实', ({ patch, code, message }) => {
     const instance = createReceiptCommandTestInstance({ references: () => references })
     const first = instance.execute(command(), session)
     expect(instance.form(first.id, { ...session, capabilities: ['receipt:read'] })).toMatchObject({ id: first.id })
     expect(() => instance.form(first.id, { ...session, capabilities: [] })).toThrow(/权限/)
-    expect(() => instance.execute(command(patch as Partial<ReceiptCommand>), session)).toThrow()
+    const before = instance.facts().rows
+    expect(() => instance.execute(command(patch as Partial<ReceiptCommand>), session)).toThrowError(expect.objectContaining({ problem: expect.objectContaining({ code, message }) }))
+    expect(instance.facts().rows).toEqual(before)
   })
 
   it('附件正文随收款保存、刷新读回和删除恢复，跨收款附件操作不产生部分修改', () => {
