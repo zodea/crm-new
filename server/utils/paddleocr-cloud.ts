@@ -300,8 +300,7 @@ export class PaddleOcrCloudClient {
       const jobId = await this.submit(input)
       input.onProgress?.(0)
       const jsonUrl = await this.poll(jobId, input.onProgress)
-      const resultResponse = await this.request(jsonUrl)
-      const text = await resultResponse.text()
+      const text = await this.request(jsonUrl)
       const parsed = parseDocumentResult(parseJsonLines(text))
 
       return {
@@ -408,17 +407,18 @@ export class PaddleOcrCloudClient {
     return { Authorization: `Bearer ${this.accessToken}` }
   }
 
-  private async request(url: string, init: RequestInit = {}): Promise<Response> {
+  private async request(url: string, init: RequestInit = {}): Promise<string> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), this.requestTimeoutMs)
 
     try {
       const response = await this.fetch(url, { ...init, signal: controller.signal })
+      const text = await response.text()
       if (!response.ok) {
-        const payload = await this.readApiPayload(response)
+        const payload = this.readApiPayload(text)
         throw errorForStatus(response.status, apiMessage(payload))
       }
-      return response
+      return text
     }
     catch (error) {
       if (error instanceof PaddleOcrCloudError)
@@ -439,8 +439,8 @@ export class PaddleOcrCloudClient {
     }
   }
 
-  private async apiData(response: Response): Promise<Record<string, unknown>> {
-    const payload = await this.readApiPayload(response)
+  private async apiData(text: string): Promise<Record<string, unknown>> {
+    const payload = this.readApiPayload(text)
     if (payload.code != null && payload.code !== 0)
       throw errorForStatus(payload.code, apiMessage(payload))
     if (!isRecord(payload.data))
@@ -448,9 +448,9 @@ export class PaddleOcrCloudClient {
     return payload.data
   }
 
-  private async readApiPayload(response: Response): Promise<ApiPayload> {
+  private readApiPayload(text: string): ApiPayload {
     try {
-      const payload = await response.json() as unknown
+      const payload = JSON.parse(text) as unknown
       if (!isRecord(payload))
         throw new TypeError('响应不是对象')
       return payload as ApiPayload

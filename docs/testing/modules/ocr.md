@@ -9,6 +9,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/ocr/paddleocr-cloud.test.ts](../../../tests/ocr/paddleocr-cloud.test.ts) | 单元／服务／状态 | paddleOcrCloudClient |
+| [tests/ocr/paddleocr-response-timeout.test.ts](../../../tests/ocr/paddleocr-response-timeout.test.ts) | 单元／服务／状态 | 提交、轮询及结果正文停滞时按请求超时中止，全部使用合成响应流 |
 | [tests/ocr/preferences.test.ts](../../../tests/ocr/preferences.test.ts) | 单元／服务／状态 | ocr 本机偏好 |
 | [tests/ocr/runtime-options.test.ts](../../../tests/ocr/runtime-options.test.ts) | 单元／服务／状态 | ocr 运行参数契约 |
 | [tests/ocr/sample-acceptance.test.ts](../../../tests/ocr/sample-acceptance.test.ts) | 单元／服务／状态 | OCR 本地样本验收清单；项目内独立合成样本 |
