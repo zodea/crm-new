@@ -52,7 +52,7 @@ export async function extractInvoicePdfText(file: File, basePath = '/'): Promise
 export async function renderInvoicePdfPages(
   file: File,
   pageIndexes: readonly number[],
-  consume: (pageIndex: number, image: File) => Promise<void>,
+  consume: (pageIndex: number, image: File, frame: { width: number, height: number }) => Promise<void>,
   basePath = '/',
 ): Promise<void> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
@@ -80,7 +80,7 @@ export async function renderInvoicePdfPages(
         canvas.height = Math.ceil(viewport.height)
         await page.render({ canvas, viewport, background: 'white' }).promise
         const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('无法生成 PDF 页面图片')), 'image/png'))
-        await consume(pageIndex, new File([blob], `page-${pageIndex + 1}.png`, { type: 'image/png' }))
+        await consume(pageIndex, new File([blob], `page-${pageIndex + 1}.png`, { type: 'image/png' }), { width: canvas.width, height: canvas.height })
       }
       finally {
         canvas.width = 0

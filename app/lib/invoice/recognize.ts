@@ -8,7 +8,7 @@ import type { RecognizeDocumentOptions } from '~/lib/recognize/engine'
 import type { ParsedInvoiceCandidate } from '~/lib/recognize/invoice-parse'
 import type { recognizeLocalInvoiceDocument } from '~/lib/recognize/local-document'
 import { INVOICE_RECOGNITION_FIELDS } from '~/lib/invoice/recognition-changes'
-import { locateInvoiceFieldRegions } from '~/lib/invoice/recognition-regions'
+import { locateInvoiceFieldRegions, locateLocalInvoiceFieldRegions } from '~/lib/invoice/recognition-regions'
 import { OcrRecognitionError, recognizeDocument } from '~/lib/recognize/engine'
 import { buildInvoiceFieldConfidence, parseInvoiceText, parseInvoiceTextPreservingUnknowns } from '~/lib/recognize/invoice-parse'
 import { round2 } from '~/lib/util/number'
@@ -148,6 +148,8 @@ export interface LocalInvoiceCandidate {
   unrecognizedPageIndexes: number[]
   requiresReview: true
   fieldRegions?: InvoiceFieldRegions
+  /** 几何来源帧仅在本次会话使用；显示前仍需核对当前原件及预览坐标系。 */
+  regionFrames?: Array<{ pageIndex: number, width: number, height: number, source: 'image' | 'pdf-render' }>
 }
 
 export async function recognizeInvoiceLocally(
@@ -159,12 +161,18 @@ export async function recognizeInvoiceLocally(
 ): Promise<LocalInvoiceCandidate> {
   const readDocument = options.readDocument ?? (await import('~/lib/recognize/local-document')).recognizeLocalInvoiceDocument
   const result = await readDocument(input.file, input.basePath, options.onProgress)
+  const fields = parseInvoiceTextPreservingUnknowns(result.pages.join('\n\n'))
+  const geometryPages = result.geometryPages ?? []
+  const locatedPages = new Set(geometryPages.map(page => page.pageIndex))
+  const unlocatedTexts = [...(result.unlocatedTexts ?? []), ...result.pages.filter((text, index) => !locatedPages.has(index) && text.trim())]
   return {
     source: 'local',
-    fields: parseInvoiceTextPreservingUnknowns(result.pages.join('\n\n')),
+    fields,
     textPages: result.pages,
     unrecognizedPageIndexes: result.unrecognizedPageIndexes,
     requiresReview: true,
+    fieldRegions: locateLocalInvoiceFieldRegions(geometryPages, fields, INVOICE_RECOGNITION_FIELDS, unlocatedTexts),
+    regionFrames: geometryPages.map(({ pageIndex, width, height, source }) => ({ pageIndex, width, height, source })),
   }
 }
 

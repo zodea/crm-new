@@ -17,6 +17,7 @@
 | [tests/invoice/print-layout.test.ts](../../../tests/invoice/print-layout.test.ts) | 单元／服务／状态 | 发票打印排版与打印资格：无原件、识别、确认、重复、金额逐项拒绝原因 |
 | [tests/invoice/recognition-changes.test.ts](../../../tests/invoice/recognition-changes.test.ts) | 单元／服务／状态 | 重新识别前后的字段差异：人工值被覆盖、清空、补出均列出，长票号按文本比较；草稿字段标记与保存确认正文 |
 | [tests/invoice/recognition-regions.test.ts](../../../tests/invoice/recognition-regions.test.ts) | 单元／服务／状态 | 识别字段 → OCR 版面块区域：归一化、金额数字边界、标签消歧、不造框条件、180° 翻转与多页；旋转/缩放坐标换算；变动字段按块合并与“原图未定位”清单；首次识别点字段定位只框当前字段 |
+| [tests/recognize/local-document.test.ts](../../../tests/recognize/local-document.test.ts) | 单元／服务／状态 | 本机 OCR 合成结果的文本与真实多边形：源帧核验、越界/歧义拒绝、混合 PDF 页码与缺口 |
 | [tests/invoice/recognize.test.ts](../../../tests/invoice/recognize.test.ts) | 单元／服务／状态 | confidenceTier:置信度分档(边框色/角标/✓确认 依据) |
 | [tests/invoice/status.test.ts](../../../tests/invoice/status.test.ts) | 单元／服务／状态 | invoiceDocStatus:单一权威的状态优先级 |
 | [tests/recognize/invoice-engine.test.ts](../../../tests/recognize/invoice-engine.test.ts) | 单元／服务／状态 | recognizeInvoice；带版面块坐标时给出字段块级区域，无坐标为空 |
@@ -27,6 +28,8 @@
 | [tests/stores/invoice-recognition.test.ts](../../../tests/stores/invoice-recognition.test.ts) | 单元／服务／状态 | invoice store 真实识别管线；重新识别只返回草稿不写库、失败不产生草稿、守卫保持；保存草稿后归档审计保留首次识别与完整修订链路；识别区域随原文件留在会话中（不入库不进日志，撤回窗口结束、刷新即失效），保存草稿后改用新区域 |
 
 ## 组件（jsdom）
+
+本机 OCR 几何的浏览器解码验证见 [InvoiceLocalGeometry.test.ts](../../../tests/browser/InvoiceLocalGeometry.test.ts)：合成图片、EXIF 方向和旋转 PDF 采用模拟 OCR 结果，真实 OCR 模型尚未验收。
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |

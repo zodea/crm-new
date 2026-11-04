@@ -1,9 +1,10 @@
 // 识别字段 → 发票原图区域（用户 2026-10-14 需求：重新识别比对与首次识别点字段定位）。纯函数，vitest 直接断言。
-// 坐标唯一来源是本次 PaddleOCR-VL 结果的版面块（prunedResult.parsing_res_list 的 block_bbox），
+// 云端使用本次 PaddleOCR-VL 的版面块，本机使用 OCR 返回的真实文本多边形；
 // 精度只到块：字段值在哪个块的文本里出现，就框住整块；块内没有字段级坐标，不推算、不造框。
 // 区域只在内存中：重新识别随草稿，首次识别随上传会话中的原文件，都不入库。
 import type { InvoiceRecognitionField, InvoiceRecognitionFieldMark } from './recognition-changes'
 import type { OcrRecognitionPage } from '~/lib/recognize/engine'
+import type { LocalOcrGeometryPage } from '~/lib/recognize/local-document'
 
 /** 相对页面宽高的 0~1 坐标（左上原点），与预览缩放无关。 */
 export interface NormalizedBox {
@@ -28,7 +29,7 @@ export type PreviewRotation = 0 | 90 | 180 | 270
 interface OcrBlock {
   pageIndex: number
   blockLabel: string
-  box: NormalizedBox
+  box: NormalizedBox | null
   /** 去空白的文本（公司名、票号、税号等连续文本匹配） */
   compact: string
   /** 空白折叠为单空格、去千分位与货币符号（金额、日期、税率按数字边界匹配） */
@@ -200,12 +201,11 @@ const FIELD_LOCATORS: Record<string, { test: (value: unknown) => BlockTest | nul
  * 把识别结果的字段值映射到 OCR 版面块：值只出现在一个块 → 该块；出现在多个块 → 仅保留带字段标签的块，
  * 仍不唯一则不定位。空值、零金额、未出现在任何块中的值都不定位。
  */
-export function locateInvoiceFieldRegions(
-  pages: readonly OcrRecognitionPage[],
+function locateFromBlocks(
+  blocks: readonly OcrBlock[],
   values: object,
   fields: readonly InvoiceRecognitionField[],
 ): Record<string, InvoiceFieldRegion> {
-  const blocks = ocrBlocks(pages)
   if (!blocks.length)
     return {}
   const regions: Record<string, InvoiceFieldRegion> = {}
@@ -215,13 +215,55 @@ export function locateInvoiceFieldRegions(
     if (!locator || !test)
       continue
     let matched = blocks.filter(test)
+    // 未核对坐标的匹配仍是歧义证据，不能因丢弃框而误认唯一。
+    if (matched.some(block => !block.box))
+      continue
     if (matched.length > 1)
       matched = locator.hint ? matched.filter(block => locator.hint!.test(block.compact)) : []
     const block = matched.length === 1 ? matched[0] : undefined
-    if (block)
+    if (block?.box)
       regions[key] = { pageIndex: block.pageIndex, box: block.box, blockLabel: block.blockLabel }
   }
   return regions
+}
+
+export function locateInvoiceFieldRegions(
+  pages: readonly OcrRecognitionPage[],
+  values: object,
+  fields: readonly InvoiceRecognitionField[],
+): Record<string, InvoiceFieldRegion> {
+  return locateFromBlocks(ocrBlocks(pages), values, fields)
+}
+
+/** 本机 OCR 只采用已核对源帧的实际多边形，不将其包装成云端版面结果。 */
+export function locateLocalInvoiceFieldRegions(
+  pages: readonly LocalOcrGeometryPage[],
+  values: object,
+  fields: readonly InvoiceRecognitionField[],
+  unlocatedTexts: readonly string[] = [],
+): Record<string, InvoiceFieldRegion> {
+  const counts = new Map<number, number>()
+  for (const page of pages)
+    counts.set(page.pageIndex, (counts.get(page.pageIndex) ?? 0) + 1)
+  const blocks = pages.flatMap((page): OcrBlock[] => {
+    const { pageIndex, width, height } = page
+    if (!Number.isSafeInteger(pageIndex) || pageIndex < 0 || counts.get(pageIndex) !== 1 || !Array.isArray(page.blocks)
+      || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) {
+      return []
+    }
+    return page.blocks.flatMap((block): OcrBlock[] => {
+      if (!block || typeof block.text !== 'string' || !block.text.trim())
+        return []
+      if (!Array.isArray(block.polygon) || block.polygon.length < 4 || block.polygon.length > 100
+        || block.polygon.some(point => !Array.isArray(point) || point.length !== 2 || point.some(value => !Number.isFinite(value))
+          || point[0] < 0 || point[0] > width || point[1] < 0 || point[1] > height)) {
+        return [{ pageIndex, blockLabel: 'text', box: null, ...blockText(block.text) }]
+      }
+      const box = normalizedBox(block.polygon, width, height)
+      return [{ pageIndex, blockLabel: 'text', box, ...blockText(block.text) }]
+    })
+  })
+  return locateFromBlocks([...blocks, ...unlocatedTexts.map(text => ({ pageIndex: -1, blockLabel: 'text', box: null, ...blockText(text) }))], values, fields)
 }
 
 /** 预览顺时针旋转后，框在旋转后画框中的位置（仍为 0~1）。 */

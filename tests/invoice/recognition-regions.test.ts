@@ -1,6 +1,6 @@
 import type { OcrRecognitionPage } from '~/lib/recognize/engine'
 import { describe, expect, it } from 'vitest'
-import { invoiceRegionFocus, invoiceRegionHighlights, locateInvoiceFieldRegions, rotatedFrame, rotateNormalizedBox } from '~/lib/invoice/recognition-regions'
+import { invoiceRegionFocus, invoiceRegionHighlights, locateInvoiceFieldRegions, locateLocalInvoiceFieldRegions, rotatedFrame, rotateNormalizedBox } from '~/lib/invoice/recognition-regions'
 
 const fields = [
   { key: 'invoiceNumber', label: '单据编号' },
@@ -85,6 +85,27 @@ describe('字段值 → OCR 版面块区域', () => {
     const quad = { block_label: 'text', block_bbox: [[10, 10], [90, 12], [92, 40], [8, 38]], block_content: '发票号码：12345678' }
     const regions = locateInvoiceFieldRegions([page([], { width: 100, height: 100 }), page([quad], { width: 100, height: 100 }, 1)], { invoiceNumber: '12345678' }, fields)
     expect(regions.invoiceNumber).toEqual({ pageIndex: 1, blockLabel: 'text', box: { x: 0.08, y: 0.1, width: expect.closeTo(0.84), height: expect.closeTo(0.3) } })
+  })
+})
+
+describe('本机识别的可信几何', () => {
+  const first = { pageIndex: 1, width: 300, height: 200, source: 'pdf-render' as const, blocks: [{ text: '发票号码：12345678', polygon: [[10, 10], [200, 10], [200, 30], [10, 30]] as Array<[number, number]> }] }
+
+  it('使用真实像素多边形与页码，按 OCR 源图尺寸归一化', () => {
+    expect(locateLocalInvoiceFieldRegions([first], { invoiceNumber: '12345678' }, fields).invoiceNumber).toEqual({ pageIndex: 1, blockLabel: 'text', box: { x: expect.closeTo(1 / 30), y: 0.05, width: expect.closeTo(190 / 300), height: expect.closeTo(0.1) } })
+  })
+
+  it('重复页、同值歧义、越界和无效尺寸均不伪造定位', () => {
+    expect(locateLocalInvoiceFieldRegions([first, first], { invoiceNumber: '12345678' }, fields)).toEqual({})
+    const same = { ...first, blocks: [...first.blocks, { ...first.blocks[0]!, polygon: [[10, 50], [200, 50], [200, 70], [10, 70]] as Array<[number, number]> }] }
+    expect(locateLocalInvoiceFieldRegions([same], { invoiceNumber: '12345678' }, fields)).toEqual({})
+    const outside = { ...first, blocks: [{ ...first.blocks[0]!, polygon: [[-1, 10], [200, 10], [200, 30], [0, 30]] as Array<[number, number]> }] }
+    expect(locateLocalInvoiceFieldRegions([outside], { invoiceNumber: '12345678' }, fields)).toEqual({})
+    const notFinite = { ...first, blocks: [{ ...first.blocks[0]!, polygon: [[10, 10], [200, 10], [200, Number.NaN], [10, 30]] as Array<[number, number]> }] }
+    expect(locateLocalInvoiceFieldRegions([notFinite], { invoiceNumber: '12345678' }, fields)).toEqual({})
+    const incomplete = { ...first, blocks: [{ ...first.blocks[0]!, polygon: [[10, 10], [200, 30]] as Array<[number, number]> }] }
+    expect(locateLocalInvoiceFieldRegions([incomplete], { invoiceNumber: '12345678' }, fields)).toEqual({})
+    expect(locateLocalInvoiceFieldRegions([{ ...first, width: 0 }], { invoiceNumber: '12345678' }, fields)).toEqual({})
   })
 })
 
