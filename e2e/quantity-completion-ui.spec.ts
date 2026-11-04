@@ -17,9 +17,8 @@ test('中央责任、缺照草稿、照片完成和责任替换保留历史，�
     return response.json()
   }
   const { id: projectId } = await create('projects', 'project:write', { name: '责任完成整链验收项目', manager: '合成经办人', status: '筹备中' })
-  const crews = []
-  for (const name of ['原责任班组', '替换责任班组'])
-    crews.push(await create('crews', 'crew:write', { name, contactName: '合成负责人', contactPhone: '13800000000', trade: '泥水工', capabilityTrades: ['泥水工'], capabilityItems: ['墙面抹灰'], defaultPayRatio: 0.8, assignmentLevel: 'worker' }, 'save'))
+  const createCrew = (name: string) => create('crews', 'crew:write', { name, contactName: '合成负责人', contactPhone: '13800000000', trade: '泥水工', capabilityTrades: ['泥水工'], capabilityItems: ['墙面抹灰'], defaultPayRatio: 0.8, assignmentLevel: 'worker' }, 'save')
+  const crews: [{ id: string }, { id: string }] = [await createCrew('原责任班组'), await createCrew('替换责任班组')]
   const query = { projectId, origin: 'real', includeDemo: false }
   const read = async (kind: string, params: Record<string, string | boolean> = {}) => {
     const response = await page.request.get(`/api/read/quantity/${kind}`, { params: { ...query, ...params } })
@@ -40,9 +39,8 @@ test('中央责任、缺照草稿、照片完成和责任替换保留历史，�
   const itemId = (await read('templates')).data.items[0].id
   const building = await execute({ kind: 'create-building', draft: { code: '1', name: '第一栋' } })
   const floor = await execute({ kind: 'create-floor', buildingId: building.id, draft: { code: '1', name: '第一层' } })
-  const units = []
-  for (const code of ['101', '102'])
-    units.push(await execute({ kind: 'create-unit', floorId: floor.id, draft: { code, name: `${code}户`, templateId: template.id } }))
+  const createUnit = (code: string) => execute({ kind: 'create-unit', floorId: floor.id, draft: { code, name: `${code}户`, templateId: template.id } })
+  const units: [{ id: string }, { id: string }] = [await createUnit('101'), await createUnit('102')]
   const stages = []
   for (const [index, name] of ['基层验收', '面层验收'].entries())
     stages.push(await execute({ kind: 'save-stage', allowArchivedEdit: false, draft: { id: null, code: `S${index}`, name, trade: '泥水工', completionMode: 'unit', sortOrder: index, itemIds: [itemId] } }))
