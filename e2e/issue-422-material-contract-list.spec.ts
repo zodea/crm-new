@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectLocalHorizontalScroll, expectNoPageOverflow } from './helpers/responsive'
 
-const money = (value: number | string) => `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (value: number | string | null) => value === null ? '待核实' : `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 test.describe('Issue #422 材料采购合同列表', () => {
   test.beforeEach(async ({ page }, testInfo) => {
@@ -29,8 +29,17 @@ test.describe('Issue #422 材料采购合同列表', () => {
     for (const origin of ['real', 'demo'] as const) {
       const rows = all.items.filter(row => row.dataOrigin === origin)
       expect(all.summary.origins[origin].contractCount).toBe(rows.length)
-      for (const [field, summaryField] of [['changed', 'changedAmount'], ['invoiced', 'invoicedAmount'], ['paid', 'paidAmount']] as const)
-        expect(Number(all.summary.origins[origin][summaryField])).toBeCloseTo(rows.reduce((sum, row) => sum + Number(row.amounts[field]), 0), 2)
+      for (const [field, summaryField] of [['changed', 'changedAmount'], ['invoiced', 'invoicedAmount'], ['paid', 'paidAmount']] as const) {
+        const values = rows.map(row => row.amounts[field])
+        const total = all.summary.origins[origin][summaryField]
+        if (values.includes(null)) {
+          expect(total).toBeNull()
+        }
+        else {
+          expect(total).not.toBeNull()
+          expect(Number(total)).toBeCloseTo(values.reduce<number>((sum, value) => sum + Number(value), 0), 2)
+        }
+      }
     }
     await page.goto('/contract/material?pageSize=10&page=2')
     const list = page.getByTestId('material-contract-list')
