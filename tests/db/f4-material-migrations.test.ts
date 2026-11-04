@@ -169,18 +169,19 @@ describe('v23 F4 物资表单与库存事实迁移', () => {
 
   it('数据库拒绝负计划量、非正到货行和负盘点数量', async () => {
     const db = await createMigratedMemoryDb()
-    await seedReferences(db)
+    try {
+      await seedReferences(db)
 
-    await expect(db.execute(`
+      await expect(db.execute(`
       INSERT INTO material_requisitions (
         id, project_id, contract_id, material_name, planned_qty
       )
       VALUES (
         'bad-requisition', 'project-f4', 'contract-f4', '瓷砖', -1
       )
-    `)).rejects.toThrow()
+    `)).rejects.toThrow('CHECK constraint failed: planned_qty >= 0')
 
-    await db.execute(`
+      await db.execute(`
       INSERT INTO material_arrivals (
         id, project_id, supplier_id, contract_id, status
       )
@@ -188,32 +189,47 @@ describe('v23 F4 物资表单与库存事实迁移', () => {
         'arrival-f4', 'project-f4', 'supplier-f4', 'contract-f4', 'draft'
       )
     `)
-    await expect(db.execute(`
+      await expect(db.execute(`
       INSERT INTO material_arrival_lines (
         id, arrival_id, material_name, qty
       )
       VALUES ('bad-arrival-line', 'arrival-f4', '瓷砖', 0)
-    `)).rejects.toThrow()
+    `)).rejects.toThrow('CHECK constraint failed: qty > 0')
 
-    await db.execute(`
+      await db.execute(`
       INSERT INTO stock_checks (id, warehouse, checker)
       VALUES ('stock-check-f4', '项目仓', '仓管')
     `)
-    await expect(db.execute(`
+      await expect(db.execute(`
       INSERT INTO stock_check_lines (
         id, stock_check_id, material_name, actual_qty
       )
       VALUES ('bad-stock-line', 'stock-check-f4', '瓷砖', -1)
-    `)).rejects.toThrow()
+    `)).rejects.toThrow('CHECK constraint failed: actual_qty >= 0')
 
-    await expect(db.execute(`
+      await expect(db.execute(`
       INSERT INTO owner_material_directs (
         id, project_id, customer_id, material_name, qty
       )
       VALUES (
         'bad-owner-direct', 'project-f4', 'customer-f4', '电梯', -1
       )
-    `)).rejects.toThrow()
-    db.close()
+    `)).rejects.toThrow('CHECK constraint failed: qty >= 0')
+
+      expect(await db.select('SELECT id FROM material_requisitions')).toEqual([])
+      expect(await db.select('SELECT id FROM material_arrival_lines')).toEqual([])
+      expect(await db.select('SELECT id FROM stock_check_lines')).toEqual([])
+      expect(await db.select('SELECT id FROM owner_material_directs')).toEqual([])
+
+      await db.execute('INSERT INTO material_requisitions (id, project_id, contract_id, material_name, planned_qty) VALUES (\'zero-requisition\', \'project-f4\', \'contract-f4\', \'瓷砖\', 0)')
+      await db.execute('INSERT INTO material_arrival_lines (id, arrival_id, material_name, qty) VALUES (\'positive-arrival-line\', \'arrival-f4\', \'瓷砖\', 1)')
+      await db.execute('INSERT INTO stock_check_lines (id, stock_check_id, material_name, actual_qty) VALUES (\'zero-stock-line\', \'stock-check-f4\', \'瓷砖\', 0)')
+      await db.execute('INSERT INTO owner_material_directs (id, project_id, customer_id, material_name, qty) VALUES (\'zero-owner-direct\', \'project-f4\', \'customer-f4\', \'电梯\', 0)')
+      expect(await db.select('SELECT id, planned_qty FROM material_requisitions')).toEqual([{ id: 'zero-requisition', planned_qty: 0 }])
+      expect(await db.select('SELECT id, qty FROM material_arrival_lines')).toEqual([{ id: 'positive-arrival-line', qty: 1 }])
+      expect(await db.select('SELECT id, actual_qty FROM stock_check_lines')).toEqual([{ id: 'zero-stock-line', actual_qty: 0 }])
+      expect(await db.select('SELECT id, qty FROM owner_material_directs')).toEqual([{ id: 'zero-owner-direct', qty: 0 }])
+    }
+    finally { db.close() }
   })
 })
