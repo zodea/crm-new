@@ -22,8 +22,8 @@ import {
 } from '~/lib/kit/import-mapping'
 import { setSupplierImportDecision, setSupplierImportSource, supplierImportDraftFromRow, supplierImportSourceKey } from '~/lib/supplier/import-command'
 import { supplierImportFileDuplicates } from '~/lib/supplier/import-review'
-import { bindCrewExcelRow, crewExcelSourceKey } from '~/stores/crew-excel-import'
-import { bindWorkerExcelRow, workerExcelSourceKey } from '~/stores/worker-excel-import'
+import { bindCrewExcelRow, crewExcelSourceKey, useCrewExcelImportStore } from '~/stores/crew-excel-import'
+import { bindWorkerExcelRow, useWorkerExcelImportStore, workerExcelSourceKey } from '~/stores/worker-excel-import'
 
 const route = useRoute()
 const router = useRouter()
