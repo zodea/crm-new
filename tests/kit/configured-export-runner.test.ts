@@ -138,8 +138,9 @@ describe('配置导出运行器', () => {
   })
 
   it('写盘失败保留失败步，重试从写盘继续', async () => {
+    const writeError = new Error('磁盘已满')
     const firstTarget = target({
-      writeFile: vi.fn().mockRejectedValueOnce(new Error('磁盘已满')),
+      writeFile: vi.fn().mockRejectedValueOnce(writeError),
     })
     const secondTarget = target()
     const pickDirectory = vi.fn()
@@ -150,10 +151,11 @@ describe('配置导出运行器', () => {
       yieldToView: vi.fn().mockResolvedValue(undefined),
     })
 
-    await expect(runner.start()).resolves.toMatchObject({
-      status: 'failed',
-      error: expect.any(Error),
-    })
+    const result = await runner.start()
+    expect(result.status).toBe('failed')
+    if (result.status !== 'failed')
+      throw new Error('导出失败时未返回原始错误')
+    expect(result.error).toBe(writeError)
     expect(runner.stepper.value.phase).toBe('failed')
     expect(runner.stepper.value.steps.map(step => step.status)).toEqual([
       'completed',
@@ -161,6 +163,9 @@ describe('配置导出运行器', () => {
       'failed',
     ])
     expect(runner.error.value).toBe('磁盘已满')
+    expect(firstTarget.writeFile).toHaveBeenCalledOnce()
+    expect(pickDirectory).toHaveBeenCalledOnce()
+    expect(secondTarget.writeFile).not.toHaveBeenCalled()
 
     await expect(runner.retry()).resolves.toEqual({
       status: 'exported',

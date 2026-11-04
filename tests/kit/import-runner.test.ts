@@ -28,19 +28,25 @@ describe('导入执行器', () => {
   })
 
   it('某行失败时停在该行，保留已完成计数', async () => {
+    const writeError = new Error('演示写入失败：FAIL-1')
     const importRow = vi.fn()
       .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('演示写入失败：FAIL-1'))
+      .mockRejectedValueOnce(writeError)
     const runner = useImportRunner(runnerEnvironment())
 
-    await expect(runner.start(rows, importRow)).resolves.toMatchObject({
-      status: 'failed',
-      error: expect.any(Error),
-    })
+    const result = await runner.start(rows, importRow)
 
+    expect(result.status).toBe('failed')
+    if (result.status !== 'failed')
+      throw new Error('导入失败时未返回原始错误')
+    expect(result.error).toBe(writeError)
     expect(runner.phase.value).toBe('failed')
     expect(runner.done.value).toBe(1)
+    expect(runner.total.value).toBe(3)
     expect(runner.error.value).toBe('演示写入失败：FAIL-1')
+    expect(importRow).toHaveBeenCalledTimes(2)
+    expect(importRow).toHaveBeenNthCalledWith(2, rows[1])
+    expect(importRow).not.toHaveBeenCalledWith(rows[2])
   })
 
   it('可预期的行级校验拒绝会继续导入并保留拒绝清单', async () => {
