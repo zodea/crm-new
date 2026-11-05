@@ -2,12 +2,10 @@ import type { SQLInputValue } from 'node:sqlite'
 import type { FinanceCommand } from '../../app/lib/finance/central-contract'
 import type { PaymentVerificationEdit } from '../../app/lib/finance/payment-verification'
 import type { ProductionStorage } from '../../server/utils/production-storage'
-import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { copyFile, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, expect, it } from 'vitest'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
@@ -25,6 +23,7 @@ import { listProductionOtherSettlementReferences, readProductionOtherSettlementR
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { PRODUCTION_STORAGE_UPGRADES, productionStorageManifest } from '../../server/utils/production-storage-schema'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { runColdProcess } from '../helpers/cold-process'
 import { createOtherSettlementPay08Source } from '../helpers/other-settlement-pay08-source'
 import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
@@ -296,8 +295,8 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
       expect((await service.original('payment_application', f.native.ids.application, f.native.ids.applicationFile, f.session)).bytes).toEqual(new Uint8Array([0, 10, 128, 255]))
     }
     finally { await recovered.close() }
-    const script = `const {registerHooks}=require('node:module'),{pathToFileURL}=require('node:url'),path=require('node:path');registerHooks({resolve(s,c,n){if(s.startsWith('~/'))s=pathToFileURL(path.resolve('app',s.slice(2))).href;try{return n(s,c)}catch(e){if((s.startsWith('.')||s.startsWith('file:'))&&e.code==='ERR_MODULE_NOT_FOUND')return n(s+'.ts',c);throw e}}});(async()=>{const {createProductionStorage}=await import('./server/utils/production-storage.ts');const {validateFinanceJournal}=await import('./server/utils/production-finance-journal.ts');const [directory,actorJson]=process.argv.slice(1);const actor=JSON.parse(actorJson);const storage=createProductionStorage({directory,workspaceId:actor.workspaceId,ownerId:actor.actorId,purpose:'verification'});await validateFinanceJournal(storage,actor);const proof=await storage.select('SELECT * FROM finance_payment_verifications ORDER BY id');process.stdout.write(JSON.stringify(proof));await storage.close()})().catch(e=>{process.stderr.write(String(e));process.exitCode=1})`
-    const coldProof = JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '-e', script, restored.directory, JSON.stringify(f.actor)], { cwd: process.cwd(), encoding: 'utf8' }))
+    const { stdout } = await runColdProcess('production-finance-cold', [restored.directory, JSON.stringify(f.actor)])
+    const coldProof = JSON.parse(stdout)
     expect(coldProof).toEqual(frozenProof)
   }
   finally { await f.storage.close() }
