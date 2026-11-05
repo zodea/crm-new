@@ -51,6 +51,72 @@ describe('送货完整受控迁移', () => {
     finally { db.close() }
   })
 
+  it('真实旧库同批原件冲突不能以缺少记录的中央批次确认切换', async () => {
+    const db = await createMigratedMemoryDb()
+    try {
+      await db.execute('INSERT INTO projects(id,name) VALUES(\'conflict-project\',\'合成项目\')')
+      const originals = [btoa('%PDF-1.7\nfirst original\n%%EOF'), btoa('%PDF-1.7\nsecond original\n%%EOF')]
+      for (const [index, original] of originals.entries()) {
+        const id = `conflict-delivery-${index}`
+        await db.execute('INSERT INTO delivery_records(id,project_id,order_no,delivery_date,archived,stored,ocr_status,print_batch_id,print_disposition) VALUES(?,\'conflict-project\',?,\'2026-09-11\',1,1,\'reviewed\',\'same-physical-batch\',\'printed\')', [id, `CONFLICT-${index}`])
+        await db.execute('INSERT INTO delivery_lines(id,delivery_record_id,material_name,unit,qty,unit_price,amount) VALUES(?,?,\'材料\',\'吨\',2,10,20)', [`line-${id}`, id])
+        await db.execute('INSERT INTO file_refs(id,owner_type,owner_id,file_name,file_size,mime_type,category) VALUES(?,\'delivery_record\',?,\'同名原件.pdf\',?,\'application/pdf\',\'source\')', [`file-${id}`, id, atob(original).length])
+        await db.execute('INSERT INTO file_payloads(file_ref_id,encoding,content) VALUES(?,\'base64\',?)', [`file-${id}`, original])
+      }
+      const readOriginals = () => db.select('SELECT f.id,f.owner_id,f.file_size,p.encoding,p.content FROM file_refs f JOIN file_payloads p ON p.file_ref_id=f.id ORDER BY f.id')
+      const before = await readOriginals()
+      expect(before).toEqual(originals.map((original, index) => ({ id: `file-conflict-delivery-${index}`, owner_id: `conflict-delivery-${index}`, file_size: atob(original).length, encoding: 'base64', content: original })))
+      const source = await createCoreMigrationLocalSource({
+        isDemoActive: () => false,
+        currentSchemaVersion: async () => LATEST_VERSION,
+        select: (sql, params) => db.select(sql, params),
+        closeDatabase: unused,
+        loadProductionSnapshot: unused,
+        readSnapshotSource: unused,
+        createBackup: unused,
+        loadBackup: unused,
+        restoreBackup: unused,
+        activateMigration: unused,
+        clearMigration: unused,
+        prepareMigration: unused,
+        loadMigrationMarker: unused,
+        loadPendingMigrationMarker: unused,
+        now: () => '2026-09-11T00:00:00.000Z',
+      }).readSource()
+      expect(source.expectations?.counts?.delivery_records).toBe(2)
+      expect(source.entities.delivery_records).toHaveLength(2)
+      for (const entity of source.entities.delivery_records!) {
+        expect(entity.attributes).toMatchObject({ sourceProblem: '同一送货批次原件冲突，请先对账', sourceState: 'missing', assetJson: 'null' })
+      }
+      const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, commandId })
+      const hash = '5'.repeat(64)
+      const beforePreflight = coreMigrationTestInstance.snapshot(session)
+      await coreMigrationTestInstance.preflight(parseCoreMigrationSourceCommand({ ...envelope('delivery-conflict-preflight'), source, backup: null }), session)
+      expect(coreMigrationTestInstance.snapshot(session)).toEqual(beforePreflight)
+      const batch = await coreMigrationTestInstance.dryRun({ ...envelope('delivery-conflict-dry'), source, backup: { backupId: `core-migration-${source.sourceHash}-${hash}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: hash, byteLength: 441, createdAt: '2026-09-15T00:00:00.000Z', immutable: true } }, session)
+      expect(batch.steps).toContainEqual(expect.objectContaining({ entityType: 'delivery_records', sourceCount: 2, importableCount: 0, skippedCount: 2 }))
+      for (const index of [0, 1]) {
+        expect(batch.issues).toContainEqual(expect.objectContaining({ entityType: 'delivery_records', legacyId: `conflict-delivery-${index}`, field: 'original', metricKey: 'apply-failed', reason: '同一送货批次原件冲突，请先对账' }))
+      }
+      expect(batch.issues).toContainEqual(expect.objectContaining({ entityType: 'delivery_records', field: 'count', metricKey: 'count', expectedValue: 2, actualValue: 0 }))
+      const attempted = await coreMigrationTestInstance.importBatch({ ...envelope('delivery-conflict-import'), batchId: batch.batchId }, session).then(
+        result => ({ result, error: null }),
+        error => ({ result: null, error }),
+      )
+      if (attempted.error) {
+        expect(attempted.error).toMatchObject({ problem: { code: 'conflict', message: 'dry-run 存在阻断问题，不能导入' } })
+      }
+      else {
+        expect(attempted.result?.status).toBe('applied')
+        await expect(coreMigrationTestInstance.confirm({ ...envelope('delivery-conflict-confirm'), batchId: batch.batchId }, session)).rejects.toThrow('存在阻塞性对账问题，不能确认切换')
+      }
+      expect(coreMigrationTestInstance.snapshot(session).authority).toBe('local')
+      expect(deliveryCommandTestInstance.list(session).records).toEqual([])
+      expect(await readOriginals()).toEqual(before)
+    }
+    finally { db.close() }
+  })
+
   it('完整迁入原件、历史与打印状态；安全回滚可撤回，后续修订后回滚严格保全', async () => {
     const db = await createMigratedMemoryDb()
     try {

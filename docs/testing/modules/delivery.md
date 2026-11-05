@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | [tests/delivery/central-service.test.ts](../../../tests/delivery/central-service.test.ts) | 单元／服务／状态 | 送货原件与修订中央公开行为；逐项验证当前权限及会话隔离 |
 | [tests/delivery/central-state.test.ts](../../../tests/delivery/central-state.test.ts) | 单元／服务／状态 | 送货浏览器中央状态 |
-| [tests/delivery/controlled-migration.test.ts](../../../tests/delivery/controlled-migration.test.ts) | 单元／服务／状态 | 送货完整受控迁移；旧原件不能借当前记录读取 |
+| [tests/delivery/controlled-migration.test.ts](../../../tests/delivery/controlled-migration.test.ts) | 合成 SQLite 与中央测试实例 | 送货受控迁移、历史原件隔离与修订后回滚保护；同批不同原件列出冲突并阻止确认切换，旧库正文不变。备份证明为模拟，不覆盖生产持久化或独立进程重启 |
 | [tests/delivery/export.test.ts](../../../tests/delivery/export.test.ts) | 单元／服务／状态 | 送货单 Excel 导出 |
 | [tests/delivery/legacy-history.test.ts](../../../tests/delivery/legacy-history.test.ts) | 单元／服务／状态 | 可证明的旧送货历史恢复 |
 | [tests/delivery/match.test.ts](../../../tests/delivery/match.test.ts) | 单元／服务／状态 | 分供方及送货项目名称匹配，包含独立来源与歧义边界 |
