@@ -212,13 +212,15 @@ export const useTabSessionStore = defineStore('tab-session', () => {
               ? descriptor.action === 'adopt'
               : ['target-cost-import', 'schedule-import', 'construction-contract-import', 'subcontract-contract-import', 'auxiliary-contract-import'].includes(descriptor.family)
                   ? ['adopt', 'restore'].includes(descriptor.action)
-                  : descriptor.family === 'schedule'
-                    ? scheduleRecoveryActions.has(descriptor.action)
-                    : descriptor.family === 'target-cost'
-                      ? ['save-header', 'save-items', 'delete', 'restore'].includes(descriptor.action)
-                      : ['draft', 'save', 'submit'].includes(descriptor.action)
-                        || (descriptor.family === 'other-settlement' && descriptor.targetId !== null && descriptor.action === 'confirm')
-                        || (descriptor.family === 'finance-payment-record' && ['confirm', 'unconfirm'].includes(descriptor.action)))
+                  : descriptor.family === 'finance-invoice' && descriptor.targetId === null
+                    ? descriptor.action === 'manual'
+                    : descriptor.family === 'schedule'
+                      ? scheduleRecoveryActions.has(descriptor.action)
+                      : descriptor.family === 'target-cost'
+                        ? ['save-header', 'save-items', 'delete', 'restore'].includes(descriptor.action)
+                        : ['draft', 'save', 'submit'].includes(descriptor.action)
+                          || (descriptor.family === 'other-settlement' && descriptor.targetId !== null && descriptor.action === 'confirm')
+                          || (descriptor.family === 'finance-payment-record' && ['confirm', 'unconfirm'].includes(descriptor.action)))
         if (permitted) {
           return fullPath
         }

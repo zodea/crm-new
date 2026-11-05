@@ -124,6 +124,10 @@ export function commandRecoveryFormTarget(fullPath: string): Pick<CommandRecover
   if (schedule)
     return schedule
   try {
+    if (fullPath.split('?')[0] === '/finance/invoice/manual-new' && url.pathname === '/finance/invoice/manual-new'
+      && !url.hash && [...url.searchParams.keys()].every(key => key === 'origin')) {
+      return { family: 'finance-invoice', targetId: null }
+    }
     const invoiceCorrection = /^\/finance\/invoice\/correction\/([^/]+)$/.exec(url.pathname)
     if (invoiceCorrection) {
       const targetId = decodeURIComponent(invoiceCorrection[1]!)

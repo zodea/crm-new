@@ -6,7 +6,7 @@ import type {
   InvoiceXlsxStyleConfig,
   InvoiceResolvedStyleConfig as StyleDraft,
 } from '~/lib/invoice/excel'
-import { ref, watch } from 'vue'
+import { nextTick, ref, useTemplateRef, watch } from 'vue'
 import InvoiceBorderSettings from '~/components/invoice/InvoiceBorderSettings.vue'
 import InvoiceExportTable from '~/components/invoice/InvoiceExportTable.vue'
 import { Button } from '~/components/ui/button'
@@ -21,11 +21,12 @@ import { resolveInvoiceBorder } from '~/lib/invoice/xlsx-border'
 import { yuan } from '~/lib/util/money'
 import { useInvoiceStore } from '~/stores/invoice'
 
-defineProps<{
+const props = defineProps<{
   rows: readonly InvoiceLedgerExportRow[]
-  totalAmount: number
+  totalAmount: number | null
   fileName: string
   saving: boolean
+  error?: string
 }>()
 
 const emit = defineEmits<{
@@ -33,6 +34,13 @@ const emit = defineEmits<{
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
+const exportError = useTemplateRef<HTMLElement>('exportError')
+watch(() => props.error, async (value) => {
+  if (value && open.value) {
+    await nextTick()
+    exportError.value?.focus()
+  }
+})
 const invoiceStore = useInvoiceStore()
 type FontKey = 'titleFont' | 'headerFont' | 'dataFont' | 'totalFont'
 type ColumnKey = keyof InvoiceLedgerExportRow
@@ -205,8 +213,11 @@ function confirmExport() {
 
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2 px-5 py-3 text-11px text-ink-soft">
           <span class="font-mono text-ink">{{ fileName }}</span>
-          <span>共 {{ rows.length }} 条 · 合计 {{ yuan(totalAmount) }}</span>
+          <span>共 {{ rows.length }} 条 · 合计 {{ totalAmount === null ? '未统计（金额缺失或超出范围）' : yuan(totalAmount) }}</span>
         </div>
+        <p v-if="error" ref="exportError" role="alert" tabindex="-1" class="m-0 px-5 py-2 text-sm text-danger">
+          {{ error }}
+        </p>
 
         <div class="min-h-0 flex-1 overflow-auto p-4 md:p-5">
           <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_370px]">

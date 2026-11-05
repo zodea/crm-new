@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // 发票示意图 —— 复刻设计稿 InvoiceShared.jsx invoiceSvg：无真实扫描件时的占位票面
 // （台账卡片视图预览 / 打印排版共用；编辑页与工作台不用它冒充原件）。纯展示，仅消费 Invoice 字段。
-import type { Invoice } from '~/stores/invoice'
+import type { InvoicePrintViewModel } from '~/lib/invoice/print-layout'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
-  invoice: Invoice
+  invoice: Pick<InvoicePrintViewModel, 'invoiceType' | 'invoiceNumber' | 'buyer' | 'seller' | 'totalAmount' | 'remark'>
 }>()
 
 const title = computed(() => props.invoice.invoiceType || '增值税发票')

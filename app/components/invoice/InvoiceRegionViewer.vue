@@ -17,7 +17,10 @@ const props = withDefaults(defineProps<{
   groups?: readonly InvoiceRegionHighlightGroup[]
   unlocated?: readonly InvoiceRecognitionField[]
   activeKey?: string | null
+  /** 本机 OCR 帧；提供时必须与当前预览的页面尺寸和方向一致。 */
+  frames?: readonly { pageIndex: number, width: number, height: number, source: 'image' | 'pdf-render' }[]
 }>(), { mode: undefined, groups: () => [], unlocated: () => [], activeKey: null })
+const emit = defineEmits<{ verifiedPages: [pages: number[]] }>()
 
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const
 const zoomIndex = shallowRef(2)
@@ -92,6 +95,24 @@ function onImageLoad(event: Event) {
 
 /** 未取到原始尺寸前按 A4 竖版比例占位，框仍按百分比定位。 */
 const A4 = { width: 1, height: Math.SQRT2 }
+function frameMatches(pageIndex: number, size: { width: number, height: number }, natural: boolean) {
+  if (!props.frames)
+    return true
+  if (!natural)
+    return false
+  const matches = props.frames.filter(frame => frame.pageIndex === pageIndex)
+  if (matches.length !== 1)
+    return false
+  const frame = matches[0]!
+  if (!Number.isSafeInteger(frame.width) || !Number.isSafeInteger(frame.height) || frame.width <= 0 || frame.height <= 0)
+    return false
+  if (!isPdf.value)
+    return frame.source === 'image' && size.width === frame.width && size.height === frame.height
+  if (frame.source !== 'pdf-render')
+    return false
+  // 渲染采用不同缩放，允许各画布像素向上取整带来的比例误差。
+  return Math.abs(size.width / size.height - frame.width / frame.height) <= 2 / Math.min(size.height, frame.height)
+}
 const pages = computed(() => {
   if (failure.value)
     return []
@@ -100,9 +121,10 @@ const pages = computed(() => {
     : imageUrl.value ? [{ pageIndex: 0, url: imageUrl.value, size: imageSize.value ?? A4, natural: !!imageSize.value }] : []
   return list.map(page => ({
     ...page,
+    verified: frameMatches(page.pageIndex, page.size, page.natural),
     frame: rotatedFrame(page.size, rotation.value),
     groups: props.groups
-      .filter(group => group.pageIndex === page.pageIndex)
+      .filter(group => group.pageIndex === page.pageIndex && frameMatches(page.pageIndex, page.size, page.natural))
       .map((group) => {
         const box = rotateNormalizedBox(group.box, rotation.value)
         // 贴近页顶的框把字段名标签放进框内，避免伸出页面被遮住
@@ -117,7 +139,8 @@ const hiddenPages = computed(() => isPdf.value && pdfPages.value.length && pdfTo
   : null)
 
 /** 框所在页超出已渲染页数（PDF 只渲染前若干页）时归入未定位，不悬空。 */
-const renderedPageIndexes = computed(() => new Set(pages.value.map(page => page.pageIndex)))
+const renderedPageIndexes = computed(() => new Set(pages.value.filter(page => page.verified).map(page => page.pageIndex)))
+watch(renderedPageIndexes, value => emit('verifiedPages', [...value]), { immediate: true })
 const offPageLabels = computed(() => props.groups
   .filter(group => pageCount.value > 0 && !renderedPageIndexes.value.has(group.pageIndex))
   .flatMap(group => group.labels))

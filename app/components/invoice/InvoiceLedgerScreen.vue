@@ -9,7 +9,7 @@ import type { InvoicePrintRequest } from '~/lib/invoice/print-layout'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { Invoice } from '~/stores/invoice'
-import { createInvoiceLedgerXlsxFromRows, INVOICE_XLSX_MIME, invoiceLedgerRows } from '~/lib/invoice/excel'
+import { createInvoiceLedgerXlsxFromRows, INVOICE_XLSX_MIME, invoiceLedgerRows, invoiceLedgerTotal } from '~/lib/invoice/excel'
 import { ledgerNodeFromQuery, projectGroupKeyFromNode, projectTreeNodeKey } from '~/lib/invoice/ledger-nodes'
 import { checkPrintableInvoice } from '~/lib/invoice/print-layout'
 import { toErrorMessage } from '~/lib/util/error'
@@ -26,7 +26,7 @@ const exportPreviewOpen = shallowRef(false)
 const exportPreviewRows = shallowRef<InvoiceLedgerExportRow[]>([])
 const exportPreviewFileName = shallowRef('')
 const exportSaving = shallowRef(false)
-const exportPreviewTotal = computed(() => exportPreviewRows.value.reduce((sum, row) => sum + row.totalAmount, 0))
+const exportPreviewTotal = computed(() => invoiceLedgerTotal(exportPreviewRows.value))
 const printMode = shallowRef(false)
 const pendingPrint = shallowRef<InvoicePrintRequest | null>(null)
 const printSelectedId = shallowRef<string | null>(null)

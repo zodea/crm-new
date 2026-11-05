@@ -21,6 +21,17 @@ export interface PrintableInvoice {
   source?: string
 }
 
+/** 打印只依赖可见票面和打印状态，不要求伪造未识别的其他金额。 */
+export interface InvoicePrintViewModel extends PrintableInvoice {
+  fileName: string
+  invoiceNumber: string
+  invoiceType: string
+  buyer: string
+  seller: string
+  remark: string
+  printCount: number
+}
+
 export interface PrintSlot<T extends PrintableInvoice> {
   invoice: T
   rotation: PrintRotation

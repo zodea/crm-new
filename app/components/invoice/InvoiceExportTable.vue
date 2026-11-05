@@ -7,7 +7,7 @@ import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
   rows: readonly InvoiceLedgerExportRow[]
-  totalAmount: number
+  totalAmount: number | null
   styleConfig: InvoiceResolvedStyleConfig
 }>()
 type FontKey = 'headerFont' | 'dataFont' | 'totalFont'
@@ -83,7 +83,7 @@ function dataColumnStyle(key: ColumnKey) {
               {{ display(row.invoiceType) }}
             </td>
             <td class="whitespace-nowrap px-3 py-2 text-right text-ink font-mono tabular-nums" :style="dataColumnStyle('totalAmount')">
-              {{ yuan(row.totalAmount) }}
+              {{ row.totalAmount === null ? '未填写' : yuan(row.totalAmount) }}
             </td>
             <td class="max-w-[220px] truncate px-3 py-2 text-ink" :title="row.projectName" :style="dataColumnStyle('projectName')">
               {{ display(row.projectName) }}
@@ -107,7 +107,7 @@ function dataColumnStyle(key: ColumnKey) {
               合计
             </td>
             <td class="whitespace-nowrap px-3 py-2 text-right text-ink font-mono tabular-nums" :style="totalBorderStyle">
-              {{ yuan(totalAmount) }}
+              {{ totalAmount === null ? '未统计' : yuan(totalAmount) }}
             </td>
             <td colspan="3" :style="totalBorderStyle" />
           </tr>

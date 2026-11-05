@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import type { InvoicePrintRequest, PrintPerPage, PrintRotation } from '~/lib/invoice/print-layout'
-import type { Invoice } from '~/stores/invoice'
+import type { InvoicePrintRequest, InvoicePrintViewModel, PrintPerPage, PrintRotation } from '~/lib/invoice/print-layout'
 import { buildPrintLayout, normalizePrintRotation, rotatePrintItems } from '~/lib/invoice/print-layout'
 import { yuan } from '~/lib/util/money'
 
 const props = withDefaults(defineProps<{
-  invoices: readonly Invoice[]
+  invoices: readonly InvoicePrintViewModel[]
   printConfirmation: InvoicePrintRequest | null
   /** 台账入口使用双栏模式；工作台默认只显示排版面板。 */
   fullPage?: boolean

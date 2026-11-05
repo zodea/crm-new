@@ -8,6 +8,11 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／状态 | 原件字节与权限核对 |
+| [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
+| [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 识别区域不进入写命令 |
+| [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对 |
+| [tests/stores/invoice-manual-startup.test.ts](../../../tests/stores/invoice-manual-startup.test.ts) | 单元／状态 | 手工原编号刷新与身份隔离 |
 | [tests/invoice/central-migration-bootstrap.test.ts](../../../tests/invoice/central-migration-bootstrap.test.ts) | 单元／服务／状态 | 迁入目录的身份、权限与来源版本 |
 | [tests/invoice/central-migration-pending.test.ts](../../../tests/invoice/central-migration-pending.test.ts) | 单元／状态 | 迁入原编号发现、身份隔离及损坏存储阻断 |
 | [tests/invoice/correction-contract.test.ts](../../../tests/invoice/correction-contract.test.ts) | 单元／服务／状态 | 更正差异、未知和真实零 |
@@ -60,6 +65,17 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/components/CentralInvoiceEntry.test.ts](../../../tests/components/CentralInvoiceEntry.test.ts) | 组件（jsdom） | 中央目录缺口和权限 |
+| [tests/components/InvoiceExportTableAmounts.test.ts](../../../tests/components/InvoiceExportTableAmounts.test.ts) | 组件（jsdom） | 旧及中央台账共用预览区分未知与真实零 |
+| [tests/components/CentralInvoiceLedgerScreen.test.ts](../../../tests/components/CentralInvoiceLedgerScreen.test.ts) | 组件（jsdom） | 台账导出及来源版本 |
+| [tests/components/CentralInvoiceLedgerView.test.ts](../../../tests/components/CentralInvoiceLedgerView.test.ts) | 组件（jsdom） | 台账来源与筛选 |
+| [tests/components/CentralInvoiceManualCreate.test.ts](../../../tests/components/CentralInvoiceManualCreate.test.ts) | 组件（jsdom） | 手工草稿、输入保护与原编号 |
+| [tests/components/CentralInvoiceManualEntry.test.ts](../../../tests/components/CentralInvoiceManualEntry.test.ts) | 组件（jsdom） | 失权隐藏及身份隔离 |
+| [tests/components/CentralInvoicePendingRecovery.test.ts](../../../tests/components/CentralInvoicePendingRecovery.test.ts) | 组件（jsdom） | 待核对提交与更正分流 |
+| [tests/components/CentralInvoiceQueue.test.ts](../../../tests/components/CentralInvoiceQueue.test.ts) | 组件（jsdom） | 队列金额与上传 |
+| [tests/components/CentralInvoiceRerecognition.test.ts](../../../tests/components/CentralInvoiceRerecognition.test.ts) | 组件（jsdom） | 未保存输入和重识别 |
+| [tests/components/CentralInvoiceWorkspaceScreen.test.ts](../../../tests/components/CentralInvoiceWorkspaceScreen.test.ts) | 组件（jsdom） | 工作台与原编号恢复 |
+| [tests/components/CentralInvoiceWorkspaceView.test.ts](../../../tests/components/CentralInvoiceWorkspaceView.test.ts) | 组件（jsdom） | 归档归属与来源版本 |
 | [tests/components/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/components/CentralInvoiceCorrectionAuthority.test.ts) | 组件（jsdom） | 撤权隐藏原票与同身份草稿恢复 |
 | [tests/components/CentralInvoiceCorrectionRoute.test.ts](../../../tests/components/CentralInvoiceCorrectionRoute.test.ts) | 组件（jsdom） | 同路由切票的未保存输入保护 |
 | [tests/components/CentralInvoiceCorrectionScreen.test.ts](../../../tests/components/CentralInvoiceCorrectionScreen.test.ts) | 组件（jsdom） | 更正草稿、提交、打印阻断及原编号 |
@@ -79,6 +95,12 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/browser/CentralInvoiceArchive.test.ts](../../../tests/browser/CentralInvoiceArchive.test.ts) | 真实组件／模拟来源 | 归档来源及主要视口 |
+| [tests/browser/CentralInvoiceLedgerExport.test.ts](../../../tests/browser/CentralInvoiceLedgerExport.test.ts) | 真实组件／模拟来源 | 台账导出与主要视口 |
+| [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
+| [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
+| [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
+| [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别草稿与交互 |
 | [tests/browser/CentralInvoiceCorrection.test.ts](../../../tests/browser/CentralInvoiceCorrection.test.ts) | 真实组件／模拟来源 | 更正票面与归属的多视口操作 |
 | [tests/browser/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/browser/CentralInvoiceCorrectionAuthority.test.ts) | 真实组件／模拟来源 | 失权隐藏与同身份草稿恢复 |
 | [tests/browser/CentralInvoiceCorrectionNavigation.test.ts](../../../tests/browser/CentralInvoiceCorrectionNavigation.test.ts) | 真实组件／模拟来源 | 键盘切票和离开保护 |
@@ -89,6 +111,9 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [e2e/production-invoice-company-manual.spec.ts](../../../e2e/production-invoice-company-manual.spec.ts) | 隔离服务／合成数据 | 手工建票与公司合同归档 |
+| [e2e/production-invoice-manual-recovery.spec.ts](../../../e2e/production-invoice-manual-recovery.spec.ts) | 隔离服务／合成数据 | 手工创建响应丢失、重启重新登录及原编号刷新恢复 |
+| [e2e/production-invoice-ledger-export.spec.ts](../../../e2e/production-invoice-ledger-export.spec.ts) | 隔离服务／合成数据 | 台账筛选导出与隔离冷读 |
 | [e2e/production-invoice-migration.spec.ts](../../../e2e/production-invoice-migration.spec.ts) | 隔离服务／合成数据 | 项目和公司旧票发布、原件及断线原编号恢复 |
 | [e2e/production-invoice-correction.spec.ts](../../../e2e/production-invoice-correction.spec.ts) | 隔离服务／合成数据 | 更正草稿、断线原编号恢复与打印阻断 |
 | [e2e/factor-solver.spec.ts](../../../e2e/factor-solver.spec.ts) | Playwright E2E | 精确因子组合工作台 |
@@ -102,4 +127,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/fixtures/invoice-ledger-layer/nuxt.config.ts](../../../tests/fixtures/invoice-ledger-layer/nuxt.config.ts) | 辅助／夹具 | 中央发票隔离验收层 |
+| [tests/fixtures/invoice-ledger-layer/app/pages/invoice-workspace-acceptance.vue](../../../tests/fixtures/invoice-ledger-layer/app/pages/invoice-workspace-acceptance.vue) | 辅助／夹具 | 工作台隔离验收入口 |
+| [tests/fixtures/invoice-ledger-layer/app/pages/invoice-ledger-acceptance.vue](../../../tests/fixtures/invoice-ledger-layer/app/pages/invoice-ledger-acceptance.vue) | 辅助／夹具 | 台账隔离验收入口 |
 | [tests/fixtures/invoice-workbook.ts](../../../tests/fixtures/invoice-workbook.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |

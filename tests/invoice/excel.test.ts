@@ -60,6 +60,20 @@ function invoice(overrides: Partial<Invoice> = {}): Invoice {
 }
 
 describe('发票台账 Excel 导出', () => {
+  it('未知金额不变成零，也不输出误导性合计；真实零仍为数值', () => {
+    const base = invoiceLedgerRows([invoice()])[0]!
+    const bytes = createInvoiceLedgerXlsxFromRows([
+      { ...base, invoiceNumber: 'unknown', totalAmount: null },
+      { ...base, invoiceNumber: 'zero', totalAmount: 0 },
+      { ...base, invoiceNumber: 'known', totalAmount: 12 },
+    ])
+    const sheet = XLSX.read(bytes, { type: 'array' }).Sheets['发票台账']!
+    expect(sheet.E3?.v ?? null).toBeNull()
+    expect(sheet.E4).toMatchObject({ t: 'n', v: 0 })
+    expect(sheet.E5).toMatchObject({ t: 'n', v: 12 })
+    expect(sheet.E6?.v).toBe('未统计（金额缺失或超出范围）')
+  })
+
   it('表头与数据的四边线型和颜色分别写入真实 XLSX，标题合计保留旧边框', async () => {
     const border = {
       top: { style: 'thin', color: 'FF102030' },

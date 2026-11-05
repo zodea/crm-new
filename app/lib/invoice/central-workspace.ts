@@ -220,6 +220,9 @@ export function createCentralInvoiceWorkspace(options: {
         ? execute({ ...envelope(), action: 'upload', baseVersion: null, ownerKind: 'company', projectId: null, original })
         : execute({ ...envelope(), action: 'upload', baseVersion: null, projectId, original })
     },
+    async manual(fields: CentralInvoiceFields, items: CentralInvoiceItem[]) {
+      return execute({ ...envelope(), action: 'manual', baseVersion: null, fields, items })
+    },
     async attachOriginal(invoice: CentralInvoiceRecord, file: File, confirmed: boolean) {
       if (!confirmed)
         throw new Error('请先确认原件属于这张发票。')

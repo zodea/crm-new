@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
+import { computed } from 'vue'
+import SegTab from '../ui/SegTab.vue'
 
 type PaneKey = 'queue' | 'source' | 'review'
 

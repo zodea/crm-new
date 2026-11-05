@@ -213,7 +213,7 @@ export interface InvoiceLedgerExportRow {
   invoiceNumber: string
   seller: string
   invoiceType: string
-  totalAmount: number
+  totalAmount: number | null
   projectName: string
   source: string
   remark: string
@@ -1244,6 +1244,19 @@ export function invoiceLedgerRows(invoices: readonly Invoice[]): InvoiceLedgerEx
   }))
 }
 
+/** 缺失金额或超出安全计算范围时，完整合计保持未知。 */
+export function invoiceLedgerTotal(rows: readonly InvoiceLedgerExportRow[]): number | null {
+  let total = 0
+  for (const row of rows) {
+    if (row.totalAmount === null || !Number.isFinite(row.totalAmount))
+      return null
+    total += row.totalAmount
+    if (!Number.isSafeInteger(Math.round(total * 100)))
+      return null
+  }
+  return total
+}
+
 function cellAddress(row: number, column: number): string {
   return XLSX.utils.encode_cell({ r: row, c: column })
 }
@@ -1395,10 +1408,12 @@ export function createInvoiceLedgerXlsxFromRows(
     }
   }
 
+  const total = invoiceLedgerTotal(rows)
   const totalCell = worksheet[cellAddress(totalRow, 4)] ?? { t: 'n', v: 0 }
-  totalCell.t = 'n'
-  totalCell.v = rows.reduce((sum, row) => sum + row.totalAmount, 0)
-  totalCell.z = config.moneyFormat
+  totalCell.t = total === null ? 's' : 'n'
+  totalCell.v = total === null ? '未统计（金额缺失或超出范围）' : total
+  if (total !== null)
+    totalCell.z = config.moneyFormat
   worksheet[cellAddress(totalRow, 4)] = totalCell
   worksheet['!ref'] = XLSX.utils.encode_range({
     s: { r: 0, c: 0 },
