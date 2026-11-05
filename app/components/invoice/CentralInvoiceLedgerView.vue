@@ -3,6 +3,7 @@ import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { centralInvoiceSourceLabel } from '~/lib/invoice/central-source-label'
 import { isISODateDTO } from '~/types/read-model'
+import CentralInvoiceLedgerCards from './CentralInvoiceLedgerCards.vue'
 
 interface ReferenceOption { id: string, label: string }
 const props = defineProps<{ records: readonly CentralInvoiceRecord[], projects: readonly ReferenceOption[], busy?: boolean }>()
@@ -14,6 +15,7 @@ const endDate = shallowRef('')
 const startDateBadInput = shallowRef(false)
 const endDateBadInput = shallowRef(false)
 const checked = ref<string[]>([])
+const view = shallowRef<'table' | 'card'>('table')
 const dateError = computed(() => {
   if (startDateBadInput.value || endDateBadInput.value || (startDate.value && !isISODateDTO(startDate.value)) || (endDate.value && !isISODateDTO(endDate.value)))
     return '请输入有效的开票日期。'
@@ -79,6 +81,11 @@ function print() {
   if (!props.busy && selected.value.length)
     emit('preparePrint', selected.value)
 }
+function updateSelection(id: string, selected: boolean) {
+  if (props.busy)
+    return
+  checked.value = selected ? [...new Set([...checked.value, id])] : checked.value.filter(value => value !== id)
+}
 function exportVisible() {
   if (!props.busy && !dateError.value && visible.value.length)
     emit('export', visible.value)
@@ -91,6 +98,14 @@ function exportVisible() {
       <h1 class="text-lg font-700">
         发票台账
       </h1>
+      <div role="group" aria-label="台账视图" class="inline-flex overflow-hidden rounded border border-line">
+        <button type="button" class="px-3 py-1 text-sm focus-visible:outline" :class="view === 'table' ? 'bg-brand-soft text-brand-deep' : 'bg-panel text-ink-soft'" :aria-pressed="view === 'table'" @click="view = 'table'">
+          表格
+        </button>
+        <button type="button" class="px-3 py-1 text-sm focus-visible:outline" :class="view === 'card' ? 'bg-brand-soft text-brand-deep' : 'bg-panel text-ink-soft'" :aria-pressed="view === 'card'" @click="view = 'card'">
+          卡片
+        </button>
+      </div>
       <button type="button" :disabled="busy || !visible.length" class="rounded border border-line px-3 py-1 text-sm" @click="exportVisible">
         导出 Excel
       </button>
@@ -118,7 +133,7 @@ function exportVisible() {
     <p v-if="selected.length" role="status" class="text-sm text-ink-soft">
       已选 {{ selected.length }} 张 · {{ total === null ? '合计未统计（金额缺失或超出范围）' : `合计 ${total.toFixed(2)}` }}
     </p>
-    <div class="min-h-0 flex-1 overflow-auto rounded border border-line bg-panel">
+    <div v-if="view === 'table'" class="min-h-0 min-w-0 flex-1 overflow-auto rounded border border-line bg-panel">
       <table class="w-full min-w-180 text-left text-sm">
         <thead class="sticky top-0 bg-panel">
           <tr>
@@ -182,6 +197,12 @@ function exportVisible() {
           </tr>
         </tbody>
       </table>
+      <p v-if="!dateError && !visible.length" class="p-4 text-sm text-ink-soft">
+        当前筛选下没有发票。
+      </p>
+    </div>
+    <div v-else class="min-h-0 min-w-0 flex-1 overflow-auto rounded border border-line bg-panel">
+      <CentralInvoiceLedgerCards :records="visible" :checked="checked" :busy="busy" :project-label="projectLabel" @selection="updateSelection" @open="emit('open', $event)" @discard="emit('discard', $event)" />
       <p v-if="!dateError && !visible.length" class="p-4 text-sm text-ink-soft">
         当前筛选下没有发票。
       </p>

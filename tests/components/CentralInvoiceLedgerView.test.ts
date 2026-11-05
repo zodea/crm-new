@@ -140,3 +140,52 @@ it('按来源证据显示新票与旧票来源，旧票缺少证据时不推断'
     expect(within(row!).getByText(label, { exact: true })).toBeTruthy()
   }
 })
+
+it('表格和卡片共用筛选、跨筛选选择、导出与打印，保留零和未知', async () => {
+  const records = [invoice('zero', 0, 'project-one'), invoice('unknown', null, 'project-two')]
+  const view = render(CentralInvoiceLedgerView, { props: { records, projects: [{ id: 'project-one', label: '同名项目' }, { id: 'project-two', label: '同名项目' }] } })
+  await fireEvent.click(screen.getByLabelText('选择发票 zero'))
+  await fireEvent.update(screen.getByLabelText('归属'), 'project-two')
+  await fireEvent.click(screen.getByRole('button', { name: '卡片' }))
+  expect(screen.getByRole('button', { name: '卡片' }).getAttribute('aria-pressed')).toBe('true')
+  expect(screen.getByText('字段预览，非原件')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'zero' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'unknown' })).toBeTruthy()
+  await fireEvent.update(screen.getByLabelText('开票开始日期'), '2026-01-02')
+  expect(screen.queryByRole('button', { name: 'unknown' })).toBeNull()
+  await fireEvent.update(screen.getByLabelText('开票开始日期'), '2026-01-01')
+  expect(screen.getByRole('button', { name: 'unknown' })).toBeTruthy()
+  await fireEvent.click(screen.getByLabelText('选择发票 unknown'))
+  expect(screen.getByText('已选 2 张 · 合计未统计（金额缺失或超出范围）')).toBeTruthy()
+  await fireEvent.click(screen.getByRole('button', { name: '导出 Excel' }))
+  expect(view.emitted('export')?.[0]?.[0]).toEqual([records[1]])
+  await fireEvent.click(screen.getByRole('button', { name: '打印所选' }))
+  expect(view.emitted('preparePrint')?.[0]?.[0]).toEqual(records)
+  await fireEvent.update(screen.getByLabelText('归属'), 'all')
+  const zeroCard = screen.getByRole('button', { name: 'zero' }).closest('article')!
+  expect(within(zeroCard).getByText('0.00')).toBeTruthy()
+  expect((screen.getByLabelText('选择发票 zero') as HTMLInputElement).checked).toBe(true)
+  const unknownCard = screen.getByRole('button', { name: 'unknown' }).closest('article')!
+  expect(within(unknownCard).getAllByText('未填写').length).toBeGreaterThan(0)
+  await fireEvent.click(screen.getByRole('button', { name: '表格' }))
+  expect((screen.getByLabelText('选择发票 unknown') as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByLabelText('选择发票 zero') as HTMLInputElement).checked).toBe(true)
+})
+
+it('卡片沿用打开、更正、删除和处理期间的限制', async () => {
+  const record = invoice('card-one', 100, 'project-one')
+  const view = render(CentralInvoiceLedgerView, {
+    props: { records: [record], projects: [{ id: 'project-one', label: '项目一' }] },
+    global: { stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } },
+  })
+  await fireEvent.click(screen.getByRole('button', { name: '卡片' }))
+  await fireEvent.click(screen.getByRole('button', { name: 'card-one' }))
+  expect(view.emitted('open')?.[0]).toEqual(['card-one'])
+  expect(screen.getByLabelText('更正发票 card-one').getAttribute('href')).toBe('/finance/invoice/correction/card-one')
+  await fireEvent.click(screen.getByRole('button', { name: '删除' }))
+  expect(view.emitted('discard')?.[0]).toEqual(['card-one'])
+  await view.rerender({ busy: true })
+  expect((screen.getByLabelText('选择发票 card-one') as HTMLInputElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: '删除' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByLabelText('更正发票 card-one')).toBeNull()
+})
