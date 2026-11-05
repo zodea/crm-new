@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { InvoiceCatalogKey, InvoiceMigrationCatalog } from '~/lib/invoice/central-migration-catalog'
-import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue'
 import { createInvoiceWorkspaceFromSession, parseInvoiceSession } from '~/lib/invoice/central-bootstrap'
 import { createInvoiceWorkspaceCatalogClient } from '~/lib/invoice/central-migration-catalog'
 import { createOurSignatoryRepository } from '~/lib/our-signatory/http-repository'
@@ -8,7 +8,7 @@ import { bindReadAuthority } from '~/lib/read-model/authority'
 import CentralInvoiceLedgerScreen from './CentralInvoiceLedgerScreen.vue'
 import CentralInvoiceWorkspaceScreen from './CentralInvoiceWorkspaceScreen.vue'
 
-defineProps<{ mode: 'workspace' | 'ledger', initialSelectedId?: string | null }>()
+const props = defineProps<{ mode: 'workspace' | 'ledger', initialSelectedId?: string | null }>()
 const emit = defineEmits<{ open: [id: string] }>()
 const config = useRuntimeConfig()
 const workspace = shallowRef<Awaited<ReturnType<typeof createInvoiceWorkspaceFromSession>> | null>(null)
@@ -16,6 +16,8 @@ const catalog = shallowRef<InvoiceMigrationCatalog>({ projects: [], suppliers: [
 const projectsReadable = shallowRef(false)
 const projectsRetrying = shallowRef(false)
 const projectsRetryError = shallowRef('')
+const entryRoot = useTemplateRef<HTMLDivElement>('entryRoot')
+const projectsRetryButton = useTemplateRef<HTMLButtonElement>('projectsRetryButton')
 const catalogClient = shallowRef<ReturnType<typeof createInvoiceWorkspaceCatalogClient> | null>(null)
 const gaps = shallowRef<string[]>([])
 const signatories = shallowRef<Array<{ id: string, label: string, version: string }>>([])
@@ -26,7 +28,13 @@ const labels: Record<InvoiceCatalogKey, string> = { projects: '项目', supplier
 let active = true
 let generation = 0
 let projectReadGeneration = 0
+let cleanupRetryFocusListeners: (() => void) | null = null
+function clearRetryFocusListeners() {
+  cleanupRetryFocusListeners?.()
+  cleanupRetryFocusListeners = null
+}
 bindReadAuthority((problem) => {
+  clearRetryFocusListeners()
   generation++
   projectReadGeneration++
   workspace.value = null
@@ -41,6 +49,7 @@ bindReadAuthority((problem) => {
   error.value = problem.message
 })
 onBeforeUnmount(() => {
+  clearRetryFocusListeners()
   active = false
   generation++
 })
@@ -138,29 +147,63 @@ async function retryProjects() {
   if (projectsRetrying.value)
     return
   const epoch = generation
+  const currentWorkspace = workspace.value
+  const restoreWorkspaceFocus = props.mode === 'workspace' && document.activeElement === projectsRetryButton.value
+  let focusMoved = false
+  const onFocusMoved = (event: Event) => {
+    if (event.type === 'pointerdown' || event.target !== projectsRetryButton.value)
+      focusMoved = true
+  }
+  const removeFocusListeners = () => {
+    document.removeEventListener('focusin', onFocusMoved)
+    document.removeEventListener('pointerdown', onFocusMoved)
+  }
+  if (restoreWorkspaceFocus) {
+    document.addEventListener('focusin', onFocusMoved)
+    document.addEventListener('pointerdown', onFocusMoved)
+    cleanupRetryFocusListeners = removeFocusListeners
+  }
   projectsRetrying.value = true
   projectsRetryError.value = ''
   try {
     await verifyProjects()
+    if (restoreWorkspaceFocus) {
+      await nextTick()
+      if (active && epoch === generation && workspace.value === currentWorkspace && props.mode === 'workspace' && !focusMoved && document.activeElement === document.body) {
+        const target = entryRoot.value?.querySelector<HTMLSelectElement>('section[aria-label="发票队列"] select:not(:disabled)')
+        ;(target ?? entryRoot.value)?.focus({ preventScroll: true })
+      }
+    }
   }
   catch (cause) {
     if (active && epoch === generation)
       projectsRetryError.value = cause instanceof Error ? cause.message : '项目目录暂不可用，请重试。'
   }
   finally {
-    if (active && epoch === generation)
+    if (active && epoch === generation) {
       projectsRetrying.value = false
+      if (projectsRetryError.value && restoreWorkspaceFocus) {
+        await nextTick()
+        if (active && epoch === generation && workspace.value === currentWorkspace && props.mode === 'workspace' && !focusMoved && document.activeElement === document.body)
+          projectsRetryButton.value?.focus({ preventScroll: true })
+      }
+    }
+    if (restoreWorkspaceFocus) {
+      removeFocusListeners()
+      if (cleanupRetryFocusListeners === removeFocusListeners)
+        cleanupRetryFocusListeners = null
+    }
   }
 }
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col">
+  <div ref="entryRoot" tabindex="-1" class="flex h-full min-h-0 flex-col">
     <p v-if="gaps.length" role="status" class="p-3 text-sm text-warn-ink">
       以下资料目录暂不可用或无读取权限：{{ gaps.join('、') }}。相关选择暂不可用，请核对权限或稍后重新读取。
     </p>
-    <div v-if="workspace && mode === 'ledger' && !projectsReadable" class="flex flex-wrap items-center gap-2 px-3 text-sm">
-      <button type="button" :disabled="projectsRetrying" class="rounded border border-line px-3 py-1" @click="retryProjects">
+    <div v-if="workspace && !projectsReadable" class="flex flex-wrap items-center gap-2 px-3 text-sm">
+      <button ref="projectsRetryButton" type="button" :disabled="projectsRetrying" class="rounded border border-line px-3 py-1" @click="retryProjects">
         {{ projectsRetrying ? '正在读取项目目录…' : '重新读取项目目录' }}
       </button>
       <p v-if="projectsRetryError" role="alert" class="text-danger">
