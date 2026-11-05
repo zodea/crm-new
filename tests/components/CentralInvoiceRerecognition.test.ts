@@ -93,7 +93,10 @@ it('识别期间版本发生变化，不采用迟到结果并保留原输入', a
   expect(f.workspace.saveRerecognition).not.toHaveBeenCalled()
 })
 
-it('识别期间失权后不显示迟到结果，恢复读取后保留原输入', async () => {
+it.each([
+  { timing: '失权期间', restoreBeforeResult: false },
+  { timing: '恢复读取之后', restoreBeforeResult: true },
+])('识别结果在$timing返回时不显示迟到结果，恢复读取后保留原输入', async ({ restoreBeforeResult }) => {
   const f = fixture()
   let finish!: (value: typeof f.candidate) => void
   f.workspace.prepareRerecognition.mockImplementationOnce(() => new Promise((resolve) => {
@@ -103,12 +106,21 @@ it('识别期间失权后不显示迟到结果，恢复读取后保留原输入'
   await fireEvent.update(screen.getByLabelText('购买方'), '人工购方')
   await fireEvent.click(screen.getByRole('button', { name: '本机重新识别' }))
   await waitFor(() => expect(f.workspace.prepareRerecognition).toHaveBeenCalledOnce())
+  expect(screen.getByText('正在识别或核对结果')).toBeTruthy()
   f.workspace.readState.value = 'forbidden'
   await nextTick()
+  if (restoreBeforeResult) {
+    f.workspace.readState.value = 'ready'
+    await nextTick()
+  }
+  expect(screen.queryByText('正在识别或核对结果')).toBeNull()
   finish(f.candidate)
   await screen.findAllByText('发票或权限已变化，未保存输入仍保留。')
-  f.workspace.readState.value = 'ready'
-  await nextTick()
+  if (!restoreBeforeResult) {
+    f.workspace.readState.value = 'ready'
+    await nextTick()
+  }
+  expect(screen.queryByText('正在识别或核对结果')).toBeNull()
   expect(screen.queryByText(/重新识别结果为未保存草稿/)).toBeNull()
   expect((screen.getByLabelText('购买方') as HTMLInputElement).value).toBe('人工购方')
 })

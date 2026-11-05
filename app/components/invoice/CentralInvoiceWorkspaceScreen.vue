@@ -22,6 +22,7 @@ const originalLoading = shallowRef(false)
 const busy = shallowRef(false)
 const uploadPreflight = shallowRef(false)
 const recognizing = shallowRef(false)
+const recognizingId = shallowRef<string | null>(null)
 const dirty = shallowRef(false)
 const error = shallowRef('')
 const pending = shallowRef<{ targetId: string | null, action: string, scopeId?: string } | null>(null)
@@ -40,13 +41,27 @@ let originalGeneration = 0
 let recognitionGeneration = 0
 let regionGeneration = 0
 let uploadAuthorityGeneration = 0
+let recognitionProgressGeneration = 0
 let active = true
 onBeforeUnmount(() => {
   active = false
   originalGeneration++
   recognitionGeneration++
   regionGeneration++
+  recognitionProgressGeneration++
 })
+
+async function withRecognitionProgress<T>(id: string, operation: () => Promise<T>): Promise<T> {
+  const generation = ++recognitionProgressGeneration
+  recognizingId.value = id
+  try {
+    return await operation()
+  }
+  finally {
+    if (generation === recognitionProgressGeneration)
+      recognizingId.value = null
+  }
+}
 
 /** Vue readonly 代理不直接克隆；逐字段复制保持事实与草稿隔离。 */
 const records = computed<CentralInvoiceRecord[]>(() => props.workspace.records.value.map(record => ({
@@ -144,6 +159,8 @@ function clearBatch() {
 }
 watch([() => props.workspace, () => props.workspace.readState.value], () => {
   uploadAuthorityGeneration++
+  recognitionProgressGeneration++
+  recognizingId.value = null
   if (batchResults.value) {
     clearBatch()
     error.value = ''
@@ -317,7 +334,7 @@ async function upload(files: File[], projectId: string | null) {
         selectedId.value = invoice.id
         try {
           const regionEpoch = regionGeneration
-          const result = await workspace.recognizeWithCandidate(invoice)
+          const result = await withRecognitionProgress(invoice.id, () => workspace.recognizeWithCandidate(invoice))
           if (!canContinue())
             break
           if (pending.value) {
@@ -376,11 +393,11 @@ async function recognize(source: 'local' | 'cloud') {
     await run(async () => {
       if (current.ocrStatus !== 'done') {
         const regionEpoch = regionGeneration
-        const result = await props.workspace.recognizeWithCandidate(current, source, consent)
+        const result = await withRecognitionProgress(current.id, () => props.workspace.recognizeWithCandidate(current, source, consent))
         rememberRegions(current, result.record, result.candidate, regionEpoch)
         return
       }
-      const candidate = await props.workspace.prepareRerecognition(current, source, consent)
+      const candidate = await withRecognitionProgress(current.id, () => props.workspace.prepareRerecognition(current, source, consent))
       if (!active || generation !== recognitionGeneration || props.workspace.readState.value !== 'ready')
         throw new Error('发票或权限已变化，未保存输入仍保留。')
       const parsed = candidate.fields
@@ -552,7 +569,7 @@ async function recover() {
         </li>
       </ul>
     </section>
-    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
+    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :recognizing-id="recognizingId" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
     <p v-if="workspace.readState.value !== 'ready' && error" role="alert" class="p-3 text-sm text-danger">
       {{ error }}
     </p>

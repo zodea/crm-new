@@ -2,11 +2,16 @@
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import { computed, shallowRef } from 'vue'
 
-const props = defineProps<{ records: readonly CentralInvoiceRecord[], selectedId: string | null, projects: readonly { id: string, label: string }[], busy?: boolean }>()
+const props = defineProps<{ records: readonly CentralInvoiceRecord[], selectedId: string | null, projects: readonly { id: string, label: string }[], busy?: boolean, recognizingId?: string | null }>()
 const emit = defineEmits<{ select: [id: string], upload: [files: File[], projectId: string | null], manual: [] }>()
 const uploadKind = shallowRef<'project' | 'company'>('project')
 const projectId = shallowRef('')
 const validProject = computed(() => props.projects.some(project => project.id === projectId.value))
+const recognitionLabels: Record<CentralInvoiceRecord['ocrStatus'], string> = {
+  pending: '识别尚未完成',
+  failed: '识别失败或部分页面未识别',
+  done: '识别完成',
+}
 function acceptFiles(files: File[] | null): string {
   if (!files?.length)
     return ''
@@ -62,7 +67,9 @@ function chooseFiles(event: Event) {
         <li v-for="record in records" :key="record.id" class="border-b border-line">
           <button type="button" :disabled="busy" class="w-full px-3 py-3 text-left" :class="record.id === selectedId ? 'bg-surface-sink' : ''" :aria-pressed="record.id === selectedId" @click="emit('select', record.id)">
             <span class="block break-all text-sm font-600">{{ record.fields.invoiceNumber || record.original?.fileName || '未填写票号' }}</span>
+            <span aria-live="polite" class="mt-1 block text-xs" :class="record.id !== recognizingId && record.ocrStatus === 'failed' ? 'text-warn-ink' : 'text-ink-soft'">{{ record.id === recognizingId ? '正在识别或核对结果' : recognitionLabels[record.ocrStatus] }}</span>
             <span class="mt-1 block text-xs text-ink-soft">{{ record.reviewStatus === 'reviewed' ? '已核对' : '待核对' }} · {{ record.accountStatus === 'archived' ? '已归档' : '未归档' }}</span>
+            <span class="mt-1 block text-xs text-ink-soft">{{ record.printCount > 0 ? `已登记打印 ${record.printCount} 次` : '未登记打印' }}</span>
             <span class="mt-1 block text-xs text-ink-soft">{{ record.fields.totalAmount === null ? '价税合计未填写' : `价税合计 ${record.fields.totalAmount}` }}</span>
           </button>
         </li>

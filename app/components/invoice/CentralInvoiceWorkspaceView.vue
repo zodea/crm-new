@@ -20,6 +20,7 @@ const props = defineProps<{
   selectedId: string | null
   originalFile: File | null
   originalLoading: boolean
+  recognizingId?: string | null
   busy: boolean
   cloudAvailable: boolean
   projects: readonly ReferenceOption[]
@@ -201,7 +202,7 @@ function setDirty(value: boolean) {
     </div>
     <AdaptiveWorkbench v-model="activePane" class="min-h-0 flex-1" :labels="{ queue: '队列', source: '原件', review: '校对' }" wide-columns="minmax(180px,1fr) minmax(280px,2fr) minmax(320px,2fr)">
       <template #queue>
-        <CentralInvoiceQueue ref="queue" :records="records" :selected-id="selectedId" :projects="projects" :busy="busy" @select="emit('select', $event)" @upload="forwardUpload" @manual="emit('manual')" />
+        <CentralInvoiceQueue ref="queue" :records="records" :selected-id="selectedId" :recognizing-id="recognizingId" :projects="projects" :busy="busy" @select="emit('select', $event)" @upload="forwardUpload" @manual="emit('manual')" />
       </template>
       <template #source>
         <section class="flex min-h-65 min-w-0 flex-col overflow-hidden rounded border border-line bg-panel p-3" aria-label="发票原件">

@@ -1,7 +1,8 @@
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
+import { flushPromises } from '@vue/test-utils'
 import { expect, it, vi } from 'vitest'
-import { nextTick, shallowRef } from 'vue'
+import { defineComponent, h, nextTick, shallowRef } from 'vue'
 import CentralInvoiceWorkspaceScreen from '~/components/invoice/CentralInvoiceWorkspaceScreen.vue'
 
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: () => {} }))
@@ -33,7 +34,11 @@ it('中央工作台选择发票并默认调用本机识别，云端未启用时�
     updatedAt: '2026-01-01T00:00:00.000Z',
     deletedAt: null,
   }
-  const recognize = vi.fn(async () => ({ record, candidate: { source: 'local', fields: record.fields, textPages: [], unrecognizedPageIndexes: [], requiresReview: true } }))
+  const candidate = { source: 'local', fields: record.fields, textPages: [], unrecognizedPageIndexes: [], requiresReview: true }
+  let finishRecognition!: (result: { record: CentralInvoiceRecord, candidate: typeof candidate }) => void
+  const recognize = vi.fn(() => new Promise<{ record: CentralInvoiceRecord, candidate: typeof candidate }>((resolve) => {
+    finishRecognition = resolve
+  }))
   const workspace = {
     records: shallowRef([record]),
     loading: shallowRef(false),
@@ -50,6 +55,10 @@ it('中央工作台选择发票并默认调用本机识别，云端未启用时�
   expect((screen.getByRole('button', { name: '云识别' }) as HTMLButtonElement).disabled).toBe(true)
   await fireEvent.click(screen.getByRole('button', { name: '本机识别' }))
   await waitFor(() => expect(recognize).toHaveBeenCalledWith(expect.objectContaining({ id: 'invoice-one' }), 'local', false))
+  expect(screen.getByText('正在识别或核对结果')).toBeTruthy()
+  finishRecognition({ record, candidate })
+  await waitFor(() => expect(screen.queryByText('正在识别或核对结果')).toBeNull())
+  expect(screen.getByText('识别尚未完成')).toBeTruthy()
   await fireEvent.update(screen.getByLabelText('购买方'), '未保存的合成购方')
   workspace.readState.value = 'unavailable'
   workspace.records.value = []
@@ -60,6 +69,44 @@ it('中央工作台选择发票并默认调用本机识别，云端未启用时�
   workspace.readState.value = 'ready'
   await nextTick()
   expect((screen.getByLabelText('购买方') as HTMLInputElement).value).toBe('未保存的合成购方')
+})
+
+it('批量上传的当前识别只在本次处理期间标记，来源切换后迟到结果不恢复标记', async () => {
+  const file = new File(['%PDF-1.4'], '合成.pdf', { type: 'application/pdf' })
+  const record = { id: 'uploaded', version: '1', original: null } as CentralInvoiceRecord
+  let finish!: (result: { record: CentralInvoiceRecord, candidate: object }) => void
+  const workspace = {
+    records: shallowRef([]),
+    loading: shallowRef(false),
+    readState: shallowRef('ready'),
+    load: vi.fn(async () => {}),
+    pendingAll: () => [],
+    upload: vi.fn(async () => record),
+    recognizeWithCandidate: vi.fn(() => new Promise<{ record: CentralInvoiceRecord, candidate: object }>((resolve) => { finish = resolve })),
+  }
+  const view = defineComponent({
+    props: { recognizingId: String },
+    emits: ['upload'],
+    setup(props, { emit }) {
+      return () => h('div', [
+        h('button', { onClick: () => emit('upload', [file], 'project-one') }, '上传合成文件'),
+        props.recognizingId ? h('p', `识别中：${props.recognizingId}`) : null,
+      ])
+    },
+  })
+  render(CentralInvoiceWorkspaceScreen, { props: { workspace: workspace as never, projects: [{ id: 'project-one', label: '合成项目' }], suppliers: [], signatories: [] }, global: { stubs: { CentralInvoiceWorkspaceView: view, NuxtLink: true } } })
+  await flushPromises()
+  await fireEvent.click(await screen.findByRole('button', { name: '上传合成文件' }))
+  await waitFor(() => expect(screen.getByText('识别中：uploaded')).toBeTruthy())
+  workspace.readState.value = 'unavailable'
+  await nextTick()
+  workspace.readState.value = 'ready'
+  await nextTick()
+  expect(screen.queryByText('识别中：uploaded')).toBeNull()
+  finish({ record, candidate: {} })
+  await flushPromises()
+  expect(screen.queryByText('识别中：uploaded')).toBeNull()
+  expect(workspace.upload).toHaveBeenCalledOnce()
 })
 
 it('手工公司票归档响应丢失后用原编号核对，不重复提交', async () => {
