@@ -7,12 +7,22 @@ const emit = defineEmits<{ select: [id: string], upload: [files: File[], project
 const uploadKind = shallowRef<'project' | 'company'>('project')
 const projectId = shallowRef('')
 const validProject = computed(() => props.projects.some(project => project.id === projectId.value))
+function acceptFiles(files: File[] | null): string {
+  if (!files?.length)
+    return ''
+  if (props.busy)
+    return '当前操作尚未完成，暂不能上传。'
+  if (uploadKind.value === 'project' && !validProject.value)
+    return '请先选择可用的上传项目。'
+  emit('upload', files, uploadKind.value === 'company' ? null : projectId.value)
+  return ''
+}
+defineExpose({ acceptFiles })
 function chooseFiles(event: Event) {
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
   input.value = ''
-  if (files.length && (uploadKind.value === 'company' || validProject.value) && !props.busy)
-    emit('upload', files, uploadKind.value === 'company' ? null : projectId.value)
+  acceptFiles(files)
 }
 </script>
 

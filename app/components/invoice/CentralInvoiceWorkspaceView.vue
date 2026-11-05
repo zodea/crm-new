@@ -2,6 +2,7 @@
 import type { CentralInvoiceFields, CentralInvoiceItem, CentralInvoiceRecord, InvoiceContractReference, InvoiceTaxVerificationSelection } from '~/lib/invoice/central-contract'
 import type { CentralInvoiceFormSnapshot } from '~/lib/invoice/central-form-snapshot'
 import type { LocalInvoiceCandidate } from '~/lib/invoice/recognize'
+import { useDropZone } from '@vueuse/core'
 import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
 import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges, invoiceRecognitionMarks } from '~/lib/invoice/recognition-changes'
@@ -59,6 +60,21 @@ const supplierVersion = ref('')
 const buyerVersion = ref('')
 const formDirty = ref(false)
 const fieldsForm = useTemplateRef<InstanceType<typeof CentralInvoiceFieldsForm>>('fieldsForm')
+const queue = useTemplateRef<InstanceType<typeof CentralInvoiceQueue>>('queue')
+const dropZone = useTemplateRef<HTMLElement>('dropZone')
+const dropError = shallowRef('')
+const { files: droppedFiles, isOverDropZone } = useDropZone(dropZone, {
+  checkValidity: items => Array.from(items).some(item => item.kind === 'file'),
+  preventDefaultForUnhandled: true,
+  onDrop: (files) => {
+    droppedFiles.value = null
+    dropError.value = queue.value?.acceptFiles(files) ?? '上传入口暂不可用，请重新读取。'
+  },
+})
+function forwardUpload(files: File[], projectId: string | null) {
+  dropError.value = ''
+  emit('upload', files, projectId)
+}
 defineExpose({ captureForm: () => fieldsForm.value?.capture() ?? null })
 const activePane = shallowRef<'queue' | 'source' | 'review'>('queue')
 const sourceFromReview = shallowRef(false)
@@ -167,7 +183,7 @@ function setDirty(value: boolean) {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col gap-3 p-3">
+  <div ref="dropZone" role="region" aria-label="发票识别与核对" class="relative flex h-full min-h-0 flex-col gap-3 p-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h1 class="text-lg font-700">
         发票识别与核对
@@ -177,9 +193,15 @@ function setDirty(value: boolean) {
     <p v-if="error" role="alert" class="rounded border border-danger p-3 text-sm text-danger">
       {{ error }}
     </p>
+    <p v-if="dropError" role="alert" class="rounded border border-danger p-3 text-sm text-danger">
+      {{ dropError }}
+    </p>
+    <div v-if="isOverDropZone && !busy" class="pointer-events-none absolute inset-1 z-40 grid place-items-center border-2 border-dashed border-brand rounded bg-panel/90" aria-hidden="true">
+      拖入发票文件上传
+    </div>
     <AdaptiveWorkbench v-model="activePane" class="min-h-0 flex-1" :labels="{ queue: '队列', source: '原件', review: '校对' }" wide-columns="minmax(180px,1fr) minmax(280px,2fr) minmax(320px,2fr)">
       <template #queue>
-        <CentralInvoiceQueue :records="records" :selected-id="selectedId" :projects="projects" :busy="busy" @select="emit('select', $event)" @upload="(files, projectId) => emit('upload', files, projectId)" @manual="emit('manual')" />
+        <CentralInvoiceQueue ref="queue" :records="records" :selected-id="selectedId" :projects="projects" :busy="busy" @select="emit('select', $event)" @upload="forwardUpload" @manual="emit('manual')" />
       </template>
       <template #source>
         <section class="flex min-h-65 min-w-0 flex-col overflow-hidden rounded border border-line bg-panel p-3" aria-label="发票原件">

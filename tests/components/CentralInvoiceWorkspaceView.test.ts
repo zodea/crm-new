@@ -1,7 +1,31 @@
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { expect, it } from 'vitest'
+import { nextTick } from 'vue'
 import CentralInvoiceWorkspaceView from '~/components/invoice/CentralInvoiceWorkspaceView.vue'
+
+it('工作台拖入文件时复用项目或公司上传归属，并在未选项目和忙碌时拒绝', async () => {
+  const props = { records: [], selectedId: null, originalFile: null, originalLoading: false, busy: false, cloudAvailable: false, projects: [{ id: 'project-one', label: '合成项目' }], suppliers: [], signatories: [] }
+  const view = render(CentralInvoiceWorkspaceView, { props })
+  const area = screen.getByRole('region', { name: '发票识别与核对' })
+  const file = new File(['%PDF-1.4'], '合成.pdf', { type: 'application/pdf' })
+  const drop = async () => fireEvent.drop(area, { dataTransfer: { items: [{ kind: 'file', type: 'application/pdf' }], files: [file], dropEffect: 'none' } })
+  await nextTick()
+  await drop()
+  expect(screen.getByText('请先选择可用的上传项目。')).toBeTruthy()
+  expect(view.emitted('upload')).toBeUndefined()
+  await fireEvent.update(screen.getByLabelText('上传项目'), 'project-one')
+  await drop()
+  expect(view.emitted('upload')).toEqual([[[file], 'project-one']])
+  await fireEvent.update(screen.getByLabelText('上传归属'), 'company')
+  await drop()
+  expect(view.emitted('upload')).toEqual([[[file], 'project-one'], [[file], null]])
+  await view.rerender({ ...props, busy: true })
+  await drop()
+  expect(view.emitted('upload')).toHaveLength(2)
+  await fireEvent.drop(area, { dataTransfer: { items: [{ kind: 'string', type: 'text/plain' }], files: [], dropEffect: 'none' } })
+  expect(view.emitted('upload')).toHaveLength(2)
+})
 
 it('归档使用用户选定的稳定项目身份；未保存输入不能归档，可重新识别但不能首次识别', async () => {
   const record: CentralInvoiceRecord = {

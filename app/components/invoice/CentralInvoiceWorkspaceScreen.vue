@@ -20,6 +20,7 @@ const selectedId = shallowRef<string | null>(props.initialSelectedId ?? null)
 const originalFile = shallowRef<File | null>(null)
 const originalLoading = shallowRef(false)
 const busy = shallowRef(false)
+const uploadPreflight = shallowRef(false)
 const recognizing = shallowRef(false)
 const dirty = shallowRef(false)
 const error = shallowRef('')
@@ -34,6 +35,7 @@ const missingRecord = shallowRef<CentralInvoiceRecord | null>(null)
 let originalGeneration = 0
 let recognitionGeneration = 0
 let regionGeneration = 0
+let uploadAuthorityGeneration = 0
 let active = true
 onBeforeUnmount(() => {
   active = false
@@ -126,7 +128,10 @@ function refreshPending() {
     error.value = message(cause)
   }
 }
-watch(() => props.workspace.readState.value, refreshPending)
+watch(() => props.workspace.readState.value, () => {
+  uploadAuthorityGeneration++
+  refreshPending()
+}, { flush: 'sync' })
 async function mayLeave() {
   if (recognizing.value)
     return false
@@ -219,41 +224,67 @@ onMounted(async () => {
   refreshPending()
 })
 async function upload(files: File[], projectId: string | null) {
+  if (!active || uploadPreflight.value || busy.value || props.workspace.readState.value !== 'ready')
+    return
+  refreshPending()
+  if (pending.value || pendingUnavailable.value)
+    return
   if (projectId !== null && !props.projects.some(project => project.id === projectId)) {
     error.value = '项目目录已变化，请重新选择上传项目。'
     return
   }
-  if (!await mayLeave())
-    return
-  draft.value = null
-  restoredSnapshot.value = null
-  dirty.value = false
-  await run(async () => {
-    const failures: string[] = []
-    for (const file of files) {
-      let invoice: CentralInvoiceRecord
-      try {
-        invoice = await props.workspace.upload(file, projectId)
-      }
-      catch (cause) {
-        failures.push(`${file.name}：${message(cause)}`)
-        break
-      }
-      selectedId.value = invoice.id
-      try {
-        const regionEpoch = regionGeneration
-        const result = await props.workspace.recognizeWithCandidate(invoice)
-        rememberRegions(invoice, result.record, result.candidate, regionEpoch)
-      }
-      catch (cause) {
-        failures.push(`${file.name}：${message(cause)}`)
-        if (props.workspace.pending(invoice.id))
-          break
-      }
+  const workspace = props.workspace
+  const authorityGeneration = uploadAuthorityGeneration
+  uploadPreflight.value = true
+  try {
+    if (!await mayLeave())
+      return
+    if (!active || props.workspace !== workspace || authorityGeneration !== uploadAuthorityGeneration || workspace.readState.value !== 'ready' || busy.value) {
+      error.value = '身份或权限已变化，未提交上传，请重新读取。'
+      return
     }
-    if (failures.length)
-      error.value = failures.join('\n')
-  })
+    refreshPending()
+    if (pending.value || pendingUnavailable.value) {
+      error.value = '上次提交尚未可靠核对，不能开始新的上传。'
+      return
+    }
+    if (projectId !== null && !props.projects.some(project => project.id === projectId)) {
+      error.value = '项目目录已变化，请重新选择上传项目。'
+      return
+    }
+    draft.value = null
+    restoredSnapshot.value = null
+    dirty.value = false
+    await run(async () => {
+      const failures: string[] = []
+      for (const file of files) {
+        let invoice: CentralInvoiceRecord
+        try {
+          invoice = await workspace.upload(file, projectId)
+        }
+        catch (cause) {
+          failures.push(`${file.name}：${message(cause)}`)
+          break
+        }
+        selectedId.value = invoice.id
+        try {
+          const regionEpoch = regionGeneration
+          const result = await workspace.recognizeWithCandidate(invoice)
+          rememberRegions(invoice, result.record, result.candidate, regionEpoch)
+        }
+        catch (cause) {
+          failures.push(`${file.name}：${message(cause)}`)
+          if (workspace.pending(invoice.id))
+            break
+        }
+      }
+      if (failures.length)
+        error.value = failures.join('\n')
+    })
+  }
+  finally {
+    uploadPreflight.value = false
+  }
 }
 async function attach(file: File) {
   const current = selected.value
@@ -452,7 +483,7 @@ async function recover() {
         核对上次提交
       </button>
     </div>
-    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :busy="busy || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
+    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
     <p v-if="workspace.readState.value !== 'ready' && error" role="alert" class="p-3 text-sm text-danger">
       {{ error }}
     </p>

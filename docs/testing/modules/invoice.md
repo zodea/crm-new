@@ -76,6 +76,7 @@
 | [tests/components/CentralInvoiceRerecognition.test.ts](../../../tests/components/CentralInvoiceRerecognition.test.ts) | 组件（jsdom） | 未保存输入和重识别 |
 | [tests/components/CentralInvoiceWorkspaceScreen.test.ts](../../../tests/components/CentralInvoiceWorkspaceScreen.test.ts) | 组件（jsdom） | 工作台与原编号恢复 |
 | [tests/components/CentralInvoiceWorkspaceView.test.ts](../../../tests/components/CentralInvoiceWorkspaceView.test.ts) | 组件（jsdom） | 归档归属与来源版本 |
+| [tests/components/CentralInvoiceDragUpload.test.ts](../../../tests/components/CentralInvoiceDragUpload.test.ts) | 组件（jsdom） | 上传确认期间目录、权限和原编号变化阻断 |
 | [tests/components/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/components/CentralInvoiceCorrectionAuthority.test.ts) | 组件（jsdom） | 撤权隐藏原票与同身份草稿恢复 |
 | [tests/components/CentralInvoiceCorrectionRoute.test.ts](../../../tests/components/CentralInvoiceCorrectionRoute.test.ts) | 组件（jsdom） | 同路由切票的未保存输入保护 |
 | [tests/components/CentralInvoiceCorrectionScreen.test.ts](../../../tests/components/CentralInvoiceCorrectionScreen.test.ts) | 组件（jsdom） | 更正草稿、提交、打印阻断及原编号 |
@@ -96,6 +97,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/browser/CentralInvoiceArchive.test.ts](../../../tests/browser/CentralInvoiceArchive.test.ts) | 真实组件／模拟来源 | 归档来源及主要视口 |
+| [tests/browser/CentralInvoiceDragUpload.test.ts](../../../tests/browser/CentralInvoiceDragUpload.test.ts) | 真实组件／模拟来源 | 五视口拖放、归属失效与键盘上传入口 |
 | [tests/browser/CentralInvoiceLedgerExport.test.ts](../../../tests/browser/CentralInvoiceLedgerExport.test.ts) | 真实组件／模拟来源 | 台账导出与主要视口 |
 | [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
@@ -112,6 +114,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/production-invoice-company-manual.spec.ts](../../../e2e/production-invoice-company-manual.spec.ts) | 隔离服务／合成数据 | 手工建票与公司合同归档 |
+| [e2e/production-invoice-drag-upload.spec.ts](../../../e2e/production-invoice-drag-upload.spec.ts) | Playwright 隔离生产构建 | 项目及公司拖放、响应丢失后原编号与原件冷恢复；不运行真实 OCR |
 | [e2e/production-invoice-manual-recovery.spec.ts](../../../e2e/production-invoice-manual-recovery.spec.ts) | 隔离服务／合成数据 | 手工创建响应丢失、重启重新登录及原编号刷新恢复 |
 | [e2e/production-invoice-ledger-export.spec.ts](../../../e2e/production-invoice-ledger-export.spec.ts) | 隔离服务／合成数据 | 台账筛选导出与隔离冷读 |
 | [e2e/production-invoice-migration.spec.ts](../../../e2e/production-invoice-migration.spec.ts) | 隔离服务／合成数据 | 项目和公司旧票发布、原件及断线原编号恢复 |
